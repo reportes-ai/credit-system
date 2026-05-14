@@ -231,7 +231,7 @@
     };
 
     const fmtFecha = d => new Date(d).toLocaleDateString('es-CL', { timeZone:'UTC', day:'2-digit', month:'2-digit', year:'numeric' });
-    const fmtTasa = v => parseFloat(v).toFixed(2) + '%';
+    const fmtTasa = v => formatCL(parseFloat(v), 2) + '%';
 
     let datos = [], editId = null;
 
