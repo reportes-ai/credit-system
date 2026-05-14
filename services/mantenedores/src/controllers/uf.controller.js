@@ -2,7 +2,7 @@ const pool = require('../../../../shared/config/database');
 
 const getAll = async (req, res) => {
   try {
-    const [rows] = await pool.query('SELECT * FROM uf ORDER BY fecha DESC LIMIT 365');
+    const [rows] = await pool.query('SELECT * FROM uf ORDER BY fecha DESC LIMIT 400');
     res.json({ success: true, data: rows, error: null });
   } catch (e) {
     res.status(500).json({ success: false, data: null, error: e.message });
@@ -11,6 +11,7 @@ const getAll = async (req, res) => {
 
 const getVigente = async (req, res) => {
   try {
+    // Fallback: si no hay valor exacto de hoy, usa el último disponible
     const [rows] = await pool.query(
       'SELECT * FROM uf WHERE fecha <= CURDATE() ORDER BY fecha DESC LIMIT 1'
     );
@@ -55,4 +56,24 @@ const remove = async (req, res) => {
   }
 };
 
-module.exports = { getAll, getVigente, create, update, remove };
+const importarCSV = async (req, res) => {
+  try {
+    const { registros } = req.body;
+    if (!Array.isArray(registros) || registros.length === 0)
+      return res.status(400).json({ success: false, data: null, error: 'Sin registros para importar' });
+
+    let insertados = 0, omitidos = 0;
+    for (const r of registros) {
+      if (!r.fecha || r.valor === undefined) { omitidos++; continue; }
+      const [exist] = await pool.query('SELECT id_uf FROM uf WHERE fecha = ?', [r.fecha]);
+      if (exist.length > 0) { omitidos++; continue; }
+      await pool.query('INSERT INTO uf (fecha, valor) VALUES (?, ?)', [r.fecha, r.valor]);
+      insertados++;
+    }
+    res.json({ success: true, data: { insertados, omitidos }, error: null });
+  } catch (e) {
+    res.status(500).json({ success: false, data: null, error: e.message });
+  }
+};
+
+module.exports = { getAll, getVigente, create, update, remove, importarCSV };

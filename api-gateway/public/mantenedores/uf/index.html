@@ -22,7 +22,7 @@
     .btn-logout { background: rgba(255,255,255,0.1); border: 1px solid rgba(255,255,255,0.2); color: #fff; border-radius: 8px; padding: 5px 12px; font-size: 0.82rem; cursor: pointer; }
     .btn-logout:hover { background: rgba(255,255,255,0.2); }
     .page-content { padding: 28px 32px; max-width: 900px; margin: 0 auto; }
-    .page-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 24px; }
+    .page-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 24px; flex-wrap: wrap; gap: 10px; }
     .page-header h4 { font-weight: 700; color: #111827; margin: 0; display: flex; align-items: center; gap: 10px; }
     .page-header h4 i { color: var(--navy); }
     .card { border: none; border-radius: 12px; box-shadow: 0 1px 4px rgba(0,0,0,0.07); }
@@ -30,13 +30,16 @@
     .uf-vigente-card .label { font-size: 0.82rem; opacity: 0.8; font-weight: 600; letter-spacing: 0.5px; }
     .uf-vigente-card .valor { font-size: 2.2rem; font-weight: 800; letter-spacing: 1px; }
     .uf-vigente-card .fecha { font-size: 0.78rem; opacity: 0.7; margin-top: 4px; }
-    .uf-vigente-card i { font-size: 3rem; opacity: 0.25; }
+    .uf-vigente-card .fallback { font-size: 0.72rem; opacity: 0.65; margin-top: 2px; font-style: italic; }
+    .uf-vigente-card i.icon { font-size: 3rem; opacity: 0.25; }
     .table { font-size: 0.88rem; }
     .table thead th { background: #f8fafc; font-weight: 700; color: #374151; font-size: 0.78rem; text-transform: uppercase; letter-spacing: 0.5px; border-bottom: 2px solid #e5e7eb; }
     .table tbody tr:hover { background: #f8fafc; }
     .valor-uf { font-weight: 700; color: var(--navy); font-size: 0.95rem; }
     .btn-primary { background: var(--navy); border-color: var(--navy); }
     .btn-primary:hover { background: var(--accent); border-color: var(--accent); }
+    .btn-success { background: #16a34a; border-color: #16a34a; }
+    .btn-success:hover { background: #15803d; border-color: #15803d; }
     .search-bar { position: relative; }
     .search-bar input { padding-left: 34px; border-radius: 8px; border: 1.5px solid #d1d5db; font-size: 0.88rem; }
     .search-bar input:focus { border-color: var(--navy); box-shadow: 0 0 0 3px rgba(1,65,162,0.1); }
@@ -48,6 +51,8 @@
     .form-control { border-radius: 8px; border: 1.5px solid #d1d5db; font-size: 0.88rem; }
     .form-control:focus { border-color: var(--navy); box-shadow: 0 0 0 3px rgba(1,65,162,0.1); }
     .toast-container { position: fixed; top: 70px; right: 20px; z-index: 9999; }
+    .import-info { background: #f0f9ff; border: 1px solid #bae6fd; border-radius: 8px; padding: 12px 16px; font-size: 0.84rem; color: #0369a1; margin-bottom: 12px; }
+    .import-info strong { display: block; margin-bottom: 4px; }
   </style>
 </head>
 <body>
@@ -56,7 +61,7 @@
       <div class="topnav-brand"><a href="/"><img src="/img/logo.png" alt="AutoFácil"></a> <span class="version-badge">v1.4</span></div>
       <div class="breadcrumb-nav">
         <a href="/">Inicio</a><span class="sep">/</span>
-        <span style="color:rgba(255,255,255,0.5)">Mantenedores</span><span class="sep">/</span>
+        <a href="/mantenedores/">Mantenedores</a><span class="sep">/</span>
         <span style="color:#fff; font-weight:600"><i class="bi bi-currency-dollar me-1"></i>UF</span>
       </div>
     </div>
@@ -79,17 +84,25 @@
   <div class="page-content">
     <div class="page-header">
       <h4><i class="bi bi-currency-dollar"></i> Valores UF</h4>
-      <button class="btn btn-primary btn-sm" onclick="abrirModal()"><i class="bi bi-plus-lg me-1"></i>Ingresar UF</button>
+      <div class="d-flex gap-2">
+        <button class="btn btn-success btn-sm" onclick="document.getElementById('csvInput').click()">
+          <i class="bi bi-upload me-1"></i>Importar CSV
+        </button>
+        <button class="btn btn-primary btn-sm" onclick="abrirModal()">
+          <i class="bi bi-plus-lg me-1"></i>Ingresar UF
+        </button>
+      </div>
+      <input type="file" id="csvInput" accept=".csv" style="display:none" onchange="procesarCSV(this)">
     </div>
 
-    <!-- UF VIGENTE -->
     <div class="uf-vigente-card" id="ufVigenteCard">
       <div>
         <div class="label">UF VIGENTE HOY</div>
         <div class="valor" id="ufValor">—</div>
         <div class="fecha" id="ufFecha">—</div>
+        <div class="fallback" id="ufFallback" style="display:none">* Último valor disponible (sin dato para hoy)</div>
       </div>
-      <i class="bi bi-currency-dollar"></i>
+      <i class="bi bi-currency-dollar icon"></i>
     </div>
 
     <div class="card">
@@ -108,7 +121,7 @@
     </div>
   </div>
 
-  <!-- MODAL -->
+  <!-- MODAL INGRESO MANUAL -->
   <div class="modal fade" id="modal" tabindex="-1">
     <div class="modal-dialog modal-sm">
       <div class="modal-content">
@@ -125,7 +138,7 @@
             <label class="form-label">Valor UF *</label>
             <div class="input-group">
               <span class="input-group-text">$</span>
-              <input type="number" id="fValor" class="form-control" placeholder="37000.00" step="0.01" min="0">
+              <input type="number" id="fValor" class="form-control" placeholder="39750.00" step="0.01" min="0">
             </div>
           </div>
           <div id="modalError" class="alert alert-danger mt-3 d-none"></div>
@@ -133,6 +146,30 @@
         <div class="modal-footer">
           <button class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
           <button class="btn btn-primary" onclick="guardar()"><i class="bi bi-floppy me-1"></i>Guardar</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- MODAL PREVIA IMPORTACION -->
+  <div class="modal fade" id="modalImport" tabindex="-1">
+    <div class="modal-dialog">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h5 class="modal-title"><i class="bi bi-upload me-2"></i>Importar CSV UF</h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+        </div>
+        <div class="modal-body">
+          <div class="import-info">
+            <strong id="importResumen">—</strong>
+            <span id="importDetalle">—</span>
+          </div>
+          <p class="text-muted" style="font-size:0.84rem">Solo se importarán fechas nuevas. Los valores existentes no serán modificados.</p>
+          <div id="importError" class="alert alert-danger d-none"></div>
+        </div>
+        <div class="modal-footer">
+          <button class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+          <button class="btn btn-success" id="btnConfirmarImport" onclick="confirmarImport()"><i class="bi bi-check-lg me-1"></i>Importar</button>
         </div>
       </div>
     </div>
@@ -156,17 +193,20 @@
       const el = document.getElementById('toast');
       el.className = `toast align-items-center text-white border-0 bg-${tipo}`;
       document.getElementById('toastMsg').textContent = msg;
-      bootstrap.Toast.getOrCreateInstance(el, { delay: 3000 }).show();
+      bootstrap.Toast.getOrCreateInstance(el, { delay: 4000 }).show();
     };
 
-    let datos = [], editId = null;
+    let datos = [], editId = null, registrosCSV = [];
 
     async function cargar() {
       const [dAll, dVig] = await Promise.all([api('GET', '/api/uf'), api('GET', '/api/uf/vigente')]);
       if (dAll?.success) { datos = dAll.data; renderizar(datos); }
       if (dVig?.success && dVig.data) {
+        const hoy = new Date().toISOString().split('T')[0];
+        const fechaUF = dVig.data.fecha?.split('T')[0] || dVig.data.fecha;
         document.getElementById('ufValor').textContent = `$ ${parseFloat(dVig.data.valor).toLocaleString('es-CL', {minimumFractionDigits:2})}`;
         document.getElementById('ufFecha').textContent = `Al ${new Date(dVig.data.fecha).toLocaleDateString('es-CL', {timeZone:'UTC'})}`;
+        if (fechaUF < hoy) document.getElementById('ufFallback').style.display = '';
       }
     }
 
@@ -226,6 +266,62 @@
       const d = await api('DELETE', `/api/uf/${id}`);
       if (d?.success) { showToast('Registro eliminado'); cargar(); }
       else showToast(d?.error || 'Error', 'danger');
+    }
+
+    // --- IMPORTACIÓN CSV ---
+    function procesarCSV(input) {
+      const file = input.files[0];
+      if (!file) return;
+      const reader = new FileReader();
+      reader.onload = e => {
+        const text = e.target.result;
+        registrosCSV = parsearCSVUF(text);
+        const meses = { 'Ene':1,'Feb':2,'Mar':3,'Abr':4,'May':5,'Jun':6,'Jul':7,'Ago':8,'Sep':9,'Oct':10,'Nov':11,'Dic':12 };
+        document.getElementById('importResumen').textContent = `Archivo: ${file.name}`;
+        document.getElementById('importDetalle').textContent = `${registrosCSV.length} valores encontrados (${registrosCSV[0]?.fecha || '?'} al ${registrosCSV[registrosCSV.length-1]?.fecha || '?'})`;
+        document.getElementById('importError').classList.add('d-none');
+        bootstrap.Modal.getOrCreateInstance(document.getElementById('modalImport')).show();
+      };
+      reader.readAsText(file, 'latin1');
+      input.value = '';
+    }
+
+    function parsearCSVUF(text) {
+      const mesesMap = {'Ene':'01','Feb':'02','Mar':'03','Abr':'04','May':'05','Jun':'06','Jul':'07','Ago':'08','Sep':'09','Oct':'10','Nov':'11','Dic':'12'};
+      const lines = text.trim().split('\n');
+      const headers = lines[0].split(';').map(h => h.trim());
+      const anio = new Date().getFullYear();
+      const registros = [];
+      for (let i = 1; i < lines.length; i++) {
+        const cols = lines[i].split(';');
+        const dia = (cols[0] || '').trim().padStart(2, '0');
+        if (!dia || isNaN(parseInt(dia))) continue;
+        for (let m = 1; m < headers.length; m++) {
+          const raw = (cols[m] || '').trim();
+          if (!raw) continue;
+          const valor = parseFloat(raw.replace(/\./g,'').replace(',','.'));
+          if (isNaN(valor)) continue;
+          const mes = mesesMap[headers[m]];
+          if (!mes) continue;
+          registros.push({ fecha: `${anio}-${mes}-${dia}`, valor });
+        }
+      }
+      return registros.sort((a,b) => a.fecha.localeCompare(b.fecha));
+    }
+
+    async function confirmarImport() {
+      const btn = document.getElementById('btnConfirmarImport');
+      btn.disabled = true; btn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span>Importando...';
+      const d = await api('POST', '/api/uf/importar', { registros: registrosCSV });
+      btn.disabled = false; btn.innerHTML = '<i class="bi bi-check-lg me-1"></i>Importar';
+      if (d?.success) {
+        bootstrap.Modal.getInstance(document.getElementById('modalImport')).hide();
+        showToast(`Importados: ${d.data.insertados} nuevos · Omitidos: ${d.data.omitidos} ya existían`);
+        cargar();
+      } else {
+        document.getElementById('importError').textContent = d?.error || 'Error al importar';
+        document.getElementById('importError').classList.remove('d-none');
+      }
     }
 
     cargar();
