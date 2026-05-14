@@ -5,34 +5,36 @@ require('dotenv').config();
 
 const app = express();
 
-// Middlewares
 app.use(cors());
 app.use(express.json());
 app.use(express.static(path.join(__dirname, '../public')));
 
-// Importar rutas
-const clientesRoutes = require('../../services/clientes/src/routes/clientes.routes');
+// Rutas de autenticación (públicas excepto donde verifyToken se aplica internamente)
+app.use('/api/auth', require('../../services/usuarios/src/routes/auth.routes'));
 
-// Registrar rutas
-app.use('/api/clientes', clientesRoutes);
+// Rutas de usuarios y perfiles
+app.use('/api/usuarios', require('../../services/usuarios/src/routes/usuarios.routes'));
+app.use('/api/perfiles', require('../../services/usuarios/src/routes/perfiles.routes'));
+
+// Rutas de clientes
+app.use('/api/clientes', require('../../services/clientes/src/routes/clientes.routes'));
 
 // Health check
 app.get('/health', (req, res) => {
   res.json({ status: 'Sistema operativo', timestamp: new Date() });
 });
 
-// Error 404
-app.use((req, res) => {
-  res.status(404).json({
-    success: false,
-    error: 'Ruta no encontrada'
-  });
+// SPA fallback: rutas de módulos sirven su index.html
+app.get(['/usuarios/', '/usuarios'], (req, res) => {
+  res.sendFile(path.join(__dirname, '../public/usuarios/index.html'));
 });
 
-// Iniciar servidor
+app.use((req, res) => {
+  res.status(404).json({ success: false, error: 'Ruta no encontrada' });
+});
+
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
-  console.log(`✓ API Gateway ejecutándose en http://localhost:${PORT}`);
-  console.log(`✓ Prueba: http://localhost:${PORT}/health`);
-  console.log(`✓ API Clientes: http://localhost:${PORT}/api/clientes`);
+  console.log(`✓ API Gateway en http://localhost:${PORT}`);
+  console.log(`✓ Login: http://localhost:${PORT}/login.html`);
 });

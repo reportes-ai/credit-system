@@ -1,528 +1,272 @@
 <!DOCTYPE html>
 <html lang="es">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Sistema de Créditos - Gestión de Clientes</title>
-    <link href="https://cdnjs.cloudflare.com/ajax/libs/bootstrap/5.3.0/css/bootstrap.min.css" rel="stylesheet">
-    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
-    <style>
-        * {
-            margin: 0;
-            padding: 0;
-            box-sizing: border-box;
-        }
-
-        body {
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            min-height: 100vh;
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-        }
-
-        .navbar {
-            background: rgba(255, 255, 255, 0.95);
-            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
-        }
-
-        .navbar-brand {
-            font-weight: 700;
-            color: #667eea !important;
-            font-size: 1.5rem;
-        }
-
-        .container-main {
-            padding: 40px 20px;
-        }
-
-        .card {
-            border: none;
-            border-radius: 15px;
-            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.2);
-            margin-bottom: 30px;
-        }
-
-        .card-header {
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            color: white;
-            border-radius: 15px 15px 0 0 !important;
-            padding: 25px;
-            border: none;
-        }
-
-        .card-header h5 {
-            margin: 0;
-            font-weight: 600;
-        }
-
-        .btn-primary {
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            border: none;
-            border-radius: 10px;
-            padding: 10px 25px;
-            font-weight: 600;
-            transition: transform 0.2s;
-        }
-
-        .btn-primary:hover {
-            transform: translateY(-2px);
-            box-shadow: 0 5px 15px rgba(102, 126, 234, 0.4);
-        }
-
-        .btn-sm {
-            border-radius: 8px;
-            padding: 5px 15px;
-            font-size: 0.85rem;
-        }
-
-        .form-control, .form-select {
-            border-radius: 10px;
-            border: 2px solid #e0e0e0;
-            padding: 12px 15px;
-            font-size: 0.95rem;
-            transition: border-color 0.3s;
-        }
-
-        .form-control:focus, .form-select:focus {
-            border-color: #667eea;
-            box-shadow: 0 0 0 0.2rem rgba(102, 126, 234, 0.25);
-        }
-
-        .table {
-            border-collapse: separate;
-            border-spacing: 0 10px;
-        }
-
-        .table thead th {
-            background: #f8f9fa;
-            border: none;
-            color: #667eea;
-            font-weight: 600;
-            padding: 15px;
-            text-transform: uppercase;
-            font-size: 0.85rem;
-        }
-
-        .table tbody td {
-            border: none;
-            padding: 15px;
-            vertical-align: middle;
-            background: white;
-        }
-
-        .table tbody tr {
-            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
-            transition: transform 0.2s, box-shadow 0.2s;
-            border-radius: 10px;
-        }
-
-        .table tbody tr:hover {
-            transform: translateY(-2px);
-            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.12);
-        }
-
-        .badge {
-            padding: 8px 12px;
-            border-radius: 20px;
-            font-weight: 600;
-        }
-
-        .badge-success {
-            background: #10b981;
-        }
-
-        .badge-warning {
-            background: #f59e0b;
-        }
-
-        .badge-danger {
-            background: #ef4444;
-        }
-
-        .alert {
-            border-radius: 10px;
-            border: none;
-            padding: 15px 20px;
-        }
-
-        .alert-success {
-            background: #d1fae5;
-            color: #065f46;
-        }
-
-        .alert-danger {
-            background: #fee2e2;
-            color: #7f1d1d;
-        }
-
-        .modal-content {
-            border-radius: 15px;
-            border: none;
-        }
-
-        .modal-header {
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            color: white;
-            border-radius: 15px 15px 0 0;
-            border: none;
-        }
-
-        .modal-header .btn-close {
-            filter: brightness(0) invert(1);
-        }
-
-        .btn-close:focus {
-            box-shadow: 0 0 0 0.25rem rgba(102, 126, 234, 0.25);
-        }
-
-        .text-muted {
-            color: #999 !important;
-        }
-
-        .loading {
-            display: none;
-            text-align: center;
-            padding: 30px;
-        }
-
-        .spinner-border {
-            color: #667eea;
-        }
-
-        @media (max-width: 768px) {
-            .table {
-                font-size: 0.85rem;
-            }
-
-            .btn-sm {
-                margin: 2px;
-            }
-        }
-    </style>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>AutoFácil — Crédito Automotriz</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.0/font/bootstrap-icons.css" rel="stylesheet">
+  <style>
+    :root {
+      --navy: #0141A2;
+      --navy-dark: #012d70;
+      --navy-light: #0255c5;
+      --accent: #009AFE;
+      --bg: #f0f4f8;
+    }
+    body {
+      background: var(--bg);
+      font-family: 'Segoe UI', system-ui, sans-serif;
+      margin: 0;
+      min-height: 100vh;
+    }
+    .topnav {
+      background: linear-gradient(90deg, var(--navy-dark), var(--navy-light));
+      color: #fff;
+      padding: 0 24px;
+      height: 60px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      position: sticky;
+      top: 0;
+      z-index: 100;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.3);
+    }
+    .topnav-brand {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      font-weight: 700;
+      font-size: 1.1rem;
+    }
+    .topnav-brand i { font-size: 1.4rem; color: #90caf9; }
+    .topnav-right { display: flex; align-items: center; gap: 16px; }
+    .user-chip {
+      background: rgba(255,255,255,0.12);
+      border-radius: 24px;
+      padding: 6px 14px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 0.88rem;
+    }
+    .avatar {
+      width: 28px; height: 28px;
+      background: #90caf9;
+      border-radius: 50%;
+      display: flex; align-items: center; justify-content: center;
+      color: var(--navy);
+      font-weight: 700;
+      font-size: 0.75rem;
+    }
+    .perfil-badge {
+      background: rgba(144,202,249,0.2);
+      border: 1px solid rgba(144,202,249,0.4);
+      color: #90caf9;
+      border-radius: 12px;
+      padding: 2px 10px;
+      font-size: 0.75rem;
+      font-weight: 600;
+    }
+    .btn-logout {
+      background: rgba(255,255,255,0.1);
+      border: 1px solid rgba(255,255,255,0.2);
+      color: #fff;
+      border-radius: 8px;
+      padding: 6px 14px;
+      font-size: 0.85rem;
+      cursor: pointer;
+      transition: background 0.2s;
+    }
+    .btn-logout:hover { background: rgba(255,255,255,0.22); }
+    .main-content { padding: 36px 40px; max-width: 1200px; margin: 0 auto; }
+    .welcome-banner {
+      background: linear-gradient(135deg, #012d70, #0141A2 50%, #009AFE);
+      border-radius: 16px;
+      color: #fff;
+      padding: 32px 40px;
+      margin-bottom: 36px;
+      position: relative;
+      overflow: hidden;
+    }
+    .welcome-banner::after {
+      content: '\F5D5';
+      font-family: 'bootstrap-icons';
+      position: absolute;
+      right: 32px; top: 50%;
+      transform: translateY(-50%);
+      font-size: 7rem;
+      opacity: 0.07;
+    }
+    .welcome-banner h2 { font-weight: 700; margin: 0 0 6px; font-size: 1.6rem; }
+    .welcome-banner p { opacity: 0.8; margin: 0; font-size: 0.95rem; }
+    .last-access-chip {
+      margin-top: 16px;
+      background: rgba(255,255,255,0.12);
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      border-radius: 8px;
+      padding: 6px 14px;
+      font-size: 0.8rem;
+    }
+    .section-title {
+      font-weight: 700;
+      font-size: 0.85rem;
+      color: #6b7280;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      margin-bottom: 20px;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+    .section-title::after { content: ''; flex: 1; height: 1px; background: #e5e7eb; }
+    .modules-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+      gap: 20px;
+    }
+    .module-card {
+      background: #fff;
+      border-radius: 14px;
+      padding: 28px 24px;
+      cursor: pointer;
+      text-decoration: none;
+      color: inherit;
+      border: 2px solid transparent;
+      transition: transform 0.18s, box-shadow 0.18s, border-color 0.18s;
+      display: block;
+      box-shadow: 0 1px 4px rgba(0,0,0,0.06);
+    }
+    .module-card:hover {
+      transform: translateY(-4px);
+      box-shadow: 0 12px 32px rgba(26,35,126,0.15);
+      border-color: var(--navy);
+      color: inherit;
+    }
+    .card-icon {
+      width: 52px; height: 52px;
+      border-radius: 14px;
+      background: linear-gradient(135deg, #e8eaf6, #c5cae9);
+      display: flex; align-items: center; justify-content: center;
+      font-size: 1.6rem;
+      color: var(--navy);
+      margin-bottom: 16px;
+      transition: background 0.18s, color 0.18s;
+    }
+    .module-card:hover .card-icon {
+      background: linear-gradient(135deg, var(--navy), var(--accent));
+      color: #fff;
+    }
+    .module-card h6 { font-weight: 700; font-size: 0.95rem; margin: 0 0 6px; color: #111827; }
+    .module-card p { font-size: 0.8rem; color: #6b7280; margin: 0 0 18px; line-height: 1.4; }
+    .btn-acceder {
+      background: var(--navy);
+      color: #fff;
+      border: none;
+      border-radius: 8px;
+      padding: 7px 16px;
+      font-size: 0.82rem;
+      font-weight: 600;
+    }
+    .module-card:hover .btn-acceder { background: var(--accent); }
+    @media (max-width: 600px) {
+      .main-content { padding: 20px 16px; }
+      .welcome-banner { padding: 24px 20px; }
+    }
+  </style>
 </head>
 <body>
-    <!-- Navbar -->
-    <nav class="navbar navbar-expand-lg navbar-light">
-        <div class="container-fluid">
-            <span class="navbar-brand">
-                <i class="fas fa-credit-card"></i> Sistema de Créditos
-            </span>
-            <span class="ms-auto text-muted">
-                <i class="fas fa-server"></i> API: localhost:3000
-            </span>
+
+  <nav class="topnav">
+    <div class="topnav-brand">
+      <img src="/img/logo.png" alt="AutoFácil" style="height:36px;filter:brightness(0) invert(1);">
+    </div>
+    <div class="topnav-right">
+      <div class="user-chip">
+        <div class="avatar" id="avatarInicial">?</div>
+        <div>
+          <div style="font-weight:600; line-height:1.3" id="navNombre">—</div>
+          <div class="perfil-badge" id="navPerfil">—</div>
         </div>
-    </nav>
+      </div>
+      <button class="btn-logout" onclick="logout()">
+        <i class="bi bi-box-arrow-right me-1"></i>Salir
+      </button>
+    </div>
+  </nav>
 
-    <!-- Main Container -->
-    <div class="container-main">
-        <div class="container-fluid">
-            <!-- Alertas -->
-            <div id="alert-container"></div>
-
-            <!-- Formulario de Nuevo Cliente -->
-            <div class="card">
-                <div class="card-header">
-                    <h5><i class="fas fa-user-plus"></i> Nuevo Cliente</h5>
-                </div>
-                <div class="card-body">
-                    <form id="form-cliente">
-                        <div class="row">
-                            <div class="col-md-6 mb-3">
-                                <label class="form-label">RUT <span class="text-danger">*</span></label>
-                                <input type="text" class="form-control" id="rut" placeholder="12345678-9" required>
-                            </div>
-                            <div class="col-md-6 mb-3">
-                                <label class="form-label">Nombre <span class="text-danger">*</span></label>
-                                <input type="text" class="form-control" id="nombre" placeholder="Juan Pérez" required>
-                            </div>
-                        </div>
-
-                        <div class="row">
-                            <div class="col-md-6 mb-3">
-                                <label class="form-label">Email</label>
-                                <input type="email" class="form-control" id="email" placeholder="juan@example.com">
-                            </div>
-                            <div class="col-md-6 mb-3">
-                                <label class="form-label">Teléfono</label>
-                                <input type="text" class="form-control" id="telefono" placeholder="+56912345678">
-                            </div>
-                        </div>
-
-                        <div class="row">
-                            <div class="col-md-12 mb-3">
-                                <label class="form-label">Dirección</label>
-                                <input type="text" class="form-control" id="direccion" placeholder="Calle Principal 123">
-                            </div>
-                        </div>
-
-                        <button type="submit" class="btn btn-primary">
-                            <i class="fas fa-save"></i> Guardar Cliente
-                        </button>
-                    </form>
-                </div>
-            </div>
-
-            <!-- Tabla de Clientes -->
-            <div class="card">
-                <div class="card-header d-flex justify-content-between align-items-center">
-                    <h5><i class="fas fa-users"></i> Lista de Clientes</h5>
-                    <button class="btn btn-light btn-sm" onclick="cargarClientes()">
-                        <i class="fas fa-sync"></i> Actualizar
-                    </button>
-                </div>
-                <div class="card-body">
-                    <div id="loading" class="loading">
-                        <div class="spinner-border" role="status">
-                            <span class="visually-hidden">Cargando...</span>
-                        </div>
-                        <p class="mt-2">Cargando clientes...</p>
-                    </div>
-
-                    <div id="table-container" style="display: none;">
-                        <table class="table">
-                            <thead>
-                                <tr>
-                                    <th>#</th>
-                                    <th>RUT</th>
-                                    <th>Nombre</th>
-                                    <th>Email</th>
-                                    <th>Teléfono</th>
-                                    <th>Estado</th>
-                                    <th>Acciones</th>
-                                </tr>
-                            </thead>
-                            <tbody id="clientes-tbody">
-                            </tbody>
-                        </table>
-                    </div>
-
-                    <div id="no-data" class="text-center text-muted py-5" style="display: none;">
-                        <i class="fas fa-inbox" style="font-size: 3rem; opacity: 0.3;"></i>
-                        <p class="mt-3">No hay clientes registrados</p>
-                    </div>
-                </div>
-            </div>
-        </div>
+  <div class="main-content">
+    <div class="welcome-banner">
+      <h2>Bienvenido, <span id="bienvenidoNombre">—</span></h2>
+      <p>Selecciona el módulo con el que deseas trabajar.</p>
     </div>
 
-    <!-- Modal Editar Cliente -->
-    <div class="modal fade" id="modalEditar" tabindex="-1">
-        <div class="modal-dialog">
-            <div class="modal-content">
-                <div class="modal-header">
-                    <h5 class="modal-title">Editar Cliente</h5>
-                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
-                </div>
-                <div class="modal-body">
-                    <form id="form-editar">
-                        <input type="hidden" id="edit-id">
-                        
-                        <div class="mb-3">
-                            <label class="form-label">Nombre</label>
-                            <input type="text" class="form-control" id="edit-nombre">
-                        </div>
-                        <div class="mb-3">
-                            <label class="form-label">Email</label>
-                            <input type="email" class="form-control" id="edit-email">
-                        </div>
-                        <div class="mb-3">
-                            <label class="form-label">Teléfono</label>
-                            <input type="text" class="form-control" id="edit-telefono">
-                        </div>
-                        <div class="mb-3">
-                            <label class="form-label">Dirección</label>
-                            <input type="text" class="form-control" id="edit-direccion">
-                        </div>
-                        <div class="mb-3">
-                            <label class="form-label">Estado</label>
-                            <select class="form-select" id="edit-estado">
-                                <option value="activo">Activo</option>
-                                <option value="inactivo">Inactivo</option>
-                                <option value="bloqueado">Bloqueado</option>
-                            </select>
-                        </div>
-                    </form>
-                </div>
-                <div class="modal-footer">
-                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
-                    <button type="button" class="btn btn-primary" onclick="guardarEdicion()">Guardar Cambios</button>
-                </div>
-            </div>
-        </div>
+    <div class="section-title"><i class="bi bi-grid-3x3-gap-fill"></i> Módulos disponibles</div>
+
+    <div class="modules-grid" id="modulesGrid">
+      <div style="grid-column:1/-1; text-align:center; padding:40px; color:#6b7280">
+        <div class="spinner-border spinner-border-sm me-2"></div>Cargando módulos...
+      </div>
     </div>
+  </div>
 
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/bootstrap/5.3.0/js/bootstrap.bundle.min.js"></script>
-    <script>
-        const API_URL = 'http://localhost:3000/api';
+  <script>
+    const token = localStorage.getItem('token');
+    const usuario = JSON.parse(localStorage.getItem('usuario') || 'null');
 
-        // Mostrar alerta
-        function mostrarAlerta(mensaje, tipo = 'success') {
-            const alertaHTML = `
-                <div class="alert alert-${tipo} alert-dismissible fade show" role="alert">
-                    <i class="fas fa-${tipo === 'success' ? 'check-circle' : 'exclamation-circle'}"></i> ${mensaje}
-                    <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
-                </div>
-            `;
-            document.getElementById('alert-container').innerHTML = alertaHTML;
-            setTimeout(() => {
-                document.getElementById('alert-container').innerHTML = '';
-            }, 5000);
-        }
+    if (!token || !usuario) { window.location.href = '/login.html'; }
 
-        // Cargar clientes
-        async function cargarClientes() {
-            document.getElementById('loading').style.display = 'block';
-            document.getElementById('table-container').style.display = 'none';
-            document.getElementById('no-data').style.display = 'none';
+    if (usuario) {
+      const nombre = `${usuario.nombre} ${usuario.apellido || ''}`.trim();
+      document.getElementById('navNombre').textContent = nombre;
+      document.getElementById('navPerfil').textContent = usuario.perfil || '';
+      document.getElementById('avatarInicial').textContent = nombre.charAt(0).toUpperCase();
+      document.getElementById('bienvenidoNombre').textContent = usuario.nombre;
+    }
 
-            try {
-                const response = await fetch(`${API_URL}/clientes`);
-                const resultado = await response.json();
+    function logout() {
+      localStorage.removeItem('token');
+      localStorage.removeItem('usuario');
+      window.location.href = '/login.html';
+    }
 
-                if (resultado.success && resultado.data.length > 0) {
-                    mostrarTablaClientes(resultado.data);
-                    document.getElementById('table-container').style.display = 'block';
-                } else {
-                    document.getElementById('no-data').style.display = 'block';
-                }
-            } catch (error) {
-                mostrarAlerta('Error al cargar clientes: ' + error.message, 'danger');
-            } finally {
-                document.getElementById('loading').style.display = 'none';
-            }
-        }
-
-        // Mostrar tabla
-        function mostrarTablaClientes(clientes) {
-            const tbody = document.getElementById('clientes-tbody');
-            tbody.innerHTML = clientes.map((cliente, index) => `
-                <tr>
-                    <td>${index + 1}</td>
-                    <td><strong>${cliente.rut}</strong></td>
-                    <td>${cliente.nombre}</td>
-                    <td>${cliente.email || '-'}</td>
-                    <td>${cliente.telefono || '-'}</td>
-                    <td>
-                        <span class="badge badge-${cliente.estado === 'activo' ? 'success' : 'warning'}">
-                            ${cliente.estado}
-                        </span>
-                    </td>
-                    <td>
-                        <button class="btn btn-sm btn-warning" onclick="abrirEditar(${cliente.id_cliente})">
-                            <i class="fas fa-edit"></i> Editar
-                        </button>
-                        <button class="btn btn-sm btn-danger" onclick="eliminarCliente(${cliente.id_cliente})">
-                            <i class="fas fa-trash"></i> Eliminar
-                        </button>
-                    </td>
-                </tr>
-            `).join('');
-        }
-
-        // Crear cliente
-        document.getElementById('form-cliente').addEventListener('submit', async (e) => {
-            e.preventDefault();
-
-            const cliente = {
-                rut: document.getElementById('rut').value,
-                nombre: document.getElementById('nombre').value,
-                email: document.getElementById('email').value,
-                telefono: document.getElementById('telefono').value,
-                direccion: document.getElementById('direccion').value
-            };
-
-            try {
-                const response = await fetch(`${API_URL}/clientes`, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify(cliente)
-                });
-
-                const resultado = await response.json();
-
-                if (resultado.success) {
-                    mostrarAlerta('Cliente creado correctamente', 'success');
-                    document.getElementById('form-cliente').reset();
-                    cargarClientes();
-                } else {
-                    mostrarAlerta('Error: ' + resultado.error, 'danger');
-                }
-            } catch (error) {
-                mostrarAlerta('Error al crear cliente: ' + error.message, 'danger');
-            }
+    async function cargarModulos() {
+      try {
+        const resp = await fetch('/api/auth/mis-permisos', {
+          headers: { Authorization: `Bearer ${token}` }
         });
+        if (resp.status === 401) { logout(); return; }
+        const data = await resp.json();
+        const grid = document.getElementById('modulesGrid');
+        grid.innerHTML = '';
 
-        // Abrir modal editar
-        function abrirEditar(idCliente) {
-            fetch(`${API_URL}/clientes/${idCliente}`)
-                .then(r => r.json())
-                .then(resultado => {
-                    const c = resultado.data;
-                    document.getElementById('edit-id').value = c.id_cliente;
-                    document.getElementById('edit-nombre').value = c.nombre;
-                    document.getElementById('edit-email').value = c.email || '';
-                    document.getElementById('edit-telefono').value = c.telefono || '';
-                    document.getElementById('edit-direccion').value = c.direccion || '';
-                    document.getElementById('edit-estado').value = c.estado;
-                    new bootstrap.Modal(document.getElementById('modalEditar')).show();
-                });
+        if (!data.success || data.data.length === 0) {
+          grid.innerHTML = '<p class="text-muted text-center py-5" style="grid-column:1/-1">Sin módulos asignados. Contacta al administrador.</p>';
+          return;
         }
 
-        // Guardar edición
-        async function guardarEdicion() {
-            const id = document.getElementById('edit-id').value;
-            const cliente = {
-                nombre: document.getElementById('edit-nombre').value,
-                email: document.getElementById('edit-email').value,
-                telefono: document.getElementById('edit-telefono').value,
-                direccion: document.getElementById('edit-direccion').value,
-                estado: document.getElementById('edit-estado').value
-            };
+        data.data.forEach(mod => {
+          const a = document.createElement('a');
+          a.href = mod.ruta || '#';
+          a.className = 'module-card';
+          a.innerHTML = `
+            <div class="card-icon"><i class="bi ${mod.icono || 'bi-grid'}"></i></div>
+            <h6>${mod.nombre}</h6>
+            <p>${mod.descripcion || ''}</p>
+            <span class="btn-acceder"><i class="bi bi-arrow-right-circle me-1"></i>Acceder</span>
+          `;
+          grid.appendChild(a);
+        });
+      } catch {
+        document.getElementById('modulesGrid').innerHTML =
+          '<p class="text-danger text-center py-4" style="grid-column:1/-1">Error al cargar módulos.</p>';
+      }
+    }
 
-            try {
-                const response = await fetch(`${API_URL}/clientes/${id}`, {
-                    method: 'PUT',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify(cliente)
-                });
-
-                const resultado = await response.json();
-
-                if (resultado.success) {
-                    mostrarAlerta('Cliente actualizado correctamente', 'success');
-                    bootstrap.Modal.getInstance(document.getElementById('modalEditar')).hide();
-                    cargarClientes();
-                } else {
-                    mostrarAlerta('Error: ' + resultado.error, 'danger');
-                }
-            } catch (error) {
-                mostrarAlerta('Error al actualizar: ' + error.message, 'danger');
-            }
-        }
-
-        // Eliminar cliente
-        async function eliminarCliente(idCliente) {
-            if (!confirm('¿Estás seguro de que deseas eliminar este cliente?')) return;
-
-            try {
-                const response = await fetch(`${API_URL}/clientes/${idCliente}`, {
-                    method: 'DELETE'
-                });
-
-                const resultado = await response.json();
-
-                if (resultado.success) {
-                    mostrarAlerta('Cliente eliminado correctamente', 'success');
-                    cargarClientes();
-                } else {
-                    mostrarAlerta('Error: ' + resultado.error, 'danger');
-                }
-            } catch (error) {
-                mostrarAlerta('Error al eliminar: ' + error.message, 'danger');
-            }
-        }
-
-        // Cargar clientes al iniciar
-        cargarClientes();
-    </script>
+    cargarModulos();
+  </script>
 </body>
 </html>
