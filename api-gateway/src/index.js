@@ -15,6 +15,7 @@ app.use('/api/auth', require('../../services/usuarios/src/routes/auth.routes'));
 // Usuarios y perfiles
 app.use('/api/usuarios', require('../../services/usuarios/src/routes/usuarios.routes'));
 app.use('/api/perfiles', require('../../services/usuarios/src/routes/perfiles.routes'));
+app.use('/api/config',   require('../../services/usuarios/src/routes/config.routes'));
 
 // Clientes
 app.use('/api/clientes', require('../../services/clientes/src/routes/clientes.routes'));
