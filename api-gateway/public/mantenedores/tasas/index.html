@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Tasas — AutoFácil</title>
+  <title>Tasas Máximas — AutoFácil</title>
   <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
   <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.0/font/bootstrap-icons.css" rel="stylesheet">
   <style>
@@ -18,35 +18,41 @@
     .breadcrumb-nav a:hover { color: #fff; }
     .breadcrumb-nav .sep { color: rgba(255,255,255,0.35); }
     .topnav-right { display: flex; align-items: center; gap: 12px; }
-    .user-chip { display: flex; align-items: center; gap: 8px; font-size: 0.85rem; }
     .avatar { width: 28px; height: 28px; background: #90caf9; border-radius: 50%; display: flex; align-items: center; justify-content: center; color: var(--navy); font-weight: 700; font-size: 0.75rem; }
     .btn-logout { background: rgba(255,255,255,0.1); border: 1px solid rgba(255,255,255,0.2); color: #fff; border-radius: 8px; padding: 5px 12px; font-size: 0.82rem; cursor: pointer; }
     .btn-logout:hover { background: rgba(255,255,255,0.2); }
-    .page-content { padding: 28px 32px; max-width: 1100px; margin: 0 auto; }
+    .page-content { padding: 28px 32px; max-width: 1000px; margin: 0 auto; }
     .page-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 24px; }
     .page-header h4 { font-weight: 700; color: #111827; margin: 0; display: flex; align-items: center; gap: 10px; }
     .page-header h4 i { color: var(--navy); }
     .card { border: none; border-radius: 12px; box-shadow: 0 1px 4px rgba(0,0,0,0.07); }
-    .table { font-size: 0.88rem; }
-    .table thead th { background: #f8fafc; font-weight: 700; color: #374151; font-size: 0.78rem; text-transform: uppercase; letter-spacing: 0.5px; border-bottom: 2px solid #e5e7eb; }
-    .table tbody tr:hover { background: #f8fafc; }
-    .badge-activo { background: #dcfce7; color: #166534; border-radius: 12px; padding: 3px 10px; font-size: 0.73rem; font-weight: 600; }
-    .badge-inactivo { background: #fee2e2; color: #991b1b; border-radius: 12px; padding: 3px 10px; font-size: 0.73rem; font-weight: 600; }
-    .badge-tipo { background: #e8eaf6; color: var(--navy); border-radius: 10px; padding: 2px 9px; font-size: 0.72rem; font-weight: 600; }
+    .vigente-card { background: linear-gradient(135deg, var(--navy-dark), var(--navy)); border-radius: 14px; color: #fff; padding: 24px 28px; margin-bottom: 24px; }
+    .vigente-title { font-size: 0.75rem; font-weight: 700; letter-spacing: 1px; opacity: 0.7; margin-bottom: 8px; }
+    .vigente-periodo { font-size: 0.88rem; opacity: 0.8; margin-bottom: 16px; }
+    .vigente-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+    .vigente-tramo { background: rgba(255,255,255,0.1); border-radius: 10px; padding: 16px 20px; }
+    .tramo-label { font-size: 0.72rem; font-weight: 700; letter-spacing: 0.5px; opacity: 0.7; margin-bottom: 10px; }
+    .tramo-row { display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px; }
+    .tramo-tipo { font-size: 0.8rem; opacity: 0.8; }
+    .tramo-valor { font-size: 1.4rem; font-weight: 800; }
+    .tramo-sub { font-size: 0.78rem; opacity: 0.65; }
+    .tramo-header { background: #f0f4f8; border-radius: 8px; padding: 8px 14px; font-size: 0.78rem; font-weight: 700; color: #374151; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 12px; }
+    .form-label { font-weight: 600; font-size: 0.82rem; color: #374151; }
+    .form-control { border-radius: 8px; border: 1.5px solid #d1d5db; font-size: 0.88rem; }
+    .form-control:focus { border-color: var(--navy); box-shadow: 0 0 0 3px rgba(1,65,162,0.1); }
+    .form-control[readonly] { background: #eef2ff; color: var(--navy); font-weight: 700; }
     .btn-primary { background: var(--navy); border-color: var(--navy); }
     .btn-primary:hover { background: var(--accent); border-color: var(--accent); }
-    .search-bar { position: relative; }
-    .search-bar input { padding-left: 34px; border-radius: 8px; border: 1.5px solid #d1d5db; font-size: 0.88rem; }
-    .search-bar input:focus { border-color: var(--navy); box-shadow: 0 0 0 3px rgba(1,65,162,0.1); }
-    .search-bar i { position: absolute; left: 10px; top: 50%; transform: translateY(-50%); color: #9ca3af; }
+    .table { font-size: 0.85rem; }
+    .table thead th { background: #f8fafc; font-weight: 700; color: #374151; font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.5px; border-bottom: 2px solid #e5e7eb; white-space: nowrap; }
+    .table tbody tr:hover { background: #f8fafc; }
+    .badge-vigente { background: #dcfce7; color: #166534; border-radius: 12px; padding: 3px 10px; font-size: 0.72rem; font-weight: 600; display: inline-block; }
+    .val-anual { font-weight: 700; color: var(--navy); }
+    .val-mensual { color: #6b7280; font-size: 0.82rem; }
+    .toast-container { position: fixed; top: 70px; right: 20px; z-index: 9999; }
     .modal-header { background: linear-gradient(135deg, var(--navy), var(--accent)); color: #fff; border-radius: 12px 12px 0 0; }
     .modal-header .btn-close { filter: invert(1); }
     .modal-content { border-radius: 12px; border: none; }
-    .form-label { font-weight: 600; font-size: 0.82rem; color: #374151; }
-    .form-control, .form-select { border-radius: 8px; border: 1.5px solid #d1d5db; font-size: 0.88rem; }
-    .form-control:focus, .form-select:focus { border-color: var(--navy); box-shadow: 0 0 0 3px rgba(1,65,162,0.1); }
-    .toast-container { position: fixed; top: 70px; right: 20px; z-index: 9999; }
-    .valor-display { font-weight: 700; color: var(--navy); font-size: 1rem; }
   </style>
 </head>
 <body>
@@ -55,12 +61,12 @@
       <div class="topnav-brand"><a href="/"><img src="/img/logo.png" alt="AutoFácil"></a> <span class="version-badge">v1.4</span></div>
       <div class="breadcrumb-nav">
         <a href="/">Inicio</a><span class="sep">/</span>
-        <span style="color:rgba(255,255,255,0.5)">Mantenedores</span><span class="sep">/</span>
+        <a href="/mantenedores/">Mantenedores</a><span class="sep">/</span>
         <span style="color:#fff; font-weight:600"><i class="bi bi-percent me-1"></i>Tasas</span>
       </div>
     </div>
     <div class="topnav-right">
-      <div class="user-chip">
+      <div style="display:flex;align-items:center;gap:8px;font-size:0.85rem">
         <div class="avatar" id="avatarInicial">?</div>
         <span style="color:#fff; font-weight:600" id="navNombre">—</span>
       </div>
@@ -77,20 +83,49 @@
 
   <div class="page-content">
     <div class="page-header">
-      <h4><i class="bi bi-percent"></i> Tasas de Interés</h4>
+      <h4><i class="bi bi-percent"></i> Tasas Máximas Convencionales</h4>
       <button class="btn btn-primary btn-sm" onclick="abrirModal()"><i class="bi bi-plus-lg me-1"></i>Nueva Tasa</button>
     </div>
+
+    <div class="vigente-card" id="vigenteCard" style="display:none">
+      <div class="vigente-title">TASA MÁXIMA CONVENCIONAL VIGENTE</div>
+      <div class="vigente-periodo" id="vigentePeriodo">—</div>
+      <div class="vigente-grid">
+        <div class="vigente-tramo">
+          <div class="tramo-label">≤ 200 UF</div>
+          <div class="tramo-row">
+            <span class="tramo-tipo">Tasa Anual</span>
+            <span class="tramo-valor" id="vAnualMenor">—</span>
+          </div>
+          <div class="tramo-sub">Mensual: <strong id="vMensualMenor">—</strong></div>
+        </div>
+        <div class="vigente-tramo">
+          <div class="tramo-label">&gt; 200 UF</div>
+          <div class="tramo-row">
+            <span class="tramo-tipo">Tasa Anual</span>
+            <span class="tramo-valor" id="vAnualMayor">—</span>
+          </div>
+          <div class="tramo-sub">Mensual: <strong id="vMensualMayor">—</strong></div>
+        </div>
+      </div>
+    </div>
+
     <div class="card">
       <div class="card-body p-3">
-        <div class="mb-3 search-bar" style="max-width:280px">
-          <i class="bi bi-search"></i>
-          <input type="text" id="buscador" class="form-control" placeholder="Buscar tasa..." oninput="filtrar()">
-        </div>
         <div class="table-responsive">
           <table class="table table-hover align-middle mb-0">
-            <thead><tr>
-              <th>Nombre</th><th>Tipo</th><th>Valor</th><th>Vigente desde</th><th>Estado</th><th style="width:110px">Acciones</th>
-            </tr></thead>
+            <thead>
+              <tr>
+                <th rowspan="2" style="vertical-align:middle">Período</th>
+                <th colspan="2" class="text-center" style="border-left:2px solid #e5e7eb">≤ 200 UF</th>
+                <th colspan="2" class="text-center" style="border-left:2px solid #e5e7eb">&gt; 200 UF</th>
+                <th rowspan="2" style="vertical-align:middle; width:90px">Acciones</th>
+              </tr>
+              <tr>
+                <th style="border-left:2px solid #e5e7eb">Anual</th><th>Mensual</th>
+                <th style="border-left:2px solid #e5e7eb">Anual</th><th>Mensual</th>
+              </tr>
+            </thead>
             <tbody id="tbody"><tr><td colspan="6" class="text-center py-4 text-muted">Cargando...</td></tr></tbody>
           </table>
         </div>
@@ -100,49 +135,64 @@
 
   <!-- MODAL -->
   <div class="modal fade" id="modal" tabindex="-1">
-    <div class="modal-dialog">
+    <div class="modal-dialog modal-lg">
       <div class="modal-content">
         <div class="modal-header">
           <h5 class="modal-title" id="modalTitulo">Nueva Tasa</h5>
           <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
         </div>
         <div class="modal-body">
+          <div class="row g-3 mb-4">
+            <div class="col-md-6">
+              <label class="form-label">Válido desde *</label>
+              <input type="date" id="fDesde" class="form-control">
+            </div>
+            <div class="col-md-6">
+              <label class="form-label">Válido hasta *</label>
+              <input type="date" id="fHasta" class="form-control">
+            </div>
+          </div>
           <div class="row g-3">
-            <div class="col-12">
-              <label class="form-label">Nombre *</label>
-              <input type="text" id="fNombre" class="form-control" placeholder="Ej: Tasa comercial junio 2024">
-            </div>
             <div class="col-md-6">
-              <label class="form-label">Tipo *</label>
-              <select id="fTipo" class="form-select">
-                <option value="mensual">Mensual</option>
-                <option value="anual">Anual</option>
-              </select>
-            </div>
-            <div class="col-md-6">
-              <label class="form-label">Valor (%) *</label>
-              <div class="input-group">
-                <input type="number" id="fValor" class="form-control" placeholder="1.5" step="0.0001" min="0">
-                <span class="input-group-text">%</span>
+              <div class="tramo-header">≤ 200 UF</div>
+              <div class="mb-3">
+                <label class="form-label">Tasa Máx. Anual (%)</label>
+                <div class="input-group">
+                  <input type="number" id="fAnualMenor" class="form-control" placeholder="33.60" step="0.01" min="0" oninput="calcMensual()">
+                  <span class="input-group-text">%</span>
+                </div>
+              </div>
+              <div>
+                <label class="form-label">Tasa Máx. Mensual (÷ 12)</label>
+                <div class="input-group">
+                  <input type="text" id="fMensualMenor" class="form-control" readonly placeholder="—">
+                  <span class="input-group-text">%</span>
+                </div>
               </div>
             </div>
             <div class="col-md-6">
-              <label class="form-label">Vigente desde *</label>
-              <input type="date" id="fVigente" class="form-control">
-            </div>
-            <div class="col-md-6" id="campoEstado" style="display:none">
-              <label class="form-label">Estado</label>
-              <select id="fEstado" class="form-select">
-                <option value="activo">Activo</option>
-                <option value="inactivo">Inactivo</option>
-              </select>
+              <div class="tramo-header">&gt; 200 UF</div>
+              <div class="mb-3">
+                <label class="form-label">Tasa Máx. Anual (%)</label>
+                <div class="input-group">
+                  <input type="number" id="fAnualMayor" class="form-control" placeholder="29.40" step="0.01" min="0" oninput="calcMensual()">
+                  <span class="input-group-text">%</span>
+                </div>
+              </div>
+              <div>
+                <label class="form-label">Tasa Máx. Mensual (÷ 12)</label>
+                <div class="input-group">
+                  <input type="text" id="fMensualMayor" class="form-control" readonly placeholder="—">
+                  <span class="input-group-text">%</span>
+                </div>
+              </div>
             </div>
           </div>
           <div id="modalError" class="alert alert-danger mt-3 d-none"></div>
         </div>
         <div class="modal-footer">
           <button class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
-          <button class="btn btn-primary" onclick="guardar()"><i class="bi bi-floppy me-1"></i>Guardar</button>
+          <button class="btn btn-primary" onclick="guardar()"><i class="bi bi-floppy me-1"></i>Guardar tasas</button>
         </div>
       </div>
     </div>
@@ -162,50 +212,69 @@
       if (r.status === 401) { logout(); return null; }
       return r.json();
     };
-    const toast = (msg, tipo='success') => {
+    const showToast = (msg, tipo='success') => {
       const el = document.getElementById('toast');
       el.className = `toast align-items-center text-white border-0 bg-${tipo}`;
       document.getElementById('toastMsg').textContent = msg;
       bootstrap.Toast.getOrCreateInstance(el, { delay: 3000 }).show();
     };
 
+    const fmtFecha = d => new Date(d).toLocaleDateString('es-CL', { timeZone:'UTC', day:'2-digit', month:'2-digit', year:'numeric' });
+    const fmtTasa = v => parseFloat(v).toFixed(2) + '%';
+
     let datos = [], editId = null;
 
     async function cargar() {
-      const d = await api('GET', '/api/tasas');
-      if (!d?.success) return;
-      datos = d.data;
-      renderizar(datos);
+      const [dAll, dVig] = await Promise.all([api('GET', '/api/tasas'), api('GET', '/api/tasas/vigente')]);
+      if (dAll?.success) { datos = dAll.data; renderizar(datos); }
+      if (dVig?.success && dVig.data) {
+        const t = dVig.data;
+        document.getElementById('vigentePeriodo').textContent = `Válido del ${fmtFecha(t.fecha_desde)} al ${fmtFecha(t.fecha_hasta)}`;
+        document.getElementById('vAnualMenor').textContent = fmtTasa(t.tasa_anual_menor);
+        document.getElementById('vMensualMenor').textContent = fmtTasa(t.tasa_mensual_menor);
+        document.getElementById('vAnualMayor').textContent = fmtTasa(t.tasa_anual_mayor);
+        document.getElementById('vMensualMayor').textContent = fmtTasa(t.tasa_mensual_mayor);
+        document.getElementById('vigenteCard').style.display = '';
+      }
     }
 
     function renderizar(lista) {
+      const hoy = new Date().toISOString().split('T')[0];
       const tbody = document.getElementById('tbody');
-      if (!lista.length) { tbody.innerHTML = '<tr><td colspan="6" class="text-center py-4 text-muted">Sin tasas registradas.</td></tr>'; return; }
-      tbody.innerHTML = lista.map(t => `
-        <tr>
-          <td><strong>${t.nombre}</strong></td>
-          <td><span class="badge-tipo">${t.tipo}</span></td>
-          <td><span class="valor-display">${parseFloat(t.valor).toFixed(4)}%</span></td>
-          <td>${new Date(t.vigente_desde).toLocaleDateString('es-CL')}</td>
-          <td><span class="badge-${t.estado}">${t.estado}</span></td>
+      if (!lista.length) { tbody.innerHTML = '<tr><td colspan="6" class="text-center py-4 text-muted">Sin registros.</td></tr>'; return; }
+      tbody.innerHTML = lista.map(t => {
+        const fd = t.fecha_desde?.split('T')[0] || t.fecha_desde;
+        const fh = t.fecha_hasta?.split('T')[0] || t.fecha_hasta;
+        const esVigente = fd <= hoy && fh >= hoy;
+        return `<tr>
+          <td>
+            <div style="font-size:0.88rem;font-weight:600">${fmtFecha(fd)} — ${fmtFecha(fh)}</div>
+            ${esVigente ? '<span class="badge-vigente mt-1">Vigente</span>' : ''}
+          </td>
+          <td style="border-left:2px solid #f1f5f9"><span class="val-anual">${fmtTasa(t.tasa_anual_menor)}</span></td>
+          <td><span class="val-mensual">${fmtTasa(t.tasa_mensual_menor)}</span></td>
+          <td style="border-left:2px solid #f1f5f9"><span class="val-anual">${fmtTasa(t.tasa_anual_mayor)}</span></td>
+          <td><span class="val-mensual">${fmtTasa(t.tasa_mensual_mayor)}</span></td>
           <td>
             <button class="btn btn-outline-primary btn-sm me-1" onclick="editar(${t.id_tasa})"><i class="bi bi-pencil"></i></button>
             <button class="btn btn-outline-danger btn-sm" onclick="eliminar(${t.id_tasa})"><i class="bi bi-trash"></i></button>
           </td>
-        </tr>`).join('');
+        </tr>`;
+      }).join('');
     }
 
-    function filtrar() {
-      const q = document.getElementById('buscador').value.toLowerCase();
-      renderizar(datos.filter(t => t.nombre.toLowerCase().includes(q) || t.tipo.includes(q)));
+    function calcMensual() {
+      const a = parseFloat(document.getElementById('fAnualMenor').value);
+      const b = parseFloat(document.getElementById('fAnualMayor').value);
+      document.getElementById('fMensualMenor').value = isNaN(a) ? '' : (Math.round(a / 12 * 100) / 100).toFixed(2);
+      document.getElementById('fMensualMayor').value = isNaN(b) ? '' : (Math.round(b / 12 * 100) / 100).toFixed(2);
     }
 
-    function abrirModal(id = null) {
-      editId = id;
-      document.getElementById('modalTitulo').textContent = id ? 'Editar Tasa' : 'Nueva Tasa';
+    function abrirModal() {
+      editId = null;
+      document.getElementById('modalTitulo').textContent = 'Nueva Tasa';
+      ['fDesde','fHasta','fAnualMenor','fAnualMayor','fMensualMenor','fMensualMayor'].forEach(id => document.getElementById(id).value = '');
       document.getElementById('modalError').classList.add('d-none');
-      document.getElementById('campoEstado').style.display = id ? '' : 'none';
-      if (!id) { document.getElementById('fNombre').value = ''; document.getElementById('fValor').value = ''; document.getElementById('fVigente').value = ''; document.getElementById('fTipo').value = 'mensual'; }
       bootstrap.Modal.getOrCreateInstance(document.getElementById('modal')).show();
     }
 
@@ -215,23 +284,31 @@
       const t = d.data;
       editId = id;
       document.getElementById('modalTitulo').textContent = 'Editar Tasa';
-      document.getElementById('fNombre').value = t.nombre;
-      document.getElementById('fTipo').value = t.tipo;
-      document.getElementById('fValor').value = t.valor;
-      document.getElementById('fVigente').value = t.vigente_desde?.split('T')[0] || '';
-      document.getElementById('fEstado').value = t.estado;
-      document.getElementById('campoEstado').style.display = '';
+      document.getElementById('fDesde').value = t.fecha_desde?.split('T')[0] || '';
+      document.getElementById('fHasta').value = t.fecha_hasta?.split('T')[0] || '';
+      document.getElementById('fAnualMenor').value = t.tasa_anual_menor;
+      document.getElementById('fAnualMayor').value = t.tasa_anual_mayor;
+      calcMensual();
       document.getElementById('modalError').classList.add('d-none');
       bootstrap.Modal.getOrCreateInstance(document.getElementById('modal')).show();
     }
 
     async function guardar() {
-      const body = { nombre: document.getElementById('fNombre').value.trim(), tipo: document.getElementById('fTipo').value, valor: parseFloat(document.getElementById('fValor').value), vigente_desde: document.getElementById('fVigente').value, estado: document.getElementById('fEstado').value || 'activo' };
+      const body = {
+        fecha_desde: document.getElementById('fDesde').value,
+        fecha_hasta: document.getElementById('fHasta').value,
+        tasa_anual_menor: parseFloat(document.getElementById('fAnualMenor').value),
+        tasa_anual_mayor: parseFloat(document.getElementById('fAnualMayor').value)
+      };
+      if (!body.fecha_desde || !body.fecha_hasta || isNaN(body.tasa_anual_menor) || isNaN(body.tasa_anual_mayor)) {
+        const el = document.getElementById('modalError');
+        el.textContent = 'Todos los campos son requeridos'; el.classList.remove('d-none'); return;
+      }
       const url = editId ? `/api/tasas/${editId}` : '/api/tasas';
       const d = await api(editId ? 'PUT' : 'POST', url, body);
       if (d?.success) {
         bootstrap.Modal.getInstance(document.getElementById('modal')).hide();
-        toast(editId ? 'Tasa actualizada' : 'Tasa creada');
+        showToast(editId ? 'Tasa actualizada' : 'Tasa guardada');
         cargar();
       } else {
         const el = document.getElementById('modalError');
@@ -240,10 +317,10 @@
     }
 
     async function eliminar(id) {
-      if (!confirm('¿Desactivar esta tasa?')) return;
+      if (!confirm('¿Eliminar este registro?')) return;
       const d = await api('DELETE', `/api/tasas/${id}`);
-      if (d?.success) { toast('Tasa desactivada'); cargar(); }
-      else toast(d?.error || 'Error', 'danger');
+      if (d?.success) { showToast('Registro eliminado'); cargar(); }
+      else showToast(d?.error || 'Error', 'danger');
     }
 
     cargar();
