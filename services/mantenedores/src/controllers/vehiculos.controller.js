@@ -37,8 +37,14 @@ const getVehiculos = async (req, res) => {
     if (tipo)  { conditions.push('tipo = ?'); params.push(tipo); }
     if (anio)  { conditions.push('anio = ?'); params.push(parseInt(anio)); }
     if (q) {
-      conditions.push('(marca LIKE ? OR modelo LIKE ? OR version LIKE ?)');
-      params.push(`%${q}%`, `%${q}%`, `%${q}%`);
+      const qLow = `%${q.toLowerCase()}%`;
+      conditions.push(
+        `(LOWER(marca) LIKE ? OR LOWER(modelo) LIKE ? OR LOWER(version) LIKE ?
+          OR LOWER(tipo) LIKE ? OR LOWER(codigo_sii) LIKE ? OR LOWER(combustible) LIKE ?
+          OR LOWER(transmision) LIKE ? OR LOWER(traccion) LIKE ? OR LOWER(pais) LIKE ?
+          OR CAST(anio AS CHAR) LIKE ?)`
+      );
+      params.push(qLow, qLow, qLow, qLow, qLow, qLow, qLow, qLow, qLow, qLow);
     }
 
     const where = conditions.length ? 'WHERE ' + conditions.join(' AND ') : '';
