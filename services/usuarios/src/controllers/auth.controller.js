@@ -3,6 +3,8 @@ const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const { JWT_SECRET, JWT_EXPIRES } = require('../../../../shared/middleware/auth');
 
+const errMsg = (e) => e.message || e.code || String(e);
+
 const login = async (req, res) => {
   try {
     const { email, password } = req.body;
@@ -57,7 +59,7 @@ const login = async (req, res) => {
       error: null
     });
   } catch (error) {
-    res.status(500).json({ success: false, data: null, error: error.message });
+    res.status(500).json({ success: false, data: null, error: errMsg(error) });
   }
 };
 
@@ -84,7 +86,7 @@ const cambiarClave = async (req, res) => {
 
     res.json({ success: true, data: { mensaje: 'Contraseña actualizada correctamente' }, error: null });
   } catch (error) {
-    res.status(500).json({ success: false, data: null, error: error.message });
+    res.status(500).json({ success: false, data: null, error: errMsg(error) });
   }
 };
 
@@ -104,7 +106,7 @@ const misPermisos = async (req, res) => {
 
     res.json({ success: true, data: modulos, error: null });
   } catch (error) {
-    res.status(500).json({ success: false, data: null, error: error.message });
+    res.status(500).json({ success: false, data: null, error: errMsg(error) });
   }
 };
 
