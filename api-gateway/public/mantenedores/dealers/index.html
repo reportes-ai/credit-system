@@ -1,0 +1,641 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Dealers — AutoFácil</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.0/font/bootstrap-icons.css" rel="stylesheet">
+  <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+  <style>
+    :root { --navy:#0141A2; --navy-dark:#012d70; --navy-light:#0255c5; --accent:#009AFE; --bg:#f0f4f8; }
+    body { background:var(--bg); font-family:'Segoe UI',system-ui,sans-serif; margin:0; min-height:100vh; }
+
+    /* TOPNAV */
+    .topnav { background:linear-gradient(90deg,var(--navy-dark),var(--navy-light)); color:#fff; height:60px; padding:0 24px; display:flex; align-items:center; justify-content:space-between; position:sticky; top:0; z-index:200; box-shadow:0 2px 8px rgba(0,0,0,0.3); }
+    .topnav-left { display:flex; align-items:center; gap:16px; }
+    .topnav-brand { display:flex; align-items:center; gap:8px; text-decoration:none; }
+    .topnav-brand img { height:32px; filter:brightness(0) invert(1); }
+    .version-badge { background:rgba(255,255,255,0.15); color:rgba(255,255,255,0.75); font-size:0.65rem; font-weight:700; border-radius:6px; padding:2px 8px; }
+    .breadcrumb-nav { color:rgba(255,255,255,0.6); font-size:0.85rem; display:flex; align-items:center; gap:6px; }
+    .breadcrumb-nav a { color:rgba(255,255,255,0.75); text-decoration:none; }
+    .breadcrumb-nav a:hover { color:#fff; }
+    .breadcrumb-nav .sep { color:rgba(255,255,255,0.35); }
+    .topnav-right { display:flex; align-items:center; gap:12px; }
+    .user-chip { background:rgba(255,255,255,0.12); border-radius:24px; padding:5px 12px; display:flex; align-items:center; gap:8px; font-size:0.85rem; }
+    .avatar { width:28px; height:28px; background:#90caf9; border-radius:50%; display:flex; align-items:center; justify-content:center; color:var(--navy); font-weight:700; font-size:0.75rem; }
+    .perfil-badge { background:rgba(144,202,249,0.2); border:1px solid rgba(144,202,249,0.4); color:#90caf9; border-radius:12px; padding:2px 10px; font-size:0.73rem; font-weight:600; }
+    .btn-logout { background:rgba(255,255,255,0.1); border:1px solid rgba(255,255,255,0.2); color:#fff; border-radius:8px; padding:5px 12px; font-size:0.82rem; cursor:pointer; }
+
+    /* MAIN */
+    .main-content { padding:24px 32px; max-width:1500px; margin:0 auto; }
+
+    /* TOOLBAR */
+    .toolbar { background:#fff; border-radius:12px; box-shadow:0 1px 4px rgba(0,0,0,0.07); padding:16px 20px; margin-bottom:16px; display:flex; align-items:center; gap:12px; flex-wrap:wrap; }
+    .search-wrap { position:relative; flex:1; min-width:280px; }
+    .search-wrap i { position:absolute; left:12px; top:50%; transform:translateY(-50%); color:#9ca3af; }
+    .search-wrap input { padding-left:36px; border-radius:8px; font-size:0.88rem; border:1px solid #e5e7eb; }
+    .search-wrap input:focus { border-color:var(--navy); box-shadow:0 0 0 3px rgba(1,65,162,0.1); outline:none; }
+    .toolbar select { border-radius:8px; font-size:0.88rem; border:1px solid #e5e7eb; padding:7px 12px; }
+    .btn-nuevo { background:var(--navy); color:#fff; border:none; border-radius:8px; padding:8px 18px; font-size:0.88rem; font-weight:600; white-space:nowrap; }
+    .btn-nuevo:hover { background:var(--navy-light); }
+    .btn-importar { background:#fff; color:#374151; border:1px solid #e5e7eb; border-radius:8px; padding:8px 14px; font-size:0.88rem; font-weight:600; white-space:nowrap; }
+    .btn-importar:hover { border-color:var(--navy); color:var(--navy); }
+    .count-badge { color:#6b7280; font-size:0.85rem; white-space:nowrap; }
+
+    /* TABLE */
+    .table-wrap { background:#fff; border-radius:12px; box-shadow:0 1px 4px rgba(0,0,0,0.07); overflow:hidden; }
+    table { width:100%; border-collapse:collapse; font-size:0.84rem; }
+    thead tr { background:var(--navy); color:#fff; }
+    thead th { padding:11px 14px; font-weight:600; font-size:0.78rem; letter-spacing:0.4px; text-transform:uppercase; white-space:nowrap; border:none; }
+    tbody tr { border-bottom:1px solid #f1f5f9; transition:background 0.1s; }
+    tbody tr:hover { background:#f8fafc; }
+    tbody td { padding:10px 14px; vertical-align:middle; color:#374151; }
+    .td-n { font-weight:700; color:var(--navy); width:40px; }
+    .td-ind { color:#6b7280; }
+    .td-rut { font-family:monospace; color:var(--accent); font-size:0.82rem; }
+    .td-nombre { font-weight:600; color:#111827; }
+    .td-razon { color:#6b7280; }
+
+    /* CCS badge */
+    .badge-ccs { display:inline-block; border-radius:20px; padding:3px 10px; font-size:0.72rem; font-weight:700; letter-spacing:0.3px; }
+    .badge-particular { background:#f3e8ff; color:#7c3aed; }
+    .badge-parque { background:#dbeafe; color:#1d4ed8; }
+    .badge-otro { background:#f0fdf4; color:#15803d; }
+
+    /* Activo */
+    .activo-si { color:#16a34a; font-weight:700; font-size:0.82rem; }
+    .activo-no { color:#dc2626; font-weight:700; font-size:0.82rem; }
+
+    /* Acciones */
+    .btn-ver { background:var(--navy); color:#fff; border:none; border-radius:6px; padding:4px 12px; font-size:0.78rem; font-weight:600; cursor:pointer; }
+    .btn-ver:hover { background:var(--navy-light); }
+    .btn-editar-row { background:var(--navy); color:#fff; border:none; border-radius:6px; padding:4px 10px; font-size:0.78rem; font-weight:600; cursor:pointer; margin-top:3px; }
+    .btn-editar-row:hover { background:#1d4ed8; }
+    .acciones-cell { display:flex; flex-direction:column; align-items:center; gap:3px; }
+
+    /* PAGINACIÓN */
+    .pag-row { display:flex; align-items:center; justify-content:space-between; padding:14px 20px; border-top:1px solid #f1f5f9; }
+    .pag-info { font-size:0.82rem; color:#6b7280; }
+
+    /* MODAL DETALLE */
+    .modal-detalle .modal-header { background:var(--navy); color:#fff; border-radius:12px 12px 0 0; }
+    .modal-detalle .modal-title { font-weight:700; font-size:1rem; }
+    .modal-detalle .btn-close { filter:invert(1); }
+    .det-table { width:100%; border-collapse:collapse; font-size:0.88rem; }
+    .det-table tr { border-bottom:1px solid #f1f5f9; }
+    .det-table td:first-child { font-weight:600; color:#374151; width:45%; padding:9px 12px; background:#f8fafc; }
+    .det-table td:last-child { color:#111827; padding:9px 12px; }
+    .btn-det-editar { background:var(--navy); color:#fff; border:none; border-radius:8px; padding:8px 20px; font-weight:600; font-size:0.88rem; }
+    .btn-det-cerrar { background:#f3f4f6; color:#374151; border:none; border-radius:8px; padding:8px 18px; font-weight:600; font-size:0.88rem; }
+
+    /* MODAL FORM */
+    .modal-form .modal-header { background:var(--navy); color:#fff; border-radius:12px 12px 0 0; }
+    .modal-form .modal-title { font-weight:700; font-size:1rem; }
+    .modal-form .btn-close { filter:invert(1); }
+    .section-label { font-size:0.75rem; font-weight:700; color:var(--navy); text-transform:uppercase; letter-spacing:0.8px; margin:16px 0 10px; padding-bottom:4px; border-bottom:2px solid #e8eaf6; }
+    .form-label { font-size:0.8rem; font-weight:600; color:#374151; margin-bottom:3px; }
+    .required-star { color:#dc2626; }
+    .btn-guardar { background:#16a34a; color:#fff; border:none; border-radius:8px; padding:9px 24px; font-weight:700; font-size:0.9rem; }
+    .btn-guardar:hover { background:#15803d; }
+    .btn-cancelar { background:#f3f4f6; color:#374151; border:none; border-radius:8px; padding:9px 18px; font-weight:600; }
+
+    /* Import progress */
+    .import-progress { display:none; margin-top:12px; }
+  </style>
+</head>
+<body>
+
+<nav class="topnav">
+  <div class="topnav-left">
+    <a href="/" class="topnav-brand">
+      <img src="/img/logo.png" alt="AutoFácil">
+      <span class="version-badge">v1.6</span>
+    </a>
+    <div class="breadcrumb-nav">
+      <a href="/">Inicio</a><span class="sep">/</span>
+      <a href="/mantenedores/"><i class="bi bi-sliders me-1"></i>Mantenedores</a><span class="sep">/</span>
+      <span style="color:#fff;font-weight:600"><i class="bi bi-building me-1"></i>Dealers</span>
+    </div>
+  </div>
+  <div class="topnav-right">
+    <div class="user-chip">
+      <div class="avatar" id="avatarInicial">?</div>
+      <div>
+        <div style="font-weight:600;line-height:1.3;color:#fff" id="navNombre">—</div>
+        <div class="perfil-badge" id="navPerfil">—</div>
+      </div>
+    </div>
+    <button class="btn-logout" onclick="logout()"><i class="bi bi-box-arrow-right me-1"></i>Salir</button>
+  </div>
+</nav>
+
+<div class="main-content">
+
+  <!-- Título -->
+  <div style="margin-bottom:16px">
+    <h5 style="font-weight:700;color:#111827;margin:0"><i class="bi bi-building me-2 text-primary"></i>Administración de Dealers</h5>
+  </div>
+
+  <!-- Toolbar -->
+  <div class="toolbar">
+    <div class="search-wrap">
+      <i class="bi bi-search"></i>
+      <input type="text" id="filtroQ" class="form-control form-control-sm" placeholder="Buscar por Nombre Indexa, Razón Social o RUT..." oninput="debounceCargar()">
+    </div>
+    <select id="filtroCcs" class="form-select form-select-sm" style="width:180px" onchange="cargar(1)">
+      <option value="">Todos los tipos</option>
+    </select>
+    <select id="filtroActivo" class="form-select form-select-sm" style="width:130px" onchange="cargar(1)">
+      <option value="">Todos</option>
+      <option value="1">Activos</option>
+      <option value="0">Inactivos</option>
+    </select>
+    <button class="btn-importar" onclick="document.getElementById('fileInput').click()">
+      <i class="bi bi-file-earmark-excel me-1 text-success"></i>Importar Excel
+    </button>
+    <input type="file" id="fileInput" accept=".xlsx" style="display:none" onchange="onFileSelected(this)">
+    <button class="btn-nuevo" onclick="abrirNuevo()">
+      <i class="bi bi-plus-circle me-1"></i>+ Nuevo Dealer
+    </button>
+    <span class="count-badge" id="countBadge"></span>
+  </div>
+
+  <!-- Tabla -->
+  <div class="table-wrap">
+    <table>
+      <thead>
+        <tr>
+          <th>N°</th>
+          <th>N° IND</th>
+          <th>RUT</th>
+          <th>NOMBRE INDEXA</th>
+          <th>NOMBRE RAZÓN SOCIAL</th>
+          <th>CCS / PARQUE</th>
+          <th>ACTIVO</th>
+          <th>ACCIONES</th>
+        </tr>
+      </thead>
+      <tbody id="tbody">
+        <tr><td colspan="8" class="text-center text-muted py-5">Cargando...</td></tr>
+      </tbody>
+    </table>
+    <div class="pag-row">
+      <span class="pag-info" id="pagInfo"></span>
+      <div class="d-flex gap-2">
+        <button class="btn btn-outline-secondary btn-sm" id="btnPrev" onclick="cambiarPag(-1)"><i class="bi bi-chevron-left"></i></button>
+        <button class="btn btn-outline-secondary btn-sm" id="btnNext" onclick="cambiarPag(1)"><i class="bi bi-chevron-right"></i></button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ====== MODAL DETALLE ====== -->
+<div class="modal fade modal-detalle" id="modalDetalle" tabindex="-1">
+  <div class="modal-dialog modal-lg">
+    <div class="modal-content" style="border-radius:12px;overflow:hidden">
+      <div class="modal-header">
+        <h5 class="modal-title" id="detTitulo">Dealer</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body p-0">
+        <table class="det-table" id="detTable"></table>
+      </div>
+      <div class="modal-footer" style="border-top:1px solid #f1f5f9">
+        <button class="btn-det-cerrar" data-bs-dismiss="modal">Cerrar</button>
+        <button class="btn-det-editar" onclick="abrirEditar()"><i class="bi bi-pencil me-1"></i>Editar</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ====== MODAL FORM ====== -->
+<div class="modal fade modal-form" id="modalForm" tabindex="-1">
+  <div class="modal-dialog modal-lg modal-dialog-scrollable">
+    <div class="modal-content" style="border-radius:12px;overflow:hidden">
+      <div class="modal-header">
+        <h5 class="modal-title" id="formTitulo">Nuevo Dealer</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body">
+        <input type="hidden" id="fId">
+
+        <div class="row g-3">
+          <div class="col-md-3">
+            <label class="form-label">N° IND</label>
+            <input type="text" class="form-control form-control-sm" id="fNumInd">
+          </div>
+          <div class="col-md-3">
+            <label class="form-label">RUT <span class="required-star">*</span></label>
+            <input type="text" class="form-control form-control-sm" id="fRut" placeholder="ej: 76545638K">
+          </div>
+          <div class="col-md-3">
+            <label class="form-label">RUT Pago</label>
+            <input type="text" class="form-control form-control-sm" id="fRutPago">
+          </div>
+          <div class="col-md-3">
+            <label class="form-label">Fecha Incorporación</label>
+            <input type="date" class="form-control form-control-sm" id="fFecha">
+          </div>
+          <div class="col-md-6">
+            <label class="form-label">Nombre Indexa <span class="required-star">*</span></label>
+            <input type="text" class="form-control form-control-sm" id="fNombreIndexa">
+          </div>
+          <div class="col-md-6">
+            <label class="form-label">Nombre Razón Social <span class="required-star">*</span></label>
+            <input type="text" class="form-control form-control-sm" id="fNombreRazon">
+          </div>
+          <div class="col-md-5">
+            <label class="form-label">CCS / Parque</label>
+            <input type="text" class="form-control form-control-sm" id="fCcs" list="ccsList" placeholder="ej: PARTICULAR">
+            <datalist id="ccsList"></datalist>
+          </div>
+          <div class="col-md-4">
+            <label class="form-label">Dirección</label>
+            <input type="text" class="form-control form-control-sm" id="fDireccion">
+          </div>
+          <div class="col-md-3" style="display:flex;gap:12px">
+            <div style="flex:1">
+              <label class="form-label">Activo</label>
+              <select class="form-select form-select-sm" id="fActivo">
+                <option value="1">SI</option>
+                <option value="0">NO</option>
+              </select>
+            </div>
+            <div style="flex:1">
+              <label class="form-label">¿Factura?</label>
+              <select class="form-select form-select-sm" id="fFactura">
+                <option value="1">SI</option>
+                <option value="0">NO</option>
+              </select>
+            </div>
+          </div>
+        </div>
+
+        <div class="section-label">DATOS DE CONTACTO</div>
+        <div class="row g-3">
+          <div class="col-md-5">
+            <label class="form-label">Contacto Comercial</label>
+            <input type="text" class="form-control form-control-sm" id="fContacto">
+          </div>
+          <div class="col-md-3">
+            <label class="form-label">Teléfono</label>
+            <input type="text" class="form-control form-control-sm" id="fTelefono">
+          </div>
+          <div class="col-md-4">
+            <label class="form-label">Correo</label>
+            <input type="email" class="form-control form-control-sm" id="fCorreo">
+          </div>
+        </div>
+
+        <div class="section-label">DATOS BANCARIOS</div>
+        <div class="row g-3">
+          <div class="col-md-4">
+            <label class="form-label">N° Cuenta</label>
+            <input type="text" class="form-control form-control-sm" id="fCuenta">
+          </div>
+          <div class="col-md-4">
+            <label class="form-label">Banco</label>
+            <input type="text" class="form-control form-control-sm" id="fBanco">
+          </div>
+        </div>
+
+        <div class="section-label">OBSERVACIONES</div>
+        <textarea class="form-control form-control-sm" id="fObs" rows="2"></textarea>
+      </div>
+      <div class="modal-footer" style="border-top:1px solid #f1f5f9">
+        <button class="btn-cancelar" data-bs-dismiss="modal">Cancelar</button>
+        <button class="btn-guardar" onclick="guardar()"><i class="bi bi-floppy me-1"></i>Guardar Cambios</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL IMPORTAR -->
+<div class="modal fade" id="modalImportar" tabindex="-1">
+  <div class="modal-dialog">
+    <div class="modal-content" style="border-radius:12px">
+      <div class="modal-header" style="background:var(--navy);color:#fff;border-radius:12px 12px 0 0">
+        <h5 class="modal-title"><i class="bi bi-file-earmark-excel me-2 text-success"></i>Importar Dealers</h5>
+        <button type="button" class="btn-close" style="filter:invert(1)" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body">
+        <div id="previewInfo" class="alert alert-info" style="font-size:0.88rem"></div>
+        <div class="import-progress" id="importProgress">
+          <div class="d-flex justify-content-between mb-1" style="font-size:0.82rem">
+            <span id="progTexto">Importando...</span><span id="progPct">0%</span>
+          </div>
+          <div class="progress"><div class="progress-bar bg-success" id="progBar" style="width:0%"></div></div>
+        </div>
+        <div id="importResult" style="display:none;margin-top:12px"></div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-secondary btn-sm" data-bs-dismiss="modal">Cancelar</button>
+        <button class="btn btn-success btn-sm" id="btnConfImport" onclick="confirmarImport()">
+          <i class="bi bi-upload me-1"></i>Importar
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+<script>
+const token = localStorage.getItem('token');
+const yo = JSON.parse(localStorage.getItem('usuario') || 'null');
+if (!token || !yo) window.location.href = '/login.html';
+document.getElementById('navNombre').textContent = `${yo?.nombre||''} ${yo?.apellido||''}`.trim();
+document.getElementById('navPerfil').textContent = yo?.perfil || '';
+document.getElementById('avatarInicial').textContent = (yo?.nombre||'?').charAt(0).toUpperCase();
+function logout() { localStorage.removeItem('token'); localStorage.removeItem('usuario'); window.location.href = '/login.html'; }
+
+const H = { 'Content-Type':'application/json', 'Authorization':'Bearer '+token };
+let pag = 1, totalRows = 0, debTimer, dealerActual = null;
+
+function debounceCargar() { clearTimeout(debTimer); debTimer = setTimeout(() => cargar(1), 350); }
+function cambiarPag(d) { pag += d; cargar(); }
+
+function ccsBadge(v) {
+  if (!v) return '—';
+  const cl = v.toUpperCase().startsWith('PARQUE') ? 'badge-parque'
+           : v.toUpperCase() === 'PARTICULAR' ? 'badge-particular' : 'badge-otro';
+  return `<span class="badge-ccs ${cl}">${v}</span>`;
+}
+function activoBadge(v) {
+  return v ? '<span class="activo-si">✓ SI</span>' : '<span class="activo-no">✗ NO</span>';
+}
+function fmt(v) { return v || '—'; }
+function fmtDate(v) {
+  if (!v) return '—';
+  return new Date(v).toLocaleDateString('es-CL', { day:'2-digit', month:'2-digit', year:'numeric' });
+}
+
+async function cargar(p) {
+  if (p) pag = p;
+  const q      = document.getElementById('filtroQ').value;
+  const ccs    = document.getElementById('filtroCcs').value;
+  const activo = document.getElementById('filtroActivo').value;
+  const params = new URLSearchParams({ page: pag, limit: 100 });
+  if (q)      params.append('q', q);
+  if (ccs)    params.append('ccs', ccs);
+  if (activo !== '') params.append('activo', activo);
+
+  const res  = await fetch('/api/dealers?' + params, { headers: H });
+  const json = await res.json();
+  if (!json.success) return;
+  const { rows, total } = json.data;
+  totalRows = total;
+
+  document.getElementById('countBadge').textContent = `${total.toLocaleString('es-CL')} dealers encontrados`;
+  const desde = (pag - 1) * 100 + 1, hasta = Math.min(pag * 100, total);
+  document.getElementById('pagInfo').textContent = total > 0 ? `Mostrando ${desde}–${hasta} de ${total.toLocaleString('es-CL')}` : '';
+  document.getElementById('btnPrev').disabled = pag <= 1;
+  document.getElementById('btnNext').disabled = hasta >= total;
+
+  const tb = document.getElementById('tbody');
+  if (!rows.length) { tb.innerHTML = '<tr><td colspan="8" class="text-center text-muted py-5">Sin resultados</td></tr>'; return; }
+  tb.innerHTML = rows.map((d, i) => `
+    <tr>
+      <td class="td-n">${d.numero ?? (pag-1)*100+i+1}</td>
+      <td class="td-ind">${fmt(d.numero_ind)}</td>
+      <td class="td-rut">${fmt(d.rut)}</td>
+      <td class="td-nombre">${fmt(d.nombre_indexa)}</td>
+      <td class="td-razon">${fmt(d.nombre_razon)}</td>
+      <td>${ccsBadge(d.ccs_parque)}</td>
+      <td>${activoBadge(d.activo)}</td>
+      <td>
+        <div class="acciones-cell">
+          <button class="btn-ver" onclick='verDealer(${JSON.stringify(d).replace(/'/g,"&#39;")})'>Ver</button>
+          <button class="btn-editar-row" onclick='abrirEditarDirecto(${JSON.stringify(d).replace(/'/g,"&#39;")})'>Editar</button>
+        </div>
+      </td>
+    </tr>`).join('');
+}
+
+async function cargarCcs() {
+  const res  = await fetch('/api/dealers/ccs', { headers: H });
+  const json = await res.json();
+  if (!json.success) return;
+  const sel = document.getElementById('filtroCcs');
+  const dl  = document.getElementById('ccsList');
+  json.data.forEach(c => {
+    sel.insertAdjacentHTML('beforeend', `<option value="${c}">${c}</option>`);
+    dl.insertAdjacentHTML('beforeend', `<option value="${c}">`);
+  });
+}
+
+// ---- VER DETALLE ----
+function verDealer(d) {
+  dealerActual = d;
+  document.getElementById('detTitulo').textContent = d.nombre_indexa || 'Dealer';
+  document.getElementById('detTable').innerHTML = [
+    ['N°',                d.numero ?? '—'],
+    ['N° IND',            fmt(d.numero_ind)],
+    ['RUT',               fmt(d.rut)],
+    ['RUT Pago',          fmt(d.rut_pago)],
+    ['Nombre Indexa',     fmt(d.nombre_indexa)],
+    ['Nombre Razón Social', fmt(d.nombre_razon)],
+    ['CCS / Parque',      fmt(d.ccs_parque)],
+    ['Dirección',         fmt(d.direccion)],
+    ['Fecha Incorporación', fmtDate(d.fecha_incorporacion)],
+    ['Contacto Comercial',fmt(d.contacto)],
+    ['Teléfono',          fmt(d.telefono)],
+    ['Correo',            fmt(d.correo)],
+    ['N° Cuenta',         fmt(d.num_cuenta)],
+    ['Banco',             fmt(d.banco)],
+    ['Activo Último Año', d.activo ? 'SI' : 'NO'],
+    ['¿Tiene Factura?',   d.tiene_factura ? 'SI' : 'NO'],
+    ['Observaciones',     fmt(d.observaciones)],
+  ].map(([k,v]) => `<tr><td>${k}</td><td>${v}</td></tr>`).join('');
+  new bootstrap.Modal(document.getElementById('modalDetalle')).show();
+}
+
+function abrirEditar() {
+  bootstrap.Modal.getInstance(document.getElementById('modalDetalle')).hide();
+  setTimeout(() => abrirEditarDirecto(dealerActual), 300);
+}
+
+function abrirEditarDirecto(d) {
+  dealerActual = d;
+  document.getElementById('formTitulo').textContent = 'Editar Dealer: ' + (d.nombre_indexa || '');
+  document.getElementById('fId').value         = d.id_dealer;
+  document.getElementById('fNumInd').value     = d.numero_ind  || '';
+  document.getElementById('fRut').value        = d.rut         || '';
+  document.getElementById('fRutPago').value    = d.rut_pago    || '';
+  document.getElementById('fFecha').value      = d.fecha_incorporacion ? d.fecha_incorporacion.slice(0,10) : '';
+  document.getElementById('fNombreIndexa').value = d.nombre_indexa || '';
+  document.getElementById('fNombreRazon').value  = d.nombre_razon  || '';
+  document.getElementById('fCcs').value        = d.ccs_parque  || '';
+  document.getElementById('fDireccion').value  = d.direccion   || '';
+  document.getElementById('fActivo').value     = d.activo ? '1' : '0';
+  document.getElementById('fFactura').value    = d.tiene_factura ? '1' : '0';
+  document.getElementById('fContacto').value   = d.contacto    || '';
+  document.getElementById('fTelefono').value   = d.telefono    || '';
+  document.getElementById('fCorreo').value     = d.correo      || '';
+  document.getElementById('fCuenta').value     = d.num_cuenta  || '';
+  document.getElementById('fBanco').value      = d.banco       || '';
+  document.getElementById('fObs').value        = d.observaciones || '';
+  new bootstrap.Modal(document.getElementById('modalForm')).show();
+}
+
+function abrirNuevo() {
+  dealerActual = null;
+  document.getElementById('formTitulo').textContent = 'Nuevo Dealer';
+  ['fId','fNumInd','fRut','fRutPago','fFecha','fNombreIndexa','fNombreRazon',
+   'fCcs','fDireccion','fContacto','fTelefono','fCorreo','fCuenta','fBanco','fObs']
+    .forEach(id => document.getElementById(id).value = '');
+  document.getElementById('fActivo').value  = '1';
+  document.getElementById('fFactura').value = '0';
+  new bootstrap.Modal(document.getElementById('modalForm')).show();
+}
+
+async function guardar() {
+  const id = document.getElementById('fId').value;
+  const rut = document.getElementById('fRut').value.trim();
+  if (!rut) { alert('RUT es obligatorio'); return; }
+  const body = {
+    numero_ind:          document.getElementById('fNumInd').value.trim(),
+    rut,
+    rut_pago:            document.getElementById('fRutPago').value.trim(),
+    fecha_incorporacion: document.getElementById('fFecha').value || null,
+    nombre_indexa:       document.getElementById('fNombreIndexa').value.trim(),
+    nombre_razon:        document.getElementById('fNombreRazon').value.trim(),
+    ccs_parque:          document.getElementById('fCcs').value.trim(),
+    direccion:           document.getElementById('fDireccion').value.trim(),
+    activo:              document.getElementById('fActivo').value === '1',
+    tiene_factura:       document.getElementById('fFactura').value === '1',
+    contacto:            document.getElementById('fContacto').value.trim(),
+    telefono:            document.getElementById('fTelefono').value.trim(),
+    correo:              document.getElementById('fCorreo').value.trim(),
+    num_cuenta:          document.getElementById('fCuenta').value.trim(),
+    banco:               document.getElementById('fBanco').value.trim(),
+    observaciones:       document.getElementById('fObs').value.trim(),
+  };
+  const url    = id ? `/api/dealers/${id}` : '/api/dealers';
+  const method = id ? 'PUT' : 'POST';
+  const res    = await fetch(url, { method, headers: H, body: JSON.stringify(body) });
+  const json   = await res.json();
+  if (json.success) {
+    bootstrap.Modal.getInstance(document.getElementById('modalForm')).hide();
+    cargar(); cargarCcs();
+  } else alert('Error: ' + json.error);
+}
+
+// ---- IMPORTAR EXCEL ----
+let importRows = [];
+
+function excelDate(v) {
+  if (!v) return null;
+  if (typeof v === 'string') return v.substring(0, 10);
+  const d = new Date(Math.round((v - 25569) * 86400000));
+  return d.toISOString().slice(0, 10);
+}
+
+function onFileSelected(input) {
+  const file = input.files[0];
+  if (!file) return;
+  input.value = '';
+  const reader = new FileReader();
+  reader.onload = e => {
+    const wb  = XLSX.read(e.target.result, { type: 'binary' });
+    const ws  = wb.Sheets[wb.SheetNames[0]];
+    const raw = XLSX.utils.sheet_to_json(ws, { header: 1, defval: null });
+
+    let hIdx = -1;
+    for (let i = 0; i < raw.length; i++) {
+      if (raw[i] && raw[i].some(c => c && String(c).includes('RUT'))) { hIdx = i; break; }
+    }
+    if (hIdx === -1) { alert('No se encontró encabezado válido.'); return; }
+
+    const h   = raw[hIdx].map(c => (c||'').toString().trim());
+    const idx = name => h.findIndex(x => x.toUpperCase().includes(name.toUpperCase()));
+    const iN    = idx('N°'); // first column N°
+    const iInd  = idx('IND');
+    const iRut  = h.findIndex((x,i) => x.toUpperCase() === 'RUT' && i < 3);
+    const iNI   = idx('INDEXA');
+    const iNR   = idx('RAZON');
+    const iCcs  = idx('CCS');
+    const iDir  = idx('DIRECC');
+    const iFec  = idx('FECHA');
+    const iCont = idx('CONTACTO');
+    const iTel  = idx('TELEF');
+    const iCorr = idx('CORREO');
+    const iCta  = idx('CUENTA');
+    const iBco  = idx('BANCO');
+    const iRP   = h.lastIndexOf(h.find(x => x.toUpperCase() === 'RUT'));
+    const iAct  = idx('ACTI');
+    const iFact = idx('FACTURA');
+    const iObs  = idx('OBS');
+
+    importRows = [];
+    for (let i = hIdx + 1; i < raw.length; i++) {
+      const r = raw[i];
+      if (!r || (!r[iRut] && !r[iNI])) continue;
+      importRows.push({
+        numero:             r[iN] ? parseInt(r[iN]) : null,
+        numero_ind:         r[iInd] != null ? String(r[iInd]).trim() : null,
+        rut:                r[iRut] != null ? String(r[iRut]).trim() : null,
+        nombre_indexa:      r[iNI]  ? String(r[iNI]).trim() : null,
+        nombre_razon:       r[iNR]  ? String(r[iNR]).trim() : null,
+        ccs_parque:         r[iCcs] ? String(r[iCcs]).trim() : null,
+        direccion:          r[iDir] ? String(r[iDir]).trim() : null,
+        fecha_incorporacion: excelDate(r[iFec]),
+        contacto:           r[iCont] ? String(r[iCont]).trim() : null,
+        telefono:           r[iTel]  ? String(r[iTel]).trim()  : null,
+        correo:             r[iCorr] ? String(r[iCorr]).trim() : null,
+        num_cuenta:         r[iCta]  ? String(r[iCta]).trim()  : null,
+        banco:              r[iBco]  ? String(r[iBco]).trim()  : null,
+        rut_pago:           r[iRP]   ? String(r[iRP]).trim()   : null,
+        activo:             r[iAct]  && String(r[iAct]).toUpperCase() === 'SI',
+        tiene_factura:      r[iFact] && String(r[iFact]).toUpperCase() === 'SI',
+        observaciones:      iObs >= 0 && r[iObs] ? String(r[iObs]).trim() : null,
+      });
+    }
+
+    document.getElementById('previewInfo').innerHTML =
+      `<strong>${importRows.length.toLocaleString('es-CL')}</strong> dealers encontrados en el archivo.`;
+    document.getElementById('importProgress').style.display = 'none';
+    document.getElementById('importResult').style.display   = 'none';
+    document.getElementById('btnConfImport').disabled = false;
+    document.getElementById('btnConfImport').textContent = 'Importar';
+    document.getElementById('btnConfImport').onclick = confirmarImport;
+    new bootstrap.Modal(document.getElementById('modalImportar')).show();
+  };
+  reader.readAsBinaryString(file);
+}
+
+async function confirmarImport() {
+  if (!importRows.length) return;
+  const BATCH = 200;
+  const total = importRows.length;
+  let insertados = 0;
+  document.getElementById('importProgress').style.display = 'block';
+  document.getElementById('btnConfImport').disabled = true;
+
+  for (let i = 0; i < total; i += BATCH) {
+    const batch = importRows.slice(i, i + BATCH);
+    const res   = await fetch('/api/dealers/importar', { method:'POST', headers:H, body:JSON.stringify({ registros: batch }) });
+    const json  = await res.json();
+    if (json.success) insertados += json.data.insertados;
+    const pct = Math.round(Math.min((i + BATCH) / total * 100, 100));
+    document.getElementById('progBar').style.width  = pct + '%';
+    document.getElementById('progPct').textContent  = pct + '%';
+    document.getElementById('progTexto').textContent = `Procesando ${Math.min(i+BATCH,total)} / ${total}`;
+  }
+
+  document.getElementById('importResult').style.display = 'block';
+  document.getElementById('importResult').innerHTML =
+    `<div class="alert alert-success mb-0"><i class="bi bi-check-circle me-2"></i><strong>${insertados.toLocaleString('es-CL')}</strong> dealers importados correctamente.</div>`;
+  document.getElementById('btnConfImport').textContent = 'Cerrar';
+  document.getElementById('btnConfImport').onclick = () => {
+    bootstrap.Modal.getInstance(document.getElementById('modalImportar')).hide();
+    cargar(1); cargarCcs();
+  };
+}
+
+// Init
+cargar(1);
+cargarCcs();
+</script>
+</body>
+</html>

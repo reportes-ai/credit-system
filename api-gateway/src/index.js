@@ -24,6 +24,7 @@ app.use('/api/tasas',      require('../../services/mantenedores/src/routes/tasas
 app.use('/api/uf',         require('../../services/mantenedores/src/routes/uf.routes'));
 app.use('/api/geografico', require('../../services/mantenedores/src/routes/geografico.routes'));
 app.use('/api/vehiculos',  require('../../services/mantenedores/src/routes/vehiculos.routes'));
+app.use('/api/dealers',    require('../../services/mantenedores/src/routes/dealers.routes'));
 
 // Health check
 app.get('/health', (req, res) => res.json({ status: 'Sistema operativo', timestamp: new Date() }));
@@ -41,6 +42,8 @@ app.get(['/mantenedores/uf', '/mantenedores/uf/'], (req, res) =>
   res.sendFile(path.join(__dirname, '../public/mantenedores/uf/index.html')));
 app.get(['/mantenedores/vehiculos', '/mantenedores/vehiculos/'], (req, res) =>
   res.sendFile(path.join(__dirname, '../public/mantenedores/vehiculos/index.html')));
+app.get(['/mantenedores/dealers', '/mantenedores/dealers/'], (req, res) =>
+  res.sendFile(path.join(__dirname, '../public/mantenedores/dealers/index.html')));
 
 app.use((req, res) => res.status(404).json({ success: false, error: 'Ruta no encontrada' }));
 
