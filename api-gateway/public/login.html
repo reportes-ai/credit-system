@@ -1,0 +1,174 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Iniciar Sesión — AutoFácil</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.0/font/bootstrap-icons.css" rel="stylesheet">
+  <style>
+    body {
+      min-height: 100vh;
+      background: linear-gradient(150deg, #001345 0%, #0141A2 60%, #009AFE 100%);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-family: 'Segoe UI', system-ui, sans-serif;
+    }
+    .login-card {
+      background: #fff;
+      border-radius: 16px;
+      box-shadow: 0 24px 60px rgba(0,0,0,0.45);
+      width: 100%;
+      max-width: 420px;
+      overflow: hidden;
+    }
+    .login-header {
+      background: #fff;
+      border-bottom: 3px solid #009AFE;
+      padding: 32px 40px 24px;
+      text-align: center;
+    }
+    .login-header img.logo {
+      height: 68px;
+      display: block;
+      margin: 0 auto 10px;
+    }
+    .login-header p {
+      color: #6b7280;
+      font-size: 0.85rem;
+      margin: 0;
+    }
+    .login-body {
+      padding: 36px 40px 40px;
+    }
+    .form-label {
+      font-weight: 600;
+      font-size: 0.85rem;
+      color: #374151;
+    }
+    .form-control {
+      border-radius: 8px;
+      border: 1.5px solid #d1d5db;
+      padding: 10px 14px;
+      font-size: 0.95rem;
+      transition: border-color 0.2s;
+    }
+    .form-control:focus {
+      border-color: #0141A2;
+      box-shadow: 0 0 0 3px rgba(1,65,162,0.12);
+    }
+    .input-group-text {
+      border-radius: 8px 0 0 8px;
+      border: 1.5px solid #d1d5db;
+      border-right: none;
+      background: #f9fafb;
+      color: #6b7280;
+    }
+    .btn-login {
+      background: linear-gradient(135deg, #0141A2, #009AFE);
+      color: #fff;
+      border: none;
+      border-radius: 8px;
+      padding: 12px;
+      font-weight: 600;
+      font-size: 1rem;
+      width: 100%;
+      transition: opacity 0.2s, transform 0.1s;
+    }
+    .btn-login:hover { opacity: 0.92; }
+    .btn-login:active { transform: scale(0.99); }
+    .btn-login:disabled { opacity: 0.65; }
+    #alerta { display: none; }
+    .version { text-align: center; color: #9ca3af; font-size: 0.75rem; margin-top: 24px; }
+  </style>
+</head>
+<body>
+  <div class="login-card">
+    <div class="login-header">
+      <img src="/img/logo.png" alt="AutoFácil" class="logo">
+      <p>Ingresa con tus credenciales para continuar</p>
+    </div>
+    <div class="login-body">
+      <div id="alerta" class="alert alert-danger alert-sm py-2 px-3 mb-3" role="alert"></div>
+
+      <form id="formLogin" novalidate>
+        <div class="mb-3">
+          <label class="form-label">Correo electrónico</label>
+          <div class="input-group">
+            <span class="input-group-text"><i class="bi bi-envelope"></i></span>
+            <input type="email" id="email" class="form-control" placeholder="usuario@empresa.cl" required autocomplete="email">
+          </div>
+        </div>
+        <div class="mb-4">
+          <label class="form-label">Contraseña</label>
+          <div class="input-group">
+            <span class="input-group-text"><i class="bi bi-lock"></i></span>
+            <input type="password" id="password" class="form-control" placeholder="••••••••" required autocomplete="current-password">
+            <button class="btn btn-outline-secondary" type="button" id="togglePass" tabindex="-1">
+              <i class="bi bi-eye" id="eyeIcon"></i>
+            </button>
+          </div>
+        </div>
+        <button type="submit" class="btn-login" id="btnLogin">
+          <span id="btnText"><i class="bi bi-box-arrow-in-right me-2"></i>Ingresar</span>
+          <span id="btnSpinner" class="d-none">
+            <span class="spinner-border spinner-border-sm me-2"></span>Ingresando...
+          </span>
+        </button>
+      </form>
+      <p class="version">Sistema de Créditos v1.0</p>
+    </div>
+  </div>
+
+  <script>
+    // Si ya hay sesión, redirigir al inicio
+    if (localStorage.getItem('token')) window.location.href = '/';
+
+    document.getElementById('togglePass').addEventListener('click', () => {
+      const inp = document.getElementById('password');
+      const ico = document.getElementById('eyeIcon');
+      if (inp.type === 'password') { inp.type = 'text'; ico.className = 'bi bi-eye-slash'; }
+      else { inp.type = 'password'; ico.className = 'bi bi-eye'; }
+    });
+
+    document.getElementById('formLogin').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const email = document.getElementById('email').value.trim();
+      const password = document.getElementById('password').value;
+      const alerta = document.getElementById('alerta');
+      const btnLogin = document.getElementById('btnLogin');
+
+      alerta.style.display = 'none';
+      btnLogin.disabled = true;
+      document.getElementById('btnText').classList.add('d-none');
+      document.getElementById('btnSpinner').classList.remove('d-none');
+
+      try {
+        const resp = await fetch('/api/auth/login', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ email, password })
+        });
+        const data = await resp.json();
+
+        if (data.success) {
+          localStorage.setItem('token', data.data.token);
+          localStorage.setItem('usuario', JSON.stringify(data.data.usuario));
+          window.location.href = '/';
+        } else {
+          alerta.textContent = data.error || 'Error al iniciar sesión';
+          alerta.style.display = 'block';
+        }
+      } catch {
+        alerta.textContent = 'Error de conexión con el servidor';
+        alerta.style.display = 'block';
+      } finally {
+        btnLogin.disabled = false;
+        document.getElementById('btnText').classList.remove('d-none');
+        document.getElementById('btnSpinner').classList.add('d-none');
+      }
+    });
+  </script>
+</body>
+</html>
