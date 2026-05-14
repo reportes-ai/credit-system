@@ -82,4 +82,17 @@ const updatePermisosPerfil = async (req, res) => {
   }
 };
 
-module.exports = { getAllPerfiles, getModulosConFuncionalidades, getPermisosPerfil, updatePermisosPerfil };
+const reordenarModulos = async (req, res) => {
+  try {
+    const { orden } = req.body; // [{ id_modulo, orden }]
+    if (!Array.isArray(orden)) return res.status(400).json({ success: false, data: null, error: 'Formato inválido' });
+    for (const m of orden) {
+      await pool.query('UPDATE modulos SET orden=? WHERE id_modulo=?', [m.orden, m.id_modulo]);
+    }
+    res.json({ success: true, data: { mensaje: 'Orden actualizado' }, error: null });
+  } catch (error) {
+    res.status(500).json({ success: false, data: null, error: error.message });
+  }
+};
+
+module.exports = { getAllPerfiles, getModulosConFuncionalidades, getPermisosPerfil, updatePermisosPerfil, reordenarModulos };
