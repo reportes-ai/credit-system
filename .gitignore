@@ -1,3 +1,6 @@
+# Claude Code worktree internals
+.claude/
+
 # Logs
 logs
 *.log

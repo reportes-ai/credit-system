@@ -1,0 +1,251 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Tasas — AutoFácil</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.0/font/bootstrap-icons.css" rel="stylesheet">
+  <style>
+    :root { --navy: #0141A2; --navy-dark: #012d70; --navy-light: #0255c5; --accent: #009AFE; --bg: #f0f4f8; }
+    body { background: var(--bg); font-family: 'Segoe UI', system-ui, sans-serif; margin: 0; min-height: 100vh; }
+    .topnav { background: linear-gradient(90deg, var(--navy-dark), var(--navy-light)); color: #fff; height: 60px; padding: 0 24px; display: flex; align-items: center; justify-content: space-between; position: sticky; top: 0; z-index: 200; box-shadow: 0 2px 8px rgba(0,0,0,0.3); }
+    .topnav-left { display: flex; align-items: center; gap: 16px; }
+    .topnav-brand img { height: 32px; filter: brightness(0) invert(1); }
+    .breadcrumb-nav { color: rgba(255,255,255,0.6); font-size: 0.85rem; display: flex; align-items: center; gap: 6px; }
+    .breadcrumb-nav a { color: rgba(255,255,255,0.75); text-decoration: none; }
+    .breadcrumb-nav a:hover { color: #fff; }
+    .breadcrumb-nav .sep { color: rgba(255,255,255,0.35); }
+    .topnav-right { display: flex; align-items: center; gap: 12px; }
+    .user-chip { display: flex; align-items: center; gap: 8px; font-size: 0.85rem; }
+    .avatar { width: 28px; height: 28px; background: #90caf9; border-radius: 50%; display: flex; align-items: center; justify-content: center; color: var(--navy); font-weight: 700; font-size: 0.75rem; }
+    .btn-logout { background: rgba(255,255,255,0.1); border: 1px solid rgba(255,255,255,0.2); color: #fff; border-radius: 8px; padding: 5px 12px; font-size: 0.82rem; cursor: pointer; }
+    .btn-logout:hover { background: rgba(255,255,255,0.2); }
+    .page-content { padding: 28px 32px; max-width: 1100px; margin: 0 auto; }
+    .page-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 24px; }
+    .page-header h4 { font-weight: 700; color: #111827; margin: 0; display: flex; align-items: center; gap: 10px; }
+    .page-header h4 i { color: var(--navy); }
+    .card { border: none; border-radius: 12px; box-shadow: 0 1px 4px rgba(0,0,0,0.07); }
+    .table { font-size: 0.88rem; }
+    .table thead th { background: #f8fafc; font-weight: 700; color: #374151; font-size: 0.78rem; text-transform: uppercase; letter-spacing: 0.5px; border-bottom: 2px solid #e5e7eb; }
+    .table tbody tr:hover { background: #f8fafc; }
+    .badge-activo { background: #dcfce7; color: #166534; border-radius: 12px; padding: 3px 10px; font-size: 0.73rem; font-weight: 600; }
+    .badge-inactivo { background: #fee2e2; color: #991b1b; border-radius: 12px; padding: 3px 10px; font-size: 0.73rem; font-weight: 600; }
+    .badge-tipo { background: #e8eaf6; color: var(--navy); border-radius: 10px; padding: 2px 9px; font-size: 0.72rem; font-weight: 600; }
+    .btn-primary { background: var(--navy); border-color: var(--navy); }
+    .btn-primary:hover { background: var(--accent); border-color: var(--accent); }
+    .search-bar { position: relative; }
+    .search-bar input { padding-left: 34px; border-radius: 8px; border: 1.5px solid #d1d5db; font-size: 0.88rem; }
+    .search-bar input:focus { border-color: var(--navy); box-shadow: 0 0 0 3px rgba(1,65,162,0.1); }
+    .search-bar i { position: absolute; left: 10px; top: 50%; transform: translateY(-50%); color: #9ca3af; }
+    .modal-header { background: linear-gradient(135deg, var(--navy), var(--accent)); color: #fff; border-radius: 12px 12px 0 0; }
+    .modal-header .btn-close { filter: invert(1); }
+    .modal-content { border-radius: 12px; border: none; }
+    .form-label { font-weight: 600; font-size: 0.82rem; color: #374151; }
+    .form-control, .form-select { border-radius: 8px; border: 1.5px solid #d1d5db; font-size: 0.88rem; }
+    .form-control:focus, .form-select:focus { border-color: var(--navy); box-shadow: 0 0 0 3px rgba(1,65,162,0.1); }
+    .toast-container { position: fixed; top: 70px; right: 20px; z-index: 9999; }
+    .valor-display { font-weight: 700; color: var(--navy); font-size: 1rem; }
+  </style>
+</head>
+<body>
+  <nav class="topnav">
+    <div class="topnav-left">
+      <div class="topnav-brand"><a href="/"><img src="/img/logo.png" alt="AutoFácil"></a></div>
+      <div class="breadcrumb-nav">
+        <a href="/">Inicio</a><span class="sep">/</span>
+        <span style="color:rgba(255,255,255,0.5)">Mantenedores</span><span class="sep">/</span>
+        <span style="color:#fff; font-weight:600"><i class="bi bi-percent me-1"></i>Tasas</span>
+      </div>
+    </div>
+    <div class="topnav-right">
+      <div class="user-chip">
+        <div class="avatar" id="avatarInicial">?</div>
+        <span style="color:#fff; font-weight:600" id="navNombre">—</span>
+      </div>
+      <button class="btn-logout" onclick="logout()"><i class="bi bi-box-arrow-right me-1"></i>Salir</button>
+    </div>
+  </nav>
+
+  <div class="toast-container">
+    <div id="toast" class="toast align-items-center text-white border-0" role="alert">
+      <div class="d-flex"><div class="toast-body" id="toastMsg"></div>
+      <button type="button" class="btn-close btn-close-white me-2 m-auto" data-bs-dismiss="toast"></button></div>
+    </div>
+  </div>
+
+  <div class="page-content">
+    <div class="page-header">
+      <h4><i class="bi bi-percent"></i> Tasas de Interés</h4>
+      <button class="btn btn-primary btn-sm" onclick="abrirModal()"><i class="bi bi-plus-lg me-1"></i>Nueva Tasa</button>
+    </div>
+    <div class="card">
+      <div class="card-body p-3">
+        <div class="mb-3 search-bar" style="max-width:280px">
+          <i class="bi bi-search"></i>
+          <input type="text" id="buscador" class="form-control" placeholder="Buscar tasa..." oninput="filtrar()">
+        </div>
+        <div class="table-responsive">
+          <table class="table table-hover align-middle mb-0">
+            <thead><tr>
+              <th>Nombre</th><th>Tipo</th><th>Valor</th><th>Vigente desde</th><th>Estado</th><th style="width:110px">Acciones</th>
+            </tr></thead>
+            <tbody id="tbody"><tr><td colspan="6" class="text-center py-4 text-muted">Cargando...</td></tr></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- MODAL -->
+  <div class="modal fade" id="modal" tabindex="-1">
+    <div class="modal-dialog">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h5 class="modal-title" id="modalTitulo">Nueva Tasa</h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+        </div>
+        <div class="modal-body">
+          <div class="row g-3">
+            <div class="col-12">
+              <label class="form-label">Nombre *</label>
+              <input type="text" id="fNombre" class="form-control" placeholder="Ej: Tasa comercial junio 2024">
+            </div>
+            <div class="col-md-6">
+              <label class="form-label">Tipo *</label>
+              <select id="fTipo" class="form-select">
+                <option value="mensual">Mensual</option>
+                <option value="anual">Anual</option>
+              </select>
+            </div>
+            <div class="col-md-6">
+              <label class="form-label">Valor (%) *</label>
+              <div class="input-group">
+                <input type="number" id="fValor" class="form-control" placeholder="1.5" step="0.0001" min="0">
+                <span class="input-group-text">%</span>
+              </div>
+            </div>
+            <div class="col-md-6">
+              <label class="form-label">Vigente desde *</label>
+              <input type="date" id="fVigente" class="form-control">
+            </div>
+            <div class="col-md-6" id="campoEstado" style="display:none">
+              <label class="form-label">Estado</label>
+              <select id="fEstado" class="form-select">
+                <option value="activo">Activo</option>
+                <option value="inactivo">Inactivo</option>
+              </select>
+            </div>
+          </div>
+          <div id="modalError" class="alert alert-danger mt-3 d-none"></div>
+        </div>
+        <div class="modal-footer">
+          <button class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+          <button class="btn btn-primary" onclick="guardar()"><i class="bi bi-floppy me-1"></i>Guardar</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+  <script>
+    const token = localStorage.getItem('token');
+    const yo = JSON.parse(localStorage.getItem('usuario') || 'null');
+    if (!token || !yo) { window.location.href = '/login.html'; }
+    document.getElementById('navNombre').textContent = `${yo?.nombre || ''} ${yo?.apellido || ''}`.trim();
+    document.getElementById('avatarInicial').textContent = (yo?.nombre || '?').charAt(0).toUpperCase();
+    function logout() { localStorage.removeItem('token'); localStorage.removeItem('usuario'); window.location.href = '/login.html'; }
+
+    const api = async (method, url, body) => {
+      const r = await fetch(url, { method, headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' }, body: body ? JSON.stringify(body) : undefined });
+      if (r.status === 401) { logout(); return null; }
+      return r.json();
+    };
+    const toast = (msg, tipo='success') => {
+      const el = document.getElementById('toast');
+      el.className = `toast align-items-center text-white border-0 bg-${tipo}`;
+      document.getElementById('toastMsg').textContent = msg;
+      bootstrap.Toast.getOrCreateInstance(el, { delay: 3000 }).show();
+    };
+
+    let datos = [], editId = null;
+
+    async function cargar() {
+      const d = await api('GET', '/api/tasas');
+      if (!d?.success) return;
+      datos = d.data;
+      renderizar(datos);
+    }
+
+    function renderizar(lista) {
+      const tbody = document.getElementById('tbody');
+      if (!lista.length) { tbody.innerHTML = '<tr><td colspan="6" class="text-center py-4 text-muted">Sin tasas registradas.</td></tr>'; return; }
+      tbody.innerHTML = lista.map(t => `
+        <tr>
+          <td><strong>${t.nombre}</strong></td>
+          <td><span class="badge-tipo">${t.tipo}</span></td>
+          <td><span class="valor-display">${parseFloat(t.valor).toFixed(4)}%</span></td>
+          <td>${new Date(t.vigente_desde).toLocaleDateString('es-CL')}</td>
+          <td><span class="badge-${t.estado}">${t.estado}</span></td>
+          <td>
+            <button class="btn btn-outline-primary btn-sm me-1" onclick="editar(${t.id_tasa})"><i class="bi bi-pencil"></i></button>
+            <button class="btn btn-outline-danger btn-sm" onclick="eliminar(${t.id_tasa})"><i class="bi bi-trash"></i></button>
+          </td>
+        </tr>`).join('');
+    }
+
+    function filtrar() {
+      const q = document.getElementById('buscador').value.toLowerCase();
+      renderizar(datos.filter(t => t.nombre.toLowerCase().includes(q) || t.tipo.includes(q)));
+    }
+
+    function abrirModal(id = null) {
+      editId = id;
+      document.getElementById('modalTitulo').textContent = id ? 'Editar Tasa' : 'Nueva Tasa';
+      document.getElementById('modalError').classList.add('d-none');
+      document.getElementById('campoEstado').style.display = id ? '' : 'none';
+      if (!id) { document.getElementById('fNombre').value = ''; document.getElementById('fValor').value = ''; document.getElementById('fVigente').value = ''; document.getElementById('fTipo').value = 'mensual'; }
+      bootstrap.Modal.getOrCreateInstance(document.getElementById('modal')).show();
+    }
+
+    async function editar(id) {
+      const d = await api('GET', `/api/tasas/${id}`);
+      if (!d?.success) return;
+      const t = d.data;
+      editId = id;
+      document.getElementById('modalTitulo').textContent = 'Editar Tasa';
+      document.getElementById('fNombre').value = t.nombre;
+      document.getElementById('fTipo').value = t.tipo;
+      document.getElementById('fValor').value = t.valor;
+      document.getElementById('fVigente').value = t.vigente_desde?.split('T')[0] || '';
+      document.getElementById('fEstado').value = t.estado;
+      document.getElementById('campoEstado').style.display = '';
+      document.getElementById('modalError').classList.add('d-none');
+      bootstrap.Modal.getOrCreateInstance(document.getElementById('modal')).show();
+    }
+
+    async function guardar() {
+      const body = { nombre: document.getElementById('fNombre').value.trim(), tipo: document.getElementById('fTipo').value, valor: parseFloat(document.getElementById('fValor').value), vigente_desde: document.getElementById('fVigente').value, estado: document.getElementById('fEstado').value || 'activo' };
+      const url = editId ? `/api/tasas/${editId}` : '/api/tasas';
+      const d = await api(editId ? 'PUT' : 'POST', url, body);
+      if (d?.success) {
+        bootstrap.Modal.getInstance(document.getElementById('modal')).hide();
+        toast(editId ? 'Tasa actualizada' : 'Tasa creada');
+        cargar();
+      } else {
+        const el = document.getElementById('modalError');
+        el.textContent = d?.error || 'Error al guardar'; el.classList.remove('d-none');
+      }
+    }
+
+    async function eliminar(id) {
+      if (!confirm('¿Desactivar esta tasa?')) return;
+      const d = await api('DELETE', `/api/tasas/${id}`);
+      if (d?.success) { toast('Tasa desactivada'); cargar(); }
+      else toast(d?.error || 'Error', 'danger');
+    }
+
+    cargar();
+  </script>
+</body>
+</html>

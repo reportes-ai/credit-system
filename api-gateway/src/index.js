@@ -9,29 +9,32 @@ app.use(cors());
 app.use(express.json());
 app.use(express.static(path.join(__dirname, '../public')));
 
-// Rutas de autenticación (públicas excepto donde verifyToken se aplica internamente)
+// Auth
 app.use('/api/auth', require('../../services/usuarios/src/routes/auth.routes'));
 
-// Rutas de usuarios y perfiles
+// Usuarios y perfiles
 app.use('/api/usuarios', require('../../services/usuarios/src/routes/usuarios.routes'));
 app.use('/api/perfiles', require('../../services/usuarios/src/routes/perfiles.routes'));
 
-// Rutas de clientes
+// Clientes
 app.use('/api/clientes', require('../../services/clientes/src/routes/clientes.routes'));
 
+// Mantenedores
+app.use('/api/tasas', require('../../services/mantenedores/src/routes/tasas.routes'));
+app.use('/api/uf',    require('../../services/mantenedores/src/routes/uf.routes'));
+
 // Health check
-app.get('/health', (req, res) => {
-  res.json({ status: 'Sistema operativo', timestamp: new Date() });
-});
+app.get('/health', (req, res) => res.json({ status: 'Sistema operativo', timestamp: new Date() }));
 
-// SPA fallback: rutas de módulos sirven su index.html
-app.get(['/usuarios/', '/usuarios'], (req, res) => {
-  res.sendFile(path.join(__dirname, '../public/usuarios/index.html'));
-});
+// SPA fallbacks
+app.get(['/usuarios', '/usuarios/'], (req, res) =>
+  res.sendFile(path.join(__dirname, '../public/usuarios/index.html')));
+app.get(['/mantenedores/tasas', '/mantenedores/tasas/'], (req, res) =>
+  res.sendFile(path.join(__dirname, '../public/mantenedores/tasas/index.html')));
+app.get(['/mantenedores/uf', '/mantenedores/uf/'], (req, res) =>
+  res.sendFile(path.join(__dirname, '../public/mantenedores/uf/index.html')));
 
-app.use((req, res) => {
-  res.status(404).json({ success: false, error: 'Ruta no encontrada' });
-});
+app.use((req, res) => res.status(404).json({ success: false, error: 'Ruta no encontrada' }));
 
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {

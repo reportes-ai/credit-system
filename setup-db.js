@@ -33,6 +33,28 @@ async function setupDatabase() {
 
     console.log('✓ Listo para crear tablas');
 
+    // --- Tablas de mantenedores ---
+    await connection.execute(`
+      CREATE TABLE IF NOT EXISTS tasas (
+        id_tasa INT PRIMARY KEY AUTO_INCREMENT,
+        nombre VARCHAR(100) NOT NULL,
+        tipo ENUM('mensual','anual') DEFAULT 'mensual',
+        valor DECIMAL(10,4) NOT NULL,
+        vigente_desde DATE NOT NULL,
+        estado VARCHAR(20) DEFAULT 'activo',
+        fecha_creacion TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      )
+    `);
+
+    await connection.execute(`
+      CREATE TABLE IF NOT EXISTS uf (
+        id_uf INT PRIMARY KEY AUTO_INCREMENT,
+        fecha DATE UNIQUE NOT NULL,
+        valor DECIMAL(12,2) NOT NULL,
+        fecha_creacion TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      )
+    `);
+
     // --- Tablas base (sin FK) ---
     await connection.execute(`
       CREATE TABLE IF NOT EXISTS perfiles (
