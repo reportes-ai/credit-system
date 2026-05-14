@@ -29,6 +29,8 @@ app.get('/health', (req, res) => res.json({ status: 'Sistema operativo', timesta
 // SPA fallbacks
 app.get(['/usuarios', '/usuarios/'], (req, res) =>
   res.sendFile(path.join(__dirname, '../public/usuarios/index.html')));
+app.get(['/mantenedores', '/mantenedores/'], (req, res) =>
+  res.sendFile(path.join(__dirname, '../public/mantenedores/index.html')));
 app.get(['/mantenedores/tasas', '/mantenedores/tasas/'], (req, res) =>
   res.sendFile(path.join(__dirname, '../public/mantenedores/tasas/index.html')));
 app.get(['/mantenedores/uf', '/mantenedores/uf/'], (req, res) =>
