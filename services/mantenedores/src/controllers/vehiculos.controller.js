@@ -1,7 +1,6 @@
 const pool = require('../../../../shared/config/database');
 
-const ensureTable = async () => {
-  await pool.query(`CREATE TABLE IF NOT EXISTS vehiculos (
+const ensureTable = () => pool.query(`CREATE TABLE IF NOT EXISTS vehiculos (
     id_vehiculo  INT AUTO_INCREMENT PRIMARY KEY,
     codigo_sii   VARCHAR(20),
     anio         SMALLINT,
@@ -23,7 +22,9 @@ const ensureTable = async () => {
     beneficio_ley VARCHAR(10),
     UNIQUE KEY uk_vehiculo (codigo_sii, anio)
   )`);
-};
+
+// Create table on module load
+ensureTable().catch(e => console.error('vehiculos table init error:', e.message));
 
 const getVehiculos = async (req, res) => {
   try {

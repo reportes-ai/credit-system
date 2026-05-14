@@ -465,7 +465,7 @@ function onFileSelected(input) {
 
 async function confirmarImport() {
   if (!importRows.length) return;
-  const BATCH = 300;
+  const BATCH = 150;
   const total = importRows.length;
   let insertados = 0;
   document.getElementById('importProgress').style.display = 'block';
