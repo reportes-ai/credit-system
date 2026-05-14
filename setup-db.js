@@ -1,28 +1,37 @@
 const mysql = require('mysql2/promise');
 const bcrypt = require('bcryptjs');
+require('dotenv').config();
+
+const isCloud = process.env.DB_HOST && process.env.DB_HOST !== 'localhost';
+
+const connConfig = {
+  host:     process.env.DB_HOST     || 'localhost',
+  port:     parseInt(process.env.DB_PORT) || 3306,
+  user:     process.env.DB_USER     || 'root',
+  password: process.env.DB_PASSWORD || '',
+  ...(isCloud && { ssl: { rejectUnauthorized: false } })
+};
 
 async function setupDatabase() {
   let connection;
   try {
-    connection = await mysql.createConnection({
-      host: process.env.DB_HOST || 'localhost',
-      user: process.env.DB_USER || 'root',
-      password: process.env.DB_PASSWORD || ''
-    });
+    if (isCloud) {
+      // En cloud la BD ya existe, conectar directo
+      connection = await mysql.createConnection({
+        ...connConfig,
+        database: process.env.DB_NAME || 'railway'
+      });
+      console.log(`✓ Conectado a MySQL cloud (${process.env.DB_HOST})`);
+    } else {
+      connection = await mysql.createConnection(connConfig);
+      console.log('✓ Conectado a MySQL local');
+      await connection.execute('CREATE DATABASE IF NOT EXISTS credit_system');
+      console.log('✓ Base de datos creada');
+      await connection.end();
+      connection = await mysql.createConnection({ ...connConfig, database: 'credit_system' });
+    }
 
-    console.log('✓ Conectado a MySQL');
-    await connection.execute('CREATE DATABASE IF NOT EXISTS credit_system');
-    console.log('✓ Base de datos creada');
-    await connection.end();
-
-    connection = await mysql.createConnection({
-      host: process.env.DB_HOST || 'localhost',
-      user: process.env.DB_USER || 'root',
-      password: process.env.DB_PASSWORD || '',
-      database: process.env.DB_NAME || 'credit_system'
-    });
-
-    console.log('✓ Conectado a credit_system');
+    console.log('✓ Listo para crear tablas');
 
     // --- Tablas base (sin FK) ---
     await connection.execute(`
