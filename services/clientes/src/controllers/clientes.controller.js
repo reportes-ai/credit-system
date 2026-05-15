@@ -1,156 +1,200 @@
 const pool = require('../../../../shared/config/database');
 
-// Obtener todos los clientes
-const getAllClientes = async (req, res) => {
+/* ─── Crear tabla si no existe ─────────────────────────────────────────── */
+const ensureTable = () => pool.query(`
+  CREATE TABLE IF NOT EXISTS clientes (
+    id_cliente          INT AUTO_INCREMENT PRIMARY KEY,
+    rut                 VARCHAR(15)  NOT NULL UNIQUE,
+    tipo_cliente        ENUM('PERSONA','EMPRESA') NOT NULL,
+
+    -- PERSONA
+    apellido_paterno    VARCHAR(100),
+    apellido_materno    VARCHAR(100),
+    nombres             VARCHAR(150),
+    fecha_nacimiento    DATE,
+    estado_civil        VARCHAR(60),
+    sexo                VARCHAR(20),
+    regimen             VARCHAR(60),
+    cargas              TINYINT UNSIGNED DEFAULT 0,
+    telefono_movil      VARCHAR(20),
+    fecha_visa          DATE,
+    tipo_visa           VARCHAR(100),
+    nacionalidad        VARCHAR(100),
+
+    -- EMPRESA
+    nombre_fantasia     VARCHAR(200),
+    razon_social        VARCHAR(200),
+    codigo_actividad    VARCHAR(20),
+    actividad_economica VARCHAR(300),
+    fecha_inicio_actividad DATE,
+
+    -- Representantes (empresa)
+    rep1_rut            VARCHAR(15),
+    rep1_nombre         VARCHAR(150),
+    rep1_ap_paterno     VARCHAR(100),
+    rep1_ap_materno     VARCHAR(100),
+    rep2_rut            VARCHAR(15),
+    rep2_nombre         VARCHAR(150),
+    rep2_ap_paterno     VARCHAR(100),
+    rep2_ap_materno     VARCHAR(100),
+    rep3_rut            VARCHAR(15),
+    rep3_nombre         VARCHAR(150),
+    rep3_ap_paterno     VARCHAR(100),
+    rep3_ap_materno     VARCHAR(100),
+
+    -- Datos de contacto / ubicación
+    correo              VARCHAR(200),
+    direccion           VARCHAR(300),
+    id_comuna           INT,
+    id_provincia        INT,
+    id_region           INT,
+
+    fecha_creacion      DATETIME DEFAULT CURRENT_TIMESTAMP,
+    fecha_actualizacion DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+  )
+`);
+
+ensureTable().catch(console.error);
+
+/* ─── Helpers ───────────────────────────────────────────────────────────── */
+const up = v => (v && typeof v === 'string' ? v.toUpperCase().trim() : v ?? null);
+
+/* ─── GET /rut/:rut ─────────────────────────────────────────────────────── */
+const getByRut = async (req, res) => {
   try {
-    const connection = await pool.getConnection();
-    const [clientes] = await connection.query('SELECT * FROM clientes');
-    connection.release();
-    
-    res.json({
-      success: true,
-      data: clientes,
-      error: null
-    });
-  } catch (error) {
-    res.status(500).json({
-      success: false,
-      data: null,
-      error: error.message
-    });
+    const rut = decodeURIComponent(req.params.rut).toUpperCase().trim();
+    const [rows] = await pool.query('SELECT * FROM clientes WHERE rut = ?', [rut]);
+    if (!rows.length)
+      return res.json({ success: true, data: null, error: null });   // no encontrado → data null
+    res.json({ success: true, data: rows[0], error: null });
+  } catch (e) {
+    res.status(500).json({ success: false, data: null, error: e.message });
   }
 };
 
-// Obtener cliente por ID
-const getClienteById = async (req, res) => {
+/* ─── GET / ─────────────────────────────────────────────────────────────── */
+const getAll = async (req, res) => {
   try {
-    const { id } = req.params;
-    const connection = await pool.getConnection();
-    const [cliente] = await connection.query(
-      'SELECT * FROM clientes WHERE id_cliente = ?',
-      [id]
-    );
-    connection.release();
-
-    if (cliente.length === 0) {
-      return res.status(404).json({
-        success: false,
-        data: null,
-        error: 'Cliente no encontrado'
-      });
+    const { q } = req.query;
+    let sql = 'SELECT * FROM clientes';
+    const params = [];
+    if (q) {
+      sql += ` WHERE rut LIKE ? OR nombres LIKE ? OR apellido_paterno LIKE ?
+               OR razon_social LIKE ? OR nombre_fantasia LIKE ?`;
+      const like = `%${q.toUpperCase()}%`;
+      params.push(like, like, like, like, like);
     }
-
-    res.json({
-      success: true,
-      data: cliente[0],
-      error: null
-    });
-  } catch (error) {
-    res.status(500).json({
-      success: false,
-      data: null,
-      error: error.message
-    });
+    sql += ' ORDER BY fecha_actualizacion DESC LIMIT 200';
+    const [rows] = await pool.query(sql, params);
+    res.json({ success: true, data: rows, error: null });
+  } catch (e) {
+    res.status(500).json({ success: false, data: null, error: e.message });
   }
 };
 
-// Crear nuevo cliente
-const createCliente = async (req, res) => {
+/* ─── GET /:id ──────────────────────────────────────────────────────────── */
+const getById = async (req, res) => {
   try {
-    const { rut, nombre, email, telefono, direccion, ciudad_id } = req.body;
+    const [rows] = await pool.query('SELECT * FROM clientes WHERE id_cliente = ?', [req.params.id]);
+    if (!rows.length)
+      return res.status(404).json({ success: false, data: null, error: 'Cliente no encontrado' });
+    res.json({ success: true, data: rows[0], error: null });
+  } catch (e) {
+    res.status(500).json({ success: false, data: null, error: e.message });
+  }
+};
 
-    if (!rut || !nombre) {
-      return res.status(400).json({
-        success: false,
-        data: null,
-        error: 'RUT y nombre son requeridos'
-      });
-    }
+/* ─── POST / ────────────────────────────────────────────────────────────── */
+const create = async (req, res) => {
+  try {
+    const b = req.body;
+    if (!b.rut || !b.tipo_cliente)
+      return res.status(400).json({ success: false, data: null, error: 'RUT y tipo_cliente son requeridos' });
 
-    const connection = await pool.getConnection();
-    const [result] = await connection.query(
-      'INSERT INTO clientes (rut, nombre, email, telefono, direccion, ciudad_id, estado) VALUES (?, ?, ?, ?, ?, ?, ?)',
-      [rut, nombre, email || null, telefono || null, direccion || null, ciudad_id || null, 'activo']
+    const rut = up(b.rut);
+    // Verificar duplicado
+    const [[{ cnt }]] = await pool.query('SELECT COUNT(*) AS cnt FROM clientes WHERE rut=?', [rut]);
+    if (cnt > 0)
+      return res.status(409).json({ success: false, data: null, error: 'El RUT ya existe' });
+
+    const [r] = await pool.query(`
+      INSERT INTO clientes
+        (rut, tipo_cliente,
+         apellido_paterno, apellido_materno, nombres, fecha_nacimiento,
+         estado_civil, sexo, regimen, cargas, telefono_movil,
+         fecha_visa, tipo_visa, nacionalidad,
+         nombre_fantasia, razon_social, codigo_actividad, actividad_economica, fecha_inicio_actividad,
+         rep1_rut, rep1_nombre, rep1_ap_paterno, rep1_ap_materno,
+         rep2_rut, rep2_nombre, rep2_ap_paterno, rep2_ap_materno,
+         rep3_rut, rep3_nombre, rep3_ap_paterno, rep3_ap_materno,
+         correo, direccion, id_comuna, id_provincia, id_region)
+      VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
+      [
+        rut, up(b.tipo_cliente),
+        up(b.apellido_paterno), up(b.apellido_materno), up(b.nombres),
+        b.fecha_nacimiento || null,
+        up(b.estado_civil), up(b.sexo), up(b.regimen),
+        b.cargas != null ? parseInt(b.cargas) : 0,
+        up(b.telefono_movil),
+        b.fecha_visa || null, up(b.tipo_visa), up(b.nacionalidad),
+        up(b.nombre_fantasia), up(b.razon_social),
+        up(b.codigo_actividad), up(b.actividad_economica),
+        b.fecha_inicio_actividad || null,
+        up(b.rep1_rut), up(b.rep1_nombre), up(b.rep1_ap_paterno), up(b.rep1_ap_materno),
+        up(b.rep2_rut), up(b.rep2_nombre), up(b.rep2_ap_paterno), up(b.rep2_ap_materno),
+        up(b.rep3_rut), up(b.rep3_nombre), up(b.rep3_ap_paterno), up(b.rep3_ap_materno),
+        up(b.correo), up(b.direccion),
+        b.id_comuna || null, b.id_provincia || null, b.id_region || null
+      ]
     );
-    connection.release();
-
-    res.status(201).json({
-      success: true,
-      data: {
-        id_cliente: result.insertId,
-        rut,
-        nombre,
-        email,
-        telefono,
-        direccion,
-        ciudad_id,
-        estado: 'activo'
-      },
-      error: null
-    });
-  } catch (error) {
-    res.status(500).json({
-      success: false,
-      data: null,
-      error: error.message
-    });
+    res.status(201).json({ success: true, data: { id_cliente: r.insertId }, error: null });
+  } catch (e) {
+    res.status(500).json({ success: false, data: null, error: e.message });
   }
 };
 
-// Actualizar cliente
-const updateCliente = async (req, res) => {
+/* ─── PUT /:id ──────────────────────────────────────────────────────────── */
+const update = async (req, res) => {
   try {
-    const { id } = req.params;
-    const { nombre, email, telefono, direccion, ciudad_id, estado } = req.body;
+    const b = req.body;
+    if (!b.tipo_cliente)
+      return res.status(400).json({ success: false, data: null, error: 'tipo_cliente es requerido' });
 
-    const connection = await pool.getConnection();
-    await connection.query(
-      'UPDATE clientes SET nombre = ?, email = ?, telefono = ?, direccion = ?, ciudad_id = ?, estado = ? WHERE id_cliente = ?',
-      [nombre, email, telefono, direccion, ciudad_id, estado, id]
+    await pool.query(`
+      UPDATE clientes SET
+        tipo_cliente=?,
+        apellido_paterno=?, apellido_materno=?, nombres=?, fecha_nacimiento=?,
+        estado_civil=?, sexo=?, regimen=?, cargas=?, telefono_movil=?,
+        fecha_visa=?, tipo_visa=?, nacionalidad=?,
+        nombre_fantasia=?, razon_social=?, codigo_actividad=?, actividad_economica=?, fecha_inicio_actividad=?,
+        rep1_rut=?, rep1_nombre=?, rep1_ap_paterno=?, rep1_ap_materno=?,
+        rep2_rut=?, rep2_nombre=?, rep2_ap_paterno=?, rep2_ap_materno=?,
+        rep3_rut=?, rep3_nombre=?, rep3_ap_paterno=?, rep3_ap_materno=?,
+        correo=?, direccion=?, id_comuna=?, id_provincia=?, id_region=?
+      WHERE id_cliente=?`,
+      [
+        up(b.tipo_cliente),
+        up(b.apellido_paterno), up(b.apellido_materno), up(b.nombres),
+        b.fecha_nacimiento || null,
+        up(b.estado_civil), up(b.sexo), up(b.regimen),
+        b.cargas != null ? parseInt(b.cargas) : 0,
+        up(b.telefono_movil),
+        b.fecha_visa || null, up(b.tipo_visa), up(b.nacionalidad),
+        up(b.nombre_fantasia), up(b.razon_social),
+        up(b.codigo_actividad), up(b.actividad_economica),
+        b.fecha_inicio_actividad || null,
+        up(b.rep1_rut), up(b.rep1_nombre), up(b.rep1_ap_paterno), up(b.rep1_ap_materno),
+        up(b.rep2_rut), up(b.rep2_nombre), up(b.rep2_ap_paterno), up(b.rep2_ap_materno),
+        up(b.rep3_rut), up(b.rep3_nombre), up(b.rep3_ap_paterno), up(b.rep3_ap_materno),
+        up(b.correo), up(b.direccion),
+        b.id_comuna || null, b.id_provincia || null, b.id_region || null,
+        req.params.id
+      ]
     );
-    connection.release();
-
-    res.json({
-      success: true,
-      data: { id_cliente: id, nombre, email, telefono, direccion, ciudad_id, estado },
-      error: null
-    });
-  } catch (error) {
-    res.status(500).json({
-      success: false,
-      data: null,
-      error: error.message
-    });
+    res.json({ success: true, data: { id_cliente: req.params.id }, error: null });
+  } catch (e) {
+    res.status(500).json({ success: false, data: null, error: e.message });
   }
 };
 
-// Eliminar cliente
-const deleteCliente = async (req, res) => {
-  try {
-    const { id } = req.params;
-
-    const connection = await pool.getConnection();
-    await connection.query('DELETE FROM clientes WHERE id_cliente = ?', [id]);
-    connection.release();
-
-    res.json({
-      success: true,
-      data: { mensaje: 'Cliente eliminado' },
-      error: null
-    });
-  } catch (error) {
-    res.status(500).json({
-      success: false,
-      data: null,
-      error: error.message
-    });
-  }
-};
-
-module.exports = {
-  getAllClientes,
-  getClienteById,
-  createCliente,
-  updateCliente,
-  deleteCliente
-};
+module.exports = { getByRut, getAll, getById, create, update };

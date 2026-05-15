@@ -1,26 +1,12 @@
 const express = require('express');
 const router = express.Router();
-const {
-  getAllClientes,
-  getClienteById,
-  createCliente,
-  updateCliente,
-  deleteCliente
-} = require('../controllers/clientes.controller');
+const { verifyToken } = require('../../../../shared/middleware/auth');
+const ctrl = require('../controllers/clientes.controller');
 
-// GET todos los clientes
-router.get('/', getAllClientes);
-
-// GET cliente por ID
-router.get('/:id', getClienteById);
-
-// POST crear cliente
-router.post('/', createCliente);
-
-// PUT actualizar cliente
-router.put('/:id', updateCliente);
-
-// DELETE eliminar cliente
-router.delete('/:id', deleteCliente);
+router.get('/rut/:rut', verifyToken, ctrl.getByRut);
+router.get('/',         verifyToken, ctrl.getAll);
+router.get('/:id',      verifyToken, ctrl.getById);
+router.post('/',        verifyToken, ctrl.create);
+router.put('/:id',      verifyToken, ctrl.update);
 
 module.exports = router;

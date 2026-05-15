@@ -46,6 +46,9 @@ app.get(['/mantenedores/vehiculos', '/mantenedores/vehiculos/'], (req, res) =>
 app.get(['/mantenedores/dealers', '/mantenedores/dealers/'], (req, res) =>
   res.sendFile(path.join(__dirname, '../public/mantenedores/dealers/index.html')));
 
+app.get(['/clientes', '/clientes/'], (req, res) =>
+  res.sendFile(path.join(__dirname, '../public/clientes/index.html')));
+
 app.use((req, res) => res.status(404).json({ success: false, error: 'Ruta no encontrada' }));
 
 const PORT = process.env.PORT || 3000;

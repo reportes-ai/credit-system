@@ -1,0 +1,1138 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Clientes — AutoFácil</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.0/font/bootstrap-icons.css" rel="stylesheet">
+  <style>
+    :root {
+      --navy: #001345;
+      --blue: #0141A2;
+      --sky:  #009AFE;
+    }
+    body { background: #f0f4f8; font-family: 'Segoe UI', system-ui, sans-serif; }
+
+    /* ── Topnav ─────────────────────────────────────────────────────── */
+    .topnav {
+      background: linear-gradient(90deg, var(--navy) 0%, var(--blue) 100%);
+      height: 56px; display: flex; align-items: center;
+      padding: 0 20px; gap: 14px; position: sticky; top: 0; z-index: 100;
+      box-shadow: 0 2px 8px rgba(0,0,0,.35);
+    }
+    .topnav img.logo { height: 36px; }
+    .topnav .breadcrumb-nav { color: rgba(255,255,255,.7); font-size: .82rem; flex: 1; }
+    .topnav .breadcrumb-nav a { color: rgba(255,255,255,.7); text-decoration: none; }
+    .topnav .breadcrumb-nav a:hover { color: #fff; }
+    .topnav .breadcrumb-nav .sep { margin: 0 6px; }
+    .topnav .breadcrumb-nav .current { color: #fff; font-weight: 600; }
+    .topnav .user-info { color: rgba(255,255,255,.85); font-size: .82rem; }
+    .version-badge {
+      background: rgba(255,255,255,.15); color: #fff;
+      font-size: .7rem; font-weight: 700; padding: 2px 8px;
+      border-radius: 20px; border: 1px solid rgba(255,255,255,.3);
+    }
+    .btn-logout {
+      background: rgba(255,255,255,.12); color: #fff;
+      border: 1px solid rgba(255,255,255,.25); border-radius: 6px;
+      padding: 5px 12px; font-size: .8rem; cursor: pointer;
+      transition: background .15s;
+    }
+    .btn-logout:hover { background: rgba(255,255,255,.22); }
+
+    /* ── Page layout ──────────────────────────────────────────────── */
+    .page-wrap { max-width: 860px; margin: 28px auto; padding: 0 16px 60px; }
+
+    /* ── Header card ──────────────────────────────────────────────── */
+    .header-card {
+      background: linear-gradient(135deg, var(--navy) 0%, var(--blue) 60%, var(--sky) 100%);
+      border-radius: 12px; padding: 22px 28px;
+      display: flex; align-items: center; justify-content: space-between;
+      margin-bottom: 20px; color: #fff;
+    }
+    .header-card h4 { margin: 0; font-weight: 700; font-size: 1.1rem; letter-spacing: .04em; }
+    .header-card .dates { font-size: .78rem; opacity: .85; text-align: right; }
+    .header-card .dates span { display: block; }
+
+    /* ── Search card ──────────────────────────────────────────────── */
+    .search-card {
+      background: #fff; border-radius: 12px;
+      box-shadow: 0 2px 12px rgba(0,0,0,.08);
+      padding: 24px 28px; margin-bottom: 20px;
+    }
+    .rut-input-wrap { display: flex; gap: 10px; align-items: center; }
+    .rut-input-wrap input {
+      flex: 1; border: 2px solid #d1d5db; border-radius: 8px;
+      padding: 11px 14px; font-size: 1.05rem; font-weight: 600;
+      letter-spacing: .06em; text-transform: uppercase;
+      transition: border-color .2s;
+    }
+    .rut-input-wrap input:focus { outline: none; border-color: var(--blue); box-shadow: 0 0 0 3px rgba(1,65,162,.1); }
+    .btn-buscar {
+      background: linear-gradient(135deg, var(--blue), var(--sky));
+      color: #fff; border: none; border-radius: 8px;
+      padding: 11px 22px; font-weight: 600; cursor: pointer;
+      display: flex; align-items: center; gap: 6px;
+      transition: opacity .2s;
+    }
+    .btn-buscar:hover { opacity: .9; }
+    .btn-buscar:disabled { opacity: .6; cursor: default; }
+
+    /* ── Status banners ───────────────────────────────────────────── */
+    .banner {
+      border-radius: 10px; padding: 16px 20px;
+      display: flex; align-items: center; justify-content: space-between;
+      margin-bottom: 18px;
+    }
+    .banner-found {
+      background: #ecfdf5; border: 1.5px solid #6ee7b7;
+    }
+    .banner-notfound {
+      background: #fff7ed; border: 1.5px solid #fcd34d;
+    }
+    .banner-title { font-weight: 700; font-size: .95rem; }
+    .banner-found .banner-title { color: #065f46; }
+    .banner-notfound .banner-title { color: #92400e; }
+    .banner-sub { font-size: .8rem; margin-top: 2px; }
+    .banner-found .banner-sub { color: #047857; }
+    .banner-notfound .banner-sub { color: #b45309; }
+
+    /* ── Type selector ────────────────────────────────────────────── */
+    .type-selector { display: flex; gap: 14px; margin-bottom: 20px; }
+    .type-card {
+      flex: 1; border: 2px solid #e5e7eb; border-radius: 12px;
+      padding: 22px 18px; text-align: center; cursor: pointer;
+      background: #fff; transition: border-color .2s, box-shadow .2s, background .2s;
+    }
+    .type-card:hover { border-color: var(--blue); }
+    .type-card.active {
+      border-color: var(--blue); background: #eff6ff;
+      box-shadow: 0 0 0 3px rgba(1,65,162,.12);
+    }
+    .type-card i { font-size: 2.2rem; color: var(--blue); display: block; margin-bottom: 8px; }
+    .type-card .type-label { font-weight: 700; font-size: 1rem; color: #1e3a5f; }
+    .type-card .type-desc { font-size: .78rem; color: #6b7280; margin-top: 4px; }
+
+    /* ── Form card ────────────────────────────────────────────────── */
+    .form-card {
+      background: #fff; border-radius: 12px;
+      box-shadow: 0 2px 12px rgba(0,0,0,.08);
+      padding: 26px 28px; margin-bottom: 20px;
+    }
+    .section-divider {
+      border: none; border-top: 2px solid #e5e7eb;
+      margin: 20px 0 18px;
+    }
+    .section-label {
+      font-size: .7rem; font-weight: 700; letter-spacing: .1em;
+      color: var(--blue); text-transform: uppercase;
+      margin-bottom: 12px; display: flex; align-items: center; gap: 6px;
+    }
+    .section-label::after {
+      content: ''; flex: 1; height: 1px; background: #e5e7eb;
+    }
+
+    /* ── Form controls ────────────────────────────────────────────── */
+    .form-label {
+      font-size: .78rem; font-weight: 600; color: #374151; margin-bottom: 4px;
+    }
+    .form-control, .form-select {
+      border: 1.5px solid #d1d5db; border-radius: 7px;
+      padding: 8px 12px; font-size: .9rem;
+      text-transform: uppercase;
+      transition: border-color .2s;
+    }
+    .form-control::placeholder { text-transform: none; color: #9ca3af; }
+    .form-control:focus, .form-select:focus {
+      border-color: var(--blue);
+      box-shadow: 0 0 0 3px rgba(1,65,162,.1);
+    }
+    /* date inputs & selects don't uppercase but other fields do */
+    .form-control.no-upper, .form-select { text-transform: none; }
+    .form-control.email-field { text-transform: lowercase; }
+
+    /* Rep card */
+    .rep-card {
+      border: 1.5px solid #e5e7eb; border-radius: 8px;
+      padding: 14px 16px; margin-bottom: 12px; background: #fafafa;
+    }
+    .rep-card .rep-num {
+      font-size: .7rem; font-weight: 700; color: var(--blue);
+      text-transform: uppercase; letter-spacing: .08em; margin-bottom: 10px;
+    }
+
+    /* ── Action buttons ───────────────────────────────────────────── */
+    .btn-guardar {
+      background: linear-gradient(135deg, var(--blue), var(--sky));
+      color: #fff; border: none; border-radius: 8px;
+      padding: 11px 28px; font-weight: 600; font-size: .95rem;
+      cursor: pointer; transition: opacity .2s;
+    }
+    .btn-guardar:hover { opacity: .9; }
+    .btn-guardar:disabled { opacity: .6; cursor: default; }
+    .btn-editar {
+      background: #fff; color: var(--blue);
+      border: 2px solid var(--blue); border-radius: 8px;
+      padding: 9px 22px; font-weight: 600; font-size: .9rem;
+      cursor: pointer; transition: background .15s;
+    }
+    .btn-editar:hover { background: #eff6ff; }
+    .btn-cancelar {
+      background: #fff; color: #6b7280;
+      border: 1.5px solid #d1d5db; border-radius: 8px;
+      padding: 9px 20px; font-weight: 600; font-size: .9rem;
+      cursor: pointer; transition: background .15s;
+    }
+    .btn-cancelar:hover { background: #f9fafb; }
+    .btn-crear {
+      background: linear-gradient(135deg, #059669, #10b981);
+      color: #fff; border: none; border-radius: 8px;
+      padding: 10px 22px; font-weight: 600; font-size: .9rem;
+      cursor: pointer; transition: opacity .2s;
+    }
+    .btn-crear:hover { opacity: .9; }
+
+    /* ── Read-only display panel ─────────────────────────────────── */
+    .field-display {
+      background: #f9fafb; border-radius: 8px;
+      border: 1.5px solid #e5e7eb; padding: 10px 14px;
+      font-size: .88rem; font-weight: 600; color: #111827;
+      text-transform: uppercase; min-height: 38px;
+    }
+    .field-display.empty { color: #9ca3af; font-weight: 400; text-transform: none; font-style: italic; }
+
+    /* ── Alert ─────────────────────────────────────────────────────── */
+    #alerta { display: none; border-radius: 8px; font-size: .88rem; padding: 10px 14px; }
+
+    /* ── Edad badge ─────────────────────────────────────────────── */
+    .edad-badge {
+      background: #eff6ff; color: var(--blue);
+      border: 1.5px solid #bfdbfe; border-radius: 7px;
+      padding: 8px 12px; font-size: .9rem; font-weight: 700;
+      min-height: 38px; display: flex; align-items: center;
+    }
+  </style>
+</head>
+<body>
+
+<!-- ── Topnav ──────────────────────────────────────────────────────── -->
+<nav class="topnav">
+  <a href="/"><img src="/img/logo.png" alt="AutoFácil" class="logo"></a>
+  <div class="breadcrumb-nav">
+    <a href="/">Inicio</a>
+    <span class="sep">›</span>
+    <span class="current">Clientes</span>
+  </div>
+  <div class="user-info d-none d-sm-flex align-items-center gap-2">
+    <span id="navUser"></span>
+    <span class="version-badge">v2.0</span>
+  </div>
+  <button class="btn-logout ms-2" onclick="logout()">
+    <i class="bi bi-box-arrow-right"></i> Salir
+  </button>
+</nav>
+
+<!-- ── Page ───────────────────────────────────────────────────────── -->
+<div class="page-wrap">
+
+  <!-- Header card -->
+  <div class="header-card" id="headerCard">
+    <div>
+      <h4><i class="bi bi-people-fill me-2"></i>ADMINISTRACIÓN CLIENTE</h4>
+      <div style="font-size:.82rem;opacity:.8;margin-top:4px;">
+        Consulta, crea y edita registros de clientes
+      </div>
+    </div>
+    <div class="dates" id="headerDates" style="display:none;">
+      <span id="hFechaCreacion"></span>
+      <span id="hFechaActualizacion"></span>
+    </div>
+  </div>
+
+  <!-- Alert -->
+  <div id="alerta" class="alert mb-3" role="alert"></div>
+
+  <!-- ── SECCIÓN 1: Búsqueda ──────────────────────────────────────── -->
+  <div class="search-card" id="secBuscar">
+    <div class="section-label"><i class="bi bi-search"></i> Ingrese RUT del cliente</div>
+    <div class="rut-input-wrap">
+      <input type="text" id="inputRut" maxlength="12"
+             placeholder="12.345.678-9"
+             autocomplete="off"
+             oninput="onRutInput(this)"
+             onkeydown="if(event.key==='Enter') buscarCliente()">
+      <button class="btn-buscar" id="btnBuscar" onclick="buscarCliente()">
+        <span id="btnBuscarText"><i class="bi bi-search"></i> Buscar</span>
+        <span id="btnBuscarSpinner" class="d-none">
+          <span class="spinner-border spinner-border-sm"></span>
+        </span>
+      </button>
+    </div>
+    <div id="rutHint" style="font-size:.75rem;color:#9ca3af;margin-top:6px;"></div>
+  </div>
+
+  <!-- ── SECCIÓN 2a: Cliente NO existe ──────────────────────────── -->
+  <div id="secNoExiste" class="d-none">
+    <div class="banner banner-notfound">
+      <div>
+        <div class="banner-title"><i class="bi bi-person-x me-2"></i>CLIENTE NO EXISTE</div>
+        <div class="banner-sub" id="notExistRut"></div>
+      </div>
+      <div class="d-flex gap-2">
+        <button class="btn-cancelar" onclick="resetAll()">
+          <i class="bi bi-x-circle me-1"></i>Cancelar
+        </button>
+        <button class="btn-crear" onclick="mostrarSelector()">
+          <i class="bi bi-person-plus me-1"></i>Crear Cliente
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── SECCIÓN 2b: Cliente EXISTE — solo lectura ────────────────── -->
+  <div id="secExiste" class="d-none">
+    <div class="banner banner-found mb-3">
+      <div>
+        <div class="banner-title"><i class="bi bi-person-check me-2"></i>CLIENTE ENCONTRADO</div>
+        <div class="banner-sub" id="existRut"></div>
+      </div>
+      <div class="d-flex gap-2">
+        <button class="btn-cancelar" onclick="resetAll()">
+          <i class="bi bi-arrow-left me-1"></i>Nueva búsqueda
+        </button>
+        <button class="btn-editar" id="btnEditar" onclick="activarEdicion()">
+          <i class="bi bi-pencil me-1"></i>Editar
+        </button>
+      </div>
+    </div>
+    <!-- Vista lectura dinámica -->
+    <div class="form-card" id="vistaLectura"></div>
+  </div>
+
+  <!-- ── SECCIÓN 3: Selector tipo ───────────────────────────────── -->
+  <div id="secSelector" class="d-none">
+    <div class="section-label mb-3" style="font-size:.8rem;font-weight:700;color:var(--navy);">
+      <i class="bi bi-ui-checks me-1"></i> SELECCIONE TIPO DE CLIENTE
+    </div>
+    <div class="type-selector">
+      <div class="type-card" id="cardPersona" onclick="seleccionarTipo('PERSONA')">
+        <i class="bi bi-person-badge"></i>
+        <div class="type-label">PERSONA</div>
+        <div class="type-desc">Persona natural</div>
+      </div>
+      <div class="type-card" id="cardEmpresa" onclick="seleccionarTipo('EMPRESA')">
+        <i class="bi bi-building"></i>
+        <div class="type-label">EMPRESA</div>
+        <div class="type-desc">Persona jurídica / Empresa</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── SECCIÓN 4a: Formulario PERSONA ─────────────────────────── -->
+  <div id="secFormPersona" class="d-none">
+    <div class="form-card">
+      <div class="section-label"><i class="bi bi-person-badge me-1"></i>Datos personales</div>
+      <div class="row g-3">
+        <div class="col-md-4">
+          <label class="form-label">Apellido Paterno *</label>
+          <input type="text" id="pApPaterno" class="form-control" placeholder="Apellido paterno" oninput="upperInput(this)">
+        </div>
+        <div class="col-md-4">
+          <label class="form-label">Apellido Materno</label>
+          <input type="text" id="pApMaterno" class="form-control" placeholder="Apellido materno" oninput="upperInput(this)">
+        </div>
+        <div class="col-md-4">
+          <label class="form-label">Nombres *</label>
+          <input type="text" id="pNombres" class="form-control" placeholder="Nombres" oninput="upperInput(this)">
+        </div>
+        <div class="col-md-3">
+          <label class="form-label">Fecha Nacimiento</label>
+          <input type="date" id="pFechaNac" class="form-control no-upper" onchange="calcularEdad()">
+        </div>
+        <div class="col-md-2">
+          <label class="form-label">Edad</label>
+          <div class="edad-badge" id="pEdad">—</div>
+        </div>
+        <div class="col-md-3">
+          <label class="form-label">Estado Civil</label>
+          <input type="text" id="pEstadoCivil" class="form-control" placeholder="Estado civil" oninput="upperInput(this)">
+        </div>
+        <div class="col-md-2">
+          <label class="form-label">Sexo</label>
+          <select id="pSexo" class="form-select no-upper">
+            <option value="">—</option>
+            <option value="MASCULINO">Masculino</option>
+            <option value="FEMENINO">Femenino</option>
+            <option value="OTRO">Otro</option>
+          </select>
+        </div>
+        <div class="col-md-2">
+          <label class="form-label">Cargas</label>
+          <input type="number" id="pCargas" class="form-control no-upper" min="0" max="20" placeholder="0">
+        </div>
+      </div>
+
+      <hr class="section-divider">
+      <div class="section-label"><i class="bi bi-credit-card me-1"></i>Datos legales / visas</div>
+      <div class="row g-3">
+        <div class="col-md-4">
+          <label class="form-label">Régimen</label>
+          <input type="text" id="pRegimen" class="form-control" placeholder="Ej: CASADO CON SEP. BIENES" oninput="upperInput(this)">
+        </div>
+        <div class="col-md-4">
+          <label class="form-label">Nacionalidad</label>
+          <input type="text" id="pNacionalidad" class="form-control" placeholder="Ej: CHILENA" oninput="upperInput(this)">
+        </div>
+        <div class="col-md-4">
+          <label class="form-label">Teléfono Móvil</label>
+          <input type="text" id="pTelefono" class="form-control no-upper" placeholder="+56 9 1234 5678">
+        </div>
+        <div class="col-md-3">
+          <label class="form-label">Tipo de Visa</label>
+          <input type="text" id="pTipoVisa" class="form-control" placeholder="Ej: TEMPORARIA" oninput="upperInput(this)">
+        </div>
+        <div class="col-md-3">
+          <label class="form-label">Fecha Visa</label>
+          <input type="date" id="pFechaVisa" class="form-control no-upper">
+        </div>
+      </div>
+
+      <hr class="section-divider">
+      <div class="section-label"><i class="bi bi-envelope me-1"></i>Contacto y domicilio</div>
+      <div class="row g-3">
+        <div class="col-md-6">
+          <label class="form-label">Correo electrónico</label>
+          <input type="email" id="pCorreo" class="form-control email-field" placeholder="correo@ejemplo.cl">
+        </div>
+        <div class="col-md-6">
+          <label class="form-label">Dirección</label>
+          <input type="text" id="pDireccion" class="form-control" placeholder="Calle, número" oninput="upperInput(this)">
+        </div>
+        <div class="col-md-4">
+          <label class="form-label">Región</label>
+          <select id="pRegion" class="form-select no-upper" onchange="cargarProvincias('p')">
+            <option value="">— Seleccione —</option>
+          </select>
+        </div>
+        <div class="col-md-4">
+          <label class="form-label">Provincia</label>
+          <select id="pProvincia" class="form-select no-upper" onchange="cargarComunas('p')">
+            <option value="">— Seleccione —</option>
+          </select>
+        </div>
+        <div class="col-md-4">
+          <label class="form-label">Comuna</label>
+          <select id="pComuna" class="form-select no-upper">
+            <option value="">— Seleccione —</option>
+          </select>
+        </div>
+      </div>
+    </div>
+
+    <!-- Botones guardar persona -->
+    <div class="d-flex gap-2 justify-content-end mb-4">
+      <button class="btn-cancelar" onclick="cancelarFormulario()">
+        <i class="bi bi-x-circle me-1"></i>Cancelar
+      </button>
+      <button class="btn-guardar" id="btnGuardarPersona" onclick="guardar('PERSONA')">
+        <i class="bi bi-floppy me-1"></i>Guardar
+      </button>
+    </div>
+  </div>
+
+  <!-- ── SECCIÓN 4b: Formulario EMPRESA ─────────────────────────── -->
+  <div id="secFormEmpresa" class="d-none">
+    <div class="form-card">
+      <div class="section-label"><i class="bi bi-building me-1"></i>Datos de la empresa</div>
+      <div class="row g-3">
+        <div class="col-md-6">
+          <label class="form-label">Nombre Fantasía</label>
+          <input type="text" id="eNombreFantasia" class="form-control" placeholder="Nombre comercial" oninput="upperInput(this)">
+        </div>
+        <div class="col-md-6">
+          <label class="form-label">Razón Social *</label>
+          <input type="text" id="eRazonSocial" class="form-control" placeholder="Razón social" oninput="upperInput(this)">
+        </div>
+        <div class="col-md-3">
+          <label class="form-label">Código Actividad</label>
+          <input type="text" id="eCodigoActividad" class="form-control no-upper" placeholder="Ej: 45111">
+        </div>
+        <div class="col-md-9">
+          <label class="form-label">Actividad Económica</label>
+          <input type="text" id="eActividadEconomica" class="form-control" placeholder="Descripción de actividad" oninput="upperInput(this)">
+        </div>
+        <div class="col-md-4">
+          <label class="form-label">Fecha Inicio Actividad</label>
+          <input type="date" id="eFechaInicio" class="form-control no-upper">
+        </div>
+        <div class="col-md-8">
+          <label class="form-label">Correo electrónico</label>
+          <input type="email" id="eCorreo" class="form-control email-field" placeholder="correo@empresa.cl">
+        </div>
+        <div class="col-12">
+          <label class="form-label">Dirección</label>
+          <input type="text" id="eDireccion" class="form-control" placeholder="Calle, número" oninput="upperInput(this)">
+        </div>
+        <div class="col-md-4">
+          <label class="form-label">Región</label>
+          <select id="eRegion" class="form-select no-upper" onchange="cargarProvincias('e')">
+            <option value="">— Seleccione —</option>
+          </select>
+        </div>
+        <div class="col-md-4">
+          <label class="form-label">Provincia</label>
+          <select id="eProvincia" class="form-select no-upper" onchange="cargarComunas('e')">
+            <option value="">— Seleccione —</option>
+          </select>
+        </div>
+        <div class="col-md-4">
+          <label class="form-label">Comuna</label>
+          <select id="eComuna" class="form-select no-upper">
+            <option value="">— Seleccione —</option>
+          </select>
+        </div>
+      </div>
+
+      <hr class="section-divider">
+      <div class="section-label"><i class="bi bi-people me-1"></i>Representantes legales</div>
+
+      <!-- Rep 1 -->
+      <div class="rep-card">
+        <div class="rep-num"><i class="bi bi-1-circle me-1"></i>Representante 1</div>
+        <div class="row g-2">
+          <div class="col-md-3">
+            <label class="form-label">RUT</label>
+            <input type="text" id="eRep1Rut" class="form-control" maxlength="12"
+                   oninput="onRepRutInput(this)" placeholder="12.345.678-9">
+          </div>
+          <div class="col-md-3">
+            <label class="form-label">Nombres</label>
+            <input type="text" id="eRep1Nombre" class="form-control" oninput="upperInput(this)">
+          </div>
+          <div class="col-md-3">
+            <label class="form-label">Ap. Paterno</label>
+            <input type="text" id="eRep1ApPat" class="form-control" oninput="upperInput(this)">
+          </div>
+          <div class="col-md-3">
+            <label class="form-label">Ap. Materno</label>
+            <input type="text" id="eRep1ApMat" class="form-control" oninput="upperInput(this)">
+          </div>
+        </div>
+      </div>
+
+      <!-- Rep 2 -->
+      <div class="rep-card">
+        <div class="rep-num"><i class="bi bi-2-circle me-1"></i>Representante 2</div>
+        <div class="row g-2">
+          <div class="col-md-3">
+            <label class="form-label">RUT</label>
+            <input type="text" id="eRep2Rut" class="form-control" maxlength="12"
+                   oninput="onRepRutInput(this)" placeholder="12.345.678-9">
+          </div>
+          <div class="col-md-3">
+            <label class="form-label">Nombres</label>
+            <input type="text" id="eRep2Nombre" class="form-control" oninput="upperInput(this)">
+          </div>
+          <div class="col-md-3">
+            <label class="form-label">Ap. Paterno</label>
+            <input type="text" id="eRep2ApPat" class="form-control" oninput="upperInput(this)">
+          </div>
+          <div class="col-md-3">
+            <label class="form-label">Ap. Materno</label>
+            <input type="text" id="eRep2ApMat" class="form-control" oninput="upperInput(this)">
+          </div>
+        </div>
+      </div>
+
+      <!-- Rep 3 -->
+      <div class="rep-card">
+        <div class="rep-num"><i class="bi bi-3-circle me-1"></i>Representante 3</div>
+        <div class="row g-2">
+          <div class="col-md-3">
+            <label class="form-label">RUT</label>
+            <input type="text" id="eRep3Rut" class="form-control" maxlength="12"
+                   oninput="onRepRutInput(this)" placeholder="12.345.678-9">
+          </div>
+          <div class="col-md-3">
+            <label class="form-label">Nombres</label>
+            <input type="text" id="eRep3Nombre" class="form-control" oninput="upperInput(this)">
+          </div>
+          <div class="col-md-3">
+            <label class="form-label">Ap. Paterno</label>
+            <input type="text" id="eRep3ApPat" class="form-control" oninput="upperInput(this)">
+          </div>
+          <div class="col-md-3">
+            <label class="form-label">Ap. Materno</label>
+            <input type="text" id="eRep3ApMat" class="form-control" oninput="upperInput(this)">
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Botones guardar empresa -->
+    <div class="d-flex gap-2 justify-content-end mb-4">
+      <button class="btn-cancelar" onclick="cancelarFormulario()">
+        <i class="bi bi-x-circle me-1"></i>Cancelar
+      </button>
+      <button class="btn-guardar" id="btnGuardarEmpresa" onclick="guardar('EMPRESA')">
+        <i class="bi bi-floppy me-1"></i>Guardar
+      </button>
+    </div>
+  </div>
+
+</div><!-- /page-wrap -->
+
+<script>
+/* ═══════════════════════════════════════════════════════════════════
+   Auth / Session
+═══════════════════════════════════════════════════════════════════ */
+const token = localStorage.getItem('token');
+if (!token) { window.location.href = '/login.html'; }
+const usuario = JSON.parse(localStorage.getItem('usuario') || '{}');
+document.getElementById('navUser').textContent = usuario.nombre || usuario.email || '';
+
+function logout() {
+  localStorage.removeItem('token');
+  localStorage.removeItem('usuario');
+  window.location.href = '/login.html';
+}
+
+function apiHeaders() {
+  return { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` };
+}
+
+/* ═══════════════════════════════════════════════════════════════════
+   State
+═══════════════════════════════════════════════════════════════════ */
+let clienteActual = null;   // objeto cliente encontrado
+let modoEdicion   = false;  // true: editando cliente existente
+let tipoSeleccionado = null;
+let todasProvincias = [];
+let todasComunas    = [];
+let regionesData    = [];
+
+/* ═══════════════════════════════════════════════════════════════════
+   RUT formatter
+═══════════════════════════════════════════════════════════════════ */
+function formatRUT(raw) {
+  let clean = raw.replace(/[^0-9kK]/g, '').toUpperCase();
+  if (clean.length < 2) return clean;
+  const dv   = clean.slice(-1);
+  const body = clean.slice(0, -1);
+  let fmt = '';
+  for (let i = body.length; i > 0; i -= 3)
+    fmt = body.slice(Math.max(0, i - 3), i) + (fmt ? '.' + fmt : '');
+  return fmt + '-' + dv;
+}
+
+function onRutInput(el) {
+  const pos = el.selectionStart;
+  const raw = el.value;
+  const clean = raw.replace(/[^0-9kK]/g, '');
+  if (clean.length >= 2) {
+    const formatted = formatRUT(raw);
+    el.value = formatted;
+  }
+  // hint de validez
+  const hint = document.getElementById('rutHint');
+  if (clean.length >= 7 && clean.length <= 9) {
+    hint.textContent = '';
+  } else if (clean.length > 0) {
+    hint.textContent = 'Ingresa el RUT completo con dígito verificador';
+  } else {
+    hint.textContent = '';
+  }
+}
+
+function onRepRutInput(el) {
+  const clean = el.value.replace(/[^0-9kK]/g, '');
+  if (clean.length >= 2) el.value = formatRUT(el.value);
+}
+
+/* ═══════════════════════════════════════════════════════════════════
+   Uppercase helper
+═══════════════════════════════════════════════════════════════════ */
+function upperInput(el) {
+  const pos = el.selectionStart;
+  el.value = el.value.toUpperCase();
+  el.setSelectionRange(pos, pos);
+}
+
+/* ═══════════════════════════════════════════════════════════════════
+   Show / Hide sections
+═══════════════════════════════════════════════════════════════════ */
+function hideAll() {
+  ['secNoExiste','secExiste','secSelector','secFormPersona','secFormEmpresa']
+    .forEach(id => document.getElementById(id).classList.add('d-none'));
+  document.getElementById('headerDates').style.display = 'none';
+  document.getElementById('alerta').style.display = 'none';
+}
+
+function showAlert(msg, type = 'danger') {
+  const el = document.getElementById('alerta');
+  el.className = `alert alert-${type} mb-3`;
+  el.textContent = msg;
+  el.style.display = 'block';
+  el.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+}
+
+function resetAll() {
+  hideAll();
+  clienteActual = null;
+  modoEdicion   = false;
+  tipoSeleccionado = null;
+  document.getElementById('inputRut').value = '';
+  document.getElementById('rutHint').textContent = '';
+  document.getElementById('inputRut').focus();
+}
+
+/* ═══════════════════════════════════════════════════════════════════
+   Buscar cliente
+═══════════════════════════════════════════════════════════════════ */
+async function buscarCliente() {
+  const rut = document.getElementById('inputRut').value.trim().toUpperCase();
+  if (!rut) { showAlert('Ingresa un RUT para buscar'); return; }
+
+  const btn = document.getElementById('btnBuscar');
+  document.getElementById('btnBuscarText').classList.add('d-none');
+  document.getElementById('btnBuscarSpinner').classList.remove('d-none');
+  btn.disabled = true;
+  hideAll();
+
+  try {
+    const resp = await fetch(`/api/clientes/rut/${encodeURIComponent(rut)}`, {
+      headers: apiHeaders()
+    });
+    const json = await resp.json();
+
+    if (!json.success) { showAlert(json.error || 'Error al buscar'); return; }
+
+    if (json.data) {
+      // Cliente encontrado
+      clienteActual = json.data;
+      document.getElementById('existRut').textContent =
+        `RUT: ${clienteActual.rut}  ·  ${clienteActual.tipo_cliente}`;
+      mostrarFechas(clienteActual);
+      mostrarVistaLectura(clienteActual);
+      document.getElementById('secExiste').classList.remove('d-none');
+    } else {
+      // No existe
+      document.getElementById('notExistRut').textContent = `RUT ${rut} no registrado en el sistema`;
+      document.getElementById('secNoExiste').classList.remove('d-none');
+    }
+  } catch {
+    showAlert('Error de conexión con el servidor');
+  } finally {
+    document.getElementById('btnBuscarText').classList.remove('d-none');
+    document.getElementById('btnBuscarSpinner').classList.add('d-none');
+    btn.disabled = false;
+  }
+}
+
+/* ═══════════════════════════════════════════════════════════════════
+   Fechas en header
+═══════════════════════════════════════════════════════════════════ */
+function mostrarFechas(c) {
+  const fmtDt = s => s ? new Date(s).toLocaleDateString('es-CL', {
+    day:'2-digit', month:'2-digit', year:'numeric', hour:'2-digit', minute:'2-digit'
+  }) : '—';
+  document.getElementById('hFechaCreacion').textContent =
+    `📅 Creación: ${fmtDt(c.fecha_creacion)}`;
+  document.getElementById('hFechaActualizacion').textContent =
+    `🔄 Actualización: ${fmtDt(c.fecha_actualizacion)}`;
+  document.getElementById('headerDates').style.display = 'block';
+}
+
+/* ═══════════════════════════════════════════════════════════════════
+   Vista lectura dinámica
+═══════════════════════════════════════════════════════════════════ */
+function dv(label, value) {
+  const v = value && String(value).trim() ? String(value).trim() : null;
+  return `
+    <div class="col-md-4 mb-2">
+      <div class="form-label">${label}</div>
+      <div class="field-display ${v ? '' : 'empty'}">${v || '—'}</div>
+    </div>`;
+}
+
+function mostrarVistaLectura(c) {
+  let html = '<div class="row">';
+
+  if (c.tipo_cliente === 'PERSONA') {
+    html += '<div class="col-12 mb-2"><div class="section-label"><i class="bi bi-person-badge me-1"></i>Datos personales</div></div>';
+    html += dv('Apellido Paterno', c.apellido_paterno);
+    html += dv('Apellido Materno', c.apellido_materno);
+    html += dv('Nombres', c.nombres);
+    html += dv('Fecha Nacimiento', c.fecha_nacimiento ? new Date(c.fecha_nacimiento).toLocaleDateString('es-CL') : null);
+    html += dv('Edad', c.fecha_nacimiento ? calcEdadStr(c.fecha_nacimiento) : null);
+    html += dv('Estado Civil', c.estado_civil);
+    html += dv('Sexo', c.sexo);
+    html += dv('Cargas', c.cargas);
+    html += dv('Régimen', c.regimen);
+    html += dv('Nacionalidad', c.nacionalidad);
+    html += dv('Teléfono Móvil', c.telefono_movil);
+    html += dv('Tipo Visa', c.tipo_visa);
+    html += dv('Fecha Visa', c.fecha_visa ? new Date(c.fecha_visa).toLocaleDateString('es-CL') : null);
+  } else {
+    html += '<div class="col-12 mb-2"><div class="section-label"><i class="bi bi-building me-1"></i>Datos empresa</div></div>';
+    html += dv('Nombre Fantasía', c.nombre_fantasia);
+    html += dv('Razón Social', c.razon_social);
+    html += dv('Código Actividad', c.codigo_actividad);
+    html += dv('Actividad Económica', c.actividad_economica);
+    html += dv('Inicio Actividad', c.fecha_inicio_actividad ? new Date(c.fecha_inicio_actividad).toLocaleDateString('es-CL') : null);
+    if (c.rep1_rut || c.rep1_nombre) {
+      html += '<div class="col-12 mt-2 mb-1"><div class="section-label"><i class="bi bi-people me-1"></i>Representantes</div></div>';
+      [[1,'rep1'],[2,'rep2'],[3,'rep3']].forEach(([n,k]) => {
+        if (c[`${k}_rut`] || c[`${k}_nombre`]) {
+          html += dv(`Rep.${n} RUT`, c[`${k}_rut`]);
+          html += dv(`Rep.${n} Nombres`, c[`${k}_nombre`]);
+          html += dv(`Rep.${n} Ap. Paterno`, c[`${k}_ap_paterno`]);
+          html += dv(`Rep.${n} Ap. Materno`, c[`${k}_ap_materno`]);
+        }
+      });
+    }
+  }
+
+  html += '<div class="col-12 mt-2 mb-1"><div class="section-label"><i class="bi bi-envelope me-1"></i>Contacto y domicilio</div></div>';
+  html += dv('Correo', c.correo);
+  html += dv('Dirección', c.direccion);
+  // Resolve region/provincia/comuna names from loaded data
+  const regionNombre   = regionesData.find(r => r.id_region   == c.id_region  )?.nombre || c.id_region   || null;
+  const provinciaNombre= todasProvincias.find(p=> p.id_provincia==c.id_provincia)?.nombre|| c.id_provincia|| null;
+  const comunaNombre   = todasComunas.find(co=> co.id_comuna   ==c.id_comuna  )?.nombre || c.id_comuna   || null;
+  html += dv('Región', regionNombre);
+  html += dv('Provincia', provinciaNombre);
+  html += dv('Comuna', comunaNombre);
+
+  html += '</div>';
+  document.getElementById('vistaLectura').innerHTML = html;
+}
+
+/* ═══════════════════════════════════════════════════════════════════
+   Selector tipo
+═══════════════════════════════════════════════════════════════════ */
+function mostrarSelector() {
+  hideAll();
+  document.getElementById('secSelector').classList.remove('d-none');
+}
+
+function seleccionarTipo(tipo) {
+  tipoSeleccionado = tipo;
+  document.getElementById('cardPersona').classList.toggle('active', tipo === 'PERSONA');
+  document.getElementById('cardEmpresa').classList.toggle('active', tipo === 'EMPRESA');
+
+  document.getElementById('secSelector').classList.remove('d-none');
+
+  if (tipo === 'PERSONA') {
+    document.getElementById('secFormPersona').classList.remove('d-none');
+    document.getElementById('secFormEmpresa').classList.add('d-none');
+  } else {
+    document.getElementById('secFormEmpresa').classList.remove('d-none');
+    document.getElementById('secFormPersona').classList.add('d-none');
+  }
+}
+
+function cancelarFormulario() {
+  if (modoEdicion && clienteActual) {
+    // Volver a vista lectura
+    hideAll();
+    mostrarFechas(clienteActual);
+    mostrarVistaLectura(clienteActual);
+    document.getElementById('secExiste').classList.remove('d-none');
+    modoEdicion = false;
+  } else {
+    resetAll();
+  }
+}
+
+/* ═══════════════════════════════════════════════════════════════════
+   Activar edición (cliente existente)
+═══════════════════════════════════════════════════════════════════ */
+async function activarEdicion() {
+  if (!clienteActual) return;
+  modoEdicion = true;
+  hideAll();
+
+  tipoSeleccionado = clienteActual.tipo_cliente;
+  document.getElementById('secSelector').classList.remove('d-none');
+  document.getElementById('cardPersona').classList.toggle('active', tipoSeleccionado === 'PERSONA');
+  document.getElementById('cardEmpresa').classList.toggle('active', tipoSeleccionado === 'EMPRESA');
+
+  // Make type cards non-interactive in edit mode (tipo no cambia)
+  document.getElementById('cardPersona').style.cursor = 'default';
+  document.getElementById('cardEmpresa').style.cursor = 'default';
+
+  if (tipoSeleccionado === 'PERSONA') {
+    document.getElementById('secFormPersona').classList.remove('d-none');
+    await precargarPersona(clienteActual);
+  } else {
+    document.getElementById('secFormEmpresa').classList.remove('d-none');
+    await precargarEmpresa(clienteActual);
+  }
+}
+
+/* ═══════════════════════════════════════════════════════════════════
+   Pre-cargar formulario con datos del cliente
+═══════════════════════════════════════════════════════════════════ */
+async function precargarPersona(c) {
+  document.getElementById('pApPaterno').value  = c.apellido_paterno  || '';
+  document.getElementById('pApMaterno').value  = c.apellido_materno  || '';
+  document.getElementById('pNombres').value    = c.nombres           || '';
+  document.getElementById('pFechaNac').value   = c.fecha_nacimiento  ? c.fecha_nacimiento.split('T')[0] : '';
+  document.getElementById('pEstadoCivil').value= c.estado_civil      || '';
+  document.getElementById('pSexo').value       = c.sexo              || '';
+  document.getElementById('pCargas').value     = c.cargas            ?? '';
+  document.getElementById('pRegimen').value    = c.regimen           || '';
+  document.getElementById('pNacionalidad').value = c.nacionalidad    || '';
+  document.getElementById('pTelefono').value   = c.telefono_movil    || '';
+  document.getElementById('pTipoVisa').value   = c.tipo_visa         || '';
+  document.getElementById('pFechaVisa').value  = c.fecha_visa ? c.fecha_visa.split('T')[0] : '';
+  document.getElementById('pCorreo').value     = c.correo            || '';
+  document.getElementById('pDireccion').value  = c.direccion         || '';
+  calcularEdad();
+  await setGeo('p', c.id_region, c.id_provincia, c.id_comuna);
+}
+
+async function precargarEmpresa(c) {
+  document.getElementById('eNombreFantasia').value    = c.nombre_fantasia     || '';
+  document.getElementById('eRazonSocial').value       = c.razon_social        || '';
+  document.getElementById('eCodigoActividad').value   = c.codigo_actividad    || '';
+  document.getElementById('eActividadEconomica').value= c.actividad_economica || '';
+  document.getElementById('eFechaInicio').value       = c.fecha_inicio_actividad ? c.fecha_inicio_actividad.split('T')[0] : '';
+  document.getElementById('eCorreo').value            = c.correo              || '';
+  document.getElementById('eDireccion').value         = c.direccion           || '';
+  // Representantes
+  [[1,'rep1'],[2,'rep2'],[3,'rep3']].forEach(([n,k]) => {
+    document.getElementById(`eRep${n}Rut`).value    = c[`${k}_rut`]        || '';
+    document.getElementById(`eRep${n}Nombre`).value = c[`${k}_nombre`]     || '';
+    document.getElementById(`eRep${n}ApPat`).value  = c[`${k}_ap_paterno`] || '';
+    document.getElementById(`eRep${n}ApMat`).value  = c[`${k}_ap_materno`] || '';
+  });
+  await setGeo('e', c.id_region, c.id_provincia, c.id_comuna);
+}
+
+/* ═══════════════════════════════════════════════════════════════════
+   Edad
+═══════════════════════════════════════════════════════════════════ */
+function calcEdadStr(fechaNac) {
+  if (!fechaNac) return null;
+  const hoy  = new Date();
+  const nac  = new Date(fechaNac);
+  let edad = hoy.getFullYear() - nac.getFullYear();
+  const m = hoy.getMonth() - nac.getMonth();
+  if (m < 0 || (m === 0 && hoy.getDate() < nac.getDate())) edad--;
+  return edad >= 0 ? `${edad} años` : null;
+}
+
+function calcularEdad() {
+  const val = document.getElementById('pFechaNac').value;
+  const badge = document.getElementById('pEdad');
+  const str = calcEdadStr(val);
+  badge.textContent = str || '—';
+}
+
+/* ═══════════════════════════════════════════════════════════════════
+   Geografico cascading
+═══════════════════════════════════════════════════════════════════ */
+async function loadGeo() {
+  try {
+    const [rRegs, rProvs, rComs] = await Promise.all([
+      fetch('/api/geografico/regiones',  { headers: apiHeaders() }).then(r=>r.json()),
+      fetch('/api/geografico/provincias',{ headers: apiHeaders() }).then(r=>r.json()),
+      fetch('/api/geografico/comunas',   { headers: apiHeaders() }).then(r=>r.json())
+    ]);
+    regionesData    = rRegs.data  || [];
+    todasProvincias = rProvs.data || [];
+    todasComunas    = rComs.data  || [];
+
+    // Populate region selects
+    ['p','e'].forEach(pfx => {
+      const sel = document.getElementById(pfx + 'Region');
+      regionesData.forEach(r => {
+        const opt = document.createElement('option');
+        opt.value = r.id_region;
+        opt.textContent = r.nombre;
+        sel.appendChild(opt);
+      });
+    });
+  } catch(e) { console.error('Error cargando geografico', e); }
+}
+
+function cargarProvincias(pfx) {
+  const regionId = document.getElementById(pfx + 'Region').value;
+  const selProv  = document.getElementById(pfx + 'Provincia');
+  const selCom   = document.getElementById(pfx + 'Comuna');
+
+  selProv.innerHTML = '<option value="">— Seleccione —</option>';
+  selCom.innerHTML  = '<option value="">— Seleccione —</option>';
+
+  const filtradas = todasProvincias.filter(p => String(p.id_region) === String(regionId));
+  filtradas.forEach(p => {
+    const opt = document.createElement('option');
+    opt.value = p.id_provincia;
+    opt.textContent = p.nombre;
+    selProv.appendChild(opt);
+  });
+}
+
+function cargarComunas(pfx) {
+  const provId  = document.getElementById(pfx + 'Provincia').value;
+  const selCom  = document.getElementById(pfx + 'Comuna');
+
+  selCom.innerHTML = '<option value="">— Seleccione —</option>';
+
+  const filtradas = todasComunas.filter(c => String(c.id_provincia) === String(provId));
+  filtradas.forEach(c => {
+    const opt = document.createElement('option');
+    opt.value = c.id_comuna;
+    opt.textContent = c.nombre;
+    selCom.appendChild(opt);
+  });
+}
+
+async function setGeo(pfx, idRegion, idProvincia, idComuna) {
+  if (!idRegion) return;
+  document.getElementById(pfx + 'Region').value = idRegion;
+  cargarProvincias(pfx);
+  if (!idProvincia) return;
+  document.getElementById(pfx + 'Provincia').value = idProvincia;
+  cargarComunas(pfx);
+  if (!idComuna) return;
+  document.getElementById(pfx + 'Comuna').value = idComuna;
+}
+
+/* ═══════════════════════════════════════════════════════════════════
+   Guardar (crear o editar)
+═══════════════════════════════════════════════════════════════════ */
+async function guardar(tipo) {
+  document.getElementById('alerta').style.display = 'none';
+  const btnId = tipo === 'PERSONA' ? 'btnGuardarPersona' : 'btnGuardarEmpresa';
+  const btn = document.getElementById(btnId);
+  btn.disabled = true;
+  btn.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Guardando...';
+
+  try {
+    const body = buildBody(tipo);
+    if (!body) { btn.disabled = false; btn.innerHTML = '<i class="bi bi-floppy me-1"></i>Guardar'; return; }
+
+    let url, method;
+    if (modoEdicion && clienteActual) {
+      url    = `/api/clientes/${clienteActual.id_cliente}`;
+      method = 'PUT';
+    } else {
+      url    = '/api/clientes/';
+      method = 'POST';
+      body.rut = document.getElementById('inputRut').value.trim().toUpperCase();
+    }
+
+    const resp = await fetch(url, {
+      method, headers: apiHeaders(), body: JSON.stringify(body)
+    });
+    const json = await resp.json();
+
+    if (!json.success) {
+      showAlert(json.error || 'Error al guardar');
+    } else {
+      showAlert(modoEdicion ? 'Cliente actualizado correctamente' : 'Cliente creado correctamente', 'success');
+      // Recargar datos del cliente
+      const rutBuscar = body.rut || clienteActual.rut;
+      await recargarCliente(rutBuscar);
+    }
+  } catch {
+    showAlert('Error de conexión con el servidor');
+  } finally {
+    btn.disabled = false;
+    btn.innerHTML = '<i class="bi bi-floppy me-1"></i>Guardar';
+  }
+}
+
+async function recargarCliente(rut) {
+  const resp = await fetch(`/api/clientes/rut/${encodeURIComponent(rut)}`, { headers: apiHeaders() });
+  const json = await resp.json();
+  if (json.success && json.data) {
+    clienteActual = json.data;
+    modoEdicion   = false;
+    hideAll();
+    document.getElementById('inputRut').value = rut;
+    mostrarFechas(clienteActual);
+    mostrarVistaLectura(clienteActual);
+    document.getElementById('existRut').textContent =
+      `RUT: ${clienteActual.rut}  ·  ${clienteActual.tipo_cliente}`;
+    document.getElementById('secExiste').classList.remove('d-none');
+    // Restore type card pointers
+    document.getElementById('cardPersona').style.cursor = 'pointer';
+    document.getElementById('cardEmpresa').style.cursor = 'pointer';
+  }
+}
+
+function buildBody(tipo) {
+  if (tipo === 'PERSONA') {
+    const apPat = document.getElementById('pApPaterno').value.trim();
+    const nombres = document.getElementById('pNombres').value.trim();
+    if (!apPat || !nombres) {
+      showAlert('Apellido paterno y nombres son obligatorios');
+      return null;
+    }
+    return {
+      tipo_cliente:     'PERSONA',
+      apellido_paterno: apPat,
+      apellido_materno: document.getElementById('pApMaterno').value.trim(),
+      nombres,
+      fecha_nacimiento: document.getElementById('pFechaNac').value || null,
+      estado_civil:     document.getElementById('pEstadoCivil').value.trim(),
+      sexo:             document.getElementById('pSexo').value,
+      regimen:          document.getElementById('pRegimen').value.trim(),
+      cargas:           document.getElementById('pCargas').value || 0,
+      telefono_movil:   document.getElementById('pTelefono').value.trim(),
+      tipo_visa:        document.getElementById('pTipoVisa').value.trim(),
+      fecha_visa:       document.getElementById('pFechaVisa').value || null,
+      nacionalidad:     document.getElementById('pNacionalidad').value.trim(),
+      correo:           document.getElementById('pCorreo').value.trim(),
+      direccion:        document.getElementById('pDireccion').value.trim(),
+      id_region:        document.getElementById('pRegion').value   || null,
+      id_provincia:     document.getElementById('pProvincia').value|| null,
+      id_comuna:        document.getElementById('pComuna').value   || null,
+    };
+  } else {
+    const razon = document.getElementById('eRazonSocial').value.trim();
+    if (!razon) {
+      showAlert('Razón social es obligatoria');
+      return null;
+    }
+    return {
+      tipo_cliente:            'EMPRESA',
+      nombre_fantasia:         document.getElementById('eNombreFantasia').value.trim(),
+      razon_social:            razon,
+      codigo_actividad:        document.getElementById('eCodigoActividad').value.trim(),
+      actividad_economica:     document.getElementById('eActividadEconomica').value.trim(),
+      fecha_inicio_actividad:  document.getElementById('eFechaInicio').value || null,
+      correo:                  document.getElementById('eCorreo').value.trim(),
+      direccion:               document.getElementById('eDireccion').value.trim(),
+      id_region:               document.getElementById('eRegion').value    || null,
+      id_provincia:            document.getElementById('eProvincia').value || null,
+      id_comuna:               document.getElementById('eComuna').value    || null,
+      rep1_rut:                document.getElementById('eRep1Rut').value.trim(),
+      rep1_nombre:             document.getElementById('eRep1Nombre').value.trim(),
+      rep1_ap_paterno:         document.getElementById('eRep1ApPat').value.trim(),
+      rep1_ap_materno:         document.getElementById('eRep1ApMat').value.trim(),
+      rep2_rut:                document.getElementById('eRep2Rut').value.trim(),
+      rep2_nombre:             document.getElementById('eRep2Nombre').value.trim(),
+      rep2_ap_paterno:         document.getElementById('eRep2ApPat').value.trim(),
+      rep2_ap_materno:         document.getElementById('eRep2ApMat').value.trim(),
+      rep3_rut:                document.getElementById('eRep3Rut').value.trim(),
+      rep3_nombre:             document.getElementById('eRep3Nombre').value.trim(),
+      rep3_ap_paterno:         document.getElementById('eRep3ApPat').value.trim(),
+      rep3_ap_materno:         document.getElementById('eRep3ApMat').value.trim(),
+    };
+  }
+}
+
+/* ═══════════════════════════════════════════════════════════════════
+   Init
+═══════════════════════════════════════════════════════════════════ */
+loadGeo();
+document.getElementById('inputRut').focus();
+</script>
+</body>
+</html>
