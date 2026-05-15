@@ -1,58 +1,98 @@
 const pool = require('../../../../shared/config/database');
 
-/* ─── Crear tabla si no existe ─────────────────────────────────────────── */
-const ensureTable = () => pool.query(`
-  CREATE TABLE IF NOT EXISTS clientes (
-    id_cliente          INT AUTO_INCREMENT PRIMARY KEY,
-    rut                 VARCHAR(15)  NOT NULL UNIQUE,
-    tipo_cliente        ENUM('PERSONA','EMPRESA') NOT NULL,
+/* ─── Crear / migrar tabla ──────────────────────────────────────────────── */
+const ensureTable = async () => {
+  // 1. Crear tabla base si no existe (esquema completo)
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS clientes (
+      id_cliente          INT AUTO_INCREMENT PRIMARY KEY,
+      rut                 VARCHAR(15)  NOT NULL UNIQUE,
+      tipo_cliente        ENUM('PERSONA','EMPRESA') NOT NULL DEFAULT 'PERSONA',
+      apellido_paterno    VARCHAR(100),
+      apellido_materno    VARCHAR(100),
+      nombres             VARCHAR(150),
+      fecha_nacimiento    DATE,
+      estado_civil        VARCHAR(60),
+      sexo                VARCHAR(20),
+      regimen             VARCHAR(60),
+      cargas              TINYINT UNSIGNED DEFAULT 0,
+      telefono_movil      VARCHAR(20),
+      fecha_visa          DATE,
+      tipo_visa           VARCHAR(100),
+      nacionalidad        VARCHAR(100),
+      nombre_fantasia     VARCHAR(200),
+      razon_social        VARCHAR(200),
+      codigo_actividad    VARCHAR(20),
+      actividad_economica VARCHAR(300),
+      fecha_inicio_actividad DATE,
+      rep1_rut            VARCHAR(15),
+      rep1_nombre         VARCHAR(150),
+      rep1_ap_paterno     VARCHAR(100),
+      rep1_ap_materno     VARCHAR(100),
+      rep2_rut            VARCHAR(15),
+      rep2_nombre         VARCHAR(150),
+      rep2_ap_paterno     VARCHAR(100),
+      rep2_ap_materno     VARCHAR(100),
+      rep3_rut            VARCHAR(15),
+      rep3_nombre         VARCHAR(150),
+      rep3_ap_paterno     VARCHAR(100),
+      rep3_ap_materno     VARCHAR(100),
+      correo              VARCHAR(200),
+      direccion           VARCHAR(300),
+      id_comuna           INT,
+      id_provincia        INT,
+      id_region           INT,
+      fecha_creacion      DATETIME DEFAULT CURRENT_TIMESTAMP,
+      fecha_actualizacion DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+    )
+  `);
 
-    -- PERSONA
-    apellido_paterno    VARCHAR(100),
-    apellido_materno    VARCHAR(100),
-    nombres             VARCHAR(150),
-    fecha_nacimiento    DATE,
-    estado_civil        VARCHAR(60),
-    sexo                VARCHAR(20),
-    regimen             VARCHAR(60),
-    cargas              TINYINT UNSIGNED DEFAULT 0,
-    telefono_movil      VARCHAR(20),
-    fecha_visa          DATE,
-    tipo_visa           VARCHAR(100),
-    nacionalidad        VARCHAR(100),
+  // 2. Migración: agregar columnas nuevas si la tabla existía con esquema viejo
+  //    TiDB soporta ADD COLUMN IF NOT EXISTS; usamos catch por si no lo soporta.
+  const migraciones = [
+    `ALTER TABLE clientes ADD COLUMN IF NOT EXISTS tipo_cliente ENUM('PERSONA','EMPRESA') NOT NULL DEFAULT 'PERSONA'`,
+    `ALTER TABLE clientes ADD COLUMN IF NOT EXISTS apellido_paterno VARCHAR(100)`,
+    `ALTER TABLE clientes ADD COLUMN IF NOT EXISTS apellido_materno VARCHAR(100)`,
+    `ALTER TABLE clientes ADD COLUMN IF NOT EXISTS nombres VARCHAR(150)`,
+    `ALTER TABLE clientes ADD COLUMN IF NOT EXISTS fecha_nacimiento DATE`,
+    `ALTER TABLE clientes ADD COLUMN IF NOT EXISTS estado_civil VARCHAR(60)`,
+    `ALTER TABLE clientes ADD COLUMN IF NOT EXISTS sexo VARCHAR(20)`,
+    `ALTER TABLE clientes ADD COLUMN IF NOT EXISTS regimen VARCHAR(60)`,
+    `ALTER TABLE clientes ADD COLUMN IF NOT EXISTS cargas TINYINT UNSIGNED DEFAULT 0`,
+    `ALTER TABLE clientes ADD COLUMN IF NOT EXISTS telefono_movil VARCHAR(20)`,
+    `ALTER TABLE clientes ADD COLUMN IF NOT EXISTS fecha_visa DATE`,
+    `ALTER TABLE clientes ADD COLUMN IF NOT EXISTS tipo_visa VARCHAR(100)`,
+    `ALTER TABLE clientes ADD COLUMN IF NOT EXISTS nacionalidad VARCHAR(100)`,
+    `ALTER TABLE clientes ADD COLUMN IF NOT EXISTS nombre_fantasia VARCHAR(200)`,
+    `ALTER TABLE clientes ADD COLUMN IF NOT EXISTS razon_social VARCHAR(200)`,
+    `ALTER TABLE clientes ADD COLUMN IF NOT EXISTS codigo_actividad VARCHAR(20)`,
+    `ALTER TABLE clientes ADD COLUMN IF NOT EXISTS actividad_economica VARCHAR(300)`,
+    `ALTER TABLE clientes ADD COLUMN IF NOT EXISTS fecha_inicio_actividad DATE`,
+    `ALTER TABLE clientes ADD COLUMN IF NOT EXISTS rep1_rut VARCHAR(15)`,
+    `ALTER TABLE clientes ADD COLUMN IF NOT EXISTS rep1_nombre VARCHAR(150)`,
+    `ALTER TABLE clientes ADD COLUMN IF NOT EXISTS rep1_ap_paterno VARCHAR(100)`,
+    `ALTER TABLE clientes ADD COLUMN IF NOT EXISTS rep1_ap_materno VARCHAR(100)`,
+    `ALTER TABLE clientes ADD COLUMN IF NOT EXISTS rep2_rut VARCHAR(15)`,
+    `ALTER TABLE clientes ADD COLUMN IF NOT EXISTS rep2_nombre VARCHAR(150)`,
+    `ALTER TABLE clientes ADD COLUMN IF NOT EXISTS rep2_ap_paterno VARCHAR(100)`,
+    `ALTER TABLE clientes ADD COLUMN IF NOT EXISTS rep2_ap_materno VARCHAR(100)`,
+    `ALTER TABLE clientes ADD COLUMN IF NOT EXISTS rep3_rut VARCHAR(15)`,
+    `ALTER TABLE clientes ADD COLUMN IF NOT EXISTS rep3_nombre VARCHAR(150)`,
+    `ALTER TABLE clientes ADD COLUMN IF NOT EXISTS rep3_ap_paterno VARCHAR(100)`,
+    `ALTER TABLE clientes ADD COLUMN IF NOT EXISTS rep3_ap_materno VARCHAR(100)`,
+    `ALTER TABLE clientes ADD COLUMN IF NOT EXISTS correo VARCHAR(200)`,
+    `ALTER TABLE clientes ADD COLUMN IF NOT EXISTS direccion VARCHAR(300)`,
+    `ALTER TABLE clientes ADD COLUMN IF NOT EXISTS id_comuna INT`,
+    `ALTER TABLE clientes ADD COLUMN IF NOT EXISTS id_provincia INT`,
+    `ALTER TABLE clientes ADD COLUMN IF NOT EXISTS id_region INT`,
+    `ALTER TABLE clientes ADD COLUMN IF NOT EXISTS fecha_creacion DATETIME DEFAULT CURRENT_TIMESTAMP`,
+    `ALTER TABLE clientes ADD COLUMN IF NOT EXISTS fecha_actualizacion DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP`,
+  ];
 
-    -- EMPRESA
-    nombre_fantasia     VARCHAR(200),
-    razon_social        VARCHAR(200),
-    codigo_actividad    VARCHAR(20),
-    actividad_economica VARCHAR(300),
-    fecha_inicio_actividad DATE,
-
-    -- Representantes (empresa)
-    rep1_rut            VARCHAR(15),
-    rep1_nombre         VARCHAR(150),
-    rep1_ap_paterno     VARCHAR(100),
-    rep1_ap_materno     VARCHAR(100),
-    rep2_rut            VARCHAR(15),
-    rep2_nombre         VARCHAR(150),
-    rep2_ap_paterno     VARCHAR(100),
-    rep2_ap_materno     VARCHAR(100),
-    rep3_rut            VARCHAR(15),
-    rep3_nombre         VARCHAR(150),
-    rep3_ap_paterno     VARCHAR(100),
-    rep3_ap_materno     VARCHAR(100),
-
-    -- Datos de contacto / ubicación
-    correo              VARCHAR(200),
-    direccion           VARCHAR(300),
-    id_comuna           INT,
-    id_provincia        INT,
-    id_region           INT,
-
-    fecha_creacion      DATETIME DEFAULT CURRENT_TIMESTAMP,
-    fecha_actualizacion DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
-  )
-`);
+  for (const sql of migraciones) {
+    await pool.query(sql).catch(() => {}); // silenciar si ya existe la columna
+  }
+};
 
 ensureTable().catch(console.error);
 
