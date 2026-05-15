@@ -201,6 +201,22 @@
     }
     .btn-crear:hover { opacity: .9; }
 
+    /* ── Toast de confirmación ────────────────────────────────────── */
+    .toast-confirm {
+      position: fixed; top: 68px; right: 20px; z-index: 9999;
+      background: #065f46; color: #fff;
+      border-radius: 10px; padding: 14px 20px;
+      display: flex; align-items: center; gap: 10px;
+      box-shadow: 0 8px 28px rgba(0,0,0,.25);
+      font-size: .92rem; font-weight: 600;
+      transform: translateX(calc(100% + 24px));
+      transition: transform .35s cubic-bezier(.4,0,.2,1);
+      min-width: 260px;
+    }
+    .toast-confirm.show { transform: translateX(0); }
+    .toast-confirm.error { background: #991b1b; }
+    .toast-confirm i { font-size: 1.2rem; flex-shrink: 0; }
+
     /* ── Campo bloqueado ──────────────────────────────────────────── */
     .campo-bloqueado {
       background: #f3f4f6 !important; color: #9ca3af !important;
@@ -258,7 +274,7 @@
   </div>
   <div class="user-info d-none d-sm-flex align-items-center gap-2">
     <span id="navUser"></span>
-    <span class="version-badge">v2.2</span>
+    <span class="version-badge">v2.3</span>
   </div>
   <button class="btn-logout ms-2" onclick="logout()">
     <i class="bi bi-box-arrow-right"></i> Salir
@@ -656,6 +672,12 @@
 
 </div><!-- /page-wrap -->
 
+<!-- Toast de confirmación -->
+<div class="toast-confirm" id="toastConfirm">
+  <i class="bi bi-check-circle-fill" id="toastIcon"></i>
+  <span id="toastMsg">Guardado correctamente</span>
+</div>
+
 <script>
 /* ═══════════════════════════════════════════════════════════════════
    Auth / Session
@@ -873,6 +895,18 @@ function showAlert(msg, type = 'danger') {
   el.textContent = msg;
   el.style.display = 'block';
   el.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+}
+
+let _toastTimer = null;
+function showToast(msg, isError = false) {
+  const toast = document.getElementById('toastConfirm');
+  const icon  = document.getElementById('toastIcon');
+  document.getElementById('toastMsg').textContent = msg;
+  icon.className = isError ? 'bi bi-x-circle-fill' : 'bi bi-check-circle-fill';
+  toast.classList.toggle('error', isError);
+  toast.classList.add('show');
+  clearTimeout(_toastTimer);
+  _toastTimer = setTimeout(() => toast.classList.remove('show'), 3800);
 }
 
 function resetAll() {
@@ -1234,14 +1268,18 @@ async function guardar(tipo) {
     const json = await resp.json();
 
     if (!json.success) {
+      showToast(json.error || 'Error al guardar', true);
       showAlert(json.error || 'Error al guardar');
     } else {
-      showAlert(modoEdicion ? 'Cliente actualizado correctamente' : 'Cliente creado correctamente', 'success');
-      // Recargar datos del cliente
+      const msg = modoEdicion ? 'Cliente actualizado correctamente ✓' : 'Cliente creado correctamente ✓';
+      // Recargar datos antes de ocultar el formulario
       const rutBuscar = body.rut || clienteActual.rut;
       await recargarCliente(rutBuscar);
+      // El toast se muestra DESPUÉS de recargarCliente (que llama hideAll)
+      showToast(msg);
     }
-  } catch {
+  } catch (err) {
+    showToast('Error de conexión con el servidor', true);
     showAlert('Error de conexión con el servidor');
   } finally {
     btn.disabled = false;
@@ -1250,21 +1288,27 @@ async function guardar(tipo) {
 }
 
 async function recargarCliente(rut) {
-  const resp = await fetch(`/api/clientes/rut/${encodeURIComponent(rut)}`, { headers: apiHeaders() });
-  const json = await resp.json();
-  if (json.success && json.data) {
-    clienteActual = json.data;
-    modoEdicion   = false;
-    hideAll();
-    document.getElementById('inputRut').value = rut;
-    mostrarFechas(clienteActual);
-    mostrarVistaLectura(clienteActual);
-    document.getElementById('existRut').textContent =
-      `RUT: ${clienteActual.rut}  ·  ${clienteActual.tipo_cliente}`;
-    document.getElementById('secExiste').classList.remove('d-none');
-    // Restore type card pointers
-    document.getElementById('cardPersona').style.cursor = 'pointer';
-    document.getElementById('cardEmpresa').style.cursor = 'pointer';
+  try {
+    const resp = await fetch(`/api/clientes/rut/${encodeURIComponent(rut)}`, { headers: apiHeaders() });
+    const json = await resp.json();
+    if (json.success && json.data) {
+      clienteActual = json.data;
+      modoEdicion   = false;
+      hideAll();
+      document.getElementById('inputRut').value = rut;
+      mostrarFechas(clienteActual);
+      mostrarVistaLectura(clienteActual);
+      document.getElementById('existRut').textContent =
+        `RUT: ${clienteActual.rut}  ·  ${clienteActual.tipo_cliente}`;
+      document.getElementById('secExiste').classList.remove('d-none');
+      document.getElementById('cardPersona').style.cursor = 'pointer';
+      document.getElementById('cardEmpresa').style.cursor = 'pointer';
+    } else {
+      // Guardó pero no pudo recargar — igual mostramos éxito
+      showAlert('Guardado. Busca el RUT para ver los datos.', 'success');
+    }
+  } catch {
+    showAlert('Guardado. Busca el RUT para ver los datos.', 'success');
   }
 }
 

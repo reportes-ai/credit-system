@@ -89,8 +89,16 @@ const ensureTable = async () => {
     `ALTER TABLE clientes ADD COLUMN IF NOT EXISTS fecha_actualizacion DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP`,
   ];
 
-  for (const sql of migraciones) {
-    await pool.query(sql).catch(() => {}); // silenciar si ya existe la columna
+  // Quitar IF NOT EXISTS y capturar sólo el error "Duplicate column" (1060)
+  // para máxima compatibilidad con distintas versiones de TiDB/MySQL
+  const alters = migraciones.map(s => s.replace(' IF NOT EXISTS', ''));
+  for (const sql of alters) {
+    try {
+      await pool.query(sql);
+    } catch (e) {
+      if (e.errno !== 1060) console.error('[clientes migration]', e.message);
+      // errno 1060 = "Duplicate column name" → columna ya existía, ignorar
+    }
   }
 };
 
