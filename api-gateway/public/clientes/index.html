@@ -42,39 +42,46 @@
     .btn-logout:hover { background: rgba(255,255,255,.22); }
 
     /* ── Page layout ──────────────────────────────────────────────── */
-    .page-wrap { max-width: 860px; margin: 28px auto; padding: 0 16px 60px; }
+    .page-wrap { max-width: 1400px; margin: 20px auto; padding: 0 24px 60px; }
 
     /* ── Header card ──────────────────────────────────────────────── */
     .header-card {
       background: linear-gradient(135deg, var(--navy) 0%, var(--blue) 60%, var(--sky) 100%);
-      border-radius: 12px; padding: 22px 28px;
+      border-radius: 10px; padding: 14px 24px;
       display: flex; align-items: center; justify-content: space-between;
-      margin-bottom: 20px; color: #fff;
+      margin-bottom: 14px; color: #fff;
     }
-    .header-card h4 { margin: 0; font-weight: 700; font-size: 1.1rem; letter-spacing: .04em; }
-    .header-card .dates { font-size: .78rem; opacity: .85; text-align: right; }
+    .header-card h4 { margin: 0; font-weight: 700; font-size: 1rem; letter-spacing: .04em; }
+    .header-card .dates { font-size: .75rem; opacity: .85; text-align: right; }
     .header-card .dates span { display: block; }
 
     /* ── Search card ──────────────────────────────────────────────── */
     .search-card {
-      background: #fff; border-radius: 12px;
-      box-shadow: 0 2px 12px rgba(0,0,0,.08);
-      padding: 24px 28px; margin-bottom: 20px;
+      background: #fff; border-radius: 10px;
+      box-shadow: 0 2px 10px rgba(0,0,0,.07);
+      padding: 14px 20px; margin-bottom: 14px;
     }
-    .rut-input-wrap { display: flex; gap: 10px; align-items: center; }
+    /* RUT search — compact inline bar */
+    .rut-bar { display: flex; align-items: center; gap: 10px; }
+    .rut-bar label {
+      font-size: .75rem; font-weight: 700; color: var(--blue);
+      text-transform: uppercase; letter-spacing: .08em;
+      white-space: nowrap;
+    }
+    .rut-input-wrap { display: flex; gap: 8px; align-items: center; flex: 1; max-width: 360px; }
     .rut-input-wrap input {
-      flex: 1; border: 2px solid #d1d5db; border-radius: 8px;
-      padding: 11px 14px; font-size: 1.05rem; font-weight: 600;
-      letter-spacing: .06em; text-transform: uppercase;
+      flex: 1; border: 1.5px solid #d1d5db; border-radius: 7px;
+      padding: 7px 12px; font-size: .92rem; font-weight: 600;
+      letter-spacing: .05em; text-transform: uppercase;
       transition: border-color .2s;
     }
     .rut-input-wrap input:focus { outline: none; border-color: var(--blue); box-shadow: 0 0 0 3px rgba(1,65,162,.1); }
     .btn-buscar {
       background: linear-gradient(135deg, var(--blue), var(--sky));
-      color: #fff; border: none; border-radius: 8px;
-      padding: 11px 22px; font-weight: 600; cursor: pointer;
-      display: flex; align-items: center; gap: 6px;
-      transition: opacity .2s;
+      color: #fff; border: none; border-radius: 7px;
+      padding: 7px 16px; font-weight: 600; font-size: .85rem; cursor: pointer;
+      display: flex; align-items: center; gap: 5px;
+      transition: opacity .2s; white-space: nowrap;
     }
     .btn-buscar:hover { opacity: .9; }
     .btn-buscar:disabled { opacity: .6; cursor: default; }
@@ -117,9 +124,9 @@
 
     /* ── Form card ────────────────────────────────────────────────── */
     .form-card {
-      background: #fff; border-radius: 12px;
-      box-shadow: 0 2px 12px rgba(0,0,0,.08);
-      padding: 26px 28px; margin-bottom: 20px;
+      background: #fff; border-radius: 10px;
+      box-shadow: 0 2px 10px rgba(0,0,0,.07);
+      padding: 20px 24px; margin-bottom: 14px;
     }
     .section-divider {
       border: none; border-top: 2px solid #e5e7eb;
@@ -273,21 +280,23 @@
 
   <!-- ── SECCIÓN 1: Búsqueda ──────────────────────────────────────── -->
   <div class="search-card" id="secBuscar">
-    <div class="section-label"><i class="bi bi-search"></i> Ingrese RUT del cliente</div>
-    <div class="rut-input-wrap">
-      <input type="text" id="inputRut" maxlength="12"
-             placeholder="12.345.678-9"
-             autocomplete="off"
-             oninput="onRutInput(this)"
-             onkeydown="if(event.key==='Enter') buscarCliente()">
-      <button class="btn-buscar" id="btnBuscar" onclick="buscarCliente()">
-        <span id="btnBuscarText"><i class="bi bi-search"></i> Buscar</span>
-        <span id="btnBuscarSpinner" class="d-none">
-          <span class="spinner-border spinner-border-sm"></span>
-        </span>
-      </button>
+    <div class="rut-bar">
+      <label><i class="bi bi-search me-1"></i>RUT del cliente</label>
+      <div class="rut-input-wrap">
+        <input type="text" id="inputRut" maxlength="12"
+               placeholder="12.345.678-9"
+               autocomplete="off"
+               oninput="onRutInput(this)"
+               onkeydown="if(event.key==='Enter') buscarCliente()">
+        <button class="btn-buscar" id="btnBuscar" onclick="buscarCliente()">
+          <span id="btnBuscarText"><i class="bi bi-search"></i> Buscar</span>
+          <span id="btnBuscarSpinner" class="d-none">
+            <span class="spinner-border spinner-border-sm"></span>
+          </span>
+        </button>
+      </div>
+      <div id="rutHint" style="font-size:.73rem;color:#9ca3af;"></div>
     </div>
-    <div id="rutHint" style="font-size:.75rem;color:#9ca3af;margin-top:6px;"></div>
   </div>
 
   <!-- ── SECCIÓN 2a: Cliente NO existe ──────────────────────────── -->
@@ -351,28 +360,28 @@
   <div id="secFormPersona" class="d-none">
     <div class="form-card">
       <div class="section-label"><i class="bi bi-person-badge me-1"></i>Datos personales</div>
-      <div class="row g-3">
-        <div class="col-md-4">
+      <div class="row g-2">
+        <div class="col-md-4 col-lg-3">
           <label class="form-label">Apellido Paterno *</label>
           <input type="text" id="pApPaterno" class="form-control" placeholder="Apellido paterno" oninput="upperInput(this)">
         </div>
-        <div class="col-md-4">
+        <div class="col-md-4 col-lg-3">
           <label class="form-label">Apellido Materno</label>
           <input type="text" id="pApMaterno" class="form-control" placeholder="Apellido materno" oninput="upperInput(this)">
         </div>
-        <div class="col-md-4">
+        <div class="col-md-4 col-lg-4">
           <label class="form-label">Nombres *</label>
           <input type="text" id="pNombres" class="form-control" placeholder="Nombres" oninput="upperInput(this)">
         </div>
-        <div class="col-md-3">
+        <div class="col-md-3 col-lg-2">
           <label class="form-label">Fecha Nacimiento</label>
           <input type="date" id="pFechaNac" class="form-control no-upper" onchange="calcularEdad()">
         </div>
-        <div class="col-md-2">
+        <div class="col-md-2 col-lg-1">
           <label class="form-label">Edad</label>
           <div class="edad-badge" id="pEdad">—</div>
         </div>
-        <div class="col-md-3">
+        <div class="col-md-3 col-lg-2">
           <label class="form-label">Estado Civil</label>
           <select id="pEstadoCivil" class="form-select no-upper" onchange="onEstadoCivilChange()">
             <option value="">— Seleccione —</option>
@@ -384,13 +393,13 @@
             <option value="VIUDO">Viudo/a</option>
           </select>
         </div>
-        <div class="col-md-3">
+        <div class="col-md-3 col-lg-3">
           <label class="form-label">Régimen</label>
           <select id="pRegimen" class="form-select no-upper">
             <option value="">— Seleccione estado civil —</option>
           </select>
         </div>
-        <div class="col-md-2">
+        <div class="col-md-2 col-lg-2">
           <label class="form-label">Sexo</label>
           <select id="pSexo" class="form-select no-upper">
             <option value="">—</option>
@@ -399,7 +408,7 @@
             <option value="OTRO">Otro</option>
           </select>
         </div>
-        <div class="col-md-2">
+        <div class="col-md-2 col-lg-1">
           <label class="form-label">Cargas</label>
           <input type="number" id="pCargas" class="form-control no-upper" min="0" max="20" placeholder="0">
         </div>
@@ -407,22 +416,22 @@
 
       <hr class="section-divider">
       <div class="section-label"><i class="bi bi-credit-card me-1"></i>Datos legales / visas</div>
-      <div class="row g-3">
-        <div class="col-md-4">
+      <div class="row g-2">
+        <div class="col-md-4 col-lg-3">
           <label class="form-label">Nacionalidad</label>
           <select id="pNacionalidad" class="form-select no-upper">
             <option value="">— Seleccione —</option>
           </select>
         </div>
-        <div class="col-md-4">
+        <div class="col-md-3 col-lg-2">
           <label class="form-label">Teléfono Móvil</label>
           <input type="text" id="pTelefono" class="form-control no-upper" placeholder="+56 9 1234 5678">
         </div>
-        <div class="col-md-4">
+        <div class="col-md-3 col-lg-2">
           <label class="form-label">Tipo de Visa</label>
           <input type="text" id="pTipoVisa" class="form-control" placeholder="Ej: TEMPORARIA" oninput="upperInput(this)">
         </div>
-        <div class="col-md-3">
+        <div class="col-md-2 col-lg-2">
           <label class="form-label">Fecha Visa</label>
           <input type="date" id="pFechaVisa" class="form-control no-upper">
         </div>
@@ -430,37 +439,37 @@
 
       <hr class="section-divider">
       <div class="section-label"><i class="bi bi-envelope me-1"></i>Contacto y domicilio</div>
-      <div class="row g-3">
-        <div class="col-md-6">
+      <div class="row g-2">
+        <div class="col-md-4 col-lg-3">
           <label class="form-label">Correo electrónico</label>
           <input type="email" id="pCorreo" class="form-control email-field" placeholder="correo@ejemplo.cl">
         </div>
-        <div class="col-md-6">
+        <div class="col-md-8 col-lg-5">
           <label class="form-label">Dirección</label>
           <input type="text" id="pDireccion" class="form-control" placeholder="Calle, número" oninput="upperInput(this)">
         </div>
-        <div class="col-12">
+        <div class="col-md-4 col-lg-3">
           <label class="form-label"><i class="bi bi-search me-1"></i>Buscar Comuna</label>
           <div class="search-wrap">
             <input type="text" id="pBuscarComuna" class="form-control no-upper"
-                   placeholder="Escriba el nombre de la comuna…"
+                   placeholder="Escriba la comuna…"
                    oninput="filtrarComunas(this,'p')" autocomplete="off">
             <div class="search-dropdown" id="pComunaDrop"></div>
           </div>
         </div>
-        <div class="col-md-4">
+        <div class="col-md-4 col-lg-3">
           <label class="form-label">Región</label>
           <select id="pRegion" class="form-select no-upper" onchange="cargarProvincias('p')">
             <option value="">— Seleccione —</option>
           </select>
         </div>
-        <div class="col-md-4">
+        <div class="col-md-4 col-lg-3">
           <label class="form-label">Provincia</label>
           <select id="pProvincia" class="form-select no-upper" onchange="cargarComunas('p')">
             <option value="">— Seleccione —</option>
           </select>
         </div>
-        <div class="col-md-4">
+        <div class="col-md-4 col-lg-2">
           <label class="form-label">Comuna</label>
           <select id="pComuna" class="form-select no-upper">
             <option value="">— Seleccione —</option>
@@ -484,12 +493,12 @@
   <div id="secFormEmpresa" class="d-none">
     <div class="form-card">
       <div class="section-label"><i class="bi bi-building me-1"></i>Datos de la empresa</div>
-      <div class="row g-3">
-        <div class="col-md-6">
+      <div class="row g-2">
+        <div class="col-md-6 col-lg-4">
           <label class="form-label">Nombre Fantasía</label>
           <input type="text" id="eNombreFantasia" class="form-control" placeholder="Nombre comercial" oninput="upperInput(this)">
         </div>
-        <div class="col-md-6">
+        <div class="col-md-6 col-lg-4">
           <label class="form-label">Razón Social *</label>
           <input type="text" id="eRazonSocial" class="form-control" placeholder="Razón social" oninput="upperInput(this)">
         </div>
@@ -522,28 +531,28 @@
           <label class="form-label">Dirección</label>
           <input type="text" id="eDireccion" class="form-control" placeholder="Calle, número" oninput="upperInput(this)">
         </div>
-        <div class="col-12">
+        <div class="col-md-4 col-lg-3">
           <label class="form-label"><i class="bi bi-search me-1"></i>Buscar Comuna</label>
           <div class="search-wrap">
             <input type="text" id="eBuscarComuna" class="form-control no-upper"
-                   placeholder="Escriba el nombre de la comuna…"
+                   placeholder="Escriba la comuna…"
                    oninput="filtrarComunas(this,'e')" autocomplete="off">
             <div class="search-dropdown" id="eComunaDrop"></div>
           </div>
         </div>
-        <div class="col-md-4">
+        <div class="col-md-4 col-lg-3">
           <label class="form-label">Región</label>
           <select id="eRegion" class="form-select no-upper" onchange="cargarProvincias('e')">
             <option value="">— Seleccione —</option>
           </select>
         </div>
-        <div class="col-md-4">
+        <div class="col-md-4 col-lg-3">
           <label class="form-label">Provincia</label>
           <select id="eProvincia" class="form-select no-upper" onchange="cargarComunas('e')">
             <option value="">— Seleccione —</option>
           </select>
         </div>
-        <div class="col-md-4">
+        <div class="col-md-4 col-lg-2">
           <label class="form-label">Comuna</label>
           <select id="eComuna" class="form-select no-upper">
             <option value="">— Seleccione —</option>
@@ -558,20 +567,20 @@
       <div class="rep-card">
         <div class="rep-num"><i class="bi bi-1-circle me-1"></i>Representante 1</div>
         <div class="row g-2">
-          <div class="col-md-3">
+          <div class="col-md-3 col-lg-2">
             <label class="form-label">RUT</label>
             <input type="text" id="eRep1Rut" class="form-control" maxlength="12"
                    oninput="onRepRutInput(this)" placeholder="12.345.678-9">
           </div>
-          <div class="col-md-3">
+          <div class="col-md-3 col-lg-3">
             <label class="form-label">Nombres</label>
             <input type="text" id="eRep1Nombre" class="form-control" oninput="upperInput(this)">
           </div>
-          <div class="col-md-3">
+          <div class="col-md-3 col-lg-3">
             <label class="form-label">Ap. Paterno</label>
             <input type="text" id="eRep1ApPat" class="form-control" oninput="upperInput(this)">
           </div>
-          <div class="col-md-3">
+          <div class="col-md-3 col-lg-3">
             <label class="form-label">Ap. Materno</label>
             <input type="text" id="eRep1ApMat" class="form-control" oninput="upperInput(this)">
           </div>
