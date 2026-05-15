@@ -58,7 +58,7 @@
 <body>
   <nav class="topnav">
     <div class="topnav-left">
-      <div class="topnav-brand"><a href="/"><img src="/img/logo.png" alt="AutoFácil"></a> <span class="version-badge">v1.8</span></div>
+      <div class="topnav-brand"><a href="/"><img src="/img/logo.png" alt="AutoFácil"></a> <span class="version-badge">v1.9</span></div>
       <div class="breadcrumb-nav">
         <a href="/">Inicio</a><span class="sep">/</span>
         <a href="/mantenedores/">Mantenedores</a><span class="sep">/</span>
@@ -311,9 +311,12 @@
         tasa_anual_menor: parseCL(document.getElementById('fAnualMenor').value),
         tasa_anual_mayor: parseCL(document.getElementById('fAnualMayor').value)
       };
+      const elErr = document.getElementById('modalError');
       if (!body.fecha_desde || !body.fecha_hasta || isNaN(body.tasa_anual_menor) || isNaN(body.tasa_anual_mayor)) {
-        const el = document.getElementById('modalError');
-        el.textContent = 'Todos los campos son requeridos'; el.classList.remove('d-none'); return;
+        elErr.textContent = 'Todos los campos son requeridos'; elErr.classList.remove('d-none'); return;
+      }
+      if (body.fecha_hasta < body.fecha_desde) {
+        elErr.textContent = 'La fecha "Hasta" no puede ser anterior a la fecha "Desde"'; elErr.classList.remove('d-none'); return;
       }
       const url = editId ? `/api/tasas/${editId}` : '/api/tasas';
       const d = await api(editId ? 'PUT' : 'POST', url, body);
@@ -322,8 +325,7 @@
         showToast(editId ? 'Tasa actualizada' : 'Tasa guardada');
         cargar();
       } else {
-        const el = document.getElementById('modalError');
-        el.textContent = d?.error || 'Error al guardar'; el.classList.remove('d-none');
+        elErr.textContent = d?.error || 'Error al guardar'; elErr.classList.remove('d-none');
       }
     }
 

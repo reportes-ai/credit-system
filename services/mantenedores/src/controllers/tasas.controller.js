@@ -12,9 +12,10 @@ const getAll = async (req, res) => {
 const getVigente = async (req, res) => {
   try {
     const hoy = new Date().toISOString().split('T')[0];
+    // Tasa vigente = la de fecha_desde más reciente que ya comenzó
     const [rows] = await pool.query(
-      'SELECT * FROM tasas WHERE fecha_desde <= ? AND fecha_hasta >= ? ORDER BY fecha_desde DESC LIMIT 1',
-      [hoy, hoy]
+      'SELECT * FROM tasas WHERE fecha_desde <= ? ORDER BY fecha_desde DESC LIMIT 1',
+      [hoy]
     );
     res.json({ success: true, data: rows[0] || null, error: null });
   } catch (e) {
@@ -37,6 +38,8 @@ const create = async (req, res) => {
     const { fecha_desde, fecha_hasta, tasa_anual_menor, tasa_anual_mayor } = req.body;
     if (!fecha_desde || !fecha_hasta || tasa_anual_menor === undefined || tasa_anual_mayor === undefined)
       return res.status(400).json({ success: false, data: null, error: 'Todos los campos son requeridos' });
+    if (fecha_hasta < fecha_desde)
+      return res.status(400).json({ success: false, data: null, error: 'La fecha hasta no puede ser anterior a la fecha desde' });
 
     const mensual_menor = Math.round((parseFloat(tasa_anual_menor) / 12) * 100) / 100;
     const mensual_mayor = Math.round((parseFloat(tasa_anual_mayor) / 12) * 100) / 100;
@@ -56,6 +59,8 @@ const update = async (req, res) => {
     const { fecha_desde, fecha_hasta, tasa_anual_menor, tasa_anual_mayor } = req.body;
     if (!fecha_desde || !fecha_hasta || tasa_anual_menor === undefined || tasa_anual_mayor === undefined)
       return res.status(400).json({ success: false, data: null, error: 'Todos los campos son requeridos' });
+    if (fecha_hasta < fecha_desde)
+      return res.status(400).json({ success: false, data: null, error: 'La fecha hasta no puede ser anterior a la fecha desde' });
 
     const mensual_menor = Math.round((parseFloat(tasa_anual_menor) / 12) * 100) / 100;
     const mensual_mayor = Math.round((parseFloat(tasa_anual_mayor) / 12) * 100) / 100;
