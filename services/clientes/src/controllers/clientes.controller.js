@@ -100,6 +100,24 @@ const ensureTable = async () => {
       // errno 1060 = "Duplicate column name" → columna ya existía, ignorar
     }
   }
+
+  // 3. Columnas del esquema viejo que eran NOT NULL → hacerlas nullable
+  //    para que no rompan el INSERT del esquema nuevo.
+  const fixes = [
+    `ALTER TABLE clientes MODIFY COLUMN nombre     VARCHAR(200) NULL DEFAULT NULL`,
+    `ALTER TABLE clientes MODIFY COLUMN email      VARCHAR(200) NULL DEFAULT NULL`,
+    `ALTER TABLE clientes MODIFY COLUMN telefono   VARCHAR(20)  NULL DEFAULT NULL`,
+    `ALTER TABLE clientes MODIFY COLUMN ciudad_id  INT          NULL DEFAULT NULL`,
+    `ALTER TABLE clientes MODIFY COLUMN estado     VARCHAR(50)  NULL DEFAULT NULL`,
+  ];
+  for (const sql of fixes) {
+    try {
+      await pool.query(sql);
+    } catch (e) {
+      // errno 1054 = "Unknown column" → la columna no existe en esta instalación, ignorar
+      if (e.errno !== 1054) console.error('[clientes migration fix]', e.message);
+    }
+  }
 };
 
 ensureTable().catch(console.error);
