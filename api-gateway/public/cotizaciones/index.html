@@ -161,7 +161,7 @@
     <span class="sep">›</span>
     <span class="current">Cotizaciones</span>
   </span>
-  <span class="version-badge">v2.5</span>
+  <span class="version-badge">v2.6</span>
   <span class="user-info" id="userInfo"></span>
   <button class="btn-logout" onclick="logout()"><i class="bi bi-box-arrow-right"></i> Salir</button>
 </nav>
@@ -238,20 +238,18 @@
               </div>
               <div class="col-sm-6 mb-2-form">
                 <label class="form-label">Plazo [meses]</label>
-                <select class="form-select" id="inPlazo" onchange="recalcular()">
-                  <option value="12">12</option>
-                  <option value="24">24</option>
-                  <option value="36">36</option>
-                  <option value="48" selected>48</option>
-                  <option value="60">60</option>
-                  <option value="72">72</option>
-                </select>
+                <select class="form-select" id="inPlazo" onchange="recalcular()"></select>
               </div>
-              <div class="col-sm-12 mb-2-form">
+              <div class="col-5 mb-2-form">
                 <label class="form-label">Tasa Mensual [%]</label>
-                <input type="text" class="form-control" id="inTasa" placeholder="0,0000" inputmode="decimal"
+                <input type="text" class="form-control" id="inTasa" placeholder="0,00" inputmode="decimal"
                   oninput="onTasaInput()">
-                <div style="font-size:.74rem;color:#9ca3af;margin-top:2px">Auto-completa según tramo. Editable manualmente.</div>
+                <div style="font-size:.72rem;color:#9ca3af;margin-top:2px">Auto según tramo.</div>
+              </div>
+              <div class="col-7 mb-2-form">
+                <label class="form-label">Fecha 1ª Cuota</label>
+                <input type="date" class="form-control" id="inFecha1Cuota" onchange="recalcular()">
+                <div style="font-size:.72rem;color:#9ca3af;margin-top:2px" id="diasInfo">Default: 30 días</div>
               </div>
             </div>
           </div>
@@ -530,7 +528,8 @@ function showToast(msg, type = 'info') {
 ═══════════════════════════════════════════════════════════════════════════ */
 function formatPeso(n) {
   if (!n && n !== 0) return '';
-  return Math.round(n).toLocaleString('es-CL');
+  // Usa regex para no depender de locale del servidor
+  return Math.round(n).toString().replace(/\B(?=(\d{3})+(?!\d))/g, '.');
 }
 function parsePeso(s) {
   if (!s) return 0;
@@ -538,7 +537,7 @@ function parsePeso(s) {
 }
 function formatTasa(n) {
   if (n === null || n === undefined || isNaN(n)) return '';
-  return n.toFixed(4).replace('.', ',');
+  return n.toFixed(2).replace('.', ',');
 }
 function parseTasa(s) {
   if (!s) return 0;
@@ -554,8 +553,15 @@ function pctf(n, decimals = 2) {
 }
 
 function onPesoInput(el) {
-  const raw = parsePeso(el.value);
-  el.value = raw > 0 ? formatPeso(raw) : '';
+  const oldVal = el.value;
+  const oldPos = el.selectionStart;
+  const raw = parsePeso(oldVal);
+  const newVal = raw > 0 ? formatPeso(raw) : '';
+  el.value = newVal;
+  // Ajusta posición cursor por los puntos añadidos/quitados
+  const diff = newVal.length - oldVal.length;
+  const newPos = Math.max(0, oldPos + diff);
+  try { el.setSelectionRange(newPos, newPos); } catch(e) {}
   recalcular();
 }
 
@@ -648,9 +654,17 @@ function calcular(p) {
   const montoFin = subCon - p.bono;
 
   const tasaD = p.tasa / 100;
-  const cuota = pmt(tasaD, p.plazo, montoFin);
+
+  // Capitalización por días de la primera cuota
+  // Si la 1ª cuota es a más/menos de 30 días, se capitaliza el interés proporcional
+  const diasPrimera = p.diasPrimeraCuota || 30;
+  const extraDias = diasPrimera - 30;
+  const interesExtra = montoFin * tasaD * extraDias / 30;
+  const capitalAjustado = montoFin + interesExtra;
+
+  const cuota = pmt(tasaD, p.plazo, capitalAjustado);
   const totalPagado = cuota * p.plazo;
-  const totalIntereses = totalPagado - montoFin;
+  const totalIntereses = totalPagado - capitalAjustado;
 
   const fondoD = p.costoFondo / 100;
   const ingTasa = pvf(fondoD, p.plazo, cuota) - montoFin;
@@ -664,6 +678,7 @@ function calcular(p) {
 
   return {
     saldoPrecio, gastosOp, subSin, segDesg, segRdh, segCesa, totalSeguros, subCon, montoFin,
+    diasPrimera, interesExtra, capitalAjustado,
     cuota, totalPagado, totalIntereses,
     ingTasa, ingSeguros, totalIngresos,
     comEjecutivo, totalCostos, rentabilidad,
@@ -676,12 +691,22 @@ function calcular(p) {
 /* ═══════════════════════════════════════════════════════════════════════════
    READ INPUTS
 ═══════════════════════════════════════════════════════════════════════════ */
+function getDiasPrimeraCuota() {
+  const el = document.getElementById('inFecha1Cuota');
+  if (!el || !el.value) return 30;
+  const fecha = new Date(el.value + 'T00:00:00');
+  const hoy = new Date(); hoy.setHours(0,0,0,0);
+  const diff = Math.round((fecha - hoy) / 86400000);
+  return diff > 0 ? diff : 30;
+}
+
 function readInputs() {
   return {
-    valorVehiculo: parsePeso(document.getElementById('inValorVehiculo').value),
-    pie:           parsePeso(document.getElementById('inPie').value),
-    plazo:         parseInt(document.getElementById('inPlazo').value),
-    tasa:          parseTasa(document.getElementById('inTasa').value),
+    valorVehiculo:    parsePeso(document.getElementById('inValorVehiculo').value),
+    pie:              parsePeso(document.getElementById('inPie').value),
+    plazo:            parseInt(document.getElementById('inPlazo').value),
+    tasa:             parseTasa(document.getElementById('inTasa').value),
+    diasPrimeraCuota: getDiasPrimeraCuota(),
     costoFondo:    parseTasa(document.getElementById('rcCostoFondo').value) || (params.costo_fondo || 0),
     prenda:        params.prenda || 0,
     retiro:        params.retiro_gestion || 0,
@@ -740,6 +765,16 @@ function renderSimulador(r, p) {
   setEl('rCuota',       $f(r.cuota));
   setEl('rPlazo',       p.plazo + ' meses');
   setEl('rTotalPagado', $f(r.totalPagado));
+
+  // Mostrar info de capitalización por días
+  const diasInfo = document.getElementById('diasInfo');
+  if (diasInfo) {
+    if (r.diasPrimera !== 30 && r.interesExtra !== 0) {
+      diasInfo.innerHTML = `<span style="color:#b45309;font-weight:600">${r.diasPrimera} días · Interés capitalizado: ${$f(r.interesExtra)}</span>`;
+    } else {
+      diasInfo.textContent = r.diasPrimera + ' días (estándar)';
+    }
+  }
 
   actualizarTramo(r.montoFin);
 }
@@ -915,9 +950,11 @@ function limpiar() {
   document.getElementById('chkCesa').checked = true;
   document.getElementById('inSaldoPrecio').value = '—';
 
-  // Reset tasa to TMC menor
+  // Reset tasa y fecha
   tasaManualmenteEditada = false;
   document.getElementById('inTasa').value = formatTasa(tasasData.tasa_mensual_menor);
+  setDefaultFecha();
+  document.getElementById('diasInfo').textContent = 'Default: 30 días';
 
   // Reset result displays
   ['rSaldoPrecio','rGastos','rSubSin','rSegDesg','rSegRdh','rSegCesa','rSubCon',
@@ -1025,6 +1062,26 @@ async function loadApis() {
 /* ═══════════════════════════════════════════════════════════════════════════
    INIT
 ═══════════════════════════════════════════════════════════════════════════ */
+// Generar opciones de plazo 12 a 60, de 1 en 1
+(function() {
+  const sel = document.getElementById('inPlazo');
+  for (let i = 12; i <= 60; i++) {
+    const opt = document.createElement('option');
+    opt.value = i; opt.textContent = i;
+    if (i === 48) opt.selected = true;
+    sel.appendChild(opt);
+  }
+})();
+
+function setDefaultFecha() {
+  const el = document.getElementById('inFecha1Cuota');
+  if (!el) return;
+  const d = new Date();
+  d.setDate(d.getDate() + 30);
+  el.value = d.toISOString().split('T')[0];
+}
+setDefaultFecha();
+
 buildSegTable();
 loadApis();
 </script>
