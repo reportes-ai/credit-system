@@ -1,5 +1,5 @@
 const router = require('express').Router();
-const { verifyToken } = require('../../../../services/usuarios/src/controllers/auth.controller');
+const { verifyToken } = require('../../../../shared/middleware/auth');
 const ctrl = require('../controllers/parametros.controller');
 
 router.get('/',  verifyToken, ctrl.getAll);
