@@ -1,6 +1,6 @@
 const pool = require('../../../../shared/config/database');
 
-// Migración: agrega columnas spread si no existen
+// Migración: agrega columnas spread y rellena histórico con 0,67% donde sea NULL
 (async () => {
   for (const sql of [
     `ALTER TABLE tasas ADD COLUMN spread_menor DECIMAL(8,4) NULL DEFAULT NULL`,
@@ -9,6 +9,13 @@ const pool = require('../../../../shared/config/database');
     try { await pool.query(sql); }
     catch(e) { if (e.errno !== 1060) console.error('[tasas migration]', e.message); }
   }
+  // Rellenar spread histórico con 0.67 donde aún sea NULL
+  try {
+    await pool.query(
+      `UPDATE tasas SET spread_menor = 0.6700, spread_mayor = 0.6700
+       WHERE spread_menor IS NULL OR spread_mayor IS NULL`
+    );
+  } catch(e) { console.error('[tasas migration spread]', e.message); }
 })();
 
 const getAll = async (req, res) => {
