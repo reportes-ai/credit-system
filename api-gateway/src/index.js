@@ -48,6 +48,8 @@ app.get(['/mantenedores/dealers', '/mantenedores/dealers/'], (req, res) =>
   res.sendFile(path.join(__dirname, '../public/mantenedores/dealers/index.html')));
 app.get(['/mantenedores/parametros', '/mantenedores/parametros/'], (req, res) =>
   res.sendFile(path.join(__dirname, '../public/mantenedores/parametros/index.html')));
+app.get(['/mantenedores/factores-seguro', '/mantenedores/factores-seguro/'], (req, res) =>
+  res.sendFile(path.join(__dirname, '../public/mantenedores/factores-seguro/index.html')));
 
 app.get(['/clientes', '/clientes/'], (req, res) =>
   res.sendFile(path.join(__dirname, '../public/clientes/index.html')));

@@ -61,7 +61,7 @@
     <div class="topnav-left">
       <a href="/" class="topnav-brand">
         <img src="/img/logo.png" alt="AutoFácil">
-        <span class="version-badge">v2.6</span>
+        <span class="version-badge">v2.7</span>
       </a>
       <div class="breadcrumb-nav">
         <a href="/">Inicio</a><span class="sep">/</span>
@@ -113,11 +113,13 @@
     function logout() { localStorage.removeItem('token'); localStorage.removeItem('usuario'); window.location.href = '/login.html'; }
 
     const ITEMS_DEFAULT = [
-      { id: 'tasas',     href: '/mantenedores/tasas/',     icon: 'bi-percent',        titulo: 'Tasas de Interés', desc: 'Gestión de tasas mensuales y anuales para créditos' },
-      { id: 'uf',        href: '/mantenedores/uf/',        icon: 'bi-currency-dollar', titulo: 'Valores UF',       desc: 'Registro y consulta del valor de la Unidad de Fomento' },
-      { id: 'comunas',   href: '/mantenedores/comunas/',   icon: 'bi-geo-alt',         titulo: 'Comunas',          desc: 'Gestión de regiones, provincias y comunas de Chile' },
-      { id: 'vehiculos', href: '/mantenedores/vehiculos/', icon: 'bi-car-front',       titulo: 'Vehículos',        desc: 'Base de tasación SII con marcas, modelos y valores' },
-      { id: 'dealers',   href: '/mantenedores/dealers/',   icon: 'bi-building',        titulo: 'Dealers',          desc: 'Administración de concesionarios y datos de contacto' },
+      { id: 'tasas',           href: '/mantenedores/tasas/',           icon: 'bi-percent',        titulo: 'Tasas de Interés',   desc: 'Gestión de tasas mensuales y anuales para créditos' },
+      { id: 'uf',              href: '/mantenedores/uf/',              icon: 'bi-currency-dollar', titulo: 'Valores UF',         desc: 'Registro y consulta del valor de la Unidad de Fomento' },
+      { id: 'dealers',         href: '/mantenedores/dealers/',         icon: 'bi-building',        titulo: 'Dealers',            desc: 'Administración de concesionarios y datos de contacto' },
+      { id: 'vehiculos',       href: '/mantenedores/vehiculos/',       icon: 'bi-car-front',       titulo: 'Vehículos',          desc: 'Base de tasación SII con marcas, modelos y valores' },
+      { id: 'comunas',         href: '/mantenedores/comunas/',         icon: 'bi-geo-alt',         titulo: 'Comunas',            desc: 'Gestión de regiones, provincias y comunas de Chile' },
+      { id: 'parametros',      href: '/mantenedores/parametros/',      icon: 'bi-sliders',         titulo: 'Parámetros Crédito', desc: 'Gastos operacionales fijos y comisiones del crédito' },
+      { id: 'factores-seguro', href: '/mantenedores/factores-seguro/', icon: 'bi-shield-check',    titulo: 'Factores Seguro',    desc: 'Tasas netas, factores calculados y comisiones AMBOS por plazo' },
     ];
 
     let sortable = null, modoReordenar = false;
