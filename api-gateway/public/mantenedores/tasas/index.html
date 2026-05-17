@@ -1,4 +1,4 @@
-﻿<!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="es">
 <head>
   <meta charset="UTF-8">
@@ -35,7 +35,6 @@
     .tramo-row { display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px; }
     .tramo-tipo { font-size: 0.8rem; opacity: 0.8; }
     .tramo-valor { font-size: 1.4rem; font-weight: 800; }
-    .tramo-sub { font-size: 0.78rem; opacity: 0.65; }
     .tramo-header { background: #f0f4f8; border-radius: 8px; padding: 8px 14px; font-size: 0.78rem; font-weight: 700; color: #374151; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 12px; }
     .form-label { font-weight: 600; font-size: 0.82rem; color: #374151; }
     .form-control { border-radius: 8px; border: 1.5px solid #d1d5db; font-size: 0.88rem; }
@@ -52,10 +51,15 @@
     .val-mensual { color: #6b7280; font-size: 0.82rem; }
     .val-spread { color: #9ca3af; font-size: 0.78rem; }
     .val-cf { color: #166534; font-size: 0.82rem; font-weight: 600; }
+    .cf-banner { background: rgba(255,255,255,0.12); border-radius: 10px; padding: 14px 20px; margin-top: 12px; display: flex; justify-content: space-between; align-items: center; }
+    .cf-label { font-size: 0.85rem; font-weight: 700; opacity: 0.9; }
+    .cf-valor { font-size: 1.5rem; font-weight: 900; color: #90cdf4; }
     .toast-container { position: fixed; top: 70px; right: 20px; z-index: 9999; }
     .modal-header { background: linear-gradient(135deg, var(--navy), var(--accent)); color: #fff; border-radius: 12px 12px 0 0; }
     .modal-header .btn-close { filter: invert(1); }
     .modal-content { border-radius: 12px; border: none; }
+    .spread-box { background: #f8fafc; border-radius: 10px; padding: 16px; margin-top: 16px; border: 1.5px solid #e5e7eb; }
+    .spread-box .spread-title { font-size: 0.78rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; color: #374151; margin-bottom: 12px; }
   </style>
 </head>
 <body>
@@ -105,14 +109,9 @@
             <span class="tramo-tipo">Tasa Mensual</span>
             <span class="tramo-valor" id="vMensualMenor">—</span>
           </div>
-          <hr style="border-color:rgba(255,255,255,0.2);margin:8px 0">
-          <div class="tramo-row">
-            <span class="tramo-tipo">Spread</span>
-            <span class="tramo-valor" id="vSpreadMenor" style="font-size:1.05rem">—</span>
-          </div>
-          <div class="tramo-row">
-            <span class="tramo-tipo" style="font-weight:700;opacity:1">Costo de Fondo</span>
-            <span class="tramo-valor" id="vCFMenor" style="font-size:1.1rem;color:#90cdf4">—</span>
+          <div class="tramo-row" style="margin-top:6px">
+            <span class="tramo-tipo" style="font-size:0.75rem">Spread implícito</span>
+            <span style="font-size:0.9rem;font-weight:600;opacity:0.8" id="vSpreadMenor">—</span>
           </div>
         </div>
         <div class="vigente-tramo">
@@ -125,16 +124,16 @@
             <span class="tramo-tipo">Tasa Mensual</span>
             <span class="tramo-valor" id="vMensualMayor">—</span>
           </div>
-          <hr style="border-color:rgba(255,255,255,0.2);margin:8px 0">
-          <div class="tramo-row">
-            <span class="tramo-tipo">Spread</span>
-            <span class="tramo-valor" id="vSpreadMayor" style="font-size:1.05rem">—</span>
-          </div>
-          <div class="tramo-row">
-            <span class="tramo-tipo" style="font-weight:700;opacity:1">Costo de Fondo</span>
-            <span class="tramo-valor" id="vCFMayor" style="font-size:1.1rem;color:#90cdf4">—</span>
+          <div class="tramo-row" style="margin-top:6px">
+            <span class="tramo-tipo" style="font-size:0.75rem">Spread</span>
+            <span style="font-size:0.9rem;font-weight:600;opacity:0.8" id="vSpreadMayor">—</span>
           </div>
         </div>
+      </div>
+      <!-- Costo de Fondo único para ambos tramos -->
+      <div class="cf-banner">
+        <div class="cf-label"><i class="bi bi-bank me-2"></i>Costo de Fondo AutoFin (igual para ambos tramos)</div>
+        <div class="cf-valor" id="vCF">—</div>
       </div>
     </div>
 
@@ -146,23 +145,23 @@
             <thead>
               <tr>
                 <th rowspan="2" style="vertical-align:middle">Período</th>
-                <th colspan="4" class="text-center" style="border-left:2px solid #e5e7eb">&#8804; 200 UF</th>
-                <th colspan="4" class="text-center" style="border-left:2px solid #e5e7eb">&gt; 200 UF</th>
+                <th colspan="3" class="text-center" style="border-left:2px solid #e5e7eb">&#8804; 200 UF</th>
+                <th colspan="3" class="text-center" style="border-left:2px solid #e5e7eb">&gt; 200 UF</th>
+                <th rowspan="2" class="text-center" style="vertical-align:middle;border-left:2px solid #e5e7eb">Costo<br>Fondo</th>
                 <th rowspan="2" style="vertical-align:middle; width:90px">Acciones</th>
               </tr>
               <tr>
                 <th style="border-left:2px solid #e5e7eb">Anual</th>
                 <th>Mensual</th>
-                <th>Spread</th>
-                <th>C. Fondo</th>
+                <th>Spread*</th>
                 <th style="border-left:2px solid #e5e7eb">Anual</th>
                 <th>Mensual</th>
                 <th>Spread</th>
-                <th>C. Fondo</th>
               </tr>
             </thead>
-            <tbody id="tbody"><tr><td colspan="10" class="text-center py-4 text-muted">Cargando...</td></tr></tbody>
+            <tbody id="tbody"><tr><td colspan="9" class="text-center py-4 text-muted">Cargando...</td></tr></tbody>
           </table>
+          <div class="text-muted mt-2" style="font-size:0.75rem;padding:0 4px">* Spread implícito ≤200 UF = Tasa mensual − Costo de Fondo</div>
         </div>
       </div>
     </div>
@@ -177,7 +176,7 @@
           <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
         </div>
         <div class="modal-body">
-          <div class="row g-3 mb-4">
+          <div class="row g-3 mb-3">
             <div class="col-md-6">
               <label class="form-label">Válido desde *</label>
               <input type="date" id="fDesde" class="form-control">
@@ -198,24 +197,17 @@
                   <span class="input-group-text">%</span>
                 </div>
               </div>
-              <div class="mb-3">
+              <div class="mb-2">
                 <label class="form-label">Tasa Máx. Mensual (÷ 12)</label>
                 <div class="input-group">
                   <input type="text" id="fMensualMenor" class="form-control" readonly placeholder="—">
                   <span class="input-group-text">%</span>
                 </div>
               </div>
-              <div class="mb-3">
-                <label class="form-label">Spread (%)</label>
-                <div class="input-group">
-                  <input type="text" id="fSpreadMenor" class="form-control" placeholder="1,05" inputmode="decimal" oninput="calcMensual()">
-                  <span class="input-group-text">%</span>
-                </div>
-              </div>
               <div>
-                <label class="form-label">Costo de Fondo (mensual − spread)</label>
+                <label class="form-label text-muted" style="font-size:0.78rem">Spread implícito (calculado)</label>
                 <div class="input-group">
-                  <input type="text" id="fCFMenor" class="form-control cf-readonly" readonly placeholder="—">
+                  <input type="text" id="fSpreadMenor" class="form-control" readonly placeholder="—" style="background:#f8fafc;color:#6b7280">
                   <span class="input-group-text">%</span>
                 </div>
               </div>
@@ -230,27 +222,28 @@
                   <span class="input-group-text">%</span>
                 </div>
               </div>
-              <div class="mb-3">
+              <div class="mb-2">
                 <label class="form-label">Tasa Máx. Mensual (÷ 12)</label>
                 <div class="input-group">
                   <input type="text" id="fMensualMayor" class="form-control" readonly placeholder="—">
                   <span class="input-group-text">%</span>
                 </div>
               </div>
-              <div class="mb-3">
+              <div>
                 <label class="form-label">Spread (%)</label>
                 <div class="input-group">
-                  <input type="text" id="fSpreadMayor" class="form-control" placeholder="1,05" inputmode="decimal" oninput="calcMensual()">
+                  <input type="text" id="fSpreadMayor" class="form-control" placeholder="0,67" inputmode="decimal" oninput="calcMensual()">
                   <span class="input-group-text">%</span>
                 </div>
               </div>
-              <div>
-                <label class="form-label">Costo de Fondo (mensual − spread)</label>
-                <div class="input-group">
-                  <input type="text" id="fCFMayor" class="form-control cf-readonly" readonly placeholder="—">
-                  <span class="input-group-text">%</span>
-                </div>
-              </div>
+            </div>
+          </div>
+          <!-- Costo de Fondo unificado -->
+          <div class="spread-box mt-3">
+            <div class="spread-title"><i class="bi bi-bank me-1"></i>Costo de Fondo AutoFin (= Mensual &gt;200 − Spread)</div>
+            <div class="input-group" style="max-width:220px">
+              <input type="text" id="fCF" class="form-control cf-readonly" readonly placeholder="—">
+              <span class="input-group-text">%</span>
             </div>
           </div>
           <div id="modalError" class="alert alert-danger mt-3 d-none"></div>
@@ -269,7 +262,6 @@
     document.addEventListener('DOMContentLoaded', () => {
       setupCLInput(document.getElementById('fAnualMenor'), 2);
       setupCLInput(document.getElementById('fAnualMayor'), 2);
-      setupCLInput(document.getElementById('fSpreadMenor'), 4);
       setupCLInput(document.getElementById('fSpreadMayor'), 4);
     });
     const token = localStorage.getItem('token');
@@ -292,11 +284,14 @@
     };
 
     const fmtFecha = d => new Date(d).toLocaleDateString('es-CL', { timeZone:'UTC', day:'2-digit', month:'2-digit', year:'numeric' });
-    const fmtTasa  = v => (v !== null && v !== undefined && !isNaN(v)) ? formatCL(parseFloat(v), 4) + '%' : '—';
-    const fmtTasa2 = v => (v !== null && v !== undefined && !isNaN(v)) ? formatCL(parseFloat(v), 2) + '%' : '—';
-    const calcCF   = (mensual, spread) => {
-      const m = parseFloat(mensual), s = parseFloat(spread);
-      if (isNaN(m) || spread === null || spread === undefined || isNaN(s)) return null;
+    const fmtP2   = v => (v !== null && v !== undefined && !isNaN(parseFloat(v))) ? formatCL(parseFloat(v), 2) + '%' : '—';
+    const fmtP4   = v => (v !== null && v !== undefined && !isNaN(parseFloat(v))) ? formatCL(parseFloat(v), 4) + '%' : '—';
+
+    // CF = mensual_mayor - spread_mayor  (único para ambos tramos)
+    // spread_menor_implicito = mensual_menor - CF
+    const calcCF = (mensual_mayor, spread_mayor) => {
+      const m = parseFloat(mensual_mayor), s = parseFloat(spread_mayor);
+      if (isNaN(m) || isNaN(s)) return null;
       return Math.round((m - s) * 10000) / 10000;
     };
 
@@ -308,17 +303,14 @@
       if (dVig?.success && dVig.data) {
         const t = dVig.data;
         document.getElementById('vigentePeriodo').textContent = `Válido del ${fmtFecha(t.fecha_desde)} al ${fmtFecha(t.fecha_hasta)}`;
-        document.getElementById('vAnualMenor').textContent   = fmtTasa2(t.tasa_anual_menor);
-        document.getElementById('vMensualMenor').textContent = fmtTasa(t.tasa_mensual_menor);
-        document.getElementById('vAnualMayor').textContent   = fmtTasa2(t.tasa_anual_mayor);
-        document.getElementById('vMensualMayor').textContent = fmtTasa(t.tasa_mensual_mayor);
-        // Spread y costo de fondo
-        const cf_menor = calcCF(t.tasa_mensual_menor, t.spread_menor);
-        const cf_mayor = calcCF(t.tasa_mensual_mayor, t.spread_mayor);
-        document.getElementById('vSpreadMenor').textContent = t.spread_menor != null ? fmtTasa(t.spread_menor) : '—';
-        document.getElementById('vCFMenor').textContent     = cf_menor !== null ? fmtTasa(cf_menor) : '—';
-        document.getElementById('vSpreadMayor').textContent = t.spread_mayor != null ? fmtTasa(t.spread_mayor) : '—';
-        document.getElementById('vCFMayor').textContent     = cf_mayor !== null ? fmtTasa(cf_mayor) : '—';
+        document.getElementById('vAnualMenor').textContent   = fmtP2(t.tasa_anual_menor);
+        document.getElementById('vMensualMenor').textContent = fmtP4(t.tasa_mensual_menor);
+        document.getElementById('vAnualMayor').textContent   = fmtP2(t.tasa_anual_mayor);
+        document.getElementById('vMensualMayor').textContent = fmtP4(t.tasa_mensual_mayor);
+        document.getElementById('vSpreadMayor').textContent  = fmtP4(t.spread_mayor);
+        document.getElementById('vSpreadMenor').textContent  = fmtP4(t.spread_menor);
+        const cf = calcCF(t.tasa_mensual_mayor, t.spread_mayor);
+        document.getElementById('vCF').textContent = cf !== null ? fmtP4(cf) : '—';
         document.getElementById('vigenteCard').style.display = '';
       }
     }
@@ -326,26 +318,24 @@
     function renderizar(lista) {
       const hoy = new Date().toISOString().split('T')[0];
       const tbody = document.getElementById('tbody');
-      if (!lista.length) { tbody.innerHTML = '<tr><td colspan="10" class="text-center py-4 text-muted">Sin registros.</td></tr>'; return; }
+      if (!lista.length) { tbody.innerHTML = '<tr><td colspan="9" class="text-center py-4 text-muted">Sin registros.</td></tr>'; return; }
       tbody.innerHTML = lista.map(t => {
         const fd = t.fecha_desde?.split('T')[0] || t.fecha_desde;
         const fh = t.fecha_hasta?.split('T')[0] || t.fecha_hasta;
         const esVigente = fd <= hoy && fh >= hoy;
-        const cf_menor = calcCF(t.tasa_mensual_menor, t.spread_menor);
-        const cf_mayor = calcCF(t.tasa_mensual_mayor, t.spread_mayor);
+        const cf = calcCF(t.tasa_mensual_mayor, t.spread_mayor);
         return `<tr>
           <td>
             <div style="font-size:0.88rem;font-weight:600">${fmtFecha(fd)} &mdash; ${fmtFecha(fh)}</div>
             ${esVigente ? '<span class="badge-vigente mt-1">Vigente</span>' : ''}
           </td>
-          <td style="border-left:2px solid #f1f5f9"><span class="val-anual">${fmtTasa2(t.tasa_anual_menor)}</span></td>
-          <td><span class="val-mensual">${fmtTasa(t.tasa_mensual_menor)}</span></td>
-          <td><span class="val-spread">${t.spread_menor != null ? fmtTasa(t.spread_menor) : '—'}</span></td>
-          <td><span class="val-cf">${cf_menor !== null ? fmtTasa(cf_menor) : '—'}</span></td>
-          <td style="border-left:2px solid #f1f5f9"><span class="val-anual">${fmtTasa2(t.tasa_anual_mayor)}</span></td>
-          <td><span class="val-mensual">${fmtTasa(t.tasa_mensual_mayor)}</span></td>
-          <td><span class="val-spread">${t.spread_mayor != null ? fmtTasa(t.spread_mayor) : '—'}</span></td>
-          <td><span class="val-cf">${cf_mayor !== null ? fmtTasa(cf_mayor) : '—'}</span></td>
+          <td style="border-left:2px solid #f1f5f9"><span class="val-anual">${fmtP2(t.tasa_anual_menor)}</span></td>
+          <td><span class="val-mensual">${fmtP4(t.tasa_mensual_menor)}</span></td>
+          <td><span class="val-spread">${fmtP4(t.spread_menor)}</span></td>
+          <td style="border-left:2px solid #f1f5f9"><span class="val-anual">${fmtP2(t.tasa_anual_mayor)}</span></td>
+          <td><span class="val-mensual">${fmtP4(t.tasa_mensual_mayor)}</span></td>
+          <td><span class="val-spread">${fmtP4(t.spread_mayor)}</span></td>
+          <td style="border-left:2px solid #f1f5f9;text-align:center"><span class="val-cf">${cf !== null ? fmtP4(cf) : '—'}</span></td>
           <td>
             <button class="btn btn-outline-primary btn-sm me-1" onclick="editar(${t.id_tasa})"><i class="bi bi-pencil"></i></button>
             <button class="btn btn-outline-danger btn-sm" onclick="eliminar(${t.id_tasa})"><i class="bi bi-trash"></i></button>
@@ -357,8 +347,7 @@
     function calcMensual() {
       const a  = parseCL(document.getElementById('fAnualMenor').value);
       const b  = parseCL(document.getElementById('fAnualMayor').value);
-      const sa = parseCL(document.getElementById('fSpreadMenor').value);
-      const sb = parseCL(document.getElementById('fSpreadMayor').value);
+      const sp = parseCL(document.getElementById('fSpreadMayor').value);
 
       const mA = isNaN(a) ? NaN : Math.round(a / 12 * 10000) / 10000;
       const mB = isNaN(b) ? NaN : Math.round(b / 12 * 10000) / 10000;
@@ -366,18 +355,20 @@
       document.getElementById('fMensualMenor').value = isNaN(mA) ? '' : formatCL(mA, 4);
       document.getElementById('fMensualMayor').value = isNaN(mB) ? '' : formatCL(mB, 4);
 
-      const cfA = (!isNaN(mA) && !isNaN(sa)) ? Math.round((mA - sa) * 10000) / 10000 : NaN;
-      const cfB = (!isNaN(mB) && !isNaN(sb)) ? Math.round((mB - sb) * 10000) / 10000 : NaN;
+      // CF = mensual_mayor - spread
+      const cf = (!isNaN(mB) && !isNaN(sp)) ? Math.round((mB - sp) * 10000) / 10000 : NaN;
+      document.getElementById('fCF').value = isNaN(cf) ? '' : formatCL(cf, 4);
 
-      document.getElementById('fCFMenor').value = isNaN(cfA) ? '' : formatCL(cfA, 4);
-      document.getElementById('fCFMayor').value = isNaN(cfB) ? '' : formatCL(cfB, 4);
+      // Spread implícito ≤200 = mensual_menor - CF
+      const spMenor = (!isNaN(mA) && !isNaN(cf)) ? Math.round((mA - cf) * 10000) / 10000 : NaN;
+      document.getElementById('fSpreadMenor').value = isNaN(spMenor) ? '' : formatCL(spMenor, 4);
     }
 
     function abrirModal() {
       editId = null;
       document.getElementById('modalTitulo').textContent = 'Nueva Tasa';
       ['fDesde','fHasta','fAnualMenor','fAnualMayor','fMensualMenor','fMensualMayor',
-       'fSpreadMenor','fSpreadMayor','fCFMenor','fCFMayor'].forEach(id => document.getElementById(id).value = '');
+       'fSpreadMayor','fSpreadMenor','fCF'].forEach(id => document.getElementById(id).value = '');
       document.getElementById('modalError').classList.add('d-none');
       bootstrap.Modal.getOrCreateInstance(document.getElementById('modal')).show();
     }
@@ -388,26 +379,23 @@
       const t = d.data;
       editId = id;
       document.getElementById('modalTitulo').textContent = 'Editar Tasa';
-      document.getElementById('fDesde').value        = t.fecha_desde?.split('T')[0] || '';
-      document.getElementById('fHasta').value        = t.fecha_hasta?.split('T')[0] || '';
-      document.getElementById('fAnualMenor').value   = formatCL(t.tasa_anual_menor, 2);
-      document.getElementById('fAnualMayor').value   = formatCL(t.tasa_anual_mayor, 2);
-      document.getElementById('fSpreadMenor').value  = t.spread_menor != null ? formatCL(t.spread_menor, 4) : '';
-      document.getElementById('fSpreadMayor').value  = t.spread_mayor != null ? formatCL(t.spread_mayor, 4) : '';
+      document.getElementById('fDesde').value       = t.fecha_desde?.split('T')[0] || '';
+      document.getElementById('fHasta').value       = t.fecha_hasta?.split('T')[0] || '';
+      document.getElementById('fAnualMenor').value  = formatCL(t.tasa_anual_menor, 2);
+      document.getElementById('fAnualMayor').value  = formatCL(t.tasa_anual_mayor, 2);
+      document.getElementById('fSpreadMayor').value = t.spread_mayor != null ? formatCL(t.spread_mayor, 4) : '';
       calcMensual();
       document.getElementById('modalError').classList.add('d-none');
       bootstrap.Modal.getOrCreateInstance(document.getElementById('modal')).show();
     }
 
     async function guardar() {
-      const spMenorRaw = document.getElementById('fSpreadMenor').value;
       const spMayorRaw = document.getElementById('fSpreadMayor').value;
       const body = {
         fecha_desde:      document.getElementById('fDesde').value,
         fecha_hasta:      document.getElementById('fHasta').value,
         tasa_anual_menor: parseCL(document.getElementById('fAnualMenor').value),
         tasa_anual_mayor: parseCL(document.getElementById('fAnualMayor').value),
-        spread_menor:     spMenorRaw !== '' ? parseCL(spMenorRaw) : null,
         spread_mayor:     spMayorRaw !== '' ? parseCL(spMayorRaw) : null,
       };
       const elErr = document.getElementById('modalError');
