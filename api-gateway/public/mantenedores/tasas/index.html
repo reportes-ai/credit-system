@@ -21,7 +21,7 @@
     .avatar { width: 28px; height: 28px; background: #90caf9; border-radius: 50%; display: flex; align-items: center; justify-content: center; color: var(--navy); font-weight: 700; font-size: 0.75rem; }
     .btn-logout { background: rgba(255,255,255,0.1); border: 1px solid rgba(255,255,255,0.2); color: #fff; border-radius: 8px; padding: 5px 12px; font-size: 0.82rem; cursor: pointer; }
     .btn-logout:hover { background: rgba(255,255,255,0.2); }
-    .page-content { padding: 28px 32px; max-width: 1000px; margin: 0 auto; }
+    .page-content { padding: 28px 32px; max-width: 1100px; margin: 0 auto; }
     .page-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 24px; }
     .page-header h4 { font-weight: 700; color: #111827; margin: 0; display: flex; align-items: center; gap: 10px; }
     .page-header h4 i { color: var(--navy); }
@@ -41,6 +41,7 @@
     .form-control { border-radius: 8px; border: 1.5px solid #d1d5db; font-size: 0.88rem; }
     .form-control:focus { border-color: var(--navy); box-shadow: 0 0 0 3px rgba(1,65,162,0.1); }
     .form-control[readonly] { background: #eef2ff; color: var(--navy); font-weight: 700; }
+    .form-control.cf-readonly { background: #f0fdf4; color: #166534; font-weight: 700; }
     .btn-primary { background: var(--navy); border-color: var(--navy); }
     .btn-primary:hover { background: var(--accent); border-color: var(--accent); }
     .table { font-size: 0.85rem; }
@@ -49,6 +50,8 @@
     .badge-vigente { background: #dcfce7; color: #166534; border-radius: 12px; padding: 3px 10px; font-size: 0.72rem; font-weight: 600; display: inline-block; }
     .val-anual { font-weight: 700; color: var(--navy); }
     .val-mensual { color: #6b7280; font-size: 0.82rem; }
+    .val-spread { color: #9ca3af; font-size: 0.78rem; }
+    .val-cf { color: #166534; font-size: 0.82rem; font-weight: 600; }
     .toast-container { position: fixed; top: 70px; right: 20px; z-index: 9999; }
     .modal-header { background: linear-gradient(135deg, var(--navy), var(--accent)); color: #fff; border-radius: 12px 12px 0 0; }
     .modal-header .btn-close { filter: invert(1); }
@@ -58,7 +61,7 @@
 <body>
   <nav class="topnav">
     <div class="topnav-left">
-      <div class="topnav-brand"><a href="/"><img src="/img/logo.png" alt="AutoFácil"></a> <span class="version-badge">v2.7</span></div>
+      <div class="topnav-brand"><a href="/"><img src="/img/logo.png" alt="AutoFácil"></a> <span class="version-badge">v2.8</span></div>
       <div class="breadcrumb-nav">
         <a href="/">Inicio</a><span class="sep">/</span>
         <a href="/mantenedores/">Mantenedores</a><span class="sep">/</span>
@@ -87,12 +90,13 @@
       <button class="btn btn-primary btn-sm" onclick="abrirModal()"><i class="bi bi-plus-lg me-1"></i>Nueva Tasa</button>
     </div>
 
+    <!-- TARJETA VIGENTE -->
     <div class="vigente-card" id="vigenteCard" style="display:none">
       <div class="vigente-title">TASA MÁXIMA CONVENCIONAL VIGENTE</div>
       <div class="vigente-periodo" id="vigentePeriodo">—</div>
       <div class="vigente-grid">
         <div class="vigente-tramo">
-          <div class="tramo-label">≤ 200 UF</div>
+          <div class="tramo-label">&#8804; 200 UF</div>
           <div class="tramo-row">
             <span class="tramo-tipo">Tasa Anual</span>
             <span class="tramo-valor" id="vAnualMenor">—</span>
@@ -100,6 +104,15 @@
           <div class="tramo-row">
             <span class="tramo-tipo">Tasa Mensual</span>
             <span class="tramo-valor" id="vMensualMenor">—</span>
+          </div>
+          <hr style="border-color:rgba(255,255,255,0.2);margin:8px 0">
+          <div class="tramo-row">
+            <span class="tramo-tipo">Spread</span>
+            <span class="tramo-valor" id="vSpreadMenor" style="font-size:1.05rem">—</span>
+          </div>
+          <div class="tramo-row">
+            <span class="tramo-tipo" style="font-weight:700;opacity:1">Costo de Fondo</span>
+            <span class="tramo-valor" id="vCFMenor" style="font-size:1.1rem;color:#90cdf4">—</span>
           </div>
         </div>
         <div class="vigente-tramo">
@@ -112,10 +125,20 @@
             <span class="tramo-tipo">Tasa Mensual</span>
             <span class="tramo-valor" id="vMensualMayor">—</span>
           </div>
+          <hr style="border-color:rgba(255,255,255,0.2);margin:8px 0">
+          <div class="tramo-row">
+            <span class="tramo-tipo">Spread</span>
+            <span class="tramo-valor" id="vSpreadMayor" style="font-size:1.05rem">—</span>
+          </div>
+          <div class="tramo-row">
+            <span class="tramo-tipo" style="font-weight:700;opacity:1">Costo de Fondo</span>
+            <span class="tramo-valor" id="vCFMayor" style="font-size:1.1rem;color:#90cdf4">—</span>
+          </div>
         </div>
       </div>
     </div>
 
+    <!-- TABLA HISTÓRICA -->
     <div class="card">
       <div class="card-body p-3">
         <div class="table-responsive">
@@ -123,16 +146,22 @@
             <thead>
               <tr>
                 <th rowspan="2" style="vertical-align:middle">Período</th>
-                <th colspan="2" class="text-center" style="border-left:2px solid #e5e7eb">≤ 200 UF</th>
-                <th colspan="2" class="text-center" style="border-left:2px solid #e5e7eb">&gt; 200 UF</th>
+                <th colspan="4" class="text-center" style="border-left:2px solid #e5e7eb">&#8804; 200 UF</th>
+                <th colspan="4" class="text-center" style="border-left:2px solid #e5e7eb">&gt; 200 UF</th>
                 <th rowspan="2" style="vertical-align:middle; width:90px">Acciones</th>
               </tr>
               <tr>
-                <th style="border-left:2px solid #e5e7eb">Anual</th><th>Mensual</th>
-                <th style="border-left:2px solid #e5e7eb">Anual</th><th>Mensual</th>
+                <th style="border-left:2px solid #e5e7eb">Anual</th>
+                <th>Mensual</th>
+                <th>Spread</th>
+                <th>C. Fondo</th>
+                <th style="border-left:2px solid #e5e7eb">Anual</th>
+                <th>Mensual</th>
+                <th>Spread</th>
+                <th>C. Fondo</th>
               </tr>
             </thead>
-            <tbody id="tbody"><tr><td colspan="6" class="text-center py-4 text-muted">Cargando...</td></tr></tbody>
+            <tbody id="tbody"><tr><td colspan="10" class="text-center py-4 text-muted">Cargando...</td></tr></tbody>
           </table>
         </div>
       </div>
@@ -159,8 +188,9 @@
             </div>
           </div>
           <div class="row g-3">
+            <!-- TRAMO MENOR -->
             <div class="col-md-6">
-              <div class="tramo-header">≤ 200 UF</div>
+              <div class="tramo-header">&#8804; 200 UF</div>
               <div class="mb-3">
                 <label class="form-label">Tasa Máx. Anual (%)</label>
                 <div class="input-group">
@@ -168,14 +198,29 @@
                   <span class="input-group-text">%</span>
                 </div>
               </div>
-              <div>
+              <div class="mb-3">
                 <label class="form-label">Tasa Máx. Mensual (÷ 12)</label>
                 <div class="input-group">
                   <input type="text" id="fMensualMenor" class="form-control" readonly placeholder="—">
                   <span class="input-group-text">%</span>
                 </div>
               </div>
+              <div class="mb-3">
+                <label class="form-label">Spread (%)</label>
+                <div class="input-group">
+                  <input type="text" id="fSpreadMenor" class="form-control" placeholder="1,05" inputmode="decimal" oninput="calcMensual()">
+                  <span class="input-group-text">%</span>
+                </div>
+              </div>
+              <div>
+                <label class="form-label">Costo de Fondo (mensual − spread)</label>
+                <div class="input-group">
+                  <input type="text" id="fCFMenor" class="form-control cf-readonly" readonly placeholder="—">
+                  <span class="input-group-text">%</span>
+                </div>
+              </div>
             </div>
+            <!-- TRAMO MAYOR -->
             <div class="col-md-6">
               <div class="tramo-header">&gt; 200 UF</div>
               <div class="mb-3">
@@ -185,10 +230,24 @@
                   <span class="input-group-text">%</span>
                 </div>
               </div>
-              <div>
+              <div class="mb-3">
                 <label class="form-label">Tasa Máx. Mensual (÷ 12)</label>
                 <div class="input-group">
                   <input type="text" id="fMensualMayor" class="form-control" readonly placeholder="—">
+                  <span class="input-group-text">%</span>
+                </div>
+              </div>
+              <div class="mb-3">
+                <label class="form-label">Spread (%)</label>
+                <div class="input-group">
+                  <input type="text" id="fSpreadMayor" class="form-control" placeholder="1,05" inputmode="decimal" oninput="calcMensual()">
+                  <span class="input-group-text">%</span>
+                </div>
+              </div>
+              <div>
+                <label class="form-label">Costo de Fondo (mensual − spread)</label>
+                <div class="input-group">
+                  <input type="text" id="fCFMayor" class="form-control cf-readonly" readonly placeholder="—">
                   <span class="input-group-text">%</span>
                 </div>
               </div>
@@ -210,6 +269,8 @@
     document.addEventListener('DOMContentLoaded', () => {
       setupCLInput(document.getElementById('fAnualMenor'), 2);
       setupCLInput(document.getElementById('fAnualMayor'), 2);
+      setupCLInput(document.getElementById('fSpreadMenor'), 4);
+      setupCLInput(document.getElementById('fSpreadMayor'), 4);
     });
     const token = localStorage.getItem('token');
     const yo = JSON.parse(localStorage.getItem('usuario') || 'null');
@@ -231,7 +292,13 @@
     };
 
     const fmtFecha = d => new Date(d).toLocaleDateString('es-CL', { timeZone:'UTC', day:'2-digit', month:'2-digit', year:'numeric' });
-    const fmtTasa = v => formatCL(parseFloat(v), 2) + '%';
+    const fmtTasa  = v => (v !== null && v !== undefined && !isNaN(v)) ? formatCL(parseFloat(v), 4) + '%' : '—';
+    const fmtTasa2 = v => (v !== null && v !== undefined && !isNaN(v)) ? formatCL(parseFloat(v), 2) + '%' : '—';
+    const calcCF   = (mensual, spread) => {
+      const m = parseFloat(mensual), s = parseFloat(spread);
+      if (isNaN(m) || spread === null || spread === undefined || isNaN(s)) return null;
+      return Math.round((m - s) * 10000) / 10000;
+    };
 
     let datos = [], editId = null;
 
@@ -241,10 +308,17 @@
       if (dVig?.success && dVig.data) {
         const t = dVig.data;
         document.getElementById('vigentePeriodo').textContent = `Válido del ${fmtFecha(t.fecha_desde)} al ${fmtFecha(t.fecha_hasta)}`;
-        document.getElementById('vAnualMenor').textContent = fmtTasa(t.tasa_anual_menor);
+        document.getElementById('vAnualMenor').textContent   = fmtTasa2(t.tasa_anual_menor);
         document.getElementById('vMensualMenor').textContent = fmtTasa(t.tasa_mensual_menor);
-        document.getElementById('vAnualMayor').textContent = fmtTasa(t.tasa_anual_mayor);
+        document.getElementById('vAnualMayor').textContent   = fmtTasa2(t.tasa_anual_mayor);
         document.getElementById('vMensualMayor').textContent = fmtTasa(t.tasa_mensual_mayor);
+        // Spread y costo de fondo
+        const cf_menor = calcCF(t.tasa_mensual_menor, t.spread_menor);
+        const cf_mayor = calcCF(t.tasa_mensual_mayor, t.spread_mayor);
+        document.getElementById('vSpreadMenor').textContent = t.spread_menor != null ? fmtTasa(t.spread_menor) : '—';
+        document.getElementById('vCFMenor').textContent     = cf_menor !== null ? fmtTasa(cf_menor) : '—';
+        document.getElementById('vSpreadMayor').textContent = t.spread_mayor != null ? fmtTasa(t.spread_mayor) : '—';
+        document.getElementById('vCFMayor').textContent     = cf_mayor !== null ? fmtTasa(cf_mayor) : '—';
         document.getElementById('vigenteCard').style.display = '';
       }
     }
@@ -252,20 +326,26 @@
     function renderizar(lista) {
       const hoy = new Date().toISOString().split('T')[0];
       const tbody = document.getElementById('tbody');
-      if (!lista.length) { tbody.innerHTML = '<tr><td colspan="6" class="text-center py-4 text-muted">Sin registros.</td></tr>'; return; }
+      if (!lista.length) { tbody.innerHTML = '<tr><td colspan="10" class="text-center py-4 text-muted">Sin registros.</td></tr>'; return; }
       tbody.innerHTML = lista.map(t => {
         const fd = t.fecha_desde?.split('T')[0] || t.fecha_desde;
         const fh = t.fecha_hasta?.split('T')[0] || t.fecha_hasta;
         const esVigente = fd <= hoy && fh >= hoy;
+        const cf_menor = calcCF(t.tasa_mensual_menor, t.spread_menor);
+        const cf_mayor = calcCF(t.tasa_mensual_mayor, t.spread_mayor);
         return `<tr>
           <td>
-            <div style="font-size:0.88rem;font-weight:600">${fmtFecha(fd)} — ${fmtFecha(fh)}</div>
+            <div style="font-size:0.88rem;font-weight:600">${fmtFecha(fd)} &mdash; ${fmtFecha(fh)}</div>
             ${esVigente ? '<span class="badge-vigente mt-1">Vigente</span>' : ''}
           </td>
-          <td style="border-left:2px solid #f1f5f9"><span class="val-anual">${fmtTasa(t.tasa_anual_menor)}</span></td>
+          <td style="border-left:2px solid #f1f5f9"><span class="val-anual">${fmtTasa2(t.tasa_anual_menor)}</span></td>
           <td><span class="val-mensual">${fmtTasa(t.tasa_mensual_menor)}</span></td>
-          <td style="border-left:2px solid #f1f5f9"><span class="val-anual">${fmtTasa(t.tasa_anual_mayor)}</span></td>
+          <td><span class="val-spread">${t.spread_menor != null ? fmtTasa(t.spread_menor) : '—'}</span></td>
+          <td><span class="val-cf">${cf_menor !== null ? fmtTasa(cf_menor) : '—'}</span></td>
+          <td style="border-left:2px solid #f1f5f9"><span class="val-anual">${fmtTasa2(t.tasa_anual_mayor)}</span></td>
           <td><span class="val-mensual">${fmtTasa(t.tasa_mensual_mayor)}</span></td>
+          <td><span class="val-spread">${t.spread_mayor != null ? fmtTasa(t.spread_mayor) : '—'}</span></td>
+          <td><span class="val-cf">${cf_mayor !== null ? fmtTasa(cf_mayor) : '—'}</span></td>
           <td>
             <button class="btn btn-outline-primary btn-sm me-1" onclick="editar(${t.id_tasa})"><i class="bi bi-pencil"></i></button>
             <button class="btn btn-outline-danger btn-sm" onclick="eliminar(${t.id_tasa})"><i class="bi bi-trash"></i></button>
@@ -275,16 +355,29 @@
     }
 
     function calcMensual() {
-      const a = parseCL(document.getElementById('fAnualMenor').value);
-      const b = parseCL(document.getElementById('fAnualMayor').value);
-      document.getElementById('fMensualMenor').value = isNaN(a) ? '' : formatCL(Math.round(a / 12 * 100) / 100, 2);
-      document.getElementById('fMensualMayor').value = isNaN(b) ? '' : formatCL(Math.round(b / 12 * 100) / 100, 2);
+      const a  = parseCL(document.getElementById('fAnualMenor').value);
+      const b  = parseCL(document.getElementById('fAnualMayor').value);
+      const sa = parseCL(document.getElementById('fSpreadMenor').value);
+      const sb = parseCL(document.getElementById('fSpreadMayor').value);
+
+      const mA = isNaN(a) ? NaN : Math.round(a / 12 * 10000) / 10000;
+      const mB = isNaN(b) ? NaN : Math.round(b / 12 * 10000) / 10000;
+
+      document.getElementById('fMensualMenor').value = isNaN(mA) ? '' : formatCL(mA, 4);
+      document.getElementById('fMensualMayor').value = isNaN(mB) ? '' : formatCL(mB, 4);
+
+      const cfA = (!isNaN(mA) && !isNaN(sa)) ? Math.round((mA - sa) * 10000) / 10000 : NaN;
+      const cfB = (!isNaN(mB) && !isNaN(sb)) ? Math.round((mB - sb) * 10000) / 10000 : NaN;
+
+      document.getElementById('fCFMenor').value = isNaN(cfA) ? '' : formatCL(cfA, 4);
+      document.getElementById('fCFMayor').value = isNaN(cfB) ? '' : formatCL(cfB, 4);
     }
 
     function abrirModal() {
       editId = null;
       document.getElementById('modalTitulo').textContent = 'Nueva Tasa';
-      ['fDesde','fHasta','fAnualMenor','fAnualMayor','fMensualMenor','fMensualMayor'].forEach(id => document.getElementById(id).value = '');
+      ['fDesde','fHasta','fAnualMenor','fAnualMayor','fMensualMenor','fMensualMayor',
+       'fSpreadMenor','fSpreadMayor','fCFMenor','fCFMayor'].forEach(id => document.getElementById(id).value = '');
       document.getElementById('modalError').classList.add('d-none');
       bootstrap.Modal.getOrCreateInstance(document.getElementById('modal')).show();
     }
@@ -295,21 +388,27 @@
       const t = d.data;
       editId = id;
       document.getElementById('modalTitulo').textContent = 'Editar Tasa';
-      document.getElementById('fDesde').value = t.fecha_desde?.split('T')[0] || '';
-      document.getElementById('fHasta').value = t.fecha_hasta?.split('T')[0] || '';
-      document.getElementById('fAnualMenor').value = formatCL(t.tasa_anual_menor, 2);
-      document.getElementById('fAnualMayor').value = formatCL(t.tasa_anual_mayor, 2);
+      document.getElementById('fDesde').value        = t.fecha_desde?.split('T')[0] || '';
+      document.getElementById('fHasta').value        = t.fecha_hasta?.split('T')[0] || '';
+      document.getElementById('fAnualMenor').value   = formatCL(t.tasa_anual_menor, 2);
+      document.getElementById('fAnualMayor').value   = formatCL(t.tasa_anual_mayor, 2);
+      document.getElementById('fSpreadMenor').value  = t.spread_menor != null ? formatCL(t.spread_menor, 4) : '';
+      document.getElementById('fSpreadMayor').value  = t.spread_mayor != null ? formatCL(t.spread_mayor, 4) : '';
       calcMensual();
       document.getElementById('modalError').classList.add('d-none');
       bootstrap.Modal.getOrCreateInstance(document.getElementById('modal')).show();
     }
 
     async function guardar() {
+      const spMenorRaw = document.getElementById('fSpreadMenor').value;
+      const spMayorRaw = document.getElementById('fSpreadMayor').value;
       const body = {
-        fecha_desde: document.getElementById('fDesde').value,
-        fecha_hasta: document.getElementById('fHasta').value,
+        fecha_desde:      document.getElementById('fDesde').value,
+        fecha_hasta:      document.getElementById('fHasta').value,
         tasa_anual_menor: parseCL(document.getElementById('fAnualMenor').value),
-        tasa_anual_mayor: parseCL(document.getElementById('fAnualMayor').value)
+        tasa_anual_mayor: parseCL(document.getElementById('fAnualMayor').value),
+        spread_menor:     spMenorRaw !== '' ? parseCL(spMenorRaw) : null,
+        spread_mayor:     spMayorRaw !== '' ? parseCL(spMayorRaw) : null,
       };
       const elErr = document.getElementById('modalError');
       if (!body.fecha_desde || !body.fecha_hasta || isNaN(body.tasa_anual_menor) || isNaN(body.tasa_anual_mayor)) {
