@@ -25,62 +25,127 @@
     .btn-logout:hover { background: rgba(255,255,255,0.2); }
 
     /* ── Page ───────────────────────────────────────────────────────── */
-    .page-content { padding: 28px 32px; max-width: 1200px; margin: 0 auto; }
-    .page-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 24px; }
+    .page-content { padding: 28px 32px; max-width: 1100px; margin: 0 auto; }
+    .page-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 24px; flex-wrap: wrap; gap: 12px; }
     .page-header h4 { font-weight: 700; color: #111827; margin: 0; display: flex; align-items: center; gap: 10px; }
     .page-header h4 i { color: var(--navy); }
+    .fecha-actualizacion { font-size: 0.8rem; color: #6b7280; display: flex; align-items: center; gap: 6px; }
+    .fecha-actualizacion strong { color: #374151; }
 
     /* ── Cards ──────────────────────────────────────────────────────── */
     .card { border: none; border-radius: 12px; box-shadow: 0 1px 4px rgba(0,0,0,0.07); margin-bottom: 20px; }
-    .card-header-custom { background: #f8fafc; border-bottom: 1px solid #e5e7eb; border-radius: 12px 12px 0 0; padding: 12px 20px; font-weight: 700; font-size: 0.8rem; color: var(--navy); text-transform: uppercase; letter-spacing: 0.05em; display: flex; align-items: center; gap: 8px; }
+    .card-header-custom {
+      background: #f8fafc; border-bottom: 1px solid #e5e7eb; border-radius: 12px 12px 0 0;
+      padding: 12px 20px; font-weight: 700; font-size: 0.8rem; color: var(--navy);
+      text-transform: uppercase; letter-spacing: 0.05em;
+      display: flex; align-items: center; justify-content: space-between; gap: 8px;
+    }
+    .card-header-left { display: flex; align-items: center; gap: 8px; }
     .card-body { padding: 0; }
 
-    /* ── Tables ─────────────────────────────────────────────────────── */
-    .seg-table { font-size: 0.82rem; width: 100%; border-collapse: collapse; }
-    .seg-table th { background: var(--navy); color: #fff; font-size: 0.75rem; text-align: center; white-space: nowrap; padding: 8px 10px; font-weight: 700; }
-    .seg-table th:first-child { background: var(--navy-dark); text-align: left; }
-    .seg-table td { text-align: center; padding: 7px 10px; border-bottom: 1px solid #f0f2f5; }
-    .seg-table td:first-child { font-weight: 700; color: var(--navy); text-align: left; background: #f8fafc; }
-    .seg-table tr:last-child td { border-bottom: none; }
-    .seg-table tr:hover td { background: #eef2ff; }
-    .seg-table tr:hover td:first-child { background: #e0e7ff; }
+    /* ── Edit/Save buttons ──────────────────────────────────────────── */
+    .btn-edit {
+      background: #f3f4f6; color: #374151; border: 1.5px solid #d1d5db;
+      border-radius: 7px; padding: 5px 14px; font-size: 0.78rem; font-weight: 600;
+      cursor: pointer; display: flex; align-items: center; gap: 6px; transition: background .15s;
+    }
+    .btn-edit:hover { background: #e5e7eb; }
+    .btn-save {
+      background: linear-gradient(135deg, var(--navy), var(--accent)); color: #fff; border: none;
+      border-radius: 7px; padding: 5px 14px; font-size: 0.78rem; font-weight: 700;
+      cursor: pointer; display: none; align-items: center; gap: 6px; transition: opacity .15s;
+    }
+    .btn-save:hover { opacity: 0.88; }
+    .btn-save:disabled { opacity: 0.55; cursor: not-allowed; }
+    .btn-cancel {
+      background: #fff; color: #6b7280; border: 1.5px solid #d1d5db;
+      border-radius: 7px; padding: 5px 14px; font-size: 0.78rem; font-weight: 600;
+      cursor: pointer; display: none; align-items: center; gap: 6px;
+    }
+    .btn-cancel:hover { background: #f9fafb; }
+    .editing-badge {
+      background: #fef3c7; border: 1px solid #fde68a; color: #92400e;
+      border-radius: 6px; padding: 2px 10px; font-size: 0.72rem; font-weight: 700;
+      display: none; align-items: center; gap: 4px;
+    }
 
-    /* Combo column coloring */
-    .col-d   { background: rgba(1,65,162,.04); }
-    .col-r   { background: rgba(0,154,254,.04); }
-    .col-c   { background: rgba(16,185,129,.04); }
-    .col-dr  { background: rgba(139,92,246,.04); }
-    .col-dc  { background: rgba(239,68,68,.04); }
-    .col-rc  { background: rgba(245,158,11,.04); }
-    .col-drc { background: rgba(31,41,55,.04); }
+    /* ── Editable table (Tabla 1) ───────────────────────────────────── */
+    .edit-table { font-size: 0.84rem; width: 100%; border-collapse: collapse; }
+    .edit-table th {
+      padding: 9px 14px; font-size: 0.76rem; font-weight: 700; color: #fff; text-align: center;
+    }
+    .edit-table th.th-plazo { background: var(--navy-dark); text-align: left; min-width: 110px; }
+    .edit-table th.th-d  { background: #1e40af; }
+    .edit-table th.th-r  { background: #0369a1; }
+    .edit-table th.th-c  { background: #047857; }
+    .edit-table td { padding: 7px 14px; border-bottom: 1px solid #f0f2f5; text-align: center; vertical-align: middle; }
+    .edit-table td:first-child { text-align: left; font-weight: 700; color: var(--navy); background: #f8fafc; }
+    .edit-table tr:last-child td { border-bottom: none; }
+    .edit-table tr:hover td { background: #f0f9ff; }
+    .edit-table tr:hover td:first-child { background: #e0f2fe; }
 
-    .th-d   { background: #1e40af !important; }
-    .th-r   { background: #0369a1 !important; }
-    .th-c   { background: #047857 !important; }
-    .th-dr  { background: #5b21b6 !important; }
-    .th-dc  { background: #b91c1c !important; }
-    .th-rc  { background: #b45309 !important; }
-    .th-drc { background: #1f2937 !important; }
+    /* Rate input field */
+    .rate-input {
+      width: 110px; border: 1.5px solid #d1d5db; border-radius: 6px;
+      padding: 4px 8px; font-size: 0.82rem; text-align: center;
+      font-weight: 600; color: #1f2937; background: #fff;
+      transition: border-color .2s, box-shadow .2s;
+    }
+    .rate-input:focus { border-color: var(--navy); box-shadow: 0 0 0 3px rgba(1,65,162,.1); outline: none; }
+    .rate-input:disabled { background: #f3f4f6; cursor: not-allowed; color: #6b7280; border-color: transparent; }
+    .rate-display { font-weight: 700; color: #1f2937; }
 
-    /* AMBOS table */
-    .ambos-table { font-size: 0.85rem; width: 100%; border-collapse: collapse; }
-    .ambos-table th { background: #0d9488; color: #fff; padding: 9px 16px; font-size: 0.78rem; font-weight: 700; }
+    /* ── Calculated table (Tabla 2) ─────────────────────────────────── */
+    .calc-table { font-size: 0.81rem; width: 100%; border-collapse: collapse; }
+    .calc-table th { padding: 8px 10px; font-size: 0.74rem; font-weight: 700; color: #fff; text-align: center; }
+    .calc-table th.th-plazo { background: var(--navy-dark); text-align: left; min-width: 100px; }
+    .calc-table th.th-d   { background: #1e40af; }
+    .calc-table th.th-r   { background: #0369a1; }
+    .calc-table th.th-c   { background: #047857; }
+    .calc-table th.th-dr  { background: #5b21b6; }
+    .calc-table th.th-dc  { background: #b91c1c; }
+    .calc-table th.th-rc  { background: #b45309; }
+    .calc-table th.th-drc { background: #1f2937; }
+    .calc-table td { padding: 6px 10px; border-bottom: 1px solid #f0f2f5; text-align: center; vertical-align: middle; }
+    .calc-table td:first-child { text-align: left; font-weight: 700; color: var(--navy); background: #f8fafc; }
+    .calc-table tr:last-child td { border-bottom: none; }
+    .calc-table tr:hover td { background: #f0f9ff; }
+    .calc-table tr:hover td:first-child { background: #e0f2fe; }
+    .calc-table .col-d   { color: #1e40af; font-weight: 600; }
+    .calc-table .col-r   { color: #0369a1; font-weight: 600; }
+    .calc-table .col-c   { color: #047857; font-weight: 600; }
+    .calc-table .col-dr  { color: #5b21b6; font-weight: 600; }
+    .calc-table .col-dc  { color: #b91c1c; font-weight: 600; }
+    .calc-table .col-rc  { color: #b45309; font-weight: 600; }
+    .calc-table .col-drc { color: #1f2937; font-weight: 700; }
+
+    /* ── AMBOS table ────────────────────────────────────────────────── */
+    .ambos-table { font-size: 0.84rem; width: 100%; border-collapse: collapse; }
+    .ambos-table th { background: #0d9488; color: #fff; padding: 9px 16px; font-size: 0.76rem; font-weight: 700; }
     .ambos-table td { padding: 10px 16px; border-bottom: 1px solid #f0f2f5; vertical-align: middle; }
     .ambos-table tr:last-child td { border-bottom: none; }
     .ambos-table tr:hover td { background: #f0fdfa; }
     .ambos-badge { display: inline-block; background: linear-gradient(135deg, #0d9488, #059669); color: #fff; border-radius: 6px; padding: 3px 10px; font-weight: 800; font-size: 0.88rem; }
     .pct-badge { display: inline-block; background: #d1fae5; color: #065f46; border-radius: 6px; padding: 3px 10px; font-weight: 700; font-size: 0.82rem; }
 
-    /* Note box */
-    .note-box { background: #fffbeb; border: 1px solid #fde68a; border-radius: 8px; padding: 12px 16px; font-size: 0.82rem; color: #92400e; display: flex; align-items: flex-start; gap: 10px; margin: 16px 20px; }
+    /* ── Info boxes ─────────────────────────────────────────────────── */
+    .note-box { background: #fffbeb; border: 1px solid #fde68a; border-radius: 8px; padding: 11px 16px; font-size: 0.8rem; color: #92400e; display: flex; align-items: flex-start; gap: 10px; margin: 14px 20px; }
     .note-box i { margin-top: 1px; flex-shrink: 0; }
+    .formula-box { background: #f0f9ff; border: 1px solid #bae6fd; border-radius: 8px; padding: 12px 18px; margin: 14px 20px; font-size: 0.82rem; }
+    .formula-box .formula-title { font-weight: 700; color: #075985; margin-bottom: 6px; font-size: 0.77rem; text-transform: uppercase; letter-spacing: .05em; }
+    .formula-box code { background: #e0f2fe; color: #0369a1; padding: 2px 6px; border-radius: 4px; font-size: 0.8rem; font-weight: 700; }
 
-    /* Formula box */
-    .formula-box { background: #f0f9ff; border: 1px solid #bae6fd; border-radius: 8px; padding: 14px 18px; margin: 16px 20px; font-size: 0.84rem; }
-    .formula-box .formula-title { font-weight: 700; color: #075985; margin-bottom: 8px; font-size: 0.8rem; text-transform: uppercase; letter-spacing: .05em; }
-    .formula-box code { background: #e0f2fe; color: #0369a1; padding: 2px 6px; border-radius: 4px; font-size: 0.82rem; font-weight: 700; }
+    /* ── AMBOS visual cards ─────────────────────────────────────────── */
+    .ambos-cards { padding: 16px 20px 20px; display: flex; flex-wrap: wrap; gap: 12px; }
+    .ambos-card { background: #fff; border-radius: 12px; padding: 16px 20px; min-width: 190px; flex: 1; border-left: 4px solid; }
 
-    /* Toast */
+    /* ── Spinners / Loading ─────────────────────────────────────────── */
+    .spinner-sm { width: 14px; height: 14px; border: 2px solid rgba(255,255,255,.4); border-top-color: #fff; border-radius: 50%; animation: spin .7s linear infinite; display: inline-block; }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    .loading-overlay { display: flex; align-items: center; gap: 10px; color: #6b7280; font-size: 0.85rem; padding: 24px 20px; }
+    .spinner-navy { border: 2px solid #d1d5db; border-top-color: var(--navy); border-radius: 50%; width: 18px; height: 18px; animation: spin .7s linear infinite; }
+
+    /* ── Toast ──────────────────────────────────────────────────────── */
     .toast-container { position: fixed; top: 72px; right: 20px; z-index: 9999; display: flex; flex-direction: column; gap: 8px; }
     .toast-item { background: #fff; border-radius: 10px; padding: 12px 16px; box-shadow: 0 4px 16px rgba(0,0,0,.14); min-width: 280px; display: flex; align-items: flex-start; gap: 10px; animation: slideIn .25s ease; border-left: 4px solid var(--navy); }
     .toast-item.success { border-left-color: #10b981; }
@@ -125,120 +190,140 @@
 
 <!-- ─── PAGE CONTENT ─────────────────────────────────────────────────────── -->
 <div class="page-content">
+
   <div class="page-header">
     <h4><i class="bi bi-shield-check"></i> Factores de Seguro</h4>
-  </div>
-
-  <!-- ═══════════════════════════════════════════════════════════════════════
-       TABLA 1 — TASAS NETAS (%) POR PLAZO
-  ═══════════════════════════════════════════════════════════════════════════ -->
-  <div class="card">
-    <div class="card-header-custom">
-      <i class="bi bi-table"></i> Tasas Netas por Plazo — Lo que paga el cliente (%)
-    </div>
-    <div class="card-body">
-      <div class="note-box">
-        <i class="bi bi-info-circle-fill"></i>
-        <span>Estas tasas se aplican sobre el <strong>Sub-Total Sin Seguros</strong> (saldo precio + gastos operacionales) para obtener el monto de cada seguro que se agrega al crédito. El plazo real se redondea al bracket superior.</span>
-      </div>
-      <div class="table-responsive">
-        <table class="seg-table">
-          <thead>
-            <tr>
-              <th style="min-width:90px">Plazo<br><span style="font-weight:400;opacity:.8;font-size:.72rem">(bracket)</span></th>
-              <th class="th-d">DESG</th>
-              <th class="th-r">RDH</th>
-              <th class="th-c">CESANTÍA</th>
-              <th class="th-dr">DESG+RDH</th>
-              <th class="th-dc">DESG+CESA</th>
-              <th class="th-rc">RDH+CESA</th>
-              <th class="th-drc">DESG+RDH+CESA</th>
-            </tr>
-          </thead>
-          <tbody id="tablaTasasNetas"></tbody>
-        </table>
-      </div>
+    <div class="fecha-actualizacion">
+      <i class="bi bi-clock-history"></i>
+      Última actualización: <strong id="fechaActualizacion">—</strong>
     </div>
   </div>
 
-  <!-- ═══════════════════════════════════════════════════════════════════════
-       TABLA 2 — FACTORES CALCULADOS (DECIMAL) — A11:H17 Excel
-  ═══════════════════════════════════════════════════════════════════════════ -->
-  <div class="card">
-    <div class="card-header-custom">
-      <i class="bi bi-calculator"></i> Factores Calculados — Decimales aplicados en simulación (A11:H17)
-    </div>
-    <div class="card-body">
-      <div class="formula-box">
-        <div class="formula-title"><i class="bi bi-function me-1"></i>Fórmula de Cálculo</div>
-        <div>
-          Seguro ($) = <code>Base × Factor</code> &nbsp;|&nbsp;
-          Base = Sub-Total Sin Seguros &nbsp;|&nbsp;
-          Factor = Tasa Neta / 100 &nbsp;|&nbsp;
-          Monto combinado ≠ suma individual (carga actuarial del paquete)
+  <!-- Loading -->
+  <div id="loadingState" class="loading-overlay">
+    <div class="spinner-navy"></div> Cargando factores de seguro...
+  </div>
+
+  <div id="mainContent" style="display:none">
+
+    <!-- ═══════════════════════════════════════════════════════════════════
+         TABLA 1 — TASAS INDIVIDUALES EDITABLES (DESG, RDH, CESANTÍA)
+    ═══════════════════════════════════════════════════════════════════════ -->
+    <div class="card">
+      <div class="card-header-custom">
+        <div class="card-header-left">
+          <i class="bi bi-pencil-square"></i>
+          Tasas Individuales por Plazo — Desgravamen, RDH, Cesantía
+          <span class="editing-badge" id="editingBadge1"><i class="bi bi-pencil-fill"></i> Editando</span>
+        </div>
+        <div style="display:flex;gap:8px;align-items:center">
+          <button class="btn-edit"   id="btnEdit1"   onclick="startEdit()"><i class="bi bi-pencil"></i> Editar</button>
+          <button class="btn-cancel" id="btnCancel1" onclick="cancelEdit()"><i class="bi bi-x"></i> Cancelar</button>
+          <button class="btn-save"   id="btnSave1"   onclick="saveRates()"><i class="bi bi-floppy"></i> Guardar</button>
         </div>
       </div>
-      <div class="table-responsive">
-        <table class="seg-table">
-          <thead>
-            <tr>
-              <th style="min-width:90px">Plazo<br><span style="font-weight:400;opacity:.8;font-size:.72rem">(bracket)</span></th>
-              <th class="th-d">DESG</th>
-              <th class="th-r">RDH</th>
-              <th class="th-c">CESANTÍA</th>
-              <th class="th-dr">DESG+RDH</th>
-              <th class="th-dc">DESG+CESA</th>
-              <th class="th-rc">RDH+CESA</th>
-              <th class="th-drc">DESG+RDH+CESA</th>
-            </tr>
-          </thead>
-          <tbody id="tablaFactoresCalc"></tbody>
-        </table>
-      </div>
-    </div>
-  </div>
-
-  <!-- ═══════════════════════════════════════════════════════════════════════
-       TABLA 3 — COMISIONES AMBOS (lo que nos pagan a nosotros)
-  ═══════════════════════════════════════════════════════════════════════════ -->
-  <div class="card">
-    <div class="card-header-custom">
-      <i class="bi bi-cash-coin"></i> Factores de Comisión AMBOS — Ingreso por Colocación de Seguros
-    </div>
-    <div class="card-body">
-      <div class="formula-box" style="background:#f0fdf4;border-color:#bbf7d0">
-        <div class="formula-title" style="color:#065f46"><i class="bi bi-function me-1"></i>Fórmula de Ingreso por Seguros</div>
-        <div style="color:#065f46">
-          Ingreso Seguros = <code style="background:#dcfce7;color:#15803d">Monto DESG × Factor AMBOS</code>
-          &nbsp;&nbsp;|&nbsp;&nbsp;
-          Comisión neta = <code style="background:#dcfce7;color:#15803d">Monto DESG × (AMBOS − 1)</code>
-          <br>
-          <span style="font-size:.78rem;opacity:.8;margin-top:4px;display:block">
-            El Factor AMBOS representa el retorno bruto que paga la compañía de seguros a AutoFácil sobre el monto del Desgravamen colocado.
-            La comisión neta es el diferencial entre el factor aplicado y el costo del seguro (AMBOS − 1).
-          </span>
+      <div class="card-body">
+        <div class="note-box">
+          <i class="bi bi-info-circle-fill"></i>
+          <span>Factores <strong>decimales</strong> que se multiplican por el <strong>Sub-Total Sin Seguros</strong> para obtener el monto de cada seguro.
+          Estos valores los proporciona la compañía aseguradora. Presiona <strong>Editar</strong> para modificar las tasas de los tres seguros individuales.</span>
+        </div>
+        <div class="table-responsive">
+          <table class="edit-table">
+            <thead>
+              <tr>
+                <th class="th-plazo">Plazo (bracket)</th>
+                <th class="th-d">DESGRAVAMEN</th>
+                <th class="th-r">RDH</th>
+                <th class="th-c">CESANTÍA</th>
+              </tr>
+            </thead>
+            <tbody id="editTableBody"></tbody>
+          </table>
         </div>
       </div>
-      <div class="table-responsive">
-        <table class="ambos-table">
-          <thead>
-            <tr>
-              <th>Rango de Plazo</th>
-              <th>Plazos Aplicables</th>
-              <th style="text-align:center">Factor AMBOS</th>
-              <th style="text-align:center">Comisión Neta %</th>
-              <th>Ejemplo: DESG $10.000.000</th>
-            </tr>
-          </thead>
-          <tbody id="tablaAmbos"></tbody>
-        </table>
-      </div>
-
-      <!-- Resumen visual de brackets -->
-      <div style="padding:16px 20px 20px;display:flex;flex-wrap:wrap;gap:14px" id="ambosCards"></div>
     </div>
-  </div>
 
+    <!-- ═══════════════════════════════════════════════════════════════════
+         TABLA 2 — FACTORES CALCULADOS (combinaciones)
+    ═══════════════════════════════════════════════════════════════════════ -->
+    <div class="card">
+      <div class="card-header-custom">
+        <div class="card-header-left">
+          <i class="bi bi-calculator"></i>
+          Factores Combinados Calculados
+        </div>
+        <span style="font-size:.72rem;color:#6b7280;font-weight:400;text-transform:none;letter-spacing:0">
+          Se calculan automáticamente de las tasas individuales usando probabilidad compuesta
+        </span>
+      </div>
+      <div class="card-body">
+        <div class="formula-box">
+          <div class="formula-title"><i class="bi bi-function me-1"></i>Fórmula de Probabilidad Compuesta</div>
+          <div>
+            <code>P(A+B) = 1 − (1−A) × (1−B)</code>
+            &nbsp;&nbsp;|&nbsp;&nbsp;
+            <code>P(A+B+C) = 1 − (1−A) × (1−B) × (1−C)</code>
+          </div>
+        </div>
+        <div class="table-responsive">
+          <table class="calc-table">
+            <thead>
+              <tr>
+                <th class="th-plazo">Plazo</th>
+                <th class="th-d">DESG</th>
+                <th class="th-r">RDH</th>
+                <th class="th-c">CESANTÍA</th>
+                <th class="th-dr">DESG+RDH</th>
+                <th class="th-dc">DESG+CESA</th>
+                <th class="th-rc">RDH+CESA</th>
+                <th class="th-drc">DESG+RDH+CESA</th>
+              </tr>
+            </thead>
+            <tbody id="calcTableBody"></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <!-- ═══════════════════════════════════════════════════════════════════
+         TABLA 3 — COMISIÓN AMBOS
+    ═══════════════════════════════════════════════════════════════════════ -->
+    <div class="card">
+      <div class="card-header-custom">
+        <div class="card-header-left">
+          <i class="bi bi-cash-coin"></i>
+          Factores de Comisión AMBOS — Ingreso por Colocación de Seguros
+        </div>
+      </div>
+      <div class="card-body">
+        <div class="formula-box" style="background:#f0fdf4;border-color:#bbf7d0">
+          <div class="formula-title" style="color:#065f46"><i class="bi bi-function me-1"></i>Fórmula de Ingreso por Seguros</div>
+          <div style="color:#065f46">
+            Ingreso Seguros = <code style="background:#dcfce7;color:#15803d">Monto DESG × Factor AMBOS</code>
+            &nbsp;&nbsp;|&nbsp;&nbsp;
+            Comisión neta = <code style="background:#dcfce7;color:#15803d">Monto DESG × (AMBOS − 1)</code>
+          </div>
+        </div>
+        <div class="table-responsive">
+          <table class="ambos-table">
+            <thead>
+              <tr>
+                <th>Rango de Plazo</th>
+                <th>Plazos Aplicables</th>
+                <th style="text-align:center">Factor AMBOS</th>
+                <th style="text-align:center">Comisión Neta %</th>
+                <th>Ejemplo: DESG $10.000.000</th>
+              </tr>
+            </thead>
+            <tbody id="tablaAmbos"></tbody>
+          </table>
+        </div>
+        <div class="ambos-cards" id="ambosCards"></div>
+      </div>
+    </div>
+
+  </div><!-- /mainContent -->
 </div><!-- /page-content -->
 
 <script>
@@ -249,119 +334,258 @@ if (!token || !yo) { window.location.href = '/login.html'; }
 document.getElementById('navNombre').textContent = `${yo?.nombre || ''} ${yo?.apellido || ''}`.trim();
 document.getElementById('avatarInicial').textContent = (yo?.nombre || '?').charAt(0).toUpperCase();
 function logout() { localStorage.removeItem('token'); localStorage.removeItem('usuario'); window.location.href = '/login.html'; }
+function authHdr() { return { 'Authorization': 'Bearer ' + token, 'Content-Type': 'application/json' }; }
 
-/* ─── FORMATTERS ─────────────────────────────────────────────────────────── */
+/* ─── TOAST ───────────────────────────────────────────────────────────────── */
+function showToast(msg, type = 'info') {
+  const c = document.getElementById('toastContainer');
+  const icon = type === 'success' ? 'bi-check-circle-fill' : type === 'error' ? 'bi-x-circle-fill' : 'bi-info-circle-fill';
+  const el = document.createElement('div');
+  el.className = `toast-item ${type}`;
+  el.innerHTML = `<i class="bi ${icon} ti-icon"></i><div class="ti-body"><div class="ti-msg">${msg}</div></div><i class="bi bi-x ti-close" onclick="this.closest('.toast-item').remove()"></i>`;
+  c.appendChild(el);
+  setTimeout(() => el.remove(), 4000);
+}
+
+/* ─── FORMATTERS ──────────────────────────────────────────────────────────── */
 function formatPeso(n) {
-  if (!n && n !== 0) return '—';
   return '$' + Math.round(n).toString().replace(/\B(?=(\d{3})+(?!\d))/g, '.');
 }
-
-/* ─── INSURANCE DATA ─────────────────────────────────────────────────────── */
-// Factores decimales (SEG_RATES — equivalente Excel A11:H17)
-const SEG_RATES = {
-  6:  { d:0.008980,  r:0.006745, c:0.036162, dr:0.015847, dc:0.045806, rc:0.043406, drc:0.053186 },
-  12: { d:0.018641,  r:0.011634, c:0.037883, dr:0.030715, dc:0.057977, rc:0.050420, drc:0.071008 },
-  24: { d:0.027538,  r:0.012248, c:0.042101, dr:0.040474, dc:0.072041, rc:0.055409, drc:0.086130 },
-  36: { d:0.035518,  r:0.012761, c:0.047120, dr:0.049208, dc:0.086130, rc:0.061121, drc:0.101200 },
-  48: { d:0.043623,  r:0.029018, c:0.052853, dr:0.075269, dc:0.101322, rc:0.085069, drc:0.136622 },
-  72: { d:0.054964,  r:0.034875, c:0.058985, dr:0.093853, dc:0.120825, rc:0.098177, drc:0.164822 },
-};
-
-// Tasas netas en % (× 100 de SEG_RATES)
-const SEG_DISPLAY = [
-  [6,  0.8980, 0.6745, 3.6162, 1.5847, 4.5806, 4.3406, 5.3186],
-  [12, 1.8641, 1.1634, 3.7883, 3.0715, 5.7977, 5.0420, 7.1008],
-  [24, 2.7538, 1.2248, 4.2101, 4.0474, 7.2041, 5.5409, 8.6130],
-  [36, 3.5518, 1.2761, 4.7120, 4.9208, 8.6130, 6.1121, 10.1200],
-  [48, 4.3623, 2.9018, 5.2853, 7.5269, 10.1322,8.5069, 13.6622],
-  [72, 5.4964, 3.4875, 5.8985, 9.3853, 12.0825,9.8177, 16.4822],
-];
-
-// Factores AMBOS por bracket de plazo
-const AMBOS_DATA = [
-  { label: '≤ 12 meses',  plazos: '6 – 12',  factor: 1.151630, plazoMin: 1,  plazoMax: 12 },
-  { label: '≤ 24 meses',  plazos: '13 – 24', factor: 1.154908, plazoMin: 13, plazoMax: 24 },
-  { label: '≤ 36 meses',  plazos: '25 – 36', factor: 1.166801, plazoMin: 25, plazoMax: 36 },
-  { label: '> 36 meses',  plazos: '37 – 72', factor: 1.173526, plazoMin: 37, plazoMax: 72 },
-];
-
-/* ─── RENDER TABLA 1: Tasas Netas % ─────────────────────────────────────── */
-function renderTasasNetas() {
-  const tbody = document.getElementById('tablaTasasNetas');
-  tbody.innerHTML = SEG_DISPLAY.map(([pz, d, r, c, dr, dc, rc, drc]) => `
-    <tr>
-      <td>${pz} meses</td>
-      <td class="col-d">${d.toFixed(4)}%</td>
-      <td class="col-r">${r.toFixed(4)}%</td>
-      <td class="col-c">${c.toFixed(4)}%</td>
-      <td class="col-dr">${dr.toFixed(4)}%</td>
-      <td class="col-dc">${dc.toFixed(4)}%</td>
-      <td class="col-rc">${rc.toFixed(4)}%</td>
-      <td class="col-drc">${drc.toFixed(4)}%</td>
-    </tr>`).join('');
+function fmtFecha(raw) {
+  if (!raw) return '—';
+  try {
+    const d = new Date(raw);
+    return d.toLocaleDateString('es-CL', { day:'2-digit', month:'2-digit', year:'numeric' }) +
+           ' ' + d.toLocaleTimeString('es-CL', { hour:'2-digit', minute:'2-digit' });
+  } catch { return '—'; }
 }
 
-/* ─── RENDER TABLA 2: Factores Calculados Decimales ─────────────────────── */
-function renderFactoresCalc() {
-  const tbody = document.getElementById('tablaFactoresCalc');
-  const brackets = [6, 12, 24, 36, 48, 72];
-  const keys = ['d', 'r', 'c', 'dr', 'dc', 'rc', 'drc'];
-  const cols = ['col-d', 'col-r', 'col-c', 'col-dr', 'col-dc', 'col-rc', 'col-drc'];
+/* ─── DATA ────────────────────────────────────────────────────────────────── */
+const PLAZOS = [6, 12, 24, 36, 48, 72];
 
-  tbody.innerHTML = brackets.map(pz => {
-    const rates = SEG_RATES[pz];
-    const cells = keys.map((k, i) =>
-      `<td class="${cols[i]}" title="= ${(rates[k]*100).toFixed(4)}% / 100">${rates[k].toFixed(6)}</td>`
-    ).join('');
-    return `<tr><td>${pz} meses</td>${cells}</tr>`;
+// Tasas cargadas desde API (individual: d, r, c por plazo)
+let rates = {};     // { 6: {d, r, c}, 12: {d, r, c}, ... }
+let ratesBak = {};  // backup for cancel
+
+// Comisiones AMBOS (fijas)
+const AMBOS_DATA = [
+  { label: '≤ 12 meses',  plazos: '6 – 12',  factor: 1.151630, color: '#0d9488' },
+  { label: '≤ 24 meses',  plazos: '13 – 24', factor: 1.154908, color: '#0369a1' },
+  { label: '≤ 36 meses',  plazos: '25 – 36', factor: 1.166801, color: '#7c3aed' },
+  { label: '> 36 meses',  plazos: '37 – 72', factor: 1.173526, color: '#b45309' },
+];
+
+/* ─── FORMULA: probabilidad compuesta ───────────────────────────────────── */
+function compP(a, b, c) {
+  // 1 - (1-a)(1-b)(1-c...)  — sólo los factores que se pasan
+  const args = [a, b, c].filter(v => v !== undefined && v !== null);
+  return 1 - args.reduce((acc, v) => acc * (1 - v), 1);
+}
+
+/* ─── RENDER TABLA 1 (Editable) ─────────────────────────────────────────── */
+function renderEditTable(editMode) {
+  const tbody = document.getElementById('editTableBody');
+  tbody.innerHTML = PLAZOS.map(pz => {
+    const r = rates[pz] || { d: 0, r: 0, c: 0 };
+    if (editMode) {
+      return `<tr>
+        <td>${pz} meses</td>
+        <td><input type="number" class="rate-input" id="inp_d_${pz}" value="${r.d.toFixed(6)}" step="0.000001" min="0" max="1" onchange="onRateChange()" oninput="onRateChange()"></td>
+        <td><input type="number" class="rate-input" id="inp_r_${pz}" value="${r.r.toFixed(6)}" step="0.000001" min="0" max="1" onchange="onRateChange()" oninput="onRateChange()"></td>
+        <td><input type="number" class="rate-input" id="inp_c_${pz}" value="${r.c.toFixed(6)}" step="0.000001" min="0" max="1" onchange="onRateChange()" oninput="onRateChange()"></td>
+      </tr>`;
+    } else {
+      return `<tr>
+        <td>${pz} meses</td>
+        <td><span class="rate-display" style="color:#1e40af">${(r.d * 100).toFixed(4)}% <small style="color:#9ca3af;font-weight:400">(${r.d.toFixed(6)})</small></span></td>
+        <td><span class="rate-display" style="color:#0369a1">${(r.r * 100).toFixed(4)}% <small style="color:#9ca3af;font-weight:400">(${r.r.toFixed(6)})</small></span></td>
+        <td><span class="rate-display" style="color:#047857">${(r.c * 100).toFixed(4)}% <small style="color:#9ca3af;font-weight:400">(${r.c.toFixed(6)})</small></span></td>
+      </tr>`;
+    }
   }).join('');
 }
 
-/* ─── RENDER TABLA 3: AMBOS Comisión ────────────────────────────────────── */
-function renderAmbos() {
-  const tbody = document.getElementById('tablaAmbos');
-  const EJ_BASE = 10000000; // $10.000.000 ejemplo
+/* ─── RENDER TABLA 2 (Calculada) ────────────────────────────────────────── */
+function renderCalcTable() {
+  const tbody = document.getElementById('calcTableBody');
+  tbody.innerHTML = PLAZOS.map(pz => {
+    const r = rates[pz] || { d: 0, r: 0, c: 0 };
+    const { d, r: rv, c } = r;
+    const dr  = compP(d, rv);
+    const dc  = compP(d, c);
+    const rc  = compP(rv, c);
+    const drc = compP(d, rv, c);
+    return `<tr>
+      <td>${pz} meses</td>
+      <td class="col-d">${(d  * 100).toFixed(4)}%</td>
+      <td class="col-r">${(rv * 100).toFixed(4)}%</td>
+      <td class="col-c">${(c  * 100).toFixed(4)}%</td>
+      <td class="col-dr">${(dr  * 100).toFixed(4)}%</td>
+      <td class="col-dc">${(dc  * 100).toFixed(4)}%</td>
+      <td class="col-rc">${(rc  * 100).toFixed(4)}%</td>
+      <td class="col-drc">${(drc * 100).toFixed(4)}%</td>
+    </tr>`;
+  }).join('');
+}
 
-  tbody.innerHTML = AMBOS_DATA.map(a => {
-    const comPct = (a.factor - 1) * 100;
-    const ingBruto = EJ_BASE * a.factor;
-    const comNeta  = EJ_BASE * (a.factor - 1);
+/* ─── RENDER TABLA 3 (AMBOS) ────────────────────────────────────────────── */
+function renderAmbos() {
+  const EJ = 10000000;
+  document.getElementById('tablaAmbos').innerHTML = AMBOS_DATA.map(a => {
+    const comPct  = ((a.factor - 1) * 100).toFixed(3);
+    const ingBruto = EJ * a.factor;
+    const comNeta  = EJ * (a.factor - 1);
     return `<tr>
       <td><strong>${a.label}</strong></td>
       <td style="color:#6b7280">${a.plazos} meses</td>
       <td style="text-align:center"><span class="ambos-badge">${a.factor.toFixed(6)}</span></td>
-      <td style="text-align:center"><span class="pct-badge">${comPct.toFixed(3)}%</span></td>
-      <td>
-        <div style="font-size:.8rem;line-height:1.7">
-          Ingreso bruto: <strong>${formatPeso(ingBruto)}</strong><br>
-          Comisión neta: <strong style="color:#065f46">${formatPeso(comNeta)}</strong>
-        </div>
+      <td style="text-align:center"><span class="pct-badge">${comPct}%</span></td>
+      <td style="font-size:.8rem;line-height:1.8">
+        Ingreso bruto: <strong>${formatPeso(ingBruto)}</strong><br>
+        Comisión neta: <strong style="color:#065f46">${formatPeso(comNeta)}</strong>
       </td>
     </tr>`;
   }).join('');
 
-  // Cards visuales
-  const cards = document.getElementById('ambosCards');
-  cards.innerHTML = AMBOS_DATA.map((a, i) => {
+  document.getElementById('ambosCards').innerHTML = AMBOS_DATA.map(a => {
     const comPct = ((a.factor - 1) * 100).toFixed(3);
-    const colors = ['#0d9488', '#0369a1', '#7c3aed', '#b45309'];
     return `
-    <div style="background:#fff;border-radius:12px;border:2px solid ${colors[i]};padding:18px 22px;min-width:210px;flex:1">
-      <div style="font-size:.7rem;font-weight:700;color:${colors[i]};text-transform:uppercase;letter-spacing:.08em;margin-bottom:6px">${a.label}</div>
-      <div style="font-size:1.8rem;font-weight:900;color:${colors[i]};letter-spacing:-.5px">${a.factor.toFixed(4)}</div>
-      <div style="font-size:.78rem;color:#6b7280;margin-top:4px">Plazos: ${a.plazos} meses</div>
-      <div style="margin-top:10px;background:${colors[i]}18;border-radius:8px;padding:6px 10px">
-        <span style="font-size:.78rem;color:#374151">Comisión neta: </span>
-        <strong style="color:${colors[i]};font-size:.88rem">${comPct}%</strong>
+    <div class="ambos-card" style="border-color:${a.color}">
+      <div style="font-size:.68rem;font-weight:700;color:${a.color};text-transform:uppercase;letter-spacing:.07em;margin-bottom:4px">${a.label}</div>
+      <div style="font-size:1.75rem;font-weight:900;color:${a.color};letter-spacing:-.5px">${a.factor.toFixed(4)}</div>
+      <div style="font-size:.75rem;color:#6b7280;margin-top:3px">Plazos: ${a.plazos} meses</div>
+      <div style="margin-top:10px;background:${a.color}18;border-radius:7px;padding:5px 10px">
+        <span style="font-size:.76rem;color:#374151">Comisión neta: </span>
+        <strong style="color:${a.color};font-size:.85rem">${comPct}%</strong>
       </div>
     </div>`;
   }).join('');
 }
 
+/* ─── EDIT MODE ──────────────────────────────────────────────────────────── */
+let editMode = false;
+
+function startEdit() {
+  ratesBak = JSON.parse(JSON.stringify(rates)); // backup
+  editMode = true;
+  renderEditTable(true);
+  document.getElementById('btnEdit1').style.display   = 'none';
+  document.getElementById('btnSave1').style.display   = 'flex';
+  document.getElementById('btnCancel1').style.display = 'flex';
+  document.getElementById('editingBadge1').style.display = 'flex';
+}
+
+function cancelEdit() {
+  rates = JSON.parse(JSON.stringify(ratesBak)); // restore
+  editMode = false;
+  renderEditTable(false);
+  renderCalcTable();
+  document.getElementById('btnEdit1').style.display   = 'flex';
+  document.getElementById('btnSave1').style.display   = 'none';
+  document.getElementById('btnCancel1').style.display = 'none';
+  document.getElementById('editingBadge1').style.display = 'none';
+}
+
+function onRateChange() {
+  // Update in-memory rates from inputs and refresh calc table live
+  PLAZOS.forEach(pz => {
+    const d = parseFloat(document.getElementById(`inp_d_${pz}`)?.value) || 0;
+    const r = parseFloat(document.getElementById(`inp_r_${pz}`)?.value) || 0;
+    const c = parseFloat(document.getElementById(`inp_c_${pz}`)?.value) || 0;
+    rates[pz] = { d, r, c };
+  });
+  renderCalcTable();
+}
+
+async function saveRates() {
+  const btn = document.getElementById('btnSave1');
+  btn.disabled = true;
+  btn.innerHTML = '<span class="spinner-sm"></span> Guardando…';
+
+  // Collect from inputs
+  const body = {};
+  PLAZOS.forEach(pz => {
+    body[`seg_d_${pz}`] = parseFloat(document.getElementById(`inp_d_${pz}`)?.value) || 0;
+    body[`seg_r_${pz}`] = parseFloat(document.getElementById(`inp_r_${pz}`)?.value) || 0;
+    body[`seg_c_${pz}`] = parseFloat(document.getElementById(`inp_c_${pz}`)?.value) || 0;
+  });
+
+  try {
+    const res = await fetch('/api/parametros-credito', {
+      method: 'PUT', headers: authHdr(), body: JSON.stringify(body),
+    });
+    if (res.status === 401) { logout(); return; }
+    const data = await res.json();
+    if (!data.success) throw new Error(data.error || 'Error al guardar');
+
+    // Update in-memory rates
+    PLAZOS.forEach(pz => {
+      rates[pz] = { d: body[`seg_d_${pz}`], r: body[`seg_r_${pz}`], c: body[`seg_c_${pz}`] };
+    });
+
+    // Update last update date
+    const ahora = new Date();
+    document.getElementById('fechaActualizacion').textContent =
+      ahora.toLocaleDateString('es-CL', { day:'2-digit', month:'2-digit', year:'numeric' }) +
+      ' ' + ahora.toLocaleTimeString('es-CL', { hour:'2-digit', minute:'2-digit' });
+
+    editMode = false;
+    renderEditTable(false);
+    renderCalcTable();
+    document.getElementById('btnEdit1').style.display   = 'flex';
+    document.getElementById('btnSave1').style.display   = 'none';
+    document.getElementById('btnCancel1').style.display = 'none';
+    document.getElementById('editingBadge1').style.display = 'none';
+    showToast('Factores guardados correctamente', 'success');
+  } catch (err) {
+    showToast('Error al guardar: ' + err.message, 'error');
+    console.error(err);
+  } finally {
+    btn.disabled = false;
+    btn.innerHTML = '<i class="bi bi-floppy"></i> Guardar';
+  }
+}
+
+/* ─── LOAD FROM API ──────────────────────────────────────────────────────── */
+async function cargar() {
+  try {
+    const res = await fetch('/api/parametros-credito', { headers: authHdr() });
+    if (res.status === 401) { logout(); return; }
+    const data = await res.json();
+    if (!data.success) throw new Error(data.error || 'Error al cargar');
+
+    const obj = data.data?.obj || {};
+
+    // Extract seg_ rates
+    PLAZOS.forEach(pz => {
+      rates[pz] = {
+        d: obj[`seg_d_${pz}`] ?? 0,
+        r: obj[`seg_r_${pz}`] ?? 0,
+        c: obj[`seg_c_${pz}`] ?? 0,
+      };
+    });
+
+    // Fecha de última actualización de seguros
+    document.getElementById('fechaActualizacion').textContent =
+      fmtFecha(data.data?.fecha_seg) || 'Sin actualizaciones registradas';
+
+    // Render all
+    renderEditTable(false);
+    renderCalcTable();
+    renderAmbos();
+
+    document.getElementById('loadingState').style.display = 'none';
+    document.getElementById('mainContent').style.display  = '';
+  } catch (err) {
+    document.getElementById('loadingState').innerHTML =
+      `<i class="bi bi-exclamation-triangle text-danger me-2"></i>
+       Error al cargar: ${err.message}. <a href="javascript:cargar()" style="color:var(--navy)">Reintentar</a>`;
+    console.error(err);
+  }
+}
+
 /* ─── INIT ────────────────────────────────────────────────────────────────── */
-renderTasasNetas();
-renderFactoresCalc();
-renderAmbos();
+cargar();
 </script>
 </body>
 </html>
