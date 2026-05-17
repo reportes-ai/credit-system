@@ -1,0 +1,1198 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Cotizaciones — AutoFácil</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.0/font/bootstrap-icons.css" rel="stylesheet">
+  <style>
+    :root {
+      --navy: #0141A2;
+      --navy-dark: #012d70;
+      --navy-light: #0255c5;
+      --accent: #009AFE;
+      --bg: #f0f4f8;
+    }
+    body { background: var(--bg); font-family: 'Segoe UI', system-ui, sans-serif; font-size: 0.88rem; }
+
+    /* ── Topnav ─────────────────────────────────────────────────────── */
+    .topnav {
+      background: linear-gradient(90deg, var(--navy-dark) 0%, var(--navy) 100%);
+      height: 60px; display: flex; align-items: center;
+      padding: 0 20px; gap: 14px; position: sticky; top: 0; z-index: 1000;
+      box-shadow: 0 2px 8px rgba(0,0,0,.35);
+    }
+    .topnav .brand { color: #fff; font-weight: 800; font-size: 1.1rem; letter-spacing: .04em; text-decoration: none; }
+    .topnav .breadcrumb-nav { color: rgba(255,255,255,.7); font-size: .82rem; flex: 1; }
+    .topnav .breadcrumb-nav a { color: rgba(255,255,255,.7); text-decoration: none; }
+    .topnav .breadcrumb-nav a:hover { color: #fff; }
+    .topnav .breadcrumb-nav .sep { margin: 0 6px; }
+    .topnav .breadcrumb-nav .current { color: #fff; font-weight: 600; }
+    .topnav .user-info { color: rgba(255,255,255,.85); font-size: .82rem; }
+    .version-badge {
+      background: rgba(255,255,255,.15); color: #fff;
+      font-size: .7rem; font-weight: 700; padding: 2px 8px;
+      border-radius: 20px; border: 1px solid rgba(255,255,255,.3);
+    }
+    .btn-logout {
+      background: rgba(255,255,255,.12); color: #fff;
+      border: 1px solid rgba(255,255,255,.25); border-radius: 6px;
+      padding: 5px 12px; font-size: .8rem; cursor: pointer;
+      transition: background .15s;
+    }
+    .btn-logout:hover { background: rgba(255,255,255,.22); }
+
+    /* ── Page layout ──────────────────────────────────────────────── */
+    .page-wrap { max-width: 1400px; margin: 20px auto; padding: 0 24px 60px; }
+
+    /* ── Info bar ─────────────────────────────────────────────────── */
+    .info-bar {
+      background: linear-gradient(135deg, var(--navy-dark) 0%, var(--navy) 60%, var(--accent) 100%);
+      border-radius: 10px; padding: 10px 20px;
+      display: flex; align-items: center; gap: 24px;
+      margin-bottom: 14px; color: #fff; flex-wrap: wrap;
+    }
+    .info-bar .info-item { display: flex; flex-direction: column; align-items: flex-start; }
+    .info-bar .info-label { font-size: .68rem; opacity: .75; text-transform: uppercase; letter-spacing: .06em; font-weight: 600; }
+    .info-bar .info-value { font-size: .95rem; font-weight: 700; }
+    .info-bar .info-sep { width: 1px; background: rgba(255,255,255,.3); height: 32px; }
+    .info-bar .tramo-badge {
+      background: rgba(255,255,255,.18); border-radius: 8px;
+      padding: 4px 12px; font-size: .8rem; font-weight: 700;
+      border: 1px solid rgba(255,255,255,.3);
+    }
+
+    /* ── Tabs ─────────────────────────────────────────────────────── */
+    .custom-tabs { border-bottom: 2px solid #d1d9e0; margin-bottom: 18px; }
+    .custom-tabs .nav-link {
+      color: #6b7280; font-weight: 600; font-size: .88rem;
+      border: none; border-bottom: 3px solid transparent;
+      padding: 8px 20px; border-radius: 0; background: none;
+      margin-bottom: -2px; transition: color .15s, border-color .15s;
+    }
+    .custom-tabs .nav-link:hover { color: var(--navy); }
+    .custom-tabs .nav-link.active {
+      color: var(--navy); border-bottom-color: var(--navy);
+      font-weight: 700;
+    }
+
+    /* ── Cards ────────────────────────────────────────────────────── */
+    .card {
+      border: none !important;
+      border-radius: 12px !important;
+      box-shadow: 0 1px 4px rgba(0,0,0,.07) !important;
+      margin-bottom: 14px;
+    }
+    .card-header {
+      background: none !important;
+      border-bottom: 1px solid #eef0f3 !important;
+      padding: 10px 16px !important;
+      font-weight: 700 !important;
+      font-size: .82rem !important;
+      color: var(--navy) !important;
+      text-transform: uppercase;
+      letter-spacing: .05em;
+    }
+    .card-body { padding: 14px 16px !important; }
+
+    /* ── Form elements ────────────────────────────────────────────── */
+    .form-label {
+      font-weight: 600 !important;
+      font-size: .82rem !important;
+      color: #374151 !important;
+      margin-bottom: 3px !important;
+    }
+    .form-control, .form-select {
+      border-radius: 8px !important;
+      border: 1.5px solid #d1d5db !important;
+      font-size: .88rem !important;
+      padding: 6px 10px !important;
+      transition: border-color .2s, box-shadow .2s;
+    }
+    .form-control:focus, .form-select:focus {
+      outline: none !important;
+      border-color: var(--navy) !important;
+      box-shadow: 0 0 0 3px rgba(1,65,162,.1) !important;
+    }
+    .form-control[readonly] {
+      background: #eef2ff !important;
+      color: var(--navy) !important;
+      font-weight: 700 !important;
+      cursor: default;
+    }
+    .mb-2-form { margin-bottom: 8px; }
+
+    /* ── Result display ───────────────────────────────────────────── */
+    .result-row {
+      display: flex; justify-content: space-between; align-items: center;
+      padding: 5px 0; border-bottom: 1px solid #f0f2f5; font-size: .84rem;
+    }
+    .result-row:last-child { border-bottom: none; }
+    .result-label { color: #6b7280; font-weight: 500; }
+    .result-value { font-weight: 700; color: #1f2937; text-align: right; }
+    .result-divider { border-top: 1px solid #d1d5db; margin: 6px 0; }
+    .result-total {
+      display: flex; justify-content: space-between; align-items: center;
+      padding: 6px 0; font-size: .88rem;
+    }
+    .result-total .result-label { color: #374151; font-weight: 700; }
+    .result-total .result-value { font-weight: 800; color: var(--navy); }
+
+    /* ── Big value displays ───────────────────────────────────────── */
+    .monto-display {
+      background: #eef2ff; border-radius: 8px; padding: 8px 12px;
+      display: flex; justify-content: space-between; align-items: center;
+      margin: 6px 0;
+    }
+    .monto-display .label { font-weight: 700; color: var(--navy); font-size: .84rem; }
+    .monto-display .value { font-weight: 800; color: var(--navy); font-size: 1rem; }
+    .cuota-display {
+      background: linear-gradient(135deg, var(--accent), #007bd6);
+      border-radius: 10px; padding: 12px 16px;
+      display: flex; justify-content: space-between; align-items: center;
+      margin: 8px 0;
+    }
+    .cuota-display .label { font-weight: 700; color: #fff; font-size: .88rem; }
+    .cuota-display .value { font-weight: 900; color: #fff; font-size: 1.35rem; }
+
+    /* ── Rentabilidad card ────────────────────────────────────────── */
+    .rent-card-pos {
+      background: linear-gradient(135deg, #d1fae5, #a7f3d0) !important;
+      border: 1px solid #6ee7b7 !important;
+    }
+    .rent-card-neg {
+      background: linear-gradient(135deg, #fee2e2, #fecaca) !important;
+      border: 1px solid #fca5a5 !important;
+    }
+    .rent-value-pos { color: #065f46 !important; font-size: 1.15rem !important; font-weight: 900 !important; }
+    .rent-value-neg { color: #7f1d1d !important; font-size: 1.15rem !important; font-weight: 900 !important; }
+
+    /* ── Buttons ─────────────────────────────────────────────────── */
+    .btn-calc {
+      background: linear-gradient(135deg, var(--navy), var(--accent));
+      color: #fff; border: none; border-radius: 8px;
+      padding: 9px 22px; font-size: .88rem; font-weight: 700;
+      cursor: pointer; transition: opacity .15s;
+    }
+    .btn-calc:hover { opacity: .88; }
+    .btn-limpiar {
+      background: #f3f4f6; color: #374151; border: 1.5px solid #d1d5db;
+      border-radius: 8px; padding: 9px 22px; font-size: .88rem; font-weight: 600;
+      cursor: pointer; transition: background .15s;
+    }
+    .btn-limpiar:hover { background: #e5e7eb; }
+
+    /* ── Insurance table ─────────────────────────────────────────── */
+    .seg-table { font-size: .8rem; }
+    .seg-table th {
+      background: var(--navy); color: #fff;
+      font-size: .75rem; text-align: center; white-space: nowrap;
+      padding: 6px 8px;
+    }
+    .seg-table td { text-align: center; padding: 5px 8px; }
+    .seg-table tr.active-row { background: #dbeafe !important; font-weight: 700; }
+    .seg-table tr:nth-child(even) { background: #f8f9fb; }
+
+    /* ── Rentabilidades tab ───────────────────────────────────────── */
+    .rent-table { font-size: .82rem; }
+    .rent-table th { padding: 8px 12px; font-size: .78rem; }
+    .rent-table td { padding: 6px 12px; }
+    .rent-table .section-header td {
+      background: #f1f5f9; font-weight: 700; font-size: .78rem;
+      color: #374151; text-transform: uppercase; letter-spacing: .05em;
+    }
+    .col-normal { background: rgba(1,65,162,.06); }
+    .col-propuesto { background: rgba(0,128,128,.06); }
+    .col-uac { background: rgba(180,120,0,.06); }
+    .th-normal { background: var(--navy) !important; }
+    .th-propuesto { background: #0d9488 !important; }
+    .th-uac { background: #b45309 !important; }
+    .rent-row-pos td { background: #d1fae5 !important; font-weight: 800; color: #065f46; }
+    .rent-row-neg td { background: #fee2e2 !important; font-weight: 800; color: #7f1d1d; }
+
+    /* ── Toast ────────────────────────────────────────────────────── */
+    .toast-container {
+      position: fixed; top: 72px; right: 20px; z-index: 9999;
+      display: flex; flex-direction: column; gap: 8px;
+    }
+    .toast-item {
+      background: #fff; border-radius: 10px; padding: 12px 16px;
+      box-shadow: 0 4px 16px rgba(0,0,0,.14); min-width: 280px;
+      display: flex; align-items: flex-start; gap: 10px;
+      animation: slideIn .25s ease;
+      border-left: 4px solid var(--navy);
+    }
+    .toast-item.success { border-left-color: #10b981; }
+    .toast-item.error   { border-left-color: #ef4444; }
+    .toast-item .ti-icon { font-size: 1.1rem; margin-top: 1px; }
+    .toast-item.success .ti-icon { color: #10b981; }
+    .toast-item.error   .ti-icon { color: #ef4444; }
+    .toast-item .ti-body { flex: 1; }
+    .toast-item .ti-msg  { font-size: .85rem; font-weight: 600; color: #1f2937; }
+    .toast-item .ti-close { cursor: pointer; color: #9ca3af; font-size: .9rem; }
+    @keyframes slideIn { from { transform: translateX(40px); opacity: 0; } to { transform: none; opacity: 1; } }
+
+    /* ── Responsive ───────────────────────────────────────────────── */
+    @media (max-width: 768px) {
+      .page-wrap { padding: 0 12px 40px; }
+      .info-bar { gap: 12px; }
+      .info-bar .info-sep { display: none; }
+    }
+  </style>
+</head>
+<body>
+
+<!-- ─── TOPNAV ──────────────────────────────────────────────────────────── -->
+<nav class="topnav">
+  <a href="/" class="brand">AutoFácil</a>
+  <span class="breadcrumb-nav">
+    <a href="/">Inicio</a>
+    <span class="sep">›</span>
+    <span class="current">Cotizaciones</span>
+  </span>
+  <span class="version-badge">v2.4</span>
+  <span class="user-info" id="userInfo"></span>
+  <button class="btn-logout" onclick="logout()"><i class="bi bi-box-arrow-right"></i> Salir</button>
+</nav>
+
+<!-- ─── TOAST CONTAINER ────────────────────────────────────────────────── -->
+<div class="toast-container" id="toastContainer"></div>
+
+<!-- ─── PAGE WRAP ──────────────────────────────────────────────────────── -->
+<div class="page-wrap">
+
+  <!-- Info bar -->
+  <div class="info-bar" id="infoBar">
+    <div class="info-item">
+      <span class="info-label">UF Vigente</span>
+      <span class="info-value" id="ibUF">Cargando…</span>
+    </div>
+    <div class="info-sep"></div>
+    <div class="info-item">
+      <span class="info-label">TMC ≤200 UF</span>
+      <span class="info-value" id="ibTmcMenor">—</span>
+    </div>
+    <div class="info-sep"></div>
+    <div class="info-item">
+      <span class="info-label">TMC >200 UF</span>
+      <span class="info-value" id="ibTmcMayor">—</span>
+    </div>
+    <div class="info-sep"></div>
+    <div class="info-item">
+      <span class="info-label">Tramo Aplicable</span>
+      <span class="tramo-badge" id="ibTramo">—</span>
+    </div>
+  </div>
+
+  <!-- Tabs nav -->
+  <ul class="nav custom-tabs" id="mainTabs">
+    <li class="nav-item">
+      <button class="nav-link active" data-tab="simulador">
+        <i class="bi bi-calculator me-1"></i>Simulador
+      </button>
+    </li>
+    <li class="nav-item">
+      <button class="nav-link" data-tab="seguros">
+        <i class="bi bi-shield-check me-1"></i>Seguros
+      </button>
+    </li>
+    <li class="nav-item">
+      <button class="nav-link" data-tab="rentabilidades">
+        <i class="bi bi-graph-up-arrow me-1"></i>Rentabilidades
+      </button>
+    </li>
+  </ul>
+
+  <!-- ═══════════════════════════════════════════════════════════════════ -->
+  <!-- TAB: SIMULADOR                                                      -->
+  <!-- ═══════════════════════════════════════════════════════════════════ -->
+  <div id="tab-simulador">
+    <div class="row g-3">
+
+      <!-- LEFT column (inputs) -->
+      <div class="col-12 col-lg-6">
+
+        <!-- Card: Vehículo y Financiamiento -->
+        <div class="card">
+          <div class="card-header"><i class="bi bi-car-front me-1"></i>Vehículo y Financiamiento</div>
+          <div class="card-body">
+            <div class="row g-2">
+              <div class="col-6 mb-2-form">
+                <label class="form-label">Valor Vehículo [$]</label>
+                <input type="number" class="form-control" id="valorVehiculo" placeholder="0" min="0" oninput="onAnyInput()">
+              </div>
+              <div class="col-6 mb-2-form">
+                <label class="form-label">Pie [$]</label>
+                <input type="number" class="form-control" id="pie" placeholder="0" min="0" oninput="onAnyInput()">
+              </div>
+              <div class="col-6 mb-2-form">
+                <label class="form-label">Saldo Precio [$]</label>
+                <input type="text" class="form-control" id="saldoPrecio" readonly value="—">
+              </div>
+              <div class="col-6 mb-2-form">
+                <label class="form-label">Plazo [meses]</label>
+                <select class="form-select" id="plazo" onchange="onAnyInput()">
+                  <option value="12">12</option>
+                  <option value="24">24</option>
+                  <option value="36">36</option>
+                  <option value="48" selected>48</option>
+                  <option value="60">60</option>
+                  <option value="72">72</option>
+                </select>
+              </div>
+              <div class="col-6 mb-2-form">
+                <label class="form-label">Tasa Mensual [%]</label>
+                <input type="number" class="form-control" id="tasaMensual" placeholder="0.0000" step="0.0001" min="0" oninput="onAnyInput()">
+              </div>
+              <div class="col-6 mb-2-form">
+                <label class="form-label">Costo Fondo [%/mes]</label>
+                <input type="number" class="form-control" id="costoFondo" value="1.78" step="0.0001" min="0" oninput="onAnyInput()">
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Card: Gastos Operacionales -->
+        <div class="card">
+          <div class="card-header"><i class="bi bi-receipt me-1"></i>Gastos Operacionales</div>
+          <div class="card-body">
+            <div class="row g-2">
+              <div class="col-6 mb-2-form">
+                <label class="form-label">Prenda [$]</label>
+                <input type="number" class="form-control" id="prenda" value="0" min="0" oninput="onAnyInput()">
+              </div>
+              <div class="col-6 mb-2-form">
+                <label class="form-label">Retiro Gestión Auto [$]</label>
+                <input type="number" class="form-control" id="retiroGestion" value="0" min="0" oninput="onAnyInput()">
+              </div>
+              <div class="col-6 mb-2-form">
+                <label class="form-label">Limitación Dominio [$]</label>
+                <input type="number" class="form-control" id="limitacionDominio" value="0" min="0" oninput="onAnyInput()">
+              </div>
+              <div class="col-6 mb-2-form">
+                <label class="form-label">Gastos Administración [$]</label>
+                <input type="number" class="form-control" id="gastosAdmin" value="0" min="0" oninput="onAnyInput()">
+              </div>
+              <div class="col-6 mb-2-form">
+                <label class="form-label">Inscripción/Transferencia [$]</label>
+                <input type="number" class="form-control" id="inscripcion" value="0" min="0" oninput="onAnyInput()">
+              </div>
+              <div class="col-6 mb-2-form">
+                <label class="form-label">GPS 24 meses [$]</label>
+                <input type="number" class="form-control" id="gps" value="0" min="0" oninput="onAnyInput()">
+              </div>
+              <div class="col-6 mb-2-form">
+                <label class="form-label">Reparaciones Menores [$]</label>
+                <input type="number" class="form-control" id="reparaciones" value="0" min="0" oninput="onAnyInput()">
+              </div>
+              <div class="col-6 mb-2-form">
+                <label class="form-label">Bono Financiamiento [$]</label>
+                <input type="number" class="form-control" id="bonoFin" value="0" min="0" oninput="onAnyInput()">
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Card: Seguros -->
+        <div class="card">
+          <div class="card-header"><i class="bi bi-shield-plus me-1"></i>Seguros</div>
+          <div class="card-body">
+            <div class="d-flex gap-4 flex-wrap">
+              <div class="form-check">
+                <input class="form-check-input" type="checkbox" id="chkDesg" onchange="onAnyInput()">
+                <label class="form-check-label form-label mb-0" for="chkDesg">Desgravamen</label>
+              </div>
+              <div class="form-check">
+                <input class="form-check-input" type="checkbox" id="chkRdh" onchange="onAnyInput()">
+                <label class="form-check-label form-label mb-0" for="chkRdh">RDH</label>
+              </div>
+              <div class="form-check">
+                <input class="form-check-input" type="checkbox" id="chkCesa" onchange="onAnyInput()">
+                <label class="form-check-label form-label mb-0" for="chkCesa">Cesantía</label>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Card: Comisiones -->
+        <div class="card">
+          <div class="card-header"><i class="bi bi-people me-1"></i>Comisiones</div>
+          <div class="card-body">
+            <div class="row g-2">
+              <div class="col-6 mb-2-form">
+                <label class="form-label">Comisión Dealer [$]</label>
+                <input type="number" class="form-control" id="comDealer" value="0" min="0" oninput="onAnyInput()">
+              </div>
+              <div class="col-6 mb-2-form">
+                <label class="form-label">Comisión Patio [$]</label>
+                <input type="number" class="form-control" id="comPatio" value="0" min="0" oninput="onAnyInput()">
+              </div>
+              <div class="col-6 mb-2-form">
+                <label class="form-label">Comisión Ejecutivo [%]</label>
+                <input type="number" class="form-control" id="pctEjecutivo" value="2.72" step="0.01" min="0" oninput="onAnyInput()">
+              </div>
+              <div class="col-6 mb-2-form">
+                <label class="form-label">Comisión CORFO [$]</label>
+                <input type="number" class="form-control" id="comCorfo" value="0" min="0" oninput="onAnyInput()">
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Action buttons -->
+        <div class="d-flex gap-2 mt-1">
+          <button class="btn-calc" onclick="calcularManual()">
+            <i class="bi bi-calculator me-1"></i>Calcular
+          </button>
+          <button class="btn-limpiar" onclick="limpiar()">
+            <i class="bi bi-trash me-1"></i>Limpiar
+          </button>
+        </div>
+      </div>
+
+      <!-- RIGHT column (results) -->
+      <div class="col-12 col-lg-6">
+
+        <!-- Card: Resumen Financiero -->
+        <div class="card">
+          <div class="card-header"><i class="bi bi-cash-stack me-1"></i>Resumen Financiero</div>
+          <div class="card-body">
+            <div class="result-row">
+              <span class="result-label">Sub Total Sin Seguros</span>
+              <span class="result-value" id="rSubTotalSin">—</span>
+            </div>
+            <div class="result-row">
+              <span class="result-label">+ Seguro Desgravamen</span>
+              <span class="result-value" id="rSegDesg">—</span>
+            </div>
+            <div class="result-row">
+              <span class="result-label">+ Seguro RDH</span>
+              <span class="result-value" id="rSegRdh">—</span>
+            </div>
+            <div class="result-row">
+              <span class="result-label">+ Seguro Cesantía</span>
+              <span class="result-value" id="rSegCesa">—</span>
+            </div>
+            <div class="result-divider"></div>
+            <div class="result-row">
+              <span class="result-label" style="font-weight:700;color:#374151">Sub Total Con Seguros</span>
+              <span class="result-value" id="rSubTotalCon">—</span>
+            </div>
+            <div class="result-row">
+              <span class="result-label">- Bono Financiamiento</span>
+              <span class="result-value" id="rBono">—</span>
+            </div>
+            <div class="result-divider" style="border-top:2px solid #d1d5db"></div>
+            <div class="monto-display">
+              <span class="label">MONTO A FINANCIAR</span>
+              <span class="value" id="rMonto">—</span>
+            </div>
+            <div class="cuota-display">
+              <span class="label">CUOTA MENSUAL</span>
+              <span class="value" id="rCuota">—</span>
+            </div>
+            <div class="result-row mt-1">
+              <span class="result-label">Total Pagado (<span id="rPlazoLabel">n</span> cuotas)</span>
+              <span class="result-value" id="rTotalPagado">—</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Card: Ingresos -->
+        <div class="card">
+          <div class="card-header"><i class="bi bi-arrow-up-circle me-1"></i>Ingresos</div>
+          <div class="card-body">
+            <div class="result-row">
+              <span class="result-label">Ingreso por Tasa</span>
+              <span class="result-value" id="rIngTasa">—</span>
+            </div>
+            <div class="result-row">
+              <span class="result-label">Ingreso por Seguros</span>
+              <span class="result-value" id="rIngSeguros">—</span>
+            </div>
+            <div class="result-row">
+              <span class="result-label">Ingreso por GPS</span>
+              <span class="result-value" id="rIngGps">—</span>
+            </div>
+            <div class="result-row">
+              <span class="result-label">Ingreso por Administración</span>
+              <span class="result-value" id="rIngAdmin">—</span>
+            </div>
+            <div class="result-divider"></div>
+            <div class="result-total">
+              <span class="result-label">TOTAL INGRESOS</span>
+              <span class="result-value" id="rTotalIngresos">—</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Card: Costos Directos -->
+        <div class="card">
+          <div class="card-header"><i class="bi bi-arrow-down-circle me-1"></i>Costos Directos</div>
+          <div class="card-body">
+            <div class="result-row">
+              <span class="result-label">Comisión Dealer</span>
+              <span class="result-value" id="rComDealer">—</span>
+            </div>
+            <div class="result-row">
+              <span class="result-label">Comisión Patio</span>
+              <span class="result-value" id="rComPatio">—</span>
+            </div>
+            <div class="result-row">
+              <span class="result-label">Comisión Ejecutivo</span>
+              <span class="result-value" id="rComEjecutivo">—</span>
+            </div>
+            <div class="result-row">
+              <span class="result-label">Comisión CORFO</span>
+              <span class="result-value" id="rComCorfo">—</span>
+            </div>
+            <div class="result-divider"></div>
+            <div class="result-total">
+              <span class="result-label">TOTAL COSTOS</span>
+              <span class="result-value" id="rTotalCostos">—</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Card: Rentabilidad -->
+        <div class="card" id="rentCard">
+          <div class="card-header"><i class="bi bi-graph-up me-1"></i>Rentabilidad</div>
+          <div class="card-body">
+            <div class="cuota-display" id="rentDisplay" style="background:linear-gradient(135deg,#6ee7b7,#34d399)">
+              <span class="label" style="color:#065f46">RENTABILIDAD BRUTA</span>
+              <span class="value" style="color:#065f46" id="rRentabilidad">—</span>
+            </div>
+            <div class="result-row">
+              <span class="result-label">% sobre Monto Financiado</span>
+              <span class="result-value" id="rPctMonto">—</span>
+            </div>
+            <div class="result-row">
+              <span class="result-label">% sobre Valor Vehículo</span>
+              <span class="result-value" id="rPctVehiculo">—</span>
+            </div>
+            <div class="result-row">
+              <span class="result-label">Spread Tasa-Fondo</span>
+              <span class="result-value" id="rSpread">—</span>
+            </div>
+          </div>
+        </div>
+
+      </div><!-- /right col -->
+    </div><!-- /row -->
+  </div><!-- /tab-simulador -->
+
+  <!-- ═══════════════════════════════════════════════════════════════════ -->
+  <!-- TAB: SEGUROS                                                         -->
+  <!-- ═══════════════════════════════════════════════════════════════════ -->
+  <div id="tab-seguros" style="display:none">
+
+    <div class="card">
+      <div class="card-header"><i class="bi bi-table me-1"></i>Factores de Seguros por Plazo (tasas netas)</div>
+      <div class="card-body p-0">
+        <div class="table-responsive">
+          <table class="table table-bordered table-sm seg-table mb-0" id="segTable">
+            <thead>
+              <tr>
+                <th>Plazo</th>
+                <th>DESG</th>
+                <th>RDH</th>
+                <th>CESANTÍA</th>
+                <th>DESG+RDH</th>
+                <th>DESG+CESA</th>
+                <th>RDH+CESA</th>
+                <th>DESG+RDH+CESA</th>
+              </tr>
+            </thead>
+            <tbody id="segTableBody"></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-header"><i class="bi bi-shield-fill-check me-1"></i>Cálculo de Seguros para Esta Operación</div>
+      <div class="card-body">
+        <div class="row g-3">
+          <div class="col-md-4">
+            <div class="result-row"><span class="result-label">Plazo seleccionado</span><span class="result-value" id="s2Plazo">—</span></div>
+            <div class="result-row"><span class="result-label">Bracket aplicado</span><span class="result-value" id="s2Bracket">—</span></div>
+            <div class="result-row"><span class="result-label">Combo seleccionado</span><span class="result-value" id="s2Combo">—</span></div>
+            <div class="result-row"><span class="result-label">Base (Sub-Total Sin Seg.)</span><span class="result-value" id="s2Base">—</span></div>
+          </div>
+          <div class="col-md-8">
+            <div class="result-row"><span class="result-label">Tasa neta aplicada</span><span class="result-value" id="s2TasaNeta">—</span></div>
+            <div class="result-row"><span class="result-label">Total Seguros (neto)</span><span class="result-value" id="s2TotalSeguros">—</span></div>
+            <div class="result-divider"></div>
+            <div class="result-row"><span class="result-label">Desgravamen (proporcional)</span><span class="result-value" id="s2Desg">—</span></div>
+            <div class="result-row"><span class="result-label">RDH (proporcional)</span><span class="result-value" id="s2Rdh">—</span></div>
+            <div class="result-row"><span class="result-label">Cesantía (proporcional)</span><span class="result-value" id="s2Cesa">—</span></div>
+            <div class="result-divider"></div>
+            <div class="result-row"><span class="result-label">Factor AMBOS (comisión)</span><span class="result-value" id="s2Ambos">—</span></div>
+            <div class="result-row"><span class="result-label">Ingreso por Seguros</span><span class="result-value" id="s2IngSeg">—</span></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+  </div><!-- /tab-seguros -->
+
+  <!-- ═══════════════════════════════════════════════════════════════════ -->
+  <!-- TAB: RENTABILIDADES                                                  -->
+  <!-- ═══════════════════════════════════════════════════════════════════ -->
+  <div id="tab-rentabilidades" style="display:none">
+
+    <div class="card">
+      <div class="card-header"><i class="bi bi-bar-chart-line me-1"></i>Comparación de Escenarios</div>
+      <div class="card-body p-0">
+        <div class="table-responsive">
+          <table class="table table-bordered rent-table mb-0" id="rentTable">
+            <thead>
+              <tr>
+                <th style="min-width:190px">Concepto</th>
+                <th class="th-normal text-center text-white" style="min-width:130px">NORMAL</th>
+                <th class="th-propuesto text-center text-white" style="min-width:150px">PROPUESTO</th>
+                <th class="th-uac text-center text-white" style="min-width:130px">UAC</th>
+              </tr>
+            </thead>
+            <tbody id="rentTableBody"></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+  </div><!-- /tab-rentabilidades -->
+
+</div><!-- /page-wrap -->
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+<script>
+/* ─────────────────────────────────────────────────────────────────────
+   AUTH
+───────────────────────────────────────────────────────────────────── */
+const token = localStorage.getItem('token');
+if (!token) { window.location.href = '/login.html'; }
+
+function logout() {
+  localStorage.clear();
+  window.location.href = '/login.html';
+}
+
+function authHdr() { return { 'Authorization': 'Bearer ' + token, 'Content-Type': 'application/json' }; }
+
+/* Decode JWT user info */
+try {
+  const payload = JSON.parse(atob(token.split('.')[1]));
+  document.getElementById('userInfo').textContent = payload.nombre || payload.email || '';
+} catch(e) {}
+
+/* ─────────────────────────────────────────────────────────────────────
+   TOAST
+───────────────────────────────────────────────────────────────────── */
+function showToast(msg, type = 'info') {
+  const c = document.getElementById('toastContainer');
+  const icon = type === 'success' ? 'bi-check-circle-fill' : type === 'error' ? 'bi-x-circle-fill' : 'bi-info-circle-fill';
+  const el = document.createElement('div');
+  el.className = `toast-item ${type}`;
+  el.innerHTML = `<i class="bi ${icon} ti-icon"></i><div class="ti-body"><div class="ti-msg">${msg}</div></div><i class="bi bi-x ti-close" onclick="this.closest('.toast-item').remove()"></i>`;
+  c.appendChild(el);
+  setTimeout(() => el.remove(), 4000);
+}
+
+/* ─────────────────────────────────────────────────────────────────────
+   FORMATTERS
+───────────────────────────────────────────────────────────────────── */
+const fmtCLP = n => isNaN(n) || n === null ? '$0' : '$' + Math.round(n).toLocaleString('es-CL');
+const fmtPct = n => isNaN(n) || n === null ? '0.00%' : n.toFixed(2) + '%';
+
+/* ─────────────────────────────────────────────────────────────────────
+   GLOBAL STATE (from APIs)
+───────────────────────────────────────────────────────────────────── */
+let ufValor = 0, ufFecha = '';
+let tmcMensualMenor = 0, tmcMensualMayor = 0;
+let tmcAnualMenor = 0, tmcAnualMayor = 0;
+
+/* ─────────────────────────────────────────────────────────────────────
+   INSURANCE TABLES
+───────────────────────────────────────────────────────────────────── */
+const SEG_RATES = {
+  6:  { d:0.00898,  r:0.006745, c:0.036162, dr:0.015847, dc:0.045806, rc:0.043406, drc:0.053186 },
+  12: { d:0.018641, r:0.011634, c:0.037883, dr:0.030715, dc:0.057977, rc:0.05042,  drc:0.071008 },
+  24: { d:0.027538, r:0.012248, c:0.042101, dr:0.040474, dc:0.072041, rc:0.055409, drc:0.08613  },
+  36: { d:0.035518, r:0.012761, c:0.04712,  dr:0.049208, dc:0.08613,  rc:0.061121, drc:0.1012   },
+  48: { d:0.043623, r:0.029018, c:0.052853, dr:0.075269, dc:0.101322, rc:0.085069, drc:0.136622 },
+  72: { d:0.054964, r:0.034875, c:0.058985, dr:0.093853, dc:0.120825, rc:0.098177, drc:0.164822 },
+};
+
+const SEG_DISPLAY = [
+  [6,  0.898,  0.675,  3.616,  1.585,  4.581,  4.341,  5.319  ],
+  [12, 1.864,  1.163,  3.788,  3.072,  5.798,  5.042,  7.101  ],
+  [24, 2.754,  1.225,  4.210,  4.047,  7.204,  5.541,  8.613  ],
+  [36, 3.552,  1.276,  4.712,  4.921,  8.613,  6.112,  10.120 ],
+  [48, 4.362,  2.902,  5.285,  7.527,  10.132, 8.507,  13.662 ],
+  [72, 5.496,  3.488,  5.899,  9.385,  12.083, 9.818,  16.482 ],
+];
+
+function getPlazoBracket(plazo) {
+  for (const b of [6, 12, 24, 36, 48, 72]) { if (plazo <= b) return b; }
+  return 72;
+}
+
+function getComboKey(d, r, c) {
+  if (d && r && c) return 'drc';
+  if (d && r) return 'dr';
+  if (d && c) return 'dc';
+  if (r && c) return 'rc';
+  if (d) return 'd';
+  if (r) return 'r';
+  if (c) return 'c';
+  return null;
+}
+
+function getComboLabel(d, r, c) {
+  const parts = [];
+  if (d) parts.push('Desgravamen');
+  if (r) parts.push('RDH');
+  if (c) parts.push('Cesantía');
+  return parts.length ? parts.join(' + ') : 'Ninguno';
+}
+
+function getAmbosFactor(plazo) {
+  if (plazo <= 12) return 1.15163;
+  if (plazo <= 24) return 1.154908;
+  if (plazo <= 36) return 1.166801;
+  if (plazo <= 48) return 1.173526;
+  return 1.173526;
+}
+
+/* ─────────────────────────────────────────────────────────────────────
+   CORE FINANCIAL FUNCTIONS
+───────────────────────────────────────────────────────────────────── */
+function pmt(rate, nper, pv) {
+  if (Math.abs(rate) < 1e-10) return pv / nper;
+  return (pv * rate * Math.pow(1 + rate, nper)) / (Math.pow(1 + rate, nper) - 1);
+}
+function pvFunc(rate, nper, pmtVal) {
+  if (Math.abs(rate) < 1e-10) return pmtVal * nper;
+  return pmtVal * (1 - Math.pow(1 + rate, -nper)) / rate;
+}
+
+/* ─────────────────────────────────────────────────────────────────────
+   MAIN CALCULATION
+───────────────────────────────────────────────────────────────────── */
+function calcular(params) {
+  const { valorVehiculo, pie, plazo, tasa, costoFondo, prenda, retiroGestion,
+          limitacionDominio, gastosAdmin, inscripcion, gps, reparaciones, bonoFin,
+          chkD, chkR, chkC, comDealer, comPatio, pctEjecutivo, comCorfo } = params;
+
+  const saldoPrecio = valorVehiculo - pie;
+
+  const subTotalSin = saldoPrecio + prenda + retiroGestion + limitacionDominio
+                    + gastosAdmin + inscripcion + gps + reparaciones;
+
+  const pb = getPlazoBracket(plazo);
+  const rates = SEG_RATES[pb];
+  let segDesg = 0, segRdh = 0, segCesa = 0;
+  const combo = getComboKey(chkD, chkR, chkC);
+  if (combo) {
+    const totalNet = rates[combo];
+    const total = subTotalSin * totalNet;
+    const sumInd = (chkD ? rates.d : 0) + (chkR ? rates.r : 0) + (chkC ? rates.c : 0);
+    if (sumInd > 0) {
+      if (chkD) segDesg = total * (rates.d / sumInd);
+      if (chkR)  segRdh  = total * (rates.r / sumInd);
+      if (chkC) segCesa = total * (rates.c / sumInd);
+    }
+  }
+  const totalSeguros = segDesg + segRdh + segCesa;
+
+  const subTotalCon = subTotalSin + totalSeguros;
+  const montoFin = subTotalCon - bonoFin;
+
+  const tasaD = tasa / 100;
+  const fondoD = costoFondo / 100;
+  const cuota = pmt(tasaD, plazo, montoFin);
+  const totalPagado = cuota * plazo;
+  const totalIntereses = totalPagado - montoFin;
+
+  const ingTasa = pvFunc(fondoD, plazo, cuota) - montoFin;
+
+  const ambosFactor = getAmbosFactor(plazo);
+  const ingSeguros = chkD ? segDesg * ambosFactor : 0;
+
+  const ingGps = 0;
+  const ingAdmin = gastosAdmin;
+  const totalIngresos = ingTasa + ingSeguros + ingGps + ingAdmin;
+
+  const rComDealer = comDealer;
+  const rComPatio = comPatio;
+  const rComEjecutivo = saldoPrecio * (pctEjecutivo / 100);
+  const rComCorfo = comCorfo;
+  const totalCostos = rComDealer + rComPatio + rComEjecutivo + rComCorfo + bonoFin;
+
+  const rentabilidad = totalIngresos - totalCostos;
+  const pctMonto = montoFin > 0 ? (rentabilidad / montoFin) * 100 : 0;
+  const pctVehiculo = valorVehiculo > 0 ? (rentabilidad / valorVehiculo) * 100 : 0;
+  const spread = tasa - costoFondo;
+
+  return {
+    saldoPrecio, subTotalSin, segDesg, segRdh, segCesa, totalSeguros,
+    subTotalCon, montoFin, cuota, totalPagado, totalIntereses,
+    ingTasa, ingSeguros, ingGps, ingAdmin, totalIngresos,
+    rComDealer, rComPatio, rComEjecutivo, rComCorfo, totalCostos,
+    rentabilidad, pctMonto, pctVehiculo, spread,
+    pb, combo, ambosFactor,
+  };
+}
+
+/* ─────────────────────────────────────────────────────────────────────
+   READ INPUTS
+───────────────────────────────────────────────────────────────────── */
+function readInputs() {
+  const n = id => { const v = parseFloat(document.getElementById(id).value); return isNaN(v) ? 0 : v; };
+  return {
+    valorVehiculo:    n('valorVehiculo'),
+    pie:              n('pie'),
+    plazo:            parseInt(document.getElementById('plazo').value),
+    tasa:             n('tasaMensual'),
+    costoFondo:       n('costoFondo'),
+    prenda:           n('prenda'),
+    retiroGestion:    n('retiroGestion'),
+    limitacionDominio:n('limitacionDominio'),
+    gastosAdmin:      n('gastosAdmin'),
+    inscripcion:      n('inscripcion'),
+    gps:              n('gps'),
+    reparaciones:     n('reparaciones'),
+    bonoFin:          n('bonoFin'),
+    chkD:             document.getElementById('chkDesg').checked,
+    chkR:             document.getElementById('chkRdh').checked,
+    chkC:             document.getElementById('chkCesa').checked,
+    comDealer:        n('comDealer'),
+    comPatio:         n('comPatio'),
+    pctEjecutivo:     n('pctEjecutivo'),
+    comCorfo:         n('comCorfo'),
+  };
+}
+
+/* ─────────────────────────────────────────────────────────────────────
+   RENDER RESULTS
+───────────────────────────────────────────────────────────────────── */
+function setEl(id, val) { const el = document.getElementById(id); if (el) el.textContent = val; }
+
+function renderSimulador(r, params) {
+  /* Saldo precio */
+  document.getElementById('saldoPrecio').value = params.valorVehiculo || params.pie
+    ? fmtCLP(r.saldoPrecio) : '—';
+
+  setEl('rSubTotalSin', fmtCLP(r.subTotalSin));
+  setEl('rSegDesg', params.chkD ? fmtCLP(r.segDesg) : '—');
+  setEl('rSegRdh',  params.chkR ? fmtCLP(r.segRdh)  : '—');
+  setEl('rSegCesa', params.chkC ? fmtCLP(r.segCesa) : '—');
+  setEl('rSubTotalCon', fmtCLP(r.subTotalCon));
+  setEl('rBono', r.montoFin !== r.subTotalCon ? fmtCLP(params.bonoFin) : '—');
+  setEl('rMonto', fmtCLP(r.montoFin));
+  setEl('rCuota', fmtCLP(r.cuota));
+  setEl('rPlazoLabel', params.plazo);
+  setEl('rTotalPagado', fmtCLP(r.totalPagado));
+
+  setEl('rIngTasa',    fmtCLP(r.ingTasa));
+  setEl('rIngSeguros', fmtCLP(r.ingSeguros));
+  setEl('rIngGps',     fmtCLP(r.ingGps));
+  setEl('rIngAdmin',   fmtCLP(r.ingAdmin));
+  setEl('rTotalIngresos', fmtCLP(r.totalIngresos));
+
+  setEl('rComDealer',   fmtCLP(r.rComDealer));
+  setEl('rComPatio',    fmtCLP(r.rComPatio));
+  setEl('rComEjecutivo',fmtCLP(r.rComEjecutivo));
+  setEl('rComCorfo',    fmtCLP(r.rComCorfo));
+  setEl('rTotalCostos', fmtCLP(r.totalCostos));
+
+  /* Rentabilidad card */
+  setEl('rRentabilidad', fmtCLP(r.rentabilidad));
+  setEl('rPctMonto',    fmtPct(r.pctMonto));
+  setEl('rPctVehiculo', fmtPct(r.pctVehiculo));
+  setEl('rSpread',      fmtPct(r.spread));
+
+  const rd = document.getElementById('rentDisplay');
+  if (r.rentabilidad >= 0) {
+    rd.style.background = 'linear-gradient(135deg,#6ee7b7,#34d399)';
+    document.getElementById('rRentabilidad').style.color = '#065f46';
+    rd.querySelector('.label').style.color = '#065f46';
+  } else {
+    rd.style.background = 'linear-gradient(135deg,#fca5a5,#f87171)';
+    document.getElementById('rRentabilidad').style.color = '#7f1d1d';
+    rd.querySelector('.label').style.color = '#7f1d1d';
+  }
+
+  /* Update tramo badge */
+  updateTramo(params.valorVehiculo);
+}
+
+/* ─────────────────────────────────────────────────────────────────────
+   RENDER SEGUROS TAB
+───────────────────────────────────────────────────────────────────── */
+function renderSegurosTab(r, params) {
+  /* Table highlighting */
+  const pb = r.pb;
+  const tbody = document.getElementById('segTableBody');
+  if (!tbody.children.length) buildSegTable();
+  Array.from(tbody.rows).forEach(row => {
+    const bracket = parseInt(row.cells[0].textContent);
+    row.classList.toggle('active-row', bracket === pb);
+  });
+
+  /* Operation calc */
+  setEl('s2Plazo',   params.plazo + ' meses');
+  setEl('s2Bracket', pb + ' meses');
+  setEl('s2Combo',   getComboLabel(params.chkD, params.chkR, params.chkC));
+  setEl('s2Base',    fmtCLP(r.subTotalSin));
+  const comboRate = r.combo ? SEG_RATES[pb][r.combo] : 0;
+  setEl('s2TasaNeta', fmtPct(comboRate * 100));
+  setEl('s2TotalSeguros', fmtCLP(r.totalSeguros));
+  setEl('s2Desg', params.chkD ? fmtCLP(r.segDesg) : '—');
+  setEl('s2Rdh',  params.chkR ? fmtCLP(r.segRdh)  : '—');
+  setEl('s2Cesa', params.chkC ? fmtCLP(r.segCesa) : '—');
+  setEl('s2Ambos', r.ambosFactor.toFixed(6));
+  setEl('s2IngSeg', fmtCLP(r.ingSeguros));
+}
+
+function buildSegTable() {
+  const tbody = document.getElementById('segTableBody');
+  tbody.innerHTML = SEG_DISPLAY.map(([pz, d, rdh, c, dr, dc, rc, drc]) => `
+    <tr>
+      <td><strong>${pz}</strong></td>
+      <td>${d.toFixed(3)}%</td>
+      <td>${rdh.toFixed(3)}%</td>
+      <td>${c.toFixed(3)}%</td>
+      <td>${dr.toFixed(3)}%</td>
+      <td>${dc.toFixed(3)}%</td>
+      <td>${rc.toFixed(3)}%</td>
+      <td>${drc.toFixed(3)}%</td>
+    </tr>`).join('');
+}
+
+/* ─────────────────────────────────────────────────────────────────────
+   RENDER RENTABILIDADES TAB
+───────────────────────────────────────────────────────────────────── */
+function renderRentabilidades(params) {
+  const normal   = calcular(params);
+
+  const tasPropuesto = parseFloat(document.getElementById('tasaPropuesto')?.value || params.tasa) || params.tasa;
+  const paramsProp   = { ...params, tasa: tasPropuesto };
+  const propuesto    = calcular(paramsProp);
+
+  /* UAC: higher rate, no seguros, no notariales */
+  const paramsUac = {
+    ...params,
+    tasa: tmcMensualMayor,
+    chkD: false, chkR: false, chkC: false,
+    prenda: 0, limitacionDominio: 0, inscripcion: 0,
+    reparaciones: 0,
+  };
+  const uac = calcular(paramsUac);
+
+  const plazo = params.plazo;
+
+  const rows = [
+    /* SUPUESTOS */
+    { type:'section', label:'SUPUESTOS' },
+    { label:'Tasa Mensual',        n:[fmtPct(normal.spread + params.costoFondo), null, fmtPct(uac.spread + params.costoFondo)], propInput:true },
+    { label:'Costo de Fondo',      v: [fmtPct(params.costoFondo), fmtPct(params.costoFondo), fmtPct(params.costoFondo)] },
+    { label:'Spread Tasa-Fondo',   v: [fmtPct(normal.spread), fmtPct(propuesto.spread), fmtPct(uac.spread)] },
+    { label:'Con Seguros',         v: [params.chkD||params.chkR||params.chkC?'Sí':'No', params.chkD||params.chkR||params.chkC?'Sí':'No', 'No'] },
+    { label:'Costos Notariales',   v: [(params.prenda||params.limitacionDominio||params.inscripcion)?'Sí':'No', (params.prenda||params.limitacionDominio||params.inscripcion)?'Sí':'No', 'No'] },
+    /* OPERACIÓN */
+    { type:'section', label:'OPERACIÓN' },
+    { label:'Valor Vehículo',      v: [fmtCLP(params.valorVehiculo), fmtCLP(params.valorVehiculo), fmtCLP(params.valorVehiculo)] },
+    { label:'Pie',                 v: [fmtCLP(params.pie), fmtCLP(params.pie), fmtCLP(params.pie)] },
+    { label:'Saldo Precio',        v: [fmtCLP(normal.saldoPrecio), fmtCLP(propuesto.saldoPrecio), fmtCLP(uac.saldoPrecio)] },
+    { label:'Sub-Total Sin Seguros', v:[fmtCLP(normal.subTotalSin), fmtCLP(propuesto.subTotalSin), fmtCLP(uac.subTotalSin)] },
+    { label:'Total Seguros',       v: [fmtCLP(normal.totalSeguros), fmtCLP(propuesto.totalSeguros), fmtCLP(uac.totalSeguros)] },
+    { label:'Monto a Financiar',   v: [fmtCLP(normal.montoFin), fmtCLP(propuesto.montoFin), fmtCLP(uac.montoFin)] },
+    { label:'Cuota Mensual',       v: [fmtCLP(normal.cuota), fmtCLP(propuesto.cuota), fmtCLP(uac.cuota)] },
+    { label:`Total Pagado (${plazo} cuotas)`, v:[fmtCLP(normal.totalPagado), fmtCLP(propuesto.totalPagado), fmtCLP(uac.totalPagado)] },
+    { label:'Total Intereses',     v: [fmtCLP(normal.totalIntereses), fmtCLP(propuesto.totalIntereses), fmtCLP(uac.totalIntereses)] },
+    /* INGRESOS Y COSTOS */
+    { type:'section', label:'INGRESOS Y COSTOS' },
+    { label:'Ingreso por Tasa',    v: [fmtCLP(normal.ingTasa), fmtCLP(propuesto.ingTasa), fmtCLP(uac.ingTasa)] },
+    { label:'Ingreso por Seguros', v: [fmtCLP(normal.ingSeguros), fmtCLP(propuesto.ingSeguros), fmtCLP(uac.ingSeguros)] },
+    { label:'Total Ingresos',      v: [fmtCLP(normal.totalIngresos), fmtCLP(propuesto.totalIngresos), fmtCLP(uac.totalIngresos)], bold:true },
+    { label:'Comisión Dealer',     v: [fmtCLP(normal.rComDealer), fmtCLP(propuesto.rComDealer), fmtCLP(uac.rComDealer)] },
+    { label:'Comisión Ejecutivo',  v: [fmtCLP(normal.rComEjecutivo), fmtCLP(propuesto.rComEjecutivo), fmtCLP(uac.rComEjecutivo)] },
+    { label:'Total Costos',        v: [fmtCLP(normal.totalCostos), fmtCLP(propuesto.totalCostos), fmtCLP(uac.totalCostos)], bold:true },
+    /* RENTABILIDAD */
+    { type:'section', label:'RENTABILIDAD' },
+    { label:'Rentabilidad Bruta',  v: [fmtCLP(normal.rentabilidad), fmtCLP(propuesto.rentabilidad), fmtCLP(uac.rentabilidad)],
+      rentRow: [normal.rentabilidad, propuesto.rentabilidad, uac.rentabilidad] },
+    { label:'% sobre Monto',       v: [fmtPct(normal.pctMonto), fmtPct(propuesto.pctMonto), fmtPct(uac.pctMonto)] },
+    { label:'% sobre Vehículo',    v: [fmtPct(normal.pctVehiculo), fmtPct(propuesto.pctVehiculo), fmtPct(uac.pctVehiculo)] },
+  ];
+
+  const tbody = document.getElementById('rentTableBody');
+  tbody.innerHTML = rows.map(row => {
+    if (row.type === 'section') {
+      return `<tr class="section-header"><td colspan="4">${row.label}</td></tr>`;
+    }
+    let c1, c2, c3;
+    if (row.propInput) {
+      c1 = fmtPct(params.tasa);
+      c2 = `<input type="number" id="tasaPropuesto" value="${tasPropuesto}" step="0.0001" style="width:90px;border-radius:6px;border:1.5px solid #d1d5db;padding:3px 6px;font-size:.82rem" oninput="onAnyInput()">%`;
+      c3 = fmtPct(tmcMensualMayor || 0);
+    } else if (row.rentRow) {
+      const cls = r => r >= 0 ? 'color:#065f46' : 'color:#7f1d1d';
+      const bg  = r => r >= 0 ? 'background:#d1fae5' : 'background:#fee2e2';
+      return `<tr>
+        <td style="font-weight:800">${row.label}</td>
+        <td class="col-normal text-center" style="${bg(row.rentRow[0])};font-weight:800;${cls(row.rentRow[0])}">${row.v[0]}</td>
+        <td class="col-propuesto text-center" style="${bg(row.rentRow[1])};font-weight:800;${cls(row.rentRow[1])}">${row.v[1]}</td>
+        <td class="col-uac text-center" style="${bg(row.rentRow[2])};font-weight:800;${cls(row.rentRow[2])}">${row.v[2]}</td>
+      </tr>`;
+    } else {
+      c1 = row.v[0]; c2 = row.v[1]; c3 = row.v[2];
+    }
+    const bld = row.bold ? 'font-weight:700' : '';
+    return `<tr>
+      <td style="${bld}">${row.label}</td>
+      <td class="col-normal text-center" style="${bld}">${c1}</td>
+      <td class="col-propuesto text-center" style="${bld}">${c2}</td>
+      <td class="col-uac text-center" style="${bld}">${c3}</td>
+    </tr>`;
+  }).join('');
+}
+
+/* ─────────────────────────────────────────────────────────────────────
+   TRAMO UPDATE
+───────────────────────────────────────────────────────────────────── */
+function updateTramo(valorVehiculo) {
+  const ibTramo = document.getElementById('ibTramo');
+  if (!ibTramo) return;
+  if (!ufValor || !valorVehiculo) { ibTramo.textContent = '—'; return; }
+  const ufAmount = valorVehiculo / ufValor;
+  ibTramo.textContent = ufAmount <= 200 ? '≤200 UF (tasa menor)' : '>200 UF (tasa mayor)';
+}
+
+/* ─────────────────────────────────────────────────────────────────────
+   MAIN RECALC
+───────────────────────────────────────────────────────────────────── */
+function onAnyInput() {
+  const params = readInputs();
+  if (!params.valorVehiculo && !params.pie) return;
+  const r = calcular(params);
+  renderSimulador(r, params);
+
+  /* Update visible tabs */
+  if (currentTab === 'seguros')        renderSegurosTab(r, params);
+  if (currentTab === 'rentabilidades') renderRentabilidades(params);
+}
+
+function calcularManual() {
+  const params = readInputs();
+  const r = calcular(params);
+  renderSimulador(r, params);
+  showToast('Cálculo actualizado', 'success');
+}
+
+/* ─────────────────────────────────────────────────────────────────────
+   LIMPIAR
+───────────────────────────────────────────────────────────────────── */
+function limpiar() {
+  const zeros = ['valorVehiculo','pie','prenda','retiroGestion','limitacionDominio',
+                 'gastosAdmin','inscripcion','gps','reparaciones','bonoFin',
+                 'comDealer','comPatio','comCorfo'];
+  zeros.forEach(id => { const el = document.getElementById(id); if(el) el.value = ''; });
+  document.getElementById('costoFondo').value = '1.78';
+  document.getElementById('pctEjecutivo').value = '2.72';
+  document.getElementById('plazo').value = '48';
+  document.getElementById('chkDesg').checked = false;
+  document.getElementById('chkRdh').checked = false;
+  document.getElementById('chkCesa').checked = false;
+  document.getElementById('saldoPrecio').value = '—';
+  if (tmcMensualMenor) document.getElementById('tasaMensual').value = tmcMensualMenor.toFixed(4);
+
+  /* Reset displays */
+  const ids = ['rSubTotalSin','rSegDesg','rSegRdh','rSegCesa','rSubTotalCon',
+                'rBono','rMonto','rCuota','rTotalPagado','rIngTasa','rIngSeguros',
+                'rIngGps','rIngAdmin','rTotalIngresos','rComDealer','rComPatio',
+                'rComEjecutivo','rComCorfo','rTotalCostos','rRentabilidad',
+                'rPctMonto','rPctVehiculo','rSpread'];
+  ids.forEach(id => setEl(id, '—'));
+  showToast('Formulario limpiado', 'info');
+}
+
+/* ─────────────────────────────────────────────────────────────────────
+   TABS
+───────────────────────────────────────────────────────────────────── */
+let currentTab = 'simulador';
+
+document.getElementById('mainTabs').addEventListener('click', e => {
+  const btn = e.target.closest('[data-tab]');
+  if (!btn) return;
+  const tab = btn.dataset.tab;
+  currentTab = tab;
+
+  document.querySelectorAll('#mainTabs .nav-link').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+  ['simulador','seguros','rentabilidades'].forEach(t =>
+    document.getElementById('tab-' + t).style.display = t === tab ? '' : 'none');
+
+  if (tab === 'seguros') {
+    buildSegTable();
+    const params = readInputs();
+    if (params.valorVehiculo || params.pie) {
+      renderSegurosTab(calcular(params), params);
+    } else {
+      buildSegTable();
+    }
+  }
+  if (tab === 'rentabilidades') {
+    const params = readInputs();
+    renderRentabilidades(params);
+  }
+});
+
+/* ─────────────────────────────────────────────────────────────────────
+   LOAD APIs
+───────────────────────────────────────────────────────────────────── */
+async function loadApis() {
+  try {
+    const [ufRes, tasaRes] = await Promise.all([
+      fetch('/api/uf/vigente', { headers: authHdr() }),
+      fetch('/api/tasas/vigente', { headers: authHdr() }),
+    ]);
+    const ufData   = await ufRes.json();
+    const tasaData = await tasaRes.json();
+
+    if (ufData.success && ufData.data) {
+      ufValor = parseFloat(ufData.data.valor);
+      ufFecha = ufData.data.fecha ? new Date(ufData.data.fecha).toLocaleDateString('es-CL') : '';
+      document.getElementById('ibUF').textContent = fmtCLP(ufValor) + (ufFecha ? ' ('+ufFecha+')' : '');
+    }
+
+    if (tasaData.success && tasaData.data) {
+      const d = tasaData.data;
+      tmcMensualMenor = parseFloat(d.tasa_mensual_menor) || 0;
+      tmcMensualMayor = parseFloat(d.tasa_mensual_mayor) || 0;
+      tmcAnualMenor   = parseFloat(d.tasa_anual_menor)   || 0;
+      tmcAnualMayor   = parseFloat(d.tasa_anual_mayor)   || 0;
+
+      document.getElementById('ibTmcMenor').textContent = tmcAnualMenor.toFixed(2) + '% anual';
+      document.getElementById('ibTmcMayor').textContent = tmcAnualMayor.toFixed(2) + '% anual';
+
+      /* Auto-fill tasa field */
+      const tmEl = document.getElementById('tasaMensual');
+      if (!tmEl.value) tmEl.value = tmcMensualMenor.toFixed(4);
+    }
+  } catch(err) {
+    showToast('Error al cargar datos del servidor', 'error');
+    console.error(err);
+  }
+}
+
+/* ─────────────────────────────────────────────────────────────────────
+   INIT
+───────────────────────────────────────────────────────────────────── */
+buildSegTable();
+loadApis();
+</script>
+</body>
+</html>
