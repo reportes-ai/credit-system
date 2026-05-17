@@ -26,6 +26,7 @@ app.use('/api/uf',         require('../../services/mantenedores/src/routes/uf.ro
 app.use('/api/geografico', require('../../services/mantenedores/src/routes/geografico.routes'));
 app.use('/api/vehiculos',  require('../../services/mantenedores/src/routes/vehiculos.routes'));
 app.use('/api/dealers',    require('../../services/mantenedores/src/routes/dealers.routes'));
+app.use('/api/parametros-credito', require('../../services/mantenedores/src/routes/parametros.routes'));
 
 // Health check
 app.get('/health', (req, res) => res.json({ status: 'Sistema operativo', timestamp: new Date() }));
@@ -45,6 +46,8 @@ app.get(['/mantenedores/vehiculos', '/mantenedores/vehiculos/'], (req, res) =>
   res.sendFile(path.join(__dirname, '../public/mantenedores/vehiculos/index.html')));
 app.get(['/mantenedores/dealers', '/mantenedores/dealers/'], (req, res) =>
   res.sendFile(path.join(__dirname, '../public/mantenedores/dealers/index.html')));
+app.get(['/mantenedores/parametros', '/mantenedores/parametros/'], (req, res) =>
+  res.sendFile(path.join(__dirname, '../public/mantenedores/parametros/index.html')));
 
 app.get(['/clientes', '/clientes/'], (req, res) =>
   res.sendFile(path.join(__dirname, '../public/clientes/index.html')));
