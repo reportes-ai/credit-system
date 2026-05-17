@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html lang="es">
 <head>
   <meta charset="UTF-8">
@@ -65,7 +65,7 @@
 <body>
   <nav class="topnav">
     <div class="topnav-left">
-      <div class="topnav-brand"><a href="/"><img src="/img/logo.png" alt="AutoFácil"></a> <span class="version-badge">v2.8</span></div>
+      <div class="topnav-brand"><a href="/"><img src="/img/logo.png" alt="AutoFácil"></a> <span class="version-badge">v2.9</span></div>
       <div class="breadcrumb-nav">
         <a href="/">Inicio</a><span class="sep">/</span>
         <a href="/mantenedores/">Mantenedores</a><span class="sep">/</span>
@@ -288,11 +288,17 @@
     const fmtP4   = v => (v !== null && v !== undefined && !isNaN(parseFloat(v))) ? formatCL(parseFloat(v), 4) + '%' : '—';
 
     // CF = mensual_mayor - spread_mayor  (único para ambos tramos)
-    // spread_menor_implicito = mensual_menor - CF
     const calcCF = (mensual_mayor, spread_mayor) => {
       const m = parseFloat(mensual_mayor), s = parseFloat(spread_mayor);
       if (isNaN(m) || isNaN(s)) return null;
       return Math.round((m - s) * 10000) / 10000;
+    };
+    // Spread implícito ≤200 = mensual_menor - CF  (siempre calculado, nunca del BD)
+    const calcSpMenor = (t) => {
+      const cf = calcCF(t.tasa_mensual_mayor, t.spread_mayor);
+      const m  = parseFloat(t.tasa_mensual_menor);
+      if (cf === null || isNaN(m)) return null;
+      return Math.round((m - cf) * 10000) / 10000;
     };
 
     let datos = [], editId = null;
@@ -308,7 +314,7 @@
         document.getElementById('vAnualMayor').textContent   = fmtP2(t.tasa_anual_mayor);
         document.getElementById('vMensualMayor').textContent = fmtP4(t.tasa_mensual_mayor);
         document.getElementById('vSpreadMayor').textContent  = fmtP4(t.spread_mayor);
-        document.getElementById('vSpreadMenor').textContent  = fmtP4(t.spread_menor);
+        document.getElementById('vSpreadMenor').textContent  = fmtP4(calcSpMenor(t));
         const cf = calcCF(t.tasa_mensual_mayor, t.spread_mayor);
         document.getElementById('vCF').textContent = cf !== null ? fmtP4(cf) : '—';
         document.getElementById('vigenteCard').style.display = '';
@@ -324,6 +330,7 @@
         const fh = t.fecha_hasta?.split('T')[0] || t.fecha_hasta;
         const esVigente = fd <= hoy && fh >= hoy;
         const cf = calcCF(t.tasa_mensual_mayor, t.spread_mayor);
+        const spMenor = calcSpMenor(t);
         return `<tr>
           <td>
             <div style="font-size:0.88rem;font-weight:600">${fmtFecha(fd)} &mdash; ${fmtFecha(fh)}</div>
@@ -331,7 +338,7 @@
           </td>
           <td style="border-left:2px solid #f1f5f9"><span class="val-anual">${fmtP2(t.tasa_anual_menor)}</span></td>
           <td><span class="val-mensual">${fmtP4(t.tasa_mensual_menor)}</span></td>
-          <td><span class="val-spread">${fmtP4(t.spread_menor)}</span></td>
+          <td><span class="val-spread">${fmtP4(spMenor)}</span></td>
           <td style="border-left:2px solid #f1f5f9"><span class="val-anual">${fmtP2(t.tasa_anual_mayor)}</span></td>
           <td><span class="val-mensual">${fmtP4(t.tasa_mensual_mayor)}</span></td>
           <td><span class="val-spread">${fmtP4(t.spread_mayor)}</span></td>

@@ -12,13 +12,13 @@ const pool = require('../../../../shared/config/database');
     try { await pool.query(sql); }
     catch(e) { if (e.errno !== 1060) console.error('[tasas migration]', e.message); }
   }
-  // Rellena spread_mayor=0.67 y calcula spread_menor implícito para registros sin spread
+  // Asegura spread_mayor=0.67 donde sea NULL y recalcula spread_menor para TODOS
+  // spread_menor implícito = mensual_menor - (mensual_mayor - spread_mayor)
   try {
+    await pool.query(`UPDATE tasas SET spread_mayor = 0.6700 WHERE spread_mayor IS NULL`);
     await pool.query(
       `UPDATE tasas
-       SET spread_mayor = 0.6700,
-           spread_menor = ROUND(tasa_mensual_menor - tasa_mensual_mayor + 0.6700, 4)
-       WHERE spread_mayor IS NULL`
+       SET spread_menor = ROUND(tasa_mensual_menor - tasa_mensual_mayor + spread_mayor, 4)`
     );
   } catch(e) { console.error('[tasas migration spread]', e.message); }
 })();
