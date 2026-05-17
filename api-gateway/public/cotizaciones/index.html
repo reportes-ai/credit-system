@@ -161,7 +161,7 @@
     <span class="sep">›</span>
     <span class="current">Cotizaciones</span>
   </span>
-  <span class="version-badge">v3.0</span>
+  <span class="version-badge">v3.1</span>
   <span class="user-info" id="userInfo"></span>
   <button class="btn-logout" onclick="logout()"><i class="bi bi-box-arrow-right"></i> Salir</button>
 </nav>
@@ -299,7 +299,7 @@
                 <label class="form-check-label form-label mb-0" for="chkCesa">Cesantía</label>
               </div>
               <div class="form-check">
-                <input class="form-check-input" type="checkbox" id="chkRep" checked onchange="recalcular()">
+                <input class="form-check-input" type="checkbox" id="chkRep" checked onchange="onChkRepChange()">
                 <label class="form-check-label form-label mb-0" for="chkRep">Rep. Menores</label>
               </div>
             </div>
@@ -946,6 +946,16 @@ function renderRentabilidades() {
 }
 
 /* ═══════════════════════════════════════════════════════════════════════════
+   CHECKBOX REP. MENORES — actualiza display y recalcula
+═══════════════════════════════════════════════════════════════════════════ */
+function onChkRepChange() {
+  const checked = document.getElementById('chkRep').checked;
+  const valor = checked ? (params.reparaciones_menores || 0) : 0;
+  setEl('gReparaciones', '$' + formatPeso(valor));
+  recalcular();
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
    MAIN RECALC
 ═══════════════════════════════════════════════════════════════════════════ */
 function recalcular() {
@@ -981,6 +991,7 @@ function limpiar() {
   document.getElementById('chkRdh').checked  = true;
   document.getElementById('chkCesa').checked = true;
   document.getElementById('chkRep').checked  = true;
+  setEl('gReparaciones', '$' + formatPeso(params.reparaciones_menores || 0));
   document.getElementById('inSaldoPrecio').value = '—';
 
   // Reset tasa y fecha
