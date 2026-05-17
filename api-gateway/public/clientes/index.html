@@ -274,7 +274,7 @@
   </div>
   <div class="user-info d-none d-sm-flex align-items-center gap-2">
     <span id="navUser"></span>
-    <span class="version-badge">v3.1</span>
+    <span class="version-badge">v3.2</span>
   </div>
   <button class="btn-logout ms-2" onclick="logout()">
     <i class="bi bi-box-arrow-right"></i> Salir
@@ -303,7 +303,8 @@
 
   <!-- ── SECCIÓN 1: Búsqueda ──────────────────────────────────────── -->
   <div class="search-card" id="secBuscar">
-    <div class="rut-bar">
+    <!-- Estado: ingresando RUT -->
+    <div class="rut-bar" id="rutInputBar">
       <label><i class="bi bi-search me-1"></i>RUT del cliente</label>
       <div class="rut-input-wrap">
         <input type="text" id="inputRut" maxlength="12"
@@ -319,6 +320,21 @@
         </button>
       </div>
       <div id="rutHint" style="font-size:.73rem;color:#9ca3af;"></div>
+    </div>
+    <!-- Estado: cliente encontrado (reemplaza la barra de búsqueda) -->
+    <div class="rut-bar d-none" id="rutFoundBar">
+      <label><i class="bi bi-person-check me-1" style="color:#059669"></i>RUT del cliente</label>
+      <div style="display:flex;align-items:center;gap:8px;flex:1;max-width:440px">
+        <div style="flex:1;background:#f0fdf4;border:1.5px solid #6ee7b7;border-radius:7px;padding:7px 12px;font-size:.92rem;font-weight:700;letter-spacing:.05em;text-transform:uppercase;color:#065f46" id="foundInfo">—</div>
+      </div>
+      <div class="d-flex gap-2 ms-2">
+        <button class="btn-cancelar" style="padding:6px 14px;font-size:.82rem" onclick="resetAll()">
+          <i class="bi bi-arrow-left me-1"></i>Nueva búsqueda
+        </button>
+        <button class="btn-editar" style="padding:6px 14px;font-size:.82rem" id="btnEditar" onclick="activarEdicion()">
+          <i class="bi bi-pencil me-1"></i>Editar
+        </button>
+      </div>
     </div>
   </div>
 
@@ -342,21 +358,6 @@
 
   <!-- ── SECCIÓN 2b: Cliente EXISTE — solo lectura ────────────────── -->
   <div id="secExiste" class="d-none">
-    <div class="banner banner-found mb-3">
-      <div>
-        <div class="banner-title"><i class="bi bi-person-check me-2"></i>CLIENTE ENCONTRADO</div>
-        <div class="banner-sub" id="existRut"></div>
-      </div>
-      <div class="d-flex gap-2">
-        <button class="btn-cancelar" onclick="resetAll()">
-          <i class="bi bi-arrow-left me-1"></i>Nueva búsqueda
-        </button>
-        <button class="btn-editar" id="btnEditar" onclick="activarEdicion()">
-          <i class="bi bi-pencil me-1"></i>Editar
-        </button>
-      </div>
-    </div>
-    <!-- Vista lectura dinámica -->
     <div class="form-card" id="vistaLectura"></div>
   </div>
 
@@ -916,7 +917,17 @@ function resetAll() {
   tipoSeleccionado = null;
   document.getElementById('inputRut').value = '';
   document.getElementById('rutHint').textContent = '';
+  // Restaurar barra de búsqueda
+  document.getElementById('rutInputBar').classList.remove('d-none');
+  document.getElementById('rutFoundBar').classList.add('d-none');
   document.getElementById('inputRut').focus();
+}
+
+function mostrarFoundBar(cliente) {
+  document.getElementById('foundInfo').textContent =
+    `${cliente.rut}  ·  ${cliente.tipo_cliente}`;
+  document.getElementById('rutInputBar').classList.add('d-none');
+  document.getElementById('rutFoundBar').classList.remove('d-none');
 }
 
 /* ═══════════════════════════════════════════════════════════════════
@@ -943,8 +954,7 @@ async function buscarCliente() {
     if (json.data) {
       // Cliente encontrado
       clienteActual = json.data;
-      document.getElementById('existRut').textContent =
-        `RUT: ${clienteActual.rut}  ·  ${clienteActual.tipo_cliente}`;
+      mostrarFoundBar(clienteActual);
       mostrarFechas(clienteActual);
       mostrarVistaLectura(clienteActual);
       document.getElementById('secExiste').classList.remove('d-none');
@@ -1296,10 +1306,9 @@ async function recargarCliente(rut) {
       modoEdicion   = false;
       hideAll();
       document.getElementById('inputRut').value = rut;
+      mostrarFoundBar(clienteActual);
       mostrarFechas(clienteActual);
       mostrarVistaLectura(clienteActual);
-      document.getElementById('existRut').textContent =
-        `RUT: ${clienteActual.rut}  ·  ${clienteActual.tipo_cliente}`;
       document.getElementById('secExiste').classList.remove('d-none');
       document.getElementById('cardPersona').style.cursor = 'pointer';
       document.getElementById('cardEmpresa').style.cursor = 'pointer';
