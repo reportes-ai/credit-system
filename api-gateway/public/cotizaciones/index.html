@@ -225,12 +225,12 @@
               <div class="col-sm-6 mb-2-form">
                 <label class="form-label">Valor Vehículo</label>
                 <input type="text" class="form-control" id="inValorVehiculo" placeholder="$0" inputmode="numeric"
-                  oninput="onPesoInput(this)">
+                  oninput="onPesoInput(this)" onfocus="onPesoFocus(this)" onclick="onPesoFocus(this)">
               </div>
               <div class="col-sm-6 mb-2-form">
                 <label class="form-label">Pie</label>
                 <input type="text" class="form-control" id="inPie" placeholder="$0" inputmode="numeric"
-                  oninput="onPesoInput(this)">
+                  oninput="onPesoInput(this)" onfocus="onPesoFocus(this)" onclick="onPesoFocus(this)">
               </div>
               <div class="col-sm-6 mb-2-form">
                 <label class="form-label">Saldo Precio</label>
@@ -242,8 +242,8 @@
               </div>
               <div class="col-5 mb-2-form">
                 <label class="form-label">Tasa Mensual [%]</label>
-                <input type="text" class="form-control" id="inTasa" placeholder="0,00" inputmode="decimal"
-                  oninput="onTasaInput()">
+                <input type="text" class="form-control" id="inTasa" placeholder="0,00%" inputmode="decimal"
+                  oninput="onTasaInput()" onfocus="onTasaFocus()" onclick="onTasaFocus()">
                 <div style="font-size:.72rem;color:#9ca3af;margin-top:2px">Auto según tramo.</div>
               </div>
               <div class="col-7 mb-2-form">
@@ -276,7 +276,7 @@
             <div style="margin-top:10px;padding-top:10px;border-top:1px solid #e5e7eb">
               <label class="form-label">Bono Financiamiento</label>
               <input type="text" class="form-control" id="inBonoFin" placeholder="$0" inputmode="numeric"
-                oninput="onPesoInput(this)">
+                oninput="onPesoInput(this)" onfocus="onPesoFocus(this)" onclick="onPesoFocus(this)">
             </div>
           </div>
         </div>
@@ -445,22 +445,22 @@
           <div class="col-sm-6 col-md-3 mb-2-form">
             <label class="form-label">Comisión Dealer</label>
             <input type="text" class="form-control" id="rcDealer" placeholder="$0" inputmode="numeric"
-              oninput="onPesoInput(this); renderRentabilidades()">
+              oninput="onPesoInput(this); renderRentabilidades()" onfocus="onPesoFocus(this)" onclick="onPesoFocus(this)">
           </div>
           <div class="col-sm-6 col-md-3 mb-2-form">
             <label class="form-label">Comisión Patio</label>
             <input type="text" class="form-control" id="rcPatio" placeholder="$0" inputmode="numeric"
-              oninput="onPesoInput(this); renderRentabilidades()">
+              oninput="onPesoInput(this); renderRentabilidades()" onfocus="onPesoFocus(this)" onclick="onPesoFocus(this)">
           </div>
           <div class="col-sm-6 col-md-3 mb-2-form">
             <label class="form-label">Comisión Ejecutivo [%]</label>
-            <input type="text" class="form-control" id="rcPctEjec" placeholder="0,00" inputmode="decimal"
+            <input type="text" class="form-control" id="rcPctEjec" placeholder="0,00%" inputmode="decimal"
               oninput="renderRentabilidades()">
           </div>
           <div class="col-sm-6 col-md-3 mb-2-form">
             <label class="form-label">Comisión CORFO</label>
             <input type="text" class="form-control" id="rcCorfo" placeholder="$0" inputmode="numeric"
-              oninput="onPesoInput(this); renderRentabilidades()">
+              oninput="onPesoInput(this); renderRentabilidades()" onfocus="onPesoFocus(this)" onclick="onPesoFocus(this)">
           </div>
           <div class="col-sm-6 col-md-3 mb-2-form">
             <label class="form-label">Costo de Fondo [%/mes]</label>
@@ -537,11 +537,11 @@ function parsePeso(s) {
 }
 function formatTasa(n) {
   if (n === null || n === undefined || isNaN(n)) return '';
-  return n.toFixed(2).replace('.', ',');
+  return n.toFixed(2).replace('.', ',') + '%';
 }
 function parseTasa(s) {
   if (!s) return 0;
-  return parseFloat(s.toString().replace(',', '.')) || 0;
+  return parseFloat(s.toString().replace(/%/g, '').replace(',', '.')) || 0;
 }
 function $f(n) {
   if (n === null || n === undefined || isNaN(n)) return '—';
@@ -552,22 +552,50 @@ function pctf(n, decimals = 2) {
   return n.toFixed(decimals).replace('.', ',') + '%';
 }
 
+// Peso input: muestra $XX.XXX.XXX con formato automático
 function onPesoInput(el) {
   const oldVal = el.value;
   const oldPos = el.selectionStart;
   const raw = parsePeso(oldVal);
-  const newVal = raw > 0 ? formatPeso(raw) : '';
+  const digits = raw > 0 ? formatPeso(raw) : '';
+  const newVal = digits ? '$' + digits : '';
   el.value = newVal;
-  // Ajusta posición cursor por los puntos añadidos/quitados
+  // Ajusta cursor: mínimo posición 1 (tras el $), compensa puntos añadidos/quitados
+  const hasDollar = newVal.startsWith('$') ? 1 : 0;
   const diff = newVal.length - oldVal.length;
-  const newPos = Math.max(0, oldPos + diff);
+  const newPos = Math.max(hasDollar, oldPos + diff);
   try { el.setSelectionRange(newPos, newPos); } catch(e) {}
   recalcular();
 }
+// Previene que el cursor quede antes del $
+function onPesoFocus(el) {
+  if (el.value.startsWith('$')) {
+    setTimeout(() => {
+      if (el.selectionStart === 0) try { el.setSelectionRange(1, 1); } catch(e) {}
+    }, 0);
+  }
+}
 
+// Tasa input: muestra 2,54% con sufijo % siempre visible
 function onTasaInput() {
   tasaManualmenteEditada = true;
+  const el = document.getElementById('inTasa');
+  const pos = el.selectionStart;
+  const raw = el.value.replace(/%/g, '');   // quita todos los %
+  el.value = raw ? raw + '%' : '';
+  // Deja cursor justo antes del %
+  const newPos = Math.min(pos, raw.length);
+  try { el.setSelectionRange(newPos, newPos); } catch(e) {}
   recalcular();
+}
+// Click/foco en tasa: mueve cursor antes del %
+function onTasaFocus() {
+  const el = document.getElementById('inTasa');
+  const val = el.value;
+  if (val.endsWith('%')) {
+    const pos = val.length - 1;
+    setTimeout(() => { try { el.setSelectionRange(pos, pos); } catch(e) {} }, 0);
+  }
 }
 
 /* ═══════════════════════════════════════════════════════════════════════════
