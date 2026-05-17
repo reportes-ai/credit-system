@@ -161,7 +161,7 @@
     <span class="sep">›</span>
     <span class="current">Cotizaciones</span>
   </span>
-  <span class="version-badge">v2.9</span>
+  <span class="version-badge">v3.0</span>
   <span class="user-info" id="userInfo"></span>
   <button class="btn-logout" onclick="logout()"><i class="bi bi-box-arrow-right"></i> Salir</button>
 </nav>
@@ -297,6 +297,10 @@
               <div class="form-check">
                 <input class="form-check-input" type="checkbox" id="chkCesa" checked onchange="recalcular()">
                 <label class="form-check-label form-label mb-0" for="chkCesa">Cesantía</label>
+              </div>
+              <div class="form-check">
+                <input class="form-check-input" type="checkbox" id="chkRep" checked onchange="recalcular()">
+                <label class="form-check-label form-label mb-0" for="chkRep">Rep. Menores</label>
               </div>
             </div>
             <div style="font-size:.78rem;color:#9ca3af">Los montos se calculan automáticamente según plazo</div>
@@ -742,7 +746,7 @@ function readInputs() {
     admin:         params.gastos_admin || 0,
     inscripcion:   params.inscripcion || 0,
     gps:           params.gps_24meses || 0,
-    reparaciones:  params.reparaciones_menores || 0,
+    reparaciones:  document.getElementById('chkRep').checked ? (params.reparaciones_menores || 0) : 0,
     bono:          parsePeso(document.getElementById('inBonoFin').value),
     chkD:          document.getElementById('chkDesg').checked,
     chkR:          document.getElementById('chkRdh').checked,
@@ -976,6 +980,7 @@ function limpiar() {
   document.getElementById('chkDesg').checked = true;
   document.getElementById('chkRdh').checked  = true;
   document.getElementById('chkCesa').checked = true;
+  document.getElementById('chkRep').checked  = true;
   document.getElementById('inSaldoPrecio').value = '—';
 
   // Reset tasa y fecha
