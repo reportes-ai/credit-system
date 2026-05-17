@@ -245,32 +245,30 @@
     </div>
 
     <!-- ═══════════════════════════════════════════════════════════════════
-         TABLA 2 — FACTORES CALCULADOS (combinaciones)
+         TABLA 2 — TABLA COMPLETA DEL ASEGURADOR (referencia)
     ═══════════════════════════════════════════════════════════════════════ -->
     <div class="card">
       <div class="card-header-custom">
         <div class="card-header-left">
-          <i class="bi bi-calculator"></i>
-          Factores Combinados Calculados
+          <i class="bi bi-table"></i>
+          Tabla Completa del Asegurador — Todas las Combinaciones (referencia)
         </div>
         <span style="font-size:.72rem;color:#6b7280;font-weight:400;text-transform:none;letter-spacing:0">
-          Se calculan automáticamente de las tasas individuales usando probabilidad compuesta
+          Valores entregados por la compañía aseguradora · Factor × Sub-Total Sin Seguros = Monto del seguro
         </span>
       </div>
       <div class="card-body">
-        <div class="formula-box">
-          <div class="formula-title"><i class="bi bi-function me-1"></i>Fórmula de Probabilidad Compuesta</div>
-          <div>
-            <code>P(A+B) = 1 − (1−A) × (1−B)</code>
-            &nbsp;&nbsp;|&nbsp;&nbsp;
-            <code>P(A+B+C) = 1 − (1−A) × (1−B) × (1−C)</code>
-          </div>
+        <div class="note-box">
+          <i class="bi bi-info-circle-fill"></i>
+          <span>Los factores de las combinaciones (<strong>DESG+RDH</strong>, <strong>DESG+CESA</strong>, etc.) son valores actuariales
+          entregados directamente por la aseguradora. <strong>No se derivan de los individuales</strong> — reflejan descuentos por paquete.
+          Los factores individuales editables (Tabla 1) se usan para distribuir proporcionalmente el monto total de cada combo.</span>
         </div>
         <div class="table-responsive">
           <table class="calc-table">
             <thead>
               <tr>
-                <th class="th-plazo">Plazo</th>
+                <th class="th-plazo">Plazo<br><span style="font-weight:400;font-size:.7rem;opacity:.8">(bracket)</span></th>
                 <th class="th-d">DESG</th>
                 <th class="th-r">RDH</th>
                 <th class="th-c">CESANTÍA</th>
@@ -282,6 +280,15 @@
             </thead>
             <tbody id="calcTableBody"></tbody>
           </table>
+        </div>
+        <div class="formula-box" style="margin-top:0;border-radius:0 0 12px 12px;border-top:none;background:#f8fafc;border-color:#e5e7eb">
+          <div class="formula-title" style="color:#374151"><i class="bi bi-info-circle me-1"></i>Cómo se usa en el simulador</div>
+          <div style="color:#374151">
+            1. Se toma el factor del <strong>combo seleccionado</strong> (ej. DESG+RDH+CESA = 0.136622 para 48m)<br>
+            2. <strong>Monto total seguros</strong> = factor × Sub-Total Sin Seguros<br>
+            3. Cada seguro individual = monto total × (tasa individual ÷ suma de tasas individuales seleccionadas)<br>
+            4. <strong>Ingreso por seguros</strong> = Monto DESG × Factor AMBOS del plazo
+          </div>
         </div>
       </div>
     </div>
@@ -367,20 +374,26 @@ const PLAZOS = [6, 12, 24, 36, 48, 72];
 let rates = {};     // { 6: {d, r, c}, 12: {d, r, c}, ... }
 let ratesBak = {};  // backup for cancel
 
-// Comisiones AMBOS (fijas)
+// Tabla completa del asegurador (todos los combos por bracket de plazo)
+// Fuente: tabla entregada por compañía aseguradora — NO son probabilidades compuestas
+const SEG_FULL = {
+   6: { d:0.008980, r:0.006745, c:0.036162, dr:0.015847, dc:0.045806, rc:0.043406, drc:0.053186 },
+  12: { d:0.018641, r:0.011634, c:0.037883, dr:0.030715, dc:0.057977, rc:0.050420, drc:0.071008 },
+  24: { d:0.027538, r:0.012248, c:0.042101, dr:0.040474, dc:0.072041, rc:0.055409, drc:0.086130 },
+  36: { d:0.035518, r:0.012761, c:0.047120, dr:0.049208, dc:0.086130, rc:0.061121, drc:0.101200 },
+  48: { d:0.043623, r:0.029018, c:0.052853, dr:0.075269, dc:0.101322, rc:0.085069, drc:0.136622 },
+  72: { d:0.054964, r:0.034875, c:0.058985, dr:0.093853, dc:0.120825, rc:0.098177, drc:0.164822 },
+};
+
+// Comisiones AMBOS (fijas, entregadas por aseguradora)
+// Ingreso por seguros = Monto DESG × Factor AMBOS
+// Verificación Excel: 48m DESG=$421.531 × 1.173526 = $494.678 ✓ | 24m DESG=$251.493 × 1.166801 = $293.443 ✓
 const AMBOS_DATA = [
   { label: '≤ 12 meses',  plazos: '6 – 12',  factor: 1.151630, color: '#0d9488' },
   { label: '≤ 24 meses',  plazos: '13 – 24', factor: 1.154908, color: '#0369a1' },
   { label: '≤ 36 meses',  plazos: '25 – 36', factor: 1.166801, color: '#7c3aed' },
   { label: '> 36 meses',  plazos: '37 – 72', factor: 1.173526, color: '#b45309' },
 ];
-
-/* ─── FORMULA: probabilidad compuesta ───────────────────────────────────── */
-function compP(a, b, c) {
-  // 1 - (1-a)(1-b)(1-c...)  — sólo los factores que se pasan
-  const args = [a, b, c].filter(v => v !== undefined && v !== null);
-  return 1 - args.reduce((acc, v) => acc * (1 - v), 1);
-}
 
 /* ─── RENDER TABLA 1 (Editable) ─────────────────────────────────────────── */
 function renderEditTable(editMode) {
@@ -405,25 +418,21 @@ function renderEditTable(editMode) {
   }).join('');
 }
 
-/* ─── RENDER TABLA 2 (Calculada) ────────────────────────────────────────── */
+/* ─── RENDER TABLA 2 (Referencia asegurador) ────────────────────────────── */
 function renderCalcTable() {
   const tbody = document.getElementById('calcTableBody');
   tbody.innerHTML = PLAZOS.map(pz => {
-    const r = rates[pz] || { d: 0, r: 0, c: 0 };
-    const { d, r: rv, c } = r;
-    const dr  = compP(d, rv);
-    const dc  = compP(d, c);
-    const rc  = compP(rv, c);
-    const drc = compP(d, rv, c);
+    const s = SEG_FULL[pz];
+    // Highlight individual rates (from editable table) in bold
     return `<tr>
       <td>${pz} meses</td>
-      <td class="col-d">${(d  * 100).toFixed(4)}%</td>
-      <td class="col-r">${(rv * 100).toFixed(4)}%</td>
-      <td class="col-c">${(c  * 100).toFixed(4)}%</td>
-      <td class="col-dr">${(dr  * 100).toFixed(4)}%</td>
-      <td class="col-dc">${(dc  * 100).toFixed(4)}%</td>
-      <td class="col-rc">${(rc  * 100).toFixed(4)}%</td>
-      <td class="col-drc">${(drc * 100).toFixed(4)}%</td>
+      <td class="col-d"  style="font-weight:800">${(s.d   * 100).toFixed(4)}%<br><small style="color:#9ca3af;font-weight:400">${s.d.toFixed(6)}</small></td>
+      <td class="col-r"  style="font-weight:800">${(s.r   * 100).toFixed(4)}%<br><small style="color:#9ca3af;font-weight:400">${s.r.toFixed(6)}</small></td>
+      <td class="col-c"  style="font-weight:800">${(s.c   * 100).toFixed(4)}%<br><small style="color:#9ca3af;font-weight:400">${s.c.toFixed(6)}</small></td>
+      <td class="col-dr" >${(s.dr  * 100).toFixed(4)}%<br><small style="color:#9ca3af;font-weight:400">${s.dr.toFixed(6)}</small></td>
+      <td class="col-dc" >${(s.dc  * 100).toFixed(4)}%<br><small style="color:#9ca3af;font-weight:400">${s.dc.toFixed(6)}</small></td>
+      <td class="col-rc" >${(s.rc  * 100).toFixed(4)}%<br><small style="color:#9ca3af;font-weight:400">${s.rc.toFixed(6)}</small></td>
+      <td class="col-drc">${(s.drc * 100).toFixed(4)}%<br><small style="color:#9ca3af;font-weight:400">${s.drc.toFixed(6)}</small></td>
     </tr>`;
   }).join('');
 }
@@ -479,7 +488,6 @@ function cancelEdit() {
   rates = JSON.parse(JSON.stringify(ratesBak)); // restore
   editMode = false;
   renderEditTable(false);
-  renderCalcTable();
   document.getElementById('btnEdit1').style.display   = 'flex';
   document.getElementById('btnSave1').style.display   = 'none';
   document.getElementById('btnCancel1').style.display = 'none';
@@ -487,14 +495,13 @@ function cancelEdit() {
 }
 
 function onRateChange() {
-  // Update in-memory rates from inputs and refresh calc table live
+  // Update in-memory rates from inputs (Tabla 2 is from insurer — no recalculation needed)
   PLAZOS.forEach(pz => {
     const d = parseFloat(document.getElementById(`inp_d_${pz}`)?.value) || 0;
     const r = parseFloat(document.getElementById(`inp_r_${pz}`)?.value) || 0;
     const c = parseFloat(document.getElementById(`inp_c_${pz}`)?.value) || 0;
     rates[pz] = { d, r, c };
   });
-  renderCalcTable();
 }
 
 async function saveRates() {
@@ -531,7 +538,6 @@ async function saveRates() {
 
     editMode = false;
     renderEditTable(false);
-    renderCalcTable();
     document.getElementById('btnEdit1').style.display   = 'flex';
     document.getElementById('btnSave1').style.display   = 'none';
     document.getElementById('btnCancel1').style.display = 'none';
