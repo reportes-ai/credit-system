@@ -159,6 +159,10 @@
     @keyframes slideIn { from { transform: translateX(40px); opacity: 0; } to { transform: none; opacity: 1; } }
 
     @media (max-width: 768px) { .page-content { padding: 16px; } }
+    .page-banner { background: linear-gradient(135deg, #012d70, #0141A2 50%, #009AFE); border-radius: 16px; color: #fff; padding: 28px 36px; margin-bottom: 36px; display: flex; align-items: center; gap: 20px; }
+    .page-banner > i { font-size: 3rem; opacity: 0.8; }
+    .page-banner h2 { font-weight: 700; margin: 0 0 4px; font-size: 1.4rem; }
+    .page-banner p { opacity: 0.8; margin: 0; font-size: 0.9rem; }
   </style>
 </head>
 <body>
@@ -168,7 +172,7 @@
   <div class="topnav-left">
     <div class="topnav-brand">
       <a href="/"><img src="/img/logo.png" alt="AutoFácil"></a>
-      <span class="version-badge ms-2">v2.7</span>
+      <span class="version-badge ms-2">v3.4</span>
     </div>
     <div class="breadcrumb-nav">
       <a href="/">Inicio</a><span class="sep">/</span>
@@ -191,12 +195,16 @@
 <!-- ─── PAGE CONTENT ─────────────────────────────────────────────────────── -->
 <div class="page-content">
 
-  <div class="page-header">
-    <h4><i class="bi bi-shield-check"></i> Factores de Seguro</h4>
-    <div class="fecha-actualizacion">
-      <i class="bi bi-clock-history"></i>
-      Última actualización: <strong id="fechaActualizacion">—</strong>
+  <div class="page-banner">
+    <i class="bi bi-shield-check"></i>
+    <div>
+      <h2>Factores de Seguro</h2>
+      <p>Tasas netas, factores calculados y comisiones por plazo</p>
     </div>
+  </div>
+  <div class="fecha-actualizacion" style="margin-bottom:16px;">
+    <i class="bi bi-clock-history"></i>
+    Última actualización: <strong id="fechaActualizacion">—</strong>
   </div>
 
   <!-- Loading -->

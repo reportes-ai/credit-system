@@ -53,12 +53,16 @@
     .search-col { padding: 8px 12px; border-bottom: 1px solid #f0f4f8; }
     .search-col input { border-radius: 6px; border: 1px solid #d1d5db; font-size: 0.82rem; padding: 5px 10px; width: 100%; }
     .badge-count { background: #e8eaf6; color: var(--navy); border-radius: 10px; padding: 2px 8px; font-size: 0.7rem; font-weight: 700; }
+    .page-banner { background: linear-gradient(135deg, #012d70, #0141A2 50%, #009AFE); border-radius: 16px; color: #fff; padding: 28px 36px; margin-bottom: 36px; display: flex; align-items: center; gap: 20px; }
+    .page-banner > i { font-size: 3rem; opacity: 0.8; }
+    .page-banner h2 { font-weight: 700; margin: 0 0 4px; font-size: 1.4rem; }
+    .page-banner p { opacity: 0.8; margin: 0; font-size: 0.9rem; }
   </style>
 </head>
 <body>
   <nav class="topnav">
     <div class="topnav-left">
-      <div class="topnav-brand"><a href="/"><img src="/img/logo.png" alt="AutoFácil"></a> <span class="version-badge">v3.2</span></div>
+      <div class="topnav-brand"><a href="/"><img src="/img/logo.png" alt="AutoFácil"></a> <span class="version-badge">v3.4</span></div>
       <div class="breadcrumb-nav">
         <a href="/">Inicio</a><span class="sep">/</span>
         <a href="/mantenedores/">Mantenedores</a><span class="sep">/</span>
@@ -82,8 +86,12 @@
   </div>
 
   <div class="page-content">
-    <div class="page-header">
-      <h4><i class="bi bi-geo-alt"></i> Regiones, Provincias y Comunas</h4>
+    <div class="page-banner">
+      <i class="bi bi-geo-alt"></i>
+      <div>
+        <h2>Comunas</h2>
+        <p>Gestión de regiones, provincias y comunas de Chile</p>
+      </div>
     </div>
 
     <div class="cols-grid">

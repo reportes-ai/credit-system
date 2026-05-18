@@ -55,6 +55,12 @@
     .header-card .dates { font-size: .75rem; opacity: .85; text-align: right; }
     .header-card .dates span { display: block; }
 
+    /* ── Page banner ───────────────────────────────────────────────── */
+    .page-banner { background: linear-gradient(135deg, #012d70, #0141A2 50%, #009AFE); border-radius: 16px; color: #fff; padding: 28px 36px; margin-bottom: 36px; display: flex; align-items: center; gap: 20px; }
+    .page-banner > i { font-size: 3rem; opacity: 0.8; }
+    .page-banner h2 { font-weight: 700; margin: 0 0 4px; font-size: 1.4rem; }
+    .page-banner p { opacity: 0.8; margin: 0; font-size: 0.9rem; }
+
     /* ── Search card ──────────────────────────────────────────────── */
     .search-card {
       background: #fff; border-radius: 10px;
@@ -274,7 +280,7 @@
   </div>
   <div class="user-info d-none d-sm-flex align-items-center gap-2">
     <span id="navUser"></span>
-    <span class="version-badge">v3.3</span>
+    <span class="version-badge">v3.4</span>
   </div>
   <button class="btn-logout ms-2" onclick="logout()">
     <i class="bi bi-box-arrow-right"></i> Salir
@@ -284,17 +290,12 @@
 <!-- ── Page ───────────────────────────────────────────────────────── -->
 <div class="page-wrap">
 
-  <!-- Header card -->
-  <div class="header-card" id="headerCard">
+  <!-- Page banner -->
+  <div class="page-banner">
+    <i class="bi bi-person-badge"></i>
     <div>
-      <h4><i class="bi bi-people-fill me-2"></i>ADMINISTRACIÓN CLIENTE</h4>
-      <div style="font-size:.82rem;opacity:.8;margin-top:4px;">
-        Consulta, crea y edita registros de clientes
-      </div>
-    </div>
-    <div class="dates" id="headerDates" style="display:none;">
-      <span id="hFechaCreacion"></span>
-      <span id="hFechaActualizacion"></span>
+      <h2>Clientes</h2>
+      <p>Búsqueda y gestión de clientes</p>
     </div>
   </div>
 

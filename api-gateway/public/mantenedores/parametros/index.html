@@ -58,6 +58,10 @@
     .toast-item.error   i.ti { color: #ef4444; }
     .toast-item span { flex: 1; font-size: .85rem; font-weight: 600; color: #1f2937; }
     @keyframes slideIn { from { transform: translateX(40px); opacity: 0; } to { transform: none; opacity: 1; } }
+    .page-banner { background: linear-gradient(135deg, #012d70, #0141A2 50%, #009AFE); border-radius: 16px; color: #fff; padding: 28px 36px; margin-bottom: 36px; display: flex; align-items: center; gap: 20px; }
+    .page-banner > i { font-size: 3rem; opacity: 0.8; }
+    .page-banner h2 { font-weight: 700; margin: 0 0 4px; font-size: 1.4rem; }
+    .page-banner p { opacity: 0.8; margin: 0; font-size: 0.9rem; }
     .loading-overlay { display: flex; align-items: center; gap: 10px; color: #6b7280; font-size: 0.85rem; padding: 40px 0; }
     .spinner-sm { width: 18px; height: 18px; border: 2px solid #d1d5db; border-top-color: var(--navy); border-radius: 50%; animation: spin .7s linear infinite; flex-shrink: 0; }
     @keyframes spin { to { transform: rotate(360deg); } }
@@ -69,7 +73,7 @@
   <div class="topnav-left">
     <div class="topnav-brand">
       <a href="/"><img src="/img/logo.png" alt="AutoFácil"></a>
-      <span class="version-badge ms-2">v2.9</span>
+      <span class="version-badge ms-2">v3.4</span>
     </div>
     <div class="breadcrumb-nav">
       <a href="/">Inicio</a><span class="sep">/</span>
@@ -89,8 +93,12 @@
 <div class="toast-container" id="toastContainer"></div>
 
 <div class="page-content">
-  <div class="page-header">
-    <h4><i class="bi bi-sliders"></i> Parámetros de Crédito</h4>
+  <div class="page-banner">
+    <i class="bi bi-sliders"></i>
+    <div>
+      <h2>Parámetros de Crédito</h2>
+      <p>Gastos operacionales fijos del crédito</p>
+    </div>
   </div>
 
   <div id="loadingState" class="loading-overlay">

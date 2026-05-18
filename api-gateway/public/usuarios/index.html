@@ -101,6 +101,12 @@
     .nueva-clave-box .clave { font-size: 1.5rem; font-weight: 700; font-family: monospace; color: #1a237e; letter-spacing: 2px; margin: 8px 0; }
 
     @media (max-width: 640px) { .page-content { padding: 16px; } .perfil-selector { grid-template-columns: 1fr; } }
+
+    /* PAGE BANNER */
+    .page-banner { background: linear-gradient(135deg, #012d70, #0141A2 50%, #009AFE); border-radius: 16px; color: #fff; padding: 28px 36px; margin-bottom: 36px; display: flex; align-items: center; gap: 20px; }
+    .page-banner > i { font-size: 3rem; opacity: 0.8; }
+    .page-banner h2 { font-weight: 700; margin: 0 0 4px; font-size: 1.4rem; }
+    .page-banner p { opacity: 0.8; margin: 0; font-size: 0.9rem; }
   </style>
 </head>
 <body>
@@ -109,7 +115,7 @@
   <nav class="topnav">
     <div class="topnav-brand">
       <a href="/"><img src="/img/logo.png" alt="AutoFácil" style="height:32px;filter:brightness(0) invert(1);"></a>
-      <span class="version-badge">v3.2</span>
+      <span class="version-badge">v3.4</span>
       <span class="sep">/</span>
       <i class="bi bi-people-fill" style="color:#7dd3fc"></i> Usuarios
     </div>
@@ -134,8 +140,12 @@
 
   <!-- PAGE -->
   <div class="page-content">
-    <div class="page-header">
-      <h4><i class="bi bi-people-fill"></i> Gestión de Usuarios</h4>
+    <div class="page-banner">
+      <i class="bi bi-people-fill"></i>
+      <div>
+        <h2>Gestión de Usuarios</h2>
+        <p>Administración de usuarios, perfiles y permisos del sistema</p>
+      </div>
     </div>
 
     <!-- TABS -->

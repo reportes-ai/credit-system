@@ -149,6 +149,12 @@
     @keyframes slideIn { from { transform: translateX(40px); opacity: 0; } to { transform: none; opacity: 1; } }
 
     @media (max-width: 768px) { .page-wrap { padding: 0 12px 40px; } .info-bar { gap: 12px; } .info-bar .info-sep { display: none; } }
+
+    /* ── Page banner ─────────────────────────────────────────────────── */
+    .page-banner { background: linear-gradient(135deg, #012d70, #0141A2 50%, #009AFE); border-radius: 16px; color: #fff; padding: 28px 36px; margin-bottom: 36px; display: flex; align-items: center; gap: 20px; }
+    .page-banner > i { font-size: 3rem; opacity: 0.8; }
+    .page-banner h2 { font-weight: 700; margin: 0 0 4px; font-size: 1.4rem; }
+    .page-banner p { opacity: 0.8; margin: 0; font-size: 0.9rem; }
   </style>
 </head>
 <body>
@@ -161,7 +167,7 @@
     <span class="sep">›</span>
     <span class="current">Cotizaciones</span>
   </span>
-  <span class="version-badge">v3.3</span>
+  <span class="version-badge">v3.4</span>
   <span class="user-info" id="userInfo"></span>
   <button class="btn-logout" onclick="logout()"><i class="bi bi-box-arrow-right"></i> Salir</button>
 </nav>
@@ -171,6 +177,15 @@
 
 <!-- ─── PAGE WRAP ─────────────────────────────────────────────────────────── -->
 <div class="page-wrap">
+
+  <!-- Page banner -->
+  <div class="page-banner">
+    <i class="bi bi-calculator"></i>
+    <div>
+      <h2>Cotizaciones</h2>
+      <p>Simulador de crédito automotriz</p>
+    </div>
+  </div>
 
   <!-- Info bar -->
   <div class="info-bar">

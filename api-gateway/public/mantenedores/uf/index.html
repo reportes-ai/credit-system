@@ -53,12 +53,16 @@
     .toast-container { position: fixed; top: 70px; right: 20px; z-index: 9999; }
     .import-info { background: #f0f9ff; border: 1px solid #bae6fd; border-radius: 8px; padding: 12px 16px; font-size: 0.84rem; color: #0369a1; margin-bottom: 12px; }
     .import-info strong { display: block; margin-bottom: 4px; }
+    .page-banner { background: linear-gradient(135deg, #012d70, #0141A2 50%, #009AFE); border-radius: 16px; color: #fff; padding: 28px 36px; margin-bottom: 36px; display: flex; align-items: center; gap: 20px; }
+    .page-banner > i { font-size: 3rem; opacity: 0.8; }
+    .page-banner h2 { font-weight: 700; margin: 0 0 4px; font-size: 1.4rem; }
+    .page-banner p { opacity: 0.8; margin: 0; font-size: 0.9rem; }
   </style>
 </head>
 <body>
   <nav class="topnav">
     <div class="topnav-left">
-      <div class="topnav-brand"><a href="/"><img src="/img/logo.png" alt="AutoFácil"></a> <span class="version-badge">v3.2</span></div>
+      <div class="topnav-brand"><a href="/"><img src="/img/logo.png" alt="AutoFácil"></a> <span class="version-badge">v3.4</span></div>
       <div class="breadcrumb-nav">
         <a href="/">Inicio</a><span class="sep">/</span>
         <a href="/mantenedores/">Mantenedores</a><span class="sep">/</span>
@@ -82,16 +86,20 @@
   </div>
 
   <div class="page-content">
-    <div class="page-header">
-      <h4><i class="bi bi-currency-dollar"></i> Valores UF</h4>
-      <div class="d-flex gap-2">
-        <button class="btn btn-success btn-sm" onclick="document.getElementById('csvInput').click()">
-          <i class="bi bi-upload me-1"></i>Importar CSV
-        </button>
-        <button class="btn btn-primary btn-sm" onclick="abrirModal()">
-          <i class="bi bi-plus-lg me-1"></i>Ingresar UF
-        </button>
+    <div class="page-banner">
+      <i class="bi bi-currency-dollar"></i>
+      <div>
+        <h2>Valores UF</h2>
+        <p>Registro y consulta del valor de la Unidad de Fomento</p>
       </div>
+    </div>
+    <div style="display:flex;justify-content:flex-end;gap:8px;margin-bottom:16px;">
+      <button class="btn btn-success btn-sm" onclick="document.getElementById('csvInput').click()">
+        <i class="bi bi-upload me-1"></i>Importar CSV
+      </button>
+      <button class="btn btn-primary btn-sm" onclick="abrirModal()">
+        <i class="bi bi-plus-lg me-1"></i>Ingresar UF
+      </button>
       <input type="file" id="csvInput" accept=".csv" style="display:none" onchange="procesarCSV(this)">
     </div>
 
