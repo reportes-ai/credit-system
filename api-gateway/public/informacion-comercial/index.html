@@ -1,0 +1,443 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Información Comercial — AutoFácil</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.0/font/bootstrap-icons.css" rel="stylesheet">
+  <style>
+    :root { --navy:#001345; --blue:#0141A2; --sky:#009AFE; }
+    body { background:#f0f4f8; font-family:'Segoe UI',system-ui,sans-serif; }
+
+    .topnav {
+      background:linear-gradient(90deg,var(--navy) 0%,var(--blue) 100%);
+      height:56px; display:flex; align-items:center;
+      padding:0 20px; gap:14px; position:sticky; top:0; z-index:100;
+      box-shadow:0 2px 8px rgba(0,0,0,.35);
+    }
+    .topnav img.logo { height:36px; }
+    .topnav .breadcrumb-nav { color:rgba(255,255,255,.7); font-size:.82rem; flex:1; }
+    .topnav .breadcrumb-nav a { color:rgba(255,255,255,.7); text-decoration:none; }
+    .topnav .breadcrumb-nav a:hover { color:#fff; }
+    .topnav .breadcrumb-nav .sep { margin:0 6px; }
+    .topnav .breadcrumb-nav .current { color:#fff; font-weight:600; }
+    .topnav .user-info { color:rgba(255,255,255,.85); font-size:.82rem; }
+    .version-badge {
+      background:rgba(255,255,255,.15); color:#fff;
+      font-size:.7rem; font-weight:700; padding:2px 8px;
+      border-radius:20px; border:1px solid rgba(255,255,255,.3);
+    }
+    .btn-logout {
+      background:rgba(255,255,255,.12); color:#fff;
+      border:1px solid rgba(255,255,255,.25); border-radius:6px;
+      padding:5px 12px; font-size:.8rem; cursor:pointer;
+    }
+    .btn-logout:hover { background:rgba(255,255,255,.22); }
+
+    .page-wrap { max-width:1100px; margin:20px auto; padding:0 24px 60px; }
+
+    /* Cliente banner */
+    .cliente-banner {
+      background:linear-gradient(135deg,var(--navy),var(--blue));
+      border-radius:12px; padding:16px 24px; margin-bottom:18px;
+      display:flex; align-items:center; justify-content:space-between; color:#fff;
+      flex-wrap:wrap; gap:10px;
+    }
+    .cliente-banner .nombre { font-weight:700; font-size:1.05rem; }
+    .cliente-banner .rut    { font-size:.9rem; opacity:.85; }
+    .nav-btns { display:flex; gap:8px; flex-wrap:wrap; }
+    .btn-nav {
+      background:rgba(255,255,255,.15); color:#fff;
+      border:1px solid rgba(255,255,255,.35); border-radius:8px;
+      padding:7px 16px; font-size:.83rem; font-weight:600; cursor:pointer;
+      transition:background .15s; text-decoration:none; display:inline-flex; align-items:center; gap:6px;
+    }
+    .btn-nav:hover { background:rgba(255,255,255,.28); color:#fff; }
+    .btn-nav.active { background:#fff; color:#059669; }
+
+    /* Form card */
+    .form-card {
+      background:#fff; border-radius:12px;
+      padding:22px 26px; margin-bottom:18px;
+      box-shadow:0 1px 6px rgba(0,0,0,.08);
+    }
+    .section-label {
+      font-size:.78rem; font-weight:700; color:#059669;
+      text-transform:uppercase; letter-spacing:.08em;
+      margin-bottom:14px; display:flex; align-items:center; gap:6px;
+    }
+    .section-divider { border-color:#e5e7eb; margin:18px 0; }
+    .form-label { font-size:.8rem; font-weight:600; color:#374151; margin-bottom:4px; }
+    .form-control, .form-select {
+      border-radius:7px; border:1.5px solid #d1d5db;
+      font-size:.88rem; padding:7px 10px;
+    }
+    .form-control:focus, .form-select:focus {
+      border-color:#059669; box-shadow:0 0 0 3px rgba(5,150,105,.1); outline:none;
+    }
+    .form-control:read-only { background:#f9fafb; }
+
+    /* Tabla deudas */
+    .deuda-table { width:100%; border-collapse:collapse; }
+    .deuda-table th {
+      font-size:.75rem; font-weight:700; color:#6b7280;
+      text-transform:uppercase; letter-spacing:.06em;
+      padding:8px 10px; border-bottom:2px solid #e5e7eb;
+      background:#f9fafb; text-align:left;
+    }
+    .deuda-table td { padding:6px 8px; border-bottom:1px solid #f3f4f6; vertical-align:middle; }
+    .deuda-table tr:hover td { background:#f9fafb; }
+    .deuda-table .row-label { font-size:.85rem; font-weight:600; color:#374151; white-space:nowrap; }
+    .deuda-table input.form-control { padding:5px 8px; }
+    .th-carga { background:#eff6ff; color:var(--blue); font-weight:700; }
+    .carga-cell input { background:#eff6ff; border-color:#93c5fd; }
+
+    /* Total carga */
+    .total-carga {
+      background:linear-gradient(135deg,#ecfdf5,#d1fae5);
+      border:2px solid #6ee7b7; border-radius:10px;
+      padding:14px 22px; display:flex; align-items:center; justify-content:space-between;
+    }
+    .total-carga .label { font-size:.85rem; font-weight:700; color:#065f46; text-transform:uppercase; letter-spacing:.06em; }
+    .total-carga .value { font-size:1.4rem; font-weight:900; color:#047857; }
+
+    /* Protestos card */
+    .protestos-card { background:#fef3c7; border:1.5px solid #fcd34d; border-radius:10px; padding:14px 18px; }
+
+    /* Checkbox */
+    .check-label { display:flex; align-items:center; gap:8px; cursor:pointer; font-weight:600; color:#374151; font-size:.9rem; }
+    .check-label input { width:18px; height:18px; cursor:pointer; accent-color:#059669; }
+
+    /* Botones */
+    .btn-guardar {
+      background:linear-gradient(135deg,#059669,#10b981);
+      color:#fff; border:none; border-radius:8px;
+      padding:10px 28px; font-weight:700; font-size:.92rem; cursor:pointer;
+    }
+    .btn-guardar:hover { opacity:.9; }
+    .btn-cancelar {
+      background:#fff; color:#6b7280;
+      border:1.5px solid #d1d5db; border-radius:8px;
+      padding:10px 22px; font-weight:600; font-size:.9rem; cursor:pointer;
+    }
+    .btn-cancelar:hover { background:#f9fafb; }
+
+    /* Toast */
+    .toast-msg {
+      position:fixed; top:68px; right:20px; z-index:9999;
+      border-radius:10px; padding:14px 20px;
+      font-weight:600; font-size:.9rem; color:#fff;
+      box-shadow:0 8px 24px rgba(0,0,0,.18);
+      animation:slideIn .25s ease; display:none;
+    }
+    @keyframes slideIn { from { transform:translateX(60px); opacity:0; } to { transform:translateX(0); opacity:1; } }
+    .toast-ok  { background:#059669; }
+    .toast-err { background:#dc2626; }
+  </style>
+</head>
+<body>
+
+<!-- ── Top nav ──────────────────────────────────────────────────── -->
+<nav class="topnav">
+  <img src="/img/logo-white.png" class="logo" onerror="this.style.display='none'">
+  <div class="breadcrumb-nav">
+    <a href="/clientes">Clientes</a>
+    <span class="sep">›</span>
+    <span class="current">Información Comercial</span>
+  </div>
+  <span class="version-badge">v1.0</span>
+  <span class="user-info" id="userLabel"></span>
+  <button class="btn-logout" onclick="logout()"><i class="bi bi-box-arrow-right"></i></button>
+</nav>
+
+<div class="page-wrap">
+
+  <!-- ── Banner cliente ──────────────────────────────────────────── -->
+  <div class="cliente-banner">
+    <div>
+      <div class="nombre" id="clienteNombre">Cargando…</div>
+      <div class="rut"    id="clienteRut"></div>
+    </div>
+    <div class="nav-btns">
+      <a class="btn-nav" id="btnGoAntLab" href="#"><i class="bi bi-briefcase"></i>Ant. Laborales</a>
+      <a class="btn-nav active" href="#"><i class="bi bi-bank"></i>Inf. Comercial</a>
+      <a class="btn-nav" href="/clientes"><i class="bi bi-person"></i>Datos Personales</a>
+    </div>
+  </div>
+
+  <!-- ── Protestos ────────────────────────────────────────────────── -->
+  <div class="form-card">
+    <div class="section-label"><i class="bi bi-exclamation-triangle-fill me-1"></i>Protestos</div>
+    <div class="protestos-card">
+      <div class="row g-3">
+        <div class="col-md-4">
+          <label class="form-label">Monto Protestos $</label>
+          <input type="number" id="fMontoProtestos" class="form-control" min="0" placeholder="0">
+        </div>
+        <div class="col-md-4">
+          <label class="form-label">Protestos Vigentes (cantidad)</label>
+          <input type="number" id="fProtestosVigentesQ" class="form-control" min="0" placeholder="0">
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── Deudas ────────────────────────────────────────────────────── -->
+  <div class="form-card">
+    <div class="section-label"><i class="bi bi-bank2 me-1"></i>Deudas en el sistema financiero</div>
+
+    <div class="table-responsive">
+      <table class="deuda-table">
+        <thead>
+          <tr>
+            <th style="width:200px">Tipo de Deuda</th>
+            <th>Monto $</th>
+            <th>Nº Instituciones</th>
+            <th class="th-carga">Carga Mensual $</th>
+          </tr>
+        </thead>
+        <tbody>
+          <!-- Deuda Vigente Total -->
+          <tr>
+            <td class="row-label">Deuda Vigente Total</td>
+            <td><input type="number" id="fDeudaVigenteTotal" class="form-control" min="0" placeholder="0"></td>
+            <td><input type="number" id="fDeudaVigenteInst"  class="form-control" min="0" placeholder="0"></td>
+            <td class="carga-cell"><input type="number" id="fDeudaVigenteCarga" class="form-control" placeholder="—" readonly tabindex="-1"></td>
+          </tr>
+          <!-- Deuda Hipotecaria -->
+          <tr>
+            <td class="row-label">Deuda Hipotecaria</td>
+            <td><input type="number" id="fDeudaHipotecaria"     class="form-control" min="0" placeholder="0"></td>
+            <td><input type="number" id="fDeudaHipotecariaInst" class="form-control" min="0" placeholder="0"></td>
+            <td class="carga-cell"><input type="number" id="fDeudaHipotecariaCarga" class="form-control" min="0" placeholder="0" oninput="calcTotal()"></td>
+          </tr>
+          <!-- Deuda Comercial -->
+          <tr>
+            <td class="row-label">Deuda Comercial</td>
+            <td><input type="number" id="fDeudaComercial"     class="form-control" min="0" placeholder="0"></td>
+            <td><input type="number" id="fDeudaComercialInst" class="form-control" min="0" placeholder="0"></td>
+            <td class="carga-cell"><input type="number" id="fDeudaComercialCarga" class="form-control" min="0" placeholder="0" oninput="calcTotal()"></td>
+          </tr>
+          <!-- Deuda Consumo -->
+          <tr>
+            <td class="row-label">Deuda Consumo</td>
+            <td><input type="number" id="fDeudaConsumo"     class="form-control" min="0" placeholder="0"></td>
+            <td><input type="number" id="fDeudaConsumoInst" class="form-control" min="0" placeholder="0"></td>
+            <td class="carga-cell"><input type="number" id="fDeudaConsumoCarga" class="form-control" min="0" placeholder="0" oninput="calcTotal()"></td>
+          </tr>
+          <!-- Deuda Morosa -->
+          <tr>
+            <td class="row-label">Deuda Morosa</td>
+            <td><input type="number" id="fDeudaMorosa"     class="form-control" min="0" placeholder="0"></td>
+            <td><input type="number" id="fDeudaMorosaInst" class="form-control" min="0" placeholder="0"></td>
+            <td class="carga-cell"><input type="text" class="form-control" value="—" readonly tabindex="-1"></td>
+          </tr>
+          <!-- Deuda Vencida -->
+          <tr>
+            <td class="row-label">Deuda Vencida</td>
+            <td><input type="number" id="fDeudaVencida"     class="form-control" min="0" placeholder="0"></td>
+            <td><input type="number" id="fDeudaVencidaInst" class="form-control" min="0" placeholder="0"></td>
+            <td class="carga-cell"><input type="text" class="form-control" value="—" readonly tabindex="-1"></td>
+          </tr>
+          <!-- Deuda Castigada -->
+          <tr>
+            <td class="row-label">Deuda Castigada</td>
+            <td><input type="number" id="fDeudaCastigada"     class="form-control" min="0" placeholder="0"></td>
+            <td><input type="number" id="fDeudaCastigadaInst" class="form-control" min="0" placeholder="0"></td>
+            <td class="carga-cell"><input type="text" class="form-control" value="—" readonly tabindex="-1"></td>
+          </tr>
+          <!-- Línea Disponible -->
+          <tr>
+            <td class="row-label">Línea Disponible</td>
+            <td><input type="number" id="fLineaDisponible"     class="form-control" min="0" placeholder="0"></td>
+            <td><input type="number" id="fLineaDisponibleInst" class="form-control" min="0" placeholder="0"></td>
+            <td class="carga-cell"><input type="text" class="form-control" value="—" readonly tabindex="-1"></td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <hr class="section-divider">
+
+    <!-- Arriendo + Propiedad -->
+    <div class="row g-3 align-items-end">
+      <div class="col-md-4">
+        <label class="form-label">Arriendo (20% Ingreso) $</label>
+        <input type="number" id="fArriendo" class="form-control" min="0" placeholder="0" oninput="calcTotal()">
+      </div>
+      <div class="col-md-4 d-flex align-items-center" style="padding-bottom:2px">
+        <label class="check-label">
+          <input type="checkbox" id="fAcreditaPropiedad">
+          Acredita Propiedad Habitación
+        </label>
+      </div>
+    </div>
+
+    <hr class="section-divider">
+
+    <!-- Total carga mensual -->
+    <div class="total-carga">
+      <div class="label"><i class="bi bi-calculator me-2"></i>Carga Mensual Total</div>
+      <div class="value" id="totalCarga">$0</div>
+    </div>
+  </div>
+
+  <!-- ── Botones ──────────────────────────────────────────────────── -->
+  <div class="d-flex gap-2 justify-content-end">
+    <button class="btn-cancelar" onclick="window.location.href='/clientes'">
+      <i class="bi bi-arrow-left me-1"></i>Volver
+    </button>
+    <button class="btn-guardar" onclick="guardar()">
+      <i class="bi bi-floppy me-1"></i>Guardar
+    </button>
+  </div>
+
+</div>
+
+<!-- Toast -->
+<div class="toast-msg toast-ok"  id="toastOk"></div>
+<div class="toast-msg toast-err" id="toastErr"></div>
+
+<script>
+/* ─── Auth ─────────────────────────────────────────────────────────── */
+const TOKEN_KEY = 'af_token';
+function getToken() { return localStorage.getItem(TOKEN_KEY); }
+function apiHeaders() { return { 'Content-Type':'application/json', 'Authorization':'Bearer '+getToken() }; }
+function logout() { localStorage.removeItem(TOKEN_KEY); location.href='/login.html'; }
+
+(function checkAuth() {
+  const t = getToken();
+  if (!t) { location.href='/login.html'; return; }
+  try {
+    const p = JSON.parse(atob(t.split('.')[1]));
+    document.getElementById('userLabel').textContent = (p.nombre||'') + ' ' + (p.apellido||'');
+    if (p.exp * 1000 < Date.now()) logout();
+  } catch(e) { logout(); }
+})();
+
+/* ─── URL params ─────────────────────────────────────────────────── */
+const params = new URLSearchParams(location.search);
+const RUT    = (params.get('rut') || '').toUpperCase().trim();
+
+document.getElementById('btnGoAntLab').href = '/antecedentes-laborales?rut=' + encodeURIComponent(RUT);
+
+if (!RUT) {
+  document.getElementById('clienteNombre').textContent = 'RUT no especificado';
+} else {
+  document.getElementById('clienteRut').textContent = RUT;
+  cargarCliente();
+  cargarDatos();
+}
+
+/* ─── Utils ──────────────────────────────────────────────────────── */
+function fmtPesos(v) { return '$' + Math.round(v||0).toLocaleString('es-CL'); }
+function showToast(msg, ok) {
+  const el = document.getElementById(ok ? 'toastOk' : 'toastErr');
+  el.textContent = msg; el.style.display = 'block';
+  setTimeout(() => el.style.display = 'none', 3200);
+}
+
+/* ─── Cargar datos del cliente ──────────────────────────────────── */
+async function cargarCliente() {
+  try {
+    const r = await fetch('/api/clientes/rut/' + encodeURIComponent(RUT), { headers: apiHeaders() });
+    const j = await r.json();
+    if (j.success && j.data) {
+      const c = j.data;
+      const nombre = [c.nombres, c.apellido_paterno, c.apellido_materno].filter(Boolean).join(' ')
+                  || c.razon_social || RUT;
+      document.getElementById('clienteNombre').textContent = nombre;
+    } else {
+      document.getElementById('clienteNombre').textContent = RUT;
+    }
+  } catch(e) {
+    document.getElementById('clienteNombre').textContent = RUT;
+  }
+}
+
+/* ─── Calcular total carga mensual ──────────────────────────────── */
+function calcTotal() {
+  const n = id => parseFloat(document.getElementById(id)?.value) || 0;
+  const total = n('fDeudaHipotecariaCarga') + n('fDeudaComercialCarga') +
+                n('fDeudaConsumoCarga')     + n('fArriendo');
+  document.getElementById('totalCarga').textContent = fmtPesos(total);
+}
+
+/* ─── Cargar datos guardados ────────────────────────────────────── */
+async function cargarDatos() {
+  try {
+    const r = await fetch('/api/informacion-comercial/' + encodeURIComponent(RUT), { headers: apiHeaders() });
+    const j = await r.json();
+    if (!j.success || !j.data) return;
+    const d = j.data;
+    const s = (id, v) => { const el = document.getElementById(id); if(el && v!=null) el.value = v; };
+    s('fMontoProtestos',       d.monto_protestos);
+    s('fProtestosVigentesQ',   d.protestos_vigentes_q);
+    s('fDeudaVigenteTotal',    d.deuda_vigente_total);
+    s('fDeudaVigenteInst',     d.deuda_vigente_inst);
+    s('fDeudaHipotecaria',     d.deuda_hipotecaria);
+    s('fDeudaHipotecariaInst', d.deuda_hipotecaria_inst);
+    s('fDeudaHipotecariaCarga',d.deuda_hipotecaria_carga);
+    s('fDeudaComercial',       d.deuda_comercial);
+    s('fDeudaComercialInst',   d.deuda_comercial_inst);
+    s('fDeudaComercialCarga',  d.deuda_comercial_carga);
+    s('fDeudaConsumo',         d.deuda_consumo);
+    s('fDeudaConsumoInst',     d.deuda_consumo_inst);
+    s('fDeudaConsumoCarga',    d.deuda_consumo_carga);
+    s('fDeudaMorosa',          d.deuda_morosa);
+    s('fDeudaMorosaInst',      d.deuda_morosa_inst);
+    s('fDeudaVencida',         d.deuda_vencida);
+    s('fDeudaVencidaInst',     d.deuda_vencida_inst);
+    s('fDeudaCastigada',       d.deuda_castigada);
+    s('fDeudaCastigadaInst',   d.deuda_castigada_inst);
+    s('fLineaDisponible',      d.linea_disponible);
+    s('fLineaDisponibleInst',  d.linea_disponible_inst);
+    s('fArriendo',             d.arriendo);
+    document.getElementById('fAcreditaPropiedad').checked = !!d.acredita_propiedad;
+    calcTotal();
+  } catch(e) {}
+}
+
+/* ─── Guardar ─────────────────────────────────────────────────────── */
+async function guardar() {
+  const n = id => document.getElementById(id).value || null;
+  const body = {
+    monto_protestos:          n('fMontoProtestos'),
+    protestos_vigentes_q:     n('fProtestosVigentesQ'),
+    deuda_vigente_total:      n('fDeudaVigenteTotal'),
+    deuda_vigente_inst:       n('fDeudaVigenteInst'),
+    deuda_hipotecaria:        n('fDeudaHipotecaria'),
+    deuda_hipotecaria_inst:   n('fDeudaHipotecariaInst'),
+    deuda_hipotecaria_carga:  n('fDeudaHipotecariaCarga'),
+    deuda_comercial:          n('fDeudaComercial'),
+    deuda_comercial_inst:     n('fDeudaComercialInst'),
+    deuda_comercial_carga:    n('fDeudaComercialCarga'),
+    deuda_consumo:            n('fDeudaConsumo'),
+    deuda_consumo_inst:       n('fDeudaConsumoInst'),
+    deuda_consumo_carga:      n('fDeudaConsumoCarga'),
+    deuda_morosa:             n('fDeudaMorosa'),
+    deuda_morosa_inst:        n('fDeudaMorosaInst'),
+    deuda_vencida:            n('fDeudaVencida'),
+    deuda_vencida_inst:       n('fDeudaVencidaInst'),
+    deuda_castigada:          n('fDeudaCastigada'),
+    deuda_castigada_inst:     n('fDeudaCastigadaInst'),
+    linea_disponible:         n('fLineaDisponible'),
+    linea_disponible_inst:    n('fLineaDisponibleInst'),
+    arriendo:                 n('fArriendo'),
+    acredita_propiedad:       document.getElementById('fAcreditaPropiedad').checked,
+  };
+  try {
+    const r = await fetch('/api/informacion-comercial/' + encodeURIComponent(RUT), {
+      method:'PUT', headers: apiHeaders(), body: JSON.stringify(body),
+    });
+    const j = await r.json();
+    if (j.success) showToast('Guardado correctamente', true);
+    else showToast(j.error || 'Error al guardar', false);
+  } catch(e) {
+    showToast('Error de conexión', false);
+  }
+}
+</script>
+</body>
+</html>

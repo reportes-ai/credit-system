@@ -18,7 +18,9 @@ app.use('/api/perfiles', require('../../services/usuarios/src/routes/perfiles.ro
 app.use('/api/config',   require('../../services/usuarios/src/routes/config.routes'));
 
 // Clientes
-app.use('/api/clientes', require('../../services/clientes/src/routes/clientes.routes'));
+app.use('/api/clientes',               require('../../services/clientes/src/routes/clientes.routes'));
+app.use('/api/antecedentes-laborales', require('../../services/clientes/src/routes/antecedentes.routes'));
+app.use('/api/informacion-comercial',  require('../../services/clientes/src/routes/informacion-comercial.routes'));
 
 // Mantenedores
 app.use('/api/tasas',      require('../../services/mantenedores/src/routes/tasas.routes'));
@@ -56,6 +58,12 @@ app.get(['/mantenedores/factores-seguro', '/mantenedores/factores-seguro/'], (re
 
 app.get(['/clientes', '/clientes/'], (req, res) =>
   res.sendFile(path.join(__dirname, '../public/clientes/index.html')));
+
+app.get(['/antecedentes-laborales', '/antecedentes-laborales/'], (req, res) =>
+  res.sendFile(path.join(__dirname, '../public/antecedentes-laborales/index.html')));
+
+app.get(['/informacion-comercial', '/informacion-comercial/'], (req, res) =>
+  res.sendFile(path.join(__dirname, '../public/informacion-comercial/index.html')));
 
 app.get(['/cotizaciones', '/cotizaciones/'], (req, res) =>
   res.sendFile(path.join(__dirname, '../public/cotizaciones/index.html')));

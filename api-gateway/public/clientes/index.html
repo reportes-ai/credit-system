@@ -280,7 +280,7 @@
   </div>
   <div class="user-info d-none d-sm-flex align-items-center gap-2">
     <span id="navUser"></span>
-    <span class="version-badge">v4.6</span>
+    <span class="version-badge">v4.7</span>
   </div>
   <button class="btn-logout ms-2" onclick="logout()">
     <i class="bi bi-box-arrow-right"></i> Salir
@@ -334,6 +334,12 @@
         </button>
         <button class="btn-editar" style="padding:6px 14px;font-size:.82rem" id="btnEditar" onclick="activarEdicion()">
           <i class="bi bi-pencil me-1"></i>Editar
+        </button>
+        <button class="btn-editar" style="padding:6px 14px;font-size:.82rem;background:#eff6ff;color:#0141A2;border-color:#0141A2" id="btnAntLab" onclick="irAntecedentes()">
+          <i class="bi bi-briefcase me-1"></i>Ant. Laborales
+        </button>
+        <button class="btn-editar" style="padding:6px 14px;font-size:.82rem;background:#f0fdf4;color:#065f46;border-color:#059669" id="btnInfCom" onclick="irInfComercial()">
+          <i class="bi bi-bank me-1"></i>Inf. Comercial
         </button>
       </div>
     </div>
@@ -1462,6 +1468,23 @@ function buildBody(tipo) {
       rep3_ap_materno:         document.getElementById('eRep3ApMat').value.trim(),
     };
   }
+}
+
+/* ═══════════════════════════════════════════════════════════════════
+   Navegación a secciones del cliente
+═══════════════════════════════════════════════════════════════════ */
+function _getRutActual() {
+  return clienteActual?.rut || document.getElementById('inputRut').value.trim().toUpperCase();
+}
+function irAntecedentes() {
+  const rut = _getRutActual();
+  if (!rut) return showAlert('No hay cliente cargado');
+  window.location.href = '/antecedentes-laborales?rut=' + encodeURIComponent(rut);
+}
+function irInfComercial() {
+  const rut = _getRutActual();
+  if (!rut) return showAlert('No hay cliente cargado');
+  window.location.href = '/informacion-comercial?rut=' + encodeURIComponent(rut);
 }
 
 /* ═══════════════════════════════════════════════════════════════════
