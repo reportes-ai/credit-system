@@ -33,6 +33,9 @@ app.use('/api/parametros-credito', require('../../services/mantenedores/src/rout
 // Cotizaciones
 app.use('/api/cotizaciones', require('../../services/cotizaciones/src/routes/cotizaciones.routes'));
 
+// Créditos
+app.use('/api/creditos', require('../../services/creditos/src/routes/creditos.routes'));
+
 // Health check
 app.get('/health', (req, res) => res.json({ status: 'Sistema operativo', timestamp: new Date() }));
 
@@ -58,6 +61,9 @@ app.get(['/mantenedores/factores-seguro', '/mantenedores/factores-seguro/'], (re
 
 app.get(['/clientes', '/clientes/'], (req, res) =>
   res.sendFile(path.join(__dirname, '../public/clientes/index.html')));
+
+app.get(['/creditos', '/creditos/'], (req, res) =>
+  res.sendFile(path.join(__dirname, '../public/creditos/index.html')));
 
 app.get(['/antecedentes-laborales', '/antecedentes-laborales/'], (req, res) =>
   res.sendFile(path.join(__dirname, '../public/antecedentes-laborales/index.html')));

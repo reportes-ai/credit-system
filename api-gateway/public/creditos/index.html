@@ -1,0 +1,753 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Créditos — AutoFácil</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.0/font/bootstrap-icons.css" rel="stylesheet">
+  <style>
+    :root { --navy:#001345; --blue:#0141A2; --sky:#009AFE; }
+    body { background:#f0f4f8; font-family:'Segoe UI',system-ui,sans-serif; }
+
+    /* ── Topnav ── */
+    .topnav {
+      background:linear-gradient(90deg,var(--navy) 0%,var(--blue) 100%);
+      height:56px; display:flex; align-items:center;
+      padding:0 20px; gap:14px; position:sticky; top:0; z-index:100;
+      box-shadow:0 2px 8px rgba(0,0,0,.35);
+    }
+    .topnav img.logo { height:36px; }
+    .topnav .breadcrumb-nav { color:rgba(255,255,255,.7); font-size:.82rem; flex:1; }
+    .topnav .breadcrumb-nav a { color:rgba(255,255,255,.7); text-decoration:none; }
+    .topnav .breadcrumb-nav a:hover { color:#fff; }
+    .topnav .breadcrumb-nav .sep { margin:0 6px; }
+    .topnav .breadcrumb-nav .current { color:#fff; font-weight:600; }
+    .topnav .user-info { color:rgba(255,255,255,.85); font-size:.82rem; }
+    .version-badge { background:rgba(255,255,255,.15); color:#fff; font-size:.7rem; font-weight:700; padding:2px 8px; border-radius:20px; border:1px solid rgba(255,255,255,.3); }
+    .btn-logout { background:rgba(255,255,255,.12); color:#fff; border:1px solid rgba(255,255,255,.25); border-radius:6px; padding:5px 12px; font-size:.8rem; cursor:pointer; }
+    .btn-logout:hover { background:rgba(255,255,255,.22); }
+
+    /* ── Layout ── */
+    .page-wrap { max-width:1300px; margin:24px auto; padding:0 24px 60px; }
+
+    /* ── Header banner ── */
+    .page-banner {
+      background:linear-gradient(135deg,var(--navy),var(--blue) 55%,var(--sky));
+      border-radius:14px; padding:22px 30px; margin-bottom:22px;
+      color:#fff; display:flex; align-items:center; gap:18px;
+    }
+    .page-banner i.icon { font-size:2.4rem; opacity:.75; }
+    .page-banner h2 { margin:0 0 3px; font-size:1.2rem; font-weight:800; }
+    .page-banner p  { margin:0; font-size:.83rem; opacity:.8; }
+
+    /* ── Tabs ── */
+    .tab-bar {
+      display:flex; gap:0; border-radius:10px; overflow:hidden;
+      box-shadow:0 1px 4px rgba(0,0,0,.1); margin-bottom:22px;
+    }
+    .tab-btn {
+      flex:1; padding:13px 0; border:none; cursor:pointer;
+      font-size:.9rem; font-weight:700; transition:background .18s, color .18s;
+      display:flex; align-items:center; justify-content:center; gap:8px;
+      background:#fff; color:#9ca3af;
+    }
+    .tab-btn:first-child { border-radius:10px 0 0 10px; }
+    .tab-btn:last-child  { border-radius:0 10px 10px 0; }
+    .tab-btn.active { background:linear-gradient(135deg,var(--navy),var(--blue)); color:#fff; }
+    .tab-btn:not(.active):hover { background:#f0f4f8; color:var(--blue); }
+    .tab-panel { display:none; }
+    .tab-panel.active { display:block; }
+
+    /* ── Cards ── */
+    .form-card { background:#fff; border-radius:12px; padding:22px 24px; margin-bottom:16px; box-shadow:0 1px 5px rgba(0,0,0,.07); }
+    .section-label { font-size:.75rem; font-weight:800; color:var(--blue); text-transform:uppercase; letter-spacing:.08em; margin-bottom:14px; display:flex; align-items:center; gap:7px; }
+    .section-divider { border-color:#e5e7eb; margin:18px 0; }
+    .form-label { font-size:.8rem; font-weight:600; color:#374151; margin-bottom:4px; }
+    .form-control, .form-select { border-radius:7px; border:1.5px solid #d1d5db; font-size:.88rem; padding:7px 10px; }
+    .form-control:focus, .form-select:focus { border-color:var(--blue); box-shadow:0 0 0 3px rgba(1,65,162,.1); outline:none; }
+    .form-control:read-only { background:#f9fafb; }
+
+    /* ── Tabla consulta ── */
+    .search-bar { display:flex; gap:10px; margin-bottom:16px; flex-wrap:wrap; }
+    .search-bar input { flex:1; min-width:200px; }
+    .search-bar select { width:160px; }
+
+    .cred-table { width:100%; border-collapse:collapse; font-size:.82rem; }
+    .cred-table th { background:#f1f5f9; color:#374151; font-size:.73rem; font-weight:700; text-transform:uppercase; letter-spacing:.05em; padding:10px 12px; border-bottom:2px solid #e5e7eb; white-space:nowrap; }
+    .cred-table td { padding:9px 12px; border-bottom:1px solid #f0f2f5; color:#374151; }
+    .cred-table tr:last-child td { border-bottom:none; }
+    .cred-table tr:hover td { background:#f8fafd; }
+    .cred-table .num { text-align:right; font-weight:600; }
+    .cred-table .mono { font-family:monospace; font-size:.8rem; }
+
+    /* Estado badges */
+    .badge-estado { display:inline-block; border-radius:20px; padding:2px 10px; font-size:.73rem; font-weight:700; white-space:nowrap; }
+    .badge-VIGENTE   { background:#dcfce7; color:#166534; }
+    .badge-EN-MORA   { background:#fef3c7; color:#92400e; }
+    .badge-CANCELADO { background:#dbeafe; color:#1e40af; }
+    .badge-PREPAGADO { background:#ede9fe; color:#5b21b6; }
+    .badge-CASTIGADO { background:#fee2e2; color:#991b1b; }
+
+    /* Número crédito */
+    .num-cred { font-family:monospace; font-weight:700; color:var(--blue); font-size:.82rem; }
+
+    /* Detalle panel */
+    .detalle-panel {
+      position:fixed; inset:0; background:rgba(0,0,0,.5); z-index:2000;
+      display:none; align-items:center; justify-content:center; padding:16px;
+    }
+    .detalle-panel.open { display:flex; }
+    .detalle-box {
+      background:#fff; border-radius:16px; width:100%; max-width:750px;
+      max-height:92vh; display:flex; flex-direction:column;
+      box-shadow:0 12px 48px rgba(0,0,0,.28); overflow:hidden;
+    }
+    .detalle-head {
+      background:linear-gradient(135deg,var(--navy),var(--blue));
+      color:#fff; padding:18px 22px; display:flex; align-items:flex-start; gap:12px; flex-shrink:0;
+    }
+    .detalle-head .dh-info { flex:1; }
+    .detalle-head .dh-num  { font-size:.8rem; opacity:.75; margin-bottom:2px; }
+    .detalle-head .dh-nombre { font-size:1.05rem; font-weight:800; }
+    .detalle-head .dh-rut { font-size:.82rem; opacity:.8; }
+    .detalle-close { background:none; border:none; color:rgba(255,255,255,.75); font-size:1.3rem; cursor:pointer; }
+    .detalle-close:hover { color:#fff; }
+    .detalle-body { padding:0; overflow-y:auto; flex:1; }
+    .detalle-footer { padding:14px 22px; border-top:1px solid #f0f2f5; display:flex; gap:10px; justify-content:flex-end; background:#f9fafb; flex-shrink:0; }
+
+    .ds { padding:16px 22px; border-bottom:1px solid #f0f2f5; }
+    .ds:last-child { border-bottom:none; }
+    .ds-title { font-size:.7rem; font-weight:800; color:var(--blue); text-transform:uppercase; letter-spacing:.08em; margin-bottom:12px; display:flex; align-items:center; gap:6px; }
+    .ds-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(160px,1fr)); gap:10px; }
+    .ds-item .ds-label { font-size:.68rem; color:#9ca3af; font-weight:600; text-transform:uppercase; }
+    .ds-item .ds-val   { font-size:.9rem; font-weight:700; color:#111827; margin-top:1px; }
+    .ds-item .ds-val.big { font-size:1.15rem; color:var(--navy); }
+
+    /* Estado edit */
+    .estado-edit { display:flex; gap:8px; align-items:center; }
+    .estado-edit select { flex:1; }
+
+    /* Botones */
+    .btn-guardar { background:linear-gradient(135deg,var(--blue),var(--sky)); color:#fff; border:none; border-radius:8px; padding:10px 26px; font-weight:700; font-size:.92rem; cursor:pointer; }
+    .btn-guardar:hover { opacity:.9; }
+    .btn-cancelar { background:#fff; color:#6b7280; border:1.5px solid #d1d5db; border-radius:8px; padding:10px 22px; font-weight:600; font-size:.9rem; cursor:pointer; }
+    .btn-cancelar:hover { background:#f9fafb; }
+    .btn-buscar-rut { background:var(--blue); color:#fff; border:none; border-radius:7px; padding:7px 16px; font-size:.88rem; font-weight:700; cursor:pointer; white-space:nowrap; }
+    .btn-buscar-rut:hover { background:#0255c5; }
+    .btn-ver-detalle { background:none; border:1.5px solid var(--blue); border-radius:6px; color:var(--blue); font-size:.75rem; font-weight:700; padding:3px 10px; cursor:pointer; white-space:nowrap; }
+    .btn-ver-detalle:hover { background:#eff6ff; }
+
+    /* RUT found bar */
+    .rut-found { background:#f0fdf4; border:1.5px solid #6ee7b7; border-radius:8px; padding:8px 14px; font-size:.88rem; font-weight:700; color:#065f46; }
+
+    /* Toast */
+    .toast-msg { position:fixed; top:68px; right:20px; z-index:9999; border-radius:10px; padding:14px 20px; font-weight:600; font-size:.9rem; color:#fff; box-shadow:0 8px 24px rgba(0,0,0,.18); display:none; }
+    .toast-ok  { background:#059669; }
+    .toast-err { background:#dc2626; }
+
+    /* Resultado vacío */
+    .empty-state { text-align:center; padding:48px 20px; color:#9ca3af; }
+    .empty-state i { font-size:3rem; display:block; margin-bottom:12px; opacity:.4; }
+
+    /* Stats bar */
+    .stats-bar { display:flex; gap:12px; margin-bottom:18px; flex-wrap:wrap; }
+    .stat-chip { background:#fff; border-radius:10px; padding:12px 18px; flex:1; min-width:130px; box-shadow:0 1px 4px rgba(0,0,0,.07); }
+    .stat-chip .sc-label { font-size:.7rem; font-weight:700; color:#9ca3af; text-transform:uppercase; letter-spacing:.06em; }
+    .stat-chip .sc-val   { font-size:1.3rem; font-weight:900; color:var(--navy); margin-top:2px; }
+  </style>
+</head>
+<body>
+
+<!-- ── Topnav ── -->
+<nav class="topnav">
+  <img src="/img/logo-white.png" class="logo" onerror="this.style.display='none'">
+  <div class="breadcrumb-nav">
+    <a href="/">Inicio</a><span class="sep">›</span>
+    <span class="current"><i class="bi bi-credit-card-2-front me-1"></i>Créditos</span>
+  </div>
+  <span class="version-badge">v1.0</span>
+  <span class="user-info" id="userLabel"></span>
+  <button class="btn-logout" onclick="logout()"><i class="bi bi-box-arrow-right"></i></button>
+</nav>
+
+<div class="page-wrap">
+
+  <!-- Banner -->
+  <div class="page-banner">
+    <i class="bi bi-credit-card-2-front-fill icon"></i>
+    <div>
+      <h2>Gestión de Créditos</h2>
+      <p>Consulta el estado de los créditos vigentes o ingresa un nuevo crédito al sistema.</p>
+    </div>
+  </div>
+
+  <!-- Tabs -->
+  <div class="tab-bar">
+    <button class="tab-btn active" id="tabConsulta" onclick="cambiarTab('consulta')">
+      <i class="bi bi-search"></i> Consulta Créditos
+    </button>
+    <button class="tab-btn" id="tabIngreso" onclick="cambiarTab('ingreso')">
+      <i class="bi bi-plus-circle"></i> Ingreso de Créditos
+    </button>
+  </div>
+
+  <!-- ════════════════════════════════
+       TAB: CONSULTA CRÉDITOS
+  ════════════════════════════════ -->
+  <div class="tab-panel active" id="panelConsulta">
+
+    <!-- Stats -->
+    <div class="stats-bar" id="statsBar">
+      <div class="stat-chip"><div class="sc-label">Total</div><div class="sc-val" id="statTotal">—</div></div>
+      <div class="stat-chip"><div class="sc-label">Vigentes</div><div class="sc-val" id="statVigentes" style="color:#166534">—</div></div>
+      <div class="stat-chip"><div class="sc-label">En Mora</div><div class="sc-val" id="statMora" style="color:#92400e">—</div></div>
+      <div class="stat-chip"><div class="sc-label">Cancelados</div><div class="sc-val" id="statCancelados" style="color:#1e40af">—</div></div>
+    </div>
+
+    <!-- Búsqueda -->
+    <div class="form-card">
+      <div class="search-bar">
+        <input type="text" id="searchQ" class="form-control" placeholder="Buscar por RUT, nombre o N° crédito…"
+               onkeydown="if(event.key==='Enter') buscarCreditos()">
+        <select id="searchEstado" class="form-select" onchange="buscarCreditos()">
+          <option value="">Todos los estados</option>
+          <option value="VIGENTE">Vigente</option>
+          <option value="EN MORA">En Mora</option>
+          <option value="CANCELADO">Cancelado</option>
+          <option value="PREPAGADO">Prepagado</option>
+          <option value="CASTIGADO">Castigado</option>
+        </select>
+        <button class="btn-buscar-rut" onclick="buscarCreditos()">
+          <i class="bi bi-search me-1"></i>Buscar
+        </button>
+      </div>
+      <div id="resultadosConsulta">
+        <div class="empty-state">
+          <i class="bi bi-credit-card"></i>
+          Ingresa una búsqueda o deja en blanco y presiona Buscar para ver todos.
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ════════════════════════════════
+       TAB: INGRESO DE CRÉDITOS
+  ════════════════════════════════ -->
+  <div class="tab-panel" id="panelIngreso">
+
+    <!-- Sección 1: Cliente -->
+    <div class="form-card">
+      <div class="section-label"><i class="bi bi-person-fill"></i>Cliente</div>
+      <div class="row g-2">
+        <div class="col-md-3">
+          <label class="form-label">RUT Cliente *</label>
+          <div class="d-flex gap-2">
+            <input type="text" id="iRut" class="form-control" maxlength="12"
+                   placeholder="12.345.678-9" oninput="onRutInputCred(this)"
+                   onkeydown="if(event.key==='Enter') buscarClienteCred()">
+            <button class="btn-buscar-rut" onclick="buscarClienteCred()">
+              <i class="bi bi-search"></i>
+            </button>
+          </div>
+        </div>
+        <div class="col-md-5" id="campoNombreCliente">
+          <label class="form-label">Nombre Cliente *</label>
+          <input type="text" id="iNombreCliente" class="form-control" placeholder="Se autocompleta al buscar RUT" oninput="upperInputCred(this)">
+        </div>
+        <div class="col-md-4">
+          <label class="form-label">Ejecutivo</label>
+          <input type="text" id="iEjecutivo" class="form-control" readonly>
+        </div>
+      </div>
+      <div id="rutClienteFoundMsg" style="display:none;margin-top:8px"></div>
+    </div>
+
+    <!-- Sección 2: Vehículo -->
+    <div class="form-card">
+      <div class="section-label"><i class="bi bi-car-front-fill"></i>Datos del Vehículo</div>
+      <div class="row g-2">
+        <div class="col-md-3 col-lg-2">
+          <label class="form-label">Tipo Vehículo</label>
+          <select id="iTipoVehiculo" class="form-select">
+            <option value="">— Seleccione —</option>
+            <option>Automóvil</option>
+            <option>Camioneta</option>
+            <option>Camión</option>
+            <option>Furgón</option>
+            <option>Van</option>
+            <option>Moto</option>
+          </select>
+        </div>
+        <div class="col-md-3 col-lg-2">
+          <label class="form-label">Marca</label>
+          <input type="text" id="iMarca" class="form-control" placeholder="Toyota" oninput="upperInputCred(this)">
+        </div>
+        <div class="col-md-3 col-lg-3">
+          <label class="form-label">Modelo</label>
+          <input type="text" id="iModelo" class="form-control" placeholder="Corolla" oninput="upperInputCred(this)">
+        </div>
+        <div class="col-md-2 col-lg-1">
+          <label class="form-label">Año</label>
+          <input type="number" id="iAnio" class="form-control" placeholder="2023" min="1990" max="2030">
+        </div>
+        <div class="col-md-2 col-lg-2">
+          <label class="form-label">Patente</label>
+          <input type="text" id="iPatente" class="form-control" placeholder="ABCD12" oninput="upperInputCred(this)" maxlength="8">
+        </div>
+        <div class="col-md-2 col-lg-2">
+          <label class="form-label">Color</label>
+          <input type="text" id="iColor" class="form-control" placeholder="Blanco" oninput="upperInputCred(this)">
+        </div>
+        <div class="col-md-4 col-lg-3">
+          <label class="form-label">N° Motor</label>
+          <input type="text" id="iMotor" class="form-control" placeholder="ABC123456" oninput="upperInputCred(this)">
+        </div>
+        <div class="col-md-4 col-lg-4">
+          <label class="form-label">N° Chasis / VIN</label>
+          <input type="text" id="iChasis" class="form-control" placeholder="9BWZZZ377VT004251" oninput="upperInputCred(this)">
+        </div>
+        <div class="col-md-4 col-lg-3">
+          <label class="form-label">Dealer</label>
+          <input type="text" id="iDealer" class="form-control" placeholder="Nombre del dealer" oninput="upperInputCred(this)">
+        </div>
+      </div>
+    </div>
+
+    <!-- Sección 3: Condiciones del Crédito -->
+    <div class="form-card">
+      <div class="section-label"><i class="bi bi-bank2"></i>Condiciones del Crédito</div>
+      <div class="row g-2">
+        <div class="col-md-3 col-lg-2">
+          <label class="form-label">Fecha Otorgamiento</label>
+          <input type="date" id="iFechaOtorg" class="form-control">
+        </div>
+        <div class="col-md-3 col-lg-2">
+          <label class="form-label">Fecha 1ª Cuota</label>
+          <input type="date" id="iFechaPrimeraCuota" class="form-control">
+        </div>
+        <div class="col-md-3 col-lg-2">
+          <label class="form-label">Valor Vehículo $</label>
+          <input type="number" id="iValorVehiculo" class="form-control" min="0" placeholder="0" oninput="calcSaldo()">
+        </div>
+        <div class="col-md-3 col-lg-2">
+          <label class="form-label">Pie $</label>
+          <input type="number" id="iPie" class="form-control" min="0" placeholder="0" oninput="calcSaldo()">
+        </div>
+        <div class="col-md-3 col-lg-2">
+          <label class="form-label">Saldo Precio $</label>
+          <input type="number" id="iSaldoPrecio" class="form-control" readonly>
+        </div>
+        <div class="col-md-3 col-lg-2">
+          <label class="form-label">Gastos Operativos $</label>
+          <input type="number" id="iGastosOp" class="form-control" min="0" placeholder="0" oninput="calcMontoFin()">
+        </div>
+        <div class="col-md-3 col-lg-2">
+          <label class="form-label">Seguros $</label>
+          <input type="number" id="iSeguros" class="form-control" min="0" placeholder="0" oninput="calcMontoFin()">
+        </div>
+        <div class="col-md-3 col-lg-2">
+          <label class="form-label">Monto Financiado $</label>
+          <input type="number" id="iMontoFin" class="form-control" readonly>
+        </div>
+        <div class="col-md-2 col-lg-1">
+          <label class="form-label">Plazo (m)</label>
+          <input type="number" id="iPlazo" class="form-control" min="1" max="84" placeholder="48">
+        </div>
+        <div class="col-md-2 col-lg-2">
+          <label class="form-label">Tasa Mensual %</label>
+          <input type="number" id="iTasa" class="form-control" step="0.01" placeholder="2.54">
+        </div>
+        <div class="col-md-3 col-lg-2">
+          <label class="form-label">Cuota Mensual $</label>
+          <input type="number" id="iCuota" class="form-control" min="0" placeholder="0">
+        </div>
+        <div class="col-md-3 col-lg-2">
+          <label class="form-label">Estado</label>
+          <select id="iEstado" class="form-select">
+            <option value="VIGENTE">Vigente</option>
+            <option value="EN MORA">En Mora</option>
+            <option value="CANCELADO">Cancelado</option>
+            <option value="PREPAGADO">Prepagado</option>
+            <option value="CASTIGADO">Castigado</option>
+          </select>
+        </div>
+      </div>
+
+      <hr class="section-divider">
+      <div class="row g-2">
+        <div class="col-12">
+          <label class="form-label">Observaciones</label>
+          <textarea id="iObservaciones" class="form-control" rows="3" placeholder="Notas adicionales sobre el crédito…"></textarea>
+        </div>
+      </div>
+    </div>
+
+    <!-- Botones -->
+    <div class="d-flex gap-2 justify-content-end">
+      <button class="btn-cancelar" onclick="limpiarIngreso()">
+        <i class="bi bi-x-circle me-1"></i>Limpiar
+      </button>
+      <button class="btn-guardar" onclick="guardarCredito()">
+        <i class="bi bi-floppy me-1"></i>Guardar Crédito
+      </button>
+    </div>
+  </div>
+
+</div><!-- /page-wrap -->
+
+<!-- Toast -->
+<div class="toast-msg toast-ok"  id="toastOk"></div>
+<div class="toast-msg toast-err" id="toastErr"></div>
+
+<!-- ════ PANEL DETALLE CRÉDITO ════ -->
+<div class="detalle-panel" id="detallePanel" onclick="if(event.target===this)cerrarDetalle()">
+  <div class="detalle-box">
+    <div class="detalle-head">
+      <div class="dh-info">
+        <div class="dh-num"  id="dNumCred">—</div>
+        <div class="dh-nombre" id="dNombre">—</div>
+        <div class="dh-rut"    id="dRut">—</div>
+      </div>
+      <button class="detalle-close" onclick="cerrarDetalle()"><i class="bi bi-x-lg"></i></button>
+    </div>
+    <div class="detalle-body" id="detalleBody"></div>
+    <div class="detalle-footer">
+      <button class="btn-cancelar" style="padding:8px 18px" onclick="cerrarDetalle()">Cerrar</button>
+      <button class="btn-guardar"  style="padding:8px 20px" onclick="guardarEstadoDetalle()">
+        <i class="bi bi-floppy me-1"></i>Guardar cambios
+      </button>
+    </div>
+  </div>
+</div>
+
+<script>
+/* ─── Auth ─────────────────────────────────────────────────────────── */
+function getToken() { return localStorage.getItem('token'); }
+function apiHdr()   { return { 'Content-Type':'application/json', 'Authorization':'Bearer '+getToken() }; }
+function logout()   { localStorage.removeItem('token'); localStorage.removeItem('usuario'); location.href='/login.html'; }
+
+(function checkAuth() {
+  const t = getToken();
+  if (!t) { location.href='/login.html'; return; }
+  try {
+    const u = JSON.parse(localStorage.getItem('usuario') || '{}');
+    document.getElementById('userLabel').textContent = (u.nombre||'') + ' ' + (u.apellido||'');
+    const p = JSON.parse(atob(t.split('.')[1]));
+    if (p.exp * 1000 < Date.now()) logout();
+    // Prellenar ejecutivo
+    document.getElementById('iEjecutivo').value = (u.nombre||'') + ' ' + (u.apellido||'');
+  } catch(e) { logout(); }
+})();
+
+/* ─── Utils ─────────────────────────────────────────────────────────── */
+function upperInputCred(el) { const s=el.selectionStart, e=el.selectionEnd; el.value=el.value.toUpperCase(); el.setSelectionRange(s,e); }
+function fmtPeso(v) { return v!=null && v!=='' ? '$'+Number(v).toLocaleString('es-CL') : '—'; }
+function showToast(msg, ok) {
+  const el = document.getElementById(ok ? 'toastOk' : 'toastErr');
+  el.textContent = msg; el.style.display = 'block';
+  setTimeout(() => el.style.display='none', 3500);
+}
+
+/* ─── Tabs ─────────────────────────────────────────────────────────── */
+function cambiarTab(tab) {
+  document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+  document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
+  document.getElementById('tab' + tab.charAt(0).toUpperCase() + tab.slice(1)).classList.add('active');
+  document.getElementById('panel' + tab.charAt(0).toUpperCase() + tab.slice(1)).classList.add('active');
+}
+
+/* ─── RUT formatter ─────────────────────────────────────────────────── */
+function formatRUT(raw) {
+  let c = raw.replace(/[^0-9kK]/g,'').toUpperCase();
+  if (c.length < 2) return c;
+  const dv=c.slice(-1), body=c.slice(0,-1);
+  let fmt='';
+  for (let i=body.length; i>0; i-=3) fmt=body.slice(Math.max(0,i-3),i)+(fmt?'.'+fmt:'');
+  return fmt+'-'+dv;
+}
+function onRutInputCred(el) {
+  const c=el.value.replace(/[^0-9kK]/g,'');
+  if (c.length>=2) el.value=formatRUT(el.value);
+}
+
+/* ═══════════════════════════════════════════════════════════════════
+   CONSULTA CRÉDITOS
+═══════════════════════════════════════════════════════════════════ */
+let _todosCreditos = [];
+
+async function buscarCreditos() {
+  const q      = document.getElementById('searchQ').value.trim();
+  const estado = document.getElementById('searchEstado').value;
+  const res    = document.getElementById('resultadosConsulta');
+  res.innerHTML = '<div class="text-center py-4 text-muted"><div class="spinner-border spinner-border-sm me-2"></div>Buscando…</div>';
+  try {
+    let url = '/api/creditos?';
+    if (q)      url += 'q=' + encodeURIComponent(q) + '&';
+    if (estado) url += 'estado=' + encodeURIComponent(estado);
+    const r = await fetch(url, { headers: apiHdr() });
+    const j = await r.json();
+    if (!j.success) throw new Error(j.error);
+    _todosCreditos = j.data || [];
+    renderConsulta(_todosCreditos);
+    actualizarStats(_todosCreditos);
+  } catch(e) {
+    res.innerHTML = `<div class="empty-state" style="color:#ef4444"><i class="bi bi-exclamation-triangle"></i>${e.message}</div>`;
+  }
+}
+
+function actualizarStats(list) {
+  document.getElementById('statTotal').textContent     = list.length;
+  document.getElementById('statVigentes').textContent  = list.filter(c=>c.estado==='VIGENTE').length;
+  document.getElementById('statMora').textContent      = list.filter(c=>c.estado==='EN MORA').length;
+  document.getElementById('statCancelados').textContent= list.filter(c=>c.estado==='CANCELADO').length;
+}
+
+function renderConsulta(list) {
+  const res = document.getElementById('resultadosConsulta');
+  if (!list.length) {
+    res.innerHTML = '<div class="empty-state"><i class="bi bi-inbox"></i>Sin resultados para esta búsqueda.</div>';
+    return;
+  }
+  const fmtF = s => s ? new Date(s).toLocaleDateString('es-CL') : '—';
+  res.innerHTML = `<div class="table-responsive">
+    <table class="cred-table">
+      <thead>
+        <tr>
+          <th>N° Crédito</th>
+          <th>RUT</th>
+          <th>Cliente</th>
+          <th>Fecha</th>
+          <th>Vehículo</th>
+          <th class="num">Cuota</th>
+          <th>Plazo</th>
+          <th style="text-align:center">Estado</th>
+          <th></th>
+        </tr>
+      </thead>
+      <tbody>
+        ${list.map(c => `
+        <tr>
+          <td class="num-cred">${c.numero_credito||'—'}</td>
+          <td class="mono">${c.rut_cliente||'—'}</td>
+          <td>${c.nombre_cliente||'—'}</td>
+          <td style="white-space:nowrap;font-size:.78rem;color:#6b7280">${fmtF(c.fecha_otorgamiento||c.created_at)}</td>
+          <td style="font-size:.8rem">${[c.marca,c.modelo,c.anio].filter(Boolean).join(' ')||'—'}</td>
+          <td class="num" style="color:var(--navy);font-weight:800">${fmtPeso(c.cuota)}</td>
+          <td style="text-align:center">${c.plazo?c.plazo+' m':'—'}</td>
+          <td style="text-align:center"><span class="badge-estado badge-${(c.estado||'').replace(' ','-')}">${c.estado||'—'}</span></td>
+          <td style="text-align:center">
+            <button class="btn-ver-detalle" onclick="abrirDetalle(${c.id_credito})">
+              <i class="bi bi-eye me-1"></i>Ver
+            </button>
+          </td>
+        </tr>`).join('')}
+      </tbody>
+    </table>
+  </div>`;
+}
+
+/* ─── Detalle crédito ────────────────────────────────────────────────── */
+let _creditoEditId = null;
+
+async function abrirDetalle(id) {
+  const panel = document.getElementById('detallePanel');
+  document.getElementById('detalleBody').innerHTML = '<div class="text-center py-5"><div class="spinner-border spinner-border-sm"></div></div>';
+  panel.classList.add('open');
+  try {
+    const r = await fetch('/api/creditos/'+id, { headers: apiHdr() });
+    const j = await r.json();
+    if (!j.success) throw new Error(j.error);
+    const c = j.data;
+    _creditoEditId = c.id_credito;
+    document.getElementById('dNumCred').textContent  = c.numero_credito || '—';
+    document.getElementById('dNombre').textContent   = c.nombre_cliente || '—';
+    document.getElementById('dRut').textContent      = c.rut_cliente    || '—';
+    const fmtD = s => s ? new Date(s).toLocaleDateString('es-CL') : '—';
+    document.getElementById('detalleBody').innerHTML = `
+      <div class="ds">
+        <div class="ds-title"><i class="bi bi-car-front-fill"></i>Vehículo</div>
+        <div class="ds-grid">
+          ${item('Tipo',    c.tipo_vehiculo)}
+          ${item('Marca',   c.marca)}
+          ${item('Modelo',  c.modelo)}
+          ${item('Año',     c.anio)}
+          ${item('Patente', c.patente)}
+          ${item('Color',   c.color)}
+          ${item('Motor',   c.motor)}
+          ${item('Chasis',  c.chasis)}
+          ${item('Dealer',  c.dealer)}
+        </div>
+      </div>
+      <div class="ds">
+        <div class="ds-title"><i class="bi bi-bank2"></i>Financiamiento</div>
+        <div class="ds-grid">
+          ${item('Fecha Otorgamiento', fmtD(c.fecha_otorgamiento))}
+          ${item('Fecha 1ª Cuota',     fmtD(c.fecha_primera_cuota))}
+          ${item('Valor Vehículo',     fmtPeso(c.valor_vehiculo))}
+          ${item('Pie',                fmtPeso(c.pie))}
+          ${item('Saldo Precio',       fmtPeso(c.saldo_precio))}
+          ${item('Gastos Operativos',  fmtPeso(c.gastos_operativos))}
+          ${item('Seguros',            fmtPeso(c.seguros))}
+          ${item('Monto Financiado',   fmtPeso(c.monto_financiado))}
+          ${item('Plazo',              c.plazo ? c.plazo+' meses' : '—')}
+          ${item('Tasa Mensual',       c.tasa_mensual ? Number(c.tasa_mensual).toFixed(2)+'%' : '—')}
+        </div>
+        <div style="margin-top:14px;background:linear-gradient(135deg,#eff6ff,#dbeafe);border:2px solid #93c5fd;border-radius:10px;padding:14px 18px;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px">
+          <div>
+            <div style="font-size:.7rem;font-weight:700;color:var(--blue);text-transform:uppercase;letter-spacing:.06em">Cuota Mensual</div>
+            <div style="font-size:1.5rem;font-weight:900;color:var(--navy)">${fmtPeso(c.cuota)}</div>
+          </div>
+          <div style="text-align:right">
+            <div style="font-size:.7rem;font-weight:700;color:#9ca3af;text-transform:uppercase">Ejecutivo</div>
+            <div style="font-size:.88rem;font-weight:700;color:#374151">${c.ejecutivo||'—'}</div>
+          </div>
+        </div>
+      </div>
+      <div class="ds">
+        <div class="ds-title"><i class="bi bi-sliders"></i>Estado y Observaciones</div>
+        <div class="row g-2">
+          <div class="col-md-4">
+            <label class="form-label">Estado</label>
+            <select id="dEstado" class="form-select">
+              <option value="VIGENTE"   ${c.estado==='VIGENTE'   ?'selected':''}>Vigente</option>
+              <option value="EN MORA"   ${c.estado==='EN MORA'   ?'selected':''}>En Mora</option>
+              <option value="CANCELADO" ${c.estado==='CANCELADO' ?'selected':''}>Cancelado</option>
+              <option value="PREPAGADO" ${c.estado==='PREPAGADO' ?'selected':''}>Prepagado</option>
+              <option value="CASTIGADO" ${c.estado==='CASTIGADO' ?'selected':''}>Castigado</option>
+            </select>
+          </div>
+          <div class="col-12">
+            <label class="form-label">Observaciones</label>
+            <textarea id="dObservaciones" class="form-control" rows="3">${c.observaciones||''}</textarea>
+          </div>
+        </div>
+      </div>`;
+  } catch(e) {
+    document.getElementById('detalleBody').innerHTML = `<div class="empty-state" style="color:#ef4444"><i class="bi bi-exclamation-triangle"></i>${e.message}</div>`;
+  }
+}
+
+function item(label, val) {
+  return `<div class="ds-item"><div class="ds-label">${label}</div><div class="ds-val">${val||'—'}</div></div>`;
+}
+
+function cerrarDetalle() {
+  document.getElementById('detallePanel').classList.remove('open');
+  _creditoEditId = null;
+}
+
+async function guardarEstadoDetalle() {
+  if (!_creditoEditId) return;
+  const body = {
+    estado:        document.getElementById('dEstado').value,
+    observaciones: document.getElementById('dObservaciones').value.trim(),
+  };
+  try {
+    const r = await fetch('/api/creditos/'+_creditoEditId, { method:'PUT', headers:apiHdr(), body:JSON.stringify(body) });
+    const j = await r.json();
+    if (j.success) {
+      showToast('Cambios guardados', true);
+      cerrarDetalle();
+      buscarCreditos();
+    } else showToast(j.error||'Error', false);
+  } catch(e) { showToast('Error de conexión', false); }
+}
+
+/* ═══════════════════════════════════════════════════════════════════
+   INGRESO DE CRÉDITOS
+═══════════════════════════════════════════════════════════════════ */
+async function buscarClienteCred() {
+  const rut = document.getElementById('iRut').value.trim().toUpperCase();
+  if (!rut) return;
+  const msg = document.getElementById('rutClienteFoundMsg');
+  try {
+    const r = await fetch('/api/clientes/rut/'+encodeURIComponent(rut), { headers:apiHdr() });
+    const j = await r.json();
+    if (j.success && j.data) {
+      const c = j.data;
+      const nombre = [c.nombres, c.apellido_paterno, c.apellido_materno].filter(Boolean).join(' ') || c.razon_social || rut;
+      document.getElementById('iNombreCliente').value = nombre;
+      msg.innerHTML = `<div class="rut-found"><i class="bi bi-person-check me-2"></i>${nombre} — ${rut}</div>`;
+      msg.style.display = 'block';
+    } else {
+      msg.innerHTML = `<div style="color:#ef4444;font-size:.82rem"><i class="bi bi-exclamation-circle me-1"></i>Cliente no encontrado. Ingresa el nombre manualmente.</div>`;
+      msg.style.display = 'block';
+    }
+  } catch(e) { showToast('Error al buscar cliente', false); }
+}
+
+function calcSaldo() {
+  const val = parseFloat(document.getElementById('iValorVehiculo').value)||0;
+  const pie = parseFloat(document.getElementById('iPie').value)||0;
+  document.getElementById('iSaldoPrecio').value = val-pie > 0 ? Math.round(val-pie) : 0;
+  calcMontoFin();
+}
+
+function calcMontoFin() {
+  const saldo   = parseFloat(document.getElementById('iSaldoPrecio').value)||0;
+  const gastos  = parseFloat(document.getElementById('iGastosOp').value)||0;
+  const seguros = parseFloat(document.getElementById('iSeguros').value)||0;
+  document.getElementById('iMontoFin').value = Math.round(saldo+gastos+seguros);
+}
+
+async function guardarCredito() {
+  const rut    = document.getElementById('iRut').value.trim().toUpperCase();
+  const nombre = document.getElementById('iNombreCliente').value.trim();
+  if (!rut || !nombre) { showToast('RUT y nombre del cliente son obligatorios', false); return; }
+
+  const body = {
+    rut_cliente:         rut,
+    nombre_cliente:      nombre,
+    estado:              document.getElementById('iEstado').value,
+    fecha_otorgamiento:  document.getElementById('iFechaOtorg').value || null,
+    fecha_primera_cuota: document.getElementById('iFechaPrimeraCuota').value || null,
+    valor_vehiculo:      document.getElementById('iValorVehiculo').value || null,
+    pie:                 document.getElementById('iPie').value || null,
+    saldo_precio:        document.getElementById('iSaldoPrecio').value || null,
+    gastos_operativos:   document.getElementById('iGastosOp').value || null,
+    seguros:             document.getElementById('iSeguros').value || null,
+    monto_financiado:    document.getElementById('iMontoFin').value || null,
+    plazo:               document.getElementById('iPlazo').value || null,
+    tasa_mensual:        document.getElementById('iTasa').value || null,
+    cuota:               document.getElementById('iCuota').value || null,
+    tipo_vehiculo:       document.getElementById('iTipoVehiculo').value || null,
+    marca:               document.getElementById('iMarca').value || null,
+    modelo:              document.getElementById('iModelo').value || null,
+    anio:                document.getElementById('iAnio').value || null,
+    patente:             document.getElementById('iPatente').value || null,
+    color:               document.getElementById('iColor').value || null,
+    motor:               document.getElementById('iMotor').value || null,
+    chasis:              document.getElementById('iChasis').value || null,
+    dealer:              document.getElementById('iDealer').value || null,
+    ejecutivo:           document.getElementById('iEjecutivo').value || null,
+    observaciones:       document.getElementById('iObservaciones').value || null,
+  };
+
+  try {
+    const r = await fetch('/api/creditos', { method:'POST', headers:apiHdr(), body:JSON.stringify(body) });
+    const j = await r.json();
+    if (j.success) {
+      showToast(`Crédito ${j.data.numero_credito} ingresado correctamente`, true);
+      limpiarIngreso();
+      cambiarTab('consulta');
+      setTimeout(buscarCreditos, 300);
+    } else showToast(j.error||'Error al guardar', false);
+  } catch(e) { showToast('Error de conexión', false); }
+}
+
+function limpiarIngreso() {
+  ['iRut','iNombreCliente','iTipoVehiculo','iMarca','iModelo','iAnio','iPatente','iColor',
+   'iMotor','iChasis','iDealer','iFechaOtorg','iFechaPrimeraCuota','iValorVehiculo','iPie',
+   'iSaldoPrecio','iGastosOp','iSeguros','iMontoFin','iPlazo','iTasa','iCuota','iObservaciones'
+  ].forEach(id => { const el=document.getElementById(id); if(el) el.value=''; });
+  document.getElementById('iEstado').value = 'VIGENTE';
+  document.getElementById('rutClienteFoundMsg').style.display = 'none';
+}
+
+/* ─── Init ─────────────────────────────────────────────────────────── */
+buscarCreditos();
+document.addEventListener('keydown', e => { if(e.key==='Escape') cerrarDetalle(); });
+</script>
+</body>
+</html>
