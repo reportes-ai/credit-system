@@ -99,12 +99,19 @@ const create = async (req, res) => {
 
 const getAll = async (req, res) => {
   try {
-    const [rows] = await pool.query(
-      `SELECT id_cotizacion, rut_cliente, nombre_cliente, fecha_cotizacion,
-              valor_vehiculo, pie, plazo, tasa_mensual, monto_financiado, cuota,
-              id_usuario, created_at
-       FROM cotizaciones ORDER BY created_at DESC LIMIT 500`
-    );
+    const { q } = req.query;
+    let sql = `SELECT id_cotizacion, rut_cliente, nombre_cliente, fecha_cotizacion,
+                      valor_vehiculo, pie, plazo, tasa_mensual, monto_financiado, cuota,
+                      id_usuario, created_at
+               FROM cotizaciones`;
+    const params = [];
+    if (q && q.trim()) {
+      const like = `%${q.trim().toUpperCase()}%`;
+      sql += ` WHERE UPPER(rut_cliente) LIKE ? OR UPPER(nombre_cliente) LIKE ?`;
+      params.push(like, like);
+    }
+    sql += ` ORDER BY created_at DESC LIMIT 500`;
+    const [rows] = await pool.query(sql, params);
     res.json({ success: true, data: rows, error: null });
   } catch (e) {
     res.status(500).json({ success: false, data: null, error: e.message });

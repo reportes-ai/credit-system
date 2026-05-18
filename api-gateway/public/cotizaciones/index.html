@@ -150,6 +150,67 @@
 
     @media (max-width: 768px) { .page-wrap { padding: 0 12px 40px; } .info-bar { gap: 12px; } .info-bar .info-sep { display: none; } }
 
+    /* ── Btn consulta ────────────────────────────────────────────────── */
+    .btn-consulta {
+      margin-left: auto;
+      background: rgba(255,255,255,.15);
+      color: #fff;
+      border: 1.5px solid rgba(255,255,255,.4);
+      border-radius: 8px;
+      padding: 7px 16px;
+      font-size: .82rem;
+      font-weight: 700;
+      cursor: pointer;
+      display: flex; align-items: center; gap: 7px;
+      transition: background .15s;
+      white-space: nowrap;
+    }
+    .btn-consulta:hover { background: rgba(255,255,255,.28); }
+
+    /* ── Panel Consulta ──────────────────────────────────────────────── */
+    .consulta-panel {
+      background: #fff;
+      border-radius: 12px;
+      box-shadow: 0 2px 12px rgba(0,0,0,.1);
+      margin-bottom: 18px;
+      overflow: hidden;
+      display: none;
+    }
+    .consulta-panel.open { display: block; }
+    .consulta-header {
+      background: linear-gradient(135deg, #012d70, #0141A2);
+      color: #fff;
+      padding: 12px 20px;
+      display: flex; align-items: center; gap: 10px; font-weight: 700; font-size: .92rem;
+    }
+    .consulta-body { padding: 16px 20px; }
+    .consulta-search {
+      display: flex; gap: 8px; margin-bottom: 14px;
+    }
+    .consulta-search input {
+      flex: 1; border: 1.5px solid #d1d5db; border-radius: 8px;
+      padding: 8px 12px; font-size: .88rem; outline: none;
+      transition: border-color .2s;
+    }
+    .consulta-search input:focus { border-color: var(--navy); box-shadow: 0 0 0 3px rgba(1,65,162,.1); }
+    .consulta-search .btn-buscar-cot {
+      background: linear-gradient(135deg, var(--navy), var(--accent));
+      color: #fff; border: none; border-radius: 8px; padding: 8px 18px;
+      font-size: .85rem; font-weight: 700; cursor: pointer; white-space: nowrap;
+    }
+    .cot-table { width: 100%; border-collapse: collapse; font-size: .82rem; }
+    .cot-table th { background: #f1f5f9; color: #374151; font-size: .75rem; font-weight: 700;
+      text-transform: uppercase; letter-spacing: .04em; padding: 8px 10px; text-align: left;
+      border-bottom: 2px solid #e5e7eb; white-space: nowrap; }
+    .cot-table td { padding: 8px 10px; border-bottom: 1px solid #f0f2f5; color: #374151; }
+    .cot-table tr:last-child td { border-bottom: none; }
+    .cot-table tr:hover td { background: #f8fafd; }
+    .cot-table .num { text-align: right; font-weight: 600; }
+    .cot-table .rut-cell { font-family: monospace; font-size: .8rem; }
+    .cot-empty { text-align: center; padding: 28px; color: #9ca3af; font-size: .88rem; }
+    .cot-loading { text-align: center; padding: 20px; color: #6b7280; font-size: .85rem; }
+    .cot-count { font-size: .78rem; color: #6b7280; margin-bottom: 8px; }
+
     /* ── Page banner ─────────────────────────────────────────────────── */
     .page-banner { background: linear-gradient(135deg, #012d70, #0141A2 50%, #009AFE); border-radius: 16px; color: #fff; padding: 28px 36px; margin-bottom: 36px; display: flex; align-items: center; gap: 20px; }
     .page-banner > i { font-size: 3rem; opacity: 0.8; }
@@ -167,7 +228,7 @@
     <span class="sep">›</span>
     <span class="current">Cotizaciones</span>
   </span>
-  <span class="version-badge">v3.9</span>
+  <span class="version-badge">v4.0</span>
   <span class="user-info" id="userInfo"></span>
   <button class="btn-logout" onclick="logout()"><i class="bi bi-box-arrow-right"></i> Salir</button>
 </nav>
@@ -207,6 +268,30 @@
     <div class="info-item">
       <span class="info-label">Tramo Aplicable</span>
       <span class="tramo-badge" id="ibTramo">—</span>
+    </div>
+    <button class="btn-consulta" onclick="toggleConsulta()">
+      <i class="bi bi-clock-history"></i> Consulta Cotizaciones
+    </button>
+  </div>
+
+  <!-- Panel Consulta Cotizaciones -->
+  <div class="consulta-panel" id="consultaPanel">
+    <div class="consulta-header">
+      <i class="bi bi-clock-history"></i> Historial de Cotizaciones
+      <button onclick="toggleConsulta()" style="margin-left:auto;background:none;border:none;color:#fff;font-size:1.1rem;cursor:pointer;line-height:1"><i class="bi bi-x-lg"></i></button>
+    </div>
+    <div class="consulta-body">
+      <div class="consulta-search">
+        <input type="text" id="cotSearchInput" placeholder="Buscar por nombre, apellido o RUT…"
+          oninput="onCotSearch()" onkeydown="if(event.key==='Enter') buscarCotizaciones()">
+        <button class="btn-buscar-cot" onclick="buscarCotizaciones()">
+          <i class="bi bi-search me-1"></i>Buscar
+        </button>
+      </div>
+      <div class="cot-count" id="cotCount"></div>
+      <div id="cotResults">
+        <div class="cot-empty"><i class="bi bi-search" style="font-size:1.6rem;display:block;margin-bottom:8px;opacity:.35"></i>Ingresa un texto para buscar o deja vacío para ver las últimas cotizaciones</div>
+      </div>
     </div>
   </div>
 
@@ -1152,6 +1237,89 @@ setDefaultFecha();
 
 buildSegTable();
 loadApis();
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   CONSULTA COTIZACIONES
+═══════════════════════════════════════════════════════════════════════════ */
+let _consultaOpen = false;
+let _cotSearchTimer = null;
+
+function toggleConsulta() {
+  _consultaOpen = !_consultaOpen;
+  const panel = document.getElementById('consultaPanel');
+  panel.classList.toggle('open', _consultaOpen);
+  if (_consultaOpen) {
+    document.getElementById('cotSearchInput').focus();
+    buscarCotizaciones(); // carga últimas al abrir
+  }
+}
+
+function onCotSearch() {
+  clearTimeout(_cotSearchTimer);
+  _cotSearchTimer = setTimeout(buscarCotizaciones, 400);
+}
+
+async function buscarCotizaciones() {
+  const q = document.getElementById('cotSearchInput').value.trim();
+  const resultsEl = document.getElementById('cotResults');
+  const countEl   = document.getElementById('cotCount');
+  resultsEl.innerHTML = '<div class="cot-loading"><i class="bi bi-hourglass-split me-1"></i>Buscando…</div>';
+  countEl.textContent = '';
+
+  try {
+    const url = q ? `/api/cotizaciones?q=${encodeURIComponent(q)}` : '/api/cotizaciones';
+    const resp = await fetch(url, { headers: authHdr() });
+    const json = await resp.json();
+    if (!json.success) throw new Error(json.error);
+
+    const rows = json.data || [];
+    countEl.textContent = rows.length === 0 ? '' : `${rows.length} resultado${rows.length !== 1 ? 's' : ''}`;
+
+    if (!rows.length) {
+      resultsEl.innerHTML = '<div class="cot-empty"><i class="bi bi-inbox" style="font-size:1.6rem;display:block;margin-bottom:8px;opacity:.35"></i>Sin resultados</div>';
+      return;
+    }
+
+    const fmtPeso = v => v != null ? '$' + Number(v).toLocaleString('es-CL') : '—';
+    const fmtFecha = s => {
+      if (!s) return '—';
+      const d = new Date(s);
+      return d.toLocaleDateString('es-CL', { day:'2-digit', month:'2-digit', year:'numeric' })
+           + ' ' + d.toLocaleTimeString('es-CL', { hour:'2-digit', minute:'2-digit' });
+    };
+
+    resultsEl.innerHTML = `
+      <div style="overflow-x:auto">
+        <table class="cot-table">
+          <thead>
+            <tr>
+              <th>Fecha</th>
+              <th>RUT</th>
+              <th>Nombre</th>
+              <th class="num">Valor Vehículo</th>
+              <th class="num">Pie</th>
+              <th style="text-align:center">Plazo</th>
+              <th class="num">Cuota</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${rows.map(r => `
+              <tr>
+                <td style="white-space:nowrap;font-size:.78rem;color:#6b7280">${fmtFecha(r.fecha_cotizacion)}</td>
+                <td class="rut-cell">${r.rut_cliente || '—'}</td>
+                <td>${r.nombre_cliente || '—'}</td>
+                <td class="num">${fmtPeso(r.valor_vehiculo)}</td>
+                <td class="num">${fmtPeso(r.pie)}</td>
+                <td style="text-align:center">${r.plazo ? r.plazo + ' m' : '—'}</td>
+                <td class="num" style="color:var(--navy);font-weight:800">${fmtPeso(r.cuota)}</td>
+              </tr>`).join('')}
+          </tbody>
+        </table>
+      </div>`;
+  } catch (e) {
+    resultsEl.innerHTML = `<div class="cot-empty" style="color:#ef4444"><i class="bi bi-exclamation-triangle me-1"></i>${e.message}</div>`;
+  }
+}
 
 /* ═══════════════════════════════════════════════════════════════════════════
    GRABAR COTIZACIÓN
