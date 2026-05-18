@@ -281,7 +281,7 @@
     <span class="sep">›</span>
     <span class="current">Cotizaciones</span>
   </span>
-  <span class="version-badge">v4.3</span>
+  <span class="version-badge">v4.4</span>
   <span class="user-info" id="userInfo"></span>
   <button class="btn-logout" onclick="logout()"><i class="bi bi-box-arrow-right"></i> Salir</button>
 </nav>
@@ -454,6 +454,10 @@
               <div class="form-check">
                 <input class="form-check-input" type="checkbox" id="chkRep" checked onchange="onChkRepChange()">
                 <label class="form-check-label form-label mb-0" for="chkRep">Rep. Menores</label>
+              </div>
+              <div class="form-check">
+                <input class="form-check-input" type="checkbox" id="chkGps" checked onchange="onChkGpsChange()">
+                <label class="form-check-label form-label mb-0" for="chkGps">GPS</label>
               </div>
             </div>
             <div style="font-size:.78rem;color:#9ca3af">Los montos se calculan automáticamente según plazo</div>
@@ -934,7 +938,7 @@ function readInputs() {
     limitacion:    params.limitacion_dominio || 0,
     admin:         params.gastos_admin || 0,
     inscripcion:   params.inscripcion || 0,
-    gps:           params.gps_24meses || 0,
+    gps:           document.getElementById('chkGps').checked ? (params.gps_24meses || 0) : 0,
     reparaciones:  document.getElementById('chkRep').checked ? (params.reparaciones_menores || 0) : 0,
     bono:          parsePeso(document.getElementById('inBonoFin').value),
     chkD:          document.getElementById('chkDesg').checked,
@@ -1144,6 +1148,12 @@ function onChkRepChange() {
   setEl('gReparaciones', '$' + formatPeso(valor));
   recalcular();
 }
+function onChkGpsChange() {
+  const checked = document.getElementById('chkGps').checked;
+  const valor = checked ? (params.gps_24meses || 0) : 0;
+  setEl('gGps', '$' + formatPeso(valor));
+  recalcular();
+}
 
 /* ═══════════════════════════════════════════════════════════════════════════
    MAIN RECALC
@@ -1181,7 +1191,9 @@ function limpiar() {
   document.getElementById('chkRdh').checked  = true;
   document.getElementById('chkCesa').checked = true;
   document.getElementById('chkRep').checked  = true;
+  document.getElementById('chkGps').checked  = true;
   setEl('gReparaciones', '$' + formatPeso(params.reparaciones_menores || 0));
+  setEl('gGps',          '$' + formatPeso(params.gps_24meses || 0));
   document.getElementById('inSaldoPrecio').value = '—';
 
   // Reset tasa y fecha
