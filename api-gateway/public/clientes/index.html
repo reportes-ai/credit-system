@@ -280,7 +280,7 @@
   </div>
   <div class="user-info d-none d-sm-flex align-items-center gap-2">
     <span id="navUser"></span>
-    <span class="version-badge">v3.4</span>
+    <span class="version-badge">v3.5</span>
   </div>
   <button class="btn-logout ms-2" onclick="logout()">
     <i class="bi bi-box-arrow-right"></i> Salir
@@ -337,6 +337,12 @@
         </button>
       </div>
     </div>
+  </div>
+
+  <!-- Fechas creación/actualización (visible al encontrar cliente) -->
+  <div id="headerDates" style="display:none;font-size:.78rem;color:#6b7280;gap:16px;flex-wrap:wrap;margin-bottom:8px;padding:0 4px">
+    <span id="hFechaCreacion"></span>
+    <span id="hFechaActualizacion"></span>
   </div>
 
   <!-- ── SECCIÓN 2a: Cliente NO existe ──────────────────────────── -->
@@ -886,9 +892,11 @@ function upperInput(el) {
 ═══════════════════════════════════════════════════════════════════ */
 function hideAll() {
   ['secNoExiste','secExiste','secSelector','secFormPersona','secFormEmpresa']
-    .forEach(id => document.getElementById(id).classList.add('d-none'));
-  document.getElementById('headerDates').style.display = 'none';
-  document.getElementById('alerta').style.display = 'none';
+    .forEach(id => document.getElementById(id)?.classList.add('d-none'));
+  const hd = document.getElementById('headerDates');
+  if (hd) hd.style.display = 'none';
+  const al = document.getElementById('alerta');
+  if (al) al.style.display = 'none';
 }
 
 function showAlert(msg, type = 'danger') {
@@ -984,7 +992,7 @@ function mostrarFechas(c) {
     `📅 Creación: ${fmtDt(c.fecha_creacion)}`;
   document.getElementById('hFechaActualizacion').textContent =
     `🔄 Actualización: ${fmtDt(c.fecha_actualizacion)}`;
-  document.getElementById('headerDates').style.display = 'block';
+  document.getElementById('headerDates').style.display = 'flex';
 }
 
 /* ═══════════════════════════════════════════════════════════════════
