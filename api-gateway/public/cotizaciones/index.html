@@ -264,6 +264,75 @@
     .btn-copiar:hover { opacity: .88; }
     .btn-copiar.copied { background: linear-gradient(135deg, #0141A2, #009AFE); }
 
+    /* ── Botón Ver ──────────────────────────────────────────────────── */
+    .btn-ver-cot {
+      background: none; border: 1.5px solid #059669; border-radius: 6px;
+      color: #059669; font-size: .75rem; font-weight: 700;
+      padding: 3px 9px; cursor: pointer; white-space: nowrap;
+      transition: background .12s, border-color .12s;
+    }
+    .btn-ver-cot:hover { background: #ecfdf5; }
+
+    /* ── Modal Vista Cotización ─────────────────────────────────────── */
+    .modal-vista-overlay {
+      display: none; position: fixed; inset: 0;
+      background: rgba(0,0,0,.55); z-index: 3100;
+      align-items: center; justify-content: center; padding: 16px;
+    }
+    .modal-vista-overlay.open { display: flex; }
+    .modal-vista-box {
+      background: #fff; border-radius: 16px; width: 100%; max-width: 680px;
+      max-height: 92vh; overflow: hidden; display: flex; flex-direction: column;
+      box-shadow: 0 12px 48px rgba(0,0,0,.28);
+    }
+    .modal-vista-head {
+      background: linear-gradient(135deg, #001345, #0141A2 60%, #009AFE);
+      color: #fff; padding: 18px 22px; display: flex; align-items: flex-start; gap: 12px; flex-shrink: 0;
+    }
+    .modal-vista-head .vh-info { flex: 1; }
+    .modal-vista-head .vh-nombre { font-size: 1.05rem; font-weight: 800; }
+    .modal-vista-head .vh-rut { font-size: .82rem; opacity: .8; margin-top: 2px; }
+    .modal-vista-head .vh-fecha { font-size: .75rem; opacity: .7; margin-top: 4px; }
+    .modal-vista-close { background: none; border: none; color: rgba(255,255,255,.75); font-size: 1.3rem; cursor: pointer; line-height: 1; padding: 0 4px; margin-top: -2px; }
+    .modal-vista-close:hover { color: #fff; }
+    .modal-vista-body { padding: 0; overflow-y: auto; flex: 1; }
+
+    /* Secciones dentro del modal */
+    .vs-section { padding: 16px 22px; border-bottom: 1px solid #f0f2f5; }
+    .vs-section:last-child { border-bottom: none; }
+    .vs-section-title {
+      font-size: .7rem; font-weight: 800; color: var(--blue);
+      text-transform: uppercase; letter-spacing: .08em;
+      margin-bottom: 12px; display: flex; align-items: center; gap: 6px;
+    }
+    .vs-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 10px; }
+    .vs-item { }
+    .vs-item .vs-label { font-size: .7rem; color: #9ca3af; font-weight: 600; text-transform: uppercase; letter-spacing: .05em; }
+    .vs-item .vs-val { font-size: .92rem; font-weight: 700; color: #111827; margin-top: 2px; }
+    .vs-item .vs-val.big { font-size: 1.2rem; color: var(--navy); }
+    .vs-item .vs-val.green { color: #059669; }
+
+    /* Tabla gastos/seguros */
+    .vs-mini-table { width: 100%; font-size: .82rem; border-collapse: collapse; }
+    .vs-mini-table td { padding: 4px 6px; }
+    .vs-mini-table td:last-child { text-align: right; font-weight: 700; color: #374151; }
+    .vs-mini-table .total-row td { border-top: 1.5px solid #e5e7eb; font-weight: 800; color: var(--navy); padding-top: 6px; }
+
+    /* Cuota destacada */
+    .vs-cuota-banner {
+      background: linear-gradient(135deg, #eff6ff, #dbeafe);
+      border: 2px solid #93c5fd; border-radius: 10px;
+      padding: 14px 18px; display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 10px;
+    }
+    .vs-cuota-banner .cuota-label { font-size: .75rem; font-weight: 700; color: var(--blue); text-transform: uppercase; letter-spacing: .06em; }
+    .vs-cuota-banner .cuota-val   { font-size: 1.6rem; font-weight: 900; color: var(--navy); }
+    .vs-cuota-banner .cae-val     { font-size: .88rem; font-weight: 700; color: #6b7280; }
+
+    .modal-vista-footer {
+      padding: 14px 22px; border-top: 1px solid #f0f2f5;
+      display: flex; gap: 10px; justify-content: flex-end; flex-shrink: 0; background: #f9fafb;
+    }
+
     /* ── Page banner ─────────────────────────────────────────────────── */
     .page-banner { background: linear-gradient(135deg, #012d70, #0141A2 50%, #009AFE); border-radius: 16px; color: #fff; padding: 28px 36px; margin-bottom: 36px; display: flex; align-items: center; gap: 20px; }
     .page-banner > i { font-size: 3rem; opacity: 0.8; }
@@ -281,7 +350,7 @@
     <span class="sep">›</span>
     <span class="current">Cotizaciones</span>
   </span>
-  <span class="version-badge">v4.6</span>
+  <span class="version-badge">v4.7</span>
   <span class="user-info" id="userInfo"></span>
   <button class="btn-logout" onclick="logout()"><i class="bi bi-box-arrow-right"></i> Salir</button>
 </nav>
@@ -1415,7 +1484,10 @@ async function buscarCotizaciones() {
                 <td class="num">${fmtPeso(r.pie)}</td>
                 <td style="text-align:center">${r.plazo ? r.plazo + ' m' : '—'}</td>
                 <td class="num" style="color:var(--navy);font-weight:800">${fmtPeso(r.cuota)}</td>
-                <td style="text-align:center">
+                <td style="text-align:center;white-space:nowrap;display:flex;gap:4px;justify-content:center">
+                  <button class="btn-ver-cot" onclick="abrirVista(window._cotRowMap[${r.id_cotizacion}])">
+                    <i class="bi bi-eye"></i> Ver
+                  </button>
                   <button class="btn-detalle-cot" onclick="abrirDetalle(window._cotRowMap[${r.id_cotizacion}])">
                     <i class="bi bi-envelope-paper"></i> Enviar
                   </button>
@@ -1604,7 +1676,7 @@ document.addEventListener('click', function(e) {
   if (e.target.id === 'modalExito')  cerrarModalExito();
 });
 document.addEventListener('keydown', function(e) {
-  if (e.key === 'Escape') { cerrarModalGrabar(); cerrarModalExito(); cerrarDetalle(); }
+  if (e.key === 'Escape') { cerrarModalGrabar(); cerrarModalExito(); cerrarDetalle(); cerrarVista(); }
   if (e.key === 'Enter' && document.getElementById('modalGrabar').style.display === 'flex') buscarYGrabar();
 });
 
@@ -1780,6 +1852,132 @@ function cerrarDetalle() {
   document.getElementById('modalDetalle').classList.remove('open');
 }
 
+/* ═══════════════════════════════════════════════════════════════════════════
+   VISTA VISUAL COTIZACIÓN
+═══════════════════════════════════════════════════════════════════════════ */
+let _vistaRowData = null;
+
+function abrirVista(rowData) {
+  _vistaRowData = rowData;
+  const fp = v => (v != null && v !== '') ? '$' + Number(v).toLocaleString('es-CL') : '—';
+  const fmtFechaLarga = s => {
+    if (!s) return '—';
+    const d = new Date(s);
+    return d.toLocaleDateString('es-CL', { weekday:'long', day:'numeric', month:'long', year:'numeric'})
+         + ' ' + d.toLocaleTimeString('es-CL', { hour:'2-digit', minute:'2-digit' });
+  };
+
+  document.getElementById('vNombre').textContent = rowData.nombre_cliente || '—';
+  document.getElementById('vRut').textContent    = rowData.rut_cliente    || '—';
+  document.getElementById('vFecha').textContent  = 'Fecha: ' + fmtFechaLarga(rowData.fecha_cotizacion);
+
+  let dj = {};
+  try { dj = typeof rowData.datos_json === 'string' ? JSON.parse(rowData.datos_json) : (rowData.datos_json || {}); } catch {}
+  const inp = dj.inputs    || {};
+  const res = dj.resultados || {};
+
+  // ── Vehículo
+  const saldo = res.saldoPrecio || ((rowData.valor_vehiculo||0) - (rowData.pie||0));
+  let html = `
+    <div class="vs-section">
+      <div class="vs-section-title"><i class="bi bi-car-front-fill"></i>Vehículo</div>
+      <div class="vs-grid">
+        <div class="vs-item"><div class="vs-label">Valor Vehículo</div><div class="vs-val">${fp(rowData.valor_vehiculo)}</div></div>
+        <div class="vs-item"><div class="vs-label">Pie</div><div class="vs-val">${fp(rowData.pie)}</div></div>
+        <div class="vs-item"><div class="vs-label">Saldo Precio</div><div class="vs-val">${fp(saldo)}</div></div>
+      </div>
+    </div>`;
+
+  // ── Gastos operativos
+  const gastos = [
+    { label:'Prenda',                     val: inp.prenda },
+    { label:'Retiro Gestión Auto',        val: inp.retiro },
+    { label:'Limitación de Dominio',      val: inp.limitacion },
+    { label:'Gastos Administración',      val: inp.admin },
+    { label:'Inscripción / Transferencia',val: inp.inscripcion },
+    { label:'GPS 24 meses',               val: inp.gps },
+    { label:'Reparaciones Menores',       val: inp.reparaciones },
+  ].filter(g => g.val && g.val > 0);
+  const totalGastos = res.gastosOp ?? gastos.reduce((s,g) => s+g.val, 0);
+
+  if (gastos.length) {
+    html += `<div class="vs-section">
+      <div class="vs-section-title"><i class="bi bi-receipt"></i>Gastos Operativos</div>
+      <table class="vs-mini-table">
+        ${gastos.map(g => `<tr><td>${g.label}</td><td>${fp(g.val)}</td></tr>`).join('')}
+        <tr class="total-row"><td>Total Gastos</td><td>${fp(totalGastos)}</td></tr>
+      </table>
+    </div>`;
+  }
+
+  // ── Seguros
+  const seguros = [
+    { label:'Desgravamen',     val: res.segDesg, activo: inp.chkD },
+    { label:'RDH (Desempleo)', val: res.segRdh,  activo: inp.chkR },
+    { label:'Cesantía',        val: res.segCesa, activo: inp.chkC },
+  ].filter(s => s.activo && s.val > 0);
+  const totalSeg = res.totalSeguros ?? seguros.reduce((s,x) => s+x.val, 0);
+
+  if (seguros.length) {
+    html += `<div class="vs-section">
+      <div class="vs-section-title"><i class="bi bi-shield-check-fill"></i>Seguros</div>
+      <table class="vs-mini-table">
+        ${seguros.map(s => `<tr><td>${s.label}</td><td>${fp(s.val)}</td></tr>`).join('')}
+        <tr class="total-row"><td>Total Seguros</td><td>${fp(totalSeg)}</td></tr>
+      </table>
+    </div>`;
+  }
+
+  // ── Financiamiento
+  const tasa = rowData.tasa_mensual ? Number(rowData.tasa_mensual).toFixed(2) + '%' : '—';
+  html += `<div class="vs-section">
+    <div class="vs-section-title"><i class="bi bi-bank2"></i>Financiamiento</div>
+    <div class="vs-grid" style="margin-bottom:14px">
+      <div class="vs-item"><div class="vs-label">Monto Financiado</div><div class="vs-val">${fp(rowData.monto_financiado)}</div></div>
+      <div class="vs-item"><div class="vs-label">Plazo</div><div class="vs-val">${rowData.plazo ? rowData.plazo + ' meses' : '—'}</div></div>
+      <div class="vs-item"><div class="vs-label">Tasa Mensual</div><div class="vs-val">${tasa}</div></div>
+    </div>`;
+
+  // CAE
+  let caeStr = '—';
+  const cae = res.cae ?? null;
+  if (cae) {
+    caeStr = (cae * 100).toFixed(2) + '%';
+  } else {
+    const spRec = saldo;
+    if (spRec > 0 && rowData.cuota && rowData.plazo) {
+      try {
+        const r2 = rateNR(rowData.plazo, -rowData.cuota, spRec);
+        if (isFinite(r2) && !isNaN(r2)) caeStr = (r2 * 12 * 100).toFixed(2) + '%';
+      } catch {}
+    }
+  }
+
+  html += `<div class="vs-cuota-banner">
+      <div>
+        <div class="cuota-label">Cuota Mensual</div>
+        <div class="cuota-val">${fp(rowData.cuota)}</div>
+      </div>
+      <div style="text-align:right">
+        <div class="vs-label">CAE (Carga Anual Equivalente)</div>
+        <div class="cae-val">${caeStr}</div>
+      </div>
+    </div>
+  </div>`;
+
+  document.getElementById('vBody').innerHTML = html;
+  document.getElementById('modalVista').classList.add('open');
+}
+
+function cerrarVista() {
+  document.getElementById('modalVista').classList.remove('open');
+}
+
+function _abrirDetalleDesdeVista() {
+  cerrarVista();
+  if (_vistaRowData) abrirDetalle(_vistaRowData);
+}
+
 async function copiarDetalle() {
   const texto = document.getElementById('detalleTexto').value;
   try {
@@ -1798,6 +1996,27 @@ async function copiarDetalle() {
   }
 }
 </script>
+
+<!-- ═══ MODAL VISTA COTIZACIÓN ═══ -->
+<div class="modal-vista-overlay" id="modalVista" onclick="if(event.target===this)cerrarVista()">
+  <div class="modal-vista-box">
+    <div class="modal-vista-head">
+      <div class="vh-info">
+        <div class="vh-nombre" id="vNombre">—</div>
+        <div class="vh-rut"    id="vRut">—</div>
+        <div class="vh-fecha"  id="vFecha">—</div>
+      </div>
+      <button class="modal-vista-close" onclick="cerrarVista()"><i class="bi bi-x-lg"></i></button>
+    </div>
+    <div class="modal-vista-body" id="vBody"></div>
+    <div class="modal-vista-footer">
+      <button onclick="cerrarVista()" style="background:#f3f4f6;color:#374151;border:1.5px solid #d1d5db;border-radius:8px;padding:9px 18px;font-size:.88rem;font-weight:600;cursor:pointer">Cerrar</button>
+      <button onclick="_abrirDetalleDesdeVista()" style="background:linear-gradient(135deg,#0141A2,#009AFE);color:#fff;border:none;border-radius:8px;padding:9px 20px;font-size:.88rem;font-weight:700;cursor:pointer">
+        <i class="bi bi-envelope-paper me-1"></i>Preparar mensaje
+      </button>
+    </div>
+  </div>
+</div>
 
 <!-- ═══ MODAL DETALLE COTIZACIÓN ═══ -->
 <div class="modal-detalle-overlay" id="modalDetalle" onclick="if(event.target===this)cerrarDetalle()">
