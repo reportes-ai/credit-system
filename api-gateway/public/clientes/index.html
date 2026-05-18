@@ -280,7 +280,7 @@
   </div>
   <div class="user-info d-none d-sm-flex align-items-center gap-2">
     <span id="navUser"></span>
-    <span class="version-badge">v3.8</span>
+    <span class="version-badge">v3.9</span>
   </div>
   <button class="btn-logout ms-2" onclick="logout()">
     <i class="bi bi-box-arrow-right"></i> Salir
@@ -950,12 +950,17 @@ async function buscarCliente() {
   document.getElementById('btnBuscarText').classList.add('d-none');
   document.getElementById('btnBuscarSpinner').classList.remove('d-none');
   btn.disabled = true;
-  hideAll();
+
+  const ctrl = new AbortController();
+  const timer = setTimeout(() => ctrl.abort(), 15000); // 15 s máx
 
   try {
+    hideAll();
     const resp = await fetch(`/api/clientes/rut/${encodeURIComponent(rut)}`, {
-      headers: apiHeaders()
+      headers: apiHeaders(),
+      signal: ctrl.signal,
     });
+    clearTimeout(timer);
     const json = await resp.json();
 
     if (!json.success) { showAlert(json.error || 'Error al buscar'); return; }
@@ -972,8 +977,11 @@ async function buscarCliente() {
       document.getElementById('notExistRut').textContent = `RUT ${rut} no registrado en el sistema`;
       document.getElementById('secNoExiste').classList.remove('d-none');
     }
-  } catch {
-    showAlert('Error de conexión con el servidor');
+  } catch (err) {
+    clearTimeout(timer);
+    showAlert(err.name === 'AbortError'
+      ? 'El servidor tardó demasiado. Intenta de nuevo.'
+      : 'Error de conexión con el servidor');
   } finally {
     document.getElementById('btnBuscarText').classList.remove('d-none');
     document.getElementById('btnBuscarSpinner').classList.add('d-none');
