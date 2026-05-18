@@ -35,33 +35,56 @@
     .page-banner h2 { margin:0 0 3px; font-size:1.2rem; font-weight:800; }
     .page-banner p  { margin:0; font-size:.83rem; opacity:.8; }
 
-    /* ── Module tab cards ── */
-    .tab-cards { display:grid; grid-template-columns:repeat(2, minmax(0,320px)); gap:12px; margin-bottom:20px; }
+    /* ── Top bar (tabs + empresa) ── */
+    .top-bar { display:flex; align-items:stretch; gap:10px; margin-bottom:20px; flex-wrap:wrap; }
+    .top-bar-sep { width:1px; background:#d1d5db; margin:6px 4px; flex-shrink:0; }
+
+    /* Tab cards */
+    .tab-cards { display:flex; gap:10px; }
     .tab-card {
-      background:#fff; border-radius:12px; padding:14px 18px; cursor:pointer;
+      background:#fff; border-radius:12px; padding:12px 16px; cursor:pointer;
       border:2px solid transparent; transition:transform .18s, box-shadow .18s, border-color .18s;
-      box-shadow:0 1px 4px rgba(0,0,0,.06); text-align:left; width:100%;
-      display:flex; align-items:center; gap:14px;
+      box-shadow:0 1px 4px rgba(0,0,0,.06); text-align:left;
+      display:flex; align-items:center; gap:12px; min-width:220px;
     }
-    .tab-card:hover { transform:translateY(-3px); box-shadow:0 8px 24px rgba(1,65,162,.15); border-color:var(--navy); }
-    .tab-card.active { border-color:var(--navy); box-shadow:0 6px 20px rgba(1,65,162,.18); }
+    .tab-card:hover { transform:translateY(-2px); box-shadow:0 6px 20px rgba(1,65,162,.15); border-color:var(--navy); }
+    .tab-card.active { border-color:var(--navy); box-shadow:0 4px 16px rgba(1,65,162,.18); }
     .tab-card .card-icon {
-      width:40px; height:40px; border-radius:10px; flex-shrink:0;
+      width:36px; height:36px; border-radius:9px; flex-shrink:0;
       background:linear-gradient(135deg,#e8eaf6,#c5cae9);
       display:flex; align-items:center; justify-content:center;
-      font-size:1.2rem; color:var(--navy);
-      transition:background .18s, color .18s;
+      font-size:1.1rem; color:var(--navy); transition:background .18s, color .18s;
     }
     .tab-card:hover .card-icon,
     .tab-card.active .card-icon { background:linear-gradient(135deg,var(--navy),var(--blue)); color:#fff; }
     .tab-card .card-text { flex:1; }
-    .tab-card h6 { font-weight:700; font-size:.88rem; margin:0 0 2px; color:#111827; }
-    .tab-card p  { font-size:.75rem; color:#6b7280; margin:0; line-height:1.3; }
-    .btn-acceder { background:var(--navy); color:#fff; border:none; border-radius:7px; padding:5px 12px; font-size:.75rem; font-weight:600; white-space:nowrap; flex-shrink:0; }
+    .tab-card h6 { font-weight:700; font-size:.85rem; margin:0 0 1px; color:#111827; }
+    .tab-card p  { font-size:.72rem; color:#6b7280; margin:0; line-height:1.3; }
+    .btn-acceder { background:var(--navy); color:#fff; border:none; border-radius:7px; padding:4px 10px; font-size:.72rem; font-weight:600; white-space:nowrap; flex-shrink:0; }
     .tab-card:hover .btn-acceder,
     .tab-card.active .btn-acceder { background:var(--blue); }
     .tab-panel { display:none; }
     .tab-panel.active { display:block; }
+
+    /* Empresa cards (inline) */
+    .empresa-bar { display:flex; gap:10px; align-items:stretch; }
+    .empresa-bar-label { font-size:.65rem; font-weight:800; color:#9ca3af; text-transform:uppercase; letter-spacing:.07em; writing-mode:vertical-rl; transform:rotate(180deg); align-self:center; margin-right:2px; }
+    .empresa-card {
+      background:#fff; border-radius:12px; padding:8px 14px;
+      cursor:pointer; border:2px solid #e5e7eb;
+      transition:transform .18s, box-shadow .18s, border-color .18s;
+      box-shadow:0 1px 4px rgba(0,0,0,.06);
+      display:flex; flex-direction:column; align-items:center; justify-content:center;
+      gap:5px; min-width:110px;
+    }
+    .empresa-card img { max-width:90px; max-height:36px; object-fit:contain; filter:grayscale(40%) opacity(.7); transition:filter .18s; }
+    .empresa-card:hover { transform:translateY(-2px); box-shadow:0 6px 18px rgba(1,65,162,.14); border-color:#93c5fd; }
+    .empresa-card:hover img { filter:none; }
+    .empresa-card.selected { border-color:var(--navy); box-shadow:0 4px 14px rgba(1,65,162,.18); }
+    .empresa-card.selected img { filter:none; }
+    .empresa-check { width:16px; height:16px; border-radius:50%; border:2px solid #d1d5db; background:#fff; display:flex; align-items:center; justify-content:center; transition:all .15s; }
+    .empresa-card.selected .empresa-check { background:var(--navy); border-color:var(--navy); }
+    .empresa-card.selected .empresa-check::after { content:'✓'; color:#fff; font-size:.55rem; font-weight:800; }
 
     /* ── Cards ── */
     .form-card { background:#fff; border-radius:12px; padding:22px 24px; margin-bottom:16px; box-shadow:0 1px 5px rgba(0,0,0,.07); }
@@ -129,7 +152,6 @@
     .ds-item .ds-val.big { font-size:1.15rem; color:var(--navy); }
 
     /* ── Empresa cards ── */
-    .empresa-grid { display:grid; grid-template-columns:repeat(3,1fr); gap:14px; margin-bottom:4px; }
     .empresa-card {
       background:#fff; border-radius:14px; padding:22px 16px;
       cursor:pointer; border:2px solid #e5e7eb;
@@ -213,24 +235,48 @@
     </div>
   </div>
 
-  <!-- Módulos -->
-  <div class="tab-cards" id="mainTabs">
-    <button class="tab-card active" data-tab="consulta" onclick="cambiarTab('consulta')">
-      <div class="card-icon"><i class="bi bi-search"></i></div>
-      <div class="card-text">
-        <h6>Consulta Créditos</h6>
-        <p>Busca y revisa créditos vigentes, en mora o cancelados.</p>
-      </div>
-      <span class="btn-acceder"><i class="bi bi-arrow-right-circle me-1"></i>Ver módulo</span>
-    </button>
-    <button class="tab-card" data-tab="ingreso" onclick="cambiarTab('ingreso')">
-      <div class="card-icon"><i class="bi bi-plus-circle"></i></div>
-      <div class="card-text">
-        <h6>Ingreso de Créditos</h6>
-        <p>Registra un nuevo crédito con cliente, vehículo y condiciones.</p>
-      </div>
-      <span class="btn-acceder"><i class="bi bi-arrow-right-circle me-1"></i>Ver módulo</span>
-    </button>
+  <!-- Top bar: módulos + empresa -->
+  <div class="top-bar">
+    <!-- Tab selectors -->
+    <div class="tab-cards" id="mainTabs">
+      <button class="tab-card active" data-tab="consulta" onclick="cambiarTab('consulta')">
+        <div class="card-icon"><i class="bi bi-search"></i></div>
+        <div class="card-text">
+          <h6>Consulta Créditos</h6>
+          <p>Busca y revisa créditos vigentes, en mora o cancelados.</p>
+        </div>
+        <span class="btn-acceder"><i class="bi bi-arrow-right-circle me-1"></i>Ver</span>
+      </button>
+      <button class="tab-card" data-tab="ingreso" onclick="cambiarTab('ingreso')">
+        <div class="card-icon"><i class="bi bi-plus-circle"></i></div>
+        <div class="card-text">
+          <h6>Ingreso de Créditos</h6>
+          <p>Registra nuevo crédito con cliente, vehículo y condiciones.</p>
+        </div>
+        <span class="btn-acceder"><i class="bi bi-arrow-right-circle me-1"></i>Ver</span>
+      </button>
+    </div>
+
+    <!-- Separador -->
+    <div class="top-bar-sep"></div>
+
+    <!-- Empresa selector -->
+    <div class="empresa-bar" id="empresaBar">
+      <span class="empresa-bar-label">Empresa</span>
+      <button type="button" class="empresa-card" data-empresa="AUTOFACIL" onclick="seleccionarEmpresa(this)">
+        <img src="/img/logo-autofacil.png" alt="AutoFácil">
+        <div class="empresa-check"></div>
+      </button>
+      <button type="button" class="empresa-card" data-empresa="AUTOFIN" onclick="seleccionarEmpresa(this)">
+        <img src="/img/logo-autofin.png" alt="AUTOFIN">
+        <div class="empresa-check"></div>
+      </button>
+      <button type="button" class="empresa-card" data-empresa="UNIDAD" onclick="seleccionarEmpresa(this)">
+        <img src="/img/logo-unidad.png" alt="Unidad">
+        <div class="empresa-check"></div>
+      </button>
+      <input type="hidden" id="iEmpresa" value="">
+    </div>
   </div>
 
   <!-- ════════════════════════════════
@@ -276,26 +322,6 @@
        TAB: INGRESO DE CRÉDITOS
   ════════════════════════════════ -->
   <div class="tab-panel" id="panelIngreso">
-
-    <!-- Sección 0: Empresa -->
-    <div class="form-card">
-      <div class="section-label"><i class="bi bi-building"></i>Empresa / Producto</div>
-      <div class="empresa-grid">
-        <button type="button" class="empresa-card" data-empresa="AUTOFACIL" onclick="seleccionarEmpresa(this)">
-          <img src="/img/logo-autofacil.png" alt="AutoFácil">
-          <div class="empresa-check"></div>
-        </button>
-        <button type="button" class="empresa-card" data-empresa="AUTOFIN" onclick="seleccionarEmpresa(this)">
-          <img src="/img/logo-autofin.png" alt="AUTOFIN">
-          <div class="empresa-check"></div>
-        </button>
-        <button type="button" class="empresa-card" data-empresa="UNIDAD" onclick="seleccionarEmpresa(this)">
-          <img src="/img/logo-unidad.png" alt="Unidad">
-          <div class="empresa-check"></div>
-        </button>
-      </div>
-      <input type="hidden" id="iEmpresa" value="">
-    </div>
 
     <!-- Sección 1: Cliente -->
     <div class="form-card">
