@@ -9,6 +9,7 @@ const pool = require('../../../../shared/config/database');
         numero_credito     VARCHAR(20) UNIQUE,
         rut_cliente        VARCHAR(15)  NOT NULL,
         nombre_cliente     VARCHAR(300) NOT NULL,
+        empresa            VARCHAR(50)  NULL,
         id_cotizacion      INT          NULL,
         estado             VARCHAR(30)  NOT NULL DEFAULT 'VIGENTE',
         fecha_otorgamiento DATE,
@@ -39,6 +40,7 @@ const pool = require('../../../../shared/config/database');
         updated_at         DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
       )
     `);
+    await pool.query(`ALTER TABLE creditos ADD COLUMN empresa VARCHAR(50) NULL AFTER nombre_cliente`).catch(e => { if(e.errno!==1060) throw e; });
   } catch (e) {
     if (e.errno !== 1050) console.error('[creditos migration]', e.message);
   }
@@ -60,7 +62,7 @@ async function generarNumero() {
 const create = async (req, res) => {
   try {
     const {
-      rut_cliente, nombre_cliente, id_cotizacion, estado,
+      rut_cliente, nombre_cliente, empresa, id_cotizacion, estado,
       fecha_otorgamiento, valor_vehiculo, pie, saldo_precio, monto_financiado,
       plazo, tasa_mensual, cuota, fecha_primera_cuota,
       gastos_operativos, seguros,
@@ -76,16 +78,16 @@ const create = async (req, res) => {
 
     const [r] = await pool.query(
       `INSERT INTO creditos
-         (numero_credito, rut_cliente, nombre_cliente, id_cotizacion, estado,
+         (numero_credito, rut_cliente, nombre_cliente, empresa, id_cotizacion, estado,
           fecha_otorgamiento, valor_vehiculo, pie, saldo_precio, monto_financiado,
           plazo, tasa_mensual, cuota, fecha_primera_cuota,
           gastos_operativos, seguros,
           tipo_vehiculo, marca, modelo, anio, patente, color, motor, chasis,
           dealer, ejecutivo, observaciones, datos_json, id_usuario)
-       VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
+       VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
       [
         numero_credito, rut_cliente.toUpperCase().trim(), nombre_cliente.trim(),
-        id_cotizacion || null, estado || 'VIGENTE',
+        empresa || null, id_cotizacion || null, estado || 'VIGENTE',
         fecha_otorgamiento || null, valor_vehiculo || null, pie || null,
         saldo_precio || null, monto_financiado || null,
         plazo || null, tasa_mensual || null, cuota || null, fecha_primera_cuota || null,

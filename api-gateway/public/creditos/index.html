@@ -132,6 +132,25 @@
     .ds-item .ds-val   { font-size:.9rem; font-weight:700; color:#111827; margin-top:1px; }
     .ds-item .ds-val.big { font-size:1.15rem; color:var(--navy); }
 
+    /* ── Empresa cards ── */
+    .empresa-grid { display:grid; grid-template-columns:repeat(3,1fr); gap:14px; margin-bottom:4px; }
+    .empresa-card {
+      background:#fff; border-radius:14px; padding:22px 16px;
+      cursor:pointer; border:2px solid #e5e7eb;
+      transition:transform .18s, box-shadow .18s, border-color .18s;
+      box-shadow:0 1px 4px rgba(0,0,0,.06);
+      display:flex; flex-direction:column; align-items:center; justify-content:center;
+      gap:10px; min-height:110px;
+    }
+    .empresa-card img { max-width:100%; max-height:54px; object-fit:contain; filter:grayscale(40%) opacity(.7); transition:filter .18s; }
+    .empresa-card:hover { transform:translateY(-3px); box-shadow:0 10px 28px rgba(1,65,162,.14); border-color:#93c5fd; }
+    .empresa-card:hover img { filter:none; }
+    .empresa-card.selected { border-color:var(--navy); box-shadow:0 8px 24px rgba(1,65,162,.18); }
+    .empresa-card.selected img { filter:none; }
+    .empresa-check { width:20px; height:20px; border-radius:50%; border:2px solid #d1d5db; background:#fff; display:flex; align-items:center; justify-content:center; transition:all .15s; }
+    .empresa-card.selected .empresa-check { background:var(--navy); border-color:var(--navy); }
+    .empresa-card.selected .empresa-check::after { content:'✓'; color:#fff; font-size:.65rem; font-weight:800; }
+
     /* Estado edit */
     .estado-edit { display:flex; gap:8px; align-items:center; }
     .estado-edit select { flex:1; }
@@ -174,7 +193,7 @@
     <a href="/">Inicio</a><span class="sep">›</span>
     <span class="current"><i class="bi bi-credit-card-2-front me-1"></i>Créditos</span>
   </div>
-  <span class="version-badge">v1.2</span>
+  <span class="version-badge">v1.3</span>
   <span class="user-info" id="userLabel"></span>
   <button class="btn-logout" onclick="logout()"><i class="bi bi-box-arrow-right"></i></button>
 </nav>
@@ -249,6 +268,26 @@
        TAB: INGRESO DE CRÉDITOS
   ════════════════════════════════ -->
   <div class="tab-panel" id="panelIngreso">
+
+    <!-- Sección 0: Empresa -->
+    <div class="form-card">
+      <div class="section-label"><i class="bi bi-building"></i>Empresa / Producto</div>
+      <div class="empresa-grid">
+        <button type="button" class="empresa-card" data-empresa="AUTOFACIL" onclick="seleccionarEmpresa(this)">
+          <img src="/img/logo-autofacil.png" alt="AutoFácil">
+          <div class="empresa-check"></div>
+        </button>
+        <button type="button" class="empresa-card" data-empresa="AUTOFIN" onclick="seleccionarEmpresa(this)">
+          <img src="/img/logo-autofin.png" alt="AUTOFIN">
+          <div class="empresa-check"></div>
+        </button>
+        <button type="button" class="empresa-card" data-empresa="UNIDAD" onclick="seleccionarEmpresa(this)">
+          <img src="/img/logo-unidad.png" alt="Unidad">
+          <div class="empresa-check"></div>
+        </button>
+      </div>
+      <input type="hidden" id="iEmpresa" value="">
+    </div>
 
     <!-- Sección 1: Cliente -->
     <div class="form-card">
@@ -469,6 +508,13 @@ function cambiarTab(tab) {
   document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
   document.querySelector(`#mainTabs .tab-card[data-tab="${tab}"]`).classList.add('active');
   document.getElementById('panel' + tab.charAt(0).toUpperCase() + tab.slice(1)).classList.add('active');
+}
+
+/* ─── Empresa selector ──────────────────────────────────────────────── */
+function seleccionarEmpresa(el) {
+  document.querySelectorAll('.empresa-card').forEach(c => c.classList.remove('selected'));
+  el.classList.add('selected');
+  document.getElementById('iEmpresa').value = el.dataset.empresa;
 }
 
 /* ─── RUT formatter ─────────────────────────────────────────────────── */
@@ -713,6 +759,7 @@ async function guardarCredito() {
   const body = {
     rut_cliente:         rut,
     nombre_cliente:      nombre,
+    empresa:             document.getElementById('iEmpresa').value || null,
     estado:              document.getElementById('iEstado').value,
     fecha_otorgamiento:  document.getElementById('iFechaOtorg').value || null,
     fecha_primera_cuota: document.getElementById('iFechaPrimeraCuota').value || null,
@@ -756,6 +803,8 @@ function limpiarIngreso() {
    'iSaldoPrecio','iGastosOp','iSeguros','iMontoFin','iPlazo','iTasa','iCuota','iObservaciones'
   ].forEach(id => { const el=document.getElementById(id); if(el) el.value=''; });
   document.getElementById('iEstado').value = 'VIGENTE';
+  document.getElementById('iEmpresa').value = '';
+  document.querySelectorAll('.empresa-card').forEach(c => c.classList.remove('selected'));
   document.getElementById('rutClienteFoundMsg').style.display = 'none';
 }
 
