@@ -281,7 +281,7 @@
     <span class="sep">›</span>
     <span class="current">Cotizaciones</span>
   </span>
-  <span class="version-badge">v4.5</span>
+  <span class="version-badge">v4.6</span>
   <span class="user-info" id="userInfo"></span>
   <button class="btn-logout" onclick="logout()"><i class="bi bi-box-arrow-right"></i> Salir</button>
 </nav>
@@ -1473,10 +1473,47 @@ function formatRUT(raw) {
   return fmt + '-' + dv;
 }
 
+function calcDV(body) {
+  const digits = String(body).replace(/\D/g, '');
+  if (!digits) return null;
+  const serie = [2, 3, 4, 5, 6, 7];
+  const suma = digits.split('').reverse()
+    .reduce((acc, d, i) => acc + parseInt(d) * serie[i % 6], 0);
+  const resto = 11 - (suma % 11);
+  if (resto === 11) return '0';
+  if (resto === 10) return 'K';
+  return String(resto);
+}
+
+function validarRUT(clean) {
+  if (clean.length < 7 || clean.length > 9) return null;
+  const dvIngresado = clean.slice(-1).toUpperCase();
+  const body = clean.slice(0, -1);
+  return calcDV(body) === dvIngresado;
+}
+
 function onGrabarRutInput(el) {
-  const clean = el.value.replace(/[^0-9kK]/g, '');
+  const clean = el.value.replace(/[^0-9kK]/g, '').toUpperCase();
   if (clean.length >= 2) el.value = formatRUT(el.value);
-  document.getElementById('mGrabarError').style.display = 'none';
+
+  const errEl = document.getElementById('mGrabarError');
+  if (clean.length >= 7 && clean.length <= 9) {
+    const ok = validarRUT(clean);
+    if (ok) {
+      el.style.borderColor = '#059669';
+      errEl.style.color = '#059669';
+      errEl.style.display = 'block';
+      errEl.textContent = '✓ RUT válido';
+    } else {
+      el.style.borderColor = '#dc2626';
+      errEl.style.color = '#dc2626';
+      errEl.style.display = 'block';
+      errEl.textContent = `✗ Dígito verificador incorrecto (debería ser ${calcDV(clean.slice(0, -1))})`;
+    }
+  } else {
+    el.style.borderColor = '#d1d5db';
+    errEl.style.display = 'none';
+  }
 }
 
 function abrirModalGrabar() {
@@ -1498,9 +1535,24 @@ function cerrarModalGrabar() {
 
 async function buscarYGrabar() {
   const rut = document.getElementById('mGrabarRut').value.trim().toUpperCase();
-  if (!rut) { document.getElementById('mGrabarError').textContent = 'Ingresa un RUT'; document.getElementById('mGrabarError').style.display = 'block'; return; }
-
   const errEl = document.getElementById('mGrabarError');
+  if (!rut) {
+    errEl.style.color = '#dc2626';
+    errEl.textContent = 'Ingresa un RUT';
+    errEl.style.display = 'block';
+    return;
+  }
+
+  // Validar DV
+  const cleanRut = rut.replace(/[^0-9kK]/g, '').toUpperCase();
+  const dvOk = validarRUT(cleanRut);
+  if (dvOk === false) {
+    errEl.style.color = '#dc2626';
+    errEl.textContent = `RUT inválido: el dígito verificador no corresponde (debería ser ${calcDV(cleanRut.slice(0, -1))})`;
+    errEl.style.display = 'block';
+    return;
+  }
+
   errEl.style.display = 'none';
   const btn = document.getElementById('mGrabarBtn');
   document.getElementById('mGrabarBtnText').textContent = 'Buscando...';

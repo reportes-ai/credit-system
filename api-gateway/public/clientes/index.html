@@ -753,27 +753,57 @@ function formatRUT(raw) {
   return fmt + '-' + dv;
 }
 
+/* Calcula el dígito verificador a partir del cuerpo (sólo dígitos) */
+function calcDV(body) {
+  const digits = String(body).replace(/\D/g, '');
+  if (!digits) return null;
+  const serie = [2, 3, 4, 5, 6, 7];
+  const suma = digits.split('').reverse()
+    .reduce((acc, d, i) => acc + parseInt(d) * serie[i % 6], 0);
+  const resto = 11 - (suma % 11);
+  if (resto === 11) return '0';
+  if (resto === 10) return 'K';
+  return String(resto);
+}
+
+/* Valida RUT completo (clean = sin puntos ni guión, mayúsculas) */
+function validarRUT(clean) {
+  if (clean.length < 7 || clean.length > 9) return null; // largo incompleto
+  const dvIngresado = clean.slice(-1).toUpperCase();
+  const body = clean.slice(0, -1);
+  return calcDV(body) === dvIngresado;
+}
+
 function onRutInput(el) {
-  const pos = el.selectionStart;
-  const raw = el.value;
-  const clean = raw.replace(/[^0-9kK]/g, '');
-  if (clean.length >= 2) {
-    const formatted = formatRUT(raw);
-    el.value = formatted;
-  }
-  // hint de validez
+  const raw   = el.value;
+  const clean = raw.replace(/[^0-9kK]/g, '').toUpperCase();
+  if (clean.length >= 2) el.value = formatRUT(raw);
+
   const hint = document.getElementById('rutHint');
   if (clean.length >= 7 && clean.length <= 9) {
-    hint.textContent = '';
+    const ok = validarRUT(clean);
+    if (ok) {
+      el.style.borderColor = '#059669';
+      hint.style.color = '#059669';
+      hint.textContent = '✓ RUT válido';
+    } else {
+      el.style.borderColor = '#dc2626';
+      hint.style.color = '#dc2626';
+      const dvEsperado = calcDV(clean.slice(0, -1));
+      hint.textContent = `✗ Dígito verificador incorrecto (debería ser ${dvEsperado})`;
+    }
   } else if (clean.length > 0) {
+    el.style.borderColor = '';
+    hint.style.color = '#9ca3af';
     hint.textContent = 'Ingresa el RUT completo con dígito verificador';
   } else {
+    el.style.borderColor = '';
     hint.textContent = '';
   }
 }
 
 function onRepRutInput(el) {
-  const clean = el.value.replace(/[^0-9kK]/g, '');
+  const clean = el.value.replace(/[^0-9kK]/g, '').toUpperCase();
   if (clean.length >= 2) el.value = formatRUT(el.value);
 }
 
@@ -945,6 +975,15 @@ function mostrarFoundBar(cliente) {
 async function buscarCliente() {
   const rut = document.getElementById('inputRut').value.trim().toUpperCase();
   if (!rut) { showAlert('Ingresa un RUT para buscar'); return; }
+
+  // Validar DV antes de buscar
+  const cleanRut = rut.replace(/[^0-9kK]/g, '').toUpperCase();
+  const dvOk = validarRUT(cleanRut);
+  if (dvOk === false) {
+    const dvEsperado = calcDV(cleanRut.slice(0, -1));
+    showAlert(`RUT inválido: el dígito verificador no corresponde (debería ser ${dvEsperado})`);
+    return;
+  }
 
   const btn = document.getElementById('btnBuscar');
   document.getElementById('btnBuscarText').classList.add('d-none');
