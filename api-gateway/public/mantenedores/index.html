@@ -25,14 +25,16 @@
     .perfil-badge { background: rgba(144,202,249,0.2); border: 1px solid rgba(144,202,249,0.4); color: #90caf9; border-radius: 12px; padding: 2px 10px; font-size: 0.73rem; font-weight: 600; }
     .btn-logout { background: rgba(255,255,255,0.1); border: 1px solid rgba(255,255,255,0.2); color: #fff; border-radius: 8px; padding: 5px 12px; font-size: 0.82rem; cursor: pointer; }
     .btn-logout:hover { background: rgba(255,255,255,0.2); }
-    .main-content { padding: 36px 40px; max-width: 900px; margin: 0 auto; }
+    .main-content { padding: 36px 40px; max-width: 1500px; margin: 0 auto; }
     .page-banner { background: linear-gradient(135deg, #012d70, #0141A2 50%, #009AFE); border-radius: 16px; color: #fff; padding: 28px 36px; margin-bottom: 36px; display: flex; align-items: center; gap: 20px; }
     .page-banner i.bi-sliders { font-size: 3rem; opacity: 0.8; }
     .page-banner h2 { font-weight: 700; margin: 0 0 4px; font-size: 1.4rem; }
     .page-banner p { opacity: 0.8; margin: 0; font-size: 0.9rem; }
     .section-title { font-weight: 700; font-size: 0.85rem; color: #6b7280; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 20px; display: flex; align-items: center; gap: 10px; }
     .section-title::after { content: ''; flex: 1; height: 1px; background: #e5e7eb; }
-    .modules-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 20px; }
+    .modules-grid { display: grid; grid-template-columns: repeat(5, 1fr); gap: 20px; }
+    @media (max-width: 900px) { .modules-grid { grid-template-columns: repeat(3, 1fr); } }
+    @media (max-width: 640px) { .main-content { padding: 20px 16px; } .modules-grid { grid-template-columns: repeat(2, 1fr); } }
     .module-card { background: #fff; border-radius: 14px; padding: 28px 24px; cursor: pointer; text-decoration: none; color: inherit; border: 2px solid transparent; transition: transform 0.18s, box-shadow 0.18s, border-color 0.18s; display: block; box-shadow: 0 1px 4px rgba(0,0,0,0.06); position: relative; }
     .module-card:hover { transform: translateY(-4px); box-shadow: 0 12px 32px rgba(1,65,162,0.15); border-color: var(--navy); color: inherit; }
     .card-icon { width: 52px; height: 52px; border-radius: 14px; background: linear-gradient(135deg, #e8eaf6, #c5cae9); display: flex; align-items: center; justify-content: center; font-size: 1.6rem; color: var(--navy); margin-bottom: 16px; transition: background 0.18s, color 0.18s; }
@@ -61,7 +63,7 @@
     <div class="topnav-left">
       <a href="/" class="topnav-brand">
         <img src="/img/logo.png" alt="AutoFácil">
-        <span class="version-badge">v3.3</span>
+        <span class="version-badge">v3.4</span>
       </a>
       <div class="breadcrumb-nav">
         <a href="/">Inicio</a><span class="sep">/</span>
