@@ -167,7 +167,7 @@
     <span class="sep">›</span>
     <span class="current">Cotizaciones</span>
   </span>
-  <span class="version-badge">v3.7</span>
+  <span class="version-badge">v3.8</span>
   <span class="user-info" id="userInfo"></span>
   <button class="btn-logout" onclick="logout()"><i class="bi bi-box-arrow-right"></i> Salir</button>
 </nav>
@@ -1158,9 +1158,14 @@ loadApis();
 function cotizacionPayload(rut, nombre) {
   const p = readInputs();
   const r = calcular(p);
+  // Fecha local del cliente (evita desfase UTC vs hora Chile)
+  const ahora = new Date();
+  const pad = n => String(n).padStart(2, '0');
+  const fechaLocal = `${ahora.getFullYear()}-${pad(ahora.getMonth()+1)}-${pad(ahora.getDate())} ${pad(ahora.getHours())}:${pad(ahora.getMinutes())}:${pad(ahora.getSeconds())}`;
   return {
     rut_cliente:      rut,
     nombre_cliente:   nombre,
+    fecha_cotizacion: fechaLocal,
     valor_vehiculo:   Math.round(p.valorVehiculo),
     pie:              Math.round(p.pie),
     plazo:            p.plazo,

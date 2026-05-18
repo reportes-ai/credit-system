@@ -47,7 +47,7 @@ const pool = require('../../../../shared/config/database');
 
 const create = async (req, res) => {
   try {
-    const { rut_cliente, nombre_cliente, valor_vehiculo, pie, plazo,
+    const { rut_cliente, nombre_cliente, fecha_cotizacion, valor_vehiculo, pie, plazo,
             tasa_mensual, monto_financiado, cuota, datos_json } = req.body;
 
     if (!rut_cliente || !nombre_cliente)
@@ -58,18 +58,19 @@ const create = async (req, res) => {
 
     const [r] = await pool.query(
       `INSERT INTO cotizaciones
-         (rut_cliente, nombre_cliente, valor_vehiculo, pie, plazo,
+         (rut_cliente, nombre_cliente, fecha_cotizacion, valor_vehiculo, pie, plazo,
           tasa_mensual, monto_financiado, cuota, datos_json, id_usuario)
-       VALUES (?,?,?,?,?,?,?,?,?,?)`,
+       VALUES (?,?,?,?,?,?,?,?,?,?,?)`,
       [
         rut_cliente.toUpperCase().trim(),
         nombre_cliente.trim(),
-        valor_vehiculo || null,
-        pie            || null,
-        plazo          || null,
-        tasa_mensual   || null,
+        fecha_cotizacion || null,
+        valor_vehiculo   || null,
+        pie              || null,
+        plazo            || null,
+        tasa_mensual     || null,
         monto_financiado || null,
-        cuota          || null,
+        cuota            || null,
         JSON.stringify(datos_json || {}),
         id_usuario,
       ]

@@ -12,6 +12,7 @@ const pool = mysql.createPool({
   user:     process.env.DB_USER     || 'root',
   password: process.env.DB_PASSWORD || '',
   database: process.env.DB_NAME     || 'credit_system',
+  timezone: '-03:00',   // Hora Chile (America/Santiago estándar)
   waitForConnections: true,
   connectionLimit: 10,
   queueLimit: 0,
