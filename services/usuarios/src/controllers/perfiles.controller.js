@@ -1,5 +1,48 @@
 const pool = require('../../../../shared/config/database');
 
+// Migración: insertar módulos Tesorería, CRM, Cobranza, Reportería si no existen
+(async () => {
+  try {
+    const nuevos = [
+      { nombre: 'Tesorería',  icono: 'bi-safe2',        ruta: '/tesoreria/', descripcion: 'Gestión de pagos y flujos de caja', orden: 20 },
+      { nombre: 'CRM',        icono: 'bi-people',        ruta: '/crm/',        descripcion: 'Gestión de relaciones con clientes', orden: 21 },
+      { nombre: 'Cobranza',   icono: 'bi-bell',          ruta: '/cobranza/',   descripcion: 'Seguimiento y gestión de cobros', orden: 22 },
+      { nombre: 'Reportería', icono: 'bi-bar-chart-line', ruta: '/reporteria/', descripcion: 'Informes y reportes del sistema', orden: 23 },
+    ];
+    for (const m of nuevos) {
+      const [rows] = await pool.query('SELECT id_modulo FROM modulos WHERE nombre = ?', [m.nombre]);
+      let id_modulo;
+      if (rows.length === 0) {
+        const [ins] = await pool.query(
+          `INSERT INTO modulos (nombre, descripcion, icono, ruta, orden, estado)
+           VALUES (?, ?, ?, ?, ?, 'activo')`,
+          [m.nombre, m.descripcion, m.icono, m.ruta, m.orden]
+        );
+        id_modulo = ins.insertId;
+        // Funcionalidad base
+        const [insF] = await pool.query(
+          `INSERT INTO funcionalidades (id_modulo, nombre, codigo)
+           VALUES (?, ?, ?)`,
+          [id_modulo, `Ver ${m.nombre}`, `${m.nombre.toLowerCase().replace(/\s/g,'_')}_ver`]
+        );
+        // Permisos: otorgar a todos los perfiles activos
+        const [perfiles] = await pool.query('SELECT id_perfil FROM perfiles');
+        for (const p of perfiles) {
+          await pool.query(
+            `INSERT IGNORE INTO permisos_perfil (id_perfil, id_funcionalidad, habilitado)
+             VALUES (?, ?, 1)`,
+            [p.id_perfil, insF.insertId]
+          );
+        }
+      }
+    }
+    // Mover Pagos dentro de Tesorería: actualizar ruta si existe y actualizar orden
+    await pool.query(`UPDATE modulos SET orden = 99, estado = 'inactivo' WHERE nombre = 'Pagos' AND ruta NOT LIKE '/tesoreria/%'`);
+  } catch (e) {
+    console.error('[modulos migration]', e.message);
+  }
+})();
+
 const getAllPerfiles = async (req, res) => {
   try {
     const [perfiles] = await pool.query(

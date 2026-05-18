@@ -57,6 +57,18 @@ app.get(['/clientes', '/clientes/'], (req, res) =>
 app.get(['/cotizaciones', '/cotizaciones/'], (req, res) =>
   res.sendFile(path.join(__dirname, '../public/cotizaciones/index.html')));
 
+app.get(['/tesoreria', '/tesoreria/'], (req, res) =>
+  res.sendFile(path.join(__dirname, '../public/tesoreria/index.html')));
+
+app.get(['/crm', '/crm/'], (req, res) =>
+  res.sendFile(path.join(__dirname, '../public/crm/index.html')));
+
+app.get(['/cobranza', '/cobranza/'], (req, res) =>
+  res.sendFile(path.join(__dirname, '../public/cobranza/index.html')));
+
+app.get(['/reporteria', '/reporteria/'], (req, res) =>
+  res.sendFile(path.join(__dirname, '../public/reporteria/index.html')));
+
 app.use((req, res) => res.status(404).json({ success: false, error: 'Ruta no encontrada' }));
 
 const PORT = process.env.PORT || 3000;
