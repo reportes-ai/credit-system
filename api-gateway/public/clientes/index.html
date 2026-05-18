@@ -280,7 +280,7 @@
   </div>
   <div class="user-info d-none d-sm-flex align-items-center gap-2">
     <span id="navUser"></span>
-    <span class="version-badge">v4.5</span>
+    <span class="version-badge">v4.6</span>
   </div>
   <button class="btn-logout ms-2" onclick="logout()">
     <i class="bi bi-box-arrow-right"></i> Salir
@@ -397,7 +397,7 @@
           <input type="text" id="pApPaterno" class="form-control" placeholder="Apellido paterno" oninput="upperInput(this)">
         </div>
         <div class="col-md-4 col-lg-3">
-          <label class="form-label">Apellido Materno</label>
+          <label class="form-label">Apellido Materno *</label>
           <input type="text" id="pApMaterno" class="form-control" placeholder="Apellido materno" oninput="upperInput(this)">
         </div>
         <div class="col-md-4 col-lg-4">
@@ -405,7 +405,7 @@
           <input type="text" id="pNombres" class="form-control" placeholder="Nombres" oninput="upperInput(this)">
         </div>
         <div class="col-md-3 col-lg-2">
-          <label class="form-label">Fecha Nacimiento</label>
+          <label class="form-label">Fecha Nacimiento *</label>
           <input type="date" id="pFechaNac" class="form-control no-upper" onchange="calcularEdad()">
         </div>
         <div class="col-md-2 col-lg-1">
@@ -431,7 +431,7 @@
           </select>
         </div>
         <div class="col-md-2 col-lg-2">
-          <label class="form-label">Sexo</label>
+          <label class="form-label">Sexo *</label>
           <select id="pSexo" class="form-select no-upper">
             <option value="">—</option>
             <option value="MASCULINO">Masculino</option>
@@ -449,21 +449,21 @@
       <div class="section-label"><i class="bi bi-credit-card me-1"></i>Datos legales / visas</div>
       <div class="row g-2">
         <div class="col-md-4 col-lg-3">
-          <label class="form-label">Nacionalidad</label>
+          <label class="form-label">Nacionalidad *</label>
           <select id="pNacionalidad" class="form-select no-upper" onchange="onNacionalidadChange()">
             <option value="">— Seleccione —</option>
           </select>
         </div>
         <div class="col-md-3 col-lg-2">
-          <label class="form-label">Teléfono Móvil</label>
+          <label class="form-label">Teléfono Móvil *</label>
           <input type="text" id="pTelefono" class="form-control no-upper" placeholder="+56 9 1234 5678">
         </div>
         <div class="col-md-3 col-lg-2">
-          <label class="form-label">Tipo de Visa</label>
+          <label class="form-label">Tipo de Visa <small class="text-muted">(extranjeros *)</small></label>
           <input type="text" id="pTipoVisa" class="form-control" placeholder="Ej: TEMPORARIA" oninput="upperInput(this)">
         </div>
         <div class="col-md-2 col-lg-2">
-          <label class="form-label">Fecha Visa</label>
+          <label class="form-label">Fecha Visa <small class="text-muted">(extranjeros *)</small></label>
           <input type="date" id="pFechaVisa" class="form-control no-upper">
         </div>
       </div>
@@ -472,11 +472,11 @@
       <div class="section-label"><i class="bi bi-envelope me-1"></i>Contacto y domicilio</div>
       <div class="row g-2">
         <div class="col-md-4 col-lg-3">
-          <label class="form-label">Correo electrónico</label>
+          <label class="form-label">Correo electrónico *</label>
           <input type="email" id="pCorreo" class="form-control email-field" placeholder="correo@ejemplo.cl">
         </div>
         <div class="col-md-8 col-lg-5">
-          <label class="form-label">Dirección</label>
+          <label class="form-label">Dirección *</label>
           <input type="text" id="pDireccion" class="form-control" placeholder="Calle, número" oninput="upperInput(this)">
         </div>
         <div class="col-md-4 col-lg-3">
@@ -1340,10 +1340,35 @@ async function recargarCliente(rut) {
 
 function buildBody(tipo) {
   if (tipo === 'PERSONA') {
-    const apPat = document.getElementById('pApPaterno').value.trim();
-    const nombres = document.getElementById('pNombres').value.trim();
-    if (!apPat || !nombres) {
-      showAlert('Apellido paterno y nombres son obligatorios');
+    const apPat      = document.getElementById('pApPaterno').value.trim();
+    const apMat      = document.getElementById('pApMaterno').value.trim();
+    const nombres    = document.getElementById('pNombres').value.trim();
+    const fechaNac   = document.getElementById('pFechaNac').value;
+    const sexo       = document.getElementById('pSexo').value;
+    const telefono   = document.getElementById('pTelefono').value.trim();
+    const correo     = document.getElementById('pCorreo').value.trim();
+    const nacion     = document.getElementById('pNacionalidad').value.trim();
+    const direccion  = document.getElementById('pDireccion').value.trim();
+    const tipoVisa   = document.getElementById('pTipoVisa').value.trim();
+    const fechaVisa  = document.getElementById('pFechaVisa').value;
+
+    const faltantes = [];
+    if (!apPat)    faltantes.push('Apellido Paterno');
+    if (!apMat)    faltantes.push('Apellido Materno');
+    if (!nombres)  faltantes.push('Nombres');
+    if (!fechaNac) faltantes.push('Fecha Nacimiento');
+    if (!sexo)     faltantes.push('Sexo');
+    if (!telefono) faltantes.push('Teléfono Móvil');
+    if (!correo)   faltantes.push('Correo electrónico');
+    if (!nacion)   faltantes.push('Nacionalidad');
+    if (!direccion)faltantes.push('Dirección');
+    if (nacion && nacion !== 'CHILE') {
+      if (!tipoVisa)  faltantes.push('Tipo de Visa');
+      if (!fechaVisa) faltantes.push('Fecha Visa');
+    }
+
+    if (faltantes.length) {
+      showAlert('Campos obligatorios faltantes: ' + faltantes.join(', '));
       return null;
     }
     return {
