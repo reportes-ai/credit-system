@@ -115,7 +115,7 @@
   <nav class="topnav">
     <div class="topnav-brand">
       <a href="/"><img src="/img/logo.png" alt="AutoFácil" style="height:32px;filter:brightness(0) invert(1);"></a>
-      <span class="version-badge">v4.5</span>
+      <span class="version-badge">v4.6</span>
       <span class="sep">/</span>
       <i class="bi bi-people-fill" style="color:#7dd3fc"></i> Usuarios
     </div>
@@ -187,6 +187,7 @@
                   <th>Nombre</th>
                   <th>RUT</th>
                   <th>Email</th>
+                  <th>Teléfono</th>
                   <th>Perfil</th>
                   <th>Supervisor</th>
                   <th>Estado</th>
@@ -290,6 +291,10 @@
             <div class="col-md-6">
               <label class="form-label">Email *</label>
               <input type="email" id="uEmail" class="form-control">
+            </div>
+            <div class="col-md-6">
+              <label class="form-label">Teléfono</label>
+              <input type="text" id="uTelefono" class="form-control" placeholder="+56 9 1234 5678">
             </div>
             <div class="col-md-6" id="campoPassword">
               <label class="form-label">Contraseña *</label>
@@ -426,6 +431,7 @@
           <td><strong>${u.nombre} ${u.apellido}</strong></td>
           <td class="text-muted">${u.rut}</td>
           <td>${u.email}</td>
+          <td class="text-muted">${u.telefono || '—'}</td>
           <td><span class="badge-perfil">${u.perfil}</span></td>
           <td class="text-muted">${u.supervisor_nombre || '—'}</td>
           <td><span class="badge-estado badge-${u.estado}">${u.estado}</span></td>
@@ -485,6 +491,7 @@
           document.getElementById('uNombre').value = u.nombre;
           document.getElementById('uApellido').value = u.apellido;
           document.getElementById('uEmail').value = u.email;
+          document.getElementById('uTelefono').value = u.telefono || '';
           document.getElementById('uPerfil').value = u.id_perfil;
           document.getElementById('uSupervisor').value = u.id_supervisor || '';
           document.getElementById('uEstado').value = u.estado;
@@ -496,6 +503,7 @@
         document.getElementById('uNombre').value = '';
         document.getElementById('uApellido').value = '';
         document.getElementById('uEmail').value = '';
+        document.getElementById('uTelefono').value = '';
         document.getElementById('uPerfil').value = '';
         document.getElementById('uPassword').value = '';
         document.getElementById('uSupervisor').value = '';
@@ -521,6 +529,7 @@
         nombre: document.getElementById('uNombre').value.trim(),
         apellido: document.getElementById('uApellido').value.trim(),
         email: document.getElementById('uEmail').value.trim(),
+        telefono: document.getElementById('uTelefono').value.trim() || null,
         id_perfil: document.getElementById('uPerfil').value,
         id_supervisor: document.getElementById('uSupervisor').value || null,
         estado: document.getElementById('uEstado').value || 'activo'
