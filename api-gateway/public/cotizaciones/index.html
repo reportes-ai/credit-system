@@ -210,6 +210,59 @@
     .cot-empty { text-align: center; padding: 28px; color: #9ca3af; font-size: .88rem; }
     .cot-loading { text-align: center; padding: 20px; color: #6b7280; font-size: .85rem; }
     .cot-count { font-size: .78rem; color: #6b7280; margin-bottom: 8px; }
+    .btn-detalle-cot {
+      background: none; border: 1.5px solid #d1d5db; border-radius: 6px;
+      color: var(--navy); font-size: .75rem; font-weight: 700;
+      padding: 3px 9px; cursor: pointer; white-space: nowrap;
+      transition: background .12s, border-color .12s;
+    }
+    .btn-detalle-cot:hover { background: #eef2ff; border-color: var(--navy); }
+
+    /* ── Modal Detalle Cotización ────────────────────────────────────── */
+    .modal-detalle-overlay {
+      display: none; position: fixed; inset: 0;
+      background: rgba(0,0,0,.5); z-index: 3000;
+      align-items: center; justify-content: center; padding: 16px;
+    }
+    .modal-detalle-overlay.open { display: flex; }
+    .modal-detalle-box {
+      background: #fff; border-radius: 16px; width: 100%; max-width: 640px;
+      max-height: 90vh; overflow: hidden; display: flex; flex-direction: column;
+      box-shadow: 0 8px 40px rgba(0,0,0,.22);
+    }
+    .modal-detalle-head {
+      background: linear-gradient(135deg, #012d70, #0141A2);
+      color: #fff; padding: 16px 20px;
+      display: flex; align-items: center; gap: 10px; flex-shrink: 0;
+    }
+    .modal-detalle-head h3 { margin: 0; font-size: 1rem; font-weight: 700; flex: 1; }
+    .modal-detalle-head .close-btn {
+      background: none; border: none; color: rgba(255,255,255,.8);
+      font-size: 1.2rem; cursor: pointer; line-height: 1; padding: 2px 6px;
+    }
+    .modal-detalle-head .close-btn:hover { color: #fff; }
+    .modal-detalle-body { padding: 20px; overflow-y: auto; flex: 1; }
+    .modal-detalle-textarea {
+      width: 100%; min-height: 380px; border: 1.5px solid #d1d5db;
+      border-radius: 10px; padding: 14px 16px; font-size: .85rem;
+      line-height: 1.7; font-family: 'Segoe UI', system-ui, sans-serif;
+      resize: vertical; outline: none; color: #1f2937;
+      transition: border-color .2s;
+    }
+    .modal-detalle-textarea:focus { border-color: var(--navy); box-shadow: 0 0 0 3px rgba(1,65,162,.1); }
+    .modal-detalle-footer {
+      padding: 14px 20px; border-top: 1px solid #f0f2f5;
+      display: flex; gap: 10px; justify-content: flex-end; flex-shrink: 0;
+    }
+    .btn-copiar {
+      background: linear-gradient(135deg, #059669, #047857);
+      color: #fff; border: none; border-radius: 8px;
+      padding: 9px 22px; font-size: .88rem; font-weight: 700;
+      cursor: pointer; display: flex; align-items: center; gap: 7px;
+      transition: opacity .15s;
+    }
+    .btn-copiar:hover { opacity: .88; }
+    .btn-copiar.copied { background: linear-gradient(135deg, #0141A2, #009AFE); }
 
     /* ── Page banner ─────────────────────────────────────────────────── */
     .page-banner { background: linear-gradient(135deg, #012d70, #0141A2 50%, #009AFE); border-radius: 16px; color: #fff; padding: 28px 36px; margin-bottom: 36px; display: flex; align-items: center; gap: 20px; }
@@ -228,7 +281,7 @@
     <span class="sep">›</span>
     <span class="current">Cotizaciones</span>
   </span>
-  <span class="version-badge">v4.0</span>
+  <span class="version-badge">v4.1</span>
   <span class="user-info" id="userInfo"></span>
   <button class="btn-logout" onclick="logout()"><i class="bi bi-box-arrow-right"></i> Salir</button>
 </nav>
@@ -1288,6 +1341,10 @@ async function buscarCotizaciones() {
            + ' ' + d.toLocaleTimeString('es-CL', { hour:'2-digit', minute:'2-digit' });
     };
 
+    // Guardar filas en mapa global para acceso desde onclick
+    window._cotRowMap = {};
+    rows.forEach(r => { window._cotRowMap[r.id_cotizacion] = r; });
+
     resultsEl.innerHTML = `
       <div style="overflow-x:auto">
         <table class="cot-table">
@@ -1300,6 +1357,7 @@ async function buscarCotizaciones() {
               <th class="num">Pie</th>
               <th style="text-align:center">Plazo</th>
               <th class="num">Cuota</th>
+              <th></th>
             </tr>
           </thead>
           <tbody>
@@ -1312,6 +1370,11 @@ async function buscarCotizaciones() {
                 <td class="num">${fmtPeso(r.pie)}</td>
                 <td style="text-align:center">${r.plazo ? r.plazo + ' m' : '—'}</td>
                 <td class="num" style="color:var(--navy);font-weight:800">${fmtPeso(r.cuota)}</td>
+                <td style="text-align:center">
+                  <button class="btn-detalle-cot" onclick="abrirDetalle(window._cotRowMap[${r.id_cotizacion}])">
+                    <i class="bi bi-envelope-paper"></i> Enviar
+                  </button>
+                </td>
               </tr>`).join('')}
           </tbody>
         </table>
@@ -1444,10 +1507,141 @@ document.addEventListener('click', function(e) {
   if (e.target.id === 'modalExito')  cerrarModalExito();
 });
 document.addEventListener('keydown', function(e) {
-  if (e.key === 'Escape') { cerrarModalGrabar(); cerrarModalExito(); }
+  if (e.key === 'Escape') { cerrarModalGrabar(); cerrarModalExito(); cerrarDetalle(); }
   if (e.key === 'Enter' && document.getElementById('modalGrabar').style.display === 'flex') buscarYGrabar();
 });
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   DETALLE COTIZACIÓN (popup texto editable + copiar)
+═══════════════════════════════════════════════════════════════════════════ */
+
+function _decodirJWT() {
+  try {
+    const t = localStorage.getItem('token');
+    if (!t) return {};
+    return JSON.parse(atob(t.split('.')[1]));
+  } catch { return {}; }
+}
+
+function _detectarTratamiento(nombreCompleto) {
+  if (!nombreCompleto) return 'Estimado/a';
+  // Toma el primer nombre (antes del primer espacio)
+  const primer = nombreCompleto.trim().split(/\s+/)[0].toUpperCase();
+  // Si termina en A (y no es ANDREA con 'E' al revés) → femenino
+  // Lista de nombres masculinos que terminan en A:
+  const masculinosConA = ['ELIAS','ISAIAS','JEREMIAS','JOSE','ZACARÍAS','ZACARIAS','LUCAS','NICOLAS','TOBIAS','MATIAS','JERONIMAS'];
+  if (masculinosConA.includes(primer)) return 'Estimado';
+  if (primer.endsWith('A')) return 'Estimada';
+  return 'Estimado';
+}
+
+function _fmtPesoDetalle(v) {
+  if (v == null || v === '') return '—';
+  return '$' + Number(v).toLocaleString('es-CL');
+}
+
+function abrirDetalle(rowData) {
+  const user = _decodirJWT();
+  const ejecutivo = `${user.nombre || ''} ${user.apellido || ''}`.trim() || 'Ejecutivo AutoFácil';
+  const emailEjec = user.email || '';
+
+  const tratamiento = _detectarTratamiento(rowData.nombre_cliente);
+  const nombre      = rowData.nombre_cliente || '—';
+  const rut         = rowData.rut_cliente    || '—';
+
+  const fmtFechaLarga = s => {
+    if (!s) return '—';
+    const d = new Date(s);
+    return d.toLocaleDateString('es-CL', { weekday:'long', day:'numeric', month:'long', year:'numeric' });
+  };
+
+  const lineas = [
+    `${tratamiento}(a): ${nombre}`,
+    `RUT: ${rut}`,
+    '',
+    `De acuerdo a lo conversado, nos es muy grato hacerle llegar la siguiente simulación del Crédito Automotriz cotizado.`,
+    '',
+    `Para mayor información, detalle o concretar la compra de su automóvil puede contactarse con su ejecutivo:`,
+    '',
+    `   ${ejecutivo}`,
+    emailEjec ? `   ✉ ${emailEjec}` : '',
+    `   📞 (agregar teléfono)`,
+    '',
+    '─'.repeat(48),
+    '   DETALLE DE LA COTIZACIÓN',
+    '─'.repeat(48),
+    '',
+    rowData.fecha_cotizacion ? `Fecha:              ${fmtFechaLarga(rowData.fecha_cotizacion)}` : '',
+    `Valor Vehículo:     ${_fmtPesoDetalle(rowData.valor_vehiculo)}`,
+    `Pie:                ${_fmtPesoDetalle(rowData.pie)}`,
+    rowData.monto_financiado ? `Monto Financiado:   ${_fmtPesoDetalle(rowData.monto_financiado)}` : '',
+    rowData.plazo            ? `Plazo:              ${rowData.plazo} meses` : '',
+    rowData.tasa_mensual     ? `Tasa Mensual:       ${Number(rowData.tasa_mensual).toFixed(2)}%` : '',
+    '',
+    rowData.cuota ? `💰 CUOTA MENSUAL:  ${_fmtPesoDetalle(rowData.cuota)}` : '',
+    '',
+    '─'.repeat(48),
+    '',
+    'Este valor es referencial y puede variar según las condiciones definitivas del crédito.',
+    '',
+    `Atentamente,`,
+    `${ejecutivo}`,
+    emailEjec ? `${emailEjec}` : '',
+    'AutoFácil',
+  ].filter(l => l !== null).join('\n');
+
+  document.getElementById('detalleTexto').value = lineas;
+  document.getElementById('modalDetalle').classList.add('open');
+
+  // Resetear botón copiar
+  const btn = document.getElementById('btnCopiar');
+  btn.classList.remove('copied');
+  btn.innerHTML = '<i class="bi bi-clipboard"></i> Copiar para correo / WhatsApp';
+}
+
+function cerrarDetalle() {
+  document.getElementById('modalDetalle').classList.remove('open');
+}
+
+async function copiarDetalle() {
+  const texto = document.getElementById('detalleTexto').value;
+  try {
+    await navigator.clipboard.writeText(texto);
+    const btn = document.getElementById('btnCopiar');
+    btn.classList.add('copied');
+    btn.innerHTML = '<i class="bi bi-check2"></i> ¡Copiado!';
+    setTimeout(() => {
+      btn.classList.remove('copied');
+      btn.innerHTML = '<i class="bi bi-clipboard"></i> Copiar para correo / WhatsApp';
+    }, 2500);
+  } catch {
+    // Fallback para navegadores sin clipboard API
+    document.getElementById('detalleTexto').select();
+    document.execCommand('copy');
+  }
+}
 </script>
+
+<!-- ═══ MODAL DETALLE COTIZACIÓN ═══ -->
+<div class="modal-detalle-overlay" id="modalDetalle" onclick="if(event.target===this)cerrarDetalle()">
+  <div class="modal-detalle-box">
+    <div class="modal-detalle-head">
+      <i class="bi bi-file-earmark-text" style="font-size:1.2rem"></i>
+      <h3>Detalle de Cotización</h3>
+      <button class="close-btn" onclick="cerrarDetalle()"><i class="bi bi-x-lg"></i></button>
+    </div>
+    <div class="modal-detalle-body">
+      <p style="font-size:.78rem;color:#6b7280;margin:0 0 10px">Puedes editar el texto antes de copiarlo.</p>
+      <textarea class="modal-detalle-textarea" id="detalleTexto"></textarea>
+    </div>
+    <div class="modal-detalle-footer">
+      <button onclick="cerrarDetalle()" style="background:#f3f4f6;color:#374151;border:1.5px solid #d1d5db;border-radius:8px;padding:9px 18px;font-size:.88rem;font-weight:600;cursor:pointer">Cerrar</button>
+      <button class="btn-copiar" id="btnCopiar" onclick="copiarDetalle()">
+        <i class="bi bi-clipboard"></i> Copiar para correo / WhatsApp
+      </button>
+    </div>
+  </div>
+</div>
 
 <!-- ═══ MODAL GRABAR: pedir RUT ═══ -->
 <div id="modalGrabar" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:2000;align-items:center;justify-content:center">
