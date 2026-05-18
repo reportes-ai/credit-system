@@ -167,7 +167,7 @@
     <span class="sep">›</span>
     <span class="current">Cotizaciones</span>
   </span>
-  <span class="version-badge">v3.6</span>
+  <span class="version-badge">v3.7</span>
   <span class="user-info" id="userInfo"></span>
   <button class="btn-logout" onclick="logout()"><i class="bi bi-box-arrow-right"></i> Salir</button>
 </nav>
@@ -1180,6 +1180,23 @@ async function guardarCotizacion(rut, nombre) {
   return resp.json();
 }
 
+function formatRUT(raw) {
+  let clean = raw.replace(/[^0-9kK]/g, '').toUpperCase();
+  if (clean.length < 2) return clean;
+  const dv   = clean.slice(-1);
+  const body = clean.slice(0, -1);
+  let fmt = '';
+  for (let i = body.length; i > 0; i -= 3)
+    fmt = body.slice(Math.max(0, i - 3), i) + (fmt ? '.' + fmt : '');
+  return fmt + '-' + dv;
+}
+
+function onGrabarRutInput(el) {
+  const clean = el.value.replace(/[^0-9kK]/g, '');
+  if (clean.length >= 2) el.value = formatRUT(el.value);
+  document.getElementById('mGrabarError').style.display = 'none';
+}
+
 function abrirModalGrabar() {
   const p = readInputs();
   if (!p.valorVehiculo || !p.plazo) {
@@ -1274,7 +1291,7 @@ document.addEventListener('keydown', function(e) {
     <label style="font-size:.82rem;font-weight:600;color:#374151;display:block;margin-bottom:6px">RUT del Cliente</label>
     <input id="mGrabarRut" type="text" placeholder="12.345.678-9" maxlength="12"
       style="width:100%;border:1.5px solid #d1d5db;border-radius:8px;padding:10px 14px;font-size:.95rem;box-sizing:border-box;outline:none"
-      oninput="this.value=this.value.replace(/[^0-9kK.\-]/g,'')"
+      oninput="onGrabarRutInput(this)"
       onfocus="this.style.borderColor='#0141A2'" onblur="this.style.borderColor='#d1d5db'">
     <div id="mGrabarError" style="display:none;color:#dc2626;font-size:.8rem;margin-top:6px"></div>
     <button id="mGrabarBtn" onclick="buscarYGrabar()"
