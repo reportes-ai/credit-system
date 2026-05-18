@@ -36,26 +36,28 @@
     .page-banner p  { margin:0; font-size:.83rem; opacity:.8; }
 
     /* ── Module tab cards ── */
-    .tab-cards { display:grid; grid-template-columns:repeat(2, minmax(0,300px)); gap:16px; margin-bottom:24px; }
+    .tab-cards { display:grid; grid-template-columns:repeat(2, minmax(0,320px)); gap:12px; margin-bottom:20px; }
     .tab-card {
-      background:#fff; border-radius:14px; padding:24px 22px; cursor:pointer;
+      background:#fff; border-radius:12px; padding:14px 18px; cursor:pointer;
       border:2px solid transparent; transition:transform .18s, box-shadow .18s, border-color .18s;
       box-shadow:0 1px 4px rgba(0,0,0,.06); text-align:left; width:100%;
+      display:flex; align-items:center; gap:14px;
     }
-    .tab-card:hover { transform:translateY(-4px); box-shadow:0 12px 32px rgba(1,65,162,.15); border-color:var(--navy); }
-    .tab-card.active { border-color:var(--navy); box-shadow:0 8px 28px rgba(1,65,162,.18); }
+    .tab-card:hover { transform:translateY(-3px); box-shadow:0 8px 24px rgba(1,65,162,.15); border-color:var(--navy); }
+    .tab-card.active { border-color:var(--navy); box-shadow:0 6px 20px rgba(1,65,162,.18); }
     .tab-card .card-icon {
-      width:52px; height:52px; border-radius:14px;
+      width:40px; height:40px; border-radius:10px; flex-shrink:0;
       background:linear-gradient(135deg,#e8eaf6,#c5cae9);
       display:flex; align-items:center; justify-content:center;
-      font-size:1.6rem; color:var(--navy); margin-bottom:14px;
+      font-size:1.2rem; color:var(--navy);
       transition:background .18s, color .18s;
     }
     .tab-card:hover .card-icon,
     .tab-card.active .card-icon { background:linear-gradient(135deg,var(--navy),var(--blue)); color:#fff; }
-    .tab-card h6 { font-weight:700; font-size:.95rem; margin:0 0 5px; color:#111827; }
-    .tab-card p  { font-size:.8rem; color:#6b7280; margin:0 0 16px; line-height:1.4; }
-    .btn-acceder { background:var(--navy); color:#fff; border:none; border-radius:8px; padding:7px 16px; font-size:.82rem; font-weight:600; }
+    .tab-card .card-text { flex:1; }
+    .tab-card h6 { font-weight:700; font-size:.88rem; margin:0 0 2px; color:#111827; }
+    .tab-card p  { font-size:.75rem; color:#6b7280; margin:0; line-height:1.3; }
+    .btn-acceder { background:var(--navy); color:#fff; border:none; border-radius:7px; padding:5px 12px; font-size:.75rem; font-weight:600; white-space:nowrap; flex-shrink:0; }
     .tab-card:hover .btn-acceder,
     .tab-card.active .btn-acceder { background:var(--blue); }
     .tab-panel { display:none; }
@@ -215,14 +217,18 @@
   <div class="tab-cards" id="mainTabs">
     <button class="tab-card active" data-tab="consulta" onclick="cambiarTab('consulta')">
       <div class="card-icon"><i class="bi bi-search"></i></div>
-      <h6>Consulta Créditos</h6>
-      <p>Busca y revisa el estado de los créditos vigentes, en mora o cancelados.</p>
+      <div class="card-text">
+        <h6>Consulta Créditos</h6>
+        <p>Busca y revisa créditos vigentes, en mora o cancelados.</p>
+      </div>
       <span class="btn-acceder"><i class="bi bi-arrow-right-circle me-1"></i>Ver módulo</span>
     </button>
     <button class="tab-card" data-tab="ingreso" onclick="cambiarTab('ingreso')">
       <div class="card-icon"><i class="bi bi-plus-circle"></i></div>
-      <h6>Ingreso de Créditos</h6>
-      <p>Registra un nuevo crédito con datos del cliente, vehículo y condiciones de financiamiento.</p>
+      <div class="card-text">
+        <h6>Ingreso de Créditos</h6>
+        <p>Registra un nuevo crédito con cliente, vehículo y condiciones.</p>
+      </div>
       <span class="btn-acceder"><i class="bi bi-arrow-right-circle me-1"></i>Ver módulo</span>
     </button>
   </div>
