@@ -102,7 +102,7 @@ const getAll = async (req, res) => {
     const { q } = req.query;
     let sql = `SELECT id_cotizacion, rut_cliente, nombre_cliente, fecha_cotizacion,
                       valor_vehiculo, pie, plazo, tasa_mensual, monto_financiado, cuota,
-                      id_usuario, created_at
+                      datos_json, id_usuario, created_at
                FROM cotizaciones`;
     const params = [];
     if (q && q.trim()) {

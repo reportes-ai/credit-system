@@ -281,7 +281,7 @@
     <span class="sep">›</span>
     <span class="current">Cotizaciones</span>
   </span>
-  <span class="version-badge">v4.1</span>
+  <span class="version-badge">v4.2</span>
   <span class="user-info" id="userInfo"></span>
   <button class="btn-logout" onclick="logout()"><i class="bi bi-box-arrow-right"></i> Salir</button>
 </nav>
@@ -1555,6 +1555,65 @@ function abrirDetalle(rowData) {
     return d.toLocaleDateString('es-CL', { weekday:'long', day:'numeric', month:'long', year:'numeric' });
   };
 
+  // Extraer datos_json (puede venir como objeto o como string)
+  let dj = {};
+  try {
+    dj = typeof rowData.datos_json === 'string'
+      ? JSON.parse(rowData.datos_json)
+      : (rowData.datos_json || {});
+  } catch { dj = {}; }
+  const inp = dj.inputs    || {};
+  const res = dj.resultados || {};
+
+  // ── Bloque Gastos Operativos ──────────────────────────────────────────
+  const gastos = [
+    { label: 'Prenda',                   val: inp.prenda },
+    { label: 'Retiro Gestión Auto',       val: inp.retiro },
+    { label: 'Limitación de Dominio',     val: inp.limitacion },
+    { label: 'Gastos Administración',     val: inp.admin },
+    { label: 'Inscripción / Transferencia', val: inp.inscripcion },
+    { label: 'GPS 24 meses',              val: inp.gps },
+    { label: 'Reparaciones Menores',      val: inp.reparaciones },
+  ].filter(g => g.val && g.val > 0);
+
+  const totalGastos = res.gastosOp ?? gastos.reduce((s, g) => s + g.val, 0);
+
+  const pad = (str, len) => str + ' '.repeat(Math.max(0, len - str.length));
+  const lineasGastos = gastos.length > 0
+    ? [
+        '─'.repeat(48),
+        '   GASTOS OPERATIVOS',
+        '─'.repeat(48),
+        '',
+        ...gastos.map(g => `   ${pad(g.label + ':', 34)} ${_fmtPesoDetalle(g.val)}`),
+        `   ${'─'.repeat(44)}`,
+        `   ${pad('Total Gastos Operativos:', 34)} ${_fmtPesoDetalle(totalGastos)}`,
+        '',
+      ]
+    : [];
+
+  // ── Bloque Seguros ────────────────────────────────────────────────────
+  const seguros = [
+    { label: 'Desgravamen',   val: res.segDesg,  activo: inp.chkD },
+    { label: 'RDH (Desempleo)', val: res.segRdh, activo: inp.chkR },
+    { label: 'Cesantía',      val: res.segCesa,  activo: inp.chkC },
+  ].filter(s => s.activo && s.val > 0);
+
+  const totalSeg = res.totalSeguros ?? seguros.reduce((s, seg) => s + seg.val, 0);
+
+  const lineasSeguros = seguros.length > 0
+    ? [
+        '─'.repeat(48),
+        '   SEGUROS INCLUIDOS',
+        '─'.repeat(48),
+        '',
+        ...seguros.map(s => `   ${pad(s.label + ':', 34)} ${_fmtPesoDetalle(s.val)}`),
+        `   ${'─'.repeat(44)}`,
+        `   ${pad('Total Seguros:', 34)} ${_fmtPesoDetalle(totalSeg)}`,
+        '',
+      ]
+    : [];
+
   const lineas = [
     `${tratamiento}(a): ${nombre}`,
     `RUT: ${rut}`,
@@ -1571,14 +1630,22 @@ function abrirDetalle(rowData) {
     '   DETALLE DE LA COTIZACIÓN',
     '─'.repeat(48),
     '',
-    rowData.fecha_cotizacion ? `Fecha:              ${fmtFechaLarga(rowData.fecha_cotizacion)}` : '',
-    `Valor Vehículo:     ${_fmtPesoDetalle(rowData.valor_vehiculo)}`,
-    `Pie:                ${_fmtPesoDetalle(rowData.pie)}`,
-    rowData.monto_financiado ? `Monto Financiado:   ${_fmtPesoDetalle(rowData.monto_financiado)}` : '',
-    rowData.plazo            ? `Plazo:              ${rowData.plazo} meses` : '',
-    rowData.tasa_mensual     ? `Tasa Mensual:       ${Number(rowData.tasa_mensual).toFixed(2)}%` : '',
+    rowData.fecha_cotizacion ? `   ${pad('Fecha:', 34)} ${fmtFechaLarga(rowData.fecha_cotizacion)}` : '',
+    `   ${pad('Valor Vehículo:', 34)} ${_fmtPesoDetalle(rowData.valor_vehiculo)}`,
+    `   ${pad('Pie:', 34)} ${_fmtPesoDetalle(rowData.pie)}`,
+    res.saldoPrecio ? `   ${pad('Saldo Precio:', 34)} ${_fmtPesoDetalle(res.saldoPrecio)}` : '',
     '',
-    rowData.cuota ? `💰 CUOTA MENSUAL:  ${_fmtPesoDetalle(rowData.cuota)}` : '',
+    ...lineasGastos,
+    ...lineasSeguros,
+    '─'.repeat(48),
+    '   FINANCIAMIENTO',
+    '─'.repeat(48),
+    '',
+    rowData.monto_financiado ? `   ${pad('Monto Financiado:', 34)} ${_fmtPesoDetalle(rowData.monto_financiado)}` : '',
+    rowData.plazo            ? `   ${pad('Plazo:', 34)} ${rowData.plazo} meses` : '',
+    rowData.tasa_mensual     ? `   ${pad('Tasa Mensual:', 34)} ${Number(rowData.tasa_mensual).toFixed(2)}%` : '',
+    '',
+    rowData.cuota ? `   💰 CUOTA MENSUAL: ${_fmtPesoDetalle(rowData.cuota)}` : '',
     '',
     '─'.repeat(48),
     '',
