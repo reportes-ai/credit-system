@@ -281,7 +281,7 @@
     <span class="sep">›</span>
     <span class="current">Cotizaciones</span>
   </span>
-  <span class="version-badge">v4.4</span>
+  <span class="version-badge">v4.5</span>
   <span class="user-info" id="userInfo"></span>
   <button class="btn-logout" onclick="logout()"><i class="bi bi-box-arrow-right"></i> Salir</button>
 </nav>
@@ -824,10 +824,14 @@ function rateNR(nper, pmt, pv, guess = 0.1) {
   }
   return r;
 }
-// CAE = tasa mensual × 12  (tasa nominal anual, igual que regulación CMF Chile)
-function calcularCAE(montoFin, cuota, plazo) {
-  if (!montoFin || !cuota || !plazo) return null;
-  const tasaMensual = rateNR(plazo, -cuota, montoFin);
+// CAE = tasa nominal anual  (CMF Chile)
+// PV = saldoPrecio (monto líquido que recibe el cliente, igual que el Excel)
+// PMT = cuota (incluye todos los costos: gastos + seguros + intereses)
+// Así el CAE refleja el verdadero costo total del crédito
+function calcularCAE(saldoPrecio, cuota, plazo) {
+  if (!saldoPrecio || !cuota || !plazo) return null;
+  const tasaMensual = rateNR(plazo, -cuota, saldoPrecio);
+  if (!isFinite(tasaMensual) || isNaN(tasaMensual)) return null;
   return tasaMensual * 12;
 }
 function getAmbosFactor(plazo) {
@@ -899,7 +903,7 @@ function calcular(p) {
   const totalCostos = p.dealer + p.patio + comEjecutivo + p.corfo + p.bono;
   const rentabilidad = totalIngresos - totalCostos;
 
-  const cae = calcularCAE(montoFin, cuota, p.plazo);
+  const cae = calcularCAE(saldoPrecio, cuota, p.plazo);
 
   return {
     saldoPrecio, gastosOp, subSin, segDesg, segRdh, segCesa, totalSeguros, subCon, montoFin,
@@ -1689,11 +1693,13 @@ function abrirDetalle(rowData) {
     rowData.cuota ? `   💰 CUOTA MENSUAL: ${_fmtPesoDetalle(rowData.cuota)}` : '',
     (() => {
       const cae = res.cae ?? null;
-      if (!cae && rowData.monto_financiado && rowData.cuota && rowData.plazo) {
-        // Recalcular si datos_json no lo trae (cotizaciones antiguas)
+      // Recalcular si datos_json no lo trae (cotizaciones antiguas)
+      // Usar saldoPrecio = valor_vehiculo - pie (igual que el Excel regulatorio)
+      const spRec = (rowData.valor_vehiculo || 0) - (rowData.pie || 0);
+      if (!cae && spRec > 0 && rowData.cuota && rowData.plazo) {
         try {
-          const r2 = rateNR(rowData.plazo, -rowData.cuota, rowData.monto_financiado);
-          return `   📊 CAE: ${(r2 * 12 * 100).toFixed(2)}%`;
+          const r2 = rateNR(rowData.plazo, -rowData.cuota, spRec);
+          if (isFinite(r2) && !isNaN(r2)) return `   📊 CAE: ${(r2 * 12 * 100).toFixed(2)}%`;
         } catch { return ''; }
       }
       return cae ? `   📊 CAE: ${(cae * 100).toFixed(2)}%` : '';
