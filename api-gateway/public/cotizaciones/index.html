@@ -167,7 +167,7 @@
     <span class="sep">›</span>
     <span class="current">Cotizaciones</span>
   </span>
-  <span class="version-badge">v3.5</span>
+  <span class="version-badge">v3.6</span>
   <span class="user-info" id="userInfo"></span>
   <button class="btn-logout" onclick="logout()"><i class="bi bi-box-arrow-right"></i> Salir</button>
 </nav>
@@ -389,6 +389,14 @@
             <div class="result-row">
               <span class="result-label">Total a Pagar</span>
               <span class="result-value" id="rTotalPagado">—</span>
+            </div>
+
+            <!-- Botón grabar cotización -->
+            <div style="margin-top:20px">
+              <button id="btnGrabar" onclick="abrirModalGrabar()"
+                style="width:100%;background:linear-gradient(135deg,#059669,#047857);color:#fff;border:none;border-radius:10px;padding:12px 0;font-size:.95rem;font-weight:700;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:8px;transition:opacity .15s">
+                <i class="bi bi-floppy2-fill"></i> Grabar Cotización
+              </button>
             </div>
           </div>
         </div>
@@ -1143,6 +1151,159 @@ setDefaultFecha();
 
 buildSegTable();
 loadApis();
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   GRABAR COTIZACIÓN
+═══════════════════════════════════════════════════════════════════════════ */
+function cotizacionPayload(rut, nombre) {
+  const p = readInputs();
+  const r = calcular(p);
+  return {
+    rut_cliente:      rut,
+    nombre_cliente:   nombre,
+    valor_vehiculo:   Math.round(p.valorVehiculo),
+    pie:              Math.round(p.pie),
+    plazo:            p.plazo,
+    tasa_mensual:     p.tasa,
+    monto_financiado: Math.round(r.montoFin),
+    cuota:            Math.round(r.cuota),
+    datos_json:       { inputs: p, resultados: r },
+  };
+}
+
+async function guardarCotizacion(rut, nombre) {
+  const resp = await fetch('/api/cotizaciones', {
+    method: 'POST',
+    headers: authHdr(),
+    body: JSON.stringify(cotizacionPayload(rut, nombre)),
+  });
+  return resp.json();
+}
+
+function abrirModalGrabar() {
+  const p = readInputs();
+  if (!p.valorVehiculo || !p.plazo) {
+    showToast('Completa el simulador antes de grabar', 'warning'); return;
+  }
+  document.getElementById('mGrabarRut').value = '';
+  document.getElementById('mGrabarError').style.display = 'none';
+  document.getElementById('mGrabarBtnText').textContent = 'Buscar cliente';
+  document.getElementById('mGrabarBtn').disabled = false;
+  document.getElementById('modalGrabar').style.display = 'flex';
+  setTimeout(() => document.getElementById('mGrabarRut').focus(), 100);
+}
+
+function cerrarModalGrabar() {
+  document.getElementById('modalGrabar').style.display = 'none';
+}
+
+async function buscarYGrabar() {
+  const rut = document.getElementById('mGrabarRut').value.trim().toUpperCase();
+  if (!rut) { document.getElementById('mGrabarError').textContent = 'Ingresa un RUT'; document.getElementById('mGrabarError').style.display = 'block'; return; }
+
+  const errEl = document.getElementById('mGrabarError');
+  errEl.style.display = 'none';
+  const btn = document.getElementById('mGrabarBtn');
+  document.getElementById('mGrabarBtnText').textContent = 'Buscando...';
+  btn.disabled = true;
+
+  try {
+    const resp = await fetch(`/api/clientes/rut/${encodeURIComponent(rut)}`, { headers: authHdr() });
+    const json = await resp.json();
+
+    if (!json.success) throw new Error(json.error || 'Error de red');
+
+    if (json.data) {
+      // Cliente existe → grabar y mostrar éxito
+      const c = json.data;
+      const nombre = [c.nombres, c.apellido_paterno, c.apellido_materno].filter(Boolean).join(' ') || c.razon_social || rut;
+      const res = await guardarCotizacion(rut, nombre);
+      if (!res.success) throw new Error(res.error);
+      cerrarModalGrabar();
+      mostrarExito(nombre, rut);
+    } else {
+      // Cliente NO existe → guardar cotización pendiente y redirigir a clientes
+      const p = readInputs();
+      const r = calcular(p);
+      localStorage.setItem('cotizacion_pendiente', JSON.stringify(cotizacionPayload(rut, rut)));
+      cerrarModalGrabar();
+      window.location.href = `/clientes/?retorno=cotizacion&rut=${encodeURIComponent(rut)}`;
+    }
+  } catch (e) {
+    errEl.textContent = e.message || 'Error al buscar cliente';
+    errEl.style.display = 'block';
+    btn.disabled = false;
+    document.getElementById('mGrabarBtnText').textContent = 'Buscar cliente';
+  }
+}
+
+function mostrarExito(nombre, rut) {
+  document.getElementById('mExitoNombre').textContent = nombre;
+  document.getElementById('mExitoRut').textContent = rut;
+  document.getElementById('modalExito').style.display = 'flex';
+}
+
+function cerrarModalExito() {
+  document.getElementById('modalExito').style.display = 'none';
+}
+
+// Cerrar modales al hacer click fuera
+document.addEventListener('click', function(e) {
+  if (e.target.id === 'modalGrabar') cerrarModalGrabar();
+  if (e.target.id === 'modalExito')  cerrarModalExito();
+});
+document.addEventListener('keydown', function(e) {
+  if (e.key === 'Escape') { cerrarModalGrabar(); cerrarModalExito(); }
+  if (e.key === 'Enter' && document.getElementById('modalGrabar').style.display === 'flex') buscarYGrabar();
+});
 </script>
+
+<!-- ═══ MODAL GRABAR: pedir RUT ═══ -->
+<div id="modalGrabar" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:2000;align-items:center;justify-content:center">
+  <div style="background:#fff;border-radius:16px;padding:32px 36px;width:100%;max-width:420px;box-shadow:0 20px 60px rgba(0,0,0,.25);position:relative">
+    <button onclick="cerrarModalGrabar()" style="position:absolute;top:14px;right:16px;background:none;border:none;font-size:1.3rem;color:#9ca3af;cursor:pointer">&#x2715;</button>
+    <div style="display:flex;align-items:center;gap:12px;margin-bottom:24px">
+      <div style="width:44px;height:44px;border-radius:12px;background:linear-gradient(135deg,#059669,#047857);display:flex;align-items:center;justify-content:center;color:#fff;font-size:1.3rem">
+        <i class="bi bi-floppy2-fill"></i>
+      </div>
+      <div>
+        <div style="font-weight:700;font-size:1.05rem;color:#111827">Grabar Cotización</div>
+        <div style="font-size:.82rem;color:#6b7280">Ingresa el RUT del cliente</div>
+      </div>
+    </div>
+    <label style="font-size:.82rem;font-weight:600;color:#374151;display:block;margin-bottom:6px">RUT del Cliente</label>
+    <input id="mGrabarRut" type="text" placeholder="12.345.678-9" maxlength="12"
+      style="width:100%;border:1.5px solid #d1d5db;border-radius:8px;padding:10px 14px;font-size:.95rem;box-sizing:border-box;outline:none"
+      oninput="this.value=this.value.replace(/[^0-9kK.\-]/g,'')"
+      onfocus="this.style.borderColor='#0141A2'" onblur="this.style.borderColor='#d1d5db'">
+    <div id="mGrabarError" style="display:none;color:#dc2626;font-size:.8rem;margin-top:6px"></div>
+    <button id="mGrabarBtn" onclick="buscarYGrabar()"
+      style="width:100%;margin-top:20px;background:#0141A2;color:#fff;border:none;border-radius:10px;padding:11px 0;font-size:.92rem;font-weight:700;cursor:pointer">
+      <span id="mGrabarBtnText">Buscar cliente</span>
+    </button>
+    <button onclick="cerrarModalGrabar()"
+      style="width:100%;margin-top:8px;background:none;color:#6b7280;border:1.5px solid #e5e7eb;border-radius:10px;padding:9px 0;font-size:.88rem;font-weight:600;cursor:pointer">
+      Cancelar
+    </button>
+  </div>
+</div>
+
+<!-- ═══ MODAL ÉXITO ═══ -->
+<div id="modalExito" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:2000;align-items:center;justify-content:center">
+  <div style="background:#fff;border-radius:16px;padding:36px 40px;width:100%;max-width:400px;box-shadow:0 20px 60px rgba(0,0,0,.25);text-align:center">
+    <div style="width:64px;height:64px;border-radius:50%;background:#dcfce7;display:flex;align-items:center;justify-content:center;margin:0 auto 16px;font-size:2rem;color:#059669">
+      <i class="bi bi-check-circle-fill"></i>
+    </div>
+    <div style="font-weight:800;font-size:1.15rem;color:#065f46;margin-bottom:8px">Cotización Grabada</div>
+    <div style="font-size:.92rem;color:#374151;margin-bottom:4px">a nombre de</div>
+    <div id="mExitoNombre" style="font-weight:700;font-size:1.1rem;color:#111827;margin-bottom:4px"></div>
+    <div id="mExitoRut" style="font-size:.85rem;color:#6b7280;font-weight:600;margin-bottom:28px"></div>
+    <button onclick="cerrarModalExito()"
+      style="background:#0141A2;color:#fff;border:none;border-radius:10px;padding:11px 32px;font-size:.92rem;font-weight:700;cursor:pointer">
+      Aceptar
+    </button>
+  </div>
+</div>
+
 </body>
 </html>

@@ -28,6 +28,9 @@ app.use('/api/vehiculos',  require('../../services/mantenedores/src/routes/vehic
 app.use('/api/dealers',    require('../../services/mantenedores/src/routes/dealers.routes'));
 app.use('/api/parametros-credito', require('../../services/mantenedores/src/routes/parametros.routes'));
 
+// Cotizaciones
+app.use('/api/cotizaciones', require('../../services/cotizaciones/src/routes/cotizaciones.routes'));
+
 // Health check
 app.get('/health', (req, res) => res.json({ status: 'Sistema operativo', timestamp: new Date() }));
 

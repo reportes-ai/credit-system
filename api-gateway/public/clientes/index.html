@@ -280,7 +280,7 @@
   </div>
   <div class="user-info d-none d-sm-flex align-items-center gap-2">
     <span id="navUser"></span>
-    <span class="version-badge">v3.5</span>
+    <span class="version-badge">v3.6</span>
   </div>
   <button class="btn-logout ms-2" onclick="logout()">
     <i class="bi bi-box-arrow-right"></i> Salir
@@ -1403,6 +1403,91 @@ document.addEventListener('click', e => {
   if (!e.target.closest('.search-wrap'))
     document.querySelectorAll('.search-dropdown').forEach(d => d.classList.remove('open'));
 });
+
+/* ═══════════════════════════════════════════════════════════════════
+   Retorno desde cotización — detecta ?retorno=cotizacion
+═══════════════════════════════════════════════════════════════════ */
+const _urlParams = new URLSearchParams(window.location.search);
+const _retorno   = _urlParams.get('retorno');
+const _rutParam  = _urlParams.get('rut');
+
+if (_retorno === 'cotizacion' && _rutParam) {
+  // Prellenar RUT en el input y arrancar búsqueda automáticamente
+  document.getElementById('inputRut').value = _rutParam;
+  // Pequeño delay para que el DOM y loadGeo terminen
+  setTimeout(() => buscarCliente(), 400);
+}
+
+async function _guardarCotizacionPendiente(cliente) {
+  const raw = localStorage.getItem('cotizacion_pendiente');
+  if (!raw) return null;
+  try {
+    const cot = JSON.parse(raw);
+    const nombre = [cliente.nombres, cliente.apellido_paterno, cliente.apellido_materno]
+      .filter(Boolean).join(' ') || cliente.razon_social || cliente.rut;
+    cot.rut_cliente    = cliente.rut;
+    cot.nombre_cliente = nombre;
+    const resp = await fetch('/api/cotizaciones', {
+      method: 'POST',
+      headers: apiHeaders(),
+      body: JSON.stringify(cot),
+    });
+    const json = await resp.json();
+    localStorage.removeItem('cotizacion_pendiente');
+    return json.success ? nombre : null;
+  } catch { return null; }
+}
+
+// Hook post-guardado: si hay cotización pendiente, guardarla y mostrar popup combinado
+const _origGuardar = guardar;
+guardar = async function(tipo) {
+  const esModoNuevo = !(modoEdicion && clienteActual);
+  await _origGuardar(tipo);
+  if (esModoNuevo && _retorno === 'cotizacion') {
+    // Esperar a que recargarCliente actualice clienteActual
+    setTimeout(async () => {
+      if (clienteActual) {
+        const nombre = await _guardarCotizacionPendiente(clienteActual);
+        if (nombre) {
+          document.getElementById('mPopNombre').textContent = nombre;
+          document.getElementById('mPopRut').textContent = clienteActual.rut;
+          document.getElementById('modalCotPopup').style.display = 'flex';
+        }
+      }
+    }, 600);
+  }
+};
+
+function cerrarModalCotPopup() {
+  document.getElementById('modalCotPopup').style.display = 'none';
+}
+document.addEventListener('keydown', e => {
+  if (e.key === 'Escape') cerrarModalCotPopup();
+});
 </script>
+
+<!-- ═══ POPUP: Cliente Creado + Cotización Grabada ═══ -->
+<div id="modalCotPopup" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:3000;align-items:center;justify-content:center">
+  <div style="background:#fff;border-radius:18px;padding:40px 44px;width:100%;max-width:400px;box-shadow:0 24px 64px rgba(0,0,0,.28);text-align:center">
+    <div style="display:flex;justify-content:center;gap:10px;margin-bottom:18px">
+      <div style="width:52px;height:52px;border-radius:50%;background:#dcfce7;display:flex;align-items:center;justify-content:center;font-size:1.6rem;color:#059669">
+        <i class="bi bi-person-check-fill"></i>
+      </div>
+      <div style="width:52px;height:52px;border-radius:50%;background:#dbeafe;display:flex;align-items:center;justify-content:center;font-size:1.6rem;color:#0141A2">
+        <i class="bi bi-floppy2-fill"></i>
+      </div>
+    </div>
+    <div style="font-weight:800;font-size:1.2rem;color:#065f46;margin-bottom:4px">¡Cliente Creado!</div>
+    <div style="font-weight:800;font-size:1.2rem;color:#0141A2;margin-bottom:16px">Cotización Grabada</div>
+    <div style="font-size:.88rem;color:#6b7280;margin-bottom:4px">a nombre de</div>
+    <div id="mPopNombre" style="font-weight:700;font-size:1.1rem;color:#111827;margin-bottom:4px"></div>
+    <div id="mPopRut" style="font-size:.85rem;color:#6b7280;font-weight:600;margin-bottom:28px"></div>
+    <button onclick="cerrarModalCotPopup()"
+      style="background:linear-gradient(135deg,#0141A2,#009AFE);color:#fff;border:none;border-radius:10px;padding:12px 40px;font-size:.95rem;font-weight:700;cursor:pointer">
+      Aceptar
+    </button>
+  </div>
+</div>
+
 </body>
 </html>
