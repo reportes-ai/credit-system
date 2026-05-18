@@ -166,7 +166,7 @@
     <div class="nav-btns">
       <a class="btn-nav active" href="#"><i class="bi bi-briefcase"></i>Ant. Laborales</a>
       <a class="btn-nav" id="btnGoInfCom" href="#"><i class="bi bi-bank"></i>Inf. Comercial</a>
-      <a class="btn-nav" href="/clientes"><i class="bi bi-person"></i>Datos Personales</a>
+      <a class="btn-nav" id="btnGoDatos" href="/clientes"><i class="bi bi-person"></i>Datos Personales</a>
     </div>
   </div>
 
@@ -310,6 +310,7 @@ const params   = new URLSearchParams(location.search);
 const RUT      = (params.get('rut') || '').toUpperCase().trim();
 
 document.getElementById('btnGoInfCom').href = '/informacion-comercial?rut=' + encodeURIComponent(RUT);
+document.getElementById('btnGoDatos').href  = '/clientes?rut=' + encodeURIComponent(RUT);
 
 if (!RUT) {
   document.getElementById('clienteNombre').textContent = 'RUT no especificado';

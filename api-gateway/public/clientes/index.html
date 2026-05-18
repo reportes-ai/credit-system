@@ -280,7 +280,7 @@
   </div>
   <div class="user-info d-none d-sm-flex align-items-center gap-2">
     <span id="navUser"></span>
-    <span class="version-badge">v4.7</span>
+    <span class="version-badge">v4.8</span>
   </div>
   <button class="btn-logout ms-2" onclick="logout()">
     <i class="bi bi-box-arrow-right"></i> Salir
@@ -1506,10 +1506,9 @@ const _urlParams = new URLSearchParams(window.location.search);
 const _retorno   = _urlParams.get('retorno');
 const _rutParam  = _urlParams.get('rut');
 
-if (_retorno === 'cotizacion' && _rutParam) {
-  // Prellenar RUT en el input y arrancar búsqueda automáticamente
+if (_rutParam) {
+  // Prellenar RUT y auto-buscar (viene de cotizaciones, ant. laborales, inf. comercial, etc.)
   document.getElementById('inputRut').value = _rutParam;
-  // Pequeño delay para que el DOM y loadGeo terminen
   setTimeout(() => buscarCliente(), 400);
 }
 
