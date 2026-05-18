@@ -290,17 +290,17 @@
 
 <script>
 /* ─── Auth ─────────────────────────────────────────────────────────── */
-const TOKEN_KEY = 'af_token';
-function getToken() { return localStorage.getItem(TOKEN_KEY); }
+function getToken() { return localStorage.getItem('token'); }
 function apiHeaders() { return { 'Content-Type':'application/json', 'Authorization':'Bearer '+getToken() }; }
-function logout() { localStorage.removeItem(TOKEN_KEY); location.href='/login.html'; }
+function logout() { localStorage.removeItem('token'); localStorage.removeItem('usuario'); location.href='/login.html'; }
 
 (function checkAuth() {
   const t = getToken();
   if (!t) { location.href='/login.html'; return; }
   try {
+    const u = JSON.parse(localStorage.getItem('usuario') || '{}');
+    document.getElementById('userLabel').textContent = (u.nombre||'') + ' ' + (u.apellido||'');
     const p = JSON.parse(atob(t.split('.')[1]));
-    document.getElementById('userLabel').textContent = (p.nombre||'') + ' ' + (p.apellido||'');
     if (p.exp * 1000 < Date.now()) logout();
   } catch(e) { logout(); }
 })();
