@@ -281,7 +281,7 @@
     <span class="sep">›</span>
     <span class="current">Cotizaciones</span>
   </span>
-  <span class="version-badge">v4.2</span>
+  <span class="version-badge">v4.3</span>
   <span class="user-info" id="userInfo"></span>
   <button class="btn-logout" onclick="logout()"><i class="bi bi-box-arrow-right"></i> Salir</button>
 </nav>
@@ -518,6 +518,12 @@
             <div class="cuota-display">
               <span class="label">CUOTA MENSUAL</span>
               <span class="value" id="rCuota">—</span>
+            </div>
+
+            <!-- CAE -->
+            <div style="background:rgba(1,65,162,.07);border-radius:8px;padding:7px 14px;margin:-4px 0 6px;display:flex;justify-content:space-between;align-items:center">
+              <span style="font-size:.8rem;font-weight:700;color:#374151">CAE <span style="font-weight:400;font-size:.72rem;color:#6b7280">(Carga Anual Equivalente)</span></span>
+              <span id="rCAE" style="font-size:.95rem;font-weight:800;color:var(--navy)">—</span>
             </div>
 
             <div class="result-row mt-1">
@@ -800,6 +806,26 @@ function pvf(r, n, p) {
   if (Math.abs(r) < 1e-10) return p * n;
   return p * (1 - Math.pow(1 + r, -n)) / r;
 }
+// RATE de Excel — Newton-Raphson: resuelve r en PV = PMT*(1-(1+r)^-n)/r
+function rateNR(nper, pmt, pv, guess = 0.1) {
+  let r = guess;
+  for (let i = 0; i < 200; i++) {
+    const q  = Math.pow(1 + r, nper);
+    const f  = pv * q + pmt * (q - 1) / r;
+    const df = nper * pv * Math.pow(1 + r, nper - 1)
+             + pmt * (nper * Math.pow(1 + r, nper - 1) * r - (q - 1)) / (r * r);
+    const rn = r - f / df;
+    if (Math.abs(rn - r) < 1e-9) return rn;
+    r = rn;
+  }
+  return r;
+}
+// CAE = tasa mensual × 12  (tasa nominal anual, igual que regulación CMF Chile)
+function calcularCAE(montoFin, cuota, plazo) {
+  if (!montoFin || !cuota || !plazo) return null;
+  const tasaMensual = rateNR(plazo, -cuota, montoFin);
+  return tasaMensual * 12;
+}
 function getAmbosFactor(plazo) {
   if (plazo <= 12) return 1.15163;
   if (plazo <= 24) return 1.154908;
@@ -869,10 +895,12 @@ function calcular(p) {
   const totalCostos = p.dealer + p.patio + comEjecutivo + p.corfo + p.bono;
   const rentabilidad = totalIngresos - totalCostos;
 
+  const cae = calcularCAE(montoFin, cuota, p.plazo);
+
   return {
     saldoPrecio, gastosOp, subSin, segDesg, segRdh, segCesa, totalSeguros, subCon, montoFin,
     diasPrimera, interesExtra, capitalAjustado,
-    cuota, totalPagado, totalIntereses,
+    cuota, totalPagado, totalIntereses, cae,
     ingTasa, ingSeguros, totalIngresos,
     comEjecutivo, totalCostos, rentabilidad,
     pctMonto: montoFin > 0 ? (rentabilidad / montoFin) * 100 : 0,
@@ -956,6 +984,7 @@ function renderSimulador(r, p) {
   setEl('rBono',        p.bono > 0 ? $f(p.bono) : '—');
   setEl('rMonto',       $f(r.montoFin));
   setEl('rCuota',       $f(r.cuota));
+  setEl('rCAE',         r.cae != null ? (r.cae * 100).toFixed(2) + '%' : '—');
   setEl('rPlazo',       p.plazo + ' meses');
   setEl('rTotalPagado', $f(r.totalPagado));
 
@@ -1163,7 +1192,7 @@ function limpiar() {
 
   // Reset result displays
   ['rSaldoPrecio','rGastos','rSubSin','rSegDesg','rSegRdh','rSegCesa','rSubCon',
-   'rBono','rMonto','rCuota','rTotalPagado'].forEach(id => setEl(id, '—'));
+   'rBono','rMonto','rCuota','rCAE','rTotalPagado'].forEach(id => setEl(id, '—'));
   document.getElementById('rPlazo').textContent = '48 meses';
   document.getElementById('ibTramo').textContent = '—';
   lastResult = null;
@@ -1646,6 +1675,17 @@ function abrirDetalle(rowData) {
     rowData.tasa_mensual     ? `   ${pad('Tasa Mensual:', 34)} ${Number(rowData.tasa_mensual).toFixed(2)}%` : '',
     '',
     rowData.cuota ? `   💰 CUOTA MENSUAL: ${_fmtPesoDetalle(rowData.cuota)}` : '',
+    (() => {
+      const cae = res.cae ?? null;
+      if (!cae && rowData.monto_financiado && rowData.cuota && rowData.plazo) {
+        // Recalcular si datos_json no lo trae (cotizaciones antiguas)
+        try {
+          const r2 = rateNR(rowData.plazo, -rowData.cuota, rowData.monto_financiado);
+          return `   📊 CAE: ${(r2 * 12 * 100).toFixed(2)}%`;
+        } catch { return ''; }
+      }
+      return cae ? `   📊 CAE: ${(cae * 100).toFixed(2)}%` : '';
+    })(),
     '',
     '─'.repeat(48),
     '',
