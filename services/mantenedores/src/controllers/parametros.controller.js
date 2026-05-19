@@ -26,6 +26,16 @@ const ensureTable = async () => {
     ['reparaciones_menores',   464796,   'Reparaciones menores ($)'],
     ['pct_ejecutivo',          2.720000, 'Comisión ejecutivo (% del saldo precio)'],
     // Tasas individuales de seguro por bracket de plazo (factor decimal sobre sub-total)
+    // Factores de carga mensual sobre deuda (% aplicado al monto de la deuda)
+    ['carga_deuda_vigente_total', 0.000000, 'Carga mensual — Deuda Vigente Total (%)'],
+    ['carga_deuda_hipotecaria',   0.050000, 'Carga mensual — Deuda Hipotecaria (%)'],
+    ['carga_deuda_comercial',     5.000000, 'Carga mensual — Deuda Comercial (%)'],
+    ['carga_deuda_consumo',       3.500000, 'Carga mensual — Deuda Consumo (%)'],
+    ['carga_deuda_morosa',        0.000000, 'Carga mensual — Deuda Morosa (%)'],
+    ['carga_deuda_vencida',       0.050000, 'Carga mensual — Deuda Vencida (%)'],
+    ['carga_deuda_castigada',     5.000000, 'Carga mensual — Deuda Castigada (%)'],
+    ['carga_linea_disponible',    3.500000, 'Carga mensual — Línea Disponible (%)'],
+    // Seguros
     ['seg_d_6',   0.008980, 'Seguro Desgravamen — plazo ≤6m'],
     ['seg_r_6',   0.006745, 'Seguro RDH — plazo ≤6m'],
     ['seg_c_6',   0.036162, 'Seguro Cesantía — plazo ≤6m'],

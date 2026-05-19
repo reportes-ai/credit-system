@@ -86,6 +86,9 @@ app.get(['/cobranza', '/cobranza/'], (req, res) =>
 app.get(['/reporteria', '/reporteria/'], (req, res) =>
   res.sendFile(path.join(__dirname, '../public/reporteria/index.html')));
 
+app.get(['/politica', '/politica/'], (req, res) =>
+  res.sendFile(path.join(__dirname, '../public/politica/index.html')));
+
 app.use((req, res) => res.status(404).json({ success: false, error: 'Ruta no encontrada' }));
 
 const PORT = process.env.PORT || 3000;
