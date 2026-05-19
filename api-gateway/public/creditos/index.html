@@ -331,7 +331,7 @@
   <div class="topnav-left">
     <div class="topnav-brand">
       <a href="/"><img src="/img/logo.png" alt="AutoFácil" style="display:block"></a>
-      <span class="version-badge" id="versionBadge">v2.5</span>
+      <span class="version-badge" id="versionBadge">v2.6</span>
     </div>
   </div>
   <div class="topnav-right">
@@ -1694,7 +1694,7 @@ async function guardarCredito() {
     combustible:         document.getElementById('iCombustible').value || null,
     tasacion:            parseInt((document.getElementById('iTasacion').value||'').replace(/[^0-9]/g,'')) || null,
     permiso_circulacion: parseInt((document.getElementById('iPermiso').value||'').replace(/[^0-9]/g,''))  || null,
-    dealer:              document.getElementById('iDealer').value || null,
+    dealer:              (document.getElementById('iDealer').value || document.getElementById('iDealerBuscar').value).trim() || null,
     id_dealer:           parseInt(document.getElementById('iDealerId').value) || null,
     tipo_ubicacion:      document.getElementById('iTipoUbicacion').value || null,
     nombre_parque:       document.getElementById('iNombreParque').value.trim() || null,
