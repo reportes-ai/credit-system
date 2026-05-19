@@ -79,6 +79,16 @@
     .promedio-badge .label { font-size:.72rem; font-weight:700; color:var(--blue); text-transform:uppercase; letter-spacing:.06em; }
     .promedio-badge .value { font-size:1.3rem; font-weight:800; color:var(--navy); }
 
+    /* Renta Acreditada badge */
+    .renta-acreditada-badge {
+      background:linear-gradient(135deg,#ecfdf5,#d1fae5);
+      border:1.5px solid #6ee7b7; border-radius:8px;
+      padding:10px 18px; text-align:center;
+    }
+    .renta-acreditada-badge .label { font-size:.72rem; font-weight:700; color:#065f46; text-transform:uppercase; letter-spacing:.06em; }
+    .renta-acreditada-badge .sub   { font-size:.68rem; color:#059669; margin-top:1px; }
+    .renta-acreditada-badge .value { font-size:1.3rem; font-weight:800; color:#047857; }
+
     /* Antigüedad display */
     .antig-display {
       background:#f9fafb; border:1.5px solid #e5e7eb; border-radius:7px;
@@ -133,7 +143,7 @@
   <div class="topnav-left">
     <div class="topnav-brand">
       <a href="/"><img src="/img/logo.png" alt="AutoFácil" style="display:block"></a>
-      <span class="version-badge" id="versionBadge">v1.2</span>
+      <span class="version-badge" id="versionBadge">v1.3</span>
     </div>
   </div>
   <div class="topnav-right">
@@ -269,6 +279,13 @@
         <div class="promedio-badge">
           <div class="label">Promedio <span id="promedioMeses">0</span> mes(es)</div>
           <div class="value" id="promedioValor">$0</div>
+        </div>
+      </div>
+      <div class="col-md-4 col-lg-3">
+        <div class="renta-acreditada-badge">
+          <div class="label"><i class="bi bi-patch-check me-1"></i>Renta Acreditada</div>
+          <div class="sub" id="rentaAcreditadaSub">—</div>
+          <div class="value" id="rentaAcreditadaValor">$0</div>
         </div>
       </div>
     </div>
@@ -525,6 +542,31 @@ function calcPromedio() {
   const prom = vals.length ? vals.reduce((a,b)=>a+b,0)/vals.length : 0;
   document.getElementById('promedioMeses').textContent = vals.length;
   document.getElementById('promedioValor').textContent = formatPesos(Math.round(prom)) || '$0';
+  calcRentaAcreditada();
+}
+
+/* ─── Renta Acreditada ───────────────────────────────────────────── */
+function calcRentaAcreditada() {
+  // Promedio variable (sólo meses con valor)
+  const vals = [];
+  for (let i = 1; i <= 6; i++) {
+    const hid = document.getElementById('fRentaMes'+i+'Val');
+    const v   = hid ? parseInt(hid.value) : 0;
+    if (v > 0) vals.push(v);
+  }
+  const prom = vals.length ? Math.round(vals.reduce((a,b)=>a+b,0)/vals.length) : 0;
+  const fija = parseInt(document.getElementById('fRentaFijaVal').value) || 0;
+
+  let acreditada, sub;
+  if (prom > 0) {
+    acreditada = prom;
+    sub = 'Promedio ' + vals.length + ' mes(es) variable' + (vals.length !== 1 ? 's' : '');
+  } else {
+    acreditada = fija;
+    sub = 'Renta fija líquida';
+  }
+  document.getElementById('rentaAcreditadaSub').textContent   = sub;
+  document.getElementById('rentaAcreditadaValor').textContent = formatPesos(acreditada) || '$0';
 }
 
 /* ─── Cargar datos guardados ────────────────────────────────────── */
