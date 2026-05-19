@@ -151,7 +151,7 @@
   <div class="topnav-left">
     <div class="topnav-brand">
       <a href="/"><img src="/img/logo.png" alt="AutoFácil" style="display:block"></a>
-      <span class="version-badge" id="versionBadge">v1.4</span>
+      <span class="version-badge" id="versionBadge">v1.5</span>
     </div>
   </div>
   <div class="topnav-right">
@@ -297,7 +297,7 @@
     <!-- Arriendo + Propiedad -->
     <div class="row g-3 align-items-end">
       <div class="col-md-4">
-        <label class="form-label">Arriendo (20% Renta Acreditada) $</label>
+        <label class="form-label" id="lblArriendo">Arriendo (20% Renta Acreditada) $</label>
         <input type="text" id="fArriendo" class="form-control" placeholder="$0" readonly tabindex="-1">
       </div>
       <div class="col-md-4 d-flex align-items-center" style="padding-bottom:2px">
@@ -477,13 +477,17 @@ function calcArriendo() {
     el.value = '';
     el.placeholder = 'No aplica';
   } else {
-    // Sin hipotecaria y sin propiedad acreditada → 20% de la renta acreditada
+    // Sin hipotecaria y sin propiedad acreditada → pct_arriendo % de la renta acreditada
     el.placeholder = '$0';
+    const pct = politica.pct_arriendo ?? 20;
     if (rentaLiquida > 0) {
-      el.value = formatMonto(Math.round(rentaLiquida * 0.20));
+      el.value = formatMonto(Math.round(rentaLiquida * pct / 100));
     } else {
       el.value = '';
     }
+    // Actualizar label con el % real de la política
+    const lbl = document.getElementById('lblArriendo');
+    if (lbl) lbl.textContent = `Arriendo (${parseFloat(pct).toFixed(0)}% Renta Acreditada) $`;
   }
   calcTotal();
 }

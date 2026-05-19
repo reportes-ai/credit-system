@@ -27,7 +27,8 @@ const ensureTable = async () => {
     ['pct_ejecutivo',          2.720000, 'Comisión ejecutivo (% del saldo precio)'],
     // Tasas individuales de seguro por bracket de plazo (factor decimal sobre sub-total)
     // Factores de carga mensual sobre deuda (% aplicado al monto de la deuda)
-    ['carga_deuda_vigente_total', 0.000000, 'Carga mensual — Deuda Vigente Total (%)'],
+    ['pct_arriendo',              20.000000, 'Porcentaje de renta destinado a arriendo (%)'],
+    ['carga_deuda_vigente_total', 0.000000,  'Carga mensual — Deuda Vigente Total (%)'],
     ['carga_deuda_hipotecaria',   0.050000, 'Carga mensual — Deuda Hipotecaria (%)'],
     ['carga_deuda_comercial',     5.000000, 'Carga mensual — Deuda Comercial (%)'],
     ['carga_deuda_consumo',       3.500000, 'Carga mensual — Deuda Consumo (%)'],

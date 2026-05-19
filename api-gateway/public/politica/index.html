@@ -65,6 +65,18 @@
     .factor-table tr:hover td { background:#f8fafc; }
     .tipo-label { font-size:.88rem; font-weight:600; color:#1e293b; }
 
+    /* Separador de sección dentro de la tabla */
+    .factor-table .tr-sep td {
+      background:#f0f4f8; padding:6px 14px;
+      font-size:.7rem; font-weight:700; color:#6b7280;
+      text-transform:uppercase; letter-spacing:.08em;
+      border-bottom:1px solid #e5e7eb;
+    }
+    /* Fila de arriendo */
+    .factor-table .tr-arriendo td { background:#fef9ec; }
+    .factor-table .tr-arriendo:hover td { background:#fef3c7; }
+    .factor-table .tr-arriendo .tipo-label { color:#92400e; }
+
     /* ── Input de porcentaje ─────────────────────────────────────────── */
     .pct-wrap { display:flex; align-items:center; justify-content:center; gap:4px; }
     .pct-input {
@@ -105,7 +117,7 @@
   <div class="topnav-left">
     <div class="topnav-brand">
       <a href="/"><img src="/img/logo.png" alt="AutoFácil" style="display:block"></a>
-      <span class="version-badge" id="versionBadge">v1.0</span>
+      <span class="version-badge" id="versionBadge">v1.1</span>
     </div>
   </div>
   <div class="topnav-right">
@@ -144,8 +156,8 @@
     <table class="factor-table">
       <thead>
         <tr>
-          <th>Tipo de Deuda</th>
-          <th style="text-align:center">Carga Mensual (%)</th>
+          <th>Concepto</th>
+          <th style="text-align:center">Factor (%)</th>
         </tr>
       </thead>
       <tbody id="factorBody">
@@ -186,7 +198,10 @@ function logout() { localStorage.removeItem('token'); localStorage.removeItem('u
 })();
 
 /* ─── Definición de factores ────────────────────────────────────── */
+// sep:true → fila separadora (no es un parámetro editable)
+// arriendo:true → estilo especial, es % sobre renta (no sobre deuda)
 const FACTORES = [
+  { sep: true,  label: 'Carga Mensual sobre Deuda' },
   { clave: 'carga_deuda_vigente_total', label: 'Deuda Vigente Total' },
   { clave: 'carga_deuda_hipotecaria',   label: 'Deuda Hipotecaria'   },
   { clave: 'carga_deuda_comercial',     label: 'Deuda Comercial'     },
@@ -195,6 +210,8 @@ const FACTORES = [
   { clave: 'carga_deuda_vencida',       label: 'Deuda Vencida'       },
   { clave: 'carga_deuda_castigada',     label: 'Deuda Castigada'     },
   { clave: 'carga_linea_disponible',    label: 'Línea Disponible'    },
+  { sep: true,  label: 'Arriendo' },
+  { clave: 'pct_arriendo', label: 'Porcentaje destinado a Arriendo', arriendo: true },
 ];
 
 let valoresOriginales = {};
@@ -209,12 +226,19 @@ function showToast(msg, ok) {
 function renderTabla(obj) {
   const tbody = document.getElementById('factorBody');
   tbody.innerHTML = FACTORES.map(f => {
-    const val = (obj[f.clave] ?? 0).toFixed(4);
-    // Mostrar con 2 decimales si el usuario lo ve: ej 5.0000 → "5,00"
+    // Fila separadora
+    if (f.sep) {
+      return `<tr class="tr-sep"><td colspan="2"><i class="bi bi-${f.arriendo ? 'house' : 'percent'} me-1"></i>${f.label}</td></tr>`;
+    }
+    const val     = (obj[f.clave] ?? 0).toFixed(4);
     const display = parseFloat(val).toLocaleString('es-CL', { minimumFractionDigits: 2, maximumFractionDigits: 4 });
+    const trClass = f.arriendo ? ' class="tr-arriendo"' : '';
+    const hint    = f.arriendo
+      ? `<div style="font-size:.7rem;color:#92400e;margin-top:2px;">% de la Renta Acreditada del cliente</div>`
+      : '';
     return `
-      <tr>
-        <td class="tipo-label">${f.label}</td>
+      <tr${trClass}>
+        <td><span class="tipo-label">${f.label}</span>${hint}</td>
         <td>
           <div class="pct-wrap">
             <input type="number" class="pct-input"
@@ -238,7 +262,7 @@ function onCambio(el, clave) {
 }
 
 function actualizarEstado() {
-  const hayCambios = FACTORES.some(f => {
+  const hayCambios = FACTORES.filter(f => !f.sep).some(f => {
     const el = document.getElementById('inp_' + f.clave);
     return el && el.classList.contains('changed');
   });
@@ -253,7 +277,7 @@ async function cargar() {
     const j = await r.json();
     if (!j.success) throw new Error(j.error);
     valoresOriginales = {};
-    FACTORES.forEach(f => {
+    FACTORES.filter(f => !f.sep).forEach(f => {
       valoresOriginales[f.clave] = j.data.obj[f.clave] ?? 0;
     });
     renderTabla(j.data.obj);
@@ -271,7 +295,7 @@ async function guardar() {
   btn.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Guardando…';
 
   const body = {};
-  FACTORES.forEach(f => {
+  FACTORES.filter(f => !f.sep).forEach(f => {
     const el = document.getElementById('inp_' + f.clave);
     body[f.clave] = parseFloat(el?.value) || 0;
   });
@@ -283,7 +307,7 @@ async function guardar() {
     const j = await r.json();
     if (!j.success) throw new Error(j.error);
     // Actualizar originales y limpiar resaltados
-    FACTORES.forEach(f => {
+    FACTORES.filter(f => !f.sep).forEach(f => {
       valoresOriginales[f.clave] = body[f.clave];
       const el = document.getElementById('inp_' + f.clave);
       if (el) el.classList.remove('changed');
