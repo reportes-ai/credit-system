@@ -331,7 +331,7 @@
   <div class="topnav-left">
     <div class="topnav-brand">
       <a href="/"><img src="/img/logo.png" alt="AutoFácil" style="display:block"></a>
-      <span class="version-badge" id="versionBadge">v2.6</span>
+      <span class="version-badge" id="versionBadge">v2.7</span>
     </div>
   </div>
   <div class="topnav-right">
@@ -466,9 +466,10 @@
         </div>
         <div class="col-md-2">
           <label class="form-label">Financiera</label>
-          <select id="iFinanciera" class="form-select">
+          <select id="iFinanciera" class="form-select" onchange="sincronizarEmpresaCard(this.value)">
             <option value="AUTOFACIL">AutoFácil</option>
             <option value="AUTOFIN">AutoFin</option>
+            <option value="UNIDAD">Unidad</option>
           </select>
         </div>
         <div class="col-md-3">
@@ -1048,7 +1049,21 @@ function cambiarTab(tab) {
 function seleccionarEmpresa(el) {
   document.querySelectorAll('.empresa-card').forEach(c => c.classList.remove('selected'));
   el.classList.add('selected');
-  document.getElementById('iEmpresa').value = el.dataset.empresa;
+  const empresa = el.dataset.empresa;
+  document.getElementById('iEmpresa').value    = empresa;
+  // Sincronizar el campo financiera con la empresa seleccionada
+  const selFin = document.getElementById('iFinanciera');
+  if (selFin) {
+    const opt = Array.from(selFin.options).find(o => o.value === empresa);
+    if (opt) selFin.value = empresa;
+  }
+}
+
+function sincronizarEmpresaCard(empresa) {
+  document.getElementById('iEmpresa').value = empresa;
+  document.querySelectorAll('.empresa-card').forEach(c => {
+    c.classList.toggle('selected', c.dataset.empresa === empresa);
+  });
 }
 
 /* ─── RUT formatter ─────────────────────────────────────────────────── */
