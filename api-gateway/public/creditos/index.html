@@ -175,7 +175,13 @@
     .btn-ver-detalle:hover { background:#eff6ff; }
 
     /* RUT found bar */
-    .rut-found { background:#f0fdf4; border:1.5px solid #6ee7b7; border-radius:8px; padding:8px 14px; font-size:.88rem; font-weight:700; color:#065f46; }
+    .rut-found { background:#f0fdf4; border:1.5px solid #6ee7b7; border-radius:8px; padding:10px 16px; font-size:.88rem; font-weight:700; color:#065f46; display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:8px; }
+    .rut-found-nombre { display:flex; align-items:center; gap:6px; }
+    .rut-found-fechas { display:flex; gap:16px; flex-wrap:wrap; align-items:center; }
+    .fecha-item { display:flex; flex-direction:column; align-items:center; gap:1px; }
+    .fecha-item .fi-label { color:#6b7280; font-size:.62rem; font-weight:700; text-transform:uppercase; letter-spacing:.05em; }
+    .fecha-item .fi-val   { color:#047857; font-size:.75rem; font-weight:700; }
+    .fecha-item .fi-val.stale { color:#dc2626 !important; font-weight:800; }
 
     /* Toast */
     .toast-msg { position:fixed; top:68px; right:20px; z-index:9999; border-radius:10px; padding:14px 20px; font-weight:600; font-size:.9rem; color:#fff; box-shadow:0 8px 24px rgba(0,0,0,.18); display:none; }
@@ -200,7 +206,7 @@
   <div class="topnav-left">
     <div class="topnav-brand">
       <a href="/"><img src="/img/logo.png" alt="AutoFácil" style="display:block"></a>
-      <span class="version-badge" id="versionBadge">v1.3</span>
+      <span class="version-badge" id="versionBadge">v1.4</span>
     </div>
   </div>
   <div class="topnav-right">
@@ -738,13 +744,42 @@ async function buscarClienteCred() {
   if (!rut) return;
   const msg = document.getElementById('rutClienteFoundMsg');
   try {
-    const r = await fetch('/api/clientes/rut/'+encodeURIComponent(rut), { headers:apiHdr() });
-    const j = await r.json();
-    if (j.success && j.data) {
-      const c = j.data;
-      const nombre = [c.nombres, c.apellido_paterno, c.apellido_materno].filter(Boolean).join(' ') || c.razon_social || rut;
+    // Traer datos del cliente y los tres timestamps en paralelo
+    const [rCliente, rAntLab, rInfoCom] = await Promise.all([
+      fetch('/api/clientes/rut/'           + encodeURIComponent(rut), { headers:apiHdr() }),
+      fetch('/api/antecedentes-laborales/' + encodeURIComponent(rut), { headers:apiHdr() }),
+      fetch('/api/informacion-comercial/'  + encodeURIComponent(rut), { headers:apiHdr() }),
+    ]);
+    const [jCliente, jAntLab, jInfoCom] = await Promise.all([
+      rCliente.json(), rAntLab.json(), rInfoCom.json(),
+    ]);
+
+    if (jCliente.success && jCliente.data) {
+      const c      = jCliente.data;
+      const nombre = [c.nombres, c.apellido_paterno, c.apellido_materno].filter(Boolean).join(' ')
+                   || c.razon_social || rut;
       document.getElementById('iNombreCliente').value = nombre;
-      msg.innerHTML = `<div class="rut-found"><i class="bi bi-person-check me-2"></i>${nombre} — ${rut}</div>`;
+
+      // Fechas de actualización
+      const hoy   = new Date();
+      const tresM = 90 * 24 * 60 * 60 * 1000; // 90 días
+      const itemFecha = (label, val) => {
+        if (!val) return `<div class="fecha-item"><span class="fi-label">${label}</span><span class="fi-val stale">Sin datos</span></div>`;
+        const d     = new Date(val);
+        const stale = (hoy - d) > tresM;
+        const txt   = d.toLocaleDateString('es-CL', { day:'2-digit', month:'2-digit', year:'2-digit' });
+        return `<div class="fecha-item"><span class="fi-label">${label}</span><span class="fi-val${stale?' stale':''}">${txt}</span></div>`;
+      };
+      const fechasHtml = [
+        itemFecha('Datos Personales', c.fecha_actualizacion),
+        itemFecha('Ant. Laborales',   jAntLab.success  && jAntLab.data  ? jAntLab.data.updated_at  : null),
+        itemFecha('Inf. Comercial',   jInfoCom.success && jInfoCom.data ? jInfoCom.data.updated_at : null),
+      ].join('');
+
+      msg.innerHTML = `<div class="rut-found">
+        <div class="rut-found-nombre"><i class="bi bi-person-check"></i>${nombre} — ${rut}</div>
+        <div class="rut-found-fechas">${fechasHtml}</div>
+      </div>`;
       msg.style.display = 'block';
     } else {
       msg.innerHTML = `<div style="color:#ef4444;font-size:.82rem"><i class="bi bi-exclamation-circle me-1"></i>Cliente no encontrado. Ingresa el nombre manualmente.</div>`;
