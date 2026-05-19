@@ -79,6 +79,17 @@
     .th-carga { background:#eff6ff; color:var(--blue); font-weight:700; }
     .carga-cell input { background:#eff6ff; border-color:#93c5fd; }
 
+    /* Fila deuda vigente con error */
+    .tr-vigente-error td { background:#dc2626 !important; color:#fff !important; transition:background .3s; }
+    .tr-vigente-error td .row-label { color:#fff !important; }
+    .tr-vigente-error td input.form-control {
+      background:#dc2626 !important; color:#fff !important;
+      border-color:#b91c1c !important; font-weight:700;
+    }
+    .tr-vigente-error td input.form-control::placeholder { color:rgba(255,255,255,.6) !important; }
+    .tr-vigente-hint { font-size:.72rem; color:#fff; margin-top:3px; font-weight:600; display:none; }
+    .tr-vigente-error .tr-vigente-hint { display:block; }
+
     /* Total carga */
     .total-carga {
       background:linear-gradient(135deg,#ecfdf5,#d1fae5);
@@ -129,7 +140,7 @@
   <div class="topnav-left">
     <div class="topnav-brand">
       <a href="/"><img src="/img/logo.png" alt="AutoFácil" style="display:block"></a>
-      <span class="version-badge" id="versionBadge">v1.0</span>
+      <span class="version-badge" id="versionBadge">v1.1</span>
     </div>
   </div>
   <div class="topnav-right">
@@ -166,7 +177,7 @@
       <div class="row g-3">
         <div class="col-md-4">
           <label class="form-label">Monto Protestos $</label>
-          <input type="number" id="fMontoProtestos" class="form-control" min="0" placeholder="0">
+          <input type="text" id="fMontoProtestos" class="form-control" placeholder="$0" autocomplete="off" oninput="montoInput(this)">
         </div>
         <div class="col-md-4">
           <label class="form-label">Protestos Vigentes (cantidad)</label>
@@ -192,58 +203,71 @@
         </thead>
         <tbody>
           <!-- Deuda Vigente Total -->
-          <tr>
-            <td class="row-label">Deuda Vigente Total</td>
-            <td><input type="number" id="fDeudaVigenteTotal" class="form-control" min="0" placeholder="0"></td>
-            <td><input type="number" id="fDeudaVigenteInst"  class="form-control" min="0" placeholder="0"></td>
-            <td class="carga-cell"><input type="number" id="fDeudaVigenteCarga" class="form-control" placeholder="—" readonly tabindex="-1"></td>
+          <tr id="trDeudaVigente">
+            <td class="row-label">Deuda Vigente Total
+              <div class="tr-vigente-hint" id="hintVigente"></div>
+            </td>
+            <td><input type="text" id="fDeudaVigenteTotal" class="form-control" placeholder="$0" autocomplete="off"
+                       oninput="montoInput(this); checkDeudaVigente()"></td>
+            <td><input type="number" id="fDeudaVigenteInst" class="form-control" min="0" placeholder="0"></td>
+            <td class="carga-cell"><input type="text" class="form-control" placeholder="—" readonly tabindex="-1"></td>
           </tr>
           <!-- Deuda Hipotecaria -->
           <tr>
             <td class="row-label">Deuda Hipotecaria</td>
-            <td><input type="number" id="fDeudaHipotecaria"     class="form-control" min="0" placeholder="0"></td>
+            <td><input type="text" id="fDeudaHipotecaria" class="form-control" placeholder="$0" autocomplete="off"
+                       oninput="montoInput(this); checkDeudaVigente()"></td>
             <td><input type="number" id="fDeudaHipotecariaInst" class="form-control" min="0" placeholder="0"></td>
-            <td class="carga-cell"><input type="number" id="fDeudaHipotecariaCarga" class="form-control" min="0" placeholder="0" oninput="calcTotal()"></td>
+            <td class="carga-cell"><input type="text" id="fDeudaHipotecariaCarga" class="form-control" placeholder="$0" autocomplete="off"
+                       oninput="montoInput(this); calcTotal()"></td>
           </tr>
           <!-- Deuda Comercial -->
           <tr>
             <td class="row-label">Deuda Comercial</td>
-            <td><input type="number" id="fDeudaComercial"     class="form-control" min="0" placeholder="0"></td>
+            <td><input type="text" id="fDeudaComercial" class="form-control" placeholder="$0" autocomplete="off"
+                       oninput="montoInput(this); checkDeudaVigente()"></td>
             <td><input type="number" id="fDeudaComercialInst" class="form-control" min="0" placeholder="0"></td>
-            <td class="carga-cell"><input type="number" id="fDeudaComercialCarga" class="form-control" min="0" placeholder="0" oninput="calcTotal()"></td>
+            <td class="carga-cell"><input type="text" id="fDeudaComercialCarga" class="form-control" placeholder="$0" autocomplete="off"
+                       oninput="montoInput(this); calcTotal()"></td>
           </tr>
           <!-- Deuda Consumo -->
           <tr>
             <td class="row-label">Deuda Consumo</td>
-            <td><input type="number" id="fDeudaConsumo"     class="form-control" min="0" placeholder="0"></td>
+            <td><input type="text" id="fDeudaConsumo" class="form-control" placeholder="$0" autocomplete="off"
+                       oninput="montoInput(this); checkDeudaVigente()"></td>
             <td><input type="number" id="fDeudaConsumoInst" class="form-control" min="0" placeholder="0"></td>
-            <td class="carga-cell"><input type="number" id="fDeudaConsumoCarga" class="form-control" min="0" placeholder="0" oninput="calcTotal()"></td>
+            <td class="carga-cell"><input type="text" id="fDeudaConsumoCarga" class="form-control" placeholder="$0" autocomplete="off"
+                       oninput="montoInput(this); calcTotal()"></td>
           </tr>
           <!-- Deuda Morosa -->
           <tr>
             <td class="row-label">Deuda Morosa</td>
-            <td><input type="number" id="fDeudaMorosa"     class="form-control" min="0" placeholder="0"></td>
+            <td><input type="text" id="fDeudaMorosa" class="form-control" placeholder="$0" autocomplete="off"
+                       oninput="montoInput(this); checkDeudaVigente()"></td>
             <td><input type="number" id="fDeudaMorosaInst" class="form-control" min="0" placeholder="0"></td>
             <td class="carga-cell"><input type="text" class="form-control" value="—" readonly tabindex="-1"></td>
           </tr>
           <!-- Deuda Vencida -->
           <tr>
             <td class="row-label">Deuda Vencida</td>
-            <td><input type="number" id="fDeudaVencida"     class="form-control" min="0" placeholder="0"></td>
+            <td><input type="text" id="fDeudaVencida" class="form-control" placeholder="$0" autocomplete="off"
+                       oninput="montoInput(this); checkDeudaVigente()"></td>
             <td><input type="number" id="fDeudaVencidaInst" class="form-control" min="0" placeholder="0"></td>
             <td class="carga-cell"><input type="text" class="form-control" value="—" readonly tabindex="-1"></td>
           </tr>
           <!-- Deuda Castigada -->
           <tr>
             <td class="row-label">Deuda Castigada</td>
-            <td><input type="number" id="fDeudaCastigada"     class="form-control" min="0" placeholder="0"></td>
+            <td><input type="text" id="fDeudaCastigada" class="form-control" placeholder="$0" autocomplete="off"
+                       oninput="montoInput(this); checkDeudaVigente()"></td>
             <td><input type="number" id="fDeudaCastigadaInst" class="form-control" min="0" placeholder="0"></td>
             <td class="carga-cell"><input type="text" class="form-control" value="—" readonly tabindex="-1"></td>
           </tr>
           <!-- Línea Disponible -->
           <tr>
             <td class="row-label">Línea Disponible</td>
-            <td><input type="number" id="fLineaDisponible"     class="form-control" min="0" placeholder="0"></td>
+            <td><input type="text" id="fLineaDisponible" class="form-control" placeholder="$0" autocomplete="off"
+                       oninput="montoInput(this)"></td>
             <td><input type="number" id="fLineaDisponibleInst" class="form-control" min="0" placeholder="0"></td>
             <td class="carga-cell"><input type="text" class="form-control" value="—" readonly tabindex="-1"></td>
           </tr>
@@ -257,7 +281,8 @@
     <div class="row g-3 align-items-end">
       <div class="col-md-4">
         <label class="form-label">Arriendo (20% Ingreso) $</label>
-        <input type="number" id="fArriendo" class="form-control" min="0" placeholder="0" oninput="calcTotal()">
+        <input type="text" id="fArriendo" class="form-control" placeholder="$0" autocomplete="off"
+               oninput="montoInput(this); calcTotal()">
       </div>
       <div class="col-md-4 d-flex align-items-center" style="padding-bottom:2px">
         <label class="check-label">
@@ -327,11 +352,39 @@ if (!RUT) {
 }
 
 /* ─── Utils ──────────────────────────────────────────────────────── */
-function fmtPesos(v) { return '$' + Math.round(v||0).toLocaleString('es-CL'); }
 function showToast(msg, ok) {
   const el = document.getElementById(ok ? 'toastOk' : 'toastErr');
   el.textContent = msg; el.style.display = 'block';
   setTimeout(() => el.style.display = 'none', 3200);
+}
+
+/* ─── Formateo de pesos CLP ($1.000.000.-) ──────────────────────── */
+function parseMonto(str) {
+  return parseInt((str || '').replace(/[^0-9]/g, '')) || 0;
+}
+function formatMonto(num) {
+  if (!num) return '';
+  return '$' + num.toLocaleString('es-CL') + '.-';
+}
+function montoInput(el) {
+  const pos   = el.selectionStart;
+  const antes = el.value.length;
+  const num   = parseMonto(el.value);
+  el.value    = formatMonto(num);
+  const delta = el.value.length - antes;
+  try { el.setSelectionRange(pos + delta, pos + delta); } catch(e) {}
+}
+/* Helper para leer valor numérico de campo formateado */
+function getNum(id) {
+  const el = document.getElementById(id);
+  return el ? parseMonto(el.value) : 0;
+}
+/* Setear valor formateado en un campo */
+function setMonto(id, v) {
+  const el = document.getElementById(id);
+  if (!el) return;
+  const num = parseInt(v) || 0;
+  el.value  = num ? formatMonto(num) : '';
 }
 
 /* ─── Cargar datos del cliente ──────────────────────────────────── */
@@ -354,10 +407,44 @@ async function cargarCliente() {
 
 /* ─── Calcular total carga mensual ──────────────────────────────── */
 function calcTotal() {
-  const n = id => parseFloat(document.getElementById(id)?.value) || 0;
-  const total = n('fDeudaHipotecariaCarga') + n('fDeudaComercialCarga') +
-                n('fDeudaConsumoCarga')     + n('fArriendo');
-  document.getElementById('totalCarga').textContent = fmtPesos(total);
+  const total = getNum('fDeudaHipotecariaCarga') +
+                getNum('fDeudaComercialCarga')   +
+                getNum('fDeudaConsumoCarga')      +
+                getNum('fArriendo');
+  document.getElementById('totalCarga').textContent =
+    total ? formatMonto(total) : '$0';
+}
+
+/* ─── Validar que Deuda Vigente = suma de sus componentes ────────── */
+function checkDeudaVigente() {
+  const vigente = getNum('fDeudaVigenteTotal');
+  const suma = getNum('fDeudaHipotecaria') +
+               getNum('fDeudaComercial')   +
+               getNum('fDeudaConsumo')     +
+               getNum('fDeudaMorosa')      +
+               getNum('fDeudaVencida')     +
+               getNum('fDeudaCastigada');
+
+  const tr    = document.getElementById('trDeudaVigente');
+  const hint  = document.getElementById('hintVigente');
+
+  // Solo validar si se ingresó algo en deuda vigente
+  if (!vigente && !suma) {
+    tr.classList.remove('tr-vigente-error');
+    hint.textContent = '';
+    return;
+  }
+
+  if (vigente !== suma) {
+    tr.classList.add('tr-vigente-error');
+    const diff = suma - vigente;
+    hint.textContent = diff > 0
+      ? `Suma componentes: ${formatMonto(suma)} (faltan ${formatMonto(diff)})`
+      : `Suma componentes: ${formatMonto(suma)} (sobran ${formatMonto(-diff)})`;
+  } else {
+    tr.classList.remove('tr-vigente-error');
+    hint.textContent = '';
+  }
 }
 
 /* ─── Cargar datos guardados ────────────────────────────────────── */
@@ -367,60 +454,65 @@ async function cargarDatos() {
     const j = await r.json();
     if (!j.success || !j.data) return;
     const d = j.data;
-    const s = (id, v) => { const el = document.getElementById(id); if(el && v!=null) el.value = v; };
-    s('fMontoProtestos',       d.monto_protestos);
-    s('fProtestosVigentesQ',   d.protestos_vigentes_q);
-    s('fDeudaVigenteTotal',    d.deuda_vigente_total);
-    s('fDeudaVigenteInst',     d.deuda_vigente_inst);
-    s('fDeudaHipotecaria',     d.deuda_hipotecaria);
-    s('fDeudaHipotecariaInst', d.deuda_hipotecaria_inst);
-    s('fDeudaHipotecariaCarga',d.deuda_hipotecaria_carga);
-    s('fDeudaComercial',       d.deuda_comercial);
-    s('fDeudaComercialInst',   d.deuda_comercial_inst);
-    s('fDeudaComercialCarga',  d.deuda_comercial_carga);
-    s('fDeudaConsumo',         d.deuda_consumo);
-    s('fDeudaConsumoInst',     d.deuda_consumo_inst);
-    s('fDeudaConsumoCarga',    d.deuda_consumo_carga);
-    s('fDeudaMorosa',          d.deuda_morosa);
-    s('fDeudaMorosaInst',      d.deuda_morosa_inst);
-    s('fDeudaVencida',         d.deuda_vencida);
-    s('fDeudaVencidaInst',     d.deuda_vencida_inst);
-    s('fDeudaCastigada',       d.deuda_castigada);
-    s('fDeudaCastigadaInst',   d.deuda_castigada_inst);
-    s('fLineaDisponible',      d.linea_disponible);
-    s('fLineaDisponibleInst',  d.linea_disponible_inst);
-    s('fArriendo',             d.arriendo);
+    const sn = (id, v) => { const el = document.getElementById(id); if(el && v!=null) el.value = v; };
+    // Campos numéricos (cantidades, no pesos)
+    sn('fProtestosVigentesQ',   d.protestos_vigentes_q);
+    sn('fDeudaVigenteInst',     d.deuda_vigente_inst);
+    sn('fDeudaHipotecariaInst', d.deuda_hipotecaria_inst);
+    sn('fDeudaComercialInst',   d.deuda_comercial_inst);
+    sn('fDeudaConsumoInst',     d.deuda_consumo_inst);
+    sn('fDeudaMorosaInst',      d.deuda_morosa_inst);
+    sn('fDeudaVencidaInst',     d.deuda_vencida_inst);
+    sn('fDeudaCastigadaInst',   d.deuda_castigada_inst);
+    sn('fLineaDisponibleInst',  d.linea_disponible_inst);
+    // Campos monetarios — formatear
+    setMonto('fMontoProtestos',       d.monto_protestos);
+    setMonto('fDeudaVigenteTotal',    d.deuda_vigente_total);
+    setMonto('fDeudaHipotecaria',     d.deuda_hipotecaria);
+    setMonto('fDeudaHipotecariaCarga',d.deuda_hipotecaria_carga);
+    setMonto('fDeudaComercial',       d.deuda_comercial);
+    setMonto('fDeudaComercialCarga',  d.deuda_comercial_carga);
+    setMonto('fDeudaConsumo',         d.deuda_consumo);
+    setMonto('fDeudaConsumoCarga',    d.deuda_consumo_carga);
+    setMonto('fDeudaMorosa',          d.deuda_morosa);
+    setMonto('fDeudaVencida',         d.deuda_vencida);
+    setMonto('fDeudaCastigada',       d.deuda_castigada);
+    setMonto('fLineaDisponible',      d.linea_disponible);
+    setMonto('fArriendo',             d.arriendo);
     document.getElementById('fAcreditaPropiedad').checked = !!d.acredita_propiedad;
     calcTotal();
+    checkDeudaVigente();
   } catch(e) {}
 }
 
 /* ─── Guardar ─────────────────────────────────────────────────────── */
 async function guardar() {
-  const n = id => document.getElementById(id).value || null;
+  // getNum() parsea el formato $1.000.000.- y devuelve número (0 si vacío → null)
+  const m = id => getNum(id) || null;
+  const ni = id => { const v = document.getElementById(id)?.value; return v ? parseInt(v) : null; };
   const body = {
-    monto_protestos:          n('fMontoProtestos'),
-    protestos_vigentes_q:     n('fProtestosVigentesQ'),
-    deuda_vigente_total:      n('fDeudaVigenteTotal'),
-    deuda_vigente_inst:       n('fDeudaVigenteInst'),
-    deuda_hipotecaria:        n('fDeudaHipotecaria'),
-    deuda_hipotecaria_inst:   n('fDeudaHipotecariaInst'),
-    deuda_hipotecaria_carga:  n('fDeudaHipotecariaCarga'),
-    deuda_comercial:          n('fDeudaComercial'),
-    deuda_comercial_inst:     n('fDeudaComercialInst'),
-    deuda_comercial_carga:    n('fDeudaComercialCarga'),
-    deuda_consumo:            n('fDeudaConsumo'),
-    deuda_consumo_inst:       n('fDeudaConsumoInst'),
-    deuda_consumo_carga:      n('fDeudaConsumoCarga'),
-    deuda_morosa:             n('fDeudaMorosa'),
-    deuda_morosa_inst:        n('fDeudaMorosaInst'),
-    deuda_vencida:            n('fDeudaVencida'),
-    deuda_vencida_inst:       n('fDeudaVencidaInst'),
-    deuda_castigada:          n('fDeudaCastigada'),
-    deuda_castigada_inst:     n('fDeudaCastigadaInst'),
-    linea_disponible:         n('fLineaDisponible'),
-    linea_disponible_inst:    n('fLineaDisponibleInst'),
-    arriendo:                 n('fArriendo'),
+    monto_protestos:          m('fMontoProtestos'),
+    protestos_vigentes_q:     ni('fProtestosVigentesQ'),
+    deuda_vigente_total:      m('fDeudaVigenteTotal'),
+    deuda_vigente_inst:       ni('fDeudaVigenteInst'),
+    deuda_hipotecaria:        m('fDeudaHipotecaria'),
+    deuda_hipotecaria_inst:   ni('fDeudaHipotecariaInst'),
+    deuda_hipotecaria_carga:  m('fDeudaHipotecariaCarga'),
+    deuda_comercial:          m('fDeudaComercial'),
+    deuda_comercial_inst:     ni('fDeudaComercialInst'),
+    deuda_comercial_carga:    m('fDeudaComercialCarga'),
+    deuda_consumo:            m('fDeudaConsumo'),
+    deuda_consumo_inst:       ni('fDeudaConsumoInst'),
+    deuda_consumo_carga:      m('fDeudaConsumoCarga'),
+    deuda_morosa:             m('fDeudaMorosa'),
+    deuda_morosa_inst:        ni('fDeudaMorosaInst'),
+    deuda_vencida:            m('fDeudaVencida'),
+    deuda_vencida_inst:       ni('fDeudaVencidaInst'),
+    deuda_castigada:          m('fDeudaCastigada'),
+    deuda_castigada_inst:     ni('fDeudaCastigadaInst'),
+    linea_disponible:         m('fLineaDisponible'),
+    linea_disponible_inst:    ni('fLineaDisponibleInst'),
+    arriendo:                 m('fArriendo'),
     acredita_propiedad:       document.getElementById('fAcreditaPropiedad').checked,
   };
   try {
