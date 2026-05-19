@@ -45,6 +45,9 @@ const pool = require('../../../../shared/config/database');
     await pool.query(`ALTER TABLE creditos ADD COLUMN combustible VARCHAR(50) NULL AFTER transmision`).catch(e => { if(e.errno!==1060) throw e; });
     await pool.query(`ALTER TABLE creditos ADD COLUMN tasacion BIGINT NULL AFTER combustible`).catch(e => { if(e.errno!==1060) throw e; });
     await pool.query(`ALTER TABLE creditos ADD COLUMN permiso_circulacion BIGINT NULL AFTER tasacion`).catch(e => { if(e.errno!==1060) throw e; });
+    await pool.query(`ALTER TABLE creditos ADD COLUMN id_dealer INT NULL AFTER permiso_circulacion`).catch(e => { if(e.errno!==1060) throw e; });
+    await pool.query(`ALTER TABLE creditos ADD COLUMN tipo_ubicacion VARCHAR(10) NULL AFTER id_dealer`).catch(e => { if(e.errno!==1060) throw e; });
+    await pool.query(`ALTER TABLE creditos ADD COLUMN nombre_parque VARCHAR(100) NULL AFTER tipo_ubicacion`).catch(e => { if(e.errno!==1060) throw e; });
   } catch (e) {
     if (e.errno !== 1050) console.error('[creditos migration]', e.message);
   }
@@ -72,7 +75,8 @@ const create = async (req, res) => {
       gastos_operativos, seguros,
       tipo_vehiculo, marca, modelo, anio, patente, color, motor, chasis,
       transmision, combustible, tasacion, permiso_circulacion,
-      dealer, ejecutivo, observaciones, datos_json,
+      dealer, id_dealer, tipo_ubicacion, nombre_parque,
+      ejecutivo, observaciones, datos_json,
     } = req.body;
 
     if (!rut_cliente || !nombre_cliente)
@@ -89,8 +93,9 @@ const create = async (req, res) => {
           gastos_operativos, seguros,
           tipo_vehiculo, marca, modelo, anio, patente, color, motor, chasis,
           transmision, combustible, tasacion, permiso_circulacion,
-          dealer, ejecutivo, observaciones, datos_json, id_usuario)
-       VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
+          dealer, id_dealer, tipo_ubicacion, nombre_parque,
+          ejecutivo, observaciones, datos_json, id_usuario)
+       VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
       [
         numero_credito, rut_cliente.toUpperCase().trim(), nombre_cliente.trim(),
         empresa || null, id_cotizacion || null, estado || 'VIGENTE',
@@ -103,7 +108,8 @@ const create = async (req, res) => {
         motor || null, chasis || null,
         transmision || null, combustible || null,
         tasacion || null, permiso_circulacion || null,
-        dealer || null, ejecutivo || null, observaciones || null,
+        dealer || null, id_dealer || null, tipo_ubicacion || null, nombre_parque || null,
+        ejecutivo || null, observaciones || null,
         JSON.stringify(datos_json || {}), id_usuario,
       ]
     );

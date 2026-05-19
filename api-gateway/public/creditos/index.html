@@ -177,6 +177,34 @@
     /* Tasación / Permiso readonly */
     .veh-readonly { background:#f0f9ff; border-color:#bfdbfe; color:#1e40af; font-weight:600; }
 
+    /* Patente validación */
+    .patente-ok  { border-color:#10b981 !important; background:#f0fdf4 !important; }
+    .patente-err { border-color:#dc2626 !important; background:#fef2f2 !important; }
+    .patente-hint { font-size:.68rem; margin-top:2px; min-height:14px; }
+    .patente-hint.ok  { color:#059669; }
+    .patente-hint.err { color:#dc2626; }
+
+    /* Dealer autocomplete */
+    .dealer-wrap { position:relative; }
+    .dealer-drop {
+      position:absolute; top:100%; left:0; right:0; z-index:300;
+      background:#fff; border:1.5px solid #93c5fd; border-radius:0 0 8px 8px;
+      box-shadow:0 6px 18px rgba(0,0,0,.12); max-height:200px; overflow-y:auto;
+      display:none;
+    }
+    .dealer-drop.open { display:block; }
+    .dealer-item { padding:7px 12px; cursor:pointer; font-size:.83rem; border-bottom:1px solid #f1f5f9; }
+    .dealer-item:last-child { border-bottom:none; }
+    .dealer-item:hover { background:#eff6ff; }
+    .dealer-item .di-name { font-weight:700; color:#1e293b; }
+    .dealer-item .di-sub  { color:#6b7280; font-size:.75rem; }
+
+    /* Parque / Calle */
+    .ubic-toggle { display:flex; gap:6px; }
+    .ubic-btn { flex:1; padding:6px 0; border:1.5px solid #d1d5db; border-radius:7px; font-size:.8rem; font-weight:700; cursor:pointer; text-align:center; background:#fff; color:#6b7280; transition:all .15s; }
+    .ubic-btn.active-parque { border-color:#0141A2; background:#eff6ff; color:#0141A2; }
+    .ubic-btn.active-calle  { border-color:#059669; background:#f0fdf4; color:#059669; }
+
     /* RUT found bar */
     .rut-found { background:#f0fdf4; border:1.5px solid #6ee7b7; border-radius:8px; padding:10px 16px; font-size:.88rem; font-weight:700; color:#065f46; display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:8px; }
     .rut-found-nombre { display:flex; align-items:center; gap:6px; }
@@ -209,7 +237,7 @@
   <div class="topnav-left">
     <div class="topnav-brand">
       <a href="/"><img src="/img/logo.png" alt="AutoFácil" style="display:block"></a>
-      <span class="version-badge" id="versionBadge">v1.5</span>
+      <span class="version-badge" id="versionBadge">v1.6</span>
     </div>
   </div>
   <div class="topnav-right">
@@ -370,7 +398,9 @@
         </div>
         <div class="col-md-2">
           <label class="form-label">Patente</label>
-          <input type="text" id="iPatente" class="form-control" placeholder="ABCD12" oninput="upperInputCred(this)" maxlength="8">
+          <input type="text" id="iPatente" class="form-control" placeholder="ABCD12"
+                 oninput="patenteInput(this)" onblur="patenteBlur(this)" maxlength="6" autocomplete="off">
+          <div class="patente-hint" id="patenteHint"></div>
         </div>
         <div class="col-md-2">
           <label class="form-label">Color</label>
@@ -399,18 +429,38 @@
           <input type="text" id="iPermiso" class="form-control veh-readonly" readonly placeholder="—">
         </div>
 
-        <!-- Fila 3: Motor / Chasis / Dealer -->
-        <div class="col-md-4">
+        <!-- Fila 3: Motor / Chasis / Dealer / Ubicación -->
+        <div class="col-md-3">
           <label class="form-label">N° Motor</label>
           <input type="text" id="iMotor" class="form-control" placeholder="ABC123456" oninput="upperInputCred(this)">
         </div>
-        <div class="col-md-4">
+        <div class="col-md-3">
           <label class="form-label">N° Chasis / VIN</label>
           <input type="text" id="iChasis" class="form-control" placeholder="9BWZZZ377VT004251" oninput="upperInputCred(this)">
         </div>
-        <div class="col-md-4">
+        <div class="col-md-3">
           <label class="form-label">Dealer</label>
-          <input type="text" id="iDealer" class="form-control" placeholder="Nombre del dealer" oninput="upperInputCred(this)">
+          <div class="dealer-wrap">
+            <input type="text" id="iDealerBuscar" class="form-control" placeholder="Buscar dealer…"
+                   oninput="dealerBuscar(this)" onblur="dealerBlur()" autocomplete="off">
+            <input type="hidden" id="iDealer">
+            <input type="hidden" id="iDealerId">
+            <div id="iDealerDrop" class="dealer-drop"></div>
+          </div>
+        </div>
+        <div class="col-md-3">
+          <label class="form-label">Ubicación</label>
+          <div class="ubic-toggle mb-1">
+            <button type="button" class="ubic-btn" id="btnUbicParque" onclick="setUbicacion('PARQUE')">
+              <i class="bi bi-building me-1"></i>Parque
+            </button>
+            <button type="button" class="ubic-btn" id="btnUbicCalle" onclick="setUbicacion('CALLE')">
+              <i class="bi bi-signpost me-1"></i>Calle
+            </button>
+          </div>
+          <input type="hidden" id="iTipoUbicacion">
+          <input type="text" id="iNombreParque" class="form-control" placeholder="Nombre del parque"
+                 style="display:none;font-size:.82rem" oninput="upperInputCred(this)">
         </div>
       </div>
     </div>
@@ -546,6 +596,80 @@ function logout()   { localStorage.removeItem('token'); localStorage.removeItem(
 /* ─── Utils ─────────────────────────────────────────────────────────── */
 function upperInputCred(el) { const s=el.selectionStart, e=el.selectionEnd; el.value=el.value.toUpperCase(); el.setSelectionRange(s,e); }
 function fmtPeso(v) { return v!=null && v!=='' && v!==0 ? '$'+Number(v).toLocaleString('es-CL') : '—'; }
+
+/* ─── Validador de Patente (LLLLNN) ─────────────────────────────────── */
+const PATENTE_RE = /^[A-Z]{4}[0-9]{2}$/;
+function patenteInput(el) {
+  el.value = el.value.toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 6);
+  const hint = document.getElementById('patenteHint');
+  el.classList.remove('patente-ok','patente-err');
+  if (el.value.length === 0) { hint.textContent = ''; hint.className = 'patente-hint'; return; }
+  if (PATENTE_RE.test(el.value)) {
+    el.classList.add('patente-ok');
+    hint.textContent = '✓ Formato válido';
+    hint.className = 'patente-hint ok';
+  } else {
+    el.classList.add('patente-err');
+    const letras = el.value.replace(/[^A-Z]/g,'').length;
+    const nums   = el.value.replace(/[^0-9]/g,'').length;
+    hint.textContent = letras < 4 ? `Faltan ${4-letras} letra(s)` : nums < 2 ? `Faltan ${2-nums} número(s)` : 'Formato: ABCD12';
+    hint.className = 'patente-hint err';
+  }
+}
+function patenteBlur(el) { patenteInput(el); }
+
+/* ─── Dealer autocomplete ─────────────────────────────────────────────── */
+let _dealerTimer = null;
+function dealerBuscar(el) {
+  clearTimeout(_dealerTimer);
+  document.getElementById('iDealer').value   = '';
+  document.getElementById('iDealerId').value = '';
+  const q = el.value.trim();
+  if (q.length < 2) { document.getElementById('iDealerDrop').classList.remove('open'); return; }
+  _dealerTimer = setTimeout(async () => {
+    const r = await fetch('/api/dealers?q=' + encodeURIComponent(q) + '&activo=1&limit=20', { headers: apiHdr() });
+    const j = await r.json();
+    const drop = document.getElementById('iDealerDrop');
+    if (!j.success || !j.data.rows.length) {
+      drop.innerHTML = '<div class="dealer-item"><span class="di-sub">Sin resultados</span></div>';
+    } else {
+      drop.innerHTML = j.data.rows.map(d => {
+        const parque = d.ccs_parque ? `<span class="di-sub">Parque ${d.ccs_parque}</span>` : `<span class="di-sub">Calle</span>`;
+        return `<div class="dealer-item" onmousedown="dealerSeleccionar(${d.id_dealer},'${(d.nombre_indexa||d.nombre_razon||'').replace(/'/g,"\\'")}','${(d.ccs_parque||'').replace(/'/g,"\\'")}')">
+          <div class="di-name">${d.nombre_indexa || d.nombre_razon}</div>${parque}
+        </div>`;
+      }).join('');
+    }
+    drop.classList.add('open');
+  }, 280);
+}
+function dealerSeleccionar(id, nombre, parque) {
+  document.getElementById('iDealerBuscar').value = nombre;
+  document.getElementById('iDealer').value       = nombre;
+  document.getElementById('iDealerId').value     = id;
+  document.getElementById('iDealerDrop').classList.remove('open');
+  // Auto-completar ubicación desde ccs_parque del dealer
+  if (parque) { setUbicacion('PARQUE'); document.getElementById('iNombreParque').value = parque; }
+  else        { setUbicacion('CALLE'); }
+}
+function dealerBlur() {
+  setTimeout(() => document.getElementById('iDealerDrop').classList.remove('open'), 200);
+  // Si hay texto pero no se seleccionó de la lista, igual guardar el texto
+  const buscar = document.getElementById('iDealerBuscar').value.trim();
+  if (buscar && !document.getElementById('iDealer').value) {
+    document.getElementById('iDealer').value = buscar;
+  }
+}
+
+/* ─── Ubicación Parque / Calle ───────────────────────────────────────── */
+function setUbicacion(tipo) {
+  document.getElementById('iTipoUbicacion').value = tipo;
+  document.getElementById('btnUbicParque').className = 'ubic-btn' + (tipo==='PARQUE'?' active-parque':'');
+  document.getElementById('btnUbicCalle').className  = 'ubic-btn' + (tipo==='CALLE'?' active-calle':'');
+  const parqueInput = document.getElementById('iNombreParque');
+  parqueInput.style.display = tipo === 'PARQUE' ? 'block' : 'none';
+  if (tipo !== 'PARQUE') parqueInput.value = '';
+}
 
 /* ─── Cascada de vehículos ───────────────────────────────────────────── */
 async function vehApiGet(params) {
@@ -794,6 +918,7 @@ async function abrirDetalle(id) {
           ${item('Motor',       c.motor)}
           ${item('Chasis',      c.chasis)}
           ${item('Dealer',      c.dealer)}
+          ${item('Ubicación',   c.tipo_ubicacion ? (c.tipo_ubicacion === 'PARQUE' ? '🏢 Parque' + (c.nombre_parque ? ': '+c.nombre_parque : '') : '🛣️ Calle') : null)}
         </div>
       </div>
       <div class="ds">
@@ -971,6 +1096,9 @@ async function guardarCredito() {
     tasacion:            parseInt((document.getElementById('iTasacion').value||'').replace(/[^0-9]/g,'')) || null,
     permiso_circulacion: parseInt((document.getElementById('iPermiso').value||'').replace(/[^0-9]/g,''))  || null,
     dealer:              document.getElementById('iDealer').value || null,
+    id_dealer:           parseInt(document.getElementById('iDealerId').value) || null,
+    tipo_ubicacion:      document.getElementById('iTipoUbicacion').value || null,
+    nombre_parque:       document.getElementById('iNombreParque').value.trim() || null,
     ejecutivo:           document.getElementById('iEjecutivo').value || null,
     observaciones:       document.getElementById('iObservaciones').value || null,
   };
@@ -989,9 +1117,10 @@ async function guardarCredito() {
 
 function limpiarIngreso() {
   ['iRut','iNombreCliente','iTipoVehiculo','iPatente','iColor',
-   'iMotor','iChasis','iDealer','iFechaOtorg','iFechaPrimeraCuota','iValorVehiculo','iPie',
+   'iMotor','iChasis','iDealer','iDealerBuscar','iDealerId',
+   'iFechaOtorg','iFechaPrimeraCuota','iValorVehiculo','iPie',
    'iSaldoPrecio','iGastosOp','iSeguros','iMontoFin','iPlazo','iTasa','iCuota','iObservaciones',
-   'iTasacion','iPermiso'
+   'iTasacion','iPermiso','iTipoUbicacion','iNombreParque'
   ].forEach(id => { const el=document.getElementById(id); if(el) el.value=''; });
   fillSelect('iMarca',     [], 'Seleccione marca',  true);
   fillSelect('iModelo',    [], 'Seleccione marca',  false);
@@ -1002,6 +1131,17 @@ function limpiarIngreso() {
   document.getElementById('iEmpresa').value = '';
   document.querySelectorAll('.empresa-card').forEach(c => c.classList.remove('selected'));
   document.getElementById('rutClienteFoundMsg').style.display = 'none';
+  // Reset dealer dropdown
+  document.getElementById('iDealerDrop').classList.remove('open');
+  // Reset ubicación
+  document.getElementById('btnUbicParque').classList.remove('active-parque');
+  document.getElementById('btnUbicCalle').classList.remove('active-calle');
+  document.getElementById('iNombreParque').style.display = 'none';
+  // Reset patente hint
+  const ph = document.getElementById('patenteHint');
+  if (ph) ph.textContent = '';
+  const pi = document.getElementById('iPatente');
+  if (pi) { pi.classList.remove('patente-ok','patente-err'); }
   vehCargaMarcas(); // recargar marcas
 }
 
