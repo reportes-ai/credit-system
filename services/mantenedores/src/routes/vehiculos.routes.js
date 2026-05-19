@@ -4,6 +4,7 @@ const { verifyToken } = require('../../../../shared/middleware/auth');
 
 router.get('/',          verifyToken, ctrl.getVehiculos);
 router.get('/filtros',   verifyToken, ctrl.getFiltros);
+router.get('/cascada',   verifyToken, ctrl.getCascada);
 router.post('/importar', verifyToken, ctrl.importar);
 router.post('/',         verifyToken, ctrl.createVehiculo);
 router.put('/:id',       verifyToken, ctrl.updateVehiculo);

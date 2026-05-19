@@ -174,6 +174,9 @@
     .btn-ver-detalle { background:none; border:1.5px solid var(--blue); border-radius:6px; color:var(--blue); font-size:.75rem; font-weight:700; padding:3px 10px; cursor:pointer; white-space:nowrap; }
     .btn-ver-detalle:hover { background:#eff6ff; }
 
+    /* Tasación / Permiso readonly */
+    .veh-readonly { background:#f0f9ff; border-color:#bfdbfe; color:#1e40af; font-weight:600; }
+
     /* RUT found bar */
     .rut-found { background:#f0fdf4; border:1.5px solid #6ee7b7; border-radius:8px; padding:10px 16px; font-size:.88rem; font-weight:700; color:#065f46; display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:8px; }
     .rut-found-nombre { display:flex; align-items:center; gap:6px; }
@@ -206,7 +209,7 @@
   <div class="topnav-left">
     <div class="topnav-brand">
       <a href="/"><img src="/img/logo.png" alt="AutoFácil" style="display:block"></a>
-      <span class="version-badge" id="versionBadge">v1.4</span>
+      <span class="version-badge" id="versionBadge">v1.5</span>
     </div>
   </div>
   <div class="topnav-right">
@@ -338,47 +341,74 @@
     <div class="form-card">
       <div class="section-label"><i class="bi bi-car-front-fill"></i>Datos del Vehículo</div>
       <div class="row g-2">
-        <div class="col-md-3 col-lg-2">
+        <!-- Fila 1: Tipo / Marca / Modelo / Año -->
+        <div class="col-md-2">
           <label class="form-label">Tipo Vehículo</label>
           <select id="iTipoVehiculo" class="form-select">
             <option value="">— Seleccione —</option>
-            <option>Automóvil</option>
-            <option>Camioneta</option>
-            <option>Camión</option>
-            <option>Furgón</option>
-            <option>Van</option>
-            <option>Moto</option>
+            <option>Automóvil</option><option>Camioneta</option><option>Camión</option>
+            <option>Furgón</option><option>Van</option><option>Moto</option>
           </select>
         </div>
-        <div class="col-md-3 col-lg-2">
+        <div class="col-md-2">
           <label class="form-label">Marca</label>
-          <input type="text" id="iMarca" class="form-control" placeholder="Toyota" oninput="upperInputCred(this)">
+          <select id="iMarca" class="form-select" onchange="vehCargaModelos()">
+            <option value="">— Seleccione —</option>
+          </select>
         </div>
-        <div class="col-md-3 col-lg-3">
+        <div class="col-md-3">
           <label class="form-label">Modelo</label>
-          <input type="text" id="iModelo" class="form-control" placeholder="Corolla" oninput="upperInputCred(this)">
+          <select id="iModelo" class="form-select" onchange="vehCargaAnios()" disabled>
+            <option value="">— Seleccione marca —</option>
+          </select>
         </div>
-        <div class="col-md-2 col-lg-1">
+        <div class="col-md-1">
           <label class="form-label">Año</label>
-          <input type="number" id="iAnio" class="form-control" placeholder="2023" min="1990" max="2030">
+          <select id="iAnio" class="form-select" onchange="vehCargaDetalle()" disabled>
+            <option value="">—</option>
+          </select>
         </div>
-        <div class="col-md-2 col-lg-2">
+        <div class="col-md-2">
           <label class="form-label">Patente</label>
           <input type="text" id="iPatente" class="form-control" placeholder="ABCD12" oninput="upperInputCred(this)" maxlength="8">
         </div>
-        <div class="col-md-2 col-lg-2">
+        <div class="col-md-2">
           <label class="form-label">Color</label>
           <input type="text" id="iColor" class="form-control" placeholder="Blanco" oninput="upperInputCred(this)">
         </div>
-        <div class="col-md-4 col-lg-3">
+
+        <!-- Fila 2: Transmisión / Combustible / Tasación / Permiso Circulación -->
+        <div class="col-md-2">
+          <label class="form-label">Transmisión</label>
+          <select id="iTransmision" class="form-select" disabled>
+            <option value="">— seleccione año —</option>
+          </select>
+        </div>
+        <div class="col-md-2">
+          <label class="form-label">Combustible</label>
+          <select id="iCombustible" class="form-select" disabled>
+            <option value="">— seleccione año —</option>
+          </select>
+        </div>
+        <div class="col-md-2">
+          <label class="form-label">Tasación $</label>
+          <input type="text" id="iTasacion" class="form-control veh-readonly" readonly placeholder="—">
+        </div>
+        <div class="col-md-2">
+          <label class="form-label">Permiso Circulación $</label>
+          <input type="text" id="iPermiso" class="form-control veh-readonly" readonly placeholder="—">
+        </div>
+
+        <!-- Fila 3: Motor / Chasis / Dealer -->
+        <div class="col-md-4">
           <label class="form-label">N° Motor</label>
           <input type="text" id="iMotor" class="form-control" placeholder="ABC123456" oninput="upperInputCred(this)">
         </div>
-        <div class="col-md-4 col-lg-4">
+        <div class="col-md-4">
           <label class="form-label">N° Chasis / VIN</label>
           <input type="text" id="iChasis" class="form-control" placeholder="9BWZZZ377VT004251" oninput="upperInputCred(this)">
         </div>
-        <div class="col-md-4 col-lg-3">
+        <div class="col-md-4">
           <label class="form-label">Dealer</label>
           <input type="text" id="iDealer" class="form-control" placeholder="Nombre del dealer" oninput="upperInputCred(this)">
         </div>
@@ -515,7 +545,108 @@ function logout()   { localStorage.removeItem('token'); localStorage.removeItem(
 
 /* ─── Utils ─────────────────────────────────────────────────────────── */
 function upperInputCred(el) { const s=el.selectionStart, e=el.selectionEnd; el.value=el.value.toUpperCase(); el.setSelectionRange(s,e); }
-function fmtPeso(v) { return v!=null && v!=='' ? '$'+Number(v).toLocaleString('es-CL') : '—'; }
+function fmtPeso(v) { return v!=null && v!=='' && v!==0 ? '$'+Number(v).toLocaleString('es-CL') : '—'; }
+
+/* ─── Cascada de vehículos ───────────────────────────────────────────── */
+async function vehApiGet(params) {
+  const qs = new URLSearchParams(params).toString();
+  const r  = await fetch('/api/vehiculos/cascada?' + qs, { headers: apiHdr() });
+  return r.json();
+}
+
+function fillSelect(id, opciones, placeholder, enabled) {
+  const el = document.getElementById(id);
+  el.innerHTML = `<option value="">— ${placeholder} —</option>` +
+    opciones.map(o => `<option value="${o}">${o}</option>`).join('');
+  el.disabled = !enabled;
+}
+
+async function vehCargaModelos() {
+  const marca = document.getElementById('iMarca').value;
+  // Resetear los selects dependientes
+  fillSelect('iModelo',     [], 'Seleccione marca', false);
+  fillSelect('iAnio',       [], '—',                false);
+  fillSelect('iTransmision',[], 'seleccione año',   false);
+  fillSelect('iCombustible',[], 'seleccione año',   false);
+  document.getElementById('iTasacion').value = '';
+  document.getElementById('iPermiso').value  = '';
+  if (!marca) return;
+  const j = await vehApiGet({ marca });
+  if (j.success) fillSelect('iModelo', j.data.modelos, 'Seleccione modelo', true);
+}
+
+async function vehCargaAnios() {
+  const marca  = document.getElementById('iMarca').value;
+  const modelo = document.getElementById('iModelo').value;
+  fillSelect('iAnio',       [], '—',              false);
+  fillSelect('iTransmision',[], 'seleccione año', false);
+  fillSelect('iCombustible',[], 'seleccione año', false);
+  document.getElementById('iTasacion').value = '';
+  document.getElementById('iPermiso').value  = '';
+  if (!marca || !modelo) return;
+  const j = await vehApiGet({ marca, modelo });
+  if (j.success) fillSelect('iAnio', j.data.anios, 'Seleccione año', true);
+}
+
+async function vehCargaDetalle() {
+  const marca  = document.getElementById('iMarca').value;
+  const modelo = document.getElementById('iModelo').value;
+  const anio   = document.getElementById('iAnio').value;
+  fillSelect('iTransmision',[], 'seleccione año', false);
+  fillSelect('iCombustible',[], 'seleccione año', false);
+  document.getElementById('iTasacion').value = '';
+  document.getElementById('iPermiso').value  = '';
+  if (!marca || !modelo || !anio) return;
+  const j = await vehApiGet({ marca, modelo, anio });
+  if (j.success && j.data) {
+    const d = j.data;
+    fillSelect('iTransmision', d.transmisiones, 'Seleccione', !!d.transmisiones.length);
+    fillSelect('iCombustible', d.combustibles,  'Seleccione', !!d.combustibles.length);
+    // Si solo hay una opción, preseleccionar
+    if (d.transmisiones.length === 1) document.getElementById('iTransmision').value = d.transmisiones[0];
+    if (d.combustibles.length  === 1) document.getElementById('iCombustible').value  = d.combustibles[0];
+    document.getElementById('iTasacion').value = d.tasacion ? fmtPeso(d.tasacion) : '';
+    document.getElementById('iPermiso').value  = d.permiso  ? fmtPeso(d.permiso)  : '';
+  }
+}
+
+// Carga marcas al inicio
+async function vehCargaMarcas() {
+  const j = await vehApiGet({});
+  if (j.success) fillSelect('iMarca', j.data.marcas, 'Seleccione marca', true);
+}
+
+// Restaura los selects en cascada al cargar un crédito existente
+async function vehRestaurar(marca, modelo, anio, transmision, combustible) {
+  if (!marca) return;
+  const jM = await vehApiGet({});
+  if (jM.success) {
+    fillSelect('iMarca', jM.data.marcas, 'Seleccione marca', true);
+    document.getElementById('iMarca').value = marca;
+  }
+  if (!modelo) return;
+  const jMod = await vehApiGet({ marca });
+  if (jMod.success) {
+    fillSelect('iModelo', jMod.data.modelos, 'Seleccione modelo', true);
+    document.getElementById('iModelo').value = modelo;
+  }
+  if (!anio) return;
+  const jA = await vehApiGet({ marca, modelo });
+  if (jA.success) {
+    fillSelect('iAnio', jA.data.anios, 'Seleccione año', true);
+    document.getElementById('iAnio').value = anio;
+  }
+  const jD = await vehApiGet({ marca, modelo, anio });
+  if (jD.success && jD.data) {
+    const d = jD.data;
+    fillSelect('iTransmision', d.transmisiones, 'Seleccione', !!d.transmisiones.length);
+    fillSelect('iCombustible', d.combustibles,  'Seleccione', !!d.combustibles.length);
+    if (transmision) document.getElementById('iTransmision').value = transmision;
+    if (combustible) document.getElementById('iCombustible').value = combustible;
+    document.getElementById('iTasacion').value = d.tasacion ? fmtPeso(d.tasacion) : '';
+    document.getElementById('iPermiso').value  = d.permiso  ? fmtPeso(d.permiso)  : '';
+  }
+}
 function showToast(msg, ok) {
   const el = document.getElementById(ok ? 'toastOk' : 'toastErr');
   el.textContent = msg; el.style.display = 'block';
@@ -650,15 +781,19 @@ async function abrirDetalle(id) {
       <div class="ds">
         <div class="ds-title"><i class="bi bi-car-front-fill"></i>Vehículo</div>
         <div class="ds-grid">
-          ${item('Tipo',    c.tipo_vehiculo)}
-          ${item('Marca',   c.marca)}
-          ${item('Modelo',  c.modelo)}
-          ${item('Año',     c.anio)}
-          ${item('Patente', c.patente)}
-          ${item('Color',   c.color)}
-          ${item('Motor',   c.motor)}
-          ${item('Chasis',  c.chasis)}
-          ${item('Dealer',  c.dealer)}
+          ${item('Tipo',        c.tipo_vehiculo)}
+          ${item('Marca',       c.marca)}
+          ${item('Modelo',      c.modelo)}
+          ${item('Año',         c.anio)}
+          ${item('Transmisión', c.transmision)}
+          ${item('Combustible', c.combustible)}
+          ${item('Tasación',    fmtPeso(c.tasacion))}
+          ${item('Perm. Circ.', fmtPeso(c.permiso_circulacion))}
+          ${item('Patente',     c.patente)}
+          ${item('Color',       c.color)}
+          ${item('Motor',       c.motor)}
+          ${item('Chasis',      c.chasis)}
+          ${item('Dealer',      c.dealer)}
         </div>
       </div>
       <div class="ds">
@@ -831,6 +966,10 @@ async function guardarCredito() {
     color:               document.getElementById('iColor').value || null,
     motor:               document.getElementById('iMotor').value || null,
     chasis:              document.getElementById('iChasis').value || null,
+    transmision:         document.getElementById('iTransmision').value || null,
+    combustible:         document.getElementById('iCombustible').value || null,
+    tasacion:            parseInt((document.getElementById('iTasacion').value||'').replace(/[^0-9]/g,'')) || null,
+    permiso_circulacion: parseInt((document.getElementById('iPermiso').value||'').replace(/[^0-9]/g,''))  || null,
     dealer:              document.getElementById('iDealer').value || null,
     ejecutivo:           document.getElementById('iEjecutivo').value || null,
     observaciones:       document.getElementById('iObservaciones').value || null,
@@ -849,18 +988,26 @@ async function guardarCredito() {
 }
 
 function limpiarIngreso() {
-  ['iRut','iNombreCliente','iTipoVehiculo','iMarca','iModelo','iAnio','iPatente','iColor',
+  ['iRut','iNombreCliente','iTipoVehiculo','iPatente','iColor',
    'iMotor','iChasis','iDealer','iFechaOtorg','iFechaPrimeraCuota','iValorVehiculo','iPie',
-   'iSaldoPrecio','iGastosOp','iSeguros','iMontoFin','iPlazo','iTasa','iCuota','iObservaciones'
+   'iSaldoPrecio','iGastosOp','iSeguros','iMontoFin','iPlazo','iTasa','iCuota','iObservaciones',
+   'iTasacion','iPermiso'
   ].forEach(id => { const el=document.getElementById(id); if(el) el.value=''; });
+  fillSelect('iMarca',     [], 'Seleccione marca',  true);
+  fillSelect('iModelo',    [], 'Seleccione marca',  false);
+  fillSelect('iAnio',      [], '—',                 false);
+  fillSelect('iTransmision',[],'seleccione año',    false);
+  fillSelect('iCombustible',[],'seleccione año',    false);
   document.getElementById('iEstado').value = 'VIGENTE';
   document.getElementById('iEmpresa').value = '';
   document.querySelectorAll('.empresa-card').forEach(c => c.classList.remove('selected'));
   document.getElementById('rutClienteFoundMsg').style.display = 'none';
+  vehCargaMarcas(); // recargar marcas
 }
 
 /* ─── Init ─────────────────────────────────────────────────────────── */
 buscarCreditos();
+vehCargaMarcas();
 document.addEventListener('keydown', e => { if(e.key==='Escape') cerrarDetalle(); });
 </script>
 </body>

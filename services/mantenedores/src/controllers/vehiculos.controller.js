@@ -154,4 +154,46 @@ const deleteVehiculo = async (req, res) => {
   } catch (e) { res.status(500).json({ success: false, data: null, error: e.message }); }
 };
 
-module.exports = { getVehiculos, getFiltros, importar, createVehiculo, updateVehiculo, deleteVehiculo };
+/* Cascada marca → modelo → año → detalle (transmisión, combustible, tasación, permiso) */
+const getCascada = async (req, res) => {
+  try {
+    const { marca, modelo, anio } = req.query;
+
+    if (marca && modelo && anio) {
+      // Registro completo para la combinación exacta
+      const [rows] = await pool.query(
+        `SELECT * FROM vehiculos WHERE marca=? AND modelo=? AND anio=? ORDER BY version LIMIT 20`,
+        [marca, modelo, parseInt(anio)]
+      );
+      const transmisiones = [...new Set(rows.map(r => r.transmision).filter(Boolean))];
+      const combustibles  = [...new Set(rows.map(r => r.combustible).filter(Boolean))];
+      // Tasación y permiso (tomar el primero disponible)
+      const tasacion = rows.find(r => r.tasacion)?.tasacion ?? null;
+      const permiso  = rows.find(r => r.permiso)?.permiso   ?? null;
+      res.json({ success: true, data: { tipo: 'detalle', transmisiones, combustibles, tasacion, permiso, rows }, error: null });
+
+    } else if (marca && modelo) {
+      // Años disponibles para marca+modelo
+      const [rows] = await pool.query(
+        `SELECT DISTINCT anio FROM vehiculos WHERE marca=? AND modelo=? ORDER BY anio DESC`,
+        [marca, modelo]
+      );
+      res.json({ success: true, data: { tipo: 'anios', anios: rows.map(r => r.anio) }, error: null });
+
+    } else if (marca) {
+      // Modelos distintos para la marca
+      const [rows] = await pool.query(
+        `SELECT DISTINCT modelo FROM vehiculos WHERE marca=? ORDER BY modelo`,
+        [marca]
+      );
+      res.json({ success: true, data: { tipo: 'modelos', modelos: rows.map(r => r.modelo) }, error: null });
+
+    } else {
+      // Todas las marcas
+      const [rows] = await pool.query(`SELECT DISTINCT marca FROM vehiculos ORDER BY marca`);
+      res.json({ success: true, data: { tipo: 'marcas', marcas: rows.map(r => r.marca) }, error: null });
+    }
+  } catch (e) { res.status(500).json({ success: false, data: null, error: e.message }); }
+};
+
+module.exports = { getVehiculos, getFiltros, getCascada, importar, createVehiculo, updateVehiculo, deleteVehiculo };
