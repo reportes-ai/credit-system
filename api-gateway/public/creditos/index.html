@@ -285,7 +285,7 @@
   <div class="topnav-left">
     <div class="topnav-brand">
       <a href="/"><img src="/img/logo.png" alt="AutoFácil" style="display:block"></a>
-      <span class="version-badge" id="versionBadge">v2.1</span>
+      <span class="version-badge" id="versionBadge">v2.2</span>
     </div>
   </div>
   <div class="topnav-right">
@@ -563,7 +563,7 @@
             <div class="col-4">
               <label class="form-label">Tasa <span class="fw-normal text-muted">[%]</span></label>
               <input type="text" id="iTasa" class="form-control" placeholder="ej: 1.78%" oninput="credTasaInput(this)" onfocus="credTasaFocus(this)" autocomplete="off">
-              <div class="field-hint">Desde costo de fondo</div>
+              <div class="field-hint" id="hintTasa">Cargando tasa vigente…</div>
             </div>
           </div>
 
@@ -1213,6 +1213,7 @@ function credPesoInput(el) {
 function credTasaInput(el) {
   const raw = el.value.replace(/%/g,'');
   el.value  = raw ? raw + '%' : '';
+  credTasaManual = raw.trim() !== '';  // flag: usuario editó manualmente
   const pos = Math.max(0, el.value.length - 1);
   try { el.setSelectionRange(pos, pos); } catch(e){}
   credRecalcular();
@@ -1255,22 +1256,58 @@ function credComboKey(d,r,c) {
 function credFmtP(n) { if(!n&&n!==0) return '—'; return '$'+Math.round(n).toLocaleString('es-CL'); }
 
 let credParams = {};
+let credUF = 0;
+let credTasas = {};
+let credTasaManual = false;
 
 async function credCargarParams() {
   try {
-    const r = await fetch('/api/parametros-credito', { headers: apiHdr() });
-    const j = await r.json();
-    if (j.success) {
-      credParams = j.data.obj || {};
-      // Auto-poblar tasa desde costo_fondo si el campo está vacío
-      const iTasa = document.getElementById('iTasa');
-      if (iTasa && !iTasa.value && credParams.costo_fondo) {
-        iTasa.value = Number(credParams.costo_fondo).toFixed(2) + '%';
-      }
-      credActualizarGastos();
-      credRecalcular();
+    const [rP, rU, rT] = await Promise.all([
+      fetch('/api/parametros-credito', { headers: apiHdr() }),
+      fetch('/api/uf/vigente',         { headers: apiHdr() }),
+      fetch('/api/tasas/vigente',      { headers: apiHdr() }),
+    ]);
+    const [jP, jU, jT] = await Promise.all([rP.json(), rU.json(), rT.json()]);
+
+    if (jP.success) credParams = jP.data.obj || {};
+    if (jU.success && jU.data) credUF = parseFloat(jU.data.valor) || 0;
+    if (jT.success && jT.data) {
+      credTasas.menor = parseFloat(jT.data.tasa_mensual_menor) || 0;
+      credTasas.mayor = parseFloat(jT.data.tasa_mensual_mayor) || 0;
     }
+    credActualizarGastos();
+    credRecalcular();
   } catch(e) {}
+}
+
+// Determina tramo ≤200 UF / >200 UF y auto-setea la tasa si no es manual
+function credActualizarTramo(montoFin) {
+  const elHint = document.getElementById('hintTasa');
+  if (!credUF || !montoFin || !credTasas.menor) {
+    if (elHint) elHint.textContent = 'Tasa vigente según tramo';
+    return;
+  }
+  const esTramoMenor = montoFin <= 200 * credUF;
+  const tasa = esTramoMenor ? credTasas.menor : credTasas.mayor;
+  if (elHint) elHint.textContent = esTramoMenor
+    ? `≤200 UF → ${Number(tasa).toFixed(2)}% mensual`
+    : `>200 UF → ${Number(tasa).toFixed(2)}% mensual`;
+  if (!credTasaManual) {
+    const iTasa = document.getElementById('iTasa');
+    if (iTasa) iTasa.value = Number(tasa).toFixed(2) + '%';
+  }
+}
+
+// Pre-calcula monto a financiar (sin tasa) para determinar tramo
+function credCalcMontoFin(p) {
+  const saldo  = p.valorVehiculo - p.pie;
+  const gastos = p.prenda + p.retiro + p.limitacion + p.admin + p.inscripcion + p.gps + p.reparaciones;
+  const subSin = saldo + gastos;
+  const pb     = credPlazoBracket(p.plazo);
+  const rates  = CRED_SEG_RATES[pb] || CRED_SEG_RATES[72];
+  const key    = credComboKey(p.chkD, p.chkR, p.chkC);
+  const segs   = key ? (rates[key] || 0) * subSin : 0;
+  return subSin + segs - (p.bono || 0);
 }
 
 function credActualizarGastos() {
@@ -1365,14 +1402,17 @@ function credCalc(p) {
 
 function credRecalcular() {
   credActualizarGastos();
-  const p = credLeerInputs();
+  let p = credLeerInputs();
   const saldo = p.valorVehiculo - p.pie;
   document.getElementById('iSaldoPrecio').value = saldo > 0 ? '$' + saldo.toLocaleString('es-CL') : '';
-  const ids = ['rCCSaldoPrecio','rCCGastos','rCCSubSin','rCCSegD','rCCSegR','rCCSegC',
-                'rCCSubCon','rCCBono','rCCMontoFin','rCCCuota','rCCCae','rCCTotal'];
   document.getElementById('rCCPlazo').textContent = (p.plazo||48) + ' meses';
   // Siempre mostrar saldo precio en el resumen
   if (saldo > 0) document.getElementById('rCCSaldoPrecio').textContent = credFmtP(saldo);
+  // Auto-switch tasa según tramo 200 UF
+  if (p.valorVehiculo) {
+    credActualizarTramo(credCalcMontoFin(p));
+    if (!credTasaManual) p = credLeerInputs(); // re-leer con tasa actualizada
+  }
   if (!p.valorVehiculo || !p.tasa) {
     ['rCCGastos','rCCSubSin','rCCSegD','rCCSegR','rCCSegC',
      'rCCSubCon','rCCBono','rCCMontoFin','rCCCuota','rCCCae','rCCTotal'].forEach(id => {
@@ -1409,8 +1449,8 @@ function credLimpiarFinanciero() {
   });
   document.getElementById('iSaldoPrecio').value = '';
   document.getElementById('iPlazo').value = '48';
-  document.getElementById('iTasa').value = credParams.costo_fondo
-    ? Number(credParams.costo_fondo).toFixed(2) + '%' : '';
+  document.getElementById('iTasa').value = '';
+  credTasaManual = false;  // permite que el tramo auto-setee la tasa
   ['chkCDesg','chkCRdh','chkCCesa','chkCRep','chkCGps'].forEach(id => {
     const el = document.getElementById(id); if(el) el.checked = true;
   });
