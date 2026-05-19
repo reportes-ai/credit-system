@@ -364,7 +364,7 @@ function parseMonto(str) {
 }
 function formatMonto(num) {
   if (!num) return '';
-  return '$' + num.toLocaleString('es-CL') + '.-';
+  return '$' + num.toLocaleString('es-CL');
 }
 function montoInput(el) {
   const pos   = el.selectionStart;
