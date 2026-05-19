@@ -40,6 +40,8 @@ const pool = require('../../../../shared/config/database');
         updated_at         DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
       )
     `);
+    await pool.query(`ALTER TABLE creditos ADD COLUMN numero_credito VARCHAR(20) NULL`).catch(e => { if(e.errno!==1060) throw e; });
+    await pool.query(`ALTER TABLE creditos ADD COLUMN financiera VARCHAR(100) NULL AFTER numero_credito`).catch(e => { if(e.errno!==1060) throw e; });
     await pool.query(`ALTER TABLE creditos ADD COLUMN empresa VARCHAR(50) NULL AFTER nombre_cliente`).catch(e => { if(e.errno!==1060) throw e; });
     await pool.query(`ALTER TABLE creditos ADD COLUMN transmision VARCHAR(50) NULL AFTER dealer`).catch(e => { if(e.errno!==1060) throw e; });
     await pool.query(`ALTER TABLE creditos ADD COLUMN combustible VARCHAR(50) NULL AFTER transmision`).catch(e => { if(e.errno!==1060) throw e; });
@@ -53,23 +55,26 @@ const pool = require('../../../../shared/config/database');
   }
 })();
 
-/* ─── Generar número de crédito ─────────────────────────────────────────── */
+/* ─── Generar número de OP ───────────────────────────────────────────────── */
+// Formato: YYMMXXX  (ej: 2605001 = año 2026, mes 05, secuencia 001)
 async function generarNumero() {
   const hoy = new Date();
-  const prefix = `AF-${hoy.getFullYear()}${String(hoy.getMonth()+1).padStart(2,'0')}${String(hoy.getDate()).padStart(2,'0')}-`;
+  const yy  = String(hoy.getFullYear()).slice(-2);
+  const mm  = String(hoy.getMonth() + 1).padStart(2, '0');
+  const prefix = `${yy}${mm}`;
   const [rows] = await pool.query(
     `SELECT numero_credito FROM creditos WHERE numero_credito LIKE ? ORDER BY id_credito DESC LIMIT 1`,
     [prefix + '%']
   );
-  const seq = rows.length ? parseInt(rows[0].numero_credito.split('-')[2]) + 1 : 1;
-  return prefix + String(seq).padStart(4, '0');
+  const seq = rows.length ? parseInt(rows[0].numero_credito.slice(4)) + 1 : 1;
+  return prefix + String(seq).padStart(3, '0');
 }
 
 /* ─── CREATE ─────────────────────────────────────────────────────────────── */
 const create = async (req, res) => {
   try {
     const {
-      rut_cliente, nombre_cliente, empresa, id_cotizacion, estado,
+      rut_cliente, nombre_cliente, empresa, financiera, id_cotizacion, estado,
       fecha_otorgamiento, valor_vehiculo, pie, saldo_precio, monto_financiado,
       plazo, tasa_mensual, cuota, fecha_primera_cuota,
       gastos_operativos, seguros,
@@ -87,7 +92,7 @@ const create = async (req, res) => {
 
     const [r] = await pool.query(
       `INSERT INTO creditos
-         (numero_credito, rut_cliente, nombre_cliente, empresa, id_cotizacion, estado,
+         (numero_credito, rut_cliente, nombre_cliente, empresa, financiera, id_cotizacion, estado,
           fecha_otorgamiento, valor_vehiculo, pie, saldo_precio, monto_financiado,
           plazo, tasa_mensual, cuota, fecha_primera_cuota,
           gastos_operativos, seguros,
@@ -95,10 +100,10 @@ const create = async (req, res) => {
           transmision, combustible, tasacion, permiso_circulacion,
           dealer, id_dealer, tipo_ubicacion, nombre_parque,
           ejecutivo, observaciones, datos_json, id_usuario)
-       VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
+       VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
       [
         numero_credito, rut_cliente.toUpperCase().trim(), nombre_cliente.trim(),
-        empresa || null, id_cotizacion || null, estado || 'VIGENTE',
+        empresa || null, financiera || 'AUTOFACIL', id_cotizacion || null, estado || 'VIGENTE',
         fecha_otorgamiento || null, valor_vehiculo || null, pie || null,
         saldo_precio || null, monto_financiado || null,
         plazo || null, tasa_mensual || null, cuota || null, fecha_primera_cuota || null,

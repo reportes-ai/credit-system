@@ -285,7 +285,7 @@
   <div class="topnav-left">
     <div class="topnav-brand">
       <a href="/"><img src="/img/logo.png" alt="AutoFácil" style="display:block"></a>
-      <span class="version-badge" id="versionBadge">v1.7</span>
+      <span class="version-badge" id="versionBadge">v1.8</span>
     </div>
   </div>
   <div class="topnav-right">
@@ -401,11 +401,18 @@
             </button>
           </div>
         </div>
-        <div class="col-md-5" id="campoNombreCliente">
+        <div class="col-md-4" id="campoNombreCliente">
           <label class="form-label">Nombre Cliente *</label>
           <input type="text" id="iNombreCliente" class="form-control" placeholder="Se autocompleta al buscar RUT" oninput="upperInputCred(this)">
         </div>
-        <div class="col-md-4">
+        <div class="col-md-2">
+          <label class="form-label">Financiera</label>
+          <select id="iFinanciera" class="form-select">
+            <option value="AUTOFACIL">AutoFácil</option>
+            <option value="AUTOFIN">AutoFin</option>
+          </select>
+        </div>
+        <div class="col-md-3">
           <label class="form-label">Ejecutivo</label>
           <input type="text" id="iEjecutivo" class="form-control" readonly>
         </div>
@@ -1051,7 +1058,10 @@ async function abrirDetalle(id) {
     const fmtD = s => s ? new Date(s).toLocaleDateString('es-CL') : '—';
     document.getElementById('detalleBody').innerHTML = `
       <div class="ds">
-        <div class="ds-title"><i class="bi bi-car-front-fill"></i>Vehículo</div>
+        <div class="ds-title" style="display:flex;justify-content:space-between;align-items:center">
+          <span><i class="bi bi-car-front-fill"></i>Vehículo</span>
+          ${c.financiera ? `<span style="font-size:.72rem;font-weight:800;background:#dbeafe;color:#1d4ed8;border-radius:6px;padding:2px 10px">${c.financiera}</span>` : ''}
+        </div>
         <div class="ds-grid">
           ${item('Tipo',        c.tipo_vehiculo)}
           ${item('Marca',       c.marca)}
@@ -1446,6 +1456,7 @@ async function guardarCredito() {
     rut_cliente:         rut,
     nombre_cliente:      nombre,
     empresa:             document.getElementById('iEmpresa').value || null,
+    financiera:          document.getElementById('iFinanciera').value || 'AUTOFACIL',
     estado:              document.getElementById('iEstado').value,
     fecha_otorgamiento:  document.getElementById('iFechaOtorg').value || null,
     fecha_primera_cuota: document.getElementById('iFechaPrimeraCuota').value || null,
@@ -1512,8 +1523,9 @@ function limpiarIngreso() {
   fillSelect('iAnio',      [], '—',                 false);
   fillSelect('iTransmision',[],'seleccione año',    false);
   fillSelect('iCombustible',[],'seleccione año',    false);
-  document.getElementById('iEstado').value = 'VIGENTE';
-  document.getElementById('iEmpresa').value = '';
+  document.getElementById('iEstado').value     = 'VIGENTE';
+  document.getElementById('iFinanciera').value = 'AUTOFACIL';
+  document.getElementById('iEmpresa').value    = '';
   document.querySelectorAll('.empresa-card').forEach(c => c.classList.remove('selected'));
   document.getElementById('rutClienteFoundMsg').style.display = 'none';
   // Reset dealer dropdown
