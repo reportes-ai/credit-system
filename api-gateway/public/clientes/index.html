@@ -260,7 +260,7 @@
   <div class="topnav-left">
     <div class="topnav-brand">
       <a href="/"><img src="/img/logo.png" alt="AutoFácil" style="display:block"></a>
-      <span class="version-badge" id="versionBadge">v4.10</span>
+      <span class="version-badge" id="versionBadge">v4.11</span>
     </div>
   </div>
   <div class="topnav-right">
@@ -449,10 +449,6 @@
           </select>
         </div>
         <div class="col-md-3 col-lg-2">
-          <label class="form-label">Teléfono Móvil *</label>
-          <input type="text" id="pTelefono" class="form-control no-upper" placeholder="+56 9 1234 5678">
-        </div>
-        <div class="col-md-3 col-lg-2">
           <label class="form-label">Tipo de Visa <small class="text-muted">(extranjeros *)</small></label>
           <select id="pTipoVisa" class="form-select">
             <option value="">— Seleccione —</option>
@@ -474,6 +470,10 @@
       <hr class="section-divider">
       <div class="section-label"><i class="bi bi-envelope me-1"></i>Contacto y domicilio</div>
       <div class="row g-2">
+        <div class="col-md-3 col-lg-2">
+          <label class="form-label">Teléfono Móvil *</label>
+          <input type="text" id="pTelefono" class="form-control no-upper" placeholder="+56 9 1234 5678">
+        </div>
         <div class="col-md-4 col-lg-3">
           <label class="form-label">Correo electrónico *</label>
           <input type="email" id="pCorreo" class="form-control email-field" placeholder="correo@ejemplo.cl">
@@ -1074,7 +1074,6 @@ function mostrarVistaLectura(c) {
     html += dv('Cargas', c.cargas);
     html += dv('Régimen', c.regimen);
     html += dv('Nacionalidad', c.nacionalidad);
-    html += dv('Teléfono Móvil', c.telefono_movil);
     html += dv('Tipo Visa', c.tipo_visa);
     html += dv('Fecha Visa', fmtFecha(c.fecha_visa));
   } else {
@@ -1098,6 +1097,7 @@ function mostrarVistaLectura(c) {
   }
 
   html += '<div class="col-12 mt-2 mb-1"><div class="section-label"><i class="bi bi-envelope me-1"></i>Contacto y domicilio</div></div>';
+  html += dv('Teléfono Móvil', c.telefono_movil);
   html += dv('Correo', c.correo);
   html += dv('Dirección', c.direccion);
   // Resolve region/provincia/comuna names from loaded data
