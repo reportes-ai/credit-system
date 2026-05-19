@@ -99,6 +99,17 @@
     .total-carga .label { font-size:.85rem; font-weight:700; color:#065f46; text-transform:uppercase; letter-spacing:.06em; }
     .total-carga .value { font-size:1.4rem; font-weight:900; color:#047857; }
 
+    /* Renta Acreditada */
+    .renta-box {
+      background:linear-gradient(135deg,#eff6ff,#dbeafe);
+      border:1.5px solid #93c5fd; border-radius:10px;
+      padding:12px 18px; display:flex; align-items:center; justify-content:space-between;
+      margin-bottom:14px;
+    }
+    .renta-box .rb-label { font-size:.78rem; font-weight:700; color:#1e40af; text-transform:uppercase; letter-spacing:.07em; }
+    .renta-box .rb-sub   { font-size:.72rem; color:#3b82f6; margin-top:2px; }
+    .renta-box .rb-value { font-size:1.25rem; font-weight:900; color:#1d4ed8; }
+
     /* Protestos card */
     .protestos-card { background:#fef3c7; border:1.5px solid #fcd34d; border-radius:10px; padding:14px 18px; }
 
@@ -140,7 +151,7 @@
   <div class="topnav-left">
     <div class="topnav-brand">
       <a href="/"><img src="/img/logo.png" alt="AutoFácil" style="display:block"></a>
-      <span class="version-badge" id="versionBadge">v1.2</span>
+      <span class="version-badge" id="versionBadge">v1.3</span>
     </div>
   </div>
   <div class="topnav-right">
@@ -274,10 +285,19 @@
 
     <hr class="section-divider">
 
+    <!-- Renta Acreditada -->
+    <div class="renta-box">
+      <div>
+        <div class="rb-label"><i class="bi bi-cash-stack me-1"></i>Renta Acreditada</div>
+        <div class="rb-sub" id="rentaBoxSub">—</div>
+      </div>
+      <div class="rb-value" id="rentaBoxValor">$0</div>
+    </div>
+
     <!-- Arriendo + Propiedad -->
     <div class="row g-3 align-items-end">
       <div class="col-md-4">
-        <label class="form-label">Arriendo (20% Renta Líquida) $</label>
+        <label class="form-label">Arriendo (20% Renta Acreditada) $</label>
         <input type="text" id="fArriendo" class="form-control" placeholder="$0" readonly tabindex="-1">
       </div>
       <div class="col-md-4 d-flex align-items-center" style="padding-bottom:2px">
@@ -383,7 +403,7 @@ function setMonto(id, v) {
 
 /* ─── Política y renta ───────────────────────────────────────────── */
 let politica     = {};
-let rentaLiquida = 0;
+let rentaLiquida = 0;   // Renta Acreditada (usada para el arriendo)
 
 async function cargarPoliticaYRenta() {
   try {
@@ -397,7 +417,25 @@ async function cargarPoliticaYRenta() {
       const r = await fetch('/api/antecedentes-laborales/' + encodeURIComponent(RUT), { headers: apiHeaders() });
       const j = await r.json();
       if (j.success && j.data) {
-        rentaLiquida = parseInt(j.data.renta_fija_liquida) || 0;
+        const d = j.data;
+        // Promedio de los 6 meses variables
+        const meses = [
+          parseInt(d.renta_var_mes1) || 0,
+          parseInt(d.renta_var_mes2) || 0,
+          parseInt(d.renta_var_mes3) || 0,
+          parseInt(d.renta_var_mes4) || 0,
+          parseInt(d.renta_var_mes5) || 0,
+          parseInt(d.renta_var_mes6) || 0,
+        ];
+        const promedio = Math.round(meses.reduce((a, b) => a + b, 0) / 6);
+        const fija     = parseInt(d.renta_fija_liquida) || 0;
+        // Si el promedio variable es $0, usar renta fija líquida
+        rentaLiquida = promedio > 0 ? promedio : fija;
+
+        // Mostrar recuadro
+        const sub = promedio > 0 ? 'Promedio 6 meses variable' : 'Renta fija líquida';
+        document.getElementById('rentaBoxSub').textContent   = sub;
+        document.getElementById('rentaBoxValor').textContent = rentaLiquida > 0 ? formatMonto(rentaLiquida) : '$0';
       }
     } catch(e) {}
   }
