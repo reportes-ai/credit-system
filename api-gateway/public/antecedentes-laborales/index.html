@@ -133,7 +133,7 @@
   <div class="topnav-left">
     <div class="topnav-brand">
       <a href="/"><img src="/img/logo.png" alt="AutoFácil" style="display:block"></a>
-      <span class="version-badge" id="versionBadge">v1.1</span>
+      <span class="version-badge" id="versionBadge">v1.2</span>
     </div>
   </div>
   <div class="topnav-right">
@@ -186,7 +186,8 @@
       <div class="col-md-3 col-lg-2">
         <label class="form-label">RUT Empresa</label>
         <input type="text" id="fRutEmpresa" class="form-control" maxlength="12"
-               placeholder="76.123.456-7" oninput="onRepRutInput(this)">
+               placeholder="76.123.456-7" oninput="onRutEmpresaInput(this)">
+        <small id="fRutEmpresaHint" style="font-size:.75rem;color:#9ca3af"></small>
       </div>
       <div class="col-md-6 col-lg-4">
         <label class="form-label">Giro Empresa</label>
@@ -245,18 +246,16 @@
         <input type="text" id="fRegionNombre" class="form-control" readonly placeholder="—">
         <input type="hidden" id="fIdRegion">
       </div>
-      <div class="col-md-4 col-lg-3">
-        <label class="form-label">Ciudad</label>
-        <input type="text" id="fCiudadComercial" class="form-control" placeholder="Ciudad" oninput="upperInput(this)">
-      </div>
     </div>
 
     <hr class="section-divider">
     <div class="section-label"><i class="bi bi-cash-coin me-1"></i>Rentas</div>
     <div class="row g-2 mb-2">
       <div class="col-md-4 col-lg-3">
-        <label class="form-label">Renta Fija Líquida $</label>
-        <input type="number" id="fRentaFija" class="form-control" min="0" placeholder="0" oninput="calcPromedio()">
+        <label class="form-label">Renta Fija Líquida</label>
+        <input type="text" id="fRentaFija" class="form-control" placeholder="$0"
+               oninput="rentaInput(this)" autocomplete="off">
+        <input type="hidden" id="fRentaFijaVal">
       </div>
     </div>
 
@@ -335,7 +334,7 @@ function showToast(msg, ok) {
   setTimeout(() => el.style.display = 'none', 3200);
 }
 
-/* ─── RUT formatter ─────────────────────────────────────────────── */
+/* ─── RUT formatter + validador ─────────────────────────────────── */
 function formatRUT(raw) {
   let clean = raw.replace(/[^0-9kK]/g,'').toUpperCase();
   if (clean.length < 2) return clean;
@@ -345,9 +344,40 @@ function formatRUT(raw) {
     fmt = body.slice(Math.max(0,i-3),i) + (fmt ? '.'+fmt : '');
   return fmt + '-' + dv;
 }
-function onRepRutInput(el) {
-  const c = el.value.replace(/[^0-9kK]/g,'');
-  if (c.length >= 2) el.value = formatRUT(el.value);
+function calcDV(body) {
+  const serie = [2,3,4,5,6,7];
+  const suma  = body.split('').reverse()
+    .reduce((acc,d,i) => acc + parseInt(d) * serie[i % 6], 0);
+  const resto = 11 - (suma % 11);
+  if (resto === 11) return '0';
+  if (resto === 10) return 'K';
+  return String(resto);
+}
+function onRutEmpresaInput(el) {
+  const raw   = el.value;
+  const clean = raw.replace(/[^0-9kK]/g,'').toUpperCase();
+  if (clean.length >= 2) el.value = formatRUT(raw);
+  const hint = document.getElementById('fRutEmpresaHint');
+  if (clean.length >= 7 && clean.length <= 9) {
+    const dvIngresado = clean.slice(-1).toUpperCase();
+    const ok = calcDV(clean.slice(0,-1)) === dvIngresado;
+    if (ok) {
+      el.style.borderColor = '#059669';
+      hint.style.color     = '#059669';
+      hint.textContent     = '✓ RUT válido';
+    } else {
+      el.style.borderColor = '#dc2626';
+      hint.style.color     = '#dc2626';
+      hint.textContent     = `✗ DV incorrecto (debería ser ${calcDV(clean.slice(0,-1))})`;
+    }
+  } else if (clean.length > 0) {
+    el.style.borderColor = '';
+    hint.style.color     = '#9ca3af';
+    hint.textContent     = 'Ingresa el RUT completo con dígito verificador';
+  } else {
+    el.style.borderColor = '';
+    hint.textContent     = '';
+  }
 }
 
 /* ─── Cargar datos del cliente ──────────────────────────────────── */
@@ -431,14 +461,47 @@ function limpiarComuna() {
   ['fComunaNombre','fProvinciaNombre','fRegionNombre'].forEach(id => document.getElementById(id).value = '');
 }
 
+/* ─── Nombres de meses anteriores ──────────────────────────────── */
+const MESES_ES = ['Ene','Feb','Mar','Abr','May','Jun','Jul','Ago','Sep','Oct','Nov','Dic'];
+function labelMes(offset) {
+  // offset=1 → mes anterior, offset=2 → hace 2 meses, etc.
+  const hoy = new Date();
+  const d   = new Date(hoy.getFullYear(), hoy.getMonth() - offset, 1);
+  return MESES_ES[d.getMonth()] + '-' + String(d.getFullYear()).slice(2);
+}
+
+/* ─── Formateo de pesos CLP ─────────────────────────────────────── */
+function parsePesos(str) {
+  return parseInt(str.replace(/[^0-9]/g,'')) || 0;
+}
+function formatPesos(num) {
+  if (!num) return '';
+  return '$' + num.toLocaleString('es-CL');
+}
+function rentaInput(el) {
+  const pos   = el.selectionStart;
+  const antes = el.value.length;
+  const num   = parsePesos(el.value);
+  el.value    = formatPesos(num);
+  // Mantener cursor aprox al mismo lugar desde el final
+  const delta = el.value.length - antes;
+  el.setSelectionRange(pos + delta, pos + delta);
+  // Guardar valor numérico en hidden (solo para fRentaFija)
+  const hid = document.getElementById(el.id + 'Val');
+  if (hid) hid.value = num || '';
+  calcPromedio();
+}
+
 /* ─── Renta variable grid ───────────────────────────────────────── */
 function buildRentaGrid() {
   const grid = document.getElementById('rentaGrid');
   let html = '';
   for (let i = 1; i <= 6; i++) {
     html += `<div>
-      <label>Mes ${i}</label>
-      <input type="number" id="fRentaMes${i}" class="form-control" min="0" placeholder="0" oninput="calcPromedio()">
+      <label>${labelMes(i)}</label>
+      <input type="text" id="fRentaMes${i}" class="form-control" placeholder="$0"
+             oninput="rentaInput(this)" autocomplete="off">
+      <input type="hidden" id="fRentaMes${i}Val">
     </div>`;
   }
   grid.innerHTML = html;
@@ -455,12 +518,13 @@ function calcAntiguedad() {
 function calcPromedio() {
   const vals = [];
   for (let i = 1; i <= 6; i++) {
-    const v = parseFloat(document.getElementById('fRentaMes'+i)?.value);
-    if (!isNaN(v) && v > 0) vals.push(v);
+    const hid = document.getElementById('fRentaMes'+i+'Val');
+    const v   = hid ? parseInt(hid.value) : 0;
+    if (v > 0) vals.push(v);
   }
   const prom = vals.length ? vals.reduce((a,b)=>a+b,0)/vals.length : 0;
   document.getElementById('promedioMeses').textContent = vals.length;
-  document.getElementById('promedioValor').textContent = fmtPesos(prom);
+  document.getElementById('promedioValor').textContent = formatPesos(Math.round(prom)) || '$0';
 }
 
 /* ─── Cargar datos guardados ────────────────────────────────────── */
@@ -480,9 +544,21 @@ async function cargarDatos() {
     s('fNumeroComercial',   d.numero_comercial);
     s('fOficinaComercial',  d.oficina_comercial);
     s('fTelefonoComercial', d.telefono_comercial);
-    s('fCiudadComercial',   d.ciudad_comercial);
-    s('fRentaFija',         d.renta_fija_liquida);
-    for (let i = 1; i <= 6; i++) s('fRentaMes'+i, d['renta_var_mes'+i]);
+    // Renta fija con formato
+    if (d.renta_fija_liquida != null) {
+      const num = parseInt(d.renta_fija_liquida) || 0;
+      document.getElementById('fRentaFija').value    = formatPesos(num);
+      document.getElementById('fRentaFijaVal').value = num;
+    }
+    // Rentas variables con formato
+    for (let i = 1; i <= 6; i++) {
+      const v = d['renta_var_mes'+i];
+      if (v != null && v !== '') {
+        const num = parseInt(v) || 0;
+        document.getElementById('fRentaMes'+i).value    = formatPesos(num);
+        document.getElementById('fRentaMes'+i+'Val').value = num;
+      }
+    }
     if (d.id_comuna_comercial) {
       const c    = allComunas.find(x => x.id_comuna == d.id_comuna_comercial);
       const prov = d.id_provincia_comercial
@@ -516,12 +592,11 @@ async function guardar() {
     id_comuna_comercial:   document.getElementById('fIdComuna').value    || null,
     id_provincia_comercial:document.getElementById('fIdProvincia').value || null,
     id_region_comercial:   document.getElementById('fIdRegion').value    || null,
-    ciudad_comercial:      document.getElementById('fCiudadComercial').value.trim(),
     telefono_comercial: document.getElementById('fTelefonoComercial').value.trim(),
-    renta_fija_liquida: document.getElementById('fRentaFija').value || null,
+    renta_fija_liquida: document.getElementById('fRentaFijaVal').value || null,
   };
   for (let i = 1; i <= 6; i++)
-    body['renta_var_mes'+i] = document.getElementById('fRentaMes'+i).value || null;
+    body['renta_var_mes'+i] = document.getElementById('fRentaMes'+i+'Val').value || null;
 
   try {
     const r = await fetch('/api/antecedentes-laborales/' + encodeURIComponent(RUT), {
