@@ -285,7 +285,7 @@
   <div class="topnav-left">
     <div class="topnav-brand">
       <a href="/"><img src="/img/logo.png" alt="AutoFácil" style="display:block"></a>
-      <span class="version-badge" id="versionBadge">v1.9</span>
+      <span class="version-badge" id="versionBadge">v2.0</span>
     </div>
   </div>
   <div class="topnav-right">
@@ -548,8 +548,8 @@
           <!-- Saldo / Plazo / Tasa -->
           <div class="row g-2 mb-2">
             <div class="col-4">
-              <label class="form-label">Saldo Precio $</label>
-              <input type="number" id="iSaldoPrecio" class="form-control" readonly>
+              <label class="form-label">Saldo Precio</label>
+              <input type="text" id="iSaldoPrecio" class="form-control" readonly style="background:#f0f4f8;font-weight:700;color:#1e293b">
             </div>
             <div class="col-4">
               <label class="form-label">Plazo <span class="fw-normal text-muted">[meses]</span></label>
@@ -567,28 +567,19 @@
             </div>
           </div>
 
-          <!-- Fechas / Estado -->
+          <!-- Fechas -->
           <div class="row g-2 mb-3">
-            <div class="col-4">
+            <div class="col-5">
               <label class="form-label">Fecha Otorgamiento</label>
-              <input type="date" id="iFechaOtorg" class="form-control">
+              <input type="date" id="iFechaOtorg" class="form-control" onchange="credActualizarDias();credRecalcular()">
             </div>
-            <div class="col-4">
+            <div class="col-7">
               <label class="form-label">Fecha 1ª Cuota</label>
-              <input type="date" id="iFechaPrimeraCuota" class="form-control" onchange="credRecalcular()">
-              <div class="field-hint">Default: 30 días</div>
-            </div>
-            <div class="col-4">
-              <label class="form-label">Estado</label>
-              <select id="iEstado" class="form-select">
-                <option value="VIGENTE">Vigente</option>
-                <option value="EN MORA">En Mora</option>
-                <option value="CANCELADO">Cancelado</option>
-                <option value="PREPAGADO">Prepagado</option>
-                <option value="CASTIGADO">Castigado</option>
-              </select>
+              <input type="date" id="iFechaPrimeraCuota" class="form-control" onchange="credActualizarDias();credRecalcular()">
+              <div class="field-hint" id="hintDias">—</div>
             </div>
           </div>
+          <input type="hidden" id="iEstado" value="VIGENTE">
 
           <!-- Gastos Operacionales -->
           <div class="cred-sub-label"><i class="bi bi-receipt me-1"></i>Gastos Operacionales</div>
@@ -1211,12 +1202,12 @@ async function buscarClienteCred() {
 
 /* ─── Helpers de formato (créditos) ────────────────────────────────────── */
 function parseCLP(id) {
-  return parseInt((document.getElementById(id)?.value||'').replace(/\./g,'').replace(/[^0-9]/g,''))||0;
+  return parseInt((document.getElementById(id)?.value||'').replace(/\$/g,'').replace(/\./g,'').replace(/[^0-9]/g,''))||0;
 }
 function credPesoInput(el) {
-  const raw = el.value.replace(/\./g,'').replace(/[^0-9]/g,'');
+  const raw = el.value.replace(/\$/g,'').replace(/\./g,'').replace(/[^0-9]/g,'');
   const n   = parseInt(raw);
-  el.value  = (!isNaN(n) && n > 0) ? n.toLocaleString('es-CL') : (raw===''?'':'0');
+  el.value  = (!isNaN(n) && n > 0) ? '$' + n.toLocaleString('es-CL') : '';
   credRecalcular();
 }
 function credTasaInput(el) {
@@ -1313,12 +1304,25 @@ function credLeerInputs() {
 }
 
 function credDiasPrimeraCuota() {
-  const el = document.getElementById('iFechaPrimeraCuota');
-  if (!el || !el.value) return 30;
-  const fecha = new Date(el.value + 'T00:00:00');
-  const hoy = new Date(); hoy.setHours(0,0,0,0);
-  const diff = Math.round((fecha - hoy) / 86400000);
+  const elCuota = document.getElementById('iFechaPrimeraCuota');
+  const elOtorg = document.getElementById('iFechaOtorg');
+  if (!elCuota?.value) return 30;
+  const fechaCuota = new Date(elCuota.value + 'T00:00:00');
+  const fechaRef   = elOtorg?.value ? new Date(elOtorg.value + 'T00:00:00') : new Date();
+  const diff = Math.round((fechaCuota - fechaRef) / 86400000);
   return diff > 0 ? diff : 30;
+}
+function credActualizarDias() {
+  const elH = document.getElementById('hintDias');
+  if (!elH) return;
+  const elO = document.getElementById('iFechaOtorg');
+  const elC = document.getElementById('iFechaPrimeraCuota');
+  if (elO?.value && elC?.value) {
+    const dias = Math.round((new Date(elC.value+'T00:00:00') - new Date(elO.value+'T00:00:00')) / 86400000);
+    elH.textContent = dias > 0 ? dias + ' días entre otorgamiento y 1ª cuota' : '⚠️ Fecha inválida';
+  } else {
+    elH.textContent = '—';
+  }
 }
 
 function credCalc(p) {
@@ -1354,7 +1358,7 @@ function credRecalcular() {
   credActualizarGastos();
   const p = credLeerInputs();
   const saldo = p.valorVehiculo - p.pie;
-  document.getElementById('iSaldoPrecio').value = saldo > 0 ? saldo : '';
+  document.getElementById('iSaldoPrecio').value = saldo > 0 ? '$' + saldo.toLocaleString('es-CL') : '';
   const ids = ['rCCSaldoPrecio','rCCGastos','rCCSubSin','rCCSegD','rCCSegR','rCCSegC',
                 'rCCSubCon','rCCBono','rCCMontoFin','rCCCuota','rCCCae','rCCTotal'];
   document.getElementById('rCCPlazo').textContent = (p.plazo||48) + ' meses';
@@ -1487,7 +1491,7 @@ async function guardarCredito() {
     fecha_primera_cuota: document.getElementById('iFechaPrimeraCuota').value || null,
     valor_vehiculo:      parseCLP('iValorVehiculo') || null,
     pie:                 parseCLP('iPie') || null,
-    saldo_precio:        parseInt(document.getElementById('iSaldoPrecio').value)||null,
+    saldo_precio:        parseCLP('iSaldoPrecio') || null,
     gastos_operativos:   document.getElementById('iGastosOp').value || null,
     seguros:             document.getElementById('iSeguros').value || null,
     monto_financiado:    document.getElementById('iMontoFin').value || null,
@@ -1592,6 +1596,7 @@ credCargarParams();
     const d30 = new Date(); d30.setDate(d30.getDate()+30);
     el30.value = d30.toISOString().split('T')[0];
   }
+  credActualizarDias();
 })();
 document.addEventListener('keydown', e => {
   if (e.key==='Escape') { cerrarDetalle(); cerrarCotizaciones(); }
