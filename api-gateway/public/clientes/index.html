@@ -260,7 +260,7 @@
   <div class="topnav-left">
     <div class="topnav-brand">
       <a href="/"><img src="/img/logo.png" alt="AutoFácil" style="display:block"></a>
-      <span class="version-badge" id="versionBadge">v4.11</span>
+      <span class="version-badge" id="versionBadge">v4.12</span>
     </div>
   </div>
   <div class="topnav-right">
@@ -472,7 +472,13 @@
       <div class="row g-2">
         <div class="col-md-3 col-lg-2">
           <label class="form-label">Teléfono Móvil *</label>
-          <input type="text" id="pTelefono" class="form-control no-upper" placeholder="+56 9 1234 5678">
+          <input type="text" id="pTelefono" class="form-control no-upper" placeholder="+56 9 1234 5678"
+                 maxlength="16"
+                 onfocus="telFocus(this)"
+                 oninput="telInput(this)"
+                 onkeydown="telKeydown(event,this)"
+                 onblur="telBlur(this)">
+          <div id="telError" class="text-danger" style="font-size:0.78rem;margin-top:2px;display:none"></div>
         </div>
         <div class="col-md-4 col-lg-3">
           <label class="form-label">Correo electrónico *</label>
@@ -1190,7 +1196,22 @@ async function precargarPersona(c) {
   document.getElementById('pCargas').value     = c.cargas       ?? '';
   document.getElementById('pNacionalidad').value = c.nacionalidad || '';
   onNacionalidadChange();
-  document.getElementById('pTelefono').value   = c.telefono_movil    || '';
+  // Pre-cargar teléfono: si ya viene con el prefijo lo dejamos, sino lo añadimos
+  (function() {
+    const tel = c.telefono_movil || '';
+    const el = document.getElementById('pTelefono');
+    if (!tel) { el.value = ''; return; }
+    if (tel.startsWith(TEL_PREFIX)) { el.value = tel; }
+    else {
+      // Normalizar: extraer solo dígitos, quitar 569 al inicio si viene
+      const raw = tel.replace(/\D/g, '').replace(/^569?/, '');
+      const d8 = raw.slice(-8);
+      el.value = d8.length === 8
+        ? TEL_PREFIX + d8.slice(0,4) + ' ' + d8.slice(4)
+        : tel;
+    }
+    mostrarTelError(null);
+  })();
   document.getElementById('pTipoVisa').value   = c.tipo_visa         || '';
   document.getElementById('pFechaVisa').value  = c.fecha_visa ? c.fecha_visa.split('T')[0] : '';
   document.getElementById('pCorreo').value     = c.correo            || '';
@@ -1222,6 +1243,126 @@ async function precargarEmpresa(c) {
 /* ═══════════════════════════════════════════════════════════════════
    Edad
 ═══════════════════════════════════════════════════════════════════ */
+/* ── Teléfono: prefijo automático +56 9 y validación ──────────────────────
+   Formato final: "+56 9 XXXX XXXX"  (16 chars, 8 dígitos del usuario)    */
+const TEL_PREFIX = '+56 9 ';
+
+function telFocus(el) {
+  if (!el.value.startsWith(TEL_PREFIX)) el.value = TEL_PREFIX;
+  // Mueve cursor al final
+  setTimeout(() => { el.selectionStart = el.selectionEnd = el.value.length; }, 0);
+}
+
+function telInput(el) {
+  let val = el.value;
+  // Asegurar prefijo
+  if (!val.startsWith(TEL_PREFIX)) val = TEL_PREFIX;
+  // Extraer solo dígitos del usuario (después del prefijo)
+  let digits = val.slice(TEL_PREFIX.length).replace(/\D/g, '');
+  if (digits.length > 8) digits = digits.slice(0, 8);
+  // Formatear con espacio en el medio: XXXX XXXX
+  let formatted = digits;
+  if (digits.length > 4) formatted = digits.slice(0, 4) + ' ' + digits.slice(4);
+  el.value = TEL_PREFIX + formatted;
+  // Validar en tiempo real (solo si hay 8 dígitos)
+  if (digits.length === 8) {
+    const err = validarPatronTelefono(digits);
+    mostrarTelError(err);
+  } else {
+    mostrarTelError(null);
+  }
+}
+
+function telKeydown(e, el) {
+  // Impedir borrar el prefijo
+  const pos = el.selectionStart;
+  const prefLen = TEL_PREFIX.length;
+  if ((e.key === 'Backspace' || e.key === 'Delete') && pos <= prefLen) {
+    e.preventDefault();
+  }
+  // Impedir Home/ArrowLeft más allá del prefijo
+  if (e.key === 'Home') {
+    e.preventDefault();
+    el.selectionStart = el.selectionEnd = prefLen;
+  }
+}
+
+function telBlur(el) {
+  const digits = el.value.slice(TEL_PREFIX.length).replace(/\D/g, '');
+  if (el.value === TEL_PREFIX || digits.length === 0) {
+    el.value = '';
+    mostrarTelError(null);
+    return;
+  }
+  if (digits.length !== 8) {
+    mostrarTelError('Ingrese exactamente 8 dígitos después del prefijo +56 9');
+    return;
+  }
+  mostrarTelError(validarPatronTelefono(digits));
+}
+
+function mostrarTelError(msg) {
+  const div = document.getElementById('telError');
+  if (!div) return;
+  if (msg) {
+    div.textContent = '⚠ ' + msg;
+    div.style.display = 'block';
+  } else {
+    div.textContent = '';
+    div.style.display = 'none';
+  }
+}
+
+function validarPatronTelefono(d) {
+  // d = 8 dígitos (string)
+  // 1. Todos iguales: 99999999, 11111111, etc.
+  if (/^(\d)\1{7}$/.test(d)) return 'Teléfono inválido (dígitos repetidos)';
+
+  // 2. Secuencia ascendente pura: 12345678, 23456789
+  const asc = '0123456789';
+  if (asc.includes(d)) return 'Teléfono inválido (secuencia ascendente)';
+
+  // 3. Secuencia descendente pura: 98765432, 87654321, 09876543
+  const desc = '9876543210';
+  if (desc.includes(d)) return 'Teléfono inválido (secuencia descendente)';
+
+  // 4. Patrón AABB repetido: 11223344, 22334455, 55667788
+  if (/^(\d)\1(\d)\2(\d)\3(\d)\4$/.test(d)) return 'Teléfono inválido (patrón repetido)';
+
+  // 5. Mitad repetida: XXXXYYYY donde XXXX===XXXX: 12341234, 56785678
+  if (d.slice(0,4) === d.slice(4)) return 'Teléfono inválido (mitad repetida)';
+
+  // 6. Patrón ABABABAB: 12121212, 34343434
+  if (/^(\d\d)\1\1\1$/.test(d)) return 'Teléfono inválido (patrón alternado)';
+
+  // 7. Escalonado pares AABBCCDD donde cada par sube 1: 11223344 (ya cubierto por #4)
+  // Escalera ascendente en pares: 11223344, 22334455
+  const pares = [d[0]+d[1], d[2]+d[3], d[4]+d[5], d[6]+d[7]];
+  if (pares.every((p,i) => i===0 || parseInt(pares[i])===parseInt(pares[i-1])+11)) {
+    return 'Teléfono inválido (patrón escalonado)';
+  }
+  // Escalera descendente en pares
+  if (pares.every((p,i) => i===0 || parseInt(pares[i])===parseInt(pares[i-1])-11)) {
+    return 'Teléfono inválido (patrón escalonado descendente)';
+  }
+
+  // 8. Demasiados dígitos iguales (5 o más del mismo)
+  for (let c = '0'; c <= '9'; c = String.fromCharCode(c.charCodeAt(0)+1)) {
+    if ((d.split(c).length - 1) >= 6) return 'Teléfono inválido (demasiados dígitos iguales)';
+  }
+
+  // 9. Subsecuencia consecutiva larga (≥6): 1234XX, XX6789, etc.
+  let maxConsec = 1, consec = 1;
+  for (let i = 1; i < 8; i++) {
+    const diff = parseInt(d[i]) - parseInt(d[i-1]);
+    if (diff === 1 || diff === -1) { consec++; if (consec > maxConsec) maxConsec = consec; }
+    else consec = 1;
+  }
+  if (maxConsec >= 6) return 'Teléfono inválido (secuencia consecutiva larga)';
+
+  return null; // válido
+}
+
 /* Formatea "YYYY-MM-DD..." → "DD-MM-YYYY" sin pasar por new Date()
    (evita desfase de timezone que resta un día en Chile UTC-3/UTC-4) */
 function fmtFecha(s) {
@@ -1412,13 +1553,23 @@ function buildBody(tipo) {
     if (!nombres)  faltantes.push('Nombres');
     if (!fechaNac) faltantes.push('Fecha Nacimiento');
     if (!sexo)     faltantes.push('Sexo');
-    if (!telefono) faltantes.push('Teléfono Móvil');
+    if (!telefono || telefono === TEL_PREFIX) faltantes.push('Teléfono Móvil');
     if (!correo)   faltantes.push('Correo electrónico');
     if (!nacion)   faltantes.push('Nacionalidad');
     if (!direccion)faltantes.push('Dirección');
     if (nacion && nacion !== 'CHILENA') {
       if (!tipoVisa)  faltantes.push('Tipo de Visa');
       if (!fechaVisa) faltantes.push('Fecha Visa');
+    }
+    // Validar formato y patrón del teléfono
+    if (telefono && telefono !== TEL_PREFIX) {
+      const digits = telefono.slice(TEL_PREFIX.length).replace(/\D/g, '');
+      if (digits.length !== 8) {
+        faltantes.push('Teléfono Móvil (debe tener 8 dígitos después de +56 9)');
+      } else {
+        const telErr = validarPatronTelefono(digits);
+        if (telErr) faltantes.push('Teléfono Móvil (' + telErr + ')');
+      }
     }
 
     if (faltantes.length) {
