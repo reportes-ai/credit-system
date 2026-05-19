@@ -151,7 +151,7 @@
   <div class="topnav-left">
     <div class="topnav-brand">
       <a href="/"><img src="/img/logo.png" alt="AutoFácil" style="display:block"></a>
-      <span class="version-badge" id="versionBadge">v1.3</span>
+      <span class="version-badge" id="versionBadge">v1.4</span>
     </div>
   </div>
   <div class="topnav-right">
@@ -436,6 +436,8 @@ async function cargarPoliticaYRenta() {
         const sub = promedio > 0 ? 'Promedio 6 meses variable' : 'Renta fija líquida';
         document.getElementById('rentaBoxSub').textContent   = sub;
         document.getElementById('rentaBoxValor').textContent = rentaLiquida > 0 ? formatMonto(rentaLiquida) : '$0';
+        // Recalcular arriendo con la renta ya disponible
+        calcArriendo();
       }
     } catch(e) {}
   }
@@ -471,12 +473,17 @@ function calcArriendo() {
   const acredita    = document.getElementById('fAcreditaPropiedad').checked;
   const el          = document.getElementById('fArriendo');
   if (hipotecaria > 0 || acredita) {
-    // Tiene hipotecaria o acredita propiedad → no se carga arriendo
+    // Tiene hipotecaria o acredita propiedad → arriendo no aplica
     el.value = '';
+    el.placeholder = 'No aplica';
   } else {
-    // Sin hipotecaria y sin propiedad → 20% de la renta líquida
-    const arr = rentaLiquida > 0 ? Math.round(rentaLiquida * 0.20) : 0;
-    el.value = arr > 0 ? formatMonto(arr) : '';
+    // Sin hipotecaria y sin propiedad acreditada → 20% de la renta acreditada
+    el.placeholder = '$0';
+    if (rentaLiquida > 0) {
+      el.value = formatMonto(Math.round(rentaLiquida * 0.20));
+    } else {
+      el.value = '';
+    }
   }
   calcTotal();
 }
