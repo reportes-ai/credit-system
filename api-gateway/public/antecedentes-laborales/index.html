@@ -133,7 +133,7 @@
   <div class="topnav-left">
     <div class="topnav-brand">
       <a href="/"><img src="/img/logo.png" alt="AutoFácil" style="display:block"></a>
-      <span class="version-badge" id="versionBadge">v1.0</span>
+      <span class="version-badge" id="versionBadge">v1.1</span>
     </div>
   </div>
   <div class="topnav-right">
@@ -231,9 +231,19 @@
         </div>
       </div>
       <div class="col-md-4 col-lg-3">
-        <label class="form-label">Comuna seleccionada</label>
+        <label class="form-label">Comuna</label>
         <input type="text" id="fComunaNombre" class="form-control" readonly placeholder="—">
         <input type="hidden" id="fIdComuna">
+      </div>
+      <div class="col-md-4 col-lg-3">
+        <label class="form-label">Provincia</label>
+        <input type="text" id="fProvinciaNombre" class="form-control" readonly placeholder="—">
+        <input type="hidden" id="fIdProvincia">
+      </div>
+      <div class="col-md-4 col-lg-3">
+        <label class="form-label">Región</label>
+        <input type="text" id="fRegionNombre" class="form-control" readonly placeholder="—">
+        <input type="hidden" id="fIdRegion">
       </div>
       <div class="col-md-4 col-lg-3">
         <label class="form-label">Ciudad</label>
@@ -358,34 +368,67 @@ async function cargarCliente() {
   }
 }
 
-/* ─── Comunas ────────────────────────────────────────────────────── */
-let allComunas = [];
-async function cargarComunas() {
+/* ─── Geografía (comunas + provincias + regiones) ─────────────────── */
+let allComunas    = [];
+let allProvincias = [];
+let allRegiones   = [];
+
+async function cargarGeo() {
   try {
-    const r = await fetch('/api/geografico/comunas', { headers: apiHeaders() });
-    const j = await r.json();
-    if (j.success) allComunas = j.data || [];
+    const [rC, rP, rR] = await Promise.all([
+      fetch('/api/geografico/comunas',   { headers: apiHeaders() }).then(r=>r.json()),
+      fetch('/api/geografico/provincias',{ headers: apiHeaders() }).then(r=>r.json()),
+      fetch('/api/geografico/regiones',  { headers: apiHeaders() }).then(r=>r.json()),
+    ]);
+    allComunas    = rC.data  || [];
+    allProvincias = rP.data  || [];
+    allRegiones   = rR.data  || [];
   } catch(e) {}
 }
+
 function filtrarComunas(el) {
   const q = el.value.toUpperCase().trim();
   const drop = document.getElementById('fComunaDrop');
-  if (!q) { drop.classList.remove('open'); return; }
-  const hits = allComunas.filter(c => c.nombre_comuna.toUpperCase().includes(q)).slice(0,12);
+  if (q.length < 2) { drop.classList.remove('open'); return; }
+  // allComunas puede tener id_provincia o id_provincia_id según el API
+  const hits = allComunas.filter(c =>
+    (c.nombre || c.nombre_comuna || '').toUpperCase().includes(q)
+  ).slice(0, 12);
   if (!hits.length) { drop.classList.remove('open'); return; }
-  drop.innerHTML = hits.map(c =>
-    `<div class="dd-item" onclick="selComuna(${c.id_comuna},'${c.nombre_comuna.replace(/'/g,"\\'")}','${(c.nombre_region||'').replace(/'/g,"\\'")}')">
-       <strong>${c.nombre_comuna}</strong> <small class="text-muted">${c.nombre_region||''}</small>
-     </div>`).join('');
+  drop.innerHTML = hits.map(c => {
+    const nombre = c.nombre || c.nombre_comuna || '';
+    const idCom  = c.id_comuna;
+    const idProv = c.id_provincia;
+    // Nombre de provincia para mostrar en el dropdown
+    const prov   = allProvincias.find(p => String(p.id_provincia) === String(idProv));
+    const reg    = prov ? allRegiones.find(r => String(r.id_region) === String(prov.id_region)) : null;
+    const hint   = [prov?.nombre, reg?.nombre].filter(Boolean).join(' — ');
+    return `<div class="dd-item" onclick="selComuna(${idCom},${idProv},\`${nombre.replace(/`/g,"'")}\`)">
+              <strong>${nombre}</strong> <small class="text-muted">${hint}</small>
+            </div>`;
+  }).join('');
   drop.classList.add('open');
 }
-function selComuna(id, nombre, ciudad) {
-  document.getElementById('fIdComuna').value = id;
-  document.getElementById('fComunaNombre').value = nombre;
-  document.getElementById('fBuscarComuna').value = '';
-  if (!document.getElementById('fCiudadComercial').value)
-    document.getElementById('fCiudadComercial').value = ciudad.toUpperCase();
+
+function selComuna(idComuna, idProvincia, nombreComuna) {
+  // Derivar región desde provincias
+  const prov = allProvincias.find(p => String(p.id_provincia) === String(idProvincia));
+  const idRegion = prov ? prov.id_region : null;
+  const reg  = idRegion ? allRegiones.find(r => String(r.id_region) === String(idRegion)) : null;
+
+  document.getElementById('fIdComuna').value      = idComuna;
+  document.getElementById('fComunaNombre').value  = nombreComuna;
+  document.getElementById('fIdProvincia').value   = idProvincia || '';
+  document.getElementById('fProvinciaNombre').value = prov ? (prov.nombre || '') : '';
+  document.getElementById('fIdRegion').value      = idRegion || '';
+  document.getElementById('fRegionNombre').value  = reg  ? (reg.nombre  || '') : '';
+  document.getElementById('fBuscarComuna').value  = '';
   document.getElementById('fComunaDrop').classList.remove('open');
+}
+
+function limpiarComuna() {
+  ['fIdComuna','fIdProvincia','fIdRegion'].forEach(id => document.getElementById(id).value = '');
+  ['fComunaNombre','fProvinciaNombre','fRegionNombre'].forEach(id => document.getElementById(id).value = '');
 }
 
 /* ─── Renta variable grid ───────────────────────────────────────── */
@@ -441,9 +484,18 @@ async function cargarDatos() {
     s('fRentaFija',         d.renta_fija_liquida);
     for (let i = 1; i <= 6; i++) s('fRentaMes'+i, d['renta_var_mes'+i]);
     if (d.id_comuna_comercial) {
-      document.getElementById('fIdComuna').value = d.id_comuna_comercial;
-      const c = allComunas.find(x => x.id_comuna == d.id_comuna_comercial);
-      if (c) document.getElementById('fComunaNombre').value = c.nombre_comuna;
+      const c    = allComunas.find(x => x.id_comuna == d.id_comuna_comercial);
+      const prov = d.id_provincia_comercial
+                   ? allProvincias.find(p => p.id_provincia == d.id_provincia_comercial)
+                   : allProvincias.find(p => String(p.id_provincia) === String(c?.id_provincia));
+      const reg  = prov ? allRegiones.find(r => r.id_region == prov.id_region) : null;
+
+      document.getElementById('fIdComuna').value      = d.id_comuna_comercial;
+      document.getElementById('fComunaNombre').value  = c ? (c.nombre || c.nombre_comuna || '') : '';
+      document.getElementById('fIdProvincia').value   = prov ? prov.id_provincia : (d.id_provincia_comercial || '');
+      document.getElementById('fProvinciaNombre').value = prov ? (prov.nombre || '') : '';
+      document.getElementById('fIdRegion').value      = reg  ? reg.id_region  : (d.id_region_comercial || '');
+      document.getElementById('fRegionNombre').value  = reg  ? (reg.nombre  || '') : '';
     }
     calcAntiguedad();
     calcPromedio();
@@ -461,8 +513,10 @@ async function guardar() {
     direccion_comercial:document.getElementById('fDireccionComercial').value.trim(),
     numero_comercial:   document.getElementById('fNumeroComercial').value.trim(),
     oficina_comercial:  document.getElementById('fOficinaComercial').value.trim(),
-    id_comuna_comercial:document.getElementById('fIdComuna').value || null,
-    ciudad_comercial:   document.getElementById('fCiudadComercial').value.trim(),
+    id_comuna_comercial:   document.getElementById('fIdComuna').value    || null,
+    id_provincia_comercial:document.getElementById('fIdProvincia').value || null,
+    id_region_comercial:   document.getElementById('fIdRegion').value    || null,
+    ciudad_comercial:      document.getElementById('fCiudadComercial').value.trim(),
     telefono_comercial: document.getElementById('fTelefonoComercial').value.trim(),
     renta_fija_liquida: document.getElementById('fRentaFija').value || null,
   };
@@ -483,7 +537,7 @@ async function guardar() {
 
 /* ─── Init ───────────────────────────────────────────────────────── */
 buildRentaGrid();
-cargarComunas().then(() => { if (RUT) cargarDatos(); });
+cargarGeo().then(() => { if (RUT) cargarDatos(); });
 
 document.addEventListener('click', e => {
   if (!e.target.closest('.search-wrap'))

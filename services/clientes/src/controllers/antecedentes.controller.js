@@ -15,6 +15,8 @@ const pool = require('../../../../shared/config/database');
         numero_comercial     VARCHAR(20),
         oficina_comercial    VARCHAR(20),
         id_comuna_comercial  INT,
+        id_provincia_comercial INT,
+        id_region_comercial  INT,
         ciudad_comercial     VARCHAR(100),
         telefono_comercial   VARCHAR(50),
         antiguedad_meses     INT,
@@ -31,6 +33,14 @@ const pool = require('../../../../shared/config/database');
     `);
   } catch (e) {
     if (e.errno !== 1050) console.error('[antecedentes_laborales migration]', e.message);
+  }
+  // Agregar columnas nuevas si la tabla ya existía
+  for (const sql of [
+    `ALTER TABLE antecedentes_laborales ADD COLUMN id_provincia_comercial INT NULL AFTER id_comuna_comercial`,
+    `ALTER TABLE antecedentes_laborales ADD COLUMN id_region_comercial    INT NULL AFTER id_provincia_comercial`,
+  ]) {
+    try { await pool.query(sql); }
+    catch(e) { if (e.errno !== 1060) console.error('[antecedentes migration]', e.message); }
   }
 })();
 
@@ -51,7 +61,8 @@ const upsert = async (req, res) => {
     const {
       tipo_trabajador, empleador, rut_empresa, giro_empresa,
       direccion_comercial, numero_comercial, oficina_comercial,
-      id_comuna_comercial, ciudad_comercial, telefono_comercial,
+      id_comuna_comercial, id_provincia_comercial, id_region_comercial,
+      ciudad_comercial, telefono_comercial,
       antiguedad_meses,
       renta_fija_liquida,
       renta_var_mes1, renta_var_mes2, renta_var_mes3,
@@ -62,43 +73,48 @@ const upsert = async (req, res) => {
       INSERT INTO antecedentes_laborales
         (rut_cliente, tipo_trabajador, empleador, rut_empresa, giro_empresa,
          direccion_comercial, numero_comercial, oficina_comercial,
-         id_comuna_comercial, ciudad_comercial, telefono_comercial,
+         id_comuna_comercial, id_provincia_comercial, id_region_comercial,
+         ciudad_comercial, telefono_comercial,
          antiguedad_meses, renta_fija_liquida,
          renta_var_mes1, renta_var_mes2, renta_var_mes3,
          renta_var_mes4, renta_var_mes5, renta_var_mes6)
-      VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
+      VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
       ON DUPLICATE KEY UPDATE
-        tipo_trabajador     = VALUES(tipo_trabajador),
-        empleador           = VALUES(empleador),
-        rut_empresa         = VALUES(rut_empresa),
-        giro_empresa        = VALUES(giro_empresa),
-        direccion_comercial = VALUES(direccion_comercial),
-        numero_comercial    = VALUES(numero_comercial),
-        oficina_comercial   = VALUES(oficina_comercial),
-        id_comuna_comercial = VALUES(id_comuna_comercial),
-        ciudad_comercial    = VALUES(ciudad_comercial),
-        telefono_comercial  = VALUES(telefono_comercial),
-        antiguedad_meses    = VALUES(antiguedad_meses),
-        renta_fija_liquida  = VALUES(renta_fija_liquida),
-        renta_var_mes1      = VALUES(renta_var_mes1),
-        renta_var_mes2      = VALUES(renta_var_mes2),
-        renta_var_mes3      = VALUES(renta_var_mes3),
-        renta_var_mes4      = VALUES(renta_var_mes4),
-        renta_var_mes5      = VALUES(renta_var_mes5),
-        renta_var_mes6      = VALUES(renta_var_mes6),
-        updated_at          = CURRENT_TIMESTAMP
+        tipo_trabajador          = VALUES(tipo_trabajador),
+        empleador                = VALUES(empleador),
+        rut_empresa              = VALUES(rut_empresa),
+        giro_empresa             = VALUES(giro_empresa),
+        direccion_comercial      = VALUES(direccion_comercial),
+        numero_comercial         = VALUES(numero_comercial),
+        oficina_comercial        = VALUES(oficina_comercial),
+        id_comuna_comercial      = VALUES(id_comuna_comercial),
+        id_provincia_comercial   = VALUES(id_provincia_comercial),
+        id_region_comercial      = VALUES(id_region_comercial),
+        ciudad_comercial         = VALUES(ciudad_comercial),
+        telefono_comercial       = VALUES(telefono_comercial),
+        antiguedad_meses         = VALUES(antiguedad_meses),
+        renta_fija_liquida       = VALUES(renta_fija_liquida),
+        renta_var_mes1           = VALUES(renta_var_mes1),
+        renta_var_mes2           = VALUES(renta_var_mes2),
+        renta_var_mes3           = VALUES(renta_var_mes3),
+        renta_var_mes4           = VALUES(renta_var_mes4),
+        renta_var_mes5           = VALUES(renta_var_mes5),
+        renta_var_mes6           = VALUES(renta_var_mes6),
+        updated_at               = CURRENT_TIMESTAMP
     `, [
       rut,
-      tipo_trabajador    || null,
-      empleador          || null,
-      rut_empresa        ? rut_empresa.toUpperCase().trim() : null,
-      giro_empresa       || null,
-      direccion_comercial|| null,
-      numero_comercial   || null,
-      oficina_comercial  || null,
-      id_comuna_comercial|| null,
-      ciudad_comercial   || null,
-      telefono_comercial || null,
+      tipo_trabajador          || null,
+      empleador                || null,
+      rut_empresa              ? rut_empresa.toUpperCase().trim() : null,
+      giro_empresa             || null,
+      direccion_comercial      || null,
+      numero_comercial         || null,
+      oficina_comercial        || null,
+      id_comuna_comercial      || null,
+      id_provincia_comercial   || null,
+      id_region_comercial      || null,
+      ciudad_comercial         || null,
+      telefono_comercial       || null,
       antiguedad_meses   != null ? parseInt(antiguedad_meses) : null,
       renta_fija_liquida != null ? parseInt(renta_fija_liquida) : null,
       renta_var_mes1     != null ? parseInt(renta_var_mes1) : null,
