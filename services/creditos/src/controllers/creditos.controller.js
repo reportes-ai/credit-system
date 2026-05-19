@@ -81,6 +81,8 @@ const pool = require('../../../../shared/config/database');
     await addCol(`ALTER TABLE creditos ADD COLUMN tipo_ubicacion     VARCHAR(10)  NULL`);
     await addCol(`ALTER TABLE creditos ADD COLUMN nombre_parque      VARCHAR(100) NULL`);
     await addCol(`ALTER TABLE creditos ADD COLUMN id_cliente         INT          NULL DEFAULT NULL`);
+    await addCol(`ALTER TABLE creditos ADD COLUMN created_at         DATETIME     NULL DEFAULT CURRENT_TIMESTAMP`);
+    await addCol(`ALTER TABLE creditos ADD COLUMN updated_at         DATETIME     NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP`);
     // Corregir columnas que puedan existir como NOT NULL sin default
     const fixCol = async (sql) => pool.query(sql).catch(e => { if(e.errno!==1054) throw e; });
     await fixCol(`ALTER TABLE creditos MODIFY COLUMN id_cliente INT NULL DEFAULT NULL`);
@@ -175,7 +177,7 @@ const getAll = async (req, res) => {
       params.push(like, like, like);
     }
     if (estado) { sql += ` AND estado = ?`; params.push(estado); }
-    sql += ` ORDER BY created_at DESC LIMIT 500`;
+    sql += ` ORDER BY COALESCE(created_at, id_credito) DESC LIMIT 500`;
     const [rows] = await pool.query(sql, params);
     res.json({ success: true, data: rows, error: null });
   } catch (e) {
