@@ -627,7 +627,7 @@ function dealerBuscar(el) {
   const q = el.value.trim();
   if (q.length < 2) { document.getElementById('iDealerDrop').classList.remove('open'); return; }
   _dealerTimer = setTimeout(async () => {
-    const r = await fetch('/api/dealers?q=' + encodeURIComponent(q) + '&activo=1&limit=20', { headers: apiHdr() });
+    const r = await fetch('/api/dealers?q=' + encodeURIComponent(q) + '&limit=20', { headers: apiHdr() });
     const j = await r.json();
     const drop = document.getElementById('iDealerDrop');
     if (!j.success || !j.data.rows.length) {
