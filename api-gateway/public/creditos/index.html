@@ -285,7 +285,7 @@
   <div class="topnav-left">
     <div class="topnav-brand">
       <a href="/"><img src="/img/logo.png" alt="AutoFácil" style="display:block"></a>
-      <span class="version-badge" id="versionBadge">v2.0</span>
+      <span class="version-badge" id="versionBadge">v2.1</span>
     </div>
   </div>
   <div class="topnav-right">
@@ -562,8 +562,8 @@
             </div>
             <div class="col-4">
               <label class="form-label">Tasa <span class="fw-normal text-muted">[%]</span></label>
-              <input type="text" id="iTasa" class="form-control" placeholder="2.54%" oninput="credTasaInput(this)" onfocus="credTasaFocus(this)" autocomplete="off">
-              <div class="field-hint">Auto según tramo</div>
+              <input type="text" id="iTasa" class="form-control" placeholder="ej: 1.78%" oninput="credTasaInput(this)" onfocus="credTasaFocus(this)" autocomplete="off">
+              <div class="field-hint">Desde costo de fondo</div>
             </div>
           </div>
 
@@ -1260,7 +1260,16 @@ async function credCargarParams() {
   try {
     const r = await fetch('/api/parametros-credito', { headers: apiHdr() });
     const j = await r.json();
-    if (j.success) { credParams = j.data.obj || {}; credActualizarGastos(); credRecalcular(); }
+    if (j.success) {
+      credParams = j.data.obj || {};
+      // Auto-poblar tasa desde costo_fondo si el campo está vacío
+      const iTasa = document.getElementById('iTasa');
+      if (iTasa && !iTasa.value && credParams.costo_fondo) {
+        iTasa.value = Number(credParams.costo_fondo).toFixed(2) + '%';
+      }
+      credActualizarGastos();
+      credRecalcular();
+    }
   } catch(e) {}
 }
 
@@ -1362,8 +1371,13 @@ function credRecalcular() {
   const ids = ['rCCSaldoPrecio','rCCGastos','rCCSubSin','rCCSegD','rCCSegR','rCCSegC',
                 'rCCSubCon','rCCBono','rCCMontoFin','rCCCuota','rCCCae','rCCTotal'];
   document.getElementById('rCCPlazo').textContent = (p.plazo||48) + ' meses';
+  // Siempre mostrar saldo precio en el resumen
+  if (saldo > 0) document.getElementById('rCCSaldoPrecio').textContent = credFmtP(saldo);
   if (!p.valorVehiculo || !p.tasa) {
-    ids.forEach(id => { const el=document.getElementById(id); if(el) el.textContent='—'; });
+    ['rCCGastos','rCCSubSin','rCCSegD','rCCSegR','rCCSegC',
+     'rCCSubCon','rCCBono','rCCMontoFin','rCCCuota','rCCCae','rCCTotal'].forEach(id => {
+      const el=document.getElementById(id); if(el) el.textContent='—';
+    });
     ['iGastosOp','iSeguros','iMontoFin','iCuota'].forEach(id => { const el=document.getElementById(id); if(el) el.value=''; });
     return;
   }
@@ -1395,7 +1409,8 @@ function credLimpiarFinanciero() {
   });
   document.getElementById('iSaldoPrecio').value = '';
   document.getElementById('iPlazo').value = '48';
-  document.getElementById('iTasa').value = '';
+  document.getElementById('iTasa').value = credParams.costo_fondo
+    ? Number(credParams.costo_fondo).toFixed(2) + '%' : '';
   ['chkCDesg','chkCRdh','chkCCesa','chkCRep','chkCGps'].forEach(id => {
     const el = document.getElementById(id); if(el) el.checked = true;
   });
