@@ -40,16 +40,46 @@ const pool = require('../../../../shared/config/database');
         updated_at         DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
       )
     `);
-    await pool.query(`ALTER TABLE creditos ADD COLUMN numero_credito VARCHAR(20) NULL`).catch(e => { if(e.errno!==1060) throw e; });
-    await pool.query(`ALTER TABLE creditos ADD COLUMN financiera VARCHAR(100) NULL AFTER numero_credito`).catch(e => { if(e.errno!==1060) throw e; });
-    await pool.query(`ALTER TABLE creditos ADD COLUMN empresa VARCHAR(50) NULL AFTER nombre_cliente`).catch(e => { if(e.errno!==1060) throw e; });
-    await pool.query(`ALTER TABLE creditos ADD COLUMN transmision VARCHAR(50) NULL AFTER dealer`).catch(e => { if(e.errno!==1060) throw e; });
-    await pool.query(`ALTER TABLE creditos ADD COLUMN combustible VARCHAR(50) NULL AFTER transmision`).catch(e => { if(e.errno!==1060) throw e; });
-    await pool.query(`ALTER TABLE creditos ADD COLUMN tasacion BIGINT NULL AFTER combustible`).catch(e => { if(e.errno!==1060) throw e; });
-    await pool.query(`ALTER TABLE creditos ADD COLUMN permiso_circulacion BIGINT NULL AFTER tasacion`).catch(e => { if(e.errno!==1060) throw e; });
-    await pool.query(`ALTER TABLE creditos ADD COLUMN id_dealer INT NULL AFTER permiso_circulacion`).catch(e => { if(e.errno!==1060) throw e; });
-    await pool.query(`ALTER TABLE creditos ADD COLUMN tipo_ubicacion VARCHAR(10) NULL AFTER id_dealer`).catch(e => { if(e.errno!==1060) throw e; });
-    await pool.query(`ALTER TABLE creditos ADD COLUMN nombre_parque VARCHAR(100) NULL AFTER tipo_ubicacion`).catch(e => { if(e.errno!==1060) throw e; });
+    // Columnas core (pueden faltar si la tabla se creó con esquema antiguo)
+    const addCol = async (sql) => pool.query(sql).catch(e => { if(e.errno!==1060) throw e; });
+    await addCol(`ALTER TABLE creditos ADD COLUMN numero_credito     VARCHAR(20)  NULL`);
+    await addCol(`ALTER TABLE creditos ADD COLUMN financiera         VARCHAR(100) NULL`);
+    await addCol(`ALTER TABLE creditos ADD COLUMN rut_cliente        VARCHAR(15)  NOT NULL DEFAULT ''`);
+    await addCol(`ALTER TABLE creditos ADD COLUMN nombre_cliente     VARCHAR(300) NOT NULL DEFAULT ''`);
+    await addCol(`ALTER TABLE creditos ADD COLUMN empresa            VARCHAR(50)  NULL`);
+    await addCol(`ALTER TABLE creditos ADD COLUMN id_cotizacion      INT          NULL`);
+    await addCol(`ALTER TABLE creditos ADD COLUMN estado             VARCHAR(30)  NOT NULL DEFAULT 'VIGENTE'`);
+    await addCol(`ALTER TABLE creditos ADD COLUMN fecha_otorgamiento DATE         NULL`);
+    await addCol(`ALTER TABLE creditos ADD COLUMN valor_vehiculo     BIGINT       NULL`);
+    await addCol(`ALTER TABLE creditos ADD COLUMN pie                BIGINT       NULL`);
+    await addCol(`ALTER TABLE creditos ADD COLUMN saldo_precio       BIGINT       NULL`);
+    await addCol(`ALTER TABLE creditos ADD COLUMN monto_financiado   BIGINT       NULL`);
+    await addCol(`ALTER TABLE creditos ADD COLUMN plazo              INT          NULL`);
+    await addCol(`ALTER TABLE creditos ADD COLUMN tasa_mensual       DECIMAL(8,4) NULL`);
+    await addCol(`ALTER TABLE creditos ADD COLUMN cuota              BIGINT       NULL`);
+    await addCol(`ALTER TABLE creditos ADD COLUMN fecha_primera_cuota DATE        NULL`);
+    await addCol(`ALTER TABLE creditos ADD COLUMN gastos_operativos  BIGINT       NULL`);
+    await addCol(`ALTER TABLE creditos ADD COLUMN seguros            BIGINT       NULL`);
+    await addCol(`ALTER TABLE creditos ADD COLUMN tipo_vehiculo      VARCHAR(100) NULL`);
+    await addCol(`ALTER TABLE creditos ADD COLUMN marca              VARCHAR(100) NULL`);
+    await addCol(`ALTER TABLE creditos ADD COLUMN modelo             VARCHAR(100) NULL`);
+    await addCol(`ALTER TABLE creditos ADD COLUMN anio               INT          NULL`);
+    await addCol(`ALTER TABLE creditos ADD COLUMN patente            VARCHAR(20)  NULL`);
+    await addCol(`ALTER TABLE creditos ADD COLUMN color              VARCHAR(50)  NULL`);
+    await addCol(`ALTER TABLE creditos ADD COLUMN motor              VARCHAR(100) NULL`);
+    await addCol(`ALTER TABLE creditos ADD COLUMN chasis             VARCHAR(100) NULL`);
+    await addCol(`ALTER TABLE creditos ADD COLUMN dealer             VARCHAR(200) NULL`);
+    await addCol(`ALTER TABLE creditos ADD COLUMN ejecutivo          VARCHAR(200) NULL`);
+    await addCol(`ALTER TABLE creditos ADD COLUMN observaciones      TEXT         NULL`);
+    await addCol(`ALTER TABLE creditos ADD COLUMN datos_json         JSON         NULL`);
+    await addCol(`ALTER TABLE creditos ADD COLUMN id_usuario         INT          NULL`);
+    await addCol(`ALTER TABLE creditos ADD COLUMN transmision        VARCHAR(50)  NULL`);
+    await addCol(`ALTER TABLE creditos ADD COLUMN combustible        VARCHAR(50)  NULL`);
+    await addCol(`ALTER TABLE creditos ADD COLUMN tasacion           BIGINT       NULL`);
+    await addCol(`ALTER TABLE creditos ADD COLUMN permiso_circulacion BIGINT      NULL`);
+    await addCol(`ALTER TABLE creditos ADD COLUMN id_dealer          INT          NULL`);
+    await addCol(`ALTER TABLE creditos ADD COLUMN tipo_ubicacion     VARCHAR(10)  NULL`);
+    await addCol(`ALTER TABLE creditos ADD COLUMN nombre_parque      VARCHAR(100) NULL`);
   } catch (e) {
     if (e.errno !== 1050) console.error('[creditos migration]', e.message);
   }
