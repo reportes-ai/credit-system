@@ -118,4 +118,20 @@ const getAll = async (req, res) => {
   }
 };
 
-module.exports = { create, getAll };
+const getByRut = async (req, res) => {
+  try {
+    const rut = req.params.rut.toUpperCase().trim();
+    const [rows] = await pool.query(
+      `SELECT id_cotizacion, rut_cliente, nombre_cliente, fecha_cotizacion,
+              valor_vehiculo, pie, plazo, tasa_mensual, monto_financiado, cuota,
+              datos_json, created_at
+       FROM cotizaciones WHERE rut_cliente = ? ORDER BY created_at DESC LIMIT 20`,
+      [rut]
+    );
+    res.json({ success: true, data: rows, error: null });
+  } catch (e) {
+    res.status(500).json({ success: false, data: null, error: e.message });
+  }
+};
+
+module.exports = { create, getAll, getByRut };

@@ -205,6 +205,54 @@
     .ubic-btn.active-parque { border-color:#0141A2; background:#eff6ff; color:#0141A2; }
     .ubic-btn.active-calle  { border-color:#059669; background:#f0fdf4; color:#059669; }
 
+    /* ── Botón cotizaciones ── */
+    .btn-cotiz-lookup { background:#eff6ff; border:1.5px solid #93c5fd; color:#1d4ed8; border-radius:8px; padding:4px 12px; font-size:.78rem; font-weight:700; cursor:pointer; transition:background .15s; display:flex; align-items:center; gap:4px; }
+    .btn-cotiz-lookup:hover:not(:disabled) { background:#dbeafe; }
+    .btn-cotiz-lookup:disabled { opacity:.4; cursor:not-allowed; }
+
+    /* ── Sub-etiquetas sección condiciones ── */
+    .cred-sub-label { font-size:.72rem; font-weight:800; text-transform:uppercase; letter-spacing:.07em; color:var(--blue); margin:10px 0 5px; display:flex; align-items:center; }
+    .field-hint { font-size:.7rem; color:#9ca3af; margin-top:2px; }
+
+    /* ── Lista gastos operacionales ── */
+    .gastos-cred-list { background:#f8fafc; border:1px solid #e2e8f0; border-radius:8px; padding:5px 12px; }
+    .gc-item { display:flex; justify-content:space-between; align-items:center; padding:3px 0; font-size:.8rem; border-bottom:1px dashed #f1f5f9; }
+    .gc-item:last-child { border-bottom:none; }
+    .gc-label { color:#374151; display:flex; align-items:center; gap:5px; }
+    .gc-val { font-weight:700; color:#1e293b; font-variant-numeric:tabular-nums; min-width:90px; text-align:right; }
+
+    /* ── Resumen crédito ── */
+    .resumen-cred { background:#fff; border:1.5px solid #e2e8f0; border-radius:12px; padding:15px 16px; }
+    .rc-title { font-size:.68rem; font-weight:800; text-transform:uppercase; letter-spacing:.08em; color:#9ca3af; margin-bottom:10px; padding-bottom:7px; border-bottom:1.5px solid #e2e8f0; }
+    .rc-item { display:flex; justify-content:space-between; font-size:.8rem; padding:2px 0; color:#374151; }
+    .rc-item.rc-subtotal { font-weight:700; color:#1e40af; padding:4px 0; }
+    .rc-item.rc-monto { font-weight:800; font-size:.88rem; color:var(--navy); padding:5px 0; }
+    .rc-item.rc-bono span:first-child { color:#059669; }
+    .rc-item.rc-seg { color:#6b7280; font-size:.77rem; }
+    .rc-sep { border-top:1px solid #e2e8f0; margin:4px 0; }
+    .rc-sep.thick { border-color:#93c5fd; border-width:1.5px; margin:6px 0; }
+    .rc-cuota-box { background:linear-gradient(135deg,var(--navy),var(--blue)); border-radius:8px; padding:10px 14px; margin:10px 0; color:#fff; display:flex; justify-content:space-between; align-items:center; }
+    .rc-cuota-label { font-size:.65rem; font-weight:800; text-transform:uppercase; letter-spacing:.07em; opacity:.85; }
+    .rc-cuota-val { font-size:1.35rem; font-weight:900; }
+    .rc-footer { background:#f8fafc; border-radius:7px; padding:7px 10px; }
+    .rc-footer-item { display:flex; justify-content:space-between; font-size:.77rem; padding:2px 0; color:#6b7280; }
+    .rc-footer-item.rc-total-pagar { font-weight:700; color:#374151; }
+
+    /* ── Modal cotizaciones ── */
+    .cot-overlay { display:none; position:fixed; inset:0; background:rgba(0,0,0,.5); z-index:600; align-items:center; justify-content:center; }
+    .cot-overlay.open { display:flex; }
+    .cot-box { background:#fff; border-radius:14px; width:min(640px,96vw); max-height:82vh; display:flex; flex-direction:column; box-shadow:0 20px 60px rgba(0,0,0,.3); overflow:hidden; }
+    .cot-head { background:linear-gradient(135deg,var(--navy),var(--blue)); color:#fff; padding:14px 20px; display:flex; align-items:center; justify-content:space-between; flex-shrink:0; }
+    .cot-head h6 { margin:0; font-size:.92rem; font-weight:800; }
+    .cot-body { overflow-y:auto; padding:14px 18px; flex:1; }
+    .cot-row { border:1.5px solid #e2e8f0; border-radius:9px; padding:10px 14px; margin-bottom:8px; cursor:pointer; transition:border-color .15s,background .15s; }
+    .cot-row:hover { border-color:var(--blue); background:#eff6ff; }
+    .cot-row-top { display:flex; justify-content:space-between; align-items:flex-start; }
+    .cot-row-date { font-size:.8rem; font-weight:700; color:#374151; }
+    .cot-row-cuota { font-size:1.1rem; font-weight:900; color:var(--navy); }
+    .cot-row-meta { display:flex; gap:12px; margin-top:3px; font-size:.74rem; color:#6b7280; }
+    .cot-foot { padding:11px 18px; border-top:1px solid #f0f2f5; display:flex; justify-content:flex-end; gap:8px; flex-shrink:0; background:#f9fafb; }
+
     /* RUT found bar */
     .rut-found { background:#f0fdf4; border:1.5px solid #6ee7b7; border-radius:8px; padding:10px 16px; font-size:.88rem; font-weight:700; color:#065f46; display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:8px; }
     .rut-found-nombre { display:flex; align-items:center; gap:6px; }
@@ -237,7 +285,7 @@
   <div class="topnav-left">
     <div class="topnav-brand">
       <a href="/"><img src="/img/logo.png" alt="AutoFácil" style="display:block"></a>
-      <span class="version-badge" id="versionBadge">v1.6</span>
+      <span class="version-badge" id="versionBadge">v1.7</span>
     </div>
   </div>
   <div class="topnav-right">
@@ -467,63 +515,143 @@
 
     <!-- Sección 3: Condiciones del Crédito -->
     <div class="form-card">
-      <div class="section-label"><i class="bi bi-bank2"></i>Condiciones del Crédito</div>
-      <div class="row g-2">
-        <div class="col-md-3 col-lg-2">
-          <label class="form-label">Fecha Otorgamiento</label>
-          <input type="date" id="iFechaOtorg" class="form-control">
+      <div class="section-label d-flex align-items-center justify-content-between pe-0" style="padding-bottom:10px">
+        <span><i class="bi bi-bank2"></i>Condiciones del Crédito</span>
+        <button type="button" class="btn-cotiz-lookup" id="btnVerCotiz" onclick="abrirCotizaciones()" disabled>
+          <i class="bi bi-clipboard-data me-1"></i>Cotizaciones del cliente
+        </button>
+      </div>
+
+      <div class="row g-3">
+        <!-- Columna izquierda: formulario simulación -->
+        <div class="col-lg-7">
+
+          <!-- Valor / Pie -->
+          <div class="row g-2 mb-2">
+            <div class="col-6">
+              <label class="form-label">Valor Vehículo $</label>
+              <input type="number" id="iValorVehiculo" class="form-control" min="0" placeholder="0" oninput="credRecalcular()">
+            </div>
+            <div class="col-6">
+              <label class="form-label">Pie $</label>
+              <input type="number" id="iPie" class="form-control" min="0" placeholder="0" oninput="credRecalcular()">
+            </div>
+          </div>
+
+          <!-- Saldo / Plazo / Tasa -->
+          <div class="row g-2 mb-2">
+            <div class="col-4">
+              <label class="form-label">Saldo Precio $</label>
+              <input type="number" id="iSaldoPrecio" class="form-control" readonly>
+            </div>
+            <div class="col-4">
+              <label class="form-label">Plazo <span class="fw-normal text-muted">[meses]</span></label>
+              <select id="iPlazo" class="form-select" onchange="credRecalcular()">
+                <option value="12">12</option><option value="24">24</option>
+                <option value="36">36</option><option value="48" selected>48</option>
+                <option value="60">60</option><option value="72">72</option>
+                <option value="84">84</option>
+              </select>
+            </div>
+            <div class="col-4">
+              <label class="form-label">Tasa <span class="fw-normal text-muted">[%]</span></label>
+              <input type="text" id="iTasa" class="form-control" placeholder="2.54%" oninput="credRecalcular()">
+              <div class="field-hint">Auto según tramo</div>
+            </div>
+          </div>
+
+          <!-- Fechas / Estado -->
+          <div class="row g-2 mb-3">
+            <div class="col-4">
+              <label class="form-label">Fecha Otorgamiento</label>
+              <input type="date" id="iFechaOtorg" class="form-control">
+            </div>
+            <div class="col-4">
+              <label class="form-label">Fecha 1ª Cuota</label>
+              <input type="date" id="iFechaPrimeraCuota" class="form-control" onchange="credRecalcular()">
+              <div class="field-hint">Default: 30 días</div>
+            </div>
+            <div class="col-4">
+              <label class="form-label">Estado</label>
+              <select id="iEstado" class="form-select">
+                <option value="VIGENTE">Vigente</option>
+                <option value="EN MORA">En Mora</option>
+                <option value="CANCELADO">Cancelado</option>
+                <option value="PREPAGADO">Prepagado</option>
+                <option value="CASTIGADO">Castigado</option>
+              </select>
+            </div>
+          </div>
+
+          <!-- Gastos Operacionales -->
+          <div class="cred-sub-label"><i class="bi bi-receipt me-1"></i>Gastos Operacionales</div>
+          <div class="gastos-cred-list mb-2">
+            <div class="gc-item"><span class="gc-label">Prenda</span><span class="gc-val" id="cgPrenda">—</span></div>
+            <div class="gc-item"><span class="gc-label">Retiro Gestión Auto</span><span class="gc-val" id="cgRetiro">—</span></div>
+            <div class="gc-item"><span class="gc-label">Limitación de Dominio</span><span class="gc-val" id="cgLimitacion">—</span></div>
+            <div class="gc-item"><span class="gc-label">Gastos Administración</span><span class="gc-val" id="cgAdmin">—</span></div>
+            <div class="gc-item"><span class="gc-label">Inscripción / Transferencia</span><span class="gc-val" id="cgInscripcion">—</span></div>
+            <div class="gc-item"><span class="gc-label" id="cgGpsLabel">GPS 24 meses</span><span class="gc-val" id="cgGps">—</span></div>
+            <div class="gc-item"><span class="gc-label" id="cgRepLabel">Reparaciones Menores</span><span class="gc-val" id="cgReparaciones">—</span></div>
+          </div>
+          <div class="row g-2 mb-3">
+            <div class="col-md-6">
+              <label class="form-label">Bono Financiamiento $</label>
+              <input type="number" id="iBonoFin" class="form-control" min="0" placeholder="0" oninput="credRecalcular()">
+            </div>
+          </div>
+
+          <!-- Seguros -->
+          <div class="cred-sub-label"><i class="bi bi-shield-check me-1"></i>Seguros</div>
+          <div class="d-flex flex-wrap gap-3 mb-1" style="font-size:.84rem">
+            <label class="d-flex align-items-center gap-1 m-0"><input type="checkbox" id="chkCDesg" onchange="credRecalcular()" checked class="form-check-input">Desgravamen</label>
+            <label class="d-flex align-items-center gap-1 m-0"><input type="checkbox" id="chkCRdh"  onchange="credRecalcular()" checked class="form-check-input">RDH</label>
+            <label class="d-flex align-items-center gap-1 m-0"><input type="checkbox" id="chkCCesa" onchange="credRecalcular()" checked class="form-check-input">Cesantía</label>
+            <label class="d-flex align-items-center gap-1 m-0"><input type="checkbox" id="chkCRep"  onchange="credRecalcular()" checked class="form-check-input">Rep. Menores</label>
+            <label class="d-flex align-items-center gap-1 m-0"><input type="checkbox" id="chkCGps"  onchange="credRecalcular()" checked class="form-check-input">GPS</label>
+          </div>
+          <div class="field-hint mb-3">Los montos se calculan automáticamente según plazo</div>
+
+          <div class="d-flex gap-2">
+            <button type="button" class="btn btn-primary btn-sm px-3" onclick="credCalcular()"><i class="bi bi-calculator me-1"></i>Calcular</button>
+            <button type="button" class="btn btn-outline-secondary btn-sm" onclick="credLimpiarFinanciero()"><i class="bi bi-eraser me-1"></i>Limpiar</button>
+          </div>
         </div>
-        <div class="col-md-3 col-lg-2">
-          <label class="form-label">Fecha 1ª Cuota</label>
-          <input type="date" id="iFechaPrimeraCuota" class="form-control">
-        </div>
-        <div class="col-md-3 col-lg-2">
-          <label class="form-label">Valor Vehículo $</label>
-          <input type="number" id="iValorVehiculo" class="form-control" min="0" placeholder="0" oninput="calcSaldo()">
-        </div>
-        <div class="col-md-3 col-lg-2">
-          <label class="form-label">Pie $</label>
-          <input type="number" id="iPie" class="form-control" min="0" placeholder="0" oninput="calcSaldo()">
-        </div>
-        <div class="col-md-3 col-lg-2">
-          <label class="form-label">Saldo Precio $</label>
-          <input type="number" id="iSaldoPrecio" class="form-control" readonly>
-        </div>
-        <div class="col-md-3 col-lg-2">
-          <label class="form-label">Gastos Operativos $</label>
-          <input type="number" id="iGastosOp" class="form-control" min="0" placeholder="0" oninput="calcMontoFin()">
-        </div>
-        <div class="col-md-3 col-lg-2">
-          <label class="form-label">Seguros $</label>
-          <input type="number" id="iSeguros" class="form-control" min="0" placeholder="0" oninput="calcMontoFin()">
-        </div>
-        <div class="col-md-3 col-lg-2">
-          <label class="form-label">Monto Financiado $</label>
-          <input type="number" id="iMontoFin" class="form-control" readonly>
-        </div>
-        <div class="col-md-2 col-lg-1">
-          <label class="form-label">Plazo (m)</label>
-          <input type="number" id="iPlazo" class="form-control" min="1" max="84" placeholder="48">
-        </div>
-        <div class="col-md-2 col-lg-2">
-          <label class="form-label">Tasa Mensual %</label>
-          <input type="number" id="iTasa" class="form-control" step="0.01" placeholder="2.54">
-        </div>
-        <div class="col-md-3 col-lg-2">
-          <label class="form-label">Cuota Mensual $</label>
-          <input type="number" id="iCuota" class="form-control" min="0" placeholder="0">
-        </div>
-        <div class="col-md-3 col-lg-2">
-          <label class="form-label">Estado</label>
-          <select id="iEstado" class="form-select">
-            <option value="VIGENTE">Vigente</option>
-            <option value="EN MORA">En Mora</option>
-            <option value="CANCELADO">Cancelado</option>
-            <option value="PREPAGADO">Prepagado</option>
-            <option value="CASTIGADO">Castigado</option>
-          </select>
+
+        <!-- Columna derecha: Resumen -->
+        <div class="col-lg-5">
+          <div class="resumen-cred">
+            <div class="rc-title"><i class="bi bi-clipboard-data me-1"></i>Resumen del Crédito</div>
+            <div class="rc-item"><span>Saldo Precio</span><span id="rCCSaldoPrecio">—</span></div>
+            <div class="rc-item"><span>+ Gastos Operacionales</span><span id="rCCGastos">—</span></div>
+            <div class="rc-sep"></div>
+            <div class="rc-item rc-subtotal"><span>Sub Total Sin Seguros</span><span id="rCCSubSin">—</span></div>
+            <div class="rc-item rc-seg"><span>+ Seguro Desgravamen</span><span id="rCCSegD">—</span></div>
+            <div class="rc-item rc-seg"><span>+ Seguro RDH</span><span id="rCCSegR">—</span></div>
+            <div class="rc-item rc-seg"><span>+ Seguro Cesantía</span><span id="rCCSegC">—</span></div>
+            <div class="rc-sep"></div>
+            <div class="rc-item rc-subtotal"><span>Sub Total Con Seguros</span><span id="rCCSubCon">—</span></div>
+            <div class="rc-item rc-bono"><span>- Bono Financiamiento</span><span id="rCCBono">—</span></div>
+            <div class="rc-sep thick"></div>
+            <div class="rc-item rc-monto"><span>MONTO A FINANCIAR</span><span id="rCCMontoFin">—</span></div>
+            <div class="rc-cuota-box">
+              <div class="rc-cuota-label">Cuota Mensual</div>
+              <div id="rCCCuota" class="rc-cuota-val">—</div>
+            </div>
+            <div class="rc-footer">
+              <div class="rc-footer-item"><span>CAE (Carga Anual Equiv.)</span><span id="rCCCae">—</span></div>
+              <div class="rc-footer-item"><span>Plazo</span><span id="rCCPlazo">48 meses</span></div>
+              <div class="rc-footer-item rc-total-pagar"><span>Total a Pagar</span><span id="rCCTotal">—</span></div>
+            </div>
+          </div>
         </div>
       </div>
+
+      <!-- Campos ocultos para guardar -->
+      <input type="hidden" id="iGastosOp">
+      <input type="hidden" id="iSeguros">
+      <input type="hidden" id="iMontoFin">
+      <input type="hidden" id="iCuota">
 
       <hr class="section-divider">
       <div class="row g-2">
@@ -568,6 +696,22 @@
       <button class="btn-guardar"  style="padding:8px 20px" onclick="guardarEstadoDetalle()">
         <i class="bi bi-floppy me-1"></i>Guardar cambios
       </button>
+    </div>
+  </div>
+</div>
+
+<!-- Modal cotizaciones -->
+<div class="cot-overlay" id="cotOverlay" onclick="if(event.target===this)cerrarCotizaciones()">
+  <div class="cot-box">
+    <div class="cot-head">
+      <h6><i class="bi bi-clipboard-data me-2"></i>Cotizaciones del cliente</h6>
+      <button style="background:none;border:none;color:rgba(255,255,255,.75);font-size:1.2rem;cursor:pointer" onclick="cerrarCotizaciones()"><i class="bi bi-x-lg"></i></button>
+    </div>
+    <div class="cot-body" id="cotBody">
+      <div class="text-center py-4 text-muted"><i class="bi bi-hourglass-split"></i></div>
+    </div>
+    <div class="cot-foot">
+      <button class="btn-cancelar" onclick="cerrarCotizaciones()">Cerrar</button>
     </div>
   </div>
 </div>
@@ -1049,21 +1193,248 @@ async function buscarClienteCred() {
       msg.innerHTML = `<div style="color:#ef4444;font-size:.82rem"><i class="bi bi-exclamation-circle me-1"></i>Cliente no encontrado. Ingresa el nombre manualmente.</div>`;
       msg.style.display = 'block';
     }
+    // Habilitar botón cotizaciones
+    const btnCotiz = document.getElementById('btnVerCotiz');
+    if (btnCotiz) btnCotiz.disabled = false;
   } catch(e) { showToast('Error al buscar cliente', false); }
 }
 
-function calcSaldo() {
-  const val = parseFloat(document.getElementById('iValorVehiculo').value)||0;
-  const pie = parseFloat(document.getElementById('iPie').value)||0;
-  document.getElementById('iSaldoPrecio').value = val-pie > 0 ? Math.round(val-pie) : 0;
-  calcMontoFin();
+/* ─── Motor de cálculo (créditos) ───────────────────────────────────────── */
+const CRED_SEG_RATES = {
+  6:  { d:0.00898,  r:0.006745, c:0.036162, dr:0.015847, dc:0.045806, rc:0.043406, drc:0.053186 },
+  12: { d:0.018641, r:0.011634, c:0.037883, dr:0.030715, dc:0.057977, rc:0.05042,  drc:0.071008 },
+  24: { d:0.027538, r:0.012248, c:0.042101, dr:0.040474, dc:0.072041, rc:0.055409, drc:0.08613  },
+  36: { d:0.035518, r:0.012761, c:0.04712,  dr:0.049208, dc:0.08613,  rc:0.061121, drc:0.1012   },
+  48: { d:0.043623, r:0.029018, c:0.052853, dr:0.075269, dc:0.101322, rc:0.085069, drc:0.136622 },
+  72: { d:0.054964, r:0.034875, c:0.058985, dr:0.093853, dc:0.120825, rc:0.098177, drc:0.164822 },
+};
+function credPlazoBracket(n) { for (const b of [6,12,24,36,48,72]) if (n<=b) return b; return 72; }
+function credPmt(r,n,pv) { if(Math.abs(r)<1e-10) return pv/n; return pv*r*Math.pow(1+r,n)/(Math.pow(1+r,n)-1); }
+function credRateNR(nper,pmt,pv,guess=0.1) {
+  let r=guess;
+  for(let i=0;i<200;i++){
+    const q=Math.pow(1+r,nper), f=pv*q+pmt*(q-1)/r;
+    const df=nper*pv*Math.pow(1+r,nper-1)+pmt*(nper*Math.pow(1+r,nper-1)*r-(q-1))/(r*r);
+    const rn=r-f/df; if(Math.abs(rn-r)<1e-9) return rn; r=rn;
+  } return r;
+}
+function credCAE(saldo,cuota,plazo) {
+  if(!saldo||!cuota||!plazo) return null;
+  const r=credRateNR(plazo,-cuota,saldo);
+  return (isFinite(r)&&!isNaN(r)) ? r*12 : null;
+}
+function credComboKey(d,r,c) {
+  if(d&&r&&c) return 'drc'; if(d&&r) return 'dr'; if(d&&c) return 'dc';
+  if(r&&c) return 'rc'; if(d) return 'd'; if(r) return 'r'; if(c) return 'c'; return null;
+}
+function credFmtP(n) { if(!n&&n!==0) return '—'; return '$'+Math.round(n).toLocaleString('es-CL'); }
+
+let credParams = {};
+
+async function credCargarParams() {
+  try {
+    const r = await fetch('/api/parametros-credito', { headers: apiHdr() });
+    const j = await r.json();
+    if (j.success) { credParams = j.data.obj || {}; credActualizarGastos(); }
+  } catch(e) {}
 }
 
-function calcMontoFin() {
-  const saldo   = parseFloat(document.getElementById('iSaldoPrecio').value)||0;
-  const gastos  = parseFloat(document.getElementById('iGastosOp').value)||0;
-  const seguros = parseFloat(document.getElementById('iSeguros').value)||0;
-  document.getElementById('iMontoFin').value = Math.round(saldo+gastos+seguros);
+function credActualizarGastos() {
+  const p = credParams;
+  const chkGps = document.getElementById('chkCGps');
+  const chkRep = document.getElementById('chkCRep');
+  const set = (id, v) => { const el=document.getElementById(id); if(el) el.textContent=credFmtP(v); };
+  set('cgPrenda',      p.prenda            || 0);
+  set('cgRetiro',      p.retiro_gestion    || 0);
+  set('cgLimitacion',  p.limitacion_dominio|| 0);
+  set('cgAdmin',       p.gastos_admin      || 0);
+  set('cgInscripcion', p.inscripcion       || 0);
+  set('cgGps',         chkGps?.checked ? (p.gps_24meses          || 0) : 0);
+  set('cgReparaciones',chkRep?.checked ? (p.reparaciones_menores || 0) : 0);
+}
+
+function credLeerInputs() {
+  const p = credParams;
+  const chkGps  = document.getElementById('chkCGps');
+  const chkRep  = document.getElementById('chkCRep');
+  const tasaRaw = (document.getElementById('iTasa').value||'').replace('%','').replace(',','.');
+  return {
+    valorVehiculo: parseInt(document.getElementById('iValorVehiculo').value)||0,
+    pie:           parseInt(document.getElementById('iPie').value)||0,
+    plazo:         parseInt(document.getElementById('iPlazo').value)||48,
+    tasa:          parseFloat(tasaRaw)||0,
+    diasPrimeraCuota: credDiasPrimeraCuota(),
+    prenda:        p.prenda             || 0,
+    retiro:        p.retiro_gestion     || 0,
+    limitacion:    p.limitacion_dominio || 0,
+    admin:         p.gastos_admin       || 0,
+    inscripcion:   p.inscripcion        || 0,
+    gps:           chkGps?.checked ? (p.gps_24meses          || 0) : 0,
+    reparaciones:  chkRep?.checked ? (p.reparaciones_menores || 0) : 0,
+    bono:          parseInt(document.getElementById('iBonoFin').value)||0,
+    chkD:          document.getElementById('chkCDesg')?.checked ?? true,
+    chkR:          document.getElementById('chkCRdh')?.checked  ?? true,
+    chkC:          document.getElementById('chkCCesa')?.checked ?? true,
+  };
+}
+
+function credDiasPrimeraCuota() {
+  const el = document.getElementById('iFechaPrimeraCuota');
+  if (!el || !el.value) return 30;
+  const fecha = new Date(el.value + 'T00:00:00');
+  const hoy = new Date(); hoy.setHours(0,0,0,0);
+  const diff = Math.round((fecha - hoy) / 86400000);
+  return diff > 0 ? diff : 30;
+}
+
+function credCalc(p) {
+  const saldoPrecio = p.valorVehiculo - p.pie;
+  const gastosOp = p.prenda + p.retiro + p.limitacion + p.admin + p.inscripcion + p.gps + p.reparaciones;
+  const subSin = saldoPrecio + gastosOp;
+  const pb = credPlazoBracket(p.plazo);
+  const rates = CRED_SEG_RATES[pb] || CRED_SEG_RATES[72];
+  const key = credComboKey(p.chkD, p.chkR, p.chkC);
+  let segDesg=0, segRdh=0, segCesa=0;
+  if (key) {
+    const totalNet = (rates[key]||0) * subSin;
+    const sumInd = (p.chkD?rates.d:0)+(p.chkR?rates.r:0)+(p.chkC?rates.c:0);
+    if (sumInd>0) {
+      if (p.chkD) segDesg = totalNet*(rates.d/sumInd);
+      if (p.chkR) segRdh  = totalNet*(rates.r/sumInd);
+      if (p.chkC) segCesa = totalNet*(rates.c/sumInd);
+    }
+  }
+  const totalSeguros = segDesg + segRdh + segCesa;
+  const subCon = subSin + totalSeguros;
+  const montoFin = subCon - p.bono;
+  const tasaD = p.tasa / 100;
+  const extraDias = (p.diasPrimeraCuota||30) - 30;
+  const capitalAjustado = montoFin + montoFin * tasaD * extraDias / 30;
+  const cuota = credPmt(tasaD, p.plazo, capitalAjustado);
+  const totalPagado = cuota * p.plazo;
+  const cae = credCAE(saldoPrecio, cuota, p.plazo);
+  return { saldoPrecio, gastosOp, subSin, segDesg, segRdh, segCesa, totalSeguros, subCon, montoFin, cuota, totalPagado, cae };
+}
+
+function credRecalcular() {
+  credActualizarGastos();
+  const p = credLeerInputs();
+  const saldo = p.valorVehiculo - p.pie;
+  document.getElementById('iSaldoPrecio').value = saldo > 0 ? saldo : '';
+  const ids = ['rCCSaldoPrecio','rCCGastos','rCCSubSin','rCCSegD','rCCSegR','rCCSegC',
+                'rCCSubCon','rCCBono','rCCMontoFin','rCCCuota','rCCCae','rCCTotal'];
+  document.getElementById('rCCPlazo').textContent = (p.plazo||48) + ' meses';
+  if (!p.valorVehiculo || !p.tasa) {
+    ids.forEach(id => { const el=document.getElementById(id); if(el) el.textContent='—'; });
+    ['iGastosOp','iSeguros','iMontoFin','iCuota'].forEach(id => { const el=document.getElementById(id); if(el) el.value=''; });
+    return;
+  }
+  const r = credCalc(p);
+  const f = credFmtP;
+  document.getElementById('rCCSaldoPrecio').textContent = f(r.saldoPrecio);
+  document.getElementById('rCCGastos').textContent      = f(r.gastosOp);
+  document.getElementById('rCCSubSin').textContent      = f(r.subSin);
+  document.getElementById('rCCSegD').textContent        = r.segDesg  > 0 ? f(r.segDesg)  : '—';
+  document.getElementById('rCCSegR').textContent        = r.segRdh   > 0 ? f(r.segRdh)   : '—';
+  document.getElementById('rCCSegC').textContent        = r.segCesa  > 0 ? f(r.segCesa)  : '—';
+  document.getElementById('rCCSubCon').textContent      = f(r.subCon);
+  document.getElementById('rCCBono').textContent        = p.bono > 0 ? f(p.bono) : '—';
+  document.getElementById('rCCMontoFin').textContent    = f(r.montoFin);
+  document.getElementById('rCCCuota').textContent       = f(r.cuota);
+  document.getElementById('rCCCae').textContent         = r.cae != null ? (r.cae*100).toFixed(2)+'%' : '—';
+  document.getElementById('rCCTotal').textContent       = f(r.totalPagado);
+  document.getElementById('iGastosOp').value = Math.round(r.gastosOp);
+  document.getElementById('iSeguros').value  = Math.round(r.totalSeguros);
+  document.getElementById('iMontoFin').value = Math.round(r.montoFin);
+  document.getElementById('iCuota').value    = Math.round(r.cuota);
+}
+
+function credCalcular() { credRecalcular(); }
+
+function credLimpiarFinanciero() {
+  ['iValorVehiculo','iPie','iBonoFin','iFechaPrimeraCuota'].forEach(id => {
+    const el = document.getElementById(id); if(el) el.value = '';
+  });
+  document.getElementById('iSaldoPrecio').value = '';
+  document.getElementById('iPlazo').value = '48';
+  document.getElementById('iTasa').value = '';
+  ['chkCDesg','chkCRdh','chkCCesa','chkCRep','chkCGps'].forEach(id => {
+    const el = document.getElementById(id); if(el) el.checked = true;
+  });
+  credRecalcular();
+}
+
+/* ─── Modal cotizaciones ─────────────────────────────────────────────────── */
+async function abrirCotizaciones() {
+  const rut = document.getElementById('iRut').value.trim().toUpperCase();
+  if (!rut) return;
+  const overlay = document.getElementById('cotOverlay');
+  const body    = document.getElementById('cotBody');
+  overlay.classList.add('open');
+  body.innerHTML = '<div class="text-center py-4"><div class="spinner-border spinner-border-sm"></div></div>';
+  try {
+    const r = await fetch('/api/cotizaciones/rut/' + encodeURIComponent(rut), { headers: apiHdr() });
+    const j = await r.json();
+    if (!j.success) throw new Error(j.error);
+    const rows = j.data;
+    if (!rows.length) {
+      body.innerHTML = '<div class="text-center py-5 text-muted"><i class="bi bi-inbox fs-2 d-block mb-2"></i>No hay cotizaciones para este RUT</div>';
+      return;
+    }
+    body.innerHTML = rows.map(c => {
+      const fecha = new Date(c.fecha_cotizacion).toLocaleString('es-CL',{day:'2-digit',month:'2-digit',year:'numeric',hour:'2-digit',minute:'2-digit'});
+      return `<div class="cot-row" onclick="cotSeleccionar(${c.id_cotizacion})">
+        <div class="cot-row-top">
+          <div>
+            <div class="cot-row-date">${fecha}</div>
+            <div class="cot-row-meta">
+              <span>Vehículo: ${credFmtP(c.valor_vehiculo)}</span>
+              <span>Plazo: ${c.plazo} m</span>
+              <span>Tasa: ${Number(c.tasa_mensual).toFixed(2)}%</span>
+            </div>
+          </div>
+          <div class="text-end">
+            <div style="font-size:.68rem;color:#9ca3af;text-transform:uppercase">Cuota mensual</div>
+            <div class="cot-row-cuota">${credFmtP(c.cuota)}</div>
+          </div>
+        </div>
+      </div>`;
+    }).join('');
+    // Store rows for selection
+    window._cotRows = rows;
+  } catch(e) {
+    body.innerHTML = `<div class="text-center py-4 text-danger"><i class="bi bi-exclamation-triangle me-1"></i>${e.message}</div>`;
+  }
+}
+
+function cotSeleccionar(id) {
+  const cot = (window._cotRows||[]).find(c => c.id_cotizacion === id);
+  if (!cot) return;
+  document.getElementById('iValorVehiculo').value = cot.valor_vehiculo || '';
+  document.getElementById('iPie').value           = cot.pie || '';
+  document.getElementById('iPlazo').value         = cot.plazo || 48;
+  document.getElementById('iTasa').value          = cot.tasa_mensual ? Number(cot.tasa_mensual).toFixed(2)+'%' : '';
+  let dj = {};
+  try { dj = typeof cot.datos_json==='string' ? JSON.parse(cot.datos_json) : (cot.datos_json||{}); } catch{}
+  const inp = dj.inputs || {};
+  if (inp.bono > 0) document.getElementById('iBonoFin').value = inp.bono;
+  if ('chkD' in inp) document.getElementById('chkCDesg').checked = inp.chkD;
+  if ('chkR' in inp) document.getElementById('chkCRdh').checked  = inp.chkR;
+  if ('chkC' in inp) document.getElementById('chkCCesa').checked = inp.chkC;
+  if ('gps'  in inp) document.getElementById('chkCGps').checked  = inp.gps > 0;
+  if ('reparaciones' in inp) document.getElementById('chkCRep').checked = inp.reparaciones > 0;
+  if (inp.diasPrimeraCuota) {
+    const hoy = new Date(); hoy.setHours(0,0,0,0);
+    const f = new Date(hoy.getTime() + inp.diasPrimeraCuota * 86400000);
+    document.getElementById('iFechaPrimeraCuota').value = f.toISOString().split('T')[0];
+  }
+  credRecalcular();
+  cerrarCotizaciones();
+  showToast('Cotización cargada correctamente', true);
+}
+
+function cerrarCotizaciones() {
+  document.getElementById('cotOverlay').classList.remove('open');
 }
 
 async function guardarCredito() {
@@ -1085,7 +1456,7 @@ async function guardarCredito() {
     seguros:             document.getElementById('iSeguros').value || null,
     monto_financiado:    document.getElementById('iMontoFin').value || null,
     plazo:               document.getElementById('iPlazo').value || null,
-    tasa_mensual:        document.getElementById('iTasa').value || null,
+    tasa_mensual:        parseFloat((document.getElementById('iTasa').value||'').replace('%','').replace(',','.')) || null,
     cuota:               document.getElementById('iCuota').value || null,
     tipo_vehiculo:       document.getElementById('iTipoVehiculo').value || null,
     marca:               document.getElementById('iMarca').value || null,
@@ -1105,6 +1476,16 @@ async function guardarCredito() {
     nombre_parque:       document.getElementById('iNombreParque').value.trim() || null,
     ejecutivo:           document.getElementById('iEjecutivo').value || null,
     observaciones:       document.getElementById('iObservaciones').value || null,
+    datos_json: {
+      bono_financiamiento: parseInt(document.getElementById('iBonoFin').value)||0,
+      seguros: {
+        desgravamen: document.getElementById('chkCDesg')?.checked ?? true,
+        rdh:         document.getElementById('chkCRdh')?.checked  ?? true,
+        cesantia:    document.getElementById('chkCCesa')?.checked ?? true,
+      },
+      gps:          document.getElementById('chkCGps')?.checked ?? true,
+      reparaciones: document.getElementById('chkCRep')?.checked ?? true,
+    },
   };
 
   try {
@@ -1146,13 +1527,35 @@ function limpiarIngreso() {
   if (ph) ph.textContent = '';
   const pi = document.getElementById('iPatente');
   if (pi) { pi.classList.remove('patente-ok','patente-err'); }
+  // Reset financiero
+  document.getElementById('iBonoFin').value = '';
+  document.getElementById('iPlazo').value   = '48';
+  document.getElementById('iTasa').value    = '';
+  ['chkCDesg','chkCRdh','chkCCesa','chkCRep','chkCGps'].forEach(id => {
+    const el=document.getElementById(id); if(el) el.checked=true;
+  });
+  credRecalcular();
+  // Disable cotizaciones button
+  const btnCotiz = document.getElementById('btnVerCotiz');
+  if (btnCotiz) btnCotiz.disabled = true;
   vehCargaMarcas(); // recargar marcas
 }
 
 /* ─── Init ─────────────────────────────────────────────────────────── */
 buscarCreditos();
 vehCargaMarcas();
-document.addEventListener('keydown', e => { if(e.key==='Escape') cerrarDetalle(); });
+credCargarParams();
+// Fecha 1ª cuota default: 30 días desde hoy
+(function() {
+  const el = document.getElementById('iFechaPrimeraCuota');
+  if (el && !el.value) {
+    const d = new Date(); d.setDate(d.getDate()+30);
+    el.value = d.toISOString().split('T')[0];
+  }
+})();
+document.addEventListener('keydown', e => {
+  if (e.key==='Escape') { cerrarDetalle(); cerrarCotizaciones(); }
+});
 </script>
 </body>
 </html>
