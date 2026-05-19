@@ -80,6 +80,10 @@ const pool = require('../../../../shared/config/database');
     await addCol(`ALTER TABLE creditos ADD COLUMN id_dealer          INT          NULL`);
     await addCol(`ALTER TABLE creditos ADD COLUMN tipo_ubicacion     VARCHAR(10)  NULL`);
     await addCol(`ALTER TABLE creditos ADD COLUMN nombre_parque      VARCHAR(100) NULL`);
+    await addCol(`ALTER TABLE creditos ADD COLUMN id_cliente         INT          NULL DEFAULT NULL`);
+    // Corregir columnas que puedan existir como NOT NULL sin default
+    const fixCol = async (sql) => pool.query(sql).catch(e => { if(e.errno!==1054) throw e; });
+    await fixCol(`ALTER TABLE creditos MODIFY COLUMN id_cliente INT NULL DEFAULT NULL`);
   } catch (e) {
     if (e.errno !== 1050) console.error('[creditos migration]', e.message);
   }
