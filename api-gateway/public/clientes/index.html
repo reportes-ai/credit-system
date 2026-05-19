@@ -260,7 +260,7 @@
   <div class="topnav-left">
     <div class="topnav-brand">
       <a href="/"><img src="/img/logo.png" alt="AutoFácil" style="display:block"></a>
-      <span class="version-badge" id="versionBadge">v4.9</span>
+      <span class="version-badge" id="versionBadge">v4.10</span>
     </div>
   </div>
   <div class="topnav-right">
@@ -454,7 +454,16 @@
         </div>
         <div class="col-md-3 col-lg-2">
           <label class="form-label">Tipo de Visa <small class="text-muted">(extranjeros *)</small></label>
-          <input type="text" id="pTipoVisa" class="form-control" placeholder="Ej: TEMPORARIA" oninput="upperInput(this)">
+          <select id="pTipoVisa" class="form-select">
+            <option value="">— Seleccione —</option>
+            <option value="RESIDENCIA DEFINITIVA">Residencia Definitiva</option>
+            <option value="SUJETA A CONTRATO DE TRABAJO">Sujeta A Contrato De Trabajo</option>
+            <option value="RESIDENCIA POR REFUGIO Y ASILO POLÍTICO">Residencia por Refugio y Asilo Político</option>
+            <option value="REUNIFICACIÓN FAMILIAR">Reunificación Familiar</option>
+            <option value="RESIDENCIA TEMPORAL">Residencia Temporal</option>
+            <option value="ESTUDIANTE RESIDENTE">Estudiante Residente</option>
+            <option value="TURISMO">Turismo</option>
+          </select>
         </div>
         <div class="col-md-2 col-lg-2">
           <label class="form-label">Fecha Visa <small class="text-muted">(extranjeros *)</small></label>
@@ -1407,7 +1416,7 @@ function buildBody(tipo) {
     if (!correo)   faltantes.push('Correo electrónico');
     if (!nacion)   faltantes.push('Nacionalidad');
     if (!direccion)faltantes.push('Dirección');
-    if (nacion && nacion !== 'CHILE') {
+    if (nacion && nacion !== 'CHILENA') {
       if (!tipoVisa)  faltantes.push('Tipo de Visa');
       if (!fechaVisa) faltantes.push('Fecha Visa');
     }
