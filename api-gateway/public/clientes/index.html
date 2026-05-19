@@ -260,7 +260,7 @@
   <div class="topnav-left">
     <div class="topnav-brand">
       <a href="/"><img src="/img/logo.png" alt="AutoFácil" style="display:block"></a>
-      <span class="version-badge" id="versionBadge">v4.8</span>
+      <span class="version-badge" id="versionBadge">v4.9</span>
     </div>
   </div>
   <div class="topnav-right">
@@ -1058,7 +1058,7 @@ function mostrarVistaLectura(c) {
     html += dv('Apellido Paterno', c.apellido_paterno);
     html += dv('Apellido Materno', c.apellido_materno);
     html += dv('Nombres', c.nombres);
-    html += dv('Fecha Nacimiento', c.fecha_nacimiento ? new Date(c.fecha_nacimiento).toLocaleDateString('es-CL') : null);
+    html += dv('Fecha Nacimiento', fmtFecha(c.fecha_nacimiento));
     html += dv('Edad', c.fecha_nacimiento ? calcEdadStr(c.fecha_nacimiento) : null);
     html += dv('Estado Civil', c.estado_civil);
     html += dv('Sexo', c.sexo);
@@ -1067,14 +1067,14 @@ function mostrarVistaLectura(c) {
     html += dv('Nacionalidad', c.nacionalidad);
     html += dv('Teléfono Móvil', c.telefono_movil);
     html += dv('Tipo Visa', c.tipo_visa);
-    html += dv('Fecha Visa', c.fecha_visa ? new Date(c.fecha_visa).toLocaleDateString('es-CL') : null);
+    html += dv('Fecha Visa', fmtFecha(c.fecha_visa));
   } else {
     html += '<div class="col-12 mb-2"><div class="section-label"><i class="bi bi-building me-1"></i>Datos empresa</div></div>';
     html += dv('Nombre Fantasía', c.nombre_fantasia);
     html += dv('Razón Social', c.razon_social);
     html += dv('Código Actividad', c.codigo_actividad);
     html += dv('Actividad Económica', c.actividad_economica);
-    html += dv('Inicio Actividad', c.fecha_inicio_actividad ? new Date(c.fecha_inicio_actividad).toLocaleDateString('es-CL') : null);
+    html += dv('Inicio Actividad', fmtFecha(c.fecha_inicio_actividad));
     if (c.rep1_rut || c.rep1_nombre) {
       html += '<div class="col-12 mt-2 mb-1"><div class="section-label"><i class="bi bi-people me-1"></i>Representantes</div></div>';
       [[1,'rep1'],[2,'rep2'],[3,'rep3']].forEach(([n,k]) => {
@@ -1213,13 +1213,23 @@ async function precargarEmpresa(c) {
 /* ═══════════════════════════════════════════════════════════════════
    Edad
 ═══════════════════════════════════════════════════════════════════ */
+/* Formatea "YYYY-MM-DD..." → "DD-MM-YYYY" sin pasar por new Date()
+   (evita desfase de timezone que resta un día en Chile UTC-3/UTC-4) */
+function fmtFecha(s) {
+  if (!s) return '—';
+  const d = s.split('T')[0].split('-'); // ["YYYY","MM","DD"]
+  return d.length === 3 ? `${d[2]}-${d[1]}-${d[0]}` : s;
+}
+
 function calcEdadStr(fechaNac) {
   if (!fechaNac) return null;
   const hoy  = new Date();
-  const nac  = new Date(fechaNac);
+  const [y, m, d] = fechaNac.split('T')[0].split('-').map(Number);
+  // Crear fecha local con año/mes/día explícitos (sin conversión UTC)
+  const nac = new Date(y, m - 1, d);
   let edad = hoy.getFullYear() - nac.getFullYear();
-  const m = hoy.getMonth() - nac.getMonth();
-  if (m < 0 || (m === 0 && hoy.getDate() < nac.getDate())) edad--;
+  const dm = hoy.getMonth() - nac.getMonth();
+  if (dm < 0 || (dm === 0 && hoy.getDate() < nac.getDate())) edad--;
   return edad >= 0 ? `${edad} años` : null;
 }
 
