@@ -35,7 +35,9 @@
   .estado-badge { border-radius:20px; padding:4px 14px; font-size:.8rem; font-weight:800; text-transform:uppercase; letter-spacing:.06em; }
   .eb-REVISION        { background:#fef2f2; color:#dc2626; border:1.5px solid #fca5a5; }
   .eb-CARGA_RESPALDOS    { background:#fff7ed; color:#c2410c; border:1.5px solid #fdba74; }
-  .eb-EMISION_DOCUMENTOS { background:#f0f9ff; color:#0369a1; border:1.5px solid #7dd3fc; }
+  .eb-EMISION_DOCUMENTOS  { background:#f0f9ff; color:#0369a1; border:1.5px solid #7dd3fc; }
+  .eb-CARGA_DOCUMENTOS_AF { background:#fdf4ff; color:#7e22ce; border:1.5px solid #d8b4fe; }
+  .eb-VALIDACION_FIRMA    { background:#fff7ed; color:#b45309; border:1.5px solid #fcd34d; }
   .eb-VIGENTE         { background:#f0fdf4; color:#16a34a; border:1.5px solid #86efac; }
   .eb-EN-MORA         { background:#fffbeb; color:#d97706; border:1.5px solid #fcd34d; }
   .eb-CANCELADO       { background:#eff6ff; color:#2563eb; border:1.5px solid #93c5fd; }
@@ -167,7 +169,7 @@
   <a class="nav-brand" href="/creditos">
     <img src="/img/logo-autofacil.png" alt="AutoFácil" onerror="this.style.display='none'">
     <span>Revisión de Crédito</span>
-    <span class="version-badge">v1.5</span>
+    <span class="version-badge">v1.6</span>
   </a>
   <div class="nav-actions">
     <span id="navUser" style="color:rgba(255,255,255,.75);font-size:.82rem"></span>
@@ -483,8 +485,10 @@ function renderPagina(c, ant, com) {
             <select id="dEstado" class="estado-select">
               <option value="REVISION"        ${c.estado==='REVISION'        ?'selected':''}>En Revisión</option>
               <option value="CARGA_RESPALDOS"    ${c.estado==='CARGA_RESPALDOS'    ?'selected':''}>Carga Respaldos</option>
-              <option value="EMISION_DOCUMENTOS" ${c.estado==='EMISION_DOCUMENTOS' ?'selected':''}>Emisión Documentos</option>
-              <option value="VIGENTE"            ${c.estado==='VIGENTE'            ?'selected':''}>Vigente</option>
+              <option value="EMISION_DOCUMENTOS"  ${c.estado==='EMISION_DOCUMENTOS'  ?'selected':''}>Emisión Documentos</option>
+              <option value="CARGA_DOCUMENTOS_AF" ${c.estado==='CARGA_DOCUMENTOS_AF' ?'selected':''}>Carga Docs. AF</option>
+              <option value="VALIDACION_FIRMA"    ${c.estado==='VALIDACION_FIRMA'    ?'selected':''}>Validación Firma</option>
+              <option value="VIGENTE"             ${c.estado==='VIGENTE'             ?'selected':''}>Vigente</option>
               <option value="EN MORA"         ${c.estado==='EN MORA'         ?'selected':''}>En Mora</option>
               <option value="CANCELADO"       ${c.estado==='CANCELADO'       ?'selected':''}>Cancelado</option>
               <option value="PREPAGADO"       ${c.estado==='PREPAGADO'       ?'selected':''}>Prepagado</option>
@@ -513,6 +517,14 @@ function renderPagina(c, ant, com) {
       <button class="btn-accion" style="background:linear-gradient(135deg,#0369a1,#0ea5e9);color:#fff"
         onclick="window.open('/creditos/documentos?id=${c.id_credito}','_blank')">
         <i class="bi bi-file-earmark-text"></i>Emitir Documentos
+      </button>` : c.estado === 'CARGA_DOCUMENTOS_AF' ? `
+      <button class="btn-accion" style="background:linear-gradient(135deg,#7e22ce,#a855f7);color:#fff"
+        onclick="location.href='/creditos/carga-documentos-af?id=${c.id_credito}'">
+        <i class="bi bi-cloud-upload"></i>Cargar Docs. Firmados
+      </button>` : c.estado === 'VALIDACION_FIRMA' ? `
+      <button class="btn-accion" style="background:linear-gradient(135deg,#b45309,#f59e0b);color:#fff"
+        onclick="location.href='/creditos/validacion-firma?id=${c.id_credito}'">
+        <i class="bi bi-pen-fill"></i>Validar Firma
       </button>` : `
       <button class="btn-accion btn-rechazar" onclick="cambiarEstadoRapido('CANCELADO')">
         <i class="bi bi-x-circle"></i>Rechazar
@@ -540,6 +552,8 @@ function icRow(label, monto, inst, carga, esMala=false) {
 function estadoEstado(e) {
   const map = { REVISION:'En Revisión', CARGA_RESPALDOS:'Carga Respaldos',
                 EMISION_DOCUMENTOS:'Emisión Documentos',
+                CARGA_DOCUMENTOS_AF:'Carga Docs. AF',
+                VALIDACION_FIRMA:'Validación Firma',
                 VIGENTE:'Vigente', 'EN MORA':'En Mora',
                 CANCELADO:'Cancelado', PREPAGADO:'Prepagado', CASTIGADO:'Castigado' };
   return map[e] || e || '—';

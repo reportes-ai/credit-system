@@ -1,0 +1,494 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Validación de Firma — AutoFácil</title>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css">
+  <style>
+    :root {
+      --navy:#0f2d6b; --blue:#1565c0; --bg:#f0f4f8;
+      --card:#fff; --border:#e2e8f0; --text:#1e293b; --muted:#64748b;
+      --green:#16a34a; --red:#dc2626; --amber:#d97706;
+    }
+    * { box-sizing:border-box; margin:0; padding:0; }
+    body { font-family:'Segoe UI',system-ui,sans-serif; background:var(--bg); color:var(--text); }
+
+    /* Navbar */
+    .navbar { background:linear-gradient(135deg,var(--navy),var(--blue)); padding:0 24px; height:52px; display:flex; align-items:center; justify-content:space-between; }
+    .nav-brand { display:flex; align-items:center; gap:10px; color:#fff; font-weight:800; font-size:1rem; text-decoration:none; }
+    .nav-brand img { height:28px; }
+    .nav-actions { display:flex; align-items:center; gap:10px; }
+    .btn-back { background:rgba(255,255,255,.15); border:1px solid rgba(255,255,255,.3); color:#fff; border-radius:8px; padding:6px 14px; font-size:.82rem; font-weight:600; cursor:pointer; display:flex; align-items:center; gap:6px; text-decoration:none; }
+    .btn-back:hover { background:rgba(255,255,255,.25); }
+    .version-badge { background:rgba(255,255,255,.15); color:rgba(255,255,255,.75); font-size:.65rem; font-weight:700; border-radius:6px; padding:2px 8px; margin-left:4px; }
+
+    /* Page */
+    .page-wrap { max-width:900px; margin:0 auto; padding:24px 16px 120px; }
+
+    /* Header */
+    .cred-header { background:linear-gradient(135deg,var(--navy),#1a56db); border-radius:14px; padding:18px 24px; color:#fff; margin-bottom:20px; display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:10px; }
+    .ch-title { font-size:1.1rem; font-weight:900; }
+    .ch-sub { font-size:.85rem; opacity:.8; margin-top:2px; }
+    .estado-badge-val { border-radius:20px; padding:4px 14px; font-size:.78rem; font-weight:800; text-transform:uppercase; background:#fefce8; color:#854d0e; border:1.5px solid #fde047; }
+
+    /* Progress */
+    .progress-wrap { background:var(--card); border-radius:12px; border:1px solid var(--border); padding:16px 20px; margin-bottom:20px; }
+    .progress-label { display:flex; justify-content:space-between; font-size:.82rem; font-weight:700; margin-bottom:8px; }
+    .progress-bar-track { background:#f1f5f9; border-radius:99px; height:10px; overflow:hidden; }
+    .progress-bar-fill { height:100%; border-radius:99px; transition:width .4s; }
+    .progress-bar-fill.ok      { background:linear-gradient(90deg,#22c55e,#16a34a); }
+    .progress-bar-fill.partial { background:linear-gradient(90deg,#f59e0b,#d97706); }
+    .progress-bar-fill.none    { background:#e2e8f0; }
+
+    /* Doc cards */
+    .docs-grid { display:grid; grid-template-columns:1fr; gap:14px; }
+    .doc-card { background:var(--card); border-radius:14px; border:2px solid var(--border); overflow:hidden; transition:border-color .2s; }
+    .doc-card.validado  { border-color:#86efac; }
+    .doc-card.rechazado { border-color:#fca5a5; }
+
+    /* Card head */
+    .doc-head { display:flex; align-items:flex-start; gap:14px; padding:16px 20px; }
+    .doc-icon { width:44px; height:44px; border-radius:11px; display:flex; align-items:center; justify-content:center; font-size:1.3rem; flex-shrink:0; background:#f1f5f9; color:var(--navy); }
+    .doc-card.validado  .doc-icon { background:#dcfce7; color:var(--green); }
+    .doc-card.rechazado .doc-icon { background:#fee2e2; color:var(--red); }
+    .doc-meta { flex:1; }
+    .doc-name { font-weight:700; font-size:.93rem; }
+    .doc-uploaded-at { font-size:.75rem; color:var(--muted); margin-top:2px; }
+    .doc-comment { font-size:.8rem; color:var(--muted); margin-top:4px; font-style:italic; }
+
+    /* Doc view/dl buttons */
+    .doc-file-btns { display:flex; gap:7px; margin-top:10px; }
+    .btn-view { background:#eff6ff; color:#1e40af; border:1px solid #bfdbfe; border-radius:7px; padding:6px 13px; font-size:.82rem; font-weight:600; cursor:pointer; display:flex; align-items:center; gap:5px; }
+    .btn-view:hover { background:#dbeafe; }
+    .btn-dl { background:#f1f5f9; color:var(--text); border:1px solid var(--border); border-radius:7px; padding:6px 11px; font-size:.88rem; cursor:pointer; }
+    .btn-dl:hover { background:#e2e8f0; }
+
+    /* Validation controls */
+    .val-controls { border-top:1px solid var(--border); padding:14px 20px; background:#f8faff; display:flex; align-items:flex-start; gap:14px; flex-wrap:wrap; }
+
+    /* Validated state display */
+    .val-ok-info { display:flex; align-items:center; gap:10px; flex:1; }
+    .val-ok-badge { background:#dcfce7; color:var(--green); border-radius:20px; padding:5px 14px; font-size:.8rem; font-weight:700; display:flex; align-items:center; gap:6px; white-space:nowrap; }
+    .val-ok-meta { font-size:.78rem; color:var(--muted); }
+
+    /* Rejected state display */
+    .val-rej-info { background:#fef2f2; border-radius:8px; padding:10px 14px; flex:1; }
+    .val-rej-badge { color:var(--red); font-weight:700; font-size:.83rem; margin-bottom:4px; display:flex; align-items:center; gap:6px; }
+    .val-rej-comment { font-size:.82rem; color:#7f1d1d; }
+    .val-rej-meta { font-size:.75rem; color:var(--muted); margin-top:3px; }
+
+    /* Pending state — checkbox + reject inline */
+    .val-pending { display:flex; align-items:center; gap:12px; flex-wrap:wrap; flex:1; }
+    .chk-label { display:flex; align-items:center; gap:8px; cursor:pointer; font-weight:700; font-size:.88rem; padding:8px 14px; background:#f0fdf4; border:1.5px solid #86efac; border-radius:9px; color:var(--green); transition:background .15s; user-select:none; }
+    .chk-label:hover { background:#dcfce7; }
+    .chk-label input[type=checkbox] { width:18px; height:18px; accent-color:var(--green); cursor:pointer; }
+    .btn-rechazar-doc { background:#fff; color:var(--red); border:1.5px solid #fca5a5; border-radius:9px; padding:8px 14px; font-size:.85rem; font-weight:700; cursor:pointer; display:flex; align-items:center; gap:6px; transition:background .15s; }
+    .btn-rechazar-doc:hover { background:#fef2f2; }
+
+    /* Re-validate button (shown on rejected cards) */
+    .btn-revalidar { background:#fff; color:var(--green); border:1.5px solid #86efac; border-radius:9px; padding:7px 13px; font-size:.82rem; font-weight:700; cursor:pointer; }
+
+    /* Rejection form */
+    .rejection-form { width:100%; margin-top:10px; }
+    .rejection-form textarea { width:100%; border:1.5px solid #fca5a5; border-radius:8px; padding:9px 12px; font-size:.85rem; font-family:inherit; resize:none; min-height:70px; }
+    .rejection-form textarea:focus { outline:none; border-color:var(--red); }
+    .rejection-form-btns { display:flex; gap:8px; margin-top:8px; }
+    .btn-confirm-rej { background:var(--red); color:#fff; border:none; border-radius:8px; padding:7px 16px; font-size:.83rem; font-weight:700; cursor:pointer; }
+    .btn-cancel-rej  { background:#f1f5f9; color:var(--text); border:1px solid var(--border); border-radius:8px; padding:7px 14px; font-size:.83rem; cursor:pointer; }
+
+    /* Action bar */
+    .action-bar { position:fixed; bottom:0; left:0; right:0; background:#fff; border-top:1.5px solid var(--border); padding:14px 24px; display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:10px; box-shadow:0 -4px 16px rgba(0,0,0,.07); z-index:100; }
+    .btn-accion { border:none; border-radius:9px; padding:11px 22px; font-size:.9rem; font-weight:700; cursor:pointer; display:flex; align-items:center; gap:7px; transition:opacity .15s; text-decoration:none; }
+    .btn-accion:hover { opacity:.88; }
+    .btn-volver     { background:#f1f5f9; color:var(--text); }
+    .btn-aprobar    { background:linear-gradient(135deg,#16a34a,#15803d); color:#fff; }
+    .btn-rechazar   { background:linear-gradient(135deg,#dc2626,#b91c1c); color:#fff; }
+    .btn-accion:disabled { background:#cbd5e1; cursor:not-allowed; opacity:1; }
+
+    /* Viewer */
+    .viewer-overlay { display:none; position:fixed; inset:0; z-index:500; background:#000; flex-direction:column; }
+    .viewer-overlay.open { display:flex; }
+    .viewer-header { background:rgba(0,0,0,.85); padding:12px 20px; display:flex; align-items:center; justify-content:space-between; }
+    .viewer-title { color:#fff; font-size:.9rem; font-weight:700; display:flex; align-items:center; gap:10px; }
+    .viewer-actions { display:flex; gap:8px; }
+    .vbtn { background:rgba(255,255,255,.12); border:1px solid rgba(255,255,255,.2); color:#fff; border-radius:7px; padding:6px 14px; font-size:.82rem; cursor:pointer; display:flex; align-items:center; gap:6px; }
+    .vbtn:hover { background:rgba(255,255,255,.22); }
+    .vbtn.close { background:rgba(220,38,38,.3); border-color:rgba(220,38,38,.5); }
+    .viewer-body { flex:1; overflow:hidden; display:flex; align-items:center; justify-content:center; }
+    .viewer-body img { max-width:100%; max-height:100%; object-fit:contain; }
+    .viewer-body iframe { width:100%; height:100%; border:none; background:#fff; }
+
+    /* Toast */
+    .toast-msg { position:fixed; bottom:90px; left:50%; transform:translateX(-50%); padding:10px 24px; border-radius:10px; font-size:.9rem; font-weight:600; display:none; z-index:999; }
+    .toast-ok  { background:#166534; color:#fff; }
+    .toast-err { background:#991b1b; color:#fff; }
+
+    .spinner-wrap { text-align:center; padding:60px; color:var(--muted); }
+    .no-data { text-align:center; padding:60px; color:var(--muted); }
+  </style>
+</head>
+<body>
+
+<nav class="navbar">
+  <a href="/creditos" class="nav-brand">
+    <img src="/img/logo-autofacil.png" alt="AutoFácil" onerror="this.style.display='none'">
+    <span>Validación de Firma</span>
+    <span class="version-badge">v1.0</span>
+  </a>
+  <div class="nav-actions">
+    <span id="navUser" style="color:rgba(255,255,255,.75);font-size:.82rem"></span>
+    <a href="/creditos" class="btn-back"><i class="bi bi-arrow-left"></i>Volver</a>
+  </div>
+</nav>
+
+<div class="page-wrap" id="pageWrap">
+  <div class="spinner-wrap"><i class="bi bi-hourglass-split" style="font-size:2rem;display:block;margin-bottom:12px"></i>Cargando…</div>
+</div>
+
+<!-- Action bar -->
+<div class="action-bar" id="actionBar" style="display:none">
+  <a href="/creditos" class="btn-accion btn-volver"><i class="bi bi-arrow-left"></i>Volver</a>
+  <div style="display:flex;gap:10px;flex-wrap:wrap">
+    <button class="btn-accion btn-rechazar" id="btnRechazarCredito" onclick="rechazarCredito()" style="display:none">
+      <i class="bi bi-arrow-counterclockwise"></i>Devolver a Carga
+    </button>
+    <button class="btn-accion btn-aprobar" id="btnAprobar" onclick="aprobarCredito()" disabled>
+      <i class="bi bi-check-circle-fill"></i>Aprobar — Marcar Vigente
+    </button>
+  </div>
+</div>
+
+<!-- Viewer -->
+<div class="viewer-overlay" id="viewerOverlay">
+  <div class="viewer-header">
+    <div class="viewer-title"><i class="bi bi-file-earmark"></i><span id="viewerName">—</span></div>
+    <div class="viewer-actions">
+      <button class="vbtn" onclick="viewerDescargar()"><i class="bi bi-download"></i>Descargar</button>
+      <button class="vbtn close" onclick="cerrarViewer()"><i class="bi bi-x-lg"></i>Cerrar</button>
+    </div>
+  </div>
+  <div class="viewer-body" id="viewerBody"></div>
+</div>
+
+<div class="toast-msg" id="toastMsg"></div>
+
+<script>
+/* ── Auth ── */
+const token = localStorage.getItem('token');
+const yo    = JSON.parse(localStorage.getItem('usuario') || 'null');
+if (!token || !yo) window.location.href = '/login.html';
+function apiHdr() { return { 'Content-Type':'application/json', Authorization:'Bearer '+token }; }
+document.getElementById('navUser').textContent = `${yo?.nombre||''} ${yo?.apellido||''}`.trim();
+
+const USUARIO_NOMBRE = `${yo?.nombre||''} ${yo?.apellido||''}`.trim() || yo?.email || 'Usuario';
+
+const qp       = new URLSearchParams(location.search);
+const creditId = qp.get('id');
+
+let _credito = null;
+let _docs    = {}; // { codigo: doc_row }
+
+const TIPOS_AF = [
+  { codigo:'hoja_resumen', nombre:'Hoja Resumen firmada',                    icon:'bi-card-list' },
+  { codigo:'contrato',     nombre:'Contrato de Crédito firmado',             icon:'bi-file-earmark-ruled' },
+  { codigo:'pagare',       nombre:'Pagaré firmado',                          icon:'bi-pen' },
+  { codigo:'mandato_af',   nombre:'Mandato AutoFácil firmado',               icon:'bi-building-lock' },
+  { codigo:'mandato_ga',   nombre:'Mandato Gestiones Automotrices firmado',  icon:'bi-building-gear' },
+];
+
+function showToast(msg, ok) {
+  const el = document.getElementById('toastMsg');
+  el.textContent = msg; el.className = 'toast-msg '+(ok?'toast-ok':'toast-err');
+  el.style.display = 'block'; setTimeout(() => el.style.display='none', 3000);
+}
+function fmtDT(s) { return s ? new Date(s).toLocaleString('es-CL',{day:'2-digit',month:'2-digit',year:'numeric',hour:'2-digit',minute:'2-digit'}) : ''; }
+function escHtml(s) { return String(s||'').replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+
+/* ── Load ── */
+async function cargarPagina() {
+  if (!creditId) {
+    document.getElementById('pageWrap').innerHTML = '<div class="no-data">ID de crédito no especificado</div>';
+    return;
+  }
+  try {
+    const [rc, rd] = await Promise.all([
+      fetch('/api/creditos/'+creditId,     { headers:apiHdr() }),
+      fetch('/api/documentos-af/'+creditId, { headers:apiHdr() }),
+    ]);
+    const [jc, jd] = await Promise.all([rc.json(), rd.json()]);
+    if (!jc.success) throw new Error(jc.error);
+    _credito = jc.data;
+    _docs = {};
+    if (jd.success) jd.data.forEach(d => { _docs[d.codigo] = d; });
+    renderPagina();
+    document.getElementById('actionBar').style.display = 'flex';
+  } catch(e) {
+    document.getElementById('pageWrap').innerHTML = `<div class="no-data"><i class="bi bi-exclamation-triangle"></i> ${e.message}</div>`;
+  }
+}
+
+function renderPagina() {
+  const c          = _credito;
+  const validados  = TIPOS_AF.filter(t => _docs[t.codigo]?.validado).length;
+  const rechazados = TIPOS_AF.filter(t => _docs[t.codigo]?.rechazado).length;
+  const total      = TIPOS_AF.length;
+  const pct        = Math.round(validados / total * 100);
+  const fillClass  = validados === total ? 'ok' : (validados > 0 ? 'partial' : 'none');
+
+  document.getElementById('pageWrap').innerHTML = `
+    <div class="cred-header">
+      <div>
+        <div class="ch-title"><i class="bi bi-shield-check me-2"></i>${c.nombre_cliente||'—'}</div>
+        <div class="ch-sub">N° Operación: ${c.numero_credito||c.id_credito} &nbsp;·&nbsp; ${c.rut_cliente||''}</div>
+      </div>
+      <span class="estado-badge-val">Validación de Firma</span>
+    </div>
+
+    <div class="progress-wrap">
+      <div class="progress-label">
+        <span><i class="bi bi-shield-check me-1"></i>Documentos validados</span>
+        <span>${rechazados > 0 ? `<span style="color:var(--red);margin-right:12px"><i class="bi bi-x-circle me-1"></i>${rechazados} rechazado${rechazados>1?'s':''}</span>` : ''}<strong style="color:${validados===total?'var(--green)':'var(--amber)'}">${validados}</strong> / ${total}</span>
+      </div>
+      <div class="progress-bar-track">
+        <div class="progress-bar-fill ${fillClass}" style="width:${pct}%"></div>
+      </div>
+    </div>
+
+    <div class="docs-grid">
+      ${TIPOS_AF.map(t => renderDocCard(t)).join('')}
+    </div>
+  `;
+
+  actualizarBotones();
+}
+
+function renderDocCard(tipo) {
+  const doc      = _docs[tipo.codigo];
+  const validado  = doc?.validado;
+  const rechazado = doc?.rechazado;
+  const cardClass = validado ? 'validado' : (rechazado ? 'rechazado' : '');
+  const comentario = doc?.comentario;
+
+  const controlsHtml = validado
+    ? renderValidadoControls(doc)
+    : (rechazado ? renderRechazadoControls(doc) : renderPendienteControls(tipo, doc));
+
+  return `
+    <div class="doc-card ${cardClass}" id="card-${tipo.codigo}">
+      <div class="doc-head">
+        <div class="doc-icon"><i class="bi ${tipo.icon}"></i></div>
+        <div class="doc-meta">
+          <div class="doc-name">${tipo.nombre}</div>
+          ${doc ? `<div class="doc-uploaded-at"><i class="bi bi-clock me-1"></i>Subido: ${fmtDT(doc.updated_at)}</div>` : '<div class="doc-uploaded-at" style="color:var(--red)"><i class="bi bi-exclamation-triangle me-1"></i>Sin archivo</div>'}
+          ${comentario ? `<div class="doc-comment"><i class="bi bi-chat-left-text me-1"></i>${escHtml(comentario)}</div>` : ''}
+          ${doc?.tiene_archivo ? `
+          <div class="doc-file-btns">
+            <button class="btn-view" onclick="verDoc(${doc.id_doc_af},'${escHtml(doc.nombre||tipo.nombre)}','${doc.mime_type||''}')">
+              <i class="bi bi-eye"></i>Ver en línea
+            </button>
+            <button class="btn-dl" title="Descargar" onclick="descargarDoc(${doc.id_doc_af},'${escHtml(doc.nombre||tipo.nombre)}')">
+              <i class="bi bi-download"></i>
+            </button>
+          </div>` : ''}
+        </div>
+      </div>
+      <div class="val-controls" id="controls-${tipo.codigo}">
+        ${doc?.tiene_archivo ? controlsHtml : '<span style="font-size:.82rem;color:var(--red)"><i class="bi bi-exclamation-circle me-1"></i>Documento no disponible</span>'}
+      </div>
+    </div>`;
+}
+
+function renderValidadoControls(doc) {
+  return `
+    <div class="val-ok-info">
+      <div class="val-ok-badge"><i class="bi bi-patch-check-fill"></i>Validado</div>
+      <div class="val-ok-meta">por <strong>${escHtml(doc.validado_por||'—')}</strong> · ${fmtDT(doc.validado_at)}</div>
+    </div>
+    <button class="btn-rechazar-doc" onclick="mostrarFormRechazo('${doc.codigo||''}',${doc.id_doc_af})" title="Cambiar a rechazado">
+      <i class="bi bi-x-circle"></i>Rechazar
+    </button>`;
+}
+
+function renderRechazadoControls(doc) {
+  return `
+    <div class="val-rej-info">
+      <div class="val-rej-badge"><i class="bi bi-x-circle-fill"></i>Rechazado por ${escHtml(doc.rechazado_por||'—')}</div>
+      <div class="val-rej-comment">${escHtml(doc.comentario_rechazo||'')}</div>
+      <div class="val-rej-meta">${fmtDT(doc.rechazado_at)}</div>
+    </div>
+    <button class="btn-revalidar" onclick="validarDoc('${doc.codigo}',${doc.id_doc_af})">
+      <i class="bi bi-arrow-counterclockwise"></i>Revalidar
+    </button>`;
+}
+
+function renderPendienteControls(tipo, doc) {
+  if (!doc) return '';
+  return `
+    <div class="val-pending">
+      <label class="chk-label">
+        <input type="checkbox" onchange="onCheckValidar('${tipo.codigo}',${doc.id_doc_af},this.checked)">
+        <i class="bi bi-patch-check"></i>Validar firma
+      </label>
+      <button class="btn-rechazar-doc" onclick="mostrarFormRechazo('${tipo.codigo}',${doc.id_doc_af})">
+        <i class="bi bi-x-circle"></i>Rechazar
+      </button>
+    </div>`;
+}
+
+/* ── Validate ── */
+async function onCheckValidar(codigo, idDoc, checked) {
+  if (!checked) return;
+  await validarDoc(codigo, idDoc);
+}
+
+async function validarDoc(codigo, idDoc) {
+  try {
+    const r = await fetch('/api/documentos-af/'+idDoc+'/validar', {
+      method:'PATCH', headers:apiHdr(),
+      body: JSON.stringify({ validado_por: USUARIO_NOMBRE })
+    });
+    const j = await r.json();
+    if (!j.success) throw new Error(j.error);
+    showToast('Documento validado', true);
+    await recargarDocs();
+  } catch(e) { showToast('Error: '+e.message, false); }
+}
+
+/* ── Reject form ── */
+function mostrarFormRechazo(codigo, idDoc) {
+  const ctrl = document.getElementById('controls-'+codigo);
+  if (!ctrl) return;
+  ctrl.innerHTML = `
+    <div style="flex:1">
+      <div style="font-size:.83rem;font-weight:700;color:var(--red);margin-bottom:8px">
+        <i class="bi bi-x-circle me-1"></i>Motivo del rechazo <span style="color:var(--red)">*</span>
+      </div>
+      <div class="rejection-form">
+        <textarea id="rej-txt-${codigo}" placeholder="Describe el problema con este documento…" rows="3"></textarea>
+        <div class="rejection-form-btns">
+          <button class="btn-confirm-rej" onclick="confirmarRechazo('${codigo}',${idDoc})">
+            <i class="bi bi-send me-1"></i>Confirmar rechazo
+          </button>
+          <button class="btn-cancel-rej" onclick="recargarDocs()">Cancelar</button>
+        </div>
+      </div>
+    </div>`;
+  document.getElementById('rej-txt-'+codigo)?.focus();
+}
+
+async function confirmarRechazo(codigo, idDoc) {
+  const txt = document.getElementById('rej-txt-'+codigo)?.value?.trim();
+  if (!txt) { showToast('Debes escribir el motivo del rechazo', false); return; }
+  try {
+    const r = await fetch('/api/documentos-af/'+idDoc+'/rechazar', {
+      method:'PATCH', headers:apiHdr(),
+      body: JSON.stringify({ comentario_rechazo: txt, rechazado_por: USUARIO_NOMBRE })
+    });
+    const j = await r.json();
+    if (!j.success) throw new Error(j.error);
+    showToast('Documento rechazado', true);
+    await recargarDocs();
+  } catch(e) { showToast('Error: '+e.message, false); }
+}
+
+/* ── Approve credit → VIGENTE ── */
+async function aprobarCredito() {
+  if (!confirm('¿Aprobar todos los documentos y marcar el crédito como VIGENTE?')) return;
+  try {
+    const r = await fetch('/api/creditos/'+creditId, {
+      method:'PUT', headers:apiHdr(),
+      body: JSON.stringify({
+        estado:'VIGENTE',
+        observaciones: _credito.observaciones||null,
+        ejecutivo:     _credito.ejecutivo||null,
+        dealer:        _credito.dealer||null,
+        patente:       _credito.patente||null,
+        color:         _credito.color||null,
+        motor:         _credito.motor||null,
+        chasis:        _credito.chasis||null,
+      })
+    });
+    const j = await r.json();
+    if (!j.success) throw new Error(j.error);
+    location.href = '/creditos/revisar?id='+creditId;
+  } catch(e) { showToast('Error: '+e.message, false); }
+}
+
+/* ── Reject credit → back to CARGA_DOCUMENTOS_AF ── */
+async function rechazarCredito() {
+  if (!confirm('¿Devolver el crédito a Carga de Documentos AF para corrección?')) return;
+  try {
+    const r = await fetch('/api/creditos/'+creditId, {
+      method:'PUT', headers:apiHdr(),
+      body: JSON.stringify({
+        estado:'CARGA_DOCUMENTOS_AF',
+        observaciones: _credito.observaciones||null,
+        ejecutivo:     _credito.ejecutivo||null,
+        dealer:        _credito.dealer||null,
+        patente:       _credito.patente||null,
+        color:         _credito.color||null,
+        motor:         _credito.motor||null,
+        chasis:        _credito.chasis||null,
+      })
+    });
+    const j = await r.json();
+    if (!j.success) throw new Error(j.error);
+    location.href = '/creditos/carga-documentos-af?id='+creditId;
+  } catch(e) { showToast('Error: '+e.message, false); }
+}
+
+/* ── Update action buttons ── */
+function actualizarBotones() {
+  const todosValidados  = TIPOS_AF.every(t => _docs[t.codigo]?.validado);
+  const hayRechazados   = TIPOS_AF.some(t  => _docs[t.codigo]?.rechazado);
+  const btnAprobar      = document.getElementById('btnAprobar');
+  const btnRechazar     = document.getElementById('btnRechazarCredito');
+  if (btnAprobar)  btnAprobar.disabled    = !todosValidados;
+  if (btnRechazar) btnRechazar.style.display = hayRechazados ? 'flex' : 'none';
+}
+
+/* ── Viewer ── */
+let _viewerDoc = null;
+async function verDoc(idDoc, nombre, mime) {
+  _viewerDoc = { idDoc, nombre };
+  document.getElementById('viewerName').textContent = nombre;
+  document.getElementById('viewerBody').innerHTML   = '<div style="color:#fff;padding:40px;font-size:1.1rem"><i class="bi bi-hourglass-split me-2"></i>Cargando…</div>';
+  document.getElementById('viewerOverlay').classList.add('open');
+  try {
+    const r    = await fetch('/api/documentos-af/view/'+idDoc, { headers:apiHdr() });
+    const blob = await r.blob();
+    const url  = URL.createObjectURL(blob);
+    const body = document.getElementById('viewerBody');
+    if (blob.type.startsWith('image/'))
+      body.innerHTML = `<img src="${url}" alt="${escHtml(nombre)}">`;
+    else if (blob.type === 'application/pdf')
+      body.innerHTML = `<iframe src="${url}" title="${escHtml(nombre)}"></iframe>`;
+    else
+      body.innerHTML = `<div style="color:#fff;text-align:center;padding:40px"><i class="bi bi-file-earmark" style="font-size:3rem;display:block;margin-bottom:12px"></i><div>${escHtml(nombre)}</div><button class="vbtn" style="margin-top:16px" onclick="viewerDescargar()"><i class="bi bi-download me-1"></i>Descargar</button></div>`;
+  } catch(e) {
+    document.getElementById('viewerBody').innerHTML = `<div style="color:#f87171;padding:40px">Error: ${e.message}</div>`;
+  }
+}
+function cerrarViewer() { document.getElementById('viewerOverlay').classList.remove('open'); document.getElementById('viewerBody').innerHTML=''; }
+async function viewerDescargar() { if (_viewerDoc) descargarDoc(_viewerDoc.idDoc, _viewerDoc.nombre); }
+async function descargarDoc(idDoc, nombre) {
+  const r   = await fetch('/api/documentos-af/download/'+idDoc, { headers:apiHdr() });
+  const b   = await r.blob();
+  const a   = document.createElement('a');
+  a.href = URL.createObjectURL(b); a.download = nombre; a.click();
+}
+
+async function recargarDocs() {
+  const r = await fetch('/api/documentos-af/'+creditId, { headers:apiHdr() });
+  const j = await r.json();
+  _docs = {};
+  if (j.success) j.data.forEach(d => { _docs[d.codigo] = d; });
+  renderPagina();
+}
+
+document.addEventListener('keydown', e => { if(e.key==='Escape') cerrarViewer(); });
+cargarPagina();
+</script>
+</body>
+</html>

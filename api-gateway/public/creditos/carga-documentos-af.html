@@ -1,0 +1,447 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Carga Documentos AutoFácil — Crédito</title>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css">
+  <style>
+    :root {
+      --navy:#0f2d6b; --blue:#1565c0; --bg:#f0f4f8;
+      --card:#fff; --border:#e2e8f0; --text:#1e293b; --muted:#64748b;
+      --green:#16a34a; --orange:#ea580c; --sky:#0369a1;
+    }
+    * { box-sizing:border-box; margin:0; padding:0; }
+    body { font-family:'Segoe UI',system-ui,sans-serif; background:var(--bg); color:var(--text); }
+
+    /* Navbar */
+    .navbar { background:linear-gradient(135deg,var(--navy),var(--blue)); padding:0 24px; height:52px; display:flex; align-items:center; justify-content:space-between; }
+    .nav-brand { display:flex; align-items:center; gap:10px; color:#fff; font-weight:800; font-size:1rem; text-decoration:none; }
+    .nav-brand img { height:28px; }
+    .nav-actions { display:flex; align-items:center; gap:10px; }
+    .btn-back { background:rgba(255,255,255,.15); border:1px solid rgba(255,255,255,.3); color:#fff; border-radius:8px; padding:6px 14px; font-size:.82rem; font-weight:600; cursor:pointer; display:flex; align-items:center; gap:6px; text-decoration:none; }
+    .btn-back:hover { background:rgba(255,255,255,.25); }
+    .version-badge { background:rgba(255,255,255,.15); color:rgba(255,255,255,.75); font-size:.65rem; font-weight:700; border-radius:6px; padding:2px 8px; margin-left:4px; }
+
+    /* Page */
+    .page-wrap { max-width:900px; margin:0 auto; padding:24px 16px 120px; }
+
+    /* Header card */
+    .cred-header { background:linear-gradient(135deg,var(--navy),#1a56db); border-radius:14px; padding:18px 24px; color:#fff; margin-bottom:20px; display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:10px; }
+    .ch-title { font-size:1.1rem; font-weight:900; }
+    .ch-sub { font-size:.85rem; opacity:.8; margin-top:2px; }
+    .estado-badge { border-radius:20px; padding:4px 14px; font-size:.78rem; font-weight:800; text-transform:uppercase; background:#e0f2fe; color:#0369a1; border:1.5px solid #7dd3fc; }
+
+    /* Progress */
+    .progress-wrap { background:var(--card); border-radius:12px; border:1px solid var(--border); padding:16px 20px; margin-bottom:20px; }
+    .progress-label { display:flex; justify-content:space-between; font-size:.82rem; font-weight:700; margin-bottom:8px; }
+    .progress-bar-track { background:#f1f5f9; border-radius:99px; height:10px; overflow:hidden; }
+    .progress-bar-fill { height:100%; border-radius:99px; transition:width .4s; background:linear-gradient(90deg,#f59e0b,#d97706); }
+    .progress-bar-fill.complete { background:linear-gradient(90deg,#22c55e,#16a34a); }
+
+    /* Doc grid */
+    .docs-grid { display:grid; grid-template-columns:1fr; gap:14px; }
+
+    /* Doc card */
+    .doc-card { background:var(--card); border-radius:14px; border:2px solid var(--border); overflow:hidden; transition:border-color .15s; }
+    .doc-card.uploaded { border-color:#86efac; }
+    .doc-card.rejected-card { border-color:#fca5a5; background:#fff5f5; }
+    .doc-head { display:flex; align-items:center; gap:14px; padding:16px 20px; }
+    .doc-icon { width:44px; height:44px; border-radius:11px; display:flex; align-items:center; justify-content:center; font-size:1.3rem; flex-shrink:0; background:#f1f5f9; color:var(--navy); }
+    .doc-card.uploaded   .doc-icon { background:#dcfce7; color:var(--green); }
+    .doc-card.rejected-card .doc-icon { background:#fee2e2; color:#dc2626; }
+    .doc-meta { flex:1; }
+    .doc-name { font-weight:700; font-size:.93rem; }
+    .doc-status { font-size:.78rem; margin-top:3px; }
+    .doc-status.empty   { color:var(--muted); }
+    .doc-status.ok      { color:var(--green); font-weight:600; }
+    .doc-status.rechazado { color:#dc2626; font-weight:600; }
+    .doc-btns { display:flex; gap:8px; }
+    .btn-upload { background:var(--sky); color:#fff; border:none; border-radius:8px; padding:7px 14px; font-size:.82rem; font-weight:600; cursor:pointer; display:flex; align-items:center; gap:5px; }
+    .btn-upload:hover { opacity:.88; }
+    .btn-icon { background:#f1f5f9; border:1px solid var(--border); color:var(--text); border-radius:8px; padding:7px 10px; font-size:1rem; cursor:pointer; }
+    .btn-icon:hover { background:#e2e8f0; }
+    .btn-icon.danger { color:#dc2626; }
+    .btn-icon.danger:hover { background:#fee2e2; }
+    input[type="file"] { display:none; }
+
+    /* Rejection alert */
+    .rejection-alert { background:#fef2f2; border-left:4px solid #dc2626; margin:0 20px 14px; border-radius:6px; padding:10px 14px; font-size:.83rem; color:#dc2626; }
+    .rejection-alert strong { display:block; margin-bottom:2px; }
+
+    /* Comment section */
+    .comment-section { border-top:1px solid var(--border); padding:12px 20px; background:#f8faff; }
+    .comment-label { font-size:.75rem; font-weight:700; color:var(--muted); text-transform:uppercase; letter-spacing:.05em; margin-bottom:6px; }
+    .comment-area { width:100%; border:1.5px solid var(--border); border-radius:8px; padding:8px 12px; font-size:.85rem; font-family:inherit; resize:none; min-height:56px; background:#fff; transition:border-color .2s; }
+    .comment-area:focus { outline:none; border-color:var(--blue); }
+    .comment-area.saving { border-color:#3b82f6; }
+    .comment-area.saved  { border-color:var(--green); }
+    .comment-save-hint { font-size:.72rem; color:var(--muted); margin-top:4px; transition:color .3s; }
+    .comment-save-hint.guardando { color:#3b82f6; }
+    .comment-save-hint.guardado  { color:var(--green); }
+
+    /* Action bar */
+    .action-bar { position:fixed; bottom:0; left:0; right:0; background:#fff; border-top:1.5px solid var(--border); padding:14px 24px; display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:10px; box-shadow:0 -4px 16px rgba(0,0,0,.07); z-index:100; }
+    .btn-accion { border:none; border-radius:9px; padding:11px 22px; font-size:.9rem; font-weight:700; cursor:pointer; display:flex; align-items:center; gap:7px; transition:opacity .15s; text-decoration:none; }
+    .btn-accion:hover { opacity:.88; }
+    .btn-volver  { background:#f1f5f9; color:var(--text); }
+    .btn-validar { background:linear-gradient(135deg,#0369a1,#0ea5e9); color:#fff; }
+    .btn-validar:disabled { background:#cbd5e1; cursor:not-allowed; opacity:1; }
+
+    /* Viewer modal */
+    .viewer-overlay { display:none; position:fixed; inset:0; z-index:500; background:#000; flex-direction:column; }
+    .viewer-overlay.open { display:flex; }
+    .viewer-header { background:rgba(0,0,0,.85); padding:12px 20px; display:flex; align-items:center; justify-content:space-between; }
+    .viewer-title { color:#fff; font-size:.9rem; font-weight:700; display:flex; align-items:center; gap:10px; }
+    .viewer-actions { display:flex; gap:8px; }
+    .vbtn { background:rgba(255,255,255,.12); border:1px solid rgba(255,255,255,.2); color:#fff; border-radius:7px; padding:6px 14px; font-size:.82rem; cursor:pointer; display:flex; align-items:center; gap:6px; }
+    .vbtn:hover { background:rgba(255,255,255,.22); }
+    .vbtn.close { background:rgba(220,38,38,.3); border-color:rgba(220,38,38,.5); }
+    .viewer-body { flex:1; overflow:hidden; display:flex; align-items:center; justify-content:center; }
+    .viewer-body img { max-width:100%; max-height:100%; object-fit:contain; }
+    .viewer-body iframe { width:100%; height:100%; border:none; background:#fff; }
+
+    /* Toast */
+    .toast-msg { position:fixed; bottom:90px; left:50%; transform:translateX(-50%); padding:10px 24px; border-radius:10px; font-size:.9rem; font-weight:600; display:none; z-index:999; }
+    .toast-ok  { background:#166534; color:#fff; }
+    .toast-err { background:#991b1b; color:#fff; }
+
+    .spinner-wrap { text-align:center; padding:60px; color:var(--muted); }
+    .no-data { text-align:center; padding:60px; color:var(--muted); font-size:.95rem; }
+  </style>
+</head>
+<body>
+
+<nav class="navbar">
+  <a href="/creditos" class="nav-brand">
+    <img src="/img/logo-autofacil.png" alt="AutoFácil" onerror="this.style.display='none'">
+    <span>Carga Documentos AutoFácil</span>
+    <span class="version-badge">v1.0</span>
+  </a>
+  <div class="nav-actions">
+    <span id="navUser" style="color:rgba(255,255,255,.75);font-size:.82rem"></span>
+    <a href="/creditos" class="btn-back"><i class="bi bi-arrow-left"></i>Volver</a>
+  </div>
+</nav>
+
+<div class="page-wrap" id="pageWrap">
+  <div class="spinner-wrap"><div class="spinner-border text-primary"></div></div>
+</div>
+
+<!-- Action bar -->
+<div class="action-bar" id="actionBar" style="display:none">
+  <a href="/creditos" class="btn-accion btn-volver"><i class="bi bi-arrow-left"></i>Volver</a>
+  <button class="btn-accion btn-validar" id="btnEnviar" onclick="enviarValidacion()" disabled>
+    <i class="bi bi-shield-check"></i>Enviar a Validación de Firma
+  </button>
+</div>
+
+<!-- Viewer modal -->
+<div class="viewer-overlay" id="viewerOverlay">
+  <div class="viewer-header">
+    <div class="viewer-title"><i class="bi bi-file-earmark"></i><span id="viewerName">—</span></div>
+    <div class="viewer-actions">
+      <button class="vbtn" id="viewerDlBtn" onclick="viewerDescargar()"><i class="bi bi-download"></i>Descargar</button>
+      <button class="vbtn close" onclick="cerrarViewer()"><i class="bi bi-x-lg"></i>Cerrar</button>
+    </div>
+  </div>
+  <div class="viewer-body" id="viewerBody"></div>
+</div>
+
+<div class="toast-msg" id="toastMsg"></div>
+
+<script>
+/* ── Auth ── */
+const token = localStorage.getItem('token');
+const yo    = JSON.parse(localStorage.getItem('usuario') || 'null');
+if (!token || !yo) window.location.href = '/login.html';
+function apiHdr() { return { 'Content-Type':'application/json', Authorization:'Bearer '+token }; }
+function logout() { localStorage.removeItem('token'); localStorage.removeItem('usuario'); window.location.href = '/login.html'; }
+document.getElementById('navUser').textContent = `${yo?.nombre||''} ${yo?.apellido||''}`.trim();
+
+/* ── URL ── */
+const qp       = new URLSearchParams(location.search);
+const creditId = qp.get('id');
+
+/* ── State ── */
+let _credito = null;
+let _docs    = {};  // { codigo: doc_row }
+let _commentTimers = {};
+
+/* ── Fixed document types for AF ── */
+const TIPOS_AF = [
+  { codigo:'hoja_resumen', nombre:'Hoja Resumen firmada',                    icon:'bi-card-list' },
+  { codigo:'contrato',     nombre:'Contrato de Crédito firmado',             icon:'bi-file-earmark-ruled' },
+  { codigo:'pagare',       nombre:'Pagaré firmado',                          icon:'bi-pen' },
+  { codigo:'mandato_af',   nombre:'Mandato AutoFácil firmado',               icon:'bi-building-lock' },
+  { codigo:'mandato_ga',   nombre:'Mandato Gestiones Automotrices firmado',  icon:'bi-building-gear' },
+];
+
+/* ── Helpers ── */
+function showToast(msg, ok) {
+  const el = document.getElementById('toastMsg');
+  el.textContent = msg; el.className = 'toast-msg '+(ok?'toast-ok':'toast-err');
+  el.style.display = 'block';
+  setTimeout(() => el.style.display = 'none', 3000);
+}
+function fmtDT(s) { return s ? new Date(s).toLocaleString('es-CL',{day:'2-digit',month:'2-digit',year:'numeric',hour:'2-digit',minute:'2-digit'}) : ''; }
+
+/* ── Load page ── */
+async function cargarPagina() {
+  if (!creditId) {
+    document.getElementById('pageWrap').innerHTML = '<div class="no-data"><i class="bi bi-exclamation-triangle"></i> ID de crédito no especificado</div>';
+    return;
+  }
+  try {
+    const [rc, rd] = await Promise.all([
+      fetch('/api/creditos/'+creditId,    { headers:apiHdr() }),
+      fetch('/api/documentos-af/'+creditId, { headers:apiHdr() }),
+    ]);
+    const [jc, jd] = await Promise.all([rc.json(), rd.json()]);
+    if (!jc.success) throw new Error(jc.error);
+    _credito = jc.data;
+
+    // Build docs map
+    _docs = {};
+    if (jd.success) jd.data.forEach(d => { _docs[d.codigo] = d; });
+
+    renderPagina();
+    document.getElementById('actionBar').style.display = 'flex';
+  } catch(e) {
+    document.getElementById('pageWrap').innerHTML = `<div class="no-data"><i class="bi bi-exclamation-triangle"></i> ${e.message}</div>`;
+  }
+}
+
+function renderPagina() {
+  const c = _credito;
+  const subidos = TIPOS_AF.filter(t => _docs[t.codigo]?.tiene_archivo).length;
+  const total   = TIPOS_AF.length;
+  const pct     = Math.round(subidos / total * 100);
+  const completo = subidos === total;
+
+  document.getElementById('pageWrap').innerHTML = `
+    <div class="cred-header">
+      <div>
+        <div class="ch-title"><i class="bi bi-file-earmark-arrow-up me-2"></i>${c.nombre_cliente||'—'}</div>
+        <div class="ch-sub">N° Operación: ${c.numero_credito||c.id_credito} &nbsp;·&nbsp; ${c.rut_cliente||''}</div>
+      </div>
+      <span class="estado-badge">Carga Documentos AF</span>
+    </div>
+
+    <div class="progress-wrap">
+      <div class="progress-label">
+        <span><i class="bi bi-paperclip me-1"></i>Documentos firmados cargados</span>
+        <span style="color:${completo?'var(--green)':'var(--orange)'}"><strong>${subidos}</strong> / ${total}</span>
+      </div>
+      <div class="progress-bar-track">
+        <div class="progress-bar-fill${completo?' complete':''}" style="width:${pct}%"></div>
+      </div>
+    </div>
+
+    <div class="docs-grid">
+      ${TIPOS_AF.map(t => renderDocCard(t)).join('')}
+    </div>
+  `;
+
+  actualizarBotonEnviar();
+}
+
+function renderDocCard(tipo) {
+  const doc   = _docs[tipo.codigo];
+  const tiene = doc?.tiene_archivo;
+  const rechazado = doc?.rechazado;
+  const comentario = doc?.comentario || '';
+
+  const cardClass = tiene ? 'uploaded' : (rechazado ? 'rejected-card' : '');
+
+  const statusHtml = tiene
+    ? `<div class="doc-status ok"><i class="bi bi-check-circle-fill me-1"></i>Subido — ${fmtDT(doc.updated_at)}</div>`
+    : `<div class="doc-status empty"><i class="bi bi-cloud-upload me-1"></i>Sin archivo</div>`;
+
+  const btnsHtml = tiene ? `
+    <button class="btn-icon" title="Ver" onclick="verDoc(${doc.id_doc_af},'${escHtml(doc.nombre||tipo.nombre)}','${doc.mime_type||''}')">
+      <i class="bi bi-eye"></i>
+    </button>
+    <button class="btn-icon" title="Descargar" onclick="descargarDoc(${doc.id_doc_af},'${escHtml(doc.nombre||tipo.nombre)}')">
+      <i class="bi bi-download"></i>
+    </button>
+    <label class="btn-icon" title="Reemplazar" style="cursor:pointer">
+      <i class="bi bi-arrow-repeat"></i>
+      <input type="file" accept="image/*,.pdf" onchange="subirArchivo('${tipo.codigo}','${escHtml(tipo.nombre)}',this)">
+    </label>
+    <button class="btn-icon danger" title="Eliminar" onclick="eliminarDoc('${tipo.codigo}',${doc.id_doc_af})">
+      <i class="bi bi-trash3"></i>
+    </button>` : `
+    <label class="btn-upload">
+      <i class="bi bi-upload"></i>Subir
+      <input type="file" accept="image/*,.pdf" onchange="subirArchivo('${tipo.codigo}','${escHtml(tipo.nombre)}',this)">
+    </label>`;
+
+  const rejectionHtml = rechazado && !tiene ? `
+    <div class="rejection-alert">
+      <strong><i class="bi bi-x-circle me-1"></i>Rechazado por: ${escHtml(doc.rechazado_por||'Validador')}</strong>
+      ${escHtml(doc.comentario_rechazo||'')}
+    </div>` : '';
+
+  return `
+    <div class="doc-card ${cardClass}" id="card-${tipo.codigo}">
+      <div class="doc-head">
+        <div class="doc-icon"><i class="bi ${tipo.icon}"></i></div>
+        <div class="doc-meta">
+          <div class="doc-name">${tipo.nombre}</div>
+          ${statusHtml}
+        </div>
+        <div class="doc-btns">${btnsHtml}</div>
+      </div>
+      ${rejectionHtml}
+      <div class="comment-section">
+        <div class="comment-label"><i class="bi bi-chat-left-text me-1"></i>Comentario opcional</div>
+        <textarea class="comment-area" id="cmt-${tipo.codigo}" rows="2"
+          placeholder="Ej: Firmado el 05/01/2025, todas las páginas rubricadas…"
+          oninput="onComentarioInput('${tipo.codigo}')">${escHtml(comentario)}</textarea>
+        <div class="comment-save-hint" id="hint-${tipo.codigo}">Guarda automáticamente al escribir</div>
+      </div>
+    </div>`;
+}
+
+function escHtml(s) { return String(s||'').replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+
+/* ── Upload ── */
+async function subirArchivo(codigo, nombre, input) {
+  const file = input.files[0];
+  if (!file) return;
+  if (file.size > 8 * 1024 * 1024) { showToast('Archivo muy grande (máx 8 MB)', false); return; }
+  try {
+    showToast('Subiendo…', true);
+    const base64 = await new Promise((res, rej) => {
+      const fr = new FileReader();
+      fr.onload = () => res(fr.result.split(',')[1]);
+      fr.onerror = rej;
+      fr.readAsDataURL(file);
+    });
+    const comentario = (document.getElementById('cmt-'+codigo)||{}).value || null;
+    const r = await fetch('/api/documentos-af', {
+      method:'POST', headers:apiHdr(),
+      body: JSON.stringify({ id_credito:parseInt(creditId), codigo, nombre:file.name||nombre, mime_type:file.type, base64, comentario })
+    });
+    const j = await r.json();
+    if (!j.success) throw new Error(j.error);
+    showToast('Documento subido', true);
+    await recargarDocs();
+  } catch(e) { showToast('Error: '+e.message, false); }
+  input.value = '';
+}
+
+/* ── Delete ── */
+async function eliminarDoc(codigo, idDoc) {
+  if (!confirm('¿Eliminar este documento?')) return;
+  const r = await fetch('/api/documentos-af/'+idDoc, { method:'DELETE', headers:apiHdr() });
+  const j = await r.json();
+  if (!j.success) { showToast('Error: '+j.error, false); return; }
+  delete _docs[codigo];
+  showToast('Documento eliminado', true);
+  renderPagina();
+}
+
+/* ── Comment auto-save ── */
+function onComentarioInput(codigo) {
+  const ta   = document.getElementById('cmt-'+codigo);
+  const hint = document.getElementById('hint-'+codigo);
+  if (hint) { hint.textContent = 'Guardando…'; hint.className = 'comment-save-hint guardando'; }
+  if (ta)   ta.classList.add('saving');
+  clearTimeout(_commentTimers[codigo]);
+  _commentTimers[codigo] = setTimeout(() => guardarComentario(codigo), 1500);
+}
+
+async function guardarComentario(codigo) {
+  const doc  = _docs[codigo];
+  if (!doc) return;
+  const ta   = document.getElementById('cmt-'+codigo);
+  const hint = document.getElementById('hint-'+codigo);
+  const val  = ta?.value || '';
+  try {
+    const r = await fetch('/api/documentos-af/'+doc.id_doc_af+'/comentario', {
+      method:'PATCH', headers:apiHdr(), body:JSON.stringify({ comentario:val })
+    });
+    const j = await r.json();
+    if (!j.success) throw new Error(j.error);
+    if (ta)   { ta.classList.remove('saving'); ta.classList.add('saved'); setTimeout(()=>ta.classList.remove('saved'),1500); }
+    if (hint) { hint.textContent = 'Guardado'; hint.className = 'comment-save-hint guardado'; setTimeout(()=>{ hint.textContent='Guarda automáticamente al escribir'; hint.className='comment-save-hint'; },2000); }
+  } catch(e) { if (hint) { hint.textContent = 'Error al guardar'; hint.className = 'comment-save-hint'; } }
+}
+
+/* ── Viewer ── */
+let _viewerDoc = null;
+async function verDoc(idDoc, nombre, mime) {
+  _viewerDoc = { idDoc, nombre, mime };
+  document.getElementById('viewerName').textContent = nombre;
+  document.getElementById('viewerBody').innerHTML = '<div style="color:#fff;padding:40px;font-size:1.1rem"><i class="bi bi-hourglass-split me-2"></i>Cargando…</div>';
+  document.getElementById('viewerOverlay').classList.add('open');
+  try {
+    const r   = await fetch('/api/documentos-af/view/'+idDoc, { headers:apiHdr() });
+    const blob = await r.blob();
+    const url  = URL.createObjectURL(blob);
+    const body = document.getElementById('viewerBody');
+    if (blob.type.startsWith('image/'))
+      body.innerHTML = `<img src="${url}" alt="${escHtml(nombre)}">`;
+    else if (blob.type === 'application/pdf')
+      body.innerHTML = `<iframe src="${url}" title="${escHtml(nombre)}"></iframe>`;
+    else
+      body.innerHTML = `<div style="color:#fff;text-align:center;padding:40px"><i class="bi bi-file-earmark" style="font-size:3rem;display:block;margin-bottom:12px"></i><div>${escHtml(nombre)}</div><button class="vbtn" style="margin-top:16px" onclick="viewerDescargar()"><i class="bi bi-download me-1"></i>Descargar</button></div>`;
+  } catch(e) {
+    document.getElementById('viewerBody').innerHTML = `<div style="color:#f87171;padding:40px">Error: ${e.message}</div>`;
+  }
+}
+function cerrarViewer() { document.getElementById('viewerOverlay').classList.remove('open'); document.getElementById('viewerBody').innerHTML = ''; }
+async function viewerDescargar() { if (_viewerDoc) descargarDoc(_viewerDoc.idDoc, _viewerDoc.nombre); }
+async function descargarDoc(idDoc, nombre) {
+  const r    = await fetch('/api/documentos-af/download/'+idDoc, { headers:apiHdr() });
+  const blob = await r.blob();
+  const a    = document.createElement('a');
+  a.href = URL.createObjectURL(blob); a.download = nombre; a.click();
+}
+
+/* ── Enviar a validación ── */
+async function enviarValidacion() {
+  if (!confirm('¿Enviar los documentos firmados a Validación de Firma?')) return;
+  try {
+    const r = await fetch('/api/creditos/'+creditId, {
+      method:'PUT', headers:apiHdr(),
+      body: JSON.stringify({
+        estado:'VALIDACION_FIRMA',
+        observaciones: _credito.observaciones||null,
+        ejecutivo:     _credito.ejecutivo||null,
+        dealer:        _credito.dealer||null,
+        patente:       _credito.patente||null,
+        color:         _credito.color||null,
+        motor:         _credito.motor||null,
+        chasis:        _credito.chasis||null,
+      })
+    });
+    const j = await r.json();
+    if (!j.success) throw new Error(j.error);
+    location.href = '/creditos/validacion-firma?id='+creditId;
+  } catch(e) { showToast('Error: '+e.message, false); }
+}
+
+/* ── Helpers ── */
+function actualizarBotonEnviar() {
+  const btn     = document.getElementById('btnEnviar');
+  const todosOk = TIPOS_AF.every(t => _docs[t.codigo]?.tiene_archivo);
+  if (btn) btn.disabled = !todosOk;
+}
+
+async function recargarDocs() {
+  const r = await fetch('/api/documentos-af/'+creditId, { headers:apiHdr() });
+  const j = await r.json();
+  _docs = {};
+  if (j.success) j.data.forEach(d => { _docs[d.codigo] = d; });
+  renderPagina();
+}
+
+document.addEventListener('keydown', e => { if(e.key==='Escape') cerrarViewer(); });
+
+cargarPagina();
+</script>
+</body>
+</html>

@@ -38,6 +38,7 @@ app.use('/api/cotizaciones', require('../../services/cotizaciones/src/routes/cot
 // Créditos
 app.use('/api/creditos',            require('../../services/creditos/src/routes/creditos.routes'));
 app.use('/api/credito-documentos',  require('../../services/creditos/src/routes/credito-documentos.routes'));
+app.use('/api/documentos-af',       require('../../services/creditos/src/routes/documentos-af.routes'));
 
 // Health check
 app.get('/health', (req, res) => res.json({ status: 'Sistema operativo', timestamp: new Date() }));
@@ -82,6 +83,12 @@ app.get(['/creditos/documentos', '/creditos/documentos/'], (req, res) =>
 
 app.get(['/mantenedores/pagares', '/mantenedores/pagares/'], (req, res) =>
   res.sendFile(path.join(__dirname, '../public/mantenedores/pagares/index.html')));
+
+app.get(['/creditos/carga-documentos-af', '/creditos/carga-documentos-af/'], (req, res) =>
+  res.sendFile(path.join(__dirname, '../public/creditos/carga-documentos-af.html')));
+
+app.get(['/creditos/validacion-firma', '/creditos/validacion-firma/'], (req, res) =>
+  res.sendFile(path.join(__dirname, '../public/creditos/validacion-firma.html')));
 
 app.get(['/antecedentes-laborales', '/antecedentes-laborales/'], (req, res) =>
   res.sendFile(path.join(__dirname, '../public/antecedentes-laborales/index.html')));

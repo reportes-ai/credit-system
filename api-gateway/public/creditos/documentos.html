@@ -150,7 +150,7 @@
             <i class="bi bi-printer-fill"></i>Imprimir Todo
           </button>
           <button class="btn-emission-confirm" onclick="confirmarEmision()">
-            <i class="bi bi-check-circle-fill"></i>Confirmar — Marcar Vigente
+            <i class="bi bi-check-circle-fill"></i>Confirmar — Cargar Firmados
           </button>
         </div>
       </div>
@@ -433,15 +433,15 @@
 
     async function confirmarEmision() {
       if (!creditId) return;
-      if (!confirm('¿Confirmar emisión y marcar el crédito como VIGENTE?')) return;
+      if (!confirm('¿Confirmar emisión? Continuarás a la carga de documentos firmados.')) return;
       try {
         const r = await fetch('/api/creditos/' + creditId, {
           method: 'PUT', headers: apiHdr(),
-          body: JSON.stringify(buildCreditBody('VIGENTE'))
+          body: JSON.stringify(buildCreditBody('CARGA_DOCUMENTOS_AF'))
         });
         const j = await r.json();
         if (!j.success) throw new Error(j.error);
-        window.location.href = '/creditos/revisar?id=' + creditId;
+        window.location.href = '/creditos/carga-documentos-af?id=' + creditId;
       } catch(e) { alert('Error: ' + e.message); }
     }
 
