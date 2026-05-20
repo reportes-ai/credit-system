@@ -20,6 +20,7 @@
   .nav-actions { display:flex; align-items:center; gap:10px; }
   .btn-back { background:rgba(255,255,255,.15); border:1px solid rgba(255,255,255,.3); color:#fff; border-radius:8px; padding:6px 14px; font-size:.82rem; font-weight:600; cursor:pointer; display:flex; align-items:center; gap:6px; text-decoration:none; transition:background .15s; }
   .btn-back:hover { background:rgba(255,255,255,.25); }
+  .version-badge { background:rgba(255,255,255,.15); color:rgba(255,255,255,.75); font-size:.65rem; font-weight:700; border-radius:6px; padding:2px 8px; letter-spacing:.5px; margin-left:4px; }
 
   /* ── Page layout ── */
   .page-wrap { max-width:1100px; margin:0 auto; padding:24px 16px 48px; }
@@ -83,6 +84,22 @@
   .amort-btn { display:inline-flex; align-items:center; gap:8px; background:#ede9fe; border:1.5px solid #c4b5fd; color:#5b21b6; border-radius:9px; padding:9px 16px; font-size:.84rem; font-weight:700; cursor:pointer; transition:background .15s; margin-top:12px; }
   .amort-btn:hover { background:#ddd6fe; }
 
+  /* ── Detalle btn (gastos/seguros) ── */
+  .det-btn { display:inline-flex; align-items:center; gap:5px; background:none; border:1px solid #cbd5e1; color:var(--muted); border-radius:6px; padding:2px 9px; font-size:.72rem; font-weight:700; cursor:pointer; transition:all .15s; margin-top:4px; }
+  .det-btn:hover { background:#f1f5f9; border-color:#94a3b8; color:var(--text); }
+  .det-btn.active { background:#eff6ff; border-color:#93c5fd; color:#1d4ed8; }
+
+  /* ── Detalle panel inline ── */
+  .det-panel { display:none; background:#f8faff; border:1.5px solid #bfdbfe; border-radius:10px; padding:12px 16px; margin-top:8px; }
+  .det-panel.open { display:block; }
+  .det-row { display:flex; justify-content:space-between; align-items:center; padding:4px 0; font-size:.83rem; border-bottom:1px dashed #e2e8f0; }
+  .det-row:last-child { border-bottom:none; }
+  .det-row-label { color:var(--muted); }
+  .det-row-val   { font-weight:700; color:var(--text); }
+  .det-row-val.highlight { color:var(--navy); font-size:.9rem; }
+  .det-row-val.zero { color:#cbd5e1; font-style:italic; font-weight:400; }
+  .det-total { display:flex; justify-content:space-between; align-items:center; padding:6px 0 0; margin-top:4px; border-top:2px solid #bfdbfe; font-size:.88rem; font-weight:800; color:var(--navy); }
+
   /* ── Action footer ── */
   .action-bar { position:sticky; bottom:0; background:#fff; border-top:1.5px solid var(--border); padding:14px 24px; display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:10px; box-shadow:0 -4px 16px rgba(0,0,0,.07); }
   .action-bar-left  { display:flex; gap:10px; align-items:center; }
@@ -139,6 +156,7 @@
   <a class="nav-brand" href="/creditos">
     <img src="/img/logo-autofacil.png" alt="AutoFácil" onerror="this.style.display='none'">
     <span>Revisión de Crédito</span>
+    <span class="version-badge">v1.1</span>
   </a>
   <div class="nav-actions">
     <span id="navUser" style="color:rgba(255,255,255,.75);font-size:.82rem"></span>
@@ -200,19 +218,39 @@ function showToast(msg, ok) {
   el.style.display='block'; setTimeout(()=>{ el.style.display='none'; }, 3500);
 }
 
+/* ── Tasas seguros (misma tabla que ingreso) ── */
+const CRED_SEG_RATES = {
+  6:  { d:0.00898,  r:0.006745, c:0.036162, dr:0.015847, dc:0.045806, rc:0.043406, drc:0.053186 },
+  12: { d:0.018641, r:0.011634, c:0.037883, dr:0.030715, dc:0.057977, rc:0.05042,  drc:0.071008 },
+  24: { d:0.027538, r:0.012248, c:0.042101, dr:0.040474, dc:0.072041, rc:0.055409, drc:0.08613  },
+  36: { d:0.035518, r:0.012761, c:0.04712,  dr:0.049208, dc:0.08613,  rc:0.061121, drc:0.1012   },
+  48: { d:0.043623, r:0.029018, c:0.052853, dr:0.075269, dc:0.101322, rc:0.085069, drc:0.136622 },
+  72: { d:0.054964, r:0.034875, c:0.058985, dr:0.093853, dc:0.120825, rc:0.098177, drc:0.164822 },
+};
+function credPlazoBracket(n) { for (const b of [6,12,24,36,48,72]) if (n<=b) return b; return 72; }
+function credComboKey(d,r,c) {
+  if(d&&r&&c) return 'drc'; if(d&&r) return 'dr'; if(d&&c) return 'dc';
+  if(r&&c) return 'rc'; if(d) return 'd'; if(r) return 'r'; if(c) return 'c'; return null;
+}
+
 /* ── Load page ── */
 const params   = new URLSearchParams(location.search);
 const creditId = params.get('id');
 let _credito   = null;
+let _credParams = {};
 
 async function cargarPagina() {
   if (!creditId) { document.getElementById('pageWrap').innerHTML = '<div class="no-data"><i class="bi bi-exclamation-triangle"></i>ID de crédito no especificado</div>'; return; }
   try {
-    // 1. Cargar crédito
-    const rc = await fetch('/api/creditos/'+creditId, { headers: apiHdr() });
-    const jc = await rc.json();
+    // 1. Cargar crédito + params en paralelo
+    const [rc, rp] = await Promise.all([
+      fetch('/api/creditos/'+creditId,     { headers: apiHdr() }),
+      fetch('/api/parametros-credito',     { headers: apiHdr() }),
+    ]);
+    const [jc, jp] = await Promise.all([rc.json(), rp.json()]);
     if (!jc.success) throw new Error(jc.error);
-    _credito = jc.data;
+    _credito  = jc.data;
+    _credParams = (jp.success && jp.data?.obj) ? jp.data.obj : {};
     const rut = _credito.rut_cliente;
 
     // 2. Cargar antecedentes e info comercial en paralelo
@@ -297,10 +335,29 @@ function renderPagina(c, ant, com) {
           ${fi('Valor Vehículo',      fmtP(c.valor_vehiculo))}
           ${fi('Pie',                 fmtP(c.pie))}
           ${fi('Saldo Precio',        fmtP(c.saldo_precio),'highlight')}
-          ${fi('Gastos Operativos',   fmtP(c.gastos_operativos))}
-          ${fi('Seguros',             fmtP(c.seguros))}
+          <div class="field-item">
+            <div class="fi-label">Gastos Operativos</div>
+            <div class="fi-val">${fmtP(c.gastos_operativos)}</div>
+            <button class="det-btn" id="btnDetGastos" onclick="toggleDetalle('gastos')">
+              <i class="bi bi-list-ul"></i>Detalle
+            </button>
+          </div>
+          <div class="field-item">
+            <div class="fi-label">Seguros</div>
+            <div class="fi-val">${fmtP(c.seguros)}</div>
+            <button class="det-btn" id="btnDetSeguros" onclick="toggleDetalle('seguros')">
+              <i class="bi bi-shield-check"></i>Detalle
+            </button>
+          </div>
           ${fi('Monto Financiado',    fmtP(c.monto_financiado),'highlight')}
         </div>
+
+        <!-- Panel detalle Gastos Operativos -->
+        <div class="det-panel" id="panelGastos"></div>
+
+        <!-- Panel detalle Seguros -->
+        <div class="det-panel" id="panelSeguros"></div>
+
         <button class="amort-btn" onclick="mostrarAmortizacion()">
           <i class="bi bi-table"></i>Ver Tabla de Amortización
         </button>
@@ -427,6 +484,102 @@ function estadoEstado(e) {
   const map = { REVISION:'En Revisión', VIGENTE:'Vigente', 'EN MORA':'En Mora',
                 CANCELADO:'Cancelado', PREPAGADO:'Prepagado', CASTIGADO:'Castigado' };
   return map[e] || e || '—';
+}
+
+/* ── Detalle Gastos Operativos y Seguros ── */
+function toggleDetalle(tipo) {
+  const panel = document.getElementById(tipo === 'gastos' ? 'panelGastos' : 'panelSeguros');
+  const btn   = document.getElementById(tipo === 'gastos' ? 'btnDetGastos' : 'btnDetSeguros');
+  const isOpen = panel.classList.contains('open');
+  if (isOpen) { panel.classList.remove('open'); btn.classList.remove('active'); return; }
+  if (tipo === 'gastos') renderDetalleGastos(panel);
+  else                   renderDetalleSeguros(panel);
+  panel.classList.add('open');
+  btn.classList.add('active');
+}
+
+function renderDetalleGastos(panel) {
+  const p  = _credParams;
+  const dj = parseDJ();
+  const fp = v => v > 0 ? fmtP(v) : '<span style="color:#cbd5e1">—</span>';
+  const rows = [
+    { label: 'Inscripción / Prenda',   val: p.prenda              || 0 },
+    { label: 'Retiro y Gestión',       val: p.retiro_gestion      || 0 },
+    { label: 'Limitación de Dominio',  val: p.limitacion_dominio  || 0 },
+    { label: 'Gastos Administrativos', val: p.gastos_admin        || 0 },
+    { label: 'Inscripción Registro',   val: p.inscripcion         || 0 },
+    { label: 'GPS 24 meses',           val: dj.gps           ? (p.gps_24meses          || 0) : 0, badge: dj.gps           ? '' : 'No incluido' },
+    { label: 'Reparaciones Menores',   val: dj.reparaciones  ? (p.reparaciones_menores || 0) : 0, badge: dj.reparaciones  ? '' : 'No incluido' },
+  ];
+  const total = rows.reduce((s,r) => s + r.val, 0);
+  panel.innerHTML = `
+    <div style="font-size:.72rem;font-weight:800;text-transform:uppercase;letter-spacing:.07em;color:var(--navy);margin-bottom:8px">
+      <i class="bi bi-list-ul me-1"></i>Desglose Gastos Operativos
+    </div>
+    ${rows.map(r => `
+    <div class="det-row">
+      <span class="det-row-label">${r.label}${r.badge ? ` <span style="font-size:.68rem;background:#f1f5f9;border-radius:4px;padding:1px 5px;color:#94a3b8">${r.badge}</span>` : ''}</span>
+      <span class="det-row-val ${r.val===0?'zero':''}">${fp(r.val)}</span>
+    </div>`).join('')}
+    <div class="det-total"><span>Total Gastos Operativos</span><span>${fmtP(total)}</span></div>`;
+}
+
+function renderDetalleSeguros(panel) {
+  const c  = _credito;
+  const dj = parseDJ();
+  const chkD = dj.seguros?.desgravamen ?? true;
+  const chkR = dj.seguros?.rdh         ?? true;
+  const chkC = dj.seguros?.cesantia    ?? true;
+
+  // Recalcular usando la misma fórmula del ingreso
+  const saldoPrecio = parseFloat(c.saldo_precio) || 0;
+  const gastosOp    = parseFloat(c.gastos_operativos) || 0;
+  const subSin      = saldoPrecio + gastosOp;
+  const pb          = credPlazoBracket(parseInt(c.plazo) || 48);
+  const rates       = CRED_SEG_RATES[pb] || CRED_SEG_RATES[72];
+  const key         = credComboKey(chkD, chkR, chkC);
+  let segDesg=0, segRdh=0, segCesa=0;
+  if (key && subSin > 0) {
+    const totalNet = (rates[key]||0) * subSin;
+    const sumInd   = (chkD?rates.d:0)+(chkR?rates.r:0)+(chkC?rates.c:0);
+    if (sumInd > 0) {
+      if (chkD) segDesg = Math.round(totalNet*(rates.d/sumInd));
+      if (chkR) segRdh  = Math.round(totalNet*(rates.r/sumInd));
+      if (chkC) segCesa = Math.round(totalNet*(rates.c/sumInd));
+    }
+  }
+  const totalSeg = segDesg + segRdh + segCesa;
+  const fp = v => v > 0 ? fmtP(v) : '<span style="color:#cbd5e1">—</span>';
+  const badge = ok => ok
+    ? '<span style="font-size:.68rem;background:#f0fdf4;border:1px solid #86efac;border-radius:4px;padding:1px 6px;color:#15803d">Incluido</span>'
+    : '<span style="font-size:.68rem;background:#f1f5f9;border-radius:4px;padding:1px 5px;color:#94a3b8">No incluido</span>';
+  panel.innerHTML = `
+    <div style="font-size:.72rem;font-weight:800;text-transform:uppercase;letter-spacing:.07em;color:var(--navy);margin-bottom:8px">
+      <i class="bi bi-shield-check me-1"></i>Desglose Seguros — Plazo bracket: ${pb} meses
+    </div>
+    <div class="det-row">
+      <span class="det-row-label">Desgravamen ${badge(chkD)}</span>
+      <span class="det-row-val ${!chkD?'zero':''}">${fp(segDesg)}</span>
+    </div>
+    <div class="det-row">
+      <span class="det-row-label">RDH / Discapacidad ${badge(chkR)}</span>
+      <span class="det-row-val ${!chkR?'zero':''}">${fp(segRdh)}</span>
+    </div>
+    <div class="det-row">
+      <span class="det-row-label">Cesantía ${badge(chkC)}</span>
+      <span class="det-row-val ${!chkC?'zero':''}">${fp(segCesa)}</span>
+    </div>
+    <div class="det-total"><span>Total Seguros</span><span>${fmtP(totalSeg)}</span></div>
+    <div style="font-size:.68rem;color:#94a3b8;margin-top:6px">Base de cálculo: Saldo precio + Gastos operativos = ${fmtP(subSin)}</div>`;
+}
+
+function parseDJ() {
+  try {
+    const dj = typeof _credito.datos_json === 'string'
+      ? JSON.parse(_credito.datos_json)
+      : (_credito.datos_json || {});
+    return dj;
+  } catch(e) { return {}; }
 }
 
 /* ── Guardar cambios ── */
