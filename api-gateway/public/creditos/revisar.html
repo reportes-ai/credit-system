@@ -64,10 +64,19 @@
   .cb-right { text-align:right; font-size:.82rem; opacity:.85; }
 
   /* ── Renta summary ── */
-  .renta-box { background:#f0fdf4; border:1.5px solid #86efac; border-radius:10px; padding:12px 18px; display:flex; gap:20px; flex-wrap:wrap; margin-top:14px; }
-  .rb-item { display:flex; flex-direction:column; gap:2px; }
+  .renta-box { background:#f0fdf4; border:1.5px solid #86efac; border-radius:10px; padding:12px 18px; display:flex; gap:0; flex-wrap:wrap; margin-top:14px; overflow:hidden; }
+  .rb-item { display:flex; flex-direction:column; gap:2px; padding:6px 18px 6px 0; }
+  .rb-item:not(:last-child) { border-right:1px dashed #86efac; margin-right:18px; }
   .rb-label { font-size:.65rem; font-weight:700; text-transform:uppercase; letter-spacing:.06em; color:#15803d; }
   .rb-val   { font-size:1rem; font-weight:800; color:#166534; }
+  /* Carga items */
+  .rb-item.carga { background:none; }
+  .rb-item.carga .rb-label  { color:#b45309; }
+  .rb-item.carga .rb-val    { color:#92400e; }
+  .rb-item.carga-new .rb-label { color:#1d4ed8; }
+  .rb-item.carga-new .rb-val   { color:#1e3a8a; }
+  .rb-pct { font-size:.75rem; font-weight:700; opacity:.75; margin-top:1px; }
+  .rb-divider { width:1px; background:#86efac; margin:4px 0; align-self:stretch; }
 
   /* ── Info comercial table ── */
   .ic-table { width:100%; border-collapse:collapse; font-size:.83rem; }
@@ -156,7 +165,7 @@
   <a class="nav-brand" href="/creditos">
     <img src="/img/logo-autofacil.png" alt="AutoFácil" onerror="this.style.display='none'">
     <span>Revisión de Crédito</span>
-    <span class="version-badge">v1.1</span>
+    <span class="version-badge">v1.2</span>
   </a>
   <div class="nav-actions">
     <span id="navUser" style="color:rgba(255,255,255,.75);font-size:.82rem"></span>
@@ -276,6 +285,19 @@ function renderPagina(c, ant, com) {
   const rentaVarProm = rentaVar.length ? Math.round(rentaVar.reduce((a,b)=>a+b,0)/rentaVar.length) : 0;
   const rentaTotal   = (ant?.renta_fija_liquida||0) + rentaVarProm;
 
+  // Carga mensual actual: suma de todas las cargas + arriendo
+  const cargaActual = com
+    ? (parseFloat(com.deuda_hipotecaria_carga)||0)
+    + (parseFloat(com.deuda_comercial_carga)||0)
+    + (parseFloat(com.deuda_consumo_carga)||0)
+    + (parseFloat(com.arriendo)||0)
+    : 0;
+  const cuota       = parseFloat(c.cuota) || 0;
+  const cargaNueva  = cargaActual + cuota;
+  const pctActual   = rentaTotal > 0 ? (cargaActual / rentaTotal * 100) : null;
+  const pctNueva    = rentaTotal > 0 ? (cargaNueva  / rentaTotal * 100) : null;
+  const fmtPct      = v => v !== null ? Number(v).toFixed(1) + '%' : '';
+
   document.getElementById('pageWrap').innerHTML = `
 
     <!-- ── Header ── -->
@@ -382,9 +404,30 @@ function renderPagina(c, ant, com) {
           ${fi('Antigüedad',          ant.antiguedad_meses!=null ? ant.antiguedad_meses+' meses' : null)}
         </div>
         <div class="renta-box">
-          <div class="rb-item"><div class="rb-label">Renta Fija Líquida</div><div class="rb-val">${fmtP(ant.renta_fija_liquida)}</div></div>
-          ${rentaVar.length ? `<div class="rb-item"><div class="rb-label">Renta Variable Prom.</div><div class="rb-val">${fmtP(rentaVarProm)}</div></div>` : ''}
-          <div class="rb-item"><div class="rb-label" style="color:#166534;font-weight:800">Renta Total Estimada</div><div class="rb-val" style="font-size:1.15rem">${fmtP(rentaTotal)}</div></div>
+          <div class="rb-item">
+            <div class="rb-label">Renta Fija Líquida</div>
+            <div class="rb-val">${fmtP(ant.renta_fija_liquida)}</div>
+          </div>
+          ${rentaVar.length ? `
+          <div class="rb-item">
+            <div class="rb-label">Renta Variable Prom.</div>
+            <div class="rb-val">${fmtP(rentaVarProm)}</div>
+          </div>` : ''}
+          <div class="rb-item">
+            <div class="rb-label" style="color:#166534;font-weight:800">Renta Total Estimada</div>
+            <div class="rb-val" style="font-size:1.15rem">${fmtP(rentaTotal)}</div>
+          </div>
+          ${cargaActual > 0 || com ? `
+          <div class="rb-item carga">
+            <div class="rb-label">Carga Mensual Actual</div>
+            <div class="rb-val">${fmtP(cargaActual)}</div>
+            ${pctActual !== null ? `<div class="rb-pct" style="color:#b45309">${fmtPct(pctActual)} renta</div>` : ''}
+          </div>
+          <div class="rb-item carga-new">
+            <div class="rb-label">Nueva Carga Mensual</div>
+            <div class="rb-val" style="font-size:1.05rem">${fmtP(cargaNueva)}</div>
+            ${pctNueva !== null ? `<div class="rb-pct" style="color:#1d4ed8">${fmtPct(pctNueva)} renta</div>` : ''}
+          </div>` : ''}
         </div>
         ${rentaVar.length ? `
         <div style="margin-top:12px">
