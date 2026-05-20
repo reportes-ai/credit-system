@@ -126,6 +126,7 @@
 
     .spinner-wrap { text-align:center; padding:60px; color:var(--muted); }
     .no-data { text-align:center; padding:60px; color:var(--muted); }
+    @keyframes spin { to { transform:rotate(360deg); } }
 
     /* ── Panel flotante cédula ── */
     .ced-panel {
@@ -200,7 +201,7 @@
   <a href="/creditos" class="nav-brand">
     <img src="/img/logo-autofacil.png" alt="AutoFácil" onerror="this.style.display='none'">
     <span>Validación de Firma</span>
-    <span class="version-badge">v1.1</span>
+    <span class="version-badge">v1.2</span>
   </a>
   <div class="nav-actions">
     <span id="navUser" style="color:rgba(255,255,255,.75);font-size:.82rem"></span>
@@ -587,6 +588,7 @@ cargarPagina();
    PANEL FLOTANTE CÉDULA DE IDENTIDAD
 ══════════════════════════════════════════════════ */
 let _cedUrl      = null;
+let _cedMime     = '';
 let _cedLoaded   = false;
 let _firmaZoom   = false;
 let _zoomScale   = 3.8;
@@ -598,58 +600,93 @@ let _cedOriginY  = 83;
 async function cargarCedula() {
   const body = document.getElementById('cedPanelBody');
   if (_cedLoaded) return;
-  try {
-    // 1. Obtener lista de tipos para encontrar el Carnet
-    const rt = await fetch('/api/tipos-documento', { headers:apiHdr() });
-    const jt = await rt.json();
-    const tipos = jt.success ? (jt.data || []) : [];
-    const tipoCarnet = tipos.find(t =>
-      /carnet|c[eé]dula|identidad/i.test(t.nombre)
-    );
 
-    // 2. Obtener documentos del crédito
+  body.innerHTML = `<div class="ced-loading"><i class="bi bi-hourglass-split" style="font-size:1.5rem;display:block;margin-bottom:8px;animation:spin .9s linear infinite"></i>Buscando cédula…</div>`;
+
+  try {
+    // 1. Tipos de documento
+    const rt = await fetch('/api/tipos-documento', { headers:apiHdr() });
+    const jt = rt.ok ? await rt.json() : { success:false, data:[] };
+    const tipos = jt.success ? (jt.data || []) : [];
+    const tipoCarnet = tipos.find(t => /carnet|c[eé]dula|identidad/i.test(t.nombre||''));
+
+    // 2. Docs del crédito
     const rd = await fetch('/api/credito-documentos/'+creditId, { headers:apiHdr() });
+    if (!rd.ok) throw new Error('No se pudieron cargar los documentos (HTTP '+rd.status+')');
     const jd = await rd.json();
     const docs = jd.success ? (jd.data || []) : [];
 
-    // Filtrar: primero por tipo carnet, si no hay → cualquier imagen/jpg
+    // 3. Elegir el documento de cédula
     let carnetDoc = null;
-    if (tipoCarnet) {
-      carnetDoc = docs.find(d => d.id_tipo === tipoCarnet.id_tipo);
-    }
-    if (!carnetDoc) {
-      // Intentar por nombre
-      carnetDoc = docs.find(d =>
-        /carnet|c[eé]dula|identidad/i.test(d.archivo_nombre||'')
-      );
-    }
-    if (!carnetDoc) {
-      // Usar el primer doc disponible (fallback)
-      carnetDoc = docs.find(d => /image/i.test(d.mime_type||''));
-    }
+    if (tipoCarnet)  carnetDoc = docs.find(d => d.id_tipo === tipoCarnet.id_tipo);
+    if (!carnetDoc)  carnetDoc = docs.find(d => /carnet|c[eé]dula|identidad/i.test(d.archivo_nombre||''));
+    if (!carnetDoc)  carnetDoc = docs.find(d => /image/i.test(d.mime_type||''));
 
     if (!carnetDoc) {
-      body.innerHTML = `<div class="ced-no-doc"><i class="bi bi-person-vcard"></i>Cédula de identidad no encontrada en los respaldos</div>`;
+      _cedLoaded = false;
+      // Mostrar lista de docs disponibles para diagnóstico
+      const lista = docs.length
+        ? docs.map(d=>`<li style="font-size:.72rem;color:#94a3b8">${d.archivo_nombre||'sin nombre'} (tipo ${d.id_tipo})</li>`).join('')
+        : '<li style="font-size:.72rem;color:#94a3b8">— sin documentos —</li>';
+      body.innerHTML = `<div class="ced-no-doc">
+        <i class="bi bi-person-vcard"></i>
+        Cédula no encontrada en los respaldos.<br>
+        <details style="margin-top:8px;text-align:left;font-size:.72rem;color:#64748b">
+          <summary style="cursor:pointer">Documentos disponibles (${docs.length})</summary>
+          <ul style="margin-top:4px;padding-left:16px">${lista}</ul>
+        </details>
+      </div>`;
       return;
     }
 
-    // 3. Cargar imagen con auth
-    const rv   = await fetch('/api/credito-documentos/view/'+carnetDoc.id_doc, { headers:apiHdr() });
-    const blob = await rv.blob();
+    // 4. Cargar el archivo con auth
+    const rv = await fetch('/api/credito-documentos/view/'+carnetDoc.id_doc, { headers:apiHdr() });
+    if (!rv.ok) throw new Error('Error al cargar imagen (HTTP '+rv.status+')');
+
+    const blob     = await rv.blob();
+    const mimeType = blob.type || carnetDoc.mime_type || '';
+
     _cedUrl    = URL.createObjectURL(blob);
+    _cedMime   = mimeType;
     _cedLoaded = true;
 
     renderCedBody();
   } catch(e) {
-    body.innerHTML = `<div class="ced-no-doc"><i class="bi bi-exclamation-triangle"></i>${e.message}</div>`;
+    _cedLoaded = false;
+    body.innerHTML = `<div class="ced-no-doc"><i class="bi bi-exclamation-triangle" style="color:#f87171"></i><span style="color:#f87171">${escHtml(e.message)}</span></div>`;
   }
 }
 
 function renderCedBody() {
   const body = document.getElementById('cedPanelBody');
+  const isPdf = _cedMime === 'application/pdf';
+
+  if (isPdf) {
+    // PDF: mostrar en iframe compacto (sin zoom de firma)
+    body.innerHTML = `
+      <div style="background:#1e293b;padding:8px 12px;display:flex;align-items:center;gap:7px">
+        <i class="bi bi-file-earmark-pdf" style="color:#f87171;font-size:1rem"></i>
+        <span style="color:#94a3b8;font-size:.75rem">La cédula está en formato PDF</span>
+        <a href="${_cedUrl}" target="_blank" style="margin-left:auto;background:rgba(255,255,255,.12);border:none;color:#fff;border-radius:6px;padding:4px 10px;font-size:.75rem;cursor:pointer;text-decoration:none">
+          <i class="bi bi-box-arrow-up-right me-1"></i>Abrir
+        </a>
+      </div>
+      <iframe src="${_cedUrl}" style="width:100%;height:220px;border:none;background:#fff"></iframe>`;
+    return;
+  }
+
+  // Imagen (jpeg, png, webp, etc.)
   body.innerHTML = `
     <div class="ced-img-wrap" id="cedImgWrap">
-      <img src="${_cedUrl}" id="cedImg" alt="Cédula de identidad" draggable="false">
+      <img src="${_cedUrl}" id="cedImg" alt="Cédula de identidad" draggable="false"
+           onload="this.style.opacity=1"
+           onerror="document.getElementById('cedImgErr').style.display='flex'"
+           style="opacity:0;transition:opacity .3s">
+      <div id="cedImgErr" style="display:none;position:absolute;inset:0;align-items:center;justify-content:center;flex-direction:column;gap:6px;color:#f87171;font-size:.8rem">
+        <i class="bi bi-exclamation-triangle" style="font-size:1.5rem"></i>
+        <span>No se pudo mostrar la imagen</span>
+        <a href="${_cedUrl}" target="_blank" style="color:#93c5fd;font-size:.75rem">Abrir en nueva pestaña</a>
+      </div>
       <div class="ced-sig-hint">
         <span><i class="bi bi-zoom-in me-1"></i>Zoom → Firma</span>
       </div>
@@ -663,7 +700,7 @@ function renderCedBody() {
       <span class="ced-zoom-val" id="cedZoomVal">${_zoomScale.toFixed(1)}×</span>
     </div>
     <div class="ced-zoom-bar" style="padding-top:0;gap:6px">
-      <span style="color:#64748b;font-size:.7rem;font-weight:700;white-space:nowrap">Posición X</span>
+      <span style="color:#64748b;font-size:.7rem;font-weight:700;white-space:nowrap">Pos X</span>
       <input type="range" class="ced-zoom-input" id="cedOriginX"
              min="0" max="100" step="1" value="${_cedOriginX}"
              oninput="ajustarOrigen('x',this.value)">
