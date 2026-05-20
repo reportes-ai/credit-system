@@ -331,7 +331,7 @@
   <div class="topnav-left">
     <div class="topnav-brand">
       <a href="/"><img src="/img/logo.png" alt="AutoFácil" style="display:block"></a>
-      <span class="version-badge" id="versionBadge">v2.7</span>
+      <span class="version-badge" id="versionBadge">v2.8</span>
     </div>
   </div>
   <div class="topnav-right">
@@ -1156,7 +1156,7 @@ function renderConsulta(list) {
           <td style="text-align:center">${c.plazo?c.plazo+' m':'—'}</td>
           <td style="text-align:center"><span class="badge-estado badge-${(c.estado||'').replace(' ','-')}">${c.estado||'—'}</span></td>
           <td style="text-align:center">
-            <button class="btn-ver-detalle" onclick="abrirDetalle(${c.id_credito})">
+            <button class="btn-ver-detalle" onclick="location.href='/creditos/revisar?id=${c.id_credito}'">
               <i class="bi bi-eye me-1"></i>Ver
             </button>
           </td>
@@ -1798,10 +1798,11 @@ function successMenuPrincipal() {
   cambiarTab('consulta');
 }
 function successRevisarCredito() {
-  document.getElementById('successOverlay').classList.remove('open');
-  cambiarTab('consulta');
   if (_savedCreditData?.id_credito) {
-    setTimeout(() => abrirDetalle(_savedCreditData.id_credito), 200);
+    location.href = '/creditos/revisar?id=' + _savedCreditData.id_credito;
+  } else {
+    document.getElementById('successOverlay').classList.remove('open');
+    cambiarTab('consulta');
   }
 }
 function successTablaAmortizacion() {

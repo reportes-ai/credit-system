@@ -65,6 +65,9 @@ app.get(['/clientes', '/clientes/'], (req, res) =>
 app.get(['/creditos', '/creditos/'], (req, res) =>
   res.sendFile(path.join(__dirname, '../public/creditos/index.html')));
 
+app.get(['/creditos/revisar', '/creditos/revisar/'], (req, res) =>
+  res.sendFile(path.join(__dirname, '../public/creditos/revisar.html')));
+
 app.get(['/antecedentes-laborales', '/antecedentes-laborales/'], (req, res) =>
   res.sendFile(path.join(__dirname, '../public/antecedentes-laborales/index.html')));
 
