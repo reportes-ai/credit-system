@@ -23,18 +23,20 @@ app.use('/api/antecedentes-laborales', require('../../services/clientes/src/rout
 app.use('/api/informacion-comercial',  require('../../services/clientes/src/routes/informacion-comercial.routes'));
 
 // Mantenedores
-app.use('/api/tasas',      require('../../services/mantenedores/src/routes/tasas.routes'));
-app.use('/api/uf',         require('../../services/mantenedores/src/routes/uf.routes'));
-app.use('/api/geografico', require('../../services/mantenedores/src/routes/geografico.routes'));
-app.use('/api/vehiculos',  require('../../services/mantenedores/src/routes/vehiculos.routes'));
-app.use('/api/dealers',    require('../../services/mantenedores/src/routes/dealers.routes'));
+app.use('/api/tasas',           require('../../services/mantenedores/src/routes/tasas.routes'));
+app.use('/api/uf',              require('../../services/mantenedores/src/routes/uf.routes'));
+app.use('/api/geografico',      require('../../services/mantenedores/src/routes/geografico.routes'));
+app.use('/api/vehiculos',       require('../../services/mantenedores/src/routes/vehiculos.routes'));
+app.use('/api/dealers',         require('../../services/mantenedores/src/routes/dealers.routes'));
 app.use('/api/parametros-credito', require('../../services/mantenedores/src/routes/parametros.routes'));
+app.use('/api/tipos-documento', require('../../services/mantenedores/src/routes/tipos-documento.routes'));
 
 // Cotizaciones
 app.use('/api/cotizaciones', require('../../services/cotizaciones/src/routes/cotizaciones.routes'));
 
 // Créditos
-app.use('/api/creditos', require('../../services/creditos/src/routes/creditos.routes'));
+app.use('/api/creditos',            require('../../services/creditos/src/routes/creditos.routes'));
+app.use('/api/credito-documentos',  require('../../services/creditos/src/routes/credito-documentos.routes'));
 
 // Health check
 app.get('/health', (req, res) => res.json({ status: 'Sistema operativo', timestamp: new Date() }));
@@ -59,6 +61,9 @@ app.get(['/mantenedores/parametros', '/mantenedores/parametros/'], (req, res) =>
 app.get(['/mantenedores/factores-seguro', '/mantenedores/factores-seguro/'], (req, res) =>
   res.sendFile(path.join(__dirname, '../public/mantenedores/factores-seguro/index.html')));
 
+app.get(['/mantenedores/tipos-documento', '/mantenedores/tipos-documento/'], (req, res) =>
+  res.sendFile(path.join(__dirname, '../public/mantenedores/tipos-documento/index.html')));
+
 app.get(['/clientes', '/clientes/'], (req, res) =>
   res.sendFile(path.join(__dirname, '../public/clientes/index.html')));
 
@@ -67,6 +72,9 @@ app.get(['/creditos', '/creditos/'], (req, res) =>
 
 app.get(['/creditos/revisar', '/creditos/revisar/'], (req, res) =>
   res.sendFile(path.join(__dirname, '../public/creditos/revisar.html')));
+
+app.get(['/creditos/respaldos', '/creditos/respaldos/'], (req, res) =>
+  res.sendFile(path.join(__dirname, '../public/creditos/respaldos.html')));
 
 app.get(['/antecedentes-laborales', '/antecedentes-laborales/'], (req, res) =>
   res.sendFile(path.join(__dirname, '../public/antecedentes-laborales/index.html')));

@@ -1,0 +1,311 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Tipos de Documento — AutoFácil</title>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css">
+<style>
+  :root { --navy:#0f2d6b; --blue:#1565c0; --bg:#f0f4f8; --card:#fff; --border:#e2e8f0; --text:#1e293b; --muted:#64748b; }
+  * { box-sizing:border-box; margin:0; padding:0; }
+  body { font-family:'Segoe UI',system-ui,sans-serif; background:var(--bg); color:var(--text); }
+
+  /* Navbar */
+  .topnav { background:linear-gradient(135deg,var(--navy),var(--blue)); padding:0 24px; height:52px; display:flex; align-items:center; justify-content:space-between; }
+  .topnav-brand { display:flex; align-items:center; gap:10px; color:#fff; font-weight:800; font-size:1rem; text-decoration:none; }
+  .topnav-brand img { height:28px; filter:brightness(0) invert(1); }
+  .version-badge { background:rgba(255,255,255,.15); color:rgba(255,255,255,.75); font-size:.65rem; font-weight:700; border-radius:6px; padding:2px 8px; letter-spacing:.5px; margin-left:4px; }
+  .topnav-right { display:flex; align-items:center; gap:12px; }
+  .btn-nav { background:rgba(255,255,255,.15); border:1px solid rgba(255,255,255,.3); color:#fff; border-radius:8px; padding:6px 14px; font-size:.82rem; font-weight:600; cursor:pointer; text-decoration:none; display:flex; align-items:center; gap:6px; }
+  .btn-nav:hover { background:rgba(255,255,255,.25); }
+
+  /* Layout */
+  .page { max-width:820px; margin:0 auto; padding:24px 16px 60px; }
+  .page-header { display:flex; align-items:center; justify-content:space-between; margin-bottom:20px; flex-wrap:wrap; gap:12px; }
+  .page-title { font-size:1.25rem; font-weight:900; color:var(--navy); display:flex; align-items:center; gap:8px; }
+
+  /* Tabla */
+  .table-card { background:var(--card); border-radius:12px; border:1px solid var(--border); overflow:hidden; }
+  table { width:100%; border-collapse:collapse; font-size:.85rem; }
+  thead th { background:#f8faff; color:var(--muted); font-size:.7rem; font-weight:800; text-transform:uppercase; letter-spacing:.06em; padding:10px 14px; border-bottom:2px solid var(--border); white-space:nowrap; }
+  tbody tr { border-bottom:1px solid #f1f5f9; transition:background .12s; }
+  tbody tr:last-child { border-bottom:none; }
+  tbody tr:hover { background:#f8faff; }
+  td { padding:10px 14px; vertical-align:middle; }
+  .td-orden  { width:50px; text-align:center; color:var(--muted); font-size:.8rem; }
+  .td-nombre { font-weight:600; }
+  .td-desc   { color:var(--muted); font-size:.8rem; }
+  .td-toggle { width:90px; text-align:center; }
+  .td-acts   { width:100px; text-align:right; white-space:nowrap; }
+
+  /* Toggle switch */
+  .toggle-wrap { display:flex; flex-direction:column; gap:4px; align-items:center; }
+  .toggle { position:relative; display:inline-block; width:36px; height:20px; }
+  .toggle input { opacity:0; width:0; height:0; }
+  .slider { position:absolute; cursor:pointer; inset:0; background:#cbd5e1; border-radius:20px; transition:.2s; }
+  .slider:before { content:''; position:absolute; height:14px; width:14px; left:3px; bottom:3px; background:#fff; border-radius:50%; transition:.2s; }
+  input:checked + .slider { background:#059669; }
+  input:checked + .slider:before { transform:translateX(16px); }
+  .toggle-lbl { font-size:.6rem; font-weight:700; color:var(--muted); text-transform:uppercase; }
+
+  /* Badge */
+  .badge-obl { background:#fef2f2; color:#dc2626; border:1px solid #fca5a5; border-radius:4px; padding:1px 7px; font-size:.68rem; font-weight:800; }
+  .badge-opt { background:#f1f5f9; color:#64748b; border-radius:4px; padding:1px 7px; font-size:.68rem; font-weight:700; }
+
+  /* Botones inline */
+  .btn-sm { border:none; background:none; border-radius:6px; padding:5px 8px; cursor:pointer; font-size:.82rem; transition:background .12s; }
+  .btn-edit { color:var(--blue); } .btn-edit:hover { background:#eff6ff; }
+  .btn-del  { color:#dc2626; }    .btn-del:hover  { background:#fef2f2; }
+  .btn-pri { background:linear-gradient(135deg,var(--navy),var(--blue)); color:#fff; border:none; border-radius:9px; padding:9px 18px; font-size:.86rem; font-weight:700; cursor:pointer; display:flex; align-items:center; gap:7px; }
+  .btn-pri:hover { opacity:.88; }
+
+  /* Modal */
+  .modal-overlay { display:none; position:fixed; inset:0; background:rgba(15,23,42,.5); z-index:500; align-items:center; justify-content:center; }
+  .modal-overlay.open { display:flex; }
+  .modal-box { background:var(--card); border-radius:14px; width:min(480px,96vw); box-shadow:0 20px 50px rgba(0,0,0,.25); overflow:hidden; }
+  .modal-head { background:linear-gradient(135deg,var(--navy),var(--blue)); color:#fff; padding:14px 20px; display:flex; align-items:center; justify-content:space-between; }
+  .modal-head h6 { margin:0; font-size:.95rem; font-weight:800; }
+  .modal-body { padding:20px; display:flex; flex-direction:column; gap:14px; }
+  .modal-foot { padding:14px 20px; border-top:1px solid var(--border); display:flex; justify-content:flex-end; gap:10px; background:#f9fafb; }
+  .form-group { display:flex; flex-direction:column; gap:4px; }
+  .form-label { font-size:.72rem; font-weight:700; text-transform:uppercase; letter-spacing:.06em; color:var(--muted); }
+  .form-input, .form-textarea { border:1.5px solid var(--border); border-radius:8px; padding:9px 12px; font-size:.88rem; font-family:inherit; color:var(--text); width:100%; transition:border-color .15s; }
+  .form-input:focus, .form-textarea:focus { outline:none; border-color:var(--blue); }
+  .form-textarea { resize:vertical; min-height:70px; }
+  .form-row { display:grid; grid-template-columns:1fr 1fr 80px; gap:12px; align-items:end; }
+  .form-check { display:flex; align-items:center; gap:8px; font-size:.88rem; font-weight:600; cursor:pointer; }
+  .form-check input[type=checkbox] { width:16px; height:16px; cursor:pointer; accent-color:var(--blue); }
+  .btn-cancel { background:#f1f5f9; border:1.5px solid var(--border); color:#475569; border-radius:9px; padding:9px 18px; font-size:.86rem; font-weight:700; cursor:pointer; }
+  .btn-save   { background:linear-gradient(135deg,var(--navy),var(--blue)); color:#fff; border:none; border-radius:9px; padding:9px 20px; font-size:.86rem; font-weight:700; cursor:pointer; }
+  .btn-save:hover, .btn-cancel:hover { opacity:.88; }
+
+  /* Toast */
+  .toast-msg { position:fixed; top:68px; right:20px; z-index:9999; border-radius:10px; padding:14px 20px; font-weight:600; font-size:.9rem; color:#fff; box-shadow:0 8px 24px rgba(0,0,0,.18); display:none; }
+  .toast-ok  { background:#059669; }
+  .toast-err { background:#dc2626; }
+
+  .no-data { text-align:center; padding:40px; color:#94a3b8; }
+  .spinner-border { width:1.8rem; height:1.8rem; border:.22em solid #cbd5e1; border-top-color:var(--blue); border-radius:50%; animation:spin .7s linear infinite; display:block; margin:40px auto; }
+  @keyframes spin { to { transform:rotate(360deg); } }
+</style>
+</head>
+<body>
+
+<nav class="topnav">
+  <a class="topnav-brand" href="/mantenedores">
+    <img src="/img/logo.png" alt="AutoFácil" onerror="this.style.display='none'">
+    <span>Tipos de Documento</span>
+    <span class="version-badge">v1.0</span>
+  </a>
+  <div class="topnav-right">
+    <span id="navUser" style="color:rgba(255,255,255,.75);font-size:.82rem"></span>
+    <a href="/mantenedores" class="btn-nav"><i class="bi bi-arrow-left"></i>Mantenedores</a>
+  </div>
+</nav>
+
+<div class="page">
+  <div class="page-header">
+    <div class="page-title"><i class="bi bi-paperclip"></i>Documentos de Respaldo</div>
+    <button class="btn-pri" onclick="abrirModal()">
+      <i class="bi bi-plus-lg"></i>Agregar Documento
+    </button>
+  </div>
+
+  <div class="table-card">
+    <div id="spinner"><div class="spinner-border"></div></div>
+    <table id="tabla" style="display:none">
+      <thead>
+        <tr>
+          <th class="td-orden">Orden</th>
+          <th>Nombre del Documento</th>
+          <th>Descripción</th>
+          <th class="td-toggle">Obligatorio</th>
+          <th class="td-toggle">Activo</th>
+          <th class="td-acts">Acciones</th>
+        </tr>
+      </thead>
+      <tbody id="tbody"></tbody>
+    </table>
+    <div id="noData" class="no-data" style="display:none">
+      <i class="bi bi-paperclip" style="font-size:1.8rem;opacity:.3;display:block;margin-bottom:8px"></i>
+      Sin tipos de documento registrados
+    </div>
+  </div>
+</div>
+
+<!-- Modal Agregar / Editar -->
+<div class="modal-overlay" id="modalOverlay" onclick="if(event.target===this)cerrarModal()">
+  <div class="modal-box">
+    <div class="modal-head">
+      <h6 id="modalTitulo"><i class="bi bi-paperclip me-2"></i>Nuevo Tipo de Documento</h6>
+      <button style="background:none;border:none;color:rgba(255,255,255,.8);font-size:1.2rem;cursor:pointer" onclick="cerrarModal()"><i class="bi bi-x-lg"></i></button>
+    </div>
+    <div class="modal-body">
+      <div class="form-group">
+        <label class="form-label">Nombre del Documento *</label>
+        <input id="fNombre" class="form-input" placeholder="Ej: Carnet de Identidad (Frente)">
+      </div>
+      <div class="form-group">
+        <label class="form-label">Descripción</label>
+        <textarea id="fDesc" class="form-textarea" placeholder="Indicaciones adicionales (opcional)"></textarea>
+      </div>
+      <div class="form-row">
+        <label class="form-check">
+          <input type="checkbox" id="fObligatorio" checked>
+          Obligatorio
+        </label>
+        <label class="form-check">
+          <input type="checkbox" id="fActivo" checked>
+          Activo
+        </label>
+        <div class="form-group">
+          <label class="form-label">Orden</label>
+          <input id="fOrden" class="form-input" type="number" min="0" value="0">
+        </div>
+      </div>
+    </div>
+    <div class="modal-foot">
+      <button class="btn-cancel" onclick="cerrarModal()">Cancelar</button>
+      <button class="btn-save"   onclick="guardar()"><i class="bi bi-floppy me-1"></i>Guardar</button>
+    </div>
+  </div>
+</div>
+
+<div class="toast-msg" id="toastMsg"></div>
+
+<script>
+function getToken() { return localStorage.getItem('token'); }
+function apiHdr()   { return { 'Content-Type':'application/json', 'Authorization':'Bearer '+getToken() }; }
+
+(function() {
+  if (!getToken()) { location.href='/login.html'; return; }
+  try { const u=JSON.parse(localStorage.getItem('usuario')||'{}'); document.getElementById('navUser').textContent=u.nombre||''; } catch(e){}
+})();
+
+function showToast(msg, ok) {
+  const el=document.getElementById('toastMsg');
+  el.textContent=msg; el.className='toast-msg '+(ok?'toast-ok':'toast-err');
+  el.style.display='block'; setTimeout(()=>{ el.style.display='none'; },3000);
+}
+
+let _editId = null;
+let _datos  = [];
+
+async function cargar() {
+  try {
+    const r = await fetch('/api/tipos-documento', { headers:apiHdr() });
+    const j = await r.json();
+    _datos = j.success ? j.data : [];
+    renderTabla();
+  } catch(e) { showToast('Error al cargar: '+e.message, false); }
+  document.getElementById('spinner').style.display='none';
+}
+
+function renderTabla() {
+  const tbody = document.getElementById('tbody');
+  document.getElementById('tabla').style.display = _datos.length ? 'table' : 'none';
+  document.getElementById('noData').style.display = _datos.length ? 'none' : 'block';
+  if (!_datos.length) return;
+  tbody.innerHTML = _datos.map(t => `
+    <tr>
+      <td class="td-orden">${t.orden}</td>
+      <td class="td-nombre">${t.nombre}</td>
+      <td class="td-desc">${t.descripcion||'—'}</td>
+      <td class="td-toggle">
+        <div class="toggle-wrap">
+          <label class="toggle">
+            <input type="checkbox" ${t.obligatorio?'checked':''} onchange="toggleCampo(${t.id_tipo},'obligatorio',this.checked)">
+            <span class="slider"></span>
+          </label>
+          <span class="toggle-lbl">${t.obligatorio?'Sí':'No'}</span>
+        </div>
+      </td>
+      <td class="td-toggle">
+        <div class="toggle-wrap">
+          <label class="toggle">
+            <input type="checkbox" ${t.activo?'checked':''} onchange="toggleCampo(${t.id_tipo},'activo',this.checked)">
+            <span class="slider"></span>
+          </label>
+          <span class="toggle-lbl">${t.activo?'Sí':'No'}</span>
+        </div>
+      </td>
+      <td class="td-acts">
+        <button class="btn-sm btn-edit" onclick="abrirModal(${t.id_tipo})" title="Editar"><i class="bi bi-pencil"></i></button>
+        <button class="btn-sm btn-del"  onclick="eliminar(${t.id_tipo})"   title="Eliminar"><i class="bi bi-trash"></i></button>
+      </td>
+    </tr>`).join('');
+}
+
+async function toggleCampo(id, campo, valor) {
+  const t = _datos.find(x => x.id_tipo === id);
+  if (!t) return;
+  const body = { nombre:t.nombre, descripcion:t.descripcion, obligatorio:t.obligatorio, activo:t.activo, orden:t.orden };
+  body[campo] = valor;
+  try {
+    const r = await fetch('/api/tipos-documento/'+id, { method:'PUT', headers:apiHdr(), body:JSON.stringify(body) });
+    const j = await r.json();
+    if (!j.success) throw new Error(j.error);
+    t[campo] = valor;
+    renderTabla();
+  } catch(e) { showToast('Error: '+e.message, false); cargar(); }
+}
+
+function abrirModal(id) {
+  _editId = id || null;
+  const t = id ? _datos.find(x => x.id_tipo === id) : null;
+  document.getElementById('modalTitulo').innerHTML = id
+    ? '<i class="bi bi-pencil me-2"></i>Editar Tipo de Documento'
+    : '<i class="bi bi-plus-lg me-2"></i>Nuevo Tipo de Documento';
+  document.getElementById('fNombre').value     = t?.nombre      || '';
+  document.getElementById('fDesc').value        = t?.descripcion  || '';
+  document.getElementById('fObligatorio').checked = t ? !!t.obligatorio : true;
+  document.getElementById('fActivo').checked      = t ? !!t.activo      : true;
+  document.getElementById('fOrden').value       = t?.orden ?? 0;
+  document.getElementById('modalOverlay').classList.add('open');
+  document.getElementById('fNombre').focus();
+}
+
+function cerrarModal() {
+  document.getElementById('modalOverlay').classList.remove('open');
+  _editId = null;
+}
+
+async function guardar() {
+  const nombre = document.getElementById('fNombre').value.trim();
+  if (!nombre) { showToast('El nombre es obligatorio', false); return; }
+  const body = {
+    nombre,
+    descripcion:  document.getElementById('fDesc').value.trim() || null,
+    obligatorio:  document.getElementById('fObligatorio').checked,
+    activo:       document.getElementById('fActivo').checked,
+    orden:        parseInt(document.getElementById('fOrden').value) || 0,
+  };
+  try {
+    const url    = _editId ? '/api/tipos-documento/'+_editId : '/api/tipos-documento';
+    const method = _editId ? 'PUT' : 'POST';
+    const r = await fetch(url, { method, headers:apiHdr(), body:JSON.stringify(body) });
+    const j = await r.json();
+    if (!j.success) throw new Error(j.error);
+    showToast(_editId ? 'Actualizado correctamente' : 'Creado correctamente', true);
+    cerrarModal();
+    cargar();
+  } catch(e) { showToast('Error: '+e.message, false); }
+}
+
+async function eliminar(id) {
+  const t = _datos.find(x => x.id_tipo === id);
+  if (!confirm(`¿Eliminar "${t?.nombre}"?\nEsto no afecta documentos ya cargados.`)) return;
+  try {
+    const r = await fetch('/api/tipos-documento/'+id, { method:'DELETE', headers:apiHdr() });
+    const j = await r.json();
+    if (!j.success) throw new Error(j.error);
+    showToast('Eliminado', true);
+    cargar();
+  } catch(e) { showToast('Error: '+e.message, false); }
+}
+
+document.addEventListener('keydown', e => { if(e.key==='Escape') cerrarModal(); });
+cargar();
+</script>
+</body>
+</html>

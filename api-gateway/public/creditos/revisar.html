@@ -33,12 +33,13 @@
   .ch-rut  { font-size:.88rem; opacity:.8; }
   .ch-right { display:flex; flex-direction:column; align-items:flex-end; gap:8px; }
   .estado-badge { border-radius:20px; padding:4px 14px; font-size:.8rem; font-weight:800; text-transform:uppercase; letter-spacing:.06em; }
-  .eb-REVISION  { background:#fef2f2; color:#dc2626; border:1.5px solid #fca5a5; }
-  .eb-VIGENTE   { background:#f0fdf4; color:#16a34a; border:1.5px solid #86efac; }
-  .eb-EN-MORA   { background:#fffbeb; color:#d97706; border:1.5px solid #fcd34d; }
-  .eb-CANCELADO { background:#eff6ff; color:#2563eb; border:1.5px solid #93c5fd; }
-  .eb-PREPAGADO { background:#f5f3ff; color:#7c3aed; border:1.5px solid #c4b5fd; }
-  .eb-CASTIGADO { background:#fff1f2; color:#be123c; border:1.5px solid #fda4af; }
+  .eb-REVISION        { background:#fef2f2; color:#dc2626; border:1.5px solid #fca5a5; }
+  .eb-CARGA_RESPALDOS { background:#fff7ed; color:#c2410c; border:1.5px solid #fdba74; }
+  .eb-VIGENTE         { background:#f0fdf4; color:#16a34a; border:1.5px solid #86efac; }
+  .eb-EN-MORA         { background:#fffbeb; color:#d97706; border:1.5px solid #fcd34d; }
+  .eb-CANCELADO       { background:#eff6ff; color:#2563eb; border:1.5px solid #93c5fd; }
+  .eb-PREPAGADO       { background:#f5f3ff; color:#7c3aed; border:1.5px solid #c4b5fd; }
+  .eb-CASTIGADO       { background:#fff1f2; color:#be123c; border:1.5px solid #fda4af; }
   .ch-updated { font-size:.72rem; opacity:.65; }
   .ch-financiera { background:rgba(255,255,255,.2); border-radius:6px; padding:3px 10px; font-size:.78rem; font-weight:800; letter-spacing:.05em; }
 
@@ -165,7 +166,7 @@
   <a class="nav-brand" href="/creditos">
     <img src="/img/logo-autofacil.png" alt="AutoFácil" onerror="this.style.display='none'">
     <span>Revisión de Crédito</span>
-    <span class="version-badge">v1.2</span>
+    <span class="version-badge">v1.3</span>
   </a>
   <div class="nav-actions">
     <span id="navUser" style="color:rgba(255,255,255,.75);font-size:.82rem"></span>
@@ -478,12 +479,13 @@ function renderPagina(c, ant, com) {
           <div>
             <div class="fi-label" style="margin-bottom:6px">Estado del Crédito</div>
             <select id="dEstado" class="estado-select">
-              <option value="REVISION"  ${c.estado==='REVISION' ?'selected':''}>En Revisión</option>
-              <option value="VIGENTE"   ${c.estado==='VIGENTE'  ?'selected':''}>Vigente</option>
-              <option value="EN MORA"   ${c.estado==='EN MORA'  ?'selected':''}>En Mora</option>
-              <option value="CANCELADO" ${c.estado==='CANCELADO'?'selected':''}>Cancelado</option>
-              <option value="PREPAGADO" ${c.estado==='PREPAGADO'?'selected':''}>Prepagado</option>
-              <option value="CASTIGADO" ${c.estado==='CASTIGADO'?'selected':''}>Castigado</option>
+              <option value="REVISION"        ${c.estado==='REVISION'        ?'selected':''}>En Revisión</option>
+              <option value="CARGA_RESPALDOS" ${c.estado==='CARGA_RESPALDOS' ?'selected':''}>Carga Respaldos</option>
+              <option value="VIGENTE"         ${c.estado==='VIGENTE'         ?'selected':''}>Vigente</option>
+              <option value="EN MORA"         ${c.estado==='EN MORA'         ?'selected':''}>En Mora</option>
+              <option value="CANCELADO"       ${c.estado==='CANCELADO'       ?'selected':''}>Cancelado</option>
+              <option value="PREPAGADO"       ${c.estado==='PREPAGADO'       ?'selected':''}>Prepagado</option>
+              <option value="CASTIGADO"       ${c.estado==='CASTIGADO'       ?'selected':''}>Castigado</option>
             </select>
           </div>
           <div>
@@ -500,12 +502,17 @@ function renderPagina(c, ant, com) {
       <a href="/creditos" class="btn-accion btn-volver"><i class="bi bi-arrow-left"></i>Volver</a>
     </div>
     <div class="action-bar-right">
+      ${c.estado === 'CARGA_RESPALDOS' ? `
+      <button class="btn-accion" style="background:linear-gradient(135deg,#ea580c,#f97316);color:#fff"
+        onclick="location.href='/creditos/respaldos?id=${c.id_credito}'">
+        <i class="bi bi-paperclip"></i>Cargar Respaldos
+      </button>` : `
       <button class="btn-accion btn-rechazar" onclick="cambiarEstadoRapido('CANCELADO')">
         <i class="bi bi-x-circle"></i>Rechazar
       </button>
       <button class="btn-accion btn-aprobar" onclick="cambiarEstadoRapido('VIGENTE')">
         <i class="bi bi-check-circle"></i>Aprobar
-      </button>
+      </button>`}
       <button class="btn-accion btn-guardar" onclick="guardarCambios()">
         <i class="bi bi-floppy"></i>Guardar cambios
       </button>
@@ -647,7 +654,25 @@ async function guardarCambios() {
 }
 
 /* ── Botones Aprobar / Rechazar ── */
-function cambiarEstadoRapido(estado) {
+async function cambiarEstadoRapido(estado) {
+  if (estado === 'VIGENTE') {
+    // Aprobar desde revisión → ir a Carga de Respaldos
+    if (!confirm('¿Aprobar el crédito? Se iniciará la carga de documentos de respaldo.')) return;
+    try {
+      const body = {
+        estado:        'CARGA_RESPALDOS',
+        observaciones: document.getElementById('dObservaciones').value.trim(),
+        ejecutivo:     _credito.ejecutivo, dealer: _credito.dealer,
+        patente:       _credito.patente,   color:  _credito.color,
+        motor:         _credito.motor,     chasis: _credito.chasis,
+      };
+      const r = await fetch('/api/creditos/'+creditId, { method:'PUT', headers:apiHdr(), body:JSON.stringify(body) });
+      const j = await r.json();
+      if (!j.success) throw new Error(j.error);
+      location.href = '/creditos/respaldos?id='+creditId;
+    } catch(e) { showToast('Error: '+e.message, false); }
+    return;
+  }
   document.getElementById('dEstado').value = estado;
   guardarCambios();
 }
