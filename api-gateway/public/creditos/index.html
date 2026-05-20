@@ -323,6 +323,9 @@
     .stat-chip .sc-val   { font-size:1.3rem; font-weight:900; color:var(--navy); margin-top:2px; }
     .stat-revision { border-color:#fca5a5; background:#fff5f5; }
     .stat-revision .sc-label { color:#dc2626; }
+    .stat-proceso  { border-color:#fdba74; background:#fff7ed; }
+    .stat-proceso .sc-label  { color:#c2410c; }
+    .stat-proceso.activo { border-color:#ea580c !important; box-shadow:0 0 0 3px #ffedd5; }
   </style>
 </head>
 <body>
@@ -332,7 +335,7 @@
   <div class="topnav-left">
     <div class="topnav-brand">
       <a href="/"><img src="/img/logo.png" alt="AutoFácil" style="display:block"></a>
-      <span class="version-badge" id="versionBadge">v2.9</span>
+      <span class="version-badge" id="versionBadge">v3.0</span>
     </div>
   </div>
   <div class="topnav-right">
@@ -403,6 +406,10 @@
         <div class="sc-label">En Revisión</div>
         <div class="sc-val" id="statRevision" style="color:#dc2626">—</div>
       </div>
+      <div class="stat-chip stat-proceso" id="chipProceso" onclick="filtrarPorEstado('__PROCESO__')" style="cursor:pointer" title="Ver créditos en proceso (no cursados ni anulados)">
+        <div class="sc-label">En Proceso</div>
+        <div class="sc-val" id="statProceso" style="color:#c2410c">—</div>
+      </div>
       <div class="stat-chip" onclick="filtrarPorEstado('VIGENTE')" style="cursor:pointer" title="Ver vigentes">
         <div class="sc-label">Vigentes</div><div class="sc-val" id="statVigentes" style="color:#166534">—</div>
       </div>
@@ -419,9 +426,10 @@
       <div class="search-bar">
         <input type="text" id="searchQ" class="form-control" placeholder="Buscar por RUT, nombre o N° crédito…"
                onkeydown="if(event.key==='Enter') buscarCreditos()">
-        <select id="searchEstado" class="form-select" onchange="buscarCreditos()">
+        <select id="searchEstado" class="form-select" onchange="_filtroProceso=false;document.getElementById('chipProceso')?.classList.remove('activo');buscarCreditos()">
           <option value="">Todos los estados</option>
           <option value="REVISION">En Revisión</option>
+          <option value="CARGA_RESPALDOS">Carga Respaldos</option>
           <option value="VIGENTE">Vigente</option>
           <option value="EN MORA">En Mora</option>
           <option value="CANCELADO">Cancelado</option>
@@ -1085,11 +1093,16 @@ function onRutInputCred(el) {
    CONSULTA CRÉDITOS
 ═══════════════════════════════════════════════════════════════════ */
 let _todosCreditos = [];
+let _filtroProceso = false;
+
+// Estados que se consideran "terminales" o activos (NO son "en proceso")
+const ESTADOS_FUERA_PROCESO = new Set(['VIGENTE','CANCELADO','PREPAGADO','CASTIGADO','EN MORA']);
 
 async function buscarCreditos() {
-  const q      = document.getElementById('searchQ').value.trim();
-  const estado = document.getElementById('searchEstado').value;
-  const res    = document.getElementById('resultadosConsulta');
+  const q = document.getElementById('searchQ').value.trim();
+  // Si el filtro proceso está activo, ignoramos el select de estado (traemos todo)
+  const estado = _filtroProceso ? '' : document.getElementById('searchEstado').value;
+  const res = document.getElementById('resultadosConsulta');
   res.innerHTML = '<div class="text-center py-4 text-muted"><div class="spinner-border spinner-border-sm me-2"></div>Buscando…</div>';
   try {
     let url = '/api/creditos?';
@@ -1098,28 +1111,46 @@ async function buscarCreditos() {
     const r = await fetch(url, { headers: apiHdr() });
     const j = await r.json();
     if (!j.success) throw new Error(j.error);
-    _todosCreditos = j.data || [];
+    const todosSinFiltro = j.data || [];
+    // Stats siempre calculan sobre la lista completa (sin filtro proceso)
+    actualizarStats(todosSinFiltro);
+    // Para la tabla, si filtro proceso aplica la exclusión
+    _todosCreditos = _filtroProceso
+      ? todosSinFiltro.filter(c => !ESTADOS_FUERA_PROCESO.has(c.estado))
+      : todosSinFiltro;
     renderConsulta(_todosCreditos);
-    actualizarStats(_todosCreditos);
   } catch(e) {
     res.innerHTML = `<div class="empty-state" style="color:#ef4444"><i class="bi bi-exclamation-triangle"></i>${e.message}</div>`;
   }
 }
 
 function actualizarStats(list) {
-  const rev = list.filter(c=>c.estado==='REVISION').length;
+  const rev     = list.filter(c => c.estado==='REVISION').length;
+  const proceso = list.filter(c => !ESTADOS_FUERA_PROCESO.has(c.estado)).length;
   document.getElementById('statTotal').textContent     = list.length;
   document.getElementById('statRevision').textContent  = rev;
+  document.getElementById('statProceso').textContent   = proceso;
   document.getElementById('statVigentes').textContent  = list.filter(c=>c.estado==='VIGENTE').length;
   document.getElementById('statMora').textContent      = list.filter(c=>c.estado==='EN MORA').length;
   document.getElementById('statCancelados').textContent= list.filter(c=>c.estado==='CANCELADO').length;
-  // Resaltar badge revisión si hay créditos pendientes
-  const chip = document.querySelector('.stat-revision');
-  if (chip) chip.style.borderColor = rev > 0 ? '#dc2626' : '';
+  // Resaltar badges
+  const chipRev  = document.querySelector('.stat-revision');
+  if (chipRev) chipRev.style.borderColor = rev > 0 ? '#dc2626' : '';
+  const chipPro  = document.getElementById('chipProceso');
+  if (chipPro) chipPro.classList.toggle('activo', _filtroProceso);
 }
 
 function filtrarPorEstado(estado) {
-  document.getElementById('searchEstado').value = estado;
+  if (estado === '__PROCESO__') {
+    _filtroProceso = true;
+    document.getElementById('searchEstado').value = '';
+  } else {
+    _filtroProceso = false;
+    document.getElementById('searchEstado').value = estado;
+  }
+  // Quitar activo de chip proceso si se seleccionó otro filtro
+  const chipPro = document.getElementById('chipProceso');
+  if (chipPro) chipPro.classList.toggle('activo', _filtroProceso);
   buscarCreditos();
 }
 
