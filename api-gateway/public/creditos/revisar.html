@@ -169,7 +169,7 @@
   <a class="nav-brand" href="/creditos">
     <img src="/img/logo-autofacil.png" alt="AutoFácil" onerror="this.style.display='none'">
     <span>Revisión de Crédito</span>
-    <span class="version-badge">v1.6</span>
+    <span class="version-badge">v1.7</span>
   </a>
   <div class="nav-actions">
     <span id="navUser" style="color:rgba(255,255,255,.75);font-size:.82rem"></span>
@@ -720,17 +720,22 @@ function mostrarAmortizacion() {
     <div class="amort-sum-item"><div class="amort-sum-lbl">Total Intereses</div><div class="amort-sum-val" style="color:#dc2626">${fp(totalInt)}</div></div>
     <div class="amort-sum-item"><div class="amort-sum-lbl">Total a Pagar</div><div class="amort-sum-val">${fp(totalPag)}</div></div>`;
   const tasaD = t/100;
+  // Saldo como float sin redondear → evita acumulación de errores
   let saldo = mf, sumCap=0, sumInt=0, sumCuota=0;
   let fecha = fecha_primera_cuota ? new Date(fecha_primera_cuota.split('T')[0]+'T00:00:00') : null;
   const fmtF2 = f => f ? f.toLocaleDateString('es-CL',{day:'2-digit',month:'2-digit',year:'numeric'}) : '—';
   let rows='';
   for (let i=1; i<=pl; i++) {
-    const interes = Math.round(saldo*tasaD);
-    let   amort   = Math.round(cu)-interes;
-    if (i===pl) amort = Math.round(saldo);
-    const cuotaF  = interes+amort;
-    saldo = Math.max(0,Math.round(saldo-amort));
-    sumCap+=amort; sumInt+=interes; sumCuota+=cuotaF;
+    if (saldo < 0.005) break; // saldo liquidado antes del plazo (raro)
+    const interes = saldo * tasaD;                          // float
+    let   amort   = cu - interes;                           // float
+    if (i === pl || amort >= saldo) amort = saldo;          // última cuota ajustada
+    const cuotaF  = interes + amort;
+    saldo         = saldo - amort;                          // float, sin Math.round
+    // Acumulados redondeados para totales exactos
+    sumCap   += Math.round(amort);
+    sumInt   += Math.round(interes);
+    sumCuota += Math.round(cuotaF);
     const fechaFila = fecha ? new Date(fecha) : null;
     if (fecha) fecha.setMonth(fecha.getMonth()+1);
     rows+=`<tr>
@@ -739,7 +744,7 @@ function mostrarAmortizacion() {
       <td style="font-weight:700">${fp(amort)}</td>
       <td style="color:#dc2626">${fp(interes)}</td>
       <td style="font-weight:800;color:var(--navy)">${fp(cuotaF)}</td>
-      <td style="color:#64748b">${fp(saldo)}</td>
+      <td style="color:#64748b">${fp(Math.max(0,saldo))}</td>
     </tr>`;
   }
   document.getElementById('amortBody').innerHTML = rows;
