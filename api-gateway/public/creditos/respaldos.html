@@ -10,7 +10,7 @@
   * { box-sizing:border-box; margin:0; padding:0; }
   body { font-family:'Segoe UI',system-ui,sans-serif; background:var(--bg); color:var(--text); }
 
-  /* Navbar */
+  /* ── Navbar ── */
   .navbar { background:linear-gradient(135deg,var(--navy),var(--blue)); padding:0 24px; height:52px; display:flex; align-items:center; justify-content:space-between; }
   .nav-brand { display:flex; align-items:center; gap:10px; color:#fff; font-weight:800; font-size:1rem; text-decoration:none; }
   .nav-brand img { height:28px; }
@@ -20,7 +20,7 @@
 
   .page-wrap { max-width:960px; margin:0 auto; padding:24px 16px 100px; }
 
-  /* Resumen crédito */
+  /* ── Resumen crédito ── */
   .cred-summary { background:linear-gradient(135deg,var(--navy),#1a56db); border-radius:14px; padding:18px 24px; color:#fff; margin-bottom:24px; display:flex; flex-wrap:wrap; gap:16px; align-items:center; justify-content:space-between; }
   .cs-left h2 { font-size:1.1rem; font-weight:900; margin-bottom:2px; }
   .cs-left p  { font-size:.82rem; opacity:.8; }
@@ -29,7 +29,7 @@
   .cs-chip-lbl { font-size:.6rem; font-weight:700; text-transform:uppercase; letter-spacing:.07em; opacity:.75; }
   .cs-chip-val { font-size:.95rem; font-weight:900; }
 
-  /* Progreso */
+  /* ── Progreso ── */
   .progress-bar-wrap { background:var(--card); border-radius:12px; border:1px solid var(--border); padding:16px 20px; margin-bottom:20px; }
   .pb-header { display:flex; align-items:center; justify-content:space-between; margin-bottom:10px; }
   .pb-title  { font-size:.82rem; font-weight:700; color:var(--navy); }
@@ -38,67 +38,93 @@
   .pb-fill   { background:linear-gradient(90deg,#059669,#10b981); height:100%; border-radius:99px; transition:width .4s; }
   .pb-fill.warn { background:linear-gradient(90deg,#f59e0b,#fbbf24); }
 
-  /* Grid de documentos */
-  .docs-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(280px,1fr)); gap:14px; margin-bottom:24px; }
+  /* ── Grid documentos ── */
+  .docs-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(290px,1fr)); gap:14px; margin-bottom:24px; }
 
-  /* Doc card */
-  .doc-card { background:var(--card); border:1.5px solid var(--border); border-radius:12px; overflow:hidden; transition:border-color .2s, box-shadow .2s; }
+  /* ── Doc card ── */
+  .doc-card { background:var(--card); border:1.5px solid var(--border); border-radius:12px; overflow:hidden; display:flex; flex-direction:column; transition:border-color .2s, box-shadow .2s; }
   .doc-card.uploaded  { border-color:#86efac; box-shadow:0 0 0 3px #f0fdf4; }
   .doc-card.uploading { border-color:#93c5fd; box-shadow:0 0 0 3px #eff6ff; }
+
   .doc-card-head { display:flex; align-items:center; gap:10px; padding:12px 14px; background:#f8faff; border-bottom:1px solid var(--border); }
-  .doc-card.uploaded  .doc-card-head { background:#f0fdf4; }
-  .doc-icon  { width:34px; height:34px; border-radius:8px; display:flex; align-items:center; justify-content:center; font-size:1rem; background:#eff6ff; color:var(--blue); flex-shrink:0; }
+  .doc-card.uploaded .doc-card-head { background:#f0fdf4; }
+  .doc-icon { width:34px; height:34px; border-radius:8px; display:flex; align-items:center; justify-content:center; font-size:1rem; background:#eff6ff; color:var(--blue); flex-shrink:0; }
   .doc-card.uploaded .doc-icon { background:#dcfce7; color:#16a34a; }
-  .doc-name  { font-size:.84rem; font-weight:700; color:var(--text); flex:1; }
-  .doc-badge-obl { font-size:.62rem; font-weight:800; background:#fef2f2; color:#dc2626; border:1px solid #fca5a5; border-radius:4px; padding:1px 6px; white-space:nowrap; }
-  .doc-badge-opt { font-size:.62rem; font-weight:700; background:#f1f5f9; color:#64748b; border-radius:4px; padding:1px 6px; }
+  .doc-name { font-size:.84rem; font-weight:700; color:var(--text); flex:1; line-height:1.3; }
+  .doc-badge-obl { font-size:.62rem; font-weight:800; background:#fef2f2; color:#dc2626; border:1px solid #fca5a5; border-radius:4px; padding:1px 6px; white-space:nowrap; flex-shrink:0; }
+  .doc-badge-opt { font-size:.62rem; font-weight:700; background:#f1f5f9; color:#64748b; border-radius:4px; padding:1px 6px; flex-shrink:0; }
 
-  .doc-card-body { padding:12px 14px; }
+  .doc-card-body { padding:12px 14px; flex:1; }
 
-  /* Estado "sin subir" */
-  .doc-empty { display:flex; flex-direction:column; align-items:center; gap:6px; padding:8px 0; }
+  /* Sin archivo */
+  .doc-empty { display:flex; flex-direction:column; align-items:center; gap:6px; padding:8px 0 4px; }
   .doc-empty i { font-size:1.6rem; color:#cbd5e1; }
   .doc-empty span { font-size:.75rem; color:#94a3b8; }
 
-  /* Estado "subido" */
-  .doc-info { display:flex; flex-direction:column; gap:3px; margin-bottom:10px; }
+  /* Archivo subido */
+  .doc-info { display:flex; flex-direction:column; gap:3px; margin-bottom:8px; }
   .doc-info-name { font-size:.82rem; font-weight:700; color:#166534; word-break:break-all; }
-  .doc-info-meta { font-size:.72rem; color:#6b7280; }
+  .doc-info-meta { font-size:.71rem; color:#6b7280; }
 
-  /* Botones upload */
-  .doc-actions { display:flex; gap:8px; margin-top:10px; }
-  .btn-upload { flex:1; display:flex; align-items:center; justify-content:center; gap:6px; background:linear-gradient(135deg,var(--navy),var(--blue)); color:#fff; border:none; border-radius:8px; padding:8px 12px; font-size:.8rem; font-weight:700; cursor:pointer; transition:opacity .15s; }
+  /* Botones de acción */
+  .doc-actions { display:flex; gap:6px; margin-top:10px; flex-wrap:wrap; }
+  .btn-upload  { flex:1; min-width:90px; display:flex; align-items:center; justify-content:center; gap:5px; background:linear-gradient(135deg,var(--navy),var(--blue)); color:#fff; border:none; border-radius:8px; padding:7px 10px; font-size:.78rem; font-weight:700; cursor:pointer; transition:opacity .15s; }
   .btn-upload:hover { opacity:.88; }
   .btn-upload.reupload { background:linear-gradient(135deg,#0369a1,#0284c7); }
-  .btn-dl   { background:#f0fdf4; border:1.5px solid #86efac; color:#15803d; border-radius:8px; padding:8px 10px; font-size:.8rem; font-weight:700; cursor:pointer; display:flex; align-items:center; gap:4px; transition:background .15s; text-decoration:none; }
+  .btn-icon-group { display:flex; gap:6px; }
+  .btn-view { background:#eff6ff; border:1.5px solid #93c5fd; color:#1d4ed8; border-radius:8px; padding:7px 10px; font-size:.82rem; cursor:pointer; display:flex; align-items:center; gap:4px; transition:background .15s; font-weight:700; }
+  .btn-view:hover { background:#dbeafe; }
+  .btn-dl   { background:#f0fdf4; border:1.5px solid #86efac; color:#15803d; border-radius:8px; padding:7px 10px; font-size:.82rem; cursor:pointer; display:flex; align-items:center; gap:4px; transition:background .15s; font-weight:700; }
   .btn-dl:hover { background:#dcfce7; }
-  .btn-del  { background:#fef2f2; border:1.5px solid #fca5a5; color:#dc2626; border-radius:8px; padding:8px 10px; font-size:.8rem; cursor:pointer; display:flex; align-items:center; transition:background .15s; }
+  .btn-del  { background:#fef2f2; border:1.5px solid #fca5a5; color:#dc2626; border-radius:8px; padding:7px 10px; font-size:.82rem; cursor:pointer; display:flex; align-items:center; transition:background .15s; }
   .btn-del:hover { background:#fee2e2; }
 
-  /* Spinner inside card */
-  .doc-spinner { display:flex; align-items:center; justify-content:center; gap:8px; padding:12px 0; font-size:.8rem; color:var(--muted); }
-  .spin-sm { width:16px; height:16px; border:2px solid #e2e8f0; border-top-color:var(--blue); border-radius:50%; animation:spin .7s linear infinite; }
-  @keyframes spin { to { transform:rotate(360deg); } }
-  .d-none { display:none!important; }
+  /* Comentario */
+  .doc-comment { border-top:1px dashed var(--border); padding:10px 14px; background:#fafbfc; }
+  .doc-comment-lbl { font-size:.63rem; font-weight:700; text-transform:uppercase; letter-spacing:.06em; color:var(--muted); margin-bottom:5px; }
+  .doc-comment-ta { width:100%; border:1.5px solid #e2e8f0; border-radius:7px; padding:7px 10px; font-size:.8rem; font-family:inherit; color:var(--text); resize:vertical; min-height:52px; max-height:120px; background:#fff; transition:border-color .15s; line-height:1.4; }
+  .doc-comment-ta:focus { outline:none; border-color:var(--blue); }
+  .doc-comment-ta.saving { border-color:#93c5fd; }
+  .doc-comment-ta.saved  { border-color:#86efac; }
 
-  /* Action bar */
+  /* Spinner dentro de card */
+  .doc-spinner { display:flex; align-items:center; justify-content:center; gap:8px; padding:14px 0; font-size:.8rem; color:var(--muted); }
+  .spin-sm { width:16px; height:16px; border:2px solid #e2e8f0; border-top-color:var(--blue); border-radius:50%; animation:spin .7s linear infinite; flex-shrink:0; }
+  @keyframes spin { to { transform:rotate(360deg); } }
+
+  /* ── Action bar ── */
   .action-bar { position:fixed; bottom:0; left:0; right:0; background:#fff; border-top:1.5px solid var(--border); padding:14px 24px; display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:10px; box-shadow:0 -4px 16px rgba(0,0,0,.07); z-index:100; }
   .btn-accion { border:none; border-radius:9px; padding:11px 22px; font-size:.9rem; font-weight:700; cursor:pointer; display:flex; align-items:center; gap:7px; transition:opacity .15s; }
   .btn-accion:hover { opacity:.88; }
-  .btn-aprobar  { background:linear-gradient(135deg,#059669,#10b981); color:#fff; }
+  .btn-aprobar { background:linear-gradient(135deg,#059669,#10b981); color:#fff; }
   .btn-aprobar:disabled { background:#d1d5db; color:#9ca3af; cursor:not-allowed; opacity:1; }
-  .btn-volver   { background:#f1f5f9; color:#475569; border:1.5px solid var(--border); }
+  .btn-volver  { background:#f1f5f9; color:#475569; border:1.5px solid var(--border); }
   .btn-volver:hover { background:#e2e8f0; }
 
-  /* Toast */
+  /* ── Viewer modal ── */
+  .viewer-overlay { display:none; position:fixed; inset:0; background:rgba(10,15,30,.85); z-index:2000; flex-direction:column; }
+  .viewer-overlay.open { display:flex; }
+  .viewer-header { background:rgba(15,45,107,.95); backdrop-filter:blur(6px); padding:12px 20px; display:flex; align-items:center; justify-content:space-between; flex-shrink:0; border-bottom:1px solid rgba(255,255,255,.1); }
+  .viewer-title  { color:#fff; font-size:.9rem; font-weight:700; display:flex; align-items:center; gap:8px; max-width:70%; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .viewer-actions { display:flex; gap:8px; align-items:center; }
+  .vbtn { background:rgba(255,255,255,.15); border:1px solid rgba(255,255,255,.25); color:#fff; border-radius:7px; padding:6px 14px; font-size:.82rem; font-weight:600; cursor:pointer; display:flex; align-items:center; gap:5px; transition:background .15s; text-decoration:none; }
+  .vbtn:hover { background:rgba(255,255,255,.28); }
+  .vbtn.close { background:rgba(220,38,38,.7); border-color:rgba(220,38,38,.5); }
+  .vbtn.close:hover { background:rgba(220,38,38,.9); }
+  .viewer-body { flex:1; overflow:hidden; display:flex; align-items:center; justify-content:center; padding:12px; }
+  .viewer-body iframe { width:100%; height:100%; border:none; border-radius:8px; background:#fff; }
+  .viewer-body img    { max-width:100%; max-height:100%; object-fit:contain; border-radius:8px; box-shadow:0 8px 32px rgba(0,0,0,.5); }
+  .viewer-no-preview { color:#94a3b8; text-align:center; }
+  .viewer-no-preview i { font-size:3rem; display:block; margin-bottom:12px; }
+  .viewer-no-preview p { font-size:.9rem; margin-bottom:16px; }
+
+  /* ── Toast / Spinner page ── */
   .toast-msg { position:fixed; top:68px; right:20px; z-index:9999; border-radius:10px; padding:14px 20px; font-weight:600; font-size:.9rem; color:#fff; box-shadow:0 8px 24px rgba(0,0,0,.18); display:none; }
   .toast-ok  { background:#059669; }
   .toast-err { background:#dc2626; }
-
-  /* Spinner page */
   .spinner-wrap { display:flex; align-items:center; justify-content:center; padding:80px; }
   .spinner-border { width:2rem; height:2rem; border:.25em solid #cbd5e1; border-top-color:var(--blue); border-radius:50%; animation:spin .7s linear infinite; }
-  .no-data { text-align:center; padding:60px; color:#94a3b8; font-size:.9rem; }
+  .no-data { text-align:center; padding:60px; color:#94a3b8; }
   .no-data i { font-size:2rem; display:block; margin-bottom:8px; opacity:.4; }
 
   @media(max-width:600px) {
@@ -113,7 +139,7 @@
   <a class="nav-brand" href="/creditos">
     <img src="/img/logo-autofacil.png" alt="AutoFácil" onerror="this.style.display='none'">
     <span>Carga de Respaldos</span>
-    <span class="version-badge">v1.0</span>
+    <span class="version-badge">v1.1</span>
   </a>
   <div style="display:flex;align-items:center;gap:10px">
     <span id="navUser" style="color:rgba(255,255,255,.75);font-size:.82rem"></span>
@@ -125,6 +151,7 @@
   <div class="spinner-wrap"><div class="spinner-border"></div></div>
 </div>
 
+<!-- Action bar -->
 <div class="action-bar" id="actionBar" style="display:none">
   <a href="/creditos" class="btn-accion btn-volver"><i class="bi bi-arrow-left"></i>Volver</a>
   <button class="btn-accion btn-aprobar" id="btnAprobar" onclick="aprobarCredito()" disabled>
@@ -132,28 +159,44 @@
   </button>
 </div>
 
-<div class="toast-msg" id="toastMsg"></div>
+<!-- Viewer modal -->
+<div class="viewer-overlay" id="viewerOverlay">
+  <div class="viewer-header">
+    <div class="viewer-title" id="viewerTitle"><i class="bi bi-file-earmark"></i><span id="viewerName">—</span></div>
+    <div class="viewer-actions">
+      <button class="vbtn" id="viewerDlBtn" onclick="viewerDescargar()"><i class="bi bi-download"></i>Descargar</button>
+      <button class="vbtn close" onclick="cerrarViewer()"><i class="bi bi-x-lg"></i>Cerrar</button>
+    </div>
+  </div>
+  <div class="viewer-body" id="viewerBody">
+    <div class="spinner-wrap"><div class="spinner-border" style="border-top-color:#fff;border-color:rgba(255,255,255,.2)"></div></div>
+  </div>
+</div>
 
 <!-- Input file oculto -->
 <input type="file" id="fileInput" style="display:none"
   accept=".pdf,.jpg,.jpeg,.png,.doc,.docx,.xls,.xlsx"
   onchange="onFileSelected(this)">
 
+<div class="toast-msg" id="toastMsg"></div>
+
 <script>
 /* ── Auth ── */
 function getToken() { return localStorage.getItem('token'); }
 function apiHdr()   { return { 'Content-Type':'application/json', 'Authorization':'Bearer '+getToken() }; }
 
-(function checkAuth() {
+(function() {
   if (!getToken()) { location.href='/login.html'; return; }
   try { const u=JSON.parse(localStorage.getItem('usuario')||'{}'); document.getElementById('navUser').textContent=u.nombre||''; } catch(e){}
 })();
 
 /* ── Helpers ── */
-const fmtP  = v => v!=null&&v!=='' ? '$'+Math.round(Number(v)).toLocaleString('es-CL') : '—';
-const fmtD  = s => s ? new Date(s).toLocaleDateString('es-CL',{timeZone:'UTC',day:'2-digit',month:'2-digit',year:'numeric'}) : '—';
-const fmtDT = s => s ? new Date(s).toLocaleString('es-CL',{day:'2-digit',month:'2-digit',year:'numeric',hour:'2-digit',minute:'2-digit'}) : '—';
-const fmtBytes = b => b < 1024 ? b+' B' : b < 1048576 ? (b/1024).toFixed(1)+' KB' : (b/1048576).toFixed(1)+' MB';
+const fmtP    = v => v!=null&&v!=='' ? '$'+Math.round(Number(v)).toLocaleString('es-CL') : '—';
+const fmtD    = s => s ? new Date(s).toLocaleDateString('es-CL',{timeZone:'UTC',day:'2-digit',month:'2-digit',year:'numeric'}) : '—';
+const fmtDT   = s => s ? new Date(s).toLocaleString('es-CL',{day:'2-digit',month:'2-digit',year:'numeric',hour:'2-digit',minute:'2-digit'}) : '—';
+const fmtBytes= b => !b ? '—' : b<1024 ? b+' B' : b<1048576 ? (b/1024).toFixed(1)+' KB' : (b/1048576).toFixed(1)+' MB';
+const isImage = m => m && m.startsWith('image/');
+const isPdf   = m => m === 'application/pdf';
 
 function showToast(msg, ok) {
   const el=document.getElementById('toastMsg');
@@ -164,12 +207,14 @@ function showToast(msg, ok) {
 /* ── Estado global ── */
 const qp       = new URLSearchParams(location.search);
 const creditId = qp.get('id');
-let _credito   = null;
-let _tipos     = [];     // todos los tipos activos
-let _docs      = {};     // { id_tipo: doc_row }
-let _pendingTipo = null; // tipo seleccionado para subir
+let _credito     = null;
+let _tipos       = [];
+let _docs        = {};       // { id_tipo: doc_row }
+let _pendingTipo = null;
+let _viewerDoc   = null;     // { id_doc, nombre, mime }
+let _commentTimers = {};     // debounce por id_doc
 
-/* ── Cargar ── */
+/* ── Cargar página ── */
 async function cargarPagina() {
   if (!creditId) {
     document.getElementById('pageWrap').innerHTML = '<div class="no-data"><i class="bi bi-exclamation-triangle"></i>ID de crédito no especificado</div>';
@@ -177,34 +222,28 @@ async function cargarPagina() {
   }
   try {
     const [rc, rt, rd] = await Promise.all([
-      fetch('/api/creditos/'+creditId,                   { headers:apiHdr() }),
-      fetch('/api/tipos-documento/activos',              { headers:apiHdr() }),
-      fetch('/api/credito-documentos/'+creditId,         { headers:apiHdr() }),
+      fetch('/api/creditos/'+creditId,            { headers:apiHdr() }),
+      fetch('/api/tipos-documento/activos',        { headers:apiHdr() }),
+      fetch('/api/credito-documentos/'+creditId,  { headers:apiHdr() }),
     ]);
     const [jc, jt, jd] = await Promise.all([rc.json(), rt.json(), rd.json()]);
     if (!jc.success) throw new Error(jc.error);
     _credito = jc.data;
     _tipos   = jt.success ? jt.data : [];
-    if (jd.success) {
-      jd.data.forEach(d => { _docs[d.id_tipo] = d; });
-    }
+    if (jd.success) jd.data.forEach(d => { _docs[d.id_tipo] = d; });
     renderPagina();
   } catch(e) {
     document.getElementById('pageWrap').innerHTML = `<div class="no-data"><i class="bi bi-exclamation-triangle"></i>${e.message}</div>`;
   }
 }
 
+/* ── Render ── */
 function renderPagina() {
   const c = _credito;
-  const obligatorios  = _tipos.filter(t => t.obligatorio);
-  const opcionales    = _tipos.filter(t => !t.obligatorio);
-  const cargadosObl   = obligatorios.filter(t => _docs[t.id_tipo]).length;
-  const cargadosTotal = _tipos.filter(t => _docs[t.id_tipo]).length;
-  const pct = _tipos.length ? Math.round(cargadosTotal/_tipos.length*100) : 0;
-  const allOblDone = obligatorios.length > 0 && cargadosObl === obligatorios.length;
+  const obligatorios = _tipos.filter(t => t.obligatorio);
+  const opcionales   = _tipos.filter(t => !t.obligatorio);
 
   document.getElementById('pageWrap').innerHTML = `
-    <!-- Resumen crédito -->
     <div class="cred-summary">
       <div class="cs-left">
         <h2><i class="bi bi-person-fill me-1"></i>${c.nombre_cliente||'—'}</h2>
@@ -219,49 +258,48 @@ function renderPagina() {
       </div>
     </div>
 
-    <!-- Barra progreso -->
     <div class="progress-bar-wrap">
       <div class="pb-header">
         <div class="pb-title"><i class="bi bi-paperclip me-1"></i>Documentos cargados</div>
-        <div class="pb-counts">${cargadosTotal} de ${_tipos.length} &nbsp;·&nbsp; Obligatorios: ${cargadosObl}/${obligatorios.length}</div>
+        <div class="pb-counts" id="pbCounts"></div>
       </div>
-      <div class="pb-track"><div class="pb-fill${allOblDone?'':' warn'}" style="width:${pct}%"></div></div>
+      <div class="pb-track"><div class="pb-fill" id="pbFill" style="width:0%"></div></div>
     </div>
 
-    <!-- Obligatorios -->
     ${obligatorios.length ? `
     <div style="font-size:.72rem;font-weight:800;text-transform:uppercase;letter-spacing:.07em;color:var(--navy);margin-bottom:10px">
       <i class="bi bi-exclamation-circle me-1" style="color:#dc2626"></i>Documentos Obligatorios
     </div>
-    <div class="docs-grid" id="gridObl">
-      ${obligatorios.map(t => renderDocCard(t)).join('')}
-    </div>` : ''}
+    <div class="docs-grid">${obligatorios.map(t => renderDocCard(t)).join('')}</div>` : ''}
 
-    <!-- Opcionales -->
     ${opcionales.length ? `
     <div style="font-size:.72rem;font-weight:800;text-transform:uppercase;letter-spacing:.07em;color:var(--muted);margin-bottom:10px;margin-top:4px">
       <i class="bi bi-paperclip me-1"></i>Documentos Opcionales
     </div>
-    <div class="docs-grid" id="gridOpc">
-      ${opcionales.map(t => renderDocCard(t)).join('')}
-    </div>` : ''}`;
+    <div class="docs-grid">${opcionales.map(t => renderDocCard(t)).join('')}</div>` : ''}`;
 
   document.getElementById('actionBar').style.display = 'flex';
-  actualizarBotonAprobar();
+  actualizarProgreso();
 }
 
 function renderDocCard(tipo) {
   const doc = _docs[tipo.id_tipo];
-  const uploaded = !!doc;
   return `
-  <div class="doc-card ${uploaded?'uploaded':''}" id="docCard_${tipo.id_tipo}">
+  <div class="doc-card ${doc?'uploaded':''}" id="docCard_${tipo.id_tipo}">
     <div class="doc-card-head">
-      <div class="doc-icon"><i class="bi bi-${uploaded?'file-check':'file-earmark'}"></i></div>
-      <div class="doc-name">${tipo.nombre}</div>
+      <div class="doc-icon"><i class="bi bi-${doc?'file-check':'file-earmark'}"></i></div>
+      <div class="doc-name">${tipo.nombre}${tipo.descripcion?`<div style="font-size:.68rem;font-weight:400;color:var(--muted);margin-top:1px">${tipo.descripcion}</div>`:''}</div>
       <span class="${tipo.obligatorio?'doc-badge-obl':'doc-badge-opt'}">${tipo.obligatorio?'Obligatorio':'Opcional'}</span>
     </div>
     <div class="doc-card-body" id="docBody_${tipo.id_tipo}">
-      ${uploaded ? renderDocSubido(tipo, doc) : renderDocVacio(tipo)}
+      ${doc ? renderDocSubido(tipo, doc) : renderDocVacio(tipo)}
+    </div>
+    <div class="doc-comment" id="docComment_${tipo.id_tipo}">
+      <div class="doc-comment-lbl"><i class="bi bi-chat-text me-1"></i>Comentario</div>
+      <textarea class="doc-comment-ta" id="docTA_${tipo.id_tipo}"
+        placeholder="Observación opcional sobre este documento…"
+        onblur="guardarComentario(${tipo.id_tipo})"
+        oninput="onComentarioInput(${tipo.id_tipo})">${doc?.comentario||''}</textarea>
     </div>
   </div>`;
 }
@@ -283,22 +321,29 @@ function renderDocSubido(tipo, doc) {
   return `
   <div class="doc-info">
     <div class="doc-info-name"><i class="bi bi-file-earmark-check me-1"></i>${doc.archivo_nombre}</div>
-    <div class="doc-info-meta">${fmtBytes(doc.archivo_size||0)} &nbsp;·&nbsp; ${fmtDT(doc.subido_at)}</div>
+    <div class="doc-info-meta">${fmtBytes(doc.archivo_size)} &nbsp;·&nbsp; ${fmtDT(doc.subido_at)}</div>
   </div>
   <div class="doc-actions">
-    <a href="/api/credito-documentos/download/${doc.id_doc}"
-       onclick="return descargarDoc(event, ${doc.id_doc}, '${doc.archivo_nombre}')"
-       class="btn-dl"><i class="bi bi-download"></i>Ver</a>
-    <button class="btn-upload reupload" onclick="seleccionarArchivo(${tipo.id_tipo})">
-      <i class="bi bi-arrow-repeat"></i>Reemplazar
+    <button class="btn-view" onclick="verDoc(${doc.id_doc},'${escQ(doc.archivo_nombre)}','${doc.mime_type||''}')">
+      <i class="bi bi-eye"></i>Ver
     </button>
-    <button class="btn-del" onclick="eliminarDoc(${tipo.id_tipo}, ${doc.id_doc})" title="Eliminar">
-      <i class="bi bi-trash"></i>
+    <div class="btn-icon-group">
+      <button class="btn-dl"  onclick="descargarDoc(${doc.id_doc},'${escQ(doc.archivo_nombre)}')" title="Descargar">
+        <i class="bi bi-download"></i>
+      </button>
+      <button class="btn-del" onclick="eliminarDoc(${tipo.id_tipo},${doc.id_doc})" title="Eliminar">
+        <i class="bi bi-trash"></i>
+      </button>
+    </div>
+    <button class="btn-upload reupload" onclick="seleccionarArchivo(${tipo.id_tipo})" style="flex:none">
+      <i class="bi bi-arrow-repeat"></i>
     </button>
   </div>`;
 }
 
-/* ── Selección de archivo ── */
+const escQ = s => (s||'').replace(/'/g,"\\'").replace(/"/g,'&quot;');
+
+/* ── Selección y subida ── */
 function seleccionarArchivo(idTipo) {
   _pendingTipo = idTipo;
   document.getElementById('fileInput').value = '';
@@ -308,33 +353,38 @@ function seleccionarArchivo(idTipo) {
 function onFileSelected(input) {
   const file = input.files[0];
   if (!file || !_pendingTipo) return;
-  if (file.size > 10 * 1024 * 1024) { showToast('El archivo no puede superar 10 MB', false); return; }
+  if (file.size > 10*1024*1024) { showToast('El archivo no puede superar 10 MB', false); return; }
   subirArchivo(_pendingTipo, file);
 }
 
 async function subirArchivo(idTipo, file) {
   const body = document.getElementById('docBody_'+idTipo);
   const card = document.getElementById('docCard_'+idTipo);
+  const comentarioActual = document.getElementById('docTA_'+idTipo)?.value || '';
   body.innerHTML = `<div class="doc-spinner"><div class="spin-sm"></div> Subiendo…</div>`;
   card.classList.add('uploading'); card.classList.remove('uploaded');
-
   try {
     const base64 = await fileToBase64(file);
     const res = await fetch('/api/credito-documentos', {
-      method: 'POST',
-      headers: apiHdr(),
+      method:'POST', headers:apiHdr(),
       body: JSON.stringify({
-        id_credito:    parseInt(creditId),
-        id_tipo:       idTipo,
+        id_credito:     parseInt(creditId),
+        id_tipo:        idTipo,
         archivo_nombre: file.name,
-        archivo_size:  file.size,
-        mime_type:     file.type || 'application/octet-stream',
-        archivo_data:  base64,
+        archivo_size:   file.size,
+        mime_type:      file.type || 'application/octet-stream',
+        archivo_data:   base64,
+        comentario:     comentarioActual || null,
       })
     });
     const j = await res.json();
     if (!j.success) throw new Error(j.error);
-    _docs[idTipo] = { id_doc: j.data.id_doc, archivo_nombre: file.name, archivo_size: file.size, subido_at: new Date().toISOString(), id_tipo: idTipo };
+    _docs[idTipo] = {
+      id_doc: j.data.id_doc, archivo_nombre: file.name,
+      archivo_size: file.size, mime_type: file.type,
+      subido_at: new Date().toISOString(), id_tipo: idTipo,
+      comentario: comentarioActual || null,
+    };
     card.classList.remove('uploading'); card.classList.add('uploaded');
     const tipo = _tipos.find(t => t.id_tipo === idTipo);
     body.innerHTML = renderDocSubido(tipo, _docs[idTipo]);
@@ -349,44 +399,119 @@ async function subirArchivo(idTipo, file) {
 }
 
 function fileToBase64(file) {
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onload  = () => resolve(reader.result.split(',')[1]);
-    reader.onerror = reject;
-    reader.readAsDataURL(file);
+  return new Promise((res, rej) => {
+    const r = new FileReader();
+    r.onload  = () => res(r.result.split(',')[1]);
+    r.onerror = rej;
+    r.readAsDataURL(file);
   });
 }
 
-/* ── Eliminar doc ── */
+/* ── Comentario ── */
+function onComentarioInput(idTipo) {
+  if (_commentTimers[idTipo]) clearTimeout(_commentTimers[idTipo]);
+  _commentTimers[idTipo] = setTimeout(() => guardarComentario(idTipo), 1500);
+}
+
+async function guardarComentario(idTipo) {
+  const doc = _docs[idTipo];
+  if (!doc) return; // no hay archivo subido, no hay id_doc
+  const ta = document.getElementById('docTA_'+idTipo);
+  if (!ta) return;
+  const texto = ta.value.trim();
+  // Mismo valor que ya está guardado
+  if (texto === (doc.comentario||'').trim()) return;
+  ta.classList.add('saving');
+  try {
+    const r = await fetch('/api/credito-documentos/'+doc.id_doc+'/comentario', {
+      method:'PATCH', headers:apiHdr(), body:JSON.stringify({ comentario: texto||null })
+    });
+    const j = await r.json();
+    if (!j.success) throw new Error(j.error);
+    doc.comentario = texto || null;
+    ta.classList.remove('saving'); ta.classList.add('saved');
+    setTimeout(() => ta.classList.remove('saved'), 1500);
+  } catch(e) {
+    ta.classList.remove('saving');
+    showToast('Error al guardar comentario: '+e.message, false);
+  }
+}
+
+/* ── Ver documento (inline) ── */
+async function verDoc(idDoc, nombre, mime) {
+  _viewerDoc = { idDoc, nombre, mime };
+  document.getElementById('viewerName').textContent = nombre;
+  document.getElementById('viewerBody').innerHTML =
+    `<div class="spinner-wrap"><div class="spinner-border" style="border-top-color:#fff;border-color:rgba(255,255,255,.2)"></div></div>`;
+  document.getElementById('viewerOverlay').classList.add('open');
+  try {
+    const res  = await fetch('/api/credito-documentos/view/'+idDoc, { headers:apiHdr() });
+    if (!res.ok) throw new Error('Error al cargar');
+    const blob = await res.blob();
+    const url  = URL.createObjectURL(blob);
+    let content;
+    if (isImage(mime)) {
+      content = `<img src="${url}" alt="${nombre}">`;
+    } else if (isPdf(mime)) {
+      content = `<iframe src="${url}" title="${nombre}"></iframe>`;
+    } else {
+      content = `
+        <div class="viewer-no-preview">
+          <i class="bi bi-file-earmark-text"></i>
+          <p>Vista previa no disponible para este tipo de archivo.</p>
+          <button class="vbtn" onclick="viewerDescargar()"><i class="bi bi-download me-1"></i>Descargar archivo</button>
+        </div>`;
+    }
+    document.getElementById('viewerBody').innerHTML = content;
+    // Guardar url para descargar si es necesario
+    _viewerDoc.blobUrl = url;
+  } catch(e) {
+    document.getElementById('viewerBody').innerHTML =
+      `<div class="viewer-no-preview"><i class="bi bi-exclamation-triangle"></i><p>${e.message}</p></div>`;
+  }
+}
+
+function cerrarViewer() {
+  document.getElementById('viewerOverlay').classList.remove('open');
+  if (_viewerDoc?.blobUrl) { URL.revokeObjectURL(_viewerDoc.blobUrl); _viewerDoc.blobUrl = null; }
+}
+
+async function viewerDescargar() {
+  if (!_viewerDoc) return;
+  descargarDoc(_viewerDoc.idDoc, _viewerDoc.nombre);
+}
+
+/* ── Descargar ── */
+async function descargarDoc(idDoc, nombre) {
+  try {
+    const res  = await fetch('/api/credito-documentos/download/'+idDoc, { headers:apiHdr() });
+    if (!res.ok) { showToast('Error al descargar', false); return; }
+    const blob = await res.blob();
+    const url  = URL.createObjectURL(blob);
+    const a    = document.createElement('a');
+    a.href=url; a.download=nombre; a.click();
+    URL.revokeObjectURL(url);
+  } catch(e) { showToast('Error: '+e.message, false); }
+}
+
+/* ── Eliminar ── */
 async function eliminarDoc(idTipo, idDoc) {
   if (!confirm('¿Eliminar este documento?')) return;
   try {
-    const res = await fetch('/api/credito-documentos/'+idDoc, { method:'DELETE', headers:apiHdr() });
-    const j   = await res.json();
+    const r = await fetch('/api/credito-documentos/'+idDoc, { method:'DELETE', headers:apiHdr() });
+    const j = await r.json();
     if (!j.success) throw new Error(j.error);
     delete _docs[idTipo];
     const card = document.getElementById('docCard_'+idTipo);
     card.classList.remove('uploaded');
     const tipo = _tipos.find(t => t.id_tipo === idTipo);
     document.getElementById('docBody_'+idTipo).innerHTML = renderDocVacio(tipo);
+    // Limpiar textarea pero conservar el DOM
+    const ta = document.getElementById('docTA_'+idTipo);
+    if (ta) ta.value = '';
     actualizarProgreso();
     showToast('Documento eliminado', true);
-  } catch(e) { showToast('Error al eliminar: '+e.message, false); }
-}
-
-/* ── Descargar ── */
-async function descargarDoc(event, idDoc, nombre) {
-  event.preventDefault();
-  try {
-    const res  = await fetch('/api/credito-documentos/download/'+idDoc, { headers:apiHdr() });
-    if (!res.ok) { showToast('Error al descargar', false); return false; }
-    const blob = await res.blob();
-    const url  = URL.createObjectURL(blob);
-    const a    = document.createElement('a');
-    a.href = url; a.download = nombre; a.click();
-    URL.revokeObjectURL(url);
-  } catch(e) { showToast('Error al descargar: '+e.message, false); }
-  return false;
+  } catch(e) { showToast('Error: '+e.message, false); }
 }
 
 /* ── Progreso ── */
@@ -395,46 +520,40 @@ function actualizarProgreso() {
   const cargadosObl  = obligatorios.filter(t => _docs[t.id_tipo]).length;
   const cargadosTotal= _tipos.filter(t => _docs[t.id_tipo]).length;
   const pct = _tipos.length ? Math.round(cargadosTotal/_tipos.length*100) : 0;
-  const fill = document.querySelector('.pb-fill');
-  const counts = document.querySelector('.pb-counts');
-  if (fill)   { fill.style.width = pct+'%'; fill.classList.toggle('warn', cargadosObl < obligatorios.length); }
+  const fill   = document.getElementById('pbFill');
+  const counts = document.getElementById('pbCounts');
+  if (fill)   { fill.style.width=pct+'%'; fill.classList.toggle('warn', cargadosObl<obligatorios.length); }
   if (counts) counts.textContent = `${cargadosTotal} de ${_tipos.length}  ·  Obligatorios: ${cargadosObl}/${obligatorios.length}`;
-  actualizarBotonAprobar();
-}
-
-function actualizarBotonAprobar() {
-  const obligatorios = _tipos.filter(t => t.obligatorio);
-  const cargadosObl  = obligatorios.filter(t => _docs[t.id_tipo]).length;
   const btn = document.getElementById('btnAprobar');
-  if (!btn) return;
-  const ok = obligatorios.length === 0 || cargadosObl === obligatorios.length;
-  btn.disabled = !ok;
-  btn.title = ok ? '' : `Faltan ${obligatorios.length - cargadosObl} documento(s) obligatorio(s)`;
+  if (btn) {
+    const ok = obligatorios.length===0 || cargadosObl===obligatorios.length;
+    btn.disabled = !ok;
+    btn.title = ok ? '' : `Faltan ${obligatorios.length-cargadosObl} documento(s) obligatorio(s)`;
+  }
 }
 
-/* ── Aprobar crédito → VIGENTE ── */
+/* ── Aprobar ── */
 async function aprobarCredito() {
   if (!confirm('¿Aprobar el crédito y marcarlo como VIGENTE?')) return;
   try {
-    const res = await fetch('/api/creditos/'+creditId, {
-      method: 'PUT', headers: apiHdr(),
+    const r = await fetch('/api/creditos/'+creditId, {
+      method:'PUT', headers:apiHdr(),
       body: JSON.stringify({
-        estado:        'VIGENTE',
-        observaciones: _credito.observaciones || null,
-        ejecutivo:     _credito.ejecutivo     || null,
-        dealer:        _credito.dealer        || null,
-        patente:       _credito.patente       || null,
-        color:         _credito.color         || null,
-        motor:         _credito.motor         || null,
-        chasis:        _credito.chasis        || null,
+        estado:'VIGENTE', observaciones:_credito.observaciones||null,
+        ejecutivo:_credito.ejecutivo||null, dealer:_credito.dealer||null,
+        patente:_credito.patente||null, color:_credito.color||null,
+        motor:_credito.motor||null, chasis:_credito.chasis||null,
       })
     });
-    const j = await res.json();
+    const j = await r.json();
     if (!j.success) throw new Error(j.error);
     showToast('¡Crédito aprobado como VIGENTE!', true);
     setTimeout(() => location.href='/creditos/revisar?id='+creditId, 1200);
   } catch(e) { showToast('Error: '+e.message, false); }
 }
+
+/* ── Keyboard ── */
+document.addEventListener('keydown', e => { if(e.key==='Escape') cerrarViewer(); });
 
 cargarPagina();
 </script>
