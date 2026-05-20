@@ -43,6 +43,20 @@
     .btn-back { background:#fff; color:#374151; border:1px solid #d1d5db; border-radius:8px; padding:8px 14px; font-size:0.85rem; cursor:pointer; display:flex; align-items:center; gap:6px; }
     .btn-back:hover { background:#f3f4f6; }
 
+    /* emission banner */
+    .emission-banner { background:linear-gradient(135deg,#0369a1,#0ea5e9); border-radius:14px; padding:20px 28px; margin-bottom:20px; display:flex; align-items:center; justify-content:space-between; gap:16px; flex-wrap:wrap; box-shadow:0 4px 16px rgba(3,105,161,0.25); }
+    .emission-banner-left { display:flex; align-items:center; gap:16px; }
+    .emission-icon { width:52px; height:52px; background:rgba(255,255,255,0.2); border-radius:14px; display:flex; align-items:center; justify-content:center; font-size:1.6rem; color:#fff; flex-shrink:0; }
+    .emission-title { color:#fff; font-weight:800; font-size:1.05rem; margin:0 0 3px; }
+    .emission-sub { color:rgba(255,255,255,0.8); font-size:0.85rem; margin:0; }
+    .emission-actions { display:flex; gap:10px; flex-wrap:wrap; align-items:center; }
+    .btn-emission-print { background:#fff; color:#0369a1; border:none; border-radius:10px; padding:10px 22px; font-size:0.9rem; font-weight:700; cursor:pointer; display:flex; align-items:center; gap:8px; transition:all 0.15s; }
+    .btn-emission-print:hover { background:#e0f2fe; transform:translateY(-1px); box-shadow:0 4px 12px rgba(0,0,0,0.15); }
+    .btn-emission-confirm { background:#16a34a; color:#fff; border:none; border-radius:10px; padding:10px 22px; font-size:0.9rem; font-weight:700; cursor:pointer; display:flex; align-items:center; gap:8px; transition:all 0.15s; }
+    .btn-emission-confirm:hover { background:#15803d; transform:translateY(-1px); box-shadow:0 4px 12px rgba(0,0,0,0.15); }
+    .btn-emission-cancel { background:rgba(255,255,255,0.15); color:#fff; border:1px solid rgba(255,255,255,0.35); border-radius:10px; padding:10px 18px; font-size:0.88rem; font-weight:600; cursor:pointer; display:flex; align-items:center; gap:6px; }
+    .btn-emission-cancel:hover { background:rgba(255,255,255,0.25); }
+
     /* document viewer */
     .doc-viewer { background:#fff; border-radius:14px; box-shadow:0 2px 8px rgba(0,0,0,0.07); min-height:400px; }
     .doc-panel { display:none; padding:0; }
@@ -118,8 +132,31 @@
     </div>
 
     <div id="pageContent" style="display:none">
+
+      <!-- Emission mode banner (shown only when estado === EMISION_DOCUMENTOS) -->
+      <div class="emission-banner" id="emissionBanner" style="display:none">
+        <div class="emission-banner-left">
+          <div class="emission-icon"><i class="bi bi-file-earmark-arrow-up-fill"></i></div>
+          <div>
+            <p class="emission-title">Emisión de Documentos</p>
+            <p class="emission-sub">Revisa y firma los documentos antes de confirmar el crédito como vigente</p>
+          </div>
+        </div>
+        <div class="emission-actions">
+          <button class="btn-emission-cancel" id="btnEmisionCancelar" onclick="cancelarEmision()">
+            <i class="bi bi-arrow-left"></i>Cancelar
+          </button>
+          <button class="btn-emission-print" onclick="imprimirTodos()">
+            <i class="bi bi-printer-fill"></i>Imprimir Todo
+          </button>
+          <button class="btn-emission-confirm" onclick="confirmarEmision()">
+            <i class="bi bi-check-circle-fill"></i>Confirmar — Marcar Vigente
+          </button>
+        </div>
+      </div>
+
       <!-- Action bar -->
-      <div class="action-bar">
+      <div class="action-bar" id="normalActionBar">
         <div class="credit-info">
           <div>
             <div class="credit-num" id="creditNumero">—</div>
@@ -157,6 +194,7 @@
     const params   = new URLSearchParams(location.search);
     const creditId = params.get('id');
     const tplOnly  = params.get('tpl'); // preview single template without credit data
+    let   _credito = null; // loaded credit record (for state transitions)
 
     /* ── Helpers ── */
     const fmtP  = v => v != null && v !== '' ? '$' + Math.round(Number(v)).toLocaleString('es-CL') : '___________';
@@ -378,6 +416,54 @@
       else window.location.href = '/creditos';
     }
 
+    /* ── Emission mode functions ── */
+    function buildCreditBody(nuevoEstado) {
+      const c = _credito || {};
+      return {
+        estado:        nuevoEstado,
+        observaciones: c.observaciones || null,
+        ejecutivo:     c.ejecutivo     || null,
+        dealer:        c.dealer        || null,
+        patente:       c.patente       || null,
+        color:         c.color         || null,
+        motor:         c.motor         || null,
+        chasis:        c.chasis        || null,
+      };
+    }
+
+    async function confirmarEmision() {
+      if (!creditId) return;
+      if (!confirm('¿Confirmar emisión y marcar el crédito como VIGENTE?')) return;
+      try {
+        const r = await fetch('/api/creditos/' + creditId, {
+          method: 'PUT', headers: apiHdr(),
+          body: JSON.stringify(buildCreditBody('VIGENTE'))
+        });
+        const j = await r.json();
+        if (!j.success) throw new Error(j.error);
+        window.location.href = '/creditos/revisar?id=' + creditId;
+      } catch(e) { alert('Error: ' + e.message); }
+    }
+
+    async function cancelarEmision() {
+      if (!creditId) { window.location.href = '/creditos'; return; }
+      if (!confirm('¿Cancelar la emisión? El crédito volverá a estado "Carga Respaldos".')) return;
+      try {
+        const r = await fetch('/api/creditos/' + creditId, {
+          method: 'PUT', headers: apiHdr(),
+          body: JSON.stringify(buildCreditBody('CARGA_RESPALDOS'))
+        });
+        const j = await r.json();
+        if (!j.success) throw new Error(j.error);
+        window.location.href = '/creditos/respaldos?id=' + creditId;
+      } catch(e) { alert('Error: ' + e.message); }
+    }
+
+    function activarModoEmision() {
+      document.getElementById('emissionBanner').style.display  = 'flex';
+      document.getElementById('normalActionBar').style.display = 'none';
+    }
+
     /* ── Load page ── */
     async function cargarPagina() {
       try {
@@ -423,7 +509,8 @@
         const [jCred, jParams] = await Promise.all([rCred.json(), rParams.json()]);
         if (!jCred.success) throw new Error(jCred.error || 'Crédito no encontrado');
 
-        const c   = jCred.data;
+        _credito  = jCred.data;
+        const c   = _credito;
         const par = (jParams.success && jParams.data?.obj) ? jParams.data.obj : {};
         const rut = c.rut_cliente;
 
@@ -437,6 +524,9 @@
         document.getElementById('creditNumero').textContent  = 'Operación N° ' + (c.numero_credito || creditId);
         document.getElementById('creditNombre').textContent  = c.nombre_cliente || '—';
         document.getElementById('creditRut').textContent     = c.rut_cliente || '—';
+
+        // Activate emission mode if state is EMISION_DOCUMENTOS
+        if (c.estado === 'EMISION_DOCUMENTOS') activarModoEmision();
 
         // Build variables and render
         const vars = buildVars(c, cli, par);

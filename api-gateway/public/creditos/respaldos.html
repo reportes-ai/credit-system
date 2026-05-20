@@ -139,7 +139,7 @@
   <a class="nav-brand" href="/creditos">
     <img src="/img/logo-autofacil.png" alt="AutoFácil" onerror="this.style.display='none'">
     <span>Carga de Respaldos</span>
-    <span class="version-badge">v1.2</span>
+    <span class="version-badge">v1.3</span>
   </a>
   <div style="display:flex;align-items:center;gap:10px">
     <span id="navUser" style="color:rgba(255,255,255,.75);font-size:.82rem"></span>
@@ -156,7 +156,7 @@
 <div class="action-bar" id="actionBar" style="display:none">
   <a href="/creditos" class="btn-accion btn-volver"><i class="bi bi-arrow-left"></i>Volver</a>
   <button class="btn-accion btn-aprobar" id="btnAprobar" onclick="aprobarCredito()" disabled>
-    <i class="bi bi-check-circle-fill"></i>Aprobar Crédito
+    <i class="bi bi-file-earmark-arrow-right-fill"></i>Emitir Documentos
   </button>
   <a id="btnDocBar" href="#" class="btn-accion" style="background:#0141A2;color:#fff;border:none;text-decoration:none">
     <i class="bi bi-file-earmark-text"></i>Ver Documentos
@@ -544,12 +544,12 @@ function actualizarProgreso() {
 
 /* ── Aprobar ── */
 async function aprobarCredito() {
-  if (!confirm('¿Aprobar el crédito y marcarlo como VIGENTE?')) return;
+  if (!confirm('¿Aprobar los respaldos y continuar a la emisión de documentos?')) return;
   try {
     const r = await fetch('/api/creditos/'+creditId, {
       method:'PUT', headers:apiHdr(),
       body: JSON.stringify({
-        estado:'VIGENTE', observaciones:_credito.observaciones||null,
+        estado:'EMISION_DOCUMENTOS', observaciones:_credito.observaciones||null,
         ejecutivo:_credito.ejecutivo||null, dealer:_credito.dealer||null,
         patente:_credito.patente||null, color:_credito.color||null,
         motor:_credito.motor||null, chasis:_credito.chasis||null,
@@ -557,8 +557,7 @@ async function aprobarCredito() {
     });
     const j = await r.json();
     if (!j.success) throw new Error(j.error);
-    showToast('¡Crédito aprobado como VIGENTE!', true);
-    setTimeout(() => location.href='/creditos/revisar?id='+creditId, 1200);
+    location.href = '/creditos/documentos?id='+creditId;
   } catch(e) { showToast('Error: '+e.message, false); }
 }
 
