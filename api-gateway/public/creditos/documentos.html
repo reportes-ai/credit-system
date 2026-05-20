@@ -1,0 +1,458 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Documentos del Crédito — AutoFácil</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.0/font/bootstrap-icons.css" rel="stylesheet">
+  <style>
+    :root { --navy:#0141A2; --navy-dark:#012d70; --navy-light:#0255c5; --accent:#009AFE; --bg:#f0f4f8; }
+    body { background:var(--bg); font-family:'Segoe UI',system-ui,sans-serif; margin:0; min-height:100vh; }
+    .topnav { background:linear-gradient(90deg,var(--navy-dark),var(--navy-light)); color:#fff; height:56px; padding:0 24px; display:flex; align-items:center; justify-content:space-between; position:sticky; top:0; z-index:200; box-shadow:0 2px 8px rgba(0,0,0,0.3); }
+    .topnav-left { display:flex; align-items:center; gap:16px; }
+    .topnav-brand { display:flex; align-items:center; gap:8px; }
+    .topnav-brand img { height:32px; filter:brightness(0) invert(1); }
+    .breadcrumb-nav { color:rgba(255,255,255,0.6); font-size:0.85rem; display:flex; align-items:center; gap:6px; }
+    .breadcrumb-nav a { color:rgba(255,255,255,0.75); text-decoration:none; }
+    .topnav-right { display:flex; align-items:center; gap:10px; }
+    .btn-logout { background:rgba(255,255,255,0.1); border:1px solid rgba(255,255,255,0.2); color:#fff; border-radius:8px; padding:5px 12px; font-size:0.82rem; cursor:pointer; }
+    .user-chip { background:rgba(255,255,255,0.12); border-radius:24px; padding:4px 12px; display:flex; align-items:center; gap:8px; font-size:0.82rem; }
+    .avatar { width:26px; height:26px; background:#90caf9; border-radius:50%; display:flex; align-items:center; justify-content:center; color:var(--navy); font-weight:700; font-size:0.72rem; }
+
+    .main-content { padding:28px 32px; max-width:1200px; margin:0 auto; }
+
+    /* tabs */
+    .doc-tabs { display:flex; gap:4px; background:#fff; border-radius:12px; padding:6px; box-shadow:0 1px 4px rgba(0,0,0,0.07); margin-bottom:20px; flex-wrap:wrap; }
+    .doc-tab { padding:8px 18px; border-radius:8px; border:none; background:transparent; font-size:0.85rem; font-weight:600; color:#6b7280; cursor:pointer; white-space:nowrap; transition:all 0.15s; display:flex; align-items:center; gap:6px; }
+    .doc-tab:hover { background:#f3f4f6; color:#111; }
+    .doc-tab.active { background:var(--navy); color:#fff; }
+    .doc-tab .badge-num { background:rgba(255,255,255,0.25); border-radius:10px; padding:1px 7px; font-size:0.72rem; }
+
+    /* action bar */
+    .action-bar { background:#fff; border-radius:12px; padding:14px 20px; margin-bottom:20px; display:flex; align-items:center; justify-content:space-between; box-shadow:0 1px 4px rgba(0,0,0,0.07); flex-wrap:wrap; gap:10px; }
+    .credit-info { display:flex; align-items:center; gap:16px; }
+    .credit-num { font-weight:700; font-size:1rem; color:#111; }
+    .credit-name { font-size:0.88rem; color:#374151; }
+    .credit-rut { font-size:0.82rem; color:#9ca3af; }
+    .action-btns { display:flex; gap:8px; flex-wrap:wrap; }
+    .btn-print-all { background:var(--navy); color:#fff; border:none; border-radius:8px; padding:8px 18px; font-size:0.85rem; font-weight:600; cursor:pointer; display:flex; align-items:center; gap:6px; }
+    .btn-print-all:hover { background:#0255c5; }
+    .btn-print-one { background:#f0f4f8; color:var(--navy); border:1px solid #d1d5db; border-radius:8px; padding:8px 16px; font-size:0.85rem; font-weight:600; cursor:pointer; display:flex; align-items:center; gap:6px; }
+    .btn-print-one:hover { background:#e5e7eb; }
+    .btn-back { background:#fff; color:#374151; border:1px solid #d1d5db; border-radius:8px; padding:8px 14px; font-size:0.85rem; cursor:pointer; display:flex; align-items:center; gap:6px; }
+    .btn-back:hover { background:#f3f4f6; }
+
+    /* document viewer */
+    .doc-viewer { background:#fff; border-radius:14px; box-shadow:0 2px 8px rgba(0,0,0,0.07); min-height:400px; }
+    .doc-panel { display:none; padding:0; }
+    .doc-panel.active { display:block; }
+
+    .loading-overlay { padding:80px; text-align:center; color:#9ca3af; }
+
+    /* ─── Document styles ─── */
+    .doc-wrap { padding:40px 52px; font-family:'Times New Roman',Times,serif; font-size:11pt; line-height:1.6; color:#111; }
+    .doc-page { max-width:700px; margin:0 auto; }
+    .doc-title { text-align:center; font-size:14pt; font-weight:bold; margin:0 0 4px; text-transform:uppercase; }
+    .doc-subtitle { text-align:center; font-size:11pt; margin:2px 0; }
+    .doc-intro { margin:16px 0; text-align:justify; }
+    .doc-nota { font-size:9pt; color:#555; margin-top:20px; font-style:italic; }
+    .doc-important { background:#fffbeb; border:1px solid #fde68a; border-radius:6px; padding:12px 16px; margin:16px 0; font-size:10pt; }
+    .sec-head { font-size:11pt; font-weight:bold; margin:18px 0 6px; border-bottom:1px solid #d1d5db; padding-bottom:4px; }
+    .doc-table { width:100%; border-collapse:collapse; margin:10px 0; font-size:10.5pt; }
+    .doc-table td, .doc-table th { border:1px solid #d1d5db; padding:6px 10px; vertical-align:top; }
+    .doc-table .td-label { background:#f9fafb; font-weight:600; width:45%; }
+    .doc-table .th-sec { background:#e8eaf6; font-weight:700; text-align:left; padding:7px 10px; }
+    .clause { margin:10px 0; text-align:justify; }
+    .doc-firma-block { margin:40px 0 20px; }
+    .firma-line { width:280px; border-top:1px solid #111; margin-bottom:6px; }
+    .doc-firmas-dos { display:flex; gap:60px; margin:40px 0 20px; }
+    .firma-col { flex:1; }
+    .firma-col .firma-line { width:100%; }
+
+    /* amortization table */
+    .amort-table { width:100%; border-collapse:collapse; margin:12px 0; font-size:10pt; }
+    .amort-table th { background:#e8eaf6; border:1px solid #d1d5db; padding:5px 8px; text-align:center; font-weight:700; font-size:9.5pt; }
+    .amort-table td { border:1px solid #e5e7eb; padding:4px 8px; text-align:right; font-size:9.5pt; }
+    .amort-table td:first-child, .amort-table td:nth-child(2) { text-align:center; }
+    .amort-table tr:nth-child(even) { background:#f9fafb; }
+    .amort-table tr:last-child { font-weight:700; background:#f0f4f8; }
+
+    /* print */
+    @media print {
+      body { background:#fff !important; }
+      .topnav, .action-bar, .doc-tabs, .no-print { display:none !important; }
+      .main-content { padding:0 !important; max-width:100% !important; }
+      .doc-viewer { box-shadow:none !important; border-radius:0 !important; }
+      .doc-panel { display:none !important; }
+      .doc-panel.print-target { display:block !important; }
+      .doc-wrap { padding:20px 32px !important; }
+    }
+  </style>
+</head>
+<body>
+  <nav class="topnav">
+    <div class="topnav-left">
+      <div class="topnav-brand">
+        <a href="/"><img src="/img/logo.png" alt="AutoFácil"></a>
+      </div>
+      <div class="breadcrumb-nav">
+        <a href="/creditos">Créditos</a>
+        <span>›</span>
+        <span id="bcCredito">Documentos</span>
+      </div>
+    </div>
+    <div class="topnav-right">
+      <div class="user-chip">
+        <div class="avatar" id="avatarInicial">?</div>
+        <span style="color:#fff" id="navNombre">—</span>
+      </div>
+      <button class="btn-logout" onclick="logout()"><i class="bi bi-box-arrow-right me-1"></i>Salir</button>
+    </div>
+  </nav>
+
+  <div class="main-content">
+    <div id="loadingOverlay" class="loading-overlay">
+      <i class="bi bi-hourglass-split" style="font-size:2.5rem;display:block;margin-bottom:16px"></i>
+      Generando documentos…
+    </div>
+
+    <div id="pageContent" style="display:none">
+      <!-- Action bar -->
+      <div class="action-bar">
+        <div class="credit-info">
+          <div>
+            <div class="credit-num" id="creditNumero">—</div>
+            <div class="credit-name" id="creditNombre">—</div>
+            <div class="credit-rut" id="creditRut">—</div>
+          </div>
+        </div>
+        <div class="action-btns">
+          <button class="btn-back" onclick="volver()"><i class="bi bi-arrow-left"></i>Volver</button>
+          <button class="btn-print-one" onclick="imprimirActual()"><i class="bi bi-printer"></i>Imprimir este</button>
+          <button class="btn-print-all" onclick="imprimirTodos()"><i class="bi bi-printer-fill"></i>Imprimir todos</button>
+        </div>
+      </div>
+
+      <!-- Tabs -->
+      <div class="doc-tabs" id="docTabs"></div>
+
+      <!-- Document viewer -->
+      <div class="doc-viewer" id="docViewer"></div>
+    </div>
+  </div>
+
+  <script>
+    /* ── Auth ── */
+    const token = localStorage.getItem('token');
+    const yo    = JSON.parse(localStorage.getItem('usuario') || 'null');
+    if (!token || !yo) window.location.href = '/login.html';
+    function apiHdr() { return { 'Content-Type': 'application/json', Authorization: 'Bearer ' + token }; }
+    function logout() { localStorage.removeItem('token'); localStorage.removeItem('usuario'); window.location.href = '/login.html'; }
+
+    document.getElementById('navNombre').textContent = `${yo?.nombre||''} ${yo?.apellido||''}`.trim();
+    document.getElementById('avatarInicial').textContent = (yo?.nombre||'?').charAt(0).toUpperCase();
+
+    /* ── URL params ── */
+    const params   = new URLSearchParams(location.search);
+    const creditId = params.get('id');
+    const tplOnly  = params.get('tpl'); // preview single template without credit data
+
+    /* ── Helpers ── */
+    const fmtP  = v => v != null && v !== '' ? '$' + Math.round(Number(v)).toLocaleString('es-CL') : '___________';
+    const fmtD  = s => s ? new Date(s).toLocaleDateString('es-CL', {timeZone:'UTC',day:'2-digit',month:'2-digit',year:'numeric'}) : '___________';
+    const MESES = ['enero','febrero','marzo','abril','mayo','junio','julio','agosto','septiembre','octubre','noviembre','diciembre'];
+    const blank = v => (v && String(v).trim()) ? v : '___________';
+
+    /* ── French amortization ── */
+    function buildAmortizacion(montoFinanciado, tasaMensual, plazo, fechaPrimeraCuota) {
+      const i = tasaMensual / 100;
+      const cuota = Math.round(montoFinanciado * i * Math.pow(1+i, plazo) / (Math.pow(1+i, plazo) - 1));
+      const rows = [];
+      let saldo = montoFinanciado;
+      const f0 = fechaPrimeraCuota ? new Date(fechaPrimeraCuota) : new Date();
+      for (let n = 1; n <= plazo; n++) {
+        const fechaCuota = new Date(f0);
+        fechaCuota.setMonth(fechaCuota.getMonth() + (n - 1));
+        const interes = Math.round(saldo * i);
+        const capital = cuota - interes;
+        saldo = Math.max(0, saldo - capital);
+        rows.push({ n, fecha: fechaCuota.toLocaleDateString('es-CL',{day:'2-digit',month:'2-digit',year:'numeric'}), saldo, capital, interes, cuota });
+      }
+      return rows;
+    }
+
+    function renderAmortTable(rows) {
+      if (!rows.length) return '';
+      return `<table class="amort-table">
+        <thead><tr>
+          <th>N° Cuota</th><th>Fecha de Pago</th><th>Saldo</th><th>Capital</th><th>Intereses</th><th>Cuota</th>
+        </tr></thead>
+        <tbody>
+          ${rows.map(r => `<tr>
+            <td>${r.n}</td>
+            <td>${r.fecha}</td>
+            <td>${r.saldo.toLocaleString('es-CL')}</td>
+            <td>${r.capital.toLocaleString('es-CL')}</td>
+            <td>${r.interes.toLocaleString('es-CL')}</td>
+            <td>${r.cuota.toLocaleString('es-CL')}</td>
+          </tr>`).join('')}
+        </tbody>
+      </table>`;
+    }
+
+    /* ── CAE calculation (IRR annualized) ── */
+    function calcCAE(montoFinanciado, cuota, plazo) {
+      if (!montoFinanciado || !cuota || !plazo) return '____%';
+      let r = 0.03;
+      for (let iter = 0; iter < 150; iter++) {
+        let pv = 0, dpv = 0;
+        for (let k = 1; k <= plazo; k++) {
+          const d = Math.pow(1+r, k);
+          pv  += cuota / d;
+          dpv -= k * cuota / (d * (1+r));
+        }
+        const f = pv - montoFinanciado;
+        if (Math.abs(dpv) < 1e-15) break;
+        const delta = f / dpv;
+        r -= delta;
+        if (Math.abs(delta) < 1e-10) break;
+      }
+      const cae = (Math.pow(1+r, 12) - 1) * 100;
+      return cae.toFixed(2) + '%';
+    }
+
+    /* ── Substitute variables in template HTML ── */
+    function substituir(html, vars) {
+      return html.replace(/\{\{([A-Z0-9_]+)\}\}/g, (_, key) => {
+        return key in vars ? (vars[key] ?? '___________') : `<span style="background:#fef3c7;padding:0 2px">{{${key}}}</span>`;
+      });
+    }
+
+    /* ── Build variables map ── */
+    function buildVars(c, cli, params, tplCodigo) {
+      // Gastos from parametros + datos_json
+      const dj = (() => { try { return JSON.parse(c.datos_json || '{}'); } catch { return {}; } })();
+      const p  = params || {};
+
+      const tasaMensual = parseFloat(c.tasa_mensual) || 0;
+      const plazo       = parseInt(c.plazo) || 0;
+      const cuota       = parseFloat(c.cuota) || 0;
+      const monto       = parseFloat(c.monto_financiado) || 0;
+      const saldo       = parseFloat(c.saldo_precio) || 0;
+
+      // Gastos desglose
+      const gastoTimbre    = parseFloat(dj.timbre || p.timbre || 0);
+      const gastoPrenda    = parseFloat(dj.prenda || p.prenda || 0);
+      const gastoInscripcion = parseFloat(dj.inscripcion || p.inscripcion || 0);
+      const gastoAdmin     = parseFloat(dj.gastos_admin || p.gastos_admin || 0);
+      const gastoGPS       = dj.chk_gps ? parseFloat(dj.gps_monto || p.gps || 0) : 0;
+
+      // Seguros
+      const costoDesgravamen = parseFloat(dj.desgravamen_monto || 0);
+      const costoCesantia    = parseFloat(dj.cesantia_monto || 0);
+      const totalSeguros     = parseFloat(c.seguros) || (costoDesgravamen + costoCesantia);
+      const totalGastos      = parseFloat(c.gastos_operativos) || (gastoTimbre + gastoPrenda + gastoInscripcion + gastoAdmin + gastoGPS);
+
+      // Amortización
+      const amortRows = buildAmortizacion(monto, tasaMensual, plazo, c.fecha_primera_cuota);
+      const tablaAmort = monto > 0 ? renderAmortTable(amortRows) : '<p><em>Datos insuficientes para generar tabla de amortización</em></p>';
+
+      // CAE
+      const cae = calcCAE(monto, cuota, plazo);
+
+      // Fecha hoy
+      const hoy = new Date();
+      const nombreCompleto = cli
+        ? `${cli.nombres||''} ${cli.apellido_paterno||''} ${cli.apellido_materno||''}`.replace(/\s+/g,' ').trim()
+        : (c.nombre_cliente || '___________');
+
+      return {
+        NUM_OP:            c.numero_credito || c.id_credito || '___________',
+        CAE:               cae,
+        FECHA_HOY:         hoy.toLocaleDateString('es-CL',{day:'2-digit',month:'2-digit',year:'numeric'}),
+        DIA:               String(hoy.getDate()).padStart(2,'0'),
+        MES_NOMBRE:        MESES[hoy.getMonth()],
+        ANO_ACTUAL:        String(hoy.getFullYear()),
+        NOMBRE_COMPLETO:   blank(nombreCompleto),
+        RUT_CLIENTE:       blank(c.rut_cliente),
+        ESTADO_CIVIL:      blank(cli?.estado_civil),
+        NACIONALIDAD:      blank(cli?.nacionalidad) === '___________' ? 'Chilena' : cli.nacionalidad,
+        DOMICILIO:         blank(cli?.direccion),
+        EMAIL:             blank(cli?.correo),
+        TELEFONO:          blank(cli?.telefono_movil),
+        TIPO_VEHICULO:     blank(c.tipo_vehiculo),
+        MARCA:             blank(c.marca),
+        MODELO:            blank(c.modelo),
+        ANO:               blank(c.anio),
+        PATENTE:           blank(c.patente),
+        COLOR:             blank(c.color),
+        MOTOR:             blank(c.motor),
+        CHASIS:            blank(c.chasis),
+        PRECIO_VEHICULO:   fmtP(c.valor_vehiculo),
+        PIE:               fmtP(c.pie),
+        SALDO_PRECIO:      fmtP(c.saldo_precio),
+        MONTO_FINANCIADO:  fmtP(c.monto_financiado),
+        TASA_MENSUAL:      tasaMensual > 0 ? tasaMensual.toFixed(2) + '%' : '____%',
+        PLAZO:             plazo > 0 ? String(plazo) : '___',
+        CUOTA:             fmtP(c.cuota),
+        COSTO_TOTAL:       cuota > 0 && plazo > 0 ? fmtP(cuota * plazo) : '___________',
+        FECHA_PRIMERA_CUOTA: fmtD(c.fecha_primera_cuota),
+        GASTO_TIMBRE:      fmtP(gastoTimbre || null),
+        GASTO_PRENDA:      fmtP(gastoPrenda || null),
+        GASTO_INSCRIPCION: fmtP(gastoInscripcion || null),
+        GASTO_ADMIN:       fmtP(gastoAdmin || null),
+        GASTO_GPS:         fmtP(gastoGPS || null),
+        TOTAL_GASTOS:      fmtP(totalGastos || c.gastos_operativos || null),
+        COSTO_DESGRAVAMEN: fmtP(costoDesgravamen || null),
+        COSTO_CESANTIA:    fmtP(costoCesantia || null),
+        TOTAL_SEGUROS:     fmtP(totalSeguros || null),
+        TABLA_AMORTIZACION: tablaAmort,
+      };
+    }
+
+    /* ── Render all documents ── */
+    const TAB_LABELS = {
+      hoja_resumen: { label: 'Hoja Resumen',              icon: 'bi-card-list' },
+      contrato:     { label: 'Contrato',                   icon: 'bi-file-earmark-ruled' },
+      pagare:       { label: 'Pagaré',                     icon: 'bi-pen' },
+      mandato_af:   { label: 'Mandato AutoFácil',          icon: 'bi-building-lock' },
+      mandato_ga:   { label: 'Mandato Gestiones',          icon: 'bi-building-gear' },
+    };
+
+    let _activeTab = null;
+
+    function renderDocs(plantillas, vars) {
+      const tabsEl   = document.getElementById('docTabs');
+      const viewerEl = document.getElementById('docViewer');
+
+      tabsEl.innerHTML   = '';
+      viewerEl.innerHTML = '';
+
+      plantillas.forEach((tpl, i) => {
+        const meta = TAB_LABELS[tpl.codigo] || { label: tpl.nombre, icon: 'bi-file-earmark' };
+
+        // Tab button
+        const btn = document.createElement('button');
+        btn.className  = 'doc-tab' + (i === 0 ? ' active' : '');
+        btn.dataset.tab = tpl.codigo;
+        btn.innerHTML  = `<i class="bi ${meta.icon}"></i>${meta.label}<span class="badge-num">${i+1}</span>`;
+        btn.onclick    = () => switchTab(tpl.codigo);
+        tabsEl.appendChild(btn);
+
+        // Panel
+        const panel = document.createElement('div');
+        panel.className = 'doc-panel' + (i === 0 ? ' active' : '');
+        panel.id = 'panel-' + tpl.codigo;
+        const rendered = substituir(tpl.contenido, vars);
+        panel.innerHTML = `<div class="doc-wrap">${rendered}</div>`;
+        viewerEl.appendChild(panel);
+      });
+
+      _activeTab = plantillas[0]?.codigo;
+    }
+
+    function switchTab(codigo) {
+      document.querySelectorAll('.doc-tab').forEach(b => b.classList.toggle('active', b.dataset.tab === codigo));
+      document.querySelectorAll('.doc-panel').forEach(p => p.classList.toggle('active', p.id === 'panel-' + codigo));
+      _activeTab = codigo;
+    }
+
+    /* ── Print functions ── */
+    function imprimirActual() {
+      document.querySelectorAll('.doc-panel').forEach(p => {
+        p.classList.remove('print-target');
+        if (p.id === 'panel-' + _activeTab) p.classList.add('print-target');
+      });
+      window.print();
+    }
+
+    function imprimirTodos() {
+      document.querySelectorAll('.doc-panel').forEach(p => p.classList.add('print-target'));
+      window.print();
+      setTimeout(() => document.querySelectorAll('.doc-panel').forEach(p => p.classList.remove('print-target')), 500);
+    }
+
+    function volver() {
+      if (creditId) window.location.href = '/creditos/revisar?id=' + creditId;
+      else window.location.href = '/creditos';
+    }
+
+    /* ── Load page ── */
+    async function cargarPagina() {
+      try {
+        // Fetch all plantillas
+        const rPlantillas = await fetch('/api/plantillas-documento', { headers: apiHdr() });
+        const jPlantillas = await rPlantillas.json();
+        if (!jPlantillas.success) throw new Error('Error cargando plantillas');
+        const plantillasIds = jPlantillas.data.map(p => p.codigo);
+
+        // Fetch content for each (parallel)
+        const contenidos = await Promise.all(
+          jPlantillas.data.map(p =>
+            fetch('/api/plantillas-documento/' + p.codigo, { headers: apiHdr() }).then(r => r.json())
+          )
+        );
+        const plantillas = contenidos.filter(j => j.success).map(j => j.data);
+
+        // If only preview mode (no credit id)
+        if (tplOnly && !creditId) {
+          const single = plantillas.find(p => p.codigo === tplOnly) || plantillas[0];
+          if (single) {
+            document.getElementById('creditNumero').textContent = 'Vista previa';
+            document.getElementById('creditNombre').textContent = single.nombre;
+            document.getElementById('creditRut').textContent    = 'Sin datos — variables marcadas en amarillo';
+            document.getElementById('bcCredito').textContent    = 'Vista previa';
+            const emptyC   = { numero_credito:'DEMO-001', rut_cliente:'12.345.678-9', nombre_cliente:'JUAN ANTONIO EJEMPLO SOTO', tasa_mensual:'2.90', plazo:36, cuota:300509, monto_financiado:6518208, saldo_precio:4990000, valor_vehiculo:8990000, pie:4000000, tipo_vehiculo:'Automóvil', marca:'NISSAN', modelo:'VERSA', anio:'2024', patente:'ABCD12', color:'Gris', motor:'HR16-000000', chasis:'3N1CN8AE0NL000001', gastos_operativos:753799, seguros:722263, fecha_primera_cuota:'2024-03-05', datos_json:'{}' };
+            const emptyCli = { nombres:'JUAN ANTONIO', apellido_paterno:'EJEMPLO', apellido_materno:'SOTO', estado_civil:'Soltero', nacionalidad:'Chilena', correo:'ejemplo@mail.com', telefono_movil:'+56912345678', direccion:'Av. Ejemplo 123, Santiago' };
+            const vars = buildVars(emptyC, emptyCli, {}, tplOnly);
+            renderDocs(plantillas.filter(p => p.codigo === tplOnly).concat(plantillas.filter(p => p.codigo !== tplOnly)), vars);
+          }
+          document.getElementById('loadingOverlay').style.display = 'none';
+          document.getElementById('pageContent').style.display    = 'block';
+          return;
+        }
+
+        if (!creditId) throw new Error('ID de crédito no especificado. Use ?id=XXX en la URL.');
+
+        // Fetch credit + parametros in parallel
+        const [rCred, rParams] = await Promise.all([
+          fetch('/api/creditos/' + creditId, { headers: apiHdr() }),
+          fetch('/api/parametros-credito',   { headers: apiHdr() }),
+        ]);
+        const [jCred, jParams] = await Promise.all([rCred.json(), rParams.json()]);
+        if (!jCred.success) throw new Error(jCred.error || 'Crédito no encontrado');
+
+        const c   = jCred.data;
+        const par = (jParams.success && jParams.data?.obj) ? jParams.data.obj : {};
+        const rut = c.rut_cliente;
+
+        // Fetch client data
+        const rCli = await fetch('/api/clientes/rut/' + encodeURIComponent(rut), { headers: apiHdr() });
+        const jCli = await rCli.json();
+        const cli  = (jCli.success && jCli.data) ? jCli.data : null;
+
+        // Update header
+        document.getElementById('bcCredito').textContent    = 'Documentos N° ' + (c.numero_credito || creditId);
+        document.getElementById('creditNumero').textContent  = 'Operación N° ' + (c.numero_credito || creditId);
+        document.getElementById('creditNombre').textContent  = c.nombre_cliente || '—';
+        document.getElementById('creditRut').textContent     = c.rut_cliente || '—';
+
+        // Build variables and render
+        const vars = buildVars(c, cli, par);
+        renderDocs(plantillas, vars);
+
+        document.getElementById('loadingOverlay').style.display = 'none';
+        document.getElementById('pageContent').style.display    = 'block';
+
+      } catch(e) {
+        document.getElementById('loadingOverlay').innerHTML =
+          `<i class="bi bi-exclamation-triangle" style="font-size:2.5rem;display:block;margin-bottom:16px;color:#dc2626"></i>
+           <span style="color:#dc2626;font-weight:600">${e.message}</span>`;
+      }
+    }
+
+    cargarPagina();
+  </script>
+</body>
+</html>

@@ -166,10 +166,11 @@
   <a class="nav-brand" href="/creditos">
     <img src="/img/logo-autofacil.png" alt="AutoFácil" onerror="this.style.display='none'">
     <span>Revisión de Crédito</span>
-    <span class="version-badge">v1.3</span>
+    <span class="version-badge">v1.4</span>
   </a>
   <div class="nav-actions">
     <span id="navUser" style="color:rgba(255,255,255,.75);font-size:.82rem"></span>
+    <a id="btnDocumentos" href="#" class="btn-back" style="background:rgba(255,255,255,.2);display:none" onclick="abrirDocumentos()"><i class="bi bi-file-earmark-text"></i>Documentos</a>
     <a href="/creditos" class="btn-back"><i class="bi bi-arrow-left"></i>Volver</a>
   </div>
 </nav>
@@ -726,7 +727,13 @@ function mostrarAmortizacion() {
 function cerrarAmort() { document.getElementById('amortOverlay').classList.remove('open'); }
 document.addEventListener('keydown', e => { if(e.key==='Escape') cerrarAmort(); });
 
-cargarPagina();
+function abrirDocumentos() {
+  window.open('/creditos/documentos?id=' + creditId, '_blank');
+}
+
+cargarPagina().then(() => {
+  document.getElementById('btnDocumentos').style.display = 'flex';
+}).catch(() => {});
 </script>
 </body>
 </html>
