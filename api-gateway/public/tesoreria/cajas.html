@@ -85,7 +85,7 @@
   <div class="topnav-left">
     <a href="/" class="topnav-brand">
       <img src="/img/logo.png" alt="AutoFácil">
-      <span class="version-badge">v1.4</span>
+      <span class="version-badge">v1.5</span>
     </a>
     <div class="breadcrumb-nav">
       <a href="/">Inicio</a><span class="sep">/</span>
@@ -412,17 +412,26 @@ async function toggleUsuario(id_usuario) {
   const u = _usuarios.find(x => x.id_usuario === id_usuario);
 
   if (asigEsta?.activo) {
-    // Ya está asignado → abrir panel de permisos
-    _usuarioSeleccionado = { id_usuario, nombre: u?.nombre_usuario||'', asig: asigEsta };
-    abrirPermisos(asigEsta);
+    // Ya está asignado → desasignar (toggle off)
+    if (!confirm(`¿Quitar a ${u?.nombre_usuario} de esta caja?`)) return;
+    await API(`/api/cajas/${id_caja}/usuarios/${id_usuario}`, { method:'DELETE' });
+    await recargarAsigCaja(id_caja);
+    cerrarPermisos();
+    renderUserList(document.getElementById('buscarUsuario').value.toLowerCase());
   } else {
-    // No está asignado → asignar con permisos base y abrir panel
+    // No está asignado → verificar que la caja no tenga ya un usuario activo
+    const yaAsignado = (_asigs[id_caja]||[]).find(a => a.activo && a.id_usuario !== id_usuario);
+    if (yaAsignado) {
+      const actual = _usuarios.find(x => x.id_usuario === yaAsignado.id_usuario);
+      if (!confirm(`Esta caja ya tiene asignado a ${actual?.nombre_usuario||'otro usuario'}. ¿Reemplazarlo por ${u?.nombre_usuario}?`)) return;
+      await API(`/api/cajas/${id_caja}/usuarios/${yaAsignado.id_usuario}`, { method:'DELETE' });
+    }
+    // Si el usuario ya está en otra caja, quitarlo de allá también
     const ucMap = mapUsuarioCaja();
     const otraCaja = ucMap[id_usuario];
     if (otraCaja?.activo && otraCaja.id_caja !== id_caja) {
-      if (!confirm(`${u?.nombre_usuario} ya tiene asignada la caja "${otraCaja.nombre_caja}". ¿Mover a esta caja?`)) return;
-      // Quitar de la otra caja
       await API(`/api/cajas/${otraCaja.id_caja}/usuarios/${id_usuario}`, { method:'DELETE' });
+      _asigs[otraCaja.id_caja] = (_asigs[otraCaja.id_caja]||[]).filter(a => a.id_usuario !== id_usuario);
     }
     // Asignar a esta caja con permisos por defecto
     const r = await API(`/api/cajas/${id_caja}/usuarios`, {
@@ -513,19 +522,10 @@ async function guardarCaja() {
   const j = await r.json();
   if (!j.success) return alert('Error: ' + j.error);
 
-  // Si era nueva caja, actualizar _cajaActual para poder asignar usuarios
-  if (!id) {
-    _cajas.push(j.data);
-    _asigs[j.data.id_caja] = [];
-    _cajaActual = j.data;
-    document.getElementById('cajId').value = j.data.id_caja;
-    document.getElementById('modalTitulo').textContent = `Editar — ${j.data.nombre}`;
-    renderUserList(document.getElementById('buscarUsuario').value.toLowerCase());
-  } else {
-    await cargarCajas();
-    _cajaActual = _cajas.find(c => c.id_caja == id) || _cajaActual;
-  }
+  await cargarCajas();
+  await cargarTodasAsignaciones();
   renderCajas();
+  modalBS.hide();
 }
 
 /* ── Helpers ─────────────────────────────────────────────────────────────── */
