@@ -168,7 +168,7 @@
   <div class="topnav-left">
     <a href="/" class="topnav-brand">
       <img src="/img/logo.png" alt="AutoFácil">
-      <span class="version-badge">v1.3</span>
+      <span class="version-badge">v1.4</span>
     </a>
     <div class="breadcrumb-nav">
       <a href="/">Inicio</a><span class="sep">/</span>
@@ -242,7 +242,7 @@
       <!-- Auto-ajuste -->
       <div class="auto-row">
         <label><i class="bi bi-calculator me-1"></i>Monto recibido</label>
-        <input type="number" id="autoMonto" class="auto-input" placeholder="$0" min="0" step="1" oninput="autoAjustar()">
+        <input type="text" id="autoMonto" class="auto-input" placeholder="$0" oninput="onPesoInput(this, autoAjustar)" inputmode="numeric">
         <span class="auto-hint" id="autoHint">Ingresa el monto recibido y se distribuirá automáticamente: primero gastos de cobranza, luego intereses por mora.</span>
       </div>
 
@@ -645,6 +645,29 @@ function actualizarPagoPanel() {
   }
 }
 
+/* ── Formato CLP en inputs ── */
+function onPesoInput(el, callback) {
+  const raw   = el.value.replace(/[^\d]/g, '');
+  const n     = parseInt(raw, 10) || 0;
+  const start = el.selectionStart;
+  const prev  = el.value.length;
+  el.value       = raw === '' ? '' : '$' + n.toLocaleString('es-CL');
+  el.dataset.raw = n;
+  const diff = el.value.length - prev;
+  try { el.setSelectionRange(start + diff, start + diff); } catch(e){}
+  if (callback) callback();
+}
+function getPesoVal(el) {
+  if (!el) return 0;
+  if (el.dataset.raw !== undefined) return parseInt(el.dataset.raw, 10) || 0;
+  return parseInt(String(el.value).replace(/[^\d]/g,''), 10) || 0;
+}
+function setPesoVal(el, n) {
+  if (!el) return;
+  el.value       = n > 0 ? '$' + Math.round(n).toLocaleString('es-CL') : '$0';
+  el.dataset.raw = Math.round(n);
+}
+
 function renderBreakdown(gastosOverride={}, moraOverride={}) {
   const datos = datosCuotasSeleccionadas();
   let sumBase=0, sumGastos=0, sumMora=0;
@@ -661,28 +684,33 @@ function renderBreakdown(gastosOverride={}, moraOverride={}) {
     const gClass = g < d.gastosMin ? 'err' : g < d.gastos ? 'warn' : '';
     const mClass = m < d.moraMin   ? 'err' : m < d.mora   ? 'warn' : '';
 
-    const gBadge = gCond > 0 ? `<span class="cond-badge ${gClass?'cond-max':'cond-ok'}">-${clp(gCond)}</span>` : '';
-    const mBadge = mCond > 0 ? `<span class="cond-badge ${mClass?'cond-max':'cond-ok'}">-${clp(mCond)}</span>` : '';
+    const gBadge = gCond > 0 ? `<span class="cond-badge ${gClass?'cond-max':'cond-ok'}" title="Condonación">-${clp(gCond)}</span>` : '';
+    const mBadge = mCond > 0 ? `<span class="cond-badge ${mClass?'cond-max':'cond-ok'}" title="Condonación">-${clp(mCond)}</span>` : '';
+
+    const gFmt = g > 0 ? '$' + Math.round(g).toLocaleString('es-CL') : '$0';
+    const mFmt = m > 0 ? '$' + Math.round(m).toLocaleString('es-CL') : '$0';
 
     return `<tr>
       <td><strong>N°${d.num}</strong></td>
       <td style="color:#6b7280;font-size:.78rem">${fmtFecha(d.s.fecha)}</td>
       <td class="text-right amt">${clp(d.s.monto)}</td>
       <td class="text-right">
-        <input type="number" class="bd-input ${gClass}" id="g_${d.num}"
-          value="${g}" min="${d.gastosMin}" max="${d.gastos}"
+        <input type="text" inputmode="numeric" class="bd-input ${gClass}" id="g_${d.num}"
+          value="${gFmt}" data-raw="${Math.round(g)}"
+          data-min="${d.gastosMin}" data-max="${d.gastos}"
           ${d.gastos===0?'disabled':(!_miCaja?.puede_condonar_gastos?'readonly':'')}
-          oninput="onBreakdownChange()">
+          oninput="onPesoInput(this, onBreakdownChange)">
         ${gBadge}
       </td>
       <td class="text-right">
-        <input type="number" class="bd-input ${mClass}" id="m_${d.num}"
-          value="${m}" min="${d.moraMin}" max="${d.mora}"
+        <input type="text" inputmode="numeric" class="bd-input ${mClass}" id="m_${d.num}"
+          value="${mFmt}" data-raw="${Math.round(m)}"
+          data-min="${d.moraMin}" data-max="${d.mora}"
           ${d.mora===0?'disabled':(!_miCaja?.puede_condonar_intereses?'readonly':'')}
-          oninput="onBreakdownChange()">
+          oninput="onPesoInput(this, onBreakdownChange)">
         ${mBadge}
       </td>
-      <td class="text-right amt" style="font-weight:800">${clp(total)}</td>
+      <td class="text-right amt" style="font-weight:800" id="tot_${d.num}">${clp(total)}</td>
     </tr>`;
   }).join('');
 
@@ -704,75 +732,91 @@ function onBreakdownChange() {
   const datos = datosCuotasSeleccionadas();
   let hasErr = false;
   datos.forEach(d => {
-    const g = parseFloat(document.getElementById(`g_${d.num}`)?.value)||0;
-    const m = parseFloat(document.getElementById(`m_${d.num}`)?.value)||0;
+    const g = getPesoVal(document.getElementById(`g_${d.num}`));
+    const m = getPesoVal(document.getElementById(`m_${d.num}`));
     total += d.s.monto + g + m;
+    // actualizar el total de esa fila
+    const totEl = document.getElementById(`tot_${d.num}`);
+    if (totEl) totEl.textContent = clp(d.s.monto + g + m);
     if (g < d.gastosMin || m < d.moraMin) hasErr = true;
   });
   document.getElementById('ppTotal').textContent = clp(total);
+  // actualizar fila de totales
+  const tfoot = document.getElementById('breakdownFoot');
+  if (tfoot) {
+    const cells = tfoot.querySelectorAll('td');
+    if (cells.length >= 6) {
+      cells[3].textContent = clp(datos.reduce((a,d)=>a+getPesoVal(document.getElementById(`g_${d.num}`)),0));
+      cells[4].textContent = clp(datos.reduce((a,d)=>a+getPesoVal(document.getElementById(`m_${d.num}`)),0));
+      cells[5].textContent = clp(total);
+    }
+  }
   mostrarError(hasErr ? 'La condonación supera el límite permitido en una o más cuotas.' : '');
 }
 
-/* ── Auto-ajuste ── */
+/* ── Auto-ajuste (condona gastos primero, luego mora) ── */
 function autoAjustar() {
-  const T = parseFloat(document.getElementById('autoMonto').value)||0;
+  const T = getPesoVal(document.getElementById('autoMonto'));
   const datos = datosCuotasSeleccionadas();
   if (!datos.length) return;
 
-  const sumBase    = datos.reduce((a,d)=>a+d.s.monto, 0);
-  const sumGastos  = datos.reduce((a,d)=>a+d.gastos, 0);
-  const sumMora    = datos.reduce((a,d)=>a+d.mora, 0);
-  const sumTotal   = sumBase + sumGastos + sumMora;
+  const sumBase   = datos.reduce((a,d)=>a+d.s.monto, 0);
+  const sumGastos = datos.reduce((a,d)=>a+d.gastos, 0);
+  const sumMora   = datos.reduce((a,d)=>a+d.mora, 0);
+  const sumTotal  = sumBase + sumGastos + sumMora;
 
-  if (T < sumBase) {
-    mostrarError(`Monto insuficiente. El mínimo es ${clp(sumBase)} (suma de cuotas base sin condonar gastos ni mora).`);
+  if (T > 0 && T < sumBase) {
+    mostrarError(`Monto insuficiente. El mínimo es ${clp(sumBase)} (solo cuotas base, sin gastos ni mora).`);
     renderBreakdown({},{});
     return;
   }
+  if (T === 0) { renderBreakdown(); return; }
   mostrarError('');
 
-  let excess = T - sumBase;
+  const excess = T - sumBase;   // lo que queda tras cubrir las cuotas base
   const gastosOverride = {}, moraOverride = {};
 
-  if (excess >= sumGastos) {
-    // Pagar todos los gastos
-    datos.forEach(d => gastosOverride[d.num] = d.gastos);
-    excess -= sumGastos;
-    // Distribuir el resto en mora
+  if (excess >= sumMora + sumGastos) {
+    // Alcanza para todo — sin condonación
+    datos.forEach(d => { gastosOverride[d.num] = d.gastos; moraOverride[d.num] = d.mora; });
+
+  } else if (excess >= sumMora) {
+    // Alcanza para pagar toda la mora; el resto va a gastos (proporcional)
+    datos.forEach(d => moraOverride[d.num] = d.mora);
+    const restoGastos = excess - sumMora;
+    datos.forEach(d => {
+      const prop = sumGastos > 0 ? Math.round(d.gastos * restoGastos / sumGastos) : 0;
+      gastosOverride[d.num] = Math.max(d.gastosMin, Math.min(d.gastos, prop));
+    });
+
+  } else {
+    // No alcanza para la mora completa → condona todos los gastos, distribuye en mora
+    datos.forEach(d => gastosOverride[d.num] = 0);   // gastos condonados primero
     if (sumMora > 0) {
-      if (excess >= sumMora) {
-        datos.forEach(d => moraOverride[d.num] = d.mora);
-      } else {
-        // Proporcional, respetando mínimos
-        datos.forEach(d => {
-          const proporcional = Math.round(d.mora * excess / sumMora);
-          moraOverride[d.num] = Math.max(d.moraMin, Math.min(d.mora, proporcional));
-        });
-        // Ajuste fino de centavos
-        const sumAjustada = datos.reduce((a,d)=>a+moraOverride[d.num],0);
-        if (sumAjustada > excess && datos.length) {
-          moraOverride[datos[datos.length-1].num] = Math.max(datos[datos.length-1].moraMin, moraOverride[datos[datos.length-1].num] - (sumAjustada - Math.round(excess)));
-        }
+      datos.forEach(d => {
+        const prop = Math.round(d.mora * excess / sumMora);
+        moraOverride[d.num] = Math.max(d.moraMin, Math.min(d.mora, prop));
+      });
+      // Ajuste fino por redondeo
+      const diff = datos.reduce((a,d)=>a+moraOverride[d.num],0) - Math.round(excess);
+      if (diff > 0) {
+        const last = datos[datos.length-1];
+        moraOverride[last.num] = Math.max(last.moraMin, moraOverride[last.num] - diff);
       }
     } else {
       datos.forEach(d => moraOverride[d.num] = 0);
     }
-  } else {
-    // No alcanza ni para todos los gastos → distribuir proporcional en gastos, mora = 0
-    datos.forEach(d => {
-      const proporcional = sumGastos > 0 ? Math.round(d.gastos * excess / sumGastos) : 0;
-      gastosOverride[d.num] = Math.max(d.gastosMin, Math.min(d.gastos, proporcional));
-      moraOverride[d.num] = 0;
-    });
   }
 
-  // Hint
-  const totalResultante = sumBase + datos.reduce((a,d)=>a+gastosOverride[d.num],0) + datos.reduce((a,d)=>a+moraOverride[d.num],0);
-  const totalCondonado  = sumTotal - totalResultante;
+  const totalResultante = sumBase
+    + datos.reduce((a,d)=>a+(gastosOverride[d.num]??d.gastos),0)
+    + datos.reduce((a,d)=>a+(moraOverride[d.num]??d.mora),0);
+  const totalCondonado = sumTotal - totalResultante;
+
   document.getElementById('autoHint').textContent = totalCondonado > 0
-    ? `Se condona ${clp(totalCondonado)} (primero gastos de cobranza, luego intereses por mora).`
+    ? `Se condona ${clp(totalCondonado)}: gastos de cobranza primero, luego intereses por mora.`
     : T > sumTotal
-      ? `Se cobrará el total sin condonación. El excedente de ${clp(T-sumTotal)} queda a favor del cliente.`
+      ? `Se cobrará el total sin condonación (excedente ${clp(T - sumTotal)} a favor del cliente).`
       : 'Se cobrará el total sin condonación.';
 
   renderBreakdown(gastosOverride, moraOverride);
@@ -798,8 +842,8 @@ async function confirmarMultiPago() {
 
   // Leer valores del breakdown
   const pagos = datos.map(d => {
-    const g = parseFloat(document.getElementById(`g_${d.num}`)?.value)||0;
-    const m = parseFloat(document.getElementById(`m_${d.num}`)?.value)||0;
+    const g = getPesoVal(document.getElementById(`g_${d.num}`));
+    const m = getPesoVal(document.getElementById(`m_${d.num}`));
     return { num: d.num, s: d.s, g, m, moraMin: d.moraMin, gastosMin: d.gastosMin };
   });
 
