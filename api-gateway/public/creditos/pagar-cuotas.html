@@ -137,7 +137,7 @@
   <a href="/creditos" class="nav-brand">
     <img src="/img/logo-autofacil.png" alt="AutoFácil" onerror="this.style.display='none'">
     <span>Pago de Cuotas</span>
-    <span class="version-badge">v1.2</span>
+    <span class="version-badge">v1.3</span>
   </a>
   <div class="nav-actions">
     <span id="navUser" style="color:rgba(255,255,255,.75);font-size:.82rem"></span>
@@ -183,6 +183,7 @@
         <div>
           <div class="field-label">Gastos de Cobranza ($)</div>
           <input type="number" class="field-input" id="mpGastosCob" oninput="calcTotal()" placeholder="0" value="0">
+          <div id="mpGastosInfo" style="font-size:.72rem;color:#b45309;margin-top:3px"></div>
         </div>
       </div>
       <div class="form-row single">
@@ -236,6 +237,7 @@ let _pagos    = [];
 let _amort    = []; // schedule calculado
 let _pagoModal = null; // cuota en edición
 let _tmc      = null; // tasa máxima convencional vigente
+let _uf       = null; // valor UF vigente
 
 const fmtP  = v => v != null ? '$'+Math.round(Number(v)).toLocaleString('es-CL') : '$0';
 const fmtD  = s => s ? new Date(s).toLocaleDateString('es-CL',{timeZone:'UTC',day:'2-digit',month:'2-digit',year:'numeric'}) : '—';
@@ -280,20 +282,38 @@ function calcMora(montoCuota, fechaVenc, fechaPago) {
   return { monto: Math.round(montoCuota * (tmc/100/365) * dias), dias, tmc };
 }
 
+/* ── Gastos de cobranza (escalonado, art. 37 Ley 19.628 / DL 2.462) ── */
+// Solo aplica cuando la cuota cumple ≥21 días de mora
+// Tramos: 9% primeros 10 UF | 6% entre 10–50 UF | 3% sobre 50 UF
+function calcGastosCobranza(montoVencido, diasMora) {
+  if (diasMora < 21 || !_uf || !montoVencido) return { monto:0, aplica:false };
+  const ufVal = parseFloat(_uf.valor) || 0;
+  if (!ufVal) return { monto:0, aplica:false };
+  const uf10 = ufVal * 10;
+  const uf40 = ufVal * 40; // tramo 2 tiene ancho 40 UF (de 10 a 50)
+  let gastos = 0, saldo = montoVencido;
+  const t1 = Math.min(saldo, uf10);  gastos += t1 * 0.09; saldo -= t1;
+  const t2 = Math.min(saldo, uf40);  gastos += t2 * 0.06; saldo -= t2;
+  if (saldo > 0)                      gastos += saldo * 0.03;
+  return { monto: Math.round(gastos), aplica:true, ufVal, diasMora };
+}
+
 /* ── Load ── */
 async function cargarPagina() {
   if (!creditId) { document.getElementById('pageWrap').innerHTML='<div class="no-data"><i class="bi bi-exclamation-triangle"></i>ID no especificado</div>'; return; }
   try {
-    const [rc, rp, rt] = await Promise.all([
+    const [rc, rp, rt, ru] = await Promise.all([
       fetch('/api/creditos/'+creditId, { headers:apiHdr() }),
       fetch('/api/pagos-credito/'+creditId, { headers:apiHdr() }),
       fetch('/api/tasas/vigente', { headers:apiHdr() }),
+      fetch('/api/uf/vigente',    { headers:apiHdr() }),
     ]);
-    const [jc, jp, jt] = await Promise.all([rc.json(), rp.json(), rt.json()]);
+    const [jc, jp, jt, ju] = await Promise.all([rc.json(), rp.json(), rt.json(), ru.json()]);
     if (!jc.success) throw new Error(jc.error);
     _credito = jc.data;
     _pagos   = jp.success ? (jp.data||[]) : [];
     _tmc     = jt.success ? jt.data : null;
+    _uf      = ju.success ? ju.data : null;
     _amort   = buildAmort(
       parseFloat(_credito.monto_financiado)||0,
       parseFloat(_credito.tasa_mensual)||0,
@@ -333,8 +353,11 @@ function renderPagina() {
 
     let pillHtml, accionHtml;
     const fechaVencStr = r.fecha ? r.fecha.toISOString().split('T')[0] : '';
-    let moraInfo = null;
-    if (vencida) moraInfo = calcMora(r.cuota, fechaVencStr, null);
+    let moraInfo = null, gcInfo = null;
+    if (vencida) {
+      moraInfo = calcMora(r.cuota, fechaVencStr, null);
+      gcInfo   = calcGastosCobranza(r.cuota, moraInfo.dias);
+    }
 
     let intMoraDisplay = '—', gtosDisplay = '—', totalDisplay = '—';
     if (pagos.length) {
@@ -343,6 +366,11 @@ function renderPagina() {
       totalDisplay   = fmtP(pagos[0].total_pagado);
     } else if (moraInfo && moraInfo.dias > 0) {
       intMoraDisplay = `<span class="amt-mora">${fmtP(moraInfo.monto)}</span><br><span style="font-size:.68rem;color:#b45309">${moraInfo.dias} días</span>`;
+      if (gcInfo && gcInfo.aplica) {
+        gtosDisplay = `<span class="amt-mora">${fmtP(gcInfo.monto)}</span>`;
+      } else if (moraInfo.dias > 0) {
+        gtosDisplay = `<span style="font-size:.72rem;color:#b45309">día ${21-moraInfo.dias>0?21-moraInfo.dias+' para cobro':'—'}</span>`;
+      }
     }
 
     if (pagos.length) {
@@ -435,7 +463,7 @@ function abrirModalPago(numeroCuota, fechaVenc, montoCuota) {
   const ahora = new Date();
   const local  = new Date(ahora.getTime() - ahora.getTimezoneOffset()*60000).toISOString().slice(0,16);
   document.getElementById('mpFechaPago').value = local;
-  // Calcular mora automáticamente
+  // Calcular mora automáticamente (TMC diaria)
   const mora = calcMora(montoCuota, fechaVenc, null);
   document.getElementById('mpInteresMora').value = mora.monto || 0;
   const infoEl = document.getElementById('mpMoraInfo');
@@ -443,6 +471,17 @@ function abrirModalPago(numeroCuota, fechaVenc, montoCuota) {
     infoEl.innerHTML = `<i class="bi bi-info-circle"></i> ${mora.dias} días en mora · TMC ${mora.tmc.toFixed(2)}% anual`;
   } else {
     infoEl.textContent = '';
+  }
+  // Calcular gastos de cobranza (aplica desde día 21 de mora)
+  const gc = calcGastosCobranza(montoCuota, mora.dias);
+  document.getElementById('mpGastosCob').value = gc.monto || 0;
+  const gcInfoEl = document.getElementById('mpGastosInfo');
+  if (gc.aplica) {
+    gcInfoEl.innerHTML = `<i class="bi bi-info-circle"></i> Escalonado legal · UF $${Math.round(gc.ufVal).toLocaleString('es-CL')}`;
+  } else if (mora.dias > 0 && mora.dias < 21) {
+    gcInfoEl.innerHTML = `<i class="bi bi-clock"></i> Aplica a partir del día 21 (faltan ${21-mora.dias} días)`;
+  } else {
+    gcInfoEl.textContent = '';
   }
   calcTotal();
   document.getElementById('modalPago').classList.add('open');
