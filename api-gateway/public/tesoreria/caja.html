@@ -138,7 +138,7 @@
   <div class="topnav-left">
     <a href="/" class="topnav-brand">
       <img src="/img/logo.png" alt="AutoFácil">
-      <span class="version-badge">v1.0</span>
+      <span class="version-badge">v1.1</span>
     </a>
     <div class="breadcrumb-nav">
       <a href="/">Inicio</a><span class="sep">/</span>
@@ -280,31 +280,19 @@ let _schedule = [];
 function renderCajaHeader() {
   const wrap = document.getElementById('cajaHeaderWrap');
   if (!_miCaja) {
-    // Administradores y Gerentes pueden acceder sin caja asignada
-    const esAdmin = ['Administrador','Gerente'].includes(yo?.perfil);
-    if (esAdmin) {
-      wrap.innerHTML = `
-        <div class="caja-header" style="border-left-color:#f59e0b">
-          <i class="bi bi-exclamation-triangle text-warning" style="font-size:1.6rem"></i>
-          <div class="caja-header-info">
-            <h6>Sin caja asignada</h6>
-            <span>Accediendo como ${yo?.perfil} — todos los permisos habilitados</span>
-          </div>
-        </div>`;
-      _miCaja = { puede_pagar_cuotas:1, puede_reversar_pagos:1, puede_condonar_intereses:1, tope_intereses:100, puede_condonar_gastos:1, tope_gastos:100, nombre_caja:'Administración' };
-    } else {
-      wrap.innerHTML = `
-        <div class="no-caja-alert">
-          <i class="bi bi-lock"></i>
-          <div>
-            <strong>Sin caja asignada</strong>
-            <p style="margin:4px 0 0;font-size:.88rem">No tienes una caja activa asignada. Contacta al administrador para que te asigne una caja con permisos de operación.</p>
-          </div>
-        </div>`;
-      document.getElementById('searchInput').disabled = true;
-      document.querySelector('.btn-buscar').disabled  = true;
-      return;
-    }
+    // Sin caja asignada → bloqueado para TODOS (incluyendo Admin/Gerente)
+    // Los pagos siempre deben ir contra una caja real
+    wrap.innerHTML = `
+      <div class="no-caja-alert">
+        <i class="bi bi-lock"></i>
+        <div>
+          <strong>Sin caja asignada</strong>
+          <p style="margin:4px 0 0;font-size:.88rem">No tienes una caja activa asignada. Los pagos deben registrarse contra una caja. Contacta al administrador para que te asigne una.</p>
+        </div>
+      </div>`;
+    document.getElementById('searchInput').disabled = true;
+    document.querySelector('.btn-buscar').disabled  = true;
+    return;
   } else {
     const perms = [];
     if (_miCaja.puede_pagar_cuotas)       perms.push(`<span class="perm-chip perm-on"><i class="bi bi-cash"></i> Pagar cuotas</span>`);
@@ -663,6 +651,7 @@ async function confirmarPago() {
     gastos_cobranza: gastos_cob, total_pagado, fecha_pago,
     fecha_vencimiento: cuota?.fecha || null,
     observacion: observacion || null,
+    id_caja: _miCaja?.id_caja || null,
   };
 
   const r = await API('/api/pagos-credito', { method:'POST', body: JSON.stringify(body) });
