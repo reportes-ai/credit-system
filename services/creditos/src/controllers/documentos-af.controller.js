@@ -1,4 +1,5 @@
-const pool = require('../../../../shared/config/database');
+const pool  = require('../../../../shared/config/database');
+const audit = require('../../../../shared/auditoria');
 
 /* ─── Ensure table ───────────────────────────────────────────────────────── */
 (async () => {
@@ -69,6 +70,12 @@ const upload = async (req, res) => {
          WHERE id_credito=? AND codigo=?`,
         [nombre || codigo, mime_type || null, buf, comentario || null, id_credito, codigo]
       );
+      audit.registrar({
+        id_credito, req,
+        accion: 'DOC_AF_CARGADO',
+        detalle: `Doc. AF reemplazado: ${nombre || codigo}`,
+        meta: { codigo, nombre: nombre || codigo, reemplazado: true },
+      });
       res.json({ success: true, data: { id_doc_af: existing[0].id_doc_af }, error: null });
     } else {
       const [r] = await pool.query(
@@ -76,6 +83,12 @@ const upload = async (req, res) => {
          VALUES (?,?,?,?,?,?)`,
         [id_credito, codigo, nombre || codigo, mime_type || null, buf, comentario || null]
       );
+      audit.registrar({
+        id_credito, req,
+        accion: 'DOC_AF_CARGADO',
+        detalle: `Doc. AF cargado: ${nombre || codigo}`,
+        meta: { codigo, nombre: nombre || codigo },
+      });
       res.status(201).json({ success: true, data: { id_doc_af: r.insertId }, error: null });
     }
   } catch (e) { res.status(500).json({ success: false, data: null, error: e.message }); }
@@ -98,6 +111,7 @@ const validar = async (req, res) => {
     const { validado_por } = req.body;
     if (!validado_por)
       return res.status(400).json({ success: false, data: null, error: 'validado_por es requerido' });
+    const [doc] = await pool.query('SELECT id_credito, codigo, nombre FROM documentos_af WHERE id_doc_af=?', [req.params.id_doc]);
     await pool.query(
       `UPDATE documentos_af
        SET validado=1, validado_por=?, validado_at=NOW(),
@@ -105,6 +119,14 @@ const validar = async (req, res) => {
        WHERE id_doc_af=?`,
       [validado_por, req.params.id_doc]
     );
+    if (doc.length) {
+      audit.registrar({
+        id_credito: doc[0].id_credito, req,
+        accion: 'DOC_AF_APROBADO',
+        detalle: `Doc. AF aprobado: ${doc[0].nombre || doc[0].codigo}`,
+        meta: { codigo: doc[0].codigo, nombre: doc[0].nombre, aprobado_por: validado_por },
+      });
+    }
     res.json({ success: true, data: null, error: null });
   } catch (e) { res.status(500).json({ success: false, data: null, error: e.message }); }
 };
@@ -115,6 +137,7 @@ const rechazar = async (req, res) => {
     const { comentario_rechazo, rechazado_por } = req.body;
     if (!comentario_rechazo)
       return res.status(400).json({ success: false, data: null, error: 'comentario_rechazo es requerido' });
+    const [doc] = await pool.query('SELECT id_credito, codigo, nombre FROM documentos_af WHERE id_doc_af=?', [req.params.id_doc]);
     await pool.query(
       `UPDATE documentos_af
        SET rechazado=1, comentario_rechazo=?, rechazado_por=?, rechazado_at=NOW(),
@@ -122,6 +145,14 @@ const rechazar = async (req, res) => {
        WHERE id_doc_af=?`,
       [comentario_rechazo, rechazado_por || null, req.params.id_doc]
     );
+    if (doc.length) {
+      audit.registrar({
+        id_credito: doc[0].id_credito, req,
+        accion: 'DOC_AF_RECHAZADO',
+        detalle: `Doc. AF rechazado: ${doc[0].nombre || doc[0].codigo} — ${comentario_rechazo}`,
+        meta: { codigo: doc[0].codigo, nombre: doc[0].nombre, motivo: comentario_rechazo, rechazado_por },
+      });
+    }
     res.json({ success: true, data: null, error: null });
   } catch (e) { res.status(500).json({ success: false, data: null, error: e.message }); }
 };

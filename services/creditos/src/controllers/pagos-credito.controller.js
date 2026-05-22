@@ -1,4 +1,5 @@
-const pool = require('../../../../shared/config/database');
+const pool  = require('../../../../shared/config/database');
+const audit = require('../../../../shared/auditoria');
 
 (async () => {
   try {
@@ -77,6 +78,12 @@ const create = async (req, res) => {
        fecha_pago || null, estado_pago || 'PAGADO',
        observacion || null, registrado_por]
     );
+    audit.registrar({
+      id_credito, req,
+      accion: 'PAGO_REGISTRADO',
+      detalle: `Cuota N°${numero_cuota} pagada — Total: $${Math.round(tp).toLocaleString('es-CL')}`,
+      meta: { numero_cuota, monto_cuota: parseFloat(monto_cuota)||0, interes_mora: parseFloat(interes_mora)||0, gastos_cobranza: parseFloat(gastos_cobranza)||0, total_pagado: tp, fecha_pago: fecha_pago || null },
+    });
     res.status(201).json({ success: true, data: { id_pago: r.insertId }, error: null });
   } catch(e) { res.status(500).json({ success: false, data: null, error: e.message }); }
 };
@@ -84,7 +91,19 @@ const create = async (req, res) => {
 /* ─── DELETE pago ────────────────────────────────────────────────────────── */
 const remove = async (req, res) => {
   try {
+    const [prev] = await pool.query(
+      'SELECT id_credito, numero_cuota, total_pagado FROM pagos_credito WHERE id_pago=?',
+      [req.params.id_pago]
+    );
     await pool.query('DELETE FROM pagos_credito WHERE id_pago = ?', [req.params.id_pago]);
+    if (prev.length) {
+      audit.registrar({
+        id_credito: prev[0].id_credito, req,
+        accion: 'PAGO_ELIMINADO',
+        detalle: `Pago cuota N°${prev[0].numero_cuota} eliminado (total era $${Math.round(prev[0].total_pagado||0).toLocaleString('es-CL')})`,
+        meta: { numero_cuota: prev[0].numero_cuota, total_pagado: prev[0].total_pagado },
+      });
+    }
     res.json({ success: true, data: { mensaje: 'Pago eliminado' }, error: null });
   } catch(e) { res.status(500).json({ success: false, data: null, error: e.message }); }
 };

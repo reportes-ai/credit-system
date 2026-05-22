@@ -1,4 +1,5 @@
-const pool = require('../../../../shared/config/database');
+const pool  = require('../../../../shared/config/database');
+const audit = require('../../../../shared/auditoria');
 
 /* ─── Migración ──────────────────────────────────────────────────────────── */
 (async () => {
@@ -154,6 +155,12 @@ const create = async (req, res) => {
         JSON.stringify(datos_json || {}), id_usuario,
       ]
     );
+    audit.registrar({
+      id_credito: r.insertId, req,
+      accion: 'CREDITO_CREADO',
+      detalle: `Crédito N°${numero_credito} creado para ${nombre_cliente}`,
+      meta: { numero_credito, cliente: nombre_cliente, rut: rut_cliente, financiera: financiera || 'AUTOFACIL', monto_financiado: monto_financiado || null },
+    });
     res.status(201).json({ success: true, data: { id_credito: r.insertId, numero_credito }, error: null });
   } catch (e) {
     res.status(500).json({ success: false, data: null, error: e.message });
@@ -200,6 +207,9 @@ const getById = async (req, res) => {
 const update = async (req, res) => {
   try {
     const { estado, observaciones, ejecutivo, dealer, patente, color, motor, chasis } = req.body;
+    // Leer estado anterior para detectar cambios
+    const [prev] = await pool.query('SELECT estado FROM creditos WHERE id_credito=?', [req.params.id]);
+    const estadoAntes = prev[0]?.estado || null;
     await pool.query(
       `UPDATE creditos SET estado=?, observaciones=?, ejecutivo=?, dealer=?,
               patente=?, color=?, motor=?, chasis=?, updated_at=CURRENT_TIMESTAMP
@@ -208,6 +218,25 @@ const update = async (req, res) => {
        patente ? patente.toUpperCase().trim() : null,
        color || null, motor || null, chasis || null, req.params.id]
     );
+    // Auditoría: cambio de estado
+    if (estado && estadoAntes && estado !== estadoAntes) {
+      audit.registrar({
+        id_credito: req.params.id, req,
+        accion: 'ESTADO_CAMBIADO',
+        detalle: `Estado: ${estadoAntes} → ${estado}`,
+        meta: { estado_antes: estadoAntes, estado_despues: estado },
+      });
+    }
+    // Auditoría: otros campos actualizados
+    const camposEditados = Object.keys(req.body).filter(k => k !== 'estado');
+    if (camposEditados.length) {
+      audit.registrar({
+        id_credito: req.params.id, req,
+        accion: 'CREDITO_ACTUALIZADO',
+        detalle: `Campos actualizados: ${camposEditados.join(', ')}`,
+        meta: { campos: camposEditados },
+      });
+    }
     res.json({ success: true, data: { id_credito: req.params.id }, error: null });
   } catch (e) {
     res.status(500).json({ success: false, data: null, error: e.message });

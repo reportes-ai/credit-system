@@ -40,6 +40,7 @@ app.use('/api/creditos',            require('../../services/creditos/src/routes/
 app.use('/api/credito-documentos',  require('../../services/creditos/src/routes/credito-documentos.routes'));
 app.use('/api/documentos-af',       require('../../services/creditos/src/routes/documentos-af.routes'));
 app.use('/api/pagos-credito',       require('../../services/creditos/src/routes/pagos-credito.routes'));
+app.use('/api/auditoria-credito',   require('../../services/creditos/src/routes/auditoria.routes'));
 
 // Health check
 app.get('/health', (req, res) => res.json({ status: 'Sistema operativo', timestamp: new Date() }));
@@ -93,6 +94,9 @@ app.get(['/creditos/validacion-firma', '/creditos/validacion-firma/'], (req, res
 
 app.get(['/creditos/pagar-cuotas', '/creditos/pagar-cuotas/'], (req, res) =>
   res.sendFile(path.join(__dirname, '../public/creditos/pagar-cuotas.html')));
+
+app.get(['/creditos/auditoria', '/creditos/auditoria/'], (req, res) =>
+  res.sendFile(path.join(__dirname, '../public/creditos/auditoria.html')));
 
 app.get(['/antecedentes-laborales', '/antecedentes-laborales/'], (req, res) =>
   res.sendFile(path.join(__dirname, '../public/antecedentes-laborales/index.html')));

@@ -1,4 +1,5 @@
-const pool = require('../../../../shared/config/database');
+const pool  = require('../../../../shared/config/database');
+const audit = require('../../../../shared/auditoria');
 
 (async () => {
   try {
@@ -55,6 +56,12 @@ const upload = async (req, res) => {
       [id_credito, id_tipo, archivo_nombre || 'documento', archivo_size || buffer.length,
        mime_type || 'application/octet-stream', buffer, comentario || null, id_usuario]
     );
+    audit.registrar({
+      id_credito, req,
+      accion: 'DOCUMENTO_CARGADO',
+      detalle: `Archivo cargado: ${archivo_nombre || 'documento'} (tipo ID ${id_tipo})`,
+      meta: { id_tipo, archivo_nombre, archivo_size: archivo_size || buffer.length, mime_type },
+    });
     res.status(201).json({ success: true, data: { id_doc: r.insertId }, error: null });
   } catch(e) { res.status(500).json({ success: false, data: null, error: e.message }); }
 };
@@ -102,7 +109,20 @@ const download = async (req, res) => {
 /* ─── DELETE ────────────────────────────────────────────────────────────── */
 const remove = async (req, res) => {
   try {
+    // Obtener datos antes de borrar para la auditoría
+    const [prev] = await pool.query(
+      'SELECT id_credito, archivo_nombre, id_tipo FROM credito_documentos WHERE id_doc=?',
+      [req.params.id_doc]
+    );
     await pool.query('DELETE FROM credito_documentos WHERE id_doc=?', [req.params.id_doc]);
+    if (prev.length) {
+      audit.registrar({
+        id_credito: prev[0].id_credito, req,
+        accion: 'DOCUMENTO_ELIMINADO',
+        detalle: `Archivo eliminado: ${prev[0].archivo_nombre || 'documento'} (tipo ID ${prev[0].id_tipo})`,
+        meta: { id_tipo: prev[0].id_tipo, archivo_nombre: prev[0].archivo_nombre },
+      });
+    }
     res.json({ success: true, data: { mensaje: 'Documento eliminado' }, error: null });
   } catch(e) { res.status(500).json({ success: false, data: null, error: e.message }); }
 };

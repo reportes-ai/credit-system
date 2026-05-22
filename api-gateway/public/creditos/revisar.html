@@ -189,10 +189,11 @@
   <a class="nav-brand" href="/creditos">
     <img src="/img/logo-autofacil.png" alt="AutoFácil" onerror="this.style.display='none'">
     <span>Revisión de Crédito</span>
-    <span class="version-badge">v2.4</span>
+    <span class="version-badge">v2.5</span>
   </a>
   <div class="nav-actions">
     <span id="navUser" style="color:rgba(255,255,255,.75);font-size:.82rem"></span>
+    <a id="btnAuditoria" href="#" class="btn-back" style="background:rgba(255,255,255,.15);display:none"><i class="bi bi-journal-text"></i>Auditoría</a>
     <a id="btnDocumentos" href="#" class="btn-back" style="background:rgba(255,255,255,.2);display:none" onclick="abrirDocumentos()"><i class="bi bi-file-earmark-text"></i>Documentos</a>
     <a href="/creditos" class="btn-back"><i class="bi bi-arrow-left"></i>Volver</a>
   </div>
@@ -1058,6 +1059,16 @@ function abrirDocumentos() {
 
 cargarPagina().then(() => {
   document.getElementById('btnDocumentos').style.display = 'flex';
+  // Botón Auditoría: solo para Administrador y Gerente
+  const PERFILES_AUDIT = ['Administrador', 'Gerente'];
+  try {
+    const u = JSON.parse(localStorage.getItem('usuario')||'{}');
+    if (PERFILES_AUDIT.includes(u.perfil)) {
+      const btn = document.getElementById('btnAuditoria');
+      btn.href = '/creditos/auditoria?id=' + creditId;
+      btn.style.display = 'flex';
+    }
+  } catch(_) {}
 }).catch(() => {});
 </script>
 </body>

@@ -1,0 +1,309 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Auditoría de Crédito — AutoFácil</title>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css">
+  <style>
+    :root { --navy:#0f2d6b; --blue:#1565c0; --bg:#f0f4f8; --card:#fff; --border:#e2e8f0; --text:#1e293b; --muted:#64748b; }
+    * { box-sizing:border-box; margin:0; padding:0; }
+    body { font-family:'Segoe UI',system-ui,sans-serif; background:var(--bg); color:var(--text); }
+
+    /* Navbar */
+    .navbar { background:linear-gradient(135deg,var(--navy),var(--blue)); padding:0 24px; height:52px; display:flex; align-items:center; justify-content:space-between; }
+    .nav-brand { display:flex; align-items:center; gap:10px; color:#fff; font-weight:800; font-size:1rem; text-decoration:none; }
+    .nav-brand img { height:28px; }
+    .nav-actions { display:flex; align-items:center; gap:10px; }
+    .btn-nav { background:rgba(255,255,255,.15); border:1px solid rgba(255,255,255,.3); color:#fff; border-radius:8px; padding:6px 14px; font-size:.82rem; font-weight:600; cursor:pointer; display:flex; align-items:center; gap:6px; text-decoration:none; }
+    .btn-nav:hover { background:rgba(255,255,255,.25); }
+    .version-badge { background:rgba(255,255,255,.15); color:rgba(255,255,255,.75); font-size:.65rem; font-weight:700; border-radius:6px; padding:2px 8px; margin-left:4px; }
+
+    /* Page */
+    .page-wrap { max-width:960px; margin:0 auto; padding:24px 16px 60px; }
+
+    /* Credit header */
+    .cred-header { background:linear-gradient(135deg,var(--navy),#1a56db); border-radius:14px; padding:18px 24px; color:#fff; margin-bottom:20px; display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:10px; }
+    .ch-title { font-size:1.1rem; font-weight:900; }
+    .ch-sub   { font-size:.85rem; opacity:.8; margin-top:2px; }
+    .admin-badge { background:rgba(255,255,255,.2); border-radius:20px; padding:3px 12px; font-size:.72rem; font-weight:800; letter-spacing:.06em; }
+
+    /* Filters */
+    .filters-bar { background:var(--card); border-radius:12px; border:1px solid var(--border); padding:14px 18px; margin-bottom:20px; display:flex; align-items:center; gap:12px; flex-wrap:wrap; }
+    .search-input { flex:1; min-width:180px; border:1.5px solid var(--border); border-radius:8px; padding:7px 11px; font-size:.85rem; font-family:inherit; }
+    .search-input:focus { outline:none; border-color:var(--blue); }
+    .filter-select { border:1.5px solid var(--border); border-radius:8px; padding:7px 10px; font-size:.82rem; font-family:inherit; background:#fff; cursor:pointer; }
+    .filter-select:focus { outline:none; border-color:var(--blue); }
+    .btn-export { background:#f1f5f9; border:1px solid var(--border); border-radius:8px; padding:7px 14px; font-size:.8rem; font-weight:600; cursor:pointer; display:flex; align-items:center; gap:5px; color:var(--text); }
+    .btn-export:hover { background:#e2e8f0; }
+    .count-badge { background:#f1f5f9; border:1px solid var(--border); border-radius:20px; padding:3px 12px; font-size:.78rem; font-weight:700; color:var(--navy); white-space:nowrap; }
+
+    /* Timeline */
+    .timeline { position:relative; padding-left:36px; }
+    .timeline::before { content:''; position:absolute; left:14px; top:0; bottom:0; width:2px; background:var(--border); }
+    .t-item { position:relative; margin-bottom:4px; }
+    .t-item:last-child { margin-bottom:0; }
+    .t-dot { position:absolute; left:-30px; top:14px; width:28px; height:28px; border-radius:50%; display:flex; align-items:center; justify-content:center; font-size:.85rem; flex-shrink:0; border:2px solid #fff; box-shadow:0 1px 4px rgba(0,0,0,.12); }
+    .t-card { background:var(--card); border:1px solid var(--border); border-radius:10px; padding:13px 16px; transition:box-shadow .15s; }
+    .t-card:hover { box-shadow:0 2px 10px rgba(0,0,0,.08); }
+    .t-head { display:flex; align-items:flex-start; justify-content:space-between; gap:12px; flex-wrap:wrap; }
+    .t-accion { font-size:.8rem; font-weight:800; text-transform:uppercase; letter-spacing:.06em; }
+    .t-fecha  { font-size:.75rem; color:var(--muted); white-space:nowrap; }
+    .t-detalle { font-size:.84rem; color:var(--text); margin-top:5px; }
+    .t-usuario { display:flex; align-items:center; gap:5px; margin-top:6px; font-size:.75rem; color:var(--muted); }
+    .t-perfil-chip { background:#f1f5f9; border-radius:20px; padding:1px 8px; font-size:.68rem; font-weight:700; color:var(--navy); }
+    .t-meta { margin-top:8px; background:#f8faff; border-radius:6px; padding:8px 12px; font-size:.75rem; font-family:monospace; color:#374151; white-space:pre-wrap; word-break:break-all; display:none; }
+    .t-meta.open { display:block; }
+    .btn-meta { background:none; border:1px solid var(--border); border-radius:5px; padding:2px 8px; font-size:.7rem; color:var(--muted); cursor:pointer; margin-top:6px; }
+    .btn-meta:hover { background:#f1f5f9; }
+
+    /* Action colors */
+    .ac-CREDITO_CREADO      { background:#dcfce7; color:#16a34a; }
+    .ac-ESTADO_CAMBIADO     { background:#dbeafe; color:#1d4ed8; }
+    .ac-CREDITO_ACTUALIZADO { background:#f1f5f9; color:#475569; }
+    .ac-DOCUMENTO_CARGADO   { background:#f3e8ff; color:#7e22ce; }
+    .ac-DOCUMENTO_ELIMINADO { background:#fee2e2; color:#991b1b; }
+    .ac-DOC_AF_CARGADO      { background:#e0f2fe; color:#0369a1; }
+    .ac-DOC_AF_APROBADO     { background:#dcfce7; color:#15803d; }
+    .ac-DOC_AF_RECHAZADO    { background:#fee2e2; color:#991b1b; }
+    .ac-PAGO_REGISTRADO     { background:#dcfce7; color:#15803d; }
+    .ac-PAGO_ELIMINADO      { background:#fee2e2; color:#991b1b; }
+
+    .dot-CREDITO_CREADO      { background:#16a34a; color:#fff; }
+    .dot-ESTADO_CAMBIADO     { background:#1d4ed8; color:#fff; }
+    .dot-CREDITO_ACTUALIZADO { background:#94a3b8; color:#fff; }
+    .dot-DOCUMENTO_CARGADO   { background:#7e22ce; color:#fff; }
+    .dot-DOCUMENTO_ELIMINADO { background:#dc2626; color:#fff; }
+    .dot-DOC_AF_CARGADO      { background:#0369a1; color:#fff; }
+    .dot-DOC_AF_APROBADO     { background:#15803d; color:#fff; }
+    .dot-DOC_AF_RECHAZADO    { background:#dc2626; color:#fff; }
+    .dot-PAGO_REGISTRADO     { background:#15803d; color:#fff; }
+    .dot-PAGO_ELIMINADO      { background:#dc2626; color:#fff; }
+
+    /* Day separator */
+    .day-sep { font-size:.72rem; font-weight:700; text-transform:uppercase; letter-spacing:.08em; color:var(--muted); margin:18px 0 10px; display:flex; align-items:center; gap:8px; }
+    .day-sep::after { content:''; flex:1; height:1px; background:var(--border); }
+
+    .spinner-wrap { text-align:center; padding:60px; color:var(--muted); }
+    .no-data { text-align:center; padding:60px; color:var(--muted); font-size:.9rem; }
+    .no-data i { font-size:2.5rem; display:block; margin-bottom:10px; opacity:.4; }
+    .acceso-denegado { text-align:center; padding:80px 24px; }
+    .acceso-denegado i { font-size:3rem; color:#dc2626; display:block; margin-bottom:16px; }
+    .acceso-denegado h2 { font-size:1.2rem; color:#dc2626; margin-bottom:8px; }
+    .acceso-denegado p  { color:var(--muted); font-size:.9rem; }
+  </style>
+</head>
+<body>
+
+<nav class="navbar">
+  <a href="/creditos" class="nav-brand">
+    <img src="/img/logo-autofacil.png" alt="AutoFácil" onerror="this.style.display='none'">
+    <span>Auditoría de Crédito</span>
+    <span class="version-badge">v1.0</span>
+  </a>
+  <div class="nav-actions">
+    <span id="navUser" style="color:rgba(255,255,255,.75);font-size:.82rem"></span>
+    <a id="btnRevisar" href="#" class="btn-nav"><i class="bi bi-eye"></i>Ver Crédito</a>
+    <a href="/creditos" class="btn-nav"><i class="bi bi-arrow-left"></i>Volver</a>
+  </div>
+</nav>
+
+<div class="page-wrap" id="pageWrap">
+  <div class="spinner-wrap"><i class="bi bi-hourglass-split" style="font-size:2rem;display:block;margin-bottom:12px"></i>Cargando…</div>
+</div>
+
+<script>
+/* ── Auth ── */
+const token = localStorage.getItem('token');
+const yo    = JSON.parse(localStorage.getItem('usuario') || 'null');
+if (!token || !yo) location.href = '/login.html';
+function apiHdr() { return { 'Content-Type':'application/json', Authorization:'Bearer '+token }; }
+document.getElementById('navUser').textContent = `${yo?.nombre||''} ${yo?.apellido||''}`.trim();
+
+/* ── Acceso: solo Administrador y Gerente ── */
+const PERFILES_AUDIT = ['Administrador', 'Gerente'];
+
+const qp       = new URLSearchParams(location.search);
+const creditId = qp.get('id');
+if (creditId) document.getElementById('btnRevisar').href = '/creditos/revisar?id='+creditId;
+
+let _eventos = [];
+let _filtrados = [];
+
+const fmtDT = s => s ? new Date(s).toLocaleString('es-CL',{day:'2-digit',month:'2-digit',year:'numeric',hour:'2-digit',minute:'2-digit',second:'2-digit'}) : '—';
+const fmtDate = s => s ? new Date(s).toLocaleDateString('es-CL',{weekday:'long',day:'numeric',month:'long',year:'numeric'}) : '';
+
+const ACCIONES_LABEL = {
+  CREDITO_CREADO:      { label:'Crédito Creado',       icon:'bi-plus-circle-fill'          },
+  ESTADO_CAMBIADO:     { label:'Cambio de Estado',      icon:'bi-arrow-right-circle-fill'   },
+  CREDITO_ACTUALIZADO: { label:'Datos Actualizados',    icon:'bi-pencil-fill'               },
+  DOCUMENTO_CARGADO:   { label:'Documento Cargado',     icon:'bi-file-earmark-arrow-up-fill'},
+  DOCUMENTO_ELIMINADO: { label:'Documento Eliminado',   icon:'bi-file-earmark-x-fill'       },
+  DOC_AF_CARGADO:      { label:'Doc. AF Cargado',       icon:'bi-file-earmark-arrow-up-fill'},
+  DOC_AF_APROBADO:     { label:'Doc. AF Aprobado',      icon:'bi-shield-fill-check'         },
+  DOC_AF_RECHAZADO:    { label:'Doc. AF Rechazado',     icon:'bi-shield-fill-x'             },
+  PAGO_REGISTRADO:     { label:'Pago Registrado',       icon:'bi-cash-coin'                 },
+  PAGO_ELIMINADO:      { label:'Pago Eliminado',        icon:'bi-trash3-fill'               },
+};
+
+function accionInfo(accion) {
+  return ACCIONES_LABEL[accion] || { label: accion, icon:'bi-circle-fill' };
+}
+
+function renderTimeline(eventos) {
+  if (!eventos.length) return '<div class="no-data"><i class="bi bi-search"></i>Sin eventos que coincidan</div>';
+
+  let html = '<div class="timeline">';
+  let lastDay = '';
+  eventos.forEach((ev, idx) => {
+    const dia = ev.fecha ? new Date(ev.fecha).toISOString().split('T')[0] : '';
+    if (dia !== lastDay) {
+      lastDay = dia;
+      html += `<div class="day-sep">${fmtDate(ev.fecha)}</div>`;
+    }
+    const info = accionInfo(ev.accion);
+    let metaStr = '';
+    if (ev.meta) {
+      try {
+        const m = typeof ev.meta === 'string' ? JSON.parse(ev.meta) : ev.meta;
+        metaStr = JSON.stringify(m, null, 2);
+      } catch(_) { metaStr = String(ev.meta); }
+    }
+    html += `
+      <div class="t-item" id="ev${ev.id_auditoria}">
+        <div class="t-dot dot-${ev.accion}"><i class="bi ${info.icon}"></i></div>
+        <div class="t-card">
+          <div class="t-head">
+            <span class="t-accion ac-${ev.accion}" style="background:transparent">${info.label}</span>
+            <span class="t-fecha"><i class="bi bi-clock me-1"></i>${fmtDT(ev.fecha)}</span>
+          </div>
+          <div class="t-detalle">${ev.detalle||'—'}</div>
+          <div class="t-usuario">
+            <i class="bi bi-person-fill"></i>
+            <strong>${ev.usuario||'Sistema'}</strong>
+            ${ev.perfil ? `<span class="t-perfil-chip">${ev.perfil}</span>` : ''}
+            ${ev.ip ? `<span style="color:#cbd5e1;margin-left:4px;font-size:.7rem">${ev.ip}</span>` : ''}
+          </div>
+          ${metaStr ? `<button class="btn-meta" onclick="toggleMeta(${ev.id_auditoria})"><i class="bi bi-code-slash"></i> Ver datos</button>
+          <div class="t-meta" id="meta${ev.id_auditoria}">${metaStr}</div>` : ''}
+        </div>
+      </div>`;
+  });
+  html += '</div>';
+  return html;
+}
+
+function toggleMeta(id) {
+  const el = document.getElementById('meta'+id);
+  if (el) el.classList.toggle('open');
+}
+
+function aplicarFiltros() {
+  const q      = document.getElementById('searchInput')?.value?.toLowerCase() || '';
+  const accion = document.getElementById('filterAccion')?.value || '';
+  const orden  = document.getElementById('filterOrden')?.value || 'asc';
+  _filtrados = _eventos.filter(ev => {
+    if (accion && ev.accion !== accion) return false;
+    if (q) {
+      const txt = `${ev.detalle||''} ${ev.usuario||''} ${ev.perfil||''} ${ev.accion||''}`.toLowerCase();
+      if (!txt.includes(q)) return false;
+    }
+    return true;
+  });
+  if (orden === 'desc') _filtrados = [..._filtrados].reverse();
+  document.getElementById('countBadge').textContent = `${_filtrados.length} evento${_filtrados.length!==1?'s':''}`;
+  document.getElementById('timelineWrap').innerHTML = renderTimeline(_filtrados);
+}
+
+function exportarCSV() {
+  const cols = ['Fecha','Usuario','Perfil','Acción','Detalle','IP'];
+  const rows = _filtrados.map(ev => [
+    fmtDT(ev.fecha),
+    ev.usuario||'',
+    ev.perfil||'',
+    ev.accion||'',
+    (ev.detalle||'').replace(/"/g,'""'),
+    ev.ip||'',
+  ].map(v=>`"${v}"`).join(','));
+  const csv  = '﻿' + [cols.join(','), ...rows].join('\n');
+  const blob = new Blob([csv], { type:'text/csv;charset=utf-8' });
+  const url  = URL.createObjectURL(blob);
+  const a    = document.createElement('a'); a.href=url; a.download=`auditoria_credito_${creditId}.csv`; a.click();
+  URL.revokeObjectURL(url);
+}
+
+async function cargarPagina() {
+  if (!creditId) {
+    document.getElementById('pageWrap').innerHTML = '<div class="no-data"><i class="bi bi-exclamation-triangle"></i>ID de crédito no especificado</div>';
+    return;
+  }
+  if (!PERFILES_AUDIT.includes(yo?.perfil)) {
+    document.getElementById('pageWrap').innerHTML = `
+      <div class="acceso-denegado">
+        <i class="bi bi-shield-lock-fill"></i>
+        <h2>Acceso restringido</h2>
+        <p>La auditoría de crédito solo está disponible para Administrador y Gerente.</p>
+      </div>`;
+    return;
+  }
+  try {
+    const [rc, ra] = await Promise.all([
+      fetch('/api/creditos/'+creditId,           { headers:apiHdr() }),
+      fetch('/api/auditoria-credito/'+creditId,  { headers:apiHdr() }),
+    ]);
+    if (ra.status === 403) {
+      document.getElementById('pageWrap').innerHTML = `
+        <div class="acceso-denegado">
+          <i class="bi bi-shield-lock-fill"></i>
+          <h2>Acceso denegado</h2>
+          <p>No tienes permisos para ver la auditoría de este crédito.</p>
+        </div>`;
+      return;
+    }
+    const [jc, ja] = await Promise.all([rc.json(), ra.json()]);
+    const c = jc.success ? jc.data : null;
+    _eventos = ja.success ? (ja.data||[]) : [];
+
+    // Opciones únicas de acción para el selector
+    const accionesUnicas = [...new Set(_eventos.map(e=>e.accion))].sort();
+    const optAcciones = accionesUnicas.map(a =>
+      `<option value="${a}">${accionInfo(a).label}</option>`
+    ).join('');
+
+    document.getElementById('pageWrap').innerHTML = `
+      ${c ? `
+      <div class="cred-header">
+        <div>
+          <div class="ch-title"><i class="bi bi-journal-text me-2"></i>Auditoría — ${c.nombre_cliente||'—'}</div>
+          <div class="ch-sub">N° ${c.numero_credito||c.id_credito} &nbsp;·&nbsp; ${c.rut_cliente||''} &nbsp;·&nbsp; ${c.marca||''} ${c.modelo||''} ${c.anio||''}</div>
+        </div>
+        <span class="admin-badge"><i class="bi bi-shield-lock me-1"></i>Sólo Administrador</span>
+      </div>` : ''}
+
+      <div class="filters-bar">
+        <input type="text" class="search-input" id="searchInput" placeholder="Buscar en eventos…" oninput="aplicarFiltros()">
+        <select class="filter-select" id="filterAccion" onchange="aplicarFiltros()">
+          <option value="">— Todas las acciones —</option>
+          ${optAcciones}
+        </select>
+        <select class="filter-select" id="filterOrden" onchange="aplicarFiltros()">
+          <option value="asc">↑ Más antiguo primero</option>
+          <option value="desc">↓ Más reciente primero</option>
+        </select>
+        <span class="count-badge" id="countBadge">${_eventos.length} eventos</span>
+        <button class="btn-export" onclick="exportarCSV()"><i class="bi bi-download"></i>Exportar CSV</button>
+      </div>
+
+      <div id="timelineWrap"></div>`;
+
+    _filtrados = [..._eventos];
+    aplicarFiltros();
+  } catch(e) {
+    document.getElementById('pageWrap').innerHTML = `<div class="no-data"><i class="bi bi-exclamation-triangle"></i>${e.message}</div>`;
+  }
+}
+
+cargarPagina();
+</script>
+</body>
+</html>
