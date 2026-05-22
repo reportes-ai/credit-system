@@ -178,7 +178,7 @@ const todosUsuarios = async (req, res) => {
               u.email, p.nombre AS perfil
        FROM usuarios u
        LEFT JOIN perfiles p ON u.id_perfil = p.id_perfil
-       WHERE u.activo = 1
+       WHERE u.estado = 'activo'
        ORDER BY nombre_usuario`
     );
     ok(res, rows);
