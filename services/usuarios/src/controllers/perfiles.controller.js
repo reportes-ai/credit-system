@@ -44,6 +44,84 @@ const pool = require('../../../../shared/config/database');
   }
 })();
 
+/* ─── Migración: agregar funcionalidades faltantes en todos los módulos ──── */
+(async () => {
+  try {
+    // [nombre_modulo, nombre_funcionalidad, codigo, habilitado_default(0/1)]
+    const nuevasFuncs = [
+      // Clientes
+      ['Clientes',     'Ver Antecedentes Laborales',      'clientes_antecedentes',       1],
+      ['Clientes',     'Ver Información Comercial',        'clientes_info_comercial',     1],
+      // Créditos
+      ['Créditos',     'Cargar Documentos Respaldo',       'creditos_cargar_doc',         1],
+      ['Créditos',     'Validar Documentos AF',            'creditos_validar_doc_af',     0],
+      ['Créditos',     'Pagar Cuotas',                     'creditos_pagar_cuotas',       0],
+      ['Créditos',     'Reversar Pagos',                   'creditos_reversar_pagos',     0],
+      ['Créditos',     'Condonar Intereses',               'creditos_condonar_intereses', 0],
+      ['Créditos',     'Condonar Gastos de Cobranza',      'creditos_condonar_gastos',    0],
+      ['Créditos',     'Ver Auditoría de Crédito',         'creditos_auditoria',          0],
+      // Tesorería
+      ['Tesorería',    'Gestionar Cajas',                  'tesoreria_cajas',             0],
+      ['Tesorería',    'Cierre de Caja',                   'tesoreria_cierre_caja',       0],
+      // Mantenedores
+      ['Mantenedores', 'Gestionar Vehículos',              'mantenedores_vehiculos',      0],
+      ['Mantenedores', 'Gestionar Dealers',                'mantenedores_dealers',        0],
+      ['Mantenedores', 'Gestionar Parámetros de Crédito',  'mantenedores_parametros',     0],
+      ['Mantenedores', 'Gestionar Tipos de Documento',     'mantenedores_tipos_doc',      0],
+      ['Mantenedores', 'Gestionar Plantillas',             'mantenedores_plantillas',     0],
+      ['Mantenedores', 'Gestionar Comunas',                'mantenedores_comunas',        0],
+      ['Mantenedores', 'Gestionar Pagarés',                'mantenedores_pagares',        0],
+      // Cotizaciones
+      ['Cotizaciones', 'Descargar Cotización',             'cotizaciones_descargar',      1],
+      // CRM
+      ['CRM',          'Crear Actividad CRM',              'crm_crear',                   0],
+      ['CRM',          'Editar Actividad CRM',             'crm_editar',                  0],
+      // Cobranza
+      ['Cobranza',     'Gestionar Cobranza',               'cobranza_gestionar',          0],
+      // Reportería
+      ['Reportería',   'Exportar Reportes',                'reporteria_exportar',         0],
+    ];
+
+    const [perfiles] = await pool.query('SELECT id_perfil FROM perfiles');
+
+    for (const [modNombre, funNombre, funCodigo, habDef] of nuevasFuncs) {
+      // Buscar módulo (nombre exacto o con variante sin acento por seguridad)
+      const [[mod]] = await pool.query(
+        'SELECT id_modulo FROM modulos WHERE nombre = ? AND estado = \'activo\'',
+        [modNombre]
+      );
+      if (!mod) continue;
+
+      // Insertar funcionalidad si no existe (verificar por código)
+      const [[existente]] = await pool.query(
+        'SELECT id_funcionalidad FROM funcionalidades WHERE codigo = ?',
+        [funCodigo]
+      );
+      let id_func;
+      if (existente) {
+        id_func = existente.id_funcionalidad;
+      } else {
+        const [ins] = await pool.query(
+          'INSERT INTO funcionalidades (id_modulo, nombre, codigo) VALUES (?,?,?)',
+          [mod.id_modulo, funNombre, funCodigo]
+        );
+        id_func = ins.insertId;
+      }
+
+      // Asignar a todos los perfiles (INSERT IGNORE para no sobreescribir config existente)
+      for (const p of perfiles) {
+        await pool.query(
+          `INSERT IGNORE INTO permisos_perfil (id_perfil, id_funcionalidad, habilitado)
+           VALUES (?,?,?)`,
+          [p.id_perfil, id_func, habDef]
+        );
+      }
+    }
+  } catch (e) {
+    console.error('[funcionalidades migration]', e.message);
+  }
+})();
+
 const getAllPerfiles = async (req, res) => {
   try {
     const [perfiles] = await pool.query(
