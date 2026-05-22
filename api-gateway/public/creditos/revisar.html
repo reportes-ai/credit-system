@@ -156,6 +156,21 @@
   .toast-ok  { background:#059669; }
   .toast-err { background:#dc2626; }
 
+  /* ── Historial de pagos ── */
+  .pagos-table { width:100%; border-collapse:collapse; font-size:.81rem; }
+  .pagos-table th { background:#f8fafc; color:var(--muted); font-size:.7rem; font-weight:700; text-transform:uppercase; letter-spacing:.05em; padding:8px 12px; border-bottom:2px solid var(--border); white-space:nowrap; }
+  .pagos-table td { padding:8px 12px; border-bottom:1px solid #f1f5f9; vertical-align:middle; }
+  .pagos-table tr:last-child td { border-bottom:none; }
+  .pagos-table tr.pg-vencido td { background:#fff5f5; }
+  .pill-pg { display:inline-flex; align-items:center; gap:4px; border-radius:20px; padding:2px 9px; font-size:.7rem; font-weight:700; white-space:nowrap; }
+  .pill-pg.pagado  { background:#dcfce7; color:#166534; }
+  .pill-pg.vencido { background:#fee2e2; color:#991b1b; }
+  .pill-pg.pendiente { background:#fef9c3; color:#854d0e; }
+  .btn-comp-sm { background:#eff6ff; color:#1d4ed8; border:1px solid #bfdbfe; border-radius:6px; padding:4px 10px; font-size:.75rem; font-weight:600; cursor:pointer; display:inline-flex; align-items:center; gap:4px; }
+  .btn-comp-sm:hover { background:#dbeafe; }
+  .btn-pagar-cuota { background:linear-gradient(135deg,#16a34a,#15803d); color:#fff; border:none; border-radius:7px; padding:5px 12px; font-size:.77rem; font-weight:700; cursor:pointer; white-space:nowrap; }
+  .btn-pagar-cuota:hover { opacity:.88; }
+
   @media(max-width:600px) {
     .ch-name { font-size:1.1rem; }
     .field-grid { grid-template-columns:1fr 1fr; }
@@ -169,7 +184,7 @@
   <a class="nav-brand" href="/creditos">
     <img src="/img/logo-autofacil.png" alt="AutoFácil" onerror="this.style.display='none'">
     <span>Revisión de Crédito</span>
-    <span class="version-badge">v1.8</span>
+    <span class="version-badge">v1.9</span>
   </a>
   <div class="nav-actions">
     <span id="navUser" style="color:rgba(255,255,255,.75);font-size:.82rem"></span>
@@ -252,29 +267,34 @@ const params   = new URLSearchParams(location.search);
 const creditId = params.get('id');
 let _credito   = null;
 let _credParams = {};
+let _pagos     = [];
+
+const ESTADOS_CURSADOS = new Set(['VIGENTE','EN MORA','CANCELADO','PREPAGADO','CASTIGADO']);
 
 async function cargarPagina() {
   if (!creditId) { document.getElementById('pageWrap').innerHTML = '<div class="no-data"><i class="bi bi-exclamation-triangle"></i>ID de crédito no especificado</div>'; return; }
   try {
-    // 1. Cargar crédito + params en paralelo
+    // 1. Crédito + params en paralelo
     const [rc, rp] = await Promise.all([
-      fetch('/api/creditos/'+creditId,     { headers: apiHdr() }),
-      fetch('/api/parametros-credito',     { headers: apiHdr() }),
+      fetch('/api/creditos/'+creditId,  { headers: apiHdr() }),
+      fetch('/api/parametros-credito',  { headers: apiHdr() }),
     ]);
     const [jc, jp] = await Promise.all([rc.json(), rp.json()]);
     if (!jc.success) throw new Error(jc.error);
-    _credito  = jc.data;
+    _credito    = jc.data;
     _credParams = (jp.success && jp.data?.obj) ? jp.data.obj : {};
-    const rut = _credito.rut_cliente;
+    const rut   = _credito.rut_cliente;
 
-    // 2. Cargar antecedentes e info comercial en paralelo
-    const [ra, ri] = await Promise.all([
+    // 2. Antecedentes + info comercial + pagos en paralelo
+    const [ra, ri, rpg] = await Promise.all([
       fetch('/api/antecedentes-laborales/'+encodeURIComponent(rut), { headers: apiHdr() }),
       fetch('/api/informacion-comercial/'+encodeURIComponent(rut),  { headers: apiHdr() }),
+      fetch('/api/pagos-credito/'+creditId,                          { headers: apiHdr() }),
     ]);
-    const [ja, ji] = await Promise.all([ra.json(), ri.json()]);
-    const ant = ja.success ? ja.data : null;
-    const com = ji.success ? ji.data : null;
+    const [ja, ji, jpg] = await Promise.all([ra.json(), ri.json(), rpg.json()]);
+    const ant = ja.success  ? ja.data  : null;
+    const com = ji.success  ? ji.data  : null;
+    _pagos    = jpg.success ? (jpg.data||[]) : [];
 
     renderPagina(_credito, ant, com);
   } catch(e) {
@@ -475,6 +495,9 @@ function renderPagina(c, ant, com) {
       </div>
     </div>
 
+    <!-- ── Historial de Pagos (solo créditos cursados) ── -->
+    ${ESTADOS_CURSADOS.has(c.estado) ? renderHistorialPagos(c) : ''}
+
     <!-- ── Estado y Observaciones ── -->
     <div class="section">
       <div class="sec-title"><i class="bi bi-sliders"></i>Estado y Observaciones</div>
@@ -509,6 +532,12 @@ function renderPagina(c, ant, com) {
       <a href="/creditos" class="btn-accion btn-volver"><i class="bi bi-arrow-left"></i>Volver</a>
     </div>
     <div class="action-bar-right">
+      ${ESTADOS_CURSADOS.has(c.estado) ? `
+      ${(c.estado === 'VIGENTE' || c.estado === 'EN MORA') ? `
+      <button class="btn-accion" style="background:linear-gradient(135deg,#16a34a,#15803d);color:#fff"
+        onclick="location.href='/creditos/pagar-cuotas?id=${c.id_credito}'">
+        <i class="bi bi-cash-coin"></i>Pagar Cuotas
+      </button>` : ''}` : `
       ${c.estado === 'CARGA_RESPALDOS' ? `
       <button class="btn-accion" style="background:linear-gradient(135deg,#ea580c,#f97316);color:#fff"
         onclick="location.href='/creditos/respaldos?id=${c.id_credito}'">
@@ -534,8 +563,168 @@ function renderPagina(c, ant, com) {
       </button>`}
       <button class="btn-accion btn-guardar" onclick="guardarCambios()">
         <i class="bi bi-floppy"></i>Guardar cambios
-      </button>
+      </button>`}
     </div>
+  </div>`;
+}
+
+/* ── Historial de Pagos ── */
+function buildAmortSchedule(c) {
+  const mf   = parseFloat(c.monto_financiado)||0;
+  const r    = (parseFloat(c.tasa_mensual)||0)/100;
+  const pl   = parseInt(c.plazo)||0;
+  const f0   = c.fecha_primera_cuota ? new Date(c.fecha_primera_cuota.split('T')[0]+'T00:00:00') : null;
+  if (!mf||!r||!pl) return [];
+  const pot  = Math.pow(1+r,pl);
+  const cu   = Math.round(mf*r*pot/(pot-1));
+  const rows = [];
+  let saldo  = mf;
+  for (let n=1; n<=pl; n++) {
+    const fecha = f0 ? new Date(f0.getFullYear(), f0.getMonth()+(n-1), f0.getDate()) : null;
+    const int   = Math.round(saldo*r);
+    let   amort = cu-int;
+    if (n===pl) amort=saldo;
+    saldo = Math.max(0, saldo-amort);
+    rows.push({ n, fecha, cuota:cu });
+  }
+  return rows;
+}
+
+function renderHistorialPagos(c) {
+  const schedule = buildAmortSchedule(c);
+  const hoy      = new Date(); hoy.setHours(0,0,0,0);
+  const fmtF = f => f ? new Date(f).toLocaleDateString('es-CL',{timeZone:'UTC',day:'2-digit',month:'2-digit',year:'numeric'}) : '—';
+  const fmtFd = f => f ? f.toLocaleDateString('es-CL',{day:'2-digit',month:'2-digit',year:'numeric'}) : '—';
+
+  let rows='', countPag=0, countVenc=0, countPend=0;
+  schedule.forEach(s => {
+    const pg     = _pagos.find(p=>p.numero_cuota===s.n);
+    const vencida = !pg && s.fecha && s.fecha < hoy;
+    if (pg) countPag++; else if (vencida) countVenc++; else countPend++;
+    const pillHtml = pg
+      ? '<span class="pill-pg pagado"><i class="bi bi-check-circle-fill"></i>Pagado</span>'
+      : (vencida
+          ? '<span class="pill-pg vencido"><i class="bi bi-exclamation-triangle-fill"></i>Vencida</span>'
+          : '<span class="pill-pg pendiente"><i class="bi bi-clock"></i>Pendiente</span>');
+    rows += `<tr class="${vencida?'pg-vencido':''}">
+      <td style="font-weight:700;color:var(--navy);text-align:center">${s.n}</td>
+      <td>${fmtFd(s.fecha)}</td>
+      <td style="font-weight:700">${fmtP(s.cuota)}</td>
+      <td style="color:#dc2626">${pg ? fmtP(pg.interes_mora)    : '—'}</td>
+      <td style="color:#dc2626">${pg ? fmtP(pg.gastos_cobranza) : '—'}</td>
+      <td style="font-weight:800;color:#16a34a">${pg ? fmtP(pg.total_pagado) : '—'}</td>
+      <td style="color:var(--muted)">${pg ? fmtDT(pg.fecha_pago) : '—'}</td>
+      <td style="text-align:center">${pillHtml}</td>
+      <td style="text-align:center">
+        ${pg ? `<button class="btn-comp-sm" onclick="verComprobanteRevisar(${pg.id_pago})">
+                  <i class="bi bi-receipt"></i>Comprobante</button>` : ''}
+      </td>
+    </tr>`;
+  });
+
+  const puedesPagar = c.estado==='VIGENTE'||c.estado==='EN MORA';
+  return `
+    <div class="section">
+      <div class="sec-title" style="justify-content:space-between">
+        <span><i class="bi bi-clock-history"></i>Historial de Pagos</span>
+        <div style="display:flex;gap:12px;align-items:center;margin-left:auto">
+          <span style="font-size:.72rem;color:var(--muted)">
+            <span style="color:#16a34a;font-weight:700">${countPag}</span> pagadas &nbsp;·&nbsp;
+            <span style="color:#dc2626;font-weight:700">${countVenc}</span> vencidas &nbsp;·&nbsp;
+            <span style="color:#a16207;font-weight:700">${countPend}</span> pendientes
+          </span>
+          ${puedesPagar ? `<a href="/creditos/pagar-cuotas?id=${c.id_credito}"
+              style="background:linear-gradient(135deg,#16a34a,#15803d);color:#fff;border:none;border-radius:8px;padding:6px 14px;font-size:.78rem;font-weight:700;text-decoration:none;display:inline-flex;align-items:center;gap:5px">
+              <i class="bi bi-cash-coin"></i>Pagar Cuotas
+            </a>` : ''}
+        </div>
+      </div>
+      <div style="overflow-x:auto">
+        <table class="pagos-table">
+          <thead>
+            <tr>
+              <th style="text-align:center">N°</th>
+              <th>Vencimiento</th>
+              <th>Monto Cuota</th>
+              <th>Int. Mora</th>
+              <th>Gtos. Cobranza</th>
+              <th>Total Pagado</th>
+              <th>Fecha Pago</th>
+              <th style="text-align:center">Estado</th>
+              <th style="text-align:center">Comprobante</th>
+            </tr>
+          </thead>
+          <tbody>${rows || '<tr><td colspan="9" class="no-data">Sin cuotas calculadas</td></tr>'}</tbody>
+        </table>
+      </div>
+    </div>`;
+}
+
+/* ── Comprobante en revisar ── */
+async function verComprobanteRevisar(idPago) {
+  try {
+    const r  = await fetch('/api/pagos-credito/pago/'+idPago, { headers:apiHdr() });
+    const j  = await r.json();
+    if (!j.success) throw new Error(j.error);
+    const pg = j.data;
+    const c  = _credito;
+    const numComp = String(idPago).padStart(8,'0');
+    const html = `
+      <div id="compPrint" style="font-family:'Segoe UI',sans-serif;padding:32px;max-width:500px;margin:0 auto">
+        <div style="text-align:center;margin-bottom:16px">
+          <div style="font-size:1.4rem;font-weight:900;color:var(--navy)">AutoFácil</div>
+          <div style="font-size:.78rem;color:var(--muted)">Crédito Automotriz</div>
+        </div>
+        <div style="text-align:center;font-size:1rem;font-weight:800;text-transform:uppercase;letter-spacing:.08em;color:var(--navy);margin:14px 0 2px">Comprobante de Pago</div>
+        <div style="text-align:center;font-size:.78rem;color:var(--muted);margin-bottom:18px">N° ${numComp}</div>
+        <div style="border-top:1px solid var(--border);padding:10px 0">
+          <div style="font-size:.68rem;font-weight:800;text-transform:uppercase;letter-spacing:.07em;color:var(--muted);margin-bottom:8px">Crédito</div>
+          ${compRow('N° Crédito', c.numero_credito||c.id_credito)}
+          ${compRow('Cliente',    c.nombre_cliente)}
+          ${compRow('RUT',        c.rut_cliente)}
+          ${compRow('Vehículo',   [c.marca,c.modelo,c.anio].filter(Boolean).join(' '))}
+        </div>
+        <div style="border-top:1px solid var(--border);padding:10px 0">
+          <div style="font-size:.68rem;font-weight:800;text-transform:uppercase;letter-spacing:.07em;color:var(--muted);margin-bottom:8px">Pago</div>
+          ${compRow('Cuota N°',         pg.numero_cuota+' de '+c.plazo)}
+          ${compRow('Vencimiento',      fmtD(pg.fecha_vencimiento))}
+          ${compRow('Fecha Pago',       fmtDT(pg.fecha_pago),'#16a34a')}
+          ${compRow('Cuota Original',   fmtP(pg.monto_cuota))}
+          ${compRow('Int. por Mora',    fmtP(pg.interes_mora),'#dc2626')}
+          ${compRow('Gtos. Cobranza',   fmtP(pg.gastos_cobranza),'#dc2626')}
+          ${pg.observacion ? compRow('Observación', pg.observacion) : ''}
+        </div>
+        <div style="background:linear-gradient(135deg,var(--navy),var(--blue));border-radius:10px;padding:14px 18px;margin-top:12px;display:flex;justify-content:space-between;align-items:center;color:#fff">
+          <span style="font-size:.78rem;font-weight:700;opacity:.85;text-transform:uppercase">Total Pagado</span>
+          <span style="font-size:1.4rem;font-weight:900">${fmtP(pg.total_pagado)}</span>
+        </div>
+        <div style="text-align:center;font-size:.7rem;color:var(--muted);margin-top:18px;padding-top:10px;border-top:1px dashed var(--border)">
+          Registrado por: ${pg.registrado_por||'—'}<br>
+          AutoFácil Crédito Automotriz · Documento no válido como boleta o factura
+        </div>
+      </div>`;
+    // Mostrar en overlay del modal amortización reusado como visor
+    const overlay = document.getElementById('amortOverlay');
+    overlay.classList.add('open');
+    overlay.innerHTML = `
+      <div class="amort-box" style="max-width:560px">
+        <div class="amort-head">
+          <h6><i class="bi bi-receipt me-2"></i>Comprobante de Pago</h6>
+          <button onclick="document.getElementById('amortOverlay').classList.remove('open')" style="background:none;border:none;color:rgba(255,255,255,.8);font-size:1.2rem;cursor:pointer"><i class="bi bi-x-lg"></i></button>
+        </div>
+        <div class="amort-scroll" style="padding:0">${html}</div>
+        <div class="amort-foot-bar">
+          <span style="font-size:.75rem;color:#9ca3af">Comprobante N° ${numComp}</span>
+          <button onclick="window.print()" style="background:linear-gradient(135deg,var(--navy),var(--blue));color:#fff;border:none;border-radius:8px;padding:7px 16px;font-weight:600;cursor:pointer;font-size:.85rem;display:flex;align-items:center;gap:6px"><i class="bi bi-printer"></i>Imprimir</button>
+        </div>
+      </div>`;
+  } catch(e) { showToast('Error: '+e.message, false); }
+}
+
+function compRow(label, val, color='') {
+  return `<div style="display:flex;justify-content:space-between;padding:3px 0;font-size:.83rem">
+    <span style="color:var(--muted)">${label}</span>
+    <span style="font-weight:700${color?';color:'+color:''}">${val||'—'}</span>
   </div>`;
 }
 
