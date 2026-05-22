@@ -189,7 +189,7 @@
   <a class="nav-brand" href="/creditos">
     <img src="/img/logo-autofacil.png" alt="AutoFácil" onerror="this.style.display='none'">
     <span>Revisión de Crédito</span>
-    <span class="version-badge">v2.3</span>
+    <span class="version-badge">v2.4</span>
   </a>
   <div class="nav-actions">
     <span id="navUser" style="color:rgba(255,255,255,.75);font-size:.82rem"></span>
@@ -273,8 +273,9 @@ const creditId = params.get('id');
 let _credito   = null;
 let _credParams = {};
 let _pagos     = [];
-let _tmc       = null; // tasa máxima convencional vigente
-let _uf        = null; // valor UF vigente
+let _tmc         = null;      // tasa máxima convencional vigente
+let _uf          = null;      // valor UF hoy (fallback)
+let _ufPorFecha  = new Map(); // UF del día-21 de mora por cuota: 'YYYY-MM-DD' → valor
 
 const ESTADOS_CURSADOS = new Set(['VIGENTE','EN MORA','CANCELADO','PREPAGADO','CASTIGADO']);
 
@@ -307,6 +308,10 @@ async function cargarPagina() {
     _tmc      = jt.success  ? jt.data  : null;
     _uf       = ju.success  ? ju.data  : null;
 
+    // Pre-cargar UF del día-21 para créditos cursados (puede tener cuotas en mora)
+    if (ESTADOS_CURSADOS.has(_credito.estado)) {
+      await precargarUFDias21(buildAmortSchedule(_credito));
+    }
     renderPagina(_credito, ant, com);
   } catch(e) {
     document.getElementById('pageWrap').innerHTML = `<div class="no-data"><i class="bi bi-exclamation-triangle"></i>${e.message}</div>`;
@@ -609,17 +614,47 @@ function calcMora(montoCuota, fechaVenc, fechaPago) {
 }
 
 /* ── Gastos de cobranza (escalonado legal, aplica desde día 21) ── */
-function calcGastosCobranza(montoVencido, diasMora) {
-  if (diasMora < 21 || !_uf || !montoVencido) return { monto:0, aplica:false };
-  const ufVal = parseFloat(_uf.valor) || 0;
+// UF fija: la del día en que la cuota cumplió exactamente 21 días de mora
+function dia21Str(fechaVenc) {
+  if (!fechaVenc) return null;
+  const iso = fechaVenc.toISOString ? fechaVenc.toISOString().split('T')[0] : fechaVenc.split('T')[0];
+  const d = new Date(iso+'T00:00:00'); d.setDate(d.getDate()+21);
+  return d.toISOString().split('T')[0];
+}
+function calcGastosCobranza(montoVencido, diasMora, fechaVenc) {
+  if (diasMora < 21 || !montoVencido) return { monto:0, aplica:false };
+  const key   = dia21Str(fechaVenc);
+  const ufVal = (key && _ufPorFecha.has(key)) ? _ufPorFecha.get(key)
+              : (parseFloat(_uf?.valor) || 0);
   if (!ufVal) return { monto:0, aplica:false };
   const uf10 = ufVal * 10;
-  const uf40 = ufVal * 40; // ancho del tramo 2 (entre 10 UF y 50 UF)
+  const uf40 = ufVal * 40;
   let gastos = 0, saldo = montoVencido;
   const t1 = Math.min(saldo, uf10); gastos += t1 * 0.09; saldo -= t1;
   const t2 = Math.min(saldo, uf40); gastos += t2 * 0.06; saldo -= t2;
   if (saldo > 0)                     gastos += saldo * 0.03;
-  return { monto: Math.round(gastos), aplica:true, ufVal };
+  return { monto: Math.round(gastos), aplica:true, ufVal, key };
+}
+
+/* ── Pre-carga UF del día-21 para todas las cuotas vencidas ── */
+async function precargarUFDias21(schedule) {
+  const hoy = new Date(); hoy.setHours(0,0,0,0);
+  const fechasNecesarias = new Set();
+  schedule.forEach(r => {
+    if (!r.fecha) return;
+    const venc = new Date(r.fecha); venc.setHours(0,0,0,0);
+    if (venc >= hoy) return;
+    const d21 = new Date(venc); d21.setDate(d21.getDate()+21);
+    if (d21 <= hoy) fechasNecesarias.add(d21.toISOString().split('T')[0]);
+  });
+  await Promise.all([...fechasNecesarias].map(async fecha => {
+    if (_ufPorFecha.has(fecha)) return;
+    try {
+      const r = await fetch('/api/uf/en/'+fecha, { headers: apiHdr() });
+      const j = await r.json();
+      if (j.success && j.data) _ufPorFecha.set(fecha, parseFloat(j.data.valor));
+    } catch(_) {}
+  }));
 }
 
 /* ── Historial de Pagos ── */
@@ -659,7 +694,7 @@ function renderHistorialPagos(c) {
     let moraCalc = null, gcCalc = null;
     if (vencida && s.fecha) {
       moraCalc = calcMora(s.cuota, s.fecha, null);
-      gcCalc   = calcGastosCobranza(s.cuota, moraCalc.dias);
+      gcCalc   = calcGastosCobranza(s.cuota, moraCalc.dias, s.fecha);
     }
     const intMoraDisplay = pg
       ? `<span style="color:#dc2626">${fmtP(pg.interes_mora)}</span>`

@@ -21,6 +21,20 @@ const getVigente = async (req, res) => {
   }
 };
 
+// UF vigente en una fecha específica (o la más reciente anterior a esa fecha)
+const getEnFecha = async (req, res) => {
+  try {
+    const { fecha } = req.params;
+    const [rows] = await pool.query(
+      'SELECT * FROM uf WHERE fecha <= ? ORDER BY fecha DESC LIMIT 1',
+      [fecha]
+    );
+    res.json({ success: true, data: rows[0] || null, error: null });
+  } catch (e) {
+    res.status(500).json({ success: false, data: null, error: e.message });
+  }
+};
+
 const create = async (req, res) => {
   try {
     const { fecha, valor } = req.body;
@@ -76,4 +90,4 @@ const importarCSV = async (req, res) => {
   }
 };
 
-module.exports = { getAll, getVigente, create, update, remove, importarCSV };
+module.exports = { getAll, getVigente, getEnFecha, create, update, remove, importarCSV };

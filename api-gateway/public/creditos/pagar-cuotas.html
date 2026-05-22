@@ -137,7 +137,7 @@
   <a href="/creditos" class="nav-brand">
     <img src="/img/logo-autofacil.png" alt="AutoFácil" onerror="this.style.display='none'">
     <span>Pago de Cuotas</span>
-    <span class="version-badge">v1.3</span>
+    <span class="version-badge">v1.4</span>
   </a>
   <div class="nav-actions">
     <span id="navUser" style="color:rgba(255,255,255,.75);font-size:.82rem"></span>
@@ -236,8 +236,9 @@ let _credito  = null;
 let _pagos    = [];
 let _amort    = []; // schedule calculado
 let _pagoModal = null; // cuota en edición
-let _tmc      = null; // tasa máxima convencional vigente
-let _uf       = null; // valor UF vigente
+let _tmc         = null;          // tasa máxima convencional vigente
+let _uf          = null;          // valor UF hoy (fallback)
+let _ufPorFecha  = new Map();     // UF del día-21 de mora por cuota: 'YYYY-MM-DD' → valor
 
 const fmtP  = v => v != null ? '$'+Math.round(Number(v)).toLocaleString('es-CL') : '$0';
 const fmtD  = s => s ? new Date(s).toLocaleDateString('es-CL',{timeZone:'UTC',day:'2-digit',month:'2-digit',year:'numeric'}) : '—';
@@ -282,20 +283,48 @@ function calcMora(montoCuota, fechaVenc, fechaPago) {
   return { monto: Math.round(montoCuota * (tmc/100/365) * dias), dias, tmc };
 }
 
-/* ── Gastos de cobranza (escalonado, art. 37 Ley 19.628 / DL 2.462) ── */
-// Solo aplica cuando la cuota cumple ≥21 días de mora
-// Tramos: 9% primeros 10 UF | 6% entre 10–50 UF | 3% sobre 50 UF
-function calcGastosCobranza(montoVencido, diasMora) {
-  if (diasMora < 21 || !_uf || !montoVencido) return { monto:0, aplica:false };
-  const ufVal = parseFloat(_uf.valor) || 0;
+/* ── Gastos de cobranza (escalonado legal, aplica desde día 21) ── */
+// UF fija: la del día en que la cuota cumplió exactamente 21 días de mora
+function dia21Str(fechaVencStr) {
+  if (!fechaVencStr) return null;
+  const d = new Date(fechaVencStr.split('T')[0]+'T00:00:00');
+  d.setDate(d.getDate()+21);
+  return d.toISOString().split('T')[0];
+}
+function calcGastosCobranza(montoVencido, diasMora, fechaVencStr) {
+  if (diasMora < 21 || !montoVencido) return { monto:0, aplica:false };
+  const key    = dia21Str(fechaVencStr);
+  const ufVal  = (key && _ufPorFecha.has(key)) ? _ufPorFecha.get(key)
+               : (parseFloat(_uf?.valor) || 0); // fallback al valor actual
   if (!ufVal) return { monto:0, aplica:false };
   const uf10 = ufVal * 10;
-  const uf40 = ufVal * 40; // tramo 2 tiene ancho 40 UF (de 10 a 50)
+  const uf40 = ufVal * 40; // ancho del tramo 2 (10→50 UF)
   let gastos = 0, saldo = montoVencido;
-  const t1 = Math.min(saldo, uf10);  gastos += t1 * 0.09; saldo -= t1;
-  const t2 = Math.min(saldo, uf40);  gastos += t2 * 0.06; saldo -= t2;
-  if (saldo > 0)                      gastos += saldo * 0.03;
-  return { monto: Math.round(gastos), aplica:true, ufVal, diasMora };
+  const t1 = Math.min(saldo, uf10); gastos += t1 * 0.09; saldo -= t1;
+  const t2 = Math.min(saldo, uf40); gastos += t2 * 0.06; saldo -= t2;
+  if (saldo > 0)                     gastos += saldo * 0.03;
+  return { monto: Math.round(gastos), aplica:true, ufVal, key };
+}
+
+/* ── Pre-carga UF del día-21 para todas las cuotas vencidas ── */
+async function precargarUFDias21(schedule) {
+  const hoy = new Date(); hoy.setHours(0,0,0,0);
+  const fechasNecesarias = new Set();
+  schedule.forEach(r => {
+    if (!r.fecha) return;
+    const venc = new Date(r.fecha); venc.setHours(0,0,0,0);
+    if (venc >= hoy) return;
+    const d21 = new Date(venc); d21.setDate(d21.getDate()+21);
+    if (d21 <= hoy) fechasNecesarias.add(d21.toISOString().split('T')[0]);
+  });
+  await Promise.all([...fechasNecesarias].map(async fecha => {
+    if (_ufPorFecha.has(fecha)) return;
+    try {
+      const r = await fetch('/api/uf/en/'+fecha, { headers:apiHdr() });
+      const j = await r.json();
+      if (j.success && j.data) _ufPorFecha.set(fecha, parseFloat(j.data.valor));
+    } catch(_) {}
+  }));
 }
 
 /* ── Load ── */
@@ -320,6 +349,7 @@ async function cargarPagina() {
       parseInt(_credito.plazo)||0,
       _credito.fecha_primera_cuota
     );
+    await precargarUFDias21(_amort);
     renderPagina();
   } catch(e) {
     document.getElementById('pageWrap').innerHTML=`<div class="no-data"><i class="bi bi-exclamation-triangle"></i>${e.message}</div>`;
@@ -356,7 +386,7 @@ function renderPagina() {
     let moraInfo = null, gcInfo = null;
     if (vencida) {
       moraInfo = calcMora(r.cuota, fechaVencStr, null);
-      gcInfo   = calcGastosCobranza(r.cuota, moraInfo.dias);
+      gcInfo   = calcGastosCobranza(r.cuota, moraInfo.dias, fechaVencStr);
     }
 
     let intMoraDisplay = '—', gtosDisplay = '—', totalDisplay = '—';
@@ -472,12 +502,12 @@ function abrirModalPago(numeroCuota, fechaVenc, montoCuota) {
   } else {
     infoEl.textContent = '';
   }
-  // Calcular gastos de cobranza (aplica desde día 21 de mora)
-  const gc = calcGastosCobranza(montoCuota, mora.dias);
+  // Calcular gastos de cobranza (aplica desde día 21; UF fija del día-21)
+  const gc = calcGastosCobranza(montoCuota, mora.dias, fechaVenc);
   document.getElementById('mpGastosCob').value = gc.monto || 0;
   const gcInfoEl = document.getElementById('mpGastosInfo');
   if (gc.aplica) {
-    gcInfoEl.innerHTML = `<i class="bi bi-info-circle"></i> Escalonado legal · UF $${Math.round(gc.ufVal).toLocaleString('es-CL')}`;
+    gcInfoEl.innerHTML = `<i class="bi bi-info-circle"></i> Escalonado legal · UF del ${gc.key}: $${Math.round(gc.ufVal).toLocaleString('es-CL')}`;
   } else if (mora.dias > 0 && mora.dias < 21) {
     gcInfoEl.innerHTML = `<i class="bi bi-clock"></i> Aplica a partir del día 21 (faltan ${21-mora.dias} días)`;
   } else {

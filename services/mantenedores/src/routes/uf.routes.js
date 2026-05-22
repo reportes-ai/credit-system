@@ -4,6 +4,7 @@ const { verifyToken } = require('../../../../shared/middleware/auth');
 
 router.get('/', verifyToken, ctrl.getAll);
 router.get('/vigente', verifyToken, ctrl.getVigente);
+router.get('/en/:fecha', verifyToken, ctrl.getEnFecha);
 router.post('/importar', verifyToken, ctrl.importarCSV);
 router.post('/', verifyToken, ctrl.create);
 router.put('/:id', verifyToken, ctrl.update);
