@@ -45,6 +45,11 @@
   .eb-CASTIGADO       { background:#fff1f2; color:#be123c; border:1.5px solid #fda4af; }
   .ch-updated { font-size:.72rem; opacity:.65; }
   .ch-financiera { background:rgba(255,255,255,.2); border-radius:6px; padding:3px 10px; font-size:.78rem; font-weight:800; letter-spacing:.05em; }
+  /* ── Payment-status badge (next to VIGENTE) ── */
+  .pago-estado-badge { border-radius:20px; padding:3px 12px; font-size:.72rem; font-weight:800; text-transform:uppercase; letter-spacing:.07em; }
+  .pago-aldia  { background:#eff6ff; color:#1d4ed8; border:1.5px solid #93c5fd; }
+  .pago-mora   { background:#fffbeb; color:#b45309; border:1.5px solid #fcd34d; }
+  .pago-vencido{ background:#fff1f2; color:#be123c; border:1.5px solid #fda4af; }
 
   /* ── Section cards ── */
   .section { background:var(--card); border-radius:12px; border:1px solid var(--border); margin-bottom:16px; overflow:hidden; }
@@ -184,7 +189,7 @@
   <a class="nav-brand" href="/creditos">
     <img src="/img/logo-autofacil.png" alt="AutoFácil" onerror="this.style.display='none'">
     <span>Revisión de Crédito</span>
-    <span class="version-badge">v2.0</span>
+    <span class="version-badge">v2.1</span>
   </a>
   <div class="nav-actions">
     <span id="navUser" style="color:rgba(255,255,255,.75);font-size:.82rem"></span>
@@ -302,6 +307,22 @@ async function cargarPagina() {
   }
 }
 
+function getEstadoPago(c) {
+  const schedule = buildAmortSchedule(c);
+  const hoy = new Date(); hoy.setHours(0,0,0,0);
+  const pagadasSet = new Set(_pagos.map(p => p.numero_cuota));
+  const mora = schedule.filter(row => {
+    if (!row.fecha) return false;
+    const venc = new Date(row.fecha); venc.setHours(0,0,0,0);
+    return venc < hoy && !pagadasSet.has(row.n);
+  });
+  if (mora.length === 0) return { label:'AL DÍA', cls:'aldia' };
+  const oldest = mora.reduce((a,b) => a.fecha < b.fecha ? a : b);
+  const dias = Math.floor((hoy - new Date(oldest.fecha)) / 86400000);
+  if (dias > 90) return { label:'VENCIDO', cls:'vencido' };
+  return { label:'EN MORA', cls:'mora' };
+}
+
 function renderPagina(c, ant, com) {
   const estadoKey = (c.estado||'').replace(' ','-');
   const rentaVar  = ant ? [ant.renta_var_mes1,ant.renta_var_mes2,ant.renta_var_mes3,
@@ -334,7 +355,10 @@ function renderPagina(c, ant, com) {
         <div class="ch-rut">${c.rut_cliente||'—'}</div>
       </div>
       <div class="ch-right">
-        <span class="estado-badge eb-${estadoKey}">${estadoEstado(c.estado)}</span>
+        <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;justify-content:flex-end">
+          <span class="estado-badge eb-${estadoKey}">${estadoEstado(c.estado)}</span>
+          ${(()=>{ if(c.estado!=='VIGENTE') return ''; const ep=getEstadoPago(c); return `<span class="pago-estado-badge pago-${ep.cls}">${ep.label}</span>`; })()}
+        </div>
         ${c.financiera ? `<span class="ch-financiera">${c.financiera}</span>` : ''}
         <div class="ch-updated"><i class="bi bi-clock me-1"></i>Actualizado: ${fmtDT(c.updated_at||c.created_at)}</div>
         <div class="ch-updated"><i class="bi bi-calendar-plus me-1"></i>Ingresado: ${fmtDT(c.created_at)}</div>
