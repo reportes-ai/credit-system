@@ -137,7 +137,7 @@
   <a href="/creditos" class="nav-brand">
     <img src="/img/logo-autofacil.png" alt="AutoFácil" onerror="this.style.display='none'">
     <span>Pago de Cuotas</span>
-    <span class="version-badge">v1.1</span>
+    <span class="version-badge">v1.2</span>
   </a>
   <div class="nav-actions">
     <span id="navUser" style="color:rgba(255,255,255,.75);font-size:.82rem"></span>
@@ -178,6 +178,7 @@
         <div>
           <div class="field-label">Intereses por Mora ($)</div>
           <input type="number" class="field-input" id="mpInteresMora" oninput="calcTotal()" placeholder="0" value="0">
+          <div id="mpMoraInfo" style="font-size:.72rem;color:#b45309;margin-top:3px"></div>
         </div>
         <div>
           <div class="field-label">Gastos de Cobranza ($)</div>
@@ -234,6 +235,7 @@ let _credito  = null;
 let _pagos    = [];
 let _amort    = []; // schedule calculado
 let _pagoModal = null; // cuota en edición
+let _tmc      = null; // tasa máxima convencional vigente
 
 const fmtP  = v => v != null ? '$'+Math.round(Number(v)).toLocaleString('es-CL') : '$0';
 const fmtD  = s => s ? new Date(s).toLocaleDateString('es-CL',{timeZone:'UTC',day:'2-digit',month:'2-digit',year:'numeric'}) : '—';
@@ -264,18 +266,34 @@ function buildAmort(mf, tasa, plazo, fechaPrimera) {
   return rows;
 }
 
+/* ── Mora calculation ── */
+function tmcAnual() {
+  if (!_tmc) return 0;
+  return parseFloat(_tmc.tasa_anual_mayor) || 0;
+}
+function calcMora(montoCuota, fechaVenc, fechaPago) {
+  const tmc = tmcAnual();
+  if (!tmc || !fechaVenc) return 0;
+  const venc = new Date(fechaVenc.split('T')[0]+'T00:00:00');
+  const pago = new Date(fechaPago || new Date()); pago.setHours(0,0,0,0);
+  const dias = Math.max(0, Math.floor((pago - venc) / 86400000));
+  return { monto: Math.round(montoCuota * (tmc/100/365) * dias), dias, tmc };
+}
+
 /* ── Load ── */
 async function cargarPagina() {
   if (!creditId) { document.getElementById('pageWrap').innerHTML='<div class="no-data"><i class="bi bi-exclamation-triangle"></i>ID no especificado</div>'; return; }
   try {
-    const [rc, rp] = await Promise.all([
+    const [rc, rp, rt] = await Promise.all([
       fetch('/api/creditos/'+creditId, { headers:apiHdr() }),
       fetch('/api/pagos-credito/'+creditId, { headers:apiHdr() }),
+      fetch('/api/tasas/vigente', { headers:apiHdr() }),
     ]);
-    const [jc, jp] = await Promise.all([rc.json(), rp.json()]);
+    const [jc, jp, jt] = await Promise.all([rc.json(), rp.json(), rt.json()]);
     if (!jc.success) throw new Error(jc.error);
     _credito = jc.data;
     _pagos   = jp.success ? (jp.data||[]) : [];
+    _tmc     = jt.success ? jt.data : null;
     _amort   = buildAmort(
       parseFloat(_credito.monto_financiado)||0,
       parseFloat(_credito.tasa_mensual)||0,
@@ -314,6 +332,19 @@ function renderPagina() {
     const rowCls  = pagos.length ? 'row-pagado' : (vencida ? 'row-vencido' : '');
 
     let pillHtml, accionHtml;
+    const fechaVencStr = r.fecha ? r.fecha.toISOString().split('T')[0] : '';
+    let moraInfo = null;
+    if (vencida) moraInfo = calcMora(r.cuota, fechaVencStr, null);
+
+    let intMoraDisplay = '—', gtosDisplay = '—', totalDisplay = '—';
+    if (pagos.length) {
+      intMoraDisplay = fmtP(pagos[0].interes_mora);
+      gtosDisplay    = fmtP(pagos[0].gastos_cobranza);
+      totalDisplay   = fmtP(pagos[0].total_pagado);
+    } else if (moraInfo && moraInfo.dias > 0) {
+      intMoraDisplay = `<span class="amt-mora">${fmtP(moraInfo.monto)}</span><br><span style="font-size:.68rem;color:#b45309">${moraInfo.dias} días</span>`;
+    }
+
     if (pagos.length) {
       const pg = pagos[0];
       pillHtml  = `<span class="pill pill-pagada"><i class="bi bi-check-circle-fill"></i>Pagada</span>`;
@@ -328,12 +359,12 @@ function renderPagina() {
         </div>`;
     } else if (vencida) {
       pillHtml  = `<span class="pill pill-mora"><i class="bi bi-exclamation-triangle-fill"></i>En Mora</span>`;
-      accionHtml= `<button class="btn-pagar" onclick="abrirModalPago(${r.n},'${r.fecha?r.fecha.toISOString().split('T')[0]:''}',${r.cuota})">
+      accionHtml= `<button class="btn-pagar" onclick="abrirModalPago(${r.n},'${fechaVencStr}',${r.cuota})">
                      <i class="bi bi-cash-coin"></i>Registrar Pago
                    </button>`;
     } else {
       pillHtml  = `<span class="pill pill-aldia"><i class="bi bi-check2"></i>Al Día</span>`;
-      accionHtml= `<button class="btn-pagar" onclick="abrirModalPago(${r.n},'${r.fecha?r.fecha.toISOString().split('T')[0]:''}',${r.cuota})">
+      accionHtml= `<button class="btn-pagar" onclick="abrirModalPago(${r.n},'${fechaVencStr}',${r.cuota})">
                      <i class="bi bi-cash-coin"></i>Registrar Pago
                    </button>`;
     }
@@ -342,9 +373,9 @@ function renderPagina() {
       <td style="font-weight:700;color:var(--navy);text-align:center">${r.n}</td>
       <td>${r.fecha ? r.fecha.toLocaleDateString('es-CL',{day:'2-digit',month:'2-digit',year:'numeric'}) : '—'}</td>
       <td class="amt">${fmtP(r.cuota)}</td>
-      <td class="amt amt-mora">${pagos.length ? fmtP(pagos[0].interes_mora) : '—'}</td>
-      <td class="amt amt-mora">${pagos.length ? fmtP(pagos[0].gastos_cobranza) : '—'}</td>
-      <td class="amt" style="color:var(--green)">${pagos.length ? fmtP(pagos[0].total_pagado) : '—'}</td>
+      <td class="amt">${intMoraDisplay}</td>
+      <td class="amt amt-mora">${gtosDisplay}</td>
+      <td class="amt" style="color:var(--green)">${totalDisplay}</td>
       <td class="amt-muted">${pagos.length ? fmtDT(pagos[0].fecha_pago) : '—'}</td>
       <td style="text-align:center">${pillHtml}</td>
       <td>${accionHtml}</td>
@@ -398,13 +429,21 @@ function abrirModalPago(numeroCuota, fechaVenc, montoCuota) {
   _pagoModal = { numeroCuota, fechaVenc, montoCuota };
   document.getElementById('mpNumeroCuota').textContent = numeroCuota;
   document.getElementById('mpMontoCuota').value  = montoCuota;
-  document.getElementById('mpInteresMora').value = 0;
   document.getElementById('mpGastosCob').value   = 0;
   document.getElementById('mpObservacion').value = '';
   // Fecha pago: ahora mismo
   const ahora = new Date();
   const local  = new Date(ahora.getTime() - ahora.getTimezoneOffset()*60000).toISOString().slice(0,16);
   document.getElementById('mpFechaPago').value = local;
+  // Calcular mora automáticamente
+  const mora = calcMora(montoCuota, fechaVenc, null);
+  document.getElementById('mpInteresMora').value = mora.monto || 0;
+  const infoEl = document.getElementById('mpMoraInfo');
+  if (mora.dias > 0 && mora.tmc > 0) {
+    infoEl.innerHTML = `<i class="bi bi-info-circle"></i> ${mora.dias} días en mora · TMC ${mora.tmc.toFixed(2)}% anual`;
+  } else {
+    infoEl.textContent = '';
+  }
   calcTotal();
   document.getElementById('modalPago').classList.add('open');
 }

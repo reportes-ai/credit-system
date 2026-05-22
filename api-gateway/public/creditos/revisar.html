@@ -189,7 +189,7 @@
   <a class="nav-brand" href="/creditos">
     <img src="/img/logo-autofacil.png" alt="AutoFácil" onerror="this.style.display='none'">
     <span>Revisión de Crédito</span>
-    <span class="version-badge">v2.1</span>
+    <span class="version-badge">v2.2</span>
   </a>
   <div class="nav-actions">
     <span id="navUser" style="color:rgba(255,255,255,.75);font-size:.82rem"></span>
@@ -273,6 +273,7 @@ const creditId = params.get('id');
 let _credito   = null;
 let _credParams = {};
 let _pagos     = [];
+let _tmc       = null; // tasa máxima convencional vigente
 
 const ESTADOS_CURSADOS = new Set(['VIGENTE','EN MORA','CANCELADO','PREPAGADO','CASTIGADO']);
 
@@ -290,16 +291,18 @@ async function cargarPagina() {
     _credParams = (jp.success && jp.data?.obj) ? jp.data.obj : {};
     const rut   = _credito.rut_cliente;
 
-    // 2. Antecedentes + info comercial + pagos en paralelo
-    const [ra, ri, rpg] = await Promise.all([
+    // 2. Antecedentes + info comercial + pagos + tasa en paralelo
+    const [ra, ri, rpg, rt] = await Promise.all([
       fetch('/api/antecedentes-laborales/'+encodeURIComponent(rut), { headers: apiHdr() }),
       fetch('/api/informacion-comercial/'+encodeURIComponent(rut),  { headers: apiHdr() }),
       fetch('/api/pagos-credito/'+creditId,                          { headers: apiHdr() }),
+      fetch('/api/tasas/vigente',                                     { headers: apiHdr() }),
     ]);
-    const [ja, ji, jpg] = await Promise.all([ra.json(), ri.json(), rpg.json()]);
+    const [ja, ji, jpg, jt] = await Promise.all([ra.json(), ri.json(), rpg.json(), rt.json()]);
     const ant = ja.success  ? ja.data  : null;
     const com = ji.success  ? ji.data  : null;
     _pagos    = jpg.success ? (jpg.data||[]) : [];
+    _tmc      = jt.success  ? jt.data  : null;
 
     renderPagina(_credito, ant, com);
   } catch(e) {
@@ -592,6 +595,16 @@ function renderPagina(c, ant, com) {
   </div>`;
 }
 
+/* ── Mora calculation (TMC) ── */
+function calcMora(montoCuota, fechaVenc, fechaPago) {
+  if (!_tmc || !fechaVenc) return { monto:0, dias:0, tmc:0 };
+  const tmc  = parseFloat(_tmc.tasa_anual_mayor) || 0;
+  const venc = new Date(fechaVenc.toISOString ? fechaVenc.toISOString().split('T')[0]+'T00:00:00' : fechaVenc+'T00:00:00');
+  const pago = new Date(fechaPago || new Date()); pago.setHours(0,0,0,0);
+  const dias = Math.max(0, Math.floor((pago - venc) / 86400000));
+  return { monto: Math.round(montoCuota * (tmc/100/365) * dias), dias, tmc };
+}
+
 /* ── Historial de Pagos ── */
 function buildAmortSchedule(c) {
   const mf   = parseFloat(c.monto_financiado)||0;
@@ -625,6 +638,14 @@ function renderHistorialPagos(c) {
     const pg     = _pagos.find(p=>p.numero_cuota===s.n);
     const vencida = !pg && s.fecha && s.fecha < hoy;
     if (pg) countPag++; else if (vencida) countVenc++; else countPend++;
+    // Calcular mora acumulada si está vencida y sin pagar
+    let moraCalc = null;
+    if (vencida && s.fecha) moraCalc = calcMora(s.cuota, s.fecha, null);
+    const intMoraDisplay = pg
+      ? `<span style="color:#dc2626">${fmtP(pg.interes_mora)}</span>`
+      : (moraCalc && moraCalc.dias > 0
+          ? `<span style="color:#dc2626;font-weight:700">${fmtP(moraCalc.monto)}</span><br><span style="font-size:.68rem;color:#b45309">${moraCalc.dias} días</span>`
+          : '—');
     const pillHtml = pg
       ? '<span class="pill-pg pagada"><i class="bi bi-check-circle-fill"></i>Pagada</span>'
       : (vencida
@@ -634,7 +655,7 @@ function renderHistorialPagos(c) {
       <td style="font-weight:700;color:var(--navy);text-align:center">${s.n}</td>
       <td>${fmtFd(s.fecha)}</td>
       <td style="font-weight:700">${fmtP(s.cuota)}</td>
-      <td style="color:#dc2626">${pg ? fmtP(pg.interes_mora)    : '—'}</td>
+      <td>${intMoraDisplay}</td>
       <td style="color:#dc2626">${pg ? fmtP(pg.gastos_cobranza) : '—'}</td>
       <td style="font-weight:800;color:#16a34a">${pg ? fmtP(pg.total_pagado) : '—'}</td>
       <td style="color:var(--muted)">${pg ? fmtDT(pg.fecha_pago) : '—'}</td>
