@@ -185,4 +185,21 @@ const todosUsuarios = async (req, res) => {
   } catch(e) { err(res, e); }
 };
 
-module.exports = { list, create, update, remove, listUsuarios, upsertUsuario, removeUsuario, todosUsuarios };
+/* GET /api/cajas/mi-caja  — devuelve la caja y permisos del usuario autenticado */
+const miCaja = async (req, res) => {
+  try {
+    const id_usuario = req.usuario?.id_usuario;
+    if (!id_usuario) return err(res, 'Sin usuario autenticado', 401);
+    const [[row]] = await pool.query(
+      `SELECT cu.*, cj.nombre AS nombre_caja, cj.descripcion
+       FROM caja_usuarios cu
+       JOIN cajas cj ON cu.id_caja = cj.id_caja
+       WHERE cu.id_usuario = ? AND cu.activo = 1 AND cj.activo = 1
+       LIMIT 1`,
+      [id_usuario]
+    );
+    ok(res, row || null);
+  } catch(e) { err(res, e); }
+};
+
+module.exports = { list, create, update, remove, listUsuarios, upsertUsuario, removeUsuario, todosUsuarios, miCaja };

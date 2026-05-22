@@ -5,6 +5,9 @@ const { verifyToken, requirePerfil } = require('../../../../shared/middleware/au
 const soloAdmin = [verifyToken, requirePerfil('Administrador', 'Gerente')];
 const autenticado = [verifyToken];
 
+// Caja del usuario autenticado (cajero)
+router.get('/mi-caja', verifyToken, ctrl.miCaja);
+
 // Usuarios disponibles (para el select del modal)
 router.get('/todos-usuarios', ...soloAdmin, ctrl.todosUsuarios);
 

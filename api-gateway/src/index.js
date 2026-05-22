@@ -113,6 +113,8 @@ app.get(['/cotizaciones', '/cotizaciones/'], (req, res) =>
 
 app.get(['/tesoreria', '/tesoreria/'], (req, res) =>
   res.sendFile(path.join(__dirname, '../public/tesoreria/index.html')));
+app.get(['/tesoreria/caja', '/tesoreria/caja/'], (req, res) =>
+  res.sendFile(path.join(__dirname, '../public/tesoreria/caja.html')));
 app.get(['/tesoreria/cajas', '/tesoreria/cajas/'], (req, res) =>
   res.sendFile(path.join(__dirname, '../public/tesoreria/cajas.html')));
 app.get(['/tesoreria/cierre-caja', '/tesoreria/cierre-caja/'], (req, res) =>
