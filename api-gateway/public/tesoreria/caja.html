@@ -168,7 +168,7 @@
   <div class="topnav-left">
     <a href="/" class="topnav-brand">
       <img src="/img/logo.png" alt="AutoFácil">
-      <span class="version-badge">v1.2</span>
+      <span class="version-badge">v1.3</span>
     </a>
     <div class="breadcrumb-nav">
       <a href="/">Inicio</a><span class="sep">/</span>
@@ -211,55 +211,75 @@
 
 <!-- ══ PANEL DE PAGO (sticky bottom) ════════════════════════════════════════ -->
 <div class="pago-panel hidden" id="pagoPanel">
-  <div class="pp-header">
-    <div class="pp-title">
-      <i class="bi bi-cash-coin"></i>
-      Registrar pago
-      <span class="pp-badge" id="ppBadge">0 cuotas</span>
+
+  <!-- ── Estado 1: resumen compacto (mientras seleccionas) ── -->
+  <div id="ppResumen" style="display:flex;align-items:center;gap:16px;padding:12px 24px;flex-wrap:wrap">
+    <div style="display:flex;align-items:center;gap:10px;flex:1;min-width:0">
+      <i class="bi bi-check2-square" style="font-size:1.3rem;color:var(--navy)"></i>
+      <div>
+        <span id="ppBadge" style="font-weight:700;font-size:.97rem;color:#111827">0 cuotas seleccionadas</span>
+        <span style="font-size:.8rem;color:#6b7280;margin-left:10px">Total: <strong id="ppTotalResumen">$0</strong></span>
+      </div>
     </div>
     <button class="pp-close" onclick="limpiarSeleccion()"><i class="bi bi-x-lg me-1"></i>Cancelar</button>
-  </div>
-
-  <div class="pp-body">
-    <!-- Auto-ajuste -->
-    <div class="auto-row">
-      <label><i class="bi bi-calculator me-1"></i>Monto recibido</label>
-      <input type="number" id="autoMonto" class="auto-input" placeholder="$0" min="0" step="1" oninput="autoAjustar()">
-      <span class="auto-hint" id="autoHint">Ingresa el monto recibido y se distribuirá automáticamente: primero gastos de cobranza, luego intereses por mora.</span>
-    </div>
-
-    <!-- Breakdown por cuota -->
-    <div class="table-wrap">
-      <table class="breakdown-table">
-        <thead>
-          <tr>
-            <th>N° Cuota</th>
-            <th>Vencimiento</th>
-            <th class="text-right">Cuota base</th>
-            <th class="text-right">Gastos cobr.</th>
-            <th class="text-right">Int. mora</th>
-            <th class="text-right">Total cuota</th>
-          </tr>
-        </thead>
-        <tbody id="breakdownBody"></tbody>
-        <tfoot id="breakdownFoot"></tfoot>
-      </table>
-    </div>
-
-    <div id="ppErrorBox" style="display:none;margin-bottom:12px"></div>
-  </div>
-
-  <div class="pp-footer">
-    <div class="pp-total-box">
-      <span class="pp-total-lbl"><i class="bi bi-cash-coin me-1"></i>Total a cobrar</span>
-      <span class="pp-total-val" id="ppTotal">$0</span>
-    </div>
-    <input type="date" id="ppFecha" class="pp-fecha">
-    <input type="text" id="ppObs" class="pp-obs" placeholder="Observación (opcional)">
-    <button class="btn-confirmar" id="btnConfirmar" onclick="confirmarMultiPago()">
-      <i class="bi bi-check2-circle"></i>Confirmar pago
+    <button class="btn-confirmar" onclick="abrirDetallePago()" style="padding:9px 24px">
+      <i class="bi bi-cash-coin"></i>Pagar
     </button>
   </div>
+
+  <!-- ── Estado 2: detalle expandido (al presionar Pagar) ── -->
+  <div id="ppDetalle" style="display:none">
+    <div class="pp-header">
+      <div class="pp-title">
+        <i class="bi bi-cash-coin"></i>
+        Detalle del pago
+        <span class="pp-badge" id="ppBadgeDetalle">0 cuotas</span>
+      </div>
+      <button class="pp-close" onclick="cerrarDetallePago()"><i class="bi bi-chevron-down me-1"></i>Volver</button>
+    </div>
+
+    <div class="pp-body">
+      <!-- Auto-ajuste -->
+      <div class="auto-row">
+        <label><i class="bi bi-calculator me-1"></i>Monto recibido</label>
+        <input type="number" id="autoMonto" class="auto-input" placeholder="$0" min="0" step="1" oninput="autoAjustar()">
+        <span class="auto-hint" id="autoHint">Ingresa el monto recibido y se distribuirá automáticamente: primero gastos de cobranza, luego intereses por mora.</span>
+      </div>
+
+      <!-- Breakdown por cuota -->
+      <div class="table-wrap">
+        <table class="breakdown-table">
+          <thead>
+            <tr>
+              <th>N° Cuota</th>
+              <th>Vencimiento</th>
+              <th class="text-right">Cuota base</th>
+              <th class="text-right">Gastos cobr.</th>
+              <th class="text-right">Int. mora</th>
+              <th class="text-right">Total cuota</th>
+            </tr>
+          </thead>
+          <tbody id="breakdownBody"></tbody>
+          <tfoot id="breakdownFoot"></tfoot>
+        </table>
+      </div>
+
+      <div id="ppErrorBox" style="display:none;margin-bottom:12px"></div>
+    </div>
+
+    <div class="pp-footer">
+      <div class="pp-total-box">
+        <span class="pp-total-lbl"><i class="bi bi-cash-coin me-1"></i>Total a cobrar</span>
+        <span class="pp-total-val" id="ppTotal">$0</span>
+      </div>
+      <input type="date" id="ppFecha" class="pp-fecha">
+      <input type="text" id="ppObs" class="pp-obs" placeholder="Observación (opcional)">
+      <button class="btn-confirmar" id="btnConfirmar" onclick="confirmarMultiPago()">
+        <i class="bi bi-check2-circle"></i>Confirmar pago
+      </button>
+    </div>
+  </div>
+
 </div>
 
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
@@ -562,7 +582,28 @@ function toggleCuota(numero, checked) {
 function limpiarSeleccion() {
   _seleccionadas.clear();
   document.getElementById('pagoPanel').classList.add('hidden');
+  document.getElementById('ppResumen').style.display = 'flex';
+  document.getElementById('ppDetalle').style.display  = 'none';
   document.getElementById('autoMonto').value = '';
+  // desmarcar checkboxes visibles
+  document.querySelectorAll('.chk-cuota').forEach(c => c.checked = false);
+  document.querySelectorAll('tr.row-sel').forEach(r => r.classList.remove('row-sel'));
+}
+
+function abrirDetallePago() {
+  document.getElementById('ppResumen').style.display = 'none';
+  document.getElementById('ppDetalle').style.display  = '';
+  document.getElementById('ppBadgeDetalle').textContent = document.getElementById('ppBadge').textContent;
+  document.getElementById('ppFecha').value = new Date().toISOString().slice(0,10);
+  document.getElementById('autoMonto').value = '';
+  document.getElementById('autoHint').textContent = 'Ingresa el monto recibido y se distribuirá automáticamente: primero gastos de cobranza, luego intereses por mora.';
+  mostrarError('');
+  renderBreakdown();
+}
+
+function cerrarDetallePago() {
+  document.getElementById('ppDetalle').style.display  = 'none';
+  document.getElementById('ppResumen').style.display = 'flex';
 }
 
 /* ── Datos de las cuotas seleccionadas ── */
@@ -582,10 +623,26 @@ function datosCuotasSeleccionadas() {
 function actualizarPagoPanel() {
   const panel = document.getElementById('pagoPanel');
   if (_seleccionadas.size === 0) { panel.classList.add('hidden'); return; }
+
+  // Calcular total para el resumen
+  const hoy = new Date();
+  let total = 0;
+  _seleccionadas.forEach(num => {
+    const s = _schedule.find(x => x.numero === num);
+    if (!s) return;
+    total += s.monto + calcMora(s.monto, s.fecha, hoy).monto + calcGastos(s.monto, s.fecha, hoy).monto;
+  });
+
+  const n = _seleccionadas.size;
+  document.getElementById('ppBadge').textContent       = `${n} cuota${n!==1?'s':''} seleccionada${n!==1?'s':''}`;
+  document.getElementById('ppTotalResumen').textContent = clp(total);
+
   panel.classList.remove('hidden');
-  document.getElementById('ppBadge').textContent = `${_seleccionadas.size} cuota${_seleccionadas.size!==1?'s':''}`;
-  document.getElementById('ppFecha').value = new Date().toISOString().slice(0,10);
-  renderBreakdown();
+  // Si el detalle estaba abierto, actualizar el breakdown también
+  if (document.getElementById('ppDetalle').style.display !== 'none') {
+    document.getElementById('ppBadgeDetalle').textContent = document.getElementById('ppBadge').textContent;
+    renderBreakdown();
+  }
 }
 
 function renderBreakdown(gastosOverride={}, moraOverride={}) {
@@ -778,9 +835,9 @@ async function confirmarMultiPago() {
     }
 
     // Éxito — refrescar
-    limpiarSeleccion();
     const jP = await (await API(`/api/pagos-credito/${_credito.id_credito}`)).json();
     _pagos = jP.data || [];
+    limpiarSeleccion();
     renderPanel();
     document.getElementById('autoMonto').value = '';
   } catch(e) {
