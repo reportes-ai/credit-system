@@ -5,23 +5,31 @@ const audit = require('../../../../shared/auditoria');
   try {
     await pool.query(`
       CREATE TABLE IF NOT EXISTS pagos_credito (
-        id_pago           INT AUTO_INCREMENT PRIMARY KEY,
-        id_credito        INT            NOT NULL,
-        numero_cuota      INT            NOT NULL,
-        fecha_vencimiento DATE           NULL,
-        monto_cuota       DECIMAL(14,2)  DEFAULT 0,
-        interes_mora      DECIMAL(14,2)  DEFAULT 0,
-        gastos_cobranza   DECIMAL(14,2)  DEFAULT 0,
-        total_pagado      DECIMAL(14,2)  DEFAULT 0,
-        fecha_pago        DATETIME       NULL,
-        estado_pago       VARCHAR(30)    DEFAULT 'PAGADO',
-        observacion       TEXT           NULL,
-        registrado_por    VARCHAR(200)   NULL,
-        created_at        DATETIME       DEFAULT CURRENT_TIMESTAMP,
-        INDEX idx_credito (id_credito),
-        INDEX idx_cuota   (id_credito, numero_cuota)
+        id_pago              INT AUTO_INCREMENT PRIMARY KEY,
+        id_credito           INT            NOT NULL,
+        numero_cuota         INT            NOT NULL,
+        fecha_vencimiento    DATE           NULL,
+        monto_cuota          DECIMAL(14,2)  DEFAULT 0,
+        interes_mora         DECIMAL(14,2)  DEFAULT 0,
+        gastos_cobranza      DECIMAL(14,2)  DEFAULT 0,
+        total_pagado         DECIMAL(14,2)  DEFAULT 0,
+        fecha_pago           DATETIME       NULL,
+        estado_pago          VARCHAR(30)    DEFAULT 'PAGADO',
+        observacion          TEXT           NULL,
+        registrado_por       VARCHAR(200)   NULL,
+        id_registrado_por    INT            NULL,
+        created_at           DATETIME       DEFAULT CURRENT_TIMESTAMP,
+        INDEX idx_credito    (id_credito),
+        INDEX idx_cuota      (id_credito, numero_cuota),
+        INDEX idx_registrado (id_registrado_por)
       )
     `);
+    // Migración: agregar columna en tablas existentes sin ella
+    await pool.query(`
+      ALTER TABLE pagos_credito
+      ADD COLUMN IF NOT EXISTS id_registrado_por INT NULL,
+      ADD INDEX IF NOT EXISTS idx_registrado (id_registrado_por)
+    `).catch(() => {}); // MySQL < 8 no soporta IF NOT EXISTS en ALTER
   } catch(e) { if (e.errno !== 1050) console.error('[pagos_credito migration]', e.message); }
 })();
 
@@ -63,6 +71,7 @@ const create = async (req, res) => {
 
     const u = req.usuario || {};
     const registrado_por = [u.nombre, u.apellido].filter(Boolean).join(' ') || u.email || null;
+    const id_registrado_por = u.id_usuario || null;
     const tp = parseFloat(total_pagado) ||
                (parseFloat(monto_cuota)||0) + (parseFloat(interes_mora)||0) + (parseFloat(gastos_cobranza)||0);
 
@@ -70,13 +79,13 @@ const create = async (req, res) => {
       `INSERT INTO pagos_credito
          (id_credito, numero_cuota, fecha_vencimiento, monto_cuota,
           interes_mora, gastos_cobranza, total_pagado, fecha_pago,
-          estado_pago, observacion, registrado_por)
-       VALUES (?,?,?,?,?,?,?,?,?,?,?)`,
+          estado_pago, observacion, registrado_por, id_registrado_por)
+       VALUES (?,?,?,?,?,?,?,?,?,?,?,?)`,
       [id_credito, numero_cuota, fecha_vencimiento || null,
        parseFloat(monto_cuota)||0, parseFloat(interes_mora)||0,
        parseFloat(gastos_cobranza)||0, tp,
        fecha_pago || null, estado_pago || 'PAGADO',
-       observacion || null, registrado_por]
+       observacion || null, registrado_por, id_registrado_por]
     );
     audit.registrar({
       id_credito, req,

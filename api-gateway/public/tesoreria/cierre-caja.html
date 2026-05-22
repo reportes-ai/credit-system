@@ -1,0 +1,391 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Cierre de Caja — AutoFácil</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.0/font/bootstrap-icons.css" rel="stylesheet">
+  <style>
+    :root { --navy:#0141A2; --navy-dark:#012d70; --navy-light:#0255c5; --accent:#009AFE; --bg:#f0f4f8; }
+    body { background:var(--bg); font-family:'Segoe UI',system-ui,sans-serif; margin:0; min-height:100vh; }
+    .topnav { background:linear-gradient(90deg,var(--navy-dark),var(--navy-light)); color:#fff; height:60px; padding:0 24px; display:flex; align-items:center; justify-content:space-between; position:sticky; top:0; z-index:200; box-shadow:0 2px 8px rgba(0,0,0,.3); }
+    .topnav-left { display:flex; align-items:center; gap:16px; }
+    .topnav-brand { display:flex; align-items:center; gap:8px; text-decoration:none; }
+    .topnav-brand img { height:32px; filter:brightness(0) invert(1); }
+    .version-badge { background:rgba(255,255,255,.15); color:rgba(255,255,255,.75); font-size:.65rem; font-weight:700; border-radius:6px; padding:2px 8px; letter-spacing:.5px; }
+    .breadcrumb-nav { color:rgba(255,255,255,.6); font-size:.85rem; display:flex; align-items:center; gap:6px; }
+    .breadcrumb-nav a { color:rgba(255,255,255,.75); text-decoration:none; }
+    .breadcrumb-nav a:hover { color:#fff; }
+    .breadcrumb-nav .sep { color:rgba(255,255,255,.35); }
+    .topnav-right { display:flex; align-items:center; gap:10px; }
+    .user-chip { background:rgba(255,255,255,.12); border-radius:24px; padding:5px 12px; display:flex; align-items:center; gap:8px; font-size:.85rem; }
+    .avatar { width:28px; height:28px; background:#90caf9; border-radius:50%; display:flex; align-items:center; justify-content:center; color:var(--navy); font-weight:700; font-size:.75rem; }
+    .perfil-badge { background:rgba(144,202,249,.2); border:1px solid rgba(144,202,249,.4); color:#90caf9; border-radius:12px; padding:2px 10px; font-size:.73rem; font-weight:600; }
+    .btn-logout { background:rgba(255,255,255,.1); border:1px solid rgba(255,255,255,.2); color:#fff; border-radius:8px; padding:5px 12px; font-size:.82rem; cursor:pointer; }
+    .btn-logout:hover { background:rgba(255,255,255,.2); }
+    .main-content { padding:32px 40px; max-width:1200px; margin:0 auto; }
+    .page-banner { background:linear-gradient(135deg,#012d70,#0141A2 50%,#009AFE); border-radius:16px; color:#fff; padding:24px 32px; margin-bottom:28px; display:flex; align-items:center; gap:18px; }
+    .page-banner i { font-size:2.4rem; opacity:.8; }
+    .page-banner h2 { font-weight:700; margin:0 0 3px; font-size:1.3rem; }
+    .page-banner p { opacity:.8; margin:0; font-size:.88rem; }
+    /* Filtros */
+    .filtros-bar { background:#fff; border-radius:12px; padding:18px 20px; margin-bottom:22px; box-shadow:0 1px 4px rgba(0,0,0,.07); display:flex; flex-wrap:wrap; gap:12px; align-items:flex-end; }
+    .filtros-bar label { font-size:.82rem; font-weight:600; color:#374151; display:block; margin-bottom:4px; }
+    .filtros-bar .form-control, .filtros-bar .form-select { font-size:.88rem; }
+    /* Tarjetas resumen */
+    .stats-row { display:grid; grid-template-columns:repeat(auto-fill,minmax(180px,1fr)); gap:14px; margin-bottom:22px; }
+    .stat-card { background:#fff; border-radius:12px; padding:16px 18px; box-shadow:0 1px 4px rgba(0,0,0,.07); }
+    .stat-label { font-size:.75rem; color:#6b7280; font-weight:600; text-transform:uppercase; letter-spacing:.4px; margin-bottom:4px; }
+    .stat-value { font-size:1.3rem; font-weight:800; color:#111827; }
+    .stat-value.blue { color:var(--navy); }
+    .stat-value.green { color:#15803d; }
+    .stat-value.amber { color:#92400e; }
+    /* Resumen por usuario */
+    .panel { background:#fff; border-radius:14px; box-shadow:0 1px 4px rgba(0,0,0,.07); margin-bottom:22px; }
+    .panel-header { padding:16px 22px; border-bottom:1px solid #e5e7eb; display:flex; align-items:center; justify-content:space-between; }
+    .panel-header h5 { margin:0; font-weight:700; font-size:.97rem; color:#111827; }
+    .panel-body { padding:0; }
+    .table-wrap { overflow-x:auto; }
+    table { width:100%; border-collapse:collapse; font-size:.85rem; }
+    thead th { background:#f8fafc; color:#374151; font-weight:700; padding:10px 14px; text-align:left; border-bottom:2px solid #e5e7eb; white-space:nowrap; }
+    tbody td { padding:10px 14px; border-bottom:1px solid #f1f5f9; color:#1f2937; vertical-align:middle; }
+    tbody tr:last-child td { border-bottom:none; }
+    tbody tr:hover td { background:#fafbfc; }
+    .tfoot-row td { background:#f0f4f8; font-weight:700; padding:10px 14px; color:#111827; border-top:2px solid #e5e7eb; }
+    .text-right { text-align:right; }
+    .empty-state { text-align:center; color:#9ca3af; padding:50px 0; }
+    .spinner-wrap { display:flex; align-items:center; justify-content:center; padding:60px 0; }
+    .btn-buscar { background:var(--navy); color:#fff; border:none; border-radius:8px; padding:8px 20px; font-size:.88rem; font-weight:600; cursor:pointer; height:38px; }
+    .btn-buscar:hover { background:var(--navy-light); }
+    .btn-export { background:#fff; border:1.5px solid #d1d5db; color:#374151; border-radius:8px; padding:7px 16px; font-size:.82rem; font-weight:600; cursor:pointer; }
+    .btn-export:hover { background:#f9fafb; }
+    @media(max-width:640px){ .main-content{padding:16px;} .stats-row{grid-template-columns:1fr 1fr;} }
+  </style>
+</head>
+<body>
+<nav class="topnav">
+  <div class="topnav-left">
+    <a href="/" class="topnav-brand">
+      <img src="/img/logo.png" alt="AutoFácil">
+      <span class="version-badge">v1.0</span>
+    </a>
+    <div class="breadcrumb-nav">
+      <a href="/">Inicio</a><span class="sep">/</span>
+      <a href="/tesoreria">Tesorería</a><span class="sep">/</span>
+      <span style="color:#fff;font-weight:600"><i class="bi bi-journal-check me-1"></i>Cierre de Caja</span>
+    </div>
+  </div>
+  <div class="topnav-right">
+    <div class="user-chip">
+      <div class="avatar" id="avatarInicial">?</div>
+      <div>
+        <div style="font-weight:600;line-height:1.3;color:#fff" id="navNombre">—</div>
+        <div class="perfil-badge" id="navPerfil">—</div>
+      </div>
+    </div>
+    <button class="btn-logout" onclick="logout()"><i class="bi bi-box-arrow-right me-1"></i>Salir</button>
+  </div>
+</nav>
+
+<div class="main-content">
+  <div class="page-banner">
+    <i class="bi bi-journal-check"></i>
+    <div>
+      <h2>Cierre de Caja</h2>
+      <p>Movimientos por fecha · por usuario · o total de cajas</p>
+    </div>
+  </div>
+
+  <!-- Filtros -->
+  <div class="filtros-bar">
+    <div>
+      <label>Desde</label>
+      <input type="date" id="filDesde" class="form-control" style="width:145px">
+    </div>
+    <div>
+      <label>Hasta</label>
+      <input type="date" id="filHasta" class="form-control" style="width:145px">
+    </div>
+    <div>
+      <label>Caja</label>
+      <select id="filCaja" class="form-select" style="width:180px" onchange="filtrarCajero()">
+        <option value="">— Todas las cajas —</option>
+      </select>
+    </div>
+    <div>
+      <label>Usuario/Cajero</label>
+      <select id="filUsuario" class="form-select" style="width:200px">
+        <option value="">— Todos —</option>
+      </select>
+    </div>
+    <button class="btn-buscar" onclick="buscar()"><i class="bi bi-search me-1"></i>Consultar</button>
+    <button class="btn-export" onclick="exportarCSV()"><i class="bi bi-download me-1"></i>Exportar</button>
+  </div>
+
+  <!-- Stats -->
+  <div class="stats-row" id="statsRow" style="display:none">
+    <div class="stat-card">
+      <div class="stat-label"><i class="bi bi-receipt me-1"></i>Pagos registrados</div>
+      <div class="stat-value blue" id="statPagos">—</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-label"><i class="bi bi-cash me-1"></i>Monto cuotas</div>
+      <div class="stat-value" id="statCuotas">—</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-label"><i class="bi bi-percent me-1"></i>Intereses mora</div>
+      <div class="stat-value amber" id="statIntereses">—</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-label"><i class="bi bi-shield-exclamation me-1"></i>Gastos cobranza</div>
+      <div class="stat-value amber" id="statGastos">—</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-label"><i class="bi bi-bank me-1"></i>Total recaudado</div>
+      <div class="stat-value green" id="statTotal">—</div>
+    </div>
+  </div>
+
+  <!-- Resumen por cajero -->
+  <div class="panel" id="panelResumen" style="display:none">
+    <div class="panel-header">
+      <h5><i class="bi bi-people me-2 text-primary"></i>Resumen por cajero</h5>
+    </div>
+    <div class="panel-body">
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>Cajero</th>
+              <th>Perfil</th>
+              <th>Caja</th>
+              <th class="text-right">Pagos</th>
+              <th class="text-right">Monto Cuotas</th>
+              <th class="text-right">Int. Mora</th>
+              <th class="text-right">Gtos. Cobranza</th>
+              <th class="text-right">Total Recaudado</th>
+            </tr>
+          </thead>
+          <tbody id="tbodyResumen"></tbody>
+          <tfoot><tr id="tfootResumen" class="tfoot-row"></tr></tfoot>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <!-- Detalle de movimientos -->
+  <div class="panel" id="panelMovimientos">
+    <div class="panel-header">
+      <h5><i class="bi bi-list-ul me-2 text-primary"></i>Detalle de movimientos</h5>
+      <span id="movCount" style="font-size:.8rem;color:#6b7280"></span>
+    </div>
+    <div class="panel-body">
+      <div id="movWrap">
+        <div class="empty-state"><i class="bi bi-search fs-1 mb-3 d-block"></i><p>Selecciona un rango de fechas y presiona Consultar</p></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+<script>
+const token = localStorage.getItem('token');
+const yo    = JSON.parse(localStorage.getItem('usuario') || 'null');
+if (!token || !yo) window.location.href = '/login.html';
+if (!['Administrador','Gerente','Supervisor'].includes(yo?.perfil)) {
+  alert('Acceso restringido'); window.location.href = '/tesoreria';
+}
+document.getElementById('navNombre').textContent = `${yo?.nombre||''} ${yo?.apellido||''}`.trim();
+document.getElementById('navPerfil').textContent  = yo?.perfil || '';
+document.getElementById('avatarInicial').textContent = (yo?.nombre||'?').charAt(0).toUpperCase();
+function logout(){ localStorage.removeItem('token'); localStorage.removeItem('usuario'); window.location.href='/login.html'; }
+
+const API = (path, opts={}) => fetch(path, { headers:{ Authorization:`Bearer ${token}`, 'Content-Type':'application/json' }, ...opts });
+const clp = v => '$' + Math.round(v||0).toLocaleString('es-CL');
+
+/* ── inicializar fechas (hoy) ────────────────────────────────────────────── */
+const hoy = new Date().toISOString().slice(0,10);
+document.getElementById('filDesde').value = hoy;
+document.getElementById('filHasta').value = hoy;
+
+/* ── datos ─────────────────────────────────────────────────────────────── */
+let _cajeros = [];     // { id_usuario, nombre, perfil, id_caja, nombre_caja }
+let _cajas   = [];     // lista única de cajas
+let _data    = null;   // último resultado
+
+(async () => {
+  const r = await API('/api/cierre-caja/cajeros');
+  const j = await r.json();
+  _cajeros = j.data || [];
+  // cajas únicas
+  const cajasMap = new Map();
+  _cajeros.forEach(c => { if (c.id_caja) cajasMap.set(c.id_caja, c.nombre_caja); });
+  _cajas = [...cajasMap.entries()].map(([id,nombre]) => ({ id, nombre }));
+  // select cajas
+  const selCaja = document.getElementById('filCaja');
+  _cajas.forEach(c => {
+    const o = document.createElement('option'); o.value = c.id; o.textContent = c.nombre; selCaja.appendChild(o);
+  });
+  filtrarCajero();
+})();
+
+function filtrarCajero() {
+  const id_caja = document.getElementById('filCaja').value;
+  const selU    = document.getElementById('filUsuario');
+  selU.innerHTML = '<option value="">— Todos —</option>';
+  const lista = id_caja ? _cajeros.filter(c => String(c.id_caja) === String(id_caja)) : _cajeros;
+  lista.forEach(c => {
+    const o = document.createElement('option');
+    o.value = c.id_usuario;
+    o.textContent = c.nombre + (c.nombre_caja ? ` (${c.nombre_caja})` : '');
+    selU.appendChild(o);
+  });
+}
+
+async function buscar() {
+  const params = new URLSearchParams({
+    desde:      document.getElementById('filDesde').value,
+    hasta:      document.getElementById('filHasta').value,
+    id_usuario: document.getElementById('filUsuario').value,
+    id_caja:    document.getElementById('filCaja').value,
+  });
+  document.getElementById('movWrap').innerHTML =
+    `<div class="spinner-wrap"><div class="spinner-border text-primary" style="width:2rem;height:2rem"></div></div>`;
+  const r = await API(`/api/cierre-caja?${params}`);
+  const j = await r.json();
+  if (!j.success) { document.getElementById('movWrap').innerHTML = `<div class="empty-state text-danger"><i class="bi bi-x-circle fs-1 d-block mb-2"></i>${j.error}</div>`; return; }
+  _data = j.data;
+  renderResultados(_data);
+}
+
+function renderResultados(d) {
+  // Stats
+  const t = d.totales;
+  document.getElementById('statPagos').textContent     = t.pagos;
+  document.getElementById('statCuotas').textContent    = clp(t.monto_cuotas);
+  document.getElementById('statIntereses').textContent = clp(t.intereses_mora);
+  document.getElementById('statGastos').textContent    = clp(t.gastos_cobranza);
+  document.getElementById('statTotal').textContent     = clp(t.total_recaudado);
+  document.getElementById('statsRow').style.display    = '';
+
+  // Resumen
+  if (d.resumen.length > 1) {
+    document.getElementById('panelResumen').style.display = '';
+    document.getElementById('tbodyResumen').innerHTML = d.resumen.map(r => `
+      <tr>
+        <td><strong>${esc(r.nombre)}</strong></td>
+        <td>${esc(r.perfil||'—')}</td>
+        <td>${esc(r.nombre_caja||'—')}</td>
+        <td class="text-right">${r.pagos}</td>
+        <td class="text-right">${clp(r.monto_cuotas)}</td>
+        <td class="text-right">${r.intereses_mora > 0 ? clp(r.intereses_mora) : '<span style="color:#9ca3af">—</span>'}</td>
+        <td class="text-right">${r.gastos_cobranza > 0 ? clp(r.gastos_cobranza) : '<span style="color:#9ca3af">—</span>'}</td>
+        <td class="text-right"><strong>${clp(r.total_recaudado)}</strong></td>
+      </tr>`).join('');
+    document.getElementById('tfootResumen').innerHTML = `
+      <td>TOTAL</td><td></td><td></td>
+      <td class="text-right">${t.pagos}</td>
+      <td class="text-right">${clp(t.monto_cuotas)}</td>
+      <td class="text-right">${clp(t.intereses_mora)}</td>
+      <td class="text-right">${clp(t.gastos_cobranza)}</td>
+      <td class="text-right">${clp(t.total_recaudado)}</td>`;
+  } else {
+    document.getElementById('panelResumen').style.display = 'none';
+  }
+
+  // Movimientos
+  document.getElementById('movCount').textContent = `${d.movimientos.length} registro${d.movimientos.length!==1?'s':''}`;
+  if (!d.movimientos.length) {
+    document.getElementById('movWrap').innerHTML =
+      `<div class="empty-state"><i class="bi bi-inbox fs-1 mb-3 d-block"></i><p>Sin movimientos para el período seleccionado</p></div>`;
+    return;
+  }
+  document.getElementById('movWrap').innerHTML = `
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th>Fecha/Hora</th>
+            <th>Crédito</th>
+            <th>Cliente</th>
+            <th class="text-right">Cuota N°</th>
+            <th class="text-right">Monto Cuota</th>
+            <th class="text-right">Int. Mora</th>
+            <th class="text-right">Gtos. Cobr.</th>
+            <th class="text-right">Total Pagado</th>
+            <th>Cajero</th>
+            <th>Caja</th>
+          </tr>
+        </thead>
+        <tbody>${d.movimientos.map(m => renderMovRow(m)).join('')}</tbody>
+        <tfoot>
+          <tr class="tfoot-row">
+            <td colspan="4">TOTAL PERÍODO ${esc(d.desde)} al ${esc(d.hasta)}</td>
+            <td class="text-right">${clp(t.monto_cuotas)}</td>
+            <td class="text-right">${clp(t.intereses_mora)}</td>
+            <td class="text-right">${clp(t.gastos_cobranza)}</td>
+            <td class="text-right">${clp(t.total_recaudado)}</td>
+            <td colspan="2"></td>
+          </tr>
+        </tfoot>
+      </table>
+    </div>`;
+}
+
+function renderMovRow(m) {
+  const dt = new Date(m.created_at);
+  const fecha = dt.toLocaleDateString('es-CL');
+  const hora  = dt.toLocaleTimeString('es-CL', { hour:'2-digit', minute:'2-digit' });
+  const hasMora   = (m.interes_mora||0) > 0;
+  const hasGastos = (m.gastos_cobranza||0) > 0;
+  return `
+  <tr>
+    <td><span style="font-weight:600">${fecha}</span><br><small style="color:#6b7280">${hora}</small></td>
+    <td><a href="/creditos/revisar?id=${m.id_credito}" style="color:var(--navy);font-weight:600">${esc(m.numero_credito||m.id_credito)}</a></td>
+    <td>${esc(m.nombre_cliente||'—')}<br><small style="color:#6b7280">${esc(m.rut_cliente||'')}</small></td>
+    <td class="text-right">N°${m.numero_cuota}</td>
+    <td class="text-right">${clp(m.monto_cuota)}</td>
+    <td class="text-right">${hasMora ? `<span style="color:#92400e">${clp(m.interes_mora)}</span>` : '<span style="color:#9ca3af">—</span>'}</td>
+    <td class="text-right">${hasGastos ? `<span style="color:#92400e">${clp(m.gastos_cobranza)}</span>` : '<span style="color:#9ca3af">—</span>'}</td>
+    <td class="text-right"><strong>${clp(m.total_pagado)}</strong></td>
+    <td>${esc(m.nombre_cajero?.trim()||m.registrado_por||'—')}</td>
+    <td>${esc(m.nombre_caja||'—')}</td>
+  </tr>`;
+}
+
+/* ── exportar CSV ────────────────────────────────────────────────────────── */
+function exportarCSV() {
+  if (!_data?.movimientos?.length) return alert('Sin datos para exportar');
+  const cols = ['Fecha','Hora','Credito','Cliente','RUT','Cuota','Monto Cuota','Int Mora','Gtos Cobranza','Total Pagado','Cajero','Caja'];
+  const rows = _data.movimientos.map(m => {
+    const dt = new Date(m.created_at);
+    return [
+      dt.toLocaleDateString('es-CL'),
+      dt.toLocaleTimeString('es-CL',{hour:'2-digit',minute:'2-digit'}),
+      m.numero_credito||m.id_credito,
+      m.nombre_cliente||'',
+      m.rut_cliente||'',
+      m.numero_cuota,
+      Math.round(m.monto_cuota||0),
+      Math.round(m.interes_mora||0),
+      Math.round(m.gastos_cobranza||0),
+      Math.round(m.total_pagado||0),
+      (m.nombre_cajero||m.registrado_por||'').trim(),
+      m.nombre_caja||'',
+    ];
+  });
+  const desde = document.getElementById('filDesde').value;
+  const hasta = document.getElementById('filHasta').value;
+  const csv = [cols, ...rows].map(r => r.map(v => `"${String(v).replace(/"/g,'""')}"`).join(',')).join('\n');
+  const blob = new Blob(['﻿'+csv], { type:'text/csv;charset=utf-8;' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = `cierre-caja_${desde}_${hasta}.csv`;
+  a.click();
+}
+
+function esc(s){ return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+</script>
+</body>
+</html>

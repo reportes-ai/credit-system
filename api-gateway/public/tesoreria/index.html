@@ -48,7 +48,7 @@
     <div class="topnav-left">
       <a href="/" class="topnav-brand">
         <img src="/img/logo.png" alt="AutoFácil">
-        <span class="version-badge">v4.5</span>
+        <span class="version-badge">v4.6</span>
       </a>
       <div class="breadcrumb-nav">
         <a href="/">Inicio</a><span class="sep">/</span>
@@ -83,6 +83,18 @@
         <p>Registro y seguimiento de pagos de créditos</p>
         <span class="btn-acceder"><i class="bi bi-arrow-right-circle me-1"></i>Acceder</span>
       </a>
+      <a href="/tesoreria/cajas" class="module-card" id="cardCajas" style="display:none">
+        <div class="card-icon"><i class="bi bi-cash-stack"></i></div>
+        <h6>Cajas</h6>
+        <p>Gestión de cajas y permisos por usuario cajero</p>
+        <span class="btn-acceder"><i class="bi bi-arrow-right-circle me-1"></i>Acceder</span>
+      </a>
+      <a href="/tesoreria/cierre-caja" class="module-card" id="cardCierre" style="display:none">
+        <div class="card-icon"><i class="bi bi-journal-check"></i></div>
+        <h6>Cierre de Caja</h6>
+        <p>Movimientos por fecha, usuario o total de cajas</p>
+        <span class="btn-acceder"><i class="bi bi-arrow-right-circle me-1"></i>Acceder</span>
+      </a>
     </div>
   </div>
 
@@ -94,6 +106,13 @@
     document.getElementById('navNombre').textContent = `${yo?.nombre||''} ${yo?.apellido||''}`.trim();
     document.getElementById('navPerfil').textContent  = yo?.perfil || '';
     document.getElementById('avatarInicial').textContent = (yo?.nombre||'?').charAt(0).toUpperCase();
+
+    // Módulos restringidos a Administrador / Gerente / Supervisor
+    const perfilAdmin = ['Administrador','Gerente','Supervisor'].includes(yo?.perfil);
+    if (perfilAdmin) {
+      document.getElementById('cardCajas').style.display  = '';
+      document.getElementById('cardCierre').style.display = '';
+    }
 
     function logout() { localStorage.removeItem('token'); localStorage.removeItem('usuario'); window.location.href = '/login.html'; }
   </script>

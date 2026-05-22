@@ -42,6 +42,10 @@ app.use('/api/documentos-af',       require('../../services/creditos/src/routes/
 app.use('/api/pagos-credito',       require('../../services/creditos/src/routes/pagos-credito.routes'));
 app.use('/api/auditoria-credito',   require('../../services/creditos/src/routes/auditoria.routes'));
 
+// Tesorería
+app.use('/api/cajas',       require('../../services/tesoreria/src/routes/cajas.routes'));
+app.use('/api/cierre-caja', require('../../services/tesoreria/src/routes/cierre-caja.routes'));
+
 // Health check
 app.get('/health', (req, res) => res.json({ status: 'Sistema operativo', timestamp: new Date() }));
 
@@ -109,6 +113,10 @@ app.get(['/cotizaciones', '/cotizaciones/'], (req, res) =>
 
 app.get(['/tesoreria', '/tesoreria/'], (req, res) =>
   res.sendFile(path.join(__dirname, '../public/tesoreria/index.html')));
+app.get(['/tesoreria/cajas', '/tesoreria/cajas/'], (req, res) =>
+  res.sendFile(path.join(__dirname, '../public/tesoreria/cajas.html')));
+app.get(['/tesoreria/cierre-caja', '/tesoreria/cierre-caja/'], (req, res) =>
+  res.sendFile(path.join(__dirname, '../public/tesoreria/cierre-caja.html')));
 
 app.get(['/crm', '/crm/'], (req, res) =>
   res.sendFile(path.join(__dirname, '../public/crm/index.html')));
