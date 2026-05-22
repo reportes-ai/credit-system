@@ -35,6 +35,11 @@ const audit = require('../../../../shared/auditoria');
       ALTER TABLE pagos_credito
       ADD COLUMN IF NOT EXISTS id_caja INT NULL
     `).catch(() => {});
+    await pool.query(`
+      ALTER TABLE pagos_credito
+      ADD COLUMN IF NOT EXISTS origen_fondos    VARCHAR(200) NULL,
+      ADD COLUMN IF NOT EXISTS id_cuenta_bancaria INT NULL
+    `).catch(() => {});
   } catch(e) { if (e.errno !== 1050) console.error('[pagos_credito migration]', e.message); }
 })();
 
@@ -69,7 +74,8 @@ const create = async (req, res) => {
     const {
       id_credito, numero_cuota, fecha_vencimiento,
       monto_cuota, interes_mora, gastos_cobranza,
-      total_pagado, fecha_pago, estado_pago, observacion, id_caja
+      total_pagado, fecha_pago, estado_pago, observacion, id_caja,
+      origen_fondos, id_cuenta_bancaria
     } = req.body;
     if (!id_credito || !numero_cuota)
       return res.status(400).json({ success: false, error: 'id_credito y numero_cuota son requeridos' });
@@ -86,14 +92,16 @@ const create = async (req, res) => {
       `INSERT INTO pagos_credito
          (id_credito, numero_cuota, fecha_vencimiento, monto_cuota,
           interes_mora, gastos_cobranza, total_pagado, fecha_pago,
-          estado_pago, observacion, registrado_por, id_registrado_por, id_caja)
-       VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)`,
+          estado_pago, observacion, registrado_por, id_registrado_por, id_caja,
+          origen_fondos, id_cuenta_bancaria)
+       VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
       [id_credito, numero_cuota, fecha_vencimiento || null,
        parseFloat(monto_cuota)||0, parseFloat(interes_mora)||0,
        parseFloat(gastos_cobranza)||0, tp,
        fecha_pago || null, estado_pago || 'PAGADO',
        observacion || null, registrado_por, id_registrado_por,
-       parseInt(id_caja) || null]
+       parseInt(id_caja) || null,
+       origen_fondos || null, parseInt(id_cuenta_bancaria) || null]
     );
     audit.registrar({
       id_credito, req,
