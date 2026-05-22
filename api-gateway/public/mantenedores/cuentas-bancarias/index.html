@@ -1,0 +1,415 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Cuentas Bancarias — AutoFácil</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.0/font/bootstrap-icons.css" rel="stylesheet">
+  <style>
+    :root { --navy:#0141A2; --navy-dark:#012d70; --navy-light:#0255c5; --accent:#009AFE; --bg:#f0f4f8; }
+    body { background:var(--bg); font-family:'Segoe UI',system-ui,sans-serif; margin:0; min-height:100vh; }
+
+    /* TOPNAV */
+    .topnav { background:linear-gradient(90deg,var(--navy-dark),var(--navy-light)); color:#fff; height:60px; padding:0 24px; display:flex; align-items:center; justify-content:space-between; position:sticky; top:0; z-index:200; box-shadow:0 2px 8px rgba(0,0,0,0.3); }
+    .topnav-left { display:flex; align-items:center; gap:16px; }
+    .topnav-brand { display:flex; align-items:center; gap:8px; text-decoration:none; }
+    .topnav-brand img { height:32px; filter:brightness(0) invert(1); }
+    .version-badge { background:rgba(255,255,255,0.15); color:rgba(255,255,255,0.75); font-size:0.65rem; font-weight:700; border-radius:6px; padding:2px 8px; }
+    .breadcrumb-nav { color:rgba(255,255,255,0.6); font-size:0.85rem; display:flex; align-items:center; gap:6px; }
+    .breadcrumb-nav a { color:rgba(255,255,255,0.75); text-decoration:none; }
+    .breadcrumb-nav a:hover { color:#fff; }
+    .breadcrumb-nav .sep { color:rgba(255,255,255,0.35); }
+    .topnav-right { display:flex; align-items:center; gap:12px; }
+    .user-chip { background:rgba(255,255,255,0.12); border-radius:24px; padding:5px 12px; display:flex; align-items:center; gap:8px; font-size:0.85rem; }
+    .avatar { width:28px; height:28px; background:#90caf9; border-radius:50%; display:flex; align-items:center; justify-content:center; color:var(--navy); font-weight:700; font-size:0.75rem; }
+    .perfil-badge { background:rgba(144,202,249,0.2); border:1px solid rgba(144,202,249,0.4); color:#90caf9; border-radius:12px; padding:2px 10px; font-size:0.73rem; font-weight:600; }
+    .btn-logout { background:rgba(255,255,255,0.1); border:1px solid rgba(255,255,255,0.2); color:#fff; border-radius:8px; padding:5px 12px; font-size:0.82rem; cursor:pointer; }
+
+    /* MAIN */
+    .main-content { padding:24px 32px; max-width:1400px; margin:0 auto; }
+
+    /* PAGE BANNER */
+    .page-banner { background:linear-gradient(135deg,#012d70,#0141A2 50%,#009AFE); border-radius:16px; color:#fff; padding:28px 36px; margin-bottom:36px; display:flex; align-items:center; gap:20px; }
+    .page-banner > i { font-size:3rem; opacity:0.8; }
+    .page-banner h2 { font-weight:700; margin:0 0 4px; font-size:1.4rem; }
+    .page-banner p { opacity:0.8; margin:0; font-size:0.9rem; }
+
+    /* TOOLBAR */
+    .toolbar { background:#fff; border-radius:12px; box-shadow:0 1px 4px rgba(0,0,0,0.07); padding:16px 20px; margin-bottom:16px; display:flex; align-items:center; gap:12px; flex-wrap:wrap; }
+    .search-wrap { position:relative; flex:1; min-width:260px; }
+    .search-wrap i { position:absolute; left:12px; top:50%; transform:translateY(-50%); color:#9ca3af; }
+    .search-wrap input { padding-left:36px; border-radius:8px; font-size:0.88rem; border:1px solid #e5e7eb; }
+    .search-wrap input:focus { border-color:var(--navy); box-shadow:0 0 0 3px rgba(1,65,162,0.1); outline:none; }
+    .toolbar select { border-radius:8px; font-size:0.88rem; border:1px solid #e5e7eb; padding:7px 12px; }
+    .btn-nuevo { background:var(--navy); color:#fff; border:none; border-radius:8px; padding:8px 18px; font-size:0.88rem; font-weight:600; white-space:nowrap; cursor:pointer; }
+    .btn-nuevo:hover { background:var(--navy-light); }
+    .count-badge { color:#6b7280; font-size:0.85rem; white-space:nowrap; }
+
+    /* TABLE */
+    .table-wrap { background:#fff; border-radius:12px; box-shadow:0 1px 4px rgba(0,0,0,0.07); overflow:hidden; }
+    table { width:100%; border-collapse:collapse; font-size:0.84rem; }
+    thead tr { background:var(--navy); color:#fff; }
+    thead th { padding:11px 14px; font-weight:600; font-size:0.78rem; letter-spacing:0.4px; text-transform:uppercase; white-space:nowrap; border:none; }
+    tbody tr { border-bottom:1px solid #f1f5f9; transition:background 0.1s; }
+    tbody tr:hover { background:#f8fafc; }
+    tbody td { padding:10px 14px; vertical-align:middle; color:#374151; }
+    .td-num { font-weight:700; color:var(--navy); width:40px; }
+    .td-razon { font-weight:600; color:#111827; }
+    .td-rut { font-family:monospace; color:var(--accent); font-size:0.82rem; }
+    .td-nombre { color:#374151; }
+    .td-cuenta { font-family:monospace; color:#374151; }
+    .td-banco { color:#6b7280; font-size:0.82rem; }
+
+    /* Activo */
+    .activo-si { color:#16a34a; font-weight:700; font-size:0.82rem; }
+    .activo-no { color:#dc2626; font-weight:700; font-size:0.82rem; }
+
+    /* Acciones */
+    .btn-editar-row { background:var(--navy); color:#fff; border:none; border-radius:6px; padding:4px 12px; font-size:0.78rem; font-weight:600; cursor:pointer; }
+    .btn-editar-row:hover { background:var(--navy-light); }
+    .btn-eliminar-row { background:#fee2e2; color:#dc2626; border:none; border-radius:6px; padding:4px 10px; font-size:0.78rem; font-weight:600; cursor:pointer; margin-left:4px; }
+    .btn-eliminar-row:hover { background:#fecaca; }
+
+    /* PAGINACIÓN */
+    .pag-row { display:flex; align-items:center; justify-content:space-between; padding:14px 20px; border-top:1px solid #f1f5f9; }
+    .pag-info { font-size:0.82rem; color:#6b7280; }
+
+    /* MODAL FORM */
+    .modal-form .modal-header { background:var(--navy); color:#fff; border-radius:12px 12px 0 0; }
+    .modal-form .modal-title { font-weight:700; font-size:1rem; }
+    .modal-form .btn-close { filter:invert(1); }
+    .section-label { font-size:0.75rem; font-weight:700; color:var(--navy); text-transform:uppercase; letter-spacing:0.8px; margin:16px 0 10px; padding-bottom:4px; border-bottom:2px solid #e8eaf6; }
+    .form-label { font-size:0.8rem; font-weight:600; color:#374151; margin-bottom:3px; }
+    .required-star { color:#dc2626; }
+    .btn-guardar { background:#16a34a; color:#fff; border:none; border-radius:8px; padding:9px 24px; font-weight:700; font-size:0.9rem; cursor:pointer; }
+    .btn-guardar:hover { background:#15803d; }
+    .btn-cancelar { background:#f3f4f6; color:#374151; border:none; border-radius:8px; padding:9px 18px; font-weight:600; cursor:pointer; }
+  </style>
+</head>
+<body>
+
+<nav class="topnav">
+  <div class="topnav-left">
+    <div class="topnav-brand">
+      <a href="/"><img src="/img/logo.png" alt="AutoFácil" style="display:block"></a>
+      <span class="version-badge">v1.0</span>
+    </div>
+    <div class="breadcrumb-nav">
+      <a href="/mantenedores/">Mantenedores</a>
+      <span class="sep">›</span>
+      <span>Cuentas Bancarias</span>
+    </div>
+  </div>
+  <div class="topnav-right">
+    <div class="user-chip">
+      <div class="avatar" id="avatarInicial">?</div>
+      <div>
+        <div style="font-weight:600;line-height:1.3;color:#fff" id="navNombre">—</div>
+        <div class="perfil-badge" id="navPerfil">—</div>
+      </div>
+    </div>
+    <button class="btn-logout" onclick="logout()"><i class="bi bi-box-arrow-right me-1"></i>Salir</button>
+  </div>
+</nav>
+
+<div class="main-content">
+
+  <!-- Page banner -->
+  <div class="page-banner">
+    <i class="bi bi-bank"></i>
+    <div>
+      <h2>Cuentas Bancarias</h2>
+      <p>Administración de cuentas para pagos y transferencias</p>
+    </div>
+  </div>
+
+  <!-- Toolbar -->
+  <div class="toolbar">
+    <div class="search-wrap">
+      <i class="bi bi-search"></i>
+      <input type="text" id="filtroQ" class="form-control form-control-sm" placeholder="Buscar por razón social, RUT o nombre…" oninput="debounceCargar()">
+    </div>
+    <select id="filtroActivo" class="form-select form-select-sm" style="width:130px" onchange="cargar()">
+      <option value="">Todos</option>
+      <option value="1">Activos</option>
+      <option value="0">Inactivos</option>
+    </select>
+    <button class="btn-nuevo" onclick="abrirNuevo()">
+      <i class="bi bi-plus-circle me-1"></i>+ Nueva Cuenta
+    </button>
+    <span class="count-badge" id="countBadge"></span>
+  </div>
+
+  <!-- Tabla -->
+  <div class="table-wrap">
+    <table>
+      <thead>
+        <tr>
+          <th>N°</th>
+          <th>RAZÓN SOCIAL</th>
+          <th>RUT</th>
+          <th>NOMBRE</th>
+          <th>N° CUENTA</th>
+          <th>BANCO</th>
+          <th>TIPO</th>
+          <th>ACTIVO</th>
+          <th>ACCIONES</th>
+        </tr>
+      </thead>
+      <tbody id="tbody">
+        <tr><td colspan="9" class="text-center text-muted py-5">Cargando…</td></tr>
+      </tbody>
+    </table>
+    <div class="pag-row">
+      <span class="pag-info" id="pagInfo"></span>
+      <div class="d-flex gap-2">
+        <button class="btn btn-outline-secondary btn-sm" id="btnPrev" onclick="cambiarPag(-1)"><i class="bi bi-chevron-left"></i></button>
+        <button class="btn btn-outline-secondary btn-sm" id="btnNext" onclick="cambiarPag(1)"><i class="bi bi-chevron-right"></i></button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ====== MODAL FORM ====== -->
+<div class="modal fade modal-form" id="modalForm" tabindex="-1">
+  <div class="modal-dialog modal-lg modal-dialog-scrollable">
+    <div class="modal-content" style="border-radius:12px;overflow:hidden">
+      <div class="modal-header">
+        <h5 class="modal-title" id="formTitulo">Nueva Cuenta Bancaria</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body">
+        <input type="hidden" id="fId">
+
+        <div class="section-label">DATOS DE LA EMPRESA</div>
+        <div class="row g-3">
+          <div class="col-md-8">
+            <label class="form-label">Razón Social <span class="required-star">*</span></label>
+            <input type="text" class="form-control form-control-sm" id="fRazonSocial" placeholder="Ej: Autofácil SpA">
+          </div>
+          <div class="col-md-4">
+            <label class="form-label">RUT <span class="required-star">*</span></label>
+            <input type="text" class="form-control form-control-sm" id="fRut" placeholder="Ej: 76.545.638-K">
+          </div>
+        </div>
+
+        <div class="section-label">DATOS BANCARIOS</div>
+        <div class="row g-3">
+          <div class="col-md-6">
+            <label class="form-label">Nombre (titular de la cuenta) <span class="required-star">*</span></label>
+            <input type="text" class="form-control form-control-sm" id="fNombre" placeholder="Ej: Juan Pérez">
+          </div>
+          <div class="col-md-6">
+            <label class="form-label">Número de Cuenta <span class="required-star">*</span></label>
+            <input type="text" class="form-control form-control-sm" id="fNumeroCuenta" placeholder="Ej: 00-123-45678-0">
+          </div>
+          <div class="col-md-6">
+            <label class="form-label">Banco</label>
+            <input type="text" class="form-control form-control-sm" id="fBanco" list="bancosList" placeholder="Ej: Banco de Chile">
+            <datalist id="bancosList">
+              <option value="Banco de Chile">
+              <option value="BancoEstado">
+              <option value="Santander">
+              <option value="BCI">
+              <option value="Itaú">
+              <option value="Scotiabank">
+              <option value="Security">
+              <option value="Falabella">
+              <option value="Ripley">
+              <option value="Consorcio">
+              <option value="BICE">
+              <option value="Internacional">
+            </datalist>
+          </div>
+          <div class="col-md-6">
+            <label class="form-label">Tipo de Cuenta</label>
+            <select class="form-select form-select-sm" id="fTipoCuenta">
+              <option value="">— Seleccionar —</option>
+              <option value="Cuenta Corriente">Cuenta Corriente</option>
+              <option value="Cuenta Vista">Cuenta Vista</option>
+              <option value="Cuenta RUT">Cuenta RUT</option>
+              <option value="Cuenta de Ahorro">Cuenta de Ahorro</option>
+            </select>
+          </div>
+          <div class="col-md-3">
+            <label class="form-label">Activo</label>
+            <select class="form-select form-select-sm" id="fActivo">
+              <option value="1">SI</option>
+              <option value="0">NO</option>
+            </select>
+          </div>
+        </div>
+      </div>
+      <div class="modal-footer" style="border-top:1px solid #f1f5f9">
+        <button class="btn-cancelar" data-bs-dismiss="modal">Cancelar</button>
+        <button class="btn-guardar" onclick="guardar()"><i class="bi bi-floppy me-1"></i>Guardar</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+<script>
+const token = localStorage.getItem('token');
+const yo = JSON.parse(localStorage.getItem('usuario') || 'null');
+if (!token || !yo) window.location.href = '/login.html';
+document.getElementById('navNombre').textContent = `${yo?.nombre||''} ${yo?.apellido||''}`.trim();
+document.getElementById('navPerfil').textContent = yo?.perfil || '';
+document.getElementById('avatarInicial').textContent = (yo?.nombre||'?').charAt(0).toUpperCase();
+function logout() { localStorage.removeItem('token'); localStorage.removeItem('usuario'); window.location.href = '/login.html'; }
+
+const H = { 'Content-Type':'application/json', 'Authorization':'Bearer '+token };
+const esAdmin = ['Administrador','Gerente'].includes(yo?.perfil);
+
+let _todos = [], _filtrado = [], pag = 1, perPag = 100, debTimer;
+let modalBS;
+
+function debounceCargar() { clearTimeout(debTimer); debTimer = setTimeout(cargar, 300); }
+function cambiarPag(d) { pag += d; renderTabla(); }
+
+async function cargar() {
+  pag = 1;
+  const res  = await fetch('/api/cuentas-bancarias', { headers: H });
+  const json = await res.json();
+  if (!json.success) return;
+  _todos = json.data;
+  filtrar();
+}
+
+function filtrar() {
+  const q = (document.getElementById('filtroQ').value || '').toLowerCase();
+  const a = document.getElementById('filtroActivo').value;
+  _filtrado = _todos.filter(r => {
+    const matchQ = !q
+      || (r.razon_social||'').toLowerCase().includes(q)
+      || (r.rut||'').toLowerCase().includes(q)
+      || (r.nombre||'').toLowerCase().includes(q)
+      || (r.numero_cuenta||'').toLowerCase().includes(q)
+      || (r.banco||'').toLowerCase().includes(q);
+    const matchA = a === '' || String(r.activo) === a;
+    return matchQ && matchA;
+  });
+  renderTabla();
+}
+
+function renderTabla() {
+  const total  = _filtrado.length;
+  const desde  = (pag - 1) * perPag;
+  const hasta  = Math.min(pag * perPag, total);
+  const pagina = _filtrado.slice(desde, hasta);
+
+  document.getElementById('countBadge').textContent = `${total.toLocaleString('es-CL')} cuenta${total !== 1 ? 's' : ''} encontrada${total !== 1 ? 's' : ''}`;
+  document.getElementById('pagInfo').textContent    = total > 0 ? `Mostrando ${desde + 1}–${hasta} de ${total.toLocaleString('es-CL')}` : '';
+  document.getElementById('btnPrev').disabled = pag <= 1;
+  document.getElementById('btnNext').disabled = hasta >= total;
+
+  const tb = document.getElementById('tbody');
+  if (!pagina.length) {
+    tb.innerHTML = '<tr><td colspan="9" class="text-center text-muted py-5">Sin resultados</td></tr>';
+    return;
+  }
+
+  tb.innerHTML = pagina.map((r, i) => `
+    <tr>
+      <td class="td-num">${desde + i + 1}</td>
+      <td class="td-razon">${esc(r.razon_social)}</td>
+      <td class="td-rut">${esc(r.rut)}</td>
+      <td class="td-nombre">${esc(r.nombre)}</td>
+      <td class="td-cuenta">${esc(r.numero_cuenta)}</td>
+      <td class="td-banco">${esc(r.banco) || '—'}</td>
+      <td style="font-size:0.82rem;color:#6b7280">${esc(r.tipo_cuenta) || '—'}</td>
+      <td>${r.activo ? '<span class="activo-si">✓ SI</span>' : '<span class="activo-no">✗ NO</span>'}</td>
+      <td>
+        ${esAdmin ? `
+          <button class="btn-editar-row" onclick="abrirEditar(${r.id_cuenta})"><i class="bi bi-pencil"></i> Editar</button>
+          <button class="btn-eliminar-row" onclick="eliminar(${r.id_cuenta})"><i class="bi bi-trash"></i></button>
+        ` : '<span class="text-muted" style="font-size:0.78rem">—</span>'}
+      </td>
+    </tr>
+  `).join('');
+}
+
+function esc(v) {
+  if (v == null) return '';
+  return String(v).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+}
+
+function getModal() {
+  if (!modalBS) modalBS = new bootstrap.Modal(document.getElementById('modalForm'));
+  return modalBS;
+}
+
+function abrirNuevo() {
+  document.getElementById('formTitulo').textContent = 'Nueva Cuenta Bancaria';
+  document.getElementById('fId').value           = '';
+  document.getElementById('fRazonSocial').value  = '';
+  document.getElementById('fRut').value          = '';
+  document.getElementById('fNombre').value       = '';
+  document.getElementById('fNumeroCuenta').value = '';
+  document.getElementById('fBanco').value        = '';
+  document.getElementById('fTipoCuenta').value   = '';
+  document.getElementById('fActivo').value       = '1';
+  getModal().show();
+}
+
+function abrirEditar(id) {
+  const r = _todos.find(x => x.id_cuenta === id);
+  if (!r) return;
+  document.getElementById('formTitulo').textContent = 'Editar Cuenta Bancaria';
+  document.getElementById('fId').value           = r.id_cuenta;
+  document.getElementById('fRazonSocial').value  = r.razon_social || '';
+  document.getElementById('fRut').value          = r.rut || '';
+  document.getElementById('fNombre').value       = r.nombre || '';
+  document.getElementById('fNumeroCuenta').value = r.numero_cuenta || '';
+  document.getElementById('fBanco').value        = r.banco || '';
+  document.getElementById('fTipoCuenta').value   = r.tipo_cuenta || '';
+  document.getElementById('fActivo').value       = r.activo ? '1' : '0';
+  getModal().show();
+}
+
+async function guardar() {
+  const id           = document.getElementById('fId').value;
+  const razon_social = document.getElementById('fRazonSocial').value.trim();
+  const rut          = document.getElementById('fRut').value.trim();
+  const nombre       = document.getElementById('fNombre').value.trim();
+  const numero_cuenta = document.getElementById('fNumeroCuenta').value.trim();
+  const banco        = document.getElementById('fBanco').value.trim();
+  const tipo_cuenta  = document.getElementById('fTipoCuenta').value;
+  const activo       = parseInt(document.getElementById('fActivo').value);
+
+  if (!razon_social || !rut || !nombre || !numero_cuenta) {
+    alert('Razón social, RUT, nombre y número de cuenta son requeridos.');
+    return;
+  }
+
+  const body = JSON.stringify({ razon_social, rut, nombre, numero_cuenta, banco: banco||null, tipo_cuenta: tipo_cuenta||null, activo });
+  const url    = id ? `/api/cuentas-bancarias/${id}` : '/api/cuentas-bancarias';
+  const method = id ? 'PUT' : 'POST';
+
+  const res  = await fetch(url, { method, headers: H, body });
+  const json = await res.json();
+  if (!json.success) { alert('Error: ' + json.error); return; }
+
+  getModal().hide();
+  await cargar();
+}
+
+async function eliminar(id) {
+  const r = _todos.find(x => x.id_cuenta === id);
+  if (!r) return;
+  if (!confirm(`¿Eliminar la cuenta "${r.nombre}" (${r.numero_cuenta})?`)) return;
+  const res  = await fetch(`/api/cuentas-bancarias/${id}`, { method:'DELETE', headers: H });
+  const json = await res.json();
+  if (!json.success) { alert('Error: ' + json.error); return; }
+  await cargar();
+}
+
+// Filtrado local en tiempo real
+document.getElementById('filtroQ').addEventListener('input', debounceCargar);
+document.getElementById('filtroActivo').addEventListener('change', filtrar);
+
+cargar();
+</script>
+</body>
+</html>

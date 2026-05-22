@@ -31,6 +31,7 @@ app.use('/api/dealers',         require('../../services/mantenedores/src/routes/
 app.use('/api/parametros-credito', require('../../services/mantenedores/src/routes/parametros.routes'));
 app.use('/api/tipos-documento',      require('../../services/mantenedores/src/routes/tipos-documento.routes'));
 app.use('/api/plantillas-documento', require('../../services/mantenedores/src/routes/plantillas.routes'));
+app.use('/api/cuentas-bancarias',    require('../../services/mantenedores/src/routes/cuentas-bancarias.routes'));
 
 // Cotizaciones
 app.use('/api/cotizaciones', require('../../services/cotizaciones/src/routes/cotizaciones.routes'));
@@ -89,6 +90,9 @@ app.get(['/creditos/documentos', '/creditos/documentos/'], (req, res) =>
 
 app.get(['/mantenedores/pagares', '/mantenedores/pagares/'], (req, res) =>
   res.sendFile(path.join(__dirname, '../public/mantenedores/pagares/index.html')));
+
+app.get(['/mantenedores/cuentas-bancarias', '/mantenedores/cuentas-bancarias/'], (req, res) =>
+  res.sendFile(path.join(__dirname, '../public/mantenedores/cuentas-bancarias/index.html')));
 
 app.get(['/creditos/carga-documentos-af', '/creditos/carga-documentos-af/'], (req, res) =>
   res.sendFile(path.join(__dirname, '../public/creditos/carga-documentos-af.html')));
