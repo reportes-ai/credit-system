@@ -25,45 +25,57 @@
     .btn-logout { background:rgba(255,255,255,.1); border:1px solid rgba(255,255,255,.2); color:#fff; border-radius:8px; padding:5px 12px; font-size:.82rem; cursor:pointer; }
     .btn-logout:hover { background:rgba(255,255,255,.2); }
     .main-content { padding:32px 40px; max-width:1100px; margin:0 auto; }
-    .page-banner { background:linear-gradient(135deg,#012d70,#0141A2 50%,#009AFE); border-radius:16px; color:#fff; padding:24px 32px; margin-bottom:32px; display:flex; align-items:center; gap:18px; }
+    .page-banner { background:linear-gradient(135deg,#012d70,#0141A2 50%,#009AFE); border-radius:16px; color:#fff; padding:24px 32px; margin-bottom:28px; display:flex; align-items:center; gap:18px; }
     .page-banner i { font-size:2.4rem; opacity:.8; }
     .page-banner h2 { font-weight:700; margin:0 0 3px; font-size:1.3rem; }
     .page-banner p { opacity:.8; margin:0; font-size:.88rem; }
+    /* Tabs */
+    .tab-bar { display:flex; gap:6px; margin-bottom:22px; }
+    .tab-btn { background:#fff; border:2px solid #e5e7eb; color:#6b7280; border-radius:10px; padding:8px 20px; font-size:.88rem; font-weight:600; cursor:pointer; transition:.15s; }
+    .tab-btn.active { background:var(--navy); border-color:var(--navy); color:#fff; }
+    .tab-btn:hover:not(.active) { border-color:var(--navy); color:var(--navy); }
+    /* Panel */
     .panel { background:#fff; border-radius:14px; box-shadow:0 1px 4px rgba(0,0,0,.07); }
-    .panel-header { padding:18px 24px; border-bottom:1px solid #e5e7eb; display:flex; align-items:center; justify-content:space-between; }
-    .panel-header h5 { margin:0; font-weight:700; font-size:1rem; color:#111827; }
-    .panel-body { padding:24px; }
-    .cajas-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(280px,1fr)); gap:18px; }
-    .caja-card { border:2px solid #e5e7eb; border-radius:12px; padding:20px; background:#fff; position:relative; transition:border-color .18s,box-shadow .18s; }
-    .caja-card.activa:hover { border-color:var(--navy); box-shadow:0 4px 18px rgba(1,65,162,.12); }
-    .caja-card.inactiva { opacity:.55; }
-    .caja-title { font-weight:700; font-size:1rem; color:#111827; margin-bottom:4px; }
-    .caja-desc { font-size:.82rem; color:#6b7280; margin-bottom:14px; }
-    .caja-badge { display:inline-flex; align-items:center; gap:5px; font-size:.75rem; font-weight:600; padding:3px 10px; border-radius:20px; }
-    .badge-activa { background:#dcfce7; color:#15803d; }
-    .badge-inactiva { background:#fee2e2; color:#b91c1c; }
-    .caja-actions { display:flex; gap:8px; margin-top:14px; }
-    .btn-icon { background:none; border:1px solid #e5e7eb; border-radius:8px; padding:6px 12px; font-size:.82rem; cursor:pointer; display:flex; align-items:center; gap:5px; }
-    .btn-icon:hover { background:#f3f4f6; }
-    .btn-primary-sm { background:var(--navy); color:#fff; border:none; border-radius:8px; padding:6px 14px; font-size:.82rem; font-weight:600; cursor:pointer; display:flex; align-items:center; gap:5px; }
-    .btn-primary-sm:hover { background:var(--navy-light); }
-    .usuarios-list { margin-top:14px; display:flex; flex-direction:column; gap:8px; }
-    .usuario-row { background:#f8fafc; border-radius:10px; padding:12px 14px; border:1px solid #e5e7eb; }
-    .usuario-nombre { font-weight:600; font-size:.88rem; color:#111827; }
-    .usuario-perfil { font-size:.75rem; color:#6b7280; }
-    .permisos-chips { display:flex; flex-wrap:wrap; gap:5px; margin-top:8px; }
-    .chip { font-size:.72rem; font-weight:600; padding:2px 8px; border-radius:10px; }
-    .chip-ok { background:#dbeafe; color:#1d4ed8; }
-    .chip-no { background:#f1f5f9; color:#94a3b8; text-decoration:line-through; }
+    .panel-header { padding:16px 22px; border-bottom:1px solid #e5e7eb; display:flex; align-items:center; justify-content:space-between; }
+    .panel-header h5 { margin:0; font-weight:700; font-size:.97rem; color:#111827; }
+    /* Tabla */
+    .table-wrap { overflow-x:auto; }
+    table { width:100%; border-collapse:collapse; font-size:.87rem; }
+    thead th { background:#f8fafc; color:#374151; font-weight:700; padding:11px 16px; text-align:left; border-bottom:2px solid #e5e7eb; white-space:nowrap; }
+    tbody td { padding:12px 16px; border-bottom:1px solid #f1f5f9; color:#1f2937; vertical-align:middle; }
+    tbody tr:last-child td { border-bottom:none; }
+    tbody tr:hover td { background:#fafbfc; }
+    /* Chips de permisos */
+    .chip { display:inline-flex; align-items:center; gap:4px; font-size:.72rem; font-weight:600; padding:3px 9px; border-radius:10px; }
+    .chip-ok  { background:#dbeafe; color:#1d4ed8; }
     .chip-tope { background:#fef9c3; color:#854d0e; }
-    .empty-state { text-align:center; color:#9ca3af; padding:40px 0; }
+    .chip-none { background:#f1f5f9; color:#9ca3af; font-style:italic; }
+    .permisos-wrap { display:flex; flex-wrap:wrap; gap:4px; }
+    /* Botones */
+    .btn-asignar { background:var(--navy); color:#fff; border:none; border-radius:8px; padding:6px 14px; font-size:.82rem; font-weight:600; cursor:pointer; white-space:nowrap; }
+    .btn-asignar:hover { background:var(--navy-light); }
+    .btn-quitar { background:none; border:1px solid #fca5a5; color:#dc2626; border-radius:8px; padding:5px 10px; font-size:.78rem; cursor:pointer; }
+    .btn-quitar:hover { background:#fee2e2; }
+    .btn-icon-sm { background:none; border:1px solid #e5e7eb; color:#374151; border-radius:7px; padding:5px 10px; font-size:.78rem; cursor:pointer; }
+    .btn-icon-sm:hover { background:#f3f4f6; }
+    .btn-primary-sm { background:var(--navy); color:#fff; border:none; border-radius:8px; padding:7px 16px; font-size:.83rem; font-weight:600; cursor:pointer; }
+    .btn-primary-sm:hover { background:var(--navy-light); }
+    /* Caja badge */
+    .caja-badge { display:inline-flex; align-items:center; gap:5px; background:#eff6ff; border:1px solid #bfdbfe; color:#1e40af; border-radius:10px; padding:3px 10px; font-size:.78rem; font-weight:600; }
+    .sin-caja { color:#9ca3af; font-style:italic; font-size:.82rem; }
+    /* Modal permisos */
+    .perm-row { display:flex; align-items:center; gap:10px; padding:10px 0; border-bottom:1px solid #f1f5f9; }
+    .perm-row:last-child { border-bottom:none; }
+    .perm-icon { font-size:1.1rem; width:24px; text-align:center; }
+    .perm-label { flex:1; font-size:.9rem; color:#374151; }
+    .tope-group { width:100px; }
+    /* Cajas list */
+    .cajas-list { display:flex; flex-direction:column; gap:10px; padding:20px; }
+    .caja-item { border:1.5px solid #e5e7eb; border-radius:10px; padding:14px 16px; display:flex; align-items:center; justify-content:space-between; background:#fafbfc; }
+    .caja-item.inactiva { opacity:.5; }
+    .empty-state { text-align:center; color:#9ca3af; padding:50px 0; }
     .spinner-wrap { display:flex; align-items:center; justify-content:center; padding:60px 0; }
-    /* Modal */
-    .modal-perm-row { display:flex; align-items:center; gap:10px; padding:8px 0; border-bottom:1px solid #f1f5f9; }
-    .modal-perm-row:last-child { border-bottom:none; }
-    .modal-perm-label { flex:1; font-size:.9rem; color:#374151; }
-    .perm-tope { width:90px; }
-    @media(max-width:640px){ .main-content{padding:16px;} .cajas-grid{grid-template-columns:1fr;} }
+    @media(max-width:640px){ .main-content{padding:16px;} }
   </style>
 </head>
 <body>
@@ -71,7 +83,7 @@
   <div class="topnav-left">
     <a href="/" class="topnav-brand">
       <img src="/img/logo.png" alt="AutoFácil">
-      <span class="version-badge">v1.0</span>
+      <span class="version-badge">v1.1</span>
     </a>
     <div class="breadcrumb-nav">
       <a href="/">Inicio</a><span class="sep">/</span>
@@ -96,21 +108,125 @@
     <i class="bi bi-cash-stack"></i>
     <div>
       <h2>Módulo de Cajas</h2>
-      <p>Crea cajas y asigna usuarios con permisos específicos por caja</p>
+      <p>Asigna una caja a cada usuario y define sus permisos de operación</p>
     </div>
   </div>
 
-  <!-- Panel principal -->
-  <div class="panel">
-    <div class="panel-header">
-      <h5><i class="bi bi-cash-stack me-2 text-primary"></i>Cajas registradas</h5>
-      <button class="btn-primary-sm" onclick="abrirModalCaja()">
-        <i class="bi bi-plus-lg"></i> Nueva caja
-      </button>
+  <!-- Tabs -->
+  <div class="tab-bar">
+    <button class="tab-btn active" onclick="showTab('asignaciones')"><i class="bi bi-people me-1"></i>Asignación por usuario</button>
+    <button class="tab-btn" onclick="showTab('cajas')"><i class="bi bi-cash-stack me-1"></i>Administrar cajas</button>
+  </div>
+
+  <!-- ═══ TAB: ASIGNACIONES ════════════════════════════════════════════════ -->
+  <div id="tabAsignaciones">
+    <div class="panel">
+      <div class="panel-header">
+        <h5><i class="bi bi-people me-2 text-primary"></i>Usuarios del sistema</h5>
+      </div>
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>Usuario</th>
+              <th>Perfil</th>
+              <th>Caja asignada</th>
+              <th>Permisos</th>
+              <th style="width:120px"></th>
+            </tr>
+          </thead>
+          <tbody id="tbodyUsuarios">
+            <tr><td colspan="5"><div class="spinner-wrap"><div class="spinner-border text-primary" style="width:2rem;height:2rem"></div></div></td></tr>
+          </tbody>
+        </table>
+      </div>
     </div>
-    <div class="panel-body">
+  </div>
+
+  <!-- ═══ TAB: CAJAS ═══════════════════════════════════════════════════════ -->
+  <div id="tabCajas" style="display:none">
+    <div class="panel">
+      <div class="panel-header">
+        <h5><i class="bi bi-cash-stack me-2 text-primary"></i>Cajas registradas</h5>
+        <button class="btn-primary-sm" onclick="abrirModalCaja()"><i class="bi bi-plus-lg me-1"></i>Nueva caja</button>
+      </div>
       <div id="cajasWrap">
-        <div class="spinner-wrap"><div class="spinner-border text-primary" style="width:2.5rem;height:2.5rem"></div></div>
+        <div class="spinner-wrap"><div class="spinner-border text-primary" style="width:2rem;height:2rem"></div></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ══ MODAL ASIGNAR CAJA A USUARIO ══════════════════════════════════════ -->
+<div class="modal fade" id="modalAsignar" tabindex="-1">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content border-0 shadow">
+      <div class="modal-header border-0 pb-1">
+        <div>
+          <h5 class="modal-title fw-bold mb-0" id="modalAsignarTitulo">Asignar caja</h5>
+          <div id="modalAsignarSubtitulo" style="font-size:.82rem;color:#6b7280"></div>
+        </div>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body">
+        <input type="hidden" id="asigUserId">
+        <div class="mb-4">
+          <label class="form-label fw-semibold">Caja asignada</label>
+          <select id="asigCajaSelect" class="form-select">
+            <option value="">— Sin caja —</option>
+          </select>
+        </div>
+
+        <p class="fw-semibold mb-1" style="font-size:.8rem;text-transform:uppercase;letter-spacing:.5px;color:#6b7280">Permisos de operación</p>
+        <div class="perm-row">
+          <i class="bi bi-cash perm-icon text-success"></i>
+          <span class="perm-label">Pagar cuotas</span>
+          <div class="form-check form-switch mb-0">
+            <input class="form-check-input" type="checkbox" id="permPagar">
+          </div>
+        </div>
+        <div class="perm-row">
+          <i class="bi bi-arrow-counterclockwise perm-icon text-warning"></i>
+          <span class="perm-label">Reversar pagos</span>
+          <div class="form-check form-switch mb-0">
+            <input class="form-check-input" type="checkbox" id="permReversar">
+          </div>
+        </div>
+        <div class="perm-row">
+          <i class="bi bi-percent perm-icon text-primary"></i>
+          <span class="perm-label">Condonar intereses por mora</span>
+          <div class="form-check form-switch mb-0">
+            <input class="form-check-input" type="checkbox" id="permCondIntereses" onchange="toggleTope('topeIntereses',this.checked)">
+          </div>
+          <div class="input-group tope-group">
+            <input type="number" id="topeIntereses" class="form-control form-control-sm" min="0" max="100" step="1" placeholder="0" disabled>
+            <span class="input-group-text" style="font-size:.8rem">%&nbsp;máx</span>
+          </div>
+        </div>
+        <div class="perm-row">
+          <i class="bi bi-shield-check perm-icon text-info"></i>
+          <span class="perm-label">Condonar gastos de cobranza</span>
+          <div class="form-check form-switch mb-0">
+            <input class="form-check-input" type="checkbox" id="permCondGastos" onchange="toggleTope('topeGastos',this.checked)">
+          </div>
+          <div class="input-group tope-group">
+            <input type="number" id="topeGastos" class="form-control form-control-sm" min="0" max="100" step="1" placeholder="0" disabled>
+            <span class="input-group-text" style="font-size:.8rem">%&nbsp;máx</span>
+          </div>
+        </div>
+        <div class="perm-row" style="border-bottom:none">
+          <i class="bi bi-toggle-on perm-icon text-secondary"></i>
+          <span class="perm-label">Asignación activa</span>
+          <div class="form-check form-switch mb-0">
+            <input class="form-check-input" type="checkbox" id="asigActivo" checked>
+          </div>
+        </div>
+      </div>
+      <div class="modal-footer border-0 pt-0">
+        <button class="btn btn-light" data-bs-dismiss="modal">Cancelar</button>
+        <button class="btn btn-primary fw-semibold px-4" onclick="guardarAsignacion()">
+          <i class="bi bi-check2 me-1"></i>Guardar
+        </button>
       </div>
     </div>
   </div>
@@ -124,7 +240,7 @@
         <h5 class="modal-title fw-bold" id="modalCajaTitulo">Nueva Caja</h5>
         <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
       </div>
-      <div class="modal-body pt-2">
+      <div class="modal-body">
         <input type="hidden" id="cajId">
         <div class="mb-3">
           <label class="form-label fw-semibold">Nombre <span class="text-danger">*</span></label>
@@ -149,87 +265,14 @@
   </div>
 </div>
 
-<!-- ══ MODAL ASIGNACIÓN USUARIO ═══════════════════════════════════════════ -->
-<div class="modal fade" id="modalUsuario" tabindex="-1">
-  <div class="modal-dialog modal-dialog-centered modal-lg">
-    <div class="modal-content border-0 shadow">
-      <div class="modal-header border-0 pb-0">
-        <h5 class="modal-title fw-bold" id="modalUsuarioTitulo">Asignar Usuario</h5>
-        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
-      </div>
-      <div class="modal-body pt-2">
-        <input type="hidden" id="asigCajaId">
-        <input type="hidden" id="asigUserId">
-        <div class="mb-3">
-          <label class="form-label fw-semibold">Usuario <span class="text-danger">*</span></label>
-          <select id="asigSelect" class="form-select">
-            <option value="">— Seleccione usuario —</option>
-          </select>
-        </div>
-        <p class="fw-semibold text-secondary mb-2" style="font-size:.85rem;text-transform:uppercase;letter-spacing:.5px">Permisos</p>
-        <div class="modal-perm-row">
-          <i class="bi bi-cash text-success fs-5"></i>
-          <span class="modal-perm-label">Pagar cuotas</span>
-          <div class="form-check form-switch mb-0">
-            <input class="form-check-input" type="checkbox" id="permPagar">
-          </div>
-        </div>
-        <div class="modal-perm-row">
-          <i class="bi bi-arrow-counterclockwise text-warning fs-5"></i>
-          <span class="modal-perm-label">Reversar pagos</span>
-          <div class="form-check form-switch mb-0">
-            <input class="form-check-input" type="checkbox" id="permReversar">
-          </div>
-        </div>
-        <div class="modal-perm-row">
-          <i class="bi bi-percent text-primary fs-5"></i>
-          <span class="modal-perm-label">Condonar intereses por mora</span>
-          <div class="form-check form-switch mb-0">
-            <input class="form-check-input" type="checkbox" id="permCondIntereses" onchange="toggleTope('topeIntereses',this.checked)">
-          </div>
-          <div class="input-group perm-tope">
-            <input type="number" id="topeIntereses" class="form-control form-control-sm" min="0" max="100" step="1" placeholder="0" disabled>
-            <span class="input-group-text">%</span>
-          </div>
-        </div>
-        <div class="modal-perm-row">
-          <i class="bi bi-shield-check text-info fs-5"></i>
-          <span class="modal-perm-label">Condonar gastos de cobranza</span>
-          <div class="form-check form-switch mb-0">
-            <input class="form-check-input" type="checkbox" id="permCondGastos" onchange="toggleTope('topeGastos',this.checked)">
-          </div>
-          <div class="input-group perm-tope">
-            <input type="number" id="topeGastos" class="form-control form-control-sm" min="0" max="100" step="1" placeholder="0" disabled>
-            <span class="input-group-text">%</span>
-          </div>
-        </div>
-        <div class="modal-perm-row border-0 pt-2">
-          <i class="bi bi-toggle-on text-secondary fs-5"></i>
-          <span class="modal-perm-label">Asignación activa</span>
-          <div class="form-check form-switch mb-0">
-            <input class="form-check-input" type="checkbox" id="asigActivo" checked>
-          </div>
-        </div>
-      </div>
-      <div class="modal-footer border-0 pt-0">
-        <button class="btn btn-light" data-bs-dismiss="modal">Cancelar</button>
-        <button class="btn btn-primary fw-semibold px-4" onclick="guardarUsuario()">
-          <i class="bi bi-check2 me-1"></i>Guardar
-        </button>
-      </div>
-    </div>
-  </div>
-</div>
-
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
 <script>
 const token = localStorage.getItem('token');
 const yo    = JSON.parse(localStorage.getItem('usuario') || 'null');
 if (!token || !yo) window.location.href = '/login.html';
 if (!['Administrador','Gerente'].includes(yo?.perfil)) {
-  alert('Acceso restringido'); window.location.href = '/tesoreria';
+  alert('Acceso restringido'); history.back();
 }
-
 document.getElementById('navNombre').textContent = `${yo?.nombre||''} ${yo?.apellido||''}`.trim();
 document.getElementById('navPerfil').textContent  = yo?.perfil || '';
 document.getElementById('avatarInicial').textContent = (yo?.nombre||'?').charAt(0).toUpperCase();
@@ -238,105 +281,180 @@ function logout(){ localStorage.removeItem('token'); localStorage.removeItem('us
 const API = (path, opts={}) => fetch(path, { headers:{ Authorization:`Bearer ${token}`, 'Content-Type':'application/json' }, ...opts });
 
 /* ── estado ─────────────────────────────────────────────────────────────── */
-let _cajas = [];
-let _usuariosDisp = [];   // todos los usuarios del sistema
-let _usuariosCaja = {};   // { id_caja: [...] }
+let _usuarios = [];   // todos los usuarios del sistema
+let _cajas    = [];   // todas las cajas
+let _asigs    = {};   // { id_usuario: asignacion | null }
 
-/* ── arranque ───────────────────────────────────────────────────────────── */
+/* ── tabs ───────────────────────────────────────────────────────────────── */
+function showTab(tab) {
+  document.getElementById('tabAsignaciones').style.display = tab==='asignaciones' ? '' : 'none';
+  document.getElementById('tabCajas').style.display        = tab==='cajas'        ? '' : 'none';
+  document.querySelectorAll('.tab-btn').forEach((b,i) => b.classList.toggle('active', (i===0&&tab==='asignaciones')||(i===1&&tab==='cajas')));
+  if (tab==='cajas') renderCajas();
+}
+
+/* ── carga inicial ──────────────────────────────────────────────────────── */
 (async () => {
-  await Promise.all([cargarCajas(), cargarTodosUsuarios()]);
+  await Promise.all([cargarUsuarios(), cargarCajas()]);
+  await cargarAsignaciones();
+  renderUsuarios();
 })();
+
+async function cargarUsuarios() {
+  const r = await API('/api/cajas/todos-usuarios');
+  const j = await r.json();
+  _usuarios = j.data || [];
+}
 
 async function cargarCajas() {
   const r = await API('/api/cajas');
   const j = await r.json();
   _cajas = j.data || [];
-  await cargarUsuariosDeCajas();
-  renderCajas();
 }
 
-async function cargarTodosUsuarios() {
-  const r = await API('/api/cajas/todos-usuarios');
-  const j = await r.json();
-  _usuariosDisp = j.data || [];
-}
-
-async function cargarUsuariosDeCajas() {
+async function cargarAsignaciones() {
+  // Para cada caja, cargar usuarios asignados y mapear por id_usuario
+  _asigs = {};
   await Promise.all(_cajas.map(async c => {
     const r = await API(`/api/cajas/${c.id_caja}/usuarios`);
     const j = await r.json();
-    _usuariosCaja[c.id_caja] = j.data || [];
+    (j.data||[]).forEach(u => { _asigs[u.id_usuario] = { ...u, caja: c }; });
   }));
 }
 
-/* ── render ─────────────────────────────────────────────────────────────── */
+/* ── render tabla usuarios ──────────────────────────────────────────────── */
+function renderUsuarios() {
+  const tbody = document.getElementById('tbodyUsuarios');
+  if (!_usuarios.length) {
+    tbody.innerHTML = `<tr><td colspan="5"><div class="empty-state"><i class="bi bi-people fs-1 d-block mb-2"></i>Sin usuarios registrados</div></td></tr>`;
+    return;
+  }
+  tbody.innerHTML = _usuarios.map(u => {
+    const a = _asigs[u.id_usuario] || null;
+    const cajaBadge = a?.caja
+      ? `<span class="caja-badge"><i class="bi bi-cash-stack"></i>${esc(a.caja.nombre)}</span>`
+      + (a.activo ? '' : ' <span style="font-size:.72rem;color:#9ca3af">(inactivo)</span>')
+      : `<span class="sin-caja">Sin caja</span>`;
+
+    const chips = [];
+    if (a?.puede_pagar_cuotas)        chips.push(`<span class="chip chip-ok"><i class="bi bi-cash"></i> Pagar</span>`);
+    if (a?.puede_reversar_pagos)      chips.push(`<span class="chip chip-ok"><i class="bi bi-arrow-counterclockwise"></i> Reversar</span>`);
+    if (a?.puede_condonar_intereses)  chips.push(`<span class="chip chip-tope"><i class="bi bi-percent"></i> Int. ≤${a.tope_intereses}%</span>`);
+    if (a?.puede_condonar_gastos)     chips.push(`<span class="chip chip-tope"><i class="bi bi-shield-check"></i> Gtos. ≤${a.tope_gastos}%</span>`);
+    if (!chips.length)                chips.push(`<span class="chip chip-none">Sin permisos</span>`);
+
+    const btns = a
+      ? `<button class="btn-asignar" onclick="editarAsignacion(${u.id_usuario})"><i class="bi bi-pencil me-1"></i>Editar</button>`
+      : `<button class="btn-asignar" onclick="editarAsignacion(${u.id_usuario})"><i class="bi bi-plus-lg me-1"></i>Asignar</button>`;
+
+    return `
+    <tr>
+      <td>
+        <div style="font-weight:600;color:#111827">${esc(u.nombre_usuario||'—')}</div>
+        <div style="font-size:.78rem;color:#6b7280">${esc(u.email||'')}</div>
+      </td>
+      <td><span style="font-size:.82rem;color:#374151">${esc(u.perfil||'—')}</span></td>
+      <td>${cajaBadge}</td>
+      <td><div class="permisos-wrap">${chips.join('')}</div></td>
+      <td style="text-align:right">${btns}</td>
+    </tr>`;
+  }).join('');
+}
+
+/* ── modal asignar/editar ───────────────────────────────────────────────── */
+const modalAsignarBS = new bootstrap.Modal(document.getElementById('modalAsignar'));
+
+function editarAsignacion(id_usuario) {
+  const u = _usuarios.find(x => x.id_usuario == id_usuario);
+  const a = _asigs[id_usuario] || null;
+  document.getElementById('asigUserId').value = id_usuario;
+  document.getElementById('modalAsignarTitulo').textContent = a ? 'Editar asignación' : 'Asignar caja';
+  document.getElementById('modalAsignarSubtitulo').textContent = u ? `${u.nombre_usuario} — ${u.perfil||''}` : '';
+
+  // Poblar select de cajas
+  const sel = document.getElementById('asigCajaSelect');
+  sel.innerHTML = '<option value="">— Sin caja —</option>';
+  _cajas.filter(c => c.activo).forEach(c => {
+    const o = document.createElement('option');
+    o.value = c.id_caja;
+    o.textContent = c.nombre;
+    sel.appendChild(o);
+  });
+  sel.value = a?.caja?.id_caja || '';
+
+  // Permisos
+  document.getElementById('permPagar').checked         = !!a?.puede_pagar_cuotas;
+  document.getElementById('permReversar').checked      = !!a?.puede_reversar_pagos;
+  document.getElementById('permCondIntereses').checked = !!a?.puede_condonar_intereses;
+  document.getElementById('permCondGastos').checked    = !!a?.puede_condonar_gastos;
+  document.getElementById('asigActivo').checked        = a ? !!a.activo : true;
+  document.getElementById('topeIntereses').value = a?.tope_intereses || '';
+  document.getElementById('topeGastos').value    = a?.tope_gastos    || '';
+  document.getElementById('topeIntereses').disabled = !a?.puede_condonar_intereses;
+  document.getElementById('topeGastos').disabled    = !a?.puede_condonar_gastos;
+
+  modalAsignarBS.show();
+}
+
+async function guardarAsignacion() {
+  const id_usuario = document.getElementById('asigUserId').value;
+  const id_caja    = document.getElementById('asigCajaSelect').value;
+  if (!id_caja) {
+    // Si no hay caja seleccionada, eliminar asignaciones existentes para este usuario
+    const cajasConUsuario = _cajas.filter(c => _asigs[id_usuario]?.caja?.id_caja == c.id_caja);
+    for (const c of cajasConUsuario) {
+      await API(`/api/cajas/${c.id_caja}/usuarios/${id_usuario}`, { method:'DELETE' });
+    }
+    modalAsignarBS.hide();
+    await cargarAsignaciones();
+    renderUsuarios();
+    return;
+  }
+  const permCI = document.getElementById('permCondIntereses').checked;
+  const permCG = document.getElementById('permCondGastos').checked;
+  const body = {
+    id_usuario,
+    puede_pagar_cuotas:       document.getElementById('permPagar').checked    ? 1 : 0,
+    puede_reversar_pagos:     document.getElementById('permReversar').checked ? 1 : 0,
+    puede_condonar_intereses: permCI ? 1 : 0,
+    tope_intereses:           permCI ? (parseFloat(document.getElementById('topeIntereses').value)||0) : 0,
+    puede_condonar_gastos:    permCG ? 1 : 0,
+    tope_gastos:              permCG ? (parseFloat(document.getElementById('topeGastos').value)||0) : 0,
+    activo:                   document.getElementById('asigActivo').checked ? 1 : 0,
+  };
+  const r = await API(`/api/cajas/${id_caja}/usuarios`, { method:'POST', body:JSON.stringify(body) });
+  const j = await r.json();
+  if (!j.success) return alert('Error: ' + j.error);
+  modalAsignarBS.hide();
+  await cargarAsignaciones();
+  renderUsuarios();
+}
+
+function toggleTope(fieldId, enabled) {
+  document.getElementById(fieldId).disabled = !enabled;
+  if (!enabled) document.getElementById(fieldId).value = '';
+}
+
+/* ── cajas: administrar ─────────────────────────────────────────────────── */
 function renderCajas() {
   const wrap = document.getElementById('cajasWrap');
   if (!_cajas.length) {
-    wrap.innerHTML = `<div class="empty-state"><i class="bi bi-cash-stack fs-1 mb-3 d-block"></i><p class="mb-0">No hay cajas registradas. Crea la primera.</p></div>`;
+    wrap.innerHTML = `<div class="empty-state"><i class="bi bi-cash-stack fs-1 d-block mb-2"></i>No hay cajas. Crea la primera.</div>`;
     return;
   }
-  wrap.innerHTML = `<div class="cajas-grid">${_cajas.map(renderCajaCard).join('')}</div>`;
-}
-
-function renderCajaCard(c) {
-  const usuarios = _usuariosCaja[c.id_caja] || [];
-  const actClass = c.activo ? 'activa' : 'inactiva';
-  const badgeHtml = c.activo
-    ? `<span class="caja-badge badge-activa"><i class="bi bi-check-circle-fill"></i>Activa</span>`
-    : `<span class="caja-badge badge-inactiva"><i class="bi bi-x-circle-fill"></i>Inactiva</span>`;
-
-  const usuariosHtml = usuarios.length
-    ? usuarios.map(u => renderUsuarioRow(u)).join('')
-    : `<div style="font-size:.8rem;color:#9ca3af;text-align:center;padding:10px 0">Sin usuarios asignados</div>`;
-
-  return `
-  <div class="caja-card ${actClass}">
-    <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:8px;">
+  wrap.innerHTML = `<div class="cajas-list">${_cajas.map(c => `
+    <div class="caja-item ${c.activo?'':'inactiva'}">
       <div>
-        <div class="caja-title"><i class="bi bi-cash-stack me-1 text-primary"></i>${esc(c.nombre)}</div>
-        <div class="caja-desc">${esc(c.descripcion||'Sin descripción')}</div>
+        <div style="font-weight:700;color:#111827"><i class="bi bi-cash-stack me-1 text-primary"></i>${esc(c.nombre)}</div>
+        <div style="font-size:.8rem;color:#6b7280">${esc(c.descripcion||'Sin descripción')} · ${c.total_usuarios||0} usuario${c.total_usuarios!==1?'s':''}</div>
       </div>
-      ${badgeHtml}
-    </div>
-    <div class="usuarios-list">${usuariosHtml}</div>
-    <div class="caja-actions">
-      <button class="btn-icon" onclick="abrirModalCaja(${c.id_caja})"><i class="bi bi-pencil"></i> Editar</button>
-      <button class="btn-primary-sm" onclick="abrirModalUsuario(${c.id_caja})"><i class="bi bi-person-plus"></i> Asignar usuario</button>
-    </div>
-  </div>`;
+      <div style="display:flex;align-items:center;gap:8px">
+        <span style="font-size:.75rem;padding:2px 9px;border-radius:8px;font-weight:600;${c.activo?'background:#dcfce7;color:#15803d':'background:#fee2e2;color:#b91c1c'}">${c.activo?'Activa':'Inactiva'}</span>
+        <button class="btn-icon-sm" onclick="abrirModalCaja(${c.id_caja})"><i class="bi bi-pencil"></i></button>
+      </div>
+    </div>`).join('')}</div>`;
 }
 
-function renderUsuarioRow(u) {
-  const chips = [];
-  if (u.puede_pagar_cuotas)        chips.push(`<span class="chip chip-ok"><i class="bi bi-cash me-1"></i>Pagar cuotas</span>`);
-  if (u.puede_reversar_pagos)      chips.push(`<span class="chip chip-ok"><i class="bi bi-arrow-counterclockwise me-1"></i>Reversar</span>`);
-  if (u.puede_condonar_intereses)  chips.push(`<span class="chip chip-tope"><i class="bi bi-percent me-1"></i>Cond. intereses &le;${u.tope_intereses}%</span>`);
-  if (u.puede_condonar_gastos)     chips.push(`<span class="chip chip-tope"><i class="bi bi-shield-check me-1"></i>Cond. gastos &le;${u.tope_gastos}%</span>`);
-  if (!chips.length)               chips.push(`<span class="chip chip-no">Sin permisos</span>`);
-
-  const estadoBadge = u.activo
-    ? `<span style="font-size:.7rem;background:#dcfce7;color:#15803d;border-radius:8px;padding:1px 7px;font-weight:600">Activo</span>`
-    : `<span style="font-size:.7rem;background:#fee2e2;color:#b91c1c;border-radius:8px;padding:1px 7px;font-weight:600">Inactivo</span>`;
-
-  return `
-  <div class="usuario-row">
-    <div style="display:flex;align-items:center;justify-content:space-between;">
-      <div>
-        <div class="usuario-nombre">${esc(u.nombre_usuario||'—')}</div>
-        <div class="usuario-perfil">${esc(u.perfil||'—')} · ${esc(u.email||'')}</div>
-      </div>
-      <div style="display:flex;gap:6px;align-items:center;">
-        ${estadoBadge}
-        <button class="btn-icon" style="padding:3px 8px;font-size:.75rem" onclick="editarUsuario(${u.id_caja},${u.id_usuario})"><i class="bi bi-pencil"></i></button>
-        <button class="btn-icon" style="padding:3px 8px;font-size:.75rem;border-color:#fee2e2;color:#dc2626" onclick="quitarUsuario(${u.id_caja},${u.id_usuario})"><i class="bi bi-person-x"></i></button>
-      </div>
-    </div>
-    <div class="permisos-chips">${chips.join('')}</div>
-  </div>`;
-}
-
-/* ── modal caja ─────────────────────────────────────────────────────────── */
 const modalCajaBS = new bootstrap.Modal(document.getElementById('modalCaja'));
 
 function abrirModalCaja(id) {
@@ -358,101 +476,17 @@ async function guardarCaja() {
     descripcion: document.getElementById('cajDesc').value.trim() || null,
     activo: document.getElementById('cajActivo').checked ? 1 : 0,
   };
-  const url    = id ? `/api/cajas/${id}` : '/api/cajas';
-  const method = id ? 'PUT' : 'POST';
-  const r = await API(url, { method, body: JSON.stringify(body) });
+  const r = await API(id ? `/api/cajas/${id}` : '/api/cajas', { method: id ? 'PUT' : 'POST', body: JSON.stringify(body) });
   const j = await r.json();
   if (!j.success) return alert('Error: ' + j.error);
   modalCajaBS.hide();
   await cargarCajas();
+  renderCajas();
+  // refrescar select en modal asignación
+  await cargarAsignaciones();
+  renderUsuarios();
 }
 
-/* ── modal usuario ──────────────────────────────────────────────────────── */
-const modalUsuarioBS = new bootstrap.Modal(document.getElementById('modalUsuario'));
-
-function toggleTope(fieldId, enabled) {
-  document.getElementById(fieldId).disabled = !enabled;
-  if (!enabled) document.getElementById(fieldId).value = '';
-}
-
-function abrirModalUsuario(id_caja) {
-  document.getElementById('asigCajaId').value = id_caja;
-  document.getElementById('asigUserId').value = '';
-  document.getElementById('modalUsuarioTitulo').textContent = 'Asignar Usuario';
-  // Poblar select
-  const sel = document.getElementById('asigSelect');
-  sel.innerHTML = '<option value="">— Seleccione usuario —</option>';
-  _usuariosDisp.forEach(u => {
-    const opt = document.createElement('option');
-    opt.value = u.id_usuario;
-    opt.textContent = `${u.nombre_usuario} (${u.perfil||'—'})`;
-    sel.appendChild(opt);
-  });
-  // Resetear permisos
-  ['permPagar','permReversar','permCondIntereses','permCondGastos','asigActivo'].forEach(id => {
-    document.getElementById(id).checked = id === 'asigActivo';
-  });
-  ['topeIntereses','topeGastos'].forEach(id => {
-    document.getElementById(id).value = '';
-    document.getElementById(id).disabled = true;
-  });
-  document.getElementById('asigSelect').disabled = false;
-  modalUsuarioBS.show();
-}
-
-function editarUsuario(id_caja, id_usuario) {
-  const u = (_usuariosCaja[id_caja]||[]).find(x => x.id_usuario == id_usuario);
-  if (!u) return;
-  document.getElementById('asigCajaId').value   = id_caja;
-  document.getElementById('asigUserId').value   = id_usuario;
-  document.getElementById('modalUsuarioTitulo').textContent = `Editar permisos — ${u.nombre_usuario}`;
-  // Select fijo
-  const sel = document.getElementById('asigSelect');
-  sel.innerHTML = `<option value="${u.id_usuario}">${esc(u.nombre_usuario)} (${esc(u.perfil||'—')})</option>`;
-  sel.disabled = true;
-  // Permisos
-  document.getElementById('permPagar').checked        = !!u.puede_pagar_cuotas;
-  document.getElementById('permReversar').checked     = !!u.puede_reversar_pagos;
-  document.getElementById('permCondIntereses').checked= !!u.puede_condonar_intereses;
-  document.getElementById('permCondGastos').checked   = !!u.puede_condonar_gastos;
-  document.getElementById('asigActivo').checked       = !!u.activo;
-  document.getElementById('topeIntereses').value    = u.tope_intereses || '';
-  document.getElementById('topeGastos').value       = u.tope_gastos    || '';
-  document.getElementById('topeIntereses').disabled = !u.puede_condonar_intereses;
-  document.getElementById('topeGastos').disabled    = !u.puede_condonar_gastos;
-  modalUsuarioBS.show();
-}
-
-async function guardarUsuario() {
-  const id_caja   = document.getElementById('asigCajaId').value;
-  const id_usuario= document.getElementById('asigUserId').value || document.getElementById('asigSelect').value;
-  if (!id_usuario) return alert('Seleccione un usuario');
-  const permCI = document.getElementById('permCondIntereses').checked;
-  const permCG = document.getElementById('permCondGastos').checked;
-  const body = {
-    id_usuario,
-    puede_pagar_cuotas:       document.getElementById('permPagar').checked     ? 1 : 0,
-    puede_reversar_pagos:     document.getElementById('permReversar').checked  ? 1 : 0,
-    puede_condonar_intereses: permCI ? 1 : 0,
-    tope_intereses:           permCI ? (parseFloat(document.getElementById('topeIntereses').value)||0) : 0,
-    puede_condonar_gastos:    permCG ? 1 : 0,
-    tope_gastos:              permCG ? (parseFloat(document.getElementById('topeGastos').value)||0) : 0,
-    activo:                   document.getElementById('asigActivo').checked ? 1 : 0,
-  };
-  const r = await API(`/api/cajas/${id_caja}/usuarios`, { method:'POST', body: JSON.stringify(body) });
-  const j = await r.json();
-  if (!j.success) return alert('Error: ' + j.error);
-  modalUsuarioBS.hide();
-  await cargarCajas();
-}
-
-async function quitarUsuario(id_caja, id_usuario) {
-  if (!confirm('¿Desactivar esta asignación?')) return;
-  await API(`/api/cajas/${id_caja}/usuarios/${id_usuario}`, { method:'DELETE' });
-  await cargarCajas();
-}
-
-/* ── util ─────────────────────────────────────────────────────────────── */
 function esc(s){ return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
 </script>
 </body>
