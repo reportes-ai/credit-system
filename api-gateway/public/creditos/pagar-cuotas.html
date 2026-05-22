@@ -137,7 +137,7 @@
   <a href="/creditos" class="nav-brand">
     <img src="/img/logo-autofacil.png" alt="AutoFácil" onerror="this.style.display='none'">
     <span>Pago de Cuotas</span>
-    <span class="version-badge">v1.4</span>
+    <span class="version-badge">v1.5</span>
   </a>
   <div class="nav-actions">
     <span id="navUser" style="color:rgba(255,255,255,.75);font-size:.82rem"></span>
@@ -362,12 +362,18 @@ function renderPagina() {
   const c  = _credito;
   const hoy = new Date(); hoy.setHours(0,0,0,0);
 
-  let countPagado=0, countVencido=0, countPendiente=0;
+  let countPagado=0, countVencido=0, countPendiente=0, montoMoraTotal=0;
   _amort.forEach(r => {
     const pagos = pagosDeCuota(r.n);
-    if (pagos.length) countPagado++;
-    else if (r.fecha && new Date(r.fecha) < hoy) countVencido++;
-    else countPendiente++;
+    if (pagos.length) { countPagado++; return; }
+    const venc = r.fecha && new Date(r.fecha) < hoy;
+    if (venc) {
+      countVencido++;
+      const fvs = r.fecha ? r.fecha.toISOString().split('T')[0] : '';
+      const mi  = calcMora(r.cuota, fvs, null);
+      const gc  = calcGastosCobranza(r.cuota, mi.dias, fvs);
+      montoMoraTotal += r.cuota + (mi.monto||0) + (gc.monto||0);
+    } else countPendiente++;
   });
 
   const esMora = c.estado === 'EN MORA';
@@ -389,11 +395,11 @@ function renderPagina() {
       gcInfo   = calcGastosCobranza(r.cuota, moraInfo.dias, fechaVencStr);
     }
 
-    let intMoraDisplay = '—', gtosDisplay = '—', totalDisplay = '—';
+    let intMoraDisplay = '—', gtosDisplay = '—', totalDisplay = '—', totalHoyDisplay = '—';
     if (pagos.length) {
-      intMoraDisplay = fmtP(pagos[0].interes_mora);
-      gtosDisplay    = fmtP(pagos[0].gastos_cobranza);
-      totalDisplay   = fmtP(pagos[0].total_pagado);
+      intMoraDisplay  = fmtP(pagos[0].interes_mora);
+      gtosDisplay     = fmtP(pagos[0].gastos_cobranza);
+      totalDisplay    = fmtP(pagos[0].total_pagado);
     } else if (moraInfo && moraInfo.dias > 0) {
       intMoraDisplay = `<span class="amt-mora">${fmtP(moraInfo.monto)}</span><br><span style="font-size:.68rem;color:#b45309">${moraInfo.dias} días</span>`;
       if (gcInfo && gcInfo.aplica) {
@@ -401,6 +407,11 @@ function renderPagina() {
       } else if (moraInfo.dias > 0) {
         gtosDisplay = `<span style="font-size:.72rem;color:#b45309">día ${21-moraInfo.dias>0?21-moraInfo.dias+' para cobro':'—'}</span>`;
       }
+      const totalHoy = r.cuota + (moraInfo.monto||0) + (gcInfo?.monto||0);
+      totalHoyDisplay = `<span style="font-weight:900;color:var(--red)">${fmtP(totalHoy)}</span>`;
+    } else if (!pagos.length) {
+      // Al día: solo cuota
+      totalHoyDisplay = `<span style="color:#1d4ed8;font-weight:700">${fmtP(r.cuota)}</span>`;
     }
 
     if (pagos.length) {
@@ -433,6 +444,7 @@ function renderPagina() {
       <td class="amt">${fmtP(r.cuota)}</td>
       <td class="amt">${intMoraDisplay}</td>
       <td class="amt amt-mora">${gtosDisplay}</td>
+      <td class="amt" style="text-align:right">${totalHoyDisplay}</td>
       <td class="amt" style="color:var(--green)">${totalDisplay}</td>
       <td class="amt-muted">${pagos.length ? fmtDT(pagos[0].fecha_pago) : '—'}</td>
       <td style="text-align:center">${pillHtml}</td>
@@ -452,7 +464,11 @@ function renderPagina() {
     <div class="stats-row">
       <div class="stat-box paid"><div class="sb-label"><i class="bi bi-check-circle me-1"></i>Pagadas</div><div class="sb-val">${countPagado}</div></div>
       <div class="stat-box pending"><div class="sb-label"><i class="bi bi-check2 me-1"></i>Al Día</div><div class="sb-val">${countPendiente}</div></div>
-      <div class="stat-box overdue"><div class="sb-label"><i class="bi bi-exclamation-triangle me-1"></i>En Mora</div><div class="sb-val">${countVencido}</div></div>
+      <div class="stat-box overdue">
+        <div class="sb-label"><i class="bi bi-exclamation-triangle me-1"></i>En Mora</div>
+        <div class="sb-val">${countVencido}</div>
+        ${montoMoraTotal>0?`<div style="font-size:.72rem;font-weight:700;color:#b91c1c;margin-top:2px">${fmtP(montoMoraTotal)}</div>`:''}
+      </div>
       <div class="stat-box"><div class="sb-label">Total cuotas</div><div class="sb-val">${_amort.length}</div></div>
     </div>
 
@@ -470,6 +486,7 @@ function renderPagina() {
               <th>Monto Cuota</th>
               <th>Int. Mora</th>
               <th>Gtos. Cobranza</th>
+              <th style="text-align:right">Total Hoy</th>
               <th>Total Pagado</th>
               <th>Fecha Pago</th>
               <th style="text-align:center">Estado</th>

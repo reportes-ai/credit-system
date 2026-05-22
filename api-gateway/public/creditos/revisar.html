@@ -189,7 +189,7 @@
   <a class="nav-brand" href="/creditos">
     <img src="/img/logo-autofacil.png" alt="AutoFácil" onerror="this.style.display='none'">
     <span>Revisión de Crédito</span>
-    <span class="version-badge">v2.5</span>
+    <span class="version-badge">v2.6</span>
   </a>
   <div class="nav-actions">
     <span id="navUser" style="color:rgba(255,255,255,.75);font-size:.82rem"></span>
@@ -686,17 +686,28 @@ function renderHistorialPagos(c) {
   const fmtF = f => f ? new Date(f).toLocaleDateString('es-CL',{timeZone:'UTC',day:'2-digit',month:'2-digit',year:'numeric'}) : '—';
   const fmtFd = f => f ? f.toLocaleDateString('es-CL',{day:'2-digit',month:'2-digit',year:'numeric'}) : '—';
 
-  let rows='', countPag=0, countVenc=0, countPend=0;
+  let rows='', countPag=0, countVenc=0, countPend=0, montoMoraTotal=0;
   schedule.forEach(s => {
-    const pg     = _pagos.find(p=>p.numero_cuota===s.n);
+    const pg      = _pagos.find(p=>p.numero_cuota===s.n);
     const vencida = !pg && s.fecha && s.fecha < hoy;
     if (pg) countPag++; else if (vencida) countVenc++; else countPend++;
+
     // Calcular mora y gastos acumulados si está vencida y sin pagar
     let moraCalc = null, gcCalc = null;
     if (vencida && s.fecha) {
       moraCalc = calcMora(s.cuota, s.fecha, null);
       gcCalc   = calcGastosCobranza(s.cuota, moraCalc.dias, s.fecha);
     }
+
+    // Total a pagar hoy
+    let totalHoy = null;
+    if (vencida) {
+      totalHoy = s.cuota + (moraCalc?.monto||0) + (gcCalc?.monto||0);
+      montoMoraTotal += totalHoy;
+    } else if (!pg) {
+      totalHoy = s.cuota; // al día: solo la cuota, sin extras
+    }
+
     const intMoraDisplay = pg
       ? `<span style="color:#dc2626">${fmtP(pg.interes_mora)}</span>`
       : (moraCalc && moraCalc.dias > 0
@@ -709,6 +720,11 @@ function renderHistorialPagos(c) {
           : (moraCalc && moraCalc.dias > 0 && moraCalc.dias < 21
               ? `<span style="font-size:.68rem;color:#b45309">día 21</span>`
               : '—'));
+    const totalHoyDisplay = pg
+      ? '—'
+      : (vencida
+          ? `<span style="font-weight:900;color:#dc2626">${fmtP(totalHoy)}</span>`
+          : `<span style="color:#1d4ed8;font-weight:700">${fmtP(totalHoy)}</span>`);
     const pillHtml = pg
       ? '<span class="pill-pg pagada"><i class="bi bi-check-circle-fill"></i>Pagada</span>'
       : (vencida
@@ -720,6 +736,7 @@ function renderHistorialPagos(c) {
       <td style="font-weight:700">${fmtP(s.cuota)}</td>
       <td>${intMoraDisplay}</td>
       <td>${gtosCobrDisplay}</td>
+      <td style="text-align:right">${totalHoyDisplay}</td>
       <td style="font-weight:800;color:#16a34a">${pg ? fmtP(pg.total_pagado) : '—'}</td>
       <td style="color:var(--muted)">${pg ? fmtDT(pg.fecha_pago) : '—'}</td>
       <td style="text-align:center">${pillHtml}</td>
@@ -738,7 +755,7 @@ function renderHistorialPagos(c) {
         <div style="display:flex;gap:12px;align-items:center;margin-left:auto">
           <span style="font-size:.72rem;color:var(--muted)">
             <span style="color:#16a34a;font-weight:700">${countPag}</span> pagadas &nbsp;·&nbsp;
-            <span style="color:#dc2626;font-weight:700">${countVenc}</span> en mora &nbsp;·&nbsp;
+            <span style="color:#dc2626;font-weight:700">${countVenc} en mora${montoMoraTotal>0?' · <span style="font-size:.8rem">'+fmtP(montoMoraTotal)+'</span>':''}</span> &nbsp;·&nbsp;
             <span style="color:#1d4ed8;font-weight:700">${countPend}</span> al día
           </span>
           ${puedesPagar ? `<a href="/creditos/pagar-cuotas?id=${c.id_credito}"
@@ -756,13 +773,14 @@ function renderHistorialPagos(c) {
               <th>Monto Cuota</th>
               <th>Int. Mora</th>
               <th>Gtos. Cobranza</th>
+              <th style="text-align:right">Total Hoy</th>
               <th>Total Pagado</th>
               <th>Fecha Pago</th>
               <th style="text-align:center">Estado</th>
               <th style="text-align:center">Comprobante</th>
             </tr>
           </thead>
-          <tbody>${rows || '<tr><td colspan="9" class="no-data">Sin cuotas calculadas</td></tr>'}</tbody>
+          <tbody>${rows || '<tr><td colspan="10" class="no-data">Sin cuotas calculadas</td></tr>'}</tbody>
         </table>
       </div>
     </div>`;
