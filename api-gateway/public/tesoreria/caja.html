@@ -7,7 +7,7 @@
   <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
   <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.0/font/bootstrap-icons.css" rel="stylesheet">
   <style>
-    :root { --navy:#0141A2; --navy-dark:#012d70; --navy-light:#0255c5; --accent:#009AFE; --bg:#f0f4f8; --green:#15803d; --red:#dc2626; --amber:#92400e; }
+    :root { --navy:#0141A2; --navy-dark:#012d70; --navy-light:#0255c5; --accent:#009AFE; --bg:#f0f4f8; --green:#15803d; --red:#dc2626; }
     * { box-sizing:border-box; }
     body { background:var(--bg); font-family:'Segoe UI',system-ui,sans-serif; margin:0; min-height:100vh; }
 
@@ -29,17 +29,18 @@
     .btn-logout:hover { background:rgba(255,255,255,.2); }
 
     /* ── Layout ── */
-    .page { max-width:1050px; margin:0 auto; padding:28px 24px 80px; }
+    .page { max-width:1100px; margin:0 auto; padding:28px 24px 220px; }
 
-    /* ── Caja badge ── */
+    /* ── Caja banner ── */
     .caja-header { background:#fff; border-radius:12px; padding:14px 20px; margin-bottom:22px; display:flex; align-items:center; gap:14px; box-shadow:0 1px 4px rgba(0,0,0,.07); border-left:4px solid var(--navy); }
-    .caja-header i { font-size:1.6rem; color:var(--navy); }
+    .caja-header i.main-icon { font-size:1.6rem; color:var(--navy); }
     .caja-header-info h6 { margin:0 0 2px; font-weight:700; color:#111827; font-size:.97rem; }
     .caja-header-info span { font-size:.8rem; color:#6b7280; }
     .perm-chips { display:flex; flex-wrap:wrap; gap:5px; margin-top:6px; }
     .perm-chip { font-size:.7rem; font-weight:600; padding:2px 8px; border-radius:8px; }
     .perm-on  { background:#dbeafe; color:#1d4ed8; }
-    .perm-off { background:#f1f5f9; color:#9ca3af; text-decoration:line-through; }
+    .no-caja-alert { background:#fff7ed; border:1.5px solid #fed7aa; border-radius:12px; padding:20px 24px; color:#92400e; display:flex; align-items:flex-start; gap:14px; margin-bottom:22px; }
+    .no-caja-alert i { font-size:1.6rem; flex-shrink:0; margin-top:2px; }
 
     /* ── Búsqueda ── */
     .search-wrap { background:#fff; border-radius:14px; padding:22px 24px; box-shadow:0 1px 4px rgba(0,0,0,.07); margin-bottom:22px; }
@@ -47,10 +48,12 @@
     .search-row { display:flex; gap:10px; }
     .search-input { flex:1; border-radius:10px; border:2px solid #e5e7eb; padding:11px 16px 11px 42px; font-size:.95rem; outline:none; transition:border-color .15s; }
     .search-input:focus { border-color:var(--navy); }
+    .search-input:disabled { background:#f9fafb; }
     .search-icon { position:absolute; left:14px; top:50%; transform:translateY(-50%); color:#9ca3af; font-size:1.1rem; pointer-events:none; }
     .search-field { position:relative; flex:1; }
     .btn-buscar { background:var(--navy); color:#fff; border:none; border-radius:10px; padding:11px 24px; font-size:.9rem; font-weight:700; cursor:pointer; white-space:nowrap; display:flex; align-items:center; gap:7px; }
     .btn-buscar:hover { background:var(--navy-light); }
+    .btn-buscar:disabled { opacity:.5; cursor:default; }
     .btn-limpiar { background:#f1f5f9; color:#374151; border:none; border-radius:10px; padding:11px 16px; font-size:.9rem; cursor:pointer; }
     .btn-limpiar:hover { background:#e5e7eb; }
 
@@ -65,12 +68,8 @@
     .cc-sub { font-size:.78rem; color:#6b7280; margin-top:1px; }
     .cc-num { font-weight:700; color:var(--navy); font-size:.88rem; font-family:monospace; }
     .cc-right { text-align:right; flex-shrink:0; }
-    .cc-monto { font-weight:800; font-size:1rem; color:#111827; }
-    .estado-pill { display:inline-flex; align-items:center; gap:4px; border-radius:20px; padding:3px 10px; font-size:.72rem; font-weight:700; }
-    .pill-vigente { background:#dcfce7; color:#15803d; }
-    .pill-mora    { background:#fef3c7; color:#92400e; }
 
-    /* ── Panel crédito seleccionado ── */
+    /* ── Panel crédito ── */
     .credito-panel { background:#fff; border-radius:14px; box-shadow:0 1px 4px rgba(0,0,0,.07); overflow:hidden; }
     .cp-header { background:linear-gradient(135deg,var(--navy-dark),#0141A2); color:#fff; padding:18px 24px; display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:10px; }
     .cp-title { font-size:1.1rem; font-weight:900; }
@@ -89,47 +88,78 @@
     .stat-box.s-pend .sb-lbl  { color:#a16207; }
     .sb-val { font-size:1.4rem; font-weight:900; color:#111827; line-height:1; }
 
-    /* Tabla cuotas */
+    /* ── Tabla cuotas ── */
     .table-wrap { overflow-x:auto; }
-    table { width:100%; border-collapse:collapse; font-size:.84rem; }
-    thead th { background:#f8fafc; color:#374151; font-weight:700; font-size:.72rem; text-transform:uppercase; letter-spacing:.04em; padding:10px 14px; border-bottom:2px solid #e5e7eb; white-space:nowrap; }
-    tbody td { padding:10px 14px; border-bottom:1px solid #f1f5f9; vertical-align:middle; }
-    tbody tr:last-child td { border-bottom:none; }
-    tbody tr.row-pagada td { background:#f0fdf4; }
-    tbody tr.row-mora   td { background:#fff8f0; }
+    table.cuotas-table { width:100%; border-collapse:collapse; font-size:.84rem; }
+    table.cuotas-table thead th { background:#f8fafc; color:#374151; font-weight:700; font-size:.72rem; text-transform:uppercase; letter-spacing:.04em; padding:10px 14px; border-bottom:2px solid #e5e7eb; white-space:nowrap; }
+    table.cuotas-table tbody td { padding:9px 14px; border-bottom:1px solid #f1f5f9; vertical-align:middle; }
+    table.cuotas-table tbody tr:last-child td { border-bottom:none; }
+    table.cuotas-table tbody tr.row-pagada td { background:#f0fdf4; }
+    table.cuotas-table tbody tr.row-mora   td { background:#fff8f0; }
+    table.cuotas-table tbody tr.row-sel    td { background:#eff6ff !important; }
     .text-right { text-align:right; }
+    .text-center { text-align:center; }
     .amt { font-weight:700; font-family:monospace; font-size:.83rem; }
     .amt-mora { color:var(--red); }
-    .amt-muted { color:#9ca3af; }
+    .amt-muted { color:#9ca3af; font-weight:400; }
 
-    /* Pills inline */
+    /* Checkbox cuota */
+    .chk-cuota { width:18px; height:18px; cursor:pointer; accent-color:var(--navy); }
+
+    /* Pills */
     .pill { display:inline-flex; align-items:center; gap:4px; border-radius:20px; padding:3px 9px; font-size:.71rem; font-weight:700; white-space:nowrap; }
-    .pill-pagada  { background:#dcfce7; color:#166534; }
-    .pill-mora    { background:#fee2e2; color:#991b1b; }
-    .pill-aldia   { background:#dbeafe; color:#1d4ed8; }
-    .pill-pend    { background:#f1f5f9; color:#64748b; }
+    .pill-pagada { background:#dcfce7; color:#166534; }
+    .pill-mora   { background:#fee2e2; color:#991b1b; }
+    .pill-aldia  { background:#dbeafe; color:#1d4ed8; }
 
-    /* Botones tabla */
-    .btn-pagar { background:linear-gradient(135deg,#16a34a,#15803d); color:#fff; border:none; border-radius:8px; padding:6px 14px; font-size:.79rem; font-weight:700; cursor:pointer; display:inline-flex; align-items:center; gap:4px; white-space:nowrap; }
-    .btn-pagar:hover { opacity:.88; }
+    /* ── Panel de pago (sticky bottom) ── */
+    .pago-panel { position:fixed; bottom:0; left:0; right:0; z-index:150; background:#fff; border-top:2px solid var(--navy); box-shadow:0 -4px 24px rgba(1,65,162,.15); padding:0; max-height:60vh; overflow-y:auto; transition:transform .25s; }
+    .pago-panel.hidden { transform:translateY(100%); }
+    .pp-header { background:linear-gradient(90deg,var(--navy-dark),#0255c5); color:#fff; padding:10px 24px; display:flex; align-items:center; justify-content:space-between; position:sticky; top:0; z-index:10; }
+    .pp-title { font-weight:700; font-size:.95rem; display:flex; align-items:center; gap:10px; }
+    .pp-badge { background:rgba(255,255,255,.2); border-radius:12px; padding:2px 10px; font-size:.78rem; }
+    .pp-close { background:rgba(255,255,255,.15); border:1px solid rgba(255,255,255,.3); color:#fff; border-radius:7px; padding:3px 10px; font-size:.8rem; cursor:pointer; }
+    .pp-body { padding:16px 24px; }
 
-    /* Modal pago */
-    .modal-field { margin-bottom:16px; }
-    .modal-field label { display:block; font-size:.82rem; font-weight:600; color:#374151; margin-bottom:5px; }
-    .modal-field .form-control { border-radius:9px; border:1.5px solid #d1d5db; padding:9px 12px; font-size:.9rem; width:100%; }
-    .modal-field .form-control:focus { border-color:var(--navy); outline:none; box-shadow:0 0 0 3px rgba(1,65,162,.1); }
-    .modal-field .form-control:disabled { background:#f9fafb; color:#6b7280; }
-    .info-tag { font-size:.75rem; color:#6b7280; margin-top:4px; display:flex; align-items:center; gap:4px; }
-    .total-box { background:#eff6ff; border:1.5px solid #bfdbfe; border-radius:10px; padding:14px 16px; margin-top:4px; display:flex; align-items:center; justify-content:space-between; }
-    .total-box .lbl { font-size:.82rem; color:#1e40af; font-weight:600; }
-    .total-box .val { font-size:1.3rem; font-weight:900; color:#1e40af; font-family:monospace; }
+    /* Auto-ajuste */
+    .auto-row { background:#f0f9ff; border:1.5px solid #bae6fd; border-radius:10px; padding:12px 16px; margin-bottom:14px; display:flex; align-items:center; gap:12px; flex-wrap:wrap; }
+    .auto-row label { font-size:.82rem; font-weight:600; color:#075985; white-space:nowrap; }
+    .auto-input { border:1.5px solid #7dd3fc; border-radius:8px; padding:7px 12px; font-size:.9rem; font-weight:700; width:180px; outline:none; color:#0c4a6e; }
+    .auto-input:focus { border-color:#0284c7; box-shadow:0 0 0 3px rgba(14,165,233,.15); }
+    .btn-auto { background:#0284c7; color:#fff; border:none; border-radius:8px; padding:7px 16px; font-size:.82rem; font-weight:700; cursor:pointer; white-space:nowrap; }
+    .btn-auto:hover { background:#0369a1; }
+    .auto-hint { font-size:.75rem; color:#0369a1; flex:1; min-width:160px; }
+
+    /* Tabla breakdown */
+    table.breakdown-table { width:100%; border-collapse:collapse; font-size:.82rem; margin-bottom:14px; }
+    table.breakdown-table thead th { background:#f8fafc; color:#6b7280; font-weight:700; font-size:.7rem; text-transform:uppercase; padding:7px 10px; border-bottom:2px solid #e5e7eb; white-space:nowrap; }
+    table.breakdown-table tbody td { padding:7px 10px; border-bottom:1px solid #f1f5f9; vertical-align:middle; }
+    table.breakdown-table tbody tr:last-child td { border-bottom:none; }
+    .bd-input { border:1.5px solid #d1d5db; border-radius:7px; padding:5px 8px; font-size:.83rem; width:120px; text-align:right; }
+    .bd-input:focus { border-color:var(--navy); outline:none; }
+    .bd-input:disabled { background:#f9fafb; color:#9ca3af; }
+    .bd-input.warn { border-color:#f59e0b; background:#fffbeb; }
+    .bd-input.err  { border-color:#ef4444; background:#fff1f2; }
+    .cond-badge { font-size:.68rem; padding:1px 6px; border-radius:5px; font-weight:700; }
+    .cond-ok  { background:#dcfce7; color:#15803d; }
+    .cond-max { background:#fee2e2; color:#991b1b; }
+
+    /* Footer pago */
+    .pp-footer { display:flex; align-items:center; gap:12px; flex-wrap:wrap; padding:12px 24px; border-top:1px solid #e5e7eb; background:#f8fafc; position:sticky; bottom:0; }
+    .pp-total-box { background:#eff6ff; border:1.5px solid #bfdbfe; border-radius:10px; padding:10px 18px; display:flex; align-items:center; gap:10px; margin-right:auto; }
+    .pp-total-lbl { font-size:.8rem; color:#1e40af; font-weight:600; }
+    .pp-total-val { font-size:1.3rem; font-weight:900; color:#1e40af; font-family:monospace; }
+    .pp-fecha { border:1.5px solid #d1d5db; border-radius:8px; padding:7px 12px; font-size:.87rem; }
+    .pp-obs   { border:1.5px solid #d1d5db; border-radius:8px; padding:7px 12px; font-size:.87rem; width:220px; }
+    .btn-confirmar { background:linear-gradient(135deg,#16a34a,#15803d); color:#fff; border:none; border-radius:10px; padding:10px 28px; font-size:.92rem; font-weight:800; cursor:pointer; white-space:nowrap; display:flex; align-items:center; gap:8px; }
+    .btn-confirmar:hover { opacity:.9; }
+    .btn-confirmar:disabled { opacity:.5; cursor:default; }
+    .pp-error { background:#fef2f2; border:1.5px solid #fca5a5; color:#991b1b; border-radius:8px; padding:8px 14px; font-size:.82rem; font-weight:600; display:flex; align-items:center; gap:6px; }
 
     /* Empty / spinner */
     .empty-state { text-align:center; color:#9ca3af; padding:48px 0; }
     .spinner-wrap { display:flex; justify-content:center; padding:40px 0; }
-    .no-caja-alert { background:#fff7ed; border:1.5px solid #fed7aa; border-radius:12px; padding:20px 24px; color:#92400e; display:flex; align-items:flex-start; gap:14px; }
-    .no-caja-alert i { font-size:1.6rem; flex-shrink:0; margin-top:2px; }
-    @media(max-width:640px){ .page{padding:16px 12px 80px;} .search-row{flex-direction:column;} }
+    @media(max-width:640px){ .page{padding:16px 12px 240px;} .search-row{flex-direction:column;} .pp-footer{flex-direction:column;align-items:stretch;} .pp-obs{width:100%;} }
   </style>
 </head>
 <body>
@@ -138,7 +168,7 @@
   <div class="topnav-left">
     <a href="/" class="topnav-brand">
       <img src="/img/logo.png" alt="AutoFácil">
-      <span class="version-badge">v1.1</span>
+      <span class="version-badge">v1.2</span>
     </a>
     <div class="breadcrumb-nav">
       <a href="/">Inicio</a><span class="sep">/</span>
@@ -159,11 +189,8 @@
 </nav>
 
 <div class="page">
-
-  <!-- Info caja del usuario -->
   <div id="cajaHeaderWrap"></div>
 
-  <!-- Búsqueda -->
   <div class="search-wrap">
     <h5><i class="bi bi-search me-2 text-primary"></i>Buscar crédito vigente</h5>
     <div class="search-row">
@@ -178,65 +205,66 @@
     </div>
   </div>
 
-  <!-- Resultados / crédito seleccionado -->
   <div id="resultadosWrap"></div>
   <div id="creditoPanelWrap" style="display:none"></div>
-
 </div>
 
-<!-- ══ MODAL PAGO ══════════════════════════════════════════════════════════ -->
-<div class="modal fade" id="modalPago" tabindex="-1">
-  <div class="modal-dialog modal-dialog-centered">
-    <div class="modal-content border-0 shadow">
-      <div class="modal-header" style="background:linear-gradient(135deg,#012d70,#0141A2);color:#fff;border-radius:12px 12px 0 0">
-        <h5 class="modal-title fw-bold" id="modalPagoTitulo">Registrar Pago</h5>
-        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
-      </div>
-      <div class="modal-body">
-        <input type="hidden" id="pagoIdCredito">
-        <input type="hidden" id="pagoNumeroCuota">
-        <input type="hidden" id="pagoMontoBase">
-
-        <div class="modal-field">
-          <label>Monto Cuota</label>
-          <input type="number" id="pagoMontoCuota" class="form-control" disabled>
-        </div>
-        <div class="modal-field">
-          <label>Interés por mora <span id="moraInfo" style="font-weight:400;color:#6b7280;font-size:.78rem"></span></label>
-          <input type="number" id="pagoMora" class="form-control" min="0" step="1" oninput="recalcTotal()">
-          <div class="info-tag" id="moraInfoTag"><i class="bi bi-info-circle"></i><span></span></div>
-        </div>
-        <div class="modal-field">
-          <label>Gastos de cobranza <span id="gastosInfo" style="font-weight:400;color:#6b7280;font-size:.78rem"></span></label>
-          <input type="number" id="pagoGastos" class="form-control" min="0" step="1" oninput="recalcTotal()">
-          <div class="info-tag" id="gastosInfoTag"><i class="bi bi-info-circle"></i><span></span></div>
-        </div>
-        <div class="modal-field">
-          <label>Fecha de Pago</label>
-          <input type="date" id="pagoFecha" class="form-control">
-        </div>
-        <div class="modal-field">
-          <label>Observación</label>
-          <input type="text" id="pagoObs" class="form-control" placeholder="Opcional">
-        </div>
-        <div class="total-box">
-          <span class="lbl"><i class="bi bi-cash-coin me-1"></i>Total a cobrar hoy</span>
-          <span class="val" id="pagoTotal">$0</span>
-        </div>
-      </div>
-      <div class="modal-footer border-0">
-        <button class="btn btn-light" data-bs-dismiss="modal">Cancelar</button>
-        <button class="btn btn-success fw-bold px-4" onclick="confirmarPago()">
-          <i class="bi bi-check2-circle me-1"></i>Registrar Pago
-        </button>
-      </div>
+<!-- ══ PANEL DE PAGO (sticky bottom) ════════════════════════════════════════ -->
+<div class="pago-panel hidden" id="pagoPanel">
+  <div class="pp-header">
+    <div class="pp-title">
+      <i class="bi bi-cash-coin"></i>
+      Registrar pago
+      <span class="pp-badge" id="ppBadge">0 cuotas</span>
     </div>
+    <button class="pp-close" onclick="limpiarSeleccion()"><i class="bi bi-x-lg me-1"></i>Cancelar</button>
+  </div>
+
+  <div class="pp-body">
+    <!-- Auto-ajuste -->
+    <div class="auto-row">
+      <label><i class="bi bi-calculator me-1"></i>Monto recibido</label>
+      <input type="number" id="autoMonto" class="auto-input" placeholder="$0" min="0" step="1" oninput="autoAjustar()">
+      <span class="auto-hint" id="autoHint">Ingresa el monto recibido y se distribuirá automáticamente: primero gastos de cobranza, luego intereses por mora.</span>
+    </div>
+
+    <!-- Breakdown por cuota -->
+    <div class="table-wrap">
+      <table class="breakdown-table">
+        <thead>
+          <tr>
+            <th>N° Cuota</th>
+            <th>Vencimiento</th>
+            <th class="text-right">Cuota base</th>
+            <th class="text-right">Gastos cobr.</th>
+            <th class="text-right">Int. mora</th>
+            <th class="text-right">Total cuota</th>
+          </tr>
+        </thead>
+        <tbody id="breakdownBody"></tbody>
+        <tfoot id="breakdownFoot"></tfoot>
+      </table>
+    </div>
+
+    <div id="ppErrorBox" style="display:none;margin-bottom:12px"></div>
+  </div>
+
+  <div class="pp-footer">
+    <div class="pp-total-box">
+      <span class="pp-total-lbl"><i class="bi bi-cash-coin me-1"></i>Total a cobrar</span>
+      <span class="pp-total-val" id="ppTotal">$0</span>
+    </div>
+    <input type="date" id="ppFecha" class="pp-fecha">
+    <input type="text" id="ppObs" class="pp-obs" placeholder="Observación (opcional)">
+    <button class="btn-confirmar" id="btnConfirmar" onclick="confirmarMultiPago()">
+      <i class="bi bi-check2-circle"></i>Confirmar pago
+    </button>
   </div>
 </div>
 
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
 <script>
-/* ── Auth ─────────────────────────────────────────────────────────────────── */
+/* ── Auth ── */
 const token = localStorage.getItem('token');
 const yo    = JSON.parse(localStorage.getItem('usuario') || 'null');
 if (!token || !yo) window.location.href = '/login.html';
@@ -249,106 +277,84 @@ function logout(){ localStorage.removeItem('token'); localStorage.removeItem('us
 const API = (path, opts={}) =>
   fetch(path, { headers:{ Authorization:`Bearer ${token}`, 'Content-Type':'application/json' }, ...opts });
 const clp = v => '$' + Math.round(v||0).toLocaleString('es-CL');
+const esc = s => String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
 
-/* ── Estado global ───────────────────────────────────────────────────────── */
-let _miCaja   = null;   // caja asignada al usuario
+/* ── Estado global ── */
+let _miCaja   = null;
 let _tmc      = 0;
 let _ufHoy    = 0;
-let _ufMap    = new Map();   // fecha → valor UF
+let _ufMap    = new Map();
 let _credito  = null;
 let _pagos    = [];
 let _schedule = [];
+let _seleccionadas = new Set();   // números de cuota seleccionados
 
-/* ── Inicialización ──────────────────────────────────────────────────────── */
+/* ── Init ── */
 (async () => {
   const [rCaja, rTmc, rUf] = await Promise.all([
     API('/api/cajas/mi-caja'),
     API('/api/tasas/vigente'),
     API('/api/uf/vigente'),
   ]);
-  const jCaja = await rCaja.json();
-  const jTmc  = await rTmc.json();
-  const jUf   = await rUf.json();
-
-  _miCaja = jCaja.data;
-  _tmc    = jTmc.data?.tasa_anual_mayor || 0;
-  _ufHoy  = jUf.data?.valor || 0;
-
+  _miCaja = (await rCaja.json()).data;
+  _tmc    = (await rTmc.json()).data?.tasa_anual_mayor || 0;
+  _ufHoy  = (await rUf.json()).data?.valor || 0;
   renderCajaHeader();
 })();
 
 function renderCajaHeader() {
   const wrap = document.getElementById('cajaHeaderWrap');
   if (!_miCaja) {
-    // Sin caja asignada → bloqueado para TODOS (incluyendo Admin/Gerente)
-    // Los pagos siempre deben ir contra una caja real
     wrap.innerHTML = `
       <div class="no-caja-alert">
         <i class="bi bi-lock"></i>
         <div>
           <strong>Sin caja asignada</strong>
-          <p style="margin:4px 0 0;font-size:.88rem">No tienes una caja activa asignada. Los pagos deben registrarse contra una caja. Contacta al administrador para que te asigne una.</p>
+          <p style="margin:4px 0 0;font-size:.88rem">No tienes una caja activa asignada. Los pagos deben registrarse contra una caja. Contacta al administrador.</p>
         </div>
       </div>`;
     document.getElementById('searchInput').disabled = true;
     document.querySelector('.btn-buscar').disabled  = true;
     return;
-  } else {
-    const perms = [];
-    if (_miCaja.puede_pagar_cuotas)       perms.push(`<span class="perm-chip perm-on"><i class="bi bi-cash"></i> Pagar cuotas</span>`);
-    if (_miCaja.puede_reversar_pagos)     perms.push(`<span class="perm-chip perm-on"><i class="bi bi-arrow-counterclockwise"></i> Reversar</span>`);
-    if (_miCaja.puede_condonar_intereses) perms.push(`<span class="perm-chip perm-on"><i class="bi bi-percent"></i> Cond. intereses ≤${_miCaja.tope_intereses}%</span>`);
-    if (_miCaja.puede_condonar_gastos)    perms.push(`<span class="perm-chip perm-on"><i class="bi bi-shield-check"></i> Cond. gastos ≤${_miCaja.tope_gastos}%</span>`);
-    wrap.innerHTML = `
-      <div class="caja-header">
-        <i class="bi bi-cash-stack"></i>
-        <div class="caja-header-info">
-          <h6><i class="bi bi-circle-fill me-1" style="color:#16a34a;font-size:.5rem;vertical-align:middle"></i>${esc(_miCaja.nombre_caja)}</h6>
-          <span>Tu caja activa · Cajero: ${esc((yo?.nombre||'')+' '+(yo?.apellido||''))}</span>
-          <div class="perm-chips">${perms.join('')}</div>
-        </div>
-      </div>`;
   }
-
-  // Verificar permiso de pagar
+  const perms = [];
+  if (_miCaja.puede_pagar_cuotas)       perms.push(`<span class="perm-chip perm-on"><i class="bi bi-cash"></i> Pagar cuotas</span>`);
+  if (_miCaja.puede_reversar_pagos)     perms.push(`<span class="perm-chip perm-on"><i class="bi bi-arrow-counterclockwise"></i> Reversar</span>`);
+  if (_miCaja.puede_condonar_intereses) perms.push(`<span class="perm-chip perm-on"><i class="bi bi-percent"></i> Cond. intereses ≤${_miCaja.tope_intereses}%</span>`);
+  if (_miCaja.puede_condonar_gastos)    perms.push(`<span class="perm-chip perm-on"><i class="bi bi-shield-check"></i> Cond. gastos ≤${_miCaja.tope_gastos}%</span>`);
+  wrap.innerHTML = `
+    <div class="caja-header">
+      <i class="bi bi-cash-stack main-icon"></i>
+      <div class="caja-header-info">
+        <h6><i class="bi bi-circle-fill me-1" style="color:#16a34a;font-size:.5rem;vertical-align:middle"></i>${esc(_miCaja.nombre_caja)}</h6>
+        <span>Tu caja activa · ${esc((yo?.nombre||'')+' '+(yo?.apellido||''))}</span>
+        <div class="perm-chips">${perms.join('')}</div>
+      </div>
+    </div>`;
   if (!_miCaja.puede_pagar_cuotas) {
     document.getElementById('searchInput').disabled = true;
     document.querySelector('.btn-buscar').disabled  = true;
-    document.getElementById('cajaHeaderWrap').insertAdjacentHTML('beforeend',`
-      <div class="no-caja-alert mt-3">
-        <i class="bi bi-lock"></i>
-        <div><strong>Sin permiso para pagar cuotas</strong><p style="margin:4px 0 0;font-size:.88rem">Tu caja no tiene habilitado el permiso de pago de cuotas.</p></div>
-      </div>`);
   }
 }
 
-/* ── Búsqueda ────────────────────────────────────────────────────────────── */
-let _searchTimer = null;
-function onSearchInput() {
-  clearTimeout(_searchTimer);
-  const q = document.getElementById('searchInput').value.trim();
-  if (q.length < 2) { document.getElementById('resultadosWrap').innerHTML = ''; return; }
-  _searchTimer = setTimeout(buscar, 350);
-}
+/* ── Búsqueda ── */
+let _debounce;
+function onSearchInput() { clearTimeout(_debounce); _debounce = setTimeout(buscar, 350); }
 
 async function buscar() {
   const q = document.getElementById('searchInput').value.trim();
   if (!q) return;
-  // ocultar panel crédito si está abierto
   cerrarPanel();
   const wrap = document.getElementById('resultadosWrap');
   wrap.innerHTML = `<div class="spinner-wrap"><div class="spinner-border text-primary" style="width:1.8rem;height:1.8rem"></div></div>`;
-  const r = await API(`/api/creditos?q=${encodeURIComponent(q)}&estado=VIGENTE`);
-  const j = await r.json();
+  const j = await (await API(`/api/creditos?q=${encodeURIComponent(q)}&estado=VIGENTE`)).json();
   const lista = j.data || [];
   if (!lista.length) {
     wrap.innerHTML = `<div class="empty-state"><i class="bi bi-search fs-1 d-block mb-3"></i><p>Sin créditos vigentes para <strong>"${esc(q)}"</strong></p></div>`;
     return;
   }
   wrap.innerHTML = `<div class="results-label">${lista.length} crédito${lista.length!==1?'s':''} encontrado${lista.length!==1?'s':''}</div>` +
-    lista.map(c => {
-      const cuota = c.cuota ? clp(c.cuota) : '—';
-      return `
+    lista.map(c => `
       <div class="credito-card" onclick="abrirCredito(${c.id_credito})">
         <div class="cc-icon"><i class="bi bi-car-front"></i></div>
         <div class="cc-main">
@@ -357,10 +363,9 @@ async function buscar() {
         </div>
         <div class="cc-right">
           <div class="cc-num">${esc(c.numero_credito||'#'+c.id_credito)}</div>
-          <div style="font-size:.75rem;color:#6b7280;margin-top:2px">Cuota ${cuota} · ${c.plazo||'?'} meses</div>
+          <div style="font-size:.75rem;color:#6b7280;margin-top:2px">Cuota ${c.cuota ? clp(c.cuota) : '—'} · ${c.plazo||'?'} meses</div>
         </div>
-      </div>`;
-    }).join('');
+      </div>`).join('');
 }
 
 function limpiar() {
@@ -373,118 +378,99 @@ function cerrarPanel() {
   document.getElementById('creditoPanelWrap').style.display = 'none';
   document.getElementById('creditoPanelWrap').innerHTML = '';
   _credito = null; _pagos = []; _schedule = [];
+  limpiarSeleccion();
   document.querySelectorAll('.credito-card.selected').forEach(el => el.classList.remove('selected'));
 }
 
-/* ── Abrir crédito ───────────────────────────────────────────────────────── */
+/* ── Abrir crédito ── */
 async function abrirCredito(id) {
-  // Marcar selección
   document.querySelectorAll('.credito-card').forEach(el => el.classList.remove('selected'));
   document.querySelectorAll('.credito-card').forEach(el => {
     if (el.getAttribute('onclick')?.includes(`(${id})`)) el.classList.add('selected');
   });
-
   const panelWrap = document.getElementById('creditoPanelWrap');
   panelWrap.style.display = '';
   panelWrap.innerHTML = `<div class="spinner-wrap"><div class="spinner-border text-primary" style="width:2rem;height:2rem"></div></div>`;
   panelWrap.scrollIntoView({ behavior:'smooth', block:'nearest' });
 
-  const [rC, rP] = await Promise.all([
-    API(`/api/creditos/${id}`),
-    API(`/api/pagos-credito/${id}`),
+  const [jC, jP] = await Promise.all([
+    API(`/api/creditos/${id}`).then(r=>r.json()),
+    API(`/api/pagos-credito/${id}`).then(r=>r.json()),
   ]);
-  const jC = await rC.json();
-  const jP = await rP.json();
   _credito = jC.data;
   _pagos   = jP.data || [];
-
   _schedule = buildSchedule(_credito);
   await precargarUFDias21(_schedule);
+  limpiarSeleccion();
   renderPanel();
 }
 
-/* ── Amortización francesa ───────────────────────────────────────────────── */
+/* ── Amortización francesa ── */
 function buildSchedule(c) {
-  const r = c.tasa_mensual / 100;
-  const n = c.plazo;
-  const mf = c.monto_financiado;
-  let cuota = (r === 0) ? mf / n : mf * r * Math.pow(1+r, n) / (Math.pow(1+r, n) - 1);
+  const r = c.tasa_mensual / 100, n = c.plazo, mf = c.monto_financiado;
+  let cuota = (r === 0) ? mf/n : mf*r*Math.pow(1+r,n)/(Math.pow(1+r,n)-1);
   const fechaBase = c.fecha_primera_cuota ? new Date(c.fecha_primera_cuota) : new Date();
-  const sched = [];
   let saldo = mf;
-  for (let i = 1; i <= n; i++) {
-    const interes = saldo * r;
-    const capital = cuota - interes;
+  return Array.from({ length: n }, (_, i) => {
+    const interes = saldo * r, capital = cuota - interes;
     const fechaVenc = new Date(fechaBase);
-    fechaVenc.setMonth(fechaVenc.getMonth() + (i - 1));
+    fechaVenc.setMonth(fechaVenc.getMonth() + i);
     saldo -= capital;
-    sched.push({ numero: i, fecha: fechaVenc.toISOString().slice(0,10), monto: cuota, capital, interes, saldo: Math.max(0, saldo) });
-  }
-  return sched;
+    return { numero: i+1, fecha: fechaVenc.toISOString().slice(0,10), monto: cuota, capital, interes, saldo: Math.max(0, saldo) };
+  });
 }
 
-/* ── UF por fecha ────────────────────────────────────────────────────────── */
-function dia21Str(fechaVenc) {
-  const d = new Date(fechaVenc + 'T12:00:00');
-  d.setDate(d.getDate() + 21);
+/* ── UF por fecha ── */
+function dia21Str(f) {
+  const d = new Date(f+'T12:00:00');
+  d.setDate(d.getDate()+21);
   return d.toISOString().slice(0,10);
 }
-
 async function precargarUFDias21(sched) {
   const fechas = [...new Set(sched.map(s => dia21Str(s.fecha)))];
   await Promise.all(fechas.map(async f => {
     if (_ufMap.has(f)) return;
-    try {
-      const r = await API(`/api/uf/en/${f}`);
-      const j = await r.json();
-      _ufMap.set(f, j.data?.valor || _ufHoy);
-    } catch { _ufMap.set(f, _ufHoy); }
+    try { const j = await (await API(`/api/uf/en/${f}`)).json(); _ufMap.set(f, j.data?.valor||_ufHoy); }
+    catch { _ufMap.set(f, _ufHoy); }
   }));
 }
 
-/* ── Cálculos mora/gastos ────────────────────────────────────────────────── */
+/* ── Cálculos mora/gastos ── */
 function calcMora(montoCuota, fechaVenc, hoy = new Date()) {
-  const venc = new Date(fechaVenc + 'T12:00:00');
-  const dias = Math.max(0, Math.floor((hoy - venc) / 86400000));
-  if (dias <= 0) return { monto: 0, dias: 0 };
-  const monto = montoCuota * (_tmc / 100 / 365) * dias;
-  return { monto: Math.round(monto), dias };
+  const dias = Math.max(0, Math.floor((hoy - new Date(fechaVenc+'T12:00:00')) / 86400000));
+  return { monto: dias > 0 ? Math.round(montoCuota * (_tmc/100/365) * dias) : 0, dias };
 }
-
 function calcGastos(montoCuota, fechaVenc, hoy = new Date()) {
-  const venc    = new Date(fechaVenc + 'T12:00:00');
-  const dias    = Math.max(0, Math.floor((hoy - venc) / 86400000));
+  const dias = Math.max(0, Math.floor((hoy - new Date(fechaVenc+'T12:00:00')) / 86400000));
   if (dias < 21) return { monto: 0, dias, aplica: false };
-  const f21     = dia21Str(fechaVenc);
-  const ufVal   = _ufMap.get(f21) || _ufHoy;
-  const uf10    = ufVal * 10;
-  const uf40    = ufVal * 40;
-  let gastos    = 0;
-  if (montoCuota <= uf10)                         gastos = montoCuota * 0.09;
-  else if (montoCuota <= uf10 + uf40)             gastos = uf10 * 0.09 + (montoCuota - uf10) * 0.06;
-  else                                            gastos = uf10 * 0.09 + uf40 * 0.06 + (montoCuota - uf10 - uf40) * 0.03;
-  return { monto: Math.round(gastos), dias, aplica: true, ufVal, f21 };
+  const ufVal = _ufMap.get(dia21Str(fechaVenc)) || _ufHoy;
+  const uf10 = ufVal*10, uf40 = ufVal*40;
+  let g = montoCuota <= uf10 ? montoCuota*0.09 :
+          montoCuota <= uf10+uf40 ? uf10*0.09+(montoCuota-uf10)*0.06 :
+          uf10*0.09+uf40*0.06+(montoCuota-uf10-uf40)*0.03;
+  return { monto: Math.round(g), dias, aplica: true };
 }
 
-/* ── Render panel crédito ────────────────────────────────────────────────── */
+/* ── Render tabla principal ── */
 function renderPanel() {
   const c = _credito;
   const hoy = new Date();
-  const pagadas = _pagos.map(p => p.numero_cuota);
-
-  let nPagadas = 0, nMora = 0, nPend = 0;
-  let montoMoraTotal = 0;
+  const pagadas = new Set(_pagos.map(p => p.numero_cuota));
+  let nPagadas=0, nMora=0, nPend=0, moraTotal=0;
 
   const filas = _schedule.map(s => {
-    const esPagada = pagadas.includes(s.numero);
+    const esPagada = pagadas.has(s.numero);
     const pago     = _pagos.find(p => p.numero_cuota === s.numero);
-    const mora     = esPagada ? { monto:0, dias:0 } : calcMora(s.monto, s.fecha, hoy);
-    const gastos   = esPagada ? { monto:0, aplica:false } : calcGastos(s.monto, s.fecha, hoy);
+    const mora     = esPagada ? {monto:0,dias:0} : calcMora(s.monto, s.fecha, hoy);
+    const gastos   = esPagada ? {monto:0,aplica:false} : calcGastos(s.monto, s.fecha, hoy);
     const totalHoy = s.monto + mora.monto + gastos.monto;
     const enMora   = !esPagada && mora.dias > 0;
     if (esPagada) nPagadas++;
-    else if (enMora) { nMora++; montoMoraTotal += totalHoy; }
+    else if (enMora) { nMora++; moraTotal += totalHoy; }
     else nPend++;
+
+    const sel = _seleccionadas.has(s.numero);
+    const rowClass = esPagada ? 'row-pagada' : sel ? 'row-sel' : (enMora ? 'row-mora' : '');
 
     const estadoPill = esPagada
       ? `<span class="pill pill-pagada"><i class="bi bi-check-circle-fill"></i> Pagada</span>`
@@ -492,23 +478,21 @@ function renderPanel() {
         ? `<span class="pill pill-mora"><i class="bi bi-exclamation-circle-fill"></i> En mora</span>`
         : `<span class="pill pill-aldia"><i class="bi bi-clock"></i> Al día</span>`;
 
-    const btnPagar = (!esPagada && _miCaja?.puede_pagar_cuotas)
-      ? `<button class="btn-pagar" onclick="abrirModalPago(${s.numero},'${s.fecha}',${s.monto},${mora.monto},${gastos.monto})"><i class="bi bi-cash-coin"></i> Pagar</button>`
-      : esPagada ? `<small style="color:#9ca3af">—</small>` : `<small style="color:#9ca3af">Sin permiso</small>`;
+    const chkCell = (!esPagada && _miCaja?.puede_pagar_cuotas)
+      ? `<td class="text-center"><input type="checkbox" class="chk-cuota" ${sel?'checked':''} onchange="toggleCuota(${s.numero},this.checked)"></td>`
+      : `<td></td>`;
 
-    const rowClass = esPagada ? 'row-pagada' : (enMora ? 'row-mora' : '');
-
-    return `<tr class="${rowClass}">
+    return `<tr class="${rowClass}" id="fila-${s.numero}">
+      ${chkCell}
       <td class="text-center"><strong>${s.numero}</strong></td>
       <td>${fmtFecha(s.fecha)}</td>
       <td class="text-right amt">${clp(s.monto)}</td>
       <td class="text-right amt ${enMora&&mora.monto?'amt-mora':''}">${mora.monto ? clp(mora.monto) : '<span class="amt-muted">—</span>'}</td>
       <td class="text-right amt ${enMora&&gastos.monto?'amt-mora':''}">${gastos.monto ? clp(gastos.monto) : '<span class="amt-muted">—</span>'}</td>
-      <td class="text-right amt" style="${enMora?'color:var(--red);font-size:.9rem':''}">${esPagada ? '<span class="amt-muted">—</span>' : clp(totalHoy)}</td>
+      <td class="text-right amt" style="${enMora?'color:var(--red)':''}">${esPagada ? '<span class="amt-muted">—</span>' : clp(totalHoy)}</td>
       <td class="text-right amt-muted">${pago ? clp(pago.total_pagado) : '<span class="amt-muted">—</span>'}</td>
       <td>${pago ? fmtFecha(pago.fecha_pago||pago.created_at) : '<span style="color:#9ca3af">—</span>'}</td>
       <td>${estadoPill}</td>
-      <td>${btnPagar}</td>
     </tr>`;
   }).join('');
 
@@ -517,17 +501,13 @@ function renderPanel() {
     <div class="cp-header">
       <div>
         <div class="cp-title"><i class="bi bi-car-front me-2"></i>${esc(c.nombre_cliente)}</div>
-        <div class="cp-sub">
-          RUT ${esc(c.rut_cliente)} &nbsp;·&nbsp; N° ${esc(c.numero_credito||c.id_credito)}
-          &nbsp;·&nbsp; ${esc(c.marca||'')} ${esc(c.modelo||'')} ${c.anio||''}
-        </div>
+        <div class="cp-sub">RUT ${esc(c.rut_cliente)} &nbsp;·&nbsp; N° ${esc(c.numero_credito||c.id_credito)} &nbsp;·&nbsp; ${esc(c.marca||'')} ${esc(c.modelo||'')} ${c.anio||''}</div>
       </div>
       <div style="display:flex;gap:8px;align-items:center">
         <span style="background:rgba(255,255,255,.15);border-radius:8px;padding:4px 12px;font-size:.78rem;font-weight:700">${c.plazo} meses · ${clp(c.cuota||_schedule[0]?.monto||0)}/mes</span>
         <button class="btn-cerrar" onclick="cerrarPanel()"><i class="bi bi-x-lg me-1"></i>Cerrar</button>
       </div>
     </div>
-
     <div class="stats-row">
       <div class="stat-box s-pagada">
         <div class="sb-lbl"><i class="bi bi-check-circle me-1"></i>Pagadas</div>
@@ -539,18 +519,18 @@ function renderPanel() {
       </div>
       <div class="stat-box s-mora" ${nMora===0?'style="opacity:.5"':''}>
         <div class="sb-lbl"><i class="bi bi-exclamation-circle me-1"></i>${nMora} en mora</div>
-        <div class="sb-val" style="font-size:1.1rem">${nMora > 0 ? clp(montoMoraTotal) : '—'}</div>
+        <div class="sb-val" style="font-size:1.1rem">${nMora>0 ? clp(moraTotal) : '—'}</div>
       </div>
       <div class="stat-box">
         <div class="sb-lbl"><i class="bi bi-bank me-1"></i>Financiado</div>
         <div class="sb-val" style="font-size:1.1rem">${clp(c.monto_financiado)}</div>
       </div>
     </div>
-
     <div class="table-wrap">
-      <table>
+      <table class="cuotas-table">
         <thead>
           <tr>
+            <th style="width:36px"></th>
             <th class="text-center">N°</th>
             <th>Vencimiento</th>
             <th class="text-right">Cuota</th>
@@ -560,118 +540,262 @@ function renderPanel() {
             <th class="text-right">Total Pagado</th>
             <th>Fecha Pago</th>
             <th>Estado</th>
-            <th>Acción</th>
           </tr>
         </thead>
         <tbody>${filas}</tbody>
       </table>
     </div>
+    ${_miCaja?.puede_pagar_cuotas ? '<p style="font-size:.75rem;color:#6b7280;padding:10px 20px;margin:0"><i class="bi bi-info-circle me-1"></i>Selecciona una o más cuotas pendientes para registrar el pago.</p>' : ''}
   </div>`;
 }
 
-/* ── Modal pago ──────────────────────────────────────────────────────────── */
-const modalPagoBS = new bootstrap.Modal(document.getElementById('modalPago'));
+/* ── Selección de cuotas ── */
+function toggleCuota(numero, checked) {
+  if (checked) _seleccionadas.add(numero);
+  else         _seleccionadas.delete(numero);
+  // actualizar clase de la fila
+  const fila = document.getElementById(`fila-${numero}`);
+  if (fila) { fila.className = checked ? 'row-sel' : (calcMora(_schedule.find(s=>s.numero===numero)?.monto||0, _schedule.find(s=>s.numero===numero)?.fecha||'').dias>0 ? 'row-mora' : ''); }
+  actualizarPagoPanel();
+}
 
-function abrirModalPago(numeroCuota, fechaVenc, montoCuota, moraCalc, gastosCalc) {
-  const mora   = calcMora(montoCuota, fechaVenc);
-  const gastos = calcGastos(montoCuota, fechaVenc);
+function limpiarSeleccion() {
+  _seleccionadas.clear();
+  document.getElementById('pagoPanel').classList.add('hidden');
+  document.getElementById('autoMonto').value = '';
+}
 
-  document.getElementById('pagoIdCredito').value   = _credito.id_credito;
-  document.getElementById('pagoNumeroCuota').value = numeroCuota;
-  document.getElementById('pagoMontoBase').value   = montoCuota;
-  document.getElementById('pagoMontoCuota').value  = Math.round(montoCuota);
-  document.getElementById('pagoFecha').value       = new Date().toISOString().slice(0,10);
-  document.getElementById('pagoObs').value         = '';
-  document.getElementById('modalPagoTitulo').textContent = `Pagar Cuota N° ${numeroCuota} — ${esc(_credito.nombre_cliente)}`;
+/* ── Datos de las cuotas seleccionadas ── */
+function datosCuotasSeleccionadas() {
+  const hoy = new Date();
+  return [..._seleccionadas].sort((a,b)=>a-b).map(num => {
+    const s      = _schedule.find(x => x.numero === num);
+    const mora   = calcMora(s.monto, s.fecha, hoy);
+    const gastos = calcGastos(s.monto, s.fecha, hoy);
+    const moraMin   = _miCaja?.puede_condonar_intereses ? Math.round(mora.monto   * (1 - (_miCaja.tope_intereses||0)/100)) : mora.monto;
+    const gastosMin = _miCaja?.puede_condonar_gastos    ? Math.round(gastos.monto * (1 - (_miCaja.tope_gastos   ||0)/100)) : gastos.monto;
+    return { num, s, mora: mora.monto, gastos: gastos.monto, moraMin, gastosMin };
+  });
+}
 
-  // Mora
-  const puedeCond  = !!_miCaja?.puede_condonar_intereses;
-  const topeMora   = _miCaja?.tope_intereses || 0;
-  const moraMin    = puedeCond ? Math.round(mora.monto * (1 - topeMora/100)) : mora.monto;
-  const moraInput  = document.getElementById('pagoMora');
-  moraInput.value  = mora.monto;
-  moraInput.min    = moraMin;
-  moraInput.readOnly = !puedeCond && mora.monto === 0;
-  if (mora.dias > 0) {
-    document.getElementById('moraInfo').textContent = `(${mora.dias} días · TMC ${_tmc.toFixed(2)}% anual)`;
-    document.getElementById('moraInfoTag').querySelector('span').textContent =
-      puedeCond ? `Puedes condonar hasta un ${topeMora}% (mínimo ${clp(moraMin)})` : 'Sin permiso para condonar';
+/* ── Panel de pago ── */
+function actualizarPagoPanel() {
+  const panel = document.getElementById('pagoPanel');
+  if (_seleccionadas.size === 0) { panel.classList.add('hidden'); return; }
+  panel.classList.remove('hidden');
+  document.getElementById('ppBadge').textContent = `${_seleccionadas.size} cuota${_seleccionadas.size!==1?'s':''}`;
+  document.getElementById('ppFecha').value = new Date().toISOString().slice(0,10);
+  renderBreakdown();
+}
+
+function renderBreakdown(gastosOverride={}, moraOverride={}) {
+  const datos = datosCuotasSeleccionadas();
+  let sumBase=0, sumGastos=0, sumMora=0;
+
+  const filas = datos.map(d => {
+    const g = gastosOverride[d.num] !== undefined ? gastosOverride[d.num] : d.gastos;
+    const m = moraOverride[d.num]   !== undefined ? moraOverride[d.num]   : d.mora;
+    const total = d.s.monto + g + m;
+    sumBase   += d.s.monto;
+    sumGastos += g;
+    sumMora   += m;
+
+    const gCond = d.gastos - g, mCond = d.mora - m;
+    const gClass = g < d.gastosMin ? 'err' : g < d.gastos ? 'warn' : '';
+    const mClass = m < d.moraMin   ? 'err' : m < d.mora   ? 'warn' : '';
+
+    const gBadge = gCond > 0 ? `<span class="cond-badge ${gClass?'cond-max':'cond-ok'}">-${clp(gCond)}</span>` : '';
+    const mBadge = mCond > 0 ? `<span class="cond-badge ${mClass?'cond-max':'cond-ok'}">-${clp(mCond)}</span>` : '';
+
+    return `<tr>
+      <td><strong>N°${d.num}</strong></td>
+      <td style="color:#6b7280;font-size:.78rem">${fmtFecha(d.s.fecha)}</td>
+      <td class="text-right amt">${clp(d.s.monto)}</td>
+      <td class="text-right">
+        <input type="number" class="bd-input ${gClass}" id="g_${d.num}"
+          value="${g}" min="${d.gastosMin}" max="${d.gastos}"
+          ${d.gastos===0?'disabled':(!_miCaja?.puede_condonar_gastos?'readonly':'')}
+          oninput="onBreakdownChange()">
+        ${gBadge}
+      </td>
+      <td class="text-right">
+        <input type="number" class="bd-input ${mClass}" id="m_${d.num}"
+          value="${m}" min="${d.moraMin}" max="${d.mora}"
+          ${d.mora===0?'disabled':(!_miCaja?.puede_condonar_intereses?'readonly':'')}
+          oninput="onBreakdownChange()">
+        ${mBadge}
+      </td>
+      <td class="text-right amt" style="font-weight:800">${clp(total)}</td>
+    </tr>`;
+  }).join('');
+
+  const totalGlobal = sumBase + sumGastos + sumMora;
+  document.getElementById('breakdownBody').innerHTML = filas;
+  document.getElementById('breakdownFoot').innerHTML = `
+    <tr style="border-top:2px solid #e5e7eb;background:#f8fafc">
+      <td colspan="2" style="font-weight:700;padding:8px 10px;font-size:.8rem;color:#374151">TOTAL</td>
+      <td class="text-right amt">${clp(sumBase)}</td>
+      <td class="text-right amt">${clp(sumGastos)}</td>
+      <td class="text-right amt">${clp(sumMora)}</td>
+      <td class="text-right amt" style="font-weight:900;color:var(--navy);font-size:.95rem">${clp(totalGlobal)}</td>
+    </tr>`;
+  document.getElementById('ppTotal').textContent = clp(totalGlobal);
+}
+
+function onBreakdownChange() {
+  let total = 0;
+  const datos = datosCuotasSeleccionadas();
+  let hasErr = false;
+  datos.forEach(d => {
+    const g = parseFloat(document.getElementById(`g_${d.num}`)?.value)||0;
+    const m = parseFloat(document.getElementById(`m_${d.num}`)?.value)||0;
+    total += d.s.monto + g + m;
+    if (g < d.gastosMin || m < d.moraMin) hasErr = true;
+  });
+  document.getElementById('ppTotal').textContent = clp(total);
+  mostrarError(hasErr ? 'La condonación supera el límite permitido en una o más cuotas.' : '');
+}
+
+/* ── Auto-ajuste ── */
+function autoAjustar() {
+  const T = parseFloat(document.getElementById('autoMonto').value)||0;
+  const datos = datosCuotasSeleccionadas();
+  if (!datos.length) return;
+
+  const sumBase    = datos.reduce((a,d)=>a+d.s.monto, 0);
+  const sumGastos  = datos.reduce((a,d)=>a+d.gastos, 0);
+  const sumMora    = datos.reduce((a,d)=>a+d.mora, 0);
+  const sumTotal   = sumBase + sumGastos + sumMora;
+
+  if (T < sumBase) {
+    mostrarError(`Monto insuficiente. El mínimo es ${clp(sumBase)} (suma de cuotas base sin condonar gastos ni mora).`);
+    renderBreakdown({},{});
+    return;
+  }
+  mostrarError('');
+
+  let excess = T - sumBase;
+  const gastosOverride = {}, moraOverride = {};
+
+  if (excess >= sumGastos) {
+    // Pagar todos los gastos
+    datos.forEach(d => gastosOverride[d.num] = d.gastos);
+    excess -= sumGastos;
+    // Distribuir el resto en mora
+    if (sumMora > 0) {
+      if (excess >= sumMora) {
+        datos.forEach(d => moraOverride[d.num] = d.mora);
+      } else {
+        // Proporcional, respetando mínimos
+        datos.forEach(d => {
+          const proporcional = Math.round(d.mora * excess / sumMora);
+          moraOverride[d.num] = Math.max(d.moraMin, Math.min(d.mora, proporcional));
+        });
+        // Ajuste fino de centavos
+        const sumAjustada = datos.reduce((a,d)=>a+moraOverride[d.num],0);
+        if (sumAjustada > excess && datos.length) {
+          moraOverride[datos[datos.length-1].num] = Math.max(datos[datos.length-1].moraMin, moraOverride[datos[datos.length-1].num] - (sumAjustada - Math.round(excess)));
+        }
+      }
+    } else {
+      datos.forEach(d => moraOverride[d.num] = 0);
+    }
   } else {
-    document.getElementById('moraInfo').textContent = '';
-    document.getElementById('moraInfoTag').querySelector('span').textContent = 'Sin días de mora';
-    moraInput.value = 0; moraInput.readOnly = true;
+    // No alcanza ni para todos los gastos → distribuir proporcional en gastos, mora = 0
+    datos.forEach(d => {
+      const proporcional = sumGastos > 0 ? Math.round(d.gastos * excess / sumGastos) : 0;
+      gastosOverride[d.num] = Math.max(d.gastosMin, Math.min(d.gastos, proporcional));
+      moraOverride[d.num] = 0;
+    });
   }
 
-  // Gastos
-  const puedeCondG = !!_miCaja?.puede_condonar_gastos;
-  const topeGastos = _miCaja?.tope_gastos || 0;
-  const gastosMin  = puedeCondG ? Math.round(gastos.monto * (1 - topeGastos/100)) : gastos.monto;
-  const gastosInput = document.getElementById('pagoGastos');
-  gastosInput.value = gastos.monto;
-  gastosInput.min   = gastosMin;
-  gastosInput.readOnly = !puedeCondG && gastos.monto === 0;
-  if (gastos.aplica) {
-    document.getElementById('gastosInfo').textContent = `(escalonado · UF del ${gastos.f21}: ${clp(gastos.ufVal)})`;
-    document.getElementById('gastosInfoTag').querySelector('span').textContent =
-      puedeCondG ? `Puedes condonar hasta un ${topeGastos}% (mínimo ${clp(gastosMin)})` : 'Sin permiso para condonar';
+  // Hint
+  const totalResultante = sumBase + datos.reduce((a,d)=>a+gastosOverride[d.num],0) + datos.reduce((a,d)=>a+moraOverride[d.num],0);
+  const totalCondonado  = sumTotal - totalResultante;
+  document.getElementById('autoHint').textContent = totalCondonado > 0
+    ? `Se condona ${clp(totalCondonado)} (primero gastos de cobranza, luego intereses por mora).`
+    : T > sumTotal
+      ? `Se cobrará el total sin condonación. El excedente de ${clp(T-sumTotal)} queda a favor del cliente.`
+      : 'Se cobrará el total sin condonación.';
+
+  renderBreakdown(gastosOverride, moraOverride);
+}
+
+function mostrarError(msg) {
+  const box = document.getElementById('ppErrorBox');
+  if (msg) {
+    box.style.display = '';
+    box.innerHTML = `<div class="pp-error"><i class="bi bi-exclamation-triangle-fill"></i>${esc(msg)}</div>`;
   } else {
-    const faltan = 21 - calcMora(montoCuota, fechaVenc).dias;
-    document.getElementById('gastosInfo').textContent = '';
-    document.getElementById('gastosInfoTag').querySelector('span').textContent =
-      mora.dias > 0 ? `Aplica desde el día 21 de mora (faltan ${faltan} días)` : 'Sin mora — no aplica';
-    gastosInput.value = 0; gastosInput.readOnly = true;
+    box.style.display = 'none';
+  }
+}
+
+/* ── Confirmar pago (multi-cuota) ── */
+async function confirmarMultiPago() {
+  const datos  = datosCuotasSeleccionadas();
+  const fecha  = document.getElementById('ppFecha').value;
+  const obs    = document.getElementById('ppObs').value.trim();
+
+  if (!fecha) return mostrarError('Selecciona la fecha de pago.');
+
+  // Leer valores del breakdown
+  const pagos = datos.map(d => {
+    const g = parseFloat(document.getElementById(`g_${d.num}`)?.value)||0;
+    const m = parseFloat(document.getElementById(`m_${d.num}`)?.value)||0;
+    return { num: d.num, s: d.s, g, m, moraMin: d.moraMin, gastosMin: d.gastosMin };
+  });
+
+  // Validar mínimos
+  for (const p of pagos) {
+    if (p.g < p.gastosMin)
+      return mostrarError(`Cuota N°${p.num}: los gastos de cobranza no pueden ser menores a ${clp(p.gastosMin)}.`);
+    if (p.m < p.moraMin)
+      return mostrarError(`Cuota N°${p.num}: los intereses por mora no pueden ser menores a ${clp(p.moraMin)}.`);
   }
 
-  recalcTotal();
-  modalPagoBS.show();
+  mostrarError('');
+  const btn = document.getElementById('btnConfirmar');
+  btn.disabled = true;
+  btn.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Registrando...';
+
+  try {
+    for (const p of pagos) {
+      const body = {
+        id_credito:       _credito.id_credito,
+        numero_cuota:     p.num,
+        monto_cuota:      Math.round(p.s.monto),
+        interes_mora:     Math.round(p.m),
+        gastos_cobranza:  Math.round(p.g),
+        total_pagado:     Math.round(p.s.monto + p.m + p.g),
+        fecha_pago:       fecha,
+        fecha_vencimiento: p.s.fecha,
+        observacion:      obs || null,
+        id_caja:          _miCaja?.id_caja || null,
+      };
+      const j = await (await API('/api/pagos-credito', { method:'POST', body:JSON.stringify(body) })).json();
+      if (!j.success) throw new Error(`Cuota N°${p.num}: ${j.error}`);
+    }
+
+    // Éxito — refrescar
+    limpiarSeleccion();
+    const jP = await (await API(`/api/pagos-credito/${_credito.id_credito}`)).json();
+    _pagos = jP.data || [];
+    renderPanel();
+    document.getElementById('autoMonto').value = '';
+  } catch(e) {
+    mostrarError(e.message);
+  } finally {
+    btn.disabled = false;
+    btn.innerHTML = '<i class="bi bi-check2-circle"></i>Confirmar pago';
+  }
 }
 
-function recalcTotal() {
-  const base   = parseFloat(document.getElementById('pagoMontoCuota').value) || 0;
-  const mora   = parseFloat(document.getElementById('pagoMora').value)       || 0;
-  const gastos = parseFloat(document.getElementById('pagoGastos').value)     || 0;
-  document.getElementById('pagoTotal').textContent = clp(base + mora + gastos);
-}
-
-async function confirmarPago() {
-  const id_credito   = document.getElementById('pagoIdCredito').value;
-  const numero_cuota = document.getElementById('pagoNumeroCuota').value;
-  const monto_cuota  = parseFloat(document.getElementById('pagoMontoCuota').value) || 0;
-  const interes_mora = parseFloat(document.getElementById('pagoMora').value)        || 0;
-  const gastos_cob   = parseFloat(document.getElementById('pagoGastos').value)      || 0;
-  const total_pagado = monto_cuota + interes_mora + gastos_cob;
-  const fecha_pago   = document.getElementById('pagoFecha').value;
-  const observacion  = document.getElementById('pagoObs').value.trim();
-
-  // Buscar fecha_vencimiento de la cuota
-  const cuota = _schedule.find(s => s.numero == numero_cuota);
-
-  const body = {
-    id_credito, numero_cuota, monto_cuota, interes_mora,
-    gastos_cobranza: gastos_cob, total_pagado, fecha_pago,
-    fecha_vencimiento: cuota?.fecha || null,
-    observacion: observacion || null,
-    id_caja: _miCaja?.id_caja || null,
-  };
-
-  const r = await API('/api/pagos-credito', { method:'POST', body: JSON.stringify(body) });
-  const j = await r.json();
-  if (!j.success) return alert('Error al registrar: ' + j.error);
-
-  modalPagoBS.hide();
-  // Refrescar panel
-  const rP = await API(`/api/pagos-credito/${id_credito}`);
-  const jP = await rP.json();
-  _pagos = jP.data || [];
-  renderPanel();
-}
-
-/* ── Helpers ─────────────────────────────────────────────────────────────── */
+/* ── Helpers ── */
 function fmtFecha(f) {
   if (!f) return '—';
   return new Date(f).toLocaleDateString('es-CL', { day:'2-digit', month:'2-digit', year:'numeric' });
 }
-function esc(s){ return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
 </script>
 </body>
 </html>
