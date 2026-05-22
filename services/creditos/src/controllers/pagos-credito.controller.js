@@ -25,22 +25,13 @@ const audit = require('../../../../shared/auditoria');
         INDEX idx_registrado (id_registrado_por)
       )
     `);
-    // Migración: agregar columna en tablas existentes sin ella
-    await pool.query(`
-      ALTER TABLE pagos_credito
-      ADD COLUMN IF NOT EXISTS id_registrado_por INT NULL,
-      ADD INDEX IF NOT EXISTS idx_registrado (id_registrado_por)
-    `).catch(() => {});
-    await pool.query(`
-      ALTER TABLE pagos_credito
-      ADD COLUMN IF NOT EXISTS id_caja INT NULL
-    `).catch(() => {});
-    await pool.query(`
-      ALTER TABLE pagos_credito
-      ADD COLUMN IF NOT EXISTS origen_fondos      VARCHAR(200) NULL,
-      ADD COLUMN IF NOT EXISTS id_cuenta_bancaria INT          NULL,
-      ADD COLUMN IF NOT EXISTS numero_transaccion INT          NULL
-    `).catch(() => {});
+    // Migración individual por columna (un ADD por ALTER para evitar fallos silenciosos)
+    const addCol = sql => pool.query(sql).catch(() => {});
+    await addCol(`ALTER TABLE pagos_credito ADD COLUMN IF NOT EXISTS id_registrado_por    INT          NULL`);
+    await addCol(`ALTER TABLE pagos_credito ADD COLUMN IF NOT EXISTS id_caja              INT          NULL`);
+    await addCol(`ALTER TABLE pagos_credito ADD COLUMN IF NOT EXISTS origen_fondos        VARCHAR(200) NULL`);
+    await addCol(`ALTER TABLE pagos_credito ADD COLUMN IF NOT EXISTS id_cuenta_bancaria   INT          NULL`);
+    await addCol(`ALTER TABLE pagos_credito ADD COLUMN IF NOT EXISTS numero_transaccion   INT          NULL`);
 
     // Tablas necesarias para el batch
     await pool.query(`
