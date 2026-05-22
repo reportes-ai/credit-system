@@ -2,12 +2,12 @@ const router = require('express').Router();
 const ctrl   = require('../controllers/auditoria.controller');
 const { verifyToken, requirePerfil } = require('../../../../shared/middleware/auth');
 
-// Solo Administrador (o Gerente si se quiere extender)
-router.get(
-  '/:id_credito',
-  verifyToken,
-  requirePerfil('Administrador', 'Gerente'),
-  ctrl.getByCredito
-);
+const soloAdmin = [verifyToken, requirePerfil('Administrador', 'Gerente')];
+
+// Backfill histórico (idempotente)
+router.post('/backfill', ...soloAdmin, ctrl.backfill);
+
+// Historial por crédito
+router.get('/:id_credito', ...soloAdmin, ctrl.getByCredito);
 
 module.exports = router;

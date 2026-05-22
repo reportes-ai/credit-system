@@ -99,7 +99,7 @@
   <a href="/creditos" class="nav-brand">
     <img src="/img/logo-autofacil.png" alt="AutoFácil" onerror="this.style.display='none'">
     <span>Auditoría de Crédito</span>
-    <span class="version-badge">v1.0</span>
+    <span class="version-badge">v1.1</span>
   </a>
   <div class="nav-actions">
     <span id="navUser" style="color:rgba(255,255,255,.75);font-size:.82rem"></span>
@@ -292,6 +292,7 @@ async function cargarPagina() {
         </select>
         <span class="count-badge" id="countBadge">${_eventos.length} eventos</span>
         <button class="btn-export" onclick="exportarCSV()"><i class="bi bi-download"></i>Exportar CSV</button>
+        <button class="btn-export" id="btnBackfill" onclick="ejecutarBackfill()" style="background:#fef9c3;border-color:#fde047;color:#92400e" title="Poblar historial desde datos existentes (idempotente)"><i class="bi bi-clock-history"></i>Poblar Historial</button>
       </div>
 
       <div id="timelineWrap"></div>`;
@@ -300,6 +301,26 @@ async function cargarPagina() {
     aplicarFiltros();
   } catch(e) {
     document.getElementById('pageWrap').innerHTML = `<div class="no-data"><i class="bi bi-exclamation-triangle"></i>${e.message}</div>`;
+  }
+}
+
+async function ejecutarBackfill() {
+  const btn = document.getElementById('btnBackfill');
+  if (!btn) return;
+  if (!confirm('¿Poblar el historial de auditoría desde los datos existentes?\n\nEs una operación idempotente — se puede ejecutar varias veces sin duplicar registros.')) return;
+  btn.disabled = true;
+  btn.innerHTML = '<i class="bi bi-hourglass-split"></i> Procesando…';
+  try {
+    const r = await fetch('/api/auditoria-credito/backfill', { method:'POST', headers:apiHdr() });
+    const j = await r.json();
+    if (!j.success) throw new Error(j.error);
+    const d = j.data;
+    alert(`✅ Backfill completado\n\nEventos insertados: ${d.insertados}\n• Créditos: ${d.creditos}\n• Documentos respaldo: ${d.documentos}\n• Documentos AF: ${d.docs_af}\n• Pagos: ${d.pagos}`);
+    cargarPagina(); // recargar
+  } catch(e) {
+    alert('Error en backfill: ' + e.message);
+    btn.disabled = false;
+    btn.innerHTML = '<i class="bi bi-clock-history"></i> Poblar Historial';
   }
 }
 

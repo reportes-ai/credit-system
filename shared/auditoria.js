@@ -19,9 +19,16 @@ const pool = require('./config/database');
         detalle       TEXT         NULL,
         meta          JSON         NULL,
         ip            VARCHAR(45)  NULL,
-        INDEX idx_credito_fecha (id_credito, fecha DESC)
+        ref_origen    VARCHAR(100) NULL,
+        INDEX idx_credito_fecha (id_credito, fecha DESC),
+        UNIQUE KEY uq_ref_origen (ref_origen)
       )
     `);
+    // Agregar ref_origen si la tabla ya existía sin ella
+    await pool.query(`ALTER TABLE auditoria_credito ADD COLUMN ref_origen VARCHAR(100) NULL`)
+      .catch(e => { if (e.errno !== 1060) throw e; });
+    await pool.query(`ALTER TABLE auditoria_credito ADD UNIQUE KEY uq_ref_origen (ref_origen)`)
+      .catch(e => { if (e.errno !== 1061 && e.errno !== 1062) throw e; });
   } catch(e) { if (e.errno !== 1050) console.error('[auditoria migration]', e.message); }
 })();
 
