@@ -44,8 +44,9 @@ app.use('/api/pagos-credito',       require('../../services/creditos/src/routes/
 app.use('/api/auditoria-credito',   require('../../services/creditos/src/routes/auditoria.routes'));
 
 // Tesorería
-app.use('/api/cajas',       require('../../services/tesoreria/src/routes/cajas.routes'));
-app.use('/api/cierre-caja', require('../../services/tesoreria/src/routes/cierre-caja.routes'));
+app.use('/api/cajas',                require('../../services/tesoreria/src/routes/cajas.routes'));
+app.use('/api/cierre-caja',          require('../../services/tesoreria/src/routes/cierre-caja.routes'));
+app.use('/api/cuentas-transitorias', require('../../services/tesoreria/src/routes/cuentas-transitorias.routes'));
 
 // Health check
 app.get('/health', (req, res) => res.json({ status: 'Sistema operativo', timestamp: new Date() }));
@@ -123,6 +124,9 @@ app.get(['/tesoreria/cajas', '/tesoreria/cajas/'], (req, res) =>
   res.sendFile(path.join(__dirname, '../public/tesoreria/cajas.html')));
 app.get(['/tesoreria/cierre-caja', '/tesoreria/cierre-caja/'], (req, res) =>
   res.sendFile(path.join(__dirname, '../public/tesoreria/cierre-caja.html')));
+
+app.get(['/tesoreria/cuentas-transitorias', '/tesoreria/cuentas-transitorias/'], (req, res) =>
+  res.sendFile(path.join(__dirname, '../public/tesoreria/cuentas-transitorias.html')));
 
 app.get(['/crm', '/crm/'], (req, res) =>
   res.sendFile(path.join(__dirname, '../public/crm/index.html')));

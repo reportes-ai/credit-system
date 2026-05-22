@@ -171,7 +171,7 @@
   <div class="topnav-left">
     <a href="/" class="topnav-brand">
       <img src="/img/logo.png" alt="AutoFácil">
-      <span class="version-badge">v1.5</span>
+      <span class="version-badge">v1.6</span>
     </a>
     <div class="breadcrumb-nav">
       <a href="/">Inicio</a><span class="sep">/</span>
@@ -242,11 +242,16 @@
     </div>
 
     <div class="pp-body">
-      <!-- Auto-ajuste -->
+      <!-- Monto recibido + saldo a favor -->
       <div class="auto-row">
-        <label><i class="bi bi-calculator me-1"></i>Monto recibido</label>
-        <input type="text" id="autoMonto" class="auto-input" placeholder="$0" oninput="onPesoInput(this, autoAjustar)" inputmode="numeric">
-        <span class="auto-hint" id="autoHint">Ingresa el monto recibido y se distribuirá automáticamente: primero gastos de cobranza, luego intereses por mora.</span>
+        <label><i class="bi bi-cash me-1"></i>Monto recibido</label>
+        <input type="text" id="autoMonto" class="auto-input" placeholder="$0" oninput="onPesoInput(this, onMontoRecibidoChange)" inputmode="numeric">
+        <div id="saldoFavorBox" style="display:none;background:#f0fdf4;border:1.5px solid #86efac;border-radius:8px;padding:6px 14px;display:none;align-items:center;gap:10px;flex-wrap:wrap">
+          <span style="font-size:.8rem;color:#15803d;font-weight:700"><i class="bi bi-wallet2 me-1"></i>Saldo a favor: <span id="saldoFavorMonto" style="font-family:monospace">$0</span></span>
+          <span style="font-size:.8rem;color:#166534;font-weight:600">|</span>
+          <span style="font-size:.8rem;color:#166534;font-weight:700">Total disponible: <span id="totalDisponibleMonto" style="font-family:monospace">$0</span></span>
+        </div>
+        <span class="auto-hint" id="autoHint">Ingresa el monto recibido para distribuir automáticamente: primero gastos de cobranza, luego intereses por mora.</span>
       </div>
 
       <!-- Breakdown por cuota -->
@@ -312,13 +317,14 @@ const clp = v => '$' + Math.round(v||0).toLocaleString('es-CL');
 const esc = s => String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
 
 /* ── Estado global ── */
-let _miCaja   = null;
-let _tmc      = 0;
-let _ufHoy    = 0;
-let _ufMap    = new Map();
-let _credito  = null;
-let _pagos    = [];
-let _schedule = [];
+let _miCaja       = null;
+let _tmc          = 0;
+let _ufHoy        = 0;
+let _ufMap        = new Map();
+let _credito      = null;
+let _pagos        = [];
+let _schedule     = [];
+let _saldoAFavor  = 0;   // saldo transitorio disponible del crédito activo
 let _seleccionadas = new Set();   // números de cuota seleccionados
 
 /* ── Init ── */
@@ -430,7 +436,7 @@ function limpiar() {
 function cerrarPanel() {
   document.getElementById('creditoPanelWrap').style.display = 'none';
   document.getElementById('creditoPanelWrap').innerHTML = '';
-  _credito = null; _pagos = []; _schedule = [];
+  _credito = null; _pagos = []; _schedule = []; _saldoAFavor = 0;
   limpiarSeleccion();
   document.querySelectorAll('.credito-card.selected').forEach(el => el.classList.remove('selected'));
 }
@@ -446,13 +452,15 @@ async function abrirCredito(id) {
   panelWrap.innerHTML = `<div class="spinner-wrap"><div class="spinner-border text-primary" style="width:2rem;height:2rem"></div></div>`;
   panelWrap.scrollIntoView({ behavior:'smooth', block:'nearest' });
 
-  const [jC, jP] = await Promise.all([
+  const [jC, jP, jSaldo] = await Promise.all([
     API(`/api/creditos/${id}`).then(r=>r.json()),
     API(`/api/pagos-credito/${id}`).then(r=>r.json()),
+    API(`/api/cuentas-transitorias/por-credito/${id}`).then(r=>r.json()),
   ]);
-  _credito = jC.data;
-  _pagos   = jP.data || [];
-  _schedule = buildSchedule(_credito);
+  _credito     = jC.data;
+  _pagos       = jP.data || [];
+  _saldoAFavor = (jSaldo.success && jSaldo.data?.saldo_total) || 0;
+  _schedule    = buildSchedule(_credito);
   await precargarUFDias21(_schedule);
   limpiarSeleccion();
   renderPanel();
@@ -620,6 +628,7 @@ function limpiarSeleccion() {
   document.getElementById('autoMonto').value = '';
   document.getElementById('ppOrigenFondos').value = '';
   document.getElementById('ppOrigenFondos').classList.remove('required');
+  document.getElementById('saldoFavorBox').style.display = 'none';
   // desmarcar checkboxes visibles
   document.querySelectorAll('.chk-cuota').forEach(c => c.checked = false);
   document.querySelectorAll('tr.row-sel').forEach(r => r.classList.remove('row-sel'));
@@ -631,7 +640,16 @@ function abrirDetallePago() {
   document.getElementById('ppBadgeDetalle').textContent = document.getElementById('ppBadge').textContent;
   document.getElementById('ppFecha').value = new Date().toISOString().slice(0,10);
   document.getElementById('autoMonto').value = '';
-  document.getElementById('autoHint').textContent = 'Ingresa el monto recibido y se distribuirá automáticamente: primero gastos de cobranza, luego intereses por mora.';
+  document.getElementById('autoHint').textContent = 'Ingresa el monto recibido para distribuir automáticamente: primero gastos de cobranza, luego intereses por mora.';
+  // Mostrar saldo a favor si existe
+  const sfBox = document.getElementById('saldoFavorBox');
+  if (_saldoAFavor > 0) {
+    sfBox.style.display = 'flex';
+    document.getElementById('saldoFavorMonto').textContent     = clp(_saldoAFavor);
+    document.getElementById('totalDisponibleMonto').textContent = clp(_saldoAFavor);
+  } else {
+    sfBox.style.display = 'none';
+  }
   mostrarError('');
   renderBreakdown();
 }
@@ -789,9 +807,24 @@ function onBreakdownChange() {
   mostrarError(hasErr ? 'La condonación supera el límite permitido en una o más cuotas.' : '');
 }
 
+/* ── Actualiza display saldo a favor ── */
+function onMontoRecibidoChange() {
+  const mrec = getPesoVal(document.getElementById('autoMonto'));
+  const box  = document.getElementById('saldoFavorBox');
+  if (_saldoAFavor > 0) {
+    box.style.display = 'flex';
+    document.getElementById('saldoFavorMonto').textContent    = clp(_saldoAFavor);
+    document.getElementById('totalDisponibleMonto').textContent = clp(mrec + _saldoAFavor);
+  } else {
+    box.style.display = 'none';
+  }
+  autoAjustar();
+}
+
 /* ── Auto-ajuste (condona gastos primero, luego mora) ── */
 function autoAjustar() {
-  const T = getPesoVal(document.getElementById('autoMonto'));
+  const mrec  = getPesoVal(document.getElementById('autoMonto'));
+  const T     = mrec + _saldoAFavor;   // disponible real = recibido + saldo a favor
   const datos = datosCuotasSeleccionadas();
   if (!datos.length) return;
 
@@ -848,10 +881,11 @@ function autoAjustar() {
     + datos.reduce((a,d)=>a+(moraOverride[d.num]??d.mora),0);
   const totalCondonado = sumTotal - totalResultante;
 
+  const excedente = T - sumTotal;
   document.getElementById('autoHint').textContent = totalCondonado > 0
     ? `Se condona ${clp(totalCondonado)}: gastos de cobranza primero, luego intereses por mora.`
-    : T > sumTotal
-      ? `Se cobrará el total sin condonación (excedente ${clp(T - sumTotal)} a favor del cliente).`
+    : excedente > 0
+      ? `Se cobrará el total. El excedente de ${clp(excedente)} quedará como Saldo a Favor del cliente.`
       : 'Se cobrará el total sin condonación.';
 
   renderBreakdown(gastosOverride, moraOverride);
@@ -867,11 +901,11 @@ function mostrarError(msg) {
   }
 }
 
-/* ── Confirmar pago (multi-cuota) ── */
+/* ── Confirmar pago (batch con correlativo global) ── */
 async function confirmarMultiPago() {
-  const datos  = datosCuotasSeleccionadas();
-  const fecha  = document.getElementById('ppFecha').value;
-  const obs    = document.getElementById('ppObs').value.trim();
+  const datos = datosCuotasSeleccionadas();
+  const fecha = document.getElementById('ppFecha').value;
+  const obs   = document.getElementById('ppObs').value.trim();
 
   const origenVal = document.getElementById('ppOrigenFondos').value;
   if (!origenVal) {
@@ -883,14 +917,14 @@ async function confirmarMultiPago() {
   if (!fecha) return mostrarError('Selecciona la fecha de pago.');
 
   // Leer valores del breakdown
-  const pagos = datos.map(d => {
+  const pagosDet = datos.map(d => {
     const g = getPesoVal(document.getElementById(`g_${d.num}`));
     const m = getPesoVal(document.getElementById(`m_${d.num}`));
     return { num: d.num, s: d.s, g, m, moraMin: d.moraMin, gastosMin: d.gastosMin };
   });
 
   // Validar mínimos
-  for (const p of pagos) {
+  for (const p of pagosDet) {
     if (p.g < p.gastosMin)
       return mostrarError(`Cuota N°${p.num}: los gastos de cobranza no pueden ser menores a ${clp(p.gastosMin)}.`);
     if (p.m < p.moraMin)
@@ -903,28 +937,43 @@ async function confirmarMultiPago() {
   btn.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Registrando...';
 
   try {
-    for (const p of pagos) {
-      const body = {
-        id_credito:       _credito.id_credito,
-        numero_cuota:     p.num,
-        monto_cuota:      Math.round(p.s.monto),
-        interes_mora:     Math.round(p.m),
-        gastos_cobranza:  Math.round(p.g),
-        total_pagado:     Math.round(p.s.monto + p.m + p.g),
-        fecha_pago:           fecha,
-        fecha_vencimiento:    p.s.fecha,
-        observacion:          obs || null,
-        id_caja:              _miCaja?.id_caja || null,
-        origen_fondos:        origenLabel || null,
-        id_cuenta_bancaria:   origenCuentaId ? parseInt(origenCuentaId) : null,
-      };
-      const j = await (await API('/api/pagos-credito', { method:'POST', body:JSON.stringify(body) })).json();
-      if (!j.success) throw new Error(`Cuota N°${p.num}: ${j.error}`);
+    const body = {
+      id_credito:         _credito.id_credito,
+      monto_recibido:     getPesoVal(document.getElementById('autoMonto')),
+      fecha_pago:         fecha,
+      observacion:        obs || null,
+      id_caja:            _miCaja?.id_caja || null,
+      origen_fondos:      origenLabel || null,
+      id_cuenta_bancaria: origenCuentaId ? parseInt(origenCuentaId) : null,
+      pagos: pagosDet.map(p => ({
+        numero_cuota:      p.num,
+        fecha_vencimiento: p.s.fecha,
+        monto_cuota:       Math.round(p.s.monto),
+        interes_mora:      Math.round(p.m),
+        gastos_cobranza:   Math.round(p.g),
+        total_pagado:      Math.round(p.s.monto + p.m + p.g),
+      })),
+    };
+
+    const j = await (await API('/api/pagos-credito/batch', { method:'POST', body:JSON.stringify(body) })).json();
+    if (!j.success) throw new Error(j.error);
+
+    const trxNum = String(j.data.numero_transaccion).padStart(6,'0');
+    let msg = `✓ Pago registrado — TRX-${trxNum}`;
+    if (j.data.transitoria) {
+      msg += ` | Saldo a favor: ${clp(j.data.transitoria.monto)}`;
+      _saldoAFavor += j.data.transitoria.monto;
     }
+    // Actualizar hint con info de transacción
+    document.getElementById('autoHint').textContent = msg;
 
     // Éxito — refrescar
-    const jP = await (await API(`/api/pagos-credito/${_credito.id_credito}`)).json();
-    _pagos = jP.data || [];
+    const [jP, jSaldo] = await Promise.all([
+      API(`/api/pagos-credito/${_credito.id_credito}`).then(r=>r.json()),
+      API(`/api/cuentas-transitorias/por-credito/${_credito.id_credito}`).then(r=>r.json()),
+    ]);
+    _pagos       = jP.data || [];
+    _saldoAFavor = (jSaldo.success && jSaldo.data?.saldo_total) || 0;
     limpiarSeleccion();
     renderPanel();
     document.getElementById('autoMonto').value = '';

@@ -95,6 +95,12 @@
         <p>Movimientos por fecha, usuario o total de cajas</p>
         <span class="btn-acceder"><i class="bi bi-arrow-right-circle me-1"></i>Acceder</span>
       </a>
+      <a href="/tesoreria/cuentas-transitorias" class="module-card" id="cardTransitorias" style="display:none">
+        <div class="card-icon"><i class="bi bi-arrow-left-right"></i></div>
+        <h6>Cuentas Transitorias</h6>
+        <p>Saldos a favor de clientes por pagos en exceso</p>
+        <span class="btn-acceder"><i class="bi bi-arrow-right-circle me-1"></i>Acceder</span>
+      </a>
     </div>
   </div>
 
@@ -110,8 +116,9 @@
     // Módulos restringidos a Administrador / Gerente / Supervisor
     const perfilAdmin = ['Administrador','Gerente','Supervisor'].includes(yo?.perfil);
     if (perfilAdmin) {
-      document.getElementById('cardCajas').style.display  = '';
-      document.getElementById('cardCierre').style.display = '';
+      document.getElementById('cardCajas').style.display       = '';
+      document.getElementById('cardCierre').style.display      = '';
+      document.getElementById('cardTransitorias').style.display = '';
     }
 
     function logout() { localStorage.removeItem('token'); localStorage.removeItem('usuario'); window.location.href = '/login.html'; }
