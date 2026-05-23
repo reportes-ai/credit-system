@@ -48,6 +48,9 @@ app.use('/api/cajas',                require('../../services/tesoreria/src/route
 app.use('/api/cierre-caja',          require('../../services/tesoreria/src/routes/cierre-caja.routes'));
 app.use('/api/cuentas-transitorias', require('../../services/tesoreria/src/routes/cuentas-transitorias.routes'));
 
+// CRM
+app.use('/api/crm', require('../../services/crm/src/routes/gestiones.routes'));
+
 // Health check
 app.get('/health', (req, res) => res.json({ status: 'Sistema operativo', timestamp: new Date() }));
 
@@ -130,6 +133,11 @@ app.get(['/tesoreria/cuentas-transitorias', '/tesoreria/cuentas-transitorias/'],
 
 app.get(['/crm', '/crm/'], (req, res) =>
   res.sendFile(path.join(__dirname, '../public/crm/index.html')));
+
+app.get(['/crm/gestiones', '/crm/gestiones/'], (req, res) =>
+  res.sendFile(path.join(__dirname, '../public/crm/gestiones.html')));
+app.get(['/crm/estadisticas', '/crm/estadisticas/'], (req, res) =>
+  res.sendFile(path.join(__dirname, '../public/crm/estadisticas.html')));
 
 app.get(['/cobranza', '/cobranza/'], (req, res) =>
   res.sendFile(path.join(__dirname, '../public/cobranza/index.html')));

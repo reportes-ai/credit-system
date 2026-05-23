@@ -1,0 +1,493 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Estadísticas CRM — AutoFácil</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.0/font/bootstrap-icons.css" rel="stylesheet">
+  <style>
+    :root {
+      --navy:#0141A2; --navy-dark:#012d70; --navy-light:#0255c5;
+      --accent:#009AFE; --bg:#f0f4f8;
+    }
+    * { box-sizing:border-box; }
+    body { background:var(--bg); font-family:'Segoe UI',system-ui,sans-serif; margin:0; min-height:100vh; }
+
+    /* TOPNAV */
+    .topnav { background:linear-gradient(90deg,var(--navy-dark),var(--navy-light)); color:#fff; height:60px; padding:0 24px; display:flex; align-items:center; justify-content:space-between; position:sticky; top:0; z-index:200; box-shadow:0 2px 8px rgba(0,0,0,.3); }
+    .topnav-left { display:flex; align-items:center; gap:16px; }
+    .topnav-brand { display:flex; align-items:center; gap:8px; text-decoration:none; }
+    .topnav-brand img { height:32px; filter:brightness(0) invert(1); }
+    .version-badge { background:rgba(255,255,255,.15); color:rgba(255,255,255,.75); font-size:.65rem; font-weight:700; border-radius:6px; padding:2px 8px; letter-spacing:.5px; }
+    .breadcrumb-nav { color:rgba(255,255,255,.6); font-size:.85rem; display:flex; align-items:center; gap:6px; }
+    .breadcrumb-nav a { color:rgba(255,255,255,.75); text-decoration:none; }
+    .breadcrumb-nav a:hover { color:#fff; }
+    .breadcrumb-nav .sep { color:rgba(255,255,255,.35); }
+    .topnav-right { display:flex; align-items:center; gap:10px; }
+    .user-chip { background:rgba(255,255,255,.12); border-radius:24px; padding:5px 12px; display:flex; align-items:center; gap:8px; font-size:.85rem; }
+    .avatar { width:28px; height:28px; background:#90caf9; border-radius:50%; display:flex; align-items:center; justify-content:center; color:var(--navy); font-weight:700; font-size:.75rem; }
+    .perfil-badge { background:rgba(144,202,249,.2); border:1px solid rgba(144,202,249,.4); color:#90caf9; border-radius:12px; padding:2px 10px; font-size:.73rem; font-weight:600; }
+    .btn-logout { background:rgba(255,255,255,.1); border:1px solid rgba(255,255,255,.2); color:#fff; border-radius:8px; padding:5px 12px; font-size:.82rem; cursor:pointer; }
+    .btn-logout:hover { background:rgba(255,255,255,.2); }
+
+    /* CONTENIDO */
+    .page-content { padding:24px 28px; max-width:1400px; margin:0 auto; }
+
+    /* KPI Cards */
+    .kpi-grid { display:grid; grid-template-columns:repeat(5,1fr); gap:16px; margin-bottom:24px; }
+    .kpi-card { background:#fff; border-radius:14px; padding:18px 20px; box-shadow:0 1px 6px rgba(0,0,0,.07); display:flex; align-items:center; gap:16px; border-left:4px solid; }
+    .kpi-icon { width:48px; height:48px; border-radius:12px; display:flex; align-items:center; justify-content:center; font-size:1.4rem; flex-shrink:0; }
+    .kpi-num { font-size:1.8rem; font-weight:800; line-height:1; margin-bottom:2px; }
+    .kpi-label { font-size:.78rem; color:#6b7280; font-weight:500; }
+
+    .kpi-blue  { border-color:#0141A2; } .kpi-blue .kpi-icon  { background:#e8f0fe; color:#0141A2; }  .kpi-blue .kpi-num  { color:#0141A2; }
+    .kpi-green { border-color:#22c55e; } .kpi-green .kpi-icon { background:#dcfce7; color:#16a34a; }  .kpi-green .kpi-num { color:#16a34a; }
+    .kpi-amber { border-color:#f59e0b; } .kpi-amber .kpi-icon { background:#fef3c7; color:#d97706; }  .kpi-amber .kpi-num { color:#d97706; }
+    .kpi-cyan  { border-color:#009AFE; } .kpi-cyan .kpi-icon  { background:#e0f2fe; color:#0284c7; }  .kpi-cyan .kpi-num  { color:#0284c7; }
+    .kpi-teal  { border-color:#14b8a6; } .kpi-teal .kpi-icon  { background:#ccfbf1; color:#0f766e; }  .kpi-teal .kpi-num  { color:#0f766e; }
+
+    /* Filtros */
+    .filter-bar { background:#fff; border-radius:12px; padding:14px 18px; box-shadow:0 1px 4px rgba(0,0,0,.06); display:flex; flex-wrap:wrap; gap:12px; align-items:center; margin-bottom:20px; }
+    .filter-bar label { font-size:.8rem; font-weight:600; color:#374151; margin:0; }
+    .filter-bar .form-control, .filter-bar .form-select { font-size:.82rem; padding:6px 10px; border-radius:8px; }
+
+    /* Panel de gráficos */
+    .charts-row { display:grid; grid-template-columns:1fr 1fr 1fr; gap:16px; margin-bottom:24px; }
+    .chart-card { background:#fff; border-radius:14px; box-shadow:0 1px 6px rgba(0,0,0,.07); overflow:hidden; }
+    .chart-header { padding:14px 18px 10px; font-weight:700; color:var(--navy); font-size:.9rem; border-bottom:1px solid #f1f5f9; }
+    .chart-body { padding:14px 18px; }
+
+    /* Barras horizontales */
+    .bar-row { display:flex; align-items:center; gap:8px; margin-bottom:8px; }
+    .bar-label { font-size:.78rem; color:#374151; width:130px; flex-shrink:0; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+    .bar-track { flex:1; height:18px; background:#f1f5f9; border-radius:9px; overflow:hidden; }
+    .bar-fill { height:100%; border-radius:9px; transition:width .5s ease; }
+    .bar-count { font-size:.75rem; color:#6b7280; font-weight:700; width:32px; text-align:right; flex-shrink:0; }
+
+    /* Donut CSS */
+    .donut-wrap { display:flex; flex-direction:column; gap:8px; }
+    .donut-item { display:flex; align-items:center; gap:10px; }
+    .donut-dot { width:12px; height:12px; border-radius:50%; flex-shrink:0; }
+    .donut-label { font-size:.82rem; color:#374151; flex:1; }
+    .donut-count { font-size:.82rem; font-weight:700; color:#1e293b; }
+    .donut-pct { font-size:.75rem; color:#9ca3af; }
+
+    /* Tabla ejecutivos */
+    .exec-table-wrap { background:#fff; border-radius:14px; box-shadow:0 1px 6px rgba(0,0,0,.07); overflow:hidden; margin-bottom:24px; }
+    .exec-header { padding:14px 18px; border-bottom:1px solid #f1f5f9; font-weight:700; color:var(--navy); font-size:.9rem; }
+    table.exec-tbl { width:100%; border-collapse:collapse; font-size:.83rem; }
+    table.exec-tbl th { background:#f8fafc; padding:10px 14px; text-align:left; font-weight:700; color:#6b7280; font-size:.75rem; text-transform:uppercase; letter-spacing:.4px; border-bottom:1px solid #e2e8f0; }
+    table.exec-tbl td { padding:10px 14px; border-bottom:1px solid #f8fafc; vertical-align:middle; }
+    table.exec-tbl tr:last-child td { border-bottom:none; }
+    table.exec-tbl tr:hover td { background:#f8fafc; }
+    .mini-bar { height:8px; background:#e2e8f0; border-radius:4px; overflow:hidden; margin-top:3px; }
+    .mini-bar-fill { height:100%; background:var(--navy); border-radius:4px; }
+    .pct-badge { font-size:.72rem; font-weight:700; padding:2px 8px; border-radius:10px; }
+    .pct-hi { background:#dcfce7; color:#16a34a; }
+    .pct-mid { background:#fef3c7; color:#d97706; }
+    .pct-lo { background:#fee2e2; color:#dc2626; }
+
+    /* Dos tablas */
+    .two-tables { display:grid; grid-template-columns:1fr 1fr; gap:16px; margin-bottom:24px; }
+    .small-table-wrap { background:#fff; border-radius:14px; box-shadow:0 1px 6px rgba(0,0,0,.07); overflow:hidden; }
+    .small-header { padding:14px 18px; border-bottom:1px solid #f1f5f9; font-weight:700; color:var(--navy); font-size:.88rem; }
+    table.small-tbl { width:100%; border-collapse:collapse; font-size:.8rem; }
+    table.small-tbl th { background:#f8fafc; padding:8px 14px; text-align:left; font-weight:700; color:#6b7280; font-size:.72rem; text-transform:uppercase; border-bottom:1px solid #e2e8f0; }
+    table.small-tbl td { padding:8px 14px; border-bottom:1px solid #f8fafc; }
+    table.small-tbl tr:last-child td { border-bottom:none; }
+
+    /* Seguimientos hoy */
+    .seg-badge { background:#fef3c7; color:#854d0e; font-size:.72rem; font-weight:700; border-radius:10px; padding:2px 8px; }
+    .btn-registrar { background:var(--accent); color:#fff; border:none; border-radius:6px; padding:3px 10px; font-size:.72rem; cursor:pointer; white-space:nowrap; }
+    .btn-registrar:hover { background:#007dce; }
+
+    /* Tendencia 7 días */
+    .tendencia-wrap { background:#fff; border-radius:14px; box-shadow:0 1px 6px rgba(0,0,0,.07); padding:18px 22px; margin-bottom:24px; }
+    .tendencia-title { font-weight:700; color:var(--navy); font-size:.9rem; margin-bottom:16px; }
+    .sparkline { display:flex; align-items:flex-end; gap:6px; height:80px; }
+    .spark-col { display:flex; flex-direction:column; align-items:center; gap:4px; flex:1; }
+    .spark-bar { background:var(--navy); border-radius:4px 4px 0 0; width:100%; min-height:4px; transition:height .5s ease; }
+    .spark-label { font-size:.72rem; color:#9ca3af; text-align:center; white-space:nowrap; }
+    .spark-count { font-size:.72rem; font-weight:700; color:var(--navy); }
+
+    /* Empty state */
+    .empty-state { text-align:center; padding:32px; color:#9ca3af; font-size:.85rem; }
+
+    /* Loading spinner */
+    @keyframes spin { to { transform:rotate(360deg); } }
+    .spin { display:inline-block; animation:spin 1s linear infinite; }
+
+    @media (max-width:1100px) {
+      .kpi-grid { grid-template-columns:repeat(3,1fr); }
+      .charts-row { grid-template-columns:1fr 1fr; }
+    }
+    @media (max-width:700px) {
+      .kpi-grid { grid-template-columns:1fr 1fr; }
+      .charts-row, .two-tables { grid-template-columns:1fr; }
+    }
+  </style>
+</head>
+<body>
+
+<!-- TOPNAV -->
+<nav class="topnav">
+  <div class="topnav-left">
+    <a href="/" class="topnav-brand">
+      <img src="/img/logo.png" alt="AutoFácil">
+      <span class="version-badge" id="versionBadge">v4.6</span>
+    </a>
+    <div class="breadcrumb-nav">
+      <a href="/">Inicio</a><span class="sep">›</span>
+      <a href="/crm">CRM</a><span class="sep">›</span>
+      <span style="color:#fff;font-weight:600"><i class="bi bi-bar-chart-line me-1"></i>Estadísticas CRM</span>
+    </div>
+  </div>
+  <div class="topnav-right">
+    <div class="user-chip">
+      <div class="avatar" id="avatarInicial">?</div>
+      <div>
+        <div style="font-weight:600;line-height:1.3;color:#fff" id="navNombre">—</div>
+        <div class="perfil-badge" id="navPerfil">—</div>
+      </div>
+    </div>
+    <button class="btn-logout" onclick="logout()"><i class="bi bi-box-arrow-right me-1"></i>Salir</button>
+  </div>
+</nav>
+
+<div class="page-content">
+
+  <!-- FILTROS -->
+  <div class="filter-bar">
+    <label>Desde</label>
+    <input type="date" class="form-control" id="fDesde" style="width:145px">
+    <label>Hasta</label>
+    <input type="date" class="form-control" id="fHasta" style="width:145px">
+    <label>Ejecutivo</label>
+    <select class="form-select" id="fUsuario" style="width:200px">
+      <option value="">— Todos —</option>
+    </select>
+    <button class="btn btn-primary btn-sm" onclick="cargarStats()">
+      <i class="bi bi-funnel-fill me-1"></i>Aplicar
+    </button>
+    <button class="btn btn-outline-secondary btn-sm" onclick="limpiarFiltros()">
+      <i class="bi bi-x-circle me-1"></i>Limpiar
+    </button>
+    <span id="loadingSpinner" style="display:none;color:#9ca3af;font-size:.82rem">
+      <i class="bi bi-arrow-repeat spin me-1"></i>Actualizando...
+    </span>
+  </div>
+
+  <!-- KPIs -->
+  <div class="kpi-grid">
+    <div class="kpi-card kpi-blue">
+      <div class="kpi-icon"><i class="bi bi-telephone-fill"></i></div>
+      <div>
+        <div class="kpi-num" id="kpiTotal">—</div>
+        <div class="kpi-label">Total Gestiones</div>
+      </div>
+    </div>
+    <div class="kpi-card kpi-green">
+      <div class="kpi-icon"><i class="bi bi-calendar-check"></i></div>
+      <div>
+        <div class="kpi-num" id="kpiHoy">—</div>
+        <div class="kpi-label">Gestiones Hoy</div>
+      </div>
+    </div>
+    <div class="kpi-card kpi-amber">
+      <div class="kpi-icon"><i class="bi bi-clock-fill"></i></div>
+      <div>
+        <div class="kpi-num" id="kpiPendientes">—</div>
+        <div class="kpi-label">Seguimientos Pendientes</div>
+      </div>
+    </div>
+    <div class="kpi-card kpi-cyan">
+      <div class="kpi-icon"><i class="bi bi-person-plus-fill"></i></div>
+      <div>
+        <div class="kpi-num" id="kpiProspectos">—</div>
+        <div class="kpi-label">Nuevos Prospectos</div>
+      </div>
+    </div>
+    <div class="kpi-card kpi-teal">
+      <div class="kpi-icon"><i class="bi bi-check-circle-fill"></i></div>
+      <div>
+        <div class="kpi-num" id="kpiCerrados">—</div>
+        <div class="kpi-label">Cerrados / Resueltos</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- GRÁFICOS 3 cols -->
+  <div class="charts-row">
+    <!-- Canal -->
+    <div class="chart-card">
+      <div class="chart-header"><i class="bi bi-bar-chart-horizontal me-2" style="color:var(--accent)"></i>Gestiones por Canal</div>
+      <div class="chart-body" id="chartCanal">
+        <div class="empty-state"><i class="bi bi-arrow-repeat spin"></i></div>
+      </div>
+    </div>
+    <!-- Resultado -->
+    <div class="chart-card">
+      <div class="chart-header"><i class="bi bi-bar-chart-horizontal me-2" style="color:#22c55e"></i>Gestiones por Resultado</div>
+      <div class="chart-body" id="chartResultado">
+        <div class="empty-state"><i class="bi bi-arrow-repeat spin"></i></div>
+      </div>
+    </div>
+    <!-- Tipo cliente donut -->
+    <div class="chart-card">
+      <div class="chart-header"><i class="bi bi-pie-chart me-2" style="color:#a855f7"></i>Tipo de Cliente</div>
+      <div class="chart-body" id="chartTipoCliente">
+        <div class="empty-state"><i class="bi bi-arrow-repeat spin"></i></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- TABLA EJECUTIVOS -->
+  <div class="exec-table-wrap">
+    <div class="exec-header"><i class="bi bi-people-fill me-2" style="color:var(--accent)"></i>Rendimiento por Ejecutivo</div>
+    <div style="overflow-x:auto">
+      <table class="exec-tbl">
+        <thead>
+          <tr>
+            <th>Ejecutivo</th>
+            <th>Total</th>
+            <th>Pendientes</th>
+            <th>Cerrados</th>
+            <th>% Resolución</th>
+            <th>Actividad</th>
+          </tr>
+        </thead>
+        <tbody id="tbodyEjecutivos">
+          <tr><td colspan="6" class="empty-state"><i class="bi bi-arrow-repeat spin"></i></td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- DOS TABLAS -->
+  <div class="two-tables">
+    <!-- Top solicitudes -->
+    <div class="small-table-wrap">
+      <div class="small-header"><i class="bi bi-list-ol me-2" style="color:var(--navy)"></i>Top Tipos de Solicitud</div>
+      <table class="small-tbl">
+        <thead><tr><th>#</th><th>Tipo de Solicitud</th><th>Cantidad</th></tr></thead>
+        <tbody id="tbopSolicitudes">
+          <tr><td colspan="3" class="empty-state"><i class="bi bi-arrow-repeat spin"></i></td></tr>
+        </tbody>
+      </table>
+    </div>
+    <!-- Seguimientos hoy -->
+    <div class="small-table-wrap">
+      <div class="small-header"><i class="bi bi-calendar-event me-2" style="color:#d97706"></i>Seguimientos para Hoy</div>
+      <table class="small-tbl">
+        <thead><tr><th>Cliente</th><th>Solicitud</th><th>Ejecutivo</th><th></th></tr></thead>
+        <tbody id="tbopSeguimientos">
+          <tr><td colspan="4" class="empty-state"><i class="bi bi-arrow-repeat spin"></i></td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- TENDENCIA 7 DÍAS -->
+  <div class="tendencia-wrap">
+    <div class="tendencia-title"><i class="bi bi-activity me-2" style="color:var(--accent)"></i>Tendencia — Últimos 7 días</div>
+    <div class="sparkline" id="sparkline">
+      <div class="empty-state" style="flex:1"><i class="bi bi-arrow-repeat spin"></i></div>
+    </div>
+  </div>
+
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+<script>
+// ─── Auth ────────────────────────────────────────────────────────────────────
+const token = localStorage.getItem('token');
+const yo    = JSON.parse(localStorage.getItem('usuario') || 'null');
+if (!token || !yo) location.href = '/login.html';
+document.getElementById('navNombre').textContent   = `${yo?.nombre||''} ${yo?.apellido||''}`.trim();
+document.getElementById('navPerfil').textContent   = yo?.perfil || '';
+document.getElementById('avatarInicial').textContent = (yo?.nombre||'?').charAt(0).toUpperCase();
+function logout() { localStorage.removeItem('token'); localStorage.removeItem('usuario'); location.href='/login.html'; }
+
+// ─── Colores ─────────────────────────────────────────────────────────────────
+const CANAL_COLORS = {
+  LLAMADA_ENTRANTE:'#0141A2', LLAMADA_SALIENTE:'#009AFE',
+  WHATSAPP:'#25D366', EMAIL:'#EA4335', PRESENCIAL:'#F59E0B',
+  WEB:'#8B5CF6', REFERIDO:'#14B8A6', OTRO:'#9CA3AF'
+};
+const TIPO_COLORS = { ACTIVO:'#22c55e', EX_CLIENTE:'#a855f7', PROSPECTO:'#3b82f6' };
+
+// ─── Cargar usuarios para filtro ──────────────────────────────────────────────
+async function cargarUsuariosFiltro() {
+  try {
+    const r = await fetch('/api/usuarios',{headers:{'Authorization':'Bearer '+token}});
+    const d = await r.json();
+    const sel = document.getElementById('fUsuario');
+    (d.data?.rows || d.data || []).forEach(u => {
+      const o = document.createElement('option');
+      o.value = u.id_usuario;
+      o.textContent = `${u.nombre||''} ${u.apellido||''}`.trim();
+      sel.appendChild(o);
+    });
+  } catch(e) {}
+}
+
+// ─── Cargar estadísticas ──────────────────────────────────────────────────────
+async function cargarStats() {
+  const sp = document.getElementById('loadingSpinner');
+  sp.style.display='';
+  const params = new URLSearchParams();
+  const desde = document.getElementById('fDesde').value;
+  const hasta = document.getElementById('fHasta').value;
+  const uid   = document.getElementById('fUsuario').value;
+  if (desde) params.set('desde', desde);
+  if (hasta) params.set('hasta', hasta);
+  if (uid)   params.set('id_usuario', uid);
+
+  try {
+    const r = await fetch('/api/crm/estadisticas?'+params.toString(),{headers:{'Authorization':'Bearer '+token}});
+    const d = await r.json();
+    if (!d.success) { alert('Error: '+d.error); return; }
+    renderStats(d.data);
+  } catch(e) {
+    console.error(e);
+  } finally {
+    sp.style.display='none';
+  }
+}
+
+function renderStats(data) {
+  const { resumen, por_canal, por_tipo_solicitud, por_resultado, por_usuario, por_tipo_cliente, tendencia_7dias, seguimientos_hoy } = data;
+
+  // KPIs
+  document.getElementById('kpiTotal').textContent     = resumen.total;
+  document.getElementById('kpiHoy').textContent       = resumen.hoy;
+  document.getElementById('kpiPendientes').textContent = resumen.pendientes;
+  document.getElementById('kpiProspectos').textContent = resumen.prospectos;
+  document.getElementById('kpiCerrados').textContent  = resumen.cerrados;
+
+  // Gráfico Canal
+  const maxCanal = Math.max(...por_canal.map(c=>c.cantidad), 1);
+  document.getElementById('chartCanal').innerHTML = por_canal.length
+    ? por_canal.map(c=>`
+        <div class="bar-row">
+          <div class="bar-label" title="${c.canal}">${canalLabel(c.canal)}</div>
+          <div class="bar-track">
+            <div class="bar-fill" style="width:${(c.cantidad/maxCanal*100).toFixed(1)}%;background:${CANAL_COLORS[c.canal]||'#9ca3af'}"></div>
+          </div>
+          <div class="bar-count">${c.cantidad}</div>
+        </div>`).join('')
+    : '<div class="empty-state">Sin datos</div>';
+
+  // Gráfico Resultado
+  const maxRes = Math.max(...por_resultado.map(r=>r.cantidad), 1);
+  document.getElementById('chartResultado').innerHTML = por_resultado.length
+    ? por_resultado.map((r,i)=>`
+        <div class="bar-row">
+          <div class="bar-label" title="${r.resultado||'Sin resultado'}">${(r.resultado||'Sin resultado').split(' ').slice(0,2).join(' ')}</div>
+          <div class="bar-track">
+            <div class="bar-fill" style="width:${(r.cantidad/maxRes*100).toFixed(1)}%;background:${RESULT_COLORS[i%RESULT_COLORS.length]}"></div>
+          </div>
+          <div class="bar-count">${r.cantidad}</div>
+        </div>`).join('')
+    : '<div class="empty-state">Sin datos</div>';
+
+  // Gráfico tipo cliente (donut CSS)
+  const totalTc = por_tipo_cliente.reduce((a,c)=>a+Number(c.cantidad),0)||1;
+  document.getElementById('chartTipoCliente').innerHTML = por_tipo_cliente.length
+    ? `<div class="donut-wrap">${por_tipo_cliente.map(c=>`
+        <div class="donut-item">
+          <div class="donut-dot" style="background:${TIPO_COLORS[c.tipo_cliente]||'#9ca3af'}"></div>
+          <div class="donut-label">${tipoClienteLabel(c.tipo_cliente)}</div>
+          <div class="donut-count">${c.cantidad}</div>
+          <div class="donut-pct">(${(c.cantidad/totalTc*100).toFixed(0)}%)</div>
+        </div>
+        <div style="background:#f1f5f9;border-radius:6px;height:8px;margin:-4px 0 4px 22px;overflow:hidden">
+          <div style="height:100%;width:${(c.cantidad/totalTc*100).toFixed(1)}%;background:${TIPO_COLORS[c.tipo_cliente]||'#9ca3af'};border-radius:6px"></div>
+        </div>`).join('')}
+      </div>`
+    : '<div class="empty-state">Sin datos</div>';
+
+  // Tabla ejecutivos
+  const maxTotal = Math.max(...por_usuario.map(u=>Number(u.cantidad)), 1);
+  document.getElementById('tbodyEjecutivos').innerHTML = por_usuario.length
+    ? por_usuario.map(u=>{
+        const pct = u.cantidad>0 ? Math.round(u.cerrados/u.cantidad*100) : 0;
+        const pctClass = pct>=80?'pct-hi':pct>=50?'pct-mid':'pct-lo';
+        return `<tr>
+          <td style="font-weight:600">${u.nombre_usuario||'—'}</td>
+          <td style="font-weight:700;color:var(--navy)">${u.cantidad}</td>
+          <td><span style="color:#d97706;font-weight:600">${u.pendientes}</span></td>
+          <td><span style="color:#16a34a;font-weight:600">${u.cerrados}</span></td>
+          <td><span class="pct-badge ${pctClass}">${pct}%</span></td>
+          <td style="min-width:100px">
+            <div class="mini-bar">
+              <div class="mini-bar-fill" style="width:${(u.cantidad/maxTotal*100).toFixed(1)}%"></div>
+            </div>
+          </td>
+        </tr>`;
+      }).join('')
+    : '<tr><td colspan="6" class="empty-state">Sin datos de ejecutivos</td></tr>';
+
+  // Top solicitudes
+  document.getElementById('tbopSolicitudes').innerHTML = por_tipo_solicitud.length
+    ? por_tipo_solicitud.slice(0,10).map((s,i)=>`<tr>
+        <td style="color:#9ca3af;font-weight:700">${i+1}</td>
+        <td>${s.tipo_solicitud}</td>
+        <td><strong>${s.cantidad}</strong></td>
+      </tr>`).join('')
+    : '<tr><td colspan="3" class="empty-state">Sin datos</td></tr>';
+
+  // Seguimientos hoy
+  document.getElementById('tbopSeguimientos').innerHTML = seguimientos_hoy.length
+    ? seguimientos_hoy.map(s=>`<tr>
+        <td>
+          <div style="font-weight:600;font-size:.8rem">${s.nombre_cliente||'—'}</div>
+          <div style="color:#9ca3af;font-size:.72rem">${s.estado||''}</div>
+        </td>
+        <td style="font-size:.78rem">${s.tipo_solicitud}</td>
+        <td style="font-size:.78rem;color:#374151">${s.nombre_usuario||'—'}</td>
+        <td><a href="/crm/gestiones" class="btn-registrar"><i class="bi bi-plus me-1"></i>Ver</a></td>
+      </tr>`).join('')
+    : '<tr><td colspan="4" class="empty-state">Sin seguimientos para hoy</td></tr>';
+
+  // Sparkline tendencia
+  const maxTend = Math.max(...tendencia_7dias.map(t=>Number(t.cantidad)), 1);
+  document.getElementById('sparkline').innerHTML = tendencia_7dias.length
+    ? tendencia_7dias.map(t=>{
+        const pct = Math.max((t.cantidad/maxTend*100),4).toFixed(0);
+        const fecha = new Date(t.fecha+'T12:00:00').toLocaleDateString('es-CL',{weekday:'short',day:'numeric'});
+        return `<div class="spark-col">
+          <div class="spark-count">${t.cantidad}</div>
+          <div class="spark-bar" style="height:${pct}px;max-height:60px"></div>
+          <div class="spark-label">${fecha}</div>
+        </div>`;
+      }).join('')
+    : '<div class="empty-state" style="flex:1">Sin datos de tendencia</div>';
+}
+
+// ─── Helpers ─────────────────────────────────────────────────────────────────
+const CANAL_LABELS = {
+  LLAMADA_ENTRANTE:'📞 Entrante', LLAMADA_SALIENTE:'📤 Saliente',
+  WHATSAPP:'💬 WhatsApp', EMAIL:'📧 Email', PRESENCIAL:'🏢 Presencial',
+  WEB:'🌐 Web', REFERIDO:'👥 Referido', OTRO:'➕ Otro'
+};
+function canalLabel(c) { return CANAL_LABELS[c]||c; }
+function tipoClienteLabel(t) { return {ACTIVO:'🟢 Activo',EX_CLIENTE:'🟣 Ex-cliente',PROSPECTO:'🔵 Prospecto'}[t]||t; }
+
+const RESULT_COLORS = ['#0141A2','#009AFE','#22c55e','#f59e0b','#a855f7','#14b8a6','#ef4444','#6366f1','#ec4899'];
+
+function limpiarFiltros() {
+  document.getElementById('fDesde').value='';
+  document.getElementById('fHasta').value='';
+  document.getElementById('fUsuario').value='';
+  cargarStats();
+}
+
+// ─── Init ─────────────────────────────────────────────────────────────────────
+cargarUsuariosFiltro();
+cargarStats();
+</script>
+<script src="/js/app-version.js"></script>
+</body>
+</html>

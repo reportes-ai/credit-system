@@ -1,0 +1,904 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Gestiones CRM — AutoFácil</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.0/font/bootstrap-icons.css" rel="stylesheet">
+  <style>
+    :root {
+      --navy:#0141A2; --navy-dark:#012d70; --navy-light:#0255c5;
+      --accent:#009AFE; --bg:#f0f4f8;
+    }
+    * { box-sizing: border-box; }
+    body { background:var(--bg); font-family:'Segoe UI',system-ui,sans-serif; margin:0; min-height:100vh; }
+
+    /* TOPNAV */
+    .topnav { background:linear-gradient(90deg,var(--navy-dark),var(--navy-light)); color:#fff; height:60px; padding:0 24px; display:flex; align-items:center; justify-content:space-between; position:sticky; top:0; z-index:300; box-shadow:0 2px 8px rgba(0,0,0,.3); }
+    .topnav-left { display:flex; align-items:center; gap:16px; }
+    .topnav-brand { display:flex; align-items:center; gap:8px; text-decoration:none; }
+    .topnav-brand img { height:32px; filter:brightness(0) invert(1); }
+    .version-badge { background:rgba(255,255,255,.15); color:rgba(255,255,255,.75); font-size:.65rem; font-weight:700; border-radius:6px; padding:2px 8px; letter-spacing:.5px; }
+    .breadcrumb-nav { color:rgba(255,255,255,.6); font-size:.85rem; display:flex; align-items:center; gap:6px; }
+    .breadcrumb-nav a { color:rgba(255,255,255,.75); text-decoration:none; }
+    .breadcrumb-nav a:hover { color:#fff; }
+    .breadcrumb-nav .sep { color:rgba(255,255,255,.35); }
+    .topnav-right { display:flex; align-items:center; gap:10px; }
+    .user-chip { background:rgba(255,255,255,.12); border-radius:24px; padding:5px 12px; display:flex; align-items:center; gap:8px; font-size:.85rem; }
+    .avatar { width:28px; height:28px; background:#90caf9; border-radius:50%; display:flex; align-items:center; justify-content:center; color:var(--navy); font-weight:700; font-size:.75rem; }
+    .perfil-badge { background:rgba(144,202,249,.2); border:1px solid rgba(144,202,249,.4); color:#90caf9; border-radius:12px; padding:2px 10px; font-size:.73rem; font-weight:600; }
+    .btn-logout { background:rgba(255,255,255,.1); border:1px solid rgba(255,255,255,.2); color:#fff; border-radius:8px; padding:5px 12px; font-size:.82rem; cursor:pointer; }
+    .btn-logout:hover { background:rgba(255,255,255,.2); }
+
+    /* LAYOUT PRINCIPAL */
+    .page-layout {
+      display:grid;
+      grid-template-columns: 380px 1fr;
+      gap:0;
+      height:calc(100vh - 60px);
+      overflow:hidden;
+    }
+
+    /* PANEL IZQUIERDO: FORMULARIO */
+    .form-panel {
+      background:#fff;
+      border-right:1px solid #dee2e6;
+      overflow-y:auto;
+      padding:20px;
+      display:flex;
+      flex-direction:column;
+      gap:0;
+    }
+    .form-panel-title {
+      font-size:1rem; font-weight:700; color:var(--navy);
+      margin-bottom:16px; display:flex; align-items:center; gap:8px;
+      padding-bottom:12px; border-bottom:2px solid var(--bg);
+    }
+    .section-label {
+      font-size:.72rem; font-weight:700; text-transform:uppercase; letter-spacing:.8px;
+      color:#6b7280; margin:12px 0 6px;
+    }
+
+    /* Tipo cliente radio */
+    .tipo-radio-group { display:flex; flex-direction:column; gap:6px; }
+    .tipo-radio-btn { display:flex; align-items:center; gap:10px; padding:8px 12px; border:2px solid #e2e8f0; border-radius:10px; cursor:pointer; transition:all .2s; font-size:.85rem; font-weight:500; color:#374151; }
+    .tipo-radio-btn:hover { border-color:var(--accent); background:#f0f9ff; }
+    .tipo-radio-btn.active-activo { border-color:#22c55e; background:#f0fdf4; color:#166534; }
+    .tipo-radio-btn.active-excliente { border-color:#a855f7; background:#faf5ff; color:#6b21a8; }
+    .tipo-radio-btn.active-prospecto { border-color:#3b82f6; background:#eff6ff; color:#1d4ed8; }
+    .tipo-radio-btn input[type=radio] { display:none; }
+    .tipo-dot { width:10px; height:10px; border-radius:50%; flex-shrink:0; }
+    .dot-activo { background:#22c55e; }
+    .dot-excliente { background:#a855f7; }
+    .dot-prospecto { background:#3b82f6; }
+
+    /* Canal botones */
+    .canal-grid { display:grid; grid-template-columns:repeat(4,1fr); gap:6px; }
+    .canal-btn { border:2px solid #e2e8f0; border-radius:8px; padding:6px 4px; text-align:center; cursor:pointer; font-size:.72rem; font-weight:600; color:#6b7280; transition:all .2s; background:#fff; line-height:1.3; }
+    .canal-btn .canal-icon { font-size:1.1rem; display:block; margin-bottom:2px; }
+    .canal-btn:hover { border-color:var(--accent); color:var(--accent); }
+    .canal-btn.selected { border-color:var(--navy); background:var(--navy); color:#fff; }
+
+    /* Prioridad */
+    .prioridad-group { display:flex; gap:6px; }
+    .prio-btn { flex:1; padding:7px; border:2px solid #e2e8f0; border-radius:8px; text-align:center; cursor:pointer; font-size:.8rem; font-weight:700; transition:all .2s; background:#fff; }
+    .prio-btn[data-p="ALTA"] { color:#dc2626; }
+    .prio-btn[data-p="ALTA"].selected { background:#dc2626; border-color:#dc2626; color:#fff; }
+    .prio-btn[data-p="MEDIA"] { color:#d97706; }
+    .prio-btn[data-p="MEDIA"].selected { background:#d97706; border-color:#d97706; color:#fff; }
+    .prio-btn[data-p="BAJA"] { color:#16a34a; }
+    .prio-btn[data-p="BAJA"].selected { background:#16a34a; border-color:#16a34a; color:#fff; }
+
+    .form-control, .form-select { font-size:.85rem; border-radius:8px; border:1px solid #d1d5db; padding:7px 10px; }
+    .form-control:focus, .form-select:focus { border-color:var(--accent); box-shadow:0 0 0 2px rgba(0,154,254,.15); outline:none; }
+    textarea.form-control { resize:vertical; min-height:70px; }
+
+    .btn-guardar { width:100%; padding:11px; background:var(--navy); color:#fff; border:none; border-radius:10px; font-weight:700; font-size:.95rem; cursor:pointer; margin-top:16px; transition:background .2s; }
+    .btn-guardar:hover { background:var(--navy-light); }
+    .btn-guardar:disabled { background:#9ca3af; cursor:not-allowed; }
+
+    /* Autocomplete RUT */
+    .autocomplete-wrap { position:relative; }
+    .autocomplete-dropdown { position:absolute; z-index:500; background:#fff; border:1px solid #d1d5db; border-radius:8px; box-shadow:0 4px 16px rgba(0,0,0,.12); width:100%; max-height:180px; overflow-y:auto; display:none; }
+    .autocomplete-item { padding:8px 12px; cursor:pointer; font-size:.83rem; border-bottom:1px solid #f1f5f9; }
+    .autocomplete-item:last-child { border-bottom:none; }
+    .autocomplete-item:hover { background:#eff6ff; }
+    .autocomplete-item .rut { color:#6b7280; font-size:.75rem; }
+
+    /* PANEL DERECHO */
+    .list-panel { overflow-y:auto; padding:20px; display:flex; flex-direction:column; gap:16px; }
+
+    .filter-bar { background:#fff; border-radius:12px; padding:14px 16px; box-shadow:0 1px 4px rgba(0,0,0,.06); display:flex; flex-wrap:wrap; gap:10px; align-items:center; }
+    .filter-bar .form-control, .filter-bar .form-select { font-size:.82rem; padding:6px 10px; }
+    .chip-filters { display:flex; gap:8px; flex-wrap:wrap; }
+    .chip-btn { border:1.5px solid #d1d5db; background:#fff; border-radius:20px; padding:4px 14px; font-size:.78rem; font-weight:600; color:#6b7280; cursor:pointer; transition:all .2s; }
+    .chip-btn:hover { border-color:var(--navy); color:var(--navy); }
+    .chip-btn.active { background:var(--navy); border-color:var(--navy); color:#fff; }
+
+    /* Tabla gestiones */
+    .gestiones-table-wrap { background:#fff; border-radius:12px; box-shadow:0 1px 4px rgba(0,0,0,.06); overflow:hidden; }
+    .gestiones-header { padding:14px 18px; border-bottom:1px solid #f1f5f9; display:flex; justify-content:space-between; align-items:center; }
+    .gestiones-count { font-size:.82rem; color:#6b7280; }
+    table.gestiones-tbl { width:100%; border-collapse:collapse; font-size:.82rem; }
+    table.gestiones-tbl th { background:#f8fafc; padding:10px 12px; text-align:left; font-weight:700; color:#374151; font-size:.75rem; text-transform:uppercase; letter-spacing:.5px; border-bottom:1px solid #e2e8f0; white-space:nowrap; }
+    table.gestiones-tbl td { padding:10px 12px; border-bottom:1px solid #f1f5f9; vertical-align:middle; }
+    table.gestiones-tbl tr:last-child td { border-bottom:none; }
+    table.gestiones-tbl tr:hover td { background:#f8fafc; }
+
+    .badge-resultado { border-radius:12px; padding:3px 10px; font-size:.72rem; font-weight:600; display:inline-block; }
+    .badge-canal { border-radius:8px; padding:3px 8px; font-size:.72rem; font-weight:600; display:inline-flex; align-items:center; gap:4px; }
+
+    .badge-ABIERTO  { background:#dbeafe; color:#1d4ed8; }
+    .badge-CERRADO  { background:#dcfce7; color:#166534; }
+    .badge-PENDIENTE { background:#fef9c3; color:#854d0e; }
+
+    .badge-prio-ALTA  { background:#fee2e2; color:#dc2626; }
+    .badge-prio-MEDIA { background:#fef3c7; color:#d97706; }
+    .badge-prio-BAJA  { background:#d1fae5; color:#059669; }
+
+    .btn-ver { background:var(--accent); color:#fff; border:none; border-radius:6px; padding:4px 10px; font-size:.75rem; cursor:pointer; white-space:nowrap; }
+    .btn-ver:hover { background:#007dce; }
+
+    /* Paginación */
+    .paginacion { display:flex; justify-content:center; gap:6px; padding:16px; }
+    .pag-btn { border:1px solid #d1d5db; background:#fff; border-radius:8px; padding:5px 12px; font-size:.82rem; cursor:pointer; color:#374151; }
+    .pag-btn:hover { background:#eff6ff; border-color:var(--accent); }
+    .pag-btn.active { background:var(--navy); border-color:var(--navy); color:#fff; }
+    .pag-btn:disabled { opacity:.4; cursor:not-allowed; }
+
+    /* DRAWER / MODAL DETALLE */
+    .drawer-overlay { position:fixed; inset:0; background:rgba(0,0,0,.4); z-index:1000; display:none; }
+    .drawer-overlay.open { display:block; }
+    .drawer { position:fixed; right:0; top:0; height:100vh; width:540px; background:#fff; z-index:1001; box-shadow:-4px 0 24px rgba(0,0,0,.15); transform:translateX(100%); transition:transform .3s ease; overflow-y:auto; }
+    .drawer.open { transform:translateX(0); }
+    .drawer-header { background:var(--navy); color:#fff; padding:16px 20px; display:flex; align-items:center; justify-content:space-between; position:sticky; top:0; }
+    .drawer-title { font-weight:700; font-size:1rem; }
+    .drawer-close { background:rgba(255,255,255,.15); border:none; color:#fff; border-radius:8px; padding:5px 10px; cursor:pointer; font-size:1rem; }
+    .drawer-body { padding:20px; }
+    .detail-section { margin-bottom:20px; }
+    .detail-section h6 { font-size:.75rem; font-weight:700; text-transform:uppercase; letter-spacing:.6px; color:#6b7280; margin-bottom:10px; }
+    .detail-grid { display:grid; grid-template-columns:1fr 1fr; gap:10px; }
+    .detail-item label { font-size:.72rem; color:#9ca3af; display:block; margin-bottom:2px; }
+    .detail-item p { font-size:.88rem; color:#1e293b; font-weight:500; margin:0; }
+    .historial-item { background:#f8fafc; border-radius:8px; padding:10px 12px; margin-bottom:8px; font-size:.82rem; border-left:3px solid var(--accent); }
+    .historial-item .h-fecha { font-size:.72rem; color:#9ca3af; }
+
+    /* Loading state */
+    .loading-row td { text-align:center; padding:32px; color:#9ca3af; }
+
+    @media (max-width:900px) {
+      .page-layout { grid-template-columns:1fr; height:auto; }
+      .form-panel { border-right:none; border-bottom:1px solid #dee2e6; }
+      .drawer { width:100%; }
+    }
+  </style>
+</head>
+<body>
+
+<!-- TOPNAV -->
+<nav class="topnav">
+  <div class="topnav-left">
+    <a href="/" class="topnav-brand">
+      <img src="/img/logo.png" alt="AutoFácil">
+      <span class="version-badge" id="versionBadge">v4.6</span>
+    </a>
+    <div class="breadcrumb-nav">
+      <a href="/">Inicio</a><span class="sep">›</span>
+      <a href="/crm">CRM</a><span class="sep">›</span>
+      <span style="color:#fff;font-weight:600"><i class="bi bi-telephone-fill me-1"></i>Gestiones de Contacto</span>
+    </div>
+  </div>
+  <div class="topnav-right">
+    <div class="user-chip">
+      <div class="avatar" id="avatarInicial">?</div>
+      <div>
+        <div style="font-weight:600;line-height:1.3;color:#fff" id="navNombre">—</div>
+        <div class="perfil-badge" id="navPerfil">—</div>
+      </div>
+    </div>
+    <button class="btn-logout" onclick="logout()"><i class="bi bi-box-arrow-right me-1"></i>Salir</button>
+  </div>
+</nav>
+
+<!-- LAYOUT PRINCIPAL -->
+<div class="page-layout">
+
+  <!-- PANEL IZQUIERDO: FORMULARIO NUEVA GESTIÓN -->
+  <div class="form-panel">
+    <div class="form-panel-title">
+      <i class="bi bi-plus-circle-fill" style="color:var(--accent)"></i>
+      Nueva Gestión
+    </div>
+
+    <!-- 1. Tipo de cliente -->
+    <div class="section-label">1. Tipo de cliente</div>
+    <div class="tipo-radio-group">
+      <label class="tipo-radio-btn active-activo" id="lbl-ACTIVO" onclick="setTipoCliente('ACTIVO')">
+        <input type="radio" name="tipo_cliente" value="ACTIVO" checked>
+        <span class="tipo-dot dot-activo"></span>
+        Activo — tiene crédito vigente
+      </label>
+      <label class="tipo-radio-btn" id="lbl-EX_CLIENTE" onclick="setTipoCliente('EX_CLIENTE')">
+        <input type="radio" name="tipo_cliente" value="EX_CLIENTE">
+        <span class="tipo-dot dot-excliente"></span>
+        Ex-cliente — crédito terminado
+      </label>
+      <label class="tipo-radio-btn" id="lbl-PROSPECTO" onclick="setTipoCliente('PROSPECTO')">
+        <input type="radio" name="tipo_cliente" value="PROSPECTO">
+        <span class="tipo-dot dot-prospecto"></span>
+        Prospecto — cliente nuevo / lead
+      </label>
+    </div>
+
+    <!-- Campos según tipo -->
+    <div id="campos-rut">
+      <div class="section-label" style="margin-top:10px">Buscar cliente por RUT</div>
+      <div class="autocomplete-wrap">
+        <input type="text" class="form-control" id="inputBuscarRut" placeholder="Ej: 12.345.678-9" autocomplete="off" oninput="buscarCliente(this.value)">
+        <div class="autocomplete-dropdown" id="autocompleteList"></div>
+      </div>
+      <div id="clienteSeleccionado" style="display:none;margin-top:8px;background:#f0fdf4;border:1px solid #bbf7d0;border-radius:8px;padding:10px;font-size:.83rem;">
+        <strong id="cs-nombre"></strong><br>
+        <span style="color:#6b7280" id="cs-rut"></span>
+        <button onclick="limpiarCliente()" style="float:right;border:none;background:none;color:#dc2626;cursor:pointer;font-size:.75rem;">✕ Quitar</button>
+      </div>
+      <input type="hidden" id="hRutCliente">
+      <input type="hidden" id="hNombreCliente">
+      <input type="hidden" id="hIdCredito">
+    </div>
+
+    <div id="campos-prospecto" style="display:none">
+      <div class="section-label" style="margin-top:10px">Datos del prospecto</div>
+      <input type="text" class="form-control mb-2" id="pNombre" placeholder="Nombre completo *">
+      <input type="text" class="form-control mb-2" id="pTelefono" placeholder="Teléfono">
+      <input type="email" class="form-control" id="pEmail" placeholder="Email">
+    </div>
+
+    <!-- 2. Canal -->
+    <div class="section-label">2. Canal de contacto</div>
+    <div class="canal-grid" id="canalGrid">
+      <div class="canal-btn" data-canal="LLAMADA_ENTRANTE" onclick="setCanal(this)">
+        <span class="canal-icon">📞</span>Entrante
+      </div>
+      <div class="canal-btn" data-canal="LLAMADA_SALIENTE" onclick="setCanal(this)">
+        <span class="canal-icon">📤</span>Saliente
+      </div>
+      <div class="canal-btn" data-canal="WHATSAPP" onclick="setCanal(this)">
+        <span class="canal-icon">💬</span>WhatsApp
+      </div>
+      <div class="canal-btn" data-canal="EMAIL" onclick="setCanal(this)">
+        <span class="canal-icon">📧</span>Email
+      </div>
+      <div class="canal-btn" data-canal="PRESENCIAL" onclick="setCanal(this)">
+        <span class="canal-icon">🏢</span>Presencial
+      </div>
+      <div class="canal-btn" data-canal="WEB" onclick="setCanal(this)">
+        <span class="canal-icon">🌐</span>Web
+      </div>
+      <div class="canal-btn" data-canal="REFERIDO" onclick="setCanal(this)">
+        <span class="canal-icon">👥</span>Referido
+      </div>
+      <div class="canal-btn" data-canal="OTRO" onclick="setCanal(this)">
+        <span class="canal-icon">➕</span>Otro
+      </div>
+    </div>
+    <input type="hidden" id="hCanal">
+
+    <!-- 3. Tipo de solicitud -->
+    <div class="section-label">3. Tipo de solicitud</div>
+    <select class="form-select" id="selectTipoSolicitud">
+      <option value="">— Seleccione tipo de cliente primero —</option>
+    </select>
+
+    <!-- 4. Resultado -->
+    <div class="section-label">4. Resultado</div>
+    <select class="form-select" id="selectResultado">
+      <option value="">— Sin resultado aún —</option>
+      <option value="Interesado - continúa proceso">Interesado - continúa proceso</option>
+      <option value="No interesado">No interesado</option>
+      <option value="Sin respuesta / No contesta">Sin respuesta / No contesta</option>
+      <option value="Reagendado">Reagendado</option>
+      <option value="Resuelto / Cerrado">Resuelto / Cerrado</option>
+      <option value="Derivado a ejecutivo">Derivado a ejecutivo</option>
+      <option value="Pendiente documentación">Pendiente documentación</option>
+      <option value="En evaluación">En evaluación</option>
+      <option value="Convertido (lead→cliente)">Convertido (lead→cliente)</option>
+    </select>
+
+    <!-- 5. Descripción -->
+    <div class="section-label">5. Descripción / Notas</div>
+    <textarea class="form-control" id="txtDescripcion" placeholder="Detalles de la gestión..."></textarea>
+
+    <!-- 6. Seguimiento -->
+    <div class="section-label">6. Seguimiento</div>
+    <textarea class="form-control mb-2" id="txtAccionSiguiente" placeholder="Acción siguiente..." style="min-height:55px"></textarea>
+    <input type="date" class="form-control" id="inputFechaSeguimiento">
+
+    <!-- 7. Prioridad -->
+    <div class="section-label">7. Prioridad</div>
+    <div class="prioridad-group">
+      <div class="prio-btn" data-p="ALTA" onclick="setPrioridad('ALTA')">🔴 Alta</div>
+      <div class="prio-btn selected" data-p="MEDIA" onclick="setPrioridad('MEDIA')">🟡 Media</div>
+      <div class="prio-btn" data-p="BAJA" onclick="setPrioridad('BAJA')">🟢 Baja</div>
+    </div>
+    <input type="hidden" id="hPrioridad" value="MEDIA">
+
+    <!-- 8. Campaña -->
+    <div class="section-label">8. Campaña (opcional)</div>
+    <select class="form-select" id="selectCampana">
+      <option value="">— Sin campaña —</option>
+    </select>
+
+    <button class="btn-guardar" id="btnGuardar" onclick="guardarGestion()">
+      <i class="bi bi-check-circle me-2"></i>Registrar Gestión
+    </button>
+    <div id="formMsg" style="margin-top:8px;font-size:.82rem;text-align:center"></div>
+  </div>
+
+  <!-- PANEL DERECHO: LISTA DE GESTIONES -->
+  <div class="list-panel">
+
+    <!-- Filtros -->
+    <div class="filter-bar">
+      <input type="text" class="form-control" id="fq" placeholder="🔍 Buscar cliente o RUT..." style="width:180px" oninput="debounceFiltrar()">
+      <select class="form-select" id="fcanal" style="width:140px" onchange="filtrar()">
+        <option value="">Todos los canales</option>
+        <option value="LLAMADA_ENTRANTE">📞 Entrante</option>
+        <option value="LLAMADA_SALIENTE">📤 Saliente</option>
+        <option value="WHATSAPP">💬 WhatsApp</option>
+        <option value="EMAIL">📧 Email</option>
+        <option value="PRESENCIAL">🏢 Presencial</option>
+        <option value="WEB">🌐 Web</option>
+        <option value="REFERIDO">👥 Referido</option>
+        <option value="OTRO">➕ Otro</option>
+      </select>
+      <select class="form-select" id="ftipo" style="width:130px" onchange="filtrar()">
+        <option value="">Todos los tipos</option>
+        <option value="ACTIVO">Activo</option>
+        <option value="EX_CLIENTE">Ex-cliente</option>
+        <option value="PROSPECTO">Prospecto</option>
+      </select>
+      <select class="form-select" id="festado" style="width:120px" onchange="filtrar()">
+        <option value="">Todos los estados</option>
+        <option value="ABIERTO">Abierto</option>
+        <option value="PENDIENTE">Pendiente</option>
+        <option value="CERRADO">Cerrado</option>
+      </select>
+      <input type="date" class="form-control" id="fdesde" style="width:135px" onchange="filtrar()">
+      <input type="date" class="form-control" id="fhasta" style="width:135px" onchange="filtrar()">
+      <button class="btn btn-outline-secondary btn-sm" onclick="limpiarFiltros()"><i class="bi bi-x-circle me-1"></i>Limpiar</button>
+    </div>
+
+    <!-- Chips rápidos -->
+    <div class="chip-filters">
+      <button class="chip-btn" id="chip-hoy" onclick="chipHoy()">📅 Hoy</button>
+      <button class="chip-btn" id="chip-semana" onclick="chipSemana()">📆 Esta semana</button>
+      <button class="chip-btn" id="chip-pendientes" onclick="chipPendientes()">⏰ Pendientes</button>
+      <button class="chip-btn" id="chip-mis" onclick="chipMis()">👤 Mis gestiones</button>
+    </div>
+
+    <!-- Tabla -->
+    <div class="gestiones-table-wrap">
+      <div class="gestiones-header">
+        <span style="font-weight:700;color:var(--navy)"><i class="bi bi-list-ul me-2"></i>Historial de Gestiones</span>
+        <span class="gestiones-count" id="conteoGestiones">Cargando...</span>
+      </div>
+      <div style="overflow-x:auto">
+        <table class="gestiones-tbl">
+          <thead>
+            <tr>
+              <th>Fecha/Hora</th>
+              <th>Canal</th>
+              <th>Cliente</th>
+              <th>Solicitud</th>
+              <th>Resultado</th>
+              <th>Prio</th>
+              <th>Ejecutivo</th>
+              <th>Estado</th>
+              <th></th>
+            </tr>
+          </thead>
+          <tbody id="tbodyGestiones">
+            <tr class="loading-row"><td colspan="9"><i class="bi bi-arrow-repeat spin me-2"></i>Cargando gestiones...</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <div class="paginacion" id="paginacion"></div>
+    </div>
+  </div>
+</div>
+
+<!-- DRAWER DETALLE -->
+<div class="drawer-overlay" id="drawerOverlay" onclick="cerrarDrawer()"></div>
+<div class="drawer" id="drawerDetalle">
+  <div class="drawer-header">
+    <span class="drawer-title"><i class="bi bi-telephone-fill me-2"></i>Detalle de Gestión</span>
+    <button class="drawer-close" onclick="cerrarDrawer()"><i class="bi bi-x-lg"></i></button>
+  </div>
+  <div class="drawer-body" id="drawerBody">
+    <div style="text-align:center;color:#9ca3af;padding:40px">Cargando...</div>
+  </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+<script>
+// ─── Auth ────────────────────────────────────────────────────────────────────
+const token = localStorage.getItem('token');
+const yo    = JSON.parse(localStorage.getItem('usuario') || 'null');
+if (!token || !yo) location.href = '/login.html';
+
+document.getElementById('navNombre').textContent   = `${yo?.nombre||''} ${yo?.apellido||''}`.trim();
+document.getElementById('navPerfil').textContent   = yo?.perfil || '';
+document.getElementById('avatarInicial').textContent = (yo?.nombre||'?').charAt(0).toUpperCase();
+function logout() { localStorage.removeItem('token'); localStorage.removeItem('usuario'); location.href='/login.html'; }
+
+// ─── Estado del formulario ────────────────────────────────────────────────────
+let tipoCliente = 'ACTIVO';
+let canalSeleccionado = '';
+let prioridadSeleccionada = 'MEDIA';
+let paginaActual = 1;
+let chipActivo = null;
+let debounceTimer = null;
+
+const SOLICITUDES = {
+  ACTIVO: [
+    'Consulta cuota/saldo','Prepago parcial','Prepago total','Refinanciamiento',
+    'Solicitud de prórroga','Certificado de deuda','Estado de cuenta',
+    'Renegociación de cuotas','Cambio datos personales','Queja o reclamo',
+    'Consulta mora/cobranza','Seguro vehículo','Recuperación de vehículo','Otra consulta'
+  ],
+  EX_CLIENTE: [
+    'Solicitud nuevo crédito','Certificado pago total','Documentos del vehículo',
+    'Consulta historial','Información de productos','Otra consulta'
+  ],
+  PROSPECTO: [
+    'Cotización de crédito','Información de productos/tasas','Seguimiento de lead',
+    'Referido de cliente','Lead campaña digital','Lead redes sociales',
+    'Lead formulario web','Consulta general','Otra'
+  ]
+};
+
+const CANAL_LABELS = {
+  LLAMADA_ENTRANTE:'📞 Entrante', LLAMADA_SALIENTE:'📤 Saliente',
+  WHATSAPP:'💬 WhatsApp', EMAIL:'📧 Email', PRESENCIAL:'🏢 Presencial',
+  WEB:'🌐 Web', REFERIDO:'👥 Referido', OTRO:'➕ Otro'
+};
+
+// ─── Tipo cliente ─────────────────────────────────────────────────────────────
+function setTipoCliente(tipo) {
+  tipoCliente = tipo;
+  ['ACTIVO','EX_CLIENTE','PROSPECTO'].forEach(t => {
+    const lbl = document.getElementById('lbl-'+t);
+    lbl.className = 'tipo-radio-btn' + (t === tipo ? ' active-'+t.toLowerCase().replace('_','') : '');
+    lbl.querySelector('input').checked = (t === tipo);
+  });
+  document.getElementById('lbl-ACTIVO').className = 'tipo-radio-btn' + (tipo==='ACTIVO' ? ' active-activo' : '');
+  document.getElementById('lbl-EX_CLIENTE').className = 'tipo-radio-btn' + (tipo==='EX_CLIENTE' ? ' active-excliente' : '');
+  document.getElementById('lbl-PROSPECTO').className = 'tipo-radio-btn' + (tipo==='PROSPECTO' ? ' active-prospecto' : '');
+
+  const mostrarRut = tipo !== 'PROSPECTO';
+  document.getElementById('campos-rut').style.display = mostrarRut ? '' : 'none';
+  document.getElementById('campos-prospecto').style.display = mostrarRut ? 'none' : '';
+
+  // Actualizar select solicitudes
+  const sel = document.getElementById('selectTipoSolicitud');
+  sel.innerHTML = '<option value="">— Seleccione tipo de solicitud —</option>';
+  SOLICITUDES[tipo].forEach(s => {
+    const o = document.createElement('option'); o.value = s; o.textContent = s;
+    sel.appendChild(o);
+  });
+}
+
+// ─── Canal ────────────────────────────────────────────────────────────────────
+function setCanal(el) {
+  document.querySelectorAll('.canal-btn').forEach(b => b.classList.remove('selected'));
+  el.classList.add('selected');
+  canalSeleccionado = el.dataset.canal;
+  document.getElementById('hCanal').value = canalSeleccionado;
+}
+
+// ─── Prioridad ────────────────────────────────────────────────────────────────
+function setPrioridad(p) {
+  prioridadSeleccionada = p;
+  document.querySelectorAll('.prio-btn').forEach(b => {
+    b.classList.toggle('selected', b.dataset.p === p);
+  });
+  document.getElementById('hPrioridad').value = p;
+}
+
+// ─── Autocomplete RUT ─────────────────────────────────────────────────────────
+let abortController = null;
+async function buscarCliente(q) {
+  if (q.length < 2) { document.getElementById('autocompleteList').style.display='none'; return; }
+  if (abortController) abortController.abort();
+  abortController = new AbortController();
+  try {
+    const r = await fetch(`/api/clientes?q=${encodeURIComponent(q)}&limit=8`, {
+      headers:{'Authorization':'Bearer '+token}, signal:abortController.signal
+    });
+    const d = await r.json();
+    const list = document.getElementById('autocompleteList');
+    const clientes = d.data?.rows || d.data || [];
+    if (!clientes.length) { list.style.display='none'; return; }
+    list.innerHTML = clientes.map(c => `
+      <div class="autocomplete-item" onclick="seleccionarCliente(${JSON.stringify(c).replace(/"/g,'&quot;')})">
+        <strong>${c.nombre||''} ${c.apellido||''}</strong>
+        <div class="rut">${c.rut_cliente||c.rut||''}</div>
+      </div>`).join('');
+    list.style.display='block';
+  } catch(e) { if(e.name!=='AbortError') console.error(e); }
+}
+
+function seleccionarCliente(c) {
+  document.getElementById('hRutCliente').value = c.rut_cliente||c.rut||'';
+  document.getElementById('hNombreCliente').value = `${c.nombre||''} ${c.apellido||''}`.trim();
+  document.getElementById('hIdCredito').value = c.id_credito||'';
+  document.getElementById('inputBuscarRut').value = '';
+  document.getElementById('autocompleteList').style.display='none';
+  const box = document.getElementById('clienteSeleccionado');
+  document.getElementById('cs-nombre').textContent = `${c.nombre||''} ${c.apellido||''}`.trim();
+  document.getElementById('cs-rut').textContent = c.rut_cliente||c.rut||'';
+  box.style.display='';
+}
+
+function limpiarCliente() {
+  document.getElementById('hRutCliente').value='';
+  document.getElementById('hNombreCliente').value='';
+  document.getElementById('hIdCredito').value='';
+  document.getElementById('clienteSeleccionado').style.display='none';
+  document.getElementById('inputBuscarRut').value='';
+}
+
+// Cerrar autocomplete al hacer clic fuera
+document.addEventListener('click', e => {
+  if (!e.target.closest('.autocomplete-wrap')) {
+    document.getElementById('autocompleteList').style.display='none';
+  }
+});
+
+// ─── Guardar Gestión ──────────────────────────────────────────────────────────
+async function guardarGestion() {
+  const btn = document.getElementById('btnGuardar');
+  const msg = document.getElementById('formMsg');
+  msg.textContent='';
+
+  if (!canalSeleccionado) { msg.innerHTML='<span style="color:#dc2626">Seleccione un canal de contacto</span>'; return; }
+  const tipo_solicitud = document.getElementById('selectTipoSolicitud').value;
+  if (!tipo_solicitud) { msg.innerHTML='<span style="color:#dc2626">Seleccione el tipo de solicitud</span>'; return; }
+
+  let rut_cliente='', nombre_cliente='', telefono='', email='';
+  if (tipoCliente === 'PROSPECTO') {
+    nombre_cliente = document.getElementById('pNombre').value.trim();
+    if (!nombre_cliente) { msg.innerHTML='<span style="color:#dc2626">Ingrese el nombre del prospecto</span>'; return; }
+    telefono = document.getElementById('pTelefono').value.trim();
+    email    = document.getElementById('pEmail').value.trim();
+  } else {
+    rut_cliente    = document.getElementById('hRutCliente').value;
+    nombre_cliente = document.getElementById('hNombreCliente').value;
+  }
+
+  const campanaEl = document.getElementById('selectCampana');
+  const id_campana = campanaEl.value ? Number(campanaEl.value) : null;
+  const nombre_campana = id_campana ? campanaEl.options[campanaEl.selectedIndex].text : null;
+
+  btn.disabled=true; btn.innerHTML='<i class="bi bi-hourglass-split me-2"></i>Guardando...';
+  try {
+    const r = await fetch('/api/crm', {
+      method:'POST',
+      headers:{'Content-Type':'application/json','Authorization':'Bearer '+token},
+      body: JSON.stringify({
+        tipo_cliente: tipoCliente,
+        canal: canalSeleccionado,
+        tipo_solicitud,
+        rut_cliente, nombre_cliente, telefono, email,
+        id_credito: document.getElementById('hIdCredito').value || null,
+        resultado: document.getElementById('selectResultado').value || null,
+        descripcion: document.getElementById('txtDescripcion').value.trim() || null,
+        accion_siguiente: document.getElementById('txtAccionSiguiente').value.trim() || null,
+        fecha_seguimiento: document.getElementById('inputFechaSeguimiento').value || null,
+        prioridad: prioridadSeleccionada,
+        id_campana, nombre_campana,
+        estado: 'ABIERTO'
+      })
+    });
+    const d = await r.json();
+    if (d.success) {
+      msg.innerHTML='<span style="color:#16a34a"><i class="bi bi-check-circle me-1"></i>Gestión registrada exitosamente</span>';
+      resetForm();
+      cargarGestiones();
+    } else {
+      msg.innerHTML=`<span style="color:#dc2626">${d.error||'Error al guardar'}</span>`;
+    }
+  } catch(e) {
+    msg.innerHTML=`<span style="color:#dc2626">Error de red: ${e.message}</span>`;
+  } finally {
+    btn.disabled=false; btn.innerHTML='<i class="bi bi-check-circle me-2"></i>Registrar Gestión';
+  }
+}
+
+function resetForm() {
+  setTipoCliente('ACTIVO');
+  document.querySelectorAll('.canal-btn').forEach(b=>b.classList.remove('selected'));
+  canalSeleccionado='';
+  document.getElementById('hCanal').value='';
+  document.getElementById('selectTipoSolicitud').value='';
+  document.getElementById('selectResultado').value='';
+  document.getElementById('txtDescripcion').value='';
+  document.getElementById('txtAccionSiguiente').value='';
+  document.getElementById('inputFechaSeguimiento').value='';
+  setPrioridad('MEDIA');
+  document.getElementById('selectCampana').value='';
+  limpiarCliente();
+  document.getElementById('pNombre').value='';
+  document.getElementById('pTelefono').value='';
+  document.getElementById('pEmail').value='';
+}
+
+// ─── Cargar campañas ──────────────────────────────────────────────────────────
+async function cargarCampanas() {
+  try {
+    const r = await fetch('/api/crm/campanas',{headers:{'Authorization':'Bearer '+token}});
+    const d = await r.json();
+    const sel = document.getElementById('selectCampana');
+    (d.data||[]).forEach(c=>{
+      const o=document.createElement('option'); o.value=c.id_campana; o.textContent=c.nombre;
+      sel.appendChild(o);
+    });
+  } catch(e) {}
+}
+
+// ─── Cargar gestiones ─────────────────────────────────────────────────────────
+async function cargarGestiones(page=1) {
+  paginaActual = page;
+  const params = new URLSearchParams({ page, limit:30 });
+  const q   = document.getElementById('fq').value.trim();
+  const can = document.getElementById('fcanal').value;
+  const tip = document.getElementById('ftipo').value;
+  const est = document.getElementById('festado').value;
+  const des = document.getElementById('fdesde').value;
+  const has = document.getElementById('fhasta').value;
+  if (q)   params.set('q', q);
+  if (can) params.set('canal', can);
+  if (tip) params.set('tipo_cliente', tip);
+  if (est) params.set('estado', est);
+  if (des) params.set('desde', des);
+  if (has) params.set('hasta', has);
+
+  // chip mis gestiones
+  if (chipActivo==='mis') params.set('id_usuario', yo.id_usuario);
+
+  const tbody = document.getElementById('tbodyGestiones');
+  tbody.innerHTML = '<tr class="loading-row"><td colspan="9"><i class="bi bi-arrow-repeat me-2"></i>Cargando...</td></tr>';
+
+  try {
+    const r = await fetch('/api/crm?'+params.toString(),{headers:{'Authorization':'Bearer '+token}});
+    const d = await r.json();
+    if (!d.success) { tbody.innerHTML=`<tr class="loading-row"><td colspan="9">Error: ${d.error}</td></tr>`; return; }
+    const { rows=[], total=0, pages=1 } = d.data;
+    document.getElementById('conteoGestiones').textContent = `${total} gestión${total!==1?'es':''}`;
+    if (!rows.length) {
+      tbody.innerHTML='<tr class="loading-row"><td colspan="9" style="color:#9ca3af"><i class="bi bi-inbox me-2"></i>Sin gestiones con estos filtros</td></tr>';
+    } else {
+      tbody.innerHTML = rows.map(g=>renderFila(g)).join('');
+    }
+    renderPaginacion(pages, page);
+  } catch(e) {
+    tbody.innerHTML=`<tr class="loading-row"><td colspan="9">Error de red: ${e.message}</td></tr>`;
+  }
+}
+
+function renderFila(g) {
+  const fecha = new Date(g.created_at).toLocaleString('es-CL',{timeZone:'America/Santiago',day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit'});
+  const canal = CANAL_LABELS[g.canal]||g.canal;
+  const badgeEstado = `<span class="badge-resultado badge-${g.estado}">${g.estado}</span>`;
+  const badgePrio = `<span class="badge-resultado badge-prio-${g.prioridad}">${g.prioridad}</span>`;
+  const resultado = g.resultado ? `<span class="badge-canal" style="background:#f3f4f6;color:#374151">${g.resultado}</span>` : '<span style="color:#9ca3af;font-size:.75rem">—</span>';
+  return `<tr>
+    <td style="white-space:nowrap;color:#6b7280;font-size:.78rem">${fecha}</td>
+    <td><span style="font-size:.82rem">${canal}</span></td>
+    <td>
+      <div style="font-weight:600;font-size:.83rem">${g.nombre_cliente||'—'}</div>
+      <div style="color:#9ca3af;font-size:.72rem">${g.rut_cliente||''}</div>
+    </td>
+    <td style="max-width:160px;font-size:.8rem">${g.tipo_solicitud}</td>
+    <td>${resultado}</td>
+    <td>${badgePrio}</td>
+    <td style="font-size:.8rem;color:#374151">${g.nombre_usuario||'—'}</td>
+    <td>${badgeEstado}</td>
+    <td><button class="btn-ver" onclick="verDetalle(${g.id_gestion})"><i class="bi bi-eye me-1"></i>Ver</button></td>
+  </tr>`;
+}
+
+function renderPaginacion(pages, current) {
+  const el = document.getElementById('paginacion');
+  if (pages<=1) { el.innerHTML=''; return; }
+  let html='';
+  html+=`<button class="pag-btn" onclick="cargarGestiones(${current-1})" ${current<=1?'disabled':''}>‹</button>`;
+  for(let p=Math.max(1,current-2);p<=Math.min(pages,current+2);p++) {
+    html+=`<button class="pag-btn ${p===current?'active':''}" onclick="cargarGestiones(${p})">${p}</button>`;
+  }
+  html+=`<button class="pag-btn" onclick="cargarGestiones(${current+1})" ${current>=pages?'disabled':''}>›</button>`;
+  el.innerHTML=html;
+}
+
+// ─── Filtros / Chips ──────────────────────────────────────────────────────────
+function filtrar() { paginaActual=1; cargarGestiones(1); }
+function debounceFiltrar() { clearTimeout(debounceTimer); debounceTimer=setTimeout(()=>filtrar(),400); }
+
+function limpiarFiltros() {
+  document.getElementById('fq').value='';
+  document.getElementById('fcanal').value='';
+  document.getElementById('ftipo').value='';
+  document.getElementById('festado').value='';
+  document.getElementById('fdesde').value='';
+  document.getElementById('fhasta').value='';
+  chipActivo=null;
+  document.querySelectorAll('.chip-btn').forEach(c=>c.classList.remove('active'));
+  filtrar();
+}
+
+function activarChip(id) {
+  document.querySelectorAll('.chip-btn').forEach(c=>c.classList.remove('active'));
+  if(chipActivo===id) { chipActivo=null; } else {
+    chipActivo=id;
+    document.getElementById('chip-'+id).classList.add('active');
+  }
+}
+
+function chipHoy() {
+  activarChip('hoy');
+  const h = new Date().toLocaleDateString('sv-SE',{timeZone:'America/Santiago'});
+  document.getElementById('fdesde').value = chipActivo ? h : '';
+  document.getElementById('fhasta').value = chipActivo ? h : '';
+  document.getElementById('festado').value='';
+  filtrar();
+}
+function chipSemana() {
+  activarChip('semana');
+  if(chipActivo) {
+    const now = new Date();
+    const day = now.getDay()||7;
+    const lun = new Date(now); lun.setDate(now.getDate()-(day-1));
+    document.getElementById('fdesde').value = lun.toLocaleDateString('sv-SE',{timeZone:'America/Santiago'});
+    document.getElementById('fhasta').value = now.toLocaleDateString('sv-SE',{timeZone:'America/Santiago'});
+  } else {
+    document.getElementById('fdesde').value=''; document.getElementById('fhasta').value='';
+  }
+  filtrar();
+}
+function chipPendientes() {
+  activarChip('pendientes');
+  document.getElementById('festado').value = chipActivo ? 'PENDIENTE' : '';
+  filtrar();
+}
+function chipMis() {
+  activarChip('mis');
+  filtrar();
+}
+
+// ─── Drawer Detalle ───────────────────────────────────────────────────────────
+async function verDetalle(id) {
+  const overlay = document.getElementById('drawerOverlay');
+  const drawer  = document.getElementById('drawerDetalle');
+  const body    = document.getElementById('drawerBody');
+  overlay.classList.add('open'); drawer.classList.add('open');
+  body.innerHTML='<div style="text-align:center;color:#9ca3af;padding:40px"><i class="bi bi-arrow-repeat spin" style="font-size:2rem"></i></div>';
+
+  try {
+    const [rG, rH] = await Promise.all([
+      fetch(`/api/crm/${id}`,{headers:{'Authorization':'Bearer '+token}}),
+      null
+    ]);
+    const dG = await rG.json();
+    if (!dG.success) { body.innerHTML=`<p class="text-danger">${dG.error}</p>`; return; }
+    const g = dG.data;
+
+    // Cargar historial RUT si hay
+    let historialHTML = '';
+    if (g.rut_cliente) {
+      const rH = await fetch(`/api/crm/historial/${encodeURIComponent(g.rut_cliente)}`,{headers:{'Authorization':'Bearer '+token}});
+      const dH = await rH.json();
+      const hist = (dH.data||[]).filter(h=>h.id_gestion!==id).slice(0,5);
+      historialHTML = hist.length ? hist.map(h=>`
+        <div class="historial-item">
+          <div class="h-fecha">${new Date(h.created_at).toLocaleString('es-CL',{timeZone:'America/Santiago'})}</div>
+          <strong>${h.tipo_solicitud}</strong> — ${CANAL_LABELS[h.canal]||h.canal}
+          ${h.resultado?`<div style="color:#6b7280;font-size:.78rem">${h.resultado}</div>`:''}
+        </div>`).join('') : '<p style="color:#9ca3af;font-size:.82rem">Sin gestiones previas</p>';
+    }
+
+    const fmt = v => v ? new Date(v).toLocaleString('es-CL',{timeZone:'America/Santiago'}) : '—';
+    const fmtD = v => v ? new Date(v).toLocaleDateString('es-CL',{timeZone:'America/Santiago'}) : '—';
+
+    body.innerHTML=`
+      <div class="detail-section">
+        <h6>Cliente</h6>
+        <div class="detail-grid">
+          <div class="detail-item"><label>Nombre</label><p>${g.nombre_cliente||'—'}</p></div>
+          <div class="detail-item"><label>RUT</label><p>${g.rut_cliente||'—'}</p></div>
+          <div class="detail-item"><label>Teléfono</label><p>${g.telefono||'—'}</p></div>
+          <div class="detail-item"><label>Email</label><p>${g.email||'—'}</p></div>
+          <div class="detail-item"><label>Tipo</label><p><span class="badge-resultado badge-${g.estado}" style="font-size:.78rem">${g.tipo_cliente}</span></p></div>
+          <div class="detail-item"><label>Estado</label><p><span class="badge-resultado badge-${g.estado}">${g.estado}</span></p></div>
+        </div>
+      </div>
+      <div class="detail-section">
+        <h6>Gestión</h6>
+        <div class="detail-grid">
+          <div class="detail-item"><label>Canal</label><p>${CANAL_LABELS[g.canal]||g.canal}</p></div>
+          <div class="detail-item"><label>Tipo solicitud</label><p>${g.tipo_solicitud}</p></div>
+          <div class="detail-item"><label>Resultado</label><p>${g.resultado||'—'}</p></div>
+          <div class="detail-item"><label>Prioridad</label><p><span class="badge-resultado badge-prio-${g.prioridad}">${g.prioridad}</span></p></div>
+          <div class="detail-item"><label>Ejecutivo</label><p>${g.nombre_usuario||'—'}</p></div>
+          <div class="detail-item"><label>Campaña</label><p>${g.nombre_campana||'—'}</p></div>
+        </div>
+        <div class="detail-item" style="margin-top:10px"><label>Descripción</label><p style="white-space:pre-wrap">${g.descripcion||'—'}</p></div>
+      </div>
+      <div class="detail-section">
+        <h6>Seguimiento</h6>
+        <div class="detail-grid">
+          <div class="detail-item"><label>Acción siguiente</label><p style="white-space:pre-wrap">${g.accion_siguiente||'—'}</p></div>
+          <div class="detail-item"><label>Fecha seguimiento</label><p>${fmtD(g.fecha_seguimiento)}</p></div>
+          <div class="detail-item"><label>Creado</label><p>${fmt(g.created_at)}</p></div>
+          <div class="detail-item"><label>Actualizado</label><p>${fmt(g.updated_at)}</p></div>
+        </div>
+      </div>
+      <div class="detail-section">
+        <h6>Editar estado / resultado</h6>
+        <div class="d-flex gap-2 mb-2">
+          <select class="form-select form-select-sm" id="editEstado">
+            <option value="">— Estado —</option>
+            ${['ABIERTO','PENDIENTE','CERRADO'].map(e=>`<option value="${e}" ${g.estado===e?'selected':''}>${e}</option>`).join('')}
+          </select>
+          <select class="form-select form-select-sm" id="editResultado">
+            <option value="">— Resultado —</option>
+            ${['Interesado - continúa proceso','No interesado','Sin respuesta / No contesta','Reagendado','Resuelto / Cerrado','Derivado a ejecutivo','Pendiente documentación','En evaluación','Convertido (lead→cliente)'].map(r=>`<option value="${r}" ${g.resultado===r?'selected':''}>${r}</option>`).join('')}
+          </select>
+        </div>
+        <button class="btn btn-sm btn-primary w-100" onclick="actualizarGestion(${g.id_gestion})">
+          <i class="bi bi-save me-1"></i>Guardar cambios
+        </button>
+        <div id="editMsg" style="margin-top:6px;font-size:.8rem;text-align:center"></div>
+      </div>
+      ${g.rut_cliente ? `<div class="detail-section"><h6>Historial del cliente (${g.rut_cliente})</h6>${historialHTML}</div>` : ''}
+    `;
+  } catch(e) {
+    body.innerHTML=`<p class="text-danger">Error: ${e.message}</p>`;
+  }
+}
+
+async function actualizarGestion(id) {
+  const estado    = document.getElementById('editEstado').value;
+  const resultado = document.getElementById('editResultado').value;
+  const msg       = document.getElementById('editMsg');
+  try {
+    const r = await fetch(`/api/crm/${id}`,{
+      method:'PUT', headers:{'Content-Type':'application/json','Authorization':'Bearer '+token},
+      body:JSON.stringify({estado:estado||undefined, resultado:resultado||undefined})
+    });
+    const d = await r.json();
+    if (d.success) {
+      msg.innerHTML='<span style="color:#16a34a">Actualizado</span>';
+      cargarGestiones(paginaActual);
+    } else {
+      msg.innerHTML=`<span style="color:#dc2626">${d.error}</span>`;
+    }
+  } catch(e) {
+    msg.innerHTML=`<span style="color:#dc2626">${e.message}</span>`;
+  }
+}
+
+function cerrarDrawer() {
+  document.getElementById('drawerOverlay').classList.remove('open');
+  document.getElementById('drawerDetalle').classList.remove('open');
+}
+
+// ─── Init ─────────────────────────────────────────────────────────────────────
+setTipoCliente('ACTIVO');
+cargarCampanas();
+cargarGestiones(1);
+</script>
+<script src="/js/app-version.js"></script>
+</body>
+</html>
