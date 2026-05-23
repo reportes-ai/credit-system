@@ -91,7 +91,7 @@
   <div class="topnav-left">
     <a href="/" class="topnav-brand">
       <img src="/img/logo.png" alt="AutoFácil">
-      <span class="version-badge">v1.2</span>
+      <span class="version-badge">v1.3</span>
     </a>
     <div class="breadcrumb-nav">
       <a href="/">Inicio</a><span class="sep">/</span>
@@ -263,16 +263,26 @@ const esc = s => String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replac
 const trxFmt = n => n ? `TRX-${String(n).padStart(6,'0')}` : '—';
 
 /* Formateo de fecha/hora siempre en horario de Chile (America/Santiago),
-   independiente del timezone del navegador o del servidor. */
+   independiente del timezone del navegador o del servidor.
+
+   mysql2 serializa DATETIME como Date objects → JSON los convierte a ISO-Z
+   (ej: "2026-05-22T21:30:00.000Z"). Si en cambio llega el formato MySQL sin
+   offset ("2026-05-22 21:30:00") lo convertimos a UTC explícitamente.       */
 const TZ = 'America/Santiago';
 function dtParts(dtStr) {
-  // Forzar interpretación UTC si el string viene sin offset (YYYY-MM-DD HH:mm:ss de MySQL)
-  const iso = typeof dtStr === 'string' ? dtStr.replace(' ', 'T') + 'Z' : dtStr;
-  const dt  = new Date(iso);
+  if (!dtStr) return { fecha: '—', hora: '—' };
+  let dt;
+  if (typeof dtStr === 'string' && /^\d{4}-\d{2}-\d{2} \d{2}:\d{2}/.test(dtStr)) {
+    // String MySQL sin timezone → forzar UTC
+    dt = new Date(dtStr.replace(' ', 'T') + 'Z');
+  } else {
+    // Ya es ISO con offset (viene de JSON.stringify(Date)) o es Date object
+    dt = new Date(dtStr);
+  }
   if (isNaN(dt)) return { fecha: '—', hora: '—' };
   return {
-    fecha: dt.toLocaleDateString('es-CL',  { timeZone: TZ, day:'2-digit', month:'2-digit', year:'numeric' }),
-    hora:  dt.toLocaleTimeString('es-CL',  { timeZone: TZ, hour:'2-digit', minute:'2-digit' }),
+    fecha: dt.toLocaleDateString('es-CL', { timeZone: TZ, day:'2-digit', month:'2-digit', year:'numeric' }),
+    hora:  dt.toLocaleTimeString('es-CL', { timeZone: TZ, hour:'2-digit', minute:'2-digit' }),
   };
 }
 
