@@ -33,39 +33,47 @@ const pool = require('../../../../shared/config/database');
 const ok  = (res, data)    => res.json({ success: true, data, error: null });
 const err = (res, e, s=500)=> res.status(s).json({ success: false, data: null, error: e?.message||e });
 
-/* ── GET /  ─ lista con filtros ── */
+/* ── GET /  ─ lista consolidada por crédito ── */
 const list = async (req, res) => {
   try {
     const { q, solo_saldo } = req.query;
-    let sql = `
-      SELECT
-        ct.*,
-        c.numero_credito,
-        ROUND(ct.monto_original - ct.monto_utilizado, 2) AS saldo
-      FROM cuentas_transitorias ct
-      LEFT JOIN creditos c ON ct.id_credito = c.id_credito
-      WHERE 1=1
-    `;
+
+    // Una fila por crédito, saldo = suma de todas las transitorias activas
+    let where = `1=1`;
     const params = [];
 
     if (q) {
       const like = `%${q.trim().toUpperCase()}%`;
-      sql += ` AND (UPPER(ct.rut_cliente) LIKE ? OR UPPER(ct.nombre_cliente) LIKE ? OR UPPER(c.numero_credito) LIKE ?)`;
+      where += ` AND (UPPER(ct.rut_cliente) LIKE ? OR UPPER(ct.nombre_cliente) LIKE ? OR UPPER(c.numero_credito) LIKE ?)`;
       params.push(like, like, like);
     }
-    if (solo_saldo === '1') {
-      sql += ` AND (ct.monto_original - ct.monto_utilizado) > 0`;
-    }
 
-    sql += ` ORDER BY ct.created_at DESC`;
+    const [rows] = await pool.query(`
+      SELECT
+        ct.id_credito,
+        ct.rut_cliente,
+        ct.nombre_cliente,
+        c.numero_credito,
+        ROUND(SUM(ct.monto_original), 2)                        AS monto_original,
+        ROUND(SUM(ct.monto_utilizado), 2)                       AS monto_utilizado,
+        ROUND(SUM(ct.monto_original - ct.monto_utilizado), 2)   AS saldo,
+        MAX(ct.numero_transaccion)                               AS ultimo_trx,
+        MAX(ct.updated_at)                                       AS ultima_actualizacion,
+        COUNT(*)                                                  AS num_registros
+      FROM cuentas_transitorias ct
+      LEFT JOIN creditos c ON ct.id_credito = c.id_credito
+      WHERE ${where}
+      GROUP BY ct.id_credito, ct.rut_cliente, ct.nombre_cliente, c.numero_credito
+      ORDER BY ultima_actualizacion DESC
+    `, params);
 
-    const [rows] = await pool.query(sql, params);
+    // Filtrar por saldo > 0 después del GROUP BY
+    const filtered = (solo_saldo === '1') ? rows.filter(r => parseFloat(r.saldo||0) > 0) : rows;
 
-    // Totales
-    const conSaldo  = rows.filter(r => parseFloat(r.saldo||0) > 0);
+    const conSaldo    = filtered.filter(r => parseFloat(r.saldo||0) > 0);
     const totalDinero = conSaldo.reduce((s, r) => s + parseFloat(r.saldo||0), 0);
 
-    ok(res, { rows, resumen: { cantidad: conSaldo.length, total: Math.round(totalDinero) } });
+    ok(res, { rows: filtered, resumen: { cantidad: conSaldo.length, total: Math.round(totalDinero) } });
   } catch(e) { err(res, e); }
 };
 

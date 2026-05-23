@@ -82,7 +82,7 @@
   <div class="topnav-left">
     <a href="/" class="topnav-brand">
       <img src="/img/logo.png" alt="AutoFácil">
-      <span class="version-badge">v1.0</span>
+      <span class="version-badge">v1.1</span>
     </a>
     <div class="breadcrumb-nav">
       <a href="/">Inicio</a><span class="sep">›</span>
@@ -143,25 +143,23 @@
     <span class="count-badge" id="countBadge"></span>
   </div>
 
-  <!-- Tabla -->
+  <!-- Tabla consolidada por crédito -->
   <div class="table-wrap">
     <table>
       <thead>
         <tr>
           <th>N° OP</th>
-          <th>TRX #</th>
           <th>CLIENTE</th>
           <th>RUT</th>
-          <th>FECHA</th>
-          <th>GLOSA</th>
-          <th class="text-right">MONTO ORIG.</th>
+          <th class="text-right">INGRESADO</th>
           <th class="text-right">UTILIZADO</th>
-          <th class="text-right">SALDO</th>
+          <th class="text-right">SALDO DISPONIBLE</th>
           <th>ESTADO</th>
+          <th>ÚLT. MOVIMIENTO</th>
         </tr>
       </thead>
       <tbody id="tbody">
-        <tr><td colspan="10" class="empty">Cargando…</td></tr>
+        <tr><td colspan="8" class="empty">Cargando…</td></tr>
       </tbody>
     </table>
     <div class="pag-row">
@@ -187,9 +185,14 @@ function logout() { localStorage.removeItem('token'); localStorage.removeItem('u
 const H = { 'Content-Type':'application/json', 'Authorization':'Bearer '+token };
 const clp = v => '$' + Math.round(v||0).toLocaleString('es-CL');
 const esc = s => String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;');
-const fmtDate = v => v ? new Date(v).toLocaleDateString('es-CL',{day:'2-digit',month:'2-digit',year:'numeric'}) : '—';
+const fmtDt = v => {
+  if (!v) return '—';
+  const d = new Date(v);
+  if (isNaN(d)) return '—';
+  return d.toLocaleDateString('es-CL', { timeZone:'America/Santiago', day:'2-digit', month:'2-digit', year:'numeric' });
+};
 
-let _data = [], _filtrado = [], pag = 1, perPag = 50, debTimer;
+let _data = [], pag = 1, perPag = 50, debTimer;
 
 function debounce() { clearTimeout(debTimer); debTimer = setTimeout(cargar, 300); }
 function cambiarPag(d) { pag += d; render(); }
@@ -217,35 +220,39 @@ function render() {
   const desde = (pag-1)*perPag, hasta = Math.min(pag*perPag, _data.length);
   const pagina = _data.slice(desde, hasta);
 
-  document.getElementById('countBadge').textContent = `${_data.length.toLocaleString('es-CL')} registro${_data.length!==1?'s':''}`;
+  document.getElementById('countBadge').textContent = `${_data.length.toLocaleString('es-CL')} crédito${_data.length!==1?'s':''}`;
   document.getElementById('pagInfo').textContent    = _data.length > 0 ? `Mostrando ${desde+1}–${hasta} de ${_data.length.toLocaleString('es-CL')}` : '';
   document.getElementById('btnPrev').disabled = pag <= 1;
   document.getElementById('btnNext').disabled = hasta >= _data.length;
 
   const tb = document.getElementById('tbody');
   if (!pagina.length) {
-    tb.innerHTML = '<tr><td colspan="10" class="empty">Sin resultados</td></tr>';
+    tb.innerHTML = '<tr><td colspan="8" class="empty">Sin resultados</td></tr>';
     return;
   }
 
   tb.innerHTML = pagina.map(r => {
     const saldo = parseFloat(r.saldo||0);
-    const trxFmt = r.numero_transaccion ? `TRX-${String(r.numero_transaccion).padStart(6,'0')}` : '—';
+    const util  = parseFloat(r.monto_utilizado||0);
     const estadoBadge = saldo > 0
-      ? `<span class="badge-activo">ACTIVO</span>`
-      : `<span class="badge-consumido">CONSUMIDO</span>`;
+      ? `<span class="badge-activo">CON SALDO</span>`
+      : `<span class="badge-consumido">AGOTADO</span>`;
 
     return `<tr>
-      <td class="td-num">${esc(r.numero_credito||r.id_credito)}</td>
-      <td class="td-trx">${trxFmt}</td>
+      <td class="td-num">
+        <a href="/creditos/revisar?id=${r.id_credito}" style="color:var(--navy);font-weight:700;text-decoration:none">
+          ${esc(r.numero_credito||r.id_credito)}
+        </a>
+      </td>
       <td class="td-cliente">${esc(r.nombre_cliente||'—')}</td>
       <td class="td-rut">${esc(r.rut_cliente||'—')}</td>
-      <td style="white-space:nowrap;font-size:.82rem">${fmtDate(r.fecha)}</td>
-      <td style="font-size:.8rem;color:#374151">${esc(r.glosa||'—')}</td>
       <td class="text-right" style="font-family:monospace;color:#374151">${clp(r.monto_original)}</td>
-      <td class="text-right td-consumido">${parseFloat(r.monto_utilizado||0)>0 ? clp(r.monto_utilizado) : '—'}</td>
-      <td class="text-right ${saldo>0?'td-saldo':'td-consumido'}">${saldo>0?clp(saldo):'—'}</td>
+      <td class="text-right td-consumido">${util > 0 ? clp(util) : '<span style="color:#9ca3af">—</span>'}</td>
+      <td class="text-right ${saldo>0?'td-saldo':'td-consumido'}" style="font-size:1rem">
+        ${saldo > 0 ? `<strong>${clp(saldo)}</strong>` : '<span style="color:#9ca3af">—</span>'}
+      </td>
       <td>${estadoBadge}</td>
+      <td style="font-size:.8rem;color:#6b7280">${fmtDt(r.ultima_actualizacion)}</td>
     </tr>`;
   }).join('');
 }

@@ -248,8 +248,11 @@ const createBatch = async (req, res) => {
       }
     }
 
-    // ── 6. Crear transitoria si hay exceso ─────────────────────────────────
-    const exceso = Math.round(totalDisponible - totalCobrado);
+    // ── 6. Crear transitoria si hay exceso de efectivo recibido ────────────
+    // Exceso = solo el sobrante del efectivo (mrec), NO el saldo a favor que
+    // quedó sin usar — ese ya vive en sus propias transitorias y no debe
+    // duplicarse al crear una nueva.
+    const exceso = Math.round(Math.max(0, mrec - totalCobrado));
     let transitoria = null;
     if (exceso > 0) {
       const [[cred]] = await conn.query(
