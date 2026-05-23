@@ -6,9 +6,10 @@ const err = (res, e, code = 500) => res.status(code).json({ success: false, data
 /*
  * GET /api/cierre-caja?desde=YYYY-MM-DD&hasta=YYYY-MM-DD&id_usuario=&id_caja=
  * Retorna:
- *   - movimientos (pagos_credito con datos de crédito y cliente)
- *   - resumen por usuario
- *   - totales generales
+ *   - movimientos (pagos_credito con numero_transaccion y origen_fondos)
+ *   - transitorias (cuentas_transitorias creadas en el período)
+ *   - resumen por usuario (contando transacciones distintas)
+ *   - totales generales (total_pagos + total_transitorias = total_recaudado)
  */
 const getCierre = async (req, res) => {
   try {
@@ -19,7 +20,6 @@ const getCierre = async (req, res) => {
     const id_caja    = req.query.id_caja    || null;
 
     /* ── filtro por usuario de caja ──────────────────────────────────────── */
-    // si se filtra por caja se restringe a los usuarios asignados a esa caja
     let usuariosEnCaja = null;
     if (id_caja) {
       const [urows] = await pool.query(
@@ -28,18 +28,19 @@ const getCierre = async (req, res) => {
       );
       usuariosEnCaja = urows.map(r => r.id_usuario);
       if (usuariosEnCaja.length === 0) {
-        return ok(res, { movimientos: [], resumen: [], totales: { pagos: 0, monto_cuotas: 0, intereses_mora: 0, gastos_cobranza: 0, total_recaudado: 0 } });
+        return ok(res, {
+          movimientos: [], transitorias: [], resumen: [],
+          totales: { transacciones: 0, monto_cuotas: 0, intereses_mora: 0, gastos_cobranza: 0, total_pagos: 0, total_transitorias: 0, total_recaudado: 0 },
+          desde, hasta
+        });
       }
     }
 
     /* ── query movimientos ───────────────────────────────────────────────── */
-    // registrado_por en pagos_credito es string (nombre del usuario)
-    // Para filtrar por id_usuario necesitamos JOIN con usuarios
     let where  = `DATE(pc.created_at) BETWEEN ? AND ?`;
     const params = [desde, hasta];
 
     if (id_usuario) {
-      // filtrar por id (registros nuevos) o por nombre coincidente (registros previos a la columna)
       const [[urow]] = await pool.query(
         `SELECT TRIM(CONCAT(COALESCE(nombre,''),' ',COALESCE(apellido,''))) AS nombre_completo FROM usuarios WHERE id_usuario=?`,
         [id_usuario]
@@ -64,6 +65,8 @@ const getCierre = async (req, res) => {
           pc.created_at,
           pc.registrado_por,
           pc.id_registrado_por,
+          pc.numero_transaccion,
+          pc.origen_fondos,
           c.numero_credito,
           c.nombre_cliente,
           c.rut_cliente,
@@ -78,48 +81,83 @@ const getCierre = async (req, res) => {
        LEFT JOIN caja_usuarios cu ON cu.id_usuario = pc.id_registrado_por AND cu.activo = 1
        LEFT JOIN cajas cj ON cu.id_caja = cj.id_caja
        WHERE ${where}
-       ORDER BY pc.created_at DESC`,
+       ORDER BY pc.numero_transaccion DESC, pc.numero_cuota ASC`,
       params
     );
 
-    /* ── resumen por usuario ─────────────────────────────────────────────── */
+    /* ── cuentas transitorias del período ───────────────────────────────── */
+    const [transitorias] = await pool.query(
+      `SELECT
+          ct.id_transitoria,
+          ct.id_credito,
+          ct.numero_transaccion,
+          ct.fecha,
+          ct.monto_original,
+          ct.monto_utilizado,
+          ROUND(ct.monto_original - ct.monto_utilizado, 2) AS saldo,
+          ct.glosa,
+          ct.estado,
+          ct.created_at,
+          c.numero_credito,
+          c.nombre_cliente,
+          c.rut_cliente
+       FROM cuentas_transitorias ct
+       LEFT JOIN creditos c ON ct.id_credito = c.id_credito
+       WHERE DATE(ct.created_at) BETWEEN ? AND ?
+       ORDER BY ct.created_at DESC`,
+      [desde, hasta]
+    ).catch(() => [[]]);
+
+    /* ── resumen por usuario (transacciones distintas) ──────────────────── */
     const resumenMap = new Map();
     for (const m of movimientos) {
       const key = m.id_registrado_por != null ? `uid_${m.id_registrado_por}` : (m.registrado_por || 'Sin usuario');
       if (!resumenMap.has(key)) {
         resumenMap.set(key, {
-          id_usuario:    m.id_registrado_por,
-          nombre:        m.nombre_cajero?.trim() || m.registrado_por || 'Sin usuario',
-          perfil:        m.perfil_cajero || null,
-          nombre_caja:   m.nombre_caja || '—',
-          pagos:         0,
-          monto_cuotas:  0,
-          intereses_mora: 0,
+          id_usuario:      m.id_registrado_por,
+          nombre:          m.nombre_cajero?.trim() || m.registrado_por || 'Sin usuario',
+          perfil:          m.perfil_cajero || null,
+          nombre_caja:     m.nombre_caja || '—',
+          _trxSet:         new Set(),
+          monto_cuotas:    0,
+          intereses_mora:  0,
           gastos_cobranza: 0,
           total_recaudado: 0,
         });
       }
       const r = resumenMap.get(key);
-      r.pagos++;
-      r.monto_cuotas    += Number(m.monto_cuota)      || 0;
-      r.intereses_mora  += Number(m.interes_mora)     || 0;
-      r.gastos_cobranza += Number(m.gastos_cobranza)  || 0;
-      r.total_recaudado += Number(m.total_pagado)     || 0;
+      r._trxSet.add(m.numero_transaccion != null ? `t${m.numero_transaccion}` : `p${m.id_pago}`);
+      r.monto_cuotas    += Number(m.monto_cuota)     || 0;
+      r.intereses_mora  += Number(m.interes_mora)    || 0;
+      r.gastos_cobranza += Number(m.gastos_cobranza) || 0;
+      r.total_recaudado += Number(m.total_pagado)    || 0;
     }
 
-    const resumen = [...resumenMap.values()];
+    const resumen = [...resumenMap.values()].map(r => {
+      const { _trxSet, ...rest } = r;
+      return { ...rest, transacciones: _trxSet.size };
+    });
 
     /* ── totales generales ───────────────────────────────────────────────── */
-    const totales = resumen.reduce((acc, r) => {
-      acc.pagos++;
-      acc.monto_cuotas    += r.monto_cuotas;
-      acc.intereses_mora  += r.intereses_mora;
-      acc.gastos_cobranza += r.gastos_cobranza;
-      acc.total_recaudado += r.total_recaudado;
-      return acc;
-    }, { pagos: movimientos.length, monto_cuotas: 0, intereses_mora: 0, gastos_cobranza: 0, total_recaudado: 0 });
+    // Contar transacciones únicas globales
+    const globalTrxSet = new Set();
+    for (const m of movimientos) {
+      globalTrxSet.add(m.numero_transaccion != null ? `t${m.numero_transaccion}` : `p${m.id_pago}`);
+    }
 
-    ok(res, { movimientos, resumen, totales, desde, hasta });
+    const totalPagos         = resumen.reduce((s, r) => s + r.total_recaudado, 0);
+    const totalTransitorias  = (transitorias || []).reduce((s, t) => s + (Number(t.monto_original) || 0), 0);
+    const totales = {
+      transacciones:     globalTrxSet.size,
+      monto_cuotas:      resumen.reduce((s, r) => s + r.monto_cuotas, 0),
+      intereses_mora:    resumen.reduce((s, r) => s + r.intereses_mora, 0),
+      gastos_cobranza:   resumen.reduce((s, r) => s + r.gastos_cobranza, 0),
+      total_pagos:       totalPagos,
+      total_transitorias: totalTransitorias,
+      total_recaudado:   totalPagos + totalTransitorias,
+    };
+
+    ok(res, { movimientos, transitorias: transitorias || [], resumen, totales, desde, hasta });
   } catch(e) { err(res, e); }
 };
 

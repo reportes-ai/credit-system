@@ -24,36 +24,59 @@
     .perfil-badge { background:rgba(144,202,249,.2); border:1px solid rgba(144,202,249,.4); color:#90caf9; border-radius:12px; padding:2px 10px; font-size:.73rem; font-weight:600; }
     .btn-logout { background:rgba(255,255,255,.1); border:1px solid rgba(255,255,255,.2); color:#fff; border-radius:8px; padding:5px 12px; font-size:.82rem; cursor:pointer; }
     .btn-logout:hover { background:rgba(255,255,255,.2); }
-    .main-content { padding:32px 40px; max-width:1200px; margin:0 auto; }
+    .main-content { padding:32px 40px; max-width:1300px; margin:0 auto; }
     .page-banner { background:linear-gradient(135deg,#012d70,#0141A2 50%,#009AFE); border-radius:16px; color:#fff; padding:24px 32px; margin-bottom:28px; display:flex; align-items:center; gap:18px; }
     .page-banner i { font-size:2.4rem; opacity:.8; }
     .page-banner h2 { font-weight:700; margin:0 0 3px; font-size:1.3rem; }
     .page-banner p { opacity:.8; margin:0; font-size:.88rem; }
+
     /* Filtros */
     .filtros-bar { background:#fff; border-radius:12px; padding:18px 20px; margin-bottom:22px; box-shadow:0 1px 4px rgba(0,0,0,.07); display:flex; flex-wrap:wrap; gap:12px; align-items:flex-end; }
     .filtros-bar label { font-size:.82rem; font-weight:600; color:#374151; display:block; margin-bottom:4px; }
     .filtros-bar .form-control, .filtros-bar .form-select { font-size:.88rem; }
-    /* Tarjetas resumen */
-    .stats-row { display:grid; grid-template-columns:repeat(auto-fill,minmax(180px,1fr)); gap:14px; margin-bottom:22px; }
+
+    /* Stats */
+    .stats-row { display:grid; grid-template-columns:repeat(auto-fill,minmax(170px,1fr)); gap:14px; margin-bottom:22px; }
     .stat-card { background:#fff; border-radius:12px; padding:16px 18px; box-shadow:0 1px 4px rgba(0,0,0,.07); }
-    .stat-label { font-size:.75rem; color:#6b7280; font-weight:600; text-transform:uppercase; letter-spacing:.4px; margin-bottom:4px; }
-    .stat-value { font-size:1.3rem; font-weight:800; color:#111827; }
-    .stat-value.blue { color:var(--navy); }
+    .stat-label { font-size:.73rem; color:#6b7280; font-weight:600; text-transform:uppercase; letter-spacing:.4px; margin-bottom:4px; }
+    .stat-value { font-size:1.25rem; font-weight:800; color:#111827; }
+    .stat-value.blue  { color:var(--navy); }
     .stat-value.green { color:#15803d; }
     .stat-value.amber { color:#92400e; }
-    /* Resumen por usuario */
+    .stat-value.teal  { color:#0e7490; }
+    .stat-divider { border-top:2px solid #e5e7eb; padding-top:12px; margin-top:4px; }
+    .stat-divider .stat-value { font-size:1.45rem; }
+
+    /* Panels */
     .panel { background:#fff; border-radius:14px; box-shadow:0 1px 4px rgba(0,0,0,.07); margin-bottom:22px; }
     .panel-header { padding:16px 22px; border-bottom:1px solid #e5e7eb; display:flex; align-items:center; justify-content:space-between; }
     .panel-header h5 { margin:0; font-weight:700; font-size:.97rem; color:#111827; }
     .panel-body { padding:0; }
     .table-wrap { overflow-x:auto; }
-    table { width:100%; border-collapse:collapse; font-size:.85rem; }
+    table { width:100%; border-collapse:collapse; font-size:.84rem; }
     thead th { background:#f8fafc; color:#374151; font-weight:700; padding:10px 14px; text-align:left; border-bottom:2px solid #e5e7eb; white-space:nowrap; }
-    tbody td { padding:10px 14px; border-bottom:1px solid #f1f5f9; color:#1f2937; vertical-align:middle; }
+    tbody td { padding:9px 14px; border-bottom:1px solid #f1f5f9; color:#1f2937; vertical-align:middle; }
     tbody tr:last-child td { border-bottom:none; }
-    tbody tr:hover td { background:#fafbfc; }
     .tfoot-row td { background:#f0f4f8; font-weight:700; padding:10px 14px; color:#111827; border-top:2px solid #e5e7eb; }
     .text-right { text-align:right; }
+
+    /* TRX group rows */
+    .tr-trx { background:#eef2ff; }
+    .tr-trx td { font-weight:600; border-bottom:none !important; padding:8px 14px; }
+    .tr-cuota td { background:#fafbff; font-size:.81rem; padding:6px 14px 6px 28px; color:#374151; border-bottom:1px solid #f1f5f9; }
+    .tr-cuota:last-of-type td { border-bottom:2px solid #c7d2fe !important; }
+    .trx-code { font-family:monospace; font-size:.8rem; font-weight:700; color:var(--navy); background:#dbeafe; border-radius:6px; padding:2px 7px; white-space:nowrap; }
+    .trx-single { background:#f0fdf4; }
+    .trx-single td { font-weight:500; }
+    .cuota-badge { background:#e0e7ff; color:#3730a3; font-size:.73rem; font-weight:700; border-radius:5px; padding:1px 6px; }
+    .origen-tag { font-size:.75rem; color:#6b7280; background:#f3f4f6; border-radius:5px; padding:2px 6px; white-space:nowrap; }
+
+    /* Transitorias table */
+    .tr-trans { background:#fff7ed; }
+    .tr-trans td { color:#92400e; }
+    .badge-activo   { background:#dcfce7; color:#15803d; font-weight:700; font-size:.72rem; border-radius:6px; padding:2px 7px; }
+    .badge-consumido{ background:#f1f5f9; color:#9ca3af; font-weight:700; font-size:.72rem; border-radius:6px; padding:2px 7px; }
+
     .empty-state { text-align:center; color:#9ca3af; padding:50px 0; }
     .spinner-wrap { display:flex; align-items:center; justify-content:center; padding:60px 0; }
     .btn-buscar { background:var(--navy); color:#fff; border:none; border-radius:8px; padding:8px 20px; font-size:.88rem; font-weight:600; cursor:pointer; height:38px; }
@@ -68,7 +91,7 @@
   <div class="topnav-left">
     <a href="/" class="topnav-brand">
       <img src="/img/logo.png" alt="AutoFácil">
-      <span class="version-badge">v1.0</span>
+      <span class="version-badge">v1.1</span>
     </a>
     <div class="breadcrumb-nav">
       <a href="/">Inicio</a><span class="sep">/</span>
@@ -126,8 +149,8 @@
   <!-- Stats -->
   <div class="stats-row" id="statsRow" style="display:none">
     <div class="stat-card">
-      <div class="stat-label"><i class="bi bi-receipt me-1"></i>Pagos registrados</div>
-      <div class="stat-value blue" id="statPagos">—</div>
+      <div class="stat-label"><i class="bi bi-hash me-1"></i>Transacciones</div>
+      <div class="stat-value blue" id="statTrx">—</div>
     </div>
     <div class="stat-card">
       <div class="stat-label"><i class="bi bi-cash me-1"></i>Monto cuotas</div>
@@ -142,6 +165,10 @@
       <div class="stat-value amber" id="statGastos">—</div>
     </div>
     <div class="stat-card">
+      <div class="stat-label"><i class="bi bi-arrow-left-right me-1"></i>Ctas. Transitorias</div>
+      <div class="stat-value teal" id="statTransitorias">—</div>
+    </div>
+    <div class="stat-card stat-divider">
       <div class="stat-label"><i class="bi bi-bank me-1"></i>Total recaudado</div>
       <div class="stat-value green" id="statTotal">—</div>
     </div>
@@ -160,11 +187,11 @@
               <th>Cajero</th>
               <th>Perfil</th>
               <th>Caja</th>
-              <th class="text-right">Pagos</th>
+              <th class="text-right">Transacciones</th>
               <th class="text-right">Monto Cuotas</th>
               <th class="text-right">Int. Mora</th>
               <th class="text-right">Gtos. Cobranza</th>
-              <th class="text-right">Total Recaudado</th>
+              <th class="text-right">Total Cuotas</th>
             </tr>
           </thead>
           <tbody id="tbodyResumen"></tbody>
@@ -174,7 +201,7 @@
     </div>
   </div>
 
-  <!-- Detalle de movimientos -->
+  <!-- Detalle de movimientos (agrupado por TRX) -->
   <div class="panel" id="panelMovimientos">
     <div class="panel-header">
       <h5><i class="bi bi-list-ul me-2 text-primary"></i>Detalle de movimientos</h5>
@@ -183,6 +210,35 @@
     <div class="panel-body">
       <div id="movWrap">
         <div class="empty-state"><i class="bi bi-search fs-1 mb-3 d-block"></i><p>Selecciona un rango de fechas y presiona Consultar</p></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Cuentas Transitorias del período -->
+  <div class="panel" id="panelTransitorias" style="display:none">
+    <div class="panel-header">
+      <h5><i class="bi bi-arrow-left-right me-2" style="color:#0e7490"></i>Cuentas Transitorias generadas en el período</h5>
+      <span id="transCount" style="font-size:.8rem;color:#6b7280"></span>
+    </div>
+    <div class="panel-body">
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>TRX</th>
+              <th>Fecha</th>
+              <th>Crédito</th>
+              <th>Cliente</th>
+              <th class="text-right">Monto Original</th>
+              <th class="text-right">Utilizado</th>
+              <th class="text-right">Saldo</th>
+              <th>Estado</th>
+              <th>Glosa</th>
+            </tr>
+          </thead>
+          <tbody id="tbodyTransitorias"></tbody>
+          <tfoot><tr id="tfootTransitorias" class="tfoot-row"></tr></tfoot>
+        </table>
       </div>
     </div>
   </div>
@@ -203,6 +259,8 @@ function logout(){ localStorage.removeItem('token'); localStorage.removeItem('us
 
 const API = (path, opts={}) => fetch(path, { headers:{ Authorization:`Bearer ${token}`, 'Content-Type':'application/json' }, ...opts });
 const clp = v => '$' + Math.round(v||0).toLocaleString('es-CL');
+const esc = s => String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+const trxFmt = n => n ? `TRX-${String(n).padStart(6,'0')}` : '—';
 
 /* ── inicializar fechas (hoy) ────────────────────────────────────────────── */
 const hoy = new Date().toISOString().slice(0,10);
@@ -210,19 +268,17 @@ document.getElementById('filDesde').value = hoy;
 document.getElementById('filHasta').value = hoy;
 
 /* ── datos ─────────────────────────────────────────────────────────────── */
-let _cajeros = [];     // { id_usuario, nombre, perfil, id_caja, nombre_caja }
-let _cajas   = [];     // lista única de cajas
-let _data    = null;   // último resultado
+let _cajeros = [];
+let _cajas   = [];
+let _data    = null;
 
 (async () => {
   const r = await API('/api/cierre-caja/cajeros');
   const j = await r.json();
   _cajeros = j.data || [];
-  // cajas únicas
   const cajasMap = new Map();
   _cajeros.forEach(c => { if (c.id_caja) cajasMap.set(c.id_caja, c.nombre_caja); });
   _cajas = [...cajasMap.entries()].map(([id,nombre]) => ({ id, nombre }));
-  // select cajas
   const selCaja = document.getElementById('filCaja');
   _cajas.forEach(c => {
     const o = document.createElement('option'); o.value = c.id; o.textContent = c.nombre; selCaja.appendChild(o);
@@ -254,30 +310,36 @@ async function buscar() {
     `<div class="spinner-wrap"><div class="spinner-border text-primary" style="width:2rem;height:2rem"></div></div>`;
   const r = await API(`/api/cierre-caja?${params}`);
   const j = await r.json();
-  if (!j.success) { document.getElementById('movWrap').innerHTML = `<div class="empty-state text-danger"><i class="bi bi-x-circle fs-1 d-block mb-2"></i>${j.error}</div>`; return; }
+  if (!j.success) {
+    document.getElementById('movWrap').innerHTML = `<div class="empty-state text-danger"><i class="bi bi-x-circle fs-1 d-block mb-2"></i>${j.error}</div>`;
+    return;
+  }
   _data = j.data;
   renderResultados(_data);
 }
 
+/* ── render principal ───────────────────────────────────────────────────── */
 function renderResultados(d) {
-  // Stats
   const t = d.totales;
-  document.getElementById('statPagos').textContent     = t.pagos;
-  document.getElementById('statCuotas').textContent    = clp(t.monto_cuotas);
-  document.getElementById('statIntereses').textContent = clp(t.intereses_mora);
-  document.getElementById('statGastos').textContent    = clp(t.gastos_cobranza);
-  document.getElementById('statTotal').textContent     = clp(t.total_recaudado);
-  document.getElementById('statsRow').style.display    = '';
 
-  // Resumen
-  if (d.resumen.length > 1) {
+  // Stats
+  document.getElementById('statTrx').textContent          = t.transacciones;
+  document.getElementById('statCuotas').textContent       = clp(t.monto_cuotas);
+  document.getElementById('statIntereses').textContent    = clp(t.intereses_mora);
+  document.getElementById('statGastos').textContent       = clp(t.gastos_cobranza);
+  document.getElementById('statTransitorias').textContent = clp(t.total_transitorias);
+  document.getElementById('statTotal').textContent        = clp(t.total_recaudado);
+  document.getElementById('statsRow').style.display       = '';
+
+  // Resumen por cajero (mostrar si hay más de uno o siempre con filtro)
+  if (d.resumen.length >= 1) {
     document.getElementById('panelResumen').style.display = '';
     document.getElementById('tbodyResumen').innerHTML = d.resumen.map(r => `
       <tr>
         <td><strong>${esc(r.nombre)}</strong></td>
         <td>${esc(r.perfil||'—')}</td>
         <td>${esc(r.nombre_caja||'—')}</td>
-        <td class="text-right">${r.pagos}</td>
+        <td class="text-right">${r.transacciones}</td>
         <td class="text-right">${clp(r.monto_cuotas)}</td>
         <td class="text-right">${r.intereses_mora > 0 ? clp(r.intereses_mora) : '<span style="color:#9ca3af">—</span>'}</td>
         <td class="text-right">${r.gastos_cobranza > 0 ? clp(r.gastos_cobranza) : '<span style="color:#9ca3af">—</span>'}</td>
@@ -285,82 +347,199 @@ function renderResultados(d) {
       </tr>`).join('');
     document.getElementById('tfootResumen').innerHTML = `
       <td>TOTAL</td><td></td><td></td>
-      <td class="text-right">${t.pagos}</td>
+      <td class="text-right">${t.transacciones}</td>
       <td class="text-right">${clp(t.monto_cuotas)}</td>
       <td class="text-right">${clp(t.intereses_mora)}</td>
       <td class="text-right">${clp(t.gastos_cobranza)}</td>
-      <td class="text-right">${clp(t.total_recaudado)}</td>`;
+      <td class="text-right">${clp(t.total_pagos)}</td>`;
   } else {
     document.getElementById('panelResumen').style.display = 'none';
   }
 
-  // Movimientos
-  document.getElementById('movCount').textContent = `${d.movimientos.length} registro${d.movimientos.length!==1?'s':''}`;
-  if (!d.movimientos.length) {
+  // Movimientos agrupados por TRX
+  renderMovimientos(d);
+
+  // Cuentas Transitorias
+  renderTransitorias(d);
+}
+
+/* ── agrupar movimientos por numero_transaccion ─────────────────────────── */
+function renderMovimientos(d) {
+  const movs = d.movimientos;
+  document.getElementById('movCount').textContent =
+    `${d.totales.transacciones} transacción${d.totales.transacciones !== 1 ? 'es' : ''} · ${movs.length} cuota${movs.length !== 1 ? 's' : ''}`;
+
+  if (!movs.length) {
     document.getElementById('movWrap').innerHTML =
       `<div class="empty-state"><i class="bi bi-inbox fs-1 mb-3 d-block"></i><p>Sin movimientos para el período seleccionado</p></div>`;
     return;
   }
-  document.getElementById('movWrap').innerHTML = `
-    <div class="table-wrap">
-      <table>
-        <thead>
-          <tr>
-            <th>Fecha/Hora</th>
-            <th>Crédito</th>
-            <th>Cliente</th>
-            <th class="text-right">Cuota N°</th>
-            <th class="text-right">Monto Cuota</th>
-            <th class="text-right">Int. Mora</th>
-            <th class="text-right">Gtos. Cobr.</th>
-            <th class="text-right">Total Pagado</th>
-            <th>Cajero</th>
-            <th>Caja</th>
-          </tr>
-        </thead>
-        <tbody>${d.movimientos.map(m => renderMovRow(m)).join('')}</tbody>
-        <tfoot>
-          <tr class="tfoot-row">
-            <td colspan="4">TOTAL PERÍODO ${esc(d.desde)} al ${esc(d.hasta)}</td>
-            <td class="text-right">${clp(t.monto_cuotas)}</td>
-            <td class="text-right">${clp(t.intereses_mora)}</td>
-            <td class="text-right">${clp(t.gastos_cobranza)}</td>
-            <td class="text-right">${clp(t.total_recaudado)}</td>
-            <td colspan="2"></td>
-          </tr>
-        </tfoot>
-      </table>
-    </div>`;
+
+  // Agrupar por TRX
+  const trxMap = new Map();
+  for (const m of movs) {
+    const key = m.numero_transaccion != null ? `t${m.numero_transaccion}` : `p${m.id_pago}`;
+    if (!trxMap.has(key)) {
+      trxMap.set(key, {
+        numero_transaccion: m.numero_transaccion,
+        created_at:         m.created_at,
+        id_credito:         m.id_credito,
+        numero_credito:     m.numero_credito,
+        nombre_cliente:     m.nombre_cliente,
+        rut_cliente:        m.rut_cliente,
+        nombre_cajero:      m.nombre_cajero,
+        registrado_por:     m.registrado_por,
+        nombre_caja:        m.nombre_caja,
+        origen_fondos:      m.origen_fondos,
+        cuotas:             [],
+        sum_monto:          0,
+        sum_mora:           0,
+        sum_gastos:         0,
+        sum_total:          0,
+      });
+    }
+    const g = trxMap.get(key);
+    g.cuotas.push(m);
+    g.sum_monto  += Number(m.monto_cuota)     || 0;
+    g.sum_mora   += Number(m.interes_mora)    || 0;
+    g.sum_gastos += Number(m.gastos_cobranza) || 0;
+    g.sum_total  += Number(m.total_pagado)    || 0;
+  }
+
+  const t = d.totales;
+  let html = `<div class="table-wrap"><table>
+    <thead><tr>
+      <th>TRX</th>
+      <th>Fecha/Hora</th>
+      <th>Crédito / Cliente</th>
+      <th>Cuota</th>
+      <th class="text-right">Monto Cuota</th>
+      <th class="text-right">Int. Mora</th>
+      <th class="text-right">Gtos. Cobr.</th>
+      <th class="text-right">Total</th>
+      <th>Cajero</th>
+      <th>Origen</th>
+    </tr></thead><tbody>`;
+
+  for (const [, g] of trxMap) {
+    const dt    = new Date(g.created_at);
+    const fecha = dt.toLocaleDateString('es-CL');
+    const hora  = dt.toLocaleTimeString('es-CL', { hour:'2-digit', minute:'2-digit' });
+    const trxCode  = g.numero_transaccion
+      ? `<span class="trx-code">${trxFmt(g.numero_transaccion)}</span>`
+      : '<span style="color:#9ca3af;font-size:.78rem">sin TRX</span>';
+    const cajero   = esc((g.nombre_cajero||'').trim() || g.registrado_por || '—');
+    const caja     = esc(g.nombre_caja || '—');
+    const origen   = g.origen_fondos ? `<span class="origen-tag">${esc(g.origen_fondos)}</span>` : '';
+    const isMulti  = g.cuotas.length > 1;
+
+    if (isMulti) {
+      // Fila cabecera TRX (multi-cuota)
+      html += `<tr class="tr-trx">
+        <td>${trxCode}</td>
+        <td><span style="font-weight:700">${fecha}</span><br><small style="color:#6366f1;font-weight:400">${hora}</small></td>
+        <td><a href="/creditos/revisar?id=${g.id_credito}" style="color:var(--navy);font-weight:700">${esc(g.numero_credito||g.id_credito)}</a><br>
+            <small style="color:#374151">${esc(g.nombre_cliente||'—')}</small></td>
+        <td><span class="cuota-badge">${g.cuotas.length} cuotas</span></td>
+        <td class="text-right">${clp(g.sum_monto)}</td>
+        <td class="text-right">${g.sum_mora > 0 ? `<span style="color:#92400e">${clp(g.sum_mora)}</span>` : '<span style="color:#9ca3af">—</span>'}</td>
+        <td class="text-right">${g.sum_gastos > 0 ? `<span style="color:#92400e">${clp(g.sum_gastos)}</span>` : '<span style="color:#9ca3af">—</span>'}</td>
+        <td class="text-right"><strong style="color:#15803d">${clp(g.sum_total)}</strong></td>
+        <td>${cajero}<br><small style="color:#6b7280">${caja}</small></td>
+        <td>${origen}</td>
+      </tr>`;
+      // Sub-filas por cuota
+      for (const q of g.cuotas) {
+        const hasMora   = (q.interes_mora||0) > 0;
+        const hasGastos = (q.gastos_cobranza||0) > 0;
+        html += `<tr class="tr-cuota">
+          <td style="color:#9ca3af;font-size:.75rem;padding-left:22px">└</td>
+          <td></td>
+          <td></td>
+          <td>N°<strong>${q.numero_cuota}</strong></td>
+          <td class="text-right">${clp(q.monto_cuota)}</td>
+          <td class="text-right">${hasMora   ? `<span style="color:#92400e">${clp(q.interes_mora)}</span>`    : '<span style="color:#d1d5db">—</span>'}</td>
+          <td class="text-right">${hasGastos ? `<span style="color:#92400e">${clp(q.gastos_cobranza)}</span>` : '<span style="color:#d1d5db">—</span>'}</td>
+          <td class="text-right" style="color:#374151">${clp(q.total_pagado)}</td>
+          <td></td>
+          <td></td>
+        </tr>`;
+      }
+    } else {
+      // Fila única (1 cuota)
+      const q = g.cuotas[0];
+      const hasMora   = (q.interes_mora||0) > 0;
+      const hasGastos = (q.gastos_cobranza||0) > 0;
+      html += `<tr class="trx-single">
+        <td>${trxCode}</td>
+        <td><span style="font-weight:600">${fecha}</span><br><small style="color:#6b7280">${hora}</small></td>
+        <td><a href="/creditos/revisar?id=${g.id_credito}" style="color:var(--navy);font-weight:600">${esc(g.numero_credito||g.id_credito)}</a><br>
+            <small style="color:#6b7280">${esc(g.nombre_cliente||'—')} · ${esc(g.rut_cliente||'')}</small></td>
+        <td>N°<strong>${q.numero_cuota}</strong></td>
+        <td class="text-right">${clp(q.monto_cuota)}</td>
+        <td class="text-right">${hasMora   ? `<span style="color:#92400e">${clp(q.interes_mora)}</span>`    : '<span style="color:#9ca3af">—</span>'}</td>
+        <td class="text-right">${hasGastos ? `<span style="color:#92400e">${clp(q.gastos_cobranza)}</span>` : '<span style="color:#9ca3af">—</span>'}</td>
+        <td class="text-right"><strong>${clp(q.total_pagado)}</strong></td>
+        <td>${cajero}<br><small style="color:#6b7280">${caja}</small></td>
+        <td>${origen}</td>
+      </tr>`;
+    }
+  }
+
+  html += `</tbody><tfoot><tr class="tfoot-row">
+    <td colspan="4">TOTAL PERÍODO ${esc(d.desde)} al ${esc(d.hasta)}</td>
+    <td class="text-right">${clp(t.monto_cuotas)}</td>
+    <td class="text-right">${clp(t.intereses_mora)}</td>
+    <td class="text-right">${clp(t.gastos_cobranza)}</td>
+    <td class="text-right">${clp(t.total_pagos)}</td>
+    <td colspan="2"></td>
+  </tr></tfoot></table></div>`;
+
+  document.getElementById('movWrap').innerHTML = html;
 }
 
-function renderMovRow(m) {
-  const dt = new Date(m.created_at);
-  const fecha = dt.toLocaleDateString('es-CL');
-  const hora  = dt.toLocaleTimeString('es-CL', { hour:'2-digit', minute:'2-digit' });
-  const hasMora   = (m.interes_mora||0) > 0;
-  const hasGastos = (m.gastos_cobranza||0) > 0;
-  return `
-  <tr>
-    <td><span style="font-weight:600">${fecha}</span><br><small style="color:#6b7280">${hora}</small></td>
-    <td><a href="/creditos/revisar?id=${m.id_credito}" style="color:var(--navy);font-weight:600">${esc(m.numero_credito||m.id_credito)}</a></td>
-    <td>${esc(m.nombre_cliente||'—')}<br><small style="color:#6b7280">${esc(m.rut_cliente||'')}</small></td>
-    <td class="text-right">N°${m.numero_cuota}</td>
-    <td class="text-right">${clp(m.monto_cuota)}</td>
-    <td class="text-right">${hasMora ? `<span style="color:#92400e">${clp(m.interes_mora)}</span>` : '<span style="color:#9ca3af">—</span>'}</td>
-    <td class="text-right">${hasGastos ? `<span style="color:#92400e">${clp(m.gastos_cobranza)}</span>` : '<span style="color:#9ca3af">—</span>'}</td>
-    <td class="text-right"><strong>${clp(m.total_pagado)}</strong></td>
-    <td>${esc(m.nombre_cajero?.trim()||m.registrado_por||'—')}</td>
-    <td>${esc(m.nombre_caja||'—')}</td>
-  </tr>`;
+/* ── cuentas transitorias del período ───────────────────────────────────── */
+function renderTransitorias(d) {
+  const trans = d.transitorias || [];
+  if (!trans.length) {
+    document.getElementById('panelTransitorias').style.display = 'none';
+    return;
+  }
+  document.getElementById('panelTransitorias').style.display = '';
+  document.getElementById('transCount').textContent = `${trans.length} registro${trans.length !== 1 ? 's' : ''} · ${clp(d.totales.total_transitorias)} generado`;
+
+  const rows = trans.map(t => {
+    const saldo   = parseFloat(t.saldo||0);
+    const estado  = saldo > 0 ? '<span class="badge-activo">ACTIVO</span>' : '<span class="badge-consumido">CONSUMIDO</span>';
+    return `<tr class="tr-trans">
+      <td><span class="trx-code" style="background:#fed7aa;color:#9a3412">${trxFmt(t.numero_transaccion)}</span></td>
+      <td style="white-space:nowrap;font-size:.82rem">${t.fecha ? new Date(t.fecha).toLocaleDateString('es-CL') : '—'}</td>
+      <td><a href="/creditos/revisar?id=${t.id_credito}" style="color:var(--navy);font-weight:600">${esc(t.numero_credito||t.id_credito)}</a></td>
+      <td>${esc(t.nombre_cliente||'—')}<br><small style="color:#6b7280">${esc(t.rut_cliente||'')}</small></td>
+      <td class="text-right" style="font-family:monospace;font-weight:700">${clp(t.monto_original)}</td>
+      <td class="text-right" style="font-family:monospace;color:#6b7280">${parseFloat(t.monto_utilizado||0) > 0 ? clp(t.monto_utilizado) : '—'}</td>
+      <td class="text-right" style="font-family:monospace;color:#15803d;font-weight:700">${saldo > 0 ? clp(saldo) : '—'}</td>
+      <td>${estado}</td>
+      <td style="font-size:.8rem;color:#374151">${esc(t.glosa||'—')}</td>
+    </tr>`;
+  }).join('');
+
+  const total = d.totales.total_transitorias;
+  document.getElementById('tbodyTransitorias').innerHTML = rows;
+  document.getElementById('tfootTransitorias').innerHTML = `
+    <td colspan="4">TOTAL CTAS. TRANSITORIAS</td>
+    <td class="text-right">${clp(total)}</td>
+    <td></td><td></td><td colspan="2"></td>`;
 }
 
 /* ── exportar CSV ────────────────────────────────────────────────────────── */
 function exportarCSV() {
   if (!_data?.movimientos?.length) return alert('Sin datos para exportar');
-  const cols = ['Fecha','Hora','Credito','Cliente','RUT','Cuota','Monto Cuota','Int Mora','Gtos Cobranza','Total Pagado','Cajero','Caja'];
+  const cols = ['TRX','Fecha','Hora','Credito','Cliente','RUT','Cuota','Monto Cuota','Int Mora','Gtos Cobranza','Total Pagado','Cajero','Caja','Origen'];
   const rows = _data.movimientos.map(m => {
     const dt = new Date(m.created_at);
     return [
+      trxFmt(m.numero_transaccion),
       dt.toLocaleDateString('es-CL'),
       dt.toLocaleTimeString('es-CL',{hour:'2-digit',minute:'2-digit'}),
       m.numero_credito||m.id_credito,
@@ -373,6 +552,7 @@ function exportarCSV() {
       Math.round(m.total_pagado||0),
       (m.nombre_cajero||m.registrado_por||'').trim(),
       m.nombre_caja||'',
+      m.origen_fondos||'',
     ];
   });
   const desde = document.getElementById('filDesde').value;
@@ -384,8 +564,6 @@ function exportarCSV() {
   a.download = `cierre-caja_${desde}_${hasta}.csv`;
   a.click();
 }
-
-function esc(s){ return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
 </script>
 </body>
 </html>
