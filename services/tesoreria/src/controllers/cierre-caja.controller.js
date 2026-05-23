@@ -67,19 +67,23 @@ const getCierre = async (req, res) => {
           pc.id_registrado_por,
           pc.numero_transaccion,
           pc.origen_fondos,
+          pc.id_cuenta_bancaria,
           c.numero_credito,
           c.nombre_cliente,
           c.rut_cliente,
           TRIM(CONCAT(COALESCE(u.nombre,''),' ',COALESCE(u.apellido,''))) AS nombre_cajero,
           p.nombre AS perfil_cajero,
           cu.id_caja,
-          cj.nombre AS nombre_caja
+          cj.nombre AS nombre_caja,
+          cb.numero_cuenta,
+          cb.banco AS banco_nombre
        FROM pagos_credito pc
        LEFT JOIN creditos c ON pc.id_credito = c.id_credito
        LEFT JOIN usuarios u ON pc.id_registrado_por = u.id_usuario
        LEFT JOIN perfiles p ON u.id_perfil = p.id_perfil
        LEFT JOIN caja_usuarios cu ON cu.id_usuario = pc.id_registrado_por AND cu.activo = 1
        LEFT JOIN cajas cj ON cu.id_caja = cj.id_caja
+       LEFT JOIN cuentas_bancarias cb ON pc.id_cuenta_bancaria = cb.id_cuenta
        WHERE ${where}
        ORDER BY pc.numero_transaccion DESC, pc.numero_cuota ASC`,
       params

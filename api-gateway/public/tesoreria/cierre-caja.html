@@ -91,7 +91,7 @@
   <div class="topnav-left">
     <a href="/" class="topnav-brand">
       <img src="/img/logo.png" alt="AutoFácil">
-      <span class="version-badge">v1.1</span>
+      <span class="version-badge">v1.2</span>
     </a>
     <div class="breadcrumb-nav">
       <a href="/">Inicio</a><span class="sep">/</span>
@@ -262,6 +262,20 @@ const clp = v => '$' + Math.round(v||0).toLocaleString('es-CL');
 const esc = s => String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
 const trxFmt = n => n ? `TRX-${String(n).padStart(6,'0')}` : '—';
 
+/* Formateo de fecha/hora siempre en horario de Chile (America/Santiago),
+   independiente del timezone del navegador o del servidor. */
+const TZ = 'America/Santiago';
+function dtParts(dtStr) {
+  // Forzar interpretación UTC si el string viene sin offset (YYYY-MM-DD HH:mm:ss de MySQL)
+  const iso = typeof dtStr === 'string' ? dtStr.replace(' ', 'T') + 'Z' : dtStr;
+  const dt  = new Date(iso);
+  if (isNaN(dt)) return { fecha: '—', hora: '—' };
+  return {
+    fecha: dt.toLocaleDateString('es-CL',  { timeZone: TZ, day:'2-digit', month:'2-digit', year:'numeric' }),
+    hora:  dt.toLocaleTimeString('es-CL',  { timeZone: TZ, hour:'2-digit', minute:'2-digit' }),
+  };
+}
+
 /* ── inicializar fechas (hoy) ────────────────────────────────────────────── */
 const hoy = new Date().toISOString().slice(0,10);
 document.getElementById('filDesde').value = hoy;
@@ -391,6 +405,7 @@ function renderMovimientos(d) {
         registrado_por:     m.registrado_por,
         nombre_caja:        m.nombre_caja,
         origen_fondos:      m.origen_fondos,
+        numero_cuenta:      m.numero_cuenta,
         cuotas:             [],
         sum_monto:          0,
         sum_mora:           0,
@@ -422,15 +437,15 @@ function renderMovimientos(d) {
     </tr></thead><tbody>`;
 
   for (const [, g] of trxMap) {
-    const dt    = new Date(g.created_at);
-    const fecha = dt.toLocaleDateString('es-CL');
-    const hora  = dt.toLocaleTimeString('es-CL', { hour:'2-digit', minute:'2-digit' });
+    const { fecha, hora } = dtParts(g.created_at);
     const trxCode  = g.numero_transaccion
       ? `<span class="trx-code">${trxFmt(g.numero_transaccion)}</span>`
       : '<span style="color:#9ca3af;font-size:.78rem">sin TRX</span>';
     const cajero   = esc((g.nombre_cajero||'').trim() || g.registrado_por || '—');
     const caja     = esc(g.nombre_caja || '—');
-    const origen   = g.origen_fondos ? `<span class="origen-tag">${esc(g.origen_fondos)}</span>` : '';
+    const origenLabel = g.origen_fondos ? `<span class="origen-tag">${esc(g.origen_fondos)}</span>` : '';
+    const cuentaNum   = g.numero_cuenta ? `<br><small style="font-family:monospace;color:#374151;font-size:.75rem">N° ${esc(g.numero_cuenta)}</small>` : '';
+    const origen      = origenLabel + cuentaNum;
     const isMulti  = g.cuotas.length > 1;
 
     if (isMulti) {
@@ -535,13 +550,13 @@ function renderTransitorias(d) {
 /* ── exportar CSV ────────────────────────────────────────────────────────── */
 function exportarCSV() {
   if (!_data?.movimientos?.length) return alert('Sin datos para exportar');
-  const cols = ['TRX','Fecha','Hora','Credito','Cliente','RUT','Cuota','Monto Cuota','Int Mora','Gtos Cobranza','Total Pagado','Cajero','Caja','Origen'];
+  const cols = ['TRX','Fecha','Hora','Credito','Cliente','RUT','Cuota','Monto Cuota','Int Mora','Gtos Cobranza','Total Pagado','Cajero','Caja','Origen','N° Cuenta'];
   const rows = _data.movimientos.map(m => {
-    const dt = new Date(m.created_at);
+    const { fecha, hora } = dtParts(m.created_at);
     return [
       trxFmt(m.numero_transaccion),
-      dt.toLocaleDateString('es-CL'),
-      dt.toLocaleTimeString('es-CL',{hour:'2-digit',minute:'2-digit'}),
+      fecha,
+      hora,
       m.numero_credito||m.id_credito,
       m.nombre_cliente||'',
       m.rut_cliente||'',
@@ -553,6 +568,7 @@ function exportarCSV() {
       (m.nombre_cajero||m.registrado_por||'').trim(),
       m.nombre_caja||'',
       m.origen_fondos||'',
+      m.numero_cuenta||'',
     ];
   });
   const desde = document.getElementById('filDesde').value;
