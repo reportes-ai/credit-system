@@ -87,6 +87,18 @@
     .empty { text-align:center; color:#9ca3af; padding:48px 0; }
     .pag-row { display:flex; align-items:center; justify-content:space-between; padding:12px 0; }
     .pag-info { font-size:.82rem; color:#6b7280; }
+
+    /* Panel admin corrección */
+    .admin-panel { background:#fff7ed; border:1.5px dashed #fb923c; border-radius:10px; padding:16px 20px; margin-top:14px; }
+    .admin-panel h6 { font-size:.82rem; font-weight:700; color:#92400e; margin:0 0 12px; }
+    .admin-row { display:flex; gap:10px; flex-wrap:wrap; align-items:flex-end; margin-bottom:10px; }
+    .admin-row label { font-size:.75rem; font-weight:600; color:#92400e; display:block; margin-bottom:3px; }
+    .admin-row input { border-radius:7px; border:1.5px solid #fed7aa; padding:6px 10px; font-size:.84rem; outline:none; width:160px; }
+    .admin-row input:focus { border-color:#f97316; }
+    .btn-admin-fix { background:#dc2626; color:#fff; border:none; border-radius:8px; padding:7px 16px; font-size:.82rem; font-weight:700; cursor:pointer; }
+    .btn-admin-fix:hover { background:#b91c1c; }
+    .btn-admin-del  { background:#fff; color:#dc2626; border:1.5px solid #dc2626; border-radius:6px; padding:2px 8px; font-size:.72rem; font-weight:700; cursor:pointer; margin-left:8px; }
+    .btn-admin-del:hover { background:#fef2f2; }
   </style>
 </head>
 <body>
@@ -94,7 +106,7 @@
   <div class="topnav-left">
     <a href="/" class="topnav-brand">
       <img src="/img/logo.png" alt="AutoFácil">
-      <span class="version-badge">v1.2</span>
+      <span class="version-badge">v1.3</span>
     </a>
     <div class="breadcrumb-nav">
       <a href="/">Inicio</a><span class="sep">›</span>
@@ -292,7 +304,7 @@ async function toggleCartola(id_credito) {
     document.getElementById(`loading-${id_credito}`).style.display = 'none';
     if (json.success) {
       _cartolas[id_credito] = json.data;
-      document.getElementById(`contenido-${id_credito}`).innerHTML = renderCartola(json.data);
+      document.getElementById(`contenido-${id_credito}`).innerHTML = renderCartola(json.data, id_credito);
     } else {
       document.getElementById(`contenido-${id_credito}`).innerHTML =
         `<p style="color:#dc2626;font-size:.88rem">Error al cargar el extracto: ${esc(json.error)}</p>`;
@@ -302,7 +314,9 @@ async function toggleCartola(id_credito) {
   }
 }
 
-function renderCartola(data) {
+const esAdmin = ['Administrador','Gerente'].includes(yo?.perfil);
+
+function renderCartola(data, id_credito) {
   const movs  = data.movimientos || [];
   const saldo = data.saldo_actual || 0;
 
@@ -311,7 +325,7 @@ function renderCartola(data) {
   }
 
   const rows = movs.map(m => {
-    const esAbono    = m.tipo === 'ABONO';
+    const esAbono     = m.tipo === 'ABONO';
     const esHistorico = m.es_historico;
     const tipoTag = esHistorico
       ? `<span class="tag-historico"><i class="bi bi-clock-history me-1"></i>HIST.</span>`
@@ -332,11 +346,19 @@ function renderCartola(data) {
 
     const saldoColor = m.saldo_corriente > 0 ? '#15803d' : (m.saldo_corriente < 0 ? '#dc2626' : '#9ca3af');
 
+    // Botón eliminar para admins en filas ABONO con id_transitoria (no históricas)
+    const btnDel = (esAdmin && esAbono && m.id_transitoria && !esHistorico)
+      ? `<button class="btn-admin-del" title="Eliminar esta transitoria"
+           onclick="eliminarTransitoria(${m.id_transitoria}, ${id_credito})">
+           <i class="bi bi-trash"></i>
+         </button>`
+      : '';
+
     return `<tr>
       <td style="white-space:nowrap">${fmtDt(m.fecha)}</td>
       <td>${trxCell}</td>
       <td>${tipoTag}</td>
-      <td style="color:#374151;font-size:.82rem">${esc(m.concepto||'—')}</td>
+      <td style="color:#374151;font-size:.82rem">${esc(m.concepto||'—')}${btnDel}</td>
       <td class="text-right">${abonoCell}</td>
       <td class="text-right">${cargoCell}</td>
       <td class="text-right saldo-col" style="color:${saldoColor}">${clp(m.saldo_corriente)}</td>
@@ -344,6 +366,38 @@ function renderCartola(data) {
   }).join('');
 
   const saldoColor = saldo > 0 ? '#15803d' : '#9ca3af';
+
+  // Panel corrección admin (solo si hay entrada HIST. o discrepancia)
+  const hayHist = movs.some(m => m.es_historico);
+  const panelAdmin = (esAdmin && hayHist) ? `
+    <div class="admin-panel">
+      <h6><i class="bi bi-tools me-1"></i>Panel de Corrección — Movimientos Históricos</h6>
+      <p style="font-size:.8rem;color:#92400e;margin-bottom:12px">
+        Existen movimientos históricos sin detalle de TRX. Puedes corregirlos usando el botón
+        <strong>🗑️</strong> en los ABONOs erróneos, o usando el formulario de corrección.
+      </p>
+      <div class="admin-row">
+        <div>
+          <label>ID Transitoria a ELIMINAR</label>
+          <input type="number" id="fix_del_${id_credito}" placeholder="ID transitoria">
+        </div>
+        <div>
+          <label>ID Transitoria afectada (cargo)</label>
+          <input type="number" id="fix_cargo_id_${id_credito}" placeholder="ID transitoria cargo">
+        </div>
+        <div>
+          <label>TRX del cargo</label>
+          <input type="number" id="fix_cargo_trx_${id_credito}" placeholder="N° transacción">
+        </div>
+        <div>
+          <label>Monto cargo ($)</label>
+          <input type="number" id="fix_cargo_monto_${id_credito}" placeholder="Ej: 191285">
+        </div>
+        <button class="btn-admin-fix" onclick="aplicarFix(${id_credito})">
+          <i class="bi bi-wrench me-1"></i>Aplicar corrección
+        </button>
+      </div>
+    </div>` : '';
 
   return `
   <table class="cartola-table">
@@ -366,7 +420,48 @@ function renderCartola(data) {
         <td class="text-right" style="color:${saldoColor};font-size:1rem">${clp(saldo)}</td>
       </tr>
     </tfoot>
-  </table>`;
+  </table>
+  ${panelAdmin}`;
+}
+
+async function eliminarTransitoria(id_transitoria, id_credito) {
+  if (!confirm(`¿Eliminar la transitoria ID ${id_transitoria}?\nEsta acción NO se puede deshacer.`)) return;
+  const res  = await fetch(`/api/cuentas-transitorias/transitoria/${id_transitoria}`, { method:'DELETE', headers:H });
+  const json = await res.json();
+  if (!json.success) return alert('Error: ' + json.error);
+  alert('Transitoria eliminada correctamente.');
+  delete _cartolas[id_credito];
+  document.getElementById(`loading-${id_credito}`).style.display = '';
+  document.getElementById(`contenido-${id_credito}`).innerHTML = '';
+  // Recargar cartola y lista
+  toggleCartola(id_credito);
+  cargar();
+}
+
+async function aplicarFix(id_credito) {
+  const del   = document.getElementById(`fix_del_${id_credito}`).value;
+  const cid   = document.getElementById(`fix_cargo_id_${id_credito}`).value;
+  const ctrx  = document.getElementById(`fix_cargo_trx_${id_credito}`).value;
+  const cmonto= document.getElementById(`fix_cargo_monto_${id_credito}`).value;
+  if (!del) return alert('Ingresa el ID de la transitoria a eliminar.');
+  if (!confirm(`Eliminar transitoria ${del} e insertar CARGO de $${cmonto}?\nEsta acción NO se puede deshacer.`)) return;
+  const res  = await fetch('/api/cuentas-transitorias/admin/fix-transitoria', {
+    method: 'POST', headers: H,
+    body: JSON.stringify({
+      id_transitoria_eliminar:  parseInt(del),
+      id_transitoria_cargo:     cid   ? parseInt(cid)   : null,
+      numero_transaccion_cargo: ctrx  ? parseInt(ctrx)  : null,
+      monto_cargo:              cmonto? parseFloat(cmonto): null,
+    })
+  });
+  const json = await res.json();
+  if (!json.success) return alert('Error: ' + json.error);
+  alert('✅ Corrección aplicada correctamente.');
+  delete _cartolas[id_credito];
+  document.getElementById(`loading-${id_credito}`).style.display = '';
+  document.getElementById(`contenido-${id_credito}`).innerHTML = '';
+  toggleCartola(id_credito);
+  cargar();
 }
 
 cargar();

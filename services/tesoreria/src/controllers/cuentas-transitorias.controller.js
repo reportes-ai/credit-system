@@ -187,4 +187,96 @@ const cartola = async (req, res) => {
   } catch(e) { err(res, e); }
 };
 
-module.exports = { list, porCredito, cartola };
+/* ── POST /admin/fix-transitoria  ─ corrección manual (solo Administrador) ── */
+/* Elimina una transitoria errónea e inserta el CARGO histórico correspondiente */
+const adminFixTransitoria = async (req, res) => {
+  try {
+    const {
+      id_transitoria_eliminar,   // ID de la transitoria a borrar (la del bug)
+      id_transitoria_cargo,      // ID de la transitoria que fue realmente consumida
+      numero_transaccion_cargo,  // TRX que generó el cargo
+      monto_cargo,               // Monto del cargo histórico
+      concepto_cargo,            // Descripción del cargo
+    } = req.body;
+
+    if (!id_transitoria_eliminar)
+      return res.status(400).json({ success: false, data: null, error: 'id_transitoria_eliminar es requerido' });
+
+    const conn = await pool.getConnection();
+    try {
+      await conn.beginTransaction();
+
+      // 1. Obtener info de la transitoria a eliminar para validar
+      const [[tr]] = await conn.query(
+        `SELECT id_transitoria, id_credito, monto_original, monto_utilizado
+         FROM cuentas_transitorias WHERE id_transitoria = ?`,
+        [id_transitoria_eliminar]
+      );
+      if (!tr) throw new Error(`Transitoria ${id_transitoria_eliminar} no encontrada`);
+      if (parseFloat(tr.monto_utilizado) > 0)
+        throw new Error(`La transitoria ya tiene $${tr.monto_utilizado} utilizado — eliminar podría causar descuadre. Revisa manualmente.`);
+
+      // 2. Eliminar la transitoria errónea
+      await conn.query('DELETE FROM cuentas_transitorias WHERE id_transitoria = ?', [id_transitoria_eliminar]);
+
+      // 3. Insertar CARGO histórico en cartola (si se indicó)
+      let cargoInsertado = null;
+      if (id_transitoria_cargo && monto_cargo) {
+        // Obtener fecha del pago real
+        const [[pc]] = await conn.query(
+          `SELECT MIN(created_at) AS fecha_pago FROM pagos_credito
+           WHERE numero_transaccion = ? LIMIT 1`,
+          [numero_transaccion_cargo || null]
+        ).catch(() => [[null]]);
+
+        await conn.query(
+          `INSERT INTO transitorias_cartola
+             (id_transitoria, id_credito, numero_transaccion, tipo, monto, concepto, created_at)
+           SELECT ?, id_credito, ?, 'CARGO', ?, ?,
+                  COALESCE(?, NOW())
+           FROM cuentas_transitorias WHERE id_transitoria = ?`,
+          [
+            id_transitoria_cargo,
+            numero_transaccion_cargo || null,
+            parseFloat(monto_cargo),
+            concepto_cargo || `Aplicado al pago TRX-${String(numero_transaccion_cargo||'').padStart(6,'0')} (histórico)`,
+            pc?.fecha_pago || null,
+            id_transitoria_cargo,
+          ]
+        );
+        cargoInsertado = true;
+      }
+
+      await conn.commit();
+      ok(res, {
+        mensaje: 'Corrección aplicada correctamente',
+        eliminada: id_transitoria_eliminar,
+        cargo_insertado: cargoInsertado,
+      });
+    } catch(e) {
+      await conn.rollback();
+      throw e;
+    } finally {
+      conn.release();
+    }
+  } catch(e) { err(res, e); }
+};
+
+/* ── DELETE /transitoria/:id  ─ eliminar una transitoria individual ── */
+const deleteTransitoria = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const [[tr]] = await pool.query(
+      'SELECT id_transitoria, monto_original, monto_utilizado FROM cuentas_transitorias WHERE id_transitoria = ?',
+      [id]
+    );
+    if (!tr) return res.status(404).json({ success: false, data: null, error: 'Transitoria no encontrada' });
+    if (parseFloat(tr.monto_utilizado) > 0)
+      return res.status(400).json({ success: false, data: null, error: `Esta transitoria tiene $${tr.monto_utilizado} ya utilizado. No se puede eliminar.` });
+
+    await pool.query('DELETE FROM cuentas_transitorias WHERE id_transitoria = ?', [id]);
+    ok(res, { mensaje: 'Transitoria eliminada', id_transitoria: id });
+  } catch(e) { err(res, e); }
+};
+
+module.exports = { list, porCredito, cartola, adminFixTransitoria, deleteTransitoria };
