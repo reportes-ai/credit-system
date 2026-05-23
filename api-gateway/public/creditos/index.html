@@ -329,7 +329,10 @@
     .stat-proceso  { border-color:#fdba74; background:#fff7ed; }
     .stat-proceso .sc-label  { color:#c2410c; }
     .stat-proceso.activo { border-color:#ea580c !important; box-shadow:0 0 0 3px #ffedd5; }
-  </style>
+    .breadcrumb-nav { color:rgba(255,255,255,.6); font-size:.85rem; display:flex; align-items:center; gap:6px; }
+    .breadcrumb-nav a { color:rgba(255,255,255,.75); text-decoration:none; }
+    .breadcrumb-nav a:hover { color:#fff; }
+    .breadcrumb-nav .sep { color:rgba(255,255,255,.35); }  </style>
 </head>
 <body>
 
@@ -340,6 +343,10 @@
       <a href="/"><img src="/img/logo.png" alt="AutoFácil" style="display:block"></a>
       <span class="version-badge" id="versionBadge">v3.2</span>
     </div>
+      <div class="breadcrumb-nav">
+        <a href="/">Inicio</a><span class="sep">›</span>
+        <span style="color:#fff;font-weight:600">Créditos</span>
+      </div>
   </div>
   <div class="topnav-right">
     <div class="user-chip">
