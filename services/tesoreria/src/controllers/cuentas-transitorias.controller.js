@@ -98,4 +98,93 @@ const porCredito = async (req, res) => {
   } catch(e) { err(res, e); }
 };
 
-module.exports = { list, porCredito };
+/* ── GET /cartola/:id_credito  ─ extracto bancario por crédito ── */
+const cartola = async (req, res) => {
+  try {
+    const id_credito = req.params.id_credito;
+
+    // Info del crédito y cliente
+    const [[cred]] = await pool.query(
+      `SELECT numero_credito, nombre_cliente, rut_cliente FROM creditos WHERE id_credito = ?`,
+      [id_credito]
+    ).catch(() => [[null]]);
+
+    // ── Movimientos: UNION de transitorias (ABONOs base) + cartola (ABONOs y CARGOs registrados)
+    // Preferimos la cartola cuando existe; para registros históricos sin cartola,
+    // mostramos el ABONO desde cuentas_transitorias y anotamos el cargo histórico al final.
+    const [movs] = await pool.query(`
+      (
+        -- ABONOs base (registros sin cartola, fallback histórico)
+        SELECT
+          ct.created_at              AS fecha,
+          ct.numero_transaccion,
+          'ABONO'                    AS tipo,
+          ct.monto_original          AS monto,
+          ct.glosa                   AS concepto,
+          ct.id_transitoria,
+          0                          AS es_cartola
+        FROM cuentas_transitorias ct
+        WHERE ct.id_credito = ?
+          AND NOT EXISTS (
+            SELECT 1 FROM transitorias_cartola tc
+            WHERE tc.id_transitoria = ct.id_transitoria AND tc.tipo = 'ABONO'
+          )
+      )
+      UNION ALL
+      (
+        -- Movimientos registrados en la cartola (ABONOs y CARGOs con detalle)
+        SELECT
+          tc.created_at              AS fecha,
+          tc.numero_transaccion,
+          tc.tipo,
+          tc.monto,
+          tc.concepto,
+          tc.id_transitoria,
+          1                          AS es_cartola
+        FROM transitorias_cartola tc
+        WHERE tc.id_credito = ?
+      )
+      ORDER BY fecha ASC, tipo DESC
+    `, [id_credito, id_credito]);
+
+    // Saldo actual real (desde la tabla de transitorias)
+    const [[{ saldo_real }]] = await pool.query(
+      `SELECT ROUND(SUM(monto_original - monto_utilizado), 2) AS saldo_real
+       FROM cuentas_transitorias WHERE id_credito = ?`,
+      [id_credito]
+    );
+
+    // Calcular saldo corriente acumulado
+    let saldo = 0;
+    const movimientos = movs.map(m => {
+      const monto = parseFloat(m.monto) || 0;
+      saldo = m.tipo === 'ABONO' ? saldo + monto : saldo - monto;
+      return { ...m, monto, saldo_corriente: Math.round(saldo * 100) / 100 };
+    });
+
+    // Si hay diferencia entre el saldo calculado y el real (registros históricos sin cargo detallado),
+    // agregar un movimiento sintético para cuadrar
+    const diff = Math.round((parseFloat(saldo_real)||0) - saldo);
+    if (Math.abs(diff) > 1 && movimientos.length > 0) {
+      movimientos.push({
+        fecha:              null,
+        numero_transaccion: null,
+        tipo:               diff < 0 ? 'CARGO' : 'ABONO',
+        monto:              Math.abs(diff),
+        concepto:           'Movimientos históricos sin detalle de TRX',
+        id_transitoria:     null,
+        es_cartola:         0,
+        saldo_corriente:    parseFloat(saldo_real) || 0,
+        es_historico:       true,
+      });
+    }
+
+    ok(res, {
+      credito:   cred || { id_credito, numero_credito: id_credito, nombre_cliente: '—', rut_cliente: '—' },
+      saldo_actual: parseFloat(saldo_real) || 0,
+      movimientos,
+    });
+  } catch(e) { err(res, e); }
+};
+
+module.exports = { list, porCredito, cartola };

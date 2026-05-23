@@ -58,6 +58,21 @@ const audit = require('../../../../shared/auditoria');
         INDEX idx_rut      (rut_cliente)
       )
     `);
+    // Cartola de movimientos de cuentas transitorias (ABONO / CARGO)
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS transitorias_cartola (
+        id_mov             INT AUTO_INCREMENT PRIMARY KEY,
+        id_transitoria     INT            NOT NULL,
+        id_credito         INT            NOT NULL,
+        numero_transaccion INT            NULL,
+        tipo               VARCHAR(10)    NOT NULL COMMENT 'ABONO o CARGO',
+        monto              DECIMAL(14,2)  NOT NULL,
+        concepto           VARCHAR(400)   NULL,
+        created_at         DATETIME       DEFAULT CURRENT_TIMESTAMP,
+        INDEX idx_credito  (id_credito),
+        INDEX idx_trans    (id_transitoria)
+      )
+    `);
   } catch(e) { if (e.errno !== 1050) console.error('[pagos_credito migration]', e.message); }
 })();
 
@@ -244,6 +259,16 @@ const createBatch = async (req, res) => {
            WHERE id_transitoria = ?`,
           [usar, usar, tr.id_transitoria]
         );
+        // ── Registrar CARGO en la cartola ──────────────────────────────────
+        await conn.query(
+          `INSERT INTO transitorias_cartola
+             (id_transitoria, id_credito, numero_transaccion, tipo, monto, concepto)
+           VALUES (?, ?, ?, 'CARGO', ?,
+             CONCAT('Aplicado al pago TRX-', LPAD(?, 6, '0'),
+                    ' (', ?, ' cuota', IF(? > 1,'s',''), ')'))`,
+          [tr.id_transitoria, id_credito, numero_transaccion, usar,
+           numero_transaccion, pagos.length, pagos.length]
+        );
         restante -= usar;
       }
     }
@@ -274,6 +299,14 @@ const createBatch = async (req, res) => {
         ]
       );
       transitoria = { id_transitoria: trIns.insertId, monto: exceso };
+      // ── Registrar ABONO en la cartola ───────────────────────────────────
+      await conn.query(
+        `INSERT INTO transitorias_cartola
+           (id_transitoria, id_credito, numero_transaccion, tipo, monto, concepto)
+         VALUES (?, ?, ?, 'ABONO', ?,
+           CONCAT('Pago en exceso TRX-', LPAD(?, 6, '0')))`,
+        [trIns.insertId, id_credito, numero_transaccion, exceso, numero_transaccion]
+      );
     }
 
     await conn.commit();

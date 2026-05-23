@@ -27,24 +27,23 @@
     .btn-logout { background:rgba(255,255,255,.1); border:1px solid rgba(255,255,255,.2); color:#fff; border-radius:8px; padding:5px 12px; font-size:.82rem; cursor:pointer; }
     .btn-logout:hover { background:rgba(255,255,255,.2); }
 
-    .main-content { max-width:1200px; margin:0 auto; padding:28px 24px; }
-
+    .main-content { max-width:1100px; margin:0 auto; padding:28px 24px; }
     .page-banner { background:linear-gradient(135deg,#012d70,#0141A2 50%,#009AFE); border-radius:16px; color:#fff; padding:28px 36px; margin-bottom:28px; display:flex; align-items:center; gap:20px; }
     .page-banner > i { font-size:3rem; opacity:.8; }
     .page-banner h2 { font-weight:700; margin:0 0 4px; font-size:1.4rem; }
     .page-banner p { opacity:.8; margin:0; font-size:.9rem; }
 
-    /* Resumen Cards */
+    /* Stats */
     .resumen-row { display:grid; grid-template-columns:repeat(auto-fill,minmax(220px,1fr)); gap:16px; margin-bottom:24px; }
     .stat-card { background:#fff; border-radius:14px; padding:20px 24px; box-shadow:0 1px 4px rgba(0,0,0,.07); display:flex; align-items:center; gap:16px; }
     .stat-icon { width:48px; height:48px; border-radius:12px; display:flex; align-items:center; justify-content:center; font-size:1.4rem; flex-shrink:0; }
-    .stat-icon.blue { background:#dbeafe; color:#1d4ed8; }
+    .stat-icon.blue  { background:#dbeafe; color:#1d4ed8; }
     .stat-icon.green { background:#dcfce7; color:#15803d; }
     .stat-label { font-size:.75rem; color:#6b7280; font-weight:600; text-transform:uppercase; letter-spacing:.5px; }
     .stat-val { font-size:1.4rem; font-weight:900; color:#111827; font-family:monospace; line-height:1.2; }
 
     /* Toolbar */
-    .toolbar { background:#fff; border-radius:12px; box-shadow:0 1px 4px rgba(0,0,0,.07); padding:14px 20px; margin-bottom:16px; display:flex; align-items:center; gap:12px; flex-wrap:wrap; }
+    .toolbar { background:#fff; border-radius:12px; box-shadow:0 1px 4px rgba(0,0,0,.07); padding:14px 20px; margin-bottom:20px; display:flex; align-items:center; gap:12px; flex-wrap:wrap; }
     .search-wrap { position:relative; flex:1; min-width:260px; }
     .search-wrap i { position:absolute; left:12px; top:50%; transform:translateY(-50%); color:#9ca3af; }
     .search-wrap input { padding-left:36px; border-radius:8px; font-size:.88rem; border:1.5px solid #e5e7eb; width:100%; padding-top:8px; padding-bottom:8px; outline:none; }
@@ -52,37 +51,50 @@
     .filter-select { border-radius:8px; font-size:.88rem; border:1.5px solid #e5e7eb; padding:8px 12px; outline:none; }
     .count-badge { color:#6b7280; font-size:.85rem; white-space:nowrap; }
 
-    /* Table */
-    .table-wrap { background:#fff; border-radius:12px; box-shadow:0 1px 4px rgba(0,0,0,.07); overflow:hidden; }
-    table { width:100%; border-collapse:collapse; font-size:.84rem; }
-    thead tr { background:var(--navy); color:#fff; }
-    thead th { padding:11px 14px; font-weight:600; font-size:.75rem; letter-spacing:.4px; text-transform:uppercase; white-space:nowrap; }
-    tbody tr { border-bottom:1px solid #f1f5f9; transition:background .1s; }
-    tbody tr:hover { background:#f8fafc; }
-    tbody td { padding:10px 14px; vertical-align:middle; color:#374151; }
-    .td-num { font-weight:700; color:var(--navy); }
-    .td-trx { font-family:monospace; font-size:.8rem; color:#6b7280; }
-    .td-cliente { font-weight:600; color:#111827; }
-    .td-rut { font-family:monospace; color:var(--accent); font-size:.8rem; }
-    .td-saldo { font-weight:900; font-family:monospace; color:#15803d; font-size:.92rem; }
-    .td-consumido { font-weight:700; font-family:monospace; color:#9ca3af; font-size:.88rem; }
+    /* Cuenta Card */
+    .cuenta-card { background:#fff; border-radius:14px; box-shadow:0 1px 4px rgba(0,0,0,.07); margin-bottom:18px; overflow:hidden; }
+    .cuenta-header { display:flex; align-items:center; justify-content:space-between; padding:16px 22px; cursor:pointer; border-bottom:1px solid #f1f5f9; user-select:none; }
+    .cuenta-header:hover { background:#f8fafc; }
+    .cuenta-header-left { display:flex; align-items:center; gap:16px; }
+    .op-badge { background:#dbeafe; color:var(--navy); font-weight:800; font-size:.85rem; border-radius:8px; padding:4px 12px; white-space:nowrap; }
+    .cuenta-cliente { font-weight:700; color:#111827; font-size:.95rem; }
+    .cuenta-rut { font-family:monospace; color:var(--accent); font-size:.82rem; }
+    .saldo-badge { font-family:monospace; font-weight:900; font-size:1.1rem; border-radius:10px; padding:5px 14px; white-space:nowrap; }
+    .saldo-badge.positivo { background:#dcfce7; color:#15803d; }
+    .saldo-badge.cero { background:#f1f5f9; color:#9ca3af; }
+    .toggle-icon { font-size:1rem; color:#9ca3af; transition:transform .2s; }
+    .toggle-icon.open { transform:rotate(180deg); }
 
-    .badge-activo { background:#dcfce7; color:#15803d; font-weight:700; font-size:.72rem; border-radius:8px; padding:2px 8px; }
-    .badge-consumido { background:#f1f5f9; color:#9ca3af; font-weight:700; font-size:.72rem; border-radius:8px; padding:2px 8px; }
+    /* Cartola (extracto bancario) */
+    .cartola-wrap { padding:0 22px 18px; }
+    .cartola-table { width:100%; border-collapse:collapse; font-size:.83rem; margin-top:12px; }
+    .cartola-table thead th { background:#f8fafc; color:#374151; font-weight:700; padding:9px 12px; text-align:left; border-bottom:2px solid #e5e7eb; white-space:nowrap; font-size:.75rem; text-transform:uppercase; letter-spacing:.3px; }
+    .cartola-table tbody td { padding:9px 12px; border-bottom:1px solid #f8fafc; vertical-align:middle; }
+    .cartola-table tbody tr:last-child td { border-bottom:none; }
+    .cartola-table tbody tr:hover td { background:#fafbff; }
+    .cartola-table tfoot td { background:#f0f4f8; font-weight:700; padding:10px 12px; border-top:2px solid #e5e7eb; }
 
-    .pag-row { display:flex; align-items:center; justify-content:space-between; padding:12px 20px; border-top:1px solid #f1f5f9; }
-    .pag-info { font-size:.82rem; color:#6b7280; }
+    /* Tipos movimiento */
+    .tag-abono { background:#dcfce7; color:#15803d; font-weight:700; font-size:.72rem; border-radius:6px; padding:2px 8px; }
+    .tag-cargo { background:#fef2f2; color:#dc2626; font-weight:700; font-size:.72rem; border-radius:6px; padding:2px 8px; }
+    .tag-historico { background:#fef9c3; color:#92400e; font-weight:700; font-size:.72rem; border-radius:6px; padding:2px 8px; }
+    .trx-code { font-family:monospace; font-size:.79rem; font-weight:700; color:var(--navy); background:#dbeafe; border-radius:5px; padding:2px 6px; white-space:nowrap; }
+    .monto-abono { font-family:monospace; font-weight:700; color:#15803d; }
+    .monto-cargo  { font-family:monospace; font-weight:700; color:#dc2626; }
+    .saldo-col { font-family:monospace; font-weight:700; color:#374151; }
 
+    .cartola-loading { text-align:center; padding:24px 0; color:#9ca3af; font-size:.88rem; }
     .empty { text-align:center; color:#9ca3af; padding:48px 0; }
+    .pag-row { display:flex; align-items:center; justify-content:space-between; padding:12px 0; }
+    .pag-info { font-size:.82rem; color:#6b7280; }
   </style>
 </head>
 <body>
-
 <nav class="topnav">
   <div class="topnav-left">
     <a href="/" class="topnav-brand">
       <img src="/img/logo.png" alt="AutoFácil">
-      <span class="version-badge">v1.1</span>
+      <span class="version-badge">v1.2</span>
     </a>
     <div class="breadcrumb-nav">
       <a href="/">Inicio</a><span class="sep">›</span>
@@ -103,12 +115,11 @@
 </nav>
 
 <div class="main-content">
-
   <div class="page-banner">
     <i class="bi bi-arrow-left-right"></i>
     <div>
       <h2>Cuentas Transitorias</h2>
-      <p>Saldos a favor de clientes generados por pagos en exceso</p>
+      <p>Extracto de saldos a favor — por crédito y cliente</p>
     </div>
   </div>
 
@@ -117,7 +128,7 @@
     <div class="stat-card">
       <div class="stat-icon blue"><i class="bi bi-people"></i></div>
       <div>
-        <div class="stat-label">Cuentas con saldo</div>
+        <div class="stat-label">Créditos con saldo</div>
         <div class="stat-val" id="statCantidad">—</div>
       </div>
     </div>
@@ -143,31 +154,16 @@
     <span class="count-badge" id="countBadge"></span>
   </div>
 
-  <!-- Tabla consolidada por crédito -->
-  <div class="table-wrap">
-    <table>
-      <thead>
-        <tr>
-          <th>N° OP</th>
-          <th>CLIENTE</th>
-          <th>RUT</th>
-          <th class="text-right">INGRESADO</th>
-          <th class="text-right">UTILIZADO</th>
-          <th class="text-right">SALDO DISPONIBLE</th>
-          <th>ESTADO</th>
-          <th>ÚLT. MOVIMIENTO</th>
-        </tr>
-      </thead>
-      <tbody id="tbody">
-        <tr><td colspan="8" class="empty">Cargando…</td></tr>
-      </tbody>
-    </table>
-    <div class="pag-row">
-      <span class="pag-info" id="pagInfo"></span>
-      <div class="d-flex gap-2">
-        <button class="btn btn-outline-secondary btn-sm" id="btnPrev" onclick="cambiarPag(-1)"><i class="bi bi-chevron-left"></i></button>
-        <button class="btn btn-outline-secondary btn-sm" id="btnNext" onclick="cambiarPag(1)"><i class="bi bi-chevron-right"></i></button>
-      </div>
+  <!-- Lista de cuentas con cartola expandible -->
+  <div id="listaCuentas">
+    <div class="empty"><i class="bi bi-arrow-left-right fs-1 d-block mb-3"></i>Cargando…</div>
+  </div>
+
+  <div class="pag-row" id="pagRow" style="display:none">
+    <span class="pag-info" id="pagInfo"></span>
+    <div class="d-flex gap-2">
+      <button class="btn btn-outline-secondary btn-sm" id="btnPrev" onclick="cambiarPag(-1)"><i class="bi bi-chevron-left"></i></button>
+      <button class="btn btn-outline-secondary btn-sm" id="btnNext" onclick="cambiarPag(1)"><i class="bi bi-chevron-right"></i></button>
     </div>
   </div>
 </div>
@@ -182,20 +178,21 @@ document.getElementById('navPerfil').textContent  = yo?.perfil || '';
 document.getElementById('avatarInicial').textContent = (yo?.nombre||'?').charAt(0).toUpperCase();
 function logout() { localStorage.removeItem('token'); localStorage.removeItem('usuario'); window.location.href='/login.html'; }
 
-const H = { 'Content-Type':'application/json', 'Authorization':'Bearer '+token };
+const H   = { 'Content-Type':'application/json', 'Authorization':'Bearer '+token };
 const clp = v => '$' + Math.round(v||0).toLocaleString('es-CL');
 const esc = s => String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;');
-const fmtDt = v => {
+const trxFmt = n => n ? `TRX-${String(n).padStart(6,'0')}` : '—';
+const fmtDt  = v => {
   if (!v) return '—';
   const d = new Date(v);
   if (isNaN(d)) return '—';
   return d.toLocaleDateString('es-CL', { timeZone:'America/Santiago', day:'2-digit', month:'2-digit', year:'numeric' });
 };
 
-let _data = [], pag = 1, perPag = 50, debTimer;
+let _data = [], pag = 1, perPag = 20, debTimer;
+const _cartolas = {};   // cache de cartolas cargadas por id_credito
 
 function debounce() { clearTimeout(debTimer); debTimer = setTimeout(cargar, 300); }
-function cambiarPag(d) { pag += d; render(); }
 
 async function cargar() {
   pag = 1;
@@ -203,6 +200,9 @@ async function cargar() {
   const s = document.getElementById('filtroEstado').value;
   const params = new URLSearchParams({ solo_saldo: s });
   if (q) params.append('q', q);
+
+  document.getElementById('listaCuentas').innerHTML =
+    '<div class="empty"><div class="spinner-border text-primary mb-3" style="width:2rem;height:2rem"></div><br>Cargando…</div>';
 
   const res  = await fetch('/api/cuentas-transitorias?' + params, { headers: H });
   const json = await res.json();
@@ -216,45 +216,157 @@ async function cargar() {
   render();
 }
 
+function cambiarPag(d) { pag += d; render(); }
+
 function render() {
-  const desde = (pag-1)*perPag, hasta = Math.min(pag*perPag, _data.length);
+  const desde  = (pag-1)*perPag, hasta = Math.min(pag*perPag, _data.length);
   const pagina = _data.slice(desde, hasta);
 
-  document.getElementById('countBadge').textContent = `${_data.length.toLocaleString('es-CL')} crédito${_data.length!==1?'s':''}`;
-  document.getElementById('pagInfo').textContent    = _data.length > 0 ? `Mostrando ${desde+1}–${hasta} de ${_data.length.toLocaleString('es-CL')}` : '';
-  document.getElementById('btnPrev').disabled = pag <= 1;
-  document.getElementById('btnNext').disabled = hasta >= _data.length;
+  document.getElementById('countBadge').textContent =
+    `${_data.length.toLocaleString('es-CL')} crédito${_data.length!==1?'s':''}`;
 
-  const tb = document.getElementById('tbody');
+  const pagRow = document.getElementById('pagRow');
+  if (_data.length > perPag) {
+    pagRow.style.display = '';
+    document.getElementById('pagInfo').textContent =
+      _data.length > 0 ? `Mostrando ${desde+1}–${hasta} de ${_data.length.toLocaleString('es-CL')}` : '';
+    document.getElementById('btnPrev').disabled = pag <= 1;
+    document.getElementById('btnNext').disabled = hasta >= _data.length;
+  } else {
+    pagRow.style.display = 'none';
+  }
+
+  const lista = document.getElementById('listaCuentas');
   if (!pagina.length) {
-    tb.innerHTML = '<tr><td colspan="8" class="empty">Sin resultados</td></tr>';
+    lista.innerHTML = '<div class="empty"><i class="bi bi-inbox fs-1 d-block mb-3"></i>Sin resultados</div>';
     return;
   }
 
-  tb.innerHTML = pagina.map(r => {
-    const saldo = parseFloat(r.saldo||0);
-    const util  = parseFloat(r.monto_utilizado||0);
-    const estadoBadge = saldo > 0
-      ? `<span class="badge-activo">CON SALDO</span>`
-      : `<span class="badge-consumido">AGOTADO</span>`;
+  lista.innerHTML = pagina.map(r => renderCuentaCard(r)).join('');
+}
+
+function renderCuentaCard(r) {
+  const saldo = parseFloat(r.saldo||0);
+  const saldoBadge = saldo > 0
+    ? `<span class="saldo-badge positivo"><i class="bi bi-check-circle me-1"></i>${clp(saldo)}</span>`
+    : `<span class="saldo-badge cero">Sin saldo</span>`;
+
+  return `
+  <div class="cuenta-card" id="card-${r.id_credito}">
+    <div class="cuenta-header" onclick="toggleCartola(${r.id_credito})">
+      <div class="cuenta-header-left">
+        <span class="op-badge">N° ${esc(r.numero_credito||r.id_credito)}</span>
+        <div>
+          <div class="cuenta-cliente">${esc(r.nombre_cliente||'—')}</div>
+          <div class="cuenta-rut">${esc(r.rut_cliente||'—')}</div>
+        </div>
+      </div>
+      <div style="display:flex;align-items:center;gap:14px">
+        ${saldoBadge}
+        <i class="bi bi-chevron-down toggle-icon" id="icon-${r.id_credito}"></i>
+      </div>
+    </div>
+    <div id="cartola-${r.id_credito}" style="display:none">
+      <div class="cartola-wrap">
+        <div class="cartola-loading" id="loading-${r.id_credito}">
+          <div class="spinner-border spinner-border-sm text-primary me-2"></div>Cargando extracto…
+        </div>
+        <div id="contenido-${r.id_credito}"></div>
+      </div>
+    </div>
+  </div>`;
+}
+
+async function toggleCartola(id_credito) {
+  const wrap = document.getElementById(`cartola-${id_credito}`);
+  const icon = document.getElementById(`icon-${id_credito}`);
+  const open = wrap.style.display !== 'none';
+
+  wrap.style.display = open ? 'none' : '';
+  icon.classList.toggle('open', !open);
+
+  if (!open && !_cartolas[id_credito]) {
+    // Cargar cartola
+    const res  = await fetch(`/api/cuentas-transitorias/cartola/${id_credito}`, { headers: H });
+    const json = await res.json();
+    document.getElementById(`loading-${id_credito}`).style.display = 'none';
+    if (json.success) {
+      _cartolas[id_credito] = json.data;
+      document.getElementById(`contenido-${id_credito}`).innerHTML = renderCartola(json.data);
+    } else {
+      document.getElementById(`contenido-${id_credito}`).innerHTML =
+        `<p style="color:#dc2626;font-size:.88rem">Error al cargar el extracto: ${esc(json.error)}</p>`;
+    }
+  } else if (!open) {
+    document.getElementById(`loading-${id_credito}`).style.display = 'none';
+  }
+}
+
+function renderCartola(data) {
+  const movs  = data.movimientos || [];
+  const saldo = data.saldo_actual || 0;
+
+  if (!movs.length) {
+    return `<p style="color:#9ca3af;font-size:.88rem;margin-top:12px">Sin movimientos registrados.</p>`;
+  }
+
+  const rows = movs.map(m => {
+    const esAbono    = m.tipo === 'ABONO';
+    const esHistorico = m.es_historico;
+    const tipoTag = esHistorico
+      ? `<span class="tag-historico"><i class="bi bi-clock-history me-1"></i>HIST.</span>`
+      : esAbono
+        ? `<span class="tag-abono"><i class="bi bi-arrow-down-circle me-1"></i>ABONO</span>`
+        : `<span class="tag-cargo"><i class="bi bi-arrow-up-circle me-1"></i>CARGO</span>`;
+
+    const trxCell = m.numero_transaccion
+      ? `<span class="trx-code">${trxFmt(m.numero_transaccion)}</span>`
+      : '<span style="color:#9ca3af;font-size:.78rem">—</span>';
+
+    const abonoCell = esAbono
+      ? `<span class="monto-abono">${clp(m.monto)}</span>`
+      : `<span style="color:#d1d5db">—</span>`;
+    const cargoCell = !esAbono
+      ? `<span class="monto-cargo">(${clp(m.monto)})</span>`
+      : `<span style="color:#d1d5db">—</span>`;
+
+    const saldoColor = m.saldo_corriente > 0 ? '#15803d' : (m.saldo_corriente < 0 ? '#dc2626' : '#9ca3af');
 
     return `<tr>
-      <td class="td-num">
-        <a href="/creditos/revisar?id=${r.id_credito}" style="color:var(--navy);font-weight:700;text-decoration:none">
-          ${esc(r.numero_credito||r.id_credito)}
-        </a>
-      </td>
-      <td class="td-cliente">${esc(r.nombre_cliente||'—')}</td>
-      <td class="td-rut">${esc(r.rut_cliente||'—')}</td>
-      <td class="text-right" style="font-family:monospace;color:#374151">${clp(r.monto_original)}</td>
-      <td class="text-right td-consumido">${util > 0 ? clp(util) : '<span style="color:#9ca3af">—</span>'}</td>
-      <td class="text-right ${saldo>0?'td-saldo':'td-consumido'}" style="font-size:1rem">
-        ${saldo > 0 ? `<strong>${clp(saldo)}</strong>` : '<span style="color:#9ca3af">—</span>'}
-      </td>
-      <td>${estadoBadge}</td>
-      <td style="font-size:.8rem;color:#6b7280">${fmtDt(r.ultima_actualizacion)}</td>
+      <td style="white-space:nowrap">${fmtDt(m.fecha)}</td>
+      <td>${trxCell}</td>
+      <td>${tipoTag}</td>
+      <td style="color:#374151;font-size:.82rem">${esc(m.concepto||'—')}</td>
+      <td class="text-right">${abonoCell}</td>
+      <td class="text-right">${cargoCell}</td>
+      <td class="text-right saldo-col" style="color:${saldoColor}">${clp(m.saldo_corriente)}</td>
     </tr>`;
   }).join('');
+
+  const saldoColor = saldo > 0 ? '#15803d' : '#9ca3af';
+
+  return `
+  <table class="cartola-table">
+    <thead>
+      <tr>
+        <th>Fecha</th>
+        <th>TRX</th>
+        <th>Tipo</th>
+        <th>Descripción</th>
+        <th class="text-right">Abono</th>
+        <th class="text-right">Cargo</th>
+        <th class="text-right">Saldo</th>
+      </tr>
+    </thead>
+    <tbody>${rows}</tbody>
+    <tfoot>
+      <tr>
+        <td colspan="5">SALDO DISPONIBLE</td>
+        <td></td>
+        <td class="text-right" style="color:${saldoColor};font-size:1rem">${clp(saldo)}</td>
+      </tr>
+    </tfoot>
+  </table>`;
 }
 
 cargar();
