@@ -27,7 +27,7 @@
     .btn-logout { background:rgba(255,255,255,.1); border:1px solid rgba(255,255,255,.2); color:#fff; border-radius:8px; padding:5px 12px; font-size:.82rem; cursor:pointer; }
     .btn-logout:hover { background:rgba(255,255,255,.2); }
 
-    .main-content { max-width:1100px; margin:0 auto; padding:28px 24px; }
+    .main-content { max-width:1600px; margin:0 auto; padding:28px 24px; }
     .page-banner { background:linear-gradient(135deg,#012d70,#0141A2 50%,#009AFE); border-radius:16px; color:#fff; padding:28px 36px; margin-bottom:28px; display:flex; align-items:center; gap:20px; }
     .page-banner > i { font-size:3rem; opacity:.8; }
     .page-banner h2 { font-weight:700; margin:0 0 4px; font-size:1.4rem; }
@@ -51,8 +51,16 @@
     .filter-select { border-radius:8px; font-size:.88rem; border:1.5px solid #e5e7eb; padding:8px 12px; outline:none; }
     .count-badge { color:#6b7280; font-size:.85rem; white-space:nowrap; }
 
+    /* Grid de cuentas */
+    #listaCuentas { display:grid; grid-template-columns:repeat(4,1fr); gap:16px; align-items:start; }
+    #listaCuentas.expanded-mode { grid-template-columns:repeat(4,1fr); }
+    @media(max-width:1300px){ #listaCuentas { grid-template-columns:repeat(3,1fr); } }
+    @media(max-width:960px) { #listaCuentas { grid-template-columns:repeat(2,1fr); } }
+    @media(max-width:600px) { #listaCuentas { grid-template-columns:1fr; } }
+
     /* Cuenta Card */
-    .cuenta-card { background:#fff; border-radius:14px; box-shadow:0 1px 4px rgba(0,0,0,.07); margin-bottom:18px; overflow:hidden; }
+    .cuenta-card { background:#fff; border-radius:14px; box-shadow:0 1px 4px rgba(0,0,0,.07); overflow:hidden; }
+    .cuenta-card.card-expanded { grid-column:1/-1; }
     .cuenta-header { display:flex; align-items:center; justify-content:space-between; padding:16px 22px; cursor:pointer; border-bottom:1px solid #f1f5f9; user-select:none; }
     .cuenta-header:hover { background:#f8fafc; }
     .cuenta-header-left { display:flex; align-items:center; gap:16px; }
@@ -84,7 +92,7 @@
     .saldo-col { font-family:monospace; font-weight:700; color:#374151; }
 
     .cartola-loading { text-align:center; padding:24px 0; color:#9ca3af; font-size:.88rem; }
-    .empty { text-align:center; color:#9ca3af; padding:48px 0; }
+    .empty { text-align:center; color:#9ca3af; padding:48px 0; grid-column:1/-1; }
     .pag-row { display:flex; align-items:center; justify-content:space-between; padding:12px 0; }
     .pag-info { font-size:.82rem; color:#6b7280; }
 
@@ -106,7 +114,7 @@
   <div class="topnav-left">
     <a href="/" class="topnav-brand">
       <img src="/img/logo.png" alt="AutoFácil">
-      <span class="version-badge">v1.3</span>
+      <span class="version-badge">v1.4</span>
     </a>
     <div class="breadcrumb-nav">
       <a href="/">Inicio</a><span class="sep">›</span>
@@ -171,7 +179,7 @@
     <div class="empty"><i class="bi bi-arrow-left-right fs-1 d-block mb-3"></i>Cargando…</div>
   </div>
 
-  <div class="pag-row" id="pagRow" style="display:none">
+  <div class="pag-row mt-2" id="pagRow" style="display:none">
     <span class="pag-info" id="pagInfo"></span>
     <div class="d-flex gap-2">
       <button class="btn btn-outline-secondary btn-sm" id="btnPrev" onclick="cambiarPag(-1)"><i class="bi bi-chevron-left"></i></button>
@@ -214,7 +222,7 @@ async function cargar() {
   if (q) params.append('q', q);
 
   document.getElementById('listaCuentas').innerHTML =
-    '<div class="empty"><div class="spinner-border text-primary mb-3" style="width:2rem;height:2rem"></div><br>Cargando…</div>';
+    '<div class="empty" style="grid-column:1/-1"><div class="spinner-border text-primary mb-3" style="width:2rem;height:2rem"></div><br>Cargando…</div>';
 
   const res  = await fetch('/api/cuentas-transitorias?' + params, { headers: H });
   const json = await res.json();
@@ -292,10 +300,12 @@ function renderCuentaCard(r) {
 async function toggleCartola(id_credito) {
   const wrap = document.getElementById(`cartola-${id_credito}`);
   const icon = document.getElementById(`icon-${id_credito}`);
+  const card = document.getElementById(`card-${id_credito}`);
   const open = wrap.style.display !== 'none';
 
   wrap.style.display = open ? 'none' : '';
   icon.classList.toggle('open', !open);
+  card.classList.toggle('card-expanded', !open);
 
   if (!open && !_cartolas[id_credito]) {
     // Cargar cartola
@@ -431,9 +441,11 @@ async function eliminarTransitoria(id_transitoria, id_credito) {
   if (!json.success) return alert('Error: ' + json.error);
   alert('Transitoria eliminada correctamente.');
   delete _cartolas[id_credito];
+  // Cerrar para que toggleCartola la reabra y recargue
+  document.getElementById(`cartola-${id_credito}`).style.display = 'none';
+  document.getElementById(`icon-${id_credito}`).classList.remove('open');
   document.getElementById(`loading-${id_credito}`).style.display = '';
   document.getElementById(`contenido-${id_credito}`).innerHTML = '';
-  // Recargar cartola y lista
   toggleCartola(id_credito);
   cargar();
 }
@@ -458,6 +470,8 @@ async function aplicarFix(id_credito) {
   if (!json.success) return alert('Error: ' + json.error);
   alert('✅ Corrección aplicada correctamente.');
   delete _cartolas[id_credito];
+  document.getElementById(`cartola-${id_credito}`).style.display = 'none';
+  document.getElementById(`icon-${id_credito}`).classList.remove('open');
   document.getElementById(`loading-${id_credito}`).style.display = '';
   document.getElementById(`contenido-${id_credito}`).innerHTML = '';
   toggleCartola(id_credito);
