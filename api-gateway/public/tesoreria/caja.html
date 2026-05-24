@@ -1115,9 +1115,11 @@ function verComprobante(numeroCuota) {
     ? `TRX-${String(trxKey).padStart(6,'0')}`
     : `PAG-${pagoRef.id_pago}`;
   const fechaEmision = new Date().toLocaleDateString('es-CL', { day:'2-digit', month:'2-digit', year:'numeric', hour:'2-digit', minute:'2-digit' });
-  const fechaPago    = pagoRef.fecha_pago
-    ? new Date(pagoRef.fecha_pago).toLocaleDateString('es-CL', { day:'2-digit', month:'2-digit', year:'numeric' })
+  // Fecha de pago solo como DD-MM-YYYY (sin hora, sin conversión de timezone)
+  const fechaPago = pagoRef.fecha_pago
+    ? String(pagoRef.fecha_pago).slice(0,10).split('-').reverse().join('-')
     : '—';
+  const nombreCajaPago = _miCaja?.nombre_caja || null;
 
   // Totales
   const totBase   = pagosGrupo.reduce((a,p) => a + parseFloat(p.monto_cuota||0), 0);
@@ -1169,8 +1171,8 @@ function verComprobante(numeroCuota) {
     <div class="recibo-section">
       <div class="recibo-section-title">Datos del Crédito</div>
       <div class="recibo-row"><span class="lbl">N° Operación</span><span class="val">${esc(c.numero_credito||c.id_credito)}</span></div>
-      <div class="recibo-row"><span class="lbl">Vehículo</span><span class="val">${esc([c.marca,c.modelo,c.anio].filter(Boolean).join(' ')||'—')}</span></div>
       <div class="recibo-row"><span class="lbl">Fecha de pago</span><span class="val">${fechaPago}</span></div>
+      ${nombreCajaPago ? `<div class="recibo-row"><span class="lbl">Caja</span><span class="val">${esc(nombreCajaPago)}</span></div>` : ''}
     </div>
 
     <div class="recibo-section">
@@ -1205,12 +1207,11 @@ function verComprobante(numeroCuota) {
       <span class="val">${clp(totPagado)}</span>
     </div>
 
+    ${pagoRef.origen_fondos ? `
     <div class="recibo-section">
       <div class="recibo-section-title">Datos de la Transacción</div>
-      ${pagoRef.origen_fondos ? `<div class="recibo-row"><span class="lbl">Origen de fondos</span><span class="val">${esc(pagoRef.origen_fondos)}</span></div>` : ''}
-      ${pagoRef.registrado_por ? `<div class="recibo-row"><span class="lbl">Atendido por</span><span class="val">${esc(pagoRef.registrado_por)}</span></div>` : ''}
-      ${_miCaja?.nombre_caja ? `<div class="recibo-row"><span class="lbl">Caja</span><span class="val">${esc(_miCaja.nombre_caja)}</span></div>` : ''}
-    </div>
+      <div class="recibo-row"><span class="lbl">Origen de fondos</span><span class="val">${esc(pagoRef.origen_fondos)}</span></div>
+    </div>` : ''}
 
     <div class="recibo-footer">
       AutoFácil Crédito Automotriz &nbsp;·&nbsp; Comprobante generado el ${fechaEmision}<br>
