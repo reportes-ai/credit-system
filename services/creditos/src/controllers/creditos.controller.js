@@ -170,22 +170,29 @@ const create = async (req, res) => {
 /* ─── GET ALL ────────────────────────────────────────────────────────────── */
 const getAll = async (req, res) => {
   try {
-    const { q, estado } = req.query;
-    let sql = `SELECT id_credito, numero_credito, rut_cliente, nombre_cliente,
-                      financiera, empresa,
-                      estado, fecha_otorgamiento, valor_vehiculo, pie,
-                      monto_financiado, plazo, tasa_mensual, cuota,
-                      fecha_primera_cuota, tipo_vehiculo, marca, modelo,
-                      anio, patente, dealer, ejecutivo, created_at
-               FROM creditos WHERE 1=1`;
+    const { q } = req.query;
+    // cuotas_pagadas se usa en el frontend para detectar mora real (igual que cobranza)
+    let sql = `SELECT cr.id_credito, cr.numero_credito, cr.rut_cliente, cr.nombre_cliente,
+                      cr.financiera, cr.empresa,
+                      cr.estado, cr.fecha_otorgamiento, cr.valor_vehiculo, cr.pie,
+                      cr.monto_financiado, cr.plazo, cr.tasa_mensual, cr.cuota,
+                      cr.fecha_primera_cuota, cr.tipo_vehiculo, cr.marca, cr.modelo,
+                      cr.anio, cr.patente, cr.dealer, cr.ejecutivo, cr.created_at,
+                      COALESCE(pp.cnt, 0) AS cuotas_pagadas
+               FROM creditos cr
+               LEFT JOIN (
+                 SELECT id_credito, COUNT(DISTINCT numero_cuota) AS cnt
+                 FROM pagos_credito WHERE estado_pago = 'PAGADO'
+                 GROUP BY id_credito
+               ) pp ON pp.id_credito = cr.id_credito
+               WHERE 1=1`;
     const params = [];
     if (q && q.trim()) {
       const like = `%${q.trim().toUpperCase()}%`;
-      sql += ` AND (UPPER(rut_cliente) LIKE ? OR UPPER(nombre_cliente) LIKE ? OR UPPER(numero_credito) LIKE ?)`;
+      sql += ` AND (UPPER(cr.rut_cliente) LIKE ? OR UPPER(cr.nombre_cliente) LIKE ? OR UPPER(cr.numero_credito) LIKE ?)`;
       params.push(like, like, like);
     }
-    if (estado) { sql += ` AND estado = ?`; params.push(estado); }
-    sql += ` ORDER BY COALESCE(created_at, id_credito) DESC LIMIT 500`;
+    sql += ` ORDER BY COALESCE(cr.created_at, cr.id_credito) DESC LIMIT 500`;
     const [rows] = await pool.query(sql, params);
     res.json({ success: true, data: rows, error: null });
   } catch (e) {

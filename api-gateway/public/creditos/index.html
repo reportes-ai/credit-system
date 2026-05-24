@@ -355,7 +355,7 @@
   <div class="topnav-left">
     <div class="topnav-brand">
       <a href="/"><img src="/img/logo.png" alt="AutoFácil" style="display:block"></a>
-      <span class="version-badge" id="versionBadge">v3.2</span>
+      <span class="version-badge" id="versionBadge">v3.3</span>
     </div>
       <div class="breadcrumb-nav">
         <a href="/">Inicio</a><span class="sep">›</span>
@@ -1126,12 +1126,15 @@ function sincronizarEmpresaCard(empresa) {
 
 function aplicarFiltroEmpresa() {
   if (!_todosCreditos.length) return;
-  const lista = _empresasFiltro.size === 0
-    ? _todosCreditos
-    : _todosCreditos.filter(c => {
-        const fin = (c.financiera || c.empresa || '').toUpperCase().replace(/[^A-Z]/g,'');
-        return [..._empresasFiltro].some(f => fin.includes(f.replace(/[^A-Z]/g,'')));
-      });
+  let lista = _filtroProceso
+    ? _todosCreditos.filter(c => !ESTADOS_FUERA_PROCESO.has(c.estado))
+    : _aplicarFiltroEstado(_todosCreditos);
+  if (_empresasFiltro.size > 0) {
+    lista = lista.filter(c => {
+      const fin = (c.financiera || c.empresa || '').toUpperCase().replace(/[^A-Z]/g,'');
+      return [..._empresasFiltro].some(f => fin.includes(f.replace(/[^A-Z]/g,'')));
+    });
+  }
   renderConsulta(lista);
 }
 
@@ -1155,33 +1158,60 @@ function onRutInputCred(el) {
 /* ═══════════════════════════════════════════════════════════════════
    CONSULTA CRÉDITOS
 ═══════════════════════════════════════════════════════════════════ */
-let _todosCreditos = [];
+let _todosCreditos = [];   // lista completa (sin filtro estado)
 let _filtroProceso = false;
 
 // Estados que se consideran "terminales" o activos (NO son "en proceso")
 const ESTADOS_FUERA_PROCESO = new Set(['VIGENTE','CANCELADO','PREPAGADO','CASTIGADO','EN MORA']);
 
+/* ── Lógica de mora real (igual que cobranza) ── */
+function _cuotasVencidas(c) {
+  if (!c.fecha_primera_cuota) return 0;
+  const fp  = new Date(c.fecha_primera_cuota);
+  const hoy = new Date();
+  const diff = (hoy.getFullYear() - fp.getFullYear()) * 12 + (hoy.getMonth() - fp.getMonth());
+  const ajuste = hoy.getDate() >= fp.getDate() ? 1 : 0;
+  return Math.min(Number(c.plazo) || 0, Math.max(0, diff + ajuste));
+}
+function _enMoraReal(c) {
+  if (c.estado !== 'VIGENTE') return false;
+  return (_cuotasVencidas(c) - Number(c.cuotas_pagadas || 0)) > 0;
+}
+
+/* ── Filtro client-side por estado ── */
+function _aplicarFiltroEstado(lista) {
+  const estado = document.getElementById('searchEstado').value;
+  if (!estado) return lista;
+  if (estado === 'EN MORA') return lista.filter(_enMoraReal);
+  if (estado === '__PROCESO__') return lista.filter(c => !ESTADOS_FUERA_PROCESO.has(c.estado));
+  return lista.filter(c => c.estado === estado);
+}
+
 async function buscarCreditos() {
   const q = document.getElementById('searchQ').value.trim();
-  // Si el filtro proceso está activo, ignoramos el select de estado (traemos todo)
-  const estado = _filtroProceso ? '' : document.getElementById('searchEstado').value;
   const res = document.getElementById('resultadosConsulta');
   res.innerHTML = '<div class="text-center py-4 text-muted"><div class="spinner-border spinner-border-sm me-2"></div>Buscando…</div>';
   try {
     let url = '/api/creditos?';
-    if (q)      url += 'q=' + encodeURIComponent(q) + '&';
-    if (estado) url += 'estado=' + encodeURIComponent(estado);
+    if (q) url += 'q=' + encodeURIComponent(q);
     const r = await fetch(url, { headers: apiHdr() });
     const j = await r.json();
     if (!j.success) throw new Error(j.error);
-    const todosSinFiltro = j.data || [];
-    // Stats siempre calculan sobre la lista completa (sin filtro proceso)
-    actualizarStats(todosSinFiltro);
-    // Para la tabla, si filtro proceso aplica la exclusión
-    _todosCreditos = _filtroProceso
-      ? todosSinFiltro.filter(c => !ESTADOS_FUERA_PROCESO.has(c.estado))
-      : todosSinFiltro;
-    renderConsulta(_todosCreditos);
+    _todosCreditos = j.data || [];
+    // Stats siempre del total (sin filtro estado)
+    actualizarStats(_todosCreditos);
+    // Lista mostrada = filtro estado + filtro financiera
+    let lista = _filtroProceso
+      ? _todosCreditos.filter(c => !ESTADOS_FUERA_PROCESO.has(c.estado))
+      : _aplicarFiltroEstado(_todosCreditos);
+    // Filtro empresa (si hay seleccionadas)
+    if (_empresasFiltro.size > 0) {
+      lista = lista.filter(c => {
+        const fin = (c.financiera || c.empresa || '').toUpperCase().replace(/[^A-Z]/g,'');
+        return [..._empresasFiltro].some(f => fin.includes(f.replace(/[^A-Z]/g,'')));
+      });
+    }
+    renderConsulta(lista);
   } catch(e) {
     res.innerHTML = `<div class="empty-state" style="color:#ef4444"><i class="bi bi-exclamation-triangle"></i>${e.message}</div>`;
   }
@@ -1190,11 +1220,12 @@ async function buscarCreditos() {
 function actualizarStats(list) {
   const rev     = list.filter(c => c.estado==='REVISION').length;
   const proceso = list.filter(c => !ESTADOS_FUERA_PROCESO.has(c.estado)).length;
+  const mora    = list.filter(_enMoraReal).length;
   document.getElementById('statTotal').textContent     = list.length;
   document.getElementById('statRevision').textContent  = rev;
   document.getElementById('statProceso').textContent   = proceso;
-  document.getElementById('statVigentes').textContent  = list.filter(c=>c.estado==='VIGENTE').length;
-  document.getElementById('statMora').textContent      = list.filter(c=>c.estado==='EN MORA').length;
+  document.getElementById('statVigentes').textContent  = list.filter(c=>c.estado==='VIGENTE' && !_enMoraReal(c)).length;
+  document.getElementById('statMora').textContent      = mora;
   document.getElementById('statCancelados').textContent= list.filter(c=>c.estado==='CANCELADO').length;
   // Resaltar badges
   const chipRev  = document.querySelector('.stat-revision');
@@ -1211,7 +1242,6 @@ function filtrarPorEstado(estado) {
     _filtroProceso = false;
     document.getElementById('searchEstado').value = estado;
   }
-  // Quitar activo de chip proceso si se seleccionó otro filtro
   const chipPro = document.getElementById('chipProceso');
   if (chipPro) chipPro.classList.toggle('activo', _filtroProceso);
   buscarCreditos();
