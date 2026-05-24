@@ -616,7 +616,12 @@ function calcGastos(montoCuota, fechaVenc, hoy = new Date()) {
 function renderPanel() {
   const c = _credito;
   const hoy = new Date();
-  const pagadas = new Set(_pagos.filter(p => p.estado_pago === 'PAGADO').map(p => p.numero_cuota));
+  const pagadasList = _pagos.filter(p => p.estado_pago === 'PAGADO');
+  const pagadas = new Set(pagadasList.map(p => p.numero_cuota));
+  // Solo la última cuota pagada (mayor número) puede reversarse
+  const ultimaCuotaPagada = pagadasList.length
+    ? Math.max(...pagadasList.map(p => p.numero_cuota))
+    : -1;
   let nPagadas=0, nMora=0, nPend=0, moraTotal=0;
 
   const filas = _schedule.map(s => {
@@ -657,7 +662,7 @@ function renderPanel() {
         <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap">
           ${estadoPill}
           ${esPagada && pago ? `<button class="btn-comprobante" onclick="verComprobante(${s.numero})"><i class="bi bi-receipt me-1"></i>Comprobante</button>` : ''}
-          ${esPagada && pago && _miCaja?.puede_reversar_pagos ? `<button class="btn-reversar" onclick="abrirModalReverso(${pago.id_pago},${s.numero})"><i class="bi bi-arrow-counterclockwise me-1"></i>Reversar</button>` : ''}
+          ${esPagada && pago && _miCaja?.puede_reversar_pagos && s.numero === ultimaCuotaPagada ? `<button class="btn-reversar" onclick="abrirModalReverso(${pago.id_pago},${s.numero})"><i class="bi bi-arrow-counterclockwise me-1"></i>Reversar</button>` : ''}
         </div>
       </td>
     </tr>`;

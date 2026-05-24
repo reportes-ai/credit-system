@@ -367,6 +367,19 @@ const reversar = async (req, res) => {
         error: `Este pago ya tiene estado "${pago.estado_pago}" y no puede reversarse.` });
     }
 
+    // 1b. Verificar que sea la última cuota pagada del crédito
+    const [[ultimaPagada]] = await conn.query(
+      `SELECT MAX(numero_cuota) AS ultima
+       FROM pagos_credito
+       WHERE id_credito = ? AND estado_pago = 'PAGADO'`,
+      [pago.id_credito]
+    );
+    if (ultimaPagada?.ultima !== pago.numero_cuota) {
+      await conn.rollback(); conn.release();
+      return res.status(400).json({ success: false, data: null,
+        error: `Solo se puede reversar la última cuota pagada (N°${ultimaPagada?.ultima}). Reversa primero las cuotas posteriores.` });
+    }
+
     // 2. Verificar permiso de reverso en la caja donde se registró el pago
     const u = req.usuario || {};
     if (pago.id_caja) {
