@@ -115,7 +115,15 @@ function buildRecibo({ credito, pagos, cajaNombre, trxNum, idPago }) {
   }
 
   return `
-    <div id="compPrint" style="font-family:'Segoe UI',system-ui,sans-serif;padding:28px 32px;max-width:480px;margin:0 auto;background:#fff">
+    <div id="compPrint" style="font-family:'Segoe UI',system-ui,sans-serif;padding:28px 32px;max-width:480px;margin:0 auto;background:#fff;position:relative;overflow:hidden">
+
+      <!-- Timbre PAGADO (marca de agua centrada) -->
+      <img src="/img/timbre-pagado.png" alt=""
+           style="position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);width:340px;opacity:.18;pointer-events:none;z-index:0;user-select:none"
+           onerror="this.style.display='none'">
+
+      <!-- Contenido sobre el timbre -->
+      <div style="position:relative;z-index:1">
 
       <!-- Logo + título -->
       <div style="text-align:center;margin-bottom:14px">
@@ -163,6 +171,7 @@ function buildRecibo({ credito, pagos, cajaNombre, trxNum, idPago }) {
         AutoFácil Crédito Automotriz &nbsp;·&nbsp; Documento no válido como boleta o factura
       </div>
 
+      </div><!-- /contenido sobre timbre -->
     </div>`;
 }
 
