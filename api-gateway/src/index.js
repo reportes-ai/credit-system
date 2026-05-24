@@ -9,6 +9,10 @@ app.use(cors());
 app.use(express.json({ limit: '10mb' }));
 app.use(express.static(path.join(__dirname, '../public')));
 
+// Favicon
+app.get('/favicon.ico', (req, res) =>
+  res.sendFile(path.join(__dirname, '../public/img/logo.png')));
+
 // Auth
 app.use('/api/auth', require('../../services/usuarios/src/routes/auth.routes'));
 
