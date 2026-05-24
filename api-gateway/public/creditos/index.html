@@ -39,41 +39,54 @@
     /* ── Top bar ── */
     .top-bar { display:flex; align-items:stretch; gap:10px; margin-bottom:20px; }
 
-    /* Tab cards: siempre visibles, 2 cols */
-    .tab-cards { display:grid; grid-template-columns:repeat(2,1fr); gap:10px; }
-
-    /* Card base compartida */
-    .tab-card, .empresa-card {
-      background:#fff; border-radius:12px; padding:16px 12px; cursor:pointer;
-      border:2px solid transparent;
+    /* Tab card (Consulta / Ingreso) */
+    .tab-card {
+      background:#fff; border-radius:12px; padding:14px 18px; cursor:pointer;
+      border:2px solid transparent; flex-shrink:0;
       transition:transform .18s, box-shadow .18s, border-color .18s;
       box-shadow:0 1px 4px rgba(0,0,0,.06);
       display:flex; flex-direction:column; align-items:center; justify-content:center;
-      gap:8px; text-align:center; width:100%;
+      gap:6px; text-align:center; min-width:120px;
     }
-    .tab-card:hover, .empresa-card:hover { transform:translateY(-3px); box-shadow:0 8px 24px rgba(1,65,162,.15); border-color:var(--navy); }
-    .tab-card.active    { border-color:var(--navy); box-shadow:0 6px 20px rgba(1,65,162,.2); }
-    .empresa-card.selected { border-color:var(--navy); box-shadow:0 6px 20px rgba(1,65,162,.2); }
-
-    /* Tab card: ícono + título */
+    .tab-card:hover { transform:translateY(-2px); box-shadow:0 8px 24px rgba(1,65,162,.15); border-color:var(--navy); }
+    .tab-card.active { border-color:var(--navy); box-shadow:0 6px 20px rgba(1,65,162,.2); }
     .tab-card .card-icon {
-      width:40px; height:40px; border-radius:10px;
+      width:36px; height:36px; border-radius:9px;
       background:linear-gradient(135deg,#e8eaf6,#c5cae9);
       display:flex; align-items:center; justify-content:center;
-      font-size:1.2rem; color:var(--navy); transition:background .18s, color .18s;
+      font-size:1.1rem; color:var(--navy); transition:background .18s, color .18s;
     }
     .tab-card:hover .card-icon,
     .tab-card.active .card-icon { background:linear-gradient(135deg,var(--navy),var(--blue)); color:#fff; }
-    .tab-card h6 { font-weight:700; font-size:.82rem; margin:0; color:#111827; line-height:1.3; }
+    .tab-card h6 { font-weight:700; font-size:.8rem; margin:0; color:#111827; line-height:1.3; }
 
-    /* Empresa cards: ocultas por defecto, se muestran como grupo */
-    .empresa-cards { display:none; grid-template-columns:repeat(3,1fr); gap:10px; }
-    .empresa-cards.visible { display:grid; }
-    .empresa-card img { max-width:100%; max-height:38px; object-fit:contain; filter:grayscale(35%) opacity(.7); transition:filter .18s; }
-    .empresa-card:hover img, .empresa-card.selected img { filter:none; }
-    .empresa-check { width:16px; height:16px; border-radius:50%; border:2px solid #d1d5db; background:#fff; display:flex; align-items:center; justify-content:center; transition:all .15s; }
-    .empresa-card.selected .empresa-check { background:var(--navy); border-color:var(--navy); }
-    .empresa-card.selected .empresa-check::after { content:'✓'; color:#fff; font-size:.55rem; font-weight:800; }
+    /* Financieras (siempre visibles, multi-toggle en consulta) */
+    .fin-cards { display:flex; gap:10px; flex:1; }
+    .fin-card {
+      background:#fff; border-radius:12px; padding:10px 16px; cursor:pointer;
+      border:2px solid #e5e7eb; flex:1;
+      transition:transform .18s, box-shadow .18s, border-color .18s;
+      box-shadow:0 1px 4px rgba(0,0,0,.06);
+      display:flex; flex-direction:column; align-items:center; justify-content:center;
+      gap:8px; min-height:80px; position:relative;
+    }
+    .fin-card:hover { transform:translateY(-2px); box-shadow:0 6px 20px rgba(1,65,162,.13); border-color:#93c5fd; }
+    .fin-card img { max-width:100%; max-height:42px; object-fit:contain; filter:grayscale(40%) opacity(.65); transition:filter .18s; }
+    .fin-card:hover img { filter:grayscale(15%) opacity(.9); }
+    .fin-card.active img { filter:none; }
+    .fin-card.active { border-color:var(--navy); box-shadow:0 6px 20px rgba(1,65,162,.18); }
+    .fin-badge {
+      position:absolute; top:6px; right:6px;
+      width:16px; height:16px; border-radius:50%;
+      border:2px solid #d1d5db; background:#fff;
+      display:flex; align-items:center; justify-content:center;
+      transition:all .15s; font-size:.55rem; font-weight:800; color:#fff;
+    }
+    .fin-card.active .fin-badge { background:var(--navy); border-color:var(--navy); }
+    .fin-card.active .fin-badge::after { content:'✓'; }
+
+    /* Empresa cards (solo ingreso — mismas fin-card pero usadas como selector) */
+    .empresa-card { display:none; }
 
     .tab-panel { display:none; }
     .tab-panel.active { display:block; }
@@ -374,32 +387,34 @@
 
   <!-- Top bar -->
   <div class="top-bar">
-    <!-- Tab selectors (siempre visibles) -->
-    <div class="tab-cards" id="mainTabs">
-      <button class="tab-card active" data-tab="consulta" onclick="cambiarTab('consulta')">
-        <div class="card-icon"><i class="bi bi-search"></i></div>
-        <h6>Consulta Créditos</h6>
-      </button>
-      <button class="tab-card" data-tab="ingreso" onclick="cambiarTab('ingreso')">
-        <div class="card-icon"><i class="bi bi-plus-circle"></i></div>
-        <h6>Ingreso de Créditos</h6>
-      </button>
-    </div>
-    <!-- Empresa (solo visible en Ingreso) -->
-    <div class="empresa-cards" id="empresaCards">
-      <button type="button" class="empresa-card" data-empresa="AUTOFACIL" onclick="seleccionarEmpresa(this)">
+    <!-- Consulta (izquierda) -->
+    <button class="tab-card active" data-tab="consulta" onclick="cambiarTab('consulta')">
+      <div class="card-icon"><i class="bi bi-search"></i></div>
+      <h6>Consulta Créditos</h6>
+    </button>
+
+    <!-- Financieras (centro — siempre visibles, multi-toggle) -->
+    <div class="fin-cards" id="finCards">
+      <button type="button" class="fin-card" data-empresa="AUTOFACIL" onclick="toggleFinanciera(this)">
         <img src="/img/logo-autofacil.png" alt="AutoFácil">
-        <div class="empresa-check"></div>
+        <div class="fin-badge"></div>
       </button>
-      <button type="button" class="empresa-card" data-empresa="AUTOFIN" onclick="seleccionarEmpresa(this)">
+      <button type="button" class="fin-card" data-empresa="AUTOFIN" onclick="toggleFinanciera(this)">
         <img src="/img/logo-autofin.png" alt="AUTOFIN">
-        <div class="empresa-check"></div>
+        <div class="fin-badge"></div>
       </button>
-      <button type="button" class="empresa-card" data-empresa="UNIDAD" onclick="seleccionarEmpresa(this)">
+      <button type="button" class="fin-card" data-empresa="UNIDAD" onclick="toggleFinanciera(this)">
         <img src="/img/logo-unidad.png" alt="Unidad">
-        <div class="empresa-check"></div>
+        <div class="fin-badge"></div>
       </button>
     </div>
+
+    <!-- Ingreso (derecha) -->
+    <button class="tab-card" data-tab="ingreso" onclick="cambiarTab('ingreso')">
+      <div class="card-icon"><i class="bi bi-plus-circle"></i></div>
+      <h6>Ingreso de Créditos</h6>
+    </button>
+
     <input type="hidden" id="iEmpresa" value="">
   </div>
 
@@ -1059,35 +1074,69 @@ function showToast(msg, ok) {
 }
 
 /* ─── Tabs ─────────────────────────────────────────────────────────── */
+let _tabActual = 'consulta';
+
 function cambiarTab(tab) {
-  document.querySelectorAll('#mainTabs .tab-card').forEach(b => b.classList.remove('active'));
+  _tabActual = tab;
+  document.querySelectorAll('.tab-card[data-tab]').forEach(b => b.classList.toggle('active', b.dataset.tab === tab));
   document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
-  document.querySelector(`#mainTabs .tab-card[data-tab="${tab}"]`).classList.add('active');
   document.getElementById('panel' + tab.charAt(0).toUpperCase() + tab.slice(1)).classList.add('active');
-  // Mostrar/ocultar empresa cards según tab
-  document.getElementById('empresaCards').classList.toggle('visible', tab === 'ingreso');
+  // En ingreso: si hay alguna fin-card activa la usamos como empresa seleccionada,
+  // sino auto-seleccionamos la primera
+  if (tab === 'ingreso') {
+    const activa = document.querySelector('.fin-card.active');
+    if (activa) {
+      _setEmpresaIngreso(activa.dataset.empresa);
+    } else {
+      const primera = document.querySelector('.fin-card');
+      if (primera) { primera.classList.add('active'); _setEmpresaIngreso(primera.dataset.empresa); }
+    }
+  }
 }
 
-/* ─── Empresa selector ──────────────────────────────────────────────── */
-function seleccionarEmpresa(el) {
-  document.querySelectorAll('.empresa-card').forEach(c => c.classList.remove('selected'));
-  el.classList.add('selected');
+/* ─── Financieras (multi-toggle filtro / selector ingreso) ─────────── */
+let _empresasFiltro = new Set(); // vacío = todas
+
+function toggleFinanciera(el) {
   const empresa = el.dataset.empresa;
-  document.getElementById('iEmpresa').value    = empresa;
-  // Sincronizar el campo financiera con la empresa seleccionada
-  const selFin = document.getElementById('iFinanciera');
-  if (selFin) {
-    const opt = Array.from(selFin.options).find(o => o.value === empresa);
-    if (opt) selFin.value = empresa;
+  if (_tabActual === 'ingreso') {
+    // Modo ingreso: single-select
+    document.querySelectorAll('.fin-card').forEach(c => c.classList.remove('active'));
+    el.classList.add('active');
+    _setEmpresaIngreso(empresa);
+  } else {
+    // Modo consulta: multi-toggle
+    el.classList.toggle('active');
+    if (_empresasFiltro.has(empresa)) _empresasFiltro.delete(empresa);
+    else                              _empresasFiltro.add(empresa);
+    aplicarFiltroEmpresa();
   }
+}
+
+function _setEmpresaIngreso(empresa) {
+  document.getElementById('iEmpresa').value = empresa;
+  const selFin = document.getElementById('iFinanciera');
+  if (selFin) { const opt = Array.from(selFin.options).find(o => o.value === empresa); if (opt) selFin.value = empresa; }
 }
 
 function sincronizarEmpresaCard(empresa) {
   document.getElementById('iEmpresa').value = empresa;
-  document.querySelectorAll('.empresa-card').forEach(c => {
-    c.classList.toggle('selected', c.dataset.empresa === empresa);
-  });
+  document.querySelectorAll('.fin-card').forEach(c => c.classList.toggle('active', c.dataset.empresa === empresa));
 }
+
+function aplicarFiltroEmpresa() {
+  if (!_todosCreditos.length) return;
+  const lista = _empresasFiltro.size === 0
+    ? _todosCreditos
+    : _todosCreditos.filter(c => {
+        const fin = (c.financiera || c.empresa || '').toUpperCase();
+        return _empresasFiltro.has(fin);
+      });
+  renderConsulta(lista);
+}
+
+/* backward-compat (sincronizarEmpresaCard se llama desde iFinanciera.onchange) */
+function seleccionarEmpresa(el) { toggleFinanciera(el); }
 
 /* ─── RUT formatter ─────────────────────────────────────────────────── */
 function formatRUT(raw) {
