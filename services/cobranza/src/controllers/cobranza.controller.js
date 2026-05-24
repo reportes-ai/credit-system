@@ -107,7 +107,9 @@ const MORA_CREDITO_SQL = `
                DATE_ADD(c.fecha_primera_cuota,
                  INTERVAL COALESCE(pp.cnt, 0) MONTH))
       ELSE 0
-    END AS dias_mora
+    END AS dias_mora,
+    cl.sexo           AS sexo_cliente,
+    cl.telefono_movil AS telefono_movil
   FROM creditos c
   LEFT JOIN (
     SELECT id_credito, COUNT(DISTINCT numero_cuota) AS cnt
@@ -115,8 +117,23 @@ const MORA_CREDITO_SQL = `
     WHERE id_credito = ?
     GROUP BY id_credito
   ) pp ON pp.id_credito = c.id_credito
+  LEFT JOIN clientes cl ON cl.rut = c.rut_cliente
   WHERE c.id_credito = ?
 `;
+
+// Formatea nombre en Title Case
+function titleCase(str) {
+  return String(str || '').toLowerCase().split(' ')
+    .map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ');
+}
+
+// Determina tratamiento según sexo
+function tratamiento(sexo) {
+  const s = String(sexo || '').toUpperCase();
+  if (s === 'FEMENINO' || s === 'F') return 'Estimada';
+  if (s === 'MASCULINO' || s === 'M') return 'Estimado';
+  return 'Estimado/a';
+}
 
 function tramoLabel(dias) {
   if (dias <= 15) return '1-15';
@@ -354,34 +371,33 @@ exports.mensajes = async (req, res) => {
     const [[credito]] = await pool.query(MORA_CREDITO_SQL, [id_credito, id_credito]);
     if (!credito) return fail(res, 'Crédito no encontrado', 404);
 
-    const nombre  = credito.nombre_cliente || 'Cliente';
-    const numero  = credito.numero_credito || credito.id_credito;
-    const cuotas  = Number(credito.cuotas_mora) || 0;
-    const monto   = Math.round(Number(credito.monto_mora || 0)).toLocaleString('es-CL');
-    const dias    = Number(credito.dias_mora) || 0;
-    const vehiculo = `${credito.marca || ''} ${credito.modelo || ''}`.trim() || 'su vehículo';
-    const patente  = credito.patente ? ` (${credito.patente})` : '';
+    const nombre   = titleCase(credito.nombre_cliente || 'Cliente');
+    const trato    = tratamiento(credito.sexo_cliente);
+    const numero   = credito.numero_credito || credito.id_credito;
+    const cuotas   = Number(credito.cuotas_mora) || 0;
+    const monto    = Math.round(Number(credito.monto_mora || 0)).toLocaleString('es-CL');
+    const dias     = Number(credito.dias_mora) || 0;
+    const telefono = credito.telefono_movil || null;
 
-    const whatsapp = `Estimado/a ${nombre}, le informamos que su crédito N° ${numero} presenta ${cuotas} cuota(s) impaga(s) con un total de $${monto} en mora hace ${dias} días. Para regularizar su situación contáctese con nosotros a la brevedad. AutoFácil.`;
+    const datosTransferencia = `Titular: AUTOFACIL SpA\nRUT: 76.545.638-K\nBanco: Banco de Chile\nCuenta Corriente: 8001829208\nMail: cobranza@autofacilchile.cl`;
 
-    const sms = `AutoFácil: Su crédito ${numero} tiene deuda de $${monto} (${dias} días mora). Contáctenos urgente.`;
+    const whatsapp = `${trato} ${nombre}, le informamos que su crédito N° ${numero} se encuentra en mora hace ${dias} días, con ${cuotas} cuota${cuotas !== 1 ? 's' : ''} impaga${cuotas !== 1 ? 's' : ''} por un total de $${monto} al día de hoy.\n\n${datosTransferencia}`;
+
+    const sms = `${trato} ${nombre}, su crédito N° ${numero} tiene ${cuotas} cuota${cuotas !== 1 ? 's' : ''} impaga${cuotas !== 1 ? 's' : ''} por $${monto} (${dias} días mora).\n${datosTransferencia}`;
 
     const emailAsunto = `[AutoFácil] Aviso de mora — Crédito N° ${numero}`;
-    const emailCuerpo = `Estimado/a ${nombre},
+    const emailCuerpo = `${trato} ${nombre},
 
-Le informamos que su crédito N° ${numero} correspondiente a ${vehiculo}${patente} presenta ${cuotas} cuota(s) impaga(s), acumulando un total de $${monto} en mora con ${dias} días de atraso.
+Le informamos que su crédito N° ${numero} se encuentra en mora hace ${dias} días, con ${cuotas} cuota${cuotas !== 1 ? 's' : ''} impaga${cuotas !== 1 ? 's' : ''} por un total de $${monto} al día de hoy.
 
-Le solicitamos regularizar esta situación a la brevedad para evitar gastos adicionales de cobranza y posibles acciones legales.
+Para regularizar su situación puede realizar una transferencia con los siguientes datos:
 
-Para consultas o acuerdos de pago, comuníquese con nosotros:
-- Teléfono: [NÚMERO DE CONTACTO]
-- Email: [EMAIL DE CONTACTO]
+${datosTransferencia}
 
 Atentamente,
-Equipo de Cobranza
-AutoFácil`;
+Equipo de Cobranza AutoFácil`;
 
-    ok(res, { whatsapp, sms, email: { asunto: emailAsunto, cuerpo: emailCuerpo } });
+    ok(res, { whatsapp, sms, email: { asunto: emailAsunto, cuerpo: emailCuerpo }, telefono });
   } catch (err) {
     fail(res, err.message, 500);
   }

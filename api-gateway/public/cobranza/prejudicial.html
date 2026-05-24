@@ -121,7 +121,7 @@
   <div class="topnav-left">
     <a href="/" class="topnav-brand">
       <img src="/img/logo.png" alt="AutoFácil">
-      <span class="version-badge" id="versionBadge">v5.1</span>
+      <span class="version-badge" id="versionBadge">v5.2</span>
     </a>
     <div class="breadcrumb-nav">
       <a href="/">Inicio</a><span class="sep">›</span>
@@ -555,17 +555,33 @@ function renderAcciones() {
   // Remotas
   const puedeRemota = !d || (d.puede_remota && d.dias_para_proxima_remota === 0);
   if (m) {
+    const telRaw = (m.telefono || '').replace(/\D/g, '').replace(/^0/, '');
+    const tel56  = telRaw.startsWith('56') ? telRaw : (telRaw ? '56' + telRaw : '');
     html += `<hr style="margin:12px 0">
       <div style="font-size:0.82rem;font-weight:700;color:#64748b;text-transform:uppercase;margin-bottom:10px">Gestiones Remotas ${!puedeRemota && d ? '<span style="color:#f59e0b">(No disponible)</span>' : ''}</div>
-      <div class="d-flex flex-wrap gap-2 mb-3">
-        <button class="btn-action btn-whatsapp" onclick="mostrarMensaje('whatsapp')" ${!puedeRemota ? 'disabled' : ''}><i class="bi bi-whatsapp"></i>WhatsApp</button>
-        <button class="btn-action btn-sms" onclick="mostrarMensaje('sms')" ${!puedeRemota ? 'disabled' : ''}><i class="bi bi-chat-text-fill"></i>SMS</button>
-        <button class="btn-action btn-email" onclick="mostrarMensaje('email')" ${!puedeRemota ? 'disabled' : ''}><i class="bi bi-envelope-fill"></i>Email</button>
+      <!-- Teléfono destino -->
+      <div style="display:flex;align-items:center;gap:8px;margin-bottom:12px;background:#f8fafc;border:1.5px solid #e2e8f0;border-radius:10px;padding:8px 12px">
+        <i class="bi bi-telephone-fill" style="color:#0141A2;font-size:1rem;flex-shrink:0"></i>
+        <span style="font-size:.78rem;color:#64748b;font-weight:600;white-space:nowrap">Celular destino</span>
+        <input id="inputTelRemoto" type="tel" value="${m.telefono || ''}"
+          style="flex:1;border:1px solid #d1d5db;border-radius:7px;padding:4px 10px;font-size:.9rem;font-weight:700;color:#111827;outline:none;min-width:0"
+          placeholder="+56 9 XXXX XXXX" oninput="actualizarTelRemoto(this.value)">
+        <button onclick="copiarTelRemoto()" title="Copiar número"
+          style="background:#e2e8f0;border:none;border-radius:7px;padding:4px 10px;cursor:pointer;font-size:.82rem;color:#374151;white-space:nowrap">
+          <i class="bi bi-clipboard"></i>
+        </button>
       </div>
+      <!-- Botones canal -->
+      <div class="d-flex flex-wrap gap-2 mb-3">
+        <button class="btn-action btn-whatsapp" onclick="enviarWhatsApp()" ${!puedeRemota ? 'disabled' : ''}><i class="bi bi-whatsapp"></i>WhatsApp</button>
+        <button class="btn-action btn-sms" onclick="mostrarMensaje('sms')" ${!puedeRemota ? 'disabled' : ''}><i class="bi bi-chat-text-fill"></i>SMS</button>
+        <button class="btn-action btn-email" onclick="enviarEmail()" ${!puedeRemota ? 'disabled' : ''}><i class="bi bi-envelope-fill"></i>Email</button>
+      </div>
+      <!-- Panel mensaje -->
       <div id="mensajePanel" style="display:none">
-        <div class="msg-box" id="msgTexto"></div>
+        <div class="msg-box" id="msgTexto" style="white-space:pre-wrap"></div>
         <div style="display:flex;gap:8px;margin-top:8px">
-          <button class="btn-action" style="background:#e2e8f0;color:#1e293b" onclick="copiarMensaje()"><i class="bi bi-clipboard"></i>Copiar</button>
+          <button class="btn-action" style="background:#e2e8f0;color:#1e293b;flex:1" onclick="copiarMensaje()"><i class="bi bi-clipboard me-1"></i>Copiar mensaje</button>
         </div>
       </div>`;
     if (!puedeRemota && d) {
@@ -579,6 +595,22 @@ function renderAcciones() {
 }
 
 let tipoMensajeActual = '';
+
+function getTelRemoto() {
+  const el = document.getElementById('inputTelRemoto');
+  return el ? el.value.replace(/\D/g,'').replace(/^0/,'') : '';
+}
+function actualizarTelRemoto() { /* solo mantiene el valor en el input */ }
+
+function copiarTelRemoto() {
+  const tel = document.getElementById('inputTelRemoto')?.value || '';
+  if (!tel) return;
+  navigator.clipboard.writeText(tel);
+  const btn = event.currentTarget;
+  btn.innerHTML = '<i class="bi bi-check2"></i>';
+  setTimeout(() => btn.innerHTML = '<i class="bi bi-clipboard"></i>', 1800);
+}
+
 function mostrarMensaje(tipo) {
   tipoMensajeActual = tipo;
   const m = mensajesActual;
@@ -591,11 +623,46 @@ function mostrarMensaje(tipo) {
   document.getElementById('mensajePanel').style.display = '';
 }
 
+function enviarWhatsApp() {
+  const m = mensajesActual;
+  if (!m) return;
+  tipoMensajeActual = 'whatsapp';
+  const tel  = getTelRemoto();
+  const txt  = m.whatsapp;
+  document.getElementById('msgTexto').textContent = txt;
+  document.getElementById('mensajePanel').style.display = '';
+  if (!tel) { alert('Ingresa el número de celular destino.'); return; }
+  const num = tel.startsWith('56') ? tel : '56' + tel;
+  window.open(`https://wa.me/${num}?text=${encodeURIComponent(txt)}`, '_blank');
+  if (confirm('¿Confirmás que enviaste el mensaje por WhatsApp?')) {
+    registrarGestion({ tipo_gestion: 'WHATSAPP', canal: 'REMOTA', confirmado: true, resultado: 'SIN_RESULTADO', mensaje: txt });
+  }
+}
+
+function enviarEmail() {
+  const m = mensajesActual;
+  if (!m) return;
+  tipoMensajeActual = 'email';
+  const txt = m.email.cuerpo;
+  document.getElementById('msgTexto').textContent = m.email.asunto + '\n\n' + txt;
+  document.getElementById('mensajePanel').style.display = '';
+  const mailto = `mailto:cobranza@autofacilchile.cl?subject=${encodeURIComponent(m.email.asunto)}&body=${encodeURIComponent(txt)}`;
+  window.open(mailto, '_blank');
+}
+
 async function copiarMensaje() {
   const txt = document.getElementById('msgTexto').textContent;
   await navigator.clipboard.writeText(txt);
-  if (confirm('¿Confirmás que enviaste el mensaje?')) {
-    await registrarGestion({ tipo_gestion: tipoMensajeActual.toUpperCase(), canal: 'REMOTA', confirmado: true, resultado: 'SIN_RESULTADO' });
+  const btn = event.currentTarget;
+  const orig = btn.innerHTML;
+  btn.innerHTML = '<i class="bi bi-check2 me-1"></i>¡Copiado!';
+  btn.style.background = '#16a34a';
+  btn.style.color = '#fff';
+  setTimeout(() => { btn.innerHTML = orig; btn.style.background = ''; btn.style.color = ''; }, 2000);
+  if (tipoMensajeActual === 'sms') {
+    if (confirm('¿Confirmás que enviaste el SMS?')) {
+      await registrarGestion({ tipo_gestion: 'SMS', canal: 'REMOTA', confirmado: true, resultado: 'SIN_RESULTADO', mensaje: txt });
+    }
   }
 }
 
