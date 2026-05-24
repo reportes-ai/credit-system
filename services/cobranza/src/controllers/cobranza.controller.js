@@ -51,84 +51,71 @@ function hoyChile() {
 
 // ─── Query base de mora ────────────────────────────────────────────────────────
 // pagos_credito solo almacena PAGOS REALIZADOS (no hay cuotas "pendientes").
-// La mora se calcula comparando:
-//   - cuotas_vencidas: las que debieron pagarse hasta hoy según schedule teórico
-//   - cuotas_pagadas:  las que efectivamente tienen pago registrado
-// Días de mora = días desde la fecha de la PRIMERA cuota no pagada.
+// La mora se calcula comparando schedule teórico vs pagos registrados.
+// Query PLANA (sin subqueries anidadas) compatible con TiDB.
+// HAVING sobre alias es soportado por TiDB en modo MySQL.
 //
-// cuotas_vencidas usa TIMESTAMPDIFF(MONTH) + ajuste por día del mes:
-//   ej: primera_cuota=15-Abr, hoy=23-May → 1 mes completo + día(23)>=día(15) → 2 vencidas ✓
-//   ej: primera_cuota=15-Abr, hoy=10-May → 0 meses completos + día(10)<día(15) → 1 vencida ✓
+// cuotas_vencidas: TIMESTAMPDIFF(MONTH) + ajuste día del mes:
+//   primera_cuota=15-Abr, hoy=23-May → TDIFF=1 + día(23)≥día(15) → 2 vencidas ✓
+//   primera_cuota=15-Abr, hoy=10-May → TDIFF=0 + día(10)<día(15)→ 1 vencida  ✓
 
-const MORA_SQL = (whereExtra = '', limitExtra = '') => `
+// Expresión reutilizable para cuotas vencidas
+const CV = `LEAST(c.plazo,
+    TIMESTAMPDIFF(MONTH, c.fecha_primera_cuota, CURDATE()) +
+    CASE WHEN DAY(CURDATE()) >= DAY(c.fecha_primera_cuota) THEN 1 ELSE 0 END
+  )`;
+
+// Query base plana — whereExtra va dentro del WHERE, havingExtra dentro del HAVING
+const MORA_SQL = (whereExtra = '', havingExtra = '') => `
   SELECT
-    base.*,
-    GREATEST(0, base.cuotas_vencidas - base.cuotas_pagadas) AS cuotas_mora,
-    GREATEST(0, base.cuotas_vencidas - base.cuotas_pagadas) * base.cuota AS monto_mora,
-    CASE WHEN GREATEST(0, base.cuotas_vencidas - base.cuotas_pagadas) > 0
-      THEN DATEDIFF(CURDATE(),
-             DATE_ADD(base.fecha_primera_cuota,
-               INTERVAL base.cuotas_pagadas MONTH))
+    c.*,
+    COALESCE(pp.cnt, 0)                        AS cuotas_pagadas,
+    GREATEST(0, ${CV} - COALESCE(pp.cnt, 0))   AS cuotas_mora,
+    GREATEST(0, ${CV} - COALESCE(pp.cnt, 0)) * COALESCE(c.cuota, 0) AS monto_mora,
+    CASE
+      WHEN GREATEST(0, ${CV} - COALESCE(pp.cnt, 0)) > 0
+        THEN DATEDIFF(CURDATE(),
+               DATE_ADD(c.fecha_primera_cuota,
+                 INTERVAL COALESCE(pp.cnt, 0) MONTH))
       ELSE 0
     END AS dias_mora
-  FROM (
-    SELECT
-      c.*,
-      CASE
-        WHEN c.fecha_primera_cuota IS NULL OR c.fecha_primera_cuota > CURDATE() THEN 0
-        ELSE LEAST(c.plazo,
-          TIMESTAMPDIFF(MONTH, c.fecha_primera_cuota, CURDATE()) +
-          CASE WHEN DAY(CURDATE()) >= DAY(c.fecha_primera_cuota) THEN 1 ELSE 0 END
-        )
-      END AS cuotas_vencidas,
-      COALESCE(pp.cnt, 0) AS cuotas_pagadas
-    FROM creditos c
-    LEFT JOIN (
-      SELECT id_credito, COUNT(DISTINCT numero_cuota) AS cnt
-      FROM pagos_credito
-      GROUP BY id_credito
-    ) pp ON pp.id_credito = c.id_credito
-    WHERE c.estado = 'VIGENTE'
-      AND (c.empresa IS NULL OR c.empresa != 'BROKERAGE')
-      AND c.fecha_primera_cuota IS NOT NULL
-      ${whereExtra}
-  ) base
-  WHERE GREATEST(0, base.cuotas_vencidas - base.cuotas_pagadas) > 0
-  ${limitExtra}
+  FROM creditos c
+  LEFT JOIN (
+    SELECT id_credito, COUNT(DISTINCT numero_cuota) AS cnt
+    FROM pagos_credito
+    GROUP BY id_credito
+  ) pp ON pp.id_credito = c.id_credito
+  WHERE c.estado = 'VIGENTE'
+    AND (c.empresa IS NULL OR c.empresa != 'BROKERAGE')
+    AND c.fecha_primera_cuota IS NOT NULL
+    AND c.fecha_primera_cuota <= CURDATE()
+    ${whereExtra}
+  HAVING cuotas_mora > 0
+    ${havingExtra}
 `;
 
-// Versión para un solo crédito (por id)
+// Versión para un solo crédito (sin HAVING: devuelve aunque no tenga mora)
 const MORA_CREDITO_SQL = `
   SELECT
-    base.*,
-    GREATEST(0, base.cuotas_vencidas - base.cuotas_pagadas) AS cuotas_mora,
-    GREATEST(0, base.cuotas_vencidas - base.cuotas_pagadas) * base.cuota AS monto_mora,
-    CASE WHEN GREATEST(0, base.cuotas_vencidas - base.cuotas_pagadas) > 0
-      THEN DATEDIFF(CURDATE(),
-             DATE_ADD(base.fecha_primera_cuota,
-               INTERVAL base.cuotas_pagadas MONTH))
+    c.*,
+    COALESCE(pp.cnt, 0)                        AS cuotas_pagadas,
+    GREATEST(0, ${CV} - COALESCE(pp.cnt, 0))   AS cuotas_mora,
+    GREATEST(0, ${CV} - COALESCE(pp.cnt, 0)) * COALESCE(c.cuota, 0) AS monto_mora,
+    CASE
+      WHEN GREATEST(0, ${CV} - COALESCE(pp.cnt, 0)) > 0
+        THEN DATEDIFF(CURDATE(),
+               DATE_ADD(c.fecha_primera_cuota,
+                 INTERVAL COALESCE(pp.cnt, 0) MONTH))
       ELSE 0
     END AS dias_mora
-  FROM (
-    SELECT
-      c.*,
-      CASE
-        WHEN c.fecha_primera_cuota IS NULL OR c.fecha_primera_cuota > CURDATE() THEN 0
-        ELSE LEAST(c.plazo,
-          TIMESTAMPDIFF(MONTH, c.fecha_primera_cuota, CURDATE()) +
-          CASE WHEN DAY(CURDATE()) >= DAY(c.fecha_primera_cuota) THEN 1 ELSE 0 END
-        )
-      END AS cuotas_vencidas,
-      COALESCE(pp.cnt, 0) AS cuotas_pagadas
-    FROM creditos c
-    LEFT JOIN (
-      SELECT id_credito, COUNT(DISTINCT numero_cuota) AS cnt
-      FROM pagos_credito
-      WHERE id_credito = ?
-      GROUP BY id_credito
-    ) pp ON pp.id_credito = c.id_credito
-    WHERE c.id_credito = ?
-  ) base
+  FROM creditos c
+  LEFT JOIN (
+    SELECT id_credito, COUNT(DISTINCT numero_cuota) AS cnt
+    FROM pagos_credito
+    WHERE id_credito = ?
+    GROUP BY id_credito
+  ) pp ON pp.id_credito = c.id_credito
+  WHERE c.id_credito = ?
 `;
 
 function tramoLabel(dias) {
@@ -230,29 +217,22 @@ exports.cartera = async (req, res) => {
       qParams.push(`%${q}%`, `%${q}%`, `%${q}%`);
     }
 
-    const havingWhere = havingFilters.length
+    const havingExtra = havingFilters.length
       ? 'AND ' + havingFilters.join(' AND ')
       : '';
 
-    // Query conteo
-    const countSql = `
-      SELECT COUNT(*) AS total FROM (
-        ${MORA_SQL(`${whereCreditos} ${whereQ}`)}
-      ) m
-      WHERE 1=1 ${havingWhere}
-    `;
+    // Query conteo — MORA_SQL ya lleva HAVING; pasamos havingExtra dentro de él
+    const countSql = `SELECT COUNT(*) AS total FROM (${MORA_SQL(`${whereCreditos} ${whereQ}`, havingExtra)}) _cnt`;
     const [[{ total }]] = await pool.query(countSql, [...qParams]);
 
     // Query datos con última gestión
     const dataSql = `
       SELECT m.*,
-        ug.tipo_gestion AS ultima_tipo,
-        ug.resultado    AS ultimo_resultado,
-        ug.created_at   AS ultima_gestion_fecha,
+        ug.tipo_gestion   AS ultima_tipo,
+        ug.resultado      AS ultimo_resultado,
+        ug.created_at     AS ultima_gestion_fecha,
         ug.nombre_usuario AS ultimo_gestor
-      FROM (
-        ${MORA_SQL(`${whereCreditos} ${whereQ}`)}
-      ) m
+      FROM (${MORA_SQL(`${whereCreditos} ${whereQ}`, havingExtra)}) m
       LEFT JOIN (
         SELECT g1.*
         FROM cobranza_gestiones g1
@@ -261,8 +241,7 @@ exports.cartera = async (req, res) => {
           FROM cobranza_gestiones GROUP BY id_credito
         ) g2 ON g1.id_credito = g2.id_credito AND g1.created_at = g2.max_fecha
       ) ug ON ug.id_credito = m.id_credito
-      WHERE 1=1 ${havingWhere}
-      ORDER BY dias_mora DESC
+      ORDER BY m.dias_mora DESC
       LIMIT ? OFFSET ?
     `;
     const [rows] = await pool.query(dataSql, [...qParams, Number(limit), offset]);
