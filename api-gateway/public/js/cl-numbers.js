@@ -17,7 +17,7 @@ function formatCL(num, decimals = 2) {
 
 function formatCLInt(num) {
   if (num === null || num === undefined || num === '') return '';
-  return parseInt(num).toLocaleString('es-CL');
+  return Math.round(Number(num)).toLocaleString('es-CL');
 }
 
 // Aplica formato chileno a un input:

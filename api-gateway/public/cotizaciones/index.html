@@ -1457,7 +1457,7 @@ async function buscarCotizaciones() {
       return;
     }
 
-    const fmtPeso = v => v != null ? '$' + Number(v).toLocaleString('es-CL') : '—';
+    const fmtPeso = v => v != null ? '$' + Math.round(Number(v)).toLocaleString('es-CL') : '—';
     const fmtFecha = s => {
       if (!s) return '—';
       const d = new Date(s);
@@ -1716,7 +1716,7 @@ function _detectarTratamiento(nombreCompleto) {
 
 function _fmtPesoDetalle(v) {
   if (v == null || v === '') return '—';
-  return '$' + Number(v).toLocaleString('es-CL');
+  return '$' + Math.round(Number(v)).toLocaleString('es-CL');
 }
 
 function abrirDetalle(rowData) {
@@ -1869,7 +1869,7 @@ let _vistaRowData = null;
 
 function abrirVista(rowData) {
   _vistaRowData = rowData;
-  const fp = v => (v != null && v !== '') ? '$' + Number(v).toLocaleString('es-CL') : '—';
+  const fp = v => (v != null && v !== '') ? '$' + Math.round(Number(v)).toLocaleString('es-CL') : '—';
   const fmtFechaLarga = s => {
     if (!s) return '—';
     const d = new Date(s);

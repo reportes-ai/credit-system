@@ -871,7 +871,7 @@ function logout()   { localStorage.removeItem('token'); localStorage.removeItem(
 
 /* ─── Utils ─────────────────────────────────────────────────────────── */
 function upperInputCred(el) { const s=el.selectionStart, e=el.selectionEnd; el.value=el.value.toUpperCase(); el.setSelectionRange(s,e); }
-function fmtPeso(v) { return v!=null && v!=='' && v!==0 ? '$'+Number(v).toLocaleString('es-CL') : '—'; }
+function fmtPeso(v) { return v!=null && v!=='' && v!==0 ? '$'+Math.round(Number(v)).toLocaleString('es-CL') : '—'; }
 
 /* ─── Validador de Patente (LLLLNN) ─────────────────────────────────── */
 const PATENTE_RE = /^[A-Z]{4}[0-9]{2}$/;
