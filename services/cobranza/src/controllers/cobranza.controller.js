@@ -110,7 +110,7 @@ const MORA_CREDITO_SQL = `
     END AS dias_mora,
     cl.sexo           AS sexo_cliente,
     cl.telefono_movil AS telefono_movil,
-    cl.email          AS email_cliente
+    cl.correo         AS email_cliente
   FROM creditos c
   LEFT JOIN (
     SELECT id_credito, COUNT(DISTINCT numero_cuota) AS cnt
