@@ -615,8 +615,7 @@ async function verComprobante(idPago) {
     document.getElementById('compBody').innerHTML = `
       <div class="comp-print" id="compPrint">
         <div class="comp-logo">
-          <div class="co-brand">AutoFácil</div>
-          <div class="co-sub">Crédito Automotriz</div>
+          <img src="/img/logo.png" alt="AutoFácil" style="height:36px;display:block;margin:0 auto 4px" onerror="this.outerHTML='<div class=\'co-brand\'>AutoFácil</div>'">
         </div>
         <div class="comp-titulo">Comprobante de Pago</div>
         <div class="comp-num">N° ${numComp} &nbsp;·&nbsp; Emitido: ${fmtDT(new Date().toISOString())}</div>
@@ -626,15 +625,14 @@ async function verComprobante(idPago) {
           <div class="comp-row"><span class="cr-label">N° Crédito</span><span class="cr-val">${c.numero_credito||c.id_credito}</span></div>
           <div class="comp-row"><span class="cr-label">Cliente</span><span class="cr-val">${c.nombre_cliente||'—'}</span></div>
           <div class="comp-row"><span class="cr-label">RUT</span><span class="cr-val">${c.rut_cliente||'—'}</span></div>
-          <div class="comp-row"><span class="cr-label">Vehículo</span><span class="cr-val">${[c.marca,c.modelo,c.anio].filter(Boolean).join(' ')||'—'}</span></div>
-          <div class="comp-row"><span class="cr-label">Patente</span><span class="cr-val">${c.patente||'—'}</span></div>
         </div>
 
         <div class="comp-section">
           <div class="comp-section-title">Detalle del Pago</div>
           <div class="comp-row"><span class="cr-label">Cuota N°</span><span class="cr-val">${pg.numero_cuota} de ${c.plazo}</span></div>
           <div class="comp-row"><span class="cr-label">Fecha Vencimiento</span><span class="cr-val">${fmtD(pg.fecha_vencimiento)}</span></div>
-          <div class="comp-row"><span class="cr-label">Fecha de Pago</span><span class="cr-val" style="color:var(--green)">${fmtDT(pg.fecha_pago)}</span></div>
+          <div class="comp-row"><span class="cr-label">Fecha de Pago</span><span class="cr-val" style="color:var(--green)">${fmtD(pg.fecha_pago)}</span></div>
+          ${pg.nombre_caja ? `<div class="comp-row"><span class="cr-label">Caja</span><span class="cr-val">${pg.nombre_caja}</span></div>` : ''}
           <div class="comp-row"><span class="cr-label">Monto Cuota</span><span class="cr-val">${fmtP(pg.monto_cuota)}</span></div>
           <div class="comp-row"><span class="cr-label">Intereses por Mora</span><span class="cr-val" style="color:var(--red)">${fmtP(pg.interes_mora)}</span></div>
           <div class="comp-row"><span class="cr-label">Gastos de Cobranza</span><span class="cr-val" style="color:var(--red)">${fmtP(pg.gastos_cobranza)}</span></div>
@@ -647,7 +645,6 @@ async function verComprobante(idPago) {
         </div>
 
         <div class="comp-footer">
-          Registrado por: ${pg.registrado_por||'—'}<br>
           AutoFácil Crédito Automotriz &nbsp;·&nbsp; Documento no válido como boleta o factura
         </div>
       </div>`;

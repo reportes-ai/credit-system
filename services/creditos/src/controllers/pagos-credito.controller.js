@@ -97,7 +97,10 @@ const getByCredito = async (req, res) => {
 const getById = async (req, res) => {
   try {
     const [rows] = await pool.query(
-      'SELECT * FROM pagos_credito WHERE id_pago = ?',
+      `SELECT pc.*, cj.nombre AS nombre_caja
+       FROM pagos_credito pc
+       LEFT JOIN cajas cj ON cj.id_caja = pc.id_caja
+       WHERE pc.id_pago = ?`,
       [req.params.id_pago]
     );
     if (!rows.length) return res.status(404).json({ success: false, error: 'Pago no encontrado' });
