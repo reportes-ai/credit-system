@@ -115,22 +115,14 @@ function buildRecibo({ credito, pagos, cajaNombre, trxNum, idPago }) {
   }
 
   return `
-    <div id="compPrint" style="font-family:'Segoe UI',system-ui,sans-serif;padding:28px 32px;max-width:480px;margin:0 auto;background:#fff;position:relative;overflow:hidden">
-
-      <!-- Timbre PAGADO (marca de agua centrada) -->
-      <img src="/img/timbre-pagado.png" alt=""
-           style="position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);width:340px;opacity:.18;pointer-events:none;z-index:0;user-select:none"
-           onerror="this.style.display='none'">
-
-      <!-- Contenido sobre el timbre -->
-      <div style="position:relative;z-index:1">
+    <div id="compPrint" style="font-family:'Segoe UI',system-ui,sans-serif;padding:28px 32px;max-width:480px;margin:0 auto;background:#fff">
 
       <!-- Logo + título -->
       <div style="text-align:center;margin-bottom:14px">
         <img src="/img/logo.png" alt="" style="height:38px;display:block;margin:0 auto"
              onerror="this.style.display='none'">
         <div style="font-size:1rem;font-weight:800;text-transform:uppercase;letter-spacing:.08em;color:#0141A2;margin-top:12px">Comprobante de Pago</div>
-        <div style="font-size:.75rem;color:#6b7280;margin-top:3px">${_cEsc(numComp)} &nbsp;·&nbsp; ${_cFmtNow()}</div>
+        <div style="font-size:.75rem;color:#6b7280;margin-top:3px">${_cEsc(numComp)}</div>
       </div>
 
       <!-- Crédito -->
@@ -171,7 +163,6 @@ function buildRecibo({ credito, pagos, cajaNombre, trxNum, idPago }) {
         AutoFácil Crédito Automotriz &nbsp;·&nbsp; Documento no válido como boleta o factura
       </div>
 
-      </div><!-- /contenido sobre timbre -->
     </div>`;
 }
 
