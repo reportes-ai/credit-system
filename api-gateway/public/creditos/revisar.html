@@ -807,8 +807,7 @@ async function verComprobanteRevisar(idPago) {
     const html = `
       <div id="compPrint" style="font-family:'Segoe UI',sans-serif;padding:32px;max-width:500px;margin:0 auto">
         <div style="text-align:center;margin-bottom:16px">
-          <div style="font-size:1.4rem;font-weight:900;color:var(--navy)">AutoFácil</div>
-          <div style="font-size:.78rem;color:var(--muted)">Crédito Automotriz</div>
+          <img src="/img/logo.png" alt="AutoFácil" style="height:36px;display:block;margin:0 auto 4px" onerror="this.outerHTML='<div style=\'font-size:1.4rem;font-weight:900;color:var(--navy)\'>AutoFácil</div>'">
         </div>
         <div style="text-align:center;font-size:1rem;font-weight:800;text-transform:uppercase;letter-spacing:.08em;color:var(--navy);margin:14px 0 2px">Comprobante de Pago</div>
         <div style="text-align:center;font-size:.78rem;color:var(--muted);margin-bottom:18px">N° ${numComp}</div>
@@ -817,13 +816,13 @@ async function verComprobanteRevisar(idPago) {
           ${compRow('N° Crédito', c.numero_credito||c.id_credito)}
           ${compRow('Cliente',    c.nombre_cliente)}
           ${compRow('RUT',        c.rut_cliente)}
-          ${compRow('Vehículo',   [c.marca,c.modelo,c.anio].filter(Boolean).join(' '))}
         </div>
         <div style="border-top:1px solid var(--border);padding:10px 0">
           <div style="font-size:.68rem;font-weight:800;text-transform:uppercase;letter-spacing:.07em;color:var(--muted);margin-bottom:8px">Pago</div>
           ${compRow('Cuota N°',         pg.numero_cuota+' de '+c.plazo)}
           ${compRow('Vencimiento',      fmtD(pg.fecha_vencimiento))}
-          ${compRow('Fecha Pago',       fmtDT(pg.fecha_pago),'#16a34a')}
+          ${compRow('Fecha Pago',       fmtD(pg.fecha_pago),'#16a34a')}
+          ${pg.nombre_caja ? compRow('Caja', pg.nombre_caja) : ''}
           ${compRow('Cuota Original',   fmtP(pg.monto_cuota))}
           ${compRow('Int. por Mora',    fmtP(pg.interes_mora),'#dc2626')}
           ${compRow('Gtos. Cobranza',   fmtP(pg.gastos_cobranza),'#dc2626')}
@@ -834,7 +833,6 @@ async function verComprobanteRevisar(idPago) {
           <span style="font-size:1.4rem;font-weight:900">${fmtP(pg.total_pagado)}</span>
         </div>
         <div style="text-align:center;font-size:.7rem;color:var(--muted);margin-top:18px;padding-top:10px;border-top:1px dashed var(--border)">
-          Registrado por: ${pg.registrado_por||'—'}<br>
           AutoFácil Crédito Automotriz · Documento no válido como boleta o factura
         </div>
       </div>`;
