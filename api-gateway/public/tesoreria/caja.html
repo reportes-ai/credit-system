@@ -218,7 +218,7 @@
   <div class="topnav-left">
     <a href="/" class="topnav-brand">
       <img src="/img/logo.png" alt="AutoFácil">
-      <span class="version-badge">v2.0</span>
+      <span class="version-badge">v2.1</span>
     </a>
     <div class="breadcrumb-nav">
       <a href="/">Inicio</a><span class="sep">›</span>
@@ -390,6 +390,7 @@
       <div class="modal-body" id="comprobanteBody" style="padding:20px 24px"></div>
       <div class="modal-footer" style="border-top:1px solid #f1f5f9;gap:8px">
         <button class="btn btn-secondary btn-sm" data-bs-dismiss="modal">Cerrar</button>
+        <button id="btnCapturarImg" class="btn btn-success btn-sm" onclick="capturarComprobanteImagen()"><i class="bi bi-image me-1"></i>Copiar imagen</button>
         <button class="btn-imprimir" onclick="imprimirComprobante()"><i class="bi bi-printer me-1"></i>Imprimir</button>
       </div>
     </div>
@@ -400,6 +401,8 @@
 <div id="printArea" style="display:none"></div>
 
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
+<script src="/js/comprobante.js"></script>
 <script>
 /* ── Auth ── */
 const token = localStorage.getItem('token');
@@ -1101,126 +1104,21 @@ function verComprobante(numeroCuota) {
   const pagoRef = _pagos.find(p => p.numero_cuota === numeroCuota);
   if (!pagoRef) return;
 
-  // Agrupar por numero_transaccion (o por id_pago si no hay TRX)
-  const trxKey = pagoRef.numero_transaccion || null;
-  const pagosGrupo = trxKey
+  const trxKey     = pagoRef.numero_transaccion || null;
+  const pagosGrupo = (trxKey
     ? _pagos.filter(p => p.numero_transaccion === trxKey)
-    : [pagoRef];
+    : [pagoRef]).sort((a,b) => a.numero_cuota - b.numero_cuota);
 
-  // Ordenar por cuota
-  pagosGrupo.sort((a, b) => a.numero_cuota - b.numero_cuota);
-
-  const c          = _credito;
-  const trxFmt     = trxKey
-    ? `TRX-${String(trxKey).padStart(6,'0')}`
-    : `PAG-${pagoRef.id_pago}`;
-  const fechaEmision = new Date().toLocaleDateString('es-CL', { day:'2-digit', month:'2-digit', year:'numeric', hour:'2-digit', minute:'2-digit' });
-  // Fecha de pago solo como DD-MM-YYYY (sin hora, sin conversión de timezone)
-  const fechaPago = pagoRef.fecha_pago
-    ? String(pagoRef.fecha_pago).slice(0,10).split('-').reverse().join('-')
-    : '—';
-  const nombreCajaPago = _miCaja?.nombre_caja || null;
-
-  // Totales
-  const totBase   = pagosGrupo.reduce((a,p) => a + parseFloat(p.monto_cuota||0), 0);
-  const totGastos = pagosGrupo.reduce((a,p) => a + parseFloat(p.gastos_cobranza||0), 0);
-  const totMora   = pagosGrupo.reduce((a,p) => a + parseFloat(p.interes_mora||0), 0);
-  const totPagado = pagosGrupo.reduce((a,p) => a + parseFloat(p.total_pagado||0), 0);
-  const hayMora   = totMora > 0;
-  const hayGastos = totGastos > 0;
-
-  // Condonado total
-  const hoy = new Date();
-  const totCondonado = pagosGrupo.reduce((a, p) => {
-    const s = _schedule.find(x => x.numero === p.numero_cuota);
-    if (!s) return a;
-    const maxG = calcGastos(s.monto, s.fecha, hoy).monto;
-    const maxM = calcMora(s.monto, s.fecha, hoy).monto;
-    return a + Math.max(0, maxG - parseFloat(p.gastos_cobranza||0))
-             + Math.max(0, maxM - parseFloat(p.interes_mora||0));
-  }, 0);
-
-  // Filas de cuotas
-  const filasCuotas = pagosGrupo.map(p => {
-    const s = _schedule.find(x => x.numero === p.numero_cuota);
-    const fv = s?.fecha ? new Date(s.fecha+'T12:00:00').toLocaleDateString('es-CL',{day:'2-digit',month:'2-digit',year:'numeric'}) : '—';
-    return `<tr>
-      <td style="padding:7px 10px;border-bottom:1px solid #f1f5f9;font-weight:700;color:var(--navy)">N°${p.numero_cuota}</td>
-      <td style="padding:7px 10px;border-bottom:1px solid #f1f5f9;color:#6b7280;font-size:.8rem">${fv}</td>
-      <td style="padding:7px 10px;border-bottom:1px solid #f1f5f9;text-align:right;font-family:monospace">${clp(p.monto_cuota||s?.monto||0)}</td>
-      ${hayGastos ? `<td style="padding:7px 10px;border-bottom:1px solid #f1f5f9;text-align:right;font-family:monospace;color:${parseFloat(p.gastos_cobranza||0)>0?'#374151':'#9ca3af'}">${parseFloat(p.gastos_cobranza||0)>0?clp(p.gastos_cobranza):'—'}</td>` : ''}
-      ${hayMora   ? `<td style="padding:7px 10px;border-bottom:1px solid #f1f5f9;text-align:right;font-family:monospace;color:${parseFloat(p.interes_mora||0)>0?'#dc2626':'#9ca3af'}">${parseFloat(p.interes_mora||0)>0?clp(p.interes_mora):'—'}</td>` : ''}
-      <td style="padding:7px 10px;border-bottom:1px solid #f1f5f9;text-align:right;font-family:monospace;font-weight:800;color:var(--navy)">${clp(p.total_pagado)}</td>
-    </tr>`;
-  }).join('');
-
-  const html = `
-  <div class="recibo">
-    <div class="recibo-header">
-      <img src="/img/logo.png" alt="AutoFácil" onerror="this.style.display='none'">
-      <h2>Comprobante de Pago</h2>
-      <div class="trx">${trxFmt} &nbsp;·&nbsp; Emitido: ${fechaEmision}</div>
-    </div>
-
-    <div class="recibo-section">
-      <div class="recibo-section-title">Datos del Cliente</div>
-      <div class="recibo-row"><span class="lbl">Nombre</span><span class="val">${esc(c.nombre_cliente)}</span></div>
-      <div class="recibo-row"><span class="lbl">RUT</span><span class="val">${esc(c.rut_cliente)}</span></div>
-    </div>
-
-    <div class="recibo-section">
-      <div class="recibo-section-title">Datos del Crédito</div>
-      <div class="recibo-row"><span class="lbl">N° Operación</span><span class="val">${esc(c.numero_credito||c.id_credito)}</span></div>
-      <div class="recibo-row"><span class="lbl">Fecha de pago</span><span class="val">${fechaPago}</span></div>
-      ${nombreCajaPago ? `<div class="recibo-row"><span class="lbl">Caja</span><span class="val">${esc(nombreCajaPago)}</span></div>` : ''}
-    </div>
-
-    <div class="recibo-section">
-      <div class="recibo-section-title">Detalle de Cuotas Pagadas (${pagosGrupo.length})</div>
-      <table style="width:100%;border-collapse:collapse;font-size:.82rem;margin-top:4px">
-        <thead>
-          <tr style="background:#f8fafc">
-            <th style="padding:7px 10px;text-align:left;font-size:.7rem;color:#6b7280;border-bottom:2px solid #e5e7eb">CUOTA</th>
-            <th style="padding:7px 10px;text-align:left;font-size:.7rem;color:#6b7280;border-bottom:2px solid #e5e7eb">VENCIMIENTO</th>
-            <th style="padding:7px 10px;text-align:right;font-size:.7rem;color:#6b7280;border-bottom:2px solid #e5e7eb">BASE</th>
-            ${hayGastos ? `<th style="padding:7px 10px;text-align:right;font-size:.7rem;color:#6b7280;border-bottom:2px solid #e5e7eb">GTOS. COBR.</th>` : ''}
-            ${hayMora   ? `<th style="padding:7px 10px;text-align:right;font-size:.7rem;color:#6b7280;border-bottom:2px solid #e5e7eb">INT. MORA</th>` : ''}
-            <th style="padding:7px 10px;text-align:right;font-size:.7rem;color:#6b7280;border-bottom:2px solid #e5e7eb">TOTAL</th>
-          </tr>
-        </thead>
-        <tbody>${filasCuotas}</tbody>
-        ${pagosGrupo.length > 1 ? `<tfoot>
-          <tr style="background:#f0f4f8">
-            <td colspan="2" style="padding:8px 10px;font-weight:800;font-size:.8rem;color:#374151">TOTAL</td>
-            <td style="padding:8px 10px;text-align:right;font-family:monospace;font-weight:700">${clp(totBase)}</td>
-            ${hayGastos ? `<td style="padding:8px 10px;text-align:right;font-family:monospace;font-weight:700">${totGastos>0?clp(totGastos):'—'}</td>` : ''}
-            ${hayMora   ? `<td style="padding:8px 10px;text-align:right;font-family:monospace;font-weight:700;color:#dc2626">${totMora>0?clp(totMora):'—'}</td>` : ''}
-            <td style="padding:8px 10px;text-align:right;font-family:monospace;font-weight:900;color:var(--navy)">${clp(totPagado)}</td>
-          </tr>
-        </tfoot>` : ''}
-      </table>
-      ${totCondonado > 0 ? `<div style="margin-top:8px;font-size:.78rem;color:#15803d;background:#f0fdf4;border:1px solid #bbf7d0;border-radius:6px;padding:5px 10px"><i class="bi bi-check-circle me-1"></i>Condonado en esta transacción: <strong>${clp(totCondonado)}</strong></div>` : ''}
-    </div>
-
-    <div class="recibo-total">
-      <span class="lbl">TOTAL PAGADO${pagosGrupo.length > 1 ? ` (${pagosGrupo.length} cuotas)` : ''}</span>
-      <span class="val">${clp(totPagado)}</span>
-    </div>
-
-    ${pagoRef.origen_fondos ? `
-    <div class="recibo-section">
-      <div class="recibo-section-title">Datos de la Transacción</div>
-      <div class="recibo-row"><span class="lbl">Origen de fondos</span><span class="val">${esc(pagoRef.origen_fondos)}</span></div>
-    </div>` : ''}
-
-    <div class="recibo-footer">
-      AutoFácil Crédito Automotriz &nbsp;·&nbsp; Comprobante generado el ${fechaEmision}<br>
-      Este documento es válido como comprobante de pago.
-    </div>
-  </div>`;
+  const html = buildRecibo({
+    credito:    _credito,
+    pagos:      pagosGrupo,
+    cajaNombre: _miCaja?.nombre_caja || null,
+    trxNum:     trxKey,
+    idPago:     pagoRef.id_pago,
+  });
 
   document.getElementById('comprobanteBody').innerHTML = html;
-  document.getElementById('printArea').innerHTML = html;
+  document.getElementById('printArea').innerHTML       = html;
   new bootstrap.Modal(document.getElementById('modalComprobante')).show();
 }
 

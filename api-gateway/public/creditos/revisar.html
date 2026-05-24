@@ -193,7 +193,7 @@
   <a class="nav-brand" href="/creditos">
     <img src="/img/logo-autofacil.png" alt="AutoFácil" style="filter:brightness(0) invert(1);height:32px;display:block" onerror="this.style.display='none'">
     <span>Revisión de Crédito</span>
-    <span class="version-badge">v2.6</span>
+    <span class="version-badge">v2.7</span>
   </a>
   <div class="breadcrumb-nav">
   <a href="/">Inicio</a><span class="sep">›</span>
@@ -802,41 +802,12 @@ async function verComprobanteRevisar(idPago) {
     const j  = await r.json();
     if (!j.success) throw new Error(j.error);
     const pg = j.data;
-    const c  = _credito;
-    const numComp = String(idPago).padStart(8,'0');
-    const html = `
-      <div id="compPrint" style="font-family:'Segoe UI',sans-serif;padding:32px;max-width:500px;margin:0 auto">
-        <div style="text-align:center;margin-bottom:16px">
-          <img src="/img/logo.png" alt="AutoFácil" style="height:36px;display:block;margin:0 auto 4px" onerror="this.outerHTML='<div style=\'font-size:1.4rem;font-weight:900;color:var(--navy)\'>AutoFácil</div>'">
-        </div>
-        <div style="text-align:center;font-size:1rem;font-weight:800;text-transform:uppercase;letter-spacing:.08em;color:var(--navy);margin:14px 0 2px">Comprobante de Pago</div>
-        <div style="text-align:center;font-size:.78rem;color:var(--muted);margin-bottom:18px">N° ${numComp}</div>
-        <div style="border-top:1px solid var(--border);padding:10px 0">
-          <div style="font-size:.68rem;font-weight:800;text-transform:uppercase;letter-spacing:.07em;color:var(--muted);margin-bottom:8px">Crédito</div>
-          ${compRow('N° Crédito', c.numero_credito||c.id_credito)}
-          ${compRow('Cliente',    c.nombre_cliente)}
-          ${compRow('RUT',        c.rut_cliente)}
-        </div>
-        <div style="border-top:1px solid var(--border);padding:10px 0">
-          <div style="font-size:.68rem;font-weight:800;text-transform:uppercase;letter-spacing:.07em;color:var(--muted);margin-bottom:8px">Pago</div>
-          ${compRow('Cuota N°',         pg.numero_cuota+' de '+c.plazo)}
-          ${compRow('Vencimiento',      fmtD(pg.fecha_vencimiento))}
-          ${compRow('Fecha Pago',       fmtD(pg.fecha_pago),'#16a34a')}
-          ${pg.nombre_caja ? compRow('Caja', pg.nombre_caja) : ''}
-          ${compRow('Cuota Original',   fmtP(pg.monto_cuota))}
-          ${compRow('Int. por Mora',    fmtP(pg.interes_mora),'#dc2626')}
-          ${compRow('Gtos. Cobranza',   fmtP(pg.gastos_cobranza),'#dc2626')}
-          ${pg.observacion ? compRow('Observación', pg.observacion) : ''}
-        </div>
-        <div style="background:linear-gradient(135deg,var(--navy),var(--blue));border-radius:10px;padding:14px 18px;margin-top:12px;display:flex;justify-content:space-between;align-items:center;color:#fff">
-          <span style="font-size:.78rem;font-weight:700;opacity:.85;text-transform:uppercase">Total Pagado</span>
-          <span style="font-size:1.4rem;font-weight:900">${fmtP(pg.total_pagado)}</span>
-        </div>
-        <div style="text-align:center;font-size:.7rem;color:var(--muted);margin-top:18px;padding-top:10px;border-top:1px dashed var(--border)">
-          AutoFácil Crédito Automotriz · Documento no válido como boleta o factura
-        </div>
-      </div>`;
-    // Mostrar en overlay del modal amortización reusado como visor
+    const html = buildRecibo({
+      credito:    _credito,
+      pagos:      [pg],
+      cajaNombre: pg.nombre_caja || null,
+      idPago:     idPago,
+    });
     const overlay = document.getElementById('amortOverlay');
     overlay.classList.add('open');
     overlay.innerHTML = `
@@ -847,8 +818,11 @@ async function verComprobanteRevisar(idPago) {
         </div>
         <div class="amort-scroll" style="padding:0">${html}</div>
         <div class="amort-foot-bar">
-          <span style="font-size:.75rem;color:#9ca3af">Comprobante N° ${numComp}</span>
-          <button onclick="window.print()" style="background:linear-gradient(135deg,var(--navy),var(--blue));color:#fff;border:none;border-radius:8px;padding:7px 16px;font-weight:600;cursor:pointer;font-size:.85rem;display:flex;align-items:center;gap:6px"><i class="bi bi-printer"></i>Imprimir</button>
+          <span style="font-size:.75rem;color:#9ca3af">Comprobante N° ${String(idPago).padStart(8,'0')}</span>
+          <div style="display:flex;gap:8px">
+            <button id="btnCapturarImg" onclick="capturarComprobanteImagen()" style="background:#16a34a;color:#fff;border:none;border-radius:8px;padding:7px 16px;font-weight:600;cursor:pointer;font-size:.85rem;display:flex;align-items:center;gap:6px"><i class="bi bi-image"></i>Copiar imagen</button>
+            <button onclick="window.print()" style="background:linear-gradient(135deg,var(--navy),var(--blue));color:#fff;border:none;border-radius:8px;padding:7px 16px;font-weight:600;cursor:pointer;font-size:.85rem;display:flex;align-items:center;gap:6px"><i class="bi bi-printer"></i>Imprimir</button>
+          </div>
         </div>
       </div>`;
   } catch(e) { showToast('Error: '+e.message, false); }
@@ -1096,6 +1070,8 @@ cargarPagina().then(() => {
   } catch(_) {}
 }).catch(() => {});
 </script>
+<script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
+<script src="/js/comprobante.js"></script>
 <script src="/js/app-version.js"></script>
 </body>
 </html>

@@ -141,7 +141,7 @@
   <a href="/creditos" class="nav-brand">
     <img src="/img/logo-autofacil.png" alt="AutoFácil" style="filter:brightness(0) invert(1);height:32px;display:block" onerror="this.style.display='none'">
     <span>Pago de Cuotas</span>
-    <span class="version-badge">v1.5</span>
+    <span class="version-badge">v1.6</span>
   </a>
   <div class="breadcrumb-nav">
   <a href="/">Inicio</a><span class="sep">›</span>
@@ -220,6 +220,7 @@
     <div class="comp-body" id="compBody"></div>
     <div class="comp-foot-btns">
       <button class="btn-cancelar" onclick="cerrarComp()">Cerrar</button>
+      <button id="btnCapturarImg" class="btn-print" style="background:#16a34a" onclick="capturarComprobanteImagen()"><i class="bi bi-image"></i>Copiar imagen</button>
       <button class="btn-print" onclick="window.print()"><i class="bi bi-printer"></i>Imprimir</button>
     </div>
   </div>
@@ -610,44 +611,12 @@ async function verComprobante(idPago) {
     const j = await r.json();
     if (!j.success) throw new Error(j.error);
     const pg = j.data;
-    const c  = _credito;
-    const numComp = String(idPago).padStart(8,'0');
-    document.getElementById('compBody').innerHTML = `
-      <div class="comp-print" id="compPrint">
-        <div class="comp-logo">
-          <img src="/img/logo.png" alt="AutoFácil" style="height:36px;display:block;margin:0 auto 4px" onerror="this.outerHTML='<div class=\'co-brand\'>AutoFácil</div>'">
-        </div>
-        <div class="comp-titulo">Comprobante de Pago</div>
-        <div class="comp-num">N° ${numComp} &nbsp;·&nbsp; Emitido: ${fmtDT(new Date().toISOString())}</div>
-
-        <div class="comp-section">
-          <div class="comp-section-title">Datos del Crédito</div>
-          <div class="comp-row"><span class="cr-label">N° Crédito</span><span class="cr-val">${c.numero_credito||c.id_credito}</span></div>
-          <div class="comp-row"><span class="cr-label">Cliente</span><span class="cr-val">${c.nombre_cliente||'—'}</span></div>
-          <div class="comp-row"><span class="cr-label">RUT</span><span class="cr-val">${c.rut_cliente||'—'}</span></div>
-        </div>
-
-        <div class="comp-section">
-          <div class="comp-section-title">Detalle del Pago</div>
-          <div class="comp-row"><span class="cr-label">Cuota N°</span><span class="cr-val">${pg.numero_cuota} de ${c.plazo}</span></div>
-          <div class="comp-row"><span class="cr-label">Fecha Vencimiento</span><span class="cr-val">${fmtD(pg.fecha_vencimiento)}</span></div>
-          <div class="comp-row"><span class="cr-label">Fecha de Pago</span><span class="cr-val" style="color:var(--green)">${fmtD(pg.fecha_pago)}</span></div>
-          ${pg.nombre_caja ? `<div class="comp-row"><span class="cr-label">Caja</span><span class="cr-val">${pg.nombre_caja}</span></div>` : ''}
-          <div class="comp-row"><span class="cr-label">Monto Cuota</span><span class="cr-val">${fmtP(pg.monto_cuota)}</span></div>
-          <div class="comp-row"><span class="cr-label">Intereses por Mora</span><span class="cr-val" style="color:var(--red)">${fmtP(pg.interes_mora)}</span></div>
-          <div class="comp-row"><span class="cr-label">Gastos de Cobranza</span><span class="cr-val" style="color:var(--red)">${fmtP(pg.gastos_cobranza)}</span></div>
-          ${pg.observacion ? `<div class="comp-row"><span class="cr-label">Observación</span><span class="cr-val">${pg.observacion}</span></div>` : ''}
-        </div>
-
-        <div class="comp-total">
-          <span class="ct-label">Total Pagado</span>
-          <span class="ct-val">${fmtP(pg.total_pagado)}</span>
-        </div>
-
-        <div class="comp-footer">
-          AutoFácil Crédito Automotriz &nbsp;·&nbsp; Documento no válido como boleta o factura
-        </div>
-      </div>`;
+    document.getElementById('compBody').innerHTML = buildRecibo({
+      credito:    _credito,
+      pagos:      [pg],
+      cajaNombre: pg.nombre_caja || null,
+      idPago:     idPago,
+    });
     document.getElementById('modalComp').classList.add('open');
   } catch(e) { showToast('Error al cargar comprobante: '+e.message, false); }
 }
@@ -659,6 +628,8 @@ document.addEventListener('keydown', e => {
 
 cargarPagina();
 </script>
+<script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
+<script src="/js/comprobante.js"></script>
 <script src="/js/app-version.js"></script>
 </body>
 </html>
