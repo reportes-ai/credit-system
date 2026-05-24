@@ -109,7 +109,8 @@ const MORA_CREDITO_SQL = `
       ELSE 0
     END AS dias_mora,
     cl.sexo           AS sexo_cliente,
-    cl.telefono_movil AS telefono_movil
+    cl.telefono_movil AS telefono_movil,
+    cl.email          AS email_cliente
   FROM creditos c
   LEFT JOIN (
     SELECT id_credito, COUNT(DISTINCT numero_cuota) AS cnt
@@ -378,6 +379,7 @@ exports.mensajes = async (req, res) => {
     const monto    = Math.round(Number(credito.monto_mora || 0)).toLocaleString('es-CL');
     const dias     = Number(credito.dias_mora) || 0;
     const telefono = credito.telefono_movil || null;
+    const email    = credito.email_cliente  || null;
 
     const datosTransferencia = `Titular: AUTOFACIL SpA\nRUT: 76.545.638-K\nBanco: Banco de Chile\nCuenta Corriente: 8001829208\nMail: cobranza@autofacilchile.cl`;
 
@@ -397,7 +399,7 @@ ${datosTransferencia}
 Atentamente,
 Equipo de Cobranza AutoFácil`;
 
-    ok(res, { whatsapp, sms, email: { asunto: emailAsunto, cuerpo: emailCuerpo }, telefono });
+    ok(res, { whatsapp, sms, email: { asunto: emailAsunto, cuerpo: emailCuerpo }, telefono, emailCliente: email });
   } catch (err) {
     fail(res, err.message, 500);
   }
