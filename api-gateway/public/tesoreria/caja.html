@@ -169,6 +169,16 @@
     .btn-comprobante { background:#eff6ff; color:#1d4ed8; border:1px solid #bfdbfe; border-radius:6px; padding:3px 10px; font-size:.73rem; font-weight:700; cursor:pointer; white-space:nowrap; }
     .btn-comprobante:hover { background:#dbeafe; }
 
+    /* Botón reversar */
+    .btn-reversar { background:#fff1f2; color:#991b1b; border:1px solid #fca5a5; border-radius:6px; padding:3px 10px; font-size:.73rem; font-weight:700; cursor:pointer; white-space:nowrap; }
+    .btn-reversar:hover { background:#fee2e2; }
+
+    /* Modal reverso */
+    #modalReverso .modal-content { border-radius:14px; overflow:hidden; }
+    #modalReverso .modal-header  { background:#991b1b; color:#fff; }
+    #modalReverso .modal-title   { font-weight:700; }
+    #modalReverso .btn-close     { filter:invert(1); }
+
     /* ── Modal Comprobante ── */
     #modalComprobante .modal-content { border-radius:14px; overflow:hidden; }
     #modalComprobante .modal-header  { background:var(--navy); color:#fff; border-radius:0; }
@@ -208,7 +218,7 @@
   <div class="topnav-left">
     <a href="/" class="topnav-brand">
       <img src="/img/logo.png" alt="AutoFácil">
-      <span class="version-badge">v1.9</span>
+      <span class="version-badge">v2.0</span>
     </a>
     <div class="breadcrumb-nav">
       <a href="/">Inicio</a><span class="sep">›</span>
@@ -334,6 +344,39 @@
     </div>
   </div>
 
+</div>
+
+<!-- ══ MODAL REVERSO ════════════════════════════════════════════════════════ -->
+<div class="modal fade" id="modalReverso" tabindex="-1">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title"><i class="bi bi-arrow-counterclockwise me-2"></i>Reversar Pago</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body" style="padding:20px 24px">
+        <div id="reversoInfo" style="background:#fff8f0;border:1.5px solid #fed7aa;border-radius:10px;padding:12px 16px;margin-bottom:16px;font-size:.88rem;color:#92400e">
+          <i class="bi bi-exclamation-triangle-fill me-2"></i>
+          <strong>Reverso de cuota N°<span id="reversoCuotaN">—</span></strong><br>
+          <span style="font-size:.8rem">Esta acción deshace el pago. La cuota volverá a su estado original (pendiente/mora) con todos sus intereses y gastos correspondientes. La operación quedará registrada en la auditoría del crédito.</span>
+        </div>
+        <label style="font-weight:700;font-size:.88rem;color:#374151;display:block;margin-bottom:6px">
+          Comentario del cajero <span style="color:#dc2626">*</span>
+        </label>
+        <textarea id="reversoComentario" rows="3"
+          style="width:100%;border:2px solid #d1d5db;border-radius:8px;padding:10px 14px;font-size:.9rem;resize:vertical;outline:none"
+          placeholder="Motivo del reverso (obligatorio)..."
+          oninput="this.style.borderColor=this.value.trim()?'#d1d5db':'#ef4444'"></textarea>
+        <div id="reversoError" style="display:none;margin-top:10px;background:#fef2f2;border:1.5px solid #fca5a5;color:#991b1b;border-radius:8px;padding:8px 14px;font-size:.82rem;font-weight:600"></div>
+      </div>
+      <div class="modal-footer" style="border-top:1px solid #f1f5f9;gap:8px">
+        <button class="btn btn-secondary btn-sm" data-bs-dismiss="modal">Cancelar</button>
+        <button id="btnConfirmarReverso" class="btn btn-danger btn-sm" onclick="confirmarReverso()" style="font-weight:700">
+          <i class="bi bi-arrow-counterclockwise me-1"></i>Confirmar Reverso
+        </button>
+      </div>
+    </div>
+  </div>
 </div>
 
 <!-- ══ MODAL COMPROBANTE ════════════════════════════════════════════════════ -->
@@ -573,12 +616,12 @@ function calcGastos(montoCuota, fechaVenc, hoy = new Date()) {
 function renderPanel() {
   const c = _credito;
   const hoy = new Date();
-  const pagadas = new Set(_pagos.map(p => p.numero_cuota));
+  const pagadas = new Set(_pagos.filter(p => p.estado_pago === 'PAGADO').map(p => p.numero_cuota));
   let nPagadas=0, nMora=0, nPend=0, moraTotal=0;
 
   const filas = _schedule.map(s => {
     const esPagada = pagadas.has(s.numero);
-    const pago     = _pagos.find(p => p.numero_cuota === s.numero);
+    const pago     = _pagos.find(p => p.numero_cuota === s.numero && p.estado_pago === 'PAGADO');
     const mora     = esPagada ? {monto:0,dias:0} : calcMora(s.monto, s.fecha, hoy);
     const gastos   = esPagada ? {monto:0,aplica:false} : calcGastos(s.monto, s.fecha, hoy);
     const totalHoy = s.monto + mora.monto + gastos.monto;
@@ -605,15 +648,16 @@ function renderPanel() {
       <td class="text-center"><strong>${s.numero}</strong></td>
       <td>${fmtFecha(s.fecha)}</td>
       <td class="text-right amt">${clp(s.monto)}</td>
-      <td class="text-right amt ${enMora&&mora.monto?'amt-mora':''}">${mora.monto ? clp(mora.monto) : '<span class="amt-muted">—</span>'}</td>
-      <td class="text-right amt ${enMora&&gastos.monto?'amt-mora':''}">${gastos.monto ? clp(gastos.monto) : '<span class="amt-muted">—</span>'}</td>
+      <td class="text-right amt ${enMora&&mora.monto?'amt-mora':''}">${esPagada ? (parseFloat(pago?.interes_mora||0)>0 ? `<span style="color:#374151">${clp(pago.interes_mora)}</span>` : '<span class="amt-muted">—</span>') : (mora.monto ? clp(mora.monto) : '<span class="amt-muted">—</span>')}</td>
+      <td class="text-right amt ${enMora&&gastos.monto?'amt-mora':''}">${esPagada ? (parseFloat(pago?.gastos_cobranza||0)>0 ? `<span style="color:#374151">${clp(pago.gastos_cobranza)}</span>` : '<span class="amt-muted">—</span>') : (gastos.monto ? clp(gastos.monto) : '<span class="amt-muted">—</span>')}</td>
       <td class="text-right amt" style="${enMora?'color:var(--red)':''}">${esPagada ? '<span class="amt-muted">—</span>' : clp(totalHoy)}</td>
       <td class="text-right amt-muted">${pago ? clp(pago.total_pagado) : '<span class="amt-muted">—</span>'}</td>
       <td>${pago ? fmtFecha(pago.fecha_pago||pago.created_at) : '<span style="color:#9ca3af">—</span>'}</td>
       <td>
-        <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
+        <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap">
           ${estadoPill}
           ${esPagada && pago ? `<button class="btn-comprobante" onclick="verComprobante(${s.numero})"><i class="bi bi-receipt me-1"></i>Comprobante</button>` : ''}
+          ${esPagada && pago && _miCaja?.puede_reversar_pagos ? `<button class="btn-reversar" onclick="abrirModalReverso(${pago.id_pago},${s.numero})"><i class="bi bi-arrow-counterclockwise me-1"></i>Reversar</button>` : ''}
         </div>
       </td>
     </tr>`;
@@ -1176,6 +1220,68 @@ function verComprobante(numeroCuota) {
 
 function imprimirComprobante() {
   window.print();
+}
+
+/* ── Reverso de pago ── */
+let _reversoIdPago   = null;
+let _reversoCuotaN   = null;
+let _reversoModalInst = null;
+
+function abrirModalReverso(id_pago, numeroCuota) {
+  _reversoIdPago  = id_pago;
+  _reversoCuotaN  = numeroCuota;
+  document.getElementById('reversoCuotaN').textContent = numeroCuota;
+  document.getElementById('reversoComentario').value   = '';
+  document.getElementById('reversoComentario').style.borderColor = '#d1d5db';
+  document.getElementById('reversoError').style.display = 'none';
+  const btn = document.getElementById('btnConfirmarReverso');
+  btn.disabled = false;
+  btn.innerHTML = '<i class="bi bi-arrow-counterclockwise me-1"></i>Confirmar Reverso';
+  _reversoModalInst = new bootstrap.Modal(document.getElementById('modalReverso'));
+  _reversoModalInst.show();
+}
+
+async function confirmarReverso() {
+  const comentario = document.getElementById('reversoComentario').value.trim();
+  if (!comentario) {
+    document.getElementById('reversoComentario').style.borderColor = '#ef4444';
+    const errBox = document.getElementById('reversoError');
+    errBox.style.display = '';
+    errBox.textContent = 'El comentario es obligatorio para reversar un pago.';
+    return;
+  }
+  document.getElementById('reversoError').style.display = 'none';
+
+  const btn = document.getElementById('btnConfirmarReverso');
+  btn.disabled = true;
+  btn.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Procesando...';
+
+  try {
+    const j = await (await API(`/api/pagos-credito/reversar/${_reversoIdPago}`, {
+      method: 'POST',
+      body:   JSON.stringify({ comentario })
+    })).json();
+
+    if (!j.success) throw new Error(j.error);
+
+    // Cerrar modal y refrescar
+    _reversoModalInst?.hide();
+
+    const [jP, jSaldo] = await Promise.all([
+      API(`/api/pagos-credito/${_credito.id_credito}`).then(r=>r.json()),
+      API(`/api/cuentas-transitorias/por-credito/${_credito.id_credito}`).then(r=>r.json()),
+    ]);
+    _pagos       = jP.data || [];
+    _saldoAFavor = (jSaldo.success && jSaldo.data?.saldo_total) || 0;
+    limpiarSeleccion();
+    renderPanel();
+  } catch(e) {
+    const errBox = document.getElementById('reversoError');
+    errBox.style.display = '';
+    errBox.textContent = e.message || 'Error al reversar el pago.';
+    btn.disabled = false;
+    btn.innerHTML = '<i class="bi bi-arrow-counterclockwise me-1"></i>Confirmar Reverso';
+  }
 }
 
 /* ── Helpers ── */

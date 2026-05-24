@@ -32,6 +32,10 @@ const audit = require('../../../../shared/auditoria');
     await addCol(`ALTER TABLE pagos_credito ADD COLUMN IF NOT EXISTS origen_fondos        VARCHAR(200) NULL`);
     await addCol(`ALTER TABLE pagos_credito ADD COLUMN IF NOT EXISTS id_cuenta_bancaria   INT          NULL`);
     await addCol(`ALTER TABLE pagos_credito ADD COLUMN IF NOT EXISTS numero_transaccion   INT          NULL`);
+    await addCol(`ALTER TABLE pagos_credito ADD COLUMN IF NOT EXISTS comentario_reverso  TEXT         NULL`);
+    await addCol(`ALTER TABLE pagos_credito ADD COLUMN IF NOT EXISTS reversado_por       VARCHAR(200) NULL`);
+    await addCol(`ALTER TABLE pagos_credito ADD COLUMN IF NOT EXISTS id_reversado_por    INT          NULL`);
+    await addCol(`ALTER TABLE pagos_credito ADD COLUMN IF NOT EXISTS fecha_reverso       DATETIME     NULL`);
 
     // Tablas necesarias para el batch
     await pool.query(`
@@ -331,4 +335,123 @@ const createBatch = async (req, res) => {
   }
 };
 
-module.exports = { getByCredito, getById, create, createBatch, remove };
+/* ─── POST /reversar/:id_pago ───────────────────────────────────────────────
+ * Reversa un pago registrado. Requiere comentario obligatorio y que el usuario
+ * tenga puede_reversar_pagos = 1 en su asignación de caja.
+ * El pago queda con estado_pago = 'REVERSADO' y la cuota vuelve a su estado
+ * original (pendiente/mora) con todos sus intereses y gastos correspondientes.
+ */
+const reversar = async (req, res) => {
+  const { id_pago } = req.params;
+  const { comentario } = req.body;
+
+  if (!comentario?.trim())
+    return res.status(400).json({ success: false, data: null,
+      error: 'El comentario es obligatorio para reversar un pago.' });
+
+  const conn = await pool.getConnection();
+  try {
+    await conn.beginTransaction();
+
+    // 1. Verificar que el pago existe y está PAGADO
+    const [[pago]] = await conn.query(
+      'SELECT * FROM pagos_credito WHERE id_pago = ?', [id_pago]
+    );
+    if (!pago) {
+      await conn.rollback(); conn.release();
+      return res.status(404).json({ success: false, data: null, error: 'Pago no encontrado.' });
+    }
+    if (pago.estado_pago !== 'PAGADO') {
+      await conn.rollback(); conn.release();
+      return res.status(400).json({ success: false, data: null,
+        error: `Este pago ya tiene estado "${pago.estado_pago}" y no puede reversarse.` });
+    }
+
+    // 2. Verificar permiso de reverso en la caja donde se registró el pago
+    const u = req.usuario || {};
+    if (pago.id_caja) {
+      const [[permCaja]] = await conn.query(
+        `SELECT puede_reversar_pagos FROM caja_usuarios
+         WHERE id_caja = ? AND id_usuario = ? AND activo = 1`,
+        [pago.id_caja, u.id_usuario]
+      );
+      if (!permCaja?.puede_reversar_pagos) {
+        await conn.rollback(); conn.release();
+        return res.status(403).json({ success: false, data: null,
+          error: 'No tienes permiso para reversar pagos en esta caja.' });
+      }
+    }
+
+    // 3. Marcar como REVERSADO
+    const reversado_por = [u.nombre, u.apellido].filter(Boolean).join(' ') || u.email || null;
+    await conn.query(
+      `UPDATE pagos_credito
+       SET estado_pago       = 'REVERSADO',
+           comentario_reverso = ?,
+           reversado_por      = ?,
+           id_reversado_por   = ?,
+           fecha_reverso      = NOW()
+       WHERE id_pago = ?`,
+      [comentario.trim(), reversado_por, u.id_usuario || null, id_pago]
+    );
+
+    // 4. Si se usó saldo a favor para pagar esta cuota (via transitoria),
+    //    restituir el monto reversado como nuevo abono en cuentas_transitorias
+    if (pago.numero_transaccion) {
+      const totalReversado = parseFloat(pago.total_pagado) || 0;
+      if (totalReversado > 0) {
+        const [[cred]] = await conn.query(
+          'SELECT rut_cliente, nombre_cliente FROM creditos WHERE id_credito = ?',
+          [pago.id_credito]
+        );
+        const [trIns] = await conn.query(
+          `INSERT INTO cuentas_transitorias
+             (id_credito, rut_cliente, nombre_cliente, numero_transaccion,
+              fecha, monto_original, glosa)
+           VALUES (?,?,?,?,CURDATE(),?,?)`,
+          [
+            pago.id_credito,
+            cred?.rut_cliente    || null,
+            cred?.nombre_cliente || null,
+            pago.numero_transaccion,
+            totalReversado,
+            `Reverso cuota N°${pago.numero_cuota} — ${comentario.trim()}`
+          ]
+        );
+        await conn.query(
+          `INSERT INTO transitorias_cartola
+             (id_transitoria, id_credito, numero_transaccion, tipo, monto, concepto)
+           VALUES (?,?,?,'ABONO',?,?)`,
+          [
+            trIns.insertId, pago.id_credito, pago.numero_transaccion,
+            totalReversado,
+            `REVERSO cuota N°${pago.numero_cuota} — ${comentario.trim()}`
+          ]
+        );
+      }
+    }
+
+    await conn.commit();
+
+    // Auditoría
+    try {
+      audit.registrar({
+        id_credito: pago.id_credito, req,
+        accion: 'PAGO_REVERSADO',
+        detalle: `Cuota N°${pago.numero_cuota} reversada. Total: $${Math.round(pago.total_pagado||0).toLocaleString('es-CL')}. Motivo: ${comentario.trim()}`,
+        meta: { numero_cuota: pago.numero_cuota, total_pagado: pago.total_pagado, comentario: comentario.trim() },
+      });
+    } catch(_) {}
+
+    res.json({ success: true,
+      data: { id_pago: Number(id_pago), numero_cuota: pago.numero_cuota, estado_pago: 'REVERSADO' },
+      error: null });
+  } catch(e) {
+    try { await conn.rollback(); } catch(_) {}
+    res.status(500).json({ success: false, data: null, error: e.message });
+  } finally {
+    conn.release();
+  }
+};
+
+module.exports = { getByCredito, getById, create, createBatch, remove, reversar };
