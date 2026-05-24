@@ -122,6 +122,95 @@ const pool = require('../../../../shared/config/database');
   }
 })();
 
+/* ─── Migración v2: módulos y funcionalidades completos ──────────────────── */
+(async () => {
+  try {
+    // 1) Asegurar módulo Usuarios
+    const [uMod] = await pool.query("SELECT id_modulo FROM modulos WHERE nombre = 'Usuarios'");
+    if (uMod.length === 0) {
+      await pool.query(
+        `INSERT INTO modulos (nombre, descripcion, icono, ruta, orden, estado)
+         VALUES ('Usuarios','Gestión de usuarios, perfiles y permisos','bi-people-fill','/usuarios/',5,'activo')`
+      );
+    }
+
+    // 2) Nuevas funcionalidades completas (todos los módulos construidos)
+    const nuevas = [
+      // ── Créditos ────────────────────────────────────────────
+      ['Créditos', 'Ver Respaldos de Crédito',      'creditos_ver_respaldos',       1],
+      ['Créditos', 'Validación de Firma',            'creditos_validacion_firma',    0],
+      ['Créditos', 'Revisar Crédito (Analista)',     'creditos_revisar',             0],
+      // ── Tesorería ───────────────────────────────────────────
+      ['Tesorería', 'Ver Cajas',                     'tesoreria_ver_cajas',          1],
+      ['Tesorería', 'Cuentas Transitorias',          'tesoreria_cuentas_transitorias', 0],
+      // ── Cobranza ────────────────────────────────────────────
+      ['Cobranza', 'Ver Pre-judicial',               'cobranza_prejudicial',         1],
+      ['Cobranza', 'Ver Judicial',                   'cobranza_judicial',            1],
+      ['Cobranza', 'Ver Mis Cobranzas',              'cobranza_mis',                 1],
+      ['Cobranza', 'Ver Provisiones de Mora',        'cobranza_provisiones',         0],
+      // ── CRM ─────────────────────────────────────────────────
+      ['CRM', 'Ver Gestiones CRM',                   'crm_gestiones',                1],
+      ['CRM', 'Ver Estadísticas CRM',                'crm_estadisticas',             0],
+      // ── Mantenedores ────────────────────────────────────────
+      ['Mantenedores', 'Gestionar Cuentas Bancarias','mantenedores_cuentas_bancarias',0],
+      ['Mantenedores', 'Gestionar Tasas',            'mantenedores_tasas',           0],
+      ['Mantenedores', 'Gestionar Factores de Seguro','mantenedores_factores_seguro',0],
+      ['Mantenedores', 'Gestionar UF',               'mantenedores_uf',              0],
+      // ── Usuarios ────────────────────────────────────────────
+      ['Usuarios', 'Gestionar Usuarios',             'usuarios_gestionar',           0],
+      ['Usuarios', 'Gestionar Perfiles y Permisos',  'usuarios_perfiles',            0],
+      ['Usuarios', 'Cambiar Mi Contraseña',          'usuarios_contrasena',          1],
+    ];
+
+    const [perfiles] = await pool.query('SELECT id_perfil FROM perfiles');
+
+    for (const [modNombre, funNombre, funCodigo, habDef] of nuevas) {
+      const [[mod]] = await pool.query(
+        "SELECT id_modulo FROM modulos WHERE nombre = ? AND estado = 'activo'",
+        [modNombre]
+      );
+      if (!mod) continue;
+
+      const [[existente]] = await pool.query(
+        'SELECT id_funcionalidad FROM funcionalidades WHERE codigo = ?', [funCodigo]
+      );
+      let id_func;
+      if (existente) {
+        id_func = existente.id_funcionalidad;
+      } else {
+        const [ins] = await pool.query(
+          'INSERT INTO funcionalidades (id_modulo, nombre, codigo) VALUES (?,?,?)',
+          [mod.id_modulo, funNombre, funCodigo]
+        );
+        id_func = ins.insertId;
+      }
+
+      for (const p of perfiles) {
+        await pool.query(
+          `INSERT IGNORE INTO permisos_perfil (id_perfil, id_funcionalidad, habilitado)
+           VALUES (?,?,?)`,
+          [p.id_perfil, id_func, habDef]
+        );
+      }
+    }
+
+    // 3) Administrador: habilitar TODAS las funcionalidades
+    const [[admin]] = await pool.query("SELECT id_perfil FROM perfiles WHERE nombre = 'Administrador' LIMIT 1");
+    if (admin) {
+      await pool.query(
+        `INSERT INTO permisos_perfil (id_perfil, id_funcionalidad, habilitado)
+         SELECT ?, id_funcionalidad, 1 FROM funcionalidades
+         ON DUPLICATE KEY UPDATE habilitado = 1`,
+        [admin.id_perfil]
+      );
+    }
+
+    console.log('✓ Perfiles v2: funcionalidades actualizadas, Administrador con acceso total');
+  } catch (e) {
+    console.error('[perfiles migration v2]', e.message);
+  }
+})();
+
 const getAllPerfiles = async (req, res) => {
   try {
     const [perfiles] = await pool.query(
