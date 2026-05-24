@@ -1,0 +1,346 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Mis Cobranzas — AutoFácil</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.0/font/bootstrap-icons.css" rel="stylesheet">
+  <style>
+    :root { --navy:#0141A2; --navy-dark:#012d70; --navy-light:#0255c5; --accent:#009AFE; --bg:#f0f4f8; }
+    body { background: var(--bg); font-family: 'Segoe UI', system-ui, sans-serif; margin: 0; min-height: 100vh; }
+    .topnav { background: linear-gradient(90deg, var(--navy-dark), var(--navy-light)); color: #fff; height: 60px; padding: 0 24px; display: flex; align-items: center; justify-content: space-between; position: sticky; top: 0; z-index: 200; box-shadow: 0 2px 8px rgba(0,0,0,0.3); }
+    .topnav-left { display: flex; align-items: center; gap: 16px; }
+    .topnav-brand { display: flex; align-items: center; gap: 8px; text-decoration: none; }
+    .topnav-brand img { height: 32px; filter: brightness(0) invert(1); }
+    .version-badge { background: rgba(255,255,255,0.15); color: rgba(255,255,255,0.75); font-size: 0.65rem; font-weight: 700; border-radius: 6px; padding: 2px 8px; letter-spacing: 0.5px; }
+    .breadcrumb-nav { color: rgba(255,255,255,0.6); font-size: 0.85rem; display: flex; align-items: center; gap: 6px; }
+    .breadcrumb-nav a { color: rgba(255,255,255,0.75); text-decoration: none; }
+    .breadcrumb-nav a:hover { color: #fff; }
+    .breadcrumb-nav .sep { color: rgba(255,255,255,0.35); }
+    .topnav-right { display: flex; align-items: center; gap: 10px; }
+    .user-chip { background: rgba(255,255,255,0.12); border-radius: 24px; padding: 5px 12px; display: flex; align-items: center; gap: 8px; font-size: 0.85rem; }
+    .avatar { width: 28px; height: 28px; background: #90caf9; border-radius: 50%; display: flex; align-items: center; justify-content: center; color: var(--navy); font-weight: 700; font-size: 0.75rem; }
+    .perfil-badge { background: rgba(144,202,249,0.2); border: 1px solid rgba(144,202,249,0.4); color: #90caf9; border-radius: 12px; padding: 2px 10px; font-size: 0.73rem; font-weight: 600; }
+    .btn-logout { background: rgba(255,255,255,0.1); border: 1px solid rgba(255,255,255,0.2); color: #fff; border-radius: 8px; padding: 5px 12px; font-size: 0.82rem; cursor: pointer; }
+    .btn-logout:hover { background: rgba(255,255,255,0.2); }
+
+    .page-content { padding: 28px 36px; max-width: 1200px; margin: 0 auto; }
+    .section-title { font-size: 1rem; font-weight: 700; color: #1e293b; margin-bottom: 14px; display: flex; align-items: center; gap: 8px; }
+
+    /* Resumen cards */
+    .summary-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 14px; margin-bottom: 28px; }
+    .summary-card { background: #fff; border-radius: 12px; padding: 16px 18px; box-shadow: 0 1px 4px rgba(0,0,0,0.07); }
+    .summary-label { font-size: 0.72rem; color: #94a3b8; font-weight: 700; text-transform: uppercase; letter-spacing: 0.4px; }
+    .summary-value { font-size: 1.35rem; font-weight: 800; color: #1e293b; margin: 2px 0 4px; }
+    .summary-sub { font-size: 0.78rem; color: #64748b; }
+
+    /* Panel acciones pendientes */
+    .accion-item { background: #fff; border-radius: 12px; padding: 14px 16px; margin-bottom: 10px; border-left: 4px solid #f59e0b; box-shadow: 0 1px 4px rgba(0,0,0,0.06); display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
+    .accion-item.judicial { border-left-color: #dc2626; }
+    .accion-info h6 { margin: 0 0 2px; font-size: 0.88rem; font-weight: 700; color: #1e293b; }
+    .accion-info .meta { font-size: 0.78rem; color: #64748b; }
+    .btn-ir { background: var(--navy); color: #fff; border: none; border-radius: 8px; padding: 6px 14px; font-size: 0.8rem; font-weight: 600; cursor: pointer; text-decoration: none; display: inline-flex; align-items: center; gap: 4px; }
+    .btn-ir.amber { background: #f59e0b; }
+    .btn-ir.red { background: #dc2626; }
+
+    /* Tabla gestiones */
+    .table-card { background: #fff; border-radius: 14px; box-shadow: 0 1px 6px rgba(0,0,0,0.08); overflow: hidden; margin-bottom: 28px; }
+    .table-header { padding: 14px 18px; border-bottom: 1px solid #f1f5f9; font-size: 0.9rem; font-weight: 700; color: #1e293b; }
+    table { width: 100%; border-collapse: collapse; }
+    th { background: #f8fafc; color: #64748b; font-size: 0.73rem; font-weight: 700; text-transform: uppercase; padding: 9px 12px; text-align: left; border-bottom: 1px solid #e2e8f0; white-space: nowrap; }
+    td { padding: 10px 12px; font-size: 0.83rem; color: #334155; border-bottom: 1px solid #f1f5f9; }
+    tr:hover td { background: #f8fafc; }
+
+    /* Promesas */
+    .promesa-item { background: #fff; border-radius: 12px; padding: 14px 16px; margin-bottom: 10px; box-shadow: 0 1px 4px rgba(0,0,0,0.06); }
+    .promesa-estado { display: inline-block; border-radius: 8px; padding: 2px 8px; font-size: 0.72rem; font-weight: 700; }
+    .promesa-pendiente { background: #fef3c7; color: #92400e; }
+    .promesa-vencida { background: #fee2e2; color: #991b1b; }
+
+    .spinner { display: inline-block; width: 18px; height: 18px; border: 2px solid #e2e8f0; border-top-color: var(--navy); border-radius: 50%; animation: spin 0.7s linear infinite; }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    .empty-state { text-align: center; padding: 30px; color: #94a3b8; font-size: 0.88rem; }
+
+    .canal-badge { display: inline-block; border-radius: 6px; padding: 2px 7px; font-size: 0.7rem; font-weight: 700; }
+    .canal-tel { background: #dbeafe; color: #1d4ed8; }
+    .canal-rem { background: #dcfce7; color: #166534; }
+    .canal-pres { background: #fef3c7; color: #92400e; }
+  </style>
+</head>
+<body>
+
+<nav class="topnav">
+  <div class="topnav-left">
+    <a href="/" class="topnav-brand">
+      <img src="/img/logo.png" alt="AutoFácil">
+      <span class="version-badge" id="versionBadge">v5.0</span>
+    </a>
+    <div class="breadcrumb-nav">
+      <a href="/">Inicio</a><span class="sep">›</span>
+      <a href="/cobranza"><i class="bi bi-bell-fill me-1"></i>Cobranza</a><span class="sep">›</span>
+      <span style="color:#fff;font-weight:600">Mis Cobranzas</span>
+    </div>
+  </div>
+  <div class="topnav-right">
+    <div class="user-chip">
+      <div class="avatar" id="avatarInicial">?</div>
+      <div>
+        <div style="font-weight:600;line-height:1.3;color:#fff" id="navNombre">—</div>
+        <div class="perfil-badge" id="navPerfil">—</div>
+      </div>
+    </div>
+    <button class="btn-logout" onclick="logout()"><i class="bi bi-box-arrow-right me-1"></i>Salir</button>
+  </div>
+</nav>
+
+<div class="page-content">
+
+  <!-- Banner usuario -->
+  <div style="display:flex;align-items:center;gap:14px;margin-bottom:24px">
+    <div style="width:52px;height:52px;background:var(--navy);border-radius:50%;display:flex;align-items:center;justify-content:center;color:#fff;font-size:1.3rem;font-weight:800" id="avatarGrande">?</div>
+    <div>
+      <div style="font-size:1.2rem;font-weight:800;color:#1e293b" id="nombreGrande">—</div>
+      <div style="font-size:0.85rem;color:#64748b">Vista personal de cobranza · <span id="perfilGrande">—</span></div>
+    </div>
+  </div>
+
+  <!-- Resumen general -->
+  <div class="summary-grid" id="summaryGrid">
+    <div class="summary-card">
+      <div class="summary-label">Mis casos en mora</div>
+      <div class="summary-value" id="sm-casos">—</div>
+      <div class="summary-sub">Créditos asignados</div>
+    </div>
+    <div class="summary-card">
+      <div class="summary-label">Monto total mora</div>
+      <div class="summary-value" id="sm-monto" style="color:#dc2626">—</div>
+      <div class="summary-sub">En cartera asignada</div>
+    </div>
+    <div class="summary-card">
+      <div class="summary-label">Acciones disponibles</div>
+      <div class="summary-value" id="sm-acciones" style="color:#f59e0b">—</div>
+      <div class="summary-sub">Créditos que puedo gestionar hoy</div>
+    </div>
+    <div class="summary-card">
+      <div class="summary-label">Promesas pendientes</div>
+      <div class="summary-value" id="sm-promesas" style="color:#d97706">—</div>
+      <div class="summary-sub">Con fecha futura</div>
+    </div>
+    <div class="summary-card">
+      <div class="summary-label">Promesas vencidas</div>
+      <div class="summary-value" id="sm-promesas-v" style="color:#dc2626">—</div>
+      <div class="summary-sub">Sin cumplir</div>
+    </div>
+    <div class="summary-card">
+      <div class="summary-label">Gestiones (30 días)</div>
+      <div class="summary-value" id="sm-gestiones">—</div>
+      <div class="summary-sub">Realizadas por mí</div>
+    </div>
+  </div>
+
+  <!-- Acciones pendientes hoy -->
+  <div class="section-title">
+    <i class="bi bi-lightning-charge-fill" style="color:#f59e0b"></i>
+    Acciones pendientes hoy
+    <span id="accionesBadge" style="background:#ef4444;color:#fff;border-radius:12px;padding:2px 8px;font-size:0.72rem;display:none"></span>
+  </div>
+  <div id="accionesPanel" style="margin-bottom:28px">
+    <div class="empty-state"><div class="spinner"></div> Cargando...</div>
+  </div>
+
+  <!-- Mis gestiones recientes -->
+  <div class="section-title"><i class="bi bi-journal-text" style="color:var(--navy)"></i>Mis gestiones recientes (últimos 30 días)</div>
+  <div class="table-card">
+    <div style="overflow-x:auto">
+      <table>
+        <thead>
+          <tr>
+            <th>Fecha</th>
+            <th>Crédito</th>
+            <th>Cliente</th>
+            <th>Tipo</th>
+            <th>Canal</th>
+            <th>Resultado</th>
+            <th>Confirmado</th>
+          </tr>
+        </thead>
+        <tbody id="gestionesBody">
+          <tr><td colspan="7" class="empty-state"><div class="spinner"></div></td></tr>
+        </tbody>
+      </table>
+    </div>
+    <div style="padding:12px 18px;border-top:1px solid #f1f5f9;display:flex;gap:8px;justify-content:flex-end">
+      <button onclick="pagAnterior()" id="btnAnterior" style="border:1px solid #e2e8f0;background:#fff;border-radius:6px;padding:4px 12px;font-size:0.82rem;cursor:pointer">&#8592; Anterior</button>
+      <button onclick="pagSiguiente()" id="btnSiguiente" style="border:1px solid #e2e8f0;background:#fff;border-radius:6px;padding:4px 12px;font-size:0.82rem;cursor:pointer">Siguiente &#8594;</button>
+    </div>
+  </div>
+
+  <!-- Promesas de pago -->
+  <div style="display:grid;grid-template-columns:1fr 1fr;gap:20px">
+
+    <div>
+      <div class="section-title"><i class="bi bi-calendar-check" style="color:#d97706"></i>Promesas de pago pendientes</div>
+      <div id="promesasPanel">
+        <div class="empty-state"><div class="spinner"></div></div>
+      </div>
+    </div>
+
+    <div>
+      <div class="section-title"><i class="bi bi-calendar-x" style="color:#dc2626"></i>Promesas vencidas</div>
+      <div id="promesasVencidasPanel">
+        <div class="empty-state"><div class="spinner"></div></div>
+      </div>
+    </div>
+
+  </div>
+
+</div>
+
+<script>
+const token = localStorage.getItem('token');
+const yo    = JSON.parse(localStorage.getItem('usuario') || 'null');
+if (!token || !yo) window.location.href = '/login.html';
+
+const nombreCompleto = `${yo?.nombre||''} ${yo?.apellido||''}`.trim();
+document.getElementById('navNombre').textContent = nombreCompleto;
+document.getElementById('navPerfil').textContent  = yo?.perfil || '';
+document.getElementById('avatarInicial').textContent = (yo?.nombre||'?').charAt(0).toUpperCase();
+document.getElementById('avatarGrande').textContent = (yo?.nombre||'?').charAt(0).toUpperCase();
+document.getElementById('nombreGrande').textContent = nombreCompleto;
+document.getElementById('perfilGrande').textContent = yo?.perfil || '';
+
+function logout() { localStorage.removeItem('token'); localStorage.removeItem('usuario'); window.location.href = '/login.html'; }
+
+function fmt(v) { return '$' + Math.round(Number(v||0)).toLocaleString('es-CL'); }
+function fmtFechaHora(s) { if (!s) return '—'; return new Date(s).toLocaleString('es-CL', { timeZone: 'America/Santiago', dateStyle: 'short', timeStyle: 'short' }); }
+function fmtFecha(s) { if (!s) return '—'; return new Date(s).toLocaleDateString('es-CL', { timeZone: 'America/Santiago' }); }
+
+let state = { page: 1, pages: 1, gestiones: [] };
+
+function pagAnterior() { if (state.page > 1) { state.page--; cargarDatos(); } }
+function pagSiguiente() { if (state.page < state.pages) { state.page++; cargarDatos(); } }
+
+function tramoBadge(dias) {
+  const d = Number(dias);
+  if (d <= 15)  return `<span style="background:#fff3e0;color:#e65100;border-radius:6px;padding:2px 6px;font-size:0.7rem;font-weight:700">⚡${d}d</span>`;
+  if (d <= 30)  return `<span style="background:#fce4ec;color:#c62828;border-radius:6px;padding:2px 6px;font-size:0.7rem;font-weight:700">${d}d</span>`;
+  if (d <= 90)  return `<span style="background:#ddd6fe;color:#5b21b6;border-radius:6px;padding:2px 6px;font-size:0.7rem;font-weight:700">${d}d</span>`;
+  return `<span style="background:#fee2e2;color:#dc2626;border-radius:6px;padding:2px 6px;font-size:0.7rem;font-weight:700">${d}d</span>`;
+}
+
+async function cargarDatos() {
+  try {
+    const params = new URLSearchParams({ page: state.page });
+    const r = await fetch('/api/cobranza/mis-gestiones?' + params, { headers: { 'Authorization': 'Bearer ' + token } });
+    const { success, data } = await r.json();
+    if (!success) return;
+
+    state.pages = data.pages;
+
+    // Resumen
+    const misCreditos = data.mis_creditos || [];
+    const promesas = data.promesas || [];
+    const promesasV = data.promesas_vencidas || [];
+    const gestiones = data.gestiones || [];
+
+    document.getElementById('sm-casos').textContent = misCreditos.length;
+    document.getElementById('sm-monto').textContent = fmt(misCreditos.reduce((s,c) => s + Number(c.monto_mora||0), 0));
+    document.getElementById('sm-gestiones').textContent = data.total_gestiones || 0;
+    document.getElementById('sm-promesas').textContent = promesas.length;
+    document.getElementById('sm-promesas-v').textContent = promesasV.length;
+
+    // Calcular acciones disponibles (necesita verificar disponibilidad)
+    // Aproximación rápida con datos de cartera
+    const disponibles = misCreditos.filter(c => {
+      // Si no hay datos exactos, mostramos todos (simplificado)
+      return true;
+    });
+    document.getElementById('sm-acciones').textContent = misCreditos.length;
+
+    // Panel de acciones pendientes
+    if (!misCreditos.length) {
+      document.getElementById('accionesPanel').innerHTML = '<div class="empty-state"><i class="bi bi-check-circle text-success me-1"></i>Sin créditos asignados en mora</div>';
+      document.getElementById('accionesBadge').style.display = 'none';
+    } else {
+      document.getElementById('accionesBadge').textContent = misCreditos.length;
+      document.getElementById('accionesBadge').style.display = '';
+      document.getElementById('accionesPanel').innerHTML = misCreditos.slice(0, 10).map(c => `
+        <div class="accion-item ${Number(c.dias_mora) > 90 ? 'judicial' : ''}">
+          <div class="accion-info">
+            <h6>${c.nombre_cliente || '—'} <span style="font-weight:400;color:#94a3b8">· ${c.numero_credito || '#'+c.id_credito}</span></h6>
+            <div class="meta">
+              ${tramoBadge(c.dias_mora)}
+              ${fmt(c.monto_mora)} mora · ${c.cuotas_mora} cuota(s) · ${c.rut_cliente || '—'}
+            </div>
+          </div>
+          <a href="${Number(c.dias_mora) > 90 ? '/cobranza/judicial' : '/cobranza/prejudicial'}" class="btn-ir ${Number(c.dias_mora) > 90 ? 'red' : 'amber'}">
+            <i class="bi bi-lightning-charge"></i>Gestionar
+          </a>
+        </div>`).join('');
+      if (misCreditos.length > 10) {
+        document.getElementById('accionesPanel').innerHTML += `<div class="empty-state" style="padding:10px">...y ${misCreditos.length - 10} más</div>`;
+      }
+    }
+
+    // Tabla gestiones recientes
+    if (!gestiones.length) {
+      document.getElementById('gestionesBody').innerHTML = '<tr><td colspan="7" class="empty-state">Sin gestiones en los últimos 30 días</td></tr>';
+    } else {
+      document.getElementById('gestionesBody').innerHTML = gestiones.map(g => {
+        const canalCls = g.canal === 'TELEFONICA' ? 'canal-tel' : g.canal === 'REMOTA' ? 'canal-rem' : 'canal-pres';
+        return `<tr>
+          <td style="font-size:0.78rem">${fmtFechaHora(g.created_at)}</td>
+          <td style="font-weight:600;color:var(--navy)">${g.numero_credito || '#'+g.id_credito}</td>
+          <td style="max-width:130px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${g.nombre_cliente || '—'}</td>
+          <td>${g.tipo_gestion}</td>
+          <td><span class="canal-badge ${canalCls}">${g.canal}</span></td>
+          <td>${g.resultado || '—'}</td>
+          <td>${g.confirmado ? '<span style="color:#10b981;font-weight:700">✓</span>' : '<span style="color:#94a3b8">—</span>'}</td>
+        </tr>`;
+      }).join('');
+    }
+
+    document.getElementById('btnAnterior').disabled = state.page <= 1;
+    document.getElementById('btnSiguiente').disabled = state.page >= state.pages;
+
+    // Promesas pendientes
+    if (!promesas.length) {
+      document.getElementById('promesasPanel').innerHTML = '<div class="empty-state">Sin promesas pendientes</div>';
+    } else {
+      document.getElementById('promesasPanel').innerHTML = promesas.map(p => `
+        <div class="promesa-item">
+          <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:4px">
+            <div style="font-weight:700;font-size:0.85rem">${p.nombre_cliente || '—'}</div>
+            <span class="promesa-estado promesa-pendiente">Pendiente</span>
+          </div>
+          <div style="font-size:0.78rem;color:#64748b">${p.numero_credito || '#'+p.id_credito} · Prometió ${fmtFecha(p.fecha_promesa)}</div>
+          <div style="font-size:0.88rem;font-weight:700;color:#d97706;margin-top:4px">${fmt(p.monto_promesa)}</div>
+        </div>`).join('');
+    }
+
+    // Promesas vencidas
+    if (!promesasV.length) {
+      document.getElementById('promesasVencidasPanel').innerHTML = '<div class="empty-state"><i class="bi bi-check text-success me-1"></i>Sin promesas vencidas</div>';
+    } else {
+      document.getElementById('promesasVencidasPanel').innerHTML = promesasV.map(p => `
+        <div class="promesa-item" style="border-left:3px solid #dc2626">
+          <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:4px">
+            <div style="font-weight:700;font-size:0.85rem">${p.nombre_cliente || '—'}</div>
+            <span class="promesa-estado promesa-vencida">Vencida</span>
+          </div>
+          <div style="font-size:0.78rem;color:#64748b">${p.numero_credito || '#'+p.id_credito} · Prometió ${fmtFecha(p.fecha_promesa)}</div>
+          <div style="font-size:0.88rem;font-weight:700;color:#dc2626;margin-top:4px">${fmt(p.monto_promesa)}</div>
+        </div>`).join('');
+    }
+
+  } catch (e) {
+    console.error(e);
+  }
+}
+
+cargarDatos();
+</script>
+<script src="/js/app-version.js"></script>
+</body>
+</html>

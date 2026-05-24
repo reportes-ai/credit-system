@@ -1,0 +1,738 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Pre-judicial — Cobranza AutoFácil</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.0/font/bootstrap-icons.css" rel="stylesheet">
+  <style>
+    :root { --navy:#0141A2; --navy-dark:#012d70; --navy-light:#0255c5; --accent:#009AFE; --bg:#f0f4f8; }
+    body { background: var(--bg); font-family: 'Segoe UI', system-ui, sans-serif; margin: 0; min-height: 100vh; }
+    .topnav { background: linear-gradient(90deg, var(--navy-dark), var(--navy-light)); color: #fff; height: 60px; padding: 0 24px; display: flex; align-items: center; justify-content: space-between; position: sticky; top: 0; z-index: 200; box-shadow: 0 2px 8px rgba(0,0,0,0.3); }
+    .topnav-left { display: flex; align-items: center; gap: 16px; }
+    .topnav-brand { display: flex; align-items: center; gap: 8px; text-decoration: none; }
+    .topnav-brand img { height: 32px; filter: brightness(0) invert(1); }
+    .version-badge { background: rgba(255,255,255,0.15); color: rgba(255,255,255,0.75); font-size: 0.65rem; font-weight: 700; border-radius: 6px; padding: 2px 8px; letter-spacing: 0.5px; }
+    .breadcrumb-nav { color: rgba(255,255,255,0.6); font-size: 0.85rem; display: flex; align-items: center; gap: 6px; }
+    .breadcrumb-nav a { color: rgba(255,255,255,0.75); text-decoration: none; }
+    .breadcrumb-nav a:hover { color: #fff; }
+    .breadcrumb-nav .sep { color: rgba(255,255,255,0.35); }
+    .topnav-right { display: flex; align-items: center; gap: 10px; }
+    .user-chip { background: rgba(255,255,255,0.12); border-radius: 24px; padding: 5px 12px; display: flex; align-items: center; gap: 8px; font-size: 0.85rem; }
+    .avatar { width: 28px; height: 28px; background: #90caf9; border-radius: 50%; display: flex; align-items: center; justify-content: center; color: var(--navy); font-weight: 700; font-size: 0.75rem; }
+    .perfil-badge { background: rgba(144,202,249,0.2); border: 1px solid rgba(144,202,249,0.4); color: #90caf9; border-radius: 12px; padding: 2px 10px; font-size: 0.73rem; font-weight: 600; }
+    .btn-logout { background: rgba(255,255,255,0.1); border: 1px solid rgba(255,255,255,0.2); color: #fff; border-radius: 8px; padding: 5px 12px; font-size: 0.82rem; cursor: pointer; }
+    .btn-logout:hover { background: rgba(255,255,255,0.2); }
+
+    .layout { display: flex; gap: 20px; padding: 24px 28px; min-height: calc(100vh - 60px); }
+
+    /* Sidebar */
+    .sidebar { width: 280px; flex-shrink: 0; }
+    .sidebar-card { background: #fff; border-radius: 14px; padding: 20px; box-shadow: 0 1px 6px rgba(0,0,0,0.08); margin-bottom: 16px; }
+    .sidebar-title { font-size: 0.85rem; font-weight: 700; color: #64748b; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 16px; }
+    .tramo-item { border-radius: 10px; padding: 12px 14px; margin-bottom: 8px; cursor: pointer; border: 2px solid transparent; transition: all 0.15s; }
+    .tramo-item:hover { border-color: #e2e8f0; }
+    .tramo-item.active { border-color: #f59e0b; background: #fffbeb; }
+    .tramo-label { font-size: 0.82rem; font-weight: 700; display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px; }
+    .tramo-bar-bg { background: #f1f5f9; border-radius: 4px; height: 6px; }
+    .tramo-bar { border-radius: 4px; height: 6px; transition: width 0.4s; }
+    .tramo-meta { font-size: 0.75rem; color: #94a3b8; margin-top: 4px; display: flex; justify-content: space-between; }
+
+    /* Main */
+    .main { flex: 1; min-width: 0; }
+    .search-bar { background: #fff; border-radius: 12px; padding: 14px 18px; box-shadow: 0 1px 4px rgba(0,0,0,0.07); margin-bottom: 16px; display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+    .search-input { border: 1.5px solid #e2e8f0; border-radius: 8px; padding: 7px 12px; font-size: 0.88rem; flex: 1; min-width: 180px; outline: none; }
+    .search-input:focus { border-color: var(--navy); }
+    .btn-buscar { background: var(--navy); color: #fff; border: none; border-radius: 8px; padding: 7px 16px; font-size: 0.88rem; font-weight: 600; cursor: pointer; }
+    .table-card { background: #fff; border-radius: 14px; box-shadow: 0 1px 6px rgba(0,0,0,0.08); overflow: hidden; }
+    .table-header { padding: 16px 20px; border-bottom: 1px solid #f1f5f9; display: flex; justify-content: space-between; align-items: center; }
+    .table-title { font-size: 0.95rem; font-weight: 700; color: #1e293b; }
+    table { width: 100%; border-collapse: collapse; }
+    th { background: #f8fafc; color: #64748b; font-size: 0.75rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.4px; padding: 10px 14px; text-align: left; border-bottom: 1px solid #e2e8f0; white-space: nowrap; }
+    td { padding: 11px 14px; font-size: 0.85rem; color: #334155; border-bottom: 1px solid #f1f5f9; vertical-align: middle; }
+    tr:hover td { background: #f8fafc; }
+
+    /* Badges de tramo */
+    .badge-tramo { display: inline-block; border-radius: 8px; padding: 3px 8px; font-size: 0.72rem; font-weight: 700; }
+    .badge-t1 { background: #fff3e0; color: #e65100; }
+    .badge-t2 { background: #fce4ec; color: #c62828; }
+    .badge-t3 { background: #f9a8d4; color: #9d174d; }
+    .badge-t4 { background: #ddd6fe; color: #5b21b6; }
+
+    /* Disponibilidad */
+    .disp-ok   { color: #10b981; font-weight: 700; }
+    .disp-warn { color: #f59e0b; font-weight: 700; }
+    .disp-no   { color: #ef4444; font-weight: 700; }
+
+    .btn-gestionar { background: #f59e0b; color: #fff; border: none; border-radius: 8px; padding: 5px 12px; font-size: 0.8rem; font-weight: 600; cursor: pointer; white-space: nowrap; }
+    .btn-gestionar:hover { background: #d97706; }
+
+    .pag-bar { padding: 14px 20px; display: flex; justify-content: space-between; align-items: center; border-top: 1px solid #f1f5f9; font-size: 0.83rem; color: #64748b; }
+
+    /* Drawer */
+    .drawer-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.35); z-index: 400; display: none; }
+    .drawer { position: fixed; right: 0; top: 0; bottom: 0; width: 520px; max-width: 95vw; background: #fff; z-index: 500; box-shadow: -4px 0 24px rgba(0,0,0,0.15); display: flex; flex-direction: column; transform: translateX(100%); transition: transform 0.3s; }
+    .drawer.open { transform: translateX(0); }
+    .drawer-head { background: linear-gradient(90deg, #d97706, #f59e0b); color: #fff; padding: 18px 22px; }
+    .drawer-head h5 { margin: 0 0 4px; font-size: 1rem; font-weight: 800; }
+    .drawer-head .sub { font-size: 0.82rem; opacity: 0.85; }
+    .drawer-close { position: absolute; right: 16px; top: 16px; background: rgba(255,255,255,0.2); border: none; color: #fff; border-radius: 8px; width: 32px; height: 32px; cursor: pointer; font-size: 1rem; display: flex; align-items: center; justify-content: center; }
+    .drawer-body { flex: 1; overflow-y: auto; padding: 20px; }
+    .mora-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 18px; }
+    .mora-box { background: #f8fafc; border-radius: 10px; padding: 12px 14px; }
+    .mora-box-label { font-size: 0.72rem; color: #94a3b8; text-transform: uppercase; font-weight: 700; letter-spacing: 0.4px; }
+    .mora-box-value { font-size: 1.15rem; font-weight: 800; color: #1e293b; }
+    .disp-panel { background: #fffbeb; border: 1.5px solid #fcd34d; border-radius: 10px; padding: 14px 16px; margin-bottom: 16px; }
+    .disp-panel-title { font-size: 0.8rem; font-weight: 700; color: #92400e; margin-bottom: 10px; text-transform: uppercase; letter-spacing: 0.4px; }
+    .disp-row { display: flex; justify-content: space-between; align-items: center; font-size: 0.85rem; color: #1e293b; margin-bottom: 6px; }
+    .disp-icon-ok  { color: #10b981; }
+    .disp-icon-no  { color: #ef4444; }
+    .nav-tabs .nav-link { font-size: 0.85rem; }
+    .tab-content { padding-top: 16px; }
+    .btn-action { border-radius: 8px; font-size: 0.85rem; font-weight: 600; padding: 8px 16px; border: none; cursor: pointer; display: inline-flex; align-items: center; gap: 6px; }
+    .btn-llamada  { background: var(--navy); color: #fff; }
+    .btn-llamada:hover  { background: var(--navy-dark); }
+    .btn-whatsapp { background: #25d366; color: #fff; }
+    .btn-whatsapp:hover { background: #128c7e; }
+    .btn-sms      { background: #6366f1; color: #fff; }
+    .btn-sms:hover      { background: #4f46e5; }
+    .btn-email    { background: #f59e0b; color: #fff; }
+    .btn-email:hover    { background: #d97706; }
+    .msg-box { background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 12px; font-size: 0.83rem; color: #334155; line-height: 1.6; margin: 10px 0; white-space: pre-wrap; max-height: 140px; overflow-y: auto; }
+    .alerta-tramo1 { background: #fff7ed; border: 1.5px solid #fed7aa; border-radius: 10px; padding: 12px 14px; margin: 14px 0; font-size: 0.85rem; color: #9a3412; }
+    .spinner { display: inline-block; width: 18px; height: 18px; border: 2px solid #e2e8f0; border-top-color: var(--navy); border-radius: 50%; animation: spin 0.7s linear infinite; }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    .empty-state { text-align: center; padding: 40px; color: #94a3b8; }
+    .form-gestion label { font-size: 0.82rem; font-weight: 600; color: #475569; }
+    .form-gestion .form-control, .form-gestion .form-select { font-size: 0.85rem; border-radius: 8px; border: 1.5px solid #e2e8f0; }
+    .form-gestion .form-control:focus, .form-gestion .form-select:focus { border-color: var(--navy); box-shadow: none; }
+    .btn-guardar { background: var(--navy); color: #fff; border: none; border-radius: 8px; padding: 8px 20px; font-size: 0.88rem; font-weight: 600; cursor: pointer; }
+    .bitacora-item { border-left: 3px solid #e2e8f0; padding: 10px 14px; margin-bottom: 10px; border-radius: 0 8px 8px 0; background: #f8fafc; }
+    .bitacora-tipo { font-size: 0.75rem; font-weight: 700; text-transform: uppercase; color: #64748b; }
+    .bitacora-fecha { font-size: 0.75rem; color: #94a3b8; }
+    .bitacora-msg { font-size: 0.83rem; color: #334155; margin-top: 4px; }
+  </style>
+</head>
+<body>
+
+<nav class="topnav">
+  <div class="topnav-left">
+    <a href="/" class="topnav-brand">
+      <img src="/img/logo.png" alt="AutoFácil">
+      <span class="version-badge" id="versionBadge">v5.0</span>
+    </a>
+    <div class="breadcrumb-nav">
+      <a href="/">Inicio</a><span class="sep">›</span>
+      <a href="/cobranza"><i class="bi bi-bell-fill me-1"></i>Cobranza</a><span class="sep">›</span>
+      <span style="color:#fff;font-weight:600">Pre-judicial</span>
+    </div>
+  </div>
+  <div class="topnav-right">
+    <div class="user-chip">
+      <div class="avatar" id="avatarInicial">?</div>
+      <div>
+        <div style="font-weight:600;line-height:1.3;color:#fff" id="navNombre">—</div>
+        <div class="perfil-badge" id="navPerfil">—</div>
+      </div>
+    </div>
+    <button class="btn-logout" onclick="logout()"><i class="bi bi-box-arrow-right me-1"></i>Salir</button>
+  </div>
+</nav>
+
+<div class="layout">
+
+  <!-- Sidebar de tramos -->
+  <aside class="sidebar">
+    <div class="sidebar-card">
+      <div class="sidebar-title"><i class="bi bi-funnel me-1"></i>Segmentación por tramos</div>
+
+      <div class="tramo-item active" data-tramo="" onclick="setTramo('')">
+        <div class="tramo-label">
+          <span>Total pre-judicial</span>
+          <span id="seg-total-n" style="font-size:0.9rem;color:#1e293b">—</span>
+        </div>
+        <div class="tramo-bar-bg"><div class="tramo-bar" id="seg-total-bar" style="width:100%;background:#94a3b8"></div></div>
+        <div class="tramo-meta">
+          <span>Todos los tramos</span>
+          <span id="seg-total-m">—</span>
+        </div>
+      </div>
+
+      <div class="tramo-item" data-tramo="1-15" onclick="setTramo('1-15')">
+        <div class="tramo-label">
+          <span>⚡ 1–15 días</span>
+          <span id="seg-t1-n" style="color:#e65100">—</span>
+        </div>
+        <div class="tramo-bar-bg"><div class="tramo-bar" id="seg-t1-bar" style="width:0%;background:#f59e0b"></div></div>
+        <div class="tramo-meta">
+          <span>Alerta temprana</span>
+          <span id="seg-t1-m">—</span>
+        </div>
+      </div>
+
+      <div class="tramo-item" data-tramo="16-30" onclick="setTramo('16-30')">
+        <div class="tramo-label">
+          <span>16–30 días</span>
+          <span id="seg-t2-n" style="color:#c62828">—</span>
+        </div>
+        <div class="tramo-bar-bg"><div class="tramo-bar" id="seg-t2-bar" style="width:0%;background:#ef4444"></div></div>
+        <div class="tramo-meta">
+          <span>Tramo 2</span>
+          <span id="seg-t2-m">—</span>
+        </div>
+      </div>
+
+      <div class="tramo-item" data-tramo="31-60" onclick="setTramo('31-60')">
+        <div class="tramo-label">
+          <span>31–60 días</span>
+          <span id="seg-t3-n" style="color:#9d174d">—</span>
+        </div>
+        <div class="tramo-bar-bg"><div class="tramo-bar" id="seg-t3-bar" style="width:0%;background:#ec4899"></div></div>
+        <div class="tramo-meta">
+          <span>Tramo 3</span>
+          <span id="seg-t3-m">—</span>
+        </div>
+      </div>
+
+      <div class="tramo-item" data-tramo="61-90" onclick="setTramo('61-90')">
+        <div class="tramo-label">
+          <span>61–90 días</span>
+          <span id="seg-t4-n" style="color:#5b21b6">—</span>
+        </div>
+        <div class="tramo-bar-bg"><div class="tramo-bar" id="seg-t4-bar" style="width:0%;background:#8b5cf6"></div></div>
+        <div class="tramo-meta">
+          <span>Tramo 4</span>
+          <span id="seg-t4-m">—</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="sidebar-card">
+      <div class="sidebar-title">Ley del Consumidor</div>
+      <div style="font-size:0.8rem;color:#64748b;line-height:1.6">
+        <div class="mb-2"><i class="bi bi-telephone text-warning me-1"></i><strong>1 gestión telefónica o presencial</strong> por semana por crédito.</div>
+        <div><i class="bi bi-phone text-primary me-1"></i><strong>2 gestiones remotas</strong> (WhatsApp, SMS, Email) por semana, separadas por al menos 2 días.</div>
+      </div>
+    </div>
+  </aside>
+
+  <!-- Contenido principal -->
+  <div class="main">
+    <div class="search-bar">
+      <input type="text" class="search-input" id="searchInput" placeholder="Buscar por nombre, RUT o N° crédito..." oninput="filtrar()">
+      <button class="btn-buscar" onclick="cargarCartera()"><i class="bi bi-search me-1"></i>Buscar</button>
+    </div>
+
+    <div class="table-card">
+      <div class="table-header">
+        <div class="table-title" id="tableTitle">Cartera Pre-judicial — Todos los tramos</div>
+        <div style="font-size:0.82rem;color:#94a3b8" id="tableCount"></div>
+      </div>
+      <div style="overflow-x:auto">
+        <table>
+          <thead>
+            <tr>
+              <th>Crédito</th>
+              <th>Cliente</th>
+              <th>RUT</th>
+              <th>Cuotas mora</th>
+              <th>Días mora</th>
+              <th>Monto mora</th>
+              <th>Última gestión</th>
+              <th>Disponibilidad</th>
+              <th></th>
+            </tr>
+          </thead>
+          <tbody id="tablaBody">
+            <tr><td colspan="9" class="empty-state"><div class="spinner"></div> Cargando...</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <div class="pag-bar">
+        <div id="pagInfo">—</div>
+        <div style="display:flex;gap:8px">
+          <button onclick="pagAnterior()" id="btnAnterior" style="border:1px solid #e2e8f0;background:#fff;border-radius:6px;padding:4px 12px;font-size:0.82rem;cursor:pointer">&#8592; Anterior</button>
+          <button onclick="pagSiguiente()" id="btnSiguiente" style="border:1px solid #e2e8f0;background:#fff;border-radius:6px;padding:4px 12px;font-size:0.82rem;cursor:pointer">Siguiente &#8594;</button>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Drawer overlay -->
+<div class="drawer-overlay" id="drawerOverlay" onclick="cerrarDrawer()"></div>
+
+<!-- Drawer -->
+<div class="drawer" id="drawer">
+  <div class="drawer-head">
+    <button class="drawer-close" onclick="cerrarDrawer()"><i class="bi bi-x"></i></button>
+    <h5 id="drawerNombre">—</h5>
+    <div class="sub" id="drawerSub">—</div>
+  </div>
+  <div class="drawer-body">
+
+    <!-- Alerta tramo 1 -->
+    <div id="alerta15" class="alerta-tramo1" style="display:none">
+      <i class="bi bi-lightning-charge-fill me-1"></i>
+      <strong>Crédito en tramo 1–15 días</strong> — Ventana para gestionar gastos de cobranza.
+      Actuar antes de <span id="fechaLimite15"></span>.
+    </div>
+
+    <!-- Resumen mora -->
+    <div class="mora-grid" id="moraGrid"></div>
+
+    <!-- Disponibilidad legal -->
+    <div class="disp-panel" id="dispPanel">
+      <div class="disp-panel-title"><i class="bi bi-shield-check me-1"></i>Disponibilidad esta semana (Ley del Consumidor)</div>
+      <div id="dispRows"><div class="spinner"></div></div>
+    </div>
+
+    <!-- Tabs -->
+    <ul class="nav nav-tabs" id="drawerTabs">
+      <li class="nav-item"><button class="nav-link active" onclick="showTab('acciones')"><i class="bi bi-telephone me-1"></i>Acciones</button></li>
+      <li class="nav-item"><button class="nav-link" onclick="showTab('bitacora')"><i class="bi bi-journal-text me-1"></i>Bitácora</button></li>
+      <li class="nav-item"><button class="nav-link" onclick="showTab('provisiones')"><i class="bi bi-graph-up me-1"></i>Provisiones</button></li>
+    </ul>
+
+    <!-- Tab Acciones -->
+    <div id="tab-acciones" class="tab-content">
+      <div id="accionesContent"><div class="spinner"></div></div>
+    </div>
+
+    <!-- Tab Bitácora -->
+    <div id="tab-bitacora" class="tab-content" style="display:none">
+      <div id="bitacoraContent"><div class="spinner"></div></div>
+    </div>
+
+    <!-- Tab Provisiones -->
+    <div id="tab-provisiones" class="tab-content" style="display:none">
+      <div id="provisionesContent"><div class="spinner"></div></div>
+    </div>
+
+  </div>
+</div>
+
+<script>
+const token = localStorage.getItem('token');
+const yo    = JSON.parse(localStorage.getItem('usuario') || 'null');
+if (!token || !yo) window.location.href = '/login.html';
+
+document.getElementById('navNombre').textContent = `${yo?.nombre||''} ${yo?.apellido||''}`.trim();
+document.getElementById('navPerfil').textContent  = yo?.perfil || '';
+document.getElementById('avatarInicial').textContent = (yo?.nombre||'?').charAt(0).toUpperCase();
+
+function logout() { localStorage.removeItem('token'); localStorage.removeItem('usuario'); window.location.href = '/login.html'; }
+
+function fmt(v) { return '$' + Math.round(Number(v||0)).toLocaleString('es-CL'); }
+function fmtFecha(s) { if (!s) return '—'; return new Date(s).toLocaleDateString('es-CL', { timeZone: 'America/Santiago' }); }
+function fmtFechaHora(s) { if (!s) return '—'; return new Date(s).toLocaleString('es-CL', { timeZone: 'America/Santiago', dateStyle: 'short', timeStyle: 'short' }); }
+
+let state = { tramo: '', q: '', page: 1, pages: 1, total: 0, rows: [] };
+let tramoStats = {};
+let creditoActual = null;
+let dispActual = null;
+let mensajesActual = null;
+
+function setTramo(t) {
+  state.tramo = t;
+  state.page = 1;
+  document.querySelectorAll('.tramo-item').forEach(el => el.classList.remove('active'));
+  document.querySelector(`[data-tramo="${t}"]`)?.classList.add('active');
+  const labels = { '': 'Todos los tramos', '1-15': 'Tramo 1–15 días', '16-30': 'Tramo 16–30 días', '31-60': 'Tramo 31–60 días', '61-90': 'Tramo 61–90 días' };
+  document.getElementById('tableTitle').textContent = 'Cartera Pre-judicial — ' + (labels[t] || t);
+  cargarCartera();
+}
+
+function filtrar() { state.q = document.getElementById('searchInput').value; }
+function pagAnterior() { if (state.page > 1) { state.page--; cargarCartera(); } }
+function pagSiguiente() { if (state.page < state.pages) { state.page++; cargarCartera(); } }
+
+async function cargarCartera() {
+  const q = document.getElementById('searchInput').value;
+  const params = new URLSearchParams({ tipo: 'prejudicial', page: state.page, limit: 30 });
+  if (state.tramo) params.set('tramo', state.tramo);
+  if (q) params.set('q', q);
+
+  document.getElementById('tablaBody').innerHTML = '<tr><td colspan="9" class="empty-state"><div class="spinner"></div> Cargando...</td></tr>';
+
+  try {
+    const r = await fetch('/api/cobranza/cartera?' + params, { headers: { 'Authorization': 'Bearer ' + token } });
+    const { success, data } = await r.json();
+    if (!success) return;
+
+    state.pages = data.pages;
+    state.total = data.total;
+    state.rows  = data.rows;
+
+    renderTabla(data.rows);
+    document.getElementById('pagInfo').textContent = `${data.total} créditos — Página ${data.page} de ${data.pages || 1}`;
+    document.getElementById('tableCount').textContent = `${data.total} resultados`;
+    document.getElementById('btnAnterior').disabled = data.page <= 1;
+    document.getElementById('btnSiguiente').disabled = data.page >= data.pages;
+
+    if (!state.tramo) calcularEstadisticasSidebar(data.rows);
+
+  } catch (e) {
+    document.getElementById('tablaBody').innerHTML = '<tr><td colspan="9" class="empty-state text-danger">Error cargando datos</td></tr>';
+  }
+}
+
+function calcularEstadisticasSidebar(rows) {
+  const grupos = { '1-15': [], '16-30': [], '31-60': [], '61-90': [] };
+  for (const r of rows) {
+    const d = Number(r.dias_mora);
+    if (d <= 15) grupos['1-15'].push(r);
+    else if (d <= 30) grupos['16-30'].push(r);
+    else if (d <= 60) grupos['31-60'].push(r);
+    else grupos['61-90'].push(r);
+  }
+  const max = Math.max(...Object.values(grupos).map(g => g.length), 1);
+  document.getElementById('seg-total-n').textContent = rows.length;
+  document.getElementById('seg-total-m').textContent = fmt(rows.reduce((s,r) => s + Number(r.monto_mora||0), 0));
+
+  [['t1','1-15'],['t2','16-30'],['t3','31-60'],['t4','61-90']].forEach(([id, key]) => {
+    const g = grupos[key];
+    document.getElementById(`seg-${id}-n`).textContent = g.length;
+    document.getElementById(`seg-${id}-m`).textContent = fmt(g.reduce((s,r) => s + Number(r.monto_mora||0), 0));
+    document.getElementById(`seg-${id}-bar`).style.width = Math.round(g.length / max * 100) + '%';
+  });
+}
+
+function tramoBadge(dias) {
+  const d = Number(dias);
+  if (d <= 15)  return `<span class="badge-tramo badge-t1">⚡ ${d}d</span>`;
+  if (d <= 30)  return `<span class="badge-tramo badge-t2">${d}d</span>`;
+  if (d <= 60)  return `<span class="badge-tramo badge-t3">${d}d</span>`;
+  return `<span class="badge-tramo badge-t4">${d}d</span>`;
+}
+
+function dispBadge(row) {
+  if (row.puede_llamar || row.puede_remota) return `<span class="disp-ok"><i class="bi bi-circle-fill" style="font-size:0.55rem"></i> Puede actuar</span>`;
+  if (row.remotas_semana < 2) return `<span class="disp-warn"><i class="bi bi-clock"></i> Espera ${row.dias_para_proxima||0}d</span>`;
+  return `<span class="disp-no"><i class="bi bi-x-circle"></i> Semana agotada</span>`;
+}
+
+function renderTabla(rows) {
+  if (!rows.length) {
+    document.getElementById('tablaBody').innerHTML = '<tr><td colspan="9" class="empty-state">Sin créditos en este tramo</td></tr>';
+    return;
+  }
+  document.getElementById('tablaBody').innerHTML = rows.map(r => `
+    <tr>
+      <td><a href="#" style="color:var(--navy);font-weight:600">${r.numero_credito || r.id_credito}</a></td>
+      <td style="max-width:160px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${r.nombre_cliente || '—'}</td>
+      <td>${r.rut_cliente || '—'}</td>
+      <td style="text-align:center">${r.cuotas_mora || 0}</td>
+      <td>${tramoBadge(r.dias_mora)}</td>
+      <td style="font-weight:700;color:#dc2626">${fmt(r.monto_mora)}</td>
+      <td style="font-size:0.78rem;color:#64748b">${r.ultima_tipo ? `${r.ultima_tipo}<br><span style="color:#94a3b8">${fmtFechaHora(r.ultima_gestion_fecha)}</span>` : '<span style="color:#94a3b8">—</span>'}</td>
+      <td>${dispBadge(r)}</td>
+      <td><button class="btn-gestionar" onclick="abrirDrawer(${r.id_credito})"><i class="bi bi-lightning-charge me-1"></i>Gestionar</button></td>
+    </tr>
+  `).join('');
+}
+
+// Drawer
+async function abrirDrawer(id_credito) {
+  const row = state.rows.find(r => r.id_credito === id_credito);
+  creditoActual = row;
+  dispActual = null;
+  mensajesActual = null;
+
+  document.getElementById('drawerNombre').textContent = row?.nombre_cliente || '—';
+  document.getElementById('drawerSub').textContent = `${row?.numero_credito || 'Crédito #' + id_credito} · RUT: ${row?.rut_cliente || '—'} · ${row?.marca || ''} ${row?.modelo || ''} ${row?.patente ? '(' + row.patente + ')' : ''}`.trim();
+
+  // Alerta 15 días
+  const dias = Number(row?.dias_mora || 0);
+  if (dias >= 1 && dias <= 15) {
+    const limit = new Date();
+    limit.setDate(limit.getDate() + (15 - dias));
+    document.getElementById('fechaLimite15').textContent = limit.toLocaleDateString('es-CL', { timeZone: 'America/Santiago' });
+    document.getElementById('alerta15').style.display = '';
+  } else {
+    document.getElementById('alerta15').style.display = 'none';
+  }
+
+  // Mora grid
+  document.getElementById('moraGrid').innerHTML = `
+    <div class="mora-box"><div class="mora-box-label">Días mora</div><div class="mora-box-value" style="color:#dc2626">${row?.dias_mora || 0}</div></div>
+    <div class="mora-box"><div class="mora-box-label">Cuotas mora</div><div class="mora-box-value">${row?.cuotas_mora || 0}</div></div>
+    <div class="mora-box"><div class="mora-box-label">Monto mora</div><div class="mora-box-value">${fmt(row?.monto_mora)}</div></div>
+    <div class="mora-box"><div class="mora-box-label">Cuota mensual</div><div class="mora-box-value">${fmt(row?.cuota)}</div></div>
+  `;
+
+  document.getElementById('drawerOverlay').style.display = '';
+  document.getElementById('drawer').classList.add('open');
+  showTab('acciones');
+
+  // Cargar disponibilidad
+  cargarDisponibilidad(id_credito);
+  cargarMensajes(id_credito);
+}
+
+function cerrarDrawer() {
+  document.getElementById('drawer').classList.remove('open');
+  document.getElementById('drawerOverlay').style.display = 'none';
+  creditoActual = null;
+}
+
+function showTab(tab) {
+  ['acciones','bitacora','provisiones'].forEach(t => {
+    document.getElementById('tab-' + t).style.display = t === tab ? '' : 'none';
+  });
+  document.querySelectorAll('#drawerTabs .nav-link').forEach((btn, i) => {
+    btn.classList.toggle('active', ['acciones','bitacora','provisiones'][i] === tab);
+  });
+  if (tab === 'bitacora' && creditoActual) cargarBitacora(creditoActual.id_credito);
+  if (tab === 'provisiones') cargarProvisiones();
+}
+
+async function cargarDisponibilidad(id_credito) {
+  document.getElementById('dispRows').innerHTML = '<div class="spinner"></div>';
+  try {
+    const r = await fetch(`/api/cobranza/disponibilidad/${id_credito}`, { headers: { 'Authorization': 'Bearer ' + token } });
+    const { success, data } = await r.json();
+    if (!success) return;
+    dispActual = data;
+
+    const iconOk = '<i class="bi bi-check-circle-fill disp-icon-ok"></i>';
+    const iconNo = '<i class="bi bi-x-circle-fill disp-icon-no"></i>';
+
+    document.getElementById('dispRows').innerHTML = `
+      <div class="disp-row">
+        <span>${data.puede_llamar ? iconOk : iconNo} Llamada/Visita (${data.llamadas_esta_semana}/1 usadas)</span>
+        <span style="font-size:0.78rem;color:#64748b">${data.puede_llamar ? 'Disponible' : 'Próx.: ' + data.proxima_llamada_disponible}</span>
+      </div>
+      <div class="disp-row">
+        <span>${(data.puede_remota && data.dias_para_proxima_remota === 0) ? iconOk : iconNo} Remotas (${data.remotas_esta_semana}/2 usadas)</span>
+        <span style="font-size:0.78rem;color:#64748b">${data.dias_para_proxima_remota > 0 ? `Espera ${data.dias_para_proxima_remota}d` : data.puede_remota ? 'Disponible' : 'Próx.: ' + data.proxima_remota_disponible}</span>
+      </div>
+    `;
+
+    renderAcciones();
+  } catch (e) {
+    document.getElementById('dispRows').innerHTML = '<span class="text-danger">Error</span>';
+  }
+}
+
+async function cargarMensajes(id_credito) {
+  try {
+    const r = await fetch(`/api/cobranza/mensajes/${id_credito}`, { headers: { 'Authorization': 'Bearer ' + token } });
+    const { success, data } = await r.json();
+    if (success) mensajesActual = data;
+    renderAcciones();
+  } catch(e) {}
+}
+
+function renderAcciones() {
+  const c = creditoActual;
+  const d = dispActual;
+  const m = mensajesActual;
+  if (!c) return;
+
+  let html = '';
+
+  // Llamada
+  if (!d || d.puede_llamar) {
+    html += `
+      <div class="mb-3">
+        <div class="d-flex align-items-center gap-2 mb-2">
+          <button class="btn-action btn-llamada" onclick="mostrarFormLlamada()"><i class="bi bi-telephone-fill"></i>Registrar Llamada/Visita</button>
+          ${d && !d.puede_llamar ? `<span class="text-muted" style="font-size:0.78rem">Disponible: ${d.proxima_llamada_disponible}</span>` : ''}
+        </div>
+        <div id="formLlamada" style="display:none"></div>
+      </div>`;
+  } else {
+    html += `<div class="mb-3 text-muted" style="font-size:0.85rem"><i class="bi bi-telephone-x me-1"></i>Llamada usada esta semana. Próxima: ${d?.proxima_llamada_disponible}</div>`;
+  }
+
+  // Remotas
+  const puedeRemota = !d || (d.puede_remota && d.dias_para_proxima_remota === 0);
+  if (m) {
+    html += `<hr style="margin:12px 0">
+      <div style="font-size:0.82rem;font-weight:700;color:#64748b;text-transform:uppercase;margin-bottom:10px">Gestiones Remotas ${!puedeRemota && d ? '<span style="color:#f59e0b">(No disponible)</span>' : ''}</div>
+      <div class="d-flex flex-wrap gap-2 mb-3">
+        <button class="btn-action btn-whatsapp" onclick="mostrarMensaje('whatsapp')" ${!puedeRemota ? 'disabled' : ''}><i class="bi bi-whatsapp"></i>WhatsApp</button>
+        <button class="btn-action btn-sms" onclick="mostrarMensaje('sms')" ${!puedeRemota ? 'disabled' : ''}><i class="bi bi-chat-text-fill"></i>SMS</button>
+        <button class="btn-action btn-email" onclick="mostrarMensaje('email')" ${!puedeRemota ? 'disabled' : ''}><i class="bi bi-envelope-fill"></i>Email</button>
+      </div>
+      <div id="mensajePanel" style="display:none">
+        <div class="msg-box" id="msgTexto"></div>
+        <div style="display:flex;gap:8px;margin-top:8px">
+          <button class="btn-action" style="background:#e2e8f0;color:#1e293b" onclick="copiarMensaje()"><i class="bi bi-clipboard"></i>Copiar</button>
+        </div>
+      </div>`;
+    if (!puedeRemota && d) {
+      html += `<div class="text-muted" style="font-size:0.8rem"><i class="bi bi-clock me-1"></i>Próxima remota disponible: ${d.proxima_remota_disponible}</div>`;
+    }
+  } else {
+    html += '<div style="padding:20px;text-align:center"><div class="spinner"></div></div>';
+  }
+
+  document.getElementById('accionesContent').innerHTML = html;
+}
+
+let tipoMensajeActual = '';
+function mostrarMensaje(tipo) {
+  tipoMensajeActual = tipo;
+  const m = mensajesActual;
+  if (!m) return;
+  let txt = '';
+  if (tipo === 'whatsapp') txt = m.whatsapp;
+  else if (tipo === 'sms')  txt = m.sms;
+  else if (tipo === 'email') txt = m.email.asunto + '\n\n' + m.email.cuerpo;
+  document.getElementById('msgTexto').textContent = txt;
+  document.getElementById('mensajePanel').style.display = '';
+}
+
+async function copiarMensaje() {
+  const txt = document.getElementById('msgTexto').textContent;
+  await navigator.clipboard.writeText(txt);
+  if (confirm('¿Confirmás que enviaste el mensaje?')) {
+    await registrarGestion({ tipo_gestion: tipoMensajeActual.toUpperCase(), canal: 'REMOTA', confirmado: true, resultado: 'SIN_RESULTADO' });
+  }
+}
+
+function mostrarFormLlamada() {
+  document.getElementById('formLlamada').style.display = '';
+  document.getElementById('formLlamada').innerHTML = `
+    <div class="form-gestion mt-2">
+      <div class="mb-2">
+        <label>Tipo</label>
+        <select class="form-select" id="llamadaTipo">
+          <option value="LLAMADA">Llamada telefónica</option>
+          <option value="VISITA">Visita presencial</option>
+        </select>
+      </div>
+      <div class="mb-2">
+        <label>Resultado</label>
+        <select class="form-select" id="llamadaResultado">
+          <option value="CONTACTADO">Contactado</option>
+          <option value="NO_CONTESTA">No contesta</option>
+          <option value="PROMESA_PAGO">Promesa de pago</option>
+          <option value="RECHAZA_PAGO">Rechaza pago</option>
+          <option value="NUMERO_ERRADO">Número errado</option>
+          <option value="SIN_RESULTADO">Sin resultado</option>
+        </select>
+      </div>
+      <div id="promesaFields" style="display:none">
+        <div class="mb-2">
+          <label>Fecha promesa</label>
+          <input type="date" class="form-control" id="llamadaFechaPromesa">
+        </div>
+        <div class="mb-2">
+          <label>Monto prometido</label>
+          <input type="number" class="form-control" id="llamadaMonto" placeholder="Ej: 250000">
+        </div>
+      </div>
+      <div class="mb-2">
+        <label>Notas</label>
+        <textarea class="form-control" id="llamadaMensaje" rows="2" placeholder="Observaciones..."></textarea>
+      </div>
+      <button class="btn-guardar" onclick="guardarLlamada()">Guardar gestión</button>
+    </div>`;
+
+  document.getElementById('llamadaResultado').addEventListener('change', function() {
+    document.getElementById('promesaFields').style.display = this.value === 'PROMESA_PAGO' ? '' : 'none';
+  });
+}
+
+async function guardarLlamada() {
+  const tipo = document.getElementById('llamadaTipo').value;
+  const resultado = document.getElementById('llamadaResultado').value;
+  const mensaje = document.getElementById('llamadaMensaje').value;
+  const fecha_promesa = document.getElementById('llamadaFechaPromesa')?.value || null;
+  const monto_promesa = document.getElementById('llamadaMonto')?.value || null;
+
+  await registrarGestion({
+    tipo_gestion: tipo,
+    canal: tipo === 'VISITA' ? 'PRESENCIAL' : 'TELEFONICA',
+    resultado,
+    mensaje,
+    fecha_promesa: fecha_promesa || undefined,
+    monto_promesa: monto_promesa || undefined,
+    confirmado: true
+  });
+}
+
+async function registrarGestion(data) {
+  if (!creditoActual) return;
+  try {
+    const r = await fetch('/api/cobranza/gestiones', {
+      method: 'POST',
+      headers: { 'Authorization': 'Bearer ' + token, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ id_credito: creditoActual.id_credito, ...data })
+    });
+    const res = await r.json();
+    if (res.success) {
+      alert('Gestión registrada correctamente.');
+      cargarDisponibilidad(creditoActual.id_credito);
+      cargarCartera();
+    } else {
+      alert('Error: ' + res.error);
+    }
+  } catch(e) {
+    alert('Error de conexión');
+  }
+}
+
+async function cargarBitacora(id_credito) {
+  document.getElementById('bitacoraContent').innerHTML = '<div class="spinner"></div>';
+  try {
+    const r = await fetch(`/api/cobranza/bitacora/${id_credito}`, { headers: { 'Authorization': 'Bearer ' + token } });
+    const { success, data } = await r.json();
+    if (!success) return;
+    if (!data.length) {
+      document.getElementById('bitacoraContent').innerHTML = '<div class="empty-state">Sin gestiones registradas</div>';
+      return;
+    }
+    document.getElementById('bitacoraContent').innerHTML = data.map(g => `
+      <div class="bitacora-item" style="border-color:${g.confirmado ? '#10b981' : '#94a3b8'}">
+        <div style="display:flex;justify-content:space-between">
+          <div class="bitacora-tipo">${g.tipo_gestion} · ${g.canal} ${g.confirmado ? '<span style="color:#10b981">✓ confirmado</span>' : ''}</div>
+          <div class="bitacora-fecha">${fmtFechaHora(g.created_at)}</div>
+        </div>
+        <div style="font-size:0.78rem;color:#64748b">${g.nombre_usuario || '—'} · ${g.resultado}</div>
+        ${g.mensaje ? `<div class="bitacora-msg">${g.mensaje}</div>` : ''}
+        ${g.resultado === 'PROMESA_PAGO' ? `<div style="font-size:0.8rem;margin-top:4px;color:#d97706"><i class="bi bi-calendar-check me-1"></i>Promesa: ${fmtFecha(g.fecha_promesa)} — ${fmt(g.monto_promesa)}</div>` : ''}
+      </div>`).join('');
+  } catch(e) {
+    document.getElementById('bitacoraContent').innerHTML = '<div class="text-danger">Error cargando bitácora</div>';
+  }
+}
+
+async function cargarProvisiones() {
+  document.getElementById('provisionesContent').innerHTML = '<div class="spinner"></div>';
+  try {
+    const r = await fetch('/api/cobranza/provisiones', { headers: { 'Authorization': 'Bearer ' + token } });
+    const { success, data } = await r.json();
+    if (!success) return;
+    const c = creditoActual;
+    let tramoInfo = '';
+    if (c) {
+      const d = Number(c.dias_mora);
+      let t = data.tramos.find(t => {
+        if (t.tramo === '91+') return d > 90;
+        const [min, max] = t.tramo.split('-').map(Number);
+        return d >= min && d <= max;
+      });
+      if (t) tramoInfo = `<div class="mora-box mb-3"><div class="mora-box-label">Provisión estimada (${t.tramo} días · ${t.pct_provision}%)</div><div class="mora-box-value" style="color:#dc2626">${fmt(Number(c.monto_mora) * t.pct_provision / 100)}</div></div>`;
+    }
+    document.getElementById('provisionesContent').innerHTML = `
+      ${tramoInfo}
+      <table class="table table-sm" style="font-size:0.82rem">
+        <thead><tr><th>Tramo</th><th>Casos</th><th>Monto mora</th><th>% Prov.</th><th>Provisión</th></tr></thead>
+        <tbody>${data.tramos.map(t => `<tr><td>${t.tramo} días</td><td>${t.casos}</td><td>${fmt(t.monto)}</td><td>${t.pct_provision}%</td><td style="font-weight:700;color:#dc2626">${fmt(t.provision_estimada)}</td></tr>`).join('')}</tbody>
+        <tfoot><tr style="font-weight:700"><td>Total</td><td></td><td>${fmt(data.deuda_mora)}</td><td></td><td style="color:#dc2626">${fmt(data.provision_total)}</td></tr></tfoot>
+      </table>`;
+  } catch(e) {
+    document.getElementById('provisionesContent').innerHTML = '<div class="text-danger">Error</div>';
+  }
+}
+
+cargarCartera();
+</script>
+<script src="/js/app-version.js"></script>
+</body>
+</html>

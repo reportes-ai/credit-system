@@ -51,6 +51,9 @@ app.use('/api/cuentas-transitorias', require('../../services/tesoreria/src/route
 // CRM
 app.use('/api/crm', require('../../services/crm/src/routes/gestiones.routes'));
 
+// Cobranza
+app.use('/api/cobranza', require('../../services/cobranza/src/routes/cobranza.routes'));
+
 // Health check
 app.get('/health', (req, res) => res.json({ status: 'Sistema operativo', timestamp: new Date() }));
 
@@ -141,6 +144,15 @@ app.get(['/crm/estadisticas', '/crm/estadisticas/'], (req, res) =>
 
 app.get(['/cobranza', '/cobranza/'], (req, res) =>
   res.sendFile(path.join(__dirname, '../public/cobranza/index.html')));
+
+app.get(['/cobranza/prejudicial', '/cobranza/prejudicial/'], (req, res) =>
+  res.sendFile(path.join(__dirname, '../public/cobranza/prejudicial.html')));
+
+app.get(['/cobranza/judicial', '/cobranza/judicial/'], (req, res) =>
+  res.sendFile(path.join(__dirname, '../public/cobranza/judicial.html')));
+
+app.get(['/cobranza/mis-cobranza', '/cobranza/mis-cobranza/'], (req, res) =>
+  res.sendFile(path.join(__dirname, '../public/cobranza/mis-cobranza.html')));
 
 app.get(['/reporteria', '/reporteria/'], (req, res) =>
   res.sendFile(path.join(__dirname, '../public/reporteria/index.html')));
