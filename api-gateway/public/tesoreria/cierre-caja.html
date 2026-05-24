@@ -78,6 +78,14 @@
     .badge-activo   { background:#dcfce7; color:#15803d; font-weight:700; font-size:.72rem; border-radius:6px; padding:2px 7px; }
     .badge-consumido{ background:#f1f5f9; color:#9ca3af; font-weight:700; font-size:.72rem; border-radius:6px; padding:2px 7px; }
 
+    /* Tipo mov */
+    .badge-abono  { background:#dcfce7; color:#15803d; font-weight:700; font-size:.72rem; border-radius:6px; padding:2px 8px; display:inline-flex; align-items:center; gap:4px; }
+    .badge-cargo  { background:#fee2e2; color:#991b1b; font-weight:700; font-size:.72rem; border-radius:6px; padding:2px 8px; display:inline-flex; align-items:center; gap:4px; }
+    .tr-reverso   { background:#fff5f5 !important; }
+    .tr-reverso td { color:#7f1d1d; }
+    .tr-cuota-rev td { background:#fff8f8 !important; font-size:.81rem; padding:6px 14px 6px 28px; color:#7f1d1d; border-bottom:1px solid #fecaca; }
+    .amt-cargo    { color:#dc2626 !important; font-weight:700; }
+
     .empty-state { text-align:center; color:#9ca3af; padding:50px 0; }
     .spinner-wrap { display:flex; align-items:center; justify-content:center; padding:60px 0; }
     .btn-buscar { background:var(--navy); color:#fff; border:none; border-radius:8px; padding:8px 20px; font-size:.88rem; font-weight:600; cursor:pointer; height:38px; }
@@ -92,7 +100,7 @@
   <div class="topnav-left">
     <a href="/" class="topnav-brand">
       <img src="/img/logo.png" alt="AutoFácil">
-      <span class="version-badge">v1.3</span>
+      <span class="version-badge">v1.4</span>
     </a>
     <div class="breadcrumb-nav">
       <a href="/">Inicio</a><span class="sep">›</span>
@@ -165,12 +173,16 @@
       <div class="stat-label"><i class="bi bi-shield-exclamation me-1"></i>Gastos cobranza</div>
       <div class="stat-value amber" id="statGastos">—</div>
     </div>
+    <div class="stat-card" id="statCardReversos" style="display:none">
+      <div class="stat-label" style="color:#991b1b"><i class="bi bi-arrow-counterclockwise me-1"></i>Reversiones (Cargo)</div>
+      <div class="stat-value amt-cargo" id="statReversiones">—</div>
+    </div>
     <div class="stat-card">
       <div class="stat-label"><i class="bi bi-arrow-left-right me-1"></i>Ctas. Transitorias</div>
       <div class="stat-value teal" id="statTransitorias">—</div>
     </div>
     <div class="stat-card stat-divider">
-      <div class="stat-label"><i class="bi bi-bank me-1"></i>Total recaudado</div>
+      <div class="stat-label"><i class="bi bi-bank me-1"></i>Total recaudado neto</div>
       <div class="stat-value green" id="statTotal">—</div>
     </div>
   </div>
@@ -234,11 +246,38 @@
               <th class="text-right">Utilizado</th>
               <th class="text-right">Saldo</th>
               <th>Estado</th>
+              <th>Tipo</th>
               <th>Glosa</th>
             </tr>
           </thead>
           <tbody id="tbodyTransitorias"></tbody>
           <tfoot><tr id="tfootTransitorias" class="tfoot-row"></tr></tfoot>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <!-- Cartola de movimientos de transitorias -->
+  <div class="panel" id="panelCartola" style="display:none">
+    <div class="panel-header">
+      <h5><i class="bi bi-journal-text me-2" style="color:#0e7490"></i>Cartola de movimientos transitorios</h5>
+      <span id="cartolaCount" style="font-size:.8rem;color:#6b7280"></span>
+    </div>
+    <div class="panel-body">
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>Tipo</th>
+              <th>TRX</th>
+              <th>Crédito</th>
+              <th>Cliente</th>
+              <th class="text-right">Monto</th>
+              <th>Concepto</th>
+              <th>Fecha</th>
+            </tr>
+          </thead>
+          <tbody id="tbodyCartola"></tbody>
         </table>
       </div>
     </div>
@@ -353,10 +392,18 @@ function renderResultados(d) {
   document.getElementById('statIntereses').textContent    = clp(t.intereses_mora);
   document.getElementById('statGastos').textContent       = clp(t.gastos_cobranza);
   document.getElementById('statTransitorias').textContent = clp(t.total_transitorias);
-  document.getElementById('statTotal').textContent        = clp(t.total_recaudado);
+  document.getElementById('statTotal').textContent        = clp(t.total_neto ?? t.total_recaudado);
   document.getElementById('statsRow').style.display       = '';
 
-  // Resumen por cajero (mostrar si hay más de uno o siempre con filtro)
+  // Stat reversiones
+  if (t.reversiones > 0) {
+    document.getElementById('statCardReversos').style.display = '';
+    document.getElementById('statReversiones').textContent    = `-${clp(t.total_reversiones)} (${t.reversiones})`;
+  } else {
+    document.getElementById('statCardReversos').style.display = 'none';
+  }
+
+  // Resumen por cajero
   if (d.resumen.length >= 1) {
     document.getElementById('panelResumen').style.display = '';
     document.getElementById('tbodyResumen').innerHTML = d.resumen.map(r => `
@@ -371,7 +418,7 @@ function renderResultados(d) {
         <td class="text-right"><strong>${clp(r.total_recaudado)}</strong></td>
       </tr>`).join('');
     document.getElementById('tfootResumen').innerHTML = `
-      <td>TOTAL</td><td></td><td></td>
+      <td>TOTAL ABONOS</td><td></td><td></td>
       <td class="text-right">${t.transacciones}</td>
       <td class="text-right">${clp(t.monto_cuotas)}</td>
       <td class="text-right">${clp(t.intereses_mora)}</td>
@@ -381,18 +428,18 @@ function renderResultados(d) {
     document.getElementById('panelResumen').style.display = 'none';
   }
 
-  // Movimientos agrupados por TRX
   renderMovimientos(d);
-
-  // Cuentas Transitorias
   renderTransitorias(d);
+  renderCartola(d);
 }
 
-/* ── agrupar movimientos por numero_transaccion ─────────────────────────── */
+/* ── movimientos agrupados (ABONO y CARGO) ──────────────────────────────── */
 function renderMovimientos(d) {
   const movs = d.movimientos;
+  const t    = d.totales;
+  const totalMovs = movs.length;
   document.getElementById('movCount').textContent =
-    `${d.totales.transacciones} transacción${d.totales.transacciones !== 1 ? 'es' : ''} · ${movs.length} cuota${movs.length !== 1 ? 's' : ''}`;
+    `${t.transacciones} pago${t.transacciones!==1?'s':''} · ${t.reversiones>0?t.reversiones+' reverso'+(t.reversiones!==1?'s':'')+' · ':''} ${totalMovs} registro${totalMovs!==1?'s':''}`;
 
   if (!movs.length) {
     document.getElementById('movWrap').innerHTML =
@@ -400,28 +447,22 @@ function renderMovimientos(d) {
     return;
   }
 
-  // Agrupar por TRX
+  // Agrupar por (tipo_mov + numero_transaccion) para separar pagos de reversiones
   const trxMap = new Map();
   for (const m of movs) {
-    const key = m.numero_transaccion != null ? `t${m.numero_transaccion}` : `p${m.id_pago}`;
+    const tipo = m.tipo_mov || 'ABONO';
+    const key  = tipo === 'CARGO'
+      ? `rev_${m.id_pago}`
+      : (m.numero_transaccion != null ? `t${m.numero_transaccion}` : `p${m.id_pago}`);
+
     if (!trxMap.has(key)) {
       trxMap.set(key, {
-        numero_transaccion: m.numero_transaccion,
-        created_at:         m.created_at,
-        id_credito:         m.id_credito,
-        numero_credito:     m.numero_credito,
-        nombre_cliente:     m.nombre_cliente,
-        rut_cliente:        m.rut_cliente,
-        nombre_cajero:      m.nombre_cajero,
-        registrado_por:     m.registrado_por,
-        nombre_caja:        m.nombre_caja,
-        origen_fondos:      m.origen_fondos,
-        numero_cuenta:      m.numero_cuenta,
-        cuotas:             [],
-        sum_monto:          0,
-        sum_mora:           0,
-        sum_gastos:         0,
-        sum_total:          0,
+        tipo_mov: tipo, numero_transaccion: m.numero_transaccion, fecha_mov: m.fecha_mov,
+        created_at: m.created_at, id_credito: m.id_credito, numero_credito: m.numero_credito,
+        nombre_cliente: m.nombre_cliente, rut_cliente: m.rut_cliente,
+        nombre_cajero: m.nombre_cajero, registrado_por: m.registrado_por,
+        nombre_caja: m.nombre_caja, origen_fondos: m.origen_fondos, numero_cuenta: m.numero_cuenta,
+        cuotas: [], sum_monto: 0, sum_mora: 0, sum_gastos: 0, sum_total: 0,
       });
     }
     const g = trxMap.get(key);
@@ -432,9 +473,9 @@ function renderMovimientos(d) {
     g.sum_total  += Number(m.total_pagado)    || 0;
   }
 
-  const t = d.totales;
   let html = `<div class="table-wrap"><table>
     <thead><tr>
+      <th>Tipo</th>
       <th>TRX</th>
       <th>Fecha/Hora</th>
       <th>Crédito / Cliente</th>
@@ -448,76 +489,114 @@ function renderMovimientos(d) {
     </tr></thead><tbody>`;
 
   for (const [, g] of trxMap) {
-    const { fecha, hora } = dtParts(g.created_at);
-    const trxCode  = g.numero_transaccion
-      ? `<span class="trx-code">${trxFmt(g.numero_transaccion)}</span>`
-      : '<span style="color:#9ca3af;font-size:.78rem">sin TRX</span>';
-    const cajero   = esc((g.nombre_cajero||'').trim() || g.registrado_por || '—');
-    const caja     = esc(g.nombre_caja || '—');
-    const origenLabel = g.origen_fondos ? `<span class="origen-tag">${esc(g.origen_fondos)}</span>` : '';
-    const cuentaNum   = g.numero_cuenta ? `<br><small style="font-family:monospace;color:#374151;font-size:.75rem">N° ${esc(g.numero_cuenta)}</small>` : '';
-    const origen      = origenLabel + cuentaNum;
-    const isMulti  = g.cuotas.length > 1;
+    const esCargo  = g.tipo_mov === 'CARGO';
+    const rowClass = esCargo ? 'tr-reverso' : (g.cuotas.length > 1 ? 'tr-trx' : 'trx-single');
+    const subClass = esCargo ? 'tr-cuota-rev' : 'tr-cuota';
+    const { fecha, hora } = dtParts(g.fecha_mov || g.created_at);
+
+    const tipoBadge = esCargo
+      ? `<span class="badge-cargo"><i class="bi bi-arrow-up-right"></i>CARGO</span>`
+      : `<span class="badge-abono"><i class="bi bi-arrow-down-left"></i>ABONO</span>`;
+
+    const trxCode = g.numero_transaccion
+      ? `<span class="trx-code" ${esCargo?'style="background:#fecaca;color:#7f1d1d"':''}>${trxFmt(g.numero_transaccion)}</span>`
+      : `<span style="color:#9ca3af;font-size:.78rem">${esCargo?'REVERSO':'sin TRX'}</span>`;
+
+    const cajero     = esc((g.nombre_cajero||'').trim() || g.registrado_por || '—');
+    const caja       = esc(g.nombre_caja || '—');
+    const origenLabel= g.origen_fondos ? `<span class="origen-tag">${esc(g.origen_fondos)}</span>` : (esCargo ? `<span class="origen-tag" style="background:#fee2e2;color:#991b1b">Reverso</span>` : '');
+    const cuentaNum  = g.numero_cuenta ? `<br><small style="font-family:monospace;color:#374151;font-size:.75rem">N° ${esc(g.numero_cuenta)}</small>` : '';
+    const origen     = origenLabel + cuentaNum;
+
+    // Fila cabecera del grupo
+    const isMulti = g.cuotas.length > 1;
+    const totalCell = esCargo
+      ? `<td class="text-right amt-cargo">-${clp(g.sum_total)}</td>`
+      : `<td class="text-right"><strong style="color:#15803d">${clp(g.sum_total)}</strong></td>`;
 
     if (isMulti) {
-      // Fila cabecera TRX (multi-cuota)
-      html += `<tr class="tr-trx">
+      html += `<tr class="${rowClass}">
+        <td>${tipoBadge}</td>
         <td>${trxCode}</td>
-        <td><span style="font-weight:700">${fecha}</span><br><small style="color:#6366f1;font-weight:400">${hora}</small></td>
-        <td><a href="/creditos/revisar?id=${g.id_credito}" style="color:var(--navy);font-weight:700">${esc(g.numero_credito||g.id_credito)}</a><br>
-            <small style="color:#374151">${esc(g.nombre_cliente||'—')}</small></td>
-        <td><span class="cuota-badge">${g.cuotas.length} cuotas</span></td>
-        <td class="text-right">${clp(g.sum_monto)}</td>
-        <td class="text-right">${g.sum_mora > 0 ? `<span style="color:#92400e">${clp(g.sum_mora)}</span>` : '<span style="color:#9ca3af">—</span>'}</td>
-        <td class="text-right">${g.sum_gastos > 0 ? `<span style="color:#92400e">${clp(g.sum_gastos)}</span>` : '<span style="color:#9ca3af">—</span>'}</td>
-        <td class="text-right"><strong style="color:#15803d">${clp(g.sum_total)}</strong></td>
+        <td><span style="font-weight:700">${fecha}</span><br><small style="color:${esCargo?'#dc2626':'#6366f1'};font-weight:400">${hora}</small></td>
+        <td><a href="/creditos/revisar?id=${g.id_credito}" style="color:${esCargo?'#991b1b':'var(--navy)'};font-weight:700">${esc(g.numero_credito||g.id_credito)}</a><br>
+            <small>${esc(g.nombre_cliente||'—')}</small></td>
+        <td><span class="cuota-badge" ${esCargo?'style="background:#fecaca;color:#7f1d1d"':''}>${g.cuotas.length} cuotas</span></td>
+        <td class="text-right ${esCargo?'amt-cargo':''}">${esCargo?'-':''}${clp(g.sum_monto)}</td>
+        <td class="text-right">${g.sum_mora > 0 ? `<span style="color:${esCargo?'#dc2626':'#92400e'}">${esCargo?'-':''}${clp(g.sum_mora)}</span>` : '<span style="color:#9ca3af">—</span>'}</td>
+        <td class="text-right">${g.sum_gastos > 0 ? `<span style="color:${esCargo?'#dc2626':'#92400e'}">${esCargo?'-':''}${clp(g.sum_gastos)}</span>` : '<span style="color:#9ca3af">—</span>'}</td>
+        ${totalCell}
         <td>${cajero}<br><small style="color:#6b7280">${caja}</small></td>
         <td>${origen}</td>
       </tr>`;
-      // Sub-filas por cuota
       for (const q of g.cuotas) {
         const hasMora   = (q.interes_mora||0) > 0;
         const hasGastos = (q.gastos_cobranza||0) > 0;
-        html += `<tr class="tr-cuota">
-          <td style="color:#9ca3af;font-size:.75rem;padding-left:22px">└</td>
-          <td></td>
-          <td></td>
+        html += `<tr class="${subClass}">
+          <td style="padding-left:22px;color:#9ca3af;font-size:.75rem">└</td>
+          <td></td><td></td><td></td>
           <td>N°<strong>${q.numero_cuota}</strong></td>
-          <td class="text-right">${clp(q.monto_cuota)}</td>
-          <td class="text-right">${hasMora   ? `<span style="color:#92400e">${clp(q.interes_mora)}</span>`    : '<span style="color:#d1d5db">—</span>'}</td>
-          <td class="text-right">${hasGastos ? `<span style="color:#92400e">${clp(q.gastos_cobranza)}</span>` : '<span style="color:#d1d5db">—</span>'}</td>
-          <td class="text-right" style="color:#374151">${clp(q.total_pagado)}</td>
-          <td></td>
-          <td></td>
+          <td class="text-right ${esCargo?'amt-cargo':''}">${esCargo?'-':''}${clp(q.monto_cuota)}</td>
+          <td class="text-right">${hasMora   ? `<span style="color:${esCargo?'#dc2626':'#92400e'}">${esCargo?'-':''}${clp(q.interes_mora)}</span>`    : '<span style="color:#d1d5db">—</span>'}</td>
+          <td class="text-right">${hasGastos ? `<span style="color:${esCargo?'#dc2626':'#92400e'}">${esCargo?'-':''}${clp(q.gastos_cobranza)}</span>` : '<span style="color:#d1d5db">—</span>'}</td>
+          <td class="text-right ${esCargo?'amt-cargo':''}">${esCargo?'-':''}${clp(q.total_pagado)}</td>
+          <td></td><td></td>
         </tr>`;
       }
     } else {
-      // Fila única (1 cuota)
       const q = g.cuotas[0];
       const hasMora   = (q.interes_mora||0) > 0;
       const hasGastos = (q.gastos_cobranza||0) > 0;
-      html += `<tr class="trx-single">
+      const motivo    = esCargo && q.comentario_reverso ? `<br><small style="color:#991b1b;font-size:.75rem" title="${esc(q.comentario_reverso)}"><i class="bi bi-chat-left-text me-1"></i>${esc(q.comentario_reverso.slice(0,40))}${q.comentario_reverso.length>40?'…':''}</small>` : '';
+      html += `<tr class="${rowClass}">
+        <td>${tipoBadge}</td>
         <td>${trxCode}</td>
-        <td><span style="font-weight:600">${fecha}</span><br><small style="color:#6b7280">${hora}</small></td>
-        <td><a href="/creditos/revisar?id=${g.id_credito}" style="color:var(--navy);font-weight:600">${esc(g.numero_credito||g.id_credito)}</a><br>
-            <small style="color:#6b7280">${esc(g.nombre_cliente||'—')} · ${esc(g.rut_cliente||'')}</small></td>
+        <td><span style="font-weight:600">${fecha}</span><br><small style="color:${esCargo?'#dc2626':'#6b7280'}">${hora}</small></td>
+        <td><a href="/creditos/revisar?id=${g.id_credito}" style="color:${esCargo?'#991b1b':'var(--navy)'};font-weight:600">${esc(g.numero_credito||g.id_credito)}</a><br>
+            <small>${esc(g.nombre_cliente||'—')} · ${esc(g.rut_cliente||'')}</small>${motivo}</td>
         <td>N°<strong>${q.numero_cuota}</strong></td>
-        <td class="text-right">${clp(q.monto_cuota)}</td>
-        <td class="text-right">${hasMora   ? `<span style="color:#92400e">${clp(q.interes_mora)}</span>`    : '<span style="color:#9ca3af">—</span>'}</td>
-        <td class="text-right">${hasGastos ? `<span style="color:#92400e">${clp(q.gastos_cobranza)}</span>` : '<span style="color:#9ca3af">—</span>'}</td>
-        <td class="text-right"><strong>${clp(q.total_pagado)}</strong></td>
+        <td class="text-right ${esCargo?'amt-cargo':''}">${esCargo?'-':''}${clp(q.monto_cuota)}</td>
+        <td class="text-right">${hasMora   ? `<span style="color:${esCargo?'#dc2626':'#92400e'}">${esCargo?'-':''}${clp(q.interes_mora)}</span>`    : '<span style="color:#9ca3af">—</span>'}</td>
+        <td class="text-right">${hasGastos ? `<span style="color:${esCargo?'#dc2626':'#92400e'}">${esCargo?'-':''}${clp(q.gastos_cobranza)}</span>` : '<span style="color:#9ca3af">—</span>'}</td>
+        ${totalCell}
         <td>${cajero}<br><small style="color:#6b7280">${caja}</small></td>
         <td>${origen}</td>
       </tr>`;
     }
   }
 
-  html += `</tbody><tfoot><tr class="tfoot-row">
-    <td colspan="4">TOTAL PERÍODO ${esc(d.desde)} al ${esc(d.hasta)}</td>
-    <td class="text-right">${clp(t.monto_cuotas)}</td>
-    <td class="text-right">${clp(t.intereses_mora)}</td>
-    <td class="text-right">${clp(t.gastos_cobranza)}</td>
-    <td class="text-right">${clp(t.total_pagos)}</td>
+  // Totales netos
+  const netoLabel = t.reversiones > 0
+    ? `NETO (${t.transacciones} pago${t.transacciones!==1?'s':''} - ${t.reversiones} reverso${t.reversiones!==1?'s':''})`
+    : `TOTAL PERÍODO ${esc(d.desde)} al ${esc(d.hasta)}`;
+
+  html += `</tbody><tfoot>`;
+  if (t.reversiones > 0) {
+    html += `<tr class="tfoot-row" style="background:#f0fdf4">
+      <td><span class="badge-abono">ABONO</span></td>
+      <td colspan="3">Bruto recaudado</td>
+      <td></td>
+      <td class="text-right">${clp(t.monto_cuotas)}</td>
+      <td class="text-right">${clp(t.intereses_mora)}</td>
+      <td class="text-right">${clp(t.gastos_cobranza)}</td>
+      <td class="text-right" style="color:#15803d;font-weight:800">${clp(t.total_pagos)}</td>
+      <td colspan="2"></td>
+    </tr>
+    <tr class="tfoot-row" style="background:#fff5f5">
+      <td><span class="badge-cargo">CARGO</span></td>
+      <td colspan="3">Total reversiones</td>
+      <td></td><td></td><td></td><td></td>
+      <td class="text-right amt-cargo">-${clp(t.total_reversiones)}</td>
+      <td colspan="2"></td>
+    </tr>`;
+  }
+  html += `<tr class="tfoot-row">
+    <td colspan="4">${netoLabel}</td>
+    <td></td>
+    <td class="text-right">${t.reversiones>0?'—':clp(t.monto_cuotas)}</td>
+    <td class="text-right">${t.reversiones>0?'—':clp(t.intereses_mora)}</td>
+    <td class="text-right">${t.reversiones>0?'—':clp(t.gastos_cobranza)}</td>
+    <td class="text-right" style="font-size:1rem">${clp(t.total_neto??t.total_pagos)}</td>
     <td colspan="2"></td>
   </tr></tfoot></table></div>`;
 
@@ -525,6 +604,15 @@ function renderMovimientos(d) {
 }
 
 /* ── cuentas transitorias del período ───────────────────────────────────── */
+function tipoTransitoria(glosa) {
+  const g = (glosa || '').toLowerCase();
+  if (g.startsWith('reverso') || g.includes('reverso cuota'))
+    return `<span class="badge-cargo"><i class="bi bi-arrow-counterclockwise"></i>REVERSO</span>`;
+  if (g.includes('exceso') || g.includes('saldo a favor'))
+    return `<span class="badge-abono"><i class="bi bi-arrow-down-left"></i>EXCESO</span>`;
+  return `<span class="badge-abono"><i class="bi bi-arrow-down-left"></i>ABONO</span>`;
+}
+
 function renderTransitorias(d) {
   const trans = d.transitorias || [];
   if (!trans.length) {
@@ -532,11 +620,12 @@ function renderTransitorias(d) {
     return;
   }
   document.getElementById('panelTransitorias').style.display = '';
-  document.getElementById('transCount').textContent = `${trans.length} registro${trans.length !== 1 ? 's' : ''} · ${clp(d.totales.total_transitorias)} generado`;
+  document.getElementById('transCount').textContent =
+    `${trans.length} registro${trans.length !== 1 ? 's' : ''} · ${clp(d.totales.total_transitorias)} generado`;
 
   const rows = trans.map(t => {
-    const saldo   = parseFloat(t.saldo||0);
-    const estado  = saldo > 0 ? '<span class="badge-activo">ACTIVO</span>' : '<span class="badge-consumido">CONSUMIDO</span>';
+    const saldo  = parseFloat(t.saldo||0);
+    const estado = saldo > 0 ? '<span class="badge-activo">ACTIVO</span>' : '<span class="badge-consumido">CONSUMIDO</span>';
     return `<tr class="tr-trans">
       <td><span class="trx-code" style="background:#fed7aa;color:#9a3412">${trxFmt(t.numero_transaccion)}</span></td>
       <td style="white-space:nowrap;font-size:.82rem">${t.fecha ? new Date(t.fecha).toLocaleDateString('es-CL') : '—'}</td>
@@ -546,6 +635,7 @@ function renderTransitorias(d) {
       <td class="text-right" style="font-family:monospace;color:#6b7280">${parseFloat(t.monto_utilizado||0) > 0 ? clp(t.monto_utilizado) : '—'}</td>
       <td class="text-right" style="font-family:monospace;color:#15803d;font-weight:700">${saldo > 0 ? clp(saldo) : '—'}</td>
       <td>${estado}</td>
+      <td>${tipoTransitoria(t.glosa)}</td>
       <td style="font-size:.8rem;color:#374151">${esc(t.glosa||'—')}</td>
     </tr>`;
   }).join('');
@@ -555,7 +645,41 @@ function renderTransitorias(d) {
   document.getElementById('tfootTransitorias').innerHTML = `
     <td colspan="4">TOTAL CTAS. TRANSITORIAS</td>
     <td class="text-right">${clp(total)}</td>
-    <td></td><td></td><td colspan="2"></td>`;
+    <td></td><td></td><td colspan="3"></td>`;
+}
+
+/* ── cartola de movimientos transitorios ─────────────────────────────────── */
+function renderCartola(d) {
+  const cart = d.cartola || [];
+  if (!cart.length) {
+    document.getElementById('panelCartola').style.display = 'none';
+    return;
+  }
+  document.getElementById('panelCartola').style.display = '';
+  document.getElementById('cartolaCount').textContent =
+    `${cart.length} movimiento${cart.length !== 1 ? 's' : ''}`;
+
+  const rows = cart.map(c => {
+    const esAbono = c.tipo === 'ABONO';
+    const badge   = esAbono
+      ? `<span class="badge-abono"><i class="bi bi-arrow-down-left"></i>ABONO</span>`
+      : `<span class="badge-cargo"><i class="bi bi-arrow-up-right"></i>CARGO</span>`;
+    const montoHtml = esAbono
+      ? `<span style="color:#15803d;font-weight:700;font-family:monospace">${clp(c.monto)}</span>`
+      : `<span class="amt-cargo" style="font-family:monospace">-${clp(c.monto)}</span>`;
+    const { fecha } = dtParts(c.created_at);
+    return `<tr style="background:${esAbono?'#f0fdf4':'#fff5f5'}">
+      <td>${badge}</td>
+      <td><span class="trx-code" style="background:${esAbono?'#bbf7d0':'#fecaca'};color:${esAbono?'#14532d':'#7f1d1d'}">${trxFmt(c.numero_transaccion)}</span></td>
+      <td><a href="/creditos/revisar?id=${c.id_credito}" style="color:var(--navy);font-weight:600">${esc(c.numero_credito||c.id_credito)}</a></td>
+      <td style="font-size:.82rem">${esc(c.nombre_cliente||'—')}</td>
+      <td class="text-right">${montoHtml}</td>
+      <td style="font-size:.8rem;color:#374151">${esc(c.concepto||'—')}</td>
+      <td style="font-size:.78rem;color:#6b7280;white-space:nowrap">${fecha}</td>
+    </tr>`;
+  }).join('');
+
+  document.getElementById('tbodyCartola').innerHTML = rows;
 }
 
 /* ── exportar CSV ────────────────────────────────────────────────────────── */
