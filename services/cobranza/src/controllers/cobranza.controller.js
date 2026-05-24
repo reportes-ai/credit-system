@@ -45,65 +45,127 @@ function ok(res, data, status = 200) {
 function fail(res, error, status = 400) {
   return res.status(status).json({ success: false, data: null, error });
 }
-
 function hoyChile() {
   return new Date().toLocaleDateString('sv-SE', { timeZone: 'America/Santiago' });
 }
 
-// Query base para créditos en mora (excluye BROKERAGE)
-const MORA_BASE = `
-  SELECT c.*,
-    DATEDIFF(CURDATE(), MIN(pc.fecha_vencimiento)) AS dias_mora,
-    COUNT(pc.id_pago) AS cuotas_mora,
-    SUM(pc.monto_cuota) AS monto_mora
-  FROM creditos c
-  JOIN pagos_credito pc ON pc.id_credito = c.id_credito
-    AND pc.fecha_vencimiento < CURDATE()
-    AND pc.estado_pago != 'PAGADO'
-  WHERE c.estado = 'VIGENTE'
-    AND (c.empresa IS NULL OR c.empresa != 'BROKERAGE')
-  GROUP BY c.id_credito
-  HAVING dias_mora > 0
+// ─── Query base de mora ────────────────────────────────────────────────────────
+// pagos_credito solo almacena PAGOS REALIZADOS (no hay cuotas "pendientes").
+// La mora se calcula comparando:
+//   - cuotas_vencidas: las que debieron pagarse hasta hoy según schedule teórico
+//   - cuotas_pagadas:  las que efectivamente tienen pago registrado
+// Días de mora = días desde la fecha de la PRIMERA cuota no pagada.
+//
+// cuotas_vencidas usa TIMESTAMPDIFF(MONTH) + ajuste por día del mes:
+//   ej: primera_cuota=15-Abr, hoy=23-May → 1 mes completo + día(23)>=día(15) → 2 vencidas ✓
+//   ej: primera_cuota=15-Abr, hoy=10-May → 0 meses completos + día(10)<día(15) → 1 vencida ✓
+
+const MORA_SQL = (whereExtra = '', limitExtra = '') => `
+  SELECT
+    base.*,
+    GREATEST(0, base.cuotas_vencidas - base.cuotas_pagadas) AS cuotas_mora,
+    GREATEST(0, base.cuotas_vencidas - base.cuotas_pagadas) * base.cuota AS monto_mora,
+    CASE WHEN GREATEST(0, base.cuotas_vencidas - base.cuotas_pagadas) > 0
+      THEN DATEDIFF(CURDATE(),
+             DATE_ADD(base.fecha_primera_cuota,
+               INTERVAL base.cuotas_pagadas MONTH))
+      ELSE 0
+    END AS dias_mora
+  FROM (
+    SELECT
+      c.*,
+      CASE
+        WHEN c.fecha_primera_cuota IS NULL OR c.fecha_primera_cuota > CURDATE() THEN 0
+        ELSE LEAST(c.plazo,
+          TIMESTAMPDIFF(MONTH, c.fecha_primera_cuota, CURDATE()) +
+          CASE WHEN DAY(CURDATE()) >= DAY(c.fecha_primera_cuota) THEN 1 ELSE 0 END
+        )
+      END AS cuotas_vencidas,
+      COALESCE(pp.cnt, 0) AS cuotas_pagadas
+    FROM creditos c
+    LEFT JOIN (
+      SELECT id_credito, COUNT(DISTINCT numero_cuota) AS cnt
+      FROM pagos_credito
+      GROUP BY id_credito
+    ) pp ON pp.id_credito = c.id_credito
+    WHERE c.estado = 'VIGENTE'
+      AND (c.empresa IS NULL OR c.empresa != 'BROKERAGE')
+      AND c.fecha_primera_cuota IS NOT NULL
+      ${whereExtra}
+  ) base
+  WHERE GREATEST(0, base.cuotas_vencidas - base.cuotas_pagadas) > 0
+  ${limitExtra}
+`;
+
+// Versión para un solo crédito (por id)
+const MORA_CREDITO_SQL = `
+  SELECT
+    base.*,
+    GREATEST(0, base.cuotas_vencidas - base.cuotas_pagadas) AS cuotas_mora,
+    GREATEST(0, base.cuotas_vencidas - base.cuotas_pagadas) * base.cuota AS monto_mora,
+    CASE WHEN GREATEST(0, base.cuotas_vencidas - base.cuotas_pagadas) > 0
+      THEN DATEDIFF(CURDATE(),
+             DATE_ADD(base.fecha_primera_cuota,
+               INTERVAL base.cuotas_pagadas MONTH))
+      ELSE 0
+    END AS dias_mora
+  FROM (
+    SELECT
+      c.*,
+      CASE
+        WHEN c.fecha_primera_cuota IS NULL OR c.fecha_primera_cuota > CURDATE() THEN 0
+        ELSE LEAST(c.plazo,
+          TIMESTAMPDIFF(MONTH, c.fecha_primera_cuota, CURDATE()) +
+          CASE WHEN DAY(CURDATE()) >= DAY(c.fecha_primera_cuota) THEN 1 ELSE 0 END
+        )
+      END AS cuotas_vencidas,
+      COALESCE(pp.cnt, 0) AS cuotas_pagadas
+    FROM creditos c
+    LEFT JOIN (
+      SELECT id_credito, COUNT(DISTINCT numero_cuota) AS cnt
+      FROM pagos_credito
+      WHERE id_credito = ?
+      GROUP BY id_credito
+    ) pp ON pp.id_credito = c.id_credito
+    WHERE c.id_credito = ?
+  ) base
 `;
 
 function tramoLabel(dias) {
-  if (dias <= 15)  return '1-15';
-  if (dias <= 30)  return '16-30';
-  if (dias <= 60)  return '31-60';
-  if (dias <= 90)  return '61-90';
+  if (dias <= 15) return '1-15';
+  if (dias <= 30) return '16-30';
+  if (dias <= 60) return '31-60';
+  if (dias <= 90) return '61-90';
   return '91+';
 }
 
 // ─── dashboard ────────────────────────────────────────────────────────────────
 exports.dashboard = async (req, res) => {
   try {
-    const [rows] = await pool.query(MORA_BASE);
+    const [rows] = await pool.query(MORA_SQL());
 
-    const hoy = hoyChile();
-
-    // Obtener última gestión por crédito de esta semana
+    // Gestiones de esta semana por crédito
     const [gestSemana] = await pool.query(`
-      SELECT id_credito, canal, created_at
+      SELECT id_credito, canal
       FROM cobranza_gestiones
       WHERE YEARWEEK(created_at, 1) = YEARWEEK(CURDATE(), 1)
     `);
 
-    const gestionesPorCredito = {};
+    const gMap = {};
     for (const g of gestSemana) {
-      if (!gestionesPorCredito[g.id_credito]) gestionesPorCredito[g.id_credito] = [];
-      gestionesPorCredito[g.id_credito].push(g);
+      if (!gMap[g.id_credito]) gMap[g.id_credito] = { tels: 0, remotas: 0 };
+      if (g.canal === 'TELEFONICA' || g.canal === 'PRESENCIAL') gMap[g.id_credito].tels++;
+      else if (g.canal === 'REMOTA') gMap[g.id_credito].remotas++;
     }
 
     let prejudicial = { casos: 0, monto_mora: 0, requieren_accion: 0, alerta_15dias: 0 };
     let judicial    = { casos: 0, monto_mora: 0, requieren_accion: 0 };
 
     for (const c of rows) {
-      const dias = Number(c.dias_mora);
+      const dias  = Number(c.dias_mora);
       const monto = Number(c.monto_mora);
-      const gests = gestionesPorCredito[c.id_credito] || [];
-      const tels = gests.filter(g => g.canal === 'TELEFONICA' || g.canal === 'PRESENCIAL');
-      const remotas = gests.filter(g => g.canal === 'REMOTA');
-      const puedeActuar = tels.length < 1 || remotas.length < 2;
+      const g = gMap[c.id_credito] || { tels: 0, remotas: 0 };
+      const puedeActuar = g.tels < 1 || g.remotas < 2;
 
       if (dias <= 90) {
         prejudicial.casos++;
@@ -117,18 +179,12 @@ exports.dashboard = async (req, res) => {
       }
     }
 
-    // Mis créditos (asignados al usuario autenticado)
     const idUsuario = req.usuario.id_usuario;
-    const misRows = rows.filter(c => c.id_usuario === idUsuario);
-    const misGests = gestSemana.filter(g =>
-      misRows.some(c => c.id_credito === g.id_credito)
-    );
+    const misRows   = rows.filter(c => c.id_usuario === idUsuario);
     let misProximas = 0;
     for (const c of misRows) {
-      const gests = gestionesPorCredito[c.id_credito] || [];
-      const tels = gests.filter(g => g.canal === 'TELEFONICA' || g.canal === 'PRESENCIAL');
-      const remotas = gests.filter(g => g.canal === 'REMOTA');
-      if (tels.length < 1 || remotas.length < 2) misProximas++;
+      const g = gMap[c.id_credito] || { tels: 0, remotas: 0 };
+      if (g.tels < 1 || g.remotas < 2) misProximas++;
     }
 
     ok(res, {
@@ -151,95 +207,69 @@ exports.cartera = async (req, res) => {
     const { tipo = 'prejudicial', tramo, q, page = 1, limit = 30 } = req.query;
     const offset = (Number(page) - 1) * Number(limit);
 
-    // Filtro por tramo/tipo de mora
-    let havingExtra = '';
-    if (tipo === 'prejudicial') {
-      havingExtra = 'AND dias_mora BETWEEN 1 AND 90';
-    } else if (tipo === 'judicial') {
-      havingExtra = 'AND dias_mora > 90';
-    } else if (tipo === 'mis') {
-      havingExtra = `AND c.id_usuario = ${pool.escape(req.usuario.id_usuario).replace(/'/g, '')}`;
-    }
+    // Filtros adicionales a nivel del WHERE externo (sobre los campos calculados)
+    const havingFilters = [];
+    if (tipo === 'prejudicial') havingFilters.push('dias_mora BETWEEN 1 AND 90');
+    else if (tipo === 'judicial') havingFilters.push('dias_mora > 90');
 
-    if (tramo) {
-      if (tramo === '1-15')   havingExtra += ' AND dias_mora BETWEEN 1 AND 15';
-      else if (tramo === '16-30') havingExtra += ' AND dias_mora BETWEEN 16 AND 30';
-      else if (tramo === '31-60') havingExtra += ' AND dias_mora BETWEEN 31 AND 60';
-      else if (tramo === '61-90') havingExtra += ' AND dias_mora BETWEEN 61 AND 90';
-      else if (tramo === '91+')   havingExtra += ' AND dias_mora > 90';
-    }
+    if (tramo === '1-15')   havingFilters.push('dias_mora BETWEEN 1 AND 15');
+    else if (tramo === '16-30') havingFilters.push('dias_mora BETWEEN 16 AND 30');
+    else if (tramo === '31-60') havingFilters.push('dias_mora BETWEEN 31 AND 60');
+    else if (tramo === '61-90') havingFilters.push('dias_mora BETWEEN 61 AND 90');
+    else if (tramo === '91+')   havingFilters.push('dias_mora > 90');
 
-    let whereQ = '';
+    // Filtro por usuario (mis gestiones)
+    let whereCreditos = '';
+    if (tipo === 'mis') whereCreditos = `AND c.id_usuario = ${Number(req.usuario.id_usuario)}`;
+
+    // Filtro por búsqueda de texto
     const qParams = [];
+    let whereQ = '';
     if (q) {
       whereQ = 'AND (c.nombre_cliente LIKE ? OR c.rut_cliente LIKE ? OR c.numero_credito LIKE ?)';
       qParams.push(`%${q}%`, `%${q}%`, `%${q}%`);
     }
 
-    const misFiltro = tipo === 'mis'
-      ? `AND c.id_usuario = ${Number(req.usuario.id_usuario)}`
+    const havingWhere = havingFilters.length
+      ? 'AND ' + havingFilters.join(' AND ')
       : '';
 
     // Query conteo
     const countSql = `
       SELECT COUNT(*) AS total FROM (
-        SELECT c.id_credito,
-          DATEDIFF(CURDATE(), MIN(pc.fecha_vencimiento)) AS dias_mora
-        FROM creditos c
-        JOIN pagos_credito pc ON pc.id_credito = c.id_credito
-          AND pc.fecha_vencimiento < CURDATE()
-          AND pc.estado_pago != 'PAGADO'
-        WHERE c.estado = 'VIGENTE'
-          AND (c.empresa IS NULL OR c.empresa != 'BROKERAGE')
-          ${misFiltro}
-          ${whereQ}
-        GROUP BY c.id_credito
-        HAVING dias_mora > 0 ${havingExtra.replace(/AND c\.id_usuario[^A-Z]*/i, '')}
-      ) t
+        ${MORA_SQL(`${whereCreditos} ${whereQ}`)}
+      ) m
+      WHERE 1=1 ${havingWhere}
     `;
-
-    // Para el tipo mis, manejarlo diferente
-    let countParams = [...qParams];
-    const [[{ total }]] = await pool.query(countSql, countParams);
+    const [[{ total }]] = await pool.query(countSql, [...qParams]);
 
     // Query datos con última gestión
     const dataSql = `
-      SELECT c.*,
-        DATEDIFF(CURDATE(), MIN(pc.fecha_vencimiento)) AS dias_mora,
-        COUNT(pc.id_pago) AS cuotas_mora,
-        SUM(pc.monto_cuota) AS monto_mora,
+      SELECT m.*,
         ug.tipo_gestion AS ultima_tipo,
-        ug.resultado AS ultimo_resultado,
-        ug.created_at AS ultima_gestion_fecha,
+        ug.resultado    AS ultimo_resultado,
+        ug.created_at   AS ultima_gestion_fecha,
         ug.nombre_usuario AS ultimo_gestor
-      FROM creditos c
-      JOIN pagos_credito pc ON pc.id_credito = c.id_credito
-        AND pc.fecha_vencimiento < CURDATE()
-        AND pc.estado_pago != 'PAGADO'
+      FROM (
+        ${MORA_SQL(`${whereCreditos} ${whereQ}`)}
+      ) m
       LEFT JOIN (
         SELECT g1.*
         FROM cobranza_gestiones g1
         INNER JOIN (
           SELECT id_credito, MAX(created_at) AS max_fecha
-          FROM cobranza_gestiones
-          GROUP BY id_credito
+          FROM cobranza_gestiones GROUP BY id_credito
         ) g2 ON g1.id_credito = g2.id_credito AND g1.created_at = g2.max_fecha
-      ) ug ON ug.id_credito = c.id_credito
-      WHERE c.estado = 'VIGENTE'
-        AND (c.empresa IS NULL OR c.empresa != 'BROKERAGE')
-        ${misFiltro}
-        ${whereQ}
-      GROUP BY c.id_credito
-      HAVING dias_mora > 0 ${havingExtra.replace(/AND c\.id_usuario[^A-Z]*/i, '')}
+      ) ug ON ug.id_credito = m.id_credito
+      WHERE 1=1 ${havingWhere}
       ORDER BY dias_mora DESC
       LIMIT ? OFFSET ?
     `;
-
     const [rows] = await pool.query(dataSql, [...qParams, Number(limit), offset]);
 
-    // Obtener disponibilidad semanal para cada crédito
+    // Disponibilidad semanal
     const ids = rows.map(r => r.id_credito);
-    let gestionesSemana = [];
+    let gestMap = {};
     if (ids.length) {
       const [gs] = await pool.query(`
         SELECT id_credito, canal, created_at
@@ -247,42 +277,32 @@ exports.cartera = async (req, res) => {
         WHERE id_credito IN (?)
           AND YEARWEEK(created_at, 1) = YEARWEEK(CURDATE(), 1)
       `, [ids]);
-      gestionesSemana = gs;
-    }
-
-    const gestMap = {};
-    for (const g of gestionesSemana) {
-      if (!gestMap[g.id_credito]) gestMap[g.id_credito] = { tels: 0, remotas: [], ultimaRemota: null };
-      if (g.canal === 'TELEFONICA' || g.canal === 'PRESENCIAL') {
-        gestMap[g.id_credito].tels++;
-      } else if (g.canal === 'REMOTA') {
-        gestMap[g.id_credito].remotas.push(g.created_at);
-        if (!gestMap[g.id_credito].ultimaRemota || g.created_at > gestMap[g.id_credito].ultimaRemota) {
-          gestMap[g.id_credito].ultimaRemota = g.created_at;
+      for (const g of gs) {
+        if (!gestMap[g.id_credito]) gestMap[g.id_credito] = { tels: 0, remotas: [], ultimaRemota: null };
+        if (g.canal === 'TELEFONICA' || g.canal === 'PRESENCIAL') {
+          gestMap[g.id_credito].tels++;
+        } else if (g.canal === 'REMOTA') {
+          gestMap[g.id_credito].remotas.push(g.created_at);
+          if (!gestMap[g.id_credito].ultimaRemota || g.created_at > gestMap[g.id_credito].ultimaRemota) {
+            gestMap[g.id_credito].ultimaRemota = g.created_at;
+          }
         }
       }
     }
 
     const enriched = rows.map(r => {
       const g = gestMap[r.id_credito] || { tels: 0, remotas: [] };
-      const puede_llamar = g.tels < 1;
-      const puede_remota = g.remotas.length < 2;
       return {
         ...r,
         monto_mora: Math.round(Number(r.monto_mora)),
-        puede_llamar,
-        puede_remota,
+        puede_llamar: g.tels < 1,
+        puede_remota: g.remotas.length < 2,
         llamadas_semana: g.tels,
         remotas_semana: g.remotas.length
       };
     });
 
-    ok(res, {
-      rows: enriched,
-      total,
-      page: Number(page),
-      pages: Math.ceil(total / Number(limit))
-    });
+    ok(res, { rows: enriched, total, page: Number(page), pages: Math.ceil(total / Number(limit)) });
   } catch (err) {
     fail(res, err.message, 500);
   }
@@ -301,27 +321,25 @@ exports.disponibilidad = async (req, res) => {
       ORDER BY created_at ASC
     `, [id_credito]);
 
-    const telGests  = gests.filter(g => g.canal === 'TELEFONICA' || g.canal === 'PRESENCIAL');
-    const remGests  = gests.filter(g => g.canal === 'REMOTA');
+    const telGests = gests.filter(g => g.canal === 'TELEFONICA' || g.canal === 'PRESENCIAL');
+    const remGests = gests.filter(g => g.canal === 'REMOTA');
 
     const puede_llamar = telGests.length < 1;
-    const puede_remota = remGests.length < 2;
 
-    // Calcular próxima llamada disponible
-    // Si ya usó la llamada esta semana, disponible el próximo lunes
     const hoy = new Date(hoyChile());
-    const diaSemana = hoy.getDay(); // 0=dom, 1=lun...6=sab
+    const diaSemana = hoy.getDay();
     const diasHastaLunes = diaSemana === 0 ? 1 : 8 - diaSemana;
     const proximoLunes = new Date(hoy);
     proximoLunes.setDate(hoy.getDate() + diasHastaLunes);
 
-    let proxima_llamada_disponible = puede_llamar ? hoyChile() : proximoLunes.toISOString().slice(0, 10);
+    const proxima_llamada_disponible = puede_llamar
+      ? hoyChile()
+      : proximoLunes.toISOString().slice(0, 10);
 
-    // Próxima remota: si ya hizo 1 remota, necesita esperar 2 días desde la última
     let proxima_remota_disponible = hoyChile();
     let dias_para_proxima_remota = 0;
 
-    if (!puede_remota) {
+    if (remGests.length >= 2) {
       proxima_remota_disponible = proximoLunes.toISOString().slice(0, 10);
       dias_para_proxima_remota = diasHastaLunes;
     } else if (remGests.length === 1) {
@@ -331,13 +349,13 @@ exports.disponibilidad = async (req, res) => {
       const proxRemotaStr = proxRemota.toISOString().slice(0, 10);
       if (proxRemotaStr > hoyChile()) {
         proxima_remota_disponible = proxRemotaStr;
-        dias_para_proxima_remota = Math.ceil((proxRemota - hoy) / (1000 * 60 * 60 * 24));
+        dias_para_proxima_remota = Math.ceil((proxRemota - hoy) / 86400000);
       }
     }
 
     ok(res, {
       puede_llamar,
-      puede_remota: puede_remota && dias_para_proxima_remota === 0,
+      puede_remota: remGests.length < 2 && dias_para_proxima_remota === 0,
       remotas_esta_semana: remGests.length,
       llamadas_esta_semana: telGests.length,
       dias_para_proxima_remota,
@@ -354,29 +372,16 @@ exports.mensajes = async (req, res) => {
   try {
     const { id_credito } = req.params;
 
-    // Obtener datos del crédito con mora
-    const [[credito]] = await pool.query(`
-      SELECT c.*,
-        DATEDIFF(CURDATE(), MIN(pc.fecha_vencimiento)) AS dias_mora,
-        COUNT(pc.id_pago) AS cuotas_mora,
-        SUM(pc.monto_cuota) AS monto_mora
-      FROM creditos c
-      JOIN pagos_credito pc ON pc.id_credito = c.id_credito
-        AND pc.fecha_vencimiento < CURDATE()
-        AND pc.estado_pago != 'PAGADO'
-      WHERE c.id_credito = ?
-      GROUP BY c.id_credito
-    `, [id_credito]);
-
+    const [[credito]] = await pool.query(MORA_CREDITO_SQL, [id_credito, id_credito]);
     if (!credito) return fail(res, 'Crédito no encontrado', 404);
 
     const nombre  = credito.nombre_cliente || 'Cliente';
     const numero  = credito.numero_credito || credito.id_credito;
-    const cuotas  = credito.cuotas_mora || 0;
+    const cuotas  = Number(credito.cuotas_mora) || 0;
     const monto   = Math.round(Number(credito.monto_mora || 0)).toLocaleString('es-CL');
-    const dias    = credito.dias_mora || 0;
+    const dias    = Number(credito.dias_mora) || 0;
     const vehiculo = `${credito.marca || ''} ${credito.modelo || ''}`.trim() || 'su vehículo';
-    const patente = credito.patente ? ` (${credito.patente})` : '';
+    const patente  = credito.patente ? ` (${credito.patente})` : '';
 
     const whatsapp = `Estimado/a ${nombre}, le informamos que su crédito N° ${numero} presenta ${cuotas} cuota(s) impaga(s) con un total de $${monto} en mora hace ${dias} días. Para regularizar su situación contáctese con nosotros a la brevedad. AutoFácil.`;
 
@@ -425,37 +430,25 @@ exports.crearGestion = async (req, res) => {
     const remGests = gestsSemana.filter(g => g.canal === 'REMOTA');
 
     if ((canal === 'TELEFONICA' || canal === 'PRESENCIAL') && telGests.length >= 1) {
-      return fail(res, 'Límite semanal alcanzado: solo se permite 1 gestión telefónica o presencial por semana por crédito (Ley del Consumidor)');
+      return fail(res, 'Límite semanal alcanzado: solo se permite 1 gestión telefónica o presencial por semana (Ley del Consumidor)');
     }
-
     if (canal === 'REMOTA') {
       if (remGests.length >= 2) {
-        return fail(res, 'Límite semanal alcanzado: solo se permiten 2 gestiones remotas por semana por crédito (Ley del Consumidor)');
+        return fail(res, 'Límite semanal alcanzado: solo se permiten 2 gestiones remotas por semana (Ley del Consumidor)');
       }
       if (remGests.length === 1) {
         const ultimaRemota = new Date(remGests[0].created_at);
         const hoy = new Date(hoyChile());
-        const diffDias = Math.floor((hoy - ultimaRemota) / (1000 * 60 * 60 * 24));
+        const diffDias = Math.floor((hoy - ultimaRemota) / 86400000);
         if (diffDias < 2) {
-          return fail(res, `Debe esperar al menos 2 días entre gestiones remotas. Próxima disponible: ${new Date(ultimaRemota.getTime() + 2 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10)}`);
+          const proxFecha = new Date(ultimaRemota.getTime() + 2 * 86400000).toISOString().slice(0, 10);
+          return fail(res, `Debe esperar al menos 2 días entre gestiones remotas. Próxima disponible: ${proxFecha}`);
         }
       }
     }
 
-    // Obtener datos del crédito
-    const [[credito]] = await pool.query(`
-      SELECT c.*,
-        DATEDIFF(CURDATE(), MIN(pc.fecha_vencimiento)) AS dias_mora,
-        COUNT(pc.id_pago) AS cuotas_mora,
-        SUM(pc.monto_cuota) AS monto_mora
-      FROM creditos c
-      LEFT JOIN pagos_credito pc ON pc.id_credito = c.id_credito
-        AND pc.fecha_vencimiento < CURDATE()
-        AND pc.estado_pago != 'PAGADO'
-      WHERE c.id_credito = ?
-      GROUP BY c.id_credito
-    `, [id_credito]);
-
+    // Obtener datos actuales del crédito y su mora
+    const [[credito]] = await pool.query(MORA_CREDITO_SQL, [id_credito, id_credito]);
     if (!credito) return fail(res, 'Crédito no encontrado', 404);
 
     const u = req.usuario;
@@ -473,17 +466,15 @@ exports.crearGestion = async (req, res) => {
       credito.numero_credito,
       credito.rut_cliente,
       credito.nombre_cliente,
-      tipo_gestion,
-      canal,
-      credito.dias_mora || 0,
-      credito.cuotas_mora || 0,
+      tipo_gestion, canal,
+      Number(credito.dias_mora) || 0,
+      Number(credito.cuotas_mora) || 0,
       Math.round(Number(credito.monto_mora || 0)),
       mensaje || null,
       resultado || 'SIN_RESULTADO',
       fecha_promesa || null,
       monto_promesa || null,
-      u.id_usuario,
-      nombre_usuario
+      u.id_usuario, nombre_usuario
     ]);
 
     const [[gestion]] = await pool.query(
@@ -499,14 +490,9 @@ exports.crearGestion = async (req, res) => {
 exports.confirmarGestion = async (req, res) => {
   try {
     const { id } = req.params;
-    const [[g]] = await pool.query(
-      'SELECT * FROM cobranza_gestiones WHERE id_gestion = ?', [id]
-    );
+    const [[g]] = await pool.query('SELECT * FROM cobranza_gestiones WHERE id_gestion = ?', [id]);
     if (!g) return fail(res, 'Gestión no encontrada', 404);
-
-    await pool.query(
-      'UPDATE cobranza_gestiones SET confirmado = 1 WHERE id_gestion = ?', [id]
-    );
+    await pool.query('UPDATE cobranza_gestiones SET confirmado = 1 WHERE id_gestion = ?', [id]);
     ok(res, { id_gestion: Number(id), confirmado: 1 });
   } catch (err) {
     fail(res, err.message, 500);
@@ -516,12 +502,10 @@ exports.confirmarGestion = async (req, res) => {
 // ─── bitacora ─────────────────────────────────────────────────────────────────
 exports.bitacora = async (req, res) => {
   try {
-    const { id_credito } = req.params;
-    const [rows] = await pool.query(`
-      SELECT * FROM cobranza_gestiones
-      WHERE id_credito = ?
-      ORDER BY created_at DESC
-    `, [id_credito]);
+    const [rows] = await pool.query(
+      'SELECT * FROM cobranza_gestiones WHERE id_credito = ? ORDER BY created_at DESC',
+      [req.params.id_credito]
+    );
     ok(res, rows);
   } catch (err) {
     fail(res, err.message, 500);
@@ -532,64 +516,42 @@ exports.bitacora = async (req, res) => {
 exports.misGestiones = async (req, res) => {
   try {
     const { page = 1, limit = 30 } = req.query;
-    const offset = (Number(page) - 1) * Number(limit);
+    const offset   = (Number(page) - 1) * Number(limit);
     const idUsuario = req.usuario.id_usuario;
 
     // Créditos asignados al usuario en mora
-    const [misCreditos] = await pool.query(`
-      SELECT c.*,
-        DATEDIFF(CURDATE(), MIN(pc.fecha_vencimiento)) AS dias_mora,
-        COUNT(pc.id_pago) AS cuotas_mora,
-        SUM(pc.monto_cuota) AS monto_mora
-      FROM creditos c
-      JOIN pagos_credito pc ON pc.id_credito = c.id_credito
-        AND pc.fecha_vencimiento < CURDATE()
-        AND pc.estado_pago != 'PAGADO'
-      WHERE c.estado = 'VIGENTE'
-        AND (c.empresa IS NULL OR c.empresa != 'BROKERAGE')
-        AND c.id_usuario = ?
-      GROUP BY c.id_credito
-      HAVING dias_mora > 0
-      ORDER BY dias_mora DESC
-    `, [idUsuario]);
+    const [misCreditos] = await pool.query(
+      `${MORA_SQL(`AND c.id_usuario = ${Number(idUsuario)}`)} ORDER BY dias_mora DESC`
+    );
 
-    // Gestiones recientes (últimos 30 días)
+    // Gestiones recientes (30 días)
     const [[{ total }]] = await pool.query(
       'SELECT COUNT(*) AS total FROM cobranza_gestiones WHERE id_usuario = ? AND created_at >= DATE_SUB(NOW(), INTERVAL 30 DAY)',
       [idUsuario]
     );
-
     const [gestiones] = await pool.query(`
       SELECT * FROM cobranza_gestiones
-      WHERE id_usuario = ?
-        AND created_at >= DATE_SUB(NOW(), INTERVAL 30 DAY)
-      ORDER BY created_at DESC
-      LIMIT ? OFFSET ?
+      WHERE id_usuario = ? AND created_at >= DATE_SUB(NOW(), INTERVAL 30 DAY)
+      ORDER BY created_at DESC LIMIT ? OFFSET ?
     `, [idUsuario, Number(limit), offset]);
 
-    // Promesas de pago pendientes
+    // Promesas pendientes y vencidas
     const [promesas] = await pool.query(`
       SELECT g.*, c.numero_credito, c.nombre_cliente, c.rut_cliente
       FROM cobranza_gestiones g
       LEFT JOIN creditos c ON c.id_credito = g.id_credito
-      WHERE g.id_usuario = ?
-        AND g.resultado = 'PROMESA_PAGO'
-        AND g.fecha_promesa IS NOT NULL
-        AND g.fecha_promesa >= CURDATE()
+      WHERE g.id_usuario = ? AND g.resultado = 'PROMESA_PAGO'
+        AND g.fecha_promesa IS NOT NULL AND g.fecha_promesa >= CURDATE()
       ORDER BY g.fecha_promesa ASC
     `, [idUsuario]);
 
-    // Promesas vencidas
     const [promesasVencidas] = await pool.query(`
       SELECT g.*, c.numero_credito, c.nombre_cliente
       FROM cobranza_gestiones g
       LEFT JOIN creditos c ON c.id_credito = g.id_credito
-      WHERE g.id_usuario = ?
-        AND g.resultado = 'PROMESA_PAGO'
-        AND g.fecha_promesa IS NOT NULL
-        AND g.fecha_promesa < CURDATE()
-      ORDER BY g.fecha_promesa DESC
-      LIMIT 20
+      WHERE g.id_usuario = ? AND g.resultado = 'PROMESA_PAGO'
+        AND g.fecha_promesa IS NOT NULL AND g.fecha_promesa < CURDATE()
+      ORDER BY g.fecha_promesa DESC LIMIT 20
     `, [idUsuario]);
 
     ok(res, {
@@ -606,32 +568,19 @@ exports.misGestiones = async (req, res) => {
   }
 };
 
-// ─── provisiones ─────────────────────────────────────────────────────────────
+// ─── provisiones ──────────────────────────────────────────────────────────────
 exports.provisiones = async (req, res) => {
   try {
-    // Deuda total vigente (excluyendo BROKERAGE)
+    // Deuda total vigente (cartera AutoFácil)
     const [[{ deuda_total }]] = await pool.query(`
-      SELECT COALESCE(SUM(c.monto_financiado), 0) AS deuda_total
-      FROM creditos c
-      WHERE c.estado = 'VIGENTE'
-        AND (c.empresa IS NULL OR c.empresa != 'BROKERAGE')
+      SELECT COALESCE(SUM(monto_financiado), 0) AS deuda_total
+      FROM creditos
+      WHERE estado = 'VIGENTE'
+        AND (empresa IS NULL OR empresa != 'BROKERAGE')
     `);
 
-    // Mora por tramos
-    const [moraRows] = await pool.query(`
-      SELECT
-        DATEDIFF(CURDATE(), MIN(pc.fecha_vencimiento)) AS dias_mora,
-        SUM(pc.monto_cuota) AS monto_mora,
-        c.id_credito
-      FROM creditos c
-      JOIN pagos_credito pc ON pc.id_credito = c.id_credito
-        AND pc.fecha_vencimiento < CURDATE()
-        AND pc.estado_pago != 'PAGADO'
-      WHERE c.estado = 'VIGENTE'
-        AND (c.empresa IS NULL OR c.empresa != 'BROKERAGE')
-      GROUP BY c.id_credito
-      HAVING dias_mora > 0
-    `);
+    // Mora por crédito usando el cálculo correcto
+    const [moraRows] = await pool.query(MORA_SQL());
 
     const tramos = [
       { tramo: '1-15',  min: 1,  max: 15,  pct_provision: 1  },
