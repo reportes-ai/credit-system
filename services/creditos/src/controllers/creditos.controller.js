@@ -172,6 +172,7 @@ const getAll = async (req, res) => {
   try {
     const { q, estado } = req.query;
     let sql = `SELECT id_credito, numero_credito, rut_cliente, nombre_cliente,
+                      financiera, empresa,
                       estado, fecha_otorgamiento, valor_vehiculo, pie,
                       monto_financiado, plazo, tasa_mensual, cuota,
                       fecha_primera_cuota, tipo_vehiculo, marca, modelo,

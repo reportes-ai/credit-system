@@ -1129,8 +1129,8 @@ function aplicarFiltroEmpresa() {
   const lista = _empresasFiltro.size === 0
     ? _todosCreditos
     : _todosCreditos.filter(c => {
-        const fin = (c.financiera || c.empresa || '').toUpperCase();
-        return _empresasFiltro.has(fin);
+        const fin = (c.financiera || c.empresa || '').toUpperCase().replace(/[^A-Z]/g,'');
+        return [..._empresasFiltro].some(f => fin.includes(f.replace(/[^A-Z]/g,'')));
       });
   renderConsulta(lista);
 }
