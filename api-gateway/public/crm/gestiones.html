@@ -109,6 +109,13 @@
     .rut-valid   { border-color:#22c55e !important; box-shadow:0 0 0 2px rgba(34,197,94,.15) !important; }
     .rut-invalid { border-color:#dc2626 !important; box-shadow:0 0 0 2px rgba(220,38,38,.15) !important; }
     .rut-hint { font-size:.72rem; margin-top:3px; min-height:16px; }
+    .mini-gest-item { background:#f8fafc; border-left:3px solid #93c5fd; border-radius:0 6px 6px 0; padding:7px 10px; margin-bottom:5px; font-size:.78rem; }
+    .mini-gest-item .mg-fecha { color:#9ca3af; font-size:.7rem; }
+    .mini-gest-item .mg-tipo  { font-weight:600; color:#1e293b; }
+    .mini-gest-item .mg-res   { color:#6b7280; font-size:.72rem; }
+    .mini-gest-item.estado-CERRADO  { border-left-color:#86efac; }
+    .mini-gest-item.estado-PENDIENTE { border-left-color:#fde68a; }
+    .mini-gest-item.estado-ABIERTO  { border-left-color:#93c5fd; }
 
     /* PANEL DERECHO */
     .list-panel { overflow-y:auto; padding:20px; display:flex; flex-direction:column; gap:16px; }
@@ -246,9 +253,21 @@
       </div>
       <div class="rut-hint" id="rutHint"></div>
       <div id="clienteSeleccionado" style="display:none;margin-top:8px;background:#f0fdf4;border:1px solid #bbf7d0;border-radius:8px;padding:10px;font-size:.83rem;">
-        <strong id="cs-nombre"></strong><br>
-        <span style="color:#6b7280" id="cs-rut"></span>
-        <button onclick="limpiarCliente()" style="float:right;border:none;background:none;color:#dc2626;cursor:pointer;font-size:.75rem;">✕ Quitar</button>
+        <div style="display:flex;justify-content:space-between;align-items:flex-start">
+          <div>
+            <strong id="cs-nombre" style="font-size:.9rem"></strong>
+            <div style="color:#6b7280;font-size:.78rem;margin-top:2px" id="cs-rut"></div>
+            <div id="cs-credito" style="margin-top:4px;font-size:.76rem"></div>
+          </div>
+          <button onclick="limpiarCliente()" style="border:none;background:none;color:#dc2626;cursor:pointer;font-size:.75rem;flex-shrink:0">✕ Quitar</button>
+        </div>
+      </div>
+      <!-- Mini historial gestiones previas -->
+      <div id="miniHistorial" style="display:none;margin-top:10px">
+        <div style="font-size:.72rem;font-weight:700;text-transform:uppercase;letter-spacing:.6px;color:#6b7280;margin-bottom:6px">
+          <i class="bi bi-clock-history me-1"></i>Gestiones previas
+        </div>
+        <div id="miniHistorialBody"></div>
       </div>
       <input type="hidden" id="hRutCliente">
       <input type="hidden" id="hNombreCliente">
@@ -563,7 +582,7 @@ function onRutInput(el) {
 
   if (raw.length < 2) {
     hint.textContent = '';
-    buscarCliente('');
+    _limpiarInfoCliente();
     return;
   }
 
@@ -571,15 +590,114 @@ function onRutInput(el) {
   if (valido === true) {
     el.classList.add('rut-valid');
     hint.innerHTML = '<span style="color:#16a34a"><i class="bi bi-check-circle-fill"></i> RUT válido</span>';
-    buscarCliente(raw);   // buscar con el raw (sin puntos) para mayor compatibilidad
+    autoCompletarCliente(fmt);   // búsqueda automática completa con RUT formateado
   } else if (valido === false && raw.length >= 7) {
     el.classList.add('rut-invalid');
     hint.innerHTML = '<span style="color:#dc2626"><i class="bi bi-x-circle-fill"></i> Dígito verificador incorrecto</span>';
     document.getElementById('autocompleteList').style.display='none';
+    _limpiarInfoCliente();
   } else {
     hint.textContent = '';
-    buscarCliente(raw);
+    buscarCliente(raw);   // dropdown sugerencias mientras tipea
   }
+}
+
+// ─── Auto-completar cliente al RUT válido ────────────────────────────────────
+function _limpiarInfoCliente() {
+  document.getElementById('clienteSeleccionado').style.display='none';
+  document.getElementById('miniHistorial').style.display='none';
+  document.getElementById('autocompleteList').style.display='none';
+}
+
+let _autoTimer = null;
+async function autoCompletarCliente(rutFormateado) {
+  clearTimeout(_autoTimer);
+  _autoTimer = setTimeout(async () => {
+    const hdrs = { 'Authorization': 'Bearer ' + token };
+    try {
+      // 1. Buscar cliente + créditos + historial en paralelo
+      const [rCli, rCred, rHist] = await Promise.all([
+        fetch(`/api/clientes?q=${encodeURIComponent(rutFormateado)}&limit=5`, { headers: hdrs }),
+        fetch(`/api/creditos?q=${encodeURIComponent(rutFormateado)}`,         { headers: hdrs }),
+        fetch(`/api/crm/historial/${encodeURIComponent(rutFormateado)}`,      { headers: hdrs }),
+      ]);
+      const [jCli, jCred, jHist] = await Promise.all([rCli.json(), rCred.json(), rHist.json()]);
+
+      const clientes = jCli.data?.rows || jCli.data || [];
+      const creditos = jCred.success ? (jCred.data || []) : [];
+      const gestiones = jHist.success ? (jHist.data || []) : [];
+
+      // 2. Determinar tipo y datos del cliente
+      let nombre = '', rut = rutFormateado, idCredito = '';
+      if (clientes.length) {
+        const c = clientes[0];
+        nombre = `${c.nombre||''} ${c.apellido||''}`.trim();
+        rut    = c.rut_cliente || c.rut || rutFormateado;
+      }
+
+      // 3. Auto-detectar tipo_cliente
+      const creditosActivos    = creditos.filter(c => c.estado === 'VIGENTE' || c.estado === 'EN MORA');
+      const creditosTerminados = creditos.filter(c => ['CANCELADO','PREPAGADO','CASTIGADO'].includes(c.estado));
+
+      let tipoAuto = 'PROSPECTO';
+      if (creditosActivos.length)    { tipoAuto = 'ACTIVO';     idCredito = creditosActivos[0].id_credito; }
+      else if (creditosTerminados.length) { tipoAuto = 'EX_CLIENTE'; idCredito = creditosTerminados[0].id_credito; }
+      else if (clientes.length)      { tipoAuto = 'PROSPECTO'; }
+
+      // 4. Seleccionar tipo automáticamente
+      setTipoCliente(tipoAuto);
+
+      // 5. Mostrar card del cliente si existe
+      if (nombre || clientes.length) {
+        document.getElementById('hRutCliente').value    = rut;
+        document.getElementById('hNombreCliente').value = nombre;
+        document.getElementById('hIdCredito').value     = idCredito || '';
+        document.getElementById('cs-nombre').textContent = nombre || '(sin nombre)';
+        document.getElementById('cs-rut').textContent   = rut;
+
+        // Info crédito
+        const csCredEl = document.getElementById('cs-credito');
+        if (creditosActivos.length) {
+          const cr = creditosActivos[0];
+          csCredEl.innerHTML = `<span style="color:#166534;font-weight:600"><i class="bi bi-patch-check-fill me-1"></i>Crédito N° ${cr.numero_credito||cr.id_credito} — ${cr.estado}</span>`;
+        } else if (creditosTerminados.length) {
+          const cr = creditosTerminados[0];
+          csCredEl.innerHTML = `<span style="color:#6b21a8"><i class="bi bi-archive-fill me-1"></i>Crédito N° ${cr.numero_credito||cr.id_credito} — ${cr.estado}</span>`;
+        } else {
+          csCredEl.innerHTML = `<span style="color:#6b7280"><i class="bi bi-person-plus me-1"></i>Sin créditos registrados</span>`;
+        }
+
+        document.getElementById('clienteSeleccionado').style.display = '';
+        document.getElementById('autocompleteList').style.display    = 'none';
+      } else {
+        // No existe en sistema → prospecto
+        document.getElementById('clienteSeleccionado').style.display='none';
+      }
+
+      // 6. Mini historial de gestiones
+      const miniH = document.getElementById('miniHistorial');
+      const miniB = document.getElementById('miniHistorialBody');
+      if (gestiones.length) {
+        const ultimas = gestiones.slice(0, 5);
+        miniB.innerHTML = ultimas.map(g => {
+          const fecha = new Date(g.created_at).toLocaleString('es-CL',{
+            timeZone:'America/Santiago', day:'2-digit', month:'2-digit',
+            hour:'2-digit', minute:'2-digit'
+          });
+          return `<div class="mini-gest-item estado-${g.estado}">
+            <div class="mg-fecha">${fecha} · <strong>${g.estado}</strong></div>
+            <div class="mg-tipo">${g.tipo_solicitud}</div>
+            <div class="mg-res">${CANAL_LABELS[g.canal]||g.canal}${g.resultado ? ' · ' + g.resultado : ''}</div>
+          </div>`;
+        }).join('');
+        miniH.style.display = '';
+      } else {
+        miniB.innerHTML = '<div style="color:#9ca3af;font-size:.78rem;padding:6px 0">Sin gestiones previas</div>';
+        miniH.style.display = nombre ? '' : 'none';
+      }
+
+    } catch(e) { console.error('autoCompletarCliente:', e); }
+  }, 300);
 }
 
 // ─── Autocomplete RUT ─────────────────────────────────────────────────────────
