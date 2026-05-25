@@ -54,6 +54,9 @@ app.use('/api/cajas',                require('../../services/tesoreria/src/route
 app.use('/api/cierre-caja',          require('../../services/tesoreria/src/routes/cierre-caja.routes'));
 app.use('/api/cuentas-transitorias', require('../../services/tesoreria/src/routes/cuentas-transitorias.routes'));
 
+// Dashboard analytics
+app.use('/api/dashboard', require('../../services/dashboard/src/routes/dashboard.routes'));
+
 // CRM
 app.use('/api/crm', require('../../services/crm/src/routes/gestiones.routes'));
 
@@ -185,6 +188,9 @@ app.get(['/reporteria', '/reporteria/'], (req, res) =>
 
 app.get(['/politica', '/politica/'], (req, res) =>
   res.sendFile(path.join(__dirname, '../public/politica/index.html')));
+
+app.get(['/dashboard', '/dashboard/'], (req, res) =>
+  res.sendFile(path.join(__dirname, '../public/dashboard/index.html')));
 
 app.use((req, res) => res.status(404).json({ success: false, error: 'Ruta no encontrada' }));
 

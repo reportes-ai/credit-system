@@ -369,6 +369,9 @@ document.addEventListener('DOMContentLoaded', () => {
         <div class="af-menu-name">${yo?.nombre || ''} ${yo?.apellido || ''}</div>
         <div class="af-menu-perfil">${yo?.perfil || ''}</div>
       </div>
+      <button class="af-menu-item" onclick="window.location.href='/dashboard';document.getElementById('afUserMenu')?.remove()">
+        <i class="bi bi-bar-chart-line"></i> Dashboard Analytics
+      </button>
       <button class="af-menu-item" onclick="afOpenModal();document.getElementById('afUserMenu')?.remove()">
         <i class="bi bi-shield-lock"></i> Cambiar contraseña
       </button>
