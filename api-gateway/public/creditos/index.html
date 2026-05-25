@@ -91,6 +91,18 @@
     .tab-panel { display:none; }
     .tab-panel.active { display:block; }
 
+    /* ── Tabs internos de Condiciones del Crédito ── */
+    .cred-tabs { border-bottom:2px solid #e5e7eb; margin-bottom:18px; padding:0; list-style:none; display:flex; gap:0; }
+    .cred-tabs .ctab-btn { background:none; border:none; border-bottom:3px solid transparent;
+      padding:8px 20px; margin-bottom:-2px; font-size:.86rem; font-weight:600; color:#6b7280;
+      cursor:pointer; border-radius:0; transition:color .15s,border-color .15s; }
+    .cred-tabs .ctab-btn:hover { color:var(--navy); }
+    .cred-tabs .ctab-btn.active { color:var(--navy); border-bottom-color:var(--navy); font-weight:700; }
+    .cred-seg-row { display:flex; justify-content:space-between; padding:4px 0; font-size:.83rem; }
+    .cred-seg-row span:first-child { color:#6b7280; }
+    .cred-seg-row span:last-child { font-weight:600; font-family:monospace; }
+    .cred-seg-sep { border-top:1px solid #e5e7eb; margin:6px 0; }
+
     /* ── Cards ── */
     .form-card { background:#fff; border-radius:12px; padding:22px 24px; margin-bottom:16px; box-shadow:0 1px 5px rgba(0,0,0,.07); }
     .section-label { font-size:.75rem; font-weight:800; color:var(--blue); text-transform:uppercase; letter-spacing:.08em; margin-bottom:14px; display:flex; align-items:center; gap:7px; }
@@ -355,7 +367,7 @@
   <div class="topnav-left">
     <div class="topnav-brand">
       <a href="/"><img src="/img/logo.png" alt="AutoFácil" style="display:block"></a>
-      <span class="version-badge" id="versionBadge">v3.3</span>
+      <span class="version-badge" id="versionBadge">v3.4</span>
     </div>
       <div class="breadcrumb-nav">
         <a href="/">Inicio</a><span class="sep">›</span>
@@ -627,6 +639,15 @@
         </button>
       </div>
 
+      <!-- ── Tabs: Simulador / Seguros / Rentabilidades ── -->
+      <ul class="cred-tabs" id="credTabsNav">
+        <li><button class="ctab-btn active" data-ctab="simulador" onclick="credCambiarTab('simulador')"><i class="bi bi-calculator me-1"></i>Simulador</button></li>
+        <li><button class="ctab-btn" data-ctab="seguros"      onclick="credCambiarTab('seguros')"><i class="bi bi-shield-check me-1"></i>Seguros</button></li>
+        <li><button class="ctab-btn" data-ctab="rentabilidades" onclick="credCambiarTab('rentabilidades')"><i class="bi bi-graph-up-arrow me-1"></i>Rentabilidades</button></li>
+      </ul>
+
+      <!-- Tab: Simulador (contenido original) -->
+      <div id="credTab-simulador">
       <div class="row g-3">
         <!-- Columna izquierda: formulario simulación -->
         <div class="col-lg-7">
@@ -748,6 +769,95 @@
       <input type="hidden" id="iSeguros">
       <input type="hidden" id="iMontoFin">
       <input type="hidden" id="iCuota">
+      </div><!-- /credTab-simulador -->
+
+      <!-- Tab: Seguros -->
+      <div id="credTab-seguros" style="display:none">
+        <div class="table-responsive mb-3">
+          <table class="table table-bordered table-sm mb-0" style="font-size:.81rem">
+            <thead>
+              <tr style="background:#f0f4f8;font-size:.72rem">
+                <th>Plazo</th><th>DESG</th><th>RDH</th><th>CESANTÍA</th>
+                <th>DESG+RDH</th><th>DESG+CESA</th><th>RDH+CESA</th><th>DESG+RDH+CESA</th>
+              </tr>
+            </thead>
+            <tbody id="ciSegTableBody"></tbody>
+          </table>
+        </div>
+        <div style="background:#f8fafc;border:1px solid #e5e7eb;border-radius:10px;padding:16px">
+          <div style="font-size:.72rem;font-weight:800;text-transform:uppercase;color:#9ca3af;margin-bottom:12px">Cálculo de Seguros para Esta Operación</div>
+          <div class="row g-2">
+            <div class="col-md-6">
+              <div class="cred-seg-row"><span>Plazo seleccionado</span><span id="ciS2Plazo">—</span></div>
+              <div class="cred-seg-row"><span>Bracket aplicado</span><span id="ciS2Bracket">—</span></div>
+              <div class="cred-seg-row"><span>Combo seleccionado</span><span id="ciS2Combo">—</span></div>
+              <div class="cred-seg-row"><span>Base (Sub-Total Sin Seg.)</span><span id="ciS2Base">—</span></div>
+            </div>
+            <div class="col-md-6">
+              <div class="cred-seg-row"><span>Tasa neta aplicada</span><span id="ciS2TasaNeta">—</span></div>
+              <div class="cred-seg-row"><span>Total Seguros (neto)</span><span id="ciS2TotalSeguros">—</span></div>
+              <div class="cred-seg-sep"></div>
+              <div class="cred-seg-row"><span>Desgravamen (proporcional)</span><span id="ciS2Desg">—</span></div>
+              <div class="cred-seg-row"><span>RDH (proporcional)</span><span id="ciS2Rdh">—</span></div>
+              <div class="cred-seg-row"><span>Cesantía (proporcional)</span><span id="ciS2Cesa">—</span></div>
+              <div class="cred-seg-sep"></div>
+              <div class="cred-seg-row"><span>Factor AMBOS (comisión)</span><span id="ciS2Ambos">—</span></div>
+              <div class="cred-seg-row"><span>Ingreso por Seguros</span><span id="ciS2IngSeg">—</span></div>
+            </div>
+          </div>
+        </div>
+      </div><!-- /credTab-seguros -->
+
+      <!-- Tab: Rentabilidades -->
+      <div id="credTab-rentabilidades" style="display:none">
+        <div class="row g-2 mb-3">
+          <div class="col-sm-6 col-md-3">
+            <label class="form-label">Comisión Dealer $</label>
+            <input type="text" class="form-control" id="ciRcDealer" placeholder="$0" inputmode="numeric"
+              oninput="credPesoInput(this);credRenderRentabilidades()">
+          </div>
+          <div class="col-sm-6 col-md-3">
+            <label class="form-label">Comisión Patio $</label>
+            <input type="text" class="form-control" id="ciRcPatio" placeholder="$0" inputmode="numeric"
+              oninput="credPesoInput(this);credRenderRentabilidades()">
+          </div>
+          <div class="col-sm-6 col-md-3">
+            <label class="form-label">Comisión Ejecutivo [%]</label>
+            <input type="text" class="form-control" id="ciRcPctEjec" placeholder="0,00" inputmode="decimal"
+              oninput="credRenderRentabilidades()">
+          </div>
+          <div class="col-sm-6 col-md-3">
+            <label class="form-label">Comisión CORFO $</label>
+            <input type="text" class="form-control" id="ciRcCorfo" placeholder="$0" inputmode="numeric"
+              oninput="credPesoInput(this);credRenderRentabilidades()">
+          </div>
+          <div class="col-sm-6 col-md-3">
+            <label class="form-label">Costo de Fondo [%/mes]</label>
+            <input type="text" class="form-control" id="ciRcCostoFondo" placeholder="0,0000" inputmode="decimal"
+              oninput="credRenderRentabilidades()">
+          </div>
+          <div class="col-sm-6 col-md-3">
+            <label class="form-label">Tasa Propuesta [%]</label>
+            <input type="text" class="form-control" id="ciRcTasaProp" placeholder="mismo que simulador" inputmode="decimal"
+              oninput="credRenderRentabilidades()">
+          </div>
+        </div>
+        <div class="table-responsive">
+          <table class="table table-bordered mb-0" style="font-size:.82rem">
+            <thead>
+              <tr>
+                <th style="min-width:200px">Concepto</th>
+                <th class="text-center text-white" style="min-width:130px;background:#1e40af">NORMAL</th>
+                <th class="text-center text-white" style="min-width:160px;background:#0ea5e9">PROPUESTO</th>
+                <th class="text-center text-white" style="min-width:130px;background:#1e3a8a">UAC</th>
+              </tr>
+            </thead>
+            <tbody id="ciRentTableBody">
+              <tr><td colspan="4" class="text-center py-4 text-muted">Completa el simulador para ver la rentabilidad.</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div><!-- /credTab-rentabilidades -->
 
       <hr class="section-divider">
       <div class="row g-2">
@@ -1544,6 +1654,11 @@ async function credCargarParams() {
       credTasas.menor = parseFloat(jT.data.tasa_mensual_menor) || 0;
       credTasas.mayor = parseFloat(jT.data.tasa_mensual_mayor) || 0;
     }
+    // Pre-cargar parámetros en inputs rentabilidades
+    const elCF = document.getElementById('ciRcCostoFondo');
+    if (elCF && !elCF.value) elCF.value = (credParams.costo_fondo||0).toFixed(4).replace('.',',');
+    const elPE = document.getElementById('ciRcPctEjec');
+    if (elPE && !elPE.value) elPE.value = (credParams.pct_ejecutivo||0).toFixed(2).replace('.',',');
     credActualizarGastos();
     credRecalcular();
   } catch(e) {}
@@ -1666,7 +1781,9 @@ function credCalc(p) {
   const cuota = credPmt(tasaD, p.plazo, capitalAjustado);
   const totalPagado = cuota * p.plazo;
   const cae = credCAE(saldoPrecio, cuota, p.plazo);
-  return { saldoPrecio, gastosOp, subSin, segDesg, segRdh, segCesa, totalSeguros, subCon, montoFin, cuota, totalPagado, cae };
+  const ambosFactor = credAmbosFactor ? credAmbosFactor(p.plazo) : 1.173526;
+  return { saldoPrecio, gastosOp, subSin, segDesg, segRdh, segCesa, totalSeguros, subCon, montoFin,
+           cuota, totalPagado, cae, pb, rates, combo: key, ambosFactor };
 }
 
 function credRecalcular() {
@@ -1690,7 +1807,8 @@ function credRecalcular() {
     ['iGastosOp','iSeguros','iMontoFin','iCuota'].forEach(id => { const el=document.getElementById(id); if(el) el.value=''; });
     return;
   }
-  const r = credCalc(p);
+  const r = credCalcFull ? credCalcFull(credLeerInputsFull ? credLeerInputsFull() : p) : credCalc(p);
+  _credLastResult = { r, p };
   const f = credFmtP;
   document.getElementById('rCCSaldoPrecio').textContent = f(r.saldoPrecio);
   document.getElementById('rCCGastos').textContent      = f(r.gastosOp);
@@ -1708,9 +1826,226 @@ function credRecalcular() {
   document.getElementById('iSeguros').value  = Math.round(r.totalSeguros);
   document.getElementById('iMontoFin').value = Math.round(r.montoFin);
   document.getElementById('iCuota').value    = Math.round(r.cuota);
+  // Actualizar pestaña activa si corresponde
+  if (credCurrentTab === 'seguros')        credRenderSegurosTab(r, p);
+  if (credCurrentTab === 'rentabilidades') credRenderRentabilidades();
 }
 
 function credCalcular() { credRecalcular(); }
+
+/* ════════════════════════════════════════════════════════════════════
+   TABS INTERNOS (Simulador / Seguros / Rentabilidades)
+════════════════════════════════════════════════════════════════════ */
+let credCurrentTab = 'simulador';
+
+function credCambiarTab(tab) {
+  credCurrentTab = tab;
+  document.querySelectorAll('#credTabsNav .ctab-btn').forEach(b =>
+    b.classList.toggle('active', b.dataset.ctab === tab));
+  ['simulador','seguros','rentabilidades'].forEach(t => {
+    const el = document.getElementById('credTab-' + t);
+    if (el) el.style.display = t === tab ? '' : 'none';
+  });
+  if (tab === 'seguros') {
+    credBuildSegTable();
+    if (_credLastResult) credRenderSegurosTab(_credLastResult.r, _credLastResult.p);
+  }
+  if (tab === 'rentabilidades') {
+    credRenderRentabilidades();
+  }
+}
+
+/* ── Datos de display seguros (igual que cotizaciones) ── */
+const CRED_SEG_DISPLAY = [
+  [6,  0.898,  0.675,  3.616,  1.585,  4.581,  4.341,  5.319 ],
+  [12, 1.864,  1.163,  3.788,  3.072,  5.798,  5.042,  7.101 ],
+  [24, 2.754,  1.225,  4.210,  4.047,  7.204,  5.541,  8.613 ],
+  [36, 3.552,  1.276,  4.712,  4.921,  8.613,  6.112,  10.120],
+  [48, 4.362,  2.902,  5.285,  7.527,  10.132, 8.507,  13.662],
+  [72, 5.496,  3.488,  5.899,  9.385,  12.083, 9.818,  16.482],
+];
+
+function credBuildSegTable() {
+  const tbody = document.getElementById('ciSegTableBody');
+  if (!tbody || tbody.children.length) return;
+  tbody.innerHTML = CRED_SEG_DISPLAY.map(([pz,d,rdh,c,dr,dc,rc,drc]) => `
+    <tr>
+      <td><strong>${pz}</strong></td>
+      <td>${d.toFixed(3)}%</td><td>${rdh.toFixed(3)}%</td><td>${c.toFixed(3)}%</td>
+      <td>${dr.toFixed(3)}%</td><td>${dc.toFixed(3)}%</td>
+      <td>${rc.toFixed(3)}%</td><td>${drc.toFixed(3)}%</td>
+    </tr>`).join('');
+}
+
+function credAmbosFactor(plazo) {
+  if (plazo <= 12) return 1.15163;
+  if (plazo <= 24) return 1.154908;
+  if (plazo <= 36) return 1.166801;
+  return 1.173526;
+}
+function credPvf(r, n, p) {
+  if (Math.abs(r) < 1e-10) return p * n;
+  return p * (1 - Math.pow(1 + r, -n)) / r;
+}
+function credParseTasa(s) {
+  if (!s) return 0;
+  return parseFloat(String(s).replace(/%/g,'').replace(',','.')) || 0;
+}
+function credComboLabel(d, r, c) {
+  const parts = [];
+  if (d) parts.push('Desgravamen'); if (r) parts.push('RDH'); if (c) parts.push('Cesantía');
+  return parts.length ? parts.join(' + ') : 'Ninguno';
+}
+function credPctf(n, dec=2) {
+  if (n == null || isNaN(n)) return '—';
+  return n.toFixed(dec).replace('.', ',') + '%';
+}
+
+/* Resultado completo incluyendo rentabilidad */
+function credCalcFull(p) {
+  const base = credCalc(p);
+  const tasaD = p.tasa / 100;
+  const costoFondoD = (p.costoFondo || 0) / 100;
+  const ambosFactor = credAmbosFactor(p.plazo);
+  const capitalAjustado = base.montoFin + base.montoFin * tasaD * ((p.diasPrimeraCuota||30)-30) / 30;
+  const ingTasa    = costoFondoD > 0 ? credPvf(costoFondoD, p.plazo, base.cuota) - base.montoFin : 0;
+  const ingSeguros = p.chkD ? base.segDesg * ambosFactor : 0;
+  const totalIngresos = ingTasa + ingSeguros;
+  const comEjecutivo  = base.saldoPrecio * ((p.pctEjec||0) / 100);
+  const totalCostos   = (p.dealer||0) + (p.patio||0) + comEjecutivo + (p.corfo||0) + (p.bono||0);
+  const rentabilidad  = totalIngresos - totalCostos;
+  const pb            = credPlazoBracket(p.plazo);
+  const rates         = CRED_SEG_RATES[pb] || CRED_SEG_RATES[72];
+  return {
+    ...base,
+    ingTasa, ingSeguros, totalIngresos,
+    comEjecutivo, totalCostos, rentabilidad,
+    pctMonto:    base.montoFin > 0   ? (rentabilidad / base.montoFin)   * 100 : 0,
+    pctVehiculo: p.valorVehiculo > 0 ? (rentabilidad / p.valorVehiculo) * 100 : 0,
+    pb, rates, ambosFactor,
+  };
+}
+
+let _credLastResult = null;
+
+function credRenderSegurosTab(r, p) {
+  credBuildSegTable();
+  const tbody = document.getElementById('ciSegTableBody');
+  if (tbody) {
+    Array.from(tbody.rows).forEach(row => {
+      const b = parseInt(row.cells[0].textContent);
+      row.style.background = b === r.pb ? '#dbeafe' : '';
+      row.style.fontWeight = b === r.pb ? '700' : '';
+    });
+  }
+  const sEl = id => { const el=document.getElementById(id); if(el) el.textContent=id; };
+  const set = (id, val) => { const el=document.getElementById(id); if(el) el.textContent=val; };
+  const comboRate = (r.combo && r.rates) ? (r.rates[r.combo]||0) : 0;
+  set('ciS2Plazo',        p.plazo + ' meses');
+  set('ciS2Bracket',      r.pb + ' meses');
+  set('ciS2Combo',        credComboLabel(p.chkD, p.chkR, p.chkC));
+  set('ciS2Base',         credFmtP(r.subSin));
+  set('ciS2TasaNeta',     credPctf(comboRate * 100, 4));
+  set('ciS2TotalSeguros', credFmtP(r.totalSeguros));
+  set('ciS2Desg',         p.chkD ? credFmtP(r.segDesg) : '—');
+  set('ciS2Rdh',          p.chkR ? credFmtP(r.segRdh)  : '—');
+  set('ciS2Cesa',         p.chkC ? credFmtP(r.segCesa) : '—');
+  set('ciS2Ambos',        r.ambosFactor ? r.ambosFactor.toFixed(6) : '—');
+  set('ciS2IngSeg',       credFmtP(r.ingSeguros));
+}
+
+function credLeerInputsFull() {
+  const base = credLeerInputs();
+  return {
+    ...base,
+    costoFondo: credParseTasa(document.getElementById('ciRcCostoFondo')?.value) || (credParams.costo_fondo || 0),
+    pctEjec:    credParseTasa(document.getElementById('ciRcPctEjec')?.value)    || (credParams.pct_ejecutivo || 0),
+    dealer:     parseInt((document.getElementById('ciRcDealer')?.value||'').replace(/\D/g,'')) || 0,
+    patio:      parseInt((document.getElementById('ciRcPatio')?.value||'').replace(/\D/g,''))  || 0,
+    corfo:      parseInt((document.getElementById('ciRcCorfo')?.value||'').replace(/\D/g,''))  || 0,
+  };
+}
+
+function credRenderRentabilidades() {
+  const p = credLeerInputsFull();
+  if (!p.valorVehiculo && !p.pie) return;
+  const normal = credCalcFull(p);
+
+  const tasaRawProp = (document.getElementById('ciRcTasaProp')?.value||'').replace('%','').replace(',','.');
+  const tasaProp = parseFloat(tasaRawProp) || p.tasa;
+  const propuesto = credCalcFull({ ...p, tasa: tasaProp });
+
+  const uac = credCalcFull({
+    ...p,
+    tasa: credTasas.mayor || p.tasa,
+    chkD: false, chkR: false, chkC: false,
+    prenda: 0, limitacion: 0, inscripcion: 0,
+  });
+
+  const f = credFmtP;
+  function pctf2(n) { return credPctf(n, 2); }
+  function pctf4(n) { return credPctf(n, 4); }
+  function rentBg(v) { return v >= 0 ? 'background:#d1fae5' : 'background:#fee2e2'; }
+  function rentCl(v) { return v >= 0 ? 'color:#065f46;font-weight:800' : 'color:#7f1d1d;font-weight:800'; }
+
+  const rows = [
+    { section: 'SUPUESTOS' },
+    { label:'Tasa Mensual',   v:[pctf4(p.tasa),     null,         pctf4(credTasas.mayor||p.tasa)], propInput:true },
+    { label:'Costo de Fondo', v:[pctf4(p.costoFondo), pctf4(p.costoFondo), pctf4(p.costoFondo)] },
+    { label:'Seguros',        v:[(p.chkD||p.chkR||p.chkC)?'Sí':'No', (p.chkD||p.chkR||p.chkC)?'Sí':'No', 'No'] },
+    { label:'G. Notariales',  v:[(p.prenda||p.limitacion||p.inscripcion)?'Sí':'No', (p.prenda||p.limitacion||p.inscripcion)?'Sí':'No', 'No'] },
+    { section: 'OPERACIÓN' },
+    { label:'Monto a Financiar', v:[f(normal.montoFin),    f(propuesto.montoFin),    f(uac.montoFin)] },
+    { label:'Cuota Mensual',     v:[f(normal.cuota),       f(propuesto.cuota),       f(uac.cuota)],    bold:true },
+    { label:'Total a Pagar',     v:[f(normal.totalPagado), f(propuesto.totalPagado), f(uac.totalPagado)] },
+    { section: 'RENTABILIDAD' },
+    { label:'Ingreso por Tasa',    v:[f(normal.ingTasa),     f(propuesto.ingTasa),     f(uac.ingTasa)] },
+    { label:'Ingreso por Seguros', v:[f(normal.ingSeguros),  f(propuesto.ingSeguros),  f(uac.ingSeguros)] },
+    { label:'Total Ingresos',      v:[f(normal.totalIngresos),f(propuesto.totalIngresos),f(uac.totalIngresos)], bold:true },
+    { label:'Comisión Dealer',     v:[f(p.dealer), f(p.dealer), f(p.dealer)] },
+    { label:'Comisión Patio',      v:[f(p.patio),  f(p.patio),  f(p.patio)] },
+    { label:'Comisión Ejecutivo',  v:[f(normal.comEjecutivo), f(propuesto.comEjecutivo), f(uac.comEjecutivo)] },
+    { label:'Comisión CORFO',      v:[f(p.corfo), f(p.corfo), f(p.corfo)] },
+    { label:'Total Costos',        v:[f(normal.totalCostos), f(propuesto.totalCostos), f(uac.totalCostos)], bold:true },
+    { label:'RENTABILIDAD',
+      v:[f(normal.rentabilidad), f(propuesto.rentabilidad), f(uac.rentabilidad)],
+      rentRow:[normal.rentabilidad, propuesto.rentabilidad, uac.rentabilidad] },
+    { label:'% sobre Monto',    v:[pctf2(normal.pctMonto),    pctf2(propuesto.pctMonto),    pctf2(uac.pctMonto)] },
+    { label:'% sobre Vehículo', v:[pctf2(normal.pctVehiculo), pctf2(propuesto.pctVehiculo), pctf2(uac.pctVehiculo)] },
+  ];
+
+  const tbody = document.getElementById('ciRentTableBody');
+  if (!tbody) return;
+  tbody.innerHTML = rows.map(row => {
+    if (row.section) return `<tr style="background:#f0f4f8"><td colspan="4" style="padding:7px 12px;font-size:.75rem;font-weight:800;color:#6b7280;text-transform:uppercase;letter-spacing:.05em">── ${row.section} ──</td></tr>`;
+    if (row.rentRow) {
+      const [rn,rp,ru] = row.rentRow;
+      return `<tr>
+        <td style="font-weight:800">${row.label}</td>
+        <td class="text-center" style="${rentBg(rn)};${rentCl(rn)}">${row.v[0]}</td>
+        <td class="text-center" style="${rentBg(rp)};${rentCl(rp)}">${row.v[1]}</td>
+        <td class="text-center" style="${rentBg(ru)};${rentCl(ru)}">${row.v[2]}</td>
+      </tr>`;
+    }
+    if (row.propInput) {
+      return `<tr>
+        <td>${row.label}</td>
+        <td class="text-center">${row.v[0]}</td>
+        <td class="text-center"><input type="text" id="ciRcTasaProp" value="${credPctf(tasaProp,4)}"
+          style="width:90px;border-radius:6px;border:1.5px solid #d1d5db;padding:3px 6px;font-size:.82rem"
+          inputmode="decimal" oninput="credRenderRentabilidades()"></td>
+        <td class="text-center">${row.v[2]}</td>
+      </tr>`;
+    }
+    const bld = row.bold ? 'font-weight:700' : '';
+    return `<tr>
+      <td style="${bld}">${row.label}</td>
+      <td class="text-center" style="${bld}">${row.v[0]}</td>
+      <td class="text-center" style="${bld}">${row.v[1]}</td>
+      <td class="text-center" style="${bld}">${row.v[2]}</td>
+    </tr>`;
+  }).join('');
+}
 
 function credLimpiarFinanciero() {
   ['iValorVehiculo','iPie','iBonoFin','iFechaPrimeraCuota'].forEach(id => {
