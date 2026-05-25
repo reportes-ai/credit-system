@@ -7,96 +7,598 @@
   <title>Crear Campaña — AutoFácil</title>
   <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
   <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.0/font/bootstrap-icons.css" rel="stylesheet">
+  <!-- SheetJS para leer Excel -->
+  <script src="https://cdn.sheetjs.com/xlsx-0.20.1/package/dist/xlsx.full.min.js"></script>
   <style>
-    :root { --navy: #0141A2; --navy-dark: #012d70; --navy-light: #0255c5; --accent: #009AFE; --bg: #f0f4f8; }
-    body { background: var(--bg); font-family: 'Segoe UI', system-ui, sans-serif; margin: 0; min-height: 100vh; }
-    .topnav { background: linear-gradient(90deg, var(--navy-dark), var(--navy-light)); color: #fff; height: 60px; padding: 0 24px; display: flex; align-items: center; justify-content: space-between; position: sticky; top: 0; z-index: 200; box-shadow: 0 2px 8px rgba(0,0,0,0.3); }
-    .topnav-left { display: flex; align-items: center; gap: 16px; }
-    .topnav-brand { display: flex; align-items: center; gap: 8px; text-decoration: none; }
-    .topnav-brand img { height: 32px; filter: brightness(0) invert(1); }
-    .version-badge { background: rgba(255,255,255,0.15); color: rgba(255,255,255,0.75); font-size: 0.65rem; font-weight: 700; border-radius: 6px; padding: 2px 8px; }
-    .breadcrumb-nav { color: rgba(255,255,255,0.6); font-size: 0.85rem; display: flex; align-items: center; gap: 6px; }
-    .breadcrumb-nav a { color: rgba(255,255,255,0.75); text-decoration: none; }
-    .breadcrumb-nav a:hover { color: #fff; }
-    .breadcrumb-nav .sep { color: rgba(255,255,255,0.35); }
-    .topnav-right { display: flex; align-items: center; gap: 10px; }
-    .user-chip { background: rgba(255,255,255,0.12); border-radius: 24px; padding: 5px 12px; display: flex; align-items: center; gap: 8px; font-size: 0.85rem; }
-    .avatar { width: 28px; height: 28px; background: #90caf9; border-radius: 50%; display: flex; align-items: center; justify-content: center; color: var(--navy); font-weight: 700; font-size: 0.75rem; }
-    .perfil-badge { background: rgba(144,202,249,0.2); border: 1px solid rgba(144,202,249,0.4); color: #90caf9; border-radius: 12px; padding: 2px 10px; font-size: 0.73rem; font-weight: 600; }
-    .btn-logout { background: rgba(255,255,255,0.1); border: 1px solid rgba(255,255,255,0.2); color: #fff; border-radius: 8px; padding: 5px 12px; font-size: 0.82rem; cursor: pointer; }
-    .btn-logout:hover { background: rgba(255,255,255,0.2); }
-    .page-content { padding: 32px 40px; max-width: 900px; margin: 0 auto; }
-    .page-banner { background: linear-gradient(135deg, #78350f, #b45309 50%, #d97706); border-radius: 16px; color: #fff; padding: 24px 32px; margin-bottom: 28px; display: flex; align-items: center; gap: 18px; }
-    .page-banner > i { font-size: 2.6rem; opacity: 0.85; }
-    .page-banner h2 { font-weight: 700; margin: 0 0 3px; font-size: 1.3rem; }
-    .page-banner p { opacity: 0.8; margin: 0; font-size: 0.88rem; }
-    .card { border: none; border-radius: 12px; box-shadow: 0 1px 4px rgba(0,0,0,0.07); }
-    .card-body { padding: 24px 28px; }
-    .section-title { font-weight: 700; font-size: .88rem; color: #374151; text-transform: uppercase; letter-spacing: .5px; margin-bottom: 16px; display: flex; align-items: center; gap: 8px; }
-    .section-title i { color: var(--navy); }
-    .form-label { font-weight: 600; font-size: 0.82rem; color: #374151; }
-    .form-control, .form-select { border-radius: 8px; border: 1.5px solid #d1d5db; font-size: 0.88rem; }
-    .form-control:focus, .form-select:focus { border-color: var(--navy); box-shadow: 0 0 0 3px rgba(26,35,126,0.1); }
-    .btn-primary { background: var(--navy); border-color: var(--navy); font-weight: 600; }
-    .btn-primary:hover { background: var(--accent); border-color: var(--accent); }
-    .coming-box { background: #fff; border-radius: 16px; padding: 60px 40px; text-align: center; box-shadow: 0 1px 4px rgba(0,0,0,.07); }
-    .coming-box i { font-size: 4rem; color: var(--navy); opacity: .15; margin-bottom: 20px; display: block; }
-    .coming-box h4 { font-weight: 700; color: #1e293b; margin-bottom: 8px; }
-    .coming-box p { color: #6b7280; font-size: .9rem; margin-bottom: 0; }
+    :root { --navy:#0141A2; --navy-dark:#012d70; --navy-light:#0255c5; --accent:#009AFE; --bg:#f0f4f8; }
+    body { background:var(--bg); font-family:'Segoe UI',system-ui,sans-serif; margin:0; min-height:100vh; }
+
+    /* NAV */
+    .topnav { background:linear-gradient(90deg,var(--navy-dark),var(--navy-light)); color:#fff; height:60px; padding:0 24px; display:flex; align-items:center; justify-content:space-between; position:sticky; top:0; z-index:200; box-shadow:0 2px 8px rgba(0,0,0,.3); }
+    .topnav-left { display:flex; align-items:center; gap:16px; }
+    .topnav-brand { display:flex; align-items:center; gap:8px; text-decoration:none; }
+    .topnav-brand img { height:32px; filter:brightness(0) invert(1); }
+    .version-badge { background:rgba(255,255,255,.15); color:rgba(255,255,255,.75); font-size:.65rem; font-weight:700; border-radius:6px; padding:2px 8px; }
+    .breadcrumb-nav { color:rgba(255,255,255,.6); font-size:.85rem; display:flex; align-items:center; gap:6px; }
+    .breadcrumb-nav a { color:rgba(255,255,255,.75); text-decoration:none; }
+    .breadcrumb-nav a:hover { color:#fff; }
+    .breadcrumb-nav .sep { color:rgba(255,255,255,.35); }
+    .topnav-right { display:flex; align-items:center; gap:10px; }
+    .user-chip { background:rgba(255,255,255,.12); border-radius:24px; padding:5px 12px; display:flex; align-items:center; gap:8px; font-size:.85rem; }
+    .avatar { width:28px; height:28px; background:#90caf9; border-radius:50%; display:flex; align-items:center; justify-content:center; color:var(--navy); font-weight:700; font-size:.75rem; }
+    .perfil-badge { background:rgba(144,202,249,.2); border:1px solid rgba(144,202,249,.4); color:#90caf9; border-radius:12px; padding:2px 10px; font-size:.73rem; font-weight:600; }
+    .btn-logout { background:rgba(255,255,255,.1); border:1px solid rgba(255,255,255,.2); color:#fff; border-radius:8px; padding:5px 12px; font-size:.82rem; cursor:pointer; }
+    .btn-logout:hover { background:rgba(255,255,255,.2); }
+
+    /* LAYOUT */
+    .page-content { padding:28px 36px; max-width:1100px; margin:0 auto; }
+    .page-banner { background:linear-gradient(135deg,#78350f,#b45309 50%,#d97706); border-radius:16px; color:#fff; padding:22px 30px; margin-bottom:24px; display:flex; align-items:center; gap:18px; }
+    .page-banner > i { font-size:2.4rem; opacity:.85; }
+    .page-banner h2 { font-weight:700; margin:0 0 3px; font-size:1.25rem; }
+    .page-banner p { opacity:.8; margin:0; font-size:.88rem; }
+
+    /* CARDS */
+    .sec-card { background:#fff; border-radius:14px; box-shadow:0 1px 5px rgba(0,0,0,.07); margin-bottom:22px; overflow:hidden; }
+    .sec-header { padding:14px 22px; font-weight:700; font-size:.88rem; color:#1e293b; display:flex; align-items:center; gap:10px; background:#f8fafc; border-bottom:1.5px solid #e5e7eb; }
+    .sec-header i { color:var(--navy); font-size:1.05rem; }
+    .sec-header .sec-num { background:var(--navy); color:#fff; border-radius:50%; width:22px; height:22px; display:flex; align-items:center; justify-content:center; font-size:.72rem; font-weight:700; flex-shrink:0; }
+    .sec-body { padding:22px; }
+
+    /* FORM */
+    .form-label { font-weight:600; font-size:.82rem; color:#374151; margin-bottom:5px; }
+    .form-control, .form-select { border-radius:8px; border:1.5px solid #d1d5db; font-size:.88rem; }
+    .form-control:focus, .form-select:focus { border-color:var(--navy); box-shadow:0 0 0 3px rgba(1,65,162,.1); }
+
+    /* DÍAS */
+    .dias-grid { display:flex; gap:8px; flex-wrap:wrap; }
+    .dia-btn { width:42px; height:42px; border-radius:10px; border:1.5px solid #d1d5db; background:#f9fafb; cursor:pointer; font-size:.8rem; font-weight:700; color:#6b7280; display:flex; align-items:center; justify-content:center; transition:all .15s; user-select:none; }
+    .dia-btn.on { background:var(--navy); border-color:var(--navy); color:#fff; }
+    .dia-btn:hover:not(.on) { border-color:var(--navy); color:var(--navy); }
+
+    /* DROP ZONE */
+    .drop-zone { border:2.5px dashed #c4d0e8; border-radius:14px; padding:40px 20px; text-align:center; cursor:pointer; transition:all .2s; background:#fafbff; }
+    .drop-zone:hover, .drop-zone.drag-over { border-color:var(--navy); background:#eef2ff; }
+    .drop-zone i { font-size:2.8rem; color:#c4d0e8; margin-bottom:10px; display:block; }
+    .drop-zone.drag-over i { color:var(--navy); }
+    .drop-zone p { color:#6b7280; font-size:.88rem; margin:0; }
+    .drop-zone .formats { font-size:.75rem; color:#9ca3af; margin-top:4px; }
+
+    /* MAPPING TABLE */
+    #mappingSection { display:none; }
+    .mapping-table { width:100%; border-collapse:collapse; font-size:.84rem; }
+    .mapping-table th { background:#f1f5f9; font-weight:700; font-size:.75rem; text-transform:uppercase; letter-spacing:.4px; color:#475569; padding:10px 12px; border-bottom:2px solid #e2e8f0; }
+    .mapping-table td { padding:9px 12px; border-bottom:1px solid #f1f5f9; vertical-align:middle; }
+    .mapping-table tr:last-child td { border-bottom:none; }
+    .col-name-pill { background:#e8f0fe; color:var(--navy); border-radius:6px; padding:3px 10px; font-weight:600; font-size:.82rem; display:inline-block; }
+    .first-val { font-family:monospace; color:#374151; font-size:.82rem; background:#f8fafc; border-radius:6px; padding:2px 8px; max-width:140px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; display:inline-block; }
+    .new-field-input { border-radius:7px; border:1.5px solid #fbbf24; font-size:.82rem; padding:5px 10px; background:#fffbeb; }
+    .new-field-input:focus { border-color:#d97706; box-shadow:0 0 0 3px rgba(217,119,6,.1); outline:none; }
+    .rec-badge { font-size:.7rem; background:#dcfce7; color:#166534; border-radius:5px; padding:1px 7px; font-weight:600; margin-left:4px; }
+    .select-campo { border-radius:7px; border:1.5px solid #d1d5db; font-size:.82rem; padding:5px 8px; width:100%; }
+    .select-campo:focus { border-color:var(--navy); box-shadow:0 0 0 3px rgba(1,65,162,.1); outline:none; }
+    .ignore-check { cursor:pointer; accent-color:#6b7280; }
+
+    /* RESPUESTAS */
+    .resp-predefs { display:flex; flex-wrap:wrap; gap:8px; margin-bottom:16px; }
+    .resp-chip { border:1.5px solid #d1d5db; border-radius:20px; padding:5px 14px; font-size:.82rem; cursor:pointer; transition:all .15s; background:#f9fafb; color:#374151; user-select:none; display:flex; align-items:center; gap:5px; }
+    .resp-chip:hover { border-color:var(--navy); color:var(--navy); }
+    .resp-chip.on { background:var(--navy); border-color:var(--navy); color:#fff; }
+    .resp-chip .remove { opacity:.7; font-size:.75rem; }
+    .resp-seleccionadas { display:flex; flex-wrap:wrap; gap:7px; min-height:36px; padding:8px; background:#f8fafc; border-radius:10px; border:1.5px solid #e5e7eb; }
+    .resp-tag { background:#1e40af; color:#fff; border-radius:16px; padding:4px 10px 4px 12px; font-size:.8rem; font-weight:600; display:flex; align-items:center; gap:6px; }
+    .resp-tag.custom { background:#7c3aed; }
+    .resp-tag button { background:none; border:none; color:rgba(255,255,255,.8); cursor:pointer; padding:0; font-size:.9rem; line-height:1; }
+    .resp-tag button:hover { color:#fff; }
+    .resp-add-row { display:flex; gap:8px; margin-top:12px; }
+
+    /* BUTTONS */
+    .btn-navy { background:var(--navy); color:#fff; border:none; border-radius:9px; padding:10px 26px; font-weight:600; font-size:.9rem; cursor:pointer; transition:background .15s; }
+    .btn-navy:hover { background:var(--accent); }
+    .btn-outline { background:#fff; color:var(--navy); border:1.5px solid var(--navy); border-radius:9px; padding:9px 22px; font-weight:600; font-size:.9rem; cursor:pointer; transition:all .15s; }
+    .btn-outline:hover { background:#eef2ff; }
+    .btn-yellow { background:#fbbf24; color:#78350f; border:none; border-radius:9px; padding:10px 22px; font-weight:700; font-size:.9rem; cursor:pointer; }
+    .btn-yellow:hover { background:#f59e0b; }
+
+    /* ALERT */
+    #alertMsg { display:none; border-radius:9px; padding:12px 16px; font-size:.88rem; margin-bottom:16px; }
+    .alert-ok   { background:#dcfce7; color:#166534; border:1px solid #86efac; }
+    .alert-fail { background:#fee2e2; color:#991b1b; border:1px solid #fca5a5; }
   </style>
 </head>
 <body>
-  <nav class="topnav">
-    <div class="topnav-left">
-      <a href="/" class="topnav-brand">
-        <img src="/img/logo.png" alt="AutoFácil">
-        <span class="version-badge">v1.0</span>
-      </a>
-      <div class="breadcrumb-nav">
-        <a href="/">Inicio</a><span class="sep">›</span>
-        <a href="/crm">CRM</a><span class="sep">›</span>
-        <span style="color:#fff;font-weight:600"><i class="bi bi-megaphone me-1"></i>Campañas Outbound</span><span class="sep">›</span>
-        <span style="color:#fff;font-weight:600">Crear Campaña</span>
-      </div>
-    </div>
-    <div class="topnav-right">
-      <div class="user-chip">
-        <div class="avatar" id="avatarInicial">?</div>
-        <div>
-          <div style="font-weight:600;line-height:1.3;color:#fff" id="navNombre">—</div>
-          <div class="perfil-badge" id="navPerfil">—</div>
-        </div>
-      </div>
-      <button class="btn-logout" onclick="logout()"><i class="bi bi-box-arrow-right me-1"></i>Salir</button>
-    </div>
-  </nav>
 
-  <div class="page-content">
-    <div class="page-banner">
-      <i class="bi bi-plus-circle-fill"></i>
+<!-- TOPNAV -->
+<nav class="topnav">
+  <div class="topnav-left">
+    <a href="/" class="topnav-brand">
+      <img src="/img/logo.png" alt="AutoFácil">
+      <span class="version-badge">v1.0</span>
+    </a>
+    <div class="breadcrumb-nav">
+      <a href="/">Inicio</a><span class="sep">›</span>
+      <a href="/crm">CRM</a><span class="sep">›</span>
+      <a href="/crm/campanas">Campañas Outbound</a><span class="sep">›</span>
+      <span style="color:#fff;font-weight:600">Crear Campaña</span>
+    </div>
+  </div>
+  <div class="topnav-right">
+    <div class="user-chip">
+      <div class="avatar" id="avatarInicial">?</div>
       <div>
-        <h2>Creación de Campaña</h2>
-        <p>Define y configura una nueva campaña de contacto outbound para tus clientes.</p>
+        <div style="font-weight:600;line-height:1.3;color:#fff" id="navNombre">—</div>
+        <div class="perfil-badge" id="navPerfil">—</div>
       </div>
     </div>
+    <button class="btn-logout" onclick="logout()"><i class="bi bi-box-arrow-right me-1"></i>Salir</button>
+  </div>
+</nav>
 
-    <div class="coming-box">
-      <i class="bi bi-gear-wide-connected"></i>
-      <h4>Módulo en construcción</h4>
-      <p>El formulario de creación de campañas estará disponible próximamente.<br>Incluirá: nombre, objetivo, segmento, canal, ejecutivos y calendario de contacto.</p>
-      <a href="/crm" class="btn btn-primary mt-4"><i class="bi bi-arrow-left me-2"></i>Volver al CRM</a>
+<div class="page-content">
+
+  <div class="page-banner">
+    <i class="bi bi-plus-circle-fill"></i>
+    <div>
+      <h2>Crear Nueva Campaña de Outbound</h2>
+      <p>Configura el nombre, fechas, horarios, contactos y respuestas disponibles para la campaña.</p>
     </div>
   </div>
 
-  <script>
-    const token = localStorage.getItem('token');
-    const yo    = JSON.parse(localStorage.getItem('usuario') || 'null');
-    if (!token || !yo) window.location.href = '/login.html';
-    document.getElementById('navNombre').textContent = `${yo?.nombre||''} ${yo?.apellido||''}`.trim();
-    document.getElementById('navPerfil').textContent  = yo?.perfil || '';
-    document.getElementById('avatarInicial').textContent = (yo?.nombre||'?').charAt(0).toUpperCase();
-    function logout() { localStorage.removeItem('token'); localStorage.removeItem('usuario'); window.location.href = '/login.html'; }
-  </script>
+  <div id="alertMsg"></div>
+
+  <!-- ① DATOS BÁSICOS -->
+  <div class="sec-card">
+    <div class="sec-header">
+      <span class="sec-num">1</span>
+      <i class="bi bi-info-circle-fill"></i>Datos de la Campaña
+    </div>
+    <div class="sec-body">
+      <div class="row g-3">
+        <div class="col-12">
+          <label class="form-label">Nombre de la campaña *</label>
+          <input type="text" id="cNombre" class="form-control" placeholder="Ej: Campaña Créditos Preaprobados Mayo 2026">
+        </div>
+        <div class="col-md-6">
+          <label class="form-label">Fecha de inicio *</label>
+          <input type="date" id="cFechaInicio" class="form-control">
+        </div>
+        <div class="col-md-6">
+          <label class="form-label">Fecha de término *</label>
+          <input type="date" id="cFechaFin" class="form-control">
+        </div>
+
+        <!-- Días de la semana -->
+        <div class="col-12">
+          <label class="form-label">Días de gestión</label>
+          <div class="dias-grid" id="diasGrid">
+            <div class="dia-btn on" data-dia="1" onclick="toggleDia(this)">Lun</div>
+            <div class="dia-btn on" data-dia="2" onclick="toggleDia(this)">Mar</div>
+            <div class="dia-btn on" data-dia="3" onclick="toggleDia(this)">Mié</div>
+            <div class="dia-btn on" data-dia="4" onclick="toggleDia(this)">Jue</div>
+            <div class="dia-btn on" data-dia="5" onclick="toggleDia(this)">Vie</div>
+            <div class="dia-btn" data-dia="6" onclick="toggleDia(this)">Sáb</div>
+            <div class="dia-btn" data-dia="7" onclick="toggleDia(this)">Dom</div>
+          </div>
+          <div style="font-size:.75rem;color:#9ca3af;margin-top:5px">Los ejecutivos solo podrán ver y gestionar los registros en los días seleccionados.</div>
+        </div>
+
+        <!-- Horario -->
+        <div class="col-md-3">
+          <label class="form-label">Horario desde</label>
+          <input type="time" id="cHorarioDesde" class="form-control" value="09:00">
+        </div>
+        <div class="col-md-3">
+          <label class="form-label">Horario hasta</label>
+          <input type="time" id="cHorarioHasta" class="form-control" value="18:00">
+        </div>
+        <div class="col-md-6 d-flex align-items-end">
+          <div style="background:#fffbeb;border:1px solid #fde68a;border-radius:8px;padding:9px 14px;font-size:.78rem;color:#92400e;width:100%">
+            <i class="bi bi-clock me-1"></i>Fuera de estas fechas, días y horarios los ejecutivos no podrán gestionar ni ver los registros.
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ② CARGA DE CONTACTOS -->
+  <div class="sec-card">
+    <div class="sec-header">
+      <span class="sec-num">2</span>
+      <i class="bi bi-table"></i>Carga de Contactos
+      <span style="margin-left:auto;font-size:.75rem;font-weight:400;color:#6b7280">Formatos aceptados: .xlsx · .xls · .csv · .txt</span>
+    </div>
+    <div class="sec-body">
+
+      <!-- Drop zone -->
+      <div class="drop-zone" id="dropZone" onclick="document.getElementById('fileInput').click()"
+           ondragover="event.preventDefault();this.classList.add('drag-over')"
+           ondragleave="this.classList.remove('drag-over')"
+           ondrop="onFileDrop(event)">
+        <i class="bi bi-cloud-arrow-up"></i>
+        <p><strong>Arrastra tu archivo aquí</strong> o haz click para seleccionar</p>
+        <p class="formats">Excel (.xlsx .xls) · CSV (.csv) · Texto tabulado (.txt)</p>
+      </div>
+      <input type="file" id="fileInput" accept=".xlsx,.xls,.csv,.txt" style="display:none" onchange="onFileSelect(this)">
+
+      <!-- Mapping section (aparece después de cargar archivo) -->
+      <div id="mappingSection" style="margin-top:20px">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px">
+          <div>
+            <span style="font-weight:700;color:#1e293b" id="mappingFileName"></span>
+            <span id="mappingRowCount" style="font-size:.78rem;color:#6b7280;margin-left:8px"></span>
+          </div>
+          <button class="btn-outline" style="font-size:.8rem;padding:6px 14px" onclick="document.getElementById('fileInput').click()">
+            <i class="bi bi-arrow-repeat me-1"></i>Cambiar archivo
+          </button>
+        </div>
+
+        <div style="overflow-x:auto">
+          <table class="mapping-table">
+            <thead>
+              <tr>
+                <th style="width:28px"><input type="checkbox" title="Ignorar todos" id="chkIgnoreAll" onchange="toggleIgnoreAll(this)"></th>
+                <th>Columna en archivo</th>
+                <th style="min-width:140px">Primer registro</th>
+                <th style="min-width:240px">Campo en el sistema</th>
+                <th style="min-width:180px">Nuevo campo personalizado</th>
+              </tr>
+            </thead>
+            <tbody id="mappingBody"></tbody>
+          </table>
+        </div>
+
+        <div style="margin-top:10px;font-size:.76rem;color:#6b7280">
+          <i class="bi bi-lightbulb me-1 text-warning"></i>
+          El sistema recomienda la equivalencia automáticamente. Puedes ajustarla o crear un campo nuevo si no existe en la lista.
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- ③ RESPUESTAS DE CAMPAÑA -->
+  <div class="sec-card">
+    <div class="sec-header">
+      <span class="sec-num">3</span>
+      <i class="bi bi-chat-square-dots-fill"></i>Respuestas de Campaña
+    </div>
+    <div class="sec-body">
+      <p style="font-size:.83rem;color:#6b7280;margin-bottom:14px">
+        Selecciona las respuestas predefinidas que usarán los ejecutivos al gestionar cada contacto, o crea respuestas especiales para esta campaña.
+      </p>
+
+      <!-- Predefinidas -->
+      <div class="resp-predefs" id="respPredefs"></div>
+
+      <!-- Seleccionadas -->
+      <label class="form-label mt-2">Respuestas seleccionadas para esta campaña</label>
+      <div class="resp-seleccionadas" id="respSeleccionadas">
+        <span style="color:#9ca3af;font-size:.8rem;align-self:center;padding:2px 6px" id="respEmpty">Selecciona respuestas arriba o crea una personalizada</span>
+      </div>
+
+      <!-- Agregar personalizada -->
+      <div class="resp-add-row">
+        <input type="text" id="respCustomInput" class="form-control" style="max-width:360px" placeholder="Nueva respuesta personalizada para esta campaña..." maxlength="80">
+        <button class="btn-yellow" onclick="agregarRespuestaCustom()">
+          <i class="bi bi-plus me-1"></i>Agregar
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- FOOTER BOTONES -->
+  <div class="d-flex justify-content-between align-items-center mb-5">
+    <a href="/crm/campanas" class="btn-outline"><i class="bi bi-arrow-left me-1"></i>Cancelar</a>
+    <button class="btn-navy" onclick="guardarCampana()">
+      <i class="bi bi-floppy me-2"></i>Guardar Campaña
+    </button>
+  </div>
+
+</div><!-- /page-content -->
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+<script>
+/* ── AUTH ─────────────────────────────────────────────────────────────── */
+const token = localStorage.getItem('token');
+const yo    = JSON.parse(localStorage.getItem('usuario') || 'null');
+if (!token || !yo) window.location.href = '/login.html';
+document.getElementById('navNombre').textContent   = `${yo?.nombre||''} ${yo?.apellido||''}`.trim();
+document.getElementById('navPerfil').textContent   = yo?.perfil || '';
+document.getElementById('avatarInicial').textContent = (yo?.nombre||'?').charAt(0).toUpperCase();
+function logout() { localStorage.removeItem('token'); localStorage.removeItem('usuario'); window.location.href = '/login.html'; }
+
+const hdrs = { 'Authorization':'Bearer '+token, 'Content-Type':'application/json' };
+
+/* ── CAMPOS DEL SISTEMA ───────────────────────────────────────────────── */
+const DB_FIELDS = [
+  // clientes
+  { key:'rut_cliente',      label:'RUT',              tabla:'clientes' },
+  { key:'nombres',          label:'Nombres',           tabla:'clientes' },
+  { key:'apellido_paterno', label:'Apellido Paterno',  tabla:'clientes' },
+  { key:'apellido_materno', label:'Apellido Materno',  tabla:'clientes' },
+  { key:'email',            label:'Email',             tabla:'clientes' },
+  { key:'telefono',         label:'Teléfono',          tabla:'clientes' },
+  { key:'celular',          label:'Celular',           tabla:'clientes' },
+  { key:'direccion',        label:'Dirección',         tabla:'clientes' },
+  { key:'ciudad',           label:'Ciudad',            tabla:'clientes' },
+  { key:'region',           label:'Región',            tabla:'clientes' },
+  { key:'comuna',           label:'Comuna',            tabla:'clientes' },
+  { key:'fecha_nacimiento', label:'Fecha Nacimiento',  tabla:'clientes' },
+  { key:'genero',           label:'Género',            tabla:'clientes' },
+  // créditos
+  { key:'numero_credito',   label:'N° Crédito',        tabla:'creditos' },
+  { key:'monto_financiado', label:'Monto Financiado',  tabla:'creditos' },
+  { key:'cuota',            label:'Cuota',             tabla:'creditos' },
+  { key:'estado_credito',   label:'Estado Crédito',    tabla:'creditos' },
+  { key:'plazo',            label:'Plazo',             tabla:'creditos' },
+  { key:'marca',            label:'Marca Vehículo',    tabla:'creditos' },
+  { key:'modelo',           label:'Modelo Vehículo',   tabla:'creditos' },
+  { key:'patente',          label:'Patente',           tabla:'creditos' },
+];
+
+/* Sinónimos para auto-recomendación */
+const SINONIMOS = {
+  rut:'rut_cliente', rutcliente:'rut_cliente', run:'rut_cliente',
+  nombre:'nombres', nombres:'nombres', name:'nombres',
+  apellido:'apellido_paterno', apellidopaterno:'apellido_paterno',
+  apellidomaterno:'apellido_materno',
+  correo:'email', mail:'email', email:'email',
+  tel:'telefono', telefono:'telefono', fono:'telefono', phone:'telefono',
+  cel:'celular', celular:'celular', movil:'celular', mobile:'celular',
+  dir:'direccion', direccion:'direccion', address:'direccion',
+  ciudad:'ciudad', region:'region', comuna:'comuna',
+  nacimiento:'fecha_nacimiento', fechanacimiento:'fecha_nacimiento',
+  genero:'genero', sexo:'genero',
+  credito:'numero_credito', numerocredito:'numero_credito', numcredito:'numero_credito',
+  monto:'monto_financiado', montofinanciado:'monto_financiado',
+  cuota:'cuota', plazo:'plazo',
+  marca:'marca', modelo:'modelo', patente:'patente',
+};
+
+function norm(s){ return s.toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g,'').replace(/[^a-z0-9]/g,''); }
+function recomendar(col) { return SINONIMOS[norm(col)] || ''; }
+
+/* ── DÍAS ─────────────────────────────────────────────────────────────── */
+function toggleDia(el){ el.classList.toggle('on'); }
+function getDias(){ return [...document.querySelectorAll('.dia-btn.on')].map(e=>e.dataset.dia).join(','); }
+
+/* ── ARCHIVO ──────────────────────────────────────────────────────────── */
+let _filasMuestra = [];
+
+function onFileDrop(e){
+  e.preventDefault();
+  document.getElementById('dropZone').classList.remove('drag-over');
+  const f = e.dataTransfer.files[0];
+  if(f) procesarArchivo(f);
+}
+function onFileSelect(input){
+  const f = input.files[0];
+  if(f) procesarArchivo(f);
+}
+
+function procesarArchivo(file){
+  const nombre = file.name;
+  const ext    = nombre.split('.').pop().toLowerCase();
+  const reader = new FileReader();
+
+  if(ext === 'xlsx' || ext === 'xls'){
+    reader.onload = e => {
+      const wb   = XLSX.read(e.target.result, { type:'array' });
+      const ws   = wb.Sheets[wb.SheetNames[0]];
+      const data = XLSX.utils.sheet_to_json(ws, { header:1, defval:'' });
+      if(!data.length) return alert('Archivo vacío');
+      const headers = data[0].map(String);
+      const filas   = data.slice(1).filter(r => r.some(c => c !== ''));
+      renderMapping(headers, filas, nombre, filas.length);
+    };
+    reader.readAsArrayBuffer(file);
+  } else {
+    reader.onload = e => {
+      const lines = e.target.result.split(/\r?\n/).filter(l=>l.trim());
+      if(!lines.length) return alert('Archivo vacío');
+      const sep     = lines[0].includes('\t') ? '\t' : lines[0].includes(';') ? ';' : ',';
+      const headers = lines[0].split(sep).map(s=>s.trim().replace(/^"|"$/g,''));
+      const filas   = lines.slice(1).map(l => l.split(sep).map(s=>s.trim().replace(/^"|"$/g,'')));
+      renderMapping(headers, filas, nombre, filas.length);
+    };
+    reader.readAsText(file, 'UTF-8');
+  }
+}
+
+function renderMapping(headers, filas, fileName, totalRows){
+  _filasMuestra = filas;
+  document.getElementById('mappingFileName').textContent  = fileName;
+  document.getElementById('mappingRowCount').textContent  = `(${totalRows.toLocaleString('es-CL')} registros)`;
+
+  const tbody = document.getElementById('mappingBody');
+  tbody.innerHTML = headers.map((col, i) => {
+    const primero = (filas[0]?.[i] ?? '');
+    const rec     = recomendar(col);
+    const recLabel = rec ? DB_FIELDS.find(f=>f.key===rec)?.label : '';
+
+    const opts = DB_FIELDS.map(f =>
+      `<option value="${f.key}" ${f.key===rec?'selected':''} data-tabla="${f.tabla}">${f.label} (${f.tabla})</option>`
+    ).join('');
+
+    return `<tr id="mrow-${i}">
+      <td><input type="checkbox" class="ignore-check" title="Ignorar columna" onchange="toggleIgnoreRow(${i},this)"></td>
+      <td><span class="col-name-pill">${col}</span></td>
+      <td><span class="first-val" title="${primero}">${primero || '—'}</span></td>
+      <td>
+        <select class="select-campo" id="msel-${i}" onchange="onSelChange(${i},this)">
+          <option value="">— Sin mapear —</option>
+          <option value="__nuevo__">✦ Crear nuevo campo...</option>
+          ${opts}
+        </select>
+        ${recLabel ? `<span class="rec-badge">★ ${recLabel}</span>` : ''}
+      </td>
+      <td id="mnew-${i}" style="display:${rec?'none':''}">
+        <input type="text" class="new-field-input form-control" id="mnewval-${i}"
+          placeholder="Nombre del nuevo campo" style="display:${rec?'none':''}">
+      </td>
+    </tr>`;
+  }).join('');
+
+  document.getElementById('mappingSection').style.display = '';
+}
+
+function onSelChange(i, sel){
+  const isNuevo = sel.value === '__nuevo__';
+  const inp = document.getElementById(`mnewval-${i}`);
+  inp.style.display = isNuevo ? '' : 'none';
+}
+
+function toggleIgnoreRow(i, chk){
+  const row = document.getElementById(`mrow-${i}`);
+  row.style.opacity = chk.checked ? '.35' : '1';
+  row.querySelectorAll('select,input[type=text]').forEach(el => el.disabled = chk.checked);
+}
+
+function toggleIgnoreAll(chk){
+  document.querySelectorAll('.ignore-check').forEach((el,i) => {
+    el.checked = chk.checked;
+    toggleIgnoreRow(i, el);
+  });
+}
+
+/* Leer mapeo actual */
+function getCamposMapeo(){
+  const rows = document.querySelectorAll('#mappingBody tr');
+  const mapeo = [];
+  rows.forEach((tr, i) => {
+    const chk = tr.querySelector('.ignore-check');
+    if(chk?.checked) return; // ignorar
+    const colName  = tr.querySelector('.col-name-pill')?.textContent || '';
+    const sel      = document.getElementById(`msel-${i}`);
+    const inp      = document.getElementById(`mnewval-${i}`);
+    const campo    = sel?.value === '__nuevo__' ? '__nuevo__:' + (inp?.value?.trim()||'') : (sel?.value||'');
+    if(campo) mapeo.push({ col_archivo: colName, campo_sistema: campo });
+  });
+  return mapeo;
+}
+
+/* ── RESPUESTAS ───────────────────────────────────────────────────────── */
+const RESP_PREDEFINIDAS = [
+  'Interesado','No interesado','Llamar después','No contesta',
+  'Número equivocado','Ocupado / Llame más tarde','Solicitó no ser contactado',
+  'Cita agendada','Venta concretada','Buzón de voz',
+  'Número fuera de servicio','Datos incorrectos',
+];
+
+let _respuestas = new Set();
+
+function initRespuestas(){
+  const c = document.getElementById('respPredefs');
+  c.innerHTML = RESP_PREDEFINIDAS.map(r =>
+    `<div class="resp-chip" data-resp="${r}" onclick="toggleResp(this,'${r.replace(/'/g,"\\'")}')">
+       <i class="bi bi-plus" style="font-size:.75rem"></i>${r}
+     </div>`
+  ).join('');
+}
+
+function toggleResp(el, resp){
+  if(_respuestas.has(resp)){
+    _respuestas.delete(resp);
+    el.classList.remove('on');
+    el.querySelector('i').className = 'bi bi-plus';
+  } else {
+    _respuestas.add(resp);
+    el.classList.add('on');
+    el.querySelector('i').className = 'bi bi-check-lg';
+  }
+  renderRespTags();
+}
+
+function agregarRespuestaCustom(){
+  const inp = document.getElementById('respCustomInput');
+  const val = inp.value.trim();
+  if(!val) return;
+  _respuestas.add(val);
+  renderRespTags();
+  inp.value = '';
+}
+
+function quitarResp(resp){
+  _respuestas.delete(resp);
+  // Desmarcar chip si existe
+  const chip = document.querySelector(`.resp-chip[data-resp="${resp}"]`);
+  if(chip){ chip.classList.remove('on'); chip.querySelector('i').className='bi bi-plus'; }
+  renderRespTags();
+}
+
+function renderRespTags(){
+  const c = document.getElementById('respSeleccionadas');
+  const empty = document.getElementById('respEmpty');
+  if(!_respuestas.size){
+    empty.style.display='';
+    c.innerHTML='';
+    c.appendChild(empty);
+    return;
+  }
+  empty.style.display='none';
+  c.innerHTML=[..._respuestas].map(r=>{
+    const isCustom = !RESP_PREDEFINIDAS.includes(r);
+    return `<span class="resp-tag ${isCustom?'custom':''}">
+      ${r}
+      <button onclick="quitarResp('${r.replace(/'/g,"\\'")}')"><i class="bi bi-x"></i></button>
+    </span>`;
+  }).join('');
+}
+
+/* Enter en input de respuesta */
+document.getElementById('respCustomInput').addEventListener('keydown', e => {
+  if(e.key === 'Enter'){ e.preventDefault(); agregarRespuestaCustom(); }
+});
+
+/* ── GUARDAR ─────────────────────────────────────────────────────────── */
+async function guardarCampana(){
+  const nombre = document.getElementById('cNombre').value.trim();
+  const fi     = document.getElementById('cFechaInicio').value;
+  const ff     = document.getElementById('cFechaFin').value;
+  const hd     = document.getElementById('cHorarioDesde').value;
+  const hh     = document.getElementById('cHorarioHasta').value;
+
+  const alertEl = document.getElementById('alertMsg');
+  function showAlert(msg, ok){
+    alertEl.className = ok ? 'alert-ok' : 'alert-fail';
+    alertEl.textContent = msg;
+    alertEl.style.display = '';
+    alertEl.scrollIntoView({ behavior:'smooth', block:'nearest' });
+  }
+
+  if(!nombre){ showAlert('El nombre de la campaña es obligatorio.', false); return; }
+  if(!fi || !ff){ showAlert('Las fechas de inicio y término son obligatorias.', false); return; }
+  if(fi > ff){ showAlert('La fecha de inicio no puede ser posterior al término.', false); return; }
+  if(!getDias()){ showAlert('Selecciona al menos un día de gestión.', false); return; }
+  if(!_respuestas.size){ showAlert('Agrega al menos una respuesta de campaña.', false); return; }
+
+  const body = {
+    nombre,
+    fecha_inicio:    fi,
+    fecha_fin:       ff,
+    dias_semana:     getDias(),
+    horario_desde:   hd,
+    horario_hasta:   hh,
+    campos_mapeo:    getCamposMapeo(),
+    respuestas_json: [..._respuestas],
+  };
+
+  try {
+    const r   = await fetch('/api/crm/campanas', { method:'POST', headers:hdrs, body:JSON.stringify(body) });
+    const res = await r.json();
+    if(res.success){
+      showAlert(`✓ Campaña "${nombre}" creada correctamente.`, true);
+      setTimeout(() => window.location.href = '/crm/campanas/gestion', 1500);
+    } else {
+      showAlert(res.error || 'Error al guardar la campaña.', false);
+    }
+  } catch(e){
+    showAlert('Error de conexión: ' + e.message, false);
+  }
+}
+
+/* ── INIT ─────────────────────────────────────────────────────────────── */
+initRespuestas();
+</script>
 <script src="/js/app-version.js"></script>
 </body>
 </html>

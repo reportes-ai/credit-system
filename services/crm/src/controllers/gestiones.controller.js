@@ -8,15 +8,33 @@ const pool = require('../../../../shared/config/database');
     const conn = await pool.getConnection();
     await conn.query(`
       CREATE TABLE IF NOT EXISTS crm_campanas (
-        id_campana   INT AUTO_INCREMENT PRIMARY KEY,
-        nombre       VARCHAR(200) NOT NULL,
-        descripcion  TEXT NULL,
-        fecha_inicio DATE NULL,
-        fecha_fin    DATE NULL,
-        activa       TINYINT(1) DEFAULT 1,
-        created_at   DATETIME DEFAULT CURRENT_TIMESTAMP
+        id_campana      INT AUTO_INCREMENT PRIMARY KEY,
+        nombre          VARCHAR(200) NOT NULL,
+        descripcion     TEXT NULL,
+        fecha_inicio    DATE NULL,
+        fecha_fin       DATE NULL,
+        dias_semana     VARCHAR(20)  NULL,
+        horario_desde   TIME         NULL,
+        horario_hasta   TIME         NULL,
+        campos_mapeo    JSON         NULL,
+        respuestas_json JSON         NULL,
+        usuarios_json   JSON         NULL,
+        activa          TINYINT(1)   DEFAULT 1,
+        id_usuario      INT          NULL,
+        created_at      DATETIME     DEFAULT CURRENT_TIMESTAMP,
+        updated_at      DATETIME     DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
       )
     `);
+    // Columnas que pueden faltar en instancias antiguas
+    const addC = async (sql) => conn.query(sql).catch(e => { if (e.errno !== 1060) throw e; });
+    await addC(`ALTER TABLE crm_campanas ADD COLUMN dias_semana   VARCHAR(20) NULL`);
+    await addC(`ALTER TABLE crm_campanas ADD COLUMN horario_desde TIME NULL`);
+    await addC(`ALTER TABLE crm_campanas ADD COLUMN horario_hasta TIME NULL`);
+    await addC(`ALTER TABLE crm_campanas ADD COLUMN campos_mapeo  JSON NULL`);
+    await addC(`ALTER TABLE crm_campanas ADD COLUMN respuestas_json JSON NULL`);
+    await addC(`ALTER TABLE crm_campanas ADD COLUMN usuarios_json JSON NULL`);
+    await addC(`ALTER TABLE crm_campanas ADD COLUMN id_usuario    INT NULL`);
+    await addC(`ALTER TABLE crm_campanas ADD COLUMN updated_at    DATETIME NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP`);
     await conn.query(`
       CREATE TABLE IF NOT EXISTS crm_gestiones (
         id_gestion       INT AUTO_INCREMENT PRIMARY KEY,
@@ -322,9 +340,25 @@ exports.stats = async (req, res) => {
 exports.listCampanas = async (req, res) => {
   try {
     const [rows] = await pool.query(
-      'SELECT * FROM crm_campanas WHERE activa = 1 ORDER BY nombre ASC'
+      `SELECT id_campana, nombre, descripcion, fecha_inicio, fecha_fin,
+              dias_semana, horario_desde, horario_hasta,
+              respuestas_json, usuarios_json, activa, created_at
+       FROM crm_campanas ORDER BY created_at DESC`
     );
     ok(res, rows);
+  } catch (err) {
+    fail(res, err.message, 500);
+  }
+};
+
+// ─── getCampana ───────────────────────────────────────────────────────────────
+exports.getCampana = async (req, res) => {
+  try {
+    const [[row]] = await pool.query(
+      'SELECT * FROM crm_campanas WHERE id_campana = ?', [req.params.id]
+    );
+    if (!row) return fail(res, 'Campaña no encontrada', 404);
+    ok(res, row);
   } catch (err) {
     fail(res, err.message, 500);
   }
@@ -333,17 +367,68 @@ exports.listCampanas = async (req, res) => {
 // ─── createCampana ────────────────────────────────────────────────────────────
 exports.createCampana = async (req, res) => {
   try {
-    const { nombre, descripcion = null, fecha_inicio = null, fecha_fin = null } = req.body;
+    const {
+      nombre, descripcion = null,
+      fecha_inicio = null, fecha_fin = null,
+      dias_semana = null, horario_desde = null, horario_hasta = null,
+      campos_mapeo = null, respuestas_json = null, usuarios_json = null,
+    } = req.body;
     if (!nombre) return fail(res, 'nombre es requerido');
 
+    const id_usuario = req.usuario?.id_usuario || null;
     const [r] = await pool.query(
-      'INSERT INTO crm_campanas (nombre, descripcion, fecha_inicio, fecha_fin) VALUES (?,?,?,?)',
-      [nombre, descripcion, fecha_inicio, fecha_fin]
+      `INSERT INTO crm_campanas
+         (nombre, descripcion, fecha_inicio, fecha_fin,
+          dias_semana, horario_desde, horario_hasta,
+          campos_mapeo, respuestas_json, usuarios_json, id_usuario)
+       VALUES (?,?,?,?,?,?,?,?,?,?,?)`,
+      [
+        nombre, descripcion, fecha_inicio, fecha_fin,
+        dias_semana, horario_desde, horario_hasta,
+        JSON.stringify(campos_mapeo || []),
+        JSON.stringify(respuestas_json || []),
+        JSON.stringify(usuarios_json || []),
+        id_usuario,
+      ]
     );
     const [[campana]] = await pool.query(
       'SELECT * FROM crm_campanas WHERE id_campana = ?', [r.insertId]
     );
     ok(res, campana, 201);
+  } catch (err) {
+    fail(res, err.message, 500);
+  }
+};
+
+// ─── updateCampana ────────────────────────────────────────────────────────────
+exports.updateCampana = async (req, res) => {
+  try {
+    const {
+      nombre, descripcion,
+      fecha_inicio, fecha_fin,
+      dias_semana, horario_desde, horario_hasta,
+      campos_mapeo, respuestas_json, usuarios_json, activa,
+    } = req.body;
+    await pool.query(
+      `UPDATE crm_campanas SET
+         nombre=?, descripcion=?, fecha_inicio=?, fecha_fin=?,
+         dias_semana=?, horario_desde=?, horario_hasta=?,
+         campos_mapeo=?, respuestas_json=?, usuarios_json=?, activa=?
+       WHERE id_campana=?`,
+      [
+        nombre, descripcion ?? null, fecha_inicio ?? null, fecha_fin ?? null,
+        dias_semana ?? null, horario_desde ?? null, horario_hasta ?? null,
+        JSON.stringify(campos_mapeo || []),
+        JSON.stringify(respuestas_json || []),
+        JSON.stringify(usuarios_json || []),
+        activa ?? 1,
+        req.params.id,
+      ]
+    );
+    const [[campana]] = await pool.query(
+      'SELECT * FROM crm_campanas WHERE id_campana = ?', [req.params.id]
+    );
+    ok(res, campana);
   } catch (err) {
     fail(res, err.message, 500);
   }
