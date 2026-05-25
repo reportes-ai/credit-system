@@ -1193,8 +1193,6 @@ function fmtFecha(f) {
   if (!f) return '—';
   return new Date(f).toLocaleDateString('es-CL', { day:'2-digit', month:'2-digit', year:'numeric' });
 }
-// Limpiar autofill de Chrome (ignora autocomplete="off" en campos de texto)
-setTimeout(() => { const s = document.getElementById('searchInput'); if(s) s.value = ''; }, 50);
 </script>
 <script src="/js/app-version.js"></script>
 </body>

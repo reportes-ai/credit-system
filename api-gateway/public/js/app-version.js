@@ -202,10 +202,14 @@ document.addEventListener('DOMContentLoaded', () => {
         <div class="af-modal-body">
           <div id="afClaveAlert" class="af-alert"></div>
 
+          <!-- Campos trampa: Chrome rellena estos (ocultos) en lugar de los campos visibles de la página -->
+          <input type="text"     style="position:absolute;opacity:0;height:0;width:0;pointer-events:none;tabindex:-1" autocomplete="username">
+          <input type="password" style="position:absolute;opacity:0;height:0;width:0;pointer-events:none;tabindex:-1" autocomplete="current-password">
+
           <div class="af-field">
             <label>Contraseña actual</label>
             <div class="af-field-wrap">
-              <input type="password" id="afClaveActual" placeholder="Tu contraseña actual" autocomplete="current-password">
+              <input type="password" id="afClaveActual" placeholder="Tu contraseña actual" autocomplete="new-password">
               <button class="af-eye" type="button" onclick="afToggleEye('afClaveActual',this)"><i class="bi bi-eye"></i></button>
             </div>
           </div>
