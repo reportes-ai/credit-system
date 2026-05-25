@@ -166,6 +166,9 @@ app.get(['/cobranza/judicial', '/cobranza/judicial/'], (req, res) =>
 app.get(['/cobranza/mis-cobranza', '/cobranza/mis-cobranza/'], (req, res) =>
   res.sendFile(path.join(__dirname, '../public/cobranza/mis-cobranza.html')));
 
+app.get(['/cobranza/reporteria', '/cobranza/reporteria/'], (req, res) =>
+  res.sendFile(path.join(__dirname, '../public/cobranza/reporteria.html')));
+
 app.get(['/reporteria', '/reporteria/'], (req, res) =>
   res.sendFile(path.join(__dirname, '../public/reporteria/index.html')));
 
