@@ -173,7 +173,7 @@ const getAll = async (req, res) => {
     const { q } = req.query;
     // cuotas_pagadas se usa en el frontend para detectar mora real (igual que cobranza)
     let sql = `SELECT cr.id_credito, cr.numero_credito, cr.rut_cliente, cr.nombre_cliente,
-                      cr.financiera, cr.empresa,
+                      COALESCE(cr.financiera, cr.empresa, 'AUTOFACIL') AS financiera, cr.empresa,
                       cr.estado, cr.fecha_otorgamiento, cr.valor_vehiculo, cr.pie,
                       cr.monto_financiado, cr.plazo, cr.tasa_mensual, cr.cuota,
                       cr.fecha_primera_cuota, cr.tipo_vehiculo, cr.marca, cr.modelo,
