@@ -1,8 +1,10 @@
 const router = require('express').Router();
-const ctrl = require('../controllers/config.controller');
+const ctrl   = require('../controllers/seguridad.controller');
 const { verifyToken, requirePerfil } = require('../../../../shared/middleware/auth');
 
-router.get('/:clave',  verifyToken, ctrl.getConfig);
-router.put('/:clave',  verifyToken, requirePerfil('Administrador'), ctrl.setConfig);
+const soloAdmin = requirePerfil('Administrador');
+
+router.get('/seguridad',  verifyToken,             ctrl.getConfig);
+router.put('/seguridad',  verifyToken, soloAdmin,  ctrl.putConfig);
 
 module.exports = router;

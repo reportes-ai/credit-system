@@ -103,6 +103,33 @@
 
     @media (max-width: 640px) { .page-content { padding: 16px; } .perfil-selector { grid-template-columns: 1fr; } }
 
+    /* SEGURIDAD TAB */
+    .seg-section { background:#fff; border-radius:12px; border:1.5px solid #e5e7eb; margin-bottom:20px; overflow:hidden; }
+    .seg-section-header { background:linear-gradient(90deg,#f8fafc,#f1f5ff); padding:14px 20px; font-weight:700; font-size:.88rem; color:#1e293b; display:flex; align-items:center; gap:10px; border-bottom:1px solid #e5e7eb; }
+    .seg-section-header i { color:var(--navy); font-size:1.05rem; }
+    .seg-section-body { padding:20px 24px; }
+    .seg-row { display:flex; align-items:center; justify-content:space-between; padding:10px 0; border-bottom:1px solid #f1f5f9; }
+    .seg-row:last-child { border-bottom:none; }
+    .seg-label { font-size:.88rem; font-weight:600; color:#374151; }
+    .seg-desc  { font-size:.75rem; color:#9ca3af; margin-top:2px; }
+    .seg-control { min-width:180px; text-align:right; }
+    .seg-badge-on  { background:#dcfce7; color:#166534; border-radius:8px; padding:2px 10px; font-size:.75rem; font-weight:700; }
+    .seg-badge-off { background:#f3f4f6; color:#6b7280; border-radius:8px; padding:2px 10px; font-size:.75rem; font-weight:700; }
+    .form-switch .form-check-input { cursor:pointer; width:42px; height:22px; }
+    .form-switch .form-check-input:checked { background-color:var(--navy); border-color:var(--navy); }
+    .seg-select { border-radius:8px; border:1.5px solid #d1d5db; font-size:.85rem; padding:5px 10px; min-width:160px; }
+    .seg-select:focus { border-color:var(--navy); box-shadow:0 0 0 3px rgba(26,35,126,0.1); outline:none; }
+    .seg-number { border-radius:8px; border:1.5px solid #d1d5db; font-size:.85rem; padding:5px 10px; width:80px; text-align:center; }
+    .seg-number:focus { border-color:var(--navy); box-shadow:0 0 0 3px rgba(26,35,126,0.1); outline:none; }
+    .btn-seg-save { background:var(--navy); color:#fff; border:none; border-radius:8px; padding:9px 24px; font-weight:600; font-size:.88rem; cursor:pointer; transition:background .15s; }
+    .btn-seg-save:hover { background:var(--accent); }
+    .seg-strength-row { display:flex; gap:6px; margin-top:8px; }
+    .seg-strength-bar { flex:1; height:4px; border-radius:4px; background:#e5e7eb; transition:background .3s; }
+    .seg-strength-bar.on-1 { background:#f87171; }
+    .seg-strength-bar.on-2 { background:#fb923c; }
+    .seg-strength-bar.on-3 { background:#facc15; }
+    .seg-strength-bar.on-4 { background:#4ade80; }
+
     /* PAGE BANNER */
     .page-banner { background: linear-gradient(135deg, #012d70, #0141A2 50%, #009AFE); border-radius: 16px; color: #fff; padding: 28px 36px; margin-bottom: 36px; display: flex; align-items: center; gap: 20px; }
     .page-banner > i { font-size: 3rem; opacity: 0.8; }
@@ -120,7 +147,7 @@
     <div class="topnav-left">
       <div class="topnav-brand">
         <a href="/"><img src="/img/logo.png" alt="AutoFácil" style="display:block"></a>
-        <span class="version-badge" id="versionBadge">v5.2</span>
+        <span class="version-badge" id="versionBadge">v5.3</span>
       </div>
       <div class="breadcrumb-nav">
         <a href="/">Inicio</a><span class="sep">›</span>
@@ -174,6 +201,11 @@
       <li class="nav-item">
         <button class="nav-link" data-tab="miclave" onclick="switchTab('miclave')">
           <i class="bi bi-key me-1"></i>Mi Contraseña
+        </button>
+      </li>
+      <li class="nav-item" id="tabSegNav" style="display:none">
+        <button class="nav-link" data-tab="seguridad" onclick="switchTab('seguridad')">
+          <i class="bi bi-shield-lock me-1"></i>Seguridad
         </button>
       </li>
     </ul>
@@ -244,6 +276,194 @@
             </div>
           </div>
         </div>
+      </div>
+    </div>
+
+    <!-- TAB: SEGURIDAD -->
+    <div id="tab-seguridad" style="display:none">
+      <div class="row g-4">
+
+        <!-- Columna izquierda -->
+        <div class="col-lg-6">
+
+          <!-- Sesión -->
+          <div class="seg-section">
+            <div class="seg-section-header">
+              <i class="bi bi-clock-history"></i>Sesión e Inactividad
+            </div>
+            <div class="seg-section-body">
+              <div class="seg-row">
+                <div>
+                  <div class="seg-label">Tiempo de inactividad</div>
+                  <div class="seg-desc">Cerrar sesión automáticamente si el usuario no tiene actividad</div>
+                </div>
+                <div class="seg-control">
+                  <select id="sTimeout" class="seg-select">
+                    <option value="0">Nunca</option>
+                    <option value="15">15 minutos</option>
+                    <option value="30">30 minutos</option>
+                    <option value="60">1 hora</option>
+                    <option value="120">2 horas</option>
+                    <option value="240">4 horas</option>
+                    <option value="480">8 horas</option>
+                  </select>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Vencimiento de clave -->
+          <div class="seg-section">
+            <div class="seg-section-header">
+              <i class="bi bi-calendar-x"></i>Vencimiento de Contraseña
+            </div>
+            <div class="seg-section-body">
+              <div class="seg-row">
+                <div>
+                  <div class="seg-label">Forzar cambio de contraseña</div>
+                  <div class="seg-desc">Los usuarios deben cambiar su clave cada cierto tiempo</div>
+                </div>
+                <div class="seg-control">
+                  <select id="sDiasVenc" class="seg-select">
+                    <option value="0">Nunca</option>
+                    <option value="30">30 días</option>
+                    <option value="60">60 días</option>
+                    <option value="90">90 días</option>
+                    <option value="180">180 días</option>
+                    <option value="365">1 año</option>
+                  </select>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Reutilización -->
+          <div class="seg-section">
+            <div class="seg-section-header">
+              <i class="bi bi-arrow-repeat"></i>Reutilización de Contraseña
+            </div>
+            <div class="seg-section-body">
+              <div class="seg-row">
+                <div>
+                  <div class="seg-label">Permitir usar la misma contraseña</div>
+                  <div class="seg-desc">El usuario puede cambiar a la misma clave actual</div>
+                </div>
+                <div class="seg-control">
+                  <div class="form-check form-switch d-flex justify-content-end">
+                    <input class="form-check-input" type="checkbox" id="sPermitirMisma" onchange="actualizarHistorial()">
+                  </div>
+                </div>
+              </div>
+              <div class="seg-row" id="rowHistorial">
+                <div>
+                  <div class="seg-label">Historial de contraseñas</div>
+                  <div class="seg-desc">No permitir reutilizar hasta que se hayan realizado N cambios distintos</div>
+                </div>
+                <div class="seg-control">
+                  <select id="sHistorial" class="seg-select">
+                    <option value="0">Sin restricción</option>
+                    <option value="3">3 cambios</option>
+                    <option value="5">5 cambios</option>
+                    <option value="10">10 cambios</option>
+                    <option value="24">24 cambios</option>
+                  </select>
+                </div>
+              </div>
+            </div>
+          </div>
+
+        </div>
+
+        <!-- Columna derecha -->
+        <div class="col-lg-6">
+
+          <!-- Formato de clave -->
+          <div class="seg-section">
+            <div class="seg-section-header">
+              <i class="bi bi-key-fill"></i>Requisitos de Contraseña
+            </div>
+            <div class="seg-section-body">
+              <div class="seg-row">
+                <div>
+                  <div class="seg-label">Longitud mínima</div>
+                  <div class="seg-desc">Número mínimo de caracteres</div>
+                </div>
+                <div class="seg-control d-flex align-items-center justify-content-end gap-2">
+                  <button class="btn btn-outline-secondary btn-sm px-2" onclick="ajustarLongitud(-1)"><i class="bi bi-dash"></i></button>
+                  <input type="number" id="sLongMin" class="seg-number" min="4" max="32" value="6" oninput="actualizarFortaleza()">
+                  <button class="btn btn-outline-secondary btn-sm px-2" onclick="ajustarLongitud(1)"><i class="bi bi-plus"></i></button>
+                </div>
+              </div>
+              <div class="seg-row">
+                <div>
+                  <div class="seg-label">Requiere mayúsculas</div>
+                  <div class="seg-desc">Al menos una letra mayúscula (A-Z)</div>
+                </div>
+                <div class="seg-control">
+                  <div class="form-check form-switch d-flex justify-content-end">
+                    <input class="form-check-input" type="checkbox" id="sReqMay" onchange="actualizarFortaleza()">
+                  </div>
+                </div>
+              </div>
+              <div class="seg-row">
+                <div>
+                  <div class="seg-label">Requiere números</div>
+                  <div class="seg-desc">Al menos un dígito (0-9)</div>
+                </div>
+                <div class="seg-control">
+                  <div class="form-check form-switch d-flex justify-content-end">
+                    <input class="form-check-input" type="checkbox" id="sReqNum" onchange="actualizarFortaleza()">
+                  </div>
+                </div>
+              </div>
+              <div class="seg-row">
+                <div>
+                  <div class="seg-label">Requiere caracteres especiales</div>
+                  <div class="seg-desc">Al menos un símbolo (!@#$%^&*...)</div>
+                </div>
+                <div class="seg-control">
+                  <div class="form-check form-switch d-flex justify-content-end">
+                    <input class="form-check-input" type="checkbox" id="sReqEsp" onchange="actualizarFortaleza()">
+                  </div>
+                </div>
+              </div>
+
+              <!-- Indicador fortaleza -->
+              <div style="margin-top:16px; padding-top:14px; border-top:1px solid #f1f5f9;">
+                <div class="d-flex justify-content-between align-items-center mb-1">
+                  <span style="font-size:.78rem;color:#6b7280;font-weight:600">Fortaleza de política</span>
+                  <span id="sFortalezaLabel" style="font-size:.78rem;font-weight:700;color:#9ca3af">Débil</span>
+                </div>
+                <div class="seg-strength-row">
+                  <div class="seg-strength-bar" id="sb1"></div>
+                  <div class="seg-strength-bar" id="sb2"></div>
+                  <div class="seg-strength-bar" id="sb3"></div>
+                  <div class="seg-strength-bar" id="sb4"></div>
+                </div>
+                <div id="sResumenReqs" style="margin-top:10px;font-size:.78rem;color:#6b7280;line-height:1.7"></div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Preview ejemplo -->
+          <div class="seg-section">
+            <div class="seg-section-header">
+              <i class="bi bi-info-circle"></i>Ejemplo de clave válida
+            </div>
+            <div class="seg-section-body">
+              <div id="sEjemploClave" style="font-family:monospace;font-size:1.1rem;font-weight:700;color:var(--navy);letter-spacing:2px;text-align:center;padding:8px 0">—</div>
+              <div id="sEjemploDesc" style="font-size:.75rem;color:#9ca3af;text-align:center;margin-top:4px"></div>
+            </div>
+          </div>
+
+        </div>
+      </div>
+
+      <!-- Botón guardar -->
+      <div class="d-flex justify-content-end mt-2 mb-4">
+        <button class="btn-seg-save" onclick="guardarSeguridad()">
+          <i class="bi bi-floppy me-2"></i>Guardar configuración de seguridad
+        </button>
       </div>
     </div>
 
@@ -413,15 +633,15 @@
 
     // ── TABS ──────────────────────────────────────────────────
     function switchTab(tab) {
-      ['usuarios', 'permisos', 'miclave'].forEach(t => {
+      ['usuarios', 'permisos', 'miclave', 'seguridad'].forEach(t => {
         document.getElementById(`tab-${t}`).style.display = t === tab ? '' : 'none';
       });
       document.querySelectorAll('.nav-tabs .nav-link').forEach(b => {
         b.classList.toggle('active', b.dataset.tab === tab);
       });
       if (tab === 'permisos' && !perfilesData.length) cargarPerfiles();
+      if (tab === 'seguridad') cargarSeguridad();
       if (tab === 'usuarios') {
-        // Limpiar búsqueda y mostrar todos al volver a la tab
         document.getElementById('buscador').value = '';
         renderUsuarios(usuariosData);
       }
@@ -711,7 +931,128 @@
       }
     }
 
+    // ── SEGURIDAD ─────────────────────────────────────────────
+    let _segCargado = false;
+
+    async function cargarSeguridad() {
+      if (_segCargado) return;
+      const data = await api('GET', '/api/config/seguridad');
+      if (!data?.success) return;
+      const c = data.data;
+      _aplicarConfig(c);
+      _segCargado = true;
+      actualizarFortaleza();
+      actualizarHistorial();
+    }
+
+    function _aplicarConfig(c) {
+      _setVal('sTimeout',       c.timeout_inactividad || '60');
+      _setVal('sDiasVenc',      c.dias_venc_clave     || '0');
+      _setVal('sLongMin',       c.longitud_minima     || '6');
+      _setChk('sReqMay',        c.req_mayusculas      === '1');
+      _setChk('sReqNum',        c.req_numeros         === '1');
+      _setChk('sReqEsp',        c.req_especiales      === '1');
+      _setChk('sPermitirMisma', c.permitir_misma_clave !== '0');
+      _setVal('sHistorial',     c.historial_claves    || '0');
+    }
+
+    function _setVal(id, v) { const el = document.getElementById(id); if (el) el.value = v; }
+    function _setChk(id, v) { const el = document.getElementById(id); if (el) el.checked = v; }
+
+    function actualizarHistorial() {
+      const permiso = document.getElementById('sPermitirMisma').checked;
+      // Si permite la misma clave, el historial no aplica
+      document.getElementById('rowHistorial').style.opacity = permiso ? '.4' : '1';
+      document.getElementById('sHistorial').disabled = permiso;
+    }
+
+    function ajustarLongitud(delta) {
+      const el = document.getElementById('sLongMin');
+      const val = Math.min(32, Math.max(4, parseInt(el.value || 6) + delta));
+      el.value = val;
+      actualizarFortaleza();
+    }
+
+    function actualizarFortaleza() {
+      const lon   = parseInt(document.getElementById('sLongMin').value || 6);
+      const may   = document.getElementById('sReqMay').checked;
+      const num   = document.getElementById('sReqNum').checked;
+      const esp   = document.getElementById('sReqEsp').checked;
+
+      // Puntaje 1-4
+      let pts = 1;
+      if (lon >= 8)  pts++;
+      if (lon >= 12) pts++;
+      if (may || num) pts = Math.max(pts, 2);
+      if (may && num) pts = Math.max(pts, 3);
+      if (esp)        pts = Math.max(pts, 3);
+      if (may && num && esp && lon >= 8) pts = 4;
+
+      const labels = ['','Débil','Media','Fuerte','Muy fuerte'];
+      const colors = ['','#f87171','#fb923c','#facc15','#4ade80'];
+      const textColors = ['','#dc2626','#ea580c','#ca8a04','#16a34a'];
+
+      document.getElementById('sFortalezaLabel').textContent  = labels[pts];
+      document.getElementById('sFortalezaLabel').style.color  = textColors[pts];
+
+      [1,2,3,4].forEach(i => {
+        const bar = document.getElementById(`sb${i}`);
+        bar.className = 'seg-strength-bar';
+        if (i <= pts) { bar.style.background = colors[pts]; } else { bar.style.background = ''; }
+      });
+
+      // Resumen legible
+      const reqs = [];
+      reqs.push(`✔ Mínimo ${lon} caracteres`);
+      if (may) reqs.push('✔ Al menos una mayúscula');
+      if (num) reqs.push('✔ Al menos un número');
+      if (esp) reqs.push('✔ Al menos un carácter especial');
+      document.getElementById('sResumenReqs').innerHTML = reqs.join('<br>');
+
+      // Ejemplo generado
+      _generarEjemplo(lon, may, num, esp);
+    }
+
+    function _generarEjemplo(lon, may, num, esp) {
+      const chars = 'abcdefghijkmnpqrstuvwxyz';
+      const mays  = 'ABCDEFGHJKLMNPQRSTUVWXYZ';
+      const nums  = '23456789';
+      const esps  = '!@#$%&*';
+      let ejemplo = '';
+      if (may) ejemplo += mays[Math.floor(Math.random()*mays.length)];
+      if (num) ejemplo += nums[Math.floor(Math.random()*nums.length)];
+      if (esp) ejemplo += esps[Math.floor(Math.random()*esps.length)];
+      while (ejemplo.length < lon) ejemplo += chars[Math.floor(Math.random()*chars.length)];
+      // Mezclar
+      ejemplo = ejemplo.split('').sort(()=>Math.random()-.5).join('');
+      document.getElementById('sEjemploClave').textContent = ejemplo;
+      document.getElementById('sEjemploDesc').textContent  =
+        `Ejemplo de clave que cumple la política (${lon} car${lon>1?'s':''})`;
+    }
+
+    async function guardarSeguridad() {
+      const body = {
+        timeout_inactividad:  document.getElementById('sTimeout').value,
+        dias_venc_clave:      document.getElementById('sDiasVenc').value,
+        longitud_minima:      document.getElementById('sLongMin').value,
+        req_mayusculas:       document.getElementById('sReqMay').checked   ? '1' : '0',
+        req_numeros:          document.getElementById('sReqNum').checked   ? '1' : '0',
+        req_especiales:       document.getElementById('sReqEsp').checked   ? '1' : '0',
+        permitir_misma_clave: document.getElementById('sPermitirMisma').checked ? '1' : '0',
+        historial_claves:     document.getElementById('sHistorial').value,
+      };
+      const data = await api('PUT', '/api/config/seguridad', body);
+      if (data?.success) {
+        showToast('Configuración de seguridad guardada');
+        _segCargado = false; // forzar reload próxima vez
+      } else {
+        showToast(data?.error || 'Error al guardar', 'danger');
+      }
+    }
+
     // ── INIT ──────────────────────────────────────────────────
+    // Solo admin ve tab Seguridad
+    if (esAdmin) document.getElementById('tabSegNav').style.display = '';
     cargarUsuarios();
   </script>
 <script src="/js/app-version.js"></script>
