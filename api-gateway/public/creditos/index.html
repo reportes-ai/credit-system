@@ -367,7 +367,7 @@
   <div class="topnav-left">
     <div class="topnav-brand">
       <a href="/"><img src="/img/logo.png" alt="AutoFácil" style="display:block"></a>
-      <span class="version-badge" id="versionBadge">v3.5</span>
+      <span class="version-badge" id="versionBadge">v3.6</span>
     </div>
       <div class="breadcrumb-nav">
         <a href="/">Inicio</a><span class="sep">›</span>
@@ -1234,17 +1234,22 @@ function sincronizarEmpresaCard(empresa) {
   document.querySelectorAll('.fin-card').forEach(c => c.classList.toggle('active', c.dataset.empresa === empresa));
 }
 
+/* Filtra lista por empresas seleccionadas (sin filtro estado) */
+function _filtrarPorEmpresa(lista) {
+  if (_empresasFiltro.size === 0) return lista;
+  return lista.filter(c => {
+    const fin = (c.financiera || c.empresa || 'AUTOFACIL').toUpperCase().replace(/[^A-Z]/g,'');
+    return [..._empresasFiltro].some(f => fin.includes(f.replace(/[^A-Z]/g,'')));
+  });
+}
+
 function aplicarFiltroEmpresa() {
   if (!_todosCreditos.length) return;
-  let lista = _filtroProceso
-    ? _todosCreditos.filter(c => !ESTADOS_FUERA_PROCESO.has(c.estado))
-    : _aplicarFiltroEstado(_todosCreditos);
-  if (_empresasFiltro.size > 0) {
-    lista = lista.filter(c => {
-      const fin = (c.financiera || c.empresa || 'AUTOFACIL').toUpperCase().replace(/[^A-Z]/g,'');
-      return [..._empresasFiltro].some(f => fin.includes(f.replace(/[^A-Z]/g,'')));
-    });
-  }
+  const baseEmpresa = _filtrarPorEmpresa(_todosCreditos);
+  actualizarStats(baseEmpresa);
+  const lista = _filtroProceso
+    ? baseEmpresa.filter(c => !ESTADOS_FUERA_PROCESO.has(c.estado))
+    : _aplicarFiltroEstado(baseEmpresa);
   renderConsulta(lista);
 }
 
@@ -1308,20 +1313,14 @@ async function buscarCreditos() {
     const j = await r.json();
     if (!j.success) throw new Error(j.error);
     _todosCreditos = j.data || [];
-    // Stats siempre del total (sin filtro estado)
-    actualizarStats(_todosCreditos);
-    // Lista mostrada = filtro estado + filtro financiera
-    let lista = _filtroProceso
-      ? _todosCreditos.filter(c => !ESTADOS_FUERA_PROCESO.has(c.estado))
-      : _aplicarFiltroEstado(_todosCreditos);
-    // Filtro empresa (si hay seleccionadas)
-    if (_empresasFiltro.size > 0) {
-      lista = lista.filter(c => {
-        const fin = (c.financiera || c.empresa || 'AUTOFACIL').toUpperCase().replace(/[^A-Z]/g,'');
-        return [..._empresasFiltro].some(f => fin.includes(f.replace(/[^A-Z]/g,'')));
-      });
-    }
-    renderConsulta(lista);
+    // Stats: total filtrado por financiera (sin filtro estado)
+    const baseEmpresa = _filtrarPorEmpresa(_todosCreditos);
+    actualizarStats(baseEmpresa);
+    // Lista mostrada = filtro estado sobre base empresa
+    const listaEstado = _filtroProceso
+      ? baseEmpresa.filter(c => !ESTADOS_FUERA_PROCESO.has(c.estado))
+      : _aplicarFiltroEstado(baseEmpresa);
+    renderConsulta(listaEstado);
   } catch(e) {
     res.innerHTML = `<div class="empty-state" style="color:#ef4444"><i class="bi bi-exclamation-triangle"></i>${e.message}</div>`;
   }
