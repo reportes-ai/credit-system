@@ -1,0 +1,580 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <link rel="icon" href="/img/favicon.png" type="image/png">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Digitación Unidad de Crédito — AutoFácil</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.0/font/bootstrap-icons.css" rel="stylesheet">
+  <style>
+    :root { --navy:#0141A2; --navy-dark:#012d70; --navy-light:#0255c5; --unidad:#005a9e; --unidad-dark:#003d6e; --bg:#f0f4f8; }
+    body { background:var(--bg); font-family:'Segoe UI',system-ui,sans-serif; margin:0; min-height:100vh; }
+    .topnav { background:linear-gradient(90deg,var(--navy-dark),var(--navy-light)); color:#fff; height:60px; padding:0 24px; display:flex; align-items:center; justify-content:space-between; position:sticky; top:0; z-index:200; box-shadow:0 2px 8px rgba(0,0,0,.3); }
+    .topnav-left { display:flex; align-items:center; gap:16px; }
+    .topnav-brand { display:flex; align-items:center; gap:8px; text-decoration:none; }
+    .topnav-brand img { height:32px; filter:brightness(0) invert(1); }
+    .version-badge { background:rgba(255,255,255,.15); color:rgba(255,255,255,.75); font-size:.65rem; font-weight:700; border-radius:6px; padding:2px 8px; }
+    .breadcrumb-nav { color:rgba(255,255,255,.6); font-size:.85rem; display:flex; align-items:center; gap:6px; }
+    .breadcrumb-nav a { color:rgba(255,255,255,.75); text-decoration:none; }
+    .breadcrumb-nav a:hover { color:#fff; }
+    .breadcrumb-nav .sep { color:rgba(255,255,255,.35); }
+    .topnav-right { display:flex; align-items:center; gap:10px; }
+    .user-chip { background:rgba(255,255,255,.12); border-radius:24px; padding:5px 12px; display:flex; align-items:center; gap:8px; font-size:.85rem; }
+    .avatar { width:28px; height:28px; background:#90caf9; border-radius:50%; display:flex; align-items:center; justify-content:center; color:var(--navy); font-weight:700; font-size:.75rem; }
+    .perfil-badge { background:rgba(144,202,249,.2); border:1px solid rgba(144,202,249,.4); color:#90caf9; border-radius:12px; padding:2px 10px; font-size:.73rem; font-weight:600; }
+    .btn-logout { background:rgba(255,255,255,.1); border:1px solid rgba(255,255,255,.2); color:#fff; border-radius:8px; padding:5px 12px; font-size:.82rem; cursor:pointer; }
+    .page-content { padding:28px 40px; max-width:1050px; margin:0 auto; }
+    /* Banner financiera — tono más oscuro para Unidad */
+    .fin-banner { border-radius:14px; padding:18px 24px; margin-bottom:24px; display:flex; align-items:center; gap:16px; color:#fff; background:linear-gradient(135deg,var(--unidad-dark),var(--unidad) 55%,#1a73c2); }
+    .fin-banner .fin-logo { font-size:1.05rem; font-weight:900; letter-spacing:-.5px; opacity:.9; background:rgba(255,255,255,.15); border-radius:8px; padding:6px 12px; white-space:nowrap; }
+    .fin-banner h2 { font-size:1.1rem; font-weight:800; margin:0 0 2px; }
+    .fin-banner p  { margin:0; font-size:.83rem; opacity:.8; }
+    /* Secciones */
+    .sec { background:#fff; border-radius:14px; box-shadow:0 1px 5px rgba(0,0,0,.07); margin-bottom:20px; overflow:hidden; }
+    .sec-header { padding:13px 20px; background:#f8fafc; border-bottom:1px solid #e5e7eb; display:flex; align-items:center; gap:8px; }
+    .sec-header i { color:var(--navy); font-size:1rem; }
+    .sec-header span { font-weight:700; font-size:.88rem; color:#1e293b; text-transform:uppercase; letter-spacing:.4px; }
+    .sec-body { padding:20px; }
+    /* Campos */
+    .form-grid { display:grid; gap:14px; }
+    .g2 { grid-template-columns:repeat(2,1fr); }
+    .g3 { grid-template-columns:repeat(3,1fr); }
+    .g4 { grid-template-columns:repeat(4,1fr); }
+    .g5 { grid-template-columns:repeat(5,1fr); }
+    @media(max-width:768px){ .g2,.g3,.g4,.g5 { grid-template-columns:1fr 1fr; } }
+    .f-group { display:flex; flex-direction:column; gap:4px; }
+    .f-group label { font-size:.75rem; font-weight:600; color:#374151; text-transform:uppercase; letter-spacing:.3px; }
+    .f-group input, .f-group select, .f-group textarea { border:1.5px solid #d1d5db; border-radius:8px; padding:8px 11px; font-size:.88rem; outline:none; transition:border-color .2s; background:#fff; }
+    .f-group input:focus, .f-group select:focus, .f-group textarea:focus { border-color:var(--navy); }
+    .f-group input.calc { background:#f0f9ff; color:#0369a1; font-weight:600; }
+    .f-req::after { content:' *'; color:#ef4444; }
+    /* RUT */
+    .rut-wrap { position:relative; }
+    .rut-wrap .rut-btn { position:absolute; right:6px; top:50%; transform:translateY(-50%); background:var(--navy); color:#fff; border:none; border-radius:6px; padding:4px 10px; font-size:.8rem; cursor:pointer; }
+    .cliente-found { background:#f0fdf4; border:1px solid #86efac; border-radius:8px; padding:10px 14px; font-size:.83rem; color:#166534; margin-top:6px; display:none; }
+    /* Parque */
+    .calc-box { background:#eff6ff; border:1px solid #bfdbfe; border-radius:10px; padding:12px 16px; margin-top:12px; }
+    .calc-row { display:flex; justify-content:space-between; align-items:center; font-size:.83rem; color:#1e40af; padding:3px 0; }
+    .calc-row strong { font-size:.9rem; }
+    /* Botones footer */
+    .form-footer { display:flex; gap:12px; justify-content:flex-end; margin-top:8px; }
+    .btn-limpiar { background:#f1f5f9; color:#374151; border:none; border-radius:10px; padding:11px 22px; font-size:.9rem; font-weight:600; cursor:pointer; }
+    .btn-limpiar:hover { background:#e2e8f0; }
+    .btn-guardar { background:var(--unidad); color:#fff; border:none; border-radius:10px; padding:11px 28px; font-size:.9rem; font-weight:700; cursor:pointer; display:flex; align-items:center; gap:8px; }
+    .btn-guardar:hover { background:var(--navy-light); }
+    .btn-guardar:disabled { background:#93c5fd; cursor:not-allowed; }
+    /* Alertas */
+    .alert-ok  { background:#f0fdf4; border:1px solid #86efac; color:#166534; border-radius:10px; padding:12px 16px; font-size:.87rem; display:none; margin-bottom:16px; }
+    .alert-err { background:#fef2f2; border:1px solid #fecaca; color:#dc2626; border-radius:10px; padding:12px 16px; font-size:.87rem; display:none; margin-bottom:16px; }
+    /* Nota de seguros Unidad */
+    .nota-unidad { background:#f0f9ff; border:1px solid #bae6fd; border-radius:8px; padding:10px 14px; font-size:.8rem; color:#075985; }
+  </style>
+</head>
+<body>
+
+<nav class="topnav">
+  <div class="topnav-left">
+    <a href="/" class="topnav-brand">
+      <img src="/img/logo.png" alt="AutoFácil">
+      <span class="version-badge">v1.0</span>
+    </a>
+    <div class="breadcrumb-nav">
+      <a href="/">Inicio</a><span class="sep">›</span>
+      <a href="/creditos">Créditos</a><span class="sep">›</span>
+      <span style="color:#fff;font-weight:600">Digitación Unidad de Crédito</span>
+    </div>
+  </div>
+  <div class="topnav-right">
+    <div class="user-chip">
+      <div class="avatar" id="avatarInicial">?</div>
+      <div>
+        <div style="font-weight:600;line-height:1.3;color:#fff" id="navNombre">—</div>
+        <div class="perfil-badge" id="navPerfil">—</div>
+      </div>
+    </div>
+    <button class="btn-logout" onclick="logout()"><i class="bi bi-box-arrow-right me-1"></i>Salir</button>
+  </div>
+</nav>
+
+<div class="page-content">
+
+  <!-- Banner Unidad de Crédito -->
+  <div class="fin-banner">
+    <div class="fin-logo"><i class="bi bi-building-fill me-1"></i>Unidad de Crédito</div>
+    <div>
+      <h2>Digitación de Operación — Unidad de Crédito</h2>
+      <p>Registro de créditos brokerage. Los campos de comisiones y FEI se gestionan en el seguimiento post-otorgamiento.</p>
+    </div>
+    <div style="margin-left:auto;display:flex;gap:10px">
+      <a href="/creditos/digitacion-autofin" style="background:rgba(255,255,255,.15);color:#fff;border:1px solid rgba(255,255,255,.3);border-radius:8px;padding:7px 14px;font-size:.82rem;text-decoration:none;display:flex;align-items:center;gap:6px">
+        <i class="bi bi-arrow-left-right"></i> Ir a AutoFin
+      </a>
+    </div>
+  </div>
+
+  <div id="alertaOk"  class="alert-ok"></div>
+  <div id="alertaErr" class="alert-err"></div>
+
+  <!-- ── 1. DATOS DE LA OPERACIÓN ─────────────────────────────── -->
+  <div class="sec">
+    <div class="sec-header"><i class="bi bi-hash"></i><span>Datos de la operación</span></div>
+    <div class="sec-body">
+      <div class="form-grid g4">
+        <div class="f-group">
+          <label>N° OP</label>
+          <input type="number" id="fNumOp" placeholder="Ej: 85000">
+        </div>
+        <div class="f-group">
+          <label class="f-req">Mes</label>
+          <input type="month" id="fMes">
+        </div>
+        <div class="f-group">
+          <label class="f-req">Estado Eval. Riesgo</label>
+          <select id="fEstadoEval">
+            <option value="">— Seleccione —</option>
+            <option>APROBADO</option>
+            <option>RECHAZADO</option>
+            <option>PENDIENTE</option>
+            <option>EN EVALUACION</option>
+          </select>
+        </div>
+        <div class="f-group">
+          <label class="f-req">Estado Crédito</label>
+          <select id="fEstadoCred">
+            <option value="">— Seleccione —</option>
+            <option>APROBADO</option>
+            <option>OTORGADO</option>
+            <option>RECHAZADO</option>
+            <option>ANULADO</option>
+          </select>
+        </div>
+      </div>
+      <div class="form-grid g3" style="margin-top:14px">
+        <div class="f-group">
+          <label>Fecha Otorgado</label>
+          <input type="date" id="fFechaOtorgado">
+        </div>
+        <div class="f-group">
+          <label class="f-req">Producto Unidad</label>
+          <select id="fProducto">
+            <option value="">— Seleccione —</option>
+            <option>CREDITO CC UNIDAD APROB 11</option>
+            <option>UNIDAD - CREDITO CONVENCIONAL</option>
+            <option>UNIDAD - PARQUE - CREDITO CONVENCIONAL</option>
+            <option>AUTOFIN - PARQUE - CREDITO CONVENCIONAL</option>
+          </select>
+        </div>
+        <div class="f-group">
+          <label>ID Financiera</label>
+          <input type="text" id="fIdFinanciera" placeholder="Ej: 5481790">
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── 2. CLIENTE ────────────────────────────────────────────── -->
+  <div class="sec">
+    <div class="sec-header"><i class="bi bi-person-fill"></i><span>Cliente</span></div>
+    <div class="sec-body">
+      <div class="form-grid g2">
+        <div class="f-group">
+          <label class="f-req">RUT Cliente</label>
+          <div class="rut-wrap">
+            <input type="text" id="fRut" placeholder="12.345.678-9" maxlength="12" oninput="formatRut(this)" onblur="buscarCliente()">
+            <button class="rut-btn" onclick="buscarCliente()"><i class="bi bi-search"></i></button>
+          </div>
+          <div id="clienteFound" class="cliente-found"></div>
+        </div>
+        <div class="f-group">
+          <label class="f-req">Nombre Cliente</label>
+          <input type="text" id="fNombre" placeholder="Se autocompleta al buscar RUT">
+        </div>
+      </div>
+      <div class="form-grid g3" style="margin-top:14px">
+        <div class="f-group">
+          <label>Ejecutivo Comercial</label>
+          <input type="text" id="fEjecutivo" placeholder="Nombre del ejecutivo">
+        </div>
+        <div class="f-group">
+          <label>Automotora / CCS</label>
+          <input type="text" id="fAutomotora" placeholder="Nombre de la automotora">
+        </div>
+        <div class="f-group">
+          <label>Nombre Local</label>
+          <input type="text" id="fNombreLocal" placeholder="Nombre del local o sucursal">
+        </div>
+      </div>
+      <div class="f-group" style="margin-top:14px">
+        <label>Comentarios</label>
+        <textarea id="fComentarios" rows="2" placeholder="Observaciones de la operación…" style="resize:vertical"></textarea>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── 3. VEHÍCULO ───────────────────────────────────────────── -->
+  <div class="sec">
+    <div class="sec-header"><i class="bi bi-car-front-fill"></i><span>Vehículo y financiamiento</span></div>
+    <div class="sec-body">
+      <div class="form-grid g3">
+        <div class="f-group">
+          <label class="f-req">Valor Vehículo $</label>
+          <input type="number" id="fValorVeh" placeholder="0" min="0" oninput="calcularSaldo()">
+        </div>
+        <div class="f-group">
+          <label class="f-req">Pie $</label>
+          <input type="number" id="fPie" placeholder="0" min="0" oninput="calcularSaldo()">
+        </div>
+        <div class="f-group">
+          <label>Saldo Precio $ <small style="color:#0369a1;font-weight:600">(calculado)</small></label>
+          <input type="text" id="fSaldo" class="calc" readonly>
+        </div>
+        <div class="f-group">
+          <label>% Financiado <small style="color:#0369a1;font-weight:600">(calculado)</small></label>
+          <input type="text" id="fPctFin" class="calc" readonly>
+        </div>
+        <div class="f-group">
+          <label>Impuesto $</label>
+          <input type="number" id="fImpuesto" placeholder="0" min="0">
+        </div>
+        <div class="f-group">
+          <label>Estado Impuesto</label>
+          <select id="fEstadoImpto">
+            <option value="">— Seleccione —</option>
+            <option>NO APLICA</option>
+            <option>PENDIENTE</option>
+            <option>PAGADO</option>
+          </select>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── 4. CONDICIONES DEL CRÉDITO ────────────────────────────── -->
+  <div class="sec">
+    <div class="sec-header"><i class="bi bi-bank2"></i><span>Condiciones del crédito</span></div>
+    <div class="sec-body">
+      <div class="form-grid g3">
+        <div class="f-group">
+          <label class="f-req">Monto Financiado Indexa $</label>
+          <input type="number" id="fMontoFin" placeholder="0" min="0">
+        </div>
+        <div class="f-group">
+          <label class="f-req">Plazo (meses)</label>
+          <select id="fPlazo">
+            <option value="">— Seleccione —</option>
+            <option value="12">12 meses</option>
+            <option value="24">24 meses</option>
+            <option value="36">36 meses</option>
+            <option value="48">48 meses</option>
+            <option value="60">60 meses</option>
+            <option value="72">72 meses</option>
+            <option value="84">84 meses</option>
+          </select>
+        </div>
+        <div class="f-group">
+          <label>Fecha Primera Cuota</label>
+          <input type="date" id="fFechaCuota">
+        </div>
+      </div>
+      <div class="form-grid g4" style="margin-top:14px">
+        <div class="f-group">
+          <label>Tasa Cliente Real (%)</label>
+          <input type="number" id="fTasCliReal" placeholder="2.63" step="0.001" min="0">
+        </div>
+        <div class="f-group">
+          <label>Tasa Cliente Pizarra (%)</label>
+          <input type="number" id="fTasCliPiz" placeholder="2.63" step="0.001" min="0">
+        </div>
+        <div class="f-group">
+          <label>Tasa Financiera Pizarra (%)</label>
+          <input type="number" id="fTasFinPiz" placeholder="1.525" step="0.001" min="0">
+        </div>
+        <div class="f-group">
+          <label>Comisión Dealer Real $</label>
+          <input type="number" id="fComDea" placeholder="0" min="0">
+        </div>
+      </div>
+      <div class="form-grid g2" style="margin-top:14px">
+        <div class="f-group">
+          <label>Monto Pago Comisión Financiera $</label>
+          <input type="number" id="fMontComFin" placeholder="0" min="0">
+        </div>
+        <!-- Sin Mayor/Menor UF, sin Monto Capitalizado, sin Limitación para Unidad -->
+      </div>
+    </div>
+  </div>
+
+  <!-- ── 5. PARQUE ─────────────────────────────────────────────── -->
+  <div class="sec">
+    <div class="sec-header"><i class="bi bi-p-circle-fill"></i><span>Parque</span></div>
+    <div class="sec-body">
+      <div class="form-grid g2">
+        <div class="f-group">
+          <label>Parque asignado</label>
+          <select id="fParque" onchange="calcularParque()">
+            <option value="NO APLICA">NO APLICA (venta en calle)</option>
+          </select>
+        </div>
+        <div id="parqueCalcBox" class="calc-box" style="display:none">
+          <div class="calc-row"><span>Comisión Parque</span> <strong id="showComParque">—</strong></div>
+          <div class="calc-row" style="font-size:.76rem;opacity:.8"><span>% aplicado sobre saldo precio</span> <span id="showPctParque">—</span></div>
+          <div class="calc-row" style="border-top:1px solid #bfdbfe;margin-top:6px;padding-top:6px">
+            <span>Arriendo mensual bruto</span> <strong id="showArriendo">—</strong>
+          </div>
+          <div style="font-size:.72rem;color:#64748b;margin-top:4px">El arriendo se prorratea entre todas las ops otorgadas del parque en el mes.</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── 6. GASTOS ─────────────────────────────────────────────── -->
+  <div class="sec">
+    <div class="sec-header"><i class="bi bi-receipt-cutoff"></i><span>Gastos operacionales</span></div>
+    <div class="sec-body">
+      <div class="form-grid g3">
+        <div class="f-group">
+          <label>Gastos Operacionales $</label>
+          <input type="number" id="fGastos" placeholder="0" min="0">
+        </div>
+        <div class="f-group">
+          <label>GPS $</label>
+          <input type="number" id="fGps" placeholder="0" min="0">
+          <div style="font-size:.72rem;color:#64748b;margin-top:3px">Costo GPS incluido en el crédito Unidad</div>
+        </div>
+      </div>
+      <!-- Nota: Unidad no genera comisiones de seguros -->
+      <div class="nota-unidad mt-3">
+        <i class="bi bi-info-circle-fill me-1"></i>
+        <strong>Unidad de Crédito no genera comisiones de seguros.</strong>
+        Los productos de seguro RDH, Cesantía y Reparaciones no aplican para operaciones de Unidad de Crédito.
+      </div>
+    </div>
+  </div>
+
+  <!-- ── 7. DOCUMENTOS ─────────────────────────────────────────── -->
+  <div class="sec">
+    <div class="sec-header"><i class="bi bi-file-earmark-check-fill"></i><span>Documentos</span></div>
+    <div class="sec-body">
+      <div class="form-grid g4">
+        <div class="f-group">
+          <label>Boleta / Factura N°</label>
+          <input type="text" id="fBoleta" placeholder="N° de boleta o factura">
+        </div>
+        <div class="f-group">
+          <label>Cantidad de Documentos</label>
+          <input type="number" id="fCantDoc" placeholder="0" min="0" value="0">
+        </div>
+        <div class="f-group">
+          <label>Documentos Autorizados</label>
+          <input type="number" id="fDocAuth" placeholder="0" min="0" value="0">
+        </div>
+        <div class="f-group">
+          <label>Fecha Recepción Documento</label>
+          <input type="date" id="fFechaDoc">
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Footer -->
+  <div class="form-footer">
+    <button class="btn-limpiar" onclick="limpiar()"><i class="bi bi-x-circle me-1"></i>Limpiar</button>
+    <button class="btn-guardar" id="btnGuardar" onclick="guardar()">
+      <i class="bi bi-floppy-fill"></i> Guardar Operación
+    </button>
+  </div>
+
+</div>
+
+<script>
+  const token = localStorage.getItem('token');
+  const yo    = JSON.parse(localStorage.getItem('usuario') || 'null');
+  if (!token || !yo) window.location.href = '/login.html';
+  document.getElementById('navNombre').textContent = `${yo?.nombre||''} ${yo?.apellido||''}`.trim();
+  document.getElementById('navPerfil').textContent  = yo?.perfil || '';
+  document.getElementById('avatarInicial').textContent = (yo?.nombre||'?').charAt(0).toUpperCase();
+  function logout() { localStorage.removeItem('token'); localStorage.removeItem('usuario'); window.location.href = '/login.html'; }
+
+  // Pre-fill ejecutivo con el usuario logueado
+  document.getElementById('fEjecutivo').value = `${yo?.nombre||''} ${yo?.apellido||''}`.trim();
+
+  // Pre-fill mes actual
+  document.getElementById('fMes').value = new Date().toISOString().slice(0,7);
+
+  let parques = [];
+
+  /* ── Cargar parques ─────────────────────────────────────────── */
+  async function cargarParques() {
+    try {
+      const r = await fetch('/api/parques-comisiones?activos=1', { headers:{ Authorization:'Bearer '+token } });
+      const { success, data } = await r.json();
+      if (!success) return;
+      parques = data;
+      const sel = document.getElementById('fParque');
+      data.forEach(p => sel.add(new Option(p.nombre, p.id)));
+    } catch(e) {}
+  }
+
+  /* ── Formatear RUT chileno ─────────────────────────────────── */
+  function formatRut(input) {
+    let v = input.value.replace(/[^0-9kK]/g,'');
+    if (v.length > 1) v = v.slice(0,-1).replace(/\B(?=(\d{3})+(?!\d))/g,'.') + '-' + v.slice(-1);
+    input.value = v.toUpperCase();
+  }
+
+  /* ── Buscar cliente por RUT ─────────────────────────────────── */
+  async function buscarCliente() {
+    const rut = document.getElementById('fRut').value.trim();
+    if (!rut || rut.length < 5) return;
+    try {
+      const r = await fetch(`/api/clientes/buscar?rut=${encodeURIComponent(rut)}`, { headers:{ Authorization:'Bearer '+token } });
+      const { success, data } = await r.json();
+      const found = document.getElementById('clienteFound');
+      if (success && data) {
+        const nombre = `${data.nombres||data.nombre||''} ${data.apellido_paterno||data.apellido||''} ${data.apellido_materno||''}`.trim();
+        document.getElementById('fNombre').value = nombre;
+        found.textContent = `✓ Cliente encontrado: ${nombre}`;
+        found.style.display = 'block';
+      } else {
+        found.style.display = 'none';
+      }
+    } catch(e) {}
+  }
+
+  /* ── Calcular saldo precio ─────────────────────────────────── */
+  function calcularSaldo() {
+    const val  = parseFloat(document.getElementById('fValorVeh').value) || 0;
+    const pie  = parseFloat(document.getElementById('fPie').value) || 0;
+    const saldo = val - pie;
+    const pct   = val > 0 ? (saldo / val * 100).toFixed(2) : 0;
+    document.getElementById('fSaldo').value  = saldo > 0 ? '$' + Math.round(saldo).toLocaleString('es-CL') : '';
+    document.getElementById('fPctFin').value = val > 0 ? pct + '%' : '';
+    calcularParque();
+  }
+
+  /* ── Calcular comisión parque ─────────────────────────────── */
+  function calcularParque() {
+    const sel    = document.getElementById('fParque');
+    const box    = document.getElementById('parqueCalcBox');
+    const selVal = sel.value;
+    if (!selVal || selVal === 'NO APLICA') { box.style.display = 'none'; return; }
+    const p = parques.find(x => String(x.id) === selVal);
+    if (!p) { box.style.display = 'none'; return; }
+    const saldo   = parseFloat(document.getElementById('fValorVeh').value||0) - parseFloat(document.getElementById('fPie').value||0);
+    const comPct  = parseFloat(p.comision_pct) || 0;
+    const comMonto = Math.round(saldo * comPct);
+    document.getElementById('showComParque').textContent = '$' + comMonto.toLocaleString('es-CL');
+    document.getElementById('showPctParque').textContent = (comPct*100).toFixed(2) + '%';
+    document.getElementById('showArriendo').textContent  = '$' + Math.round(p.arriendo).toLocaleString('es-CL');
+    box.style.display = '';
+  }
+
+  /* ── Guardar operación ─────────────────────────────────────── */
+  async function guardar() {
+    const ok  = document.getElementById('alertaOk');
+    const err = document.getElementById('alertaErr');
+    ok.style.display = 'none'; err.style.display = 'none';
+
+    const mes    = document.getElementById('fMes').value;
+    const rut    = document.getElementById('fRut').value.trim();
+    const estado = document.getElementById('fEstadoCred').value;
+    if (!mes)    { err.textContent = 'El mes es requerido.'; err.style.display = 'block'; window.scrollTo(0,0); return; }
+    if (!rut)    { err.textContent = 'El RUT del cliente es requerido.'; err.style.display = 'block'; window.scrollTo(0,0); return; }
+    if (!estado) { err.textContent = 'Selecciona el estado del crédito.'; err.style.display = 'block'; window.scrollTo(0,0); return; }
+
+    const selParque  = document.getElementById('fParque');
+    const parqueSelId = selParque.value;
+    const parqueNombre = (parqueSelId && parqueSelId !== 'NO APLICA')
+      ? (parques.find(x => String(x.id) === parqueSelId)?.nombre || 'NO APLICA')
+      : 'NO APLICA';
+
+    const body = {
+      num_op:             parseInt(document.getElementById('fNumOp').value)||null,
+      mes:                mes + '-01',
+      financiera:         'UNIDAD DE CREDITO',
+      rut_cliente:        rut,
+      nombre_cliente:     document.getElementById('fNombre').value.trim(),
+      comentarios:        document.getElementById('fComentarios').value.trim(),
+      ejecutivo:          document.getElementById('fEjecutivo').value.trim(),
+      automotora:         document.getElementById('fAutomotora').value.trim(),
+      nombre_local:       document.getElementById('fNombreLocal').value.trim(),
+      estado_eval:        document.getElementById('fEstadoEval').value,
+      estado_credito:     estado,
+      fecha_otorgado:     document.getElementById('fFechaOtorgado').value || null,
+      producto:           document.getElementById('fProducto').value,
+      valor_vehiculo:     parseFloat(document.getElementById('fValorVeh').value)||null,
+      pie:                parseFloat(document.getElementById('fPie').value)||null,
+      impuesto:           parseFloat(document.getElementById('fImpuesto').value)||null,
+      estado_impuesto:    document.getElementById('fEstadoImpto').value,
+      limitacion:         0,          // No aplica Unidad
+      gastos:             parseFloat(document.getElementById('fGastos').value)||0,
+      gps:                parseFloat(document.getElementById('fGps').value)||0,
+      seguro_rdh:         0,          // No aplica Unidad
+      seguro_cesantia:    0,          // No aplica Unidad
+      seguro_rep_menor:   0,          // No aplica Unidad
+      monto_financiado:   parseFloat(document.getElementById('fMontoFin').value)||null,
+      plazo:              parseInt(document.getElementById('fPlazo').value)||null,
+      tascli_real:        parseFloat(document.getElementById('fTasCliReal').value)/100||null,
+      tascli_pizarra:     parseFloat(document.getElementById('fTasCliPiz').value)/100||null,
+      tasfin_pizarra:     parseFloat(document.getElementById('fTasFinPiz').value)/100||null,
+      comdea_real:        parseFloat(document.getElementById('fComDea').value)||null,
+      monto_comision_fin: parseFloat(document.getElementById('fMontComFin').value)||null,
+      id_financiera:      document.getElementById('fIdFinanciera').value.trim(),
+      fecha_primera_cuota: document.getElementById('fFechaCuota').value || null,
+      parque:             parqueNombre,
+      mayor_menor:        null,       // No aplica Unidad
+      monto_capitalizado: 0,          // No aplica Unidad
+      boleta_factura:     document.getElementById('fBoleta').value.trim(),
+      cantidad_docs:      parseInt(document.getElementById('fCantDoc').value)||0,
+      docs_autorizados:   parseInt(document.getElementById('fDocAuth').value)||0,
+      fecha_recep_doc:    document.getElementById('fFechaDoc').value || null,
+    };
+
+    const btn = document.getElementById('btnGuardar');
+    btn.disabled = true; btn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span>Guardando…';
+
+    try {
+      const r = await fetch('/api/operaciones', {
+        method:'POST',
+        headers:{ 'Content-Type':'application/json', Authorization:'Bearer '+token },
+        body: JSON.stringify(body)
+      });
+      const data = await r.json();
+      if (data.success) {
+        ok.innerHTML = `<i class="bi bi-check-circle me-2"></i>Operación guardada correctamente. ID: <strong>${data.data.id}</strong> — N° OP: <strong>${data.data.num_op || '—'}</strong>`;
+        ok.style.display = 'block';
+        window.scrollTo(0,0);
+        setTimeout(() => { limpiar(); }, 1500);
+      } else {
+        err.textContent = data.error || 'Error al guardar.';
+        err.style.display = 'block';
+        window.scrollTo(0,0);
+      }
+    } catch(e) {
+      err.textContent = 'Error de conexión.';
+      err.style.display = 'block';
+    } finally {
+      btn.disabled = false;
+      btn.innerHTML = '<i class="bi bi-floppy-fill"></i> Guardar Operación';
+    }
+  }
+
+  function limpiar() {
+    document.querySelectorAll('input:not([id=fEjecutivo]):not([id=fMes]), select, textarea').forEach(el => {
+      el.value = '';
+    });
+    document.getElementById('fMes').value = new Date().toISOString().slice(0,7);
+    document.getElementById('fSaldo').value = '';
+    document.getElementById('fPctFin').value = '';
+    document.getElementById('clienteFound').style.display = 'none';
+    document.getElementById('parqueCalcBox').style.display = 'none';
+    document.getElementById('alertaOk').style.display = 'none';
+    document.getElementById('alertaErr').style.display = 'none';
+  }
+
+  cargarParques();
+</script>
+<script src="/js/app-version.js"></script>
+</body>
+</html>

@@ -36,6 +36,7 @@ app.use('/api/parametros-credito', require('../../services/mantenedores/src/rout
 app.use('/api/tipos-documento',      require('../../services/mantenedores/src/routes/tipos-documento.routes'));
 app.use('/api/plantillas-documento', require('../../services/mantenedores/src/routes/plantillas.routes'));
 app.use('/api/cuentas-bancarias',    require('../../services/mantenedores/src/routes/cuentas-bancarias.routes'));
+app.use('/api/parques-comisiones',   require('../../services/mantenedores/src/routes/parques.routes'));
 
 // Cotizaciones
 app.use('/api/cotizaciones', require('../../services/cotizaciones/src/routes/cotizaciones.routes'));
@@ -45,6 +46,7 @@ app.use('/api/creditos',            require('../../services/creditos/src/routes/
 app.use('/api/credito-documentos',  require('../../services/creditos/src/routes/credito-documentos.routes'));
 app.use('/api/documentos-af',       require('../../services/creditos/src/routes/documentos-af.routes'));
 app.use('/api/pagos-credito',       require('../../services/creditos/src/routes/pagos-credito.routes'));
+app.use('/api/operaciones',         require('../../services/creditos/src/routes/operaciones.routes'));
 app.use('/api/auditoria-credito',   require('../../services/creditos/src/routes/auditoria.routes'));
 
 // Tesorería
@@ -104,6 +106,15 @@ app.get(['/mantenedores/pagares', '/mantenedores/pagares/'], (req, res) =>
 
 app.get(['/mantenedores/cuentas-bancarias', '/mantenedores/cuentas-bancarias/'], (req, res) =>
   res.sendFile(path.join(__dirname, '../public/mantenedores/cuentas-bancarias/index.html')));
+
+app.get(['/mantenedores/parques', '/mantenedores/parques/'], (req, res) =>
+  res.sendFile(path.join(__dirname, '../public/mantenedores/parques/index.html')));
+
+app.get(['/creditos/digitacion-autofin', '/creditos/digitacion-autofin/'], (req, res) =>
+  res.sendFile(path.join(__dirname, '../public/creditos/digitacion-autofin.html')));
+
+app.get(['/creditos/digitacion-unidad', '/creditos/digitacion-unidad/'], (req, res) =>
+  res.sendFile(path.join(__dirname, '../public/creditos/digitacion-unidad.html')));
 
 app.get(['/creditos/carga-documentos-af', '/creditos/carga-documentos-af/'], (req, res) =>
   res.sendFile(path.join(__dirname, '../public/creditos/carga-documentos-af.html')));
