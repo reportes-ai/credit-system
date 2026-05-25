@@ -211,6 +211,68 @@ const pool = require('../../../../shared/config/database');
   }
 })();
 
+/* ─── Migración v3: nuevos módulos y funcionalidades ─────────────────────── */
+(async () => {
+  try {
+    const [perfiles] = await pool.query('SELECT id_perfil FROM perfiles');
+    const [[admin]]  = await pool.query("SELECT id_perfil FROM perfiles WHERE nombre='Administrador' LIMIT 1");
+
+    // Helper: insertar funcionalidad si no existe y asignarla a todos los perfiles
+    async function addFunc(modNombre, funNombre, funCodigo, habDef = 0) {
+      const [[mod]] = await pool.query(
+        "SELECT id_modulo FROM modulos WHERE nombre=? AND estado='activo'", [modNombre]
+      );
+      if (!mod) return;
+      const [[ex]] = await pool.query(
+        'SELECT id_funcionalidad FROM funcionalidades WHERE codigo=?', [funCodigo]
+      );
+      let id_func;
+      if (ex) {
+        id_func = ex.id_funcionalidad;
+      } else {
+        const [ins] = await pool.query(
+          'INSERT INTO funcionalidades (id_modulo, nombre, codigo) VALUES (?,?,?)',
+          [mod.id_modulo, funNombre, funCodigo]
+        );
+        id_func = ins.insertId;
+      }
+      for (const p of perfiles) {
+        await pool.query(
+          `INSERT IGNORE INTO permisos_perfil (id_perfil, id_funcionalidad, habilitado) VALUES (?,?,?)`,
+          [p.id_perfil, id_func, habDef]
+        );
+      }
+      return id_func;
+    }
+
+    // ── CRM: Campañas de Outbound ──────────────────────────────────────────
+    await addFunc('CRM', 'Ver Campañas Outbound',        'crm_campanas_ver',        1);
+    await addFunc('CRM', 'Crear Campaña Outbound',       'crm_campanas_crear',      0);
+    await addFunc('CRM', 'Gestionar Campañas Outbound',  'crm_campanas_gestionar',  0);
+    await addFunc('CRM', 'Ver Resultados de Campaña',    'crm_campanas_resultados', 0);
+
+    // ── Usuarios: Seguridad ────────────────────────────────────────────────
+    await addFunc('Usuarios', 'Gestionar Configuración de Seguridad', 'usuarios_seguridad', 0);
+
+    // ── Créditos: nuevas acciones ──────────────────────────────────────────
+    await addFunc('Créditos', 'Ver Documentos AF',       'creditos_documentos_af',  0);
+
+    // ── Administrador: habilitar TODO lo nuevo ─────────────────────────────
+    if (admin) {
+      await pool.query(
+        `INSERT INTO permisos_perfil (id_perfil, id_funcionalidad, habilitado)
+         SELECT ?, id_funcionalidad, 1 FROM funcionalidades
+         ON DUPLICATE KEY UPDATE habilitado = 1`,
+        [admin.id_perfil]
+      );
+    }
+
+    console.log('✓ Perfiles v3: nuevos módulos CRM-Campañas y Usuarios-Seguridad agregados');
+  } catch (e) {
+    console.error('[perfiles migration v3]', e.message);
+  }
+})();
+
 const getAllPerfiles = async (req, res) => {
   try {
     const [perfiles] = await pool.query(
