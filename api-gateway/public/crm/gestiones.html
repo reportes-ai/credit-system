@@ -106,6 +106,9 @@
     .autocomplete-item:last-child { border-bottom:none; }
     .autocomplete-item:hover { background:#eff6ff; }
     .autocomplete-item .rut { color:#6b7280; font-size:.75rem; }
+    .rut-valid   { border-color:#22c55e !important; box-shadow:0 0 0 2px rgba(34,197,94,.15) !important; }
+    .rut-invalid { border-color:#dc2626 !important; box-shadow:0 0 0 2px rgba(220,38,38,.15) !important; }
+    .rut-hint { font-size:.72rem; margin-top:3px; min-height:16px; }
 
     /* PANEL DERECHO */
     .list-panel { overflow-y:auto; padding:20px; display:flex; flex-direction:column; gap:16px; }
@@ -182,7 +185,7 @@
   <div class="topnav-left">
     <a href="/" class="topnav-brand">
       <img src="/img/logo.png" alt="AutoFácil">
-      <span class="version-badge" id="versionBadge">v4.6</span>
+      <span class="version-badge" id="versionBadge">v4.7</span>
     </a>
     <div class="breadcrumb-nav">
       <a href="/">Inicio</a><span class="sep">›</span>
@@ -236,9 +239,12 @@
     <div id="campos-rut">
       <div class="section-label" style="margin-top:10px">Buscar cliente por RUT</div>
       <div class="autocomplete-wrap">
-        <input type="text" class="form-control" id="inputBuscarRut" placeholder="Ej: 12.345.678-9" autocomplete="off" oninput="buscarCliente(this.value)">
+        <input type="text" class="form-control" id="inputBuscarRut" placeholder="Ej: 12.345.678-9"
+               autocomplete="off" maxlength="12"
+               oninput="onRutInput(this)" onkeydown="if(event.key==='Enter'){event.preventDefault();buscarCliente(this.value)}">
         <div class="autocomplete-dropdown" id="autocompleteList"></div>
       </div>
+      <div class="rut-hint" id="rutHint"></div>
       <div id="clienteSeleccionado" style="display:none;margin-top:8px;background:#f0fdf4;border:1px solid #bbf7d0;border-radius:8px;padding:10px;font-size:.83rem;">
         <strong id="cs-nombre"></strong><br>
         <span style="color:#6b7280" id="cs-rut"></span>
@@ -508,6 +514,74 @@ function setPrioridad(p) {
   document.getElementById('hPrioridad').value = p;
 }
 
+// ─── RUT: formato y validación ────────────────────────────────────────────────
+function _calcDV(rut) {
+  let sum = 0, mul = 2, r = parseInt(rut);
+  while (r > 0) {
+    sum += (r % 10) * mul;
+    r   = Math.floor(r / 10);
+    mul = mul === 7 ? 2 : mul + 1;
+  }
+  const dv = 11 - (sum % 11);
+  return dv === 11 ? '0' : dv === 10 ? 'K' : String(dv);
+}
+
+function _formatRut(raw) {
+  // raw: solo dígitos y K (ya limpio)
+  if (!raw) return '';
+  const cuerpo = raw.slice(0, -1);
+  const dv     = raw.slice(-1).toUpperCase();
+  if (!cuerpo) return dv;
+  // Aplicar puntos cada 3 dígitos de derecha a izquierda
+  const conPuntos = cuerpo.replace(/\B(?=(\d{3})+(?!\d))/g, '.');
+  return `${conPuntos}-${dv}`;
+}
+
+function _rutValido(rut) {
+  // rut formateado: xx.xxx.xxx-z
+  const clean = rut.replace(/\./g,'').replace(/-/g,'').toUpperCase();
+  if (clean.length < 2) return null; // insuficiente para validar
+  const cuerpo = clean.slice(0, -1);
+  const dvInp  = clean.slice(-1);
+  if (!/^\d+$/.test(cuerpo)) return false;
+  return _calcDV(cuerpo) === dvInp;
+}
+
+function onRutInput(el) {
+  const pos      = el.selectionStart;
+  const oldLen   = el.value.length;
+  // Limpiar: solo dígitos + K al final
+  const raw = el.value.replace(/[^0-9kK]/g,'').toUpperCase();
+  const fmt = raw.length >= 2 ? _formatRut(raw) : raw;
+  el.value = fmt;
+  // Ajustar cursor
+  const diff = fmt.length - oldLen;
+  try { el.setSelectionRange(pos + diff, pos + diff); } catch(e) {}
+
+  const hint = document.getElementById('rutHint');
+  el.classList.remove('rut-valid','rut-invalid');
+
+  if (raw.length < 2) {
+    hint.textContent = '';
+    buscarCliente('');
+    return;
+  }
+
+  const valido = _rutValido(fmt);
+  if (valido === true) {
+    el.classList.add('rut-valid');
+    hint.innerHTML = '<span style="color:#16a34a"><i class="bi bi-check-circle-fill"></i> RUT válido</span>';
+    buscarCliente(raw);   // buscar con el raw (sin puntos) para mayor compatibilidad
+  } else if (valido === false && raw.length >= 7) {
+    el.classList.add('rut-invalid');
+    hint.innerHTML = '<span style="color:#dc2626"><i class="bi bi-x-circle-fill"></i> Dígito verificador incorrecto</span>';
+    document.getElementById('autocompleteList').style.display='none';
+  } else {
+    hint.textContent = '';
+    buscarCliente(raw);
+  }
+}
+
 // ─── Autocomplete RUT ─────────────────────────────────────────────────────────
 let abortController = null;
 async function buscarCliente(q) {
@@ -548,7 +622,11 @@ function limpiarCliente() {
   document.getElementById('hNombreCliente').value='';
   document.getElementById('hIdCredito').value='';
   document.getElementById('clienteSeleccionado').style.display='none';
-  document.getElementById('inputBuscarRut').value='';
+  const inp = document.getElementById('inputBuscarRut');
+  inp.value='';
+  inp.classList.remove('rut-valid','rut-invalid');
+  const hint = document.getElementById('rutHint');
+  if (hint) hint.textContent='';
 }
 
 // Cerrar autocomplete al hacer clic fuera
