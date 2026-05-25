@@ -31,6 +31,23 @@
     .coming-sub { color: #6b7280; font-size: 0.95rem; margin-bottom: 28px; }
     .btn-volver { background: var(--navy); color: #fff; border: none; border-radius: 10px; padding: 10px 24px; font-size: 0.9rem; font-weight: 600; cursor: pointer; text-decoration: none; }
     .btn-volver:hover { background: var(--navy-light); color: #fff; }
+
+    /* CAMPAÑAS */
+    .campanas-card { background:#fff; border-radius:16px; padding:24px; box-shadow:0 1px 6px rgba(0,0,0,.08); grid-column:1/-1; border:2px solid transparent; }
+    .campanas-header { display:flex; align-items:center; gap:14px; margin-bottom:20px; padding-bottom:16px; border-bottom:2px solid #f1f5f9; }
+    .campanas-icon { width:52px; height:52px; background:linear-gradient(135deg,#fef3c7,#fde68a); border-radius:14px; display:flex; align-items:center; justify-content:center; font-size:1.5rem; color:#b45309; flex-shrink:0; }
+    .campanas-title { font-size:1.1rem; font-weight:800; color:#1e293b; margin:0 0 3px; }
+    .campanas-sub { font-size:.82rem; color:#6b7280; margin:0; }
+    .campanas-badge { margin-left:auto; background:#fef3c7; color:#92400e; font-size:.72rem; font-weight:700; border-radius:8px; padding:3px 10px; border:1px solid #fde68a; white-space:nowrap; }
+    .campanas-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(240px,1fr)); gap:14px; }
+    .sub-card { background:#f8fafc; border:1.5px solid #e5e7eb; border-radius:12px; padding:18px; cursor:pointer; transition:all .2s; text-decoration:none; display:block; }
+    .sub-card:hover { border-color:var(--navy); background:#eef2ff; transform:translateY(-2px); box-shadow:0 4px 12px rgba(1,65,162,.1); }
+    .sub-card-icon { width:40px; height:40px; border-radius:10px; display:flex; align-items:center; justify-content:center; font-size:1.15rem; margin-bottom:12px; }
+    .sub-card-icon.crear  { background:#dbeafe; color:#1d4ed8; }
+    .sub-card-icon.gestion { background:#d1fae5; color:#065f46; }
+    .sub-card-name { font-weight:700; font-size:.92rem; color:#1e293b; margin-bottom:4px; }
+    .sub-card-desc { font-size:.78rem; color:#6b7280; line-height:1.5; }
+    .sub-card-link { margin-top:12px; font-size:.78rem; font-weight:600; color:var(--navy); }
   </style>
 </head>
 <body>
@@ -38,7 +55,7 @@
     <div class="topnav-left">
       <a href="/" class="topnav-brand">
         <img src="/img/logo.png" alt="AutoFácil">
-        <span class="version-badge">v4.6</span>
+        <span class="version-badge">v4.7</span>
       </a>
       <div class="breadcrumb-nav">
         <a href="/">Inicio</a><span class="sep">›</span>
@@ -85,6 +102,35 @@
           <div style="margin-top:14px;font-size:.8rem;font-weight:600;color:var(--navy)">Abrir módulo <i class="bi bi-arrow-right ms-1"></i></div>
         </div>
       </a>
+
+      <!-- CAMPAÑAS DE OUTBOUND -->
+      <div class="campanas-card">
+        <div class="campanas-header">
+          <div class="campanas-icon"><i class="bi bi-megaphone-fill"></i></div>
+          <div>
+            <div class="campanas-title">Campañas de Outbound</div>
+            <div class="campanas-sub">Diseña, lanza y gestiona campañas de contacto masivo y seguimiento proactivo de clientes.</div>
+          </div>
+          <span class="campanas-badge"><i class="bi bi-broadcast me-1"></i>Outbound</span>
+        </div>
+        <div class="campanas-grid">
+
+          <a href="/crm/campanas/crear" class="sub-card">
+            <div class="sub-card-icon crear"><i class="bi bi-plus-circle-fill"></i></div>
+            <div class="sub-card-name">Creación de Campaña</div>
+            <div class="sub-card-desc">Define el nombre, objetivo, segmento de clientes, canal y ejecutivos asignados a la campaña.</div>
+            <div class="sub-card-link">Crear campaña <i class="bi bi-arrow-right ms-1"></i></div>
+          </a>
+
+          <a href="/crm/campanas/gestion" class="sub-card">
+            <div class="sub-card-icon gestion"><i class="bi bi-kanban-fill"></i></div>
+            <div class="sub-card-name">Gestión de Campaña</div>
+            <div class="sub-card-desc">Supervisa el avance, resultados y seguimientos de todas las campañas activas y cerradas.</div>
+            <div class="sub-card-link">Ver campañas <i class="bi bi-arrow-right ms-1"></i></div>
+          </a>
+
+        </div>
+      </div>
 
     </div>
   </div>
