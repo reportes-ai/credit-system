@@ -1,5 +1,23 @@
 const pool = require('../../../../shared/config/database');
 
+const CONFIG_KEY = 'dashboard_tab_permisos';
+
+// ── Inicializar tabla config si no existe ─────────────────────────────────────
+(async () => {
+  try {
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS dashboard_config (
+        config_key   VARCHAR(80)  NOT NULL PRIMARY KEY,
+        config_value MEDIUMTEXT   NOT NULL,
+        updated_at   DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP
+          ON UPDATE CURRENT_TIMESTAMP
+      )
+    `);
+  } catch (e) {
+    console.error('[dashboard] CREATE TABLE dashboard_config:', e.message);
+  }
+})();
+
 // ── Labels de meses ──────────────────────────────────────────────────────────
 const MESES_LABELS = {
   '2024-01':'Ene 24','2024-02':'Feb 24','2024-03':'Mar 24','2024-04':'Abr 24',
@@ -100,6 +118,39 @@ function procesarDatos(rows) {
 
   return { tendencia, ej_perf: { meses: mesesKeys, meses_labels: MESES_LABELS, ejecutivos: ejPerf } };
 }
+
+// ── Permisos de pestañas ──────────────────────────────────────────────────────
+exports.getPermisos = async (req, res) => {
+  try {
+    const [rows] = await pool.query(
+      'SELECT config_value FROM dashboard_config WHERE config_key = ?', [CONFIG_KEY]
+    );
+    const permisos = rows.length ? JSON.parse(rows[0].config_value) : {};
+    return res.json({ success: true, permisos });
+  } catch (err) {
+    console.error('[dashboard] getPermisos:', err);
+    return res.status(500).json({ success: false, error: err.message });
+  }
+};
+
+exports.savePermisos = async (req, res) => {
+  try {
+    const { permisos } = req.body;
+    if (!permisos || typeof permisos !== 'object') {
+      return res.status(400).json({ success: false, error: 'Permisos inválidos' });
+    }
+    const json = JSON.stringify(permisos);
+    await pool.query(`
+      INSERT INTO dashboard_config (config_key, config_value)
+      VALUES (?, ?)
+      ON DUPLICATE KEY UPDATE config_value = VALUES(config_value), updated_at = NOW()
+    `, [CONFIG_KEY, json]);
+    return res.json({ success: true });
+  } catch (err) {
+    console.error('[dashboard] savePermisos:', err);
+    return res.status(500).json({ success: false, error: err.message });
+  }
+};
 
 // ── Controller ────────────────────────────────────────────────────────────────
 exports.getDatos = async (req, res) => {

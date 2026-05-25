@@ -1,7 +1,9 @@
-const router = require('express').Router();
-const ctrl   = require('../controllers/dashboard.controller');
-const { verifyToken } = require('../../../../shared/middleware/auth');
+const router  = require('express').Router();
+const ctrl    = require('../controllers/dashboard.controller');
+const { verifyToken, requirePerfil } = require('../../../../shared/middleware/auth');
 
-router.get('/datos', verifyToken, ctrl.getDatos);
+router.get('/datos',     verifyToken, ctrl.getDatos);
+router.get('/permisos',  verifyToken, ctrl.getPermisos);
+router.post('/permisos', verifyToken, requirePerfil('ADMINISTRADOR'), ctrl.savePermisos);
 
 module.exports = router;

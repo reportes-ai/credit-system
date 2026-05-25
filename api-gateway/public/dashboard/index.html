@@ -124,14 +124,14 @@ body{font-family:'Roboto',sans-serif;background:#f0f2f5;font-size:12px;color:#33
 <body>
 
 <script>
-// Stub para compatibilidad con código del panel Admin (no se usa)
-const _sesionToken = null;
-async function apiUsuarios() { return { ok: false, error: 'No disponible en esta versión' }; }
-
-// Auth: usa JWT del credit-system
+// ── Auth: usa JWT del credit-system ──────────────────────────────────────────
 const _token = localStorage.getItem('token');
 const _usuario = JSON.parse(localStorage.getItem('usuario') || 'null');
 if (!_token) { window.location.href = '/login.html'; }
+
+// Stub para llamadas de usuarios que no aplican (sub-tab oculto)
+const _sesionToken = _token;
+async function apiUsuarios() { return { ok: false, error: 'Gestión de usuarios en el sistema principal' }; }
 
 let sesionActual = _usuario ? {
   nombre: _usuario.nombre || _usuario.email || 'Usuario',
@@ -145,8 +145,9 @@ function actualizarTopbarUsuario() {
     el.innerHTML = '<span style="font-size:10px;color:#7bafd4">👤 ' + sesionActual.nombre + '</span>'
       + '<button onclick="cerrarSesion()" style="background:#1a3a6a;border:1px solid #2a4070;color:#aac4e8;border-radius:4px;padding:2px 8px;font-size:10px;cursor:pointer;margin-left:6px">Salir</button>';
   }
+  // Mostrar tab Admin solo para ADMINISTRADOR
   const tabAdmin = document.getElementById('tab-admin');
-  if (tabAdmin) tabAdmin.style.display = 'none';
+  if (tabAdmin) tabAdmin.style.display = sesionActual.perfil === 'ADMINISTRADOR' ? 'flex' : 'none';
   aplicarPermisosNavTabs();
 }
 
@@ -156,7 +157,28 @@ function cerrarSesion() {
   window.location.href = '/login.html';
 }
 
-document.addEventListener('DOMContentLoaded', function() {
+// ── API dashboard propia ──────────────────────────────────────────────────────
+async function apiDashboard(method, path, body) {
+  const opts = {
+    method,
+    headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + _token }
+  };
+  if (body) opts.body = JSON.stringify(body);
+  const r = await fetch('/api/dashboard/' + path, opts);
+  return r.json();
+}
+
+async function cargarPermisosDesdeAPI() {
+  try {
+    const data = await apiDashboard('GET', 'permisos');
+    if (data.success && data.permisos) {
+      sessionStorage.setItem('af_tab_permisos', JSON.stringify(data.permisos));
+    }
+  } catch(e) { console.warn('No se pudieron cargar permisos:', e); }
+}
+
+document.addEventListener('DOMContentLoaded', async function() {
+  await cargarPermisosDesdeAPI();
   actualizarTopbarUsuario();
 });
 </script>
@@ -3020,14 +3042,14 @@ function buildV7() {
     </div>
   </div>
 
-  <!-- Sub-pestañas Admin -->
+  <!-- Sub-pestañas Admin: solo permisos de pestañas (usuarios se gestionan en el sistema principal) -->
   <div style="display:flex;gap:4px;margin:10px 0 0 0;border-bottom:2px solid #1a3a6a">
     <button id="adm-tab-usuarios" onclick="adminSubTab('usuarios')"
-      style="padding:7px 20px;border:none;border-radius:6px 6px 0 0;background:#1a3a6a;color:#fff;font-size:12px;font-weight:600;cursor:pointer">
+      style="display:none">
       👥 Usuarios
     </button>
     <button id="adm-tab-permisos" onclick="adminSubTab('permisos')"
-      style="padding:7px 20px;border:none;border-radius:6px 6px 0 0;background:#0d1627;color:#7bafd4;font-size:12px;font-weight:600;cursor:pointer">
+      style="padding:7px 20px;border:none;border-radius:6px 6px 0 0;background:#1a3a6a;color:#fff;font-size:12px;font-weight:600;cursor:pointer">
       🔒 Permisos de Pestañas
     </button>
   </div>
@@ -3163,8 +3185,7 @@ function aplicarPermisosNavTabs() {
 
 // ======== ADMIN DE USUARIOS ========
 async function buildVAdmin() {
-  adminSubTab('usuarios');
-  setTimeout(async function() { await renderTablaAdmin(); }, 50);
+  adminSubTab('permisos'); // solo mostramos permisos de pestañas
 }
 
 function adminSubTab(sec) {
@@ -3251,8 +3272,8 @@ async function guardarPermisosTabsAdmin() {
   var btn = document.querySelector('button[onclick="guardarPermisosTabsAdmin()"]');
   if (btn) { btn.textContent = '⏳ Guardando...'; btn.disabled = true; }
   try {
-    const resp = await apiUsuarios({ accion: 'guardar-permisos', permisos }, _sesionToken);
-    if (!resp.ok) throw new Error(resp.error || 'Error al guardar');
+    const resp = await apiDashboard('POST', 'permisos', { permisos });
+    if (!resp.success) throw new Error(resp.error || 'Error al guardar');
     sessionStorage.setItem('af_tab_permisos', JSON.stringify(permisos));
     aplicarPermisosNavTabs();
     if (btn) { btn.textContent = '✅ Guardado'; btn.style.background='#1565c0'; btn.disabled=false; setTimeout(function(){ btn.textContent='💾 Guardar Cambios'; btn.style.background='#43a047'; }, 2000); }
