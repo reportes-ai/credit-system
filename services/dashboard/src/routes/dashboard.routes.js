@@ -4,6 +4,6 @@ const { verifyToken, requirePerfil } = require('../../../../shared/middleware/au
 
 router.get('/datos',     verifyToken, ctrl.getDatos);
 router.get('/permisos',  verifyToken, ctrl.getPermisos);
-router.post('/permisos', verifyToken, requirePerfil('ADMINISTRADOR'), ctrl.savePermisos);
+router.post('/permisos', verifyToken, requirePerfil('Administrador'), ctrl.savePermisos);
 
 module.exports = router;

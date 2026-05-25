@@ -135,9 +135,15 @@ async function apiUsuarios() { return { ok: false, error: 'Gestión de usuarios 
 
 let sesionActual = _usuario ? {
   nombre: _usuario.nombre || _usuario.email || 'Usuario',
-  perfil: _usuario.perfil || 'USUARIO',
+  perfil: _usuario.perfil || _usuario.perfil_nombre || 'USUARIO',
   usuario: _usuario.email || ''
 } : { nombre: 'Usuario', perfil: 'USUARIO', usuario: '' };
+
+// Helper: comparar perfil sin importar mayúsculas/minúsculas
+function esAdmin() {
+  return sesionActual && sesionActual.perfil &&
+    sesionActual.perfil.toLowerCase() === 'administrador';
+}
 
 function actualizarTopbarUsuario() {
   const el = document.getElementById('topbar-usuario');
@@ -145,9 +151,9 @@ function actualizarTopbarUsuario() {
     el.innerHTML = '<span style="font-size:10px;color:#7bafd4">👤 ' + sesionActual.nombre + '</span>'
       + '<button onclick="cerrarSesion()" style="background:#1a3a6a;border:1px solid #2a4070;color:#aac4e8;border-radius:4px;padding:2px 8px;font-size:10px;cursor:pointer;margin-left:6px">Salir</button>';
   }
-  // Mostrar tab Admin solo para ADMINISTRADOR
+  // Mostrar tab Admin solo para Administrador
   const tabAdmin = document.getElementById('tab-admin');
-  if (tabAdmin) tabAdmin.style.display = sesionActual.perfil === 'ADMINISTRADOR' ? 'flex' : 'none';
+  if (tabAdmin) tabAdmin.style.display = esAdmin() ? 'flex' : 'none';
   aplicarPermisosNavTabs();
 }
 
@@ -829,11 +835,7 @@ function showV(id, el) {
   if(id==='vppto') { buildVPpto(); }
   if(id==='vevol') { buildVEvol(); }
   if(id==='vadmin') {
-    // Verificar que solo admin puede acceder
-    if (!sesionActual || sesionActual.perfil !== 'ADMINISTRADOR') {
-      alert('Acceso denegado.');
-      return;
-    }
+    if (!esAdmin()) { alert('Acceso denegado.'); return; }
     buildVAdmin();
   }
   if(id==='v6') {
@@ -1933,7 +1935,9 @@ async function cargarDatos() {
     // Actualizar badge de última actualización
     if (datos.generado_en) {
       // Convertir generado_en a hora de Santiago (UTC-3)
-      const fechaUTC = new Date(datos.generado_en.replace(' ', 'T') + 'Z');
+      // Soporta tanto ISO "2026-05-25T12:00:00.000Z" como "2026-05-25 12:00:00"
+      const _gen = datos.generado_en;
+      const fechaUTC = new Date(_gen.endsWith('Z') ? _gen : _gen.replace(' ', 'T') + 'Z');
       const fechaSCL = fechaUTC.toLocaleString('es-CL', {
         timeZone: 'America/Santiago',
         day: '2-digit', month: '2-digit', year: 'numeric',
