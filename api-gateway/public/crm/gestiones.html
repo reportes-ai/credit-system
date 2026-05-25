@@ -367,7 +367,7 @@
 
     <!-- Filtros -->
     <div class="filter-bar">
-      <input type="text" class="form-control" id="fq" placeholder="🔍 Buscar cliente o RUT..." style="width:180px" autocomplete="off" oninput="debounceFiltrar()">
+      <input type="text" class="form-control" id="fq" placeholder="🔍 Buscar cliente o RUT..." style="width:180px" autocomplete="new-password" oninput="debounceFiltrar()">
       <select class="form-select" id="fcanal" style="width:140px" onchange="filtrar()">
         <option value="">Todos los canales</option>
         <option value="LLAMADA_ENTRANTE">📞 Entrante</option>
@@ -1101,6 +1101,7 @@ setTipoCliente('ACTIVO');
 cargarCampanas();
 cargarGestiones(1);
 </script>
+<script>setTimeout(()=>{document.querySelectorAll("input[autocomplete=new-password]").forEach(i=>i.value="")},50);</script>
 <script src="/js/app-version.js"></script>
 </body>
 </html>

@@ -221,7 +221,7 @@
   <!-- Contenido principal -->
   <div class="main">
     <div class="search-bar">
-      <input type="text" class="search-input" id="searchInput" placeholder="Buscar por nombre, RUT o N° crédito..." autocomplete="off" oninput="filtrar()">
+      <input type="text" class="search-input" id="searchInput" placeholder="Buscar por nombre, RUT o N° crédito..." autocomplete="new-password" oninput="filtrar()">
       <button class="btn-buscar" onclick="cargarCartera()"><i class="bi bi-search me-1"></i>Buscar</button>
     </div>
 
@@ -799,6 +799,7 @@ async function cargarProvisiones() {
 
 cargarCartera();
 </script>
+<script>setTimeout(()=>{document.querySelectorAll("input[autocomplete=new-password]").forEach(i=>i.value="")},50);</script>
 <script src="/js/app-version.js"></script>
 </body>
 </html>

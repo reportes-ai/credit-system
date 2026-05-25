@@ -246,7 +246,7 @@
     <div class="search-row">
       <div class="search-field">
         <i class="bi bi-search search-icon"></i>
-        <input type="text" id="searchInput" class="search-input" autocomplete="off"
+        <input type="text" id="searchInput" class="search-input" autocomplete="new-password"
           placeholder="N° de operación, nombre o RUT del cliente..."
           oninput="onSearchInput()" onkeydown="if(event.key==='Enter') buscar()">
       </div>
@@ -1193,6 +1193,8 @@ function fmtFecha(f) {
   if (!f) return '—';
   return new Date(f).toLocaleDateString('es-CL', { day:'2-digit', month:'2-digit', year:'numeric' });
 }
+// Limpiar autofill de Chrome (ignora autocomplete="off" en campos de texto)
+setTimeout(() => { const s = document.getElementById('searchInput'); if(s) s.value = ''; }, 50);
 </script>
 <script src="/js/app-version.js"></script>
 </body>

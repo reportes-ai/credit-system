@@ -413,7 +413,7 @@
     </div>
     <div class="consulta-body">
       <div class="consulta-search">
-        <input type="text" id="cotSearchInput" placeholder="Buscar por nombre, apellido o RUT…" autocomplete="off"
+        <input type="text" id="cotSearchInput" placeholder="Buscar por nombre, apellido o RUT…" autocomplete="new-password"
           oninput="onCotSearch()" onkeydown="if(event.key==='Enter') buscarCotizaciones()">
         <button class="btn-buscar-cot" onclick="buscarCotizaciones()">
           <i class="bi bi-search me-1"></i>Buscar
@@ -2097,6 +2097,7 @@ async function copiarDetalle() {
   </div>
 </div>
 
+<script>setTimeout(()=>{document.querySelectorAll("input[autocomplete=new-password]").forEach(i=>i.value="")},50);</script>
 <script src="/js/app-version.js"></script>
 </body>
 </html>
