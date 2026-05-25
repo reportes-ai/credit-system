@@ -367,7 +367,7 @@
   <div class="topnav-left">
     <div class="topnav-brand">
       <a href="/"><img src="/img/logo.png" alt="AutoFácil" style="display:block"></a>
-      <span class="version-badge" id="versionBadge">v3.7</span>
+      <span class="version-badge" id="versionBadge">v3.8</span>
     </div>
       <div class="breadcrumb-nav">
         <a href="/">Inicio</a><span class="sep">›</span>
@@ -393,32 +393,8 @@
     <i class="bi bi-credit-card-2-front-fill icon"></i>
     <div>
       <h2>Gestión de Créditos</h2>
-      <p>Consulta el estado de los créditos vigentes, ingresa un nuevo crédito o digita operaciones de brokerage.</p>
+      <p>Consulta créditos vigentes o ingresa uno nuevo. Selecciona AutoFin o Unidad para digitación de brokerage.</p>
     </div>
-  </div>
-
-  <!-- Acceso rápido Brokerage -->
-  <div style="display:flex;gap:12px;margin-bottom:18px">
-    <a href="/creditos/digitacion-autofin" style="flex:1;display:flex;align-items:center;gap:14px;background:#fff;border-radius:12px;padding:14px 20px;text-decoration:none;border:2px solid #e5e7eb;box-shadow:0 1px 4px rgba(0,0,0,.06);transition:border-color .18s,box-shadow .18s" onmouseover="this.style.borderColor='#0141A2';this.style.boxShadow='0 6px 20px rgba(1,65,162,.15)'" onmouseout="this.style.borderColor='#e5e7eb';this.style.boxShadow='0 1px 4px rgba(0,0,0,.06)'">
-      <div style="width:40px;height:40px;border-radius:10px;background:linear-gradient(135deg,#012d70,#0255c5);display:flex;align-items:center;justify-content:center;flex-shrink:0">
-        <i class="bi bi-pencil-square" style="color:#fff;font-size:1.2rem"></i>
-      </div>
-      <div>
-        <div style="font-weight:700;font-size:.88rem;color:#1e293b">Digitación AutoFin</div>
-        <div style="font-size:.75rem;color:#64748b">Registro de operaciones brokerage AutoFin</div>
-      </div>
-      <i class="bi bi-chevron-right" style="margin-left:auto;color:#94a3b8;font-size:.9rem"></i>
-    </a>
-    <a href="/creditos/digitacion-unidad" style="flex:1;display:flex;align-items:center;gap:14px;background:#fff;border-radius:12px;padding:14px 20px;text-decoration:none;border:2px solid #e5e7eb;box-shadow:0 1px 4px rgba(0,0,0,.06);transition:border-color .18s,box-shadow .18s" onmouseover="this.style.borderColor='#005a9e';this.style.boxShadow='0 6px 20px rgba(0,90,158,.15)'" onmouseout="this.style.borderColor='#e5e7eb';this.style.boxShadow='0 1px 4px rgba(0,0,0,.06)'">
-      <div style="width:40px;height:40px;border-radius:10px;background:linear-gradient(135deg,#003d6e,#005a9e);display:flex;align-items:center;justify-content:center;flex-shrink:0">
-        <i class="bi bi-pencil-square" style="color:#fff;font-size:1.2rem"></i>
-      </div>
-      <div>
-        <div style="font-weight:700;font-size:.88rem;color:#1e293b">Digitación Unidad de Crédito</div>
-        <div style="font-size:.75rem;color:#64748b">Registro de operaciones brokerage Unidad</div>
-      </div>
-      <i class="bi bi-chevron-right" style="margin-left:auto;color:#94a3b8;font-size:.9rem"></i>
-    </a>
   </div>
 
   <!-- Top bar -->
@@ -1219,11 +1195,16 @@ function cambiarTab(tab) {
   // sino auto-seleccionamos la primera
   if (tab === 'ingreso') {
     const activa = document.querySelector('.fin-card.active');
+    const empresa = activa ? activa.dataset.empresa : null;
+    // Brokerage: redirigir directamente a su formulario específico
+    if (empresa === 'AUTOFIN') { window.location.href = '/creditos/digitacion-autofin'; return; }
+    if (empresa === 'UNIDAD')  { window.location.href = '/creditos/digitacion-unidad';  return; }
     if (activa) {
-      _setEmpresaIngreso(activa.dataset.empresa);
+      _setEmpresaIngreso(empresa);
     } else {
-      const primera = document.querySelector('.fin-card');
-      if (primera) { primera.classList.add('active'); _setEmpresaIngreso(primera.dataset.empresa); }
+      // Sin selección: auto-seleccionar AutoFácil
+      const autofacil = document.querySelector('.fin-card[data-empresa="AUTOFACIL"]');
+      if (autofacil) { autofacil.classList.add('active'); _setEmpresaIngreso('AUTOFACIL'); }
     }
   }
 }
@@ -1234,7 +1215,10 @@ let _empresasFiltro = new Set(); // vacío = todas
 function toggleFinanciera(el) {
   const empresa = el.dataset.empresa;
   if (_tabActual === 'ingreso') {
-    // Modo ingreso: single-select
+    // Brokerage: AutoFin y Unidad tienen su propio formulario diferenciado
+    if (empresa === 'AUTOFIN')  { window.location.href = '/creditos/digitacion-autofin';  return; }
+    if (empresa === 'UNIDAD')   { window.location.href = '/creditos/digitacion-unidad';   return; }
+    // AutoFácil: formulario integrado en esta página
     document.querySelectorAll('.fin-card').forEach(c => c.classList.remove('active'));
     el.classList.add('active');
     _setEmpresaIngreso(empresa);
