@@ -273,6 +273,108 @@ const pool = require('../../../../shared/config/database');
   }
 })();
 
+/* ─── Migración v4: nombres alineados con la app ─────────────────────────── */
+(async () => {
+  try {
+    // 1) Actualizar nombres para que coincidan exactamente con las páginas/cards
+    const renombrar = [
+      // Tesorería
+      ['tesoreria_cajas',            'Administración de Cajas'],
+      ['tesoreria_ver_cajas',        'Caja'],
+      // CRM
+      ['crm_gestiones',              'Gestiones de Contacto'],
+      ['crm_estadisticas',           'Estadísticas CRM'],
+      ['crm_campanas_ver',           'Campañas de Outbound'],
+      ['crm_campanas_crear',         'Creación de Campaña'],
+      ['crm_campanas_gestionar',     'Gestión de Campaña'],
+      ['crm_campanas_resultados',    'Resultados de Campaña'],
+      ['crm_crear',                  'Registrar Gestión CRM'],
+      ['crm_editar',                 'Editar Gestión CRM'],
+      // Cobranza
+      ['cobranza_prejudicial',       'Pre-judicial'],
+      ['cobranza_judicial',          'Judicial'],
+      ['cobranza_mis',               'Reportería Cobranzas'],
+      // Mantenedores
+      ['mantenedores_vehiculos',     'Vehículos'],
+      ['mantenedores_dealers',       'Dealers'],
+      ['mantenedores_parametros',    'Parámetros Crédito'],
+      ['mantenedores_tipos_doc',     'Tipos de Documento'],
+      ['mantenedores_plantillas',    'Plantillas de Documentos'],
+      ['mantenedores_comunas',       'Comunas'],
+      ['mantenedores_pagares',       'Pagarés AutoFácil'],
+      ['mantenedores_cuentas_bancarias', 'Cuentas Bancarias'],
+      ['mantenedores_tasas',         'Tasas de Interés'],
+      ['mantenedores_uf',            'Valores UF'],
+      ['mantenedores_factores_seguro','Factores Seguro'],
+      // Créditos
+      ['creditos_revisar',           'Revisión de Crédito'],
+      ['creditos_ver_respaldos',     'Carga de Respaldos'],
+      ['creditos_cargar_doc',        'Documentos del Crédito'],
+      ['creditos_documentos_af',     'Carga Documentos AutoFácil'],
+      ['creditos_validar_doc_af',    'Validación de Documentos AF'],
+      ['creditos_auditoria',         'Auditoría de Crédito'],
+      ['creditos_pagar_cuotas',      'Pago de Cuotas'],
+      // Usuarios
+      ['usuarios_seguridad',         'Seguridad'],
+      ['usuarios_perfiles',          'Perfiles y Permisos'],
+    ];
+
+    for (const [codigo, nombre] of renombrar) {
+      await pool.query(
+        'UPDATE funcionalidades SET nombre = ? WHERE codigo = ?',
+        [nombre, codigo]
+      );
+    }
+
+    // 2) Agregar funcionalidades faltantes (páginas que no tenían código propio)
+    async function addFunc4(modNombre, funNombre, funCodigo, habDef = 0) {
+      const [[mod]] = await pool.query(
+        "SELECT id_modulo FROM modulos WHERE nombre=? AND estado='activo'", [modNombre]
+      );
+      if (!mod) return;
+      const [[ex]] = await pool.query(
+        'SELECT id_funcionalidad FROM funcionalidades WHERE codigo=?', [funCodigo]
+      );
+      if (ex) return; // ya existe
+      const [ins] = await pool.query(
+        'INSERT INTO funcionalidades (id_modulo, nombre, codigo) VALUES (?,?,?)',
+        [mod.id_modulo, funNombre, funCodigo]
+      );
+      const id_func = ins.insertId;
+      const [perfiles] = await pool.query('SELECT id_perfil FROM perfiles');
+      for (const p of perfiles) {
+        await pool.query(
+          'INSERT IGNORE INTO permisos_perfil (id_perfil, id_funcionalidad, habilitado) VALUES (?,?,?)',
+          [p.id_perfil, id_func, habDef]
+        );
+      }
+    }
+
+    // Créditos — páginas que faltaban
+    await addFunc4('Créditos', 'Documentos del Crédito',     'creditos_documentos',      1);
+    // Clientes — submodulos con nombre de app
+    await addFunc4('Clientes', 'Antecedentes Laborales',     'clientes_antecedentes_lab', 1);
+    await addFunc4('Clientes', 'Información Comercial',      'clientes_info_comercial2',  1);
+    // Cobranza — reportería específica (nueva ruta)
+    await addFunc4('Cobranza', 'Reportería Cobranzas',       'cobranza_reporteria',       0);
+
+    // 3) Administrador: habilitar TODAS las funcionalidades (incluyendo nuevas)
+    const [[admin]] = await pool.query("SELECT id_perfil FROM perfiles WHERE nombre='Administrador' LIMIT 1");
+    if (admin) {
+      await pool.query(
+        `INSERT INTO permisos_perfil (id_perfil, id_funcionalidad, habilitado)
+         SELECT ?, id_funcionalidad, 1 FROM funcionalidades
+         ON DUPLICATE KEY UPDATE habilitado = 1`,
+        [admin.id_perfil]
+      );
+    }
+
+    console.log('✓ Perfiles v4: nombres de funcionalidades alineados con la app');
+  } catch (e) {
+    console.error('[perfiles migration v4]', e.message);
+  }
+})();
+
 const getAllPerfiles = async (req, res) => {
   try {
     const [perfiles] = await pool.query(
