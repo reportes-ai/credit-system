@@ -462,7 +462,7 @@
     <!-- Búsqueda -->
     <div class="form-card">
       <div class="search-bar">
-        <input type="text" id="searchQ" class="form-control" placeholder="Buscar por RUT, nombre o N° crédito…"
+        <input type="text" id="searchQ" class="form-control" placeholder="Buscar por RUT, nombre o N° crédito…" autocomplete="off"
                onkeydown="if(event.key==='Enter') buscarCreditos()">
         <select id="searchEstado" class="form-select" onchange="_filtroProceso=false;document.getElementById('chipProceso')?.classList.remove('activo');buscarCreditos()">
           <option value="">Todos los estados</option>
@@ -512,7 +512,7 @@
         </div>
         <div class="col-md-4" id="campoNombreCliente">
           <label class="form-label">Nombre Cliente *</label>
-          <input type="text" id="iNombreCliente" class="form-control" placeholder="Se autocompleta al buscar RUT" oninput="upperInputCred(this)">
+          <input type="text" id="iNombreCliente" class="form-control" placeholder="Se autocompleta al buscar RUT" autocomplete="off" oninput="upperInputCred(this)">
         </div>
         <div class="col-md-2">
           <label class="form-label">Financiera</label>
