@@ -368,4 +368,60 @@ const reordenarModulos = async (req, res) => {
   }
 };
 
-module.exports = { getAllPerfiles, getModulosConFuncionalidades, getPermisosPerfil, updatePermisosPerfil, reordenarModulos };
+/* ─── CREATE PERFIL ──────────────────────────────────────────────────────── */
+const createPerfil = async (req, res) => {
+  try {
+    const { nombre, descripcion = null } = req.body;
+    if (!nombre?.trim()) return res.status(400).json({ success: false, data: null, error: 'El nombre es requerido' });
+
+    // Verificar que no exista
+    const [[ex]] = await pool.query('SELECT id_perfil FROM perfiles WHERE nombre = ?', [nombre.trim()]);
+    if (ex) return res.status(400).json({ success: false, data: null, error: 'Ya existe un perfil con ese nombre' });
+
+    const [r] = await pool.query(
+      'INSERT INTO perfiles (nombre, descripcion) VALUES (?, ?)',
+      [nombre.trim(), descripcion || null]
+    );
+    const id_perfil = r.insertId;
+
+    // Copiar todas las funcionalidades con habilitado=0
+    const [funcs] = await pool.query('SELECT id_funcionalidad FROM funcionalidades');
+    for (const f of funcs) {
+      await pool.query(
+        'INSERT IGNORE INTO permisos_perfil (id_perfil, id_funcionalidad, habilitado) VALUES (?,?,0)',
+        [id_perfil, f.id_funcionalidad]
+      );
+    }
+
+    const [[perfil]] = await pool.query('SELECT * FROM perfiles WHERE id_perfil = ?', [id_perfil]);
+    res.status(201).json({ success: true, data: perfil, error: null });
+  } catch (e) {
+    res.status(500).json({ success: false, data: null, error: e.message });
+  }
+};
+
+/* ─── DELETE PERFIL ──────────────────────────────────────────────────────── */
+const deletePerfil = async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    // Proteger perfil Administrador
+    const [[perfil]] = await pool.query('SELECT nombre FROM perfiles WHERE id_perfil = ?', [id]);
+    if (!perfil) return res.status(404).json({ success: false, data: null, error: 'Perfil no encontrado' });
+    if (perfil.nombre === 'Administrador') return res.status(400).json({ success: false, data: null, error: 'No se puede eliminar el perfil Administrador' });
+
+    // Verificar que no haya usuarios con este perfil
+    const [[usos]] = await pool.query('SELECT COUNT(*) AS cnt FROM usuarios WHERE id_perfil = ?', [id]);
+    if (usos.cnt > 0) return res.status(400).json({ success: false, data: null, error: `No se puede eliminar: ${usos.cnt} usuario(s) tienen este perfil` });
+
+    // Eliminar permisos y perfil
+    await pool.query('DELETE FROM permisos_perfil WHERE id_perfil = ?', [id]);
+    await pool.query('DELETE FROM perfiles WHERE id_perfil = ?', [id]);
+
+    res.json({ success: true, data: { eliminado: id }, error: null });
+  } catch (e) {
+    res.status(500).json({ success: false, data: null, error: e.message });
+  }
+};
+
+module.exports = { getAllPerfiles, getModulosConFuncionalidades, getPermisosPerfil, updatePermisosPerfil, reordenarModulos, createPerfil, deletePerfil };

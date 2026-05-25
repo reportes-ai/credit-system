@@ -147,7 +147,7 @@
     <div class="topnav-left">
       <div class="topnav-brand">
         <a href="/"><img src="/img/logo.png" alt="AutoFácil" style="display:block"></a>
-        <span class="version-badge" id="versionBadge">v5.3</span>
+        <span class="version-badge" id="versionBadge">v5.4</span>
       </div>
       <div class="breadcrumb-nav">
         <a href="/">Inicio</a><span class="sep">›</span>
@@ -253,7 +253,12 @@
         <div class="col-md-3">
           <div class="card h-100">
             <div class="card-body p-3">
-              <p class="fw-bold text-muted mb-2" style="font-size:0.78rem;text-transform:uppercase;letter-spacing:.5px">Perfiles</p>
+              <div class="d-flex align-items-center justify-content-between mb-2">
+                <p class="fw-bold text-muted mb-0" style="font-size:0.78rem;text-transform:uppercase;letter-spacing:.5px">Perfiles</p>
+                <button class="btn btn-primary btn-sm py-0 px-2" style="font-size:.75rem" onclick="abrirModalNuevoPerfil()" id="btnNuevoPerfil" title="Nuevo perfil">
+                  <i class="bi bi-plus-lg"></i> Nuevo
+                </button>
+              </div>
               <div id="listaPerfiles"></div>
             </div>
           </div>
@@ -563,6 +568,35 @@
     </div>
   </div>
 
+  <!-- MODAL NUEVO PERFIL -->
+  <div class="modal fade" id="modalNuevoPerfil" tabindex="-1">
+    <div class="modal-dialog modal-sm">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h5 class="modal-title"><i class="bi bi-shield-plus me-2"></i>Nuevo Perfil</h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+        </div>
+        <div class="modal-body">
+          <div class="mb-3">
+            <label class="form-label">Nombre del perfil *</label>
+            <input type="text" id="npNombre" class="form-control" placeholder="Ej: Analista de Riesgo" maxlength="80">
+          </div>
+          <div class="mb-2">
+            <label class="form-label">Descripción</label>
+            <input type="text" id="npDescripcion" class="form-control" placeholder="Opcional" maxlength="200">
+          </div>
+          <div id="npError" class="alert alert-danger mt-2 d-none" style="font-size:.84rem"></div>
+        </div>
+        <div class="modal-footer">
+          <button class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+          <button class="btn btn-primary" onclick="guardarNuevoPerfil()">
+            <i class="bi bi-floppy me-1"></i>Crear perfil
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+
   <!-- MODAL RESET CLAVE -->
   <div class="modal fade" id="modalResetClave" tabindex="-1">
     <div class="modal-dialog modal-sm">
@@ -842,9 +876,17 @@
     function renderListaPerfiles() {
       const el = document.getElementById('listaPerfiles');
       el.innerHTML = perfilesData.map(p => `
-        <button class="btn w-100 text-start mb-1 btn-outline-secondary btn-sm perfil-item" data-id="${p.id_perfil}" onclick="seleccionarPerfil(${p.id_perfil}, '${p.nombre}')">
-          <i class="bi bi-shield me-2"></i>${p.nombre}
-        </button>
+        <div class="d-flex align-items-center mb-1 gap-1">
+          <button class="btn flex-grow-1 text-start btn-outline-secondary btn-sm perfil-item" data-id="${p.id_perfil}"
+            onclick="seleccionarPerfil(${p.id_perfil}, '${p.nombre.replace(/'/g,"\\'")}')">
+            <i class="bi bi-shield me-2"></i>${p.nombre}
+          </button>
+          ${esAdmin && p.nombre !== 'Administrador' ? `
+          <button class="btn btn-outline-danger btn-sm px-2 py-1" title="Eliminar perfil"
+            onclick="eliminarPerfil(${p.id_perfil}, '${p.nombre.replace(/'/g,"\\'")}')">
+            <i class="bi bi-trash3" style="font-size:.75rem"></i>
+          </button>` : ''}
+        </div>
       `).join('');
     }
 
@@ -1050,9 +1092,64 @@
       }
     }
 
+    // ── NUEVO PERFIL ──────────────────────────────────────────
+    function abrirModalNuevoPerfil() {
+      document.getElementById('npNombre').value = '';
+      document.getElementById('npDescripcion').value = '';
+      document.getElementById('npError').classList.add('d-none');
+      bootstrap.Modal.getOrCreateInstance(document.getElementById('modalNuevoPerfil')).show();
+      setTimeout(() => document.getElementById('npNombre').focus(), 300);
+    }
+
+    async function guardarNuevoPerfil() {
+      const errEl = document.getElementById('npError');
+      errEl.classList.add('d-none');
+      const nombre = document.getElementById('npNombre').value.trim();
+      const desc   = document.getElementById('npDescripcion').value.trim();
+      if (!nombre) { errEl.textContent = 'El nombre es obligatorio.'; errEl.classList.remove('d-none'); return; }
+
+      const data = await api('POST', '/api/perfiles', { nombre, descripcion: desc || null });
+      if (data?.success) {
+        bootstrap.Modal.getInstance(document.getElementById('modalNuevoPerfil')).hide();
+        showToast(`Perfil "${nombre}" creado. Ahora configura sus permisos.`);
+        perfilesData = [];            // forzar recarga
+        await cargarPerfiles();
+        seleccionarPerfil(data.data.id_perfil, data.data.nombre);
+      } else {
+        errEl.textContent = data?.error || 'Error al crear perfil';
+        errEl.classList.remove('d-none');
+      }
+    }
+
+    // Enter en input nombre
+    document.addEventListener('DOMContentLoaded', () => {
+      document.getElementById('npNombre')?.addEventListener('keydown', e => {
+        if (e.key === 'Enter') guardarNuevoPerfil();
+      });
+    });
+
+    async function eliminarPerfil(id, nombre) {
+      if (!confirm(`¿Eliminar el perfil "${nombre}"?\n\nEsta acción no se puede deshacer. El perfil no debe tener usuarios asignados.`)) return;
+      const data = await api('DELETE', `/api/perfiles/${id}`);
+      if (data?.success) {
+        showToast(`Perfil "${nombre}" eliminado`);
+        // Limpiar panel si estaba seleccionado
+        if (perfilActualId === id) {
+          perfilActualId = null;
+          document.getElementById('perfilSeleccionadoHeader').classList.add('d-none');
+          document.getElementById('permisosGrid').innerHTML = '<p class="text-muted text-center py-4">Selecciona un perfil para ver y editar sus permisos.</p>';
+        }
+        perfilesData = [];
+        await cargarPerfiles();
+      } else {
+        showToast(data?.error || 'Error al eliminar', 'danger');
+      }
+    }
+
     // ── INIT ──────────────────────────────────────────────────
-    // Solo admin ve tab Seguridad
+    // Solo admin ve tab Seguridad y botón nuevo perfil
     if (esAdmin) document.getElementById('tabSegNav').style.display = '';
+    if (!esAdmin) { const b = document.getElementById('btnNuevoPerfil'); if(b) b.style.display='none'; }
     cargarUsuarios();
   </script>
 <script src="/js/app-version.js"></script>
