@@ -433,3 +433,40 @@ exports.updateCampana = async (req, res) => {
     fail(res, err.message, 500);
   }
 };
+
+// ─── resultadosCampana ────────────────────────────────────────────────────────
+exports.resultadosCampana = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const [[campana]] = await pool.query(
+      'SELECT * FROM crm_campanas WHERE id_campana = ?', [id]
+    );
+    if (!campana) return fail(res, 'Campaña no encontrada', 404);
+
+    // Gestiones de la campaña
+    const [gestiones] = await pool.query(
+      `SELECT id_gestion, rut_cliente, nombre_cliente, telefono, email,
+              canal, tipo_solicitud, resultado, descripcion,
+              accion_siguiente, fecha_seguimiento, estado,
+              nombre_usuario, created_at, updated_at
+       FROM crm_gestiones
+       WHERE id_campana = ?
+       ORDER BY created_at DESC`,
+      [id]
+    );
+
+    // Resumen por resultado
+    const resumenMap = {};
+    gestiones.forEach(g => {
+      const key = g.resultado || 'Sin resultado';
+      if (!resumenMap[key]) resumenMap[key] = { resultado: key, total: 0, casos: [] };
+      resumenMap[key].total++;
+      resumenMap[key].casos.push(g);
+    });
+    const resumen = Object.values(resumenMap).sort((a, b) => b.total - a.total);
+
+    ok(res, { campana, gestiones, resumen, total: gestiones.length });
+  } catch (err) {
+    fail(res, err.message, 500);
+  }
+};

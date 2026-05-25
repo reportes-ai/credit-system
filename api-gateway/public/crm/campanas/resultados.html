@@ -1,0 +1,466 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <link rel="icon" href="/img/favicon.png" type="image/png">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Resultados de Campaña — AutoFácil</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.0/font/bootstrap-icons.css" rel="stylesheet">
+  <script src="https://cdn.sheetjs.com/xlsx-0.20.1/package/dist/xlsx.full.min.js"></script>
+  <style>
+    :root { --navy:#0141A2; --navy-dark:#012d70; --navy-light:#0255c5; --accent:#009AFE; --bg:#f0f4f8; }
+    body { background:var(--bg); font-family:'Segoe UI',system-ui,sans-serif; margin:0; min-height:100vh; }
+
+    .topnav { background:linear-gradient(90deg,var(--navy-dark),var(--navy-light)); color:#fff; height:60px; padding:0 24px; display:flex; align-items:center; justify-content:space-between; position:sticky; top:0; z-index:200; box-shadow:0 2px 8px rgba(0,0,0,.3); }
+    .topnav-left { display:flex; align-items:center; gap:16px; }
+    .topnav-brand { display:flex; align-items:center; gap:8px; text-decoration:none; }
+    .topnav-brand img { height:32px; filter:brightness(0) invert(1); }
+    .version-badge { background:rgba(255,255,255,.15); color:rgba(255,255,255,.75); font-size:.65rem; font-weight:700; border-radius:6px; padding:2px 8px; }
+    .breadcrumb-nav { color:rgba(255,255,255,.6); font-size:.85rem; display:flex; align-items:center; gap:6px; }
+    .breadcrumb-nav a { color:rgba(255,255,255,.75); text-decoration:none; }
+    .breadcrumb-nav a:hover { color:#fff; }
+    .breadcrumb-nav .sep { color:rgba(255,255,255,.35); }
+    .topnav-right { display:flex; align-items:center; gap:10px; }
+    .user-chip { background:rgba(255,255,255,.12); border-radius:24px; padding:5px 12px; display:flex; align-items:center; gap:8px; font-size:.85rem; }
+    .avatar { width:28px; height:28px; background:#90caf9; border-radius:50%; display:flex; align-items:center; justify-content:center; color:var(--navy); font-weight:700; font-size:.75rem; }
+    .perfil-badge { background:rgba(144,202,249,.2); border:1px solid rgba(144,202,249,.4); color:#90caf9; border-radius:12px; padding:2px 10px; font-size:.73rem; font-weight:600; }
+    .btn-logout { background:rgba(255,255,255,.1); border:1px solid rgba(255,255,255,.2); color:#fff; border-radius:8px; padding:5px 12px; font-size:.82rem; cursor:pointer; }
+    .btn-logout:hover { background:rgba(255,255,255,.2); }
+
+    .page-content { padding:28px 36px; max-width:1200px; margin:0 auto; }
+    .page-banner { background:linear-gradient(135deg,var(--navy-dark),var(--navy) 50%,var(--navy-light)); border-radius:16px; color:#fff; padding:22px 30px; margin-bottom:24px; display:flex; align-items:center; gap:18px; }
+    .page-banner > i { font-size:2.4rem; opacity:.85; }
+    .page-banner h2 { font-weight:700; margin:0 0 3px; font-size:1.25rem; }
+    .page-banner p { opacity:.8; margin:0; font-size:.88rem; }
+
+    /* SELECTOR CAMPAÑA */
+    .sel-card { background:#fff; border-radius:14px; box-shadow:0 1px 5px rgba(0,0,0,.07); padding:20px 24px; margin-bottom:20px; display:flex; align-items:center; gap:16px; flex-wrap:wrap; }
+    .form-select { border-radius:8px; border:1.5px solid #d1d5db; font-size:.9rem; padding:8px 12px; }
+    .form-select:focus { border-color:var(--navy); box-shadow:0 0 0 3px rgba(1,65,162,.1); outline:none; }
+
+    /* INFO CAMPAÑA */
+    #infoCampana { display:none; }
+    .info-card { background:#fff; border-radius:14px; box-shadow:0 1px 5px rgba(0,0,0,.07); padding:20px 24px; margin-bottom:20px; }
+    .info-row { display:flex; align-items:flex-start; gap:24px; flex-wrap:wrap; }
+    .info-item { min-width:120px; }
+    .info-label { font-size:.72rem; font-weight:700; text-transform:uppercase; letter-spacing:.4px; color:#9ca3af; margin-bottom:3px; }
+    .info-val { font-size:.92rem; font-weight:600; color:#1e293b; }
+    .badge-activa   { background:#dcfce7; color:#166534; border-radius:8px; padding:4px 12px; font-size:.78rem; font-weight:700; }
+    .badge-cerrada  { background:#fee2e2; color:#991b1b; border-radius:8px; padding:4px 12px; font-size:.78rem; font-weight:700; }
+    .badge-pendiente{ background:#fef3c7; color:#92400e; border-radius:8px; padding:4px 12px; font-size:.78rem; font-weight:700; }
+    .progress-bar-track { height:7px; background:#e5e7eb; border-radius:10px; margin-top:8px; overflow:hidden; }
+    .progress-bar-fill  { height:100%; border-radius:10px; background:linear-gradient(90deg,var(--navy),var(--accent)); transition:width .6s; }
+    .dia-tag { display:inline-block; background:#e8f0fe; color:var(--navy); border-radius:6px; padding:2px 8px; font-size:.75rem; font-weight:700; margin-right:3px; }
+
+    /* STATS CHIPS */
+    .stats-row { display:flex; gap:12px; flex-wrap:wrap; margin-bottom:20px; }
+    .stat-chip { background:#fff; border-radius:12px; box-shadow:0 1px 4px rgba(0,0,0,.07); padding:14px 20px; text-align:center; min-width:120px; flex:1; }
+    .stat-num  { font-size:1.6rem; font-weight:800; color:var(--navy); line-height:1; }
+    .stat-lbl  { font-size:.74rem; color:#6b7280; margin-top:3px; }
+
+    /* RESULTADOS ACORDEÓN */
+    #resultados { display:none; }
+    .res-block { background:#fff; border-radius:12px; box-shadow:0 1px 4px rgba(0,0,0,.07); margin-bottom:12px; overflow:hidden; }
+    .res-header { display:flex; align-items:center; gap:12px; padding:14px 20px; cursor:pointer; user-select:none; border-bottom:1.5px solid transparent; transition:background .15s; }
+    .res-header:hover { background:#f8fafc; }
+    .res-header.open { border-bottom-color:#e5e7eb; }
+    .res-dot { width:12px; height:12px; border-radius:50%; flex-shrink:0; }
+    .res-nombre { font-weight:700; font-size:.92rem; color:#1e293b; flex:1; }
+    .res-count { background:#f1f5f9; border-radius:20px; padding:3px 12px; font-size:.8rem; font-weight:700; color:#475569; }
+    .res-pct { font-size:.78rem; color:#9ca3af; min-width:40px; text-align:right; }
+    .res-bar-wrap { flex:1; max-width:160px; }
+    .res-bar { height:6px; border-radius:6px; min-width:4px; transition:width .4s; }
+    .res-export-btn { background:none; border:1px solid #d1d5db; border-radius:7px; padding:4px 10px; font-size:.75rem; cursor:pointer; color:#374151; display:flex; align-items:center; gap:4px; transition:all .15s; }
+    .res-export-btn:hover { border-color:var(--navy); color:var(--navy); }
+    .res-chevron { color:#9ca3af; transition:transform .2s; }
+    .res-header.open .res-chevron { transform:rotate(180deg); }
+    .res-body { display:none; padding:0 20px 16px; }
+    .res-body.show { display:block; }
+
+    /* TABLE */
+    .casos-table { width:100%; border-collapse:collapse; font-size:.82rem; margin-top:10px; }
+    .casos-table th { background:#f8fafc; font-weight:700; font-size:.72rem; text-transform:uppercase; letter-spacing:.4px; color:#475569; padding:8px 10px; border-bottom:2px solid #e2e8f0; white-space:nowrap; }
+    .casos-table td { padding:7px 10px; border-bottom:1px solid #f1f5f9; vertical-align:top; color:#374151; }
+    .casos-table tr:last-child td { border-bottom:none; }
+    .casos-table tr:hover td { background:#f8fafc; }
+
+    /* EXPORT TOTAL */
+    .export-bar { background:#fff; border-radius:12px; box-shadow:0 1px 4px rgba(0,0,0,.07); padding:16px 22px; display:flex; align-items:center; justify-content:space-between; margin-bottom:24px; flex-wrap:wrap; gap:10px; }
+    .btn-export { background:var(--navy); color:#fff; border:none; border-radius:8px; padding:9px 20px; font-size:.85rem; font-weight:600; cursor:pointer; display:flex; align-items:center; gap:7px; transition:background .15s; }
+    .btn-export:hover { background:var(--accent); }
+    .btn-export-outline { background:#fff; color:var(--navy); border:1.5px solid var(--navy); border-radius:8px; padding:8px 18px; font-size:.85rem; font-weight:600; cursor:pointer; display:flex; align-items:center; gap:7px; transition:all .15s; }
+    .btn-export-outline:hover { background:#eef2ff; }
+
+    .empty-state { text-align:center; padding:60px 20px; color:#9ca3af; }
+    .empty-state i { font-size:3.5rem; opacity:.25; display:block; margin-bottom:14px; }
+  </style>
+</head>
+<body>
+
+<nav class="topnav">
+  <div class="topnav-left">
+    <a href="/" class="topnav-brand">
+      <img src="/img/logo.png" alt="AutoFácil">
+      <span class="version-badge">v1.0</span>
+    </a>
+    <div class="breadcrumb-nav">
+      <a href="/">Inicio</a><span class="sep">›</span>
+      <a href="/crm">CRM</a><span class="sep">›</span>
+      <a href="/crm/campanas">Campañas Outbound</a><span class="sep">›</span>
+      <span style="color:#fff;font-weight:600">Resultados de Campaña</span>
+    </div>
+  </div>
+  <div class="topnav-right">
+    <div class="user-chip">
+      <div class="avatar" id="avatarInicial">?</div>
+      <div>
+        <div style="font-weight:600;line-height:1.3;color:#fff" id="navNombre">—</div>
+        <div class="perfil-badge" id="navPerfil">—</div>
+      </div>
+    </div>
+    <button class="btn-logout" onclick="logout()"><i class="bi bi-box-arrow-right me-1"></i>Salir</button>
+  </div>
+</nav>
+
+<div class="page-content">
+
+  <div class="page-banner">
+    <i class="bi bi-bar-chart-steps"></i>
+    <div>
+      <h2>Resultados de Campaña</h2>
+      <p>Selecciona una campaña para ver el resumen de gestiones, resultados y exportar los datos.</p>
+    </div>
+  </div>
+
+  <!-- SELECTOR -->
+  <div class="sel-card">
+    <i class="bi bi-megaphone-fill" style="font-size:1.4rem;color:var(--navy)"></i>
+    <div style="flex:1;max-width:480px">
+      <label style="font-size:.78rem;font-weight:700;color:#374151;display:block;margin-bottom:5px">Seleccionar campaña</label>
+      <select id="selCampana" class="form-select" onchange="cargarResultados(this.value)">
+        <option value="">— Selecciona una campaña —</option>
+      </select>
+    </div>
+    <div id="loadingSpinner" style="display:none;color:var(--navy);font-size:.85rem">
+      <i class="bi bi-arrow-repeat" style="animation:spin 1s linear infinite"></i> Cargando...
+    </div>
+  </div>
+
+  <!-- INFO CAMPAÑA -->
+  <div id="infoCampana">
+    <div class="info-card">
+      <div class="d-flex align-items-start justify-content-between mb-3 flex-wrap gap-2">
+        <div>
+          <div style="font-size:1.1rem;font-weight:800;color:#1e293b" id="iNombre">—</div>
+          <div style="font-size:.8rem;color:#6b7280;margin-top:2px" id="iId"></div>
+        </div>
+        <div id="iEstadoBadge"></div>
+      </div>
+      <div class="info-row">
+        <div class="info-item">
+          <div class="info-label">Inicio</div>
+          <div class="info-val" id="iInicio">—</div>
+        </div>
+        <div class="info-item">
+          <div class="info-label">Término</div>
+          <div class="info-val" id="iTermino">—</div>
+        </div>
+        <div class="info-item">
+          <div class="info-label">Días restantes</div>
+          <div class="info-val" id="iDiasRestantes">—</div>
+        </div>
+        <div class="info-item">
+          <div class="info-label">Horario</div>
+          <div class="info-val" id="iHorario">—</div>
+        </div>
+        <div class="info-item" style="flex:2">
+          <div class="info-label">Días de gestión</div>
+          <div id="iDias" style="margin-top:4px"></div>
+        </div>
+        <div class="info-item" style="flex:3">
+          <div class="info-label">Avance de campaña</div>
+          <div class="progress-bar-track" style="margin-top:8px;max-width:280px">
+            <div class="progress-bar-fill" id="iProgress" style="width:0%"></div>
+          </div>
+          <div style="font-size:.72rem;color:#9ca3af;margin-top:3px" id="iProgressLabel"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- STATS CHIPS -->
+    <div class="stats-row" id="statsRow"></div>
+
+    <!-- BARRA EXPORTAR TODO -->
+    <div class="export-bar">
+      <div style="font-size:.88rem;font-weight:600;color:#374151">
+        <i class="bi bi-table me-2 text-primary"></i>Exportar datos de la campaña completa
+      </div>
+      <div class="d-flex gap-2 flex-wrap">
+        <button class="btn-export-outline" onclick="exportarExcel('todo')">
+          <i class="bi bi-file-earmark-excel"></i>Exportar todo (Excel)
+        </button>
+      </div>
+    </div>
+
+    <!-- RESULTADOS ACORDEÓN -->
+    <div id="resultados"></div>
+
+  </div><!-- /infoCampana -->
+
+</div>
+
+<style>
+@keyframes spin { from{transform:rotate(0deg)} to{transform:rotate(360deg)} }
+</style>
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+<script>
+/* ── AUTH ──────────────────────────────────────────────────────────────── */
+const token = localStorage.getItem('token');
+const yo    = JSON.parse(localStorage.getItem('usuario') || 'null');
+if (!token || !yo) window.location.href = '/login.html';
+document.getElementById('navNombre').textContent    = `${yo?.nombre||''} ${yo?.apellido||''}`.trim();
+document.getElementById('navPerfil').textContent    = yo?.perfil || '';
+document.getElementById('avatarInicial').textContent = (yo?.nombre||'?').charAt(0).toUpperCase();
+function logout() { localStorage.removeItem('token'); localStorage.removeItem('usuario'); window.location.href = '/login.html'; }
+
+const hdrs = { 'Authorization':'Bearer '+token };
+
+/* ── COLORES POR RESULTADO ─────────────────────────────────────────────── */
+const PALETTE = [
+  '#2563eb','#16a34a','#dc2626','#d97706','#7c3aed',
+  '#0891b2','#db2777','#65a30d','#9333ea','#ea580c',
+  '#0284c7','#15803d',
+];
+function colorForIndex(i){ return PALETTE[i % PALETTE.length]; }
+
+/* ── HELPERS ───────────────────────────────────────────────────────────── */
+function fmtFecha(s){ if(!s) return '—'; const d=new Date(s+'T12:00:00'); return d.toLocaleDateString('es-CL',{day:'2-digit',month:'long',year:'numeric'}); }
+function fmtHora(t){ if(!t) return '—'; return t.slice(0,5); }
+function fmtDt(s){ if(!s) return '—'; return new Date(s).toLocaleString('es-CL',{timeZone:'America/Santiago',day:'2-digit',month:'2-digit',year:'2-digit',hour:'2-digit',minute:'2-digit'}); }
+
+const DIAS_LABELS = { '1':'Lun','2':'Mar','3':'Mié','4':'Jue','5':'Vie','6':'Sáb','7':'Dom' };
+
+/* ── CARGAR LISTA DE CAMPAÑAS ──────────────────────────────────────────── */
+async function cargarCampanas(){
+  const r = await fetch('/api/crm/campanas', { headers: hdrs });
+  const j = await r.json();
+  const sel = document.getElementById('selCampana');
+  (j.data || []).forEach(c => {
+    const opt = document.createElement('option');
+    opt.value = c.id_campana;
+    opt.textContent = c.nombre + (c.activa ? '' : ' [Inactiva]');
+    sel.appendChild(opt);
+  });
+  // Auto-select from URL param
+  const params = new URLSearchParams(location.search);
+  const pid = params.get('id');
+  if (pid) { sel.value = pid; cargarResultados(pid); }
+}
+
+/* ── CARGAR RESULTADOS ─────────────────────────────────────────────────── */
+let _data = null;
+
+async function cargarResultados(id){
+  if (!id) { document.getElementById('infoCampana').style.display='none'; return; }
+  document.getElementById('loadingSpinner').style.display = '';
+  try {
+    const r = await fetch(`/api/crm/campanas/${id}/resultados`, { headers: hdrs });
+    _data   = await r.json();
+    if (!_data.success) return;
+    renderInfo(_data.data);
+  } finally {
+    document.getElementById('loadingSpinner').style.display = 'none';
+  }
+}
+
+function renderInfo({ campana, resumen, total }){
+  document.getElementById('infoCampana').style.display = '';
+
+  // Nombre e ID
+  document.getElementById('iNombre').textContent = campana.nombre;
+  document.getElementById('iId').textContent     = `Campaña #${campana.id_campana}`;
+
+  // Fechas
+  document.getElementById('iInicio').textContent  = fmtFecha(campana.fecha_inicio);
+  document.getElementById('iTermino').textContent = fmtFecha(campana.fecha_fin);
+
+  // Horario
+  document.getElementById('iHorario').textContent =
+    `${fmtHora(campana.horario_desde)} – ${fmtHora(campana.horario_hasta)}`;
+
+  // Días de gestión
+  const diasEl = document.getElementById('iDias');
+  const dias   = (campana.dias_semana || '1,2,3,4,5').split(',').filter(Boolean);
+  diasEl.innerHTML = dias.map(d => `<span class="dia-tag">${DIAS_LABELS[d]||d}</span>`).join('');
+
+  // Estado y días restantes
+  const hoy    = new Date().toISOString().slice(0,10);
+  const inicio = campana.fecha_inicio;
+  const fin    = campana.fecha_fin;
+  let estado = 'pendiente', diasRest = '—';
+  if (fin && hoy > fin) {
+    estado = 'cerrada';
+    diasRest = 'Cerrada';
+  } else if (inicio && hoy >= inicio) {
+    estado = 'activa';
+    if (fin) {
+      const diff = Math.ceil((new Date(fin) - new Date(hoy)) / 86400000);
+      diasRest = diff > 0 ? `${diff} días` : 'Último día';
+    }
+  } else if (inicio && hoy < inicio) {
+    estado = 'pendiente';
+    const diff = Math.ceil((new Date(inicio) - new Date(hoy)) / 86400000);
+    diasRest = `Inicia en ${diff} días`;
+  }
+  document.getElementById('iDiasRestantes').textContent = diasRest;
+  const badgeEl = document.getElementById('iEstadoBadge');
+  badgeEl.innerHTML = estado === 'activa'
+    ? '<span class="badge-activa"><i class="bi bi-circle-fill me-1" style="font-size:.5rem"></i>Activa</span>'
+    : estado === 'cerrada'
+    ? '<span class="badge-cerrada"><i class="bi bi-lock-fill me-1"></i>Cerrada</span>'
+    : '<span class="badge-pendiente"><i class="bi bi-clock me-1"></i>Pendiente</span>';
+
+  // Progress
+  let pct = 0, progressLabel = '';
+  if (inicio && fin) {
+    const totalDias = (new Date(fin) - new Date(inicio)) / 86400000 || 1;
+    const pasados   = (new Date(hoy) - new Date(inicio)) / 86400000;
+    pct = Math.min(100, Math.max(0, Math.round(pasados / totalDias * 100)));
+    progressLabel = `${pct}% del período transcurrido`;
+  }
+  document.getElementById('iProgress').style.width = pct + '%';
+  document.getElementById('iProgressLabel').textContent = progressLabel;
+
+  // STATS chips
+  const contactados = new Set(_data.data.gestiones.map(g => g.rut_cliente).filter(Boolean)).size;
+  const gestionados = total;
+  const sinResultado= _data.data.gestiones.filter(g => !g.resultado).length;
+  document.getElementById('statsRow').innerHTML = [
+    { num: gestionados, lbl: 'Total gestiones' },
+    { num: contactados, lbl: 'Contactos únicos' },
+    { num: resumen.length, lbl: 'Tipos de resultado' },
+    { num: sinResultado, lbl: 'Sin resultado' },
+  ].map(s => `<div class="stat-chip"><div class="stat-num">${s.num.toLocaleString('es-CL')}</div><div class="stat-lbl">${s.lbl}</div></div>`).join('');
+
+  // ACORDEÓN de resultados
+  const resEl = document.getElementById('resultados');
+  resEl.style.display = '';
+
+  if (!resumen.length) {
+    resEl.innerHTML = `<div class="empty-state"><i class="bi bi-inbox"></i>Esta campaña no tiene gestiones registradas aún.</div>`;
+    return;
+  }
+
+  const maxTotal = resumen[0]?.total || 1;
+  resEl.innerHTML = resumen.map((r, i) => {
+    const color = colorForIndex(i);
+    const pctR  = Math.round(r.total / gestionados * 100);
+    const barW  = Math.round(r.total / maxTotal * 100);
+    return `
+    <div class="res-block">
+      <div class="res-header" onclick="toggleAcordeon(this)" id="rh-${i}">
+        <span class="res-dot" style="background:${color}"></span>
+        <span class="res-nombre">${r.resultado}</span>
+        <div class="res-bar-wrap">
+          <div class="res-bar" style="background:${color};width:${barW}%"></div>
+        </div>
+        <span class="res-count">${r.total.toLocaleString('es-CL')}</span>
+        <span class="res-pct">${pctR}%</span>
+        <button class="res-export-btn" onclick="event.stopPropagation();exportarExcel('resultado','${r.resultado.replace(/'/g,"\\'")}')">
+          <i class="bi bi-file-earmark-excel"></i>Excel
+        </button>
+        <i class="bi bi-chevron-down res-chevron"></i>
+      </div>
+      <div class="res-body" id="rb-${i}">
+        ${renderTabla(r.casos, i)}
+      </div>
+    </div>`;
+  }).join('');
+}
+
+function toggleAcordeon(header){
+  const idx  = header.id.split('-')[1];
+  const body = document.getElementById(`rb-${idx}`);
+  const open = body.classList.toggle('show');
+  header.classList.toggle('open', open);
+}
+
+function renderTabla(casos, idx){
+  if (!casos.length) return '<p style="color:#9ca3af;padding:10px 0">Sin casos.</p>';
+  const cols = [
+    { key:'created_at',      label:'Fecha gestión' },
+    { key:'rut_cliente',     label:'RUT' },
+    { key:'nombre_cliente',  label:'Nombre' },
+    { key:'telefono',        label:'Teléfono' },
+    { key:'canal',           label:'Canal' },
+    { key:'tipo_solicitud',  label:'Tipo solicitud' },
+    { key:'descripcion',     label:'Descripción' },
+    { key:'accion_siguiente',label:'Acción siguiente' },
+    { key:'fecha_seguimiento',label:'Seguimiento' },
+    { key:'nombre_usuario',  label:'Ejecutivo' },
+    { key:'estado',          label:'Estado' },
+  ];
+  const thead = cols.map(c=>`<th>${c.label}</th>`).join('');
+  const tbody = casos.map(g=>`<tr>${cols.map(c=>{
+    let v = g[c.key] ?? '—';
+    if (c.key==='created_at'||c.key==='fecha_seguimiento') v = fmtDt(v==='—'?null:v);
+    if (c.key==='canal') v = v.replace(/_/g,' ');
+    return `<td style="white-space:nowrap">${v}</td>`;
+  }).join('')}</tr>`).join('');
+  return `<div style="overflow-x:auto"><table class="casos-table"><thead><tr>${thead}</tr></thead><tbody>${tbody}</tbody></table></div>`;
+}
+
+/* ── EXPORTAR EXCEL ────────────────────────────────────────────────────── */
+function exportarExcel(tipo, resultado){
+  if (!_data?.data) return;
+  const { campana, gestiones } = _data.data;
+
+  let filas = gestiones;
+  if (tipo === 'resultado') filas = gestiones.filter(g => (g.resultado||'Sin resultado') === resultado);
+
+  const ws_data = filas.map(g => ({
+    'Fecha Gestión':     g.created_at ? new Date(g.created_at).toLocaleString('es-CL') : '',
+    'RUT':               g.rut_cliente || '',
+    'Nombre':            g.nombre_cliente || '',
+    'Teléfono':          g.telefono || '',
+    'Email':             g.email || '',
+    'Canal':             (g.canal||'').replace(/_/g,' '),
+    'Tipo Solicitud':    g.tipo_solicitud || '',
+    'Resultado':         g.resultado || '',
+    'Descripción':       g.descripcion || '',
+    'Acción Siguiente':  g.accion_siguiente || '',
+    'Fecha Seguimiento': g.fecha_seguimiento || '',
+    'Estado':            g.estado || '',
+    'Ejecutivo':         g.nombre_usuario || '',
+  }));
+
+  if (!filas.length) { alert('No hay datos para exportar.'); return; }
+
+  const wb  = XLSX.utils.book_new();
+  const ws  = XLSX.utils.json_to_sheet(filas_data || filas.map(g=>({...g})));
+
+  // Construir hoja correctamente
+  const ws2 = XLSX.utils.json_to_sheet(ws_data);
+
+  // Ajuste de anchos de columna
+  const cols = Object.keys(ws_data[0]||{});
+  ws2['!cols'] = cols.map(k => ({ wch: Math.max(k.length, 14) }));
+
+  const sheetName = tipo === 'resultado'
+    ? resultado.slice(0,28).replace(/[\\/:*?[\]]/g,'_')
+    : 'Todos';
+
+  XLSX.utils.book_append_sheet(wb, ws2, sheetName);
+
+  const fname = `Campaña_${campana.nombre.replace(/[\\/:*?[\]]/g,'_')}_${sheetName}_${new Date().toLocaleDateString('es-CL').replace(/\//g,'-')}.xlsx`;
+  XLSX.writeFile(wb, fname);
+}
+
+/* ── INIT ──────────────────────────────────────────────────────────────── */
+cargarCampanas();
+</script>
+<script src="/js/app-version.js"></script>
+</body>
+</html>
