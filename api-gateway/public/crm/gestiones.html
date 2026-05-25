@@ -192,7 +192,7 @@
   <div class="topnav-left">
     <a href="/" class="topnav-brand">
       <img src="/img/logo.png" alt="AutoFácil">
-      <span class="version-badge" id="versionBadge">v4.7</span>
+      <span class="version-badge" id="versionBadge">v4.8</span>
     </a>
     <div class="breadcrumb-nav">
       <a href="/">Inicio</a><span class="sep">›</span>
@@ -631,8 +631,13 @@ async function autoCompletarCliente(rutFormateado) {
       let nombre = '', rut = rutFormateado, idCredito = '';
       if (clientes.length) {
         const c = clientes[0];
-        nombre = `${c.nombre||''} ${c.apellido||''}`.trim();
+        // Tabla clientes usa: nombres, apellido_paterno, apellido_materno
+        nombre = `${c.nombres||c.nombre||''} ${c.apellido_paterno||c.apellido||''}`.trim();
         rut    = c.rut_cliente || c.rut || rutFormateado;
+      }
+      // Fallback: si no hay cliente en tabla clientes pero sí créditos, usar nombre del crédito
+      if (!nombre && creditos.length) {
+        nombre = creditos[0].nombre_cliente || '';
       }
 
       // 3. Auto-detectar tipo_cliente
@@ -648,7 +653,7 @@ async function autoCompletarCliente(rutFormateado) {
       setTipoCliente(tipoAuto);
 
       // 5. Mostrar card del cliente si existe
-      if (nombre || clientes.length) {
+      if (nombre || clientes.length || creditos.length) {
         document.getElementById('hRutCliente').value    = rut;
         document.getElementById('hNombreCliente').value = nombre;
         document.getElementById('hIdCredito').value     = idCredito || '';
