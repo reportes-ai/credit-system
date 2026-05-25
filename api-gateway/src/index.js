@@ -145,6 +145,8 @@ app.get(['/crm/gestiones', '/crm/gestiones/'], (req, res) =>
   res.sendFile(path.join(__dirname, '../public/crm/gestiones.html')));
 app.get(['/crm/estadisticas', '/crm/estadisticas/'], (req, res) =>
   res.sendFile(path.join(__dirname, '../public/crm/estadisticas.html')));
+app.get(['/crm/campanas', '/crm/campanas/'], (req, res) =>
+  res.sendFile(path.join(__dirname, '../public/crm/campanas/index.html')));
 app.get(['/crm/campanas/crear', '/crm/campanas/crear/'], (req, res) =>
   res.sendFile(path.join(__dirname, '../public/crm/campanas/crear.html')));
 app.get(['/crm/campanas/gestion', '/crm/campanas/gestion/'], (req, res) =>
