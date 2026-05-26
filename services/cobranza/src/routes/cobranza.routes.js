@@ -5,6 +5,7 @@ const ctrl   = require('../controllers/cobranza.controller');
 const { verifyToken } = require('../../../../shared/middleware/auth');
 
 // Rutas estáticas primero
+router.get('/diagnostico',            verifyToken, ctrl.diagnostico);
 router.get('/dashboard',              verifyToken, ctrl.dashboard);
 router.get('/cartera',                verifyToken, ctrl.cartera);
 router.get('/provisiones',            verifyToken, ctrl.provisiones);

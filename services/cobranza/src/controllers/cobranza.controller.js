@@ -83,10 +83,13 @@ const MORA_SQL = (whereExtra = '', havingExtra = '') => `
   LEFT JOIN (
     SELECT id_credito, COUNT(DISTINCT numero_cuota) AS cnt
     FROM pagos_credito
+    WHERE estado_pago = 'PAGADO'
     GROUP BY id_credito
   ) pp ON pp.id_credito = c.id_credito
   WHERE c.estado = 'VIGENTE'
-    AND (c.empresa IS NULL OR c.empresa != 'BROKERAGE')
+    AND (c.financiera = 'AUTOFACIL' OR c.financiera IS NULL)
+    AND c.plazo IS NOT NULL
+    AND c.plazo > 0
     AND c.fecha_primera_cuota IS NOT NULL
     AND c.fecha_primera_cuota <= CURDATE()
     ${whereExtra}
@@ -115,7 +118,7 @@ const MORA_CREDITO_SQL = `
   LEFT JOIN (
     SELECT id_credito, COUNT(DISTINCT numero_cuota) AS cnt
     FROM pagos_credito
-    WHERE id_credito = ?
+    WHERE id_credito = ? AND estado_pago = 'PAGADO'
     GROUP BY id_credito
   ) pp ON pp.id_credito = c.id_credito
   LEFT JOIN clientes cl ON cl.rut = c.rut_cliente
@@ -559,6 +562,69 @@ exports.misGestiones = async (req, res) => {
       total_gestiones: total,
       page: Number(page),
       pages: Math.ceil(total / Number(limit))
+    });
+  } catch (err) {
+    fail(res, err.message, 500);
+  }
+};
+
+// ─── diagnostico ──────────────────────────────────────────────────────────────
+exports.diagnostico = async (req, res) => {
+  try {
+    // 1. Todos los créditos VIGENTE
+    const [[{ total_vigente }]] = await pool.query(
+      `SELECT COUNT(*) AS total_vigente FROM creditos WHERE estado = 'VIGENTE'`
+    );
+
+    // 2. VIGENTE solo AutoFácil con fecha_primera_cuota
+    const [[{ autofacil_con_fecha }]] = await pool.query(
+      `SELECT COUNT(*) AS autofacil_con_fecha
+       FROM creditos
+       WHERE estado = 'VIGENTE'
+         AND (financiera = 'AUTOFACIL' OR financiera IS NULL)
+         AND fecha_primera_cuota IS NOT NULL`
+    );
+
+    // 3. VIGENTE AutoFácil con fecha pasada y plazo
+    const [[{ con_fecha_pasada }]] = await pool.query(
+      `SELECT COUNT(*) AS con_fecha_pasada
+       FROM creditos
+       WHERE estado = 'VIGENTE'
+         AND (financiera = 'AUTOFACIL' OR financiera IS NULL)
+         AND plazo IS NOT NULL AND plazo > 0
+         AND fecha_primera_cuota IS NOT NULL
+         AND fecha_primera_cuota <= CURDATE()`
+    );
+
+    // 4. Con mora real calculada
+    const [conMora] = await pool.query(MORA_SQL());
+
+    // 5. Muestra por financiera
+    const [porFinanciera] = await pool.query(
+      `SELECT COALESCE(financiera,'(NULL)') AS financiera, estado, COUNT(*) AS cnt
+       FROM creditos
+       WHERE estado IN ('VIGENTE','EN MORA')
+       GROUP BY financiera, estado
+       ORDER BY cnt DESC`
+    );
+
+    // 6. Sample de créditos AutoFácil VIGENTE con sus campos de mora
+    const [sample] = await pool.query(
+      `SELECT id_credito, numero_credito, nombre_cliente, financiera,
+              fecha_primera_cuota, plazo, cuota, estado
+       FROM creditos
+       WHERE estado = 'VIGENTE'
+         AND (financiera = 'AUTOFACIL' OR financiera IS NULL)
+       LIMIT 10`
+    );
+
+    ok(res, {
+      total_vigente,
+      autofacil_con_fecha,
+      con_fecha_pasada,
+      creditos_en_mora: conMora.length,
+      por_financiera: porFinanciera,
+      sample_autofacil: sample,
     });
   } catch (err) {
     fail(res, err.message, 500);
