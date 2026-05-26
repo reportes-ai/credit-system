@@ -195,7 +195,7 @@
   <a class="nav-brand" href="/creditos">
     <img src="/img/logo-autofacil.png" alt="AutoFácil" style="filter:brightness(0) invert(1);height:32px;display:block" onerror="this.style.display='none'">
     <span>Revisión de Crédito</span>
-    <span class="version-badge">v3.0</span>
+    <span class="version-badge">v3.1</span>
   </a>
   <div class="breadcrumb-nav">
   <a href="/">Inicio</a><span class="sep">›</span>
@@ -578,6 +578,11 @@ function renderPagina(c, ant, com) {
   <div class="action-bar">
     <div class="action-bar-left">
       <a href="/creditos" class="btn-accion btn-volver"><i class="bi bi-arrow-left"></i>Volver</a>
+      ${!ESTADOS_CURSADOS.has(c.estado) ? `
+      <button class="btn-accion" style="background:linear-gradient(135deg,#d97706,#f59e0b);color:#fff"
+        onclick="location.href='/creditos?editar=${c.id_credito}'">
+        <i class="bi bi-pencil-square"></i>Editar Crédito
+      </button>` : ''}
     </div>
     <div class="action-bar-right">
       ${ESTADOS_CURSADOS.has(c.estado) ? `

@@ -283,30 +283,118 @@ const getById = async (req, res) => {
 /* ─── UPDATE ─────────────────────────────────────────────────────────────── */
 const update = async (req, res) => {
   try {
-    const { estado, observaciones, ejecutivo, dealer, patente, color, motor, chasis } = req.body;
+    const {
+      estado, observaciones, ejecutivo, dealer, patente, color, motor, chasis,
+      // Campos de edición completa
+      rut_cliente, nombre_cliente, financiera,
+      fecha_otorgamiento, fecha_primera_cuota,
+      valor_vehiculo, pie, saldo_precio, monto_financiado,
+      plazo, tasa_mensual, cuota,
+      gastos_operativos, seguros,
+      tipo_vehiculo, marca, modelo, anio,
+      transmision, combustible, tasacion, permiso_circulacion,
+      id_dealer, tipo_ubicacion, nombre_parque,
+      datos_json,
+    } = req.body;
 
     const [prev] = await pool.query(
-      'SELECT estado FROM operaciones_brokerage WHERE id = ?', [req.params.id]
+      'SELECT estado, numero_credito, nombre_cliente FROM operaciones_brokerage WHERE id = ?',
+      [req.params.id]
     );
+    if (!prev.length) return res.status(404).json({ success: false, data: null, error: 'Crédito no encontrado' });
     const estadoAntes = prev[0]?.estado || null;
 
-    await pool.query(`
-      UPDATE operaciones_brokerage
-      SET estado      = ?,
-          observaciones = ?,
-          ejecutivo   = ?,
-          automotora  = ?,
-          patente     = ?,
-          color       = ?,
-          motor       = ?,
-          chasis      = ?,
-          updated_at  = CURRENT_TIMESTAMP
-      WHERE id = ?
-    `, [
-      estado, observaciones || null, ejecutivo || null, dealer || null,
-      patente ? patente.toUpperCase().trim() : null,
-      color || null, motor || null, chasis || null, req.params.id
-    ]);
+    // Detectar si es una edición completa (vienen campos financieros)
+    const esEdicionCompleta = monto_financiado !== undefined || valor_vehiculo !== undefined;
+
+    if (esEdicionCompleta) {
+      // ── Edición completa: actualiza todos los campos del formulario de ingreso
+      const saldo = saldo_precio || (valor_vehiculo && pie ? (valor_vehiculo - pie) : null);
+      const pct   = (valor_vehiculo && saldo) ? saldo / valor_vehiculo : null;
+
+      await pool.query(`
+        UPDATE operaciones_brokerage
+        SET estado               = ?,
+            observaciones        = ?,
+            ejecutivo            = ?,
+            automotora           = ?,
+            patente              = ?,
+            color                = ?,
+            motor                = ?,
+            chasis               = ?,
+            nombre_cliente       = ?,
+            financiera           = ?,
+            fecha_otorgado       = ?,
+            fecha_primera_cuota  = ?,
+            valor_vehiculo       = ?,
+            pie                  = ?,
+            saldo_precio         = ?,
+            pct_financiado       = ?,
+            monto_financiado     = ?,
+            plazo                = ?,
+            tascli_real          = ?,
+            cuota                = ?,
+            gastos               = ?,
+            seguros              = ?,
+            tipo_vehiculo        = ?,
+            marca                = ?,
+            modelo               = ?,
+            anio                 = ?,
+            transmision          = ?,
+            combustible          = ?,
+            tasacion             = ?,
+            permiso_circulacion  = ?,
+            id_dealer            = ?,
+            tipo_ubicacion       = ?,
+            nombre_parque_mgmt   = ?,
+            datos_json           = ?,
+            updated_at           = CURRENT_TIMESTAMP
+        WHERE id = ?
+      `, [
+        estado || estadoAntes, observaciones || null,
+        ejecutivo || null, dealer || null,
+        patente ? patente.toUpperCase().trim() : null,
+        color || null, motor || null, chasis || null,
+        nombre_cliente ? nombre_cliente.trim() : prev[0].nombre_cliente,
+        financiera || 'AUTOFACIL',
+        fecha_otorgamiento || null,
+        fecha_primera_cuota || null,
+        valor_vehiculo || null, pie || null, saldo || null, pct || null, monto_financiado || null,
+        plazo || null, tasa_mensual || null, cuota || null,
+        gastos_operativos || null, seguros || null,
+        tipo_vehiculo || null, marca || null, modelo || null, anio || null,
+        transmision || null, combustible || null, tasacion || null, permiso_circulacion || null,
+        id_dealer || null, tipo_ubicacion || null, nombre_parque || null,
+        datos_json ? JSON.stringify(datos_json) : null,
+        req.params.id,
+      ]);
+
+      audit.registrar({
+        id_credito: req.params.id, req,
+        accion: 'CREDITO_EDITADO',
+        detalle: `Crédito N°${prev[0].numero_credito} editado por ${req.usuario?.nombre || 'usuario'}`,
+        meta: { monto_financiado, plazo, tasa_mensual, valor_vehiculo },
+      });
+    } else {
+      // ── Actualización parcial: solo estado/observaciones/campos de gestión
+      await pool.query(`
+        UPDATE operaciones_brokerage
+        SET estado        = ?,
+            observaciones = ?,
+            ejecutivo     = ?,
+            automotora    = ?,
+            patente       = ?,
+            color         = ?,
+            motor         = ?,
+            chasis        = ?,
+            updated_at    = CURRENT_TIMESTAMP
+        WHERE id = ?
+      `, [
+        estado, observaciones || null, ejecutivo || null, dealer || null,
+        patente ? patente.toUpperCase().trim() : null,
+        color || null, motor || null, chasis || null, req.params.id
+      ]);
+    }
 
     if (estado && estadoAntes && estado !== estadoAntes) {
       audit.registrar({

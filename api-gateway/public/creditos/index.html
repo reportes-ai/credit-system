@@ -303,6 +303,13 @@
     /* Resultado vacío */
     .empty-state { text-align:center; padding:48px 20px; color:#9ca3af; }
 
+    /* ── Edit mode banner ── */
+    .edit-mode-banner { display:none; background:linear-gradient(135deg,#d97706,#f59e0b); border-radius:10px; padding:10px 18px; margin-bottom:14px; color:#fff; font-weight:700; font-size:.88rem; align-items:center; gap:10px; }
+    .edit-mode-banner.visible { display:flex; }
+    .edit-mode-banner i { font-size:1.1rem; }
+    .edit-mode-banner .emb-num { background:rgba(255,255,255,.25); border-radius:6px; padding:2px 10px; font-size:.82rem; letter-spacing:.04em; }
+    .btn-guardar-edit { background:linear-gradient(135deg,#d97706,#f59e0b) !important; }
+
     /* ── Modal éxito grabado ──────────────────────────────── */
     .success-overlay { display:none; position:fixed; inset:0; background:rgba(15,23,42,.6); z-index:2050; align-items:center; justify-content:center; }
     .success-overlay.open { display:flex; }
@@ -369,7 +376,7 @@
   <div class="topnav-left">
     <div class="topnav-brand">
       <a href="/"><img src="/img/logo.png" alt="AutoFácil" style="display:block"></a>
-      <span class="version-badge" id="versionBadge">v4.0</span>
+      <span class="version-badge" id="versionBadge">v4.1</span>
     </div>
       <div class="breadcrumb-nav">
         <a href="/">Inicio</a><span class="sep">›</span>
@@ -504,6 +511,17 @@
        TAB: INGRESO DE CRÉDITOS
   ════════════════════════════════ -->
   <div class="tab-panel" id="panelIngreso">
+
+    <!-- Edit mode banner -->
+    <div class="edit-mode-banner" id="editModeBanner">
+      <i class="bi bi-pencil-square"></i>
+      <span>Editando crédito:</span>
+      <span class="emb-num" id="editModeNum">—</span>
+      <span style="margin-left:auto;font-size:.78rem;opacity:.85">Modifica los campos y presiona "Actualizar Crédito"</span>
+      <button type="button" onclick="cancelarEdicion()" style="background:rgba(255,255,255,.2);border:1px solid rgba(255,255,255,.4);color:#fff;border-radius:6px;padding:4px 12px;font-size:.78rem;font-weight:700;cursor:pointer;margin-left:8px">
+        <i class="bi bi-x me-1"></i>Cancelar
+      </button>
+    </div>
 
     <!-- Sección 1: Cliente -->
     <div class="form-card">
@@ -879,7 +897,7 @@
       <button class="btn-cancelar" onclick="limpiarIngreso()">
         <i class="bi bi-x-circle me-1"></i>Limpiar
       </button>
-      <button class="btn-guardar" onclick="guardarCredito()">
+      <button class="btn-guardar" id="btnGuardarCredito" onclick="guardarCredito()">
         <i class="bi bi-floppy me-1"></i>Guardar Crédito
       </button>
     </div>
@@ -1188,6 +1206,10 @@ function showToast(msg, ok) {
   el.textContent = msg; el.style.display = 'block';
   setTimeout(() => el.style.display='none', 3500);
 }
+
+/* ─── Modo Edición ─────────────────────────────────────────────────── */
+let _modoEditar = null;   // id_credito si estamos editando, null si es ingreso nuevo
+let _modoEditarNumero = null; // numero_credito para mostrar en banner
 
 /* ─── Tabs ─────────────────────────────────────────────────────────── */
 let _tabActual = 'consulta';
@@ -2231,25 +2253,36 @@ async function guardarCredito() {
   };
 
   try {
-    const r = await fetch('/api/creditos', { method:'POST', headers:apiHdr(), body:JSON.stringify(body) });
-    const j = await r.json();
-    if (j.success) {
-      // Guardar datos para amortización y modal
-      _savedCreditData = {
-        id_credito:         j.data.id_credito,
-        numero_credito:     j.data.numero_credito,
-        monto_financiado:   parseFloat(body.monto_financiado)   || 0,
-        tasa_mensual:       parseFloat(body.tasa_mensual)        || 0,
-        plazo:              parseInt(body.plazo)                 || 0,
-        fecha_primera_cuota: body.fecha_primera_cuota            || null,
-        cuota:              parseFloat(body.cuota)               || 0,
-      };
-      // Mostrar modal de éxito
-      document.getElementById('successNum').textContent = 'N° ' + j.data.numero_credito;
-      document.getElementById('successOverlay').classList.add('open');
-      limpiarIngreso();
-      setTimeout(buscarCreditos, 300);
-    } else showToast(j.error||'Error al guardar', false);
+    if (_modoEditar) {
+      // ── MODO EDICIÓN: PUT
+      const r = await fetch('/api/creditos/' + _modoEditar, { method:'PUT', headers:apiHdr(), body:JSON.stringify(body) });
+      const j = await r.json();
+      if (j.success) {
+        showToast('Crédito actualizado correctamente', true);
+        setTimeout(() => { location.href = '/creditos/revisar?id=' + _modoEditar; }, 800);
+      } else showToast(j.error||'Error al actualizar', false);
+    } else {
+      // ── MODO NUEVO: POST
+      const r = await fetch('/api/creditos', { method:'POST', headers:apiHdr(), body:JSON.stringify(body) });
+      const j = await r.json();
+      if (j.success) {
+        // Guardar datos para amortización y modal
+        _savedCreditData = {
+          id_credito:         j.data.id_credito,
+          numero_credito:     j.data.numero_credito,
+          monto_financiado:   parseFloat(body.monto_financiado)   || 0,
+          tasa_mensual:       parseFloat(body.tasa_mensual)        || 0,
+          plazo:              parseInt(body.plazo)                 || 0,
+          fecha_primera_cuota: body.fecha_primera_cuota            || null,
+          cuota:              parseFloat(body.cuota)               || 0,
+        };
+        // Mostrar modal de éxito
+        document.getElementById('successNum').textContent = 'N° ' + j.data.numero_credito;
+        document.getElementById('successOverlay').classList.add('open');
+        limpiarIngreso();
+        setTimeout(buscarCreditos, 300);
+      } else showToast(j.error||'Error al guardar', false);
+    }
   } catch(e) { showToast('Error de conexión', false); }
 }
 
@@ -2399,6 +2432,120 @@ function cerrarAmort() {
   document.getElementById('amortOverlay').classList.remove('open');
 }
 
+/* ─── Modo Edición — Carga y helpers ───────────────────────────────── */
+async function cargarModoEdicion(idCredito) {
+  try {
+    const r = await fetch('/api/creditos/' + idCredito, { headers: apiHdr() });
+    const j = await r.json();
+    if (!j.success) throw new Error(j.error || 'Error al cargar crédito');
+    const c = j.data;
+    _modoEditar = idCredito;
+    _modoEditarNumero = c.numero_credito;
+
+    // Cambiar a tab ingreso forzando AutoFácil (sin redirigir a otras páginas)
+    document.querySelectorAll('.tab-card[data-tab]').forEach(b => b.classList.toggle('active', b.dataset.tab === 'ingreso'));
+    document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
+    document.getElementById('panelIngreso').classList.add('active');
+    _tabActual = 'ingreso';
+    document.querySelectorAll('.fin-card').forEach(cc => cc.classList.remove('active'));
+    const afCard = document.querySelector('.fin-card[data-empresa="AUTOFACIL"]');
+    if (afCard) afCard.classList.add('active');
+    _setEmpresaIngreso(c.financiera || 'AUTOFACIL');
+
+    // Mostrar banner edición
+    document.getElementById('editModeBanner').classList.add('visible');
+    document.getElementById('editModeNum').textContent = c.numero_credito || '—';
+
+    // Cambiar texto del botón guardar
+    const btnG = document.getElementById('btnGuardarCredito');
+    if (btnG) {
+      btnG.innerHTML = '<i class="bi bi-arrow-repeat me-1"></i>Actualizar Crédito';
+      btnG.classList.add('btn-guardar-edit');
+    }
+
+    // ── Cliente
+    document.getElementById('iRut').value          = c.rut_cliente  || '';
+    document.getElementById('iNombreCliente').value = c.nombre_cliente || '';
+    document.getElementById('iFinanciera').value    = c.financiera   || 'AUTOFACIL';
+    document.getElementById('iEjecutivo').value     = c.ejecutivo    || '';
+    document.getElementById('iEstado').value        = c.estado       || 'INGRESO';
+    document.getElementById('iObservaciones').value = c.observaciones || '';
+
+    // ── Fechas
+    if (c.fecha_otorgamiento)  document.getElementById('iFechaOtorg').value         = c.fecha_otorgamiento.split('T')[0];
+    if (c.fecha_primera_cuota) document.getElementById('iFechaPrimeraCuota').value  = c.fecha_primera_cuota.split('T')[0];
+
+    // ── Financiero
+    const parsePeso = s => s ? String(Math.round(Number(s))).replace(/\B(?=(\d{3})+(?!\d))/g, '.') : '';
+    document.getElementById('iValorVehiculo').value = parsePeso(c.valor_vehiculo);
+    document.getElementById('iPie').value           = parsePeso(c.pie);
+    document.getElementById('iPlazo').value         = c.plazo || '48';
+    document.getElementById('iTasa').value          = c.tasa_mensual ? Number(c.tasa_mensual).toFixed(2)+'%' : '';
+
+    // ── Vehículo (texto directo)
+    document.getElementById('iPatente').value = c.patente || '';
+    document.getElementById('iColor').value   = c.color   || '';
+    document.getElementById('iMotor').value   = c.motor   || '';
+    document.getElementById('iChasis').value  = c.chasis  || '';
+
+    // ── Tipo vehículo
+    const iTipoV = document.getElementById('iTipoVehiculo');
+    if (c.tipo_vehiculo) iTipoV.value = c.tipo_vehiculo;
+
+    // ── Dealer
+    document.getElementById('iDealerBuscar').value = c.dealer || '';
+    document.getElementById('iDealer').value       = c.dealer || '';
+    if (c.id_dealer) document.getElementById('iDealerId').value = c.id_dealer;
+
+    // ── Ubicación (DB column is nombre_parque_mgmt, VIEW alias is nombre_parque)
+    if (c.tipo_ubicacion) setUbicacion(c.tipo_ubicacion);
+    const nombreParque = c.nombre_parque || c.nombre_parque_mgmt || '';
+    if (nombreParque) document.getElementById('iNombreParque').value = nombreParque;
+
+    // ── Datos JSON (seguros, GPS, etc.)
+    try {
+      const dj = typeof c.datos_json === 'string' ? JSON.parse(c.datos_json) : (c.datos_json || {});
+      if (dj.seguros) {
+        const chkD = document.getElementById('chkCDesg'); if (chkD) chkD.checked = dj.seguros.desgravamen ?? true;
+        const chkR = document.getElementById('chkCRdh');  if (chkR) chkR.checked = dj.seguros.rdh         ?? true;
+        const chkC = document.getElementById('chkCCesa'); if (chkC) chkC.checked = dj.seguros.cesantia    ?? true;
+      }
+      const chkG = document.getElementById('chkCGps'); if (chkG) chkG.checked = dj.gps          ?? true;
+      const chkP = document.getElementById('chkCRep'); if (chkP) chkP.checked = dj.reparaciones  ?? true;
+      if (dj.bono_financiamiento) document.getElementById('iBonoFin').value = String(Math.round(dj.bono_financiamiento)).replace(/\B(?=(\d{3})+(?!\d))/g, '.');
+    } catch(_) {}
+
+    // ── Vehículo cascada (marca → modelo → año → transmisión/combustible)
+    await vehRestaurar(c.marca, c.modelo, c.anio ? String(c.anio) : null, c.transmision, c.combustible);
+
+    // Recalcular con los datos cargados
+    credRecalcular();
+
+    // Habilitar cotizaciones
+    const btnCotiz = document.getElementById('btnVerCotiz');
+    if (btnCotiz) btnCotiz.disabled = !c.rut_cliente;
+
+    // Scroll al top del panel ingreso
+    document.getElementById('panelIngreso').scrollIntoView({ behavior: 'smooth', block: 'start' });
+
+  } catch(e) {
+    showToast('Error al cargar crédito para edición: ' + e.message, false);
+  }
+}
+
+function cancelarEdicion() {
+  if (_modoEditar) {
+    location.href = '/creditos/revisar?id=' + _modoEditar;
+  } else {
+    _modoEditar = null;
+    _modoEditarNumero = null;
+    document.getElementById('editModeBanner').classList.remove('visible');
+    const btnG = document.getElementById('btnGuardarCredito');
+    if (btnG) { btnG.innerHTML = '<i class="bi bi-floppy me-1"></i>Guardar Crédito'; btnG.classList.remove('btn-guardar-edit'); }
+    cambiarTab('consulta');
+  }
+}
+
 /* ─── Init ─────────────────────────────────────────────────────────── */
 buscarCreditos();
 vehCargaMarcas();
@@ -2414,6 +2561,13 @@ credCargarParams();
     el30.value = d30.toISOString().split('T')[0];
   }
   credActualizarDias();
+})();
+
+// ── Detectar ?editar=<id> ── //
+(function() {
+  const params  = new URLSearchParams(location.search);
+  const editId  = params.get('editar');
+  if (editId) cargarModoEdicion(editId);
 })();
 document.addEventListener('keydown', e => {
   if (e.key==='Escape') { cerrarDetalle(); cerrarCotizaciones(); cerrarAmort(); }
