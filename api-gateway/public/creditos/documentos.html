@@ -114,7 +114,7 @@
       <div class="breadcrumb-nav">
         <a href="/">Inicio</a><span class="sep">›</span>
         <a href="/creditos">Créditos</a><span class="sep">›</span>
-        <span style="color:#fff;font-weight:600"><i class="bi bi-file-earmark me-1"></i>Documentos</span>
+        <span style="color:#fff;font-weight:600"><i class="bi bi-file-earmark me-1"></i><span id="bcCredito">Documentos</span></span>
       </div>
     </div>
     <div class="topnav-right">
@@ -490,10 +490,11 @@
         if (tplOnly && !creditId) {
           const single = plantillas.find(p => p.codigo === tplOnly) || plantillas[0];
           if (single) {
-            document.getElementById('creditNumero').textContent = 'Vista previa';
-            document.getElementById('creditNombre').textContent = single.nombre;
-            document.getElementById('creditRut').textContent    = 'Sin datos — variables marcadas en amarillo';
-            document.getElementById('bcCredito').textContent    = 'Vista previa';
+            const _set = (id, val) => { const el = document.getElementById(id); if (el) el.textContent = val; };
+            _set('creditNumero', 'Vista previa');
+            _set('creditNombre', single.nombre);
+            _set('creditRut',    'Sin datos — variables marcadas en amarillo');
+            _set('bcCredito',    'Vista previa');
             const emptyC   = { numero_credito:'DEMO-001', rut_cliente:'12.345.678-9', nombre_cliente:'JUAN ANTONIO EJEMPLO SOTO', tasa_mensual:'2.90', plazo:36, cuota:300509, monto_financiado:6518208, saldo_precio:4990000, valor_vehiculo:8990000, pie:4000000, tipo_vehiculo:'Automóvil', marca:'NISSAN', modelo:'VERSA', anio:'2024', patente:'ABCD12', color:'Gris', motor:'HR16-000000', chasis:'3N1CN8AE0NL000001', gastos_operativos:753799, seguros:722263, fecha_primera_cuota:'2024-03-05', datos_json:'{}' };
             const emptyCli = { nombres:'JUAN ANTONIO', apellido_paterno:'EJEMPLO', apellido_materno:'SOTO', estado_civil:'Soltero', nacionalidad:'Chilena', correo:'ejemplo@mail.com', telefono_movil:'+56912345678', direccion:'Av. Ejemplo 123, Santiago' };
             const vars = buildVars(emptyC, emptyCli, {}, tplOnly);
@@ -525,10 +526,11 @@
         const cli  = (jCli.success && jCli.data) ? jCli.data : null;
 
         // Update header
-        document.getElementById('bcCredito').textContent    = 'Documentos N° ' + (c.numero_credito || creditId);
-        document.getElementById('creditNumero').textContent  = 'Operación N° ' + (c.numero_credito || creditId);
-        document.getElementById('creditNombre').textContent  = c.nombre_cliente || '—';
-        document.getElementById('creditRut').textContent     = c.rut_cliente || '—';
+        const _set = (id, val) => { const el = document.getElementById(id); if (el) el.textContent = val; };
+        _set('bcCredito',   'Documentos N° ' + (c.numero_credito || creditId));
+        _set('creditNumero','Operación N° '  + (c.numero_credito || creditId));
+        _set('creditNombre', c.nombre_cliente || '—');
+        _set('creditRut',    c.rut_cliente    || '—');
 
         // Activate emission mode if state is EMISION_DOCUMENTOS
         if (c.estado === 'EMISION_DOCUMENTOS') activarModoEmision();
