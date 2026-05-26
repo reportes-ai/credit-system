@@ -34,8 +34,10 @@
   .ch-rut  { font-size:.88rem; opacity:.8; }
   .ch-right { display:flex; flex-direction:column; align-items:flex-end; gap:8px; }
   .estado-badge { border-radius:20px; padding:4px 14px; font-size:.8rem; font-weight:800; text-transform:uppercase; letter-spacing:.06em; }
-  .eb-REVISION        { background:#fef2f2; color:#dc2626; border:1.5px solid #fca5a5; }
+  .eb-INGRESO         { background:#fefce8; color:#854d0e; border:1.5px solid #fde047; }
+  .eb-REVISION        { background:#fefce8; color:#854d0e; border:1.5px solid #fde047; }
   .eb-CARGA_RESPALDOS    { background:#fff7ed; color:#c2410c; border:1.5px solid #fdba74; }
+  .eb-EN_ANALISIS        { background:#f5f3ff; color:#5b21b6; border:1.5px solid #c4b5fd; }
   .eb-EMISION_DOCUMENTOS  { background:#f0f9ff; color:#0369a1; border:1.5px solid #7dd3fc; }
   .eb-CARGA_DOCUMENTOS_AF { background:#fdf4ff; color:#7e22ce; border:1.5px solid #d8b4fe; }
   .eb-VALIDACION_FIRMA    { background:#fff7ed; color:#b45309; border:1.5px solid #fcd34d; }
@@ -193,7 +195,7 @@
   <a class="nav-brand" href="/creditos">
     <img src="/img/logo-autofacil.png" alt="AutoFácil" style="filter:brightness(0) invert(1);height:32px;display:block" onerror="this.style.display='none'">
     <span>Revisión de Crédito</span>
-    <span class="version-badge">v2.9</span>
+    <span class="version-badge">v3.0</span>
   </a>
   <div class="breadcrumb-nav">
   <a href="/">Inicio</a><span class="sep">›</span>
@@ -551,16 +553,17 @@ function renderPagina(c, ant, com) {
           <div>
             <div class="fi-label" style="margin-bottom:6px">Estado del Crédito</div>
             <select id="dEstado" class="estado-select">
-              <option value="REVISION"        ${c.estado==='REVISION'        ?'selected':''}>En Revisión</option>
+              <option value="INGRESO"            ${(c.estado==='INGRESO'||c.estado==='REVISION') ?'selected':''}>Ingresado</option>
               <option value="CARGA_RESPALDOS"    ${c.estado==='CARGA_RESPALDOS'    ?'selected':''}>Carga Respaldos</option>
-              <option value="EMISION_DOCUMENTOS"  ${c.estado==='EMISION_DOCUMENTOS'  ?'selected':''}>Emisión Documentos</option>
-              <option value="CARGA_DOCUMENTOS_AF" ${c.estado==='CARGA_DOCUMENTOS_AF' ?'selected':''}>Carga Docs. AF</option>
-              <option value="VALIDACION_FIRMA"    ${c.estado==='VALIDACION_FIRMA'    ?'selected':''}>Validación Firma</option>
-              <option value="VIGENTE"             ${c.estado==='VIGENTE'             ?'selected':''}>Vigente</option>
-              <option value="EN MORA"         ${c.estado==='EN MORA'         ?'selected':''}>En Mora</option>
-              <option value="CANCELADO"       ${c.estado==='CANCELADO'       ?'selected':''}>Cancelado</option>
-              <option value="PREPAGADO"       ${c.estado==='PREPAGADO'       ?'selected':''}>Prepagado</option>
-              <option value="CASTIGADO"       ${c.estado==='CASTIGADO'       ?'selected':''}>Castigado</option>
+              <option value="EN_ANALISIS"        ${c.estado==='EN_ANALISIS'        ?'selected':''}>En Análisis</option>
+              <option value="EMISION_DOCUMENTOS" ${c.estado==='EMISION_DOCUMENTOS' ?'selected':''}>Emisión Documentos</option>
+              <option value="CARGA_DOCUMENTOS_AF"${c.estado==='CARGA_DOCUMENTOS_AF'?'selected':''}>Carga Docs. AF</option>
+              <option value="VALIDACION_FIRMA"   ${c.estado==='VALIDACION_FIRMA'   ?'selected':''}>Validación Firma</option>
+              <option value="VIGENTE"            ${c.estado==='VIGENTE'            ?'selected':''}>Vigente</option>
+              <option value="EN MORA"            ${c.estado==='EN MORA'            ?'selected':''}>En Mora</option>
+              <option value="CANCELADO"          ${c.estado==='CANCELADO'          ?'selected':''}>Cancelado</option>
+              <option value="PREPAGADO"          ${c.estado==='PREPAGADO'          ?'selected':''}>Prepagado</option>
+              <option value="CASTIGADO"          ${c.estado==='CASTIGADO'          ?'selected':''}>Castigado</option>
             </select>
           </div>
           <div>
@@ -583,10 +586,18 @@ function renderPagina(c, ant, com) {
         onclick="location.href='/creditos/pagar-cuotas?id=${c.id_credito}'">
         <i class="bi bi-cash-coin"></i>Pagar Cuotas
       </button>` : ''}` : `
-      ${c.estado === 'CARGA_RESPALDOS' ? `
-      <button class="btn-accion" style="background:linear-gradient(135deg,#ea580c,#f97316);color:#fff"
+      ${(c.estado === 'INGRESO' || c.estado === 'REVISION') ? `
+      <button class="btn-accion" style="background:linear-gradient(135deg,#b45309,#f59e0b);color:#fff"
         onclick="location.href='/creditos/respaldos?id=${c.id_credito}'">
         <i class="bi bi-paperclip"></i>Cargar Respaldos
+      </button>` : c.estado === 'CARGA_RESPALDOS' ? `
+      <button class="btn-accion" style="background:linear-gradient(135deg,#ea580c,#f97316);color:#fff"
+        onclick="location.href='/creditos/respaldos?id=${c.id_credito}'">
+        <i class="bi bi-paperclip"></i>Ver / Completar Respaldos
+      </button>` : c.estado === 'EN_ANALISIS' ? `
+      <button class="btn-accion" style="background:linear-gradient(135deg,#5b21b6,#7c3aed);color:#fff"
+        onclick="location.href='/creditos/respaldos?id=${c.id_credito}'">
+        <i class="bi bi-clipboard2-check"></i>Analizar y Aprobar
       </button>` : c.estado === 'EMISION_DOCUMENTOS' ? `
       <button class="btn-accion" style="background:linear-gradient(135deg,#0369a1,#0ea5e9);color:#fff"
         onclick="window.open('/creditos/documentos?id=${c.id_credito}','_blank')">
@@ -598,13 +609,10 @@ function renderPagina(c, ant, com) {
       </button>` : c.estado === 'VALIDACION_FIRMA' ? `
       <button class="btn-accion" style="background:linear-gradient(135deg,#b45309,#f59e0b);color:#fff"
         onclick="location.href='/creditos/validacion-firma?id=${c.id_credito}'">
-        <i class="bi bi-pen-fill"></i>Validar Firma
+        <i class="bi bi-pen-fill"></i>Validar Firmas
       </button>` : `
       <button class="btn-accion btn-rechazar" onclick="cambiarEstadoRapido('CANCELADO')">
         <i class="bi bi-x-circle"></i>Rechazar
-      </button>
-      <button class="btn-accion btn-aprobar" onclick="cambiarEstadoRapido('VIGENTE')">
-        <i class="bi bi-check-circle"></i>Aprobar
       </button>`}
       <button class="btn-accion btn-guardar" onclick="guardarCambios()">
         <i class="bi bi-floppy"></i>Guardar cambios
@@ -872,12 +880,16 @@ function icRow(label, monto, inst, carga, esMala=false) {
 }
 
 function estadoEstado(e) {
-  const map = { REVISION:'En Revisión', CARGA_RESPALDOS:'Carga Respaldos',
-                EMISION_DOCUMENTOS:'Emisión Documentos',
-                CARGA_DOCUMENTOS_AF:'Carga Docs. AF',
-                VALIDACION_FIRMA:'Validación Firma',
-                VIGENTE:'Vigente', 'EN MORA':'En Mora',
-                CANCELADO:'Cancelado', PREPAGADO:'Prepagado', CASTIGADO:'Castigado' };
+  const map = {
+    INGRESO:'Ingresado', REVISION:'Ingresado',
+    CARGA_RESPALDOS:'Carga Respaldos',
+    EN_ANALISIS:'En Análisis',
+    EMISION_DOCUMENTOS:'Emisión Documentos',
+    CARGA_DOCUMENTOS_AF:'Carga Docs. AF',
+    VALIDACION_FIRMA:'Validación Firma',
+    VIGENTE:'Vigente', 'EN MORA':'En Mora',
+    CANCELADO:'Cancelado', PREPAGADO:'Prepagado', CASTIGADO:'Castigado',
+  };
   return map[e] || e || '—';
 }
 

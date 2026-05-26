@@ -202,7 +202,7 @@ const create = async (req, res) => {
               NOW(), NOW())
     `, [
       numero_credito, rut_cliente.toUpperCase().trim(), nombre_cliente.trim(), fin,
-      estado || 'VIGENTE',
+      estado || 'INGRESO',
       id_cotizacion || null, id_usuario,
       fecha_otorgamiento || null, fecha_otorgamiento || null,
       valor_vehiculo || null, pie || null, saldo || null, pct || null, monto_financiado || null,
