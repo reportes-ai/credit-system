@@ -30,6 +30,8 @@ const audit = require('../../../../shared/auditoria');
     await addCol(`ALTER TABLE operaciones_brokerage ADD COLUMN id_cotizacion      INT          NULL`);
     await addCol(`ALTER TABLE operaciones_brokerage ADD COLUMN datos_json         JSON         NULL`);
     await addCol(`ALTER TABLE operaciones_brokerage ADD COLUMN observaciones      TEXT         NULL`);
+    await addCol(`ALTER TABLE operaciones_brokerage ADD COLUMN gastos             BIGINT       NULL`);
+    await addCol(`ALTER TABLE operaciones_brokerage ADD COLUMN seguros            BIGINT       NULL`);
     // Poblar estado = VIGENTE para OTORGADOS que aún no tienen estado de gestión
     await pool.query(`
       UPDATE operaciones_brokerage
