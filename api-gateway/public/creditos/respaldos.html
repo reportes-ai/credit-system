@@ -18,6 +18,10 @@
   .version-badge { background:rgba(255,255,255,.15); color:rgba(255,255,255,.75); font-size:.65rem; font-weight:700; border-radius:6px; padding:2px 8px; letter-spacing:.5px; margin-left:4px; }
   .btn-back { background:rgba(255,255,255,.15); border:1px solid rgba(255,255,255,.3); color:#fff; border-radius:8px; padding:6px 14px; font-size:.82rem; font-weight:600; cursor:pointer; display:flex; align-items:center; gap:6px; text-decoration:none; transition:background .15s; }
   .btn-back:hover { background:rgba(255,255,255,.25); }
+  .breadcrumb-nav { color:rgba(255,255,255,.6); font-size:.85rem; display:flex; align-items:center; gap:6px; }
+  .breadcrumb-nav a { color:rgba(255,255,255,.75); text-decoration:none; }
+  .breadcrumb-nav a:hover { color:#fff; }
+  .breadcrumb-nav .sep { color:rgba(255,255,255,.35); }
 
   .page-wrap { max-width:960px; margin:0 auto; padding:24px 16px 100px; }
 
@@ -46,6 +50,12 @@
   .doc-card { background:var(--card); border:1.5px solid var(--border); border-radius:12px; overflow:hidden; display:flex; flex-direction:column; transition:border-color .2s, box-shadow .2s; }
   .doc-card.uploaded  { border-color:#86efac; box-shadow:0 0 0 3px #f0fdf4; }
   .doc-card.uploading { border-color:#93c5fd; box-shadow:0 0 0 3px #eff6ff; }
+  .doc-card.aprobado  { border-color:#4ade80; box-shadow:0 0 0 3px #f0fdf4; }
+  .doc-card.aprobado .doc-card-head { background:#f0fdf4; }
+  .doc-card.aprobado .doc-icon { background:#dcfce7; color:#16a34a; }
+  .doc-card.rechazado { border-color:#f87171; box-shadow:0 0 0 3px #fef2f2; }
+  .doc-card.rechazado .doc-card-head { background:#fef2f2; }
+  .doc-card.rechazado .doc-icon { background:#fee2e2; color:#dc2626; }
 
   .doc-card-head { display:flex; align-items:center; gap:10px; padding:12px 14px; background:#f8faff; border-bottom:1px solid var(--border); }
   .doc-card.uploaded .doc-card-head { background:#f0fdf4; }
@@ -80,13 +90,27 @@
   .btn-del  { background:#fef2f2; border:1.5px solid #fca5a5; color:#dc2626; border-radius:8px; padding:7px 10px; font-size:.82rem; cursor:pointer; display:flex; align-items:center; transition:background .15s; }
   .btn-del:hover { background:#fee2e2; }
 
+  /* ── Barra de aprobación ── */
+  .approval-bar { display:flex; align-items:center; gap:8px; padding:10px 0 2px; border-top:1px dashed #e2e8f0; flex-wrap:wrap; margin-top:6px; }
+  .btn-apr { flex:1; min-width:80px; display:flex; align-items:center; justify-content:center; gap:5px; background:#f0fdf4; border:1.5px solid #86efac; color:#15803d; border-radius:8px; padding:7px 10px; font-size:.78rem; font-weight:700; cursor:pointer; transition:all .15s; }
+  .btn-apr:not(.active):hover { background:#dcfce7; }
+  .btn-apr.active { background:linear-gradient(135deg,#059669,#10b981); color:#fff; border-color:#059669; }
+  .btn-rch { flex:1; min-width:80px; display:flex; align-items:center; justify-content:center; gap:5px; background:#fef2f2; border:1.5px solid #fca5a5; color:#dc2626; border-radius:8px; padding:7px 10px; font-size:.78rem; font-weight:700; cursor:pointer; transition:all .15s; }
+  .btn-rch:not(.active):hover { background:#fee2e2; }
+  .btn-rch.active { background:linear-gradient(135deg,#dc2626,#ef4444); color:#fff; border-color:#dc2626; }
+  .apr-badge { font-size:.65rem; font-weight:600; display:flex; align-items:center; gap:3px; padding:2px 7px; border-radius:99px; white-space:nowrap; }
+  .apr-badge.ok { background:#dcfce7; color:#15803d; }
+  .apr-badge.ko { background:#fee2e2; color:#dc2626; }
+
   /* Comentario */
   .doc-comment { border-top:1px dashed var(--border); padding:10px 14px; background:#fafbfc; }
-  .doc-comment-lbl { font-size:.63rem; font-weight:700; text-transform:uppercase; letter-spacing:.06em; color:var(--muted); margin-bottom:5px; }
+  .doc-comment-lbl { font-size:.63rem; font-weight:700; text-transform:uppercase; letter-spacing:.06em; color:var(--muted); margin-bottom:5px; display:flex; align-items:center; gap:5px; }
+  .lbl-req { color:#dc2626; font-weight:800; }
   .doc-comment-ta { width:100%; border:1.5px solid #e2e8f0; border-radius:7px; padding:7px 10px; font-size:.8rem; font-family:inherit; color:var(--text); resize:vertical; min-height:52px; max-height:120px; background:#fff; transition:border-color .15s; line-height:1.4; }
   .doc-comment-ta:focus { outline:none; border-color:var(--blue); }
   .doc-comment-ta.saving { border-color:#93c5fd; }
   .doc-comment-ta.saved  { border-color:#86efac; }
+  .doc-comment-ta.ta-required { border-color:#f87171; background:#fff8f8; }
 
   /* Spinner dentro de card */
   .doc-spinner { display:flex; align-items:center; justify-content:center; gap:8px; padding:14px 0; font-size:.8rem; color:var(--muted); }
@@ -132,10 +156,7 @@
     .docs-grid { grid-template-columns:1fr; }
     .cred-summary { flex-direction:column; align-items:flex-start; }
   }
-    .breadcrumb-nav { color:rgba(255,255,255,.6); font-size:.85rem; display:flex; align-items:center; gap:6px; }
-    .breadcrumb-nav a { color:rgba(255,255,255,.75); text-decoration:none; }
-    .breadcrumb-nav a:hover { color:#fff; }
-    .breadcrumb-nav .sep { color:rgba(255,255,255,.35); }</style>
+</style>
 </head>
 <body>
 
@@ -143,7 +164,7 @@
   <a class="nav-brand" href="/creditos">
     <img src="/img/logo-autofacil.png" alt="AutoFácil" style="filter:brightness(0) invert(1);height:32px;display:block" onerror="this.style.display='none'">
     <span>Carga de Respaldos</span>
-    <span class="version-badge">v2.0</span>
+    <span class="version-badge">v2.1</span>
   </a>
   <div class="breadcrumb-nav"><a href="/">Inicio</a><span class="sep">›</span><a href="/creditos">Créditos</a><span class="sep">›</span><span style="color:#fff;font-weight:600"><i class="bi bi-folder2 me-1"></i>Respaldos</span></div>
   <div style="display:flex;align-items:center;gap:10px">
@@ -196,12 +217,13 @@
 
 <script>
 /* ── Auth ── */
-function getToken() { return localStorage.getItem('token'); }
-function apiHdr()   { return { 'Content-Type':'application/json', 'Authorization':'Bearer '+getToken() }; }
+function getToken()   { return localStorage.getItem('token'); }
+function apiHdr()     { return { 'Content-Type':'application/json', 'Authorization':'Bearer '+getToken() }; }
+function getUsuario() { try { return JSON.parse(localStorage.getItem('usuario')||'{}'); } catch(e) { return {}; } }
 
 (function() {
   if (!getToken()) { location.href='/login.html'; return; }
-  try { const u=JSON.parse(localStorage.getItem('usuario')||'{}'); document.getElementById('navUser').textContent=u.nombre||''; } catch(e){}
+  try { const u=getUsuario(); document.getElementById('navUser').textContent=u.nombre||''; } catch(e){}
 })();
 
 /* ── Helpers ── */
@@ -211,6 +233,7 @@ const fmtDT   = s => s ? new Date(s).toLocaleString('es-CL',{day:'2-digit',month
 const fmtBytes= b => !b ? '—' : b<1024 ? b+' B' : b<1048576 ? (b/1024).toFixed(1)+' KB' : (b/1048576).toFixed(1)+' MB';
 const isImage = m => m && m.startsWith('image/');
 const isPdf   = m => m === 'application/pdf';
+const escQ    = s => (s||'').replace(/'/g,"\\'").replace(/"/g,'&quot;');
 
 function showToast(msg, ok) {
   const el=document.getElementById('toastMsg');
@@ -230,9 +253,10 @@ if (creditId) {
 let _credito     = null;
 let _tipos       = [];
 let _docs        = {};       // { id_tipo: doc_row }
+let _esAnalista  = false;
 let _pendingTipo = null;
-let _viewerDoc   = null;     // { id_doc, nombre, mime }
-let _commentTimers = {};     // debounce por id_doc
+let _viewerDoc   = null;     // { idDoc, nombre, mime }
+let _commentTimers = {};     // debounce por id_tipo
 
 /* ── Cargar página ── */
 async function cargarPagina() {
@@ -260,12 +284,12 @@ async function cargarPagina() {
 /* ── Render ── */
 function renderPagina() {
   const c = _credito;
-  const esAnalista = c.estado === 'EN_ANALISIS';
-  // Adaptar botón principal según estado
+  _esAnalista = c.estado === 'EN_ANALISIS';
+
   const btnAprobar = document.getElementById('btnAprobar');
   const btnLabel   = document.getElementById('btnAprobarLabel');
   if (btnAprobar && btnLabel) {
-    if (esAnalista) {
+    if (_esAnalista) {
       btnLabel.textContent = 'Aprobar Crédito → Emitir Documentos';
       btnAprobar.style.background = 'linear-gradient(135deg,#5b21b6,#7c3aed)';
     } else {
@@ -277,19 +301,19 @@ function renderPagina() {
   const opcionales   = _tipos.filter(t => !t.obligatorio);
 
   document.getElementById('pageWrap').innerHTML = `
-    ${esAnalista ? `
+    ${_esAnalista ? `
     <div style="background:linear-gradient(135deg,#5b21b6,#7c3aed);border-radius:12px;padding:14px 20px;margin-bottom:16px;display:flex;align-items:center;gap:14px;color:#fff">
       <i class="bi bi-clipboard2-check-fill" style="font-size:1.5rem"></i>
       <div>
         <div style="font-weight:800;font-size:.95rem">ANÁLISIS DE CRÉDITO — Analista de Crédito</div>
-        <div style="font-size:.8rem;opacity:.85">Revisa los documentos del cliente y aprueba el crédito para continuar con la emisión de documentos</div>
+        <div style="font-size:.8rem;opacity:.85">Revisa cada documento y marca <strong>Aprobar</strong> o <strong>Rechazar</strong>. Si rechazas alguno el crédito vuelve al Ejecutivo Comercial.</div>
       </div>
     </div>` : `
     <div style="background:linear-gradient(135deg,#c2410c,#f97316);border-radius:12px;padding:14px 20px;margin-bottom:16px;display:flex;align-items:center;gap:14px;color:#fff">
       <i class="bi bi-paperclip" style="font-size:1.5rem"></i>
       <div>
         <div style="font-weight:800;font-size:.95rem">CARGA DE RESPALDOS — Ejecutivo Comercial</div>
-        <div style="font-size:.8rem;opacity:.85">Carga los documentos del cliente. Una vez completos los obligatorios, envía al Analista de Crédito para análisis</div>
+        <div style="font-size:.8rem;opacity:.85">Carga los documentos del cliente. Una vez completos los obligatorios, envía al Analista de Crédito para análisis.</div>
       </div>
     </div>`}
     <div class="cred-summary">
@@ -330,12 +354,17 @@ function renderPagina() {
   actualizarProgreso();
 }
 
+/* ── Render card ── */
 function renderDocCard(tipo) {
   const doc = _docs[tipo.id_tipo];
+  const cardClass = doc
+    ? (doc.aprobado === 1 ? 'aprobado' : doc.aprobado === 0 ? 'rechazado' : 'uploaded')
+    : '';
+  const isRejected = doc && doc.aprobado === 0;
   return `
-  <div class="doc-card ${doc?'uploaded':''}" id="docCard_${tipo.id_tipo}">
+  <div class="doc-card ${cardClass}" id="docCard_${tipo.id_tipo}">
     <div class="doc-card-head">
-      <div class="doc-icon"><i class="bi bi-${doc?'file-check':'file-earmark'}"></i></div>
+      <div class="doc-icon"><i class="bi bi-${doc ? (doc.aprobado===1?'file-check-fill':doc.aprobado===0?'file-x':'file-check') : 'file-earmark'}"></i></div>
       <div class="doc-name">${tipo.nombre}${tipo.descripcion?`<div style="font-size:.68rem;font-weight:400;color:var(--muted);margin-top:1px">${tipo.descripcion}</div>`:''}</div>
       <span class="${tipo.obligatorio?'doc-badge-obl':'doc-badge-opt'}">${tipo.obligatorio?'Obligatorio':'Opcional'}</span>
     </div>
@@ -343,9 +372,12 @@ function renderDocCard(tipo) {
       ${doc ? renderDocSubido(tipo, doc) : renderDocVacio(tipo)}
     </div>
     <div class="doc-comment" id="docComment_${tipo.id_tipo}">
-      <div class="doc-comment-lbl"><i class="bi bi-chat-text me-1"></i>Comentario</div>
-      <textarea class="doc-comment-ta" id="docTA_${tipo.id_tipo}"
-        placeholder="Observación opcional sobre este documento…"
+      <div class="doc-comment-lbl">
+        <i class="bi bi-chat-text"></i>Comentario
+        ${isRejected ? '<span class="lbl-req">* Obligatorio</span>' : ''}
+      </div>
+      <textarea class="doc-comment-ta ${isRejected?'ta-required':''}" id="docTA_${tipo.id_tipo}"
+        placeholder="${isRejected ? '⚠️ Explica el motivo del rechazo…' : 'Observación opcional sobre este documento…'}"
         onblur="guardarComentario(${tipo.id_tipo})"
         oninput="onComentarioInput(${tipo.id_tipo})">${doc?.comentario||''}</textarea>
     </div>
@@ -366,6 +398,21 @@ function renderDocVacio(tipo) {
 }
 
 function renderDocSubido(tipo, doc) {
+  const idTipo = tipo.id_tipo;
+  const aprBar = _esAnalista ? `
+  <div class="approval-bar">
+    <button class="btn-apr ${doc.aprobado===1?'active':''}" onclick="aprobarDoc(${idTipo})">
+      <i class="bi bi-check-circle-fill"></i>Aprobar
+    </button>
+    <button class="btn-rch ${doc.aprobado===0?'active':''}" onclick="rechazarDoc(${idTipo})">
+      <i class="bi bi-x-circle-fill"></i>Rechazar
+    </button>
+    ${doc.aprobado===1 && doc.aprobado_por
+      ? `<span class="apr-badge ok"><i class="bi bi-person-check"></i>${doc.aprobado_por}</span>` : ''}
+    ${doc.aprobado===0 && doc.rechazado_por
+      ? `<span class="apr-badge ko"><i class="bi bi-person-x"></i>${doc.rechazado_por}</span>` : ''}
+  </div>` : '';
+
   return `
   <div class="doc-info">
     <div class="doc-info-name"><i class="bi bi-file-earmark-check me-1"></i>${doc.archivo_nombre}</div>
@@ -379,17 +426,158 @@ function renderDocSubido(tipo, doc) {
       <button class="btn-dl"  onclick="descargarDoc(${doc.id_doc},'${escQ(doc.archivo_nombre)}')" title="Descargar">
         <i class="bi bi-download"></i>
       </button>
-      <button class="btn-del" onclick="eliminarDoc(${tipo.id_tipo},${doc.id_doc})" title="Eliminar">
+      <button class="btn-del" onclick="eliminarDoc(${idTipo},${doc.id_doc})" title="Eliminar">
         <i class="bi bi-trash"></i>
       </button>
     </div>
-    <button class="btn-upload reupload" onclick="seleccionarArchivo(${tipo.id_tipo})" style="flex:none">
+    <button class="btn-upload reupload" onclick="seleccionarArchivo(${idTipo})" style="flex:none">
       <i class="bi bi-arrow-repeat"></i>
     </button>
-  </div>`;
+  </div>
+  ${aprBar}`;
 }
 
-const escQ = s => (s||'').replace(/'/g,"\\'").replace(/"/g,'&quot;');
+/* ── Aprobación / Rechazo por documento ── */
+async function aprobarDoc(idTipo) {
+  const doc = _docs[idTipo];
+  if (!doc) return;
+  const u = getUsuario();
+  const nombre = u.nombre || u.email || 'Analista';
+  // Toggle: si ya estaba aprobado, lo quita
+  const nuevoAprobado = doc.aprobado === 1 ? null : 1;
+  try {
+    const r = await fetch('/api/credito-documentos/'+doc.id_doc+'/aprobar', {
+      method:'PATCH', headers:apiHdr(),
+      body: JSON.stringify({ aprobado: nuevoAprobado, aprobado_por: nuevoAprobado === 1 ? nombre : null, rechazado_por: null })
+    });
+    const j = await r.json();
+    if (!j.success) throw new Error(j.error);
+    doc.aprobado    = nuevoAprobado;
+    doc.aprobado_por = nuevoAprobado === 1 ? nombre : null;
+    doc.rechazado_por = null;
+    actualizarCardAprobacion(idTipo);
+    actualizarProgreso();
+  } catch(e) { showToast('Error: '+e.message, false); }
+}
+
+async function rechazarDoc(idTipo) {
+  const doc = _docs[idTipo];
+  if (!doc) return;
+
+  // Toggle: si ya estaba rechazado, lo quita
+  if (doc.aprobado === 0) {
+    try {
+      const r = await fetch('/api/credito-documentos/'+doc.id_doc+'/aprobar', {
+        method:'PATCH', headers:apiHdr(),
+        body: JSON.stringify({ aprobado: null, aprobado_por: null, rechazado_por: null })
+      });
+      const j = await r.json();
+      if (!j.success) throw new Error(j.error);
+      doc.aprobado = null;
+      doc.rechazado_por = null;
+      actualizarCardAprobacion(idTipo);
+      actualizarProgreso();
+    } catch(e) { showToast('Error: '+e.message, false); }
+    return;
+  }
+
+  // Validar comentario obligatorio
+  const ta = document.getElementById('docTA_'+idTipo);
+  const comentario = ta ? ta.value.trim() : '';
+  if (!comentario) {
+    if (ta) { ta.classList.add('ta-required'); ta.focus(); }
+    showToast('⚠️ El comentario es obligatorio al rechazar un documento', false);
+    return;
+  }
+
+  const tipo = _tipos.find(t => t.id_tipo === idTipo);
+  if (!confirm(`⚠️ ¿Rechazar el documento "${tipo?.nombre||''}"?\n\nEl crédito será devuelto al Ejecutivo Comercial para corrección.`)) return;
+
+  const u = getUsuario();
+  const rechazado_por = u.nombre || u.email || 'Analista';
+
+  try {
+    const r = await fetch('/api/credito-documentos/'+doc.id_doc+'/aprobar', {
+      method:'PATCH', headers:apiHdr(),
+      body: JSON.stringify({ aprobado: 0, rechazado_por, aprobado_por: null })
+    });
+    const j = await r.json();
+    if (!j.success) throw new Error(j.error);
+    doc.aprobado = 0;
+    doc.rechazado_por = rechazado_por;
+    doc.aprobado_por = null;
+    actualizarCardAprobacion(idTipo);
+    // Guardar comentario también
+    await guardarComentario(idTipo);
+    // Devolver crédito a INGRESO
+    await devolverCreditoAIngreso(tipo?.nombre || 'documento');
+  } catch(e) { showToast('Error: '+e.message, false); }
+}
+
+async function devolverCreditoAIngreso(nombreDoc) {
+  try {
+    const obs = `Documento rechazado por analista: ${nombreDoc}. ${_credito.observaciones||''}`.trim();
+    const r = await fetch('/api/creditos/'+creditId, {
+      method:'PUT', headers:apiHdr(),
+      body: JSON.stringify({
+        estado: 'INGRESO',
+        observaciones: obs,
+        ejecutivo: _credito.ejecutivo||null,
+        dealer:    _credito.dealer||null,
+        patente:   _credito.patente||null,
+        color:     _credito.color||null,
+        motor:     _credito.motor||null,
+        chasis:    _credito.chasis||null,
+      })
+    });
+    const j = await r.json();
+    if (!j.success) throw new Error(j.error);
+    showToast('Crédito devuelto al Ejecutivo Comercial para corrección', false);
+    setTimeout(() => { location.href = '/creditos'; }, 2000);
+  } catch(e) {
+    showToast('Error al devolver crédito: '+e.message, false);
+  }
+}
+
+function actualizarCardAprobacion(idTipo) {
+  const card = document.getElementById('docCard_'+idTipo);
+  const doc  = _docs[idTipo];
+  if (!card || !doc) return;
+
+  // Clases del card
+  card.classList.remove('uploaded','aprobado','rechazado');
+  if      (doc.aprobado === 1) card.classList.add('aprobado');
+  else if (doc.aprobado === 0) card.classList.add('rechazado');
+  else                          card.classList.add('uploaded');
+
+  // Ícono cabecera
+  const icon = card.querySelector('.doc-icon i');
+  if (icon) {
+    icon.className = 'bi bi-' + (doc.aprobado===1 ? 'file-check-fill' : doc.aprobado===0 ? 'file-x' : 'file-check');
+  }
+
+  // Re-render cuerpo (barra de aprobación)
+  const tipo = _tipos.find(t => t.id_tipo === idTipo);
+  const body = document.getElementById('docBody_'+idTipo);
+  if (body && tipo) body.innerHTML = renderDocSubido(tipo, doc);
+
+  // Actualizar textarea
+  const ta = document.getElementById('docTA_'+idTipo);
+  const commentDiv = document.getElementById('docComment_'+idTipo);
+  if (ta) {
+    const isRejected = doc.aprobado === 0;
+    ta.classList.toggle('ta-required', isRejected);
+    ta.placeholder = isRejected
+      ? '⚠️ Explica el motivo del rechazo…'
+      : 'Observación opcional sobre este documento…';
+    if (commentDiv) {
+      const lbl = commentDiv.querySelector('.doc-comment-lbl');
+      if (lbl) {
+        lbl.innerHTML = `<i class="bi bi-chat-text"></i>Comentario${isRejected ? ' <span class="lbl-req">* Obligatorio</span>' : ''}`;
+      }
+    }
+  }
+}
 
 /* ── Selección y subida ── */
 function seleccionarArchivo(idTipo) {
@@ -410,7 +598,8 @@ async function subirArchivo(idTipo, file) {
   const card = document.getElementById('docCard_'+idTipo);
   const comentarioActual = document.getElementById('docTA_'+idTipo)?.value || '';
   body.innerHTML = `<div class="doc-spinner"><div class="spin-sm"></div> Subiendo…</div>`;
-  card.classList.add('uploading'); card.classList.remove('uploaded');
+  card.classList.remove('uploaded','aprobado','rechazado');
+  card.classList.add('uploading');
   try {
     const base64 = await fileToBase64(file);
     const res = await fetch('/api/credito-documentos', {
@@ -429,11 +618,13 @@ async function subirArchivo(idTipo, file) {
     if (!j.success) throw new Error(j.error);
     _docs[idTipo] = {
       id_doc: j.data.id_doc, archivo_nombre: file.name,
-      archivo_size: file.size, mime_type: file.type,
+      archivo_size: file.size, mime_type: file.type || 'application/octet-stream',
       subido_at: new Date().toISOString(), id_tipo: idTipo,
       comentario: comentarioActual || null,
+      aprobado: null, aprobado_por: null, rechazado_por: null,
     };
-    card.classList.remove('uploading'); card.classList.add('uploaded');
+    card.classList.remove('uploading');
+    card.classList.add('uploaded');
     const tipo = _tipos.find(t => t.id_tipo === idTipo);
     body.innerHTML = renderDocSubido(tipo, _docs[idTipo]);
     actualizarProgreso();
@@ -457,17 +648,18 @@ function fileToBase64(file) {
 
 /* ── Comentario ── */
 function onComentarioInput(idTipo) {
+  const ta = document.getElementById('docTA_'+idTipo);
+  if (ta) ta.classList.remove('ta-required');
   if (_commentTimers[idTipo]) clearTimeout(_commentTimers[idTipo]);
   _commentTimers[idTipo] = setTimeout(() => guardarComentario(idTipo), 1500);
 }
 
 async function guardarComentario(idTipo) {
   const doc = _docs[idTipo];
-  if (!doc) return; // no hay archivo subido, no hay id_doc
+  if (!doc) return;
   const ta = document.getElementById('docTA_'+idTipo);
   if (!ta) return;
   const texto = ta.value.trim();
-  // Mismo valor que ya está guardado
   if (texto === (doc.comentario||'').trim()) return;
   ta.classList.add('saving');
   try {
@@ -485,7 +677,7 @@ async function guardarComentario(idTipo) {
   }
 }
 
-/* ── Ver documento (inline) ── */
+/* ── Ver documento ── */
 async function verDoc(idDoc, nombre, mime) {
   _viewerDoc = { idDoc, nombre, mime };
   document.getElementById('viewerName').textContent = nombre;
@@ -494,14 +686,16 @@ async function verDoc(idDoc, nombre, mime) {
   document.getElementById('viewerOverlay').classList.add('open');
   try {
     const res  = await fetch('/api/credito-documentos/view/'+idDoc, { headers:apiHdr() });
-    if (!res.ok) throw new Error('Error al cargar');
+    if (!res.ok) throw new Error('Error al cargar el documento');
     const blob = await res.blob();
+    // Usar mime del parámetro; si vacío, usar el tipo del blob devuelto por el servidor
+    const effectiveMime = mime || blob.type || '';
     const url  = URL.createObjectURL(blob);
     let content;
-    if (isImage(mime)) {
-      content = `<img src="${url}" alt="${nombre}">`;
-    } else if (isPdf(mime)) {
-      content = `<iframe src="${url}" title="${nombre}"></iframe>`;
+    if (isImage(effectiveMime)) {
+      content = `<img src="${url}" alt="${escQ(nombre)}">`;
+    } else if (isPdf(effectiveMime)) {
+      content = `<iframe src="${url}" title="${escQ(nombre)}"></iframe>`;
     } else {
       content = `
         <div class="viewer-no-preview">
@@ -511,7 +705,6 @@ async function verDoc(idDoc, nombre, mime) {
         </div>`;
     }
     document.getElementById('viewerBody').innerHTML = content;
-    // Guardar url para descargar si es necesario
     _viewerDoc.blobUrl = url;
   } catch(e) {
     document.getElementById('viewerBody').innerHTML =
@@ -542,7 +735,7 @@ async function descargarDoc(idDoc, nombre) {
   } catch(e) { showToast('Error: '+e.message, false); }
 }
 
-/* ── Limpiar TODOS los documentos del crédito ── */
+/* ── Limpiar TODOS ── */
 async function limpiarTodosLosDocs() {
   if (!confirm('⚠️ ¿Eliminar TODOS los documentos cargados para este crédito?\n\nÚsalo si los documentos mostrados no corresponden a este cliente.')) return;
   try {
@@ -550,7 +743,7 @@ async function limpiarTodosLosDocs() {
     const j = await r.json();
     if (!j.success) throw new Error(j.error);
     _docs = {};
-    showToast('Todos los documentos fueron eliminados. Ahora puedes subir los correctos.', true);
+    showToast('Todos los documentos fueron eliminados.', true);
     renderPagina();
   } catch(e) { showToast('Error: '+e.message, false); }
 }
@@ -564,12 +757,11 @@ async function eliminarDoc(idTipo, idDoc) {
     if (!j.success) throw new Error(j.error);
     delete _docs[idTipo];
     const card = document.getElementById('docCard_'+idTipo);
-    card.classList.remove('uploaded');
+    card.classList.remove('uploaded','aprobado','rechazado');
     const tipo = _tipos.find(t => t.id_tipo === idTipo);
     document.getElementById('docBody_'+idTipo).innerHTML = renderDocVacio(tipo);
-    // Limpiar textarea pero conservar el DOM
     const ta = document.getElementById('docTA_'+idTipo);
-    if (ta) ta.value = '';
+    if (ta) { ta.value = ''; ta.classList.remove('ta-required'); }
     actualizarProgreso();
     showToast('Documento eliminado', true);
   } catch(e) { showToast('Error: '+e.message, false); }
@@ -577,28 +769,42 @@ async function eliminarDoc(idTipo, idDoc) {
 
 /* ── Progreso ── */
 function actualizarProgreso() {
-  const obligatorios = _tipos.filter(t => t.obligatorio);
-  const cargadosObl  = obligatorios.filter(t => _docs[t.id_tipo]).length;
-  const cargadosTotal= _tipos.filter(t => _docs[t.id_tipo]).length;
+  const obligatorios  = _tipos.filter(t => t.obligatorio);
+  const cargadosObl   = obligatorios.filter(t => _docs[t.id_tipo]).length;
+  const cargadosTotal = _tipos.filter(t => _docs[t.id_tipo]).length;
   const pct = _tipos.length ? Math.round(cargadosTotal/_tipos.length*100) : 0;
   const fill   = document.getElementById('pbFill');
   const counts = document.getElementById('pbCounts');
   if (fill)   { fill.style.width=pct+'%'; fill.classList.toggle('warn', cargadosObl<obligatorios.length); }
-  if (counts) counts.textContent = `${cargadosTotal} de ${_tipos.length}  ·  Obligatorios: ${cargadosObl}/${obligatorios.length}`;
+
   const btn = document.getElementById('btnAprobar');
   if (btn) {
-    const ok = obligatorios.length===0 || cargadosObl===obligatorios.length;
-    btn.disabled = !ok;
-    btn.title = ok ? '' : `Faltan ${obligatorios.length-cargadosObl} documento(s) obligatorio(s)`;
+    if (_esAnalista) {
+      // Analista: todos los obligatorios deben estar cargados Y aprobados
+      const todosCargados  = obligatorios.length===0 || cargadosObl===obligatorios.length;
+      const todosAprobados = obligatorios.every(t => _docs[t.id_tipo]?.aprobado === 1);
+      const ok = todosCargados && todosAprobados;
+      btn.disabled = !ok;
+      if (!todosCargados)   btn.title = `Faltan ${obligatorios.length-cargadosObl} documento(s) obligatorio(s)`;
+      else if (!todosAprobados) btn.title = 'Debes aprobar todos los documentos obligatorios';
+      else                      btn.title = '';
+      if (counts) {
+        const aprobados = obligatorios.filter(t => _docs[t.id_tipo]?.aprobado===1).length;
+        counts.textContent = `${cargadosTotal} de ${_tipos.length} cargados  ·  Aprobados: ${aprobados}/${obligatorios.length}`;
+      }
+    } else {
+      const ok = obligatorios.length===0 || cargadosObl===obligatorios.length;
+      btn.disabled = !ok;
+      btn.title = ok ? '' : `Faltan ${obligatorios.length-cargadosObl} documento(s) obligatorio(s)`;
+      if (counts) counts.textContent = `${cargadosTotal} de ${_tipos.length}  ·  Obligatorios: ${cargadosObl}/${obligatorios.length}`;
+    }
   }
 }
 
-/* ── Aprobar / Avanzar ── */
+/* ── Aprobar / Avanzar crédito ── */
 async function aprobarCredito() {
-  // Determinar a qué estado va según el estado actual
-  const esAnalista = _credito.estado === 'EN_ANALISIS';
-  const estadoSiguiente = esAnalista ? 'EMISION_DOCUMENTOS' : 'EN_ANALISIS';
-  const msg = esAnalista
+  const estadoSiguiente = _esAnalista ? 'EMISION_DOCUMENTOS' : 'EN_ANALISIS';
+  const msg = _esAnalista
     ? '¿Aprobar el crédito y los respaldos? El ejecutivo podrá emitir los documentos.'
     : '¿Enviar al Analista de Crédito para análisis y aprobación?';
   if (!confirm(msg)) return;
@@ -614,7 +820,6 @@ async function aprobarCredito() {
     });
     const j = await r.json();
     if (!j.success) throw new Error(j.error);
-    // Si avanzó a EMISION_DOCUMENTOS → ir a emitir docs; si fue a EN_ANALISIS → volver a créditos
     if (estadoSiguiente === 'EMISION_DOCUMENTOS') {
       location.href = '/creditos/documentos?id='+creditId;
     } else {

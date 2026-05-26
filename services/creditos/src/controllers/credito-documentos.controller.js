@@ -17,8 +17,16 @@ const audit = require('../../../../shared/auditoria');
         subido_por     INT         NULL
       )
     `);
-    // Agrega columna comentario si la tabla ya existía
+    // Agrega columnas si la tabla ya existía
     await pool.query(`ALTER TABLE credito_documentos ADD COLUMN comentario TEXT NULL`)
+      .catch(e => { if (e.errno !== 1060) throw e; });
+    await pool.query(`ALTER TABLE credito_documentos ADD COLUMN aprobado TINYINT NULL`)
+      .catch(e => { if (e.errno !== 1060) throw e; });
+    await pool.query(`ALTER TABLE credito_documentos ADD COLUMN aprobado_por VARCHAR(200) NULL`)
+      .catch(e => { if (e.errno !== 1060) throw e; });
+    await pool.query(`ALTER TABLE credito_documentos ADD COLUMN rechazado_por VARCHAR(200) NULL`)
+      .catch(e => { if (e.errno !== 1060) throw e; });
+    await pool.query(`ALTER TABLE credito_documentos ADD COLUMN aprobado_at DATETIME NULL`)
       .catch(e => { if (e.errno !== 1060) throw e; });
   } catch(e) { if (e.errno !== 1050) console.error('[credito_documentos migration]', e.message); }
 })();
@@ -28,7 +36,8 @@ const getByCredito = async (req, res) => {
   try {
     const [rows] = await pool.query(
       `SELECT id_doc, id_credito, id_tipo, archivo_nombre, archivo_size, mime_type,
-              comentario, subido_at, subido_por
+              comentario, subido_at, subido_por,
+              aprobado, aprobado_por, rechazado_por, aprobado_at
        FROM credito_documentos WHERE id_credito = ? ORDER BY id_tipo, subido_at DESC`,
       [req.params.id_credito]
     );
@@ -145,4 +154,44 @@ const removeAll = async (req, res) => {
   } catch(e) { res.status(500).json({ success: false, data: null, error: e.message }); }
 };
 
-module.exports = { getByCredito, upload, updateComentario, view, download, remove, removeAll };
+/* ─── PATCH aprobación por documento ────────────────────────────────────── */
+const updateAprobacion = async (req, res) => {
+  try {
+    const { aprobado, aprobado_por, rechazado_por } = req.body;
+    const aprobado_at = (aprobado !== null && aprobado !== undefined) ? new Date() : null;
+
+    const [prev] = await pool.query(
+      'SELECT id_credito, archivo_nombre FROM credito_documentos WHERE id_doc=?',
+      [req.params.id_doc]
+    );
+    if (!prev.length)
+      return res.status(404).json({ success: false, data: null, error: 'Documento no encontrado' });
+
+    await pool.query(
+      `UPDATE credito_documentos
+         SET aprobado=?, aprobado_por=?, rechazado_por=?, aprobado_at=?
+       WHERE id_doc=?`,
+      [aprobado ?? null, aprobado_por || null, rechazado_por || null, aprobado_at, req.params.id_doc]
+    );
+
+    const accion = aprobado === 1
+      ? 'DOCUMENTO_APROBADO'
+      : aprobado === 0
+        ? 'DOCUMENTO_RECHAZADO'
+        : 'DOCUMENTO_REVISION_ANULADA';
+
+    audit.registrar({
+      id_credito: prev[0].id_credito, req, accion,
+      detalle: aprobado === 1
+        ? `Documento aprobado por ${aprobado_por}`
+        : aprobado === 0
+          ? `Documento rechazado por ${rechazado_por}`
+          : 'Revisión de documento anulada',
+      meta: { aprobado, aprobado_por, rechazado_por, archivo_nombre: prev[0].archivo_nombre },
+    });
+
+    res.json({ success: true, data: { id_doc: req.params.id_doc }, error: null });
+  } catch(e) { res.status(500).json({ success: false, data: null, error: e.message }); }
+};
+
+module.exports = { getByCredito, upload, updateComentario, updateAprobacion, view, download, remove, removeAll };

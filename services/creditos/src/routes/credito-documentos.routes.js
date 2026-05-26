@@ -5,6 +5,7 @@ const { verifyToken } = require('../../../../shared/middleware/auth');
 router.get('/download/:id_doc',       verifyToken, ctrl.download);
 router.get('/view/:id_doc',           verifyToken, ctrl.view);
 router.patch('/:id_doc/comentario',   verifyToken, ctrl.updateComentario);
+router.patch('/:id_doc/aprobar',      verifyToken, ctrl.updateAprobacion);
 router.get('/:id_credito',            verifyToken, ctrl.getByCredito);
 router.post('/',                      verifyToken, ctrl.upload);
 router.delete('/all/:id_credito',     verifyToken, ctrl.removeAll);
