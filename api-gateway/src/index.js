@@ -193,6 +193,9 @@ app.get(['/politica', '/politica/'], (req, res) =>
 app.get(['/dashboard', '/dashboard/'], (req, res) =>
   res.sendFile(path.join(__dirname, '../public/dashboard/index.html')));
 
+app.get(['/cartas-aprobacion', '/cartas-aprobacion/'], (req, res) =>
+  res.sendFile(path.join(__dirname, '../public/cartas-aprobacion/index.html')));
+
 app.use((req, res) => res.status(404).json({ success: false, error: 'Ruta no encontrada' }));
 
 const PORT = process.env.PORT || 3000;
