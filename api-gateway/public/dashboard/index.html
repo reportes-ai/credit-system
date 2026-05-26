@@ -30,9 +30,8 @@ body{font-family:'Roboto',sans-serif;background:#f0f2f5;font-size:12px;color:#33
 .dash-header{display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:10px}
 .dash-title{font-size:22px;font-weight:700;color:#1a2a4a;text-transform:uppercase;letter-spacing:-.3px}
 .period-badge{background:#fff;border:1px solid #dce3ed;padding:5px 12px;border-radius:6px;font-size:11px;color:#555;display:flex;align-items:center;gap:6px}
-.logo-block{text-align:right}
-.logo-block .logo-text{font-size:20px;font-weight:700;color:#1a2a4a}
-.logo-block .logo-text span{color:#2196F3}
+.logo-block{text-align:right;display:flex;flex-direction:column;align-items:flex-end;gap:2px}
+.logo-block img{height:36px;display:block}
 .logo-block .logo-sub{font-size:10px;color:#888;font-style:italic}
 
 /* ---- KPI STRIP ---- */
@@ -192,7 +191,10 @@ document.addEventListener('DOMContentLoaded', async function() {
 
 <div class="topbar">
   <div class="topbar-row1">
-    <div style="display:flex;flex-direction:column;line-height:1.2"><div class="brand">Auto<span>Fácil</span></div><span style="font-size:9px;font-weight:300;color:#7bafd4;margin-left:1px">Dashboard <span style="color:#4fc3f7;font-weight:600">V3.6</span></span></div>
+    <div style="display:flex;flex-direction:column;align-items:flex-start;gap:2px">
+      <a href="/"><img src="/img/logo.png" alt="AutoFácil" style="height:32px;display:block;filter:brightness(0) invert(1)"></a>
+      <span style="font-size:9px;font-weight:300;color:#7bafd4;margin-left:1px">Dashboard <span style="color:#4fc3f7;font-weight:600">V3.6</span></span>
+    </div>
     <div id="ultima-act" style="font-size:10px;color:#4fc3f7;margin-left:8px"></div>
     <div id="date-selector" style="display:flex;align-items:center;gap:8px;background:#0f1e38;padding:4px 12px;border-radius:6px;border:1px solid #2a4070;margin-left:8px">
       <span style="color:#7bafd4;font-size:11px;white-space:nowrap">📅 Período:</span>
@@ -231,7 +233,7 @@ document.addEventListener('DOMContentLoaded', async function() {
     </div>
     <div style="display:flex;align-items:center;gap:12px">
       <div class="period-badge" id="badge-periodo">📅 —</div>
-      <div class="logo-block"><div class="logo-text">Auto<span>Fácil</span></div><div class="logo-sub">Crédito Automotriz</div></div>
+      <div class="logo-block"><img src="/img/logo.png" alt="AutoFácil" style="height:36px;display:block"><div class="logo-sub">Crédito Automotriz</div></div>
     </div>
   </div>
 
@@ -363,7 +365,7 @@ document.addEventListener('DOMContentLoaded', async function() {
     </div>
     <div style="display:flex;align-items:center;gap:12px">
       <div class="period-badge" id="badge-periodo">📅 —</div>
-      <div class="logo-block"><div class="logo-text">Auto<span>Fácil</span></div><div class="logo-sub">Crédito Automotriz</div></div>
+      <div class="logo-block"><img src="/img/logo.png" alt="AutoFácil" style="height:36px;display:block"><div class="logo-sub">Crédito Automotriz</div></div>
     </div>
   </div>
   <div class="kpi-strip" id="kpi1b"></div>
@@ -489,7 +491,7 @@ document.addEventListener('DOMContentLoaded', async function() {
     </div>
     <div style="display:flex;align-items:center;gap:12px">
       <div class="period-badge" id="badge-periodo">📅 —</div>
-      <div class="logo-block"><div class="logo-text">Auto<span>Fácil</span></div><div class="logo-sub">Crédito Automotriz</div></div>
+      <div class="logo-block"><img src="/img/logo.png" alt="AutoFácil" style="height:36px;display:block"><div class="logo-sub">Crédito Automotriz</div></div>
     </div>
   </div>
 
@@ -558,7 +560,7 @@ document.addEventListener('DOMContentLoaded', async function() {
     <div class="dash-title">Rentabilidades por Colocación</div>
     <div style="display:flex;align-items:center;gap:12px">
       <div class="period-badge" id="badge-periodo">📅 —</div>
-      <div class="logo-block"><div class="logo-text">Auto<span>Fácil</span></div><div class="logo-sub">Crédito Automotriz</div></div>
+      <div class="logo-block"><img src="/img/logo.png" alt="AutoFácil" style="height:36px;display:block"><div class="logo-sub">Crédito Automotriz</div></div>
     </div>
   </div>
 
@@ -652,7 +654,7 @@ document.addEventListener('DOMContentLoaded', async function() {
   <div class="dash-header">
     <div class="dash-title">P&L Operativo</div>
     <div style="display:flex;align-items:center;gap:12px">
-      <div class="logo-block"><div class="logo-text">Auto<span>Fácil</span></div><div class="logo-sub">Crédito Automotriz</div></div>
+      <div class="logo-block"><img src="/img/logo.png" alt="AutoFácil" style="height:36px;display:block"><div class="logo-sub">Crédito Automotriz</div></div>
     </div>
   </div>
 
@@ -2259,7 +2261,7 @@ function buildV4() {
     <div class="dash-title">Desempeño por Ejecutivo</div>
     <div style="display:flex;align-items:center;gap:10px">
       <div class="period-badge" id="badge-periodo">📅 —</div>
-      <div class="logo-block"><div class="logo-text">Auto<span>Fácil</span></div><div class="logo-sub">Crédito Automotriz</div></div>
+      <div class="logo-block"><img src="/img/logo.png" alt="AutoFácil" style="height:36px;display:block"><div class="logo-sub">Crédito Automotriz</div></div>
     </div>
   </div>
 
@@ -2493,7 +2495,7 @@ function buildV5() {
         📥 Exportar Detalle Excel
       </button>
       <div class="period-badge" id="badge-periodo">📅 —</div>
-      <div class="logo-block"><div class="logo-text">Auto<span>Fácil</span></div><div class="logo-sub">Crédito Automotriz</div></div>
+      <div class="logo-block"><img src="/img/logo.png" alt="AutoFácil" style="height:36px;display:block"><div class="logo-sub">Crédito Automotriz</div></div>
     </div>
   </div>
   <div class="kpi-strip" id="kpi6"></div>
@@ -2819,7 +2821,7 @@ function exportarDetalleV6() {
     <div class="dash-title">Funnel de Conversión por Ejecutivo</div>
     <div style="display:flex;align-items:center;gap:12px">
       <div class="period-badge" id="badge-periodo">📅 —</div>
-      <div class="logo-block"><div class="logo-text">Auto<span>Fácil</span></div><div class="logo-sub">Crédito Automotriz</div></div>
+      <div class="logo-block"><img src="/img/logo.png" alt="AutoFácil" style="height:36px;display:block"><div class="logo-sub">Crédito Automotriz</div></div>
     </div>
   </div>
 
@@ -3045,7 +3047,7 @@ function buildV7() {
   <div class="dash-header">
     <div class="dash-title">⚙️ Administración</div>
     <div style="display:flex;align-items:center;gap:12px">
-      <div class="logo-block"><div class="logo-text">Auto<span>Fácil</span></div><div class="logo-sub">Crédito Automotriz</div></div>
+      <div class="logo-block"><img src="/img/logo.png" alt="AutoFácil" style="height:36px;display:block"><div class="logo-sub">Crédito Automotriz</div></div>
     </div>
   </div>
 
@@ -3521,7 +3523,7 @@ async function guardarNuevaClave() {
     <div class="dash-title">Comparativo Ejecutivos — Mismos Días Cierre</div>
     <div style="display:flex;align-items:center;gap:12px">
       <div class="period-badge" id="badge-periodo">📅 —</div>
-      <div class="logo-block"><div class="logo-text">Auto<span>Fácil</span></div><div class="logo-sub">Crédito Automotriz</div></div>
+      <div class="logo-block"><img src="/img/logo.png" alt="AutoFácil" style="height:36px;display:block"><div class="logo-sub">Crédito Automotriz</div></div>
     </div>
   </div>
 
@@ -3813,7 +3815,7 @@ function mostrarListaOps() {
   <div class="dash-header">
     <div class="dash-title">📅 Historia — Estadísticas por Período</div>
     <div style="display:flex;align-items:center;gap:12px">
-      <div class="logo-block"><div class="logo-text">Auto<span>Fácil</span></div><div class="logo-sub">Crédito Automotriz</div></div>
+      <div class="logo-block"><img src="/img/logo.png" alt="AutoFácil" style="height:36px;display:block"><div class="logo-sub">Crédito Automotriz</div></div>
     </div>
   </div>
 
@@ -4090,7 +4092,7 @@ function buildVHist() {
       <div class="dash-title">🎯 Seguimiento Presupuesto</div>
     </div>
     <div style="display:flex;align-items:center;gap:12px">
-      <div class="logo-block"><div class="logo-text">Auto<span>Fácil</span></div><div class="logo-sub">Crédito Automotriz</div></div>
+      <div class="logo-block"><img src="/img/logo.png" alt="AutoFácil" style="height:36px;display:block"><div class="logo-sub">Crédito Automotriz</div></div>
     </div>
   </div>
 
@@ -4376,7 +4378,7 @@ function buildVPpto() {
   <div class="dash-header">
     <div><div class="dash-title">📊 Evolución Histórica de Operaciones</div></div>
     <div style="display:flex;align-items:center;gap:12px">
-      <div class="logo-block"><div class="logo-text">Auto<span>Fácil</span></div><div class="logo-sub">Crédito Automotriz</div></div>
+      <div class="logo-block"><img src="/img/logo.png" alt="AutoFácil" style="height:36px;display:block"><div class="logo-sub">Crédito Automotriz</div></div>
     </div>
   </div>
   <div id="evol-kpis" class="kpi-strip" style="margin-bottom:12px"></div>
