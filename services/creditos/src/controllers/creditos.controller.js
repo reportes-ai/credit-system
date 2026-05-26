@@ -52,11 +52,11 @@ const audit = require('../../../../shared/auditoria');
         financiera,
         financiera                                                  AS empresa,
         COALESCE(estado,
-          CASE estado_eval
-            WHEN 'OTORGADO'  THEN 'VIGENTE'
-            WHEN 'RECHAZADO' THEN 'CANCELADO'
-            WHEN 'ANULADO'   THEN 'CANCELADO'
-            ELSE estado_eval
+          CASE
+            WHEN estado_credito = 'OTORGADO' THEN 'VIGENTE'
+            WHEN estado_eval    = 'OTORGADO' THEN 'VIGENTE'
+            WHEN estado_eval IN ('RECHAZADO','ANULADO') THEN 'CANCELADO'
+            ELSE COALESCE(estado_credito, estado_eval)
           END)                                                      AS estado,
         fecha_otorgado                                              AS fecha_otorgamiento,
         valor_vehiculo, pie, saldo_precio, monto_financiado,
@@ -104,11 +104,11 @@ const SELECT_GESTION = `
     ob.nombre_cliente,
     COALESCE(ob.financiera, 'AUTOFACIL')                       AS financiera,
     COALESCE(ob.estado,
-      CASE ob.estado_eval
-        WHEN 'OTORGADO'  THEN 'VIGENTE'
-        WHEN 'RECHAZADO' THEN 'CANCELADO'
-        WHEN 'ANULADO'   THEN 'CANCELADO'
-        ELSE ob.estado_eval
+      CASE
+        WHEN ob.estado_credito = 'OTORGADO' THEN 'VIGENTE'
+        WHEN ob.estado_eval    = 'OTORGADO' THEN 'VIGENTE'
+        WHEN ob.estado_eval IN ('RECHAZADO','ANULADO') THEN 'CANCELADO'
+        ELSE COALESCE(ob.estado_credito, ob.estado_eval)
       END)                                                     AS estado,
     ob.fecha_otorgado                                          AS fecha_otorgamiento,
     ob.valor_vehiculo,
