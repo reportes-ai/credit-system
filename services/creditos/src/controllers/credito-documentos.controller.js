@@ -55,6 +55,13 @@ const upload = async (req, res) => {
     const buffer     = Buffer.from(archivo_data, 'base64');
     const id_usuario = req.usuario?.id_usuario || null;
 
+    // Nombre legible del tipo de documento
+    let tipoNombre = `tipo ID ${id_tipo}`;
+    try {
+      const [tn] = await pool.query('SELECT nombre FROM tipos_documento WHERE id_tipo=?', [id_tipo]);
+      if (tn.length) tipoNombre = tn[0].nombre;
+    } catch(e) {}
+
     // Reemplaza el doc anterior del mismo tipo para este crédito
     await pool.query('DELETE FROM credito_documentos WHERE id_credito=? AND id_tipo=?', [id_credito, id_tipo]);
 
@@ -68,8 +75,8 @@ const upload = async (req, res) => {
     audit.registrar({
       id_credito, req,
       accion: 'DOCUMENTO_CARGADO',
-      detalle: `Archivo cargado: ${archivo_nombre || 'documento'} (tipo ID ${id_tipo})`,
-      meta: { id_tipo, archivo_nombre, archivo_size: archivo_size || buffer.length, mime_type },
+      detalle: `${tipoNombre}: ${archivo_nombre || 'documento'}`,
+      meta: { id_tipo, tipo_nombre: tipoNombre, archivo_nombre, archivo_size: archivo_size || buffer.length, mime_type },
     });
     res.status(201).json({ success: true, data: { id_doc: r.insertId }, error: null });
   } catch(e) { res.status(500).json({ success: false, data: null, error: e.message }); }
@@ -120,16 +127,21 @@ const remove = async (req, res) => {
   try {
     // Obtener datos antes de borrar para la auditoría
     const [prev] = await pool.query(
-      'SELECT id_credito, archivo_nombre, id_tipo FROM credito_documentos WHERE id_doc=?',
+      `SELECT cd.id_credito, cd.archivo_nombre, cd.id_tipo,
+              t.nombre AS tipo_nombre
+       FROM credito_documentos cd
+       LEFT JOIN tipos_documento t ON t.id_tipo = cd.id_tipo
+       WHERE cd.id_doc=?`,
       [req.params.id_doc]
     );
     await pool.query('DELETE FROM credito_documentos WHERE id_doc=?', [req.params.id_doc]);
     if (prev.length) {
+      const tipoNombre = prev[0].tipo_nombre || `tipo ID ${prev[0].id_tipo}`;
       audit.registrar({
         id_credito: prev[0].id_credito, req,
         accion: 'DOCUMENTO_ELIMINADO',
-        detalle: `Archivo eliminado: ${prev[0].archivo_nombre || 'documento'} (tipo ID ${prev[0].id_tipo})`,
-        meta: { id_tipo: prev[0].id_tipo, archivo_nombre: prev[0].archivo_nombre },
+        detalle: `${tipoNombre}: ${prev[0].archivo_nombre || 'documento'} eliminado`,
+        meta: { id_tipo: prev[0].id_tipo, tipo_nombre: tipoNombre, archivo_nombre: prev[0].archivo_nombre },
       });
     }
     res.json({ success: true, data: { mensaje: 'Documento eliminado' }, error: null });
@@ -161,11 +173,17 @@ const updateAprobacion = async (req, res) => {
     const aprobado_at = (aprobado !== null && aprobado !== undefined) ? new Date() : null;
 
     const [prev] = await pool.query(
-      'SELECT id_credito, archivo_nombre FROM credito_documentos WHERE id_doc=?',
+      `SELECT cd.id_credito, cd.archivo_nombre, cd.id_tipo,
+              t.nombre AS tipo_nombre
+       FROM credito_documentos cd
+       LEFT JOIN tipos_documento t ON t.id_tipo = cd.id_tipo
+       WHERE cd.id_doc=?`,
       [req.params.id_doc]
     );
     if (!prev.length)
       return res.status(404).json({ success: false, data: null, error: 'Documento no encontrado' });
+
+    const tipoNombre = prev[0].tipo_nombre || `tipo ID ${prev[0].id_tipo}`;
 
     await pool.query(
       `UPDATE credito_documentos
@@ -183,11 +201,11 @@ const updateAprobacion = async (req, res) => {
     audit.registrar({
       id_credito: prev[0].id_credito, req, accion,
       detalle: aprobado === 1
-        ? `Documento aprobado por ${aprobado_por}`
+        ? `${tipoNombre} — Aprobado por ${aprobado_por}`
         : aprobado === 0
-          ? `Documento rechazado por ${rechazado_por}`
-          : 'Revisión de documento anulada',
-      meta: { aprobado, aprobado_por, rechazado_por, archivo_nombre: prev[0].archivo_nombre },
+          ? `${tipoNombre} — Rechazado por ${rechazado_por}`
+          : `${tipoNombre} — Revisión anulada`,
+      meta: { aprobado, tipo_nombre: tipoNombre, aprobado_por, rechazado_por, archivo_nombre: prev[0].archivo_nombre },
     });
 
     res.json({ success: true, data: { id_doc: req.params.id_doc }, error: null });
