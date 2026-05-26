@@ -127,4 +127,22 @@ const remove = async (req, res) => {
   } catch(e) { res.status(500).json({ success: false, data: null, error: e.message }); }
 };
 
-module.exports = { getByCredito, upload, updateComentario, view, download, remove };
+/* ─── DELETE ALL por crédito ─────────────────────────────────────────────── */
+const removeAll = async (req, res) => {
+  try {
+    const { id_credito } = req.params;
+    const [prev] = await pool.query(
+      'SELECT COUNT(*) AS cnt FROM credito_documentos WHERE id_credito=?', [id_credito]
+    );
+    await pool.query('DELETE FROM credito_documentos WHERE id_credito=?', [id_credito]);
+    audit.registrar({
+      id_credito, req,
+      accion: 'DOCUMENTOS_LIMPIADOS',
+      detalle: `Se eliminaron ${prev[0]?.cnt || 0} documentos del crédito`,
+      meta: { total: prev[0]?.cnt || 0 },
+    });
+    res.json({ success: true, data: { mensaje: 'Documentos eliminados', total: prev[0]?.cnt || 0 }, error: null });
+  } catch(e) { res.status(500).json({ success: false, data: null, error: e.message }); }
+};
+
+module.exports = { getByCredito, upload, updateComentario, view, download, remove, removeAll };
