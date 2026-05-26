@@ -2460,7 +2460,7 @@ function loadCustomSIIData(){
 let _ufCache = null;
 async function _fetchUFfromAPI(){
   try {
-    const tok = localStorage.getItem('af_token');
+    const tok = localStorage.getItem('token');
     const r = await fetch('/api/uf/vigente', { headers:{ 'Authorization':'Bearer '+tok } });
     if(!r.ok) return null;
     const j = await r.json();
@@ -4233,7 +4233,7 @@ function _mapPerfil(perfilSistema){
 
 // Inicia sesión directo desde el token del sistema principal
 async function doLogin(){
-  const tok = localStorage.getItem('af_token');
+  const tok = localStorage.getItem('token');   // clave usada por el sistema principal
   if(!tok){ location.href='/login.html'; return; }
 
   // Decodificar JWT localmente para obtener datos del usuario
