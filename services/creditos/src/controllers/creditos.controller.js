@@ -52,7 +52,12 @@ const audit = require('../../../../shared/auditoria');
         financiera,
         financiera                                                  AS empresa,
         COALESCE(estado,
-          IF(estado_eval = 'OTORGADO', 'VIGENTE', estado_eval))    AS estado,
+          CASE estado_eval
+            WHEN 'OTORGADO'  THEN 'VIGENTE'
+            WHEN 'RECHAZADO' THEN 'CANCELADO'
+            WHEN 'ANULADO'   THEN 'CANCELADO'
+            ELSE estado_eval
+          END)                                                      AS estado,
         fecha_otorgado                                              AS fecha_otorgamiento,
         valor_vehiculo, pie, saldo_precio, monto_financiado,
         plazo, tascli_real AS tasa_mensual, cuota, fecha_primera_cuota,
@@ -98,7 +103,13 @@ const SELECT_GESTION = `
     ob.rut_cliente,
     ob.nombre_cliente,
     COALESCE(ob.financiera, 'AUTOFACIL')                       AS financiera,
-    COALESCE(ob.estado, 'VIGENTE')                             AS estado,
+    COALESCE(ob.estado,
+      CASE ob.estado_eval
+        WHEN 'OTORGADO'  THEN 'VIGENTE'
+        WHEN 'RECHAZADO' THEN 'CANCELADO'
+        WHEN 'ANULADO'   THEN 'CANCELADO'
+        ELSE ob.estado_eval
+      END)                                                     AS estado,
     ob.fecha_otorgado                                          AS fecha_otorgamiento,
     ob.valor_vehiculo,
     ob.pie,
@@ -129,7 +140,7 @@ const SELECT_GESTION = `
 
 const WHERE_GESTION = `
   WHERE (
-    (ob.financiera IN ('AUTOFIN','UNIDAD DE CREDITO') AND ob.estado_eval = 'OTORGADO')
+    ob.financiera IN ('AUTOFIN','UNIDAD DE CREDITO')
     OR ob.numero_credito IS NOT NULL
   )
 `;
