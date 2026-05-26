@@ -170,7 +170,7 @@ exports.getDatos = async (req, res) => {
         COALESCE(monto_financiado, 0)                         AS monto_financiado,
         COALESCE(tascli_real, 0)                              AS tasa_cli,
         COALESCE(comdea_real, 0)                              AS com_dealer,
-        COALESCE(rentabilidad_af_directo, 0)                  AS rentab_afa,
+        COALESCE(monto_comision_fin, 0)                       AS rentab_afa,
         COALESCE(com_rdh, 0) + COALESCE(com_cesantia, 0)
           + COALESCE(com_reparaciones, 0)                     AS com_seguros,
         COALESCE(com_parque, 0)                               AS com_parque,
@@ -193,10 +193,22 @@ exports.getDatos = async (req, res) => {
       ORDER BY mes ASC, num_op ASC
     `);
 
-    // Agregar institucion derivada
+    // Agregar institucion derivada + castear decimales a número
+    // (MySQL2/TiDB devuelve columnas DECIMAL como strings)
     const raw = rows.map(r => ({
       ...r,
-      institucion: derInstitucion(r.financiera),
+      institucion:        derInstitucion(r.financiera),
+      saldo_precio:       +(r.saldo_precio)       || 0,
+      monto_financiado:   +(r.monto_financiado)   || 0,
+      tasa_cli:           +(r.tasa_cli)            || 0,
+      com_dealer:         +(r.com_dealer)          || 0,
+      rentab_afa:         +(r.rentab_afa)          || 0,
+      com_seguros:        +(r.com_seguros)         || 0,
+      com_parque:         +(r.com_parque)          || 0,
+      arriendo_parque:    +(r.arriendo_parque)     || 0,
+      ingreso_neto_total: +(r.ingreso_neto_total)  || 0,
+      plazo:              +(r.plazo)               || 0,
+      mayor_mm30:         +(r.mayor_mm30)          || 0,
     }));
 
     const { tendencia, ej_perf } = procesarDatos(raw);
