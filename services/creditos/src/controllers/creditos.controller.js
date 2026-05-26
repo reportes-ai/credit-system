@@ -116,7 +116,9 @@ const SELECT_GESTION = `
     ob.ejecutivo,
     ob.mes,
     ob.created_at,
-    COALESCE(pp.cnt, 0)                                        AS cuotas_pagadas
+    -- cuotas_pagadas solo para créditos digitados manualmente (numero_credito propio)
+    -- Los importados desde Excel (brokerage) no se trackean en pagos: NULL evita falsos EN MORA
+    IF(ob.numero_credito IS NOT NULL, COALESCE(pp.cnt, 0), NULL) AS cuotas_pagadas
   FROM operaciones_brokerage ob
   LEFT JOIN (
     SELECT id_credito, COUNT(DISTINCT numero_cuota) AS cnt
@@ -227,7 +229,7 @@ const getAll = async (req, res) => {
                OR UPPER(COALESCE(ob.numero_credito, CONCAT('OP-',ob.num_op))) LIKE ?)`;
       params.push(like, like, like);
     }
-    sql += ` ORDER BY ob.created_at DESC, ob.id DESC LIMIT 500`;
+    sql += ` ORDER BY ob.mes DESC, ob.id DESC LIMIT 5000`;
 
     const [rows] = await pool.query(sql, params);
     res.json({ success: true, data: rows, error: null });
