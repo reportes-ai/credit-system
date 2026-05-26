@@ -4214,6 +4214,14 @@ function pendingForReview(){
 
 // ========== LOGIN — controlado por sesión del sistema principal ==========
 
+// Decodifica el payload del JWT sin verificar firma (solo para leer datos)
+function _decodeJWT(token){
+  try {
+    const payload = token.split('.')[1];
+    return JSON.parse(atob(payload.replace(/-/g,'+').replace(/_/g,'/')));
+  } catch(e) { return null; }
+}
+
 // Mapeo de perfil del sistema principal → perfil cartas
 function _mapPerfil(perfilSistema){
   if(!perfilSistema) return 'EJECUTIVO';
@@ -4227,34 +4235,50 @@ function _mapPerfil(perfilSistema){
 async function doLogin(){
   const tok = localStorage.getItem('af_token');
   if(!tok){ location.href='/login.html'; return; }
-  try {
-    const r = await fetch('/api/auth/me', { headers:{ 'Authorization':'Bearer '+tok } });
-    if(!r.ok){ location.href='/login.html'; return; }
-    const { data } = await r.json();
-    const perfilCartas = _mapPerfil(data.perfil);
-    currentUser = {
-      login:    data.usuario || data.email || 'usuario',
-      name:     data.nombre  || data.name  || 'Usuario',
-      pass:     '',
-      perfil:   perfilCartas,
-      initials: (data.nombre||'U').split(' ').map(w=>w[0]).slice(0,2).join('').toUpperCase(),
-      mail:     data.email   || '',
-      tel:      data.tel     || ''
-    };
-    document.getElementById('loginPage').style.display='none';
-    document.getElementById('app').style.display='block';
-    document.getElementById('headerUser').textContent = currentUser.name + ' (' + currentUser.perfil + ')';
-    // Cargar UF del sistema principal en caché
-    _fetchUFfromAPI().then(uf => { if(uf) _ufCache = uf; });
-    await initApp();
-  } catch(e) {
-    location.href='/login.html';
+
+  // Decodificar JWT localmente para obtener datos del usuario
+  const payload = _decodeJWT(tok);
+  if(!payload){ location.href='/login.html'; return; }
+
+  // Verificar que el token no haya expirado
+  if(payload.exp && payload.exp < Math.floor(Date.now()/1000)){
+    location.href='/login.html'; return;
   }
+
+  // Validar token contra el servidor usando el endpoint existente
+  try {
+    const r = await fetch('/api/auth/mis-permisos', {
+      headers:{ 'Authorization':'Bearer '+tok }
+    });
+    if(!r.ok){ location.href='/login.html'; return; }
+  } catch(e) {
+    location.href='/login.html'; return;
+  }
+
+  const nombre   = [payload.nombre, payload.apellido].filter(Boolean).join(' ') || 'Usuario';
+  const perfilCartas = _mapPerfil(payload.perfil_nombre);
+
+  currentUser = {
+    login:    payload.email || String(payload.id_usuario) || 'usuario',
+    name:     nombre,
+    pass:     '',
+    perfil:   perfilCartas,
+    initials: nombre.split(' ').map(w=>w[0]).slice(0,2).join('').toUpperCase(),
+    mail:     payload.email || '',
+    tel:      ''
+  };
+
+  document.getElementById('app').style.display = 'block';
+  document.getElementById('headerUser').textContent = currentUser.name + ' (' + currentUser.perfil + ')';
+
+  // Cargar UF del sistema principal en caché (no bloqueante)
+  _fetchUFfromAPI().then(uf => { if(uf) _ufCache = uf; });
+
+  await initApp();
 }
 
 function doLogout(){
   currentUser = null;
-  // Cerrar sesión vuelve al menú principal del sistema
   location.href = '/';
 }
 
