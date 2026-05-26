@@ -242,19 +242,44 @@
   /* Filtros dinámicos */
   .filtro-card {
     background:#fff; border:1.5px solid #e9d5ff; border-radius:10px;
-    padding:12px 14px; margin-bottom:10px;
+    margin-bottom:8px; overflow:hidden;
+    transition:border-color .15s;
   }
   .filtro-card:last-child { margin-bottom:0; }
+  .filtro-card.tiene-valor { border-color:#7c3aed; }
+
   .filtro-label {
     font-size:.73rem; font-weight:700; color:#5b21b6;
-    display:flex; align-items:center; gap:5px; margin-bottom:8px;
+    display:flex; align-items:center; gap:5px;
+    padding:10px 14px; margin:0;
     text-transform:uppercase; letter-spacing:.04em;
+    cursor:pointer; user-select:none;
+    transition:background .12s;
   }
+  .filtro-label:hover { background:#faf5ff; }
   .filtro-label .tipo-badge {
     background:#ede9fe; color:#7c3aed; border-radius:6px;
     padding:1px 7px; font-size:.64rem; font-weight:700; margin-left:auto;
     text-transform:none; letter-spacing:0;
   }
+  .filtro-label .fl-chevron {
+    font-size:.75rem; color:#a78bfa; transition:transform .2s; margin-left:4px;
+  }
+  .filtro-card.open .fl-chevron { transform:rotate(180deg); }
+  .filtro-card.tiene-valor .filtro-label { color:#4c1d95; }
+  .filtro-card.tiene-valor .fl-chevron { color:#7c3aed; }
+
+  /* punto indicador de filtro activo */
+  .filtro-label .fl-dot {
+    width:7px; height:7px; border-radius:50%; background:#7c3aed;
+    flex-shrink:0; display:none;
+  }
+  .filtro-card.tiene-valor .fl-dot { display:inline-block; }
+
+  .filtro-body {
+    display:none; padding:0 14px 12px;
+  }
+  .filtro-card.open .filtro-body { display:block; }
   .fi { width:100%; border:1.5px solid #d1d5db; border-radius:7px; padding:6px 10px; font-size:.84rem; color:#1e293b; outline:none; transition:border-color .15s; }
   .fi:focus { border-color:#7c3aed; box-shadow:0 0 0 3px rgba(124,58,237,.1); }
   .fi-row { display:grid; grid-template-columns:1fr 1fr; gap:8px; }
@@ -453,12 +478,16 @@ function renderFiltros(){
   el.innerHTML = camposConFiltro.map(k=>{
     const campo = mod.campos.find(f=>f.key===k);
     const ft = campo.filtro;
-    return `<div class="filtro-card">
-      <div class="filtro-label">
+    return `<div class="filtro-card" id="fc_${k}">
+      <div class="filtro-label" onclick="toggleFiltroCard('${k}')">
+        <span class="fl-dot"></span>
         <i class="bi ${TIPO_ICON[ft.tipo]}"></i>${campo.label}
         <span class="tipo-badge">${TIPO_LABEL[ft.tipo]}</span>
+        <i class="bi bi-chevron-down fl-chevron"></i>
       </div>
-      ${renderWidgetFiltro(k, ft)}
+      <div class="filtro-body">
+        ${renderWidgetFiltro(k, ft)}
+      </div>
     </div>`;
   }).join('');
 }
@@ -467,41 +496,51 @@ function renderWidgetFiltro(key, ft){
   const id = k => `f_${key}_${k}`;
   switch(ft.tipo){
     case 'texto':
-      return `<input class="fi" id="${id('v')}" type="text" placeholder="Buscar… (contiene)">`;
+      return `<input class="fi" id="${id('v')}" type="text" placeholder="Buscar… (contiene)"
+        oninput="marcarFiltroActivo('${key}')">`;
 
     case 'multi':
       return `<div class="multi-pills">${ft.opts.map(o=>
-        `<label class="multi-pill"><input type="checkbox" name="${id('v')}" value="${o}">${o}</label>`
+        `<label class="multi-pill"><input type="checkbox" name="${id('v')}" value="${o}"
+          onchange="marcarFiltroActivo('${key}')">${o}</label>`
       ).join('')}</div>`;
 
     case 'fecha':
       return `<div class="fi-row">
-        <div><span class="fi-lbl">Desde</span><input class="fi" id="${id('min')}" type="date"></div>
-        <div><span class="fi-lbl">Hasta</span><input class="fi" id="${id('max')}" type="date"></div>
+        <div><span class="fi-lbl">Desde</span><input class="fi" id="${id('min')}" type="date" onchange="marcarFiltroActivo('${key}')"></div>
+        <div><span class="fi-lbl">Hasta</span><input class="fi" id="${id('max')}" type="date" onchange="marcarFiltroActivo('${key}')"></div>
       </div>`;
 
     case 'monto':
       return `<div class="fi-row">
-        <div><span class="fi-lbl">Monto mínimo ($)</span><input class="fi" id="${id('min')}" type="text" inputmode="numeric" placeholder="0" oninput="fmtCLP(this)"></div>
-        <div><span class="fi-lbl">Monto máximo ($)</span><input class="fi" id="${id('max')}" type="text" inputmode="numeric" placeholder="Sin límite" oninput="fmtCLP(this)"></div>
+        <div><span class="fi-lbl">Monto mínimo ($)</span><input class="fi" id="${id('min')}" type="text" inputmode="numeric" placeholder="0"
+          oninput="fmtCLP(this);marcarFiltroActivo('${key}')"></div>
+        <div><span class="fi-lbl">Monto máximo ($)</span><input class="fi" id="${id('max')}" type="text" inputmode="numeric" placeholder="Sin límite"
+          oninput="fmtCLP(this);marcarFiltroActivo('${key}')"></div>
       </div>`;
 
     case 'rango':
       return `<div class="fi-row">
-        <div><span class="fi-lbl">Mín ${ft.sufijo||''}</span><input class="fi" id="${id('min')}" type="number" min="${ft.min??0}" placeholder="${ft.min??0}"></div>
-        <div><span class="fi-lbl">Máx ${ft.sufijo||''}</span><input class="fi" id="${id('max')}" type="number" max="${ft.max??9999}" placeholder="${ft.max??'Sin límite'}"></div>
+        <div><span class="fi-lbl">Mín ${ft.sufijo||''}</span><input class="fi" id="${id('min')}" type="number" min="${ft.min??0}" placeholder="${ft.min??0}"
+          oninput="marcarFiltroActivo('${key}')"></div>
+        <div><span class="fi-lbl">Máx ${ft.sufijo||''}</span><input class="fi" id="${id('max')}" type="number" max="${ft.max??9999}" placeholder="${ft.max??'Sin límite'}"
+          oninput="marcarFiltroActivo('${key}')"></div>
       </div>`;
 
     case 'pct':
       return `<div class="fi-row">
-        <div><span class="fi-lbl">Tasa mínima (%)</span><input class="fi" id="${id('min')}" type="number" min="0" max="100" step="0.01" placeholder="0"></div>
-        <div><span class="fi-lbl">Tasa máxima (%)</span><input class="fi" id="${id('max')}" type="number" min="0" max="100" step="0.01" placeholder="Sin límite"></div>
+        <div><span class="fi-lbl">Tasa mínima (%)</span><input class="fi" id="${id('min')}" type="number" min="0" max="100" step="0.01" placeholder="0"
+          oninput="marcarFiltroActivo('${key}')"></div>
+        <div><span class="fi-lbl">Tasa máxima (%)</span><input class="fi" id="${id('max')}" type="number" min="0" max="100" step="0.01" placeholder="Sin límite"
+          oninput="marcarFiltroActivo('${key}')"></div>
       </div>`;
 
     case 'anio':
       return `<div class="fi-row">
-        <div><span class="fi-lbl">Año desde</span><input class="fi" id="${id('min')}" type="number" min="${ft.min??1990}" max="${ft.max??2030}" placeholder="${ft.min??1990}"></div>
-        <div><span class="fi-lbl">Año hasta</span><input class="fi" id="${id('max')}" type="number" min="${ft.min??1990}" max="${ft.max??2030}" placeholder="${ft.max??2030}"></div>
+        <div><span class="fi-lbl">Año desde</span><input class="fi" id="${id('min')}" type="number" min="${ft.min??1990}" max="${ft.max??2030}" placeholder="${ft.min??1990}"
+          oninput="marcarFiltroActivo('${key}')"></div>
+        <div><span class="fi-lbl">Año hasta</span><input class="fi" id="${id('max')}" type="number" min="${ft.min??1990}" max="${ft.max??2030}" placeholder="${ft.max??2030}"
+          oninput="marcarFiltroActivo('${key}')"></div>
       </div>`;
 
     default: return '';
@@ -545,9 +584,36 @@ function leerFiltros(){
   return result;
 }
 
+/* ── Acordeón de filtros ─────────────────────────────────────── */
+function toggleFiltroCard(key){
+  const card = document.getElementById('fc_'+key);
+  if(!card) return;
+  card.classList.toggle('open');
+}
+
+/* Marca la card con punto morado si tiene algún valor activo */
+function marcarFiltroActivo(key){
+  const mod = MODULOS[moduloActivo];
+  const campo = mod.campos.find(f=>f.key===key);
+  const ft = campo?.filtro; if(!ft) return;
+  const id = s=>`f_${key}_${s}`;
+  let activo = false;
+  switch(ft.tipo){
+    case 'texto':
+      activo = !!(document.getElementById(id('v'))?.value?.trim()); break;
+    case 'multi':
+      activo = [...document.querySelectorAll(`input[name="${id('v')}"]`)].some(i=>i.checked); break;
+    default:
+      activo = !!(document.getElementById(id('min'))?.value || document.getElementById(id('max'))?.value);
+  }
+  document.getElementById('fc_'+key)?.classList.toggle('tiene-valor', activo);
+}
+
 function limpiarFiltros(){
   document.querySelectorAll('#filtros-dinamicos .fi').forEach(i=>{ i.value=''; });
   document.querySelectorAll('#filtros-dinamicos input[type=checkbox]').forEach(i=>{ i.checked=false; });
+  // Quitar indicadores visuales
+  camposSel.forEach(k => document.getElementById('fc_'+k)?.classList.remove('tiene-valor'));
 }
 
 /* ── Aplicar filtros a los datos ─────────────────────────────── */
