@@ -1744,8 +1744,8 @@ function buildV1b() {
     const tblAnt = document.getElementById('t-fin1b-ant');
     if (tblAnt) tblAnt.innerHTML = '<tr><td colspan="8" style="padding:12px;color:#888;text-align:center">Actualiza los datos para ver esta comparación</td></tr>';
     if (tituloAnt) tituloAnt.textContent = 'Mismos días faltantes — ' + mesesNombres[mesAnt] + ' ' + anioAnt + ' (pendiente actualización)';
-    return;
-  }
+    // NO retornar — continuar con CONCESIONARIOS, EJECUTIVOS, etc.
+  } else {
   const rawAnt = todosAntMes.filter(r => {
     if (!r.fecha_ot) return false;
     const diaOt = parseInt(r.fecha_ot.split('-')[2]);
@@ -1777,6 +1777,7 @@ function buildV1b() {
     '<thead><tr><th>Institución</th><th>Ops</th><th>Total Fin.</th><th>Prom. Fin</th><th>Saldo Precio</th><th>Com Dealer</th><th>Ing. x Col.</th><th>Ing. x Seguros</th></tr></thead>' +
     '<tbody>'+finRowsAnt+'</tbody>' +
     '<tfoot><tr><td>Total</td><td>'+totAnt.ops+'</td><td>'+fM(totAnt.fin)+'</td><td>'+fM(totAnt.ops?totAnt.fin/totAnt.ops:0)+'</td><td>'+fM(totAnt.saldo)+'</td><td>'+fM(totAnt.com_dealer)+'</td><td>'+fM(totAnt.afa)+'</td><td>'+fM(totAnt.com_seg)+'</td></tr></tfoot>';
+  } // fin else tienenFechaOt
 
   // Concesionarios otorgados
   const ccsOt = {};
@@ -1905,6 +1906,8 @@ async function cargarDatos() {
 
     // Actualizar RAW_DATA global
     window.RAW_DATA = (datos.raw || []).map(function(r) {
+      // Alias: el API devuelve fecha_otorgado, el código interno usa fecha_ot
+      if (!r.fecha_ot && r.fecha_otorgado) r.fecha_ot = r.fecha_otorgado;
       // Derivar dia_mes y dia_semana desde fecha_estado (FECHA EV, col J) para todos
       if (!r.dia_mes) {
         const f = r.fecha_estado && r.fecha_estado !== 'NO APLICA' ? r.fecha_estado : null;
