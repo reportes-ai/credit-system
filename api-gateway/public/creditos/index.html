@@ -24,7 +24,7 @@
     .btn-logout:hover { background: rgba(255,255,255,0.22); }
 
     /* ── Layout ── */
-    .page-wrap { max-width:1300px; margin:24px auto; padding:0 24px 60px; }
+    .page-wrap { max-width:1600px; margin:24px auto; padding:0 24px 60px; }
 
     /* ── Header banner ── */
     .page-banner {
@@ -367,7 +367,7 @@
   <div class="topnav-left">
     <div class="topnav-brand">
       <a href="/"><img src="/img/logo.png" alt="AutoFácil" style="display:block"></a>
-      <span class="version-badge" id="versionBadge">v3.8</span>
+      <span class="version-badge" id="versionBadge">v3.9</span>
     </div>
       <div class="breadcrumb-nav">
         <a href="/">Inicio</a><span class="sep">›</span>
@@ -1376,14 +1376,21 @@ function renderConsulta(list) {
     return;
   }
   const fmtF = s => s ? new Date(s).toLocaleDateString('es-CL') : '—';
+  const fmtM = v => v ? '$'+Number(v).toLocaleString('es-CL') : '—';
+  const finTag = f => {
+    const color = f==='AUTOFIN'?'#dbeafe;color:#1d4ed8' : f&&f.includes('UNIDAD')?'#fce7f3;color:#9d174d':'#f1f5f9;color:#374151';
+    return `<span style="font-size:.7rem;font-weight:700;background:${color};border-radius:4px;padding:2px 7px">${f||'—'}</span>`;
+  };
   res.innerHTML = `<div class="table-responsive">
-    <table class="cred-table">
+    <table class="cred-table" style="min-width:900px">
       <thead>
         <tr>
           <th>N° Crédito</th>
           <th>RUT</th>
           <th>Cliente</th>
+          <th>Financiera</th>
           <th>Fecha</th>
+          <th class="num">Monto</th>
           <th>Vehículo</th>
           <th class="num">Cuota</th>
           <th>Plazo</th>
@@ -1397,7 +1404,9 @@ function renderConsulta(list) {
           <td class="num-cred">${c.numero_credito||'—'}</td>
           <td class="mono">${c.rut_cliente||'—'}</td>
           <td>${c.nombre_cliente||'—'}</td>
+          <td>${finTag(c.financiera)}</td>
           <td style="white-space:nowrap;font-size:.78rem;color:#6b7280">${fmtF(c.fecha_otorgamiento||c.created_at)}</td>
+          <td class="num" style="color:#059669;font-weight:700">${fmtM(c.monto_financiado)}</td>
           <td style="font-size:.8rem">${[c.marca,c.modelo,c.anio].filter(Boolean).join(' ')||'—'}</td>
           <td class="num" style="color:var(--navy);font-weight:800">${fmtPeso(c.cuota)}</td>
           <td style="text-align:center">${c.plazo?c.plazo+' m':'—'}</td>
