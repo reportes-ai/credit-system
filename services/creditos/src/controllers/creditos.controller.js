@@ -143,6 +143,8 @@ const WHERE_GESTION = `
     ob.financiera IN ('AUTOFIN','UNIDAD DE CREDITO')
     OR ob.numero_credito IS NOT NULL
   )
+  AND ob.estado_eval  != 'ANULADO'
+  AND (ob.estado_credito IS NULL OR ob.estado_credito != 'ANULADO')
 `;
 
 /* ─── CREATE ─────────────────────────────────────────────────────────────── */
