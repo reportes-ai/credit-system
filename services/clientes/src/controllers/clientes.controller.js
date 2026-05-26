@@ -129,10 +129,48 @@ const up = v => (v && typeof v === 'string' ? v.toUpperCase().trim() : v ?? null
 const getByRut = async (req, res) => {
   try {
     const rut = decodeURIComponent(req.params.rut).toUpperCase().trim();
+
+    // 1. Buscar en tabla clientes (datos completos)
     const [rows] = await pool.query('SELECT * FROM clientes WHERE rut = ?', [rut]);
-    if (!rows.length)
-      return res.json({ success: true, data: null, error: null });   // no encontrado → data null
-    res.json({ success: true, data: rows[0], error: null });
+    if (rows.length) return res.json({ success: true, data: rows[0], error: null });
+
+    // 2. Fallback: buscar en operaciones_brokerage (datos básicos del Excel)
+    const [ops] = await pool.query(`
+      SELECT rut_cliente AS rut, nombre_cliente,
+             MAX(fecha_otorgado) AS ultima_op,
+             COUNT(*) AS total_ops
+      FROM operaciones_brokerage
+      WHERE UPPER(REPLACE(rut_cliente,' ','')) = UPPER(REPLACE(?,' ',''))
+      GROUP BY rut_cliente, nombre_cliente
+      LIMIT 1
+    `, [rut]);
+
+    if (!ops.length) return res.json({ success: true, data: null, error: null });
+
+    // Armar nombre desde nombre_cliente (viene como "APELLIDO1 APELLIDO2 NOMBRES")
+    const nombreCompleto = ops[0].nombre_cliente || '';
+    const partes = nombreCompleto.trim().split(/\s+/);
+
+    return res.json({
+      success: true,
+      data: {
+        id_cliente:       null,
+        rut:              ops[0].rut,
+        tipo_cliente:     'PERSONA',
+        nombres:          partes.slice(2).join(' ') || partes[0] || '',
+        apellido_paterno: partes[0] || '',
+        apellido_materno: partes[1] || '',
+        nombre_fantasia:  null,
+        razon_social:     null,
+        correo:           null,
+        telefono_movil:   null,
+        direccion:        null,
+        _desde_brokerage: true,   // indica que viene del Excel, sin perfil completo
+        _total_ops:       ops[0].total_ops,
+        _ultima_op:       ops[0].ultima_op,
+      },
+      error: null,
+    });
   } catch (e) {
     res.status(500).json({ success: false, data: null, error: e.message });
   }
