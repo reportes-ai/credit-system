@@ -200,24 +200,10 @@ body { font-family: 'Segoe UI', Arial, sans-serif; background: var(--gray-bg); c
 </head>
 <body>
 
-<!-- LOGIN -->
-<div id="loginPage" class="login-wrap">
-  <div class="login-box">
-    <div class="logo-big"><img id="logoLogin" src="/img/logo.png" alt="AutoFácil" style="height:48px;object-fit:contain;display:block;margin:0 auto"></div>
-    <h2>Generador de Cartas de Aprobación</h2>
-    <h3>Ingrese sus credenciales</h3>
-    <div style="font-size:11px;color:#90CAF9;margin-top:4px">V5.32</div>
-    <div class="form-group">
-      <label>Usuario</label>
-      <input type="text" id="loginUser" placeholder="usuario" value="admin">
-    </div>
-    <div class="form-group">
-      <label>Contraseña</label>
-      <input type="password" id="loginPass" placeholder="contraseña" value="clave 1010">
-    </div>
-    <button class="btn-login" onclick="doLogin()">INGRESAR</button>
-    <div id="loginError" class="login-error"></div>
-  </div>
+<!-- LOGIN (oculto — acceso controlado por sesión del sistema principal) -->
+<div id="loginPage" style="display:none">
+  <input type="hidden" id="loginUser" value="admin">
+  <input type="hidden" id="loginPass" value="clave 1010">
 </div>
 
 <!-- APP -->
@@ -489,8 +475,8 @@ body { font-family: 'Segoe UI', Arial, sans-serif; background: var(--gray-bg); c
             <input type="text" id="fTasaPizarra" readonly style="color:#546E7A">
           </div>
           <div class="field" style="display:flex;flex-direction:column;gap:4px;justify-content:flex-end;padding-bottom:2px">
-            <span id="alertUF" style="display:none;font-size:10px;font-weight:700;color:#2E7D32;cursor:pointer" onclick="openMantenedorUF()">ACTUALIZAR UF</span>
-            <span id="alertTMC" style="display:none;font-size:10px;font-weight:700;color:#2E7D32;cursor:pointer" onclick="openMantenedorUF()">ACTUALIZAR TMC</span>
+            <span id="alertUF" style="display:none"></span>
+            <span id="alertTMC" style="display:none"></span>
             <span id="alertAprobacion" style="display:none;font-size:10px;font-weight:700;color:#C62828">REQUIERE APROBACIÓN</span>
           </div>
         </div>
@@ -1377,77 +1363,6 @@ body { font-family: 'Segoe UI', Arial, sans-serif; background: var(--gray-bg); c
       <div style="color:white;font-size:15px;font-weight:700">🛠 Mantenedores</div>
       <button onclick="closeMantenedorUF()" style="background:rgba(255,255,255,0.2);border:none;color:white;border-radius:20px;padding:4px 14px;cursor:pointer;font-size:12px">✕ Cerrar</button>
     </div>
-    <!-- Body -->
-    <div style="background:#f5f5f5;display:flex;gap:0;min-height:400px">
-      
-      <!-- LEFT: UF -->
-      <div style="flex:1;padding:20px;border-right:1px solid #ddd">
-        <div style="color:#2E7D32;font-weight:700;font-size:12px;text-transform:uppercase;margin-bottom:12px">🟩 Valor UF</div>
-        <div id="ufHoy" style="font-size:13px;color:#333;margin-bottom:10px"></div>
-        <div style="font-size:11px;color:#666;margin-bottom:10px">Cargue el archivo CSV anual del SII para actualizar todos los valores de UF.</div>
-        <label style="display:block;border:2px dashed #4CAF50;border-radius:8px;padding:14px;text-align:center;cursor:pointer;font-size:12px;color:#2E7D32;font-weight:600">
-          🗂 Cargar CSV UF anual
-          <input type="file" accept=".csv" id="ufCsvInput" style="display:none" onchange="loadUFcsv(this)">
-        </label>
-        <div id="ufUploadStatus" style="margin-top:10px;font-size:11px"></div>
-        <div id="ufLastUpdate" style="margin-top:6px;font-size:10px;color:#888"></div>
-      </div>
-
-      <!-- RIGHT: TASAS -->
-      <div style="flex:1.4;padding:20px">
-        <div style="color:#E65100;font-weight:700;font-size:12px;text-transform:uppercase;margin-bottom:12px">🔥 Tasas Máximas Convencionales</div>
-        
-        <table style="width:100%;border-collapse:collapse;font-size:12px">
-          <thead>
-            <tr style="background:#E8F5E9">
-              <td style="padding:6px 10px;font-weight:700;border:1px solid #C8E6C9">TRAMO</td>
-              <td style="padding:6px 10px;font-weight:700;border:1px solid #C8E6C9;text-align:center">≤ 200 UF</td>
-              <td style="padding:6px 10px;font-weight:700;border:1px solid #C8E6C9;text-align:center">&gt; 200 UF</td>
-            </tr>
-          </thead>
-          <tbody>
-            <tr>
-              <td style="padding:6px 10px;border:1px solid #E0E0E0;font-size:11px">VÁLIDO DESDE — HASTA</td>
-              <td colspan="2" style="padding:6px 10px;border:1px solid #E0E0E0;text-align:center">
-                <div style="display:flex;align-items:center;gap:6px;justify-content:center">
-                  <input type="date" id="tasaDesde1" style="font-size:11px;padding:3px;border:1px solid #ccc;border-radius:4px" onchange="syncTasaFechas('desde')">
-                  <span style="font-size:10px;color:#888">→</span>
-                  <input type="date" id="tasaHasta1" style="font-size:11px;padding:3px;border:1px solid #ccc;border-radius:4px" onchange="syncTasaFechas('hasta')">
-                </div>
-                <div style="font-size:9px;color:#888;margin-top:3px">Aplica para ambos tramos</div>
-              </td>
-            </tr>
-            <tr style="background:#FFFDE7">
-              <td style="padding:6px 10px;border:1px solid #E0E0E0;font-size:11px">TASA MÁX. ANUAL</td>
-              <td style="padding:6px 10px;border:1px solid #E0E0E0;text-align:center">
-                <div style="display:flex;align-items:center;justify-content:center;gap:4px">
-                  <input type="number" id="tasaAnual1" step="0.01" min="0" max="100" style="width:70px;font-size:12px;padding:3px;border:1px solid #ccc;border-radius:4px;text-align:right" oninput="calcTasaMensual(1)" placeholder="0.00"> %
-                </div>
-              </td>
-              <td style="padding:6px 10px;border:1px solid #E0E0E0;text-align:center">
-                <div style="display:flex;align-items:center;justify-content:center;gap:4px">
-                  <input type="number" id="tasaAnual2" step="0.01" min="0" max="100" style="width:70px;font-size:12px;padding:3px;border:1px solid #ccc;border-radius:4px;text-align:right" oninput="calcTasaMensual(2)" placeholder="0.00"> %
-                </div>
-              </td>
-            </tr>
-            <tr style="background:#E8F5E9">
-              <td style="padding:6px 10px;border:1px solid #E0E0E0;font-size:11px">TASA MÁX. MENSUAL</td>
-              <td style="padding:6px 10px;border:1px solid #E0E0E0;text-align:center;font-weight:700" id="tasaMensual1">—</td>
-              <td style="padding:6px 10px;border:1px solid #E0E0E0;text-align:center;font-weight:700" id="tasaMensual2">—</td>
-            </tr>
-          </tbody>
-        </table>
-
-        <div style="margin-top:8px;font-size:10px;color:#888">* Tasa mensual = Tasa anual ÷ 12, redondeada a 2 decimales.</div>
-        <div id="tasasLastSave" style="font-size:10px;color:#888;margin-top:4px"></div>
-
-        <div style="margin-top:14px;display:flex;justify-content:flex-end">
-          <button class="btn btn-success" onclick="saveTasas()" style="font-size:12px;padding:7px 18px">💾 Guardar tasas</button>
-        </div>
-      </div>
-
-    </div>
-
     <!-- FINANCIERA PREFERENTE -->
     <div style="background:#fff;padding:16px 20px;border-top:1px solid #ddd">
       <div style="color:#1565C0;font-weight:700;font-size:12px;text-transform:uppercase;margin-bottom:10px;text-align:center">🏦 Financiera Preferente de Acuerdo a Saldo Precio</div>
@@ -2541,64 +2456,40 @@ function loadCustomSIIData(){
 
 // ========== MANTENEDOR UF & TASAS ==========
 
+// ── UF desde el sistema principal (caché en memoria) ──
+let _ufCache = null;
+async function _fetchUFfromAPI(){
+  try {
+    const tok = localStorage.getItem('af_token');
+    const r = await fetch('/api/uf/vigente', { headers:{ 'Authorization':'Bearer '+tok } });
+    if(!r.ok) return null;
+    const j = await r.json();
+    // Espera { data: { valor, fecha } } o array
+    const d = Array.isArray(j.data) ? j.data[0] : j.data;
+    if(d && d.valor) return { value: parseFloat(d.valor), date: (d.fecha||new Date().toISOString()).split('T')[0] };
+  } catch(e) {}
+  return null;
+}
 function getUFhoy(){
-  // Get today's UF value
+  // Si ya tenemos el valor en caché, devolverlo
+  if(_ufCache) return _ufCache;
+  // Fallback: usar UF_DATA_2026 embebido
   const today = new Date().toISOString().split('T')[0];
-  // Try active UF data (custom or built-in)
   const customUF = localStorage.getItem('af_uf_data');
   const ufMap = customUF ? JSON.parse(customUF) : UF_DATA_2026;
-  // Find today or most recent
   if(ufMap[today]) return {value: ufMap[today], date: today};
-  // Find closest previous date
   const dates = Object.keys(ufMap).filter(d => d <= today).sort().reverse();
   if(dates.length) return {value: ufMap[dates[0]], date: dates[0]};
   return null;
 }
 
 function openMantenedorUF(){
-  // Show UF del día
-  const uf = getUFhoy();
-  const ufEl = document.getElementById('ufHoy');
-  if(uf){
-    const d = new Date(uf.date + 'T12:00:00').toLocaleDateString('es-CL', {day:'numeric',month:'long',year:'numeric'});
-    ufEl.innerHTML = `<strong style="font-size:18px;color:#1B5E20">${uf.value.toLocaleString('es-CL', {minimumFractionDigits:2, maximumFractionDigits:2})}</strong><br><span style="font-size:11px;color:#666">UF del día — $\{d}</span>`;
-  } else {
-    ufEl.textContent = 'Sin datos cargados';
-  }
-  const ufData = JSON.parse(localStorage.getItem('af_uf_data') || '{}');
-  const ufKeys = Object.keys(ufData).sort();
-  if(ufKeys.length){
-    const fmt = k => new Date(k+'T12:00:00').toLocaleDateString('es-CL');
-    document.getElementById('ufLastUpdate').textContent = 'Actualizado: ' + fmt(ufKeys[0]) + ' hasta el ' + fmt(ufKeys[ufKeys.length-1]) + ' (' + ufKeys.length + ' valores)';
-  } else {
-    const lastUF = localStorage.getItem('af_uf_upload_date');
-    document.getElementById('ufLastUpdate').textContent = lastUF ? 'Actualizado: ' + lastUF : '';
-  }
-
-  // Load saved tasas
-  const tasas = JSON.parse(localStorage.getItem('af_tasas') || '{}');
-  const desde = tasas.desde1 || tasas.desde2 || '';
-  const hasta = tasas.hasta1 || tasas.hasta2 || '';
-  document.getElementById('tasaDesde1').value = desde;
-  document.getElementById('tasaHasta1').value = hasta;
-  // Keep hidden fields in sync for backend compatibility
-  const d2 = document.getElementById('tasaDesde2');
-  const h2 = document.getElementById('tasaHasta2');
-  if(d2) d2.value = desde;
-  if(h2) h2.value = hasta;
-  document.getElementById('tasaAnual1').value = tasas.anual1 || '';
-  document.getElementById('tasaAnual2').value = tasas.anual2 || '';
-  calcTasaMensual(1); calcTasaMensual(2);
-  const lastSave = localStorage.getItem('af_tasas_lastmod');
-  document.getElementById('tasasLastSave').textContent = lastSave ? 'Guardadas: ' + lastSave : 'Sin datos guardados';
-
-  // Render financiera table
+  // Render financiera table (UF y Tasas eliminados — se usan datos del sistema principal)
   _financieraEditData = null;
   renderFinancieraTable();
   const lastFin = localStorage.getItem('af_financiera_lastmod');
   const finSaveEl = document.getElementById('financieraLastSave');
   if(finSaveEl) finSaveEl.textContent = lastFin ? 'Guardada: ' + lastFin : '';
-
   document.getElementById('mantenedorOverlay').classList.add('active');
 }
 
@@ -2606,92 +2497,11 @@ function closeMantenedorUF(){
   document.getElementById('mantenedorOverlay').classList.remove('active');
 }
 
-function calcTasaMensual(tramo){
-  const anual = parseFloat(document.getElementById('tasaAnual'+tramo).value) || 0;
-  const mensual = anual > 0 ? (anual / 12).toFixed(2) : '—';
-  document.getElementById('tasaMensual'+tramo).textContent = anual > 0 ? mensual + ' %' : '—';
-}
-
-function syncTasaFechas(tipo){
-  // Keep both tramos with the same dates
-  if(tipo === 'desde'){
-    const v = document.getElementById('tasaDesde1').value;
-    const el2 = document.getElementById('tasaDesde2');
-    if(el2) el2.value = v;
-  } else {
-    const v = document.getElementById('tasaHasta1').value;
-    const el2 = document.getElementById('tasaHasta2');
-    if(el2) el2.value = v;
-  }
-}
-
-function saveTasas(){
-  const anual1 = parseFloat(document.getElementById('tasaAnual1').value) || 0;
-  const anual2 = parseFloat(document.getElementById('tasaAnual2').value) || 0;
-  const sharedDesde = document.getElementById('tasaDesde1').value;
-  const sharedHasta = document.getElementById('tasaHasta1').value;
-  const tasas = {
-    desde1: sharedDesde,
-    hasta1: sharedHasta,
-    desde2: sharedDesde,
-    hasta2: sharedHasta,
-    anual1: anual1,
-    anual2: anual2,
-    mensual1: parseFloat((anual1 / 12).toFixed(2)) || 0,
-    mensual2: parseFloat((anual2 / 12).toFixed(2)) || 0,
-  };
-  localStorage.setItem('af_tasas', JSON.stringify(tasas));
-  const now = new Date().toLocaleDateString('es-CL') + ' ' + new Date().toLocaleTimeString('es-CL',{hour:'2-digit',minute:'2-digit'});
-  const mod = now + ' — ' + (currentUser ? currentUser.name : '');
-  localStorage.setItem('af_tasas_lastmod', mod);
-  // Sync to Supabase
-  dbSetParam('tasas', JSON.stringify(tasas));
-  document.getElementById('tasasLastSave').textContent = 'Guardadas: ' + mod;
-  showToast('✓ Tasas guardadas correctamente');
-}
-
-function loadUFcsv(input){
-  const file = input.files[0];
-  if(!file) return;
-  const reader = new FileReader();
-  reader.onload = function(e){
-    try{
-      const text = e.target.result;
-      const lines = text.split('\n');
-      const months = ['Ene','Feb','Mar','Abr','May','Jun','Jul','Ago','Sep','Oct','Nov','Dic'];
-      const year = new Date().getFullYear();
-      const ufMap = {};
-      for(let i=1; i<lines.length; i++){
-        const parts = lines[i].trim().split(';');
-        if(!parts[0]) continue;
-        const day = parseInt(parts[0]);
-        if(isNaN(day)) continue;
-        for(let m=0; m<12; m++){
-          const val = (parts[m+1]||'').trim().replace(/\./g,'').replace(',','.');
-          if(!val) continue;
-          const v = parseFloat(val);
-          if(isNaN(v)) continue;
-          const key = year+'-'+String(m+1).padStart(2,'0')+'-'+String(day).padStart(2,'0');
-          ufMap[key] = v;
-        }
-      }
-      localStorage.setItem('af_uf_data', JSON.stringify(ufMap));
-      const now = new Date().toLocaleDateString('es-CL');
-      localStorage.setItem('af_uf_upload_date', now + ' (' + Object.keys(ufMap).length + ' valores)');
-      dbSetParam('uf_data', JSON.stringify(ufMap));
-      document.getElementById('ufUploadStatus').innerHTML = '<span style="color:#2E7D32">✓ ' + Object.keys(ufMap).length + ' valores cargados</span>';
-      const ufKeys2 = Object.keys(ufMap).sort();
-      const fmt2 = k => new Date(k+'T12:00:00').toLocaleDateString('es-CL');
-      document.getElementById('ufLastUpdate').textContent = ufKeys2.length ? 'Actualizado: ' + fmt2(ufKeys2[0]) + ' hasta el ' + fmt2(ufKeys2[ufKeys2.length-1]) + ' (' + ufKeys2.length + ' valores)' : 'Actualizado: ' + now;
-      // Refresh UF display
-      openMantenedorUF();
-      showToast('✓ UF actualizada: ' + Object.keys(ufMap).length + ' valores');
-    } catch(err){
-      document.getElementById('ufUploadStatus').innerHTML = '<span style="color:#C62828">✗ Error: ' + err.message + '</span>';
-    }
-  };
-  reader.readAsText(file, 'utf-8');
-}
+// Stubs: UF y Tasas eliminados del mantenedor (se usan datos del sistema principal)
+function calcTasaMensual(){}
+function syncTasaFechas(){}
+function saveTasas(){ showToast('Las tasas se gestionan desde el menú principal del sistema'); }
+function loadUFcsv(){ showToast('La UF se obtiene automáticamente del sistema principal'); }
 
 // ========== EXCEPCIONES ==========
 
@@ -4402,48 +4212,50 @@ function pendingForReview(){
   return cartas.filter(c => c.status==='PENDIENTE' && c.creadoPor !== currentUser.login);
 }
 
-// ========== LOGIN ==========
+// ========== LOGIN — controlado por sesión del sistema principal ==========
+
+// Mapeo de perfil del sistema principal → perfil cartas
+function _mapPerfil(perfilSistema){
+  if(!perfilSistema) return 'EJECUTIVO';
+  const p = String(perfilSistema).toUpperCase();
+  if(p.includes('ADMIN')) return 'ADMIN';
+  if(p.includes('SUPERV') || p.includes('ANALISTA') || p.includes('GERENTE')) return 'SUPERVISOR';
+  return 'EJECUTIVO';
+}
+
+// Inicia sesión directo desde el token del sistema principal
 async function doLogin(){
-  const login = document.getElementById('loginUser').value.trim();
-  const pass = document.getElementById('loginPass').value;
-  const btn = document.querySelector('.btn-login');
-  btn.textContent = 'Verificando...'; btn.disabled = true;
+  const tok = localStorage.getItem('af_token');
+  if(!tok){ location.href='/login.html'; return; }
   try {
-    const {data, error} = await supa.from('af_users').select('*').eq('login', login).eq('pass', pass).maybeSingle();
-    if(error){
-      document.getElementById('loginError').textContent = 'Error de conexión: ' + (error.message || error.code || JSON.stringify(error));
-      btn.textContent = 'INGRESAR'; btn.disabled = false;
-      return;
-    }
-    // Supabase source of truth; fallback to local users if table is empty/unseeded
-    let userData = data;
-    if(!userData){
-      userData = users.find(u => u.login === login && u.pass === pass) || null;
-    }
-    if(!userData){
-      document.getElementById('loginError').textContent = 'Usuario o contraseña incorrectos';
-      btn.textContent = 'INGRESAR'; btn.disabled = false;
-      return;
-    }
-    currentUser = {login: userData.login, name: userData.name, pass: userData.pass,
-      perfil: userData.perfil, initials: userData.initials||'', mail: userData.mail||'', tel: userData.tel||''};
+    const r = await fetch('/api/auth/me', { headers:{ 'Authorization':'Bearer '+tok } });
+    if(!r.ok){ location.href='/login.html'; return; }
+    const { data } = await r.json();
+    const perfilCartas = _mapPerfil(data.perfil);
+    currentUser = {
+      login:    data.usuario || data.email || 'usuario',
+      name:     data.nombre  || data.name  || 'Usuario',
+      pass:     '',
+      perfil:   perfilCartas,
+      initials: (data.nombre||'U').split(' ').map(w=>w[0]).slice(0,2).join('').toUpperCase(),
+      mail:     data.email   || '',
+      tel:      data.tel     || ''
+    };
     document.getElementById('loginPage').style.display='none';
     document.getElementById('app').style.display='block';
     document.getElementById('headerUser').textContent = currentUser.name + ' (' + currentUser.perfil + ')';
+    // Cargar UF del sistema principal en caché
+    _fetchUFfromAPI().then(uf => { if(uf) _ufCache = uf; });
     await initApp();
   } catch(e) {
-    document.getElementById('loginError').textContent = 'Error: ' + (e.message || JSON.stringify(e));
-    btn.textContent = 'INGRESAR'; btn.disabled = false;
+    location.href='/login.html';
   }
 }
 
 function doLogout(){
   currentUser = null;
-  document.getElementById('loginPage').style.display='flex';
-  document.getElementById('app').style.display='none';
-  document.getElementById('loginUser').value='';
-  document.getElementById('loginPass').value='';
-  document.getElementById('loginError').textContent='';
+  // Cerrar sesión vuelve al menú principal del sistema
+  location.href = '/';
 }
 
 async function initApp(){
@@ -6106,24 +5918,8 @@ function closeModal(){ document.getElementById('modalOverlay').classList.remove(
 function closeRevModal(){ document.getElementById('revModalOverlay').classList.remove('active'); }
 function goRevision(){ closeRevModal(); showPage('revPage'); }
 
-// Enter key for login
-document.getElementById('loginPass').addEventListener('keydown',e=>{ if(e.key==='Enter') doLogin(); });
-
-// ── Auto-login: si el usuario ya está autenticado en el sistema AutoFácil ──
-(function autoLoginFromMainSystem() {
-  const afToken = localStorage.getItem('af_token');
-  if (!afToken) return; // no hay sesión principal, mostrar login normal
-  // Verificar que el token del sistema principal sea válido
-  fetch('/api/auth/me', {
-    headers: { 'Authorization': 'Bearer ' + afToken, 'Content-Type': 'application/json' }
-  }).then(r => r.ok ? r.json() : null).then(j => {
-    if (!j || !j.data) return; // token inválido
-    // Token válido → auto-login con credenciales de la aplicación
-    document.getElementById('loginUser').value = 'admin';
-    document.getElementById('loginPass').value = 'clave 1010';
-    doLogin();
-  }).catch(() => {});
-})();
+// ── Arranque: iniciar sesión directo desde el token del sistema principal ──
+doLogin();
 </script>
 </body>
 </html>
