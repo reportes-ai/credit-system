@@ -237,9 +237,14 @@ const getAll = async (req, res) => {
     const params = [];
 
     if (q && q.trim()) {
-      const like = `%${q.trim().toUpperCase()}%`;
-      sql += ` AND (UPPER(ob.rut_cliente) LIKE ? OR UPPER(ob.nombre_cliente) LIKE ?
-               OR UPPER(COALESCE(ob.numero_credito, CONCAT('OP-',ob.num_op))) LIKE ?)`;
+      // Normalizar: quitar puntos para comparar RUTs con/sin formato (77.267.903-3 = 77267903-3)
+      const qNorm = q.trim().toUpperCase().replace(/\./g, '');
+      const like  = `%${qNorm}%`;
+      sql += ` AND (
+        UPPER(REPLACE(ob.rut_cliente,'.',''))       LIKE ? OR
+        UPPER(ob.nombre_cliente)                    LIKE ? OR
+        UPPER(COALESCE(ob.numero_credito, CONCAT('OP-',ob.num_op))) LIKE ?
+      )`;
       params.push(like, like, like);
     }
     sql += ` ORDER BY ob.mes DESC, ob.id DESC LIMIT 5000`;
