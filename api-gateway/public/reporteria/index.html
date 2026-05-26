@@ -10,8 +10,6 @@
   <style>
     :root { --navy:#001345; --blue:#0141A2; --sky:#009AFE; }
     body { background:#f0f4f8; font-family:'Segoe UI',system-ui,sans-serif; }
-
-    /* ── Topnav ─────────────────────────────────────────────────────── */
     .topnav { background:linear-gradient(90deg,#012d70,#0255c5); color:#fff; height:60px; padding:0 24px; display:flex; align-items:center; justify-content:space-between; position:sticky; top:0; z-index:200; box-shadow:0 2px 8px rgba(0,0,0,.3); }
     .topnav-left { display:flex; align-items:center; gap:16px; }
     .topnav-brand { display:flex; align-items:center; gap:8px; text-decoration:none; }
@@ -27,90 +25,32 @@
     .perfil-badge { background:rgba(144,202,249,.2); border:1px solid rgba(144,202,249,.4); color:#90caf9; border-radius:12px; padding:2px 10px; font-size:.73rem; font-weight:600; }
     .btn-logout { background:rgba(255,255,255,.1); border:1px solid rgba(255,255,255,.2); color:#fff; border-radius:8px; padding:5px 12px; font-size:.82rem; cursor:pointer; transition:background .2s; }
     .btn-logout:hover { background:rgba(255,255,255,.22); }
-
-    /* ── Layout ──────────────────────────────────────────────────────── */
     .page-wrap { max-width:1060px; margin:28px auto; padding:0 24px 60px; }
-
-    /* ── Banner ──────────────────────────────────────────────────────── */
-    .page-banner {
-      background:linear-gradient(135deg,#012d70,#0141A2 55%,#009AFE);
-      border-radius:16px; color:#fff; padding:28px 36px; margin-bottom:28px;
-      display:flex; align-items:center; gap:20px;
-    }
+    .page-banner { background:linear-gradient(135deg,#012d70,#0141A2 55%,#009AFE); border-radius:16px; color:#fff; padding:28px 36px; margin-bottom:28px; display:flex; align-items:center; gap:20px; }
     .page-banner > i { font-size:3rem; opacity:.8; }
     .page-banner h2 { font-weight:700; margin:0 0 4px; font-size:1.35rem; }
     .page-banner p { opacity:.8; margin:0; font-size:.88rem; }
-
-    /* ── Section title ──────────────────────────────────────────────── */
-    .section-title {
-      font-size:.75rem; font-weight:700; color:#6b7280;
-      text-transform:uppercase; letter-spacing:.1em;
-      display:flex; align-items:center; gap:10px; margin-bottom:16px;
-    }
+    .section-title { font-size:.75rem; font-weight:700; color:#6b7280; text-transform:uppercase; letter-spacing:.1em; display:flex; align-items:center; gap:10px; margin-bottom:16px; }
     .section-title::after { content:''; flex:1; height:1px; background:#e5e7eb; }
-
-    /* ── Cards grid ──────────────────────────────────────────────────── */
     .reports-grid { display:grid; grid-template-columns:repeat(3,1fr); gap:20px; }
-    @media(max-width:768px) { .reports-grid { grid-template-columns:1fr 1fr; } }
-    @media(max-width:480px) { .reports-grid { grid-template-columns:1fr; } }
-
-    /* ── Report card ─────────────────────────────────────────────────── */
-    .report-card {
-      background:#fff; border-radius:14px; padding:28px 24px;
-      border:2px solid transparent;
-      box-shadow:0 1px 6px rgba(0,0,0,.07);
-      cursor:pointer; text-decoration:none; color:inherit;
-      display:flex; flex-direction:column; gap:0;
-      transition:transform .16s, box-shadow .16s, border-color .16s;
-      position:relative; overflow:hidden;
-    }
-    .report-card:hover {
-      transform:translateY(-4px);
-      box-shadow:0 12px 32px rgba(1,65,162,.13);
-      border-color:var(--blue); color:inherit;
-    }
-    .report-card.disabled {
-      cursor:default; opacity:.65;
-    }
-    .report-card.disabled:hover {
-      transform:none; box-shadow:0 1px 6px rgba(0,0,0,.07); border-color:transparent;
-    }
-
-    /* Accent strip top */
-    .report-card::before {
-      content:''; position:absolute; top:0; left:0; right:0; height:3px;
-      background:var(--card-accent, linear-gradient(90deg,var(--blue),var(--sky)));
-      opacity:0; transition:opacity .16s;
-    }
+    @media(max-width:768px){ .reports-grid{ grid-template-columns:1fr 1fr; } }
+    @media(max-width:480px){ .reports-grid{ grid-template-columns:1fr; } }
+    .report-card { background:#fff; border-radius:14px; padding:28px 24px; border:2px solid transparent; box-shadow:0 1px 6px rgba(0,0,0,.07); cursor:pointer; text-decoration:none; color:inherit; display:flex; flex-direction:column; transition:transform .16s,box-shadow .16s,border-color .16s; position:relative; overflow:hidden; }
+    .report-card:hover { transform:translateY(-4px); box-shadow:0 12px 32px rgba(1,65,162,.13); border-color:var(--blue); color:inherit; }
+    .report-card.disabled { cursor:default; opacity:.65; }
+    .report-card.disabled:hover { transform:none; box-shadow:0 1px 6px rgba(0,0,0,.07); border-color:transparent; }
+    .report-card::before { content:''; position:absolute; top:0; left:0; right:0; height:3px; background:var(--card-accent,linear-gradient(90deg,var(--blue),var(--sky))); opacity:0; transition:opacity .16s; }
     .report-card:hover::before { opacity:1; }
-
-    .card-icon-wrap {
-      width:52px; height:52px; border-radius:13px; margin-bottom:16px;
-      display:flex; align-items:center; justify-content:center;
-      font-size:1.55rem; flex-shrink:0;
-      transition:background .16s, color .16s;
-    }
+    .card-icon-wrap { width:52px; height:52px; border-radius:13px; margin-bottom:16px; display:flex; align-items:center; justify-content:center; font-size:1.55rem; flex-shrink:0; transition:background .16s,color .16s; }
     .report-card h6 { font-weight:700; font-size:.97rem; margin:0 0 6px; color:#111827; }
-    .report-card p  { font-size:.8rem; color:#6b7280; margin:0 0 18px; line-height:1.45; flex:1; }
+    .report-card p { font-size:.8rem; color:#6b7280; margin:0 0 18px; line-height:1.45; flex:1; }
     .card-footer-row { display:flex; align-items:center; justify-content:space-between; }
-    .badge-status {
-      font-size:.68rem; font-weight:700; border-radius:8px; padding:3px 9px;
-      display:inline-flex; align-items:center; gap:4px;
-    }
-    .badge-status.activo   { background:#dcfce7; color:#166534; }
-    .badge-status.pronto   { background:#fef9c3; color:#854d0e; }
-    .btn-abrir {
-      background:var(--blue); color:#fff; border:none; border-radius:8px;
-      padding:7px 16px; font-size:.8rem; font-weight:600; cursor:pointer;
-      display:inline-flex; align-items:center; gap:5px; transition:background .15s;
-    }
+    .badge-status { font-size:.68rem; font-weight:700; border-radius:8px; padding:3px 9px; display:inline-flex; align-items:center; gap:4px; }
+    .badge-status.activo { background:#dcfce7; color:#166534; }
+    .badge-status.pronto { background:#fef9c3; color:#854d0e; }
+    .btn-abrir { background:var(--blue); color:#fff; border:none; border-radius:8px; padding:7px 16px; font-size:.8rem; font-weight:600; cursor:pointer; display:inline-flex; align-items:center; gap:5px; transition:background .15s; }
     .btn-abrir:hover { background:var(--sky); }
-
-    /* ── Tailor Made card – especial ─────────────────────────────────── */
-    .report-card.tailor {
-      --card-accent: linear-gradient(90deg,#7c3aed,#a855f7,#ec4899);
-      background:linear-gradient(145deg,#faf5ff,#fff);
-    }
+    .report-card.tailor { --card-accent:linear-gradient(90deg,#7c3aed,#a855f7,#ec4899); background:linear-gradient(145deg,#faf5ff,#fff); }
     .report-card.tailor .card-icon-wrap { background:linear-gradient(135deg,#ede9fe,#fce7f3); color:#7c3aed; }
     .report-card.tailor:hover .card-icon-wrap { background:linear-gradient(135deg,#7c3aed,#a855f7); color:#fff; }
     .report-card.tailor h6 { color:#4c1d95; }
@@ -118,12 +58,11 @@
 </head>
 <body>
 
-<!-- ── Topnav ─────────────────────────────────────────────────── -->
 <nav class="topnav">
   <div class="topnav-left">
     <a href="/" class="topnav-brand">
       <img src="/img/logo.png" alt="AutoFácil">
-      <span class="version-badge" id="versionBadge">v1.0</span>
+      <span class="version-badge" id="versionBadge">v1.1</span>
     </a>
     <div class="breadcrumb-nav">
       <a href="/">Inicio</a><span class="sep">›</span>
@@ -146,8 +85,6 @@
 </nav>
 
 <div class="page-wrap">
-
-  <!-- ── Banner ─────────────────────────────────────────────────── -->
   <div class="page-banner">
     <i class="bi bi-bar-chart-line"></i>
     <div>
@@ -155,17 +92,12 @@
       <p>Informes, exportaciones y reportes personalizados del sistema</p>
     </div>
   </div>
-
-  <!-- ── Grid de reportes ───────────────────────────────────────── -->
   <div class="section-title"><i class="bi bi-grid-3x3-gap"></i>Reportes disponibles</div>
-
   <div class="reports-grid">
-
-    <!-- ── Tailor Made ────────────────────────────────── -->
     <div class="report-card tailor" onclick="abrirTailorMade()">
       <div class="card-icon-wrap"><i class="bi bi-sliders2"></i></div>
       <h6>Tailor Made</h6>
-      <p>Construye tu propio reporte: elige campos, filtra datos y exporta exactamente lo que necesitas.</p>
+      <p>Construye tu propio reporte: elige campos, aplica filtros específicos por tipo y exporta exactamente lo que necesitas.</p>
       <div class="card-footer-row">
         <span class="badge-status activo"><i class="bi bi-check-circle-fill"></i>Disponible</span>
         <button class="btn-abrir" style="background:linear-gradient(135deg,#7c3aed,#a855f7)">
@@ -173,46 +105,34 @@
         </button>
       </div>
     </div>
-
-    <!-- ── Placeholder 2 ─────────────────────────────── -->
     <div class="report-card disabled">
       <div class="card-icon-wrap" style="background:#f0f4f8;color:#94a3b8"><i class="bi bi-file-earmark-bar-graph"></i></div>
       <h6 style="color:#9ca3af">Cartera de Créditos</h6>
       <p>Resumen de la cartera activa, estados, montos financiados y distribución por ejecutivo.</p>
-      <div class="card-footer-row">
-        <span class="badge-status pronto"><i class="bi bi-clock"></i>Próximamente</span>
-      </div>
+      <div class="card-footer-row"><span class="badge-status pronto"><i class="bi bi-clock"></i>Próximamente</span></div>
     </div>
-
-    <!-- ── Placeholder 3 ─────────────────────────────── -->
     <div class="report-card disabled">
       <div class="card-icon-wrap" style="background:#f0f4f8;color:#94a3b8"><i class="bi bi-cash-coin"></i></div>
       <h6 style="color:#9ca3af">Cobranza y Mora</h6>
       <p>Detalle de cuotas vencidas, tasas de mora, recuperación y seguimiento de deudores.</p>
-      <div class="card-footer-row">
-        <span class="badge-status pronto"><i class="bi bi-clock"></i>Próximamente</span>
-      </div>
+      <div class="card-footer-row"><span class="badge-status pronto"><i class="bi bi-clock"></i>Próximamente</span></div>
     </div>
-
   </div>
-
-</div><!-- /page-wrap -->
+</div>
 
 <!-- ═══════════════════════════════════════════════════════════════
-     PANEL: TAILOR MADE
+     PANEL TAILOR MADE
 ═══════════════════════════════════════════════════════════════ -->
-<div id="panelTailor" style="display:none; position:fixed; inset:0; background:rgba(0,0,0,.5); z-index:500; overflow-y:auto; padding:24px 16px;">
-  <div style="background:#fff; border-radius:18px; max-width:820px; margin:0 auto; box-shadow:0 24px 64px rgba(0,0,0,.22); overflow:hidden;">
+<div id="panelTailor" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.52);z-index:500;overflow-y:auto;padding:20px 12px;">
+  <div style="background:#fff;border-radius:18px;max-width:900px;margin:0 auto;box-shadow:0 24px 64px rgba(0,0,0,.24);overflow:hidden;">
 
-    <!-- Header del panel -->
-    <div style="background:linear-gradient(135deg,#4c1d95,#7c3aed,#a855f7); padding:24px 28px; display:flex; align-items:center; justify-content:space-between;">
+    <!-- Header -->
+    <div style="background:linear-gradient(135deg,#4c1d95,#7c3aed,#a855f7);padding:22px 28px;display:flex;align-items:center;justify-content:space-between;">
       <div style="display:flex;align-items:center;gap:14px">
-        <div style="width:44px;height:44px;background:rgba(255,255,255,.15);border-radius:12px;display:flex;align-items:center;justify-content:center;font-size:1.4rem;color:#fff">
-          <i class="bi bi-sliders2"></i>
-        </div>
+        <div style="width:44px;height:44px;background:rgba(255,255,255,.15);border-radius:12px;display:flex;align-items:center;justify-content:center;font-size:1.4rem;color:#fff"><i class="bi bi-sliders2"></i></div>
         <div>
           <div style="font-weight:700;font-size:1.1rem;color:#fff">Tailor Made</div>
-          <div style="font-size:.8rem;color:rgba(255,255,255,.75)">Selecciona campos y genera tu reporte personalizado</div>
+          <div style="font-size:.8rem;color:rgba(255,255,255,.75)">Selecciona campos · Filtra por tipo · Exporta a Excel</div>
         </div>
       </div>
       <button onclick="cerrarTailor()" style="background:rgba(255,255,255,.15);border:none;color:#fff;border-radius:8px;padding:7px 14px;font-size:.85rem;cursor:pointer;display:flex;align-items:center;gap:6px">
@@ -220,13 +140,11 @@
       </button>
     </div>
 
-    <div style="padding:28px;">
+    <div style="padding:24px 28px">
 
-      <!-- Módulo a exportar -->
-      <div style="margin-bottom:20px">
-        <label style="font-size:.8rem;font-weight:700;color:#374151;display:block;margin-bottom:8px">
-          <i class="bi bi-database me-1" style="color:#7c3aed"></i>Módulo de datos
-        </label>
+      <!-- Módulo -->
+      <div style="margin-bottom:18px">
+        <label style="font-size:.78rem;font-weight:700;color:#374151;display:block;margin-bottom:8px"><i class="bi bi-database me-1" style="color:#7c3aed"></i>Módulo de datos</label>
         <div style="display:flex;flex-wrap:wrap;gap:8px" id="modulos-btns">
           <button class="mod-btn active" data-mod="creditos"  onclick="seleccionarModulo(this)"><i class="bi bi-credit-card me-1"></i>Créditos</button>
           <button class="mod-btn"        data-mod="clientes"  onclick="seleccionarModulo(this)"><i class="bi bi-people me-1"></i>Clientes</button>
@@ -235,58 +153,55 @@
         </div>
       </div>
 
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:20px">
-
-        <!-- Columna izquierda: Campos disponibles -->
+      <!-- Campos disponibles / Campos del reporte -->
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:18px">
         <div>
-          <label style="font-size:.8rem;font-weight:700;color:#374151;display:block;margin-bottom:8px">
+          <label style="font-size:.78rem;font-weight:700;color:#374151;display:block;margin-bottom:6px">
             <i class="bi bi-list-check me-1" style="color:#7c3aed"></i>Campos disponibles
-            <span style="font-weight:400;color:#9ca3af;font-size:.75rem"> (clic para seleccionar)</span>
+            <span style="font-weight:400;color:#9ca3af;font-size:.73rem"> — clic para agregar</span>
           </label>
-          <div style="border:1.5px solid #e2e8f0;border-radius:10px;max-height:280px;overflow-y:auto" id="campos-disponibles"></div>
+          <div style="border:1.5px solid #e2e8f0;border-radius:10px;max-height:260px;overflow-y:auto" id="campos-disponibles"></div>
         </div>
-
-        <!-- Columna derecha: Campos seleccionados -->
         <div>
-          <label style="font-size:.8rem;font-weight:700;color:#374151;display:block;margin-bottom:8px">
-            <i class="bi bi-table me-1" style="color:#7c3aed"></i>Campos del reporte
-            <span id="sel-count" style="font-weight:400;color:#9ca3af;font-size:.75rem"> (0 seleccionados)</span>
+          <label style="font-size:.78rem;font-weight:700;color:#374151;display:block;margin-bottom:6px">
+            <i class="bi bi-table me-1" style="color:#7c3aed"></i>Columnas del reporte
+            <span id="sel-count" style="font-weight:400;color:#9ca3af;font-size:.73rem"> (0)</span>
           </label>
-          <div style="border:1.5px solid #e2e8f0;border-radius:10px;max-height:280px;overflow-y:auto" id="campos-seleccionados">
-            <div style="padding:24px;text-align:center;color:#9ca3af;font-size:.82rem">
-              <i class="bi bi-arrow-left" style="display:block;font-size:1.5rem;margin-bottom:6px;opacity:.4"></i>
-              Selecciona campos desde la lista
-            </div>
+          <div style="border:1.5px solid #e2e8f0;border-radius:10px;max-height:260px;overflow-y:auto" id="campos-seleccionados"></div>
+        </div>
+      </div>
+
+      <!-- ── Filtros dinámicos ────────────────────────────────────── -->
+      <div style="background:#faf5ff;border:1.5px solid #ede9fe;border-radius:12px;padding:16px;margin-bottom:18px">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px">
+          <span style="font-size:.78rem;font-weight:700;color:#374151">
+            <i class="bi bi-funnel-fill me-1" style="color:#7c3aed"></i>Filtros activos
+            <span id="filtros-count" style="font-weight:400;color:#9ca3af"></span>
+          </span>
+          <button onclick="limpiarFiltros()" style="background:none;border:none;color:#7c3aed;font-size:.75rem;font-weight:600;cursor:pointer;padding:2px 6px;border-radius:5px">
+            <i class="bi bi-eraser me-1"></i>Limpiar todo
+          </button>
+        </div>
+        <div id="filtros-dinamicos">
+          <div style="color:#9ca3af;font-size:.8rem;text-align:center;padding:12px">
+            Selecciona campos para activar sus filtros
           </div>
         </div>
       </div>
 
-      <!-- Filtros -->
-      <div style="margin-top:20px;background:#faf5ff;border-radius:10px;padding:16px">
-        <div style="font-size:.8rem;font-weight:700;color:#374151;margin-bottom:12px"><i class="bi bi-funnel me-1" style="color:#7c3aed"></i>Filtros</div>
-        <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px" id="filtros-area">
-          <div>
-            <label style="font-size:.75rem;font-weight:600;color:#6b7280;display:block;margin-bottom:4px">Desde</label>
-            <input type="date" id="f-desde" style="width:100%;border:1.5px solid #d1d5db;border-radius:7px;padding:7px 10px;font-size:.85rem">
-          </div>
-          <div>
-            <label style="font-size:.75rem;font-weight:600;color:#6b7280;display:block;margin-bottom:4px">Hasta</label>
-            <input type="date" id="f-hasta" style="width:100%;border:1.5px solid #d1d5db;border-radius:7px;padding:7px 10px;font-size:.85rem">
-          </div>
-          <div id="filtro-extra"></div>
-        </div>
-      </div>
-
-      <!-- Vista previa + acciones -->
-      <div style="margin-top:20px">
-        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;flex-wrap:wrap;gap:8px">
-          <label style="font-size:.8rem;font-weight:700;color:#374151"><i class="bi bi-eye me-1" style="color:#7c3aed"></i>Vista previa <span id="preview-count" style="font-weight:400;color:#9ca3af"></span></label>
+      <!-- Vista previa -->
+      <div>
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;flex-wrap:wrap;gap:8px">
+          <span style="font-size:.78rem;font-weight:700;color:#374151">
+            <i class="bi bi-eye me-1" style="color:#7c3aed"></i>Vista previa
+            <span id="preview-count" style="font-weight:400;color:#9ca3af"></span>
+          </span>
           <div style="display:flex;gap:8px">
             <button onclick="previsualizarReporte()" style="background:#ede9fe;color:#5b21b6;border:none;border-radius:7px;padding:7px 16px;font-size:.82rem;font-weight:600;cursor:pointer;display:flex;align-items:center;gap:5px">
-              <i class="bi bi-eye"></i> Previsualizar
+              <i class="bi bi-eye"></i>Previsualizar
             </button>
-            <button onclick="exportarExcel()" id="btnExport" style="background:linear-gradient(135deg,#16a34a,#22c55e);color:#fff;border:none;border-radius:7px;padding:7px 16px;font-size:.82rem;font-weight:600;cursor:pointer;display:flex;align-items:center;gap:5px">
-              <i class="bi bi-file-earmark-excel"></i> Exportar Excel
+            <button onclick="exportarCSV()" style="background:linear-gradient(135deg,#16a34a,#22c55e);color:#fff;border:none;border-radius:7px;padding:7px 16px;font-size:.82rem;font-weight:600;cursor:pointer;display:flex;align-items:center;gap:5px">
+              <i class="bi bi-file-earmark-excel"></i>Exportar Excel
             </button>
           </div>
         </div>
@@ -298,281 +213,456 @@
         </div>
       </div>
 
-    </div><!-- /padding -->
+    </div>
   </div>
 </div>
 
+<!-- ── Estilos del panel ─────────────────────────────────────── -->
 <style>
+  /* Módulo btns */
   .mod-btn { background:#f1f5f9; border:1.5px solid #e2e8f0; color:#374151; border-radius:8px; padding:7px 16px; font-size:.83rem; font-weight:600; cursor:pointer; transition:background .15s; }
   .mod-btn:hover { background:#ede9fe; border-color:#c4b5fd; color:#5b21b6; }
   .mod-btn.active { background:#7c3aed; border-color:#7c3aed; color:#fff; }
-  .campo-item { display:flex; align-items:center; padding:8px 14px; border-bottom:1px solid #f1f5f9; cursor:pointer; font-size:.83rem; gap:8px; transition:background .12s; }
+
+  /* Campos */
+  .campo-item { display:flex; align-items:center; padding:8px 12px; border-bottom:1px solid #f1f5f9; cursor:pointer; font-size:.82rem; gap:8px; transition:background .12s; }
   .campo-item:last-child { border-bottom:none; }
   .campo-item:hover { background:#f8fafc; }
-  .campo-item.selected { background:#faf5ff; color:#5b21b6; }
-  .campo-item .campo-check { width:16px; height:16px; border-radius:4px; border:1.5px solid #d1d5db; flex-shrink:0; display:flex; align-items:center; justify-content:center; font-size:.65rem; }
-  .campo-item.selected .campo-check { background:#7c3aed; border-color:#7c3aed; color:#fff; }
-  .sel-chip { display:flex; align-items:center; justify-content:space-between; padding:7px 12px; border-bottom:1px solid #f1f5f9; font-size:.82rem; }
-  .sel-chip:last-child { border-bottom:none; }
-  .sel-chip button { background:none; border:none; color:#dc2626; cursor:pointer; padding:0 4px; font-size:.8rem; }
-  .preview-tbl { width:100%; border-collapse:collapse; font-size:.78rem; }
-  .preview-tbl th { background:#f0f4f8; padding:8px 12px; text-align:left; font-size:.7rem; font-weight:700; color:#6b7280; text-transform:uppercase; white-space:nowrap; position:sticky; top:0; }
-  .preview-tbl td { padding:7px 12px; border-bottom:1px solid #f1f5f9; white-space:nowrap; }
+  .campo-item.sel { background:#faf5ff; color:#5b21b6; }
+  .campo-chk { width:16px; height:16px; border-radius:4px; border:1.5px solid #d1d5db; flex-shrink:0; display:flex; align-items:center; justify-content:center; font-size:.62rem; color:transparent; }
+  .campo-item.sel .campo-chk { background:#7c3aed; border-color:#7c3aed; color:#fff; }
+
+  /* Columnas seleccionadas */
+  .col-chip { display:flex; align-items:center; gap:6px; padding:6px 12px; border-bottom:1px solid #f1f5f9; font-size:.82rem; }
+  .col-chip:last-child { border-bottom:none; }
+  .col-chip .tipo-icon { font-size:.8rem; color:#9ca3af; flex-shrink:0; }
+  .col-chip span { flex:1; }
+  .col-chip button { background:none; border:none; color:#dc2626; cursor:pointer; padding:0 3px; font-size:.78rem; }
+
+  /* Filtros dinámicos */
+  .filtro-card {
+    background:#fff; border:1.5px solid #e9d5ff; border-radius:10px;
+    padding:12px 14px; margin-bottom:10px;
+  }
+  .filtro-card:last-child { margin-bottom:0; }
+  .filtro-label {
+    font-size:.73rem; font-weight:700; color:#5b21b6;
+    display:flex; align-items:center; gap:5px; margin-bottom:8px;
+    text-transform:uppercase; letter-spacing:.04em;
+  }
+  .filtro-label .tipo-badge {
+    background:#ede9fe; color:#7c3aed; border-radius:6px;
+    padding:1px 7px; font-size:.64rem; font-weight:700; margin-left:auto;
+    text-transform:none; letter-spacing:0;
+  }
+  .fi { width:100%; border:1.5px solid #d1d5db; border-radius:7px; padding:6px 10px; font-size:.84rem; color:#1e293b; outline:none; transition:border-color .15s; }
+  .fi:focus { border-color:#7c3aed; box-shadow:0 0 0 3px rgba(124,58,237,.1); }
+  .fi-row { display:grid; grid-template-columns:1fr 1fr; gap:8px; }
+  .fi-lbl { font-size:.7rem; font-weight:600; color:#6b7280; margin-bottom:3px; display:block; }
+  .multi-pills { display:flex; flex-wrap:wrap; gap:6px; }
+  .multi-pill { display:flex; align-items:center; gap:4px; background:#f1f5f9; border:1.5px solid #e2e8f0; border-radius:7px; padding:4px 10px; cursor:pointer; font-size:.78rem; font-weight:600; color:#374151; transition:background .12s; user-select:none; }
+  .multi-pill:has(input:checked) { background:#ede9fe; border-color:#a78bfa; color:#4c1d95; }
+  .multi-pill input { display:none; }
+
+  /* Preview table */
+  .ptbl { width:100%; border-collapse:collapse; font-size:.78rem; }
+  .ptbl th { background:#f0f4f8; padding:8px 12px; text-align:left; font-size:.68rem; font-weight:700; color:#6b7280; text-transform:uppercase; white-space:nowrap; position:sticky; top:0; }
+  .ptbl td { padding:6px 12px; border-bottom:1px solid #f1f5f9; white-space:nowrap; max-width:220px; overflow:hidden; text-overflow:ellipsis; }
 </style>
 
 <script>
 /* ── Auth ─────────────────────────────────────────────────────── */
-function getToken()    { return localStorage.getItem('token'); }
-function apiHeaders()  { return { 'Content-Type':'application/json', 'Authorization':'Bearer '+getToken() }; }
-function logout()      { localStorage.removeItem('token'); localStorage.removeItem('usuario'); location.href='/login.html'; }
+function getToken()   { return localStorage.getItem('token'); }
+function apiHdrs()    { return { 'Content-Type':'application/json', 'Authorization':'Bearer '+getToken() }; }
+function logout()     { localStorage.removeItem('token'); localStorage.removeItem('usuario'); location.href='/login.html'; }
 
-(function checkAuth() {
-  const t = getToken();
-  if (!t) { location.href='/login.html'; return; }
+(function checkAuth(){
+  const t = getToken(); if(!t){ location.href='/login.html'; return; }
   try {
-    const u = JSON.parse(localStorage.getItem('usuario') || '{}');
+    const u = JSON.parse(localStorage.getItem('usuario')||'{}');
     document.getElementById('avatarInicial').textContent = (u.nombre||'?').charAt(0).toUpperCase();
-    document.getElementById('navNombre').textContent = ((u.nombre||'') + ' ' + (u.apellido||'')).trim();
-    document.getElementById('navPerfil').textContent = u.perfil || u.nombre_perfil || '—';
+    document.getElementById('navNombre').textContent = ((u.nombre||'')+' '+(u.apellido||'')).trim();
+    document.getElementById('navPerfil').textContent  = u.perfil||u.nombre_perfil||'—';
     const p = JSON.parse(atob(t.split('.')[1]));
-    if (p.exp * 1000 < Date.now()) logout();
-  } catch(e) { logout(); }
+    if(p.exp*1000 < Date.now()) logout();
+  } catch(e){ logout(); }
 })();
 
 /* ═══════════════════════════════════════════════════════════════
-   TAILOR MADE
+   DEFINICIÓN DE MÓDULOS Y CAMPOS
+   tipo de filtro por campo:
+     texto   → buscar por texto (contiene)
+     multi   → selección múltiple de valores conocidos
+     fecha   → rango de fechas (desde / hasta)
+     monto   → rango numérico en pesos CLP
+     rango   → rango numérico genérico con sufijo
+     pct     → rango porcentual
+     anio    → rango de año
 ═══════════════════════════════════════════════════════════════ */
+const TIPO_ICON = {
+  texto:'bi-fonts', multi:'bi-ui-checks-grid', fecha:'bi-calendar-range',
+  monto:'bi-currency-dollar', rango:'bi-sliders', pct:'bi-percent', anio:'bi-calendar2',
+};
+const TIPO_LABEL = {
+  texto:'Texto', multi:'Selección múltiple', fecha:'Rango de fechas',
+  monto:'Rango de monto', rango:'Rango numérico', pct:'Rango %', anio:'Rango de año',
+};
+
 const MODULOS = {
-  creditos: {
-    label: 'Créditos',
-    campos: [
-      { key:'numero_credito',    label:'N° Crédito'         },
-      { key:'rut_cliente',       label:'RUT Cliente'        },
-      { key:'nombre_cliente',    label:'Nombre Cliente'     },
-      { key:'financiera',        label:'Financiera'         },
-      { key:'estado',            label:'Estado'             },
-      { key:'fecha_otorgamiento',label:'Fecha Otorgamiento' },
-      { key:'valor_vehiculo',    label:'Valor Vehículo'     },
-      { key:'pie',               label:'Pie'                },
-      { key:'monto_financiado',  label:'Monto Financiado'   },
-      { key:'plazo',             label:'Plazo (meses)'      },
-      { key:'tasa_mensual',      label:'Tasa Mensual'       },
-      { key:'cuota',             label:'Cuota'              },
-      { key:'marca',             label:'Marca'              },
-      { key:'modelo',            label:'Modelo'             },
-      { key:'anio',              label:'Año'                },
-      { key:'patente',           label:'Patente'            },
-      { key:'dealer',            label:'Dealer'             },
-      { key:'ejecutivo',         label:'Ejecutivo'          },
-    ],
-    filtroExtra: { key:'estado', label:'Estado', tipo:'select',
-      opciones:['Todos','INGRESO','CARGA_RESPALDOS','EN_ANALISIS','EMISION_DOCUMENTOS','CARGA_DOCUMENTOS_AF','VALIDACION_FIRMA','VIGENTE','RECHAZADO'] }
+  creditos:{
+    label:'Créditos', url:'/api/creditos',
+    campos:[
+      { key:'numero_credito',     label:'N° Crédito',         filtro:{ tipo:'texto' } },
+      { key:'rut_cliente',        label:'RUT Cliente',         filtro:{ tipo:'texto' } },
+      { key:'nombre_cliente',     label:'Nombre Cliente',      filtro:{ tipo:'texto' } },
+      { key:'financiera',         label:'Financiera',          filtro:{ tipo:'multi', opts:['AUTOFACIL','AUTOFIN','UNIDAD DE CREDITO'] } },
+      { key:'estado',             label:'Estado',              filtro:{ tipo:'multi', opts:['INGRESO','CARGA_RESPALDOS','EN_ANALISIS','EMISION_DOCUMENTOS','CARGA_DOCUMENTOS_AF','VALIDACION_FIRMA','VIGENTE','RECHAZADO'] } },
+      { key:'fecha_otorgamiento', label:'Fecha Otorgamiento',  filtro:{ tipo:'fecha' } },
+      { key:'valor_vehiculo',     label:'Valor Vehículo',      filtro:{ tipo:'monto' } },
+      { key:'pie',                label:'Pie',                 filtro:{ tipo:'monto' } },
+      { key:'monto_financiado',   label:'Monto Financiado',    filtro:{ tipo:'monto' } },
+      { key:'plazo',              label:'Plazo (meses)',        filtro:{ tipo:'rango', sufijo:'meses', min:6, max:84 } },
+      { key:'tasa_mensual',       label:'Tasa Mensual',        filtro:{ tipo:'pct' } },
+      { key:'cuota',              label:'Cuota Mensual',       filtro:{ tipo:'monto' } },
+      { key:'tipo_vehiculo',      label:'Tipo Vehículo',       filtro:{ tipo:'multi', opts:['Automóvil','SUV','Camioneta','Furgón','Moto','Otro'] } },
+      { key:'marca',              label:'Marca',               filtro:{ tipo:'texto' } },
+      { key:'modelo',             label:'Modelo',              filtro:{ tipo:'texto' } },
+      { key:'anio',               label:'Año Vehículo',        filtro:{ tipo:'anio', min:1990, max:2030 } },
+      { key:'patente',            label:'Patente',             filtro:{ tipo:'texto' } },
+      { key:'dealer',             label:'Dealer',              filtro:{ tipo:'texto' } },
+      { key:'ejecutivo',          label:'Ejecutivo',           filtro:{ tipo:'texto' } },
+      { key:'mes',                label:'Mes Operación',       filtro:{ tipo:'fecha' } },
+    ]
   },
-  clientes: {
-    label: 'Clientes',
-    campos: [
-      { key:'rut',        label:'RUT'         },
-      { key:'nombre',     label:'Nombre'      },
-      { key:'apellido',   label:'Apellido'    },
-      { key:'email',      label:'Email'       },
-      { key:'telefono',   label:'Teléfono'    },
-      { key:'direccion',  label:'Dirección'   },
-      { key:'ciudad',     label:'Ciudad'      },
-      { key:'created_at', label:'Fecha Alta'  },
-    ],
-    filtroExtra: null
+  clientes:{
+    label:'Clientes', url:'/api/clientes',
+    campos:[
+      { key:'rut',        label:'RUT',          filtro:{ tipo:'texto' } },
+      { key:'nombre',     label:'Nombre',       filtro:{ tipo:'texto' } },
+      { key:'apellido',   label:'Apellido',     filtro:{ tipo:'texto' } },
+      { key:'email',      label:'Email',        filtro:{ tipo:'texto' } },
+      { key:'telefono',   label:'Teléfono',     filtro:{ tipo:'texto' } },
+      { key:'direccion',  label:'Dirección',    filtro:{ tipo:'texto' } },
+      { key:'ciudad',     label:'Ciudad',       filtro:{ tipo:'texto' } },
+      { key:'created_at', label:'Fecha Alta',   filtro:{ tipo:'fecha' } },
+    ]
   },
-  cobranza: {
-    label: 'Cobranza',
-    campos: [
-      { key:'numero_credito', label:'N° Crédito'   },
-      { key:'nombre_cliente', label:'Cliente'       },
-      { key:'cuota',          label:'Monto Cuota'  },
-      { key:'numero_cuota',   label:'N° Cuota'     },
-      { key:'fecha_venc',     label:'Vencimiento'  },
-      { key:'estado_pago',    label:'Estado Pago'  },
-      { key:'fecha_pago',     label:'Fecha Pago'   },
-    ],
-    filtroExtra: { key:'estado_pago', label:'Estado Pago', tipo:'select',
-      opciones:['Todos','PENDIENTE','PAGADO','VENCIDO'] }
+  cobranza:{
+    label:'Cobranza', url:'/api/cobranza',
+    campos:[
+      { key:'numero_credito', label:'N° Crédito',   filtro:{ tipo:'texto' } },
+      { key:'nombre_cliente', label:'Cliente',       filtro:{ tipo:'texto' } },
+      { key:'cuota',          label:'Monto Cuota',  filtro:{ tipo:'monto' } },
+      { key:'numero_cuota',   label:'N° Cuota',     filtro:{ tipo:'rango', sufijo:'cuota', min:1, max:96 } },
+      { key:'fecha_venc',     label:'Vencimiento',  filtro:{ tipo:'fecha' } },
+      { key:'estado_pago',    label:'Estado Pago',  filtro:{ tipo:'multi', opts:['PENDIENTE','PAGADO','VENCIDO'] } },
+      { key:'fecha_pago',     label:'Fecha Pago',   filtro:{ tipo:'fecha' } },
+      { key:'dias_mora',      label:'Días en Mora', filtro:{ tipo:'rango', sufijo:'días', min:0, max:365 } },
+    ]
   },
-  tesoreria: {
-    label: 'Tesorería',
-    campos: [
-      { key:'fecha',        label:'Fecha'         },
-      { key:'tipo',         label:'Tipo'          },
-      { key:'concepto',     label:'Concepto'      },
-      { key:'monto',        label:'Monto'         },
-      { key:'nombre_caja',  label:'Caja'          },
-      { key:'usuario',      label:'Usuario'       },
-    ],
-    filtroExtra: null
+  tesoreria:{
+    label:'Tesorería', url:'/api/cajas/movimientos',
+    campos:[
+      { key:'fecha',       label:'Fecha',    filtro:{ tipo:'fecha' } },
+      { key:'tipo',        label:'Tipo',     filtro:{ tipo:'multi', opts:['INGRESO','EGRESO','CIERRE'] } },
+      { key:'concepto',    label:'Concepto', filtro:{ tipo:'texto' } },
+      { key:'monto',       label:'Monto',    filtro:{ tipo:'monto' } },
+      { key:'nombre_caja', label:'Caja',     filtro:{ tipo:'texto' } },
+      { key:'usuario',     label:'Usuario',  filtro:{ tipo:'texto' } },
+    ]
   }
 };
 
-let moduloActivo = 'creditos';
-let camposSeleccionados = [];
-let datosPreview = [];
+/* ── Estado ──────────────────────────────────────────────────── */
+let moduloActivo   = 'creditos';
+let camposSel      = [];   // keys seleccionadas
+let datosBrutos    = [];   // datos crudos de API
+let datosFilter    = [];   // datos tras aplicar filtros
 
-function abrirTailorMade() {
+/* ── Abrir / cerrar ──────────────────────────────────────────── */
+function abrirTailorMade(){
   document.getElementById('panelTailor').style.display = 'block';
   document.body.style.overflow = 'hidden';
-  seleccionarModulo(document.querySelector('.mod-btn.active'));
+  seleccionarModulo(document.querySelector('.mod-btn[data-mod="creditos"]'));
 }
-function cerrarTailor() {
+function cerrarTailor(){
   document.getElementById('panelTailor').style.display = 'none';
   document.body.style.overflow = '';
 }
+document.getElementById('panelTailor').addEventListener('click', e => { if(e.target===e.currentTarget) cerrarTailor(); });
 
-function seleccionarModulo(btn) {
-  document.querySelectorAll('.mod-btn').forEach(b => b.classList.remove('active'));
+/* ── Seleccionar módulo ──────────────────────────────────────── */
+function seleccionarModulo(btn){
+  document.querySelectorAll('.mod-btn').forEach(b=>b.classList.remove('active'));
   btn.classList.add('active');
   moduloActivo = btn.dataset.mod;
-  camposSeleccionados = [];
-  datosPreview = [];
-  renderCampos();
-  renderSeleccionados();
-  renderFiltroExtra();
-  document.getElementById('preview-table').innerHTML = `<div style="padding:24px;text-align:center;color:#9ca3af;font-size:.82rem"><i class="bi bi-table" style="display:block;font-size:1.5rem;margin-bottom:6px;opacity:.3"></i>Presiona "Previsualizar" para ver los primeros registros</div>`;
-  document.getElementById('preview-count').textContent = '';
+  camposSel = []; datosBrutos = []; datosFilter = [];
+  renderCampos(); renderSeleccionados(); renderFiltros();
+  resetPreview();
 }
 
-function renderCampos() {
+/* ── Campos disponibles ──────────────────────────────────────── */
+function renderCampos(){
   const mod = MODULOS[moduloActivo];
-  const c = document.getElementById('campos-disponibles');
-  c.innerHTML = mod.campos.map(f => {
-    const sel = camposSeleccionados.includes(f.key);
-    return `<div class="campo-item${sel?' selected':''}" onclick="toggleCampo('${f.key}')">
-      <span class="campo-check">${sel?'<i class="bi bi-check2"></i>':''}</span>
+  document.getElementById('campos-disponibles').innerHTML = mod.campos.map(f=>{
+    const sel = camposSel.includes(f.key);
+    return `<div class="campo-item${sel?' sel':''}" onclick="toggleCampo('${f.key}')">
+      <span class="campo-chk">${sel?'<i class="bi bi-check2"></i>':''}</span>
+      <i class="bi ${TIPO_ICON[f.filtro?.tipo]||'bi-circle'}" style="font-size:.8rem;color:#9ca3af;flex-shrink:0"></i>
       ${f.label}
     </div>`;
   }).join('');
 }
 
-function renderSeleccionados() {
+/* ── Columnas del reporte ────────────────────────────────────── */
+function renderSeleccionados(){
   const mod = MODULOS[moduloActivo];
+  document.getElementById('sel-count').textContent = ` (${camposSel.length})`;
   const c = document.getElementById('campos-seleccionados');
-  document.getElementById('sel-count').textContent = ` (${camposSeleccionados.length} seleccionados)`;
-  if (!camposSeleccionados.length) {
-    c.innerHTML = `<div style="padding:24px;text-align:center;color:#9ca3af;font-size:.82rem"><i class="bi bi-arrow-left" style="display:block;font-size:1.5rem;margin-bottom:6px;opacity:.4"></i>Selecciona campos desde la lista</div>`;
-    return;
+  if(!camposSel.length){
+    c.innerHTML = `<div style="padding:24px;text-align:center;color:#9ca3af;font-size:.8rem">
+      <i class="bi bi-arrow-left" style="display:block;font-size:1.4rem;margin-bottom:5px;opacity:.35"></i>
+      Elige campos desde la lista
+    </div>`; return;
   }
-  c.innerHTML = camposSeleccionados.map(k => {
+  c.innerHTML = camposSel.map(k=>{
     const f = mod.campos.find(x=>x.key===k);
-    return `<div class="sel-chip">
+    return `<div class="col-chip">
+      <i class="bi ${TIPO_ICON[f?.filtro?.tipo]||'bi-circle'} tipo-icon"></i>
       <span>${f?.label||k}</span>
       <button onclick="quitarCampo('${k}')" title="Quitar"><i class="bi bi-x-lg"></i></button>
     </div>`;
   }).join('');
 }
 
-function renderFiltroExtra() {
+/* ── Filtros dinámicos ───────────────────────────────────────── */
+function renderFiltros(){
   const mod = MODULOS[moduloActivo];
-  const c = document.getElementById('filtro-extra');
-  if (!mod.filtroExtra) { c.innerHTML=''; return; }
-  const fe = mod.filtroExtra;
-  if (fe.tipo === 'select') {
-    c.innerHTML = `<label style="font-size:.75rem;font-weight:600;color:#6b7280;display:block;margin-bottom:4px">${fe.label}</label>
-      <select id="f-extra" style="width:100%;border:1.5px solid #d1d5db;border-radius:7px;padding:7px 10px;font-size:.85rem">
-        ${fe.opciones.map(o=>`<option>${o}</option>`).join('')}
-      </select>`;
+  const el = document.getElementById('filtros-dinamicos');
+  const count = document.getElementById('filtros-count');
+
+  const camposConFiltro = camposSel.filter(k => mod.campos.find(f=>f.key===k)?.filtro);
+  count.textContent = camposConFiltro.length ? ` — ${camposConFiltro.length} campo${camposConFiltro.length>1?'s':''}` : '';
+
+  if(!camposConFiltro.length){
+    el.innerHTML = `<div style="color:#9ca3af;font-size:.8rem;text-align:center;padding:10px">
+      Selecciona campos para activar sus filtros
+    </div>`; return;
+  }
+
+  el.innerHTML = camposConFiltro.map(k=>{
+    const campo = mod.campos.find(f=>f.key===k);
+    const ft = campo.filtro;
+    return `<div class="filtro-card">
+      <div class="filtro-label">
+        <i class="bi ${TIPO_ICON[ft.tipo]}"></i>${campo.label}
+        <span class="tipo-badge">${TIPO_LABEL[ft.tipo]}</span>
+      </div>
+      ${renderWidgetFiltro(k, ft)}
+    </div>`;
+  }).join('');
+}
+
+function renderWidgetFiltro(key, ft){
+  const id = k => `f_${key}_${k}`;
+  switch(ft.tipo){
+    case 'texto':
+      return `<input class="fi" id="${id('v')}" type="text" placeholder="Buscar… (contiene)">`;
+
+    case 'multi':
+      return `<div class="multi-pills">${ft.opts.map(o=>
+        `<label class="multi-pill"><input type="checkbox" name="${id('v')}" value="${o}">${o}</label>`
+      ).join('')}</div>`;
+
+    case 'fecha':
+      return `<div class="fi-row">
+        <div><span class="fi-lbl">Desde</span><input class="fi" id="${id('min')}" type="date"></div>
+        <div><span class="fi-lbl">Hasta</span><input class="fi" id="${id('max')}" type="date"></div>
+      </div>`;
+
+    case 'monto':
+      return `<div class="fi-row">
+        <div><span class="fi-lbl">Monto mínimo ($)</span><input class="fi" id="${id('min')}" type="number" min="0" step="1000" placeholder="0"></div>
+        <div><span class="fi-lbl">Monto máximo ($)</span><input class="fi" id="${id('max')}" type="number" min="0" step="1000" placeholder="Sin límite"></div>
+      </div>`;
+
+    case 'rango':
+      return `<div class="fi-row">
+        <div><span class="fi-lbl">Mín ${ft.sufijo||''}</span><input class="fi" id="${id('min')}" type="number" min="${ft.min??0}" placeholder="${ft.min??0}"></div>
+        <div><span class="fi-lbl">Máx ${ft.sufijo||''}</span><input class="fi" id="${id('max')}" type="number" max="${ft.max??9999}" placeholder="${ft.max??'Sin límite'}"></div>
+      </div>`;
+
+    case 'pct':
+      return `<div class="fi-row">
+        <div><span class="fi-lbl">Tasa mínima (%)</span><input class="fi" id="${id('min')}" type="number" min="0" max="100" step="0.01" placeholder="0"></div>
+        <div><span class="fi-lbl">Tasa máxima (%)</span><input class="fi" id="${id('max')}" type="number" min="0" max="100" step="0.01" placeholder="Sin límite"></div>
+      </div>`;
+
+    case 'anio':
+      return `<div class="fi-row">
+        <div><span class="fi-lbl">Año desde</span><input class="fi" id="${id('min')}" type="number" min="${ft.min??1990}" max="${ft.max??2030}" placeholder="${ft.min??1990}"></div>
+        <div><span class="fi-lbl">Año hasta</span><input class="fi" id="${id('max')}" type="number" min="${ft.min??1990}" max="${ft.max??2030}" placeholder="${ft.max??2030}"></div>
+      </div>`;
+
+    default: return '';
   }
 }
 
-function toggleCampo(key) {
-  const idx = camposSeleccionados.indexOf(key);
-  if (idx >= 0) camposSeleccionados.splice(idx, 1);
-  else camposSeleccionados.push(key);
-  renderCampos();
-  renderSeleccionados();
+/* ── Leer valores actuales de filtros ────────────────────────── */
+function leerFiltros(){
+  const mod = MODULOS[moduloActivo];
+  const result = {};
+  camposSel.forEach(k=>{
+    const campo = mod.campos.find(f=>f.key===k);
+    const ft = campo?.filtro; if(!ft) return;
+    const id = s => `f_${k}_${s}`;
+    switch(ft.tipo){
+      case 'texto': {
+        const v = document.getElementById(id('v'))?.value?.trim().toLowerCase();
+        if(v) result[k] = { tipo:'texto', v };
+        break;
+      }
+      case 'multi': {
+        const checked = [...document.querySelectorAll(`input[name="${id('v')}"]`)].filter(i=>i.checked).map(i=>i.value);
+        if(checked.length) result[k] = { tipo:'multi', v: checked };
+        break;
+      }
+      case 'fecha': case 'monto': case 'rango': case 'pct': case 'anio': {
+        const mn = document.getElementById(id('min'))?.value;
+        const mx = document.getElementById(id('max'))?.value;
+        if(mn||mx) result[k] = { tipo: ft.tipo, min: mn||null, max: mx||null };
+        break;
+      }
+    }
+  });
+  return result;
 }
 
-function quitarCampo(key) {
-  camposSeleccionados = camposSeleccionados.filter(k => k !== key);
-  renderCampos();
-  renderSeleccionados();
+function limpiarFiltros(){
+  document.querySelectorAll('#filtros-dinamicos .fi').forEach(i=>{ i.value=''; });
+  document.querySelectorAll('#filtros-dinamicos input[type=checkbox]').forEach(i=>{ i.checked=false; });
 }
 
-/* ── Previsualizar ────────────────────────────────────────────── */
-async function previsualizarReporte() {
-  if (!camposSeleccionados.length) {
-    document.getElementById('preview-table').innerHTML = `<div style="padding:16px;text-align:center;color:#dc2626;font-size:.85rem">Selecciona al menos un campo.</div>`;
+/* ── Aplicar filtros a los datos ─────────────────────────────── */
+function aplicarFiltros(datos){
+  const filtros = leerFiltros();
+  if(!Object.keys(filtros).length) return datos;
+
+  return datos.filter(row=>{
+    for(const [key, f] of Object.entries(filtros)){
+      const val = row[key];
+      if(f.tipo==='texto'){
+        if(!String(val??'').toLowerCase().includes(f.v)) return false;
+      } else if(f.tipo==='multi'){
+        if(!f.v.includes(String(val??''))) return false;
+      } else if(f.tipo==='fecha'){
+        const d = val ? new Date(val) : null;
+        if(!d) return false;
+        if(f.min && d < new Date(f.min)) return false;
+        if(f.max && d > new Date(f.max+'T23:59:59')) return false;
+      } else if(['monto','rango','pct','anio'].includes(f.tipo)){
+        const n = parseFloat(val);
+        if(isNaN(n)) return false;
+        if(f.min !== null && f.min !== '' && n < parseFloat(f.min)) return false;
+        if(f.max !== null && f.max !== '' && n > parseFloat(f.max)) return false;
+      }
+    }
+    return true;
+  });
+}
+
+/* ── Toggle campo ────────────────────────────────────────────── */
+function toggleCampo(key){
+  const i = camposSel.indexOf(key);
+  if(i>=0) camposSel.splice(i,1); else camposSel.push(key);
+  renderCampos(); renderSeleccionados(); renderFiltros();
+}
+function quitarCampo(key){
+  camposSel = camposSel.filter(k=>k!==key);
+  renderCampos(); renderSeleccionados(); renderFiltros();
+}
+
+/* ── Previsualizar ───────────────────────────────────────────── */
+function resetPreview(){
+  document.getElementById('preview-table').innerHTML = `<div style="padding:24px;text-align:center;color:#9ca3af;font-size:.82rem">
+    <i class="bi bi-table" style="display:block;font-size:1.5rem;margin-bottom:6px;opacity:.3"></i>
+    Presiona "Previsualizar" para ver los primeros registros
+  </div>`;
+  document.getElementById('preview-count').textContent='';
+}
+
+async function previsualizarReporte(){
+  if(!camposSel.length){
+    document.getElementById('preview-table').innerHTML = `<div style="padding:14px;text-align:center;color:#dc2626;font-size:.84rem"><i class="bi bi-exclamation-triangle me-1"></i>Selecciona al menos un campo.</div>`;
     return;
   }
-  document.getElementById('preview-table').innerHTML = `<div style="padding:16px;text-align:center;color:#6b7280;font-size:.85rem"><div class="spinner-border spinner-border-sm me-2"></div>Cargando…</div>`;
+  document.getElementById('preview-table').innerHTML = `<div style="padding:14px;text-align:center;color:#6b7280;font-size:.82rem"><div class="spinner-border spinner-border-sm me-2"></div>Cargando datos…</div>`;
 
   try {
-    const desde = document.getElementById('f-desde').value;
-    const hasta  = document.getElementById('f-hasta').value;
-    const extra  = document.getElementById('f-extra')?.value;
-
-    // Llamada al endpoint correspondiente
-    let url = '';
-    const params = new URLSearchParams();
-    if (desde) params.set('desde', desde);
-    if (hasta)  params.set('hasta', hasta);
-    if (extra && extra !== 'Todos') params.set('estado', extra);
-
-    if (moduloActivo === 'creditos')  url = `/api/creditos?${params}`;
-    else if (moduloActivo === 'clientes') url = `/api/clientes?${params}`;
-    else if (moduloActivo === 'cobranza') url = `/api/cobranza?${params}`;
-    else if (moduloActivo === 'tesoreria') url = `/api/cajas/movimientos?${params}`;
-
-    const r = await fetch(url, { headers: apiHeaders() });
-    const j = await r.json();
-    datosPreview = Array.isArray(j.data) ? j.data : (j.data?.rows || []);
-
     const mod = MODULOS[moduloActivo];
-    const campos = camposSeleccionados.map(k => ({ key:k, label: mod.campos.find(x=>x.key===k)?.label||k }));
-    const filas = datosPreview.slice(0, 50);
+    const r = await fetch(mod.url, { headers: apiHdrs() });
+    const j = await r.json();
+    datosBrutos = Array.isArray(j.data) ? j.data : (j.data?.rows || j.data?.creditos || []);
+    datosFilter = aplicarFiltros(datosBrutos);
 
-    document.getElementById('preview-count').textContent = ` — ${datosPreview.length} registros`;
+    const campos = camposSel.map(k=>({ key:k, label: mod.campos.find(f=>f.key===k)?.label||k }));
+    const filas  = datosFilter.slice(0,50);
 
-    document.getElementById('preview-table').innerHTML = `
-      <table class="preview-tbl">
-        <thead><tr>${campos.map(c=>`<th>${c.label}</th>`).join('')}</tr></thead>
-        <tbody>${filas.map(row=>
-          `<tr>${campos.map(c=>`<td>${row[c.key]??'—'}</td>`).join('')}</tr>`
-        ).join('')}</tbody>
-      </table>`;
-  } catch(e) {
-    document.getElementById('preview-table').innerHTML = `<div style="padding:16px;text-align:center;color:#dc2626;font-size:.85rem">Error: ${e.message}</div>`;
+    document.getElementById('preview-count').textContent =
+      ` — ${datosFilter.length} de ${datosBrutos.length} registros`;
+
+    document.getElementById('preview-table').innerHTML = filas.length
+      ? `<table class="ptbl">
+          <thead><tr>${campos.map(c=>`<th>${c.label}</th>`).join('')}</tr></thead>
+          <tbody>${filas.map(row=>
+            `<tr>${campos.map(c=>`<td title="${row[c.key]??''}">${fmtVal(row[c.key],c.key)}</td>`).join('')}</tr>`
+          ).join('')}</tbody>
+        </table>`
+      : `<div style="padding:20px;text-align:center;color:#6b7280;font-size:.84rem"><i class="bi bi-search me-1"></i>Sin resultados con los filtros aplicados.</div>`;
+
+  } catch(e){
+    document.getElementById('preview-table').innerHTML = `<div style="padding:14px;text-align:center;color:#dc2626;font-size:.84rem">Error: ${e.message}</div>`;
   }
 }
 
-/* ── Exportar Excel (CSV descargable) ─────────────────────────── */
-function exportarExcel() {
-  if (!datosPreview.length) {
-    previsualizarReporte().then(exportarExcel);
-    return;
+/* ── Formatear valor en tabla ────────────────────────────────── */
+function fmtVal(v, key){
+  if(v===null||v===undefined) return '—';
+  // Monto
+  if(['valor_vehiculo','pie','monto_financiado','cuota','monto','tasacion','permiso_circulacion'].includes(key)){
+    return '$'+Number(v).toLocaleString('es-CL');
   }
+  // Porcentaje
+  if(['tasa_mensual'].includes(key)) return Number(v).toFixed(2)+'%';
+  // Fecha
+  if(key.startsWith('fecha')||key==='mes'||key==='created_at'){
+    return v ? String(v).slice(0,10) : '—';
+  }
+  return String(v);
+}
+
+/* ── Exportar CSV / Excel ────────────────────────────────────── */
+async function exportarCSV(){
+  if(!datosBrutos.length) await previsualizarReporte();
+  if(!datosFilter.length){ alert('Sin datos para exportar.'); return; }
+
   const mod = MODULOS[moduloActivo];
-  const campos = camposSeleccionados.map(k => ({ key:k, label: mod.campos.find(x=>x.key===k)?.label||k }));
+  const campos = camposSel.map(k=>({ key:k, label: mod.campos.find(f=>f.key===k)?.label||k }));
 
-  const BOM = '﻿';
-  const header = campos.map(c => `"${c.label}"`).join(';');
-  const rows   = datosPreview.map(row =>
-    campos.map(c => {
-      const v = row[c.key] ?? '';
-      return `"${String(v).replace(/"/g,'""')}"`;
-    }).join(';')
+  const BOM    = '﻿';
+  const header = campos.map(c=>`"${c.label}"`).join(';');
+  const rows   = datosFilter.map(row=>
+    campos.map(c=>`"${String(row[c.key]??'').replace(/"/g,'""')}"`).join(';')
   );
-  const csv = BOM + [header, ...rows].join('\r\n');
+  const csv = BOM + [header,...rows].join('\r\n');
 
-  const blob = new Blob([csv], { type:'text/csv;charset=utf-8;' });
+  const blob = new Blob([csv],{type:'text/csv;charset=utf-8;'});
   const url  = URL.createObjectURL(blob);
   const a    = document.createElement('a');
-  const hoy  = new Date().toISOString().slice(0,10);
-  a.href = url;
-  a.download = `reporte_${moduloActivo}_${hoy}.csv`;
-  document.body.appendChild(a); a.click();
-  document.body.removeChild(a); URL.revokeObjectURL(url);
+  a.href=url; a.download=`reporte_${moduloActivo}_${new Date().toISOString().slice(0,10)}.csv`;
+  document.body.appendChild(a); a.click(); document.body.removeChild(a);
+  URL.revokeObjectURL(url);
 }
-
-/* Cerrar al click afuera */
-document.getElementById('panelTailor').addEventListener('click', function(e) {
-  if (e.target === this) cerrarTailor();
-});
 </script>
 <script src="/js/app-version.js"></script>
 </body>
