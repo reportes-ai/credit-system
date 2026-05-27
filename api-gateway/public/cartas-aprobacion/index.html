@@ -4539,8 +4539,7 @@ function getConcPool(){
     return DB_DEALERS.filter(d => d.tipo === 'PARQUE');
   }
   // Calle = PARTICULAR (sinónimos)
-  const calle = DB_DEALERS.filter(d => d.tipo === 'PARTICULAR');
-  return calle.length ? calle : DB_DEALERS; // fallback si aún no hay clasificación
+  return DB_DEALERS.filter(d => d.tipo === 'PARTICULAR');
 }
 
 function filterConc(){
@@ -4548,6 +4547,11 @@ function filterConc(){
   const list = document.getElementById('concList');
   if(!DB_DEALERS.length){ list.style.display='none'; return; }
   const pool = getConcPool();
+  if(!pool.length){
+    list.innerHTML = '<div class="autocomplete-item" style="color:#999;cursor:default">Sin dealers para este tipo de carta</div>';
+    list.style.display='block';
+    return;
+  }
   const matches = val.length === 0
     ? pool.slice(0, 20)
     : pool.filter(c => c.nombre.toLowerCase().includes(val)).slice(0, 15);
