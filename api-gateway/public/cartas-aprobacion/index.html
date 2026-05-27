@@ -2271,8 +2271,10 @@ function loadCustomSIIData(){
 
 // ========== MANTENEDOR UF & TASAS ==========
 
-// ── UF desde el sistema principal (caché en memoria) ──
+// ── UF y Tasas desde el sistema principal (caché en memoria) ──
 let _ufCache = null;
+let _tasasCache = null;
+
 async function _fetchUFfromAPI(){
   try {
     const tok = localStorage.getItem('token');
@@ -2282,6 +2284,17 @@ async function _fetchUFfromAPI(){
     // Espera { data: { valor, fecha } } o array
     const d = Array.isArray(j.data) ? j.data[0] : j.data;
     if(d && d.valor) return { value: parseFloat(d.valor), date: (d.fecha||new Date().toISOString()).split('T')[0] };
+  } catch(e) {}
+  return null;
+}
+
+async function _fetchTasasFromAPI(){
+  try {
+    const tok = localStorage.getItem('token');
+    const r = await fetch('/api/tasas/vigente', { headers:{ 'Authorization':'Bearer '+tok } });
+    if(!r.ok) return null;
+    const j = await r.json();
+    if(j.data && j.data.tasa_mensual_menor != null) return j.data;
   } catch(e) {}
   return null;
 }
@@ -2324,12 +2337,11 @@ function loadUFcsv(){ showToast('La UF se obtiene automáticamente del sistema p
 // Se usa al grabar correcciones para limpiar excepciones ya resueltas.
 function recalcExcepcionesFromCarta(c){
   const excepciones = [];
-  const tasas = JSON.parse(localStorage.getItem('af_tasas') || '{}');
 
   // UF
   const uf = getUFhoy();
   if(!uf){
-    excepciones.push({tipo:'UF', msg:'No hay valor de UF cargado. Use el Mantenedor para cargar el CSV de UF.'});
+    excepciones.push({tipo:'UF', msg:'No hay valor de UF cargado.'});
   } else {
     const today = new Date().toISOString().split('T')[0];
     if(uf.date < today){
@@ -2337,17 +2349,19 @@ function recalcExcepcionesFromCarta(c){
     }
   }
 
-  // Tramo UF
+  // Tramo UF y tasa pizarra del sistema principal
   const ufVal = uf ? uf.value : 0;
   const montoUF = c.montoCreditoUF || (ufVal > 0 ? (c.saldo||0) / ufVal : 0);
   const esTramo1 = montoUF <= 200;
-  const tasaMensualPizarra = esTramo1 ? (tasas.mensual1||0) : (tasas.mensual2||0);
+  const tasaMensualPizarra = _tasasCache
+    ? parseFloat(esTramo1 ? (_tasasCache.tasa_mensual_menor || 0) : (_tasasCache.tasa_mensual_mayor || 0))
+    : 0;
 
-  // TMC vencida
-  const fechaHasta = esTramo1 ? tasas.hasta1 : tasas.hasta2;
+  // Tasa pizarra vencida
+  const fechaHasta = _tasasCache ? _tasasCache.fecha_hasta : null;
   const today2 = new Date().toISOString().split('T')[0];
   if(fechaHasta && fechaHasta < today2){
-    excepciones.push({tipo:'TMC', msg:'La Tasa Máxima Convencional venció el ' + new Date(fechaHasta+'T12:00:00').toLocaleDateString('es-CL') + '. Actualice en el Mantenedor.'});
+    excepciones.push({tipo:'TASA', msg:'La Tasa Pizarra venció el ' + new Date(fechaHasta+'T12:00:00').toLocaleDateString('es-CL') + '. Actualice en el Mantenedor de Tasas.'});
   }
 
   // TASA
@@ -2408,18 +2422,19 @@ function getExcepciones(){
     }
   }
 
-  // 2. TMC vencida
-  const tasas = JSON.parse(localStorage.getItem('af_tasas') || '{}');
+  // 2. Tasa pizarra vencida (usando fechas del sistema principal)
   const montoUF = parseFloat(document.getElementById('fMontoCreditoUF').dataset.raw || '0');
   const esTramo1 = montoUF <= 200;
-  const fechaHasta = esTramo1 ? tasas.hasta1 : tasas.hasta2;
+  const fechaHasta = _tasasCache ? _tasasCache.fecha_hasta : null;
   const today2 = new Date().toISOString().split('T')[0];
   if(fechaHasta && fechaHasta < today2){
-    excepciones.push({tipo:'TMC', msg:'La Tasa Máxima Convencional venció el ' + new Date(fechaHasta+'T12:00:00').toLocaleDateString('es-CL') + '. Actualice en el Mantenedor.'});
+    excepciones.push({tipo:'TASA', msg:'La Tasa Pizarra venció el ' + new Date(fechaHasta+'T12:00:00').toLocaleDateString('es-CL') + '. Actualice en el Mantenedor de Tasas.'});
   }
 
   // 3. Tasa crédito diferente a pizarra
-  const tasaMensualPizarra = esTramo1 ? (tasas.mensual1 || 0) : (tasas.mensual2 || 0);
+  const tasaMensualPizarra = _tasasCache
+    ? parseFloat(esTramo1 ? (_tasasCache.tasa_mensual_menor || 0) : (_tasasCache.tasa_mensual_mayor || 0))
+    : 0;
   const tasaCredito = parseRateInput(document.getElementById('fTasaCredito'));
   if(tasaMensualPizarra > 0 && tasaCredito > 0 && Math.abs(tasaCredito - tasaMensualPizarra) > 0.001){
     const dir = tasaCredito > tasaMensualPizarra ? 'SUPERIOR' : 'INFERIOR';
@@ -4086,8 +4101,9 @@ async function doLogin(){
   document.getElementById('app').style.display = 'block';
   document.getElementById('headerUser').textContent = currentUser.name + ' (' + currentUser.perfil + ')';
 
-  // Cargar UF del sistema principal en caché (no bloqueante)
+  // Cargar UF y Tasas del sistema principal en caché (no bloqueante)
   _fetchUFfromAPI().then(uf => { if(uf) _ufCache = uf; });
+  _fetchTasasFromAPI().then(t => { if(t) _tasasCache = t; });
 
   await initApp();
 }
@@ -4118,6 +4134,18 @@ async function initApp(){
     // Load comisiones from params
     const comStr = await dbGetParam('comisiones');
     if(comStr){ try{ const c=JSON.parse(comStr); COMISIONES.length=0; c.forEach(x=>COMISIONES.push(x)); }catch(e){} }
+
+    // Load financiera preferente from Supabase (overrides localStorage if saved)
+    const finStr = await dbGetParam('financiera');
+    if(finStr && finStr !== 'null' && finStr !== ''){
+      try{ localStorage.setItem('af_financiera', finStr); }catch(e){}
+    }
+
+    // Load tasas del sistema principal (bloqueante para que estén disponibles en el formulario)
+    if(!_tasasCache){
+      const t = await _fetchTasasFromAPI();
+      if(t) _tasasCache = t;
+    }
 
     // Load firma empresa
     const firmaStr = await dbGetParam('firma_empresa');
@@ -4410,14 +4438,12 @@ function checkTasas(){
     return; 
   }
   
-  // Get tasas from localStorage
-  const tasas = JSON.parse(localStorage.getItem('af_tasas') || '{}');
-  
-  // Determine tramo: <= 200 UF or > 200 UF
+  // Tasas del sistema principal (≤200 UF → tasa_mensual_menor, >200 UF → tasa_mensual_mayor)
   const esTramo1 = montoUF <= 200;
-  const tasaMensualPizarra = esTramo1 ? (tasas.mensual1 || 0) : (tasas.mensual2 || 0);
-  const fechaDesde = esTramo1 ? tasas.desde1 : tasas.desde2;
-  
+  const tasaMensualPizarra = _tasasCache
+    ? parseFloat(esTramo1 ? (_tasasCache.tasa_mensual_menor || 0) : (_tasasCache.tasa_mensual_mayor || 0))
+    : 0;
+
   // Show tasa pizarra
   if(tasaMensualPizarra > 0){
     fTasaPizarra.value = tasaMensualPizarra.toFixed(2) + ' %';
@@ -4426,10 +4452,10 @@ function checkTasas(){
     fTasaPizarra.value = 'Sin datos';
     fTasaPizarra.style.color = '#C62828';
   }
-  
-  // Check if TMC is outdated (using hasta date)
+
+  // Check if tasa pizarra is outdated
   const today = new Date().toISOString().split('T')[0];
-  const fechaHasta = esTramo1 ? tasas.hasta1 : tasas.hasta2;
+  const fechaHasta = _tasasCache ? _tasasCache.fecha_hasta : null;
   const tmcVencida = fechaHasta && fechaHasta < today;
   if(alertTMC) alertTMC.style.display = tmcVencida ? '' : 'none';
   
