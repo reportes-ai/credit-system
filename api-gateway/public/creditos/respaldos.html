@@ -164,7 +164,7 @@
   <a class="nav-brand" href="/creditos">
     <img src="/img/logo-autofacil.png" alt="AutoFácil" style="filter:brightness(0) invert(1);height:32px;display:block" onerror="this.style.display='none'">
     <span>Carga de Respaldos</span>
-    <span class="version-badge">v2.2</span>
+    <span class="version-badge">v2.3</span>
   </a>
   <div class="breadcrumb-nav"><a href="/">Inicio</a><span class="sep">›</span><a href="/creditos">Créditos</a><span class="sep">›</span><span style="color:#fff;font-weight:600"><i class="bi bi-folder2 me-1"></i>Respaldos</span></div>
   <div style="display:flex;align-items:center;gap:10px">
@@ -185,6 +185,15 @@
     style="background:#fee2e2;color:#991b1b;border:1px solid #fca5a5;font-size:.78rem"
     title="Eliminar todos los documentos y empezar de nuevo">
     <i class="bi bi-trash3"></i>Limpiar documentos
+  </button>
+  <!-- Botones broker (solo AUTOFIN / UNIDAD DE CREDITO) -->
+  <button id="btnCursado" class="btn-accion" onclick="marcarEstadoBroker('CURSADO')"
+    style="display:none;background:linear-gradient(135deg,#16a34a,#15803d);color:#fff">
+    <i class="bi bi-check2-circle"></i>CURSADO
+  </button>
+  <button id="btnDesistido" class="btn-accion" onclick="marcarEstadoBroker('DESISTIDO')"
+    style="display:none;background:linear-gradient(135deg,#b91c1c,#dc2626);color:#fff">
+    <i class="bi bi-x-circle"></i>DESISTIDO
   </button>
   <button class="btn-accion btn-aprobar" id="btnAprobar" onclick="aprobarCredito()" disabled>
     <i class="bi bi-send-check-fill"></i><span id="btnAprobarLabel">Enviar a Análisis</span>
@@ -294,6 +303,15 @@ function renderPagina() {
   const c = _credito;
   _esAnalista = c.estado === 'EN_ANALISIS';
 
+  // Broker: mostrar botones CURSADO / DESISTIDO para AUTOFIN y UNIDAD
+  const esBroker = ['AUTOFIN','UNIDAD DE CREDITO'].includes((c.financiera||'').toUpperCase());
+  const estadoBroker = ['CARTA_APROBACION','OTORGADO'].includes(c.estado);
+  const mostrarBroker = esBroker && estadoBroker;
+  const btnCursado   = document.getElementById('btnCursado');
+  const btnDesistido = document.getElementById('btnDesistido');
+  if (btnCursado)   btnCursado.style.display   = mostrarBroker ? '' : 'none';
+  if (btnDesistido) btnDesistido.style.display = mostrarBroker ? '' : 'none';
+
   const btnAprobar = document.getElementById('btnAprobar');
   const btnLabel   = document.getElementById('btnAprobarLabel');
   if (btnAprobar && btnLabel) {
@@ -317,10 +335,10 @@ function renderPagina() {
         <div style="font-size:.8rem;opacity:.85">Revisa cada documento y marca <strong>Aprobar</strong> o <strong>Rechazar</strong>. Si rechazas alguno el crédito vuelve al Ejecutivo Comercial.</div>
       </div>
     </div>` : `
-    <div style="background:linear-gradient(135deg,#c2410c,#f97316);border-radius:12px;padding:14px 20px;margin-bottom:16px;display:flex;align-items:center;gap:14px;color:#fff">
+    <div style="background:linear-gradient(135deg,var(--navy),#1a56db);border-radius:12px;padding:14px 20px;margin-bottom:16px;display:flex;align-items:center;gap:14px;color:#fff">
       <i class="bi bi-paperclip" style="font-size:1.5rem"></i>
       <div>
-        <div style="font-weight:800;font-size:.95rem">CARGA DE RESPALDOS — Ejecutivo Comercial</div>
+        <div style="font-weight:800;font-size:.95rem">CARGA DE RESPALDOS — Analista de Crédito</div>
         <div style="font-size:.8rem;opacity:.85">Carga los documentos del cliente. Una vez completos los obligatorios, envía al Analista de Crédito para análisis.</div>
       </div>
     </div>`}
@@ -810,6 +828,25 @@ function actualizarProgreso() {
 }
 
 /* ── Aprobar / Avanzar crédito ── */
+/* ── Botones broker: CURSADO / DESISTIDO ── */
+async function marcarEstadoBroker(nuevoEstado) {
+  const label = nuevoEstado === 'CURSADO' ? 'CURSADO' : 'DESISTIDO';
+  const msg   = nuevoEstado === 'CURSADO'
+    ? '¿Confirmar que el crédito fue CURSADO por la institución financiera?'
+    : '¿Confirmar que el crédito quedó DESISTIDO (no se cursó)?';
+  if (!confirm(msg)) return;
+  try {
+    const r = await fetch('/api/creditos/'+creditId, {
+      method: 'PUT', headers: apiHdr(),
+      body: JSON.stringify({ estado: nuevoEstado, observaciones: _credito.observaciones || '', ejecutivo: _credito.ejecutivo, dealer: _credito.dealer, patente: _credito.patente }),
+    });
+    const j = await r.json();
+    if (!j.success) throw new Error(j.error);
+    showToast(`Crédito marcado como ${label}`, true);
+    setTimeout(() => location.href = '/creditos', 1400);
+  } catch(e) { showToast('Error: '+e.message, false); }
+}
+
 async function aprobarCredito() {
   const estadoSiguiente = _esAnalista ? 'EMISION_DOCUMENTOS' : 'EN_ANALISIS';
   const msg = _esAnalista

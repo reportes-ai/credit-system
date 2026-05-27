@@ -119,6 +119,9 @@ app.get(['/mantenedores/cuentas-bancarias', '/mantenedores/cuentas-bancarias/'],
 app.get(['/mantenedores/parques', '/mantenedores/parques/'], (req, res) =>
   res.sendFile(path.join(__dirname, '../public/mantenedores/parques/index.html')));
 
+app.get(['/mantenedores/flujo-brokerage', '/mantenedores/flujo-brokerage/'], (req, res) =>
+  res.sendFile(path.join(__dirname, '../public/mantenedores/flujo-brokerage/index.html')));
+
 app.get(['/creditos/digitacion-autofin', '/creditos/digitacion-autofin/'], (req, res) =>
   res.sendFile(path.join(__dirname, '../public/creditos/digitacion-autofin.html')));
 
