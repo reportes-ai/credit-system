@@ -34,6 +34,10 @@ const audit = require('../../../../shared/auditoria');
     await addCol(`ALTER TABLE operaciones_brokerage ADD COLUMN observaciones      TEXT         NULL`);
     await addCol(`ALTER TABLE operaciones_brokerage ADD COLUMN gastos             BIGINT       NULL`);
     await addCol(`ALTER TABLE operaciones_brokerage ADD COLUMN seguros            BIGINT       NULL`);
+    // Campos desde cartas de aprobación
+    await addCol(`ALTER TABLE operaciones_brokerage ADD COLUMN rut_concesionario  VARCHAR(20)  NULL`);
+    await addCol(`ALTER TABLE operaciones_brokerage ADD COLUMN vendedor           VARCHAR(150) NULL`);
+    // comdea_real ya existe en la tabla original (comisión/participación del dealer)
     // Poblar estado correcto según tipo de financiera:
     // - AUTOFACIL (cartera propia) → VIGENTE (se puede trackear pagos)
     // - AUTOFIN / UNIDAD DE CREDITO (brokerage) → OTORGADO (somos broker, no podemos saber si está vigente)
@@ -139,6 +143,9 @@ const SELECT_GESTION = `
     ob.anio,
     ob.patente,
     ob.automotora                                              AS dealer,
+    ob.rut_concesionario,
+    ob.vendedor,
+    ob.comdea_real                                             AS comision_dealer,
     ob.ejecutivo,
     ob.mes,
     ob.id_financiera,
@@ -175,7 +182,7 @@ const create = async (req, res) => {
       transmision, combustible, tasacion, permiso_circulacion,
       dealer, id_dealer, tipo_ubicacion, nombre_parque,
       ejecutivo, observaciones, datos_json,
-      id_financiera,
+      id_financiera, rut_concesionario, vendedor, comision_dealer,
     } = req.body;
 
     if (!rut_cliente || !nombre_cliente)
@@ -202,6 +209,7 @@ const create = async (req, res) => {
          transmision, combustible, tasacion, permiso_circulacion,
          automotora, id_dealer, tipo_ubicacion, nombre_parque_mgmt,
          ejecutivo, observaciones, datos_json, id_financiera,
+         rut_concesionario, vendedor, comdea_real,
          created_at, updated_at)
       VALUES (?,?,?,?,
               'OTORGADO',?,
@@ -214,6 +222,7 @@ const create = async (req, res) => {
               ?,?,?,?,
               ?,?,?,?,
               ?,?,?,?,
+              ?,?,?,
               NOW(), NOW())
     `, [
       numero_credito, rut_cliente.toUpperCase().trim(), nombre_cliente.trim(), fin,
@@ -231,6 +240,9 @@ const create = async (req, res) => {
       ejecutivo || null, observaciones || null,
       datos_json ? JSON.stringify(datos_json) : null,
       id_financiera || null,
+      rut_concesionario || null,
+      vendedor || null,
+      comision_dealer != null ? Math.round(parseFloat(comision_dealer)) : null,
     ]);
 
     audit.registrar({
