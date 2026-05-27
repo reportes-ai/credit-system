@@ -189,34 +189,8 @@
           document.getElementById('btnText').innerHTML = '<i class="bi bi-check-circle-fill me-2"></i>¡Bienvenido!';
           btnLogin.style.background = 'linear-gradient(135deg,#059669,#10b981)';
 
-          /* ── Sonido de transición (tono ascendente electrónico) ── */
-          try {
-            const AudioCtx = window.AudioContext || window.webkitAudioContext;
-            if (AudioCtx) {
-              const ctx = new AudioCtx(), t = ctx.currentTime;
-              /* Tono ascendente principal */
-              const o1 = ctx.createOscillator(), g1 = ctx.createGain();
-              o1.type = 'sine';
-              o1.frequency.setValueAtTime(110, t);
-              o1.frequency.exponentialRampToValueAtTime(1760, t + 0.72);
-              g1.gain.setValueAtTime(0, t);
-              g1.gain.linearRampToValueAtTime(0.13, t + 0.08);
-              g1.gain.setValueAtTime(0.13, t + 0.55);
-              g1.gain.exponentialRampToValueAtTime(0.001, t + 0.8);
-              o1.connect(g1); g1.connect(ctx.destination);
-              o1.start(t); o1.stop(t + 0.85);
-              /* Capa sawtooth que sube */
-              const o2 = ctx.createOscillator(), g2 = ctx.createGain();
-              o2.type = 'sawtooth';
-              o2.frequency.setValueAtTime(220, t + 0.05);
-              o2.frequency.exponentialRampToValueAtTime(2800, t + 0.68);
-              g2.gain.setValueAtTime(0, t + 0.05);
-              g2.gain.linearRampToValueAtTime(0.07, t + 0.1);
-              g2.gain.exponentialRampToValueAtTime(0.001, t + 0.72);
-              o2.connect(g2); g2.connect(ctx.destination);
-              o2.start(t + 0.05); o2.stop(t + 0.75);
-            }
-          } catch(e) {}
+          /* ── Sonido de bienvenida ── */
+          try { new Audio('/audio/bienvenido.mp3').play(); } catch(e) {}
 
           /* ── Dissolve + redirect ── */
           setTimeout(() => {
