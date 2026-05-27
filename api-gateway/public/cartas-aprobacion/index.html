@@ -1676,7 +1676,7 @@ function buildCorregirForm(c){
       </div>
       <div class="form-row cols-3">
         <div class="field"><label>Concesionario</label><input type="text" id="cConcesionario" value="${c.concesionario}"></div>
-        <div class="field"><label>RUT Concesionario</label><input type="text" id="cRutConc" value="${c.rutConc}"></div>
+        <div class="field"><label>RUT Concesionario</label><input type="text" id="cRutConc" value="${formatRUT(c.rutConc)}" oninput="autoFormatRUT(this)"></div>
         <div class="field"><label>Vendedor</label><input type="text" id="cVendedor" value="${c.vendedor}"></div>
       </div>
     </div>
@@ -4558,7 +4558,7 @@ function filterConc(){
 
 function selectConcItem(el, nombre, rut){
   document.getElementById('fConcesionario').value = nombre;
-  document.getElementById('fRutConc').value = rut;
+  document.getElementById('fRutConc').value = formatRUT(rut);
   document.getElementById('concList').style.display='none';
 }
 
@@ -4566,7 +4566,7 @@ function selectConc(idx){
   const c = getConcPool()[idx];
   if(!c) return;
   document.getElementById('fConcesionario').value = c.nombre;
-  document.getElementById('fRutConc').value = c.rut;
+  document.getElementById('fRutConc').value = formatRUT(c.rut);
   document.getElementById('concList').style.display='none';
 }
 
