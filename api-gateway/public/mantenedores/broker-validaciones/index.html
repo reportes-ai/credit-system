@@ -1,0 +1,274 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <link rel="icon" href="/img/favicon.png" type="image/png">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Documentos a Validar Brokers — AutoFácil</title>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css">
+  <style>
+    :root { --navy:#0141A2; --navy-dark:#012d70; --accent:#009AFE; --bg:#f0f4f8; --card:#fff; --border:#e2e8f0; --text:#1e293b; --muted:#64748b; }
+    * { box-sizing:border-box; margin:0; padding:0; }
+    body { font-family:'Segoe UI',system-ui,sans-serif; background:var(--bg); color:var(--text); }
+
+    .topnav { background:linear-gradient(90deg,var(--navy-dark),var(--navy)); color:#fff; height:56px; padding:0 24px; display:flex; align-items:center; justify-content:space-between; position:sticky; top:0; z-index:200; box-shadow:0 2px 8px rgba(0,0,0,.25); }
+    .nav-brand { display:flex; align-items:center; gap:10px; color:#fff; font-weight:800; font-size:1rem; text-decoration:none; }
+    .nav-brand img { height:28px; filter:brightness(0) invert(1); }
+    .version-badge { background:rgba(255,255,255,.15); color:rgba(255,255,255,.75); font-size:.65rem; font-weight:700; border-radius:6px; padding:2px 8px; letter-spacing:.5px; }
+    .breadcrumb-nav { color:rgba(255,255,255,.6); font-size:.85rem; display:flex; align-items:center; gap:6px; }
+    .breadcrumb-nav a { color:rgba(255,255,255,.75); text-decoration:none; }
+    .breadcrumb-nav a:hover { color:#fff; }
+    .breadcrumb-nav .sep { color:rgba(255,255,255,.35); }
+    .btn-back { background:rgba(255,255,255,.15); border:1px solid rgba(255,255,255,.3); color:#fff; border-radius:8px; padding:6px 14px; font-size:.82rem; font-weight:600; cursor:pointer; display:flex; align-items:center; gap:6px; text-decoration:none; transition:background .15s; }
+    .btn-back:hover { background:rgba(255,255,255,.25); }
+
+    .page-wrap { max-width:900px; margin:0 auto; padding:28px 16px 60px; }
+    .page-banner { background:linear-gradient(135deg,var(--navy-dark),var(--navy) 60%,var(--accent)); border-radius:14px; color:#fff; padding:22px 28px; margin-bottom:28px; display:flex; align-items:center; gap:16px; }
+    .page-banner i { font-size:2.4rem; opacity:.85; }
+    .page-banner h2 { font-weight:800; font-size:1.2rem; margin:0 0 4px; }
+    .page-banner p  { opacity:.8; font-size:.85rem; margin:0; }
+
+    /* Tabs financiera */
+    .fin-tabs { display:flex; gap:8px; margin-bottom:20px; }
+    .fin-tab { padding:8px 22px; border-radius:8px; font-size:.88rem; font-weight:700; cursor:pointer; border:2px solid var(--border); background:var(--card); color:var(--muted); transition:all .15s; }
+    .fin-tab.active { background:var(--navy); color:#fff; border-color:var(--navy); }
+    .fin-tab:hover:not(.active) { border-color:var(--navy); color:var(--navy); }
+
+    /* Panel */
+    .panel { background:var(--card); border-radius:12px; border:1px solid var(--border); overflow:hidden; }
+    .panel-head { display:flex; align-items:center; justify-content:space-between; padding:14px 20px; background:#f8faff; border-bottom:1px solid var(--border); }
+    .panel-head-title { font-weight:800; font-size:.9rem; color:var(--navy); display:flex; align-items:center; gap:8px; }
+    .btn-add { background:linear-gradient(135deg,var(--navy),var(--accent)); color:#fff; border:none; border-radius:8px; padding:8px 18px; font-size:.84rem; font-weight:700; cursor:pointer; display:flex; align-items:center; gap:6px; transition:opacity .15s; }
+    .btn-add:hover { opacity:.88; }
+
+    /* Lista items */
+    .items-list { padding:8px 0; min-height:60px; }
+    .item-row { display:flex; align-items:center; gap:10px; padding:10px 20px; border-bottom:1px solid var(--border); transition:background .12s; }
+    .item-row:last-child { border-bottom:none; }
+    .item-row:hover { background:#f8faff; }
+    .item-num { width:28px; height:28px; border-radius:7px; background:#eff6ff; color:var(--navy); font-size:.78rem; font-weight:800; display:flex; align-items:center; justify-content:center; flex-shrink:0; }
+    .item-texto { flex:1; font-size:.88rem; font-weight:600; color:var(--text); }
+    .item-badge-inactivo { font-size:.65rem; font-weight:700; background:#fef2f2; color:#dc2626; border-radius:4px; padding:2px 7px; }
+    .btn-edit { background:#eff6ff; border:1.5px solid #93c5fd; color:#1d4ed8; border-radius:7px; padding:5px 12px; font-size:.78rem; font-weight:700; cursor:pointer; transition:background .12s; }
+    .btn-edit:hover { background:#dbeafe; }
+    .btn-del  { background:#fef2f2; border:1.5px solid #fca5a5; color:#dc2626; border-radius:7px; padding:5px 10px; font-size:.78rem; cursor:pointer; transition:background .12s; display:flex; align-items:center; }
+    .btn-del:hover { background:#fee2e2; }
+
+    /* Spinner / empty */
+    .spinner-wrap { display:flex; align-items:center; justify-content:center; padding:40px; }
+    .spinner { width:1.5rem; height:1.5rem; border:.22em solid #e2e8f0; border-top-color:var(--navy); border-radius:50%; animation:spin .7s linear infinite; }
+    @keyframes spin { to { transform:rotate(360deg); } }
+    .empty-state { text-align:center; padding:40px; color:#94a3b8; font-size:.85rem; }
+    .empty-state i { font-size:2rem; display:block; margin-bottom:8px; }
+
+    /* Modal */
+    .modal-overlay { display:none; position:fixed; inset:0; background:rgba(10,15,30,.6); z-index:1000; align-items:center; justify-content:center; }
+    .modal-overlay.open { display:flex; }
+    .modal-box { background:#fff; border-radius:14px; padding:28px; width:100%; max-width:420px; box-shadow:0 16px 48px rgba(0,0,0,.25); }
+    .modal-title { font-size:1rem; font-weight:800; color:var(--navy); margin-bottom:18px; display:flex; align-items:center; gap:8px; }
+    .form-group { margin-bottom:14px; }
+    .form-group label { display:block; font-size:.78rem; font-weight:700; color:var(--muted); text-transform:uppercase; letter-spacing:.05em; margin-bottom:5px; }
+    .form-group input, .form-group select {
+      width:100%; border:1.5px solid var(--border); border-radius:8px; padding:9px 12px;
+      font-size:.88rem; font-family:inherit; color:var(--text); transition:border-color .15s;
+    }
+    .form-group input:focus, .form-group select:focus { outline:none; border-color:var(--navy); }
+    .modal-actions { display:flex; gap:10px; margin-top:20px; justify-content:flex-end; }
+    .btn-cancel { background:#f1f5f9; border:1.5px solid var(--border); color:#475569; border-radius:8px; padding:9px 18px; font-size:.86rem; font-weight:700; cursor:pointer; }
+    .btn-cancel:hover { background:#e2e8f0; }
+    .btn-save { background:linear-gradient(135deg,var(--navy),var(--accent)); color:#fff; border:none; border-radius:8px; padding:9px 22px; font-size:.86rem; font-weight:700; cursor:pointer; transition:opacity .15s; }
+    .btn-save:hover { opacity:.88; }
+
+    /* Toast */
+    .toast-msg { position:fixed; top:68px; right:20px; z-index:9999; border-radius:10px; padding:12px 20px; font-weight:600; font-size:.88rem; color:#fff; box-shadow:0 6px 20px rgba(0,0,0,.18); display:none; }
+    .toast-ok  { background:#059669; }
+    .toast-err { background:#dc2626; }
+  </style>
+</head>
+<body>
+
+<nav class="topnav">
+  <div style="display:flex;align-items:center;gap:16px">
+    <a class="nav-brand" href="/mantenedores">
+      <img src="/img/logo.png" alt="AutoFácil" onerror="this.style.display='none'">
+      <span>Mantenedores</span>
+      <span class="version-badge">v1.0</span>
+    </a>
+    <div class="breadcrumb-nav">
+      <a href="/">Inicio</a><span class="sep">›</span>
+      <a href="/mantenedores">Mantenedores</a><span class="sep">›</span>
+      <span style="color:#fff;font-weight:600"><i class="bi bi-card-checklist me-1"></i>Docs a Validar Brokers</span>
+    </div>
+  </div>
+  <a href="/mantenedores" class="btn-back"><i class="bi bi-arrow-left"></i>Volver</a>
+</nav>
+
+<div class="page-wrap">
+  <div class="page-banner">
+    <i class="bi bi-card-checklist"></i>
+    <div>
+      <h2>Documentos a Validar Brokers</h2>
+      <p>Gestiona los ítems de validación documental que aparecen como checklist al cargar respaldos de créditos AUTOFIN y UNIDAD DE CRÉDITO.</p>
+    </div>
+  </div>
+
+  <div class="fin-tabs">
+    <button class="fin-tab active" onclick="cambiarFin('AUTOFIN')">AUTOFIN</button>
+    <button class="fin-tab" onclick="cambiarFin('UNIDAD')">UNIDAD DE CRÉDITO</button>
+  </div>
+
+  <div class="panel">
+    <div class="panel-head">
+      <div class="panel-head-title"><i class="bi bi-list-check"></i><span id="panelTitle">Ítems — AUTOFIN</span></div>
+      <button class="btn-add" onclick="abrirModal()"><i class="bi bi-plus-lg"></i>Agregar ítem</button>
+    </div>
+    <div class="items-list" id="itemsList">
+      <div class="spinner-wrap"><div class="spinner"></div></div>
+    </div>
+  </div>
+</div>
+
+<!-- Modal nuevo/editar -->
+<div class="modal-overlay" id="modalOverlay">
+  <div class="modal-box">
+    <div class="modal-title"><i class="bi bi-pencil-square"></i><span id="modalTitle">Nuevo ítem</span></div>
+    <div class="form-group">
+      <label>Texto del ítem *</label>
+      <input type="text" id="fTexto" placeholder="Ej: Cédula de Identidad" maxlength="200">
+    </div>
+    <div class="form-group">
+      <label>Orden</label>
+      <input type="number" id="fOrden" placeholder="0" min="0" max="999">
+    </div>
+    <div class="form-group" id="fActivoWrap">
+      <label>Estado</label>
+      <select id="fActivo">
+        <option value="1">Activo</option>
+        <option value="0">Inactivo</option>
+      </select>
+    </div>
+    <div class="modal-actions">
+      <button class="btn-cancel" onclick="cerrarModal()">Cancelar</button>
+      <button class="btn-save" onclick="guardarItem()"><i class="bi bi-floppy me-1"></i>Guardar</button>
+    </div>
+  </div>
+</div>
+
+<div class="toast-msg" id="toastMsg"></div>
+
+<script>
+function getToken() { return localStorage.getItem('token'); }
+function apiHdr()   { return { 'Content-Type':'application/json', 'Authorization':'Bearer '+getToken() }; }
+(function(){ if (!getToken()) location.href='/login.html'; })();
+
+let _finActual = 'AUTOFIN';
+let _items     = [];
+let _editId    = null;
+
+function showToast(msg, ok) {
+  const el = document.getElementById('toastMsg');
+  el.textContent = msg;
+  el.className = 'toast-msg '+(ok?'toast-ok':'toast-err');
+  el.style.display = 'block';
+  setTimeout(() => el.style.display='none', 3200);
+}
+
+function cambiarFin(fin) {
+  _finActual = fin;
+  document.querySelectorAll('.fin-tab').forEach(t => t.classList.remove('active'));
+  event.target.classList.add('active');
+  document.getElementById('panelTitle').textContent = `Ítems — ${fin === 'UNIDAD' ? 'UNIDAD DE CRÉDITO' : fin}`;
+  cargarItems();
+}
+
+async function cargarItems() {
+  document.getElementById('itemsList').innerHTML = '<div class="spinner-wrap"><div class="spinner"></div></div>';
+  try {
+    const r = await fetch(`/api/broker-validation-items?financiera=${_finActual}&todos=1`, { headers:apiHdr() });
+    const j = await r.json();
+    if (!j.success) throw new Error(j.error);
+    _items = j.data;
+    renderItems();
+  } catch(e) {
+    document.getElementById('itemsList').innerHTML = `<div class="empty-state"><i class="bi bi-exclamation-triangle"></i>${e.message}</div>`;
+  }
+}
+
+function renderItems() {
+  if (!_items.length) {
+    document.getElementById('itemsList').innerHTML = '<div class="empty-state"><i class="bi bi-inbox"></i>Sin ítems configurados.<br>Agrega el primero con el botón +.</div>';
+    return;
+  }
+  document.getElementById('itemsList').innerHTML = _items.map((it, idx) => `
+    <div class="item-row">
+      <div class="item-num">${idx+1}</div>
+      <div class="item-texto">${it.texto}${!it.activo ? ' <span class="item-badge-inactivo">Inactivo</span>' : ''}</div>
+      <button class="btn-edit" onclick="abrirModal(${it.id})"><i class="bi bi-pencil"></i></button>
+      <button class="btn-del"  onclick="eliminarItem(${it.id})" title="Desactivar ítem"><i class="bi bi-trash"></i></button>
+    </div>`).join('');
+}
+
+function abrirModal(id) {
+  _editId = id || null;
+  const it = id ? _items.find(i => i.id === id) : null;
+  document.getElementById('modalTitle').textContent = it ? 'Editar ítem' : 'Nuevo ítem';
+  document.getElementById('fTexto').value  = it?.texto  || '';
+  document.getElementById('fOrden').value  = it?.orden  ?? '';
+  document.getElementById('fActivo').value = it ? (it.activo ? '1' : '0') : '1';
+  document.getElementById('fActivoWrap').style.display = it ? '' : 'none';
+  document.getElementById('modalOverlay').classList.add('open');
+  setTimeout(() => document.getElementById('fTexto').focus(), 80);
+}
+
+function cerrarModal() {
+  document.getElementById('modalOverlay').classList.remove('open');
+  _editId = null;
+}
+
+async function guardarItem() {
+  const texto = document.getElementById('fTexto').value.trim();
+  const orden = parseInt(document.getElementById('fOrden').value) || 0;
+  const activo = document.getElementById('fActivo').value;
+  if (!texto) { document.getElementById('fTexto').focus(); showToast('El texto es obligatorio', false); return; }
+
+  try {
+    let r, j;
+    if (_editId) {
+      r = await fetch(`/api/broker-validation-items/${_editId}`, {
+        method:'PUT', headers:apiHdr(),
+        body: JSON.stringify({ texto, orden, activo: parseInt(activo), financiera: _finActual })
+      });
+    } else {
+      r = await fetch('/api/broker-validation-items', {
+        method:'POST', headers:apiHdr(),
+        body: JSON.stringify({ texto, orden, financiera: _finActual })
+      });
+    }
+    j = await r.json();
+    if (!j.success) throw new Error(j.error);
+    cerrarModal();
+    showToast(_editId ? 'Ítem actualizado' : 'Ítem creado', true);
+    await cargarItems();
+  } catch(e) { showToast('Error: '+e.message, false); }
+}
+
+async function eliminarItem(id) {
+  const it = _items.find(i => i.id === id);
+  if (!confirm(`¿Desactivar el ítem "${it?.texto||''}"?\nSeguirá apareciendo en créditos existentes pero no en los nuevos.`)) return;
+  try {
+    const r = await fetch(`/api/broker-validation-items/${id}`, { method:'DELETE', headers:apiHdr() });
+    const j = await r.json();
+    if (!j.success) throw new Error(j.error);
+    showToast('Ítem desactivado', true);
+    await cargarItems();
+  } catch(e) { showToast('Error: '+e.message, false); }
+}
+
+document.addEventListener('keydown', e => { if (e.key === 'Escape') cerrarModal(); });
+document.getElementById('modalOverlay').addEventListener('click', e => { if (e.target === e.currentTarget) cerrarModal(); });
+
+cargarItems();
+</script>
+<script src="/js/app-version.js"></script>
+</body>
+</html>

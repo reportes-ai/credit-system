@@ -49,6 +49,8 @@ app.use('/api/documentos-af',       require('../../services/creditos/src/routes/
 app.use('/api/pagos-credito',       require('../../services/creditos/src/routes/pagos-credito.routes'));
 app.use('/api/operaciones',         require('../../services/creditos/src/routes/operaciones.routes'));
 app.use('/api/auditoria-credito',   require('../../services/creditos/src/routes/auditoria.routes'));
+app.use('/api/broker-validation-items', require('../../services/creditos/src/routes/broker-validation-items.routes'));
+app.use('/api/broker-validaciones',     require('../../services/creditos/src/routes/broker-validaciones.routes'));
 
 // Tesorería
 app.use('/api/cajas',                require('../../services/tesoreria/src/routes/cajas.routes'));
@@ -121,6 +123,9 @@ app.get(['/mantenedores/parques', '/mantenedores/parques/'], (req, res) =>
 
 app.get(['/mantenedores/flujo-brokerage', '/mantenedores/flujo-brokerage/'], (req, res) =>
   res.sendFile(path.join(__dirname, '../public/mantenedores/flujo-brokerage/index.html')));
+
+app.get(['/mantenedores/broker-validaciones', '/mantenedores/broker-validaciones/'], (req, res) =>
+  res.sendFile(path.join(__dirname, '../public/mantenedores/broker-validaciones/index.html')));
 
 app.get(['/creditos/digitacion-autofin', '/creditos/digitacion-autofin/'], (req, res) =>
   res.sendFile(path.join(__dirname, '../public/creditos/digitacion-autofin.html')));

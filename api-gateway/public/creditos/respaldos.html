@@ -152,9 +152,36 @@
   .no-data { text-align:center; padding:60px; color:#94a3b8; }
   .no-data i { font-size:2rem; display:block; margin-bottom:8px; opacity:.4; }
 
+  /* ── Checklist de validación (broker) ── */
+  .checklist-wrap { background:var(--card); border:1.5px solid var(--border); border-radius:12px; margin-bottom:24px; overflow:hidden; }
+  .checklist-head { background:#f8faff; border-bottom:1px solid var(--border); padding:12px 18px; display:flex; align-items:center; justify-content:space-between; }
+  .checklist-head-title { font-size:.82rem; font-weight:800; color:var(--navy); display:flex; align-items:center; gap:8px; text-transform:uppercase; letter-spacing:.05em; }
+  .checklist-table { width:100%; border-collapse:collapse; }
+  .checklist-table th { font-size:.66rem; font-weight:800; text-transform:uppercase; letter-spacing:.06em; color:var(--muted); padding:9px 18px; background:#fafbff; border-bottom:1px solid var(--border); text-align:left; }
+  .checklist-table th.th-val { text-align:center; width:100px; }
+  .checklist-table td { padding:10px 18px; border-bottom:1px solid #f0f4f8; font-size:.86rem; vertical-align:middle; }
+  .checklist-table tr:last-child td { border-bottom:none; }
+  .checklist-table tr:hover td { background:#fafbff; }
+  .chk-num { width:24px; height:24px; border-radius:6px; background:#eff6ff; color:var(--navy); font-size:.72rem; font-weight:800; display:inline-flex; align-items:center; justify-content:center; }
+  .chk-texto { font-weight:600; }
+  .td-val { text-align:center; }
+  .val-group { display:inline-flex; gap:4px; }
+  .btn-val { padding:5px 10px; border-radius:6px; font-size:.73rem; font-weight:800; cursor:pointer; border:1.5px solid var(--border); background:var(--card); color:var(--muted); transition:all .12s; letter-spacing:.03em; }
+  .btn-val:hover { border-color:#94a3b8; color:#334155; }
+  .btn-val.SI.active  { background:#dcfce7; color:#15803d; border-color:#86efac; }
+  .btn-val.NO.active  { background:#fee2e2; color:#dc2626; border-color:#fca5a5; }
+  .btn-val.NA.active  { background:#f1f5f9; color:#475569; border-color:#94a3b8; }
+  .checklist-footer { padding:12px 18px; border-top:1px solid var(--border); background:#fafbff; display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:8px; }
+  .validado-por { font-size:.78rem; color:var(--muted); display:flex; align-items:center; gap:5px; }
+  .validado-por strong { color:var(--text); }
+  .chk-progress { font-size:.75rem; color:var(--muted); }
+  .chk-all-ok { font-size:.78rem; font-weight:700; color:#15803d; display:flex; align-items:center; gap:5px; }
+
   @media(max-width:600px) {
     .docs-grid { grid-template-columns:1fr; }
     .cred-summary { flex-direction:column; align-items:flex-start; }
+    .checklist-table th.th-val, .checklist-table td.td-val { width:90px; }
+    .btn-val { padding:4px 7px; font-size:.68rem; }
   }
 </style>
 </head>
@@ -164,7 +191,7 @@
   <a class="nav-brand" href="/creditos">
     <img src="/img/logo-autofacil.png" alt="AutoFácil" style="filter:brightness(0) invert(1);height:32px;display:block" onerror="this.style.display='none'">
     <span>Carga de Respaldos</span>
-    <span class="version-badge">v2.7</span>
+    <span class="version-badge">v2.8</span>
   </a>
   <div class="breadcrumb-nav"><a href="/">Inicio</a><span class="sep">›</span><a href="/creditos">Créditos</a><span class="sep">›</span><span style="color:#fff;font-weight:600"><i class="bi bi-folder2 me-1"></i>Respaldos</span></div>
   <div style="display:flex;align-items:center;gap:10px">
@@ -273,6 +300,10 @@ let _esAnalista  = false;
 let _pendingTipo = null;
 let _viewerDoc   = null;     // { idDoc, nombre, mime }
 let _commentTimers = {};     // debounce por id_tipo
+// Checklist broker
+let _validationItems = [];   // items del catálogo
+let _validaciones    = {};   // { id_item: 'SI'|'NO'|'NA' }
+let _validadoPor     = null; // nombre del validador
 
 /* ── Cargar página ── */
 async function cargarPagina() {
@@ -290,15 +321,32 @@ async function cargarPagina() {
     // Mapear financiera del crédito → clave de tipos de documento
     const finMap = { 'AUTOFIN':'AUTOFIN', 'UNIDAD DE CREDITO':'UNIDAD' };
     const finKey = finMap[(_credito.financiera||'').toUpperCase()] || 'AUTOFACIL';
+    const esBrokerLoad = finKey !== 'AUTOFACIL';
 
-    // 2. Cargar tipos de documento (filtrados por financiera) + documentos en paralelo
-    const [rt, rd] = await Promise.all([
+    // 2. Cargar tipos de documento + documentos (+ checklist si broker) en paralelo
+    const fetchList = [
       fetch('/api/tipos-documento/activos?financiera='+finKey, { headers:apiHdr() }),
       fetch('/api/credito-documentos/'+creditId,               { headers:apiHdr() }),
-    ]);
-    const [jt, jd] = await Promise.all([rt.json(), rd.json()]);
-    _tipos   = jt.success ? jt.data : [];
-    if (jd.success) jd.data.forEach(d => { _docs[d.id_tipo] = d; });
+    ];
+    if (esBrokerLoad) {
+      fetchList.push(fetch('/api/broker-validation-items?financiera='+finKey, { headers:apiHdr() }));
+      fetchList.push(fetch('/api/broker-validaciones/'+creditId,              { headers:apiHdr() }));
+    }
+    const responses = await Promise.all(fetchList);
+    const jsons     = await Promise.all(responses.map(r => r.json()));
+    _tipos = jsons[0].success ? jsons[0].data : [];
+    if (jsons[1].success) jsons[1].data.forEach(d => { _docs[d.id_tipo] = d; });
+    if (esBrokerLoad) {
+      _validationItems = jsons[2]?.success ? jsons[2].data : [];
+      _validaciones    = {};
+      _validadoPor     = null;
+      if (jsons[3]?.success) {
+        jsons[3].data.forEach(v => {
+          _validaciones[v.id_item] = v.valor;
+          if (v.validado_por && !_validadoPor) _validadoPor = v.validado_por;
+        });
+      }
+    }
     renderPagina();
   } catch(e) {
     document.getElementById('pageWrap').innerHTML = `<div class="no-data"><i class="bi bi-exclamation-triangle"></i>${e.message}</div>`;
@@ -400,6 +448,8 @@ function renderPagina() {
       <div class="pb-track"><div class="pb-fill" id="pbFill" style="width:0%"></div></div>
     </div>
 
+    ${esBroker && _validationItems.length ? `<div id="checklistWrap"></div>` : ''}
+
     ${obligatorios.length ? `
     <div style="font-size:.72rem;font-weight:800;text-transform:uppercase;letter-spacing:.07em;color:var(--navy);margin-bottom:10px">
       <i class="bi bi-exclamation-circle me-1" style="color:#dc2626"></i>Documentos Obligatorios
@@ -413,6 +463,7 @@ function renderPagina() {
     <div class="docs-grid">${opcionales.map(t => renderDocCard(t)).join('')}</div>` : ''}`;
 
   document.getElementById('actionBar').style.display = 'flex';
+  if (esBroker && _validationItems.length) renderChecklist();
   actualizarProgreso();
 }
 
@@ -641,6 +692,93 @@ function actualizarCardAprobacion(idTipo) {
   }
 }
 
+/* ── Checklist de validación (broker) ── */
+function renderChecklist() {
+  const wrap = document.getElementById('checklistWrap');
+  if (!wrap) return;
+  const total = _validationItems.length;
+  const siCount = _validationItems.filter(it => _validaciones[it.id] === 'SI').length;
+  const allSI   = total > 0 && siCount === total;
+  const u       = getUsuario();
+  const nombre  = _validadoPor || u.nombre || u.email || '';
+
+  wrap.innerHTML = `
+  <div class="checklist-wrap">
+    <div class="checklist-head">
+      <div class="checklist-head-title"><i class="bi bi-list-check"></i>Validación de Documentos</div>
+      ${allSI ? `<span style="font-size:.75rem;font-weight:700;color:#15803d;display:flex;align-items:center;gap:5px"><i class="bi bi-check-circle-fill"></i>Todos validados</span>` : `<span class="chk-progress">${siCount} / ${total} validados</span>`}
+    </div>
+    <table class="checklist-table">
+      <thead>
+        <tr>
+          <th style="width:32px">#</th>
+          <th>Documento</th>
+          <th class="th-val">Validación</th>
+        </tr>
+      </thead>
+      <tbody>
+        ${_validationItems.map((it, idx) => {
+          const val = _validaciones[it.id] || null;
+          return `<tr>
+            <td><span class="chk-num">${idx+1}</span></td>
+            <td class="chk-texto">${it.texto}</td>
+            <td class="td-val">
+              <div class="val-group">
+                <button class="btn-val SI ${val==='SI'?'active':''}" onclick="setValidacion(${it.id},'SI')">SI</button>
+                <button class="btn-val NO ${val==='NO'?'active':''}" onclick="setValidacion(${it.id},'NO')">NO</button>
+                <button class="btn-val NA ${val==='NA'?'active':''}" onclick="setValidacion(${it.id},'NA')">N/A</button>
+              </div>
+            </td>
+          </tr>`;
+        }).join('')}
+      </tbody>
+    </table>
+    <div class="checklist-footer">
+      <div class="validado-por">
+        <i class="bi bi-person-check"></i>
+        ${nombre ? `Validado por: <strong>${nombre}</strong>` : '<span style="color:#94a3b8">Sin validaciones registradas aún</span>'}
+      </div>
+      ${allSI ? `<div class="chk-all-ok"><i class="bi bi-shield-check"></i>Documentación completa — listo para Carta de Aprobación</div>` : ''}
+    </div>
+  </div>`;
+}
+
+async function setValidacion(idItem, valor) {
+  // Toggle: si ya tiene ese valor, lo deselecciona
+  const prev = _validaciones[idItem];
+  const nuevoValor = prev === valor ? null : valor;
+  _validaciones[idItem] = nuevoValor;
+
+  const u      = getUsuario();
+  const nombre = _validadoPor || u.nombre || u.email || null;
+  _validadoPor = nombre;
+
+  // Guardar en backend (enviar todas las validaciones actuales)
+  const payload = _validationItems.map(it => ({
+    id_item: it.id,
+    valor:   _validaciones[it.id] || null,
+  }));
+  try {
+    const r = await fetch('/api/broker-validaciones/'+creditId, {
+      method:'POST', headers:apiHdr(),
+      body: JSON.stringify({ validaciones: payload, validado_por: nombre })
+    });
+    const j = await r.json();
+    if (!j.success) throw new Error(j.error);
+    // Actualizar validadoPor desde la respuesta si corresponde
+    if (j.data?.length) {
+      const found = j.data.find(v => v.validado_por);
+      if (found) _validadoPor = found.validado_por;
+    }
+  } catch(e) {
+    // Revertir en caso de error
+    _validaciones[idItem] = prev;
+    showToast('Error al guardar: '+e.message, false);
+  }
+  renderChecklist();
+  actualizarProgreso();
+}
+
 /* ── Selección y subida ── */
 function seleccionarArchivo(idTipo) {
   _pendingTipo = idTipo;
@@ -842,11 +980,20 @@ function actualizarProgreso() {
   const esBrokerAct = ['AUTOFIN','UNIDAD DE CREDITO'].includes((_credito?.financiera||'').toUpperCase());
   const oblOk = obligatorios.length === 0 || cargadosObl === obligatorios.length;
 
+  // Para broker: también requiere que todos los ítems de validación sean SI
+  const chkOk = !esBrokerAct || _validationItems.length === 0 ||
+    _validationItems.every(it => _validaciones[it.id] === 'SI');
+  const cartaOk = oblOk && chkOk;
+
   // Botón "Pasar a Carta de Aprobación" para broker pre-carta
   const btnCarta = document.getElementById('btnCartaAprobacion');
   if (btnCarta && btnCarta.style.display !== 'none') {
-    btnCarta.disabled = !oblOk;
-    btnCarta.title = oblOk ? '' : `Faltan ${obligatorios.length-cargadosObl} documento(s) obligatorio(s)`;
+    btnCarta.disabled = !cartaOk;
+    if (!oblOk) btnCarta.title = `Faltan ${obligatorios.length-cargadosObl} documento(s) obligatorio(s)`;
+    else if (!chkOk) {
+      const pendChk = _validationItems.filter(it => _validaciones[it.id] !== 'SI').length;
+      btnCarta.title = `Faltan ${pendChk} ítem(s) del checklist sin marcar SI`;
+    } else btnCarta.title = '';
   }
 
   const btn = document.getElementById('btnAprobar');
