@@ -83,9 +83,33 @@
     #alerta { display: none; }
     .version { text-align: center; color: #9ca3af; font-size: 0.75rem; margin-top: 24px; }
     .version strong { color: #0141A2; font-weight: 700; }
+
+    /* ── Dissolve transition ── */
+    @keyframes cardDissolve {
+      0%   { transform: scale(1);    opacity: 1; filter: blur(0px);  }
+      30%  { transform: scale(1.05); opacity: 1; filter: blur(0px);  }
+      100% { transform: scale(0.82); opacity: 0; filter: blur(14px); }
+    }
+    @keyframes bgDarken {
+      0%   { opacity: 1; }
+      100% { opacity: 0; }
+    }
+    .login-card.dissolving {
+      animation: cardDissolve 0.75s cubic-bezier(0.4, 0, 0.6, 1) forwards;
+      pointer-events: none;
+    }
+    #bgOverlay {
+      position: fixed; inset: 0;
+      background: #000d2e;
+      opacity: 0; pointer-events: none;
+      transition: opacity 0.75s ease;
+      z-index: 999;
+    }
+    #bgOverlay.active { opacity: 1; }
   </style>
 </head>
 <body>
+  <div id="bgOverlay"></div>
   <div class="login-card">
     <div class="login-header">
       <img src="/img/logo.png" alt="AutoFácil" class="logo">
@@ -158,15 +182,59 @@
         if (data.success) {
           localStorage.setItem('token', data.data.token);
           localStorage.setItem('usuario', JSON.stringify(data.data.usuario));
-          window.location.href = '/';
+
+          /* ── Botón de éxito ── */
+          document.getElementById('btnSpinner').classList.add('d-none');
+          document.getElementById('btnText').classList.remove('d-none');
+          document.getElementById('btnText').innerHTML = '<i class="bi bi-check-circle-fill me-2"></i>¡Bienvenido!';
+          btnLogin.style.background = 'linear-gradient(135deg,#059669,#10b981)';
+
+          /* ── Sonido de transición (tono ascendente electrónico) ── */
+          try {
+            const AudioCtx = window.AudioContext || window.webkitAudioContext;
+            if (AudioCtx) {
+              const ctx = new AudioCtx(), t = ctx.currentTime;
+              /* Tono ascendente principal */
+              const o1 = ctx.createOscillator(), g1 = ctx.createGain();
+              o1.type = 'sine';
+              o1.frequency.setValueAtTime(110, t);
+              o1.frequency.exponentialRampToValueAtTime(1760, t + 0.72);
+              g1.gain.setValueAtTime(0, t);
+              g1.gain.linearRampToValueAtTime(0.13, t + 0.08);
+              g1.gain.setValueAtTime(0.13, t + 0.55);
+              g1.gain.exponentialRampToValueAtTime(0.001, t + 0.8);
+              o1.connect(g1); g1.connect(ctx.destination);
+              o1.start(t); o1.stop(t + 0.85);
+              /* Capa sawtooth que sube */
+              const o2 = ctx.createOscillator(), g2 = ctx.createGain();
+              o2.type = 'sawtooth';
+              o2.frequency.setValueAtTime(220, t + 0.05);
+              o2.frequency.exponentialRampToValueAtTime(2800, t + 0.68);
+              g2.gain.setValueAtTime(0, t + 0.05);
+              g2.gain.linearRampToValueAtTime(0.07, t + 0.1);
+              g2.gain.exponentialRampToValueAtTime(0.001, t + 0.72);
+              o2.connect(g2); g2.connect(ctx.destination);
+              o2.start(t + 0.05); o2.stop(t + 0.75);
+            }
+          } catch(e) {}
+
+          /* ── Dissolve + redirect ── */
+          setTimeout(() => {
+            document.querySelector('.login-card').classList.add('dissolving');
+            document.getElementById('bgOverlay').classList.add('active');
+            setTimeout(() => { window.location.href = '/'; }, 780);
+          }, 320);
+
         } else {
           alerta.textContent = data.error || 'Error al iniciar sesión';
           alerta.style.display = 'block';
+          btnLogin.disabled = false;
+          document.getElementById('btnText').classList.remove('d-none');
+          document.getElementById('btnSpinner').classList.add('d-none');
         }
       } catch {
         alerta.textContent = 'Error de conexión con el servidor';
         alerta.style.display = 'block';
-      } finally {
         btnLogin.disabled = false;
         document.getElementById('btnText').classList.remove('d-none');
         document.getElementById('btnSpinner').classList.add('d-none');
