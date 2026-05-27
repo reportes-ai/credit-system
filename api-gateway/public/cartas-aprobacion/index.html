@@ -211,7 +211,7 @@ body { font-family: 'Segoe UI', Arial, sans-serif; background: var(--gray-bg); c
   <div class="header no-print">
     <div class="header-logo" style="display:flex;align-items:center;gap:8px">
         <img id="logoHeader" src="/img/logo.png" alt="AutoFácil" style="height:32px;object-fit:contain">
-        <span style="font-size:11px;font-weight:400;color:#90CAF9">V5.34</span>
+        <span style="font-size:11px;font-weight:400;color:#90CAF9">V5.35</span>
       </div>
     <div class="header-right">
       <span class="header-user" id="headerUser"></span>
@@ -373,15 +373,25 @@ body { font-family: 'Segoe UI', Arial, sans-serif; background: var(--gray-bg); c
             <div id="alertFinanciera" style="display:none;margin-top:4px;font-size:10px;font-weight:700;padding:4px 6px;border-radius:3px;position:relative;z-index:1"></div>
           </div>
         </div>
-        <div class="form-row cols-3">
+        <div class="form-row cols-4">
           <div class="field">
-            <label>Nombre Cliente *</label>
-            <input type="text" id="fNombreCliente" placeholder="Nombre completo" onblur="autoTitleCase(this)">
+            <label>Nombre(s) *</label>
+            <input type="text" id="fNombre" placeholder="Nombre(s)" onblur="autoTitleCase(this)">
+          </div>
+          <div class="field">
+            <label>Apellido Paterno *</label>
+            <input type="text" id="fApellidoPaterno" placeholder="Apellido Paterno" onblur="autoTitleCase(this)">
+          </div>
+          <div class="field">
+            <label>Apellido Materno</label>
+            <input type="text" id="fApellidoMaterno" placeholder="Apellido Materno" onblur="autoTitleCase(this)">
           </div>
           <div class="field">
             <label>RUT Cliente *</label>
             <input type="text" id="fRutCliente" placeholder="12.345.678-9" oninput="autoFormatRUT(this)">
           </div>
+        </div>
+        <div class="form-row cols-3">
           <div class="field">
             <label>Fecha Emisión</label>
             <input type="date" id="fFecha" readonly>
@@ -1443,6 +1453,46 @@ async function dbGetCartas(){
   } catch(e){ console.error('getCartas:', e); return null; }
 }
 
+// Guarda o actualiza el cliente en la base de clientes (silencioso, no bloquea flujo)
+async function upsertClienteDesdeCartaSilente(rut, nombres, apellidoPaterno, apellidoMaterno){
+  if(!rut || !nombres || !apellidoPaterno) return;
+  const h = { 'Content-Type':'application/json', 'Authorization':'Bearer '+currentUser.token };
+  try {
+    // Buscar si el cliente ya existe
+    const res = await fetch('/api/clientes/rut/' + encodeURIComponent(rut), { headers: h });
+    if(!res.ok) return;
+    const j = await res.json();
+    if(j.success && j.data && j.data.id_cliente){
+      // Existe → leer datos completos y hacer PUT mezclando sólo los nombres
+      const full = j.data;
+      await fetch('/api/clientes/' + full.id_cliente, {
+        method: 'PUT',
+        headers: h,
+        body: JSON.stringify({
+          ...full,
+          tipo_cliente:     full.tipo_cliente || 'PERSONA',
+          nombres:          nombres,
+          apellido_paterno: apellidoPaterno,
+          apellido_materno: apellidoMaterno || full.apellido_materno || ''
+        })
+      });
+    } else {
+      // No existe → crear con datos mínimos
+      await fetch('/api/clientes', {
+        method: 'POST',
+        headers: h,
+        body: JSON.stringify({
+          rut:              rut,
+          tipo_cliente:     'PERSONA',
+          nombres:          nombres,
+          apellido_paterno: apellidoPaterno,
+          apellido_materno: apellidoMaterno || ''
+        })
+      });
+    }
+  } catch(e){ /* silencioso */ }
+}
+
 async function dbUpsertCarta(c){
   try {
     const r = await fetch('/api/cartas', {
@@ -1638,9 +1688,13 @@ function buildCorregirForm(c){
   wrap.innerHTML = `
     <div class="form-card">
       <div class="form-card-title">Editar Carta N° ${c.opCarta}</div>
-      <div class="form-row cols-3">
-        <div class="field"><label>Nombre Cliente</label><input type="text" id="cNombreCliente" value="${toTitleCase(c.cliente)}" onblur="autoTitleCase(this)"></div>
+      <div class="form-row cols-4">
+        <div class="field"><label>Nombre(s)</label><input type="text" id="cNombre" value="${toTitleCase(c.nombres||'')}" onblur="autoTitleCase(this)" placeholder="Nombre(s)"></div>
+        <div class="field"><label>Apellido Paterno</label><input type="text" id="cApellidoPaterno" value="${toTitleCase(c.apellidoPaterno||'')}" onblur="autoTitleCase(this)" placeholder="Ap. Paterno"></div>
+        <div class="field"><label>Apellido Materno</label><input type="text" id="cApellidoMaterno" value="${toTitleCase(c.apellidoMaterno||'')}" onblur="autoTitleCase(this)" placeholder="Ap. Materno"></div>
         <div class="field"><label>RUT Cliente</label><input type="text" id="cRutCliente" value="${formatRUT(c.rutCliente)}" oninput="autoFormatRUT(this)"></div>
+      </div>
+      <div class="form-row cols-3">
         <div class="field"><label>Plazo</label>
           <select id="cPlazo" onchange="calcCorregirPart('${c.id}')">
             ${Array.from({length:67},(_,i)=>i+6).map(p=>`<option value="${p}" ${p==c.plazo?'selected':''}>${p}</option>`).join('')}
@@ -1755,7 +1809,13 @@ function grabarCorreccion(id){
     return; 
   }
   // Update fields
-  c.cliente = toTitleCase(document.getElementById('cNombreCliente').value.trim()) || c.cliente;
+  const cNombre      = toTitleCase(document.getElementById('cNombre').value.trim());
+  const cApPaterno   = toTitleCase(document.getElementById('cApellidoPaterno').value.trim());
+  const cApMaterno   = toTitleCase(document.getElementById('cApellidoMaterno').value.trim());
+  if(cNombre)    c.nombres        = cNombre;
+  if(cApPaterno) c.apellidoPaterno = cApPaterno;
+  c.apellidoMaterno = cApMaterno;
+  c.cliente = [c.nombres||'', c.apellidoPaterno||'', c.apellidoMaterno||''].filter(Boolean).join(' ') || c.cliente;
   c.rutCliente = formatRUT(document.getElementById('cRutCliente').value.trim()) || c.rutCliente;
   c.plazo = document.getElementById('cPlazo').value;
   c.tipoVehiculo = document.getElementById('cTipoVehiculo').value.trim();
@@ -4649,8 +4709,12 @@ async function grabarCarta(){
   if(!ej) { alert('Seleccione un Ejecutivo Comercial'); return; }
   const opOrigen = document.getElementById('fOpOrigen').value.trim();
   if(!opOrigen) { alert('Ingrese N° Operación Origen'); return; }
-  const cliente = document.getElementById('fNombreCliente').value.trim();
-  if(!cliente) { alert('Ingrese Nombre Cliente'); return; }
+  const fNombre = toTitleCase(document.getElementById('fNombre').value.trim());
+  if(!fNombre) { alert('Ingrese el Nombre del cliente'); return; }
+  const fApPaterno = toTitleCase(document.getElementById('fApellidoPaterno').value.trim());
+  if(!fApPaterno) { alert('Ingrese el Apellido Paterno del cliente'); return; }
+  const fApMaterno = toTitleCase(document.getElementById('fApellidoMaterno').value.trim());
+  const cliente = [fNombre, fApPaterno, fApMaterno].filter(Boolean).join(' ');
   const rutCliente = document.getElementById('fRutCliente').value.trim();
   if(!rutCliente) { alert('Ingrese RUT Cliente'); return; }
   const marca = document.getElementById('fMarca').value;
@@ -4669,7 +4733,10 @@ async function grabarCarta(){
     ejecutivoNombre: ejecutivos[parseInt(ej)].nombre,
     ejecutivoMail: ejecutivos[parseInt(ej)].mail,
     ejecutivoTel: ejecutivos[parseInt(ej)].tel,
-    cliente: toTitleCase(cliente),
+    cliente: cliente,
+    nombres: fNombre,
+    apellidoPaterno: fApPaterno,
+    apellidoMaterno: fApMaterno,
     rutCliente: formatRUT(rutCliente),
     tipoVehiculo: document.getElementById('fTipoVehiculo').value,
     marca: marca,
@@ -4738,6 +4805,9 @@ async function grabarCarta(){
     return;
   }
 
+  // Guardar cliente en base de clientes (silencioso)
+  upsertClienteDesdeCartaSilente(carta.rutCliente, carta.nombres, carta.apellidoPaterno, carta.apellidoMaterno);
+
   // Agregar al array local con el id real ya asignado por el backend
   cartas.push(carta);
   saveData();
@@ -4753,7 +4823,7 @@ async function grabarCarta(){
 function clearForm(){
   selectedTipoCarta='';
   document.querySelectorAll('.tipo-opt').forEach(el=>el.classList.remove('selected'));
-  ['fEjecutivo','fOpOrigen','fNombreCliente','fRutCliente','fTipoVehiculo','fMarca','fModelo','fAnio',
+  ['fEjecutivo','fOpOrigen','fNombre','fApellidoPaterno','fApellidoMaterno','fRutCliente','fTipoVehiculo','fMarca','fModelo','fAnio',
    'fPatente','fSaldo','fParque','fConcesionario','fRutConc','fVendedor',
    'fMailEjecutivo','fTelEjecutivo','fOpCarta','fPlazo','fPartNeto','fPartIVA','fPartBruto'].forEach(id=>{
     const el=document.getElementById(id); if(el){ el.value=el.tagName==='SELECT'?'':'';}
