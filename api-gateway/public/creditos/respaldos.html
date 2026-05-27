@@ -164,7 +164,7 @@
   <a class="nav-brand" href="/creditos">
     <img src="/img/logo-autofacil.png" alt="AutoFácil" style="filter:brightness(0) invert(1);height:32px;display:block" onerror="this.style.display='none'">
     <span>Carga de Respaldos</span>
-    <span class="version-badge">v2.6</span>
+    <span class="version-badge">v2.7</span>
   </a>
   <div class="breadcrumb-nav"><a href="/">Inicio</a><span class="sep">›</span><a href="/creditos">Créditos</a><span class="sep">›</span><span style="color:#fff;font-weight:600"><i class="bi bi-folder2 me-1"></i>Respaldos</span></div>
   <div style="display:flex;align-items:center;gap:10px">
@@ -187,6 +187,12 @@
     <i class="bi bi-trash3"></i>Limpiar documentos
   </button>
   <!-- Botones broker (solo AUTOFIN / UNIDAD DE CREDITO) -->
+  <!-- Pre-carta: avanzar a CARTA_APROBACION cuando documentos listos -->
+  <button id="btnCartaAprobacion" class="btn-accion" onclick="avanzarCartaAprobacion()"
+    style="display:none;background:linear-gradient(135deg,#0369a1,#0ea5e9);color:#fff" disabled>
+    <i class="bi bi-file-earmark-check"></i>Pasar a Carta de Aprobación
+  </button>
+  <!-- Carta ya generada: cursar o desistir -->
   <button id="btnCursado" class="btn-accion" onclick="marcarEstadoBroker('OTORGADO')"
     style="display:none;background:linear-gradient(135deg,#16a34a,#15803d);color:#fff">
     <i class="bi bi-check2-circle"></i>Crédito Cursado
@@ -304,21 +310,29 @@ function renderPagina() {
   const c = _credito;
   _esAnalista = c.estado === 'EN_ANALISIS';
 
-  // Broker: AUTOFIN y UNIDAD → mostrar Cursado/Desistido, ocultar Enviar a Análisis
+  // Broker: AUTOFIN y UNIDAD → flujo propio, ocultar Enviar a Análisis
   const esBroker = ['AUTOFIN','UNIDAD DE CREDITO'].includes((c.financiera||'').toUpperCase());
-  // Mostrar solo si el crédito está pendiente de decisión (CARTA_APROBACION)
-  const mostrarBroker = esBroker && c.estado === 'CARTA_APROBACION';
+  const ESTADOS_BROKER_FINALES_R = new Set(['OTORGADO','DESISTIDO','CURSADO']);
 
+  // Botón "Pasar a Carta de Aprobación": broker + NO está en CARTA_APROBACION ni estado final
+  const btnCartaAprobacion = document.getElementById('btnCartaAprobacion');
+  if (btnCartaAprobacion) {
+    const mostrarCarta = esBroker && !ESTADOS_BROKER_FINALES_R.has(c.estado) && c.estado !== 'CARTA_APROBACION';
+    btnCartaAprobacion.style.display = mostrarCarta ? '' : 'none';
+    if (mostrarCarta) btnCartaAprobacion.disabled = false; // se habilita después de subir docs
+  }
+
+  // Botones Cursado / Desistido: broker + CARTA_APROBACION
   const btnCursado   = document.getElementById('btnCursado');
   const btnDesistido = document.getElementById('btnDesistido');
-  if (btnCursado)   btnCursado.style.display   = mostrarBroker ? '' : 'none';
-  if (btnDesistido) btnDesistido.style.display = mostrarBroker ? '' : 'none';
+  const mostrarCursarDesistir = esBroker && c.estado === 'CARTA_APROBACION';
+  if (btnCursado)   btnCursado.style.display   = mostrarCursarDesistir ? '' : 'none';
+  if (btnDesistido) btnDesistido.style.display = mostrarCursarDesistir ? '' : 'none';
 
   const btnAprobar = document.getElementById('btnAprobar');
   const btnLabel   = document.getElementById('btnAprobarLabel');
   if (btnAprobar) {
     if (esBroker) {
-      // Créditos broker: no tienen flujo de análisis interno
       btnAprobar.style.display = 'none';
     } else {
       btnAprobar.style.display = '';
@@ -337,7 +351,19 @@ function renderPagina() {
   const opcionales   = _tipos.filter(t => !t.obligatorio);
 
   document.getElementById('pageWrap').innerHTML = `
-    ${_esAnalista ? `
+    ${esBroker ? `
+    <div style="background:linear-gradient(135deg,#0369a1,#0284c7);border-radius:12px;padding:14px 20px;margin-bottom:16px;display:flex;align-items:center;gap:14px;color:#fff">
+      <i class="bi bi-building-check" style="font-size:1.5rem"></i>
+      <div>
+        <div style="font-weight:800;font-size:.95rem">VALIDACIÓN DE DOCUMENTOS — ${c.financiera||'Broker'}</div>
+        <div style="font-size:.8rem;opacity:.85">
+          Sube los documentos requeridos por <strong>${c.financiera||'la financiera'}</strong>.
+          ${c.estado === 'CARTA_APROBACION'
+            ? 'La carta de aprobación ya fue generada. Puedes <strong>cursar</strong> o <strong>desistir</strong> el crédito.'
+            : 'Una vez completos los obligatorios, avanza a <strong>Carta de Aprobación</strong>.'}
+        </div>
+      </div>
+    </div>` : _esAnalista ? `
     <div style="background:linear-gradient(135deg,#5b21b6,#7c3aed);border-radius:12px;padding:14px 20px;margin-bottom:16px;display:flex;align-items:center;gap:14px;color:#fff">
       <i class="bi bi-clipboard2-check-fill" style="font-size:1.5rem"></i>
       <div>
@@ -813,15 +839,24 @@ function actualizarProgreso() {
   const counts = document.getElementById('pbCounts');
   if (fill)   { fill.style.width=pct+'%'; fill.classList.toggle('warn', cargadosObl<obligatorios.length); }
 
+  const esBrokerAct = ['AUTOFIN','UNIDAD DE CREDITO'].includes((_credito?.financiera||'').toUpperCase());
+  const oblOk = obligatorios.length === 0 || cargadosObl === obligatorios.length;
+
+  // Botón "Pasar a Carta de Aprobación" para broker pre-carta
+  const btnCarta = document.getElementById('btnCartaAprobacion');
+  if (btnCarta && btnCarta.style.display !== 'none') {
+    btnCarta.disabled = !oblOk;
+    btnCarta.title = oblOk ? '' : `Faltan ${obligatorios.length-cargadosObl} documento(s) obligatorio(s)`;
+  }
+
   const btn = document.getElementById('btnAprobar');
   if (btn) {
     if (_esAnalista) {
-      // Analista: todos los obligatorios deben estar cargados Y aprobados
-      const todosCargados  = obligatorios.length===0 || cargadosObl===obligatorios.length;
+      const todosCargados  = oblOk;
       const todosAprobados = obligatorios.every(t => _docs[t.id_tipo]?.aprobado === 1);
       const ok = todosCargados && todosAprobados;
       btn.disabled = !ok;
-      if (!todosCargados)   btn.title = `Faltan ${obligatorios.length-cargadosObl} documento(s) obligatorio(s)`;
+      if (!todosCargados)       btn.title = `Faltan ${obligatorios.length-cargadosObl} documento(s) obligatorio(s)`;
       else if (!todosAprobados) btn.title = 'Debes aprobar todos los documentos obligatorios';
       else                      btn.title = '';
       if (counts) {
@@ -829,9 +864,8 @@ function actualizarProgreso() {
         counts.textContent = `${cargadosTotal} de ${_tipos.length} cargados  ·  Aprobados: ${aprobados}/${obligatorios.length}`;
       }
     } else {
-      const ok = obligatorios.length===0 || cargadosObl===obligatorios.length;
-      btn.disabled = !ok;
-      btn.title = ok ? '' : `Faltan ${obligatorios.length-cargadosObl} documento(s) obligatorio(s)`;
+      btn.disabled = !oblOk;
+      btn.title = oblOk ? '' : `Faltan ${obligatorios.length-cargadosObl} documento(s) obligatorio(s)`;
       if (counts) counts.textContent = `${cargadosTotal} de ${_tipos.length}  ·  Obligatorios: ${cargadosObl}/${obligatorios.length}`;
     }
   }
@@ -882,6 +916,30 @@ async function aprobarCredito() {
       showToast('Enviado a Análisis correctamente', true);
       setTimeout(() => { location.href = '/creditos'; }, 1500);
     }
+  } catch(e) { showToast('Error: '+e.message, false); }
+}
+
+/* ── Broker: avanzar a CARTA_APROBACION ── */
+async function avanzarCartaAprobacion() {
+  if (!confirm('¿Confirmar que los documentos están listos?\nEl crédito pasará a estado CARTA DE APROBACIÓN.')) return;
+  try {
+    const r = await fetch('/api/creditos/'+creditId, {
+      method:'PUT', headers:apiHdr(),
+      body: JSON.stringify({
+        estado:        'CARTA_APROBACION',
+        observaciones: _credito.observaciones||null,
+        ejecutivo:     _credito.ejecutivo||null,
+        dealer:        _credito.dealer||null,
+        patente:       _credito.patente||null,
+        color:         _credito.color||null,
+        motor:         _credito.motor||null,
+        chasis:        _credito.chasis||null,
+      })
+    });
+    const j = await r.json();
+    if (!j.success) throw new Error(j.error);
+    showToast('Crédito avanzado a Carta de Aprobación', true);
+    setTimeout(() => location.href = '/creditos/revisar?id='+creditId, 1400);
   } catch(e) { showToast('Error: '+e.message, false); }
 }
 
