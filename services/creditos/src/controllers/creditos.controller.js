@@ -440,6 +440,20 @@ const update = async (req, res) => {
         detalle: `Estado: ${estadoAntes} → ${estado}`,
         meta: { estado_antes: estadoAntes, estado_despues: estado },
       });
+
+      // Crédito cursado → marcar carta de aprobación como otorgada automáticamente
+      if (estado === 'OTORGADO') {
+        try {
+          await pool.query(
+            `UPDATE cartas_aprobacion
+             SET otorgado = 1, fecha_otorgado = NOW()
+             WHERE id_credito_creado = ? AND (otorgado = 0 OR otorgado IS NULL)`,
+            [req.params.id]
+          );
+        } catch (e2) {
+          console.error('[update] Error marcando carta como otorgada:', e2.message);
+        }
+      }
     }
     res.json({ success: true, data: { id_credito: req.params.id }, error: null });
   } catch (e) {
