@@ -4106,12 +4106,16 @@ async function initApp(){
         const jDlr = await rDlr.json();
         if(jDlr.data && jDlr.data.rows && jDlr.data.rows.length > 0){
           DB_DEALERS.length = 0;
-          jDlr.data.rows.forEach(d => DB_DEALERS.push({
-            nombre: d.nombre_indexa || d.nombre_razon || '',
-            rut:    d.rut || '',
-            parque: d.ccs_parque || '',
-            tipo:   d.ccs_parque ? 'PARQUE' : 'PARTICULAR'
-          }));
+          jDlr.data.rows.forEach(d => {
+            const ccs = (d.ccs_parque || '').trim().toUpperCase();
+            const esParque = ccs && ccs !== 'PARTICULAR';
+            DB_DEALERS.push({
+              nombre: d.nombre_indexa || d.nombre_razon || '',
+              rut:    d.rut || '',
+              parque: esParque ? ccs : '',
+              tipo:   esParque ? 'PARQUE' : 'PARTICULAR'
+            });
+          });
           console.log(`✓ Dealers cargados: ${DB_DEALERS.length}`);
         } else {
           console.warn('dealers API devolvió 0 filas');
@@ -4534,7 +4538,7 @@ function getConcPool(){
   if(!selectedTipoCarta) return DB_DEALERS;
   const isParque = selectedTipoCarta.includes('PARQUE');
   if(isParque){
-    const parque = (document.getElementById('fParque') || {}).value || '';
+    const parque = ((document.getElementById('fParque') || {}).value || '').trim().toUpperCase();
     if(parque) return DB_DEALERS.filter(d => d.parque === parque);
     return DB_DEALERS.filter(d => d.tipo === 'PARQUE');
   }
