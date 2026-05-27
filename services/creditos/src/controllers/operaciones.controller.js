@@ -117,7 +117,9 @@ const create = async (req, res) => {
       'monto_financiado','plazo','tascli_real','tascli_pizarra','tasfin_pizarra',
       'comdea_real','monto_comision_fin','id_financiera','fecha_primera_cuota',
       'parque','mayor_menor','monto_capitalizado',
-      'boleta_factura','cantidad_docs','docs_autorizados','fecha_recep_doc','created_by'
+      'boleta_factura','cantidad_docs','docs_autorizados','fecha_recep_doc',
+      'rut_concesionario','vendedor',   // col CB "RUT DEALER" y vendedor del concesionario
+      'created_by'
     ];
 
     const values = fields.map(f => {
@@ -161,6 +163,7 @@ const update = async (req, res) => {
       'comdea_real=?','monto_comision_fin=?','id_financiera=?','fecha_primera_cuota=?',
       'parque=?','mayor_menor=?','monto_capitalizado=?',
       'boleta_factura=?','cantidad_docs=?','docs_autorizados=?','fecha_recep_doc=?',
+      'rut_concesionario=?','vendedor=?',
       'updated_at=NOW()'
     ];
     const vals = [
@@ -175,6 +178,7 @@ const update = async (req, res) => {
       b.comdea_real||null, b.monto_comision_fin||null, b.id_financiera||null, b.fecha_primera_cuota||null,
       b.parque||'NO APLICA', b.mayor_menor||null, b.monto_capitalizado||0,
       b.boleta_factura||null, b.cantidad_docs||0, b.docs_autorizados||0, b.fecha_recep_doc||null,
+      b.rut_concesionario||null, b.vendedor||null,
       id
     ];
 
