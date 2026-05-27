@@ -499,7 +499,7 @@ body { font-family: 'Segoe UI', Arial, sans-serif; background: var(--gray-bg); c
           <div class="field" style="position:relative">
             <label>Concesionario *</label>
             <div class="autocomplete-wrap">
-              <input type="text" id="fConcesionario" placeholder="Escriba para buscar..." oninput="filterConc()" autocomplete="off">
+              <input type="text" id="fConcesionario" placeholder="Haga click o escriba para buscar..." oninput="filterConc()" onfocus="filterConc(true)" autocomplete="off">
               <div id="concList" class="autocomplete-list" style="display:none"></div>
             </div>
           </div>
@@ -4055,7 +4055,7 @@ async function initApp(){
 
     // Load ejecutivos
     const dbEj = await dbGetEjecutivos();
-    if(dbEj) ejecutivos = dbEj;
+    if(dbEj && dbEj.length > 0) ejecutivos = dbEj;
 
     // Dealers and brand/model/years loaded from inline data
 
@@ -4537,13 +4537,16 @@ function getConcPool(){
   return DB_DEALERS.filter(d => !d.parque || d.tipo === 'PARTICULAR');
 }
 
-function filterConc(){
+function filterConc(showAll){
   const val = document.getElementById('fConcesionario').value.toLowerCase();
   const list = document.getElementById('concList');
-  if(val.length < 2) { list.style.display='none'; return; }
   const pool = getConcPool();
-  const matches = pool.filter(c => c.nombre.toLowerCase().includes(val)).slice(0,15);
-  if(!matches.length) { list.style.display='none'; return; }
+  if(!pool.length){ list.style.display='none'; return; }
+  // Mostrar primeros 20 al hacer focus; filtrar al escribir
+  const matches = val.length === 0
+    ? pool.slice(0, 20)
+    : pool.filter(c => c.nombre.toLowerCase().includes(val)).slice(0, 15);
+  if(!matches.length){ list.style.display='none'; return; }
   list.innerHTML = matches.map((c) => `<div class="autocomplete-item" data-rut="${c.rut}" onclick="selectConcItem(this,'${c.nombre.replace(/'/g,"\'")}','${c.rut}')">${c.nombre}</div>`).join('');
   list.style.display='block';
 }

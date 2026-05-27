@@ -84,6 +84,35 @@ const pool = require('../../../../shared/config/database');
     try { await pool.query(sql); }
     catch (e) { console.error('[cartas migration]', e.message); }
   }
+
+  // Seed ejecutivos si la tabla está vacía
+  try {
+    const [[{ cnt }]] = await pool.query('SELECT COUNT(*) AS cnt FROM cartas_ejecutivos');
+    if (cnt === 0) {
+      const seed = [
+        ['Solange Vucina',      'solange.vucina@autofacilchile.cl',      '+56976354089'],
+        ['Tatiana Arriagada',   'tatiana.arriagada@autofacilchile.cl',   '+56949808667'],
+        ['Alvaro Pinochet',     'alvaro.pinochet@autofacilchile.cl',     '+56978730681'],
+        ['Alvaro Vargas',       'alvaro.vargas@autofacilchile.cl',       '+56934998273'],
+        ['Carlo Moreno',        'carlo.moreno@autofacilchile.cl',        '+56932280210'],
+        ['Karen Farías',        'karen.farias@autofacilchile.cl',        '+56931250518'],
+        ['Luis Soto Ravello',   'luis.soto@autofacilchile.cl',           '+56981980972'],
+        ['Florencia Bazan',     'florencia.bazan@autofacilchile.cl',     '+56951930421'],
+        ['Sebastian Millar',    'sebastian.millar@autofacilchile.cl',    '+56937496188'],
+        ['Juan Muñoz',          'juan.munoz@autofacilchile.cl',          '+56966184542'],
+        ['Cristina Peña',       'cristina.pena@autofacilchile.cl',       '+56932645136'],
+        ['Catherinne Vargas',   'catherinne.vargas@autofacilchile.cl',   '+56989216789'],
+        ['Claudia Vergara',     'claudia.vergara@autofacilchile.cl',     '+56968796402'],
+      ];
+      for (const [nombre, mail, tel] of seed) {
+        await pool.query(
+          'INSERT IGNORE INTO cartas_ejecutivos (nombre, mail, tel) VALUES (?,?,?)',
+          [nombre, mail, tel]
+        );
+      }
+      console.log('✓ cartas_ejecutivos: seeded con lista inicial de ejecutivos');
+    }
+  } catch (e) { console.error('[cartas ejecutivos seed]', e.message); }
 })();
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
