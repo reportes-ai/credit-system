@@ -140,6 +140,9 @@
     .badge-CANCELADO { background:#dbeafe; color:#1e40af; }
     .badge-PREPAGADO { background:#ede9fe; color:#5b21b6; }
     .badge-CASTIGADO { background:#fee2e2; color:#991b1b; }
+    .badge-OTORGADO  { background:#fef9c3; color:#854d0e; border:1px solid #fde68a; }
+    .badge-CURSADO   { background:#dcfce7; color:#15803d; border:1px solid #4ade80; }
+    .badge-DESISTIDO { background:#fee2e2; color:#b91c1c; border:1px solid #fca5a5; }
 
     /* Número crédito */
     .num-cred { font-family:monospace; font-weight:700; color:var(--blue); font-size:.82rem; }
@@ -377,7 +380,7 @@
   <div class="topnav-left">
     <div class="topnav-brand">
       <a href="/"><img src="/img/logo.png" alt="AutoFácil" style="display:block"></a>
-      <span class="version-badge" id="versionBadge">v4.1</span>
+      <span class="version-badge" id="versionBadge">v4.2</span>
     </div>
       <div class="breadcrumb-nav">
         <a href="/">Inicio</a><span class="sep">›</span>
@@ -465,7 +468,16 @@
         <div class="sc-label">En Proceso</div>
         <div class="sc-val" id="statProceso" style="color:#c2410c">—</div>
       </div>
-      <div class="stat-chip" onclick="filtrarPorEstado('VIGENTE')" style="cursor:pointer" title="Ver vigentes">
+      <div class="stat-chip" onclick="filtrarPorEstado('OTORGADO')" style="cursor:pointer" title="Ver otorgados (broker)">
+        <div class="sc-label">Otorgados</div><div class="sc-val" id="statOtorgados" style="color:#854d0e">—</div>
+      </div>
+      <div class="stat-chip" onclick="filtrarPorEstado('CURSADO')" style="cursor:pointer" title="Ver cursados">
+        <div class="sc-label">Cursados</div><div class="sc-val" id="statCursados" style="color:#15803d">—</div>
+      </div>
+      <div class="stat-chip" onclick="filtrarPorEstado('DESISTIDO')" style="cursor:pointer" title="Ver desistidos">
+        <div class="sc-label">Desistidos</div><div class="sc-val" id="statDesistidos" style="color:#b91c1c">—</div>
+      </div>
+      <div class="stat-chip" onclick="filtrarPorEstado('VIGENTE')" style="cursor:pointer" title="Ver vigentes (AutoFácil)">
         <div class="sc-label">Vigentes</div><div class="sc-val" id="statVigentes" style="color:#166534">—</div>
       </div>
       <div class="stat-chip" onclick="filtrarPorEstado('EN MORA')" style="cursor:pointer" title="Ver en mora">
@@ -495,6 +507,11 @@
           <option value="CANCELADO">Cancelado</option>
           <option value="PREPAGADO">Prepagado</option>
           <option value="CASTIGADO">Castigado</option>
+          <optgroup label="── Broker ──">
+          <option value="OTORGADO">Otorgado</option>
+          <option value="CURSADO">Cursado</option>
+          <option value="DESISTIDO">Desistido</option>
+          </optgroup>
         </select>
         <button class="btn-buscar-rut" onclick="buscarCreditos()">
           <i class="bi bi-search me-1"></i>Buscar
@@ -1315,7 +1332,7 @@ let _todosCreditos = [];   // lista completa (sin filtro estado)
 let _filtroProceso = false;
 
 // Estados que se consideran "terminales" o activos (NO son "en proceso")
-const ESTADOS_FUERA_PROCESO = new Set(['VIGENTE','CANCELADO','PREPAGADO','CASTIGADO','EN MORA']);
+const ESTADOS_FUERA_PROCESO = new Set(['VIGENTE','CANCELADO','PREPAGADO','CASTIGADO','EN MORA','OTORGADO','CURSADO','DESISTIDO']);
 // Estados del nuevo flujo AutoFácil
 const LABEL_ESTADO = {
   INGRESO:'Ingresado', REVISION:'Ingresado',
@@ -1327,6 +1344,7 @@ const LABEL_ESTADO = {
   VALIDACION_FIRMA:'Validación Firma',
   VIGENTE:'Vigente', 'EN MORA':'En Mora',
   CANCELADO:'Cancelado', PREPAGADO:'Prepagado', CASTIGADO:'Castigado',
+  OTORGADO:'Otorgado', CURSADO:'Cursado', DESISTIDO:'Desistido',
 };
 
 /* ── Lógica de mora real (igual que cobranza) ── */
@@ -1391,6 +1409,12 @@ function actualizarStats(list) {
   document.getElementById('statVigentes').textContent  = list.filter(c=>c.estado==='VIGENTE' && !_enMoraReal(c)).length;
   document.getElementById('statMora').textContent      = mora;
   document.getElementById('statCancelados').textContent= list.filter(c=>c.estado==='CANCELADO').length;
+  const elOtorg = document.getElementById('statOtorgados');
+  if (elOtorg) elOtorg.textContent = list.filter(c=>c.estado==='OTORGADO').length;
+  const elCurs = document.getElementById('statCursados');
+  if (elCurs) elCurs.textContent = list.filter(c=>c.estado==='CURSADO').length;
+  const elDes = document.getElementById('statDesistidos');
+  if (elDes) elDes.textContent = list.filter(c=>c.estado==='DESISTIDO').length;
   // Resaltar badge ingresados
   const chipRev = document.querySelector('.stat-revision');
   if (chipRev) chipRev.style.borderColor = ingresados > 0 ? '#854d0e' : '';
@@ -1554,6 +1578,11 @@ async function abrirDetalle(id) {
               <option value="CANCELADO"          ${c.estado==='CANCELADO'          ?'selected':''}>Cancelado</option>
               <option value="PREPAGADO"          ${c.estado==='PREPAGADO'          ?'selected':''}>Prepagado</option>
               <option value="CASTIGADO"          ${c.estado==='CASTIGADO'          ?'selected':''}>Castigado</option>
+              <optgroup label="── Broker (AUTOFIN / UNIDAD) ──">
+              <option value="OTORGADO"           ${c.estado==='OTORGADO'           ?'selected':''}>Otorgado</option>
+              <option value="CURSADO"            ${c.estado==='CURSADO'            ?'selected':''}>Cursado</option>
+              <option value="DESISTIDO"          ${c.estado==='DESISTIDO'          ?'selected':''}>Desistido</option>
+              </optgroup>
             </select>
           </div>
           <div class="col-12">

@@ -34,13 +34,22 @@ const audit = require('../../../../shared/auditoria');
     await addCol(`ALTER TABLE operaciones_brokerage ADD COLUMN observaciones      TEXT         NULL`);
     await addCol(`ALTER TABLE operaciones_brokerage ADD COLUMN gastos             BIGINT       NULL`);
     await addCol(`ALTER TABLE operaciones_brokerage ADD COLUMN seguros            BIGINT       NULL`);
-    // Poblar estado = VIGENTE para OTORGADOS que aún no tienen estado de gestión
+    // Poblar estado correcto según tipo de financiera:
+    // - AUTOFACIL (cartera propia) → VIGENTE (se puede trackear pagos)
+    // - AUTOFIN / UNIDAD DE CREDITO (brokerage) → OTORGADO (somos broker, no podemos saber si está vigente)
+    await pool.query(`
+      UPDATE operaciones_brokerage
+      SET estado = 'OTORGADO'
+      WHERE estado_eval = 'OTORGADO'
+        AND (estado IS NULL OR estado = '' OR estado = 'VIGENTE')
+        AND financiera IN ('AUTOFIN', 'UNIDAD DE CREDITO')
+    `);
     await pool.query(`
       UPDATE operaciones_brokerage
       SET estado = 'VIGENTE'
       WHERE estado_eval = 'OTORGADO'
         AND (estado IS NULL OR estado = '')
-        AND financiera IN ('AUTOFIN', 'UNIDAD DE CREDITO')
+        AND (financiera IS NULL OR financiera NOT IN ('AUTOFIN', 'UNIDAD DE CREDITO'))
     `);
 
     // VIEW creditos → operaciones_brokerage
@@ -57,6 +66,7 @@ const audit = require('../../../../shared/auditoria');
         financiera                                                  AS empresa,
         COALESCE(estado,
           CASE
+            WHEN financiera IN ('AUTOFIN','UNIDAD DE CREDITO') AND estado_eval = 'OTORGADO' THEN 'OTORGADO'
             WHEN estado_credito = 'OTORGADO' THEN 'VIGENTE'
             WHEN estado_eval    = 'OTORGADO' THEN 'VIGENTE'
             WHEN estado_eval IN ('RECHAZADO','ANULADO') THEN 'CANCELADO'
@@ -109,6 +119,7 @@ const SELECT_GESTION = `
     COALESCE(ob.financiera, 'AUTOFACIL')                       AS financiera,
     COALESCE(ob.estado,
       CASE
+        WHEN ob.financiera IN ('AUTOFIN','UNIDAD DE CREDITO') AND ob.estado_eval = 'OTORGADO' THEN 'OTORGADO'
         WHEN ob.estado_credito = 'OTORGADO' THEN 'VIGENTE'
         WHEN ob.estado_eval    = 'OTORGADO' THEN 'VIGENTE'
         WHEN ob.estado_eval IN ('RECHAZADO','ANULADO') THEN 'CANCELADO'

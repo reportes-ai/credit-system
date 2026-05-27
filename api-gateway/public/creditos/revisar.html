@@ -41,11 +41,15 @@
   .eb-EMISION_DOCUMENTOS  { background:#f0f9ff; color:#0369a1; border:1.5px solid #7dd3fc; }
   .eb-CARGA_DOCUMENTOS_AF { background:#fdf4ff; color:#7e22ce; border:1.5px solid #d8b4fe; }
   .eb-VALIDACION_FIRMA    { background:#fff7ed; color:#b45309; border:1.5px solid #fcd34d; }
-  .eb-VIGENTE         { background:#f0fdf4; color:#16a34a; border:1.5px solid #86efac; }
-  .eb-EN-MORA         { background:#fffbeb; color:#d97706; border:1.5px solid #fcd34d; }
-  .eb-CANCELADO       { background:#eff6ff; color:#2563eb; border:1.5px solid #93c5fd; }
-  .eb-PREPAGADO       { background:#f5f3ff; color:#7c3aed; border:1.5px solid #c4b5fd; }
-  .eb-CASTIGADO       { background:#fff1f2; color:#be123c; border:1.5px solid #fda4af; }
+  .eb-VIGENTE              { background:#f0fdf4; color:#16a34a; border:1.5px solid #86efac; }
+  .eb-EN-MORA              { background:#fffbeb; color:#d97706; border:1.5px solid #fcd34d; }
+  .eb-CANCELADO            { background:#eff6ff; color:#2563eb; border:1.5px solid #93c5fd; }
+  .eb-PREPAGADO            { background:#f5f3ff; color:#7c3aed; border:1.5px solid #c4b5fd; }
+  .eb-CASTIGADO            { background:#fff1f2; color:#be123c; border:1.5px solid #fda4af; }
+  .eb-OTORGADO             { background:#fef9c3; color:#854d0e; border:1.5px solid #fde68a; }
+  .eb-CARTA_APROBACION     { background:#e0f2fe; color:#0369a1; border:1.5px solid #7dd3fc; }
+  .eb-CURSADO              { background:#f0fdf4; color:#15803d; border:1.5px solid #4ade80; }
+  .eb-DESISTIDO            { background:#fef2f2; color:#b91c1c; border:1.5px solid #fca5a5; }
   .ch-updated { font-size:.72rem; opacity:.65; }
   .ch-financiera { background:rgba(255,255,255,.2); border-radius:6px; padding:3px 10px; font-size:.78rem; font-weight:800; letter-spacing:.05em; }
   /* ── Payment-status badge (next to VIGENTE) ── */
@@ -195,7 +199,7 @@
   <a class="nav-brand" href="/creditos">
     <img src="/img/logo-autofacil.png" alt="AutoFácil" style="filter:brightness(0) invert(1);height:32px;display:block" onerror="this.style.display='none'">
     <span>Revisión de Crédito</span>
-    <span class="version-badge">v3.1</span>
+    <span class="version-badge">v3.2</span>
   </a>
   <div class="breadcrumb-nav">
   <a href="/">Inicio</a><span class="sep">›</span>
@@ -289,7 +293,10 @@ let _tmc         = null;      // tasa máxima convencional vigente
 let _uf          = null;      // valor UF hoy (fallback)
 let _ufPorFecha  = new Map(); // UF del día-21 de mora por cuota: 'YYYY-MM-DD' → valor
 
-const ESTADOS_CURSADOS = new Set(['VIGENTE','EN MORA','CANCELADO','PREPAGADO','CASTIGADO']);
+const ESTADOS_CURSADOS  = new Set(['VIGENTE','EN MORA','CANCELADO','PREPAGADO','CASTIGADO']);
+// Broker: estados finales de créditos AUTOFIN/UNIDAD (no se puede trackear pagos)
+const ESTADOS_BROKER    = new Set(['OTORGADO','CARTA_APROBACION','CURSADO','DESISTIDO']);
+const esBroker = () => _credito && ['AUTOFIN','UNIDAD DE CREDITO'].includes(_credito.financiera);
 
 async function cargarPagina() {
   if (!creditId) { document.getElementById('pageWrap').innerHTML = '<div class="no-data"><i class="bi bi-exclamation-triangle"></i>ID de crédito no especificado</div>'; return; }
@@ -564,6 +571,12 @@ function renderPagina(c, ant, com) {
               <option value="CANCELADO"          ${c.estado==='CANCELADO'          ?'selected':''}>Cancelado</option>
               <option value="PREPAGADO"          ${c.estado==='PREPAGADO'          ?'selected':''}>Prepagado</option>
               <option value="CASTIGADO"          ${c.estado==='CASTIGADO'          ?'selected':''}>Castigado</option>
+              <optgroup label="── Broker (AUTOFIN / UNIDAD) ──">
+              <option value="CARTA_APROBACION"   ${c.estado==='CARTA_APROBACION'   ?'selected':''}>Carta Aprobación</option>
+              <option value="OTORGADO"           ${c.estado==='OTORGADO'           ?'selected':''}>Otorgado</option>
+              <option value="CURSADO"            ${c.estado==='CURSADO'            ?'selected':''}>Cursado</option>
+              <option value="DESISTIDO"          ${c.estado==='DESISTIDO'          ?'selected':''}>Desistido</option>
+              </optgroup>
             </select>
           </div>
           <div>
@@ -578,7 +591,7 @@ function renderPagina(c, ant, com) {
   <div class="action-bar">
     <div class="action-bar-left">
       <a href="/creditos" class="btn-accion btn-volver"><i class="bi bi-arrow-left"></i>Volver</a>
-      ${!ESTADOS_CURSADOS.has(c.estado) ? `
+      ${!ESTADOS_CURSADOS.has(c.estado) && !ESTADOS_BROKER.has(c.estado) ? `
       <button class="btn-accion" style="background:linear-gradient(135deg,#d97706,#f59e0b);color:#fff"
         onclick="location.href='/creditos?editar=${c.id_credito}'">
         <i class="bi bi-pencil-square"></i>Editar Crédito
@@ -590,7 +603,21 @@ function renderPagina(c, ant, com) {
       <button class="btn-accion" style="background:linear-gradient(135deg,#16a34a,#15803d);color:#fff"
         onclick="location.href='/creditos/pagar-cuotas?id=${c.id_credito}'">
         <i class="bi bi-cash-coin"></i>Pagar Cuotas
-      </button>` : ''}` : `
+      </button>` : ''}
+      ` : ESTADOS_BROKER.has(c.estado) ? `
+      ${(c.estado === 'CARTA_APROBACION' || c.estado === 'OTORGADO') ? `
+      <button class="btn-accion" style="background:linear-gradient(135deg,#16a34a,#15803d);color:#fff"
+        onclick="marcarBroker('CURSADO')">
+        <i class="bi bi-check2-circle"></i>CURSADO
+      </button>
+      <button class="btn-accion" style="background:linear-gradient(135deg,#b91c1c,#dc2626);color:#fff"
+        onclick="marcarBroker('DESISTIDO')">
+        <i class="bi bi-x-circle"></i>DESISTIDO
+      </button>` : ''}
+      <button class="btn-accion btn-guardar" onclick="guardarCambios()">
+        <i class="bi bi-floppy"></i>Guardar cambios
+      </button>
+      ` : `
       ${(c.estado === 'INGRESO' || c.estado === 'REVISION') ? `
       <button class="btn-accion" style="background:linear-gradient(135deg,#b45309,#f59e0b);color:#fff"
         onclick="location.href='/creditos/respaldos?id=${c.id_credito}'">
@@ -894,6 +921,8 @@ function estadoEstado(e) {
     VALIDACION_FIRMA:'Validación Firma',
     VIGENTE:'Vigente', 'EN MORA':'En Mora',
     CANCELADO:'Cancelado', PREPAGADO:'Prepagado', CASTIGADO:'Castigado',
+    OTORGADO:'Otorgado', CARTA_APROBACION:'Carta Aprobación',
+    CURSADO:'Cursado', DESISTIDO:'Desistido',
   };
   return map[e] || e || '—';
 }
@@ -1013,6 +1042,33 @@ async function guardarCambios() {
     if (j.success) { showToast('Cambios guardados correctamente', true); _credito.estado = body.estado; }
     else showToast(j.error||'Error al guardar', false);
   } catch(e) { showToast('Error de conexión', false); }
+}
+
+/* ── Broker: marcar CURSADO o DESISTIDO ── */
+async function marcarBroker(nuevoEstado) {
+  const label = nuevoEstado === 'CURSADO' ? 'CURSADO' : 'DESISTIDO';
+  const msg   = nuevoEstado === 'CURSADO'
+    ? '¿Confirmar que el crédito fue CURSADO por la institución financiera?'
+    : '¿Confirmar que el crédito quedó DESISTIDO (no se cursó)?';
+  if (!confirm(msg)) return;
+  try {
+    const body = {
+      estado:        nuevoEstado,
+      observaciones: document.getElementById('dObservaciones').value.trim(),
+      ejecutivo:     _credito.ejecutivo,
+      dealer:        _credito.dealer,
+      patente:       _credito.patente,
+      color:         _credito.color,
+      motor:         _credito.motor,
+      chasis:        _credito.chasis,
+    };
+    const r = await fetch('/api/creditos/'+creditId, { method:'PUT', headers:apiHdr(), body:JSON.stringify(body) });
+    const j = await r.json();
+    if (!j.success) throw new Error(j.error);
+    _credito.estado = nuevoEstado;
+    showToast(`Crédito marcado como ${label}`, true);
+    setTimeout(() => location.reload(), 1200);
+  } catch(e) { showToast('Error: '+e.message, false); }
 }
 
 /* ── Botones Aprobar / Rechazar ── */
