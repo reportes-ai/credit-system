@@ -211,7 +211,7 @@ body { font-family: 'Segoe UI', Arial, sans-serif; background: var(--gray-bg); c
   <div class="header no-print">
     <div class="header-logo" style="display:flex;align-items:center;gap:8px">
         <img id="logoHeader" src="/img/logo.png" alt="AutoFácil" style="height:32px;object-fit:contain">
-        <span style="font-size:11px;font-weight:400;color:#90CAF9">V5.33</span>
+        <span style="font-size:11px;font-weight:400;color:#90CAF9">V5.34</span>
       </div>
     <div class="header-right">
       <span class="header-user" id="headerUser"></span>
@@ -4873,10 +4873,13 @@ async function ejecutarAprobacion(id, comentarios){
   // ── Crear crédito en el sistema principal ────────────────────────────────
   let numCredito = null;
   let _errorCredito = null;
+  if (!c.rutCliente || !c.cliente) {
+    _errorCredito = 'La carta no tiene RUT o nombre de cliente. Completa esos campos y vuelve a aprobar.';
+  } else
   try {
     const creditoBody = {
-      rut_cliente:      c.rutCliente   || '',
-      nombre_cliente:   c.cliente      || '',
+      rut_cliente:      c.rutCliente,
+      nombre_cliente:   c.cliente,
       // Mapear acreedor de la carta → financiera del sistema de créditos
       financiera:       (c.acreedor||'').includes('UNIDAD') ? 'UNIDAD DE CREDITO'
                       : (c.acreedor||'').includes('AUTOFIN') ? 'AUTOFIN'

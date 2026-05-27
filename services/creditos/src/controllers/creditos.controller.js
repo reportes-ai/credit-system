@@ -22,8 +22,10 @@ const audit = require('../../../../shared/auditoria');
     await addCol(`ALTER TABLE operaciones_brokerage ADD COLUMN numero_credito     VARCHAR(20)  NULL`);
     await addCol(`ALTER TABLE operaciones_brokerage ADD COLUMN estado             VARCHAR(30)  NULL`);
     await addCol(`ALTER TABLE operaciones_brokerage ADD COLUMN cuota              BIGINT       NULL`);
-    await addCol(`ALTER TABLE operaciones_brokerage ADD COLUMN tipo_ubicacion     VARCHAR(10)  NULL`);
+    await addCol(`ALTER TABLE operaciones_brokerage ADD COLUMN tipo_ubicacion     VARCHAR(50)  NULL`);
     await addCol(`ALTER TABLE operaciones_brokerage ADD COLUMN nombre_parque_mgmt VARCHAR(100) NULL`);
+    // Ampliar tipo_ubicacion si quedó como VARCHAR(10)
+    await pool.query(`ALTER TABLE operaciones_brokerage MODIFY COLUMN tipo_ubicacion VARCHAR(50) NULL`).catch(() => {});
     await addCol(`ALTER TABLE operaciones_brokerage ADD COLUMN id_dealer          INT          NULL`);
     await addCol(`ALTER TABLE operaciones_brokerage ADD COLUMN id_cliente         INT          NULL`);
     await addCol(`ALTER TABLE operaciones_brokerage ADD COLUMN id_usuario         INT          NULL`);
