@@ -441,17 +441,84 @@ const update = async (req, res) => {
         meta: { estado_antes: estadoAntes, estado_despues: estado },
       });
 
-      // Crédito cursado → marcar carta de aprobación como otorgada automáticamente
+      // Crédito cursado → marcar carta como otorgada + agregar entrada a cartolas
       if (estado === 'OTORGADO') {
         try {
+          // 1. Marcar carta como otorgada
           await pool.query(
             `UPDATE cartas_aprobacion
              SET otorgado = 1, fecha_otorgado = NOW()
              WHERE id_credito_creado = ? AND (otorgado = 0 OR otorgado IS NULL)`,
             [req.params.id]
           );
+
+          // 2. Obtener la carta vinculada
+          const [[carta]] = await pool.query(
+            `SELECT * FROM cartas_aprobacion WHERE id_credito_creado = ? LIMIT 1`,
+            [req.params.id]
+          );
+
+          if (carta) {
+            // 3. Obtener mail del dealer
+            const [[dealer]] = await pool.query(
+              `SELECT correo FROM dealers WHERE rut = ? LIMIT 1`,
+              [carta.rut_conc || '']
+            ).catch(() => [[null]]);
+
+            // 4. Leer cartolas actuales del parámetro
+            const [[paramRow]] = await pool.query(
+              `SELECT \`value\` FROM cartas_parametros WHERE \`key\` = 'cartolas'`
+            ).catch(() => [[null]]);
+
+            let cartolas = [];
+            try { cartolas = JSON.parse(paramRow?.value || '[]'); } catch {}
+            if (!Array.isArray(cartolas)) cartolas = [];
+
+            // 5. Solo agregar si no existe ya la operación
+            const yaExiste = cartolas.find(r => String(r.nOp) === String(carta.op_origen || carta.op_carta));
+            if (!yaExiste) {
+              const nextCorr = cartolas.length > 0
+                ? Math.max(...cartolas.map(r => Number(r.correlativo) || 0)) + 1
+                : 1;
+              const now = new Date();
+              const excelDate = Math.round((now - new Date(1899, 11, 30)) / 86400000);
+              const mesDisplay = now.toLocaleDateString('es-CL', { month: 'long', year: 'numeric' });
+
+              cartolas.push({
+                correlativo:    nextCorr,
+                mes:            excelDate,
+                mesDisplay,
+                nOp:            carta.op_origen || carta.op_carta || '',
+                movimiento:     'COMISION',
+                rutConc:        carta.rut_conc   || '',
+                concesionario:  carta.concesionario || '',
+                mail:           dealer?.correo   || '',
+                ejecutivo:      carta.ejecutivo_nombre || '',
+                nombreCliente:  carta.cliente    || '',
+                rutCliente:     carta.rut_cliente || '',
+                saldoPrecio:    carta.saldo       || 0,
+                comisionBruta:  carta.part_bruto  || 0,
+                estadoComision: 'PENDIENTE',
+                nOperacion:     carta.op_carta    || '',
+                vendedor:       carta.vendedor    || '',
+                acreedor:       carta.acreedor    || '',
+                pctComision:    carta.saldo > 0 ? (carta.part_bruto || 0) / carta.saldo : 0,
+                observaciones:  '',
+                cartaId:        carta.id,
+              });
+
+              // 6. Guardar cartolas actualizadas
+              await pool.query(
+                `INSERT INTO cartas_parametros (\`key\`, \`value\`, updated_by)
+                 VALUES ('cartolas', ?, 'system')
+                 ON DUPLICATE KEY UPDATE \`value\` = VALUES(\`value\`), updated_at = NOW()`,
+                [JSON.stringify(cartolas)]
+              );
+              console.log(`✓ Cartola agregada para carta ${carta.op_carta} (crédito ${req.params.id})`);
+            }
+          }
         } catch (e2) {
-          console.error('[update] Error marcando carta como otorgada:', e2.message);
+          console.error('[update] Error marcando carta/cartola como otorgada:', e2.message);
         }
       }
     }
