@@ -141,6 +141,7 @@ const SELECT_GESTION = `
     ob.automotora                                              AS dealer,
     ob.ejecutivo,
     ob.mes,
+    ob.id_financiera,
     ob.created_at,
     -- cuotas_pagadas solo para créditos digitados manualmente (numero_credito propio)
     -- Los importados desde Excel (brokerage) no se trackean en pagos: NULL evita falsos EN MORA
@@ -174,6 +175,7 @@ const create = async (req, res) => {
       transmision, combustible, tasacion, permiso_circulacion,
       dealer, id_dealer, tipo_ubicacion, nombre_parque,
       ejecutivo, observaciones, datos_json,
+      id_financiera,
     } = req.body;
 
     if (!rut_cliente || !nombre_cliente)
@@ -199,7 +201,7 @@ const create = async (req, res) => {
          patente, color, motor, chasis,
          transmision, combustible, tasacion, permiso_circulacion,
          automotora, id_dealer, tipo_ubicacion, nombre_parque_mgmt,
-         ejecutivo, observaciones, datos_json,
+         ejecutivo, observaciones, datos_json, id_financiera,
          created_at, updated_at)
       VALUES (?,?,?,?,
               'OTORGADO',?,
@@ -211,7 +213,7 @@ const create = async (req, res) => {
               ?,?,?,?,
               ?,?,?,?,
               ?,?,?,?,
-              ?,?,?,
+              ?,?,?,?,
               NOW(), NOW())
     `, [
       numero_credito, rut_cliente.toUpperCase().trim(), nombre_cliente.trim(), fin,
@@ -228,6 +230,7 @@ const create = async (req, res) => {
       dealer || null, id_dealer || null, tipo_ubicacion || null, nombre_parque || null,
       ejecutivo || null, observaciones || null,
       datos_json ? JSON.stringify(datos_json) : null,
+      id_financiera || null,
     ]);
 
     audit.registrar({
