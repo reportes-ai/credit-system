@@ -4530,35 +4530,27 @@ function toggleCambioPartic(){
 }
 
 
-function getConcPool(forSearch){
-  // forSearch=true → devuelve TODOS los dealers (para filtrar por texto)
-  // forSearch=false → filtrar por tipo de carta (para lista inicial en focus)
-  if(forSearch || !selectedTipoCarta) return DB_DEALERS;
+function getConcPool(){
+  if(!selectedTipoCarta) return DB_DEALERS;
   const isParque = selectedTipoCarta.includes('PARQUE');
   if(isParque){
     const parque = (document.getElementById('fParque') || {}).value || '';
-    if(!parque) return DB_DEALERS; // sin parque seleccionado → mostrar todos
-    return DB_DEALERS.filter(d => d.parque === parque);
+    if(parque) return DB_DEALERS.filter(d => d.parque === parque);
+    return DB_DEALERS.filter(d => d.tipo === 'PARQUE');
   }
-  // Calle: dealers sin parque asignado; si no hay ninguno, devolver todos
-  const calle = DB_DEALERS.filter(d => !d.parque || d.tipo === 'PARTICULAR');
-  return calle.length ? calle : DB_DEALERS;
+  // Calle = PARTICULAR (sinónimos)
+  const calle = DB_DEALERS.filter(d => d.tipo === 'PARTICULAR');
+  return calle.length ? calle : DB_DEALERS; // fallback si aún no hay clasificación
 }
 
-function filterConc(focusMode){
+function filterConc(){
   const val = document.getElementById('fConcesionario').value.toLowerCase().trim();
   const list = document.getElementById('concList');
   if(!DB_DEALERS.length){ list.style.display='none'; return; }
-  let matches;
-  if(val.length === 0){
-    // Focus sin texto → mostrar primeros 20 del pool por tipo de carta
-    matches = getConcPool(false).slice(0, 20);
-  } else {
-    // Escribiendo → buscar en TODOS los dealers por nombre
-    matches = getConcPool(true)
-      .filter(c => c.nombre.toLowerCase().includes(val))
-      .slice(0, 15);
-  }
+  const pool = getConcPool();
+  const matches = val.length === 0
+    ? pool.slice(0, 20)
+    : pool.filter(c => c.nombre.toLowerCase().includes(val)).slice(0, 15);
   if(!matches.length){ list.style.display='none'; return; }
   list.innerHTML = matches.map((c) => `<div class="autocomplete-item" data-rut="${c.rut}" onclick="selectConcItem(this,'${c.nombre.replace(/'/g,"\'")}','${c.rut}')">${c.nombre}</div>`).join('');
   list.style.display='block';
