@@ -592,7 +592,7 @@ body { font-family: 'Segoe UI', Arial, sans-serif; background: var(--gray-bg); c
       <table class="data-table" id="impTable">
         <thead>
           <tr>
-            <th>N° Op Carta</th><th>Tipo</th><th>Cliente</th><th>Concesionario</th><th>Estado</th><th>Aprobado por</th><th>Acciones</th>
+            <th>N° Op Carta</th><th>Tipo</th><th>Cliente</th><th>Concesionario</th><th>Estado</th><th>Aprobado por</th><th>N° Crédito</th><th>Acciones</th>
           </tr>
         </thead>
         <tbody id="impBody"></tbody>
@@ -4834,12 +4834,63 @@ async function ejecutarAprobacion(id, comentarios){
   if(comentarios) c.excepcionesComentarios = comentarios;
   const ok = await dbUpsertCarta(c);
   if(!ok){ showModal('Error','No se pudo guardar la aprobación. Intenta nuevamente.'); return; }
+
+  // ── Crear crédito en el sistema principal ────────────────────────────────
+  let numCredito = null;
+  try {
+    const creditoBody = {
+      rut_cliente:      c.rutCliente   || '',
+      nombre_cliente:   c.cliente      || '',
+      financiera:       c.acreedor     || 'AUTOFACIL',
+      estado:           'CARTA_APROBACION',
+      valor_vehiculo:   c.precioVenta  || null,
+      pie:              c.pie          || null,
+      saldo_precio:     c.saldo        || null,
+      monto_financiado: c.montoCreditoCLP || c.saldo || null,
+      plazo:            c.plazo ? parseInt(c.plazo) : null,
+      tasa_mensual:     c.tasaCredito  || null,
+      tipo_vehiculo:    c.tipoVehiculo || null,
+      marca:            c.marca        || null,
+      modelo:           c.modelo       || null,
+      anio:             c.anio         || null,
+      patente:          c.patente      || null,
+      dealer:           c.concesionario|| null,
+      tipo_ubicacion:   c.tipo         || null,
+      nombre_parque:    c.parque       || null,
+      ejecutivo:        c.ejecutivoNombre || null,
+      datos_json: {
+        id_carta:   c.id,
+        op_carta:   c.opCarta,
+        op_origen:  c.opOrigen,
+        rut_conc:   c.rutConc,
+        vendedor:   c.vendedor,
+        part_bruto: c.partBruto,
+      }
+    };
+    const rCred = await fetch('/api/creditos', {
+      method: 'POST', headers: _hdr(), body: JSON.stringify(creditoBody)
+    });
+    if(rCred.ok){
+      const jCred = await rCred.json();
+      numCredito = jCred.data?.numero_credito || null;
+      // Guardar referencia del crédito en la carta
+      c.numeroCreditoCreado = numCredito;
+      c.idCreditoCreado = jCred.data?.id_credito || null;
+      await dbUpsertCarta(c);
+    } else {
+      console.warn('No se pudo crear crédito:', await rCred.text());
+    }
+  } catch(ex){ console.warn('Error creando crédito desde carta:', ex); }
+
   const fresh = await dbGetCartas();
   if(fresh) cartas = fresh;
   saveData();
   renderRevTable();
   updateMenuBadges();
-  showModal('✓ Carta aprobada','La carta '+c.opCarta+' ha sido aprobada y está lista para imprimir.');
+  const msgCredito = numCredito
+    ? `\n\nCrédito N° ${numCredito} creado en estado CARTA APROBACIÓN.`
+    : '\n\n(No se pudo crear el crédito automáticamente — créalo manualmente.)';
+  showModal('✓ Carta aprobada','La carta '+c.opCarta+' ha sido aprobada y está lista para imprimir.' + msgCredito);
 }
 
 function rechazarCarta(id){
@@ -4893,7 +4944,7 @@ async function renderImpTable(){
     return true;
   });
   if(!list.length){
-    tbody.innerHTML='<tr><td colspan="7" style="text-align:center;color:#888;padding:20px">No hay cartas</td></tr>';
+    tbody.innerHTML='<tr><td colspan="8" style="text-align:center;color:#888;padding:20px">No hay cartas</td></tr>';
     return;
   }
   tbody.innerHTML = list.map(c=>`
@@ -4904,12 +4955,13 @@ async function renderImpTable(){
       <td style="font-size:12px">${c.concesionario}</td>
       <td><span class="badge-status ${c.status==='APROBADA'?'badge-aprobada':c.status==='RECHAZADA'?'badge-rechazada':c.status==='ANULADA'?'badge-anulada':c.status==='ELIMINADA'?'badge-eliminada':'badge-pendiente'}">${c.status}</span></td>
       <td style="font-size:12px">${c.aprobadoPorNombre||'-'}</td>
+      <td style="font-size:12px;font-family:monospace;font-weight:700;color:#1565C0">${c.numeroCreditoCreado||'-'}</td>
       <td>
         <button class="btn btn-secondary" style="font-size:11px;padding:4px 10px" onclick="verCarta(${c.id},false)">Ver</button>
         ${c.status==='APROBADA' ? `<button class="btn btn-primary" style="font-size:11px;padding:4px 10px;margin-left:4px" onclick="imprimirCarta(${c.id})">🖨 Imprimir</button>` : `<span style="font-size:11px;color:#E65100;margin-left:6px">Pendiente Revisión</span>`}
       </td>
     </tr>
-  `).join('');;;;
+  `).join('');
 }
 
 function filterImpTable(){ renderImpTable(); }

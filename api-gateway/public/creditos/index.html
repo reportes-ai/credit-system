@@ -131,6 +131,7 @@
     .badge-REVISION            { background:#fef9c3; color:#854d0e; border:1px solid #fde047; }
     .badge-CARGA_RESPALDOS     { background:#ffedd5; color:#c2410c; border:1px solid #fdba74; }
     .badge-EN_ANALISIS         { background:#ede9fe; color:#5b21b6; border:1px solid #c4b5fd; }
+    .badge-CARTA_APROBACION    { background:#e0f2fe; color:#0369a1; border:1px solid #7dd3fc; }
     .badge-EMISION_DOCUMENTOS  { background:#e0f2fe; color:#0369a1; border:1px solid #7dd3fc; }
     .badge-CARGA_DOCUMENTOS_AF { background:#faf5ff; color:#7e22ce; border:1px solid #d8b4fe; }
     .badge-VALIDACION_FIRMA    { background:#fffbeb; color:#b45309; border:1px solid #fcd34d; }
@@ -456,9 +457,9 @@
         <div class="sc-label">Ingresados</div>
         <div class="sc-val" id="statRevision" style="color:#854d0e">—</div>
       </div>
-      <div class="stat-chip" onclick="filtrarPorEstado('EN_ANALISIS')" style="cursor:pointer" title="Ver en análisis">
-        <div class="sc-label">En Análisis</div>
-        <div class="sc-val" id="statAnalisis" style="color:#5b21b6">—</div>
+      <div class="stat-chip" onclick="filtrarPorEstado('CARTA_APROBACION')" style="cursor:pointer" title="Ver créditos con Carta de Aprobación">
+        <div class="sc-label">Carta Enviada</div>
+        <div class="sc-val" id="statCartaAprobacion" style="color:#0369a1">—</div>
       </div>
       <div class="stat-chip stat-proceso" id="chipProceso" onclick="filtrarPorEstado('__PROCESO__')" style="cursor:pointer" title="Ver créditos en proceso (no cursados ni anulados)">
         <div class="sc-label">En Proceso</div>
@@ -485,6 +486,7 @@
           <option value="INGRESO">Ingresado</option>
           <option value="CARGA_RESPALDOS">Carga Respaldos</option>
           <option value="EN_ANALISIS">En Análisis</option>
+          <option value="CARTA_APROBACION">Carta Aprobación</option>
           <option value="EMISION_DOCUMENTOS">Emisión Documentos</option>
           <option value="CARGA_DOCUMENTOS_AF">Carga Docs. AF</option>
           <option value="VALIDACION_FIRMA">Validación Firma</option>
@@ -1319,6 +1321,7 @@ const LABEL_ESTADO = {
   INGRESO:'Ingresado', REVISION:'Ingresado',
   CARGA_RESPALDOS:'Carga Respaldos',
   EN_ANALISIS:'En Análisis',
+  CARTA_APROBACION:'Carta Aprobación',
   EMISION_DOCUMENTOS:'Emisión Documentos',
   CARGA_DOCUMENTOS_AF:'Carga Docs. AF',
   VALIDACION_FIRMA:'Validación Firma',
@@ -1377,12 +1380,12 @@ async function buscarCreditos() {
 
 function actualizarStats(list) {
   const ingresados = list.filter(c => c.estado==='INGRESO' || c.estado==='REVISION').length;
-  const analisis   = list.filter(c => c.estado==='EN_ANALISIS').length;
+  const analisis   = list.filter(c => c.estado==='CARTA_APROBACION').length;
   const proceso    = list.filter(c => !ESTADOS_FUERA_PROCESO.has(c.estado)).length;
   const mora       = list.filter(_enMoraReal).length;
   document.getElementById('statTotal').textContent     = list.length;
   document.getElementById('statRevision').textContent  = ingresados;
-  const elAn = document.getElementById('statAnalisis');
+  const elAn = document.getElementById('statCartaAprobacion');
   if (elAn) elAn.textContent = analisis;
   document.getElementById('statProceso').textContent   = proceso;
   document.getElementById('statVigentes').textContent  = list.filter(c=>c.estado==='VIGENTE' && !_enMoraReal(c)).length;
@@ -1542,6 +1545,7 @@ async function abrirDetalle(id) {
               <option value="INGRESO"            ${c.estado==='INGRESO'            ?'selected':''}>Ingresado</option>
               <option value="CARGA_RESPALDOS"    ${c.estado==='CARGA_RESPALDOS'    ?'selected':''}>Carga Respaldos</option>
               <option value="EN_ANALISIS"        ${c.estado==='EN_ANALISIS'        ?'selected':''}>En Análisis</option>
+              <option value="CARTA_APROBACION"   ${c.estado==='CARTA_APROBACION'   ?'selected':''}>Carta Aprobación</option>
               <option value="EMISION_DOCUMENTOS" ${c.estado==='EMISION_DOCUMENTOS' ?'selected':''}>Emisión Documentos</option>
               <option value="CARGA_DOCUMENTOS_AF"${c.estado==='CARGA_DOCUMENTOS_AF'?'selected':''}>Carga Docs. AF</option>
               <option value="VALIDACION_FIRMA"   ${c.estado==='VALIDACION_FIRMA'   ?'selected':''}>Validación Firma</option>
