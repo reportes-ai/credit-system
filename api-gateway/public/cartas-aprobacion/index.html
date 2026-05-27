@@ -226,13 +226,13 @@ body { font-family: 'Segoe UI', Arial, sans-serif; background: var(--gray-bg); c
     <div class="menu-title">Generador de Cartas de Aprobación y Cartolas</div>
     <div id="menuSubtitle" class="menu-subtitle"></div>
     <div class="menu-grid">
-      <button class="menu-btn blue" onclick="showPage('genPage')">GENERADOR DE CARTA DE APROBACIÓN</button>
+      <button class="menu-btn blue" id="btnGenerar" onclick="showPage('genPage')">GENERADOR DE CARTA DE APROBACIÓN</button>
       <button class="menu-btn red" id="btnRechazadas" onclick="showRechazadasPage()" style="display:none">CARTAS RECHAZADAS</button>
       <button class="menu-btn red" id="btnRevision" onclick="showPage('revPage')">REVISIÓN CARTA DE APROBACIÓN</button>
-      <button class="menu-btn blue" onclick="showPage('impPage')">IMPRESIÓN DE CARTA DE APROBACIÓN</button>
-      <button class="menu-btn blue" onclick="showPage('informesPage')">INFORMES CARTAS DE APROBACIÓN</button>
-      <button class="menu-btn blue" onclick="showPage('cartolasPage')">EMISIÓN DE CARTOLAS</button>
-      <button class="menu-btn blue" onclick="showPage('impCartolasPage')">CARTOLAS ENVIADAS</button>
+      <button class="menu-btn blue" id="btnImpresion" onclick="showPage('impPage')">IMPRESIÓN DE CARTA DE APROBACIÓN</button>
+      <button class="menu-btn blue" id="btnInformes" onclick="showPage('informesPage')">INFORMES CARTAS DE APROBACIÓN</button>
+      <button class="menu-btn blue" id="btnCartolaEmision" onclick="showPage('cartolasPage')">EMISIÓN DE CARTOLAS</button>
+      <button class="menu-btn blue" id="btnCartolaEnviada" onclick="showPage('impCartolasPage')">CARTOLAS ENVIADAS</button>
       <span id="btnDealers"></span>
       <span id="btnCarga"></span>
       <button class="menu-btn green" id="btnManten" onclick="showPage('mantenPage')">MANTENCIÓN USUARIOS</button>
@@ -2204,6 +2204,7 @@ function loadCustomSIIData(){
 // ── UF y Tasas desde el sistema principal (caché en memoria) ──
 let _ufCache = null;
 let _tasasCache = null;
+let _misPermisos = [];
 
 async function _fetchUFfromAPI(){
   try {
@@ -4005,12 +4006,14 @@ async function doLogin(){
     location.href='/login.html'; return;
   }
 
-  // Validar token contra el servidor usando el endpoint existente
+  // Validar token contra el servidor y cargar funcionalidades habilitadas
   try {
     const r = await fetch('/api/auth/mis-permisos', {
       headers:{ 'Authorization':'Bearer '+tok }
     });
     if(!r.ok){ location.href='/login.html'; return; }
+    const rj = await r.json();
+    if(Array.isArray(rj.funcionalidades)) _misPermisos = rj.funcionalidades;
   } catch(e) {
     location.href='/login.html'; return;
   }
@@ -4154,16 +4157,27 @@ async function initApp(){
   // Initial UF/tasas check
   setTimeout(() => { try{ calcCreditoFields(); checkFinancieraPreferente(); }catch(e){} }, 500);
 
-  // Admin-only buttons
-  const isAdmin = currentUser.perfil==='ADMIN' || currentUser.perfil==='SUPERVISOR';
-  const isSuperAdmin = currentUser.perfil==='ADMIN';
-  const adminDisplay = isAdmin ? '' : 'none';
-  document.getElementById('btnDealers').style.display = adminDisplay;
-  document.getElementById('btnCarga').style.display = adminDisplay;
-  document.getElementById('btnManten').style.display = isSuperAdmin ? '' : 'none';
-  document.getElementById('btnParams').style.display = adminDisplay;
-  document.getElementById('btnManten2').style.display = adminDisplay;
-  document.getElementById('menuNoteAdmin').style.display = adminDisplay;
+  // Visibilidad de botones del menú según funcionalidades habilitadas
+  const hasPerm = (code) => _misPermisos.includes(code);
+  // Fallback: si _misPermisos está vacío (token antiguo sin funcionalidades), usar lógica de perfil
+  const fallbackAdmin = currentUser.perfil==='ADMIN' || currentUser.perfil==='SUPERVISOR';
+  const fallbackSuperAdmin = currentUser.perfil==='ADMIN';
+  const useFallback = _misPermisos.length === 0;
+
+  function vis(code, fallback){ return (useFallback ? fallback : hasPerm(code)) ? '' : 'none'; }
+
+  document.getElementById('btnGenerar').style.display        = vis('cartas_generador',         true);
+  document.getElementById('btnRevision').style.display       = vis('cartas_revision',           true);
+  document.getElementById('btnImpresion').style.display      = vis('cartas_impresion',          true);
+  document.getElementById('btnInformes').style.display       = vis('cartas_informes',           true);
+  document.getElementById('btnCartolaEmision').style.display = vis('cartas_cartolas_emision',   true);
+  document.getElementById('btnCartolaEnviada').style.display = vis('cartas_cartolas_enviadas',  true);
+  document.getElementById('btnManten').style.display         = vis('cartas_manten_usuarios',    fallbackSuperAdmin);
+  document.getElementById('btnParams').style.display         = vis('cartas_params_particip',    fallbackAdmin);
+  document.getElementById('btnManten2').style.display        = vis('cartas_mantenedores',       fallbackAdmin);
+  document.getElementById('btnDealers').style.display        = fallbackAdmin ? '' : 'none';
+  document.getElementById('btnCarga').style.display          = fallbackAdmin ? '' : 'none';
+  document.getElementById('menuNoteAdmin').style.display     = fallbackAdmin ? '' : 'none';
 
   // Update all menu badges
   updateMenuBadges();

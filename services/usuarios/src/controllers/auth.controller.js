@@ -92,8 +92,9 @@ const cambiarClave = async (req, res) => {
 
 const misPermisos = async (req, res) => {
   try {
-    const { id_perfil } = req.usuario;
+    const { id_perfil, id_usuario } = req.usuario;
 
+    // Módulos accesibles (para el menú principal — compatible con versión anterior)
     const [modulos] = await pool.query(
       `SELECT DISTINCT m.id_modulo, m.nombre, m.descripcion, m.icono, m.ruta, m.orden
        FROM modulos m
@@ -104,7 +105,36 @@ const misPermisos = async (req, res) => {
       [id_perfil]
     );
 
-    res.json({ success: true, data: modulos, error: null });
+    // Códigos de funcionalidades habilitadas (perfil base)
+    const [perfilFuncs] = await pool.query(
+      `SELECT f.codigo, pp.habilitado
+       FROM permisos_perfil pp
+       JOIN funcionalidades f ON f.id_funcionalidad = pp.id_funcionalidad
+       WHERE pp.id_perfil = ?`,
+      [id_perfil]
+    );
+    const permisosMapa = {};
+    perfilFuncs.forEach(p => { permisosMapa[p.codigo] = p.habilitado === 1; });
+
+    // Aplicar overrides individuales del usuario (permisos_usuario)
+    try {
+      const [userFuncs] = await pool.query(
+        `SELECT f.codigo, pu.habilitado
+         FROM permisos_usuario pu
+         JOIN funcionalidades f ON f.id_funcionalidad = pu.id_funcionalidad
+         WHERE pu.id_usuario = ?`,
+        [id_usuario]
+      );
+      userFuncs.forEach(p => { permisosMapa[p.codigo] = p.habilitado === 1; });
+    } catch (e) { /* tabla puede no existir aún */ }
+
+    const funcionalidades = Object.entries(permisosMapa)
+      .filter(([, v]) => v)
+      .map(([codigo]) => codigo);
+
+    // data = array de módulos (compatibilidad hacia atrás)
+    // funcionalidades = array de códigos habilitados (nuevo campo)
+    res.json({ success: true, data: modulos, funcionalidades, error: null });
   } catch (error) {
     res.status(500).json({ success: false, data: null, error: errMsg(error) });
   }

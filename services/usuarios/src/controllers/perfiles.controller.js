@@ -376,6 +376,65 @@ const pool = require('../../../../shared/config/database');
   }
 })();
 
+/* ─── Migración v5: funcionalidades granulares de Cartas de Aprobación ──── */
+(async () => {
+  try {
+    const [perfiles] = await pool.query('SELECT id_perfil FROM perfiles');
+    const [[admin]]  = await pool.query("SELECT id_perfil FROM perfiles WHERE nombre='Administrador' LIMIT 1");
+
+    async function addFuncV5(modNombre, funNombre, funCodigo, habDef = 0) {
+      const [[mod]] = await pool.query(
+        "SELECT id_modulo FROM modulos WHERE nombre=? AND estado='activo'", [modNombre]
+      );
+      if (!mod) return;
+      const [[ex]] = await pool.query(
+        'SELECT id_funcionalidad FROM funcionalidades WHERE codigo=?', [funCodigo]
+      );
+      let id_func;
+      if (ex) {
+        id_func = ex.id_funcionalidad;
+      } else {
+        const [ins] = await pool.query(
+          'INSERT INTO funcionalidades (id_modulo, nombre, codigo) VALUES (?,?,?)',
+          [mod.id_modulo, funNombre, funCodigo]
+        );
+        id_func = ins.insertId;
+      }
+      for (const p of perfiles) {
+        await pool.query(
+          `INSERT IGNORE INTO permisos_perfil (id_perfil, id_funcionalidad, habilitado) VALUES (?,?,?)`,
+          [p.id_perfil, id_func, habDef]
+        );
+      }
+    }
+
+    const MOD = 'Cartas de Aprobación';
+    await addFuncV5(MOD, 'Generador de Carta',          'cartas_generador',         1);
+    await addFuncV5(MOD, 'Revisión de Carta',            'cartas_revision',          1);
+    await addFuncV5(MOD, 'Impresión de Carta',           'cartas_impresion',         1);
+    await addFuncV5(MOD, 'Informes de Cartas',           'cartas_informes',          1);
+    await addFuncV5(MOD, 'Emisión de Cartolas',          'cartas_cartolas_emision',  1);
+    await addFuncV5(MOD, 'Cartolas Enviadas',            'cartas_cartolas_enviadas', 1);
+    await addFuncV5(MOD, 'Mantención Usuarios Cartas',   'cartas_manten_usuarios',   0);
+    await addFuncV5(MOD, 'Parámetros Participación',     'cartas_params_particip',   0);
+    await addFuncV5(MOD, 'Mantenedores Cartas',          'cartas_mantenedores',      0);
+
+    // Administrador: habilitar TODAS (incluye las nuevas)
+    if (admin) {
+      await pool.query(
+        `INSERT INTO permisos_perfil (id_perfil, id_funcionalidad, habilitado)
+         SELECT ?, id_funcionalidad, 1 FROM funcionalidades
+         ON DUPLICATE KEY UPDATE habilitado = 1`,
+        [admin.id_perfil]
+      );
+    }
+
+    console.log('✓ Perfiles v5: funcionalidades de Cartas de Aprobación agregadas');
+  } catch (e) {
+    console.error('[perfiles migration v5]', e.message);
+  }
+})();
+
 const getAllPerfiles = async (req, res) => {
   try {
     const [perfiles] = await pool.query(
