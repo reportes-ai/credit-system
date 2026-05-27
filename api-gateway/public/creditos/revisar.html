@@ -183,6 +183,16 @@
   .btn-pagar-cuota { background:linear-gradient(135deg,#16a34a,#15803d); color:#fff; border:none; border-radius:7px; padding:5px 12px; font-size:.77rem; font-weight:700; cursor:pointer; white-space:nowrap; }
   .btn-pagar-cuota:hover { opacity:.88; }
 
+  /* ── Edit Broker Modal ── */
+  .eb-field { display:flex; flex-direction:column; gap:4px; font-size:.72rem; font-weight:700; color:var(--muted); text-transform:uppercase; letter-spacing:.05em; }
+  .eb-field input, .eb-field select { border:1.5px solid #e2e8f0; border-radius:8px; padding:8px 10px; font-size:.88rem; font-weight:500; color:var(--text); background:#fff; outline:none; font-family:inherit; transition:border-color .15s; }
+  .eb-field textarea { border:1.5px solid #e2e8f0; border-radius:8px; padding:8px 10px; font-size:.88rem; color:var(--text); background:#fff; outline:none; font-family:inherit; resize:vertical; transition:border-color .15s; }
+  .eb-field input:focus, .eb-field select:focus, .eb-field textarea:focus { border-color:var(--blue); box-shadow:0 0 0 3px rgba(21,101,192,.1); }
+  .eb-field input[readonly] { background:#f8fafc; color:#64748b; cursor:default; }
+  .eb-sec-title { font-size:.72rem; font-weight:800; text-transform:uppercase; letter-spacing:.07em; color:var(--navy); border-bottom:2px solid #e2e8f0; padding-bottom:8px; margin:0 0 14px; display:flex; align-items:center; gap:6px; }
+  .eb-grid-3 { display:grid; grid-template-columns:repeat(3,1fr); gap:12px; margin-bottom:18px; }
+  .eb-grid-2 { display:grid; grid-template-columns:repeat(2,1fr); gap:12px; margin-bottom:18px; }
+
   @media(max-width:600px) {
     .ch-name { font-size:1.1rem; }
     .field-grid { grid-template-columns:1fr 1fr; }
@@ -199,7 +209,7 @@
   <a class="nav-brand" href="/creditos">
     <img src="/img/logo-autofacil.png" alt="AutoFácil" style="filter:brightness(0) invert(1);height:32px;display:block" onerror="this.style.display='none'">
     <span>Revisión de Crédito</span>
-    <span class="version-badge">v3.4</span>
+    <span class="version-badge">v3.5</span>
   </a>
   <div class="breadcrumb-nav">
   <a href="/">Inicio</a><span class="sep">›</span>
@@ -241,6 +251,92 @@
 </div>
 
 <div class="toast-msg" id="toastMsg"></div>
+
+<!-- Modal Edición Completa Broker -->
+<div id="editBrokerOverlay" class="amort-overlay" onclick="if(event.target===this)cerrarEditBroker()">
+  <div class="amort-box" style="max-width:880px">
+    <div class="amort-head" style="background:linear-gradient(135deg,#b45309,#d97706)">
+      <h6><i class="bi bi-pencil-square me-2"></i>Editar Crédito Broker — <span id="editBrokerNumCred">—</span></h6>
+      <button style="background:none;border:none;color:rgba(255,255,255,.8);font-size:1.2rem;cursor:pointer" onclick="cerrarEditBroker()"><i class="bi bi-x-lg"></i></button>
+    </div>
+    <div class="amort-scroll" style="padding:20px 24px">
+
+      <!-- Financiamiento -->
+      <div class="eb-sec-title"><i class="bi bi-bank2"></i>Financiamiento</div>
+      <div class="eb-grid-3">
+        <label class="eb-field"><span>Fecha Otorgamiento</span><input type="date" id="eb_fecha_otorgado"></label>
+        <label class="eb-field"><span>Fecha 1ª Cuota</span><input type="date" id="eb_fecha_primera_cuota"></label>
+        <label class="eb-field"><span>N° Op. Financiera</span><input type="text" id="eb_id_financiera" placeholder="Ej: 12345"></label>
+        <label class="eb-field"><span>Valor Vehículo ($)</span><input type="number" id="eb_valor_vehiculo" oninput="calcSaldoBroker()"></label>
+        <label class="eb-field"><span>Pie ($)</span><input type="number" id="eb_pie" oninput="calcSaldoBroker()"></label>
+        <label class="eb-field"><span>Saldo Precio ($)</span><input type="number" id="eb_saldo_precio" readonly></label>
+        <label class="eb-field"><span>Monto Financiado ($)</span><input type="number" id="eb_monto_financiado"></label>
+        <label class="eb-field"><span>Plazo (meses)</span><input type="number" id="eb_plazo" min="1" max="120"></label>
+        <label class="eb-field"><span>Tasa Mensual (%)</span><input type="number" id="eb_tasa_mensual" step="0.001"></label>
+        <label class="eb-field"><span>Cuota ($)</span><input type="number" id="eb_cuota"></label>
+        <label class="eb-field"><span>Gastos Operativos ($)</span><input type="number" id="eb_gastos"></label>
+        <label class="eb-field"><span>Seguros ($)</span><input type="number" id="eb_seguros"></label>
+        <label class="eb-field"><span>Participación Dealer ($)</span><input type="number" id="eb_comdea_real"></label>
+        <label class="eb-field"><span>Ejecutivo</span><input type="text" id="eb_ejecutivo"></label>
+      </div>
+
+      <!-- Vehículo -->
+      <div class="eb-sec-title"><i class="bi bi-car-front-fill"></i>Vehículo</div>
+      <div class="eb-grid-3">
+        <label class="eb-field"><span>Tipo Vehículo</span><input type="text" id="eb_tipo_vehiculo"></label>
+        <label class="eb-field"><span>Marca</span><input type="text" id="eb_marca"></label>
+        <label class="eb-field"><span>Modelo</span><input type="text" id="eb_modelo"></label>
+        <label class="eb-field"><span>Año</span><input type="number" id="eb_anio" min="1990" max="2035"></label>
+        <label class="eb-field"><span>Patente (PPU)</span><input type="text" id="eb_patente" style="text-transform:uppercase"></label>
+        <label class="eb-field"><span>Color</span><input type="text" id="eb_color"></label>
+        <label class="eb-field"><span>Motor</span><input type="text" id="eb_motor"></label>
+        <label class="eb-field"><span>Chasis</span><input type="text" id="eb_chasis"></label>
+        <label class="eb-field"><span>Transmisión</span><input type="text" id="eb_transmision"></label>
+        <label class="eb-field"><span>Combustible</span><input type="text" id="eb_combustible"></label>
+      </div>
+
+      <!-- Cliente / Comercial -->
+      <div class="eb-sec-title"><i class="bi bi-building"></i>Cliente y Comercial</div>
+      <div class="eb-grid-2">
+        <label class="eb-field"><span>Nombre Cliente</span><input type="text" id="eb_nombre_cliente"></label>
+        <label class="eb-field"><span>Concesionario / Automotora</span><input type="text" id="eb_dealer"></label>
+        <label class="eb-field"><span>RUT Concesionario</span><input type="text" id="eb_rut_concesionario"></label>
+        <label class="eb-field"><span>Vendedor</span><input type="text" id="eb_vendedor"></label>
+        <label class="eb-field">
+          <span>Tipo Ubicación</span>
+          <select id="eb_tipo_ubicacion">
+            <option value="">— Sin especificar —</option>
+            <option value="PARQUE">🏢 Parque</option>
+            <option value="CALLE">🛣️ Calle</option>
+          </select>
+        </label>
+      </div>
+
+      <!-- Estado -->
+      <div class="eb-sec-title"><i class="bi bi-sliders"></i>Estado y Observaciones</div>
+      <div style="display:grid;grid-template-columns:220px 1fr;gap:12px">
+        <label class="eb-field">
+          <span>Estado del Crédito</span>
+          <select id="eb_estado">
+            <option value="CARTA_APROBACION">Carta Aprobación</option>
+            <option value="OTORGADO">Otorgado (Cursado)</option>
+            <option value="CURSADO">Cursado</option>
+            <option value="DESISTIDO">Desistido</option>
+            <option value="CANCELADO">Cancelado</option>
+          </select>
+        </label>
+        <label class="eb-field"><span>Observaciones</span><textarea id="eb_observaciones" rows="2"></textarea></label>
+      </div>
+    </div>
+    <div class="amort-foot-bar">
+      <span style="font-size:.75rem;color:#9ca3af"><i class="bi bi-shield-lock me-1"></i>Solo perfiles autorizados pueden editar créditos broker</span>
+      <div style="display:flex;gap:8px">
+        <button onclick="cerrarEditBroker()" style="background:#f1f5f9;border:1.5px solid #e2e8f0;border-radius:8px;padding:7px 16px;font-weight:600;cursor:pointer;font-size:.85rem">Cancelar</button>
+        <button onclick="guardarEditBroker()" style="background:linear-gradient(135deg,var(--navy),var(--blue));color:#fff;border:none;border-radius:8px;padding:7px 20px;font-weight:700;cursor:pointer;font-size:.85rem;display:flex;align-items:center;gap:6px"><i class="bi bi-floppy"></i>Guardar Cambios</button>
+      </div>
+    </div>
+  </div>
+</div>
 
 <script>
 /* ── Auth ── */
@@ -297,6 +393,29 @@ const ESTADOS_CURSADOS  = new Set(['VIGENTE','EN MORA','CANCELADO','PREPAGADO','
 // Broker: estados finales de créditos AUTOFIN/UNIDAD (no se puede trackear pagos)
 const ESTADOS_BROKER    = new Set(['OTORGADO','CARTA_APROBACION','CURSADO','DESISTIDO']);
 const esBroker = () => _credito && ['AUTOFIN','UNIDAD DE CREDITO'].includes(_credito.financiera);
+
+// ── Permisos edición créditos broker ──────────────────────────────────────────
+const PERFILES_EDITAR_BROKER      = new Set(['Administrador','Gerente','Supervisor','Analista de Crédito']);
+const PERFILES_MODIFICAR_OTORGADO = new Set(['Administrador','Gerente']);
+const ESTADOS_BROKER_FINALES      = new Set(['OTORGADO','DESISTIDO','CURSADO']);
+
+function _perfil() {
+  try { return JSON.parse(localStorage.getItem('usuario')||'{}').perfil||''; } catch(_){ return ''; }
+}
+
+function puedeEditarBroker(c) {
+  if (!['AUTOFIN','UNIDAD DE CREDITO'].includes(c?.financiera)) return false;
+  const p = _perfil();
+  if (ESTADOS_BROKER_FINALES.has(c.estado)) return PERFILES_MODIFICAR_OTORGADO.has(p);
+  return PERFILES_EDITAR_BROKER.has(p);
+}
+
+function puedeGuardarEstadoBroker(c) {
+  if (!['AUTOFIN','UNIDAD DE CREDITO'].includes(c?.financiera)) return true;
+  const p = _perfil();
+  if (ESTADOS_BROKER_FINALES.has(c.estado)) return PERFILES_MODIFICAR_OTORGADO.has(p);
+  return PERFILES_EDITAR_BROKER.has(p);
+}
 
 async function cargarPagina() {
   if (!creditId) { document.getElementById('pageWrap').innerHTML = '<div class="no-data"><i class="bi bi-exclamation-triangle"></i>ID de crédito no especificado</div>'; return; }
@@ -596,6 +715,11 @@ function renderPagina(c, ant, com) {
         onclick="location.href='/creditos?editar=${c.id_credito}'">
         <i class="bi bi-pencil-square"></i>Editar Crédito
       </button>` : ''}
+      ${['AUTOFIN','UNIDAD DE CREDITO'].includes(c.financiera) && puedeEditarBroker(c) ? `
+      <button class="btn-accion" style="background:linear-gradient(135deg,#d97706,#f59e0b);color:#fff"
+        onclick="abrirEditBroker()">
+        <i class="bi bi-pencil-square"></i>Editar Crédito
+      </button>` : ''}
     </div>
     <div class="action-bar-right">
       ${ESTADOS_CURSADOS.has(c.estado) ? `
@@ -605,7 +729,7 @@ function renderPagina(c, ant, com) {
         <i class="bi bi-cash-coin"></i>Pagar Cuotas
       </button>` : ''}
       ` : ['AUTOFIN','UNIDAD DE CREDITO'].includes(c.financiera) ? `
-      ${c.estado === 'CARTA_APROBACION' ? `
+      ${c.estado === 'CARTA_APROBACION' && puedeGuardarEstadoBroker(c) ? `
       <button class="btn-accion" style="background:linear-gradient(135deg,#16a34a,#15803d);color:#fff"
         onclick="marcarBroker('OTORGADO')">
         <i class="bi bi-check2-circle"></i>Crédito Cursado
@@ -614,9 +738,10 @@ function renderPagina(c, ant, com) {
         onclick="marcarBroker('DESISTIDO')">
         <i class="bi bi-x-circle"></i>Crédito Desistido
       </button>` : ''}
+      ${puedeGuardarEstadoBroker(c) ? `
       <button class="btn-accion btn-guardar" onclick="guardarCambios()">
         <i class="bi bi-floppy"></i>Guardar cambios
-      </button>
+      </button>` : `<span style="font-size:.78rem;color:#94a3b8;align-self:center;padding:0 6px"><i class="bi bi-lock me-1"></i>Solo ${ESTADOS_BROKER_FINALES.has(c.estado)?'Gerente/Admin':'analistas y superiores'} pueden modificar</span>`}
       ` : `
       ${(c.estado === 'INGRESO' || c.estado === 'REVISION') ? `
       <button class="btn-accion" style="background:linear-gradient(135deg,#b45309,#f59e0b);color:#fff"
@@ -1023,6 +1148,126 @@ function parseDJ() {
   } catch(e) { return {}; }
 }
 
+/* ── Edit Broker Modal ── */
+function abrirEditBroker() {
+  const c = _credito;
+  if (!c) return;
+  document.getElementById('editBrokerNumCred').textContent = c.numero_credito||c.numero_credito_fmt||'—';
+  const setV = (id, v) => { const el=document.getElementById(id); if(el) el.value=(v!=null?v:''); };
+  const setD = (id, v) => { const el=document.getElementById(id); if(el) el.value=v?(v.split?v.split('T')[0]:v):''; };
+  const setS = (id, v) => { const el=document.getElementById(id); if(el && v) el.value=v; };
+
+  // Financiamiento
+  setD('eb_fecha_otorgado',      c.fecha_otorgamiento||c.fecha_otorgado);
+  setD('eb_fecha_primera_cuota', c.fecha_primera_cuota);
+  setV('eb_id_financiera',       c.id_financiera);
+  setV('eb_valor_vehiculo',      c.valor_vehiculo);
+  setV('eb_pie',                 c.pie);
+  setV('eb_saldo_precio',        c.saldo_precio);
+  setV('eb_monto_financiado',    c.monto_financiado);
+  setV('eb_plazo',               c.plazo);
+  setV('eb_tasa_mensual',        c.tascli_real||c.tasa_mensual);
+  setV('eb_cuota',               c.cuota);
+  setV('eb_gastos',              c.gastos);
+  setV('eb_seguros',             c.seguros);
+  setV('eb_comdea_real',         c.comdea_real||c.comision_dealer);
+  setV('eb_ejecutivo',           c.ejecutivo);
+
+  // Vehículo
+  setV('eb_tipo_vehiculo',       c.tipo_vehiculo);
+  setV('eb_marca',               c.marca);
+  setV('eb_modelo',              c.modelo);
+  setV('eb_anio',                c.anio);
+  setV('eb_patente',             c.patente);
+  setV('eb_color',               c.color);
+  setV('eb_motor',               c.motor);
+  setV('eb_chasis',              c.chasis);
+  setV('eb_transmision',         c.transmision);
+  setV('eb_combustible',         c.combustible);
+
+  // Cliente / Comercial
+  setV('eb_nombre_cliente',      c.nombre_cliente);
+  setV('eb_dealer',              c.dealer||c.automotora);
+  setV('eb_rut_concesionario',   c.rut_concesionario);
+  setV('eb_vendedor',            c.vendedor);
+  setS('eb_tipo_ubicacion',      c.tipo_ubicacion||'');
+
+  // Estado
+  setS('eb_estado',              c.estado||'CARTA_APROBACION');
+  setV('eb_observaciones',       c.observaciones||'');
+
+  document.getElementById('editBrokerOverlay').classList.add('open');
+}
+
+function cerrarEditBroker() {
+  document.getElementById('editBrokerOverlay').classList.remove('open');
+}
+
+function calcSaldoBroker() {
+  const vv  = parseFloat(document.getElementById('eb_valor_vehiculo')?.value)||0;
+  const pie = parseFloat(document.getElementById('eb_pie')?.value)||0;
+  const el  = document.getElementById('eb_saldo_precio');
+  if (el) el.value = (vv && pie) ? Math.round(vv-pie) : (vv||'');
+}
+
+async function guardarEditBroker() {
+  const c = _credito;
+  const g  = id => { const el=document.getElementById(id); return (el?.value?.trim()||null); };
+  const gn = id => { const v=document.getElementById(id)?.value; return (v!==''&&v!=null) ? (parseFloat(v)||null) : null; };
+  const gi = id => { const v=document.getElementById(id)?.value; return (v!==''&&v!=null) ? (parseInt(v)||null)   : null; };
+
+  const vv  = gn('eb_valor_vehiculo');
+  const pie = gn('eb_pie');
+
+  const body = {
+    // Financiamiento (triggers esEdicionCompleta on backend)
+    monto_financiado:    gn('eb_monto_financiado'),
+    valor_vehiculo:      vv,
+    pie:                 pie,
+    saldo_precio:        (vv!=null&&pie!=null) ? Math.round(vv-pie) : null,
+    plazo:               gi('eb_plazo'),
+    tasa_mensual:        gn('eb_tasa_mensual'),
+    cuota:               gn('eb_cuota'),
+    gastos_operativos:   gn('eb_gastos'),
+    seguros:             gn('eb_seguros'),
+    comision_dealer:     gn('eb_comdea_real'),
+    id_financiera:       g('eb_id_financiera'),
+    fecha_otorgamiento:  g('eb_fecha_otorgado'),
+    fecha_primera_cuota: g('eb_fecha_primera_cuota'),
+    // Vehículo
+    tipo_vehiculo:       g('eb_tipo_vehiculo'),
+    marca:               g('eb_marca'),
+    modelo:              g('eb_modelo'),
+    anio:                gi('eb_anio'),
+    patente:             g('eb_patente'),
+    color:               g('eb_color'),
+    motor:               g('eb_motor'),
+    chasis:              g('eb_chasis'),
+    transmision:         g('eb_transmision'),
+    combustible:         g('eb_combustible'),
+    // Cliente / Comercial
+    nombre_cliente:      g('eb_nombre_cliente')||c.nombre_cliente,
+    financiera:          c.financiera,
+    dealer:              g('eb_dealer'),
+    rut_concesionario:   g('eb_rut_concesionario'),
+    vendedor:            g('eb_vendedor'),
+    tipo_ubicacion:      g('eb_tipo_ubicacion'),
+    ejecutivo:           g('eb_ejecutivo'),
+    // Estado
+    estado:              g('eb_estado')||c.estado,
+    observaciones:       g('eb_observaciones'),
+  };
+
+  try {
+    const r = await fetch('/api/creditos/'+creditId, { method:'PUT', headers:apiHdr(), body:JSON.stringify(body) });
+    const j = await r.json();
+    if (!j.success) throw new Error(j.error||'Error al guardar');
+    showToast('Crédito actualizado correctamente', true);
+    cerrarEditBroker();
+    setTimeout(() => location.reload(), 1200);
+  } catch(e) { showToast('Error: '+e.message, false); }
+}
+
 /* ── Guardar cambios ── */
 async function guardarCambios() {
   if (!_credito) return;
@@ -1150,7 +1395,7 @@ function mostrarAmortizacion() {
   document.getElementById('amortOverlay').classList.add('open');
 }
 function cerrarAmort() { document.getElementById('amortOverlay').classList.remove('open'); }
-document.addEventListener('keydown', e => { if(e.key==='Escape') cerrarAmort(); });
+document.addEventListener('keydown', e => { if(e.key==='Escape') { cerrarAmort(); cerrarEditBroker(); } });
 
 function abrirDocumentos() {
   window.open('/creditos/documentos?id=' + creditId, '_blank');

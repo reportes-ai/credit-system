@@ -629,4 +629,62 @@ const getUsuariosByPerfil = async (req, res) => {
   }
 };
 
+/* ─── Migración v6: permisos de edición de créditos broker ───────────────── */
+(async () => {
+  try {
+    const [[admin]] = await pool.query("SELECT id_perfil FROM perfiles WHERE nombre='Administrador' LIMIT 1");
+
+    async function addFuncV6(modNombre, funNombre, funCodigo) {
+      const [[mod]] = await pool.query(
+        "SELECT id_modulo FROM modulos WHERE nombre=? AND estado='activo'", [modNombre]
+      );
+      if (!mod) return null;
+      const [[ex]] = await pool.query('SELECT id_funcionalidad FROM funcionalidades WHERE codigo=?', [funCodigo]);
+      if (ex) return ex.id_funcionalidad;
+      const [ins] = await pool.query(
+        'INSERT INTO funcionalidades (id_modulo, nombre, codigo) VALUES (?,?,?)',
+        [mod.id_modulo, funNombre, funCodigo]
+      );
+      return ins.insertId;
+    }
+
+    // Funcionalidad: Editar Crédito Broker (Analista, Supervisor, Gerente, Admin)
+    const idEditBroker = await addFuncV6('Créditos', 'Editar Crédito Broker', 'creditos_editar_broker');
+    // Funcionalidad: Modificar Crédito Otorgado (solo Gerente y Admin)
+    const idModOtorg   = await addFuncV6('Créditos', 'Modificar Crédito Otorgado', 'creditos_modificar_otorgado');
+
+    if (idEditBroker) {
+      // Habilitar para Analista de Crédito, Supervisor, Gerente, Administrador
+      const habilitados = ['Administrador','Gerente','Supervisor','Analista de Crédito'];
+      const [perfiles] = await pool.query('SELECT id_perfil, nombre FROM perfiles');
+      for (const p of perfiles) {
+        const hab = habilitados.includes(p.nombre) ? 1 : 0;
+        await pool.query(
+          `INSERT INTO permisos_perfil (id_perfil, id_funcionalidad, habilitado)
+           VALUES (?,?,?) ON DUPLICATE KEY UPDATE habilitado=VALUES(habilitado)`,
+          [p.id_perfil, idEditBroker, hab]
+        );
+      }
+    }
+
+    if (idModOtorg) {
+      // Habilitar solo para Gerente y Administrador
+      const habilitados = ['Administrador','Gerente'];
+      const [perfiles] = await pool.query('SELECT id_perfil, nombre FROM perfiles');
+      for (const p of perfiles) {
+        const hab = habilitados.includes(p.nombre) ? 1 : 0;
+        await pool.query(
+          `INSERT INTO permisos_perfil (id_perfil, id_funcionalidad, habilitado)
+           VALUES (?,?,?) ON DUPLICATE KEY UPDATE habilitado=VALUES(habilitado)`,
+          [p.id_perfil, idModOtorg, hab]
+        );
+      }
+    }
+
+    console.log('✓ Perfiles v6: permisos edición créditos broker configurados');
+  } catch (e) {
+    console.error('[perfiles migration v6]', e.message);
+  }
+})();
+
 module.exports = { getAllPerfiles, getModulosConFuncionalidades, getPermisosPerfil, updatePermisosPerfil, reordenarModulos, createPerfil, deletePerfil, getUsuariosByPerfil };

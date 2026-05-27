@@ -323,6 +323,7 @@ const update = async (req, res) => {
       transmision, combustible, tasacion, permiso_circulacion,
       id_dealer, tipo_ubicacion, nombre_parque,
       datos_json,
+      rut_concesionario, vendedor, comision_dealer, id_financiera,
     } = req.body;
 
     const [prev] = await pool.query(
@@ -376,6 +377,10 @@ const update = async (req, res) => {
             tipo_ubicacion       = ?,
             nombre_parque_mgmt   = ?,
             datos_json           = ?,
+            rut_concesionario    = ?,
+            vendedor             = ?,
+            comdea_real          = ?,
+            id_financiera        = ?,
             updated_at           = CURRENT_TIMESTAMP
         WHERE id = ?
       `, [
@@ -394,6 +399,10 @@ const update = async (req, res) => {
         transmision || null, combustible || null, tasacion || null, permiso_circulacion || null,
         id_dealer || null, tipo_ubicacion || null, nombre_parque || null,
         datos_json ? JSON.stringify(datos_json) : null,
+        rut_concesionario || null,
+        vendedor || null,
+        comision_dealer != null ? Math.round(parseFloat(comision_dealer)) : null,
+        id_financiera || null,
         req.params.id,
       ]);
 
