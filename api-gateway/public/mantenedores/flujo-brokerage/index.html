@@ -8,65 +8,95 @@
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css">
 <style>
   :root { --navy:#0f2d6b; --blue:#1565c0; --bg:#f0f4f8; --card:#fff; --border:#e2e8f0; --text:#1e293b; --muted:#64748b; }
-  * { box-sizing:border-box; margin:0; padding:0; }
-  body { font-family:'Segoe UI',system-ui,sans-serif; background:var(--bg); color:var(--text); }
+  *{ box-sizing:border-box; margin:0; padding:0; }
+  body{ font-family:'Segoe UI',system-ui,sans-serif; background:var(--bg); color:var(--text); }
 
-  .topnav { background:linear-gradient(135deg,var(--navy),var(--blue)); padding:0 24px; height:52px; display:flex; align-items:center; justify-content:space-between; }
-  .topnav-brand { display:flex; align-items:center; gap:10px; color:#fff; font-weight:800; font-size:1rem; text-decoration:none; }
-  .topnav-brand img { height:28px; filter:brightness(0) invert(1); }
-  .version-badge { background:rgba(255,255,255,.15); color:rgba(255,255,255,.75); font-size:.65rem; font-weight:700; border-radius:6px; padding:2px 8px; letter-spacing:.5px; margin-left:4px; }
-  .topnav-right { display:flex; align-items:center; gap:12px; }
-  .btn-nav { background:rgba(255,255,255,.15); border:1px solid rgba(255,255,255,.3); color:#fff; border-radius:8px; padding:6px 14px; font-size:.82rem; font-weight:600; cursor:pointer; text-decoration:none; display:flex; align-items:center; gap:6px; }
-  .btn-nav:hover { background:rgba(255,255,255,.25); }
-  .breadcrumb-nav { color:rgba(255,255,255,.6); font-size:.85rem; display:flex; align-items:center; gap:6px; }
-  .breadcrumb-nav a { color:rgba(255,255,255,.75); text-decoration:none; }
-  .breadcrumb-nav .sep { color:rgba(255,255,255,.35); }
+  .topnav{ background:linear-gradient(135deg,var(--navy),var(--blue)); padding:0 24px; height:52px; display:flex; align-items:center; justify-content:space-between; }
+  .topnav-brand{ display:flex; align-items:center; gap:10px; color:#fff; font-weight:800; font-size:1rem; text-decoration:none; }
+  .topnav-brand img{ height:28px; filter:brightness(0) invert(1); }
+  .version-badge{ background:rgba(255,255,255,.15); color:rgba(255,255,255,.75); font-size:.65rem; font-weight:700; border-radius:6px; padding:2px 8px; letter-spacing:.5px; margin-left:4px; }
+  .topnav-right{ display:flex; align-items:center; gap:12px; }
+  .btn-nav{ background:rgba(255,255,255,.15); border:1px solid rgba(255,255,255,.3); color:#fff; border-radius:8px; padding:6px 14px; font-size:.82rem; font-weight:600; cursor:pointer; text-decoration:none; display:flex; align-items:center; gap:6px; }
+  .btn-nav:hover{ background:rgba(255,255,255,.25); }
+  .breadcrumb-nav{ color:rgba(255,255,255,.6); font-size:.85rem; display:flex; align-items:center; gap:6px; }
+  .breadcrumb-nav a{ color:rgba(255,255,255,.75); text-decoration:none; }
+  .breadcrumb-nav .sep{ color:rgba(255,255,255,.35); }
 
-  .page { max-width:900px; margin:0 auto; padding:28px 16px 60px; }
+  .page{ max-width:1000px; margin:0 auto; padding:24px 16px 80px; }
 
-  /* Cards de financiera */
-  .fin-cards { display:grid; grid-template-columns:1fr 1fr; gap:20px; margin-bottom:32px; }
-  @media(max-width:640px){ .fin-cards{ grid-template-columns:1fr; } }
+  .fin-grid{ display:grid; grid-template-columns:1fr 1fr; gap:22px; }
+  @media(max-width:680px){ .fin-grid{ grid-template-columns:1fr; } }
 
-  .fin-card { background:var(--card); border-radius:14px; border:1px solid var(--border); overflow:hidden; box-shadow:0 2px 8px rgba(0,0,0,.05); }
-  .fin-card-head { padding:16px 20px; display:flex; align-items:center; gap:12px; border-bottom:2px solid var(--border); }
-  .fin-card-icon { width:40px; height:40px; border-radius:10px; display:flex; align-items:center; justify-content:center; font-size:1.3rem; }
-  .fin-card-title { font-size:.95rem; font-weight:900; color:var(--navy); }
-  .fin-card-sub   { font-size:.75rem; color:var(--muted); margin-top:2px; }
-  .icon-afin { background:#ede9fe; color:#5b21b6; }
-  .icon-uc   { background:#fef9c3; color:#854d0e; }
+  /* Card principal */
+  .fin-card{ background:var(--card); border-radius:14px; border:1px solid var(--border); overflow:hidden; box-shadow:0 2px 10px rgba(0,0,0,.06); }
+  .fin-head{ padding:14px 18px; display:flex; align-items:center; justify-content:space-between; border-bottom:2px solid var(--border); }
+  .fin-head-left{ display:flex; align-items:center; gap:10px; }
+  .fin-icon{ width:38px; height:38px; border-radius:9px; display:flex; align-items:center; justify-content:center; font-size:1.2rem; }
+  .ic-afin{ background:#ede9fe; color:#5b21b6; }
+  .ic-uc  { background:#fef9c3; color:#854d0e; }
+  .fin-name{ font-size:.92rem; font-weight:900; color:var(--navy); }
+  .fin-sub { font-size:.72rem; color:var(--muted); margin-top:1px; }
+  .fin-badge{ border-radius:20px; padding:2px 10px; font-size:.65rem; font-weight:800; letter-spacing:.04em; }
+  .fb-afin{ background:#ede9fe; color:#5b21b6; }
+  .fb-uc  { background:#fef9c3; color:#854d0e; }
 
-  /* Flujo de etapas */
-  .flow-wrap { padding:20px; }
-  .flow-step { display:flex; align-items:flex-start; gap:14px; margin-bottom:4px; position:relative; }
-  .flow-step:not(:last-child)::after {
-    content:''; position:absolute; left:18px; top:38px; width:2px; height:calc(100% - 2px);
-    background:#e2e8f0;
-  }
-  .step-circle { width:36px; height:36px; border-radius:50%; display:flex; align-items:center; justify-content:center;
-    font-size:.8rem; font-weight:900; color:#fff; flex-shrink:0; z-index:1; }
-  .step-body { flex:1; background:#f8faff; border:1px solid var(--border); border-radius:10px; padding:12px 14px; margin-bottom:12px; }
-  .step-estado { font-size:.65rem; font-weight:800; text-transform:uppercase; letter-spacing:.06em; color:var(--muted); margin-bottom:3px; }
-  .step-title { font-size:.9rem; font-weight:800; color:var(--navy); margin-bottom:4px; }
-  .step-desc  { font-size:.78rem; color:var(--muted); line-height:1.45; }
-  .step-docs  { margin-top:8px; display:flex; flex-wrap:wrap; gap:5px; }
-  .step-doc-tag { background:#eff6ff; color:#1d4ed8; border:1px solid #bfdbfe; border-radius:5px; padding:2px 8px; font-size:.68rem; font-weight:700; }
-  .step-result { display:flex; gap:8px; margin-top:8px; }
-  .result-ok  { background:#f0fdf4; color:#15803d; border:1px solid #86efac; border-radius:6px; padding:3px 10px; font-size:.72rem; font-weight:800; }
-  .result-no  { background:#fef2f2; color:#b91c1c; border:1px solid #fca5a5; border-radius:6px; padding:3px 10px; font-size:.72rem; font-weight:800; }
+  .btn-save-flow{ background:linear-gradient(135deg,var(--navy),var(--blue)); color:#fff; border:none; border-radius:8px; padding:7px 15px; font-size:.78rem; font-weight:700; cursor:pointer; display:flex; align-items:center; gap:6px; opacity:0; transition:opacity .2s; }
+  .btn-save-flow.visible{ opacity:1; }
+  .btn-save-flow:hover{ opacity:.85!important; }
 
-  /* Colores etapas */
-  .s1 { background:#0369a1; }
-  .s2 { background:#5b21b6; }
-  .s3 { background:#0f2d6b; }
-  .s4ok { background:#15803d; }
-  .s4no { background:#b91c1c; }
+  /* Steps */
+  .steps-wrap{ padding:16px 16px 8px; }
+  .step{ display:flex; gap:12px; position:relative; margin-bottom:4px; }
+  .step:not(:last-child)::after{ content:''; position:absolute; left:17px; top:36px; width:2px; height:calc(100% + 4px); background:#e2e8f0; z-index:0; }
+  .step-num{ width:34px; height:34px; border-radius:50%; display:flex; align-items:center; justify-content:center; font-size:.78rem; font-weight:900; color:#fff; flex-shrink:0; z-index:1; }
+  .n1{ background:#0369a1; } .n2{ background:#5b21b6; } .n3{ background:#0f2d6b; } .n4{ background:#15803d; }
 
-  .section-title { font-size:.72rem; font-weight:800; text-transform:uppercase; letter-spacing:.07em; color:var(--navy); margin-bottom:16px; display:flex; align-items:center; gap:8px; }
-  .section-title::after { content:''; flex:1; height:1px; background:var(--border); }
+  .step-body{ flex:1; background:#f8faff; border:1.5px solid var(--border); border-radius:10px; padding:11px 13px; margin-bottom:14px; position:relative; transition:border-color .15s; }
+  .step-body:hover{ border-color:#94a3b8; }
+  .step-body.editing{ border-color:var(--blue); background:#fff; }
 
-  .note-box { background:#fffbeb; border:1.5px solid #fde68a; border-radius:10px; padding:14px 18px; font-size:.83rem; color:#78350f; margin-bottom:24px; display:flex; gap:10px; align-items:flex-start; }
-  .note-box i { font-size:1.1rem; flex-shrink:0; margin-top:1px; }
+  .step-estado{ font-size:.6rem; font-weight:800; text-transform:uppercase; letter-spacing:.06em; color:var(--muted); margin-bottom:3px; }
+
+  /* Editable fields */
+  .step-title{ font-size:.88rem; font-weight:800; color:var(--navy); margin-bottom:4px; }
+  .step-title[contenteditable=true]{ outline:none; border-bottom:1.5px dashed var(--blue); padding-bottom:1px; cursor:text; }
+  .step-desc{ font-size:.76rem; color:var(--muted); line-height:1.45; }
+  .step-desc[contenteditable=true]{ outline:none; border-bottom:1.5px dashed #93c5fd; padding-bottom:1px; cursor:text; }
+
+  .step-edit-btn{ position:absolute; top:8px; right:8px; background:none; border:none; color:#94a3b8; cursor:pointer; font-size:.8rem; padding:2px 5px; border-radius:4px; transition:all .15s; }
+  .step-edit-btn:hover{ background:#eff6ff; color:var(--blue); }
+  .step-edit-btn.active{ color:var(--blue); background:#eff6ff; }
+
+  /* Documents list (dynamic) */
+  .step-docs{ margin-top:8px; display:flex; flex-wrap:wrap; gap:5px; min-height:24px; }
+  .doc-tag{ background:#eff6ff; color:#1d4ed8; border:1px solid #bfdbfe; border-radius:5px; padding:2px 8px; font-size:.67rem; font-weight:700; }
+  .doc-tag.obl{ background:#fef2f2; color:#dc2626; border-color:#fca5a5; }
+  .doc-tag.empty{ background:#f1f5f9; color:#94a3b8; border-color:#e2e8f0; font-style:italic; }
+
+  /* Result badges */
+  .result-row{ display:flex; gap:8px; margin-top:8px; }
+  .r-ok{ background:#f0fdf4; color:#15803d; border:1px solid #86efac; border-radius:6px; padding:3px 10px; font-size:.72rem; font-weight:800; }
+  .r-no{ background:#fef2f2; color:#b91c1c; border:1px solid #fca5a5; border-radius:6px; padding:3px 10px; font-size:.72rem; font-weight:800; }
+
+  /* Help note */
+  .note{ background:#fffbeb; border:1.5px solid #fde68a; border-radius:10px; padding:12px 16px; font-size:.8rem; color:#78350f; margin-bottom:20px; display:flex; gap:9px; align-items:flex-start; }
+
+  /* Section */
+  .sec-title{ font-size:.72rem; font-weight:800; text-transform:uppercase; letter-spacing:.07em; color:var(--navy); margin-bottom:16px; display:flex; align-items:center; gap:8px; }
+  .sec-title::after{ content:''; flex:1; height:1px; background:var(--border); }
+
+  /* Quick links */
+  .links-row{ display:flex; flex-wrap:wrap; gap:10px; }
+  .quick-link{ display:flex; align-items:center; gap:7px; background:var(--card); border:1.5px solid var(--border); border-radius:9px; padding:9px 16px; text-decoration:none; color:var(--navy); font-weight:700; font-size:.84rem; transition:.15s; }
+  .quick-link:hover{ border-color:var(--blue); color:var(--blue); }
+
+  /* Toast */
+  .toast-msg{ position:fixed; top:64px; right:20px; z-index:9999; border-radius:10px; padding:12px 18px; font-weight:600; font-size:.88rem; color:#fff; box-shadow:0 8px 24px rgba(0,0,0,.18); display:none; transition:opacity .3s; }
+  .toast-ok { background:#059669; }
+  .toast-err{ background:#dc2626; }
+
+  .spinner{ width:20px; height:20px; border:.2em solid #e2e8f0; border-top-color:var(--blue); border-radius:50%; animation:spin .7s linear infinite; margin:20px auto; }
+  @keyframes spin{ to{ transform:rotate(360deg); } }
 </style>
 </head>
 <body>
@@ -75,7 +105,7 @@
   <a class="topnav-brand" href="/mantenedores">
     <img src="/img/logo.png" alt="AutoFácil" onerror="this.style.display='none'">
     <span>Flujo Crédito Brokerage</span>
-    <span class="version-badge">v1.0</span>
+    <span class="version-badge">v2.0</span>
   </a>
   <div class="breadcrumb-nav">
     <a href="/">Inicio</a><span class="sep">›</span>
@@ -90,164 +120,237 @@
 
 <div class="page">
 
-  <div class="section-title"><i class="bi bi-diagram-3"></i>Flujo de Créditos Brokereados</div>
-
-  <div class="note-box">
+  <div class="note">
     <i class="bi bi-info-circle-fill"></i>
-    <div>AutoFácil actúa como <strong>broker</strong> en créditos AUTOFIN y UNIDAD DE CRÉDITO. No gestionamos los pagos ni el estado post-cursado — solo intermediamos y registramos el resultado final (Cursado o Desistido).</div>
+    <div>Haz clic en <strong><i class="bi bi-pencil"></i></strong> en cualquier paso para editar su nombre o descripción. Los documentos de la <strong>Carga de Documentos</strong> se toman automáticamente desde el mantenedor <a href="/mantenedores/tipos-documento/" style="color:#92400e;font-weight:700">Tipos de Documento</a>.</div>
   </div>
 
-  <div class="fin-cards">
+  <div class="sec-title" style="margin-bottom:18px"><i class="bi bi-diagram-3"></i>Flujo por Institución</div>
 
-    <!-- AUTOFIN -->
-    <div class="fin-card">
-      <div class="fin-card-head">
-        <div class="fin-card-icon icon-afin"><i class="bi bi-building"></i></div>
-        <div>
-          <div class="fin-card-title">AUTOFIN</div>
-          <div class="fin-card-sub">Flujo de etapas brokerage</div>
-        </div>
-      </div>
-      <div class="flow-wrap">
-
-        <div class="flow-step">
-          <div class="step-circle s1">1</div>
-          <div class="step-body">
-            <div class="step-estado">Estado: CARTA_APROBACION</div>
-            <div class="step-title"><i class="bi bi-envelope-check me-1"></i>Carta de Aprobación</div>
-            <div class="step-desc">El ejecutivo genera la Carta de Aprobación y la somete a revisión. Al aprobarse se crea el crédito automáticamente en estado CARTA_APROBACION.</div>
-            <div class="step-docs">
-              <span class="step-doc-tag">Carta de Aprobación impresa</span>
-            </div>
-          </div>
-        </div>
-
-        <div class="flow-step">
-          <div class="step-circle s2">2</div>
-          <div class="step-body">
-            <div class="step-estado">Estado: CARTA_APROBACION → carga docs</div>
-            <div class="step-title"><i class="bi bi-paperclip me-1"></i>Carga de Documentos</div>
-            <div class="step-desc">El Analista de Crédito carga los documentos requeridos para AUTOFIN (configurables en Tipos de Documento).</div>
-            <div class="step-docs">
-              <span class="step-doc-tag">Carnet de Identidad</span>
-              <span class="step-doc-tag">Certificado AFP</span>
-              <span class="step-doc-tag">Liquidaciones</span>
-              <span class="step-doc-tag">+ más según config.</span>
-            </div>
-          </div>
-        </div>
-
-        <div class="flow-step">
-          <div class="step-circle s3">3</div>
-          <div class="step-body">
-            <div class="step-estado">Estado: OTORGADO</div>
-            <div class="step-title"><i class="bi bi-send-check me-1"></i>Envío a Autofin</div>
-            <div class="step-desc">Documentos completos. El expediente es enviado a Autofin para evaluación y desembolso.</div>
-          </div>
-        </div>
-
-        <div class="flow-step">
-          <div class="step-circle s4ok">✓</div>
-          <div class="step-body">
-            <div class="step-estado">Estado final</div>
-            <div class="step-title"><i class="bi bi-flag-fill me-1"></i>Resultado Final</div>
-            <div class="step-desc">El Analista registra el resultado una vez confirmado por Autofin.</div>
-            <div class="step-result">
-              <span class="result-ok"><i class="bi bi-check2-circle me-1"></i>CURSADO</span>
-              <span class="result-no"><i class="bi bi-x-circle me-1"></i>DESISTIDO</span>
-            </div>
-          </div>
-        </div>
-
-      </div>
-    </div>
-
-    <!-- UNIDAD DE CRÉDITO -->
-    <div class="fin-card">
-      <div class="fin-card-head">
-        <div class="fin-card-icon icon-uc"><i class="bi bi-bank"></i></div>
-        <div>
-          <div class="fin-card-title">UNIDAD DE CRÉDITO</div>
-          <div class="fin-card-sub">Flujo de etapas brokerage</div>
-        </div>
-      </div>
-      <div class="flow-wrap">
-
-        <div class="flow-step">
-          <div class="step-circle s1">1</div>
-          <div class="step-body">
-            <div class="step-estado">Estado: CARTA_APROBACION</div>
-            <div class="step-title"><i class="bi bi-envelope-check me-1"></i>Carta de Aprobación</div>
-            <div class="step-desc">El ejecutivo genera la Carta de Aprobación y la somete a revisión. Al aprobarse se crea el crédito automáticamente en estado CARTA_APROBACION.</div>
-            <div class="step-docs">
-              <span class="step-doc-tag">Carta de Aprobación impresa</span>
-            </div>
-          </div>
-        </div>
-
-        <div class="flow-step">
-          <div class="step-circle s2">2</div>
-          <div class="step-body">
-            <div class="step-estado">Estado: CARTA_APROBACION → carga docs</div>
-            <div class="step-title"><i class="bi bi-paperclip me-1"></i>Carga de Documentos</div>
-            <div class="step-desc">El Analista de Crédito carga los documentos requeridos para Unidad de Crédito (configurables en Tipos de Documento).</div>
-            <div class="step-docs">
-              <span class="step-doc-tag">Carnet de Identidad</span>
-              <span class="step-doc-tag">Certificado AFP</span>
-              <span class="step-doc-tag">Liquidaciones</span>
-              <span class="step-doc-tag">+ más según config.</span>
-            </div>
-          </div>
-        </div>
-
-        <div class="flow-step">
-          <div class="step-circle s3">3</div>
-          <div class="step-body">
-            <div class="step-estado">Estado: OTORGADO</div>
-            <div class="step-title"><i class="bi bi-send-check me-1"></i>Envío a Unidad de Crédito</div>
-            <div class="step-desc">Documentos completos. El expediente es enviado a la Unidad de Crédito para evaluación y desembolso.</div>
-          </div>
-        </div>
-
-        <div class="flow-step">
-          <div class="step-circle s4ok">✓</div>
-          <div class="step-body">
-            <div class="step-estado">Estado final</div>
-            <div class="step-title"><i class="bi bi-flag-fill me-1"></i>Resultado Final</div>
-            <div class="step-desc">El Analista registra el resultado una vez confirmado por Unidad de Crédito.</div>
-            <div class="step-result">
-              <span class="result-ok"><i class="bi bi-check2-circle me-1"></i>CURSADO</span>
-              <span class="result-no"><i class="bi bi-x-circle me-1"></i>DESISTIDO</span>
-            </div>
-          </div>
-        </div>
-
-      </div>
-    </div>
-
+  <div class="fin-grid" id="finGrid">
+    <div class="spinner"></div>
+    <div class="spinner"></div>
   </div>
 
-  <!-- Accesos rápidos -->
-  <div class="section-title"><i class="bi bi-lightning-charge"></i>Accesos Rápidos</div>
-  <div style="display:flex;flex-wrap:wrap;gap:12px">
-    <a href="/mantenedores/tipos-documento/" style="display:flex;align-items:center;gap:8px;background:var(--card);border:1.5px solid var(--border);border-radius:10px;padding:10px 18px;text-decoration:none;color:var(--navy);font-weight:700;font-size:.87rem;transition:.15s" onmouseover="this.style.borderColor='var(--blue)'" onmouseout="this.style.borderColor='var(--border)'">
-      <i class="bi bi-paperclip" style="font-size:1.1rem;color:var(--blue)"></i>Tipos de Documento
-    </a>
-    <a href="/cartas-aprobacion/" style="display:flex;align-items:center;gap:8px;background:var(--card);border:1.5px solid var(--border);border-radius:10px;padding:10px 18px;text-decoration:none;color:var(--navy);font-weight:700;font-size:.87rem;transition:.15s" onmouseover="this.style.borderColor='var(--blue)'" onmouseout="this.style.borderColor='var(--border)'">
-      <i class="bi bi-envelope-check" style="font-size:1.1rem;color:var(--blue)"></i>Cartas de Aprobación
-    </a>
-    <a href="/creditos" style="display:flex;align-items:center;gap:8px;background:var(--card);border:1.5px solid var(--border);border-radius:10px;padding:10px 18px;text-decoration:none;color:var(--navy);font-weight:700;font-size:.87rem;transition:.15s" onmouseover="this.style.borderColor='var(--blue)'" onmouseout="this.style.borderColor='var(--border)'">
-      <i class="bi bi-credit-card" style="font-size:1.1rem;color:var(--blue)"></i>Gestión de Créditos
-    </a>
+  <div style="margin-top:28px">
+    <div class="sec-title"><i class="bi bi-lightning-charge"></i>Accesos Rápidos</div>
+    <div class="links-row">
+      <a href="/mantenedores/tipos-documento/" class="quick-link"><i class="bi bi-paperclip" style="color:var(--blue)"></i>Tipos de Documento</a>
+      <a href="/cartas-aprobacion/" class="quick-link"><i class="bi bi-envelope-check" style="color:var(--blue)"></i>Cartas de Aprobación</a>
+      <a href="/creditos" class="quick-link"><i class="bi bi-credit-card" style="color:var(--blue)"></i>Gestión de Créditos</a>
+    </div>
   </div>
 
 </div>
 
+<div class="toast-msg" id="toastMsg"></div>
+
 <script>
+const TOKEN = () => localStorage.getItem('token');
+const HDR   = () => ({ 'Content-Type':'application/json', 'Authorization':'Bearer '+TOKEN() });
+
 (function(){
-  if (!localStorage.getItem('token')) { location.href='/login.html'; return; }
-  try { const u=JSON.parse(localStorage.getItem('usuario')||'{}'); document.getElementById('navUser').textContent=u.nombre||''; } catch(e){}
+  if(!TOKEN()){ location.href='/login.html'; return; }
+  try{ const u=JSON.parse(localStorage.getItem('usuario')||'{}'); document.getElementById('navUser').textContent=u.nombre||''; }catch(e){}
 })();
+
+function toast(msg, ok=true){
+  const el=document.getElementById('toastMsg');
+  el.textContent=msg; el.className='toast-msg '+(ok?'toast-ok':'toast-err');
+  el.style.display='block'; setTimeout(()=>{ el.style.display='none'; },3000);
+}
+
+// ── Defaults de pasos (4 fijos por financiera) ────────────────────────────────
+const DEFAULTS = {
+  AUTOFIN: [
+    { id:'carta',    num:1, color:'n1', estado:'CARTA_APROBACION',
+      title:'Carta de Aprobación',
+      desc:'El ejecutivo genera la Carta de Aprobación y la somete a revisión. Al aprobarse, el crédito queda en estado CARTA_APROBACION.' },
+    { id:'docs',     num:2, color:'n2', estado:'CARTA_APROBACION — Carga Docs',
+      title:'Carga de Documentos',
+      desc:'El Analista de Crédito carga los documentos requeridos para Autofin. Los documentos obligatorios se configuran en el mantenedor Tipos de Documento.',
+      showDocs: true },
+    { id:'envio',    num:3, color:'n3', estado:'OTORGADO',
+      title:'Envío a Autofin',
+      desc:'Expediente completo. Se envía a Autofin para evaluación y desembolso del crédito.' },
+    { id:'resultado',num:4, color:'n4', estado:'CURSADO / DESISTIDO',
+      title:'Resultado Final',
+      desc:'El Analista registra el resultado final una vez confirmado por Autofin.',
+      showResult: true }
+  ],
+  UNIDAD: [
+    { id:'carta',    num:1, color:'n1', estado:'CARTA_APROBACION',
+      title:'Carta de Aprobación',
+      desc:'El ejecutivo genera la Carta de Aprobación y la somete a revisión. Al aprobarse, el crédito queda en estado CARTA_APROBACION.' },
+    { id:'docs',     num:2, color:'n2', estado:'CARTA_APROBACION — Carga Docs',
+      title:'Carga de Documentos',
+      desc:'El Analista de Crédito carga los documentos requeridos para Unidad de Crédito. Los documentos obligatorios se configuran en el mantenedor Tipos de Documento.',
+      showDocs: true },
+    { id:'envio',    num:3, color:'n3', estado:'OTORGADO',
+      title:'Envío a Unidad de Crédito',
+      desc:'Expediente completo. Se envía a la Unidad de Crédito para evaluación y desembolso del crédito.' },
+    { id:'resultado',num:4, color:'n4', estado:'CURSADO / DESISTIDO',
+      title:'Resultado Final',
+      desc:'El Analista registra el resultado final una vez confirmado por la Unidad de Crédito.',
+      showResult: true }
+  ]
+};
+
+// Estado por financiera
+const _state = {
+  AUTOFIN: { steps:null, docs:[], dirty:false },
+  UNIDAD:  { steps:null, docs:[], dirty:false }
+};
+
+// ── Cargar datos ──────────────────────────────────────────────────────────────
+async function cargarTodo(){
+  await Promise.all([cargarFinanciera('AUTOFIN'), cargarFinanciera('UNIDAD')]);
+  renderGrid();
+}
+
+async function cargarFinanciera(fin){
+  // 1. Config guardada
+  try{
+    const r = await fetch(`/api/cartas-params/flujo_brokerage_${fin.toLowerCase()}`, { headers:HDR() });
+    const j = await r.json();
+    if(j.success && j.data){
+      try{ _state[fin].steps = JSON.parse(j.data); }catch(e){ _state[fin].steps = null; }
+    }
+  }catch(e){}
+  if(!_state[fin].steps) _state[fin].steps = JSON.parse(JSON.stringify(DEFAULTS[fin]));
+
+  // 2. Documentos activos
+  try{
+    const r = await fetch(`/api/tipos-documento/activos?financiera=${fin}`, { headers:HDR() });
+    const j = await r.json();
+    _state[fin].docs = j.success ? j.data : [];
+  }catch(e){ _state[fin].docs = []; }
+}
+
+// ── Render ────────────────────────────────────────────────────────────────────
+function renderGrid(){
+  const grid = document.getElementById('finGrid');
+  grid.innerHTML = [
+    renderCard('AUTOFIN', 'ic-afin', 'fb-afin', 'AUTOFIN', 'bi-building'),
+    renderCard('UNIDAD',  'ic-uc',   'fb-uc',   'UNIDAD DE CRÉDITO', 'bi-bank'),
+  ].join('');
+}
+
+function renderCard(fin, iconCls, badgeCls, label, icon){
+  const s = _state[fin];
+  return `
+  <div class="fin-card">
+    <div class="fin-head">
+      <div class="fin-head-left">
+        <div class="fin-icon ${iconCls}"><i class="bi ${icon}"></i></div>
+        <div>
+          <div class="fin-name">${label}</div>
+          <div class="fin-sub">Flujo de etapas brokerage</div>
+        </div>
+        <span class="fin-badge ${badgeCls}">${fin}</span>
+      </div>
+      <button id="btnSave_${fin}" class="btn-save-flow" onclick="guardarFlujo('${fin}')">
+        <i class="bi bi-floppy"></i>Guardar
+      </button>
+    </div>
+    <div class="steps-wrap">
+      ${s.steps.map(step => renderStep(fin, step, s.docs)).join('')}
+    </div>
+  </div>`;
+}
+
+function renderStep(fin, step, docs){
+  let docsHtml = '';
+  if(step.showDocs){
+    const activos = docs.filter(d => d.activo);
+    if(activos.length){
+      docsHtml = `<div class="step-docs">${activos.map(d =>
+        `<span class="doc-tag ${d.obligatorio?'obl':''}" title="${d.obligatorio?'Obligatorio':'Opcional'}">${d.nombre}</span>`
+      ).join('')}</div>`;
+    } else {
+      docsHtml = `<div class="step-docs"><span class="doc-tag empty">Sin documentos activos — configura en Tipos de Documento</span></div>`;
+    }
+  }
+  const resultHtml = step.showResult
+    ? `<div class="result-row"><span class="r-ok"><i class="bi bi-check2-circle me-1"></i>CURSADO</span><span class="r-no"><i class="bi bi-x-circle me-1"></i>DESISTIDO</span></div>`
+    : '';
+
+  return `
+  <div class="step">
+    <div class="step-num ${step.color}">${step.num}</div>
+    <div class="step-body" id="sb_${fin}_${step.id}">
+      <div class="step-estado">Estado: ${step.estado}</div>
+      <div class="step-title" id="title_${fin}_${step.id}">${step.title}</div>
+      <div class="step-desc"  id="desc_${fin}_${step.id}">${step.desc}</div>
+      ${docsHtml}
+      ${resultHtml}
+      <button class="step-edit-btn" id="ebtn_${fin}_${step.id}" onclick="toggleEdit('${fin}','${step.id}')" title="Editar paso">
+        <i class="bi bi-pencil"></i>
+      </button>
+    </div>
+  </div>`;
+}
+
+// ── Edición inline ────────────────────────────────────────────────────────────
+const _editing = {};  // { 'AUTOFIN_carta': true }
+
+function toggleEdit(fin, stepId){
+  const key = `${fin}_${stepId}`;
+  const isEditing = _editing[key];
+
+  const titleEl = document.getElementById(`title_${fin}_${stepId}`);
+  const descEl  = document.getElementById(`desc_${fin}_${stepId}`);
+  const body    = document.getElementById(`sb_${fin}_${stepId}`);
+  const btn     = document.getElementById(`ebtn_${fin}_${stepId}`);
+
+  if(isEditing){
+    // Guardar cambios locales
+    const step = _state[fin].steps.find(s => s.id === stepId);
+    if(step){
+      step.title = titleEl.textContent.trim() || step.title;
+      step.desc  = descEl.textContent.trim()  || step.desc;
+    }
+    titleEl.removeAttribute('contenteditable');
+    descEl.removeAttribute('contenteditable');
+    body.classList.remove('editing');
+    btn.classList.remove('active');
+    btn.innerHTML = '<i class="bi bi-pencil"></i>';
+    _editing[key] = false;
+
+    // Marcar como pendiente de guardar
+    _state[fin].dirty = true;
+    const saveBtn = document.getElementById(`btnSave_${fin}`);
+    if(saveBtn) saveBtn.classList.add('visible');
+  } else {
+    titleEl.setAttribute('contenteditable', 'true');
+    descEl.setAttribute('contenteditable', 'true');
+    body.classList.add('editing');
+    btn.classList.add('active');
+    btn.innerHTML = '<i class="bi bi-check-lg"></i>';
+    titleEl.focus();
+    _editing[key] = true;
+  }
+}
+
+// ── Guardar flujo en DB ───────────────────────────────────────────────────────
+async function guardarFlujo(fin){
+  const steps = _state[fin].steps;
+  try{
+    const r = await fetch(`/api/cartas-params/flujo_brokerage_${fin.toLowerCase()}`, {
+      method:'PUT', headers:HDR(),
+      body: JSON.stringify({ value: JSON.stringify(steps) })
+    });
+    const j = await r.json();
+    if(!j.success) throw new Error(j.error);
+    _state[fin].dirty = false;
+    const saveBtn = document.getElementById(`btnSave_${fin}`);
+    if(saveBtn) saveBtn.classList.remove('visible');
+    toast(`Flujo ${fin} guardado correctamente`);
+  }catch(e){ toast('Error al guardar: '+e.message, false); }
+}
+
+// ── Inicio ────────────────────────────────────────────────────────────────────
+cargarTodo();
 </script>
 <script src="/js/app-version.js"></script>
 </body>
