@@ -108,6 +108,10 @@
     .module-card { position: relative; }
     .btn-guardar-orden { background: #16a34a; border: none; color: #fff; border-radius: 8px; padding: 5px 14px; font-size: 0.82rem; font-weight: 600; cursor: pointer; display: none; align-items: center; gap: 6px; }
     .btn-guardar-orden:hover { background: #15803d; }
+
+    /* ── Intro animation ── */
+    body.intro-lock { overflow: hidden; }
+    .module-card.intro-hidden { opacity: 0; }
   </style>
 </head>
 <body>
@@ -116,7 +120,7 @@
     <div class="topnav-left">
       <div class="topnav-brand">
         <img src="/img/logo.png" alt="AutoFácil">
-        <span class="version-badge">v4.5</span>
+        <span class="version-badge">v4.6</span>
       </div>
     </div>
 
@@ -227,6 +231,130 @@
       } else alert('Error al guardar orden: ' + json.error);
     }
 
+    /* ══════════════════════════════════════════════════════════════
+       🚀  INTRO — Tarjetas voladoras + sonido láser
+       Solo se ejecuta una vez por sesión (sessionStorage flag)
+    ══════════════════════════════════════════════════════════════ */
+    function playLaserSound() {
+      try {
+        const Ctx = window.AudioContext || window.webkitAudioContext;
+        if (!Ctx) return;
+        const ctx = new Ctx();
+        const t   = ctx.currentTime;
+
+        /* ─ Gran barrido láser descendente ─ */
+        function sweep(freqA, freqB, start, dur, type = 'sawtooth', vol = 0.11) {
+          const osc = ctx.createOscillator(), g = ctx.createGain(), f = ctx.createBiquadFilter();
+          f.type = 'lowpass'; f.frequency.value = 4000;
+          osc.type = type;
+          osc.frequency.setValueAtTime(freqA, t + start);
+          osc.frequency.exponentialRampToValueAtTime(freqB, t + start + dur);
+          g.gain.setValueAtTime(0, t + start);
+          g.gain.linearRampToValueAtTime(vol, t + start + 0.02);
+          g.gain.setValueAtTime(vol, t + start + dur * 0.6);
+          g.gain.exponentialRampToValueAtTime(0.001, t + start + dur);
+          osc.connect(f); f.connect(g); g.connect(ctx.destination);
+          osc.start(t + start); osc.stop(t + start + dur + 0.05);
+        }
+
+        /* ─ Ruido electrónico (impacto) ─ */
+        function zap(start, dur = 0.07, vol = 0.18) {
+          const buf  = ctx.createBuffer(1, ctx.sampleRate * dur, ctx.sampleRate);
+          const data = buf.getChannelData(0);
+          for (let i = 0; i < data.length; i++)
+            data[i] = (Math.random() * 2 - 1) * Math.exp(-i / (ctx.sampleRate * 0.012));
+          const src = ctx.createBufferSource(), g = ctx.createGain();
+          const f   = ctx.createBiquadFilter();
+          f.type = 'bandpass'; f.frequency.value = 1800; f.Q.value = 3;
+          g.gain.value = vol;
+          src.buffer = buf;
+          src.connect(f); f.connect(g); g.connect(ctx.destination);
+          src.start(t + start); src.stop(t + start + dur + 0.02);
+        }
+
+        /* ─ Acorde final de aterrizaje ─ */
+        function chord(start) {
+          [523, 659, 784, 1047].forEach((freq, i) => {
+            const o = ctx.createOscillator(), g = ctx.createGain();
+            o.type = 'sine'; o.frequency.value = freq;
+            g.gain.setValueAtTime(0, t + start + i * 0.045);
+            g.gain.linearRampToValueAtTime(0.07, t + start + i * 0.045 + 0.025);
+            g.gain.exponentialRampToValueAtTime(0.001, t + start + i * 0.045 + 0.9);
+            o.connect(g); g.connect(ctx.destination);
+            o.start(t + start + i * 0.045);
+            o.stop(t + start + i * 0.045 + 1);
+          });
+        }
+
+        /* ─ Secuencia ─ */
+        sweep(2800, 90,  0,    1.25, 'sawtooth', 0.13);   // gran barrido
+        sweep(1600, 300, 0.06, 0.55, 'square',   0.07);   // capa media
+        sweep(180,  900, 0.25, 0.65, 'sine',     0.09);   // subida electrónica
+        sweep(3200, 400, 0.12, 0.40, 'sawtooth', 0.05);   // chispazo alto
+        zap(0, 0.12, 0.20);                                // impacto inicial
+        zap(0.55, 0.08, 0.12);                             // segundo impacto
+
+        const numCards = document.querySelectorAll('.module-card').length || 8;
+        chord(0.10 + numCards * 0.075 + 0.15);            // acorde de aterrizaje
+
+      } catch(e) { /* browser sin AudioContext */ }
+    }
+
+    function introAnimation() {
+      const grid  = document.getElementById('modulesGrid');
+      const cards = [...grid.querySelectorAll('.module-card')];
+      if (!cards.length) return;
+
+      const vw = Math.max(window.innerWidth  + 200, 1000);
+      const vh = Math.max(window.innerHeight + 200,  700);
+
+      /* Posiciones de salida: esquinas y bordes, cicladas por índice */
+      const origins = [
+        `translate(-${vw}px, -${vh * 0.6}px) rotate(-28deg) scale(0.35)`,
+        `translate(${vw}px,  -${vh * 0.6}px) rotate( 28deg) scale(0.35)`,
+        `translate(-${vw}px,  ${vh * 0.2}px) rotate( 22deg) scale(0.35)`,
+        `translate(${vw}px,   ${vh * 0.2}px) rotate(-22deg) scale(0.35)`,
+        `translate(-${vw * 0.5}px, -${vh}px) rotate(-18deg) scale(0.35)`,
+        `translate(${vw * 0.5}px,  -${vh}px) rotate( 18deg) scale(0.35)`,
+        `translate(-${vw}px,  ${vh * 0.5}px) rotate( 15deg) scale(0.35)`,
+        `translate(${vw}px,   ${vh * 0.5}px) rotate(-15deg) scale(0.35)`,
+        `translate(-${vw * 0.3}px, -${vh}px) rotate( 24deg) scale(0.35)`,
+        `translate(${vw * 0.3}px,   ${vh}px) rotate(-24deg) scale(0.35)`,
+        `translate(0px, -${vh}px)             rotate(-12deg) scale(0.35)`,
+        `translate(0px,  ${vh}px)             rotate( 12deg) scale(0.35)`,
+      ];
+
+      document.body.classList.add('intro-lock');
+
+      /* Estado inicial: fuera de pantalla */
+      cards.forEach((c, i) => {
+        c.style.transition = 'none';
+        c.style.transform  = origins[i % origins.length];
+        c.style.opacity    = '0';
+      });
+
+      /* Pequeña pausa para que el DOM pinte el estado inicial */
+      requestAnimationFrame(() => requestAnimationFrame(() => {
+        playLaserSound();
+
+        cards.forEach((c, i) => {
+          const dur = 0.52 + Math.random() * 0.18;
+          setTimeout(() => {
+            c.style.transition = `transform ${dur}s cubic-bezier(0.175,0.885,0.32,1.275), opacity 0.28s ease`;
+            c.style.transform  = '';
+            c.style.opacity    = '1';
+          }, 80 + i * 72);
+        });
+
+        /* Limpiar estilos inline tras la animación */
+        const cleanAt = 80 + (cards.length - 1) * 72 + 750;
+        setTimeout(() => {
+          document.body.classList.remove('intro-lock');
+          cards.forEach(c => { c.style.transition = ''; c.style.transform = ''; c.style.opacity = ''; });
+        }, cleanAt);
+      }));
+    }
+
     async function cargarModulos() {
       try {
         const resp = await fetch('/api/auth/mis-permisos', { headers: H });
@@ -252,6 +380,12 @@
             <span class="btn-acceder"><i class="bi bi-arrow-right-circle me-1"></i>Acceder</span>`;
           grid.appendChild(a);
         });
+
+        /* 🚀 Intro solo en la primera visita de la sesión */
+        if (!sessionStorage.getItem('af_intro_done')) {
+          sessionStorage.setItem('af_intro_done', '1');
+          introAnimation();
+        }
       } catch {
         document.getElementById('modulesGrid').innerHTML = '<p class="text-danger text-center py-4" style="grid-column:1/-1">Error al cargar módulos.</p>';
       }
