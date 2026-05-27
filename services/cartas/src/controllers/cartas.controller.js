@@ -85,6 +85,12 @@ const pool = require('../../../../shared/config/database');
     catch (e) { console.error('[cartas migration]', e.message); }
   }
 
+  // Agregar columnas numero_credito_creado e id_credito_creado si no existen
+  try {
+    await pool.query(`ALTER TABLE cartas_aprobacion ADD COLUMN IF NOT EXISTS numero_credito_creado VARCHAR(30) DEFAULT NULL`);
+    await pool.query(`ALTER TABLE cartas_aprobacion ADD COLUMN IF NOT EXISTS id_credito_creado INT DEFAULT NULL`);
+  } catch(e) { /* columna ya existe */ }
+
   // Seed ejecutivos si la tabla está vacía
   try {
     const [[{ cnt }]] = await pool.query('SELECT COUNT(*) AS cnt FROM cartas_ejecutivos');
@@ -180,6 +186,8 @@ function mapRow(r) {
     montoCreditoUF:           r.monto_credito_uf ? parseFloat(r.monto_credito_uf) : 0,
     excepciones:              parseJSON(r.excepciones) || [],
     excepcionesComentarios:   parseJSON(r.excepciones_comentarios),
+    numeroCreditoCreado:      r.numero_credito_creado || null,
+    idCreditoCreado:          r.id_credito_creado || null,
   };
 }
 
@@ -224,6 +232,8 @@ const upsert = async (req, res) => {
       c.montoCreditoUF || null,
       c.excepciones ? JSON.stringify(c.excepciones) : null,
       c.excepcionesComentarios ? JSON.stringify(c.excepcionesComentarios) : null,
+      c.numeroCreditoCreado || null,
+      c.idCreditoCreado || null,
     ];
 
     if (c.id) {
@@ -250,7 +260,8 @@ const upsert = async (req, res) => {
           fecha_correccion=?, corregido_por=?,
           otorgado=?, fecha_otorgado=?,
           tasa_credito=?, monto_credito_clp=?, monto_credito_uf=?,
-          excepciones=?, excepciones_comentarios=?
+          excepciones=?, excepciones_comentarios=?,
+          numero_credito_creado=?, id_credito_creado=?
         WHERE id=?`,
         [...vals, c.id]
       );
@@ -279,7 +290,8 @@ const upsert = async (req, res) => {
           fecha_correccion, corregido_por,
           otorgado, fecha_otorgado,
           tasa_credito, monto_credito_clp, monto_credito_uf,
-          excepciones, excepciones_comentarios
+          excepciones, excepciones_comentarios,
+          numero_credito_creado, id_credito_creado
         ) VALUES (${vals.map(() => '?').join(',')})`,
         vals
       );

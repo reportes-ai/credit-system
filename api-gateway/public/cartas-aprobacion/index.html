@@ -2428,14 +2428,27 @@ function confirmarGrabarConExcepciones(){
 }
 
 async function ejecutarGrabarCarta(carta){
+  const btnGrabar = document.getElementById('btnGrabarCarta');
+  if(btnGrabar){ btnGrabar.disabled = true; btnGrabar.textContent = 'Grabando...'; }
+
+  const ok = await dbUpsertCarta(carta);
+
+  if(btnGrabar){ btnGrabar.disabled = false; btnGrabar.textContent = 'GRABAR CARTA'; }
+
+  if(!ok){
+    showModal('Error al grabar', 'No se pudo guardar la carta en la base de datos. Verifique su conexión e intente nuevamente.');
+    return;
+  }
+
   cartas.push(carta);
   saveData();
-  await dbUpsertCarta(carta);
   clearForm();
-  document.getElementById('genSuccess').style.display='block';
-  document.getElementById('genSuccess').textContent = '✓ Carta N° ' + carta.opCarta + ' grabada exitosamente. Pendiente de revisión.';
-  setTimeout(()=>{ document.getElementById('genSuccess').style.display='none'; }, 5000);
   updateMenuBadges();
+
+  showModal(
+    '✓ Carta Grabada',
+    `La carta N° <strong>${carta.opCarta}</strong> fue grabada exitosamente y queda <strong>pendiente de revisión</strong>.`
+  );
 }
 
 // ========== FINANCIERA PREFERENTE ==========
@@ -4640,7 +4653,7 @@ async function grabarCarta(){
   if(!precio) { alert('Ingrese Precio de Venta'); return; }
 
   const carta = {
-    id: Date.now(),
+    id: null,
     opCarta: document.getElementById('fOpCarta').value,
     opOrigen: opOrigen,
     tipo: tipo,
@@ -4703,16 +4716,30 @@ async function grabarCarta(){
   }
 
   carta.excepciones = [];
+
+  // Guardar en DB primero (el id viene del backend)
+  const btnGrabar = document.getElementById('btnGrabarCarta');
+  if(btnGrabar){ btnGrabar.disabled = true; btnGrabar.textContent = 'Grabando...'; }
+
+  const ok = await dbUpsertCarta(carta);
+
+  if(btnGrabar){ btnGrabar.disabled = false; btnGrabar.textContent = 'GRABAR CARTA'; }
+
+  if(!ok){
+    showModal('Error al grabar', 'No se pudo guardar la carta en la base de datos. Verifique su conexión e intente nuevamente.');
+    return;
+  }
+
+  // Agregar al array local con el id real ya asignado por el backend
   cartas.push(carta);
   saveData();
-  // Sync to Supabase (await to ensure it's saved before showing success)
-  await dbUpsertCarta(carta);
   clearForm();
-  document.getElementById('genSuccess').style.display='block';
-  document.getElementById('genSuccess').textContent = `✓ Carta N° ${carta.opCarta} grabada exitosamente. Pendiente de revisión.`;
-  setTimeout(()=>{ document.getElementById('genSuccess').style.display='none'; },5000);
-  // Update menu badges
   updateMenuBadges();
+
+  showModal(
+    '✓ Carta Grabada',
+    `La carta N° <strong>${carta.opCarta}</strong> fue grabada exitosamente y queda <strong>pendiente de revisión</strong>.`
+  );
 }
 
 function clearForm(){
