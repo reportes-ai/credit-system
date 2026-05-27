@@ -55,6 +55,11 @@ app.use('/api/cajas',                require('../../services/tesoreria/src/route
 app.use('/api/cierre-caja',          require('../../services/tesoreria/src/routes/cierre-caja.routes'));
 app.use('/api/cuentas-transitorias', require('../../services/tesoreria/src/routes/cuentas-transitorias.routes'));
 
+// Cartas de Aprobación
+app.use('/api/cartas',            require('../../services/cartas/src/routes/cartas.routes'));
+app.use('/api/cartas-ejecutivos', require('../../services/cartas/src/routes/ejecutivos.routes'));
+app.use('/api/cartas-params',     require('../../services/cartas/src/routes/parametros.routes'));
+
 // Dashboard analytics
 app.use('/api/dashboard', require('../../services/dashboard/src/routes/dashboard.routes'));
 

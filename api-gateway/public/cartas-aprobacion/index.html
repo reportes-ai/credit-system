@@ -194,7 +194,6 @@ body { font-family: 'Segoe UI', Arial, sans-serif; background: var(--gray-bg); c
   }
 }
 </style>
-<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
 </head>
@@ -1391,158 +1390,89 @@ document.addEventListener('DOMContentLoaded', () => {
   });
 });
 
-// ========== SUPABASE CONFIG ==========
-const SUPA_URL = 'https://wvjzzefvimaegrphixdq.supabase.co';
-const SUPA_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Ind2anp6ZWZ2aW1hZWdycGhpeGRxIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzQ4OTE1NDksImV4cCI6MjA5MDQ2NzU0OX0.aB7emuk7Ypj5vPhht7vpkFuLuhkwSjN_dc3_jh-udLk';
-const supa = supabase.createClient(SUPA_URL, SUPA_KEY);
+// ========== DB LAYER — TiDB (sistema principal) ==========
+// Todas las operaciones van al backend Express propio.
+// Supabase eliminado.
 
-// ========== DB LAYER ==========
-// All data operations go through Supabase
-// localStorage used as fallback/cache only
+function _tok(){ return localStorage.getItem('token') || ''; }
+function _hdr(){ return { 'Content-Type':'application/json', 'Authorization':'Bearer '+_tok() }; }
 
-async function dbGetUsers(){
-  const {data, error} = await supa.from('af_users').select('*').order('created_at');
-  if(error){ console.error('getUsers:', error); return null; }
-  return data.map(u => ({
-    login: u.login, name: u.name, pass: u.pass,
-    perfil: u.perfil, initials: u.initials||'', mail: u.mail||'', tel: u.tel||''
-  }));
-}
+// ── Usuarios de la app ────────────────────────────────────────────────────────
+// Ya no se gestiona tabla propia: los usuarios vienen del JWT del sistema principal.
+async function dbGetUsers(){ return null; }
+async function dbSaveUser(){ return true; }
+async function dbDeleteUser(){ return true; }
 
-async function dbSaveUser(u, isNew){
-  if(isNew){
-    const {error} = await supa.from('af_users').insert({
-      login: u.login, name: u.name, pass: u.pass,
-      perfil: u.perfil, initials: u.initials, mail: u.mail, tel: u.tel
-    });
-    return !error;
-  } else {
-    const {error} = await supa.from('af_users').update({
-      name: u.name, pass: u.pass, perfil: u.perfil,
-      initials: u.initials, mail: u.mail, tel: u.tel
-    }).eq('login', u.login);
-    return !error;
-  }
-}
-
-async function dbDeleteUser(login){
-  const {error} = await supa.from('af_users').delete().eq('login', login);
-  return !error;
-}
-
+// ── Ejecutivos ────────────────────────────────────────────────────────────────
 async function dbGetEjecutivos(){
-  const {data, error} = await supa.from('af_ejecutivos').select('*').order('nombre');
-  if(error){ console.error('getEjecutivos:', error); return null; }
-  return data.map(e => ({nombre: e.nombre, mail: e.mail||'', tel: e.tel||'', _id: e.id}));
+  try {
+    const r = await fetch('/api/cartas-ejecutivos', { headers: _hdr() });
+    if(!r.ok) return null;
+    const j = await r.json();
+    return (j.data || []).map(e => ({ nombre: e.nombre, mail: e.mail||'', tel: e.tel||'', _id: e.id }));
+  } catch(e){ console.error('getEjecutivos:', e); return null; }
 }
 
 async function dbSaveEjecutivo(e){
-  if(e._id){
-    const {error} = await supa.from('af_ejecutivos').update({nombre: e.nombre, mail: e.mail, tel: e.tel}).eq('id', e._id);
-    return !error;
-  } else {
-    const {error} = await supa.from('af_ejecutivos').insert({nombre: e.nombre, mail: e.mail, tel: e.tel});
-    return !error;
-  }
+  try {
+    const url  = e._id ? `/api/cartas-ejecutivos/${e._id}` : '/api/cartas-ejecutivos';
+    const meth = e._id ? 'PUT' : 'POST';
+    const r = await fetch(url, { method: meth, headers: _hdr(), body: JSON.stringify({ nombre: e.nombre, mail: e.mail, tel: e.tel }) });
+    return r.ok;
+  } catch(ex){ console.error('saveEjecutivo:', ex); return false; }
 }
 
 async function dbDeleteEjecutivo(id){
-  const {error} = await supa.from('af_ejecutivos').delete().eq('id', id);
-  return !error;
+  try {
+    const r = await fetch(`/api/cartas-ejecutivos/${id}`, { method: 'DELETE', headers: _hdr() });
+    return r.ok;
+  } catch(ex){ return false; }
 }
 
+// ── Cartas ────────────────────────────────────────────────────────────────────
 async function dbGetCartas(){
-  const {data, error} = await supa.from('af_cartas').select('*').order('fecha_creacion', {ascending: false});
-  if(error){ console.error('getCartas:', error); return null; }
-  return data.map(mapCartaFromDB);
-}
-
-function mapCartaFromDB(r){
-  return {
-    id: r.id,
-    opCarta: r.op_carta, opOrigen: r.op_origen, tipo: r.tipo,
-    ejecutivoIdx: r.ejecutivo_idx, ejecutivoNombre: r.ejecutivo_nombre,
-    ejecutivoMail: r.ejecutivo_mail, ejecutivoTel: r.ejecutivo_tel,
-    cliente: r.cliente, rutCliente: r.rut_cliente,
-    tipoVehiculo: r.tipo_vehiculo, marca: r.marca, modelo: r.modelo,
-    anio: r.anio, patente: r.patente, prenda: r.prenda,
-    precioVenta: r.precio_venta, pie: r.pie, saldo: r.saldo,
-    plazo: r.plazo, acreedor: r.acreedor, parque: r.parque,
-    concesionario: r.concesionario, rutConc: r.rut_conc, vendedor: r.vendedor,
-    partNeto: r.part_neto, partIVA: r.part_iva, partBruto: r.part_bruto,
-    fecha: r.fecha,
-    fechaCreacion: r.fecha_creacion,
-    creadoPor: r.creado_por, creadoPorNombre: r.creado_por_nombre, creadoPorInitials: r.creado_por_initials,
-    status: r.status,
-    aprobadoPor: r.aprobado_por, aprobadoPorNombre: r.aprobado_por_nombre, aprobadoPorInitials: r.aprobado_por_initials,
-    fechaAprobacion: r.fecha_aprobacion,
-    rechazadoPor: r.rechazado_por, rechazadoPorNombre: r.rechazado_por_nombre,
-    fechaRechazo: r.fecha_rechazo, motivoRechazo: r.motivo_rechazo,
-    anuladoPor: r.anulado_por, fechaAnulacion: r.fecha_anulacion,
-    eliminadoPor: r.eliminado_por, fechaEliminacion: r.fecha_eliminacion,
-    fechaCorreccion: r.fecha_correccion, corregidoPor: r.corregido_por,
-    otorgado: r.otorgado || false,
-    fechaOtorgado: r.fecha_otorgado || null,
-    tasaCredito: r.tasa_credito || 0,
-    montoCreditoCLP: r.monto_credito_clp || 0,
-    montoCreditoUF: r.monto_credito_uf || 0,
-    excepciones: r.excepciones ? (typeof r.excepciones === 'string' ? JSON.parse(r.excepciones) : r.excepciones) : [],
-    excepcionesComentarios: r.excepciones_comentarios ? (typeof r.excepciones_comentarios === 'string' ? JSON.parse(r.excepciones_comentarios) : r.excepciones_comentarios) : null,
-  };
-}
-
-function mapCartaToDB(c){
-  return {
-    id: c.id, op_carta: c.opCarta, op_origen: c.opOrigen, tipo: c.tipo,
-    ejecutivo_idx: c.ejecutivoIdx, ejecutivo_nombre: c.ejecutivoNombre,
-    ejecutivo_mail: c.ejecutivoMail, ejecutivo_tel: c.ejecutivoTel,
-    cliente: c.cliente, rut_cliente: c.rutCliente,
-    tipo_vehiculo: c.tipoVehiculo, marca: c.marca, modelo: c.modelo,
-    anio: c.anio, patente: c.patente, prenda: c.prenda,
-    precio_venta: c.precioVenta, pie: c.pie, saldo: c.saldo,
-    plazo: c.plazo, acreedor: c.acreedor, parque: c.parque,
-    concesionario: c.concesionario, rut_conc: c.rutConc, vendedor: c.vendedor,
-    part_neto: c.partNeto, part_iva: c.partIVA, part_bruto: c.partBruto,
-    fecha: c.fecha, fecha_creacion: c.fechaCreacion,
-    creado_por: c.creadoPor, creado_por_nombre: c.creadoPorNombre, creado_por_initials: c.creadoPorInitials,
-    status: c.status,
-    aprobado_por: c.aprobadoPor, aprobado_por_nombre: c.aprobadoPorNombre, aprobado_por_initials: c.aprobadoPorInitials,
-    fecha_aprobacion: c.fechaAprobacion,
-    rechazado_por: c.rechazadoPor, rechazado_por_nombre: c.rechazadoPorNombre,
-    fecha_rechazo: c.fechaRechazo, motivo_rechazo: c.motivoRechazo,
-    anulado_por: c.anuladoPor, fecha_anulacion: c.fechaAnulacion,
-    eliminado_por: c.eliminadoPor, fecha_eliminacion: c.fechaEliminacion,
-    fecha_correccion: c.fechaCorreccion, corregido_por: c.corregidoPor,
-    otorgado: c.otorgado || false,
-    fecha_otorgado: c.fechaOtorgado || null,
-    tasa_credito: c.tasaCredito || 0,
-    monto_credito_clp: c.montoCreditoCLP || 0,
-    monto_credito_uf: c.montoCreditoUF || 0,
-    excepciones: c.excepciones ? JSON.stringify(c.excepciones) : null,
-    excepciones_comentarios: c.excepcionesComentarios ? JSON.stringify(c.excepcionesComentarios) : null,
-  };
+  try {
+    const r = await fetch('/api/cartas', { headers: _hdr() });
+    if(!r.ok) return null;
+    const j = await r.json();
+    return j.data || [];
+  } catch(e){ console.error('getCartas:', e); return null; }
 }
 
 async function dbUpsertCarta(c){
-  const row = mapCartaToDB(c);
-  const {error} = await supa.from('af_cartas').upsert(row, {onConflict: 'id'});
-  if(error) console.error('upsertCarta:', error);
-  return !error;
+  try {
+    const r = await fetch('/api/cartas', {
+      method: 'POST',
+      headers: _hdr(),
+      body: JSON.stringify(c)
+    });
+    if(r.ok){
+      const j = await r.json();
+      // Si era nueva carta, actualizar el id con el insertId devuelto
+      if(!c.id && j.data && j.data.id) c.id = j.data.id;
+    }
+    return r.ok;
+  } catch(e){ console.error('upsertCarta:', e); return false; }
 }
 
+// ── Parámetros ────────────────────────────────────────────────────────────────
 async function dbGetParam(key){
-  const {data, error} = await supa.from('af_parametros').select('value').eq('key', key).single();
-  if(error) return null;
-  return data.value;
+  try {
+    const r = await fetch(`/api/cartas-params/${encodeURIComponent(key)}`, { headers: _hdr() });
+    if(!r.ok) return null;
+    const j = await r.json();
+    return j.data;
+  } catch(e){ return null; }
 }
 
-async function dbSetParam(key, value, updatedBy){
-  const {error} = await supa.from('af_parametros').upsert({
-    key, value: String(value),
-    updated_at: new Date().toISOString(),
-    updated_by: updatedBy || (currentUser ? currentUser.login : 'system')
-  }, {onConflict: 'key'});
-  return !error;
+async function dbSetParam(key, value){
+  try {
+    await fetch(`/api/cartas-params/${encodeURIComponent(key)}`, {
+      method: 'POST',
+      headers: _hdr(),
+      body: JSON.stringify({ value: String(value) })
+    });
+  } catch(e){ console.error('setParam:', e); }
 }
 
 // Show loading overlay
