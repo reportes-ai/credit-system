@@ -209,7 +209,7 @@
   <a class="nav-brand" href="/creditos">
     <img src="/img/logo-autofacil.png" alt="AutoFácil" style="filter:brightness(0) invert(1);height:32px;display:block" onerror="this.style.display='none'">
     <span>Revisión de Crédito</span>
-    <span class="version-badge">v3.5</span>
+    <span class="version-badge">v3.6</span>
   </a>
   <div class="breadcrumb-nav">
   <a href="/">Inicio</a><span class="sep">›</span>
@@ -710,7 +710,7 @@ function renderPagina(c, ant, com) {
   <div class="action-bar">
     <div class="action-bar-left">
       <a href="/creditos" class="btn-accion btn-volver"><i class="bi bi-arrow-left"></i>Volver</a>
-      ${!ESTADOS_CURSADOS.has(c.estado) && !ESTADOS_BROKER.has(c.estado) ? `
+      ${!ESTADOS_CURSADOS.has(c.estado) && !ESTADOS_BROKER.has(c.estado) && !['AUTOFIN','UNIDAD DE CREDITO'].includes(c.financiera) ? `
       <button class="btn-accion" style="background:linear-gradient(135deg,#d97706,#f59e0b);color:#fff"
         onclick="location.href='/creditos?editar=${c.id_credito}'">
         <i class="bi bi-pencil-square"></i>Editar Crédito
@@ -1170,7 +1170,7 @@ function abrirEditBroker() {
   setV('eb_cuota',               c.cuota);
   setV('eb_gastos',              c.gastos);
   setV('eb_seguros',             c.seguros);
-  setV('eb_comdea_real',         c.comdea_real||c.comision_dealer);
+  setV('eb_comdea_real',         c.comdea_real ?? c.comision_dealer);
   setV('eb_ejecutivo',           c.ejecutivo);
 
   // Vehículo
@@ -1190,10 +1190,26 @@ function abrirEditBroker() {
   setV('eb_dealer',              c.dealer||c.automotora);
   setV('eb_rut_concesionario',   c.rut_concesionario);
   setV('eb_vendedor',            c.vendedor);
-  setS('eb_tipo_ubicacion',      c.tipo_ubicacion||'');
 
-  // Estado
-  setS('eb_estado',              c.estado||'CARTA_APROBACION');
+  // Tipo ubicación: normalizar a mayúsculas para coincidir con opciones PARQUE/CALLE
+  const ubSel = document.getElementById('eb_tipo_ubicacion');
+  if (ubSel) ubSel.value = (c.tipo_ubicacion||'').toUpperCase() || '';
+
+  // Estado: insertar opción dinámica si el estado actual no está en el select
+  const estSel = document.getElementById('eb_estado');
+  if (estSel) {
+    const currentEstado = c.estado || 'CARTA_APROBACION';
+    const opciones = [...estSel.options].map(o => o.value);
+    if (!opciones.includes(currentEstado)) {
+      const labels = { INGRESO:'Ingresado', REVISION:'Ingresado', CARGA_RESPALDOS:'Carga Respaldos',
+                       EN_ANALISIS:'En Análisis', EMISION_DOCUMENTOS:'Emisión Documentos',
+                       CARGA_DOCUMENTOS_AF:'Carga Docs. AF', VALIDACION_FIRMA:'Validación Firma',
+                       VIGENTE:'Vigente' };
+      estSel.insertBefore(new Option((labels[currentEstado]||currentEstado)+' (actual)', currentEstado), estSel.firstChild);
+    }
+    estSel.value = currentEstado;
+  }
+
   setV('eb_observaciones',       c.observaciones||'');
 
   document.getElementById('editBrokerOverlay').classList.add('open');
