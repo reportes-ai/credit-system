@@ -176,7 +176,7 @@
       if (esAdmin) document.getElementById('btnReordenar').style.display = 'flex';
     }
 
-    function logout() { localStorage.removeItem('token'); localStorage.removeItem('usuario'); window.location.href = '/login.html'; }
+    function logout() { localStorage.removeItem('token'); localStorage.removeItem('usuario'); sessionStorage.removeItem('af_intro_done'); window.location.href = '/login.html'; }
 
     let sortable = null;
     let modulosData = [];
