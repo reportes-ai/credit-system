@@ -802,7 +802,7 @@ body { font-family: 'Segoe UI', Arial, sans-serif; background: var(--gray-bg); c
           <tr>
             <th>CORR.</th>
             <th>MES</th>
-            <th>N° OP</th>
+            <th>N°OP/ID</th>
             <th>MOVIMIENTO</th>
             <th>RUT CONC.</th>
             <th>CONCESIONARIO</th>
@@ -813,7 +813,7 @@ body { font-family: 'Segoe UI', Arial, sans-serif; background: var(--gray-bg); c
             <th>SALDO PRECIO</th>
             <th>COMISIÓN BRUTA</th>
             <th>E° COMISIÓN</th>
-            <th>N° OPERACIÓN</th>
+            <th>N° CARTA APROBACIÓN</th>
             <th>VENDEDOR</th>
             <th>ACREEDOR</th>
             <th>% COMISIÓN</th>
@@ -2964,9 +2964,9 @@ function exportCartolasExcel(){
   let cartolas = getCartolasData();
   if(!cartolas.length){ showModal('Sin datos','No hay registros en Detalle Mes.'); return; }
   
-  const headers = ['CORRELATIVO','MES','N° OP','MOVIMIENTO','RUT Concesionario','Concesionario',
+  const headers = ['CORRELATIVO','MES','N°OP/ID','MOVIMIENTO','RUT Concesionario','Concesionario',
     'mail','Ejecutivo Comercial','Nombre del Cliente','RUT del Cliente','Saldo Precio',
-    'Comision Bruta','E° Comisión','N° OPERACIÓN','VENDEDOR','ACREEDOR','% COMISIÓN','Observaciones'];
+    'Comision Bruta','E° Comisión','N° CARTA APROBACIÓN','VENDEDOR','ACREEDOR','% COMISIÓN','Observaciones'];
   
   const rows = cartolas.map(r => [
     r.correlativo, r.mesDisplay, r.nOp, r.movimiento, r.rutConc, r.concesionario,
@@ -3091,7 +3091,7 @@ function renderRevisionCartolas(){
         <div style="font-weight:700;font-size:11px;text-transform:uppercase;color:${color};margin:8px 0 4px;padding:3px 6px;background:${color}22">${label}</div>
         <table style="width:100%;border-collapse:collapse;font-size:10.5px">
           <tr style="background:#F5F5F5">
-            <th style="padding:3px 6px;border:1px solid #E0E0E0;text-align:left">N° OP</th>
+            <th style="padding:3px 6px;border:1px solid #E0E0E0;text-align:left">N°OP/ID</th>
             <th style="padding:3px 6px;border:1px solid #E0E0E0">Ejecutivo</th>
             <th style="padding:3px 6px;border:1px solid #E0E0E0">Cliente</th>
             <th style="padding:3px 6px;border:1px solid #E0E0E0">RUT</th>
@@ -3602,7 +3602,7 @@ function buildCartolaPDF(concName, g, mes, totalComis, totalAnul, totalPrep, sub
     <div style="background:${color};color:white;padding:4px 8px;font-weight:700;font-size:9.5px;text-transform:uppercase;margin-top:10px">${title}</div>
     <table style="width:100%;border-collapse:collapse;font-size:9px">
       <thead><tr style="background:${color};color:white">
-        <th style="${thStyle}">N° OP</th><th style="${thStyle}">Ejecutivo</th><th style="${thStyle}">Nombre Cliente</th>
+        <th style="${thStyle}">N°OP/ID</th><th style="${thStyle}">Ejecutivo</th><th style="${thStyle}">Nombre Cliente</th>
         <th style="${thStyle}">RUT Cliente</th><th style="${thStyle};text-align:right">Saldo Precio</th>
         <th style="${thStyle};text-align:right">Comisión Bruta</th><th style="${thStyle}">E° Comisión</th><th style="${thStyle}">Observaciones</th>
       </tr></thead>
