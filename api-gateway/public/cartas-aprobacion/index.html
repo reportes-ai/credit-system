@@ -1238,6 +1238,10 @@ body { font-family: 'Segoe UI', Arial, sans-serif; background: var(--gray-bg); c
   </div>
 </div>
 
+<!-- BANNER DE NOTIFICACIONES (no bloquea) -->
+<div id="notifBanner" style="display:none;position:fixed;top:60px;right:18px;z-index:9999;max-width:360px;min-width:260px">
+</div>
+
 <!-- DEALER DETAIL/EDIT MODAL -->
 <div class="modal-overlay" id="dealerModalOverlay" style="align-items:flex-start;padding:20px;overflow-y:auto">
   <div class="modal" style="max-width:750px;width:95%;margin:auto">
@@ -4052,9 +4056,12 @@ async function doLogin(){
   _fetchTasasFromAPI().then(t => { if(t) _tasasCache = t; });
 
   await initApp();
+  // Iniciar polling de notificaciones después de cargar
+  _iniciarPolling();
 }
 
 function doLogout(){
+  if(_notifTimer) clearInterval(_notifTimer);
   currentUser = null;
   location.href = '/';
 }
@@ -4180,13 +4187,14 @@ async function initApp(){
   setTimeout(() => { try{ calcCreditoFields(); checkFinancieraPreferente(); }catch(e){} }, 500);
 
   // Visibilidad de botones del menú según funcionalidades habilitadas
-  const hasPerm = (code) => _misPermisos.includes(code);
+  // hasPerm es global para que el sistema de notificaciones pueda usarla
+  window.hasPerm = (code) => _misPermisos.includes(code);
   // Fallback: si _misPermisos está vacío (token antiguo sin funcionalidades), usar lógica de perfil
   const fallbackAdmin = currentUser.perfil==='ADMIN' || currentUser.perfil==='SUPERVISOR';
   const fallbackSuperAdmin = currentUser.perfil==='ADMIN';
   const useFallback = _misPermisos.length === 0;
 
-  function vis(code, fallback){ return (useFallback ? fallback : hasPerm(code)) ? '' : 'none'; }
+  function vis(code, fallback){ return (useFallback ? fallback : window.hasPerm(code)) ? '' : 'none'; }
 
   document.getElementById('btnGenerar').style.display        = vis('cartas_generador',         true);
   document.getElementById('btnRevision').style.display       = vis('cartas_revision',           true);
@@ -4868,7 +4876,10 @@ async function ejecutarAprobacion(id, comentarios){
     const creditoBody = {
       rut_cliente:      c.rutCliente   || '',
       nombre_cliente:   c.cliente      || '',
-      financiera:       c.acreedor     || 'AUTOFACIL',
+      // Mapear acreedor de la carta → financiera del sistema de créditos
+      financiera:       (c.acreedor||'').includes('UNIDAD') ? 'UNIDAD DE CREDITO'
+                      : (c.acreedor||'').includes('AUTOFIN') ? 'AUTOFIN'
+                      : 'AUTOFIN',
       estado:           'CARTA_APROBACION',
       valor_vehiculo:   c.precioVenta  || null,
       pie:              c.pie          || null,
@@ -4900,12 +4911,13 @@ async function ejecutarAprobacion(id, comentarios){
     if(rCred.ok){
       const jCred = await rCred.json();
       numCredito = jCred.data?.numero_credito || null;
-      // Guardar referencia del crédito en la carta
       c.numeroCreditoCreado = numCredito;
       c.idCreditoCreado = jCred.data?.id_credito || null;
       await dbUpsertCarta(c);
     } else {
-      console.warn('No se pudo crear crédito:', await rCred.text());
+      const errTxt = await rCred.text();
+      console.warn('No se pudo crear crédito HTTP', rCred.status, errTxt);
+      try{ const ej = JSON.parse(errTxt); if(ej.error) console.warn('Error backend:', ej.error); }catch(e){}
     }
   } catch(ex){ console.warn('Error creando crédito desde carta:', ex); }
 
@@ -5684,7 +5696,7 @@ function commitSaveParams(updated){
 // ========== MODAL ==========
 function showModal(title, msg, cancelCb, okCb){
   document.getElementById('modalTitle').textContent=title;
-  document.getElementById('modalMsg').textContent=msg;
+  document.getElementById('modalMsg').innerHTML=msg;   // innerHTML para soportar HTML en mensajes
   document.getElementById('modalOverlay').classList.add('active');
   const cancel=document.getElementById('modalCancel');
   const ok=document.getElementById('modalOk');
@@ -5696,6 +5708,94 @@ function closeModal(){ document.getElementById('modalOverlay').classList.remove(
 
 function closeRevModal(){ document.getElementById('revModalOverlay').classList.remove('active'); }
 function goRevision(){ closeRevModal(); showPage('revPage'); }
+
+// ══════════════════════════════════════════════════════════════════════════════
+// SISTEMA DE NOTIFICACIONES (polling cada 30s)
+// ══════════════════════════════════════════════════════════════════════════════
+
+let _notifTimer = null;
+// Tracks: { cartaId: lastStatus } para detectar cambios
+const _notifEstados = {};
+// Para no repetir notif de revision en la misma sesion
+let _notifRevisionMostrada = false;
+
+function _showNotifBanner(msg, tipo, onClick){
+  const banner = document.getElementById('notifBanner');
+  if(!banner) return;
+  const color = tipo==='info' ? '#1565C0' : tipo==='success' ? '#2E7D32' : '#C62828';
+  const bgColor = tipo==='info' ? '#E3F2FD' : tipo==='success' ? '#E8F5E9' : '#FFEBEE';
+  const id = 'nb_' + Date.now();
+  const div = document.createElement('div');
+  div.id = id;
+  div.style.cssText = `background:${bgColor};border-left:4px solid ${color};border-radius:6px;
+    padding:12px 14px;margin-bottom:8px;box-shadow:0 2px 8px rgba(0,0,0,.15);
+    font-size:13px;color:#222;cursor:${onClick?'pointer':'default'};position:relative`;
+  div.innerHTML = `<div style="font-weight:700;color:${color};margin-bottom:4px">🔔 AutoFácil</div>
+    <div>${msg}</div>
+    <button onclick="document.getElementById('${id}').remove();event.stopPropagation()"
+      style="position:absolute;top:6px;right:8px;background:none;border:none;font-size:14px;cursor:pointer;color:#888">✕</button>`;
+  if(onClick) div.addEventListener('click', () => { onClick(); div.remove(); });
+  banner.appendChild(div);
+  banner.style.display = 'block';
+  // Auto-dismiss en 15s
+  setTimeout(() => { try{ div.remove(); if(!banner.children.length) banner.style.display='none'; }catch(e){} }, 15000);
+}
+
+async function _pollNotificaciones(){
+  if(!currentUser) return;
+  try {
+    const fresh = await dbGetCartas();
+    if(!fresh) return;
+
+    const puedeRevisar = window.hasPerm && window.hasPerm('cartas_revision');
+
+    // ── 1. Cartas pendientes de revisión (para revisores) ──────────────────
+    if(puedeRevisar){
+      const pendientes = fresh.filter(c => c.status === 'PENDIENTE' && c.creadoPor !== currentUser.login);
+      if(pendientes.length > 0 && !_notifRevisionMostrada){
+        _notifRevisionMostrada = true;
+        _showNotifBanner(
+          `<strong>${pendientes.length} carta(s) de aprobación</strong> requieren su revisión.`,
+          'info',
+          () => showPage('revPage')
+        );
+      }
+    }
+
+    // ── 2. Cambios de estado en cartas propias (para el creador) ──────────
+    const misCartas = fresh.filter(c => c.creadoPor === currentUser.login);
+    for(const c of misCartas){
+      const prev = _notifEstados[c.id];
+      const curr = c.status;
+      // Si cambió de PENDIENTE → APROBADA o RECHAZADA
+      if(prev === 'PENDIENTE' && (curr === 'APROBADA' || curr === 'RECHAZADA')){
+        const tipo = curr === 'APROBADA' ? 'success' : 'error';
+        const txt  = curr === 'APROBADA'
+          ? `La carta <strong>${c.opCarta}</strong> fue <strong style="color:#2E7D32">APROBADA</strong>.`
+          : `La carta <strong>${c.opCarta}</strong> fue <strong style="color:#C62828">RECHAZADA</strong>. Motivo: ${c.motivoRechazo || '-'}`;
+        _showNotifBanner(txt, tipo, () => showPage('impPage'));
+      }
+      _notifEstados[c.id] = curr;
+    }
+
+    // Sincronizar cartas locales
+    cartas = fresh;
+    saveData();
+    updateMenuBadges();
+
+  } catch(e){ /* silencioso */ }
+}
+
+function _iniciarPolling(){
+  // Inicializar estado actual (sin notificar)
+  cartas.forEach(c => { _notifEstados[c.id] = c.status; });
+  // Primer chequeo a los 5s (para dar tiempo a que cargue todo)
+  setTimeout(async () => {
+    await _pollNotificaciones();
+    // Luego cada 30s
+    _notifTimer = setInterval(_pollNotificaciones, 30000);
+  }, 5000);
+}
 
 // ── Arranque: iniciar sesión directo desde el token del sistema principal ──
 doLogin();
