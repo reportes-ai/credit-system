@@ -211,7 +211,7 @@ body { font-family: 'Segoe UI', Arial, sans-serif; background: var(--gray-bg); c
   <div class="header no-print">
     <div class="header-logo" style="display:flex;align-items:center;gap:8px">
         <img id="logoHeader" src="/img/logo.png" alt="AutoFácil" style="height:32px;object-fit:contain">
-        <span style="font-size:11px;font-weight:400;color:#90CAF9">V5.32</span>
+        <span style="font-size:11px;font-weight:400;color:#90CAF9">V5.33</span>
       </div>
     <div class="header-right">
       <span class="header-user" id="headerUser"></span>
@@ -4872,6 +4872,7 @@ async function ejecutarAprobacion(id, comentarios){
 
   // ── Crear crédito en el sistema principal ────────────────────────────────
   let numCredito = null;
+  let _errorCredito = null;
   try {
     const creditoBody = {
       rut_cliente:      c.rutCliente   || '',
@@ -4916,10 +4917,16 @@ async function ejecutarAprobacion(id, comentarios){
       await dbUpsertCarta(c);
     } else {
       const errTxt = await rCred.text();
-      console.warn('No se pudo crear crédito HTTP', rCred.status, errTxt);
-      try{ const ej = JSON.parse(errTxt); if(ej.error) console.warn('Error backend:', ej.error); }catch(e){}
+      try{
+        const ej = JSON.parse(errTxt);
+        _errorCredito = `HTTP ${rCred.status}: ${ej.error || errTxt}`;
+      } catch(e){ _errorCredito = `HTTP ${rCred.status}: ${errTxt}`; }
+      console.warn('Error creando crédito:', _errorCredito);
     }
-  } catch(ex){ console.warn('Error creando crédito desde carta:', ex); }
+  } catch(ex){
+    _errorCredito = ex.message || String(ex);
+    console.warn('Excepción creando crédito:', _errorCredito);
+  }
 
   const fresh = await dbGetCartas();
   if(fresh) cartas = fresh;
@@ -4927,9 +4934,9 @@ async function ejecutarAprobacion(id, comentarios){
   renderRevTable();
   updateMenuBadges();
   const msgCredito = numCredito
-    ? `\n\nCrédito N° ${numCredito} creado en estado CARTA APROBACIÓN.`
-    : '\n\n(No se pudo crear el crédito automáticamente — créalo manualmente.)';
-  showModal('✓ Carta aprobada','La carta '+c.opCarta+' ha sido aprobada y está lista para imprimir.' + msgCredito);
+    ? `<br><br>✅ Crédito N° <strong>${numCredito}</strong> creado en estado <strong>CARTA APROBACIÓN</strong>.`
+    : `<br><br>⚠️ No se pudo crear el crédito automáticamente.<br><small style="color:#888">${_errorCredito || 'Error desconocido'}</small>`;
+  showModal('✓ Carta aprobada', `La carta <strong>${c.opCarta}</strong> fue aprobada y está lista para imprimir.${msgCredito}`);
 }
 
 function rechazarCarta(id){
