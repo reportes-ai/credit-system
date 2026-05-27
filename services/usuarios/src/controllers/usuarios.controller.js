@@ -1,11 +1,26 @@
 const pool = require('../../../../shared/config/database');
 const bcrypt = require('bcryptjs');
 
-/* ─── Migración: agregar columna telefono si no existe ─────────── */
+/* ─── Migraciones ──────────────────────────────────────────────── */
 (async () => {
   try {
     await pool.query(`ALTER TABLE usuarios ADD COLUMN telefono VARCHAR(20) NULL DEFAULT NULL`);
   } catch (e) { if (e.errno !== 1060) console.error('[usuarios migration telefono]', e.message); }
+})();
+
+// Tabla de permisos individuales por usuario (excepciones al perfil base)
+(async () => {
+  try {
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS permisos_usuario (
+        id_usuario       INT NOT NULL,
+        id_funcionalidad INT NOT NULL,
+        habilitado       TINYINT(1) NOT NULL,
+        PRIMARY KEY (id_usuario, id_funcionalidad),
+        INDEX idx_pu_usuario (id_usuario)
+      )
+    `);
+  } catch (e) { console.error('[permisos_usuario migration]', e.message); }
 })();
 
 const PERFILES_GLOBALES = ['Administrador', 'Gerente'];
@@ -141,4 +156,62 @@ const resetClave = async (req, res) => {
   }
 };
 
-module.exports = { getAllUsuarios, getUsuarioById, createUsuario, updateUsuario, deleteUsuario, resetClave };
+/* ─── Permisos individuales por usuario ────────────────────────── */
+
+const getPermisosUsuario = async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    const [[u]] = await pool.query('SELECT id_perfil FROM usuarios WHERE id_usuario = ?', [id]);
+    if (!u) return res.status(404).json({ success: false, data: null, error: 'Usuario no encontrado' });
+
+    // Base del perfil
+    const [baseRows] = await pool.query(
+      'SELECT id_funcionalidad, habilitado FROM permisos_perfil WHERE id_perfil = ?',
+      [u.id_perfil]
+    );
+    const base = {};
+    baseRows.forEach(p => { base[p.id_funcionalidad] = p.habilitado === 1; });
+
+    // Overrides individuales del usuario
+    const [ovRows] = await pool.query(
+      'SELECT id_funcionalidad, habilitado FROM permisos_usuario WHERE id_usuario = ?',
+      [id]
+    );
+    const overrides = {};
+    ovRows.forEach(o => { overrides[o.id_funcionalidad] = o.habilitado === 1; });
+
+    res.json({ success: true, data: { base, overrides }, error: null });
+  } catch (e) {
+    res.status(500).json({ success: false, data: null, error: e.message });
+  }
+};
+
+const updatePermisosUsuario = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { permisos } = req.body; // [{ id_funcionalidad, habilitado, es_override }]
+
+    if (!Array.isArray(permisos)) {
+      return res.status(400).json({ success: false, data: null, error: 'Formato inválido' });
+    }
+
+    // Eliminar todos los overrides actuales del usuario
+    await pool.query('DELETE FROM permisos_usuario WHERE id_usuario = ?', [id]);
+
+    // Insertar solo los que difieren del base (es_override = true)
+    const inserts = permisos.filter(p => p.es_override);
+    for (const p of inserts) {
+      await pool.query(
+        'INSERT INTO permisos_usuario (id_usuario, id_funcionalidad, habilitado) VALUES (?,?,?)',
+        [id, p.id_funcionalidad, p.habilitado ? 1 : 0]
+      );
+    }
+
+    res.json({ success: true, data: { mensaje: 'Permisos de usuario actualizados' }, error: null });
+  } catch (e) {
+    res.status(500).json({ success: false, data: null, error: e.message });
+  }
+};
+
+module.exports = { getAllUsuarios, getUsuarioById, createUsuario, updateUsuario, deleteUsuario, resetClave, getPermisosUsuario, updatePermisosUsuario };

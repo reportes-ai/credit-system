@@ -527,4 +527,47 @@ const deletePerfil = async (req, res) => {
   }
 };
 
-module.exports = { getAllPerfiles, getModulosConFuncionalidades, getPermisosPerfil, updatePermisosPerfil, reordenarModulos, createPerfil, deletePerfil };
+/* ─── Usuarios por perfil (con indicadores de override) ─────────── */
+const getUsuariosByPerfil = async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    // Permisos base del perfil
+    const [baseRows] = await pool.query(
+      'SELECT id_funcionalidad, habilitado FROM permisos_perfil WHERE id_perfil = ?', [id]
+    );
+    const base = {};
+    baseRows.forEach(p => { base[p.id_funcionalidad] = p.habilitado === 1; });
+
+    // Usuarios activos con este perfil
+    const [users] = await pool.query(
+      `SELECT id_usuario, nombre, apellido, email, estado
+       FROM usuarios WHERE id_perfil = ? AND estado = 'activo'
+       ORDER BY nombre, apellido`,
+      [id]
+    );
+
+    // Para cada usuario, calcular cuántos permisos extra/faltan
+    const result = [];
+    for (const u of users) {
+      const [ovRows] = await pool.query(
+        'SELECT id_funcionalidad, habilitado FROM permisos_usuario WHERE id_usuario = ?',
+        [u.id_usuario]
+      );
+      let extra = 0, missing = 0;
+      for (const ov of ovRows) {
+        const profileHas = base[ov.id_funcionalidad] || false;
+        const userHas = ov.habilitado === 1;
+        if (userHas && !profileHas) extra++;
+        if (!userHas && profileHas) missing++;
+      }
+      result.push({ ...u, extra_count: extra, missing_count: missing });
+    }
+
+    res.json({ success: true, data: result, error: null });
+  } catch (e) {
+    res.status(500).json({ success: false, data: null, error: e.message });
+  }
+};
+
+module.exports = { getAllPerfiles, getModulosConFuncionalidades, getPermisosPerfil, updatePermisosPerfil, reordenarModulos, createPerfil, deletePerfil, getUsuariosByPerfil };

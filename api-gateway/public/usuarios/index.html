@@ -270,12 +270,35 @@
         <div class="col-md-9">
           <div class="card">
             <div class="card-body">
+              <!-- Header modo PERFIL -->
               <div id="perfilSeleccionadoHeader" class="mb-3 d-none">
                 <div class="d-flex justify-content-between align-items-center">
                   <h6 class="fw-bold mb-0" id="perfilNombreTitle">—</h6>
                   <button class="btn btn-primary btn-sm" onclick="guardarPermisos()">
                     <i class="bi bi-floppy me-1"></i>Guardar Permisos
                   </button>
+                </div>
+                <hr class="my-2">
+              </div>
+              <!-- Header modo USUARIO -->
+              <div id="usuarioPermisosHeader" class="mb-3 d-none">
+                <div class="d-flex justify-content-between align-items-center flex-wrap gap-2">
+                  <div class="d-flex align-items-center gap-2">
+                    <button class="btn btn-outline-secondary btn-sm py-0 px-2" onclick="volverAlPerfil()" title="Volver al perfil">
+                      <i class="bi bi-arrow-left"></i>
+                    </button>
+                    <div>
+                      <h6 class="fw-bold mb-0" id="usuarioNombreTitle">—</h6>
+                      <small class="text-muted" id="usuarioPerfilTitle">—</small>
+                    </div>
+                  </div>
+                  <button class="btn btn-primary btn-sm" onclick="guardarPermisosUsuario()">
+                    <i class="bi bi-floppy me-1"></i>Guardar
+                  </button>
+                </div>
+                <div class="d-flex gap-3 mt-2" style="font-size:0.76rem">
+                  <span><span style="display:inline-block;width:10px;height:10px;background:#d4edda;border:1px solid #28a745;border-radius:2px;margin-right:4px"></span>Verde = extra (no está en el perfil base)</span>
+                  <span><span style="display:inline-block;width:10px;height:10px;background:#f8d7da;border:1px solid #dc3545;border-radius:2px;margin-right:4px"></span>Rojo = falta (el perfil lo tiene pero el usuario no)</span>
                 </div>
                 <hr class="my-2">
               </div>
@@ -867,35 +890,102 @@
     let perfilActualId = null;
     let permisosActuales = {};
 
+    // Estado para expansión de usuarios por perfil
+    let perfilesExpandidos = {};       // { id_perfil: bool }
+    let usuariosEnPerfil  = {};        // { id_perfil: [...] }
+
+    // Estado para edición de permisos por usuario
+    let modoUsuario       = false;
+    let usuarioActualId   = null;
+    let perfilBaseId      = null;
+    let permisosBaseData  = {};        // { id_func: bool } — permisos del perfil base
+    let permisosUsuarioDelta = {};     // { id_func: bool } — estado actual editado
+
     async function cargarPerfiles() {
       const [pData, mData] = await Promise.all([
         api('GET', '/api/perfiles'),
         api('GET', '/api/perfiles/modulos-funcionalidades')
       ]);
       perfilesData = pData?.data || [];
-      modulosData = mData?.data || [];
+      modulosData  = mData?.data || [];
       renderListaPerfiles();
     }
 
-    function renderListaPerfiles() {
-      const el = document.getElementById('listaPerfiles');
-      el.innerHTML = perfilesData.map(p => `
-        <div class="d-flex align-items-center mb-1 gap-1">
-          <button class="btn flex-grow-1 text-start btn-outline-secondary btn-sm perfil-item" data-id="${p.id_perfil}"
-            onclick="seleccionarPerfil(${p.id_perfil}, '${p.nombre.replace(/'/g,"\\'")}')">
-            <i class="bi bi-shield me-2"></i>${p.nombre}
-          </button>
-          ${esAdmin && p.nombre !== 'Administrador' ? `
-          <button class="btn btn-outline-danger btn-sm px-2 py-1" title="Eliminar perfil"
-            onclick="eliminarPerfil(${p.id_perfil}, '${p.nombre.replace(/'/g,"\\'")}')">
-            <i class="bi bi-trash3" style="font-size:.75rem"></i>
-          </button>` : ''}
-        </div>
-      `).join('');
+    // ── Badge de indicador ──────────────────────────────────
+    function getIndicadorBadge(extra, missing) {
+      if (!extra && !missing) return '';
+      if (extra && missing)  return `<span style="font-size:.7rem;font-weight:700;color:#856404;background:#fff3cd;border:1px solid #ffc107;border-radius:3px;padding:0 4px;margin-left:4px">+/−</span>`;
+      if (extra)             return `<span style="font-size:.7rem;font-weight:700;color:#155724;background:#d4edda;border:1px solid #28a745;border-radius:3px;padding:0 4px;margin-left:4px">+</span>`;
+      return                        `<span style="font-size:.7rem;font-weight:700;color:#721c24;background:#f8d7da;border:1px solid #dc3545;border-radius:3px;padding:0 4px;margin-left:4px">−</span>`;
     }
 
+    // ── Render lista de perfiles ────────────────────────────
+    function renderListaPerfiles() {
+      const el = document.getElementById('listaPerfiles');
+      el.innerHTML = perfilesData.map(p => {
+        const expandido = !!perfilesExpandidos[p.id_perfil];
+        const usrs = usuariosEnPerfil[p.id_perfil] || [];
+        const nombre = p.nombre.replace(/'/g, "\\'");
+        return `
+        <div class="mb-1" id="perfil-bloque-${p.id_perfil}">
+          <div class="d-flex align-items-center gap-1">
+            <button class="btn btn-outline-secondary btn-sm px-1 py-0" style="min-width:22px;font-size:.7rem"
+              onclick="toggleExpandirPerfil(${p.id_perfil})" title="${expandido ? 'Colapsar' : 'Expandir usuarios'}">
+              <i class="bi bi-chevron-${expandido ? 'down' : 'right'}"></i>
+            </button>
+            <button class="btn flex-grow-1 text-start btn-outline-secondary btn-sm perfil-item" data-id="${p.id_perfil}"
+              onclick="seleccionarPerfil(${p.id_perfil}, '${nombre}')">
+              <i class="bi bi-shield me-2"></i>${p.nombre}
+            </button>
+            ${esAdmin && p.nombre !== 'Administrador' ? `
+            <button class="btn btn-outline-danger btn-sm px-2 py-1" title="Eliminar perfil"
+              onclick="eliminarPerfil(${p.id_perfil}, '${nombre}')">
+              <i class="bi bi-trash3" style="font-size:.75rem"></i>
+            </button>` : ''}
+          </div>
+          ${expandido ? `
+          <div id="usuarios-perfil-${p.id_perfil}" class="ms-4 mt-1 border-start ps-2" style="border-color:#dee2e6!important">
+            ${usrs.length === 0
+              ? `<div class="text-muted" style="font-size:.75rem;padding:4px 0">Sin usuarios activos</div>`
+              : usrs.map(u => `
+                <div class="d-flex align-items-center mb-1">
+                  <button class="btn btn-sm text-start py-0 px-1 flex-grow-1 ${usuarioActualId === u.id_usuario ? 'btn-secondary' : 'btn-link text-dark'}"
+                    style="font-size:.78rem;text-decoration:none"
+                    onclick="seleccionarUsuario(${u.id_usuario}, '${(u.nombre+' '+u.apellido).replace(/'/g,"\\'")}', ${p.id_perfil}, '${nombre}')">
+                    <i class="bi bi-person me-1" style="font-size:.7rem"></i>${u.nombre} ${u.apellido}
+                  </button>
+                  ${getIndicadorBadge(u.extra_count, u.missing_count)}
+                </div>
+              `).join('')
+            }
+          </div>` : ''}
+        </div>`;
+      }).join('');
+    }
+
+    // ── Expandir / colapsar perfil ──────────────────────────
+    async function toggleExpandirPerfil(id) {
+      perfilesExpandidos[id] = !perfilesExpandidos[id];
+      if (perfilesExpandidos[id] && !usuariosEnPerfil[id]) {
+        const data = await api('GET', `/api/perfiles/${id}/usuarios`);
+        usuariosEnPerfil[id] = data?.data || [];
+      }
+      renderListaPerfiles();
+    }
+
+    // ── Refrescar usuarios de un perfil (después de guardar) ─
+    async function refrescarUsuariosDePerfil(id_perfil) {
+      const data = await api('GET', `/api/perfiles/${id_perfil}/usuarios`);
+      usuariosEnPerfil[id_perfil] = data?.data || [];
+      renderListaPerfiles();
+    }
+
+    // ── Seleccionar perfil (modo edición permisos de perfil) ─
     async function seleccionarPerfil(id, nombre) {
+      modoUsuario = false;
+      usuarioActualId = null;
       perfilActualId = id;
+
       document.querySelectorAll('.perfil-item').forEach(b => {
         b.classList.toggle('btn-primary', parseInt(b.dataset.id) === id);
         b.classList.toggle('btn-outline-secondary', parseInt(b.dataset.id) !== id);
@@ -903,10 +993,15 @@
 
       document.getElementById('perfilNombreTitle').textContent = nombre;
       document.getElementById('perfilSeleccionadoHeader').classList.remove('d-none');
+      document.getElementById('usuarioPermisosHeader').classList.add('d-none');
 
       const data = await api('GET', `/api/perfiles/${id}/permisos`);
       permisosActuales = data?.data || {};
 
+      renderGridPerfil();
+    }
+
+    function renderGridPerfil() {
       const grid = document.getElementById('permisosGrid');
       grid.innerHTML = modulosData.map(mod => `
         <div class="permisos-modulo">
@@ -923,8 +1018,7 @@
                     onchange="togglePermiso(${f.id_funcionalidad}, this.checked)"
                     data-id="${f.id_funcionalidad}">
                   <span>${f.nombre}</span>
-                </label>
-              `;
+                </label>`;
             }).join('')}
           </div>
         </div>
@@ -943,8 +1037,119 @@
         id_funcionalidad: parseInt(id), habilitado: hab
       }));
       const data = await api('PUT', `/api/perfiles/${perfilActualId}/permisos`, { permisos });
-      if (data?.success) showToast('Permisos guardados correctamente');
-      else showToast(data?.error || 'Error al guardar permisos', 'danger');
+      if (data?.success) {
+        showToast('Permisos guardados correctamente');
+        // Refrescar indicadores de usuarios de este perfil
+        if (perfilesExpandidos[perfilActualId]) refrescarUsuariosDePerfil(perfilActualId);
+      } else {
+        showToast(data?.error || 'Error al guardar permisos', 'danger');
+      }
+    }
+
+    // ── Seleccionar usuario (modo edición overrides de usuario) ─
+    async function seleccionarUsuario(id, nombre, id_perfil, perfilNombre) {
+      modoUsuario = true;
+      usuarioActualId = id;
+      perfilBaseId = id_perfil;
+
+      document.querySelectorAll('.perfil-item').forEach(b => {
+        b.classList.remove('btn-primary');
+        b.classList.add('btn-outline-secondary');
+      });
+
+      document.getElementById('usuarioNombreTitle').textContent = nombre;
+      document.getElementById('usuarioPerfilTitle').textContent = 'Perfil base: ' + perfilNombre;
+      document.getElementById('usuarioPermisosHeader').classList.remove('d-none');
+      document.getElementById('perfilSeleccionadoHeader').classList.add('d-none');
+
+      const data = await api('GET', `/api/usuarios/${id}/permisos`);
+      permisosBaseData   = data?.data?.base     || {};
+      const overrides    = data?.data?.overrides || {};
+
+      // Estado actual = base + overrides aplicados
+      permisosUsuarioDelta = { ...permisosBaseData };
+      for (const [fid, val] of Object.entries(overrides)) {
+        permisosUsuarioDelta[parseInt(fid)] = val;
+      }
+
+      renderGridUsuario();
+      // Re-render lista para marcar usuario activo
+      renderListaPerfiles();
+    }
+
+    function renderGridUsuario() {
+      const grid = document.getElementById('permisosGrid');
+      grid.innerHTML = modulosData.map(mod => `
+        <div class="permisos-modulo">
+          <div class="permisos-modulo-header">
+            <i class="bi ${mod.icono || 'bi-grid'}"></i>${mod.nombre}
+          </div>
+          <div class="permisos-modulo-body">
+            ${mod.funcionalidades.map(f => {
+              const fid = f.id_funcionalidad;
+              const enBase    = !!permisosBaseData[fid];
+              const efectivo  = !!permisosUsuarioDelta[fid];
+              const esExtra   = efectivo && !enBase;   // usuario tiene, perfil no
+              const esFalta   = !efectivo && enBase;   // perfil tiene, usuario no
+              const esNormal  = efectivo === enBase;
+              const bgColor   = esExtra ? '#d4edda' : esFalta ? '#f8d7da' : '';
+              const borderCol = esExtra ? '#28a745' : esFalta ? '#dc3545' : '';
+              const labelStyle = bgColor ? `background:${bgColor};border-color:${borderCol}` : '';
+              const checkedClass = efectivo ? 'checked' : '';
+              return `
+                <label class="permiso-check ${checkedClass}" id="pcu-${fid}" style="${labelStyle}">
+                  <input type="checkbox" ${efectivo ? 'checked' : ''} ${!esAdmin ? 'disabled' : ''}
+                    onchange="togglePermisoUsuario(${fid}, this.checked)"
+                    data-id="${fid}">
+                  <span>${f.nombre}</span>
+                </label>`;
+            }).join('')}
+          </div>
+        </div>
+      `).join('');
+    }
+
+    function togglePermisoUsuario(fid, val) {
+      permisosUsuarioDelta[fid] = val;
+      const lbl = document.getElementById(`pcu-${fid}`);
+      if (!lbl) return;
+      const enBase   = !!permisosBaseData[fid];
+      const esExtra  = val && !enBase;
+      const esFalta  = !val && enBase;
+      lbl.style.background   = esExtra ? '#d4edda' : esFalta ? '#f8d7da' : '';
+      lbl.style.borderColor  = esExtra ? '#28a745' : esFalta ? '#dc3545' : '';
+      lbl.classList.toggle('checked', val);
+    }
+
+    async function guardarPermisosUsuario() {
+      if (!usuarioActualId) return;
+      const permisos = Object.entries(permisosUsuarioDelta).map(([fid, val]) => ({
+        id_funcionalidad: parseInt(fid),
+        habilitado: val,
+        es_override: val !== !!permisosBaseData[parseInt(fid)]
+      }));
+      const data = await api('PUT', `/api/usuarios/${usuarioActualId}/permisos`, { permisos });
+      if (data?.success) {
+        showToast('Permisos de usuario guardados');
+        // Refrescar indicadores del perfil
+        if (perfilBaseId) refrescarUsuariosDePerfil(perfilBaseId);
+      } else {
+        showToast(data?.error || 'Error al guardar', 'danger');
+      }
+    }
+
+    function volverAlPerfil() {
+      if (perfilBaseId) {
+        const p = perfilesData.find(x => x.id_perfil === perfilBaseId);
+        if (p) seleccionarPerfil(p.id_perfil, p.nombre);
+      } else {
+        modoUsuario = false;
+        usuarioActualId = null;
+        document.getElementById('usuarioPermisosHeader').classList.add('d-none');
+        document.getElementById('perfilSeleccionadoHeader').classList.add('d-none');
+        document.getElementById('permisosGrid').innerHTML = '<p class="text-muted text-center py-4">Selecciona un perfil para ver y editar sus permisos.</p>';
+        renderListaPerfiles();
+      }
     }
 
     // ── CAMBIAR CLAVE ─────────────────────────────────────────
@@ -1137,12 +1342,15 @@
       const data = await api('DELETE', `/api/perfiles/${id}`);
       if (data?.success) {
         showToast(`Perfil "${nombre}" eliminado`);
-        // Limpiar panel si estaba seleccionado
-        if (perfilActualId === id) {
-          perfilActualId = null;
+        // Limpiar estado
+        if (perfilActualId === id || perfilBaseId === id) {
+          perfilActualId = null; modoUsuario = false; usuarioActualId = null; perfilBaseId = null;
           document.getElementById('perfilSeleccionadoHeader').classList.add('d-none');
+          document.getElementById('usuarioPermisosHeader').classList.add('d-none');
           document.getElementById('permisosGrid').innerHTML = '<p class="text-muted text-center py-4">Selecciona un perfil para ver y editar sus permisos.</p>';
         }
+        delete perfilesExpandidos[id];
+        delete usuariosEnPerfil[id];
         perfilesData = [];
         await cargarPerfiles();
       } else {

@@ -10,5 +10,7 @@ router.post('/', verifyToken, soloAdmin, ctrl.createUsuario);
 router.put('/:id', verifyToken, soloAdmin, ctrl.updateUsuario);
 router.delete('/:id', verifyToken, soloAdmin, ctrl.deleteUsuario);
 router.post('/:id/reset-clave', verifyToken, soloAdmin, ctrl.resetClave);
+router.get('/:id/permisos',  verifyToken, ctrl.getPermisosUsuario);
+router.put('/:id/permisos',  verifyToken, soloAdmin, ctrl.updatePermisosUsuario);
 
 module.exports = router;
