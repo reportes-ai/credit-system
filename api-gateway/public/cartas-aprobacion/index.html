@@ -4101,10 +4101,10 @@ async function initApp(){
     // ── Dealers desde el sistema principal (/api/dealers) ──
     showLoading('Cargando concesionarios del sistema...');
     try {
-      const rDlr = await fetch('/api/dealers?limit=2000&activo=1', { headers:{ 'Authorization':'Bearer '+localStorage.getItem('token') } });
+      const rDlr = await fetch('/api/dealers?limit=2000', { headers:{ 'Authorization':'Bearer '+localStorage.getItem('token') } });
       if(rDlr.ok){
         const jDlr = await rDlr.json();
-        if(jDlr.data && jDlr.data.rows){
+        if(jDlr.data && jDlr.data.rows && jDlr.data.rows.length > 0){
           DB_DEALERS.length = 0;
           jDlr.data.rows.forEach(d => DB_DEALERS.push({
             nombre: d.nombre_indexa || d.nombre_razon || '',
@@ -4112,7 +4112,12 @@ async function initApp(){
             parque: d.ccs_parque || '',
             tipo:   d.ccs_parque ? 'PARQUE' : 'PARTICULAR'
           }));
+          console.log(`✓ Dealers cargados: ${DB_DEALERS.length}`);
+        } else {
+          console.warn('dealers API devolvió 0 filas');
         }
+      } else {
+        console.warn('dealers API status:', rDlr.status);
       }
     } catch(ex){ console.warn('dealers API error:', ex); }
 
@@ -4525,27 +4530,35 @@ function toggleCambioPartic(){
 }
 
 
-function getConcPool(){
-  // Usar DB_DEALERS cargado desde el sistema principal
+function getConcPool(forSearch){
+  // forSearch=true → devuelve TODOS los dealers (para filtrar por texto)
+  // forSearch=false → filtrar por tipo de carta (para lista inicial en focus)
+  if(forSearch || !selectedTipoCarta) return DB_DEALERS;
   const isParque = selectedTipoCarta.includes('PARQUE');
   if(isParque){
-    const parque = document.getElementById('fParque').value;
-    if(!parque) return [];
+    const parque = (document.getElementById('fParque') || {}).value || '';
+    if(!parque) return DB_DEALERS; // sin parque seleccionado → mostrar todos
     return DB_DEALERS.filter(d => d.parque === parque);
   }
-  // Calle / Particular: dealers sin parque asignado
-  return DB_DEALERS.filter(d => !d.parque || d.tipo === 'PARTICULAR');
+  // Calle: dealers sin parque asignado; si no hay ninguno, devolver todos
+  const calle = DB_DEALERS.filter(d => !d.parque || d.tipo === 'PARTICULAR');
+  return calle.length ? calle : DB_DEALERS;
 }
 
-function filterConc(showAll){
-  const val = document.getElementById('fConcesionario').value.toLowerCase();
+function filterConc(focusMode){
+  const val = document.getElementById('fConcesionario').value.toLowerCase().trim();
   const list = document.getElementById('concList');
-  const pool = getConcPool();
-  if(!pool.length){ list.style.display='none'; return; }
-  // Mostrar primeros 20 al hacer focus; filtrar al escribir
-  const matches = val.length === 0
-    ? pool.slice(0, 20)
-    : pool.filter(c => c.nombre.toLowerCase().includes(val)).slice(0, 15);
+  if(!DB_DEALERS.length){ list.style.display='none'; return; }
+  let matches;
+  if(val.length === 0){
+    // Focus sin texto → mostrar primeros 20 del pool por tipo de carta
+    matches = getConcPool(false).slice(0, 20);
+  } else {
+    // Escribiendo → buscar en TODOS los dealers por nombre
+    matches = getConcPool(true)
+      .filter(c => c.nombre.toLowerCase().includes(val))
+      .slice(0, 15);
+  }
   if(!matches.length){ list.style.display='none'; return; }
   list.innerHTML = matches.map((c) => `<div class="autocomplete-item" data-rut="${c.rut}" onclick="selectConcItem(this,'${c.nombre.replace(/'/g,"\'")}','${c.rut}')">${c.nombre}</div>`).join('');
   list.style.display='block';
