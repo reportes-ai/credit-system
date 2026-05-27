@@ -189,9 +189,6 @@
           document.getElementById('btnText').innerHTML = '<i class="bi bi-check-circle-fill me-2"></i>¡Bienvenido!';
           btnLogin.style.background = 'linear-gradient(135deg,#059669,#10b981)';
 
-          /* ── Sonido de bienvenida ── */
-          try { new Audio('/audio/bienvenido.mp3').play(); } catch(e) {}
-
           /* ── Dissolve + redirect ── */
           setTimeout(() => {
             document.querySelector('.login-card').classList.add('dissolving');
