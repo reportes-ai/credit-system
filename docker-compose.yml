@@ -1,0 +1,42 @@
+services:
+
+  db:
+    image: mysql:8.0
+    container_name: credit_db
+    restart: unless-stopped
+    environment:
+      MYSQL_ROOT_PASSWORD: credit1234
+      MYSQL_DATABASE: credit_system
+    ports:
+      - "3307:3306"          # 3307 en host para no chocar con MySQL local
+    volumes:
+      - db_data:/var/lib/mysql
+      - ./docker/init:/docker-entrypoint-initdb.d   # ← volcado SQL va aquí
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "root", "-pcredit1234"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  app:
+    build: .
+    container_name: credit_app
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+    ports:
+      - "3000:3000"
+    environment:
+      DB_HOST: db
+      DB_PORT: 3306
+      DB_USER: root
+      DB_PASSWORD: credit1234
+      DB_NAME: credit_system
+      PORT: 3000
+      JWT_SECRET: backup_local_jwt_secret_2025
+    volumes:
+      - ./uploads:/app/uploads    # si hay archivos subidos
+
+volumes:
+  db_data:
