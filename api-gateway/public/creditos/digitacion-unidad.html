@@ -77,7 +77,7 @@
   <div class="topnav-left">
     <a href="/" class="topnav-brand">
       <img src="/img/logo.png" alt="AutoFácil">
-      <span class="version-badge">v1.3</span>
+      <span class="version-badge">v1.4</span>
     </a>
     <div class="breadcrumb-nav">
       <a href="/">Inicio</a><span class="sep">›</span>
@@ -443,6 +443,18 @@
 
   setTimeout(autoFillNumOp, 300);
 
+  // Si volvemos desde /clientes con ?rut=, auto-buscar el cliente recién creado
+  (function() {
+    const p = new URLSearchParams(window.location.search);
+    const rutPre = p.get('rut');
+    if (rutPre) {
+      const inp = document.getElementById('fRut');
+      inp.value = formatRutStr(rutPre);
+      setTimeout(buscarCliente, 400);
+      history.replaceState(null, '', window.location.pathname);
+    }
+  })();
+
   let parques = [];
 
   /* ── Cargar parques ─────────────────────────────────────────── */
@@ -458,10 +470,13 @@
   }
 
   /* ── Formatear RUT chileno ─────────────────────────────────── */
+  function formatRutStr(v) {
+    v = (v||'').replace(/[^0-9kK]/g,'').toUpperCase();
+    if (v.length < 2) return v;
+    return v.slice(0,-1).replace(/\B(?=(\d{3})+(?!\d))/g,'.') + '-' + v.slice(-1);
+  }
   function formatRut(input) {
-    let v = input.value.replace(/[^0-9kK]/g,'');
-    if (v.length > 1) v = v.slice(0,-1).replace(/\B(?=(\d{3})+(?!\d))/g,'.') + '-' + v.slice(-1);
-    input.value = v.toUpperCase();
+    input.value = formatRutStr(input.value);
   }
 
   /* ── Buscar cliente por RUT ─────────────────────────────────── */
@@ -476,10 +491,17 @@
         const nombre = [data.nombres||data.nombre||'', data.apellido_paterno||data.apellido||'', data.apellido_materno||''].filter(Boolean).join(' ');
         document.getElementById('fNombre').value = nombre;
         found.innerHTML = `<i class="bi bi-check-circle-fill me-1"></i>Cliente encontrado: <strong>${nombre}</strong>`;
-        found.style.background=''; found.style.borderColor=''; found.style.color='';
+        found.style.background='#f0fdf4'; found.style.borderColor='#86efac'; found.style.color='#166534';
         found.style.display = 'block';
       } else {
-        found.innerHTML = '<i class="bi bi-exclamation-triangle-fill me-1"></i>Cliente no encontrado — puedes ingresar el nombre manualmente';
+        const returnUrl = encodeURIComponent(window.location.pathname);
+        const rutEnc    = encodeURIComponent(rut);
+        found.innerHTML = `<i class="bi bi-exclamation-triangle-fill me-1"></i>
+          Cliente no encontrado.
+          <a href="/clientes?rut=${rutEnc}&return=${returnUrl}"
+             style="margin-left:10px;background:#1565C0;color:#fff;border-radius:6px;padding:3px 12px;font-size:.8rem;font-weight:700;text-decoration:none;display:inline-flex;align-items:center;gap:5px">
+            <i class="bi bi-person-plus-fill"></i> Crear cliente
+          </a>`;
         found.style.background='#fff7ed'; found.style.borderColor='#fed7aa'; found.style.color='#c2410c';
         found.style.display = 'block';
       }
@@ -491,12 +513,6 @@
 
   /* ── Autocomplete automotoras — búsqueda server-side ─────────── */
   let _dealerTimer = null;
-
-  function formatRutStr(v) {
-    v = (v||'').replace(/[^0-9kK]/g,'').toUpperCase();
-    if (v.length < 2) return v;
-    return v.slice(0,-1).replace(/\B(?=(\d{3})+(?!\d))/g,'.') + '-' + v.slice(-1);
-  }
 
   function _posicionarDropdown() {
     const inp  = document.getElementById('fAutomotora');
