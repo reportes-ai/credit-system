@@ -211,7 +211,7 @@
           <label>Automotora / CCS</label>
           <input type="text" id="fAutomotora" placeholder="Buscar automotora…" autocomplete="off"
             oninput="buscarAutomotora(this.value)" onblur="setTimeout(()=>document.getElementById('autocompleteConc').style.display='none',200)">
-          <div id="autocompleteConc" style="display:none;position:absolute;top:100%;left:0;right:0;background:#fff;border:1px solid #d1d5db;border-radius:8px;box-shadow:0 4px 12px rgba(0,0,0,.12);z-index:100;max-height:420px;overflow-y:auto"></div>
+          <div id="autocompleteConc" style="display:none;position:fixed;background:#fff;border:1px solid #d1d5db;border-radius:8px;box-shadow:0 4px 16px rgba(0,0,0,.15);z-index:9999;max-height:420px;overflow-y:auto"></div>
         </div>
         <div class="f-group">
           <label>RUT Automotora</label>
@@ -498,6 +498,15 @@
     return v.slice(0,-1).replace(/\B(?=(\d{3})+(?!\d))/g,'.') + '-' + v.slice(-1);
   }
 
+  function _posicionarDropdown() {
+    const inp  = document.getElementById('fAutomotora');
+    const box  = document.getElementById('autocompleteConc');
+    const rect = inp.getBoundingClientRect();
+    box.style.top   = (rect.bottom + 2) + 'px';
+    box.style.left  = rect.left + 'px';
+    box.style.width = rect.width + 'px';
+  }
+
   function buscarAutomotora(q) {
     const box = document.getElementById('autocompleteConc');
     const term = q.trim();
@@ -523,10 +532,14 @@
             <span style="margin-left:8px;font-size:.72rem;font-weight:700;color:${tipoColor}">${tipo}</span>
           </div>`;
         }).join('');
+        _posicionarDropdown();
         box.style.display = 'block';
       } catch(e) { box.style.display = 'none'; }
     }, 250);
   }
+
+  window.addEventListener('scroll', () => { if (document.getElementById('autocompleteConc').style.display !== 'none') _posicionarDropdown(); }, true);
+  window.addEventListener('resize', () => { if (document.getElementById('autocompleteConc').style.display !== 'none') _posicionarDropdown(); });
 
   document.addEventListener('click', e => {
     const item = e.target.closest('#autocompleteConc [data-nombre]');
