@@ -1521,23 +1521,30 @@ async function guardar(tipo) {
       await recargarCliente(rutBuscar);
       // El toast se muestra DESPUÉS de recargarCliente (que llama hideAll)
       showToast(msg);
-      // Si llegamos desde otra página, mostrar botón de regreso con RUT incluido
+      // Si llegamos desde otra página con ?return=, redirigir automáticamente con el RUT
       const _retUrl = new URLSearchParams(window.location.search).get('return');
       if(_retUrl){
+        const sep = _retUrl.includes('?') ? '&' : '?';
+        const destino = _retUrl + sep + 'rut=' + encodeURIComponent(rutBuscar);
+        // Mostrar barra de cuenta regresiva
         const bar = document.getElementById('returnToCartasBar');
         if(bar){
-          // Adjuntar el RUT para que la página destino pueda auto-buscar el cliente
-          const sep = _retUrl.includes('?') ? '&' : '?';
-          bar.dataset.url = _retUrl + sep + 'rut=' + encodeURIComponent(rutBuscar);
+          bar.dataset.url = destino;
           bar.style.display = 'flex';
-          // Label y botón según origen
-          const _label = new URLSearchParams(window.location.search).get('returnLabel');
-          if(_label){
-            const msgEl = document.getElementById('returnBarMsg');
-            const btnEl = document.getElementById('returnBarBtn');
-            if(msgEl) msgEl.textContent = 'Cliente guardado. Puedes volver a continuar.';
-            if(btnEl) btnEl.textContent = '← ' + _label;
-          }
+          let seg = 3;
+          const msgEl = document.getElementById('returnBarMsg');
+          const btnEl = document.getElementById('returnBarBtn');
+          if(msgEl) msgEl.textContent = `Cliente guardado ✓  —  Volviendo en ${seg}s…`;
+          if(btnEl) btnEl.textContent = '← Volver ahora';
+          const iv = setInterval(()=>{
+            seg--;
+            if(seg > 0){
+              if(msgEl) msgEl.textContent = `Cliente guardado ✓  —  Volviendo en ${seg}s…`;
+            } else {
+              clearInterval(iv);
+              window.location.href = destino;
+            }
+          }, 1000);
         }
       }
     }
