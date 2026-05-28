@@ -209,7 +209,7 @@
   <a class="nav-brand" href="/creditos">
     <img src="/img/logo-autofacil.png" alt="AutoFácil" style="filter:brightness(0) invert(1);height:32px;display:block" onerror="this.style.display='none'">
     <span>Revisión de Crédito</span>
-    <span class="version-badge">v3.7</span>
+    <span class="version-badge">v3.8</span>
   </a>
   <div class="breadcrumb-nav">
   <a href="/">Inicio</a><span class="sep">›</span>
@@ -776,7 +776,7 @@ function renderPagina(c, ant, com) {
       <button class="btn-accion btn-rechazar" onclick="cambiarEstadoRapido('CANCELADO')">
         <i class="bi bi-x-circle"></i>Rechazar
       </button>`}
-      <button class="btn-accion btn-guardar" onclick="guardarCambios()">
+      <button id="btnGuardarEstado" class="btn-accion btn-guardar" onclick="guardarCambios()">
         <i class="bi bi-floppy"></i>Guardar cambios
       </button>`}
     </div>
@@ -1424,14 +1424,24 @@ function abrirDocumentos() {
 
 cargarPagina().then(() => {
   document.getElementById('btnDocumentos').style.display = 'flex';
-  // Botón Auditoría: solo para Administrador y Gerente
-  const PERFILES_AUDIT = ['Administrador', 'Gerente'];
+
   try {
     const u = JSON.parse(localStorage.getItem('usuario')||'{}');
-    if (PERFILES_AUDIT.includes(u.perfil)) {
+
+    // Botón Auditoría: solo para Administrador y Gerente
+    if (['Administrador','Gerente'].includes(u.perfil)) {
       const btn = document.getElementById('btnAuditoria');
-      btn.href = '/creditos/auditoria?id=' + creditId;
-      btn.style.display = 'flex';
+      if (btn) { btn.href = '/creditos/auditoria?id=' + creditId; btn.style.display = 'flex'; }
+    }
+
+    // Sección Estado y Observaciones: editable solo para Administrador
+    if (u.perfil !== 'Administrador') {
+      const selEstado  = document.getElementById('dEstado');
+      const txtObs     = document.getElementById('dObservaciones');
+      const btnGuardar = document.getElementById('btnGuardarEstado');
+      if (selEstado)  { selEstado.disabled  = true; selEstado.style.background  = '#f8fafc'; selEstado.style.color = '#374151'; selEstado.style.cursor = 'default'; }
+      if (txtObs)     { txtObs.readOnly     = true;  txtObs.style.background    = '#f8fafc'; txtObs.style.color   = '#374151'; txtObs.style.cursor = 'default'; }
+      if (btnGuardar) { btnGuardar.style.display = 'none'; }
     }
   } catch(_) {}
 }).catch(() => {});
