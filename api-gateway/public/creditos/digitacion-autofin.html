@@ -91,7 +91,7 @@
   <div class="topnav-left">
     <a href="/" class="topnav-brand">
       <img src="/img/logo.png" alt="AutoFácil">
-      <span class="version-badge">v1.0</span>
+      <span class="version-badge">v1.1</span>
     </a>
     <div class="breadcrumb-nav">
       <a href="/">Inicio</a><span class="sep">›</span>
@@ -140,12 +140,17 @@
     <div class="sec-body">
       <div class="form-grid g4">
         <div class="f-group">
-          <label>N° OP</label>
-          <input type="number" id="fNumOp" placeholder="Ej: 85000">
+          <label>N° OP <span id="numOpStatus" style="font-size:10px;font-weight:400;color:#6b7280"></span></label>
+          <div style="display:flex;gap:4px;align-items:center">
+            <input type="number" id="fNumOp" placeholder="Auto al elegir mes" style="flex:1;background:#E3F2FD;font-weight:700;color:#0141A2" readonly>
+            <button type="button" id="btnEditNumOp" title="Editar manualmente"
+              onclick="document.getElementById('fNumOp').removeAttribute('readonly');document.getElementById('fNumOp').style.background='';document.getElementById('fNumOp').style.color='';this.style.display='none'"
+              style="background:#90A4AE;color:#fff;border:none;border-radius:4px;padding:5px 8px;font-size:11px;cursor:pointer">✏</button>
+          </div>
         </div>
         <div class="f-group">
           <label class="f-req">Mes</label>
-          <input type="month" id="fMes">
+          <input type="month" id="fMes" onchange="autoFillNumOp()">
         </div>
         <div class="f-group">
           <label class="f-req">Estado Eval. Riesgo</label>
@@ -449,9 +454,36 @@
   // Pre-fill ejecutivo con el usuario logueado
   document.getElementById('fEjecutivo').value = `${yo?.nombre||''} ${yo?.apellido||''}`.trim();
 
-  // Pre-fill mes actual
+  // Pre-fill mes actual y auto-generar N° OP
   const hoy = new Date();
   document.getElementById('fMes').value = hoy.toISOString().slice(0,7);
+
+  /* ── Auto-generar N° OP correlativo ─────────────────────────── */
+  async function autoFillNumOp() {
+    const mes = document.getElementById('fMes').value;  // "YYYY-MM"
+    if (!mes) return;
+    const statusEl = document.getElementById('numOpStatus');
+    const input    = document.getElementById('fNumOp');
+    // Si el usuario habilitó edición manual, no sobreescribir
+    if (!input.hasAttribute('readonly')) return;
+    statusEl.textContent = '⏳';
+    try {
+      const r = await fetch(`/api/operaciones/next-op?mes=${encodeURIComponent(mes)}`,
+        { headers: { Authorization: 'Bearer ' + token } });
+      const j = await r.json();
+      if (j.success && j.data?.nextOp) {
+        input.value = j.data.nextOp;
+        statusEl.textContent = '(auto)';
+      } else {
+        statusEl.textContent = '(error)';
+      }
+    } catch(e) {
+      statusEl.textContent = '';
+    }
+  }
+
+  // Disparar al cargar (mes ya está pre-llenado)
+  setTimeout(autoFillNumOp, 300);
 
   let parques = [];
 
@@ -615,11 +647,19 @@
   }
 
   function limpiar() {
-    document.querySelectorAll('input:not([id=fEjecutivo]):not([id=fMes]), select, textarea').forEach(el => {
+    document.querySelectorAll('input:not([id=fEjecutivo]):not([id=fMes]):not([id=fNumOp]), select, textarea').forEach(el => {
       if (el.type === 'checkbox') el.checked = false;
       else el.value = '';
     });
+    // Restablecer N° OP a auto-generado
+    const numOpEl = document.getElementById('fNumOp');
+    numOpEl.setAttribute('readonly', '');
+    numOpEl.style.background = '#E3F2FD';
+    numOpEl.style.color = '#0141A2';
+    numOpEl.value = '';
+    document.getElementById('btnEditNumOp').style.display = '';
     document.getElementById('fMes').value = new Date().toISOString().slice(0,7);
+    autoFillNumOp();   // re-calcular N° OP para el mes actual
     document.getElementById('fSaldo').value = '';
     document.getElementById('fPctFin').value = '';
     document.getElementById('clienteFound').style.display = 'none';

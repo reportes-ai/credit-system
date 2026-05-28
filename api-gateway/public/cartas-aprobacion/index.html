@@ -282,12 +282,12 @@ body { font-family: 'Segoe UI', Arial, sans-serif; background: var(--gray-bg); c
         </div>
         <div class="form-row cols-4">
           <div class="field">
-            <label>N° Operación Origen</label>
-            <input type="text" id="fOpOrigen" placeholder="Referencia op. crédito">
+            <label>ID Financiera *</label>
+            <input type="text" id="fOpOrigen" placeholder="Ej: 5481790" oninput="calcOpCarta()">
           </div>
           <div class="field">
-            <label>N° Carta (correlativo)</label>
-            <input type="text" id="fOpCarta" readonly style="background:#E3F2FD;font-weight:700;color:#0141A2">
+            <label>N° Carta (auto)</label>
+            <input type="text" id="fOpCarta" readonly style="background:#E3F2FD;font-weight:700;color:#0141A2" placeholder="26 + ID + iniciales">
           </div>
           <div class="field">
             <label>Plazo (cuotas) *</label>
@@ -4248,7 +4248,6 @@ async function initApp(){
   // Set fecha
   document.getElementById('fFecha').value = new Date().toISOString().split('T')[0];
   updateMesField();
-  autoSetNextOpCarta();
   // Restore sessionStorage draft if returning from Clientes page
   _restoreCartaDraft();
   // Ensure grabar button is enabled on init
@@ -4330,7 +4329,7 @@ function showPage(id){
   }
   document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
   document.getElementById(id).classList.add('active');
-  if(id==='genPage'){ autoSetNextOpCarta(); }
+  if(id==='genPage'){ /* genPage init */ }
   if(id==='revPage') renderRevTable();
   if(id==='impPage') renderImpTable();
   if(id==='informesPage') renderInformes();
@@ -4381,19 +4380,11 @@ function fillEjecutivo(){
 }
 
 function calcOpCarta(){
-  // Legacy: no longer derives from fOpOrigen. Auto-correlativo is set by autoSetNextOpCarta().
-}
-
-function autoSetNextOpCarta(){
-  // Compute next sequential correlativo from existing cartas
-  let maxNum = 0;
-  cartas.forEach(c => {
-    const n = parseInt(String(c.opCarta || '').replace(/\D/g, ''), 10);
-    if(!isNaN(n) && n > maxNum) maxNum = n;
-  });
-  const next = (maxNum + 1).toString().padStart(4, '0');
-  const el = document.getElementById('fOpCarta');
-  if(el) el.value = next;
+  const orig = document.getElementById('fOpOrigen').value.trim();
+  if(!orig){ document.getElementById('fOpCarta').value = ''; return; }
+  const year     = new Date().getFullYear().toString().slice(-2);
+  const initials = currentUser ? (currentUser.initials || currentUser.creadoPorInitials || 'XX') : 'XX';
+  document.getElementById('fOpCarta').value = year + orig + initials;
 }
 
 function updateMesField(){
@@ -4846,6 +4837,7 @@ async function grabarCarta(){
   const ejVal = document.getElementById('fEjecutivo').value;
   if(!ejVal) { alert('Seleccione un Ejecutivo Comercial'); return; }
   const opOrigen = document.getElementById('fOpOrigen').value.trim();
+  if(!opOrigen) { alert('Ingrese el ID de la Financiera (N° Operación Origen)'); return; }
   const fNombre = toTitleCase(document.getElementById('fNombre').value.trim());
   if(!fNombre) { alert('Ingrese el Nombre del cliente'); return; }
   const fApPaterno = toTitleCase(document.getElementById('fApellidoPaterno').value.trim());
@@ -4973,7 +4965,6 @@ function clearForm(){
   document.getElementById('fAcreedor').value='AUTOFIN';
   document.getElementById('fFecha').value=new Date().toISOString().split('T')[0];
   updateMesField();
-  autoSetNextOpCarta();
   rawSaldo = 0;
   ['fPrecioVenta','fPie','fMontoCreditoCLP','fTasaCredito'].forEach(id=>{
     const el=document.getElementById(id); if(el){ el.value=''; el.dataset.raw='0'; }

@@ -68,6 +68,42 @@ function calcular(body) {
   return { saldo_precio: Math.round(saldo), pct_financiado: parseFloat(pct.toFixed(6)) };
 }
 
+/* ─── GET /api/operaciones/next-op?mes=YYYY-MM ───────────────────────── */
+// Retorna el siguiente num_op con formato YYYYMM + secuencial 3 dígitos
+const nextOp = async (req, res) => {
+  try {
+    const { mes } = req.query; // ej: "2026-05"
+    if (!mes || !/^\d{4}-\d{2}$/.test(mes))
+      return res.status(400).json({ success: false, data: null, error: 'Parámetro mes requerido (YYYY-MM)' });
+
+    const prefix = parseInt(mes.replace('-', ''), 10); // 202605
+    const prefixStr = String(prefix);                  // "202605"
+
+    // Buscar el mayor num_op cuyo prefijo coincida con YYYYMM
+    const [[row]] = await pool.query(
+      `SELECT MAX(num_op) AS max_op
+       FROM operaciones_brokerage
+       WHERE DATE_FORMAT(mes, '%Y-%m') = ?`,
+      [mes]
+    );
+
+    const maxOp = row?.max_op ? parseInt(row.max_op) : 0;
+    let nextNum;
+
+    if (maxOp > 0 && String(maxOp).startsWith(prefixStr)) {
+      // El último num_op tiene el mismo prefijo → incrementar
+      nextNum = maxOp + 1;
+    } else {
+      // No hay ops este mes o el máximo es de otro mes → arrancar en YYYYMM001
+      nextNum = parseInt(prefixStr + '001', 10);
+    }
+
+    res.json({ success: true, data: { nextOp: nextNum }, error: null });
+  } catch (e) {
+    res.status(500).json({ success: false, data: null, error: e.message });
+  }
+};
+
 /* ─── GET /api/operaciones?financiera=AUTOFIN&mes=2025-01 ─────────────── */
 const getAll = async (req, res) => {
   try {
@@ -200,4 +236,4 @@ const remove = async (req, res) => {
   }
 };
 
-module.exports = { getAll, getOne, create, update, remove };
+module.exports = { getAll, getOne, create, update, remove, nextOp };
