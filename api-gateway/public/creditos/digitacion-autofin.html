@@ -89,7 +89,7 @@
   <div class="topnav-left">
     <a href="/" class="topnav-brand">
       <img src="/img/logo.png" alt="AutoFácil">
-      <span class="version-badge">v1.4</span>
+      <span class="version-badge">v1.5</span>
     </a>
     <div class="breadcrumb-nav">
       <a href="/">Inicio</a><span class="sep">›</span>
@@ -530,6 +530,19 @@
 
   setTimeout(autoFillNumOp, 300);
 
+  // Si volvemos desde /clientes con ?rut=, auto-buscar el cliente recién creado
+  (function() {
+    const p = new URLSearchParams(window.location.search);
+    const rutPre = p.get('rut');
+    if (rutPre) {
+      const inp = document.getElementById('fRut');
+      inp.value = formatRutStr(rutPre);
+      setTimeout(buscarCliente, 400);
+      // Limpiar el parámetro de la URL sin recargar
+      history.replaceState(null, '', window.location.pathname);
+    }
+  })();
+
   let parques = [];
 
   /* ── Cargar parques ─────────────────────────────────────────── */
@@ -545,10 +558,13 @@
   }
 
   /* ── Formatear RUT chileno ─────────────────────────────────── */
+  function formatRutStr(v) {
+    v = (v||'').replace(/[^0-9kK]/g,'').toUpperCase();
+    if (v.length < 2) return v;
+    return v.slice(0,-1).replace(/\B(?=(\d{3})+(?!\d))/g,'.') + '-' + v.slice(-1);
+  }
   function formatRut(input) {
-    let v = input.value.replace(/[^0-9kK]/g,'');
-    if (v.length > 1) v = v.slice(0,-1).replace(/\B(?=(\d{3})+(?!\d))/g,'.') + '-' + v.slice(-1);
-    input.value = v.toUpperCase();
+    input.value = formatRutStr(input.value);
   }
 
   /* ── Formato pesos chilenos ─────────────────────────────────── */
@@ -572,10 +588,17 @@
         const nombre = [data.nombres||data.nombre||'', data.apellido_paterno||data.apellido||'', data.apellido_materno||''].filter(Boolean).join(' ');
         document.getElementById('fNombre').value = nombre;
         found.innerHTML = `<i class="bi bi-check-circle-fill me-1"></i>Cliente encontrado: <strong>${nombre}</strong>`;
-        found.style.background=''; found.style.borderColor=''; found.style.color='';
+        found.style.background='#f0fdf4'; found.style.borderColor='#86efac'; found.style.color='#166534';
         found.style.display = 'block';
       } else {
-        found.innerHTML = '<i class="bi bi-exclamation-triangle-fill me-1"></i>Cliente no encontrado — puedes ingresar el nombre manualmente';
+        const returnUrl = encodeURIComponent(window.location.pathname);
+        const rutEnc    = encodeURIComponent(rut);
+        found.innerHTML = `<i class="bi bi-exclamation-triangle-fill me-1"></i>
+          Cliente no encontrado.
+          <a href="/clientes?rut=${rutEnc}&return=${returnUrl}"
+             style="margin-left:10px;background:#1565C0;color:#fff;border-radius:6px;padding:3px 12px;font-size:.8rem;font-weight:700;text-decoration:none;display:inline-flex;align-items:center;gap:5px">
+            <i class="bi bi-person-plus-fill"></i> Crear cliente
+          </a>`;
         found.style.background = '#fff7ed'; found.style.borderColor = '#fed7aa'; found.style.color = '#c2410c';
         found.style.display = 'block';
       }
@@ -607,22 +630,29 @@
       (d.rut||'').toLowerCase().includes(term)
     ).slice(0, 10);
     if (!matches.length) { box.style.display = 'none'; return; }
-    box.innerHTML = matches.map(d =>
-      `<div style="padding:8px 12px;cursor:pointer;font-size:.85rem;border-bottom:1px solid #f3f4f6"
+    box.innerHTML = matches.map(d => {
+      const tipo = d.ccs_parque ? 'PARQUE' : 'CALLE';
+      const tipoColor = tipo === 'PARQUE' ? '#0141A2' : '#374151';
+      return `<div style="padding:8px 12px;cursor:pointer;font-size:.85rem;border-bottom:1px solid #f3f4f6"
         onmouseover="this.style.background='#f0f9ff'" onmouseout="this.style.background=''"
-        data-nombre="${(d.nombre_indexa||d.nombre_razon||'').replace(/"/g,'&quot;')}" data-rut="${(d.rut||'').replace(/"/g,'&quot;')}">
+        data-nombre="${(d.nombre_indexa||d.nombre_razon||'').replace(/"/g,'&quot;')}"
+        data-rut="${(d.rut||'').replace(/"/g,'&quot;')}"
+        data-ccs="${(d.ccs_parque||'').replace(/"/g,'&quot;')}">
         <strong>${d.nombre_indexa||d.nombre_razon||'—'}</strong>
-        <span style="color:#6b7280;margin-left:8px;font-size:.78rem">${d.rut||''}</span>
-      </div>`
-    ).join('');
+        <span style="color:#6b7280;margin-left:8px;font-size:.78rem">${formatRutStr(d.rut||'')}</span>
+        <span style="margin-left:8px;font-size:.72rem;font-weight:700;color:${tipoColor}">${tipo}</span>
+      </div>`;
+    }).join('');
     box.style.display = 'block';
   }
 
   document.addEventListener('click', e => {
     const item = e.target.closest('#autocompleteConc [data-nombre]');
     if (item) {
-      document.getElementById('fAutomotora').value   = item.dataset.nombre;
-      document.getElementById('fRutAutomotora').value = item.dataset.rut;
+      document.getElementById('fAutomotora').value    = item.dataset.nombre;
+      document.getElementById('fRutAutomotora').value = formatRutStr(item.dataset.rut);
+      // CALLE / PARQUE según ccs_parque del dealer
+      document.getElementById('fTipoLugar').value = item.dataset.ccs ? 'PARQUE' : 'CALLE';
       document.getElementById('autocompleteConc').style.display = 'none';
     }
   });
