@@ -7,12 +7,12 @@
  *   - El token tiene formato inválido
  */
 (function () {
-  const token   = localStorage.getItem('token');
-  const usuario = localStorage.getItem('usuario');
+  const token   = sessionStorage.getItem('token');
+  const usuario = sessionStorage.getItem('usuario');
 
   function redirigir() {
-    localStorage.removeItem('token');
-    localStorage.removeItem('usuario');
+    sessionStorage.removeItem('token');
+    sessionStorage.removeItem('usuario');
     window.location.href = '/login.html';
   }
 

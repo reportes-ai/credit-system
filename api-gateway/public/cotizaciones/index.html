@@ -756,13 +756,13 @@
 /* ═══════════════════════════════════════════════════════════════════════════
    AUTH
 ═══════════════════════════════════════════════════════════════════════════ */
-const token = localStorage.getItem('token');
+const token = sessionStorage.getItem('token');
 if (!token) { window.location.href = '/login.html'; }
 function logout() { localStorage.clear(); window.location.href = '/login.html'; }
 function authHdr() { return { 'Authorization': 'Bearer ' + token, 'Content-Type': 'application/json' }; }
 
 try {
-  const _u = JSON.parse(localStorage.getItem('usuario') || '{}');
+  const _u = JSON.parse(sessionStorage.getItem('usuario') || '{}');
   document.getElementById('avatarInicial').textContent = (_u.nombre||'?').charAt(0).toUpperCase();
   document.getElementById('navNombre').textContent = ((_u.nombre||'') + ' ' + (_u.apellido||'')).trim();
   document.getElementById('navPerfil').textContent = _u.perfil || _u.nombre_perfil || '—';
@@ -1700,7 +1700,7 @@ document.addEventListener('keydown', function(e) {
 
 function _decodirJWT() {
   try {
-    const t = localStorage.getItem('token');
+    const t = sessionStorage.getItem('token');
     if (!t) return {};
     return JSON.parse(atob(t.split('.')[1]));
   } catch { return {}; }

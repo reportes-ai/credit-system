@@ -160,8 +160,8 @@
   </div>
 
   <script>
-    const token = localStorage.getItem('token');
-    const usuario = JSON.parse(localStorage.getItem('usuario') || 'null');
+    const token = sessionStorage.getItem('token');
+    const usuario = JSON.parse(sessionStorage.getItem('usuario') || 'null');
     if (!token || !usuario) { window.location.href = '/login.html'; }
 
     const esAdmin = usuario?.perfil === 'Administrador';
@@ -176,7 +176,7 @@
       if (esAdmin) document.getElementById('btnReordenar').style.display = 'flex';
     }
 
-    function logout() { localStorage.removeItem('token'); localStorage.removeItem('usuario'); sessionStorage.removeItem('af_intro_done'); window.location.href = '/login.html'; }
+    function logout() { sessionStorage.removeItem('token'); sessionStorage.removeItem('usuario'); sessionStorage.removeItem('af_intro_done'); window.location.href = '/login.html'; }
 
     let sortable = null;
     let modulosData = [];

@@ -176,8 +176,8 @@
 </div>
 
 <script>
-  const token = localStorage.getItem('token');
-  const yo    = JSON.parse(localStorage.getItem('usuario') || 'null');
+  const token = sessionStorage.getItem('token');
+  const yo    = JSON.parse(sessionStorage.getItem('usuario') || 'null');
   if (!token || !yo) window.location.href = '/login.html';
 
   document.getElementById('navNombre').textContent = `${yo?.nombre||''} ${yo?.apellido||''}`.trim();
@@ -185,8 +185,8 @@
   document.getElementById('avatarInicial').textContent = (yo?.nombre||'?').charAt(0).toUpperCase();
 
   function logout() {
-    localStorage.removeItem('token');
-    localStorage.removeItem('usuario');
+    sessionStorage.removeItem('token');
+    sessionStorage.removeItem('usuario');
     window.location.href = '/login.html';
   }
 

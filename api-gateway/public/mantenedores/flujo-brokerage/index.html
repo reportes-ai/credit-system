@@ -146,12 +146,12 @@
 <div class="toast-msg" id="toastMsg"></div>
 
 <script>
-const TOKEN = () => localStorage.getItem('token');
+const TOKEN = () => sessionStorage.getItem('token');
 const HDR   = () => ({ 'Content-Type':'application/json', 'Authorization':'Bearer '+TOKEN() });
 
 (function(){
   if(!TOKEN()){ location.href='/login.html'; return; }
-  try{ const u=JSON.parse(localStorage.getItem('usuario')||'{}'); document.getElementById('navUser').textContent=u.nombre||''; }catch(e){}
+  try{ const u=JSON.parse(sessionStorage.getItem('usuario')||'{}'); document.getElementById('navUser').textContent=u.nombre||''; }catch(e){}
 })();
 
 function toast(msg, ok=true){

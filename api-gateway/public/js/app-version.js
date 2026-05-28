@@ -323,7 +323,7 @@ document.addEventListener('DOMContentLoaded', () => {
     btn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span>Guardando…';
 
     try {
-      const token = localStorage.getItem('token');
+      const token = sessionStorage.getItem('token');
       const r = await fetch('/api/auth/cambiar-clave', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token },
@@ -360,7 +360,7 @@ document.addEventListener('DOMContentLoaded', () => {
     let menu = document.getElementById('afUserMenu');
     if (menu) { menu.remove(); return; }
 
-    const yo = JSON.parse(localStorage.getItem('usuario') || 'null');
+    const yo = JSON.parse(sessionStorage.getItem('usuario') || 'null');
 
     menu = document.createElement('div');
     menu.id = 'afUserMenu';
@@ -376,7 +376,7 @@ document.addEventListener('DOMContentLoaded', () => {
         <i class="bi bi-shield-lock"></i> Cambiar contraseña
       </button>
       <hr class="af-menu-divider">
-      <button class="af-menu-item" style="color:#dc2626" onclick="localStorage.removeItem('token');localStorage.removeItem('usuario');window.location.href='/login.html'">
+      <button class="af-menu-item" style="color:#dc2626" onclick="sessionStorage.removeItem('token');sessionStorage.removeItem('usuario');window.location.href='/login.html'">
         <i class="bi bi-box-arrow-right" style="color:#dc2626"></i> Cerrar sesión
       </button>
     `;

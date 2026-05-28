@@ -292,9 +292,9 @@
 <script src="/js/auth-guard.js"></script>
 <script>
 /* ── Auth ── */
-function getToken()   { return localStorage.getItem('token'); }
+function getToken()   { return sessionStorage.getItem('token'); }
 function apiHdr()     { return { 'Content-Type':'application/json', 'Authorization':'Bearer '+getToken() }; }
-function getUsuario() { try { return JSON.parse(localStorage.getItem('usuario')||'{}'); } catch(e) { return {}; } }
+function getUsuario() { try { return JSON.parse(sessionStorage.getItem('usuario')||'{}'); } catch(e) { return {}; } }
 
 (function() {
   if (!getToken()) { location.href='/login.html'; return; }

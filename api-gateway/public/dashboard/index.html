@@ -124,8 +124,8 @@ body{font-family:'Roboto',sans-serif;background:#f0f2f5;font-size:12px;color:#33
 
 <script>
 // ── Auth: usa JWT del credit-system ──────────────────────────────────────────
-const _token = localStorage.getItem('token');
-const _usuario = JSON.parse(localStorage.getItem('usuario') || 'null');
+const _token = sessionStorage.getItem('token');
+const _usuario = JSON.parse(sessionStorage.getItem('usuario') || 'null');
 if (!_token) { window.location.href = '/login.html'; }
 
 // Stub para llamadas de usuarios que no aplican (sub-tab oculto)
@@ -157,8 +157,8 @@ function actualizarTopbarUsuario() {
 }
 
 function cerrarSesion() {
-  localStorage.removeItem('token');
-  localStorage.removeItem('usuario');
+  sessionStorage.removeItem('token');
+  sessionStorage.removeItem('usuario');
   window.location.href = '/login.html';
 }
 
@@ -1897,7 +1897,7 @@ async function cargarDatos() {
   const loadingEl = document.getElementById('loading-overlay');
   try {
     const r = await fetch('/api/dashboard/datos', {
-      headers: { 'Authorization': 'Bearer ' + (localStorage.getItem('token') || '') }
+      headers: { 'Authorization': 'Bearer ' + (sessionStorage.getItem('token') || '') }
     });
     if (!r.ok) throw new Error('No se pudo cargar el JSON');
     const datos = await r.json();

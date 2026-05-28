@@ -195,13 +195,13 @@
   <script src="/js/cl-numbers.js"></script>
   <script>
     document.addEventListener('DOMContentLoaded', () => setupCLInput(document.getElementById('fValor'), 2));
-    const token = localStorage.getItem('token');
-    const yo = JSON.parse(localStorage.getItem('usuario') || 'null');
+    const token = sessionStorage.getItem('token');
+    const yo = JSON.parse(sessionStorage.getItem('usuario') || 'null');
     if (!token || !yo) { window.location.href = '/login.html'; }
     document.getElementById('avatarInicial').textContent = (yo?.nombre || '?').charAt(0).toUpperCase();
     document.getElementById('navNombre').textContent = `${yo?.nombre || ''} ${yo?.apellido || ''}`.trim();
     document.getElementById('navPerfil').textContent = yo?.perfil || yo?.nombre_perfil || '—';
-    function logout() { localStorage.removeItem('token'); localStorage.removeItem('usuario'); window.location.href = '/login.html'; }
+    function logout() { sessionStorage.removeItem('token'); sessionStorage.removeItem('usuario'); window.location.href = '/login.html'; }
 
     const api = async (method, url, body) => {
       const r = await fetch(url, { method, headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' }, body: body ? JSON.stringify(body) : undefined });

@@ -341,11 +341,11 @@
 <script src="/js/auth-guard.js"></script>
 <script>
 /* ── Auth ── */
-function getToken() { return localStorage.getItem('token'); }
+function getToken() { return sessionStorage.getItem('token'); }
 function apiHdr()   { return { 'Content-Type':'application/json', 'Authorization':'Bearer '+getToken() }; }
 
 try {
-  const u = JSON.parse(localStorage.getItem('usuario')||'{}');
+  const u = JSON.parse(sessionStorage.getItem('usuario')||'{}');
   document.getElementById('navUser').textContent = u.nombre || '';
 } catch(e){}
 
@@ -398,7 +398,7 @@ const PERFILES_MODIFICAR_OTORGADO = new Set(['Administrador','Gerente']);
 const ESTADOS_BROKER_FINALES      = new Set(['OTORGADO','DESISTIDO','CURSADO']);
 
 function _perfil() {
-  try { return JSON.parse(localStorage.getItem('usuario')||'{}').perfil||''; } catch(_){ return ''; }
+  try { return JSON.parse(sessionStorage.getItem('usuario')||'{}').perfil||''; } catch(_){ return ''; }
 }
 
 function puedeEditarBroker(c) {
@@ -1424,7 +1424,7 @@ cargarPagina().then(() => {
   document.getElementById('btnDocumentos').style.display = 'flex';
 
   try {
-    const u = JSON.parse(localStorage.getItem('usuario')||'{}');
+    const u = JSON.parse(sessionStorage.getItem('usuario')||'{}');
 
     // Botón Auditoría: solo para Administrador y Gerente
     if (['Administrador','Gerente'].includes(u.perfil)) {

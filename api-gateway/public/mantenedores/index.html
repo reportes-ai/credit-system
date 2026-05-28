@@ -102,8 +102,8 @@
   </div>
 
   <script>
-    const token = localStorage.getItem('token');
-    const yo    = JSON.parse(localStorage.getItem('usuario') || 'null');
+    const token = sessionStorage.getItem('token');
+    const yo    = JSON.parse(sessionStorage.getItem('usuario') || 'null');
     if (!token || !yo) window.location.href = '/login.html';
     const esAdmin = yo?.perfil === 'Administrador';
     const H = { 'Content-Type': 'application/json', Authorization: 'Bearer ' + token };
@@ -113,7 +113,7 @@
     document.getElementById('avatarInicial').textContent = (yo?.nombre||'?').charAt(0).toUpperCase();
     if (esAdmin) document.getElementById('btnReordenar').style.display = 'flex';
 
-    function logout() { localStorage.removeItem('token'); localStorage.removeItem('usuario'); window.location.href = '/login.html'; }
+    function logout() { sessionStorage.removeItem('token'); sessionStorage.removeItem('usuario'); window.location.href = '/login.html'; }
 
     const ITEMS_DEFAULT = [
       { id: 'tasas',           href: '/mantenedores/tasas/',           icon: 'bi-percent',        titulo: 'Tasas de Interés',   desc: 'Gestión de tasas mensuales y anuales para créditos' },

@@ -721,16 +721,16 @@
 /* ═══════════════════════════════════════════════════════════════════
    Auth / Session
 ═══════════════════════════════════════════════════════════════════ */
-const token = localStorage.getItem('token');
+const token = sessionStorage.getItem('token');
 if (!token) { window.location.href = '/login.html'; }
-const usuario = JSON.parse(localStorage.getItem('usuario') || '{}');
+const usuario = JSON.parse(sessionStorage.getItem('usuario') || '{}');
 document.getElementById('avatarInicial').textContent = (usuario.nombre||'?').charAt(0).toUpperCase();
 document.getElementById('navNombre').textContent = ((usuario.nombre||'') + ' ' + (usuario.apellido||'')).trim();
 document.getElementById('navPerfil').textContent = usuario.perfil || usuario.nombre_perfil || '—';
 
 function logout() {
-  localStorage.removeItem('token');
-  localStorage.removeItem('usuario');
+  sessionStorage.removeItem('token');
+  sessionStorage.removeItem('usuario');
   window.location.href = '/login.html';
 }
 

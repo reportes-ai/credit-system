@@ -290,8 +290,8 @@
 
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
 <script>
-const token = localStorage.getItem('token');
-const yo    = JSON.parse(localStorage.getItem('usuario') || 'null');
+const token = sessionStorage.getItem('token');
+const yo    = JSON.parse(sessionStorage.getItem('usuario') || 'null');
 if (!token || !yo) window.location.href = '/login.html';
 if (!['Administrador','Gerente','Supervisor'].includes(yo?.perfil)) {
   alert('Acceso restringido'); window.location.href = '/tesoreria';
@@ -299,7 +299,7 @@ if (!['Administrador','Gerente','Supervisor'].includes(yo?.perfil)) {
 document.getElementById('navNombre').textContent = `${yo?.nombre||''} ${yo?.apellido||''}`.trim();
 document.getElementById('navPerfil').textContent  = yo?.perfil || '';
 document.getElementById('avatarInicial').textContent = (yo?.nombre||'?').charAt(0).toUpperCase();
-function logout(){ localStorage.removeItem('token'); localStorage.removeItem('usuario'); window.location.href='/login.html'; }
+function logout(){ sessionStorage.removeItem('token'); sessionStorage.removeItem('usuario'); window.location.href='/login.html'; }
 
 const API = (path, opts={}) => fetch(path, { headers:{ Authorization:`Bearer ${token}`, 'Content-Type':'application/json' }, ...opts });
 const clp = v => '$' + Math.round(v||0).toLocaleString('es-CL');

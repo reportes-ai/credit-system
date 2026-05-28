@@ -230,8 +230,8 @@
 
 <script>
 /* ── Auth ── */
-const token = localStorage.getItem('token');
-const yo    = JSON.parse(localStorage.getItem('usuario') || 'null');
+const token = sessionStorage.getItem('token');
+const yo    = JSON.parse(sessionStorage.getItem('usuario') || 'null');
 if (!token || !yo) location.href = '/login.html';
 function apiHdr() { return { 'Content-Type':'application/json', Authorization:'Bearer '+token }; }
 document.getElementById('navUser').textContent = `${yo?.nombre||''} ${yo?.apellido||''}`.trim();

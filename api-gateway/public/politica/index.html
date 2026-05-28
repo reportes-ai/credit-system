@@ -427,9 +427,9 @@
 /* ═══════════════════════════════════════════════════════════════════
    AUTH
 ═══════════════════════════════════════════════════════════════════ */
-function getToken() { return localStorage.getItem('token'); }
+function getToken() { return sessionStorage.getItem('token'); }
 function apiHeaders() { return { 'Content-Type':'application/json', 'Authorization':'Bearer '+getToken() }; }
-function logout() { localStorage.removeItem('token'); localStorage.removeItem('usuario'); location.href='/login.html'; }
+function logout() { sessionStorage.removeItem('token'); sessionStorage.removeItem('usuario'); location.href='/login.html'; }
 
 
 function showToast(msg, ok) {

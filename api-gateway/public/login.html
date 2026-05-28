@@ -150,7 +150,7 @@
 
   <script>
     // Si ya hay sesión, redirigir al inicio
-    if (localStorage.getItem('token')) window.location.href = '/';
+    if (sessionStorage.getItem('token')) window.location.href = '/';
 
     document.getElementById('togglePass').addEventListener('click', () => {
       const inp = document.getElementById('password');
@@ -180,8 +180,8 @@
         const data = await resp.json();
 
         if (data.success) {
-          localStorage.setItem('token', data.data.token);
-          localStorage.setItem('usuario', JSON.stringify(data.data.usuario));
+          sessionStorage.setItem('token', data.data.token);
+          sessionStorage.setItem('usuario', JSON.stringify(data.data.usuario));
 
           /* ── Botón de éxito ── */
           document.getElementById('btnSpinner').classList.add('d-none');

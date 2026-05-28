@@ -158,7 +158,7 @@
 
 <script src="/js/auth-guard.js"></script>
 <script>
-function getToken() { return localStorage.getItem('token'); }
+function getToken() { return sessionStorage.getItem('token'); }
 function apiHdr()   { return { 'Content-Type':'application/json', 'Authorization':'Bearer '+getToken() }; }
 (function(){ if (!getToken()) location.href='/login.html'; })();
 

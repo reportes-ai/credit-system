@@ -203,8 +203,8 @@
 </div>
 
 <script>
-const token = localStorage.getItem('token');
-const yo    = JSON.parse(localStorage.getItem('usuario') || 'null');
+const token = sessionStorage.getItem('token');
+const yo    = JSON.parse(sessionStorage.getItem('usuario') || 'null');
 if (!token || !yo) window.location.href = '/login.html';
 
 const nombreCompleto = `${yo?.nombre||''} ${yo?.apellido||''}`.trim();
@@ -215,7 +215,7 @@ document.getElementById('avatarGrande').textContent = (yo?.nombre||'?').charAt(0
 document.getElementById('nombreGrande').textContent = nombreCompleto;
 document.getElementById('perfilGrande').textContent = yo?.perfil || '';
 
-function logout() { localStorage.removeItem('token'); localStorage.removeItem('usuario'); window.location.href = '/login.html'; }
+function logout() { sessionStorage.removeItem('token'); sessionStorage.removeItem('usuario'); window.location.href = '/login.html'; }
 
 function fmt(v) { return '$' + Math.round(Number(v||0)).toLocaleString('es-CL'); }
 function fmtFechaHora(s) { if (!s) return '—'; return new Date(s).toLocaleString('es-CL', { timeZone: 'America/Santiago', dateStyle: 'short', timeStyle: 'short' }); }
