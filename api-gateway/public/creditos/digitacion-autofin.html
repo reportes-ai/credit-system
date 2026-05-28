@@ -91,7 +91,7 @@
   <div class="topnav-left">
     <a href="/" class="topnav-brand">
       <img src="/img/logo.png" alt="AutoFácil">
-      <span class="version-badge">v1.1</span>
+      <span class="version-badge">v1.2</span>
     </a>
     <div class="breadcrumb-nav">
       <a href="/">Inicio</a><span class="sep">›</span>
@@ -166,6 +166,7 @@
           <label class="f-req">Estado Crédito</label>
           <select id="fEstadoCred">
             <option value="">— Seleccione —</option>
+            <option>PENDIENTE</option>
             <option>APROBADO</option>
             <option>OTORGADO</option>
             <option>RECHAZADO</option>
@@ -173,7 +174,11 @@
           </select>
         </div>
       </div>
-      <div class="form-grid g3" style="margin-top:14px">
+      <div class="form-grid g4" style="margin-top:14px">
+        <div class="f-group">
+          <label>Ejecutivo Comercial</label>
+          <input type="text" id="fEjecutivo" placeholder="Nombre del ejecutivo">
+        </div>
         <div class="f-group">
           <label>Fecha Otorgado</label>
           <input type="date" id="fFechaOtorgado">
@@ -223,17 +228,21 @@
         </div>
       </div>
       <div class="form-grid g3" style="margin-top:14px">
-        <div class="f-group">
-          <label>Ejecutivo Comercial</label>
-          <input type="text" id="fEjecutivo" placeholder="Nombre del ejecutivo">
-        </div>
-        <div class="f-group">
+        <div class="f-group" style="position:relative">
           <label>Automotora / CCS</label>
-          <input type="text" id="fAutomotora" placeholder="Nombre de la automotora">
+          <input type="text" id="fAutomotora" placeholder="Buscar automotora…" autocomplete="off"
+            oninput="buscarAutomotora(this.value)" onblur="setTimeout(()=>document.getElementById('autocompleteConc').style.display='none',200)">
+          <div id="autocompleteConc" style="display:none;position:absolute;top:100%;left:0;right:0;background:#fff;border:1px solid #d1d5db;border-radius:8px;box-shadow:0 4px 12px rgba(0,0,0,.12);z-index:100;max-height:200px;overflow-y:auto"></div>
         </div>
         <div class="f-group">
-          <label>Nombre Local</label>
-          <input type="text" id="fNombreLocal" placeholder="Nombre del local o sucursal">
+          <label>RUT Automotora</label>
+          <input type="text" id="fRutAutomotora" placeholder="Auto al seleccionar" readonly
+            style="background:#f8fafc;color:#374151">
+        </div>
+        <div class="f-group">
+          <label>Tipo Ubicación</label>
+          <input type="text" id="fTipoLugar" readonly
+            style="background:#f8fafc;font-weight:700;color:#0141A2" placeholder="CALLE / PARQUE">
         </div>
       </div>
       <div class="f-group" style="margin-top:14px">
@@ -453,6 +462,8 @@
 
   // Pre-fill ejecutivo con el usuario logueado
   document.getElementById('fEjecutivo').value = `${yo?.nombre||''} ${yo?.apellido||''}`.trim();
+  // Tipo Ubicación inicial
+  document.getElementById('fTipoLugar').value = 'CALLE';
 
   // Pre-fill mes actual y auto-generar N° OP
   const hoy = new Date();
@@ -513,20 +524,73 @@
   async function buscarCliente() {
     const rut = document.getElementById('fRut').value.trim();
     if (!rut || rut.length < 5) return;
+    const found = document.getElementById('clienteFound');
     try {
-      const r = await fetch(`/api/clientes/buscar?rut=${encodeURIComponent(rut)}`, { headers:{ Authorization:'Bearer '+token } });
+      const r = await fetch(`/api/clientes/rut/${encodeURIComponent(rut)}`, { headers:{ Authorization:'Bearer '+token } });
       const { success, data } = await r.json();
-      const found = document.getElementById('clienteFound');
       if (success && data) {
-        const nombre = `${data.nombres||data.nombre||''} ${data.apellido_paterno||data.apellido||''} ${data.apellido_materno||''}`.trim();
+        const nombre = [data.nombres||data.nombre||'', data.apellido_paterno||data.apellido||'', data.apellido_materno||''].filter(Boolean).join(' ');
         document.getElementById('fNombre').value = nombre;
-        found.textContent = `✓ Cliente encontrado: ${nombre}`;
+        found.innerHTML = `<i class="bi bi-check-circle-fill me-1"></i>Cliente encontrado: <strong>${nombre}</strong>`;
         found.style.display = 'block';
       } else {
-        found.style.display = 'none';
+        found.innerHTML = '<i class="bi bi-exclamation-triangle-fill me-1"></i>Cliente no encontrado — puedes ingresar el nombre manualmente';
+        found.style.background = '#fff7ed'; found.style.borderColor = '#fed7aa'; found.style.color = '#c2410c';
+        found.style.display = 'block';
       }
+    } catch(e) {
+      found.textContent = 'Error al buscar cliente';
+      found.style.display = 'block';
+    }
+  }
+
+  /* ── Autocomplete automotoras (dealers) ─────────────────────── */
+  let _dealers = [];
+  async function _loadDealers() {
+    if (_dealers.length) return;
+    try {
+      const r = await fetch('/api/dealers?limit=500', { headers:{ Authorization:'Bearer '+token } });
+      const j = await r.json();
+      _dealers = j.data?.rows || j.data || [];
     } catch(e) {}
   }
+
+  async function buscarAutomotora(q) {
+    await _loadDealers();
+    const box = document.getElementById('autocompleteConc');
+    const term = q.trim().toLowerCase();
+    if (!term) { box.style.display = 'none'; return; }
+    const matches = _dealers.filter(d =>
+      (d.nombre_indexa||'').toLowerCase().includes(term) ||
+      (d.nombre_razon||'').toLowerCase().includes(term) ||
+      (d.rut||'').toLowerCase().includes(term)
+    ).slice(0, 10);
+    if (!matches.length) { box.style.display = 'none'; return; }
+    box.innerHTML = matches.map(d =>
+      `<div onclick="selectAutomotora(${JSON.stringify(d.nombre_indexa||d.nombre_razon||'').replace(/"/g,'&quot;'),JSON.stringify(d.rut||'').replace(/"/g,'&quot;')})"
+        style="padding:8px 12px;cursor:pointer;font-size:.85rem;border-bottom:1px solid #f3f4f6"
+        onmouseover="this.style.background='#f0f9ff'" onmouseout="this.style.background=''"
+        data-nombre="${(d.nombre_indexa||d.nombre_razon||'').replace(/"/g,'&quot;')}" data-rut="${(d.rut||'').replace(/"/g,'&quot;')}">
+        <strong>${d.nombre_indexa||d.nombre_razon||'—'}</strong>
+        <span style="color:#6b7280;margin-left:8px;font-size:.78rem">${d.rut||''}</span>
+      </div>`
+    ).join('');
+    box.style.display = 'block';
+  }
+
+  function selectAutomotora(nombre, rut) {
+    // Called via inline data attributes
+  }
+
+  // Use event delegation for autocomplete items
+  document.addEventListener('click', e => {
+    const item = e.target.closest('#autocompleteConc [data-nombre]');
+    if (item) {
+      document.getElementById('fAutomotora').value = item.dataset.nombre;
+      document.getElementById('fRutAutomotora').value = item.dataset.rut;
+      document.getElementById('autocompleteConc').style.display = 'none';
+    }
+  });
 
   /* ── Calcular saldo precio ─────────────────────────────────── */
   function calcularSaldo() {
@@ -544,6 +608,9 @@
     const sel    = document.getElementById('fParque');
     const box    = document.getElementById('parqueCalcBox');
     const selVal = sel.value;
+    // Actualizar Tipo Ubicación automáticamente
+    const tipoEl = document.getElementById('fTipoLugar');
+    if (tipoEl) tipoEl.value = (!selVal || selVal === 'NO APLICA') ? 'CALLE' : 'PARQUE';
     if (!selVal || selVal === 'NO APLICA') { box.style.display = 'none'; return; }
     const p = parques.find(x => String(x.id) === selVal);
     if (!p) { box.style.display = 'none'; return; }
@@ -584,7 +651,8 @@
       comentarios:      document.getElementById('fComentarios').value.trim(),
       ejecutivo:        document.getElementById('fEjecutivo').value.trim(),
       automotora:       document.getElementById('fAutomotora').value.trim(),
-      nombre_local:     document.getElementById('fNombreLocal').value.trim(),
+      rut_concesionario: document.getElementById('fRutAutomotora').value.trim(),
+      nombre_local:     document.getElementById('fTipoLugar').value.trim(),
       estado_eval:      document.getElementById('fEstadoEval').value,
       estado_credito:   estado,
       fecha_otorgado:   document.getElementById('fFechaOtorgado').value || null,
@@ -659,7 +727,13 @@
     numOpEl.value = '';
     document.getElementById('btnEditNumOp').style.display = '';
     document.getElementById('fMes').value = new Date().toISOString().slice(0,7);
-    autoFillNumOp();   // re-calcular N° OP para el mes actual
+    autoFillNumOp();
+    document.getElementById('fRutAutomotora').value = '';
+    document.getElementById('fTipoLugar').value = 'CALLE';
+    document.getElementById('autocompleteConc').style.display = 'none';
+    document.getElementById('clienteFound').style.background = '';
+    document.getElementById('clienteFound').style.borderColor = '';
+    document.getElementById('clienteFound').style.color = '';
     document.getElementById('fSaldo').value = '';
     document.getElementById('fPctFin').value = '';
     document.getElementById('clienteFound').style.display = 'none';
