@@ -89,7 +89,7 @@
   <div class="topnav-left">
     <a href="/" class="topnav-brand">
       <img src="/img/logo.png" alt="AutoFácil">
-      <span class="version-badge">v1.8</span>
+      <span class="version-badge">v1.9</span>
     </a>
     <div class="breadcrumb-nav">
       <a href="/">Inicio</a><span class="sep">›</span>
@@ -906,7 +906,7 @@
 
   async function cargarMarcasVehiculo() {
     try {
-      const r = await fetch('/api/vehiculos/filtros', { headers:{ Authorization:'Bearer '+token } });
+      const r = await fetch('/api/vehiculos/cascada', { headers:{ Authorization:'Bearer '+token } });
       const j = await r.json();
       _vMarcas = j.data?.marcas || [];
     } catch(e) {}
@@ -920,9 +920,11 @@
       document.getElementById('fMarca').value = v;
       document.getElementById('fModelo').value = '';
       document.getElementById('fAnio').value  = '';
+      document.getElementById('fTasacion').value = '';
+      document.getElementById('fPermisoCir').value = '';
       _vModelos = []; _vAnios = [];
       try {
-        const r = await fetch(`/api/vehiculos/filtros?marca=${encodeURIComponent(v)}`,
+        const r = await fetch(`/api/vehiculos/cascada?marca=${encodeURIComponent(v)}`,
           { headers:{ Authorization:'Bearer '+token } });
         const j = await r.json();
         _vModelos = j.data?.modelos || [];
@@ -934,12 +936,16 @@
   function acModelo(q) {
     const term = q.trim().toLowerCase();
     const hits = term ? _vModelos.filter(m => m.toLowerCase().includes(term)) : _vModelos;
+    if (!hits.length) { document.getElementById('acModeloBox').style.display = 'none'; return; }
     _acVehBox('acModeloBox', 'fModelo', hits.slice(0, 25), async v => {
       document.getElementById('fModelo').value = v;
+      document.getElementById('fAnio').value  = '';
+      document.getElementById('fTasacion').value = '';
+      document.getElementById('fPermisoCir').value = '';
       _vAnios = [];
       const marca = document.getElementById('fMarca').value.trim();
       try {
-        const r = await fetch(`/api/vehiculos/filtros?marca=${encodeURIComponent(marca)}&modelo=${encodeURIComponent(v)}`,
+        const r = await fetch(`/api/vehiculos/cascada?marca=${encodeURIComponent(marca)}&modelo=${encodeURIComponent(v)}`,
           { headers:{ Authorization:'Bearer '+token } });
         const j = await r.json();
         _vAnios = j.data?.anios || [];
@@ -965,7 +971,7 @@
     if (!marca || !modelo || !anio) return;
     try {
       const r = await fetch(
-        `/api/vehiculos/filtros?marca=${encodeURIComponent(marca)}&modelo=${encodeURIComponent(modelo)}&anio=${encodeURIComponent(anio)}`,
+        `/api/vehiculos/cascada?marca=${encodeURIComponent(marca)}&modelo=${encodeURIComponent(modelo)}&anio=${encodeURIComponent(anio)}`,
         { headers:{ Authorization:'Bearer '+token } });
       const j = await r.json();
       if (j.data?.tasacion) document.getElementById('fTasacion').value  = '$' + parseInt(j.data.tasacion).toLocaleString('es-CL');
@@ -973,9 +979,17 @@
     } catch(e) {}
   }
 
-  // Mostrar modelos al enfocar Modelo si ya hay marca
+  // Mostrar modelos al enfocar Modelo si ya hay marca seleccionada
   document.getElementById('fModelo').addEventListener('focus', () => {
     if (_vModelos.length) acModelo(document.getElementById('fModelo').value);
+  });
+
+  // Mostrar años al enfocar Año si ya hay modelo seleccionado
+  document.getElementById('fAnio').addEventListener('focus', () => {
+    if (_vAnios.length) _acVehBox('acAnioBox', 'fAnio', _vAnios, v2 => {
+      document.getElementById('fAnio').value = v2;
+      autoFillVehiculo();
+    });
   });
 
 </script>
