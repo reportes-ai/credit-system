@@ -69,34 +69,31 @@ function calcular(body) {
 }
 
 /* ─── GET /api/operaciones/next-op?mes=YYYY-MM ───────────────────────── */
-// Retorna el siguiente num_op con formato YYYYMM + secuencial 3 dígitos
+// Misma fórmula que generarNumero() en creditos.controller: YYMM + seq 3 dígitos
+// ej: mes=2026-05 → prefix="2605", resultado "2605006"
 const nextOp = async (req, res) => {
   try {
     const { mes } = req.query; // ej: "2026-05"
     if (!mes || !/^\d{4}-\d{2}$/.test(mes))
       return res.status(400).json({ success: false, data: null, error: 'Parámetro mes requerido (YYYY-MM)' });
 
-    const prefix = parseInt(mes.replace('-', ''), 10); // 202605
-    const prefixStr = String(prefix);                  // "202605"
+    // Replicar la lógica de generarNumero(): YYMM (2 dígitos de año)
+    const [anio, mStr] = mes.split('-');
+    const yy     = String(anio).slice(-2);          // "26"
+    const mm     = String(mStr).padStart(2, '0');   // "05"
+    const prefix = yy + mm;                          // "2605"
 
-    // Buscar el mayor num_op cuyo prefijo coincida con YYYYMM
-    const [[row]] = await pool.query(
-      `SELECT MAX(num_op) AS max_op
-       FROM operaciones_brokerage
-       WHERE DATE_FORMAT(mes, '%Y-%m') = ?`,
-      [mes]
+    const [rows] = await pool.query(
+      `SELECT numero_credito FROM operaciones_brokerage
+       WHERE numero_credito LIKE ? ORDER BY id DESC LIMIT 1`,
+      [prefix + '%']
     );
 
-    const maxOp = row?.max_op ? parseInt(row.max_op) : 0;
-    let nextNum;
+    const seq = rows.length
+      ? parseInt(rows[0].numero_credito.slice(4), 10) + 1
+      : 1;
 
-    if (maxOp > 0 && String(maxOp).startsWith(prefixStr)) {
-      // El último num_op tiene el mismo prefijo → incrementar
-      nextNum = maxOp + 1;
-    } else {
-      // No hay ops este mes o el máximo es de otro mes → arrancar en YYYYMM001
-      nextNum = parseInt(prefixStr + '001', 10);
-    }
+    const nextNum = prefix + String(seq).padStart(3, '0'); // "2605006"
 
     res.json({ success: true, data: { nextOp: nextNum }, error: null });
   } catch (e) {
@@ -136,15 +133,36 @@ const getOne = async (req, res) => {
 };
 
 /* ─── POST /api/operaciones ───────────────────────────────────────────── */
+// Genera numero_credito (YYMMXXX) — misma lógica que creditos.controller
+async function generarNumeroCred(mesISO) {
+  const base = mesISO ? new Date(mesISO) : new Date();
+  const yy     = String(base.getFullYear()).slice(-2);
+  const mm     = String(base.getMonth() + 1).padStart(2, '0');
+  const prefix = `${yy}${mm}`;
+  const [rows] = await pool.query(
+    `SELECT numero_credito FROM operaciones_brokerage
+     WHERE numero_credito LIKE ? ORDER BY id DESC LIMIT 1`,
+    [prefix + '%']
+  );
+  const seq = rows.length ? parseInt(rows[0].numero_credito.slice(4), 10) + 1 : 1;
+  return prefix + String(seq).padStart(3, '0');
+}
+
 const create = async (req, res) => {
   try {
     const b = req.body;
     if (!b.financiera) return res.status(400).json({ success: false, data: null, error: 'financiera requerida' });
     if (!b.rut_cliente) return res.status(400).json({ success: false, data: null, error: 'RUT cliente requerido' });
 
+    // Auto-asignar numero_credito si no viene del formulario
+    if (!b.numero_credito) {
+      b.numero_credito = await generarNumeroCred(b.mes || null);
+    }
+
     const { saldo_precio, pct_financiado } = calcular(b);
 
     const fields = [
+      'numero_credito',
       'num_op','mes','financiera','rut_cliente','nombre_cliente','comentarios',
       'ejecutivo','id_ejecutivo','automotora','nombre_local','estado_eval','estado_credito',
       'fecha_otorgado','producto','valor_vehiculo','pie','saldo_precio','pct_financiado',
@@ -154,7 +172,7 @@ const create = async (req, res) => {
       'comdea_real','monto_comision_fin','id_financiera','fecha_primera_cuota',
       'parque','mayor_menor','monto_capitalizado',
       'boleta_factura','cantidad_docs','docs_autorizados','fecha_recep_doc',
-      'rut_concesionario','vendedor',   // col CB "RUT DEALER" y vendedor del concesionario
+      'rut_concesionario','vendedor',
       'created_by'
     ];
 

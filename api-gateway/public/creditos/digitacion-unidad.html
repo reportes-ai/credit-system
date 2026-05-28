@@ -571,7 +571,7 @@
       });
       const data = await r.json();
       if (data.success) {
-        ok.innerHTML = `<i class="bi bi-check-circle me-2"></i>Operación guardada correctamente. ID: <strong>${data.data.id}</strong> — N° OP: <strong>${data.data.num_op || '—'}</strong>`;
+        ok.innerHTML = `<i class="bi bi-check-circle me-2"></i>Operación guardada correctamente. N° Crédito: <strong>${data.data.numero_credito || data.data.num_op || '—'}</strong> (ID: ${data.data.id})`;
         ok.style.display = 'block';
         window.scrollTo(0,0);
         setTimeout(() => { limpiar(); }, 1500);
