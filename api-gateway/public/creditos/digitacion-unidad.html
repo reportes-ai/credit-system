@@ -77,7 +77,7 @@
   <div class="topnav-left">
     <a href="/" class="topnav-brand">
       <img src="/img/logo.png" alt="AutoFácil">
-      <span class="version-badge">v1.2</span>
+      <span class="version-badge">v1.3</span>
     </a>
     <div class="breadcrumb-nav">
       <a href="/">Inicio</a><span class="sep">›</span>
@@ -489,44 +489,52 @@
     }
   }
 
-  /* ── Autocomplete automotoras (dealers) ─────────────────────── */
-  let _dealers = [];
-  async function _loadDealers() {
-    if (_dealers.length) return;
-    try {
-      const r = await fetch('/api/dealers?limit=500', { headers:{ Authorization:'Bearer '+token } });
-      const j = await r.json();
-      _dealers = j.data?.rows || j.data || [];
-    } catch(e) {}
+  /* ── Autocomplete automotoras — búsqueda server-side ─────────── */
+  let _dealerTimer = null;
+
+  function formatRutStr(v) {
+    v = (v||'').replace(/[^0-9kK]/g,'').toUpperCase();
+    if (v.length < 2) return v;
+    return v.slice(0,-1).replace(/\B(?=(\d{3})+(?!\d))/g,'.') + '-' + v.slice(-1);
   }
 
-  async function buscarAutomotora(q) {
-    await _loadDealers();
+  function buscarAutomotora(q) {
     const box = document.getElementById('autocompleteConc');
-    const term = q.trim().toLowerCase();
-    if (!term) { box.style.display = 'none'; return; }
-    const matches = _dealers.filter(d =>
-      (d.nombre_indexa||'').toLowerCase().includes(term) ||
-      (d.nombre_razon||'').toLowerCase().includes(term) ||
-      (d.rut||'').toLowerCase().includes(term)
-    ).slice(0, 10);
-    if (!matches.length) { box.style.display = 'none'; return; }
-    box.innerHTML = matches.map(d =>
-      `<div style="padding:8px 12px;cursor:pointer;font-size:.85rem;border-bottom:1px solid #f3f4f6"
-        onmouseover="this.style.background='#f0f9ff'" onmouseout="this.style.background=''"
-        data-nombre="${(d.nombre_indexa||d.nombre_razon||'').replace(/"/g,'&quot;')}" data-rut="${(d.rut||'').replace(/"/g,'&quot;')}">
-        <strong>${d.nombre_indexa||d.nombre_razon||'—'}</strong>
-        <span style="color:#6b7280;margin-left:8px;font-size:.78rem">${d.rut||''}</span>
-      </div>`
-    ).join('');
-    box.style.display = 'block';
+    const term = q.trim();
+    if (term.length < 2) { box.style.display = 'none'; return; }
+    clearTimeout(_dealerTimer);
+    _dealerTimer = setTimeout(async () => {
+      try {
+        const r = await fetch(`/api/dealers?q=${encodeURIComponent(term)}&limit=12`,
+          { headers:{ Authorization:'Bearer '+token } });
+        const j = await r.json();
+        const matches = j.data?.rows || j.data || [];
+        if (!matches.length) { box.style.display = 'none'; return; }
+        box.innerHTML = matches.map(d => {
+          const tipo = d.ccs_parque ? 'PARQUE' : 'CALLE';
+          const tipoColor = tipo === 'PARQUE' ? '#0141A2' : '#374151';
+          return `<div style="padding:8px 12px;cursor:pointer;font-size:.85rem;border-bottom:1px solid #f3f4f6"
+            onmouseover="this.style.background='#f0f9ff'" onmouseout="this.style.background=''"
+            data-nombre="${(d.nombre_indexa||d.nombre_razon||'').replace(/"/g,'&quot;')}"
+            data-rut="${(d.rut||'').replace(/"/g,'&quot;')}"
+            data-ccs="${(d.ccs_parque||'').replace(/"/g,'&quot;')}">
+            <strong>${d.nombre_indexa||d.nombre_razon||'—'}</strong>
+            <span style="color:#6b7280;margin-left:8px;font-size:.78rem">${formatRutStr(d.rut||'')}</span>
+            <span style="margin-left:8px;font-size:.72rem;font-weight:700;color:${tipoColor}">${tipo}</span>
+          </div>`;
+        }).join('');
+        box.style.display = 'block';
+      } catch(e) { box.style.display = 'none'; }
+    }, 250);
   }
 
   document.addEventListener('click', e => {
     const item = e.target.closest('#autocompleteConc [data-nombre]');
     if (item) {
-      document.getElementById('fAutomotora').value = item.dataset.nombre;
-      document.getElementById('fRutAutomotora').value = item.dataset.rut;
+      document.getElementById('fAutomotora').value    = item.dataset.nombre;
+      document.getElementById('fRutAutomotora').value = formatRutStr(item.dataset.rut);
+      const tipoEl = document.getElementById('fTipoLugar');
+      if (tipoEl) tipoEl.value = item.dataset.ccs ? 'PARQUE' : 'CALLE';
       document.getElementById('autocompleteConc').style.display = 'none';
     }
   });
