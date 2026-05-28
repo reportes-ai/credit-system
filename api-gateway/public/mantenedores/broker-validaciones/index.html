@@ -156,6 +156,7 @@
 
 <div class="toast-msg" id="toastMsg"></div>
 
+<script src="/js/auth-guard.js"></script>
 <script>
 function getToken() { return localStorage.getItem('token'); }
 function apiHdr()   { return { 'Content-Type':'application/json', 'Authorization':'Bearer '+getToken() }; }

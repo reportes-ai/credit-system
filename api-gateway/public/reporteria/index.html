@@ -295,23 +295,13 @@
   .ptbl td { padding:6px 12px; border-bottom:1px solid #f1f5f9; white-space:nowrap; max-width:220px; overflow:hidden; text-overflow:ellipsis; }
 </style>
 
+<script src="/js/auth-guard.js"></script>
 <script>
 /* ── Auth ─────────────────────────────────────────────────────── */
 function getToken()   { return localStorage.getItem('token'); }
 function apiHdrs()    { return { 'Content-Type':'application/json', 'Authorization':'Bearer '+getToken() }; }
 function logout()     { localStorage.removeItem('token'); localStorage.removeItem('usuario'); location.href='/login.html'; }
 
-(function checkAuth(){
-  const t = getToken(); if(!t){ location.href='/login.html'; return; }
-  try {
-    const u = JSON.parse(localStorage.getItem('usuario')||'{}');
-    document.getElementById('avatarInicial').textContent = (u.nombre||'?').charAt(0).toUpperCase();
-    document.getElementById('navNombre').textContent = ((u.nombre||'')+' '+(u.apellido||'')).trim();
-    document.getElementById('navPerfil').textContent  = u.perfil||u.nombre_perfil||'—';
-    const p = JSON.parse(atob(t.split('.')[1]));
-    if(p.exp*1000 < Date.now()) logout();
-  } catch(e){ logout(); }
-})();
 
 /* ═══════════════════════════════════════════════════════════════
    DEFINICIÓN DE MÓDULOS Y CAMPOS

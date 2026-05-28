@@ -319,24 +319,14 @@
 <div class="toast-msg toast-ok"  id="toastOk"></div>
 <div class="toast-msg toast-err" id="toastErr"></div>
 
+<script src="/js/auth-guard.js"></script>
 <script>
 /* ─── Auth ─────────────────────────────────────────────────────────── */
 function getToken() { return localStorage.getItem('token'); }
 function apiHeaders() { return { 'Content-Type':'application/json', 'Authorization':'Bearer '+getToken() }; }
 function logout() { localStorage.removeItem('token'); localStorage.removeItem('usuario'); location.href='/login.html'; }
 
-(function checkAuth() {
-  const t = getToken();
-  if (!t) { location.href='/login.html'; return; }
-  try {
-    const u = JSON.parse(localStorage.getItem('usuario') || '{}');
-    document.getElementById('avatarInicial').textContent = (u.nombre||'?').charAt(0).toUpperCase();
-    document.getElementById('navNombre').textContent = ((u.nombre||'') + ' ' + (u.apellido||'')).trim();
-    document.getElementById('navPerfil').textContent = u.perfil || u.nombre_perfil || '—';
-    const p = JSON.parse(atob(t.split('.')[1]));
-    if (p.exp * 1000 < Date.now()) logout();
-  } catch(e) { logout(); }
-})();
+
 
 /* ─── URL params ─────────────────────────────────────────────────── */
 const params   = new URLSearchParams(location.search);

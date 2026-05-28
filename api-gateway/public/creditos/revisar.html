@@ -338,18 +338,16 @@
   </div>
 </div>
 
+<script src="/js/auth-guard.js"></script>
 <script>
 /* ── Auth ── */
 function getToken() { return localStorage.getItem('token'); }
 function apiHdr()   { return { 'Content-Type':'application/json', 'Authorization':'Bearer '+getToken() }; }
 
-(function checkAuth() {
-  if (!getToken()) { location.href='/login.html'; return; }
-  try {
-    const u = JSON.parse(localStorage.getItem('usuario')||'{}');
-    document.getElementById('navUser').textContent = u.nombre || '';
-  } catch(e){}
-})();
+try {
+  const u = JSON.parse(localStorage.getItem('usuario')||'{}');
+  document.getElementById('navUser').textContent = u.nombre || '';
+} catch(e){}
 
 /* ── Helpers ── */
 const fmtP  = v => v != null && v !== '' ? '$'+Math.round(Number(v)).toLocaleString('es-CL') : '—';

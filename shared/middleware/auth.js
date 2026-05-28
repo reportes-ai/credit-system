@@ -1,6 +1,7 @@
 const jwt = require('jsonwebtoken');
 
-const JWT_SECRET = process.env.JWT_SECRET || 'credit_system_secret_2024';
+const JWT_SECRET = process.env.JWT_SECRET;
+if (!JWT_SECRET) throw new Error('JWT_SECRET no está definido en las variables de entorno');
 const JWT_EXPIRES = '8h';
 
 const verifyToken = (req, res, next) => {
