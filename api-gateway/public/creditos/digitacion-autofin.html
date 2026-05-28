@@ -76,13 +76,11 @@
     /* Alerta */
     .alert-ok  { background:#f0fdf4; border:1px solid #86efac; color:#166534; border-radius:10px; padding:12px 16px; font-size:.87rem; display:none; margin-bottom:16px; }
     .alert-err { background:#fef2f2; border:1px solid #fecaca; color:#dc2626; border-radius:10px; padding:12px 16px; font-size:.87rem; display:none; margin-bottom:16px; }
-    /* Mayor/Menor badge */
-    .radio-group { display:flex; gap:10px; }
-    .radio-opt { display:flex; align-items:center; gap:6px; cursor:pointer; }
-    .radio-opt input { accent-color:var(--navy); }
-    .radio-opt span { font-size:.85rem; color:#374151; }
     /* Seguros hints */
     .seguro-calc { font-size:.72rem; color:#64748b; margin-top:3px; }
+    /* Sub-sección dentro de sec-body */
+    .sub-sec-title { font-size:.78rem; font-weight:700; color:#6b7280; text-transform:uppercase; letter-spacing:.5px; margin-bottom:12px; padding-top:14px; border-top:1px solid #e5e7eb; margin-top:18px; }
+    .sub-sec-title i { color:var(--navy); }
   </style>
 </head>
 <body>
@@ -91,7 +89,7 @@
   <div class="topnav-left">
     <a href="/" class="topnav-brand">
       <img src="/img/logo.png" alt="AutoFácil">
-      <span class="version-badge">v1.2</span>
+      <span class="version-badge">v1.4</span>
     </a>
     <div class="breadcrumb-nav">
       <a href="/">Inicio</a><span class="sep">›</span>
@@ -100,7 +98,6 @@
     </div>
   </div>
   <div class="topnav-right">
-    
     <a href="/dashboard" title="Dashboard Analytics" style="display:flex;align-items:center;gap:5px;color:rgba(255,255,255,0.85);text-decoration:none;font-size:12px;font-weight:500;padding:5px 10px;border:1px solid rgba(255,255,255,0.25);border-radius:6px;transition:.15s" onmouseover="this.style.background='rgba(255,255,255,0.1)'" onmouseout="this.style.background='transparent'">
       <i class="bi bi-bar-chart-line" style="font-size:15px"></i> Dashboard
     </a>
@@ -175,14 +172,10 @@
           </select>
         </div>
       </div>
-      <div class="form-grid g4" style="margin-top:14px">
+      <div class="form-grid g3" style="margin-top:14px">
         <div class="f-group">
           <label>Ejecutivo Comercial</label>
           <input type="text" id="fEjecutivo" placeholder="Nombre del ejecutivo">
-        </div>
-        <div class="f-group">
-          <label>Fecha Otorgado</label>
-          <input type="date" id="fFechaOtorgado">
         </div>
         <div class="f-group">
           <label class="f-req">Producto AutoFin</label>
@@ -253,11 +246,35 @@
     </div>
   </div>
 
-  <!-- ── 3. VEHÍCULO ───────────────────────────────────────────── -->
+  <!-- ── 3. VEHÍCULO Y FINANCIAMIENTO ─────────────────────────── -->
   <div class="sec">
     <div class="sec-header"><i class="bi bi-car-front-fill"></i><span>Vehículo y financiamiento</span></div>
     <div class="sec-body">
-      <div class="form-grid g3">
+      <!-- Datos del vehículo -->
+      <div class="form-grid g5">
+        <div class="f-group">
+          <label>Marca</label>
+          <input type="text" id="fMarca" placeholder="Toyota, Chevrolet…">
+        </div>
+        <div class="f-group">
+          <label>Modelo</label>
+          <input type="text" id="fModelo" placeholder="Corolla, Spark…">
+        </div>
+        <div class="f-group">
+          <label>Año</label>
+          <input type="number" id="fAnio" placeholder="2024" min="1990" max="2030">
+        </div>
+        <div class="f-group">
+          <label>Tasación $</label>
+          <input type="text" id="fTasacion" placeholder="$0" oninput="fmtPesos(this)">
+        </div>
+        <div class="f-group">
+          <label>Permiso Circulación $</label>
+          <input type="text" id="fPermisoCir" placeholder="$0" oninput="fmtPesos(this)">
+        </div>
+      </div>
+      <!-- Valores financiamiento -->
+      <div class="form-grid g3" style="margin-top:14px">
         <div class="f-group">
           <label class="f-req">Valor Vehículo $</label>
           <input type="number" id="fValorVeh" placeholder="0" min="0" oninput="calcularSaldo()">
@@ -270,6 +287,8 @@
           <label>Saldo Precio $ <small style="color:#0369a1;font-weight:600">(calculado)</small></label>
           <input type="text" id="fSaldo" class="calc" readonly>
         </div>
+      </div>
+      <div class="form-grid g3" style="margin-top:14px">
         <div class="f-group">
           <label>% Financiado <small style="color:#0369a1;font-weight:600">(calculado)</small></label>
           <input type="text" id="fPctFin" class="calc" readonly>
@@ -295,70 +314,88 @@
   <div class="sec">
     <div class="sec-header"><i class="bi bi-bank2"></i><span>Condiciones del crédito</span></div>
     <div class="sec-body">
+      <!-- Montos y plazos -->
       <div class="form-grid g4">
         <div class="f-group">
-          <label class="f-req">Monto Financiado Indexa $</label>
-          <input type="number" id="fMontoFin" placeholder="0" min="0">
+          <label class="f-req">Monto Financiado $</label>
+          <input type="text" id="fMontoFin" placeholder="$0" oninput="fmtPesos(this);calcularMayorMenor();calcularCuota()">
         </div>
         <div class="f-group">
-          <label class="f-req">Plazo (meses)</label>
-          <select id="fPlazo">
+          <label class="f-req">Plazo (cuotas)</label>
+          <select id="fPlazo" onchange="calcularCuota()">
             <option value="">— Seleccione —</option>
-            <option value="12">12 meses</option>
-            <option value="24">24 meses</option>
-            <option value="36">36 meses</option>
-            <option value="48">48 meses</option>
-            <option value="60">60 meses</option>
-            <option value="72">72 meses</option>
-            <option value="84">84 meses</option>
           </select>
+        </div>
+        <div class="f-group">
+          <label>Fecha Otorgamiento</label>
+          <input type="date" id="fFechaOtorgado" onchange="calcularMayorMenor()">
         </div>
         <div class="f-group">
           <label>Fecha Primera Cuota</label>
           <input type="date" id="fFechaCuota">
         </div>
-        <div class="f-group">
-          <label>Mayor / Menor 200 UF</label>
-          <select id="fMayorMenor">
-            <option value="">— Seleccione —</option>
-            <option value="MENOR">MENOR a 200 UF</option>
-            <option value="MAYOR">MAYOR a 200 UF</option>
-          </select>
-        </div>
       </div>
+      <!-- Mayor/Menor + Tasas -->
       <div class="form-grid g4" style="margin-top:14px">
         <div class="f-group">
-          <label>Tasa Cliente Real (%)</label>
-          <input type="number" id="fTasCliReal" placeholder="2.63" step="0.001" min="0">
+          <label>Mayor / Menor 200 UF <small id="fUfDia" style="color:#0369a1;font-weight:600;text-transform:none;letter-spacing:0"></small></label>
+          <input type="text" id="fMayorMenor" class="calc" readonly placeholder="Automático — ingresa monto y fecha">
+          <input type="hidden" id="fMayorMenorHidden">
         </div>
         <div class="f-group">
-          <label>Tasa Cliente Pizarra (%)</label>
+          <label>Tasa Cliente (%)</label>
+          <input type="number" id="fTasCliReal" placeholder="2.63" step="0.001" min="0" oninput="calcularCuota()">
+        </div>
+        <div class="f-group">
+          <label>TMC (%)</label>
           <input type="number" id="fTasCliPiz" placeholder="2.63" step="0.001" min="0">
-        </div>
-        <div class="f-group">
-          <label>Tasa Financiera Pizarra (%)</label>
-          <input type="number" id="fTasFinPiz" placeholder="1.525" step="0.001" min="0">
-        </div>
-        <div class="f-group">
-          <label>Comisión Dealer Real $</label>
-          <input type="number" id="fComDea" placeholder="0" min="0">
-        </div>
-      </div>
-      <div class="form-grid g3" style="margin-top:14px">
-        <div class="f-group">
-          <label>Monto Pago Comisión Financiera $</label>
-          <input type="number" id="fMontComFin" placeholder="0" min="0">
         </div>
         <div class="f-group">
           <label>Monto Capitalizado $</label>
           <input type="number" id="fMontoCap" placeholder="0" min="0">
         </div>
-        <div class="f-group" style="align-items:center;justify-content:center;padding-top:14px">
+      </div>
+
+      <!-- Sub-sección: Gastos y Seguros -->
+      <div class="sub-sec-title"><i class="bi bi-shield-fill-check me-1"></i>Gastos y Seguros</div>
+      <div class="form-grid g4">
+        <div class="f-group">
+          <label>Gastos Operacionales $</label>
+          <input type="number" id="fGastos" placeholder="0" min="0">
+        </div>
+        <div class="f-group">
+          <label>Seguro RDH+E $</label>
+          <input type="number" id="fSegRdh" placeholder="0" min="0">
+          <div class="seguro-calc">Comisión según penetración mensual (tabla RDH)</div>
+        </div>
+        <div class="f-group">
+          <label>Seguro Cesantía $</label>
+          <input type="number" id="fSegCes" placeholder="0" min="0">
+          <div class="seguro-calc">Comisión según penetración mensual (tabla Cesantía)</div>
+        </div>
+        <div class="f-group">
+          <label>Seguro Rep. Menor $</label>
+          <input type="number" id="fSegRep" placeholder="0" min="0">
+          <div class="seguro-calc">Comisión según penetración mensual (tabla Reparaciones)</div>
+        </div>
+      </div>
+      <div style="background:#fef9c3;border:1px solid #fef08a;border-radius:8px;padding:10px 14px;margin-top:12px;font-size:.8rem;color:#854d0e">
+        <i class="bi bi-info-circle me-1"></i> Las <strong>comisiones de seguros</strong> (RDH, Cesantía, Reparaciones) se calculan automáticamente en el módulo de liquidación mensual usando las tablas de penetración. Solo ingresa los montos de prima.
+      </div>
+
+      <!-- Monto Cuota + Limitación -->
+      <div class="form-grid g3" style="margin-top:18px">
+        <div class="f-group">
+          <label>Monto Cuota $ <small style="color:#0369a1;font-weight:600">(calculado)</small></label>
+          <input type="text" id="fMontoCuota" class="calc" readonly placeholder="Automático">
+        </div>
+        <div class="f-group" style="justify-content:flex-end;padding-top:18px">
           <div class="toggle-wrap">
             <input type="checkbox" class="toggle" id="fLimitacion">
             <label for="fLimitacion">Tiene Limitación <span style="font-size:.72rem;color:#64748b">(+$5.630 al monto FEI)</span></label>
           </div>
         </div>
+        <div></div>
       </div>
     </div>
   </div>
@@ -386,33 +423,23 @@
     </div>
   </div>
 
-  <!-- ── 6. GASTOS Y SEGUROS ───────────────────────────────────── -->
+  <!-- ── 6. INGRESOS Y GASTOS AUTOFÁCIL ───────────────────────── -->
   <div class="sec">
-    <div class="sec-header"><i class="bi bi-shield-fill-check"></i><span>Gastos y Seguros</span></div>
+    <div class="sec-header"><i class="bi bi-graph-up-arrow"></i><span>Ingresos y Gastos AutoFácil</span></div>
     <div class="sec-body">
-      <div class="form-grid g4">
+      <div class="form-grid g3">
         <div class="f-group">
-          <label>Gastos Operacionales $</label>
-          <input type="number" id="fGastos" placeholder="0" min="0">
+          <label>Tasa Financiera (%)</label>
+          <input type="number" id="fTasFinPiz" placeholder="1.525" step="0.001" min="0">
         </div>
         <div class="f-group">
-          <label>Seguro RDH+E $</label>
-          <input type="number" id="fSegRdh" placeholder="0" min="0">
-          <div class="seguro-calc">Comisión según penetración mensual (tabla RDH)</div>
+          <label>Comisión Dealer Real $</label>
+          <input type="number" id="fComDea" placeholder="0" min="0">
         </div>
         <div class="f-group">
-          <label>Seguro Cesantía $</label>
-          <input type="number" id="fSegCes" placeholder="0" min="0">
-          <div class="seguro-calc">Comisión según penetración mensual (tabla Cesantía)</div>
+          <label>Monto Pago Comisión Fin. $</label>
+          <input type="number" id="fMontComFin" placeholder="0" min="0">
         </div>
-        <div class="f-group">
-          <label>Seguro Rep. Menor $</label>
-          <input type="number" id="fSegRep" placeholder="0" min="0">
-          <div class="seguro-calc">Comisión según penetración mensual (tabla Reparaciones)</div>
-        </div>
-      </div>
-      <div style="background:#fef9c3;border:1px solid #fef08a;border-radius:8px;padding:10px 14px;margin-top:12px;font-size:.8rem;color:#854d0e">
-        <i class="bi bi-info-circle me-1"></i> Las <strong>comisiones de seguros</strong> (RDH, Cesantía, Reparaciones) se calculan automáticamente en el módulo de liquidación mensual usando las tablas de penetración. Solo ingresa los montos de prima.
       </div>
     </div>
   </div>
@@ -466,17 +493,24 @@
   // Tipo Ubicación inicial
   document.getElementById('fTipoLugar').value = 'CALLE';
 
+  // Poblar opciones de Plazo (cuotas) 6–72 en pasos de 6
+  (function() {
+    const sel = document.getElementById('fPlazo');
+    for (let i = 6; i <= 72; i += 6) {
+      sel.add(new Option(i, i));
+    }
+  })();
+
   // Pre-fill mes actual y auto-generar N° OP
   const hoy = new Date();
   document.getElementById('fMes').value = hoy.toISOString().slice(0,7);
 
   /* ── Auto-generar N° OP correlativo ─────────────────────────── */
   async function autoFillNumOp() {
-    const mes = document.getElementById('fMes').value;  // "YYYY-MM"
+    const mes = document.getElementById('fMes').value;
     if (!mes) return;
     const statusEl = document.getElementById('numOpStatus');
     const input    = document.getElementById('fNumOp');
-    // Si el usuario habilitó edición manual, no sobreescribir
     if (!input.hasAttribute('readonly')) return;
     statusEl.textContent = '⏳';
     try {
@@ -494,7 +528,6 @@
     }
   }
 
-  // Disparar al cargar (mes ya está pre-llenado)
   setTimeout(autoFillNumOp, 300);
 
   let parques = [];
@@ -507,10 +540,7 @@
       if (!success) return;
       parques = data;
       const sel = document.getElementById('fParque');
-      data.forEach(p => {
-        const opt = new Option(p.nombre, p.id);
-        sel.add(opt);
-      });
+      data.forEach(p => sel.add(new Option(p.nombre, p.id)));
     } catch(e) {}
   }
 
@@ -519,6 +549,15 @@
     let v = input.value.replace(/[^0-9kK]/g,'');
     if (v.length > 1) v = v.slice(0,-1).replace(/\B(?=(\d{3})+(?!\d))/g,'.') + '-' + v.slice(-1);
     input.value = v.toUpperCase();
+  }
+
+  /* ── Formato pesos chilenos ─────────────────────────────────── */
+  function fmtPesos(input) {
+    let raw = input.value.replace(/[^0-9]/g,'');
+    input.value = raw ? '$' + parseInt(raw, 10).toLocaleString('es-CL') : '';
+  }
+  function parsePesos(str) {
+    return parseInt((str||'').replace(/[^0-9]/g,''), 10) || 0;
   }
 
   /* ── Buscar cliente por RUT ─────────────────────────────────── */
@@ -533,6 +572,7 @@
         const nombre = [data.nombres||data.nombre||'', data.apellido_paterno||data.apellido||'', data.apellido_materno||''].filter(Boolean).join(' ');
         document.getElementById('fNombre').value = nombre;
         found.innerHTML = `<i class="bi bi-check-circle-fill me-1"></i>Cliente encontrado: <strong>${nombre}</strong>`;
+        found.style.background=''; found.style.borderColor=''; found.style.color='';
         found.style.display = 'block';
       } else {
         found.innerHTML = '<i class="bi bi-exclamation-triangle-fill me-1"></i>Cliente no encontrado — puedes ingresar el nombre manualmente';
@@ -558,7 +598,7 @@
 
   async function buscarAutomotora(q) {
     await _loadDealers();
-    const box = document.getElementById('autocompleteConc');
+    const box  = document.getElementById('autocompleteConc');
     const term = q.trim().toLowerCase();
     if (!term) { box.style.display = 'none'; return; }
     const matches = _dealers.filter(d =>
@@ -568,8 +608,7 @@
     ).slice(0, 10);
     if (!matches.length) { box.style.display = 'none'; return; }
     box.innerHTML = matches.map(d =>
-      `<div onclick="selectAutomotora(${JSON.stringify(d.nombre_indexa||d.nombre_razon||'').replace(/"/g,'&quot;'),JSON.stringify(d.rut||'').replace(/"/g,'&quot;')})"
-        style="padding:8px 12px;cursor:pointer;font-size:.85rem;border-bottom:1px solid #f3f4f6"
+      `<div style="padding:8px 12px;cursor:pointer;font-size:.85rem;border-bottom:1px solid #f3f4f6"
         onmouseover="this.style.background='#f0f9ff'" onmouseout="this.style.background=''"
         data-nombre="${(d.nombre_indexa||d.nombre_razon||'').replace(/"/g,'&quot;')}" data-rut="${(d.rut||'').replace(/"/g,'&quot;')}">
         <strong>${d.nombre_indexa||d.nombre_razon||'—'}</strong>
@@ -579,15 +618,10 @@
     box.style.display = 'block';
   }
 
-  function selectAutomotora(nombre, rut) {
-    // Called via inline data attributes
-  }
-
-  // Use event delegation for autocomplete items
   document.addEventListener('click', e => {
     const item = e.target.closest('#autocompleteConc [data-nombre]');
     if (item) {
-      document.getElementById('fAutomotora').value = item.dataset.nombre;
+      document.getElementById('fAutomotora').value   = item.dataset.nombre;
       document.getElementById('fRutAutomotora').value = item.dataset.rut;
       document.getElementById('autocompleteConc').style.display = 'none';
     }
@@ -604,19 +638,64 @@
     calcularParque();
   }
 
+  /* ── Mayor / Menor 200 UF (automático) ─────────────────────── */
+  async function calcularMayorMenor() {
+    const monto   = parsePesos(document.getElementById('fMontoFin').value);
+    const fecha   = document.getElementById('fFechaOtorgado').value;
+    const ufLabel = document.getElementById('fUfDia');
+    const dispEl  = document.getElementById('fMayorMenor');
+    const hidEl   = document.getElementById('fMayorMenorHidden');
+    if (!monto || !fecha) {
+      dispEl.value = ''; hidEl.value = '';
+      if (ufLabel) ufLabel.textContent = '';
+      return;
+    }
+    try {
+      const r = await fetch(`/api/uf/en/${fecha}`, { headers:{ Authorization:'Bearer '+token } });
+      const j = await r.json();
+      const ufVal = j.data?.valor;
+      if (!ufVal) {
+        dispEl.value = '(UF no disponible para esa fecha)';
+        hidEl.value  = '';
+        if (ufLabel) ufLabel.textContent = '';
+        return;
+      }
+      if (ufLabel) ufLabel.textContent = '(UF $' + Number(ufVal).toLocaleString('es-CL', { minimumFractionDigits: 2 }) + ')';
+      const montoUF  = monto / ufVal;
+      const resultado = montoUF >= 200 ? 'MAYOR' : 'MENOR';
+      dispEl.value = montoUF.toFixed(2) + ' UF → ' + resultado + ' a 200 UF';
+      hidEl.value  = resultado;
+      calcularCuota();
+    } catch(e) {
+      dispEl.value = '(error al consultar UF)';
+    }
+  }
+
+  /* ── Cálculo de cuota francesa ──────────────────────────────── */
+  function calcularCuota() {
+    const monto    = parsePesos(document.getElementById('fMontoFin').value);
+    const i        = (parseFloat(document.getElementById('fTasCliReal').value) || 0) / 100;
+    const n        = parseInt(document.getElementById('fPlazo').value) || 0;
+    const cuotaEl  = document.getElementById('fMontoCuota');
+    if (!monto || !n) { cuotaEl.value = ''; return; }
+    const cuota = i > 0
+      ? monto * i * Math.pow(1 + i, n) / (Math.pow(1 + i, n) - 1)
+      : monto / n;
+    cuotaEl.value = '$' + Math.round(cuota).toLocaleString('es-CL');
+  }
+
   /* ── Calcular comisión parque ─────────────────────────────── */
   function calcularParque() {
     const sel    = document.getElementById('fParque');
     const box    = document.getElementById('parqueCalcBox');
     const selVal = sel.value;
-    // Actualizar Tipo Ubicación automáticamente
     const tipoEl = document.getElementById('fTipoLugar');
     if (tipoEl) tipoEl.value = (!selVal || selVal === 'NO APLICA') ? 'CALLE' : 'PARQUE';
     if (!selVal || selVal === 'NO APLICA') { box.style.display = 'none'; return; }
     const p = parques.find(x => String(x.id) === selVal);
     if (!p) { box.style.display = 'none'; return; }
-    const saldo = parseFloat(document.getElementById('fValorVeh').value||0) - parseFloat(document.getElementById('fPie').value||0);
-    const comPct = parseFloat(p.comision_pct) || 0;
+    const saldo   = parseFloat(document.getElementById('fValorVeh').value||0) - parseFloat(document.getElementById('fPie').value||0);
+    const comPct  = parseFloat(p.comision_pct) || 0;
     const comMonto = Math.round(saldo * comPct);
     document.getElementById('showComParque').textContent = '$' + comMonto.toLocaleString('es-CL');
     document.getElementById('showPctParque').textContent = (comPct*100).toFixed(2) + '%';
@@ -637,52 +716,57 @@
     if (!rut)    { err.textContent = 'El RUT del cliente es requerido.'; err.style.display = 'block'; window.scrollTo(0,0); return; }
     if (!estado) { err.textContent = 'Selecciona el estado del crédito.'; err.style.display = 'block'; window.scrollTo(0,0); return; }
 
-    const selParque = document.getElementById('fParque');
+    const selParque   = document.getElementById('fParque');
     const parqueSelId = selParque.value;
     const parqueNombre = (parqueSelId && parqueSelId !== 'NO APLICA')
       ? (parques.find(x=>String(x.id)===parqueSelId)?.nombre || 'NO APLICA')
       : 'NO APLICA';
 
     const body = {
-      num_op:           parseInt(document.getElementById('fNumOp').value)||null,
-      mes:              mes + '-01',
-      financiera:       'AUTOFIN',
-      rut_cliente:      rut,
-      nombre_cliente:   document.getElementById('fNombre').value.trim(),
-      comentarios:      document.getElementById('fComentarios').value.trim(),
-      ejecutivo:        document.getElementById('fEjecutivo').value.trim(),
-      automotora:       document.getElementById('fAutomotora').value.trim(),
-      rut_concesionario: document.getElementById('fRutAutomotora').value.trim(),
-      nombre_local:     document.getElementById('fTipoLugar').value.trim(),
-      estado_eval:      document.getElementById('fEstadoEval').value,
-      estado_credito:   estado,
-      fecha_otorgado:   document.getElementById('fFechaOtorgado').value || null,
-      producto:         document.getElementById('fProducto').value,
-      valor_vehiculo:   parseFloat(document.getElementById('fValorVeh').value)||null,
-      pie:              parseFloat(document.getElementById('fPie').value)||null,
-      impuesto:         parseFloat(document.getElementById('fImpuesto').value)||null,
-      estado_impuesto:  document.getElementById('fEstadoImpto').value,
-      limitacion:       document.getElementById('fLimitacion').checked ? 1 : 0,
-      gastos:           parseFloat(document.getElementById('fGastos').value)||0,
-      seguro_rdh:       parseFloat(document.getElementById('fSegRdh').value)||0,
-      seguro_cesantia:  parseFloat(document.getElementById('fSegCes').value)||0,
-      seguro_rep_menor: parseFloat(document.getElementById('fSegRep').value)||0,
-      monto_financiado: parseFloat(document.getElementById('fMontoFin').value)||null,
-      plazo:            parseInt(document.getElementById('fPlazo').value)||null,
-      tascli_real:      parseFloat(document.getElementById('fTasCliReal').value)/100||null,
-      tascli_pizarra:   parseFloat(document.getElementById('fTasCliPiz').value)/100||null,
-      tasfin_pizarra:   parseFloat(document.getElementById('fTasFinPiz').value)/100||null,
-      comdea_real:      parseFloat(document.getElementById('fComDea').value)||null,
-      monto_comision_fin: parseFloat(document.getElementById('fMontComFin').value)||null,
-      id_financiera:    document.getElementById('fIdFinanciera').value.trim(),
+      num_op:              parseInt(document.getElementById('fNumOp').value)||null,
+      mes:                 mes + '-01',
+      financiera:          'AUTOFIN',
+      rut_cliente:         rut,
+      nombre_cliente:      document.getElementById('fNombre').value.trim(),
+      comentarios:         document.getElementById('fComentarios').value.trim(),
+      ejecutivo:           document.getElementById('fEjecutivo').value.trim(),
+      automotora:          document.getElementById('fAutomotora').value.trim(),
+      rut_concesionario:   document.getElementById('fRutAutomotora').value.trim(),
+      nombre_local:        document.getElementById('fTipoLugar').value.trim(),
+      estado_eval:         document.getElementById('fEstadoEval').value,
+      estado_credito:      estado,
+      fecha_otorgado:      document.getElementById('fFechaOtorgado').value || null,
+      producto:            document.getElementById('fProducto').value,
+      marca:               document.getElementById('fMarca').value.trim() || null,
+      modelo:              document.getElementById('fModelo').value.trim() || null,
+      anio_vehiculo:       parseInt(document.getElementById('fAnio').value)||null,
+      tasacion:            parsePesos(document.getElementById('fTasacion').value)||null,
+      permiso_circulacion: parsePesos(document.getElementById('fPermisoCir').value)||null,
+      valor_vehiculo:      parseFloat(document.getElementById('fValorVeh').value)||null,
+      pie:                 parseFloat(document.getElementById('fPie').value)||null,
+      impuesto:            parseFloat(document.getElementById('fImpuesto').value)||null,
+      estado_impuesto:     document.getElementById('fEstadoImpto').value,
+      limitacion:          document.getElementById('fLimitacion').checked ? 1 : 0,
+      gastos:              parseFloat(document.getElementById('fGastos').value)||0,
+      seguro_rdh:          parseFloat(document.getElementById('fSegRdh').value)||0,
+      seguro_cesantia:     parseFloat(document.getElementById('fSegCes').value)||0,
+      seguro_rep_menor:    parseFloat(document.getElementById('fSegRep').value)||0,
+      monto_financiado:    parsePesos(document.getElementById('fMontoFin').value)||null,
+      plazo:               parseInt(document.getElementById('fPlazo').value)||null,
+      tascli_real:         parseFloat(document.getElementById('fTasCliReal').value)/100||null,
+      tascli_pizarra:      parseFloat(document.getElementById('fTasCliPiz').value)/100||null,
+      tasfin_pizarra:      parseFloat(document.getElementById('fTasFinPiz').value)/100||null,
+      comdea_real:         parseFloat(document.getElementById('fComDea').value)||null,
+      monto_comision_fin:  parseFloat(document.getElementById('fMontComFin').value)||null,
+      id_financiera:       document.getElementById('fIdFinanciera').value.trim(),
       fecha_primera_cuota: document.getElementById('fFechaCuota').value || null,
-      parque:           parqueNombre,
-      mayor_menor:      document.getElementById('fMayorMenor').value,
-      monto_capitalizado: parseFloat(document.getElementById('fMontoCap').value)||0,
-      boleta_factura:   document.getElementById('fBoleta').value.trim(),
-      cantidad_docs:    parseInt(document.getElementById('fCantDoc').value)||0,
-      docs_autorizados: parseInt(document.getElementById('fDocAuth').value)||0,
-      fecha_recep_doc:  document.getElementById('fFechaDoc').value || null,
+      parque:              parqueNombre,
+      mayor_menor:         document.getElementById('fMayorMenorHidden').value,
+      monto_capitalizado:  parseFloat(document.getElementById('fMontoCap').value)||0,
+      boleta_factura:      document.getElementById('fBoleta').value.trim(),
+      cantidad_docs:       parseInt(document.getElementById('fCantDoc').value)||0,
+      docs_autorizados:    parseInt(document.getElementById('fDocAuth').value)||0,
+      fecha_recep_doc:     document.getElementById('fFechaDoc').value || null,
     };
 
     const btn = document.getElementById('btnGuardar');
@@ -699,7 +783,6 @@
         ok.innerHTML = `<i class="bi bi-check-circle me-2"></i>Operación guardada correctamente. N° Crédito: <strong>${data.data.numero_credito || data.data.num_op || '—'}</strong> (ID: ${data.data.id})`;
         ok.style.display = 'block';
         window.scrollTo(0,0);
-        // limpiar después de 1.5s
         setTimeout(() => { limpiar(); }, 1500);
       } else {
         err.textContent = data.error || 'Error al guardar.';
@@ -729,17 +812,21 @@
     document.getElementById('btnEditNumOp').style.display = '';
     document.getElementById('fMes').value = new Date().toISOString().slice(0,7);
     autoFillNumOp();
-    document.getElementById('fRutAutomotora').value = '';
-    document.getElementById('fTipoLugar').value = 'CALLE';
+    document.getElementById('fRutAutomotora').value     = '';
+    document.getElementById('fTipoLugar').value         = 'CALLE';
     document.getElementById('autocompleteConc').style.display = 'none';
-    document.getElementById('clienteFound').style.background = '';
+    document.getElementById('clienteFound').style.background  = '';
     document.getElementById('clienteFound').style.borderColor = '';
-    document.getElementById('clienteFound').style.color = '';
-    document.getElementById('fSaldo').value = '';
-    document.getElementById('fPctFin').value = '';
-    document.getElementById('clienteFound').style.display = 'none';
+    document.getElementById('clienteFound').style.color       = '';
+    document.getElementById('clienteFound').style.display     = 'none';
+    document.getElementById('fSaldo').value     = '';
+    document.getElementById('fPctFin').value    = '';
+    document.getElementById('fMayorMenor').value       = '';
+    document.getElementById('fMayorMenorHidden').value = '';
+    document.getElementById('fMontoCuota').value       = '';
+    document.getElementById('fUfDia').textContent      = '';
     document.getElementById('parqueCalcBox').style.display = 'none';
-    document.getElementById('alertaOk').style.display = 'none';
+    document.getElementById('alertaOk').style.display  = 'none';
     document.getElementById('alertaErr').style.display = 'none';
   }
 

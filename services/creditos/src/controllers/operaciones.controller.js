@@ -78,6 +78,20 @@ const pool = require('../../../../shared/config/database');
   }
 })();
 
+// Migración v3: datos de vehículo
+(async () => {
+  const cols = [
+    `ALTER TABLE operaciones_brokerage ADD COLUMN marca VARCHAR(100) NULL`,
+    `ALTER TABLE operaciones_brokerage ADD COLUMN modelo VARCHAR(100) NULL`,
+    `ALTER TABLE operaciones_brokerage ADD COLUMN anio_vehiculo SMALLINT NULL`,
+    `ALTER TABLE operaciones_brokerage ADD COLUMN tasacion BIGINT NULL`,
+    `ALTER TABLE operaciones_brokerage ADD COLUMN permiso_circulacion BIGINT NULL`,
+  ];
+  for (const sql of cols) {
+    try { await pool.query(sql); } catch (e) { if (e.errno !== 1060) console.error('[operaciones v3]', e.message); }
+  }
+})();
+
 /* ─── helpers ─────────────────────────────────────────────────────────── */
 function calcular(body) {
   const p = parseFloat(body.valor_vehiculo) || 0;
@@ -184,7 +198,8 @@ const create = async (req, res) => {
       'numero_credito',
       'num_op','mes','financiera','rut_cliente','nombre_cliente','comentarios',
       'ejecutivo','id_ejecutivo','automotora','nombre_local','estado_eval','estado_credito',
-      'fecha_otorgado','producto','valor_vehiculo','pie','saldo_precio','pct_financiado',
+      'fecha_otorgado','producto','marca','modelo','anio_vehiculo','tasacion','permiso_circulacion',
+      'valor_vehiculo','pie','saldo_precio','pct_financiado',
       'impuesto','estado_impuesto','limitacion','gastos','gps',
       'seguro_rdh','seguro_cesantia','seguro_rep_menor',
       'monto_financiado','plazo','tascli_real','tascli_pizarra','tasfin_pizarra',
@@ -229,7 +244,9 @@ const update = async (req, res) => {
     const sets = [
       'num_op=?','mes=?','financiera=?','rut_cliente=?','nombre_cliente=?','comentarios=?',
       'ejecutivo=?','automotora=?','nombre_local=?','estado_eval=?','estado_credito=?',
-      'fecha_otorgado=?','producto=?','valor_vehiculo=?','pie=?',
+      'fecha_otorgado=?','producto=?',
+      'marca=?','modelo=?','anio_vehiculo=?','tasacion=?','permiso_circulacion=?',
+      'valor_vehiculo=?','pie=?',
       'saldo_precio=?','pct_financiado=?','impuesto=?','estado_impuesto=?',
       'limitacion=?','gastos=?','gps=?','seguro_rdh=?','seguro_cesantia=?','seguro_rep_menor=?',
       'monto_financiado=?','plazo=?','tascli_real=?','tascli_pizarra=?','tasfin_pizarra=?',
@@ -242,7 +259,9 @@ const update = async (req, res) => {
     const vals = [
       b.num_op||null, b.mes||null, b.financiera, b.rut_cliente, b.nombre_cliente||null, b.comentarios||null,
       b.ejecutivo||null, b.automotora||null, b.nombre_local||null, b.estado_eval||null, b.estado_credito||null,
-      b.fecha_otorgado||null, b.producto||null, b.valor_vehiculo||null, b.pie||null,
+      b.fecha_otorgado||null, b.producto||null,
+      b.marca||null, b.modelo||null, b.anio_vehiculo||null, b.tasacion||null, b.permiso_circulacion||null,
+      b.valor_vehiculo||null, b.pie||null,
       saldo_precio, pct_financiado, b.impuesto||null, b.estado_impuesto||null,
       b.limitacion ? 1 : 0, b.gastos||0, b.gps||0,
       b.seguro_rdh||0, b.seguro_cesantia||0, b.seguro_rep_menor||0,
