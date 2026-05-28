@@ -42,16 +42,25 @@ async function main() {
   for (const { table_name } of tables) {
     process.stdout.write(`  → ${table_name} ... `);
 
-    // CREATE TABLE
+    // CREATE TABLE — renombrar FKs para que sean únicas en toda la BD (MySQL 8)
     const [[row]] = await conn.query(`SHOW CREATE TABLE \`${table_name}\``);
     const createSql = row['Create Table']
-      .replace(/AUTO_INCREMENT=\d+/g, '')  // quitar auto_increment offset
-      .replace(/\n/g, '\n');
+      .replace(/AUTO_INCREMENT=\d+/g, '')
+      .replace(/CONSTRAINT `([^`]+)` FOREIGN KEY/g,
+        (_, fkName) => `CONSTRAINT \`${table_name}_${fkName}\` FOREIGN KEY`);
 
     lines.push(`-- ─── ${table_name} ───────────────────────────────`);
     lines.push(`DROP TABLE IF EXISTS \`${table_name}\`;`);
     lines.push(createSql + ';');
     lines.push('');
+
+    // Detectar columnas JSON
+    const [colInfo] = await conn.query(
+      `SELECT COLUMN_NAME FROM information_schema.COLUMNS
+       WHERE TABLE_SCHEMA=? AND TABLE_NAME=? AND DATA_TYPE='json'`,
+      [process.env.DB_NAME, table_name]
+    );
+    const jsonCols = new Set(colInfo.map(c => c.COLUMN_NAME));
 
     // Datos
     const [rows] = await conn.query(`SELECT * FROM \`${table_name}\``);
@@ -60,21 +69,28 @@ async function main() {
       continue;
     }
 
-    // INSERT en lotes de 500
-    const cols = Object.keys(rows[0]).map(c => `\`${c}\``).join(', ');
-    const chunks = [];
+    const colNames = Object.keys(rows[0]);
+    const colsSql  = colNames.map(c => `\`${c}\``).join(', ');
+    const chunks   = [];
     for (let i = 0; i < rows.length; i += 500) chunks.push(rows.slice(i, i + 500));
 
     for (const chunk of chunks) {
       const vals = chunk.map(r =>
-        '(' + Object.values(r).map(v => {
-          if (v === null) return 'NULL';
+        '(' + colNames.map(col => {
+          const v = r[col];
+          if (v === null || v === undefined) return 'NULL';
           if (typeof v === 'number') return v;
           if (v instanceof Date) return `'${v.toISOString().slice(0, 19).replace('T', ' ')}'`;
-          return `'${String(v).replace(/\\/g, '\\\\').replace(/'/g, "\\'").replace(/\n/g, '\\n').replace(/\r/g, '\\r')}'`;
+          const str = String(v);
+          // Columna JSON: validar; si no es JSON válido → NULL
+          if (jsonCols.has(col)) {
+            try { JSON.parse(str); return conn.escape(str); }
+            catch(e) { return 'NULL'; }
+          }
+          return conn.escape(str);
         }).join(', ') + ')'
       ).join(',\n');
-      lines.push(`INSERT INTO \`${table_name}\` (${cols}) VALUES`);
+      lines.push(`INSERT INTO \`${table_name}\` (${colsSql}) VALUES`);
       lines.push(vals + ';');
       lines.push('');
     }
