@@ -1,0 +1,547 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <link rel="icon" href="/img/favicon.png" type="image/png">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Tesorería Brokerage — AutoFácil</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.0/font/bootstrap-icons.css" rel="stylesheet">
+  <style>
+    :root { --navy:#0141A2; --navy-dark:#012d70; --navy-light:#0255c5; --accent:#009AFE; --bg:#f0f4f8; }
+    body { background:var(--bg); font-family:'Segoe UI',system-ui,sans-serif; margin:0; min-height:100vh; }
+    .topnav { background:linear-gradient(90deg,var(--navy-dark),var(--navy-light)); color:#fff; height:60px; padding:0 24px; display:flex; align-items:center; justify-content:space-between; position:sticky; top:0; z-index:200; box-shadow:0 2px 8px rgba(0,0,0,.3); }
+    .topnav-left { display:flex; align-items:center; gap:16px; }
+    .topnav-brand { display:flex; align-items:center; gap:8px; text-decoration:none; }
+    .topnav-brand img { height:32px; filter:brightness(0) invert(1); }
+    .version-badge { background:rgba(255,255,255,.15); color:rgba(255,255,255,.75); font-size:.65rem; font-weight:700; border-radius:6px; padding:2px 8px; }
+    .breadcrumb-nav { color:rgba(255,255,255,.6); font-size:.85rem; display:flex; align-items:center; gap:6px; }
+    .breadcrumb-nav a { color:rgba(255,255,255,.75); text-decoration:none; }
+    .breadcrumb-nav .sep { color:rgba(255,255,255,.35); }
+    .topnav-right { display:flex; align-items:center; gap:10px; }
+    .user-chip { background:rgba(255,255,255,.12); border-radius:24px; padding:5px 12px; display:flex; align-items:center; gap:8px; font-size:.85rem; }
+    .avatar { width:28px; height:28px; background:#90caf9; border-radius:50%; display:flex; align-items:center; justify-content:center; color:var(--navy); font-weight:700; font-size:.75rem; }
+    .perfil-badge { background:rgba(144,202,249,.2); border:1px solid rgba(144,202,249,.4); color:#90caf9; border-radius:12px; padding:2px 10px; font-size:.73rem; font-weight:600; }
+    .btn-logout { background:rgba(255,255,255,.1); border:1px solid rgba(255,255,255,.2); color:#fff; border-radius:8px; padding:5px 12px; font-size:.82rem; cursor:pointer; }
+    .page-content { padding:28px 40px; max-width:1300px; margin:0 auto; }
+    /* Tabs */
+    .tabs { display:flex; gap:4px; margin-bottom:24px; background:#fff; border-radius:12px; padding:6px; box-shadow:0 1px 4px rgba(0,0,0,.06); }
+    .tab-btn { flex:1; border:none; background:transparent; border-radius:8px; padding:10px; font-size:.87rem; font-weight:600; color:#6b7280; cursor:pointer; transition:all .18s; }
+    .tab-btn.active { background:var(--navy); color:#fff; }
+    .tab-btn:hover:not(.active) { background:#f0f4f8; }
+    /* Filtros */
+    .filters { background:#fff; border-radius:12px; padding:16px 20px; margin-bottom:20px; display:flex; gap:14px; flex-wrap:wrap; align-items:flex-end; box-shadow:0 1px 4px rgba(0,0,0,.06); }
+    .f-group { display:flex; flex-direction:column; gap:4px; }
+    .f-group label { font-size:.73rem; font-weight:700; color:#374151; text-transform:uppercase; }
+    .f-group input, .f-group select { border:1.5px solid #d1d5db; border-radius:8px; padding:7px 11px; font-size:.85rem; outline:none; min-width:140px; }
+    .f-group input:focus, .f-group select:focus { border-color:var(--navy); }
+    .btn-filter { background:var(--navy); color:#fff; border:none; border-radius:8px; padding:8px 18px; font-size:.85rem; font-weight:700; cursor:pointer; height:36px; align-self:flex-end; }
+    /* Tabla */
+    .table-wrap { background:#fff; border-radius:14px; box-shadow:0 1px 5px rgba(0,0,0,.07); overflow:hidden; }
+    .t-head { background:#f8fafc; padding:12px 20px; border-bottom:1px solid #e5e7eb; display:grid; grid-template-columns:60px 110px 1fr 120px 100px 100px 110px 160px; gap:10px; font-size:.75rem; font-weight:700; color:#374151; text-transform:uppercase; }
+    .t-row { padding:14px 20px; border-bottom:1px solid #f1f5f9; display:grid; grid-template-columns:60px 110px 1fr 120px 100px 100px 110px 160px; gap:10px; align-items:center; font-size:.84rem; color:#111827; transition:background .12s; }
+    .t-row:hover { background:#f0f9ff; }
+    .t-row:last-child { border-bottom:none; }
+    .badge { display:inline-block; padding:3px 9px; border-radius:12px; font-size:.73rem; font-weight:700; }
+    .badge-PENDIENTE   { background:#fef9c3; color:#92400e; }
+    .badge-LIBERADO    { background:#dbeafe; color:#1e40af; }
+    .badge-PROGRAMADO  { background:#e0e7ff; color:#3730a3; }
+    .badge-PAGADO      { background:#d1fae5; color:#065f46; }
+    .badge-NO-OT       { background:#fee2e2; color:#991b1b; }
+    .cell-cliente { overflow:hidden; }
+    .cell-cliente .nombre { font-weight:600; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+    .cell-cliente .rut { font-size:.75rem; color:#6b7280; }
+    .cell-monto { font-weight:700; color:var(--navy); font-size:.88rem; }
+    .btn-row { background:var(--navy); color:#fff; border:none; border-radius:6px; padding:5px 12px; font-size:.78rem; font-weight:600; cursor:pointer; display:flex; align-items:center; gap:4px; }
+    .btn-row:hover { background:var(--navy-light); }
+    .empty-state { padding:48px; text-align:center; color:#9ca3af; }
+    .empty-state i { font-size:2.5rem; display:block; margin-bottom:12px; }
+    /* Resumen stats */
+    .stats-row { display:grid; grid-template-columns:repeat(4,1fr); gap:16px; margin-bottom:24px; }
+    .stat-card { background:#fff; border-radius:12px; padding:16px 20px; box-shadow:0 1px 4px rgba(0,0,0,.06); }
+    .stat-card .stat-label { font-size:.75rem; font-weight:700; color:#6b7280; text-transform:uppercase; letter-spacing:.5px; margin-bottom:6px; }
+    .stat-card .stat-value { font-size:1.4rem; font-weight:800; color:var(--navy); }
+    .stat-card .stat-sub { font-size:.75rem; color:#9ca3af; margin-top:2px; }
+    @media(max-width:900px){ .t-head,.t-row{grid-template-columns:60px 1fr 100px 120px;} }
+    @media(max-width:640px){ .page-content{padding:16px;} .stats-row{grid-template-columns:repeat(2,1fr);} }
+  </style>
+</head>
+<body>
+<nav class="topnav">
+  <div class="topnav-left">
+    <a href="/" class="topnav-brand">
+      <img src="/img/logo.png" alt="AutoFácil">
+      <span class="version-badge">v1.0</span>
+    </a>
+    <div class="breadcrumb-nav">
+      <a href="/">Inicio</a><span class="sep">›</span>
+      <a href="/tesoreria">Tesorería</a><span class="sep">›</span>
+      <span style="color:#fff;font-weight:600">Brokerage</span>
+    </div>
+  </div>
+  <div class="topnav-right">
+    <a href="/dashboard" title="Dashboard" style="display:flex;align-items:center;gap:5px;color:rgba(255,255,255,0.85);text-decoration:none;font-size:12px;font-weight:500;padding:5px 10px;border:1px solid rgba(255,255,255,0.25);border-radius:6px">
+      <i class="bi bi-bar-chart-line" style="font-size:15px"></i> Dashboard
+    </a>
+    <div class="user-chip">
+      <div class="avatar" id="avatarInicial">?</div>
+      <div>
+        <div style="font-weight:600;line-height:1.3;color:#fff" id="navNombre">—</div>
+        <div class="perfil-badge" id="navPerfil">—</div>
+      </div>
+    </div>
+    <button class="btn-logout" onclick="logout()"><i class="bi bi-box-arrow-right me-1"></i>Salir</button>
+  </div>
+</nav>
+
+<div class="page-content">
+  <!-- Banner -->
+  <div style="background:linear-gradient(135deg,#012d70,#0141A2 55%,#009AFE);border-radius:16px;color:#fff;padding:24px 32px;margin-bottom:28px;display:flex;align-items:center;gap:18px">
+    <i class="bi bi-safe2" style="font-size:2.6rem;opacity:.8"></i>
+    <div>
+      <h2 style="font-weight:800;margin:0 0 4px;font-size:1.3rem">Tesorería — Brokerage</h2>
+      <p style="opacity:.8;margin:0;font-size:.88rem">Gestión de facturas dealers, liberación de pagos y registro de transferencias</p>
+    </div>
+  </div>
+
+  <!-- Stats -->
+  <div class="stats-row">
+    <div class="stat-card"><div class="stat-label">Pendientes Pago</div><div class="stat-value" id="statPendientes">—</div><div class="stat-sub">Ops liberadas sin pagar</div></div>
+    <div class="stat-card"><div class="stat-label">Pagadas este mes</div><div class="stat-value" id="statPagadas">—</div><div class="stat-sub">Transferencias registradas</div></div>
+    <div class="stat-card"><div class="stat-label">Monto Pendiente</div><div class="stat-value" id="statMontoPend">—</div><div class="stat-sub">Saldo precio por pagar</div></div>
+    <div class="stat-card"><div class="stat-label">Monto Pagado</div><div class="stat-value" id="statMontoPag">—</div><div class="stat-sub">Transferido este mes</div></div>
+  </div>
+
+  <!-- Tabs -->
+  <div class="tabs">
+    <button class="tab-btn active" id="tabPend" onclick="cambiarTab('pendiente')"><i class="bi bi-clock-fill me-2"></i>Por Pagar</button>
+    <button class="tab-btn" id="tabPag"  onclick="cambiarTab('pagado')"><i class="bi bi-check2-circle me-2"></i>Pagados</button>
+    <button class="tab-btn" id="tabLib"  onclick="cambiarTab('liberar')"><i class="bi bi-send-fill me-2"></i>Listos para Liberar</button>
+    <button class="tab-btn" id="tabAll"  onclick="cambiarTab('')"><i class="bi bi-list-ul me-2"></i>Todas las Ops</button>
+  </div>
+
+  <!-- Filtros -->
+  <div class="filters">
+    <div class="f-group">
+      <label>Mes</label>
+      <input type="month" id="fMes" value="">
+    </div>
+    <div class="f-group">
+      <label>Financiera</label>
+      <select id="fFinanciera">
+        <option value="">Todas</option>
+        <option>AUTOFIN</option>
+        <option>UNIDAD DE CREDITO</option>
+      </select>
+    </div>
+    <button class="btn-filter" onclick="cargar()"><i class="bi bi-search me-1"></i>Buscar</button>
+    <div style="margin-left:auto;font-size:.82rem;color:#6b7280;align-self:center" id="totalLabel"></div>
+  </div>
+
+  <!-- Tabla -->
+  <div class="table-wrap" id="tablaWrap">
+    <div class="t-head">
+      <div>N° Op</div><div>Mes</div><div>Cliente / Automotora</div>
+      <div>Saldo Precio</div><div>Financiera</div><div>Estado</div>
+      <div>Fundantes</div><div>Acciones</div>
+    </div>
+    <div id="tablaBody"><div class="empty-state"><i class="bi bi-search"></i>Selecciona un filtro y busca</div></div>
+  </div>
+</div>
+
+<!-- Modal Detalle Operación -->
+<div id="modalDetalle" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:1000;overflow-y:auto">
+  <div style="max-width:700px;margin:40px auto;background:#fff;border-radius:16px;padding:32px;box-shadow:0 20px 60px rgba(0,0,0,.3)">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:20px">
+      <h5 style="font-weight:700;color:var(--navy);margin:0" id="modalOpTitulo">—</h5>
+      <button onclick="cerrarModal()" style="background:#f1f5f9;border:none;border-radius:8px;padding:6px 12px;cursor:pointer;font-size:.9rem"><i class="bi bi-x-lg"></i></button>
+    </div>
+    <div id="modalOpMeta" style="background:#f8fafc;border-radius:10px;padding:14px 18px;margin-bottom:20px;font-size:.85rem;display:grid;grid-template-columns:1fr 1fr;gap:8px"></div>
+
+    <!-- Fundantes (solo lectura en modal) -->
+    <div style="margin-bottom:20px">
+      <div style="font-weight:700;font-size:.83rem;color:#374151;text-transform:uppercase;letter-spacing:.5px;margin-bottom:10px">Fundantes</div>
+      <div id="modalFundantes" style="font-size:.84rem;color:#6b7280"></div>
+    </div>
+
+    <!-- Facturas -->
+    <div style="margin-bottom:20px">
+      <div style="font-weight:700;font-size:.83rem;color:#374151;text-transform:uppercase;letter-spacing:.5px;margin-bottom:10px;display:flex;align-items:center;justify-content:space-between">
+        Facturas del Dealer
+        <button onclick="mostrarFormFactura()" id="btnAddFact" style="background:var(--navy);color:#fff;border:none;border-radius:6px;padding:5px 12px;font-size:.78rem;cursor:pointer"><i class="bi bi-plus-lg me-1"></i>Registrar Factura</button>
+      </div>
+      <div id="modalFacturas"></div>
+      <!-- Form factura -->
+      <div id="formFactura" style="display:none;background:#f0f9ff;border:1px solid #bfdbfe;border-radius:10px;padding:16px;margin-top:10px">
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:12px">
+          <div class="f-group"><label>N° Factura</label><input id="fFactNum" placeholder="Ej: 001234"></div>
+          <div class="f-group"><label>RUT Emisor</label><input id="fFactRut" placeholder="Ej: 76.123.456-7"></div>
+          <div class="f-group"><label>Nombre Emisor</label><input id="fFactNombre" placeholder="Nombre del dealer"></div>
+          <div class="f-group"><label>Monto $</label><input id="fFactMonto" type="number" placeholder="0"></div>
+          <div class="f-group"><label>Fecha Factura</label><input id="fFactFecha" type="date"></div>
+          <div class="f-group"><label>Observaciones</label><input id="fFactObs" placeholder="Opcional"></div>
+        </div>
+        <div style="margin-bottom:12px">
+          <label style="font-size:.75rem;font-weight:700;color:#374151;text-transform:uppercase;display:block;margin-bottom:4px">Adjuntar Factura</label>
+          <input type="file" id="fFactFile" accept=".pdf,.jpg,.jpeg,.png" style="font-size:.83rem">
+        </div>
+        <div style="display:flex;gap:8px;justify-content:flex-end">
+          <button onclick="document.getElementById('formFactura').style.display='none'" style="background:#f1f5f9;color:#374151;border:none;border-radius:8px;padding:7px 14px;font-size:.83rem;cursor:pointer">Cancelar</button>
+          <button onclick="guardarFactura()" style="background:var(--navy);color:#fff;border:none;border-radius:8px;padding:7px 16px;font-size:.83rem;font-weight:700;cursor:pointer" id="btnGuardFact"><i class="bi bi-floppy-fill me-1"></i>Guardar</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Pagos -->
+    <div>
+      <div style="font-weight:700;font-size:.83rem;color:#374151;text-transform:uppercase;letter-spacing:.5px;margin-bottom:10px;display:flex;align-items:center;justify-content:space-between">
+        Pagos / Transferencias
+        <button onclick="mostrarFormPago()" id="btnAddPago" style="background:#065f46;color:#fff;border:none;border-radius:6px;padding:5px 12px;font-size:.78rem;cursor:pointer"><i class="bi bi-plus-lg me-1"></i>Registrar Pago</button>
+      </div>
+      <div id="modalPagos"></div>
+      <!-- Form pago -->
+      <div id="formPago" style="display:none;background:#f0fdf4;border:1px solid #86efac;border-radius:10px;padding:16px;margin-top:10px">
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:12px">
+          <div class="f-group"><label>Tipo Pago</label>
+            <select id="fPagoTipo">
+              <option value="SALDO_PRECIO">Saldo Precio</option>
+              <option value="COMISION">Comisión</option>
+              <option value="OTRO">Otro</option>
+            </select>
+          </div>
+          <div class="f-group"><label>Monto $ *</label><input id="fPagoMonto" type="number" placeholder="0"></div>
+          <div class="f-group"><label>Banco</label><input id="fPagoBanco" placeholder="Ej: Banco de Chile"></div>
+          <div class="f-group"><label>Cuenta Destino</label><input id="fPagoCuenta" placeholder="N° cuenta bancaria"></div>
+          <div class="f-group"><label>N° Transacción</label><input id="fPagoTrans" placeholder="Comprobante transferencia"></div>
+          <div class="f-group"><label>Fecha Pago</label><input id="fPagoFecha" type="date"></div>
+        </div>
+        <div class="f-group" style="margin-bottom:12px"><label>Observaciones</label><input id="fPagoObs" placeholder="Opcional"></div>
+        <div style="display:flex;gap:8px;justify-content:flex-end">
+          <button onclick="document.getElementById('formPago').style.display='none'" style="background:#f1f5f9;color:#374151;border:none;border-radius:8px;padding:7px 14px;font-size:.83rem;cursor:pointer">Cancelar</button>
+          <button onclick="guardarPago()" style="background:#065f46;color:#fff;border:none;border-radius:8px;padding:7px 16px;font-size:.83rem;font-weight:700;cursor:pointer" id="btnGuardPago"><i class="bi bi-floppy-fill me-1"></i>Guardar Pago</button>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+  const token = localStorage.getItem('token');
+  const yo    = JSON.parse(localStorage.getItem('usuario') || 'null');
+  if (!token || !yo) window.location.href = '/login.html';
+  document.getElementById('navNombre').textContent = `${yo?.nombre||''} ${yo?.apellido||''}`.trim();
+  document.getElementById('navPerfil').textContent  = yo?.perfil || '';
+  document.getElementById('avatarInicial').textContent = (yo?.nombre||'?').charAt(0).toUpperCase();
+  function logout(){ localStorage.clear(); window.location.href='/login.html'; }
+
+  // Mes actual por defecto
+  document.getElementById('fMes').value = new Date().toISOString().slice(0,7);
+
+  let tabActivo = 'pendiente';
+  let opActual = null;
+
+  function cambiarTab(tab) {
+    tabActivo = tab;
+    ['tabPend','tabPag','tabLib','tabAll'].forEach(id => document.getElementById(id).classList.remove('active'));
+    const map = { pendiente:'tabPend', pagado:'tabPag', liberar:'tabLib', '':'tabAll' };
+    if (map[tab]) document.getElementById(map[tab]).classList.add('active');
+    cargar();
+  }
+
+  async function cargar() {
+    const mes = document.getElementById('fMes').value;
+    const fin = document.getElementById('fFinanciera').value;
+    let url = `/api/brokerage/operaciones?limit=200`;
+    if (mes) url += `&mes=${mes}`;
+    if (fin) url += `&financiera=${encodeURIComponent(fin)}`;
+    if (tabActivo) url += `&estado_pago=${tabActivo}`;
+
+    document.getElementById('tablaBody').innerHTML = '<div class="empty-state"><span class="spinner-border spinner-border-sm me-2"></span>Cargando…</div>';
+    try {
+      const r = await fetch(url, { headers:{Authorization:'Bearer '+token} });
+      const j = await r.json();
+      const rows = j.data || [];
+      document.getElementById('totalLabel').textContent = `${rows.length} operación${rows.length!==1?'es':''}`;
+      actualizarStats(rows);
+      renderTabla(rows);
+    } catch(e) {
+      document.getElementById('tablaBody').innerHTML = '<div class="empty-state"><i class="bi bi-x-circle"></i>Error al cargar</div>';
+    }
+  }
+
+  function actualizarStats(rows) {
+    const pendientes = rows.filter(r => r.liberado_pago && r.estado_pago !== 'PAGADO');
+    const pagados    = rows.filter(r => r.estado_pago === 'PAGADO');
+    const montoPend  = pendientes.reduce((s,r) => s + (parseFloat(r.saldo_precio)||0), 0);
+    const montoPag   = pagados.reduce((s,r) => s + (parseFloat(r.monto_pagado)||0), 0);
+    document.getElementById('statPendientes').textContent = pendientes.length;
+    document.getElementById('statPagadas').textContent = pagados.length;
+    document.getElementById('statMontoPend').textContent = montoPend > 0 ? '$' + Math.round(montoPend).toLocaleString('es-CL') : '$0';
+    document.getElementById('statMontoPag').textContent  = montoPag  > 0 ? '$' + Math.round(montoPag).toLocaleString('es-CL')  : '$0';
+  }
+
+  function renderTabla(rows) {
+    if (!rows.length) {
+      document.getElementById('tablaBody').innerHTML = '<div class="empty-state"><i class="bi bi-inbox"></i>No hay operaciones para mostrar</div>';
+      return;
+    }
+    document.getElementById('tablaBody').innerHTML = rows.map(op => {
+      const mes = op.mes ? op.mes.slice(0,7) : '—';
+      const saldo = op.saldo_precio ? '$'+Number(op.saldo_precio).toLocaleString('es-CL') : '—';
+      const ef = op.estado_fundantes || 'PENDIENTE';
+      const ep = op.estado_pago || (op.liberado_pago ? 'LIBERADO' : 'PENDIENTE');
+      const badgePago = op.estado_pago === 'PAGADO'
+        ? '<span class="badge badge-PAGADO">PAGADO</span>'
+        : op.liberado_pago
+          ? '<span class="badge badge-LIBERADO">LIBERADO</span>'
+          : '<span class="badge badge-PENDIENTE">PENDIENTE</span>';
+      const badgeFund = `<span class="badge badge-${ef}" style="font-size:.68rem">${ef}</span>`;
+      return `<div class="t-row">
+        <div style="font-weight:700;color:var(--navy)">${op.numero_credito||op.num_op||op.id}</div>
+        <div style="color:#374151">${mes}</div>
+        <div class="cell-cliente">
+          <div class="nombre">${escHtml(op.nombre_cliente||op.rut_cliente||'—')}</div>
+          <div class="rut">${op.automotora||op.financiera||''}</div>
+        </div>
+        <div class="cell-monto">${saldo}</div>
+        <div style="font-size:.78rem">${op.financiera||'—'}</div>
+        <div>${badgePago}</div>
+        <div>${badgeFund}</div>
+        <div style="display:flex;gap:6px;flex-wrap:wrap">
+          <button class="btn-row" onclick="abrirDetalle(${op.id})"><i class="bi bi-eye-fill me-1"></i>Detalle</button>
+        </div>
+      </div>`;
+    }).join('');
+  }
+
+  async function abrirDetalle(id) {
+    opActual = null;
+    document.getElementById('modalOpTitulo').textContent = 'Cargando…';
+    document.getElementById('modalDetalle').style.display = 'block';
+    document.getElementById('formFactura').style.display = 'none';
+    document.getElementById('formPago').style.display = 'none';
+
+    try {
+      const r = await fetch(`/api/brokerage/operaciones/${id}`, { headers:{Authorization:'Bearer '+token} });
+      const j = await r.json();
+      if (!j.success) { alert(j.error||'Error'); cerrarModal(); return; }
+      opActual = j.data;
+      renderModalDetalle(j.data);
+    } catch(e) { alert('Error de conexión'); cerrarModal(); }
+  }
+
+  function renderModalDetalle(d) {
+    const op = d.operacion;
+    document.getElementById('modalOpTitulo').textContent =
+      `Op. #${op.numero_credito||op.num_op||op.id} — ${op.nombre_cliente||op.rut_cliente}`;
+
+    const meta = [
+      ['Financiera', op.financiera],
+      ['Mes', op.mes ? op.mes.slice(0,7) : '—'],
+      ['RUT Cliente', op.rut_cliente||'—'],
+      ['Saldo Precio', op.saldo_precio ? '$'+Number(op.saldo_precio).toLocaleString('es-CL') : '—'],
+      ['Automotora', op.automotora||'—'],
+      ['Plazo', op.plazo ? op.plazo+' meses' : '—'],
+      ['Estado Crédito', op.estado_credito||'—'],
+      ['Liberado Pago', op.liberado_pago ? `✓ Sí (${op.liberado_por||'—'})` : '✗ No'],
+      ['Estado Pago', op.estado_pago||'—'],
+      ['N° Transacción', op.num_transaccion||'—'],
+    ];
+    document.getElementById('modalOpMeta').innerHTML = meta.map(([k,v])=>
+      `<div><span style="font-weight:700;color:#374151;font-size:.78rem">${k}:</span> <span style="color:#111;font-size:.85rem">${escHtml(v||'—')}</span></div>`
+    ).join('');
+
+    // Fundantes
+    if (d.fundantes && d.fundantes.length) {
+      document.getElementById('modalFundantes').innerHTML = d.fundantes.map(f =>
+        `<div style="display:flex;align-items:center;gap:8px;padding:6px 0;border-bottom:1px solid #f1f5f9">
+          <span style="font-size:.8rem;flex:1">${escHtml(f.nombre_documento)}</span>
+          <span class="badge badge-${f.estado}" style="font-size:.68rem">${f.estado}</span>
+          ${f.archivo_nombre ? `<a href="/api/fundantes/${f.id}/download" target="_blank" style="color:var(--navy);font-size:.75rem"><i class="bi bi-download"></i></a>` : ''}
+        </div>`
+      ).join('');
+    } else {
+      document.getElementById('modalFundantes').innerHTML = '<span style="color:#9ca3af;font-size:.83rem">Sin fundantes cargados</span>';
+    }
+
+    // Facturas
+    renderFacturas(d.facturas || []);
+    // Pagos
+    renderPagos(d.pagos || []);
+  }
+
+  function renderFacturas(facturas) {
+    const el = document.getElementById('modalFacturas');
+    if (!facturas.length) { el.innerHTML = '<span style="color:#9ca3af;font-size:.83rem">Sin facturas registradas</span>'; return; }
+    el.innerHTML = facturas.map(f =>
+      `<div style="background:#f8fafc;border-radius:8px;padding:10px 14px;margin-bottom:8px;display:flex;gap:10px;align-items:center">
+        <i class="bi bi-receipt" style="color:var(--navy);font-size:1.1rem"></i>
+        <div style="flex:1;font-size:.83rem">
+          <strong>N° ${escHtml(f.numero_factura||'—')}</strong> · ${escHtml(f.nombre_emisor||f.rut_emisor||'—')}
+          · ${f.monto ? '$'+Number(f.monto).toLocaleString('es-CL') : '—'}
+          · ${f.fecha_factura ? new Date(f.fecha_factura).toLocaleDateString('es-CL') : '—'}
+        </div>
+        ${f.archivo_nombre ? `<a href="/api/brokerage/facturas/${f.id}/download" target="_blank" style="color:var(--navy);font-size:.8rem"><i class="bi bi-download"></i></a>` : ''}
+        <button onclick="eliminarFactura(${f.id})" style="background:#fef2f2;color:#dc2626;border:none;border-radius:6px;padding:3px 7px;font-size:.75rem;cursor:pointer"><i class="bi bi-trash3"></i></button>
+      </div>`
+    ).join('');
+  }
+
+  function renderPagos(pagos) {
+    const el = document.getElementById('modalPagos');
+    if (!pagos.length) { el.innerHTML = '<span style="color:#9ca3af;font-size:.83rem">Sin pagos registrados</span>'; return; }
+    el.innerHTML = pagos.map(p =>
+      `<div style="background:#f0fdf4;border:1px solid #a7f3d0;border-radius:8px;padding:10px 14px;margin-bottom:8px;font-size:.83rem">
+        <div style="display:flex;gap:10px;align-items:center">
+          <i class="bi bi-bank" style="color:#065f46;font-size:1.1rem"></i>
+          <div style="flex:1">
+            <strong>${p.tipo_pago||'SALDO_PRECIO'}</strong>
+            · ${p.monto ? '$'+Number(p.monto).toLocaleString('es-CL') : '—'}
+            · ${p.banco||'—'}
+            <span class="badge badge-${p.estado}" style="font-size:.68rem;margin-left:4px">${p.estado}</span>
+          </div>
+          <button onclick="eliminarPago(${p.id})" style="background:#fef2f2;color:#dc2626;border:none;border-radius:6px;padding:3px 7px;font-size:.75rem;cursor:pointer"><i class="bi bi-trash3"></i></button>
+        </div>
+        ${p.num_transaccion ? `<div style="margin-top:4px;color:#065f46;font-size:.78rem"><i class="bi bi-hash me-1"></i>Transacción: <strong>${p.num_transaccion}</strong> · ${p.fecha_pago||'—'}</div>` : ''}
+        ${!p.num_transaccion ? `<div style="margin-top:6px"><button onclick="modalTransferencia(${p.id})" style="background:#dbeafe;color:#1e40af;border:none;border-radius:6px;padding:4px 10px;font-size:.75rem;cursor:pointer"><i class="bi bi-send me-1"></i>Registrar N° Transacción</button></div>` : ''}
+      </div>`
+    ).join('');
+  }
+
+  function mostrarFormFactura() {
+    document.getElementById('formFactura').style.display = '';
+    document.getElementById('formFactura').scrollIntoView({ behavior:'smooth' });
+  }
+  function mostrarFormPago() {
+    document.getElementById('formPago').style.display = '';
+    document.getElementById('fPagoFecha').value = new Date().toISOString().split('T')[0];
+    document.getElementById('formPago').scrollIntoView({ behavior:'smooth' });
+  }
+
+  async function guardarFactura() {
+    if (!opActual) return;
+    const monto = document.getElementById('fFactMonto').value;
+    const btn = document.getElementById('btnGuardFact');
+    btn.disabled = true; btn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span>Guardando…';
+    try {
+      let b64=null, mime=null, nombre=null;
+      const file = document.getElementById('fFactFile').files[0];
+      if (file) { b64 = await fileToBase64(file); mime=file.type; nombre=file.name; }
+      const r = await fetch('/api/brokerage/facturas', {
+        method:'POST',
+        headers:{'Content-Type':'application/json', Authorization:'Bearer '+token},
+        body: JSON.stringify({
+          operacion_id: opActual.operacion.id,
+          numero_factura: document.getElementById('fFactNum').value.trim(),
+          rut_emisor: document.getElementById('fFactRut').value.trim(),
+          nombre_emisor: document.getElementById('fFactNombre').value.trim(),
+          monto: parseFloat(monto)||null,
+          fecha_factura: document.getElementById('fFactFecha').value||null,
+          observaciones: document.getElementById('fFactObs').value.trim(),
+          archivo_nombre: nombre, mime_type: mime, archivo_data: b64
+        })
+      });
+      const j = await r.json();
+      if (j.success) {
+        document.getElementById('formFactura').style.display='none';
+        ['fFactNum','fFactRut','fFactNombre','fFactMonto','fFactFecha','fFactObs'].forEach(id=>document.getElementById(id).value='');
+        document.getElementById('fFactFile').value='';
+        // Recargar detalle
+        await recargarDetalle(opActual.operacion.id);
+      } else { alert(j.error||'Error al guardar factura'); }
+    } catch(e) { alert('Error de conexión'); }
+    finally { btn.disabled=false; btn.innerHTML='<i class="bi bi-floppy-fill me-1"></i>Guardar'; }
+  }
+
+  async function guardarPago() {
+    if (!opActual) return;
+    const monto = document.getElementById('fPagoMonto').value;
+    if (!monto) { alert('El monto es requerido'); return; }
+    const btn = document.getElementById('btnGuardPago');
+    btn.disabled=true; btn.innerHTML='<span class="spinner-border spinner-border-sm me-1"></span>Guardando…';
+    try {
+      const r = await fetch('/api/brokerage/pagos', {
+        method:'POST',
+        headers:{'Content-Type':'application/json', Authorization:'Bearer '+token},
+        body: JSON.stringify({
+          operacion_id: opActual.operacion.id,
+          tipo_pago: document.getElementById('fPagoTipo').value,
+          monto: parseFloat(monto),
+          banco: document.getElementById('fPagoBanco').value.trim(),
+          cuenta_destino: document.getElementById('fPagoCuenta').value.trim(),
+          num_transaccion: document.getElementById('fPagoTrans').value.trim()||null,
+          fecha_pago: document.getElementById('fPagoFecha').value||null,
+          observaciones: document.getElementById('fPagoObs').value.trim()
+        })
+      });
+      const j = await r.json();
+      if (j.success) {
+        document.getElementById('formPago').style.display='none';
+        ['fPagoMonto','fPagoBanco','fPagoCuenta','fPagoTrans','fPagoFecha','fPagoObs'].forEach(id=>document.getElementById(id).value='');
+        await recargarDetalle(opActual.operacion.id);
+        cargar(); // actualizar tabla
+      } else { alert(j.error||'Error al guardar pago'); }
+    } catch(e) { alert('Error de conexión'); }
+    finally { btn.disabled=false; btn.innerHTML='<i class="bi bi-floppy-fill me-1"></i>Guardar Pago'; }
+  }
+
+  async function eliminarFactura(id) {
+    if (!confirm('¿Eliminar esta factura?')) return;
+    await fetch(`/api/brokerage/facturas/${id}`, { method:'DELETE', headers:{Authorization:'Bearer '+token} });
+    if (opActual) await recargarDetalle(opActual.operacion.id);
+  }
+
+  async function eliminarPago(id) {
+    if (!confirm('¿Eliminar este pago?')) return;
+    await fetch(`/api/brokerage/pagos/${id}`, { method:'DELETE', headers:{Authorization:'Bearer '+token} });
+    if (opActual) await recargarDetalle(opActual.operacion.id);
+  }
+
+  let transId = null;
+  function modalTransferencia(id) {
+    transId = id;
+    const num = prompt('Ingresa el N° de transacción bancaria:');
+    if (!num) return;
+    const fecha = prompt('Fecha del pago (YYYY-MM-DD):', new Date().toISOString().split('T')[0]);
+    registrarTransferencia(id, num, fecha);
+  }
+
+  async function registrarTransferencia(id, num, fecha) {
+    try {
+      const r = await fetch(`/api/brokerage/pagos/${id}/transferencia`, {
+        method:'PUT',
+        headers:{'Content-Type':'application/json', Authorization:'Bearer '+token},
+        body: JSON.stringify({ num_transaccion: num, fecha_pago: fecha||null })
+      });
+      const j = await r.json();
+      if (j.success) {
+        alert('¡Transferencia registrada correctamente!');
+        if (opActual) await recargarDetalle(opActual.operacion.id);
+        cargar();
+      } else { alert(j.error||'Error'); }
+    } catch(e) { alert('Error de conexión'); }
+  }
+
+  async function recargarDetalle(id) {
+    const r = await fetch(`/api/brokerage/operaciones/${id}`, { headers:{Authorization:'Bearer '+token} });
+    const j = await r.json();
+    if (j.success) { opActual = j.data; renderModalDetalle(j.data); }
+  }
+
+  function cerrarModal() {
+    document.getElementById('modalDetalle').style.display = 'none';
+    opActual = null;
+  }
+  document.getElementById('modalDetalle').addEventListener('click', e => {
+    if (e.target === document.getElementById('modalDetalle')) cerrarModal();
+  });
+
+  function fileToBase64(file){ return new Promise((res,rej)=>{ const r=new FileReader(); r.onload=e=>res(e.target.result.split(',')[1]); r.onerror=rej; r.readAsDataURL(file); }); }
+  function escHtml(s){ return (s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+
+  // Carga inicial
+  cargar();
+</script>
+<script src="/js/app-version.js"></script>
+</body>
+</html>

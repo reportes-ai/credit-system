@@ -687,4 +687,62 @@ const getUsuariosByPerfil = async (req, res) => {
   }
 })();
 
+/* ─── Migración v7: workflow brokerage completo ───────────────────────────── */
+(async () => {
+  try {
+    const [perfiles] = await pool.query('SELECT id_perfil, nombre FROM perfiles');
+    const [[admin]]  = await pool.query("SELECT id_perfil FROM perfiles WHERE nombre='Administrador' LIMIT 1");
+
+    async function addFuncV7(modNombre, funNombre, funCodigo, habPorPerfil = {}) {
+      const [[mod]] = await pool.query(
+        "SELECT id_modulo FROM modulos WHERE nombre=? AND estado='activo'", [modNombre]
+      );
+      if (!mod) return;
+      const [[ex]] = await pool.query('SELECT id_funcionalidad FROM funcionalidades WHERE codigo=?', [funCodigo]);
+      let id_func;
+      if (ex) {
+        id_func = ex.id_funcionalidad;
+      } else {
+        const [ins] = await pool.query(
+          'INSERT INTO funcionalidades (id_modulo, nombre, codigo) VALUES (?,?,?)',
+          [mod.id_modulo, funNombre, funCodigo]
+        );
+        id_func = ins.insertId;
+      }
+      for (const p of perfiles) {
+        const hab = habPorPerfil[p.nombre] !== undefined ? (habPorPerfil[p.nombre] ? 1 : 0) : 0;
+        await pool.query(
+          `INSERT IGNORE INTO permisos_perfil (id_perfil, id_funcionalidad, habilitado) VALUES (?,?,?)`,
+          [p.id_perfil, id_func, hab]
+        );
+      }
+    }
+
+    // Módulo Créditos — Brokerage
+    await addFuncV7('Créditos', 'Cargar Fundantes Brokerage',     'creditos_fundantes_cargar',   { 'Administrador':1,'Gerente':1,'Supervisor':1,'Analista de Crédito':1,'Ejecutivo':1,'Ejecutivo Comercial':1 });
+    await addFuncV7('Créditos', 'Validar Fundantes Brokerage',    'creditos_fundantes_validar',  { 'Administrador':1,'Gerente':1,'Supervisor':1,'Analista de Crédito':1 });
+    await addFuncV7('Créditos', 'Liberar Pago Brokerage',         'creditos_liberar_pago',       { 'Administrador':1,'Gerente':1,'Supervisor':1,'Analista de Crédito':1 });
+    await addFuncV7('Créditos', 'Marcar No Otorgado Brokerage',   'creditos_no_otorgado',        { 'Administrador':1,'Gerente':1,'Supervisor':1,'Analista de Crédito':1 });
+    await addFuncV7('Créditos', 'Ver Fundantes Brokerage',        'creditos_fundantes_ver',      { 'Administrador':1,'Gerente':1,'Supervisor':1,'Analista de Crédito':1,'Ejecutivo':1,'Ejecutivo Comercial':1 });
+
+    // Módulo Tesorería — Brokerage
+    await addFuncV7('Tesorería', 'Panel Brokerage Tesorería',     'tesoreria_brokerage_ver',     { 'Administrador':1,'Gerente':1,'Supervisor':1,'Tesorería':1,'Tesoreria':1 });
+    await addFuncV7('Tesorería', 'Registrar Facturas Brokerage',  'tesoreria_brokerage_facturas',{ 'Administrador':1,'Gerente':1,'Tesorería':1,'Tesoreria':1 });
+    await addFuncV7('Tesorería', 'Registrar Pagos Brokerage',     'tesoreria_brokerage_pagos',   { 'Administrador':1,'Gerente':1,'Tesorería':1,'Tesoreria':1 });
+
+    // Administrador: habilitar TODAS
+    if (admin) {
+      await pool.query(
+        `INSERT INTO permisos_perfil (id_perfil, id_funcionalidad, habilitado)
+         SELECT ?, id_funcionalidad, 1 FROM funcionalidades
+         ON DUPLICATE KEY UPDATE habilitado = 1`,
+        [admin.id_perfil]
+      );
+    }
+    console.log('✓ Perfiles v7: funcionalidades brokerage workflow agregadas');
+  } catch (e) {
+    console.error('[perfiles migration v7]', e.message);
+  }
+})();
+
 module.exports = { getAllPerfiles, getModulosConFuncionalidades, getPermisosPerfil, updatePermisosPerfil, reordenarModulos, createPerfil, deletePerfil, getUsuariosByPerfil };

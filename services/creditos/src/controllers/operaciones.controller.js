@@ -59,6 +59,25 @@ const pool = require('../../../../shared/config/database');
   }
 })();
 
+// Migración v2: nuevas columnas workflow completo
+(async () => {
+  const alteraciones = [
+    `ALTER TABLE operaciones_brokerage ADD COLUMN numero_credito VARCHAR(20) NULL AFTER id`,
+    `ALTER TABLE operaciones_brokerage ADD COLUMN rut_concesionario VARCHAR(20) NULL`,
+    `ALTER TABLE operaciones_brokerage ADD COLUMN vendedor VARCHAR(150) NULL`,
+    `ALTER TABLE operaciones_brokerage ADD COLUMN estado_fundantes VARCHAR(30) NOT NULL DEFAULT 'PENDIENTE'`,
+    `ALTER TABLE operaciones_brokerage ADD COLUMN liberado_pago TINYINT(1) NOT NULL DEFAULT 0`,
+    `ALTER TABLE operaciones_brokerage ADD COLUMN fecha_liberado_pago DATE NULL`,
+    `ALTER TABLE operaciones_brokerage ADD COLUMN liberado_por VARCHAR(150) NULL`,
+    `ALTER TABLE operaciones_brokerage ADD COLUMN estado_pago VARCHAR(30) NULL`,
+    `ALTER TABLE operaciones_brokerage ADD COLUMN fecha_pago DATE NULL`,
+    `ALTER TABLE operaciones_brokerage ADD COLUMN num_transaccion VARCHAR(100) NULL`,
+  ];
+  for (const sql of alteraciones) {
+    try { await pool.query(sql); } catch (e) { if (e.errno !== 1060) console.error('[operaciones v2]', e.message); }
+  }
+})();
+
 /* ─── helpers ─────────────────────────────────────────────────────────── */
 function calcular(body) {
   const p = parseFloat(body.valor_vehiculo) || 0;
@@ -254,4 +273,49 @@ const remove = async (req, res) => {
   }
 };
 
-module.exports = { getAll, getOne, create, update, remove, nextOp };
+/* ─── PUT /api/operaciones/:id/liberar-pago ──────────────────────── */
+// Solo analistas/supervisores/gerentes pueden liberar a pago
+const PUEDE_LIBERAR = ['Administrador', 'Gerente', 'Supervisor', 'Analista de Crédito'];
+
+const liberarPago = async (req, res) => {
+  try {
+    const perfil = req.usuario?.perfil_nombre || '';
+    if (!PUEDE_LIBERAR.includes(perfil)) {
+      return res.status(403).json({ success: false, data: null, error: 'Sin permisos para liberar a pago' });
+    }
+    const { id } = req.params;
+    const [[exists]] = await pool.query('SELECT id, estado_fundantes FROM operaciones_brokerage WHERE id = ?', [id]);
+    if (!exists) return res.status(404).json({ success: false, data: null, error: 'Operación no encontrada' });
+
+    const liberadoPor = req.usuario ? `${req.usuario.nombre} ${req.usuario.apellido || ''}`.trim() : null;
+    await pool.query(
+      `UPDATE operaciones_brokerage SET liberado_pago=1, fecha_liberado_pago=CURDATE(), liberado_por=? WHERE id=?`,
+      [liberadoPor, id]
+    );
+    const [[row]] = await pool.query('SELECT * FROM operaciones_brokerage WHERE id = ?', [id]);
+    res.json({ success: true, data: row, error: null });
+  } catch (e) {
+    res.status(500).json({ success: false, data: null, error: e.message });
+  }
+};
+
+/* ─── PUT /api/operaciones/:id/no-otorgado ───────────────────────── */
+const marcarNoOtorgado = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { comentario } = req.body;
+    const [[exists]] = await pool.query('SELECT id FROM operaciones_brokerage WHERE id = ?', [id]);
+    if (!exists) return res.status(404).json({ success: false, data: null, error: 'Operación no encontrada' });
+    await pool.query(
+      `UPDATE operaciones_brokerage SET estado_credito='NO OTORGADO',
+       comentarios=CONCAT(COALESCE(comentarios,''),' | NO OTORGADO: ', COALESCE(?,'')) WHERE id=?`,
+      [comentario || '', id]
+    );
+    const [[row]] = await pool.query('SELECT * FROM operaciones_brokerage WHERE id = ?', [id]);
+    res.json({ success: true, data: row, error: null });
+  } catch (e) {
+    res.status(500).json({ success: false, data: null, error: e.message });
+  }
+};
+
+module.exports = { getAll, getOne, create, update, remove, nextOp, liberarPago, marcarNoOtorgado };

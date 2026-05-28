@@ -51,11 +51,13 @@ app.use('/api/operaciones',         require('../../services/creditos/src/routes/
 app.use('/api/auditoria-credito',   require('../../services/creditos/src/routes/auditoria.routes'));
 app.use('/api/broker-validation-items', require('../../services/creditos/src/routes/broker-validation-items.routes'));
 app.use('/api/broker-validaciones',     require('../../services/creditos/src/routes/broker-validaciones.routes'));
+app.use('/api/fundantes',               require('../../services/creditos/src/routes/fundantes.routes'));
 
 // Tesorería
 app.use('/api/cajas',                require('../../services/tesoreria/src/routes/cajas.routes'));
 app.use('/api/cierre-caja',          require('../../services/tesoreria/src/routes/cierre-caja.routes'));
 app.use('/api/cuentas-transitorias', require('../../services/tesoreria/src/routes/cuentas-transitorias.routes'));
+app.use('/api/brokerage',            require('../../services/tesoreria/src/routes/brokerage.routes'));
 
 // Cartas de Aprobación
 app.use('/api/cartas',            require('../../services/cartas/src/routes/cartas.routes'));
@@ -165,6 +167,12 @@ app.get(['/tesoreria/cierre-caja', '/tesoreria/cierre-caja/'], (req, res) =>
 
 app.get(['/tesoreria/cuentas-transitorias', '/tesoreria/cuentas-transitorias/'], (req, res) =>
   res.sendFile(path.join(__dirname, '../public/tesoreria/cuentas-transitorias.html')));
+
+app.get(['/tesoreria/brokerage', '/tesoreria/brokerage/'], (req, res) =>
+  res.sendFile(path.join(__dirname, '../public/tesoreria/brokerage.html')));
+
+app.get(['/creditos/fundantes', '/creditos/fundantes/'], (req, res) =>
+  res.sendFile(path.join(__dirname, '../public/creditos/fundantes.html')));
 
 app.get(['/crm', '/crm/'], (req, res) =>
   res.sendFile(path.join(__dirname, '../public/crm/index.html')));

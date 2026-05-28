@@ -109,6 +109,27 @@
         <p>Saldos a favor de clientes por pagos en exceso</p>
         <span class="btn-acceder"><i class="bi bi-arrow-right-circle me-1"></i>Acceder</span>
       </a>
+      <a href="/tesoreria/brokerage" class="module-card" id="cardBrokerage">
+        <div class="card-icon"><i class="bi bi-building-check"></i></div>
+        <h6>Brokerage — Facturas y Pagos</h6>
+        <p>Recepción de facturas de dealers, liberación de pagos y registro de transferencias bancarias</p>
+        <span class="btn-acceder"><i class="bi bi-arrow-right-circle me-1"></i>Acceder</span>
+      </a>
+    </div>
+
+    <div class="section-title" style="margin-top:32px"><i class="bi bi-journal-arrow-up"></i> Fundantes Brokerage</div>
+    <div class="modules-grid" style="grid-template-columns:repeat(2,1fr)">
+      <div class="module-card" style="cursor:default">
+        <div class="card-icon"><i class="bi bi-folder2-open"></i></div>
+        <h6>Cargar Fundantes</h6>
+        <p>Sube los documentos fundantes de una operación brokerage ingresando el ID de operación</p>
+        <div style="display:flex;gap:8px;margin-top:6px">
+          <input type="number" id="inputOpFund" placeholder="ID Operación" style="border:1.5px solid #d1d5db;border-radius:8px;padding:6px 10px;font-size:.83rem;width:130px">
+          <a id="linkFundantes" href="/creditos/fundantes" class="btn-acceder" style="display:inline-flex;align-items:center;gap:6px;text-decoration:none" onclick="abrirFundantes(event)">
+            <i class="bi bi-arrow-right-circle me-1"></i>Ir a Fundantes
+          </a>
+        </div>
+      </div>
     </div>
   </div>
 
@@ -127,6 +148,12 @@
       document.getElementById('cardCajas').style.display       = '';
       document.getElementById('cardCierre').style.display      = '';
       document.getElementById('cardTransitorias').style.display = '';
+    }
+
+    function abrirFundantes(e) {
+      e.preventDefault();
+      const op = document.getElementById('inputOpFund').value.trim();
+      window.location.href = op ? `/creditos/fundantes?op=${op}` : '/creditos/fundantes';
     }
 
     function logout() { localStorage.removeItem('token'); localStorage.removeItem('usuario'); window.location.href = '/login.html'; }
