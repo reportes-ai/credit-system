@@ -282,12 +282,12 @@ body { font-family: 'Segoe UI', Arial, sans-serif; background: var(--gray-bg); c
         </div>
         <div class="form-row cols-4">
           <div class="field">
-            <label>N° Operación Origen *</label>
-            <input type="text" id="fOpOrigen" oninput="calcOpCarta()">
+            <label>N° Operación Origen</label>
+            <input type="text" id="fOpOrigen" placeholder="Referencia op. crédito">
           </div>
           <div class="field">
-            <label>N° Operación Carta</label>
-            <input type="text" id="fOpCarta" readonly>
+            <label>N° Carta (correlativo)</label>
+            <input type="text" id="fOpCarta" readonly style="background:#E3F2FD;font-weight:700;color:#0141A2">
           </div>
           <div class="field">
             <label>Plazo (cuotas) *</label>
@@ -373,7 +373,7 @@ body { font-family: 'Segoe UI', Arial, sans-serif; background: var(--gray-bg); c
             <div id="alertFinanciera" style="display:none;margin-top:4px;font-size:10px;font-weight:700;padding:4px 6px;border-radius:3px;position:relative;z-index:1"></div>
           </div>
         </div>
-        <div class="form-row cols-4">
+        <div class="form-row cols-3">
           <div class="field">
             <label>Nombre(s) *</label>
             <input type="text" id="fNombre" placeholder="Nombre(s)" onblur="autoTitleCase(this)">
@@ -386,15 +386,22 @@ body { font-family: 'Segoe UI', Arial, sans-serif; background: var(--gray-bg); c
             <label>Apellido Materno</label>
             <input type="text" id="fApellidoMaterno" placeholder="Apellido Materno" onblur="autoTitleCase(this)">
           </div>
-          <div class="field">
-            <label>RUT Cliente *</label>
-            <input type="text" id="fRutCliente" placeholder="12.345.678-9" oninput="autoFormatRUT(this)">
-          </div>
         </div>
         <div class="form-row cols-3">
           <div class="field">
+            <label>RUT Cliente *</label>
+            <div style="display:flex;gap:6px;align-items:center">
+              <input type="text" id="fRutCliente" placeholder="12.345.678-9" oninput="autoFormatRUT(this)" style="flex:1">
+              <button type="button" onclick="irACrearCliente()" title="Crear nuevo cliente" style="background:#1976D2;color:#fff;border:none;border-radius:4px;padding:5px 10px;font-size:11px;font-weight:600;cursor:pointer;white-space:nowrap">+ Crear</button>
+            </div>
+          </div>
+          <div class="field">
             <label>Fecha Emisión</label>
-            <input type="date" id="fFecha" readonly>
+            <input type="date" id="fFecha" readonly onchange="updateMesField()">
+          </div>
+          <div class="field">
+            <label>Mes</label>
+            <input type="text" id="fMes" readonly style="background:#F5F5F5;color:#546E7A">
           </div>
         </div>
       </div>
@@ -4240,6 +4247,10 @@ async function initApp(){
 
   // Set fecha
   document.getElementById('fFecha').value = new Date().toISOString().split('T')[0];
+  updateMesField();
+  autoSetNextOpCarta();
+  // Restore sessionStorage draft if returning from Clientes page
+  _restoreCartaDraft();
   // Ensure grabar button is enabled on init
   const btnGrabar = document.getElementById('btnGrabarCarta');
   if(btnGrabar){ btnGrabar.disabled = false; btnGrabar.style.opacity = ''; }
@@ -4294,8 +4305,20 @@ async function initApp(){
 
 function fillEjecutivoSelect(){
   const sel = document.getElementById('fEjecutivo');
+  // Preserve current selection by nombre (stable across refreshes)
+  const currentNombre = sel.dataset.selectedNombre || '';
   sel.innerHTML = '<option value="">-- Seleccione --</option>';
-  ejecutivos.forEach((e,i) => sel.innerHTML += `<option value="${i}">${e.nombre}</option>`);
+  ejecutivos.forEach(e => {
+    const opt = document.createElement('option');
+    opt.value = e._id || e.nombre; // _id for DB executives, fallback to nombre
+    opt.textContent = e.nombre;
+    sel.appendChild(opt);
+  });
+  // Restore selection by _id or nombre
+  if(currentNombre){
+    const match = ejecutivos.find(e => e.nombre === currentNombre);
+    if(match) sel.value = match._id || match.nombre;
+  }
 }
 
 // ========== PAGES ==========
@@ -4307,6 +4330,7 @@ function showPage(id){
   }
   document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
   document.getElementById(id).classList.add('active');
+  if(id==='genPage'){ autoSetNextOpCarta(); }
   if(id==='revPage') renderRevTable();
   if(id==='impPage') renderImpTable();
   if(id==='informesPage') renderInformes();
@@ -4345,19 +4369,41 @@ function fillConcByParque(){
 
 // ========== FORM HELPERS ==========
 function fillEjecutivo(){
-  const idx = document.getElementById('fEjecutivo').value;
-  if(idx==='') return;
-  const ej = ejecutivos[idx];
-  document.getElementById('fMailEjecutivo').value = ej.mail;
-  document.getElementById('fTelEjecutivo').value = ej.tel;
+  const sel = document.getElementById('fEjecutivo');
+  const val = sel.value;
+  if(!val) return;
+  // Find by _id (preferred) or nombre (legacy)
+  const ej = ejecutivos.find(e => String(e._id) === String(val)) || ejecutivos.find(e => e.nombre === val);
+  if(!ej) return;
+  sel.dataset.selectedNombre = ej.nombre; // Track for refresh stability
+  document.getElementById('fMailEjecutivo').value = ej.mail || '';
+  document.getElementById('fTelEjecutivo').value  = ej.tel  || '';
 }
 
 function calcOpCarta(){
-  const orig = document.getElementById('fOpOrigen').value.trim();
-  if(!orig) { document.getElementById('fOpCarta').value=''; return; }
-  const year = new Date().getFullYear().toString().slice(-2);
-  const initials = currentUser ? currentUser.initials : 'XX';
-  document.getElementById('fOpCarta').value = year + orig + initials;
+  // Legacy: no longer derives from fOpOrigen. Auto-correlativo is set by autoSetNextOpCarta().
+}
+
+function autoSetNextOpCarta(){
+  // Compute next sequential correlativo from existing cartas
+  let maxNum = 0;
+  cartas.forEach(c => {
+    const n = parseInt(String(c.opCarta || '').replace(/\D/g, ''), 10);
+    if(!isNaN(n) && n > maxNum) maxNum = n;
+  });
+  const next = (maxNum + 1).toString().padStart(4, '0');
+  const el = document.getElementById('fOpCarta');
+  if(el) el.value = next;
+}
+
+function updateMesField(){
+  const fechaEl = document.getElementById('fFecha');
+  const mesEl   = document.getElementById('fMes');
+  if(!fechaEl || !mesEl) return;
+  const fechaStr = fechaEl.value;
+  if(!fechaStr){ mesEl.value = ''; return; }
+  const d = new Date(fechaStr + 'T12:00:00');
+  mesEl.value = d.toLocaleDateString('es-CL', { month: 'long', year: 'numeric' });
 }
 
 function fmtInputDisplay(input, displayId){
@@ -4365,6 +4411,98 @@ function fmtInputDisplay(input, displayId){
   if(!el) return;
   const val = parseFloat(input.value)||0;
   el.textContent = val > 0 ? '$' + Math.round(val).toLocaleString('es-CL') : '';
+}
+
+// ── Ir a crear cliente y volver ─────────────────────────────────────────────
+function irACrearCliente(){
+  // Save current form state so we can restore on return
+  const draft = {
+    tipo: selectedTipoCarta,
+    opOrigen:      document.getElementById('fOpOrigen')?.value || '',
+    opCarta:       document.getElementById('fOpCarta')?.value  || '',
+    ejVal:         document.getElementById('fEjecutivo')?.value || '',
+    ejNombre:      document.getElementById('fEjecutivo')?.selectedOptions[0]?.text || '',
+    ejMail:        document.getElementById('fMailEjecutivo')?.value || '',
+    ejTel:         document.getElementById('fTelEjecutivo')?.value  || '',
+    nombre:        document.getElementById('fNombre')?.value || '',
+    apPaterno:     document.getElementById('fApellidoPaterno')?.value || '',
+    apMaterno:     document.getElementById('fApellidoMaterno')?.value || '',
+    rutCliente:    document.getElementById('fRutCliente')?.value || '',
+    plazo:         document.getElementById('fPlazo')?.value || '',
+    acreedor:      document.getElementById('fAcreedor')?.value || '',
+    tipoVehiculo:  document.getElementById('fTipoVehiculo')?.value || '',
+    marca:         document.getElementById('fMarca')?.value || '',
+    modelo:        document.getElementById('fModelo')?.value || '',
+    anio:          document.getElementById('fAnio')?.value || '',
+    patente:       document.getElementById('fPatente')?.value || '',
+    precioVenta:   document.getElementById('fPrecioVenta')?.value || '',
+    pie:           document.getElementById('fPie')?.value || '',
+    concesionario: document.getElementById('fConcesionario')?.value || '',
+    rutConc:       document.getElementById('fRutConc')?.value || '',
+    vendedor:      document.getElementById('fVendedor')?.value || '',
+  };
+  sessionStorage.setItem('af_carta_draft', JSON.stringify(draft));
+  // Pre-fill RUT so clientes page can auto-search
+  const rut = document.getElementById('fRutCliente')?.value || '';
+  window.location.href = '/clientes/' + (rut ? '?rutPre=' + encodeURIComponent(rut) + '&return=/cartas-aprobacion/' : '?return=/cartas-aprobacion/');
+}
+
+function _restoreCartaDraft(){
+  const raw = sessionStorage.getItem('af_carta_draft');
+  if(!raw) return;
+  sessionStorage.removeItem('af_carta_draft');
+  try {
+    const d = JSON.parse(raw);
+    // Restore tipo (selectTipo uses event.target, so set manually)
+    if(d.tipo){
+      selectedTipoCarta = d.tipo;
+      document.querySelectorAll('.tipo-opt').forEach(el => {
+        el.classList.toggle('selected', el.textContent.trim().toUpperCase() === d.tipo.toUpperCase() ||
+          (d.tipo === 'DEALER CALLE' && el.textContent.includes('Dealer Calle')) ||
+          (d.tipo === 'DEALER PARQUE' && el.textContent.includes('Dealer Parque')) ||
+          (d.tipo === 'ALTA GAMA - CALLE' && el.textContent.includes('Alta Gama') && el.textContent.includes('Calle')) ||
+          (d.tipo === 'ALTA GAMA - PARQUE' && el.textContent.includes('Alta Gama') && el.textContent.includes('Parque')));
+      });
+      const isParque = d.tipo.includes('PARQUE');
+      const fp = document.getElementById('fieldParque');
+      if(fp) fp.style.display = isParque ? '' : 'none';
+      if(typeof calcParticipacion === 'function') calcParticipacion();
+    }
+    // Restore text fields
+    const set = (id, v) => { const el=document.getElementById(id); if(el && v) el.value = v; };
+    set('fOpOrigen', d.opOrigen);
+    set('fNombre',          d.nombre);
+    set('fApellidoPaterno', d.apPaterno);
+    set('fApellidoMaterno', d.apMaterno);
+    set('fRutCliente',      d.rutCliente);
+    set('fPlazo',           d.plazo);
+    set('fAcreedor',        d.acreedor);
+    set('fTipoVehiculo',    d.tipoVehiculo);
+    set('fPatente',         d.patente);
+    set('fConcesionario',   d.concesionario);
+    set('fRutConc',         d.rutConc);
+    set('fVendedor',        d.vendedor);
+    // Restore ejecutivo by nombre (robust across page reloads)
+    if(d.ejNombre && d.ejNombre !== '-- Seleccione --'){
+      const sel = document.getElementById('fEjecutivo');
+      if(sel){
+        const match = [...sel.options].find(o => o.text === d.ejNombre);
+        if(match){ sel.value = match.value; sel.dataset.selectedNombre = d.ejNombre; fillEjecutivo(); }
+        else { set('fMailEjecutivo', d.ejMail); set('fTelEjecutivo', d.ejTel); }
+      }
+    }
+    // Restore marca/modelo/año cascade
+    if(d.marca){ set('fMarca', d.marca); if(typeof fillModelos==='function') fillModelos(); }
+    if(d.modelo){ set('fModelo', d.modelo); if(typeof fillAnios==='function') fillAnios(); }
+    if(d.anio) set('fAnio', d.anio);
+    // Restore money fields
+    if(d.precioVenta){ const el=document.getElementById('fPrecioVenta'); if(el){ el.value=d.precioVenta; if(typeof fmtMoneyInput==='function') fmtMoneyInput(el); } }
+    if(d.pie){ const el=document.getElementById('fPie'); if(el){ el.value=d.pie; if(typeof fmtMoneyInput==='function') fmtMoneyInput(el); } }
+    // Keep auto-correlativo (don't override with old opCarta)
+    showToast('✓ Borrador de carta restaurado. Complete los datos del cliente.');
+    // Switch to genPage
+    if(typeof showPage==='function') showPage('genPage');
+  } catch(ex){ console.warn('Restore draft error:', ex); }
 }
 
 // Allow only numeric keys in money fields
@@ -4705,10 +4843,9 @@ async function grabarCarta(){
   // Validate
   const tipo = selectedTipoCarta;
   if(!tipo) { alert('Seleccione el tipo de carta'); return; }
-  const ej = document.getElementById('fEjecutivo').value;
-  if(!ej) { alert('Seleccione un Ejecutivo Comercial'); return; }
+  const ejVal = document.getElementById('fEjecutivo').value;
+  if(!ejVal) { alert('Seleccione un Ejecutivo Comercial'); return; }
   const opOrigen = document.getElementById('fOpOrigen').value.trim();
-  if(!opOrigen) { alert('Ingrese N° Operación Origen'); return; }
   const fNombre = toTitleCase(document.getElementById('fNombre').value.trim());
   if(!fNombre) { alert('Ingrese el Nombre del cliente'); return; }
   const fApPaterno = toTitleCase(document.getElementById('fApellidoPaterno').value.trim());
@@ -4724,15 +4861,17 @@ async function grabarCarta(){
   const precio = parseMoneyInput(document.getElementById('fPrecioVenta'));
   if(!precio) { alert('Ingrese Precio de Venta'); return; }
 
+  // Find ejecutivo by _id (preferred) or nombre value
+  const ejObj = ejecutivos.find(e => String(e._id) === String(ejVal)) || ejecutivos.find(e => e.nombre === ejVal);
+  if(!ejObj) { alert('Ejecutivo no encontrado, por favor recargue la página'); return; }
   const carta = {
     id: null,
     opCarta: document.getElementById('fOpCarta').value,
     opOrigen: opOrigen,
     tipo: tipo,
-    ejecutivoIdx: parseInt(ej),
-    ejecutivoNombre: ejecutivos[parseInt(ej)].nombre,
-    ejecutivoMail: ejecutivos[parseInt(ej)].mail,
-    ejecutivoTel: ejecutivos[parseInt(ej)].tel,
+    ejecutivoNombre: ejObj.nombre,      // stored as hardcoded text — persists even if executive is deleted
+    ejecutivoMail: ejObj.mail || '',
+    ejecutivoTel:  ejObj.tel  || '',
     cliente: cliente,
     nombres: fNombre,
     apellidoPaterno: fApPaterno,
@@ -4825,12 +4964,16 @@ function clearForm(){
   document.querySelectorAll('.tipo-opt').forEach(el=>el.classList.remove('selected'));
   ['fEjecutivo','fOpOrigen','fNombre','fApellidoPaterno','fApellidoMaterno','fRutCliente','fTipoVehiculo','fMarca','fModelo','fAnio',
    'fPatente','fSaldo','fParque','fConcesionario','fRutConc','fVendedor',
-   'fMailEjecutivo','fTelEjecutivo','fOpCarta','fPlazo','fPartNeto','fPartIVA','fPartBruto'].forEach(id=>{
+   'fMailEjecutivo','fTelEjecutivo','fPlazo','fPartNeto','fPartIVA','fPartBruto'].forEach(id=>{
     const el=document.getElementById(id); if(el){ el.value=el.tagName==='SELECT'?'':'';}
   });
+  const ejSel = document.getElementById('fEjecutivo');
+  if(ejSel) ejSel.dataset.selectedNombre = '';
   document.getElementById('fPrenda').value='SI';
   document.getElementById('fAcreedor').value='AUTOFIN';
   document.getElementById('fFecha').value=new Date().toISOString().split('T')[0];
+  updateMesField();
+  autoSetNextOpCarta();
   rawSaldo = 0;
   ['fPrecioVenta','fPie','fMontoCreditoCLP','fTasaCredito'].forEach(id=>{
     const el=document.getElementById(id); if(el){ el.value=''; el.dataset.raw='0'; }

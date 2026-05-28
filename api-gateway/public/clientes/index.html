@@ -259,12 +259,22 @@
 </head>
 <body>
 
+<!-- ── Barra de retorno a Cartas de Aprobación ─────────────────────── -->
+<div id="returnToCartasBar" style="display:none;background:#1565C0;color:#fff;padding:10px 20px;align-items:center;gap:12px;font-size:13px;font-weight:600;position:sticky;top:0;z-index:500">
+  <i class="bi bi-check-circle-fill" style="color:#4ade80;font-size:1.1rem"></i>
+  <span>Cliente guardado. Puedes volver al Generador de Cartas para continuar.</span>
+  <button onclick="window.location.href=document.getElementById('returnToCartasBar').dataset.url"
+    style="background:#fff;color:#1565C0;border:none;border-radius:6px;padding:5px 16px;font-size:12px;font-weight:700;cursor:pointer;margin-left:auto">
+    ← Volver a Cartas
+  </button>
+</div>
+
 <!-- ── Topnav ──────────────────────────────────────────────────────── -->
 <nav class="topnav">
   <div class="topnav-left">
     <div class="topnav-brand">
       <a href="/"><img src="/img/logo.png" alt="AutoFácil" style="display:block"></a>
-      <span class="version-badge" id="versionBadge">v4.12</span>
+      <span class="version-badge" id="versionBadge">v4.13</span>
     </div>
       <div class="breadcrumb-nav">
         <a href="/">Inicio</a><span class="sep">›</span>
@@ -1511,6 +1521,12 @@ async function guardar(tipo) {
       await recargarCliente(rutBuscar);
       // El toast se muestra DESPUÉS de recargarCliente (que llama hideAll)
       showToast(msg);
+      // Si llegamos desde otra página (ej. Cartas), mostrar botón de regreso
+      const _retUrl = new URLSearchParams(window.location.search).get('return');
+      if(_retUrl){
+        const bar = document.getElementById('returnToCartasBar');
+        if(bar){ bar.style.display = 'flex'; bar.dataset.url = _retUrl; }
+      }
     }
   } catch (err) {
     showToast('Error de conexión con el servidor', true);
@@ -1730,6 +1746,22 @@ function cerrarModalCotPopup() {
 document.addEventListener('keydown', e => {
   if (e.key === 'Escape') cerrarModalCotPopup();
 });
+
+// Si venimos desde Cartas con ?rutPre=, auto-rellenar el campo de búsqueda
+(function(){
+  const params = new URLSearchParams(window.location.search);
+  const rutPre = params.get('rutPre');
+  if(rutPre){
+    const inp = document.getElementById('inputRut');
+    if(inp){ inp.value = rutPre; }
+    // Intentar buscar después de que cargue el componente
+    setTimeout(() => {
+      const btn = document.querySelector('button[onclick*="buscarCliente"], button[onclick*="buscar"]') ||
+                  document.getElementById('btnBuscar');
+      if(btn) btn.click();
+    }, 400);
+  }
+})();
 </script>
 
 <!-- ═══ POPUP: Cliente Creado + Cotización Grabada ═══ -->
