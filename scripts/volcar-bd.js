@@ -27,6 +27,7 @@ async function main() {
   lines.push('-- Volcado generado por scripts/volcar-bd.js');
   lines.push(`-- Fecha: ${new Date().toISOString()}`);
   lines.push('');
+  lines.push('SET NAMES utf8mb4;');
   lines.push('SET FOREIGN_KEY_CHECKS=0;');
   lines.push('SET SQL_MODE="NO_AUTO_VALUE_ON_ZERO";');
   lines.push('');
