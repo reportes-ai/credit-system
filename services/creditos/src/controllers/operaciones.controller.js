@@ -92,6 +92,20 @@ const pool = require('../../../../shared/config/database');
   }
 })();
 
+// Migración v4: índices para mejorar performance de búsquedas
+(async () => {
+  const indices = [
+    `ALTER TABLE operaciones_brokerage ADD INDEX idx_mes (mes)`,
+    `ALTER TABLE operaciones_brokerage ADD INDEX idx_estado_credito (estado_credito)`,
+    `ALTER TABLE operaciones_brokerage ADD INDEX idx_rut_cliente (rut_cliente)`,
+    `ALTER TABLE operaciones_brokerage ADD INDEX idx_financiera (financiera)`,
+    `ALTER TABLE operaciones_brokerage ADD INDEX idx_mes_numop (mes, num_op)`,
+  ];
+  for (const sql of indices) {
+    try { await pool.query(sql); } catch (e) { if (e.errno !== 1061) console.error('[operaciones v4]', e.message); }
+  }
+})();
+
 /* ─── helpers ─────────────────────────────────────────────────────────── */
 function calcular(body) {
   const p = parseFloat(body.valor_vehiculo) || 0;
