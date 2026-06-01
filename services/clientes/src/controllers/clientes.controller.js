@@ -214,6 +214,10 @@ const create = async (req, res) => {
     const b = req.body;
     if (!b.rut || !b.tipo_cliente)
       return res.status(400).json({ success: false, data: null, error: 'RUT y tipo_cliente son requeridos' });
+    if (b.tipo_cliente === 'NATURAL' && (!b.nombres || !b.apellido_paterno))
+      return res.status(400).json({ success: false, data: null, error: 'Nombres y apellido paterno son requeridos para persona natural' });
+    if (b.tipo_cliente === 'JURIDICA' && !b.razon_social)
+      return res.status(400).json({ success: false, data: null, error: 'Razón social es requerida para persona jurídica' });
 
     const rut = up(b.rut);
     // Verificar duplicado
@@ -263,6 +267,10 @@ const update = async (req, res) => {
     const b = req.body;
     if (!b.tipo_cliente)
       return res.status(400).json({ success: false, data: null, error: 'tipo_cliente es requerido' });
+    if (b.tipo_cliente === 'NATURAL' && (!b.nombres || !b.apellido_paterno))
+      return res.status(400).json({ success: false, data: null, error: 'Nombres y apellido paterno son requeridos para persona natural' });
+    if (b.tipo_cliente === 'JURIDICA' && !b.razon_social)
+      return res.status(400).json({ success: false, data: null, error: 'Razón social es requerida para persona jurídica' });
 
     await pool.query(`
       UPDATE clientes SET
