@@ -236,6 +236,7 @@
        Solo se ejecuta una vez por sesión (sessionStorage flag)
     ══════════════════════════════════════════════════════════════ */
     function playLaserSound() {
+      if (window._silenciarIntro) return;
       try { new Audio('/audio/bienvenido.mp3').play(); } catch(e) {}
     }
 
@@ -320,11 +321,17 @@
           grid.appendChild(a);
         });
 
-        /* 🚀 Intro + sonido solo la primera vez del día */
-        const hoy = new Date().toISOString().slice(0, 10); // "2026-06-01"
-        const ultimaIntro = localStorage.getItem('af_intro_fecha');
-        if (ultimaIntro !== hoy) {
-          localStorage.setItem('af_intro_fecha', hoy);
+        /* 🚀 Animación: una vez por sesión */
+        if (!sessionStorage.getItem('af_intro_done')) {
+          sessionStorage.setItem('af_intro_done', '1');
+          /* 🔊 Audio: solo la primera vez del día */
+          const hoy = new Date().toISOString().slice(0, 10);
+          if (localStorage.getItem('af_intro_fecha') !== hoy) {
+            localStorage.setItem('af_intro_fecha', hoy);
+          } else {
+            // Ya sonó hoy — silenciar reemplazando la función
+            window._silenciarIntro = true;
+          }
           introAnimation();
         }
       } catch {
