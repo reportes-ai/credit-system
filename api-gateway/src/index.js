@@ -105,6 +105,8 @@ app.get(['/mantenedores/parametros', '/mantenedores/parametros/'], (req, res) =>
   res.sendFile(path.join(__dirname, '../public/mantenedores/parametros/index.html')));
 app.get(['/mantenedores/factores-seguro', '/mantenedores/factores-seguro/'], (req, res) =>
   res.sendFile(path.join(__dirname, '../public/mantenedores/factores-seguro/index.html')));
+app.get(['/mantenedores/financieras', '/mantenedores/financieras/'], (req, res) =>
+  res.sendFile(path.join(__dirname, '../public/mantenedores/financieras/index.html')));
 
 app.get(['/mantenedores/tipos-documento', '/mantenedores/tipos-documento/'], (req, res) =>
   res.sendFile(path.join(__dirname, '../public/mantenedores/tipos-documento/index.html')));

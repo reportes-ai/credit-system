@@ -1,4 +1,5 @@
 const pool = require('../../../../shared/config/database');
+const { calcularOperacion } = require('../utils/calcular-operacion');
 
 // Migración: tabla operaciones_brokerage
 (async () => {
@@ -103,6 +104,18 @@ const pool = require('../../../../shared/config/database');
   ];
   for (const sql of indices) {
     try { await pool.query(sql); } catch (e) { if (e.errno !== 1061) console.error('[operaciones v4]', e.message); }
+  }
+})();
+
+// Migración v5: columnas para cálculo automático de ingresos y comisiones
+(async () => {
+  const cols = [
+    `ALTER TABLE operaciones_brokerage ADD COLUMN com_reparaciones DECIMAL(15,0) NULL`,
+    `ALTER TABLE operaciones_brokerage ADD COLUMN comej DECIMAL(15,0) NULL`,
+    `ALTER TABLE operaciones_brokerage ADD COLUMN ingreso_neto_total DECIMAL(15,2) NULL`,
+  ];
+  for (const sql of cols) {
+    try { await pool.query(sql); } catch (e) { if (e.errno !== 1060) console.error('[operaciones v5]', e.message); }
   }
 })();
 
@@ -238,6 +251,24 @@ const create = async (req, res) => {
       `INSERT INTO operaciones_brokerage (${fields.join(',')}) VALUES (${fields.map(() => '?').join(',')})`,
       values
     );
+
+    // Auto-calcular ingresos y comisiones (solo si es crédito otorgado/aprobado)
+    if (['OTORGADO','APROBADO'].includes((b.estado_credito||'').toUpperCase())) {
+      try {
+        const calc = await calcularOperacion({ ...b, saldo_precio, id: r.insertId });
+        await pool.query(`
+          UPDATE operaciones_brokerage SET
+            monto_comision_fin = ?, com_rdh = ?, com_cesantia = ?,
+            com_reparaciones = ?, comdea_real = ?, com_parque = ?,
+            comej = ?, ingreso_neto_total = ?
+          WHERE id = ?`,
+          [calc.monto_comision_fin, calc.com_rdh, calc.com_cesantia,
+           calc.com_reparaciones, calc.comdea_real, calc.com_parque,
+           calc.comej, calc.ingreso_neto_total, r.insertId]
+        );
+      } catch(calcErr) { console.error('[calcular-operacion create]', calcErr.message); }
+    }
+
     const [[row]] = await pool.query('SELECT * FROM operaciones_brokerage WHERE id = ?', [r.insertId]);
     res.status(201).json({ success: true, data: row, error: null });
   } catch (e) {
@@ -289,6 +320,24 @@ const update = async (req, res) => {
     ];
 
     await pool.query(`UPDATE operaciones_brokerage SET ${sets.join(',')} WHERE id=?`, vals);
+
+    // Auto-calcular ingresos y comisiones al actualizar
+    if (['OTORGADO','APROBADO'].includes((b.estado_credito||'').toUpperCase())) {
+      try {
+        const calc = await calcularOperacion({ ...b, saldo_precio, id });
+        await pool.query(`
+          UPDATE operaciones_brokerage SET
+            monto_comision_fin = ?, com_rdh = ?, com_cesantia = ?,
+            com_reparaciones = ?, comdea_real = ?, com_parque = ?,
+            comej = ?, ingreso_neto_total = ?
+          WHERE id = ?`,
+          [calc.monto_comision_fin, calc.com_rdh, calc.com_cesantia,
+           calc.com_reparaciones, calc.comdea_real, calc.com_parque,
+           calc.comej, calc.ingreso_neto_total, id]
+        );
+      } catch(calcErr) { console.error('[calcular-operacion update]', calcErr.message); }
+    }
+
     const [[row]] = await pool.query('SELECT * FROM operaciones_brokerage WHERE id = ?', [id]);
     res.json({ success: true, data: row, error: null });
   } catch (e) {

@@ -55,6 +55,34 @@ const ensureTable = async () => {
     ['seg_d_72',  0.054964, 'Seguro Desgravamen — plazo ≤72m'],
     ['seg_r_72',  0.034875, 'Seguro RDH — plazo ≤72m'],
     ['seg_c_72',  0.058985, 'Seguro Cesantía — plazo ≤72m'],
+    // ── AutoFin — fórmulas de ingreso ────────────────────────────────────
+    ['autofin_tmc_menor_200', 33.60, 'AutoFin — TMC anual ≤200 UF (%)'],
+    ['autofin_tmc_mayor_200', 29.40, 'AutoFin — TMC anual >200 UF (%)'],
+    ['autofin_spread_fondo',   0.67, 'AutoFin — Spread costo de fondo mensual (%)'],
+    // ── UAC (Unidad de Crédito) — ingreso por tramo de operaciones ───────
+    ['uac_pct_tier1',  14.00, 'UAC — % sobre saldo precio con 1-5 ops/mes'],
+    ['uac_pct_tier2',  16.00, 'UAC — % sobre saldo precio con 6-10 ops/mes'],
+    ['uac_pct_tier3',  18.00, 'UAC — % sobre saldo precio con 11+ ops/mes'],
+    ['uac_ops_tier1_max',  5, 'UAC — N° máximo de ops para tier 1 (14%)'],
+    ['uac_ops_tier2_max', 10, 'UAC — N° máximo de ops para tier 2 (16%)'],
+    // ── Comisión Dealer por plazo (% sobre saldo precio) ─────────────────
+    ['dealer_pct_6',   0.00, 'Dealer CALLE — % saldo precio plazo ≤6m'],
+    ['dealer_pct_12',  0.00, 'Dealer CALLE — % saldo precio plazo ≤12m'],
+    ['dealer_pct_24',  2.50, 'Dealer CALLE — % saldo precio plazo ≤24m'],
+    ['dealer_pct_36',  5.00, 'Dealer CALLE — % saldo precio plazo ≤36m'],
+    ['dealer_pct_99',  7.50, 'Dealer CALLE — % saldo precio plazo >36m'],
+    ['patio_pct',      2.50, 'Patio/Parque — % saldo precio (todos los plazos)'],
+    // ── Factores de comisión AutoFácil por seguros (% de prima desg) ─────
+    ['seg_com_desg_6',  62.525, 'Factor comisión desgravamen plazo ≤6m'],
+    ['seg_com_cesa_6',  52.636, 'Factor comisión cesantía plazo ≤6m'],
+    ['seg_com_desg_12', 62.827, 'Factor comisión desgravamen plazo ≤12m'],
+    ['seg_com_cesa_12', 52.663, 'Factor comisión cesantía plazo ≤12m'],
+    ['seg_com_desg_24', 63.171, 'Factor comisión desgravamen plazo ≤24m'],
+    ['seg_com_cesa_24', 53.509, 'Factor comisión cesantía plazo ≤24m'],
+    ['seg_com_desg_36', 63.539, 'Factor comisión desgravamen plazo ≥25m'],
+    ['seg_com_cesa_36', 53.815, 'Factor comisión cesantía plazo ≥25m'],
+    // ── Comisión ejecutivo ────────────────────────────────────────────────
+    ['pct_ejecutivo_fin', 2.12, 'Comisión ejecutivo sobre monto financiado (%)'],
   ];
   for (const [clave, valor, descripcion] of defaults) {
     await pool.query(
