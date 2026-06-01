@@ -759,7 +759,7 @@
 ═══════════════════════════════════════════════════════════════════════════ */
 const token = sessionStorage.getItem('token');
 if (!token) { window.location.href = '/login.html'; }
-function logout() { localStorage.clear(); window.location.href = '/login.html'; }
+function logout() { sessionStorage.removeItem('token'); sessionStorage.removeItem('usuario'); sessionStorage.removeItem('af_intro_done'); window.location.href = '/login.html'; }
 function authHdr() { return { 'Authorization': 'Bearer ' + token, 'Content-Type': 'application/json' }; }
 
 try {

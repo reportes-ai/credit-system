@@ -224,7 +224,7 @@
   document.getElementById('navNombre').textContent = `${yo?.nombre||''} ${yo?.apellido||''}`.trim();
   document.getElementById('navPerfil').textContent  = yo?.perfil || '';
   document.getElementById('avatarInicial').textContent = (yo?.nombre||'?').charAt(0).toUpperCase();
-  function logout(){ localStorage.clear(); window.location.href='/login.html'; }
+  function logout(){ sessionStorage.removeItem('token'); sessionStorage.removeItem('usuario'); sessionStorage.removeItem('af_intro_done'); window.location.href='/login.html'; }
 
   const ANALISTAS = ['Administrador','Gerente','Supervisor','Analista de Crédito'];
   const esAnalista = ANALISTAS.includes(yo?.perfil || '');
