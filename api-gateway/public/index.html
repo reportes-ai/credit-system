@@ -176,7 +176,7 @@
       if (esAdmin) document.getElementById('btnReordenar').style.display = 'flex';
     }
 
-    function logout() { sessionStorage.removeItem('token'); sessionStorage.removeItem('usuario'); sessionStorage.removeItem('af_intro_done'); window.location.href = '/login.html'; }
+    function logout() { sessionStorage.removeItem('token'); sessionStorage.removeItem('usuario'); window.location.href = '/login.html'; }
 
     let sortable = null;
     let modulosData = [];
@@ -320,9 +320,11 @@
           grid.appendChild(a);
         });
 
-        /* 🚀 Intro solo en la primera visita de la sesión */
-        if (!sessionStorage.getItem('af_intro_done')) {
-          sessionStorage.setItem('af_intro_done', '1');
+        /* 🚀 Intro + sonido solo la primera vez del día */
+        const hoy = new Date().toISOString().slice(0, 10); // "2026-06-01"
+        const ultimaIntro = localStorage.getItem('af_intro_fecha');
+        if (ultimaIntro !== hoy) {
+          localStorage.setItem('af_intro_fecha', hoy);
           introAnimation();
         }
       } catch {
