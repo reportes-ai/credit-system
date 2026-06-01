@@ -1721,7 +1721,7 @@ if (_rutParam) {
 }
 
 async function _guardarCotizacionPendiente(cliente) {
-  const raw = localStorage.getItem('cotizacion_pendiente');
+  const raw = sessionStorage.getItem('cotizacion_pendiente');
   if (!raw) return null;
   try {
     const cot = JSON.parse(raw);
@@ -1735,7 +1735,7 @@ async function _guardarCotizacionPendiente(cliente) {
       body: JSON.stringify(cot),
     });
     const json = await resp.json();
-    localStorage.removeItem('cotizacion_pendiente');
+    sessionStorage.removeItem('cotizacion_pendiente');
     return json.success ? nombre : null;
   } catch { return null; }
 }

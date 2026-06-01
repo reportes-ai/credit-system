@@ -1662,7 +1662,7 @@ async function buscarYGrabar() {
       // Cliente NO existe → guardar cotización pendiente y redirigir a clientes
       const p = readInputs();
       const r = calcular(p);
-      localStorage.setItem('cotizacion_pendiente', JSON.stringify(cotizacionPayload(rut, rut)));
+      sessionStorage.setItem('cotizacion_pendiente', JSON.stringify(cotizacionPayload(rut, rut)));
       cerrarModalGrabar();
       window.location.href = `/clientes/?retorno=cotizacion&rut=${encodeURIComponent(rut)}`;
     }
