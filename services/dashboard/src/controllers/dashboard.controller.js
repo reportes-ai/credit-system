@@ -129,7 +129,7 @@ exports.getPermisos = async (req, res) => {
     return res.json({ success: true, permisos });
   } catch (err) {
     console.error('[dashboard] getPermisos:', err);
-    return res.status(500).json({ success: false, error: err.message });
+    return (console.error('[error]', err), res.status(500).json({success:false,data:null,error:'Error interno del servidor'}));
   }
 };
 
@@ -148,7 +148,7 @@ exports.savePermisos = async (req, res) => {
     return res.json({ success: true });
   } catch (err) {
     console.error('[dashboard] savePermisos:', err);
-    return res.status(500).json({ success: false, error: err.message });
+    return (console.error('[error]', err), res.status(500).json({success:false,data:null,error:'Error interno del servidor'}));
   }
 };
 
@@ -223,6 +223,6 @@ exports.getDatos = async (req, res) => {
     });
   } catch (err) {
     console.error('[dashboard] getDatos error:', err);
-    return res.status(500).json({ success: false, error: err.message });
+    return (console.error('[error]', err), res.status(500).json({success:false,data:null,error:'Error interno del servidor'}));
   }
 };

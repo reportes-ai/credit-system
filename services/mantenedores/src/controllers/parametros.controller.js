@@ -79,7 +79,7 @@ const getAll = async (req, res) => {
       : null;
     res.json({ success: true, data: { lista: rows, obj, fecha_seg: fechaSeg }, error: null });
   } catch (e) {
-    res.status(500).json({ success: false, data: null, error: e.message });
+    (console.error('[error]', e), res.status(500).json({success:false,data:null,error:'Error interno del servidor'}));
   }
 };
 
@@ -95,7 +95,7 @@ const updateAll = async (req, res) => {
     }
     res.json({ success: true, data: { mensaje: 'Parámetros actualizados' }, error: null });
   } catch (e) {
-    res.status(500).json({ success: false, data: null, error: e.message });
+    (console.error('[error]', e), res.status(500).json({success:false,data:null,error:'Error interno del servidor'}));
   }
 };
 

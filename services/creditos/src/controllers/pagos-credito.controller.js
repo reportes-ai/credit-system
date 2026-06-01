@@ -90,7 +90,7 @@ const getByCredito = async (req, res) => {
       [req.params.id_credito]
     );
     res.json({ success: true, data: rows, error: null });
-  } catch(e) { res.status(500).json({ success: false, data: null, error: e.message }); }
+  } catch(e) { (console.error('[error]', e), res.status(500).json({success:false,data:null,error:'Error interno del servidor'})); }
 };
 
 /* ─── GET un pago por ID ─────────────────────────────────────────────────── */
@@ -105,7 +105,7 @@ const getById = async (req, res) => {
     );
     if (!rows.length) return res.status(404).json({ success: false, error: 'Pago no encontrado' });
     res.json({ success: true, data: rows[0], error: null });
-  } catch(e) { res.status(500).json({ success: false, data: null, error: e.message }); }
+  } catch(e) { (console.error('[error]', e), res.status(500).json({success:false,data:null,error:'Error interno del servidor'})); }
 };
 
 /* ─── POST registrar pago ────────────────────────────────────────────────── */
@@ -150,7 +150,7 @@ const create = async (req, res) => {
       meta: { numero_cuota, monto_cuota: parseFloat(monto_cuota)||0, interes_mora: parseFloat(interes_mora)||0, gastos_cobranza: parseFloat(gastos_cobranza)||0, total_pagado: tp, fecha_pago: fecha_pago || null },
     });
     res.status(201).json({ success: true, data: { id_pago: r.insertId }, error: null });
-  } catch(e) { res.status(500).json({ success: false, data: null, error: e.message }); }
+  } catch(e) { (console.error('[error]', e), res.status(500).json({success:false,data:null,error:'Error interno del servidor'})); }
 };
 
 /* ─── DELETE pago ────────────────────────────────────────────────────────── */
@@ -170,7 +170,7 @@ const remove = async (req, res) => {
       });
     }
     res.json({ success: true, data: { mensaje: 'Pago eliminado' }, error: null });
-  } catch(e) { res.status(500).json({ success: false, data: null, error: e.message }); }
+  } catch(e) { (console.error('[error]', e), res.status(500).json({success:false,data:null,error:'Error interno del servidor'})); }
 };
 
 /* ─── POST /batch  — pago múltiple con correlativo global ────────────────── */
@@ -332,7 +332,7 @@ const createBatch = async (req, res) => {
   } catch(e) {
     console.error('[createBatch]', e.message);
     try { await conn.rollback(); } catch(_) {}
-    res.status(500).json({ success: false, data: null, error: e.message });
+    (console.error('[error]', e), res.status(500).json({success:false,data:null,error:'Error interno del servidor'}));
   } finally {
     conn.release();
   }
@@ -464,7 +464,7 @@ const reversar = async (req, res) => {
       error: null });
   } catch(e) {
     try { await conn.rollback(); } catch(_) {}
-    res.status(500).json({ success: false, data: null, error: e.message });
+    (console.error('[error]', e), res.status(500).json({success:false,data:null,error:'Error interno del servidor'}));
   } finally {
     conn.release();
   }

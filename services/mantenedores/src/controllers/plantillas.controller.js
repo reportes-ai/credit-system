@@ -404,7 +404,7 @@ const getAll = async (req, res) => {
       'SELECT id_plantilla, codigo, nombre, descripcion, activo, updated_at FROM plantillas_documento ORDER BY id_plantilla'
     );
     res.json({ success: true, data: rows, error: null });
-  } catch (e) { res.status(500).json({ success: false, data: null, error: e.message }); }
+  } catch (e) { (console.error('[error]', e), res.status(500).json({success:false,data:null,error:'Error interno del servidor'})); }
 };
 
 const getByCodigo = async (req, res) => {
@@ -414,7 +414,7 @@ const getByCodigo = async (req, res) => {
     );
     if (!rows.length) return res.status(404).json({ success: false, data: null, error: 'Plantilla no encontrada' });
     res.json({ success: true, data: rows[0], error: null });
-  } catch (e) { res.status(500).json({ success: false, data: null, error: e.message }); }
+  } catch (e) { (console.error('[error]', e), res.status(500).json({success:false,data:null,error:'Error interno del servidor'})); }
 };
 
 const update = async (req, res) => {
@@ -426,7 +426,7 @@ const update = async (req, res) => {
       [nombre, descripcion || null, contenido, activo !== false ? 1 : 0, req.params.codigo]
     );
     res.json({ success: true, data: { codigo: req.params.codigo }, error: null });
-  } catch (e) { res.status(500).json({ success: false, data: null, error: e.message }); }
+  } catch (e) { (console.error('[error]', e), res.status(500).json({success:false,data:null,error:'Error interno del servidor'})); }
 };
 
 const resetDefault = async (req, res) => {
@@ -438,7 +438,7 @@ const resetDefault = async (req, res) => {
       [tpl.nombre, tpl.descripcion, tpl.contenido, tpl.codigo]
     );
     res.json({ success: true, data: { codigo: tpl.codigo }, error: null });
-  } catch (e) { res.status(500).json({ success: false, data: null, error: e.message }); }
+  } catch (e) { (console.error('[error]', e), res.status(500).json({success:false,data:null,error:'Error interno del servidor'})); }
 };
 
 module.exports = { getAll, getByCodigo, update, resetDefault };

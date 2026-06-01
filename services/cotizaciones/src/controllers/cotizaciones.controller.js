@@ -93,7 +93,7 @@ const create = async (req, res) => {
     );
     res.status(201).json({ success: true, data: { id_cotizacion: r.insertId }, error: null });
   } catch (e) {
-    res.status(500).json({ success: false, data: null, error: e.message });
+    (console.error('[error]', e), res.status(500).json({success:false,data:null,error:'Error interno del servidor'}));
   }
 };
 
@@ -114,7 +114,7 @@ const getAll = async (req, res) => {
     const [rows] = await pool.query(sql, params);
     res.json({ success: true, data: rows, error: null });
   } catch (e) {
-    res.status(500).json({ success: false, data: null, error: e.message });
+    (console.error('[error]', e), res.status(500).json({success:false,data:null,error:'Error interno del servidor'}));
   }
 };
 
@@ -130,7 +130,7 @@ const getByRut = async (req, res) => {
     );
     res.json({ success: true, data: rows, error: null });
   } catch (e) {
-    res.status(500).json({ success: false, data: null, error: e.message });
+    (console.error('[error]', e), res.status(500).json({success:false,data:null,error:'Error interno del servidor'}));
   }
 };
 

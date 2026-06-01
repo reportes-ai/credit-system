@@ -172,7 +172,7 @@ const getByRut = async (req, res) => {
       error: null,
     });
   } catch (e) {
-    res.status(500).json({ success: false, data: null, error: e.message });
+    (console.error('[error]', e), res.status(500).json({success:false,data:null,error:'Error interno del servidor'}));
   }
 };
 
@@ -192,7 +192,7 @@ const getAll = async (req, res) => {
     const [rows] = await pool.query(sql, params);
     res.json({ success: true, data: rows, error: null });
   } catch (e) {
-    res.status(500).json({ success: false, data: null, error: e.message });
+    (console.error('[error]', e), res.status(500).json({success:false,data:null,error:'Error interno del servidor'}));
   }
 };
 
@@ -204,7 +204,7 @@ const getById = async (req, res) => {
       return res.status(404).json({ success: false, data: null, error: 'Cliente no encontrado' });
     res.json({ success: true, data: rows[0], error: null });
   } catch (e) {
-    res.status(500).json({ success: false, data: null, error: e.message });
+    (console.error('[error]', e), res.status(500).json({success:false,data:null,error:'Error interno del servidor'}));
   }
 };
 
@@ -253,7 +253,7 @@ const create = async (req, res) => {
     );
     res.status(201).json({ success: true, data: { id_cliente: r.insertId }, error: null });
   } catch (e) {
-    res.status(500).json({ success: false, data: null, error: e.message });
+    (console.error('[error]', e), res.status(500).json({success:false,data:null,error:'Error interno del servidor'}));
   }
 };
 
@@ -297,7 +297,7 @@ const update = async (req, res) => {
     );
     res.json({ success: true, data: { id_cliente: req.params.id }, error: null });
   } catch (e) {
-    res.status(500).json({ success: false, data: null, error: e.message });
+    (console.error('[error]', e), res.status(500).json({success:false,data:null,error:'Error interno del servidor'}));
   }
 };
 

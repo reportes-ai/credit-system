@@ -94,7 +94,7 @@ const getOperaciones = async (req, res) => {
     );
     res.json({ success: true, data: rows, error: null });
   } catch (e) {
-    res.status(500).json({ success: false, data: null, error: e.message });
+    (console.error('[error]', e), res.status(500).json({success:false,data:null,error:'Error interno del servidor'}));
   }
 };
 
@@ -119,7 +119,7 @@ const getOperacion = async (req, res) => {
 
     res.json({ success: true, data: { operacion: op, facturas, pagos, fundantes }, error: null });
   } catch (e) {
-    res.status(500).json({ success: false, data: null, error: e.message });
+    (console.error('[error]', e), res.status(500).json({success:false,data:null,error:'Error interno del servidor'}));
   }
 };
 
@@ -150,7 +150,7 @@ const createFactura = async (req, res) => {
     );
     res.status(201).json({ success: true, data: row, error: null });
   } catch (e) {
-    res.status(500).json({ success: false, data: null, error: e.message });
+    (console.error('[error]', e), res.status(500).json({success:false,data:null,error:'Error interno del servidor'}));
   }
 };
 
@@ -166,7 +166,7 @@ const downloadFactura = async (req, res) => {
     res.set('Content-Disposition', `attachment; filename="${row.archivo_nombre || 'factura'}"`);
     res.send(row.archivo_data);
   } catch (e) {
-    res.status(500).json({ success: false, data: null, error: e.message });
+    (console.error('[error]', e), res.status(500).json({success:false,data:null,error:'Error interno del servidor'}));
   }
 };
 
@@ -176,7 +176,7 @@ const deleteFactura = async (req, res) => {
     await pool.query('DELETE FROM facturas_brokerage WHERE id = ?', [req.params.id]);
     res.json({ success: true, data: { eliminado: req.params.id }, error: null });
   } catch (e) {
-    res.status(500).json({ success: false, data: null, error: e.message });
+    (console.error('[error]', e), res.status(500).json({success:false,data:null,error:'Error interno del servidor'}));
   }
 };
 
@@ -212,7 +212,7 @@ const createPago = async (req, res) => {
     const [[row]] = await pool.query('SELECT * FROM pagos_brokerage WHERE id = ?', [r.insertId]);
     res.status(201).json({ success: true, data: row, error: null });
   } catch (e) {
-    res.status(500).json({ success: false, data: null, error: e.message });
+    (console.error('[error]', e), res.status(500).json({success:false,data:null,error:'Error interno del servidor'}));
   }
 };
 
@@ -241,7 +241,7 @@ const registrarTransferencia = async (req, res) => {
     const [[row]] = await pool.query('SELECT * FROM pagos_brokerage WHERE id = ?', [req.params.id]);
     res.json({ success: true, data: row, error: null });
   } catch (e) {
-    res.status(500).json({ success: false, data: null, error: e.message });
+    (console.error('[error]', e), res.status(500).json({success:false,data:null,error:'Error interno del servidor'}));
   }
 };
 
@@ -251,7 +251,7 @@ const deletePago = async (req, res) => {
     await pool.query('DELETE FROM pagos_brokerage WHERE id = ?', [req.params.id]);
     res.json({ success: true, data: { eliminado: req.params.id }, error: null });
   } catch (e) {
-    res.status(500).json({ success: false, data: null, error: e.message });
+    (console.error('[error]', e), res.status(500).json({success:false,data:null,error:'Error interno del servidor'}));
   }
 };
 

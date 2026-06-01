@@ -8,7 +8,7 @@ const getAll = async (req, res) => {
     );
     res.json({ success: true, data: rows, error: null });
   } catch (e) {
-    res.status(500).json({ success: false, data: null, error: e.message });
+    (console.error('[error]', e), res.status(500).json({success:false,data:null,error:'Error interno del servidor'}));
   }
 };
 
@@ -22,7 +22,7 @@ const create = async (req, res) => {
     );
     res.status(201).json({ success: true, data: { id: r.insertId }, error: null });
   } catch (e) {
-    res.status(500).json({ success: false, data: null, error: e.message });
+    (console.error('[error]', e), res.status(500).json({success:false,data:null,error:'Error interno del servidor'}));
   }
 };
 
@@ -36,7 +36,7 @@ const update = async (req, res) => {
     );
     res.json({ success: true, data: { id: req.params.id }, error: null });
   } catch (e) {
-    res.status(500).json({ success: false, data: null, error: e.message });
+    (console.error('[error]', e), res.status(500).json({success:false,data:null,error:'Error interno del servidor'}));
   }
 };
 
@@ -45,7 +45,7 @@ const remove = async (req, res) => {
     await pool.query('UPDATE cartas_ejecutivos SET activo=0 WHERE id=?', [req.params.id]);
     res.json({ success: true, data: { mensaje: 'Ejecutivo eliminado' }, error: null });
   } catch (e) {
-    res.status(500).json({ success: false, data: null, error: e.message });
+    (console.error('[error]', e), res.status(500).json({success:false,data:null,error:'Error interno del servidor'}));
   }
 };
 

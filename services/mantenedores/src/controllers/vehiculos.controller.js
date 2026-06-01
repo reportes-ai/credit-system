@@ -56,7 +56,7 @@ const getVehiculos = async (req, res) => {
     );
 
     res.json({ success: true, data: { rows, total, page: parseInt(page), limit: parseInt(limit) }, error: null });
-  } catch (e) { res.status(500).json({ success: false, data: null, error: e.message }); }
+  } catch (e) { (console.error('[error]', e), res.status(500).json({success:false,data:null,error:'Error interno del servidor'})); }
 };
 
 const getFiltros = async (req, res) => {
@@ -75,7 +75,7 @@ const getFiltros = async (req, res) => {
       },
       error: null,
     });
-  } catch (e) { res.status(500).json({ success: false, data: null, error: e.message }); }
+  } catch (e) { (console.error('[error]', e), res.status(500).json({success:false,data:null,error:'Error interno del servidor'})); }
 };
 
 const importar = async (req, res) => {
@@ -109,7 +109,7 @@ const importar = async (req, res) => {
       VALUES ?`;
     const [result] = await pool.query(sql, [toInsert]);
     res.json({ success: true, data: { insertados: result.affectedRows }, error: null });
-  } catch (e) { res.status(500).json({ success: false, data: null, error: e.message }); }
+  } catch (e) { (console.error('[error]', e), res.status(500).json({success:false,data:null,error:'Error interno del servidor'})); }
 };
 
 const createVehiculo = async (req, res) => {
@@ -126,7 +126,7 @@ const createVehiculo = async (req, res) => {
        equipamiento, tasacion, permiso, beneficio_ley]
     );
     res.status(201).json({ success: true, data: { id_vehiculo: r.insertId }, error: null });
-  } catch (e) { res.status(500).json({ success: false, data: null, error: e.message }); }
+  } catch (e) { (console.error('[error]', e), res.status(500).json({success:false,data:null,error:'Error interno del servidor'})); }
 };
 
 const updateVehiculo = async (req, res) => {
@@ -144,14 +144,14 @@ const updateVehiculo = async (req, res) => {
        equipamiento, tasacion, permiso, beneficio_ley, req.params.id]
     );
     res.json({ success: true, data: { id_vehiculo: req.params.id }, error: null });
-  } catch (e) { res.status(500).json({ success: false, data: null, error: e.message }); }
+  } catch (e) { (console.error('[error]', e), res.status(500).json({success:false,data:null,error:'Error interno del servidor'})); }
 };
 
 const deleteVehiculo = async (req, res) => {
   try {
     await pool.query('DELETE FROM vehiculos WHERE id_vehiculo=?', [req.params.id]);
     res.json({ success: true, data: { mensaje: 'Vehículo eliminado' }, error: null });
-  } catch (e) { res.status(500).json({ success: false, data: null, error: e.message }); }
+  } catch (e) { (console.error('[error]', e), res.status(500).json({success:false,data:null,error:'Error interno del servidor'})); }
 };
 
 /* Cascada marca → modelo → año → detalle (transmisión, combustible, tasación, permiso) */
@@ -193,7 +193,7 @@ const getCascada = async (req, res) => {
       const [rows] = await pool.query(`SELECT DISTINCT marca FROM vehiculos ORDER BY marca`);
       res.json({ success: true, data: { tipo: 'marcas', marcas: rows.map(r => r.marca) }, error: null });
     }
-  } catch (e) { res.status(500).json({ success: false, data: null, error: e.message }); }
+  } catch (e) { (console.error('[error]', e), res.status(500).json({success:false,data:null,error:'Error interno del servidor'})); }
 };
 
 module.exports = { getVehiculos, getFiltros, getCascada, importar, createVehiculo, updateVehiculo, deleteVehiculo };

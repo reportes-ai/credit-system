@@ -28,7 +28,7 @@ const getAll = async (req, res) => {
     const [rows] = await pool.query('SELECT * FROM tasas ORDER BY fecha_desde DESC');
     res.json({ success: true, data: rows, error: null });
   } catch (e) {
-    res.status(500).json({ success: false, data: null, error: e.message });
+    (console.error('[error]', e), res.status(500).json({success:false,data:null,error:'Error interno del servidor'}));
   }
 };
 
@@ -41,7 +41,7 @@ const getVigente = async (req, res) => {
     );
     res.json({ success: true, data: rows[0] || null, error: null });
   } catch (e) {
-    res.status(500).json({ success: false, data: null, error: e.message });
+    (console.error('[error]', e), res.status(500).json({success:false,data:null,error:'Error interno del servidor'}));
   }
 };
 
@@ -51,7 +51,7 @@ const getById = async (req, res) => {
     if (!rows.length) return res.status(404).json({ success: false, data: null, error: 'Tasa no encontrada' });
     res.json({ success: true, data: rows[0], error: null });
   } catch (e) {
-    res.status(500).json({ success: false, data: null, error: e.message });
+    (console.error('[error]', e), res.status(500).json({success:false,data:null,error:'Error interno del servidor'}));
   }
 };
 
@@ -77,7 +77,7 @@ const create = async (req, res) => {
     );
     res.status(201).json({ success: true, data: { id_tasa: r.insertId }, error: null });
   } catch (e) {
-    res.status(500).json({ success: false, data: null, error: e.message });
+    (console.error('[error]', e), res.status(500).json({success:false,data:null,error:'Error interno del servidor'}));
   }
 };
 
@@ -102,7 +102,7 @@ const update = async (req, res) => {
     );
     res.json({ success: true, data: { id_tasa: req.params.id }, error: null });
   } catch (e) {
-    res.status(500).json({ success: false, data: null, error: e.message });
+    (console.error('[error]', e), res.status(500).json({success:false,data:null,error:'Error interno del servidor'}));
   }
 };
 
@@ -111,7 +111,7 @@ const remove = async (req, res) => {
     await pool.query('DELETE FROM tasas WHERE id_tasa=?', [req.params.id]);
     res.json({ success: true, data: { mensaje: 'Tasa eliminada' }, error: null });
   } catch (e) {
-    res.status(500).json({ success: false, data: null, error: e.message });
+    (console.error('[error]', e), res.status(500).json({success:false,data:null,error:'Error interno del servidor'}));
   }
 };
 

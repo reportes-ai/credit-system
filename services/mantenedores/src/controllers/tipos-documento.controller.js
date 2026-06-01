@@ -64,7 +64,7 @@ const getAll = async (req, res) => {
       ? await pool.query('SELECT * FROM tipos_documento WHERE financiera=? ORDER BY orden, id_tipo', [fin])
       : await pool.query('SELECT * FROM tipos_documento ORDER BY financiera, orden, id_tipo');
     res.json({ success: true, data: rows, error: null });
-  } catch(e) { res.status(500).json({ success: false, data: null, error: e.message }); }
+  } catch(e) { (console.error('[error]', e), res.status(500).json({success:false,data:null,error:'Error interno del servidor'})); }
 };
 
 const getActivos = async (req, res) => {
@@ -74,7 +74,7 @@ const getActivos = async (req, res) => {
       ? await pool.query('SELECT * FROM tipos_documento WHERE activo=1 AND financiera=? ORDER BY orden, id_tipo', [fin])
       : await pool.query('SELECT * FROM tipos_documento WHERE activo=1 ORDER BY financiera, orden, id_tipo');
     res.json({ success: true, data: rows, error: null });
-  } catch(e) { res.status(500).json({ success: false, data: null, error: e.message }); }
+  } catch(e) { (console.error('[error]', e), res.status(500).json({success:false,data:null,error:'Error interno del servidor'})); }
 };
 
 const create = async (req, res) => {
@@ -86,7 +86,7 @@ const create = async (req, res) => {
       [nombre, descripcion || null, obligatorio ? 1 : 0, activo !== false ? 1 : 0, orden || 0, financiera || 'AUTOFACIL']
     );
     res.status(201).json({ success: true, data: { id_tipo: r.insertId }, error: null });
-  } catch(e) { res.status(500).json({ success: false, data: null, error: e.message }); }
+  } catch(e) { (console.error('[error]', e), res.status(500).json({success:false,data:null,error:'Error interno del servidor'})); }
 };
 
 const update = async (req, res) => {
@@ -98,14 +98,14 @@ const update = async (req, res) => {
       [nombre, descripcion || null, obligatorio ? 1 : 0, activo !== false ? 1 : 0, orden || 0, financiera || 'AUTOFACIL', req.params.id]
     );
     res.json({ success: true, data: { id_tipo: req.params.id }, error: null });
-  } catch(e) { res.status(500).json({ success: false, data: null, error: e.message }); }
+  } catch(e) { (console.error('[error]', e), res.status(500).json({success:false,data:null,error:'Error interno del servidor'})); }
 };
 
 const remove = async (req, res) => {
   try {
     await pool.query('DELETE FROM tipos_documento WHERE id_tipo=?', [req.params.id]);
     res.json({ success: true, data: { mensaje: 'Tipo de documento eliminado' }, error: null });
-  } catch(e) { res.status(500).json({ success: false, data: null, error: e.message }); }
+  } catch(e) { (console.error('[error]', e), res.status(500).json({success:false,data:null,error:'Error interno del servidor'})); }
 };
 
 module.exports = { getAll, getActivos, create, update, remove };

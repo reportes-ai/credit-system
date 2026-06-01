@@ -51,7 +51,7 @@ const getByRut = async (req, res) => {
       'SELECT * FROM antecedentes_laborales WHERE rut_cliente = ?', [rut]);
     res.json({ success: true, data: rows[0] || null, error: null });
   } catch (e) {
-    res.status(500).json({ success: false, data: null, error: e.message });
+    (console.error('[error]', e), res.status(500).json({success:false,data:null,error:'Error interno del servidor'}));
   }
 };
 
@@ -127,7 +127,7 @@ const upsert = async (req, res) => {
 
     res.json({ success: true, data: { rut_cliente: rut }, error: null });
   } catch (e) {
-    res.status(500).json({ success: false, data: null, error: e.message });
+    (console.error('[error]', e), res.status(500).json({success:false,data:null,error:'Error interno del servidor'}));
   }
 };
 

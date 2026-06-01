@@ -255,7 +255,7 @@ const create = async (req, res) => {
     res.status(201).json({ success: true, data: { id_credito: r.insertId, numero_credito }, error: null });
   } catch (e) {
     console.error('[creditos create]', e);
-    res.status(500).json({ success: false, data: null, error: e.message });
+    (console.error('[error]', e), res.status(500).json({success:false,data:null,error:'Error interno del servidor'}));
   }
 };
 
@@ -283,7 +283,7 @@ const getAll = async (req, res) => {
     res.json({ success: true, data: rows, error: null });
   } catch (e) {
     console.error('[creditos getAll]', e);
-    res.status(500).json({ success: false, data: null, error: e.message });
+    (console.error('[error]', e), res.status(500).json({success:false,data:null,error:'Error interno del servidor'}));
   }
 };
 
@@ -304,7 +304,7 @@ const getById = async (req, res) => {
       return res.status(404).json({ success: false, data: null, error: 'Crédito no encontrado' });
     res.json({ success: true, data: rows[0], error: null });
   } catch (e) {
-    res.status(500).json({ success: false, data: null, error: e.message });
+    (console.error('[error]', e), res.status(500).json({success:false,data:null,error:'Error interno del servidor'}));
   }
 };
 
@@ -524,7 +524,7 @@ const update = async (req, res) => {
     }
     res.json({ success: true, data: { id_credito: req.params.id }, error: null });
   } catch (e) {
-    res.status(500).json({ success: false, data: null, error: e.message });
+    (console.error('[error]', e), res.status(500).json({success:false,data:null,error:'Error interno del servidor'}));
   }
 };
 

@@ -558,7 +558,7 @@ const createPerfil = async (req, res) => {
     const [[perfil]] = await pool.query('SELECT * FROM perfiles WHERE id_perfil = ?', [id_perfil]);
     res.status(201).json({ success: true, data: perfil, error: null });
   } catch (e) {
-    res.status(500).json({ success: false, data: null, error: e.message });
+    (console.error('[error]', e), res.status(500).json({success:false,data:null,error:'Error interno del servidor'}));
   }
 };
 
@@ -582,7 +582,7 @@ const deletePerfil = async (req, res) => {
 
     res.json({ success: true, data: { eliminado: id }, error: null });
   } catch (e) {
-    res.status(500).json({ success: false, data: null, error: e.message });
+    (console.error('[error]', e), res.status(500).json({success:false,data:null,error:'Error interno del servidor'}));
   }
 };
 
@@ -625,7 +625,7 @@ const getUsuariosByPerfil = async (req, res) => {
 
     res.json({ success: true, data: result, error: null });
   } catch (e) {
-    res.status(500).json({ success: false, data: null, error: e.message });
+    (console.error('[error]', e), res.status(500).json({success:false,data:null,error:'Error interno del servidor'}));
   }
 };
 

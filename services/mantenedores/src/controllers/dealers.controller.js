@@ -50,21 +50,21 @@ const getDealers = async (req, res) => {
       [...params, parseInt(limit), offset]
     );
     res.json({ success: true, data: { rows, total, page: parseInt(page) }, error: null });
-  } catch (e) { res.status(500).json({ success: false, data: null, error: e.message }); }
+  } catch (e) { (console.error('[error]', e), res.status(500).json({success:false,data:null,error:'Error interno del servidor'})); }
 };
 
 const getDealer = async (req, res) => {
   try {
     const [[row]] = await pool.query('SELECT * FROM dealers WHERE id_dealer=?', [req.params.id]);
     res.json({ success: true, data: row || null, error: null });
-  } catch (e) { res.status(500).json({ success: false, data: null, error: e.message }); }
+  } catch (e) { (console.error('[error]', e), res.status(500).json({success:false,data:null,error:'Error interno del servidor'})); }
 };
 
 const getCcsList = async (req, res) => {
   try {
     const [rows] = await pool.query('SELECT DISTINCT ccs_parque FROM dealers WHERE ccs_parque IS NOT NULL ORDER BY ccs_parque');
     res.json({ success: true, data: rows.map(r => r.ccs_parque), error: null });
-  } catch (e) { res.status(500).json({ success: false, data: null, error: e.message }); }
+  } catch (e) { (console.error('[error]', e), res.status(500).json({success:false,data:null,error:'Error interno del servidor'})); }
 };
 
 const importar = async (req, res) => {
@@ -89,7 +89,7 @@ const importar = async (req, res) => {
       VALUES ?`;
     const [result] = await pool.query(sql, [vals]);
     res.json({ success: true, data: { insertados: result.affectedRows }, error: null });
-  } catch (e) { res.status(500).json({ success: false, data: null, error: e.message }); }
+  } catch (e) { (console.error('[error]', e), res.status(500).json({success:false,data:null,error:'Error interno del servidor'})); }
 };
 
 const createDealer = async (req, res) => {
@@ -107,7 +107,7 @@ const createDealer = async (req, res) => {
        r.activo ? 1 : 0, r.tiene_factura ? 1 : 0, r.observaciones || null]
     );
     res.status(201).json({ success: true, data: { id_dealer: result.insertId, numero: maxN }, error: null });
-  } catch (e) { res.status(500).json({ success: false, data: null, error: e.message }); }
+  } catch (e) { (console.error('[error]', e), res.status(500).json({success:false,data:null,error:'Error interno del servidor'})); }
 };
 
 const updateDealer = async (req, res) => {
@@ -125,14 +125,14 @@ const updateDealer = async (req, res) => {
        req.params.id]
     );
     res.json({ success: true, data: { id_dealer: req.params.id }, error: null });
-  } catch (e) { res.status(500).json({ success: false, data: null, error: e.message }); }
+  } catch (e) { (console.error('[error]', e), res.status(500).json({success:false,data:null,error:'Error interno del servidor'})); }
 };
 
 const deleteDealer = async (req, res) => {
   try {
     await pool.query('DELETE FROM dealers WHERE id_dealer=?', [req.params.id]);
     res.json({ success: true, data: { mensaje: 'Dealer eliminado' }, error: null });
-  } catch (e) { res.status(500).json({ success: false, data: null, error: e.message }); }
+  } catch (e) { (console.error('[error]', e), res.status(500).json({success:false,data:null,error:'Error interno del servidor'})); }
 };
 
 module.exports = { getDealers, getDealer, getCcsList, importar, createDealer, updateDealer, deleteDealer };

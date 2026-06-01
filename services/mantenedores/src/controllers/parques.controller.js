@@ -54,7 +54,7 @@ const getAll = async (req, res) => {
     );
     res.json({ success: true, data: rows, error: null });
   } catch (e) {
-    res.status(500).json({ success: false, data: null, error: e.message });
+    (console.error('[error]', e), res.status(500).json({success:false,data:null,error:'Error interno del servidor'}));
   }
 };
 
@@ -75,7 +75,7 @@ const create = async (req, res) => {
     const [[row]] = await pool.query('SELECT * FROM parques_comisiones WHERE id = ?', [r.insertId]);
     res.status(201).json({ success: true, data: row, error: null });
   } catch (e) {
-    res.status(500).json({ success: false, data: null, error: e.message });
+    (console.error('[error]', e), res.status(500).json({success:false,data:null,error:'Error interno del servidor'}));
   }
 };
 
@@ -94,7 +94,7 @@ const update = async (req, res) => {
     const [[row]] = await pool.query('SELECT * FROM parques_comisiones WHERE id = ?', [id]);
     res.json({ success: true, data: row, error: null });
   } catch (e) {
-    res.status(500).json({ success: false, data: null, error: e.message });
+    (console.error('[error]', e), res.status(500).json({success:false,data:null,error:'Error interno del servidor'}));
   }
 };
 
@@ -104,7 +104,7 @@ const remove = async (req, res) => {
     await pool.query('UPDATE parques_comisiones SET activo = 0 WHERE id = ?', [id]);
     res.json({ success: true, data: { desactivado: id }, error: null });
   } catch (e) {
-    res.status(500).json({ success: false, data: null, error: e.message });
+    (console.error('[error]', e), res.status(500).json({success:false,data:null,error:'Error interno del servidor'}));
   }
 };
 

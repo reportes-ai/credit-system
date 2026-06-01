@@ -41,7 +41,7 @@ const getConfig = async (req, res) => {
     rows.forEach(r => { cfg[r.clave] = r.valor; });
     res.json({ success: true, data: cfg, error: null });
   } catch (e) {
-    res.status(500).json({ success: false, data: null, error: e.message });
+    (console.error('[error]', e), res.status(500).json({success:false,data:null,error:'Error interno del servidor'}));
   }
 };
 
@@ -65,7 +65,7 @@ const putConfig = async (req, res) => {
     }
     res.json({ success: true, data: null, error: null });
   } catch (e) {
-    res.status(500).json({ success: false, data: null, error: e.message });
+    (console.error('[error]', e), res.status(500).json({success:false,data:null,error:'Error interno del servidor'}));
   }
 };
 

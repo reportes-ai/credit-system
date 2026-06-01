@@ -42,7 +42,7 @@ const getByCredito = async (req, res) => {
       [req.params.id_credito]
     );
     res.json({ success: true, data: rows, error: null });
-  } catch(e) { res.status(500).json({ success: false, data: null, error: e.message }); }
+  } catch(e) { (console.error('[error]', e), res.status(500).json({success:false,data:null,error:'Error interno del servidor'})); }
 };
 
 /* ─── UPLOAD (base64 en JSON) ───────────────────────────────────────────── */
@@ -79,7 +79,7 @@ const upload = async (req, res) => {
       meta: { id_tipo, tipo_nombre: tipoNombre, archivo_nombre, archivo_size: archivo_size || buffer.length, mime_type },
     });
     res.status(201).json({ success: true, data: { id_doc: r.insertId }, error: null });
-  } catch(e) { res.status(500).json({ success: false, data: null, error: e.message }); }
+  } catch(e) { (console.error('[error]', e), res.status(500).json({success:false,data:null,error:'Error interno del servidor'})); }
 };
 
 /* ─── PATCH comentario ───────────────────────────────────────────────────── */
@@ -89,7 +89,7 @@ const updateComentario = async (req, res) => {
     await pool.query('UPDATE credito_documentos SET comentario=? WHERE id_doc=?',
       [comentario || null, req.params.id_doc]);
     res.json({ success: true, data: { id_doc: req.params.id_doc }, error: null });
-  } catch(e) { res.status(500).json({ success: false, data: null, error: e.message }); }
+  } catch(e) { (console.error('[error]', e), res.status(500).json({success:false,data:null,error:'Error interno del servidor'})); }
 };
 
 /* ─── VIEW inline (para previsualización) ───────────────────────────────── */
@@ -104,7 +104,7 @@ const view = async (req, res) => {
     res.setHeader('Content-Type', doc.mime_type || 'application/octet-stream');
     res.setHeader('Content-Disposition', `inline; filename*=UTF-8''${encodeURIComponent(doc.archivo_nombre)}`);
     res.send(doc.archivo_data);
-  } catch(e) { res.status(500).json({ success: false, error: e.message }); }
+  } catch(e) { (console.error('[error]', e), res.status(500).json({success:false,data:null,error:'Error interno del servidor'})); }
 };
 
 /* ─── DOWNLOAD (fuerza descarga) ────────────────────────────────────────── */
@@ -119,7 +119,7 @@ const download = async (req, res) => {
     res.setHeader('Content-Type', doc.mime_type || 'application/octet-stream');
     res.setHeader('Content-Disposition', `attachment; filename*=UTF-8''${encodeURIComponent(doc.archivo_nombre)}`);
     res.send(doc.archivo_data);
-  } catch(e) { res.status(500).json({ success: false, error: e.message }); }
+  } catch(e) { (console.error('[error]', e), res.status(500).json({success:false,data:null,error:'Error interno del servidor'})); }
 };
 
 /* ─── DELETE ────────────────────────────────────────────────────────────── */
@@ -145,7 +145,7 @@ const remove = async (req, res) => {
       });
     }
     res.json({ success: true, data: { mensaje: 'Documento eliminado' }, error: null });
-  } catch(e) { res.status(500).json({ success: false, data: null, error: e.message }); }
+  } catch(e) { (console.error('[error]', e), res.status(500).json({success:false,data:null,error:'Error interno del servidor'})); }
 };
 
 /* ─── DELETE ALL por crédito ─────────────────────────────────────────────── */
@@ -163,7 +163,7 @@ const removeAll = async (req, res) => {
       meta: { total: prev[0]?.cnt || 0 },
     });
     res.json({ success: true, data: { mensaje: 'Documentos eliminados', total: prev[0]?.cnt || 0 }, error: null });
-  } catch(e) { res.status(500).json({ success: false, data: null, error: e.message }); }
+  } catch(e) { (console.error('[error]', e), res.status(500).json({success:false,data:null,error:'Error interno del servidor'})); }
 };
 
 /* ─── PATCH aprobación por documento ────────────────────────────────────── */
@@ -209,7 +209,7 @@ const updateAprobacion = async (req, res) => {
     });
 
     res.json({ success: true, data: { id_doc: req.params.id_doc }, error: null });
-  } catch(e) { res.status(500).json({ success: false, data: null, error: e.message }); }
+  } catch(e) { (console.error('[error]', e), res.status(500).json({success:false,data:null,error:'Error interno del servidor'})); }
 };
 
 module.exports = { getByCredito, upload, updateComentario, updateAprobacion, view, download, remove, removeAll };

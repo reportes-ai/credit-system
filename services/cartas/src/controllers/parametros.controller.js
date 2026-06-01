@@ -10,7 +10,7 @@ const getParam = async (req, res) => {
     if (!rows.length) return res.json({ success: true, data: null, error: null });
     res.json({ success: true, data: rows[0].value, error: null });
   } catch (e) {
-    res.status(500).json({ success: false, data: null, error: e.message });
+    (console.error('[error]', e), res.status(500).json({success:false,data:null,error:'Error interno del servidor'}));
   }
 };
 
@@ -25,7 +25,7 @@ const setParam = async (req, res) => {
     );
     res.json({ success: true, data: { key: req.params.key }, error: null });
   } catch (e) {
-    res.status(500).json({ success: false, data: null, error: e.message });
+    (console.error('[error]', e), res.status(500).json({success:false,data:null,error:'Error interno del servidor'}));
   }
 };
 

@@ -43,7 +43,7 @@ const getByCredito = async (req, res) => {
       [req.params.id_credito]
     );
     res.json({ success: true, data: rows, error: null });
-  } catch (e) { res.status(500).json({ success: false, data: null, error: e.message }); }
+  } catch (e) { (console.error('[error]', e), res.status(500).json({success:false,data:null,error:'Error interno del servidor'})); }
 };
 
 /* ─── POST / (upload / replace) ─────────────────────────────────────────── */
@@ -91,7 +91,7 @@ const upload = async (req, res) => {
       });
       res.status(201).json({ success: true, data: { id_doc_af: r.insertId }, error: null });
     }
-  } catch (e) { res.status(500).json({ success: false, data: null, error: e.message }); }
+  } catch (e) { (console.error('[error]', e), res.status(500).json({success:false,data:null,error:'Error interno del servidor'})); }
 };
 
 /* ─── PATCH /:id_doc/comentario ─────────────────────────────────────────── */
@@ -102,7 +102,7 @@ const updateComentario = async (req, res) => {
       [req.body.comentario || null, req.params.id_doc]
     );
     res.json({ success: true, data: null, error: null });
-  } catch (e) { res.status(500).json({ success: false, data: null, error: e.message }); }
+  } catch (e) { (console.error('[error]', e), res.status(500).json({success:false,data:null,error:'Error interno del servidor'})); }
 };
 
 /* ─── PATCH /:id_doc/validar ─────────────────────────────────────────────── */
@@ -128,7 +128,7 @@ const validar = async (req, res) => {
       });
     }
     res.json({ success: true, data: null, error: null });
-  } catch (e) { res.status(500).json({ success: false, data: null, error: e.message }); }
+  } catch (e) { (console.error('[error]', e), res.status(500).json({success:false,data:null,error:'Error interno del servidor'})); }
 };
 
 /* ─── PATCH /:id_doc/rechazar ────────────────────────────────────────────── */
@@ -154,7 +154,7 @@ const rechazar = async (req, res) => {
       });
     }
     res.json({ success: true, data: null, error: null });
-  } catch (e) { res.status(500).json({ success: false, data: null, error: e.message }); }
+  } catch (e) { (console.error('[error]', e), res.status(500).json({success:false,data:null,error:'Error interno del servidor'})); }
 };
 
 /* ─── GET /view/:id_doc ──────────────────────────────────────────────────── */
@@ -170,7 +170,7 @@ const view = async (req, res) => {
     res.setHeader('Content-Type', mime_type || 'application/octet-stream');
     res.setHeader('Content-Disposition', `inline; filename="${encodeURIComponent(nombre)}"`);
     res.send(contenido);
-  } catch (e) { res.status(500).json({ success: false, error: e.message }); }
+  } catch (e) { (console.error('[error]', e), res.status(500).json({success:false,data:null,error:'Error interno del servidor'})); }
 };
 
 /* ─── GET /download/:id_doc ──────────────────────────────────────────────── */
@@ -186,7 +186,7 @@ const download = async (req, res) => {
     res.setHeader('Content-Type', mime_type || 'application/octet-stream');
     res.setHeader('Content-Disposition', `attachment; filename="${encodeURIComponent(nombre)}"`);
     res.send(contenido);
-  } catch (e) { res.status(500).json({ success: false, error: e.message }); }
+  } catch (e) { (console.error('[error]', e), res.status(500).json({success:false,data:null,error:'Error interno del servidor'})); }
 };
 
 /* ─── DELETE /:id_doc ────────────────────────────────────────────────────── */
@@ -194,7 +194,7 @@ const remove = async (req, res) => {
   try {
     await pool.query('DELETE FROM documentos_af WHERE id_doc_af=?', [req.params.id_doc]);
     res.json({ success: true, data: null, error: null });
-  } catch (e) { res.status(500).json({ success: false, data: null, error: e.message }); }
+  } catch (e) { (console.error('[error]', e), res.status(500).json({success:false,data:null,error:'Error interno del servidor'})); }
 };
 
 module.exports = { getByCredito, upload, updateComentario, validar, rechazar, view, download, remove };

@@ -200,7 +200,7 @@ const getAll = async (req, res) => {
     );
     res.json({ success: true, data: rows.map(mapRow), error: null });
   } catch (e) {
-    res.status(500).json({ success: false, data: null, error: e.message });
+    (console.error('[error]', e), res.status(500).json({success:false,data:null,error:'Error interno del servidor'}));
   }
 };
 
@@ -298,7 +298,7 @@ const upsert = async (req, res) => {
       res.status(201).json({ success: true, data: { id: r.insertId }, error: null });
     }
   } catch (e) {
-    res.status(500).json({ success: false, data: null, error: e.message });
+    (console.error('[error]', e), res.status(500).json({success:false,data:null,error:'Error interno del servidor'}));
   }
 };
 

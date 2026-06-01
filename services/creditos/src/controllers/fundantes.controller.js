@@ -48,7 +48,7 @@ const getByOperacion = async (req, res) => {
     );
     res.json({ success: true, data: rows, error: null });
   } catch (e) {
-    res.status(500).json({ success: false, data: null, error: e.message });
+    (console.error('[error]', e), res.status(500).json({success:false,data:null,error:'Error interno del servidor'}));
   }
 };
 
@@ -64,7 +64,7 @@ const download = async (req, res) => {
     res.set('Content-Disposition', `attachment; filename="${row.archivo_nombre || 'fundante'}"`);
     res.send(row.archivo_data);
   } catch (e) {
-    res.status(500).json({ success: false, data: null, error: e.message });
+    (console.error('[error]', e), res.status(500).json({success:false,data:null,error:'Error interno del servidor'}));
   }
 };
 
@@ -108,7 +108,7 @@ const upload = async (req, res) => {
 
     res.status(201).json({ success: true, data: row, error: null });
   } catch (e) {
-    res.status(500).json({ success: false, data: null, error: e.message });
+    (console.error('[error]', e), res.status(500).json({success:false,data:null,error:'Error interno del servidor'}));
   }
 };
 
@@ -140,7 +140,7 @@ const validar = async (req, res) => {
     const [[row]] = await pool.query('SELECT * FROM fundantes_brokerage WHERE id = ?', [req.params.id]);
     res.json({ success: true, data: row, error: null });
   } catch (e) {
-    res.status(500).json({ success: false, data: null, error: e.message });
+    (console.error('[error]', e), res.status(500).json({success:false,data:null,error:'Error interno del servidor'}));
   }
 };
 
@@ -170,7 +170,7 @@ const remove = async (req, res) => {
     await _recalcEstadoFundantes(exists.operacion_id);
     res.json({ success: true, data: { eliminado: req.params.id }, error: null });
   } catch (e) {
-    res.status(500).json({ success: false, data: null, error: e.message });
+    (console.error('[error]', e), res.status(500).json({success:false,data:null,error:'Error interno del servidor'}));
   }
 };
 

@@ -66,7 +66,7 @@ const getItems = async (req, res) => {
     sql += ' ORDER BY financiera, orden, id';
     const [rows] = await pool.query(sql, p);
     res.json({ success: true, data: rows, error: null });
-  } catch(e) { res.status(500).json({ success: false, data: null, error: e.message }); }
+  } catch(e) { (console.error('[error]', e), res.status(500).json({success:false,data:null,error:'Error interno del servidor'})); }
 };
 
 const createItem = async (req, res) => {
@@ -80,7 +80,7 @@ const createItem = async (req, res) => {
     );
     const [[row]] = await pool.query('SELECT * FROM broker_validation_items WHERE id=?', [r.insertId]);
     res.status(201).json({ success: true, data: row, error: null });
-  } catch(e) { res.status(500).json({ success: false, data: null, error: e.message }); }
+  } catch(e) { (console.error('[error]', e), res.status(500).json({success:false,data:null,error:'Error interno del servidor'})); }
 };
 
 const updateItem = async (req, res) => {
@@ -96,7 +96,7 @@ const updateItem = async (req, res) => {
     );
     const [[row]] = await pool.query('SELECT * FROM broker_validation_items WHERE id=?', [id]);
     res.json({ success: true, data: row, error: null });
-  } catch(e) { res.status(500).json({ success: false, data: null, error: e.message }); }
+  } catch(e) { (console.error('[error]', e), res.status(500).json({success:false,data:null,error:'Error interno del servidor'})); }
 };
 
 const deleteItem = async (req, res) => {
@@ -106,7 +106,7 @@ const deleteItem = async (req, res) => {
       [req.params.id]
     );
     res.json({ success: true, data: { id: req.params.id }, error: null });
-  } catch(e) { res.status(500).json({ success: false, data: null, error: e.message }); }
+  } catch(e) { (console.error('[error]', e), res.status(500).json({success:false,data:null,error:'Error interno del servidor'})); }
 };
 
 // ── Validaciones por crédito ───────────────────────────────────────────────
@@ -117,7 +117,7 @@ const getValidaciones = async (req, res) => {
       [req.params.creditId]
     );
     res.json({ success: true, data: rows, error: null });
-  } catch(e) { res.status(500).json({ success: false, data: null, error: e.message }); }
+  } catch(e) { (console.error('[error]', e), res.status(500).json({success:false,data:null,error:'Error interno del servidor'})); }
 };
 
 const saveValidaciones = async (req, res) => {
@@ -154,7 +154,7 @@ const saveValidaciones = async (req, res) => {
 
     const [rows] = await pool.query('SELECT * FROM broker_validaciones WHERE id_credito=?', [creditId]);
     res.json({ success: true, data: rows, error: null });
-  } catch(e) { res.status(500).json({ success: false, data: null, error: e.message }); }
+  } catch(e) { (console.error('[error]', e), res.status(500).json({success:false,data:null,error:'Error interno del servidor'})); }
 };
 
 module.exports = { getItems, createItem, updateItem, deleteItem, getValidaciones, saveValidaciones };

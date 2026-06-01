@@ -11,7 +11,7 @@ const getConfig = async (req, res) => {
   try {
     const [[row]] = await pool.query('SELECT valor FROM config_sistema WHERE clave=?', [req.params.clave]);
     res.json({ success: true, data: row ? JSON.parse(row.valor) : null, error: null });
-  } catch (e) { res.status(500).json({ success: false, data: null, error: e.message }); }
+  } catch (e) { (console.error('[error]', e), res.status(500).json({success:false,data:null,error:'Error interno del servidor'})); }
 };
 
 const setConfig = async (req, res) => {
@@ -22,7 +22,7 @@ const setConfig = async (req, res) => {
       [req.params.clave, JSON.stringify(valor)]
     );
     res.json({ success: true, data: { mensaje: 'Guardado' }, error: null });
-  } catch (e) { res.status(500).json({ success: false, data: null, error: e.message }); }
+  } catch (e) { (console.error('[error]', e), res.status(500).json({success:false,data:null,error:'Error interno del servidor'})); }
 };
 
 module.exports = { getConfig, setConfig };

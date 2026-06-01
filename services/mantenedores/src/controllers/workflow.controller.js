@@ -89,7 +89,7 @@ exports.get = async (req, res) => {
     res.json({ success: true, data: etapas });
   } catch (e) {
     console.error('[workflow] get:', e);
-    res.status(500).json({ success: false, error: e.message });
+    (console.error('[error]', e), res.status(500).json({success:false,data:null,error:'Error interno del servidor'}));
   }
 };
 
@@ -109,6 +109,6 @@ exports.put = async (req, res) => {
     res.json({ success: true, data: ordenadas });
   } catch (e) {
     console.error('[workflow] put:', e);
-    res.status(500).json({ success: false, error: e.message });
+    (console.error('[error]', e), res.status(500).json({success:false,data:null,error:'Error interno del servidor'}));
   }
 };
