@@ -105,7 +105,8 @@
     </div>
   </div>
 
-  <script>
+  <script src="/js/auth-guard.js"></script>
+<script>
     const token = sessionStorage.getItem('token');
     const yo    = JSON.parse(sessionStorage.getItem('usuario') || 'null');
     if (!token || !yo) window.location.href = '/login.html';

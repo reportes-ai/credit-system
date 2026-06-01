@@ -145,6 +145,7 @@
 
 <div class="toast-msg" id="toastMsg"></div>
 
+<script src="/js/auth-guard.js"></script>
 <script>
 const TOKEN = () => sessionStorage.getItem('token');
 const HDR   = () => ({ 'Content-Type':'application/json', 'Authorization':'Bearer '+TOKEN() });
