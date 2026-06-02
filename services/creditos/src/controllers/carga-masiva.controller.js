@@ -71,7 +71,7 @@ function mapRow(row) {
     nombre_cliente:     s('NOMBRE'),
     comentarios:        s('COMENTARIOS'),
     ejecutivo:          s('EJ.COMERCIAL'),
-    financiera:         s('FINANCIERA'),
+    financiera:         norm(getCol(row, 'FINANCIERA')) || 'NO APLICA',
     automotora:         s('AUTOMOTORA'),
     nombre_local:       s('NOMBRE LOCAL'),
     estado_eval:        s('ESTADO EVAL. RIESGO', 'ESTADO EVAL RIESGO'),
