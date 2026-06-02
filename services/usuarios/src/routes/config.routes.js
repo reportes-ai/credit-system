@@ -9,6 +9,6 @@ router.get('/seguridad',      verifyToken,            ctrl.getConfig);
 router.put('/seguridad',      verifyToken, soloAdmin, ctrl.putConfig);
 
 router.get('/ui/:clave',      verifyToken,            uiCtrl.getUiConfig);
-router.put('/ui/:clave',      verifyToken, soloAdmin, uiCtrl.putUiConfig);
+router.put('/ui/:clave',      verifyToken,            uiCtrl.putUiConfig);
 
 module.exports = router;

@@ -206,10 +206,10 @@
           toggleReordenar();
           mostrarToastOrden('Orden guardado');
         } else {
-          alert('Error al guardar: ' + (json.error || res.status));
+          mostrarToastError('Error al guardar: ' + (json.error || res.status));
         }
       } catch (e) {
-        alert('Error al guardar: ' + e.message);
+        mostrarToastError('Error al guardar: ' + e.message);
       } finally {
         btn.disabled = false;
         btn.innerHTML = '<i class="bi bi-floppy"></i>Guardar orden';
