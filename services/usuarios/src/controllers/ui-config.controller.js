@@ -1,42 +1,47 @@
 const pool = require('../../../../shared/config/database');
 
-/* Reutiliza config_seguridad (ya existe en producción) con prefijo "ui_" */
+const ENSURE_TABLE = `
+  CREATE TABLE IF NOT EXISTS config_ui (
+    clave      VARCHAR(100) NOT NULL PRIMARY KEY,
+    valor      TEXT         NOT NULL,
+    updated_at DATETIME     DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+  )`;
 
 const getUiConfig = async (req, res) => {
   try {
-    const clave = 'ui_' + req.params.clave;
-    console.log('[getUiConfig] clave:', clave, '| usuario:', req.usuario?.id_usuario);
-    const [rows] = await pool.query('SELECT valor FROM config_seguridad WHERE clave = ?', [clave]);
-    console.log('[getUiConfig] rows encontradas:', rows.length);
+    await pool.query(ENSURE_TABLE);
+    const { clave } = req.params;
+    const [rows] = await pool.query('SELECT valor FROM config_ui WHERE clave = ?', [clave]);
     if (!rows.length) return res.json({ success: true, data: null, error: null });
     let data;
     try { data = JSON.parse(rows[0].valor); } catch { data = rows[0].valor; }
-    console.log('[getUiConfig] data retornada:', Array.isArray(data) ? `array[${data.length}]` : typeof data);
     res.json({ success: true, data, error: null });
   } catch (e) {
-    console.error('[getUiConfig ERROR]', e.message);
+    console.error('[getUiConfig]', e.message);
     res.status(500).json({ success: false, data: null, error: e.message });
   }
 };
 
 const putUiConfig = async (req, res) => {
   try {
-    const clave = 'ui_' + req.params.clave;
+    await pool.query(ENSURE_TABLE);
+    const { clave } = req.params;
     const { valor } = req.body;
-    console.log('[putUiConfig] clave:', clave, '| usuario:', req.usuario?.id_usuario, '| perfil:', req.usuario?.perfil_nombre, '| valor tipo:', typeof valor, '| length:', Array.isArray(valor) ? valor.length : '?');
     if (valor === undefined) return res.status(400).json({ success: false, data: null, error: 'Falta campo valor' });
     const valorStr = typeof valor === 'string' ? valor : JSON.stringify(valor);
     await pool.query(
-      `INSERT INTO config_seguridad (clave, valor) VALUES (?, ?)
+      `INSERT INTO config_ui (clave, valor) VALUES (?, ?)
        ON DUPLICATE KEY UPDATE valor = VALUES(valor), updated_at = CURRENT_TIMESTAMP`,
       [clave, valorStr]
     );
-    console.log('[putUiConfig] guardado OK:', clave);
     res.json({ success: true, data: null, error: null });
   } catch (e) {
-    console.error('[putUiConfig ERROR]', e.message);
+    console.error('[putUiConfig]', e.message);
     res.status(500).json({ success: false, data: null, error: e.message });
   }
 };
 
-module.exports = { getUiConfig, putUiConfig };
+/* GET /api/config/ui/ping — diagnóstico sin BD */
+const ping = (_req, res) => res.json({ success: true, data: 'pong', error: null });
+
+module.exports = { getUiConfig, putUiConfig, ping };

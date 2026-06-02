@@ -216,6 +216,18 @@
       }
     }
 
+    /* diagnóstico: window.testOrden() en consola del navegador */
+    window.testOrden = async function() {
+      const ping = await fetch('/api/config/ui/ping', { headers: H });
+      console.log('PING status:', ping.status, await ping.json());
+      const get  = await fetch(`/api/config/ui/${CONFIG_KEY}`, { headers: H });
+      console.log('GET  status:', get.status,  await get.json());
+      const put  = await fetch(`/api/config/ui/${CONFIG_KEY}`, { method: 'PUT', headers: H, body: JSON.stringify({ valor: ['TEST'] }) });
+      console.log('PUT  status:', put.status,  await put.json());
+      const get2 = await fetch(`/api/config/ui/${CONFIG_KEY}`, { headers: H });
+      console.log('GET2 status:', get2.status, await get2.json());
+    };
+
     cargar();
   </script>
 <script src="/js/app-version.js"></script>
