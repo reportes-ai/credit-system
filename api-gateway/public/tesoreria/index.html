@@ -145,14 +145,23 @@
 
     let sortable = null, modoReordenar = false;
 
+    function leerOrdenLocal() {
+      try { const v = localStorage.getItem(CONFIG_KEY); return v ? JSON.parse(v) : null; } catch { return null; }
+    }
+
     async function cargar() {
       const items = ITEMS_ALL.filter(i => !i.soloAdmin || esAdmin);
-      let orden = null;
-      try {
-        const res  = await fetch(`/api/config/ui/${CONFIG_KEY}`, { headers: H });
-        const json = await res.json();
-        if (json.success && Array.isArray(json.data)) orden = json.data;
-      } catch {}
+      let orden = leerOrdenLocal();
+      if (!orden) {
+        try {
+          const res  = await fetch(`/api/config/ui/${CONFIG_KEY}`, { headers: H });
+          const json = await res.json();
+          if (json.success && Array.isArray(json.data)) {
+            orden = json.data;
+            localStorage.setItem(CONFIG_KEY, JSON.stringify(orden));
+          }
+        } catch {}
+      }
 
       const ordenados = orden
         ? orden.map(id => items.find(i => i.id === id)).filter(Boolean)
@@ -206,16 +215,14 @@
       try {
         const ids = [...document.getElementById('modulesGrid').querySelectorAll('.module-card')]
           .map(c => c.dataset.id);
-        const res  = await fetch(`/api/config/ui/${CONFIG_KEY}`, {
-          method: 'PUT', headers: H, body: JSON.stringify({ valor: ids }),
-        });
-        const json = await res.json();
-        if (json.success) {
-          toggleReordenar();
-          mostrarToastOrden('Orden guardado');
-        } else {
-          alert('Error al guardar: ' + json.error);
-        }
+        localStorage.setItem(CONFIG_KEY, JSON.stringify(ids));
+        try {
+          await fetch(`/api/config/ui/${CONFIG_KEY}`, {
+            method: 'PUT', headers: H, body: JSON.stringify({ valor: ids }),
+          });
+        } catch {}
+        toggleReordenar();
+        mostrarToastOrden('Orden guardado');
       } catch (e) {
         alert('Error al guardar: ' + e.message);
       } finally {

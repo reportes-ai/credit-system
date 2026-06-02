@@ -212,17 +212,25 @@
 
   // Aplica orden guardado reordenando nodos del DOM
   (async () => {
-    try {
-      const res  = await fetch(`/api/config/ui/${CONFIG_KEY}`, { headers: H });
-      const json = await res.json();
-      if (json.success && Array.isArray(json.data)) {
-        const grid = document.getElementById('moduleGrid');
-        json.data.forEach(id => {
-          const card = grid.querySelector(`[data-id="${id}"]`);
-          if (card) grid.appendChild(card);
-        });
-      }
-    } catch {}
+    let orden = null;
+    try { const v = localStorage.getItem(CONFIG_KEY); orden = v ? JSON.parse(v) : null; } catch {}
+    if (!orden) {
+      try {
+        const res  = await fetch(`/api/config/ui/${CONFIG_KEY}`, { headers: H });
+        const json = await res.json();
+        if (json.success && Array.isArray(json.data)) {
+          orden = json.data;
+          localStorage.setItem(CONFIG_KEY, JSON.stringify(orden));
+        }
+      } catch {}
+    }
+    if (orden) {
+      const grid = document.getElementById('moduleGrid');
+      orden.forEach(id => {
+        const card = grid.querySelector(`[data-id="${id}"]`);
+        if (card) grid.appendChild(card);
+      });
+    }
   })();
 
   let sortable = null, modoReordenar = false;
@@ -261,16 +269,14 @@
     try {
       const ids = [...document.getElementById('moduleGrid').querySelectorAll('.module-card[data-id]')]
         .map(c => c.dataset.id);
-      const res  = await fetch(`/api/config/ui/${CONFIG_KEY}`, {
-        method: 'PUT', headers: H, body: JSON.stringify({ valor: ids }),
-      });
-      const json = await res.json();
-      if (json.success) {
-        toggleReordenar();
-        mostrarToastOrden('Orden guardado');
-      } else {
-        alert('Error al guardar: ' + json.error);
-      }
+      localStorage.setItem(CONFIG_KEY, JSON.stringify(ids));
+      try {
+        await fetch(`/api/config/ui/${CONFIG_KEY}`, {
+          method: 'PUT', headers: H, body: JSON.stringify({ valor: ids }),
+        });
+      } catch {}
+      toggleReordenar();
+      mostrarToastOrden('Orden guardado');
     } catch (e) {
       alert('Error al guardar: ' + e.message);
     } finally {

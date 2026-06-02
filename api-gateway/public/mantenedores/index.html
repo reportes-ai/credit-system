@@ -137,13 +137,23 @@
     let sortable = null, modoReordenar = false;
     const CONFIG_KEY = 'submenu_mantenedores';
 
+    function leerOrdenLocal() {
+      try { const v = localStorage.getItem(CONFIG_KEY); return v ? JSON.parse(v) : null; } catch { return null; }
+    }
+
     async function cargar() {
-      let orden = null;
-      try {
-        const res  = await fetch(`/api/config/ui/${CONFIG_KEY}`, { headers: H });
-        const json = await res.json();
-        if (json.success && Array.isArray(json.data)) orden = json.data;
-      } catch {}
+      // localStorage primero (siempre disponible), luego API como respaldo
+      let orden = leerOrdenLocal();
+      if (!orden) {
+        try {
+          const res  = await fetch(`/api/config/ui/${CONFIG_KEY}`, { headers: H });
+          const json = await res.json();
+          if (json.success && Array.isArray(json.data)) {
+            orden = json.data;
+            localStorage.setItem(CONFIG_KEY, JSON.stringify(orden));
+          }
+        } catch {}
+      }
 
       const items = orden
         ? orden.map(id => ITEMS_DEFAULT.find(i => i.id === id)).filter(Boolean)
@@ -198,16 +208,16 @@
       try {
         const ids = [...document.getElementById('modulesGrid').querySelectorAll('.module-card')]
           .map(c => c.dataset.id);
-        const res  = await fetch(`/api/config/ui/${CONFIG_KEY}`, {
-          method: 'PUT', headers: H, body: JSON.stringify({ valor: ids }),
-        });
-        const json = await res.json();
-        if (json.success) {
-          toggleReordenar();
-          mostrarToastOrden('Orden guardado');
-        } else {
-          alert('Error al guardar: ' + json.error);
-        }
+        // localStorage: siempre persiste en este navegador
+        localStorage.setItem(CONFIG_KEY, JSON.stringify(ids));
+        // API: respaldo en servidor (no bloquea si falla)
+        try {
+          await fetch(`/api/config/ui/${CONFIG_KEY}`, {
+            method: 'PUT', headers: H, body: JSON.stringify({ valor: ids }),
+          });
+        } catch {}
+        toggleReordenar();
+        mostrarToastOrden('Orden guardado');
       } catch (e) {
         alert('Error al guardar: ' + e.message);
       } finally {
