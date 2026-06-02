@@ -167,7 +167,7 @@
     if (!token || !usuario) { window.location.href = '/login.html'; }
 
     const esAdmin = usuario?.perfil === 'Administrador';
-    const H = { Authorization: `Bearer ${token}` };
+    const H = { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' };
 
     if (usuario) {
       const nombre = `${usuario.nombre} ${usuario.apellido || ''}`.trim();
