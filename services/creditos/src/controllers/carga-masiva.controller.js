@@ -58,7 +58,7 @@ function resolveCol(row, ...candidates) {
 }
 function getCol(row, ...candidates) { return row[resolveCol(row, ...candidates)]; }
 
-function mapRow(row) {
+function mapRow(row, mesOverride) {
   const n = (...cols) => normNum(getCol(row, ...cols));
   const s = (...cols) => { const v = norm(getCol(row, ...cols)); return (v && v.toUpperCase() !== 'NO APLICA') ? v : null; };
   const d = (...cols) => normDate(getCol(row, ...cols));
@@ -66,7 +66,8 @@ function mapRow(row) {
 
   return {
     num_op:             i('OP'),
-    mes:                d('MES'),
+    // mesOverride fuerza el mes contable del archivo (evita que fechas de evaluación en otro mes corrompan el dato)
+    mes:                mesOverride || d('MES'),
     rut_cliente:        s('RUT'),
     nombre_cliente:     s('NOMBRE'),
     comentarios:        s('COMENTARIOS'),
@@ -201,12 +202,15 @@ const importar = async (req, res) => {
 
     const nuevos = data.filter(r => !setExistentes.has(parseInt(r[colOP])));
 
+    // mes_override: fuerza el mes contable a un valor fijo (evita desfases por fecha de evaluación)
+    const mesOverride = req.body.mes_override || null;
+
     let insertados = 0;
     let errores    = [];
 
     for (const row of nuevos) {
       try {
-        const obj = mapRow(row);
+        const obj = mapRow(row, mesOverride);
         if (!obj.num_op) continue;
 
         const cols   = Object.keys(obj).filter(k => obj[k] !== undefined && obj[k] !== null);
@@ -240,4 +244,26 @@ const importar = async (req, res) => {
   }
 };
 
-module.exports = { preview, importar };
+/* ── POST /api/carga-masiva/corregir-mes ───────────────────────────────── */
+// Corrige registros cuyo mes quedó en un mes diferente al esperado
+// Body: { mes_incorrecto: '2026-06-01', mes_correcto: '2026-05-01' }
+const corregirMes = async (req, res) => {
+  try {
+    const { mes_incorrecto, mes_correcto } = req.body;
+    if (!mes_incorrecto || !mes_correcto) {
+      return res.status(400).json({ success: false, data: null, error: 'Faltan parámetros mes_incorrecto y mes_correcto' });
+    }
+    const mesInc = mes_incorrecto.slice(0, 7); // YYYY-MM
+    const mesCor = mes_correcto.slice(0, 7);
+    const [result] = await pool.query(
+      `UPDATE operaciones_brokerage SET mes = ? WHERE DATE_FORMAT(mes, '%Y-%m') = ?`,
+      [mesCor + '-01', mesInc]
+    );
+    res.json({ success: true, data: { afectados: result.affectedRows }, error: null });
+  } catch (e) {
+    console.error('[corregirMes]', e.message);
+    res.status(500).json({ success: false, data: null, error: e.message });
+  }
+};
+
+module.exports = { preview, importar, corregirMes };

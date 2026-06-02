@@ -105,11 +105,16 @@
       <div class="sub">Solo archivos .xlsx — máx. 10 MB</div>
     </div>
     <input type="file" id="fileInput" accept=".xlsx" onchange="archivoSeleccionado(event)">
-    <div style="display:flex;gap:12px;margin-top:16px">
+    <div style="display:flex;gap:16px;margin-top:16px;align-items:center;flex-wrap:wrap">
+      <div style="display:flex;align-items:center;gap:8px">
+        <label style="font-weight:600;font-size:.85rem;color:#374151;white-space:nowrap"><i class="bi bi-calendar3 me-1"></i>Mes contable del archivo:</label>
+        <input type="month" id="mesArchivo" style="border:1.5px solid #d1d5db;border-radius:8px;padding:7px 12px;font-size:.88rem;outline:none">
+      </div>
       <button class="btn-main" id="btnPreview" onclick="ejecutarPreview()" disabled>
         <i class="bi bi-eye"></i>Vista previa
       </button>
     </div>
+    <div style="margin-top:10px;font-size:.78rem;color:#9ca3af"><i class="bi bi-info-circle me-1"></i>El mes contable asegura que todos los registros queden asignados al mes correcto, independiente de cuándo fueron evaluados.</div>
   </div>
 
   <!-- PASO 2: Preview -->
@@ -126,6 +131,26 @@
     <button class="btn-main btn-success" id="btnImportar" onclick="ejecutarImport()">
       <i class="bi bi-cloud-upload"></i>Importar registros nuevos
     </button>
+  </div>
+
+  <!-- HERRAMIENTA: Corregir mes de registros mal asignados -->
+  <div class="card-box">
+    <h6><i class="bi bi-wrench"></i>Corregir mes contable de registros existentes</h6>
+    <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap">
+      <div style="display:flex;align-items:center;gap:8px">
+        <label style="font-size:.83rem;color:#374151;font-weight:600">Mes incorrecto:</label>
+        <input type="month" id="mesIncorrecto" style="border:1.5px solid #d1d5db;border-radius:8px;padding:6px 10px;font-size:.85rem">
+      </div>
+      <i class="bi bi-arrow-right" style="color:#9ca3af"></i>
+      <div style="display:flex;align-items:center;gap:8px">
+        <label style="font-size:.83rem;color:#374151;font-weight:600">Mes correcto:</label>
+        <input type="month" id="mesCorrecto" style="border:1.5px solid #d1d5db;border-radius:8px;padding:6px 10px;font-size:.85rem">
+      </div>
+      <button class="btn-main" onclick="corregirMes()" style="background:#d97706">
+        <i class="bi bi-pencil"></i>Corregir mes
+      </button>
+    </div>
+    <div style="font-size:.75rem;color:#9ca3af;margin-top:8px">Mueve todos los registros del mes incorrecto al mes correcto en la base de datos.</div>
   </div>
 
   <!-- PASO 3: Resultado -->
@@ -220,18 +245,38 @@ function mostrarPreview({ resumen, preview }) {
 
 async function ejecutarImport() {
   if (!archivoActual) return;
-  if (!confirm(`¿Confirmas la importación? Solo se insertarán los registros NUEVOS.`)) return;
+  const mes = document.getElementById('mesArchivo').value;
+  if (!mes) { toast('Selecciona el mes contable del archivo antes de importar', false); return; }
+  if (!confirm(`¿Confirmas la importación de registros NUEVOS con mes contable ${mes}?`)) return;
   const btn = document.getElementById('btnImportar');
   btn.disabled = true; btn.innerHTML = '<i class="bi bi-hourglass-split"></i>Importando...';
   try {
     const fd = new FormData();
     fd.append('archivo', archivoActual);
+    fd.append('mes_override', mes + '-01');
     const res  = await fetch('/api/carga-masiva/importar', { method:'POST', headers:H, body:fd });
     const json = await res.json();
     if (!json.success) { toast('Error: ' + json.error, false); return; }
     mostrarResultado(json.data);
   } catch(e) { toast('Error: ' + e.message, false); }
   finally { btn.disabled = false; btn.innerHTML = '<i class="bi bi-cloud-upload"></i>Importar registros nuevos'; }
+}
+
+async function corregirMes() {
+  const inc = document.getElementById('mesIncorrecto').value;
+  const cor = document.getElementById('mesCorrecto').value;
+  if (!inc || !cor) { toast('Selecciona ambos meses', false); return; }
+  if (inc === cor)   { toast('Los meses son iguales', false); return; }
+  if (!confirm(`¿Mover TODOS los registros de ${inc} → ${cor}?`)) return;
+  try {
+    const res  = await fetch('/api/carga-masiva/corregir-mes', {
+      method:'POST', headers: {...H, 'Content-Type':'application/json'},
+      body: JSON.stringify({ mes_incorrecto: inc + '-01', mes_correcto: cor + '-01' }),
+    });
+    const json = await res.json();
+    if (json.success) toast(`✓ ${json.data.afectados} registros corregidos de ${inc} → ${cor}`, true);
+    else toast('Error: ' + json.error, false);
+  } catch(e) { toast('Error: ' + e.message, false); }
 }
 
 function mostrarResultado(d) {
