@@ -208,6 +208,9 @@
         if (sortable) { sortable.destroy(); sortable = null; }
         // Restaurar href
         grid.querySelectorAll('.module-card').forEach(card => {
+          // Restaurar por data-ruta (simCard y cualquier card con ruta directa)
+          if (card.dataset.ruta) { card.href = card.dataset.ruta; return; }
+          // Restaurar por id de módulo
           const id = parseInt(card.dataset.id);
           const mod = modulosData.find(m => m.id_modulo === id);
           if (mod) card.href = mod.ruta || '#';
@@ -312,8 +315,12 @@
         // Simulador Rentabilidad — siempre como primer card
         const simCard = document.createElement('a');
         simCard.href = '/simulador/';
+        simCard.dataset.ruta = '/simulador/';  // persiste aunque sortable quite el href
         simCard.className = 'module-card';
+        simCard.style.cursor = 'pointer';
+        simCard.addEventListener('click', (e) => { e.preventDefault(); window.location.href = '/simulador/'; });
         simCard.innerHTML = `
+          <i class="bi bi-grip-vertical drag-handle"></i>
           <div class="card-icon"><i class="bi bi-calculator"></i></div>
           <h6>Simulador Rentabilidad</h6>
           <p>AutoFin y Unidad de Crédito. Calcula ingresos, comisiones y cuota en tiempo real.</p>
