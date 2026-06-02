@@ -84,36 +84,46 @@ function calcularComision(creditos, vars) {
   const baseMas24 = montoMas24 * pct_mas24;
   const incentivo_base = base24 + baseMas24;
 
-  // NCNU: AUTOFIN, no CORFO
+  // NCNU: AUTOFIN, no CORFO (base de medición de seguros)
   const ncnu = otorgados.filter(c =>
     (c.financiera || '').toUpperCase() === 'AUTOFIN' &&
     !(c.producto || '').toUpperCase().includes('CORFO')
   );
-  const ncnu_total = ncnu.length;
-  const ncnu_cesantia = ncnu.filter(c => (parseFloat(c.seguro_cesantia) || 0) > 0).length;
+  const ncnu_total    = ncnu.length;
+  const ncnu_cesantia = ncnu.filter(c => (parseFloat(c.seguro_cesantia)  || 0) > 0).length;
   const ncnu_rep      = ncnu.filter(c => (parseFloat(c.seguro_rep_menor) || 0) > 0).length;
 
-  const cruce_cesantia    = ncnu_total > 0 ? ncnu_cesantia / ncnu_total : 0;
-  const cruce_reparaciones= ncnu_total > 0 ? ncnu_rep      / ncnu_total : 0;
-  const calidad = otorgados.length > 0 ? 1 : 0; // todos los cursados se otorgan
+  const cruce_cesantia     = ncnu_total > 0 ? ncnu_cesantia / ncnu_total : 0;
+  const cruce_reparaciones = ncnu_total > 0 ? ncnu_rep      / ncnu_total : 0;
+
+  // Calidad: meta = 3 créditos UNIDAD DE CRÉDITO en el mes
+  const META_UNIDAD = 3;
+  const unidad_logrado = otorgados.filter(c =>
+    (c.financiera || '').toUpperCase().includes('UNIDAD') ||
+    (c.producto   || '').toUpperCase().includes('UNIDAD')
+  ).length;
+  const calidad        = Math.min(unidad_logrado / META_UNIDAD, 1);
 
   const cumple_ces = cruce_cesantia    > umbral_cesantia;
   const cumple_rep = cruce_reparaciones > umbral_rep;
 
-  const ajuste_ces    = (cumple_ces ? cruce_cesantia    : 0) * peso_cesantia * factor_max;
-  const ajuste_rep    = (cumple_rep ? cruce_reparaciones : 0) * peso_rep      * factor_max;
-  const ajuste_calidad= calidad * peso_calidad * factor_max;
-  const factor_ajuste = ajuste_ces + ajuste_rep + ajuste_calidad;
+  const ajuste_ces     = (cumple_ces ? cruce_cesantia    : 0) * peso_cesantia * factor_max;
+  const ajuste_rep     = (cumple_rep ? cruce_reparaciones : 0) * peso_rep      * factor_max;
+  const ajuste_calidad = calidad * peso_calidad * factor_max;
+  const factor_ajuste  = ajuste_ces + ajuste_rep + ajuste_calidad;
 
-  // Montos con seguro
-  const ces24    = ot24.filter(c => (parseFloat(c.seguro_cesantia)||0) > 0).reduce((s,c)=>s+(parseFloat(c.monto_financiado)||0),0);
-  const cesMas24 = otMas24.filter(c=> (parseFloat(c.seguro_cesantia)||0) > 0).reduce((s,c)=>s+(parseFloat(c.monto_financiado)||0),0);
-  const rep24    = ot24.filter(c => (parseFloat(c.seguro_rep_menor)||0) > 0).reduce((s,c)=>s+(parseFloat(c.monto_financiado)||0),0);
-  const repMas24 = otMas24.filter(c=> (parseFloat(c.seguro_rep_menor)||0) > 0).reduce((s,c)=>s+(parseFloat(c.monto_financiado)||0),0);
+  // Bonos cesantía y rep: solo sobre créditos NCNU con seguro
+  const ncnu24    = ncnu.filter(c => parseInt(c.plazo) <= 24);
+  const ncnuMas24 = ncnu.filter(c => parseInt(c.plazo) >  24);
 
-  const bono_ces    = (ces24 * pct_24 + cesMas24 * pct_mas24) * ajuste_ces;
-  const bono_rep    = (rep24 * pct_24 + repMas24 * pct_mas24) * ajuste_rep;
-  const bono_calidad= (base24 + baseMas24) * ajuste_calidad;
+  const ces24    = ncnu24.filter(c    => (parseFloat(c.seguro_cesantia) ||0)>0).reduce((s,c)=>s+(parseFloat(c.monto_financiado)||0),0);
+  const cesMas24 = ncnuMas24.filter(c => (parseFloat(c.seguro_cesantia) ||0)>0).reduce((s,c)=>s+(parseFloat(c.monto_financiado)||0),0);
+  const rep24    = ncnu24.filter(c    => (parseFloat(c.seguro_rep_menor)||0)>0).reduce((s,c)=>s+(parseFloat(c.monto_financiado)||0),0);
+  const repMas24 = ncnuMas24.filter(c => (parseFloat(c.seguro_rep_menor)||0)>0).reduce((s,c)=>s+(parseFloat(c.monto_financiado)||0),0);
+
+  const bono_ces     = (ces24 * pct_24 + cesMas24 * pct_mas24) * ajuste_ces;
+  const bono_rep     = (rep24 * pct_24 + repMas24 * pct_mas24) * ajuste_rep;
+  const bono_calidad = (base24 + baseMas24) * ajuste_calidad;
 
   const incentivo_final = incentivo_base + bono_ces + bono_rep + bono_calidad;
 
@@ -125,7 +135,8 @@ function calcularComision(creditos, vars) {
     base_24: base24, base_mas24: baseMas24,
     incentivo_base,
     ncnu_total, ncnu_cesantia, ncnu_rep,
-    cruce_cesantia, cruce_reparaciones, calidad,
+    cruce_cesantia, cruce_reparaciones,
+    calidad, calidad_logrado: unidad_logrado, calidad_meta: META_UNIDAD,
     cumple_cesantia: cumple_ces, cumple_reparaciones: cumple_rep,
     ajuste_cesantia: ajuste_ces, ajuste_reparaciones: ajuste_rep,
     ajuste_calidad, factor_ajuste,

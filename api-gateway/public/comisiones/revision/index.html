@@ -384,11 +384,11 @@ function renderEjecutivo(d, idx, mes) {
         <div class="prog-bar"><div class="prog-bar-fill" style="width:${barRep}%;background:${d.cumple_reparaciones?'#16a34a':'#dc2626'}"></div></div>
         <div class="m-sub">${d.cumple_reparaciones?'✓ Cumple':'✗ No cumple'} &nbsp;| ajuste: ${pct(d.ajuste_reparaciones)}</div>
       </div>
-      <div class="metrica ok">
-        <div class="m-label">Calidad</div>
-        <div class="m-value">${pct(d.calidad)}</div>
-        <div class="m-sub">${d.total_creditos} créditos otorgados · meta: 100%</div>
-        <div class="m-sub">ajuste: ${pct(d.ajuste_calidad)}</div>
+      <div class="metrica ${(d.calidad_logrado||0) >= (d.calidad_meta||3) ? 'ok' : (d.calidad_logrado||0) > 0 ? 'warn' : 'bad'}">
+        <div class="m-label">Calidad — Créditos UNIDAD</div>
+        <div class="m-value">${pct(d.calidad)} <small style="font-size:.72rem;font-weight:400">(${d.calidad_logrado||0}/${d.calidad_meta||3})</small></div>
+        <div class="prog-bar"><div class="prog-bar-fill" style="width:${Math.min((d.calidad||0)*100,100)}%;background:${(d.calidad_logrado||0)>=(d.calidad_meta||3)?'#16a34a':(d.calidad_logrado||0)>0?'#d97706':'#dc2626'}"></div></div>
+        <div class="m-sub">${d.calidad_logrado||0} crédito${(d.calidad_logrado||0)!==1?'s':''} UNIDAD · meta: ${d.calidad_meta||3} | ajuste: ${pct(d.ajuste_calidad)}</div>
       </div>
     </div>
 
