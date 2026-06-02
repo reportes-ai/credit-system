@@ -220,7 +220,8 @@
 
     async function guardarOrden() {
       const grid = document.getElementById('modulesGrid');
-      const cards = [...grid.querySelectorAll('.module-card')];
+      const cards = [...grid.querySelectorAll('.module-card')]
+        .filter(c => c.dataset.id && !isNaN(parseInt(c.dataset.id)));
       const orden = cards.map((c, i) => ({ id_modulo: parseInt(c.dataset.id), orden: i + 1 }));
       const res = await fetch('/api/perfiles/modulos/reordenar', {
         method: 'PUT',
