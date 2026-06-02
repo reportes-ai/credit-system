@@ -210,6 +210,26 @@ const getCalculo = async (req, res) => {
     const resultado = Object.entries(map).map(([ejecutivo, creds]) => {
       const calc = calcularComision(creds, vars);
       const aprob = aprobMap[ejecutivo] || { estado: 'pendiente' };
+
+      // Anotar cada crédito con su incentivo individual
+      if (calc.cumple_minimo) {
+        creds.forEach(c => {
+          if ((c.estado_credito || '').toUpperCase() !== 'OTORGADO') return;
+          const pct    = parseInt(c.plazo) <= 24 ? vars.pct_24 : vars.pct_mas24;
+          const monto  = parseFloat(c.monto_financiado) || 0;
+          const base   = monto * pct;
+          const isNcnu = (c.financiera || '').toUpperCase() === 'AUTOFIN' &&
+                         !(c.producto  || '').toUpperCase().includes('CORFO');
+          const hasCes = (parseFloat(c.seguro_cesantia)  || 0) > 0;
+          const hasRep = (parseFloat(c.seguro_rep_menor) || 0) > 0;
+          c.incentivo_base_credito      = base;
+          c.bono_cesantia_credito       = (isNcnu && hasCes) ? base * calc.ajuste_cesantia    : 0;
+          c.bono_rep_credito            = (isNcnu && hasRep) ? base * calc.ajuste_reparaciones : 0;
+          c.bono_calidad_credito        = base * calc.ajuste_calidad;
+          c.incentivo_adicional_credito = c.bono_cesantia_credito + c.bono_rep_credito + c.bono_calidad_credito;
+        });
+      }
+
       return { ejecutivo, mes, ...calc, estado: aprob.estado, notas: aprob.notas, aprobado_at: aprob.aprobado_at, creditos: creds };
     });
 

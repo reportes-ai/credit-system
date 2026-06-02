@@ -333,8 +333,9 @@ function renderEjecutivo(d, idx, mes) {
 
   // Solo créditos OTORGADOS en la tabla
   const otorgados = (d.creditos||[]).filter(c => (c.estado_credito||'').toUpperCase()==='OTORGADO');
-  const credHtml = otorgados.map(c => `
-    <tr>
+  const credHtml = otorgados.map(c => {
+    const tieneAdicional = (c.incentivo_adicional_credito||0) > 0;
+    return `<tr>
       <td>${c.num_op||'—'}</td>
       <td>${c.nombre_cliente||'—'}</td>
       <td>${c.rut_cliente||'—'}</td>
@@ -343,7 +344,10 @@ function renderEjecutivo(d, idx, mes) {
       <td style="text-align:right">${fmt(c.monto_financiado)}</td>
       <td style="text-align:right;color:${(parseFloat(c.seguro_cesantia)||0)>0?'#16a34a':'#9ca3af'}">${(parseFloat(c.seguro_cesantia)||0)>0?'✓ '+fmt(c.seguro_cesantia):'—'}</td>
       <td style="text-align:right;color:${(parseFloat(c.seguro_rep_menor)||0)>0?'#16a34a':'#9ca3af'}">${(parseFloat(c.seguro_rep_menor)||0)>0?'✓ '+fmt(c.seguro_rep_menor):'—'}</td>
-    </tr>`).join('');
+      <td style="text-align:right;font-weight:600;color:#0141A2">${fmt(c.incentivo_base_credito||0)}</td>
+      <td style="text-align:right;font-weight:600;color:${tieneAdicional?'#16a34a':'#9ca3af'}">${tieneAdicional?fmt(c.incentivo_adicional_credito):'—'}</td>
+    </tr>`;
+  }).join('');
 
   return `<div class="ej-card ${estadoClass}" id="ej-card-${idx}">
     <div class="ej-header">
@@ -411,14 +415,14 @@ function renderEjecutivo(d, idx, mes) {
     </button>
     <div class="creditos-tabla" id="creditos-${idx}">
       <table>
-        <thead><tr><th>N° Op</th><th>Cliente</th><th>RUT</th><th>Financiera</th><th style="text-align:center">Plazo</th><th style="text-align:right">Monto Fin.</th><th style="text-align:right">Seg. Cesantía</th><th style="text-align:right">Seg. Rep.</th></tr></thead>
+        <thead><tr><th>N° Op</th><th>Cliente</th><th>RUT</th><th>Financiera</th><th style="text-align:center">Plazo</th><th style="text-align:right">Monto Fin.</th><th style="text-align:right">Seg. Cesantía</th><th style="text-align:right">Seg. Rep.</th><th style="text-align:right;color:#0141A2">Incentivo Base</th><th style="text-align:right;color:#16a34a">Incentivo Adicional</th></tr></thead>
         <tbody>${credHtml}</tbody>
       </table>
     </div>
     <!-- Datos ocultos para copiar -->
     <div id="copy-data-${idx}" style="display:none"
       data-ej="${d.ejecutivo}" data-mes="${document.getElementById('filtroMes').value}"
-      data-creds='${JSON.stringify(otorgados.map(c=>({op:c.num_op,cliente:c.nombre_cliente,fin:c.financiera,plazo:c.plazo,monto:c.monto_financiado,ces:c.seguro_cesantia,rep:c.seguro_rep_menor})))}'
+      data-creds='${JSON.stringify(otorgados.map(c=>({op:c.num_op,cliente:c.nombre_cliente,fin:c.financiera,plazo:c.plazo,monto:c.monto_financiado,ces:c.seguro_cesantia,rep:c.seguro_rep_menor,ibase:c.incentivo_base_credito||0,iadl:c.incentivo_adicional_credito||0})))}'
       data-base="${fmt(d.incentivo_base)}" data-bces="${fmt(d.cumple_cesantia?d.bono_cesantia:0)}"
       data-brep="${fmt(d.cumple_reparaciones?d.bono_reparaciones:0)}" data-bcal="${fmt(d.bono_calidad)}"
       data-final="${fmt(d.incentivo_final)}" data-sc="${fmt(d.con_semana_corrida)}"
@@ -453,14 +457,17 @@ function copiarResumen(idx) {
   const filasCreds = creds.map((c, i) => {
     const tieneC = (parseFloat(c.ces) || 0) > 0;
     const tieneR = (parseFloat(c.rep) || 0) > 0;
+    const tieneAdl = (c.iadl || 0) > 0;
     return `<tr style="background:${i%2===0?'#f8fafc':'#fff'}">
       <td style="${TD};color:#374151">${c.op||'—'}</td>
-      <td style="${TD};font-weight:500;white-space:normal;max-width:180px">${c.cliente||'—'}</td>
+      <td style="${TD};font-weight:500;white-space:normal;max-width:160px">${c.cliente||'—'}</td>
       <td style="${TD};text-align:center;color:#0141A2;font-weight:700">${abrevFin(c.fin)}</td>
       <td style="${TD};text-align:center">${c.plazo||'—'}c</td>
       <td style="${TD};text-align:right;font-weight:600">${fmt(c.monto)}</td>
       <td style="${TD};text-align:center;color:${tieneC?'#16a34a':'#9ca3af'}">${tieneC?'✔ '+fmt(c.ces):'—'}</td>
       <td style="${TD};text-align:center;color:${tieneR?'#16a34a':'#9ca3af'}">${tieneR?'✔ '+fmt(c.rep):'—'}</td>
+      <td style="${TD};text-align:right;font-weight:700;color:#0141A2">${fmt(c.ibase)}</td>
+      <td style="${TD};text-align:right;font-weight:700;color:${tieneAdl?'#16a34a':'#9ca3af'}">${tieneAdl?fmt(c.iadl):'—'}</td>
     </tr>`;
   }).join('');
 
@@ -487,18 +494,21 @@ function copiarResumen(idx) {
     </div>
     <table style="width:100%;border-collapse:collapse;font-size:11.5px;table-layout:fixed">
       <colgroup>
-        <col style="width:72px"><col style="width:200px"><col style="width:72px">
-        <col style="width:48px"><col style="width:100px"><col style="width:110px"><col style="width:110px">
+        <col style="width:62px"><col style="width:160px"><col style="width:62px">
+        <col style="width:40px"><col style="width:88px"><col style="width:88px"><col style="width:82px">
+        <col style="width:88px"><col style="width:90px">
       </colgroup>
       <thead>
         <tr style="background:#e8eaf6">
-          <th style="padding:7px 8px;text-align:left;font-weight:700;color:#374151;border-bottom:2px solid #c5cae9;white-space:nowrap">N° Op</th>
-          <th style="padding:7px 8px;text-align:left;font-weight:700;color:#374151;border-bottom:2px solid #c5cae9">Cliente</th>
-          <th style="padding:7px 8px;text-align:center;font-weight:700;color:#374151;border-bottom:2px solid #c5cae9;white-space:nowrap">Financiera</th>
-          <th style="padding:7px 8px;text-align:center;font-weight:700;color:#374151;border-bottom:2px solid #c5cae9;white-space:nowrap">Plazo</th>
-          <th style="padding:7px 8px;text-align:right;font-weight:700;color:#374151;border-bottom:2px solid #c5cae9;white-space:nowrap">Monto Fin.</th>
-          <th style="padding:7px 8px;text-align:center;font-weight:700;color:#374151;border-bottom:2px solid #c5cae9;white-space:nowrap">Seg. Cesantía</th>
-          <th style="padding:7px 8px;text-align:center;font-weight:700;color:#374151;border-bottom:2px solid #c5cae9;white-space:nowrap">Seg. Rep.</th>
+          <th style="padding:6px 7px;text-align:left;font-weight:700;color:#374151;border-bottom:2px solid #c5cae9;white-space:nowrap;font-size:11px">N° Op</th>
+          <th style="padding:6px 7px;text-align:left;font-weight:700;color:#374151;border-bottom:2px solid #c5cae9;font-size:11px">Cliente</th>
+          <th style="padding:6px 7px;text-align:center;font-weight:700;color:#374151;border-bottom:2px solid #c5cae9;white-space:nowrap;font-size:11px">Financiera</th>
+          <th style="padding:6px 7px;text-align:center;font-weight:700;color:#374151;border-bottom:2px solid #c5cae9;white-space:nowrap;font-size:11px">Plazo</th>
+          <th style="padding:6px 7px;text-align:right;font-weight:700;color:#374151;border-bottom:2px solid #c5cae9;white-space:nowrap;font-size:11px">Monto Fin.</th>
+          <th style="padding:6px 7px;text-align:center;font-weight:700;color:#374151;border-bottom:2px solid #c5cae9;white-space:nowrap;font-size:11px">Seg. Cesantía</th>
+          <th style="padding:6px 7px;text-align:center;font-weight:700;color:#374151;border-bottom:2px solid #c5cae9;white-space:nowrap;font-size:11px">Seg. Rep.</th>
+          <th style="padding:6px 7px;text-align:right;font-weight:700;color:#0141A2;border-bottom:2px solid #c5cae9;white-space:nowrap;font-size:11px">Inc. Base</th>
+          <th style="padding:6px 7px;text-align:right;font-weight:700;color:#16a34a;border-bottom:2px solid #c5cae9;white-space:nowrap;font-size:11px">Inc. Adicional</th>
         </tr>
       </thead>
       <tbody>${filasCreds}</tbody>
