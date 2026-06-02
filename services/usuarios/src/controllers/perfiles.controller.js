@@ -11,6 +11,7 @@ const pool = require('../../../../shared/config/database');
       { nombre: 'Política',   icono: 'bi-shield-check',  ruta: '/politica/',   descripcion: 'Política de crédito AutoFácil', orden: 24 },
       { nombre: 'Cartas de Aprobación', icono: 'bi-envelope-check', ruta: '/cartas-aprobacion/', descripcion: 'Generación e historial de cartas de aprobación de crédito', orden: 25 },
       { nombre: 'Comisión Ejecutivos', icono: 'bi-cash-coin', ruta: '/comisiones/', descripcion: 'Cálculo, revisión y aprobación de comisiones mensuales por ejecutivo comercial', orden: 26 },
+      { nombre: 'Carga Masiva',       icono: 'bi-cloud-upload', ruta: '/carga-masiva/', descripcion: 'Importación masiva de operaciones desde archivo Excel. Solo Administrador.', orden: 27 },
     ];
     for (const m of nuevos) {
       const [rows] = await pool.query('SELECT id_modulo FROM modulos WHERE nombre = ?', [m.nombre]);
