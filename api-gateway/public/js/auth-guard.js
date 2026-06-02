@@ -32,21 +32,24 @@
     return;
   }
 
-  // Poblar elementos de navbar con datos del usuario (ids estándar usados en todas las páginas)
-  try {
-    const u = JSON.parse(usuario);
-    const nombre = [u.nombre || '', u.apellido || ''].filter(Boolean).join(' ');
-    const perfil = u.perfil || u.perfil_nombre || '';
-    const inicial = (u.nombre || '?').charAt(0).toUpperCase();
+  // Poblar navbar — espera al DOM si los elementos aún no existen
+  function poblarNav() {
+    try {
+      const u = JSON.parse(usuario);
+      const nombre = [u.nombre || '', u.apellido || ''].filter(Boolean).join(' ');
+      const perfil = u.perfil || u.perfil_nombre || '';
+      const inicial = (u.nombre || '?').charAt(0).toUpperCase();
+      const set = (id, val) => { const e = document.getElementById(id); if (e) e.textContent = val; };
+      set('navNombre', nombre);
+      set('navPerfil', perfil);
+      set('avatarInicial', inicial);
+      set('navUser', u.nombre || '');
+    } catch (e) {}
+  }
 
-    const elNombre   = document.getElementById('navNombre');
-    const elPerfil   = document.getElementById('navPerfil');
-    const elAvatar   = document.getElementById('avatarInicial');
-    const elNavUser  = document.getElementById('navUser');   // algunas páginas usan este id
-
-    if (elNombre)  elNombre.textContent  = nombre;
-    if (elPerfil)  elPerfil.textContent  = perfil;
-    if (elAvatar)  elAvatar.textContent  = inicial;
-    if (elNavUser) elNavUser.textContent = u.nombre || '';
-  } catch (e) {}
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', poblarNav);
+  } else {
+    poblarNav();
+  }
 })();

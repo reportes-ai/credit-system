@@ -41,6 +41,7 @@
     .f-group input:focus, .f-group select:focus { border-color:var(--navy); }
     .f-group input.auto { background:#eff6ff; color:#1d4ed8; font-weight:600; }
     .f-row { display:grid; grid-template-columns:1fr 1fr; gap:12px; }
+    .f-row > * { min-width:0; }
 
     /* Toggle switches */
     .toggle-group { display:flex; background:#f1f5f9; border-radius:8px; padding:3px; gap:2px; }
@@ -58,14 +59,11 @@
     .uf-badge { background:#fef9c3; border:1px solid #fde68a; border-radius:8px; padding:8px 14px; font-size:.82rem; color:#92400e; display:flex; align-items:center; gap:6px; margin-bottom:14px; }
     .uf-badge strong { color:#78350f; }
 
-    /* Results */
-    .fin-tabs { display:flex; gap:8px; margin-bottom:16px; }
-    .fin-tab { flex:1; border:2px solid #e5e7eb; border-radius:10px; padding:10px 16px; text-align:center; cursor:pointer; transition:all .15s; font-weight:700; font-size:.85rem; color:#6b7280; }
-    .fin-tab.af.active { border-color:var(--af); background:#eff6ff; color:var(--af); }
-    .fin-tab.uac.active { border-color:var(--uac); background:#f0fdf4; color:var(--uac); }
-
-    .res-panel { display:none; }
-    .res-panel.visible { display:block; }
+    /* Results — columnas paralelas */
+    .res-cols { display:grid; grid-template-columns:1fr 1fr; gap:16px; }
+    @media(max-width:900px){ .res-cols { grid-template-columns:1fr; } }
+    .res-panel { display:block; }
+    .badge-mejor { background:#f59e0b; color:#fff; font-size:.7rem; font-weight:700; border-radius:12px; padding:2px 8px; margin-left:8px; }
 
     .res-section { margin-bottom:16px; }
     .res-title { font-size:.72rem; font-weight:700; color:#9ca3af; text-transform:uppercase; letter-spacing:.5px; margin-bottom:8px; display:flex; align-items:center; gap:6px; }
@@ -244,29 +242,24 @@
 
     <!-- ── Panel Resultados ──────────────────────────────────────────── -->
     <div>
-      <!-- Tabs financieras -->
-      <div class="fin-tabs">
-        <div class="fin-tab af active" onclick="showFin('af')"><i class="bi bi-bank me-1"></i> AutoFin</div>
-        <div class="fin-tab uac" onclick="showFin('uac')"><i class="bi bi-building me-1"></i> Unidad de Crédito</div>
-      </div>
-
       <!-- Monto Financiado (común) -->
       <div class="card" style="margin-bottom:16px">
+        <div class="card-hdr" style="background:#374151"><i class="bi bi-calculator"></i> Monto Financiado</div>
         <div class="card-bd" style="padding:16px">
           <div id="montoFinBox" class="monto-fin-box" style="margin-bottom:0"></div>
         </div>
       </div>
 
-      <!-- AutoFin -->
-      <div id="panelAf" class="res-panel visible card">
-        <div class="card-hdr" style="background:var(--af)"><i class="bi bi-bank"></i> AutoFin — Resultados</div>
-        <div class="card-bd" id="resAf"></div>
-      </div>
-
-      <!-- UAC -->
-      <div id="panelUac" class="res-panel card">
-        <div class="card-hdr" style="background:var(--uac)"><i class="bi bi-building"></i> Unidad de Crédito — Resultados</div>
-        <div class="card-bd" id="resUac"></div>
+      <!-- AutoFin y UAC en paralelo -->
+      <div class="res-cols">
+        <div id="panelAf" class="res-panel card">
+          <div class="card-hdr" id="hdrAf" style="background:var(--af)"><i class="bi bi-bank"></i> AutoFin</div>
+          <div class="card-bd" id="resAf"></div>
+        </div>
+        <div id="panelUac" class="res-panel card">
+          <div class="card-hdr" id="hdrUac" style="background:var(--uac)"><i class="bi bi-building"></i> Unidad de Crédito</div>
+          <div class="card-bd" id="resUac"></div>
+        </div>
       </div>
     </div>
   </div>
@@ -307,11 +300,20 @@ function getToggle(groupId) {
   for (let i=0;i<btns.length;i++) if (btns[i].classList.contains('active')) return i;
   return 0;
 }
-function showFin(fin) {
-  document.querySelectorAll('.fin-tab').forEach(t => t.classList.remove('active'));
-  document.querySelector('.fin-tab.' + fin).classList.add('active');
-  document.getElementById('panelAf').classList.toggle('visible', fin === 'af');
-  document.getElementById('panelUac').classList.toggle('visible', fin === 'uac');
+function marcarMejor(rentab_af, rentab_uac) {
+  const hdrAf  = document.getElementById('hdrAf');
+  const hdrUac = document.getElementById('hdrUac');
+  const badge  = '<span class="badge-mejor">⭐ Más rentable</span>';
+  if (rentab_af > rentab_uac) {
+    hdrAf.innerHTML  = '<i class="bi bi-bank"></i> AutoFin' + badge;
+    hdrUac.innerHTML = '<i class="bi bi-building"></i> Unidad de Crédito';
+  } else if (rentab_uac > rentab_af) {
+    hdrAf.innerHTML  = '<i class="bi bi-bank"></i> AutoFin';
+    hdrUac.innerHTML = '<i class="bi bi-building"></i> Unidad de Crédito' + badge;
+  } else {
+    hdrAf.innerHTML  = '<i class="bi bi-bank"></i> AutoFin';
+    hdrUac.innerHTML = '<i class="bi bi-building"></i> Unidad de Crédito';
+  }
 }
 
 /* ── Carga inicial ─────────────────────────────────────────────────── */
@@ -507,6 +509,8 @@ function simular() {
     cuota: cuota_uac, esPatio, esCorfo: false,
     tier_note: `Ingreso calculado con Tier 1 (${P.uac_pct_tier1||14}% sobre saldo precio). El % real depende del total de operaciones otorgadas en el mes.`
   });
+
+  marcarMejor(rentab_af, rentab_uac);
 }
 
 function renderResultados({ ing_tasa, ing_seg, com_corfo, com_dealer, com_patio, com_ej, rentab, pct, cuota, esPatio, esCorfo, tier_note }) {
