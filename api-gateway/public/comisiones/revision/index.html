@@ -29,19 +29,26 @@
     .page-banner h2 { font-weight:700; margin:0 0 2px; font-size:1.25rem; }
     .page-banner p { opacity:.8; margin:0; font-size:.85rem; }
     /* Filtro */
-    .filtro-bar { background:#fff; border-radius:12px; padding:16px 22px; margin-bottom:24px; display:flex; align-items:center; gap:16px; box-shadow:0 1px 4px rgba(0,0,0,.06); flex-wrap:wrap; }
-    .filtro-bar label { font-weight:600; font-size:.85rem; color:#374151; }
-    .filtro-bar input[type=month] { border:1.5px solid #d1d5db; border-radius:8px; padding:7px 12px; font-size:.88rem; outline:none; }
-    .filtro-bar input:focus { border-color:var(--navy); }
+    .filtro-bar { background:#fff; border-radius:12px; padding:16px 22px; margin-bottom:24px; display:flex; align-items:center; gap:14px; box-shadow:0 1px 4px rgba(0,0,0,.06); flex-wrap:wrap; }
+    .filtro-bar label { font-weight:600; font-size:.85rem; color:#374151; white-space:nowrap; }
+    .filtro-bar input[type=month],
+    .filtro-bar select { border:1.5px solid #d1d5db; border-radius:8px; padding:7px 12px; font-size:.88rem; outline:none; background:#fff; }
+    .filtro-bar input:focus, .filtro-bar select:focus { border-color:var(--navy); }
+    .filtro-bar select { min-width:220px; }
     .btn-buscar { background:var(--navy); color:#fff; border:none; border-radius:8px; padding:8px 20px; font-size:.85rem; font-weight:600; cursor:pointer; display:flex; align-items:center; gap:6px; }
     .btn-buscar:hover { background:var(--navy-light); }
-    /* Resumen stats */
-    .stats-row { display:grid; grid-template-columns:repeat(4,1fr); gap:16px; margin-bottom:24px; }
-    @media(max-width:900px){ .stats-row { grid-template-columns:repeat(2,1fr); } }
-    .stat-card { background:#fff; border-radius:12px; padding:16px 20px; box-shadow:0 1px 4px rgba(0,0,0,.06); }
-    .stat-card .label { font-size:.72rem; color:#9ca3af; font-weight:600; text-transform:uppercase; letter-spacing:.5px; }
-    .stat-card .value { font-size:1.4rem; font-weight:800; color:#111827; margin-top:2px; }
-    .stat-card .sub { font-size:.75rem; color:#6b7280; margin-top:2px; }
+    /* Stats 6 columnas */
+    .stats-row { display:grid; grid-template-columns:repeat(6,1fr); gap:14px; margin-bottom:24px; }
+    @media(max-width:1100px){ .stats-row { grid-template-columns:repeat(3,1fr); } }
+    @media(max-width:700px){ .stats-row { grid-template-columns:repeat(2,1fr); } }
+    .stat-card { background:#fff; border-radius:12px; padding:14px 18px; box-shadow:0 1px 4px rgba(0,0,0,.06); border-left:4px solid transparent; }
+    .stat-card.green  { border-left-color:#16a34a; }
+    .stat-card.red    { border-left-color:#dc2626; }
+    .stat-card.blue   { border-left-color:#0141A2; }
+    .stat-card.amber  { border-left-color:#d97706; }
+    .stat-card .label { font-size:.7rem; color:#9ca3af; font-weight:600; text-transform:uppercase; letter-spacing:.5px; }
+    .stat-card .value { font-size:1.3rem; font-weight:800; color:#111827; margin-top:2px; }
+    .stat-card .sub   { font-size:.73rem; color:#6b7280; margin-top:2px; }
     /* Tarjeta ejecutivo */
     .ej-card { background:#fff; border-radius:14px; padding:24px; margin-bottom:20px; box-shadow:0 1px 6px rgba(0,0,0,.07); border:2px solid transparent; }
     .ej-card.aprobado { border-color:#16a34a; }
@@ -52,22 +59,23 @@
     .badge-estado.pendiente { background:#fef3c7; color:#d97706; }
     .badge-estado.aprobado  { background:#dcfce7; color:#16a34a; }
     .badge-estado.rechazado { background:#fee2e2; color:#dc2626; }
-    .ej-acciones { display:flex; gap:8px; }
-    .btn-aprobar  { background:#16a34a; color:#fff; border:none; border-radius:8px; padding:6px 16px; font-size:.82rem; font-weight:600; cursor:pointer; }
-    .btn-rechazar { background:#fff; color:#dc2626; border:1.5px solid #dc2626; border-radius:8px; padding:6px 16px; font-size:.82rem; font-weight:600; cursor:pointer; }
+    .ej-acciones { display:flex; gap:8px; flex-wrap:wrap; }
+    .btn-aprobar  { background:#16a34a; color:#fff; border:none; border-radius:8px; padding:6px 14px; font-size:.82rem; font-weight:600; cursor:pointer; }
+    .btn-rechazar { background:#fff; color:#dc2626; border:1.5px solid #dc2626; border-radius:8px; padding:6px 14px; font-size:.82rem; font-weight:600; cursor:pointer; }
+    .btn-copiar   { background:#f3f4f6; color:#374151; border:1.5px solid #d1d5db; border-radius:8px; padding:6px 14px; font-size:.82rem; font-weight:600; cursor:pointer; display:flex; align-items:center; gap:5px; }
+    .btn-copiar:hover { background:#e5e7eb; }
     .btn-aprobar:hover  { background:#15803d; }
     .btn-rechazar:hover { background:#fee2e2; }
-    /* Grid de métricas */
+    /* Métricas */
     .metricas-grid { display:grid; grid-template-columns:repeat(3,1fr); gap:12px; margin-bottom:16px; }
     @media(max-width:800px){ .metricas-grid { grid-template-columns:repeat(2,1fr); } }
     .metrica { background:#f8fafc; border-radius:10px; padding:12px 14px; }
     .metrica .m-label { font-size:.71rem; color:#9ca3af; font-weight:600; text-transform:uppercase; letter-spacing:.4px; }
     .metrica .m-value { font-size:1.1rem; font-weight:700; color:#111827; margin-top:1px; }
     .metrica .m-sub   { font-size:.73rem; color:#6b7280; }
-    .metrica.warn .m-value { color:#d97706; }
     .metrica.ok   .m-value { color:#16a34a; }
     .metrica.bad  .m-value { color:#dc2626; }
-    /* Barra de progreso */
+    .metrica.warn .m-value { color:#d97706; }
     .prog-bar { height:6px; border-radius:3px; background:#e5e7eb; margin-top:6px; overflow:hidden; }
     .prog-bar-fill { height:100%; border-radius:3px; transition:width .4s; }
     /* Desglose */
@@ -75,24 +83,29 @@
     .desglose-title { font-size:.78rem; font-weight:700; color:#374151; margin-bottom:10px; display:flex; align-items:center; gap:6px; }
     .desglose-row { display:flex; justify-content:space-between; font-size:.82rem; padding:4px 0; border-bottom:1px solid #e5e7eb; }
     .desglose-row:last-child { border-bottom:none; font-weight:700; color:#0141A2; font-size:.88rem; }
-    .desglose-row span:last-child { font-weight:600; }
-    /* Total final */
     .total-final { background:linear-gradient(135deg,#012d70,#0141A2); color:#fff; border-radius:12px; padding:16px 22px; display:flex; justify-content:space-between; align-items:center; margin-top:14px; }
     .total-final .tf-label { font-size:.82rem; opacity:.8; }
     .total-final .tf-value { font-size:1.5rem; font-weight:800; }
     .total-final .tf-sc { font-size:.8rem; opacity:.7; }
-    /* Sin datos */
-    .empty-state { text-align:center; padding:60px 20px; color:#9ca3af; }
-    .empty-state i { font-size:3rem; display:block; margin-bottom:12px; }
-    .no-cumple { background:#fee2e2; border:1.5px solid #fca5a5; border-radius:12px; padding:16px 20px; color:#dc2626; display:flex; align-items:center; gap:12px; font-weight:600; font-size:.88rem; }
-    /* Collapsible créditos */
+    .no-cumple { background:#fee2e2; border:1.5px solid #fca5a5; border-radius:12px; padding:14px 18px; color:#dc2626; display:flex; align-items:center; gap:10px; font-weight:600; font-size:.88rem; }
+    /* Sección agrupadora */
+    .grupo-titulo { font-weight:700; font-size:.82rem; color:#6b7280; text-transform:uppercase; letter-spacing:1px; margin:24px 0 12px; display:flex; align-items:center; gap:10px; }
+    .grupo-titulo::after { content:''; flex:1; height:1px; background:#e5e7eb; }
+    /* Tabla créditos */
     .toggle-creditos { background:none; border:none; color:var(--navy); font-size:.8rem; font-weight:600; cursor:pointer; display:flex; align-items:center; gap:4px; padding:0; margin-top:10px; }
     .creditos-tabla { margin-top:10px; display:none; }
-    .creditos-tabla.visible { display:block; }
-    .creditos-tabla table { width:100%; border-collapse:collapse; font-size:.77rem; }
-    .creditos-tabla th { background:#e8eaf6; color:#374151; font-weight:700; padding:6px 10px; text-align:left; }
+    .creditos-tabla.visible { display:block; overflow-x:auto; }
+    .creditos-tabla table { width:100%; border-collapse:collapse; font-size:.77rem; min-width:680px; }
+    .creditos-tabla th { background:#e8eaf6; color:#374151; font-weight:700; padding:6px 10px; text-align:left; white-space:nowrap; }
     .creditos-tabla td { padding:5px 10px; border-bottom:1px solid #f1f5f9; }
     .creditos-tabla tr:last-child td { border-bottom:none; }
+    .empty-state { text-align:center; padding:60px 20px; color:#9ca3af; }
+    .empty-state i { font-size:3rem; display:block; margin-bottom:12px; }
+    /* Toast */
+    #toast { position:fixed; bottom:24px; right:24px; padding:12px 20px; border-radius:10px; color:#fff; font-weight:600; font-size:.88rem; display:flex; align-items:center; gap:8px; box-shadow:0 4px 20px rgba(0,0,0,.2); transform:translateY(80px); opacity:0; transition:.28s; z-index:9999; max-width:340px; }
+    #toast.show { transform:translateY(0); opacity:1; }
+    #toast.ok  { background:#166534; }
+    #toast.err { background:#991b1b; }
     @media(max-width:640px){ .main-content { padding:16px; } }
   </style>
 </head>
@@ -127,41 +140,56 @@
     </div>
   </div>
 
-  <!-- Filtro -->
+  <!-- Filtros -->
   <div class="filtro-bar">
     <label><i class="bi bi-calendar3 me-1"></i>Mes:</label>
-    <input type="month" id="filtroMes" value="">
+    <input type="month" id="filtroMes">
+    <label><i class="bi bi-person me-1"></i>Ejecutivo:</label>
+    <select id="filtroEj">
+      <option value="">— Todos —</option>
+    </select>
     <button class="btn-buscar" onclick="cargar()"><i class="bi bi-search"></i>Calcular</button>
     <span id="loadingSpinner" style="display:none;color:#6b7280;font-size:.85rem"><i class="bi bi-hourglass-split me-1"></i>Calculando...</span>
   </div>
 
-  <!-- Stats resumen -->
+  <!-- Stats -->
   <div class="stats-row" id="statsRow" style="display:none">
-    <div class="stat-card">
+    <div class="stat-card blue">
       <div class="label">Ejecutivos</div>
-      <div class="value" id="statEjs">—</div>
+      <div class="value" id="statTotal">—</div>
       <div class="sub">en el mes</div>
     </div>
-    <div class="stat-card">
+    <div class="stat-card green">
+      <div class="label">Con Comisión</div>
+      <div class="value" id="statConComision">—</div>
+      <div class="sub" id="statConSub">cumplen mínimo</div>
+    </div>
+    <div class="stat-card red">
+      <div class="label">Sin Comisión</div>
+      <div class="value" id="statSinComision">—</div>
+      <div class="sub">no cumplen mínimo</div>
+    </div>
+    <div class="stat-card blue">
       <div class="label">Total Financiado</div>
       <div class="value" id="statMonto">—</div>
-      <div class="sub">todos los ejecutivos</div>
+      <div class="sub">ejecutivos con comisión</div>
     </div>
-    <div class="stat-card">
+    <div class="stat-card green">
       <div class="label">Total Comisiones</div>
       <div class="value" id="statComisiones">—</div>
       <div class="sub">incentivo final bruto</div>
     </div>
-    <div class="stat-card">
+    <div class="stat-card amber">
       <div class="label">Aprobados</div>
       <div class="value" id="statAprobados">—</div>
       <div class="sub" id="statAprobadosSub">pendientes</div>
     </div>
   </div>
 
-  <!-- Resultados -->
   <div id="resultado"></div>
 </div>
+
+<div id="toast"><i id="toastIcon" class="bi bi-check-circle-fill"></i><span id="toastMsg"></span></div>
 
 <script src="/js/auth-guard.js"></script>
 <script>
@@ -175,15 +203,28 @@ document.getElementById('navNombre').textContent = `${yo?.nombre||''} ${yo?.apel
 document.getElementById('navPerfil').textContent  = yo?.perfil || '';
 document.getElementById('avatarInicial').textContent = (yo?.nombre||'?').charAt(0).toUpperCase();
 
-// Default: mes actual
 const hoy = new Date();
 document.getElementById('filtroMes').value = `${hoy.getFullYear()}-${String(hoy.getMonth()+1).padStart(2,'0')}`;
 
 function logout() { sessionStorage.removeItem('token'); sessionStorage.removeItem('usuario'); window.location.href = '/login.html'; }
 function fmt(n) { return '$' + Math.round(n||0).toLocaleString('es-CL'); }
 function pct(n) { return ((n||0)*100).toFixed(1) + '%'; }
+function nombreMes(ym) {
+  const [y,m] = ym.split('-');
+  return new Date(y, parseInt(m)-1, 1).toLocaleString('es-CL',{month:'long',year:'numeric'});
+}
 
 let datosActuales = [];
+let toastTimer;
+
+function toast(msg, ok=true) {
+  const t = document.getElementById('toast');
+  document.getElementById('toastMsg').textContent = msg;
+  document.getElementById('toastIcon').className = ok ? 'bi bi-check-circle-fill' : 'bi bi-x-circle-fill';
+  t.className = `show ${ok?'ok':'err'}`;
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => t.classList.remove('show'), 3200);
+}
 
 async function cargar() {
   const mes = document.getElementById('filtroMes').value;
@@ -196,6 +237,19 @@ async function cargar() {
     const json = await res.json();
     if (!json.success) { document.getElementById('resultado').innerHTML = `<div class="alert alert-danger">${json.error}</div>`; return; }
     datosActuales = json.data;
+
+    // Poblar filtro de ejecutivos
+    const sel = document.getElementById('filtroEj');
+    const valActual = sel.value;
+    sel.innerHTML = '<option value="">— Todos —</option>';
+    json.data.forEach(d => {
+      const o = document.createElement('option');
+      o.value = d.ejecutivo;
+      o.textContent = d.ejecutivo;
+      if (d.ejecutivo === valActual) o.selected = true;
+      sel.appendChild(o);
+    });
+
     renderizar(json.data, mes);
   } catch(e) {
     document.getElementById('resultado').innerHTML = `<div class="alert alert-danger">Error al cargar: ${e.message}</div>`;
@@ -204,89 +258,114 @@ async function cargar() {
   }
 }
 
+function filtrarYRenderizar() {
+  const ejFiltro = document.getElementById('filtroEj').value;
+  const mes = document.getElementById('filtroMes').value;
+  const datos = ejFiltro ? datosActuales.filter(d => d.ejecutivo === ejFiltro) : datosActuales;
+  renderizar(datos, mes);
+}
+
+document.getElementById('filtroEj').addEventListener('change', filtrarYRenderizar);
+
 function renderizar(data, mes) {
   if (!data.length) {
-    document.getElementById('resultado').innerHTML = `<div class="empty-state"><i class="bi bi-inbox"></i>Sin créditos otorgados en ${mes}</div>`;
+    document.getElementById('resultado').innerHTML = `<div class="empty-state"><i class="bi bi-inbox"></i>Sin créditos para el período seleccionado</div>`;
+    document.getElementById('statsRow').style.display = 'none';
     return;
   }
 
-  // Stats globales
-  const totalMonto     = data.reduce((s,d) => s + (d.total_financiado||0), 0);
-  const totalComision  = data.reduce((s,d) => s + (d.incentivo_final||0), 0);
-  const aprobados      = data.filter(d => d.estado === 'aprobado').length;
-  document.getElementById('statEjs').textContent       = data.length;
-  document.getElementById('statMonto').textContent     = fmt(totalMonto);
-  document.getElementById('statComisiones').textContent= fmt(totalComision);
-  document.getElementById('statAprobados').textContent = `${aprobados}/${data.length}`;
-  document.getElementById('statAprobadosSub').textContent = (aprobados === data.length ? '✓ todos aprobados' : `${data.length - aprobados} pendientes`);
+  const conComision  = data.filter(d => d.cumple_minimo);
+  const sinComision  = data.filter(d => !d.cumple_minimo);
+  const totalMonto   = conComision.reduce((s,d) => s + (d.total_financiado||0), 0);
+  const totalComis   = conComision.reduce((s,d) => s + (d.incentivo_final||0), 0);
+  const aprobados    = data.filter(d => d.estado === 'aprobado').length;
+
+  document.getElementById('statTotal').textContent        = data.length;
+  document.getElementById('statConComision').textContent  = conComision.length;
+  document.getElementById('statConSub').textContent       = `total: ${fmt(totalMonto)}`;
+  document.getElementById('statSinComision').textContent  = sinComision.length;
+  document.getElementById('statMonto').textContent        = fmt(totalMonto);
+  document.getElementById('statComisiones').textContent   = fmt(totalComis);
+  document.getElementById('statAprobados').textContent    = `${aprobados}/${data.length}`;
+  document.getElementById('statAprobadosSub').textContent = aprobados === data.length ? '✓ todos aprobados' : `${data.length - aprobados} pendientes`;
   document.getElementById('statsRow').style.display = 'grid';
 
-  const html = data.map((d,i) => renderEjecutivo(d, i, mes)).join('');
+  let html = '';
+
+  if (conComision.length) {
+    html += `<div class="grupo-titulo" style="color:#16a34a"><i class="bi bi-check-circle-fill"></i>Con Comisión (${conComision.length})</div>`;
+    html += conComision.map((d,i) => renderEjecutivo(d, 'c'+i, mes)).join('');
+  }
+
+  if (sinComision.length) {
+    html += `<div class="grupo-titulo" style="color:#dc2626"><i class="bi bi-x-circle-fill"></i>Sin Comisión — No cumplen mínimo (${sinComision.length})</div>`;
+    html += sinComision.map((d,i) => renderEjSinComision(d, 's'+i)).join('');
+  }
+
   document.getElementById('resultado').innerHTML = html;
 }
 
-function renderEjecutivo(d, i, mes) {
+function renderEjSinComision(d, idx) {
   const estadoClass = d.estado || 'pendiente';
-  const estadoLabel = { pendiente:'Pendiente', aprobado:'Aprobado', rechazado:'Rechazado' }[estadoClass] || 'Pendiente';
-
-  if (!d.cumple_minimo) {
-    return `<div class="ej-card ${estadoClass}">
-      <div class="ej-header">
-        <div class="ej-nombre"><i class="bi bi-person-fill"></i>${d.ejecutivo}
-          <span class="badge-estado ${estadoClass}">${estadoLabel}</span>
-        </div>
+  return `<div class="ej-card" id="ej-card-${idx}">
+    <div class="ej-header">
+      <div class="ej-nombre"><i class="bi bi-person-fill"></i>${d.ejecutivo}
+        <span class="badge-estado ${estadoClass}">${{pendiente:'Pendiente',aprobado:'Aprobado',rechazado:'Rechazado'}[estadoClass]||'Pendiente'}</span>
       </div>
-      <div class="no-cumple"><i class="bi bi-x-circle-fill fs-5"></i>
-        No cumple mínimo — Monto financiado: ${fmt(d.total_financiado)} (mínimo requerido: ver variables)
-      </div>
-    </div>`;
-  }
+    </div>
+    <div class="no-cumple"><i class="bi bi-x-circle-fill fs-5"></i>
+      No cumple mínimo — Monto financiado del mes: <strong>${fmt(d.total_financiado)}</strong> &nbsp;|&nbsp; Créditos: ${d.total_creditos||0}
+    </div>
+  </div>`;
+}
 
-  const barCes = Math.min((d.cruce_cesantia||0)*100, 100);
-  const barRep = Math.min((d.cruce_reparaciones||0)*100, 100);
-  const barCal = Math.min((d.calidad||0)*100, 100);
-  const barAj  = Math.min((d.factor_ajuste||0)/0.66*100, 100);
-
+function renderEjecutivo(d, idx, mes) {
+  const estadoClass = d.estado || 'pendiente';
+  const estadoLabel = {pendiente:'Pendiente',aprobado:'Aprobado',rechazado:'Rechazado'}[estadoClass]||'Pendiente';
+  const barCes = Math.min((d.cruce_cesantia||0)*100,100);
+  const barRep = Math.min((d.cruce_reparaciones||0)*100,100);
   const colCes = d.cumple_cesantia    ? 'ok' : 'bad';
   const colRep = d.cumple_reparaciones? 'ok' : 'bad';
-  const colCal = (d.calidad||0) >= 0.8 ? 'ok' : 'warn';
 
   const botonesAdmin = esAdmin ? `
-    <div class="ej-acciones">
-      <button class="btn-aprobar"  onclick="cambiarEstado('${d.ejecutivo}','${mes}','aprobado',${d.incentivo_final||0},${d.con_semana_corrida||0})"><i class="bi bi-check-lg me-1"></i>Aprobar</button>
-      <button class="btn-rechazar" onclick="cambiarEstado('${d.ejecutivo}','${mes}','rechazado',${d.incentivo_final||0},${d.con_semana_corrida||0})"><i class="bi bi-x-lg me-1"></i>Rechazar</button>
-    </div>` : '';
+    <button class="btn-aprobar"  onclick="cambiarEstado('${d.ejecutivo}','${mes}','aprobado',${d.incentivo_final||0},${d.con_semana_corrida||0})"><i class="bi bi-check-lg me-1"></i>Aprobar</button>
+    <button class="btn-rechazar" onclick="cambiarEstado('${d.ejecutivo}','${mes}','rechazado',${d.incentivo_final||0},${d.con_semana_corrida||0})"><i class="bi bi-x-lg me-1"></i>Rechazar</button>` : '';
 
-  const credHtml = (d.creditos||[]).map(c => `
+  // Solo créditos OTORGADOS en la tabla
+  const otorgados = (d.creditos||[]).filter(c => (c.estado_credito||'').toUpperCase()==='OTORGADO');
+  const credHtml = otorgados.map(c => `
     <tr>
-      <td>${c.num_op||c.nombre_cliente||'—'}</td>
+      <td>${c.num_op||'—'}</td>
       <td>${c.nombre_cliente||'—'}</td>
+      <td>${c.rut_cliente||'—'}</td>
       <td>${c.financiera||'—'}</td>
-      <td>${c.plazo||'—'}</td>
+      <td style="text-align:center">${c.plazo||'—'}</td>
       <td style="text-align:right">${fmt(c.monto_financiado)}</td>
       <td style="text-align:right;color:${(parseFloat(c.seguro_cesantia)||0)>0?'#16a34a':'#9ca3af'}">${(parseFloat(c.seguro_cesantia)||0)>0?'✓ '+fmt(c.seguro_cesantia):'—'}</td>
       <td style="text-align:right;color:${(parseFloat(c.seguro_rep_menor)||0)>0?'#16a34a':'#9ca3af'}">${(parseFloat(c.seguro_rep_menor)||0)>0?'✓ '+fmt(c.seguro_rep_menor):'—'}</td>
     </tr>`).join('');
 
-  return `<div class="ej-card ${estadoClass}" id="ej-card-${i}">
+  return `<div class="ej-card ${estadoClass}" id="ej-card-${idx}">
     <div class="ej-header">
-      <div class="ej-nombre">
-        <i class="bi bi-person-fill"></i>${d.ejecutivo}
+      <div class="ej-nombre"><i class="bi bi-person-fill"></i>${d.ejecutivo}
         <span class="badge-estado ${estadoClass}">${estadoLabel}</span>
       </div>
-      ${botonesAdmin}
+      <div class="ej-acciones">
+        ${botonesAdmin}
+        <button class="btn-copiar" onclick="copiarResumen('${idx}')"><i class="bi bi-clipboard"></i>Copiar para email</button>
+      </div>
     </div>
 
     <div class="metricas-grid">
       <div class="metrica">
         <div class="m-label">Créditos otorgados</div>
         <div class="m-value">${d.total_creditos}</div>
-        <div class="m-sub">NCNU: ${d.ncnu_total} elegibles</div>
+        <div class="m-sub">NCNU elegibles: ${d.ncnu_total}</div>
       </div>
       <div class="metrica">
         <div class="m-label">Total financiado</div>
         <div class="m-value">${fmt(d.total_financiado)}</div>
-        <div class="m-sub">≤24: ${fmt(d.monto_24)} | +24: ${fmt(d.monto_mas24)}</div>
+        <div class="m-sub">≤24c: ${fmt(d.monto_24)} | +24c: ${fmt(d.monto_mas24)}</div>
       </div>
       <div class="metrica">
         <div class="m-label">Incentivo Base</div>
@@ -295,79 +374,113 @@ function renderEjecutivo(d, i, mes) {
       </div>
       <div class="metrica ${colCes}">
         <div class="m-label">Cruce Cesantía</div>
-        <div class="m-value">${pct(d.cruce_cesantia)} <small style="font-size:.7rem;font-weight:400">(${d.ncnu_cesantia}/${d.ncnu_total})</small></div>
+        <div class="m-value">${pct(d.cruce_cesantia)} (${d.ncnu_cesantia}/${d.ncnu_total})</div>
         <div class="prog-bar"><div class="prog-bar-fill" style="width:${barCes}%;background:${d.cumple_cesantia?'#16a34a':'#dc2626'}"></div></div>
-        <div class="m-sub">${d.cumple_cesantia?'✓ Cumple mínimo':'✗ No cumple mínimo'}</div>
+        <div class="m-sub">${d.cumple_cesantia?'✓ Cumple':'✗ No cumple'} &nbsp;| ajuste: ${pct(d.ajuste_cesantia)}</div>
       </div>
       <div class="metrica ${colRep}">
         <div class="m-label">Cruce Rep. Menores</div>
-        <div class="m-value">${pct(d.cruce_reparaciones)} <small style="font-size:.7rem;font-weight:400">(${d.ncnu_rep}/${d.ncnu_total})</small></div>
+        <div class="m-value">${pct(d.cruce_reparaciones)} (${d.ncnu_rep}/${d.ncnu_total})</div>
         <div class="prog-bar"><div class="prog-bar-fill" style="width:${barRep}%;background:${d.cumple_reparaciones?'#16a34a':'#dc2626'}"></div></div>
-        <div class="m-sub">${d.cumple_reparaciones?'✓ Cumple mínimo':'✗ No cumple mínimo'}</div>
+        <div class="m-sub">${d.cumple_reparaciones?'✓ Cumple':'✗ No cumple'} &nbsp;| ajuste: ${pct(d.ajuste_reparaciones)}</div>
       </div>
-      <div class="metrica ${colCal}">
+      <div class="metrica ok">
         <div class="m-label">Calidad</div>
         <div class="m-value">${pct(d.calidad)}</div>
-        <div class="prog-bar"><div class="prog-bar-fill" style="width:${barCal}%;background:#16a34a"></div></div>
-        <div class="m-sub">Factor ajuste: ${pct(d.factor_ajuste)} / 66%</div>
+        <div class="m-sub">ajuste calidad: ${pct(d.ajuste_calidad)}</div>
       </div>
     </div>
 
     <div class="desglose">
       <div class="desglose-title"><i class="bi bi-calculator"></i>Desglose incentivo final</div>
-      <div class="desglose-row"><span>Incentivo base (≤24 + +24)</span><span>${fmt(d.incentivo_base)}</span></div>
-      <div class="desglose-row"><span>+ Bono Seg. Cesantía ${d.cumple_cesantia?'(ajuste '+pct(d.ajuste_cesantia)+')':'(no cumple)'}</span><span>${d.cumple_cesantia?fmt(d.bono_cesantia):'$0'}</span></div>
-      <div class="desglose-row"><span>+ Bono Seg. Reparaciones ${d.cumple_reparaciones?'(ajuste '+pct(d.ajuste_reparaciones)+')':'(no cumple)'}</span><span>${d.cumple_reparaciones?fmt(d.bono_reparaciones):'$0'}</span></div>
+      <div class="desglose-row"><span>Incentivo base (≤24 + >24)</span><span>${fmt(d.incentivo_base)}</span></div>
+      <div class="desglose-row"><span>+ Bono Seg. Cesantía ${d.cumple_cesantia?'(ajuste '+pct(d.ajuste_cesantia)+')':'— no cumple'}</span><span>${fmt(d.cumple_cesantia?d.bono_cesantia:0)}</span></div>
+      <div class="desglose-row"><span>+ Bono Seg. Reparaciones ${d.cumple_reparaciones?'(ajuste '+pct(d.ajuste_reparaciones)+')':'— no cumple'}</span><span>${fmt(d.cumple_reparaciones?d.bono_reparaciones:0)}</span></div>
       <div class="desglose-row"><span>+ Bono Calidad (ajuste ${pct(d.ajuste_calidad)})</span><span>${fmt(d.bono_calidad)}</span></div>
       <div class="desglose-row"><span>= Incentivo Final</span><span>${fmt(d.incentivo_final)}</span></div>
     </div>
 
     <div class="total-final">
-      <div>
-        <div class="tf-label">Incentivo Final Bruto</div>
-        <div class="tf-value">${fmt(d.incentivo_final)}</div>
-      </div>
-      <div style="text-align:right">
-        <div class="tf-sc">Con semana corrida (aprox. ×1.2)</div>
-        <div class="tf-value">${fmt(d.con_semana_corrida)}</div>
-      </div>
+      <div><div class="tf-label">Incentivo Final Bruto</div><div class="tf-value">${fmt(d.incentivo_final)}</div></div>
+      <div style="text-align:right"><div class="tf-sc">Con semana corrida (aprox. ×1.2)</div><div class="tf-value">${fmt(d.con_semana_corrida)}</div></div>
     </div>
 
-    <button class="toggle-creditos" onclick="toggleCreditos(${i})">
-      <i class="bi bi-chevron-down" id="chevron-${i}"></i>Ver detalle créditos (${(d.creditos||[]).length})
+    <button class="toggle-creditos" onclick="toggleCreditos('${idx}')">
+      <i class="bi bi-chevron-down" id="chevron-${idx}"></i>Ver operaciones comisionables (${otorgados.length} OTORGADAS)
     </button>
-    <div class="creditos-tabla" id="creditos-${i}">
+    <div class="creditos-tabla" id="creditos-${idx}">
       <table>
-        <thead><tr><th>N° Op</th><th>Cliente</th><th>Financiera</th><th>Plazo</th><th>Monto Fin.</th><th>Seg. Cesantía</th><th>Seg. Rep.</th></tr></thead>
+        <thead><tr><th>N° Op</th><th>Cliente</th><th>RUT</th><th>Financiera</th><th style="text-align:center">Plazo</th><th style="text-align:right">Monto Fin.</th><th style="text-align:right">Seg. Cesantía</th><th style="text-align:right">Seg. Rep.</th></tr></thead>
         <tbody>${credHtml}</tbody>
       </table>
+    </div>
+    <!-- Datos ocultos para copiar -->
+    <div id="copy-data-${idx}" style="display:none"
+      data-ej="${d.ejecutivo}" data-mes="${document.getElementById('filtroMes').value}"
+      data-creds='${JSON.stringify(otorgados.map(c=>({op:c.num_op,cliente:c.nombre_cliente,plazo:c.plazo,monto:c.monto_financiado,ces:c.seguro_cesantia,rep:c.seguro_rep_menor})))}'
+      data-base="${fmt(d.incentivo_base)}" data-bces="${fmt(d.cumple_cesantia?d.bono_cesantia:0)}"
+      data-brep="${fmt(d.cumple_reparaciones?d.bono_reparaciones:0)}" data-bcal="${fmt(d.bono_calidad)}"
+      data-final="${fmt(d.incentivo_final)}" data-sc="${fmt(d.con_semana_corrida)}"
+      data-cruce-ces="${pct(d.cruce_cesantia)}" data-cruce-rep="${pct(d.cruce_reparaciones)}">
     </div>
   </div>`;
 }
 
-function toggleCreditos(i) {
-  const div = document.getElementById(`creditos-${i}`);
-  const ico = document.getElementById(`chevron-${i}`);
+function toggleCreditos(idx) {
+  const div = document.getElementById(`creditos-${idx}`);
+  const ico = document.getElementById(`chevron-${idx}`);
   div.classList.toggle('visible');
   ico.className = div.classList.contains('visible') ? 'bi bi-chevron-up' : 'bi bi-chevron-down';
+}
+
+function copiarResumen(idx) {
+  const el   = document.getElementById(`copy-data-${idx}`);
+  const ej   = el.dataset.ej;
+  const mes  = el.dataset.mes ? nombreMes(el.dataset.mes) : '';
+  const creds= JSON.parse(el.dataset.creds||'[]');
+
+  const linCreds = creds.map((c,i) =>
+    `  ${i+1}. Op ${c.op||'—'} | ${c.cliente||'—'} | ${c.plazo} cuotas | ${fmt(c.monto)}` +
+    ((parseFloat(c.ces)||0)>0 ? ` | Seg.Ces: ${fmt(c.ces)}`:'') +
+    ((parseFloat(c.rep)||0)>0 ? ` | Seg.Rep: ${fmt(c.rep)}`:'')
+  ).join('\n');
+
+  const texto = `LIQUIDACIÓN DE COMISIÓN — ${mes.toUpperCase()}
+Ejecutivo: ${ej}
+${'─'.repeat(55)}
+
+OPERACIONES COMISIONABLES (${creds.length} créditos OTORGADOS):
+${linCreds}
+
+${'─'.repeat(55)}
+DETALLE CÁLCULO:
+  Incentivo Base:              ${el.dataset.base}
+  + Bono Seg. Cesantía:        ${el.dataset.bces}  (cruce: ${el.dataset['cruce-ces']})
+  + Bono Seg. Reparaciones:    ${el.dataset.brep}  (cruce: ${el.dataset['cruce-rep']})
+  + Bono Calidad:              ${el.dataset.bcal}
+${'─'.repeat(55)}
+  INCENTIVO FINAL BRUTO:       ${el.dataset.final}
+  Con Semana Corrida (×1.2):   ${el.dataset.sc}
+
+AutoFácil — Crédito Automotriz`;
+
+  navigator.clipboard.writeText(texto)
+    .then(() => toast(`Resumen de ${ej} copiado al portapapeles`, true))
+    .catch(() => toast('No se pudo copiar — intenta con Ctrl+C', false));
 }
 
 async function cambiarEstado(ejecutivo, mes, estado, incentivo_final, con_semana_corrida) {
   try {
     const res  = await fetch('/api/comisiones/aprobar', {
-      method: 'POST', headers: H,
-      body: JSON.stringify({ ejecutivo, mes, estado, incentivo_final, con_semana_corrida }),
+      method:'POST', headers:H,
+      body:JSON.stringify({ejecutivo, mes, estado, incentivo_final, con_semana_corrida}),
     });
     const json = await res.json();
-    if (json.success) {
-      cargar(); // recarga para reflejar nuevo estado
-    } else {
-      alert('Error: ' + json.error);
-    }
-  } catch(e) { alert('Error: ' + e.message); }
+    if (json.success) { toast(`${estado === 'aprobado' ? '✓ Aprobado' : '✗ Rechazado'}: ${ejecutivo}`, estado==='aprobado'); cargar(); }
+    else toast('Error: ' + json.error, false);
+  } catch(e) { toast('Error: ' + e.message, false); }
 }
 
-// Carga automática al entrar
 cargar();
 </script>
 <script src="/js/app-version.js"></script>
