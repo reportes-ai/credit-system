@@ -434,39 +434,100 @@ function toggleCreditos(idx) {
 }
 
 function copiarResumen(idx) {
-  const el   = document.getElementById(`copy-data-${idx}`);
-  const ej   = el.dataset.ej;
-  const mes  = el.dataset.mes ? nombreMes(el.dataset.mes) : '';
-  const creds= JSON.parse(el.dataset.creds||'[]');
+  const el    = document.getElementById(`copy-data-${idx}`);
+  const ej    = el.dataset.ej;
+  const mesYM = el.dataset.mes;
+  const mesLabel = mesYM ? nombreMes(mesYM).replace(/^\w/, c => c.toUpperCase()) : '';
+  const creds = JSON.parse(el.dataset.creds || '[]');
+  // Fix: dataset convierte data-cruce-ces → dataset.cruceCes
+  const cruceCes = el.dataset.cruceCes || '—';
+  const cruceRep = el.dataset.cruceRep || '—';
 
-  const linCreds = creds.map((c,i) =>
-    `  ${i+1}. Op ${c.op||'—'} | ${c.cliente||'—'} | ${c.plazo} cuotas | ${fmt(c.monto)}` +
-    ((parseFloat(c.ces)||0)>0 ? ` | Seg.Ces: ${fmt(c.ces)}`:'') +
-    ((parseFloat(c.rep)||0)>0 ? ` | Seg.Rep: ${fmt(c.rep)}`:'')
-  ).join('\n');
+  const filasCreds = creds.map((c, i) => {
+    const tieneC = (parseFloat(c.ces) || 0) > 0;
+    const tieneR = (parseFloat(c.rep) || 0) > 0;
+    return `<tr style="background:${i%2===0?'#f8fafc':'#fff'}">
+      <td style="padding:7px 10px;border-bottom:1px solid #e5e7eb;color:#374151">${c.op||'—'}</td>
+      <td style="padding:7px 10px;border-bottom:1px solid #e5e7eb;font-weight:500">${c.cliente||'—'}</td>
+      <td style="padding:7px 10px;border-bottom:1px solid #e5e7eb;text-align:center">${c.plazo||'—'}</td>
+      <td style="padding:7px 10px;border-bottom:1px solid #e5e7eb;text-align:right;font-weight:600">${fmt(c.monto)}</td>
+      <td style="padding:7px 10px;border-bottom:1px solid #e5e7eb;text-align:center;color:${tieneC?'#16a34a':'#9ca3af'}">${tieneC?'✔ '+fmt(c.ces):'—'}</td>
+      <td style="padding:7px 10px;border-bottom:1px solid #e5e7eb;text-align:center;color:${tieneR?'#16a34a':'#9ca3af'}">${tieneR?'✔ '+fmt(c.rep):'—'}</td>
+    </tr>`;
+  }).join('');
 
-  const texto = `LIQUIDACIÓN DE COMISIÓN — ${mes.toUpperCase()}
-Ejecutivo: ${ej}
-${'─'.repeat(55)}
+  const html = `
+<div style="font-family:'Segoe UI',Arial,sans-serif;max-width:700px;margin:0 auto;color:#111827">
 
-OPERACIONES COMISIONABLES (${creds.length} créditos OTORGADOS):
-${linCreds}
+  <!-- Header -->
+  <div style="background:linear-gradient(135deg,#012d70,#0141A2);border-radius:12px 12px 0 0;padding:24px 28px;color:#fff">
+    <div style="font-size:11px;letter-spacing:2px;text-transform:uppercase;opacity:.7;margin-bottom:4px">AutoFácil — Crédito Automotriz</div>
+    <div style="font-size:20px;font-weight:800;margin-bottom:2px">Liquidación de Comisión</div>
+    <div style="font-size:14px;opacity:.85">${mesLabel}</div>
+  </div>
 
-${'─'.repeat(55)}
-DETALLE CÁLCULO:
-  Incentivo Base:              ${el.dataset.base}
-  + Bono Seg. Cesantía:        ${el.dataset.bces}  (cruce: ${el.dataset['cruce-ces']})
-  + Bono Seg. Reparaciones:    ${el.dataset.brep}  (cruce: ${el.dataset['cruce-rep']})
-  + Bono Calidad:              ${el.dataset.bcal}
-${'─'.repeat(55)}
-  INCENTIVO FINAL BRUTO:       ${el.dataset.final}
-  Con Semana Corrida (×1.2):   ${el.dataset.sc}
+  <!-- Ejecutivo -->
+  <div style="background:#0255c5;padding:12px 28px;color:#fff;display:flex;align-items:center">
+    <span style="font-size:13px;opacity:.8;margin-right:8px">Ejecutivo Comercial:</span>
+    <span style="font-size:15px;font-weight:700">${ej}</span>
+  </div>
 
-AutoFácil — Crédito Automotriz`;
+  <!-- Créditos -->
+  <div style="background:#fff;padding:24px 28px 8px;border:1px solid #e5e7eb;border-top:none">
+    <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:#6b7280;margin-bottom:12px">
+      Operaciones Comisionables — ${creds.length} crédito${creds.length!==1?'s':''} OTORGADO${creds.length!==1?'S':''}
+    </div>
+    <table style="width:100%;border-collapse:collapse;font-size:13px">
+      <thead>
+        <tr style="background:#e8eaf6">
+          <th style="padding:8px 10px;text-align:left;font-weight:700;color:#374151;border-bottom:2px solid #c5cae9">N° Op</th>
+          <th style="padding:8px 10px;text-align:left;font-weight:700;color:#374151;border-bottom:2px solid #c5cae9">Cliente</th>
+          <th style="padding:8px 10px;text-align:center;font-weight:700;color:#374151;border-bottom:2px solid #c5cae9">Plazo</th>
+          <th style="padding:8px 10px;text-align:right;font-weight:700;color:#374151;border-bottom:2px solid #c5cae9">Monto Fin.</th>
+          <th style="padding:8px 10px;text-align:center;font-weight:700;color:#374151;border-bottom:2px solid #c5cae9">Seg. Cesantía</th>
+          <th style="padding:8px 10px;text-align:center;font-weight:700;color:#374151;border-bottom:2px solid #c5cae9">Seg. Rep.</th>
+        </tr>
+      </thead>
+      <tbody>${filasCreds}</tbody>
+    </table>
+  </div>
 
-  navigator.clipboard.writeText(texto)
-    .then(() => toast(`Resumen de ${ej} copiado al portapapeles`, true))
-    .catch(() => toast('No se pudo copiar — intenta con Ctrl+C', false));
+  <!-- Desglose cálculo -->
+  <div style="background:#f0f4f8;padding:20px 28px;border:1px solid #e5e7eb;border-top:none">
+    <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:#6b7280;margin-bottom:14px">Desglose del Cálculo</div>
+    <table style="width:100%;font-size:13px;border-collapse:collapse">
+      <tr><td style="padding:5px 0;color:#374151">Incentivo Base (0.75% ≤24c / 1.00% &gt;24c)</td><td style="padding:5px 0;text-align:right;font-weight:600">${el.dataset.base}</td></tr>
+      <tr><td style="padding:5px 0;color:#374151">+ Bono Seg. Cesantía &nbsp;<span style="background:#dcfce7;color:#166534;font-size:11px;padding:1px 7px;border-radius:10px">cruce ${cruceCes}</span></td><td style="padding:5px 0;text-align:right;font-weight:600">${el.dataset.bces}</td></tr>
+      <tr><td style="padding:5px 0;color:#374151">+ Bono Seg. Reparaciones &nbsp;<span style="background:#dcfce7;color:#166534;font-size:11px;padding:1px 7px;border-radius:10px">cruce ${cruceRep}</span></td><td style="padding:5px 0;text-align:right;font-weight:600">${el.dataset.brep}</td></tr>
+      <tr><td style="padding:5px 0;color:#374151">+ Bono Calidad</td><td style="padding:5px 0;text-align:right;font-weight:600">${el.dataset.bcal}</td></tr>
+      <tr style="border-top:2px solid #c5cae9">
+        <td style="padding:10px 0 5px;font-weight:700;color:#0141A2;font-size:14px">= INCENTIVO FINAL BRUTO</td>
+        <td style="padding:10px 0 5px;text-align:right;font-weight:800;color:#0141A2;font-size:16px">${el.dataset.final}</td>
+      </tr>
+    </table>
+  </div>
+
+  <!-- Total con semana corrida -->
+  <div style="background:linear-gradient(135deg,#012d70,#0141A2);border-radius:0 0 12px 12px;padding:18px 28px;display:flex;justify-content:space-between;align-items:center;color:#fff">
+    <div>
+      <div style="font-size:11px;opacity:.75;margin-bottom:3px">Con Semana Corrida (aprox. ×1.2)</div>
+      <div style="font-size:22px;font-weight:800">${el.dataset.sc}</div>
+    </div>
+    <div style="text-align:right;font-size:11px;opacity:.6">
+      AutoFácil — Crédito Automotriz<br>${mesLabel}
+    </div>
+  </div>
+
+</div>`;
+
+  const blob = new Blob([html], { type: 'text/html' });
+  navigator.clipboard.write([new ClipboardItem({ 'text/html': blob })])
+    .then(() => toast(`✓ Resumen HTML de ${ej} copiado — listo para pegar en Gmail`, true))
+    .catch(() => {
+      // Fallback texto plano si el navegador no soporta ClipboardItem
+      const txt = `LIQUIDACIÓN COMISIÓN ${mesLabel.toUpperCase()} — ${ej}\n\nOperaciones (${creds.length}):\n${creds.map((c,i)=>`${i+1}. Op${c.op||'?'} | ${c.cliente} | ${c.plazo}c | ${fmt(c.monto)}`).join('\n')}\n\nIncentivo Base: ${el.dataset.base}\nBono Cesantía: ${el.dataset.bces}\nBono Reparaciones: ${el.dataset.brep}\nBono Calidad: ${el.dataset.bcal}\nINCENTIVO FINAL: ${el.dataset.final}\nCon S.Corrida: ${el.dataset.sc}`;
+      navigator.clipboard.writeText(txt).then(() => toast('Copiado (texto plano — navegador no soporta HTML)', true));
+    });
 }
 
 async function cambiarEstado(ejecutivo, mes, estado, incentivo_final, con_semana_corrida) {
