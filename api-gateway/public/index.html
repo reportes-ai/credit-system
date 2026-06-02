@@ -225,25 +225,24 @@
       btn.textContent = 'Guardando…';
       try {
         const grid = document.getElementById('modulesGrid');
-        const cards = [...grid.querySelectorAll('.module-card')]
-          .filter(c => c.dataset.id && !isNaN(parseInt(c.dataset.id)));
-        const orden = cards.map((c, i) => ({ id_modulo: parseInt(c.dataset.id), orden: i + 1 }));
+        // Guarda el orden como array de rutas (igual que mantenedores — usa config_ui)
+        const ids = [...grid.querySelectorAll('.module-card[data-id]')]
+          .map(c => c.dataset.id);
 
-        const res = await fetch('/api/perfiles/modulos/reordenar', {
+        const res = await fetch('/api/config/ui/dashboard', {
           method: 'PUT',
-          headers: { ...H, 'Content-Type': 'application/json' },
-          body: JSON.stringify({ orden }),
+          headers: H,
+          body: JSON.stringify({ valor: ids }),
         });
         const json = await res.json();
         if (json.success) {
           toggleReordenar();
-          modulosData.forEach(m => { const o = orden.find(x => x.id_modulo === m.id_modulo); if (o) m.orden = o.orden; });
           mostrarToastOrden('Orden guardado');
         } else {
-          alert('Error al guardar orden: ' + (json.error || res.status));
+          mostrarToastError('Error al guardar: ' + (json.error || res.status));
         }
       } catch(e) {
-        alert('Error de conexión al guardar: ' + e.message);
+        mostrarToastError('Error al guardar: ' + e.message);
       } finally {
         btn.disabled = false;
         btn.innerHTML = '<i class="bi bi-floppy"></i> Guardar orden';
@@ -316,9 +315,15 @@
 
     async function cargarModulos() {
       try {
-        const resp = await fetch('/api/auth/mis-permisos', { headers: H });
+        // Carga módulos y orden guardado en paralelo
+        const [resp, respOrden] = await Promise.all([
+          fetch('/api/auth/mis-permisos', { headers: H }),
+          fetch('/api/config/ui/dashboard',  { headers: H }),
+        ]);
         if (resp.status === 401) { logout(); return; }
-        const data = await resp.json();
+        const data      = await resp.json();
+        const dataOrden = await respOrden.json();
+
         const grid = document.getElementById('modulesGrid');
         grid.innerHTML = '';
         if (!data.success || data.data.length === 0) {
@@ -327,10 +332,18 @@
         }
         modulosData = data.data;
 
-        // Simulador Rentabilidad — siempre como primer card
+        // Orden guardado (array de id_modulo como string) o por defecto
+        const ordenGuardado = (dataOrden.success && Array.isArray(dataOrden.data)) ? dataOrden.data : null;
+        const modsSorted = ordenGuardado
+          ? ordenGuardado.map(id => modulosData.find(m => String(m.id_modulo) === String(id))).filter(Boolean)
+              .concat(modulosData.filter(m => !ordenGuardado.includes(String(m.id_modulo))))
+          : modulosData;
+
+        // Simulador Rentabilidad — incluido en el orden si ya fue guardado, sino va primero
         const simCard = document.createElement('a');
         simCard.href = '/simulador/';
-        simCard.dataset.ruta = '/simulador/';  // persiste aunque sortable quite el href
+        simCard.dataset.ruta = '/simulador/';
+        simCard.dataset.id = 'sim';
         simCard.className = 'module-card';
         simCard.style.cursor = 'pointer';
         simCard.addEventListener('click', (e) => { e.preventDefault(); window.location.href = '/simulador/'; });
@@ -340,21 +353,38 @@
           <h6>Simulador Rentabilidad</h6>
           <p>AutoFin y Unidad de Crédito. Calcula ingresos, comisiones y cuota en tiempo real.</p>
           <span class="btn-acceder"><i class="bi bi-arrow-right-circle me-1"></i>Acceder</span>`;
-        grid.appendChild(simCard);
 
-        data.data.forEach(mod => {
-          const a = document.createElement('a');
-          a.href = mod.ruta || '#';
-          a.className = 'module-card';
-          a.dataset.id = mod.id_modulo;
-          a.innerHTML = `
-            <i class="bi bi-grip-vertical drag-handle"></i>
-            <div class="card-icon"><i class="bi ${mod.icono || 'bi-grid'}"></i></div>
-            <h6>${mod.nombre}</h6>
-            <p>${mod.descripcion || ''}</p>
-            <span class="btn-acceder"><i class="bi bi-arrow-right-circle me-1"></i>Acceder</span>`;
-          grid.appendChild(a);
-        });
+        // Si hay orden guardado con 'sim', respetarlo; si no, simCard va primero
+        if (ordenGuardado && ordenGuardado.includes('sim')) {
+          const allItems = [{ id_modulo: 'sim', _el: simCard },
+            ...modsSorted.map(m => ({ ...m, _el: null }))];
+          const reordenados = ordenGuardado
+            .map(id => allItems.find(x => String(x.id_modulo) === String(id)))
+            .filter(Boolean)
+            .concat(allItems.filter(x => !ordenGuardado.includes(String(x.id_modulo))));
+          reordenados.forEach(item => {
+            if (item._el) { grid.appendChild(item._el); return; }
+            const m = item;
+            const a = document.createElement('a');
+            a.href = m.ruta || '#'; a.className = 'module-card'; a.dataset.id = m.id_modulo;
+            a.innerHTML = `<i class="bi bi-grip-vertical drag-handle"></i>
+              <div class="card-icon"><i class="bi ${m.icono || 'bi-grid'}"></i></div>
+              <h6>${m.nombre}</h6><p>${m.descripcion || ''}</p>
+              <span class="btn-acceder"><i class="bi bi-arrow-right-circle me-1"></i>Acceder</span>`;
+            grid.appendChild(a);
+          });
+        } else {
+          grid.appendChild(simCard);
+          modsSorted.forEach(mod => {
+            const a = document.createElement('a');
+            a.href = mod.ruta || '#'; a.className = 'module-card'; a.dataset.id = mod.id_modulo;
+            a.innerHTML = `<i class="bi bi-grip-vertical drag-handle"></i>
+              <div class="card-icon"><i class="bi ${mod.icono || 'bi-grid'}"></i></div>
+              <h6>${mod.nombre}</h6><p>${mod.descripcion || ''}</p>
+              <span class="btn-acceder"><i class="bi bi-arrow-right-circle me-1"></i>Acceder</span>`;
+            grid.appendChild(a);
+          });
+        }
 
         /* 🚀 Animación: una vez por sesión */
         if (!sessionStorage.getItem('af_intro_done')) {
