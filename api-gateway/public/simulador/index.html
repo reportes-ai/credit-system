@@ -164,9 +164,10 @@
 
           <div class="f-row">
             <div class="f-group">
-              <label>Plazo (meses)</label>
+              <label>Plazo (cuotas)</label>
               <input type="number" id="iPlazo" value="48" min="12" max="72" step="1"
-                oninput="this.value=Math.min(72,Math.max(12,parseInt(this.value)||48));simular()">
+                oninput="simular()"
+                onblur="if(this.value<12)this.value=12;if(this.value>72)this.value=72;simular()">
             </div>
             <div class="f-group">
               <label>Tasa Cliente % <small style="color:#0369a1">(auto)</small></label>
@@ -359,7 +360,7 @@ function getDealerPct(plazo) {
 function simular() {
   const valor   = parseMiles(document.getElementById('iValor').value);
   const pie     = parseMiles(document.getElementById('iPie').value);
-  const plazo   = parseInt(document.getElementById('iPlazo').value) || 48;
+  const plazo   = Math.min(72, Math.max(12, parseInt(document.getElementById('iPlazo').value) || 48));
   const esPatio = getToggle('tgDealer') === 0;
   const esCorfo = getToggle('tgProducto') === 1;
 
