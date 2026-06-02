@@ -526,7 +526,8 @@ const reordenarModulos = async (req, res) => {
     }
     res.json({ success: true, data: { mensaje: 'Orden actualizado' }, error: null });
   } catch (error) {
-    res.status(500).json({ success: false, data: null, error: error.message });
+    console.error('[reordenarModulos]', error.message);
+    res.status(500).json({ success: false, data: null, error: 'Error interno del servidor' });
   }
 };
 

@@ -219,21 +219,33 @@
     }
 
     async function guardarOrden() {
-      const grid = document.getElementById('modulesGrid');
-      const cards = [...grid.querySelectorAll('.module-card')]
-        .filter(c => c.dataset.id && !isNaN(parseInt(c.dataset.id)));
-      const orden = cards.map((c, i) => ({ id_modulo: parseInt(c.dataset.id), orden: i + 1 }));
-      const res = await fetch('/api/perfiles/modulos/reordenar', {
-        method: 'PUT',
-        headers: { ...H, 'Content-Type': 'application/json' },
-        body: JSON.stringify({ orden }),
-      });
-      const json = await res.json();
-      if (json.success) {
-        toggleReordenar();
-        // Actualizar orden local
-        modulosData.forEach(m => { const o = orden.find(x => x.id_modulo === m.id_modulo); if (o) m.orden = o.orden; });
-      } else alert('Error al guardar orden: ' + json.error);
+      const btn = document.getElementById('btnGuardarOrden');
+      btn.disabled = true;
+      btn.textContent = 'Guardando…';
+      try {
+        const grid = document.getElementById('modulesGrid');
+        const cards = [...grid.querySelectorAll('.module-card')]
+          .filter(c => c.dataset.id && !isNaN(parseInt(c.dataset.id)));
+        const orden = cards.map((c, i) => ({ id_modulo: parseInt(c.dataset.id), orden: i + 1 }));
+
+        const res = await fetch('/api/perfiles/modulos/reordenar', {
+          method: 'PUT',
+          headers: { ...H, 'Content-Type': 'application/json' },
+          body: JSON.stringify({ orden }),
+        });
+        const json = await res.json();
+        if (json.success) {
+          toggleReordenar();
+          modulosData.forEach(m => { const o = orden.find(x => x.id_modulo === m.id_modulo); if (o) m.orden = o.orden; });
+        } else {
+          alert('Error al guardar orden: ' + (json.error || res.status));
+        }
+      } catch(e) {
+        alert('Error de conexión al guardar: ' + e.message);
+      } finally {
+        btn.disabled = false;
+        btn.textContent = '💾 Guardar orden';
+      }
     }
 
     /* ══════════════════════════════════════════════════════════════
