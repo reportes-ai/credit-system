@@ -47,11 +47,22 @@ function normInt(v) {
 }
 
 /* ── Mapea fila del Excel a objeto DB ──────────────────────────────────── */
+// Resuelve el nombre real de una columna (tolerante a espacios y case)
+function resolveCol(row, ...candidates) {
+  const keys = Object.keys(row);
+  for (const c of candidates) {
+    const found = keys.find(k => k.trim().toUpperCase() === c.trim().toUpperCase());
+    if (found !== undefined) return found;
+  }
+  return candidates[0]; // fallback
+}
+function getCol(row, ...candidates) { return row[resolveCol(row, ...candidates)]; }
+
 function mapRow(row) {
-  const n = (col) => normNum(row[col]);
-  const s = (col) => { const v = norm(row[col]); return (v && v.toUpperCase() !== 'NO APLICA') ? v : null; };
-  const d = (col) => normDate(row[col]);
-  const i = (col) => normInt(row[col]);
+  const n = (...cols) => normNum(getCol(row, ...cols));
+  const s = (...cols) => { const v = norm(getCol(row, ...cols)); return (v && v.toUpperCase() !== 'NO APLICA') ? v : null; };
+  const d = (...cols) => normDate(getCol(row, ...cols));
+  const i = (...cols) => normInt(getCol(row, ...cols));
 
   return {
     num_op:             i('OP'),
@@ -63,20 +74,20 @@ function mapRow(row) {
     financiera:         s('FINANCIERA'),
     automotora:         s('AUTOMOTORA'),
     nombre_local:       s('NOMBRE LOCAL'),
-    estado_eval:        s('ESTADO EVAL. RIESGO'),
-    estado_credito:     s('ESTADO CREDITO'),
+    estado_eval:        s('ESTADO EVAL. RIESGO', 'ESTADO EVAL RIESGO'),
+    estado_credito:     s('ESTADO CREDITO', 'ESTADO CRÉDITO'),
     fecha_otorgado:     d('FECHA OTORGADO'),
     producto:           s('PRODUCTO'),
-    valor_vehiculo:     i('VALOR VEHICULO'),
+    valor_vehiculo:     i('VALOR VEHICULO', 'VALOR VEHÍCULO'),
     pie:                i('PIE'),
     saldo_precio:       i('SALDO PRECIO'),
     pct_financiado:     n('% FINANCIADO'),
     impuesto:           i('IMPUESTO'),
-    estado_impuesto:    s('ESTADO IMPTO'),
+    estado_impuesto:    s('ESTADO IMPTO', 'ESTADO IMPUESTO'),
     gastos:             i('GASTOS'),
-    seguro_rdh:         i('SEGURO RDH+E'),
-    seguro_cesantia:    i('SEG.CESANTIA'),
-    seguro_rep_menor:   i('SEG. REP MENOR'),
+    seguro_rdh:         i('SEGURO RDH+E', 'SEGURO RDH'),
+    seguro_cesantia:    i('SEG.CESANTIA', 'SEG. CESANTIA', 'SEGURO CESANTIA'),
+    seguro_rep_menor:   i('SEG. REP MENOR', 'SEG.REP MENOR', 'SEG. REP. MENOR'),
     monto_financiado:   i('MONTO FINANCIADO INDEXA'),
     tascli_real:        n('TASCLI REAL'),
     tascli_pizarra:     n('TASCLI PIZARRA'),
@@ -85,7 +96,7 @@ function mapRow(row) {
     comej:              i('COMEJ $'),
     monto_comision_fin: i('RENTABILIDAD AUTOFACIL DIRECTO'),
     plazo:              i('PLAZO'),
-    parque:             norm(row['PARQUE']) || 'NO APLICA',
+    parque:             s('PARQUE') || 'NO APLICA',
     ingreso_neto_total: n('INGRESO NETO TOTAL AF'),
     resultado_negocio:  n('RESULTADO NEGOCIO'),
     mayor_menor:        s('MAYOR/MENOR'),
@@ -111,12 +122,23 @@ const preview = async (req, res) => {
 
     if (!data.length) return res.status(400).json({ success: false, data: null, error: 'Archivo vacío' });
 
-    const ops = data.map(r => parseInt(r['OP'])).filter(Boolean);
-    const [existentes] = await pool.query(
-      `SELECT num_op FROM operaciones_brokerage WHERE num_op IN (${ops.map(()=>'?').join(',')})`,
-      ops
-    );
-    const setExistentes = new Set(existentes.map(r => r.num_op));
+    // Detectar nombre exacto de la columna OP (puede tener espacios o diferente case)
+    const colOP = Object.keys(data[0]).find(k => k.trim().toUpperCase() === 'OP') || 'OP';
+
+    const ops = data.map(r => parseInt(r[colOP])).filter(v => !isNaN(v) && v > 0);
+    if (!ops.length) return res.status(400).json({ success: false, data: null, error: `No se encontraron OPs válidas. Columna detectada: "${colOP}". Primeras claves: ${Object.keys(data[0]).slice(0,5).join(', ')}` });
+
+    // TiDB/MySQL: query en chunks de 500 para evitar límite de parámetros
+    const setExistentes = new Set();
+    const chunkSize = 500;
+    for (let i = 0; i < ops.length; i += chunkSize) {
+      const chunk = ops.slice(i, i + chunkSize);
+      const [rows] = await pool.query(
+        `SELECT num_op FROM operaciones_brokerage WHERE num_op IN (${chunk.map(()=>'?').join(',')})`,
+        chunk
+      );
+      rows.forEach(r => setExistentes.add(r.num_op));
+    }
 
     const resumen = {
       total:     data.length,
@@ -154,14 +176,21 @@ const importar = async (req, res) => {
     const ws   = wb.Sheets[wb.SheetNames[0]];
     const data = XLSX.utils.sheet_to_json(ws, { defval: '' });
 
-    const ops = data.map(r => parseInt(r['OP'])).filter(Boolean);
-    const [existentes] = await pool.query(
-      `SELECT num_op FROM operaciones_brokerage WHERE num_op IN (${ops.map(()=>'?').join(',')})`,
-      ops
-    );
-    const setExistentes = new Set(existentes.map(r => r.num_op));
+    const colOP = Object.keys(data[0]).find(k => k.trim().toUpperCase() === 'OP') || 'OP';
+    const ops   = data.map(r => parseInt(r[colOP])).filter(v => !isNaN(v) && v > 0);
 
-    const nuevos = data.filter(r => !setExistentes.has(parseInt(r['OP'])));
+    const setExistentes = new Set();
+    const chunkSize = 500;
+    for (let i = 0; i < ops.length; i += chunkSize) {
+      const chunk = ops.slice(i, i + chunkSize);
+      const [rows] = await pool.query(
+        `SELECT num_op FROM operaciones_brokerage WHERE num_op IN (${chunk.map(()=>'?').join(',')})`,
+        chunk
+      );
+      rows.forEach(r => setExistentes.add(r.num_op));
+    }
+
+    const nuevos = data.filter(r => !setExistentes.has(parseInt(r[colOP])));
 
     let insertados = 0;
     let errores    = [];
