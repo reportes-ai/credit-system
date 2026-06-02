@@ -167,14 +167,8 @@
           <div class="f-row">
             <div class="f-group">
               <label>Plazo (meses)</label>
-              <select id="iPlazo" onchange="simular()">
-                <option value="12">12 meses</option>
-                <option value="24">24 meses</option>
-                <option value="36">36 meses</option>
-                <option value="48" selected>48 meses</option>
-                <option value="60">60 meses</option>
-                <option value="72">72 meses</option>
-              </select>
+              <input type="number" id="iPlazo" value="48" min="12" max="72" step="1"
+                oninput="this.value=Math.min(72,Math.max(12,parseInt(this.value)||48));simular()">
             </div>
             <div class="f-group">
               <label>Tasa Cliente % <small style="color:#0369a1">(auto)</small></label>
