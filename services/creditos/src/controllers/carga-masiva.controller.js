@@ -140,24 +140,33 @@ const preview = async (req, res) => {
       rows.forEach(r => setExistentes.add(r.num_op));
     }
 
+    // Detectar nombres de columnas clave usando búsqueda flexible
+    const keys = Object.keys(data[0]);
+    const findCol = (...names) => keys.find(k => names.some(n => k.trim().toUpperCase() === n.toUpperCase())) || names[0];
+    const colEstado   = findCol('ESTADO CREDITO', 'ESTADO CRÉDITO', 'ESTADO_CREDITO');
+    const colNombre   = findCol('NOMBRE');
+    const colProducto = findCol('PRODUCTO');
+    const colFin      = findCol('FINANCIERA');
+    const colMonto    = findCol('MONTO FINANCIADO INDEXA', 'MONTO FINANCIADO');
+
     const resumen = {
       total:     data.length,
       nuevos:    ops.filter(o => !setExistentes.has(o)).length,
       existentes: setExistentes.size,
-      otorgados: data.filter(r => (r['ESTADO CREDITO']||'').toUpperCase() === 'OTORGADO').length,
+      otorgados: data.filter(r => (r[colEstado]||'').toString().toUpperCase() === 'OTORGADO').length,
     };
 
     // Vista previa: primeras 10 nuevas
     const preview = data
-      .filter(r => !setExistentes.has(parseInt(r['OP'])))
+      .filter(r => !setExistentes.has(parseInt(r[colOP])))
       .slice(0, 10)
       .map(r => ({
-        op:       r['OP'],
-        nombre:   r['NOMBRE'],
-        estado:   r['ESTADO CREDITO'],
-        producto: r['PRODUCTO'],
-        financiera: r['FINANCIERA'],
-        monto:    r['MONTO FINANCIADO INDEXA'],
+        op:        r[colOP],
+        nombre:    r[colNombre],
+        estado:    r[colEstado],
+        producto:  r[colProducto],
+        financiera:r[colFin],
+        monto:     r[colMonto],
       }));
 
     res.json({ success: true, data: { resumen, preview }, error: null });
