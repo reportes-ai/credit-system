@@ -86,8 +86,22 @@ app.use('/api/cobranza', require('../../services/cobranza/src/routes/cobranza.ro
 // Comisiones ejecutivos
 app.use('/api/comisiones', require('../../services/comisiones/src/routes/comisiones.routes'));
 
+// Carga masiva de operaciones
+app.use('/api/carga-masiva', require('../../services/creditos/src/routes/carga-masiva.routes'));
+
+// Mantenedor comisiones de seguro
+app.use('/api/comisiones-seguro', require('../../services/mantenedores/src/routes/comisiones-seguro.routes'));
+
 // Health check
 app.get('/health', (req, res) => res.json({ status: 'Sistema operativo', timestamp: new Date() }));
+
+// Mantenedor comisiones seguro SPA
+app.get(['/mantenedores/comisiones-seguro', '/mantenedores/comisiones-seguro/'], (req, res) =>
+  res.sendFile(path.join(__dirname, '../public/mantenedores/comisiones-seguro/index.html')));
+
+// Carga masiva SPA
+app.get(['/carga-masiva', '/carga-masiva/'], (req, res) =>
+  res.sendFile(path.join(__dirname, '../public/carga-masiva/index.html')));
 
 // Comisiones SPA
 app.get(['/comisiones', '/comisiones/'], (req, res) =>

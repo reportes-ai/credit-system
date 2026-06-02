@@ -1,0 +1,259 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <link rel="icon" href="/img/favicon.png" type="image/png">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Carga Masiva Operaciones — AutoFácil</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css" rel="stylesheet">
+  <style>
+    :root { --navy:#0141A2; --navy-dark:#012d70; --navy-light:#0255c5; --accent:#009AFE; --bg:#f0f4f8; }
+    body { background:var(--bg); font-family:'Segoe UI',system-ui,sans-serif; margin:0; min-height:100vh; }
+    .topnav { background:linear-gradient(90deg,var(--navy-dark),var(--navy-light)); color:#fff; height:60px; padding:0 24px; display:flex; align-items:center; justify-content:space-between; position:sticky; top:0; z-index:200; box-shadow:0 2px 8px rgba(0,0,0,.3); }
+    .topnav-left { display:flex; align-items:center; gap:16px; }
+    .topnav-brand { display:flex; align-items:center; gap:8px; text-decoration:none; }
+    .topnav-brand img { height:32px; filter:brightness(0) invert(1); }
+    .version-badge { background:rgba(255,255,255,.15); color:rgba(255,255,255,.75); font-size:.65rem; font-weight:700; border-radius:6px; padding:2px 8px; }
+    .breadcrumb-nav { color:rgba(255,255,255,.6); font-size:.85rem; display:flex; align-items:center; gap:6px; }
+    .breadcrumb-nav a { color:rgba(255,255,255,.75); text-decoration:none; }
+    .breadcrumb-nav .sep { color:rgba(255,255,255,.35); }
+    .topnav-right { display:flex; align-items:center; gap:10px; }
+    .user-chip { background:rgba(255,255,255,.12); border-radius:24px; padding:5px 12px; display:flex; align-items:center; gap:8px; font-size:.85rem; }
+    .avatar { width:28px; height:28px; background:#90caf9; border-radius:50%; display:flex; align-items:center; justify-content:center; color:var(--navy); font-weight:700; font-size:.75rem; }
+    .perfil-badge { background:rgba(144,202,249,.2); border:1px solid rgba(144,202,249,.4); color:#90caf9; border-radius:12px; padding:2px 10px; font-size:.73rem; font-weight:600; }
+    .btn-logout { background:rgba(255,255,255,.1); border:1px solid rgba(255,255,255,.2); color:#fff; border-radius:8px; padding:5px 12px; font-size:.82rem; cursor:pointer; }
+    .main-content { padding:32px 40px; max-width:1100px; margin:0 auto; }
+    .page-banner { background:linear-gradient(135deg,#012d70,#0141A2 50%,#009AFE); border-radius:16px; color:#fff; padding:24px 32px; margin-bottom:28px; display:flex; align-items:center; gap:20px; }
+    .page-banner i { font-size:2.4rem; opacity:.8; }
+    .page-banner h2 { font-weight:700; margin:0 0 2px; font-size:1.25rem; }
+    .page-banner p { opacity:.8; margin:0; font-size:.85rem; }
+    .card-box { background:#fff; border-radius:14px; padding:28px; box-shadow:0 1px 5px rgba(0,0,0,.07); margin-bottom:20px; }
+    .card-box h6 { font-weight:700; font-size:.82rem; text-transform:uppercase; letter-spacing:1px; color:#6b7280; margin-bottom:16px; display:flex; align-items:center; gap:8px; }
+    .card-box h6::after { content:''; flex:1; height:1px; background:#e5e7eb; }
+    .drop-zone { border:2px dashed #d1d5db; border-radius:12px; padding:40px 20px; text-align:center; cursor:pointer; transition:.2s; }
+    .drop-zone:hover, .drop-zone.drag-over { border-color:var(--navy); background:#f0f4f8; }
+    .drop-zone i { font-size:2.5rem; color:#9ca3af; display:block; margin-bottom:10px; }
+    .drop-zone .label { font-size:.9rem; color:#374151; font-weight:600; }
+    .drop-zone .sub { font-size:.78rem; color:#9ca3af; margin-top:4px; }
+    input[type=file] { display:none; }
+    .btn-main { background:var(--navy); color:#fff; border:none; border-radius:10px; padding:10px 24px; font-size:.9rem; font-weight:700; cursor:pointer; display:inline-flex; align-items:center; gap:8px; }
+    .btn-main:hover { background:var(--navy-light); }
+    .btn-main:disabled { opacity:.55; cursor:not-allowed; }
+    .btn-success { background:#16a34a; }
+    .btn-success:hover { background:#15803d; }
+    .stats-row { display:grid; grid-template-columns:repeat(4,1fr); gap:14px; margin-bottom:20px; }
+    .stat-item { background:#f8fafc; border-radius:10px; padding:14px 18px; border-left:4px solid #e5e7eb; }
+    .stat-item.green { border-left-color:#16a34a; }
+    .stat-item.blue  { border-left-color:#0141A2; }
+    .stat-item.amber { border-left-color:#d97706; }
+    .stat-item.red   { border-left-color:#dc2626; }
+    .stat-item .lbl  { font-size:.72rem; color:#9ca3af; font-weight:600; text-transform:uppercase; letter-spacing:.5px; }
+    .stat-item .val  { font-size:1.5rem; font-weight:800; color:#111827; }
+    .preview-table { font-size:.8rem; }
+    .preview-table th { background:#e8eaf6; color:#374151; font-weight:700; padding:7px 10px; }
+    .preview-table td { padding:6px 10px; border-bottom:1px solid #f1f5f9; }
+    .badge-new { background:#dcfce7; color:#166534; font-size:.7rem; font-weight:700; padding:2px 8px; border-radius:10px; }
+    .badge-exists { background:#fef3c7; color:#92400e; font-size:.7rem; font-weight:700; padding:2px 8px; border-radius:10px; }
+    .result-box { background:#f0fdf4; border:1.5px solid #86efac; border-radius:12px; padding:20px 24px; }
+    .result-box.error { background:#fff0f0; border-color:#fca5a5; }
+    .log-line { font-size:.82rem; font-family:monospace; color:#374151; padding:2px 0; }
+    .log-line.err { color:#dc2626; }
+    #toast { position:fixed; bottom:24px; right:24px; padding:12px 22px; border-radius:10px; color:#fff; font-weight:600; font-size:.88rem; display:flex; align-items:center; gap:8px; box-shadow:0 4px 20px rgba(0,0,0,.2); transform:translateY(80px); opacity:0; transition:.28s; z-index:9999; }
+    #toast.show { transform:translateY(0); opacity:1; }
+    #toast.ok  { background:#166534; }
+    #toast.err { background:#991b1b; }
+    @media(max-width:700px){ .stats-row { grid-template-columns:repeat(2,1fr); } .main-content { padding:16px; } }
+  </style>
+</head>
+<body>
+<nav class="topnav">
+  <div class="topnav-left">
+    <a href="/" class="topnav-brand"><img src="/img/logo.png" alt="AutoFácil"><span class="version-badge">v5.1</span></a>
+    <div class="breadcrumb-nav">
+      <a href="/">Inicio</a><span class="sep">›</span>
+      <span style="color:#fff;font-weight:600"><i class="bi bi-cloud-upload me-1"></i>Carga Masiva Operaciones</span>
+    </div>
+  </div>
+  <div class="topnav-right">
+    <div class="user-chip">
+      <div class="avatar" id="avatarInicial">?</div>
+      <div>
+        <div style="font-weight:600;line-height:1.3;color:#fff" id="navNombre">—</div>
+        <div class="perfil-badge" id="navPerfil">—</div>
+      </div>
+    </div>
+    <button class="btn-logout" onclick="logout()"><i class="bi bi-box-arrow-right me-1"></i>Salir</button>
+  </div>
+</nav>
+
+<div class="main-content">
+  <div class="page-banner">
+    <i class="bi bi-cloud-upload"></i>
+    <div>
+      <h2>Carga Masiva de Operaciones</h2>
+      <p>Importa el archivo Excel calculado. Solo se insertan registros NUEVOS (clave: N° Operación). Los existentes se saltan automáticamente.</p>
+    </div>
+  </div>
+
+  <!-- PASO 1: Seleccionar archivo -->
+  <div class="card-box">
+    <h6><i class="bi bi-1-circle-fill"></i>Seleccionar archivo Excel (.xlsx)</h6>
+    <div class="drop-zone" id="dropZone" onclick="document.getElementById('fileInput').click()" ondragover="onDrag(event,true)" ondragleave="onDrag(event,false)" ondrop="onDrop(event)">
+      <i class="bi bi-file-earmark-spreadsheet"></i>
+      <div class="label" id="dropLabel">Arrastra el archivo aquí o haz clic para seleccionar</div>
+      <div class="sub">Solo archivos .xlsx — máx. 10 MB</div>
+    </div>
+    <input type="file" id="fileInput" accept=".xlsx" onchange="archivoSeleccionado(event)">
+    <div style="display:flex;gap:12px;margin-top:16px">
+      <button class="btn-main" id="btnPreview" onclick="ejecutarPreview()" disabled>
+        <i class="bi bi-eye"></i>Vista previa
+      </button>
+    </div>
+  </div>
+
+  <!-- PASO 2: Preview -->
+  <div class="card-box" id="paso2" style="display:none">
+    <h6><i class="bi bi-2-circle-fill"></i>Resumen del archivo</h6>
+    <div class="stats-row" id="statsRow"></div>
+    <div style="font-size:.82rem;color:#374151;margin-bottom:12px;font-weight:600">Muestra de registros NUEVOS a importar (primeros 10):</div>
+    <div style="overflow-x:auto">
+      <table class="table preview-table" id="previewTable">
+        <thead><tr><th>N° Op</th><th>Nombre</th><th>Estado</th><th>Producto</th><th>Financiera</th><th>Monto Fin.</th></tr></thead>
+        <tbody id="previewBody"></tbody>
+      </table>
+    </div>
+    <button class="btn-main btn-success" id="btnImportar" onclick="ejecutarImport()">
+      <i class="bi bi-cloud-upload"></i>Importar registros nuevos
+    </button>
+  </div>
+
+  <!-- PASO 3: Resultado -->
+  <div class="card-box" id="paso3" style="display:none">
+    <h6><i class="bi bi-3-circle-fill"></i>Resultado de la importación</h6>
+    <div id="resultadoContent"></div>
+  </div>
+</div>
+
+<div id="toast"><i id="toastIcon" class="bi bi-check-circle-fill"></i><span id="toastMsg"></span></div>
+
+<script src="/js/auth-guard.js"></script>
+<script>
+const token = sessionStorage.getItem('token');
+const yo    = JSON.parse(sessionStorage.getItem('usuario') || 'null');
+if (!token || !yo) window.location.href = '/login.html';
+if (yo?.perfil !== 'Administrador') { alert('Solo Administradores pueden hacer carga masiva'); window.location.href = '/'; }
+const H = { Authorization: 'Bearer ' + token };
+
+document.getElementById('navNombre').textContent = `${yo?.nombre||''} ${yo?.apellido||''}`.trim();
+document.getElementById('navPerfil').textContent  = yo?.perfil || '';
+document.getElementById('avatarInicial').textContent = (yo?.nombre||'?').charAt(0).toUpperCase();
+function logout() { sessionStorage.removeItem('token'); sessionStorage.removeItem('usuario'); window.location.href = '/login.html'; }
+
+let archivoActual = null;
+let toastTimer;
+
+function toast(msg, ok=true) {
+  const t = document.getElementById('toast');
+  document.getElementById('toastMsg').textContent = msg;
+  document.getElementById('toastIcon').className = ok ? 'bi bi-check-circle-fill' : 'bi bi-x-circle-fill';
+  t.className = `show ${ok?'ok':'err'}`;
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => t.classList.remove('show'), 4000);
+}
+
+function fmt(n) { return n ? '$' + Math.round(n).toLocaleString('es-CL') : '—'; }
+
+function onDrag(e, over) { e.preventDefault(); document.getElementById('dropZone').classList[over?'add':'remove']('drag-over'); }
+function onDrop(e) { e.preventDefault(); onDrag(e,false); const f = e.dataTransfer.files[0]; if (f) cargarArchivo(f); }
+function archivoSeleccionado(e) { const f = e.target.files[0]; if (f) cargarArchivo(f); }
+
+function cargarArchivo(f) {
+  if (!f.name.endsWith('.xlsx')) { toast('Solo se aceptan archivos .xlsx', false); return; }
+  archivoActual = f;
+  document.getElementById('dropLabel').textContent = `✓ ${f.name} (${(f.size/1024).toFixed(0)} KB)`;
+  document.getElementById('btnPreview').disabled = false;
+  document.getElementById('paso2').style.display = 'none';
+  document.getElementById('paso3').style.display = 'none';
+}
+
+async function ejecutarPreview() {
+  if (!archivoActual) return;
+  const btn = document.getElementById('btnPreview');
+  btn.disabled = true; btn.innerHTML = '<i class="bi bi-hourglass-split"></i>Analizando...';
+  try {
+    const fd = new FormData();
+    fd.append('archivo', archivoActual);
+    const res  = await fetch('/api/carga-masiva/preview', { method:'POST', headers:H, body:fd });
+    const json = await res.json();
+    if (!json.success) { toast('Error: ' + json.error, false); return; }
+    mostrarPreview(json.data);
+  } catch(e) { toast('Error: ' + e.message, false); }
+  finally { btn.disabled = false; btn.innerHTML = '<i class="bi bi-eye"></i>Vista previa'; }
+}
+
+function mostrarPreview({ resumen, preview }) {
+  document.getElementById('statsRow').innerHTML = `
+    <div class="stat-item blue"><div class="lbl">Total archivo</div><div class="val">${resumen.total}</div></div>
+    <div class="stat-item green"><div class="lbl">Nuevos a importar</div><div class="val">${resumen.nuevos}</div></div>
+    <div class="stat-item amber"><div class="lbl">Ya existentes (se saltan)</div><div class="val">${resumen.existentes}</div></div>
+    <div class="stat-item blue"><div class="lbl">OTORGADOS en archivo</div><div class="val">${resumen.otorgados}</div></div>`;
+
+  const tbody = document.getElementById('previewBody');
+  tbody.innerHTML = preview.length
+    ? preview.map(r => `<tr>
+        <td><strong>${r.op}</strong></td>
+        <td>${r.nombre||'—'}</td>
+        <td><span class="badge-new">${r.estado||'—'}</span></td>
+        <td style="font-size:.75rem">${r.producto||'—'}</td>
+        <td>${r.financiera||'—'}</td>
+        <td style="text-align:right">${fmt(r.monto)}</td>
+      </tr>`).join('')
+    : '<tr><td colspan="6" class="text-center text-secondary py-3">No hay registros nuevos para importar</td></tr>';
+
+  document.getElementById('paso2').style.display = '';
+  if (resumen.nuevos === 0) {
+    document.getElementById('btnImportar').disabled = true;
+    document.getElementById('btnImportar').innerHTML = '<i class="bi bi-check-all"></i>Todos ya existen — nada que importar';
+  }
+}
+
+async function ejecutarImport() {
+  if (!archivoActual) return;
+  if (!confirm(`¿Confirmas la importación? Solo se insertarán los registros NUEVOS.`)) return;
+  const btn = document.getElementById('btnImportar');
+  btn.disabled = true; btn.innerHTML = '<i class="bi bi-hourglass-split"></i>Importando...';
+  try {
+    const fd = new FormData();
+    fd.append('archivo', archivoActual);
+    const res  = await fetch('/api/carga-masiva/importar', { method:'POST', headers:H, body:fd });
+    const json = await res.json();
+    if (!json.success) { toast('Error: ' + json.error, false); return; }
+    mostrarResultado(json.data);
+  } catch(e) { toast('Error: ' + e.message, false); }
+  finally { btn.disabled = false; btn.innerHTML = '<i class="bi bi-cloud-upload"></i>Importar registros nuevos'; }
+}
+
+function mostrarResultado(d) {
+  const errHtml = d.errores?.length
+    ? `<div style="margin-top:12px"><strong style="color:#dc2626">Errores (${d.errores.length}):</strong>${d.errores.map(e=>`<div class="log-line err">OP ${e.op}: ${e.error}</div>`).join('')}</div>`
+    : '';
+
+  document.getElementById('resultadoContent').innerHTML = `
+    <div class="result-box ${d.errores?.length?'':''}">
+      <div style="font-size:1.1rem;font-weight:700;color:#166534;margin-bottom:12px">
+        <i class="bi bi-check-circle-fill me-2"></i>Importación completada
+      </div>
+      <div class="log-line">📋 Total en archivo: <strong>${d.total_archivo}</strong></div>
+      <div class="log-line">⏭️ Ya existentes (saltados): <strong>${d.ya_existentes}</strong></div>
+      <div class="log-line">🆕 Nuevos procesados: <strong>${d.nuevos_intentados}</strong></div>
+      <div class="log-line" style="color:#166534;font-weight:700">✅ Insertados correctamente: <strong>${d.insertados}</strong></div>
+      ${errHtml}
+    </div>`;
+  document.getElementById('paso3').style.display = '';
+  toast(`✓ ${d.insertados} registros importados`, true);
+}
+</script>
+<script src="/js/app-version.js"></script>
+</body>
+</html>
