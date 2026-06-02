@@ -66,8 +66,15 @@ function mapRow(row, mesOverride) {
 
   return {
     num_op:             i('OP'),
-    // mesOverride fuerza el mes contable del archivo (evita que fechas de evaluación en otro mes corrompan el dato)
-    mes:                mesOverride || d('MES'),
+    // mes = mes de FECHA OTORGADO si existe; si no (APROBADO/RECHAZADO) usa el mes del archivo
+    mes: (() => {
+      const fOtorg = normDate(getCol(row, 'FECHA OTORGADO'));
+      if (fOtorg && fOtorg !== 'NO APLICA') {
+        // primer día del mes de la fecha de otorgamiento
+        return fOtorg.slice(0, 7) + '-01';
+      }
+      return mesOverride || null;
+    })(),
     rut_cliente:        s('RUT'),
     nombre_cliente:     s('NOMBRE'),
     comentarios:        s('COMENTARIOS'),
