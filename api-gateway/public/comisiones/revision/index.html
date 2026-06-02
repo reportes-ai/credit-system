@@ -387,7 +387,8 @@ function renderEjecutivo(d, idx, mes) {
       <div class="metrica ok">
         <div class="m-label">Calidad</div>
         <div class="m-value">${pct(d.calidad)}</div>
-        <div class="m-sub">ajuste calidad: ${pct(d.ajuste_calidad)}</div>
+        <div class="m-sub">${d.total_creditos} créditos otorgados · meta: 100%</div>
+        <div class="m-sub">ajuste: ${pct(d.ajuste_calidad)}</div>
       </div>
     </div>
 
@@ -417,7 +418,7 @@ function renderEjecutivo(d, idx, mes) {
     <!-- Datos ocultos para copiar -->
     <div id="copy-data-${idx}" style="display:none"
       data-ej="${d.ejecutivo}" data-mes="${document.getElementById('filtroMes').value}"
-      data-creds='${JSON.stringify(otorgados.map(c=>({op:c.num_op,cliente:c.nombre_cliente,plazo:c.plazo,monto:c.monto_financiado,ces:c.seguro_cesantia,rep:c.seguro_rep_menor})))}'
+      data-creds='${JSON.stringify(otorgados.map(c=>({op:c.num_op,cliente:c.nombre_cliente,fin:c.financiera,plazo:c.plazo,monto:c.monto_financiado,ces:c.seguro_cesantia,rep:c.seguro_rep_menor})))}'
       data-base="${fmt(d.incentivo_base)}" data-bces="${fmt(d.cumple_cesantia?d.bono_cesantia:0)}"
       data-brep="${fmt(d.cumple_reparaciones?d.bono_reparaciones:0)}" data-bcal="${fmt(d.bono_calidad)}"
       data-final="${fmt(d.incentivo_final)}" data-sc="${fmt(d.con_semana_corrida)}"
@@ -449,6 +450,7 @@ function copiarResumen(idx) {
     return `<tr style="background:${i%2===0?'#f8fafc':'#fff'}">
       <td style="padding:7px 10px;border-bottom:1px solid #e5e7eb;color:#374151">${c.op||'—'}</td>
       <td style="padding:7px 10px;border-bottom:1px solid #e5e7eb;font-weight:500">${c.cliente||'—'}</td>
+      <td style="padding:7px 10px;border-bottom:1px solid #e5e7eb;text-align:center;color:#0141A2;font-weight:600">${c.fin||'—'}</td>
       <td style="padding:7px 10px;border-bottom:1px solid #e5e7eb;text-align:center">${c.plazo||'—'}</td>
       <td style="padding:7px 10px;border-bottom:1px solid #e5e7eb;text-align:right;font-weight:600">${fmt(c.monto)}</td>
       <td style="padding:7px 10px;border-bottom:1px solid #e5e7eb;text-align:center;color:${tieneC?'#16a34a':'#9ca3af'}">${tieneC?'✔ '+fmt(c.ces):'—'}</td>
@@ -482,6 +484,7 @@ function copiarResumen(idx) {
         <tr style="background:#e8eaf6">
           <th style="padding:8px 10px;text-align:left;font-weight:700;color:#374151;border-bottom:2px solid #c5cae9">N° Op</th>
           <th style="padding:8px 10px;text-align:left;font-weight:700;color:#374151;border-bottom:2px solid #c5cae9">Cliente</th>
+          <th style="padding:8px 10px;text-align:center;font-weight:700;color:#374151;border-bottom:2px solid #c5cae9">Financiera</th>
           <th style="padding:8px 10px;text-align:center;font-weight:700;color:#374151;border-bottom:2px solid #c5cae9">Plazo</th>
           <th style="padding:8px 10px;text-align:right;font-weight:700;color:#374151;border-bottom:2px solid #c5cae9">Monto Fin.</th>
           <th style="padding:8px 10px;text-align:center;font-weight:700;color:#374151;border-bottom:2px solid #c5cae9">Seg. Cesantía</th>
