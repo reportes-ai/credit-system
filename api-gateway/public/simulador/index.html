@@ -305,15 +305,17 @@ function marcarMejor(rentab_af, rentab_uac) {
   const hdrAf  = document.getElementById('hdrAf');
   const hdrUac = document.getElementById('hdrUac');
   const badge  = '<span class="badge-mejor">⭐ Más rentable</span>';
+  const rentValAf  = `<span style="margin-left:auto;font-size:.95rem;font-weight:800">Rentabilidad ${fN(rentab_af)}</span>`;
+  const rentValUac = `<span style="margin-left:auto;font-size:.95rem;font-weight:800">Rentabilidad ${fN(rentab_uac)}</span>`;
   if (rentab_af > rentab_uac) {
-    hdrAf.innerHTML  = '<i class="bi bi-bank"></i> AutoFin' + badge;
-    hdrUac.innerHTML = '<i class="bi bi-building"></i> Unidad de Crédito';
+    hdrAf.innerHTML  = '<i class="bi bi-bank"></i> AutoFin' + badge + rentValAf;
+    hdrUac.innerHTML = '<i class="bi bi-building"></i> Unidad de Crédito' + rentValUac;
   } else if (rentab_uac > rentab_af) {
-    hdrAf.innerHTML  = '<i class="bi bi-bank"></i> AutoFin';
-    hdrUac.innerHTML = '<i class="bi bi-building"></i> Unidad de Crédito' + badge;
+    hdrAf.innerHTML  = '<i class="bi bi-bank"></i> AutoFin' + rentValAf;
+    hdrUac.innerHTML = '<i class="bi bi-building"></i> Unidad de Crédito' + badge + rentValUac;
   } else {
-    hdrAf.innerHTML  = '<i class="bi bi-bank"></i> AutoFin';
-    hdrUac.innerHTML = '<i class="bi bi-building"></i> Unidad de Crédito';
+    hdrAf.innerHTML  = '<i class="bi bi-bank"></i> AutoFin' + rentValAf;
+    hdrUac.innerHTML = '<i class="bi bi-building"></i> Unidad de Crédito' + rentValUac;
   }
 }
 
