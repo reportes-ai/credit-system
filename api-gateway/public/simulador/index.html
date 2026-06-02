@@ -1,0 +1,586 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <link rel="icon" href="/img/favicon.png" type="image/png">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Simulador Rentabilidad — AutoFácil</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css" rel="stylesheet">
+  <style>
+    :root { --navy:#0141A2; --navy-dark:#012d70; --navy-light:#0255c5; --accent:#009AFE; --bg:#f0f4f8; --af:#0141A2; --uac:#166534; }
+    body { background:var(--bg); font-family:'Segoe UI',system-ui,sans-serif; margin:0; min-height:100vh; }
+    .topnav { background:linear-gradient(90deg,var(--navy-dark),var(--navy-light)); color:#fff; height:60px; padding:0 24px; display:flex; align-items:center; justify-content:space-between; position:sticky; top:0; z-index:200; box-shadow:0 2px 8px rgba(0,0,0,.3); }
+    .topnav-left { display:flex; align-items:center; gap:16px; }
+    .topnav-brand img { height:32px; filter:brightness(0) invert(1); }
+    .version-badge { background:rgba(255,255,255,.15); color:rgba(255,255,255,.75); font-size:.65rem; font-weight:700; border-radius:6px; padding:2px 8px; }
+    .breadcrumb-nav { color:rgba(255,255,255,.6); font-size:.85rem; display:flex; align-items:center; gap:6px; }
+    .breadcrumb-nav a { color:rgba(255,255,255,.75); text-decoration:none; }
+    .breadcrumb-nav .sep { color:rgba(255,255,255,.35); }
+    .topnav-right { display:flex; align-items:center; gap:12px; }
+    .user-chip { background:rgba(255,255,255,.12); border-radius:24px; padding:5px 12px; display:flex; align-items:center; gap:8px; font-size:.85rem; }
+    .avatar { width:28px; height:28px; background:#90caf9; border-radius:50%; display:flex; align-items:center; justify-content:center; color:var(--navy); font-weight:700; font-size:.75rem; }
+    .perfil-badge { background:rgba(144,202,249,.2); border:1px solid rgba(144,202,249,.4); color:#90caf9; border-radius:12px; padding:2px 10px; font-size:.73rem; font-weight:600; }
+    .btn-logout { background:rgba(255,255,255,.1); border:1px solid rgba(255,255,255,.2); color:#fff; border-radius:8px; padding:5px 12px; font-size:.82rem; cursor:pointer; }
+
+    /* Layout */
+    .page-content { padding:24px 32px; max-width:1300px; margin:0 auto; }
+    .sim-layout { display:grid; grid-template-columns:380px 1fr; gap:24px; align-items:start; }
+    @media(max-width:900px){ .sim-layout { grid-template-columns:1fr; } }
+
+    /* Cards */
+    .card { border:none; border-radius:14px; box-shadow:0 1px 5px rgba(0,0,0,.08); }
+    .card-hdr { background:var(--navy-dark); color:#fff; border-radius:14px 14px 0 0; padding:14px 20px; font-weight:700; font-size:.88rem; display:flex; align-items:center; gap:8px; }
+    .card-hdr i { font-size:1rem; }
+    .card-bd { padding:20px; background:#fff; border-radius:0 0 14px 14px; }
+
+    /* Inputs */
+    .f-group { display:flex; flex-direction:column; gap:4px; margin-bottom:14px; }
+    .f-group label { font-size:.72rem; font-weight:700; color:#374151; text-transform:uppercase; letter-spacing:.3px; }
+    .f-group input, .f-group select { border:1.5px solid #d1d5db; border-radius:8px; padding:8px 11px; font-size:.9rem; outline:none; transition:border-color .2s; background:#fff; }
+    .f-group input:focus, .f-group select:focus { border-color:var(--navy); }
+    .f-group input.auto { background:#eff6ff; color:#1d4ed8; font-weight:600; }
+    .f-row { display:grid; grid-template-columns:1fr 1fr; gap:12px; }
+
+    /* Toggle switches */
+    .toggle-group { display:flex; background:#f1f5f9; border-radius:8px; padding:3px; gap:2px; }
+    .toggle-group button { flex:1; border:none; border-radius:6px; padding:6px 12px; font-size:.8rem; font-weight:600; cursor:pointer; transition:all .15s; background:transparent; color:#6b7280; }
+    .toggle-group button.active { background:#fff; color:var(--navy); box-shadow:0 1px 3px rgba(0,0,0,.1); }
+
+    /* Checkboxes seguros */
+    .seg-row { display:flex; gap:8px; flex-wrap:wrap; }
+    .seg-chip { display:flex; align-items:center; gap:6px; padding:6px 12px; border-radius:8px; border:1.5px solid #d1d5db; cursor:pointer; font-size:.82rem; font-weight:600; color:#374151; transition:all .15s; user-select:none; }
+    .seg-chip input { display:none; }
+    .seg-chip.checked { border-color:var(--navy); background:#eff6ff; color:var(--navy); }
+    .seg-chip i { font-size:.9rem; }
+
+    /* UF badge */
+    .uf-badge { background:#fef9c3; border:1px solid #fde68a; border-radius:8px; padding:8px 14px; font-size:.82rem; color:#92400e; display:flex; align-items:center; gap:6px; margin-bottom:14px; }
+    .uf-badge strong { color:#78350f; }
+
+    /* Results */
+    .fin-tabs { display:flex; gap:8px; margin-bottom:16px; }
+    .fin-tab { flex:1; border:2px solid #e5e7eb; border-radius:10px; padding:10px 16px; text-align:center; cursor:pointer; transition:all .15s; font-weight:700; font-size:.85rem; color:#6b7280; }
+    .fin-tab.af.active { border-color:var(--af); background:#eff6ff; color:var(--af); }
+    .fin-tab.uac.active { border-color:var(--uac); background:#f0fdf4; color:var(--uac); }
+
+    .res-panel { display:none; }
+    .res-panel.visible { display:block; }
+
+    .res-section { margin-bottom:16px; }
+    .res-title { font-size:.72rem; font-weight:700; color:#9ca3af; text-transform:uppercase; letter-spacing:.5px; margin-bottom:8px; display:flex; align-items:center; gap:6px; }
+    .res-row { display:flex; justify-content:space-between; align-items:center; padding:8px 12px; border-radius:8px; margin-bottom:4px; font-size:.85rem; }
+    .res-row .lbl { color:#374151; }
+    .res-row .val { font-weight:700; color:#111827; }
+    .res-row.ingreso { background:#f0fdf4; }
+    .res-row.ingreso .val { color:#166534; }
+    .res-row.costo { background:#fef2f2; }
+    .res-row.costo .val { color:#dc2626; }
+    .res-row.neutral { background:#f8fafc; }
+
+    .rentab-box { border-radius:12px; padding:16px 20px; margin-top:8px; display:flex; justify-content:space-between; align-items:center; }
+    .rentab-box.pos { background:linear-gradient(135deg,#059669,#10b981); color:#fff; }
+    .rentab-box.neg { background:linear-gradient(135deg,#dc2626,#ef4444); color:#fff; }
+    .rentab-box .rlbl { font-size:.8rem; opacity:.85; }
+    .rentab-box .rval { font-size:1.4rem; font-weight:800; }
+    .rentab-box .rpct { font-size:.85rem; opacity:.8; }
+
+    .cuota-box { background:var(--navy); color:#fff; border-radius:10px; padding:14px 20px; text-align:center; margin-top:12px; }
+    .cuota-box .clbl { font-size:.75rem; opacity:.75; text-transform:uppercase; letter-spacing:.3px; }
+    .cuota-box .cval { font-size:1.6rem; font-weight:800; }
+
+    .monto-fin-box { background:#eff6ff; border:1px solid #bfdbfe; border-radius:8px; padding:10px 14px; margin-bottom:16px; }
+    .monto-fin-box .mfrow { display:flex; justify-content:space-between; font-size:.82rem; padding:2px 0; }
+    .monto-fin-box .mfrow .mflbl { color:#1e40af; }
+    .monto-fin-box .mfrow .mfval { font-weight:700; color:#1e40af; }
+    .monto-fin-box .mfrow.total { border-top:1px solid #bfdbfe; margin-top:4px; padding-top:6px; font-size:.88rem; }
+
+    .uac-tier-note { background:#f0fdf4; border:1px solid #bbf7d0; border-radius:8px; padding:8px 12px; font-size:.75rem; color:#166534; margin-bottom:12px; }
+
+    .tag-mm { display:inline-block; padding:2px 8px; border-radius:12px; font-size:.72rem; font-weight:700; }
+    .tag-menor { background:#dbeafe; color:#1e40af; }
+    .tag-mayor { background:#fef9c3; color:#92400e; }
+
+    .divider { border:none; border-top:1px solid #e5e7eb; margin:14px 0; }
+    .disclaimer { font-size:.72rem; color:#9ca3af; text-align:center; margin-top:12px; }
+  </style>
+</head>
+<body>
+<script src="/js/auth-guard.js"></script>
+<nav class="topnav">
+  <div class="topnav-left">
+    <a href="/" class="topnav-brand">
+      <img src="/img/logo.png" alt="AutoFácil">
+      <span class="version-badge">v1.0</span>
+    </a>
+    <div class="breadcrumb-nav">
+      <a href="/">Inicio</a><span class="sep">›</span>
+      <span style="color:#fff;font-weight:600">Simulador Rentabilidad</span>
+    </div>
+  </div>
+  <div class="topnav-right">
+    <div class="user-chip">
+      <div class="avatar" id="avatarInicial">?</div>
+      <div>
+        <div style="font-weight:600;line-height:1.3;color:#fff" id="navNombre">—</div>
+        <div class="perfil-badge" id="navPerfil">—</div>
+      </div>
+    </div>
+    <button class="btn-logout" onclick="logout()"><i class="bi bi-box-arrow-right me-1"></i>Salir</button>
+  </div>
+</nav>
+
+<div class="page-content">
+  <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:20px;flex-wrap:wrap;gap:12px">
+    <h4 style="font-weight:700;color:#111827;margin:0;display:flex;align-items:center;gap:10px">
+      <i class="bi bi-calculator" style="color:var(--navy)"></i> Simulador de Rentabilidad
+    </h4>
+    <div id="ufBadge" class="uf-badge" style="margin-bottom:0">
+      <i class="bi bi-currency-dollar"></i> UF hoy: <strong id="ufValor">cargando…</strong>
+      <span id="mmTag" class="tag-mm" style="margin-left:6px;display:none"></span>
+    </div>
+  </div>
+
+  <div class="sim-layout">
+    <!-- ── Panel Inputs ──────────────────────────────────────────────── -->
+    <div>
+      <div class="card">
+        <div class="card-hdr"><i class="bi bi-sliders"></i> Datos del Crédito</div>
+        <div class="card-bd">
+
+          <div class="f-row">
+            <div class="f-group">
+              <label>Valor Vehículo $</label>
+              <input type="text" id="iValor" placeholder="$10.000.000" oninput="fmtMiles(this);simular()">
+            </div>
+            <div class="f-group">
+              <label>Pie $</label>
+              <input type="text" id="iPie" placeholder="$3.500.000" oninput="fmtMiles(this);simular()">
+            </div>
+          </div>
+
+          <div class="f-group">
+            <label>Saldo Precio $ <small style="color:#0369a1;font-weight:600">(calculado)</small></label>
+            <input type="text" id="iSaldo" class="auto" readonly>
+          </div>
+
+          <div class="f-row">
+            <div class="f-group">
+              <label>Plazo (meses)</label>
+              <select id="iPlazo" onchange="simular()">
+                <option value="12">12 meses</option>
+                <option value="24">24 meses</option>
+                <option value="36">36 meses</option>
+                <option value="48" selected>48 meses</option>
+                <option value="60">60 meses</option>
+                <option value="72">72 meses</option>
+              </select>
+            </div>
+            <div class="f-group">
+              <label>Tasa Cliente % <small style="color:#0369a1">(auto)</small></label>
+              <input type="number" id="iTasa" step="0.01" oninput="simular()">
+            </div>
+          </div>
+
+          <hr class="divider">
+
+          <div class="f-group">
+            <label>Seguros incluidos</label>
+            <div class="seg-row">
+              <label class="seg-chip checked" id="chipDesg">
+                <input type="checkbox" id="iDesg" checked onchange="toggleChip('chipDesg','iDesg');simular()">
+                <i class="bi bi-shield-fill-check"></i> Desgravamen
+              </label>
+              <label class="seg-chip checked" id="chipRdh">
+                <input type="checkbox" id="iRdh" checked onchange="toggleChip('chipRdh','iRdh');simular()">
+                <i class="bi bi-heart-pulse-fill"></i> RDH
+              </label>
+              <label class="seg-chip checked" id="chipCesa">
+                <input type="checkbox" id="iCesa" checked onchange="toggleChip('chipCesa','iCesa');simular()">
+                <i class="bi bi-briefcase-fill"></i> Cesantía
+              </label>
+            </div>
+          </div>
+
+          <hr class="divider">
+
+          <div class="f-group">
+            <label>Tipo Dealer</label>
+            <div class="toggle-group" id="tgDealer">
+              <button class="active" onclick="setToggle('tgDealer',0);simular()">🏢 Patio</button>
+              <button onclick="setToggle('tgDealer',1);simular()">🚗 Calle</button>
+            </div>
+          </div>
+
+          <div class="f-group">
+            <label>Producto</label>
+            <div class="toggle-group" id="tgProducto">
+              <button class="active" onclick="setToggle('tgProducto',0);simular()">Normal</button>
+              <button onclick="setToggle('tgProducto',1);simular()">CORFO</button>
+            </div>
+          </div>
+
+          <hr class="divider">
+
+          <div class="f-group">
+            <label>Gastos incluidos</label>
+            <div class="seg-row">
+              <label class="seg-chip checked" id="chipPrenda">
+                <input type="checkbox" id="iPrenda" checked onchange="toggleChip('chipPrenda','iPrenda');simular()">
+                Prenda
+              </label>
+              <label class="seg-chip checked" id="chipGps">
+                <input type="checkbox" id="iGps" checked onchange="toggleChip('chipGps','iGps');simular()">
+                GPS
+              </label>
+              <label class="seg-chip checked" id="chipRep">
+                <input type="checkbox" id="iRep" checked onchange="toggleChip('chipRep','iRep');simular()">
+                Rep. Menores
+              </label>
+              <label class="seg-chip" id="chipLim">
+                <input type="checkbox" id="iLim" onchange="toggleChip('chipLim','iLim');simular()">
+                Limitación
+              </label>
+            </div>
+          </div>
+
+        </div>
+      </div>
+    </div>
+
+    <!-- ── Panel Resultados ──────────────────────────────────────────── -->
+    <div>
+      <!-- Tabs financieras -->
+      <div class="fin-tabs">
+        <div class="fin-tab af active" onclick="showFin('af')"><i class="bi bi-bank me-1"></i> AutoFin</div>
+        <div class="fin-tab uac" onclick="showFin('uac')"><i class="bi bi-building me-1"></i> Unidad de Crédito</div>
+      </div>
+
+      <!-- Monto Financiado (común) -->
+      <div class="card" style="margin-bottom:16px">
+        <div class="card-bd" style="padding:16px">
+          <div id="montoFinBox" class="monto-fin-box" style="margin-bottom:0"></div>
+        </div>
+      </div>
+
+      <!-- AutoFin -->
+      <div id="panelAf" class="res-panel visible card">
+        <div class="card-hdr" style="background:var(--af)"><i class="bi bi-bank"></i> AutoFin — Resultados</div>
+        <div class="card-bd" id="resAf"></div>
+      </div>
+
+      <!-- UAC -->
+      <div id="panelUac" class="res-panel card">
+        <div class="card-hdr" style="background:var(--uac)"><i class="bi bi-building"></i> Unidad de Crédito — Resultados</div>
+        <div class="card-bd" id="resUac"></div>
+      </div>
+    </div>
+  </div>
+  <p class="disclaimer">Simulación orientativa basada en los parámetros vigentes del sistema. Los valores reales pueden variar.</p>
+</div>
+
+<script>
+const token = sessionStorage.getItem('token');
+const yo    = JSON.parse(sessionStorage.getItem('usuario') || 'null');
+function logout() { sessionStorage.removeItem('token'); sessionStorage.removeItem('usuario'); sessionStorage.removeItem('af_intro_done'); window.location.href = '/login.html'; }
+function hdr() { return { Authorization: 'Bearer ' + token }; }
+
+let P = {};    // parámetros del sistema
+let UF = 0;   // valor UF hoy
+
+/* ── Helpers formato ──────────────────────────────────────────────── */
+function fmtMiles(inp) {
+  let raw = inp.value.replace(/[^0-9]/g,'');
+  inp.value = raw ? '$' + parseInt(raw,10).toLocaleString('es-CL') : '';
+}
+function parseMiles(s) { return parseInt((s||'').replace(/[^0-9]/g,''),10) || 0; }
+function fN(n) { return n==null||isNaN(n) ? '—' : '$' + Math.round(n).toLocaleString('es-CL'); }
+function fP(n) { return n==null||isNaN(n) ? '—' : n.toFixed(1) + '%'; }
+
+/* ── Toggle helpers ────────────────────────────────────────────────── */
+function toggleChip(chipId, cbId) {
+  const cb = document.getElementById(cbId);
+  const chip = document.getElementById(chipId);
+  if (cb.checked) chip.classList.add('checked');
+  else chip.classList.remove('checked');
+}
+function setToggle(groupId, idx) {
+  const btns = document.getElementById(groupId).querySelectorAll('button');
+  btns.forEach((b,i) => b.classList.toggle('active', i === idx));
+}
+function getToggle(groupId) {
+  const btns = document.getElementById(groupId).querySelectorAll('button');
+  for (let i=0;i<btns.length;i++) if (btns[i].classList.contains('active')) return i;
+  return 0;
+}
+function showFin(fin) {
+  document.querySelectorAll('.fin-tab').forEach(t => t.classList.remove('active'));
+  document.querySelector('.fin-tab.' + fin).classList.add('active');
+  document.getElementById('panelAf').classList.toggle('visible', fin === 'af');
+  document.getElementById('panelUac').classList.toggle('visible', fin === 'uac');
+}
+
+/* ── Carga inicial ─────────────────────────────────────────────────── */
+async function cargarDatos() {
+  const hoy = new Date().toISOString().slice(0,10);
+  const [rp, ru] = await Promise.all([
+    fetch('/api/parametros-credito', { headers: hdr() }),
+    fetch('/api/uf/en/' + hoy, { headers: hdr() })
+  ]);
+  const jp = await rp.json();
+  const ju = await ru.json();
+  if (jp.success) jp.data.lista.forEach(r => { P[r.clave] = parseFloat(r.valor); });
+  if (ju.success && ju.data?.valor) {
+    UF = parseFloat(ju.data.valor);
+    document.getElementById('ufValor').textContent = '$' + Math.round(UF).toLocaleString('es-CL');
+  }
+  simular();
+}
+
+/* ── Tasas de seguro por plazo ─────────────────────────────────────── */
+function getSegRate(tipo, plazo) {
+  // tipo: 'd'=desgravamen, 'r'=rdh, 'c'=cesantia
+  const brackets = [6,12,24,36,48,72];
+  const key = brackets.find(b => plazo <= b) || 72;
+  return (P['seg_' + tipo + '_' + key] || 0);
+}
+function getSegComFactor(tipo, plazo) {
+  // tipo: 'desg' o 'cesa'
+  if (plazo <= 6)  return (P['seg_com_' + tipo + '_6']  || 0) / 100;
+  if (plazo <= 12) return (P['seg_com_' + tipo + '_12'] || 0) / 100;
+  if (plazo <= 24) return (P['seg_com_' + tipo + '_24'] || 0) / 100;
+  return              (P['seg_com_' + tipo + '_36'] || 0) / 100;
+}
+function getDealerPct(plazo) {
+  if (plazo <= 6)  return (P.dealer_pct_6  || 0) / 100;
+  if (plazo <= 12) return (P.dealer_pct_12 || 0) / 100;
+  if (plazo <= 24) return (P.dealer_pct_24 || 0) / 100;
+  if (plazo <= 36) return (P.dealer_pct_36 || 0) / 100;
+  return              (P.dealer_pct_99 || 0) / 100;
+}
+
+/* ── Cálculo principal ─────────────────────────────────────────────── */
+function simular() {
+  const valor   = parseMiles(document.getElementById('iValor').value);
+  const pie     = parseMiles(document.getElementById('iPie').value);
+  const plazo   = parseInt(document.getElementById('iPlazo').value) || 48;
+  const esPatio = getToggle('tgDealer') === 0;
+  const esCorfo = getToggle('tgProducto') === 1;
+
+  const saldo   = valor - pie;
+  document.getElementById('iSaldo').value = saldo > 0 ? fN(saldo) : '';
+
+  if (!valor || !plazo || saldo <= 0) { clearResults(); return; }
+
+  // Gastos fijos
+  const incPrenda = document.getElementById('iPrenda').checked;
+  const incGps    = document.getElementById('iGps').checked;
+  const incRep    = document.getElementById('iRep').checked;
+  const incLim    = document.getElementById('iLim').checked;
+  const gastos = (incPrenda ? (P.prenda || 0) : 0)
+               + (incGps    ? (P.gps_24meses || 0) : 0)
+               + (incRep    ? (P.reparaciones_menores || 0) : 0)
+               + (incLim    ? (P.limitacion_dominio || 0) : 0)
+               + (P.inscripcion || 0);
+
+  const sub_sin_seg = saldo + gastos;
+
+  // Seguros
+  const incDesg = document.getElementById('iDesg').checked;
+  const incRdh  = document.getElementById('iRdh').checked;
+  const incCesa = document.getElementById('iCesa').checked;
+
+  const rateDesg = incDesg ? getSegRate('d', plazo) : 0;
+  const rateRdh  = incRdh  ? getSegRate('r', plazo) : 0;
+  const rateCesa = incCesa ? getSegRate('c', plazo) : 0;
+  const totalRate = rateDesg + rateRdh + rateCesa;
+
+  // Factor de capitalización seguros: 1 / (1 - totalRate)
+  const factorSeg = totalRate > 0 ? 1 / (1 - totalRate) : 1;
+  const capital   = Math.round(sub_sin_seg * factorSeg);
+  const primaDesg = Math.round(capital * rateDesg);
+  const primaRdh  = Math.round(capital * rateRdh);
+  const primaCesa = Math.round(capital * rateCesa);
+  const totalPrimas = primaDesg + primaRdh + primaCesa;
+  const monto_fin = sub_sin_seg + totalPrimas;
+
+  // Determinar mayor/menor 200 UF
+  const limite200 = UF ? 200 * UF : null;
+  const esMayor   = limite200 ? monto_fin > limite200 : false;
+  const tmcMenor  = (P.autofin_tmc_menor_200 || 33.60) / 100 / 12;
+  const tmcMayor  = (P.autofin_tmc_mayor_200 || 29.40) / 100 / 12;
+  const tasaAuto  = esMayor ? tmcMayor : tmcMenor;
+
+  // Tasa (usar campo manual si lo modificaron)
+  const tasaInput = document.getElementById('iTasa');
+  if (!tasaInput.dataset.manual || tasaInput.dataset.manual === 'false') {
+    tasaInput.value = (tasaAuto * 100).toFixed(2);
+  }
+  const tasaCli = (parseFloat(tasaInput.value) || tasaAuto * 100) / 100;
+
+  // Tag mayor/menor
+  const mmTag = document.getElementById('mmTag');
+  if (limite200) {
+    mmTag.style.display = '';
+    mmTag.className = 'tag-mm ' + (esMayor ? 'tag-mayor' : 'tag-menor');
+    mmTag.textContent = esMayor ? '> 200 UF' : '≤ 200 UF';
+  }
+
+  // ── AutoFin ────────────────────────────────────────────────────────
+  const spread    = (P.autofin_spread_fondo || 0.67) / 100;
+  const costoFondo = tmcMayor - spread; // fijo 1.78%
+  let ing_tasa_af = 0;
+  if (tasaCli > 0 && costoFondo > 0 && plazo > 0) {
+    const cuota = monto_fin * tasaCli * Math.pow(1+tasaCli,plazo) / (Math.pow(1+tasaCli,plazo)-1);
+    const pv    = cuota * (1 - Math.pow(1+costoFondo,-plazo)) / costoFondo;
+    ing_tasa_af = Math.round(pv - monto_fin);
+  }
+  // CORFO: ingreso adicional por diferencial de tasa
+  let com_corfo_af = 0;
+  if (esCorfo) {
+    const corfoSpread = esMayor ? 0.004 : 0.005; // 0.4% o 0.5% mensual
+    if (tasaCli - corfoSpread > 0 && plazo > 0) {
+      const cuota2 = monto_fin * (tasaCli-corfoSpread) * Math.pow(1+(tasaCli-corfoSpread),plazo)
+                   / (Math.pow(1+(tasaCli-corfoSpread),plazo)-1);
+      const pv2 = cuota2 * (1-Math.pow(1+costoFondo,-plazo)) / costoFondo;
+      com_corfo_af = Math.round(pv2 - monto_fin);
+    }
+  }
+
+  // ── UAC ────────────────────────────────────────────────────────────
+  // Usar tier 1 (14%) para simulación base — nota al usuario
+  const uacPct = (P.uac_pct_tier1 || 14) / 100;
+  const ing_tasa_uac = Math.round(saldo * uacPct);
+
+  // ── Seguros (común AF y UAC para AF; UAC no paga seguros) ──────────
+  const factorComDesg = getSegComFactor('desg', plazo);
+  const factorComCesa = getSegComFactor('cesa', plazo);
+  const ing_seg_af    = primaDesg > 0 ? Math.round(factorComDesg * primaDesg + factorComCesa * primaDesg) : 0;
+  const ing_seg_uac   = 0; // UAC no paga comisión seguros
+
+  // ── Comisiones dealer ──────────────────────────────────────────────
+  const dealerPct = getDealerPct(plazo);
+  const patioPct  = (P.patio_pct || 2.50) / 100;
+  let com_dealer, com_patio;
+  if (esPatio) {
+    com_dealer = Math.round(saldo * dealerPct);
+    com_patio  = Math.round(saldo * patioPct);
+  } else {
+    com_dealer = Math.round(saldo * (dealerPct + patioPct));
+    com_patio  = 0;
+  }
+
+  // ── Comisión ejecutivo ─────────────────────────────────────────────
+  const pctEj  = (P.pct_ejecutivo_fin || 2.12) / 100;
+  const com_ej = Math.round(monto_fin * pctEj);
+
+  // ── Cuota mensual ──────────────────────────────────────────────────
+  const cuota_af  = tasaCli > 0 ? Math.round(monto_fin * tasaCli * Math.pow(1+tasaCli,plazo) / (Math.pow(1+tasaCli,plazo)-1)) : Math.round(monto_fin/plazo);
+  const tasaUAC   = esMayor ? tmcMayor : tmcMenor;
+  const cuota_uac = tasaUAC > 0 ? Math.round(monto_fin * tasaUAC * Math.pow(1+tasaUAC,plazo) / (Math.pow(1+tasaUAC,plazo)-1)) : Math.round(monto_fin/plazo);
+
+  // ── Rentabilidad ───────────────────────────────────────────────────
+  const total_costos = com_dealer + com_patio + com_ej;
+  const rentab_af  = ing_tasa_af + ing_seg_af + com_corfo_af - total_costos;
+  const rentab_uac = ing_tasa_uac + ing_seg_uac - total_costos;
+  const pct_af     = monto_fin ? rentab_af  / monto_fin * 100 : 0;
+  const pct_uac    = monto_fin ? rentab_uac / monto_fin * 100 : 0;
+
+  // ── Renderizar monto financiado ────────────────────────────────────
+  document.getElementById('montoFinBox').innerHTML = `
+    <div class="mfrow"><span class="mflbl">Saldo Precio</span><span class="mfval">${fN(saldo)}</span></div>
+    <div class="mfrow"><span class="mflbl">Gastos Operacionales</span><span class="mfval">${fN(gastos)}</span></div>
+    ${totalPrimas > 0 ? `<div class="mfrow"><span class="mflbl">Primas Seguros (cap.)</span><span class="mfval">${fN(totalPrimas)}</span></div>` : ''}
+    <div class="mfrow total" style="font-weight:700">
+      <span class="mflbl">Monto Financiado</span><span class="mfval">${fN(monto_fin)}</span>
+    </div>
+  `;
+
+  // ── Renderizar AutoFin ─────────────────────────────────────────────
+  document.getElementById('resAf').innerHTML = renderResultados({
+    ing_tasa: ing_tasa_af, ing_seg: ing_seg_af, com_corfo: com_corfo_af,
+    com_dealer, com_patio, com_ej,
+    rentab: rentab_af, pct: pct_af,
+    cuota: cuota_af, esPatio, esCorfo,
+    tier_note: null
+  });
+
+  // ── Renderizar UAC ─────────────────────────────────────────────────
+  document.getElementById('resUac').innerHTML = renderResultados({
+    ing_tasa: ing_tasa_uac, ing_seg: ing_seg_uac, com_corfo: 0,
+    com_dealer, com_patio, com_ej,
+    rentab: rentab_uac, pct: pct_uac,
+    cuota: cuota_uac, esPatio, esCorfo: false,
+    tier_note: `Ingreso calculado con Tier 1 (${P.uac_pct_tier1||14}% sobre saldo precio). El % real depende del total de operaciones otorgadas en el mes.`
+  });
+}
+
+function renderResultados({ ing_tasa, ing_seg, com_corfo, com_dealer, com_patio, com_ej, rentab, pct, cuota, esPatio, esCorfo, tier_note }) {
+  const total_ing = ing_tasa + ing_seg + (com_corfo || 0);
+  const total_cos = com_dealer + com_patio + com_ej;
+
+  return `
+    ${tier_note ? `<div class="uac-tier-note"><i class="bi bi-info-circle me-1"></i>${tier_note}</div>` : ''}
+    <div class="res-section">
+      <div class="res-title"><i class="bi bi-arrow-up-circle-fill" style="color:#059669"></i> Ingresos AutoFácil</div>
+      <div class="res-row ingreso">
+        <span class="lbl">Ingreso por Colocación</span>
+        <span class="val">${fN(ing_tasa)}</span>
+      </div>
+      <div class="res-row ingreso">
+        <span class="lbl">Ingreso por Seguros</span>
+        <span class="val">${fN(ing_seg)}</span>
+      </div>
+      ${esCorfo ? `<div class="res-row ingreso"><span class="lbl">Comisión CORFO</span><span class="val">${fN(com_corfo)}</span></div>` : ''}
+      <div class="res-row neutral" style="font-weight:700">
+        <span class="lbl">Total Ingresos</span>
+        <span class="val" style="color:#059669">${fN(total_ing)}</span>
+      </div>
+    </div>
+    <div class="res-section">
+      <div class="res-title"><i class="bi bi-arrow-down-circle-fill" style="color:#dc2626"></i> Costos Directos</div>
+      <div class="res-row costo">
+        <span class="lbl">Comisión Dealer ${esPatio ? '(Patio)' : '(Calle)'}</span>
+        <span class="val">${fN(com_dealer)}</span>
+      </div>
+      ${esPatio ? `<div class="res-row costo"><span class="lbl">Comisión Patio</span><span class="val">${fN(com_patio)}</span></div>` : ''}
+      <div class="res-row costo">
+        <span class="lbl">Comisión Ejecutivo Comercial</span>
+        <span class="val">${fN(com_ej)}</span>
+      </div>
+      <div class="res-row neutral" style="font-weight:700">
+        <span class="lbl">Total Costos</span>
+        <span class="val" style="color:#dc2626">${fN(total_cos)}</span>
+      </div>
+    </div>
+    <div class="rentab-box ${rentab >= 0 ? 'pos' : 'neg'}">
+      <div>
+        <div class="rlbl">Rentabilidad AutoFácil</div>
+        <div class="rval">${fN(rentab)}</div>
+      </div>
+      <div class="rpct">${fP(pct)}<br>del monto fin.</div>
+    </div>
+    <div class="cuota-box">
+      <div class="clbl">Cuota Mensual Cliente</div>
+      <div class="cval">${fN(cuota)}</div>
+    </div>
+  `;
+}
+
+function clearResults() {
+  document.getElementById('montoFinBox').innerHTML = '';
+  document.getElementById('resAf').innerHTML  = '<p style="color:#9ca3af;text-align:center;padding:20px">Ingresa los datos del crédito para ver los resultados.</p>';
+  document.getElementById('resUac').innerHTML = '<p style="color:#9ca3af;text-align:center;padding:20px">Ingresa los datos del crédito para ver los resultados.</p>';
+}
+
+// Detectar si el usuario modificó la tasa manualmente
+document.getElementById('iTasa').addEventListener('input', function() {
+  this.dataset.manual = 'true';
+  this.classList.add('auto'); // keep style but allow manual
+});
+
+cargarDatos();
+</script>
+<script src="/js/app-version.js"></script>
+</body>
+</html>

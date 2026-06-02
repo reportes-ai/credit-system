@@ -87,6 +87,8 @@ app.use('/api/cobranza', require('../../services/cobranza/src/routes/cobranza.ro
 app.get('/health', (req, res) => res.json({ status: 'Sistema operativo', timestamp: new Date() }));
 
 // SPA fallbacks
+app.get(['/simulador', '/simulador/'], (req, res) =>
+  res.sendFile(path.join(__dirname, '../public/simulador/index.html')));
 app.get(['/usuarios', '/usuarios/'], (req, res) =>
   res.sendFile(path.join(__dirname, '../public/usuarios/index.html')));
 app.get(['/mantenedores', '/mantenedores/'], (req, res) =>
