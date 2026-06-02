@@ -83,8 +83,19 @@ app.use('/api/crm', require('../../services/crm/src/routes/gestiones.routes'));
 // Cobranza
 app.use('/api/cobranza', require('../../services/cobranza/src/routes/cobranza.routes'));
 
+// Comisiones ejecutivos
+app.use('/api/comisiones', require('../../services/comisiones/src/routes/comisiones.routes'));
+
 // Health check
 app.get('/health', (req, res) => res.json({ status: 'Sistema operativo', timestamp: new Date() }));
+
+// Comisiones SPA
+app.get(['/comisiones', '/comisiones/'], (req, res) =>
+  res.sendFile(path.join(__dirname, '../public/comisiones/index.html')));
+app.get(['/comisiones/revision', '/comisiones/revision/'], (req, res) =>
+  res.sendFile(path.join(__dirname, '../public/comisiones/revision/index.html')));
+app.get(['/comisiones/variables', '/comisiones/variables/'], (req, res) =>
+  res.sendFile(path.join(__dirname, '../public/comisiones/variables/index.html')));
 
 // SPA fallbacks
 app.get(['/simulador', '/simulador/'], (req, res) =>

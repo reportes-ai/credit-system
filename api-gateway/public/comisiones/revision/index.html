@@ -1,0 +1,375 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <link rel="icon" href="/img/favicon.png" type="image/png">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Revisión Comisiones — AutoFácil</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css" rel="stylesheet">
+  <style>
+    :root { --navy:#0141A2; --navy-dark:#012d70; --navy-light:#0255c5; --accent:#009AFE; --bg:#f0f4f8; }
+    body { background:var(--bg); font-family:'Segoe UI',system-ui,sans-serif; margin:0; min-height:100vh; }
+    .topnav { background:linear-gradient(90deg,var(--navy-dark),var(--navy-light)); color:#fff; height:60px; padding:0 24px; display:flex; align-items:center; justify-content:space-between; position:sticky; top:0; z-index:200; box-shadow:0 2px 8px rgba(0,0,0,.3); }
+    .topnav-left { display:flex; align-items:center; gap:16px; }
+    .topnav-brand { display:flex; align-items:center; gap:8px; text-decoration:none; }
+    .topnav-brand img { height:32px; filter:brightness(0) invert(1); }
+    .version-badge { background:rgba(255,255,255,.15); color:rgba(255,255,255,.75); font-size:.65rem; font-weight:700; border-radius:6px; padding:2px 8px; }
+    .breadcrumb-nav { color:rgba(255,255,255,.6); font-size:.85rem; display:flex; align-items:center; gap:6px; }
+    .breadcrumb-nav a { color:rgba(255,255,255,.75); text-decoration:none; }
+    .breadcrumb-nav .sep { color:rgba(255,255,255,.35); }
+    .topnav-right { display:flex; align-items:center; gap:10px; }
+    .user-chip { background:rgba(255,255,255,.12); border-radius:24px; padding:5px 12px; display:flex; align-items:center; gap:8px; font-size:.85rem; }
+    .avatar { width:28px; height:28px; background:#90caf9; border-radius:50%; display:flex; align-items:center; justify-content:center; color:var(--navy); font-weight:700; font-size:.75rem; }
+    .perfil-badge { background:rgba(144,202,249,.2); border:1px solid rgba(144,202,249,.4); color:#90caf9; border-radius:12px; padding:2px 10px; font-size:.73rem; font-weight:600; }
+    .btn-logout { background:rgba(255,255,255,.1); border:1px solid rgba(255,255,255,.2); color:#fff; border-radius:8px; padding:5px 12px; font-size:.82rem; cursor:pointer; }
+    .main-content { padding:32px 40px; max-width:1400px; margin:0 auto; }
+    .page-banner { background:linear-gradient(135deg,#012d70,#0141A2 50%,#009AFE); border-radius:16px; color:#fff; padding:24px 32px; margin-bottom:28px; display:flex; align-items:center; gap:20px; }
+    .page-banner i { font-size:2.4rem; opacity:.8; }
+    .page-banner h2 { font-weight:700; margin:0 0 2px; font-size:1.25rem; }
+    .page-banner p { opacity:.8; margin:0; font-size:.85rem; }
+    /* Filtro */
+    .filtro-bar { background:#fff; border-radius:12px; padding:16px 22px; margin-bottom:24px; display:flex; align-items:center; gap:16px; box-shadow:0 1px 4px rgba(0,0,0,.06); flex-wrap:wrap; }
+    .filtro-bar label { font-weight:600; font-size:.85rem; color:#374151; }
+    .filtro-bar input[type=month] { border:1.5px solid #d1d5db; border-radius:8px; padding:7px 12px; font-size:.88rem; outline:none; }
+    .filtro-bar input:focus { border-color:var(--navy); }
+    .btn-buscar { background:var(--navy); color:#fff; border:none; border-radius:8px; padding:8px 20px; font-size:.85rem; font-weight:600; cursor:pointer; display:flex; align-items:center; gap:6px; }
+    .btn-buscar:hover { background:var(--navy-light); }
+    /* Resumen stats */
+    .stats-row { display:grid; grid-template-columns:repeat(4,1fr); gap:16px; margin-bottom:24px; }
+    @media(max-width:900px){ .stats-row { grid-template-columns:repeat(2,1fr); } }
+    .stat-card { background:#fff; border-radius:12px; padding:16px 20px; box-shadow:0 1px 4px rgba(0,0,0,.06); }
+    .stat-card .label { font-size:.72rem; color:#9ca3af; font-weight:600; text-transform:uppercase; letter-spacing:.5px; }
+    .stat-card .value { font-size:1.4rem; font-weight:800; color:#111827; margin-top:2px; }
+    .stat-card .sub { font-size:.75rem; color:#6b7280; margin-top:2px; }
+    /* Tarjeta ejecutivo */
+    .ej-card { background:#fff; border-radius:14px; padding:24px; margin-bottom:20px; box-shadow:0 1px 6px rgba(0,0,0,.07); border:2px solid transparent; }
+    .ej-card.aprobado { border-color:#16a34a; }
+    .ej-card.rechazado { border-color:#dc2626; }
+    .ej-header { display:flex; align-items:center; justify-content:space-between; margin-bottom:18px; flex-wrap:wrap; gap:10px; }
+    .ej-nombre { font-size:1.05rem; font-weight:700; color:#111827; display:flex; align-items:center; gap:10px; }
+    .badge-estado { font-size:.72rem; font-weight:700; padding:3px 10px; border-radius:12px; }
+    .badge-estado.pendiente { background:#fef3c7; color:#d97706; }
+    .badge-estado.aprobado  { background:#dcfce7; color:#16a34a; }
+    .badge-estado.rechazado { background:#fee2e2; color:#dc2626; }
+    .ej-acciones { display:flex; gap:8px; }
+    .btn-aprobar  { background:#16a34a; color:#fff; border:none; border-radius:8px; padding:6px 16px; font-size:.82rem; font-weight:600; cursor:pointer; }
+    .btn-rechazar { background:#fff; color:#dc2626; border:1.5px solid #dc2626; border-radius:8px; padding:6px 16px; font-size:.82rem; font-weight:600; cursor:pointer; }
+    .btn-aprobar:hover  { background:#15803d; }
+    .btn-rechazar:hover { background:#fee2e2; }
+    /* Grid de métricas */
+    .metricas-grid { display:grid; grid-template-columns:repeat(3,1fr); gap:12px; margin-bottom:16px; }
+    @media(max-width:800px){ .metricas-grid { grid-template-columns:repeat(2,1fr); } }
+    .metrica { background:#f8fafc; border-radius:10px; padding:12px 14px; }
+    .metrica .m-label { font-size:.71rem; color:#9ca3af; font-weight:600; text-transform:uppercase; letter-spacing:.4px; }
+    .metrica .m-value { font-size:1.1rem; font-weight:700; color:#111827; margin-top:1px; }
+    .metrica .m-sub   { font-size:.73rem; color:#6b7280; }
+    .metrica.warn .m-value { color:#d97706; }
+    .metrica.ok   .m-value { color:#16a34a; }
+    .metrica.bad  .m-value { color:#dc2626; }
+    /* Barra de progreso */
+    .prog-bar { height:6px; border-radius:3px; background:#e5e7eb; margin-top:6px; overflow:hidden; }
+    .prog-bar-fill { height:100%; border-radius:3px; transition:width .4s; }
+    /* Desglose */
+    .desglose { background:#f0f4f8; border-radius:10px; padding:14px 16px; margin-top:12px; }
+    .desglose-title { font-size:.78rem; font-weight:700; color:#374151; margin-bottom:10px; display:flex; align-items:center; gap:6px; }
+    .desglose-row { display:flex; justify-content:space-between; font-size:.82rem; padding:4px 0; border-bottom:1px solid #e5e7eb; }
+    .desglose-row:last-child { border-bottom:none; font-weight:700; color:#0141A2; font-size:.88rem; }
+    .desglose-row span:last-child { font-weight:600; }
+    /* Total final */
+    .total-final { background:linear-gradient(135deg,#012d70,#0141A2); color:#fff; border-radius:12px; padding:16px 22px; display:flex; justify-content:space-between; align-items:center; margin-top:14px; }
+    .total-final .tf-label { font-size:.82rem; opacity:.8; }
+    .total-final .tf-value { font-size:1.5rem; font-weight:800; }
+    .total-final .tf-sc { font-size:.8rem; opacity:.7; }
+    /* Sin datos */
+    .empty-state { text-align:center; padding:60px 20px; color:#9ca3af; }
+    .empty-state i { font-size:3rem; display:block; margin-bottom:12px; }
+    .no-cumple { background:#fee2e2; border:1.5px solid #fca5a5; border-radius:12px; padding:16px 20px; color:#dc2626; display:flex; align-items:center; gap:12px; font-weight:600; font-size:.88rem; }
+    /* Collapsible créditos */
+    .toggle-creditos { background:none; border:none; color:var(--navy); font-size:.8rem; font-weight:600; cursor:pointer; display:flex; align-items:center; gap:4px; padding:0; margin-top:10px; }
+    .creditos-tabla { margin-top:10px; display:none; }
+    .creditos-tabla.visible { display:block; }
+    .creditos-tabla table { width:100%; border-collapse:collapse; font-size:.77rem; }
+    .creditos-tabla th { background:#e8eaf6; color:#374151; font-weight:700; padding:6px 10px; text-align:left; }
+    .creditos-tabla td { padding:5px 10px; border-bottom:1px solid #f1f5f9; }
+    .creditos-tabla tr:last-child td { border-bottom:none; }
+    @media(max-width:640px){ .main-content { padding:16px; } }
+  </style>
+</head>
+<body>
+<nav class="topnav">
+  <div class="topnav-left">
+    <a href="/" class="topnav-brand"><img src="/img/logo.png" alt="AutoFácil"><span class="version-badge">v5.1</span></a>
+    <div class="breadcrumb-nav">
+      <a href="/">Inicio</a><span class="sep">›</span>
+      <a href="/comisiones/">Comisión Ejecutivos</a><span class="sep">›</span>
+      <span style="color:#fff;font-weight:600">Revisión y Aprobación</span>
+    </div>
+  </div>
+  <div class="topnav-right">
+    <div class="user-chip">
+      <div class="avatar" id="avatarInicial">?</div>
+      <div>
+        <div style="font-weight:600;line-height:1.3;color:#fff" id="navNombre">—</div>
+        <div class="perfil-badge" id="navPerfil">—</div>
+      </div>
+    </div>
+    <button class="btn-logout" onclick="logout()"><i class="bi bi-box-arrow-right me-1"></i>Salir</button>
+  </div>
+</nav>
+
+<div class="main-content">
+  <div class="page-banner">
+    <i class="bi bi-clipboard-check"></i>
+    <div>
+      <h2>Revisión y Aprobación de Comisiones</h2>
+      <p>Detalle del cálculo por ejecutivo comercial — incentivo base, cruces de seguros, calidad e incentivo final</p>
+    </div>
+  </div>
+
+  <!-- Filtro -->
+  <div class="filtro-bar">
+    <label><i class="bi bi-calendar3 me-1"></i>Mes:</label>
+    <input type="month" id="filtroMes" value="">
+    <button class="btn-buscar" onclick="cargar()"><i class="bi bi-search"></i>Calcular</button>
+    <span id="loadingSpinner" style="display:none;color:#6b7280;font-size:.85rem"><i class="bi bi-hourglass-split me-1"></i>Calculando...</span>
+  </div>
+
+  <!-- Stats resumen -->
+  <div class="stats-row" id="statsRow" style="display:none">
+    <div class="stat-card">
+      <div class="label">Ejecutivos</div>
+      <div class="value" id="statEjs">—</div>
+      <div class="sub">en el mes</div>
+    </div>
+    <div class="stat-card">
+      <div class="label">Total Financiado</div>
+      <div class="value" id="statMonto">—</div>
+      <div class="sub">todos los ejecutivos</div>
+    </div>
+    <div class="stat-card">
+      <div class="label">Total Comisiones</div>
+      <div class="value" id="statComisiones">—</div>
+      <div class="sub">incentivo final bruto</div>
+    </div>
+    <div class="stat-card">
+      <div class="label">Aprobados</div>
+      <div class="value" id="statAprobados">—</div>
+      <div class="sub" id="statAprobadosSub">pendientes</div>
+    </div>
+  </div>
+
+  <!-- Resultados -->
+  <div id="resultado"></div>
+</div>
+
+<script src="/js/auth-guard.js"></script>
+<script>
+const token = sessionStorage.getItem('token');
+const yo    = JSON.parse(sessionStorage.getItem('usuario') || 'null');
+if (!token || !yo) window.location.href = '/login.html';
+const H = { 'Content-Type': 'application/json', Authorization: 'Bearer ' + token };
+const esAdmin = yo?.perfil === 'Administrador';
+
+document.getElementById('navNombre').textContent = `${yo?.nombre||''} ${yo?.apellido||''}`.trim();
+document.getElementById('navPerfil').textContent  = yo?.perfil || '';
+document.getElementById('avatarInicial').textContent = (yo?.nombre||'?').charAt(0).toUpperCase();
+
+// Default: mes actual
+const hoy = new Date();
+document.getElementById('filtroMes').value = `${hoy.getFullYear()}-${String(hoy.getMonth()+1).padStart(2,'0')}`;
+
+function logout() { sessionStorage.removeItem('token'); sessionStorage.removeItem('usuario'); window.location.href = '/login.html'; }
+function fmt(n) { return '$' + Math.round(n||0).toLocaleString('es-CL'); }
+function pct(n) { return ((n||0)*100).toFixed(1) + '%'; }
+
+let datosActuales = [];
+
+async function cargar() {
+  const mes = document.getElementById('filtroMes').value;
+  if (!mes) return;
+  document.getElementById('loadingSpinner').style.display = 'inline';
+  document.getElementById('resultado').innerHTML = '';
+  document.getElementById('statsRow').style.display = 'none';
+  try {
+    const res  = await fetch(`/api/comisiones/calculo?mes=${mes}`, { headers: H });
+    const json = await res.json();
+    if (!json.success) { document.getElementById('resultado').innerHTML = `<div class="alert alert-danger">${json.error}</div>`; return; }
+    datosActuales = json.data;
+    renderizar(json.data, mes);
+  } catch(e) {
+    document.getElementById('resultado').innerHTML = `<div class="alert alert-danger">Error al cargar: ${e.message}</div>`;
+  } finally {
+    document.getElementById('loadingSpinner').style.display = 'none';
+  }
+}
+
+function renderizar(data, mes) {
+  if (!data.length) {
+    document.getElementById('resultado').innerHTML = `<div class="empty-state"><i class="bi bi-inbox"></i>Sin créditos otorgados en ${mes}</div>`;
+    return;
+  }
+
+  // Stats globales
+  const totalMonto     = data.reduce((s,d) => s + (d.total_financiado||0), 0);
+  const totalComision  = data.reduce((s,d) => s + (d.incentivo_final||0), 0);
+  const aprobados      = data.filter(d => d.estado === 'aprobado').length;
+  document.getElementById('statEjs').textContent       = data.length;
+  document.getElementById('statMonto').textContent     = fmt(totalMonto);
+  document.getElementById('statComisiones').textContent= fmt(totalComision);
+  document.getElementById('statAprobados').textContent = `${aprobados}/${data.length}`;
+  document.getElementById('statAprobadosSub').textContent = (aprobados === data.length ? '✓ todos aprobados' : `${data.length - aprobados} pendientes`);
+  document.getElementById('statsRow').style.display = 'grid';
+
+  const html = data.map((d,i) => renderEjecutivo(d, i, mes)).join('');
+  document.getElementById('resultado').innerHTML = html;
+}
+
+function renderEjecutivo(d, i, mes) {
+  const estadoClass = d.estado || 'pendiente';
+  const estadoLabel = { pendiente:'Pendiente', aprobado:'Aprobado', rechazado:'Rechazado' }[estadoClass] || 'Pendiente';
+
+  if (!d.cumple_minimo) {
+    return `<div class="ej-card ${estadoClass}">
+      <div class="ej-header">
+        <div class="ej-nombre"><i class="bi bi-person-fill"></i>${d.ejecutivo}
+          <span class="badge-estado ${estadoClass}">${estadoLabel}</span>
+        </div>
+      </div>
+      <div class="no-cumple"><i class="bi bi-x-circle-fill fs-5"></i>
+        No cumple mínimo — Monto financiado: ${fmt(d.total_financiado)} (mínimo requerido: ver variables)
+      </div>
+    </div>`;
+  }
+
+  const barCes = Math.min((d.cruce_cesantia||0)*100, 100);
+  const barRep = Math.min((d.cruce_reparaciones||0)*100, 100);
+  const barCal = Math.min((d.calidad||0)*100, 100);
+  const barAj  = Math.min((d.factor_ajuste||0)/0.66*100, 100);
+
+  const colCes = d.cumple_cesantia    ? 'ok' : 'bad';
+  const colRep = d.cumple_reparaciones? 'ok' : 'bad';
+  const colCal = (d.calidad||0) >= 0.8 ? 'ok' : 'warn';
+
+  const botonesAdmin = esAdmin ? `
+    <div class="ej-acciones">
+      <button class="btn-aprobar"  onclick="cambiarEstado('${d.ejecutivo}','${mes}','aprobado',${d.incentivo_final||0},${d.con_semana_corrida||0})"><i class="bi bi-check-lg me-1"></i>Aprobar</button>
+      <button class="btn-rechazar" onclick="cambiarEstado('${d.ejecutivo}','${mes}','rechazado',${d.incentivo_final||0},${d.con_semana_corrida||0})"><i class="bi bi-x-lg me-1"></i>Rechazar</button>
+    </div>` : '';
+
+  const credHtml = (d.creditos||[]).map(c => `
+    <tr>
+      <td>${c.num_op||c.nombre_cliente||'—'}</td>
+      <td>${c.nombre_cliente||'—'}</td>
+      <td>${c.financiera||'—'}</td>
+      <td>${c.plazo||'—'}</td>
+      <td style="text-align:right">${fmt(c.monto_financiado)}</td>
+      <td style="text-align:right;color:${(parseFloat(c.seguro_cesantia)||0)>0?'#16a34a':'#9ca3af'}">${(parseFloat(c.seguro_cesantia)||0)>0?'✓ '+fmt(c.seguro_cesantia):'—'}</td>
+      <td style="text-align:right;color:${(parseFloat(c.seguro_rep_menor)||0)>0?'#16a34a':'#9ca3af'}">${(parseFloat(c.seguro_rep_menor)||0)>0?'✓ '+fmt(c.seguro_rep_menor):'—'}</td>
+    </tr>`).join('');
+
+  return `<div class="ej-card ${estadoClass}" id="ej-card-${i}">
+    <div class="ej-header">
+      <div class="ej-nombre">
+        <i class="bi bi-person-fill"></i>${d.ejecutivo}
+        <span class="badge-estado ${estadoClass}">${estadoLabel}</span>
+      </div>
+      ${botonesAdmin}
+    </div>
+
+    <div class="metricas-grid">
+      <div class="metrica">
+        <div class="m-label">Créditos otorgados</div>
+        <div class="m-value">${d.total_creditos}</div>
+        <div class="m-sub">NCNU: ${d.ncnu_total} elegibles</div>
+      </div>
+      <div class="metrica">
+        <div class="m-label">Total financiado</div>
+        <div class="m-value">${fmt(d.total_financiado)}</div>
+        <div class="m-sub">≤24: ${fmt(d.monto_24)} | +24: ${fmt(d.monto_mas24)}</div>
+      </div>
+      <div class="metrica">
+        <div class="m-label">Incentivo Base</div>
+        <div class="m-value">${fmt(d.incentivo_base)}</div>
+        <div class="m-sub">0.75%×≤24 + 1.00%×+24</div>
+      </div>
+      <div class="metrica ${colCes}">
+        <div class="m-label">Cruce Cesantía</div>
+        <div class="m-value">${pct(d.cruce_cesantia)} <small style="font-size:.7rem;font-weight:400">(${d.ncnu_cesantia}/${d.ncnu_total})</small></div>
+        <div class="prog-bar"><div class="prog-bar-fill" style="width:${barCes}%;background:${d.cumple_cesantia?'#16a34a':'#dc2626'}"></div></div>
+        <div class="m-sub">${d.cumple_cesantia?'✓ Cumple mínimo':'✗ No cumple mínimo'}</div>
+      </div>
+      <div class="metrica ${colRep}">
+        <div class="m-label">Cruce Rep. Menores</div>
+        <div class="m-value">${pct(d.cruce_reparaciones)} <small style="font-size:.7rem;font-weight:400">(${d.ncnu_rep}/${d.ncnu_total})</small></div>
+        <div class="prog-bar"><div class="prog-bar-fill" style="width:${barRep}%;background:${d.cumple_reparaciones?'#16a34a':'#dc2626'}"></div></div>
+        <div class="m-sub">${d.cumple_reparaciones?'✓ Cumple mínimo':'✗ No cumple mínimo'}</div>
+      </div>
+      <div class="metrica ${colCal}">
+        <div class="m-label">Calidad</div>
+        <div class="m-value">${pct(d.calidad)}</div>
+        <div class="prog-bar"><div class="prog-bar-fill" style="width:${barCal}%;background:#16a34a"></div></div>
+        <div class="m-sub">Factor ajuste: ${pct(d.factor_ajuste)} / 66%</div>
+      </div>
+    </div>
+
+    <div class="desglose">
+      <div class="desglose-title"><i class="bi bi-calculator"></i>Desglose incentivo final</div>
+      <div class="desglose-row"><span>Incentivo base (≤24 + +24)</span><span>${fmt(d.incentivo_base)}</span></div>
+      <div class="desglose-row"><span>+ Bono Seg. Cesantía ${d.cumple_cesantia?'(ajuste '+pct(d.ajuste_cesantia)+')':'(no cumple)'}</span><span>${d.cumple_cesantia?fmt(d.bono_cesantia):'$0'}</span></div>
+      <div class="desglose-row"><span>+ Bono Seg. Reparaciones ${d.cumple_reparaciones?'(ajuste '+pct(d.ajuste_reparaciones)+')':'(no cumple)'}</span><span>${d.cumple_reparaciones?fmt(d.bono_reparaciones):'$0'}</span></div>
+      <div class="desglose-row"><span>+ Bono Calidad (ajuste ${pct(d.ajuste_calidad)})</span><span>${fmt(d.bono_calidad)}</span></div>
+      <div class="desglose-row"><span>= Incentivo Final</span><span>${fmt(d.incentivo_final)}</span></div>
+    </div>
+
+    <div class="total-final">
+      <div>
+        <div class="tf-label">Incentivo Final Bruto</div>
+        <div class="tf-value">${fmt(d.incentivo_final)}</div>
+      </div>
+      <div style="text-align:right">
+        <div class="tf-sc">Con semana corrida (aprox. ×1.2)</div>
+        <div class="tf-value">${fmt(d.con_semana_corrida)}</div>
+      </div>
+    </div>
+
+    <button class="toggle-creditos" onclick="toggleCreditos(${i})">
+      <i class="bi bi-chevron-down" id="chevron-${i}"></i>Ver detalle créditos (${(d.creditos||[]).length})
+    </button>
+    <div class="creditos-tabla" id="creditos-${i}">
+      <table>
+        <thead><tr><th>N° Op</th><th>Cliente</th><th>Financiera</th><th>Plazo</th><th>Monto Fin.</th><th>Seg. Cesantía</th><th>Seg. Rep.</th></tr></thead>
+        <tbody>${credHtml}</tbody>
+      </table>
+    </div>
+  </div>`;
+}
+
+function toggleCreditos(i) {
+  const div = document.getElementById(`creditos-${i}`);
+  const ico = document.getElementById(`chevron-${i}`);
+  div.classList.toggle('visible');
+  ico.className = div.classList.contains('visible') ? 'bi bi-chevron-up' : 'bi bi-chevron-down';
+}
+
+async function cambiarEstado(ejecutivo, mes, estado, incentivo_final, con_semana_corrida) {
+  try {
+    const res  = await fetch('/api/comisiones/aprobar', {
+      method: 'POST', headers: H,
+      body: JSON.stringify({ ejecutivo, mes, estado, incentivo_final, con_semana_corrida }),
+    });
+    const json = await res.json();
+    if (json.success) {
+      cargar(); // recarga para reflejar nuevo estado
+    } else {
+      alert('Error: ' + json.error);
+    }
+  } catch(e) { alert('Error: ' + e.message); }
+}
+
+// Carga automática al entrar
+cargar();
+</script>
+<script src="/js/app-version.js"></script>
+</body>
+</html>

@@ -10,6 +10,7 @@ const pool = require('../../../../shared/config/database');
       { nombre: 'Reportería', icono: 'bi-bar-chart-line', ruta: '/reporteria/', descripcion: 'Informes y reportes del sistema', orden: 23 },
       { nombre: 'Política',   icono: 'bi-shield-check',  ruta: '/politica/',   descripcion: 'Política de crédito AutoFácil', orden: 24 },
       { nombre: 'Cartas de Aprobación', icono: 'bi-envelope-check', ruta: '/cartas-aprobacion/', descripcion: 'Generación e historial de cartas de aprobación de crédito', orden: 25 },
+      { nombre: 'Comisión Ejecutivos', icono: 'bi-cash-coin', ruta: '/comisiones/', descripcion: 'Cálculo, revisión y aprobación de comisiones mensuales por ejecutivo comercial', orden: 26 },
     ];
     for (const m of nuevos) {
       const [rows] = await pool.query('SELECT id_modulo FROM modulos WHERE nombre = ?', [m.nombre]);
