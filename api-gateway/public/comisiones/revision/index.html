@@ -448,22 +448,24 @@ function copiarResumen(idx) {
   const cruceCes = el.dataset.cruceCes || '—';
   const cruceRep = el.dataset.cruceRep || '—';
 
+  const abrevFin = f => (f||'').toUpperCase().includes('UNIDAD') ? 'UNIDAD' : (f||'AUTOFIN').toUpperCase().replace('AUTOFIN','AUTOFIN');
+  const TD  = 'padding:5px 8px;border-bottom:1px solid #e5e7eb;font-size:11.5px;white-space:nowrap';
   const filasCreds = creds.map((c, i) => {
     const tieneC = (parseFloat(c.ces) || 0) > 0;
     const tieneR = (parseFloat(c.rep) || 0) > 0;
     return `<tr style="background:${i%2===0?'#f8fafc':'#fff'}">
-      <td style="padding:7px 10px;border-bottom:1px solid #e5e7eb;color:#374151">${c.op||'—'}</td>
-      <td style="padding:7px 10px;border-bottom:1px solid #e5e7eb;font-weight:500">${c.cliente||'—'}</td>
-      <td style="padding:7px 10px;border-bottom:1px solid #e5e7eb;text-align:center;color:#0141A2;font-weight:600">${c.fin||'—'}</td>
-      <td style="padding:7px 10px;border-bottom:1px solid #e5e7eb;text-align:center">${c.plazo||'—'}</td>
-      <td style="padding:7px 10px;border-bottom:1px solid #e5e7eb;text-align:right;font-weight:600">${fmt(c.monto)}</td>
-      <td style="padding:7px 10px;border-bottom:1px solid #e5e7eb;text-align:center;color:${tieneC?'#16a34a':'#9ca3af'}">${tieneC?'✔ '+fmt(c.ces):'—'}</td>
-      <td style="padding:7px 10px;border-bottom:1px solid #e5e7eb;text-align:center;color:${tieneR?'#16a34a':'#9ca3af'}">${tieneR?'✔ '+fmt(c.rep):'—'}</td>
+      <td style="${TD};color:#374151">${c.op||'—'}</td>
+      <td style="${TD};font-weight:500;white-space:normal;max-width:180px">${c.cliente||'—'}</td>
+      <td style="${TD};text-align:center;color:#0141A2;font-weight:700">${abrevFin(c.fin)}</td>
+      <td style="${TD};text-align:center">${c.plazo||'—'}c</td>
+      <td style="${TD};text-align:right;font-weight:600">${fmt(c.monto)}</td>
+      <td style="${TD};text-align:center;color:${tieneC?'#16a34a':'#9ca3af'}">${tieneC?'✔ '+fmt(c.ces):'—'}</td>
+      <td style="${TD};text-align:center;color:${tieneR?'#16a34a':'#9ca3af'}">${tieneR?'✔ '+fmt(c.rep):'—'}</td>
     </tr>`;
   }).join('');
 
   const html = `
-<div style="font-family:'Segoe UI',Arial,sans-serif;max-width:700px;margin:0 auto;color:#111827">
+<div style="font-family:'Segoe UI',Arial,sans-serif;max-width:860px;margin:0 auto;color:#111827">
 
   <!-- Header -->
   <div style="background:linear-gradient(135deg,#012d70,#0141A2);border-radius:12px 12px 0 0;padding:24px 28px;color:#fff">
@@ -483,16 +485,20 @@ function copiarResumen(idx) {
     <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:#6b7280;margin-bottom:12px">
       Operaciones Comisionables — ${creds.length} crédito${creds.length!==1?'s':''} OTORGADO${creds.length!==1?'S':''}
     </div>
-    <table style="width:100%;border-collapse:collapse;font-size:13px">
+    <table style="width:100%;border-collapse:collapse;font-size:11.5px;table-layout:fixed">
+      <colgroup>
+        <col style="width:72px"><col style="width:200px"><col style="width:72px">
+        <col style="width:48px"><col style="width:100px"><col style="width:110px"><col style="width:110px">
+      </colgroup>
       <thead>
         <tr style="background:#e8eaf6">
-          <th style="padding:8px 10px;text-align:left;font-weight:700;color:#374151;border-bottom:2px solid #c5cae9">N° Op</th>
-          <th style="padding:8px 10px;text-align:left;font-weight:700;color:#374151;border-bottom:2px solid #c5cae9">Cliente</th>
-          <th style="padding:8px 10px;text-align:center;font-weight:700;color:#374151;border-bottom:2px solid #c5cae9">Financiera</th>
-          <th style="padding:8px 10px;text-align:center;font-weight:700;color:#374151;border-bottom:2px solid #c5cae9">Plazo</th>
-          <th style="padding:8px 10px;text-align:right;font-weight:700;color:#374151;border-bottom:2px solid #c5cae9">Monto Fin.</th>
-          <th style="padding:8px 10px;text-align:center;font-weight:700;color:#374151;border-bottom:2px solid #c5cae9">Seg. Cesantía</th>
-          <th style="padding:8px 10px;text-align:center;font-weight:700;color:#374151;border-bottom:2px solid #c5cae9">Seg. Rep.</th>
+          <th style="padding:7px 8px;text-align:left;font-weight:700;color:#374151;border-bottom:2px solid #c5cae9;white-space:nowrap">N° Op</th>
+          <th style="padding:7px 8px;text-align:left;font-weight:700;color:#374151;border-bottom:2px solid #c5cae9">Cliente</th>
+          <th style="padding:7px 8px;text-align:center;font-weight:700;color:#374151;border-bottom:2px solid #c5cae9;white-space:nowrap">Financiera</th>
+          <th style="padding:7px 8px;text-align:center;font-weight:700;color:#374151;border-bottom:2px solid #c5cae9;white-space:nowrap">Plazo</th>
+          <th style="padding:7px 8px;text-align:right;font-weight:700;color:#374151;border-bottom:2px solid #c5cae9;white-space:nowrap">Monto Fin.</th>
+          <th style="padding:7px 8px;text-align:center;font-weight:700;color:#374151;border-bottom:2px solid #c5cae9;white-space:nowrap">Seg. Cesantía</th>
+          <th style="padding:7px 8px;text-align:center;font-weight:700;color:#374151;border-bottom:2px solid #c5cae9;white-space:nowrap">Seg. Rep.</th>
         </tr>
       </thead>
       <tbody>${filasCreds}</tbody>
