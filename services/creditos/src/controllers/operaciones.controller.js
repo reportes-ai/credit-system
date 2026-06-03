@@ -464,23 +464,38 @@ const recalcularComisiones = async (req, res) => {
        FROM creditos WHERE saldo_precio > 0 AND plazo > 0`
     );
 
-    // 3b. Calcular penetración por mes — solo AutoFin OTORGADO
-    // pen_X = (créditos AutoFin OTORGADO en el mes con seguro_X > 0) / total AutoFin OTORGADO en mes × 100
-    const mesMap = {}; // mes → { total, rdh, ces, rep }
+    // 3b. Pre-calcular por mes: penetración AutoFin + conteo UAC (para tiers)
+    const mesMap = {};    // mes → { total(AF), rdh, ces, rep, uacOps }
     for (const row of rows) {
-      const fin = (row.financiera || '').toUpperCase();
+      const fin  = (row.financiera || '').toUpperCase();
+      const esOt = (row.estado_credito || '').toUpperCase() === 'OTORGADO';
+      const mes  = (row.mes || row.fecha_otorgado || '').toString().slice(0, 7);
+      if (!mes) continue;
+      if (!mesMap[mes]) mesMap[mes] = { total: 0, rdh: 0, ces: 0, rep: 0, uacOps: 0 };
+
+      // Penetración AutoFin
       const esAF = (fin.includes('AUTOFIN') || fin.includes('AUTOF')) &&
                    !fin.includes('AUTOFACIL') && !fin.includes('AUTOFÁCIL');
-      const esOt = (row.estado_credito || '').toUpperCase() === 'OTORGADO';
-      if (!esAF || !esOt) continue;
-      const mes = (row.mes || row.fecha_otorgado || '').toString().slice(0, 7);
-      if (!mes) continue;
-      if (!mesMap[mes]) mesMap[mes] = { total: 0, rdh: 0, ces: 0, rep: 0 };
-      mesMap[mes].total++;
-      if (parseFloat(row.seguro_rdh)       > 0) mesMap[mes].rdh++;
-      if (parseFloat(row.seguro_cesantia)  > 0) mesMap[mes].ces++;
-      if (parseFloat(row.seguro_rep_menor) > 0) mesMap[mes].rep++;
+      if (esAF && esOt) {
+        mesMap[mes].total++;
+        if (parseFloat(row.seguro_rdh)       > 0) mesMap[mes].rdh++;
+        if (parseFloat(row.seguro_cesantia)  > 0) mesMap[mes].ces++;
+        if (parseFloat(row.seguro_rep_menor) > 0) mesMap[mes].rep++;
+      }
+
+      // Conteo UAC para tiers (OTORGADO + APROBADO)
+      const esUAC = fin.includes('UNIDAD') || fin.includes('UAC');
+      const esOtAp = ['OTORGADO','APROBADO'].includes((row.estado_credito || '').toUpperCase());
+      if (esUAC && esOtAp) mesMap[mes].uacOps++;
     }
+
+    // Helper: tier UAC según volumen del mes
+    const getUacPct = (mes) => {
+      const ops = mesMap[mes]?.uacOps || 0;
+      if (ops >= p.uac_ops_tier2_max) return p.uac_pct_tier3 / 100;
+      if (ops >= p.uac_ops_tier1_max) return p.uac_pct_tier2 / 100;
+      return p.uac_pct_tier1 / 100;
+    };
 
     // 4. Helpers inline (sin DB)
     const getDealerPct = (plazo) => {
@@ -531,7 +546,7 @@ const recalcularComisiones = async (req, res) => {
             monto_comision_fin = Math.round(pv - montoCap);
           }
         } else if (fin.includes('UNIDAD') || fin.includes('UAC')) {
-          monto_comision_fin = Math.round(saldo * (p.uac_pct_tier1 / 100));
+          monto_comision_fin = Math.round(saldo * getUacPct(mes));
         }
       }
 
