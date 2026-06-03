@@ -41,7 +41,7 @@ const pool = require('../../../../shared/config/database');
 
 const getByRut = async (req, res) => {
   try {
-    const rut = req.params.rut.toUpperCase().trim();
+    const rut = req.params.rut.replace(/\./g, '').toUpperCase().trim();
     const [rows] = await pool.query(
       'SELECT * FROM informacion_comercial WHERE rut_cliente = ?', [rut]);
     res.json({ success: true, data: rows[0] || null, error: null });
@@ -52,7 +52,7 @@ const getByRut = async (req, res) => {
 
 const upsert = async (req, res) => {
   try {
-    const rut = req.params.rut.toUpperCase().trim();
+    const rut = req.params.rut.replace(/\./g, '').toUpperCase().trim();
     const {
       monto_protestos, protestos_vigentes_q,
       deuda_vigente_total, deuda_vigente_inst,

@@ -46,7 +46,7 @@ const pool = require('../../../../shared/config/database');
 
 const getByRut = async (req, res) => {
   try {
-    const rut = req.params.rut.toUpperCase().trim();
+    const rut = req.params.rut.replace(/\./g, '').toUpperCase().trim();
     const [rows] = await pool.query(
       'SELECT * FROM antecedentes_laborales WHERE rut_cliente = ?', [rut]);
     res.json({ success: true, data: rows[0] || null, error: null });
@@ -57,7 +57,7 @@ const getByRut = async (req, res) => {
 
 const upsert = async (req, res) => {
   try {
-    const rut = req.params.rut.toUpperCase().trim();
+    const rut = req.params.rut.replace(/\./g, '').toUpperCase().trim();
     const {
       tipo_trabajador, empleador, rut_empresa, giro_empresa,
       direccion_comercial, numero_comercial, oficina_comercial,
