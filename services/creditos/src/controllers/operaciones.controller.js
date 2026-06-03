@@ -439,10 +439,16 @@ const recalcularComisiones = async (req, res) => {
     const p = {};
     paramRows.forEach(r => { p[r.clave] = parseFloat(r.valor); });
 
-    // 1b. Pre-cargar factores de comisión de seguros
-    const [segRows] = await pool.query(
-      'SELECT plazo_min, plazo_max, pct_desgravamen, pct_cesantia FROM comisiones_seguro_plazo WHERE estado="activo" ORDER BY plazo_min'
+    // 1b. Pre-cargar tramos de comisión por penetración
+    const [penTramos] = await pool.query(
+      'SELECT tipo, pen_min, pct_comision FROM comisiones_seguro_penetracion WHERE estado="activo" ORDER BY tipo, pen_min'
     );
+    const getPenPct = (tipo, pen) => {
+      const filas = penTramos.filter(r => r.tipo === tipo && parseFloat(pen || 0) >= parseFloat(r.pen_min));
+      if (!filas.length) return 0;
+      const best = filas.reduce((a, b) => parseFloat(a.pen_min) > parseFloat(b.pen_min) ? a : b);
+      return parseFloat(best.pct_comision) / 100;
+    };
 
     // 2. Pre-cargar todas las UF necesarias en un Map fecha→valor
     const [ufRows] = await pool.query('SELECT fecha, valor FROM uf');
@@ -483,11 +489,6 @@ const recalcularComisiones = async (req, res) => {
       if (plazo <= 24) return p.dealer_pct_24 / 100;
       if (plazo <= 36) return p.dealer_pct_36 / 100;
       return p.dealer_pct_99 / 100;
-    };
-    const getSegCom = (plazo) => {
-      const row = segRows.find(r => plazo >= r.plazo_min && plazo <= r.plazo_max);
-      if (!row) return { desg: 0, cesa: 0 };
-      return { desg: parseFloat(row.pct_desgravamen) / 100, cesa: parseFloat(row.pct_cesantia) / 100 };
     };
 
     // 5. Calcular todo en memoria
@@ -534,15 +535,12 @@ const recalcularComisiones = async (req, res) => {
         }
       }
 
-      // Comisión seguros — solo para OTORGADO
-      // com_rdh      = seguro_rdh      × pct_desgravamen(plazo)
-      // com_cesantia = seguro_cesantia × pct_cesantia(plazo)
-      // com_reparaciones = 0 (rep. menores no genera comisión)
-      let com_rdh = 0, com_cesantia = 0;
+      // Comisión seguros — solo para OTORGADO, según tramo de penetración del mes
+      let com_rdh = 0, com_cesantia = 0, com_reparaciones_seg = 0;
       if (plazo > 0 && esOtorgado) {
-        const { desg, cesa } = getSegCom(plazo);
-        com_rdh      = Math.round(desg * (parseFloat(row.seguro_rdh)      || 0));
-        com_cesantia = Math.round(cesa * (parseFloat(row.seguro_cesantia) || 0));
+        com_rdh              = Math.round(getPenPct('rdh',        pen_rdh)          * (parseFloat(row.seguro_rdh)       || 0));
+        com_cesantia         = Math.round(getPenPct('cesantia',   pen_cesantia)     * (parseFloat(row.seguro_cesantia)  || 0));
+        com_reparaciones_seg = Math.round(getPenPct('reparacion', pen_reparaciones) * (parseFloat(row.seguro_rep_menor) || 0));
       }
 
       // Comisión dealer
@@ -556,11 +554,11 @@ const recalcularComisiones = async (req, res) => {
         com_parque_calc = esParque ? Math.round(saldo * patio_pct) : 0;
       }
 
-      const ingreso_neto_total = monto_comision_fin + com_rdh + com_cesantia - comdea_real - com_parque_calc;
+      const ingreso_neto_total = monto_comision_fin + com_rdh + com_cesantia + com_reparaciones_seg - comdea_real - com_parque_calc;
 
-      // [0:comdea, 1:com_parque, 2:monto_com_fin, 3:com_rdh, 4:com_cesantia, 5:com_rep(0),
+      // [0:comdea, 1:com_parque, 2:monto_com_fin, 3:com_rdh, 4:com_cesantia, 5:com_rep,
       //  6:ingreso_neto, 7:pen_rdh, 8:pen_cesantia, 9:pen_rep, 10:id]
-      return [comdea_real, com_parque_calc, monto_comision_fin, com_rdh, com_cesantia, 0,
+      return [comdea_real, com_parque_calc, monto_comision_fin, com_rdh, com_cesantia, com_reparaciones_seg,
               ingreso_neto_total, pen_rdh, pen_cesantia, pen_reparaciones, row.id];
     });
 

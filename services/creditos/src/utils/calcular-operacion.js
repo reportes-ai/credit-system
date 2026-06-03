@@ -36,18 +36,20 @@ function getDealerPct(plazo, p) {
   return p.dealer_pct_99 / 100;
 }
 
-/* ── Cargar factores de comisión de seguros desde comisiones_seguro_plazo ── */
-async function cargarSegCom() {
+/* ── Cargar tramos de comisión por penetración ──────────────────────── */
+async function cargarPenTramos() {
   const [rows] = await pool.query(
-    'SELECT plazo_min, plazo_max, pct_desgravamen, pct_cesantia FROM comisiones_seguro_plazo WHERE estado="activo" ORDER BY plazo_min'
+    'SELECT tipo, pen_min, pct_comision FROM comisiones_seguro_penetracion WHERE estado="activo" ORDER BY tipo, pen_min'
   );
   return rows;
 }
 
-function getSegCom(plazo, segRows) {
-  const row = segRows.find(r => plazo >= r.plazo_min && plazo <= r.plazo_max);
-  if (!row) return { desg: 0, cesa: 0 };
-  return { desg: parseFloat(row.pct_desgravamen) / 100, cesa: parseFloat(row.pct_cesantia) / 100 };
+/* Dado el % de penetración, retorna el pct_comision del tramo más alto alcanzado */
+function getPenComision(tipo, pen, tramos) {
+  const filas = tramos.filter(r => r.tipo === tipo && parseFloat(pen) >= parseFloat(r.pen_min));
+  if (!filas.length) return 0;
+  const best = filas.reduce((a, b) => parseFloat(a.pen_min) > parseFloat(b.pen_min) ? a : b);
+  return parseFloat(best.pct_comision) / 100;
 }
 
 /* ── Contar operaciones UAC otorgadas/aprobadas en el mes ───────────── */
@@ -65,9 +67,9 @@ async function contarOpsUAC(mes) {
 
 /* ── CÁLCULO PRINCIPAL ──────────────────────────────────────────────── */
 async function calcularOperacion(op) {
-  const p       = await cargarParams();
-  const segRows = await cargarSegCom();
-  const uf      = await getUF(op.fecha_otorgado);
+  const p      = await cargarParams();
+  const tramos = await cargarPenTramos();
+  const uf     = await getUF(op.fecha_otorgado);
 
   const saldo_precio  = parseFloat(op.saldo_precio)    || 0;
   const monto_fin     = parseFloat(op.monto_financiado)   || 0;
@@ -116,15 +118,18 @@ async function calcularOperacion(op) {
     }
   }
 
-  // ── 2. Ingreso por seguros ─────────────────────────────────────────
-  // com_rdh      = seguro_rdh      × pct_desgravamen(plazo)
-  // com_cesantia = seguro_cesantia × pct_cesantia(plazo)
-  // com_reparaciones = 0 (rep. menores no genera comisión)
+  // ── 2. Ingreso por seguros — comisión según tramo de penetración ──────
+  // pen_rdh/cesantia/reparacion deben venir en op (calculados previamente por mes)
+  // com_rdh          = seguro_rdh       × pct_comision(pen_rdh)
+  // com_cesantia     = seguro_cesantia  × pct_comision(pen_cesantia)
+  // com_reparaciones = seguro_rep_menor × pct_comision(pen_reparacion)
   if (plazo > 0) {
-    const { desg, cesa } = getSegCom(plazo, segRows);
-    com_rdh      = Math.round(desg * primaRDH);
-    com_cesantia = Math.round(cesa * primaCesantia);
-    com_reparaciones = 0;
+    const pctRdh  = getPenComision('rdh',        op.pen_rdh          ?? 0, tramos);
+    const pctCes  = getPenComision('cesantia',   op.pen_cesantia     ?? 0, tramos);
+    const pctRep  = getPenComision('reparacion', op.pen_reparaciones ?? 0, tramos);
+    com_rdh          = Math.round(pctRdh  * primaRDH);
+    com_cesantia     = Math.round(pctCes  * primaCesantia);
+    com_reparaciones = Math.round(pctRep  * (parseFloat(op.seguro_rep_menor) || 0));
   }
 
   // ── 3. Comisión dealer ─────────────────────────────────────────────
@@ -145,7 +150,7 @@ async function calcularOperacion(op) {
   }
 
   // ── 5. Ingreso neto total ──────────────────────────────────────────
-  const com_seguros_total  = com_rdh + com_cesantia;
+  const com_seguros_total  = com_rdh + com_cesantia + com_reparaciones;
   const ingreso_neto_total = monto_comision_fin + com_seguros_total
                            - comdea_real - com_parque_calc;
 
@@ -153,7 +158,7 @@ async function calcularOperacion(op) {
     monto_comision_fin,
     com_rdh,
     com_cesantia,
-    com_reparaciones: 0,
+    com_reparaciones,
     comdea_real,
     com_parque:        com_parque_calc,
     comej,
