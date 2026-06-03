@@ -425,4 +425,65 @@ const marcarNoOtorgado = async (req, res) => {
   }
 };
 
-module.exports = { getAll, getOne, create, update, remove, nextOp, liberarPago, marcarNoOtorgado };
+/* ─── POST /api/operaciones/recalcular-comisiones ──────────────────── */
+// Recalcula comdea_real, com_parque e ingreso_neto_total para todos los
+// registros que tienen saldo_precio y plazo. Solo Administrador.
+const recalcularComisiones = async (req, res) => {
+  try {
+    const perfil = req.usuario?.perfil_nombre || '';
+    if (perfil !== 'Administrador')
+      return res.status(403).json({ success: false, data: null, error: 'Solo Administrador puede ejecutar el recálculo' });
+
+    const [rows] = await pool.query(
+      `SELECT id, saldo_precio, plazo, financiera, parque, com_parque,
+              seguro_rdh, seguro_cesantia, seguro_rep_menor,
+              monto_financiado, fecha_otorgado, mes
+       FROM creditos
+       WHERE saldo_precio > 0 AND plazo > 0`
+    );
+
+    let actualizados = 0;
+    let errores = 0;
+
+    for (const row of rows) {
+      try {
+        const calc = await calcularOperacion(row);
+        await pool.query(
+          `UPDATE creditos SET
+             comdea_real       = ?,
+             com_parque        = ?,
+             monto_comision_fin = ?,
+             com_rdh           = ?,
+             com_cesantia      = ?,
+             com_reparaciones  = ?,
+             ingreso_neto_total = ?
+           WHERE id = ?`,
+          [
+            calc.comdea_real,
+            calc.com_parque,
+            calc.monto_comision_fin,
+            calc.com_rdh,
+            calc.com_cesantia,
+            calc.com_reparaciones,
+            calc.ingreso_neto_total,
+            row.id,
+          ]
+        );
+        actualizados++;
+      } catch (e) {
+        console.error(`[recalc] id=${row.id}`, e.message);
+        errores++;
+      }
+    }
+
+    res.json({
+      success: true,
+      data: { total: rows.length, actualizados, errores },
+      error: null,
+    });
+  } catch (e) {
+    (console.error('[error]', e), res.status(500).json({ success: false, data: null, error: e.message }));
+  }
+};
+
+module.exports = { getAll, getOne, create, update, remove, nextOp, liberarPago, marcarNoOtorgado, recalcularComisiones };
