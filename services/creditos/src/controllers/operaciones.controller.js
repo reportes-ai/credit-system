@@ -426,63 +426,131 @@ const marcarNoOtorgado = async (req, res) => {
 };
 
 /* ─── POST /api/operaciones/recalcular-comisiones ──────────────────── */
-// Recalcula comdea_real, com_parque e ingreso_neto_total para todos los
-// registros que tienen saldo_precio y plazo. Solo Administrador.
+// Recalcula comdea_real, com_parque e ingreso_neto_total en batch.
+// Pre-carga params y UF una sola vez. UPDATEs en chunks de 500.
 const recalcularComisiones = async (req, res) => {
   try {
     const perfil = req.usuario?.perfil_nombre || '';
     if (perfil !== 'Administrador')
       return res.status(403).json({ success: false, data: null, error: 'Solo Administrador puede ejecutar el recálculo' });
 
+    // 1. Pre-cargar parámetros una sola vez
+    const [paramRows] = await pool.query('SELECT clave, valor FROM parametros_credito');
+    const p = {};
+    paramRows.forEach(r => { p[r.clave] = parseFloat(r.valor); });
+
+    // 2. Pre-cargar todas las UF necesarias en un Map fecha→valor
+    const [ufRows] = await pool.query('SELECT fecha, valor FROM uf');
+    const ufMap = {};
+    ufRows.forEach(r => { ufMap[r.fecha.toString().slice(0,10)] = parseFloat(r.valor); });
+
+    // 3. Traer todos los registros a recalcular
     const [rows] = await pool.query(
       `SELECT id, saldo_precio, plazo, financiera, parque, com_parque,
               seguro_rdh, seguro_cesantia, seguro_rep_menor,
               monto_financiado, fecha_otorgado, mes
-       FROM creditos
-       WHERE saldo_precio > 0 AND plazo > 0`
+       FROM creditos WHERE saldo_precio > 0 AND plazo > 0`
     );
 
-    let actualizados = 0;
-    let errores = 0;
+    // 4. Helpers inline (sin DB)
+    const getDealerPct = (plazo) => {
+      if (plazo <= 6)  return p.dealer_pct_6  / 100;
+      if (plazo <= 12) return p.dealer_pct_12 / 100;
+      if (plazo <= 24) return p.dealer_pct_24 / 100;
+      if (plazo <= 36) return p.dealer_pct_36 / 100;
+      return p.dealer_pct_99 / 100;
+    };
+    const getSegCom = (plazo) => {
+      if (plazo <= 6)  return { desg: p.seg_com_desg_6 /100, cesa: p.seg_com_cesa_6 /100 };
+      if (plazo <= 12) return { desg: p.seg_com_desg_12/100, cesa: p.seg_com_cesa_12/100 };
+      if (plazo <= 24) return { desg: p.seg_com_desg_24/100, cesa: p.seg_com_cesa_24/100 };
+      return             { desg: p.seg_com_desg_36/100, cesa: p.seg_com_cesa_36/100 };
+    };
 
-    for (const row of rows) {
-      try {
-        const calc = await calcularOperacion(row);
-        await pool.query(
-          `UPDATE creditos SET
-             comdea_real       = ?,
-             com_parque        = ?,
-             monto_comision_fin = ?,
-             com_rdh           = ?,
-             com_cesantia      = ?,
-             com_reparaciones  = ?,
-             ingreso_neto_total = ?
-           WHERE id = ?`,
-          [
-            calc.comdea_real,
-            calc.com_parque,
-            calc.monto_comision_fin,
-            calc.com_rdh,
-            calc.com_cesantia,
-            calc.com_reparaciones,
-            calc.ingreso_neto_total,
-            row.id,
-          ]
-        );
-        actualizados++;
-      } catch (e) {
-        console.error(`[recalc] id=${row.id}`, e.message);
-        errores++;
+    // 5. Calcular todo en memoria
+    const updates = rows.map(row => {
+      const saldo    = parseFloat(row.saldo_precio)    || 0;
+      const montoFin = parseFloat(row.monto_financiado) || 0;
+      const plazo    = parseInt(row.plazo)              || 0;
+      const fin      = (row.financiera || '').toUpperCase();
+      const esParque = !!(row.com_parque || (row.parque && row.parque !== 'NO APLICA'));
+      const uf       = ufMap[row.fecha_otorgado?.toString().slice(0,10)] || null;
+
+      // Comisión financiera (monto_comision_fin)
+      let monto_comision_fin = 0;
+      if (plazo > 0 && montoFin > 0) {
+        if (fin.includes('AUTOFIN') || fin.includes('AUTOF')) {
+          const tmc_menor  = (p.autofin_tmc_menor_200 / 100) / 12;
+          const tmc_mayor  = (p.autofin_tmc_mayor_200 / 100) / 12;
+          const spread     = p.autofin_spread_fondo / 100;
+          const costo_fondo = tmc_mayor - spread;
+          const limite_200  = uf ? 200 * uf : null;
+          const tasa_cli    = (limite_200 && montoFin > limite_200) ? tmc_mayor : tmc_menor;
+          if (tasa_cli > 0 && costo_fondo > 0) {
+            const cuota = montoFin * tasa_cli * Math.pow(1+tasa_cli,plazo) / (Math.pow(1+tasa_cli,plazo)-1);
+            const pv    = cuota * (1 - Math.pow(1+costo_fondo,-plazo)) / costo_fondo;
+            monto_comision_fin = Math.round(pv - montoFin);
+          }
+        } else if (fin.includes('UNIDAD') || fin.includes('UAC')) {
+          monto_comision_fin = Math.round(saldo * (p.uac_pct_tier1 / 100));
+        }
       }
+
+      // Comisión seguros
+      let com_rdh = 0, com_cesantia = 0;
+      const primaDesg = parseFloat(row.seguro_rdh) || 0;
+      if (plazo > 0 && primaDesg > 0 && !fin.includes('UNIDAD') && !fin.includes('UAC')) {
+        const { desg, cesa } = getSegCom(plazo);
+        com_rdh      = Math.round(desg * primaDesg);
+        com_cesantia = Math.round(cesa * primaDesg);
+      }
+
+      // Comisión dealer
+      let comdea_real = 0, com_parque_calc = 0;
+      if (saldo > 0 && plazo > 0) {
+        const dealer_pct = getDealerPct(plazo);
+        const patio_pct  = p.patio_pct / 100;
+        comdea_real     = Math.round(saldo * dealer_pct);
+        com_parque_calc = esParque ? Math.round(saldo * patio_pct) : 0;
+      }
+
+      const ingreso_neto_total = monto_comision_fin + com_rdh + com_cesantia - comdea_real - com_parque_calc;
+
+      return [comdea_real, com_parque_calc, monto_comision_fin, com_rdh, com_cesantia, ingreso_neto_total, row.id];
+    });
+
+    // 6. UPDATE en chunks de 500 con CASE WHEN
+    const CHUNK = 500;
+    let actualizados = 0;
+    for (let i = 0; i < updates.length; i += CHUNK) {
+      const chunk = updates.slice(i, i + CHUNK);
+      const ids   = chunk.map(u => u[6]);
+      const mkCase = (idx) => 'CASE id ' + chunk.map(u => `WHEN ${u[6]} THEN ?`).join(' ') + ' END';
+      const vals  = [
+        ...chunk.map(u => u[0]), // comdea_real
+        ...chunk.map(u => u[1]), // com_parque
+        ...chunk.map(u => u[2]), // monto_comision_fin
+        ...chunk.map(u => u[3]), // com_rdh
+        ...chunk.map(u => u[4]), // com_cesantia
+        ...chunk.map(u => u[5]), // ingreso_neto_total
+        ...ids,
+      ];
+      const sql = `UPDATE creditos SET
+        comdea_real        = CASE id ${chunk.map(u=>`WHEN ${u[6]} THEN ?`).join(' ')} END,
+        com_parque         = CASE id ${chunk.map(u=>`WHEN ${u[6]} THEN ?`).join(' ')} END,
+        monto_comision_fin = CASE id ${chunk.map(u=>`WHEN ${u[6]} THEN ?`).join(' ')} END,
+        com_rdh            = CASE id ${chunk.map(u=>`WHEN ${u[6]} THEN ?`).join(' ')} END,
+        com_cesantia       = CASE id ${chunk.map(u=>`WHEN ${u[6]} THEN ?`).join(' ')} END,
+        ingreso_neto_total = CASE id ${chunk.map(u=>`WHEN ${u[6]} THEN ?`).join(' ')} END
+        WHERE id IN (${ids.map(()=>'?').join(',')})`;
+      await pool.query(sql, vals);
+      actualizados += chunk.length;
     }
 
-    res.json({
-      success: true,
-      data: { total: rows.length, actualizados, errores },
-      error: null,
-    });
+    res.json({ success: true, data: { total: rows.length, actualizados }, error: null });
   } catch (e) {
-    (console.error('[error]', e), res.status(500).json({ success: false, data: null, error: e.message }));
+    console.error('[recalc]', e);
+    res.status(500).json({ success: false, data: null, error: e.message });
   }
 };
 
