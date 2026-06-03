@@ -48,6 +48,7 @@ app.use('/api/tipos-documento',      require('../../services/mantenedores/src/ro
 app.use('/api/plantillas-documento', require('../../services/mantenedores/src/routes/plantillas.routes'));
 app.use('/api/cuentas-bancarias',    require('../../services/mantenedores/src/routes/cuentas-bancarias.routes'));
 app.use('/api/parques-comisiones',   require('../../services/mantenedores/src/routes/parques.routes'));
+app.use('/api/bd-operaciones',       require('../../services/mantenedores/src/routes/bd-operaciones.routes'));
 
 // Cotizaciones
 app.use('/api/cotizaciones', require('../../services/cotizaciones/src/routes/cotizaciones.routes'));

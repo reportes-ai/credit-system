@@ -1,6 +1,7 @@
 'use strict';
 const pool = require('../../../../shared/config/database');
 const XLSX = require('xlsx');
+const { calcularComisionFin } = require('../utils/calcular-comision-fin');
 
 /* ── Asegurar columnas extra en operaciones_brokerage ──────────────────── */
 (async () => {
@@ -21,6 +22,11 @@ function norm(v) {
   const s = String(v).trim();
   if (s === '' || s.toUpperCase() === 'NO APLICA' || s === '0' && false) return null;
   return s;
+}
+function normRut(v) {
+  const s = norm(v);
+  if (!s) return null;
+  return s.replace(/\./g, '').toUpperCase();
 }
 function normNum(v) {
   const s = norm(v);
@@ -75,7 +81,7 @@ function mapRow(row, mesOverride) {
       }
       return mesOverride || null;
     })(),
-    rut_cliente:        s('RUT'),
+    rut_cliente:        normRut(getCol(row, 'RUT')),
     nombre_cliente:     s('NOMBRE'),
     comentarios:        s('COMENTARIOS'),
     ejecutivo:          s('EJ.COMERCIAL'),
@@ -214,6 +220,8 @@ const importar = async (req, res) => {
 
     let insertados = 0;
     let errores    = [];
+    // Rastrear ops insertadas sin monto_comision_fin para recalcular post-insert
+    const sinComisionFin = [];
 
     for (const row of nuevos) {
       try {
@@ -229,8 +237,23 @@ const importar = async (req, res) => {
           vals
         );
         insertados++;
+
+        // Si el Excel no traía monto_comision_fin, marcar para recalcular
+        if (obj.monto_comision_fin === null || obj.monto_comision_fin === undefined) {
+          sinComisionFin.push({ num_op: obj.num_op, mes: obj.mes, financiera: obj.financiera });
+        }
       } catch (e) {
         errores.push({ op: row['OP'], error: e.message });
+      }
+    }
+
+    // ── Recálculo post-insert de monto_comision_fin ─────────────────────
+    let recalculados = 0;
+    if (sinComisionFin.length > 0) {
+      try {
+        recalculados = await calcularComisionFin(sinComisionFin);
+      } catch (e) {
+        console.error('[recalc comision fin]', e.message);
       }
     }
 
@@ -241,6 +264,7 @@ const importar = async (req, res) => {
         ya_existentes:   setExistentes.size,
         nuevos_intentados: nuevos.length,
         insertados,
+        recalculados_comision_fin: recalculados,
         errores,
       },
       error: null,

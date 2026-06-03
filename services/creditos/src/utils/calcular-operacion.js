@@ -108,8 +108,8 @@ async function calcularOperacion(op) {
     }
   }
 
-  // ── 2. Ingreso por seguros ─────────────────────────────────────────
-  if (plazo > 0 && primaDesg > 0) {
+  // ── 2. Ingreso por seguros (UNIDAD/UAC no paga comisión de seguros) ──
+  if (plazo > 0 && primaDesg > 0 && !financiera.includes('UNIDAD') && !financiera.includes('UAC')) {
     const { desg, cesa } = getSegCom(plazo, p);
     com_rdh      = Math.round(desg * primaDesg);  // comisión desgravamen
     com_cesantia = Math.round(cesa * primaDesg);  // comisión cesantía

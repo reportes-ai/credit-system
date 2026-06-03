@@ -213,6 +213,7 @@ const create = async (req, res) => {
     const b = req.body;
     if (!b.financiera) return res.status(400).json({ success: false, data: null, error: 'financiera requerida' });
     if (!b.rut_cliente) return res.status(400).json({ success: false, data: null, error: 'RUT cliente requerido' });
+    b.rut_cliente = b.rut_cliente.replace(/\./g, '').toUpperCase().trim();
 
     // Auto-asignar numero_credito si no viene del formulario
     if (!b.numero_credito) {
@@ -284,6 +285,7 @@ const update = async (req, res) => {
     const [[exists]] = await pool.query('SELECT id FROM operaciones_brokerage WHERE id = ?', [id]);
     if (!exists) return res.status(404).json({ success: false, data: null, error: 'No encontrada' });
 
+    if (b.rut_cliente) b.rut_cliente = b.rut_cliente.replace(/\./g, '').toUpperCase().trim();
     const { saldo_precio, pct_financiado } = calcular(b);
 
     const sets = [
