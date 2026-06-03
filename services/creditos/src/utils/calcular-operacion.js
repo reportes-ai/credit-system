@@ -66,7 +66,8 @@ async function calcularOperacion(op) {
   const monto_fin     = parseFloat(op.monto_financiado) || 0;
   const plazo         = parseInt(op.plazo)              || 0;
   const financiera    = (op.financiera || '').toUpperCase();
-  const esParque      = !!(op.com_parque || (op.parque && op.parque !== 'NO APLICA'));
+  const parqueVal     = (op.parque || '').toUpperCase().trim();
+  const esParque      = parqueVal.includes('PARQUE');
 
   // Seguros activos
   const primaDesg = parseFloat(op.seguro_rdh)     || 0; // campo seguro_rdh = desgravamen prima

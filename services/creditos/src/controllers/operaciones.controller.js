@@ -473,7 +473,8 @@ const recalcularComisiones = async (req, res) => {
       const montoFin = parseFloat(row.monto_financiado) || 0;
       const plazo    = parseInt(row.plazo)              || 0;
       const fin      = (row.financiera || '').toUpperCase();
-      const esParque = !!(row.com_parque || (row.parque && row.parque !== 'NO APLICA'));
+      const parqueVal = (row.parque || '').toUpperCase().trim();
+      const esParque  = parqueVal.includes('PARQUE');
       const uf       = ufMap[row.fecha_otorgado?.toString().slice(0,10)] || null;
 
       // Comisión financiera (monto_comision_fin)
