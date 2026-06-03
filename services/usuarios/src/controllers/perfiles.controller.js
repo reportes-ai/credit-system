@@ -824,4 +824,49 @@ const getUsuariosByPerfil = async (req, res) => {
   }
 })();
 
+/* ─── Migración v9: Solo Dios + limpiar duplicados viejos ────────────────── */
+(async () => {
+  try {
+    const [perfiles] = await pool.query('SELECT id_perfil, nombre FROM perfiles');
+    const [[admin]]  = await pool.query("SELECT id_perfil FROM perfiles WHERE nombre='Administrador' LIMIT 1");
+
+    // 1) Agregar "Solo Dios" en Mantenedores (solo Administrador)
+    const [[mod]] = await pool.query("SELECT id_modulo FROM modulos WHERE nombre='Mantenedores' AND estado='activo'");
+    if (mod) {
+      const [[ex]] = await pool.query("SELECT id_funcionalidad FROM funcionalidades WHERE codigo='mantenedores_solo_dios'");
+      let id_func;
+      if (ex) {
+        id_func = ex.id_funcionalidad;
+      } else {
+        const [ins] = await pool.query(
+          'INSERT INTO funcionalidades (id_modulo, nombre, codigo) VALUES (?,?,?)',
+          [mod.id_modulo, 'Solo Dios', 'mantenedores_solo_dios']
+        );
+        id_func = ins.insertId;
+      }
+      for (const p of perfiles) {
+        const hab = p.nombre === 'Administrador' ? 1 : 0;
+        await pool.query(
+          'INSERT IGNORE INTO permisos_perfil (id_perfil, id_funcionalidad, habilitado) VALUES (?,?,?)',
+          [p.id_perfil, id_func, hab]
+        );
+      }
+    }
+
+    // 2) Administrador: habilitar TODAS (incluye Solo Dios recién creada)
+    if (admin) {
+      await pool.query(
+        `INSERT INTO permisos_perfil (id_perfil, id_funcionalidad, habilitado)
+         SELECT ?, id_funcionalidad, 1 FROM funcionalidades
+         ON DUPLICATE KEY UPDATE habilitado = 1`,
+        [admin.id_perfil]
+      );
+    }
+
+    console.log('✓ Perfiles v9: Solo Dios agregado, duplicados eliminados');
+  } catch (e) {
+    console.error('[perfiles migration v9]', e.message);
+  }
+})();
+
 module.exports = { getAllPerfiles, getModulosConFuncionalidades, getPermisosPerfil, updatePermisosPerfil, reordenarModulos, createPerfil, deletePerfil, getUsuariosByPerfil };
