@@ -824,23 +824,41 @@ const getUsuariosByPerfil = async (req, res) => {
   }
 })();
 
-/* ─── Migración v9: Solo Dios + limpiar duplicados viejos ────────────────── */
+/* ─── Migración v9: nombres exactos por card + Solo Dios + limpiar dupl. ─── */
 (async () => {
   try {
     const [perfiles] = await pool.query('SELECT id_perfil, nombre FROM perfiles');
     const [[admin]]  = await pool.query("SELECT id_perfil FROM perfiles WHERE nombre='Administrador' LIMIT 1");
 
-    // 1) Agregar "Solo Dios" en Mantenedores (solo Administrador)
-    const [[mod]] = await pool.query("SELECT id_modulo FROM modulos WHERE nombre='Mantenedores' AND estado='activo'");
-    if (mod) {
-      const [[ex]] = await pool.query("SELECT id_funcionalidad FROM funcionalidades WHERE codigo='mantenedores_solo_dios'");
+    // 1) Renombrar funcionalidades para que coincidan EXACTAMENTE con el nombre de la card
+    const renombres = [
+      // Mantenedores
+      ['mantenedores_parques',             'Arriendo y Comisión Parques'],
+      ['mantenedores_flujo_brokerage',     'Flujo Crédito Brokerage'],
+      ['mantenedores_broker_validaciones', 'Documentos a Validar Brokers'],
+      ['mantenedores_financieras',         'Fórmulas Financieras'],
+      ['mantenedores_comisiones_seguro',   'Comisiones de Seguro'],
+      ['mantenedores_solo_dios',           'SOLO DIOS'],
+      ['mantenedores_pagares',             'Pagarés Autofacil'],
+      // Comisión Ejecutivos
+      ['comisiones_variables',             'Mantenedor Variables Comisiones'],
+      ['comisiones_revision',              'Revisión y Aprobación Comisiones'],
+    ];
+    for (const [codigo, nombre] of renombres) {
+      await pool.query('UPDATE funcionalidades SET nombre=? WHERE codigo=?', [nombre, codigo]);
+    }
+
+    // 2) Agregar "SOLO DIOS" si no existe
+    const [[modMan]] = await pool.query("SELECT id_modulo FROM modulos WHERE nombre='Mantenedores' AND estado='activo'");
+    if (modMan) {
+      const [[exSD]] = await pool.query("SELECT id_funcionalidad FROM funcionalidades WHERE codigo='mantenedores_solo_dios'");
       let id_func;
-      if (ex) {
-        id_func = ex.id_funcionalidad;
+      if (exSD) {
+        id_func = exSD.id_funcionalidad;
       } else {
         const [ins] = await pool.query(
           'INSERT INTO funcionalidades (id_modulo, nombre, codigo) VALUES (?,?,?)',
-          [mod.id_modulo, 'Solo Dios', 'mantenedores_solo_dios']
+          [modMan.id_modulo, 'SOLO DIOS', 'mantenedores_solo_dios']
         );
         id_func = ins.insertId;
       }
@@ -853,7 +871,18 @@ const getUsuariosByPerfil = async (req, res) => {
       }
     }
 
-    // 2) Administrador: habilitar TODAS (incluye Solo Dios recién creada)
+    // 3) Eliminar duplicados viejos por nombre (los que v4 no alcanzó a renombrar)
+    //    Primero sacamos sus ids para borrar también los permisos
+    const [dups] = await pool.query(
+      "SELECT id_funcionalidad FROM funcionalidades WHERE nombre IN ('Gestionar Tasas','Gestionar UF')"
+    );
+    if (dups.length) {
+      const ids = dups.map(r => r.id_funcionalidad);
+      await pool.query('DELETE FROM permisos_perfil WHERE id_funcionalidad IN (?)', [ids]);
+      await pool.query('DELETE FROM funcionalidades   WHERE id_funcionalidad IN (?)', [ids]);
+    }
+
+    // 4) Administrador: habilitar TODAS
     if (admin) {
       await pool.query(
         `INSERT INTO permisos_perfil (id_perfil, id_funcionalidad, habilitado)
@@ -863,7 +892,7 @@ const getUsuariosByPerfil = async (req, res) => {
       );
     }
 
-    console.log('✓ Perfiles v9: Solo Dios agregado, duplicados eliminados');
+    console.log('✓ Perfiles v9: nombres alineados con cards, Solo Dios agregado, duplicados eliminados');
   } catch (e) {
     console.error('[perfiles migration v9]', e.message);
   }
