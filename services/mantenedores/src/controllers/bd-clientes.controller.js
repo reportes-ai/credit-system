@@ -1,11 +1,11 @@
 'use strict';
 const pool = require('../../../../shared/config/database');
 
-/* "nombre" vacío (usa "nombres"). "correo" migrado a "email". Ambos excluidos. */
-const EXCLUIR = ['nombre', 'correo'];
+/* Campos duplicados/vacíos excluidos de la vista */
+const EXCLUIR = ['nombre', 'correo', 'telefono'];
 
-/* Orden preferido de columnas: las primeras van al inicio, el resto en orden natural */
-const COL_ORDER = ['id_cliente','rut','nombres','apellido_paterno','apellido_materno','nombre_completo'];
+/* Orden preferido de columnas */
+const COL_ORDER = ['id_cliente','rut','nombres','apellido_paterno','apellido_materno','nombre_completo','email','telefono_movil'];
 
 const DATE_FIELDS = ['fecha_creacion','fecha_nacimiento','fecha_visa',
   'fecha_inicio_actividad','fecha_actualizacion'];
