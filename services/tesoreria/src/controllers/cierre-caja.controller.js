@@ -55,8 +55,8 @@ const getCierre = async (req, res) => {
       pc.id_cuenta_bancaria, pc.comentario_reverso,
       pc.registrado_por, pc.id_registrado_por,
       c.numero_credito,
-      COALESCE(cl.nombre_completo, c.nombre_cliente) AS nombre_cliente,
-      COALESCE(cl.rut,             c.rut_cliente)    AS rut_cliente,
+      COALESCE(cl.nombre_completo, '') AS nombre_cliente,
+      COALESCE(cl.rut,             '') AS rut_cliente,
       TRIM(CONCAT(COALESCE(u.nombre,''),' ',COALESCE(u.apellido,''))) AS nombre_cajero,
       pr.nombre AS perfil_cajero,
       COALESCE(pc.id_caja, cu.id_caja) AS id_caja,
@@ -115,8 +115,8 @@ const getCierre = async (req, res) => {
           pc.reversado_por    AS registrado_por,
           pc.id_reversado_por AS id_registrado_por,
           c.numero_credito,
-          COALESCE(cl2.nombre_completo, c.nombre_cliente) AS nombre_cliente,
-          COALESCE(cl2.rut,             c.rut_cliente)    AS rut_cliente,
+          COALESCE(cl2.nombre_completo, '') AS nombre_cliente,
+          COALESCE(cl2.rut,             '') AS rut_cliente,
           TRIM(CONCAT(COALESCE(ur.nombre,''),' ',COALESCE(ur.apellido,''))) AS nombre_cajero,
           prr.nombre AS perfil_cajero,
           COALESCE(pc.id_caja, cu2.id_caja) AS id_caja,
@@ -149,8 +149,8 @@ const getCierre = async (req, res) => {
           ROUND(ct.monto_original - ct.monto_utilizado, 2) AS saldo,
           ct.glosa, ct.estado, ct.created_at,
           c.numero_credito,
-          COALESCE(cl3.nombre_completo, c.nombre_cliente) AS nombre_cliente,
-          COALESCE(cl3.rut,             c.rut_cliente)    AS rut_cliente
+          COALESCE(cl3.nombre_completo, '') AS nombre_cliente,
+          COALESCE(cl3.rut,             '') AS rut_cliente
        FROM cuentas_transitorias ct
        LEFT JOIN creditos  c   ON ct.id_credito = c.id
        LEFT JOIN clientes  cl3 ON cl3.id_cliente = c.id_cliente
@@ -165,10 +165,11 @@ const getCierre = async (req, res) => {
     if (idsTransitorias.length) {
       const [cart] = await pool.query(
         `SELECT tc.*, ct.glosa AS glosa_transitoria,
-                c.numero_credito, c.nombre_cliente
+                c.numero_credito, COALESCE(cl_tc.nombre_completo,'') AS nombre_cliente
          FROM transitorias_cartola tc
          LEFT JOIN cuentas_transitorias ct ON tc.id_transitoria = ct.id_transitoria
          LEFT JOIN creditos c ON tc.id_credito = c.id_credito
+         LEFT JOIN clientes cl_tc ON cl_tc.id_cliente = c.id_cliente
          WHERE tc.id_transitoria IN (${idsTransitorias.map(() => '?').join(',')})
          ORDER BY tc.created_at ASC`,
         idsTransitorias

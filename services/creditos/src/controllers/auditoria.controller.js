@@ -41,8 +41,8 @@ const backfill = async (req, res) => {
     /* ── 1. Créditos creados ─────────────────────────────────────────────── */
     const [creditos] = await pool.query(
       `SELECT c.id_credito, c.numero_credito,
-              COALESCE(cl.nombre_completo, c.nombre_cliente) AS nombre_cliente,
-              COALESCE(cl.rut,             c.rut_cliente)    AS rut_cliente,
+              COALESCE(cl.nombre_completo, '') AS nombre_cliente,
+              COALESCE(cl.rut,             '') AS rut_cliente,
               c.financiera, c.monto_financiado, c.estado, c.created_at,
               c.id_usuario,
               TRIM(CONCAT(COALESCE(u.nombre,''), ' ', COALESCE(u.apellido,''))) AS usr_nombre,

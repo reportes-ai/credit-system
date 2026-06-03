@@ -186,8 +186,8 @@ const getCalculo = async (req, res) => {
               ob.monto_financiado, ob.plazo, ob.seguro_cesantia, ob.seguro_rep_menor,
               ob.seguro_rdh, ob.valor_vehiculo, ob.pie, ob.saldo_precio,
               ob.fecha_otorgado, ob.num_op,
-              COALESCE(cl.nombre_completo, ob.nombre_cliente) AS nombre_cliente,
-              COALESCE(cl.rut, ob.rut_cliente)                AS rut_cliente
+              COALESCE(cl.nombre_completo, '') AS nombre_cliente,
+              COALESCE(cl.rut, '')             AS rut_cliente
        FROM creditos ob
        LEFT JOIN clientes cl ON cl.id_cliente = ob.id_cliente
        WHERE DATE_FORMAT(COALESCE(ob.fecha_otorgado, ob.mes), '%Y-%m') = ?

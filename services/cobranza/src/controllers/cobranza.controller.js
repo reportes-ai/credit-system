@@ -73,8 +73,8 @@ const CV = `LEAST(c.plazo,
 const MORA_SQL = (whereExtra = '', havingExtra = '') => `
   SELECT
     c.*,
-    COALESCE(cl_m.rut,             c.rut_cliente)    AS rut_cliente,
-    COALESCE(cl_m.nombre_completo, c.nombre_cliente) AS nombre_cliente,
+    COALESCE(cl_m.rut,             '')    AS rut_cliente,
+    COALESCE(cl_m.nombre_completo, '') AS nombre_cliente,
     COALESCE(pp.cnt, 0)                        AS cuotas_pagadas,
     GREATEST(0, ${CV} - COALESCE(pp.cnt, 0))   AS cuotas_mora,
     GREATEST(0, ${CV} - COALESCE(pp.cnt, 0)) * COALESCE(c.cuota, 0) AS monto_mora,
@@ -118,8 +118,8 @@ const MORA_CREDITO_SQL = `
                  INTERVAL COALESCE(pp.cnt, 0) MONTH))
       ELSE 0
     END AS dias_mora,
-    COALESCE(cl.rut,             c.rut_cliente)    AS rut_cliente,
-    COALESCE(cl.nombre_completo, c.nombre_cliente) AS nombre_cliente,
+    COALESCE(cl.rut,             '') AS rut_cliente,
+    COALESCE(cl.nombre_completo, '') AS nombre_cliente,
     cl.sexo           AS sexo_cliente,
     cl.telefono_movil AS telefono_movil,
     cl.email          AS email_cliente
@@ -243,7 +243,7 @@ exports.cartera = async (req, res) => {
     const qParams = [];
     let whereQ = '';
     if (q) {
-      whereQ = 'AND (COALESCE(cl_m.nombre_completo, c.nombre_cliente) LIKE ? OR COALESCE(cl_m.rut, c.rut_cliente) LIKE ? OR c.numero_credito LIKE ?)';
+      whereQ = 'AND (COALESCE(cl_m.nombre_completo, \'\') LIKE ? OR COALESCE(cl_m.rut, \'\') LIKE ? OR c.numero_credito LIKE ?)';
       qParams.push(`%${q}%`, `%${q}%`, `%${q}%`);
     }
 
@@ -546,18 +546,23 @@ exports.misGestiones = async (req, res) => {
 
     // Promesas pendientes y vencidas
     const [promesas] = await pool.query(`
-      SELECT g.*, c.numero_credito, c.nombre_cliente, c.rut_cliente
+      SELECT g.*, c.numero_credito,
+             COALESCE(cl.nombre_completo,'') AS nombre_cliente,
+             COALESCE(cl.rut,'') AS rut_cliente
       FROM cobranza_gestiones g
       LEFT JOIN creditos c ON c.id_credito = g.id_credito
+      LEFT JOIN clientes cl ON cl.id_cliente = c.id_cliente
       WHERE g.id_usuario = ? AND g.resultado = 'PROMESA_PAGO'
         AND g.fecha_promesa IS NOT NULL AND g.fecha_promesa >= CURDATE()
       ORDER BY g.fecha_promesa ASC
     `, [idUsuario]);
 
     const [promesasVencidas] = await pool.query(`
-      SELECT g.*, c.numero_credito, c.nombre_cliente
+      SELECT g.*, c.numero_credito,
+             COALESCE(cl.nombre_completo,'') AS nombre_cliente
       FROM cobranza_gestiones g
       LEFT JOIN creditos c ON c.id_credito = g.id_credito
+      LEFT JOIN clientes cl ON cl.id_cliente = c.id_cliente
       WHERE g.id_usuario = ? AND g.resultado = 'PROMESA_PAGO'
         AND g.fecha_promesa IS NOT NULL AND g.fecha_promesa < CURDATE()
       ORDER BY g.fecha_promesa DESC LIMIT 20

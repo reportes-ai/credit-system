@@ -288,7 +288,10 @@ const createBatch = async (req, res) => {
     let transitoria = null;
     if (exceso > 0) {
       const [[cred]] = await conn.query(
-        'SELECT numero_credito, rut_cliente, nombre_cliente FROM creditos WHERE id_credito = ?',
+        `SELECT c.numero_credito, COALESCE(cl.rut,'') AS rut_cliente,
+                COALESCE(cl.nombre_completo,'') AS nombre_cliente
+         FROM creditos c LEFT JOIN clientes cl ON cl.id_cliente = c.id_cliente
+         WHERE c.id_credito = ?`,
         [id_credito]
       );
       const [trIns] = await conn.query(
@@ -417,7 +420,9 @@ const reversar = async (req, res) => {
       const totalReversado = parseFloat(pago.total_pagado) || 0;
       if (totalReversado > 0) {
         const [[cred]] = await conn.query(
-          'SELECT rut_cliente, nombre_cliente FROM creditos WHERE id_credito = ?',
+          `SELECT COALESCE(cl.rut,'') AS rut_cliente, COALESCE(cl.nombre_completo,'') AS nombre_cliente
+           FROM creditos c LEFT JOIN clientes cl ON cl.id_cliente = c.id_cliente
+           WHERE c.id_credito = ?`,
           [pago.id_credito]
         );
         const [trIns] = await conn.query(

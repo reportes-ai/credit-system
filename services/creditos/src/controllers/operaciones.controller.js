@@ -173,8 +173,8 @@ const getAll = async (req, res) => {
     const w = where.length ? 'WHERE ' + where.join(' AND ') : '';
     const [rows] = await pool.query(
       `SELECT ob.*,
-              COALESCE(cl.rut,             ob.rut_cliente)    AS rut_cliente,
-              COALESCE(cl.nombre_completo, ob.nombre_cliente) AS nombre_cliente
+              COALESCE(cl.rut,             '') AS rut_cliente,
+              COALESCE(cl.nombre_completo, '') AS nombre_cliente
        FROM creditos ob
        LEFT JOIN clientes cl ON cl.id_cliente = ob.id_cliente
        ${w} ORDER BY ob.mes DESC, ob.num_op DESC LIMIT ? OFFSET ?`,
@@ -190,8 +190,8 @@ const getAll = async (req, res) => {
 const getOne = async (req, res) => {
   try {
     const [[row]] = await pool.query(
-      `SELECT ob.*, COALESCE(cl.rut, ob.rut_cliente) AS rut_cliente,
-              COALESCE(cl.nombre_completo, ob.nombre_cliente) AS nombre_cliente
+      `SELECT ob.*, COALESCE(cl.rut, '') AS rut_cliente,
+              COALESCE(cl.nombre_completo, '') AS nombre_cliente
        FROM creditos ob
        LEFT JOIN clientes cl ON cl.id_cliente = ob.id_cliente
        WHERE ob.id = ?`, [req.params.id]);

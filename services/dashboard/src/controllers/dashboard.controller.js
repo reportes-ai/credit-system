@@ -185,8 +185,8 @@ exports.getDatos = async (req, res) => {
         COALESCE(estado_sp, '')                               AS estado_sp,
         COALESCE(status_comaf, '')                            AS status_comaf,
         COALESCE(resultado_negocio, '')                       AS resultado_negocio,
-        COALESCE(cl.rut, ob.rut_cliente, '')                  AS rut_cliente,
-        COALESCE(cl.nombre_completo, ob.nombre_cliente, '')   AS nombre_cliente,
+        COALESCE(cl.rut, '')                                  AS rut_cliente,
+        COALESCE(cl.nombre_completo, '')                      AS nombre_cliente,
         COALESCE(ob.rut_concesionario, '')                    AS rut_dealer
       FROM creditos ob
       LEFT JOIN clientes cl ON cl.id_cliente = ob.id_cliente

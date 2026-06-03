@@ -56,42 +56,6 @@ const audit = require('../../../../shared/auditoria');
         AND (financiera IS NULL OR financiera NOT IN ('AUTOFIN', 'UNIDAD DE CREDITO'))
     `);
 
-    // VIEW creditos → creditos
-    // Todos los módulos (cobranza, tesorería, auditoría, pagos, CRM)
-    // siguen usando "FROM creditos" sin cambios.
-    await pool.query(`
-      CREATE OR REPLACE VIEW creditos AS
-      SELECT
-        id                                                          AS id_credito,
-        COALESCE(numero_credito, CONCAT('OP-', num_op))             AS numero_credito,
-        rut_cliente,
-        nombre_cliente,
-        financiera,
-        financiera                                                  AS empresa,
-        COALESCE(estado,
-          CASE
-            WHEN financiera IN ('AUTOFIN','UNIDAD DE CREDITO') AND estado_eval = 'OTORGADO' THEN 'OTORGADO'
-            WHEN estado_credito = 'OTORGADO' THEN 'VIGENTE'
-            WHEN estado_eval    = 'OTORGADO' THEN 'VIGENTE'
-            WHEN estado_eval IN ('RECHAZADO','ANULADO') THEN 'CANCELADO'
-            ELSE COALESCE(estado_credito, estado_eval)
-          END)                                                      AS estado,
-        fecha_otorgado                                              AS fecha_otorgamiento,
-        valor_vehiculo, pie, saldo_precio, monto_financiado,
-        plazo, tascli_real AS tasa_mensual, cuota, fecha_primera_cuota,
-        tipo_vehiculo, marca, modelo, anio,
-        patente, color, motor, chasis, transmision, combustible,
-        tasacion, permiso_circulacion,
-        automotora                                                  AS dealer,
-        ejecutivo,
-        observaciones,
-        datos_json,
-        id_dealer, id_cliente, id_usuario, id_cotizacion,
-        estado_eval,
-        mes,
-        created_at, updated_at
-      FROM creditos
-    `);
   } catch (e) {
     if (e.errno !== 1050) console.error('[creditos migration]', e.message);
   }
@@ -118,8 +82,8 @@ const SELECT_GESTION = `
   SELECT
     ob.id                                                      AS id_credito,
     COALESCE(ob.numero_credito, CONCAT('OP-',ob.num_op))       AS numero_credito,
-    COALESCE(cl.rut,             ob.rut_cliente)    AS rut_cliente,
-    COALESCE(cl.nombre_completo, ob.nombre_cliente) AS nombre_cliente,
+    COALESCE(cl.rut,             '')    AS rut_cliente,
+    COALESCE(cl.nombre_completo, '')   AS nombre_cliente,
     COALESCE(ob.financiera, 'AUTOFACIL')                       AS financiera,
     COALESCE(ob.estado,
       CASE
@@ -186,12 +150,17 @@ const create = async (req, res) => {
       id_financiera, rut_concesionario, vendedor, comision_dealer,
     } = req.body;
 
-    if (!rut_cliente || !nombre_cliente)
-      return res.status(400).json({ success: false, data: null, error: 'rut_cliente y nombre_cliente son requeridos' });
+    if (!rut_cliente)
+      return res.status(400).json({ success: false, data: null, error: 'rut_cliente es requerido' });
 
     const numero_credito = await generarNumero();
     const id_usuario = req.usuario?.id_usuario || null;
     const fin = financiera || 'AUTOFACIL';
+
+    // Resolver id_cliente
+    const rutNorm = rut_cliente.replace(/\./g, '').toUpperCase().trim();
+    const [[cliRow]] = await pool.query('SELECT id_cliente FROM clientes WHERE rut = ?', [rutNorm]);
+    const id_cliente_resolved = cliRow?.id_cliente || null;
 
     // saldo_precio calculado si no viene
     const saldo = saldo_precio || (valor_vehiculo && pie ? (valor_vehiculo - pie) : null);
@@ -199,9 +168,9 @@ const create = async (req, res) => {
 
     const [r] = await pool.query(`
       INSERT INTO creditos
-        (numero_credito, rut_cliente, nombre_cliente, financiera,
+        (numero_credito, financiera,
          estado_eval, estado,
-         id_cotizacion, id_usuario,
+         id_cotizacion, id_usuario, id_cliente,
          fecha_otorgado, mes,
          valor_vehiculo, pie, saldo_precio, pct_financiado, monto_financiado,
          plazo, tascli_real, cuota, fecha_primera_cuota,
@@ -212,9 +181,9 @@ const create = async (req, res) => {
          ejecutivo, observaciones, datos_json, id_financiera,
          rut_concesionario, vendedor, comdea_real,
          created_at, updated_at)
-      VALUES (?,?,?,?,
+      VALUES (?,?,
               'OTORGADO',?,
-              ?,?,
+              ?,?,?,
               ?,DATE_FORMAT(COALESCE(?, NOW()), '%Y-%m-01'),
               ?,?,?,?,?,
               ?,?,?,?,
@@ -226,9 +195,9 @@ const create = async (req, res) => {
               ?,?,?,
               NOW(), NOW())
     `, [
-      numero_credito, rut_cliente.toUpperCase().trim(), nombre_cliente.trim(), fin,
+      numero_credito, fin,
       estado || 'INGRESO',
-      id_cotizacion || null, id_usuario,
+      id_cotizacion || null, id_usuario, id_cliente_resolved,
       fecha_otorgamiento || null, fecha_otorgamiento || null,
       valor_vehiculo || null, pie || null, saldo || null, pct || null, monto_financiado || null,
       plazo || null, tasa_mensual || null, cuota || null, fecha_primera_cuota || null,
@@ -272,8 +241,8 @@ const getAll = async (req, res) => {
       const qNorm = q.trim().toUpperCase().replace(/\./g, '');
       const like  = `%${qNorm}%`;
       sql += ` AND (
-        UPPER(REPLACE(COALESCE(cl.rut, ob.rut_cliente),'.',''))           LIKE ? OR
-        UPPER(COALESCE(cl.nombre_completo, ob.nombre_cliente))           LIKE ? OR
+        UPPER(REPLACE(COALESCE(cl.rut, ''),'.',''))      LIKE ? OR
+        UPPER(COALESCE(cl.nombre_completo, ''))          LIKE ? OR
         UPPER(COALESCE(ob.numero_credito, CONCAT('OP-',ob.num_op)))      LIKE ?
       )`;
       params.push(like, like, like);
@@ -298,8 +267,8 @@ const getById = async (req, res) => {
               ob.automotora                                         AS dealer,
               ob.tascli_real                                        AS tasa_mensual,
               ob.fecha_otorgado                                     AS fecha_otorgamiento,
-              COALESCE(cl.rut,             ob.rut_cliente)          AS rut_cliente,
-              COALESCE(cl.nombre_completo, ob.nombre_cliente)       AS nombre_cliente
+              COALESCE(cl.rut,             '') AS rut_cliente,
+              COALESCE(cl.nombre_completo, '') AS nombre_cliente
        FROM creditos ob
        LEFT JOIN clientes cl ON cl.id_cliente = ob.id_cliente
        WHERE ob.id = ?`,
@@ -333,7 +302,7 @@ const update = async (req, res) => {
 
     const [prev] = await pool.query(
       `SELECT c.estado, c.numero_credito,
-              COALESCE(cl.nombre_completo, c.nombre_cliente) AS nombre_cliente
+              COALESCE(cl.nombre_completo, '') AS nombre_cliente
        FROM creditos c
        LEFT JOIN clientes cl ON cl.id_cliente = c.id_cliente
        WHERE c.id = ?`,
@@ -360,7 +329,6 @@ const update = async (req, res) => {
             color                = ?,
             motor                = ?,
             chasis               = ?,
-            nombre_cliente       = ?,
             financiera           = ?,
             fecha_otorgado       = ?,
             fecha_primera_cuota  = ?,
@@ -397,7 +365,6 @@ const update = async (req, res) => {
         ejecutivo || null, dealer || null,
         patente ? patente.toUpperCase().trim() : null,
         color || null, motor || null, chasis || null,
-        nombre_cliente ? nombre_cliente.trim() : prev[0].nombre_cliente,
         financiera || 'AUTOFACIL',
         fecha_otorgamiento || null,
         fecha_primera_cuota || null,

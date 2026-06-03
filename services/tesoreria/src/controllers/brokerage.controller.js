@@ -83,8 +83,8 @@ const getOperaciones = async (req, res) => {
 
     const [rows] = await pool.query(
       `SELECT o.*,
-         COALESCE(cl.rut,             o.rut_cliente)    AS rut_cliente,
-         COALESCE(cl.nombre_completo, o.nombre_cliente) AS nombre_cliente,
+         COALESCE(cl.rut,             '') AS rut_cliente,
+         COALESCE(cl.nombre_completo, '') AS nombre_cliente,
          (SELECT COUNT(*) FROM facturas_brokerage f WHERE f.operacion_id = o.id) AS cnt_facturas,
          (SELECT COUNT(*) FROM pagos_brokerage p WHERE p.operacion_id = o.id) AS cnt_pagos,
          (SELECT SUM(p.monto) FROM pagos_brokerage p WHERE p.operacion_id = o.id AND p.estado = 'PAGADO') AS monto_pagado
@@ -106,8 +106,8 @@ const getOperacion = async (req, res) => {
   try {
     const [[op]] = await pool.query(
       `SELECT o.*,
-              COALESCE(cl.rut,             o.rut_cliente)    AS rut_cliente,
-              COALESCE(cl.nombre_completo, o.nombre_cliente) AS nombre_cliente
+              COALESCE(cl.rut,             '') AS rut_cliente,
+              COALESCE(cl.nombre_completo, '') AS nombre_cliente
        FROM creditos o
        LEFT JOIN clientes cl ON cl.id_cliente = o.id_cliente
        WHERE o.id = ?`,
