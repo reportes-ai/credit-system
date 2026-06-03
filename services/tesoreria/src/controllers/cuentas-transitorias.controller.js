@@ -61,7 +61,7 @@ const list = async (req, res) => {
         MAX(ct.updated_at)                                       AS ultima_actualizacion,
         COUNT(*)                                                  AS num_registros
       FROM cuentas_transitorias ct
-      LEFT JOIN creditos c ON ct.id_credito = c.id_credito
+      LEFT JOIN creditos c ON ct.id_credito = c.id
       WHERE ${where}
       GROUP BY ct.id_credito, ct.rut_cliente, ct.nombre_cliente, c.numero_credito
       ORDER BY ultima_actualizacion DESC
