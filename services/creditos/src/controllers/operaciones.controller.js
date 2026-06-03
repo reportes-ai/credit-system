@@ -452,8 +452,9 @@ const recalcularComisiones = async (req, res) => {
     // 3. Traer todos los registros a recalcular
     const [rows] = await pool.query(
       `SELECT id, saldo_precio, plazo, financiera, parque, com_parque,
-              seguro_rdh, seguro_cesantia, seguro_rep_menor,
-              monto_financiado, monto_capitalizado, fecha_otorgado, mes
+              seguro_cesantia, seguro_rep_menor,
+              monto_financiado, monto_capitalizado, fecha_otorgado, mes,
+              estado_credito
        FROM creditos WHERE saldo_precio > 0 AND plazo > 0`
     );
 
@@ -502,13 +503,17 @@ const recalcularComisiones = async (req, res) => {
         }
       }
 
-      // Comisión seguros
-      let com_rdh = 0, com_cesantia = 0;
-      const primaDesg = parseFloat(row.seguro_rdh) || 0;
-      if (plazo > 0 && primaDesg > 0 && !fin.includes('UNIDAD') && !fin.includes('UAC')) {
+      // Comisión seguros — solo para OTORGADO
+      // com_cesantia   = seguro_cesantia  × pct_cesantia(plazo)
+      // com_reparaciones = seguro_rep_menor × pct_desgravamen(plazo)
+      let com_cesantia = 0, com_reparaciones = 0;
+      const esOtorgado = (row.estado_credito || '').toUpperCase() === 'OTORGADO';
+      if (plazo > 0 && esOtorgado) {
         const { desg, cesa } = getSegCom(plazo);
-        com_rdh      = Math.round(desg * primaDesg);
-        com_cesantia = Math.round(cesa * primaDesg);
+        const primaCes = parseFloat(row.seguro_cesantia)  || 0;
+        const primaRep = parseFloat(row.seguro_rep_menor) || 0;
+        com_cesantia     = Math.round(cesa * primaCes);
+        com_reparaciones = Math.round(desg * primaRep);
       }
 
       // Comisión dealer
@@ -522,9 +527,10 @@ const recalcularComisiones = async (req, res) => {
         com_parque_calc = esParque ? Math.round(saldo * patio_pct) : 0;
       }
 
-      const ingreso_neto_total = monto_comision_fin + com_rdh + com_cesantia - comdea_real - com_parque_calc;
+      const ingreso_neto_total = monto_comision_fin + com_cesantia + com_reparaciones - comdea_real - com_parque_calc;
 
-      return [comdea_real, com_parque_calc, monto_comision_fin, com_rdh, com_cesantia, ingreso_neto_total, row.id];
+      // [comdea, com_parque, monto_com_fin, com_cesantia, com_reparaciones, ingreso_neto, id]
+      return [comdea_real, com_parque_calc, monto_comision_fin, com_cesantia, com_reparaciones, ingreso_neto_total, row.id];
     });
 
     // 6. UPDATE en chunks de 500 con CASE WHEN
@@ -533,13 +539,12 @@ const recalcularComisiones = async (req, res) => {
     for (let i = 0; i < updates.length; i += CHUNK) {
       const chunk = updates.slice(i, i + CHUNK);
       const ids   = chunk.map(u => u[6]);
-      const mkCase = (idx) => 'CASE id ' + chunk.map(u => `WHEN ${u[6]} THEN ?`).join(' ') + ' END';
       const vals  = [
         ...chunk.map(u => u[0]), // comdea_real
         ...chunk.map(u => u[1]), // com_parque
         ...chunk.map(u => u[2]), // monto_comision_fin
-        ...chunk.map(u => u[3]), // com_rdh
-        ...chunk.map(u => u[4]), // com_cesantia
+        ...chunk.map(u => u[3]), // com_cesantia
+        ...chunk.map(u => u[4]), // com_reparaciones
         ...chunk.map(u => u[5]), // ingreso_neto_total
         ...ids,
       ];
@@ -547,8 +552,8 @@ const recalcularComisiones = async (req, res) => {
         comdea_real        = CASE id ${chunk.map(u=>`WHEN ${u[6]} THEN ?`).join(' ')} END,
         com_parque         = CASE id ${chunk.map(u=>`WHEN ${u[6]} THEN ?`).join(' ')} END,
         monto_comision_fin = CASE id ${chunk.map(u=>`WHEN ${u[6]} THEN ?`).join(' ')} END,
-        com_rdh            = CASE id ${chunk.map(u=>`WHEN ${u[6]} THEN ?`).join(' ')} END,
         com_cesantia       = CASE id ${chunk.map(u=>`WHEN ${u[6]} THEN ?`).join(' ')} END,
+        com_reparaciones   = CASE id ${chunk.map(u=>`WHEN ${u[6]} THEN ?`).join(' ')} END,
         ingreso_neto_total = CASE id ${chunk.map(u=>`WHEN ${u[6]} THEN ?`).join(' ')} END
         WHERE id IN (${ids.map(()=>'?').join(',')})`;
       await pool.query(sql, vals);

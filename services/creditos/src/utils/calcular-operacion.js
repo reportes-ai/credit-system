@@ -77,10 +77,9 @@ async function calcularOperacion(op) {
   const parqueVal     = (op.parque || '').toUpperCase().trim();
   const esParque      = parqueVal.includes('PARQUE');
 
-  // Seguros activos
-  const primaDesg = parseFloat(op.seguro_rdh)     || 0; // campo seguro_rdh = desgravamen prima
-  const primaRDH  = parseFloat(op.seguro_cesantia)|| 0; // campo seguro_cesantia = rdh prima
-  const primaCesa = parseFloat(op.seguro_rep_menor)|| 0; // campo seguro_rep_menor = cesantia prima
+  // Primas de seguros
+  const primaCesantia = parseFloat(op.seguro_cesantia)  || 0;
+  const primaRepMenor = parseFloat(op.seguro_rep_menor) || 0;
 
   let monto_comision_fin = 0;
   let com_rdh            = 0;
@@ -117,13 +116,14 @@ async function calcularOperacion(op) {
     }
   }
 
-  // ── 2. Ingreso por seguros (UNIDAD/UAC no paga comisión de seguros) ──
-  if (plazo > 0 && primaDesg > 0 && !financiera.includes('UNIDAD') && !financiera.includes('UAC')) {
+  // ── 2. Ingreso por seguros ─────────────────────────────────────────
+  // com_cesantia   = seguro_cesantia  × pct_cesantia(plazo)
+  // com_reparaciones = seguro_rep_menor × pct_desgravamen(plazo)
+  // Solo aplica a créditos OTORGADOS (el check de estado se hace en el caller)
+  if (plazo > 0) {
     const { desg, cesa } = getSegCom(plazo, segRows);
-    com_rdh      = Math.round(desg * primaDesg);  // comisión desgravamen
-    com_cesantia = Math.round(cesa * primaDesg);  // comisión cesantía
-    // RDH y reparaciones menores no generan comisión según el Excel
-    com_reparaciones = 0;
+    com_cesantia     = Math.round(cesa * primaCesantia);
+    com_reparaciones = Math.round(desg * primaRepMenor);
   }
 
   // ── 3. Comisión dealer ─────────────────────────────────────────────
@@ -144,13 +144,13 @@ async function calcularOperacion(op) {
   }
 
   // ── 5. Ingreso neto total ──────────────────────────────────────────
-  const com_seguros_total = com_rdh + com_cesantia + com_reparaciones;
+  const com_seguros_total  = com_cesantia + com_reparaciones;
   const ingreso_neto_total = monto_comision_fin + com_seguros_total
                            - comdea_real - com_parque_calc;
 
   return {
     monto_comision_fin,
-    com_rdh,
+    com_rdh:           0,  // ya no se calcula — se deja en 0
     com_cesantia,
     com_reparaciones,
     comdea_real,
