@@ -105,7 +105,12 @@ const cartola = async (req, res) => {
 
     // Info del crédito y cliente
     const [[cred]] = await pool.query(
-      `SELECT numero_credito, nombre_cliente, rut_cliente FROM creditos WHERE id_credito = ?`,
+      `SELECT c.numero_credito,
+              COALESCE(cl.nombre_completo, c.nombre_cliente) AS nombre_cliente,
+              COALESCE(cl.rut,             c.rut_cliente)    AS rut_cliente
+       FROM creditos c
+       LEFT JOIN clientes cl ON cl.id_cliente = c.id_cliente
+       WHERE c.id = ?`,
       [id_credito]
     ).catch(() => [[null]]);
 
