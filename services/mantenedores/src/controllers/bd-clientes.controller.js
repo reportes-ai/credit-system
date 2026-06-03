@@ -1,7 +1,11 @@
 'use strict';
 const pool = require('../../../../shared/config/database');
 
-const EXCLUIR = [];
+/* Campo "nombre" está vacío — se usa "nombres". Se excluye para no duplicar */
+const EXCLUIR = ['nombre'];
+
+/* Orden preferido de columnas: las primeras van al inicio, el resto en orden natural */
+const COL_ORDER = ['id_cliente','rut','nombres','apellido_paterno','apellido_materno','nombre_completo'];
 
 const DATE_FIELDS = ['fecha_creacion','fecha_nacimiento','fecha_visa',
   'fecha_inicio_actividad','fecha_actualizacion'];
@@ -10,9 +14,11 @@ const DATE_FIELDS = ['fecha_creacion','fecha_nacimiento','fecha_visa',
 const getColumns = async (req, res) => {
   try {
     const [rows] = await pool.query('DESCRIBE clientes');
-    const cols = rows
-      .filter(r => !EXCLUIR.includes(r.Field))
-      .map(r => ({ field: r.Field, type: r.Type, nullable: r.Null === 'YES', key: r.Key }));
+    const all = rows.filter(r => !EXCLUIR.includes(r.Field));
+    // Ordenar: primeras las de COL_ORDER, luego el resto
+    const priority = COL_ORDER.map(f => all.find(r => r.Field === f)).filter(Boolean);
+    const rest     = all.filter(r => !COL_ORDER.includes(r.Field));
+    const cols = [...priority, ...rest].map(r => ({ field: r.Field, type: r.Type, nullable: r.Null === 'YES', key: r.Key }));
     res.json({ success: true, data: cols, error: null });
   } catch (e) {
     res.status(500).json({ success: false, data: null, error: e.message });
