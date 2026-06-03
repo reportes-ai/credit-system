@@ -128,35 +128,30 @@
     <i class="bi bi-person-fill-gear"></i>
     <div>
       <h2>👤 BD CLIENTES NIVEL DIOS</h2>
-      <p>Busca por RUT y accede a <strong>todas las operaciones</strong> del cliente con todos sus campos y filtros por columna</p>
+      <p>Todos los registros con filtros por columna — filtra por RUT para ver un cliente específico. Doble clic en celda para editar.</p>
     </div>
   </div>
 
   <div class="toolbar">
-    <input type="text" class="rut-input" id="rutInput" placeholder="RUT: 12345678-9"
-      onkeydown="if(event.key==='Enter') buscar()"
-      oninput="this.value=this.value.replace(/\./g,'').toUpperCase()">
-    <button class="btn-buscar" onclick="buscar()"><i class="bi bi-search"></i>Buscar</button>
-    <div style="width:1px;height:24px;background:#e5e7eb;margin:0 4px;"></div>
-    <div class="info-chip" id="totalChip" style="display:none">Total: <span id="totalLabel">—</span></div>
-    <div class="info-chip" id="pageChip"  style="display:none">Página: <span id="pageLabel">—</span></div>
-    <button class="btn btn-sm btn-outline-secondary" id="btnClearFilters" style="display:none" onclick="clearFilters()"><i class="bi bi-x-circle me-1"></i>Limpiar filtros</button>
-    <button class="btn btn-sm btn-outline-primary" id="btnExport" style="display:none" onclick="exportCSV()"><i class="bi bi-download me-1"></i>Exportar CSV</button>
+    <div class="info-chip">Total: <span id="totalLabel">—</span></div>
+    <div class="info-chip">Página: <span id="pageLabel">—</span></div>
+    <button class="btn btn-sm btn-outline-secondary" onclick="clearFilters()"><i class="bi bi-x-circle me-1"></i>Limpiar filtros</button>
+    <button class="btn btn-sm btn-outline-primary" onclick="exportCSV()"><i class="bi bi-download me-1"></i>Exportar CSV</button>
     <div style="flex:1"></div>
-    <label style="font-size:.82rem;color:#6b7280;display:none" id="limitLabel">Filas por página:</label>
-    <select class="per-page" id="limitSel" style="display:none" onchange="changeLimit()">
+    <label style="font-size:.82rem;color:#6b7280;">Filas por página:</label>
+    <select class="per-page" id="limitSel" onchange="changeLimit()">
       <option value="25">25</option><option value="50" selected>50</option>
       <option value="100">100</option><option value="200">200</option>
     </select>
   </div>
 
-  <div class="client-header" id="clientHeader">
+  <div class="client-header" id="clientHeader" style="display:none">
     <div class="client-name" id="clientName">—</div>
     <div class="client-rut"  id="clientRut">—</div>
     <div class="client-stats" id="clientStats"></div>
   </div>
 
-  <div class="table-wrapper" id="tableWrapper" style="display:none">
+  <div class="table-wrapper">
     <div class="table-scroll">
       <table id="mainTable">
         <thead id="thead"></thead>
@@ -164,14 +159,9 @@
       </table>
     </div>
     <div class="pagination-bar">
-      <div class="info" id="paginInfo">—</div>
+      <div class="info" id="paginInfo">Cargando...</div>
       <div class="page-btns" id="pageBtns"></div>
     </div>
-  </div>
-
-  <div class="empty-state" id="emptyState">
-    <i class="bi bi-person-bounding-box"></i>
-    <p>Ingresa un RUT para ver todas las operaciones del cliente</p>
   </div>
 </div>
 
@@ -195,9 +185,7 @@ let sortCol  = 'mes';
 let sortDir  = 'desc';
 let page     = 1;
 let limit    = 50;
-let total    = 0;
 let editCell = null;
-let currentRut = '';
 
 function toast(msg, type='success') {
   const c = document.getElementById('toastContainer');
@@ -213,70 +201,42 @@ async function init() {
   const r = await fetch('/api/bd-operaciones/columns', {headers:H});
   const j = await r.json();
   columns = j.data;
+  // Pre-cargar RUT desde URL si viene
   const urlRut = new URLSearchParams(location.search).get('rut');
-  if (urlRut) { document.getElementById('rutInput').value=urlRut; buscar(); }
+  if (urlRut) filters = { rut_cliente: urlRut.replace(/\./g,'').toUpperCase() };
+  buildHeaders();
+  await load();
 }
 
-function showToolbar(show) {
-  ['totalChip','pageChip','btnClearFilters','btnExport','limitLabel','limitSel']
-    .forEach(id => document.getElementById(id).style.display = show ? (id==='limitLabel'?'inline':'inline-flex'||'inline-block') : 'none');
-  document.getElementById('limitSel').style.display = show ? 'inline-block' : 'none';
-  document.getElementById('limitLabel').style.display = show ? 'inline' : 'none';
-  document.getElementById('btnClearFilters').style.display = show ? 'inline-flex' : 'none';
-  document.getElementById('btnExport').style.display = show ? 'inline-flex' : 'none';
-  document.getElementById('totalChip').style.display = show ? 'inline-flex' : 'none';
-  document.getElementById('pageChip').style.display  = show ? 'inline-flex' : 'none';
-}
-
-async function buscar() {
-  const rut = document.getElementById('rutInput').value.trim().replace(/\./g,'').toUpperCase();
-  if (!rut) return;
-  currentRut = rut;
-  filters = { rut_cliente: rut };
-  page = 1;
-  await load(true);
-}
-
-async function load(isNewSearch=false) {
+async function load() {
   showLoading(true);
   try {
-    const activeFilters = { ...filters };
+    const activeFilters = Object.fromEntries(Object.entries(filters).filter(([,v])=>v!==''));
     const qs = new URLSearchParams({ page, limit, sort:sortCol, dir:sortDir, filters:JSON.stringify(activeFilters) });
     const r  = await fetch(`/api/bd-operaciones?${qs}`, {headers:H});
     const j  = await r.json();
     if (!j.success) throw new Error(j.error);
-    total = j.data.total;
 
-    if (!total && isNewSearch) {
-      document.getElementById('clientHeader').style.display = 'none';
-      document.getElementById('tableWrapper').style.display = 'none';
-      document.getElementById('emptyState').style.display   = 'block';
-      document.getElementById('emptyState').innerHTML = `<i class="bi bi-person-x"></i><p>No se encontraron operaciones para RUT <strong>${currentRut}</strong></p>`;
-      showToolbar(false);
-      showLoading(false); return;
-    }
-
-    if (isNewSearch) {
-      const rows = j.data.rows;
-      const nombre = rows.find(r=>r.nombre_cliente)?.nombre_cliente || '—';
+    // Ficha cliente si hay filtro por RUT exacto
+    const rut = filters.rut_cliente;
+    if (rut && j.data.rows.length) {
+      const nombre = j.data.rows.find(r=>r.nombre_cliente)?.nombre_cliente || '—';
       document.getElementById('clientName').textContent = nombre;
-      document.getElementById('clientRut').textContent  = currentRut;
-      const otorgados  = j.data.rows.filter(r=>r.estado_credito==='OTORGADO').length;
+      document.getElementById('clientRut').textContent  = rut;
+      const otorgados = j.data.rows.filter(r=>r.estado_credito==='OTORGADO').length;
       const financieras = [...new Set(j.data.rows.map(r=>r.financiera).filter(Boolean))].join(', ');
       document.getElementById('clientStats').innerHTML = `
-        <div class="stat-chip"><strong>${total}</strong>Operaciones totales</div>
-        <div class="stat-chip"><strong>${otorgados}</strong>Otorgadas (pág. actual)</div>
+        <div class="stat-chip"><strong>${j.data.total}</strong>Operaciones</div>
+        <div class="stat-chip"><strong>${otorgados}</strong>Otorgadas</div>
         <div class="stat-chip"><strong style="font-size:.72rem">${financieras||'—'}</strong>Financieras</div>`;
       document.getElementById('clientHeader').style.display = 'block';
-      document.getElementById('tableWrapper').style.display = 'block';
-      document.getElementById('emptyState').style.display   = 'none';
-      showToolbar(true);
-      buildHeaders();
+    } else {
+      document.getElementById('clientHeader').style.display = 'none';
     }
 
     renderRows(j.data.rows);
     renderPagination(j.data);
-    document.getElementById('totalLabel').textContent = total.toLocaleString();
+    document.getElementById('totalLabel').textContent = j.data.total.toLocaleString();
     document.getElementById('pageLabel').textContent  = `${j.data.page} / ${j.data.pages}`;
   } catch(e) {
     toast(e.message,'error');
@@ -297,7 +257,7 @@ function buildHeaders() {
     const inp = document.createElement('input');
     inp.type='text'; inp.className='filter-input'; inp.placeholder='🔍';
     inp.dataset.col = col.field;
-    inp.value = col.field==='rut_cliente' ? currentRut : (filters[col.field]||'');
+    inp.value = filters[col.field] || '';
     inp.oninput = debounce(()=>{ filters[col.field]=inp.value; page=1; load(); }, 400);
     inner.appendChild(label); inner.appendChild(inp); th.appendChild(inner); tr.appendChild(th);
   });
@@ -368,14 +328,14 @@ function renderPagination(d) {
 }
 
 function changeLimit() { limit=parseInt(document.getElementById('limitSel').value); page=1; load(); }
-function clearFilters() { filters={rut_cliente:currentRut}; document.querySelectorAll('.filter-input').forEach(inp=>{ inp.value=inp.dataset.col==='rut_cliente'?currentRut:''; }); page=1; load(); }
+function clearFilters() { filters={}; document.querySelectorAll('.filter-input').forEach(inp=>inp.value=''); page=1; load(); }
 function exportCSV() {
   const rows=[...document.querySelectorAll('#tbody tr')];
   const header=columns.map(c=>c.field).join(',');
   const lines=rows.map(tr=>[...tr.querySelectorAll('td')].map(td=>`"${td.title||td.textContent}"`).join(','));
   const csv=[header,...lines].join('\n');
   const a=document.createElement('a'); a.href=URL.createObjectURL(new Blob([csv],{type:'text/csv'}));
-  a.download=`cliente_${currentRut}.csv`; a.click();
+  a.download='clientes.csv'; a.click();
 }
 
 init();
