@@ -40,14 +40,17 @@ const backfill = async (req, res) => {
   try {
     /* ── 1. Créditos creados ─────────────────────────────────────────────── */
     const [creditos] = await pool.query(
-      `SELECT c.id_credito, c.numero_credito, c.nombre_cliente, c.rut_cliente,
+      `SELECT c.id_credito, c.numero_credito,
+              COALESCE(cl.nombre_completo, c.nombre_cliente) AS nombre_cliente,
+              COALESCE(cl.rut,             c.rut_cliente)    AS rut_cliente,
               c.financiera, c.monto_financiado, c.estado, c.created_at,
               c.id_usuario,
               TRIM(CONCAT(COALESCE(u.nombre,''), ' ', COALESCE(u.apellido,''))) AS usr_nombre,
               p.nombre AS usr_perfil
        FROM creditos c
-       LEFT JOIN usuarios u ON c.id_usuario = u.id_usuario
-       LEFT JOIN perfiles p ON u.id_perfil  = p.id_perfil`
+       LEFT JOIN clientes cl ON cl.id_cliente = c.id_cliente
+       LEFT JOIN usuarios u  ON c.id_usuario  = u.id_usuario
+       LEFT JOIN perfiles p  ON u.id_perfil   = p.id_perfil`
     );
     for (const c of creditos) {
       await ins({

@@ -73,6 +73,8 @@ const CV = `LEAST(c.plazo,
 const MORA_SQL = (whereExtra = '', havingExtra = '') => `
   SELECT
     c.*,
+    COALESCE(cl_m.rut,             c.rut_cliente)    AS rut_cliente,
+    COALESCE(cl_m.nombre_completo, c.nombre_cliente) AS nombre_cliente,
     COALESCE(pp.cnt, 0)                        AS cuotas_pagadas,
     GREATEST(0, ${CV} - COALESCE(pp.cnt, 0))   AS cuotas_mora,
     GREATEST(0, ${CV} - COALESCE(pp.cnt, 0)) * COALESCE(c.cuota, 0) AS monto_mora,
@@ -84,6 +86,7 @@ const MORA_SQL = (whereExtra = '', havingExtra = '') => `
       ELSE 0
     END AS dias_mora
   FROM creditos c
+  LEFT JOIN clientes cl_m ON cl_m.id_cliente = c.id_cliente
   LEFT JOIN (
     SELECT id_credito, COUNT(DISTINCT numero_cuota) AS cnt
     FROM pagos_credito
@@ -115,9 +118,11 @@ const MORA_CREDITO_SQL = `
                  INTERVAL COALESCE(pp.cnt, 0) MONTH))
       ELSE 0
     END AS dias_mora,
+    COALESCE(cl.rut,             c.rut_cliente)    AS rut_cliente,
+    COALESCE(cl.nombre_completo, c.nombre_cliente) AS nombre_cliente,
     cl.sexo           AS sexo_cliente,
     cl.telefono_movil AS telefono_movil,
-    cl.correo         AS email_cliente
+    cl.email          AS email_cliente
   FROM creditos c
   LEFT JOIN (
     SELECT id_credito, COUNT(DISTINCT numero_cuota) AS cnt
@@ -125,7 +130,7 @@ const MORA_CREDITO_SQL = `
     WHERE id_credito = ? AND estado_pago = 'PAGADO'
     GROUP BY id_credito
   ) pp ON pp.id_credito = c.id_credito
-  LEFT JOIN clientes cl ON cl.rut = c.rut_cliente
+  LEFT JOIN clientes cl ON cl.id_cliente = c.id_cliente
   WHERE c.id_credito = ?
 `;
 
@@ -238,7 +243,7 @@ exports.cartera = async (req, res) => {
     const qParams = [];
     let whereQ = '';
     if (q) {
-      whereQ = 'AND (c.nombre_cliente LIKE ? OR c.rut_cliente LIKE ? OR c.numero_credito LIKE ?)';
+      whereQ = 'AND (COALESCE(cl_m.nombre_completo, c.nombre_cliente) LIKE ? OR COALESCE(cl_m.rut, c.rut_cliente) LIKE ? OR c.numero_credito LIKE ?)';
       qParams.push(`%${q}%`, `%${q}%`, `%${q}%`);
     }
 

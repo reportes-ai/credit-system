@@ -118,8 +118,8 @@ const SELECT_GESTION = `
   SELECT
     ob.id                                                      AS id_credito,
     COALESCE(ob.numero_credito, CONCAT('OP-',ob.num_op))       AS numero_credito,
-    ob.rut_cliente,
-    ob.nombre_cliente,
+    COALESCE(cl.rut,             ob.rut_cliente)    AS rut_cliente,
+    COALESCE(cl.nombre_completo, ob.nombre_cliente) AS nombre_cliente,
     COALESCE(ob.financiera, 'AUTOFACIL')                       AS financiera,
     COALESCE(ob.estado,
       CASE
@@ -154,6 +154,7 @@ const SELECT_GESTION = `
     -- Los importados desde Excel (brokerage) no se trackean en pagos: NULL evita falsos EN MORA
     IF(ob.numero_credito IS NOT NULL, COALESCE(pp.cnt, 0), NULL) AS cuotas_pagadas
   FROM creditos ob
+  LEFT JOIN clientes cl ON cl.id_cliente = ob.id_cliente
   LEFT JOIN (
     SELECT id_credito, COUNT(DISTINCT numero_cuota) AS cnt
     FROM pagos_credito WHERE estado_pago = 'PAGADO'
@@ -271,9 +272,9 @@ const getAll = async (req, res) => {
       const qNorm = q.trim().toUpperCase().replace(/\./g, '');
       const like  = `%${qNorm}%`;
       sql += ` AND (
-        UPPER(REPLACE(ob.rut_cliente,'.',''))       LIKE ? OR
-        UPPER(ob.nombre_cliente)                    LIKE ? OR
-        UPPER(COALESCE(ob.numero_credito, CONCAT('OP-',ob.num_op))) LIKE ?
+        UPPER(REPLACE(COALESCE(cl.rut, ob.rut_cliente),'.',''))           LIKE ? OR
+        UPPER(COALESCE(cl.nombre_completo, ob.nombre_cliente))           LIKE ? OR
+        UPPER(COALESCE(ob.numero_credito, CONCAT('OP-',ob.num_op)))      LIKE ?
       )`;
       params.push(like, like, like);
     }
@@ -296,8 +297,12 @@ const getById = async (req, res) => {
               COALESCE(ob.numero_credito, CONCAT('OP-',ob.num_op)) AS numero_credito_fmt,
               ob.automotora                                         AS dealer,
               ob.tascli_real                                        AS tasa_mensual,
-              ob.fecha_otorgado                                     AS fecha_otorgamiento
-       FROM creditos ob WHERE ob.id = ?`,
+              ob.fecha_otorgado                                     AS fecha_otorgamiento,
+              COALESCE(cl.rut,             ob.rut_cliente)          AS rut_cliente,
+              COALESCE(cl.nombre_completo, ob.nombre_cliente)       AS nombre_cliente
+       FROM creditos ob
+       LEFT JOIN clientes cl ON cl.id_cliente = ob.id_cliente
+       WHERE ob.id = ?`,
       [req.params.id]
     );
     if (!rows.length)
@@ -327,7 +332,11 @@ const update = async (req, res) => {
     } = req.body;
 
     const [prev] = await pool.query(
-      'SELECT estado, numero_credito, nombre_cliente FROM creditos WHERE id = ?',
+      `SELECT c.estado, c.numero_credito,
+              COALESCE(cl.nombre_completo, c.nombre_cliente) AS nombre_cliente
+       FROM creditos c
+       LEFT JOIN clientes cl ON cl.id_cliente = c.id_cliente
+       WHERE c.id = ?`,
       [req.params.id]
     );
     if (!prev.length) return res.status(404).json({ success: false, data: null, error: 'Crédito no encontrado' });
