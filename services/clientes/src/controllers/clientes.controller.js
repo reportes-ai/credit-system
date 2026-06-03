@@ -123,8 +123,18 @@ const ensureTable = async () => {
 ensureTable().catch(console.error);
 
 /* ─── Helpers ───────────────────────────────────────────────────────────── */
-const up    = v => (v && typeof v === 'string' ? v.toUpperCase().trim() : v ?? null);
+const up      = v => (v && typeof v === 'string' ? v.toUpperCase().trim() : v ?? null);
 const normRut = v => v ? v.replace(/\./g, '').toUpperCase().trim() : null;
+
+/* Calcula nombre_completo según tipo_cliente */
+const calcNombreCompleto = (tipo, b) => {
+  if (tipo === 'EMPRESA') {
+    return up(b.razon_social) || null;
+  }
+  // PERSONA: concatenar nombres + apellido_paterno + apellido_materno
+  return [up(b.nombres), up(b.apellido_paterno), up(b.apellido_materno)]
+    .filter(Boolean).join(' ') || null;
+};
 
 /* ─── GET /rut/:rut ─────────────────────────────────────────────────────── */
 const getByRut = async (req, res) => {
@@ -228,9 +238,12 @@ const create = async (req, res) => {
     if (cnt > 0)
       return res.status(409).json({ success: false, data: null, error: 'El RUT ya existe' });
 
+    const tipoCliente = up(b.tipo_cliente);
+    const nombreCompleto = calcNombreCompleto(tipoCliente, b);
+
     const [r] = await pool.query(`
       INSERT INTO clientes
-        (rut, tipo_cliente,
+        (rut, tipo_cliente, nombre_completo,
          apellido_paterno, apellido_materno, nombres, fecha_nacimiento,
          estado_civil, sexo, regimen, cargas, telefono_movil,
          fecha_visa, tipo_visa, nacionalidad,
@@ -239,9 +252,9 @@ const create = async (req, res) => {
          rep2_rut, rep2_nombre, rep2_ap_paterno, rep2_ap_materno,
          rep3_rut, rep3_nombre, rep3_ap_paterno, rep3_ap_materno,
          email, direccion, id_comuna, id_provincia, id_region)
-      VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
+      VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
       [
-        rut, up(b.tipo_cliente),
+        rut, tipoCliente, nombreCompleto,
         up(b.apellido_paterno), up(b.apellido_materno), up(b.nombres),
         b.fecha_nacimiento || null,
         up(b.estado_civil), up(b.sexo), up(b.regimen),
@@ -275,9 +288,12 @@ const update = async (req, res) => {
     if (b.tipo_cliente === 'JURIDICA' && !b.razon_social)
       return res.status(400).json({ success: false, data: null, error: 'Razón social es requerida para persona jurídica' });
 
+    const tipoCliente = up(b.tipo_cliente);
+    const nombreCompleto = calcNombreCompleto(tipoCliente, b);
+
     await pool.query(`
       UPDATE clientes SET
-        tipo_cliente=?,
+        tipo_cliente=?, nombre_completo=?,
         apellido_paterno=?, apellido_materno=?, nombres=?, fecha_nacimiento=?,
         estado_civil=?, sexo=?, regimen=?, cargas=?, telefono_movil=?,
         fecha_visa=?, tipo_visa=?, nacionalidad=?,
@@ -288,7 +304,7 @@ const update = async (req, res) => {
         email=?, direccion=?, id_comuna=?, id_provincia=?, id_region=?
       WHERE id_cliente=?`,
       [
-        up(b.tipo_cliente),
+        tipoCliente, nombreCompleto,
         up(b.apellido_paterno), up(b.apellido_materno), up(b.nombres),
         b.fecha_nacimiento || null,
         up(b.estado_civil), up(b.sexo), up(b.regimen),
