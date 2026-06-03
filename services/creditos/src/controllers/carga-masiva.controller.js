@@ -223,10 +223,36 @@ const importar = async (req, res) => {
     // Rastrear ops insertadas sin monto_comision_fin para recalcular post-insert
     const sinComisionFin = [];
 
+    // Cache rut → id_cliente para no repetir queries en el loop
+    const clienteCache = {};
+
     for (const row of nuevos) {
       try {
         const obj = mapRow(row, mesOverride);
         if (!obj.num_op) continue;
+
+        // ── Resolver id_cliente ──────────────────────────────────────────
+        if (obj.rut_cliente) {
+          if (clienteCache[obj.rut_cliente] === undefined) {
+            const [[cl]] = await pool.query(
+              'SELECT id_cliente FROM clientes WHERE rut = ?',
+              [obj.rut_cliente]
+            );
+            if (cl) {
+              clienteCache[obj.rut_cliente] = cl.id_cliente;
+            } else {
+              // Crear cliente nuevo en la tabla clientes
+              const nombreCompleto = obj.nombre_cliente || null;
+              const [ins] = await pool.query(
+                `INSERT INTO clientes (rut, nombre_completo) VALUES (?, ?)
+                 ON DUPLICATE KEY UPDATE id_cliente = LAST_INSERT_ID(id_cliente)`,
+                [obj.rut_cliente, nombreCompleto]
+              );
+              clienteCache[obj.rut_cliente] = ins.insertId;
+            }
+          }
+          obj.id_cliente = clienteCache[obj.rut_cliente] || null;
+        }
 
         const cols   = Object.keys(obj).filter(k => obj[k] !== undefined && obj[k] !== null);
         const vals   = cols.map(k => obj[k]);
