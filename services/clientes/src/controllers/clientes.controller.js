@@ -123,12 +123,13 @@ const ensureTable = async () => {
 ensureTable().catch(console.error);
 
 /* ─── Helpers ───────────────────────────────────────────────────────────── */
-const up = v => (v && typeof v === 'string' ? v.toUpperCase().trim() : v ?? null);
+const up    = v => (v && typeof v === 'string' ? v.toUpperCase().trim() : v ?? null);
+const normRut = v => v ? v.replace(/\./g, '').toUpperCase().trim() : null;
 
 /* ─── GET /rut/:rut ─────────────────────────────────────────────────────── */
 const getByRut = async (req, res) => {
   try {
-    const rut = decodeURIComponent(req.params.rut).toUpperCase().trim();
+    const rut = normRut(decodeURIComponent(req.params.rut));
 
     // 1. Buscar en tabla clientes (datos completos)
     const [rows] = await pool.query('SELECT * FROM clientes WHERE rut = ?', [rut]);
@@ -219,7 +220,7 @@ const create = async (req, res) => {
     if (b.tipo_cliente === 'JURIDICA' && !b.razon_social)
       return res.status(400).json({ success: false, data: null, error: 'Razón social es requerida para persona jurídica' });
 
-    const rut = up(b.rut);
+    const rut = normRut(b.rut);
     // Verificar duplicado
     const [[{ cnt }]] = await pool.query('SELECT COUNT(*) AS cnt FROM clientes WHERE rut=?', [rut]);
     if (cnt > 0)
