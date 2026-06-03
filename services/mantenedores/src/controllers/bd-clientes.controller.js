@@ -42,7 +42,7 @@ const getAll = async (req, res) => {
     const where = [], vals = [];
     for (const [col, val] of Object.entries(filters)) {
       if (!validCols.includes(col) || val === '' || val === null || val === undefined) continue;
-      where.push(`\`${col}\` LIKE ?`);
+      where.push(`LOWER(\`${col}\`) LIKE LOWER(?)`);
       vals.push(`%${val}%`);
     }
     const whereStr = where.length ? 'WHERE ' + where.join(' AND ') : '';
