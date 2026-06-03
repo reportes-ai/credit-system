@@ -748,4 +748,80 @@ const getUsuariosByPerfil = async (req, res) => {
   }
 })();
 
+/* ─── Migración v8: funcionalidades faltantes detectadas ─────────────────── */
+(async () => {
+  try {
+    const [perfiles] = await pool.query('SELECT id_perfil, nombre FROM perfiles');
+    const [[admin]]  = await pool.query("SELECT id_perfil FROM perfiles WHERE nombre='Administrador' LIMIT 1");
+
+    async function addFuncV8(modNombre, funNombre, funCodigo, habPorPerfil = {}) {
+      const [[mod]] = await pool.query(
+        "SELECT id_modulo FROM modulos WHERE nombre=? AND estado='activo'", [modNombre]
+      );
+      if (!mod) return;
+      const [[ex]] = await pool.query('SELECT id_funcionalidad FROM funcionalidades WHERE codigo=?', [funCodigo]);
+      let id_func;
+      if (ex) {
+        id_func = ex.id_funcionalidad;
+      } else {
+        const [ins] = await pool.query(
+          'INSERT INTO funcionalidades (id_modulo, nombre, codigo) VALUES (?,?,?)',
+          [mod.id_modulo, funNombre, funCodigo]
+        );
+        id_func = ins.insertId;
+      }
+      for (const p of perfiles) {
+        const hab = habPorPerfil[p.nombre] !== undefined ? (habPorPerfil[p.nombre] ? 1 : 0) : 0;
+        await pool.query(
+          'INSERT IGNORE INTO permisos_perfil (id_perfil, id_funcionalidad, habilitado) VALUES (?,?,?)',
+          [p.id_perfil, id_func, hab]
+        );
+      }
+    }
+
+    // Asegurar módulo Simulador
+    const [simMod] = await pool.query("SELECT id_modulo FROM modulos WHERE nombre='Simulador'");
+    if (simMod.length === 0) {
+      const [ins] = await pool.query(
+        `INSERT INTO modulos (nombre, descripcion, icono, ruta, orden, estado)
+         VALUES ('Simulador','Simulador de crédito automotriz','bi-calculator','/simulador/',28,'activo')`
+      );
+      await pool.query(
+        'INSERT INTO funcionalidades (id_modulo, nombre, codigo) VALUES (?,?,?)',
+        [ins.insertId, 'Ver Simulador', 'simulador_ver']
+      );
+    }
+
+    // Mantenedores — páginas sin permiso
+    await addFuncV8('Mantenedores', 'Parques',              'mantenedores_parques',              { Administrador:1, Gerente:1 });
+    await addFuncV8('Mantenedores', 'Financieras',          'mantenedores_financieras',          { Administrador:1, Gerente:1 });
+    await addFuncV8('Mantenedores', 'Comisiones Seguro',    'mantenedores_comisiones_seguro',    { Administrador:1 });
+    await addFuncV8('Mantenedores', 'BD Operaciones',       'mantenedores_bd_operaciones',       { Administrador:1 });
+    await addFuncV8('Mantenedores', 'BD Clientes',          'mantenedores_bd_clientes',          { Administrador:1 });
+    await addFuncV8('Mantenedores', 'Flujo Brokerage',      'mantenedores_flujo_brokerage',      { Administrador:1, Gerente:1, Supervisor:1 });
+    await addFuncV8('Mantenedores', 'Broker Validaciones',  'mantenedores_broker_validaciones',  { Administrador:1, Gerente:1, Supervisor:1 });
+
+    // Comisión Ejecutivos — subpáginas
+    await addFuncV8('Comisión Ejecutivos', 'Variables de Comisión',    'comisiones_variables',  { Administrador:1, Gerente:1 });
+    await addFuncV8('Comisión Ejecutivos', 'Revisión y Aprobación',    'comisiones_revision',   { Administrador:1, Gerente:1, Supervisor:1 });
+
+    // Simulador — asignar a todos los perfiles
+    await addFuncV8('Simulador', 'Ver Simulador', 'simulador_ver', { Administrador:1, Gerente:1, Supervisor:1, Ejecutivo:1, 'Ejecutivo Comercial':1 });
+
+    // Administrador: habilitar TODAS
+    if (admin) {
+      await pool.query(
+        `INSERT INTO permisos_perfil (id_perfil, id_funcionalidad, habilitado)
+         SELECT ?, id_funcionalidad, 1 FROM funcionalidades
+         ON DUPLICATE KEY UPDATE habilitado = 1`,
+        [admin.id_perfil]
+      );
+    }
+
+    console.log('✓ Perfiles v8: funcionalidades faltantes agregadas');
+  } catch (e) {
+    console.error('[perfiles migration v8]', e.message);
+  }
+})();
+
 module.exports = { getAllPerfiles, getModulosConFuncionalidades, getPermisosPerfil, updatePermisosPerfil, reordenarModulos, createPerfil, deletePerfil, getUsuariosByPerfil };
