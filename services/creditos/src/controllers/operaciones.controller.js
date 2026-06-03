@@ -538,7 +538,6 @@ const recalcularComisiones = async (req, res) => {
       // com_cesantia   = seguro_cesantia  × pct_cesantia(plazo)
       // com_reparaciones = seguro_rep_menor × pct_desgravamen(plazo)
       let com_cesantia = 0, com_reparaciones = 0;
-      const esOtorgado = (row.estado_credito || '').toUpperCase() === 'OTORGADO';
       if (plazo > 0 && esOtorgado) {
         const { desg, cesa } = getSegCom(plazo);
         const primaCes = parseFloat(row.seguro_cesantia)  || 0;
