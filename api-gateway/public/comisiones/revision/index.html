@@ -112,7 +112,7 @@
 <body>
 <nav class="topnav">
   <div class="topnav-left">
-    <a href="/" class="topnav-brand"><img src="/img/logo.png" alt="AutoFácil"><span class="version-badge">v5.2</span></a>
+    <a href="/" class="topnav-brand"><img src="/img/logo.png" alt="AutoFácil"><span class="version-badge">v5.3</span></a>
     <div class="breadcrumb-nav">
       <a href="/">Inicio</a><span class="sep">›</span>
       <a href="/comisiones/">Comisión Ejecutivos</a><span class="sep">›</span>
@@ -172,12 +172,12 @@
     <div class="stat-card blue">
       <div class="label">Total Financiado</div>
       <div class="value" id="statMonto">—</div>
-      <div class="sub">ejecutivos con comisión</div>
+      <div class="sub" id="statMontoSub">todos los ejecutivos</div>
     </div>
     <div class="stat-card green">
       <div class="label">Total Comisiones</div>
       <div class="value" id="statComisiones">—</div>
-      <div class="sub">incentivo final bruto</div>
+      <div class="sub" id="statComisionesSub">incentivo final bruto</div>
     </div>
     <div class="stat-card amber">
       <div class="label">Aprobados</div>
@@ -277,15 +277,19 @@ function renderizar(data, mes) {
   const conComision  = data.filter(d => d.cumple_minimo);
   const sinComision  = data.filter(d => !d.cumple_minimo);
   const totalMonto   = conComision.reduce((s,d) => s + (d.total_financiado||0), 0);
+  const totalMontoAll= data.reduce((s,d) => s + (d.total_financiado||0), 0);
   const totalComis   = conComision.reduce((s,d) => s + (d.incentivo_final||0), 0);
+  const pctComis     = totalMontoAll > 0 ? (totalComis / totalMontoAll * 100).toFixed(2) : '0.00';
   const aprobados    = data.filter(d => d.estado === 'aprobado').length;
 
   document.getElementById('statTotal').textContent        = data.length;
   document.getElementById('statConComision').textContent  = conComision.length;
   document.getElementById('statConSub').textContent       = `total: ${fmt(totalMonto)}`;
   document.getElementById('statSinComision').textContent  = sinComision.length;
-  document.getElementById('statMonto').textContent        = fmt(totalMonto);
+  document.getElementById('statMonto').textContent        = fmt(totalMontoAll);
+  document.getElementById('statMontoSub').textContent     = `con comisión: ${fmt(totalMonto)}`;
   document.getElementById('statComisiones').textContent   = fmt(totalComis);
+  document.getElementById('statComisionesSub').textContent= `${pctComis}% del total colocado`;
   document.getElementById('statAprobados').textContent    = `${aprobados}/${data.length}`;
   document.getElementById('statAprobadosSub').textContent = aprobados === data.length ? '✓ todos aprobados' : `${data.length - aprobados} pendientes`;
   document.getElementById('statsRow').style.display = 'grid';
