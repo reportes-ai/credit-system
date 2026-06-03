@@ -88,7 +88,7 @@
   <div class="topnav-left">
     <a href="/" class="topnav-brand">
       <img src="/img/logo.png" alt="AutoFácil">
-      <span class="version-badge" id="versionBadge">v4.10</span>
+      <span class="version-badge" id="versionBadge">v4.11</span>
     </a>
     <div class="breadcrumb-nav">
       <a href="/">Inicio</a><span class="sep">›</span>
@@ -265,7 +265,9 @@ function renderRows(rows) {
     tr.onclick = (e) => {
       if (e.target.tagName === 'INPUT' || e.target.tagName === 'BUTTON') return;
       if (editCell) return;
-      openOps(row.id_cliente, row.nombre_completo || row.nombres || row.rut);
+      tr._clickTimer = setTimeout(() => {
+        openOps(row.id_cliente, row.nombre_completo || row.nombres || row.rut);
+      }, 250);
     };
     columns.forEach(col => {
       const td = document.createElement('td');
@@ -277,7 +279,7 @@ function renderRows(rows) {
       } else {
         td.textContent = val; td.className = 'editable'; td.title = String(val);
       }
-      td.ondblclick = (e) => { e.stopPropagation(); startEdit(tr, td, col, val); };
+      td.ondblclick = (e) => { e.stopPropagation(); clearTimeout(tr._clickTimer); startEdit(tr, td, col, val); };
       tr.appendChild(td);
     });
     tbody.appendChild(tr);
