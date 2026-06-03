@@ -1,8 +1,8 @@
 'use strict';
 const pool = require('../../../../shared/config/database');
 
-/* Campo "nombre" está vacío — se usa "nombres". Se excluye para no duplicar */
-const EXCLUIR = ['nombre'];
+/* "nombre" vacío (usa "nombres"). "correo" migrado a "email". Ambos excluidos. */
+const EXCLUIR = ['nombre', 'correo'];
 
 /* Orden preferido de columnas: las primeras van al inicio, el resto en orden natural */
 const COL_ORDER = ['id_cliente','rut','nombres','apellido_paterno','apellido_materno','nombre_completo'];

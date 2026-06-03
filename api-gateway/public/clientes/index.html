@@ -1127,7 +1127,7 @@ function mostrarVistaLectura(c) {
 
   html += '<div class="col-12 mt-2 mb-1"><div class="section-label"><i class="bi bi-envelope me-1"></i>Contacto y domicilio</div></div>';
   html += dv('Teléfono Móvil', c.telefono_movil);
-  html += dv('Correo', c.correo);
+  html += dv('Correo', c.email);
   html += dv('Dirección', c.direccion);
   // Resolve region/provincia/comuna names from loaded data
   const regionNombre   = regionesData.find(r => r.id_region   == c.id_region  )?.nombre || c.id_region   || null;
@@ -1237,7 +1237,7 @@ async function precargarPersona(c) {
   })();
   document.getElementById('pTipoVisa').value   = c.tipo_visa         || '';
   document.getElementById('pFechaVisa').value  = c.fecha_visa ? c.fecha_visa.split('T')[0] : '';
-  document.getElementById('pCorreo').value     = c.correo            || '';
+  document.getElementById('pCorreo').value     = c.email             || '';
   document.getElementById('pDireccion').value  = c.direccion         || '';
   calcularEdad();
   await setGeo('p', c.id_region, c.id_provincia, c.id_comuna);
@@ -1251,7 +1251,7 @@ async function precargarEmpresa(c) {
   if (c.codigo_actividad && c.actividad_economica)
     document.getElementById('eBuscarActividad').value = `${c.codigo_actividad} — ${c.actividad_economica}`;
   document.getElementById('eFechaInicio').value       = c.fecha_inicio_actividad ? c.fecha_inicio_actividad.split('T')[0] : '';
-  document.getElementById('eCorreo').value            = c.correo              || '';
+  document.getElementById('eCorreo').value            = c.email               || '';
   document.getElementById('eDireccion').value         = c.direccion           || '';
   // Representantes
   [[1,'rep1'],[2,'rep2'],[3,'rep3']].forEach(([n,k]) => {
@@ -1639,7 +1639,7 @@ function buildBody(tipo) {
       tipo_visa:        document.getElementById('pTipoVisa').value.trim(),
       fecha_visa:       document.getElementById('pFechaVisa').value || null,
       nacionalidad:     document.getElementById('pNacionalidad').value.trim(),
-      correo:           document.getElementById('pCorreo').value.trim(),
+      email:            document.getElementById('pCorreo').value.trim(),
       direccion:        document.getElementById('pDireccion').value.trim(),
       id_region:        document.getElementById('pRegion').value   || null,
       id_provincia:     document.getElementById('pProvincia').value|| null,
@@ -1658,7 +1658,7 @@ function buildBody(tipo) {
       codigo_actividad:        document.getElementById('eCodigoActividad').value.trim(),
       actividad_economica:     document.getElementById('eActividadEconomica').value.trim(),
       fecha_inicio_actividad:  document.getElementById('eFechaInicio').value || null,
-      correo:                  document.getElementById('eCorreo').value.trim(),
+      email:                   document.getElementById('eCorreo').value.trim(),
       direccion:               document.getElementById('eDireccion').value.trim(),
       id_region:               document.getElementById('eRegion').value    || null,
       id_provincia:            document.getElementById('eProvincia').value || null,

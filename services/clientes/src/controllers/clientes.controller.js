@@ -37,7 +37,7 @@ const ensureTable = async () => {
       rep3_nombre         VARCHAR(150),
       rep3_ap_paterno     VARCHAR(100),
       rep3_ap_materno     VARCHAR(100),
-      correo              VARCHAR(200),
+      email              VARCHAR(200),
       direccion           VARCHAR(300),
       id_comuna           INT,
       id_provincia        INT,
@@ -80,7 +80,7 @@ const ensureTable = async () => {
     `ALTER TABLE clientes ADD COLUMN IF NOT EXISTS rep3_nombre VARCHAR(150)`,
     `ALTER TABLE clientes ADD COLUMN IF NOT EXISTS rep3_ap_paterno VARCHAR(100)`,
     `ALTER TABLE clientes ADD COLUMN IF NOT EXISTS rep3_ap_materno VARCHAR(100)`,
-    `ALTER TABLE clientes ADD COLUMN IF NOT EXISTS correo VARCHAR(200)`,
+    `ALTER TABLE clientes ADD COLUMN IF NOT EXISTS email VARCHAR(200)`,
     `ALTER TABLE clientes ADD COLUMN IF NOT EXISTS direccion VARCHAR(300)`,
     `ALTER TABLE clientes ADD COLUMN IF NOT EXISTS id_comuna INT`,
     `ALTER TABLE clientes ADD COLUMN IF NOT EXISTS id_provincia INT`,
@@ -162,7 +162,7 @@ const getByRut = async (req, res) => {
         apellido_materno: partes[1] || '',
         nombre_fantasia:  null,
         razon_social:     null,
-        correo:           null,
+        email:           null,
         telefono_movil:   null,
         direccion:        null,
         _desde_brokerage: true,   // indica que viene del Excel, sin perfil completo
@@ -235,7 +235,7 @@ const create = async (req, res) => {
          rep1_rut, rep1_nombre, rep1_ap_paterno, rep1_ap_materno,
          rep2_rut, rep2_nombre, rep2_ap_paterno, rep2_ap_materno,
          rep3_rut, rep3_nombre, rep3_ap_paterno, rep3_ap_materno,
-         correo, direccion, id_comuna, id_provincia, id_region)
+         email, direccion, id_comuna, id_provincia, id_region)
       VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
       [
         rut, up(b.tipo_cliente),
@@ -251,7 +251,7 @@ const create = async (req, res) => {
         up(b.rep1_rut), up(b.rep1_nombre), up(b.rep1_ap_paterno), up(b.rep1_ap_materno),
         up(b.rep2_rut), up(b.rep2_nombre), up(b.rep2_ap_paterno), up(b.rep2_ap_materno),
         up(b.rep3_rut), up(b.rep3_nombre), up(b.rep3_ap_paterno), up(b.rep3_ap_materno),
-        up(b.correo), up(b.direccion),
+        up(b.email), up(b.direccion),
         b.id_comuna || null, b.id_provincia || null, b.id_region || null
       ]
     );
@@ -282,7 +282,7 @@ const update = async (req, res) => {
         rep1_rut=?, rep1_nombre=?, rep1_ap_paterno=?, rep1_ap_materno=?,
         rep2_rut=?, rep2_nombre=?, rep2_ap_paterno=?, rep2_ap_materno=?,
         rep3_rut=?, rep3_nombre=?, rep3_ap_paterno=?, rep3_ap_materno=?,
-        correo=?, direccion=?, id_comuna=?, id_provincia=?, id_region=?
+        email=?, direccion=?, id_comuna=?, id_provincia=?, id_region=?
       WHERE id_cliente=?`,
       [
         up(b.tipo_cliente),
@@ -298,7 +298,7 @@ const update = async (req, res) => {
         up(b.rep1_rut), up(b.rep1_nombre), up(b.rep1_ap_paterno), up(b.rep1_ap_materno),
         up(b.rep2_rut), up(b.rep2_nombre), up(b.rep2_ap_paterno), up(b.rep2_ap_materno),
         up(b.rep3_rut), up(b.rep3_nombre), up(b.rep3_ap_paterno), up(b.rep3_ap_materno),
-        up(b.correo), up(b.direccion),
+        up(b.email), up(b.direccion),
         b.id_comuna || null, b.id_provincia || null, b.id_region || null,
         req.params.id
       ]
