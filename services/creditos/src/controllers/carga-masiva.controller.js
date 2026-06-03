@@ -3,13 +3,13 @@ const pool = require('../../../../shared/config/database');
 const XLSX = require('xlsx');
 const { calcularComisionFin } = require('../utils/calcular-comision-fin');
 
-/* ── Asegurar columnas extra en operaciones_brokerage ──────────────────── */
+/* ── Asegurar columnas extra en creditos ──────────────────── */
 (async () => {
   const extra = [
-    `ALTER TABLE operaciones_brokerage ADD COLUMN com_rdh       DECIMAL(15,0) NULL`,
-    `ALTER TABLE operaciones_brokerage ADD COLUMN com_cesantia  DECIMAL(15,0) NULL`,
-    `ALTER TABLE operaciones_brokerage ADD COLUMN com_parque    DECIMAL(15,0) NULL`,
-    `ALTER TABLE operaciones_brokerage ADD COLUMN resultado_negocio DECIMAL(15,2) NULL`,
+    `ALTER TABLE creditos ADD COLUMN com_rdh       DECIMAL(15,0) NULL`,
+    `ALTER TABLE creditos ADD COLUMN com_cesantia  DECIMAL(15,0) NULL`,
+    `ALTER TABLE creditos ADD COLUMN com_parque    DECIMAL(15,0) NULL`,
+    `ALTER TABLE creditos ADD COLUMN resultado_negocio DECIMAL(15,2) NULL`,
   ];
   for (const sql of extra) {
     try { await pool.query(sql); } catch (e) { if (e.errno !== 1060) console.error('[carga-masiva migration]', e.message); }
@@ -148,7 +148,7 @@ const preview = async (req, res) => {
     for (let i = 0; i < ops.length; i += chunkSize) {
       const chunk = ops.slice(i, i + chunkSize);
       const [rows] = await pool.query(
-        `SELECT num_op FROM operaciones_brokerage WHERE num_op IN (${chunk.map(()=>'?').join(',')})`,
+        `SELECT num_op FROM creditos WHERE num_op IN (${chunk.map(()=>'?').join(',')})`,
         chunk
       );
       rows.forEach(r => setExistentes.add(r.num_op));
@@ -207,7 +207,7 @@ const importar = async (req, res) => {
     for (let i = 0; i < ops.length; i += chunkSize) {
       const chunk = ops.slice(i, i + chunkSize);
       const [rows] = await pool.query(
-        `SELECT num_op FROM operaciones_brokerage WHERE num_op IN (${chunk.map(()=>'?').join(',')})`,
+        `SELECT num_op FROM creditos WHERE num_op IN (${chunk.map(()=>'?').join(',')})`,
         chunk
       );
       rows.forEach(r => setExistentes.add(r.num_op));
@@ -233,7 +233,7 @@ const importar = async (req, res) => {
         const placeholders = cols.map(() => '?').join(',');
 
         await pool.query(
-          `INSERT INTO operaciones_brokerage (${cols.join(',')}) VALUES (${placeholders})`,
+          `INSERT INTO creditos (${cols.join(',')}) VALUES (${placeholders})`,
           vals
         );
         insertados++;
@@ -287,7 +287,7 @@ const corregirMes = async (req, res) => {
     const mesInc = mes_incorrecto.slice(0, 7); // YYYY-MM
     const mesCor = mes_correcto.slice(0, 7);
     const [result] = await pool.query(
-      `UPDATE operaciones_brokerage SET mes = ? WHERE DATE_FORMAT(mes, '%Y-%m') = ?`,
+      `UPDATE creditos SET mes = ? WHERE DATE_FORMAT(mes, '%Y-%m') = ?`,
       [mesCor + '-01', mesInc]
     );
     res.json({ success: true, data: { afectados: result.affectedRows }, error: null });

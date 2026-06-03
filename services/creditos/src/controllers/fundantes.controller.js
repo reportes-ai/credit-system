@@ -76,7 +76,7 @@ const upload = async (req, res) => {
       return res.status(400).json({ success: false, data: null, error: 'operacion_id y nombre_documento requeridos' });
     }
     // Verificar operación existe
-    const [[op]] = await pool.query('SELECT id FROM operaciones_brokerage WHERE id = ?', [operacion_id]);
+    const [[op]] = await pool.query('SELECT id FROM creditos WHERE id = ?', [operacion_id]);
     if (!op) return res.status(404).json({ success: false, data: null, error: 'Operación no encontrada' });
 
     const buffer = archivo_data ? Buffer.from(archivo_data, 'base64') : null;
@@ -100,7 +100,7 @@ const upload = async (req, res) => {
 
     // Actualizar estado_fundantes de la operación a CARGADOS (si estaba PENDIENTE)
     await pool.query(
-      `UPDATE operaciones_brokerage
+      `UPDATE creditos
        SET estado_fundantes = CASE WHEN estado_fundantes = 'PENDIENTE' THEN 'CARGADOS' ELSE estado_fundantes END
        WHERE id = ?`,
       [operacion_id]
@@ -158,7 +158,7 @@ async function _recalcEstadoFundantes(operacion_id) {
   else if (todos_aprobados) nuevo = 'APROBADOS';
   else if (hay_pendiente) nuevo = 'CARGADOS';
   else nuevo = 'CARGADOS';
-  await pool.query('UPDATE operaciones_brokerage SET estado_fundantes=? WHERE id=?', [nuevo, operacion_id]);
+  await pool.query('UPDATE creditos SET estado_fundantes=? WHERE id=?', [nuevo, operacion_id]);
 }
 
 /* ─── DELETE /api/fundantes/:id ─────────────────────────────────────── */

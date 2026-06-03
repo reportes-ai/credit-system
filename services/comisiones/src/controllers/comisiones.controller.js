@@ -186,7 +186,7 @@ const getCalculo = async (req, res) => {
               monto_financiado, plazo, seguro_cesantia, seguro_rep_menor,
               seguro_rdh, valor_vehiculo, pie, saldo_precio,
               fecha_otorgado, num_op, nombre_cliente, rut_cliente
-       FROM operaciones_brokerage
+       FROM creditos
        WHERE DATE_FORMAT(COALESCE(fecha_otorgado, mes), '%Y-%m') = ?
          AND ejecutivo IS NOT NULL AND ejecutivo != ''`,
       [mes]
@@ -267,7 +267,7 @@ const getEjecutivos = async (req, res) => {
     const where = mes ? `WHERE DATE_FORMAT(COALESCE(fecha_otorgado, mes), '%Y-%m') = ?` : '';
     const params = mes ? [mes] : [];
     const [rows] = await pool.query(
-      `SELECT DISTINCT ejecutivo FROM operaciones_brokerage
+      `SELECT DISTINCT ejecutivo FROM creditos
        ${where} AND ejecutivo IS NOT NULL AND ejecutivo != ''
        ORDER BY ejecutivo`,
       params

@@ -17,7 +17,7 @@ async function getUF(fecha) {
 
 async function contarOpsUAC(mesStr) {
   const [rows] = await pool.query(`
-    SELECT COUNT(*) AS cnt FROM operaciones_brokerage
+    SELECT COUNT(*) AS cnt FROM creditos
     WHERE DATE_FORMAT(mes,'%Y-%m') = ?
       AND (financiera LIKE '%UNIDAD%' OR financiera LIKE '%UAC%')
       AND estado_credito IN ('OTORGADO','APROBADO')
@@ -56,7 +56,7 @@ async function calcularComisionFin(ops) {
     if (fin.includes('UNIDAD') || fin.includes('UAC')) {
       // Obtener saldo_precio y mes de la BD (ya insertado)
       const [rows] = await pool.query(
-        'SELECT saldo_precio, mes FROM operaciones_brokerage WHERE num_op = ? LIMIT 1',
+        'SELECT saldo_precio, mes FROM creditos WHERE num_op = ? LIMIT 1',
         [op.num_op]
       );
       if (!rows.length) continue;
@@ -75,7 +75,7 @@ async function calcularComisionFin(ops) {
 
     } else if (fin.includes('AUTOFIN') || fin.includes('AUTOF')) {
       const [rows] = await pool.query(
-        'SELECT monto_financiado, plazo, fecha_otorgado FROM operaciones_brokerage WHERE num_op = ? LIMIT 1',
+        'SELECT monto_financiado, plazo, fecha_otorgado FROM creditos WHERE num_op = ? LIMIT 1',
         [op.num_op]
       );
       if (!rows.length) continue;
@@ -102,7 +102,7 @@ async function calcularComisionFin(ops) {
 
     if (monto_comision_fin !== null) {
       await pool.query(
-        'UPDATE operaciones_brokerage SET monto_comision_fin = ? WHERE num_op = ?',
+        'UPDATE creditos SET monto_comision_fin = ? WHERE num_op = ?',
         [monto_comision_fin, op.num_op]
       );
       actualizados++;

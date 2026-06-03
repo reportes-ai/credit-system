@@ -188,7 +188,7 @@ exports.getDatos = async (req, res) => {
         COALESCE(rut_cliente, '')                             AS rut_cliente,
         COALESCE(nombre_cliente, '')                          AS nombre_cliente,
         COALESCE(rut_dealer, '')                              AS rut_dealer
-      FROM operaciones_brokerage
+      FROM creditos
       WHERE mes IS NOT NULL
       ORDER BY mes ASC, num_op ASC
     `);

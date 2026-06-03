@@ -1,62 +1,62 @@
 const pool  = require('../../../../shared/config/database');
 const audit = require('../../../../shared/auditoria');
 
-// ── Migración: agregar campos de gestión a operaciones_brokerage ──────────────
+// ── Migración: agregar campos de gestión a creditos ──────────────
 (async () => {
   try {
     const addCol = async (sql) => pool.query(sql).catch(e => { if (e.errno !== 1060) throw e; });
     // Campos de vehículo
-    await addCol(`ALTER TABLE operaciones_brokerage ADD COLUMN tipo_vehiculo      VARCHAR(100) NULL`);
-    await addCol(`ALTER TABLE operaciones_brokerage ADD COLUMN marca              VARCHAR(100) NULL`);
-    await addCol(`ALTER TABLE operaciones_brokerage ADD COLUMN modelo             VARCHAR(100) NULL`);
-    await addCol(`ALTER TABLE operaciones_brokerage ADD COLUMN anio               INT          NULL`);
-    await addCol(`ALTER TABLE operaciones_brokerage ADD COLUMN patente            VARCHAR(20)  NULL`);
-    await addCol(`ALTER TABLE operaciones_brokerage ADD COLUMN color              VARCHAR(50)  NULL`);
-    await addCol(`ALTER TABLE operaciones_brokerage ADD COLUMN motor              VARCHAR(100) NULL`);
-    await addCol(`ALTER TABLE operaciones_brokerage ADD COLUMN chasis             VARCHAR(100) NULL`);
-    await addCol(`ALTER TABLE operaciones_brokerage ADD COLUMN transmision        VARCHAR(50)  NULL`);
-    await addCol(`ALTER TABLE operaciones_brokerage ADD COLUMN combustible        VARCHAR(50)  NULL`);
-    await addCol(`ALTER TABLE operaciones_brokerage ADD COLUMN tasacion           BIGINT       NULL`);
-    await addCol(`ALTER TABLE operaciones_brokerage ADD COLUMN permiso_circulacion BIGINT      NULL`);
+    await addCol(`ALTER TABLE creditos ADD COLUMN tipo_vehiculo      VARCHAR(100) NULL`);
+    await addCol(`ALTER TABLE creditos ADD COLUMN marca              VARCHAR(100) NULL`);
+    await addCol(`ALTER TABLE creditos ADD COLUMN modelo             VARCHAR(100) NULL`);
+    await addCol(`ALTER TABLE creditos ADD COLUMN anio               INT          NULL`);
+    await addCol(`ALTER TABLE creditos ADD COLUMN patente            VARCHAR(20)  NULL`);
+    await addCol(`ALTER TABLE creditos ADD COLUMN color              VARCHAR(50)  NULL`);
+    await addCol(`ALTER TABLE creditos ADD COLUMN motor              VARCHAR(100) NULL`);
+    await addCol(`ALTER TABLE creditos ADD COLUMN chasis             VARCHAR(100) NULL`);
+    await addCol(`ALTER TABLE creditos ADD COLUMN transmision        VARCHAR(50)  NULL`);
+    await addCol(`ALTER TABLE creditos ADD COLUMN combustible        VARCHAR(50)  NULL`);
+    await addCol(`ALTER TABLE creditos ADD COLUMN tasacion           BIGINT       NULL`);
+    await addCol(`ALTER TABLE creditos ADD COLUMN permiso_circulacion BIGINT      NULL`);
     // Campos de gestión
-    await addCol(`ALTER TABLE operaciones_brokerage ADD COLUMN numero_credito     VARCHAR(20)  NULL`);
-    await addCol(`ALTER TABLE operaciones_brokerage ADD COLUMN estado             VARCHAR(30)  NULL`);
-    await addCol(`ALTER TABLE operaciones_brokerage ADD COLUMN cuota              BIGINT       NULL`);
-    await addCol(`ALTER TABLE operaciones_brokerage ADD COLUMN tipo_ubicacion     VARCHAR(50)  NULL`);
-    await addCol(`ALTER TABLE operaciones_brokerage ADD COLUMN nombre_parque_mgmt VARCHAR(100) NULL`);
+    await addCol(`ALTER TABLE creditos ADD COLUMN numero_credito     VARCHAR(20)  NULL`);
+    await addCol(`ALTER TABLE creditos ADD COLUMN estado             VARCHAR(30)  NULL`);
+    await addCol(`ALTER TABLE creditos ADD COLUMN cuota              BIGINT       NULL`);
+    await addCol(`ALTER TABLE creditos ADD COLUMN tipo_ubicacion     VARCHAR(50)  NULL`);
+    await addCol(`ALTER TABLE creditos ADD COLUMN nombre_parque_mgmt VARCHAR(100) NULL`);
     // Ampliar tipo_ubicacion si quedó como VARCHAR(10)
-    await pool.query(`ALTER TABLE operaciones_brokerage MODIFY COLUMN tipo_ubicacion VARCHAR(50) NULL`).catch(() => {});
-    await addCol(`ALTER TABLE operaciones_brokerage ADD COLUMN id_dealer          INT          NULL`);
-    await addCol(`ALTER TABLE operaciones_brokerage ADD COLUMN id_cliente         INT          NULL`);
-    await addCol(`ALTER TABLE operaciones_brokerage ADD COLUMN id_usuario         INT          NULL`);
-    await addCol(`ALTER TABLE operaciones_brokerage ADD COLUMN id_cotizacion      INT          NULL`);
-    await addCol(`ALTER TABLE operaciones_brokerage ADD COLUMN datos_json         JSON         NULL`);
-    await addCol(`ALTER TABLE operaciones_brokerage ADD COLUMN observaciones      TEXT         NULL`);
-    await addCol(`ALTER TABLE operaciones_brokerage ADD COLUMN gastos             BIGINT       NULL`);
-    await addCol(`ALTER TABLE operaciones_brokerage ADD COLUMN seguros            BIGINT       NULL`);
+    await pool.query(`ALTER TABLE creditos MODIFY COLUMN tipo_ubicacion VARCHAR(50) NULL`).catch(() => {});
+    await addCol(`ALTER TABLE creditos ADD COLUMN id_dealer          INT          NULL`);
+    await addCol(`ALTER TABLE creditos ADD COLUMN id_cliente         INT          NULL`);
+    await addCol(`ALTER TABLE creditos ADD COLUMN id_usuario         INT          NULL`);
+    await addCol(`ALTER TABLE creditos ADD COLUMN id_cotizacion      INT          NULL`);
+    await addCol(`ALTER TABLE creditos ADD COLUMN datos_json         JSON         NULL`);
+    await addCol(`ALTER TABLE creditos ADD COLUMN observaciones      TEXT         NULL`);
+    await addCol(`ALTER TABLE creditos ADD COLUMN gastos             BIGINT       NULL`);
+    await addCol(`ALTER TABLE creditos ADD COLUMN seguros            BIGINT       NULL`);
     // Campos desde cartas de aprobación
-    await addCol(`ALTER TABLE operaciones_brokerage ADD COLUMN rut_concesionario  VARCHAR(20)  NULL`);
-    await addCol(`ALTER TABLE operaciones_brokerage ADD COLUMN vendedor           VARCHAR(150) NULL`);
+    await addCol(`ALTER TABLE creditos ADD COLUMN rut_concesionario  VARCHAR(20)  NULL`);
+    await addCol(`ALTER TABLE creditos ADD COLUMN vendedor           VARCHAR(150) NULL`);
     // comdea_real ya existe en la tabla original (comisión/participación del dealer)
     // Poblar estado correcto según tipo de financiera:
     // - AUTOFACIL (cartera propia) → VIGENTE (se puede trackear pagos)
     // - AUTOFIN / UNIDAD DE CREDITO (brokerage) → OTORGADO (somos broker, no podemos saber si está vigente)
     await pool.query(`
-      UPDATE operaciones_brokerage
+      UPDATE creditos
       SET estado = 'OTORGADO'
       WHERE estado_eval = 'OTORGADO'
         AND (estado IS NULL OR estado = '' OR estado = 'VIGENTE')
         AND financiera IN ('AUTOFIN', 'UNIDAD DE CREDITO')
     `);
     await pool.query(`
-      UPDATE operaciones_brokerage
+      UPDATE creditos
       SET estado = 'VIGENTE'
       WHERE estado_eval = 'OTORGADO'
         AND (estado IS NULL OR estado = '')
         AND (financiera IS NULL OR financiera NOT IN ('AUTOFIN', 'UNIDAD DE CREDITO'))
     `);
 
-    // VIEW creditos → operaciones_brokerage
+    // VIEW creditos → creditos
     // Todos los módulos (cobranza, tesorería, auditoría, pagos, CRM)
     // siguen usando "FROM creditos" sin cambios.
     await pool.query(`
@@ -90,7 +90,7 @@ const audit = require('../../../../shared/auditoria');
         estado_eval,
         mes,
         created_at, updated_at
-      FROM operaciones_brokerage
+      FROM creditos
     `);
   } catch (e) {
     if (e.errno !== 1050) console.error('[creditos migration]', e.message);
@@ -104,7 +104,7 @@ async function generarNumero() {
   const mm   = String(hoy.getMonth() + 1).padStart(2, '0');
   const prefix = `${yy}${mm}`;
   const [rows] = await pool.query(
-    `SELECT numero_credito FROM operaciones_brokerage
+    `SELECT numero_credito FROM creditos
      WHERE numero_credito LIKE ? ORDER BY id DESC LIMIT 1`,
     [prefix + '%']
   );
@@ -153,7 +153,7 @@ const SELECT_GESTION = `
     -- cuotas_pagadas solo para créditos digitados manualmente (numero_credito propio)
     -- Los importados desde Excel (brokerage) no se trackean en pagos: NULL evita falsos EN MORA
     IF(ob.numero_credito IS NOT NULL, COALESCE(pp.cnt, 0), NULL) AS cuotas_pagadas
-  FROM operaciones_brokerage ob
+  FROM creditos ob
   LEFT JOIN (
     SELECT id_credito, COUNT(DISTINCT numero_cuota) AS cnt
     FROM pagos_credito WHERE estado_pago = 'PAGADO'
@@ -197,7 +197,7 @@ const create = async (req, res) => {
     const pct   = (valor_vehiculo && saldo) ? saldo / valor_vehiculo : null;
 
     const [r] = await pool.query(`
-      INSERT INTO operaciones_brokerage
+      INSERT INTO creditos
         (numero_credito, rut_cliente, nombre_cliente, financiera,
          estado_eval, estado,
          id_cotizacion, id_usuario,
@@ -297,7 +297,7 @@ const getById = async (req, res) => {
               ob.automotora                                         AS dealer,
               ob.tascli_real                                        AS tasa_mensual,
               ob.fecha_otorgado                                     AS fecha_otorgamiento
-       FROM operaciones_brokerage ob WHERE ob.id = ?`,
+       FROM creditos ob WHERE ob.id = ?`,
       [req.params.id]
     );
     if (!rows.length)
@@ -327,7 +327,7 @@ const update = async (req, res) => {
     } = req.body;
 
     const [prev] = await pool.query(
-      'SELECT estado, numero_credito, nombre_cliente FROM operaciones_brokerage WHERE id = ?',
+      'SELECT estado, numero_credito, nombre_cliente FROM creditos WHERE id = ?',
       [req.params.id]
     );
     if (!prev.length) return res.status(404).json({ success: false, data: null, error: 'Crédito no encontrado' });
@@ -342,7 +342,7 @@ const update = async (req, res) => {
       const pct   = (valor_vehiculo && saldo) ? saldo / valor_vehiculo : null;
 
       await pool.query(`
-        UPDATE operaciones_brokerage
+        UPDATE creditos
         SET estado               = ?,
             observaciones        = ?,
             ejecutivo            = ?,
@@ -415,7 +415,7 @@ const update = async (req, res) => {
     } else {
       // ── Actualización parcial: solo estado/observaciones/campos de gestión
       await pool.query(`
-        UPDATE operaciones_brokerage
+        UPDATE creditos
         SET estado        = ?,
             observaciones = ?,
             ejecutivo     = ?,

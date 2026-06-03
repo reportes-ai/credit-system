@@ -134,12 +134,12 @@ const getByRut = async (req, res) => {
     const [rows] = await pool.query('SELECT * FROM clientes WHERE rut = ?', [rut]);
     if (rows.length) return res.json({ success: true, data: rows[0], error: null });
 
-    // 2. Fallback: buscar en operaciones_brokerage (datos básicos del Excel)
+    // 2. Fallback: buscar en creditos (datos básicos del Excel)
     const [ops] = await pool.query(`
       SELECT rut_cliente AS rut, nombre_cliente,
              MAX(fecha_otorgado) AS ultima_op,
              COUNT(*) AS total_ops
-      FROM operaciones_brokerage
+      FROM creditos
       WHERE UPPER(REPLACE(rut_cliente,' ','')) = UPPER(REPLACE(?,' ',''))
       GROUP BY rut_cliente, nombre_cliente
       LIMIT 1

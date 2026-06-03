@@ -86,7 +86,7 @@ const getOperaciones = async (req, res) => {
          (SELECT COUNT(*) FROM facturas_brokerage f WHERE f.operacion_id = o.id) AS cnt_facturas,
          (SELECT COUNT(*) FROM pagos_brokerage p WHERE p.operacion_id = o.id) AS cnt_pagos,
          (SELECT SUM(p.monto) FROM pagos_brokerage p WHERE p.operacion_id = o.id AND p.estado = 'PAGADO') AS monto_pagado
-       FROM operaciones_brokerage o
+       FROM creditos o
        ${w}
        ORDER BY o.mes DESC, o.id DESC
        LIMIT ? OFFSET ?`,
@@ -101,7 +101,7 @@ const getOperaciones = async (req, res) => {
 /* ─── GET /api/brokerage/operaciones/:id ─────────────────────────── */
 const getOperacion = async (req, res) => {
   try {
-    const [[op]] = await pool.query('SELECT * FROM operaciones_brokerage WHERE id = ?', [req.params.id]);
+    const [[op]] = await pool.query('SELECT * FROM creditos WHERE id = ?', [req.params.id]);
     if (!op) return res.status(404).json({ success: false, data: null, error: 'Operación no encontrada' });
 
     const [facturas] = await pool.query(
@@ -129,7 +129,7 @@ const createFactura = async (req, res) => {
     const { operacion_id, numero_factura, rut_emisor, nombre_emisor, monto, fecha_factura, archivo_nombre, mime_type, archivo_data, observaciones } = req.body;
     if (!operacion_id) return res.status(400).json({ success: false, data: null, error: 'operacion_id requerido' });
 
-    const [[op]] = await pool.query('SELECT id FROM operaciones_brokerage WHERE id = ?', [operacion_id]);
+    const [[op]] = await pool.query('SELECT id FROM creditos WHERE id = ?', [operacion_id]);
     if (!op) return res.status(404).json({ success: false, data: null, error: 'Operación no encontrada' });
 
     const buffer = archivo_data ? Buffer.from(archivo_data, 'base64') : null;
@@ -186,7 +186,7 @@ const createPago = async (req, res) => {
     const { operacion_id, tipo_pago, monto, banco, cuenta_destino, num_transaccion, fecha_pago, observaciones } = req.body;
     if (!operacion_id || !monto) return res.status(400).json({ success: false, data: null, error: 'operacion_id y monto requeridos' });
 
-    const [[op]] = await pool.query('SELECT id FROM operaciones_brokerage WHERE id = ?', [operacion_id]);
+    const [[op]] = await pool.query('SELECT id FROM creditos WHERE id = ?', [operacion_id]);
     if (!op) return res.status(404).json({ success: false, data: null, error: 'Operación no encontrada' });
 
     const regPor = req.usuario ? `${req.usuario.nombre} ${req.usuario.apellido || ''}`.trim() : null;
@@ -204,7 +204,7 @@ const createPago = async (req, res) => {
     // Si hay N° transacción → marcar operación como PAGADO
     if (num_transaccion) {
       await pool.query(
-        "UPDATE operaciones_brokerage SET estado_pago='PAGADO', fecha_pago=?, num_transaccion=? WHERE id=?",
+        "UPDATE creditos SET estado_pago='PAGADO', fecha_pago=?, num_transaccion=? WHERE id=?",
         [fecha_pago || null, num_transaccion, operacion_id]
       );
     }
@@ -234,7 +234,7 @@ const registrarTransferencia = async (req, res) => {
 
     // Marcar operación como PAGADO
     await pool.query(
-      "UPDATE operaciones_brokerage SET estado_pago='PAGADO', fecha_pago=COALESCE(?,fecha_pago), num_transaccion=? WHERE id=?",
+      "UPDATE creditos SET estado_pago='PAGADO', fecha_pago=COALESCE(?,fecha_pago), num_transaccion=? WHERE id=?",
       [fecha_pago || null, num_transaccion, pago.operacion_id]
     );
 

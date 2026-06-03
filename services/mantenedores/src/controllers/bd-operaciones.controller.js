@@ -7,7 +7,7 @@ const EXCLUIR = ['datos_json'];
 /* ── GET /api/bd-operaciones/columns ─── */
 const getColumns = async (req, res) => {
   try {
-    const [rows] = await pool.query('DESCRIBE operaciones_brokerage');
+    const [rows] = await pool.query('DESCRIBE creditos');
     const cols = rows
       .filter(r => !EXCLUIR.includes(r.Field))
       .map(r => ({ field: r.Field, type: r.Type, nullable: r.Null === 'YES', key: r.Key }));
@@ -27,7 +27,7 @@ const getAll = async (req, res) => {
     const sortDir = req.query.dir === 'asc' ? 'ASC' : 'DESC';
 
     // Validar nombre de columna para evitar SQL injection
-    const [colRows] = await pool.query('DESCRIBE operaciones_brokerage');
+    const [colRows] = await pool.query('DESCRIBE creditos');
     const validCols = colRows.map(r => r.Field);
     const safeSort  = validCols.includes(sortCol) ? sortCol : 'id';
 
@@ -42,10 +42,10 @@ const getAll = async (req, res) => {
     const whereStr = where.length ? 'WHERE ' + where.join(' AND ') : '';
 
     const [[{ total }]] = await pool.query(
-      `SELECT COUNT(*) AS total FROM operaciones_brokerage ${whereStr}`, vals
+      `SELECT COUNT(*) AS total FROM creditos ${whereStr}`, vals
     );
     const [rows] = await pool.query(
-      `SELECT * FROM operaciones_brokerage ${whereStr} ORDER BY \`${safeSort}\` ${sortDir} LIMIT ? OFFSET ?`,
+      `SELECT * FROM creditos ${whereStr} ORDER BY \`${safeSort}\` ${sortDir} LIMIT ? OFFSET ?`,
       [...vals, limit, offset]
     );
 
@@ -78,7 +78,7 @@ const update = async (req, res) => {
       return res.status(400).json({ success: false, data: null, error: 'Sin datos' });
 
     // Validar columnas
-    const [colRows] = await pool.query('DESCRIBE operaciones_brokerage');
+    const [colRows] = await pool.query('DESCRIBE creditos');
     const validCols = colRows.map(r => r.Field).filter(f => f !== 'id' && !EXCLUIR.includes(f));
 
     const sets = [], vals = [];
@@ -90,9 +90,9 @@ const update = async (req, res) => {
     if (!sets.length) return res.status(400).json({ success: false, data: null, error: 'Sin campos válidos' });
 
     vals.push(id);
-    await pool.query(`UPDATE operaciones_brokerage SET ${sets.join(', ')}, updated_at = NOW() WHERE id = ?`, vals);
+    await pool.query(`UPDATE creditos SET ${sets.join(', ')}, updated_at = NOW() WHERE id = ?`, vals);
 
-    const [[updated]] = await pool.query('SELECT * FROM operaciones_brokerage WHERE id = ?', [id]);
+    const [[updated]] = await pool.query('SELECT * FROM creditos WHERE id = ?', [id]);
     EXCLUIR.forEach(f => delete updated[f]);
     res.json({ success: true, data: updated, error: null });
   } catch (e) {

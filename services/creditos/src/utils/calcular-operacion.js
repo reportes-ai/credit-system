@@ -49,7 +49,7 @@ async function contarOpsUAC(mes) {
   if (!mes) return 0;
   const mesStr = typeof mes === 'string' ? mes.slice(0, 7) : mes.toISOString().slice(0, 7);
   const [rows] = await pool.query(`
-    SELECT COUNT(*) AS cnt FROM operaciones_brokerage
+    SELECT COUNT(*) AS cnt FROM creditos
     WHERE DATE_FORMAT(mes,'%Y-%m') = ?
       AND (financiera LIKE '%UNIDAD%' OR financiera LIKE '%UAC%')
       AND estado_credito IN ('OTORGADO','APROBADO')

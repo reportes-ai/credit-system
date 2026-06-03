@@ -1,11 +1,11 @@
 const pool = require('../../../../shared/config/database');
 const { calcularOperacion } = require('../utils/calcular-operacion');
 
-// Migración: tabla operaciones_brokerage
+// Migración: tabla creditos
 (async () => {
   try {
     await pool.query(`
-      CREATE TABLE IF NOT EXISTS operaciones_brokerage (
+      CREATE TABLE IF NOT EXISTS creditos (
         id               INT AUTO_INCREMENT PRIMARY KEY,
         num_op           INT,
         mes              DATE,
@@ -54,7 +54,7 @@ const { calcularOperacion } = require('../utils/calcular-operacion');
         created_by       INT
       )
     `);
-    console.log('✓ operaciones_brokerage: tabla lista');
+    console.log('✓ creditos: tabla lista');
   } catch (e) {
     console.error('[operaciones migration]', e.message);
   }
@@ -63,16 +63,16 @@ const { calcularOperacion } = require('../utils/calcular-operacion');
 // Migración v2: nuevas columnas workflow completo
 (async () => {
   const alteraciones = [
-    `ALTER TABLE operaciones_brokerage ADD COLUMN numero_credito VARCHAR(20) NULL AFTER id`,
-    `ALTER TABLE operaciones_brokerage ADD COLUMN rut_concesionario VARCHAR(20) NULL`,
-    `ALTER TABLE operaciones_brokerage ADD COLUMN vendedor VARCHAR(150) NULL`,
-    `ALTER TABLE operaciones_brokerage ADD COLUMN estado_fundantes VARCHAR(30) NOT NULL DEFAULT 'PENDIENTE'`,
-    `ALTER TABLE operaciones_brokerage ADD COLUMN liberado_pago TINYINT(1) NOT NULL DEFAULT 0`,
-    `ALTER TABLE operaciones_brokerage ADD COLUMN fecha_liberado_pago DATE NULL`,
-    `ALTER TABLE operaciones_brokerage ADD COLUMN liberado_por VARCHAR(150) NULL`,
-    `ALTER TABLE operaciones_brokerage ADD COLUMN estado_pago VARCHAR(30) NULL`,
-    `ALTER TABLE operaciones_brokerage ADD COLUMN fecha_pago DATE NULL`,
-    `ALTER TABLE operaciones_brokerage ADD COLUMN num_transaccion VARCHAR(100) NULL`,
+    `ALTER TABLE creditos ADD COLUMN numero_credito VARCHAR(20) NULL AFTER id`,
+    `ALTER TABLE creditos ADD COLUMN rut_concesionario VARCHAR(20) NULL`,
+    `ALTER TABLE creditos ADD COLUMN vendedor VARCHAR(150) NULL`,
+    `ALTER TABLE creditos ADD COLUMN estado_fundantes VARCHAR(30) NOT NULL DEFAULT 'PENDIENTE'`,
+    `ALTER TABLE creditos ADD COLUMN liberado_pago TINYINT(1) NOT NULL DEFAULT 0`,
+    `ALTER TABLE creditos ADD COLUMN fecha_liberado_pago DATE NULL`,
+    `ALTER TABLE creditos ADD COLUMN liberado_por VARCHAR(150) NULL`,
+    `ALTER TABLE creditos ADD COLUMN estado_pago VARCHAR(30) NULL`,
+    `ALTER TABLE creditos ADD COLUMN fecha_pago DATE NULL`,
+    `ALTER TABLE creditos ADD COLUMN num_transaccion VARCHAR(100) NULL`,
   ];
   for (const sql of alteraciones) {
     try { await pool.query(sql); } catch (e) { if (e.errno !== 1060) console.error('[operaciones v2]', e.message); }
@@ -82,11 +82,11 @@ const { calcularOperacion } = require('../utils/calcular-operacion');
 // Migración v3: datos de vehículo
 (async () => {
   const cols = [
-    `ALTER TABLE operaciones_brokerage ADD COLUMN marca VARCHAR(100) NULL`,
-    `ALTER TABLE operaciones_brokerage ADD COLUMN modelo VARCHAR(100) NULL`,
-    `ALTER TABLE operaciones_brokerage ADD COLUMN anio_vehiculo SMALLINT NULL`,
-    `ALTER TABLE operaciones_brokerage ADD COLUMN tasacion BIGINT NULL`,
-    `ALTER TABLE operaciones_brokerage ADD COLUMN permiso_circulacion BIGINT NULL`,
+    `ALTER TABLE creditos ADD COLUMN marca VARCHAR(100) NULL`,
+    `ALTER TABLE creditos ADD COLUMN modelo VARCHAR(100) NULL`,
+    `ALTER TABLE creditos ADD COLUMN anio_vehiculo SMALLINT NULL`,
+    `ALTER TABLE creditos ADD COLUMN tasacion BIGINT NULL`,
+    `ALTER TABLE creditos ADD COLUMN permiso_circulacion BIGINT NULL`,
   ];
   for (const sql of cols) {
     try { await pool.query(sql); } catch (e) { if (e.errno !== 1060) console.error('[operaciones v3]', e.message); }
@@ -96,11 +96,11 @@ const { calcularOperacion } = require('../utils/calcular-operacion');
 // Migración v4: índices para mejorar performance de búsquedas
 (async () => {
   const indices = [
-    `ALTER TABLE operaciones_brokerage ADD INDEX idx_mes (mes)`,
-    `ALTER TABLE operaciones_brokerage ADD INDEX idx_estado_credito (estado_credito)`,
-    `ALTER TABLE operaciones_brokerage ADD INDEX idx_rut_cliente (rut_cliente)`,
-    `ALTER TABLE operaciones_brokerage ADD INDEX idx_financiera (financiera)`,
-    `ALTER TABLE operaciones_brokerage ADD INDEX idx_mes_numop (mes, num_op)`,
+    `ALTER TABLE creditos ADD INDEX idx_mes (mes)`,
+    `ALTER TABLE creditos ADD INDEX idx_estado_credito (estado_credito)`,
+    `ALTER TABLE creditos ADD INDEX idx_rut_cliente (rut_cliente)`,
+    `ALTER TABLE creditos ADD INDEX idx_financiera (financiera)`,
+    `ALTER TABLE creditos ADD INDEX idx_mes_numop (mes, num_op)`,
   ];
   for (const sql of indices) {
     try { await pool.query(sql); } catch (e) { if (e.errno !== 1061) console.error('[operaciones v4]', e.message); }
@@ -110,9 +110,9 @@ const { calcularOperacion } = require('../utils/calcular-operacion');
 // Migración v5: columnas para cálculo automático de ingresos y comisiones
 (async () => {
   const cols = [
-    `ALTER TABLE operaciones_brokerage ADD COLUMN com_reparaciones DECIMAL(15,0) NULL`,
-    `ALTER TABLE operaciones_brokerage ADD COLUMN comej DECIMAL(15,0) NULL`,
-    `ALTER TABLE operaciones_brokerage ADD COLUMN ingreso_neto_total DECIMAL(15,2) NULL`,
+    `ALTER TABLE creditos ADD COLUMN com_reparaciones DECIMAL(15,0) NULL`,
+    `ALTER TABLE creditos ADD COLUMN comej DECIMAL(15,0) NULL`,
+    `ALTER TABLE creditos ADD COLUMN ingreso_neto_total DECIMAL(15,2) NULL`,
   ];
   for (const sql of cols) {
     try { await pool.query(sql); } catch (e) { if (e.errno !== 1060) console.error('[operaciones v5]', e.message); }
@@ -144,7 +144,7 @@ const nextOp = async (req, res) => {
     const prefix = yy + mm;                          // "2605"
 
     const [rows] = await pool.query(
-      `SELECT numero_credito FROM operaciones_brokerage
+      `SELECT numero_credito FROM creditos
        WHERE numero_credito LIKE ? ORDER BY id DESC LIMIT 1`,
       [prefix + '%']
     );
@@ -172,7 +172,7 @@ const getAll = async (req, res) => {
     if (estado)     { where.push('estado_credito = ?'); params.push(estado); }
     const w = where.length ? 'WHERE ' + where.join(' AND ') : '';
     const [rows] = await pool.query(
-      `SELECT * FROM operaciones_brokerage ${w} ORDER BY mes DESC, num_op DESC LIMIT ? OFFSET ?`,
+      `SELECT * FROM creditos ${w} ORDER BY mes DESC, num_op DESC LIMIT ? OFFSET ?`,
       [...params, parseInt(limit), parseInt(offset)]
     );
     res.json({ success: true, data: rows, error: null });
@@ -184,7 +184,7 @@ const getAll = async (req, res) => {
 /* ─── GET /api/operaciones/:id ────────────────────────────────────────── */
 const getOne = async (req, res) => {
   try {
-    const [[row]] = await pool.query('SELECT * FROM operaciones_brokerage WHERE id = ?', [req.params.id]);
+    const [[row]] = await pool.query('SELECT * FROM creditos WHERE id = ?', [req.params.id]);
     if (!row) return res.status(404).json({ success: false, data: null, error: 'Operación no encontrada' });
     res.json({ success: true, data: row, error: null });
   } catch (e) {
@@ -200,7 +200,7 @@ async function generarNumeroCred(mesISO) {
   const mm     = String(base.getMonth() + 1).padStart(2, '0');
   const prefix = `${yy}${mm}`;
   const [rows] = await pool.query(
-    `SELECT numero_credito FROM operaciones_brokerage
+    `SELECT numero_credito FROM creditos
      WHERE numero_credito LIKE ? ORDER BY id DESC LIMIT 1`,
     [prefix + '%']
   );
@@ -249,7 +249,7 @@ const create = async (req, res) => {
     });
 
     const [r] = await pool.query(
-      `INSERT INTO operaciones_brokerage (${fields.join(',')}) VALUES (${fields.map(() => '?').join(',')})`,
+      `INSERT INTO creditos (${fields.join(',')}) VALUES (${fields.map(() => '?').join(',')})`,
       values
     );
 
@@ -258,7 +258,7 @@ const create = async (req, res) => {
       try {
         const calc = await calcularOperacion({ ...b, saldo_precio, id: r.insertId });
         await pool.query(`
-          UPDATE operaciones_brokerage SET
+          UPDATE creditos SET
             monto_comision_fin = ?, com_rdh = ?, com_cesantia = ?,
             com_reparaciones = ?, comdea_real = ?, com_parque = ?,
             comej = ?, ingreso_neto_total = ?
@@ -270,7 +270,7 @@ const create = async (req, res) => {
       } catch(calcErr) { console.error('[calcular-operacion create]', calcErr.message); }
     }
 
-    const [[row]] = await pool.query('SELECT * FROM operaciones_brokerage WHERE id = ?', [r.insertId]);
+    const [[row]] = await pool.query('SELECT * FROM creditos WHERE id = ?', [r.insertId]);
     res.status(201).json({ success: true, data: row, error: null });
   } catch (e) {
     (console.error('[error]', e), res.status(500).json({success:false,data:null,error:'Error interno del servidor'}));
@@ -282,7 +282,7 @@ const update = async (req, res) => {
   try {
     const { id } = req.params;
     const b = req.body;
-    const [[exists]] = await pool.query('SELECT id FROM operaciones_brokerage WHERE id = ?', [id]);
+    const [[exists]] = await pool.query('SELECT id FROM creditos WHERE id = ?', [id]);
     if (!exists) return res.status(404).json({ success: false, data: null, error: 'No encontrada' });
 
     if (b.rut_cliente) b.rut_cliente = b.rut_cliente.replace(/\./g, '').toUpperCase().trim();
@@ -321,14 +321,14 @@ const update = async (req, res) => {
       id
     ];
 
-    await pool.query(`UPDATE operaciones_brokerage SET ${sets.join(',')} WHERE id=?`, vals);
+    await pool.query(`UPDATE creditos SET ${sets.join(',')} WHERE id=?`, vals);
 
     // Auto-calcular ingresos y comisiones al actualizar
     if (['OTORGADO','APROBADO'].includes((b.estado_credito||'').toUpperCase())) {
       try {
         const calc = await calcularOperacion({ ...b, saldo_precio, id });
         await pool.query(`
-          UPDATE operaciones_brokerage SET
+          UPDATE creditos SET
             monto_comision_fin = ?, com_rdh = ?, com_cesantia = ?,
             com_reparaciones = ?, comdea_real = ?, com_parque = ?,
             comej = ?, ingreso_neto_total = ?
@@ -340,7 +340,7 @@ const update = async (req, res) => {
       } catch(calcErr) { console.error('[calcular-operacion update]', calcErr.message); }
     }
 
-    const [[row]] = await pool.query('SELECT * FROM operaciones_brokerage WHERE id = ?', [id]);
+    const [[row]] = await pool.query('SELECT * FROM creditos WHERE id = ?', [id]);
     res.json({ success: true, data: row, error: null });
   } catch (e) {
     (console.error('[error]', e), res.status(500).json({success:false,data:null,error:'Error interno del servidor'}));
@@ -350,7 +350,7 @@ const update = async (req, res) => {
 /* ─── DELETE /api/operaciones/:id ────────────────────────────────────── */
 const remove = async (req, res) => {
   try {
-    await pool.query('DELETE FROM operaciones_brokerage WHERE id = ?', [req.params.id]);
+    await pool.query('DELETE FROM creditos WHERE id = ?', [req.params.id]);
     res.json({ success: true, data: { eliminado: req.params.id }, error: null });
   } catch (e) {
     (console.error('[error]', e), res.status(500).json({success:false,data:null,error:'Error interno del servidor'}));
@@ -368,15 +368,15 @@ const liberarPago = async (req, res) => {
       return res.status(403).json({ success: false, data: null, error: 'Sin permisos para liberar a pago' });
     }
     const { id } = req.params;
-    const [[exists]] = await pool.query('SELECT id, estado_fundantes FROM operaciones_brokerage WHERE id = ?', [id]);
+    const [[exists]] = await pool.query('SELECT id, estado_fundantes FROM creditos WHERE id = ?', [id]);
     if (!exists) return res.status(404).json({ success: false, data: null, error: 'Operación no encontrada' });
 
     const liberadoPor = req.usuario ? `${req.usuario.nombre} ${req.usuario.apellido || ''}`.trim() : null;
     await pool.query(
-      `UPDATE operaciones_brokerage SET liberado_pago=1, fecha_liberado_pago=CURDATE(), liberado_por=? WHERE id=?`,
+      `UPDATE creditos SET liberado_pago=1, fecha_liberado_pago=CURDATE(), liberado_por=? WHERE id=?`,
       [liberadoPor, id]
     );
-    const [[row]] = await pool.query('SELECT * FROM operaciones_brokerage WHERE id = ?', [id]);
+    const [[row]] = await pool.query('SELECT * FROM creditos WHERE id = ?', [id]);
     res.json({ success: true, data: row, error: null });
   } catch (e) {
     (console.error('[error]', e), res.status(500).json({success:false,data:null,error:'Error interno del servidor'}));
@@ -388,14 +388,14 @@ const marcarNoOtorgado = async (req, res) => {
   try {
     const { id } = req.params;
     const { comentario } = req.body;
-    const [[exists]] = await pool.query('SELECT id FROM operaciones_brokerage WHERE id = ?', [id]);
+    const [[exists]] = await pool.query('SELECT id FROM creditos WHERE id = ?', [id]);
     if (!exists) return res.status(404).json({ success: false, data: null, error: 'Operación no encontrada' });
     await pool.query(
-      `UPDATE operaciones_brokerage SET estado_credito='NO OTORGADO',
+      `UPDATE creditos SET estado_credito='NO OTORGADO',
        comentarios=CONCAT(COALESCE(comentarios,''),' | NO OTORGADO: ', COALESCE(?,'')) WHERE id=?`,
       [comentario || '', id]
     );
-    const [[row]] = await pool.query('SELECT * FROM operaciones_brokerage WHERE id = ?', [id]);
+    const [[row]] = await pool.query('SELECT * FROM creditos WHERE id = ?', [id]);
     res.json({ success: true, data: row, error: null });
   } catch (e) {
     (console.error('[error]', e), res.status(500).json({success:false,data:null,error:'Error interno del servidor'}));
