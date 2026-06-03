@@ -83,10 +83,13 @@ const getOperaciones = async (req, res) => {
 
     const [rows] = await pool.query(
       `SELECT o.*,
+         COALESCE(cl.rut,             o.rut_cliente)    AS rut_cliente,
+         COALESCE(cl.nombre_completo, o.nombre_cliente) AS nombre_cliente,
          (SELECT COUNT(*) FROM facturas_brokerage f WHERE f.operacion_id = o.id) AS cnt_facturas,
          (SELECT COUNT(*) FROM pagos_brokerage p WHERE p.operacion_id = o.id) AS cnt_pagos,
          (SELECT SUM(p.monto) FROM pagos_brokerage p WHERE p.operacion_id = o.id AND p.estado = 'PAGADO') AS monto_pagado
        FROM creditos o
+       LEFT JOIN clientes cl ON cl.id_cliente = o.id_cliente
        ${w}
        ORDER BY o.mes DESC, o.id DESC
        LIMIT ? OFFSET ?`,
@@ -101,7 +104,15 @@ const getOperaciones = async (req, res) => {
 /* ─── GET /api/brokerage/operaciones/:id ─────────────────────────── */
 const getOperacion = async (req, res) => {
   try {
-    const [[op]] = await pool.query('SELECT * FROM creditos WHERE id = ?', [req.params.id]);
+    const [[op]] = await pool.query(
+      `SELECT o.*,
+              COALESCE(cl.rut,             o.rut_cliente)    AS rut_cliente,
+              COALESCE(cl.nombre_completo, o.nombre_cliente) AS nombre_cliente
+       FROM creditos o
+       LEFT JOIN clientes cl ON cl.id_cliente = o.id_cliente
+       WHERE o.id = ?`,
+      [req.params.id]
+    );
     if (!op) return res.status(404).json({ success: false, data: null, error: 'Operación no encontrada' });
 
     const [facturas] = await pool.query(
