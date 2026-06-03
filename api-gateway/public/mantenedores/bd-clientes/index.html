@@ -25,56 +25,70 @@
     .perfil-badge { background:rgba(144,202,249,.2); border:1px solid rgba(144,202,249,.4); color:#90caf9; border-radius:12px; padding:2px 10px; font-size:.73rem; font-weight:600; }
     .btn-logout { background:rgba(255,255,255,.1); border:1px solid rgba(255,255,255,.2); color:#fff; border-radius:8px; padding:5px 12px; font-size:.82rem; cursor:pointer; }
     .main-content { padding:24px 28px; }
-    .page-banner { background:linear-gradient(135deg,#0f4c0f,#16a34a 50%,#4ade80); border-radius:14px; color:#fff; padding:20px 28px; margin-bottom:20px; display:flex; align-items:center; gap:16px; }
+    .page-banner { background:linear-gradient(135deg,#012d70,#0141A2 50%,#009AFE); border-radius:14px; color:#fff; padding:20px 28px; margin-bottom:20px; display:flex; align-items:center; gap:16px; }
     .page-banner i { font-size:2.4rem; opacity:.85; }
     .page-banner h2 { font-weight:800; margin:0 0 2px; font-size:1.3rem; }
     .page-banner p { opacity:.75; margin:0; font-size:.85rem; }
 
-    /* Búsqueda */
-    .search-bar { background:#fff; border-radius:12px; padding:18px 22px; margin-bottom:18px; box-shadow:0 1px 4px rgba(0,0,0,.06); }
-    .search-row { display:flex; gap:12px; align-items:center; flex-wrap:wrap; }
-    .rut-input { border:2px solid #e5e7eb; border-radius:10px; padding:10px 16px; font-size:1rem; font-weight:600; width:240px; transition:.15s; }
+    /* Toolbar */
+    .toolbar { background:#fff; border-radius:12px; padding:14px 18px; margin-bottom:14px; display:flex; align-items:center; gap:10px; flex-wrap:wrap; box-shadow:0 1px 4px rgba(0,0,0,.06); }
+    .toolbar .info-chip { background:var(--navy); color:#fff; border-radius:8px; padding:5px 14px; font-size:.82rem; font-weight:700; }
+    .toolbar .info-chip span { opacity:.7; font-weight:400; }
+    .rut-input { border:2px solid #e5e7eb; border-radius:8px; padding:6px 14px; font-size:.9rem; font-weight:600; width:200px; transition:.15s; }
     .rut-input:focus { outline:none; border-color:var(--navy); }
-    .btn-buscar { background:var(--navy); color:#fff; border:none; border-radius:10px; padding:10px 24px; font-size:.9rem; font-weight:700; cursor:pointer; display:flex; align-items:center; gap:8px; }
+    .btn-buscar { background:var(--navy); color:#fff; border:none; border-radius:8px; padding:7px 18px; font-size:.83rem; font-weight:700; cursor:pointer; display:flex; align-items:center; gap:6px; }
     .btn-buscar:hover { background:var(--navy-dark); }
 
     /* Ficha cliente */
-    .client-header { background:#fff; border-radius:12px; padding:20px 24px; margin-bottom:16px; box-shadow:0 1px 4px rgba(0,0,0,.06); display:none; }
-    .client-name { font-size:1.3rem; font-weight:800; color:#111827; margin:0 0 4px; }
-    .client-rut  { font-size:.95rem; color:#6b7280; margin:0; font-weight:600; }
-    .client-stats { display:flex; gap:14px; margin-top:14px; flex-wrap:wrap; }
-    .stat-chip { background:#f0f4ff; border:1px solid #c7d2fe; border-radius:8px; padding:6px 14px; font-size:.8rem; }
-    .stat-chip strong { color:var(--navy); font-size:1rem; display:block; }
+    .client-header { background:#fff; border-radius:12px; padding:16px 22px; margin-bottom:14px; box-shadow:0 1px 4px rgba(0,0,0,.06); display:none; border-left:4px solid var(--navy); }
+    .client-name { font-size:1.15rem; font-weight:800; color:#111827; margin:0 0 2px; }
+    .client-rut  { font-size:.88rem; color:#6b7280; font-weight:600; margin:0; }
+    .client-stats { display:flex; gap:10px; margin-top:12px; flex-wrap:wrap; }
+    .stat-chip { background:#f0f4ff; border:1px solid #c7d2fe; border-radius:8px; padding:5px 12px; font-size:.78rem; }
+    .stat-chip strong { color:var(--navy); font-size:.95rem; display:block; }
 
     /* Tabla */
     .table-wrapper { background:#fff; border-radius:12px; box-shadow:0 1px 6px rgba(0,0,0,.07); overflow:hidden; }
-    .table-scroll { overflow-x:auto; overflow-y:auto; max-height:calc(100vh - 380px); }
+    .table-scroll { overflow-x:auto; overflow-y:auto; max-height:calc(100vh - 340px); }
     table { border-collapse:collapse; width:max-content; min-width:100%; font-size:.78rem; }
-    thead th { background:#16a34a; color:#fff; font-weight:600; white-space:nowrap; position:sticky; top:0; z-index:10; padding:0; }
+    thead th { background:var(--navy); color:#fff; font-weight:600; white-space:nowrap; position:sticky; top:0; z-index:10; padding:0; }
     thead th .th-inner { display:flex; flex-direction:column; }
-    thead th .th-label { padding:8px 10px 4px; cursor:pointer; user-select:none; white-space:nowrap; display:flex; align-items:center; gap:4px; }
-    thead th .th-label:hover { background:rgba(255,255,255,.12); }
+    thead th .th-label { padding:8px 10px 4px; display:flex; align-items:center; gap:4px; cursor:pointer; user-select:none; white-space:nowrap; }
+    thead th .th-label:hover { background:rgba(255,255,255,.1); }
+    thead th .th-label .sort-icon { font-size:.65rem; opacity:.5; }
+    thead th .th-label.sorted-asc .sort-icon::before { content:' ▲'; opacity:1; }
+    thead th .th-label.sorted-desc .sort-icon::before { content:' ▼'; opacity:1; }
     thead th .filter-input { background:rgba(255,255,255,.15); border:1px solid rgba(255,255,255,.25); color:#fff; border-radius:5px; padding:3px 7px; font-size:.72rem; width:calc(100% - 14px); margin:0 7px 6px; box-sizing:border-box; }
     thead th .filter-input::placeholder { color:rgba(255,255,255,.5); }
-    thead th .filter-input:focus { outline:none; background:rgba(255,255,255,.25); }
+    thead th .filter-input:focus { outline:none; background:rgba(255,255,255,.25); border-color:#fff; }
     tbody tr { border-bottom:1px solid #f0f0f0; }
-    tbody tr:hover { background:#f0fff4; }
+    tbody tr:hover { background:#f0f7ff; }
     tbody td { padding:6px 10px; white-space:nowrap; max-width:220px; overflow:hidden; text-overflow:ellipsis; color:#374151; }
     tbody td.null-val { color:#d1d5db; font-style:italic; }
     tbody td.editable { cursor:pointer; }
     tbody td.editable:hover { background:#fffbeb; }
-    .edit-cell-input { border:2px solid #16a34a; border-radius:5px; padding:3px 7px; font-size:.78rem; width:100%; min-width:80px; box-sizing:border-box; }
+    .edit-cell-input { border:2px solid var(--accent); border-radius:5px; padding:3px 7px; font-size:.78rem; width:100%; min-width:80px; box-sizing:border-box; }
     .btn-action { border:none; border-radius:6px; padding:4px 10px; font-size:.75rem; font-weight:600; cursor:pointer; }
     .btn-save { background:#16a34a; color:#fff; }
     .btn-cancel { background:#e5e7eb; color:#374151; }
 
+    /* Paginación */
+    .pagination-bar { padding:12px 18px; display:flex; align-items:center; justify-content:space-between; border-top:1px solid #f0f0f0; flex-wrap:wrap; gap:8px; }
+    .pagination-bar .info { font-size:.8rem; color:#6b7280; }
+    .page-btns { display:flex; gap:4px; align-items:center; }
+    .page-btn { background:#f3f4f6; border:1px solid #e5e7eb; border-radius:6px; padding:4px 10px; font-size:.8rem; cursor:pointer; font-weight:600; color:#374151; }
+    .page-btn:hover { background:#e0e7ff; }
+    .page-btn.active { background:var(--navy); color:#fff; border-color:var(--navy); }
+    .page-btn:disabled { opacity:.4; cursor:default; }
+    select.per-page { border:1px solid #e5e7eb; border-radius:6px; padding:4px 8px; font-size:.8rem; color:#374151; }
+
     /* Empty state */
-    .empty-state { text-align:center; padding:60px 20px; color:#9ca3af; }
+    .empty-state { text-align:center; padding:60px 20px; color:#9ca3af; background:#fff; border-radius:12px; box-shadow:0 1px 4px rgba(0,0,0,.06); }
     .empty-state i { font-size:3rem; margin-bottom:16px; display:block; }
 
     /* Loading */
     .loading-overlay { position:fixed; inset:0; background:rgba(255,255,255,.7); display:none; align-items:center; justify-content:center; z-index:999; }
-    .spinner { width:40px; height:40px; border:4px solid #e5e7eb; border-top-color:#16a34a; border-radius:50%; animation:spin .7s linear infinite; }
+    .spinner { width:40px; height:40px; border:4px solid #e5e7eb; border-top-color:var(--navy); border-radius:50%; animation:spin .7s linear infinite; }
     @keyframes spin { to { transform:rotate(360deg); } }
     .toast-container { position:fixed; bottom:20px; right:20px; z-index:9999; display:flex; flex-direction:column; gap:8px; }
     .toast { background:#1e293b; color:#fff; border-radius:10px; padding:12px 18px; font-size:.83rem; display:flex; align-items:center; gap:10px; box-shadow:0 4px 20px rgba(0,0,0,.25); animation:slideIn .2s ease; }
@@ -88,11 +102,12 @@
   <div class="topnav-left">
     <a href="/" class="topnav-brand">
       <img src="/img/logo.png" alt="AutoFácil">
-      <span class="version-badge" id="versionBadge">v4.8</span>
+      <span class="version-badge">v4.8</span>
     </a>
     <div class="breadcrumb-nav">
       <a href="/">Inicio</a><span class="sep">›</span>
       <a href="/mantenedores/">Mantenedores</a><span class="sep">›</span>
+      <a href="/mantenedores/solo-dios/">⚡ Solo Dios</a><span class="sep">›</span>
       <span style="color:#fff;font-weight:600"><i class="bi bi-person-fill-gear me-1"></i>BD Clientes Nivel Dios</span>
     </div>
   </div>
@@ -113,20 +128,26 @@
     <i class="bi bi-person-fill-gear"></i>
     <div>
       <h2>👤 BD CLIENTES NIVEL DIOS</h2>
-      <p>Busca por RUT y accede a <strong>todas las operaciones</strong> del cliente con todos sus campos</p>
+      <p>Busca por RUT y accede a <strong>todas las operaciones</strong> del cliente con todos sus campos y filtros por columna</p>
     </div>
   </div>
 
-  <div class="search-bar">
-    <div class="search-row">
-      <input type="text" class="rut-input" id="rutInput" placeholder="Ej: 12345678-9"
-        onkeydown="if(event.key==='Enter') buscar()"
-        oninput="this.value=this.value.replace(/\./g,'').toUpperCase()">
-      <button class="btn-buscar" onclick="buscar()">
-        <i class="bi bi-search"></i>Buscar cliente
-      </button>
-      <span id="buscarStatus" style="font-size:.83rem;color:#6b7280;"></span>
-    </div>
+  <div class="toolbar">
+    <input type="text" class="rut-input" id="rutInput" placeholder="RUT: 12345678-9"
+      onkeydown="if(event.key==='Enter') buscar()"
+      oninput="this.value=this.value.replace(/\./g,'').toUpperCase()">
+    <button class="btn-buscar" onclick="buscar()"><i class="bi bi-search"></i>Buscar</button>
+    <div style="width:1px;height:24px;background:#e5e7eb;margin:0 4px;"></div>
+    <div class="info-chip" id="totalChip" style="display:none">Total: <span id="totalLabel">—</span></div>
+    <div class="info-chip" id="pageChip"  style="display:none">Página: <span id="pageLabel">—</span></div>
+    <button class="btn btn-sm btn-outline-secondary" id="btnClearFilters" style="display:none" onclick="clearFilters()"><i class="bi bi-x-circle me-1"></i>Limpiar filtros</button>
+    <button class="btn btn-sm btn-outline-primary" id="btnExport" style="display:none" onclick="exportCSV()"><i class="bi bi-download me-1"></i>Exportar CSV</button>
+    <div style="flex:1"></div>
+    <label style="font-size:.82rem;color:#6b7280;display:none" id="limitLabel">Filas por página:</label>
+    <select class="per-page" id="limitSel" style="display:none" onchange="changeLimit()">
+      <option value="25">25</option><option value="50" selected>50</option>
+      <option value="100">100</option><option value="200">200</option>
+    </select>
   </div>
 
   <div class="client-header" id="clientHeader">
@@ -135,12 +156,16 @@
     <div class="client-stats" id="clientStats"></div>
   </div>
 
-  <div class="table-wrapper" id="tableWrapper" style="display:none;">
+  <div class="table-wrapper" id="tableWrapper" style="display:none">
     <div class="table-scroll">
       <table id="mainTable">
         <thead id="thead"></thead>
         <tbody id="tbody"></tbody>
       </table>
+    </div>
+    <div class="pagination-bar">
+      <div class="info" id="paginInfo">—</div>
+      <div class="page-btns" id="pageBtns"></div>
     </div>
   </div>
 
@@ -159,17 +184,18 @@ const token = sessionStorage.getItem('token');
 const yo    = JSON.parse(sessionStorage.getItem('usuario') || 'null');
 if (!token || !yo) window.location.href = '/login.html';
 const H = { 'Content-Type':'application/json', Authorization:'Bearer '+token };
-
 document.getElementById('navNombre').textContent = `${yo?.nombre||''} ${yo?.apellido||''}`.trim();
 document.getElementById('navPerfil').textContent  = yo?.perfil || '';
 document.getElementById('avatarInicial').textContent = (yo?.nombre||'?').charAt(0).toUpperCase();
 function logout() { sessionStorage.removeItem('token'); sessionStorage.removeItem('usuario'); window.location.href='/login.html'; }
 
 let columns  = [];
-let rows     = [];
 let filters  = {};
 let sortCol  = 'mes';
 let sortDir  = 'desc';
+let page     = 1;
+let limit    = 50;
+let total    = 0;
 let editCell = null;
 let currentRut = '';
 
@@ -178,82 +204,85 @@ function toast(msg, type='success') {
   const d = document.createElement('div');
   d.className = `toast ${type}`;
   d.innerHTML = `<i class="bi bi-${type==='success'?'check-circle':'exclamation-triangle'}"></i>${msg}`;
-  c.appendChild(d);
-  setTimeout(() => d.remove(), 3500);
+  c.appendChild(d); setTimeout(()=>d.remove(), 3500);
 }
+function showLoading(v) { document.getElementById('loadingOverlay').style.display=v?'flex':'none'; }
+function debounce(fn,ms) { let t; return (...a)=>{clearTimeout(t);t=setTimeout(()=>fn(...a),ms);}; }
 
 async function init() {
   const r = await fetch('/api/bd-operaciones/columns', {headers:H});
   const j = await r.json();
   columns = j.data;
+  const urlRut = new URLSearchParams(location.search).get('rut');
+  if (urlRut) { document.getElementById('rutInput').value=urlRut; buscar(); }
+}
+
+function showToolbar(show) {
+  ['totalChip','pageChip','btnClearFilters','btnExport','limitLabel','limitSel']
+    .forEach(id => document.getElementById(id).style.display = show ? (id==='limitLabel'?'inline':'inline-flex'||'inline-block') : 'none');
+  document.getElementById('limitSel').style.display = show ? 'inline-block' : 'none';
+  document.getElementById('limitLabel').style.display = show ? 'inline' : 'none';
+  document.getElementById('btnClearFilters').style.display = show ? 'inline-flex' : 'none';
+  document.getElementById('btnExport').style.display = show ? 'inline-flex' : 'none';
+  document.getElementById('totalChip').style.display = show ? 'inline-flex' : 'none';
+  document.getElementById('pageChip').style.display  = show ? 'inline-flex' : 'none';
 }
 
 async function buscar() {
-  let rut = document.getElementById('rutInput').value.trim().replace(/\./g,'').toUpperCase();
+  const rut = document.getElementById('rutInput').value.trim().replace(/\./g,'').toUpperCase();
   if (!rut) return;
   currentRut = rut;
-  filters = {};
+  filters = { rut_cliente: rut };
+  page = 1;
+  await load(true);
+}
+
+async function load(isNewSearch=false) {
   showLoading(true);
   try {
-    const qs = new URLSearchParams({
-      page:1, limit:200, sort:sortCol, dir:sortDir,
-      filters: JSON.stringify({ rut_cliente: rut })
-    });
-    const r = await fetch(`/api/bd-operaciones?${qs}`, {headers:H});
-    const j = await r.json();
+    const activeFilters = { ...filters };
+    const qs = new URLSearchParams({ page, limit, sort:sortCol, dir:sortDir, filters:JSON.stringify(activeFilters) });
+    const r  = await fetch(`/api/bd-operaciones?${qs}`, {headers:H});
+    const j  = await r.json();
     if (!j.success) throw new Error(j.error);
-    rows = j.data.rows;
+    total = j.data.total;
 
-    if (!rows.length) {
+    if (!total && isNewSearch) {
       document.getElementById('clientHeader').style.display = 'none';
       document.getElementById('tableWrapper').style.display = 'none';
       document.getElementById('emptyState').style.display   = 'block';
-      document.getElementById('emptyState').innerHTML = `<i class="bi bi-person-x"></i><p>No se encontraron operaciones para RUT <strong>${rut}</strong></p>`;
-      document.getElementById('buscarStatus').textContent = 'Sin resultados';
-      return;
+      document.getElementById('emptyState').innerHTML = `<i class="bi bi-person-x"></i><p>No se encontraron operaciones para RUT <strong>${currentRut}</strong></p>`;
+      showToolbar(false);
+      showLoading(false); return;
     }
 
-    // Ficha cliente
-    const nombre = rows.find(r=>r.nombre_cliente)?.nombre_cliente || '—';
-    document.getElementById('clientName').textContent = nombre;
-    document.getElementById('clientRut').textContent  = rut;
-    const otorgados  = rows.filter(r=>r.estado_credito==='OTORGADO').length;
-    const vigentes   = rows.filter(r=>r.estado==='VIGENTE').length;
-    const financieras = [...new Set(rows.map(r=>r.financiera).filter(Boolean))].join(', ');
-    document.getElementById('clientStats').innerHTML = `
-      <div class="stat-chip"><strong>${rows.length}</strong>Total operaciones</div>
-      <div class="stat-chip"><strong>${otorgados}</strong>Otorgadas</div>
-      <div class="stat-chip"><strong>${vigentes}</strong>Vigentes</div>
-      <div class="stat-chip"><strong style="font-size:.75rem">${financieras||'—'}</strong>Financieras</div>
-    `;
-    document.getElementById('clientHeader').style.display = 'block';
-    document.getElementById('tableWrapper').style.display = 'block';
-    document.getElementById('emptyState').style.display   = 'none';
-    document.getElementById('buscarStatus').textContent   = `${rows.length} operaciones encontradas`;
+    if (isNewSearch) {
+      const rows = j.data.rows;
+      const nombre = rows.find(r=>r.nombre_cliente)?.nombre_cliente || '—';
+      document.getElementById('clientName').textContent = nombre;
+      document.getElementById('clientRut').textContent  = currentRut;
+      const otorgados  = j.data.rows.filter(r=>r.estado_credito==='OTORGADO').length;
+      const financieras = [...new Set(j.data.rows.map(r=>r.financiera).filter(Boolean))].join(', ');
+      document.getElementById('clientStats').innerHTML = `
+        <div class="stat-chip"><strong>${total}</strong>Operaciones totales</div>
+        <div class="stat-chip"><strong>${otorgados}</strong>Otorgadas (pág. actual)</div>
+        <div class="stat-chip"><strong style="font-size:.72rem">${financieras||'—'}</strong>Financieras</div>`;
+      document.getElementById('clientHeader').style.display = 'block';
+      document.getElementById('tableWrapper').style.display = 'block';
+      document.getElementById('emptyState').style.display   = 'none';
+      showToolbar(true);
+      buildHeaders();
+    }
 
-    buildHeaders();
-    renderRows(filterAndSort());
+    renderRows(j.data.rows);
+    renderPagination(j.data);
+    document.getElementById('totalLabel').textContent = total.toLocaleString();
+    document.getElementById('pageLabel').textContent  = `${j.data.page} / ${j.data.pages}`;
   } catch(e) {
     toast(e.message,'error');
   } finally {
     showLoading(false);
   }
-}
-
-function filterAndSort() {
-  let result = [...rows];
-  for (const [col, val] of Object.entries(filters)) {
-    if (!val) continue;
-    result = result.filter(r => String(r[col]||'').toLowerCase().includes(val.toLowerCase()));
-  }
-  result.sort((a,b) => {
-    const va = a[sortCol], vb = b[sortCol];
-    if (va === null || va === undefined) return 1;
-    if (vb === null || vb === undefined) return -1;
-    const cmp = String(va).localeCompare(String(vb), undefined, {numeric:true});
-    return sortDir === 'asc' ? cmp : -cmp;
-  });
-  return result;
 }
 
 function buildHeaders() {
@@ -263,22 +292,23 @@ function buildHeaders() {
     const inner = document.createElement('div'); inner.className='th-inner';
     const label = document.createElement('div');
     label.className = 'th-label' + (sortCol===col.field?' sorted-'+sortDir:'');
-    label.innerHTML = col.field;
-    label.onclick = () => { sortCol===col.field ? sortDir=(sortDir==='asc'?'desc':'asc') : (sortCol=col.field,sortDir='asc'); buildHeaders(); renderRows(filterAndSort()); };
+    label.innerHTML = `${col.field}<span class="sort-icon"></span>`;
+    label.onclick = () => { sortCol===col.field?(sortDir=sortDir==='asc'?'desc':'asc'):(sortCol=col.field,sortDir='asc'); page=1; buildHeaders(); load(); };
     const inp = document.createElement('input');
     inp.type='text'; inp.className='filter-input'; inp.placeholder='🔍';
-    inp.value = filters[col.field]||'';
-    inp.oninput = debounce(() => { filters[col.field]=inp.value; renderRows(filterAndSort()); }, 250);
+    inp.dataset.col = col.field;
+    inp.value = col.field==='rut_cliente' ? currentRut : (filters[col.field]||'');
+    inp.oninput = debounce(()=>{ filters[col.field]=inp.value; page=1; load(); }, 400);
     inner.appendChild(label); inner.appendChild(inp); th.appendChild(inner); tr.appendChild(th);
   });
   document.getElementById('thead').innerHTML='';
   document.getElementById('thead').appendChild(tr);
 }
 
-function renderRows(data) {
+function renderRows(rows) {
   const tbody = document.getElementById('tbody');
   tbody.innerHTML='';
-  data.forEach(row => {
+  rows.forEach(row => {
     const tr = document.createElement('tr');
     columns.forEach(col => {
       const td = document.createElement('td');
@@ -286,7 +316,7 @@ function renderRows(data) {
       td.dataset.field=col.field; td.dataset.id=row.id;
       if (val===null||val===undefined||val==='') { td.textContent='—'; td.className='null-val editable'; }
       else { td.textContent=val; td.className='editable'; td.title=String(val); }
-      if (col.field !== 'id') td.ondblclick = () => startEdit(tr, td, col, val);
+      if (col.field!=='id') td.ondblclick=()=>startEdit(tr,td,col,val);
       tr.appendChild(td);
     });
     tbody.appendChild(tr);
@@ -295,17 +325,16 @@ function renderRows(data) {
 
 function startEdit(tr, td, col, oldVal) {
   if (editCell) cancelEdit();
-  editCell = {tr,td,col,oldVal};
-  const inp = document.createElement('input');
+  editCell={tr,td,col,oldVal};
+  const inp=document.createElement('input');
   inp.className='edit-cell-input';
-  inp.value = (oldVal===null||oldVal===undefined)?'':oldVal;
-  inp.onkeydown = e => { if(e.key==='Enter') saveEdit(td.dataset.id,col.field,inp.value); if(e.key==='Escape') cancelEdit(); };
+  inp.value=(oldVal===null||oldVal===undefined)?'':oldVal;
+  inp.onkeydown=e=>{if(e.key==='Enter')saveEdit(td.dataset.id,col.field,inp.value);if(e.key==='Escape')cancelEdit();};
   td.innerHTML=''; td.appendChild(inp);
   const s=document.createElement('button'); s.className='btn-action btn-save ms-1'; s.textContent='✓'; s.onclick=()=>saveEdit(td.dataset.id,col.field,inp.value);
   const c=document.createElement('button'); c.className='btn-action btn-cancel ms-1'; c.textContent='✕'; c.onclick=cancelEdit;
   td.appendChild(s); td.appendChild(c); inp.focus(); inp.select();
 }
-
 function cancelEdit() {
   if (!editCell) return;
   const {td,oldVal}=editCell;
@@ -313,36 +342,43 @@ function cancelEdit() {
   td.className=(oldVal===null||oldVal===undefined||oldVal==='')?'null-val editable':'editable';
   editCell=null;
 }
-
 async function saveEdit(id, field, newVal) {
   showLoading(true);
   try {
-    const r = await fetch(`/api/bd-operaciones/${id}`, {
-      method:'PUT', headers:H,
-      body: JSON.stringify({[field]: newVal===''?null:newVal})
-    });
-    const j = await r.json();
-    if (!j.success) throw new Error(j.error);
-    // Actualizar fila local
-    const row = rows.find(r=>r.id==id);
-    if (row) row[field] = newVal===''?null:newVal;
-    editCell=null;
-    toast(`✅ ${field} actualizado`);
-    renderRows(filterAndSort());
-  } catch(e) {
-    toast(e.message,'error'); cancelEdit();
-  } finally {
-    showLoading(false);
-  }
+    const r=await fetch(`/api/bd-operaciones/${id}`,{method:'PUT',headers:H,body:JSON.stringify({[field]:newVal===''?null:newVal})});
+    const j=await r.json();
+    if(!j.success) throw new Error(j.error);
+    editCell=null; toast(`✅ ${field} actualizado`); await load();
+  } catch(e) { toast(e.message,'error'); cancelEdit(); }
+  finally { showLoading(false); }
 }
 
-function showLoading(v) { document.getElementById('loadingOverlay').style.display=v?'flex':'none'; }
-function debounce(fn,ms) { let t; return (...a) => { clearTimeout(t); t=setTimeout(()=>fn(...a),ms); }; }
+function renderPagination(d) {
+  document.getElementById('paginInfo').textContent =
+    `Mostrando ${((d.page-1)*d.limit)+1}–${Math.min(d.page*d.limit,d.total)} de ${d.total.toLocaleString()} registros`;
+  const container=document.getElementById('pageBtns');
+  container.innerHTML='';
+  const mk=(label,p,dis=false)=>{const b=document.createElement('button');b.className='page-btn'+(p===page?' active':'');b.textContent=label;b.disabled=dis;b.onclick=()=>{page=p;load();};return b;};
+  container.appendChild(mk('«',1,page===1));
+  container.appendChild(mk('‹',page-1,page===1));
+  const start=Math.max(1,page-2),end=Math.min(d.pages,page+2);
+  for(let i=start;i<=end;i++) container.appendChild(mk(i,i));
+  container.appendChild(mk('›',page+1,page===d.pages));
+  container.appendChild(mk('»',d.pages,page===d.pages));
+}
+
+function changeLimit() { limit=parseInt(document.getElementById('limitSel').value); page=1; load(); }
+function clearFilters() { filters={rut_cliente:currentRut}; document.querySelectorAll('.filter-input').forEach(inp=>{ inp.value=inp.dataset.col==='rut_cliente'?currentRut:''; }); page=1; load(); }
+function exportCSV() {
+  const rows=[...document.querySelectorAll('#tbody tr')];
+  const header=columns.map(c=>c.field).join(',');
+  const lines=rows.map(tr=>[...tr.querySelectorAll('td')].map(td=>`"${td.title||td.textContent}"`).join(','));
+  const csv=[header,...lines].join('\n');
+  const a=document.createElement('a'); a.href=URL.createObjectURL(new Blob([csv],{type:'text/csv'}));
+  a.download=`cliente_${currentRut}.csv`; a.click();
+}
 
 init();
-// Auto-buscar si viene RUT en URL
-const urlRut = new URLSearchParams(location.search).get('rut');
-if (urlRut) { document.getElementById('rutInput').value=urlRut; buscar(); }
 </script>
 </body>
 </html>

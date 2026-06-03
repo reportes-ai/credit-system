@@ -49,9 +49,16 @@ const getAll = async (req, res) => {
       [...vals, limit, offset]
     );
 
-    // Eliminar campos excluidos
+    // Limpiar campos excluidos y formatear fechas/dates
+    const DATE_FIELDS = ['mes','fecha_otorgado','fecha_primera_cuota','fecha_estado','fecha_recep_fei',
+      'fecha_pago_sp','fecha_estim_pago_comaf','fecha_pago_com_dealer','fecha_recep_doc',
+      'fecha_liberado_pago','fecha_pago','created_at','updated_at'];
     const data = rows.map(r => {
       EXCLUIR.forEach(f => delete r[f]);
+      DATE_FIELDS.forEach(f => {
+        if (r[f] instanceof Date) r[f] = r[f].toISOString().slice(0, 10);
+        else if (r[f] && typeof r[f] === 'string' && r[f].includes('T')) r[f] = r[f].slice(0, 10);
+      });
       return r;
     });
 
