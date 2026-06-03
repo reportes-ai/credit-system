@@ -137,12 +137,14 @@ const getByRut = async (req, res) => {
 
     // 2. Fallback: buscar en creditos (datos básicos del Excel)
     const [ops] = await pool.query(`
-      SELECT rut_cliente AS rut, nombre_cliente,
-             MAX(fecha_otorgado) AS ultima_op,
+      SELECT ob.rut_cliente AS rut,
+             COALESCE(cl.nombre_completo, ob.nombre_cliente) AS nombre_cliente,
+             MAX(ob.fecha_otorgado) AS ultima_op,
              COUNT(*) AS total_ops
-      FROM creditos
-      WHERE UPPER(REPLACE(rut_cliente,' ','')) = UPPER(REPLACE(?,' ',''))
-      GROUP BY rut_cliente, nombre_cliente
+      FROM creditos ob
+      LEFT JOIN clientes cl ON cl.id_cliente = ob.id_cliente
+      WHERE UPPER(REPLACE(ob.rut_cliente,' ','')) = UPPER(REPLACE(?,' ',''))
+      GROUP BY ob.rut_cliente, ob.nombre_cliente
       LIMIT 1
     `, [rut]);
 

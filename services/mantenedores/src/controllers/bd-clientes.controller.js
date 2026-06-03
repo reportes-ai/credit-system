@@ -75,7 +75,7 @@ const getOperaciones = async (req, res) => {
   try {
     const { id } = req.params;
     const [rows] = await pool.query(
-      `SELECT id, num_op, mes, financiera, monto, plazo, estado, monto_comision_fin, rut_cliente
+      `SELECT id, num_op, mes, financiera, monto_financiado AS monto, plazo, estado_credito AS estado, monto_comision_fin
        FROM creditos WHERE id_cliente = ? ORDER BY mes DESC, id DESC`,
       [id]
     );

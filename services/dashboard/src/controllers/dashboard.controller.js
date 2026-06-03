@@ -185,12 +185,13 @@ exports.getDatos = async (req, res) => {
         COALESCE(estado_sp, '')                               AS estado_sp,
         COALESCE(status_comaf, '')                            AS status_comaf,
         COALESCE(resultado_negocio, '')                       AS resultado_negocio,
-        COALESCE(rut_cliente, '')                             AS rut_cliente,
-        COALESCE(nombre_cliente, '')                          AS nombre_cliente,
+        COALESCE(cl.rut, ob.rut_cliente, '')                  AS rut_cliente,
+        COALESCE(cl.nombre_completo, ob.nombre_cliente, '')   AS nombre_cliente,
         COALESCE(rut_dealer, '')                              AS rut_dealer
-      FROM creditos
-      WHERE mes IS NOT NULL
-      ORDER BY mes ASC, num_op ASC
+      FROM creditos ob
+      LEFT JOIN clientes cl ON cl.id_cliente = ob.id_cliente
+      WHERE ob.mes IS NOT NULL
+      ORDER BY ob.mes ASC, ob.num_op ASC
     `);
 
     // Agregar institucion derivada + castear decimales a número

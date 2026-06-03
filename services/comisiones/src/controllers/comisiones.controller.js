@@ -182,13 +182,16 @@ const getCalculo = async (req, res) => {
 
     // Trae todos los créditos del mes agrupados por ejecutivo
     const [creditos] = await pool.query(
-      `SELECT ejecutivo, estado_credito, financiera, producto,
-              monto_financiado, plazo, seguro_cesantia, seguro_rep_menor,
-              seguro_rdh, valor_vehiculo, pie, saldo_precio,
-              fecha_otorgado, num_op, nombre_cliente, rut_cliente
-       FROM creditos
-       WHERE DATE_FORMAT(COALESCE(fecha_otorgado, mes), '%Y-%m') = ?
-         AND ejecutivo IS NOT NULL AND ejecutivo != ''`,
+      `SELECT ob.ejecutivo, ob.estado_credito, ob.financiera, ob.producto,
+              ob.monto_financiado, ob.plazo, ob.seguro_cesantia, ob.seguro_rep_menor,
+              ob.seguro_rdh, ob.valor_vehiculo, ob.pie, ob.saldo_precio,
+              ob.fecha_otorgado, ob.num_op,
+              COALESCE(cl.nombre_completo, ob.nombre_cliente) AS nombre_cliente,
+              COALESCE(cl.rut, ob.rut_cliente)                AS rut_cliente
+       FROM creditos ob
+       LEFT JOIN clientes cl ON cl.id_cliente = ob.id_cliente
+       WHERE DATE_FORMAT(COALESCE(ob.fecha_otorgado, ob.mes), '%Y-%m') = ?
+         AND ob.ejecutivo IS NOT NULL AND ob.ejecutivo != ''`,
       [mes]
     );
 
