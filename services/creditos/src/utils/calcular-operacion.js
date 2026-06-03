@@ -63,7 +63,8 @@ async function calcularOperacion(op) {
   const uf  = await getUF(op.fecha_otorgado);
 
   const saldo_precio  = parseFloat(op.saldo_precio)    || 0;
-  const monto_fin     = parseFloat(op.monto_financiado) || 0;
+  const monto_fin     = parseFloat(op.monto_financiado)   || 0;
+  const monto_cap     = parseFloat(op.monto_capitalizado) || monto_fin; // AutoFin usa capitalizado
   const plazo         = parseInt(op.plazo)              || 0;
   const financiera    = (op.financiera || '').toUpperCase();
   const parqueVal     = (op.parque || '').toUpperCase().trim();
@@ -85,19 +86,19 @@ async function calcularOperacion(op) {
   // ── 1. Ingreso por tasa ────────────────────────────────────────────
   if (plazo > 0 && monto_fin > 0) {
     if (financiera.includes('AUTOFIN') || financiera.includes('AUTOF')) {
-      // AutoFin: PV spread
+      // AutoFin: PV spread — usa monto_capitalizado como base
       const tmc_menor = (p.autofin_tmc_menor_200 / 100) / 12; // mensual
       const tmc_mayor = (p.autofin_tmc_mayor_200 / 100) / 12;
       const spread    = (p.autofin_spread_fondo  / 100);       // mensual
       const costo_fondo = tmc_mayor - spread;                  // 1.78% fijo
       const limite_200  = uf ? 200 * uf : null;
-      const tasa_cli    = (limite_200 && monto_fin > limite_200) ? tmc_mayor : tmc_menor;
+      const tasa_cli    = (limite_200 && monto_cap > limite_200) ? tmc_mayor : tmc_menor;
 
       if (tasa_cli > 0 && costo_fondo > 0) {
-        const cuota = monto_fin * tasa_cli * Math.pow(1 + tasa_cli, plazo)
+        const cuota = monto_cap * tasa_cli * Math.pow(1 + tasa_cli, plazo)
                     / (Math.pow(1 + tasa_cli, plazo) - 1);
         const pv = cuota * (1 - Math.pow(1 + costo_fondo, -plazo)) / costo_fondo;
-        monto_comision_fin = Math.round(pv - monto_fin);
+        monto_comision_fin = Math.round(pv - monto_cap);
       }
     } else if (financiera.includes('UNIDAD') || financiera.includes('UAC')) {
       // UAC: % del saldo precio según volumen del mes

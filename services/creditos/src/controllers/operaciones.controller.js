@@ -448,7 +448,7 @@ const recalcularComisiones = async (req, res) => {
     const [rows] = await pool.query(
       `SELECT id, saldo_precio, plazo, financiera, parque, com_parque,
               seguro_rdh, seguro_cesantia, seguro_rep_menor,
-              monto_financiado, fecha_otorgado, mes
+              monto_financiado, monto_capitalizado, fecha_otorgado, mes
        FROM creditos WHERE saldo_precio > 0 AND plazo > 0`
     );
 
@@ -469,9 +469,10 @@ const recalcularComisiones = async (req, res) => {
 
     // 5. Calcular todo en memoria
     const updates = rows.map(row => {
-      const saldo    = parseFloat(row.saldo_precio)    || 0;
-      const montoFin = parseFloat(row.monto_financiado) || 0;
-      const plazo    = parseInt(row.plazo)              || 0;
+      const saldo    = parseFloat(row.saldo_precio)      || 0;
+      const montoFin = parseFloat(row.monto_financiado)  || 0;
+      const montoCap = parseFloat(row.monto_capitalizado) || montoFin;
+      const plazo    = parseInt(row.plazo)                || 0;
       const fin      = (row.financiera || '').toUpperCase();
       const parqueVal = (row.parque || '').toUpperCase().trim();
       const esParque  = parqueVal.includes('PARQUE');
@@ -486,11 +487,11 @@ const recalcularComisiones = async (req, res) => {
           const spread     = p.autofin_spread_fondo / 100;
           const costo_fondo = tmc_mayor - spread;
           const limite_200  = uf ? 200 * uf : null;
-          const tasa_cli    = (limite_200 && montoFin > limite_200) ? tmc_mayor : tmc_menor;
+          const tasa_cli    = (limite_200 && montoCap > limite_200) ? tmc_mayor : tmc_menor;
           if (tasa_cli > 0 && costo_fondo > 0) {
-            const cuota = montoFin * tasa_cli * Math.pow(1+tasa_cli,plazo) / (Math.pow(1+tasa_cli,plazo)-1);
+            const cuota = montoCap * tasa_cli * Math.pow(1+tasa_cli,plazo) / (Math.pow(1+tasa_cli,plazo)-1);
             const pv    = cuota * (1 - Math.pow(1+costo_fondo,-plazo)) / costo_fondo;
-            monto_comision_fin = Math.round(pv - montoFin);
+            monto_comision_fin = Math.round(pv - montoCap);
           }
         } else if (fin.includes('UNIDAD') || fin.includes('UAC')) {
           monto_comision_fin = Math.round(saldo * (p.uac_pct_tier1 / 100));
