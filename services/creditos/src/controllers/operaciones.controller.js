@@ -172,7 +172,12 @@ const getAll = async (req, res) => {
     if (estado)     { where.push('estado_credito = ?'); params.push(estado); }
     const w = where.length ? 'WHERE ' + where.join(' AND ') : '';
     const [rows] = await pool.query(
-      `SELECT * FROM creditos ${w} ORDER BY mes DESC, num_op DESC LIMIT ? OFFSET ?`,
+      `SELECT ob.*,
+              COALESCE(cl.rut,             ob.rut_cliente)    AS rut_cliente,
+              COALESCE(cl.nombre_completo, ob.nombre_cliente) AS nombre_cliente
+       FROM creditos ob
+       LEFT JOIN clientes cl ON cl.id_cliente = ob.id_cliente
+       ${w} ORDER BY ob.mes DESC, ob.num_op DESC LIMIT ? OFFSET ?`,
       [...params, parseInt(limit), parseInt(offset)]
     );
     res.json({ success: true, data: rows, error: null });
@@ -184,7 +189,12 @@ const getAll = async (req, res) => {
 /* ─── GET /api/operaciones/:id ────────────────────────────────────────── */
 const getOne = async (req, res) => {
   try {
-    const [[row]] = await pool.query('SELECT * FROM creditos WHERE id = ?', [req.params.id]);
+    const [[row]] = await pool.query(
+      `SELECT ob.*, COALESCE(cl.rut, ob.rut_cliente) AS rut_cliente,
+              COALESCE(cl.nombre_completo, ob.nombre_cliente) AS nombre_cliente
+       FROM creditos ob
+       LEFT JOIN clientes cl ON cl.id_cliente = ob.id_cliente
+       WHERE ob.id = ?`, [req.params.id]);
     if (!row) return res.status(404).json({ success: false, data: null, error: 'Operación no encontrada' });
     res.json({ success: true, data: row, error: null });
   } catch (e) {
@@ -215,6 +225,10 @@ const create = async (req, res) => {
     if (!b.rut_cliente) return res.status(400).json({ success: false, data: null, error: 'RUT cliente requerido' });
     b.rut_cliente = b.rut_cliente.replace(/\./g, '').toUpperCase().trim();
 
+    // Resolver id_cliente desde tabla clientes
+    const [[cliRow]] = await pool.query('SELECT id_cliente FROM clientes WHERE rut = ?', [b.rut_cliente]);
+    b.id_cliente = cliRow?.id_cliente || null;
+
     // Auto-asignar numero_credito si no viene del formulario
     if (!b.numero_credito) {
       b.numero_credito = await generarNumeroCred(b.mes || null);
@@ -235,6 +249,7 @@ const create = async (req, res) => {
       'parque','mayor_menor','monto_capitalizado',
       'boleta_factura','cantidad_docs','docs_autorizados','fecha_recep_doc',
       'rut_concesionario','vendedor',
+      'id_cliente',
       'created_by'
     ];
 
@@ -288,6 +303,12 @@ const update = async (req, res) => {
     if (b.rut_cliente) b.rut_cliente = b.rut_cliente.replace(/\./g, '').toUpperCase().trim();
     const { saldo_precio, pct_financiado } = calcular(b);
 
+    // Resolver id_cliente si viene rut_cliente
+    if (b.rut_cliente) {
+      const [[cliRow]] = await pool.query('SELECT id_cliente FROM clientes WHERE rut = ?', [b.rut_cliente]);
+      b.id_cliente = cliRow?.id_cliente || null;
+    }
+
     const sets = [
       'num_op=?','mes=?','financiera=?','rut_cliente=?','nombre_cliente=?','comentarios=?',
       'ejecutivo=?','automotora=?','nombre_local=?','estado_eval=?','estado_credito=?',
@@ -301,6 +322,7 @@ const update = async (req, res) => {
       'parque=?','mayor_menor=?','monto_capitalizado=?',
       'boleta_factura=?','cantidad_docs=?','docs_autorizados=?','fecha_recep_doc=?',
       'rut_concesionario=?','vendedor=?',
+      'id_cliente=?',
       'updated_at=NOW()'
     ];
     const vals = [
@@ -318,6 +340,7 @@ const update = async (req, res) => {
       b.parque||'NO APLICA', b.mayor_menor||null, b.monto_capitalizado||0,
       b.boleta_factura||null, b.cantidad_docs||0, b.docs_autorizados||0, b.fecha_recep_doc||null,
       b.rut_concesionario||null, b.vendedor||null,
+      b.id_cliente||null,
       id
     ];
 
