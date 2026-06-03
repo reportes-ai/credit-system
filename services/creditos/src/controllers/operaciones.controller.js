@@ -535,15 +535,14 @@ const recalcularComisiones = async (req, res) => {
       }
 
       // Comisión seguros — solo para OTORGADO
-      // com_cesantia   = seguro_cesantia  × pct_cesantia(plazo)
-      // com_reparaciones = seguro_rep_menor × pct_desgravamen(plazo)
-      let com_cesantia = 0, com_reparaciones = 0;
+      // com_rdh      = seguro_rdh      × pct_desgravamen(plazo)
+      // com_cesantia = seguro_cesantia × pct_cesantia(plazo)
+      // com_reparaciones = 0 (rep. menores no genera comisión)
+      let com_rdh = 0, com_cesantia = 0;
       if (plazo > 0 && esOtorgado) {
         const { desg, cesa } = getSegCom(plazo);
-        const primaCes = parseFloat(row.seguro_cesantia)  || 0;
-        const primaRep = parseFloat(row.seguro_rep_menor) || 0;
-        com_cesantia     = Math.round(cesa * primaCes);
-        com_reparaciones = Math.round(desg * primaRep);
+        com_rdh      = Math.round(desg * (parseFloat(row.seguro_rdh)      || 0));
+        com_cesantia = Math.round(cesa * (parseFloat(row.seguro_cesantia) || 0));
       }
 
       // Comisión dealer
@@ -557,11 +556,11 @@ const recalcularComisiones = async (req, res) => {
         com_parque_calc = esParque ? Math.round(saldo * patio_pct) : 0;
       }
 
-      const ingreso_neto_total = monto_comision_fin + com_cesantia + com_reparaciones - comdea_real - com_parque_calc;
+      const ingreso_neto_total = monto_comision_fin + com_rdh + com_cesantia - comdea_real - com_parque_calc;
 
-      // [0:comdea, 1:com_parque, 2:monto_com_fin, 3:com_cesantia, 4:com_reparaciones,
-      //  5:ingreso_neto, 6:pen_rdh, 7:pen_cesantia, 8:pen_rep, 9:id]
-      return [comdea_real, com_parque_calc, monto_comision_fin, com_cesantia, com_reparaciones,
+      // [0:comdea, 1:com_parque, 2:monto_com_fin, 3:com_rdh, 4:com_cesantia, 5:com_rep(0),
+      //  6:ingreso_neto, 7:pen_rdh, 8:pen_cesantia, 9:pen_rep, 10:id]
+      return [comdea_real, com_parque_calc, monto_comision_fin, com_rdh, com_cesantia, 0,
               ingreso_neto_total, pen_rdh, pen_cesantia, pen_reparaciones, row.id];
     });
 
@@ -570,24 +569,26 @@ const recalcularComisiones = async (req, res) => {
     let actualizados = 0;
     for (let i = 0; i < updates.length; i += CHUNK) {
       const chunk   = updates.slice(i, i + CHUNK);
-      const ids     = chunk.map(u => u[9]);
-      const caseId  = chunk.map(u => `WHEN ${u[9]} THEN ?`).join(' ');
+      const ids     = chunk.map(u => u[10]);
+      const caseId  = chunk.map(u => `WHEN ${u[10]} THEN ?`).join(' ');
       const vals = [
-        ...chunk.map(u => u[0]), // comdea_real
-        ...chunk.map(u => u[1]), // com_parque
-        ...chunk.map(u => u[2]), // monto_comision_fin
-        ...chunk.map(u => u[3]), // com_cesantia
-        ...chunk.map(u => u[4]), // com_reparaciones
-        ...chunk.map(u => u[5]), // ingreso_neto_total
-        ...chunk.map(u => u[6]), // pen_rdh (null para no-AutoFin)
-        ...chunk.map(u => u[7]), // pen_cesantia
-        ...chunk.map(u => u[8]), // pen_reparaciones
+        ...chunk.map(u => u[0]),  // comdea_real
+        ...chunk.map(u => u[1]),  // com_parque
+        ...chunk.map(u => u[2]),  // monto_comision_fin
+        ...chunk.map(u => u[3]),  // com_rdh
+        ...chunk.map(u => u[4]),  // com_cesantia
+        ...chunk.map(u => u[5]),  // com_reparaciones (0)
+        ...chunk.map(u => u[6]),  // ingreso_neto_total
+        ...chunk.map(u => u[7]),  // pen_rdh
+        ...chunk.map(u => u[8]),  // pen_cesantia
+        ...chunk.map(u => u[9]),  // pen_reparaciones
         ...ids,
       ];
       const sql = `UPDATE creditos SET
         comdea_real        = CASE id ${caseId} END,
         com_parque         = CASE id ${caseId} END,
         monto_comision_fin = CASE id ${caseId} END,
+        com_rdh            = CASE id ${caseId} END,
         com_cesantia       = CASE id ${caseId} END,
         com_reparaciones   = CASE id ${caseId} END,
         ingreso_neto_total = CASE id ${caseId} END,

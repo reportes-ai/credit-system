@@ -78,8 +78,8 @@ async function calcularOperacion(op) {
   const esParque      = parqueVal.includes('PARQUE');
 
   // Primas de seguros
+  const primaRDH      = parseFloat(op.seguro_rdh)       || 0;
   const primaCesantia = parseFloat(op.seguro_cesantia)  || 0;
-  const primaRepMenor = parseFloat(op.seguro_rep_menor) || 0;
 
   let monto_comision_fin = 0;
   let com_rdh            = 0;
@@ -117,13 +117,14 @@ async function calcularOperacion(op) {
   }
 
   // ── 2. Ingreso por seguros ─────────────────────────────────────────
-  // com_cesantia   = seguro_cesantia  × pct_cesantia(plazo)
-  // com_reparaciones = seguro_rep_menor × pct_desgravamen(plazo)
-  // Solo aplica a créditos OTORGADOS (el check de estado se hace en el caller)
+  // com_rdh      = seguro_rdh      × pct_desgravamen(plazo)
+  // com_cesantia = seguro_cesantia × pct_cesantia(plazo)
+  // com_reparaciones = 0 (rep. menores no genera comisión)
   if (plazo > 0) {
     const { desg, cesa } = getSegCom(plazo, segRows);
-    com_cesantia     = Math.round(cesa * primaCesantia);
-    com_reparaciones = Math.round(desg * primaRepMenor);
+    com_rdh      = Math.round(desg * primaRDH);
+    com_cesantia = Math.round(cesa * primaCesantia);
+    com_reparaciones = 0;
   }
 
   // ── 3. Comisión dealer ─────────────────────────────────────────────
@@ -144,15 +145,15 @@ async function calcularOperacion(op) {
   }
 
   // ── 5. Ingreso neto total ──────────────────────────────────────────
-  const com_seguros_total  = com_cesantia + com_reparaciones;
+  const com_seguros_total  = com_rdh + com_cesantia;
   const ingreso_neto_total = monto_comision_fin + com_seguros_total
                            - comdea_real - com_parque_calc;
 
   return {
     monto_comision_fin,
-    com_rdh:           0,  // ya no se calcula — se deja en 0
+    com_rdh,
     com_cesantia,
-    com_reparaciones,
+    com_reparaciones: 0,
     comdea_real,
     com_parque:        com_parque_calc,
     comej,
