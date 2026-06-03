@@ -3,7 +3,8 @@ const router = express.Router();
 const { verifyToken } = require('../../../../shared/middleware/auth');
 const ctrl = require('../controllers/clientes.controller');
 
-router.get('/rut/:rut', verifyToken, ctrl.getByRut);
+router.get('/reporteria', verifyToken, ctrl.getReporteria);
+router.get('/rut/:rut',  verifyToken, ctrl.getByRut);
 router.get('/',         verifyToken, ctrl.getAll);
 router.get('/:id',      verifyToken, ctrl.getById);
 router.post('/',        verifyToken, ctrl.create);

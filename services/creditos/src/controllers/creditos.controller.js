@@ -504,4 +504,47 @@ const update = async (req, res) => {
   }
 };
 
-module.exports = { create, getAll, getById, update };
+/* ─── GET /reporteria — todos los campos de créditos ─────────────────────── */
+const getReporteria = async (req, res) => {
+  try {
+    const [rows] = await pool.query(`
+      SELECT
+        COALESCE(ob.numero_credito, CONCAT('OP-',ob.num_op)) AS numero_credito,
+        ob.num_op,
+        COALESCE(cl.rut,             '')  AS rut_cliente,
+        COALESCE(cl.nombre_completo, '')  AS nombre_cliente,
+        ob.financiera,
+        ob.estado_credito                 AS estado,
+        ob.fecha_otorgado,
+        ob.mes,
+        ob.valor_vehiculo, ob.saldo_precio, ob.pie,
+        ob.monto_financiado, ob.monto_capitalizado,
+        ob.plazo,
+        ob.tascli_real                    AS tasa_mensual,
+        ob.cuota,
+        ob.fecha_primera_cuota,
+        ob.tipo_vehiculo, ob.marca, ob.modelo, ob.anio, ob.patente,
+        ob.automotora                     AS dealer,
+        ob.rut_concesionario,
+        ob.vendedor,
+        ob.parque,
+        ob.ejecutivo,
+        ob.comdea_real                    AS comision_dealer,
+        ob.com_parque,
+        ob.monto_comision_fin,
+        ob.com_rdh, ob.com_cesantia, ob.com_reparaciones,
+        ob.ingreso_neto_total,
+        ob.seguro_rdh, ob.seguro_cesantia, ob.seguro_rep_menor,
+        ob.pen_rdh, ob.pen_cesantia, ob.pen_reparaciones,
+        ob.created_at
+      FROM creditos ob
+      LEFT JOIN clientes cl ON cl.id_cliente = ob.id_cliente
+      ORDER BY ob.mes DESC, ob.id DESC
+    `);
+    res.json({ success: true, data: rows, error: null });
+  } catch (e) {
+    res.status(500).json({ success: false, data: null, error: e.message });
+  }
+};
+
+module.exports = { create, getAll, getById, update, getReporteria };

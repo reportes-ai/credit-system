@@ -328,4 +328,39 @@ const update = async (req, res) => {
   }
 };
 
-module.exports = { getByRut, getAll, getById, create, update };
+/* ─── GET /reporteria — JOIN clientes + antecedentes + info_comercial ─────── */
+const getReporteria = async (req, res) => {
+  try {
+    const [rows] = await pool.query(`
+      SELECT
+        c.rut, c.tipo_cliente, c.nombre_completo,
+        c.nombres, c.apellido_paterno, c.apellido_materno,
+        c.fecha_nacimiento, c.estado_civil, c.sexo, c.regimen, c.cargas,
+        c.telefono_movil, c.nacionalidad, c.email, c.direccion,
+        c.actividad_economica, c.fecha_creacion,
+        -- Antecedentes Laborales
+        al.tipo_trabajador, al.empleador, al.rut_empresa, al.giro_empresa,
+        al.ciudad_comercial, al.telefono_comercial, al.antiguedad_meses,
+        al.renta_fija_liquida,
+        al.renta_var_mes1, al.renta_var_mes2, al.renta_var_mes3,
+        -- Información Comercial
+        ic.monto_protestos, ic.protestos_vigentes_q,
+        ic.deuda_vigente_total, ic.deuda_vigente_inst,
+        ic.deuda_hipotecaria, ic.deuda_hipotecaria_carga,
+        ic.deuda_comercial, ic.deuda_comercial_carga,
+        ic.deuda_consumo, ic.deuda_consumo_carga,
+        ic.deuda_morosa, ic.deuda_morosa_inst,
+        ic.deuda_vencida, ic.deuda_castigada,
+        ic.linea_disponible, ic.arriendo, ic.acredita_propiedad
+      FROM clientes c
+      LEFT JOIN antecedentes_laborales al ON al.rut_cliente = c.rut
+      LEFT JOIN informacion_comercial   ic ON ic.rut_cliente = c.rut
+      ORDER BY c.fecha_creacion DESC
+    `);
+    res.json({ success: true, data: rows, error: null });
+  } catch (e) {
+    res.status(500).json({ success: false, data: null, error: e.message });
+  }
+};
+
+module.exports = { getByRut, getAll, getById, create, update, getReporteria };

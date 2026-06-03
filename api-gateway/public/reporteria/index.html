@@ -62,7 +62,7 @@
   <div class="topnav-left">
     <a href="/" class="topnav-brand">
       <img src="/img/logo.png" alt="AutoFácil">
-      <span class="version-badge" id="versionBadge">v1.1</span>
+      <span class="version-badge" id="versionBadge">v1.2</span>
     </a>
     <div class="breadcrumb-nav">
       <a href="/">Inicio</a><span class="sep">›</span>
@@ -325,41 +325,102 @@ const TIPO_LABEL = {
 
 const MODULOS = {
   creditos:{
-    label:'Créditos', url:'/api/creditos',
+    label:'Créditos', url:'/api/creditos/reporteria',
     campos:[
-      { key:'numero_credito',     label:'N° Crédito',         filtro:{ tipo:'texto' } },
-      { key:'rut_cliente',        label:'RUT Cliente',         filtro:{ tipo:'texto' } },
-      { key:'nombre_cliente',     label:'Nombre Cliente',      filtro:{ tipo:'texto' } },
-      { key:'financiera',         label:'Financiera',          filtro:{ tipo:'multi', opts:['AUTOFACIL','AUTOFIN','UNIDAD DE CREDITO'] } },
-      { key:'estado',             label:'Estado',              filtro:{ tipo:'multi', opts:['INGRESO','CARGA_RESPALDOS','EN_ANALISIS','EMISION_DOCUMENTOS','CARGA_DOCUMENTOS_AF','VALIDACION_FIRMA','VIGENTE','RECHAZADO'] } },
-      { key:'fecha_otorgamiento', label:'Fecha Otorgamiento',  filtro:{ tipo:'fecha' } },
-      { key:'valor_vehiculo',     label:'Valor Vehículo',      filtro:{ tipo:'monto' } },
-      { key:'pie',                label:'Pie',                 filtro:{ tipo:'monto' } },
-      { key:'monto_financiado',   label:'Monto Financiado',    filtro:{ tipo:'monto' } },
-      { key:'plazo',              label:'Plazo (meses)',        filtro:{ tipo:'rango', sufijo:'meses', min:6, max:84 } },
-      { key:'tasa_mensual',       label:'Tasa Mensual',        filtro:{ tipo:'pct' } },
-      { key:'cuota',              label:'Cuota Mensual',       filtro:{ tipo:'monto' } },
-      { key:'tipo_vehiculo',      label:'Tipo Vehículo',       filtro:{ tipo:'multi', opts:['Automóvil','SUV','Camioneta','Furgón','Moto','Otro'] } },
-      { key:'marca',              label:'Marca',               filtro:{ tipo:'texto' } },
-      { key:'modelo',             label:'Modelo',              filtro:{ tipo:'texto' } },
-      { key:'anio',               label:'Año Vehículo',        filtro:{ tipo:'anio', min:1990, max:2030 } },
-      { key:'patente',            label:'Patente',             filtro:{ tipo:'texto' } },
-      { key:'dealer',             label:'Dealer',              filtro:{ tipo:'texto' } },
-      { key:'ejecutivo',          label:'Ejecutivo',           filtro:{ tipo:'texto' } },
-      { key:'mes',                label:'Mes Operación',       filtro:{ tipo:'fecha' } },
+      { key:'numero_credito',       label:'N° Crédito',           filtro:{ tipo:'texto' } },
+      { key:'num_op',               label:'N° Operación',         filtro:{ tipo:'texto' } },
+      { key:'rut_cliente',          label:'RUT Cliente',           filtro:{ tipo:'texto' } },
+      { key:'nombre_cliente',       label:'Nombre Cliente',        filtro:{ tipo:'texto' } },
+      { key:'financiera',           label:'Financiera',            filtro:{ tipo:'multi', opts:['AUTOFACIL','AUTOFIN','UNIDAD DE CREDITO'] } },
+      { key:'estado',               label:'Estado',                filtro:{ tipo:'multi', opts:['OTORGADO','RECHAZADO','VIGENTE','EN_ANALISIS','EMISION_DOCUMENTOS','CARGA_DOCUMENTOS_AF','VALIDACION_FIRMA','CANCELADO'] } },
+      { key:'fecha_otorgado',       label:'Fecha Otorgamiento',    filtro:{ tipo:'fecha' } },
+      { key:'mes',                  label:'Mes Operación',         filtro:{ tipo:'fecha' } },
+      { key:'valor_vehiculo',       label:'Valor Vehículo',        filtro:{ tipo:'monto' } },
+      { key:'saldo_precio',         label:'Saldo Precio',          filtro:{ tipo:'monto' } },
+      { key:'pie',                  label:'Pie',                   filtro:{ tipo:'monto' } },
+      { key:'monto_financiado',     label:'Monto Financiado',      filtro:{ tipo:'monto' } },
+      { key:'monto_capitalizado',   label:'Monto Capitalizado',    filtro:{ tipo:'monto' } },
+      { key:'plazo',                label:'Plazo (meses)',          filtro:{ tipo:'rango', sufijo:'meses', min:6, max:84 } },
+      { key:'tasa_mensual',         label:'Tasa Mensual',          filtro:{ tipo:'pct' } },
+      { key:'cuota',                label:'Cuota Mensual',         filtro:{ tipo:'monto' } },
+      { key:'fecha_primera_cuota',  label:'Fecha 1ª Cuota',        filtro:{ tipo:'fecha' } },
+      { key:'tipo_vehiculo',        label:'Tipo Vehículo',          filtro:{ tipo:'multi', opts:['Automóvil','SUV','Camioneta','Furgón','Moto','Otro'] } },
+      { key:'marca',                label:'Marca',                 filtro:{ tipo:'texto' } },
+      { key:'modelo',               label:'Modelo',                filtro:{ tipo:'texto' } },
+      { key:'anio',                 label:'Año Vehículo',          filtro:{ tipo:'anio', min:1990, max:2030 } },
+      { key:'patente',              label:'Patente',               filtro:{ tipo:'texto' } },
+      { key:'dealer',               label:'Dealer / Automotora',   filtro:{ tipo:'texto' } },
+      { key:'rut_concesionario',    label:'RUT Concesionario',     filtro:{ tipo:'texto' } },
+      { key:'vendedor',             label:'Vendedor',              filtro:{ tipo:'texto' } },
+      { key:'parque',               label:'Parque',                filtro:{ tipo:'texto' } },
+      { key:'ejecutivo',            label:'Ejecutivo',             filtro:{ tipo:'texto' } },
+      { key:'comision_dealer',      label:'Comisión Dealer',       filtro:{ tipo:'monto' } },
+      { key:'com_parque',           label:'Comisión Parque',       filtro:{ tipo:'monto' } },
+      { key:'monto_comision_fin',   label:'Ingreso x Colocación',  filtro:{ tipo:'monto' } },
+      { key:'com_rdh',              label:'Comisión RDH',          filtro:{ tipo:'monto' } },
+      { key:'com_cesantia',         label:'Comisión Cesantía',     filtro:{ tipo:'monto' } },
+      { key:'com_reparaciones',     label:'Comisión Reparaciones', filtro:{ tipo:'monto' } },
+      { key:'ingreso_neto_total',   label:'Ingreso Neto Total',    filtro:{ tipo:'monto' } },
+      { key:'seguro_rdh',           label:'Prima RDH',             filtro:{ tipo:'monto' } },
+      { key:'seguro_cesantia',      label:'Prima Cesantía',        filtro:{ tipo:'monto' } },
+      { key:'seguro_rep_menor',     label:'Prima Rep. Menores',    filtro:{ tipo:'monto' } },
+      { key:'pen_rdh',              label:'Penetración RDH (%)',   filtro:{ tipo:'pct' } },
+      { key:'pen_cesantia',         label:'Penetración Cesantía (%)', filtro:{ tipo:'pct' } },
+      { key:'pen_reparaciones',     label:'Penetración Rep. (%)',  filtro:{ tipo:'pct' } },
+      { key:'created_at',           label:'Fecha Ingreso',         filtro:{ tipo:'fecha' } },
     ]
   },
   clientes:{
-    label:'Clientes', url:'/api/clientes',
+    label:'Clientes', url:'/api/clientes/reporteria',
     campos:[
-      { key:'rut',        label:'RUT',          filtro:{ tipo:'texto' } },
-      { key:'nombre',     label:'Nombre',       filtro:{ tipo:'texto' } },
-      { key:'apellido',   label:'Apellido',     filtro:{ tipo:'texto' } },
-      { key:'email',      label:'Email',        filtro:{ tipo:'texto' } },
-      { key:'telefono',   label:'Teléfono',     filtro:{ tipo:'texto' } },
-      { key:'direccion',  label:'Dirección',    filtro:{ tipo:'texto' } },
-      { key:'ciudad',     label:'Ciudad',       filtro:{ tipo:'texto' } },
-      { key:'created_at', label:'Fecha Alta',   filtro:{ tipo:'fecha' } },
+      // ── Identificación ──────────────────────────────────────
+      { key:'rut',                  label:'RUT',                   filtro:{ tipo:'texto' } },
+      { key:'tipo_cliente',         label:'Tipo Cliente',          filtro:{ tipo:'multi', opts:['PERSONA','EMPRESA'] } },
+      { key:'nombres',              label:'Nombres',               filtro:{ tipo:'texto' } },
+      { key:'apellido_paterno',     label:'Apellido Paterno',      filtro:{ tipo:'texto' } },
+      { key:'apellido_materno',     label:'Apellido Materno',      filtro:{ tipo:'texto' } },
+      { key:'nombre_completo',      label:'Nombre Completo',       filtro:{ tipo:'texto' } },
+      { key:'fecha_nacimiento',     label:'Fecha Nacimiento',      filtro:{ tipo:'fecha' } },
+      { key:'estado_civil',         label:'Estado Civil',          filtro:{ tipo:'texto' } },
+      { key:'sexo',                 label:'Sexo',                  filtro:{ tipo:'multi', opts:['MASCULINO','FEMENINO'] } },
+      { key:'regimen',              label:'Régimen',               filtro:{ tipo:'texto' } },
+      { key:'cargas',               label:'N° Cargas',             filtro:{ tipo:'rango', sufijo:'', min:0, max:20 } },
+      { key:'nacionalidad',         label:'Nacionalidad',          filtro:{ tipo:'texto' } },
+      { key:'telefono_movil',       label:'Teléfono',              filtro:{ tipo:'texto' } },
+      { key:'email',                label:'Email',                 filtro:{ tipo:'texto' } },
+      { key:'direccion',            label:'Dirección',             filtro:{ tipo:'texto' } },
+      { key:'actividad_economica',  label:'Actividad Económica',   filtro:{ tipo:'texto' } },
+      { key:'fecha_creacion',       label:'Fecha Alta',            filtro:{ tipo:'fecha' } },
+      // ── Antecedentes Laborales ───────────────────────────────
+      { key:'tipo_trabajador',      label:'Tipo Trabajador',       filtro:{ tipo:'texto' } },
+      { key:'empleador',            label:'Empleador',             filtro:{ tipo:'texto' } },
+      { key:'rut_empresa',          label:'RUT Empresa',           filtro:{ tipo:'texto' } },
+      { key:'giro_empresa',         label:'Giro Empresa',          filtro:{ tipo:'texto' } },
+      { key:'ciudad_comercial',     label:'Ciudad Comercial',      filtro:{ tipo:'texto' } },
+      { key:'telefono_comercial',   label:'Teléfono Comercial',    filtro:{ tipo:'texto' } },
+      { key:'antiguedad_meses',     label:'Antigüedad (meses)',    filtro:{ tipo:'rango', sufijo:'meses', min:0, max:600 } },
+      { key:'renta_fija_liquida',   label:'Renta Fija Líquida',    filtro:{ tipo:'monto' } },
+      { key:'renta_var_mes1',       label:'Renta Variable Mes 1',  filtro:{ tipo:'monto' } },
+      { key:'renta_var_mes2',       label:'Renta Variable Mes 2',  filtro:{ tipo:'monto' } },
+      { key:'renta_var_mes3',       label:'Renta Variable Mes 3',  filtro:{ tipo:'monto' } },
+      // ── Información Comercial ────────────────────────────────
+      { key:'monto_protestos',      label:'Monto Protestos',       filtro:{ tipo:'monto' } },
+      { key:'protestos_vigentes_q', label:'N° Protestos Vigentes', filtro:{ tipo:'rango', sufijo:'', min:0, max:99 } },
+      { key:'deuda_vigente_total',  label:'Deuda Vigente Total',   filtro:{ tipo:'monto' } },
+      { key:'deuda_vigente_inst',   label:'Inst. Deuda Vigente',   filtro:{ tipo:'rango', sufijo:'', min:0, max:99 } },
+      { key:'deuda_hipotecaria',    label:'Deuda Hipotecaria',     filtro:{ tipo:'monto' } },
+      { key:'deuda_hipotecaria_carga', label:'Carga Hipotecaria',  filtro:{ tipo:'monto' } },
+      { key:'deuda_comercial',      label:'Deuda Comercial',       filtro:{ tipo:'monto' } },
+      { key:'deuda_comercial_carga', label:'Carga Comercial',      filtro:{ tipo:'monto' } },
+      { key:'deuda_consumo',        label:'Deuda Consumo',         filtro:{ tipo:'monto' } },
+      { key:'deuda_consumo_carga',  label:'Carga Consumo',         filtro:{ tipo:'monto' } },
+      { key:'deuda_morosa',         label:'Deuda Morosa',          filtro:{ tipo:'monto' } },
+      { key:'deuda_morosa_inst',    label:'Inst. Deuda Morosa',    filtro:{ tipo:'rango', sufijo:'', min:0, max:99 } },
+      { key:'deuda_vencida',        label:'Deuda Vencida',         filtro:{ tipo:'monto' } },
+      { key:'deuda_castigada',      label:'Deuda Castigada',       filtro:{ tipo:'monto' } },
+      { key:'linea_disponible',     label:'Línea Disponible',      filtro:{ tipo:'monto' } },
+      { key:'arriendo',             label:'Arriendo',              filtro:{ tipo:'monto' } },
+      { key:'acredita_propiedad',   label:'Acredita Propiedad',    filtro:{ tipo:'multi', opts:['1','0'] } },
     ]
   },
   cobranza:{
@@ -692,11 +753,17 @@ async function previsualizarReporte(){
 function fmtVal(v, key){
   if(v===null||v===undefined) return '—';
   // Monto
-  if(['valor_vehiculo','pie','monto_financiado','cuota','monto','tasacion','permiso_circulacion'].includes(key)){
+  if(['valor_vehiculo','saldo_precio','pie','monto_financiado','monto_capitalizado','cuota','monto',
+      'comision_dealer','com_parque','monto_comision_fin','com_rdh','com_cesantia','com_reparaciones',
+      'ingreso_neto_total','seguro_rdh','seguro_cesantia','seguro_rep_menor',
+      'renta_fija_liquida','renta_var_mes1','renta_var_mes2','renta_var_mes3',
+      'monto_protestos','deuda_vigente_total','deuda_hipotecaria','deuda_hipotecaria_carga',
+      'deuda_comercial','deuda_comercial_carga','deuda_consumo','deuda_consumo_carga',
+      'deuda_morosa','deuda_vencida','deuda_castigada','linea_disponible','arriendo'].includes(key)){
     return '$'+Number(v).toLocaleString('es-CL');
   }
   // Porcentaje
-  if(['tasa_mensual'].includes(key)) return Number(v).toFixed(2)+'%';
+  if(['tasa_mensual','pen_rdh','pen_cesantia','pen_reparaciones'].includes(key)) return Number(v).toFixed(2)+'%';
   // Fecha
   if(key.startsWith('fecha')||key==='mes'||key==='created_at'){
     return v ? String(v).slice(0,10) : '—';
