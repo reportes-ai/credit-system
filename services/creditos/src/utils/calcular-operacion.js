@@ -122,9 +122,11 @@ async function calcularOperacion(op) {
   if (saldo_precio > 0 && plazo > 0) {
     const dealer_pct = getDealerPct(plazo, p);
     const patio_pct  = p.patio_pct / 100;
-    // Parque: dealer recibe dealer_pct, parque recibe patio_pct por separado
-    // Calle:  dealer recibe dealer_pct solamente, sin descuento de parque
-    comdea_real     = Math.round(saldo_precio * dealer_pct);
+    // Parque: dealer recibe dealer_pct (neto), parque recibe patio_pct por separado
+    // Calle:  dealer recibe dealer_pct + patio_pct (no hay parque que pagar)
+    comdea_real     = esParque
+      ? Math.round(saldo_precio * dealer_pct)
+      : Math.round(saldo_precio * (dealer_pct + patio_pct));
     com_parque_calc = esParque ? Math.round(saldo_precio * patio_pct) : 0;
   }
 

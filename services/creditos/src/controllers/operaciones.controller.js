@@ -511,7 +511,9 @@ const recalcularComisiones = async (req, res) => {
       if (saldo > 0 && plazo > 0) {
         const dealer_pct = getDealerPct(plazo);
         const patio_pct  = p.patio_pct / 100;
-        comdea_real     = Math.round(saldo * dealer_pct);
+        comdea_real     = esParque
+          ? Math.round(saldo * dealer_pct)
+          : Math.round(saldo * (dealer_pct + patio_pct));
         com_parque_calc = esParque ? Math.round(saldo * patio_pct) : 0;
       }
 
