@@ -439,6 +439,11 @@ const recalcularComisiones = async (req, res) => {
     const p = {};
     paramRows.forEach(r => { p[r.clave] = parseFloat(r.valor); });
 
+    // 1b. Pre-cargar factores de comisión de seguros
+    const [segRows] = await pool.query(
+      'SELECT plazo_min, plazo_max, pct_desgravamen, pct_cesantia FROM comisiones_seguro_plazo WHERE estado="activo" ORDER BY plazo_min'
+    );
+
     // 2. Pre-cargar todas las UF necesarias en un Map fecha→valor
     const [ufRows] = await pool.query('SELECT fecha, valor FROM uf');
     const ufMap = {};
@@ -461,10 +466,9 @@ const recalcularComisiones = async (req, res) => {
       return p.dealer_pct_99 / 100;
     };
     const getSegCom = (plazo) => {
-      if (plazo <= 6)  return { desg: p.seg_com_desg_6 /100, cesa: p.seg_com_cesa_6 /100 };
-      if (plazo <= 12) return { desg: p.seg_com_desg_12/100, cesa: p.seg_com_cesa_12/100 };
-      if (plazo <= 24) return { desg: p.seg_com_desg_24/100, cesa: p.seg_com_cesa_24/100 };
-      return             { desg: p.seg_com_desg_36/100, cesa: p.seg_com_cesa_36/100 };
+      const row = segRows.find(r => plazo >= r.plazo_min && plazo <= r.plazo_max);
+      if (!row) return { desg: 0, cesa: 0 };
+      return { desg: parseFloat(row.pct_desgravamen) / 100, cesa: parseFloat(row.pct_cesantia) / 100 };
     };
 
     // 5. Calcular todo en memoria

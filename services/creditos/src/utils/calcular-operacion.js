@@ -36,12 +36,18 @@ function getDealerPct(plazo, p) {
   return p.dealer_pct_99 / 100;
 }
 
-/* ── Factor de comisión de seguros por plazo ────────────────────────── */
-function getSegCom(plazo, p) {
-  if (plazo <= 6)  return { desg: p.seg_com_desg_6  / 100, cesa: p.seg_com_cesa_6  / 100 };
-  if (plazo <= 12) return { desg: p.seg_com_desg_12 / 100, cesa: p.seg_com_cesa_12 / 100 };
-  if (plazo <= 24) return { desg: p.seg_com_desg_24 / 100, cesa: p.seg_com_cesa_24 / 100 };
-  return             { desg: p.seg_com_desg_36 / 100, cesa: p.seg_com_cesa_36 / 100 };
+/* ── Cargar factores de comisión de seguros desde comisiones_seguro_plazo ── */
+async function cargarSegCom() {
+  const [rows] = await pool.query(
+    'SELECT plazo_min, plazo_max, pct_desgravamen, pct_cesantia FROM comisiones_seguro_plazo WHERE estado="activo" ORDER BY plazo_min'
+  );
+  return rows;
+}
+
+function getSegCom(plazo, segRows) {
+  const row = segRows.find(r => plazo >= r.plazo_min && plazo <= r.plazo_max);
+  if (!row) return { desg: 0, cesa: 0 };
+  return { desg: parseFloat(row.pct_desgravamen) / 100, cesa: parseFloat(row.pct_cesantia) / 100 };
 }
 
 /* ── Contar operaciones UAC otorgadas/aprobadas en el mes ───────────── */
@@ -59,8 +65,9 @@ async function contarOpsUAC(mes) {
 
 /* ── CÁLCULO PRINCIPAL ──────────────────────────────────────────────── */
 async function calcularOperacion(op) {
-  const p   = await cargarParams();
-  const uf  = await getUF(op.fecha_otorgado);
+  const p       = await cargarParams();
+  const segRows = await cargarSegCom();
+  const uf      = await getUF(op.fecha_otorgado);
 
   const saldo_precio  = parseFloat(op.saldo_precio)    || 0;
   const monto_fin     = parseFloat(op.monto_financiado)   || 0;
@@ -112,7 +119,7 @@ async function calcularOperacion(op) {
 
   // ── 2. Ingreso por seguros (UNIDAD/UAC no paga comisión de seguros) ──
   if (plazo > 0 && primaDesg > 0 && !financiera.includes('UNIDAD') && !financiera.includes('UAC')) {
-    const { desg, cesa } = getSegCom(plazo, p);
+    const { desg, cesa } = getSegCom(plazo, segRows);
     com_rdh      = Math.round(desg * primaDesg);  // comisión desgravamen
     com_cesantia = Math.round(cesa * primaDesg);  // comisión cesantía
     // RDH y reparaciones menores no generan comisión según el Excel
