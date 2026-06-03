@@ -61,7 +61,7 @@
   <div class="topnav-left">
     <a href="/" class="topnav-brand">
       <img src="/img/logo.png" alt="AutoFácil">
-      <span class="version-badge">v1.1</span>
+      <span class="version-badge">v1.2</span>
     </a>
     <div class="breadcrumb-nav">
       <a href="/">Inicio</a><span class="sep">›</span>
@@ -171,14 +171,14 @@
     </div>
     <div class="card-bd">
       <div class="formula-box">
-        Dealer CALLE: Com = Saldo Precio × Dealer% &nbsp;(el dealer recibe todo)<br>
-        Dealer PARQUE: Com_dealer = Saldo Precio × Dealer% &nbsp;+&nbsp; Com_parque = Saldo Precio × Patio% &nbsp;(el 2.5% va al parque)
+        Dealer PARQUE: Com_dealer = Saldo Precio × Dealer_parque% &nbsp;+&nbsp; Com_parque = Saldo Precio × Patio% &nbsp;(el 2.5% va al parque)<br>
+        Dealer CALLE: Com = Saldo Precio × Dealer_calle% &nbsp;(el dealer recibe todo, sin descuento parque)
       </div>
       <table class="tbl">
         <thead>
           <tr>
             <th>Plazo</th>
-            <th>Dealer CALLE (%)</th>
+            <th>Dealer PARQUE (%)</th>
             <th>Patio / Parque (%)</th>
             <th>Total PARQUE (%)</th>
           </tr>
