@@ -452,11 +452,29 @@ const recalcularComisiones = async (req, res) => {
     // 3. Traer todos los registros a recalcular
     const [rows] = await pool.query(
       `SELECT id, saldo_precio, plazo, financiera, parque, com_parque,
-              seguro_cesantia, seguro_rep_menor,
+              seguro_rdh, seguro_cesantia, seguro_rep_menor,
               monto_financiado, monto_capitalizado, fecha_otorgado, mes,
               estado_credito
        FROM creditos WHERE saldo_precio > 0 AND plazo > 0`
     );
+
+    // 3b. Calcular penetración por mes — solo AutoFin OTORGADO
+    // pen_X = (créditos AutoFin OTORGADO en el mes con seguro_X > 0) / total AutoFin OTORGADO en mes × 100
+    const mesMap = {}; // mes → { total, rdh, ces, rep }
+    for (const row of rows) {
+      const fin = (row.financiera || '').toUpperCase();
+      const esAF = (fin.includes('AUTOFIN') || fin.includes('AUTOF')) &&
+                   !fin.includes('AUTOFACIL') && !fin.includes('AUTOFÁCIL');
+      const esOt = (row.estado_credito || '').toUpperCase() === 'OTORGADO';
+      if (!esAF || !esOt) continue;
+      const mes = (row.mes || row.fecha_otorgado || '').toString().slice(0, 7);
+      if (!mes) continue;
+      if (!mesMap[mes]) mesMap[mes] = { total: 0, rdh: 0, ces: 0, rep: 0 };
+      mesMap[mes].total++;
+      if (parseFloat(row.seguro_rdh)       > 0) mesMap[mes].rdh++;
+      if (parseFloat(row.seguro_cesantia)  > 0) mesMap[mes].ces++;
+      if (parseFloat(row.seguro_rep_menor) > 0) mesMap[mes].rep++;
+    }
 
     // 4. Helpers inline (sin DB)
     const getDealerPct = (plazo) => {
@@ -481,7 +499,20 @@ const recalcularComisiones = async (req, res) => {
       const fin      = (row.financiera || '').toUpperCase();
       const parqueVal = (row.parque || '').toUpperCase().trim();
       const esParque  = parqueVal.includes('PARQUE');
-      const uf       = ufMap[row.fecha_otorgado?.toString().slice(0,10)] || null;
+      const uf        = ufMap[row.fecha_otorgado?.toString().slice(0,10)] || null;
+      const esAF      = (fin.includes('AUTOFIN') || fin.includes('AUTOF')) &&
+                        !fin.includes('AUTOFACIL') && !fin.includes('AUTOFÁCIL');
+      const esOtorgado = (row.estado_credito || '').toUpperCase() === 'OTORGADO';
+      const mes        = (row.mes || row.fecha_otorgado || '').toString().slice(0, 7);
+
+      // Penetración — solo AutoFin OTORGADO; resto queda null
+      let pen_rdh = null, pen_cesantia = null, pen_reparaciones = null;
+      if (esAF && esOtorgado && mes && mesMap[mes]) {
+        const m = mesMap[mes];
+        pen_rdh          = m.total > 0 ? Math.round((m.rdh / m.total) * 10000) / 100 : 0;
+        pen_cesantia     = m.total > 0 ? Math.round((m.ces / m.total) * 10000) / 100 : 0;
+        pen_reparaciones = m.total > 0 ? Math.round((m.rep / m.total) * 10000) / 100 : 0;
+      }
 
       // Comisión financiera (monto_comision_fin)
       let monto_comision_fin = 0;
@@ -529,32 +560,41 @@ const recalcularComisiones = async (req, res) => {
 
       const ingreso_neto_total = monto_comision_fin + com_cesantia + com_reparaciones - comdea_real - com_parque_calc;
 
-      // [comdea, com_parque, monto_com_fin, com_cesantia, com_reparaciones, ingreso_neto, id]
-      return [comdea_real, com_parque_calc, monto_comision_fin, com_cesantia, com_reparaciones, ingreso_neto_total, row.id];
+      // [0:comdea, 1:com_parque, 2:monto_com_fin, 3:com_cesantia, 4:com_reparaciones,
+      //  5:ingreso_neto, 6:pen_rdh, 7:pen_cesantia, 8:pen_rep, 9:id]
+      return [comdea_real, com_parque_calc, monto_comision_fin, com_cesantia, com_reparaciones,
+              ingreso_neto_total, pen_rdh, pen_cesantia, pen_reparaciones, row.id];
     });
 
     // 6. UPDATE en chunks de 500 con CASE WHEN
     const CHUNK = 500;
     let actualizados = 0;
     for (let i = 0; i < updates.length; i += CHUNK) {
-      const chunk = updates.slice(i, i + CHUNK);
-      const ids   = chunk.map(u => u[6]);
-      const vals  = [
+      const chunk   = updates.slice(i, i + CHUNK);
+      const ids     = chunk.map(u => u[9]);
+      const caseId  = chunk.map(u => `WHEN ${u[9]} THEN ?`).join(' ');
+      const vals = [
         ...chunk.map(u => u[0]), // comdea_real
         ...chunk.map(u => u[1]), // com_parque
         ...chunk.map(u => u[2]), // monto_comision_fin
         ...chunk.map(u => u[3]), // com_cesantia
         ...chunk.map(u => u[4]), // com_reparaciones
         ...chunk.map(u => u[5]), // ingreso_neto_total
+        ...chunk.map(u => u[6]), // pen_rdh (null para no-AutoFin)
+        ...chunk.map(u => u[7]), // pen_cesantia
+        ...chunk.map(u => u[8]), // pen_reparaciones
         ...ids,
       ];
       const sql = `UPDATE creditos SET
-        comdea_real        = CASE id ${chunk.map(u=>`WHEN ${u[6]} THEN ?`).join(' ')} END,
-        com_parque         = CASE id ${chunk.map(u=>`WHEN ${u[6]} THEN ?`).join(' ')} END,
-        monto_comision_fin = CASE id ${chunk.map(u=>`WHEN ${u[6]} THEN ?`).join(' ')} END,
-        com_cesantia       = CASE id ${chunk.map(u=>`WHEN ${u[6]} THEN ?`).join(' ')} END,
-        com_reparaciones   = CASE id ${chunk.map(u=>`WHEN ${u[6]} THEN ?`).join(' ')} END,
-        ingreso_neto_total = CASE id ${chunk.map(u=>`WHEN ${u[6]} THEN ?`).join(' ')} END
+        comdea_real        = CASE id ${caseId} END,
+        com_parque         = CASE id ${caseId} END,
+        monto_comision_fin = CASE id ${caseId} END,
+        com_cesantia       = CASE id ${caseId} END,
+        com_reparaciones   = CASE id ${caseId} END,
+        ingreso_neto_total = CASE id ${caseId} END,
+        pen_rdh            = CASE id ${caseId} END,
+        pen_cesantia       = CASE id ${caseId} END,
+        pen_reparaciones   = CASE id ${caseId} END
         WHERE id IN (${ids.map(()=>'?').join(',')})`;
       await pool.query(sql, vals);
       actualizados += chunk.length;
