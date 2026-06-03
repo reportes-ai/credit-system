@@ -25,33 +25,16 @@
     .perfil-badge { background:rgba(144,202,249,.2); border:1px solid rgba(144,202,249,.4); color:#90caf9; border-radius:12px; padding:2px 10px; font-size:.73rem; font-weight:600; }
     .btn-logout { background:rgba(255,255,255,.1); border:1px solid rgba(255,255,255,.2); color:#fff; border-radius:8px; padding:5px 12px; font-size:.82rem; cursor:pointer; }
     .main-content { padding:24px 28px; }
-    .page-banner { background:linear-gradient(135deg,#012d70,#0141A2 50%,#009AFE); border-radius:14px; color:#fff; padding:20px 28px; margin-bottom:20px; display:flex; align-items:center; gap:16px; }
+    .page-banner { background:linear-gradient(135deg,#1a0050,#0141A2 50%,#009AFE); border-radius:14px; color:#fff; padding:20px 28px; margin-bottom:20px; display:flex; align-items:center; gap:16px; }
     .page-banner i { font-size:2.4rem; opacity:.85; }
     .page-banner h2 { font-weight:800; margin:0 0 2px; font-size:1.3rem; }
     .page-banner p { opacity:.75; margin:0; font-size:.85rem; }
-
-    /* Toolbar */
     .toolbar { background:#fff; border-radius:12px; padding:14px 18px; margin-bottom:14px; display:flex; align-items:center; gap:10px; flex-wrap:wrap; box-shadow:0 1px 4px rgba(0,0,0,.06); }
     .toolbar .info-chip { background:var(--navy); color:#fff; border-radius:8px; padding:5px 14px; font-size:.82rem; font-weight:700; }
-    .toolbar .info-chip span { opacity:.7; font-weight:400; }
-    .rut-input { border:2px solid #e5e7eb; border-radius:8px; padding:6px 14px; font-size:.9rem; font-weight:600; width:200px; transition:.15s; }
-    .rut-input:focus { outline:none; border-color:var(--navy); }
-    .btn-buscar { background:var(--navy); color:#fff; border:none; border-radius:8px; padding:7px 18px; font-size:.83rem; font-weight:700; cursor:pointer; display:flex; align-items:center; gap:6px; }
-    .btn-buscar:hover { background:var(--navy-dark); }
-
-    /* Ficha cliente */
-    .client-header { background:#fff; border-radius:12px; padding:16px 22px; margin-bottom:14px; box-shadow:0 1px 4px rgba(0,0,0,.06); display:none; border-left:4px solid var(--navy); }
-    .client-name { font-size:1.15rem; font-weight:800; color:#111827; margin:0 0 2px; }
-    .client-rut  { font-size:.88rem; color:#6b7280; font-weight:600; margin:0; }
-    .client-stats { display:flex; gap:10px; margin-top:12px; flex-wrap:wrap; }
-    .stat-chip { background:#f0f4ff; border:1px solid #c7d2fe; border-radius:8px; padding:5px 12px; font-size:.78rem; }
-    .stat-chip strong { color:var(--navy); font-size:.95rem; display:block; }
-
-    /* Tabla */
     .table-wrapper { background:#fff; border-radius:12px; box-shadow:0 1px 6px rgba(0,0,0,.07); overflow:hidden; }
-    .table-scroll { overflow-x:auto; overflow-y:auto; max-height:calc(100vh - 340px); }
+    .table-scroll { overflow-x:auto; overflow-y:auto; max-height:calc(100vh - 280px); }
     table { border-collapse:collapse; width:max-content; min-width:100%; font-size:.78rem; }
-    thead th { background:var(--navy); color:#fff; font-weight:600; white-space:nowrap; position:sticky; top:0; z-index:10; padding:0; }
+    thead th { background:#0141A2; color:#fff; font-weight:600; white-space:nowrap; position:sticky; top:0; z-index:10; padding:0; }
     thead th .th-inner { display:flex; flex-direction:column; }
     thead th .th-label { padding:8px 10px 4px; display:flex; align-items:center; gap:4px; cursor:pointer; user-select:none; white-space:nowrap; }
     thead th .th-label:hover { background:rgba(255,255,255,.1); }
@@ -61,7 +44,7 @@
     thead th .filter-input { background:rgba(255,255,255,.15); border:1px solid rgba(255,255,255,.25); color:#fff; border-radius:5px; padding:3px 7px; font-size:.72rem; width:calc(100% - 14px); margin:0 7px 6px; box-sizing:border-box; }
     thead th .filter-input::placeholder { color:rgba(255,255,255,.5); }
     thead th .filter-input:focus { outline:none; background:rgba(255,255,255,.25); border-color:#fff; }
-    tbody tr { border-bottom:1px solid #f0f0f0; }
+    tbody tr { border-bottom:1px solid #f0f0f0; cursor:pointer; }
     tbody tr:hover { background:#f0f7ff; }
     tbody td { padding:6px 10px; white-space:nowrap; max-width:220px; overflow:hidden; text-overflow:ellipsis; color:#374151; }
     tbody td.null-val { color:#d1d5db; font-style:italic; }
@@ -71,8 +54,6 @@
     .btn-action { border:none; border-radius:6px; padding:4px 10px; font-size:.75rem; font-weight:600; cursor:pointer; }
     .btn-save { background:#16a34a; color:#fff; }
     .btn-cancel { background:#e5e7eb; color:#374151; }
-
-    /* Paginación */
     .pagination-bar { padding:12px 18px; display:flex; align-items:center; justify-content:space-between; border-top:1px solid #f0f0f0; flex-wrap:wrap; gap:8px; }
     .pagination-bar .info { font-size:.8rem; color:#6b7280; }
     .page-btns { display:flex; gap:4px; align-items:center; }
@@ -81,12 +62,17 @@
     .page-btn.active { background:var(--navy); color:#fff; border-color:var(--navy); }
     .page-btn:disabled { opacity:.4; cursor:default; }
     select.per-page { border:1px solid #e5e7eb; border-radius:6px; padding:4px 8px; font-size:.8rem; color:#374151; }
-
-    /* Empty state */
-    .empty-state { text-align:center; padding:60px 20px; color:#9ca3af; background:#fff; border-radius:12px; box-shadow:0 1px 4px rgba(0,0,0,.06); }
-    .empty-state i { font-size:3rem; margin-bottom:16px; display:block; }
-
-    /* Loading */
+    .modal-ops { display:none; position:fixed; inset:0; background:rgba(0,0,0,.55); z-index:900; align-items:center; justify-content:center; }
+    .modal-ops.open { display:flex; }
+    .modal-card { background:#fff; border-radius:16px; width:min(900px,94vw); max-height:85vh; display:flex; flex-direction:column; box-shadow:0 8px 40px rgba(0,0,0,.3); overflow:hidden; }
+    .modal-header { background:linear-gradient(135deg,#012d70,#0141A2); color:#fff; padding:18px 24px; display:flex; align-items:center; justify-content:space-between; }
+    .modal-header h5 { margin:0; font-size:1rem; font-weight:700; }
+    .modal-close { background:rgba(255,255,255,.15); border:none; color:#fff; border-radius:8px; padding:5px 12px; cursor:pointer; font-size:1rem; }
+    .modal-body { overflow-y:auto; padding:16px 20px; }
+    .ops-table { width:100%; border-collapse:collapse; font-size:.8rem; }
+    .ops-table th { background:#0141A2; color:#fff; padding:7px 10px; text-align:left; }
+    .ops-table td { padding:6px 10px; border-bottom:1px solid #f0f0f0; }
+    .ops-table tr:hover td { background:#f0f7ff; }
     .loading-overlay { position:fixed; inset:0; background:rgba(255,255,255,.7); display:none; align-items:center; justify-content:center; z-index:999; }
     .spinner { width:40px; height:40px; border:4px solid #e5e7eb; border-top-color:var(--navy); border-radius:50%; animation:spin .7s linear infinite; }
     @keyframes spin { to { transform:rotate(360deg); } }
@@ -102,13 +88,13 @@
   <div class="topnav-left">
     <a href="/" class="topnav-brand">
       <img src="/img/logo.png" alt="AutoFácil">
-      <span class="version-badge">v4.8</span>
+      <span class="version-badge" id="versionBadge">v4.9</span>
     </a>
     <div class="breadcrumb-nav">
       <a href="/">Inicio</a><span class="sep">›</span>
       <a href="/mantenedores/">Mantenedores</a><span class="sep">›</span>
       <a href="/mantenedores/solo-dios/">⚡ Solo Dios</a><span class="sep">›</span>
-      <span style="color:#fff;font-weight:600"><i class="bi bi-person-fill-gear me-1"></i>BD Clientes Nivel Dios</span>
+      <span style="color:#fff;font-weight:600"><i class="bi bi-people-fill me-1"></i>BD Clientes Nivel Dios</span>
     </div>
   </div>
   <div class="topnav-right">
@@ -125,10 +111,10 @@
 
 <div class="main-content">
   <div class="page-banner">
-    <i class="bi bi-person-fill-gear"></i>
+    <i class="bi bi-people-fill"></i>
     <div>
-      <h2>👤 BD CLIENTES NIVEL DIOS</h2>
-      <p>Todos los registros con filtros por columna — filtra por RUT para ver un cliente específico. Doble clic en celda para editar.</p>
+      <h2>⚡ BD CLIENTES NIVEL DIOS</h2>
+      <p>Vista y edición directa de la tabla <strong>clientes</strong> — 1 registro por RUT. Doble clic en celda para editar. Clic en fila para ver operaciones del cliente.</p>
     </div>
   </div>
 
@@ -140,19 +126,15 @@
     <div style="flex:1"></div>
     <label style="font-size:.82rem;color:#6b7280;">Filas por página:</label>
     <select class="per-page" id="limitSel" onchange="changeLimit()">
-      <option value="25">25</option><option value="50" selected>50</option>
-      <option value="100">100</option><option value="200">200</option>
+      <option value="25">25</option>
+      <option value="50" selected>50</option>
+      <option value="100">100</option>
+      <option value="200">200</option>
     </select>
   </div>
 
-  <div class="client-header" id="clientHeader" style="display:none">
-    <div class="client-name" id="clientName">—</div>
-    <div class="client-rut"  id="clientRut">—</div>
-    <div class="client-stats" id="clientStats"></div>
-  </div>
-
   <div class="table-wrapper">
-    <div class="table-scroll">
+    <div class="table-scroll" id="tableScroll">
       <table id="mainTable">
         <thead id="thead"></thead>
         <tbody id="tbody"></tbody>
@@ -161,6 +143,27 @@
     <div class="pagination-bar">
       <div class="info" id="paginInfo">Cargando...</div>
       <div class="page-btns" id="pageBtns"></div>
+    </div>
+  </div>
+</div>
+
+<!-- Modal operaciones del cliente -->
+<div class="modal-ops" id="modalOps">
+  <div class="modal-card">
+    <div class="modal-header">
+      <h5 id="modalTitle"><i class="bi bi-list-ul me-2"></i>Operaciones del cliente</h5>
+      <button class="modal-close" onclick="closeModal()">✕</button>
+    </div>
+    <div class="modal-body">
+      <table class="ops-table">
+        <thead>
+          <tr>
+            <th>ID</th><th>Num. Op</th><th>Mes</th><th>Financiera</th>
+            <th>Monto</th><th>Plazo</th><th>Estado</th><th>Com. Fin.</th>
+          </tr>
+        </thead>
+        <tbody id="opsBody"></tbody>
+      </table>
     </div>
   </div>
 </div>
@@ -174,38 +177,63 @@ const token = sessionStorage.getItem('token');
 const yo    = JSON.parse(sessionStorage.getItem('usuario') || 'null');
 if (!token || !yo) window.location.href = '/login.html';
 const H = { 'Content-Type':'application/json', Authorization:'Bearer '+token };
+
 document.getElementById('navNombre').textContent = `${yo?.nombre||''} ${yo?.apellido||''}`.trim();
 document.getElementById('navPerfil').textContent  = yo?.perfil || '';
 document.getElementById('avatarInicial').textContent = (yo?.nombre||'?').charAt(0).toUpperCase();
 function logout() { sessionStorage.removeItem('token'); sessionStorage.removeItem('usuario'); window.location.href='/login.html'; }
 
-let columns  = [];
-let filters  = {};
-let sortCol  = 'mes';
-let sortDir  = 'desc';
-let page     = 1;
-let limit    = 50;
-let editCell = null;
+let columns   = [];
+let filters   = {};
+let sortCol   = 'id_cliente';
+let sortDir   = 'desc';
+let page      = 1;
+let limit     = 50;
+let totalRows = 0;
+let editCell  = null;
 
 function toast(msg, type='success') {
   const c = document.getElementById('toastContainer');
   const d = document.createElement('div');
   d.className = `toast ${type}`;
   d.innerHTML = `<i class="bi bi-${type==='success'?'check-circle':'exclamation-triangle'}"></i>${msg}`;
-  c.appendChild(d); setTimeout(()=>d.remove(), 3500);
+  c.appendChild(d);
+  setTimeout(() => d.remove(), 3500);
 }
-function showLoading(v) { document.getElementById('loadingOverlay').style.display=v?'flex':'none'; }
-function debounce(fn,ms) { let t; return (...a)=>{clearTimeout(t);t=setTimeout(()=>fn(...a),ms);}; }
 
 async function init() {
-  const r = await fetch('/api/bd-operaciones/columns', {headers:H});
+  const r = await fetch('/api/bd-clientes/columns', {headers:H});
   const j = await r.json();
   columns = j.data;
-  // Pre-cargar RUT desde URL si viene
-  const urlRut = new URLSearchParams(location.search).get('rut');
-  if (urlRut) filters = { rut_cliente: urlRut.replace(/\./g,'').toUpperCase() };
   buildHeaders();
   await load();
+}
+
+function buildHeaders() {
+  const tr = document.createElement('tr');
+  columns.forEach(col => {
+    const th = document.createElement('th');
+    const inner = document.createElement('div');
+    inner.className = 'th-inner';
+    const label = document.createElement('div');
+    label.className = 'th-label' + (sortCol===col.field ? ' sorted-'+sortDir : '');
+    label.innerHTML = `${col.field}<span class="sort-icon"></span>`;
+    label.onclick = () => toggleSort(col.field);
+    const inp = document.createElement('input');
+    inp.type = 'text'; inp.className = 'filter-input'; inp.placeholder = '🔍';
+    inp.dataset.col = col.field; inp.value = filters[col.field] || '';
+    inp.oninput = debounce(() => { filters[col.field] = inp.value; page=1; load(); }, 400);
+    inner.appendChild(label); inner.appendChild(inp);
+    th.appendChild(inner); tr.appendChild(th);
+  });
+  document.getElementById('thead').innerHTML = '';
+  document.getElementById('thead').appendChild(tr);
+}
+
+function toggleSort(col) {
+  if (sortCol === col) sortDir = sortDir==='asc'?'desc':'asc';
+  else { sortCol=col; sortDir='asc'; }
+  page=1; buildHeaders(); load();
 }
 
 async function load() {
@@ -213,70 +241,43 @@ async function load() {
   try {
     const activeFilters = Object.fromEntries(Object.entries(filters).filter(([,v])=>v!==''));
     const qs = new URLSearchParams({ page, limit, sort:sortCol, dir:sortDir, filters:JSON.stringify(activeFilters) });
-    const r  = await fetch(`/api/bd-operaciones?${qs}`, {headers:H});
-    const j  = await r.json();
+    const r = await fetch(`/api/bd-clientes?${qs}`, {headers:H});
+    const j = await r.json();
     if (!j.success) throw new Error(j.error);
-
-    // Ficha cliente si hay filtro por RUT exacto
-    const rut = filters.rut_cliente;
-    if (rut && j.data.rows.length) {
-      const nombre = j.data.rows.find(r=>r.nombre_cliente)?.nombre_cliente || '—';
-      document.getElementById('clientName').textContent = nombre;
-      document.getElementById('clientRut').textContent  = rut;
-      const otorgados = j.data.rows.filter(r=>r.estado_credito==='OTORGADO').length;
-      const financieras = [...new Set(j.data.rows.map(r=>r.financiera).filter(Boolean))].join(', ');
-      document.getElementById('clientStats').innerHTML = `
-        <div class="stat-chip"><strong>${j.data.total}</strong>Operaciones</div>
-        <div class="stat-chip"><strong>${otorgados}</strong>Otorgadas</div>
-        <div class="stat-chip"><strong style="font-size:.72rem">${financieras||'—'}</strong>Financieras</div>`;
-      document.getElementById('clientHeader').style.display = 'block';
-    } else {
-      document.getElementById('clientHeader').style.display = 'none';
-    }
-
+    totalRows = j.data.total;
     renderRows(j.data.rows);
     renderPagination(j.data);
-    document.getElementById('totalLabel').textContent = j.data.total.toLocaleString();
+    document.getElementById('totalLabel').textContent = totalRows.toLocaleString();
     document.getElementById('pageLabel').textContent  = `${j.data.page} / ${j.data.pages}`;
   } catch(e) {
-    toast(e.message,'error');
+    toast(e.message, 'error');
   } finally {
     showLoading(false);
   }
 }
 
-function buildHeaders() {
-  const tr = document.createElement('tr');
-  columns.forEach(col => {
-    const th = document.createElement('th');
-    const inner = document.createElement('div'); inner.className='th-inner';
-    const label = document.createElement('div');
-    label.className = 'th-label' + (sortCol===col.field?' sorted-'+sortDir:'');
-    label.innerHTML = `${col.field}<span class="sort-icon"></span>`;
-    label.onclick = () => { sortCol===col.field?(sortDir=sortDir==='asc'?'desc':'asc'):(sortCol=col.field,sortDir='asc'); page=1; buildHeaders(); load(); };
-    const inp = document.createElement('input');
-    inp.type='text'; inp.className='filter-input'; inp.placeholder='🔍';
-    inp.dataset.col = col.field;
-    inp.value = filters[col.field] || '';
-    inp.oninput = debounce(()=>{ filters[col.field]=inp.value; page=1; load(); }, 400);
-    inner.appendChild(label); inner.appendChild(inp); th.appendChild(inner); tr.appendChild(th);
-  });
-  document.getElementById('thead').innerHTML='';
-  document.getElementById('thead').appendChild(tr);
-}
-
 function renderRows(rows) {
   const tbody = document.getElementById('tbody');
-  tbody.innerHTML='';
+  tbody.innerHTML = '';
   rows.forEach(row => {
     const tr = document.createElement('tr');
+    tr.title = 'Clic → ver operaciones | Doble clic en celda → editar';
+    tr.onclick = (e) => {
+      if (e.target.tagName === 'INPUT' || e.target.tagName === 'BUTTON') return;
+      if (editCell) return;
+      openOps(row.id_cliente, row.nombre_completo || row.nombres || row.rut);
+    };
     columns.forEach(col => {
       const td = document.createElement('td');
       const val = row[col.field];
-      td.dataset.field=col.field; td.dataset.id=row.id;
-      if (val===null||val===undefined||val==='') { td.textContent='—'; td.className='null-val editable'; }
-      else { td.textContent=val; td.className='editable'; td.title=String(val); }
-      if (col.field!=='id') td.ondblclick=()=>startEdit(tr,td,col,val);
+      td.dataset.field = col.field;
+      td.dataset.id    = row.id_cliente;
+      if (val === null || val === undefined || val === '') {
+        td.textContent = '—'; td.className = 'null-val editable';
+      } else {
+        td.textContent = val; td.className = 'editable'; td.title = String(val);
+      }
+      td.ondblclick = (e) => { e.stopPropagation(); startEdit(tr, td, col, val); };
       tr.appendChild(td);
     });
     tbody.appendChild(tr);
@@ -285,58 +286,125 @@ function renderRows(rows) {
 
 function startEdit(tr, td, col, oldVal) {
   if (editCell) cancelEdit();
-  editCell={tr,td,col,oldVal};
-  const inp=document.createElement('input');
-  inp.className='edit-cell-input';
-  inp.value=(oldVal===null||oldVal===undefined)?'':oldVal;
-  inp.onkeydown=e=>{if(e.key==='Enter')saveEdit(td.dataset.id,col.field,inp.value);if(e.key==='Escape')cancelEdit();};
-  td.innerHTML=''; td.appendChild(inp);
-  const s=document.createElement('button'); s.className='btn-action btn-save ms-1'; s.textContent='✓'; s.onclick=()=>saveEdit(td.dataset.id,col.field,inp.value);
-  const c=document.createElement('button'); c.className='btn-action btn-cancel ms-1'; c.textContent='✕'; c.onclick=cancelEdit;
-  td.appendChild(s); td.appendChild(c); inp.focus(); inp.select();
+  if (col.field === 'id_cliente') return;
+  editCell = {tr, td, col, oldVal};
+  const inp = document.createElement('input');
+  inp.className = 'edit-cell-input';
+  inp.value = (oldVal === null || oldVal === undefined) ? '' : oldVal;
+  inp.onkeydown = e => {
+    if (e.key === 'Enter')  saveEdit(td.dataset.id, col.field, inp.value);
+    if (e.key === 'Escape') cancelEdit();
+  };
+  td.innerHTML = '';
+  td.appendChild(inp);
+  const btnSave = document.createElement('button');
+  btnSave.className = 'btn-action btn-save ms-1'; btnSave.textContent = '✓';
+  btnSave.onclick = (e) => { e.stopPropagation(); saveEdit(td.dataset.id, col.field, inp.value); };
+  const btnCan = document.createElement('button');
+  btnCan.className = 'btn-action btn-cancel ms-1'; btnCan.textContent = '✕';
+  btnCan.onclick = (e) => { e.stopPropagation(); cancelEdit(); };
+  td.appendChild(btnSave); td.appendChild(btnCan);
+  inp.focus(); inp.select();
 }
+
 function cancelEdit() {
   if (!editCell) return;
-  const {td,oldVal}=editCell;
-  td.innerHTML=''; td.textContent=(oldVal===null||oldVal===undefined||oldVal==='')?'—':oldVal;
-  td.className=(oldVal===null||oldVal===undefined||oldVal==='')?'null-val editable':'editable';
-  editCell=null;
+  const {td, oldVal} = editCell;
+  td.innerHTML = '';
+  td.textContent = (oldVal === null || oldVal === undefined || oldVal === '') ? '—' : oldVal;
+  td.className = (oldVal === null || oldVal === undefined || oldVal === '') ? 'null-val editable' : 'editable';
+  editCell = null;
 }
+
 async function saveEdit(id, field, newVal) {
   showLoading(true);
   try {
-    const r=await fetch(`/api/bd-operaciones/${id}`,{method:'PUT',headers:H,body:JSON.stringify({[field]:newVal===''?null:newVal})});
-    const j=await r.json();
-    if(!j.success) throw new Error(j.error);
-    editCell=null; toast(`✅ ${field} actualizado`); await load();
-  } catch(e) { toast(e.message,'error'); cancelEdit(); }
-  finally { showLoading(false); }
+    const r = await fetch(`/api/bd-clientes/${id}`, {
+      method:'PUT', headers:H,
+      body: JSON.stringify({ [field]: newVal === '' ? null : newVal })
+    });
+    const j = await r.json();
+    if (!j.success) throw new Error(j.error);
+    editCell = null;
+    toast(`✅ ${field} actualizado`);
+    await load();
+  } catch(e) {
+    toast(e.message,'error');
+    cancelEdit();
+  } finally {
+    showLoading(false);
+  }
 }
+
+async function openOps(id, nombre) {
+  document.getElementById('modalTitle').innerHTML =
+    `<i class="bi bi-list-ul me-2"></i>Operaciones de <strong>${nombre||id}</strong>`;
+  document.getElementById('opsBody').innerHTML = '<tr><td colspan="8" class="text-center py-3">Cargando...</td></tr>';
+  document.getElementById('modalOps').classList.add('open');
+  try {
+    const r = await fetch(`/api/bd-clientes/${id}/operaciones`, {headers:H});
+    const j = await r.json();
+    if (!j.success) throw new Error(j.error);
+    const ops = j.data;
+    const tbody = document.getElementById('opsBody');
+    if (!ops.length) {
+      tbody.innerHTML = '<tr><td colspan="8" class="text-center text-muted py-3">Sin operaciones registradas</td></tr>';
+    } else {
+      tbody.innerHTML = ops.map(op => `
+        <tr>
+          <td>${op.id}</td>
+          <td>${op.num_op||'—'}</td>
+          <td>${op.mes||'—'}</td>
+          <td>${op.financiera||'—'}</td>
+          <td>${op.monto ? Number(op.monto).toLocaleString('es-CL') : '—'}</td>
+          <td>${op.plazo||'—'}</td>
+          <td>${op.estado||'—'}</td>
+          <td>${op.monto_comision_fin ? Number(op.monto_comision_fin).toLocaleString('es-CL') : '—'}</td>
+        </tr>`).join('');
+    }
+  } catch(e) {
+    document.getElementById('opsBody').innerHTML = `<tr><td colspan="8" class="text-center text-danger py-3">${e.message}</td></tr>`;
+  }
+}
+
+function closeModal() { document.getElementById('modalOps').classList.remove('open'); }
+document.getElementById('modalOps').addEventListener('click', e => {
+  if (e.target === document.getElementById('modalOps')) closeModal();
+});
 
 function renderPagination(d) {
   document.getElementById('paginInfo').textContent =
     `Mostrando ${((d.page-1)*d.limit)+1}–${Math.min(d.page*d.limit,d.total)} de ${d.total.toLocaleString()} registros`;
-  const container=document.getElementById('pageBtns');
-  container.innerHTML='';
-  const mk=(label,p,dis=false)=>{const b=document.createElement('button');b.className='page-btn'+(p===page?' active':'');b.textContent=label;b.disabled=dis;b.onclick=()=>{page=p;load();};return b;};
-  container.appendChild(mk('«',1,page===1));
-  container.appendChild(mk('‹',page-1,page===1));
-  const start=Math.max(1,page-2),end=Math.min(d.pages,page+2);
-  for(let i=start;i<=end;i++) container.appendChild(mk(i,i));
-  container.appendChild(mk('›',page+1,page===d.pages));
-  container.appendChild(mk('»',d.pages,page===d.pages));
+  const container = document.getElementById('pageBtns');
+  container.innerHTML = '';
+  const mk = (label, p, dis=false) => {
+    const b = document.createElement('button');
+    b.className = 'page-btn' + (p===page?' active':'');
+    b.textContent = label; b.disabled = dis;
+    b.onclick = () => { page=p; load(); };
+    return b;
+  };
+  container.appendChild(mk('«', 1, page===1));
+  container.appendChild(mk('‹', page-1, page===1));
+  const start = Math.max(1, page-2), end = Math.min(d.pages, page+2);
+  for (let i=start; i<=end; i++) container.appendChild(mk(i,i));
+  container.appendChild(mk('›', page+1, page===d.pages));
+  container.appendChild(mk('»', d.pages, page===d.pages));
 }
 
 function changeLimit() { limit=parseInt(document.getElementById('limitSel').value); page=1; load(); }
-function clearFilters() { filters={}; document.querySelectorAll('.filter-input').forEach(inp=>inp.value=''); page=1; load(); }
+function clearFilters() { filters={}; document.querySelectorAll('.filter-input').forEach(i=>i.value=''); page=1; load(); }
+
 function exportCSV() {
-  const rows=[...document.querySelectorAll('#tbody tr')];
-  const header=columns.map(c=>c.field).join(',');
-  const lines=rows.map(tr=>[...tr.querySelectorAll('td')].map(td=>`"${td.title||td.textContent}"`).join(','));
-  const csv=[header,...lines].join('\n');
-  const a=document.createElement('a'); a.href=URL.createObjectURL(new Blob([csv],{type:'text/csv'}));
-  a.download='clientes.csv'; a.click();
+  const rows = [...document.querySelectorAll('#tbody tr')];
+  const header = columns.map(c=>c.field).join(',');
+  const lines  = rows.map(tr => [...tr.querySelectorAll('td')].map(td=>`"${td.title||td.textContent}"`).join(','));
+  const blob = new Blob([header+'\n'+lines.join('\n')],{type:'text/csv'});
+  const a = document.createElement('a'); a.href=URL.createObjectURL(blob); a.download='clientes.csv'; a.click();
 }
+
+function showLoading(v) { document.getElementById('loadingOverlay').style.display = v?'flex':'none'; }
+function debounce(fn,ms) { let t; return (...a) => { clearTimeout(t); t=setTimeout(()=>fn(...a),ms); }; }
 
 init();
 </script>
