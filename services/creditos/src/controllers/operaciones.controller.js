@@ -310,10 +310,10 @@ const update = async (req, res) => {
     }
 
     const sets = [
-      'num_op=?','mes=?','financiera=?','rut_cliente=?','nombre_cliente=?','comentarios=?',
+      'num_op=?','mes=?','financiera=?','comentarios=?',
       'ejecutivo=?','automotora=?','nombre_local=?','estado_eval=?','estado_credito=?',
       'fecha_otorgado=?','producto=?',
-      'marca=?','modelo=?','anio_vehiculo=?','tasacion=?','permiso_circulacion=?',
+      'marca=?','modelo=?','anio=?','tasacion=?','permiso_circulacion=?',
       'valor_vehiculo=?','pie=?',
       'saldo_precio=?','pct_financiado=?','impuesto=?','estado_impuesto=?',
       'limitacion=?','gastos=?','gps=?','seguro_rdh=?','seguro_cesantia=?','seguro_rep_menor=?',
@@ -326,10 +326,10 @@ const update = async (req, res) => {
       'updated_at=NOW()'
     ];
     const vals = [
-      b.num_op||null, b.mes||null, b.financiera, b.rut_cliente, b.nombre_cliente||null, b.comentarios||null,
+      b.num_op||null, b.mes||null, b.financiera, b.comentarios||null,
       b.ejecutivo||null, b.automotora||null, b.nombre_local||null, b.estado_eval||null, b.estado_credito||null,
       b.fecha_otorgado||null, b.producto||null,
-      b.marca||null, b.modelo||null, b.anio_vehiculo||null, b.tasacion||null, b.permiso_circulacion||null,
+      b.marca||null, b.modelo||null, b.anio||null, b.tasacion||null, b.permiso_circulacion||null,
       b.valor_vehiculo||null, b.pie||null,
       saldo_precio, pct_financiado, b.impuesto||null, b.estado_impuesto||null,
       b.limitacion ? 1 : 0, b.gastos||0, b.gps||0,
