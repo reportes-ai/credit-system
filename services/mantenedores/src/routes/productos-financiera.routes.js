@@ -1,5 +1,5 @@
 const router     = require('express').Router();
-const verifyToken = require('../../../../shared/middleware/auth');
+const { verifyToken } = require('../../../../shared/middleware/auth');
 const ctrl        = require('../controllers/productos-financiera.controller');
 
 router.get('/',     verifyToken, ctrl.getAll);
