@@ -387,30 +387,32 @@
         document.getElementById(`grp-${sid}`)?.querySelectorAll('.chip').forEach(c => yaPresentes.add(c.dataset.key));
       });
 
-      // Módulos nuevos: los que vienen de BD y no están en ningún grupo
-      const nuevos = dbList.filter(m => !yaPresentes.has(m.ruta));
-
-      if (nuevos.length === 0) {
-        btn.disabled = false;
-        btn.innerHTML = '<i class="bi bi-arrow-repeat"></i> Actualizar Módulos';
-        const ok = document.getElementById('saveOk');
-        ok.textContent = '✓ Sin módulos nuevos';
-        ok.style.display = 'flex';
-        setTimeout(() => { ok.style.display = 'none'; ok.textContent = '✓ Guardado correctamente'; }, 2500);
-        return;
-      }
-
-      // Agregar los nuevos al grupo HOME
+      // Módulos nuevos de BD no presentes en ningún grupo → van al HOME
+      const nuevosMod = dbList.filter(m => !yaPresentes.has(m.ruta));
       const homeBody = document.getElementById('grp-home');
-      nuevos.forEach(m => homeBody.appendChild(makeChip(m.ruta, m.nombre, m.icono, 'module')));
-      refreshCount('home');
+      nuevosMod.forEach(m => homeBody.appendChild(makeChip(m.ruta, m.nombre, m.icono, 'module')));
+      if (nuevosMod.length) refreshCount('home');
 
-      btn.disabled = false;
-      btn.innerHTML = '<i class="bi bi-arrow-repeat"></i> Actualizar Módulos';
+      // Sub-items del manifiesto no presentes en ningún grupo → van a su sección default
+      const nuevosSub = Object.entries(PLACEMENT_ITEMS).filter(([k]) => !yaPresentes.has(k));
+      nuevosSub.forEach(([key, item]) => {
+        const body = document.getElementById(`grp-${item.section}`);
+        if (body) body.appendChild(makeChip(key, item.titulo, item.icon, 'subitem'));
+      });
+      nuevosSub.forEach(([, item]) => refreshCount(item.section));
+
+      const total = nuevosMod.length + nuevosSub.length;
       const ok = document.getElementById('saveOk');
-      ok.textContent = `✓ ${nuevos.length} módulo(s) nuevo(s) agregado(s) al HOME`;
+      if (total === 0) {
+        ok.textContent = '✓ Sin módulos ni sub-módulos nuevos';
+      } else {
+        const partes = [];
+        if (nuevosMod.length) partes.push(`${nuevosMod.length} módulo(s) → HOME`);
+        if (nuevosSub.length) partes.push(`${nuevosSub.length} sub-módulo(s) → sección por defecto`);
+        ok.textContent = `✓ Agregados: ${partes.join(' · ')}`;
+      }
       ok.style.display = 'flex';
-      setTimeout(() => { ok.style.display = 'none'; ok.textContent = '✓ Guardado correctamente'; }, 3500);
+      setTimeout(() => { ok.style.display = 'none'; ok.textContent = '✓ Guardado correctamente'; }, 4000);
     }
 
     async function resetDefaults() {
