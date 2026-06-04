@@ -118,6 +118,29 @@ body{font-family:'Roboto',sans-serif;background:#f0f2f5;font-size:12px;color:#33
 
 /* ---- TENDENCIA KPI ---- */
 .tend-kpi-row{display:grid;grid-template-columns:repeat(5,1fr);gap:8px;margin-bottom:10px}
+
+/* ---- MODAL DETALLE EJECUTIVO ---- */
+#modal-ejec-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:9000;align-items:center;justify-content:center}
+#modal-ejec-overlay.open{display:flex}
+#modal-ejec{background:#fff;border-radius:8px;box-shadow:0 8px 32px rgba(0,0,0,.35);width:92vw;max-width:1100px;max-height:88vh;display:flex;flex-direction:column;overflow:hidden}
+#modal-ejec-head{background:#1a3a6a;color:#fff;padding:10px 14px;display:flex;align-items:center;justify-content:space-between;flex-shrink:0}
+#modal-ejec-title{font-size:13px;font-weight:700;text-transform:uppercase;letter-spacing:.3px}
+#modal-ejec-close{background:none;border:none;color:#fff;font-size:18px;cursor:pointer;line-height:1;padding:0 4px}
+#modal-ejec-kpis{display:flex;gap:8px;padding:8px 12px;background:#f8faff;border-bottom:1px solid #dce3ed;flex-shrink:0;flex-wrap:wrap}
+.mekpi{background:#fff;border:1px solid #dce3ed;border-radius:5px;padding:5px 10px;min-width:100px}
+.mekpi-lbl{font-size:9px;color:#888;text-transform:uppercase}
+.mekpi-val{font-size:14px;font-weight:700;color:#1a3a6a}
+#modal-ejec-body{overflow:auto;flex:1;padding:8px 12px}
+#t-modal-ops{width:100%;border-collapse:collapse;font-size:11px}
+#t-modal-ops thead th{background:#1a3a6a;color:#fff;padding:6px 8px;text-align:right;white-space:nowrap;font-size:10px;position:sticky;top:0}
+#t-modal-ops thead th:first-child,#t-modal-ops thead th:nth-child(2){text-align:left}
+#t-modal-ops tbody td{padding:5px 8px;border-bottom:1px solid #f0f2f5;text-align:right;white-space:nowrap}
+#t-modal-ops tbody td:first-child,#t-modal-ops tbody td:nth-child(2){text-align:left;color:#444}
+#t-modal-ops tbody tr:hover{background:#f5f8ff}
+#t-modal-ops tfoot td{padding:5px 8px;font-weight:700;color:#1a3a6a;border-top:2px solid #dce3ed;background:#f8faff;text-align:right}
+#t-modal-ops tfoot td:first-child{text-align:left}
+.ej-link{color:#1565C0;text-decoration:none;cursor:pointer;border-bottom:1px dotted #1565C0}
+.ej-link:hover{color:#0d47a1}
 </style>
 </head>
 <body>
@@ -194,7 +217,7 @@ document.addEventListener('DOMContentLoaded', async function() {
   <div class="topbar-row1">
     <div style="display:flex;flex-direction:column;align-items:flex-start;gap:2px">
       <a href="/"><img src="/img/logo.png" alt="AutoFácil" style="height:32px;display:block;filter:brightness(0) invert(1)"></a>
-      <span style="font-size:9px;font-weight:300;color:#7bafd4;margin-left:1px">Dashboard <span style="color:#4fc3f7;font-weight:600">V3.6</span></span>
+      <span style="font-size:9px;font-weight:300;color:#7bafd4;margin-left:1px">Dashboard <span style="color:#4fc3f7;font-weight:600">V3.7</span></span>
     </div>
     <div id="ultima-act" style="font-size:10px;color:#4fc3f7;margin-left:8px"></div>
     <div id="date-selector" style="display:flex;align-items:center;gap:8px;background:#0f1e38;padding:4px 12px;border-radius:6px;border:1px solid #2a4070;margin-left:8px">
@@ -1036,7 +1059,7 @@ function buildV1() {
 
   // Tabla ejecutivos
   const ejRows = f.ejecutivos.map((e,i)=>`<tr>
-    <td><span class="rank">${i+1}.</span>${e.nombre.length>24?e.nombre.substring(0,24)+'…':e.nombre}</td>
+    <td><span class="rank">${i+1}.</span><a class="ej-link" onclick="abrirDetalleEjecutivo(${JSON.stringify(e.nombre)},'ap')">${e.nombre.length>24?e.nombre.substring(0,24)+'…':e.nombre}</a></td>
     <td>${e.ops}</td><td>${fM(e.saldo)}</td><td>${fM(e.saldo/e.ops)}</td>
     <td>${fM(e.saldo)}</td><td>${fM(e.com_dealer)}</td><td>${fM(e.rentab_afa)}</td>
   </tr>`).join('');
@@ -1807,7 +1830,7 @@ function buildV1b() {
   const ejRows2 = topEj.map(([nombre,v],i)=>{
     const finStyle = v.fin < 40000000 ? 'color:#e53935;font-weight:700' : '';
     return `<tr>
-    <td><span class="rank">${i+1}.</span>${nombre.length>24?nombre.substring(0,24)+'…':nombre}</td>
+    <td><span class="rank">${i+1}.</span><a class="ej-link" onclick="abrirDetalleEjecutivo(${JSON.stringify(nombre)},'ot')">${nombre.length>24?nombre.substring(0,24)+'…':nombre}</a></td>
     <td>${v.ops}</td><td style="${finStyle}">${fM(v.fin)}</td><td>${fM(v.ops?v.fin/v.ops:0)}</td>
     <td>${fM(v.saldo)}</td><td>${fM(v.cd)}</td><td>${fM(v.afa)}</td>
   </tr>`;}).join('');
@@ -4546,6 +4569,109 @@ function buildVEvol() {
     }
   });
 }
+</script>
+
+<!-- ============================================================ MODAL DETALLE EJECUTIVO ============================================================ -->
+<div id="modal-ejec-overlay" onclick="if(event.target===this)cerrarModalEjec()">
+  <div id="modal-ejec">
+    <div id="modal-ejec-head">
+      <span id="modal-ejec-title">Detalle Ejecutivo</span>
+      <button id="modal-ejec-close" onclick="cerrarModalEjec()">✕</button>
+    </div>
+    <div id="modal-ejec-kpis"></div>
+    <div id="modal-ejec-body">
+      <table id="t-modal-ops">
+        <thead><tr>
+          <th style="text-align:left">N° OP</th>
+          <th style="text-align:left">N° Crédito (Fin.)</th>
+          <th>Financiera</th>
+          <th>Concesionario</th>
+          <th>Estado</th>
+          <th>Saldo Precio</th>
+          <th>Total Financiado</th>
+          <th>Plazo</th>
+          <th>Com. Dealer</th>
+          <th>Ing. x Col.</th>
+        </tr></thead>
+        <tbody id="t-modal-ops-body"></tbody>
+        <tfoot id="t-modal-ops-foot"></tfoot>
+      </table>
+    </div>
+  </div>
+</div>
+
+<script>
+// ======== MODAL DETALLE EJECUTIVO ========
+function abrirDetalleEjecutivo(nombre, tipo) {
+  const desde = document.getElementById('sel-desde')?.value || '';
+  const hasta  = document.getElementById('sel-hasta')?.value  || '';
+
+  // Filtrar RAW_DATA según tipo
+  let ops = (window.RAW_DATA || []).filter(r =>
+    r.ejecutivo === nombre &&
+    r.mes >= desde && r.mes <= hasta
+  );
+  if (tipo === 'ot') {
+    ops = ops.filter(r => r.estado_eval === 'OTORGADO');
+  } else {
+    // aprobados: todos menos rechazados y anulados
+    ops = ops.filter(r => !['RECHAZADO','ANULADO'].includes(r.estado_eval));
+  }
+
+  const fM = n => {
+    const v = parseFloat(n)||0;
+    if (Math.abs(v) >= 1e6) return '$' + (v/1e6).toFixed(1) + 'M';
+    if (Math.abs(v) >= 1e3) return '$' + Math.round(v/1e3) + 'K';
+    return '$' + Math.round(v);
+  };
+
+  // KPIs resumen
+  const totFin  = ops.reduce((a,r) => a + (parseFloat(r.monto_financiado)||0), 0);
+  const totSaldo= ops.reduce((a,r) => a + (parseFloat(r.saldo_precio)||0), 0);
+  const totCD   = ops.reduce((a,r) => a + (parseFloat(r.com_dealer)||0), 0);
+  const totIng  = ops.reduce((a,r) => a + (parseFloat(r.rentab_afa)||0), 0);
+  document.getElementById('modal-ejec-kpis').innerHTML = `
+    <div class="mekpi"><div class="mekpi-lbl">Operaciones</div><div class="mekpi-val">${ops.length}</div></div>
+    <div class="mekpi"><div class="mekpi-lbl">Total Financiado</div><div class="mekpi-val">${fM(totFin)}</div></div>
+    <div class="mekpi"><div class="mekpi-lbl">Saldo Precio</div><div class="mekpi-val">${fM(totSaldo)}</div></div>
+    <div class="mekpi"><div class="mekpi-lbl">Com. Dealer</div><div class="mekpi-val">${fM(totCD)}</div></div>
+    <div class="mekpi"><div class="mekpi-lbl">Ing. x Colocaciones</div><div class="mekpi-val">${fM(totIng)}</div></div>`;
+
+  // Filas de operaciones — ordenar por saldo desc
+  ops.sort((a,b) => (parseFloat(b.saldo_precio)||0) - (parseFloat(a.saldo_precio)||0));
+  const body = ops.map(r => {
+    const ccs = (r.automotora||'—');
+    const fin = r.financiera || '—';
+    const nc  = r.numero_credito || '—';
+    return `<tr>
+      <td>${r.op||'—'}</td>
+      <td>${nc}</td>
+      <td><span class="${fin==='AUTOFIN'?'tag-men':'tag-may'}">${fin}</span></td>
+      <td style="max-width:180px;overflow:hidden;text-overflow:ellipsis">${ccs.length>26?ccs.substring(0,26)+'…':ccs}</td>
+      <td><span class="${r.estado_eval==='OTORGADO'?'pct-ok':r.estado_eval==='APROBADO'?'pct-hi':'pct-warn'}">${r.estado_eval||'—'}</span></td>
+      <td>${fM(r.saldo_precio)}</td>
+      <td>${fM(r.monto_financiado)}</td>
+      <td>${r.plazo||'—'}</td>
+      <td>${fM(r.com_dealer)}</td>
+      <td>${fM(r.rentab_afa)}</td>
+    </tr>`;
+  }).join('');
+  document.getElementById('t-modal-ops-body').innerHTML = body || '<tr><td colspan="10" style="text-align:center;color:#888;padding:12px">Sin operaciones</td></tr>';
+  document.getElementById('t-modal-ops-foot').innerHTML = `<tr>
+    <td colspan="5">Total (${ops.length} ops)</td>
+    <td>${fM(totSaldo)}</td><td>${fM(totFin)}</td><td>—</td>
+    <td>${fM(totCD)}</td><td>${fM(totIng)}</td>
+  </tr>`;
+
+  const tipoLabel = tipo === 'ot' ? 'OTORGADOS' : 'APROBADOS';
+  document.getElementById('modal-ejec-title').textContent = nombre + ' — ' + tipoLabel + ' (' + desde + (desde !== hasta ? ' → ' + hasta : '') + ')';
+  document.getElementById('modal-ejec-overlay').classList.add('open');
+}
+
+function cerrarModalEjec() {
+  document.getElementById('modal-ejec-overlay').classList.remove('open');
+}
+document.addEventListener('keydown', e => { if (e.key === 'Escape') cerrarModalEjec(); });
 </script>
 
 </body>
