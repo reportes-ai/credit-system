@@ -107,6 +107,48 @@
     @media (max-width: 900px) { .modules-grid { grid-template-columns: repeat(3, 1fr); } }
     @media (max-width: 640px) { .main-content { padding: 20px 16px; } .welcome-banner { padding: 24px 20px; } .topnav-menu { display: none; } .modules-grid { grid-template-columns: repeat(2, 1fr); } }
 
+    /* ── CINTA NOTICIAS ── */
+    .news-ticker {
+      background: linear-gradient(90deg, #012d70, #013a8a);
+      border-bottom: 1px solid rgba(0,154,254,0.25);
+      height: 28px; display: flex; align-items: center;
+      overflow: hidden; position: sticky; top: 60px; z-index: 199;
+    }
+    .news-label {
+      background: #009AFE; color: #fff;
+      font-size: 0.68rem; font-weight: 800; letter-spacing: 1px;
+      padding: 0 12px; height: 100%; display: flex; align-items: center;
+      white-space: nowrap; flex-shrink: 0; text-transform: uppercase;
+    }
+    .news-track-wrap {
+      flex: 1; overflow: hidden; position: relative; height: 100%;
+    }
+    .news-track {
+      display: flex; align-items: center; gap: 0;
+      height: 100%; white-space: nowrap;
+      animation: tickerScroll 60s linear infinite;
+      will-change: transform;
+    }
+    .news-track:hover { animation-play-state: paused; }
+    @keyframes tickerScroll {
+      0%   { transform: translateX(0); }
+      100% { transform: translateX(-50%); }
+    }
+    .news-item {
+      display: inline-flex; align-items: center; gap: 8px;
+      padding: 0 28px; font-size: 0.76rem; color: #bfdbfe;
+      cursor: pointer; transition: color 0.15s;
+    }
+    .news-item:hover { color: #fff; }
+    .news-item .news-dot {
+      width: 4px; height: 4px; border-radius: 50%;
+      background: #60a5fa; flex-shrink: 0;
+    }
+    .news-item .news-src {
+      color: #60a5fa; font-weight: 700; font-size: 0.68rem;
+      text-transform: uppercase; margin-right: 2px;
+    }
+
     /* ── REORDENAR ── */
     .btn-reordenar { background: rgba(255,255,255,0.12); border: 1px solid rgba(255,255,255,0.25); color: #fff; border-radius: 8px; padding: 5px 13px; font-size: 0.82rem; font-weight: 600; cursor: pointer; display: flex; align-items: center; gap: 6px; transition: background 0.15s; }
     .btn-reordenar:hover { background: rgba(255,255,255,0.22); }
@@ -134,7 +176,7 @@
     <div class="topnav-left">
       <a href="/" class="topnav-brand">
         <img src="/img/logo.png" alt="AutoFácil">
-        <span class="version-badge">v4.9</span>
+        <span class="version-badge">v5.0</span>
       </a>
     </div>
 
@@ -169,6 +211,16 @@
       <button class="btn-logout" onclick="logout()"><i class="bi bi-box-arrow-right me-1"></i>Salir</button>
     </div>
   </nav>
+
+  <!-- Cinta de noticias -->
+  <div class="news-ticker" id="newsTicker">
+    <div class="news-label">📰 Noticias</div>
+    <div class="news-track-wrap">
+      <div class="news-track" id="newsTrack">
+        <span class="news-item"><span class="news-dot"></span>Cargando noticias...</span>
+      </div>
+    </div>
+  </div>
 
   <div class="main-content">
     <div class="welcome-banner">
@@ -479,6 +531,51 @@
 <script src="/js/app-version.js"></script>
 
 <script>
+/* ── Cinta de noticias (RSS → rss2json) ─────────────────────────────── */
+(async function initTicker() {
+  const FEEDS = [
+    { url: 'https://www.biobiochile.cl/feed/', src: 'BioBío' },
+    { url: 'https://www.latercera.com/feed/',  src: 'La Tercera' },
+  ];
+  const RSS2JSON = 'https://api.rss2json.com/v1/api.json?rss_url=';
+
+  let noticias = [];
+
+  for (const feed of FEEDS) {
+    try {
+      const r = await fetch(`${RSS2JSON}${encodeURIComponent(feed.url)}&count=8`);
+      const d = await r.json();
+      if (d.status === 'ok' && d.items?.length) {
+        d.items.forEach(item => noticias.push({ titulo: item.title, link: item.link, src: feed.src }));
+      }
+    } catch { /* ignorar feed fallido */ }
+  }
+
+  if (!noticias.length) {
+    // Fallback estático si ambos feeds fallan
+    noticias = [
+      { titulo: 'Sin conexión a noticias en este momento', link: '#', src: '' },
+    ];
+  }
+
+  // Renderizar: duplicar lista para loop continuo
+  const track = document.getElementById('newsTrack');
+  const buildItems = () => noticias.map(n =>
+    `<span class="news-item" onclick="window.open('${n.link}','_blank')" title="${n.titulo}">
+       <span class="news-dot"></span>
+       ${n.src ? `<span class="news-src">${n.src}</span>` : ''}
+       ${n.titulo}
+     </span>`
+  ).join('');
+
+  track.innerHTML = buildItems() + buildItems(); // doble para loop
+
+  // Ajustar duración según cantidad de caracteres
+  const totalChars = noticias.reduce((s, n) => s + n.titulo.length, 0);
+  const dur = Math.max(40, Math.min(120, totalChars * 0.18));
+  track.style.animationDuration = dur + 's';
+})();
+
 /* ── Widget Clima (Open-Meteo, sin API key) ──────────────────────────── */
 const WMO_ICON = {
   0:'☀️', 1:'🌤️', 2:'⛅', 3:'☁️',
