@@ -11,6 +11,23 @@ const PLACEMENT_SECTIONS = {
 };
 
 const PLACEMENT_ITEMS = {
+  // ── HOME — módulos principales ────────────────────────────────────────────
+  '/clientes/':              { section:'home', href:'/clientes/',              icon:'bi-people-fill',            titulo:'Clientes' },
+  '/cotizaciones/':          { section:'home', href:'/cotizaciones/',          icon:'bi-calculator',             titulo:'Cotizaciones' },
+  '/creditos/':              { section:'home', href:'/creditos/',              icon:'bi-credit-card-2-front',    titulo:'Créditos' },
+  '/tesoreria/':             { section:'home', href:'/tesoreria/',             icon:'bi-safe2',                  titulo:'Tesorería' },
+  '/crm/':                   { section:'home', href:'/crm/',                   icon:'bi-headset',                titulo:'CRM' },
+  '/cobranza/':              { section:'home', href:'/cobranza/',              icon:'bi-bell-fill',              titulo:'Cobranza' },
+  '/reporteria/':            { section:'home', href:'/reporteria/',            icon:'bi-bar-chart-line-fill',    titulo:'Reportería' },
+  '/politica/':              { section:'home', href:'/politica/',              icon:'bi-shield-lock',            titulo:'Política de Crédito' },
+  '/usuarios/':              { section:'home', href:'/usuarios/',              icon:'bi-people',                 titulo:'Usuarios' },
+  '/mantenedores/':          { section:'home', href:'/mantenedores/',          icon:'bi-gear-fill',              titulo:'Mantenedores' },
+  '/cartas-aprobacion/':     { section:'home', href:'/cartas-aprobacion/',     icon:'bi-envelope-paper',         titulo:'Cartas de Aprobación' },
+  '/comisiones/':            { section:'home', href:'/comisiones/',            icon:'bi-cash-coin',              titulo:'Comisión Ejecutivos' },
+  '/carga-masiva/':          { section:'home', href:'/carga-masiva/',          icon:'bi-cloud-upload',           titulo:'Carga Masiva' },
+  '/simulador/':             { section:'home', href:'/simulador/',             icon:'bi-calculator',             titulo:'Simulador Rentabilidad' },
+  '/antecedentes-laborales/':{ section:'home', href:'/antecedentes-laborales/',icon:'bi-briefcase',              titulo:'Antecedentes Laborales' },
+  '/informacion-comercial/': { section:'home', href:'/informacion-comercial/', icon:'bi-building',               titulo:'Información Comercial' },
   // ── MANTENEDORES ─────────────────────────────────────────────────────────
   'tasas':              { section:'mantenedores', href:'/mantenedores/tasas/',            icon:'bi-percent',               titulo:'Tasas de Interés' },
   'uf':                 { section:'mantenedores', href:'/mantenedores/uf/',               icon:'bi-currency-dollar',        titulo:'Valores UF' },
