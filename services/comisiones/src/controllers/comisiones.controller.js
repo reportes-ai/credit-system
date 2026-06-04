@@ -112,18 +112,10 @@ function calcularComision(creditos, vars) {
   const ajuste_calidad = calidad * peso_calidad * factor_max;
   const factor_ajuste  = ajuste_ces + ajuste_rep + ajuste_calidad;
 
-  // Bonos cesantía y rep: solo sobre créditos NCNU con seguro
-  const ncnu24    = ncnu.filter(c => parseInt(c.plazo) <= 24);
-  const ncnuMas24 = ncnu.filter(c => parseInt(c.plazo) >  24);
-
-  const ces24    = ncnu24.filter(c    => (parseFloat(c.seguro_cesantia) ||0)>0).reduce((s,c)=>s+(parseFloat(c.monto_financiado)||0),0);
-  const cesMas24 = ncnuMas24.filter(c => (parseFloat(c.seguro_cesantia) ||0)>0).reduce((s,c)=>s+(parseFloat(c.monto_financiado)||0),0);
-  const rep24    = ncnu24.filter(c    => (parseFloat(c.seguro_rep_menor)||0)>0).reduce((s,c)=>s+(parseFloat(c.monto_financiado)||0),0);
-  const repMas24 = ncnuMas24.filter(c => (parseFloat(c.seguro_rep_menor)||0)>0).reduce((s,c)=>s+(parseFloat(c.monto_financiado)||0),0);
-
-  const bono_ces     = (ces24 * pct_24 + cesMas24 * pct_mas24) * ajuste_ces;
-  const bono_rep     = (rep24 * pct_24 + repMas24 * pct_mas24) * ajuste_rep;
-  const bono_calidad = (base24 + baseMas24) * ajuste_calidad;
+  // Bonos cesantía, rep y calidad: todos aplican el ajuste sobre incentivo_base total
+  const bono_ces     = incentivo_base * ajuste_ces;
+  const bono_rep     = incentivo_base * ajuste_rep;
+  const bono_calidad = incentivo_base * ajuste_calidad;
 
   const incentivo_final = incentivo_base + bono_ces + bono_rep + bono_calidad;
 
