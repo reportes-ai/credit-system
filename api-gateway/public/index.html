@@ -119,7 +119,51 @@
       font-size: 0.68rem; font-weight: 800; letter-spacing: 1px;
       padding: 0 12px; height: 100%; display: flex; align-items: center;
       white-space: nowrap; flex-shrink: 0; text-transform: uppercase;
+      cursor: pointer; user-select: none; gap: 5px;
+      transition: background .15s;
     }
+    .news-label:hover { background: #0085e0; }
+    .news-label .nl-arrow { font-size: .6rem; transition: transform .2s; }
+    .news-label.open .nl-arrow { transform: rotate(180deg); }
+
+    /* Panel configuración noticias */
+    .news-config-panel {
+      position: fixed; top: 88px; left: 0;
+      background: #0d2959; border: 1px solid rgba(0,154,254,.35);
+      border-top: none; border-radius: 0 0 12px 12px;
+      padding: 16px 20px; z-index: 500;
+      min-width: 320px; box-shadow: 4px 8px 24px rgba(0,0,0,.4);
+      display: none;
+      animation: panelDown .15s ease;
+    }
+    @keyframes panelDown { from{opacity:0;transform:translateY(-6px)} to{opacity:1;transform:translateY(0)} }
+    .news-config-panel.show { display: block; }
+    .ncp-title { font-size: .7rem; font-weight: 800; color: #60a5fa; text-transform: uppercase;
+                 letter-spacing: 1px; margin-bottom: 10px; }
+    .ncp-row { display: flex; align-items: center; justify-content: space-between;
+               padding: 6px 0; border-bottom: 1px solid rgba(255,255,255,.06); }
+    .ncp-row:last-child { border-bottom: none; }
+    .ncp-label { font-size: .78rem; color: #bfdbfe; }
+    .ncp-sublabel { font-size: .68rem; color: #60a5fa; }
+
+    /* Toggle switch */
+    .ncp-toggle { position: relative; width: 36px; height: 20px; flex-shrink: 0; }
+    .ncp-toggle input { opacity: 0; width: 0; height: 0; }
+    .ncp-toggle .slider {
+      position: absolute; inset: 0; background: #1e3a6e; border-radius: 20px;
+      cursor: pointer; transition: .2s;
+    }
+    .ncp-toggle .slider::before {
+      content: ''; position: absolute; width: 14px; height: 14px;
+      left: 3px; top: 3px; background: #fff; border-radius: 50%; transition: .2s;
+    }
+    .ncp-toggle input:checked + .slider { background: #009AFE; }
+    .ncp-toggle input:checked + .slider::before { transform: translateX(16px); }
+
+    /* Slider velocidad */
+    .ncp-speed { width: 100%; accent-color: #009AFE; cursor: pointer; }
+    .ncp-speed-labels { display: flex; justify-content: space-between;
+                        font-size: .65rem; color: #60a5fa; margin-top: 2px; }
     .news-track-wrap {
       flex: 1; overflow: hidden; position: relative; height: 100%;
     }
@@ -176,7 +220,7 @@
     <div class="topnav-left">
       <a href="/" class="topnav-brand">
         <img src="/img/logo.png" alt="AutoFácil">
-        <span class="version-badge">v5.3</span>
+        <span class="version-badge">v5.4</span>
       </a>
     </div>
 
@@ -214,11 +258,58 @@
 
   <!-- Cinta de noticias -->
   <div class="news-ticker" id="newsTicker">
-    <div class="news-label">📰 Noticias</div>
+    <div class="news-label" id="newsLabelBtn" onclick="toggleNewsPanel()">
+      📰 Noticias <span class="nl-arrow">▼</span>
+    </div>
     <div class="news-track-wrap">
       <div class="news-track" id="newsTrack">
         <span class="news-item"><span class="news-dot"></span>Cargando noticias...</span>
       </div>
+    </div>
+  </div>
+
+  <!-- Panel config noticias (solo admin) -->
+  <div class="news-config-panel" id="newsConfigPanel">
+    <div class="ncp-title">⚙️ Configuración Cinta de Noticias</div>
+
+    <!-- Mostrar / ocultar -->
+    <div class="ncp-row">
+      <div><div class="ncp-label">Mostrar cinta de noticias</div></div>
+      <label class="ncp-toggle">
+        <input type="checkbox" id="ncpMostrar" checked onchange="applyNewsConfig()">
+        <span class="slider"></span>
+      </label>
+    </div>
+
+    <!-- Feeds -->
+    <div class="ncp-row" style="margin-top:6px">
+      <div class="ncp-label" style="font-weight:700;color:#93c5fd">Feeds activos</div>
+    </div>
+    <div class="ncp-row">
+      <div><div class="ncp-label">🇨🇱 Chile General</div><div class="ncp-sublabel">google.com/news · chile noticias</div></div>
+      <label class="ncp-toggle"><input type="checkbox" id="ncpFeed0" checked onchange="applyNewsConfig()"><span class="slider"></span></label>
+    </div>
+    <div class="ncp-row">
+      <div><div class="ncp-label">💰 Economía Chile</div><div class="ncp-sublabel">google.com/news · economia chile</div></div>
+      <label class="ncp-toggle"><input type="checkbox" id="ncpFeed1" checked onchange="applyNewsConfig()"><span class="slider"></span></label>
+    </div>
+    <div class="ncp-row">
+      <div><div class="ncp-label">📈 Finanzas & Crédito</div><div class="ncp-sublabel">google.com/news · finanzas credito chile</div></div>
+      <label class="ncp-toggle"><input type="checkbox" id="ncpFeed2" checked onchange="applyNewsConfig()"><span class="slider"></span></label>
+    </div>
+
+    <!-- Velocidad -->
+    <div class="ncp-row" style="margin-top:6px; flex-direction:column; align-items:stretch; gap:6px">
+      <div style="display:flex;justify-content:space-between;align-items:center">
+        <div class="ncp-label" style="font-weight:700;color:#93c5fd">Velocidad de desplazamiento</div>
+        <span style="font-size:.72rem;color:#60a5fa" id="ncpSpeedLabel">Normal</span>
+      </div>
+      <input type="range" class="ncp-speed" id="ncpSpeed" min="1" max="5" value="3" oninput="applyNewsConfig()">
+      <div class="ncp-speed-labels"><span>Lento</span><span>Normal</span><span>Rápido</span></div>
+    </div>
+
+    <div style="margin-top:10px;text-align:right">
+      <button onclick="toggleNewsPanel()" style="background:rgba(255,255,255,.1);border:1px solid rgba(255,255,255,.2);color:#bfdbfe;border-radius:6px;padding:4px 12px;font-size:.75rem;cursor:pointer">Cerrar</button>
     </div>
   </div>
 
@@ -531,19 +622,39 @@
 <script src="/js/app-version.js"></script>
 
 <script>
-/* ── Cinta de noticias (backend proxy /api/noticias) ────────────────── */
-(async function initTicker() {
-  let noticias = [];
-  try {
-    const r = await fetch('/api/noticias');
-    const d = await r.json();
-    if (d.success && d.data?.length) noticias = d.data;
-  } catch { /* fallback abajo */ }
+/* ── Cinta de noticias ────────────────────────────────────────────────── */
+const NEWS_SPEED_MAP = { 1: 0.22, 2: 0.16, 3: 0.10, 4: 0.06, 5: 0.035 };
+const NEWS_SPEED_LABELS = { 1:'Muy lento', 2:'Lento', 3:'Normal', 4:'Rápido', 5:'Muy rápido' };
+let ALL_NOTICIAS = [];
 
-  if (!noticias.length) {
-    noticias = [{ titulo: 'Sin noticias disponibles en este momento', link: '#', src: '' }];
-  }
+// Cargar config guardada
+function loadNewsConfig() {
+  try { return JSON.parse(localStorage.getItem('newsConfig') || '{}'); } catch { return {}; }
+}
+function saveNewsConfig(cfg) {
+  localStorage.setItem('newsConfig', JSON.stringify(cfg));
+}
 
+function applyNewsConfig() {
+  const mostrar = document.getElementById('ncpMostrar').checked;
+  const speed   = parseInt(document.getElementById('ncpSpeed').value);
+  const feeds   = [0,1,2].map(i => document.getElementById(`ncpFeed${i}`)?.checked ?? true);
+
+  document.getElementById('ncpSpeedLabel').textContent = NEWS_SPEED_LABELS[speed];
+  saveNewsConfig({ mostrar, speed, feeds });
+
+  // Mostrar/ocultar cinta
+  const ticker = document.getElementById('newsTicker');
+  ticker.style.display = mostrar ? 'flex' : 'none';
+
+  // Filtrar noticias por feeds activos
+  const srcMap = ['Google News','Economía','Finanzas'];
+  const activeSrcs = srcMap.filter((_,i) => feeds[i]);
+  const filtradas = ALL_NOTICIAS.filter(n => !n.src || activeSrcs.includes(n.src));
+  renderTicker(filtradas.length ? filtradas : ALL_NOTICIAS, speed);
+}
+
+function renderTicker(noticias, speed) {
   const track = document.getElementById('newsTrack');
   const buildItems = () => noticias.map(n =>
     `<span class="news-item" onclick="${n.link !== '#' ? `window.open('${n.link}','_blank')` : ''}" title="${n.titulo.replace(/"/g,'&quot;')}">
@@ -552,12 +663,70 @@
        ${n.titulo}
      </span>`
   ).join('');
-
   track.innerHTML = buildItems() + buildItems();
-
-  const totalChars = noticias.reduce((s, n) => s + n.titulo.length, 0);
-  const dur = Math.max(22, Math.min(70, totalChars * 0.10));
+  const totalChars = noticias.reduce((s,n) => s + n.titulo.length, 0);
+  const factor = NEWS_SPEED_MAP[speed] || 0.10;
+  const dur = Math.max(12, Math.min(120, totalChars * factor));
   track.style.animationDuration = dur + 's';
+}
+
+// Panel toggle (solo admin)
+function toggleNewsPanel() {
+  const yo = JSON.parse(sessionStorage.getItem('usuario') || 'null');
+  if (!yo || yo.perfil?.toLowerCase() !== 'administrador') return;
+  const panel = document.getElementById('newsConfigPanel');
+  const label = document.getElementById('newsLabelBtn');
+  const open  = panel.classList.toggle('show');
+  label.classList.toggle('open', open);
+  if (open) {
+    // cerrar al click fuera
+    setTimeout(() => document.addEventListener('click', closeNewsPanelOutside, { once: true }), 10);
+  }
+}
+function closeNewsPanelOutside(e) {
+  const panel = document.getElementById('newsConfigPanel');
+  const label = document.getElementById('newsLabelBtn');
+  if (!panel.contains(e.target) && !label.contains(e.target)) {
+    panel.classList.remove('show');
+    label.classList.remove('open');
+  } else if (panel.contains(e.target)) {
+    // re-registrar si hizo clic dentro
+    setTimeout(() => document.addEventListener('click', closeNewsPanelOutside, { once: true }), 10);
+  }
+}
+
+(async function initTicker() {
+  // Restaurar config guardada
+  const cfg = loadNewsConfig();
+  if (cfg.mostrar === false) document.getElementById('newsTicker').style.display = 'none';
+  if (cfg.speed) {
+    document.getElementById('ncpSpeed').value = cfg.speed;
+    document.getElementById('ncpSpeedLabel').textContent = NEWS_SPEED_LABELS[cfg.speed];
+  }
+  if (cfg.feeds) cfg.feeds.forEach((v,i) => { const el = document.getElementById(`ncpFeed${i}`); if(el) el.checked = v; });
+  if (cfg.mostrar === false) { const el = document.getElementById('ncpMostrar'); if(el) el.checked = false; }
+
+  // Ocultar flecha del label si no es admin
+  const yo = JSON.parse(sessionStorage.getItem('usuario') || 'null');
+  if (!yo || yo.perfil?.toLowerCase() !== 'administrador') {
+    document.getElementById('newsLabelBtn').style.cursor = 'default';
+    const arr = document.querySelector('.nl-arrow'); if(arr) arr.style.display='none';
+  }
+
+  try {
+    const r = await fetch('/api/noticias');
+    const d = await r.json();
+    if (d.success && d.data?.length) ALL_NOTICIAS = d.data;
+  } catch {}
+
+  if (!ALL_NOTICIAS.length) ALL_NOTICIAS = [{ titulo: 'Sin noticias disponibles en este momento', link: '#', src: '' }];
+
+  const speed = parseInt(document.getElementById('ncpSpeed').value) || 3;
+  const feeds = [0,1,2].map(i => document.getElementById(`ncpFeed${i}`)?.checked ?? true);
+  const srcMap = ['Google News','Economía','Finanzas'];
+  const activeSrcs = srcMap.filter((_,i) => feeds[i]);
+  const filtradas = ALL_NOTICIAS.filter(n => !n.src || activeSrcs.includes(n.src));
+  renderTicker(filtradas.length ? filtradas : ALL_NOTICIAS, speed);
 })();
 
 /* ── Widget Clima (Open-Meteo, sin API key) ──────────────────────────── */
