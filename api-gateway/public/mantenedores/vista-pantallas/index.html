@@ -102,6 +102,7 @@
       </div>
       <button class="btn-nav btn-reordenar" id="btnReordenar" onclick="toggleReordenar()"><i class="bi bi-arrows-move"></i>Reordenar</button>
       <button class="btn-nav btn-guardar" id="btnGuardar" onclick="guardar()"><i class="bi bi-floppy"></i>Guardar orden</button>
+      <button class="btn-nav" id="btnActualizar" onclick="actualizarModulos()" style="background:rgba(255,255,255,.1);color:#fff;border:1px solid rgba(255,255,255,.25)"><i class="bi bi-arrow-repeat"></i> Actualizar Módulos</button>
       <button class="btn-nav btn-reset-top" onclick="resetDefaults()" style="background:rgba(255,255,255,.1);color:#fff;border:1px solid rgba(255,255,255,.25)"><i class="bi bi-arrow-counterclockwise"></i></button>
       <button class="btn-logout" onclick="logout()"><i class="bi bi-box-arrow-right me-1"></i>Salir</button>
     </div>
@@ -366,6 +367,50 @@
 
       btn.disabled = false;
       btn.innerHTML = '<i class="bi bi-floppy"></i>Guardar orden';
+    }
+
+    async function actualizarModulos() {
+      const btn = document.getElementById('btnActualizar');
+      btn.disabled = true;
+      btn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span>Actualizando…';
+
+      let respMods = { success: false, data: [] };
+      try {
+        respMods = await fetch('/api/auth/mis-permisos', { headers: H }).then(r => r.json());
+      } catch {}
+
+      const dbList = respMods.success ? respMods.data : [];
+
+      // Recopilar todas las rutas/keys ya presentes en algún grupo
+      const yaPresentes = new Set();
+      Object.keys(PLACEMENT_SECTIONS).forEach(sid => {
+        document.getElementById(`grp-${sid}`)?.querySelectorAll('.chip').forEach(c => yaPresentes.add(c.dataset.key));
+      });
+
+      // Módulos nuevos: los que vienen de BD y no están en ningún grupo
+      const nuevos = dbList.filter(m => !yaPresentes.has(m.ruta));
+
+      if (nuevos.length === 0) {
+        btn.disabled = false;
+        btn.innerHTML = '<i class="bi bi-arrow-repeat"></i> Actualizar Módulos';
+        const ok = document.getElementById('saveOk');
+        ok.textContent = '✓ Sin módulos nuevos';
+        ok.style.display = 'flex';
+        setTimeout(() => { ok.style.display = 'none'; ok.textContent = '✓ Guardado correctamente'; }, 2500);
+        return;
+      }
+
+      // Agregar los nuevos al grupo HOME
+      const homeBody = document.getElementById('grp-home');
+      nuevos.forEach(m => homeBody.appendChild(makeChip(m.ruta, m.nombre, m.icono, 'module')));
+      refreshCount('home');
+
+      btn.disabled = false;
+      btn.innerHTML = '<i class="bi bi-arrow-repeat"></i> Actualizar Módulos';
+      const ok = document.getElementById('saveOk');
+      ok.textContent = `✓ ${nuevos.length} módulo(s) nuevo(s) agregado(s) al HOME`;
+      ok.style.display = 'flex';
+      setTimeout(() => { ok.style.display = 'none'; ok.textContent = '✓ Guardado correctamente'; }, 3500);
     }
 
     async function resetDefaults() {
