@@ -2,7 +2,7 @@
 <html lang="es">
 <head>
 <meta charset="UTF-8">
-<!-- v1.2 -->
+<!-- v1.3 -->
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>AutoFácil — Dashboard</title>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
@@ -2013,25 +2013,12 @@ async function cargarDatos() {
     document.getElementById('periodo-label').textContent = EJ_PERF.meses_labels?.[ultimoMes] || ultimoMes;
 
   } catch(e) {
-    console.warn('[cargarDatos] Error:', e.message);
-    cargarDatos._intentos = (cargarDatos._intentos || 0) + 1;
-    if (cargarDatos._intentos <= 3) {
-      const espera = cargarDatos._intentos * 5000; // 5s, 10s, 15s
-      const msgEl = document.getElementById('loading-msg');
-      if (msgEl) msgEl.textContent = `Servidor iniciando… reintentando (${cargarDatos._intentos}/3)`;
-      setTimeout(() => cargarDatos(), espera);
-      return; // mantener spinner, no ejecutar finally
-    }
-    // 3 intentos fallidos → datos embebidos
-    if (loadingEl) loadingEl.style.display = 'none';
-    console.warn('Usando datos embebidos tras 3 intentos');
+    console.warn('No se pudo cargar datos del API:', e.message);
     window.DASH = window.DASH_INLINE;
     buildV1(); buildV1b();
-    return;
+  } finally {
+    if (loadingEl) loadingEl.style.display = 'none';
   }
-  // Éxito: ocultar spinner
-  if (loadingEl) loadingEl.style.display = 'none';
-}
 }
 
 // Mostrar spinner mientras carga
@@ -2043,7 +2030,6 @@ document.body.insertAdjacentHTML('afterbegin', `
   <style>@keyframes spin{to{transform:rotate(360deg)}}</style>
 `);
 
-cargarDatos._intentos = 0;
 cargarDatos();</script>
 <script>
 // RAW_DATA se carga dinámicamente desde /data/dashboard_data.json
