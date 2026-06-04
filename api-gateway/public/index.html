@@ -176,7 +176,7 @@
     <div class="topnav-left">
       <a href="/" class="topnav-brand">
         <img src="/img/logo.png" alt="AutoFácil">
-        <span class="version-badge">v5.1</span>
+        <span class="version-badge">v5.2</span>
       </a>
     </div>
 
@@ -596,17 +596,27 @@ async function cargarClima(lat, lon, ciudad) {
   }
 }
 
+async function getCiudad(lat, lon) {
+  try {
+    const r = await fetch(
+      `https://nominatim.openstreetmap.org/reverse?lat=${lat}&lon=${lon}&format=json&zoom=10`,
+      { headers: { 'Accept-Language': 'es' } }
+    );
+    const d = await r.json();
+    return d.address?.city || d.address?.town || d.address?.village || d.address?.county || 'Mi ubicación';
+  } catch { return 'Mi ubicación'; }
+}
+
 function initClima() {
-  // Intenta geolocalización; si falla usa Santiago
   if (navigator.geolocation) {
     navigator.geolocation.getCurrentPosition(
-      pos => {
+      async pos => {
         const { latitude: lat, longitude: lon } = pos.coords;
-        // Reverse geocode ciudad con Open-Meteo no aplica; usamos "Mi ubicación"
-        cargarClima(lat, lon, 'Mi ubicación');
+        const ciudad = await getCiudad(lat, lon);
+        cargarClima(lat, lon, ciudad);
       },
       () => cargarClima(-33.4569, -70.6483, 'Santiago'),
-      { timeout: 4000 }
+      { timeout: 5000 }
     );
   } else {
     cargarClima(-33.4569, -70.6483, 'Santiago');
