@@ -239,17 +239,37 @@
       }
     }
 
+    const norm = r => r ? (r.endsWith('/') ? r : r + '/') : r;
+
+    // Construye el mapa completo de todos los items conocidos: key → { nombre, icono, type, defaultSection }
+    function buildMasterList(dbList) {
+      const master = new Map();
+      // 1. Módulos de BD
+      dbList.forEach(m => master.set(norm(m.ruta), { nombre: m.nombre, icono: m.icono || 'bi-grid', type: 'module', defaultSection: 'home' }));
+      // 2. Fallback para módulos no devueltos por la BD
+      HOME_FALLBACK.forEach(f => {
+        const k = norm(f.ruta);
+        if (!master.has(k)) master.set(k, { nombre: f.nombre, icono: f.icono, type: 'module', defaultSection: 'home' });
+      });
+      // 3. Sub-items del manifiesto
+      Object.entries(PLACEMENT_ITEMS).forEach(([key, item]) => {
+        if (!master.has(key)) master.set(key, { nombre: item.titulo, icono: item.icon || 'bi-grid', type: 'subitem', defaultSection: item.section });
+      });
+      return master;
+    }
+
     async function init() {
       const grid = document.getElementById('groupsGrid');
       grid.innerHTML = '<p style="grid-column:1/-1;text-align:center;color:#6b7280;padding:40px"><span class="spinner-border spinner-border-sm me-2"></span>Cargando módulos…</p>';
 
-      let respMods = { success: false, data: [] };
-      let placement = {};
+      let dbList = [], placement = {};
       try {
-        [respMods, placement] = await Promise.all([
+        const [rM, rP] = await Promise.all([
           fetch('/api/auth/mis-permisos', { headers: H }).then(r => r.json()),
           loadPlacementConfig(H),
         ]);
+        if (rM.success) dbList = rM.data;
+        placement = rP;
       } catch(e) {
         grid.innerHTML = `<p style="grid-column:1/-1;text-align:center;color:#dc2626;padding:40px"><i class="bi bi-exclamation-triangle me-2"></i>Error al cargar: ${e.message}</p>`;
         return;
@@ -257,78 +277,44 @@
 
       grid.innerHTML = '';
 
-      // Combinar módulos de BD con fallback (BD tiene prioridad para nombre/icono)
-      const dbList = respMods.success ? respMods.data : [];
-      const rutasDb = new Set(dbList.map(m => m.ruta));
-      // Agregar fallback entries que no estén en BD (así siempre aparecen todos)
-      const extras = HOME_FALLBACK.filter(f => !rutasDb.has(f.ruta));
-      const dbMods = [...dbList, ...extras];
-
+      const master = buildMasterList(dbList);
       const zones = {};
       Object.keys(PLACEMENT_SECTIONS).forEach(s => { zones[s] = []; });
 
-      // Formato nuevo: placement_v2 = { sectionId: [key1, key2, ...] }
-      // Formato viejo: { key: sectionId }
-      let placementOrdered = null;
-      const isNewFormat = placement && Object.keys(placement).some(k => Array.isArray(placement[k]));
-      if (isNewFormat) placementOrdered = placement;
+      // Normalizar placement: soporta tanto formato nuevo {sec:[keys]} como viejo {key:sec}
+      const isNewFmt = Object.values(placement).some(v => Array.isArray(v));
+      const keyToSec = new Map();
 
-      if (placementOrdered) {
-        // Construir un lookup rápido key→section desde arrays ordenados
-        const keyToSection = {};
-        Object.entries(placementOrdered).forEach(([sec, arr]) => {
-          if (Array.isArray(arr)) arr.forEach(k => { keyToSection[k] = sec; });
+      if (isNewFmt) {
+        // Nuevo formato — reconstruir keyToSec y respetar orden guardado
+        const orderedKeys = []; // para preservar orden dentro de cada sección
+        Object.entries(placement).forEach(([sec, arr]) => {
+          if (Array.isArray(arr)) arr.forEach(k => { keyToSec.set(norm(k), sec); keyToSec.set(k, sec); orderedKeys.push({ k, sec }); });
         });
-
-        // Módulos BD en su orden guardado
-        const homeOrder = placementOrdered['home'] || [];
-        const usedKeys = new Set();
-        homeOrder.forEach(key => {
-          const m = dbMods.find(m => m.ruta === key);
-          if (m) { zones['home'].push(makeChip(m.ruta, m.nombre, m.icono, 'module')); usedKeys.add(key); }
-        });
-        // Módulos BD asignados a otras secciones
-        dbMods.forEach(m => {
-          if (usedKeys.has(m.ruta)) return;
-          const sec = keyToSection[m.ruta] || 'home';
+        // Colocar items en orden guardado primero
+        const placed = new Set();
+        orderedKeys.forEach(({ k, sec }) => {
+          const nk = norm(k);
+          const key = master.has(nk) ? nk : (master.has(k) ? k : null);
+          if (!key || placed.has(key)) return;
+          const info = master.get(key);
           if (!zones[sec]) zones[sec] = [];
-          zones[sec].push(makeChip(m.ruta, m.nombre, m.icono, 'module'));
+          zones[sec].push(makeChip(key, info.nombre, info.icono, info.type));
+          placed.add(key);
         });
-
-        // Sub-items del manifiesto en su orden guardado
-        Object.entries(placementOrdered).forEach(([sec, arr]) => {
-          if (!Array.isArray(arr)) return;
-          arr.forEach(key => {
-            if (PLACEMENT_ITEMS[key]) {
-              const item = PLACEMENT_ITEMS[key];
-              if (!zones[sec]) zones[sec] = [];
-              // Evitar duplicado si ya está
-              if (!zones[sec].find(c => c && c.dataset && c.dataset.key === key))
-                zones[sec].push(makeChip(key, item.titulo, item.icon, 'subitem'));
-            }
-          });
-        });
-        // Sub-items no presentes en ningún array → default
-        Object.entries(PLACEMENT_ITEMS).forEach(([key, item]) => {
-          const sec = keyToSection[key] || item.section;
+        // Luego los que no están en el config → default
+        master.forEach((info, key) => {
+          if (placed.has(key)) return;
+          const sec = info.defaultSection;
           if (!zones[sec]) zones[sec] = [];
-          if (!zones[sec].find(c => c && c.dataset && c.dataset.key === key))
-            zones[sec].push(makeChip(key, item.titulo, item.icon, 'subitem'));
+          zones[sec].push(makeChip(key, info.nombre, info.icono, info.type));
         });
-
       } else {
-        // Sin config (o formato viejo flat) — usar defaults
-        const flatPlacement = (!isNewFormat && placement) ? placement : {};
-
-        dbMods.forEach(m => {
-          const sec = flatPlacement[m.ruta] || 'home';
+        // Sin config o formato viejo plano
+        master.forEach((info, key) => {
+          const sec = placement[key] || placement[norm(key)] || info.defaultSection;
           if (!zones[sec]) zones[sec] = [];
-          zones[sec].push(makeChip(m.ruta, m.nombre, m.icono, 'module'));
-        });
-        Object.entries(PLACEMENT_ITEMS).forEach(([key, item]) => {
-          const sec = flatPlacement[key] || item.section;
-          if (!zones[sec]) zones[sec] = [];
-          zones[sec].push(makeChip(key, item.titulo, item.icon, 'subitem'));
+          zones[sec].push(makeChip(key, info.nombre, info.icono, info.type));
         });
       }
 
@@ -374,45 +360,49 @@
       btn.disabled = true;
       btn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span>Actualizando…';
 
-      let respMods = { success: false, data: [] };
+      let dbList = [];
       try {
-        respMods = await fetch('/api/auth/mis-permisos', { headers: H }).then(r => r.json());
+        const r = await fetch('/api/auth/mis-permisos', { headers: H }).then(r => r.json());
+        if (r.success) dbList = r.data;
       } catch {}
 
-      const dbList = respMods.success ? respMods.data : [];
+      // Master list con normalización de rutas
+      const master = buildMasterList(dbList);
 
-      // Recopilar todas las rutas/keys ya presentes en algún grupo
+      // Keys ya presentes (en ambas formas: con y sin slash final)
       const yaPresentes = new Set();
       Object.keys(PLACEMENT_SECTIONS).forEach(sid => {
-        document.getElementById(`grp-${sid}`)?.querySelectorAll('.chip').forEach(c => yaPresentes.add(c.dataset.key));
+        document.getElementById(`grp-${sid}`)?.querySelectorAll('.chip').forEach(c => {
+          yaPresentes.add(c.dataset.key);
+          yaPresentes.add(norm(c.dataset.key));
+        });
       });
 
-      // Módulos nuevos de BD no presentes en ningún grupo → van al HOME
-      const nuevosMod = dbList.filter(m => !yaPresentes.has(m.ruta));
-      const homeBody = document.getElementById('grp-home');
-      nuevosMod.forEach(m => homeBody.appendChild(makeChip(m.ruta, m.nombre, m.icono, 'module')));
-      if (nuevosMod.length) refreshCount('home');
-
-      // Sub-items del manifiesto no presentes en ningún grupo → van a su sección default
-      const nuevosSub = Object.entries(PLACEMENT_ITEMS).filter(([k]) => !yaPresentes.has(k));
-      nuevosSub.forEach(([key, item]) => {
-        const body = document.getElementById(`grp-${item.section}`);
-        if (body) body.appendChild(makeChip(key, item.titulo, item.icon, 'subitem'));
+      let addedMod = 0, addedSub = 0;
+      master.forEach((info, key) => {
+        if (yaPresentes.has(key) || yaPresentes.has(norm(key))) return;
+        const sec = info.defaultSection;
+        const body = document.getElementById(`grp-${sec}`);
+        if (!body) return;
+        body.appendChild(makeChip(key, info.nombre, info.icono, info.type));
+        refreshCount(sec);
+        if (info.type === 'module') addedMod++; else addedSub++;
       });
-      nuevosSub.forEach(([, item]) => refreshCount(item.section));
 
-      const total = nuevosMod.length + nuevosSub.length;
       const ok = document.getElementById('saveOk');
+      const total = addedMod + addedSub;
       if (total === 0) {
-        ok.textContent = '✓ Sin módulos ni sub-módulos nuevos';
+        ok.textContent = '✓ Todo al día — sin elementos nuevos';
       } else {
         const partes = [];
-        if (nuevosMod.length) partes.push(`${nuevosMod.length} módulo(s) → HOME`);
-        if (nuevosSub.length) partes.push(`${nuevosSub.length} sub-módulo(s) → sección por defecto`);
+        if (addedMod) partes.push(`${addedMod} módulo(s) → HOME`);
+        if (addedSub) partes.push(`${addedSub} sub-módulo(s) → sección por defecto`);
         ok.textContent = `✓ Agregados: ${partes.join(' · ')}`;
       }
       ok.style.display = 'flex';
       setTimeout(() => { ok.style.display = 'none'; ok.textContent = '✓ Guardado correctamente'; }, 4000);
+      btn.disabled = false;
+      btn.innerHTML = '<i class="bi bi-arrow-repeat"></i> Actualizar Módulos';
     }
 
     async function resetDefaults() {
