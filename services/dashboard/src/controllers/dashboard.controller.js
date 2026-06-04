@@ -162,6 +162,13 @@ exports.savePermisos = async (req, res) => {
 // ── Controller ────────────────────────────────────────────────────────────────
 exports.getDatos = async (req, res) => {
   try {
+    // UF vigente para calcular MAYOR/MENOR 200UF dinámicamente
+    const [ufRows] = await pool.query(
+      'SELECT valor FROM uf WHERE fecha <= CURDATE() ORDER BY fecha DESC LIMIT 1'
+    );
+    const uf_vigente = parseFloat(ufRows[0]?.valor) || 38000;
+
+    // Deduplicar: si hay num_op repetido, quedarse con el registro de mayor id
     const [rows] = await pool.query(`
       SELECT
         num_op                                                  AS op,
@@ -196,29 +203,37 @@ exports.getDatos = async (req, res) => {
         COALESCE(cl.nombre_completo, '')                      AS nombre_cliente,
         COALESCE(ob.rut_concesionario, '')                    AS rut_dealer,
         COALESCE(ob.id_financiera, '')                         AS id_financiera
-      FROM creditos ob
+      FROM (
+        SELECT *, ROW_NUMBER() OVER (PARTITION BY num_op ORDER BY id DESC) AS _rn
+        FROM creditos WHERE mes IS NOT NULL
+      ) ob
       LEFT JOIN clientes cl ON cl.id_cliente = ob.id_cliente
-      WHERE ob.mes IS NOT NULL
+      WHERE ob._rn = 1
       ORDER BY ob.mes ASC, ob.num_op ASC
     `);
 
     // Agregar institucion derivada + castear decimales a número
     // (MySQL2/TiDB devuelve columnas DECIMAL como strings)
-    const raw = rows.map(r => ({
-      ...r,
-      institucion:        derInstitucion(r.financiera, r.producto),
-      saldo_precio:       +(r.saldo_precio)       || 0,
-      monto_financiado:   +(r.monto_financiado)   || 0,
-      tasa_cli:           +(r.tasa_cli)            || 0,
-      com_dealer:         +(r.com_dealer)          || 0,
-      rentab_afa:         +(r.rentab_afa)          || 0,
-      com_seguros:        +(r.com_seguros)         || 0,
-      com_parque:         +(r.com_parque)          || 0,
-      arriendo_parque:    +(r.arriendo_parque)     || 0,
-      ingreso_neto_total: +(r.ingreso_neto_total)  || 0,
-      plazo:              +(r.plazo)               || 0,
-      mayor_mm30:         +(r.mayor_mm30)          || 0,
-    }));
+    const raw = rows.map(r => {
+      const saldo = +(r.saldo_precio) || 0;
+      return {
+        ...r,
+        institucion:        derInstitucion(r.financiera, r.producto),
+        saldo_precio:       saldo,
+        monto_financiado:   +(r.monto_financiado)   || 0,
+        tasa_cli:           +(r.tasa_cli)            || 0,
+        com_dealer:         +(r.com_dealer)          || 0,
+        rentab_afa:         +(r.rentab_afa)          || 0,
+        com_seguros:        +(r.com_seguros)         || 0,
+        com_parque:         +(r.com_parque)          || 0,
+        arriendo_parque:    +(r.arriendo_parque)     || 0,
+        ingreso_neto_total: +(r.ingreso_neto_total)  || 0,
+        plazo:              +(r.plazo)               || 0,
+        mayor_mm30:         +(r.mayor_mm30)          || 0,
+        // Recalcular MAYOR/MENOR 200UF dinámicamente con UF vigente
+        mayor_menor:        saldo > 200 * uf_vigente ? 'MAYOR 200UF' : 'MENOR 200UF',
+      };
+    });
 
     const { tendencia, ej_perf } = procesarDatos(raw);
 
@@ -226,6 +241,7 @@ exports.getDatos = async (req, res) => {
       success:         true,
       generado_en:     new Date().toISOString(),
       total_registros: raw.length,
+      uf_vigente,
       raw,
       tendencia,
       ej_perf,

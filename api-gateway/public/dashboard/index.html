@@ -217,7 +217,7 @@ document.addEventListener('DOMContentLoaded', async function() {
   <div class="topbar-row1">
     <div style="display:flex;flex-direction:column;align-items:flex-start;gap:2px">
       <a href="/"><img src="/img/logo.png" alt="AutoFácil" style="height:32px;display:block;filter:brightness(0) invert(1)"></a>
-      <span style="font-size:9px;font-weight:300;color:#7bafd4;margin-left:1px">Dashboard <span style="color:#4fc3f7;font-weight:600">V3.7</span></span>
+      <span style="font-size:9px;font-weight:300;color:#7bafd4;margin-left:1px">Dashboard <span style="color:#4fc3f7;font-weight:600">V3.8</span></span>
     </div>
     <div id="ultima-act" style="font-size:10px;color:#4fc3f7;margin-left:8px"></div>
     <div id="date-selector" style="display:flex;align-items:center;gap:8px;background:#0f1e38;padding:4px 12px;border-radius:6px;border:1px solid #2a4070;margin-left:8px">
@@ -957,25 +957,25 @@ function buildV1() {
     <div style="font-size:10px;color:#888">${dtotOps1?(dvOps1[i]/dtotOps1*100).toFixed(1):0}%</div></div></div>`).join('');
 
   // 4 donuts adicionales v1 — usando RAW_DATA aprobados del período
+  const _uf1 = window.UF_VIGENTE || 38000;
   const aprobados1 = window.RAW_DATA.filter(r => {
     const desde = document.getElementById('sel-desde')?.value||'';
     const hasta  = document.getElementById('sel-hasta')?.value||'';
     return r.mes >= desde && r.mes <= hasta &&
-           !['RECHAZADO','ANULADO'].includes(r.estado_eval) &&
-           (r.institucion==='AUTOFIN'||r.institucion==='UNIDAD DE CREDITO');
+           !['RECHAZADO','ANULADO'].includes(r.estado_eval);
   });
   const finAp = {};
   aprobados1.forEach(r => {
-    const k = r.institucion==='AUTOFIN'?'AUTOFIN':'UNIDAD';
-    if(!finAp[k]) finAp[k]={ops:0,saldo:0,fin:0,plazo_sum:0,afa:0,mayor:0,menor:0};
-    finAp[k].ops++; finAp[k].saldo+=r.saldo_precio; finAp[k].fin+=r.monto_financiado;
-    finAp[k].plazo_sum+=r.plazo; finAp[k].afa+=r.rentab_afa;
-    if((r.mayor_menor||'').includes('MAYOR')) finAp[k].mayor++;
-    else finAp[k].menor++;
+    const inst = r.institucion==='UNIDAD DE CREDITO'?'UNIDAD':'AUTOFIN';
+    if(!finAp[inst]) finAp[inst]={ops:0,saldo:0,fin:0,plazo_sum:0,afa:0,mayor:0,menor:0};
+    finAp[inst].ops++; finAp[inst].saldo+=r.saldo_precio; finAp[inst].fin+=r.monto_financiado;
+    finAp[inst].plazo_sum+=r.plazo; finAp[inst].afa+=r.rentab_afa;
+    if(r.saldo_precio > 200 * _uf1) finAp[inst].mayor++;
+    else finAp[inst].menor++;
   });
   const totAp = aprobados1.length;
-  const mayorAp = aprobados1.filter(r=>(r.mayor_menor||'').includes('MAYOR')).length;
-  const menorAp = aprobados1.length - mayorAp;
+  const mayorAp = aprobados1.filter(r => r.saldo_precio > 200 * _uf1).length;
+  const menorAp = totAp - mayorAp;
 
   // Donut 1: Composición 200UF
   const dvMM1 = [mayorAp, menorAp], dtMM1 = dvMM1[0]+dvMM1[1];
@@ -1926,6 +1926,9 @@ async function cargarDatos() {
     if (!r.ok) throw new Error('No se pudo cargar el JSON');
     const datos = await r.json();
 
+    // Guardar UF vigente globalmente para cálculos MAYOR/MENOR
+    window.UF_VIGENTE = parseFloat(datos.uf_vigente) || 38000;
+
     // Enriquecer detalle_v2 con financiera y ejecutivo
     const opMap = {};
     (datos.raw||[]).forEach(r => { opMap[r.op] = r; });
@@ -2055,10 +2058,12 @@ window.RAW_DATA = [];
 
   // Calcular resumen de un mes/rango desde RAW_DATA
   function calcResumen(rows) {
+    const uf = window.UF_VIGENTE || 38000;
     // Operaciones aprobadas (no rechazadas/anuladas)
     const aprobados = rows.filter(r => !['RECHAZADO','ANULADO'].includes(r.estado_eval));
     // Todas las aprobadas son del negocio AutoFácil (AUTOFIN o UNIDAD)
     // Si institucion no viene clasificada, derivar aquí también
+    // Recalcular mayor_menor dinámicamente con UF vigente
     const resolveInst = r => {
       if (r.institucion === 'AUTOFIN' || r.institucion === 'UNIDAD DE CREDITO') return r.institucion;
       const f = (r.financiera||'').toUpperCase();
@@ -2066,7 +2071,11 @@ window.RAW_DATA = [];
       if (f.includes('UNIDAD') || p.startsWith('UNIDAD')) return 'UNIDAD DE CREDITO';
       return 'AUTOFIN'; // todas las ops son del negocio
     };
-    const con_fin = aprobados.map(r => ({ ...r, institucion: resolveInst(r) }));
+    const con_fin = aprobados.map(r => ({
+      ...r,
+      institucion:  resolveInst(r),
+      mayor_menor:  (r.saldo_precio||0) > 200 * uf ? 'MAYOR 200UF' : 'MENOR 200UF',
+    }));
     const fin = {};
     con_fin.forEach(r => {
       const k = r.institucion === 'AUTOFIN' ? 'AUTOFIN' : 'UNIDAD';
