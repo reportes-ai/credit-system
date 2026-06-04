@@ -4713,13 +4713,40 @@ function cerrarModalEjec() {
 }
 document.addEventListener('keydown', e => { if (e.key === 'Escape') cerrarModalEjec(); });
 
-function copiarTablaModal() {
+function _tablaModalHTML() {
+  const titulo = document.getElementById('modal-ejec-title').textContent;
+  const kpis = document.getElementById('modal-ejec-kpis').innerText.replace(/\n/g,' | ');
   const table = document.getElementById('t-modal-ops');
   const rows = [...table.querySelectorAll('thead tr, tbody tr, tfoot tr')];
-  const text = rows.map(tr =>
-    [...tr.querySelectorAll('th,td')].map(c => c.innerText.trim()).join('\t')
-  ).join('\n');
-  navigator.clipboard.writeText(text).then(() => {
+  const trHtml = rows.map((tr, i) => {
+    const tag = tr.closest('thead') ? 'th' : 'td';
+    const cells = [...tr.querySelectorAll('th,td')].map(c => {
+      const txt = c.innerText.trim();
+      const bg = tr.closest('thead') ? 'background:#1a3a6a;color:#fff;' :
+                 tr.closest('tfoot')  ? 'background:#f0f4fa;font-weight:bold;color:#1a3a6a;' : '';
+      return `<${tag} style="border:1px solid #ccc;padding:5px 8px;white-space:nowrap;${bg}">${txt}</${tag}>`;
+    }).join('');
+    return `<tr>${cells}</tr>`;
+  }).join('');
+  return `<html><body>
+<p style="font-family:Arial,sans-serif;font-size:13px;font-weight:bold;color:#1a3a6a">${titulo}</p>
+<p style="font-family:Arial,sans-serif;font-size:11px;color:#555">${kpis}</p>
+<table style="border-collapse:collapse;font-family:Arial,sans-serif;font-size:11px">${trHtml}</table>
+</body></html>`;
+}
+
+function copiarTablaModal() {
+  const html = _tablaModalHTML();
+  const plain = (() => {
+    const table = document.getElementById('t-modal-ops');
+    const rows = [...table.querySelectorAll('thead tr, tbody tr, tfoot tr')];
+    return rows.map(tr => [...tr.querySelectorAll('th,td')].map(c => c.innerText.trim()).join('\t')).join('\n');
+  })();
+  const item = new ClipboardItem({
+    'text/html':  new Blob([html],  { type: 'text/html' }),
+    'text/plain': new Blob([plain], { type: 'text/plain' })
+  });
+  navigator.clipboard.write([item]).then(() => {
     const btn = document.querySelector('#modal-ejec-head button[onclick="copiarTablaModal()"]');
     const orig = btn.textContent;
     btn.textContent = '✓ Copiado';
@@ -4730,13 +4757,8 @@ function copiarTablaModal() {
 
 function exportarExcelModal() {
   const titulo = document.getElementById('modal-ejec-title').textContent;
-  const table = document.getElementById('t-modal-ops');
-  const rows = [...table.querySelectorAll('thead tr, tbody tr, tfoot tr')];
-  const tsv = rows.map(tr =>
-    [...tr.querySelectorAll('th,td')].map(c => '"' + c.innerText.trim().replace(/"/g,'""') + '"').join('\t')
-  ).join('\n');
-  const bom = '﻿';
-  const blob = new Blob([bom + tsv], { type: 'text/tab-separated-values;charset=utf-8' });
+  const html = _tablaModalHTML();
+  const blob = new Blob(['﻿' + html], { type: 'application/vnd.ms-excel;charset=utf-8' });
   const a = document.createElement('a');
   a.href = URL.createObjectURL(blob);
   a.download = titulo.replace(/[/\\:*?"<>|]/g, '_') + '.xls';
