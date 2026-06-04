@@ -176,7 +176,7 @@
     <div class="topnav-left">
       <a href="/" class="topnav-brand">
         <img src="/img/logo.png" alt="AutoFácil">
-        <span class="version-badge">v5.2</span>
+        <span class="version-badge">v5.3</span>
       </a>
     </div>
 
@@ -556,7 +556,7 @@
   track.innerHTML = buildItems() + buildItems();
 
   const totalChars = noticias.reduce((s, n) => s + n.titulo.length, 0);
-  const dur = Math.max(45, Math.min(140, totalChars * 0.20));
+  const dur = Math.max(22, Math.min(70, totalChars * 0.10));
   track.style.animationDuration = dur + 's';
 })();
 
