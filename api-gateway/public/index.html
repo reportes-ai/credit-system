@@ -220,7 +220,7 @@
     <div class="topnav-left">
       <a href="/" class="topnav-brand">
         <img src="/img/logo.png" alt="AutoFácil">
-        <span class="version-badge">v5.4</span>
+        <span class="version-badge">v5.5</span>
       </a>
     </div>
 
@@ -302,7 +302,7 @@
     <div class="ncp-row" style="margin-top:6px; flex-direction:column; align-items:stretch; gap:6px">
       <div style="display:flex;justify-content:space-between;align-items:center">
         <div class="ncp-label" style="font-weight:700;color:#93c5fd">Velocidad de desplazamiento</div>
-        <span style="font-size:.72rem;color:#60a5fa" id="ncpSpeedLabel">Normal</span>
+        <span style="font-size:.72rem;color:#60a5fa" id="ncpSpeedLabel">Rápido</span>
       </div>
       <input type="range" class="ncp-speed" id="ncpSpeed" min="1" max="5" value="3" oninput="applyNewsConfig()">
       <div class="ncp-speed-labels"><span>Lento</span><span>Normal</span><span>Rápido</span></div>
@@ -623,8 +623,8 @@
 
 <script>
 /* ── Cinta de noticias ────────────────────────────────────────────────── */
-const NEWS_SPEED_MAP = { 1: 0.22, 2: 0.16, 3: 0.10, 4: 0.06, 5: 0.035 };
-const NEWS_SPEED_LABELS = { 1:'Muy lento', 2:'Lento', 3:'Normal', 4:'Rápido', 5:'Muy rápido' };
+const NEWS_SPEED_MAP = { 1: 0.12, 2: 0.07, 3: 0.04, 4: 0.022, 5: 0.012 };
+const NEWS_SPEED_LABELS = { 1:'Lento', 2:'Normal', 3:'Rápido', 4:'Muy rápido', 5:'Turbo' };
 let ALL_NOTICIAS = [];
 
 // Cargar config guardada
@@ -665,8 +665,12 @@ function renderTicker(noticias, speed) {
   ).join('');
   track.innerHTML = buildItems() + buildItems();
   const totalChars = noticias.reduce((s,n) => s + n.titulo.length, 0);
-  const factor = NEWS_SPEED_MAP[speed] || 0.10;
-  const dur = Math.max(12, Math.min(120, totalChars * factor));
+  const factor = NEWS_SPEED_MAP[speed] || 0.04;
+  const dur = Math.max(6, Math.min(80, totalChars * factor));
+  // Forzar reinicio de animación CSS
+  track.style.animation = 'none';
+  void track.offsetWidth; // reflow
+  track.style.animation = '';
   track.style.animationDuration = dur + 's';
 }
 
