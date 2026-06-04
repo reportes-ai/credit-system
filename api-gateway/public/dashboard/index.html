@@ -4713,40 +4713,47 @@ function cerrarModalEjec() {
 }
 document.addEventListener('keydown', e => { if (e.key === 'Escape') cerrarModalEjec(); });
 
-function _tablaModalHTML() {
-  const titulo = document.getElementById('modal-ejec-title').textContent;
-  const kpis = document.getElementById('modal-ejec-kpis').innerText.replace(/\n/g,' | ');
+function _filasCsv() {
   const table = document.getElementById('t-modal-ops');
   const rows = [...table.querySelectorAll('thead tr, tbody tr, tfoot tr')];
-  const trHtml = rows.map((tr, i) => {
-    const tag = tr.closest('thead') ? 'th' : 'td';
-    const cells = [...tr.querySelectorAll('th,td')].map(c => {
-      const txt = c.innerText.trim();
-      const bg = tr.closest('thead') ? 'background:#1a3a6a;color:#fff;' :
-                 tr.closest('tfoot')  ? 'background:#f0f4fa;font-weight:bold;color:#1a3a6a;' : '';
-      return `<${tag} style="border:1px solid #ccc;padding:5px 8px;white-space:nowrap;${bg}">${txt}</${tag}>`;
-    }).join('');
+  return rows.map(tr =>
+    [...tr.querySelectorAll('th,td')].map(c => '"' + c.innerText.trim().replace(/"/g,'""') + '"').join(';')
+  ).join('\r\n');
+}
+
+function _tablaHtml() {
+  const titulo = document.getElementById('modal-ejec-title').textContent;
+  const kpis   = document.getElementById('modal-ejec-kpis');
+  const kpisTxt = [...kpis.querySelectorAll('.mekpi')].map(k =>
+    '<b>' + k.querySelector('.mekpi-lbl').innerText + ':</b> ' + k.querySelector('.mekpi-val').innerText
+  ).join(' &nbsp;|&nbsp; ');
+  const table = document.getElementById('t-modal-ops');
+  const rows  = [...table.querySelectorAll('thead tr, tbody tr, tfoot tr')];
+  const trs = rows.map(tr => {
+    const isHead = !!tr.closest('thead');
+    const isFoot = !!tr.closest('tfoot');
+    const bg = isHead ? 'background:#1a3a6a;color:#fff;font-weight:bold'
+             : isFoot ? 'background:#eef2fa;color:#1a3a6a;font-weight:bold' : '';
+    const cells = [...tr.querySelectorAll('th,td')].map(c =>
+      `<td style="border:1px solid #ccc;padding:4px 8px;white-space:nowrap;${bg}">${c.innerText.trim()}</td>`
+    ).join('');
     return `<tr>${cells}</tr>`;
   }).join('');
-  return `<html><body>
-<p style="font-family:Arial,sans-serif;font-size:13px;font-weight:bold;color:#1a3a6a">${titulo}</p>
-<p style="font-family:Arial,sans-serif;font-size:11px;color:#555">${kpis}</p>
-<table style="border-collapse:collapse;font-family:Arial,sans-serif;font-size:11px">${trHtml}</table>
-</body></html>`;
+  return `<p style="font-family:Arial;font-size:13px;font-weight:bold;color:#1a3a6a;margin:0 0 4px">${titulo}</p>`
+       + `<p style="font-family:Arial;font-size:11px;color:#555;margin:0 0 8px">${kpisTxt}</p>`
+       + `<table style="border-collapse:collapse;font-family:Arial;font-size:11px">${trs}</table>`;
 }
 
 function copiarTablaModal() {
-  const html = _tablaModalHTML();
+  const html  = _tablaHtml();
   const plain = (() => {
-    const table = document.getElementById('t-modal-ops');
-    const rows = [...table.querySelectorAll('thead tr, tbody tr, tfoot tr')];
+    const rows = [...document.getElementById('t-modal-ops').querySelectorAll('thead tr, tbody tr, tfoot tr')];
     return rows.map(tr => [...tr.querySelectorAll('th,td')].map(c => c.innerText.trim()).join('\t')).join('\n');
   })();
-  const item = new ClipboardItem({
+  navigator.clipboard.write([new ClipboardItem({
     'text/html':  new Blob([html],  { type: 'text/html' }),
     'text/plain': new Blob([plain], { type: 'text/plain' })
-  });
-  navigator.clipboard.write([item]).then(() => {
+  })]).then(() => {
     const btn = document.querySelector('#modal-ejec-head button[onclick="copiarTablaModal()"]');
     const orig = btn.textContent;
     btn.textContent = '✓ Copiado';
@@ -4757,11 +4764,13 @@ function copiarTablaModal() {
 
 function exportarExcelModal() {
   const titulo = document.getElementById('modal-ejec-title').textContent;
-  const html = _tablaModalHTML();
-  const blob = new Blob(['﻿' + html], { type: 'application/vnd.ms-excel;charset=utf-8' });
+  const kpis   = [...document.getElementById('modal-ejec-kpis').querySelectorAll('.mekpi')]
+    .map(k => k.querySelector('.mekpi-lbl').innerText + ': ' + k.querySelector('.mekpi-val').innerText).join('; ');
+  const csv = '"' + titulo + '"\r\n"' + kpis + '"\r\n\r\n' + _filasCsv();
+  const blob = new Blob(['﻿' + csv], { type: 'text/csv;charset=utf-8' });
   const a = document.createElement('a');
   a.href = URL.createObjectURL(blob);
-  a.download = titulo.replace(/[/\\:*?"<>|]/g, '_') + '.xls';
+  a.download = titulo.replace(/[/\\:*?"<>|]/g, '_') + '.csv';
   a.click();
 }
 </script>
