@@ -1,1 +1,82 @@
-# Credit System - Estándares ## Stack - Backend: Express.js + Node.js - BD: MySQL (pool compartido) - Arquitectura: Modular con /services/ ## Convenciones - Tablas: snake_case - Rutas: kebab-case - Funciones: camelCase - Archivos: kebab-case.js ## Reglas Importantes 1. SIEMPRE importar pool desde: const pool = require('../../../shared/config/database'); 2. Validar entrada en TODAS las rutas 3. Responder JSON uniforme: { success: true, data: {...}, error: null } 4. Cada módulo en /services/ es independiente 5. Base de datos ÚNICA (shared) para todos
+# Credit System — AutoFácil Crédito Automotriz
+
+## Stack
+- Backend: Express.js + Node.js (servicios independientes en /services/)
+- BD: TiDB Cloud (MySQL-compatible) — pool compartido en shared/config/database.js
+- Frontend: HTML/CSS/JS vanilla en api-gateway/public/
+- Deploy: GitHub main → Render (auto-deploy)
+- Auth: JWT (shared/middleware/auth.js → verifyToken)
+
+## Convenciones
+- Tablas BD: snake_case
+- Rutas HTTP: kebab-case
+- Funciones JS: camelCase
+- Archivos: kebab-case.js
+- Versión en badge HTML: subir en cada cambio (<!-- v1.x -->)
+
+## Reglas Importantes
+1. SIEMPRE: `const pool = require('../../../shared/config/database');`
+2. Validar entrada en TODAS las rutas
+3. Respuesta uniforme: `{ success: true, data: {...}, error: null }`
+4. Migraciones: bloque `(async () => { ... })()` al inicio del controller
+5. Tabla creditos: PK es `id` (NO `id_credito` — ese es solo alias en SELECT)
+
+## Estructura de Servicios
+```
+services/
+  creditos/        → operaciones de crédito, carga masiva Excel
+  clientes/        → datos personales + antecedentes_laborales + informacion_comercial
+  comisiones/      → cálculo mensual de comisiones por ejecutivo
+  dashboard/       → API datos dashboard (GET /api/dashboard/datos)
+  usuarios/        → auth, perfiles, permisos
+  mantenedores/    → UF, tasas, parques, dealers, etc.
+  tesoreria/       → cuentas transitorias, cajas, brokerage
+  reporteria/      → endpoints para reportería Tailor Made
+  cotizaciones/    → simulador de créditos
+  cobranza/        → gestión de cobranza
+  cartas/          → generación de cartas
+  crm/             → gestiones CRM
+api-gateway/
+  public/          → HTML/JS frontend de cada módulo
+  index.js         → proxy y rutas estáticas
+shared/
+  config/database.js
+  middleware/auth.js
+```
+
+## Tablas Clave
+- `creditos` → operaciones de crédito (PK: id, clave negocio: num_op)
+- `clientes` → datos personales (PK: id_cliente, UNIQUE: rut)
+- `antecedentes_laborales` → situación laboral (FK: rut_cliente)
+- `informacion_comercial` → perfil deudas (FK: rut_cliente)
+- `comisiones_variables` → parámetros configurables de comisiones
+- `uf` → valores históricos UF (fecha, valor)
+- `dashboard_config` → config permisos tabs del dashboard
+- `usuarios`, `perfiles`, `permisos_perfil`, `funcionalidades`, `modulos`
+
+## Decisiones de Arquitectura Tomadas
+- dashboard/getDatos: deduplicación por num_op via ROW_NUMBER() OVER PARTITION
+- MAYOR/MENOR 200UF: se recalcula con UF de fecha_otorgado (no campo BD)
+  - tabla uf se carga completa en memoria, lookup en JS: getUF(fecha)
+- derInstitucion(financiera, producto): AUTOFIN es el default (todas las ops son del negocio)
+- calcResumen (frontend): usa TODAS las aprobadas (no filtra por institución)
+- JOIN cuentas_transitorias → creditos: usar `c.id` (NO `c.id_credito`)
+- Permisos perfiles: migrations v8 y v9 en perfiles.controller.js
+
+## Páginas Frontend Importantes
+- /dashboard/ → Dashboard principal (v3.8)
+- /comisiones/revision/ → Revisión comisiones ejecutivos (v5.3)
+- /usuarios/ → Gestión usuarios y permisos
+- /reporteria/ → Reportería Tailor Made
+- /tesoreria/cuentas-transitorias/ → Cuentas transitorias
+
+## Flujo de Datos Dashboard
+1. Excel carga masiva → tabla creditos (via /api/creditos/carga-masiva)
+2. GET /api/dashboard/datos → lee creditos + clientes, calcula institucion/mayor_menor
+3. Frontend aplica filtros por fecha y recalcula resúmenes en calcResumen()
+4. RAW_DATA en window.RAW_DATA, resúmenes en window.DASH.feb/jan
+
+## APIs Externas / Dependencias
+- TiDB Cloud (BD en la nube)
+- Render (servidor producción)
+- GitHub (repositorio: reportes-ai/credit-system)
