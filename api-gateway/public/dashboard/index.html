@@ -4642,6 +4642,8 @@ function buildVEvol() {
 
 <script>
 // ======== MODAL DETALLE EJECUTIVO ========
+let _modalData = { ops: [], titulo: '', totSaldo: 0, totFin: 0, totCD: 0, totIng: 0 };
+
 function abrirDetalleEjecutivo(nombre, tipo) {
   const desde = document.getElementById('sel-desde')?.value || '';
   const hasta  = document.getElementById('sel-hasta')?.value  || '';
@@ -4704,7 +4706,9 @@ function abrirDetalleEjecutivo(nombre, tipo) {
   </tr>`;
 
   const tipoLabel = tipo === 'ot' ? 'OTORGADOS' : 'APROBADOS';
-  document.getElementById('modal-ejec-title').textContent = nombre + ' — ' + tipoLabel + ' (' + desde + (desde !== hasta ? ' → ' + hasta : '') + ')';
+  const titulo = nombre + ' — ' + tipoLabel + ' (' + desde + (desde !== hasta ? ' → ' + hasta : '') + ')';
+  document.getElementById('modal-ejec-title').textContent = titulo;
+  _modalData = { ops, titulo, totSaldo, totFin, totCD, totIng, fM };
   document.getElementById('modal-ejec-overlay').classList.add('open');
 }
 
@@ -4713,43 +4717,38 @@ function cerrarModalEjec() {
 }
 document.addEventListener('keydown', e => { if (e.key === 'Escape') cerrarModalEjec(); });
 
-function _filasCsv() {
-  const table = document.getElementById('t-modal-ops');
-  const rows = [...table.querySelectorAll('thead tr, tbody tr, tfoot tr')];
-  return rows.map(tr =>
-    [...tr.querySelectorAll('th,td')].map(c => '"' + c.innerText.trim().replace(/"/g,'""') + '"').join(';')
-  ).join('\r\n');
+function _buildModalContent() {
+  const { ops, titulo, totSaldo, totFin, totCD, totIng, fM } = _modalData;
+  const cols = ['N° OP','N° Crédito (Fin.)','Financiera','Concesionario','Estado','Saldo Precio','Total Financiado','Plazo','Com. Dealer','Ing. x Col.'];
+  const dataRows = ops.map(r => [
+    r.op||'—', r.id_financiera||'—', r.financiera||'—',
+    r.automotora||'—', r.estado_eval||'—',
+    fM(r.saldo_precio), fM(r.monto_financiado),
+    r.plazo||'—', fM(r.com_dealer), fM(r.rentab_afa)
+  ]);
+  const footRow = ['Total ('+ops.length+' ops)','','','','',fM(totSaldo),fM(totFin),'—',fM(totCD),fM(totIng)];
+  return { cols, dataRows, footRow, titulo };
 }
 
 function _tablaHtml() {
-  const titulo = document.getElementById('modal-ejec-title').textContent;
-  const kpis   = document.getElementById('modal-ejec-kpis');
-  const kpisTxt = [...kpis.querySelectorAll('.mekpi')].map(k =>
-    '<b>' + k.querySelector('.mekpi-lbl').innerText + ':</b> ' + k.querySelector('.mekpi-val').innerText
-  ).join(' &nbsp;|&nbsp; ');
-  const table = document.getElementById('t-modal-ops');
-  const rows  = [...table.querySelectorAll('thead tr, tbody tr, tfoot tr')];
-  const trs = rows.map(tr => {
-    const isHead = !!tr.closest('thead');
-    const isFoot = !!tr.closest('tfoot');
-    const bg = isHead ? 'background:#1a3a6a;color:#fff;font-weight:bold'
-             : isFoot ? 'background:#eef2fa;color:#1a3a6a;font-weight:bold' : '';
-    const cells = [...tr.querySelectorAll('th,td')].map(c =>
-      `<td style="border:1px solid #ccc;padding:4px 8px;white-space:nowrap;${bg}">${c.innerText.trim()}</td>`
-    ).join('');
-    return `<tr>${cells}</tr>`;
-  }).join('');
+  const { cols, dataRows, footRow, titulo } = _buildModalContent();
+  const { ops, totSaldo, totFin, totCD, totIng, fM } = _modalData;
+  const kpisTxt = `<b>Operaciones:</b> ${ops.length} &nbsp;|&nbsp; <b>Total Financiado:</b> ${fM(totFin)} &nbsp;|&nbsp; <b>Saldo Precio:</b> ${fM(totSaldo)} &nbsp;|&nbsp; <b>Com. Dealer:</b> ${fM(totCD)} &nbsp;|&nbsp; <b>Ing. x Col.:</b> ${fM(totIng)}`;
+  const thStyle = 'border:1px solid #ccc;padding:4px 8px;white-space:nowrap;background:#1a3a6a;color:#fff;font-weight:bold';
+  const tdStyle = 'border:1px solid #ccc;padding:4px 8px;white-space:nowrap';
+  const tfStyle = 'border:1px solid #ccc;padding:4px 8px;white-space:nowrap;background:#eef2fa;color:#1a3a6a;font-weight:bold';
+  const headRow = `<tr>${cols.map(c=>`<th style="${thStyle}">${c}</th>`).join('')}</tr>`;
+  const bodyRows = dataRows.map(row=>`<tr>${row.map(c=>`<td style="${tdStyle}">${c}</td>`).join('')}</tr>`).join('');
+  const foot = `<tr>${footRow.map(c=>`<td style="${tfStyle}">${c}</td>`).join('')}</tr>`;
   return `<p style="font-family:Arial;font-size:13px;font-weight:bold;color:#1a3a6a;margin:0 0 4px">${titulo}</p>`
        + `<p style="font-family:Arial;font-size:11px;color:#555;margin:0 0 8px">${kpisTxt}</p>`
-       + `<table style="border-collapse:collapse;font-family:Arial;font-size:11px">${trs}</table>`;
+       + `<table style="border-collapse:collapse;font-family:Arial;font-size:11px">${headRow}${bodyRows}${foot}</table>`;
 }
 
 function copiarTablaModal() {
   const html  = _tablaHtml();
-  const plain = (() => {
-    const rows = [...document.getElementById('t-modal-ops').querySelectorAll('thead tr, tbody tr, tfoot tr')];
-    return rows.map(tr => [...tr.querySelectorAll('th,td')].map(c => c.innerText.trim()).join('\t')).join('\n');
-  })();
+  const { cols, dataRows, footRow, titulo } = _buildModalContent();
+  const plain = [cols, ...dataRows, footRow].map(r => r.join('\t')).join('\n');
   navigator.clipboard.write([new ClipboardItem({
     'text/html':  new Blob([html],  { type: 'text/html' }),
     'text/plain': new Blob([plain], { type: 'text/plain' })
@@ -4763,10 +4762,12 @@ function copiarTablaModal() {
 }
 
 function exportarExcelModal() {
-  const titulo = document.getElementById('modal-ejec-title').textContent;
-  const kpis   = [...document.getElementById('modal-ejec-kpis').querySelectorAll('.mekpi')]
-    .map(k => k.querySelector('.mekpi-lbl').innerText + ': ' + k.querySelector('.mekpi-val').innerText).join('; ');
-  const csv = '"' + titulo + '"\r\n"' + kpis + '"\r\n\r\n' + _filasCsv();
+  const { cols, dataRows, footRow, titulo } = _buildModalContent();
+  const { ops, totSaldo, totFin, totCD, totIng, fM } = _modalData;
+  const kpis = `Operaciones: ${ops.length}; Total Financiado: ${fM(totFin)}; Saldo Precio: ${fM(totSaldo)}; Com. Dealer: ${fM(totCD)}; Ing. x Col.: ${fM(totIng)}`;
+  const esc = v => '"' + String(v).replace(/"/g,'""') + '"';
+  const csv = esc(titulo) + '\r\n' + esc(kpis) + '\r\n\r\n'
+    + [cols, ...dataRows, footRow].map(r => r.map(esc).join(';')).join('\r\n');
   const blob = new Blob(['﻿' + csv], { type: 'text/csv;charset=utf-8' });
   const a = document.createElement('a');
   a.href = URL.createObjectURL(blob);
