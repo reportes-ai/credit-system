@@ -1,0 +1,304 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <link rel="icon" href="/img/favicon.png" type="image/png">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>BD Antecedentes Laborales Nivel Dios — AutoFácil</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css" rel="stylesheet">
+  <style>
+    :root { --navy:#0141A2; --navy-dark:#012d70; --navy-light:#0255c5; --accent:#009AFE; --bg:#f0f4f8; }
+    body { background:var(--bg); font-family:'Segoe UI',system-ui,sans-serif; margin:0; min-height:100vh; }
+    .topnav { background:linear-gradient(90deg,var(--navy-dark),var(--navy-light)); color:#fff; height:60px; padding:0 24px; display:flex; align-items:center; justify-content:space-between; position:sticky; top:0; z-index:200; box-shadow:0 2px 8px rgba(0,0,0,.3); }
+    .topnav-left { display:flex; align-items:center; gap:16px; }
+    .topnav-brand { display:flex; align-items:center; gap:8px; }
+    .topnav-brand img { height:34px; filter:brightness(0) invert(1); }
+    .version-badge { background:rgba(255,255,255,.15); color:rgba(255,255,255,.75); font-size:.65rem; font-weight:700; border-radius:6px; padding:2px 8px; }
+    .breadcrumb-nav { color:rgba(255,255,255,.6); font-size:.85rem; display:flex; align-items:center; gap:6px; }
+    .breadcrumb-nav a { color:rgba(255,255,255,.75); text-decoration:none; }
+    .breadcrumb-nav a:hover { color:#fff; }
+    .breadcrumb-nav .sep { color:rgba(255,255,255,.35); }
+    .topnav-right { display:flex; align-items:center; gap:12px; }
+    .user-chip { background:rgba(255,255,255,.12); border-radius:24px; padding:5px 12px; display:flex; align-items:center; gap:8px; font-size:.85rem; }
+    .avatar { width:28px; height:28px; background:#90caf9; border-radius:50%; display:flex; align-items:center; justify-content:center; color:var(--navy); font-weight:700; font-size:.75rem; }
+    .perfil-badge { background:rgba(144,202,249,.2); border:1px solid rgba(144,202,249,.4); color:#90caf9; border-radius:12px; padding:2px 10px; font-size:.73rem; font-weight:600; }
+    .btn-logout { background:rgba(255,255,255,.1); border:1px solid rgba(255,255,255,.2); color:#fff; border-radius:8px; padding:5px 12px; font-size:.82rem; cursor:pointer; }
+    .main-content { padding:24px 28px; }
+    .page-banner { background:linear-gradient(135deg,#1a0050,#065f46 50%,#10b981); border-radius:14px; color:#fff; padding:20px 28px; margin-bottom:20px; display:flex; align-items:center; gap:16px; }
+    .page-banner i { font-size:2.4rem; opacity:.85; }
+    .page-banner h2 { font-weight:800; margin:0 0 2px; font-size:1.3rem; }
+    .page-banner p { opacity:.75; margin:0; font-size:.85rem; }
+    .toolbar { background:#fff; border-radius:12px; padding:14px 18px; margin-bottom:14px; display:flex; align-items:center; gap:10px; flex-wrap:wrap; box-shadow:0 1px 4px rgba(0,0,0,.06); }
+    .toolbar .info-chip { background:var(--navy); color:#fff; border-radius:8px; padding:5px 14px; font-size:.82rem; font-weight:700; }
+    .table-wrapper { background:#fff; border-radius:12px; box-shadow:0 1px 6px rgba(0,0,0,.07); overflow:hidden; }
+    .table-scroll { overflow-x:auto; overflow-y:auto; max-height:calc(100vh - 260px); }
+    table { border-collapse:collapse; width:max-content; min-width:100%; font-size:.78rem; }
+    thead th { background:#065f46; color:#fff; font-weight:600; white-space:nowrap; position:sticky; top:0; z-index:10; padding:0; }
+    thead th .th-inner { display:flex; flex-direction:column; }
+    thead th .th-label { padding:8px 10px 4px; display:flex; align-items:center; gap:4px; cursor:pointer; user-select:none; white-space:nowrap; }
+    thead th .th-label:hover { background:rgba(255,255,255,.1); }
+    thead th .th-label .sort-icon { font-size:.65rem; opacity:.5; }
+    thead th .th-label.sorted-asc .sort-icon::before { content:' ▲'; opacity:1; }
+    thead th .th-label.sorted-desc .sort-icon::before { content:' ▼'; opacity:1; }
+    thead th .filter-input { background:rgba(255,255,255,.15); border:1px solid rgba(255,255,255,.25); color:#fff; border-radius:5px; padding:3px 7px; font-size:.72rem; width:calc(100% - 14px); margin:0 7px 6px; box-sizing:border-box; }
+    thead th .filter-input::placeholder { color:rgba(255,255,255,.5); }
+    thead th .filter-input:focus { outline:none; background:rgba(255,255,255,.25); border-color:#fff; }
+    tbody tr { border-bottom:1px solid #f0f0f0; }
+    tbody tr:hover { background:#f0fdf4; }
+    tbody td { padding:6px 10px; white-space:nowrap; max-width:220px; overflow:hidden; text-overflow:ellipsis; color:#374151; }
+    tbody td.null-val { color:#d1d5db; font-style:italic; }
+    tbody td.editable { cursor:pointer; }
+    tbody td.editable:hover { background:#fffbeb; }
+    .edit-cell-input { border:2px solid var(--accent); border-radius:5px; padding:3px 7px; font-size:.78rem; width:100%; min-width:80px; box-sizing:border-box; }
+    .btn-action { border:none; border-radius:6px; padding:4px 10px; font-size:.75rem; font-weight:600; cursor:pointer; }
+    .btn-save { background:#16a34a; color:#fff; }
+    .btn-cancel { background:#e5e7eb; color:#374151; }
+    .pagination-bar { padding:12px 18px; display:flex; align-items:center; justify-content:space-between; border-top:1px solid #f0f0f0; flex-wrap:wrap; gap:8px; }
+    .pagination-bar .info { font-size:.8rem; color:#6b7280; }
+    .page-btns { display:flex; gap:4px; align-items:center; }
+    .page-btn { background:#f3f4f6; border:1px solid #e5e7eb; border-radius:6px; padding:4px 10px; font-size:.8rem; cursor:pointer; font-weight:600; color:#374151; }
+    .page-btn:hover { background:#d1fae5; }
+    .page-btn.active { background:#065f46; color:#fff; border-color:#065f46; }
+    .page-btn:disabled { opacity:.4; cursor:default; }
+    select.per-page { border:1px solid #e5e7eb; border-radius:6px; padding:4px 8px; font-size:.8rem; color:#374151; }
+    .loading-overlay { position:fixed; inset:0; background:rgba(255,255,255,.7); display:none; align-items:center; justify-content:center; z-index:999; }
+    .spinner { width:40px; height:40px; border:4px solid #e5e7eb; border-top-color:#065f46; border-radius:50%; animation:spin .7s linear infinite; }
+    @keyframes spin { to { transform:rotate(360deg); } }
+    .toast-container { position:fixed; bottom:20px; right:20px; z-index:9999; display:flex; flex-direction:column; gap:8px; }
+    .toast { background:#1e293b; color:#fff; border-radius:10px; padding:12px 18px; font-size:.83rem; display:flex; align-items:center; gap:10px; box-shadow:0 4px 20px rgba(0,0,0,.25); animation:slideIn .2s ease; }
+    .toast.success { border-left:4px solid #16a34a; }
+    .toast.error { border-left:4px solid #dc2626; }
+    @keyframes slideIn { from { transform:translateX(100%); opacity:0; } to { transform:translateX(0); opacity:1; } }
+  </style>
+</head>
+<body>
+<nav class="topnav">
+  <div class="topnav-left">
+    <a href="/" class="topnav-brand">
+      <img src="/img/logo.png" alt="AutoFácil">
+      <span class="version-badge">v1.0</span>
+    </a>
+    <div class="breadcrumb-nav">
+      <a href="/">Inicio</a><span class="sep">›</span>
+      <a href="/mantenedores/">Mantenedores</a><span class="sep">›</span>
+      <a href="/mantenedores/solo-dios/">⚡ Solo Dios</a><span class="sep">›</span>
+      <span style="color:#fff;font-weight:600"><i class="bi bi-briefcase-fill me-1"></i>BD Antecedentes Laborales</span>
+    </div>
+  </div>
+  <div class="topnav-right">
+    <div class="user-chip">
+      <div class="avatar" id="avatarInicial">?</div>
+      <div>
+        <div style="font-weight:600;line-height:1.3;color:#fff" id="navNombre">—</div>
+        <div class="perfil-badge" id="navPerfil">—</div>
+      </div>
+    </div>
+    <button class="btn-logout" onclick="logout()"><i class="bi bi-box-arrow-right me-1"></i>Salir</button>
+  </div>
+</nav>
+
+<div class="main-content">
+  <div class="page-banner">
+    <i class="bi bi-briefcase-fill"></i>
+    <div>
+      <h2>⚡ BD ANTECEDENTES LABORALES NIVEL DIOS</h2>
+      <p>Vista y edición directa de la tabla <strong>antecedentes_laborales</strong> — todos los campos, filtros por columna, edición inline.</p>
+    </div>
+  </div>
+
+  <div class="toolbar">
+    <div class="info-chip">Total: <span id="totalLabel">—</span></div>
+    <div class="info-chip">Página: <span id="pageLabel">—</span></div>
+    <button class="btn btn-sm btn-outline-secondary" onclick="clearFilters()"><i class="bi bi-x-circle me-1"></i>Limpiar filtros</button>
+    <button class="btn btn-sm btn-outline-success" onclick="exportCSV()"><i class="bi bi-download me-1"></i>Exportar CSV</button>
+    <div style="flex:1"></div>
+    <label style="font-size:.82rem;color:#6b7280;">Filas por página:</label>
+    <select class="per-page" id="limitSel" onchange="changeLimit()">
+      <option value="25">25</option>
+      <option value="50" selected>50</option>
+      <option value="100">100</option>
+      <option value="200">200</option>
+    </select>
+  </div>
+
+  <div class="table-wrapper">
+    <div class="table-scroll">
+      <table id="mainTable">
+        <thead id="thead"></thead>
+        <tbody id="tbody"></tbody>
+      </table>
+    </div>
+    <div class="pagination-bar">
+      <div class="info" id="paginInfo">Cargando...</div>
+      <div class="page-btns" id="pageBtns"></div>
+    </div>
+  </div>
+</div>
+
+<div class="loading-overlay" id="loadingOverlay"><div class="spinner"></div></div>
+<div class="toast-container" id="toastContainer"></div>
+
+<script src="/js/auth-guard.js"></script>
+<script>
+const token = sessionStorage.getItem('token');
+const yo    = JSON.parse(sessionStorage.getItem('usuario') || 'null');
+if (!token || !yo) window.location.href = '/login.html';
+const H = { 'Content-Type':'application/json', Authorization:'Bearer '+token };
+document.getElementById('navNombre').textContent = `${yo?.nombre||''} ${yo?.apellido||''}`.trim();
+document.getElementById('navPerfil').textContent  = yo?.perfil || '';
+document.getElementById('avatarInicial').textContent = (yo?.nombre||'?').charAt(0).toUpperCase();
+function logout() { sessionStorage.removeItem('token'); sessionStorage.removeItem('usuario'); window.location.href='/login.html'; }
+
+const API = '/api/bd-antecedentes';
+const PK  = 'id';
+
+let columns = [], filters = {}, sortCol = PK, sortDir = 'desc';
+let page = 1, limit = 50, totalRows = 0, editCell = null;
+
+function toast(msg, type='success') {
+  const c = document.getElementById('toastContainer');
+  const d = document.createElement('div');
+  d.className = `toast ${type}`;
+  d.innerHTML = `<i class="bi bi-${type==='success'?'check-circle':'exclamation-triangle'}"></i> ${msg}`;
+  c.appendChild(d); setTimeout(() => d.remove(), 3500);
+}
+function showLoading(v) { document.getElementById('loadingOverlay').style.display = v ? 'flex' : 'none'; }
+function debounce(fn, ms) { let t; return (...a) => { clearTimeout(t); t = setTimeout(() => fn(...a), ms); }; }
+
+async function init() {
+  const r = await fetch(`${API}/columns`, {headers:H});
+  const j = await r.json();
+  columns = j.data; buildHeaders(); await load();
+}
+
+function buildHeaders() {
+  const tr = document.createElement('tr');
+  columns.forEach(col => {
+    const th = document.createElement('th');
+    const inner = document.createElement('div'); inner.className = 'th-inner';
+    const label = document.createElement('div');
+    label.className = 'th-label' + (sortCol===col.field ? ' sorted-'+sortDir : '');
+    label.innerHTML = `${col.field}<span class="sort-icon"></span>`;
+    label.onclick = () => toggleSort(col.field);
+    const inp = document.createElement('input');
+    inp.type='text'; inp.className='filter-input'; inp.placeholder='🔍';
+    inp.dataset.col=col.field; inp.value=filters[col.field]||'';
+    inp.oninput=debounce(()=>{ filters[col.field]=inp.value; page=1; load(); },400);
+    inner.appendChild(label); inner.appendChild(inp);
+    th.appendChild(inner); tr.appendChild(th);
+  });
+  document.getElementById('thead').innerHTML='';
+  document.getElementById('thead').appendChild(tr);
+}
+
+function toggleSort(col) {
+  sortDir = sortCol===col ? (sortDir==='asc'?'desc':'asc') : 'asc';
+  sortCol = col; page=1; buildHeaders(); load();
+}
+
+async function load() {
+  showLoading(true);
+  try {
+    const af = Object.fromEntries(Object.entries(filters).filter(([,v])=>v!==''));
+    const qs = new URLSearchParams({page,limit,sort:sortCol,dir:sortDir,filters:JSON.stringify(af)});
+    const r = await fetch(`${API}?${qs}`,{headers:H});
+    const j = await r.json();
+    if (!j.success) throw new Error(j.error);
+    totalRows = j.data.total; renderRows(j.data.rows); renderPagination(j.data);
+    document.getElementById('totalLabel').textContent = totalRows.toLocaleString();
+    document.getElementById('pageLabel').textContent  = `${j.data.page} / ${j.data.pages}`;
+  } catch(e) { toast(e.message,'error'); }
+  finally { showLoading(false); }
+}
+
+function renderRows(rows) {
+  const tbody = document.getElementById('tbody');
+  tbody.innerHTML='';
+  rows.forEach(row => {
+    const tr = document.createElement('tr');
+    columns.forEach(col => {
+      const td = document.createElement('td');
+      const val = row[col.field];
+      td.dataset.field=col.field; td.dataset.id=row[PK];
+      if (val===null||val===undefined||val==='') { td.textContent='—'; td.className='null-val editable'; }
+      else { td.textContent=val; td.className='editable'; td.title=String(val); }
+      td.ondblclick = e => { e.stopPropagation(); startEdit(tr,td,col,val); };
+      tr.appendChild(td);
+    });
+    tbody.appendChild(tr);
+  });
+}
+
+function startEdit(tr, td, col, oldVal) {
+  if (editCell) cancelEdit();
+  if (col.field === PK) return;
+  editCell={tr,td,col,oldVal};
+  const inp=document.createElement('input');
+  inp.className='edit-cell-input';
+  inp.value=(oldVal===null||oldVal===undefined)?'':oldVal;
+  inp.onkeydown=e=>{ if(e.key==='Enter') saveEdit(td.dataset.id,col.field,inp.value); if(e.key==='Escape') cancelEdit(); };
+  td.innerHTML=''; td.appendChild(inp);
+  const s=document.createElement('button'); s.className='btn-action btn-save ms-1'; s.textContent='✓';
+  s.onclick=e=>{e.stopPropagation();saveEdit(td.dataset.id,col.field,inp.value);};
+  const c=document.createElement('button'); c.className='btn-action btn-cancel ms-1'; c.textContent='✕';
+  c.onclick=e=>{e.stopPropagation();cancelEdit();};
+  td.appendChild(s); td.appendChild(c); inp.focus(); inp.select();
+}
+
+function cancelEdit() {
+  if (!editCell) return;
+  const {td,oldVal}=editCell;
+  if (oldVal===null||oldVal===undefined||oldVal==='') { td.textContent='—'; td.className='null-val editable'; }
+  else { td.textContent=oldVal; td.className='editable'; td.title=String(oldVal); }
+  editCell=null;
+}
+
+async function saveEdit(id, field, val) {
+  showLoading(true);
+  try {
+    const r=await fetch(`${API}/${id}`,{method:'PUT',headers:H,body:JSON.stringify({[field]:val===''?null:val})});
+    const j=await r.json();
+    if (!j.success) throw new Error(j.error);
+    const {td,col}=editCell; editCell=null;
+    const newVal=j.data[field];
+    if (newVal===null||newVal===undefined||newVal==='') { td.textContent='—'; td.className='null-val editable'; }
+    else { td.textContent=newVal; td.className='editable'; td.title=String(newVal); }
+    td.ondblclick=e=>{e.stopPropagation();startEdit(null,td,col,newVal);};
+    toast('Guardado correctamente');
+  } catch(e) { toast(e.message,'error'); cancelEdit(); }
+  finally { showLoading(false); }
+}
+
+function renderPagination({page:p, pages, total, limit:lim}) {
+  const info=document.getElementById('paginInfo');
+  const start=(p-1)*lim+1, end=Math.min(p*lim,total);
+  info.textContent=`Mostrando ${start.toLocaleString()}–${end.toLocaleString()} de ${total.toLocaleString()} registros`;
+  const cont=document.getElementById('pageBtns'); cont.innerHTML='';
+  const mk=(label,pg,disabled=false,active=false)=>{
+    const b=document.createElement('button'); b.className='page-btn'+(active?' active':'');
+    b.textContent=label; b.disabled=disabled;
+    b.onclick=()=>{page=pg;load();}; return b;
+  };
+  cont.appendChild(mk('«',1,p<=1)); cont.appendChild(mk('‹',p-1,p<=1));
+  const start2=Math.max(1,p-2), end2=Math.min(pages,p+2);
+  for(let i=start2;i<=end2;i++) cont.appendChild(mk(i,i,false,i===p));
+  cont.appendChild(mk('›',p+1,p>=pages)); cont.appendChild(mk('»',pages,p>=pages));
+}
+
+function clearFilters() { filters={}; page=1; buildHeaders(); load(); }
+function changeLimit() { limit=parseInt(document.getElementById('limitSel').value); page=1; load(); }
+
+function exportCSV() {
+  const rows=[columns.map(c=>c.field).join(';')];
+  document.querySelectorAll('#tbody tr').forEach(tr=>{
+    rows.push([...tr.querySelectorAll('td')].map(td=>{ const v=td.textContent==='—'?'':td.textContent; return `"${v.replace(/"/g,'""')}"`; }).join(';'));
+  });
+  const blob=new Blob(['﻿'+rows.join('\n')],{type:'text/csv;charset=utf-8;'});
+  const a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download='antecedentes_laborales.csv'; a.click();
+}
+
+init();
+</script>
+</body>
+</html>

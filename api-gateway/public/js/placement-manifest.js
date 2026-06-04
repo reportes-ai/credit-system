@@ -74,8 +74,10 @@ const PLACEMENT_ITEMS = {
   'broker-validaciones':     { section:'mantenedores',  href:'/mantenedores/broker-validaciones/',icon:'bi-card-checklist',         titulo:'Docs Validar Brokers' },
   'financieras':             { section:'mantenedores',  href:'/mantenedores/financieras/',        icon:'bi-calculator',             titulo:'Fórmulas Financieras' },
   'comisiones-seguro':       { section:'mantenedores',  href:'/mantenedores/comisiones-seguro/',  icon:'bi-shield-half',            titulo:'Comisiones Seguro' },
-  'bd-clientes':             { section:'mantenedores',  href:'/mantenedores/bd-clientes/',        icon:'bi-database',               titulo:'BD Clientes' },
-  'bd-operaciones':          { section:'mantenedores',  href:'/mantenedores/bd-operaciones/',     icon:'bi-database-gear',          titulo:'BD Operaciones' },
+  'bd-clientes':             { section:'mantenedores',  href:'/mantenedores/bd-clientes/',               icon:'bi-database',               titulo:'BD Clientes' },
+  'bd-operaciones':          { section:'mantenedores',  href:'/mantenedores/bd-operaciones/',            icon:'bi-database-gear',          titulo:'BD Operaciones' },
+  'bd-antecedentes':         { section:'mantenedores',  href:'/mantenedores/bd-antecedentes/',           icon:'bi-briefcase-fill',          titulo:'BD Antecedentes Laborales' },
+  'bd-inf-comercial':        { section:'mantenedores',  href:'/mantenedores/bd-informacion-comercial/',  icon:'bi-building-fill',           titulo:'BD Información Comercial' },
   'vista-pantallas':         { section:'mantenedores',  href:'/mantenedores/vista-pantallas/',    icon:'bi-layout-wtf',             titulo:'Vista Pantallas' },
   'solo-dios':               { section:'mantenedores',  href:'/mantenedores/solo-dios/',          icon:'bi-lightning-charge-fill',  titulo:'SOLO DIOS' },
 };
