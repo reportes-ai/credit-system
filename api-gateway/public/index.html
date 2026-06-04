@@ -168,16 +168,11 @@
       flex: 1; overflow: hidden; position: relative; height: 100%;
     }
     .news-track {
-      display: flex; align-items: center; gap: 0;
+      display: flex; align-items: center;
       height: 100%; white-space: nowrap;
-      animation: tickerScroll 60s linear infinite;
       will-change: transform;
     }
-    .news-track:hover { animation-play-state: paused; }
-    @keyframes tickerScroll {
-      0%   { transform: translateX(0); }
-      100% { transform: translateX(-50%); }
-    }
+    .ticker-half { display: inline-flex; align-items: center; white-space: nowrap; }
     .news-item {
       display: inline-flex; align-items: center; gap: 8px;
       padding: 0 28px; font-size: 0.76rem; color: #bfdbfe;
@@ -220,7 +215,7 @@
     <div class="topnav-left">
       <a href="/" class="topnav-brand">
         <img src="/img/logo.png" alt="AutoFácil">
-        <span class="version-badge">v5.5</span>
+        <span class="version-badge">v5.6</span>
       </a>
     </div>
 
@@ -622,17 +617,92 @@
 <script src="/js/app-version.js"></script>
 
 <script>
-/* ── Cinta de noticias ────────────────────────────────────────────────── */
-const NEWS_SPEED_MAP = { 1: 0.12, 2: 0.07, 3: 0.04, 4: 0.022, 5: 0.012 };
+/* ── Cinta de noticias — motor rAF sin saltos ────────────────────────── */
+// px/segundo por nivel (1=lento … 5=turbo)
+const NEWS_PPS    = { 1: 60, 2: 110, 3: 180, 4: 280, 5: 420 };
 const NEWS_SPEED_LABELS = { 1:'Lento', 2:'Normal', 3:'Rápido', 4:'Muy rápido', 5:'Turbo' };
-let ALL_NOTICIAS = [];
 
-// Cargar config guardada
-function loadNewsConfig() {
-  try { return JSON.parse(localStorage.getItem('newsConfig') || '{}'); } catch { return {}; }
+let ALL_NOTICIAS   = [];
+let tickerPPS      = 180;       // velocidad actual px/s
+let tickerOffset   = 0;         // posición actual en px
+let tickerHalfW    = 0;         // ancho de una mitad del track
+let tickerRAF      = null;      // handle requestAnimationFrame
+let tickerLastT    = null;      // timestamp último frame
+let tickerPaused   = false;
+
+function loadNewsConfig()     { try { return JSON.parse(localStorage.getItem('newsConfig') || '{}'); } catch { return {}; } }
+function saveNewsConfig(cfg)  { localStorage.setItem('newsConfig', JSON.stringify(cfg)); }
+
+/* Construye items HTML (sin duplicar — duplicamos en renderTicker) */
+function buildHTML(noticias) {
+  return noticias.map(n =>
+    `<span class="news-item" onclick="${n.link !== '#' ? `window.open('${n.link}','_blank')` : ''}" title="${(n.titulo||'').replace(/"/g,'&quot;')}">
+      <span class="news-dot"></span>${n.src ? `<span class="news-src">${n.src}</span>` : ''}${n.titulo}
+    </span>`
+  ).join('');
 }
-function saveNewsConfig(cfg) {
-  localStorage.setItem('newsConfig', JSON.stringify(cfg));
+
+/* Renderiza contenido y arranca el ticker */
+function renderTicker(noticias) {
+  const track = document.getElementById('newsTrack');
+  if (!track) return;
+
+  // Detener loop anterior
+  if (tickerRAF) { cancelAnimationFrame(tickerRAF); tickerRAF = null; }
+  track.style.transform = 'translateX(0)';
+
+  const html = buildHTML(noticias);
+  // Dos copias exactamente iguales para loop seamless
+  track.innerHTML = `<span class="ticker-half">${html}</span><span class="ticker-half">${html}</span>`;
+
+  // Medir ancho de una mitad tras render
+  requestAnimationFrame(() => {
+    const halves = track.querySelectorAll('.ticker-half');
+    tickerHalfW  = halves[0] ? halves[0].offsetWidth : 0;
+    tickerOffset = 0;
+    tickerLastT  = null;
+    startTickerLoop(track);
+  });
+}
+
+function startTickerLoop(track) {
+  function frame(ts) {
+    if (tickerLastT === null) tickerLastT = ts;
+    const dt = (ts - tickerLastT) / 1000; // segundos
+    tickerLastT = ts;
+
+    if (!tickerPaused && tickerHalfW > 0) {
+      tickerOffset += tickerPPS * dt;
+      if (tickerOffset >= tickerHalfW) tickerOffset -= tickerHalfW; // loop perfecto
+      track.style.transform = `translateX(${-tickerOffset}px)`;
+    }
+    tickerRAF = requestAnimationFrame(frame);
+  }
+  tickerRAF = requestAnimationFrame(frame);
+}
+
+/* Pausa al hover */
+document.addEventListener('DOMContentLoaded', () => {
+  const wrap = document.querySelector('.news-track-wrap');
+  if (wrap) {
+    wrap.addEventListener('mouseenter', () => { tickerPaused = true; });
+    wrap.addEventListener('mouseleave', () => { tickerPaused = false; tickerLastT = null; });
+  }
+});
+
+/* Cambio de velocidad: sólo actualiza pps, sin reiniciar */
+function setTickerSpeed(speed) {
+  tickerPPS = NEWS_PPS[speed] || 180;
+  document.getElementById('ncpSpeedLabel').textContent = NEWS_SPEED_LABELS[speed];
+}
+
+/* Filtrar noticias activas según feeds */
+function getFilteredNoticias() {
+  const feeds   = [0,1,2].map(i => document.getElementById(`ncpFeed${i}`)?.checked ?? true);
+  const srcMap  = ['Google News','Economía','Finanzas'];
+  const activos = srcMap.filter((_,i) => feeds[i]);
+  const f = ALL_NOTICIAS.filter(n => !n.src || activos.includes(n.src));
+  return f.length ? f : ALL_NOTICIAS;
 }
 
 function applyNewsConfig() {
@@ -640,38 +710,13 @@ function applyNewsConfig() {
   const speed   = parseInt(document.getElementById('ncpSpeed').value);
   const feeds   = [0,1,2].map(i => document.getElementById(`ncpFeed${i}`)?.checked ?? true);
 
-  document.getElementById('ncpSpeedLabel').textContent = NEWS_SPEED_LABELS[speed];
+  setTickerSpeed(speed);
   saveNewsConfig({ mostrar, speed, feeds });
 
-  // Mostrar/ocultar cinta
-  const ticker = document.getElementById('newsTicker');
-  ticker.style.display = mostrar ? 'flex' : 'none';
+  document.getElementById('newsTicker').style.display = mostrar ? 'flex' : 'none';
 
-  // Filtrar noticias por feeds activos
-  const srcMap = ['Google News','Economía','Finanzas'];
-  const activeSrcs = srcMap.filter((_,i) => feeds[i]);
-  const filtradas = ALL_NOTICIAS.filter(n => !n.src || activeSrcs.includes(n.src));
-  renderTicker(filtradas.length ? filtradas : ALL_NOTICIAS, speed);
-}
-
-function renderTicker(noticias, speed) {
-  const track = document.getElementById('newsTrack');
-  const buildItems = () => noticias.map(n =>
-    `<span class="news-item" onclick="${n.link !== '#' ? `window.open('${n.link}','_blank')` : ''}" title="${n.titulo.replace(/"/g,'&quot;')}">
-       <span class="news-dot"></span>
-       ${n.src ? `<span class="news-src">${n.src}</span>` : ''}
-       ${n.titulo}
-     </span>`
-  ).join('');
-  track.innerHTML = buildItems() + buildItems();
-  const totalChars = noticias.reduce((s,n) => s + n.titulo.length, 0);
-  const factor = NEWS_SPEED_MAP[speed] || 0.04;
-  const dur = Math.max(6, Math.min(80, totalChars * factor));
-  // Forzar reinicio de animación CSS
-  track.style.animation = 'none';
-  void track.offsetWidth; // reflow
-  track.style.animation = '';
-  track.style.animationDuration = dur + 's';
+  // Solo re-renderiza si cambió algún feed (no en cada movimiento del slider)
+  renderTicker(getFilteredNoticias());
 }
 
 // Panel toggle (solo admin)
@@ -682,55 +727,46 @@ function toggleNewsPanel() {
   const label = document.getElementById('newsLabelBtn');
   const open  = panel.classList.toggle('show');
   label.classList.toggle('open', open);
-  if (open) {
-    // cerrar al click fuera
-    setTimeout(() => document.addEventListener('click', closeNewsPanelOutside, { once: true }), 10);
-  }
+  if (open) setTimeout(() => document.addEventListener('click', closeNewsPanelOutside, { once: true }), 10);
 }
 function closeNewsPanelOutside(e) {
   const panel = document.getElementById('newsConfigPanel');
   const label = document.getElementById('newsLabelBtn');
   if (!panel.contains(e.target) && !label.contains(e.target)) {
-    panel.classList.remove('show');
-    label.classList.remove('open');
-  } else if (panel.contains(e.target)) {
-    // re-registrar si hizo clic dentro
+    panel.classList.remove('show'); label.classList.remove('open');
+  } else {
     setTimeout(() => document.addEventListener('click', closeNewsPanelOutside, { once: true }), 10);
   }
 }
 
 (async function initTicker() {
-  // Restaurar config guardada
   const cfg = loadNewsConfig();
-  if (cfg.mostrar === false) document.getElementById('newsTicker').style.display = 'none';
-  if (cfg.speed) {
-    document.getElementById('ncpSpeed').value = cfg.speed;
-    document.getElementById('ncpSpeedLabel').textContent = NEWS_SPEED_LABELS[cfg.speed];
-  }
-  if (cfg.feeds) cfg.feeds.forEach((v,i) => { const el = document.getElementById(`ncpFeed${i}`); if(el) el.checked = v; });
-  if (cfg.mostrar === false) { const el = document.getElementById('ncpMostrar'); if(el) el.checked = false; }
 
-  // Ocultar flecha del label si no es admin
+  // Restaurar config
+  if (cfg.mostrar === false) document.getElementById('newsTicker').style.display = 'none';
+  const savedSpeed = cfg.speed || 3;
+  document.getElementById('ncpSpeed').value = savedSpeed;
+  document.getElementById('ncpSpeedLabel').textContent = NEWS_SPEED_LABELS[savedSpeed];
+  tickerPPS = NEWS_PPS[savedSpeed] || 180;
+  if (cfg.feeds) cfg.feeds.forEach((v,i) => { const el = document.getElementById(`ncpFeed${i}`); if (el) el.checked = v; });
+  if (cfg.mostrar === false) { const el = document.getElementById('ncpMostrar'); if (el) el.checked = false; }
+
+  // Ocultar controles si no es admin
   const yo = JSON.parse(sessionStorage.getItem('usuario') || 'null');
   if (!yo || yo.perfil?.toLowerCase() !== 'administrador') {
     document.getElementById('newsLabelBtn').style.cursor = 'default';
-    const arr = document.querySelector('.nl-arrow'); if(arr) arr.style.display='none';
+    const arr = document.querySelector('.nl-arrow'); if (arr) arr.style.display = 'none';
   }
 
+  // Cargar noticias
   try {
     const r = await fetch('/api/noticias');
     const d = await r.json();
     if (d.success && d.data?.length) ALL_NOTICIAS = d.data;
   } catch {}
-
   if (!ALL_NOTICIAS.length) ALL_NOTICIAS = [{ titulo: 'Sin noticias disponibles en este momento', link: '#', src: '' }];
 
-  const speed = parseInt(document.getElementById('ncpSpeed').value) || 3;
-  const feeds = [0,1,2].map(i => document.getElementById(`ncpFeed${i}`)?.checked ?? true);
-  const srcMap = ['Google News','Economía','Finanzas'];
-  const activeSrcs = srcMap.filter((_,i) => feeds[i]);
-  const filtradas = ALL_NOTICIAS.filter(n => !n.src || activeSrcs.includes(n.src));
-  renderTicker(filtradas.length ? filtradas : ALL_NOTICIAS, speed);
+  renderTicker(getFilteredNoticias());
 })();
 
 /* ── Widget Clima (Open-Meteo, sin API key) ──────────────────────────── */
