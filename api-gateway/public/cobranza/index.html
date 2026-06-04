@@ -352,7 +352,66 @@
   }
 
   cargarDashboard();
+
+  // ── Placement dinámico ──────────────────────────────────────────────────
+  (async () => {
+    let placement = {};
+    let modsBD = [];
+    try {
+      const [rP, rM] = await Promise.all([
+        fetch('/api/config/ui/placement_v2', { headers: H }),
+        fetch('/api/auth/mis-permisos', { headers: H }),
+      ]);
+      const jP = await rP.json(); const jM = await rM.json();
+      if (jP.success && jP.data) placement = jP.data;
+      if (jM.success && Array.isArray(jM.data)) modsBD = jM.data;
+    } catch {}
+    if (!Object.keys(placement).length) return; // sin config, mostrar todo
+
+    const KEY = { prejudicial:'cobr-prejudicial', judicial:'cobr-judicial', reporteria:'cobr-reporteria' };
+    const grid = document.getElementById('moduleGrid');
+
+    // Ocultar cards nativas movidas a otra sección
+    grid.querySelectorAll('.module-card[data-id]').forEach(card => {
+      const k = KEY[card.dataset.id];
+      const sec = k ? (placement[k] || 'cobranza') : 'cobranza';
+      if (sec !== 'cobranza') card.style.display = 'none';
+    });
+
+    // Agregar extras de otras secciones movidos aquí
+    const nativeHrefs = new Set(['/cobranza/prejudicial','/cobranza/judicial','/cobranza/reporteria']);
+    const allExtras = [
+      ...Object.entries(placement)
+        .filter(([k, sec]) => sec === 'cobranza' && !Object.values(KEY).includes(k))
+        .map(([k]) => {
+          const mod = modsBD.find(m => m.ruta === k);
+          if (mod) return { href: mod.ruta, icon: mod.icono||'bi-grid', titulo: mod.nombre, desc: mod.descripcion||'' };
+          // sub-item from manifest (inline fallback)
+          const MANT = { 'tasas':{ href:'/mantenedores/tasas/',icon:'bi-percent',titulo:'Tasas de Interés',desc:'' },'uf':{ href:'/mantenedores/uf/',icon:'bi-currency-dollar',titulo:'Valores UF',desc:'' } };
+          return null; // otros sub-items no críticos
+        }).filter(Boolean),
+    ];
+
+    // Para sub-items del manifiesto movidos aquí, necesitamos fetch del manifiesto
+    // Usamos los datos del placement_v2 y buscamos en modsBD; el resto se renderiza igual
+    Object.entries(placement).forEach(([k, sec]) => {
+      if (sec !== 'cobranza') return;
+      if (Object.values(KEY).includes(k)) return; // ya nativo
+      const mod = modsBD.find(m => m.ruta === k);
+      if (mod && !nativeHrefs.has(mod.ruta)) {
+        const a = document.createElement('a');
+        a.href = mod.ruta; a.className = 'module-card blue'; a.dataset.id = k;
+        a.innerHTML = `<i class="bi bi-grip-vertical drag-handle"></i>
+          <div class="card-icon blue"><i class="bi ${mod.icono||'bi-grid'}"></i></div>
+          <div class="card-title">${mod.nombre}</div>
+          <div class="card-desc">${mod.descripcion||''}</div>
+          <div class="card-link blue">Acceder <i class="bi bi-arrow-right"></i></div>`;
+        grid.appendChild(a);
+      }
+    });
+  })();
 </script>
+<script src="/js/placement-manifest.js"></script>
 <script src="/js/app-version.js"></script>
 </body>
 </html>

@@ -120,6 +120,7 @@
     </div>
   </div>
 
+  <script src="/js/placement-manifest.js"></script>
   <script src="/js/auth-guard.js"></script>
   <script>
     const token = sessionStorage.getItem('token');
@@ -146,18 +147,44 @@
     let sortable = null, modoReordenar = false;
 
     async function cargar() {
-      const items = ITEMS_ALL.filter(i => !i.soloAdmin || esAdmin);
-      let orden = null;
+      let orden = null, placement = {}, modsBD = [];
       try {
-        const res  = await fetch(`/api/config/ui/${CONFIG_KEY}`, { headers: H });
-        const json = await res.json();
-        if (json.success && Array.isArray(json.data)) orden = json.data;
+        const [rO, rP, rM] = await Promise.all([
+          fetch(`/api/config/ui/${CONFIG_KEY}`, { headers: H }),
+          fetch('/api/config/ui/placement_v2', { headers: H }),
+          fetch('/api/auth/mis-permisos', { headers: H }),
+        ]);
+        const jO = await rO.json(); const jP = await rP.json(); const jM = await rM.json();
+        if (jO.success && Array.isArray(jO.data)) orden = jO.data;
+        if (jP.success && jP.data) placement = jP.data;
+        if (jM.success && Array.isArray(jM.data)) modsBD = jM.data;
       } catch {}
 
+      // Mapa: id interno → clave manifest
+      const KEY = { 'caja':'teso-caja','cajas':'teso-cajas','cierre-caja':'teso-cierre-caja','cuentas-transitorias':'teso-cuentas-transitorias','brokerage':'teso-brokerage' };
+
+      // Nativos: mostrar si no fueron movidos a otra sección
+      const base = ITEMS_ALL.filter(i => !i.soloAdmin || esAdmin);
+      const nativeItems = base.filter(i => {
+        const k = KEY[i.id]; const sec = k ? placement[k] : undefined;
+        return !sec || sec === 'tesoreria';
+      });
+
+      // Extras de otras secciones movidos aquí
+      const nativeManifestKeys = new Set(Object.values(KEY));
+      const nativeHrefs = new Set(ITEMS_ALL.map(i => i.href));
+      const extrasSubitem = Object.entries(typeof PLACEMENT_ITEMS !== 'undefined' ? PLACEMENT_ITEMS : {})
+        .filter(([k, v]) => !nativeManifestKeys.has(k) && placement[k] === 'tesoreria')
+        .map(([k, v]) => ({ id: k, href: v.href, icon: v.icon, titulo: v.titulo, desc: v.desc }));
+      const extrasMods = modsBD
+        .filter(m => placement[m.ruta] === 'tesoreria' && !nativeHrefs.has(m.ruta))
+        .map(m => ({ id: m.ruta, href: m.ruta, icon: m.icono || 'bi-grid', titulo: m.nombre, desc: m.descripcion || '' }));
+
+      const allItems = [...nativeItems, ...extrasSubitem, ...extrasMods];
       const ordenados = orden
-        ? orden.map(id => items.find(i => i.id === id)).filter(Boolean)
-            .concat(items.filter(i => !orden.includes(i.id)))
-        : items;
+        ? orden.map(id => allItems.find(i => i.id === id)).filter(Boolean)
+            .concat(allItems.filter(i => !orden.includes(i.id)))
+        : allItems;
 
       const grid = document.getElementById('modulesGrid');
       grid.innerHTML = ordenados.map(m => `

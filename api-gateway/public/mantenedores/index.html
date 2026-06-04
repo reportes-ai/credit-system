@@ -102,6 +102,7 @@
     <div class="modules-grid" id="modulesGrid"></div>
   </div>
 
+  <script src="/js/placement-manifest.js"></script>
   <script src="/js/auth-guard.js"></script>
 <script>
     const token = sessionStorage.getItem('token');
@@ -143,30 +144,35 @@
     const CONFIG_KEY = 'submenu_mantenedores';
 
     async function cargar() {
-      let orden = null, hiddenFromHome = null, modsBD = [];
+      let orden = null, placement = {}, modsBD = [];
       try {
-        const [rOrden, rHidden, rMods] = await Promise.all([
+        const [rOrden, rPlacement, rMods] = await Promise.all([
           fetch(`/api/config/ui/${CONFIG_KEY}`, { headers: H }),
-          fetch('/api/config/ui/hidden_from_home', { headers: H }),
+          fetch('/api/config/ui/placement_v2', { headers: H }),
           fetch('/api/auth/mis-permisos', { headers: H }),
         ]);
-        const jOrden  = await rOrden.json();
-        const jHidden = await rHidden.json();
-        const jMods   = await rMods.json();
-        if (jOrden.success  && Array.isArray(jOrden.data))  orden = jOrden.data;
-        if (jHidden.success && Array.isArray(jHidden.data)) hiddenFromHome = jHidden.data;
-        if (jMods.success   && Array.isArray(jMods.data))   modsBD = jMods.data;
+        const jOrden = await rOrden.json(); const jP = await rPlacement.json(); const jM = await rMods.json();
+        if (jOrden.success && Array.isArray(jOrden.data)) orden = jOrden.data;
+        if (jP.success && jP.data) placement = jP.data;
+        if (jM.success && Array.isArray(jM.data)) modsBD = jM.data;
       } catch {}
 
-      // Módulos BD que están ocultos del home → agregarlos como extras
-      const rutasFijas = new Set(ITEMS_DEFAULT.map(i => i.href));
-      const extras = hiddenFromHome
-        ? modsBD
-            .filter(m => hiddenFromHome.includes(m.ruta) && !rutasFijas.has(m.ruta))
-            .map(m => ({ id: String(m.id_modulo), href: m.ruta, icon: m.icono || 'bi-grid', titulo: m.nombre, desc: m.descripcion || '' }))
-        : [];
+      // Items nativos de mantenedores: mostrar si no fueron movidos a otra sección
+      const nativeItems = ITEMS_DEFAULT.filter(i => !placement[i.id] || placement[i.id] === 'mantenedores');
 
-      const allItems = [...ITEMS_DEFAULT, ...extras];
+      // Extras: sub-items de otras secciones movidos aquí
+      const nativeIds = new Set(ITEMS_DEFAULT.map(i => i.id));
+      const extrasSubitem = Object.entries(PLACEMENT_ITEMS || {})
+        .filter(([k, v]) => !nativeIds.has(k) && placement[k] === 'mantenedores')
+        .map(([k, v]) => ({ id: k, href: v.href, icon: v.icon, titulo: v.titulo, desc: v.desc }));
+
+      // Extras: módulos BD movidos aquí
+      const nativeHrefs = new Set(ITEMS_DEFAULT.map(i => i.href));
+      const extrasMods = modsBD
+        .filter(m => placement[m.ruta] === 'mantenedores' && !nativeHrefs.has(m.ruta))
+        .map(m => ({ id: m.ruta, href: m.ruta, icon: m.icono || 'bi-grid', titulo: m.nombre, desc: m.descripcion || '' }));
+
+      const allItems = [...nativeItems, ...extrasSubitem, ...extrasMods];
       const items = orden
         ? orden.map(id => allItems.find(i => i.id === id)).filter(Boolean)
             .concat(allItems.filter(i => !orden.includes(i.id)))

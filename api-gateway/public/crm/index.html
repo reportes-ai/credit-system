@@ -114,6 +114,51 @@
     document.getElementById('navPerfil').textContent  = yo?.perfil || '';
     document.getElementById('avatarInicial').textContent = (yo?.nombre||'?').charAt(0).toUpperCase();
     function logout() { sessionStorage.removeItem('token'); sessionStorage.removeItem('usuario'); window.location.href = '/login.html'; }
+
+    // ── Placement dinámico ───────────────────────────────────────────────
+    (async () => {
+      let placement = {}, modsBD = [];
+      try {
+        const [rP, rM] = await Promise.all([
+          fetch('/api/config/ui/placement_v2', { headers: { Authorization:'Bearer '+token } }),
+          fetch('/api/auth/mis-permisos',       { headers: { Authorization:'Bearer '+token } }),
+        ]);
+        const jP = await rP.json(); const jM = await rM.json();
+        if (jP.success && jP.data) placement = jP.data;
+        if (jM.success && Array.isArray(jM.data)) modsBD = jM.data;
+      } catch {}
+      if (!Object.keys(placement).length) return;
+
+      const KEY = { '/crm/gestiones':'crm-gestiones', '/crm/estadisticas':'crm-estadisticas', '/crm/campanas':'crm-campanas' };
+      const grid = document.querySelector('[style*="grid-template-columns"]');
+      if (!grid) return;
+
+      // Ocultar cards nativas movidas a otra sección
+      grid.querySelectorAll('a[href]').forEach(a => {
+        const k = KEY[a.getAttribute('href')];
+        const sec = k ? (placement[k] || 'crm') : 'crm';
+        if (sec !== 'crm') a.style.display = 'none';
+      });
+
+      // Agregar módulos BD movidos aquí
+      const nativeHrefs = new Set(Object.keys(KEY));
+      Object.entries(placement).forEach(([k, sec]) => {
+        if (sec !== 'crm') return;
+        if (Object.values(KEY).includes(k)) return;
+        const mod = modsBD.find(m => m.ruta === k);
+        if (mod && !nativeHrefs.has(mod.ruta)) {
+          const a = document.createElement('a');
+          a.href = mod.ruta; a.style.textDecoration = 'none';
+          a.innerHTML = `<div style="background:#fff;border-radius:14px;padding:22px 20px;box-shadow:0 1px 6px rgba(0,0,0,.08);border:2px solid transparent;transition:all .2s;cursor:pointer" onmouseover="this.style.borderColor='var(--navy)';this.style.transform='translateY(-2px)'" onmouseout="this.style.borderColor='transparent';this.style.transform=''">
+            <div style="width:48px;height:48px;background:#e8f0fe;border-radius:12px;display:flex;align-items:center;justify-content:center;font-size:1.4rem;margin-bottom:14px;color:var(--navy)"><i class="bi ${mod.icono||'bi-grid'}"></i></div>
+            <div style="font-weight:700;font-size:1rem;color:#1e293b;margin-bottom:6px">${mod.nombre}</div>
+            <div style="font-size:.83rem;color:#6b7280;line-height:1.5">${mod.descripcion||''}</div>
+            <div style="margin-top:14px;font-size:.8rem;font-weight:600;color:var(--navy)">Acceder <i class="bi bi-arrow-right ms-1"></i></div>
+          </div>`;
+          grid.appendChild(a);
+        }
+      });
+    })();
   </script>
 <script src="/js/app-version.js"></script>
 </body>
