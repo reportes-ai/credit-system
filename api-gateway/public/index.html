@@ -334,15 +334,28 @@
         }
         const placement = (dataPlacement.success && dataPlacement.data && typeof dataPlacement.data === 'object') ? dataPlacement.data : {};
         const DEFAULT_OCULTAS = ['/politica/', '/carga-masiva/'];
-        // Módulos que van en home: no movidos a otra sección (o sin config → filtrar defaults ocultos)
-        const hasPlacement = Object.keys(placement).length > 0;
-        modulosData = data.data.filter(m => {
-          const sec = placement[m.ruta];
-          if (sec) return sec === 'home';
-          return !DEFAULT_OCULTAS.includes(m.ruta);
-        });
+        const isNewFmt = Object.keys(placement).some(k => Array.isArray(placement[k]));
 
-        // Orden guardado (array de id_modulo como string) o por defecto
+        if (isNewFmt && Array.isArray(placement['home'])) {
+          // Nuevo formato: placement.home es array ordenado de rutas
+          const homeOrder = placement['home'];
+          const allMods = data.data;
+          // Módulos en el orden guardado
+          const ordered = homeOrder.map(ruta => allMods.find(m => m.ruta === ruta)).filter(Boolean);
+          // Módulos no mencionados en ninguna sección → también van al home
+          const mentioned = new Set(Object.values(placement).flat());
+          const extras = allMods.filter(m => !mentioned.has(m.ruta) && !DEFAULT_OCULTAS.includes(m.ruta));
+          modulosData = [...ordered, ...extras];
+        } else {
+          // Formato viejo o sin config
+          modulosData = data.data.filter(m => {
+            const sec = placement[m.ruta];
+            if (sec) return sec === 'home';
+            return !DEFAULT_OCULTAS.includes(m.ruta);
+          });
+        }
+
+        // Orden guardado legacy (array de id_modulo como string) o por defecto
         const ordenGuardado = (dataOrden.success && Array.isArray(dataOrden.data)) ? dataOrden.data : null;
         const modsSorted = ordenGuardado
           ? ordenGuardado.map(id => modulosData.find(m => String(m.id_modulo) === String(id))).filter(Boolean)
