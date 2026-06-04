@@ -330,7 +330,8 @@
           grid.innerHTML = '<p class="text-muted text-center py-5" style="grid-column:1/-1">Sin módulos asignados. Contacta al administrador.</p>';
           return;
         }
-        modulosData = data.data;
+        const RUTAS_OCULTAS = ['/politica/', '/carga-masiva/'];
+        modulosData = data.data.filter(m => !RUTAS_OCULTAS.includes(m.ruta));
 
         // Orden guardado (array de id_modulo como string) o por defecto
         const ordenGuardado = (dataOrden.success && Array.isArray(dataOrden.data)) ? dataOrden.data : null;
