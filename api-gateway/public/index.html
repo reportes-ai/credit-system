@@ -121,7 +121,7 @@
     <div class="topnav-left">
       <a href="/" class="topnav-brand">
         <img src="/img/logo.png" alt="AutoFácil">
-        <span class="version-badge">v4.6</span>
+        <span class="version-badge">v4.7</span>
       </a>
     </div>
 
@@ -334,24 +334,51 @@
         }
         const placement = (dataPlacement.success && dataPlacement.data && typeof dataPlacement.data === 'object') ? dataPlacement.data : {};
         const DEFAULT_OCULTAS = ['/politica/', '/carga-masiva/'];
+        const normR = r => r ? (r.endsWith('/') ? r : r + '/') : r;
+        // Fallback para módulos que no vienen de mis-permisos
+        const HOME_FALLBACK = [
+          { ruta:'/clientes/',           nombre:'Clientes',              icono:'bi-people-fill',          descripcion:'' },
+          { ruta:'/cotizaciones/',       nombre:'Cotizaciones',          icono:'bi-calculator',           descripcion:'' },
+          { ruta:'/creditos/',           nombre:'Créditos',              icono:'bi-credit-card-2-front',  descripcion:'' },
+          { ruta:'/tesoreria/',          nombre:'Tesorería',             icono:'bi-safe2',                descripcion:'' },
+          { ruta:'/crm/',                nombre:'CRM',                   icono:'bi-headset',              descripcion:'' },
+          { ruta:'/cobranza/',           nombre:'Cobranza',              icono:'bi-bell-fill',            descripcion:'' },
+          { ruta:'/reporteria/',         nombre:'Reportería',            icono:'bi-bar-chart-line-fill',  descripcion:'' },
+          { ruta:'/politica/',           nombre:'Política',              icono:'bi-shield-lock',          descripcion:'' },
+          { ruta:'/usuarios/',           nombre:'Usuarios',              icono:'bi-people',               descripcion:'' },
+          { ruta:'/mantenedores/',       nombre:'Mantenedores',          icono:'bi-gear-fill',            descripcion:'' },
+          { ruta:'/cartas-aprobacion/',  nombre:'Cartas de Aprobación',  icono:'bi-envelope-paper',       descripcion:'' },
+          { ruta:'/comisiones/',         nombre:'Comisión Ejecutivos',   icono:'bi-cash-coin',            descripcion:'' },
+          { ruta:'/carga-masiva/',       nombre:'Carga Masiva',          icono:'bi-cloud-upload',         descripcion:'' },
+          { ruta:'/antecedentes-laborales/', nombre:'Antecedentes Laborales', icono:'bi-briefcase',       descripcion:'' },
+          { ruta:'/informacion-comercial/',  nombre:'Información Comercial',  icono:'bi-building',        descripcion:'' },
+        ];
+        // Construye mapa normalizado de todos los módulos disponibles
+        const modMap = new Map();
+        data.data.forEach(m => modMap.set(normR(m.ruta), m));
+        HOME_FALLBACK.forEach(f => { const k = normR(f.ruta); if (!modMap.has(k)) modMap.set(k, { ...f, id_modulo: k }); });
+
         const isNewFmt = Object.keys(placement).some(k => Array.isArray(placement[k]));
 
         if (isNewFmt && Array.isArray(placement['home'])) {
-          // Nuevo formato: placement.home es array ordenado de rutas
           const homeOrder = placement['home'];
-          const allMods = data.data;
-          // Módulos en el orden guardado
-          const ordered = homeOrder.map(ruta => allMods.find(m => m.ruta === ruta)).filter(Boolean);
-          // Módulos no mencionados en ninguna sección → también van al home
-          const mentioned = new Set(Object.values(placement).flat());
-          const extras = allMods.filter(m => !mentioned.has(m.ruta) && !DEFAULT_OCULTAS.includes(m.ruta));
+          const mentioned = new Set(Object.values(placement).flat().map(normR));
+          // Items en el orden guardado (normaliza slash para el lookup)
+          const ordered = homeOrder.map(r => modMap.get(normR(r))).filter(Boolean);
+          const orderedKeys = new Set(homeOrder.map(normR));
+          // Items válidos no mencionados en ninguna sección → extras
+          const extras = [...modMap.values()].filter(m => {
+            const k = normR(m.ruta);
+            return !mentioned.has(k) && !orderedKeys.has(k) && !DEFAULT_OCULTAS.includes(k);
+          });
           modulosData = [...ordered, ...extras];
         } else {
           // Formato viejo o sin config
-          modulosData = data.data.filter(m => {
-            const sec = placement[m.ruta];
+          modulosData = [...modMap.values()].filter(m => {
+            const k = normR(m.ruta);
+            const sec = placement[k] || placement[m.ruta];
             if (sec) return sec === 'home';
-            return !DEFAULT_OCULTAS.includes(m.ruta);
+            return !DEFAULT_OCULTAS.includes(k);
           });
         }
 
