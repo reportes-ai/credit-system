@@ -4642,7 +4642,7 @@ function abrirDetalleEjecutivo(nombre, tipo) {
   const body = ops.map(r => {
     const ccs = (r.automotora||'—');
     const fin = r.financiera || '—';
-    const nc  = r.numero_credito || '—';
+    const nc  = r.id_financiera || '—';
     return `<tr>
       <td>${r.op||'—'}</td>
       <td>${nc}</td>
