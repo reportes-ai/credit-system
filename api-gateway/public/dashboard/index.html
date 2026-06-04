@@ -3118,6 +3118,7 @@ function buildV7() {
     <div class="card" style="margin-top:10px">
       <div class="card-head" style="display:flex;align-items:center;justify-content:space-between">
         <span>🔒 Control de Acceso por Pestaña</span>
+        <button onclick="restaurarPermisosDefault()" style="background:#e53935;color:#fff;border:none;border-radius:6px;padding:5px 14px;font-size:12px;font-weight:600;cursor:pointer;margin-right:8px" title="Vuelve al orden original y muestra todas las pestañas a todos los perfiles">🔄 Restaurar por defecto</button>
         <button onclick="guardarPermisosTabsAdmin()" style="background:#43a047;color:#fff;border:none;border-radius:6px;padding:5px 16px;font-size:12px;font-weight:600;cursor:pointer">💾 Guardar Cambios</button>
       </div>
       <div style="padding:10px 4px;font-size:11px;color:#7bafd4;margin-bottom:4px">
@@ -3215,12 +3216,15 @@ function aplicarPermisosNavTabs() {
     aplicarOrdenNavTabs();
   }
   // Aplicar visibilidad
-  const perfil = sesionActual.perfil;
+  const perfil = (sesionActual.perfil || '').toUpperCase();
   TABS_NAV.forEach(function(tab) {
     const el = document.querySelector('.tab[data-viewid="' + tab.id + '"]');
     if (!el) return;
     const permitidos = permisos[tab.id];
-    el.style.display = (!permitidos || permitidos.length === 0 || permitidos.includes(perfil)) ? '' : 'none';
+    // Mostrar si: sin restricción, array vacío, o el perfil está incluido (case-insensitive)
+    const visible = !permitidos || permitidos.length === 0 ||
+                    permitidos.some(function(p){ return p.toUpperCase() === perfil; });
+    el.style.display = visible ? '' : 'none';
   });
 }
 
@@ -3301,6 +3305,30 @@ function initDragTablas() {
       renderTablaPermisos();
     });
   });
+}
+
+async function restaurarPermisosDefault() {
+  if (!confirm('¿Restaurar el orden original y hacer visibles todas las pestañas para todos los perfiles?')) return;
+  // Restaurar orden original hardcodeado
+  const ORDER_DEFAULT = ['v1b','v1','v2','v3','v5','v7','v6','v8','vhist','vppto','vevol','v2pl'];
+  ORDER_DEFAULT.forEach(function(id, i) {
+    var idx = TABS_NAV.findIndex(function(t){ return t.id===id; });
+    if (idx !== -1 && idx !== i) { var t = TABS_NAV.splice(idx,1)[0]; TABS_NAV.splice(i,0,t); }
+  });
+  // Permisos: todos los perfiles ven todas las pestañas
+  var permisos = { _order: ORDER_DEFAULT };
+  TABS_NAV.forEach(function(tab) { permisos[tab.id] = PERFILES_SISTEMA.slice(); });
+  try {
+    const resp = await apiDashboard('POST', 'permisos', { permisos });
+    if (!resp.success) throw new Error(resp.error || 'Error');
+    sessionStorage.setItem('af_tab_permisos', JSON.stringify(permisos));
+    aplicarOrdenNavTabs();
+    aplicarPermisosNavTabs();
+    renderTablaPermisos();
+    alert('✅ Permisos restaurados. Todas las pestañas son visibles.');
+  } catch(e) {
+    alert('❌ Error al restaurar: ' + e.message);
+  }
 }
 
 async function guardarPermisosTabsAdmin() {
