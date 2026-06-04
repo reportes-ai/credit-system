@@ -2,7 +2,7 @@
 <html lang="es">
 <head>
 <meta charset="UTF-8">
-<!-- v1.0 -->
+<!-- v1.1 -->
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>AutoFácil — Dashboard</title>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
@@ -4649,10 +4649,11 @@ function abrirDetalleEjecutivo(nombre, tipo) {
   const hasta  = document.getElementById('sel-hasta')?.value  || '';
 
   // Filtrar RAW_DATA según tipo
-  let ops = (window.RAW_DATA || []).filter(r =>
-    r.ejecutivo === nombre &&
-    r.mes >= desde && r.mes <= hasta
-  );
+  // Usar fecha_otorgado si existe (igual que comisiones), si no usar mes
+  let ops = (window.RAW_DATA || []).filter(r => {
+    const mesRef = (r.fecha_otorgado || r.fecha_ot) ? (r.fecha_otorgado || r.fecha_ot).slice(0,7) : r.mes;
+    return r.ejecutivo === nombre && mesRef >= desde && mesRef <= hasta;
+  });
   if (tipo === 'ot') {
     ops = ops.filter(r => r.estado_eval === 'OTORGADO');
   } else {
