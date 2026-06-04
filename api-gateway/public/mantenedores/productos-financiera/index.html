@@ -1,0 +1,306 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <link rel="icon" href="/img/favicon.png" type="image/png">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Productos por Financiera — AutoFácil</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css" rel="stylesheet">
+  <!-- v1.0 -->
+  <style>
+    :root { --navy:#0141A2; --navy-dark:#012d70; --navy-light:#0255c5; --accent:#009AFE; --bg:#f0f4f8; }
+    body { background:var(--bg); font-family:'Segoe UI',system-ui,sans-serif; margin:0; min-height:100vh; }
+    .topnav { background:linear-gradient(90deg,var(--navy-dark),var(--navy-light)); color:#fff; height:60px; padding:0 24px; display:flex; align-items:center; justify-content:space-between; position:sticky; top:0; z-index:200; box-shadow:0 2px 8px rgba(0,0,0,.3); }
+    .topnav-left { display:flex; align-items:center; gap:16px; }
+    .topnav-brand { display:flex; align-items:center; gap:8px; }
+    .topnav-brand img { height:34px; filter:brightness(0) invert(1); }
+    .version-badge { background:rgba(255,255,255,.15); color:rgba(255,255,255,.75); font-size:.65rem; font-weight:700; border-radius:6px; padding:2px 8px; }
+    .breadcrumb-nav { color:rgba(255,255,255,.6); font-size:.85rem; display:flex; align-items:center; gap:6px; }
+    .breadcrumb-nav a { color:rgba(255,255,255,.75); text-decoration:none; }
+    .breadcrumb-nav a:hover { color:#fff; }
+    .breadcrumb-nav .sep { color:rgba(255,255,255,.35); }
+    .topnav-right { display:flex; align-items:center; gap:12px; }
+    .user-chip { background:rgba(255,255,255,.12); border-radius:24px; padding:5px 12px; display:flex; align-items:center; gap:8px; font-size:.85rem; }
+    .avatar { width:28px; height:28px; background:#90caf9; border-radius:50%; display:flex; align-items:center; justify-content:center; color:var(--navy); font-weight:700; font-size:.75rem; }
+    .perfil-badge { background:rgba(144,202,249,.2); border:1px solid rgba(144,202,249,.4); color:#90caf9; border-radius:12px; padding:2px 10px; font-size:.73rem; font-weight:600; }
+    .btn-logout { background:rgba(255,255,255,.1); border:1px solid rgba(255,255,255,.2); color:#fff; border-radius:8px; padding:5px 12px; font-size:.82rem; cursor:pointer; }
+    .main-content { padding:32px 40px; max-width:1100px; margin:0 auto; }
+    @media (max-width:700px) { .main-content { padding:20px 12px; } }
+
+    .page-header { display:flex; align-items:center; gap:14px; margin-bottom:28px; }
+    .page-icon { width:52px; height:52px; border-radius:14px; background:linear-gradient(135deg,#1e3a8a,#3b82f6); color:#fff; display:flex; align-items:center; justify-content:center; font-size:1.5rem; flex-shrink:0; }
+    .page-header h2 { margin:0 0 2px; font-weight:800; font-size:1.4rem; color:#111827; }
+    .page-header p { margin:0; font-size:.85rem; color:#6b7280; }
+
+    /* Tabs financiera */
+    .fin-tabs { display:flex; gap:8px; margin-bottom:20px; }
+    .fin-tab { border:2px solid #e5e7eb; background:#fff; border-radius:10px; padding:10px 20px; font-size:.88rem; font-weight:600; cursor:pointer; color:#6b7280; display:flex; align-items:center; gap:8px; transition:all .15s; }
+    .fin-tab.active { border-color:var(--navy); background:var(--navy); color:#fff; }
+    .fin-tab:hover:not(.active) { border-color:var(--navy); color:var(--navy); }
+    .count-badge { background:rgba(255,255,255,.3); border-radius:10px; padding:1px 8px; font-size:.75rem; }
+    .fin-tab:not(.active) .count-badge { background:#f3f4f6; color:#374151; }
+
+    /* Tabla */
+    .card-panel { background:#fff; border-radius:14px; box-shadow:0 1px 4px rgba(0,0,0,.06); padding:0; overflow:hidden; }
+    .panel-toolbar { padding:14px 20px; border-bottom:1px solid #f3f4f6; display:flex; align-items:center; gap:12px; flex-wrap:wrap; }
+    .panel-toolbar input[type=text] { border:1px solid #d1d5db; border-radius:8px; padding:7px 12px; font-size:.85rem; width:260px; }
+    .btn-add { background:var(--navy); color:#fff; border:none; border-radius:8px; padding:8px 16px; font-size:.84rem; font-weight:600; cursor:pointer; display:flex; align-items:center; gap:6px; }
+    .btn-add:hover { background:var(--navy-dark); }
+
+    table { width:100%; border-collapse:collapse; font-size:.85rem; }
+    th { background:#f8fafc; color:#374151; font-weight:700; padding:10px 14px; border-bottom:2px solid #e5e7eb; text-align:left; white-space:nowrap; }
+    td { padding:10px 14px; border-bottom:1px solid #f3f4f6; vertical-align:middle; }
+    tr:hover td { background:#fafbfc; }
+    .badge-activo { background:#dcfce7; color:#15803d; border-radius:20px; padding:2px 10px; font-size:.75rem; font-weight:700; }
+    .badge-inactivo { background:#fee2e2; color:#dc2626; border-radius:20px; padding:2px 10px; font-size:.75rem; font-weight:700; }
+    .badge-fin { border-radius:20px; padding:2px 10px; font-size:.75rem; font-weight:700; }
+    .badge-autofin { background:#dbeafe; color:#1d4ed8; }
+    .badge-unidad  { background:#e0e7ff; color:#3730a3; }
+
+    .btn-icon { border:none; background:none; cursor:pointer; padding:4px 6px; border-radius:6px; font-size:1rem; transition:background .12s; }
+    .btn-icon:hover { background:#f3f4f6; }
+    .btn-icon.danger:hover { background:#fee2e2; color:#dc2626; }
+
+    /* Modal */
+    .modal-backdrop { position:fixed; inset:0; background:rgba(0,0,0,.4); z-index:1000; display:flex; align-items:center; justify-content:center; }
+    .modal-box { background:#fff; border-radius:16px; width:460px; max-width:95vw; padding:28px; box-shadow:0 20px 60px rgba(0,0,0,.25); }
+    .modal-box h5 { font-weight:800; margin:0 0 20px; font-size:1.05rem; }
+    .form-group { margin-bottom:16px; }
+    .form-group label { font-size:.82rem; font-weight:600; color:#374151; display:block; margin-bottom:4px; }
+    .form-group select, .form-group input { width:100%; border:1px solid #d1d5db; border-radius:8px; padding:9px 12px; font-size:.88rem; }
+    .form-group select:focus, .form-group input:focus { outline:none; border-color:var(--navy); box-shadow:0 0 0 3px rgba(1,65,162,.1); }
+    .modal-footer { display:flex; justify-content:flex-end; gap:10px; margin-top:20px; }
+    .btn-cancel { border:1px solid #d1d5db; background:#fff; border-radius:8px; padding:8px 18px; font-size:.85rem; cursor:pointer; }
+    .btn-save   { background:var(--navy); color:#fff; border:none; border-radius:8px; padding:8px 18px; font-size:.85rem; font-weight:600; cursor:pointer; }
+    .btn-save:hover { background:var(--navy-dark); }
+
+    .empty-state { text-align:center; padding:48px 20px; color:#9ca3af; }
+    .empty-state i { font-size:2.5rem; display:block; margin-bottom:10px; }
+  </style>
+</head>
+<body>
+<nav class="topnav">
+  <div class="topnav-left">
+    <a href="/" class="topnav-brand">
+      <img src="/img/logo.png" alt="AutoFácil">
+      <span class="version-badge">v1.0</span>
+    </a>
+    <div class="breadcrumb-nav">
+      <a href="/">Inicio</a><span class="sep">›</span>
+      <a href="/mantenedores/">Mantenedores</a><span class="sep">›</span>
+      <span style="color:#fff;font-weight:600">Productos por Financiera</span>
+    </div>
+  </div>
+  <div class="topnav-right">
+    <div class="user-chip">
+      <div class="avatar" id="avatarInicial">?</div>
+      <div>
+        <div style="font-weight:600;line-height:1.3;color:#fff" id="navNombre">—</div>
+        <div class="perfil-badge" id="navPerfil">—</div>
+      </div>
+    </div>
+    <button class="btn-logout" onclick="logout()"><i class="bi bi-box-arrow-right me-1"></i>Salir</button>
+  </div>
+</nav>
+
+<div class="main-content">
+  <div class="page-header">
+    <div class="page-icon"><i class="bi bi-tags-fill"></i></div>
+    <div>
+      <h2>Productos por Financiera</h2>
+      <p>Administra los productos disponibles en la digitación de operaciones para cada financiera</p>
+    </div>
+  </div>
+
+  <!-- Tabs por financiera -->
+  <div class="fin-tabs">
+    <button class="fin-tab active" data-fin="AUTOFIN" onclick="switchTab(this)">
+      <i class="bi bi-building-fill"></i> AUTOFIN
+      <span class="count-badge" id="cntAutofin">0</span>
+    </button>
+    <button class="fin-tab" data-fin="UNIDAD DE CREDITO" onclick="switchTab(this)">
+      <i class="bi bi-bank"></i> UNIDAD DE CRÉDITO
+      <span class="count-badge" id="cntUnidad">0</span>
+    </button>
+  </div>
+
+  <div class="card-panel">
+    <div class="panel-toolbar">
+      <input type="text" id="buscarInput" placeholder="Buscar producto..." oninput="renderTabla()">
+      <button class="btn-add" onclick="abrirModal()"><i class="bi bi-plus-circle-fill"></i> Agregar Producto</button>
+    </div>
+    <div id="tablaWrap">
+      <div class="empty-state"><i class="bi bi-hourglass-split"></i>Cargando...</div>
+    </div>
+  </div>
+</div>
+
+<!-- Modal agregar/editar -->
+<div class="modal-backdrop" id="modal" style="display:none" onclick="if(event.target===this)cerrarModal()">
+  <div class="modal-box">
+    <h5 id="modalTitulo">Agregar Producto</h5>
+    <input type="hidden" id="mId">
+    <div class="form-group">
+      <label>Financiera *</label>
+      <select id="mFinanciera">
+        <option value="AUTOFIN">AUTOFIN</option>
+        <option value="UNIDAD DE CREDITO">UNIDAD DE CREDITO</option>
+      </select>
+    </div>
+    <div class="form-group">
+      <label>Nombre del Producto *</label>
+      <input type="text" id="mProducto" placeholder="Ej: AUTOFIN - CREDITO CONVENCIONAL" autocomplete="off">
+    </div>
+    <div class="form-group">
+      <label>Orden</label>
+      <input type="number" id="mOrden" value="0" min="0">
+    </div>
+    <div class="form-group">
+      <label>Estado</label>
+      <select id="mActivo">
+        <option value="1">Activo</option>
+        <option value="0">Inactivo</option>
+      </select>
+    </div>
+    <div class="modal-footer">
+      <button class="btn-cancel" onclick="cerrarModal()">Cancelar</button>
+      <button class="btn-save" onclick="guardar()"><i class="bi bi-check-circle-fill me-1"></i>Guardar</button>
+    </div>
+  </div>
+</div>
+
+<script src="/js/auth-guard.js"></script>
+<script>
+  const token = sessionStorage.getItem('token');
+  const yo    = JSON.parse(sessionStorage.getItem('usuario') || 'null');
+  if (!token || !yo) window.location.href = '/login.html';
+  document.getElementById('navNombre').textContent = `${yo?.nombre||''} ${yo?.apellido||''}`.trim();
+  document.getElementById('navPerfil').textContent  = yo?.perfil || '';
+  document.getElementById('avatarInicial').textContent = (yo?.nombre||'?').charAt(0).toUpperCase();
+  function logout() { sessionStorage.removeItem('token'); sessionStorage.removeItem('usuario'); window.location.href='/login.html'; }
+
+  const headers = { 'Content-Type':'application/json', 'Authorization': `Bearer ${token}` };
+  let ALL = [];        // todos los registros
+  let finActual = 'AUTOFIN';
+
+  async function cargar() {
+    try {
+      const r = await fetch('/api/productos-financiera', { headers });
+      const d = await r.json();
+      ALL = d.success ? d.data : [];
+    } catch { ALL = []; }
+    actualizarContadores();
+    renderTabla();
+  }
+
+  function actualizarContadores() {
+    document.getElementById('cntAutofin').textContent = ALL.filter(x => x.financiera === 'AUTOFIN').length;
+    document.getElementById('cntUnidad').textContent  = ALL.filter(x => x.financiera === 'UNIDAD DE CREDITO').length;
+  }
+
+  function switchTab(btn) {
+    document.querySelectorAll('.fin-tab').forEach(t => t.classList.remove('active'));
+    btn.classList.add('active');
+    finActual = btn.dataset.fin;
+    document.getElementById('buscarInput').value = '';
+    renderTabla();
+  }
+
+  function renderTabla() {
+    const q = document.getElementById('buscarInput').value.toLowerCase();
+    const rows = ALL.filter(x => x.financiera === finActual && (!q || x.producto.toLowerCase().includes(q)));
+    const wrap = document.getElementById('tablaWrap');
+    if (!rows.length) {
+      wrap.innerHTML = `<div class="empty-state"><i class="bi bi-inbox"></i>No hay productos para esta financiera</div>`;
+      return;
+    }
+    const badgeFin = finActual === 'AUTOFIN'
+      ? `<span class="badge-fin badge-autofin">AUTOFIN</span>`
+      : `<span class="badge-fin badge-unidad">UNIDAD</span>`;
+    wrap.innerHTML = `
+      <table>
+        <thead><tr>
+          <th style="width:50px">Orden</th>
+          <th>Producto</th>
+          <th>Financiera</th>
+          <th>Estado</th>
+          <th style="width:80px">Acciones</th>
+        </tr></thead>
+        <tbody>
+          ${rows.map(r => `
+            <tr>
+              <td style="text-align:center;color:#9ca3af">${r.orden}</td>
+              <td style="font-weight:600;color:#111827">${r.producto}</td>
+              <td>${badgeFin}</td>
+              <td>${r.activo ? '<span class="badge-activo">Activo</span>' : '<span class="badge-inactivo">Inactivo</span>'}</td>
+              <td>
+                <button class="btn-icon" title="Editar" onclick="editar(${r.id})"><i class="bi bi-pencil-fill" style="color:#1d4ed8"></i></button>
+                <button class="btn-icon danger" title="Eliminar" onclick="eliminar(${r.id},'${r.producto.replace(/'/g,"\\'")}')"><i class="bi bi-trash3-fill"></i></button>
+              </td>
+            </tr>`).join('')}
+        </tbody>
+      </table>`;
+  }
+
+  function abrirModal(id) {
+    document.getElementById('mId').value = '';
+    document.getElementById('mFinanciera').value = finActual;
+    document.getElementById('mProducto').value = '';
+    document.getElementById('mOrden').value = 0;
+    document.getElementById('mActivo').value = '1';
+    document.getElementById('modalTitulo').textContent = 'Agregar Producto';
+    document.getElementById('modal').style.display = 'flex';
+    document.getElementById('mProducto').focus();
+  }
+
+  function editar(id) {
+    const item = ALL.find(x => x.id === id);
+    if (!item) return;
+    document.getElementById('mId').value = id;
+    document.getElementById('mFinanciera').value = item.financiera;
+    document.getElementById('mProducto').value = item.producto;
+    document.getElementById('mOrden').value = item.orden;
+    document.getElementById('mActivo').value = item.activo ? '1' : '0';
+    document.getElementById('modalTitulo').textContent = 'Editar Producto';
+    document.getElementById('modal').style.display = 'flex';
+  }
+
+  function cerrarModal() {
+    document.getElementById('modal').style.display = 'none';
+  }
+
+  async function guardar() {
+    const id       = document.getElementById('mId').value;
+    const payload  = {
+      financiera: document.getElementById('mFinanciera').value,
+      producto:   document.getElementById('mProducto').value.trim(),
+      orden:      parseInt(document.getElementById('mOrden').value) || 0,
+      activo:     parseInt(document.getElementById('mActivo').value),
+    };
+    if (!payload.producto) { alert('El nombre del producto es requerido'); return; }
+    try {
+      const url    = id ? `/api/productos-financiera/${id}` : '/api/productos-financiera';
+      const method = id ? 'PUT' : 'POST';
+      const r = await fetch(url, { method, headers, body: JSON.stringify(payload) });
+      const d = await r.json();
+      if (!d.success) { alert(d.error || 'Error al guardar'); return; }
+      cerrarModal();
+      await cargar();
+    } catch { alert('Error de conexión'); }
+  }
+
+  async function eliminar(id, nombre) {
+    if (!confirm(`¿Eliminar el producto "${nombre}"?`)) return;
+    try {
+      const r = await fetch(`/api/productos-financiera/${id}`, { method:'DELETE', headers });
+      const d = await r.json();
+      if (!d.success) { alert(d.error || 'Error al eliminar'); return; }
+      await cargar();
+    } catch { alert('Error de conexión'); }
+  }
+
+  cargar();
+</script>
+</body>
+</html>

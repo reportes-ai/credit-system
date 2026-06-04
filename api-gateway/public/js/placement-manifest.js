@@ -74,6 +74,7 @@ const PLACEMENT_ITEMS = {
   'broker-validaciones':     { section:'mantenedores',  href:'/mantenedores/broker-validaciones/',icon:'bi-card-checklist',         titulo:'Docs Validar Brokers' },
   'financieras':             { section:'mantenedores',  href:'/mantenedores/financieras/',        icon:'bi-calculator',             titulo:'Fórmulas Financieras' },
   'comisiones-seguro':       { section:'mantenedores',  href:'/mantenedores/comisiones-seguro/',  icon:'bi-shield-half',            titulo:'Comisiones Seguro' },
+  'productos-financiera':    { section:'mantenedores',  href:'/mantenedores/productos-financiera/', icon:'bi-tags-fill',              titulo:'Productos por Financiera' },
   'bd-clientes':             { section:'mantenedores',  href:'/mantenedores/bd-clientes/',               icon:'bi-database',               titulo:'BD Clientes' },
   'bd-operaciones':          { section:'mantenedores',  href:'/mantenedores/bd-operaciones/',            icon:'bi-database-gear',          titulo:'BD Operaciones' },
   'bd-antecedentes':         { section:'mantenedores',  href:'/mantenedores/bd-antecedentes/',           icon:'bi-briefcase-fill',          titulo:'BD Antecedentes Laborales' },

@@ -52,6 +52,7 @@ app.use('/api/bd-operaciones',            require('../../services/mantenedores/s
 app.use('/api/bd-clientes',               require('../../services/mantenedores/src/routes/bd-clientes.routes'));
 app.use('/api/bd-antecedentes',           require('../../services/mantenedores/src/routes/bd-antecedentes.routes'));
 app.use('/api/bd-informacion-comercial',  require('../../services/mantenedores/src/routes/bd-informacion-comercial.routes'));
+app.use('/api/productos-financiera',      require('../../services/mantenedores/src/routes/productos-financiera.routes'));
 
 // Cotizaciones
 app.use('/api/cotizaciones', require('../../services/cotizaciones/src/routes/cotizaciones.routes'));

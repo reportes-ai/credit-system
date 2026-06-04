@@ -77,7 +77,7 @@
   <div class="topnav-left">
     <a href="/" class="topnav-brand">
       <img src="/img/logo.png" alt="AutoFácil">
-      <span class="version-badge">v1.4</span>
+      <span class="version-badge">v1.5</span>
     </a>
     <div class="breadcrumb-nav">
       <a href="/">Inicio</a><span class="sep">›</span>
@@ -173,11 +173,7 @@
         <div class="f-group">
           <label class="f-req">Producto Unidad</label>
           <select id="fProducto">
-            <option value="">— Seleccione —</option>
-            <option>CREDITO CC UNIDAD APROB 11</option>
-            <option>UNIDAD - CREDITO CONVENCIONAL</option>
-            <option>UNIDAD - PARQUE - CREDITO CONVENCIONAL</option>
-            <option>AUTOFIN - PARQUE - CREDITO CONVENCIONAL</option>
+            <option value="">— Cargando... —</option>
           </select>
         </div>
         <div class="f-group">
@@ -415,6 +411,24 @@
   document.getElementById('navPerfil').textContent  = yo?.perfil || '';
   document.getElementById('avatarInicial').textContent = (yo?.nombre||'?').charAt(0).toUpperCase();
   function logout() { sessionStorage.removeItem('token'); sessionStorage.removeItem('usuario'); window.location.href = '/login.html'; }
+
+  // Cargar productos dinámicos desde mantenedor
+  (async () => {
+    try {
+      const r = await fetch('/api/productos-financiera?financiera=UNIDAD%20DE%20CREDITO&activo=1',
+        { headers: { Authorization: 'Bearer ' + token } });
+      const d = await r.json();
+      const sel = document.getElementById('fProducto');
+      sel.innerHTML = '<option value="">— Seleccione —</option>';
+      if (d.success && d.data.length) {
+        d.data.forEach(p => {
+          const opt = document.createElement('option');
+          opt.value = opt.textContent = p.producto;
+          sel.appendChild(opt);
+        });
+      }
+    } catch { /* fallback: select queda vacío */ }
+  })();
 
   // Pre-fill ejecutivo con el usuario logueado
   document.getElementById('fEjecutivo').value = `${yo?.nombre||''} ${yo?.apellido||''}`.trim();

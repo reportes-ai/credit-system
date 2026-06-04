@@ -89,7 +89,7 @@
   <div class="topnav-left">
     <a href="/" class="topnav-brand">
       <img src="/img/logo.png" alt="AutoFácil">
-      <span class="version-badge">v1.9</span>
+      <span class="version-badge">v2.0</span>
     </a>
     <div class="breadcrumb-nav">
       <a href="/">Inicio</a><span class="sep">›</span>
@@ -180,19 +180,7 @@
         <div class="f-group">
           <label class="f-req">Producto AutoFin</label>
           <select id="fProducto">
-            <option value="">— Seleccione —</option>
-            <option>CREDITO CC NUEVO AUTOFIN APROB 10</option>
-            <option>CREDITO CC AUTOMALL AUTOFIN</option>
-            <option>CREDITO CC AUTOFIN PARQUE CARMOONS</option>
-            <option>CREDITO CC AUTOFIN PARQUE PANAMERICANA</option>
-            <option>CREDITO CC AUTOFIN PARQUE AUTOMOTRIZ OESTE</option>
-            <option>CREDITO CC AUTOFIN PARQUE AUTOCENTER QUILICURA</option>
-            <option>CREDITO AUTOFIN PARQUE MAIPU</option>
-            <option>CREDITO AUTOFIN AUTOPARQUE LONQUEN</option>
-            <option>AUTOFIN - CREDITO CONVENCIONAL</option>
-            <option>AUTOFIN - CREDITO CORFO</option>
-            <option>AUTOFIN - PARQUE - CREDITO CONVENCIONAL</option>
-            <option>PRODUCTO CORFO AUTOFIN MAYOR - MENOR 200 UF</option>
+            <option value="">— Cargando... —</option>
           </select>
         </div>
         <div class="f-group">
@@ -499,6 +487,24 @@
   document.getElementById('fEjecutivo').value = `${yo?.nombre||''} ${yo?.apellido||''}`.trim();
   // Tipo Ubicación inicial
   document.getElementById('fTipoLugar').value = 'CALLE';
+
+  // Cargar productos dinámicos desde mantenedor
+  (async () => {
+    try {
+      const r = await fetch('/api/productos-financiera?financiera=AUTOFIN&activo=1',
+        { headers: { Authorization: 'Bearer ' + token } });
+      const d = await r.json();
+      const sel = document.getElementById('fProducto');
+      sel.innerHTML = '<option value="">— Seleccione —</option>';
+      if (d.success && d.data.length) {
+        d.data.forEach(p => {
+          const opt = document.createElement('option');
+          opt.value = opt.textContent = p.producto;
+          sel.appendChild(opt);
+        });
+      }
+    } catch { /* fallback */ }
+  })();
 
   // Poblar opciones de Plazo (cuotas) 6–72 en pasos de 6
   (function() {
