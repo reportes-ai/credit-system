@@ -176,7 +176,7 @@
     <div class="topnav-left">
       <a href="/" class="topnav-brand">
         <img src="/img/logo.png" alt="AutoFácil">
-        <span class="version-badge">v5.0</span>
+        <span class="version-badge">v5.1</span>
       </a>
     </div>
 
@@ -531,48 +531,32 @@
 <script src="/js/app-version.js"></script>
 
 <script>
-/* ── Cinta de noticias (RSS → rss2json) ─────────────────────────────── */
+/* ── Cinta de noticias (backend proxy /api/noticias) ────────────────── */
 (async function initTicker() {
-  const FEEDS = [
-    { url: 'https://www.biobiochile.cl/feed/', src: 'BioBío' },
-    { url: 'https://www.latercera.com/feed/',  src: 'La Tercera' },
-  ];
-  const RSS2JSON = 'https://api.rss2json.com/v1/api.json?rss_url=';
-
   let noticias = [];
-
-  for (const feed of FEEDS) {
-    try {
-      const r = await fetch(`${RSS2JSON}${encodeURIComponent(feed.url)}&count=8`);
-      const d = await r.json();
-      if (d.status === 'ok' && d.items?.length) {
-        d.items.forEach(item => noticias.push({ titulo: item.title, link: item.link, src: feed.src }));
-      }
-    } catch { /* ignorar feed fallido */ }
-  }
+  try {
+    const r = await fetch('/api/noticias');
+    const d = await r.json();
+    if (d.success && d.data?.length) noticias = d.data;
+  } catch { /* fallback abajo */ }
 
   if (!noticias.length) {
-    // Fallback estático si ambos feeds fallan
-    noticias = [
-      { titulo: 'Sin conexión a noticias en este momento', link: '#', src: '' },
-    ];
+    noticias = [{ titulo: 'Sin noticias disponibles en este momento', link: '#', src: '' }];
   }
 
-  // Renderizar: duplicar lista para loop continuo
   const track = document.getElementById('newsTrack');
   const buildItems = () => noticias.map(n =>
-    `<span class="news-item" onclick="window.open('${n.link}','_blank')" title="${n.titulo}">
+    `<span class="news-item" onclick="${n.link !== '#' ? `window.open('${n.link}','_blank')` : ''}" title="${n.titulo.replace(/"/g,'&quot;')}">
        <span class="news-dot"></span>
        ${n.src ? `<span class="news-src">${n.src}</span>` : ''}
        ${n.titulo}
      </span>`
   ).join('');
 
-  track.innerHTML = buildItems() + buildItems(); // doble para loop
+  track.innerHTML = buildItems() + buildItems();
 
-  // Ajustar duración según cantidad de caracteres
   const totalChars = noticias.reduce((s, n) => s + n.titulo.length, 0);
-  const dur = Math.max(40, Math.min(120, totalChars * 0.18));
+  const dur = Math.max(45, Math.min(140, totalChars * 0.20));
   track.style.animationDuration = dur + 's';
 })();
 
