@@ -85,7 +85,7 @@
 <body>
   <nav class="topnav">
     <div class="topnav-left">
-      <a href="/" class="topnav-brand"><img src="/img/logo.png" alt="AutoFácil"><span class="version-badge">v2.3</span></a>
+      <a href="/" class="topnav-brand"><img src="/img/logo.png" alt="AutoFácil"><span class="version-badge">v2.4</span></a>
       <div class="breadcrumb-nav">
         <a href="/">Inicio</a><span style="color:rgba(255,255,255,.35)">›</span>
         <a href="/mantenedores/">Mantenedores</a><span style="color:rgba(255,255,255,.35)">›</span>
@@ -135,25 +135,8 @@
     document.getElementById('avatarInicial').textContent = (yo?.nombre||'?').charAt(0).toUpperCase();
     function logout() { sessionStorage.clear(); window.location.href = '/login.html'; }
 
-    // Módulos del HOME conocidos (fallback si la BD no los devuelve o para complementar)
-    const HOME_FALLBACK = [
-      { ruta:'/clientes/',           nombre:'Clientes',              icono:'bi-people-fill' },
-      { ruta:'/cotizaciones/',       nombre:'Cotizaciones',          icono:'bi-calculator' },
-      { ruta:'/creditos/',           nombre:'Créditos',              icono:'bi-credit-card-2-front' },
-      { ruta:'/tesoreria/',          nombre:'Tesorería',             icono:'bi-safe2' },
-      { ruta:'/crm/',                nombre:'CRM',                   icono:'bi-headset' },
-      { ruta:'/cobranza/',           nombre:'Cobranza',              icono:'bi-bell-fill' },
-      { ruta:'/reporteria/',         nombre:'Reportería',            icono:'bi-bar-chart-line-fill' },
-      { ruta:'/politica/',           nombre:'Política',              icono:'bi-shield-lock' },
-      { ruta:'/usuarios/',           nombre:'Usuarios',              icono:'bi-people' },
-      { ruta:'/mantenedores/',       nombre:'Mantenedores',          icono:'bi-gear-fill' },
-      { ruta:'/cartas-aprobacion/',  nombre:'Cartas de Aprobación',  icono:'bi-envelope-paper' },
-      { ruta:'/comisiones/',         nombre:'Comisión Ejecutivos',   icono:'bi-cash-coin' },
-      { ruta:'/carga-masiva/',       nombre:'Carga Masiva',          icono:'bi-cloud-upload' },
-      { ruta:'/simulador/',          nombre:'Simulador Rentabilidad',icono:'bi-calculator' },
-      { ruta:'/antecedentes-laborales/', nombre:'Antecedentes Laborales', icono:'bi-briefcase' },
-      { ruta:'/informacion-comercial/',  nombre:'Información Comercial',  icono:'bi-building' },
-    ];
+    // HOME_FALLBACK vacío — todos los items están definidos en placement-manifest.js
+    const HOME_FALLBACK = [];
 
     let sortables = [];
     let reorderMode = false;
