@@ -217,7 +217,7 @@ document.addEventListener('DOMContentLoaded', async function() {
   <div class="topbar-row1">
     <div style="display:flex;flex-direction:column;align-items:flex-start;gap:2px">
       <a href="/"><img src="/img/logo.png" alt="AutoFácil" style="height:32px;display:block;filter:brightness(0) invert(1)"></a>
-      <span style="font-size:9px;font-weight:300;color:#7bafd4;margin-left:1px">Dashboard <span style="color:#4fc3f7;font-weight:600">V3.8</span></span>
+      <span style="font-size:9px;font-weight:300;color:#7bafd4;margin-left:1px">Dashboard <span style="color:#4fc3f7;font-weight:600">V3.9</span></span>
     </div>
     <div id="ultima-act" style="font-size:10px;color:#4fc3f7;margin-left:8px"></div>
     <div id="date-selector" style="display:flex;align-items:center;gap:8px;background:#0f1e38;padding:4px 12px;border-radius:6px;border:1px solid #2a4070;margin-left:8px">
@@ -4612,7 +4612,11 @@ function buildVEvol() {
   <div id="modal-ejec">
     <div id="modal-ejec-head">
       <span id="modal-ejec-title">Detalle Ejecutivo</span>
-      <button id="modal-ejec-close" onclick="cerrarModalEjec()">✕</button>
+      <div style="display:flex;gap:6px;align-items:center">
+        <button onclick="copiarTablaModal()" style="background:#2d6abf;border:none;color:#fff;padding:4px 10px;border-radius:4px;font-size:11px;cursor:pointer;font-weight:600">📋 Copiar</button>
+        <button onclick="exportarExcelModal()" style="background:#1e7e34;border:none;color:#fff;padding:4px 10px;border-radius:4px;font-size:11px;cursor:pointer;font-weight:600">⬇ Excel</button>
+        <button id="modal-ejec-close" onclick="cerrarModalEjec()">✕</button>
+      </div>
     </div>
     <div id="modal-ejec-kpis"></div>
     <div id="modal-ejec-body">
@@ -4708,6 +4712,36 @@ function cerrarModalEjec() {
   document.getElementById('modal-ejec-overlay').classList.remove('open');
 }
 document.addEventListener('keydown', e => { if (e.key === 'Escape') cerrarModalEjec(); });
+
+function copiarTablaModal() {
+  const table = document.getElementById('t-modal-ops');
+  const rows = [...table.querySelectorAll('thead tr, tbody tr, tfoot tr')];
+  const text = rows.map(tr =>
+    [...tr.querySelectorAll('th,td')].map(c => c.innerText.trim()).join('\t')
+  ).join('\n');
+  navigator.clipboard.writeText(text).then(() => {
+    const btn = document.querySelector('#modal-ejec-head button[onclick="copiarTablaModal()"]');
+    const orig = btn.textContent;
+    btn.textContent = '✓ Copiado';
+    btn.style.background = '#28a745';
+    setTimeout(() => { btn.textContent = orig; btn.style.background = '#2d6abf'; }, 1800);
+  });
+}
+
+function exportarExcelModal() {
+  const titulo = document.getElementById('modal-ejec-title').textContent;
+  const table = document.getElementById('t-modal-ops');
+  const rows = [...table.querySelectorAll('thead tr, tbody tr, tfoot tr')];
+  const tsv = rows.map(tr =>
+    [...tr.querySelectorAll('th,td')].map(c => '"' + c.innerText.trim().replace(/"/g,'""') + '"').join('\t')
+  ).join('\n');
+  const bom = '﻿';
+  const blob = new Blob([bom + tsv], { type: 'text/tab-separated-values;charset=utf-8' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = titulo.replace(/[/\\:*?"<>|]/g, '_') + '.xls';
+  a.click();
+}
 </script>
 
 </body>
