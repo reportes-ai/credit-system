@@ -134,8 +134,25 @@
     document.getElementById('avatarInicial').textContent = (yo?.nombre||'?').charAt(0).toUpperCase();
     function logout() { sessionStorage.clear(); window.location.href = '/login.html'; }
 
-    // Módulo Simulador (hardcodeado en home, no está en BD modulos)
-    const SIMULADOR = { ruta:'/simulador/', nombre:'Simulador Rentabilidad', icono:'bi-calculator', descripcion:'AutoFin y Unidad de Crédito. Calcula ingresos y cuota en tiempo real.' };
+    // Módulos del HOME conocidos (fallback si la BD no los devuelve o para complementar)
+    const HOME_FALLBACK = [
+      { ruta:'/clientes/',           nombre:'Clientes',              icono:'bi-people-fill' },
+      { ruta:'/cotizaciones/',       nombre:'Cotizaciones',          icono:'bi-calculator' },
+      { ruta:'/creditos/',           nombre:'Créditos',              icono:'bi-credit-card-2-front' },
+      { ruta:'/tesoreria/',          nombre:'Tesorería',             icono:'bi-safe2' },
+      { ruta:'/crm/',                nombre:'CRM',                   icono:'bi-headset' },
+      { ruta:'/cobranza/',           nombre:'Cobranza',              icono:'bi-bell-fill' },
+      { ruta:'/reporteria/',         nombre:'Reportería',            icono:'bi-bar-chart-line-fill' },
+      { ruta:'/politica/',           nombre:'Política',              icono:'bi-shield-lock' },
+      { ruta:'/usuarios/',           nombre:'Usuarios',              icono:'bi-people' },
+      { ruta:'/mantenedores/',       nombre:'Mantenedores',          icono:'bi-gear-fill' },
+      { ruta:'/cartas-aprobacion/',  nombre:'Cartas de Aprobación',  icono:'bi-envelope-paper' },
+      { ruta:'/comisiones/',         nombre:'Comisión Ejecutivos',   icono:'bi-cash-coin' },
+      { ruta:'/carga-masiva/',       nombre:'Carga Masiva',          icono:'bi-cloud-upload' },
+      { ruta:'/simulador/',          nombre:'Simulador Rentabilidad',icono:'bi-calculator' },
+      { ruta:'/antecedentes-laborales/', nombre:'Antecedentes Laborales', icono:'bi-briefcase' },
+      { ruta:'/informacion-comercial/',  nombre:'Información Comercial',  icono:'bi-building' },
+    ];
 
     let sortables = [];
     let reorderMode = false;
@@ -222,15 +239,29 @@
     }
 
     async function init() {
-      const [respMods, placement] = await Promise.all([
-        fetch('/api/auth/mis-permisos', { headers: H }).then(r=>r.json()),
-        loadPlacementConfig(H),
-      ]);
+      const grid = document.getElementById('groupsGrid');
+      grid.innerHTML = '<p style="grid-column:1/-1;text-align:center;color:#6b7280;padding:40px"><span class="spinner-border spinner-border-sm me-2"></span>Cargando módulos…</p>';
 
-      // Construir lookup: key → itemData
-      const dbMods = respMods.success ? respMods.data : [];
-      // Agregar Simulador si no está en la lista de BD
-      if (!dbMods.find(m => m.ruta === '/simulador/')) dbMods.push(SIMULADOR);
+      let respMods = { success: false, data: [] };
+      let placement = {};
+      try {
+        [respMods, placement] = await Promise.all([
+          fetch('/api/auth/mis-permisos', { headers: H }).then(r => r.json()),
+          loadPlacementConfig(H),
+        ]);
+      } catch(e) {
+        grid.innerHTML = `<p style="grid-column:1/-1;text-align:center;color:#dc2626;padding:40px"><i class="bi bi-exclamation-triangle me-2"></i>Error al cargar: ${e.message}</p>`;
+        return;
+      }
+
+      grid.innerHTML = '';
+
+      // Combinar módulos de BD con fallback (BD tiene prioridad para nombre/icono)
+      const dbList = respMods.success ? respMods.data : [];
+      const rutasDb = new Set(dbList.map(m => m.ruta));
+      // Agregar fallback entries que no estén en BD (así siempre aparecen todos)
+      const extras = HOME_FALLBACK.filter(f => !rutasDb.has(f.ruta));
+      const dbMods = [...dbList, ...extras];
 
       const zones = {};
       Object.keys(PLACEMENT_SECTIONS).forEach(s => { zones[s] = []; });
