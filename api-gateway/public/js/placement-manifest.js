@@ -9,12 +9,12 @@ const PLACEMENT_SECTIONS = {
   crm:           { label: 'CRM',                  icon: 'bi-headset',                color: '#1e3a8a' },
   cobranza:      { label: 'Cobranza',             icon: 'bi-bell-fill',              color: '#7f1d1d' },
   reporteria:    { label: 'Reportería',           icon: 'bi-bar-chart-line-fill',    color: '#064e3b' },
-  comisiones:    { label: 'Comisiones',           icon: 'bi-cash-coin',              color: '#065f46' },
+  comisiones:    { label: 'Comisión Ejecutivos',   icon: 'bi-cash-coin',              color: '#065f46' },
   mantenedores:  { label: 'Mantenedores',         icon: 'bi-gear-fill',              color: '#374151' },
   usuarios:      { label: 'Usuarios',             icon: 'bi-people',                 color: '#4b5563' },
   cartas:        { label: 'Cartas de Aprobación', icon: 'bi-envelope-paper',         color: '#5b21b6' },
   politica:      { label: 'Política',             icon: 'bi-shield-lock',            color: '#7c3aed' },
-  simulador:     { label: 'Simulador',            icon: 'bi-calculator',             color: '#0369a1' },
+  simulador:     { label: 'Simulador Rentabilidad', icon: 'bi-calculator',           color: '#0369a1' },
   carga_masiva:  { label: 'Carga Masiva',         icon: 'bi-cloud-upload',           color: '#0f766e' },
 };
 
