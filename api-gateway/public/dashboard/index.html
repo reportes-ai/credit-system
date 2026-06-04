@@ -1059,7 +1059,7 @@ function buildV1() {
 
   // Tabla ejecutivos
   const ejRows = f.ejecutivos.map((e,i)=>`<tr>
-    <td><span class="rank">${i+1}.</span><a class="ej-link" onclick="abrirDetalleEjecutivo(${JSON.stringify(e.nombre)},'ap')">${e.nombre.length>24?e.nombre.substring(0,24)+'…':e.nombre}</a></td>
+    <td><span class="rank">${i+1}.</span><a class="ej-link" onclick="abrirDetalleEjecutivo('${e.nombre.replace(/'/g,"\\'")}','ap')">${e.nombre.length>24?e.nombre.substring(0,24)+'…':e.nombre}</a></td>
     <td>${e.ops}</td><td>${fM(e.saldo)}</td><td>${fM(e.saldo/e.ops)}</td>
     <td>${fM(e.saldo)}</td><td>${fM(e.com_dealer)}</td><td>${fM(e.rentab_afa)}</td>
   </tr>`).join('');
@@ -1830,7 +1830,7 @@ function buildV1b() {
   const ejRows2 = topEj.map(([nombre,v],i)=>{
     const finStyle = v.fin < 40000000 ? 'color:#e53935;font-weight:700' : '';
     return `<tr>
-    <td><span class="rank">${i+1}.</span><a class="ej-link" onclick="abrirDetalleEjecutivo(${JSON.stringify(nombre)},'ot')">${nombre.length>24?nombre.substring(0,24)+'…':nombre}</a></td>
+    <td><span class="rank">${i+1}.</span><a class="ej-link" onclick="abrirDetalleEjecutivo('${nombre.replace(/'/g,"\\'")}','ot')">${nombre.length>24?nombre.substring(0,24)+'…':nombre}</a></td>
     <td>${v.ops}</td><td style="${finStyle}">${fM(v.fin)}</td><td>${fM(v.ops?v.fin/v.ops:0)}</td>
     <td>${fM(v.saldo)}</td><td>${fM(v.cd)}</td><td>${fM(v.afa)}</td>
   </tr>`;}).join('');
