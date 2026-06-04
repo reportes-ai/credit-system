@@ -121,7 +121,7 @@
     <div class="topnav-left">
       <a href="/" class="topnav-brand">
         <img src="/img/logo.png" alt="AutoFácil">
-        <span class="version-badge">v4.7</span>
+        <span class="version-badge">v4.8</span>
       </a>
     </div>
 
@@ -333,7 +333,7 @@
           return;
         }
         const placement = (dataPlacement.success && dataPlacement.data && typeof dataPlacement.data === 'object') ? dataPlacement.data : {};
-        const DEFAULT_OCULTAS = ['/politica/', '/carga-masiva/'];
+        const DEFAULT_OCULTAS = ['/politica/', '/carga-masiva/', '/antecedentes-laborales/', '/informacion-comercial/'];
         const normR = r => r ? (r.endsWith('/') ? r : r + '/') : r;
         // Fallback para módulos que no vienen de mis-permisos
         const HOME_FALLBACK = [
@@ -350,8 +350,6 @@
           { ruta:'/cartas-aprobacion/',  nombre:'Cartas de Aprobación',  icono:'bi-envelope-paper',       descripcion:'' },
           { ruta:'/comisiones/',         nombre:'Comisión Ejecutivos',   icono:'bi-cash-coin',            descripcion:'' },
           { ruta:'/carga-masiva/',       nombre:'Carga Masiva',          icono:'bi-cloud-upload',         descripcion:'' },
-          { ruta:'/antecedentes-laborales/', nombre:'Antecedentes Laborales', icono:'bi-briefcase',       descripcion:'' },
-          { ruta:'/informacion-comercial/',  nombre:'Información Comercial',  icono:'bi-building',        descripcion:'' },
         ];
         // Construye mapa normalizado de todos los módulos disponibles
         const modMap = new Map();
