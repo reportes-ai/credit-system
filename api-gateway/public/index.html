@@ -316,13 +316,15 @@
     async function cargarModulos() {
       try {
         // Carga módulos y orden guardado en paralelo
-        const [resp, respOrden] = await Promise.all([
+        const [resp, respOrden, respHidden] = await Promise.all([
           fetch('/api/auth/mis-permisos', { headers: H }),
           fetch('/api/config/ui/dashboard',  { headers: H }),
+          fetch('/api/config/ui/hidden_from_home', { headers: H }),
         ]);
         if (resp.status === 401) { logout(); return; }
-        const data      = await resp.json();
-        const dataOrden = await respOrden.json();
+        const data       = await resp.json();
+        const dataOrden  = await respOrden.json();
+        const dataHidden = await respHidden.json();
 
         const grid = document.getElementById('modulesGrid');
         grid.innerHTML = '';
@@ -330,8 +332,8 @@
           grid.innerHTML = '<p class="text-muted text-center py-5" style="grid-column:1/-1">Sin módulos asignados. Contacta al administrador.</p>';
           return;
         }
-        const RUTAS_OCULTAS = ['/politica/', '/carga-masiva/'];
-        modulosData = data.data.filter(m => !RUTAS_OCULTAS.includes(m.ruta));
+        const rutasOcultas = (dataHidden.success && Array.isArray(dataHidden.data)) ? dataHidden.data : ['/politica/', '/carga-masiva/'];
+        modulosData = data.data.filter(m => !rutasOcultas.includes(m.ruta));
 
         // Orden guardado (array de id_modulo como string) o por defecto
         const ordenGuardado = (dataOrden.success && Array.isArray(dataOrden.data)) ? dataOrden.data : null;

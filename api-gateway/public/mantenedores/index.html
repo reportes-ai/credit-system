@@ -136,23 +136,41 @@
       { id: 'solo-dios', href: '/mantenedores/solo-dios/', icon: 'bi-lightning-charge-fill', titulo: 'SOLO DIOS', desc: 'Acceso directo a la BD sin filtros — edición total de operaciones y clientes' },
       { id: 'politica', href: '/politica/', icon: 'bi-shield-lock', titulo: 'Política de Crédito', desc: 'Política de crédito AutoFácil' },
       { id: 'carga-masiva', href: '/carga-masiva/', icon: 'bi-cloud-upload', titulo: 'Carga Masiva', desc: 'Importación masiva de operaciones desde archivo Excel. Solo Administrador.' },
+      { id: 'vista-pantallas', href: '/mantenedores/vista-pantallas/', icon: 'bi-layout-wtf', titulo: 'Vista Pantallas', desc: 'Configura qué módulos aparecen en el Home y cuáles dentro de Mantenedores' },
     ];
 
     let sortable = null, modoReordenar = false;
     const CONFIG_KEY = 'submenu_mantenedores';
 
     async function cargar() {
-      let orden = null;
+      let orden = null, hiddenFromHome = null, modsBD = [];
       try {
-        const res  = await fetch(`/api/config/ui/${CONFIG_KEY}`, { headers: H });
-        const json = await res.json();
-        if (json.success && Array.isArray(json.data)) orden = json.data;
+        const [rOrden, rHidden, rMods] = await Promise.all([
+          fetch(`/api/config/ui/${CONFIG_KEY}`, { headers: H }),
+          fetch('/api/config/ui/hidden_from_home', { headers: H }),
+          fetch('/api/auth/mis-permisos', { headers: H }),
+        ]);
+        const jOrden  = await rOrden.json();
+        const jHidden = await rHidden.json();
+        const jMods   = await rMods.json();
+        if (jOrden.success  && Array.isArray(jOrden.data))  orden = jOrden.data;
+        if (jHidden.success && Array.isArray(jHidden.data)) hiddenFromHome = jHidden.data;
+        if (jMods.success   && Array.isArray(jMods.data))   modsBD = jMods.data;
       } catch {}
 
+      // Módulos BD que están ocultos del home → agregarlos como extras
+      const rutasFijas = new Set(ITEMS_DEFAULT.map(i => i.href));
+      const extras = hiddenFromHome
+        ? modsBD
+            .filter(m => hiddenFromHome.includes(m.ruta) && !rutasFijas.has(m.ruta))
+            .map(m => ({ id: String(m.id_modulo), href: m.ruta, icon: m.icono || 'bi-grid', titulo: m.nombre, desc: m.descripcion || '' }))
+        : [];
+
+      const allItems = [...ITEMS_DEFAULT, ...extras];
       const items = orden
-        ? orden.map(id => ITEMS_DEFAULT.find(i => i.id === id)).filter(Boolean)
-            .concat(ITEMS_DEFAULT.filter(i => !orden.includes(i.id)))
-        : ITEMS_DEFAULT;
+        ? orden.map(id => allItems.find(i => i.id === id)).filter(Boolean)
+            .concat(allItems.filter(i => !orden.includes(i.id)))
+        : allItems;
 
       const grid = document.getElementById('modulesGrid');
       grid.innerHTML = items.map(m => `
