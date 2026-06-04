@@ -11,7 +11,10 @@
   <script src="/js/placement-manifest.js"></script>
   <style>
     :root { --navy:#0141A2; --navy-dark:#012d70; --navy-light:#0255c5; --bg:#f0f4f8; }
+    * { box-sizing:border-box; }
     body { background:var(--bg); font-family:'Segoe UI',system-ui,sans-serif; margin:0; min-height:100vh; }
+
+    /* NAV */
     .topnav { background:linear-gradient(90deg,var(--navy-dark),var(--navy-light)); color:#fff; height:60px; padding:0 24px; display:flex; align-items:center; justify-content:space-between; position:sticky; top:0; z-index:200; box-shadow:0 2px 8px rgba(0,0,0,.3); }
     .topnav-left { display:flex; align-items:center; gap:16px; }
     .topnav-brand img { height:34px; filter:brightness(0) invert(1); }
@@ -24,51 +27,59 @@
     .perfil-badge { background:rgba(144,202,249,.2); border:1px solid rgba(144,202,249,.4); color:#90caf9; border-radius:12px; padding:2px 10px; font-size:.73rem; font-weight:600; }
     .btn-logout { background:rgba(255,255,255,.1); border:1px solid rgba(255,255,255,.2); color:#fff; border-radius:8px; padding:5px 12px; font-size:.82rem; cursor:pointer; }
 
-    .main-content { padding:28px 32px; max-width:1600px; margin:0 auto; }
-    .page-banner { background:linear-gradient(135deg,#012d70,#0141A2 50%,#009AFE); border-radius:14px; color:#fff; padding:24px 32px; margin-bottom:24px; display:flex; align-items:center; gap:16px; }
-    .page-banner i { font-size:2.4rem; opacity:.8; }
-    .page-banner h2 { font-weight:700; margin:0 0 4px; font-size:1.3rem; }
-    .page-banner p { opacity:.8; margin:0; font-size:.86rem; }
+    /* MAIN */
+    .main-content { padding:24px 32px; max-width:1600px; margin:0 auto; }
+    .page-banner { background:linear-gradient(135deg,#012d70,#0141A2 50%,#009AFE); border-radius:14px; color:#fff; padding:20px 28px; margin-bottom:22px; display:flex; align-items:center; gap:14px; }
+    .page-banner i.bi-layout-wtf { font-size:2.2rem; opacity:.8; }
+    .page-banner h2 { font-weight:700; margin:0 0 3px; font-size:1.2rem; }
+    .page-banner p { opacity:.8; margin:0; font-size:.82rem; }
 
-    /* ── ZONAS ── */
-    .zones-row { display:flex; gap:16px; align-items:flex-start; overflow-x:auto; padding-bottom:8px; }
-    .zone { background:#fff; border-radius:12px; box-shadow:0 1px 6px rgba(0,0,0,.07); min-width:260px; flex:1; display:flex; flex-direction:column; }
-    .zone-header { padding:11px 14px; display:flex; align-items:center; gap:8px; border-radius:12px 12px 0 0; flex-shrink:0; }
-    .zone-header h3 { margin:0; font-size:.9rem; font-weight:700; color:#fff; flex:1; }
-    .zone-count { background:rgba(255,255,255,.25); border-radius:20px; padding:2px 9px; font-size:.72rem; font-weight:700; color:#fff; white-space:nowrap; }
-    .zone-body { padding:10px; min-height:200px; flex:1; }
-    .zone-empty { color:#9ca3af; font-size:.75rem; text-align:center; padding:30px 10px; }
+    /* GROUPS GRID */
+    .groups-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(340px,1fr)); gap:16px; }
 
-    /* ── DRAG CARDS ── */
-    .drag-card { background:#f8faff; border:2px solid #e2e8f0; border-radius:9px; padding:9px 11px; margin-bottom:8px; cursor:grab; display:flex; align-items:center; gap:9px; transition:box-shadow .15s,border-color .15s,transform .12s; user-select:none; }
-    .drag-card:hover { box-shadow:0 3px 12px rgba(1,65,162,.13); border-color:#0141A2; transform:translateY(-1px); }
-    .drag-card.sortable-chosen { cursor:grabbing; box-shadow:0 6px 20px rgba(1,65,162,.22); border-color:#0141A2; transform:scale(1.02); }
-    .drag-card.sortable-ghost { opacity:.25; }
-    .drag-card.type-module { border-left:3px solid #0141A2; }
-    .drag-card.type-subitem { border-left:3px solid #6b7280; }
-    .dc-icon { width:32px; height:32px; border-radius:8px; background:linear-gradient(135deg,#e8eaf6,#c5cae9); display:flex; align-items:center; justify-content:center; font-size:1rem; color:#0141A2; flex-shrink:0; }
-    .dc-info { flex:1; min-width:0; }
-    .dc-title { font-size:.8rem; font-weight:700; color:#111827; display:block; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
-    .dc-desc { font-size:.68rem; color:#6b7280; display:block; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
-    .dc-handle { color:#d1d5db; font-size:.9rem; flex-shrink:0; }
-    .dc-badge { font-size:.6rem; font-weight:700; border-radius:4px; padding:1px 5px; flex-shrink:0; }
-    .badge-mod { background:#dbeafe; color:#1e40af; }
-    .badge-sub { background:#f3f4f6; color:#6b7280; }
+    /* GROUP CARD */
+    .group-card { background:#fff; border-radius:12px; box-shadow:0 1px 6px rgba(0,0,0,.07); overflow:hidden; }
+    .group-header { padding:10px 14px; display:flex; align-items:center; gap:8px; }
+    .group-header i { font-size:1rem; color:#fff; }
+    .group-header h3 { margin:0; font-size:.88rem; font-weight:700; color:#fff; flex:1; }
+    .group-count { background:rgba(255,255,255,.28); border-radius:20px; padding:2px 9px; font-size:.7rem; font-weight:700; color:#fff; }
+    .group-body { padding:10px 12px; min-height:52px; display:flex; flex-wrap:wrap; gap:6px; align-content:flex-start; }
+    .group-empty { color:#c4c9d4; font-size:.72rem; font-style:italic; width:100%; text-align:center; padding:6px 0; }
 
-    /* ── SAVE BAR ── */
-    .save-bar { display:flex; align-items:center; justify-content:flex-end; gap:12px; margin-top:20px; }
-    .btn-save { background:var(--navy); color:#fff; border:none; border-radius:9px; padding:9px 24px; font-size:.88rem; font-weight:700; cursor:pointer; display:flex; align-items:center; gap:7px; transition:background .15s; }
+    /* CHIPS */
+    .chip {
+      display:inline-flex; align-items:center; gap:5px;
+      background:#f0f4ff; border:1.5px solid #c7d2fe;
+      border-radius:20px; padding:4px 10px 4px 7px;
+      font-size:.75rem; font-weight:600; color:#1e3a8a;
+      cursor:grab; user-select:none; white-space:nowrap;
+      transition:box-shadow .12s, border-color .12s, transform .1s;
+    }
+    .chip:hover { box-shadow:0 2px 8px rgba(1,65,162,.18); border-color:#818cf8; transform:translateY(-1px); }
+    .chip.sortable-chosen { cursor:grabbing; box-shadow:0 4px 14px rgba(1,65,162,.25); border-color:#4f46e5; transform:scale(1.04); }
+    .chip.sortable-ghost { opacity:.25; }
+    .chip .chip-icon { font-size:.8rem; color:#4f46e5; }
+    .chip .chip-drag { font-size:.75rem; color:#9ca3af; margin-right:1px; }
+    .chip.type-module { background:#eff6ff; border-color:#bfdbfe; color:#1d4ed8; }
+    .chip.type-module .chip-icon { color:#2563eb; }
+
+    /* SAVE BAR */
+    .save-bar { position:sticky; bottom:0; background:rgba(240,244,248,.95); backdrop-filter:blur(6px); border-top:1px solid #e2e8f0; padding:12px 0; display:flex; align-items:center; justify-content:flex-end; gap:12px; margin-top:20px; }
+    .btn-save { background:var(--navy); color:#fff; border:none; border-radius:9px; padding:9px 24px; font-size:.88rem; font-weight:700; cursor:pointer; display:flex; align-items:center; gap:7px; }
     .btn-save:hover { background:var(--navy-light); }
     .btn-save:disabled { background:#9ca3af; cursor:not-allowed; }
-    .save-ok { font-size:.82rem; color:#16a34a; font-weight:600; display:none; align-items:center; gap:5px; }
     .btn-reset { background:#fff; color:#6b7280; border:1px solid #d1d5db; border-radius:9px; padding:9px 18px; font-size:.82rem; font-weight:600; cursor:pointer; }
     .btn-reset:hover { background:#f9fafb; }
+    .save-ok { font-size:.82rem; color:#16a34a; font-weight:600; display:none; align-items:center; gap:5px; }
+
+    /* DRAG OVER INDICATOR */
+    .group-body.drag-over { background:#f0f4ff; outline:2px dashed #818cf8; border-radius:6px; }
   </style>
 </head>
 <body>
   <nav class="topnav">
     <div class="topnav-left">
-      <a href="/" class="topnav-brand"><img src="/img/logo.png" alt="AutoFácil"><span class="version-badge">v2.0</span></a>
+      <a href="/" class="topnav-brand"><img src="/img/logo.png" alt="AutoFácil"><span class="version-badge">v2.1</span></a>
       <div class="breadcrumb-nav">
         <a href="/">Inicio</a><span style="color:rgba(255,255,255,.35)">›</span>
         <a href="/mantenedores/">Mantenedores</a><span style="color:rgba(255,255,255,.35)">›</span>
@@ -91,19 +102,19 @@
     <div class="page-banner">
       <i class="bi bi-layout-wtf"></i>
       <div>
-        <h2>Vista Pantallas</h2>
-        <p>Arrastra cualquier módulo o sub-item a cualquier sección. Las cards azules <b>●</b> son módulos del Home; las grises <b>●</b> son sub-items de sección. Los cambios se aplican a todos los usuarios.</p>
+        <h2>Vista Pantallas — Organización de Módulos</h2>
+        <p>Arrastra los chips entre grupos para mover módulos y sub-módulos de sección. <span style="background:rgba(255,255,255,.2);border-radius:4px;padding:1px 6px">azul = módulo principal</span> &nbsp; <span style="background:rgba(255,255,255,.2);border-radius:4px;padding:1px 6px">gris = sub-item</span></p>
       </div>
     </div>
 
-    <div class="zones-row" id="zonesRow">
+    <div class="groups-grid" id="groupsGrid">
       <!-- generado por JS -->
     </div>
 
     <div class="save-bar">
-      <span class="save-ok" id="saveOk"><i class="bi bi-check-circle-fill"></i>Guardado correctamente</span>
+      <span class="save-ok" id="saveOk"><i class="bi bi-check-circle-fill me-1"></i>Guardado</span>
       <button class="btn-reset" onclick="resetDefaults()"><i class="bi bi-arrow-counterclockwise me-1"></i>Restaurar defaults</button>
-      <button class="btn-save" id="btnSave" onclick="guardar()"><i class="bi bi-floppy"></i>Guardar cambios</button>
+      <button class="btn-save" id="btnSave" onclick="guardar()"><i class="bi bi-floppy me-1"></i>Guardar cambios</button>
     </div>
   </div>
 
@@ -118,138 +129,116 @@
     document.getElementById('avatarInicial').textContent = (yo?.nombre||'?').charAt(0).toUpperCase();
     function logout() { sessionStorage.clear(); window.location.href = '/login.html'; }
 
-    const SECTION_COLORS = {
-      home:         '#1a3a6a',
-      mantenedores: '#374151',
-      tesoreria:    '#065f46',
-      cobranza:     '#92400e',
-      crm:          '#1e40af',
-    };
-
-    let dbModules = []; // módulos del home (BD)
-
-    function makeCard(key, title, desc, icon, type) {
-      const div = document.createElement('div');
-      div.className = `drag-card type-${type}`;
-      div.dataset.key = key;
-      div.innerHTML = `
-        <i class="bi bi-grip-vertical dc-handle"></i>
-        <div class="dc-icon"><i class="bi ${icon || 'bi-grid'}"></i></div>
-        <div class="dc-info">
-          <strong class="dc-title">${title}</strong>
-          <span class="dc-desc">${desc || ''}</span>
-        </div>
-        <span class="dc-badge ${type === 'module' ? 'badge-mod' : 'badge-sub'}">${type === 'module' ? 'MOD' : 'SUB'}</span>`;
-      return div;
+    function makeChip(key, titulo, icon, type) {
+      const span = document.createElement('span');
+      span.className = `chip type-${type}`;
+      span.dataset.key = key;
+      span.innerHTML = `<i class="bi bi-grip-vertical chip-drag"></i><i class="bi ${icon||'bi-grid'} chip-icon"></i>${titulo}`;
+      return span;
     }
 
-    function buildZone(sectionId, items) {
+    function buildGroup(sectionId, items) {
       const cfg = PLACEMENT_SECTIONS[sectionId];
-      const zone = document.createElement('div');
-      zone.className = 'zone';
-      zone.innerHTML = `
-        <div class="zone-header" style="background:${SECTION_COLORS[sectionId]}">
-          <i class="bi ${cfg.icon}" style="font-size:1rem;color:#fff"></i>
+      const card = document.createElement('div');
+      card.className = 'group-card';
+      card.innerHTML = `
+        <div class="group-header" style="background:${cfg.color}">
+          <i class="bi ${cfg.icon}"></i>
           <h3>${cfg.label}</h3>
-          <span class="zone-count" id="count-${sectionId}">0</span>
+          <span class="group-count" id="cnt-${sectionId}">0</span>
         </div>
-        <div class="zone-body" id="zone-${sectionId}">
-          <div class="zone-empty">Arrastra cards aquí</div>
+        <div class="group-body" id="grp-${sectionId}">
+          <span class="group-empty">Arrastra chips aquí</span>
         </div>`;
-      document.getElementById('zonesRow').appendChild(zone);
+      document.getElementById('groupsGrid').appendChild(card);
 
-      const body = document.getElementById(`zone-${sectionId}`);
-      items.forEach(item => body.appendChild(item));
-      updateCount(sectionId);
+      const body = document.getElementById(`grp-${sectionId}`);
+      items.forEach(chip => body.appendChild(chip));
+      refreshCount(sectionId);
 
       Sortable.create(body, {
-        group: 'global',
-        animation: 140,
-        handle: '.dc-handle',
+        group: 'chips',
+        animation: 130,
+        handle: '.chip-drag',
         ghostClass: 'sortable-ghost',
         chosenClass: 'sortable-chosen',
-        onEnd: () => Object.keys(PLACEMENT_SECTIONS).forEach(updateCount),
+        onAdd: () => Object.keys(PLACEMENT_SECTIONS).forEach(refreshCount),
+        onEnd: () => Object.keys(PLACEMENT_SECTIONS).forEach(refreshCount),
       });
     }
 
-    function updateCount(sectionId) {
-      const body = document.getElementById(`zone-${sectionId}`);
-      const n = body ? body.querySelectorAll('.drag-card').length : 0;
-      const el = document.getElementById(`count-${sectionId}`);
+    function refreshCount(sectionId) {
+      const body = document.getElementById(`grp-${sectionId}`);
+      if (!body) return;
+      const n = body.querySelectorAll('.chip').length;
+      const el = document.getElementById(`cnt-${sectionId}`);
       if (el) el.textContent = n;
-      // Mostrar/ocultar hint
-      if (body) body.querySelector('.zone-empty').style.display = n === 0 ? 'block' : 'none';
+      const empty = body.querySelector('.group-empty');
+      if (empty) empty.style.display = n === 0 ? '' : 'none';
     }
 
     async function init() {
       const [respMods, placement] = await Promise.all([
-        fetch('/api/auth/mis-permisos', { headers: H }).then(r => r.json()),
+        fetch('/api/auth/mis-permisos', { headers: H }).then(r=>r.json()),
         loadPlacementConfig(H),
       ]);
 
-      dbModules = respMods.success ? respMods.data : [];
+      const dbMods = respMods.success ? respMods.data : [];
 
-      // Construir mapa: sectionId → [cards]
+      // Construir mapa sectionId → chips[]
       const zones = {};
       Object.keys(PLACEMENT_SECTIONS).forEach(s => { zones[s] = []; });
 
-      // Módulos de BD → su section efectiva (default: home)
-      dbModules.forEach(m => {
-        const sec = (placement[m.ruta] || 'home');
-        zones[sec] = zones[sec] || [];
-        zones[sec].push(makeCard(m.ruta, m.nombre, m.descripcion, m.icono, 'module'));
+      // Módulos de BD (tipo 'module', default → home)
+      dbMods.forEach(m => {
+        const sec = placement[m.ruta] || 'home';
+        if (!zones[sec]) zones[sec] = [];
+        zones[sec].push(makeChip(m.ruta, m.nombre, m.icono, 'module'));
       });
 
-      // Sub-items del manifiesto → su section efectiva (default: section original)
+      // Sub-items del manifiesto (tipo 'subitem', default → su sección original)
       Object.entries(PLACEMENT_ITEMS).forEach(([key, item]) => {
-        const sec = (placement[key] || item.section);
-        zones[sec] = zones[sec] || [];
-        zones[sec].push(makeCard(key, item.titulo, item.desc, item.icon, 'subitem'));
+        const sec = placement[key] || item.section;
+        if (!zones[sec]) zones[sec] = [];
+        zones[sec].push(makeChip(key, item.titulo, item.icon, 'subitem'));
       });
 
-      // Renderizar zonas en orden
-      Object.keys(PLACEMENT_SECTIONS).forEach(sectionId => {
-        buildZone(sectionId, zones[sectionId]);
-      });
+      Object.keys(PLACEMENT_SECTIONS).forEach(sid => buildGroup(sid, zones[sid] || []));
     }
 
     async function guardar() {
       const btn = document.getElementById('btnSave');
       btn.disabled = true;
-      btn.innerHTML = '<span class="spinner-border spinner-border-sm"></span> Guardando…';
+      btn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span>Guardando…';
 
       const placement = {};
-      Object.keys(PLACEMENT_SECTIONS).forEach(sectionId => {
-        document.getElementById(`zone-${sectionId}`).querySelectorAll('.drag-card').forEach(card => {
-          placement[card.dataset.key] = sectionId;
+      Object.keys(PLACEMENT_SECTIONS).forEach(sid => {
+        document.getElementById(`grp-${sid}`).querySelectorAll('.chip').forEach(c => {
+          placement[c.dataset.key] = sid;
         });
       });
 
       try {
         const r = await fetch('/api/config/ui/placement_v2', {
-          method: 'PUT', headers: H, body: JSON.stringify({ valor: placement })
+          method:'PUT', headers:H, body:JSON.stringify({ valor: placement })
         });
         const d = await r.json();
         if (!d.success) throw new Error(d.error);
         const ok = document.getElementById('saveOk');
         ok.style.display = 'flex';
-        setTimeout(() => { ok.style.display = 'none'; }, 3000);
-      } catch(e) {
-        alert('Error al guardar: ' + e.message);
-      }
+        setTimeout(() => { ok.style.display = 'none'; }, 2500);
+      } catch(e) { alert('Error: ' + e.message); }
 
       btn.disabled = false;
-      btn.innerHTML = '<i class="bi bi-floppy"></i>Guardar cambios';
+      btn.innerHTML = '<i class="bi bi-floppy me-1"></i>Guardar cambios';
     }
 
     async function resetDefaults() {
-      if (!confirm('¿Restaurar todos los módulos a su posición original? Se perderán los cambios guardados.')) return;
-      try {
-        await fetch('/api/config/ui/placement_v2', {
-          method: 'PUT', headers: H, body: JSON.stringify({ valor: {} })
-        });
-        location.reload();
-      } catch(e) { alert('Error: ' + e.message); }
+      if (!confirm('¿Restaurar todo a la posición original?')) return;
+      await fetch('/api/config/ui/placement_v2', {
+        method:'PUT', headers:H, body:JSON.stringify({ valor: {} })
+      });
+      location.reload();
     }
 
     init();
