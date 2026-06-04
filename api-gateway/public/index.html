@@ -70,6 +70,19 @@
     .btn-logout { background: rgba(255,255,255,0.1); border: 1px solid rgba(255,255,255,0.2); color: #fff; border-radius: 8px; padding: 5px 12px; font-size: 0.82rem; cursor: pointer; transition: background 0.2s; }
     .btn-logout:hover { background: rgba(255,255,255,0.22); }
 
+    /* ── CLIMA WIDGET ── */
+    .clima-widget {
+      display: flex; align-items: center; gap: 8px;
+      background: rgba(255,255,255,0.10); border: 1px solid rgba(255,255,255,0.18);
+      border-radius: 20px; padding: 5px 12px; font-size: 0.82rem; color: rgba(255,255,255,0.92);
+      cursor: default; white-space: nowrap; user-select: none;
+    }
+    .clima-widget .clima-icon { font-size: 1.15rem; line-height: 1; }
+    .clima-widget .clima-temp { font-weight: 700; font-size: 0.95rem; }
+    .clima-widget .clima-rango { color: rgba(255,255,255,0.65); font-size: 0.75rem; }
+    .clima-widget .clima-ciudad { color: rgba(255,255,255,0.6); font-size: 0.72rem; }
+    .clima-sep { color: rgba(255,255,255,0.3); }
+
     /* ── CONTENT ── */
     .main-content { padding: 36px 40px; max-width: 1500px; margin: 0 auto; }
     .welcome-banner {
@@ -121,12 +134,22 @@
     <div class="topnav-left">
       <a href="/" class="topnav-brand">
         <img src="/img/logo.png" alt="AutoFácil">
-        <span class="version-badge">v4.8</span>
+        <span class="version-badge">v4.9</span>
       </a>
     </div>
 
     <div class="topnav-right">
       
+    <!-- Widget Clima -->
+    <div class="clima-widget" id="climaWidget" title="Clima actual">
+      <span class="clima-icon" id="climaIcon">⏳</span>
+      <span class="clima-temp" id="climaTemp">—</span>
+      <span class="clima-sep">|</span>
+      <span class="clima-rango"><span id="climaMin">—</span>° / <span id="climaMax">—</span>°</span>
+      <span class="clima-sep">·</span>
+      <span class="clima-ciudad" id="climaCiudad">Santiago</span>
+    </div>
+
     <a href="/dashboard" title="Dashboard Analytics" style="display:flex;align-items:center;gap:5px;color:rgba(255,255,255,0.85);text-decoration:none;font-size:12px;font-weight:500;padding:5px 10px;border:1px solid rgba(255,255,255,0.25);border-radius:6px;transition:.15s" onmouseover="this.style.background='rgba(255,255,255,0.1)'" onmouseout="this.style.background='transparent'">
       <i class="bi bi-bar-chart-line" style="font-size:15px"></i> Dashboard
     </a>
@@ -454,5 +477,62 @@
     cargarModulos();
   </script>
 <script src="/js/app-version.js"></script>
+
+<script>
+/* ── Widget Clima (Open-Meteo, sin API key) ──────────────────────────── */
+const WMO_ICON = {
+  0:'☀️', 1:'🌤️', 2:'⛅', 3:'☁️',
+  45:'🌫️', 48:'🌫️',
+  51:'🌦️', 53:'🌦️', 55:'🌧️',
+  61:'🌧️', 63:'🌧️', 65:'🌧️',
+  71:'🌨️', 73:'🌨️', 75:'❄️',
+  77:'❄️',
+  80:'🌦️', 81:'🌧️', 82:'⛈️',
+  85:'🌨️', 86:'🌨️',
+  95:'⛈️', 96:'⛈️', 99:'⛈️',
+};
+
+async function cargarClima(lat, lon, ciudad) {
+  try {
+    const url = `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&current=temperature_2m,weathercode&daily=temperature_2m_max,temperature_2m_min&timezone=auto&forecast_days=1`;
+    const r = await fetch(url);
+    const d = await r.json();
+    const temp  = Math.round(d.current.temperature_2m);
+    const code  = d.current.weathercode;
+    const tmax  = Math.round(d.daily.temperature_2m_max[0]);
+    const tmin  = Math.round(d.daily.temperature_2m_min[0]);
+    const icon  = WMO_ICON[code] || '🌡️';
+    document.getElementById('climaIcon').textContent  = icon;
+    document.getElementById('climaTemp').textContent  = temp + '°C';
+    document.getElementById('climaMin').textContent   = tmin;
+    document.getElementById('climaMax').textContent   = tmax;
+    document.getElementById('climaCiudad').textContent = ciudad;
+    document.getElementById('climaWidget').title =
+      `${icon} ${temp}°C — Máx ${tmax}° / Mín ${tmin}° · ${ciudad}`;
+  } catch {
+    document.getElementById('climaIcon').textContent = '🌡️';
+    document.getElementById('climaTemp').textContent = '—';
+  }
+}
+
+function initClima() {
+  // Intenta geolocalización; si falla usa Santiago
+  if (navigator.geolocation) {
+    navigator.geolocation.getCurrentPosition(
+      pos => {
+        const { latitude: lat, longitude: lon } = pos.coords;
+        // Reverse geocode ciudad con Open-Meteo no aplica; usamos "Mi ubicación"
+        cargarClima(lat, lon, 'Mi ubicación');
+      },
+      () => cargarClima(-33.4569, -70.6483, 'Santiago'),
+      { timeout: 4000 }
+    );
+  } else {
+    cargarClima(-33.4569, -70.6483, 'Santiago');
+  }
+}
+
+initClima();
+</script>
 </body>
 </html>
