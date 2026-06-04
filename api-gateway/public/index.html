@@ -215,7 +215,7 @@
     <div class="topnav-left">
       <a href="/" class="topnav-brand">
         <img src="/img/logo.png" alt="AutoFácil">
-        <span class="version-badge">v5.6</span>
+        <span class="version-badge">v5.7</span>
       </a>
     </div>
 
@@ -619,7 +619,7 @@
 <script>
 /* ── Cinta de noticias — motor rAF sin saltos ────────────────────────── */
 // px/segundo por nivel (1=lento … 5=turbo)
-const NEWS_PPS    = { 1: 60, 2: 110, 3: 180, 4: 280, 5: 420 };
+const NEWS_PPS    = { 1: 25, 2: 50, 3: 85, 4: 140, 5: 220 };
 const NEWS_SPEED_LABELS = { 1:'Lento', 2:'Normal', 3:'Rápido', 4:'Muy rápido', 5:'Turbo' };
 
 let ALL_NOTICIAS   = [];
@@ -630,8 +630,28 @@ let tickerRAF      = null;      // handle requestAnimationFrame
 let tickerLastT    = null;      // timestamp último frame
 let tickerPaused   = false;
 
-function loadNewsConfig()     { try { return JSON.parse(localStorage.getItem('newsConfig') || '{}'); } catch { return {}; } }
-function saveNewsConfig(cfg)  { localStorage.setItem('newsConfig', JSON.stringify(cfg)); }
+function loadNewsConfigLocal() { try { return JSON.parse(localStorage.getItem('newsConfig') || '{}'); } catch { return {}; } }
+
+async function loadNewsConfigServer() {
+  try {
+    const tk = sessionStorage.getItem('token');
+    const r  = await fetch('/api/config/ui/news_config', { headers:{ Authorization:'Bearer '+tk } });
+    const d  = await r.json();
+    return (d.success && d.data && typeof d.data === 'object') ? d.data : {};
+  } catch { return {}; }
+}
+
+async function saveNewsConfig(cfg) {
+  localStorage.setItem('newsConfig', JSON.stringify(cfg)); // cache local inmediato
+  try {
+    const tk = sessionStorage.getItem('token');
+    await fetch('/api/config/ui/news_config', {
+      method: 'PUT',
+      headers: { 'Content-Type':'application/json', Authorization:'Bearer '+tk },
+      body: JSON.stringify({ valor: cfg }),
+    });
+  } catch { /* silencioso */ }
+}
 
 /* Construye items HTML (sin duplicar — duplicamos en renderTicker) */
 function buildHTML(noticias) {
@@ -711,11 +731,9 @@ function applyNewsConfig() {
   const feeds   = [0,1,2].map(i => document.getElementById(`ncpFeed${i}`)?.checked ?? true);
 
   setTickerSpeed(speed);
-  saveNewsConfig({ mostrar, speed, feeds });
+  saveNewsConfig({ mostrar, speed, feeds }); // guarda en servidor + localStorage
 
   document.getElementById('newsTicker').style.display = mostrar ? 'flex' : 'none';
-
-  // Solo re-renderiza si cambió algún feed (no en cada movimiento del slider)
   renderTicker(getFilteredNoticias());
 }
 
@@ -740,14 +758,16 @@ function closeNewsPanelOutside(e) {
 }
 
 (async function initTicker() {
-  const cfg = loadNewsConfig();
+  // Cargar config desde servidor (para todos los usuarios); fallback a localStorage
+  const cfgServer = await loadNewsConfigServer();
+  const cfg = Object.keys(cfgServer).length ? cfgServer : loadNewsConfigLocal();
 
-  // Restaurar config
+  // Aplicar config
   if (cfg.mostrar === false) document.getElementById('newsTicker').style.display = 'none';
-  const savedSpeed = cfg.speed || 3;
+  const savedSpeed = cfg.speed || 2;
   document.getElementById('ncpSpeed').value = savedSpeed;
   document.getElementById('ncpSpeedLabel').textContent = NEWS_SPEED_LABELS[savedSpeed];
-  tickerPPS = NEWS_PPS[savedSpeed] || 180;
+  tickerPPS = NEWS_PPS[savedSpeed] || 50;
   if (cfg.feeds) cfg.feeds.forEach((v,i) => { const el = document.getElementById(`ncpFeed${i}`); if (el) el.checked = v; });
   if (cfg.mostrar === false) { const el = document.getElementById('ncpMostrar'); if (el) el.checked = false; }
 
