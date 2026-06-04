@@ -162,52 +162,51 @@ exports.savePermisos = async (req, res) => {
 // ── Controller ────────────────────────────────────────────────────────────────
 exports.getDatos = async (req, res) => {
   try {
-    // UF vigente para calcular MAYOR/MENOR 200UF dinámicamente
-    const [ufRows] = await pool.query(
-      'SELECT valor FROM uf WHERE fecha <= CURDATE() ORDER BY fecha DESC LIMIT 1'
-    );
-    const uf_vigente = parseFloat(ufRows[0]?.valor) || 38000;
-
-    // Deduplicar: si hay num_op repetido, quedarse con el registro de mayor id
+    // Deduplicar por num_op + JOIN UF de la fecha de otorgamiento para MAYOR/MENOR 200UF
     const [rows] = await pool.query(`
       SELECT
-        num_op                                                  AS op,
-        DATE_FORMAT(mes, '%Y-%m')                              AS mes,
-        COALESCE(ejecutivo, '')                                 AS ejecutivo,
-        COALESCE(financiera, '')                               AS financiera,
-        COALESCE(automotora, '')                               AS automotora,
-        COALESCE(nombre_local, '')                             AS nombre_local,
-        COALESCE(estado_eval, '')                              AS estado_eval,
-        COALESCE(estado_credito, '')                           AS estado_credito,
-        COALESCE(producto, '')                                 AS producto,
-        COALESCE(saldo_precio, 0)                             AS saldo_precio,
-        COALESCE(monto_financiado, 0)                         AS monto_financiado,
-        COALESCE(tascli_real, 0)                              AS tasa_cli,
-        COALESCE(comdea_real, 0)                              AS com_dealer,
-        COALESCE(monto_comision_fin, 0)                       AS rentab_afa,
-        COALESCE(com_rdh, 0) + COALESCE(com_cesantia, 0)
-          + COALESCE(com_reparaciones, 0)                     AS com_seguros,
-        COALESCE(com_parque, 0)                               AS com_parque,
-        COALESCE(arriendo_parque, 0)                          AS arriendo_parque,
-        COALESCE(ingreso_neto_total, 0)                       AS ingreso_neto_total,
-        COALESCE(plazo, 0)                                    AS plazo,
-        COALESCE(mayor_menor, '')                             AS mayor_menor,
-        COALESCE(mayor_mm30, 0)                               AS mayor_mm30,
-        DATE_FORMAT(fecha_estado, '%Y-%m-%d')                  AS fecha_estado,
-        DATE_FORMAT(fecha_otorgado, '%Y-%m-%d')               AS fecha_otorgado,
-        COALESCE(parque, '')                                   AS parque,
-        COALESCE(estado_sp, '')                               AS estado_sp,
-        COALESCE(status_comaf, '')                            AS status_comaf,
-        COALESCE(resultado_negocio, '')                       AS resultado_negocio,
+        ob.num_op                                               AS op,
+        DATE_FORMAT(ob.mes, '%Y-%m')                           AS mes,
+        COALESCE(ob.ejecutivo, '')                             AS ejecutivo,
+        COALESCE(ob.financiera, '')                            AS financiera,
+        COALESCE(ob.automotora, '')                            AS automotora,
+        COALESCE(ob.nombre_local, '')                          AS nombre_local,
+        COALESCE(ob.estado_eval, '')                           AS estado_eval,
+        COALESCE(ob.estado_credito, '')                        AS estado_credito,
+        COALESCE(ob.producto, '')                              AS producto,
+        COALESCE(ob.saldo_precio, 0)                          AS saldo_precio,
+        COALESCE(ob.monto_financiado, 0)                      AS monto_financiado,
+        COALESCE(ob.tascli_real, 0)                           AS tasa_cli,
+        COALESCE(ob.comdea_real, 0)                           AS com_dealer,
+        COALESCE(ob.monto_comision_fin, 0)                    AS rentab_afa,
+        COALESCE(ob.com_rdh, 0) + COALESCE(ob.com_cesantia, 0)
+          + COALESCE(ob.com_reparaciones, 0)                  AS com_seguros,
+        COALESCE(ob.com_parque, 0)                            AS com_parque,
+        COALESCE(ob.arriendo_parque, 0)                       AS arriendo_parque,
+        COALESCE(ob.ingreso_neto_total, 0)                    AS ingreso_neto_total,
+        COALESCE(ob.plazo, 0)                                 AS plazo,
+        COALESCE(ob.mayor_menor, '')                          AS mayor_menor,
+        COALESCE(ob.mayor_mm30, 0)                            AS mayor_mm30,
+        DATE_FORMAT(ob.fecha_estado, '%Y-%m-%d')              AS fecha_estado,
+        DATE_FORMAT(ob.fecha_otorgado, '%Y-%m-%d')            AS fecha_otorgado,
+        COALESCE(ob.parque, '')                               AS parque,
+        COALESCE(ob.estado_sp, '')                            AS estado_sp,
+        COALESCE(ob.status_comaf, '')                         AS status_comaf,
+        COALESCE(ob.resultado_negocio, '')                    AS resultado_negocio,
         COALESCE(cl.rut, '')                                  AS rut_cliente,
         COALESCE(cl.nombre_completo, '')                      AS nombre_cliente,
         COALESCE(ob.rut_concesionario, '')                    AS rut_dealer,
-        COALESCE(ob.id_financiera, '')                         AS id_financiera
+        COALESCE(ob.id_financiera, '')                        AS id_financiera,
+        COALESCE(uf.valor, 38000)                             AS uf_otorgamiento
       FROM (
         SELECT *, ROW_NUMBER() OVER (PARTITION BY num_op ORDER BY id DESC) AS _rn
         FROM creditos WHERE mes IS NOT NULL
       ) ob
       LEFT JOIN clientes cl ON cl.id_cliente = ob.id_cliente
+      LEFT JOIN uf ON uf.fecha = (
+        SELECT MAX(u2.fecha) FROM uf u2
+        WHERE u2.fecha <= COALESCE(ob.fecha_otorgado, ob.fecha_estado, CURDATE())
+      )
       WHERE ob._rn = 1
       ORDER BY ob.mes ASC, ob.num_op ASC
     `);
@@ -216,6 +215,7 @@ exports.getDatos = async (req, res) => {
     // (MySQL2/TiDB devuelve columnas DECIMAL como strings)
     const raw = rows.map(r => {
       const saldo = +(r.saldo_precio) || 0;
+      const ufOt  = +(r.uf_otorgamiento) || 38000;
       return {
         ...r,
         institucion:        derInstitucion(r.financiera, r.producto),
@@ -230,8 +230,9 @@ exports.getDatos = async (req, res) => {
         ingreso_neto_total: +(r.ingreso_neto_total)  || 0,
         plazo:              +(r.plazo)               || 0,
         mayor_mm30:         +(r.mayor_mm30)          || 0,
-        // Recalcular MAYOR/MENOR 200UF dinámicamente con UF vigente
-        mayor_menor:        saldo > 200 * uf_vigente ? 'MAYOR 200UF' : 'MENOR 200UF',
+        uf_otorgamiento:    ufOt,
+        // MAYOR/MENOR calculado con la UF de la fecha de otorgamiento
+        mayor_menor:        saldo > 200 * ufOt ? 'MAYOR 200UF' : 'MENOR 200UF',
       };
     });
 
@@ -241,7 +242,6 @@ exports.getDatos = async (req, res) => {
       success:         true,
       generado_en:     new Date().toISOString(),
       total_registros: raw.length,
-      uf_vigente,
       raw,
       tendencia,
       ej_perf,

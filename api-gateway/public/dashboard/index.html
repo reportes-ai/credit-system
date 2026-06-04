@@ -957,7 +957,6 @@ function buildV1() {
     <div style="font-size:10px;color:#888">${dtotOps1?(dvOps1[i]/dtotOps1*100).toFixed(1):0}%</div></div></div>`).join('');
 
   // 4 donuts adicionales v1 — usando RAW_DATA aprobados del período
-  const _uf1 = window.UF_VIGENTE || 38000;
   const aprobados1 = window.RAW_DATA.filter(r => {
     const desde = document.getElementById('sel-desde')?.value||'';
     const hasta  = document.getElementById('sel-hasta')?.value||'';
@@ -970,11 +969,12 @@ function buildV1() {
     if(!finAp[inst]) finAp[inst]={ops:0,saldo:0,fin:0,plazo_sum:0,afa:0,mayor:0,menor:0};
     finAp[inst].ops++; finAp[inst].saldo+=r.saldo_precio; finAp[inst].fin+=r.monto_financiado;
     finAp[inst].plazo_sum+=r.plazo; finAp[inst].afa+=r.rentab_afa;
-    if(r.saldo_precio > 200 * _uf1) finAp[inst].mayor++;
+    // mayor_menor calculado con UF de fecha_otorgado (viene del API)
+    if((r.mayor_menor||'').includes('MAYOR')) finAp[inst].mayor++;
     else finAp[inst].menor++;
   });
   const totAp = aprobados1.length;
-  const mayorAp = aprobados1.filter(r => r.saldo_precio > 200 * _uf1).length;
+  const mayorAp = aprobados1.filter(r=>(r.mayor_menor||'').includes('MAYOR')).length;
   const menorAp = totAp - mayorAp;
 
   // Donut 1: Composición 200UF
@@ -1926,9 +1926,6 @@ async function cargarDatos() {
     if (!r.ok) throw new Error('No se pudo cargar el JSON');
     const datos = await r.json();
 
-    // Guardar UF vigente globalmente para cálculos MAYOR/MENOR
-    window.UF_VIGENTE = parseFloat(datos.uf_vigente) || 38000;
-
     // Enriquecer detalle_v2 con financiera y ejecutivo
     const opMap = {};
     (datos.raw||[]).forEach(r => { opMap[r.op] = r; });
@@ -2058,24 +2055,17 @@ window.RAW_DATA = [];
 
   // Calcular resumen de un mes/rango desde RAW_DATA
   function calcResumen(rows) {
-    const uf = window.UF_VIGENTE || 38000;
     // Operaciones aprobadas (no rechazadas/anuladas)
     const aprobados = rows.filter(r => !['RECHAZADO','ANULADO'].includes(r.estado_eval));
-    // Todas las aprobadas son del negocio AutoFácil (AUTOFIN o UNIDAD)
-    // Si institucion no viene clasificada, derivar aquí también
-    // Recalcular mayor_menor dinámicamente con UF vigente
+    // mayor_menor ya viene calculado correctamente desde el API (UF de fecha_otorgado)
     const resolveInst = r => {
       if (r.institucion === 'AUTOFIN' || r.institucion === 'UNIDAD DE CREDITO') return r.institucion;
       const f = (r.financiera||'').toUpperCase();
       const p = (r.producto||'').toUpperCase();
       if (f.includes('UNIDAD') || p.startsWith('UNIDAD')) return 'UNIDAD DE CREDITO';
-      return 'AUTOFIN'; // todas las ops son del negocio
+      return 'AUTOFIN';
     };
-    const con_fin = aprobados.map(r => ({
-      ...r,
-      institucion:  resolveInst(r),
-      mayor_menor:  (r.saldo_precio||0) > 200 * uf ? 'MAYOR 200UF' : 'MENOR 200UF',
-    }));
+    const con_fin = aprobados.map(r => ({ ...r, institucion: resolveInst(r) }));
     const fin = {};
     con_fin.forEach(r => {
       const k = r.institucion === 'AUTOFIN' ? 'AUTOFIN' : 'UNIDAD';
