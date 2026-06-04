@@ -2055,9 +2055,18 @@ window.RAW_DATA = [];
 
   // Calcular resumen de un mes/rango desde RAW_DATA
   function calcResumen(rows) {
-    // Operaciones aprobadas (no rechazadas/anuladas) con institución asignada
+    // Operaciones aprobadas (no rechazadas/anuladas)
     const aprobados = rows.filter(r => !['RECHAZADO','ANULADO'].includes(r.estado_eval));
-    const con_fin   = aprobados.filter(r => r.institucion === 'AUTOFIN' || r.institucion === 'UNIDAD DE CREDITO');
+    // Todas las aprobadas son del negocio AutoFácil (AUTOFIN o UNIDAD)
+    // Si institucion no viene clasificada, derivar aquí también
+    const resolveInst = r => {
+      if (r.institucion === 'AUTOFIN' || r.institucion === 'UNIDAD DE CREDITO') return r.institucion;
+      const f = (r.financiera||'').toUpperCase();
+      const p = (r.producto||'').toUpperCase();
+      if (f.includes('UNIDAD') || p.startsWith('UNIDAD')) return 'UNIDAD DE CREDITO';
+      return 'AUTOFIN'; // todas las ops son del negocio
+    };
+    const con_fin = aprobados.map(r => ({ ...r, institucion: resolveInst(r) }));
     const fin = {};
     con_fin.forEach(r => {
       const k = r.institucion === 'AUTOFIN' ? 'AUTOFIN' : 'UNIDAD';

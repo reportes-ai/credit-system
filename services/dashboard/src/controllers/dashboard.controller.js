@@ -34,12 +34,19 @@ const MESES_LABELS = {
 function n(v) { return parseFloat(v) || 0; }
 function s(v) { return v ? String(v).trim() : ''; }
 
-function derInstitucion(financiera) {
-  if (!financiera) return 'NO APLICA';
-  const f = financiera.toUpperCase();
-  if (f === 'AUTOFIN') return 'AUTOFIN';
-  if (f.includes('UNIDAD')) return 'UNIDAD DE CREDITO';
-  return 'NO APLICA';
+function derInstitucion(financiera, producto) {
+  const f = (financiera || '').toUpperCase().trim();
+  const p = (producto   || '').toUpperCase().trim();
+  // UNIDAD tiene prioridad
+  if (f.includes('UNIDAD') || p.startsWith('UNIDAD')) return 'UNIDAD DE CREDITO';
+  // AUTOFIN por campo financiera o producto
+  if (f.includes('AUTOFIN') || f.includes('AUTOFACIL') ||
+      p.startsWith('AUTOFIN') || p.startsWith('AUTOFACIL')) return 'AUTOFIN';
+  // Si tiene financiera válida (banco externo) pero tiene producto AutoFácil
+  if (p && p !== 'NO APLICA' && p !== '') return 'AUTOFIN';
+  // Default: cualquier op cargada es AUTOFIN
+  if (f && f !== 'NO APLICA') return 'AUTOFIN';
+  return 'AUTOFIN'; // todas las ops son del negocio AutoFácil
 }
 
 // ── Procesamiento igual al original Vercel ────────────────────────────────────
@@ -199,7 +206,7 @@ exports.getDatos = async (req, res) => {
     // (MySQL2/TiDB devuelve columnas DECIMAL como strings)
     const raw = rows.map(r => ({
       ...r,
-      institucion:        derInstitucion(r.financiera),
+      institucion:        derInstitucion(r.financiera, r.producto),
       saldo_precio:       +(r.saldo_precio)       || 0,
       monto_financiado:   +(r.monto_financiado)   || 0,
       tasa_cli:           +(r.tasa_cli)            || 0,
