@@ -274,7 +274,7 @@
   <div class="topnav-left">
     <a href="/" class="topnav-brand">
       <img src="/img/logo.png" alt="AutoFácil" style="display:block">
-      <span class="version-badge" id="versionBadge">v4.17</span>
+      <span class="version-badge" id="versionBadge">v4.18</span>
     </a>
       <div class="breadcrumb-nav">
         <a href="/">Inicio</a><span class="sep">›</span>
@@ -1943,6 +1943,8 @@ function mostrarPreviewDealer(p) {
     'Nombre':         p.nombre_completo,
     'RUT':            p.rut,
     'Fecha Nac.':     p.fecha_nacimiento,
+    'Sexo':           p.sexo,
+    'Nacionalidad':   p.nacionalidad,
     'Estado Civil':   p.estado_civil,
     'Hijos / Cargas': p.hijos,
     'Dirección':      p.direccion_principal,
@@ -1992,14 +1994,37 @@ function aplicarDatosDealer() {
     if (cEl && !cEl.value) cEl.value = p.hijos;
   }
 
-  // Teléfono móvil (primer celular del titular)
+  // Sexo
+  if (p.sexo) {
+    const sEl = document.getElementById('pSexo');
+    if (sEl) sEl.value = p.sexo; // MASCULINO / FEMENINO
+  }
+
+  // Nacionalidad
+  if (p.nacionalidad) {
+    const nEl = document.getElementById('pNacionalidad');
+    if (nEl) {
+      const opt = [...nEl.options].find(o =>
+        o.value.toUpperCase() === p.nacionalidad.toUpperCase() ||
+        o.text.toUpperCase()  === p.nacionalidad.toUpperCase()
+      );
+      if (opt) {
+        nEl.value = opt.value;
+        if (typeof onNacionalidadChange === 'function') onNacionalidadChange();
+      }
+    }
+  }
+
+  // Teléfono móvil — formato requerido: "+56 9 XXXX XXXX"
   const cel = p.telefonos?.find(t => t.tipo === 'Celular');
   if (cel) {
     const tEl = document.getElementById('pTelefono');
-    if (tEl && !tEl.value) {
-      // Formato "56 (9) 81362751" → "+56981362751" o simplemente el número limpio
-      const numLimpio = cel.numero.replace(/\D/g, '').replace(/^56/, '');
-      tEl.value = numLimpio;
+    if (tEl && (!tEl.value || tEl.value === '+56 9 ')) {
+      // "56 (9) 81362751" → solo los 8 dígitos del abonado
+      const digits = cel.numero.replace(/\D/g, '').replace(/^569/, ''); // quita 56 9
+      if (digits.length === 8) {
+        tEl.value = '+56 9 ' + digits.slice(0,4) + ' ' + digits.slice(4);
+      }
     }
   }
 

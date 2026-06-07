@@ -160,6 +160,12 @@ function parseDealernetPDF(text) {
 
     const hjM = pText.match(/HIJOS\s+(\d+)/);
     if (hjM) r.hijos = parseInt(hjM[1]);
+
+    const sexM = pText.match(/SEXO\s+(Masculino|Femenino)/i);
+    if (sexM) r.sexo = sexM[1].toUpperCase();
+
+    const nacM = pText.match(/NACIONALIDAD\s+([A-Za-záéíóúñÑ]+)/);
+    if (nacM) r.nacionalidad = nacM[1];
   }
 
   // Teléfonos del Titular
