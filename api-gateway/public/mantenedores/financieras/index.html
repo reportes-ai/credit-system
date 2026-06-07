@@ -61,7 +61,7 @@
   <div class="topnav-left">
     <a href="/" class="topnav-brand">
       <img src="/img/logo.png" alt="AutoFácil">
-      <span class="version-badge">v1.4</span>
+      <span class="version-badge">v1.5</span>
     </a>
     <div class="breadcrumb-nav">
       <a href="/">Inicio</a><span class="sep">›</span>
@@ -152,9 +152,14 @@
           <span class="desc">% sobre saldo precio — tramo medio</span>
         </div>
         <div class="param-row">
-          <label>% Tier 3 (<span id="lbl_tier3_min">11</span>+ ops)</label>
+          <label>% Tier 3 (<span id="lbl_tier3_min">11</span> a <span id="lbl_tier3_max">15</span> ops)</label>
           <input type="number" step="0.01" id="p_uac_pct_tier3" oninput="markChanged(this)">
           <span class="desc">% sobre saldo precio — tramo alto</span>
+        </div>
+        <div class="param-row">
+          <label>% Tier 4 (<span id="lbl_tier4_min">16</span>+ ops)</label>
+          <input type="number" step="0.01" id="p_uac_pct_tier4" oninput="markChanged(this)">
+          <span class="desc">% sobre saldo precio — tramo élite</span>
         </div>
         <div class="param-row">
           <label>Máx ops Tier 1</label>
@@ -165,6 +170,11 @@
           <label>Máx ops Tier 2</label>
           <input type="number" step="1" id="p_uac_ops_tier2_max" oninput="markChanged(this);updateTierLabels()">
           <span class="desc">Hasta este N° de ops aplica Tier 2</span>
+        </div>
+        <div class="param-row">
+          <label>Máx ops Tier 3</label>
+          <input type="number" step="1" id="p_uac_ops_tier3_max" oninput="markChanged(this);updateTierLabels()">
+          <span class="desc">Hasta este N° de ops aplica Tier 3</span>
         </div>
       </div>
     </div>
@@ -252,7 +262,8 @@ function hdr() { return { 'Content-Type':'application/json', Authorization:'Bear
 const CLAVES_TMC  = ['autofin_tmc_menor_200','autofin_tmc_mayor_200'];
 const CLAVES = [
   'autofin_spread_fondo',
-  'uac_pct_tier1','uac_pct_tier2','uac_pct_tier3','uac_ops_tier1_max','uac_ops_tier2_max',
+  'uac_pct_tier1','uac_pct_tier2','uac_pct_tier3','uac_pct_tier4',
+  'uac_ops_tier1_max','uac_ops_tier2_max','uac_ops_tier3_max',
   'dealer_pct_6','dealer_pct_12','dealer_pct_24','dealer_pct_36','dealer_pct_99','patio_pct',
   'pct_ejecutivo_fin'
 ];
@@ -300,10 +311,14 @@ function calcAllTotals() {
 function updateTierLabels() {
   const t1max = parseInt(document.getElementById('p_uac_ops_tier1_max')?.value) || 5;
   const t2max = parseInt(document.getElementById('p_uac_ops_tier2_max')?.value) || 10;
-  ['lbl_tier1_max'].forEach(id => { const e=document.getElementById(id); if(e) e.textContent=t1max; });
-  ['lbl_tier2_min'].forEach(id => { const e=document.getElementById(id); if(e) e.textContent=t1max+1; });
-  ['lbl_tier2_max'].forEach(id => { const e=document.getElementById(id); if(e) e.textContent=t2max; });
-  ['lbl_tier3_min'].forEach(id => { const e=document.getElementById(id); if(e) e.textContent=t2max+1; });
+  const t3max = parseInt(document.getElementById('p_uac_ops_tier3_max')?.value) || 15;
+  const set = (id, v) => { const e = document.getElementById(id); if (e) e.textContent = v; };
+  set('lbl_tier1_max', t1max);
+  set('lbl_tier2_min', t1max + 1);
+  set('lbl_tier2_max', t2max);
+  set('lbl_tier3_min', t2max + 1);
+  set('lbl_tier3_max', t3max);
+  set('lbl_tier4_min', t3max + 1);
 }
 
 // ── Guardar ─────────────────────────────────────────────────────────
