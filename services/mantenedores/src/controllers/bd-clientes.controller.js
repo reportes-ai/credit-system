@@ -135,13 +135,16 @@ const remove = async (req, res) => {
     // Verificar que ningún cliente tenga operaciones activas
     const placeholders = ids.map(() => '?').join(',');
     const [ops] = await pool.query(
-      `SELECT rut_cliente, COUNT(*) AS n FROM creditos WHERE rut_cliente IN (
-         SELECT rut FROM clientes WHERE id_cliente IN (${placeholders})
-       ) GROUP BY rut_cliente HAVING n > 0`,
+      `SELECT c.id_cliente, c.rut, COUNT(cr.id) AS n
+       FROM clientes c
+       JOIN creditos cr ON cr.id_cliente = c.id_cliente
+       WHERE c.id_cliente IN (${placeholders})
+       GROUP BY c.id_cliente, c.rut
+       HAVING n > 0`,
       ids
     );
     if (ops.length > 0) {
-      const ruts = ops.map(o => o.rut_cliente).join(', ');
+      const ruts = ops.map(o => o.rut).join(', ');
       return res.status(409).json({
         success: false,
         error: `No se puede eliminar: los siguientes RUTs tienen operaciones registradas: ${ruts}`,
