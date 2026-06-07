@@ -274,7 +274,7 @@
   <div class="topnav-left">
     <a href="/" class="topnav-brand">
       <img src="/img/logo.png" alt="AutoFácil" style="display:block">
-      <span class="version-badge" id="versionBadge">v4.16</span>
+      <span class="version-badge" id="versionBadge">v4.17</span>
     </a>
       <div class="breadcrumb-nav">
         <a href="/">Inicio</a><span class="sep">›</span>
@@ -1949,6 +1949,7 @@ function mostrarPreviewDealer(p) {
     'Teléfono':       p.telefonos?.[0]?.numero,
     'Email':          p.emails?.[0],
     'Dirección':      p.direccion_principal ? p.direccion_principal.split(',')[0].trim() : null,
+    'Comuna':         p.direccion_principal ? (p.direccion_principal.split(',')[1]||'').trim() : null,
   };
   const html = Object.entries(fns)
     .filter(([,v]) => v != null && v !== '')
@@ -2008,13 +2009,25 @@ function aplicarDatosDealer() {
     if (eEl && !eEl.value) eEl.value = p.emails[0];
   }
 
-  // Dirección principal
+  // Dirección principal — Dealernet: "Calle Número, Comuna, Ciudad, Región"
   if (p.direccion_principal) {
+    const partes = p.direccion_principal.split(',').map(s => s.trim());
+
+    // Campo dirección = calle + número
     const dEl = document.getElementById('pDireccion');
-    if (dEl && !dEl.value) {
-      // Dealernet entrega "Calle Número, Comuna, Ciudad, Región" → solo "Calle Número"
-      const soloCalleNum = p.direccion_principal.split(',')[0].trim();
-      dEl.value = soloCalleNum.toUpperCase();
+    if (dEl && !dEl.value && partes[0]) dEl.value = partes[0].toUpperCase();
+
+    // Comuna = segunda parte
+    if (partes[1] && typeof todasComunas !== 'undefined') {
+      const nombreComuna = partes[1].toUpperCase();
+      const comuna = todasComunas.find(c =>
+        c.nombre.toUpperCase() === nombreComuna ||
+        c.nombre.toUpperCase().includes(nombreComuna) ||
+        nombreComuna.includes(c.nombre.toUpperCase())
+      );
+      if (comuna) {
+        seleccionarComuna('p', comuna.id_comuna, comuna.id_provincia, comuna.nombre);
+      }
     }
   }
 
