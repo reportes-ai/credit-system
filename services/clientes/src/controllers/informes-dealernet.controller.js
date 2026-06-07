@@ -269,9 +269,9 @@ const getAll = async (req, res) => {
 
 const getByRut = async (req, res) => {
   try {
-    const rut = req.params.rut;
+    const rut = req.params.rut.replace(/\./g, '').trim().toUpperCase();
     const [rows] = await pool.query(
-      'SELECT * FROM informes_dealernet WHERE rut = ? ORDER BY fecha_carga DESC',
+      'SELECT * FROM informes_dealernet WHERE REPLACE(rut,\'.\',\'\') = ? ORDER BY fecha_carga DESC',
       [rut]
     );
     res.json({ success: true, data: rows, error: null });
@@ -297,8 +297,9 @@ const uploadInforme = [
         }
       }
 
-      // RUT override desde body si se envió manualmente
-      const rut = (req.body.rut || parsed.rut || 'SIN_RUT').trim();
+      // RUT override desde body si se envió manualmente — normalizar sin puntos
+      const normalizeRut = r => (r || '').replace(/\./g, '').trim().toUpperCase();
+      const rut = normalizeRut(req.body.rut || parsed.rut) || 'SIN_RUT';
 
       const [result] = await pool.query(`
         INSERT INTO informes_dealernet
