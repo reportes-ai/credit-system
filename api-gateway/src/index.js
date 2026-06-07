@@ -35,6 +35,7 @@ app.use('/api/config',   require('../../services/usuarios/src/routes/config.rout
 app.use('/api/clientes',               require('../../services/clientes/src/routes/clientes.routes'));
 app.use('/api/antecedentes-laborales', require('../../services/clientes/src/routes/antecedentes.routes'));
 app.use('/api/informacion-comercial',  require('../../services/clientes/src/routes/informacion-comercial.routes'));
+app.use('/api/informes-dealernet',     require('../../services/clientes/src/routes/informes-dealernet.routes'));
 
 // Mantenedores
 app.use('/api/tasas',           require('../../services/mantenedores/src/routes/tasas.routes'));
@@ -261,6 +262,9 @@ app.get(['/dashboard', '/dashboard/'], (req, res) =>
 
 app.get(['/cartas-aprobacion', '/cartas-aprobacion/'], (req, res) =>
   res.sendFile(path.join(__dirname, '../public/cartas-aprobacion/index.html')));
+
+app.get(['/informes-dealernet', '/informes-dealernet/'], (req, res) =>
+  res.sendFile(path.join(__dirname, '../public/informes-dealernet/index.html')));
 
 app.use((req, res) => res.status(404).json({ success: false, error: 'Ruta no encontrada' }));
 
