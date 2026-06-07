@@ -193,6 +193,17 @@
     </div>
   </div>
 
+  <!-- ── Botón Dealernet ──────────────────────────────────────────── -->
+  <div id="dealernetBanner" style="display:none;background:#fff7ed;border:1px solid #fed7aa;border-radius:10px;padding:.7rem 1rem;margin-bottom:.8rem;align-items:center;justify-content:space-between;gap:.5rem;flex-wrap:wrap">
+    <div style="font-size:.88rem;color:#9a3412">
+      <i class="bi bi-file-earmark-bar-graph-fill me-1"></i>
+      <strong>Informe Dealernet disponible</strong> — <span id="dealernetFecha"></span>
+    </div>
+    <button onclick="cargarDesdeDealernet()" style="background:#c2410c;color:#fff;border:none;border-radius:7px;padding:5px 14px;font-size:.82rem;font-weight:600;cursor:pointer">
+      <i class="bi bi-cloud-download me-1"></i>Cargar datos financieros
+    </button>
+  </div>
+
   <!-- ── Protestos ────────────────────────────────────────────────── -->
   <div class="form-card">
     <div class="section-label"><i class="bi bi-exclamation-triangle-fill me-1"></i>Protestos</div>
@@ -634,6 +645,84 @@ async function guardar() {
     showToast('Error de conexión', false);
   }
 }
+
+
+/* ─── Dealernet: detectar informe disponible y cargar datos ────── */
+let _dealerData = null;
+
+async function verificarDealernet() {
+  if (!RUT) return;
+  try {
+    const r = await fetch('/api/informes-dealernet/rut/' + encodeURIComponent(RUT), {
+      headers: apiHeaders()
+    });
+    const j = await r.json();
+    if (!j.success || !j.data.length) return;
+
+    const informe = j.data[0]; // más reciente
+    const extraido = typeof informe.datos_extraidos === 'string'
+      ? JSON.parse(informe.datos_extraidos) : informe.datos_extraidos;
+
+    if (!extraido?.fin) return;
+    _dealerData = extraido.fin;
+
+    // Mostrar banner
+    const banner = document.getElementById('dealernetBanner');
+    banner.style.display = 'flex';
+    document.getElementById('dealernetFecha').textContent =
+      'Informe del ' + (informe.fecha_informe || informe.fecha_carga?.substring(0,10) || '');
+  } catch(e) {
+    console.warn('[dealernet] error al verificar:', e.message);
+  }
+}
+
+function cargarDesdeDealernet() {
+  if (!_dealerData) return;
+  const fin = _dealerData;
+
+  const setM = (id, v) => {
+    const el = document.getElementById(id);
+    if (!el || !v) return;
+    const num = parseInt(v) || 0;
+    if (num === 0) return; // no sobreescribir con 0 si ya hay dato
+    el.value = '$' + num.toLocaleString('es-CL');
+    if (typeof checkDeudaVigente === 'function') checkDeudaVigente();
+  };
+  const setN = (id, v) => {
+    const el = document.getElementById(id);
+    if (el && v) el.value = v;
+  };
+
+  setM('fDeudaVigenteTotal', fin.deuda_vigente_total);
+  setM('fDeudaHipotecaria',  fin.deuda_hipotecaria);
+  setM('fDeudaComercial',    fin.deuda_comercial);
+  setM('fDeudaConsumo',      fin.deuda_consumo);
+  setM('fDeudaMorosa',       fin.deuda_morosa);
+  setM('fDeudaVencida',      fin.deuda_vencida);
+  setM('fDeudaCastigada',    fin.deuda_castigada);
+  setM('fLineaDisponible',   fin.linea_disponible);
+  setM('fMontoProtestos',    fin.monto_protestos);
+  setN('fProtestosVigentesQ', fin.protestos_vigentes_q);
+  setN('fDeudaVigenteInst',  fin.nro_inst_consumo);
+
+  // Flash verde en campos cargados
+  ['fDeudaVigenteTotal','fDeudaHipotecaria','fDeudaComercial',
+   'fDeudaConsumo','fDeudaMorosa','fDeudaVencida','fDeudaCastigada',
+   'fLineaDisponible'].forEach(id => {
+    const el = document.getElementById(id);
+    if (el && el.value && el.value !== '$0') {
+      el.style.transition = 'background .4s';
+      el.style.background = '#d1fae5';
+      setTimeout(() => { el.style.background = ''; }, 2000);
+    }
+  });
+
+  document.getElementById('dealernetBanner').style.display = 'none';
+  showToast('Datos financieros cargados desde Dealernet ✓', true);
+}
+
+// Ejecutar al cargar la página
+if (RUT) setTimeout(verificarDealernet, 800);
 </script>
 <script src="/js/app-version.js"></script>
 </body>

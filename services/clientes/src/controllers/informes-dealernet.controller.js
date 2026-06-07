@@ -68,6 +68,25 @@ const upload = multer({
 });
 
 // ── Parser Dealernet PDF ──────────────────────────────────────────────────────
+
+// Extrae el PRIMER valor (periodo más reciente) de una fila del historial SBIF.
+// El texto tiene formato: "LABEL\nLABEL2\n  9.956  10.678  10.534  37.552"
+// o bien: "LABEL\n0000" (todos ceros sin espacios)
+// Retorna valor en PESOS (M$ * 1000).
+function histVal(histText, labelFragment) {
+  const idx = histText.indexOf(labelFragment);
+  if (idx === -1) return 0;
+  // Buscar la primera línea NUMÉRICA que sigue al label
+  const after = histText.substring(idx + labelFragment.length);
+  const m = after.match(/\n\s*([\d\. ]+)\n/);
+  if (!m) return 0;
+  const line = m[1].trim();
+  // "0000" → cuatro ceros consecutivos → primer valor es 0
+  if (/^0+$/.test(line)) return 0;
+  const first = line.split(/\s+/)[0];
+  return (parseInt(first.replace(/\./g, '')) || 0) * 1000;
+}
+
 function parseDealernetPDF(text) {
   const r = {
     rut: null, nombre_completo: null,
@@ -75,7 +94,22 @@ function parseDealernetPDF(text) {
     fecha_nacimiento: null, edad: null, ocupacion: null,
     estado_civil: null, perfil_socioeconomico: null, hijos: null,
     deuda_total_mk: 0, impagos_vigentes: 0,
-    direccion_principal: null, telefonos: [], emails: [], fecha_informe: null
+    direccion_principal: null, telefonos: [], emails: [], fecha_informe: null,
+    // ── Datos financieros SBIF (Historial de Documentos) ──────────────────
+    fin: {
+      deuda_vigente_total:   0,   // AL DÍA E IMPAGOS < 30 DÍAS  (M$→$)
+      deuda_hipotecaria:     0,   // CRÉDITOS PARA VIVIENDA
+      deuda_comercial:       0,   // CRÉDITOS COMERCIALES
+      deuda_consumo:         0,   // CRÉDITOS DE CONSUMO
+      deuda_morosa:          0,   // IMPAGOS 30-90 + 90-180 días
+      deuda_vencida:         0,   // IMPAGOS 180 DÍAS Y 3 AÑOS
+      deuda_castigada:       0,   // IMPAGOS >= 3 AÑOS
+      linea_disponible:      0,   // LINEA CRÉDITO DISPONIBLE
+      nro_inst_consumo:      0,   // NRO. ENTIDADES CRED.CONSUMO
+      // Protestos (del Boletín de Alertas / CCS)
+      protestos_vigentes_q:  0,
+      monto_protestos:       0,
+    }
   };
 
   // RUT (formato X.XXX.XXX-X)
@@ -176,6 +210,34 @@ function parseDealernetPDF(text) {
   // Impagos vigentes
   const impM = text.match(/Boletín de Impagos Vigente[\s\S]{0,700}?Total\s+(\d+)/);
   if (impM) r.impagos_vigentes = parseInt(impM[1]);
+
+  // ── Historial financiero SBIF ─────────────────────────────────────────────
+  const histStart = text.indexOf('Historial de Documentos');
+  const histEnd   = text.indexOf('Perfil Comercial');
+  if (histStart > -1) {
+    const h = text.substring(histStart, histEnd > histStart ? histEnd : histStart + 4000);
+
+    r.fin.deuda_vigente_total = histVal(h, 'AL DÍA E IMPAGOS < 30');
+    r.fin.deuda_hipotecaria   = histVal(h, 'CRÉDITOS PARA\nVIVIENDA');
+    r.fin.deuda_comercial     = histVal(h, 'CRÉDITOS\nCOMERCIALES');
+    r.fin.deuda_consumo       = histVal(h, 'CRÉDITOS DE\nCONSUMO');
+    r.fin.deuda_morosa        = histVal(h, 'IMPAGOS 30 Y 90') +
+                                histVal(h, 'IMPAGOS 90 Y 180');
+    r.fin.deuda_vencida       = histVal(h, 'IMPAGOS 180');
+    r.fin.deuda_castigada     = histVal(h, 'IMPAGOS >= 3');
+    r.fin.linea_disponible    = histVal(h, 'LINEA CRÉDITO\nDISPONIBLE');
+    // Nº instituciones consumo
+    const nroM = h.match(/NRO\. ENTIDADES\nCRED\.CONSUMO\n\s*(\d+)/);
+    if (nroM) r.fin.nro_inst_consumo = parseInt(nroM[1]);
+  }
+
+  // Protestos (Boletín de Alertas / CCS)
+  const protQM = text.match(/Protesto\s+(\d+)/);
+  if (protQM) r.fin.protestos_vigentes_q = parseInt(protQM[1]);
+
+  // Monto protestos CCS
+  const protMontoM = text.match(/Falta De Fondos[\s\S]{0,100}?\$\s*([\d\.]+)/);
+  if (protMontoM) r.fin.monto_protestos = parseInt(protMontoM[1].replace(/\./g,'')) || 0;
 
   return r;
 }
