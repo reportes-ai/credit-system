@@ -203,9 +203,10 @@ function parseDealernetPDF(text) {
   }
 
   // Dirección principal
-  const dirIdx = text.indexOf('Direcciones más probables de residencia');
+  const DIR_LABEL = 'Direcciones más probables de residencia';
+  const dirIdx = text.indexOf(DIR_LABEL);
   if (dirIdx > -1) {
-    const dText = text.substring(dirIdx + 42, dirIdx + 600);
+    const dText = text.substring(dirIdx + DIR_LABEL.length, dirIdx + 600);
     const dLines = dText.split('\n')
       .map(l => l.trim())
       .filter(l => l.length > 5 && !l.startsWith('Contactabilidad') && !l.startsWith('Calidad') && !l.startsWith('Relación'));
