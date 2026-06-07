@@ -274,7 +274,7 @@
   <div class="topnav-left">
     <a href="/" class="topnav-brand">
       <img src="/img/logo.png" alt="AutoFácil" style="display:block">
-      <span class="version-badge" id="versionBadge">v4.14</span>
+      <span class="version-badge" id="versionBadge">v4.15</span>
     </a>
       <div class="breadcrumb-nav">
         <a href="/">Inicio</a><span class="sep">›</span>
@@ -409,7 +409,14 @@
   <!-- ── SECCIÓN 4a: Formulario PERSONA ─────────────────────────── -->
   <div id="secFormPersona" class="d-none">
     <div class="form-card">
-      <div class="section-label"><i class="bi bi-person-badge me-1"></i>Datos personales</div>
+      <div class="section-label d-flex align-items-center justify-content-between">
+        <span><i class="bi bi-person-badge me-1"></i>Datos personales</span>
+        <button type="button" class="btn btn-sm" id="btnDealernetForm"
+          onclick="abrirModalDealernet()"
+          style="background:#fff7ed;color:#c2410c;border:1px solid #ea580c;font-size:.78rem;padding:3px 10px;border-radius:6px">
+          <i class="bi bi-file-earmark-bar-graph me-1"></i>Cargar desde Dealernet
+        </button>
+      </div>
       <div class="row g-2">
         <div class="col-md-4 col-lg-3">
           <label class="form-label">Apellido Paterno *</label>
@@ -1818,5 +1825,223 @@ document.addEventListener('keydown', e => {
 </div>
 
 <script src="/js/app-version.js"></script>
+
+<!-- ══════════════════════════════════════════════════════════════════
+     MODAL DEALERNET — Carga PDF y auto-rellena formulario de cliente
+     ══════════════════════════════════════════════════════════════════ -->
+<div id="modalDealernetOverlay" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:9000;align-items:center;justify-content:center">
+  <div style="background:#fff;border-radius:16px;width:min(540px,95vw);box-shadow:0 8px 40px rgba(0,0,0,.25);overflow:hidden">
+
+    <!-- Header -->
+    <div style="background:linear-gradient(90deg,#012D70,#0141A2);color:#fff;padding:.9rem 1.2rem;display:flex;align-items:center;justify-content:space-between">
+      <div>
+        <div style="font-weight:700;font-size:1rem"><i class="bi bi-file-earmark-bar-graph me-2"></i>Cargar desde Dealernet</div>
+        <div style="font-size:.78rem;opacity:.8;margin-top:2px">Sube el PDF del informe — los campos se llenarán automáticamente</div>
+      </div>
+      <button onclick="cerrarModalDealernet()" style="background:none;border:none;color:#fff;font-size:1.3rem;cursor:pointer;line-height:1">&times;</button>
+    </div>
+
+    <!-- Body -->
+    <div style="padding:1.2rem">
+
+      <!-- Drop zone -->
+      <div id="dzCliente"
+        onclick="document.getElementById('fileInputCliente').click()"
+        ondragover="event.preventDefault();this.style.borderColor='#009AFE';this.style.background='#eaf6ff'"
+        ondragleave="this.style.borderColor='#aac4e0';this.style.background='#fff'"
+        ondrop="event.preventDefault();this.style.borderColor='#aac4e0';this.style.background='#fff';handleDealernetDrop(event)"
+        style="border:2.5px dashed #aac4e0;border-radius:12px;padding:2rem 1rem;text-align:center;cursor:pointer;transition:.2s">
+        <i class="bi bi-file-earmark-pdf" style="font-size:2.5rem;color:#aac4e0"></i>
+        <div style="margin:.5rem 0 0;color:#6b7280;font-size:.9rem"><strong>Arrastra el PDF aquí</strong> o haz clic para seleccionar</div>
+        <div style="font-size:.78rem;color:#9ca3af;margin-top:4px">Informe comercial, financiero o legal de Dealernet</div>
+      </div>
+      <input type="file" id="fileInputCliente" accept=".pdf" style="display:none" onchange="handleDealernetFile(this)">
+
+      <!-- Spinner -->
+      <div id="dzSpinner" style="display:none;align-items:center;gap:8px;margin-top:.8rem">
+        <div class="spinner-border spinner-border-sm text-primary"></div>
+        <span style="font-size:.85rem;color:#6b7280">Leyendo PDF y extrayendo datos…</span>
+      </div>
+
+      <!-- Preview resultado -->
+      <div id="dzPreview" style="display:none;margin-top:.8rem;background:#f0fdf4;border:1px solid #86efac;border-radius:10px;padding:.8rem 1rem">
+        <div style="font-weight:700;color:#065f46;font-size:.9rem;margin-bottom:.4rem">
+          <i class="bi bi-check-circle-fill me-1"></i>Datos extraídos — confirma y aplica
+        </div>
+        <div id="dzPreviewContent" style="font-size:.83rem;color:#374151;line-height:1.8"></div>
+        <div style="margin-top:.8rem;display:flex;gap:.5rem">
+          <button onclick="aplicarDatosDealer()" style="background:#065f46;color:#fff;border:none;border-radius:8px;padding:6px 18px;font-size:.85rem;font-weight:600;cursor:pointer">
+            <i class="bi bi-check2 me-1"></i>Aplicar al formulario
+          </button>
+          <button onclick="resetDzCliente()" style="background:#fff;color:#6b7280;border:1px solid #d1d5db;border-radius:8px;padding:6px 14px;font-size:.85rem;cursor:pointer">
+            Cancelar
+          </button>
+        </div>
+      </div>
+
+      <!-- Error -->
+      <div id="dzError" style="display:none;margin-top:.8rem;background:#fef2f2;border:1px solid #fca5a5;border-radius:10px;padding:.7rem 1rem;font-size:.83rem;color:#991b1b"></div>
+
+    </div>
+  </div>
+</div>
+
+<script>
+/* ── Modal Dealernet (formulario cliente) ────────────────────────── */
+let _dealerParsed = null;
+
+function abrirModalDealernet() {
+  resetDzCliente();
+  document.getElementById('modalDealernetOverlay').style.display = 'flex';
+}
+function cerrarModalDealernet() {
+  document.getElementById('modalDealernetOverlay').style.display = 'none';
+}
+
+function handleDealernetDrop(e) {
+  const f = e.dataTransfer.files[0];
+  if (f) processDealernetFile(f);
+}
+function handleDealernetFile(inp) {
+  if (inp.files[0]) processDealernetFile(inp.files[0]);
+  inp.value = '';
+}
+
+async function processDealernetFile(file) {
+  document.getElementById('dzSpinner').style.display = 'flex';
+  document.getElementById('dzPreview').style.display = 'none';
+  document.getElementById('dzError').style.display   = 'none';
+
+  const fd = new FormData();
+  fd.append('pdf', file);
+  // Pasamos el RUT del buscador si ya está
+  const rutBuscador = document.getElementById('inputRut')?.value?.trim() ||
+                      document.getElementById('searchRut')?.value?.trim() || '';
+  if (rutBuscador) fd.append('rut', rutBuscador);
+
+  try {
+    const resp = await fetch('/api/informes-dealernet/upload', {
+      method: 'POST',
+      headers: { 'Authorization': 'Bearer ' + (sessionStorage.getItem('token') || '') },
+      body: fd
+    });
+    const j = await resp.json();
+    if (!j.success) throw new Error(j.error || 'Error al procesar PDF');
+
+    _dealerParsed = j.data.parsed;
+    mostrarPreviewDealer(_dealerParsed);
+  } catch(e) {
+    document.getElementById('dzError').style.display = 'block';
+    document.getElementById('dzError').textContent = '⚠ ' + e.message;
+  } finally {
+    document.getElementById('dzSpinner').style.display = 'none';
+  }
+}
+
+function mostrarPreviewDealer(p) {
+  const fns = {
+    'Nombre':         p.nombre_completo,
+    'RUT':            p.rut,
+    'Fecha Nac.':     p.fecha_nacimiento,
+    'Estado Civil':   p.estado_civil,
+    'Hijos / Cargas': p.hijos,
+    'Dirección':      p.direccion_principal,
+    'Teléfono':       p.telefonos?.[0]?.numero,
+    'Email':          p.emails?.[0],
+  };
+  const html = Object.entries(fns)
+    .filter(([,v]) => v != null && v !== '')
+    .map(([k,v]) => `<span style="color:#6b7280">${k}:</span> <strong>${v}</strong><br>`)
+    .join('');
+  document.getElementById('dzPreviewContent').innerHTML = html || 'Se extrajeron datos básicos del PDF.';
+  document.getElementById('dzPreview').style.display = 'block';
+}
+
+function aplicarDatosDealer() {
+  if (!_dealerParsed) return;
+  const p = _dealerParsed;
+
+  // Nombres
+  if (p.apellido_paterno) document.getElementById('pApPaterno').value = p.apellido_paterno.toUpperCase();
+  if (p.apellido_materno) document.getElementById('pApMaterno').value = p.apellido_materno.toUpperCase();
+  if (p.nombres)          document.getElementById('pNombres').value   = p.nombres.toUpperCase();
+
+  // Fecha nacimiento — Dealernet entrega "23 de Diciembre de 1961", convertir a YYYY-MM-DD
+  if (p.fecha_nacimiento) {
+    const fechaISO = parseFechaEspanol(p.fecha_nacimiento);
+    if (fechaISO) {
+      document.getElementById('pFechaNac').value = fechaISO;
+      if (typeof calcularEdad === 'function') calcularEdad();
+    }
+  }
+
+  // Estado civil
+  if (p.estado_civil) {
+    const ec = p.estado_civil.toUpperCase();
+    const sel = document.getElementById('pEstadoCivil');
+    const opt = [...sel.options].find(o => o.value.toUpperCase() === ec || o.text.toUpperCase() === ec);
+    if (opt) sel.value = opt.value;
+    if (typeof onEstadoCivilChange === 'function') onEstadoCivilChange();
+  }
+
+  // Cargas = hijos
+  if (p.hijos != null) {
+    const cEl = document.getElementById('pCargas');
+    if (cEl && !cEl.value) cEl.value = p.hijos;
+  }
+
+  // Teléfono móvil (primer celular del titular)
+  const cel = p.telefonos?.find(t => t.tipo === 'Celular');
+  if (cel) {
+    const tEl = document.getElementById('pTelefono');
+    if (tEl && !tEl.value) {
+      // Formato "56 (9) 81362751" → "+56981362751" o simplemente el número limpio
+      const numLimpio = cel.numero.replace(/\D/g, '').replace(/^56/, '');
+      tEl.value = numLimpio;
+    }
+  }
+
+  // Email
+  if (p.emails?.[0]) {
+    const eEl = document.getElementById('pEmail');
+    if (eEl && !eEl.value) eEl.value = p.emails[0];
+  }
+
+  cerrarModalDealernet();
+
+  // Flash visual en los campos llenados
+  ['pApPaterno','pApMaterno','pNombres','pFechaNac'].forEach(id => {
+    const el = document.getElementById(id);
+    if (el && el.value) {
+      el.style.transition = 'background .4s';
+      el.style.background = '#d1fae5';
+      setTimeout(() => { el.style.background = ''; }, 1800);
+    }
+  });
+}
+
+function parseFechaEspanol(str) {
+  // "23 de Diciembre de 1961" → "1961-12-23"
+  const meses = { enero:1,febrero:2,marzo:3,abril:4,mayo:5,junio:6,
+                  julio:7,agosto:8,septiembre:9,octubre:10,noviembre:11,diciembre:12 };
+  const m = str.toLowerCase().match(/(\d{1,2})\s+de\s+([a-záéíóú]+)\s+de\s+(\d{4})/);
+  if (!m) return null;
+  const mes = meses[m[2]];
+  if (!mes) return null;
+  return `${m[3]}-${String(mes).padStart(2,'0')}-${String(m[1]).padStart(2,'0')}`;
+}
+
+function resetDzCliente() {
+  _dealerParsed = null;
+  document.getElementById('dzPreview').style.display = 'none';
+  document.getElementById('dzError').style.display   = 'none';
+  document.getElementById('dzSpinner').style.display = 'none';
+}
+
+// Cerrar al clic fuera del modal
+document.getElementById('modalDealernetOverlay').addEventListener('click', function(e) {
+  if (e.target === this) cerrarModalDealernet();
+});
+</script>
 </body>
 </html>
