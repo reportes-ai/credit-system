@@ -155,7 +155,7 @@
   <div class="topnav-left">
     <a href="/" class="topnav-brand">
       <img src="/img/logo.png" alt="AutoFácil" style="display:block">
-      <span class="version-badge" id="versionBadge">v1.5</span>
+      <span class="version-badge" id="versionBadge">v1.6</span>
     </a>
       <div class="breadcrumb-nav">
         <a href="/">Inicio</a><span class="sep">›</span>
@@ -721,6 +721,10 @@ function cargarDesdeDealernet(silencioso = false) {
   setN('fProtestosVigentesQ', fin.protestos_vigentes_q);
   setN('fDeudaVigenteInst',  fin.nro_inst_consumo);
 
+  // Recalcular cargas (oninput no se dispara al setear .value programáticamente)
+  if (typeof calcCargas === 'function') calcCargas();
+  if (typeof calcArriendo === 'function') calcArriendo();
+
   document.getElementById('dealernetBanner').style.display = 'none';
   if (!silencioso) showToast('Datos financieros cargados desde Dealernet ✓', true);
 
@@ -736,8 +740,6 @@ function cargarDesdeDealernet(silencioso = false) {
     }
   });
 
-  document.getElementById('dealernetBanner').style.display = 'none';
-  showToast('Datos financieros cargados desde Dealernet ✓', true);
 }
 
 // Ejecutar DESPUÉS de que cargarDatos() tenga tiempo de completar
