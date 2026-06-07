@@ -274,7 +274,7 @@
   <div class="topnav-left">
     <a href="/" class="topnav-brand">
       <img src="/img/logo.png" alt="AutoFácil" style="display:block">
-      <span class="version-badge" id="versionBadge">v4.15</span>
+      <span class="version-badge" id="versionBadge">v4.16</span>
     </a>
       <div class="breadcrumb-nav">
         <a href="/">Inicio</a><span class="sep">›</span>
@@ -1948,6 +1948,7 @@ function mostrarPreviewDealer(p) {
     'Dirección':      p.direccion_principal,
     'Teléfono':       p.telefonos?.[0]?.numero,
     'Email':          p.emails?.[0],
+    'Dirección':      p.direccion_principal ? p.direccion_principal.split(',')[0].trim() : null,
   };
   const html = Object.entries(fns)
     .filter(([,v]) => v != null && v !== '')
@@ -2001,16 +2002,26 @@ function aplicarDatosDealer() {
     }
   }
 
-  // Email
+  // Email (id correcto: pCorreo)
   if (p.emails?.[0]) {
-    const eEl = document.getElementById('pEmail');
+    const eEl = document.getElementById('pCorreo');
     if (eEl && !eEl.value) eEl.value = p.emails[0];
+  }
+
+  // Dirección principal
+  if (p.direccion_principal) {
+    const dEl = document.getElementById('pDireccion');
+    if (dEl && !dEl.value) {
+      // Dealernet entrega "Calle Número, Comuna, Ciudad, Región" → solo "Calle Número"
+      const soloCalleNum = p.direccion_principal.split(',')[0].trim();
+      dEl.value = soloCalleNum.toUpperCase();
+    }
   }
 
   cerrarModalDealernet();
 
   // Flash visual en los campos llenados
-  ['pApPaterno','pApMaterno','pNombres','pFechaNac'].forEach(id => {
+  ['pApPaterno','pApMaterno','pNombres','pFechaNac','pCorreo','pDireccion','pTelefono'].forEach(id => {
     const el = document.getElementById(id);
     if (el && el.value) {
       el.style.transition = 'background .4s';
