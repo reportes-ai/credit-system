@@ -647,8 +647,18 @@ async function guardar() {
 }
 
 
-/* ─── Dealernet: detectar informe disponible y cargar datos ────── */
+/* ─── Dealernet: detectar informe y cargar automáticamente ──────── */
 let _dealerData = null;
+
+// Devuelve true si todos los campos financieros están vacíos / en $0
+function camposFinancierosVacios() {
+  const ids = ['fDeudaVigenteTotal','fDeudaHipotecaria','fDeudaComercial',
+               'fDeudaConsumo','fDeudaMorosa','fDeudaVencida','fDeudaCastigada'];
+  return ids.every(id => {
+    const el = document.getElementById(id);
+    return !el || !el.value || el.value === '$0' || el.value === '';
+  });
+}
 
 async function verificarDealernet() {
   if (!RUT) return;
@@ -666,17 +676,23 @@ async function verificarDealernet() {
     if (!extraido?.fin) return;
     _dealerData = extraido.fin;
 
-    // Mostrar banner
-    const banner = document.getElementById('dealernetBanner');
-    banner.style.display = 'flex';
-    document.getElementById('dealernetFecha').textContent =
-      'Informe del ' + (informe.fecha_informe || informe.fecha_carga?.substring(0,10) || '');
+    const fechaLabel = 'Informe del ' + (informe.fecha_informe || informe.fecha_carga?.substring(0,10) || '');
+
+    if (camposFinancierosVacios()) {
+      // Cliente nuevo / sin datos → cargar automáticamente
+      cargarDesdeDealernet(true); // silencioso
+    } else {
+      // Ya tiene datos guardados → mostrar banner como opción
+      const banner = document.getElementById('dealernetBanner');
+      banner.style.display = 'flex';
+      document.getElementById('dealernetFecha').textContent = fechaLabel;
+    }
   } catch(e) {
     console.warn('[dealernet] error al verificar:', e.message);
   }
 }
 
-function cargarDesdeDealernet() {
+function cargarDesdeDealernet(silencioso = false) {
   if (!_dealerData) return;
   const fin = _dealerData;
 
@@ -684,7 +700,7 @@ function cargarDesdeDealernet() {
     const el = document.getElementById(id);
     if (!el || !v) return;
     const num = parseInt(v) || 0;
-    if (num === 0) return; // no sobreescribir con 0 si ya hay dato
+    if (num === 0) return;
     el.value = '$' + num.toLocaleString('es-CL');
     if (typeof checkDeudaVigente === 'function') checkDeudaVigente();
   };
@@ -705,6 +721,9 @@ function cargarDesdeDealernet() {
   setN('fProtestosVigentesQ', fin.protestos_vigentes_q);
   setN('fDeudaVigenteInst',  fin.nro_inst_consumo);
 
+  document.getElementById('dealernetBanner').style.display = 'none';
+  if (!silencioso) showToast('Datos financieros cargados desde Dealernet ✓', true);
+
   // Flash verde en campos cargados
   ['fDeudaVigenteTotal','fDeudaHipotecaria','fDeudaComercial',
    'fDeudaConsumo','fDeudaMorosa','fDeudaVencida','fDeudaCastigada',
@@ -721,8 +740,9 @@ function cargarDesdeDealernet() {
   showToast('Datos financieros cargados desde Dealernet ✓', true);
 }
 
-// Ejecutar al cargar la página
-if (RUT) setTimeout(verificarDealernet, 800);
+// Ejecutar DESPUÉS de que cargarDatos() tenga tiempo de completar
+// (cargarDatos se invoca desde cargarPoliticaYRenta().then(...))
+if (RUT) setTimeout(verificarDealernet, 1400);
 </script>
 <script src="/js/app-version.js"></script>
 </body>
