@@ -73,6 +73,16 @@
     .ops-table th { background:#0141A2; color:#fff; padding:7px 10px; text-align:left; }
     .ops-table td { padding:6px 10px; border-bottom:1px solid #f0f0f0; }
     .ops-table tr:hover td { background:#f0f7ff; }
+    /* ── Checkbox column ── */
+    th.col-chk, td.col-chk { width:36px; min-width:36px; max-width:36px; text-align:center; padding:4px 6px !important; }
+    input[type=checkbox].row-chk { width:15px; height:15px; cursor:pointer; accent-color:var(--navy); }
+    /* ── Delete toolbar ── */
+    #deleteBar { display:none; background:#fef2f2; border:1px solid #fca5a5; border-radius:8px;
+      padding:7px 14px; align-items:center; gap:10px; }
+    #deleteBar.show { display:flex; }
+    .btn-delete-sel { background:#dc2626; color:#fff; border:none; border-radius:7px;
+      padding:5px 14px; font-size:.82rem; font-weight:600; cursor:pointer; }
+    .btn-delete-sel:hover { background:#b91c1c; }
     .loading-overlay { position:fixed; inset:0; background:rgba(255,255,255,.7); display:none; align-items:center; justify-content:center; z-index:999; }
     .spinner { width:40px; height:40px; border:4px solid #e5e7eb; border-top-color:var(--navy); border-radius:50%; animation:spin .7s linear infinite; }
     @keyframes spin { to { transform:rotate(360deg); } }
@@ -88,7 +98,7 @@
   <div class="topnav-left">
     <a href="/" class="topnav-brand">
       <img src="/img/logo.png" alt="AutoFácil">
-      <span class="version-badge" id="versionBadge">v4.11</span>
+      <span class="version-badge" id="versionBadge">v4.12</span>
     </a>
     <div class="breadcrumb-nav">
       <a href="/">Inicio</a><span class="sep">›</span>
@@ -123,6 +133,14 @@
     <div class="info-chip">Página: <span id="pageLabel">—</span></div>
     <button class="btn btn-sm btn-outline-secondary" onclick="clearFilters()"><i class="bi bi-x-circle me-1"></i>Limpiar filtros</button>
     <button class="btn btn-sm btn-outline-primary" onclick="exportCSV()"><i class="bi bi-download me-1"></i>Exportar CSV</button>
+    <div id="deleteBar">
+      <i class="bi bi-trash-fill text-danger"></i>
+      <span id="deleteCount" style="font-size:.82rem;font-weight:700;color:#dc2626"></span>
+      <button class="btn-delete-sel" onclick="eliminarSeleccionados()">
+        <i class="bi bi-trash me-1"></i>Eliminar seleccionados
+      </button>
+      <button class="btn btn-sm btn-outline-secondary" onclick="clearSelection()">Cancelar</button>
+    </div>
     <div style="flex:1"></div>
     <label style="font-size:.82rem;color:#6b7280;">Filas por página:</label>
     <select class="per-page" id="limitSel" onchange="changeLimit()">
@@ -191,6 +209,7 @@ let page      = 1;
 let limit     = 50;
 let totalRows = 0;
 let editCell  = null;
+let selected  = new Set(); // ids seleccionados
 
 function toast(msg, type='success') {
   const c = document.getElementById('toastContainer');
@@ -211,6 +230,17 @@ async function init() {
 
 function buildHeaders() {
   const tr = document.createElement('tr');
+
+  // Checkbox "seleccionar todo"
+  const thChk = document.createElement('th');
+  thChk.className = 'col-chk';
+  const chkAll = document.createElement('input');
+  chkAll.type = 'checkbox'; chkAll.id = 'chkAll'; chkAll.className = 'row-chk';
+  chkAll.title = 'Seleccionar todos';
+  chkAll.onchange = () => toggleSelectAll(chkAll.checked);
+  thChk.appendChild(chkAll);
+  tr.appendChild(thChk);
+
   columns.forEach(col => {
     const th = document.createElement('th');
     const inner = document.createElement('div');
@@ -261,6 +291,7 @@ function renderRows(rows) {
   tbody.innerHTML = '';
   rows.forEach(row => {
     const tr = document.createElement('tr');
+    if (selected.has(row.id_cliente)) tr.style.background = '#eff6ff';
     tr.title = 'Clic → ver operaciones | Doble clic en celda → editar';
     tr.onclick = (e) => {
       if (e.target.tagName === 'INPUT' || e.target.tagName === 'BUTTON') return;
@@ -269,6 +300,18 @@ function renderRows(rows) {
         openOps(row.id_cliente, row.nombre_completo || row.nombres || row.rut);
       }, 250);
     };
+
+    // Checkbox por fila
+    const tdChk = document.createElement('td');
+    tdChk.className = 'col-chk';
+    const chk = document.createElement('input');
+    chk.type = 'checkbox'; chk.className = 'row-chk';
+    chk.checked = selected.has(row.id_cliente);
+    chk.dataset.id = row.id_cliente;
+    chk.onclick = (e) => { e.stopPropagation(); clearTimeout(tr._clickTimer); toggleRow(row.id_cliente, chk.checked, tr); };
+    tdChk.appendChild(chk);
+    tr.appendChild(tdChk);
+
     columns.forEach(col => {
       const td = document.createElement('td');
       const val = row[col.field];
@@ -284,6 +327,7 @@ function renderRows(rows) {
     });
     tbody.appendChild(tr);
   });
+  updateDeleteBar();
 }
 
 function startEdit(tr, td, col, oldVal) {
@@ -407,6 +451,73 @@ function exportCSV() {
 
 function showLoading(v) { document.getElementById('loadingOverlay').style.display = v?'flex':'none'; }
 function debounce(fn,ms) { let t; return (...a) => { clearTimeout(t); t=setTimeout(()=>fn(...a),ms); }; }
+
+/* ── Selección ──────────────────────────────────────────────────── */
+function toggleRow(id, checked, tr) {
+  if (checked) { selected.add(id); tr.style.background = '#eff6ff'; }
+  else         { selected.delete(id); tr.style.background = ''; }
+  updateDeleteBar();
+}
+
+function toggleSelectAll(checked) {
+  document.querySelectorAll('.row-chk').forEach(chk => {
+    const id = parseInt(chk.dataset.id);
+    chk.checked = checked;
+    const tr = chk.closest('tr');
+    if (checked) { selected.add(id); if(tr) tr.style.background='#eff6ff'; }
+    else         { selected.delete(id); if(tr) tr.style.background=''; }
+  });
+  updateDeleteBar();
+}
+
+function clearSelection() {
+  selected.clear();
+  document.querySelectorAll('.row-chk').forEach(c => { c.checked=false; c.closest('tr').style.background=''; });
+  const ca = document.getElementById('chkAll'); if(ca) ca.checked=false;
+  updateDeleteBar();
+}
+
+function updateDeleteBar() {
+  const bar = document.getElementById('deleteBar');
+  const n = selected.size;
+  if (n > 0) {
+    bar.classList.add('show');
+    document.getElementById('deleteCount').textContent = `${n} cliente${n>1?'s':''} seleccionado${n>1?'s':''}`;
+  } else {
+    bar.classList.remove('show');
+  }
+}
+
+/* ── Eliminar ───────────────────────────────────────────────────── */
+async function eliminarSeleccionados() {
+  const ids = [...selected];
+  if (!ids.length) return;
+  const confirm1 = confirm(
+    `⚠️ ¿Eliminar ${ids.length} cliente${ids.length>1?'s':''}?\n\n` +
+    `Esto también borrará sus antecedentes laborales e información comercial.\n` +
+    `Los clientes con operaciones registradas NO serán eliminados.\n\n` +
+    `Esta acción no se puede deshacer.`
+  );
+  if (!confirm1) return;
+
+  showLoading(true);
+  try {
+    const r = await fetch('/api/bd-clientes', {
+      method: 'DELETE',
+      headers: H,
+      body: JSON.stringify({ ids })
+    });
+    const j = await r.json();
+    if (!j.success) throw new Error(j.error);
+    toast(`✅ ${j.data.deleted} cliente${j.data.deleted>1?'s':''} eliminado${j.data.deleted>1?'s':''}`);
+    selected.clear();
+    await load();
+  } catch(e) {
+    toast(e.message, 'error');
+  } finally {
+    showLoading(false);
+  }
+}
 
 init();
 </script>

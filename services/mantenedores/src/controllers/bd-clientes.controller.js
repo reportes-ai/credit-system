@@ -126,4 +126,37 @@ const update = async (req, res) => {
   }
 };
 
-module.exports = { getColumns, getAll, getOperaciones, update };
+// DELETE /api/bd-clientes  body: { ids: [1,2,3] }
+const remove = async (req, res) => {
+  try {
+    const { ids } = req.body;
+    if (!Array.isArray(ids) || ids.length === 0)
+      return res.status(400).json({ success: false, error: 'Se requiere array de ids', data: null });
+    // Verificar que ningún cliente tenga operaciones activas
+    const placeholders = ids.map(() => '?').join(',');
+    const [ops] = await pool.query(
+      `SELECT rut_cliente, COUNT(*) AS n FROM creditos WHERE rut_cliente IN (
+         SELECT rut FROM clientes WHERE id_cliente IN (${placeholders})
+       ) GROUP BY rut_cliente HAVING n > 0`,
+      ids
+    );
+    if (ops.length > 0) {
+      const ruts = ops.map(o => o.rut_cliente).join(', ');
+      return res.status(409).json({
+        success: false,
+        error: `No se puede eliminar: los siguientes RUTs tienen operaciones registradas: ${ruts}`,
+        data: null
+      });
+    }
+    // Eliminar registros relacionados primero (antecedentes, info comercial)
+    await pool.query(`DELETE FROM antecedentes_laborales WHERE rut_cliente IN (SELECT rut FROM clientes WHERE id_cliente IN (${placeholders}))`, ids);
+    await pool.query(`DELETE FROM informacion_comercial   WHERE rut_cliente IN (SELECT rut FROM clientes WHERE id_cliente IN (${placeholders}))`, ids);
+    const [result] = await pool.query(`DELETE FROM clientes WHERE id_cliente IN (${placeholders})`, ids);
+    res.json({ success: true, data: { deleted: result.affectedRows }, error: null });
+  } catch (e) {
+    console.error('[bd-clientes delete]', e.message);
+    res.status(500).json({ success: false, data: null, error: e.message });
+  }
+};
+
+module.exports = { getColumns, getAll, getOperaciones, update, remove };
