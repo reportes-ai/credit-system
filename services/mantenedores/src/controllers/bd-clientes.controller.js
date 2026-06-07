@@ -148,9 +148,11 @@ const remove = async (req, res) => {
         data: null
       });
     }
-    // Eliminar registros relacionados primero (antecedentes, info comercial)
+    // Eliminar registros relacionados primero
     await pool.query(`DELETE FROM antecedentes_laborales WHERE rut_cliente IN (SELECT rut FROM clientes WHERE id_cliente IN (${placeholders}))`, ids);
     await pool.query(`DELETE FROM informacion_comercial   WHERE rut_cliente IN (SELECT rut FROM clientes WHERE id_cliente IN (${placeholders}))`, ids);
+    // Eliminar informes dealernet si existen
+    await pool.query(`DELETE FROM informes_dealernet WHERE rut IN (SELECT rut FROM clientes WHERE id_cliente IN (${placeholders}))`, ids).catch(() => {});
     const [result] = await pool.query(`DELETE FROM clientes WHERE id_cliente IN (${placeholders})`, ids);
     res.json({ success: true, data: { deleted: result.affectedRows }, error: null });
   } catch (e) {
