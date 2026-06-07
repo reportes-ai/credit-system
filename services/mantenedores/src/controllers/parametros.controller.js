@@ -66,12 +66,21 @@ const ensureTable = async () => {
     ['uac_ops_tier1_max',  5, 'UAC — N° máximo de ops para tier 1 (14%)'],
     ['uac_ops_tier2_max', 10, 'UAC — N° máximo de ops para tier 2 (16%)'],
     // ── Comisión Dealer por plazo (% sobre saldo precio) ─────────────────
-    ['dealer_pct_6',   0.00, 'Dealer CALLE — % saldo precio plazo ≤6m'],
-    ['dealer_pct_12',  0.00, 'Dealer CALLE — % saldo precio plazo ≤12m'],
-    ['dealer_pct_24',  2.50, 'Dealer CALLE — % saldo precio plazo ≤24m'],
-    ['dealer_pct_36',  5.00, 'Dealer CALLE — % saldo precio plazo ≤36m'],
-    ['dealer_pct_99',  7.50, 'Dealer CALLE — % saldo precio plazo >36m'],
+    ['dealer_pct_6',   0.00, 'Dealer PARQUE — % saldo precio plazo ≤6m'],
+    ['dealer_pct_12',  0.00, 'Dealer PARQUE — % saldo precio plazo ≤12m'],
+    ['dealer_pct_24',  2.50, 'Dealer PARQUE — % saldo precio plazo ≤24m'],
+    ['dealer_pct_36',  5.00, 'Dealer PARQUE — % saldo precio plazo ≤36m'],
+    ['dealer_pct_99',  7.50, 'Dealer PARQUE — % saldo precio plazo >36m'],
     ['patio_pct',      2.50, 'Patio/Parque — % saldo precio (todos los plazos)'],
+    // ── Comisión Dealer CALLE (independiente de parque+patio) ─────────────
+    ['dealer_calle_pct_6',   2.50, 'Dealer CALLE — % saldo precio plazo ≤6m'],
+    ['dealer_calle_pct_12',  2.50, 'Dealer CALLE — % saldo precio plazo ≤12m'],
+    ['dealer_calle_pct_24',  5.00, 'Dealer CALLE — % saldo precio plazo ≤24m'],
+    ['dealer_calle_pct_36',  7.50, 'Dealer CALLE — % saldo precio plazo ≤36m'],
+    ['dealer_calle_pct_99', 10.00, 'Dealer CALLE — % saldo precio plazo >36m'],
+    // ── UAC Tier 4 y Tier 3 max ───────────────────────────────────────────
+    ['uac_pct_tier4',       20.00, 'UAC — % sobre saldo precio tramo élite'],
+    ['uac_ops_tier3_max',   15,    'UAC — N° máximo de ops para tier 3'],
     // ── Factores de comisión AutoFácil por seguros (% de prima desg) ─────
     ['seg_com_desg_6',  62.525, 'Factor comisión desgravamen plazo ≤6m'],
     ['seg_com_cesa_6',  52.636, 'Factor comisión cesantía plazo ≤6m'],

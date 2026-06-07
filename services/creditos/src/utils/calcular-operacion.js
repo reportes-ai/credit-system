@@ -35,6 +35,16 @@ function getDealerPct(plazo, p) {
   if (plazo <= 36) return p.dealer_pct_36 / 100;
   return p.dealer_pct_99 / 100;
 }
+function getDealerCallePct(plazo, p) {
+  // Usa parámetro independiente dealer_calle_pct_X; fallback a parque+patio
+  const patio = (p.patio_pct || 0) / 100;
+  const fb = getDealerPct(plazo, p) + patio;
+  if (plazo <= 6)  return p.dealer_calle_pct_6  != null ? p.dealer_calle_pct_6  / 100 : fb;
+  if (plazo <= 12) return p.dealer_calle_pct_12 != null ? p.dealer_calle_pct_12 / 100 : fb;
+  if (plazo <= 24) return p.dealer_calle_pct_24 != null ? p.dealer_calle_pct_24 / 100 : fb;
+  if (plazo <= 36) return p.dealer_calle_pct_36 != null ? p.dealer_calle_pct_36 / 100 : fb;
+  return p.dealer_calle_pct_99 != null ? p.dealer_calle_pct_99 / 100 : fb;
+}
 
 /* ── Cargar tramos de comisión por penetración ──────────────────────── */
 async function cargarPenTramos() {
@@ -136,11 +146,12 @@ async function calcularOperacion(op) {
   if (saldo_precio > 0 && plazo > 0) {
     const dealer_pct = getDealerPct(plazo, p);
     const patio_pct  = p.patio_pct / 100;
+    const calle_pct  = getDealerCallePct(plazo, p);
     // Parque: dealer recibe dealer_pct (neto), parque recibe patio_pct por separado
-    // Calle:  dealer recibe dealer_pct + patio_pct (no hay parque que pagar)
+    // Calle:  dealer recibe calle_pct (parámetro independiente)
     comdea_real     = esParque
       ? Math.round(saldo_precio * dealer_pct)
-      : Math.round(saldo_precio * (dealer_pct + patio_pct));
+      : Math.round(saldo_precio * calle_pct);
     com_parque_calc = esParque ? Math.round(saldo_precio * patio_pct) : 0;
   }
 

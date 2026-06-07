@@ -355,7 +355,17 @@ function getDealerPct(plazo) {
   if (plazo <= 12) return (P.dealer_pct_12 || 0) / 100;
   if (plazo <= 24) return (P.dealer_pct_24 || 0) / 100;
   if (plazo <= 36) return (P.dealer_pct_36 || 0) / 100;
-  return              (P.dealer_pct_99 || 0) / 100;
+  return (P.dealer_pct_99 || 0) / 100;
+}
+function getDealerCallePct(plazo) {
+  const patio = (P.patio_pct || 0) / 100;
+  const fb = getDealerPct(plazo) + patio;
+  if (plazo <= 6)  return P.dealer_calle_pct_6  != null ? P.dealer_calle_pct_6  / 100 : fb;
+  if (plazo <= 12) return P.dealer_calle_pct_12 != null ? P.dealer_calle_pct_12 / 100 : fb;
+  if (plazo <= 24) return P.dealer_calle_pct_24 != null ? P.dealer_calle_pct_24 / 100 : fb;
+  if (plazo <= 36) return P.dealer_calle_pct_36 != null ? P.dealer_calle_pct_36 / 100 : fb;
+  return P.dealer_calle_pct_99 != null ? P.dealer_calle_pct_99 / 100 : fb;
+}
 }
 
 /* ── Cálculo principal ─────────────────────────────────────────────── */
@@ -460,12 +470,13 @@ function simular() {
   // ── Comisiones dealer ──────────────────────────────────────────────
   const dealerPct = getDealerPct(plazo);
   const patioPct  = (P.patio_pct || 2.50) / 100;
+  const callePct  = getDealerCallePct(plazo);
   let com_dealer, com_patio;
   if (esPatio) {
     com_dealer = Math.round(saldo * dealerPct);
     com_patio  = Math.round(saldo * patioPct);
   } else {
-    com_dealer = Math.round(saldo * (dealerPct + patioPct));
+    com_dealer = Math.round(saldo * callePct);
     com_patio  = 0;
   }
 
