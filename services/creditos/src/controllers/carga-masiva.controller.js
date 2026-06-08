@@ -253,6 +253,11 @@ const importar = async (req, res) => {
           obj.id_cliente = clienteCache[obj.rut_cliente] || null;
         }
 
+        // rut_cliente y nombre_cliente pertenecen a la tabla clientes, no a creditos.
+        // Se usaron para resolver id_cliente — eliminarlos para evitar error de columna inexistente.
+        delete obj.rut_cliente;
+        delete obj.nombre_cliente;
+
         const cols   = Object.keys(obj).filter(k => obj[k] !== undefined && obj[k] !== null);
         const vals   = cols.map(k => obj[k]);
         const placeholders = cols.map(() => '?').join(',');
@@ -337,4 +342,112 @@ const corregirMes = async (req, res) => {
   }
 };
 
-module.exports = { preview, importar, corregirMes };
+/* ── POST /api/carga-masiva/actualizar ─────────────────────────────────────
+   Actualiza registros EXISTENTES con los campos del Excel que estén vacíos en la BD.
+   Llave de búsqueda: num_op (OP del Excel).
+   NUNCA sobreescribe el campo "ejecutivo".
+   Solo escribe campos que estén vacíos/nulos en la BD Y tengan valor en el Excel.
+   ─────────────────────────────────────────────────────────────────────────── */
+const actualizar = async (req, res) => {
+  try {
+    if (!req.file) return res.status(400).json({ success: false, data: null, error: 'No se recibió archivo' });
+
+    const wb   = XLSX.read(req.file.buffer, { type: 'buffer', cellDates: false });
+    const ws   = wb.Sheets[wb.SheetNames[0]];
+    const data = XLSX.utils.sheet_to_json(ws, { defval: '' });
+
+    if (!data.length) return res.status(400).json({ success: false, data: null, error: 'Archivo vacío' });
+
+    const colOP = Object.keys(data[0]).find(k => k.trim().toUpperCase() === 'OP') || 'OP';
+    const mesOverride = req.body.mes_override || null;
+
+    // Campos que NUNCA se deben sobreescribir (datos gestionados por operaciones)
+    const CAMPOS_PROTEGIDOS = new Set([
+      'ejecutivo', 'num_op', 'id_credito', 'id_cliente',
+      'rut_cliente', 'nombre_cliente',
+    ]);
+
+    let actualizados = 0;
+    let sinCambios   = 0;
+    let noEncontrados = 0;
+    const errores    = [];
+    const detallesLog = [];
+
+    for (const row of data) {
+      const numOp = parseInt(row[colOP]);
+      if (!numOp || isNaN(numOp)) continue;
+
+      try {
+        // Obtener registro actual de la BD
+        const [[existente]] = await pool.query(
+          'SELECT * FROM creditos WHERE num_op = ?', [numOp]
+        );
+        if (!existente) { noEncontrados++; continue; }
+
+        // Obtener campos nuevos del Excel
+        const obj = mapRow(row, mesOverride);
+        delete obj.rut_cliente;
+        delete obj.nombre_cliente;
+
+        // Construir SET solo con campos:
+        //   1. No protegidos
+        //   2. Que tienen valor en el Excel (no null)
+        //   3. Que están vacíos/nulos en la BD
+        const setCols = [];
+        const setVals = [];
+
+        for (const [campo, valorNuevo] of Object.entries(obj)) {
+          if (CAMPOS_PROTEGIDOS.has(campo)) continue;
+          if (valorNuevo === null || valorNuevo === undefined) continue;
+          const valorActual = existente[campo];
+          const estaVacio = valorActual === null || valorActual === undefined || valorActual === '' || valorActual === 0;
+          if (estaVacio) {
+            setCols.push(`\`${campo}\` = ?`);
+            setVals.push(valorNuevo);
+          }
+        }
+
+        if (setCols.length === 0) { sinCambios++; continue; }
+
+        setVals.push(numOp);
+        await pool.query(
+          `UPDATE creditos SET ${setCols.join(', ')} WHERE num_op = ?`,
+          setVals
+        );
+        actualizados++;
+        detallesLog.push({ num_op: numOp, campos_actualizados: setCols.length });
+
+      } catch (e) {
+        errores.push({ op: numOp, error: e.message });
+      }
+    }
+
+    // Guardar en historial
+    if (actualizados > 0) {
+      historial.crearSesion({
+        fuente:     'autofacil-update',
+        usuario:    req.user?.nombre || req.user?.email || null,
+        archivo:    req.file?.originalname || null,
+        insertados: 0, actualizados, errores: errores.length,
+        total:      data.length,
+      }).catch(() => {});
+    }
+
+    res.json({
+      success: true,
+      data: {
+        total_archivo:  data.length,
+        actualizados,
+        sin_cambios:    sinCambios,
+        no_encontrados: noEncontrados,
+        errores,
+      },
+      error: null,
+    });
+  } catch (e) {
+    console.error('[actualizar]', e.message);
+    res.status(500).json({ success: false, data: null, error: e.message });
+  }
+};
+
+module.exports = { preview, importar, corregirMes, actualizar };

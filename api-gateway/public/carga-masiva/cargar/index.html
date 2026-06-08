@@ -138,6 +138,37 @@
     </div>
   </div>
 
+  <!-- Actualizar campos faltantes -->
+  <div class="card mb-4">
+    <div class="section-title"><i class="bi bi-pencil-square" style="color:#7c3aed"></i>Actualizar campos faltantes en registros existentes</div>
+    <p style="font-size:.82rem;color:#6b7280;margin-bottom:16px">
+      Carga un Excel para rellenar los campos vacíos/nulos de los registros que ya existen en la BD.<br>
+      La llave de búsqueda es el <strong>N° Operación (OP)</strong>. <strong>No se modificará el campo Ejecutivo</strong> ni se sobreescribirán valores ya ingresados.
+    </p>
+
+    <div class="drop-zone" id="dropZoneUpd" onclick="document.getElementById('fileInputUpd').click()" ondragover="onDragUpd(event,true)" ondragleave="onDragUpd(event,false)" ondrop="onDropUpd(event)">
+      <i class="bi bi-file-earmark-spreadsheet"></i>
+      <div class="label" id="dropLabelUpd">Arrastra el archivo aquí o haz clic para seleccionar</div>
+      <div class="sub">Solo archivos .xlsx — máx. 10 MB</div>
+    </div>
+    <input type="file" id="fileInputUpd" accept=".xlsx" onchange="archivoSeleccionadoUpd(event)">
+
+    <div style="display:flex;gap:16px;margin-top:20px;align-items:center;flex-wrap:wrap">
+      <div style="display:flex;align-items:center;gap:8px">
+        <label style="font-weight:600;font-size:.85rem;color:#374151;white-space:nowrap"><i class="bi bi-calendar3 me-1"></i>Mes contable:</label>
+        <input type="month" id="mesArchivoUpd" style="border:1.5px solid #d1d5db;border-radius:8px;padding:7px 12px;font-size:.88rem;outline:none">
+      </div>
+      <button class="btn-main" id="btnActualizar" onclick="ejecutarActualizar()" disabled style="background:#7c3aed">
+        <i class="bi bi-arrow-repeat"></i>Actualizar campos vacíos
+      </button>
+    </div>
+
+    <div id="pasoUpd" style="display:none;margin-top:24px;border-top:1px solid #e5e7eb;padding-top:20px">
+      <div class="section-title"><i class="bi bi-check2-circle" style="color:#7c3aed"></i>Resultado de la actualización</div>
+      <div id="resultadoUpd"></div>
+    </div>
+  </div>
+
   <!-- Corregir mes -->
   <div class="card">
     <div class="section-title"><i class="bi bi-wrench" style="color:#d97706"></i>Corregir mes contable de registros existentes</div>
@@ -271,6 +302,57 @@ function mostrarResultado(d) {
     </div>`;
   document.getElementById('paso3').style.display = '';
   toast(`✓ ${d.insertados} registros importados`, true);
+}
+
+/* ── Actualizar campos faltantes ── */
+let archivoActualUpd = null;
+
+function onDragUpd(e, over) { e.preventDefault(); document.getElementById('dropZoneUpd').classList[over?'add':'remove']('drag-over'); }
+function onDropUpd(e) { e.preventDefault(); onDragUpd(e,false); const f = e.dataTransfer.files[0]; if (f) cargarArchivoUpd(f); }
+function archivoSeleccionadoUpd(e) { const f = e.target.files[0]; if (f) cargarArchivoUpd(f); }
+
+function cargarArchivoUpd(f) {
+  if (!f.name.endsWith('.xlsx')) { toast('Solo se aceptan archivos .xlsx', false); return; }
+  archivoActualUpd = f;
+  document.getElementById('dropLabelUpd').textContent = `✓ ${f.name} (${(f.size/1024).toFixed(0)} KB)`;
+  document.getElementById('btnActualizar').disabled = false;
+  document.getElementById('pasoUpd').style.display = 'none';
+}
+
+async function ejecutarActualizar() {
+  if (!archivoActualUpd) return;
+  const mes = document.getElementById('mesArchivoUpd').value;
+  if (!mes) { toast('Selecciona el mes contable antes de continuar', false); return; }
+  if (!confirm(`¿Actualizar campos vacíos con mes contable ${mes}?\nNo se modificará el campo Ejecutivo ni se sobreescribirán valores existentes.`)) return;
+  const btn = document.getElementById('btnActualizar');
+  btn.disabled = true; btn.innerHTML = '<i class="bi bi-hourglass-split"></i>Actualizando...';
+  try {
+    const fd = new FormData();
+    fd.append('archivo', archivoActualUpd);
+    fd.append('mes_override', mes + '-01');
+    const res  = await fetch('/api/carga-masiva/actualizar', { method:'POST', headers:H, body:fd });
+    const json = await res.json();
+    if (!json.success) { toast('Error: ' + json.error, false); return; }
+    mostrarResultadoUpd(json.data);
+  } catch(e) { toast('Error: ' + e.message, false); }
+  finally { btn.disabled = false; btn.innerHTML = '<i class="bi bi-arrow-repeat"></i>Actualizar campos vacíos'; }
+}
+
+function mostrarResultadoUpd(d) {
+  const errHtml = d.errores?.length
+    ? `<div style="margin-top:12px"><strong style="color:#dc2626">Errores:</strong>${d.errores.map(e=>`<div class="log-line err">OP ${e.op}: ${e.error}</div>`).join('')}</div>`
+    : '';
+  document.getElementById('resultadoUpd').innerHTML = `
+    <div class="result-box">
+      <div style="font-size:1.1rem;font-weight:700;color:#6d28d9;margin-bottom:12px"><i class="bi bi-check-circle-fill me-2"></i>Actualización completada</div>
+      <div class="log-line">📋 Total en archivo: <strong>${d.total_archivo}</strong></div>
+      <div class="log-line" style="color:#6d28d9;font-weight:700">✅ Registros actualizados: <strong>${d.actualizados}</strong></div>
+      <div class="log-line">⏭️ Sin cambios (ya tenían datos): <strong>${d.sin_cambios}</strong></div>
+      <div class="log-line">❓ No encontrados en BD: <strong>${d.no_encontrados}</strong></div>
+      ${errHtml}
+    </div>`;
+  document.getElementById('pasoUpd').style.display = '';
+  toast(`✓ ${d.actualizados} registros actualizados`, true);
 }
 
 async function corregirMes() {

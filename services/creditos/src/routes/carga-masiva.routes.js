@@ -8,6 +8,7 @@ const soloAdmin = requirePerfil('Administrador');
 
 router.post('/preview',      verifyToken, soloAdmin, upload.single('archivo'), ctrl.preview);
 router.post('/importar',     verifyToken, soloAdmin, upload.single('archivo'), ctrl.importar);
+router.post('/actualizar',   verifyToken, soloAdmin, upload.single('archivo'), ctrl.actualizar);
 router.post('/corregir-mes', verifyToken, soloAdmin, ctrl.corregirMes);
 
 module.exports = router;
