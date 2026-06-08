@@ -147,7 +147,7 @@
     <div class="topnav-left">
       <a href="/" class="topnav-brand">
         <img src="/img/logo.png" alt="AutoFácil" style="display:block">
-        <span class="version-badge" id="versionBadge">v5.4</span>
+        <span class="version-badge" id="versionBadge">v5.5</span>
       </a>
       <div class="breadcrumb-nav">
         <a href="/">Inicio</a><span class="sep">›</span>
@@ -653,6 +653,30 @@
     </div>
   </div>
 
+  <!-- MODAL EJECUTIVOS -->
+  <div class="modal fade" id="modalEjecutivos" tabindex="-1">
+    <div class="modal-dialog modal-md">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h5 class="modal-title"><i class="bi bi-people me-2"></i>Ejecutivos asignados — <span id="ejUsuarioNombre"></span></h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+        </div>
+        <div class="modal-body">
+          <p class="text-muted" style="font-size:.83rem">Este usuario solo verá las comisiones de los ejecutivos marcados. Si no se asigna ninguno y no es Administrador, no verá nada.</p>
+          <div id="ejListaChecks" style="max-height:360px;overflow-y:auto;display:flex;flex-direction:column;gap:6px"></div>
+          <div class="mt-3 d-flex gap-2">
+            <button class="btn btn-outline-secondary btn-sm" onclick="ejSelTodos(true)">Seleccionar todos</button>
+            <button class="btn btn-outline-secondary btn-sm" onclick="ejSelTodos(false)">Deseleccionar todos</button>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+          <button class="btn btn-primary" onclick="guardarEjecutivos()"><i class="bi bi-floppy me-1"></i>Guardar</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
   <script src="/js/bootstrap.bundle.min.js"></script>
   <script src="/js/auth-guard.js"></script>
 <script>
@@ -738,6 +762,7 @@
           <td>
             ${esAdmin ? `
               <button class="btn btn-outline-primary btn-sm me-1" title="Editar" onclick="abrirModalUsuario(${u.id_usuario})"><i class="bi bi-pencil"></i></button>
+              <button class="btn btn-outline-success btn-sm me-1" title="Ejecutivos asignados" onclick="abrirModalEjecutivos(${u.id_usuario}, '${u.nombre} ${u.apellido}')"><i class="bi bi-people"></i></button>
               <button class="btn btn-outline-warning btn-sm me-1" title="Resetear clave" onclick="abrirResetClave(${u.id_usuario}, '${u.nombre} ${u.apellido}')"><i class="bi bi-key"></i></button>
               <button class="btn btn-outline-danger btn-sm" title="Desactivar" onclick="desactivarUsuario(${u.id_usuario})"><i class="bi bi-person-x"></i></button>
             ` : '—'}
@@ -1364,6 +1389,48 @@
     if (esAdmin) document.getElementById('tabSegNav').style.display = '';
     if (!esAdmin) { const b = document.getElementById('btnNuevoPerfil'); if(b) b.style.display='none'; }
     cargarUsuarios();
+
+    // ── MODAL EJECUTIVOS ──────────────────────────────────────
+    let _ejUsuarioId = null;
+    let _ejListaCompleta = [];
+
+    async function abrirModalEjecutivos(id, nombre) {
+      _ejUsuarioId = id;
+      document.getElementById('ejUsuarioNombre').textContent = nombre;
+      document.getElementById('ejListaChecks').innerHTML = '<div class="text-muted text-center py-3"><div class="spinner-border spinner-border-sm"></div></div>';
+      bootstrap.Modal.getOrCreateInstance(document.getElementById('modalEjecutivos')).show();
+
+      // Cargar lista de ejecutivos disponibles desde comisiones
+      const [ejRes, asigRes] = await Promise.all([
+        fetch('/api/comisiones/ejecutivos', { headers: { Authorization: 'Bearer ' + token } }).then(r => r.json()),
+        api('GET', `/api/usuarios/${id}/ejecutivos`)
+      ]);
+      _ejListaCompleta = ejRes?.data || [];
+      const asignados = new Set(asigRes?.data || []);
+
+      document.getElementById('ejListaChecks').innerHTML = _ejListaCompleta.length
+        ? _ejListaCompleta.map(ej => `
+            <label style="display:flex;align-items:center;gap:10px;padding:8px 12px;border:1px solid #e5e7eb;border-radius:8px;cursor:pointer;background:#fafafa">
+              <input type="checkbox" class="ej-check form-check-input mt-0" value="${ej}" ${asignados.has(ej) ? 'checked' : ''}>
+              <span style="font-size:.88rem;font-weight:500">${ej}</span>
+            </label>`).join('')
+        : '<p class="text-muted text-center py-3">No hay ejecutivos registrados aún.</p>';
+    }
+
+    function ejSelTodos(val) {
+      document.querySelectorAll('.ej-check').forEach(c => c.checked = val);
+    }
+
+    async function guardarEjecutivos() {
+      const seleccionados = [...document.querySelectorAll('.ej-check:checked')].map(c => c.value);
+      const r = await api('PUT', `/api/usuarios/${_ejUsuarioId}/ejecutivos`, { ejecutivos: seleccionados });
+      if (r?.success) {
+        bootstrap.Modal.getInstance(document.getElementById('modalEjecutivos')).hide();
+        showToast('Ejecutivos asignados correctamente');
+      } else {
+        showToast(r?.error || 'Error al guardar', 'danger');
+      }
+    }
   </script>
 <script src="/js/app-version.js"></script>
 </body>

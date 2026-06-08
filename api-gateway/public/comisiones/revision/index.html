@@ -112,7 +112,7 @@
 <body>
 <nav class="topnav">
   <div class="topnav-left">
-    <a href="/" class="topnav-brand"><img src="/img/logo.png" alt="AutoFácil"><span class="version-badge">v5.5</span></a>
+    <a href="/" class="topnav-brand"><img src="/img/logo.png" alt="AutoFácil"><span class="version-badge">v5.6</span></a>
     <div class="breadcrumb-nav">
       <a href="/">Inicio</a><span class="sep">›</span>
       <a href="/comisiones/">Comisión Ejecutivos</a><span class="sep">›</span>
@@ -198,6 +198,7 @@ const yo    = JSON.parse(sessionStorage.getItem('usuario') || 'null');
 if (!token || !yo) window.location.href = '/login.html';
 const H = { 'Content-Type': 'application/json', Authorization: 'Bearer ' + token };
 const esAdmin = yo?.perfil === 'Administrador';
+let _ejAsignados = null; // null = sin restricción (admin), [] = sin asignación, ['nombre',...] = filtro
 
 document.getElementById('navNombre').textContent = `${yo?.nombre||''} ${yo?.apellido||''}`.trim();
 document.getElementById('navPerfil').textContent  = yo?.perfil || '';
@@ -238,11 +239,24 @@ async function cargar() {
     if (!json.success) { document.getElementById('resultado').innerHTML = `<div class="alert alert-danger">${json.error}</div>`; return; }
     datosActuales = json.data;
 
+    // Si no es admin: cargar ejecutivos asignados
+    if (!esAdmin && _ejAsignados === null) {
+      try {
+        const ejRes = await fetch('/api/usuarios/me/ejecutivos', { headers: H });
+        const ejJson = await ejRes.json();
+        _ejAsignados = ejJson?.data || [];
+      } catch { _ejAsignados = []; }
+    }
+
+    // Filtrar datos según asignación
+    const datosPermitidos = esAdmin ? json.data
+      : json.data.filter(d => _ejAsignados.includes(d.ejecutivo));
+
     // Poblar filtro de ejecutivos
     const sel = document.getElementById('filtroEj');
     const valActual = sel.value;
     sel.innerHTML = '<option value="">— Todos —</option>';
-    json.data.forEach(d => {
+    datosPermitidos.forEach(d => {
       const o = document.createElement('option');
       o.value = d.ejecutivo;
       o.textContent = d.ejecutivo;
@@ -250,19 +264,13 @@ async function cargar() {
       sel.appendChild(o);
     });
 
-    // Si no es admin: bloquear al propio ejecutivo
+    // Si no es admin y solo hay un ejecutivo: bloquear selector
     if (!esAdmin) {
-      const nombreCompleto = `${yo?.nombre||''} ${yo?.apellido||''}`.trim().toUpperCase();
-      // Buscar coincidencia en los datos (nombre ejecutivo puede estar en mayúsculas)
-      const matchEj = json.data.find(d => d.ejecutivo && d.ejecutivo.toUpperCase().includes(yo?.nombre?.toUpperCase()));
-      const ejPropio = matchEj ? matchEj.ejecutivo : nombreCompleto;
-      sel.value = ejPropio;
-      sel.disabled = true;
-      const datos = json.data.filter(d => d.ejecutivo === ejPropio);
-      renderizar(datos, mes);
-    } else {
-      renderizar(json.data, mes);
+      sel.disabled = _ejAsignados.length <= 1;
+      if (_ejAsignados.length === 1) sel.value = _ejAsignados[0];
     }
+
+    renderizar(datosPermitidos, mes);
   } catch(e) {
     document.getElementById('resultado').innerHTML = `<div class="alert alert-danger">Error al cargar: ${e.message}</div>`;
   } finally {

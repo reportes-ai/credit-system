@@ -23,6 +23,20 @@ const bcrypt = require('bcryptjs');
   } catch (e) { console.error('[permisos_usuario migration]', e.message); }
 })();
 
+// Tabla asignación ejecutivos por usuario
+(async () => {
+  try {
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS usuario_ejecutivos (
+        id           INT AUTO_INCREMENT PRIMARY KEY,
+        id_usuario   INT NOT NULL,
+        ejecutivo    VARCHAR(200) NOT NULL,
+        INDEX idx_ue_usuario (id_usuario)
+      )
+    `);
+  } catch (e) { console.error('[usuario_ejecutivos migration]', e.message); }
+})();
+
 const PERFILES_GLOBALES = ['Administrador', 'Gerente'];
 
 const buildFiltroUsuario = (usuario) => {
@@ -214,4 +228,46 @@ const updatePermisosUsuario = async (req, res) => {
   }
 };
 
-module.exports = { getAllUsuarios, getUsuarioById, createUsuario, updateUsuario, deleteUsuario, resetClave, getPermisosUsuario, updatePermisosUsuario };
+/* ─── GET /usuarios/:id/ejecutivos ─────────────────────────────── */
+const getEjecutivosUsuario = async (req, res) => {
+  try {
+    const [rows] = await pool.query(
+      `SELECT ejecutivo FROM usuario_ejecutivos WHERE id_usuario = ? ORDER BY ejecutivo`,
+      [req.params.id]
+    );
+    res.json({ success: true, data: rows.map(r => r.ejecutivo), error: null });
+  } catch (e) {
+    res.status(500).json({ success: false, data: null, error: e.message });
+  }
+};
+
+/* ─── PUT /usuarios/:id/ejecutivos ─────────────────────────────── */
+const updateEjecutivosUsuario = async (req, res) => {
+  try {
+    const { ejecutivos } = req.body; // array de strings
+    if (!Array.isArray(ejecutivos)) return res.status(400).json({ success: false, data: null, error: 'ejecutivos debe ser un array' });
+    await pool.query(`DELETE FROM usuario_ejecutivos WHERE id_usuario = ?`, [req.params.id]);
+    if (ejecutivos.length) {
+      const vals = ejecutivos.map(e => [req.params.id, e]);
+      await pool.query(`INSERT INTO usuario_ejecutivos (id_usuario, ejecutivo) VALUES ?`, [vals]);
+    }
+    res.json({ success: true, data: null, error: null });
+  } catch (e) {
+    res.status(500).json({ success: false, data: null, error: e.message });
+  }
+};
+
+/* ─── GET /usuarios/mis-ejecutivos  (para el usuario logueado) ─── */
+const misEjecutivos = async (req, res) => {
+  try {
+    const [rows] = await pool.query(
+      `SELECT ejecutivo FROM usuario_ejecutivos WHERE id_usuario = ? ORDER BY ejecutivo`,
+      [req.usuario.id_usuario]
+    );
+    res.json({ success: true, data: rows.map(r => r.ejecutivo), error: null });
+  } catch (e) {
+    res.status(500).json({ success: false, data: null, error: e.message });
+  }
+};
+
+module.exports = { getAllUsuarios, getUsuarioById, createUsuario, updateUsuario, deleteUsuario, resetClave, getPermisosUsuario, updatePermisosUsuario, getEjecutivosUsuario, updateEjecutivosUsuario, misEjecutivos };
