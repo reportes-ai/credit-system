@@ -47,7 +47,7 @@
 <body>
 <nav class="topnav">
   <div class="topnav-left">
-    <a href="/" class="topnav-brand"><img src="/img/logo.png" alt="AutoFácil"><span class="version-badge">v6.1</span></a>
+    <a href="/" class="topnav-brand"><img src="/img/logo.png" alt="AutoFácil"><span class="version-badge">v6.2</span></a>
     <div class="breadcrumb-nav">
       <a href="/">Inicio</a><span class="sep">›</span>
       <a href="/carga-masiva/">Carga Masiva</a><span class="sep">›</span>
@@ -97,13 +97,8 @@
     <div style="display:flex;gap:10px;align-items:center;margin-top:16px;flex-wrap:wrap;border-top:1px solid #f1f5f9;padding-top:16px">
       <input id="nuevoEstadoTri" type="text" placeholder="Estado Trinidad (ej: Devuelto)"
         style="border:1.5px solid #d1d5db;border-radius:8px;padding:7px 12px;font-size:.85rem;flex:1;min-width:140px;outline:none">
-      <select id="nuevoEstadoAF"
-        style="border:1.5px solid #d1d5db;border-radius:8px;padding:7px 12px;font-size:.85rem;flex:1;min-width:140px;outline:none;background:#fff">
-        <option value="Digitado">Digitado</option>
-        <option value="Aprobado">Aprobado</option>
-        <option value="Otorgado">Otorgado</option>
-        <option value="Rechazado">Rechazado</option>
-      </select>
+      <input id="nuevoEstadoAF" type="text" placeholder="Estado AutoFácil (ej: Aprobado)"
+        style="border:1.5px solid #d1d5db;border-radius:8px;padding:7px 12px;font-size:.85rem;flex:1;min-width:140px;outline:none">
       <button class="btn-main" onclick="eqAgregarEstado()" style="padding:7px 18px;font-size:.85rem">
         <i class="bi bi-plus-lg"></i>Agregar
       </button>
@@ -144,16 +139,13 @@ function eqRenderEstados() {
     tbody.innerHTML = '<tr><td colspan="3" style="text-align:center;color:#9ca3af;padding:16px">Sin equivalencias. Agrega la primera abajo.</td></tr>';
     return;
   }
+  const inputStyle = 'width:100%;border:1.5px solid #e5e7eb;border-radius:6px;padding:5px 9px;font-size:.85rem';
   tbody.innerHTML = eqEstadosData.map((r,i) => `
     <tr id="eqEst_${r.id}">
       <td><input type="text" value="${esc(r.estado_trinidad)}" data-idx="${i}" data-field="estado_trinidad"
-        style="width:100%;border:1.5px solid #e5e7eb;border-radius:6px;padding:5px 9px;font-size:.85rem"
-        oninput="eqEstEdit(this)"></td>
-      <td><select data-idx="${i}" data-field="estado_autofacil"
-        style="width:100%;border:1.5px solid #e5e7eb;border-radius:6px;padding:5px 9px;font-size:.85rem;background:#fff"
-        onchange="eqEstEdit(this)">
-        ${['Digitado','Aprobado','Otorgado','Rechazado'].map(v=>`<option value="${v}"${r.estado_autofacil===v?' selected':''}>${v}</option>`).join('')}
-      </select></td>
+        style="${inputStyle}" oninput="eqEstEdit(this)"></td>
+      <td><input type="text" value="${esc(r.estado_autofacil)}" data-idx="${i}" data-field="estado_autofacil"
+        style="${inputStyle}" oninput="eqEstEdit(this)"></td>
       <td style="text-align:center">
         <button onclick="eqEliminarEstado(${r.id})"
           style="background:#fee2e2;border:none;border-radius:6px;padding:4px 10px;cursor:pointer;color:#dc2626;font-size:.8rem">
