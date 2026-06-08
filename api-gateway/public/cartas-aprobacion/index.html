@@ -211,7 +211,7 @@ body { font-family: 'Segoe UI', Arial, sans-serif; background: var(--gray-bg); c
   <div class="header no-print">
     <div class="header-logo" style="display:flex;align-items:center;gap:8px">
         <img id="logoHeader" src="/img/logo.png" alt="AutoFácil" style="height:32px;object-fit:contain">
-        <span style="font-size:11px;font-weight:400;color:#90CAF9">V5.41</span>
+        <span style="font-size:11px;font-weight:400;color:#90CAF9">V5.42</span>
       </div>
     <div class="header-right">
       <span class="header-user" id="headerUser"></span>
@@ -4872,7 +4872,16 @@ function toggleCambioPartic(){
 // Edición por monto bruto → actualiza % y neto/iva
 function onPartBrutoInput(el) {
   if (!cambioParticActivo) return;
+  // Formatear en tiempo real
+  const pos = el.selectionStart;
+  const prevLen = el.value.length;
   const raw = parseInt((el.value || '').replace(/[^0-9]/g,''), 10) || 0;
+  if (raw > 0) {
+    el.value = '$' + raw.toLocaleString('es-CL');
+    // Ajustar cursor para compensar cambio de largo
+    const newPos = pos + (el.value.length - prevLen);
+    try { el.setSelectionRange(newPos, newPos); } catch(e){}
+  }
   const neto = Math.round(raw / 1.19);
   const iva  = raw - neto;
   document.getElementById('fPartNeto').value = raw > 0 ? '$' + neto.toLocaleString('es-CL') : '';
@@ -4890,8 +4899,6 @@ function onPartBrutoInput(el) {
   const autoBruto = parseInt(el.dataset.autoBruto || '0');
   const alertPart = document.getElementById('alertPartExcepcion');
   if (alertPart) alertPart.style.display = (autoBruto > 0 && raw > autoBruto) ? '' : 'none';
-  // Formato al salir
-  el.onblur = () => { if (raw > 0) el.value = '$' + raw.toLocaleString('es-CL'); };
 }
 
 // Edición por % → calcula bruto y actualiza neto/iva
