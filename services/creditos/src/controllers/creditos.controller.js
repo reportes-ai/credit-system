@@ -256,13 +256,36 @@ const getAll = async (req, res) => {
       params.push(estado.toUpperCase());
     }
 
-    // Total para paginación
-    const [countRows] = await pool.query(
-      `SELECT COUNT(*) AS total FROM creditos ob
-       LEFT JOIN clientes cl ON cl.id_cliente = ob.id_cliente` + where,
-      params
-    );
+    // Stats por estado (todos los registros que coinciden, sin paginar)
+    const estadoExpr = `COALESCE(ob.estado,
+      CASE
+        WHEN ob.financiera IN ('AUTOFIN','UNIDAD DE CREDITO') AND ob.estado_eval = 'OTORGADO' THEN 'OTORGADO'
+        WHEN ob.estado_credito = 'OTORGADO' THEN 'VIGENTE'
+        WHEN ob.estado_eval    = 'OTORGADO' THEN 'VIGENTE'
+        WHEN ob.estado_eval IN ('RECHAZADO','ANULADO') THEN 'CANCELADO'
+        ELSE COALESCE(ob.estado_credito, ob.estado_eval)
+      END)`;
+
+    const [[statsRows], [countRows]] = await Promise.all([
+      pool.query(
+        `SELECT ${estadoExpr} AS estado, COUNT(*) AS cnt
+         FROM creditos ob
+         LEFT JOIN clientes cl ON cl.id_cliente = ob.id_cliente
+         LEFT JOIN (SELECT id_credito, COUNT(DISTINCT numero_cuota) AS cnt FROM pagos_credito WHERE estado_pago='PAGADO' GROUP BY id_credito) pp ON pp.id_credito = ob.id
+         ${where}
+         GROUP BY ${estadoExpr}`,
+        params
+      ),
+      pool.query(
+        `SELECT COUNT(*) AS total FROM creditos ob
+         LEFT JOIN clientes cl ON cl.id_cliente = ob.id_cliente` + where,
+        params
+      ),
+    ]);
+
     const total = countRows[0].total;
+    const stats = {};
+    for (const r of statsRows) stats[r.estado || 'SIN_ESTADO'] = r.cnt;
 
     const sql = SELECT_GESTION + where +
       ` ORDER BY ob.mes DESC, ob.id DESC LIMIT ? OFFSET ?`;
@@ -271,6 +294,7 @@ const getAll = async (req, res) => {
     res.json({
       success: true,
       data: rows,
+      stats,
       pagination: { total, page: pageNum, limit: limitNum, pages: Math.ceil(total / limitNum) },
       error: null
     });

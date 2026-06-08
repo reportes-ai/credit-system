@@ -352,13 +352,14 @@ async function buscarCreditos(page = 1) {
     const j = await r.json();
     if (!j.success) throw new Error(j.error);
     _todosCreditos = j.data || [];
-    const pag = j.pagination || {};
+    const pag   = j.pagination || {};
+    const stats = j.stats      || {};
 
-    // Stats usando totales del servidor
+    // Stats desde servidor (totales reales de todos los registros, no solo la página)
+    actualizarStats(stats, pag.total);
+
+    // Render página actual con filtro client-side
     const baseEmpresa = _filtrarPorEmpresa(_todosCreditos);
-    actualizarStats(baseEmpresa, pag.total);
-
-    // Filtro estado client-side sobre la página actual
     const listaEstado = _filtroProceso
       ? baseEmpresa.filter(c => !ESTADOS_FUERA_PROCESO.has(c.estado))
       : _aplicarFiltroEstado(baseEmpresa);
@@ -387,25 +388,25 @@ function renderPaginacion(pag) {
   el.innerHTML = html;
 }
 
-function actualizarStats(list, totalServidor) {
-  const ingresados = list.filter(c => c.estado==='INGRESO' || c.estado==='REVISION').length;
-  const analisis   = list.filter(c => c.estado==='CARTA_APROBACION').length;
-  const proceso    = list.filter(c => !ESTADOS_FUERA_PROCESO.has(c.estado)).length;
-  const mora       = list.filter(_enMoraReal).length;
-  document.getElementById('statTotal').textContent     = totalServidor != null ? totalServidor.toLocaleString('es-CL') : list.length;
+function actualizarStats(stats, totalServidor) {
+  // stats es el objeto {ESTADO: count} del servidor — totales reales
+  const g = (e) => (stats[e] || 0);
+  const ingresados = g('INGRESO') + g('REVISION');
+  const proceso    = totalServidor - g('CANCELADO') - g('VIGENTE') - g('OTORGADO') - g('CURSADO') - g('DESISTIDO');
+  document.getElementById('statTotal').textContent     = (totalServidor || 0).toLocaleString('es-CL');
   document.getElementById('statRevision').textContent  = ingresados;
   const elAn = document.getElementById('statCartaAprobacion');
-  if (elAn) elAn.textContent = analisis;
-  document.getElementById('statProceso').textContent   = proceso;
-  document.getElementById('statVigentes').textContent  = list.filter(c=>c.estado==='VIGENTE' && !_enMoraReal(c)).length;
-  document.getElementById('statMora').textContent      = mora;
-  document.getElementById('statCancelados').textContent= list.filter(c=>c.estado==='CANCELADO').length;
+  if (elAn) elAn.textContent = g('CARTA_APROBACION');
+  document.getElementById('statProceso').textContent   = Math.max(0, proceso);
+  document.getElementById('statVigentes').textContent  = g('VIGENTE');
+  document.getElementById('statMora').textContent      = g('EN MORA') || 0;
+  document.getElementById('statCancelados').textContent= g('CANCELADO');
   const elOtorg = document.getElementById('statOtorgados');
-  if (elOtorg) elOtorg.textContent = list.filter(c=>c.estado==='OTORGADO').length;
+  if (elOtorg) elOtorg.textContent = g('OTORGADO');
   const elCurs = document.getElementById('statCursados');
-  if (elCurs) elCurs.textContent = list.filter(c=>c.estado==='CURSADO').length;
+  if (elCurs) elCurs.textContent = g('CURSADO');
   const elDes = document.getElementById('statDesistidos');
-  if (elDes) elDes.textContent = list.filter(c=>c.estado==='DESISTIDO').length;
+  if (elDes) elDes.textContent = g('DESISTIDO');
   // Resaltar badge ingresados
   const chipRev = document.querySelector('.stat-revision');
   if (chipRev) chipRev.style.borderColor = ingresados > 0 ? '#854d0e' : '';
