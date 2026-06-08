@@ -109,7 +109,7 @@
   <div class="topnav-left">
     <a href="/" class="topnav-brand">
       <img src="/img/logo.png" alt="AutoFácil">
-      <span class="version-badge">v1.0</span>
+      <span class="version-badge">v1.1</span>
     </a>
     <div class="breadcrumb-nav">
       <a href="/">Inicio</a><span class="sep">›</span>
@@ -278,8 +278,17 @@ let UF = 0;   // valor UF hoy
 
 /* ── Helpers formato ──────────────────────────────────────────────── */
 function fmtMiles(inp) {
-  let raw = inp.value.replace(/[^0-9]/g,'');
-  inp.value = raw ? '$' + parseInt(raw,10).toLocaleString('es-CL') : '';
+  // Guardar posición del cursor relativa al final para no perderla al reformatear
+  const selStart = inp.selectionStart;
+  const oldLen   = inp.value.length;
+  let raw = inp.value.replace(/[^0-9]/g, '');
+  if (!raw) { inp.value = ''; return; }
+  const formatted = '$' + parseInt(raw, 10).toLocaleString('es-CL');
+  inp.value = formatted;
+  // Restaurar cursor al final del número (no al final del string si hay sufijos)
+  const diff = formatted.length - oldLen;
+  const newPos = Math.max(0, selStart + diff);
+  inp.setSelectionRange(newPos, newPos);
 }
 function parseMiles(s) { return parseInt((s||'').replace(/[^0-9]/g,''),10) || 0; }
 function fN(n) { return n==null||isNaN(n) ? '—' : '$' + Math.round(n).toLocaleString('es-CL'); }
@@ -321,7 +330,9 @@ function marcarMejor(rentab_af, rentab_uac) {
 
 /* ── Carga inicial ─────────────────────────────────────────────────── */
 async function cargarDatos() {
-  const hoy = new Date().toISOString().slice(0,10);
+  // Usar fecha Chile en vez de UTC para no buscar fecha futura
+  const hoy = new Date().toLocaleDateString('en-CA', { timeZone: 'America/Santiago' });
+
   const [rp, ru] = await Promise.all([
     fetch('/api/parametros-credito', { headers: hdr() }),
     fetch('/api/uf/en/' + hoy, { headers: hdr() })
@@ -329,9 +340,25 @@ async function cargarDatos() {
   const jp = await rp.json();
   const ju = await ru.json();
   if (jp.success) jp.data.lista.forEach(r => { P[r.clave] = parseFloat(r.valor); });
+
   if (ju.success && ju.data?.valor) {
     UF = parseFloat(ju.data.valor);
     document.getElementById('ufValor').textContent = '$' + Math.round(UF).toLocaleString('es-CL');
+  } else {
+    // Fallback: buscar la UF más reciente disponible
+    try {
+      const rf = await fetch('/api/uf/vigente', { headers: hdr() });
+      const jf = await rf.json();
+      if (jf.success && jf.data?.valor) {
+        UF = parseFloat(jf.data.valor);
+        const fechaUF = jf.data.fecha ? ' (' + new Date(jf.data.fecha).toLocaleDateString('es-CL') + ')' : '';
+        document.getElementById('ufValor').textContent = '$' + Math.round(UF).toLocaleString('es-CL') + fechaUF;
+      } else {
+        document.getElementById('ufValor').textContent = 'No disponible';
+      }
+    } catch(_) {
+      document.getElementById('ufValor').textContent = 'Error al cargar';
+    }
   }
   simular();
 }
