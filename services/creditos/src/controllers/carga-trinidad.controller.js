@@ -195,22 +195,19 @@ exports.importar = async (req, res) => {
       try {
         if (existMap[f.num_op]) {
           const actual = existMap[f.num_op];
-          // Detectar campos que cambian
-          const CAMPOS = ['estado_autofin', 'estado_credito'];
-          for (const campo of CAMPOS) {
-            const ant = actual[campo] ?? null;
-            const nvo = f[campo]     ?? null;
-            if (String(ant ?? '') !== String(nvo ?? '')) {
-              cambiosLog.push({ num_op: f.num_op, campo, valor_anterior: ant, valor_nuevo: nvo });
-            }
+          // Solo registrar cambio de estado_autofin (estado_credito NO se pisa — viene de AutoFácil)
+          const ant = actual['estado_autofin'] ?? null;
+          const nvo = f['estado_autofin']      ?? null;
+          if (String(ant ?? '') !== String(nvo ?? '')) {
+            cambiosLog.push({ num_op: f.num_op, campo: 'estado_autofin', valor_anterior: ant, valor_nuevo: nvo });
           }
           await pool.query(
             `UPDATE creditos SET
-               estado_autofin = ?, estado_credito = ?,
+               estado_autofin = ?,
                marca = COALESCE(?, marca), modelo = COALESCE(?, modelo),
                vendedor = COALESCE(?, vendedor), updated_at = NOW()
              WHERE num_op = ?`,
-            [f.estado_autofin, f.estado_credito, f.marca, f.modelo, f.vendedor, f.num_op]
+            [f.estado_autofin, f.marca, f.modelo, f.vendedor, f.num_op]
           );
           actualizados++;
           log.push(`✓ Actualizado ${f.num_op} → ${f.estado_autofin} / ${f.estado_credito}`);

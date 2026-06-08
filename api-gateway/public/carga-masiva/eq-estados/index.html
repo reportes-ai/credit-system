@@ -47,7 +47,7 @@
 <body>
 <nav class="topnav">
   <div class="topnav-left">
-    <a href="/" class="topnav-brand"><img src="/img/logo.png" alt="AutoFácil"><span class="version-badge">v6.0</span></a>
+    <a href="/" class="topnav-brand"><img src="/img/logo.png" alt="AutoFácil"><span class="version-badge">v6.1</span></a>
     <div class="breadcrumb-nav">
       <a href="/">Inicio</a><span class="sep">›</span>
       <a href="/carga-masiva/">Carga Masiva</a><span class="sep">›</span>
@@ -100,6 +100,7 @@
       <select id="nuevoEstadoAF"
         style="border:1.5px solid #d1d5db;border-radius:8px;padding:7px 12px;font-size:.85rem;flex:1;min-width:140px;outline:none;background:#fff">
         <option value="Digitado">Digitado</option>
+        <option value="Aprobado">Aprobado</option>
         <option value="Otorgado">Otorgado</option>
         <option value="Rechazado">Rechazado</option>
       </select>
@@ -151,7 +152,7 @@ function eqRenderEstados() {
       <td><select data-idx="${i}" data-field="estado_autofacil"
         style="width:100%;border:1.5px solid #e5e7eb;border-radius:6px;padding:5px 9px;font-size:.85rem;background:#fff"
         onchange="eqEstEdit(this)">
-        ${['Digitado','Otorgado','Rechazado'].map(v=>`<option value="${v}"${r.estado_autofacil===v?' selected':''}>${v}</option>`).join('')}
+        ${['Digitado','Aprobado','Otorgado','Rechazado'].map(v=>`<option value="${v}"${r.estado_autofacil===v?' selected':''}>${v}</option>`).join('')}
       </select></td>
       <td style="text-align:center">
         <button onclick="eqEliminarEstado(${r.id})"
