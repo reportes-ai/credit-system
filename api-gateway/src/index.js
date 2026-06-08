@@ -1,3 +1,6 @@
+// Forzar timezone Chile antes de cualquier operación de fecha
+process.env.TZ = 'America/Santiago';
+
 const express = require('express');
 const cors = require('cors');
 const path = require('path');
