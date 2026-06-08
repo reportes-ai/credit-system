@@ -1,5 +1,6 @@
 const pool = require('../../../../shared/config/database');
 const { calcularOperacion } = require('../utils/calcular-operacion');
+const { recalcularMeses } = require('../utils/recalcular-mes');
 
 // Migración: tabla creditos
 (async () => {
@@ -434,190 +435,47 @@ const recalcularComisiones = async (req, res) => {
     if (perfil !== 'Administrador')
       return res.status(403).json({ success: false, data: null, error: 'Solo Administrador puede ejecutar el recálculo' });
 
-    // 1. Pre-cargar parámetros una sola vez
-    const [paramRows] = await pool.query('SELECT clave, valor FROM parametros_credito');
-    const p = {};
-    paramRows.forEach(r => { p[r.clave] = parseFloat(r.valor); });
+    const { mes_desde, mes_hasta } = req.body || {};
 
-    // 1b. Pre-cargar tramos de comisión por penetración
-    const [penTramos] = await pool.query(
-      'SELECT tipo, pen_min, pct_comision FROM comisiones_seguro_penetracion WHERE estado="activo" ORDER BY tipo, pen_min'
-    );
-    const getPenPct = (tipo, pen) => {
-      const filas = penTramos.filter(r => r.tipo === tipo && parseFloat(pen || 0) >= parseFloat(r.pen_min));
-      if (!filas.length) return 0;
-      const best = filas.reduce((a, b) => parseFloat(a.pen_min) > parseFloat(b.pen_min) ? a : b);
-      return parseFloat(best.pct_comision) / 100;
-    };
-
-    // 2. Pre-cargar todas las UF necesarias en un Map fecha→valor
-    const [ufRows] = await pool.query('SELECT fecha, valor FROM uf');
-    const ufMap = {};
-    ufRows.forEach(r => { ufMap[r.fecha.toString().slice(0,10)] = parseFloat(r.valor); });
-
-    // 3. Traer todos los registros a recalcular
-    const [rows] = await pool.query(
-      `SELECT id, saldo_precio, plazo, financiera, parque, com_parque,
-              seguro_rdh, seguro_cesantia, seguro_rep_menor,
-              monto_financiado, monto_capitalizado, fecha_otorgado, mes,
-              estado_credito
-       FROM creditos WHERE saldo_precio > 0 AND plazo > 0`
-    );
-
-    // 3b. Pre-calcular por mes: penetración AutoFin + conteo UAC (para tiers)
-    const mesMap = {};    // mes → { total(AF), rdh, ces, rep, uacOps }
-    for (const row of rows) {
-      const fin  = (row.financiera || '').toUpperCase();
-      const esOt = (row.estado_credito || '').toUpperCase() === 'OTORGADO';
-      const mes  = (row.mes || row.fecha_otorgado || '').toString().slice(0, 7);
-      if (!mes) continue;
-      if (!mesMap[mes]) mesMap[mes] = { total: 0, rdh: 0, ces: 0, rep: 0, uacOps: 0 };
-
-      // Penetración AutoFin
-      const esAF = (fin.includes('AUTOFIN') || fin.includes('AUTOF')) &&
-                   !fin.includes('AUTOFACIL') && !fin.includes('AUTOFÁCIL');
-      if (esAF && esOt) {
-        mesMap[mes].total++;
-        if (parseFloat(row.seguro_rdh)       > 0) mesMap[mes].rdh++;
-        if (parseFloat(row.seguro_cesantia)  > 0) mesMap[mes].ces++;
-        if (parseFloat(row.seguro_rep_menor) > 0) mesMap[mes].rep++;
+    // Determinar los meses a recalcular
+    let meses;
+    if (mes_desde && mes_hasta) {
+      // Generar lista de meses entre mes_desde y mes_hasta (YYYY-MM)
+      meses = [];
+      const [y0, m0] = mes_desde.split('-').map(Number);
+      const [y1, m1] = mes_hasta.split('-').map(Number);
+      let y = y0, m = m0;
+      while (y < y1 || (y === y1 && m <= m1)) {
+        meses.push(`${y}-${String(m).padStart(2, '0')}`);
+        m++;
+        if (m > 12) { m = 1; y++; }
+        if (meses.length > 60) break; // seguridad: máximo 5 años
       }
-
-      // Conteo UAC para tiers (OTORGADO + APROBADO)
-      const esUAC = fin.includes('UNIDAD') || fin.includes('UAC');
-      const esOtAp = ['OTORGADO','APROBADO'].includes((row.estado_credito || '').toUpperCase());
-      if (esUAC && esOtAp) mesMap[mes].uacOps++;
+    } else {
+      // Sin rango: obtener todos los meses distintos en BD
+      const [mesRows] = await pool.query(
+        `SELECT DISTINCT DATE_FORMAT(mes, '%Y-%m') AS m FROM creditos
+         WHERE mes IS NOT NULL ORDER BY m`
+      );
+      meses = mesRows.map(r => r.m);
     }
 
-    // Helper: tier UAC según volumen del mes
-    const getUacPct = (mes) => {
-      const ops = mesMap[mes]?.uacOps || 0;
-      if (ops >= p.uac_ops_tier2_max) return p.uac_pct_tier3 / 100;
-      if (ops >= p.uac_ops_tier1_max) return p.uac_pct_tier2 / 100;
-      return p.uac_pct_tier1 / 100;
-    };
+    const resultado = await recalcularMeses(meses);
 
-    // 4. Helpers inline (sin DB)
-    const getDealerPct = (plazo) => {
-      if (plazo <= 6)  return p.dealer_pct_6  / 100;
-      if (plazo <= 12) return p.dealer_pct_12 / 100;
-      if (plazo <= 24) return p.dealer_pct_24 / 100;
-      if (plazo <= 36) return p.dealer_pct_36 / 100;
-      return p.dealer_pct_99 / 100;
-    };
-
-    // 5. Calcular todo en memoria
-    const updates = rows.map(row => {
-      const saldo    = parseFloat(row.saldo_precio)      || 0;
-      const montoFin = parseFloat(row.monto_financiado)  || 0;
-      const montoCap = parseFloat(row.monto_capitalizado) || montoFin;
-      const plazo    = parseInt(row.plazo)                || 0;
-      const fin      = (row.financiera || '').toUpperCase();
-      const parqueVal = (row.parque || '').toUpperCase().trim();
-      const esParque  = parqueVal.includes('PARQUE');
-      const uf        = ufMap[row.fecha_otorgado?.toString().slice(0,10)] || null;
-      const esAF      = (fin.includes('AUTOFIN') || fin.includes('AUTOF')) &&
-                        !fin.includes('AUTOFACIL') && !fin.includes('AUTOFÁCIL');
-      const esOtorgado = (row.estado_credito || '').toUpperCase() === 'OTORGADO';
-      const mes        = (row.mes || row.fecha_otorgado || '').toString().slice(0, 7);
-
-      // Penetración — solo AutoFin OTORGADO; resto queda null
-      let pen_rdh = null, pen_cesantia = null, pen_reparaciones = null;
-      if (esAF && esOtorgado && mes && mesMap[mes]) {
-        const m = mesMap[mes];
-        pen_rdh          = m.total > 0 ? Math.round((m.rdh / m.total) * 10000) / 100 : 0;
-        pen_cesantia     = m.total > 0 ? Math.round((m.ces / m.total) * 10000) / 100 : 0;
-        pen_reparaciones = m.total > 0 ? Math.round((m.rep / m.total) * 10000) / 100 : 0;
-      }
-
-      // Comisión financiera (monto_comision_fin)
-      let monto_comision_fin = 0;
-      if (plazo > 0 && montoFin > 0) {
-        if (fin.includes('AUTOFIN') || fin.includes('AUTOF')) {
-          const tmc_menor  = (p.autofin_tmc_menor_200 / 100) / 12;
-          const tmc_mayor  = (p.autofin_tmc_mayor_200 / 100) / 12;
-          const spread     = p.autofin_spread_fondo / 100;
-          const costo_fondo = tmc_mayor - spread;
-          const limite_200  = uf ? 200 * uf : null;
-          const tasa_cli    = (limite_200 && montoCap > limite_200) ? tmc_mayor : tmc_menor;
-          if (tasa_cli > 0 && costo_fondo > 0) {
-            const cuota = montoCap * tasa_cli * Math.pow(1+tasa_cli,plazo) / (Math.pow(1+tasa_cli,plazo)-1);
-            const pv    = cuota * (1 - Math.pow(1+costo_fondo,-plazo)) / costo_fondo;
-            monto_comision_fin = Math.round(pv - montoCap);
-          }
-        } else if (fin.includes('UNIDAD') || fin.includes('UAC')) {
-          monto_comision_fin = Math.round(saldo * getUacPct(mes));
-        }
-      }
-
-      // Comisión seguros — solo para OTORGADO, según tramo de penetración del mes
-      let com_rdh = 0, com_cesantia = 0, com_reparaciones_seg = 0;
-      if (plazo > 0 && esOtorgado) {
-        com_rdh              = Math.round(getPenPct('rdh',        pen_rdh)          * (parseFloat(row.seguro_rdh)       || 0));
-        com_cesantia         = Math.round(getPenPct('cesantia',   pen_cesantia)     * (parseFloat(row.seguro_cesantia)  || 0));
-        com_reparaciones_seg = Math.round(getPenPct('reparacion', pen_reparaciones) * (parseFloat(row.seguro_rep_menor) || 0));
-      }
-
-      // Comisión dealer
-      let comdea_real = 0, com_parque_calc = 0;
-      if (saldo > 0 && plazo > 0) {
-        const dealer_pct = getDealerPct(plazo);
-        const patio_pct  = p.patio_pct / 100;
-        comdea_real     = esParque
-          ? Math.round(saldo * dealer_pct)
-          : Math.round(saldo * (dealer_pct + patio_pct));
-        com_parque_calc = esParque ? Math.round(saldo * patio_pct) : 0;
-      }
-
-      const ingreso_neto_total = monto_comision_fin + com_rdh + com_cesantia + com_reparaciones_seg - comdea_real - com_parque_calc;
-
-      // [0:comdea, 1:com_parque, 2:monto_com_fin, 3:com_rdh, 4:com_cesantia, 5:com_rep,
-      //  6:ingreso_neto, 7:pen_rdh, 8:pen_cesantia, 9:pen_rep, 10:id]
-      return [comdea_real, com_parque_calc, monto_comision_fin, com_rdh, com_cesantia, com_reparaciones_seg,
-              ingreso_neto_total, pen_rdh, pen_cesantia, pen_reparaciones, row.id];
+    res.json({
+      success: true,
+      data: {
+        meses: meses.length,
+        actualizados: resultado.actualizados,
+        log: resultado.log,
+      },
+      error: null,
     });
-
-    // 6. UPDATE en chunks de 500 con CASE WHEN
-    const CHUNK = 500;
-    let actualizados = 0;
-    for (let i = 0; i < updates.length; i += CHUNK) {
-      const chunk   = updates.slice(i, i + CHUNK);
-      const ids     = chunk.map(u => u[10]);
-      const caseId  = chunk.map(u => `WHEN ${u[10]} THEN ?`).join(' ');
-      const vals = [
-        ...chunk.map(u => u[0]),  // comdea_real
-        ...chunk.map(u => u[1]),  // com_parque
-        ...chunk.map(u => u[2]),  // monto_comision_fin
-        ...chunk.map(u => u[3]),  // com_rdh
-        ...chunk.map(u => u[4]),  // com_cesantia
-        ...chunk.map(u => u[5]),  // com_reparaciones (0)
-        ...chunk.map(u => u[6]),  // ingreso_neto_total
-        ...chunk.map(u => u[7]),  // pen_rdh
-        ...chunk.map(u => u[8]),  // pen_cesantia
-        ...chunk.map(u => u[9]),  // pen_reparaciones
-        ...ids,
-      ];
-      const sql = `UPDATE creditos SET
-        comdea_real        = CASE id ${caseId} END,
-        com_parque         = CASE id ${caseId} END,
-        monto_comision_fin = CASE id ${caseId} END,
-        com_rdh            = CASE id ${caseId} END,
-        com_cesantia       = CASE id ${caseId} END,
-        com_reparaciones   = CASE id ${caseId} END,
-        ingreso_neto_total = CASE id ${caseId} END,
-        pen_rdh            = CASE id ${caseId} END,
-        pen_cesantia       = CASE id ${caseId} END,
-        pen_reparaciones   = CASE id ${caseId} END
-        WHERE id IN (${ids.map(()=>'?').join(',')})`;
-      await pool.query(sql, vals);
-      actualizados += chunk.length;
-    }
-
-    res.json({ success: true, data: { total: rows.length, actualizados }, error: null });
   } catch (e) {
     console.error('[recalc]', e);
     res.status(500).json({ success: false, data: null, error: e.message });
   }
 };
+
 
 module.exports = { getAll, getOne, create, update, remove, nextOp, liberarPago, marcarNoOtorgado, recalcularComisiones };
