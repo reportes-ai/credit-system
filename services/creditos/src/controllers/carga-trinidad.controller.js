@@ -301,3 +301,37 @@ exports.importar = async (req, res) => {
     return res.json({ success: false, error: e.message });
   }
 };
+
+/* ── POST /api/carga-trinidad/reprocesar-estados ────────────────
+   Lee la tabla trinidad_estados y actualiza estado_credito + estado_eval
+   en todos los creditos que tienen estado_autofin registrado.
+───────────────────────────────────────────────────────────────── */
+exports.reprocesarEstados = async (req, res) => {
+  try {
+    const mapaEstados = await cargarMapaEstados();
+    const EVAL_MAP = { 'Otorgado':'OTORGADO', 'Aprobado':'APROBADO', 'Rechazado':'RECHAZADO', 'Digitado':'PENDIENTE' };
+
+    // Traer todos los créditos con estado_autofin
+    const [creditos] = await pool.query(
+      `SELECT id, num_op, estado_autofin FROM creditos WHERE estado_autofin IS NOT NULL AND estado_autofin != ''`
+    );
+
+    if (!creditos.length) return res.json({ success: true, data: { actualizados: 0, mensaje: 'No hay créditos con estado Trinidad' } });
+
+    let actualizados = 0;
+    for (const c of creditos) {
+      const estadoCredito = mapEstado(c.estado_autofin, mapaEstados);
+      const estadoEval    = EVAL_MAP[estadoCredito] || estadoCredito?.toUpperCase() || null;
+      await pool.query(
+        `UPDATE creditos SET estado_credito = ?, estado_eval = ?, updated_at = NOW() WHERE id = ?`,
+        [estadoCredito, estadoEval, c.id]
+      );
+      actualizados++;
+    }
+
+    return res.json({ success: true, data: { actualizados, mensaje: `${actualizados} créditos actualizados con las equivalencias actuales` } });
+  } catch (e) {
+    console.error('[carga-trinidad reprocesar-estados]', e);
+    return res.json({ success: false, error: e.message });
+  }
+};

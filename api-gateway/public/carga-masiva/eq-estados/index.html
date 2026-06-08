@@ -47,7 +47,7 @@
 <body>
 <nav class="topnav">
   <div class="topnav-left">
-    <a href="/" class="topnav-brand"><img src="/img/logo.png" alt="AutoFácil"><span class="version-badge">v6.2</span></a>
+    <a href="/" class="topnav-brand"><img src="/img/logo.png" alt="AutoFácil"><span class="version-badge">v6.3</span></a>
     <div class="breadcrumb-nav">
       <a href="/">Inicio</a><span class="sep">›</span>
       <a href="/carga-masiva/">Carga Masiva</a><span class="sep">›</span>
@@ -78,9 +78,15 @@
   <div class="card">
     <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:18px;flex-wrap:wrap;gap:10px">
       <div style="font-size:.82rem;color:#6b7280">Edita las celdas directamente. Presiona <strong>Guardar cambios</strong> cuando termines.</div>
-      <button onclick="eqGuardarEstados()" class="btn-main btn-save" id="btnGuardarEstados">
-        <i class="bi bi-floppy"></i>Guardar cambios
-      </button>
+      <div style="display:flex;gap:10px;flex-wrap:wrap">
+        <button onclick="eqGuardarEstados()" class="btn-main btn-save" id="btnGuardarEstados">
+          <i class="bi bi-floppy"></i>Guardar cambios
+        </button>
+        <button onclick="reprocesarEstados()" class="btn-main" id="btnReprocesar"
+          style="background:#0141A2" title="Aplica las equivalencias actuales a todos los créditos de la BD">
+          <i class="bi bi-arrow-repeat"></i>Aplicar a BD
+        </button>
+      </div>
     </div>
     <div style="overflow-x:auto">
       <table class="table preview-table" id="tblEstados" style="min-width:520px">
@@ -205,6 +211,23 @@ async function eqEliminarEstado(id) {
   if (!res.success) { toast('Error: '+res.error, false); return; }
   toast('Eliminado', true);
   eqCargarEstados();
+}
+
+async function reprocesarEstados() {
+  if (!confirm('¿Aplicar las equivalencias actuales a TODOS los créditos de la BD?\n\nActualizará estado_credito y estado_eval en todos los registros con estado Trinidad.')) return;
+  const btn = document.getElementById('btnReprocesar');
+  btn.disabled = true;
+  btn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span>Procesando…';
+  try {
+    const res = await fetch('/api/carga-trinidad/reprocesar-estados', { method:'POST', headers:H }).then(x=>x.json());
+    if (!res.success) throw new Error(res.error);
+    toast(res.data.mensaje, true);
+  } catch(e) {
+    toast('Error: ' + e.message, false);
+  } finally {
+    btn.disabled = false;
+    btn.innerHTML = '<i class="bi bi-arrow-repeat"></i>Aplicar a BD';
+  }
 }
 
 eqCargarEstados();
