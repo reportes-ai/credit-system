@@ -337,36 +337,62 @@ function _aplicarFiltroEstado(lista) {
   return lista.filter(c => c.estado === estado);
 }
 
-async function buscarCreditos() {
+let _paginaActual = 1;
+const _LIMIT_PAG  = 100;
+
+async function buscarCreditos(page = 1) {
+  _paginaActual = page;
   const q = document.getElementById('searchQ').value.trim();
   const res = document.getElementById('resultadosConsulta');
   res.innerHTML = '<div class="text-center py-4 text-muted"><div class="spinner-border spinner-border-sm me-2"></div>Buscando…</div>';
   try {
-    let url = '/api/creditos?';
-    if (q) url += 'q=' + encodeURIComponent(q);
-    const r = await fetch(url, { headers: apiHdr() });
+    const params = new URLSearchParams({ page, limit: _LIMIT_PAG });
+    if (q) params.set('q', q);
+    const r = await fetch('/api/creditos?' + params, { headers: apiHdr() });
     const j = await r.json();
     if (!j.success) throw new Error(j.error);
     _todosCreditos = j.data || [];
-    // Stats: total filtrado por financiera (sin filtro estado)
+    const pag = j.pagination || {};
+
+    // Stats usando totales del servidor
     const baseEmpresa = _filtrarPorEmpresa(_todosCreditos);
-    actualizarStats(baseEmpresa);
-    // Lista mostrada = filtro estado sobre base empresa
+    actualizarStats(baseEmpresa, pag.total);
+
+    // Filtro estado client-side sobre la página actual
     const listaEstado = _filtroProceso
       ? baseEmpresa.filter(c => !ESTADOS_FUERA_PROCESO.has(c.estado))
       : _aplicarFiltroEstado(baseEmpresa);
     renderConsulta(listaEstado);
+    renderPaginacion(pag);
   } catch(e) {
     res.innerHTML = `<div class="empty-state" style="color:#ef4444"><i class="bi bi-exclamation-triangle"></i>${e.message}</div>`;
   }
 }
 
-function actualizarStats(list) {
+function renderPaginacion(pag) {
+  let el = document.getElementById('pagCreditos');
+  if (!el) {
+    el = document.createElement('div');
+    el.id = 'pagCreditos';
+    el.style.cssText = 'display:flex;align-items:center;justify-content:center;gap:6px;padding:12px 0;flex-wrap:wrap;font-size:.83rem';
+    document.getElementById('resultadosConsulta').after(el);
+  }
+  if (!pag.pages || pag.pages <= 1) { el.innerHTML = ''; return; }
+  const p = pag.page, total = pag.pages;
+  const btnStyle = (activo) => `style="border:1px solid #d1d5db;border-radius:6px;padding:4px 10px;cursor:pointer;background:${activo?'#0141A2':'#fff'};color:${activo?'#fff':'#374151'};font-weight:${activo?'700':'400'}"`;
+  let html = `<span style="color:#6b7280">Página ${p} de ${total} (${pag.total.toLocaleString('es-CL')} registros)</span>`;
+  if (p > 1)     html += `<button ${btnStyle(false)} onclick="buscarCreditos(1)">«</button><button ${btnStyle(false)} onclick="buscarCreditos(${p-1})">‹</button>`;
+  html += `<button ${btnStyle(true)} disabled>${p}</button>`;
+  if (p < total) html += `<button ${btnStyle(false)} onclick="buscarCreditos(${p+1})">›</button><button ${btnStyle(false)} onclick="buscarCreditos(${total})">»</button>`;
+  el.innerHTML = html;
+}
+
+function actualizarStats(list, totalServidor) {
   const ingresados = list.filter(c => c.estado==='INGRESO' || c.estado==='REVISION').length;
   const analisis   = list.filter(c => c.estado==='CARTA_APROBACION').length;
   const proceso    = list.filter(c => !ESTADOS_FUERA_PROCESO.has(c.estado)).length;
   const mora       = list.filter(_enMoraReal).length;
-  document.getElementById('statTotal').textContent     = list.length;
+  document.getElementById('statTotal').textContent     = totalServidor != null ? totalServidor.toLocaleString('es-CL') : list.length;
   document.getElementById('statRevision').textContent  = ingresados;
   const elAn = document.getElementById('statCartaAprobacion');
   if (elAn) elAn.textContent = analisis;
@@ -397,7 +423,7 @@ function filtrarPorEstado(estado) {
   }
   const chipPro = document.getElementById('chipProceso');
   if (chipPro) chipPro.classList.toggle('activo', _filtroProceso);
-  buscarCreditos();
+  buscarCreditos(1);
 }
 
 function renderConsulta(list) {
@@ -582,7 +608,7 @@ async function guardarEstadoDetalle() {
     if (j.success) {
       showToast('Cambios guardados', true);
       cerrarDetalle();
-      buscarCreditos();
+      buscarCreditos(1);
     } else showToast(j.error||'Error', false);
   } catch(e) { showToast('Error de conexión', false); }
 }
@@ -1545,7 +1571,7 @@ function cancelarEdicion() {
 }
 
 /* ─── Init ─────────────────────────────────────────────────────────── */
-buscarCreditos();
+buscarCreditos(1);
 vehCargaMarcas();
 credCargarParams();
 // Fechas por defecto

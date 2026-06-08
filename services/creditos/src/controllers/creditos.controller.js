@@ -232,28 +232,51 @@ const create = async (req, res) => {
 /* ─── GET ALL ────────────────────────────────────────────────────────────── */
 const getAll = async (req, res) => {
   try {
-    const { q } = req.query;
-    let sql = SELECT_GESTION + WHERE_GESTION;
+    const { q, page, limit, estado } = req.query;
+    const pageNum  = Math.max(1, parseInt(page)  || 1);
+    const limitNum = Math.min(500, Math.max(1, parseInt(limit) || 100));
+    const offset   = (pageNum - 1) * limitNum;
+
+    let where = WHERE_GESTION;
     const params = [];
 
     if (q && q.trim()) {
-      // Normalizar: quitar puntos para comparar RUTs con/sin formato (77.267.903-3 = 77267903-3)
       const qNorm = q.trim().toUpperCase().replace(/\./g, '');
       const like  = `%${qNorm}%`;
-      sql += ` AND (
-        UPPER(REPLACE(COALESCE(cl.rut, ''),'.',''))      LIKE ? OR
-        UPPER(COALESCE(cl.nombre_completo, ''))          LIKE ? OR
-        UPPER(COALESCE(ob.numero_credito, CONCAT('OP-',ob.num_op)))      LIKE ?
+      where += ` AND (
+        UPPER(REPLACE(COALESCE(cl.rut, ''),'.',''))                        LIKE ? OR
+        UPPER(COALESCE(cl.nombre_completo, ''))                            LIKE ? OR
+        UPPER(COALESCE(ob.numero_credito, CONCAT('OP-',ob.num_op)))        LIKE ?
       )`;
       params.push(like, like, like);
     }
-    sql += ` ORDER BY ob.mes DESC, ob.id DESC LIMIT 50000`;
 
-    const [rows] = await pool.query(sql, params);
-    res.json({ success: true, data: rows, error: null });
+    if (estado && estado !== 'todos') {
+      where += ` AND ob.estado = ?`;
+      params.push(estado.toUpperCase());
+    }
+
+    // Total para paginación
+    const [countRows] = await pool.query(
+      `SELECT COUNT(*) AS total FROM creditos ob
+       LEFT JOIN clientes cl ON cl.id_cliente = ob.id_cliente` + where,
+      params
+    );
+    const total = countRows[0].total;
+
+    const sql = SELECT_GESTION + where +
+      ` ORDER BY ob.mes DESC, ob.id DESC LIMIT ? OFFSET ?`;
+    const [rows] = await pool.query(sql, [...params, limitNum, offset]);
+
+    res.json({
+      success: true,
+      data: rows,
+      pagination: { total, page: pageNum, limit: limitNum, pages: Math.ceil(total / limitNum) },
+      error: null
+    });
   } catch (e) {
     console.error('[creditos getAll]', e);
-    (console.error('[error]', e), res.status(500).json({success:false,data:null,error:'Error interno del servidor'}));
+    res.status(500).json({ success: false, data: null, error: e.message });
   }
 };
 
