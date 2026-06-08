@@ -343,6 +343,7 @@ async function cargarDatos() {
   try {
     const rv = await fetch('/api/uf/vigente', { headers: hdr() });
     const jv = await rv.json();
+    console.log('[UF] status:', rv.status, 'response:', JSON.stringify(jv));
     if (jv.success && jv.data?.valor) {
       UF = parseFloat(jv.data.valor);
       const fechaUF = jv.data.fecha
@@ -352,10 +353,11 @@ async function cargarDatos() {
         '$' + Math.round(UF).toLocaleString('es-CL') +
         (fechaUF ? ' · ' + fechaUF : '');
     } else {
-      document.getElementById('ufValor').textContent = 'Sin datos';
+      document.getElementById('ufValor').textContent =
+        'Sin datos (HTTP ' + rv.status + ')';
     }
   } catch(e) {
-    document.getElementById('ufValor').textContent = 'Error';
+    document.getElementById('ufValor').textContent = 'Error: ' + e.message;
     console.warn('[simulador] uf/vigente:', e.message);
   }
 
