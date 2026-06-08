@@ -339,6 +339,36 @@ const importar = async (req, res) => {
   }
 };
 
+/* ── POST /api/carga-masiva/eliminar-por-ops ──────────────────────────────
+   Elimina registros por lista de num_op. Solo Administrador.
+   Body: { ops: [88169, 88170, ...] }
+   ─────────────────────────────────────────────────────────────────────── */
+const eliminarPorOps = async (req, res) => {
+  try {
+    const { ops } = req.body || {};
+    if (!Array.isArray(ops) || !ops.length) {
+      return res.status(400).json({ success: false, data: null, error: 'Se requiere array ops[]' });
+    }
+    const nums = ops.map(o => parseInt(o)).filter(n => !isNaN(n) && n > 0);
+    if (!nums.length) return res.status(400).json({ success: false, data: null, error: 'No hay OPs válidas' });
+
+    const chunkSize = 500;
+    let eliminados = 0;
+    for (let i = 0; i < nums.length; i += chunkSize) {
+      const chunk = nums.slice(i, i + chunkSize);
+      const [result] = await pool.query(
+        `DELETE FROM creditos WHERE num_op IN (${chunk.map(() => '?').join(',')})`,
+        chunk
+      );
+      eliminados += result.affectedRows;
+    }
+    res.json({ success: true, data: { eliminados }, error: null });
+  } catch (e) {
+    console.error('[eliminarPorOps]', e.message);
+    res.status(500).json({ success: false, data: null, error: e.message });
+  }
+};
+
 /* ── POST /api/carga-masiva/corregir-mes ───────────────────────────────── */
 // Corrige registros cuyo mes quedó en un mes diferente al esperado
 // Body: { mes_incorrecto: '2026-06-01', mes_correcto: '2026-05-01' }
@@ -477,4 +507,4 @@ const actualizar = async (req, res) => {
   }
 };
 
-module.exports = { preview, importar, corregirMes, actualizar };
+module.exports = { preview, importar, corregirMes, actualizar, eliminarPorOps };

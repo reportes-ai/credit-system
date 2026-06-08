@@ -6,9 +6,10 @@ const { verifyToken, requirePerfil } = require('../../../../shared/middleware/au
 const upload  = multer({ storage: multer.memoryStorage(), limits: { fileSize: 10 * 1024 * 1024 } });
 const soloAdmin = requirePerfil('Administrador');
 
-router.post('/preview',      verifyToken, soloAdmin, upload.single('archivo'), ctrl.preview);
-router.post('/importar',     verifyToken, soloAdmin, upload.single('archivo'), ctrl.importar);
-router.post('/actualizar',   verifyToken, soloAdmin, upload.single('archivo'), ctrl.actualizar);
-router.post('/corregir-mes', verifyToken, soloAdmin, ctrl.corregirMes);
+router.post('/preview',           verifyToken, soloAdmin, upload.single('archivo'), ctrl.preview);
+router.post('/importar',          verifyToken, soloAdmin, upload.single('archivo'), ctrl.importar);
+router.post('/actualizar',        verifyToken, soloAdmin, upload.single('archivo'), ctrl.actualizar);
+router.post('/eliminar-por-ops',  verifyToken, soloAdmin, ctrl.eliminarPorOps);
+router.post('/corregir-mes',      verifyToken, soloAdmin, ctrl.corregirMes);
 
 module.exports = router;
