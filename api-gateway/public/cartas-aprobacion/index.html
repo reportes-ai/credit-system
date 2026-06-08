@@ -211,7 +211,7 @@ body { font-family: 'Segoe UI', Arial, sans-serif; background: var(--gray-bg); c
   <div class="header no-print">
     <div class="header-logo" style="display:flex;align-items:center;gap:8px">
         <img id="logoHeader" src="/img/logo.png" alt="AutoFácil" style="height:32px;object-fit:contain">
-        <span style="font-size:11px;font-weight:400;color:#90CAF9">V5.43</span>
+        <span style="font-size:11px;font-weight:400;color:#90CAF9">V5.44</span>
       </div>
     <div class="header-right">
       <span class="header-user" id="headerUser"></span>
@@ -4726,30 +4726,36 @@ function checkTasas(){
   const montoCLP = parseMoneyInput(document.getElementById('fMontoCreditoCLP'));
   const montoUF = parseFloat(document.getElementById('fMontoCreditoUF').dataset.raw || '0');
   const tasaCredito = parseRateInput(document.getElementById('fTasaCredito'));
-  
+
   const alertTMC = document.getElementById('alertTMC');
   const alertAprobacion = document.getElementById('alertAprobacion');
-  const fTasaPizarra = document.getElementById('fTasaPizarra');
-  
-  if(!montoCLP || !tasaCredito){ 
-    if(alertAprobacion) alertAprobacion.style.display = 'none';
-    return; 
-  }
-  
-  // Tasas del sistema principal (≤200 UF → tasa_mensual_menor, >200 UF → tasa_mensual_mayor)
+  const fTasaPizarraEl = document.getElementById('fTasaPizarra');
+
+  // Mostrar tasa pizarra en cuanto se conoce el tramo UF (no requiere tasa ingresada)
   const esTramo1 = montoUF <= 200;
-  const tasaMensualPizarra = _tasasCache
+  const tasaMensualPizarra = _tasasCache && montoUF > 0
     ? parseFloat(esTramo1 ? (_tasasCache.tasa_mensual_menor || 0) : (_tasasCache.tasa_mensual_mayor || 0))
     : 0;
-
-  // Show tasa pizarra
-  if(tasaMensualPizarra > 0){
-    fTasaPizarra.value = tasaMensualPizarra.toFixed(2) + ' %';
-    fTasaPizarra.style.color = '#333';
-  } else {
-    fTasaPizarra.value = 'Sin datos';
-    fTasaPizarra.style.color = '#C62828';
+  if(fTasaPizarraEl){
+    if(tasaMensualPizarra > 0){
+      const tramo = esTramo1 ? '≤200 UF' : '>200 UF';
+      fTasaPizarraEl.value = tasaMensualPizarra.toFixed(4) + ' % (' + tramo + ')';
+      fTasaPizarraEl.style.color = '#0141A2';
+      fTasaPizarraEl.style.fontWeight = '600';
+    } else if(montoUF > 0) {
+      fTasaPizarraEl.value = 'Sin datos';
+      fTasaPizarraEl.style.color = '#C62828';
+      fTasaPizarraEl.style.fontWeight = '';
+    }
   }
+
+  if(!montoCLP || !tasaCredito){
+    if(alertAprobacion) alertAprobacion.style.display = 'none';
+    return;
+  }
+
+  // Referencia local para el resto de la función
+  const fTasaPizarra = fTasaPizarraEl;
 
   // Check if tasa pizarra is outdated
   const today = new Date().toISOString().split('T')[0];
