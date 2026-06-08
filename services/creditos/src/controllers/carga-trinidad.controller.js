@@ -81,9 +81,11 @@ function parseExcel(buffer, mapaEstados = {}, mapaEjecutivos = {}) {
   const ws = wb.Sheets[wb.SheetNames[0]];
   const raw = XLSX.utils.sheet_to_json(ws, { header: 1, defval: null });
 
-  // Fila 3 (índice 3) = headers, datos desde fila 4
-  const headers = (raw[3] || []).map(h => String(h || '').trim());
-  const dataRows = raw.slice(4);
+  // Buscar dinámicamente la fila de headers (la que contiene columna "ID")
+  let headerIdx = raw.findIndex(row => Array.isArray(row) && row.some(c => String(c||'').trim().toUpperCase() === 'ID'));
+  if (headerIdx < 0) headerIdx = 2; // fallback
+  const headers = (raw[headerIdx] || []).map(h => String(h || '').trim());
+  const dataRows = raw.slice(headerIdx + 1);
 
   return dataRows
     .filter(row => row && row[0] != null)          // saltar filas vacías
