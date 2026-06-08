@@ -274,7 +274,7 @@
   <div class="topnav-left">
     <a href="/" class="topnav-brand">
       <img src="/img/logo.png" alt="AutoFácil" style="display:block">
-      <span class="version-badge" id="versionBadge">v4.18</span>
+      <span class="version-badge" id="versionBadge">v4.19</span>
     </a>
       <div class="breadcrumb-nav">
         <a href="/">Inicio</a><span class="sep">›</span>
@@ -1537,25 +1537,37 @@ async function guardar(tipo) {
       if(_retUrl){
         const sep = _retUrl.includes('?') ? '&' : '?';
         const destino = _retUrl + sep + 'rut=' + encodeURIComponent(rutBuscar);
-        // Mostrar barra de cuenta regresiva
+        const retNombre = _retUrl.includes('cartas') ? 'Carta de Aprobación'
+                        : _retUrl.includes('cotiz')  ? 'Cotización'
+                        : _retUrl.includes('credito') ? 'Crédito' : 'página anterior';
+        // Mostrar barra prominente de retorno
         const bar = document.getElementById('returnToCartasBar');
         if(bar){
           bar.dataset.url = destino;
           bar.style.display = 'flex';
+          bar.style.background = '#065f46';
+          bar.style.fontSize = '14px';
+          bar.style.padding = '14px 24px';
+          bar.style.boxShadow = '0 4px 12px rgba(0,0,0,.3)';
           let seg = 3;
           const msgEl = document.getElementById('returnBarMsg');
           const btnEl = document.getElementById('returnBarBtn');
-          if(msgEl) msgEl.textContent = `Cliente guardado ✓  —  Volviendo en ${seg}s…`;
-          if(btnEl) btnEl.textContent = '← Volver ahora';
+          if(msgEl) msgEl.textContent = `✅ Cliente creado — Volviendo a ${retNombre} en ${seg}s…`;
+          if(btnEl){ btnEl.textContent = `← Volver a ${retNombre} ahora`; btnEl.style.fontSize = '13px'; btnEl.style.padding = '7px 18px'; }
           const iv = setInterval(()=>{
             seg--;
             if(seg > 0){
-              if(msgEl) msgEl.textContent = `Cliente guardado ✓  —  Volviendo en ${seg}s…`;
+              if(msgEl) msgEl.textContent = `✅ Cliente creado — Volviendo a ${retNombre} en ${seg}s…`;
             } else {
               clearInterval(iv);
               window.location.href = destino;
             }
           }, 1000);
+          // Scroll al tope para que se vea la barra
+          window.scrollTo({ top: 0, behavior: 'smooth' });
+        } else {
+          // Fallback sin barra: redirigir directo
+          setTimeout(() => window.location.href = destino, 1500);
         }
       }
     }
