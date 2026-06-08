@@ -103,6 +103,10 @@ app.use('/api/carga-masiva', require('../../services/creditos/src/routes/carga-m
 // Mantenedor comisiones de seguro
 app.use('/api/comisiones-seguro', require('../../services/mantenedores/src/routes/comisiones-seguro.routes'));
 
+// Login
+app.get(['/login', '/login/'], (req, res) =>
+  res.sendFile(path.join(__dirname, '../public/login.html')));
+
 // Health check
 app.get('/health', (req, res) => res.json({ status: 'Sistema operativo', timestamp: new Date() }));
 
@@ -145,6 +149,12 @@ app.get(['/mantenedores/factores-seguro', '/mantenedores/factores-seguro/'], (re
   res.sendFile(path.join(__dirname, '../public/mantenedores/factores-seguro/index.html')));
 app.get(['/mantenedores/financieras', '/mantenedores/financieras/'], (req, res) =>
   res.sendFile(path.join(__dirname, '../public/mantenedores/financieras/index.html')));
+
+app.get(['/mantenedores/solo-dios', '/mantenedores/solo-dios/'], (req, res) =>
+  res.sendFile(path.join(__dirname, '../public/mantenedores/solo-dios/index.html')));
+
+app.get(['/mantenedores/servidor-hora', '/mantenedores/servidor-hora/'], (req, res) =>
+  res.sendFile(path.join(__dirname, '../public/mantenedores/servidor-hora/index.html')));
 
 app.get(['/mantenedores/tipos-documento', '/mantenedores/tipos-documento/'], (req, res) =>
   res.sendFile(path.join(__dirname, '../public/mantenedores/tipos-documento/index.html')));
