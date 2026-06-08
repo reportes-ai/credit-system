@@ -211,7 +211,7 @@ body { font-family: 'Segoe UI', Arial, sans-serif; background: var(--gray-bg); c
   <div class="header no-print">
     <div class="header-logo" style="display:flex;align-items:center;gap:8px">
         <img id="logoHeader" src="/img/logo.png" alt="AutoFácil" style="height:32px;object-fit:contain">
-        <span style="font-size:11px;font-weight:400;color:#90CAF9">V5.42</span>
+        <span style="font-size:11px;font-weight:400;color:#90CAF9">V5.43</span>
       </div>
     <div class="header-right">
       <span class="header-user" id="headerUser"></span>
@@ -2688,33 +2688,49 @@ function checkFinancieraPreferente(){
   const isAutofin = acreedor.includes('AUTOFIN');
   const isUnidad = acreedor.includes('UNIDAD');
 
-  // Case 1: Both not available (NO SE PUEDE)
-  if(!autofinOk && !unidadOk){
+  // Helper: descripción de límites de una financiera para el rango de plazo actual
+  const limAF = (() => {
+    const parts = [];
+    if (typeof row.autofin_min === 'number' && row.autofin_min > 0) parts.push('saldo mín ' + fmtCLP(row.autofin_min));
+    if (row.autofin_max != null) {
+      const maxLabel = (typeof row.autofin_max === 'string' && row.autofin_max.toUpperCase().includes('UF'))
+        ? row.autofin_max + (ufVal > 0 ? ' (' + fmtCLP(Math.round(parseFloat(row.autofin_max)*ufVal)) + ')' : '')
+        : (typeof row.autofin_max === 'number' && row.autofin_max < 90000000 ? 'saldo máx ' + fmtCLP(row.autofin_max) : null);
+      if (maxLabel) parts.push('saldo máx ' + maxLabel);
+    }
+    parts.push('plazo ' + row.desde + '–' + row.hasta + ' cuotas');
+    return parts.join(', ');
+  })();
+  const limUN = (() => {
+    const parts = [];
+    if (row.unidad_min != null) parts.push('saldo mín ' + fmtCLP(row.unidad_min));
+    if (row.unidad_max != null) parts.push('saldo máx ' + fmtCLP(row.unidad_max));
+    parts.push('plazo ' + row.desde + '–' + row.hasta + ' cuotas');
+    return parts.join(', ');
+  })();
+
+  const setCritico = msg => {
     alertEl.style.display = '';
     alertEl.style.background = '#FFEBEE';
     alertEl.style.color = '#C62828';
     alertEl.style.border = '1px solid #EF9A9A';
-    alertEl.innerHTML = '🚫 CASO CRÍTICO: Ninguna financiera aplica para este plazo (' + plazo + ' cuotas) y saldo (' + fmtCLP(saldo) + '). No se puede grabar.';
+    alertEl.innerHTML = msg;
     if(grabarBtn){ grabarBtn.disabled = true; grabarBtn.style.opacity = '0.5'; }
+  };
+
+  // Case 1: Both not available (NO SE PUEDE)
+  if(!autofinOk && !unidadOk){
+    setCritico('🚫 CASO CRÍTICO: Ninguna financiera aplica para plazo ' + plazo + ' cuotas / saldo ' + fmtCLP(saldo) + '. No se puede grabar.');
     return;
   }
 
   // Case 2: Selected financiera says NO SE PUEDE
   if(isAutofin && !autofinOk){
-    alertEl.style.display = '';
-    alertEl.style.background = '#FFEBEE';
-    alertEl.style.color = '#C62828';
-    alertEl.style.border = '1px solid #EF9A9A';
-    alertEl.innerHTML = '🚫 CASO CRÍTICO: AUTOFIN no aplica para plazo ' + plazo + ' cuotas con saldo ' + fmtCLP(saldo) + '. ' + (unidadOk ? 'Use UNIDAD DE CRÉDITO.' : 'No hay financiera disponible.');
-    if(grabarBtn){ grabarBtn.disabled = true; grabarBtn.style.opacity = '0.5'; }
+    setCritico('🚫 CASO CRÍTICO: AUTOFIN no aplica — requiere ' + limAF + '.' + (unidadOk ? ' Use UNIDAD DE CRÉDITO (' + limUN + ').' : ''));
     return;
   }
   if(isUnidad && !unidadOk){
-    alertEl.style.display = '';
-    alertEl.style.background = '#FFEBEE';
-    alertEl.style.color = '#C62828';
-    alertEl.style.border = '1px solid #EF9A9A';
-    alertEl.innerHTML = '🚫 CASO CRÍTICO: UNIDAD DE CRÉDITO no aplica para plazo ' + plazo + ' cuotas con saldo ' + fmtCLP(saldo) + '. ' + (autofinOk ? 'Use AUTOFIN.' : 'No hay financiera disponible.');
+    setCritico('🚫 CASO CRÍTICO: UNIDAD DE CRÉDITO no aplica — requiere ' + limUN + '.' + (autofinOk ? ' Use AUTOFIN (' + limAF + ').' : ''));
     if(grabarBtn){ grabarBtn.disabled = true; grabarBtn.style.opacity = '0.5'; }
     return;
   }
