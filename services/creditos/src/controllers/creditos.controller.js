@@ -257,11 +257,14 @@ const getAll = async (req, res) => {
     }
 
     if (financiera && financiera !== 'TODAS') {
-      if (financiera === 'AUTOFACIL') {
+      const fin = financiera.toUpperCase();
+      if (fin === 'AUTOFACIL') {
         where += ` AND (ob.financiera IS NULL OR ob.financiera NOT IN ('AUTOFIN','UNIDAD DE CREDITO'))`;
+      } else if (fin === 'UNIDAD') {
+        where += ` AND ob.financiera = 'UNIDAD DE CREDITO'`;
       } else {
         where += ` AND ob.financiera = ?`;
-        params.push(financiera.toUpperCase());
+        params.push(fin);
       }
     }
 
