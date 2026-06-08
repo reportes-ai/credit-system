@@ -211,7 +211,7 @@ body { font-family: 'Segoe UI', Arial, sans-serif; background: var(--gray-bg); c
   <div class="header no-print">
     <div class="header-logo" style="display:flex;align-items:center;gap:8px">
         <img id="logoHeader" src="/img/logo.png" alt="AutoFácil" style="height:32px;object-fit:contain">
-        <span style="font-size:11px;font-weight:400;color:#90CAF9">V5.37</span>
+        <span style="font-size:11px;font-weight:400;color:#90CAF9">V5.38</span>
       </div>
     <div class="header-right">
       <span class="header-user" id="headerUser"></span>
@@ -4431,11 +4431,26 @@ async function buscarCliente() {
     if (r.ok) {
       const j = await r.json();
       const c = j.data || j;
-      // Rellenar nombres desde BD
       const toTitle = s => s ? s.split(' ').map(w=>w.charAt(0).toUpperCase()+w.slice(1).toLowerCase()).join(' ') : '';
-      document.getElementById('fNombre').value        = toTitle(c.nombres || c.nombre || '');
-      document.getElementById('fApellidoPaterno').value = toTitle(c.apellido_paterno || '');
-      document.getElementById('fApellidoMaterno').value = toTitle(c.apellido_materno || '');
+      let nombres = c.nombres || c.nombre || '';
+      let apPat   = c.apellido_paterno || '';
+      let apMat   = c.apellido_materno || '';
+      // Fallback: si faltan los campos separados, parsear nombre_completo
+      if (!nombres && !apPat && (c.nombre_completo || c.nombre_cliente)) {
+        const nc = (c.nombre_completo || c.nombre_cliente || '').trim();
+        const parts = nc.split(/\s+/).filter(Boolean);
+        if (parts.length >= 3) {
+          // formato: NOMBRES... APELLIDO_PATERNO APELLIDO_MATERNO
+          apMat = parts[parts.length - 1];
+          apPat = parts[parts.length - 2];
+          nombres = parts.slice(0, parts.length - 2).join(' ');
+        } else if (parts.length === 2) {
+          apPat = parts[1]; nombres = parts[0];
+        } else { nombres = nc; }
+      }
+      document.getElementById('fNombre').value          = toTitle(nombres);
+      document.getElementById('fApellidoPaterno').value = toTitle(apPat);
+      document.getElementById('fApellidoMaterno').value = toTitle(apMat);
       msg.textContent = '✅ Cliente encontrado';
       msg.style.cssText = 'font-size:10px;margin-top:3px;display:block;color:#2e7d32;font-weight:600';
     } else if (r.status === 404) {
