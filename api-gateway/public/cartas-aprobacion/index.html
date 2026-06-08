@@ -211,7 +211,7 @@ body { font-family: 'Segoe UI', Arial, sans-serif; background: var(--gray-bg); c
   <div class="header no-print">
     <div class="header-logo" style="display:flex;align-items:center;gap:8px">
         <img id="logoHeader" src="/img/logo.png" alt="AutoFácil" style="height:32px;object-fit:contain">
-        <span style="font-size:11px;font-weight:400;color:#90CAF9">V5.39</span>
+        <span style="font-size:11px;font-weight:400;color:#90CAF9">V5.40</span>
       </div>
     <div class="header-right">
       <span class="header-user" id="headerUser"></span>
@@ -377,7 +377,8 @@ body { font-family: 'Segoe UI', Arial, sans-serif; background: var(--gray-bg); c
           <div class="field">
             <label>RUT Cliente *</label>
             <div style="display:flex;gap:6px;align-items:center">
-              <input type="text" id="fRutCliente" placeholder="12.345.678-9" oninput="autoFormatRUT(this)"
+              <input type="text" id="fRutCliente" placeholder="12.345.678-9"
+                     oninput="onRutClienteInput(this)"
                      onkeydown="if(event.key==='Enter')buscarCliente()" style="flex:1">
               <button type="button" onclick="buscarCliente()" id="btnBuscarCliente"
                 style="background:#0141A2;color:#fff;border:none;border-radius:4px;padding:5px 14px;font-size:11px;font-weight:600;cursor:pointer;white-space:nowrap">
@@ -4415,10 +4416,57 @@ function fmtInputDisplay(input, displayId){
   el.textContent = val > 0 ? '$' + Math.round(val).toLocaleString('es-CL') : '';
 }
 
+// ── Validación RUT ───────────────────────────────────────────────────────────
+function calcDV(body) {
+  const digits = String(body).replace(/\D/g, '');
+  if (!digits) return null;
+  const serie = [2, 3, 4, 5, 6, 7];
+  const suma = digits.split('').reverse()
+    .reduce((acc, d, i) => acc + parseInt(d) * serie[i % 6], 0);
+  const resto = 11 - (suma % 11);
+  if (resto === 11) return '0';
+  if (resto === 10) return 'K';
+  return String(resto);
+}
+function validarRUT(clean) {
+  if (!clean || clean.length < 7 || clean.length > 9) return null;
+  const dvIngresado = clean.slice(-1).toUpperCase();
+  return calcDV(clean.slice(0, -1)) === dvIngresado;
+}
+function onRutClienteInput(el) {
+  autoFormatRUT(el);
+  const clean = (el.value || '').replace(/[^0-9kK]/g, '').toUpperCase();
+  const msg = document.getElementById('rutClienteMsg');
+  if (!msg) return;
+  const estado = validarRUT(clean);
+  if (estado === true) {
+    msg.textContent = '✓ RUT válido';
+    msg.style.cssText = 'font-size:10px;margin-top:3px;display:block;color:#2e7d32;font-weight:600';
+    el.style.borderColor = '#059669';
+  } else if (estado === false) {
+    const dvEsp = calcDV(clean.slice(0, -1));
+    msg.textContent = `✗ Dígito verificador incorrecto (debería ser ${dvEsp})`;
+    msg.style.cssText = 'font-size:10px;margin-top:3px;display:block;color:#c62828;font-weight:600';
+    el.style.borderColor = '#dc2626';
+  } else {
+    msg.textContent = '';
+    msg.style.display = 'none';
+    el.style.borderColor = '';
+  }
+}
+
 // ── Buscar cliente por RUT y autocompletar nombres ───────────────────────────
 async function buscarCliente() {
   const rut = (document.getElementById('fRutCliente')?.value || '').trim();
   if (!rut) return;
+  const clean = rut.replace(/[^0-9kK]/g, '').toUpperCase();
+  const dvOk = validarRUT(clean);
+  if (dvOk === false) {
+    const dvEsp = calcDV(clean.slice(0, -1));
+    const msg = document.getElementById('rutClienteMsg');
+    if (msg) { msg.textContent = `✗ RUT inválido — dígito verificador debería ser ${dvEsp}`; msg.style.cssText = 'font-size:10px;margin-top:3px;display:block;color:#c62828;font-weight:700'; }
+    return;
+  }
   const msg = document.getElementById('rutClienteMsg');
   const btn = document.getElementById('btnBuscarCliente');
   btn.textContent = '⏳'; btn.disabled = true;
