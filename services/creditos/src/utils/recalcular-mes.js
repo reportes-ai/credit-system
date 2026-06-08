@@ -85,6 +85,16 @@ function getTierUAC(cnt, p) {
   return (p.uac_pct_tier1 || 14) / 100;
 }
 
+/* ── Prima de seguro por plazo (% del monto_financiado) ─────────────── */
+function getSegRate(prefix, plazo, p) {
+  if (plazo <= 6)  return p[`${prefix}_6`]  || 0;
+  if (plazo <= 12) return p[`${prefix}_12`] || 0;
+  if (plazo <= 24) return p[`${prefix}_24`] || 0;
+  if (plazo <= 36) return p[`${prefix}_36`] || 0;
+  if (plazo <= 48) return p[`${prefix}_48`] || 0;
+  return p[`${prefix}_72`] || 0;
+}
+
 /* ═══════════════════════════════════════════════════════════════════════
    recalcularMeses(meses, opciones)
    meses   : array de strings 'YYYY-MM'
@@ -117,11 +127,32 @@ async function recalcularMeses(meses, opciones = {}) {
 
     if (!ops.length) continue;
 
-    // ── Penetración de seguros del mes ──────────────────────────────
-    const total = ops.length;
-    const penRdh = ops.filter(r => parseFloat(r.seguro_rdh || 0) > 0).length / total * 100;
-    const penCes = ops.filter(r => parseFloat(r.seguro_cesantia || 0) > 0).length / total * 100;
-    const penRep = ops.filter(r => parseFloat(r.seguro_rep_menor || 0) > 0).length / total * 100;
+    // ── Paso 1: calcular primas de seguros para AUTOFIN ─────────────
+    // Las primas se derivan de los parámetros cuando el Excel no las trae.
+    // UNIDAD/Trinidad no aplica seguros AutoFácil → primas = 0.
+    for (const op of ops) {
+      const fin   = (op.financiera || '').toUpperCase();
+      const esAF  = fin.includes('AUTOFIN') || fin.includes('AUTOF');
+      const plazo = parseInt(op.plazo) || 0;
+      if (!esAF || plazo === 0) continue;
+
+      const monto = parseFloat(op.monto_financiado) || 0;
+      if (!monto) continue;
+
+      op._prima_rdh  = Math.round(monto * getSegRate('seg_r', plazo, p));
+      op._prima_ces  = Math.round(monto * getSegRate('seg_c', plazo, p));
+      op._prima_rep  = Math.round(p.reparaciones_menores || 0);
+    }
+
+    // ── Paso 2: penetración solo entre ops AUTOFIN del mes ──────────
+    const opsAF  = ops.filter(r => {
+      const f = (r.financiera || '').toUpperCase();
+      return f.includes('AUTOFIN') || f.includes('AUTOF');
+    });
+    const totalAF = opsAF.length || 1;
+    const penRdh  = opsAF.filter(r => (r._prima_rdh || 0) > 0).length / totalAF * 100;
+    const penCes  = opsAF.filter(r => (r._prima_ces || 0) > 0).length / totalAF * 100;
+    const penRep  = opsAF.filter(r => (r._prima_rep || 0) > 0).length / totalAF * 100;
 
     // ── Conteo UAC del mes ──────────────────────────────────────────
     const cntUAC = ops.filter(r =>
@@ -130,9 +161,9 @@ async function recalcularMeses(meses, opciones = {}) {
     ).length;
     const pctUAC = getTierUAC(cntUAC, p);
 
-    log.push(`Mes ${mesStr}: ${total} ops | penRDH=${penRdh.toFixed(1)}% | penCes=${penCes.toFixed(1)}% | cntUAC=${cntUAC} (${(pctUAC*100).toFixed(0)}%)`);
+    log.push(`Mes ${mesStr}: ${ops.length} ops | AF=${totalAF} penRDH=${penRdh.toFixed(0)}% penCes=${penCes.toFixed(0)}% | UAC=${cntUAC} (${(pctUAC*100).toFixed(0)}%)`);
 
-    // ── Recalcular cada op ───────────────────────────────────────────
+    // ── Paso 3: recalcular cada op ───────────────────────────────────
     for (const op of ops) {
       const fin       = (op.financiera || '').toUpperCase();
       const parqKey   = (op.parque || '').toUpperCase().trim();
@@ -169,10 +200,10 @@ async function recalcularMeses(meses, opciones = {}) {
         }
       }
 
-      // 2. Seguros ────────────────────────────────────────────────────
-      const primaRDH  = parseFloat(op.seguro_rdh)       || 0;
-      const primaCes  = parseFloat(op.seguro_cesantia)  || 0;
-      const primaRep  = parseFloat(op.seguro_rep_menor) || 0;
+      // 2. Primas de seguros (calculadas en paso 1 para AUTOFIN) ──────
+      const primaRDH  = op._prima_rdh || 0;
+      const primaCes  = op._prima_ces || 0;
+      const primaRep  = op._prima_rep || 0;
 
       const pctRdh = getPenComision('rdh',        penRdh, tramos);
       const pctCes = getPenComision('cesantia',   penCes, tramos);
@@ -213,6 +244,9 @@ async function recalcularMeses(meses, opciones = {}) {
           comdea_real         = ?,
           com_parque          = ?,
           arriendo_parque     = ?,
+          seguro_rdh          = ?,
+          seguro_cesantia     = ?,
+          seguro_rep_menor    = ?,
           com_rdh             = ?,
           com_cesantia        = ?,
           com_reparaciones    = ?,
@@ -227,6 +261,9 @@ async function recalcularMeses(meses, opciones = {}) {
         comdea_real,
         com_parque_val,
         arriendo_val,
+        primaRDH || null,
+        primaCes || null,
+        primaRep || null,
         com_rdh,
         com_cesantia,
         com_reparaciones,
