@@ -281,7 +281,7 @@ exports.importar = async (req, res) => {
                 monto_financiado, fecha_otorgado, mes,
                 marca, modelo, vendedor,
                 financiera, created_at, updated_at)
-             VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,'NO APLICA', NOW(), NOW())`,
+             VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,'AUTOFIN', NOW(), NOW())`,
             [
               f.num_op, f.estado_autofin, f.estado_credito, f.estado_eval,
               f.producto, f.ejecutivo, f.ejecutivo_tri, f.automotora,
