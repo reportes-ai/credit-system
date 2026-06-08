@@ -98,7 +98,7 @@
   <div class="topnav-left">
     <a href="/" class="topnav-brand">
       <img src="/img/logo.png" alt="AutoFácil">
-      <span class="version-badge" id="versionBadge">v4.13</span>
+      <span class="version-badge" id="versionBadge">v4.14</span>
     </a>
     <div class="breadcrumb-nav">
       <a href="/">Inicio</a><span class="sep">›</span>
@@ -221,11 +221,21 @@ function toast(msg, type='success') {
 }
 
 async function init() {
-  const r = await fetch('/api/bd-clientes/columns', {headers:H});
-  const j = await r.json();
-  columns = j.data;
-  buildHeaders();
-  await load();
+  try {
+    const r = await fetch('/api/bd-clientes/columns', {headers:H});
+    if (!r.ok) throw new Error(`HTTP ${r.status}`);
+    const j = await r.json();
+    if (!j.success || !j.data) throw new Error(j.error || 'Sin columnas');
+    columns = j.data;
+    buildHeaders();
+    await load();
+  } catch(e) {
+    document.getElementById('tbody').innerHTML =
+      `<tr><td colspan="99" style="color:#dc2626;padding:24px;text-align:center">
+        <i class="bi bi-exclamation-triangle-fill me-2"></i>
+        Error al cargar: ${e.message}. Intenta recargar la página.
+      </td></tr>`;
+  }
 }
 
 function buildHeaders() {
