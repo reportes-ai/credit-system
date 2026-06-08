@@ -330,36 +330,35 @@ function marcarMejor(rentab_af, rentab_uac) {
 
 /* ── Carga inicial ─────────────────────────────────────────────────── */
 async function cargarDatos() {
-  // Usar fecha Chile en vez de UTC para no buscar fecha futura
-  const hoy = new Date().toLocaleDateString('en-CA', { timeZone: 'America/Santiago' });
-
-  const [rp, ru] = await Promise.all([
-    fetch('/api/parametros-credito', { headers: hdr() }),
-    fetch('/api/uf/en/' + hoy, { headers: hdr() })
-  ]);
-  const jp = await rp.json();
-  const ju = await ru.json();
-  if (jp.success) jp.data.lista.forEach(r => { P[r.clave] = parseFloat(r.valor); });
-
-  if (ju.success && ju.data?.valor) {
-    UF = parseFloat(ju.data.valor);
-    document.getElementById('ufValor').textContent = '$' + Math.round(UF).toLocaleString('es-CL');
-  } else {
-    // Fallback: buscar la UF más reciente disponible
-    try {
-      const rf = await fetch('/api/uf/vigente', { headers: hdr() });
-      const jf = await rf.json();
-      if (jf.success && jf.data?.valor) {
-        UF = parseFloat(jf.data.valor);
-        const fechaUF = jf.data.fecha ? ' (' + new Date(jf.data.fecha).toLocaleDateString('es-CL') + ')' : '';
-        document.getElementById('ufValor').textContent = '$' + Math.round(UF).toLocaleString('es-CL') + fechaUF;
-      } else {
-        document.getElementById('ufValor').textContent = 'No disponible';
-      }
-    } catch(_) {
-      document.getElementById('ufValor').textContent = 'Error al cargar';
+  // ── Parámetros del sistema (independiente de UF) ──
+  try {
+    const rp = await fetch('/api/parametros-credito', { headers: hdr() });
+    const jp = await rp.json();
+    if (jp.success && jp.data?.lista) {
+      jp.data.lista.forEach(r => { P[r.clave] = parseFloat(r.valor); });
     }
+  } catch(e) { console.warn('[simulador] parametros-credito:', e.message); }
+
+  // ── UF: primero vigente (más confiable), sin depender de fecha ──
+  try {
+    const rv = await fetch('/api/uf/vigente', { headers: hdr() });
+    const jv = await rv.json();
+    if (jv.success && jv.data?.valor) {
+      UF = parseFloat(jv.data.valor);
+      const fechaUF = jv.data.fecha
+        ? new Date(jv.data.fecha + 'T12:00:00').toLocaleDateString('es-CL')
+        : '';
+      document.getElementById('ufValor').textContent =
+        '$' + Math.round(UF).toLocaleString('es-CL') +
+        (fechaUF ? ' · ' + fechaUF : '');
+    } else {
+      document.getElementById('ufValor').textContent = 'Sin datos';
+    }
+  } catch(e) {
+    document.getElementById('ufValor').textContent = 'Error';
+    console.warn('[simulador] uf/vigente:', e.message);
   }
+
   simular();
 }
 
