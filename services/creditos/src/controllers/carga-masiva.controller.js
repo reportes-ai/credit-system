@@ -229,13 +229,11 @@ const importar = async (req, res) => {
 
     const { colOP, colIdFin } = detectarCols(data);
 
-    // Llave de deduplicación: ID FINANCIERA
+    // Llave de deduplicación: ID FINANCIERA (solo para el conteo en el resumen)
     const ids = data.map(r => String(r[colIdFin] || '').trim()).filter(v => v && v.toUpperCase() !== 'NO APLICA');
     const setExistentes = await getExistentes(ids);
 
-    const nuevos = data.filter(r => !setExistentes.has(String(r[colIdFin]||'').trim()));
-
-    // mes_override: fuerza el mes contable a un valor fijo (evita desfases por fecha de evaluación)
+    // Todos los registros se procesan — el upsert decide insert o update
     const mesOverride = req.body.mes_override || null;
 
     let insertados = 0;
@@ -244,7 +242,7 @@ const importar = async (req, res) => {
     const clienteCache   = {};
     const detallesLog    = [];   // para log historial
 
-    for (const row of nuevos) {
+    for (const row of data) {
       try {
         const obj = mapRow(row, mesOverride);
         if (!obj.num_op) continue;
@@ -330,7 +328,7 @@ const importar = async (req, res) => {
       data: {
         total_archivo:   data.length,
         ya_existentes:   setExistentes.size,
-        nuevos_intentados: nuevos.length,
+        nuevos_intentados: data.length,
         insertados,
         recalculados_comision_fin: recalculados,
         errores,
