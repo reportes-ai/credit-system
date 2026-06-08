@@ -69,7 +69,7 @@
 <body>
 <nav class="topnav">
   <div class="topnav-left">
-    <a href="/" class="topnav-brand"><img src="/img/logo.png" alt="AutoFácil"><span class="version-badge">v5.1</span></a>
+    <a href="/" class="topnav-brand"><img src="/img/logo.png" alt="AutoFácil"><span class="version-badge">v5.2</span></a>
     <div class="breadcrumb-nav">
       <a href="/">Inicio</a><span class="sep">›</span>
       <span style="color:#fff;font-weight:600"><i class="bi bi-cloud-upload me-1"></i>Carga Masiva Operaciones</span>
@@ -157,6 +157,65 @@
   <div class="card-box" id="paso3" style="display:none">
     <h6><i class="bi bi-3-circle-fill"></i>Resultado de la importación</h6>
     <div id="resultadoContent"></div>
+  </div>
+
+  <!-- ═══════════════════════════════════════════════════════════ -->
+  <!-- SECCIÓN TRINIDAD                                           -->
+  <!-- ═══════════════════════════════════════════════════════════ -->
+  <div style="margin:32px 0 16px;display:flex;align-items:center;gap:12px">
+    <div style="flex:1;height:2px;background:linear-gradient(90deg,#0141A2,transparent)"></div>
+    <span style="font-size:.78rem;font-weight:700;color:#0141A2;text-transform:uppercase;letter-spacing:1.5px;white-space:nowrap">
+      <i class="bi bi-diagram-3 me-1"></i>Integración Trinidad
+    </span>
+    <div style="flex:1;height:2px;background:linear-gradient(270deg,#0141A2,transparent)"></div>
+  </div>
+
+  <!-- Card Carga Trinidad -->
+  <div class="card-box" style="border-left:4px solid #0141A2">
+    <h6><i class="bi bi-diagram-3-fill" style="color:#0141A2"></i>Carga Trinidad
+      <span style="font-size:.72rem;font-weight:400;color:#9ca3af;text-transform:none;letter-spacing:0;margin-left:8px">Carga/actualiza base desde Trinidad</span>
+    </h6>
+    <p style="font-size:.83rem;color:#6b7280;margin-bottom:16px">
+      Importa el archivo de solicitudes exportado desde Trinidad. Registros nuevos se <strong>insertan</strong>; existentes se <strong>actualizan</strong> (estado).
+      La llave de unión es el <strong>ID Trinidad = N° Operación AutoFácil</strong>.
+      Estado <em>Cursado</em> → <strong>Otorgado</strong>; el resto → <strong>Digitado</strong>.
+    </p>
+    <div class="drop-zone" id="triDropZone" onclick="document.getElementById('triFileInput').click()"
+         ondragover="triOnDrag(event,true)" ondragleave="triOnDrag(event,false)" ondrop="triOnDrop(event)">
+      <i class="bi bi-file-earmark-spreadsheet"></i>
+      <div class="label" id="triDropLabel">Arrastra el Excel de Trinidad aquí o haz clic para seleccionar</div>
+      <div class="sub">Solo archivos .xlsx exportados desde Trinidad — máx. 10 MB</div>
+    </div>
+    <input type="file" id="triFileInput" accept=".xlsx" onchange="triArchivoSeleccionado(event)">
+    <div style="margin-top:16px">
+      <button class="btn-main" id="btnTriPreview" onclick="triEjecutarPreview()" disabled>
+        <i class="bi bi-eye"></i>Vista previa
+      </button>
+    </div>
+  </div>
+
+  <!-- Preview Trinidad -->
+  <div class="card-box" id="triPaso2" style="display:none">
+    <h6><i class="bi bi-2-circle-fill"></i>Resumen archivo Trinidad</h6>
+    <div class="stats-row" id="triStatsRow"></div>
+    <!-- Distribución por estado Trinidad -->
+    <div id="triEstadosDist" style="margin-bottom:16px"></div>
+    <div style="font-size:.82rem;color:#374151;margin-bottom:10px;font-weight:600">Muestra primeros 20 registros:</div>
+    <div style="overflow-x:auto">
+      <table class="table preview-table" id="triPreviewTable">
+        <thead><tr><th>N° Op</th><th>Nombre</th><th>RUT</th><th>Estado Trinidad</th><th>Estado AF</th><th>Acción</th></tr></thead>
+        <tbody id="triPreviewBody"></tbody>
+      </table>
+    </div>
+    <button class="btn-main btn-success" id="btnTriImportar" onclick="triEjecutarImport()">
+      <i class="bi bi-cloud-upload"></i>Importar / Actualizar
+    </button>
+  </div>
+
+  <!-- Resultado Trinidad -->
+  <div class="card-box" id="triPaso3" style="display:none">
+    <h6><i class="bi bi-3-circle-fill"></i>Resultado carga Trinidad</h6>
+    <div id="triResultadoContent"></div>
   </div>
 </div>
 
@@ -277,6 +336,119 @@ async function corregirMes() {
     if (json.success) toast(`✓ ${json.data.afectados} registros corregidos de ${inc} → ${cor}`, true);
     else toast('Error: ' + json.error, false);
   } catch(e) { toast('Error: ' + e.message, false); }
+}
+
+/* ══════════════════════════════════════════════
+   TRINIDAD
+══════════════════════════════════════════════ */
+let triFile = null;
+
+function triOnDrag(e, over) {
+  e.preventDefault();
+  document.getElementById('triDropZone').classList.toggle('drag-over', over);
+}
+function triOnDrop(e) {
+  e.preventDefault();
+  triOnDrag(e, false);
+  const f = e.dataTransfer.files[0];
+  if (f) triSetFile(f);
+}
+function triArchivoSeleccionado(e) {
+  const f = e.target.files[0];
+  if (f) triSetFile(f);
+}
+function triSetFile(f) {
+  triFile = f;
+  document.getElementById('triDropLabel').textContent = '📄 ' + f.name;
+  document.getElementById('btnTriPreview').disabled = false;
+  document.getElementById('triPaso2').style.display = 'none';
+  document.getElementById('triPaso3').style.display = 'none';
+}
+
+async function triEjecutarPreview() {
+  if (!triFile) return;
+  const btn = document.getElementById('btnTriPreview');
+  btn.disabled = true; btn.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Analizando...';
+  try {
+    const fd = new FormData();
+    fd.append('archivo', triFile);
+    const resp = await fetch('/api/carga-trinidad/preview', { method:'POST', headers:{ Authorization:'Bearer '+token }, body:fd });
+    const r = await resp.json();
+    if (!r.success) { toast('Error: ' + r.error, false); return; }
+    const d = r.data;
+
+    // Stats
+    document.getElementById('triStatsRow').innerHTML = `
+      <div class="stat-item blue"><div class="lbl">Total en archivo</div><div class="val">${d.total}</div></div>
+      <div class="stat-item green"><div class="lbl">Registros nuevos</div><div class="val">${d.nuevos}</div></div>
+      <div class="stat-item amber"><div class="lbl">A actualizar</div><div class="val">${d.actualizados}</div></div>
+      <div class="stat-item" style="border-left-color:#6366f1"><div class="lbl">Tipos de estado</div><div class="val">${Object.keys(d.porEstado).length}</div></div>`;
+
+    // Distribución estados Trinidad
+    const estHtml = Object.entries(d.porEstado).map(([e,c]) =>
+      `<span style="display:inline-flex;align-items:center;gap:5px;margin:3px 4px;background:#f1f5f9;border-radius:8px;padding:3px 10px;font-size:.78rem">
+        <strong style="color:#0141A2">${c}</strong> ${e}
+       </span>`).join('');
+    document.getElementById('triEstadosDist').innerHTML =
+      `<div style="font-size:.78rem;color:#6b7280;font-weight:600;margin-bottom:6px">Distribución de estados Trinidad:</div>${estHtml}`;
+
+    // Tabla preview
+    const colores = { 'Otorgado':'#dcfce7;color:#166534', 'Digitado':'#f1f5f9;color:#374151' };
+    document.getElementById('triPreviewBody').innerHTML = d.preview.map(f => `
+      <tr>
+        <td><strong>${f.num_op}</strong></td>
+        <td>${f.nombre_cliente||'—'}</td>
+        <td style="font-size:.75rem">${f.rut_cliente||'—'}</td>
+        <td><span style="background:#e0e7ff;color:#3730a3;border-radius:8px;padding:2px 8px;font-size:.75rem;font-weight:700">${f.estado_autofin||'—'}</span></td>
+        <td><span style="background:${colores[f.estado_credito]||'#f1f5f9;color:#374151'};border-radius:8px;padding:2px 8px;font-size:.75rem;font-weight:700">${f.estado_credito}</span></td>
+        <td>${f.existe
+          ? '<span class="badge-exists">Actualizar</span>'
+          : '<span class="badge-new">Insertar</span>'}</td>
+      </tr>`).join('');
+
+    document.getElementById('triPaso2').style.display = '';
+  } catch(ex) {
+    toast('Error: ' + ex.message, false);
+  } finally {
+    btn.disabled = false; btn.innerHTML = '<i class="bi bi-eye"></i>Vista previa';
+  }
+}
+
+async function triEjecutarImport() {
+  if (!triFile) return;
+  const btn = document.getElementById('btnTriImportar');
+  btn.disabled = true; btn.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Importando...';
+  try {
+    const fd = new FormData();
+    fd.append('archivo', triFile);
+    const resp = await fetch('/api/carga-trinidad/importar', { method:'POST', headers:{ Authorization:'Bearer '+token }, body:fd });
+    const r = await resp.json();
+    if (!r.success) { toast('Error: ' + r.error, false); return; }
+    const d = r.data;
+
+    const logHtml = d.log.slice(0,50).map(l =>
+      `<div class="log-line ${l.startsWith('✗')?'err':''}">${l}</div>`).join('');
+
+    document.getElementById('triResultadoContent').innerHTML = `
+      <div class="result-box ${d.errores>0?'error':''}">
+        <div style="font-size:1.1rem;font-weight:700;color:${d.errores>0?'#dc2626':'#166534'};margin-bottom:12px">
+          <i class="bi bi-check-circle-fill me-2"></i>Carga Trinidad completada
+        </div>
+        <div class="log-line">📋 Total procesados: <strong>${d.total}</strong></div>
+        <div class="log-line" style="color:#166534">➕ Insertados nuevos: <strong>${d.insertados}</strong></div>
+        <div class="log-line" style="color:#d97706">🔄 Actualizados: <strong>${d.actualizados}</strong></div>
+        ${d.errores > 0 ? `<div class="log-line err">✗ Errores: <strong>${d.errores}</strong></div>` : ''}
+        <details style="margin-top:12px"><summary style="cursor:pointer;font-size:.8rem;color:#6b7280">Ver log completo (${d.log.length} líneas)</summary>
+          <div style="max-height:200px;overflow-y:auto;margin-top:8px;background:#f9fafb;border-radius:8px;padding:10px">${logHtml}</div>
+        </details>
+      </div>`;
+    document.getElementById('triPaso3').style.display = '';
+    toast(`✓ ${d.insertados} insertados · ${d.actualizados} actualizados`, true);
+  } catch(ex) {
+    toast('Error: ' + ex.message, false);
+  } finally {
+    btn.disabled = false; btn.innerHTML = '<i class="bi bi-cloud-upload"></i>Importar / Actualizar';
+  }
 }
 
 function mostrarResultado(d) {
