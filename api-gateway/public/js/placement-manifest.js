@@ -82,6 +82,12 @@ const PLACEMENT_ITEMS = {
   'bd-inf-comercial':        { section:'mantenedores',  href:'/mantenedores/bd-informacion-comercial/',  icon:'bi-building-fill',           titulo:'BD Información Comercial' },
   'vista-pantallas':         { section:'mantenedores',  href:'/mantenedores/vista-pantallas/',    icon:'bi-layout-wtf',             titulo:'Vista Pantallas' },
   'solo-dios':               { section:'mantenedores',  href:'/mantenedores/solo-dios/',          icon:'bi-lightning-charge-fill',  titulo:'SOLO DIOS' },
+  // ── CARGA MASIVA ──────────────────────────────────────────────────────────
+  'cm-cargar':               { section:'carga_masiva',  href:'/carga-masiva/#secAutofacil',       icon:'bi-upload',                 titulo:'Cargar' },
+  'cm-trinidad':             { section:'carga_masiva',  href:'/carga-masiva/#secTrinidad',        icon:'bi-cloud-arrow-up',         titulo:'Carga Trinidad' },
+  'cm-eq-estados':           { section:'carga_masiva',  href:'/carga-masiva/#secEqEstados',       icon:'bi-arrow-left-right',       titulo:'Equivalencias Trinidad' },
+  'cm-eq-ejecs':             { section:'carga_masiva',  href:'/carga-masiva/#secEqEjecs',         icon:'bi-person-lines-fill',      titulo:'Equivalencia Ejecutivos' },
+  'cm-historial':            { section:'carga_masiva',  href:'/carga-masiva/#secHistorial',       icon:'bi-clock-history',          titulo:'Historial' },
 };
 
 async function loadPlacementConfig(headers) {
