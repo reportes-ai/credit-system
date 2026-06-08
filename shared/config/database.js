@@ -19,10 +19,22 @@ const pool = mysql.createPool({
   ...(needsSSL && { ssl: { rejectUnauthorized: false } })
 });
 
-// Forzar timezone Chile en cada sesión de BD
-// → CURRENT_TIMESTAMP y NOW() devuelven hora Chile, no UTC
+// Calcula dinámicamente el offset UTC de Chile (maneja DST automáticamente)
+function getChileTZOffset() {
+  const now = new Date();
+  // Diferencia en minutos entre UTC y America/Santiago
+  const utcStr  = now.toLocaleString('en-US', { timeZone: 'UTC' });
+  const clStr   = now.toLocaleString('en-US', { timeZone: 'America/Santiago' });
+  const diffMin = (new Date(clStr) - new Date(utcStr)) / 60000;
+  const h = Math.floor(Math.abs(diffMin) / 60).toString().padStart(2, '0');
+  const m = (Math.abs(diffMin) % 60).toString().padStart(2, '0');
+  return (diffMin >= 0 ? '+' : '-') + h + ':' + m;
+}
+
+// Forzar timezone Chile en cada sesión de BD — automático invierno/verano
 pool.on('connection', conn => {
-  conn.query("SET time_zone = '-04:00'");
+  const tz = getChileTZOffset(); // '-04:00' en invierno, '-03:00' en verano
+  conn.query(`SET time_zone = '${tz}'`);
 });
 
 module.exports = pool;
