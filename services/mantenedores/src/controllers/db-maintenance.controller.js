@@ -127,6 +127,48 @@ exports.getDiagnostico = async (req, res) => {
   }
 };
 
+// ─── Historial de mantenciones ──────────────────────────────────────────────
+exports.getHistorial = async (req, res) => {
+  try {
+    const limit = Math.min(parseInt(req.query.limit) || 200, 500);
+    const [rows] = await pool.query(`
+      SELECT id, tabla_nombre, operacion, estado, duracion_ms,
+             filas_aprox, ejecutado_por, ejecutado_at
+      FROM db_maintenance_log
+      ORDER BY ejecutado_at DESC
+      LIMIT ?
+    `, [limit]);
+
+    // Agrupar por sesión: registros con ejecutado_at dentro del mismo minuto
+    // de la misma ejecución (para mostrar "sesiones")
+    const sesiones = [];
+    let sesionActual = null;
+    rows.forEach(r => {
+      const key = r.ejecutado_por + '_' + r.ejecutado_at.toString().substring(0, 16);
+      if (!sesionActual || sesionActual.key !== key) {
+        sesionActual = {
+          key,
+          fecha: r.ejecutado_at,
+          ejecutado_por: r.ejecutado_por || 'sistema',
+          tablas: [],
+          exitosas: 0,
+          fallidas: 0,
+          duracion_total_ms: 0,
+        };
+        sesiones.push(sesionActual);
+      }
+      sesionActual.tablas.push(r);
+      if (r.estado === 'ok') sesionActual.exitosas++;
+      else sesionActual.fallidas++;
+      sesionActual.duracion_total_ms += r.duracion_ms || 0;
+    });
+
+    return res.json({ success: true, data: { rows, sesiones }, error: null });
+  } catch (err) {
+    return res.status(500).json({ success: false, data: null, error: err.message });
+  }
+};
+
 // ─── Ejecutar mantenimiento ──────────────────────────────────────────────────
 exports.ejecutarMantenimiento = async (req, res) => {
   const { tablas: tablasParam = [], modo = 'analyze' } = req.body || {};
