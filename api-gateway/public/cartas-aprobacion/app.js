@@ -4811,4 +4811,3 @@ function _iniciarPolling(){
 
 // ── Arranque: iniciar sesión directo desde el token del sistema principal ──
 doLogin();
-</script>
