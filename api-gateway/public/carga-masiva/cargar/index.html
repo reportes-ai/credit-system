@@ -1,0 +1,295 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <link rel="icon" href="/img/favicon.png" type="image/png">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Cargar — Carga Masiva AutoFácil</title>
+  <link href="/css/bootstrap.min.css" rel="stylesheet">
+  <link href="/css/bootstrap-icons.css" rel="stylesheet">
+  <style>
+    :root { --navy:#0141A2; --navy-dark:#012d70; --navy-light:#0255c5; --accent:#009AFE; --bg:#f0f4f8; }
+    body { background:var(--bg); font-family:'Segoe UI',system-ui,sans-serif; margin:0; min-height:100vh; }
+    .topnav { background:linear-gradient(90deg,var(--navy-dark),var(--navy-light)); color:#fff; height:60px; padding:0 24px; display:flex; align-items:center; justify-content:space-between; position:sticky; top:0; z-index:200; box-shadow:0 2px 8px rgba(0,0,0,.3); }
+    .topnav-left { display:flex; align-items:center; gap:16px; }
+    .topnav-brand { display:flex; align-items:center; gap:8px; text-decoration:none; }
+    .topnav-brand img { height:32px; filter:brightness(0) invert(1); }
+    .version-badge { background:rgba(255,255,255,.15); color:rgba(255,255,255,.75); font-size:.65rem; font-weight:700; border-radius:6px; padding:2px 8px; }
+    .breadcrumb-nav { color:rgba(255,255,255,.6); font-size:.85rem; display:flex; align-items:center; gap:6px; }
+    .breadcrumb-nav a { color:rgba(255,255,255,.75); text-decoration:none; }
+    .breadcrumb-nav .sep { color:rgba(255,255,255,.35); }
+    .topnav-right { display:flex; align-items:center; gap:10px; }
+    .user-chip { background:rgba(255,255,255,.12); border-radius:24px; padding:5px 12px; display:flex; align-items:center; gap:8px; font-size:.85rem; }
+    .avatar { width:28px; height:28px; background:#90caf9; border-radius:50%; display:flex; align-items:center; justify-content:center; color:var(--navy); font-weight:700; font-size:.75rem; }
+    .perfil-badge { background:rgba(144,202,249,.2); border:1px solid rgba(144,202,249,.4); color:#90caf9; border-radius:12px; padding:2px 10px; font-size:.73rem; font-weight:600; }
+    .btn-logout { background:rgba(255,255,255,.1); border:1px solid rgba(255,255,255,.2); color:#fff; border-radius:8px; padding:5px 12px; font-size:.82rem; cursor:pointer; }
+    .main-content { padding:32px 40px; max-width:900px; margin:0 auto; }
+    .page-banner { background:linear-gradient(135deg,#012d70,#0078d4 60%,#009AFE); border-radius:14px; color:#fff; padding:20px 28px; margin-bottom:24px; display:flex; align-items:center; gap:16px; }
+    .page-banner i { font-size:2rem; opacity:.85; }
+    .page-banner h2 { font-weight:700; margin:0 0 2px; font-size:1.1rem; }
+    .page-banner p { opacity:.8; margin:0; font-size:.82rem; }
+    .card { background:#fff; border-radius:14px; padding:28px; box-shadow:0 1px 5px rgba(0,0,0,.07); border:none; }
+    .section-title { font-weight:700; font-size:.78rem; text-transform:uppercase; letter-spacing:.8px; color:#6b7280; margin-bottom:14px; display:flex; align-items:center; gap:8px; }
+    .section-title::after { content:''; flex:1; height:1px; background:#e5e7eb; }
+    .drop-zone { border:2px dashed #d1d5db; border-radius:12px; padding:40px 20px; text-align:center; cursor:pointer; transition:.2s; }
+    .drop-zone:hover, .drop-zone.drag-over { border-color:var(--navy); background:#f0f4f8; }
+    .drop-zone i { font-size:2.5rem; color:#9ca3af; display:block; margin-bottom:10px; }
+    .drop-zone .label { font-size:.9rem; color:#374151; font-weight:600; }
+    .drop-zone .sub { font-size:.78rem; color:#9ca3af; margin-top:4px; }
+    input[type=file] { display:none; }
+    .btn-main { background:var(--navy); color:#fff; border:none; border-radius:10px; padding:10px 24px; font-size:.9rem; font-weight:700; cursor:pointer; display:inline-flex; align-items:center; gap:8px; }
+    .btn-main:hover { background:var(--navy-light); }
+    .btn-main:disabled { opacity:.55; cursor:not-allowed; }
+    .btn-success { background:#16a34a; }
+    .btn-success:hover { background:#15803d; }
+    .stats-row { display:grid; grid-template-columns:repeat(4,1fr); gap:14px; margin-bottom:20px; }
+    .stat-item { background:#f8fafc; border-radius:10px; padding:14px 18px; border-left:4px solid #e5e7eb; }
+    .stat-item.green { border-left-color:#16a34a; }
+    .stat-item.blue  { border-left-color:#0141A2; }
+    .stat-item.amber { border-left-color:#d97706; }
+    .stat-item .lbl  { font-size:.72rem; color:#9ca3af; font-weight:600; text-transform:uppercase; letter-spacing:.5px; }
+    .stat-item .val  { font-size:1.5rem; font-weight:800; color:#111827; }
+    .preview-table { font-size:.8rem; }
+    .preview-table th { background:#e8eaf6; color:#374151; font-weight:700; padding:7px 10px; }
+    .preview-table td { padding:6px 10px; border-bottom:1px solid #f1f5f9; }
+    .badge-new { background:#dcfce7; color:#166534; font-size:.7rem; font-weight:700; padding:2px 8px; border-radius:10px; }
+    .result-box { background:#f0fdf4; border:1.5px solid #86efac; border-radius:12px; padding:20px 24px; }
+    .result-box.error { background:#fff0f0; border-color:#fca5a5; }
+    .log-line { font-size:.82rem; font-family:monospace; color:#374151; padding:2px 0; }
+    .log-line.err { color:#dc2626; }
+    #toast { position:fixed; bottom:24px; right:24px; padding:12px 22px; border-radius:10px; color:#fff; font-weight:600; font-size:.88rem; display:flex; align-items:center; gap:8px; box-shadow:0 4px 20px rgba(0,0,0,.2); transform:translateY(80px); opacity:0; transition:.28s; z-index:9999; }
+    #toast.show { transform:translateY(0); opacity:1; }
+    #toast.ok  { background:#166534; }
+    #toast.err { background:#991b1b; }
+    @media(max-width:700px){ .stats-row { grid-template-columns:repeat(2,1fr); } .main-content { padding:16px; } }
+  </style>
+</head>
+<body>
+<nav class="topnav">
+  <div class="topnav-left">
+    <a href="/" class="topnav-brand"><img src="/img/logo.png" alt="AutoFácil"><span class="version-badge">v6.0</span></a>
+    <div class="breadcrumb-nav">
+      <a href="/">Inicio</a><span class="sep">›</span>
+      <a href="/carga-masiva/">Carga Masiva</a><span class="sep">›</span>
+      <span style="color:#fff;font-weight:600">Cargar</span>
+    </div>
+  </div>
+  <div class="topnav-right">
+    <div class="user-chip">
+      <div class="avatar" id="avatarInicial">?</div>
+      <div>
+        <div style="font-weight:600;line-height:1.3;color:#fff" id="navNombre">—</div>
+        <div class="perfil-badge" id="navPerfil">—</div>
+      </div>
+    </div>
+    <button class="btn-logout" onclick="logout()"><i class="bi bi-box-arrow-right me-1"></i>Salir</button>
+  </div>
+</nav>
+
+<div class="main-content">
+  <div class="page-banner">
+    <i class="bi bi-cloud-upload-fill"></i>
+    <div>
+      <h2>Cargar</h2>
+      <p>Importación masiva desde el Excel calculado AutoFácil — solo inserta registros NUEVOS (clave: N° Operación)</p>
+    </div>
+  </div>
+
+  <div class="card mb-4">
+    <!-- Zona de carga -->
+    <div class="drop-zone" id="dropZone" onclick="document.getElementById('fileInput').click()" ondragover="onDrag(event,true)" ondragleave="onDrag(event,false)" ondrop="onDrop(event)">
+      <i class="bi bi-file-earmark-spreadsheet"></i>
+      <div class="label" id="dropLabel">Arrastra el archivo aquí o haz clic para seleccionar</div>
+      <div class="sub">Solo archivos .xlsx — máx. 10 MB</div>
+    </div>
+    <input type="file" id="fileInput" accept=".xlsx" onchange="archivoSeleccionado(event)">
+
+    <div style="display:flex;gap:16px;margin-top:20px;align-items:center;flex-wrap:wrap">
+      <div style="display:flex;align-items:center;gap:8px">
+        <label style="font-weight:600;font-size:.85rem;color:#374151;white-space:nowrap"><i class="bi bi-calendar3 me-1"></i>Mes contable:</label>
+        <input type="month" id="mesArchivo" style="border:1.5px solid #d1d5db;border-radius:8px;padding:7px 12px;font-size:.88rem;outline:none">
+      </div>
+      <button class="btn-main" id="btnPreview" onclick="ejecutarPreview()" disabled>
+        <i class="bi bi-eye"></i>Vista previa
+      </button>
+    </div>
+    <div style="margin-top:8px;font-size:.75rem;color:#9ca3af"><i class="bi bi-info-circle me-1"></i>El mes contable asegura que todos los registros queden asignados al mes correcto.</div>
+
+    <!-- Preview -->
+    <div id="paso2" style="display:none;margin-top:28px;border-top:1px solid #e5e7eb;padding-top:22px">
+      <div class="section-title"><i class="bi bi-bar-chart-fill" style="color:#009AFE"></i>Resumen del archivo</div>
+      <div class="stats-row" id="statsRow"></div>
+      <div style="font-size:.82rem;color:#374151;margin-bottom:12px;font-weight:600">Muestra de registros NUEVOS a importar (primeros 10):</div>
+      <div style="overflow-x:auto">
+        <table class="table preview-table">
+          <thead><tr><th>N° Op</th><th>Nombre</th><th>Estado</th><th>Producto</th><th>Financiera</th><th>Monto Fin.</th></tr></thead>
+          <tbody id="previewBody"></tbody>
+        </table>
+      </div>
+      <button class="btn-main btn-success" id="btnImportar" onclick="ejecutarImport()">
+        <i class="bi bi-cloud-upload"></i>Importar registros nuevos
+      </button>
+    </div>
+
+    <!-- Resultado -->
+    <div id="paso3" style="display:none;margin-top:24px;border-top:1px solid #e5e7eb;padding-top:20px">
+      <div class="section-title"><i class="bi bi-check2-circle" style="color:#16a34a"></i>Resultado de la importación</div>
+      <div id="resultadoContent"></div>
+    </div>
+  </div>
+
+  <!-- Corregir mes -->
+  <div class="card">
+    <div class="section-title"><i class="bi bi-wrench" style="color:#d97706"></i>Corregir mes contable de registros existentes</div>
+    <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap">
+      <div style="display:flex;align-items:center;gap:8px">
+        <label style="font-size:.83rem;color:#374151;font-weight:600">Mes incorrecto:</label>
+        <input type="month" id="mesIncorrecto" style="border:1.5px solid #d1d5db;border-radius:8px;padding:6px 10px;font-size:.85rem">
+      </div>
+      <i class="bi bi-arrow-right" style="color:#9ca3af"></i>
+      <div style="display:flex;align-items:center;gap:8px">
+        <label style="font-size:.83rem;color:#374151;font-weight:600">Mes correcto:</label>
+        <input type="month" id="mesCorrecto" style="border:1.5px solid #d1d5db;border-radius:8px;padding:6px 10px;font-size:.85rem">
+      </div>
+      <button class="btn-main" onclick="corregirMes()" style="background:#d97706">
+        <i class="bi bi-pencil"></i>Corregir mes
+      </button>
+    </div>
+    <div style="font-size:.73rem;color:#9ca3af;margin-top:8px">Mueve todos los registros del mes incorrecto al mes correcto en la base de datos.</div>
+  </div>
+</div>
+
+<div id="toast"><i id="toastIcon" class="bi bi-check-circle-fill"></i><span id="toastMsg"></span></div>
+
+<script src="/js/auth-guard.js"></script>
+<script>
+const token = sessionStorage.getItem('token');
+const yo    = JSON.parse(sessionStorage.getItem('usuario') || 'null');
+if (!token || !yo) window.location.href = '/login.html';
+if (yo?.perfil !== 'Administrador') { alert('Solo Administradores pueden hacer carga masiva'); window.location.href = '/'; }
+const H = { Authorization: 'Bearer ' + token };
+document.getElementById('navNombre').textContent = `${yo?.nombre||''} ${yo?.apellido||''}`.trim();
+document.getElementById('navPerfil').textContent  = yo?.perfil || '';
+document.getElementById('avatarInicial').textContent = (yo?.nombre||'?').charAt(0).toUpperCase();
+function logout() { sessionStorage.removeItem('token'); sessionStorage.removeItem('usuario'); window.location.href = '/login.html'; }
+
+let archivoActual = null, toastTimer;
+
+function toast(msg, ok=true) {
+  const t = document.getElementById('toast');
+  document.getElementById('toastMsg').textContent = msg;
+  document.getElementById('toastIcon').className = ok ? 'bi bi-check-circle-fill' : 'bi bi-x-circle-fill';
+  t.className = `show ${ok?'ok':'err'}`;
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => t.classList.remove('show'), 4000);
+}
+
+function fmt(n) { return n ? '$' + Math.round(n).toLocaleString('es-CL') : '—'; }
+
+function onDrag(e, over) { e.preventDefault(); document.getElementById('dropZone').classList[over?'add':'remove']('drag-over'); }
+function onDrop(e) { e.preventDefault(); onDrag(e,false); const f = e.dataTransfer.files[0]; if (f) cargarArchivo(f); }
+function archivoSeleccionado(e) { const f = e.target.files[0]; if (f) cargarArchivo(f); }
+
+function cargarArchivo(f) {
+  if (!f.name.endsWith('.xlsx')) { toast('Solo se aceptan archivos .xlsx', false); return; }
+  archivoActual = f;
+  document.getElementById('dropLabel').textContent = `✓ ${f.name} (${(f.size/1024).toFixed(0)} KB)`;
+  document.getElementById('btnPreview').disabled = false;
+  document.getElementById('paso2').style.display = 'none';
+  document.getElementById('paso3').style.display = 'none';
+}
+
+async function ejecutarPreview() {
+  if (!archivoActual) return;
+  const btn = document.getElementById('btnPreview');
+  btn.disabled = true; btn.innerHTML = '<i class="bi bi-hourglass-split"></i>Analizando...';
+  try {
+    const fd = new FormData();
+    fd.append('archivo', archivoActual);
+    const res  = await fetch('/api/carga-masiva/preview', { method:'POST', headers:H, body:fd });
+    const json = await res.json();
+    if (!json.success) { toast('Error: ' + json.error, false); return; }
+    mostrarPreview(json.data);
+  } catch(e) { toast('Error: ' + e.message, false); }
+  finally { btn.disabled = false; btn.innerHTML = '<i class="bi bi-eye"></i>Vista previa'; }
+}
+
+function mostrarPreview({ resumen, preview }) {
+  document.getElementById('statsRow').innerHTML = `
+    <div class="stat-item blue"><div class="lbl">Total archivo</div><div class="val">${resumen.total}</div></div>
+    <div class="stat-item green"><div class="lbl">Nuevos a importar</div><div class="val">${resumen.nuevos}</div></div>
+    <div class="stat-item amber"><div class="lbl">Ya existentes</div><div class="val">${resumen.existentes}</div></div>
+    <div class="stat-item blue"><div class="lbl">OTORGADOS</div><div class="val">${resumen.otorgados}</div></div>`;
+  const tbody = document.getElementById('previewBody');
+  tbody.innerHTML = preview.length
+    ? preview.map(r => `<tr>
+        <td><strong>${r.op}</strong></td><td>${r.nombre||'—'}</td>
+        <td><span class="badge-new">${r.estado||'—'}</span></td>
+        <td style="font-size:.75rem">${r.producto||'—'}</td>
+        <td>${r.financiera||'—'}</td>
+        <td style="text-align:right">${fmt(r.monto)}</td>
+      </tr>`).join('')
+    : '<tr><td colspan="6" class="text-center text-secondary py-3">No hay registros nuevos para importar</td></tr>';
+  document.getElementById('paso2').style.display = '';
+  if (resumen.nuevos === 0) {
+    document.getElementById('btnImportar').disabled = true;
+    document.getElementById('btnImportar').innerHTML = '<i class="bi bi-check-all"></i>Todos ya existen';
+  }
+}
+
+async function ejecutarImport() {
+  if (!archivoActual) return;
+  const mes = document.getElementById('mesArchivo').value;
+  if (!mes) { toast('Selecciona el mes contable antes de importar', false); return; }
+  if (!confirm(`¿Confirmas la importación con mes contable ${mes}?`)) return;
+  const btn = document.getElementById('btnImportar');
+  btn.disabled = true; btn.innerHTML = '<i class="bi bi-hourglass-split"></i>Importando...';
+  try {
+    const fd = new FormData();
+    fd.append('archivo', archivoActual);
+    fd.append('mes_override', mes + '-01');
+    const res  = await fetch('/api/carga-masiva/importar', { method:'POST', headers:H, body:fd });
+    const json = await res.json();
+    if (!json.success) { toast('Error: ' + json.error, false); return; }
+    mostrarResultado(json.data);
+  } catch(e) { toast('Error: ' + e.message, false); }
+  finally { btn.disabled = false; btn.innerHTML = '<i class="bi bi-cloud-upload"></i>Importar registros nuevos'; }
+}
+
+function mostrarResultado(d) {
+  const errHtml = d.errores?.length
+    ? `<div style="margin-top:12px"><strong style="color:#dc2626">Errores:</strong>${d.errores.map(e=>`<div class="log-line err">OP ${e.op}: ${e.error}</div>`).join('')}</div>`
+    : '';
+  document.getElementById('resultadoContent').innerHTML = `
+    <div class="result-box">
+      <div style="font-size:1.1rem;font-weight:700;color:#166534;margin-bottom:12px"><i class="bi bi-check-circle-fill me-2"></i>Importación completada</div>
+      <div class="log-line">📋 Total en archivo: <strong>${d.total_archivo}</strong></div>
+      <div class="log-line">⏭️ Ya existentes (saltados): <strong>${d.ya_existentes}</strong></div>
+      <div class="log-line">🆕 Nuevos procesados: <strong>${d.nuevos_intentados}</strong></div>
+      <div class="log-line" style="color:#166534;font-weight:700">✅ Insertados: <strong>${d.insertados}</strong></div>
+      ${errHtml}
+    </div>`;
+  document.getElementById('paso3').style.display = '';
+  toast(`✓ ${d.insertados} registros importados`, true);
+}
+
+async function corregirMes() {
+  const inc = document.getElementById('mesIncorrecto').value;
+  const cor = document.getElementById('mesCorrecto').value;
+  if (!inc || !cor) { toast('Selecciona ambos meses', false); return; }
+  if (inc === cor)   { toast('Los meses son iguales', false); return; }
+  if (!confirm(`¿Mover TODOS los registros de ${inc} → ${cor}?`)) return;
+  try {
+    const res  = await fetch('/api/carga-masiva/corregir-mes', {
+      method:'POST', headers:{...H,'Content-Type':'application/json'},
+      body: JSON.stringify({ mes_incorrecto: inc+'-01', mes_correcto: cor+'-01' }),
+    });
+    const json = await res.json();
+    if (json.success) toast(`✓ ${json.data.afectados} registros corregidos`, true);
+    else toast('Error: ' + json.error, false);
+  } catch(e) { toast('Error: ' + e.message, false); }
+}
+</script>
+<script src="/js/app-version.js"></script>
+</body>
+</html>
