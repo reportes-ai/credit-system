@@ -3,13 +3,19 @@ const pool     = require('../../../../shared/config/database');
 const XLSX     = require('xlsx');
 const historial = require('./carga-historial.controller');
 
-/* ── Migración: agregar columna estado_autofin ─────────────────── */
+/* ── Migraciones ────────────────────────────────────────────────── */
 (async () => {
   try {
     await pool.query(`ALTER TABLE creditos ADD COLUMN estado_autofin VARCHAR(50) NULL COMMENT 'Estado en sistema Trinidad'`);
     console.log('[carga-trinidad] columna estado_autofin creada');
   } catch (e) {
     if (e.errno !== 1060) console.error('[carga-trinidad migration]', e.message);
+  }
+  try {
+    const [r] = await pool.query(`UPDATE creditos SET ejecutivo = UPPER(ejecutivo) WHERE ejecutivo IS NOT NULL AND ejecutivo != UPPER(ejecutivo)`);
+    if (r.affectedRows > 0) console.log(`[carga-trinidad] ${r.affectedRows} ejecutivos convertidos a mayúsculas`);
+  } catch (e) {
+    console.error('[carga-trinidad migration uppercase]', e.message);
   }
 })();
 
