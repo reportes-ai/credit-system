@@ -1,6 +1,28 @@
 'use strict';
 const pool = require('../../../../shared/config/database');
 
+// ─── Migración: crear tabla de log si no existe ──────────────────────────────
+(async () => {
+  try {
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS db_maintenance_log (
+        id           INT AUTO_INCREMENT PRIMARY KEY,
+        tabla_nombre VARCHAR(128) NOT NULL,
+        operacion    VARCHAR(32)  NOT NULL DEFAULT 'analyze',
+        estado       VARCHAR(16)  NOT NULL DEFAULT 'ok',
+        duracion_ms  INT          DEFAULT 0,
+        filas_aprox  BIGINT       DEFAULT 0,
+        ejecutado_por VARCHAR(64) DEFAULT NULL,
+        ejecutado_at  DATETIME    NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        INDEX idx_tabla (tabla_nombre),
+        INDEX idx_fecha (ejecutado_at)
+      )
+    `);
+  } catch (e) {
+    console.error('[db-maintenance] migración log:', e.message);
+  }
+})();
+
 // ─── Diagnóstico ────────────────────────────────────────────────────────────
 exports.getDiagnostico = async (req, res) => {
   try {
@@ -14,95 +36,56 @@ exports.getDiagnostico = async (req, res) => {
         DATA_LENGTH       AS bytes_datos,
         INDEX_LENGTH      AS bytes_indices,
         DATA_FREE         AS bytes_libres,
-        CREATE_TIME       AS fecha_creacion,
-        UPDATE_TIME       AS ultima_modificacion,
-        TABLE_COMMENT     AS comentario
+        UPDATE_TIME       AS ultima_modificacion
       FROM information_schema.TABLES
       WHERE TABLE_SCHEMA = DATABASE()
         AND TABLE_TYPE = 'BASE TABLE'
+        AND TABLE_NAME != 'db_maintenance_log'
       ORDER BY (DATA_LENGTH + INDEX_LENGTH) DESC
     `);
 
-    // 2. Historial de ANALYZE (TiDB: information_schema.ANALYZE_STATUS)
-    // Guarda el último analyze exitoso por tabla
-    let analyzeMap = {};
-    try {
-      const [anal] = await conn.query(`
-        SELECT Table_name, State, Start_time, End_time, Fail_reason
-        FROM information_schema.ANALYZE_STATUS
-        WHERE Db_name = DATABASE()
-        ORDER BY End_time DESC
-      `);
-      // Quedarse con el registro más reciente por tabla
-      anal.forEach(r => {
-        if (!analyzeMap[r.Table_name]) analyzeMap[r.Table_name] = r;
-      });
-    } catch (_) {
-      // Fallback: intentar mysql.stats_meta
-      try {
-        const [stats] = await conn.query(`
-          SELECT table_name, modify_count, count AS filas_stats
-          FROM mysql.stats_meta WHERE db_name = DATABASE()
-        `);
-        stats.forEach(s => {
-          analyzeMap[s.table_name] = {
-            Table_name: s.table_name,
-            State: 'finished',
-            End_time: null,
-            modify_count: s.modify_count,
-          };
-        });
-      } catch (_2) { /* sin acceso a estadísticas */ }
-    }
-
-    // 3. Variables globales relevantes
-    const [vars] = await conn.query(`
-      SHOW VARIABLES WHERE Variable_name IN (
-        'innodb_stats_auto_recalc',
-        'tidb_analyze_version',
-        'version',
-        'version_comment'
-      )
+    // 2. Último ANALYZE exitoso por tabla desde nuestro propio log
+    const [logs] = await conn.query(`
+      SELECT tabla_nombre, MAX(ejecutado_at) AS ultimo_analyze,
+             SUM(CASE WHEN estado = 'ok' THEN 1 ELSE 0 END) AS veces_ok,
+             COUNT(*) AS veces_total
+      FROM db_maintenance_log
+      WHERE estado = 'ok'
+      GROUP BY tabla_nombre
     `);
-    const varMap = {};
-    vars.forEach(v => { varMap[v.Variable_name] = v.Value; });
+    const logMap = {};
+    logs.forEach(l => { logMap[l.tabla_nombre] = l; });
 
-    // 4. Calcular diagnóstico por tabla
-    const hayAnalyzeStatus = Object.keys(analyzeMap).length > 0;
+    // 3. Calcular diagnóstico por tabla
+    const UMBRAL_DIAS_ANALYZE = 30; // advertir si no se analiza en 30 días
+    const ahora = new Date();
 
     const diagnostico = tablas.map(t => {
       const totalBytes = (t.bytes_datos || 0) + (t.bytes_indices || 0);
       const libresBytes = t.bytes_libres || 0;
       const fragPct = totalBytes > 0 ? (libresBytes / totalBytes) * 100 : 0;
-      const anal = analyzeMap[t.nombre] || null;
+      const logEntry = logMap[t.nombre] || null;
 
-      // Nivel de alerta
       let nivel = 'ok';
       const motivos = [];
 
+      // Fragmentación
       if (fragPct > 30) {
         nivel = 'warning';
         motivos.push(`Fragmentación ${fragPct.toFixed(1)}% (>30%)`);
       }
 
-      // Lógica basada en ANALYZE_STATUS
-      if (hayAnalyzeStatus) {
-        if (!anal) {
-          // Tabla nunca analizada
-          if (t.filas_aprox > 1000) {
-            nivel = nivel === 'ok' ? 'warning' : nivel;
-            motivos.push('Nunca analizada');
-          }
-        } else if (anal.State && anal.State.toLowerCase().includes('fail')) {
-          nivel = 'warning';
-          motivos.push(`Último ANALYZE falló: ${anal.Fail_reason || 'error desconocido'}`);
-        }
-        // Si está en analyze_status con state finished → ok (sin motivo extra)
-      } else {
-        // No se pudo leer ANALYZE_STATUS ni stats_meta → solo advertir en tablas grandes
-        if (t.filas_aprox > 1000) {
+      // Antigüedad del último ANALYZE
+      if (!logEntry) {
+        if (t.filas_aprox > 500) {
           nivel = nivel === 'ok' ? 'warning' : nivel;
-          motivos.push('Sin estadísticas disponibles');
+          motivos.push('Sin mantenimiento previo');
+        }
+      } else {
+        const diasDesde = (ahora - new Date(logEntry.ultimo_analyze)) / 86400000;
+        if (diasDesde > UMBRAL_DIAS_ANALYZE) {
+          nivel = nivel === 'ok' ? 'warning' : nivel;
+          motivos.push(`Último ANALYZE hace ${Math.floor(diasDesde)} días`);
         }
       }
 
@@ -113,19 +96,19 @@ exports.getDiagnostico = async (req, res) => {
         indice_mb: ((t.bytes_indices || 0) / 1048576).toFixed(2),
         frag_pct: fragPct.toFixed(1),
         ultima_mod: t.ultima_modificacion,
-        ultimo_analyze: anal ? (anal.End_time || null) : null,
-        analyze_state: anal ? (anal.State || null) : null,
-        tiene_stats: !!anal,
+        ultimo_analyze: logEntry ? logEntry.ultimo_analyze : null,
+        veces_analizada: logEntry ? logEntry.veces_ok : 0,
+        tiene_stats: !!logEntry,
         nivel,
         motivos,
       };
     });
 
-    // 5. Resumen global
+    // 4. Resumen global
     const total = diagnostico.length;
-    const criticas = diagnostico.filter(t => t.nivel === 'critical').length;
+    const criticas    = diagnostico.filter(t => t.nivel === 'critical').length;
     const advertencias = diagnostico.filter(t => t.nivel === 'warning').length;
-    const ok = diagnostico.filter(t => t.nivel === 'ok').length;
+    const ok          = diagnostico.filter(t => t.nivel === 'ok').length;
 
     conn.release();
 
@@ -134,7 +117,6 @@ exports.getDiagnostico = async (req, res) => {
       data: {
         tablas: diagnostico,
         resumen: { total, criticas, advertencias, ok },
-        variables: varMap,
         timestamp: new Date().toISOString(),
       },
       error: null,
@@ -147,8 +129,8 @@ exports.getDiagnostico = async (req, res) => {
 
 // ─── Ejecutar mantenimiento ──────────────────────────────────────────────────
 exports.ejecutarMantenimiento = async (req, res) => {
-  // tablas: array de nombres, o vacío = todas
   const { tablas: tablasParam = [], modo = 'analyze' } = req.body || {};
+  const usuario = req.user ? (req.user.email || req.user.nombre || String(req.user.id)) : 'sistema';
 
   try {
     const conn = await pool.getConnection();
@@ -158,41 +140,54 @@ exports.ejecutarMantenimiento = async (req, res) => {
     if (!tablasTarget.length) {
       const [rows] = await conn.query(`
         SELECT TABLE_NAME FROM information_schema.TABLES
-        WHERE TABLE_SCHEMA = DATABASE() AND TABLE_TYPE = 'BASE TABLE'
+        WHERE TABLE_SCHEMA = DATABASE()
+          AND TABLE_TYPE = 'BASE TABLE'
+          AND TABLE_NAME != 'db_maintenance_log'
       `);
       tablasTarget = rows.map(r => r.TABLE_NAME);
     }
+
+    // Obtener filas actuales por tabla para el log
+    const [infoTablas] = await conn.query(`
+      SELECT TABLE_NAME, TABLE_ROWS
+      FROM information_schema.TABLES
+      WHERE TABLE_SCHEMA = DATABASE() AND TABLE_TYPE = 'BASE TABLE'
+    `);
+    const filasMap = {};
+    infoTablas.forEach(r => { filasMap[r.TABLE_NAME] = r.TABLE_ROWS || 0; });
 
     const resultados = [];
     const inicio = Date.now();
 
     for (const tabla of tablasTarget) {
       const t0 = Date.now();
+      let estado = 'ok';
+      let errMsg = null;
       try {
-        if (modo === 'analyze' || modo === 'full') {
-          await conn.query(`ANALYZE TABLE \`${tabla}\``);
-        }
-        resultados.push({
-          tabla,
-          operacion: modo,
-          estado: 'ok',
-          ms: Date.now() - t0,
-        });
+        await conn.query(`ANALYZE TABLE \`${tabla}\``);
       } catch (err) {
-        resultados.push({
-          tabla,
-          operacion: modo,
-          estado: 'error',
-          mensaje: err.message,
-          ms: Date.now() - t0,
-        });
+        estado = 'error';
+        errMsg = err.message;
       }
+      const ms = Date.now() - t0;
+
+      // Registrar en nuestro log
+      try {
+        await conn.query(
+          `INSERT INTO db_maintenance_log
+             (tabla_nombre, operacion, estado, duracion_ms, filas_aprox, ejecutado_por)
+           VALUES (?, ?, ?, ?, ?, ?)`,
+          [tabla, modo, estado, ms, filasMap[tabla] || 0, usuario]
+        );
+      } catch (_) { /* log no crítico */ }
+
+      resultados.push({ tabla, operacion: modo, estado, mensaje: errMsg, ms });
     }
 
     conn.release();
 
     const exitosas = resultados.filter(r => r.estado === 'ok').length;
-    const fallidas = resultados.filter(r => r.estado === 'error').length;
+    const fallidas  = resultados.filter(r => r.estado === 'error').length;
 
     return res.json({
       success: true,

@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- v1.1 -->
+<!-- v1.2 -->
 <html lang="es">
 <head>
   <meta charset="UTF-8">
@@ -124,7 +124,7 @@
 <div class="topbar">
   <i class="bi bi-database-gear" style="font-size:1.5rem"></i>
   <h1>Mantenimiento de Base de Datos</h1>
-  <span class="badge-version">v1.1</span>
+  <span class="badge-version">v1.2</span>
   <a href="/mantenedores/" class="ms-auto text-white-50 text-decoration-none" style="font-size:.85rem">
     <i class="bi bi-arrow-left"></i> Mantenedores
   </a>
@@ -316,10 +316,11 @@ function renderTablas(tablas) {
       : '<span style="color:#aaa;font-size:.78rem">–</span>';
 
     const ultimoAnalyze = t.ultimo_analyze
-      ? `<span style="color:#2e7d32;font-size:.8rem">${fmtFecha(t.ultimo_analyze)}</span>`
-      : t.tiene_stats
-        ? `<span style="color:#2e7d32;font-size:.8rem">✓ Analizada</span>`
-        : `<span style="color:#aaa;font-size:.78rem">Nunca</span>`;
+      ? `<span style="color:#2e7d32;font-size:.8rem">
+           ${fmtFecha(t.ultimo_analyze)}
+           <span style="color:#888;font-size:.72rem">(${t.veces_analizada}×)</span>
+         </span>`
+      : `<span style="color:#e65100;font-size:.78rem">Nunca</span>`;
 
     tbody.innerHTML += `<tr>
       <td><input type="checkbox" class="checkbox-tabla chk-tabla"
