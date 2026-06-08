@@ -17,6 +17,23 @@ const historial = require('./carga-historial.controller');
   } catch (e) {
     console.error('[carga-trinidad migration uppercase]', e.message);
   }
+  try {
+    // Parchar registros de Trinidad sin estado_eval usando el estado_credito existente
+    const [r] = await pool.query(`
+      UPDATE creditos SET estado_eval =
+        CASE estado_credito
+          WHEN 'Otorgado'  THEN 'OTORGADO'
+          WHEN 'Aprobado'  THEN 'APROBADO'
+          WHEN 'Rechazado' THEN 'RECHAZADO'
+          WHEN 'Digitado'  THEN 'PENDIENTE'
+          ELSE UPPER(estado_credito)
+        END
+      WHERE (estado_eval IS NULL OR estado_eval = '') AND estado_credito IS NOT NULL AND estado_credito != ''
+    `);
+    if (r.affectedRows > 0) console.log(`[carga-trinidad] ${r.affectedRows} registros con estado_eval parcheado desde estado_credito`);
+  } catch (e) {
+    console.error('[carga-trinidad migration estado_eval]', e.message);
+  }
 })();
 
 /* ── Carga mapa de estados desde BD (con fallback hardcoded) ────── */
@@ -113,10 +130,16 @@ function parseExcel(buffer, mapaEstados = {}, mapaEjecutivos = {}) {
       const fechaBase    = fechaCurse || fechaIngreso;
       const mes          = fechaBase ? fechaBase.slice(0, 7) + '-01' : null;
 
+      const estadoCredito = mapEstado(estadoTri, mapaEstados);
+      // Derivar estado_eval (usado por el dashboard) desde estado_credito
+      const EVAL_MAP = { 'Otorgado':'OTORGADO', 'Aprobado':'APROBADO', 'Rechazado':'RECHAZADO', 'Digitado':'PENDIENTE' };
+      const estadoEval = EVAL_MAP[estadoCredito] || estadoCredito?.toUpperCase() || null;
+
       return {
         num_op,
         estado_autofin:  estadoTri,
-        estado_credito:  mapEstado(estadoTri, mapaEstados),
+        estado_credito:  estadoCredito,
+        estado_eval:     estadoEval,
         producto:        normStr(get('Producto')),
         ejecutivo:       mapEjecutivo(ejTri, mapaEjecutivos),
         ejecutivo_tri:   ejTri,
@@ -210,24 +233,25 @@ exports.importar = async (req, res) => {
           await pool.query(
             `UPDATE creditos SET
                estado_autofin = ?,
-               marca = COALESCE(?, marca), modelo = COALESCE(?, modelo),
+               estado_eval    = COALESCE(NULLIF(estado_eval,''), ?),
+               marca    = COALESCE(?, marca), modelo   = COALESCE(?, modelo),
                vendedor = COALESCE(?, vendedor), updated_at = NOW()
              WHERE num_op = ?`,
-            [f.estado_autofin, f.marca, f.modelo, f.vendedor, f.num_op]
+            [f.estado_autofin, f.estado_eval, f.marca, f.modelo, f.vendedor, f.num_op]
           );
           actualizados++;
           log.push(`✓ Actualizado ${f.num_op} → ${f.estado_autofin} / ${f.estado_credito}`);
         } else {
           await pool.query(
             `INSERT INTO creditos
-               (num_op, estado_autofin, estado_credito,
+               (num_op, estado_autofin, estado_credito, estado_eval,
                 producto, ejecutivo, automotora, valor_vehiculo, pie, saldo_precio,
                 monto_financiado, fecha_otorgado, mes,
                 marca, modelo, vendedor,
                 financiera, created_at, updated_at)
-             VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,'NO APLICA', NOW(), NOW())`,
+             VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,'NO APLICA', NOW(), NOW())`,
             [
-              f.num_op, f.estado_autofin, f.estado_credito,
+              f.num_op, f.estado_autofin, f.estado_credito, f.estado_eval,
               f.producto, f.ejecutivo, f.automotora,
               f.valor_vehiculo, f.pie, f.saldo_precio,
               f.monto_financiado, f.fecha_otorgado, f.mes,
