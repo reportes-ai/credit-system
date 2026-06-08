@@ -84,19 +84,19 @@
     .btn-delete-sel:hover { background:#b91c1c; }
 
     /* Modal Recalcular */
-    .modal-backdrop { position:fixed; inset:0; background:rgba(0,0,0,.45); z-index:1000; display:none; align-items:center; justify-content:center; }
+    .modal-backdrop { position:fixed; inset:0; background:rgba(0,0,0,.6); z-index:2000; display:none; align-items:center; justify-content:center; backdrop-filter:blur(2px); }
     .modal-backdrop.show { display:flex; }
-    .modal-box { background:#fff; border-radius:16px; padding:28px 32px; width:100%; max-width:460px; box-shadow:0 8px 40px rgba(0,0,0,.25); }
-    .modal-box h5 { font-weight:700; margin:0 0 6px; font-size:1.05rem; color:#0141A2; }
-    .modal-box p.hint { font-size:.82rem; color:#6b7280; margin:0 0 20px; }
-    .modal-box label { font-size:.83rem; font-weight:600; color:#374151; display:block; margin-bottom:4px; }
-    .modal-box input[type=month] { border:1.5px solid #d1d5db; border-radius:8px; padding:7px 11px; font-size:.88rem; width:100%; box-sizing:border-box; outline:none; }
-    .modal-box input[type=month]:focus { border-color:#0141A2; }
-    .modal-btns { display:flex; gap:10px; justify-content:flex-end; margin-top:22px; }
-    .btn-recalc { background:#0141A2; color:#fff; border:none; border-radius:9px; padding:9px 22px; font-size:.88rem; font-weight:700; cursor:pointer; display:flex; align-items:center; gap:7px; }
+    .modal-box { background:#fff; border-radius:16px; padding:30px 34px; width:100%; max-width:480px; box-shadow:0 12px 60px rgba(0,0,0,.4); position:relative; z-index:2001; }
+    .modal-box h5 { font-weight:700; margin:0 0 6px; font-size:1.1rem; color:#0141A2; display:flex; align-items:center; gap:8px; }
+    .modal-box p.hint { font-size:.82rem; color:#6b7280; margin:0 0 22px; line-height:1.5; }
+    .modal-box label { font-size:.83rem; font-weight:600; color:#374151; display:block; margin-bottom:5px; }
+    .modal-box input[type=month] { border:1.5px solid #d1d5db; border-radius:8px; padding:8px 12px; font-size:.9rem; width:100%; box-sizing:border-box; outline:none; background:#fafafa; }
+    .modal-box input[type=month]:focus { border-color:#0141A2; background:#fff; }
+    .modal-btns { display:flex; gap:10px; justify-content:flex-end; margin-top:24px; }
+    .btn-recalc { background:#0141A2; color:#fff; border:none; border-radius:9px; padding:10px 24px; font-size:.9rem; font-weight:700; cursor:pointer; display:flex; align-items:center; gap:7px; }
     .btn-recalc:hover { background:#0255c5; }
     .btn-recalc:disabled { opacity:.55; cursor:not-allowed; }
-    #recalcLog { background:#f8fafc; border:1px solid #e5e7eb; border-radius:8px; padding:12px 14px; font-size:.76rem; color:#374151; max-height:180px; overflow-y:auto; white-space:pre-wrap; margin-top:14px; display:none; }
+    #recalcLog { background:#f1f5f9; border:1px solid #e2e8f0; border-radius:8px; padding:12px 14px; font-size:.76rem; color:#374151; max-height:180px; overflow-y:auto; white-space:pre-wrap; margin-top:16px; display:none; font-family:monospace; line-height:1.5; }
 
     /* Loading */
     .loading-overlay { position:fixed; inset:0; background:rgba(255,255,255,.7); display:flex; align-items:center; justify-content:center; z-index:999; display:none; }
