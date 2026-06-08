@@ -64,12 +64,24 @@
     #toast.ok  { background:#166534; }
     #toast.err { background:#991b1b; }
     @media(max-width:700px){ .stats-row { grid-template-columns:repeat(2,1fr); } .main-content { padding:16px; } }
+
+    /* ── Cards de módulo (igual que home) ── */
+    .modules-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(200px,1fr)); gap:18px; margin-bottom:28px; }
+    .module-card { background:#fff; border-radius:14px; padding:24px 20px; cursor:pointer; text-decoration:none; color:inherit; border:2px solid transparent; transition:transform .18s,box-shadow .18s,border-color .18s; display:block; box-shadow:0 1px 4px rgba(0,0,0,.06); }
+    .module-card:hover { transform:translateY(-4px); box-shadow:0 12px 32px rgba(1,65,162,.15); border-color:var(--navy); color:inherit; }
+    .mc-icon { width:48px; height:48px; border-radius:12px; background:linear-gradient(135deg,#e8eaf6,#c5cae9); display:flex; align-items:center; justify-content:center; font-size:1.45rem; color:var(--navy); margin-bottom:14px; transition:background .18s,color .18s; }
+    .module-card:hover .mc-icon { background:linear-gradient(135deg,var(--navy),var(--accent)); color:#fff; }
+    .module-card h6 { font-weight:700; font-size:.92rem; margin:0 0 5px; color:#111827; }
+    .module-card p  { font-size:.76rem; color:#6b7280; margin:0 0 16px; line-height:1.4; }
+    .btn-acceder { display:inline-flex; align-items:center; gap:6px; background:var(--navy); color:#fff; border:none; border-radius:8px; padding:7px 16px; font-size:.8rem; font-weight:700; cursor:pointer; transition:background .15s; }
+    .btn-acceder:hover { background:var(--accent); }
+    @media(max-width:600px){ .modules-grid { grid-template-columns:repeat(2,1fr); gap:12px; } }
   </style>
 </head>
 <body>
 <nav class="topnav">
   <div class="topnav-left">
-    <a href="/" class="topnav-brand"><img src="/img/logo.png" alt="AutoFácil"><span class="version-badge">v5.8</span></a>
+    <a href="/" class="topnav-brand"><img src="/img/logo.png" alt="AutoFácil"><span class="version-badge">v5.9</span></a>
     <div class="breadcrumb-nav">
       <a href="/">Inicio</a><span class="sep">›</span>
       <span style="color:#fff;font-weight:600"><i class="bi bi-cloud-upload me-1"></i>Carga Masiva Operaciones</span>
@@ -88,14 +100,49 @@
 </nav>
 
 <div class="main-content">
-  <div class="page-banner">
-    <i class="bi bi-cloud-upload"></i>
-    <div>
-      <h2>Carga Masiva de Operaciones</h2>
-      <p>Importa el archivo Excel calculado. Solo se insertan registros NUEVOS (clave: N° Operación). Los existentes se saltan automáticamente.</p>
-    </div>
+
+  <!-- Grid de navegación tipo módulo -->
+  <div class="modules-grid">
+
+    <a class="module-card" onclick="irA('secAutofacil')" href="javascript:void(0)">
+      <div class="mc-icon"><i class="bi bi-cloud-upload-fill"></i></div>
+      <h6>Cargar</h6>
+      <p>Importación masiva de operaciones desde el Excel calculado AutoFácil</p>
+      <button class="btn-acceder"><i class="bi bi-arrow-right-circle"></i>Acceder</button>
+    </a>
+
+    <a class="module-card" onclick="irA('secTrinidad')" href="javascript:void(0)">
+      <div class="mc-icon"><i class="bi bi-diagram-3-fill"></i></div>
+      <h6>Carga Trinidad</h6>
+      <p>Carga y actualiza créditos desde el sistema Trinidad</p>
+      <button class="btn-acceder"><i class="bi bi-arrow-right-circle"></i>Acceder</button>
+    </a>
+
+    <a class="module-card" onclick="irA('secEqEstados')" href="javascript:void(0)">
+      <div class="mc-icon"><i class="bi bi-arrow-left-right"></i></div>
+      <h6>Equivalencias Trinidad</h6>
+      <p>Mapeo editable de estados Trinidad → estados AutoFácil</p>
+      <button class="btn-acceder"><i class="bi bi-arrow-right-circle"></i>Acceder</button>
+    </a>
+
+    <a class="module-card" onclick="irA('secEqEjecs')" href="javascript:void(0)">
+      <div class="mc-icon"><i class="bi bi-people-fill"></i></div>
+      <h6>Equivalencia Ejecutivos</h6>
+      <p>Mapeo de nombres de ejecutivos Trinidad → AutoFácil</p>
+      <button class="btn-acceder"><i class="bi bi-arrow-right-circle"></i>Acceder</button>
+    </a>
+
+    <a class="module-card" onclick="irA('secHistorial')" href="javascript:void(0)">
+      <div class="mc-icon"><i class="bi bi-clock-history"></i></div>
+      <h6>Historial</h6>
+      <p>Registro de cargas realizadas y campos actualizados por carga</p>
+      <button class="btn-acceder"><i class="bi bi-arrow-right-circle"></i>Acceder</button>
+    </a>
+
   </div>
 
+  <!-- ══════════════════ SECCIÓN AUTOFÁCIL ══════════════════ -->
+  <div id="secAutofacil" style="scroll-margin-top:72px"></div>
   <!-- ─── Card: Cargar AutoFácil ──────────────────────────────── -->
   <div class="card-box" style="border-left:4px solid #009AFE">
     <h6><i class="bi bi-cloud-upload-fill" style="color:#009AFE"></i>Cargar
@@ -169,9 +216,8 @@
     </div>
   </div>
 
-  <!-- ═══════════════════════════════════════════════════════════ -->
-  <!-- SECCIÓN TRINIDAD                                           -->
-  <!-- ═══════════════════════════════════════════════════════════ -->
+  <!-- ══════════════════ SECCIÓN TRINIDAD ══════════════════ -->
+  <div id="secTrinidad" style="scroll-margin-top:72px"></div>
   <div style="margin:32px 0 16px;display:flex;align-items:center;gap:12px">
     <div style="flex:1;height:2px;background:linear-gradient(90deg,#0141A2,transparent)"></div>
     <span style="font-size:.78rem;font-weight:700;color:#0141A2;text-transform:uppercase;letter-spacing:1.5px;white-space:nowrap">
@@ -232,6 +278,7 @@
     </div>
   </div>
 
+  <div id="secEqEstados" style="scroll-margin-top:72px"></div>
   <!-- ─── Card: Equivalencias Estados Trinidad ─────────────────── -->
   <div class="card-box" style="border-left:4px solid #7c3aed;margin-top:20px">
     <h6><i class="bi bi-arrow-left-right" style="color:#7c3aed"></i>Equivalencias Trinidad
@@ -269,6 +316,7 @@
     </div>
   </div>
 
+  <div id="secEqEjecs" style="scroll-margin-top:72px"></div>
   <!-- ─── Card: Equivalencias Ejecutivos ───────────────────────── -->
   <div class="card-box" style="border-left:4px solid #0891b2;margin-top:20px">
     <h6><i class="bi bi-people-fill" style="color:#0891b2"></i>Equivalencia Ejecutivos
@@ -307,6 +355,7 @@
     </div>
   </div>
 
+  <div id="secHistorial" style="scroll-margin-top:72px"></div>
   <!-- ═══════════════════════════════════════════════════════════ -->
   <!-- HISTORIAL DE CARGAS                                       -->
   <!-- ═══════════════════════════════════════════════════════════ -->
@@ -435,6 +484,11 @@
 <script>
 const token = sessionStorage.getItem('token');
 const yo    = JSON.parse(sessionStorage.getItem('usuario') || 'null');
+
+function irA(id) {
+  const el = document.getElementById(id);
+  if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+}
 if (!token || !yo) window.location.href = '/login.html';
 if (yo?.perfil !== 'Administrador') { alert('Solo Administradores pueden hacer carga masiva'); window.location.href = '/'; }
 const H = { Authorization: 'Bearer ' + token };
