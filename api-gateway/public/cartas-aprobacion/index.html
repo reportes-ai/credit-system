@@ -211,7 +211,7 @@ body { font-family: 'Segoe UI', Arial, sans-serif; background: var(--gray-bg); c
   <div class="header no-print">
     <div class="header-logo" style="display:flex;align-items:center;gap:8px">
         <img id="logoHeader" src="/img/logo.png" alt="AutoFácil" style="height:32px;object-fit:contain">
-        <span style="font-size:11px;font-weight:400;color:#90CAF9">V5.36</span>
+        <span style="font-size:11px;font-weight:400;color:#90CAF9">V5.37</span>
       </div>
     <div class="header-right">
       <span class="header-user" id="headerUser"></span>
@@ -539,27 +539,32 @@ body { font-family: 'Segoe UI', Arial, sans-serif; background: var(--gray-bg); c
       <!-- Participación -->
       <div class="form-card" style="overflow:visible">
         <div class="form-card-title">Participación del Dealer</div>
-        <div class="form-row cols-5">
+        <div class="form-row" style="display:grid;grid-template-columns:1fr 1fr 1fr auto auto;gap:10px;align-items:end">
           <div class="field">
             <label>Valor Neto</label>
-            <input type="text" id="fPartNeto" readonly style="color:#546E7A">
+            <input type="text" id="fPartNeto" readonly style="color:#546E7A;background:#F5F5F5">
           </div>
           <div class="field">
             <label>IVA (19%)</label>
-            <input type="text" id="fPartIVA" readonly style="color:#546E7A">
+            <input type="text" id="fPartIVA" readonly style="color:#546E7A;background:#F5F5F5">
           </div>
           <div class="field">
-            <label>Valor Bruto</label>
-            <input type="text" id="fPartBruto">
+            <label>Valor Bruto &nbsp;<span id="fPartPctDisplay" style="font-weight:700;color:#0141A2;font-size:11px"></span></label>
+            <input type="text" id="fPartBruto" oninput="onPartBrutoInput(this)">
           </div>
-          <div class="field" style="display:flex;align-items:flex-end;padding-bottom:4px">
+          <div class="field" id="fieldPartPct" style="display:none;min-width:90px">
+            <label>% sobre saldo</label>
+            <input type="number" id="fPartPct" step="0.01" placeholder="0.00"
+                   oninput="onPartPctInput(this)"
+                   style="border-color:#1976D2;font-weight:700;width:100%">
+          </div>
+          <div class="field" style="padding-bottom:4px;white-space:nowrap">
             <div class="checkbox-row">
               <input type="checkbox" id="chkCambioPartic" onchange="toggleCambioPartic()">
-              <label for="chkCambioPartic">Cambio Participación</label>
+              <label for="chkCambioPartic">Cambio<br>Participación</label>
             </div>
-            <span id="alertPartExcepcion" style="display:none;color:#C62828;font-size:11px;font-weight:700;margin-left:8px">PARTICIPACIÓN REQUIERE APROBACIÓN</span>
+            <span id="alertPartExcepcion" style="display:none;color:#C62828;font-size:10px;font-weight:700;margin-top:3px;display:block">⚠ REQUIERE APROBACIÓN</span>
           </div>
-          <div class="field"></div>
         </div>
       </div>
 
@@ -4750,42 +4755,96 @@ function calcParticipacion(){
   const iva = bruto - neto;
   const partBrutoEl = document.getElementById('fPartBruto');
   partBrutoEl.value = bruto > 0 ? '$' + bruto.toLocaleString('es-CL') : '$0';
-  partBrutoEl.dataset.autoBruto = bruto; // store for comparison
+  partBrutoEl.dataset.autoBruto = bruto;
   document.getElementById('fPartNeto').value = neto > 0 ? '$' + neto.toLocaleString('es-CL') : '$0';
-  document.getElementById('fPartIVA').value = iva > 0 ? '$' + iva.toLocaleString('es-CL') : '$0';
+  document.getElementById('fPartIVA').value  = iva  > 0 ? '$' + iva.toLocaleString('es-CL')  : '$0';
+  // Mostrar % sobre saldo
+  const pctDisp = document.getElementById('fPartPctDisplay');
+  if (pctDisp && saldo > 0 && bruto > 0) {
+    pctDisp.textContent = '(' + (bruto / saldo * 100).toFixed(2) + '%)';
+  } else if (pctDisp) { pctDisp.textContent = ''; }
 }
 
 function toggleCambioPartic(){
   cambioParticActivo = document.getElementById('chkCambioPartic').checked;
-  const brutoField = document.getElementById('fPartBruto');
-  brutoField.readOnly = !cambioParticActivo;
-  brutoField.style.background = cambioParticActivo ? '' : '#F5F5F5';
-  brutoField.style.color = cambioParticActivo ? '#212121' : '#546E7A';
-  const alertPart = document.getElementById('alertPartExcepcion');
-  if(cambioParticActivo){
-    brutoField.value = '';
-    brutoField.placeholder = 'Ingrese monto bruto';
-    brutoField.oninput = function(){
-      const raw = parseInt(this.value.replace(/[^0-9]/g,''), 10) || 0;
-      const neto = Math.round(raw / 1.19);
-      const iva = raw - neto;
-      document.getElementById('fPartNeto').value = raw > 0 ? '$' + neto.toLocaleString('es-CL') : '';
-      document.getElementById('fPartIVA').value = raw > 0 ? '$' + iva.toLocaleString('es-CL') : '';
-      // Compare with auto-calculated bruto
-      const autoBruto = parseInt(String(brutoField.dataset.autoBruto || '0'));
-      if(alertPart) alertPart.style.display = (autoBruto > 0 && raw > autoBruto) ? '' : 'none';
-    };
-    brutoField.onblur = function(){
-      const raw = parseInt(this.value.replace(/[^0-9]/g,''), 10) || 0;
-      if(raw > 0) this.value = '$' + raw.toLocaleString('es-CL');
-    };
+  const brutoField   = document.getElementById('fPartBruto');
+  const pctField     = document.getElementById('fieldPartPct');
+  const alertPart    = document.getElementById('alertPartExcepcion');
+  if (cambioParticActivo) {
+    // Activar edición
+    brutoField.readOnly = false;
+    brutoField.style.background = '';
+    brutoField.style.color = '#212121';
+    brutoField.style.borderColor = '#1976D2';
+    brutoField.style.fontWeight = '700';
+    if (pctField) pctField.style.display = '';
+    // Pre-cargar % actual en el campo %
+    const brutoActual = parseInt((brutoField.value || '').replace(/[^0-9]/g,'')) || 0;
+    const saldo = rawSaldo > 0 ? rawSaldo : (() => {
+      const p = parseMoneyInput(document.getElementById('fPrecioVenta'));
+      const pi = parseMoneyInput(document.getElementById('fPie'));
+      return Math.max(0, p - pi);
+    })();
+    if (saldo > 0 && brutoActual > 0) {
+      document.getElementById('fPartPct').value = (brutoActual / saldo * 100).toFixed(2);
+    }
   } else {
-    brutoField.oninput = null;
-    brutoField.onblur = null;
-    brutoField.placeholder = '';
-    if(alertPart) alertPart.style.display = 'none';
+    brutoField.readOnly = true;
+    brutoField.style.background = '#F5F5F5';
+    brutoField.style.color = '#546E7A';
+    brutoField.style.borderColor = '';
+    brutoField.style.fontWeight = '';
+    if (pctField) pctField.style.display = 'none';
+    if (alertPart) alertPart.style.display = 'none';
     calcParticipacion();
   }
+}
+
+// Edición por monto bruto → actualiza % y neto/iva
+function onPartBrutoInput(el) {
+  if (!cambioParticActivo) return;
+  const raw = parseInt((el.value || '').replace(/[^0-9]/g,''), 10) || 0;
+  const neto = Math.round(raw / 1.19);
+  const iva  = raw - neto;
+  document.getElementById('fPartNeto').value = raw > 0 ? '$' + neto.toLocaleString('es-CL') : '';
+  document.getElementById('fPartIVA').value  = raw > 0 ? '$' + iva.toLocaleString('es-CL')  : '';
+  // Actualizar % vinculado
+  const saldo = rawSaldo > 0 ? rawSaldo : Math.max(0,
+    parseMoneyInput(document.getElementById('fPrecioVenta')) - parseMoneyInput(document.getElementById('fPie')));
+  const pctEl = document.getElementById('fPartPct');
+  if (pctEl && saldo > 0 && raw > 0) pctEl.value = (raw / saldo * 100).toFixed(2);
+  else if (pctEl) pctEl.value = '';
+  // Mostrar % en label
+  const pctDisp = document.getElementById('fPartPctDisplay');
+  if (pctDisp && saldo > 0 && raw > 0) pctDisp.textContent = '(' + (raw/saldo*100).toFixed(2) + '%)';
+  // Alerta excepción
+  const autoBruto = parseInt(el.dataset.autoBruto || '0');
+  const alertPart = document.getElementById('alertPartExcepcion');
+  if (alertPart) alertPart.style.display = (autoBruto > 0 && raw > autoBruto) ? '' : 'none';
+  // Formato al salir
+  el.onblur = () => { if (raw > 0) el.value = '$' + raw.toLocaleString('es-CL'); };
+}
+
+// Edición por % → calcula bruto y actualiza neto/iva
+function onPartPctInput(el) {
+  if (!cambioParticActivo) return;
+  const pct   = parseFloat(el.value) || 0;
+  const saldo = rawSaldo > 0 ? rawSaldo : Math.max(0,
+    parseMoneyInput(document.getElementById('fPrecioVenta')) - parseMoneyInput(document.getElementById('fPie')));
+  if (!saldo || !pct) return;
+  const bruto = Math.round(saldo * pct / 100);
+  const neto  = Math.round(bruto / 1.19);
+  const iva   = bruto - neto;
+  const brutoEl = document.getElementById('fPartBruto');
+  brutoEl.value = '$' + bruto.toLocaleString('es-CL');
+  document.getElementById('fPartNeto').value = '$' + neto.toLocaleString('es-CL');
+  document.getElementById('fPartIVA').value  = '$' + iva.toLocaleString('es-CL');
+  const pctDisp = document.getElementById('fPartPctDisplay');
+  if (pctDisp) pctDisp.textContent = '(' + pct.toFixed(2) + '%)';
+  // Alerta excepción
+  const autoBruto = parseInt(brutoEl.dataset.autoBruto || '0');
+  const alertPart = document.getElementById('alertPartExcepcion');
+  if (alertPart) alertPart.style.display = (autoBruto > 0 && bruto > autoBruto) ? '' : 'none';
 }
 
 
