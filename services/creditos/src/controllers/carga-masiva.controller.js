@@ -100,7 +100,7 @@ function mapRow(row, mesOverride) {
     nombre_cliente:     s('NOMBRE'),
     comentarios:        s('COMENTARIOS'),
     ejecutivo:          s('EJ.COMERCIAL'),
-    financiera:         norm(getCol(row, 'FINANCIERA')) || 'NO APLICA',
+    financiera:         s('FINANCIERA') || s('Institución','INSTITUCION','INSTITUCIÓN') || 'NO APLICA',
     automotora:         s('AUTOMOTORA'),
     nombre_local:       s('NOMBRE LOCAL'),
     estado_eval:        s('ESTADO EVAL. RIESGO', 'ESTADO EVAL RIESGO'),
