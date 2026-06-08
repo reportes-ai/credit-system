@@ -101,7 +101,8 @@ app.use('/api/comisiones', require('../../services/comisiones/src/routes/comisio
 
 // Carga masiva de operaciones
 app.use('/api/carga-masiva',    require('../../services/creditos/src/routes/carga-masiva.routes'));
-app.use('/api/carga-trinidad', require('../../services/creditos/src/routes/carga-trinidad.routes'));
+app.use('/api/carga-trinidad',   require('../../services/creditos/src/routes/carga-trinidad.routes'));
+app.use('/api/trinidad-config',  require('../../services/creditos/src/routes/trinidad-config.routes'));
 
 // Mantenedor comisiones de seguro
 app.use('/api/comisiones-seguro', require('../../services/mantenedores/src/routes/comisiones-seguro.routes'));

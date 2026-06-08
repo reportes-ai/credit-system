@@ -69,7 +69,7 @@
 <body>
 <nav class="topnav">
   <div class="topnav-left">
-    <a href="/" class="topnav-brand"><img src="/img/logo.png" alt="AutoFácil"><span class="version-badge">v5.2</span></a>
+    <a href="/" class="topnav-brand"><img src="/img/logo.png" alt="AutoFácil"><span class="version-badge">v5.3</span></a>
     <div class="breadcrumb-nav">
       <a href="/">Inicio</a><span class="sep">›</span>
       <span style="color:#fff;font-weight:600"><i class="bi bi-cloud-upload me-1"></i>Carga Masiva Operaciones</span>
@@ -216,6 +216,80 @@
   <div class="card-box" id="triPaso3" style="display:none">
     <h6><i class="bi bi-3-circle-fill"></i>Resultado carga Trinidad</h6>
     <div id="triResultadoContent"></div>
+  </div>
+
+  <!-- ─── Card: Equivalencias Estados Trinidad ─────────────────── -->
+  <div class="card-box" style="border-left:4px solid #7c3aed;margin-top:20px">
+    <h6><i class="bi bi-arrow-left-right" style="color:#7c3aed"></i>Equivalencias Trinidad
+      <span style="font-size:.72rem;font-weight:400;color:#9ca3af;text-transform:none;letter-spacing:0;margin-left:8px">Mapeo Estado Trinidad → Estado AutoFácil</span>
+      <button onclick="eqGuardarEstados()" class="btn-main" id="btnGuardarEstados"
+        style="margin-left:auto;padding:5px 16px;font-size:.8rem;background:#7c3aed">
+        <i class="bi bi-floppy"></i>Guardar cambios
+      </button>
+    </h6>
+    <div style="overflow-x:auto">
+      <table class="table preview-table" id="tblEstados" style="min-width:520px">
+        <thead><tr>
+          <th>Estado en Trinidad</th>
+          <th>Estado en AutoFácil</th>
+          <th style="width:80px;text-align:center">Acción</th>
+        </tr></thead>
+        <tbody id="bodyEstados">
+          <tr><td colspan="3" style="text-align:center;color:#9ca3af;padding:20px">Cargando…</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <!-- Fila para añadir nuevo -->
+    <div style="display:flex;gap:10px;align-items:center;margin-top:12px;flex-wrap:wrap">
+      <input id="nuevoEstadoTri" type="text" placeholder="Estado Trinidad (ej: Devuelto)"
+        style="border:1.5px solid #d1d5db;border-radius:8px;padding:7px 12px;font-size:.85rem;flex:1;min-width:140px;outline:none">
+      <select id="nuevoEstadoAF"
+        style="border:1.5px solid #d1d5db;border-radius:8px;padding:7px 12px;font-size:.85rem;flex:1;min-width:140px;outline:none;background:#fff">
+        <option value="Digitado">Digitado</option>
+        <option value="Otorgado">Otorgado</option>
+        <option value="Rechazado">Rechazado</option>
+      </select>
+      <button class="btn-main" onclick="eqAgregarEstado()" style="padding:7px 18px;font-size:.85rem">
+        <i class="bi bi-plus-lg"></i>Agregar
+      </button>
+    </div>
+  </div>
+
+  <!-- ─── Card: Equivalencias Ejecutivos ───────────────────────── -->
+  <div class="card-box" style="border-left:4px solid #0891b2;margin-top:20px">
+    <h6><i class="bi bi-people-fill" style="color:#0891b2"></i>Equivalencia Ejecutivos
+      <span style="font-size:.72rem;font-weight:400;color:#9ca3af;text-transform:none;letter-spacing:0;margin-left:8px">Nombre Trinidad → Nombre en AutoFácil</span>
+      <button onclick="eqGuardarEjecutivos()" class="btn-main" id="btnGuardarEjecs"
+        style="margin-left:auto;padding:5px 16px;font-size:.8rem;background:#0891b2">
+        <i class="bi bi-floppy"></i>Guardar cambios
+      </button>
+    </h6>
+    <p style="font-size:.82rem;color:#6b7280;margin-bottom:14px">
+      Al cargar desde Trinidad, el nombre del ejecutivo se traduce automáticamente al nombre registrado en AutoFácil.
+      Si no hay equivalencia, se usa el nombre de Trinidad tal cual.
+    </p>
+    <div style="overflow-x:auto">
+      <table class="table preview-table" id="tblEjecs" style="min-width:560px">
+        <thead><tr>
+          <th>Nombre en Trinidad</th>
+          <th>Nombre en AutoFácil</th>
+          <th style="width:80px;text-align:center">Acción</th>
+        </tr></thead>
+        <tbody id="bodyEjecs">
+          <tr><td colspan="3" style="text-align:center;color:#9ca3af;padding:20px">Cargando…</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <!-- Fila para añadir nuevo -->
+    <div style="display:flex;gap:10px;align-items:center;margin-top:12px;flex-wrap:wrap">
+      <input id="nuevoEjecTri" type="text" placeholder="Nombre en Trinidad (ej: BRANDON BARBAS RUZ (AFA))"
+        style="border:1.5px solid #d1d5db;border-radius:8px;padding:7px 12px;font-size:.85rem;flex:1;min-width:180px;outline:none">
+      <input id="nuevoEjecAF" type="text" placeholder="Nombre en AutoFácil (ej: Brandon Barbas)"
+        style="border:1.5px solid #d1d5db;border-radius:8px;padding:7px 12px;font-size:.85rem;flex:1;min-width:180px;outline:none">
+      <button class="btn-main" onclick="eqAgregarEjecutivo()" style="padding:7px 18px;font-size:.85rem;background:#0891b2">
+        <i class="bi bi-plus-lg"></i>Agregar
+      </button>
+    </div>
   </div>
 </div>
 
@@ -470,6 +544,178 @@ function mostrarResultado(d) {
   document.getElementById('paso3').style.display = '';
   toast(`✓ ${d.insertados} registros importados`, true);
 }
+
+/* ══════════════════════════════════════════════════════════════
+   EQUIVALENCIAS TRINIDAD — ESTADOS
+══════════════════════════════════════════════════════════════ */
+
+// cache local de filas con sus ids originales
+let eqEstadosData = [];
+let eqEjecsData   = [];
+
+function eqRenderEstados() {
+  const tbody = document.getElementById('bodyEstados');
+  if (!eqEstadosData.length) {
+    tbody.innerHTML = '<tr><td colspan="3" style="text-align:center;color:#9ca3af;padding:16px">Sin equivalencias. Agrega la primera abajo.</td></tr>';
+    return;
+  }
+  const afOpts = ['Digitado','Otorgado','Rechazado'].map(v => `<option value="${v}">${v}</option>`).join('');
+  tbody.innerHTML = eqEstadosData.map((r,i) => `
+    <tr id="eqEst_${r.id}">
+      <td><input type="text" value="${esc(r.estado_trinidad)}" data-idx="${i}" data-field="estado_trinidad"
+        style="width:100%;border:1.5px solid #e5e7eb;border-radius:6px;padding:5px 9px;font-size:.85rem"
+        oninput="eqEstEdit(this)"></td>
+      <td><select data-idx="${i}" data-field="estado_autofacil"
+        style="width:100%;border:1.5px solid #e5e7eb;border-radius:6px;padding:5px 9px;font-size:.85rem;background:#fff"
+        onchange="eqEstEdit(this)">
+        ${['Digitado','Otorgado','Rechazado'].map(v=>`<option value="${v}"${r.estado_autofacil===v?' selected':''}>${v}</option>`).join('')}
+      </select></td>
+      <td style="text-align:center">
+        <button onclick="eqEliminarEstado(${r.id})"
+          style="background:#fee2e2;border:none;border-radius:6px;padding:4px 10px;cursor:pointer;color:#dc2626;font-size:.8rem">
+          <i class="bi bi-trash3"></i>
+        </button>
+      </td>
+    </tr>`).join('');
+}
+
+function eqEstEdit(el) {
+  const i = +el.dataset.idx;
+  eqEstadosData[i][el.dataset.field] = el.value;
+  document.getElementById('btnGuardarEstados').style.background = '#b45309';
+}
+
+async function eqCargarEstados() {
+  try {
+    const r = await fetch('/api/trinidad-config/estados', { headers: H }).then(x=>x.json());
+    eqEstadosData = r.data || [];
+    eqRenderEstados();
+  } catch { document.getElementById('bodyEstados').innerHTML = '<tr><td colspan="3" style="color:red">Error al cargar</td></tr>'; }
+}
+
+async function eqGuardarEstados() {
+  const btn = document.getElementById('btnGuardarEstados');
+  btn.disabled = true; btn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span>Guardando…';
+  let ok = 0, err = 0;
+  for (const r of eqEstadosData) {
+    const res = await fetch(`/api/trinidad-config/estados/${r.id}`, {
+      method:'PUT', headers:{...H,'Content-Type':'application/json'},
+      body: JSON.stringify({ estado_trinidad: r.estado_trinidad, estado_autofacil: r.estado_autofacil })
+    }).then(x=>x.json());
+    res.success ? ok++ : err++;
+  }
+  btn.disabled = false; btn.innerHTML = '<i class="bi bi-floppy"></i>Guardar cambios';
+  btn.style.background = '#7c3aed';
+  toast(err ? `✗ ${err} error(es) al guardar` : `✓ ${ok} equivalencias guardadas`, !err);
+}
+
+async function eqAgregarEstado() {
+  const tri = document.getElementById('nuevoEstadoTri').value.trim();
+  const af  = document.getElementById('nuevoEstadoAF').value;
+  if (!tri) { toast('Ingresa el estado Trinidad', false); return; }
+  const res = await fetch('/api/trinidad-config/estados', {
+    method:'POST', headers:{...H,'Content-Type':'application/json'},
+    body: JSON.stringify({ estado_trinidad: tri, estado_autofacil: af })
+  }).then(x=>x.json());
+  if (!res.success) { toast('Error: ' + res.error, false); return; }
+  document.getElementById('nuevoEstadoTri').value = '';
+  toast('Estado agregado', true);
+  eqCargarEstados();
+}
+
+async function eqEliminarEstado(id) {
+  if (!confirm('¿Eliminar esta equivalencia de estado?')) return;
+  const res = await fetch(`/api/trinidad-config/estados/${id}`, { method:'DELETE', headers: H }).then(x=>x.json());
+  if (!res.success) { toast('Error: ' + res.error, false); return; }
+  toast('Eliminado', true);
+  eqCargarEstados();
+}
+
+/* ══════════════════════════════════════════════════════════════
+   EQUIVALENCIAS TRINIDAD — EJECUTIVOS
+══════════════════════════════════════════════════════════════ */
+
+function eqRenderEjecs() {
+  const tbody = document.getElementById('bodyEjecs');
+  if (!eqEjecsData.length) {
+    tbody.innerHTML = '<tr><td colspan="3" style="text-align:center;color:#9ca3af;padding:16px">Sin equivalencias. Agrega la primera abajo.</td></tr>';
+    return;
+  }
+  tbody.innerHTML = eqEjecsData.map((r,i) => `
+    <tr id="eqEj_${r.id}">
+      <td><input type="text" value="${esc(r.nombre_trinidad)}" data-idx="${i}" data-field="nombre_trinidad"
+        style="width:100%;border:1.5px solid #e5e7eb;border-radius:6px;padding:5px 9px;font-size:.82rem"
+        oninput="eqEjEdit(this)"></td>
+      <td><input type="text" value="${esc(r.nombre_autofacil)}" data-idx="${i}" data-field="nombre_autofacil"
+        style="width:100%;border:1.5px solid #e5e7eb;border-radius:6px;padding:5px 9px;font-size:.82rem"
+        oninput="eqEjEdit(this)"></td>
+      <td style="text-align:center">
+        <button onclick="eqEliminarEjecutivo(${r.id})"
+          style="background:#fee2e2;border:none;border-radius:6px;padding:4px 10px;cursor:pointer;color:#dc2626;font-size:.8rem">
+          <i class="bi bi-trash3"></i>
+        </button>
+      </td>
+    </tr>`).join('');
+}
+
+function eqEjEdit(el) {
+  const i = +el.dataset.idx;
+  eqEjecsData[i][el.dataset.field] = el.value;
+  document.getElementById('btnGuardarEjecs').style.background = '#0e7490';
+}
+
+async function eqCargarEjecutivos() {
+  try {
+    const r = await fetch('/api/trinidad-config/ejecutivos', { headers: H }).then(x=>x.json());
+    eqEjecsData = r.data || [];
+    eqRenderEjecs();
+  } catch { document.getElementById('bodyEjecs').innerHTML = '<tr><td colspan="3" style="color:red">Error al cargar</td></tr>'; }
+}
+
+async function eqGuardarEjecutivos() {
+  const btn = document.getElementById('btnGuardarEjecs');
+  btn.disabled = true; btn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span>Guardando…';
+  let ok = 0, err = 0;
+  for (const r of eqEjecsData) {
+    const res = await fetch(`/api/trinidad-config/ejecutivos/${r.id}`, {
+      method:'PUT', headers:{...H,'Content-Type':'application/json'},
+      body: JSON.stringify({ nombre_trinidad: r.nombre_trinidad, nombre_autofacil: r.nombre_autofacil })
+    }).then(x=>x.json());
+    res.success ? ok++ : err++;
+  }
+  btn.disabled = false; btn.innerHTML = '<i class="bi bi-floppy"></i>Guardar cambios';
+  btn.style.background = '#0891b2';
+  toast(err ? `✗ ${err} error(es)` : `✓ ${ok} ejecutivos guardados`, !err);
+}
+
+async function eqAgregarEjecutivo() {
+  const tri = document.getElementById('nuevoEjecTri').value.trim();
+  const af  = document.getElementById('nuevoEjecAF').value.trim();
+  if (!tri || !af) { toast('Completa ambos campos', false); return; }
+  const res = await fetch('/api/trinidad-config/ejecutivos', {
+    method:'POST', headers:{...H,'Content-Type':'application/json'},
+    body: JSON.stringify({ nombre_trinidad: tri, nombre_autofacil: af })
+  }).then(x=>x.json());
+  if (!res.success) { toast('Error: ' + res.error, false); return; }
+  document.getElementById('nuevoEjecTri').value = '';
+  document.getElementById('nuevoEjecAF').value  = '';
+  toast('Ejecutivo agregado', true);
+  eqCargarEjecutivos();
+}
+
+async function eqEliminarEjecutivo(id) {
+  if (!confirm('¿Eliminar esta equivalencia de ejecutivo?')) return;
+  const res = await fetch(`/api/trinidad-config/ejecutivos/${id}`, { method:'DELETE', headers: H }).then(x=>x.json());
+  if (!res.success) { toast('Error: ' + res.error, false); return; }
+  toast('Eliminado', true);
+  eqCargarEjecutivos();
+}
+
+function esc(s) { return (s||'').replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/</g,'&lt;'); }
+
+// Cargar equivalencias al iniciar
+eqCargarEstados();
+eqCargarEjecutivos();
 </script>
 <script src="/js/app-version.js"></script>
 </body>

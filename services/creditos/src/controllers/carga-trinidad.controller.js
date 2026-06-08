@@ -12,10 +12,34 @@ const XLSX = require('xlsx');
   }
 })();
 
-/* ── Mapa de estado Trinidad → estado AutoFácil ────────────────── */
-function mapEstado(estadoTrinidad) {
+/* ── Carga mapa de estados desde BD (con fallback hardcoded) ────── */
+async function cargarMapaEstados() {
+  try {
+    const [rows] = await pool.query('SELECT estado_trinidad, estado_autofacil FROM trinidad_estados');
+    const mapa = {};
+    for (const r of rows) mapa[r.estado_trinidad.trim().toLowerCase()] = r.estado_autofacil;
+    return mapa;
+  } catch { return { cursado: 'Otorgado' }; }
+}
+
+/* ── Carga mapa de ejecutivos desde BD ──────────────────────────── */
+async function cargarMapaEjecutivos() {
+  try {
+    const [rows] = await pool.query('SELECT nombre_trinidad, nombre_autofacil FROM trinidad_ejecutivos');
+    const mapa = {};
+    for (const r of rows) mapa[r.nombre_trinidad.trim().toLowerCase()] = r.nombre_autofacil;
+    return mapa;
+  } catch { return {}; }
+}
+
+function mapEstado(estadoTrinidad, mapaEstados) {
   if (!estadoTrinidad) return 'Digitado';
-  return estadoTrinidad.trim().toLowerCase() === 'cursado' ? 'Otorgado' : 'Digitado';
+  return mapaEstados[estadoTrinidad.trim().toLowerCase()] || 'Digitado';
+}
+
+function mapEjecutivo(nombreTrinidad, mapaEjecutivos) {
+  if (!nombreTrinidad) return null;
+  return mapaEjecutivos[nombreTrinidad.trim().toLowerCase()] || nombreTrinidad.trim();
 }
 
 /* ── Normaliza RUT (quita puntos, espacios) ─────────────────────── */
@@ -51,7 +75,7 @@ function normStr(v) {
 }
 
 /* ── Lee el Excel y retorna array de filas mapeadas ─────────────── */
-function parseExcel(buffer) {
+function parseExcel(buffer, mapaEstados = {}, mapaEjecutivos = {}) {
   const wb = XLSX.read(buffer, { type: 'buffer', cellDates: true });
   const ws = wb.Sheets[wb.SheetNames[0]];
   const raw = XLSX.utils.sheet_to_json(ws, { header: 1, defval: null });
@@ -73,6 +97,7 @@ function parseExcel(buffer) {
       if (!num_op || isNaN(num_op)) return null;
 
       const estadoTri = normStr(get('Estado')) || normStr(get('ESTADO'));
+      const ejTri     = normStr(get('Ejecutivo'));
 
       const fechaCurse   = normDate(get('Fecha Curse'));
       const fechaIngreso = normDate(get('Fecha Ingreso'));
@@ -82,11 +107,12 @@ function parseExcel(buffer) {
       return {
         num_op,
         estado_autofin:  estadoTri,
-        estado_credito:  mapEstado(estadoTri),
+        estado_credito:  mapEstado(estadoTri, mapaEstados),
         rut_cliente:     normRut(get('Rut Cliente')),
         nombre_cliente:  normStr(get('Nombre')),
         producto:        normStr(get('Producto')),
-        ejecutivo:       normStr(get('Ejecutivo')),
+        ejecutivo:       mapEjecutivo(ejTri, mapaEjecutivos),
+        ejecutivo_tri:   ejTri,
         automotora:      normStr(get('Dealer')),
         valor_vehiculo:  normInt(get('Precio')),
         pie:             normInt(get('Pie')),
@@ -103,7 +129,8 @@ function parseExcel(buffer) {
 exports.preview = async (req, res) => {
   try {
     if (!req.file) return res.json({ success: false, error: 'Archivo requerido' });
-    const filas = parseExcel(req.file.buffer);
+    const [mapaEstados, mapaEjecutivos] = await Promise.all([cargarMapaEstados(), cargarMapaEjecutivos()]);
+    const filas = parseExcel(req.file.buffer, mapaEstados, mapaEjecutivos);
     if (!filas.length) return res.json({ success: false, error: 'No se encontraron registros con ID válido' });
 
     const numOps = filas.map(f => f.num_op);
@@ -140,7 +167,8 @@ exports.preview = async (req, res) => {
 exports.importar = async (req, res) => {
   try {
     if (!req.file) return res.json({ success: false, error: 'Archivo requerido' });
-    const filas = parseExcel(req.file.buffer);
+    const [mapaEstados, mapaEjecutivos] = await Promise.all([cargarMapaEstados(), cargarMapaEjecutivos()]);
+    const filas = parseExcel(req.file.buffer, mapaEstados, mapaEjecutivos);
     if (!filas.length) return res.json({ success: false, error: 'No se encontraron registros con ID válido' });
 
     const numOps = filas.map(f => f.num_op);
