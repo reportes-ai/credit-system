@@ -72,6 +72,17 @@
     .page-btn:disabled { opacity:.4; cursor:default; }
     select.per-page { border:1px solid #e5e7eb; border-radius:6px; padding:4px 8px; font-size:.8rem; color:#374151; }
 
+    /* ── Checkbox column ── */
+    th.col-chk, td.col-chk { width:36px; min-width:36px; max-width:36px; text-align:center; padding:4px 6px !important; }
+    input[type=checkbox].row-chk { width:15px; height:15px; cursor:pointer; accent-color:var(--navy); }
+    /* ── Delete toolbar ── */
+    #deleteBar { display:none; background:#fef2f2; border:1px solid #fca5a5; border-radius:8px;
+      padding:7px 14px; align-items:center; gap:10px; }
+    #deleteBar.show { display:flex; }
+    .btn-delete-sel { background:#dc2626; color:#fff; border:none; border-radius:7px;
+      padding:5px 14px; font-size:.82rem; font-weight:600; cursor:pointer; }
+    .btn-delete-sel:hover { background:#b91c1c; }
+
     /* Loading */
     .loading-overlay { position:fixed; inset:0; background:rgba(255,255,255,.7); display:flex; align-items:center; justify-content:center; z-index:999; display:none; }
     .spinner { width:40px; height:40px; border:4px solid #e5e7eb; border-top-color:var(--navy); border-radius:50%; animation:spin .7s linear infinite; }
@@ -90,7 +101,7 @@
   <div class="topnav-left">
     <a href="/" class="topnav-brand">
       <img src="/img/logo.png" alt="AutoFácil">
-      <span class="version-badge" id="versionBadge">v4.8</span>
+      <span class="version-badge" id="versionBadge">v4.9</span>
     </a>
     <div class="breadcrumb-nav">
       <a href="/">Inicio</a><span class="sep">›</span>
@@ -125,6 +136,14 @@
     <div class="info-chip">Página: <span id="pageLabel">—</span></div>
     <button class="btn btn-sm btn-outline-secondary" onclick="clearFilters()"><i class="bi bi-x-circle me-1"></i>Limpiar filtros</button>
     <button class="btn btn-sm btn-outline-primary" onclick="exportCSV()"><i class="bi bi-download me-1"></i>Exportar CSV</button>
+    <div id="deleteBar">
+      <i class="bi bi-trash-fill text-danger"></i>
+      <span id="deleteCount" style="font-size:.82rem;font-weight:700;color:#dc2626"></span>
+      <button class="btn-delete-sel" onclick="eliminarSeleccionados()">
+        <i class="bi bi-trash me-1"></i>Eliminar seleccionados
+      </button>
+      <button class="btn btn-sm btn-outline-secondary" onclick="clearSelection()">Cancelar</button>
+    </div>
     <div style="flex:1"></div>
     <label style="font-size:.82rem;color:#6b7280;">Filas por página:</label>
     <select class="per-page" id="limitSel" onchange="changeLimit()">
@@ -172,6 +191,7 @@ let page      = 1;
 let limit     = 50;
 let totalRows = 0;
 let editCell  = null; // {tr, td, field, oldVal}
+let selected  = new Set();
 
 /* ── Toast ── */
 function toast(msg, type='success') {
@@ -194,6 +214,13 @@ async function init() {
 
 function buildHeaders() {
   const tr1 = document.createElement('tr');
+
+  // Checkbox "select all"
+  const thChk = document.createElement('th');
+  thChk.className = 'col-chk';
+  thChk.innerHTML = '<input type="checkbox" id="chkAll" onchange="toggleSelectAll(this.checked)">';
+  tr1.appendChild(thChk);
+
   columns.forEach(col => {
     const th = document.createElement('th');
     const inner = document.createElement('div');
@@ -257,6 +284,20 @@ function renderRows(rows) {
   tbody.innerHTML = '';
   rows.forEach(row => {
     const tr = document.createElement('tr');
+    if (selected.has(row.id)) tr.style.background = '#eff6ff';
+
+    // Checkbox
+    const tdChk = document.createElement('td');
+    tdChk.className = 'col-chk';
+    const chk = document.createElement('input');
+    chk.type = 'checkbox';
+    chk.className = 'row-chk';
+    chk.dataset.id = row.id;
+    chk.checked = selected.has(row.id);
+    chk.onchange = () => toggleRow(row.id, chk.checked, tr);
+    tdChk.appendChild(chk);
+    tr.appendChild(tdChk);
+
     columns.forEach(col => {
       const td = document.createElement('td');
       const val = row[col.field];
@@ -373,6 +414,75 @@ function exportCSV() {
 
 function showLoading(v) { document.getElementById('loadingOverlay').style.display = v?'flex':'none'; }
 function debounce(fn,ms) { let t; return (...a) => { clearTimeout(t); t=setTimeout(()=>fn(...a),ms); }; }
+
+/* ── Selección ── */
+function toggleRow(id, checked, tr) {
+  if (checked) { selected.add(id); tr.style.background = '#eff6ff'; }
+  else         { selected.delete(id); tr.style.background = ''; }
+  updateDeleteBar();
+}
+
+function toggleSelectAll(checked) {
+  document.querySelectorAll('.row-chk').forEach(chk => {
+    const id = parseInt(chk.dataset.id);
+    chk.checked = checked;
+    const tr = chk.closest('tr');
+    if (checked) { selected.add(id); if (tr) tr.style.background = '#eff6ff'; }
+    else         { selected.delete(id); if (tr) tr.style.background = ''; }
+  });
+  updateDeleteBar();
+}
+
+function clearSelection() {
+  selected.clear();
+  document.querySelectorAll('.row-chk').forEach(c => c.checked = false);
+  document.querySelectorAll('#tbody tr').forEach(tr => tr.style.background = '');
+  const chkAll = document.getElementById('chkAll');
+  if (chkAll) chkAll.checked = false;
+  updateDeleteBar();
+}
+
+function updateDeleteBar() {
+  const bar = document.getElementById('deleteBar');
+  const n = selected.size;
+  if (n > 0) {
+    bar.classList.add('show');
+    document.getElementById('deleteCount').textContent = `${n} operación${n>1?'es':''} seleccionada${n>1?'s':''}`;
+  } else {
+    bar.classList.remove('show');
+  }
+}
+
+/* ── Eliminar ── */
+async function eliminarSeleccionados() {
+  const ids = [...selected];
+  if (!ids.length) return;
+  const ok = confirm(
+    `⚠️ ¿Eliminar ${ids.length} operación${ids.length>1?'es':''} de la tabla creditos?\n\n` +
+    `Esta acción no se puede deshacer.`
+  );
+  if (!ok) return;
+  showLoading(true);
+  try {
+    const r = await fetch('/api/bd-operaciones', {
+      method: 'DELETE',
+      headers: H,
+      body: JSON.stringify({ ids })
+    });
+    let j;
+    try { j = await r.json(); } catch(_) { throw new Error(`Error HTTP ${r.status}`); }
+    if (!r.ok || !j.success) throw new Error(j?.error || `Error ${r.status}`);
+    toast(`✅ ${j.data.deleted} operación${j.data.deleted>1?'es':''} eliminada${j.data.deleted>1?'s':''}`);
+    selected.clear();
+    updateDeleteBar();
+    await load();
+  } catch(e) {
+    console.error('[eliminar]', e);
+    alert('Error al eliminar: ' + e.message);
+  } finally {
+    showLoading(false);
+  }
+}
 
 init();
 </script>

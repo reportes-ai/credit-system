@@ -101,4 +101,26 @@ const update = async (req, res) => {
   }
 };
 
-module.exports = { getColumns, getAll, update };
+/* ── DELETE /api/bd-operaciones ─── */
+const deleteMany = async (req, res) => {
+  try {
+    const { ids } = req.body;
+    if (!Array.isArray(ids) || ids.length === 0)
+      return res.status(400).json({ success: false, data: null, error: 'ids requerido' });
+
+    const safeIds = ids.map(Number).filter(n => Number.isInteger(n) && n > 0);
+    if (!safeIds.length)
+      return res.status(400).json({ success: false, data: null, error: 'IDs inválidos' });
+
+    const placeholders = safeIds.map(() => '?').join(',');
+    const [result] = await pool.query(
+      `DELETE FROM creditos WHERE id IN (${placeholders})`, safeIds
+    );
+    res.json({ success: true, data: { deleted: result.affectedRows }, error: null });
+  } catch (e) {
+    console.error('[bd-operaciones delete]', e.message);
+    res.status(500).json({ success: false, data: null, error: e.message });
+  }
+};
+
+module.exports = { getColumns, getAll, update, deleteMany };
