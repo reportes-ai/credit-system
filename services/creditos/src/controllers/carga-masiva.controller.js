@@ -7,14 +7,28 @@ const historial = require('./carga-historial.controller');
 /* ── Asegurar columnas extra en creditos ──────────────────── */
 (async () => {
   const extra = [
-    `ALTER TABLE creditos ADD COLUMN com_rdh       DECIMAL(15,0) NULL`,
-    `ALTER TABLE creditos ADD COLUMN com_cesantia  DECIMAL(15,0) NULL`,
-    `ALTER TABLE creditos ADD COLUMN com_parque    DECIMAL(15,0) NULL`,
-    `ALTER TABLE creditos ADD COLUMN resultado_negocio DECIMAL(15,2) NULL`,
+    `ALTER TABLE creditos ADD COLUMN com_rdh            DECIMAL(15,0) NULL`,
+    `ALTER TABLE creditos ADD COLUMN com_cesantia       DECIMAL(15,0) NULL`,
+    `ALTER TABLE creditos ADD COLUMN com_parque         DECIMAL(15,0) NULL`,
+    `ALTER TABLE creditos ADD COLUMN resultado_negocio  DECIMAL(15,2) NULL`,
+    `ALTER TABLE creditos ADD COLUMN id_financiera      VARCHAR(30)   NULL`,
+    `ALTER TABLE creditos ADD COLUMN nombre_local       VARCHAR(200)  NULL`,
+    `ALTER TABLE creditos ADD COLUMN valor_vehiculo     BIGINT        NULL`,
+    `ALTER TABLE creditos ADD COLUMN pie                BIGINT        NULL`,
+    `ALTER TABLE creditos ADD COLUMN ingreso_neto_total DECIMAL(15,2) NULL`,
+    `ALTER TABLE creditos ADD COLUMN rentab_directo     DECIMAL(15,2) NULL`,
+    `ALTER TABLE creditos ADD COLUMN bono_total         DECIMAL(15,2) NULL`,
+    `ALTER TABLE creditos ADD COLUMN tasa_piso          DECIMAL(10,6) NULL`,
+    `ALTER TABLE creditos ADD COLUMN tasfin_pizarra     DECIMAL(10,6) NULL`,
+    `ALTER TABLE creditos ADD COLUMN com_reparaciones   DECIMAL(15,0) NULL`,
   ];
   for (const sql of extra) {
     try { await pool.query(sql); } catch (e) { if (e.errno !== 1060) console.error('[carga-masiva migration]', e.message); }
   }
+  // Índice único en id_financiera para evitar duplicados futuros
+  try {
+    await pool.query(`ALTER TABLE creditos ADD UNIQUE INDEX uq_id_financiera (id_financiera)`);
+  } catch (e) { /* ya existe o id_financiera es null en viejos registros — ignorar */ }
 })();
 
 /* ── Normaliza un valor del Excel ──────────────────────────────────────── */
@@ -126,6 +140,37 @@ function mapRow(row, mesOverride) {
   };
 }
 
+/* ── Helpers de búsqueda de columnas en el Excel ─────────────────────────── */
+function detectarCols(data) {
+  const keys = Object.keys(data[0]);
+  const find  = (...names) => keys.find(k => names.some(n => k.trim().toUpperCase() === n.toUpperCase())) || names[0];
+  return {
+    colOP:      find('OP'),
+    colIdFin:   find('ID FINANCIERA'),
+    colEstado:  find('ESTADO CREDITO', 'ESTADO CRÉDITO'),
+    colNombre:  find('NOMBRE'),
+    colProducto:find('PRODUCTO'),
+    colFin:     find('FINANCIERA'),
+    colMonto:   find('MONTO FINANCIADO INDEXA', 'MONTO FINANCIADO'),
+  };
+}
+
+/* Retorna Set de id_financiera existentes en BD para los valores del Excel */
+async function getExistentes(ids) {
+  const set = new Set();
+  if (!ids.length) return set;
+  const chunkSize = 500;
+  for (let i = 0; i < ids.length; i += chunkSize) {
+    const chunk = ids.slice(i, i + chunkSize);
+    const [rows] = await pool.query(
+      `SELECT id_financiera FROM creditos WHERE id_financiera IN (${chunk.map(()=>'?').join(',')})`,
+      chunk
+    );
+    rows.forEach(r => set.add(String(r.id_financiera)));
+  }
+  return set;
+}
+
 /* ── POST /api/carga-masiva/preview ─────────────────────────────────────── */
 const preview = async (req, res) => {
   try {
@@ -137,54 +182,36 @@ const preview = async (req, res) => {
 
     if (!data.length) return res.status(400).json({ success: false, data: null, error: 'Archivo vacío' });
 
-    // Detectar nombre exacto de la columna OP (puede tener espacios o diferente case)
-    const colOP = Object.keys(data[0]).find(k => k.trim().toUpperCase() === 'OP') || 'OP';
+    const { colOP, colIdFin, colEstado, colNombre, colProducto, colFin, colMonto } = detectarCols(data);
 
-    const ops = data.map(r => parseInt(r[colOP])).filter(v => !isNaN(v) && v > 0);
-    if (!ops.length) return res.status(400).json({ success: false, data: null, error: `No se encontraron OPs válidas. Columna detectada: "${colOP}". Primeras claves: ${Object.keys(data[0]).slice(0,5).join(', ')}` });
+    // Llave: ID FINANCIERA
+    const ids = data.map(r => String(r[colIdFin] || '').trim()).filter(v => v && v !== '' && v.toUpperCase() !== 'NO APLICA');
+    if (!ids.length) return res.status(400).json({ success: false, data: null, error: `No se encontró la columna "ID FINANCIERA" en el archivo. Columnas detectadas: ${Object.keys(data[0]).slice(0,8).join(', ')}` });
 
-    // TiDB/MySQL: query en chunks de 500 para evitar límite de parámetros
-    const setExistentes = new Set();
-    const chunkSize = 500;
-    for (let i = 0; i < ops.length; i += chunkSize) {
-      const chunk = ops.slice(i, i + chunkSize);
-      const [rows] = await pool.query(
-        `SELECT num_op FROM creditos WHERE num_op IN (${chunk.map(()=>'?').join(',')})`,
-        chunk
-      );
-      rows.forEach(r => setExistentes.add(r.num_op));
-    }
-
-    // Detectar nombres de columnas clave usando búsqueda flexible
-    const keys = Object.keys(data[0]);
-    const findCol = (...names) => keys.find(k => names.some(n => k.trim().toUpperCase() === n.toUpperCase())) || names[0];
-    const colEstado   = findCol('ESTADO CREDITO', 'ESTADO CRÉDITO', 'ESTADO_CREDITO');
-    const colNombre   = findCol('NOMBRE');
-    const colProducto = findCol('PRODUCTO');
-    const colFin      = findCol('FINANCIERA');
-    const colMonto    = findCol('MONTO FINANCIADO INDEXA', 'MONTO FINANCIADO');
+    const setExistentes = await getExistentes(ids);
 
     const resumen = {
-      total:     data.length,
-      nuevos:    ops.filter(o => !setExistentes.has(o)).length,
+      total:      data.length,
+      nuevos:     data.filter(r => !setExistentes.has(String(r[colIdFin]||'').trim())).length,
       existentes: setExistentes.size,
-      otorgados: data.filter(r => (r[colEstado]||'').toString().toUpperCase() === 'OTORGADO').length,
+      otorgados:  data.filter(r => (r[colEstado]||'').toString().toUpperCase() === 'OTORGADO').length,
     };
 
     // Vista previa: primeras 10 nuevas
-    const preview = data
-      .filter(r => !setExistentes.has(parseInt(r[colOP])))
+    const previw = data
+      .filter(r => !setExistentes.has(String(r[colIdFin]||'').trim()))
       .slice(0, 10)
       .map(r => ({
-        op:        r[colOP],
-        nombre:    r[colNombre],
-        estado:    r[colEstado],
-        producto:  r[colProducto],
-        financiera:r[colFin],
-        monto:     r[colMonto],
+        op:          r[colOP],
+        id_financiera: r[colIdFin],
+        nombre:      r[colNombre],
+        estado:      r[colEstado],
+        producto:    r[colProducto],
+        financiera:  r[colFin],
+        monto:       r[colMonto],
       }));
 
-    res.json({ success: true, data: { resumen, preview }, error: null });
+    res.json({ success: true, data: { resumen, preview: previw }, error: null });
   } catch (e) {
     console.error('[preview]', e.message);
     res.status(500).json({ success: false, data: null, error: e.message });
@@ -200,21 +227,13 @@ const importar = async (req, res) => {
     const ws   = wb.Sheets[wb.SheetNames[0]];
     const data = XLSX.utils.sheet_to_json(ws, { defval: '' });
 
-    const colOP = Object.keys(data[0]).find(k => k.trim().toUpperCase() === 'OP') || 'OP';
-    const ops   = data.map(r => parseInt(r[colOP])).filter(v => !isNaN(v) && v > 0);
+    const { colOP, colIdFin } = detectarCols(data);
 
-    const setExistentes = new Set();
-    const chunkSize = 500;
-    for (let i = 0; i < ops.length; i += chunkSize) {
-      const chunk = ops.slice(i, i + chunkSize);
-      const [rows] = await pool.query(
-        `SELECT num_op FROM creditos WHERE num_op IN (${chunk.map(()=>'?').join(',')})`,
-        chunk
-      );
-      rows.forEach(r => setExistentes.add(r.num_op));
-    }
+    // Llave de deduplicación: ID FINANCIERA
+    const ids = data.map(r => String(r[colIdFin] || '').trim()).filter(v => v && v.toUpperCase() !== 'NO APLICA');
+    const setExistentes = await getExistentes(ids);
 
-    const nuevos = data.filter(r => !setExistentes.has(parseInt(r[colOP])));
+    const nuevos = data.filter(r => !setExistentes.has(String(r[colIdFin]||'').trim()));
 
     // mes_override: fuerza el mes contable a un valor fijo (evita desfases por fecha de evaluación)
     const mesOverride = req.body.mes_override || null;
@@ -358,7 +377,7 @@ const actualizar = async (req, res) => {
 
     if (!data.length) return res.status(400).json({ success: false, data: null, error: 'Archivo vacío' });
 
-    const colOP = Object.keys(data[0]).find(k => k.trim().toUpperCase() === 'OP') || 'OP';
+    const { colOP, colIdFin } = detectarCols(data);
     const mesOverride = req.body.mes_override || null;
 
     // Campos que NUNCA se deben sobreescribir (datos gestionados por operaciones)
@@ -374,14 +393,22 @@ const actualizar = async (req, res) => {
     const detallesLog = [];
 
     for (const row of data) {
-      const numOp = parseInt(row[colOP]);
-      if (!numOp || isNaN(numOp)) continue;
+      const idFin  = String(row[colIdFin] || '').trim();
+      const numOp  = parseInt(row[colOP]);
 
       try {
-        // Obtener registro actual de la BD
-        const [[existente]] = await pool.query(
-          'SELECT * FROM creditos WHERE num_op = ?', [numOp]
-        );
+        // Buscar por id_financiera (llave principal) → fallback a num_op
+        let existente;
+        if (idFin && idFin.toUpperCase() !== 'NO APLICA') {
+          [[existente]] = await pool.query(
+            'SELECT * FROM creditos WHERE id_financiera = ?', [idFin]
+          );
+        }
+        if (!existente && !isNaN(numOp) && numOp > 0) {
+          [[existente]] = await pool.query(
+            'SELECT * FROM creditos WHERE num_op = ?', [numOp]
+          );
+        }
         if (!existente) { noEncontrados++; continue; }
 
         // Obtener campos nuevos del Excel
