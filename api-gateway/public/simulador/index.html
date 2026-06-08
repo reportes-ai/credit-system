@@ -347,7 +347,7 @@ async function cargarDatos() {
     if (jv.success && jv.data?.valor) {
       UF = parseFloat(jv.data.valor);
       const fechaUF = jv.data.fecha
-        ? new Date(jv.data.fecha + 'T12:00:00').toLocaleDateString('es-CL')
+        ? new Date(String(jv.data.fecha).slice(0,10) + 'T12:00:00').toLocaleDateString('es-CL')
         : '';
       document.getElementById('ufValor').textContent =
         '$' + Math.round(UF).toLocaleString('es-CL') +
