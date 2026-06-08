@@ -8,15 +8,34 @@
   <link rel="stylesheet" href="/css/bootstrap.min.css">
   <link rel="stylesheet" href="/css/bootstrap-icons.css">
   <style>
-    body { background: #f0f2f5; font-family: 'Segoe UI', sans-serif; }
-    .topbar {
-      background: linear-gradient(135deg, #1a237e 0%, #283593 100%);
-      color: #fff; padding: 14px 28px;
-      display: flex; align-items: center; gap: 14px;
+    :root { --navy-dark:#0d1b4b; --navy:#1a237e; --navy-light:#283593; }
+    body { background: #f0f2f5; font-family: 'Segoe UI', sans-serif; margin:0; }
+    .topnav {
+      background: linear-gradient(90deg, var(--navy-dark), var(--navy-light));
+      color: #fff; height: 60px; padding: 0 24px;
+      display: flex; align-items: center; justify-content: space-between;
+      position: sticky; top: 0; z-index: 200;
+      box-shadow: 0 2px 8px rgba(0,0,0,.3);
     }
-    .topbar h1 { font-size: 1.25rem; font-weight: 700; margin: 0; }
-    .topbar .badge-version { background: rgba(255,255,255,.18); font-size: .72rem;
-      padding: 2px 8px; border-radius: 20px; }
+    .topnav-left  { display:flex; align-items:center; gap:16px; }
+    .topnav-brand img { height:32px; filter:brightness(0) invert(1); }
+    .version-badge { background:rgba(255,255,255,.15); color:rgba(255,255,255,.75);
+      font-size:.65rem; font-weight:700; border-radius:6px; padding:2px 8px; }
+    .breadcrumb-nav { color:rgba(255,255,255,.6); font-size:.85rem;
+      display:flex; align-items:center; gap:6px; }
+    .breadcrumb-nav a { color:rgba(255,255,255,.75); text-decoration:none; }
+    .breadcrumb-nav a:hover { color:#fff; }
+    .breadcrumb-nav .sep { color:rgba(255,255,255,.35); }
+    .topnav-right { display:flex; align-items:center; gap:12px; }
+    .user-chip { background:rgba(255,255,255,.12); border-radius:24px;
+      padding:5px 12px; display:flex; align-items:center; gap:8px; font-size:.85rem; }
+    .avatar { width:28px; height:28px; background:#90caf9; border-radius:50%;
+      display:flex; align-items:center; justify-content:center;
+      color:var(--navy); font-weight:700; font-size:.75rem; }
+    .perfil-badge { background:rgba(144,202,249,.2); border:1px solid rgba(144,202,249,.4);
+      color:#90caf9; border-radius:12px; padding:2px 10px; font-size:.73rem; font-weight:600; }
+    .btn-logout { background:rgba(255,255,255,.1); border:1px solid rgba(255,255,255,.2);
+      color:#fff; border-radius:8px; padding:5px 12px; font-size:.82rem; cursor:pointer; }
     .card-stat {
       background: #fff; border-radius: 12px; padding: 20px 24px;
       box-shadow: 0 2px 8px rgba(0,0,0,.06); text-align: center;
@@ -260,14 +279,25 @@
 </head>
 <body>
 
-<div class="topbar">
-  <i class="bi bi-database-gear" style="font-size:1.5rem"></i>
-  <h1>Mantenimiento de Base de Datos</h1>
-  <span class="badge-version">v1.5</span>
-  <a href="/mantenedores/" class="ms-auto text-white-50 text-decoration-none" style="font-size:.85rem">
-    <i class="bi bi-arrow-left"></i> Mantenedores
-  </a>
-</div>
+<nav class="topnav">
+  <div class="topnav-left">
+    <a class="topnav-brand" href="/"><img src="/img/logo.png" alt="AutoFácil"></a>
+    <span class="version-badge">v1.5</span>
+    <nav class="breadcrumb-nav">
+      <a href="/">Inicio</a><span class="sep">›</span>
+      <a href="/mantenedores/">Mantenedores</a><span class="sep">›</span>
+      <span>Mantenimiento BD</span>
+    </nav>
+  </div>
+  <div class="topnav-right">
+    <div class="user-chip">
+      <div class="avatar" id="navInitial">?</div>
+      <span id="navNombre">—</span>
+      <span class="perfil-badge" id="navPerfil">—</span>
+    </div>
+    <button class="btn-logout" onclick="logout()"><i class="bi bi-box-arrow-right"></i> Salir</button>
+  </div>
+</nav>
 
 <!-- Overlay de ejecución -->
 <div id="overlay-run">
@@ -1419,6 +1449,21 @@ function renderSlowQueries(data) {
     </tr>`;
   }).join('');
 }
+
+// ── Nav: usuario ──────────────────────────────────────────────────────
+function logout() { sessionStorage.clear(); window.location.href = '/login.html'; }
+(function initNav() {
+  const token = sessionStorage.getItem('token');
+  if (!token) return;
+  try {
+    const payload = JSON.parse(atob(token.split('.')[1]));
+    const nombre  = payload.nombre || payload.email || '?';
+    const perfil  = payload.perfil || payload.rol || '';
+    document.getElementById('navNombre').textContent  = nombre;
+    document.getElementById('navPerfil').textContent  = perfil;
+    document.getElementById('navInitial').textContent = nombre.charAt(0).toUpperCase();
+  } catch (_) {}
+})();
 
 // ── Inicialización ────────────────────────────────────────────────────
 // Ocultar todos los bloques de tab excepto el inicial (diag)
