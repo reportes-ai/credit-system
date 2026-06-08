@@ -1,6 +1,7 @@
 'use strict';
-const pool = require('../../../../shared/config/database');
-const XLSX = require('xlsx');
+const pool     = require('../../../../shared/config/database');
+const XLSX     = require('xlsx');
+const historial = require('./carga-historial.controller');
 
 /* ── Migración: agregar columna estado_autofin ─────────────────── */
 (async () => {
@@ -172,21 +173,34 @@ exports.importar = async (req, res) => {
     if (!filas.length) return res.json({ success: false, error: 'No se encontraron registros con ID válido' });
 
     const numOps = filas.map(f => f.num_op);
+    // Traer registros actuales para detectar cambios
     const [existing] = await pool.query(
-      `SELECT num_op FROM creditos WHERE num_op IN (${numOps.map(() => '?').join(',')})`,
+      `SELECT num_op, estado_autofin, estado_credito FROM creditos
+       WHERE num_op IN (${numOps.map(() => '?').join(',')})`,
       numOps
     );
-    const existSet = new Set(existing.map(r => r.num_op));
+    const existMap = Object.fromEntries(existing.map(r => [r.num_op, r]));
 
-    let insertados  = 0;
+    let insertados   = 0;
     let actualizados = 0;
     let errores      = 0;
-    const log = [];
+    const log          = [];
+    const detallesIns  = [];   // para historial inserts
+    const cambiosLog   = [];   // para historial cambios
 
     for (const f of filas) {
       try {
-        if (existSet.has(f.num_op)) {
-          // UPDATE solo los estados
+        if (existMap[f.num_op]) {
+          const actual = existMap[f.num_op];
+          // Detectar campos que cambian
+          const CAMPOS = ['estado_autofin', 'estado_credito'];
+          for (const campo of CAMPOS) {
+            const ant = actual[campo] ?? null;
+            const nvo = f[campo]     ?? null;
+            if (String(ant ?? '') !== String(nvo ?? '')) {
+              cambiosLog.push({ num_op: f.num_op, campo, valor_anterior: ant, valor_nuevo: nvo });
+            }
+          }
           await pool.query(
             `UPDATE creditos SET estado_autofin = ?, estado_credito = ?, updated_at = NOW()
              WHERE num_op = ?`,
@@ -195,7 +209,6 @@ exports.importar = async (req, res) => {
           actualizados++;
           log.push(`✓ Actualizado ${f.num_op} → ${f.estado_autofin} / ${f.estado_credito}`);
         } else {
-          // INSERT registro nuevo
           await pool.query(
             `INSERT INTO creditos
                (num_op, estado_autofin, estado_credito, rut_cliente, nombre_cliente,
@@ -210,12 +223,31 @@ exports.importar = async (req, res) => {
             ]
           );
           insertados++;
+          detallesIns.push({ num_op: f.num_op, datos: f });
           log.push(`➕ Insertado  ${f.num_op} → ${f.estado_autofin} / ${f.estado_credito}`);
         }
       } catch (rowErr) {
         errores++;
         log.push(`✗ Error ${f.num_op}: ${rowErr.message}`);
       }
+    }
+
+    // ── Guardar en historial ──────────────────────────────────────
+    if (insertados > 0 || actualizados > 0) {
+      historial.crearSesion({
+        fuente:      'trinidad',
+        usuario:     req.user?.nombre || req.user?.email || null,
+        archivo:     req.file?.originalname || null,
+        insertados, actualizados, errores,
+        total:       filas.length,
+      }).then(sesionId => {
+        for (const d of detallesIns) {
+          historial.logDetalle(sesionId, d.num_op, 'insert', d.datos).catch(() => {});
+        }
+        for (const c of cambiosLog) {
+          historial.logCambio(sesionId, c.num_op, c.campo, c.valor_anterior, c.valor_nuevo).catch(() => {});
+        }
+      }).catch(() => {});
     }
 
     return res.json({

@@ -5,12 +5,17 @@ if (!JWT_SECRET) throw new Error('JWT_SECRET no está definido en las variables 
 const JWT_EXPIRES = '8h';
 
 const verifyToken = (req, res, next) => {
+  // Acepta token en header Authorization o en query param ?token= (para descargas directas)
   const authHeader = req.headers.authorization;
-  if (!authHeader || !authHeader.startsWith('Bearer ')) {
+  const rawToken   = (authHeader && authHeader.startsWith('Bearer '))
+    ? authHeader.split(' ')[1]
+    : req.query.token;
+  if (!rawToken) {
     return res.status(401).json({ success: false, data: null, error: 'Token requerido' });
   }
   try {
-    req.usuario = jwt.verify(authHeader.split(' ')[1], JWT_SECRET);
+    req.usuario = jwt.verify(rawToken, JWT_SECRET);
+    req.user    = req.usuario;   // alias para controllers que usan req.user
     next();
   } catch {
     return res.status(401).json({ success: false, data: null, error: 'Token inválido o expirado' });

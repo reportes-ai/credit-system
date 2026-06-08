@@ -2,6 +2,7 @@
 const pool = require('../../../../shared/config/database');
 const XLSX = require('xlsx');
 const { calcularComisionFin } = require('../utils/calcular-comision-fin');
+const historial = require('./carga-historial.controller');
 
 /* ── Asegurar columnas extra en creditos ──────────────────── */
 (async () => {
@@ -220,11 +221,9 @@ const importar = async (req, res) => {
 
     let insertados = 0;
     let errores    = [];
-    // Rastrear ops insertadas sin monto_comision_fin para recalcular post-insert
     const sinComisionFin = [];
-
-    // Cache rut → id_cliente para no repetir queries en el loop
-    const clienteCache = {};
+    const clienteCache   = {};
+    const detallesLog    = [];   // para log historial
 
     for (const row of nuevos) {
       try {
@@ -263,8 +262,8 @@ const importar = async (req, res) => {
           vals
         );
         insertados++;
+        detallesLog.push({ num_op: obj.num_op, datos: obj });
 
-        // Si el Excel no traía monto_comision_fin, marcar para recalcular
         if (obj.monto_comision_fin === null || obj.monto_comision_fin === undefined) {
           sinComisionFin.push({ num_op: obj.num_op, mes: obj.mes, financiera: obj.financiera });
         }
@@ -281,6 +280,21 @@ const importar = async (req, res) => {
       } catch (e) {
         console.error('[recalc comision fin]', e.message);
       }
+    }
+
+    // ── Guardar en historial (sin bloquear la respuesta) ───────────
+    if (insertados > 0) {
+      historial.crearSesion({
+        fuente:     'autofacil',
+        usuario:    req.user?.nombre || req.user?.email || null,
+        archivo:    req.file?.originalname || null,
+        insertados, actualizados: 0, errores: errores.length,
+        total:      data.length,
+      }).then(sesionId => {
+        for (const d of detallesLog) {
+          historial.logDetalle(sesionId, d.num_op, 'insert', d.datos).catch(() => {});
+        }
+      }).catch(() => {});
     }
 
     res.json({
