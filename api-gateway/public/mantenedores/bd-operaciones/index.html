@@ -84,9 +84,9 @@
     .btn-delete-sel:hover { background:#b91c1c; }
 
     /* Modal Recalcular */
-    .modal-backdrop { position:fixed; inset:0; background:rgba(0,0,0,.7); z-index:2000; display:none; align-items:center; justify-content:center; }
+    .modal-backdrop { position:fixed; inset:0; background:rgba(0,0,0,.7); z-index:9000; display:none; align-items:center; justify-content:center; }
     .modal-backdrop.show { display:flex; }
-    .modal-box { background:#ffffff !important; opacity:1 !important; border-radius:16px; padding:30px 34px; width:100%; max-width:480px; box-shadow:0 12px 60px rgba(0,0,0,.5); position:relative; z-index:2001; isolation:isolate; }
+    .modal-box { border-radius:16px; padding:30px 34px; width:100%; max-width:480px; box-shadow:0 12px 60px rgba(0,0,0,.5); }
     .modal-box h5 { font-weight:700; margin:0 0 6px; font-size:1.1rem; color:#0141A2; display:flex; align-items:center; gap:8px; }
     .modal-box p.hint { font-size:.82rem; color:#6b7280; margin:0 0 22px; line-height:1.5; }
     .modal-box label { font-size:.83rem; font-weight:600; color:#374151; display:block; margin-bottom:5px; }
@@ -186,7 +186,7 @@
 
 <!-- Modal Recalcular -->
 <div class="modal-backdrop" id="modalRecalcular" onclick="cerrarModalRecalcular(event)">
-  <div class="modal-box" onclick="event.stopPropagation()">
+  <div class="modal-box" onclick="event.stopPropagation()" style="background:#fff;opacity:1;">
     <h5><i class="bi bi-arrow-repeat me-2"></i>Recalcular comisiones</h5>
     <p class="hint">Recalcula Ing x Colocaciones, Com. Dealer, Com. Parque y normaliza ejecutivos por mes. Deja vacío para recalcular <strong>todos los meses</strong>.</p>
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px">
