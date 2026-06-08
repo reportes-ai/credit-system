@@ -212,13 +212,24 @@ exports.importar = async (req, res) => {
     if (!filas.length) return res.json({ success: false, error: 'No se encontraron registros con ID válido' });
 
     const numOps = filas.map(f => f.num_op);
-    // Traer registros actuales para detectar cambios
+
+    // Traer registros actuales (por num_op propio)
     const [existing] = await pool.query(
       `SELECT num_op, estado_autofin, estado_credito FROM creditos
        WHERE num_op IN (${numOps.map(() => '?').join(',')})`,
       numOps
     );
     const existMap = Object.fromEntries(existing.map(r => [r.num_op, r]));
+
+    // Detectar num_ops Trinidad que ya existen como id_financiera en un registro AUTOFIN
+    // Esos no se insertan para evitar duplicados (el registro AUTOFIN es la fuente canónica)
+    const [afEquiv] = await pool.query(
+      `SELECT id_financiera FROM creditos
+       WHERE id_financiera IN (${numOps.map(() => '?').join(',')})
+         AND financiera != 'NO APLICA'`,
+      numOps.map(String)
+    );
+    const afEquivSet = new Set(afEquiv.map(r => parseInt(r.id_financiera)));
 
     let insertados   = 0;
     let actualizados = 0;
@@ -229,6 +240,20 @@ exports.importar = async (req, res) => {
 
     for (const f of filas) {
       try {
+        // Si ya existe un registro AUTOFIN con id_financiera = este num_op Trinidad,
+        // no insertar duplicado. Actualizar estado_autofin en el registro AUTOFIN.
+        if (afEquivSet.has(f.num_op)) {
+          await pool.query(
+            `UPDATE creditos SET estado_autofin = ?, ejecutivo_tri = ?,
+               estado_eval = COALESCE(NULLIF(estado_eval,''), ?), updated_at = NOW()
+             WHERE id_financiera = ? AND financiera != 'NO APLICA'`,
+            [f.estado_autofin, f.ejecutivo_tri, f.estado_eval, String(f.num_op)]
+          );
+          actualizados++;
+          log.push(`↔ Sincronizado en AF ${f.num_op} → ${f.estado_autofin}`);
+          continue;
+        }
+
         if (existMap[f.num_op]) {
           const actual = existMap[f.num_op];
           // Solo registrar cambio de estado_autofin (estado_credito NO se pisa — viene de AutoFácil)

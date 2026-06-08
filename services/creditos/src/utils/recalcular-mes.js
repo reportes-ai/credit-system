@@ -85,15 +85,6 @@ function getTierUAC(cnt, p) {
   return (p.uac_pct_tier1 || 14) / 100;
 }
 
-/* ── Prima de seguro por plazo (% del monto_financiado) ─────────────── */
-function getSegRate(prefix, plazo, p) {
-  if (plazo <= 6)  return p[`${prefix}_6`]  || 0;
-  if (plazo <= 12) return p[`${prefix}_12`] || 0;
-  if (plazo <= 24) return p[`${prefix}_24`] || 0;
-  if (plazo <= 36) return p[`${prefix}_36`] || 0;
-  if (plazo <= 48) return p[`${prefix}_48`] || 0;
-  return p[`${prefix}_72`] || 0;
-}
 
 /* ═══════════════════════════════════════════════════════════════════════
    recalcularMeses(meses, opciones)
@@ -103,9 +94,8 @@ function getSegRate(prefix, plazo, p) {
 async function recalcularMeses(meses, opciones = {}) {
   if (!meses || !meses.length) return { actualizados: 0, log: [] };
 
-  const [p, tramos, parqMap] = await Promise.all([
+  const [p, parqMap] = await Promise.all([
     cargarParams(),
-    cargarPenTramos(),
     cargarParques(),
   ]);
 
@@ -119,6 +109,7 @@ async function recalcularMeses(meses, opciones = {}) {
              saldo_precio, monto_financiado, monto_capitalizado,
              plazo, fecha_otorgado, mes,
              seguro_rdh, seguro_cesantia, seguro_rep_menor,
+             com_rdh, com_cesantia, com_reparaciones,
              tascli_real
       FROM creditos
       WHERE DATE_FORMAT(mes, '%Y-%m') = ?
@@ -127,32 +118,9 @@ async function recalcularMeses(meses, opciones = {}) {
 
     if (!ops.length) continue;
 
-    // ── Paso 1: calcular primas de seguros para AUTOFIN ─────────────
-    // Las primas se derivan de los parámetros cuando el Excel no las trae.
-    // UNIDAD/Trinidad no aplica seguros AutoFácil → primas = 0.
-    for (const op of ops) {
-      const fin   = (op.financiera || '').toUpperCase();
-      const esAF  = fin.includes('AUTOFIN') || fin.includes('AUTOF');
-      const plazo = parseInt(op.plazo) || 0;
-      if (!esAF || plazo === 0) continue;
-
-      const monto = parseFloat(op.monto_financiado) || 0;
-      if (!monto) continue;
-
-      op._prima_rdh  = Math.round(monto * getSegRate('seg_r', plazo, p));
-      op._prima_ces  = Math.round(monto * getSegRate('seg_c', plazo, p));
-      op._prima_rep  = Math.round(p.reparaciones_menores || 0);
-    }
-
-    // ── Paso 2: penetración solo entre ops AUTOFIN del mes ──────────
-    const opsAF  = ops.filter(r => {
-      const f = (r.financiera || '').toUpperCase();
-      return f.includes('AUTOFIN') || f.includes('AUTOF');
-    });
-    const totalAF = opsAF.length || 1;
-    const penRdh  = opsAF.filter(r => (r._prima_rdh || 0) > 0).length / totalAF * 100;
-    const penCes  = opsAF.filter(r => (r._prima_ces || 0) > 0).length / totalAF * 100;
-    const penRep  = opsAF.filter(r => (r._prima_rep || 0) > 0).length / totalAF * 100;
+    // ── Conteo UAC (penetración de seguros no se recalcula aquí) ────
+    // Las comisiones de seguros (com_rdh/cesantia/rep) vienen del Excel
+    // y se leen desde BD sin modificarse.
 
     // ── Conteo UAC del mes ──────────────────────────────────────────
     const cntUAC = ops.filter(r =>
@@ -161,7 +129,7 @@ async function recalcularMeses(meses, opciones = {}) {
     ).length;
     const pctUAC = getTierUAC(cntUAC, p);
 
-    log.push(`Mes ${mesStr}: ${ops.length} ops | AF=${totalAF} penRDH=${penRdh.toFixed(0)}% penCes=${penCes.toFixed(0)}% | UAC=${cntUAC} (${(pctUAC*100).toFixed(0)}%)`);
+    log.push(`Mes ${mesStr}: ${ops.length} ops | UAC=${cntUAC} (${(pctUAC*100).toFixed(0)}%)`);
 
     // ── Paso 3: recalcular cada op ───────────────────────────────────
     for (const op of ops) {
@@ -200,18 +168,11 @@ async function recalcularMeses(meses, opciones = {}) {
         }
       }
 
-      // 2. Primas de seguros (calculadas en paso 1 para AUTOFIN) ──────
-      const primaRDH  = op._prima_rdh || 0;
-      const primaCes  = op._prima_ces || 0;
-      const primaRep  = op._prima_rep || 0;
-
-      const pctRdh = getPenComision('rdh',        penRdh, tramos);
-      const pctCes = getPenComision('cesantia',   penCes, tramos);
-      const pctRep = getPenComision('reparacion', penRep, tramos);
-
-      const com_rdh          = Math.round(pctRdh * primaRDH);
-      const com_cesantia     = Math.round(pctCes * primaCes);
-      const com_reparaciones = Math.round(pctRep * primaRep);
+      // 2. Comisiones de seguros — vienen del Excel (leídas desde BD) ──
+      // No se recalculan aquí. Se usan para ingreso_neto_total.
+      const com_rdh          = parseFloat(op.com_rdh)          || 0;
+      const com_cesantia     = parseFloat(op.com_cesantia)     || 0;
+      const com_reparaciones = parseFloat(op.com_reparaciones) || 0;
 
       // 3. Comisión Dealer ────────────────────────────────────────────
       let comdea_real    = 0;
@@ -244,15 +205,6 @@ async function recalcularMeses(meses, opciones = {}) {
           comdea_real         = ?,
           com_parque          = ?,
           arriendo_parque     = ?,
-          seguro_rdh          = ?,
-          seguro_cesantia     = ?,
-          seguro_rep_menor    = ?,
-          com_rdh             = ?,
-          com_cesantia        = ?,
-          com_reparaciones    = ?,
-          pen_rdh             = ?,
-          pen_cesantia        = ?,
-          pen_reparaciones    = ?,
           ingreso_neto_total  = ?,
           updated_at          = NOW()
         WHERE id = ?
@@ -261,15 +213,6 @@ async function recalcularMeses(meses, opciones = {}) {
         comdea_real,
         com_parque_val,
         arriendo_val,
-        primaRDH || null,
-        primaCes || null,
-        primaRep || null,
-        com_rdh,
-        com_cesantia,
-        com_reparaciones,
-        Math.round(penRdh * 100) / 100,
-        Math.round(penCes * 100) / 100,
-        Math.round(penRep * 100) / 100,
         ingreso_neto_total,
         op.id,
       ]);
