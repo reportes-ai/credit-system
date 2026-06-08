@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- v1.0 -->
+<!-- v1.1 -->
 <html lang="es">
 <head>
   <meta charset="UTF-8">
@@ -124,7 +124,7 @@
 <div class="topbar">
   <i class="bi bi-database-gear" style="font-size:1.5rem"></i>
   <h1>Mantenimiento de Base de Datos</h1>
-  <span class="badge-version">v1.0</span>
+  <span class="badge-version">v1.1</span>
   <a href="/mantenedores/" class="ms-auto text-white-50 text-decoration-none" style="font-size:.85rem">
     <i class="bi bi-arrow-left"></i> Mantenedores
   </a>
@@ -215,8 +215,8 @@
             <th style="text-align:right">Datos (MB)</th>
             <th style="text-align:right">Índices (MB)</th>
             <th style="text-align:right">Frag %</th>
-            <th>Modificaciones sin ANALYZE</th>
-            <th>Última modificación</th>
+            <th>Último ANALYZE</th>
+            <th>Última modificación BD</th>
             <th>Estado</th>
             <th>Motivos</th>
           </tr>
@@ -315,9 +315,11 @@ function renderTablas(tablas) {
       ? t.motivos.map(m => `<span class="motivo-tag">${m}</span>`).join('')
       : '<span style="color:#aaa;font-size:.78rem">–</span>';
 
-    const modSinAnalyze = t.modify_count !== null
-      ? fmtNum(t.modify_count)
-      : '<span style="color:#aaa">–</span>';
+    const ultimoAnalyze = t.ultimo_analyze
+      ? `<span style="color:#2e7d32;font-size:.8rem">${fmtFecha(t.ultimo_analyze)}</span>`
+      : t.tiene_stats
+        ? `<span style="color:#2e7d32;font-size:.8rem">✓ Analizada</span>`
+        : `<span style="color:#aaa;font-size:.78rem">Nunca</span>`;
 
     tbody.innerHTML += `<tr>
       <td><input type="checkbox" class="checkbox-tabla chk-tabla"
@@ -331,7 +333,7 @@ function renderTablas(tablas) {
           ${t.frag_pct}%
         </span>
       </td>
-      <td style="text-align:right">${modSinAnalyze}</td>
+      <td style="font-size:.8rem">${ultimoAnalyze}</td>
       <td style="font-size:.8rem">${fmtFecha(t.ultima_mod)}</td>
       <td>${badge}</td>
       <td>${motivos}</td>

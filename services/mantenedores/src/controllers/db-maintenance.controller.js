@@ -23,18 +23,36 @@ exports.getDiagnostico = async (req, res) => {
       ORDER BY (DATA_LENGTH + INDEX_LENGTH) DESC
     `);
 
-    // 2. Estadísticas del optimizador (último ANALYZE)
-    let statsMap = {};
+    // 2. Historial de ANALYZE (TiDB: information_schema.ANALYZE_STATUS)
+    // Guarda el último analyze exitoso por tabla
+    let analyzeMap = {};
     try {
-      const [stats] = await conn.query(`
-        SELECT table_name, modify_count, count AS filas_stats,
-               version AS version_stats
-        FROM mysql.stats_meta
-        WHERE db_name = DATABASE()
+      const [anal] = await conn.query(`
+        SELECT Table_name, State, Start_time, End_time, Fail_reason
+        FROM information_schema.ANALYZE_STATUS
+        WHERE Db_name = DATABASE()
+        ORDER BY End_time DESC
       `);
-      stats.forEach(s => { statsMap[s.table_name] = s; });
+      // Quedarse con el registro más reciente por tabla
+      anal.forEach(r => {
+        if (!analyzeMap[r.Table_name]) analyzeMap[r.Table_name] = r;
+      });
     } catch (_) {
-      // mysql.stats_meta puede no estar disponible en todos los tiers de TiDB
+      // Fallback: intentar mysql.stats_meta
+      try {
+        const [stats] = await conn.query(`
+          SELECT table_name, modify_count, count AS filas_stats
+          FROM mysql.stats_meta WHERE db_name = DATABASE()
+        `);
+        stats.forEach(s => {
+          analyzeMap[s.table_name] = {
+            Table_name: s.table_name,
+            State: 'finished',
+            End_time: null,
+            modify_count: s.modify_count,
+          };
+        });
+      } catch (_2) { /* sin acceso a estadísticas */ }
     }
 
     // 3. Variables globales relevantes
@@ -50,11 +68,13 @@ exports.getDiagnostico = async (req, res) => {
     vars.forEach(v => { varMap[v.Variable_name] = v.Value; });
 
     // 4. Calcular diagnóstico por tabla
+    const hayAnalyzeStatus = Object.keys(analyzeMap).length > 0;
+
     const diagnostico = tablas.map(t => {
       const totalBytes = (t.bytes_datos || 0) + (t.bytes_indices || 0);
       const libresBytes = t.bytes_libres || 0;
       const fragPct = totalBytes > 0 ? (libresBytes / totalBytes) * 100 : 0;
-      const stats = statsMap[t.nombre] || null;
+      const anal = analyzeMap[t.nombre] || null;
 
       // Nivel de alerta
       let nivel = 'ok';
@@ -64,20 +84,26 @@ exports.getDiagnostico = async (req, res) => {
         nivel = 'warning';
         motivos.push(`Fragmentación ${fragPct.toFixed(1)}% (>30%)`);
       }
-      if (stats && stats.modify_count > 0) {
-        const ratio = stats.filas_stats > 0
-          ? (stats.modify_count / stats.filas_stats) * 100 : 100;
-        if (ratio > 20) {
+
+      // Lógica basada en ANALYZE_STATUS
+      if (hayAnalyzeStatus) {
+        if (!anal) {
+          // Tabla nunca analizada
+          if (t.filas_aprox > 1000) {
+            nivel = nivel === 'ok' ? 'warning' : nivel;
+            motivos.push('Nunca analizada');
+          }
+        } else if (anal.State && anal.State.toLowerCase().includes('fail')) {
           nivel = 'warning';
-          motivos.push(`${ratio.toFixed(0)}% de filas modificadas sin ANALYZE`);
+          motivos.push(`Último ANALYZE falló: ${anal.Fail_reason || 'error desconocido'}`);
         }
-        if (ratio > 50) {
-          nivel = 'critical';
+        // Si está en analyze_status con state finished → ok (sin motivo extra)
+      } else {
+        // No se pudo leer ANALYZE_STATUS ni stats_meta → solo advertir en tablas grandes
+        if (t.filas_aprox > 1000) {
+          nivel = nivel === 'ok' ? 'warning' : nivel;
+          motivos.push('Sin estadísticas disponibles');
         }
-      }
-      if (!stats && t.filas_aprox > 1000) {
-        nivel = nivel === 'ok' ? 'warning' : nivel;
-        motivos.push('Sin estadísticas recientes');
       }
 
       return {
@@ -87,8 +113,9 @@ exports.getDiagnostico = async (req, res) => {
         indice_mb: ((t.bytes_indices || 0) / 1048576).toFixed(2),
         frag_pct: fragPct.toFixed(1),
         ultima_mod: t.ultima_modificacion,
-        modify_count: stats ? stats.modify_count : null,
-        tiene_stats: !!stats,
+        ultimo_analyze: anal ? (anal.End_time || null) : null,
+        analyze_state: anal ? (anal.State || null) : null,
+        tiene_stats: !!anal,
         nivel,
         motivos,
       };
