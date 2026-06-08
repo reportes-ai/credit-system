@@ -247,7 +247,7 @@ const getAll = async (req, res) => {
       )`;
       params.push(like, like, like);
     }
-    sql += ` ORDER BY ob.mes DESC, ob.id DESC LIMIT 5000`;
+    sql += ` ORDER BY ob.mes DESC, ob.id DESC LIMIT 20000`;
 
     const [rows] = await pool.query(sql, params);
     res.json({ success: true, data: rows, error: null });
