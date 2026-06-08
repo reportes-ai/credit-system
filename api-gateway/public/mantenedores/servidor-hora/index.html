@@ -140,6 +140,42 @@
     </div>
   </div>
 
+  <!-- Control manual TZ -->
+  <div class="card">
+    <div class="card-hdr"><i class="bi bi-sliders"></i> Control Manual de Timezone BD</div>
+    <div class="card-body">
+      <p style="font-size:.85rem;color:#6b7280;margin:0 0 14px">
+        Por defecto el sistema usa <strong>America/Santiago automático</strong> (cambia con DST sin intervención).<br>
+        Solo usa el override manual si hay un problema y necesitas forzar un offset específico.
+      </p>
+      <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap">
+        <div>
+          <label style="font-size:.78rem;font-weight:700;color:#6b7280;display:block;margin-bottom:4px">TZ ACTIVO EN BD</label>
+          <span id="tzActivoLabel" style="font-size:1rem;font-weight:800;color:#0141A2;font-family:monospace">—</span>
+          <span id="tzModoLabel" style="margin-left:8px;font-size:.78rem;color:#6b7280"></span>
+        </div>
+        <div style="flex:1;min-width:200px">
+          <label style="font-size:.78rem;font-weight:700;color:#6b7280;display:block;margin-bottom:4px">OVERRIDE MANUAL</label>
+          <select id="tzSelect" style="border:1px solid #d1d5db;border-radius:8px;padding:7px 12px;font-size:.88rem;font-family:monospace;width:180px">
+            <option value="">Automático (America/Santiago)</option>
+            <option value="-03:00">-03:00 (Verano / CLST)</option>
+            <option value="-04:00">-04:00 (Invierno / CLT)</option>
+            <option value="+00:00">+00:00 (UTC)</option>
+          </select>
+        </div>
+        <div style="display:flex;gap:8px;align-items:flex-end;padding-bottom:2px">
+          <button onclick="guardarTZ()" style="background:#0141A2;color:#fff;border:none;border-radius:8px;padding:8px 18px;font-size:.85rem;font-weight:600;cursor:pointer">
+            <i class="bi bi-floppy"></i> Guardar
+          </button>
+          <button onclick="restablecerTZ()" style="background:#f3f4f6;color:#374151;border:1px solid #d1d5db;border-radius:8px;padding:8px 14px;font-size:.85rem;cursor:pointer" title="Volver a automático">
+            <i class="bi bi-arrow-counterclockwise"></i> Restablecer
+          </button>
+        </div>
+      </div>
+      <div id="tzMsg" style="margin-top:10px;font-size:.82rem;display:none"></div>
+    </div>
+  </div>
+
   <!-- Próximo cambio DST -->
   <div id="panelDST"></div>
 
@@ -204,9 +240,17 @@ async function cargar(){
       <table class="info-table">
         <tr><td>NOW() según la BD</td><td>${d.bd_now || '—'}</td></tr>
         <tr><td>NOW() formateado Chile</td><td>${bdFecha}</td></tr>
+        <tr><td>time_zone activo (sesión)</td><td class="ok">${d.bd_tz_session || '—'}</td></tr>
         <tr><td>time_zone global (TiDB)</td><td>${d.bd_tz_global || '—'}</td></tr>
-        <tr><td>time_zone sesión</td><td>${d.bd_tz_session || '—'}</td></tr>
+        <tr><td>TZ Node → BD</td><td>${d.tz_bd_activo || '—'} ${d.tz_bd_override ? '<span style="color:#d97706;font-size:.75rem">(override manual activo)</span>' : '<span style="color:#16a34a;font-size:.75rem">(automático)</span>'}</td></tr>
       </table>`;
+
+    /* Control TZ */
+    document.getElementById('tzActivoLabel').textContent = d.tz_bd_activo || '—';
+    document.getElementById('tzModoLabel').textContent   = d.tz_bd_override ? '⚠ Override manual activo' : '✓ Automático';
+    document.getElementById('tzModoLabel').style.color   = d.tz_bd_override ? '#d97706' : '#16a34a';
+    const sel = document.getElementById('tzSelect');
+    sel.value = d.tz_bd_override || '';
 
     /* Panel registros */
     const fmtReg = v => v ? new Date(v).toLocaleString('es-CL',{timeZone:'America/Santiago',day:'2-digit',month:'2-digit',year:'numeric',hour:'2-digit',minute:'2-digit',second:'2-digit',hour12:false}) : '—';
@@ -244,8 +288,38 @@ async function cargar(){
   }
 }
 cargar();
-// Auto-refresh cada 30s
 setInterval(cargar, 30000);
+
+/* ── Guardar override TZ ── */
+async function guardarTZ(){
+  const valor = document.getElementById('tzSelect').value;
+  const msg   = document.getElementById('tzMsg');
+  try {
+    const r = await fetch('/api/servidor-hora/tz-override', {
+      method: 'POST',
+      headers: { 'Content-Type':'application/json', Authorization:'Bearer '+TOKEN },
+      body: JSON.stringify({ valor })
+    });
+    const j = await r.json();
+    if(!j.success) throw new Error(j.error);
+    msg.style.display = '';
+    msg.style.color   = '#16a34a';
+    msg.textContent   = valor
+      ? `✓ Override guardado: ${valor} — todas las nuevas conexiones usarán este offset.`
+      : '✓ Restablecido a automático (America/Santiago DST).';
+    cargar();
+  } catch(e){
+    msg.style.display = '';
+    msg.style.color   = '#dc2626';
+    msg.textContent   = 'Error: ' + e.message;
+  }
+  setTimeout(() => msg.style.display = 'none', 5000);
+}
+
+function restablecerTZ(){
+  document.getElementById('tzSelect').value = '';
+  guardarTZ();
+}
 </script>
 </body>
 </html>
