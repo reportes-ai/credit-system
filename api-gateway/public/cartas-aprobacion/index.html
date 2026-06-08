@@ -211,7 +211,7 @@ body { font-family: 'Segoe UI', Arial, sans-serif; background: var(--gray-bg); c
   <div class="header no-print">
     <div class="header-logo" style="display:flex;align-items:center;gap:8px">
         <img id="logoHeader" src="/img/logo.png" alt="AutoFácil" style="height:32px;object-fit:contain">
-        <span style="font-size:11px;font-weight:400;color:#90CAF9">V5.44</span>
+        <span style="font-size:11px;font-weight:400;color:#90CAF9">V5.45</span>
       </div>
     <div class="header-right">
       <span class="header-user" id="headerUser"></span>
@@ -2720,7 +2720,7 @@ function checkFinancieraPreferente(){
 
   // Case 1: Both not available (NO SE PUEDE)
   if(!autofinOk && !unidadOk){
-    setCritico('🚫 CASO CRÍTICO: Ninguna financiera aplica para plazo ' + plazo + ' cuotas / saldo ' + fmtCLP(saldo) + '. No se puede grabar.');
+    setCritico('🚫 CASO CRÍTICO: Ninguna financiera aplica — AUTOFIN requiere ' + limAF + '. UNIDAD DE CRÉDITO requiere ' + limUN + '. No se puede grabar.');
     return;
   }
 
