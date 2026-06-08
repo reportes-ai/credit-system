@@ -111,8 +111,6 @@ function parseExcel(buffer, mapaEstados = {}, mapaEjecutivos = {}) {
         num_op,
         estado_autofin:  estadoTri,
         estado_credito:  mapEstado(estadoTri, mapaEstados),
-        rut_cliente:     normRut(get('Rut Cliente')),
-        nombre_cliente:  normStr(get('Nombre')),
         producto:        normStr(get('Producto')),
         ejecutivo:       mapEjecutivo(ejTri, mapaEjecutivos),
         ejecutivo_tri:   ejTri,
@@ -123,6 +121,9 @@ function parseExcel(buffer, mapaEstados = {}, mapaEjecutivos = {}) {
         monto_financiado:normInt(get('Monto Pagare')),
         fecha_otorgado:  fechaCurse,
         mes,
+        marca:           normStr(get('Marca')),
+        modelo:          normStr(get('Modelo')),
+        vendedor:        normStr(get('Vendedor')),
       };
     })
     .filter(Boolean);
@@ -204,24 +205,30 @@ exports.importar = async (req, res) => {
             }
           }
           await pool.query(
-            `UPDATE creditos SET estado_autofin = ?, estado_credito = ?, updated_at = NOW()
+            `UPDATE creditos SET
+               estado_autofin = ?, estado_credito = ?,
+               marca = COALESCE(?, marca), modelo = COALESCE(?, modelo),
+               vendedor = COALESCE(?, vendedor), updated_at = NOW()
              WHERE num_op = ?`,
-            [f.estado_autofin, f.estado_credito, f.num_op]
+            [f.estado_autofin, f.estado_credito, f.marca, f.modelo, f.vendedor, f.num_op]
           );
           actualizados++;
           log.push(`✓ Actualizado ${f.num_op} → ${f.estado_autofin} / ${f.estado_credito}`);
         } else {
           await pool.query(
             `INSERT INTO creditos
-               (num_op, estado_autofin, estado_credito, rut_cliente, nombre_cliente,
+               (num_op, estado_autofin, estado_credito,
                 producto, ejecutivo, automotora, valor_vehiculo, pie, saldo_precio,
-                monto_financiado, fecha_otorgado, mes, financiera, created_at, updated_at)
-             VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,'NO APLICA', NOW(), NOW())`,
+                monto_financiado, fecha_otorgado, mes,
+                marca, modelo, vendedor,
+                financiera, created_at, updated_at)
+             VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,'NO APLICA', NOW(), NOW())`,
             [
-              f.num_op, f.estado_autofin, f.estado_credito, f.rut_cliente,
-              f.nombre_cliente, f.producto, f.ejecutivo, f.automotora,
-              f.valor_vehiculo, f.pie, f.saldo_precio, f.monto_financiado,
-              f.fecha_otorgado, f.mes,
+              f.num_op, f.estado_autofin, f.estado_credito,
+              f.producto, f.ejecutivo, f.automotora,
+              f.valor_vehiculo, f.pie, f.saldo_precio,
+              f.monto_financiado, f.fecha_otorgado, f.mes,
+              f.marca, f.modelo, f.vendedor,
             ]
           );
           insertados++;
