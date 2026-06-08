@@ -59,6 +59,7 @@ app.use('/api/bd-informacion-comercial',  require('../../services/mantenedores/s
 app.use('/api/productos-financiera',      require('../../services/mantenedores/src/routes/productos-financiera.routes'));
 app.use('/api/noticias',                  require('../../services/mantenedores/src/routes/noticias.routes'));
 app.use('/api/servidor-hora',             require('../../services/mantenedores/src/routes/servidor-hora.routes'));
+app.use('/api/db-maintenance',            require('../../services/mantenedores/src/routes/db-maintenance.routes'));
 
 // Cotizaciones
 app.use('/api/cotizaciones', require('../../services/cotizaciones/src/routes/cotizaciones.routes'));
@@ -155,6 +156,9 @@ app.get(['/mantenedores/solo-dios', '/mantenedores/solo-dios/'], (req, res) =>
 
 app.get(['/mantenedores/servidor-hora', '/mantenedores/servidor-hora/'], (req, res) =>
   res.sendFile(path.join(__dirname, '../public/mantenedores/servidor-hora/index.html')));
+
+app.get(['/mantenedores/db-maintenance', '/mantenedores/db-maintenance/'], (req, res) =>
+  res.sendFile(path.join(__dirname, '../public/mantenedores/db-maintenance/index.html')));
 
 app.get(['/mantenedores/tipos-documento', '/mantenedores/tipos-documento/'], (req, res) =>
   res.sendFile(path.join(__dirname, '../public/mantenedores/tipos-documento/index.html')));

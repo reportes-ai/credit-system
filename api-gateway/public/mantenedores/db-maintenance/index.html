@@ -1,0 +1,431 @@
+<!DOCTYPE html>
+<!-- v1.0 -->
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Mantenimiento BD — AutoFácil</title>
+  <link rel="stylesheet" href="/css/bootstrap.min.css">
+  <link rel="stylesheet" href="/css/bootstrap-icons.css">
+  <style>
+    body { background: #f0f2f5; font-family: 'Segoe UI', sans-serif; }
+    .topbar {
+      background: linear-gradient(135deg, #1a237e 0%, #283593 100%);
+      color: #fff; padding: 14px 28px;
+      display: flex; align-items: center; gap: 14px;
+    }
+    .topbar h1 { font-size: 1.25rem; font-weight: 700; margin: 0; }
+    .topbar .badge-version { background: rgba(255,255,255,.18); font-size: .72rem;
+      padding: 2px 8px; border-radius: 20px; }
+    .card-stat {
+      background: #fff; border-radius: 12px; padding: 20px 24px;
+      box-shadow: 0 2px 8px rgba(0,0,0,.06); text-align: center;
+    }
+    .card-stat .num { font-size: 2.2rem; font-weight: 800; }
+    .card-stat .lbl { font-size: .8rem; color: #6c757d; text-transform: uppercase;
+      letter-spacing: .05em; margin-top: 2px; }
+    .num-ok     { color: #2e7d32; }
+    .num-warn   { color: #e65100; }
+    .num-crit   { color: #c62828; }
+    .num-total  { color: #1a237e; }
+
+    .tabla-card {
+      background: #fff; border-radius: 12px;
+      box-shadow: 0 2px 8px rgba(0,0,0,.06); overflow: hidden;
+    }
+    .tabla-card .card-header-custom {
+      background: #1a237e; color: #fff;
+      padding: 14px 20px; font-weight: 700; font-size: .95rem;
+      display: flex; align-items: center; gap: 8px;
+    }
+    table.db-table { width: 100%; border-collapse: collapse; font-size: .875rem; }
+    table.db-table thead th {
+      background: #e8eaf6; color: #1a237e;
+      padding: 10px 14px; font-weight: 700;
+      border-bottom: 2px solid #c5cae9;
+      white-space: nowrap;
+    }
+    table.db-table tbody tr { border-bottom: 1px solid #f0f0f0; transition: background .15s; }
+    table.db-table tbody tr:hover { background: #f5f7ff; }
+    table.db-table tbody td { padding: 9px 14px; vertical-align: middle; }
+
+    .badge-ok   { background: #e8f5e9; color: #2e7d32; border-radius: 20px;
+                  padding: 3px 10px; font-size: .78rem; font-weight: 600; }
+    .badge-warn { background: #fff3e0; color: #e65100; border-radius: 20px;
+                  padding: 3px 10px; font-size: .78rem; font-weight: 600; }
+    .badge-crit { background: #ffebee; color: #c62828; border-radius: 20px;
+                  padding: 3px 10px; font-size: .78rem; font-weight: 600; }
+
+    .btn-mant {
+      background: linear-gradient(135deg, #1a237e, #283593);
+      color: #fff; border: none; border-radius: 8px;
+      padding: 10px 24px; font-weight: 700; font-size: .95rem;
+      cursor: pointer; transition: opacity .2s;
+    }
+    .btn-mant:disabled { opacity: .55; cursor: not-allowed; }
+    .btn-mant:not(:disabled):hover { opacity: .88; }
+
+    .btn-diag {
+      background: #fff; color: #1a237e;
+      border: 2px solid #1a237e; border-radius: 8px;
+      padding: 9px 20px; font-weight: 700; font-size: .95rem;
+      cursor: pointer; transition: all .2s;
+    }
+    .btn-diag:hover { background: #e8eaf6; }
+
+    .progress-wrap { background: #e8eaf6; border-radius: 8px; height: 10px; overflow: hidden; }
+    .progress-bar  { height: 100%; border-radius: 8px; transition: width .4s;
+      background: linear-gradient(90deg, #1a237e, #5c6bc0); }
+
+    .log-box {
+      background: #0d1117; color: #58d379;
+      border-radius: 8px; padding: 16px;
+      font-family: 'Courier New', monospace; font-size: .82rem;
+      max-height: 260px; overflow-y: auto;
+      line-height: 1.6;
+    }
+    .log-box .log-err  { color: #ff7070; }
+    .log-box .log-ok   { color: #58d379; }
+    .log-box .log-info { color: #79b8ff; }
+    .log-box .log-warn { color: #f0c060; }
+
+    .motivo-tag {
+      display: inline-block; background: #fff3e0; color: #e65100;
+      border-radius: 4px; padding: 1px 7px; font-size: .73rem;
+      margin: 1px 2px;
+    }
+    .spinner-ring {
+      display: inline-block; width: 18px; height: 18px;
+      border: 3px solid rgba(255,255,255,.3);
+      border-top-color: #fff; border-radius: 50%;
+      animation: spin .7s linear infinite; vertical-align: middle;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    .select-all-row { background: #e8eaf6 !important; }
+    .checkbox-tabla { cursor: pointer; width: 16px; height: 16px; }
+
+    #overlay-run {
+      display: none; position: fixed; inset: 0;
+      background: rgba(0,0,0,.55); z-index: 1000;
+      align-items: center; justify-content: center;
+    }
+    #overlay-run.activo { display: flex; }
+    .overlay-box {
+      background: #fff; border-radius: 14px;
+      padding: 36px 48px; text-align: center; min-width: 320px;
+    }
+    .overlay-box h3 { font-size: 1.1rem; font-weight: 700; color: #1a237e; margin-bottom: 18px; }
+    .overlay-progress { margin: 16px 0; font-size: .85rem; color: #555; }
+  </style>
+</head>
+<body>
+
+<div class="topbar">
+  <i class="bi bi-database-gear" style="font-size:1.5rem"></i>
+  <h1>Mantenimiento de Base de Datos</h1>
+  <span class="badge-version">v1.0</span>
+  <a href="/mantenedores/" class="ms-auto text-white-50 text-decoration-none" style="font-size:.85rem">
+    <i class="bi bi-arrow-left"></i> Mantenedores
+  </a>
+</div>
+
+<!-- Overlay de ejecución -->
+<div id="overlay-run">
+  <div class="overlay-box">
+    <div class="spinner-ring" style="width:36px;height:36px;border-width:4px;
+      border-color:rgba(26,35,126,.2);border-top-color:#1a237e;margin-bottom:16px"></div>
+    <h3>Ejecutando mantenimiento…</h3>
+    <div class="progress-wrap" style="height:12px;margin-bottom:12px">
+      <div class="progress-bar" id="overlay-prog" style="width:0%"></div>
+    </div>
+    <div class="overlay-progress" id="overlay-txt">Iniciando…</div>
+  </div>
+</div>
+
+<div class="container-fluid" style="max-width:1400px;padding:28px 20px">
+
+  <!-- Acciones y resumen -->
+  <div class="row g-3 mb-4 align-items-center">
+    <div class="col-auto">
+      <button class="btn-diag" id="btn-diagnostico" onclick="cargarDiagnostico()">
+        <i class="bi bi-search"></i> Diagnosticar ahora
+      </button>
+    </div>
+    <div class="col-auto">
+      <button class="btn-mant" id="btn-run" onclick="ejecutarMantenimiento()" disabled>
+        <i class="bi bi-wrench-adjustable-circle"></i> Ejecutar mantenimiento
+      </button>
+    </div>
+    <div class="col-auto">
+      <select id="sel-modo" class="form-select form-select-sm" style="width:auto;display:inline-block">
+        <option value="analyze">ANALYZE TABLE (estadísticas)</option>
+      </select>
+    </div>
+    <div class="col text-end text-muted" style="font-size:.82rem" id="txt-ultima"></div>
+  </div>
+
+  <!-- Cards de resumen -->
+  <div class="row g-3 mb-4" id="cards-resumen" style="display:none">
+    <div class="col-6 col-md-3">
+      <div class="card-stat">
+        <div class="num num-total" id="res-total">–</div>
+        <div class="lbl">Tablas totales</div>
+      </div>
+    </div>
+    <div class="col-6 col-md-3">
+      <div class="card-stat">
+        <div class="num num-ok" id="res-ok">–</div>
+        <div class="lbl">✓ En buen estado</div>
+      </div>
+    </div>
+    <div class="col-6 col-md-3">
+      <div class="card-stat">
+        <div class="num num-warn" id="res-warn">–</div>
+        <div class="lbl">⚠ Requieren atención</div>
+      </div>
+    </div>
+    <div class="col-6 col-md-3">
+      <div class="card-stat">
+        <div class="num num-crit" id="res-crit">–</div>
+        <div class="lbl">🚨 Críticas</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Tabla de diagnóstico -->
+  <div class="tabla-card mb-4" id="bloque-tabla" style="display:none">
+    <div class="card-header-custom">
+      <i class="bi bi-table"></i>
+      Estado de tablas
+      <span class="ms-auto" style="font-size:.8rem;font-weight:400">
+        Selecciona tablas para mantenimiento selectivo
+      </span>
+    </div>
+    <div style="overflow-x:auto">
+      <table class="db-table">
+        <thead>
+          <tr>
+            <th style="width:36px">
+              <input type="checkbox" id="chk-all" class="checkbox-tabla"
+                     onchange="toggleAll(this)" title="Seleccionar todas">
+            </th>
+            <th>Tabla</th>
+            <th style="text-align:right">Filas</th>
+            <th style="text-align:right">Datos (MB)</th>
+            <th style="text-align:right">Índices (MB)</th>
+            <th style="text-align:right">Frag %</th>
+            <th>Modificaciones sin ANALYZE</th>
+            <th>Última modificación</th>
+            <th>Estado</th>
+            <th>Motivos</th>
+          </tr>
+        </thead>
+        <tbody id="tbody-tablas"></tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- Log de resultados -->
+  <div id="bloque-log" style="display:none">
+    <div class="tabla-card">
+      <div class="card-header-custom">
+        <i class="bi bi-terminal"></i> Log de ejecución
+        <button onclick="document.getElementById('log-content').innerHTML=''"
+                class="ms-auto btn btn-sm btn-outline-light">Limpiar</button>
+      </div>
+      <div class="p-3">
+        <div class="log-box" id="log-content"></div>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<script src="/js/auth-guard.js"></script>
+<script>
+const API = '/api/db-maintenance';
+let _datos = null;
+
+function fmtNum(n) {
+  if (n === null || n === undefined) return '–';
+  return Number(n).toLocaleString('es-CL');
+}
+function fmtFecha(f) {
+  if (!f) return '–';
+  return new Date(f).toLocaleString('es-CL', { day:'2-digit', month:'2-digit',
+    year:'numeric', hour:'2-digit', minute:'2-digit' });
+}
+
+function log(msg, tipo = 'ok') {
+  const box = document.getElementById('log-content');
+  const ts = new Date().toLocaleTimeString('es-CL');
+  box.innerHTML += `<div class="log-${tipo}">[${ts}] ${msg}</div>`;
+  box.scrollTop = box.scrollHeight;
+  document.getElementById('bloque-log').style.display = '';
+}
+
+async function cargarDiagnostico() {
+  const btn = document.getElementById('btn-diagnostico');
+  btn.disabled = true;
+  btn.innerHTML = '<span class="spinner-ring"></span> Diagnosticando…';
+  try {
+    const r = await fetch(API, {
+      headers: { Authorization: 'Bearer ' + sessionStorage.getItem('token') }
+    });
+    if (!ok(r)) throw new Error('Error ' + r.status);
+    const json = await r.json();
+    if (!json.success) throw new Error(json.error || 'Error desconocido');
+    _datos = json.data;
+    renderTablas(_datos.tablas);
+    renderResumen(_datos.resumen);
+    document.getElementById('txt-ultima').textContent =
+      'Diagnóstico al ' + fmtFecha(json.data.timestamp);
+    document.getElementById('btn-run').disabled = false;
+  } catch (e) {
+    log('Error al diagnosticar: ' + e.message, 'err');
+    alert('Error: ' + e.message);
+  } finally {
+    btn.disabled = false;
+    btn.innerHTML = '<i class="bi bi-search"></i> Diagnosticar ahora';
+  }
+}
+
+function ok(r) { return r.status >= 200 && r.status < 300; }
+
+function renderResumen(r) {
+  document.getElementById('res-total').textContent = r.total;
+  document.getElementById('res-ok').textContent   = r.ok;
+  document.getElementById('res-warn').textContent = r.advertencias;
+  document.getElementById('res-crit').textContent = r.criticas;
+  document.getElementById('cards-resumen').style.display = '';
+}
+
+function renderTablas(tablas) {
+  const tbody = document.getElementById('tbody-tablas');
+  tbody.innerHTML = '';
+  tablas.forEach(t => {
+    const badge = t.nivel === 'critical'
+      ? `<span class="badge-crit">🚨 Crítico</span>`
+      : t.nivel === 'warning'
+        ? `<span class="badge-warn">⚠ Atención</span>`
+        : `<span class="badge-ok">✓ OK</span>`;
+
+    const motivos = t.motivos.length
+      ? t.motivos.map(m => `<span class="motivo-tag">${m}</span>`).join('')
+      : '<span style="color:#aaa;font-size:.78rem">–</span>';
+
+    const modSinAnalyze = t.modify_count !== null
+      ? fmtNum(t.modify_count)
+      : '<span style="color:#aaa">–</span>';
+
+    tbody.innerHTML += `<tr>
+      <td><input type="checkbox" class="checkbox-tabla chk-tabla"
+                 value="${t.nombre}" checked></td>
+      <td><strong>${t.nombre}</strong></td>
+      <td style="text-align:right">${fmtNum(t.filas)}</td>
+      <td style="text-align:right">${t.tamano_mb}</td>
+      <td style="text-align:right">${t.indice_mb}</td>
+      <td style="text-align:right">
+        <span style="color:${parseFloat(t.frag_pct)>30?'#c62828':parseFloat(t.frag_pct)>15?'#e65100':'#2e7d32'}">
+          ${t.frag_pct}%
+        </span>
+      </td>
+      <td style="text-align:right">${modSinAnalyze}</td>
+      <td style="font-size:.8rem">${fmtFecha(t.ultima_mod)}</td>
+      <td>${badge}</td>
+      <td>${motivos}</td>
+    </tr>`;
+  });
+  document.getElementById('bloque-tabla').style.display = '';
+}
+
+function toggleAll(chk) {
+  document.querySelectorAll('.chk-tabla').forEach(c => { c.checked = chk.checked; });
+}
+
+async function ejecutarMantenimiento() {
+  const seleccionadas = [...document.querySelectorAll('.chk-tabla:checked')]
+    .map(c => c.value);
+
+  if (!seleccionadas.length) {
+    alert('Selecciona al menos una tabla.');
+    return;
+  }
+
+  const modo = document.getElementById('sel-modo').value;
+  const confirmar = confirm(
+    `¿Ejecutar ANALYZE en ${seleccionadas.length} tabla(s)?\n\n` +
+    `Esta operación actualiza las estadísticas del optimizador.\n` +
+    `Puede tardar varios segundos en bases de datos grandes.`
+  );
+  if (!confirmar) return;
+
+  // Mostrar overlay
+  const overlay = document.getElementById('overlay-run');
+  const overlayProg = document.getElementById('overlay-prog');
+  const overlayTxt = document.getElementById('overlay-txt');
+  overlay.classList.add('activo');
+  document.getElementById('btn-run').disabled = true;
+
+  log(`Iniciando mantenimiento (${modo}) en ${seleccionadas.length} tabla(s)…`, 'info');
+
+  try {
+    // Simular progreso mientras espera
+    let prog = 5;
+    const intervalo = setInterval(() => {
+      prog = Math.min(prog + 3, 90);
+      overlayProg.style.width = prog + '%';
+      overlayTxt.textContent = `Procesando… ${prog}%`;
+    }, 800);
+
+    const r = await fetch(API + '/run', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: 'Bearer ' + sessionStorage.getItem('token'),
+      },
+      body: JSON.stringify({ tablas: seleccionadas, modo }),
+    });
+
+    clearInterval(intervalo);
+    overlayProg.style.width = '100%';
+    overlayTxt.textContent = 'Procesando resultados…';
+
+    if (!ok(r)) throw new Error('Error HTTP ' + r.status);
+    const json = await r.json();
+    if (!json.success) throw new Error(json.error || 'Error desconocido');
+
+    const res = json.data;
+    const dur = (res.resumen.duracion_ms / 1000).toFixed(1);
+
+    log(`─── Resumen: ${res.resumen.exitosas} exitosas, ${res.resumen.fallidas} fallidas, duración ${dur}s`, 'info');
+
+    res.resultados.forEach(r2 => {
+      if (r2.estado === 'ok') {
+        log(`  ✓ ${r2.tabla} — ANALYZE OK (${r2.ms}ms)`, 'ok');
+      } else {
+        log(`  ✗ ${r2.tabla} — ERROR: ${r2.mensaje}`, 'err');
+      }
+    });
+
+    log(`✅ Mantenimiento completado en ${dur}s`, 'ok');
+
+    // Refrescar diagnóstico automáticamente
+    setTimeout(() => cargarDiagnostico(), 1000);
+
+  } catch (e) {
+    log('Error al ejecutar: ' + e.message, 'err');
+    alert('Error: ' + e.message);
+  } finally {
+    overlay.classList.remove('activo');
+    document.getElementById('btn-run').disabled = false;
+  }
+}
+
+// Auto-cargar al entrar
+cargarDiagnostico();
+</script>
+<script src="/js/app-version.js"></script>
+</body>
+</html>
