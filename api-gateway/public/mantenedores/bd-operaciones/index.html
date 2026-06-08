@@ -83,20 +83,25 @@
       padding:5px 14px; font-size:.82rem; font-weight:600; cursor:pointer; }
     .btn-delete-sel:hover { background:#b91c1c; }
 
-    /* Modal Recalcular */
-    .modal-backdrop { position:fixed; inset:0; background:rgba(0,0,0,.7); z-index:9000; display:none; align-items:center; justify-content:center; }
-    .modal-backdrop.show { display:flex; }
-    .modal-box { border-radius:16px; padding:30px 34px; width:100%; max-width:480px; box-shadow:0 12px 60px rgba(0,0,0,.5); }
-    .modal-box h5 { font-weight:700; margin:0 0 6px; font-size:1.1rem; color:#0141A2; display:flex; align-items:center; gap:8px; }
-    .modal-box p.hint { font-size:.82rem; color:#6b7280; margin:0 0 22px; line-height:1.5; }
-    .modal-box label { font-size:.83rem; font-weight:600; color:#374151; display:block; margin-bottom:5px; }
-    .modal-box input[type=month] { border:1.5px solid #d1d5db; border-radius:8px; padding:8px 12px; font-size:.9rem; width:100%; box-sizing:border-box; outline:none; background:#fafafa; }
-    .modal-box input[type=month]:focus { border-color:#0141A2; background:#fff; }
-    .modal-btns { display:flex; gap:10px; justify-content:flex-end; margin-top:24px; }
-    .btn-recalc { background:#0141A2; color:#fff; border:none; border-radius:9px; padding:10px 24px; font-size:.9rem; font-weight:700; cursor:pointer; display:flex; align-items:center; gap:7px; }
-    .btn-recalc:hover { background:#0255c5; }
-    .btn-recalc:disabled { opacity:.55; cursor:not-allowed; }
-    #recalcLog { background:#f1f5f9; border:1px solid #e2e8f0; border-radius:8px; padding:12px 14px; font-size:.76rem; color:#374151; max-height:180px; overflow-y:auto; white-space:pre-wrap; margin-top:16px; display:none; font-family:monospace; line-height:1.5; }
+    /* Modal Recalcular — dialog nativo */
+    #dlgRecalcular { border:none; border-radius:16px; padding:32px 36px; width:480px; max-width:95vw;
+      box-shadow:0 8px 40px rgba(0,0,0,.35); font-family:'Segoe UI',system-ui,sans-serif; }
+    #dlgRecalcular::backdrop { background:rgba(0,0,0,.65); }
+    #dlgRecalcular h5 { font-weight:700; font-size:1.1rem; color:#0141A2; margin:0 0 8px; display:flex; align-items:center; gap:8px; }
+    #dlgRecalcular .hint { font-size:.83rem; color:#6b7280; margin:0 0 22px; line-height:1.5; }
+    #dlgRecalcular label { font-size:.83rem; font-weight:600; color:#374151; display:block; margin-bottom:5px; }
+    #dlgRecalcular input[type=month] { border:1.5px solid #d1d5db; border-radius:8px; padding:8px 12px;
+      font-size:.9rem; width:100%; box-sizing:border-box; outline:none; }
+    #dlgRecalcular input[type=month]:focus { border-color:#0141A2; }
+    #dlgRecalcular .row-meses { display:grid; grid-template-columns:1fr 1fr; gap:16px; }
+    #dlgRecalcular .dlg-btns { display:flex; gap:10px; justify-content:flex-end; margin-top:24px; }
+    #dlgRecalcular .btn-ejecutar { background:#0141A2; color:#fff; border:none; border-radius:9px;
+      padding:9px 22px; font-size:.88rem; font-weight:700; cursor:pointer; display:inline-flex; align-items:center; gap:7px; }
+    #dlgRecalcular .btn-ejecutar:hover { background:#0255c5; }
+    #dlgRecalcular .btn-ejecutar:disabled { opacity:.5; cursor:not-allowed; }
+    #recalcLog { background:#f1f5f9; border:1px solid #e2e8f0; border-radius:8px; padding:12px 14px;
+      font-size:.76rem; color:#1e293b; max-height:200px; overflow-y:auto; white-space:pre-wrap;
+      margin-top:16px; display:none; font-family:Consolas,monospace; line-height:1.5; }
 
     /* Loading */
     .loading-overlay { position:fixed; inset:0; background:rgba(255,255,255,.7); display:flex; align-items:center; justify-content:center; z-index:999; display:none; }
@@ -184,30 +189,29 @@
   </div>
 </div>
 
-<!-- Modal Recalcular -->
-<div class="modal-backdrop" id="modalRecalcular" onclick="cerrarModalRecalcular(event)">
-  <div class="modal-box" onclick="event.stopPropagation()" style="background:#fff;opacity:1;">
-    <h5><i class="bi bi-arrow-repeat me-2"></i>Recalcular comisiones</h5>
-    <p class="hint">Recalcula Ing x Colocaciones, Com. Dealer, Com. Parque y normaliza ejecutivos por mes. Deja vacío para recalcular <strong>todos los meses</strong>.</p>
-    <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px">
-      <div>
-        <label for="recalcDesde">Mes desde</label>
-        <input type="month" id="recalcDesde" placeholder="YYYY-MM">
-      </div>
-      <div>
-        <label for="recalcHasta">Mes hasta</label>
-        <input type="month" id="recalcHasta" placeholder="YYYY-MM">
-      </div>
+<!-- Dialog Recalcular (nativo) -->
+<dialog id="dlgRecalcular">
+  <h5><i class="bi bi-arrow-repeat"></i>Recalcular comisiones</h5>
+  <p class="hint">Recalcula Ing x Colocaciones, Com. Dealer, Com. Parque y normaliza ejecutivos.<br>
+    Deja vacío para recalcular <strong>todos los meses</strong>.</p>
+  <div class="row-meses">
+    <div>
+      <label for="recalcDesde">Mes desde</label>
+      <input type="month" id="recalcDesde">
     </div>
-    <div id="recalcLog"></div>
-    <div class="modal-btns">
-      <button class="btn btn-sm btn-outline-secondary" onclick="cerrarModalRecalcular()">Cancelar</button>
-      <button class="btn-recalc" id="btnRecalcEjecutar" onclick="ejecutarRecalculo()">
-        <i class="bi bi-arrow-repeat"></i>Recalcular
-      </button>
+    <div>
+      <label for="recalcHasta">Mes hasta</label>
+      <input type="month" id="recalcHasta">
     </div>
   </div>
-</div>
+  <div id="recalcLog"></div>
+  <div class="dlg-btns">
+    <button class="btn btn-sm btn-outline-secondary" onclick="document.getElementById('dlgRecalcular').close()">Cancelar</button>
+    <button class="btn-ejecutar" id="btnRecalcEjecutar" onclick="ejecutarRecalculo()">
+      <i class="bi bi-arrow-repeat"></i>Recalcular
+    </button>
+  </div>
+</dialog>
 
 <div class="loading-overlay" id="loadingOverlay"><div class="spinner"></div></div>
 <div class="toast-container" id="toastContainer"></div>
@@ -224,60 +228,43 @@ document.getElementById('navPerfil').textContent  = yo?.perfil || '';
 document.getElementById('avatarInicial').textContent = (yo?.nombre||'?').charAt(0).toUpperCase();
 function logout() { sessionStorage.removeItem('token'); sessionStorage.removeItem('usuario'); window.location.href='/login.html'; }
 
-/* ── Modal Recalcular ──────────────────────────────────────────────────── */
+/* ── Dialog Recalcular ─────────────────────────────────────────────────── */
 function abrirModalRecalcular() {
+  const dlg = document.getElementById('dlgRecalcular');
   document.getElementById('recalcLog').style.display = 'none';
   document.getElementById('recalcLog').textContent = '';
-  document.getElementById('btnRecalcEjecutar').disabled = false;
-  document.getElementById('btnRecalcEjecutar').innerHTML = '<i class="bi bi-arrow-repeat"></i>Recalcular';
-  document.getElementById('modalRecalcular').classList.add('show');
-}
-function cerrarModalRecalcular(e) {
-  if (e && e.target !== document.getElementById('modalRecalcular')) return;
-  document.getElementById('modalRecalcular').classList.remove('show');
+  const btn = document.getElementById('btnRecalcEjecutar');
+  btn.disabled = false;
+  btn.innerHTML = '<i class="bi bi-arrow-repeat"></i>Recalcular';
+  dlg.showModal();
 }
 async function ejecutarRecalculo() {
   const desde = document.getElementById('recalcDesde').value;
   const hasta  = document.getElementById('recalcHasta').value;
-  if ((desde && !hasta) || (!desde && hasta)) {
-    toast('Completa ambos meses o deja ambos vacíos', 'error'); return;
-  }
-  if (desde && hasta && desde > hasta) {
-    toast('El mes desde no puede ser mayor al hasta', 'error'); return;
-  }
-  const confirmar = desde
-    ? `¿Recalcular comisiones de ${desde} a ${hasta}?`
-    : '¿Recalcular TODOS los meses en la BD? (puede tardar varios minutos)';
-  if (!confirm(confirmar)) return;
+  if ((desde && !hasta) || (!desde && hasta)) { toast('Completa ambos meses o deja ambos vacíos', 'error'); return; }
+  if (desde && hasta && desde > hasta) { toast('Mes desde no puede ser mayor al hasta', 'error'); return; }
+  if (!confirm(desde ? `¿Recalcular de ${desde} a ${hasta}?` : '¿Recalcular TODOS los meses? Puede tardar varios minutos.')) return;
 
   const btn = document.getElementById('btnRecalcEjecutar');
   btn.disabled = true;
-  btn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span>Calculando…';
+  btn.innerHTML = '<span class="spinner-border spinner-border-sm"></span> Calculando…';
   const logEl = document.getElementById('recalcLog');
   logEl.textContent = 'Procesando…';
   logEl.style.display = 'block';
 
   try {
-    const body = {};
-    if (desde) { body.mes_desde = desde; body.mes_hasta = hasta; }
+    const body = desde ? { mes_desde: desde, mes_hasta: hasta } : {};
     const res = await fetch('/api/operaciones/recalcular-comisiones', {
-      method: 'POST',
-      headers: H,
-      body: JSON.stringify(body),
+      method: 'POST', headers: H, body: JSON.stringify(body)
     }).then(r => r.json());
-
     if (!res.success) throw new Error(res.error);
     const d = res.data;
-    logEl.textContent = [
-      `✅ Listo: ${d.actualizados.toLocaleString('es-CL')} operaciones actualizadas en ${d.meses} mes(es).`,
-      '',
-      ...(d.log || []),
-    ].join('\n');
+    logEl.textContent = [`✅ ${d.actualizados.toLocaleString('es-CL')} ops actualizadas en ${d.meses} mes(es).`, '', ...(d.log||[])].join('\n');
     toast(`${d.actualizados.toLocaleString('es-CL')} ops recalculadas`);
-    load(); // refrescar tabla
+    load();
   } catch(e) {
     logEl.textContent = '❌ Error: ' + e.message;
-    toast('Error en recálculo: ' + e.message, 'error');
+    toast('Error: ' + e.message, 'error');
   } finally {
     btn.disabled = false;
     btn.innerHTML = '<i class="bi bi-arrow-repeat"></i>Recalcular de nuevo';
