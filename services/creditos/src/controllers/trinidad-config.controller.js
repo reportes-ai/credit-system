@@ -25,7 +25,63 @@ const pool = require('../../../../shared/config/database');
     try { await pool.query(sql); } catch (e) { console.error('[trinidad-config migration]', e.message); }
   }
 
-  // Seed inicial de estados si la tabla está vacía
+  // ── Seed de ejecutivos desde archivo de equivalencias oficial ──
+  // Usa INSERT IGNORE para no sobreescribir ediciones manuales
+  const SEED_EJECUTIVOS = [
+    ['ALVARO PINOCHET (AFA)',                    'ALVARO PINOCHET'],
+    ['Alvaro Vargas Vielma',                     'ALVARO VARGAS'],
+    ['Alvaro Vargas Vielma (AFA)',               'ALVARO VARGAS'],
+    ['Alvaro Vargas Vielma (AFA) (JL)',          'ALVARO VARGAS'],
+    ['BRANDON BARBAS RUZ (AFA)',                 'BRANDON BARBAS'],
+    ['CARLO ANDRÉS MORENO LIZAMA (AFA)',         'CARLO ANDRÉS'],
+    ['Carlos Ruiz Cruz',                         'CARLOS RUIZ'],
+    ['CATALINA CONTRERAS CARRIZO',              'CATALINA CONTRERAS'],
+    ['Catherinne Vargas Vielma (AFA)',           'CATHERINNE VARGAS'],
+    ['Cristina Peña Vega (AFA)',                'CRISTINA PEÑA'],
+    ['Dániza Rodríguez Torrejón',               'DANIZA RODRÍGUEZ'],
+    ['Eduardo Abad Diaz GTE',                   'EDUARDO ABAD'],
+    ['EJECUTIVO AFA',                           'EJECUTIVO AUTOFACIL'],
+    ['FERNANDO CONTRERAS FERNANDEZ (AFA)',       'FERNANDO CONTRERAS'],
+    ['FLORENCIA BAZAN SILVA (AFA)',             'FLORENCIA BAZAN'],
+    ['Gonzalo Maldonado Miño',                  'GONZALO MALDONADO'],
+    ['Juan Muñoz Nuñez (AFA)',                  'JUAN MUÑOZ'],
+    ['Karen Farias (AFA)',                      'KAREN FARIAS'],
+    ['Karen Méndez Caneo (AFA)',                'KAREN MENDEZ'],
+    ['LEONARDO SEVILLA (AFA) GTE',              'LEONARDO SEVILLA'],
+    ['LUIS SOTO RAVELLO (AFA)',                 'LUIS SOTO'],
+    ['MARIA NAVARRETE BADILLO',                 'MARIA NAVARRETE'],
+    ['SEBASTIAN MILLAR',                        'SEBASTIAN MILLAR'],
+    ['Sebastian Millar Carvajal (AFA)',          'SEBASTIAN MILLAR'],
+    ['SOLANGE VUCINA SALAZAR (AFA)',            'SOLANGE VUCINA'],
+    ['Tatiana Arriagada Cabezas (AFA)',          'EJECUTIVO AUTOFACIL'],
+    ['Tatiana Arriagada Cabezas (AFA) (JL)',    'TATIANA ARRIAGADA'],
+    ['VENDEDOR (AFA) PARQUE OESTE (LS)',         'VENDEDOR (AutoFácil)'],
+    ['VARGAS CATHERINNE',                       'CATHERINNE VARGAS'],
+    ['CONTRERAS FERNANDO',                      'FERNANDO CONTRERAS'],
+    ['MUÑOZ NUÑEZ JUAN',                        'JUAN MUÑOZ'],
+    ['FARIAS DE LA TORRE KAREN',                'KAREN FARIAS'],
+    ['SOTO RAVELLO LUIS',                       'LUIS SOTO'],
+    ['VUCINA SALAZAR SOLANGE',                  'SOLANGE VUCINA'],
+    ['VARGAS VIELMA ALVARO',                    'ALVARO VARGAS'],
+    ['PEÑA CRISTINA',                           'CRISTINA PEÑA'],
+    ['ARRIAGADA CABEZAS TATIANA',               'TATIANA ARRIAGADA'],
+    ['BAZAN FLORENCIA',                         'FLORENCIA BAZAN'],
+    ['Dagoberto Irribarra',                     'DAGOBERTO IRRIBARRA'],
+    ['MORENO LIZAMA CARLO',                     'CARLO MORENO'],
+    ['MILLAR SEBASTIAN',                        'SEBASTIAN MILLAR'],
+    ['PINOCHET LILLO ALVARO',                   'ALVARO PINOCHET'],
+  ];
+  for (const [tri, af] of SEED_EJECUTIVOS) {
+    try {
+      await pool.query(
+        'INSERT IGNORE INTO trinidad_ejecutivos (nombre_trinidad, nombre_autofacil) VALUES (?,?)',
+        [tri, af]
+      );
+    } catch (e) { /* ignorar duplicado */ }
+  }
+  console.log('[trinidad-config] seed ejecutivos aplicado');
+
+  // ── Seed inicial de estados si la tabla está vacía ──
   const [cnt] = await pool.query('SELECT COUNT(*) AS n FROM trinidad_estados');
   if (cnt[0].n === 0) {
     const defaults = [

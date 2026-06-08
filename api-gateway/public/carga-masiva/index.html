@@ -69,7 +69,7 @@
 <body>
 <nav class="topnav">
   <div class="topnav-left">
-    <a href="/" class="topnav-brand"><img src="/img/logo.png" alt="AutoFácil"><span class="version-badge">v5.6</span></a>
+    <a href="/" class="topnav-brand"><img src="/img/logo.png" alt="AutoFácil"><span class="version-badge">v5.7</span></a>
     <div class="breadcrumb-nav">
       <a href="/">Inicio</a><span class="sep">›</span>
       <span style="color:#fff;font-weight:600"><i class="bi bi-cloud-upload me-1"></i>Carga Masiva Operaciones</span>
@@ -761,30 +761,58 @@ async function eqEliminarEstado(id) {
    EQUIVALENCIAS TRINIDAD — EJECUTIVOS
 ══════════════════════════════════════════════════════════════ */
 
-// Ejecutivos de Trinidad conocidos (del export de ejemplo)
-const EJECUTIVOS_TRINIDAD = [
-  'BRANDON BARBAS RUZ (AFA)',
-  'Catherinne Vargas Vielma (AFA)',
-  'FERNANDO CONTRERAS FERNANDEZ (AFA)',
-  'Juan Muñoz Nuñez (AFA)',
-  'Karen Farias (AFA)',
-  'Karen Méndez Caneo (AFA)',
-  'LUIS SOTO RAVELLO (AFA)',
-  'SOLANGE VUCINA SALAZAR (AFA)',
-];
+// Ejecutivos Trinidad con equivalencia oficial (del archivo de equivalencias)
+// Cualquiera fuera de esta lista → 'REVISAR'
+const EJECUTIVOS_TRINIDAD_MAP = {
+  'ALVARO PINOCHET (AFA)':                 'ALVARO PINOCHET',
+  'Alvaro Vargas Vielma':                  'ALVARO VARGAS',
+  'Alvaro Vargas Vielma (AFA)':            'ALVARO VARGAS',
+  'Alvaro Vargas Vielma (AFA) (JL)':       'ALVARO VARGAS',
+  'BRANDON BARBAS RUZ (AFA)':              'BRANDON BARBAS',
+  'CARLO ANDRÉS MORENO LIZAMA (AFA)':      'CARLO ANDRÉS',
+  'Carlos Ruiz Cruz':                      'CARLOS RUIZ',
+  'CATALINA CONTRERAS CARRIZO':            'CATALINA CONTRERAS',
+  'Catherinne Vargas Vielma (AFA)':        'CATHERINNE VARGAS',
+  'Cristina Peña Vega (AFA)':              'CRISTINA PEÑA',
+  'Dániza Rodríguez Torrejón':             'DANIZA RODRÍGUEZ',
+  'Eduardo Abad Diaz GTE':                 'EDUARDO ABAD',
+  'EJECUTIVO AFA':                         'EJECUTIVO AUTOFACIL',
+  'FERNANDO CONTRERAS FERNANDEZ (AFA)':    'FERNANDO CONTRERAS',
+  'FLORENCIA BAZAN SILVA (AFA)':           'FLORENCIA BAZAN',
+  'Gonzalo Maldonado Miño':                'GONZALO MALDONADO',
+  'Juan Muñoz Nuñez (AFA)':               'JUAN MUÑOZ',
+  'Karen Farias (AFA)':                    'KAREN FARIAS',
+  'Karen Méndez Caneo (AFA)':              'KAREN MENDEZ',
+  'LEONARDO SEVILLA (AFA) GTE':            'LEONARDO SEVILLA',
+  'LUIS SOTO RAVELLO (AFA)':               'LUIS SOTO',
+  'MARIA NAVARRETE BADILLO':               'MARIA NAVARRETE',
+  'SEBASTIAN MILLAR':                      'SEBASTIAN MILLAR',
+  'Sebastian Millar Carvajal (AFA)':       'SEBASTIAN MILLAR',
+  'SOLANGE VUCINA SALAZAR (AFA)':          'SOLANGE VUCINA',
+  'Tatiana Arriagada Cabezas (AFA)':       'EJECUTIVO AUTOFACIL',
+  'Tatiana Arriagada Cabezas (AFA) (JL)':  'TATIANA ARRIAGADA',
+  'VENDEDOR (AFA) PARQUE OESTE (LS)':      'VENDEDOR (AutoFácil)',
+  'VARGAS CATHERINNE':                     'CATHERINNE VARGAS',
+  'CONTRERAS FERNANDO':                    'FERNANDO CONTRERAS',
+  'MUÑOZ NUÑEZ JUAN':                      'JUAN MUÑOZ',
+  'FARIAS DE LA TORRE KAREN':              'KAREN FARIAS',
+  'SOTO RAVELLO LUIS':                     'LUIS SOTO',
+  'VUCINA SALAZAR SOLANGE':                'SOLANGE VUCINA',
+  'VARGAS VIELMA ALVARO':                  'ALVARO VARGAS',
+  'PEÑA CRISTINA':                         'CRISTINA PEÑA',
+  'ARRIAGADA CABEZAS TATIANA':             'TATIANA ARRIAGADA',
+  'BAZAN FLORENCIA':                       'FLORENCIA BAZAN',
+  'Dagoberto Irribarra':                   'DAGOBERTO IRRIBARRA',
+  'MORENO LIZAMA CARLO':                   'CARLO MORENO',
+  'MILLAR SEBASTIAN':                      'SEBASTIAN MILLAR',
+  'PINOCHET LILLO ALVARO':                 'ALVARO PINOCHET',
+};
 
 let eqEjecsAF = [];   // ejecutivos de nuestra BD
 
-/* Intento automático de match: quita "(AFA)", normaliza y busca coincidencia */
-function autoMatch(triNombre, listaAF) {
-  const clean = triNombre.replace(/\([^)]*\)/g,'').trim().toLowerCase()
-    .normalize('NFD').replace(/[̀-ͯ]/g,'');
-  // buscar en listaAF el que más se parece (contiene o es contenido)
-  const directa = listaAF.find(af => {
-    const afClean = af.toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g,'');
-    return afClean.includes(clean) || clean.includes(afClean);
-  });
-  return directa || null;
+/* Busca equivalencia exacta en el mapa oficial; si no existe → 'REVISAR' */
+function autoMatch(triNombre) {
+  return EJECUTIVOS_TRINIDAD_MAP[triNombre.trim()] || 'REVISAR';
 }
 
 function eqRenderEjecs() {
@@ -817,7 +845,9 @@ function eqRenderEjecs() {
            </select>
          </div>`;
 
-    return `<tr id="eqEj_${r.id}" style="${!tieneMatch?'background:#fffbeb':''}">
+    const esRevisar = tieneMatch && r.nombre_autofacil.trim().toUpperCase() === 'REVISAR';
+    const rowBg = !tieneMatch ? 'background:#fffbeb' : esRevisar ? 'background:#fff1f2' : '';
+    return `<tr id="eqEj_${r.id}" style="${rowBg}">
       <td>
         <div style="font-size:.83rem;font-weight:600;color:#374151">${esc(r.nombre_trinidad)}</div>
       </td>
@@ -833,9 +863,15 @@ function eqRenderEjecs() {
 
   // Mostrar aviso si quedan sin asignar
   const sinAsignar = eqEjecsData.filter(r => !r.nombre_autofacil?.trim()).length;
+  const enRevisar  = eqEjecsData.filter(r => r.nombre_autofacil?.trim().toUpperCase() === 'REVISAR').length;
   const aviso = document.getElementById('avisoSinAsignar');
-  if (aviso) aviso.style.display = sinAsignar ? '' : 'none';
-  if (aviso) aviso.textContent = `⚠️ ${sinAsignar} ejecutivo(s) sin equivalencia asignada — selecciona de la lista.`;
+  if (aviso) {
+    const msgs = [];
+    if (sinAsignar) msgs.push(`${sinAsignar} ejecutivo(s) sin equivalencia — selecciona de la lista`);
+    if (enRevisar)  msgs.push(`${enRevisar} marcado(s) como REVISAR — asigna su equivalencia definitiva`);
+    aviso.style.display = msgs.length ? '' : 'none';
+    aviso.textContent = msgs.length ? '⚠️ ' + msgs.join(' · ') : '';
+  }
 }
 
 /* Dialogo para cambiar la equivalencia de un ejecutivo ya mapeado */
@@ -888,16 +924,11 @@ async function eqCargarEjecutivos() {
     eqEjecsAF   = rAF.data  || [];
     eqEjecsData = rEjecs.data || [];
 
-    // Si la tabla está vacía, pre-poblar con los de Trinidad + auto-match
-    if (eqEjecsData.length === 0 && EJECUTIVOS_TRINIDAD.length) {
-      for (const tri of EJECUTIVOS_TRINIDAD) {
-        const af = autoMatch(tri, eqEjecsAF) || '';
-        const res = await fetch('/api/trinidad-config/ejecutivos', {
-          method:'POST', headers:{...H,'Content-Type':'application/json'},
-          body: JSON.stringify({ nombre_trinidad: tri, nombre_autofacil: af })
-        }).then(x=>x.json());
-        if (res.success) eqEjecsData.push({ id: res.data.id, nombre_trinidad: tri, nombre_autofacil: af });
-      }
+    // Si la tabla está vacía, el backend ya la pre-populó vía seed en el arranque
+    // (trinidad-config.controller.js). Si por algún motivo está vacía, mostrar mensaje.
+    if (eqEjecsData.length === 0) {
+      document.getElementById('avisoSinAsignar').style.display = '';
+      document.getElementById('avisoSinAsignar').textContent = 'ℹ️ La tabla de equivalencias está vacía. Se cargará al reiniciar el servidor.';
     }
     eqRenderEjecs();
   } catch(e) {
