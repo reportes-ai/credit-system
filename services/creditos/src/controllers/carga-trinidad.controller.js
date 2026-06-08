@@ -12,6 +12,12 @@ const historial = require('./carga-historial.controller');
     if (e.errno !== 1060) console.error('[carga-trinidad migration]', e.message);
   }
   try {
+    await pool.query(`ALTER TABLE creditos ADD COLUMN ejecutivo_tri VARCHAR(150) NULL COMMENT 'Nombre ejecutivo original en Trinidad'`);
+    console.log('[carga-trinidad] columna ejecutivo_tri creada');
+  } catch (e) {
+    if (e.errno !== 1060) console.error('[carga-trinidad migration ejecutivo_tri]', e.message);
+  }
+  try {
     const [r] = await pool.query(`UPDATE creditos SET ejecutivo = UPPER(ejecutivo) WHERE ejecutivo IS NOT NULL AND ejecutivo != UPPER(ejecutivo)`);
     if (r.affectedRows > 0) console.log(`[carga-trinidad] ${r.affectedRows} ejecutivos convertidos a mayúsculas`);
   } catch (e) {
@@ -232,12 +238,12 @@ exports.importar = async (req, res) => {
           }
           await pool.query(
             `UPDATE creditos SET
-               estado_autofin = ?,
+               estado_autofin = ?, ejecutivo_tri = ?,
                estado_eval    = COALESCE(NULLIF(estado_eval,''), ?),
                marca    = COALESCE(?, marca), modelo   = COALESCE(?, modelo),
                vendedor = COALESCE(?, vendedor), updated_at = NOW()
              WHERE num_op = ?`,
-            [f.estado_autofin, f.estado_eval, f.marca, f.modelo, f.vendedor, f.num_op]
+            [f.estado_autofin, f.ejecutivo_tri, f.estado_eval, f.marca, f.modelo, f.vendedor, f.num_op]
           );
           actualizados++;
           log.push(`✓ Actualizado ${f.num_op} → ${f.estado_autofin} / ${f.estado_credito}`);
@@ -245,14 +251,14 @@ exports.importar = async (req, res) => {
           await pool.query(
             `INSERT INTO creditos
                (num_op, estado_autofin, estado_credito, estado_eval,
-                producto, ejecutivo, automotora, valor_vehiculo, pie, saldo_precio,
+                producto, ejecutivo, ejecutivo_tri, automotora, valor_vehiculo, pie, saldo_precio,
                 monto_financiado, fecha_otorgado, mes,
                 marca, modelo, vendedor,
                 financiera, created_at, updated_at)
-             VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,'NO APLICA', NOW(), NOW())`,
+             VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,'NO APLICA', NOW(), NOW())`,
             [
               f.num_op, f.estado_autofin, f.estado_credito, f.estado_eval,
-              f.producto, f.ejecutivo, f.automotora,
+              f.producto, f.ejecutivo, f.ejecutivo_tri, f.automotora,
               f.valor_vehiculo, f.pie, f.saldo_precio,
               f.monto_financiado, f.fecha_otorgado, f.mes,
               f.marca, f.modelo, f.vendedor,
