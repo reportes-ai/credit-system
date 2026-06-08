@@ -219,9 +219,51 @@ async function recalcularMeses(meses, opciones = {}) {
 
       actualizados++;
     }
+
+    // ── Normalizar ejecutivos del mes según tabla trinidad_ejecutivos ──
+    await normalizarEjecutivosMes(mesStr, log);
   }
 
   return { actualizados, log };
+}
+
+/* ── Normaliza el campo ejecutivo usando la tabla trinidad_ejecutivos ─── */
+async function normalizarEjecutivosMes(mesStr, log = []) {
+  const [mapRows] = await pool.query(
+    'SELECT nombre_trinidad, nombre_autofacil FROM trinidad_ejecutivos'
+  );
+  if (!mapRows.length) return;
+
+  // Mapa: nombre_trinidad.toUpperCase().trim() → nombre_autofacil
+  const mapa = {};
+  for (const r of mapRows) {
+    mapa[r.nombre_trinidad.toUpperCase().trim()] = r.nombre_autofacil;
+  }
+
+  // Traer ejecutivos distintos del mes que necesiten normalización
+  const [ejRows] = await pool.query(
+    `SELECT DISTINCT ejecutivo FROM creditos
+     WHERE DATE_FORMAT(mes, '%Y-%m') = ? AND ejecutivo IS NOT NULL AND ejecutivo != ''`,
+    [mesStr]
+  );
+
+  let normalizados = 0;
+  for (const row of ejRows) {
+    const raw = (row.ejecutivo || '').toUpperCase().trim();
+    const norm = mapa[raw];
+    if (norm && norm !== row.ejecutivo) {
+      const [r] = await pool.query(
+        `UPDATE creditos SET ejecutivo = ?, updated_at = NOW()
+         WHERE DATE_FORMAT(mes, '%Y-%m') = ? AND ejecutivo = ?`,
+        [norm, mesStr, row.ejecutivo]
+      );
+      if (r.affectedRows > 0) {
+        normalizados += r.affectedRows;
+        log.push(`👤 ${row.ejecutivo} → ${norm} (${r.affectedRows} ops)`);
+      }
+    }
+  }
+  if (normalizados > 0) log.push(`Ejecutivos normalizados: ${normalizados}`);
 }
 
 /* ── Extraer meses únicos de una lista de ops ───────────────────────── */
@@ -234,4 +276,4 @@ function extraerMeses(ops) {
   return [...set];
 }
 
-module.exports = { recalcularMeses, extraerMeses };
+module.exports = { recalcularMeses, extraerMeses, normalizarEjecutivosMes };
