@@ -71,11 +71,11 @@ exports.getInfo = async (req, res) => {
 
     // Última operación creada
     const [[ultimaOp]] = await pool.query(
-      'SELECT id, num_op, created_at FROM creditos ORDER BY created_at DESC LIMIT 1'
+      'SELECT id, num_op, updated_at AS created_at FROM creditos ORDER BY updated_at DESC LIMIT 1'
     );
     // Último cliente creado
     const [[ultimoCliente]] = await pool.query(
-      'SELECT id_cliente, rut, created_at FROM clientes ORDER BY created_at DESC LIMIT 1'
+      'SELECT id_cliente, rut, fecha_creacion AS created_at FROM clientes ORDER BY fecha_creacion DESC LIMIT 1'
     );
 
     const proximo = proximoCambioDST();
