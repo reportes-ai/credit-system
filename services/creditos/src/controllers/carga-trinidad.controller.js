@@ -1,7 +1,8 @@
 'use strict';
-const pool     = require('../../../../shared/config/database');
-const XLSX     = require('xlsx');
+const pool      = require('../../../../shared/config/database');
+const XLSX      = require('xlsx');
 const historial = require('./carga-historial.controller');
+const { recalcularMeses } = require('../utils/recalcular-mes');
 
 /* ── Migraciones ────────────────────────────────────────────────── */
 (async () => {
@@ -290,6 +291,19 @@ exports.importar = async (req, res) => {
           historial.logCambio(sesionId, c.num_op, c.campo, c.valor_anterior, c.valor_nuevo).catch(() => {});
         }
       }).catch(() => {});
+    }
+
+    // ── Recálculo completo de comisiones (incluye tiers UNIDAD) ─────────
+    if (insertados > 0 || actualizados > 0) {
+      try {
+        const mesesSet = new Set(filas.map(f => (f.mes || '').slice(0, 7)).filter(Boolean));
+        const resultado = await recalcularMeses([...mesesSet]);
+        console.log('[carga-trinidad recalc]', resultado.log.join(' | '));
+        log.push(`🔄 Comisiones recalculadas: ${resultado.actualizados} ops`);
+      } catch (e) {
+        console.error('[carga-trinidad recalc]', e.message);
+        log.push(`⚠ Recálculo comisiones: ${e.message}`);
+      }
     }
 
     return res.json({

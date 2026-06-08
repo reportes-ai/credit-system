@@ -1,7 +1,7 @@
 'use strict';
 const pool = require('../../../../shared/config/database');
 const XLSX = require('xlsx');
-const { calcularComisionFin } = require('../utils/calcular-comision-fin');
+const { recalcularMeses, extraerMeses } = require('../utils/recalcular-mes');
 const historial = require('./carga-historial.controller');
 
 /* ── Asegurar columnas extra en creditos ──────────────────── */
@@ -238,7 +238,6 @@ const importar = async (req, res) => {
 
     let insertados = 0;
     let errores    = [];
-    const sinComisionFin = [];
     const clienteCache   = {};
     const detallesLog    = [];   // para log historial
 
@@ -289,22 +288,26 @@ const importar = async (req, res) => {
         );
         insertados++;
         detallesLog.push({ num_op: obj.num_op, datos: obj });
-
-        if (obj.monto_comision_fin === null || obj.monto_comision_fin === undefined) {
-          sinComisionFin.push({ num_op: obj.num_op, mes: obj.mes, financiera: obj.financiera });
-        }
       } catch (e) {
         errores.push({ op: row['OP'], error: e.message });
       }
     }
 
-    // ── Recálculo post-insert de monto_comision_fin ─────────────────────
+    // ── Recálculo completo de comisiones para todos los meses afectados ──
+    // Incluye: monto_comision_fin, comdea_real, com_parque, arriendo_parque,
+    //          com_rdh/cesantia/reparaciones, ingreso_neto_total
+    // Para UNIDAD recalcula TODAS las ops del mes si cambia el tier.
     let recalculados = 0;
-    if (sinComisionFin.length > 0) {
+    let recalcLog    = [];
+    if (insertados > 0) {
       try {
-        recalculados = await calcularComisionFin(sinComisionFin);
+        const mesesAfectados = extraerMeses(data.map(r => ({ mes: r.mes || r.fecha_otorgado })));
+        const resultado = await recalcularMeses(mesesAfectados);
+        recalculados = resultado.actualizados;
+        recalcLog    = resultado.log;
+        console.log('[recalcular-mes]', recalcLog.join(' | '));
       } catch (e) {
-        console.error('[recalc comision fin]', e.message);
+        console.error('[recalcular-mes]', e.message);
       }
     }
 
@@ -326,11 +329,11 @@ const importar = async (req, res) => {
     res.json({
       success: true,
       data: {
-        total_archivo:   data.length,
-        ya_existentes:   setExistentes.size,
+        total_archivo:     data.length,
+        ya_existentes:     setExistentes.size,
         nuevos_intentados: data.length,
         insertados,
-        recalculados_comision_fin: recalculados,
+        recalculados_comisiones: recalculados,
         errores,
       },
       error: null,
