@@ -146,17 +146,17 @@
 </div>
 
 <script>
-const TOKEN = localStorage.getItem('af_token');
-if(!TOKEN){ window.location.href = '/login/'; }
+const TOKEN = sessionStorage.getItem('token');
+const yo    = JSON.parse(sessionStorage.getItem('usuario') || 'null');
+if(!TOKEN){ window.location.href = '/login.html'; }
 
 /* ── Nav ── */
 try {
-  const u = JSON.parse(atob(TOKEN.split('.')[1]));
-  document.getElementById('navNombre').textContent  = u.nombre || u.username || '—';
-  document.getElementById('navPerfil').textContent  = u.perfil || '—';
-  document.getElementById('navInitial').textContent = (u.nombre || u.username || '?')[0].toUpperCase();
+  document.getElementById('navNombre').textContent  = yo?.nombre || yo?.username || '—';
+  document.getElementById('navPerfil').textContent  = yo?.perfil || '—';
+  document.getElementById('navInitial').textContent = (yo?.nombre || yo?.username || '?')[0].toUpperCase();
 } catch(e){}
-function logout(){ localStorage.clear(); window.location.href='/login/'; }
+function logout(){ sessionStorage.clear(); window.location.href='/login.html'; }
 
 /* ── Reloj live ── */
 function tickReloj(){
@@ -174,7 +174,7 @@ async function cargar(){
   document.getElementById('spinnerBtn').style.display='';
   document.getElementById('iconRefresh').style.display='none';
   try {
-    const r  = await fetch('/api/servidor-hora', { headers:{ Authorization:'Bearer '+TOKEN } });
+    const r  = await fetch('/api/servidor-hora', { headers:{ 'Content-Type':'application/json', Authorization:'Bearer '+TOKEN } });
     const j  = await r.json();
     if(!j.success) throw new Error(j.error);
     const d  = j.data;
