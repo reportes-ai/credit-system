@@ -112,7 +112,7 @@
 <body>
 <nav class="topnav">
   <div class="topnav-left">
-    <a href="/" class="topnav-brand"><img src="/img/logo.png" alt="AutoFácil"><span class="version-badge">v5.3</span></a>
+    <a href="/" class="topnav-brand"><img src="/img/logo.png" alt="AutoFácil"><span class="version-badge">v5.4</span></a>
     <div class="breadcrumb-nav">
       <a href="/">Inicio</a><span class="sep">›</span>
       <a href="/comisiones/">Comisión Ejecutivos</a><span class="sep">›</span>
@@ -384,19 +384,19 @@ function renderEjecutivo(d, idx, mes) {
         <div class="m-label">Cruce Cesantía</div>
         <div class="m-value">${pct(d.cruce_cesantia)} (${d.ncnu_cesantia}/${d.ncnu_total})</div>
         <div class="prog-bar"><div class="prog-bar-fill" style="width:${barCes}%;background:${d.cumple_cesantia?'#16a34a':'#dc2626'}"></div></div>
-        <div class="m-sub">${d.cumple_cesantia?'✓ Cumple':'✗ No cumple'} &nbsp;| ajuste: ${pct(d.ajuste_cesantia)}</div>
+        <div class="m-sub">${d.cumple_cesantia?'✓ Cumple':'✗ No cumple'} &nbsp;| mín: ${pct(d.umbral_cesantia||0.65)} | ajuste: ${pct(d.ajuste_cesantia)}</div>
       </div>
       <div class="metrica ${colRep}">
         <div class="m-label">Cruce Rep. Menores</div>
         <div class="m-value">${pct(d.cruce_reparaciones)} (${d.ncnu_rep}/${d.ncnu_total})</div>
         <div class="prog-bar"><div class="prog-bar-fill" style="width:${barRep}%;background:${d.cumple_reparaciones?'#16a34a':'#dc2626'}"></div></div>
-        <div class="m-sub">${d.cumple_reparaciones?'✓ Cumple':'✗ No cumple'} &nbsp;| ajuste: ${pct(d.ajuste_reparaciones)}</div>
+        <div class="m-sub">${d.cumple_reparaciones?'✓ Cumple':'✗ No cumple'} &nbsp;| mín: ${pct(d.umbral_rep||0.50)} | ajuste: ${pct(d.ajuste_reparaciones)}</div>
       </div>
       <div class="metrica ${(d.calidad_logrado||0) >= (d.calidad_meta||3) ? 'ok' : (d.calidad_logrado||0) > 0 ? 'warn' : 'bad'}">
         <div class="m-label">Calidad — Créditos UNIDAD</div>
         <div class="m-value">${pct(d.calidad)} <small style="font-size:.72rem;font-weight:400">(${d.calidad_logrado||0}/${d.calidad_meta||3})</small></div>
         <div class="prog-bar"><div class="prog-bar-fill" style="width:${Math.min((d.calidad||0)*100,100)}%;background:${(d.calidad_logrado||0)>=(d.calidad_meta||3)?'#16a34a':(d.calidad_logrado||0)>0?'#d97706':'#dc2626'}"></div></div>
-        <div class="m-sub">${d.calidad_logrado||0} crédito${(d.calidad_logrado||0)!==1?'s':''} UNIDAD · meta: ${d.calidad_meta||3} | ajuste: ${pct(d.ajuste_calidad)}</div>
+        <div class="m-sub">${d.calidad_logrado||0} crédito${(d.calidad_logrado||0)!==1?'s':''} UNIDAD · mín: ${d.calidad_meta||3} créditos | ajuste: ${pct(d.ajuste_calidad)}</div>
       </div>
     </div>
 

@@ -129,6 +129,7 @@ function calcularComision(creditos, vars) {
     ncnu_total, ncnu_cesantia, ncnu_rep,
     cruce_cesantia, cruce_reparaciones,
     calidad, calidad_logrado: unidad_logrado, calidad_meta: META_UNIDAD,
+    umbral_cesantia, umbral_rep,
     cumple_cesantia: cumple_ces, cumple_reparaciones: cumple_rep,
     ajuste_cesantia: ajuste_ces, ajuste_reparaciones: ajuste_rep,
     ajuste_calidad, factor_ajuste,
