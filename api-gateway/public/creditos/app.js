@@ -266,7 +266,7 @@ function _filtrarPorEmpresa(lista) {
 function aplicarFiltroEmpresa() {
   if (!_todosCreditos.length) return;
   const baseEmpresa = _filtrarPorEmpresa(_todosCreditos);
-  actualizarStats(baseEmpresa);
+  actualizarStats(_lastStats, _lastTotal);
   const lista = _filtroProceso
     ? baseEmpresa.filter(c => !ESTADOS_FUERA_PROCESO.has(c.estado))
     : _aplicarFiltroEstado(baseEmpresa);
@@ -339,6 +339,8 @@ function _aplicarFiltroEstado(lista) {
 
 let _paginaActual = 1;
 const _LIMIT_PAG  = 100;
+let _lastStats = {};
+let _lastTotal  = 0;
 
 async function buscarCreditos(page = 1) {
   _paginaActual = page;
@@ -356,7 +358,9 @@ async function buscarCreditos(page = 1) {
     const stats = j.stats      || {};
 
     // Stats desde servidor (totales reales de todos los registros, no solo la página)
-    actualizarStats(stats, pag.total);
+    _lastStats = stats;
+    _lastTotal = pag.total || 0;
+    actualizarStats(_lastStats, _lastTotal);
 
     // Render página actual con filtro client-side
     const baseEmpresa = _filtrarPorEmpresa(_todosCreditos);
@@ -392,7 +396,7 @@ function actualizarStats(stats, totalServidor) {
   // stats es el objeto {ESTADO: count} del servidor — totales reales
   const g = (e) => (stats[e] || 0);
   const ingresados = g('INGRESO') + g('REVISION');
-  const proceso    = totalServidor - g('CANCELADO') - g('VIGENTE') - g('OTORGADO') - g('CURSADO') - g('DESISTIDO');
+  const proceso    = (totalServidor || 0) - g('CANCELADO') - g('VIGENTE') - g('OTORGADO') - g('CURSADO') - g('DESISTIDO') - g('CARTA_APROBACION');
   document.getElementById('statTotal').textContent     = (totalServidor || 0).toLocaleString('es-CL');
   document.getElementById('statRevision').textContent  = ingresados;
   const elAn = document.getElementById('statCartaAprobacion');
