@@ -280,9 +280,13 @@ const importar = async (req, res) => {
         const cols   = Object.keys(obj).filter(k => obj[k] !== undefined && obj[k] !== null);
         const vals   = cols.map(k => obj[k]);
         const placeholders = cols.map(() => '?').join(',');
+        // ON DUPLICATE KEY UPDATE — si ya existe (num_op+mes+financiera), actualiza en vez de fallar
+        const updateCols = cols.filter(k => !['num_op','mes','financiera'].includes(k));
+        const updateSet  = updateCols.map(k => `\`${k}\` = VALUES(\`${k}\`)`).join(', ');
 
         await pool.query(
-          `INSERT INTO creditos (${cols.join(',')}) VALUES (${placeholders})`,
+          `INSERT INTO creditos (${cols.map(k=>`\`${k}\``).join(',')}) VALUES (${placeholders})
+           ON DUPLICATE KEY UPDATE ${updateSet}`,
           vals
         );
         insertados++;
