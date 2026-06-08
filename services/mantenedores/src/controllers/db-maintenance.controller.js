@@ -33,6 +33,18 @@ const pool = require('../../../../shared/config/database');
         UNIQUE KEY uq_tabla_idx (tabla_nombre, index_nombre)
       )
     `);
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS db_size_history (
+        id           INT AUTO_INCREMENT PRIMARY KEY,
+        tabla_nombre VARCHAR(128) NOT NULL,
+        filas        BIGINT       DEFAULT 0,
+        datos_mb     DECIMAL(10,3) DEFAULT 0,
+        indices_mb   DECIMAL(10,3) DEFAULT 0,
+        total_mb     DECIMAL(10,3) DEFAULT 0,
+        registrado_at DATE         NOT NULL DEFAULT (CURRENT_DATE),
+        INDEX idx_tabla_fecha (tabla_nombre, registrado_at)
+      )
+    `);
   } catch (e) {
     console.error('[db-maintenance] migraciones:', e.message);
   }

@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- v1.4 -->
+<!-- v1.5 -->
 <html lang="es">
 <head>
   <meta charset="UTF-8">
@@ -206,6 +206,56 @@
     }
     .btn-baseline:disabled { opacity: .5; cursor: not-allowed; }
     .btn-baseline:not(:disabled):hover { opacity: .85; }
+
+    /* ── Tabs superiores ── */
+    .tab-bar { display:flex; gap:4px; flex-wrap:wrap; margin-bottom:20px; }
+    .tab-btn {
+      background:#fff; border:2px solid #d0d4e8; border-radius:8px;
+      padding:8px 16px; font-size:.85rem; font-weight:600; color:#555;
+      cursor:pointer; transition:all .18s; display:flex; align-items:center; gap:6px;
+    }
+    .tab-btn:hover { border-color:#1a237e; color:#1a237e; background:#f0f2ff; }
+    .tab-btn.activo { border-color:#1a237e; background:#1a237e; color:#fff; }
+    .tab-btn .dot {
+      width:8px; height:8px; border-radius:50%; background:#aaa; flex-shrink:0;
+    }
+    .tab-btn.activo .dot { background:rgba(255,255,255,.6); }
+    .dot-ok   { background:#2e7d32 !important; }
+    .dot-warn { background:#e65100 !important; }
+    .dot-crit { background:#c62828 !important; }
+
+    /* ── Slow queries ── */
+    .sq-dur { font-weight:700; }
+    .sq-dur.lenta   { color:#e65100; }
+    .sq-dur.muy-lenta { color:#c62828; }
+    .sq-query { font-family:'Courier New',monospace; font-size:.75rem;
+                color:#444; max-width:380px; white-space:nowrap;
+                overflow:hidden; text-overflow:ellipsis; }
+
+    /* ── Crecimiento ── */
+    .crec-positivo { color:#c62828; font-weight:700; }
+    .crec-neutro   { color:#aaa; }
+    .crec-mini-bar { display:inline-block; height:6px; border-radius:3px;
+                     background:linear-gradient(90deg,#1a237e,#5c6bc0);
+                     vertical-align:middle; margin-left:4px; }
+
+    /* ── Integridad ── */
+    .integ-ok   { background:#e8f5e9; }
+    .integ-warn { background:#fff8f0; }
+    .integ-crit { background:#fff0f0; }
+    .integ-err  { background:#f5f5f5; }
+
+    /* ── Conexiones ── */
+    .conn-chip {
+      border-radius:8px; padding:10px 18px; text-align:center;
+      background:#fff; box-shadow:0 1px 6px rgba(0,0,0,.07);
+    }
+    .conn-chip .cv { font-size:1.8rem; font-weight:800; }
+    .conn-chip .cl { font-size:.75rem; color:#888; text-transform:uppercase;
+                     letter-spacing:.04em; margin-top:2px; }
+    .proc-sleep { color:#bbb; }
+    .proc-activa { color:#1a237e; font-weight:600; }
+    .proc-lenta  { color:#c62828; font-weight:700; }
   </style>
 </head>
 <body>
@@ -213,7 +263,7 @@
 <div class="topbar">
   <i class="bi bi-database-gear" style="font-size:1.5rem"></i>
   <h1>Mantenimiento de Base de Datos</h1>
-  <span class="badge-version">v1.4</span>
+  <span class="badge-version">v1.5</span>
   <a href="/mantenedores/" class="ms-auto text-white-50 text-decoration-none" style="font-size:.85rem">
     <i class="bi bi-arrow-left"></i> Mantenedores
   </a>
@@ -235,7 +285,7 @@
 <div class="container-fluid" style="max-width:1400px;padding:28px 20px">
 
   <!-- Barra de acciones -->
-  <div class="row g-3 mb-4 align-items-center">
+  <div class="row g-3 mb-3 align-items-center">
     <div class="col-auto">
       <button class="btn-diag" id="btn-diagnostico" onclick="cargarDiagnostico()">
         <i class="bi bi-search"></i> Diagnosticar ahora
@@ -251,12 +301,32 @@
         <option value="analyze">ANALYZE TABLE (estadísticas)</option>
       </select>
     </div>
-    <div class="col-auto">
-      <button class="btn-hist" id="btn-toggle-hist" onclick="toggleHistorial()">
-        <i class="bi bi-clock-history"></i> Historial de mantenciones
-      </button>
-    </div>
     <div class="col text-end text-muted" style="font-size:.82rem" id="txt-ultima"></div>
+  </div>
+
+  <!-- Tabs de módulos -->
+  <div class="tab-bar mb-3">
+    <button class="tab-btn activo" id="tab-diag"       onclick="activarTab('diag')">
+      <span class="dot" id="dot-diag"></span><i class="bi bi-table"></i> Estado de tablas
+    </button>
+    <button class="tab-btn" id="tab-indices"    onclick="activarTab('indices')">
+      <span class="dot" id="dot-indices"></span><i class="bi bi-key-fill"></i> Índices
+    </button>
+    <button class="tab-btn" id="tab-integridad" onclick="activarTab('integridad')">
+      <span class="dot" id="dot-integridad"></span><i class="bi bi-shield-check"></i> Integridad
+    </button>
+    <button class="tab-btn" id="tab-crecimiento" onclick="activarTab('crecimiento')">
+      <span class="dot" id="dot-crecimiento"></span><i class="bi bi-graph-up"></i> Crecimiento
+    </button>
+    <button class="tab-btn" id="tab-conexiones"  onclick="activarTab('conexiones')">
+      <span class="dot" id="dot-conexiones"></span><i class="bi bi-diagram-3"></i> Conexiones
+    </button>
+    <button class="tab-btn" id="tab-slowq"       onclick="activarTab('slowq')">
+      <span class="dot" id="dot-slowq"></span><i class="bi bi-speedometer2"></i> Consultas lentas
+    </button>
+    <button class="tab-btn" id="tab-historial"   onclick="activarTab('historial')">
+      <span class="dot" id="dot-historial"></span><i class="bi bi-clock-history"></i> Historial
+    </button>
   </div>
 
   <!-- Cards de resumen -->
@@ -288,7 +358,7 @@
   </div>
 
   <!-- ══════════════════════════════════════════════════════════
-       HISTORIAL (oculto por defecto)
+       HISTORIAL
   ══════════════════════════════════════════════════════════ -->
   <div id="bloque-historial" style="display:none" class="mb-4">
     <div class="panel-card">
@@ -305,7 +375,7 @@
   <!-- ══════════════════════════════════════════════════════════
        TABLA DE DIAGNÓSTICO
   ══════════════════════════════════════════════════════════ -->
-  <div class="panel-card mb-4" id="bloque-tabla" style="display:none">
+  <div class="panel-card mb-4" id="bloque-tabla">
     <div class="panel-header">
       <i class="bi bi-table"></i> Estado de tablas
       <span class="ms-auto" style="font-size:.8rem;font-weight:400">
@@ -373,6 +443,136 @@
         <i class="bi bi-hourglass" style="font-size:1.5rem;opacity:.4"></i><br>
         Cargando verificación de índices…
       </div>
+    </div>
+  </div>
+
+  <!-- ══════════════════════════════════════════════════════════
+       INTEGRIDAD REFERENCIAL
+  ══════════════════════════════════════════════════════════ -->
+  <div id="bloque-integridad" style="display:none" class="mb-4">
+    <div class="panel-card">
+      <div class="panel-header">
+        <i class="bi bi-shield-check"></i> Integridad Referencial
+        <button onclick="cargarIntegridad()" class="ms-auto btn btn-sm btn-outline-light">
+          <i class="bi bi-arrow-clockwise"></i> Actualizar
+        </button>
+      </div>
+      <div id="integ-resumen" class="p-3 pb-0" style="display:none">
+        <div class="row g-2 mb-3" id="integ-chips"></div>
+      </div>
+      <div style="overflow-x:auto">
+        <table class="db-table">
+          <thead>
+            <tr>
+              <th>Verificación</th>
+              <th>Tabla</th>
+              <th style="text-align:right">Registros con problema</th>
+              <th>Estado</th>
+              <th>Descripción</th>
+            </tr>
+          </thead>
+          <tbody id="tbody-integridad">
+            <tr><td colspan="5" class="hist-empty">Cargando…</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <!-- ══════════════════════════════════════════════════════════
+       CRECIMIENTO
+  ══════════════════════════════════════════════════════════ -->
+  <div id="bloque-crecimiento" style="display:none" class="mb-4">
+    <div class="panel-card">
+      <div class="panel-header">
+        <i class="bi bi-graph-up"></i> Control de Crecimiento
+        <span class="ms-auto" id="crec-snapshot-txt" style="font-size:.8rem;font-weight:400"></span>
+      </div>
+      <div style="overflow-x:auto">
+        <table class="db-table">
+          <thead>
+            <tr>
+              <th>Tabla</th>
+              <th style="text-align:right">Filas actuales</th>
+              <th style="text-align:right">Datos (MB)</th>
+              <th style="text-align:right">Índices (MB)</th>
+              <th style="text-align:right">Total (MB)</th>
+              <th style="text-align:right">Crecim. semanal (filas)</th>
+              <th style="text-align:right">Crecim. semanal (MB)</th>
+              <th style="text-align:right">Días historial</th>
+            </tr>
+          </thead>
+          <tbody id="tbody-crecimiento">
+            <tr><td colspan="8" class="hist-empty">Cargando…</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <div class="p-3" style="font-size:.78rem;color:#888">
+        <i class="bi bi-info-circle"></i>
+        El crecimiento semanal se calcula comparando el snapshot de hoy con el más antiguo disponible.
+        Se irá volviendo más preciso con el tiempo (mínimo 2 días de historial).
+      </div>
+    </div>
+  </div>
+
+  <!-- ══════════════════════════════════════════════════════════
+       CONEXIONES ACTIVAS
+  ══════════════════════════════════════════════════════════ -->
+  <div id="bloque-conexiones" style="display:none" class="mb-4">
+    <div class="panel-card">
+      <div class="panel-header">
+        <i class="bi bi-diagram-3"></i> Conexiones Activas
+        <button onclick="cargarConexiones()" class="ms-auto btn btn-sm btn-outline-light">
+          <i class="bi bi-arrow-clockwise"></i> Actualizar
+        </button>
+      </div>
+      <div class="p-3 pb-1">
+        <div class="row g-3 mb-2" id="conn-chips-row"></div>
+      </div>
+      <div style="overflow-x:auto">
+        <table class="db-table">
+          <thead>
+            <tr>
+              <th>#ID</th><th>Usuario</th><th>Host</th><th>BD</th>
+              <th>Comando</th><th style="text-align:right">Tiempo (s)</th>
+              <th>Estado</th><th>Consulta activa</th>
+            </tr>
+          </thead>
+          <tbody id="tbody-conexiones">
+            <tr><td colspan="8" class="hist-empty">Cargando…</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <!-- ══════════════════════════════════════════════════════════
+       CONSULTAS LENTAS
+  ══════════════════════════════════════════════════════════ -->
+  <div id="bloque-slowq" style="display:none" class="mb-4">
+    <div class="panel-card">
+      <div class="panel-header">
+        <i class="bi bi-speedometer2"></i> Consultas Lentas (Top 20)
+        <button onclick="cargarSlowQueries()" class="ms-auto btn btn-sm btn-outline-light">
+          <i class="bi bi-arrow-clockwise"></i> Actualizar
+        </button>
+      </div>
+      <div style="overflow-x:auto">
+        <table class="db-table">
+          <thead>
+            <tr>
+              <th style="text-align:right">Duración (s)</th>
+              <th>Usuario</th><th>BD</th>
+              <th>Inicio / Estado</th>
+              <th>Consulta</th>
+            </tr>
+          </thead>
+          <tbody id="tbody-slowq">
+            <tr><td colspan="5" class="hist-empty">Cargando…</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <div class="p-3" id="slowq-nota" style="font-size:.78rem;color:#888;display:none"></div>
     </div>
   </div>
 
@@ -572,7 +772,7 @@ function renderTablas(tablas) {
       <td>${motivos}</td>
     </tr>`;
   });
-  document.getElementById('bloque-tabla').style.display = '';
+  // bloque-tabla siempre visible en tab diag
 }
 
 function toggleAll(chk) {
@@ -955,9 +1155,284 @@ async function restaurarTodos() {
   }
 }
 
-// Auto-cargar al entrar
+// ── Sistema de tabs ───────────────────────────────────────────────────
+const TABS = {
+  diag:        { bloque: 'bloque-tabla',       carga: () => {} },
+  indices:     { bloque: 'bloque-indices',      carga: cargarIndices },
+  integridad:  { bloque: 'bloque-integridad',   carga: cargarIntegridad },
+  crecimiento: { bloque: 'bloque-crecimiento',  carga: cargarCrecimiento },
+  conexiones:  { bloque: 'bloque-conexiones',   carga: cargarConexiones },
+  slowq:       { bloque: 'bloque-slowq',        carga: cargarSlowQueries },
+  historial:   { bloque: 'bloque-historial',    carga: cargarHistorial },
+};
+let _tabActivo = 'diag';
+const _cargado = new Set(['diag']);
+
+function activarTab(tab) {
+  // Ocultar todos
+  Object.keys(TABS).forEach(k => {
+    document.getElementById(TABS[k].bloque).style.display = 'none';
+    document.getElementById('tab-' + k).classList.remove('activo');
+  });
+  // Mostrar seleccionado
+  _tabActivo = tab;
+  document.getElementById(TABS[tab].bloque).style.display = '';
+  document.getElementById('tab-' + tab).classList.add('activo');
+  // Cards de resumen solo en tab diag
+  document.getElementById('cards-resumen').style.display =
+    (tab === 'diag' && _datos) ? '' : 'none';
+  // Cargar si aún no se ha cargado
+  if (!_cargado.has(tab)) {
+    _cargado.add(tab);
+    TABS[tab].carga();
+  }
+}
+
+function setDot(tab, nivel) {
+  const dot = document.getElementById('dot-' + tab);
+  if (!dot) return;
+  dot.className = 'dot';
+  if (nivel === 'ok')       dot.classList.add('dot-ok');
+  else if (nivel === 'warn') dot.classList.add('dot-warn');
+  else if (nivel === 'crit') dot.classList.add('dot-crit');
+}
+
+// ── Integridad ────────────────────────────────────────────────────────
+async function cargarIntegridad() {
+  document.getElementById('tbody-integridad').innerHTML =
+    '<tr><td colspan="5" class="hist-empty"><span class="spinner-ring" style="border-top-color:#1a237e;border-color:rgba(26,35,126,.2)"></span> Verificando integridad…</td></tr>';
+  try {
+    const r = await fetch(API + '/integridad', {
+      headers: { Authorization: 'Bearer ' + sessionStorage.getItem('token') }
+    });
+    const json = await r.json();
+    if (!json.success) throw new Error(json.error);
+    renderIntegridad(json.data);
+  } catch (e) {
+    document.getElementById('tbody-integridad').innerHTML =
+      `<tr><td colspan="5" class="hist-empty" style="color:#c62828">Error: ${e.message}</td></tr>`;
+  }
+}
+
+function renderIntegridad(data) {
+  const { checks, resumen } = data;
+  const nivelGlobal = resumen.criticos > 0 ? 'crit' : resumen.warnings > 0 ? 'warn' : 'ok';
+  setDot('integridad', nivelGlobal);
+
+  const chips = document.getElementById('integ-chips');
+  chips.innerHTML = `
+    <div class="col-auto"><span class="idx-chip idx-chip-ok"><i class="bi bi-check-circle-fill"></i> ${resumen.ok} OK</span></div>
+    ${resumen.warnings ? `<div class="col-auto"><span class="idx-chip idx-chip-miss" style="background:#fff3e0;color:#e65100"><i class="bi bi-exclamation-triangle-fill"></i> ${resumen.warnings} advertencias</span></div>` : ''}
+    ${resumen.criticos ? `<div class="col-auto"><span class="idx-chip idx-chip-miss"><i class="bi bi-x-circle-fill"></i> ${resumen.criticos} críticos</span></div>` : ''}
+    ${resumen.total_problemas > 0 ? `<div class="col-auto"><span class="idx-chip" style="background:#ffebee;color:#b71c1c">${fmtNum(resumen.total_problemas)} registros con problema</span></div>` : ''}
+  `;
+  document.getElementById('integ-resumen').style.display = '';
+
+  const tbody = document.getElementById('tbody-integridad');
+  tbody.innerHTML = checks.map(c => {
+    const cls = c.estado === 'ok' ? 'integ-ok' : c.estado === 'warning' ? 'integ-warn' :
+                c.estado === 'critical' ? 'integ-crit' : 'integ-err';
+    const badge = c.estado === 'ok'
+      ? '<span class="badge-ok">✓ OK</span>'
+      : c.estado === 'warning'
+        ? '<span class="badge-warn">⚠ Advertencia</span>'
+        : c.estado === 'critical'
+          ? '<span class="badge-crit">🚨 Crítico</span>'
+          : '<span style="color:#888;font-size:.8rem">Error</span>';
+    const total = c.total !== null ? `<strong style="color:${c.total>0?'#c62828':'#2e7d32'}">${fmtNum(c.total)}</strong>` : '–';
+    return `<tr class="${cls}">
+      <td><strong>${c.nombre}</strong></td>
+      <td><span class="idx-cols">${c.tabla}</span></td>
+      <td style="text-align:right">${total}</td>
+      <td>${badge}</td>
+      <td style="font-size:.82rem;color:#555">${c.descripcion}${c.error ? `<br><span style="color:#c62828;font-size:.75rem">${c.error}</span>` : ''}</td>
+    </tr>`;
+  }).join('');
+}
+
+// ── Crecimiento ───────────────────────────────────────────────────────
+async function cargarCrecimiento() {
+  document.getElementById('tbody-crecimiento').innerHTML =
+    '<tr><td colspan="8" class="hist-empty"><span class="spinner-ring" style="border-top-color:#1a237e;border-color:rgba(26,35,126,.2)"></span> Cargando datos de crecimiento…</td></tr>';
+  try {
+    const r = await fetch(API + '/crecimiento', {
+      headers: { Authorization: 'Bearer ' + sessionStorage.getItem('token') }
+    });
+    const json = await r.json();
+    if (!json.success) throw new Error(json.error);
+    renderCrecimiento(json.data);
+  } catch (e) {
+    document.getElementById('tbody-crecimiento').innerHTML =
+      `<tr><td colspan="8" class="hist-empty" style="color:#c62828">Error: ${e.message}</td></tr>`;
+  }
+}
+
+function renderCrecimiento(data) {
+  document.getElementById('crec-snapshot-txt').textContent =
+    'Snapshot guardado: ' + data.snapshot_date;
+  setDot('crecimiento', 'ok');
+
+  const maxMb = Math.max(...data.actuales.map(t => parseFloat(t.total_mb) || 0), 1);
+  const tbody = document.getElementById('tbody-crecimiento');
+  tbody.innerHTML = data.actuales.map(t => {
+    const barW = Math.round((parseFloat(t.total_mb) / maxMb) * 80);
+    const crecF = t.crecimiento_filas !== null
+      ? `<span class="${t.crecimiento_filas > 0 ? 'crec-positivo' : 'crec-neutro'}">
+           ${t.crecimiento_filas > 0 ? '+' : ''}${fmtNum(t.crecimiento_filas)}
+         </span>`
+      : '<span class="crec-neutro">–</span>';
+    const crecMb = t.crecimiento_mb !== null
+      ? `<span class="${parseFloat(t.crecimiento_mb) > 0 ? 'crec-positivo' : 'crec-neutro'}">
+           ${parseFloat(t.crecimiento_mb) > 0 ? '+' : ''}${t.crecimiento_mb}
+         </span>`
+      : '<span class="crec-neutro">–</span>';
+    return `<tr>
+      <td><strong>${t.tabla}</strong></td>
+      <td style="text-align:right">${fmtNum(t.filas)}</td>
+      <td style="text-align:right">${t.datos_mb}</td>
+      <td style="text-align:right">${t.indices_mb}</td>
+      <td style="text-align:right">
+        ${t.total_mb}
+        <span class="crec-mini-bar" style="width:${barW}px"></span>
+      </td>
+      <td style="text-align:right">${crecF}</td>
+      <td style="text-align:right">${crecMb}</td>
+      <td style="text-align:right;color:#888;font-size:.8rem">${t.dias_historial} días</td>
+    </tr>`;
+  }).join('');
+}
+
+// ── Conexiones ────────────────────────────────────────────────────────
+async function cargarConexiones() {
+  document.getElementById('tbody-conexiones').innerHTML =
+    '<tr><td colspan="8" class="hist-empty"><span class="spinner-ring" style="border-top-color:#1a237e;border-color:rgba(26,35,126,.2)"></span> Consultando conexiones…</td></tr>';
+  try {
+    const r = await fetch(API + '/conexiones', {
+      headers: { Authorization: 'Bearer ' + sessionStorage.getItem('token') }
+    });
+    const json = await r.json();
+    if (!json.success) throw new Error(json.error);
+    renderConexiones(json.data);
+  } catch (e) {
+    document.getElementById('tbody-conexiones').innerHTML =
+      `<tr><td colspan="8" class="hist-empty" style="color:#c62828">Error: ${e.message}</td></tr>`;
+  }
+}
+
+function renderConexiones(data) {
+  const { procesos, resumen } = data;
+  const nivelDot = resumen.lentas > 0 ? 'warn' : 'ok';
+  setDot('conexiones', nivelDot);
+
+  const chips = document.getElementById('conn-chips-row');
+  const maxConn = resumen.max_connections || '–';
+  const pct = resumen.threads_connected && resumen.max_connections
+    ? Math.round((resumen.threads_connected / resumen.max_connections) * 100) : null;
+  chips.innerHTML = `
+    <div class="col-6 col-md-2"><div class="conn-chip">
+      <div class="cv" style="color:#1a237e">${resumen.total}</div>
+      <div class="cl">Procesos totales</div>
+    </div></div>
+    <div class="col-6 col-md-2"><div class="conn-chip">
+      <div class="cv" style="color:#2e7d32">${resumen.activas}</div>
+      <div class="cl">Activas</div>
+    </div></div>
+    <div class="col-6 col-md-2"><div class="conn-chip">
+      <div class="cv" style="color:#aaa">${resumen.dormidas}</div>
+      <div class="cl">Dormidas (Sleep)</div>
+    </div></div>
+    <div class="col-6 col-md-2"><div class="conn-chip">
+      <div class="cv" style="color:${resumen.lentas>0?'#c62828':'#2e7d32'}">${resumen.lentas}</div>
+      <div class="cl">Lentas (&gt;5s)</div>
+    </div></div>
+    <div class="col-6 col-md-2"><div class="conn-chip">
+      <div class="cv" style="color:#555">${resumen.threads_connected || '–'} / ${maxConn}</div>
+      <div class="cl">Hilos${pct !== null ? ' ('+pct+'%)' : ''}</div>
+    </div></div>
+  `;
+
+  const tbody = document.getElementById('tbody-conexiones');
+  tbody.innerHTML = procesos.map(p => {
+    const esSleep  = p.comando === 'Sleep';
+    const esLenta  = Number(p.tiempo_seg) > 5;
+    const cls = esSleep ? 'proc-sleep' : esLenta ? 'proc-lenta' : 'proc-activa';
+    return `<tr>
+      <td class="${cls}">${p.id}</td>
+      <td>${p.usuario || '–'}</td>
+      <td style="font-size:.78rem">${(p.host || '').split(':')[0]}</td>
+      <td style="font-size:.8rem">${p.base_datos || '–'}</td>
+      <td><span class="idx-cols">${p.comando || '–'}</span></td>
+      <td style="text-align:right" class="${esLenta ? 'proc-lenta' : ''}">${p.tiempo_seg ?? '–'}</td>
+      <td style="font-size:.75rem;color:#888">${p.estado || '–'}</td>
+      <td class="sq-query" style="max-width:280px" title="${(p.consulta_activa||'').replace(/"/g,'&quot;')}">${p.consulta_activa || '–'}</td>
+    </tr>`;
+  }).join('') || '<tr><td colspan="8" class="hist-empty">Sin conexiones activas</td></tr>';
+}
+
+// ── Consultas lentas ──────────────────────────────────────────────────
+async function cargarSlowQueries() {
+  document.getElementById('tbody-slowq').innerHTML =
+    '<tr><td colspan="5" class="hist-empty"><span class="spinner-ring" style="border-top-color:#1a237e;border-color:rgba(26,35,126,.2)"></span> Consultando…</td></tr>';
+  try {
+    const r = await fetch(API + '/slow-queries', {
+      headers: { Authorization: 'Bearer ' + sessionStorage.getItem('token') }
+    });
+    const json = await r.json();
+    if (!json.success) throw new Error(json.error);
+    renderSlowQueries(json.data);
+  } catch (e) {
+    document.getElementById('tbody-slowq').innerHTML =
+      `<tr><td colspan="5" class="hist-empty" style="color:#c62828">Error: ${e.message}</td></tr>`;
+  }
+}
+
+function renderSlowQueries(data) {
+  const { rows } = data;
+  setDot('slowq', rows.length > 0 ? 'warn' : 'ok');
+
+  const nota = document.getElementById('slowq-nota');
+  if (!rows.length) {
+    document.getElementById('tbody-slowq').innerHTML =
+      '<tr><td colspan="5" class="hist-empty" style="color:#2e7d32"><i class="bi bi-check-circle-fill"></i> Sin consultas lentas detectadas</td></tr>';
+    nota.style.display = 'none';
+    return;
+  }
+
+  // Detectar si viene de SLOW_QUERY o PROCESSLIST
+  const esProclist = rows[0] && rows[0].estado !== undefined;
+  nota.textContent = esProclist
+    ? 'ℹ️ Mostrando procesos activos con tiempo >1s (SLOW_QUERY no disponible en este tier de TiDB Cloud)'
+    : 'ℹ️ Fuente: information_schema.SLOW_QUERY';
+  nota.style.display = '';
+
+  const tbody = document.getElementById('tbody-slowq');
+  tbody.innerHTML = rows.map(r => {
+    const dur   = parseFloat(r.duracion_seg) || 0;
+    const cls   = dur > 10 ? 'muy-lenta' : dur > 3 ? 'lenta' : '';
+    const inicio = r.inicio ? fmtFecha(r.inicio) : (r.estado || '–');
+    return `<tr>
+      <td style="text-align:right"><span class="sq-dur ${cls}">${dur.toFixed(3)}</span></td>
+      <td>${r.usuario || '–'}</td>
+      <td style="font-size:.8rem">${r.base_datos || '–'}</td>
+      <td style="font-size:.78rem">${inicio}</td>
+      <td class="sq-query" title="${(r.consulta||'').replace(/"/g,'&quot;')}">${r.consulta || '–'}</td>
+    </tr>`;
+  }).join('');
+}
+
+// ── Inicialización ────────────────────────────────────────────────────
+// Ocultar todos los bloques de tab excepto el inicial (diag)
+['indices','integridad','crecimiento','conexiones','slowq','historial'].forEach(k => {
+  document.getElementById(TABS[k].bloque).style.display = 'none';
+});
+document.getElementById('cards-resumen').style.display = 'none';
+document.getElementById('bloque-log').style.display = 'none';
+
 cargarDiagnostico();
-cargarIndices();
+// Pre-cargar integridad y crecimiento en background (no bloquean)
+setTimeout(() => { cargarIndices(); }, 300);
+setTimeout(() => { cargarIntegridad(); _cargado.add('integridad'); }, 600);
+setTimeout(() => { cargarCrecimiento(); _cargado.add('crecimiento'); }, 900);
 </script>
 <script src="/js/app-version.js"></script>
 </body>
