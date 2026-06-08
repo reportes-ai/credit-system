@@ -396,7 +396,7 @@ function renderEjecutivo(d, idx, mes) {
         <div class="m-label">Calidad — Créditos UNIDAD</div>
         <div class="m-value">${pct(d.calidad)} <small style="font-size:.72rem;font-weight:400">(${d.calidad_logrado||0}/${d.calidad_meta||3})</small></div>
         <div class="prog-bar"><div class="prog-bar-fill" style="width:${Math.min((d.calidad||0)*100,100)}%;background:${(d.calidad_logrado||0)>=(d.calidad_meta||3)?'#16a34a':(d.calidad_logrado||0)>0?'#d97706':'#dc2626'}"></div></div>
-        <div class="m-sub">${d.calidad_logrado||0} crédito${(d.calidad_logrado||0)!==1?'s':''} UNIDAD · mín: ${d.calidad_meta||3} créditos | ajuste: ${pct(d.ajuste_calidad)}</div>
+        <div class="m-sub">${d.calidad_logrado||0} crédito${(d.calidad_logrado||0)!==1?'s':''} UNIDAD · meta: ${d.calidad_meta||3} | mín: ${d.calidad_meta||3} créditos | ajuste: ${pct(d.ajuste_calidad)}</div>
       </div>
     </div>
 
