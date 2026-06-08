@@ -211,7 +211,7 @@ body { font-family: 'Segoe UI', Arial, sans-serif; background: var(--gray-bg); c
   <div class="header no-print">
     <div class="header-logo" style="display:flex;align-items:center;gap:8px">
         <img id="logoHeader" src="/img/logo.png" alt="AutoFácil" style="height:32px;object-fit:contain">
-        <span style="font-size:11px;font-weight:400;color:#90CAF9">V5.40</span>
+        <span style="font-size:11px;font-weight:400;color:#90CAF9">V5.41</span>
       </div>
     <div class="header-right">
       <span class="header-user" id="headerUser"></span>
@@ -4260,8 +4260,13 @@ async function initApp(){
   // Set fecha
   document.getElementById('fFecha').value = new Date().toISOString().split('T')[0];
   updateMesField();
-  // Restore sessionStorage draft if returning from Clientes page
-  _restoreCartaDraft();
+  // Restaurar draft SOLO si venimos del flujo crear-cliente (?rut= en URL)
+  // Si el usuario entra directo, no restaurar para no mostrar datos del uso anterior
+  if (new URLSearchParams(window.location.search).get('rut')) {
+    _restoreCartaDraft();
+  } else {
+    sessionStorage.removeItem('af_carta_draft'); // limpiar draft huérfano
+  }
   // Ensure grabar button is enabled on init
   const btnGrabar = document.getElementById('btnGrabarCarta');
   if(btnGrabar){ btnGrabar.disabled = false; btnGrabar.style.opacity = ''; }
