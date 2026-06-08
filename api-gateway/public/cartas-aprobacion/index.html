@@ -211,7 +211,7 @@ body { font-family: 'Segoe UI', Arial, sans-serif; background: var(--gray-bg); c
   <div class="header no-print">
     <div class="header-logo" style="display:flex;align-items:center;gap:8px">
         <img id="logoHeader" src="/img/logo.png" alt="AutoFácil" style="height:32px;object-fit:contain">
-        <span style="font-size:11px;font-weight:400;color:#90CAF9">V5.38</span>
+        <span style="font-size:11px;font-weight:400;color:#90CAF9">V5.39</span>
       </div>
     <div class="header-right">
       <span class="header-user" id="headerUser"></span>
@@ -4428,9 +4428,9 @@ async function buscarCliente() {
     const r = await fetch('/api/clientes/rut/' + encodeURIComponent(rut), {
       headers: { Authorization: 'Bearer ' + token }
     });
-    if (r.ok) {
-      const j = await r.json();
-      const c = j.data || j;
+    const j = await r.json();
+    if (r.ok && j.success && j.data) {
+      const c = j.data;
       const toTitle = s => s ? s.split(' ').map(w=>w.charAt(0).toUpperCase()+w.slice(1).toLowerCase()).join(' ') : '';
       let nombres = c.nombres || c.nombre || '';
       let apPat   = c.apellido_paterno || '';
@@ -4453,12 +4453,13 @@ async function buscarCliente() {
       document.getElementById('fApellidoMaterno').value = toTitle(apMat);
       msg.textContent = '✅ Cliente encontrado';
       msg.style.cssText = 'font-size:10px;margin-top:3px;display:block;color:#2e7d32;font-weight:600';
-    } else if (r.status === 404) {
+    } else if (j.success && !j.data) {
+      // API respondió OK pero data es null → cliente no existe
       msg.textContent = '⚠️ Cliente no encontrado — se abrirá el formulario de creación';
       msg.style.cssText = 'font-size:10px;margin-top:3px;display:block;color:#c62828;font-weight:600';
       setTimeout(() => irACrearCliente(), 1200);
     } else {
-      msg.textContent = '❌ Error al buscar cliente';
+      msg.textContent = '❌ Error al buscar: ' + (j.error || r.status);
       msg.style.cssText = 'font-size:10px;margin-top:3px;display:block;color:#c62828';
     }
   } catch(e) {
