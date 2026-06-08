@@ -211,7 +211,7 @@ body { font-family: 'Segoe UI', Arial, sans-serif; background: var(--gray-bg); c
   <div class="header no-print">
     <div class="header-logo" style="display:flex;align-items:center;gap:8px">
         <img id="logoHeader" src="/img/logo.png" alt="AutoFácil" style="height:32px;object-fit:contain">
-        <span style="font-size:11px;font-weight:400;color:#90CAF9">V5.35</span>
+        <span style="font-size:11px;font-weight:400;color:#90CAF9">V5.36</span>
       </div>
     <div class="header-right">
       <span class="header-user" id="headerUser"></span>
@@ -375,6 +375,28 @@ body { font-family: 'Segoe UI', Arial, sans-serif; background: var(--gray-bg); c
         </div>
         <div class="form-row cols-3">
           <div class="field">
+            <label>RUT Cliente *</label>
+            <div style="display:flex;gap:6px;align-items:center">
+              <input type="text" id="fRutCliente" placeholder="12.345.678-9" oninput="autoFormatRUT(this)"
+                     onkeydown="if(event.key==='Enter')buscarCliente()" style="flex:1">
+              <button type="button" onclick="buscarCliente()" id="btnBuscarCliente"
+                style="background:#0141A2;color:#fff;border:none;border-radius:4px;padding:5px 14px;font-size:11px;font-weight:600;cursor:pointer;white-space:nowrap">
+                🔍 Buscar
+              </button>
+            </div>
+            <div id="rutClienteMsg" style="font-size:10px;margin-top:3px;display:none"></div>
+          </div>
+          <div class="field">
+            <label>Fecha Emisión</label>
+            <input type="date" id="fFecha" readonly onchange="updateMesField()">
+          </div>
+          <div class="field">
+            <label>Mes</label>
+            <input type="text" id="fMes" readonly style="background:#F5F5F5;color:#546E7A">
+          </div>
+        </div>
+        <div class="form-row cols-3">
+          <div class="field">
             <label>Nombre(s) *</label>
             <input type="text" id="fNombre" placeholder="Nombre(s)" onblur="autoTitleCase(this)">
           </div>
@@ -385,23 +407,6 @@ body { font-family: 'Segoe UI', Arial, sans-serif; background: var(--gray-bg); c
           <div class="field">
             <label>Apellido Materno</label>
             <input type="text" id="fApellidoMaterno" placeholder="Apellido Materno" onblur="autoTitleCase(this)">
-          </div>
-        </div>
-        <div class="form-row cols-3">
-          <div class="field">
-            <label>RUT Cliente *</label>
-            <div style="display:flex;gap:6px;align-items:center">
-              <input type="text" id="fRutCliente" placeholder="12.345.678-9" oninput="autoFormatRUT(this)" style="flex:1">
-              <button type="button" onclick="irACrearCliente()" title="Crear nuevo cliente" style="background:#1976D2;color:#fff;border:none;border-radius:4px;padding:5px 10px;font-size:11px;font-weight:600;cursor:pointer;white-space:nowrap">+ Crear</button>
-            </div>
-          </div>
-          <div class="field">
-            <label>Fecha Emisión</label>
-            <input type="date" id="fFecha" readonly onchange="updateMesField()">
-          </div>
-          <div class="field">
-            <label>Mes</label>
-            <input type="text" id="fMes" readonly style="background:#F5F5F5;color:#546E7A">
           </div>
         </div>
       </div>
@@ -4403,6 +4408,45 @@ function fmtInputDisplay(input, displayId){
   if(!el) return;
   const val = parseFloat(input.value)||0;
   el.textContent = val > 0 ? '$' + Math.round(val).toLocaleString('es-CL') : '';
+}
+
+// ── Buscar cliente por RUT y autocompletar nombres ───────────────────────────
+async function buscarCliente() {
+  const rut = (document.getElementById('fRutCliente')?.value || '').trim();
+  if (!rut) return;
+  const msg = document.getElementById('rutClienteMsg');
+  const btn = document.getElementById('btnBuscarCliente');
+  btn.textContent = '⏳'; btn.disabled = true;
+  msg.style.display = 'none';
+  try {
+    const token = sessionStorage.getItem('token');
+    const r = await fetch('/api/clientes/rut/' + encodeURIComponent(rut), {
+      headers: { Authorization: 'Bearer ' + token }
+    });
+    if (r.ok) {
+      const j = await r.json();
+      const c = j.data || j;
+      // Rellenar nombres desde BD
+      const toTitle = s => s ? s.split(' ').map(w=>w.charAt(0).toUpperCase()+w.slice(1).toLowerCase()).join(' ') : '';
+      document.getElementById('fNombre').value        = toTitle(c.nombres || c.nombre || '');
+      document.getElementById('fApellidoPaterno').value = toTitle(c.apellido_paterno || '');
+      document.getElementById('fApellidoMaterno').value = toTitle(c.apellido_materno || '');
+      msg.textContent = '✅ Cliente encontrado';
+      msg.style.cssText = 'font-size:10px;margin-top:3px;display:block;color:#2e7d32;font-weight:600';
+    } else if (r.status === 404) {
+      msg.textContent = '⚠️ Cliente no encontrado — se abrirá el formulario de creación';
+      msg.style.cssText = 'font-size:10px;margin-top:3px;display:block;color:#c62828;font-weight:600';
+      setTimeout(() => irACrearCliente(), 1200);
+    } else {
+      msg.textContent = '❌ Error al buscar cliente';
+      msg.style.cssText = 'font-size:10px;margin-top:3px;display:block;color:#c62828';
+    }
+  } catch(e) {
+    msg.textContent = '❌ Error de conexión';
+    msg.style.cssText = 'font-size:10px;margin-top:3px;display:block;color:#c62828';
+  } finally {
+    btn.textContent = '🔍 Buscar'; btn.disabled = false;
+  }
 }
 
 // ── Ir a crear cliente y volver ─────────────────────────────────────────────
