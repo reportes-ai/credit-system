@@ -39,12 +39,29 @@ exports.getInfo = async (req, res) => {
     });
     const horaUTC = ahora.toISOString().replace('T', ' ').slice(0, 19) + ' UTC';
 
-    // Offset actual de Chile
-    const offsetMs   = -new Date().toLocaleString('en-US', { timeZone: 'America/Santiago', timeZoneName: 'shortOffset' })
-      .match(/GMT([+-]\d+)/)?.[1] * 60 * 60 * 1000 || 0;
-    const chileTZ    = Intl.DateTimeFormat('es-CL', { timeZone: 'America/Santiago', timeZoneName: 'longOffset' })
-      .formatToParts(ahora).find(p => p.type === 'timeZoneName')?.value || '';
-    const modoActual = chileTZ.includes('-03') ? 'VERANO (UTC-3)' : 'INVIERNO (UTC-4)';
+    // Offset actual de Chile — compatible con Node 12+
+    let chileTZ = 'GMT-04:00';
+    let modoActual = 'INVIERNO (UTC-4)';
+    try {
+      const parts = Intl.DateTimeFormat('en-US', { timeZone: 'America/Santiago', timeZoneName: 'short' })
+        .formatToParts(ahora);
+      const tzPart = parts.find(p => p.type === 'timeZoneName')?.value || '';
+      // CLT = -4, CLST = -3
+      if (tzPart.includes('CLST') || tzPart.includes('-3') || tzPart.includes('GMT-3')) {
+        chileTZ = 'GMT-03:00 (CLST)';
+        modoActual = 'VERANO (UTC-3)';
+      } else {
+        chileTZ = 'GMT-04:00 (CLT)';
+        modoActual = 'INVIERNO (UTC-4)';
+      }
+    } catch(e) {
+      // fallback: calcular por diferencia con UTC
+      const utcH = ahora.getUTCHours();
+      const clH  = parseInt(ahora.toLocaleString('en-US', { timeZone:'America/Santiago', hour:'numeric', hour12:false }));
+      const diff = clH - utcH;
+      if (diff === -3 || diff === 21) { chileTZ = 'GMT-03:00 (CLST)'; modoActual = 'VERANO (UTC-3)'; }
+      else { chileTZ = 'GMT-04:00 (CLT)'; modoActual = 'INVIERNO (UTC-4)'; }
+    }
 
     // TZ del proceso
     const tzProceso = process.env.TZ || 'No configurado (UTC por defecto)';
