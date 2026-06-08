@@ -220,7 +220,7 @@ function buildV1() {
     const desde = document.getElementById('sel-desde')?.value||'';
     const hasta  = document.getElementById('sel-hasta')?.value||'';
     return r.mes >= desde && r.mes <= hasta &&
-           !['RECHAZADO','ANULADO'].includes(r.estado_eval);
+           ['APROBADO','OTORGADO'].includes(r.estado_eval);
   });
   const finAp = {};
   aprobados1.forEach(r => {
@@ -1314,8 +1314,8 @@ window.RAW_DATA = [];
 
   // Calcular resumen de un mes/rango desde RAW_DATA
   function calcResumen(rows) {
-    // Operaciones aprobadas (no rechazadas/anuladas)
-    const aprobados = rows.filter(r => !['RECHAZADO','ANULADO'].includes(r.estado_eval));
+    // Operaciones aprobadas: APROBADO + OTORGADO (Cursado en Trinidad)
+    const aprobados = rows.filter(r => ['APROBADO','OTORGADO'].includes(r.estado_eval));
     // mayor_menor ya viene calculado correctamente desde el API (UF de fecha_otorgado)
     const resolveInst = r => {
       if (r.institucion === 'AUTOFIN' || r.institucion === 'UNIDAD DE CREDITO') return r.institucion;
