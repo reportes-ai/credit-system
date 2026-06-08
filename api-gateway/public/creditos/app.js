@@ -264,9 +264,10 @@ function _filtrarPorEmpresa(lista) {
 }
 
 function aplicarFiltroEmpresa() {
-  if (!_todosCreditos.length) return;
+  buscarCreditos(1);
+}
+function _aplicarFiltroEmpresaLocal() {
   const baseEmpresa = _filtrarPorEmpresa(_todosCreditos);
-  actualizarStats(_lastStats, _lastTotal);
   const lista = _filtroProceso
     ? baseEmpresa.filter(c => !ESTADOS_FUERA_PROCESO.has(c.estado))
     : _aplicarFiltroEstado(baseEmpresa);
@@ -350,6 +351,7 @@ async function buscarCreditos(page = 1) {
   try {
     const params = new URLSearchParams({ page, limit: _LIMIT_PAG });
     if (q) params.set('q', q);
+    if (_empresasFiltro.size === 1) params.set('financiera', [..._empresasFiltro][0]);
     const r = await fetch('/api/creditos?' + params, { headers: apiHdr() });
     const j = await r.json();
     if (!j.success) throw new Error(j.error);

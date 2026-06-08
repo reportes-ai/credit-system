@@ -232,7 +232,7 @@ const create = async (req, res) => {
 /* ─── GET ALL ────────────────────────────────────────────────────────────── */
 const getAll = async (req, res) => {
   try {
-    const { q, page, limit, estado } = req.query;
+    const { q, page, limit, estado, financiera } = req.query;
     const pageNum  = Math.max(1, parseInt(page)  || 1);
     const limitNum = Math.min(500, Math.max(1, parseInt(limit) || 100));
     const offset   = (pageNum - 1) * limitNum;
@@ -254,6 +254,15 @@ const getAll = async (req, res) => {
     if (estado && estado !== 'todos') {
       where += ` AND ob.estado = ?`;
       params.push(estado.toUpperCase());
+    }
+
+    if (financiera && financiera !== 'TODAS') {
+      if (financiera === 'AUTOFACIL') {
+        where += ` AND (ob.financiera IS NULL OR ob.financiera NOT IN ('AUTOFIN','UNIDAD DE CREDITO'))`;
+      } else {
+        where += ` AND ob.financiera = ?`;
+        params.push(financiera.toUpperCase());
+      }
     }
 
     // Stats por estado (todos los registros que coinciden, sin paginar)
