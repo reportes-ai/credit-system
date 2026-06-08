@@ -1290,8 +1290,7 @@ document.body.insertAdjacentHTML('afterbegin', `
   
 `);
 
-cargarDatos();</script>
-<script>
+cargarDatos();
 // RAW_DATA se carga dinámicamente desde /data/dashboard_data.json
 window.RAW_DATA = [];
 
@@ -3571,4 +3570,4 @@ function exportarExcelModal() {
   a.href = URL.createObjectURL(blob);
   a.download = titulo.replace(/[/\\:*?"<>|]/g, '_') + '.csv';
   a.click();
-}
+}
