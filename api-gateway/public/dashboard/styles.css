@@ -1,0 +1,134 @@
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:'Roboto',sans-serif;background:#f0f2f5;font-size:12px;color:#333}
+
+/* ---- NAV ---- */
+.topbar{background:#1a2a4a;display:flex;flex-direction:column;flex-wrap:nowrap}
+.topbar-row1{display:flex;align-items:center;gap:10px;padding:0 12px;height:42px;border-bottom:1px solid #2a4070}
+.topbar-row2{display:flex;align-items:center;padding:0 8px;height:36px;background:#0f1e38}
+.brand{color:#fff;font-size:18px;font-weight:700;letter-spacing:-.5px}
+.brand span{color:#4fc3f7}
+.tabs{display:flex;gap:0px}
+.tab{padding:0 13px;height:36px;display:flex;align-items:center;font-size:11px;font-weight:500;color:#aac4e8;cursor:pointer;border-bottom:2px solid transparent;transition:.15s;white-space:nowrap}
+.tab:hover{color:#fff;background:#ffffff0d}
+.tab.active{color:#fff;border-bottom-color:#4fc3f7}
+
+/* ---- VIEWS ---- */
+.view{display:none;padding:12px 14px}
+.view.active{display:block}
+
+/* ---- HEADER BAR ---- */
+.dash-header{display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:10px}
+.dash-title{font-size:22px;font-weight:700;color:#1a2a4a;text-transform:uppercase;letter-spacing:-.3px}
+.period-badge{background:#fff;border:1px solid #dce3ed;padding:5px 12px;border-radius:6px;font-size:11px;color:#555;display:flex;align-items:center;gap:6px}
+.logo-block{text-align:right;display:flex;flex-direction:column;align-items:flex-end;gap:2px}
+.logo-block img{height:36px;display:block}
+.logo-block .logo-sub{font-size:10px;color:#888;font-style:italic}
+
+/* ---- KPI STRIP ---- */
+.kpi-strip{display:flex;gap:6px;margin-bottom:10px;flex-wrap:wrap}
+.kpi-box{background:#fff;border:1px solid #dce3ed;border-radius:6px;padding:7px 12px;min-width:110px;flex:1}
+.kpi-box.highlight{background:#e3f2fd;border-color:#90caf9}
+.kpi-box.highlight-teal{background:#e0f7fa;border-color:#4fc3f7}
+.kpi-label{font-size:10px;color:#777;text-transform:uppercase;letter-spacing:.3px;margin-bottom:2px}
+.kpi-val{font-size:18px;font-weight:700;color:#1a2a4a;line-height:1.1}
+.kpi-val.big{font-size:22px}
+.kpi-sub{font-size:10px;color:#2196F3;font-weight:500;margin-top:1px}
+
+/* ---- GRID ---- */
+.g2{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px}
+.g3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;margin-bottom:10px}
+.g6535{display:grid;grid-template-columns:1.85fr 1fr;gap:10px;margin-bottom:10px}
+.g3565{display:grid;grid-template-columns:1fr 1.85fr;gap:10px;margin-bottom:10px}
+.g3parts{display:grid;grid-template-columns:1.1fr 1.2fr 0.7fr;gap:10px;margin-bottom:10px}
+
+/* ---- CARD ---- */
+.card{background:#fff;border:1px solid #dce3ed;border-radius:6px;overflow:hidden}
+.card-head{background:#1a3a6a;color:#fff;padding:7px 10px;font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.3px;display:flex;align-items:center;justify-content:space-between}
+.card-head.light{background:#2196F3}
+.card-head.teal{background:#00838f}
+.card-body{padding:8px 10px}
+
+/* ---- TABLES ---- */
+.tbl{width:100%;border-collapse:collapse;font-size:11px}
+.tbl thead tr{background:#1a3a6a}
+.tbl thead th{color:#fff;padding:5px 6px;text-align:right;font-weight:500;font-size:10px;white-space:nowrap}
+.tbl thead th:first-child{text-align:left}
+.tbl tbody td{padding:4px 6px;border-bottom:1px solid #f0f2f5;text-align:right;white-space:nowrap;color:#333}
+.tbl tbody td:first-child{text-align:left;color:#444}
+.tbl tbody tr:hover{background:#f5f8ff}
+.tbl tfoot td{padding:5px 6px;font-weight:700;color:#1a3a6a;border-top:2px solid #dce3ed;text-align:right;background:#f8faff}
+.tbl tfoot td:first-child{text-align:left}
+.num{text-align:right}
+.rank{color:#aaa;font-size:10px;margin-right:3px}
+
+/* ---- DONUT ---- */
+.donut-section{display:flex;align-items:center;gap:12px;padding:8px 10px}
+.donut-wrap{position:relative;width:130px;height:130px;flex-shrink:0}
+.donut-center{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);text-align:center}
+.donut-center-val{font-size:13px;font-weight:700;color:#1a2a4a}
+.donut-center-lbl{font-size:9px;color:#888}
+.donut-legend-list{flex:1}
+.dleg{display:flex;align-items:center;gap:6px;margin-bottom:7px}
+.dleg-dot{width:10px;height:10px;border-radius:50%;flex-shrink:0}
+.dleg-name{font-size:10px;color:#555;flex:1}
+.dleg-val{font-weight:700;font-size:11px;color:#1a2a4a}
+.dleg-pct{font-size:10px;color:#888}
+
+/* ---- SUMMARY TABLE (estado comercial) ---- */
+.sumtbl{width:100%;border-collapse:collapse;font-size:11px}
+.sumtbl th{color:#fff;background:#1a3a6a;padding:5px 8px;text-align:left;font-weight:500;font-size:10px}
+.sumtbl th:not(:first-child){text-align:right}
+.sumtbl td{padding:4px 8px;border-bottom:1px solid #f0f2f5;text-align:right}
+.sumtbl td:first-child{text-align:left;color:#444}
+.sumtbl tfoot td{font-weight:700;color:#1a3a6a;border-top:2px solid #dce3ed;background:#f8faff;padding:5px 8px}
+
+/* ---- HIGHLIGHTED NUMBERS ---- */
+.pct-hi{background:#1565C0;color:#fff;padding:1px 5px;border-radius:3px;font-weight:600;font-size:10px}
+.pct-warn{background:#f59e0b20;color:#b45309;padding:1px 5px;border-radius:3px;font-weight:600;font-size:10px}
+.pct-ok{background:#10b98120;color:#065f46;padding:1px 5px;border-radius:3px;font-weight:600;font-size:10px}
+.pct-bad{background:#ef444420;color:#991b1b;padding:1px 5px;border-radius:3px;font-weight:600;font-size:10px}
+.tag-may{background:#1565C020;color:#1565C0;padding:1px 5px;border-radius:3px;font-size:9px;font-weight:600}
+.tag-men{background:#43a04720;color:#2e7d32;padding:1px 5px;border-radius:3px;font-size:9px;font-weight:600}
+
+/* ---- CHART CONTAINER ---- */
+.ch{position:relative}
+
+/* ---- SCROLL TABLE ---- */
+.scroll-t{overflow-y:auto;max-height:340px}
+.scroll-t thead th{position:sticky;top:0;z-index:1;background:#1a3a6a;color:#fff}
+#t-modal-ops thead th{position:sticky;top:0;z-index:2;background:#1a3a6a}
+.scroll-t::-webkit-scrollbar{width:4px}
+.scroll-t::-webkit-scrollbar-track{background:#f0f2f5}
+.scroll-t::-webkit-scrollbar-thumb{background:#cdd5df;border-radius:2px}
+
+/* ---- FILTER PILLS ---- */
+.pills{display:flex;gap:5px;margin-bottom:8px}
+.pill{padding:3px 10px;border-radius:12px;font-size:10px;font-weight:600;cursor:pointer;border:1px solid #dce3ed;background:#f8faff;color:#555;transition:.15s}
+.pill.active{background:#1a3a6a;color:#fff;border-color:#1a3a6a}
+
+/* ---- TENDENCIA KPI ---- */
+.tend-kpi-row{display:grid;grid-template-columns:repeat(5,1fr);gap:8px;margin-bottom:10px}
+
+/* ---- MODAL DETALLE EJECUTIVO ---- */
+#modal-ejec-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:9000;align-items:center;justify-content:center}
+#modal-ejec-overlay.open{display:flex}
+#modal-ejec{background:#fff;border-radius:8px;box-shadow:0 8px 32px rgba(0,0,0,.35);width:92vw;max-width:1100px;max-height:88vh;display:flex;flex-direction:column;overflow:hidden}
+#modal-ejec-head{background:#1a3a6a;color:#fff;padding:10px 14px;display:flex;align-items:center;justify-content:space-between;flex-shrink:0}
+#modal-ejec-title{font-size:13px;font-weight:700;text-transform:uppercase;letter-spacing:.3px}
+#modal-ejec-close{background:none;border:none;color:#fff;font-size:18px;cursor:pointer;line-height:1;padding:0 4px}
+#modal-ejec-kpis{display:flex;gap:8px;padding:8px 12px;background:#f8faff;border-bottom:1px solid #dce3ed;flex-shrink:0;flex-wrap:wrap}
+.mekpi{background:#fff;border:1px solid #dce3ed;border-radius:5px;padding:5px 10px;min-width:100px}
+.mekpi-lbl{font-size:9px;color:#888;text-transform:uppercase}
+.mekpi-val{font-size:14px;font-weight:700;color:#1a3a6a}
+#modal-ejec-body{overflow:auto;flex:1;padding:8px 12px}
+#t-modal-ops{width:100%;border-collapse:collapse;font-size:11px}
+#t-modal-ops thead th{background:#1a3a6a;color:#fff;padding:6px 8px;text-align:right;white-space:nowrap;font-size:10px;position:sticky;top:0}
+#t-modal-ops thead th:first-child,#t-modal-ops thead th:nth-child(2){text-align:left}
+#t-modal-ops tbody td{padding:5px 8px;border-bottom:1px solid #f0f2f5;text-align:right;white-space:nowrap}
+#t-modal-ops tbody td:first-child,#t-modal-ops tbody td:nth-child(2){text-align:left;color:#444}
+#t-modal-ops tbody tr:hover{background:#f5f8ff}
+#t-modal-ops tfoot td{padding:5px 8px;font-weight:700;color:#1a3a6a;border-top:2px solid #dce3ed;background:#f8faff;text-align:right}
+#t-modal-ops tfoot td:first-child{text-align:left}
+.ej-link{color:#1565C0;text-decoration:none;cursor:pointer;border-bottom:1px dotted #1565C0}
+.ej-link:hover{color:#0d47a1}
+@keyframes spin{to{transform:rotate(360deg)}}
