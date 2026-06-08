@@ -344,9 +344,12 @@ exports.verificarIndices = async (req, res) => {
     const [baseline] = await conn.query(
       'SELECT * FROM db_index_baseline ORDER BY tabla_nombre, index_nombre'
     );
-    const [capInfo] = await conn.query(
-      'SELECT MIN(capturado_at) AS fecha, capturado_por FROM db_index_baseline LIMIT 1'
-    );
+    const [capInfo] = await conn.query(`
+      SELECT capturado_at AS fecha, capturado_por
+      FROM db_index_baseline
+      ORDER BY capturado_at ASC
+      LIMIT 1
+    `);
     conn.release();
 
     if (!baseline.length) {
