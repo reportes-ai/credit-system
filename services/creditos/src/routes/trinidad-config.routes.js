@@ -11,6 +11,7 @@ router.put   ('/estados/:id',   verifyToken, soloAdmin, ctrl.updateEstado);
 router.delete('/estados/:id',   verifyToken, soloAdmin, ctrl.deleteEstado);
 
 // Ejecutivos
+router.get   ('/ejecutivos-af',   verifyToken, ctrl.getEjecutivosAF);
 router.get   ('/ejecutivos',      verifyToken, ctrl.getEjecutivos);
 router.post  ('/ejecutivos',      verifyToken, soloAdmin, ctrl.createEjecutivo);
 router.put   ('/ejecutivos/:id',  verifyToken, soloAdmin, ctrl.updateEjecutivo);

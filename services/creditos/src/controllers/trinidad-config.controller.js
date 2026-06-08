@@ -105,6 +105,20 @@ exports.deleteEstado = async (req, res) => {
 
 /* ══════════════════ EJECUTIVOS ══════════════════ */
 
+// Devuelve lista de ejecutivos distintos de la tabla creditos (para el dropdown)
+exports.getEjecutivosAF = async (req, res) => {
+  try {
+    const [rows] = await pool.query(
+      `SELECT DISTINCT ejecutivo FROM creditos
+       WHERE ejecutivo IS NOT NULL AND ejecutivo <> ''
+       ORDER BY ejecutivo`
+    );
+    return res.json({ success: true, data: rows.map(r => r.ejecutivo) });
+  } catch (e) {
+    return res.json({ success: false, error: e.message });
+  }
+};
+
 exports.getEjecutivos = async (req, res) => {
   try {
     const [rows] = await pool.query('SELECT * FROM trinidad_ejecutivos ORDER BY nombre_trinidad');
