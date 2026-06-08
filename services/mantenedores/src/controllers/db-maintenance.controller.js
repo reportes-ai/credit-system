@@ -1,7 +1,7 @@
 'use strict';
 const pool = require('../../../../shared/config/database');
 
-// ─── Migración: crear tabla de log si no existe ──────────────────────────────
+// ─── Migraciones ─────────────────────────────────────────────────────────────
 (async () => {
   try {
     await pool.query(`
@@ -18,8 +18,23 @@ const pool = require('../../../../shared/config/database');
         INDEX idx_fecha (ejecutado_at)
       )
     `);
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS db_index_baseline (
+        id             INT AUTO_INCREMENT PRIMARY KEY,
+        tabla_nombre   VARCHAR(128) NOT NULL,
+        index_nombre   VARCHAR(128) NOT NULL,
+        columnas       TEXT         NOT NULL,   -- JSON array de columnas en orden
+        es_unico       TINYINT(1)   NOT NULL DEFAULT 0,
+        es_pk          TINYINT(1)   NOT NULL DEFAULT 0,
+        index_type     VARCHAR(32)  NOT NULL DEFAULT 'BTREE',
+        ddl_restaurar  TEXT         DEFAULT NULL, -- CREATE INDEX listo para ejecutar
+        capturado_at   DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        capturado_por  VARCHAR(64)  DEFAULT NULL,
+        UNIQUE KEY uq_tabla_idx (tabla_nombre, index_nombre)
+      )
+    `);
   } catch (e) {
-    console.error('[db-maintenance] migración log:', e.message);
+    console.error('[db-maintenance] migraciones:', e.message);
   }
 })();
 
@@ -247,6 +262,188 @@ exports.ejecutarMantenimiento = async (req, res) => {
     });
   } catch (err) {
     console.error('[db-maintenance] ejecutarMantenimiento:', err.message);
+    return res.status(500).json({ success: false, data: null, error: err.message });
+  }
+};
+
+// ─── Helper: leer índices actuales de information_schema ────────────────────
+async function leerIndicesActuales(conn) {
+  const [rows] = await conn.query(`
+    SELECT
+      TABLE_NAME     AS tabla,
+      INDEX_NAME     AS nombre,
+      SEQ_IN_INDEX   AS seq,
+      COLUMN_NAME    AS columna,
+      NON_UNIQUE     AS no_unico,
+      INDEX_TYPE     AS tipo
+    FROM information_schema.STATISTICS
+    WHERE TABLE_SCHEMA = DATABASE()
+      AND TABLE_NAME NOT IN ('db_maintenance_log','db_index_baseline')
+    ORDER BY TABLE_NAME, INDEX_NAME, SEQ_IN_INDEX
+  `);
+  const mapa = {};
+  rows.forEach(r => {
+    const key = r.tabla + '||' + r.nombre;
+    if (!mapa[key]) {
+      mapa[key] = {
+        tabla:    r.tabla,
+        nombre:   r.nombre,
+        columnas: [],
+        es_unico: r.no_unico === 0 ? 1 : 0,
+        es_pk:    r.nombre === 'PRIMARY' ? 1 : 0,
+        tipo:     r.tipo,
+      };
+    }
+    mapa[key].columnas.push(r.columna);
+  });
+  return Object.values(mapa);
+}
+
+// ─── Capturar baseline de índices ────────────────────────────────────────────
+exports.capturarBaseline = async (req, res) => {
+  const usuario = req.user ? (req.user.email || req.user.nombre || String(req.user.id)) : 'sistema';
+  try {
+    const conn = await pool.getConnection();
+    const indices = await leerIndicesActuales(conn);
+    await conn.query('DELETE FROM db_index_baseline');
+    for (const idx of indices) {
+      let ddl = null;
+      if (!idx.es_pk) {
+        const unico = idx.es_unico ? 'UNIQUE ' : '';
+        const cols  = idx.columnas.map(c => `\`${c}\``).join(', ');
+        ddl = `CREATE ${unico}INDEX \`${idx.nombre}\` ON \`${idx.tabla}\` (${cols})`;
+      }
+      await conn.query(
+        `INSERT INTO db_index_baseline
+           (tabla_nombre, index_nombre, columnas, es_unico, es_pk, index_type, ddl_restaurar, capturado_por)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+        [idx.tabla, idx.nombre, JSON.stringify(idx.columnas),
+         idx.es_unico, idx.es_pk, idx.tipo, ddl, usuario]
+      );
+    }
+    conn.release();
+    return res.json({
+      success: true,
+      data: { total_indices: indices.length, capturado_at: new Date().toISOString() },
+      error: null,
+    });
+  } catch (err) {
+    console.error('[db-maintenance] capturarBaseline:', err.message);
+    return res.status(500).json({ success: false, data: null, error: err.message });
+  }
+};
+
+// ─── Verificar índices vs baseline ───────────────────────────────────────────
+exports.verificarIndices = async (req, res) => {
+  try {
+    const conn = await pool.getConnection();
+    const actuales = await leerIndicesActuales(conn);
+    const actualMap = {};
+    actuales.forEach(i => { actualMap[i.tabla + '||' + i.nombre] = i; });
+
+    const [baseline] = await conn.query(
+      'SELECT * FROM db_index_baseline ORDER BY tabla_nombre, index_nombre'
+    );
+    const [capInfo] = await conn.query(
+      'SELECT MIN(capturado_at) AS fecha, capturado_por FROM db_index_baseline LIMIT 1'
+    );
+    conn.release();
+
+    if (!baseline.length) {
+      return res.json({
+        success: true,
+        data: { sin_baseline: true, faltantes: [], extras: [], ok: [], resumen: {} },
+        error: null,
+      });
+    }
+
+    const faltantes = [];
+    const ok = [];
+    baseline.forEach(b => {
+      const key = b.tabla_nombre + '||' + b.index_nombre;
+      if (actualMap[key]) {
+        ok.push({ tabla: b.tabla_nombre, nombre: b.index_nombre, es_pk: b.es_pk,
+                  columnas: JSON.parse(b.columnas || '[]') });
+      } else {
+        faltantes.push({
+          tabla: b.tabla_nombre, nombre: b.index_nombre,
+          columnas: JSON.parse(b.columnas || '[]'),
+          es_unico: b.es_unico, es_pk: b.es_pk, tipo: b.index_type, ddl: b.ddl_restaurar,
+        });
+      }
+    });
+    const extras = actuales
+      .filter(i => !baseline.find(b => b.tabla_nombre === i.tabla && b.index_nombre === i.nombre))
+      .map(i => ({ tabla: i.tabla, nombre: i.nombre, columnas: i.columnas, es_pk: i.es_pk }));
+
+    return res.json({
+      success: true,
+      data: {
+        sin_baseline: false, faltantes, extras, ok,
+        resumen: {
+          total_baseline: baseline.length,
+          ok: ok.length, faltantes: faltantes.length, extras: extras.length,
+        },
+        captura: capInfo[0] || null,
+      },
+      error: null,
+    });
+  } catch (err) {
+    console.error('[db-maintenance] verificarIndices:', err.message);
+    return res.status(500).json({ success: false, data: null, error: err.message });
+  }
+};
+
+// ─── Restaurar índices faltantes ─────────────────────────────────────────────
+exports.restaurarIndices = async (req, res) => {
+  const { indices: param = [] } = req.body || {};
+  const usuario = req.user ? (req.user.email || req.user.nombre || String(req.user.id)) : 'sistema';
+  try {
+    const conn = await pool.getConnection();
+    let query = 'SELECT * FROM db_index_baseline WHERE ddl_restaurar IS NOT NULL AND es_pk = 0';
+    const args = [];
+    if (param.length) {
+      const pares = param.map(() => '(tabla_nombre = ? AND index_nombre = ?)').join(' OR ');
+      query += ` AND (${pares})`;
+      param.forEach(p => args.push(p.tabla, p.nombre));
+    }
+    const [targets] = await conn.query(query, args);
+    const actuales  = await leerIndicesActuales(conn);
+    const actualKeys = new Set(actuales.map(i => i.tabla + '||' + i.nombre));
+
+    const resultados = [];
+    for (const t of targets) {
+      const key = t.tabla_nombre + '||' + t.index_nombre;
+      if (actualKeys.has(key)) {
+        resultados.push({ tabla: t.tabla_nombre, nombre: t.index_nombre, estado: 'ya_existe' });
+        continue;
+      }
+      const t0 = Date.now();
+      try {
+        await conn.query(t.ddl_restaurar);
+        const ms = Date.now() - t0;
+        resultados.push({ tabla: t.tabla_nombre, nombre: t.index_nombre, estado: 'restaurado', ms });
+        await conn.query(
+          `INSERT INTO db_maintenance_log (tabla_nombre, operacion, estado, duracion_ms, ejecutado_por)
+           VALUES (?, ?, ?, ?, ?)`,
+          [t.tabla_nombre, 'restore_index:' + t.index_nombre, 'ok', ms, usuario]
+        );
+      } catch (err) {
+        resultados.push({ tabla: t.tabla_nombre, nombre: t.index_nombre,
+                          estado: 'error', mensaje: err.message });
+      }
+    }
+    conn.release();
+    const restaurados = resultados.filter(r => r.estado === 'restaurado').length;
+    const errores     = resultados.filter(r => r.estado === 'error').length;
+    return res.json({
+      success: true,
+      data: { resultados, resumen: { restaurados, errores,
+        ya_existian: resultados.length - restaurados - errores } },
+      error: null,
+    });
+  } catch (err) {
+    console.error('[db-maintenance] restaurarIndices:', err.message);
     return res.status(500).json({ success: false, data: null, error: err.message });
   }
 };

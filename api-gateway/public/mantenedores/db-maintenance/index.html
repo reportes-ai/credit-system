@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- v1.3 -->
+<!-- v1.4 -->
 <html lang="es">
 <head>
   <meta charset="UTF-8">
@@ -163,6 +163,49 @@
     .hist-row-err { background: #fff8f8; }
     .hist-dur { color: #888; font-size: .78rem; }
     .hist-empty { text-align: center; color: #aaa; padding: 40px; font-size: .9rem; }
+
+    /* ── Índices ── */
+    .idx-ok-row  { background: #fafff9; }
+    .idx-flt-row { background: #fff8f8; }
+    .idx-ext-row { background: #f8f9ff; }
+    .idx-tag { display: inline-block; border-radius: 4px; padding: 1px 8px;
+               font-size: .73rem; font-weight: 600; margin: 1px 2px; }
+    .idx-tag-pk   { background: #e3f2fd; color: #0d47a1; }
+    .idx-tag-uq   { background: #f3e5f5; color: #6a1b9a; }
+    .idx-tag-idx  { background: #e8f5e9; color: #1b5e20; }
+    .idx-tag-miss { background: #ffebee; color: #b71c1c; }
+    .idx-tag-new  { background: #e8eaf6; color: #283593; }
+    .idx-cols     { font-family: 'Courier New', monospace; font-size: .78rem;
+                    color: #555; background: #f5f5f5; border-radius: 4px;
+                    padding: 1px 6px; }
+    .alert-baseline {
+      background: #fff8e1; border: 1px solid #ffe082; border-radius: 10px;
+      padding: 16px 20px; display: flex; gap: 14px; align-items: flex-start;
+    }
+    .card-idx-resumen {
+      display: flex; gap: 16px; flex-wrap: wrap; padding: 16px 20px;
+      border-bottom: 1px solid #eee;
+    }
+    .idx-chip { border-radius: 8px; padding: 8px 16px; font-size: .84rem;
+                font-weight: 700; display: flex; align-items: center; gap: 6px; }
+    .idx-chip-ok   { background: #e8f5e9; color: #2e7d32; }
+    .idx-chip-miss { background: #ffebee; color: #c62828; }
+    .idx-chip-new  { background: #e8eaf6; color: #283593; }
+    .idx-chip-tot  { background: #f3f4f6; color: #444; }
+    .btn-restaurar-all {
+      background: #c62828; color: #fff; border: none; border-radius: 8px;
+      padding: 9px 20px; font-weight: 700; font-size: .88rem;
+      cursor: pointer; transition: opacity .2s;
+    }
+    .btn-restaurar-all:disabled { opacity: .5; cursor: not-allowed; }
+    .btn-restaurar-all:not(:disabled):hover { opacity: .85; }
+    .btn-baseline {
+      background: #1a237e; color: #fff; border: none; border-radius: 8px;
+      padding: 9px 20px; font-weight: 700; font-size: .88rem;
+      cursor: pointer; transition: opacity .2s;
+    }
+    .btn-baseline:disabled { opacity: .5; cursor: not-allowed; }
+    .btn-baseline:not(:disabled):hover { opacity: .85; }
   </style>
 </head>
 <body>
@@ -170,7 +213,7 @@
 <div class="topbar">
   <i class="bi bi-database-gear" style="font-size:1.5rem"></i>
   <h1>Mantenimiento de Base de Datos</h1>
-  <span class="badge-version">v1.3</span>
+  <span class="badge-version">v1.4</span>
   <a href="/mantenedores/" class="ms-auto text-white-50 text-decoration-none" style="font-size:.85rem">
     <i class="bi bi-arrow-left"></i> Mantenedores
   </a>
@@ -305,6 +348,30 @@
       </div>
       <div class="p-3">
         <div class="log-box" id="log-content"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ══════════════════════════════════════════════════════════
+       VERIFICACIÓN DE ÍNDICES
+  ══════════════════════════════════════════════════════════ -->
+  <div class="panel-card mb-4" id="bloque-indices">
+    <div class="panel-header">
+      <i class="bi bi-key-fill"></i> Verificación de Índices
+      <div class="ms-auto d-flex gap-2 align-items-center">
+        <button class="btn-restaurar-all" id="btn-restaurar-all"
+                onclick="restaurarTodos()" style="display:none">
+          <i class="bi bi-arrow-counterclockwise"></i> Restaurar faltantes
+        </button>
+        <button class="btn-baseline" id="btn-baseline" onclick="capturarBaseline()">
+          <i class="bi bi-camera"></i> Capturar foto actual
+        </button>
+      </div>
+    </div>
+    <div id="idx-contenido">
+      <div class="hist-empty" style="padding:30px">
+        <i class="bi bi-hourglass" style="font-size:1.5rem;opacity:.4"></i><br>
+        Cargando verificación de índices…
       </div>
     </div>
   </div>
@@ -684,8 +751,213 @@ async function ejecutarMantenimiento() {
   }
 }
 
+// ── Índices ────────────────────────────────────────────────────────────
+async function cargarIndices() {
+  document.getElementById('idx-contenido').innerHTML =
+    '<div class="hist-empty" style="padding:24px"><span class="spinner-ring" style="border-top-color:#1a237e;border-color:rgba(26,35,126,.2)"></span> Verificando índices…</div>';
+  try {
+    const r = await fetch(API + '/indices', {
+      headers: { Authorization: 'Bearer ' + sessionStorage.getItem('token') }
+    });
+    if (!httpOk(r)) throw new Error('Error ' + r.status);
+    const json = await r.json();
+    if (!json.success) throw new Error(json.error);
+    renderIndices(json.data);
+  } catch (e) {
+    document.getElementById('idx-contenido').innerHTML =
+      `<div class="hist-empty" style="color:#c62828;padding:24px">Error: ${e.message}</div>`;
+  }
+}
+
+function renderIndices(data) {
+  const cont = document.getElementById('idx-contenido');
+  const btnRest = document.getElementById('btn-restaurar-all');
+
+  if (data.sin_baseline) {
+    cont.innerHTML = `
+      <div class="p-4">
+        <div class="alert-baseline">
+          <i class="bi bi-camera" style="font-size:1.8rem;color:#f59e0b;flex-shrink:0"></i>
+          <div>
+            <div style="font-weight:700;font-size:.95rem;margin-bottom:6px">
+              Sin foto de referencia (baseline) todavía
+            </div>
+            <div style="font-size:.85rem;color:#555;line-height:1.6">
+              Para poder detectar índices faltantes en el futuro, primero debes capturar el estado actual
+              de la base de datos como referencia. Haz clic en <b>"Capturar foto actual"</b> cuando la BD
+              esté en buen estado (idealmente recién instalada o tras una verificación manual).<br>
+              A partir de ese momento, cada diagnóstico comparará el estado real contra esta foto
+              y alertará si falta algún índice.
+            </div>
+          </div>
+        </div>
+      </div>`;
+    btnRest.style.display = 'none';
+    return;
+  }
+
+  const { faltantes, extras, ok, resumen, captura } = data;
+  btnRest.style.display = faltantes.length ? '' : 'none';
+
+  const fechaCaptura = captura && captura.fecha
+    ? fmtFecha(captura.fecha) + (captura.capturado_por ? ' por ' + captura.capturado_por : '')
+    : '–';
+
+  let html = `
+    <div class="card-idx-resumen">
+      <span class="idx-chip idx-chip-tot"><i class="bi bi-database"></i> ${resumen.total_baseline} índices en baseline</span>
+      <span class="idx-chip idx-chip-ok"><i class="bi bi-check-circle-fill"></i> ${resumen.ok} presentes</span>
+      ${faltantes.length ? `<span class="idx-chip idx-chip-miss"><i class="bi bi-exclamation-triangle-fill"></i> ${faltantes.length} FALTANTES</span>` : ''}
+      ${extras.length    ? `<span class="idx-chip idx-chip-new"><i class="bi bi-plus-circle"></i> ${extras.length} nuevos</span>` : ''}
+      <span style="margin-left:auto;font-size:.78rem;color:#aaa">Foto tomada: ${fechaCaptura}</span>
+    </div>`;
+
+  // Faltantes (crítico)
+  if (faltantes.length) {
+    html += `
+    <div style="padding:12px 20px 4px;font-weight:700;color:#c62828;font-size:.88rem">
+      <i class="bi bi-exclamation-triangle-fill"></i> Índices FALTANTES — presentes en la foto pero ausentes en la BD actual
+    </div>
+    <div style="overflow-x:auto">
+    <table class="db-table">
+      <thead><tr>
+        <th><input type="checkbox" id="chk-idx-all" onchange="toggleIdxAll(this)"> Sel.</th>
+        <th>Tabla</th><th>Nombre del índice</th><th>Tipo</th><th>Columnas</th><th>DDL restauración</th>
+      </tr></thead>
+      <tbody>
+        ${faltantes.map((f, i) => `
+          <tr class="idx-flt-row">
+            <td><input type="checkbox" class="chk-idx" data-tabla="${f.tabla}" data-nombre="${f.nombre}" checked></td>
+            <td><strong>${f.tabla}</strong></td>
+            <td><span class="idx-tag idx-tag-miss">${f.nombre}</span></td>
+            <td>
+              ${f.es_pk ? '<span class="idx-tag idx-tag-pk">PRIMARY KEY</span>' : ''}
+              ${f.es_unico && !f.es_pk ? '<span class="idx-tag idx-tag-uq">UNIQUE</span>' : ''}
+              ${!f.es_pk && !f.es_unico ? '<span class="idx-tag idx-tag-idx">INDEX</span>' : ''}
+            </td>
+            <td>${f.columnas.map(c => `<span class="idx-cols">${c}</span>`).join(' + ')}</td>
+            <td style="font-size:.75rem;color:#555;font-family:monospace">${f.ddl || '(PK — no restaurable automáticamente)'}</td>
+          </tr>`).join('')}
+      </tbody>
+    </table></div>`;
+  }
+
+  // OK
+  html += `
+    <details style="margin:12px 20px">
+      <summary style="cursor:pointer;font-weight:700;font-size:.85rem;color:#2e7d32;padding:6px 0">
+        <i class="bi bi-check-circle-fill"></i> ${ok.length} índices presentes y en orden
+      </summary>
+      <div style="overflow-x:auto;margin-top:8px">
+      <table class="db-table">
+        <thead><tr><th>Tabla</th><th>Índice</th><th>Tipo</th><th>Columnas</th></tr></thead>
+        <tbody>
+          ${ok.map(i => `
+            <tr class="idx-ok-row">
+              <td>${i.tabla}</td>
+              <td><span class="idx-tag ${i.es_pk ? 'idx-tag-pk' : 'idx-tag-idx'}">${i.nombre}</span></td>
+              <td>${i.es_pk ? '<span class="idx-tag idx-tag-pk">PK</span>' : i.es_unico ? '<span class="idx-tag idx-tag-uq">UNIQUE</span>' : '<span class="idx-tag idx-tag-idx">INDEX</span>'}</td>
+              <td>${(i.columnas||[]).map(c => `<span class="idx-cols">${c}</span>`).join(' + ')}</td>
+            </tr>`).join('')}
+        </tbody>
+      </table></div>
+    </details>`;
+
+  // Extras
+  if (extras.length) {
+    html += `
+    <details style="margin:4px 20px 12px">
+      <summary style="cursor:pointer;font-weight:700;font-size:.85rem;color:#283593;padding:6px 0">
+        <i class="bi bi-plus-circle"></i> ${extras.length} índices nuevos (no estaban en la foto)
+      </summary>
+      <div style="font-size:.8rem;color:#666;margin:6px 0 8px">
+        Estos índices se crearon después de la última foto. No es un problema — son mejoras.
+        Si quieres incluirlos en la referencia, toma una nueva foto.
+      </div>
+      <div style="overflow-x:auto">
+      <table class="db-table">
+        <thead><tr><th>Tabla</th><th>Índice</th><th>Columnas</th></tr></thead>
+        <tbody>
+          ${extras.map(i => `
+            <tr class="idx-ext-row">
+              <td>${i.tabla}</td>
+              <td><span class="idx-tag idx-tag-new">${i.nombre}</span></td>
+              <td>${(i.columnas||[]).map(c => `<span class="idx-cols">${c}</span>`).join(' + ')}</td>
+            </tr>`).join('')}
+        </tbody>
+      </table></div>
+    </details>`;
+  }
+
+  cont.innerHTML = html;
+}
+
+function toggleIdxAll(chk) {
+  document.querySelectorAll('.chk-idx').forEach(c => { c.checked = chk.checked; });
+}
+
+async function capturarBaseline() {
+  if (!confirm('¿Capturar el estado actual de todos los índices como referencia?\n\nEsto sobreescribirá la foto anterior.')) return;
+  const btn = document.getElementById('btn-baseline');
+  btn.disabled = true;
+  btn.innerHTML = '<span class="spinner-ring"></span> Capturando…';
+  try {
+    const r = await fetch(API + '/indices/baseline', {
+      method: 'POST',
+      headers: { Authorization: 'Bearer ' + sessionStorage.getItem('token') }
+    });
+    const json = await r.json();
+    if (!json.success) throw new Error(json.error);
+    log(`📸 Baseline capturado: ${json.data.total_indices} índices registrados como referencia`, 'info');
+    await cargarIndices();
+  } catch (e) {
+    alert('Error: ' + e.message);
+  } finally {
+    btn.disabled = false;
+    btn.innerHTML = '<i class="bi bi-camera"></i> Capturar foto actual';
+  }
+}
+
+async function restaurarTodos() {
+  const seleccionados = [...document.querySelectorAll('.chk-idx:checked')]
+    .map(c => ({ tabla: c.dataset.tabla, nombre: c.dataset.nombre }));
+
+  if (!seleccionados.length) { alert('Selecciona al menos un índice.'); return; }
+
+  const detalles = seleccionados.map(s => `  • ${s.tabla} → ${s.nombre}`).join('\n');
+  if (!confirm(`¿Restaurar ${seleccionados.length} índice(s)?\n\n${detalles}\n\nEsta operación puede tardar algunos segundos.`)) return;
+
+  const btn = document.getElementById('btn-restaurar-all');
+  btn.disabled = true;
+  btn.innerHTML = '<span class="spinner-ring"></span> Restaurando…';
+
+  try {
+    const r = await fetch(API + '/indices/restaurar', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + sessionStorage.getItem('token') },
+      body: JSON.stringify({ indices: seleccionados }),
+    });
+    const json = await r.json();
+    if (!json.success) throw new Error(json.error);
+    const res = json.data.resumen;
+    log(`🔑 Restauración: ${res.restaurados} índice(s) creados, ${res.errores} error(es)`, res.errores ? 'warn' : 'ok');
+    json.data.resultados.forEach(r2 => {
+      if (r2.estado === 'restaurado') log(`  ✓ ${r2.tabla}.${r2.nombre} — restaurado (${r2.ms}ms)`, 'ok');
+      else if (r2.estado === 'error') log(`  ✗ ${r2.tabla}.${r2.nombre} — ERROR: ${r2.mensaje}`, 'err');
+    });
+    await cargarIndices();
+  } catch (e) {
+    alert('Error: ' + e.message);
+    log('Error restaurando índices: ' + e.message, 'err');
+  } finally {
+    btn.disabled = false;
+    btn.innerHTML = '<i class="bi bi-arrow-counterclockwise"></i> Restaurar faltantes';
+  }
+}
+
 // Auto-cargar al entrar
 cargarDiagnostico();
+cargarIndices();
 </script>
 <script src="/js/app-version.js"></script>
 </body>
