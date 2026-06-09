@@ -27,10 +27,43 @@ async function cargarParams() {
   return p;
 }
 
+/* ── Tasas históricas completas ─────────────────────────────────────── */
+async function cargarTasas() {
+  const [rows] = await pool.query(`
+    SELECT fecha_desde, fecha_hasta,
+           tasa_mensual_menor, tasa_mensual_mayor,
+           spread_menor, spread_mayor
+    FROM tasas ORDER BY fecha_desde
+  `);
+  return rows;
+}
+
+/* ── Normalizar fecha a string YYYY-MM-DD ───────────────────────────── */
+function toDateStr(fecha) {
+  if (!fecha) return null;
+  return (fecha instanceof Date ? fecha.toISOString() : fecha.toString()).slice(0, 10);
+}
+
+/* ── Buscar tasa vigente para una fecha ─────────────────────────────── */
+function getTasaByFecha(fecha, tasas) {
+  if (!fecha || !tasas.length) return null;
+  const f = toDateStr(fecha);
+  const t = tasas.find(r =>
+    toDateStr(r.fecha_desde) <= f &&
+    toDateStr(r.fecha_hasta) >= f
+  );
+  // Si no hay registro exacto, usar el más reciente anterior
+  if (!t) {
+    const pasados = tasas.filter(r => toDateStr(r.fecha_hasta) < f);
+    return pasados.length ? pasados[pasados.length - 1] : tasas[0];
+  }
+  return t;
+}
+
 /* ── UF de una fecha ────────────────────────────────────────────────── */
 async function getUF(fecha) {
   if (!fecha) return null;
-  const f = fecha.toString().slice(0, 10);
+  const f = (fecha instanceof Date ? fecha.toISOString() : fecha.toString()).slice(0, 10);
   const [rows] = await pool.query('SELECT valor FROM uf WHERE fecha = ? LIMIT 1', [f]);
   return rows.length ? parseFloat(rows[0].valor) : null;
 }
@@ -94,9 +127,10 @@ function getTierUAC(cnt, p) {
 async function recalcularMeses(meses, opciones = {}) {
   if (!meses || !meses.length) return { actualizados: 0, log: [] };
 
-  const [p, parqMap] = await Promise.all([
+  const [p, parqMap, todasTasas] = await Promise.all([
     cargarParams(),
     cargarParques(),
+    cargarTasas(),
   ]);
 
   let actualizados = 0;
@@ -146,19 +180,21 @@ async function recalcularMeses(meses, opciones = {}) {
 
       let monto_comision_fin = 0;
 
-      // 1. Ing x Colocaciones ─────────────────────────────────────────
-      if (plazo > 0) {
-        if (esUAC && saldo > 0) {
-          monto_comision_fin = Math.round(saldo * pctUAC);
+      // 1. Ing x Colocaciones — fórmula PV spread con tasas históricas ──
+      if (plazo > 0 && montoCap > 0) {
+        const tasa = getTasaByFecha(op.fecha_otorgado, todasTasas);
+        if (tasa) {
+          const uf         = await getUF(op.fecha_otorgado);
+          const limite_200 = uf ? 200 * uf : null;
+          const esMayor200 = limite_200 ? montoCap > limite_200 : false;
+          const tasa_cli   = (esMayor200
+            ? parseFloat(tasa.tasa_mensual_mayor)
+            : parseFloat(tasa.tasa_mensual_menor)) / 100;
+          const spread_val = (esMayor200
+            ? parseFloat(tasa.spread_mayor)
+            : parseFloat(tasa.spread_menor)) / 100;
+          const costo_fondo = tasa_cli - spread_val;
 
-        } else if (esAF && montoCap > 0) {
-          const uf          = await getUF(op.fecha_otorgado);
-          const tmc_menor   = (p.autofin_tmc_menor_200 / 100) / 12;
-          const tmc_mayor   = (p.autofin_tmc_mayor_200 / 100) / 12;
-          const spread      = (p.autofin_spread_fondo  / 100);
-          const costo_fondo = tmc_mayor - spread;
-          const limite_200  = uf ? 200 * uf : null;
-          const tasa_cli    = (limite_200 && montoCap > limite_200) ? tmc_mayor : tmc_menor;
           if (tasa_cli > 0 && costo_fondo > 0) {
             const cuota = montoCap * tasa_cli * Math.pow(1 + tasa_cli, plazo)
                         / (Math.pow(1 + tasa_cli, plazo) - 1);
