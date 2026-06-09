@@ -489,7 +489,7 @@
         const dataPlacement = await respPlacement.json().catch(() => ({ success: false, data: {} }));
 
         // Mostrar link Dashboard: tiene funcionalidad ver_dashboard, o tiene módulo dashboard, o es admin/gerente
-        const perfil = yo?.perfil || '';
+        const perfil = usuario?.perfil || '';
         const esAdminGerente = ['Administrador','Gerente'].includes(perfil);
         const tieneFuncDash = (data.funcionalidades||[]).includes('ver_dashboard');
         const tieneModDash  = data.success && (data.data||[]).some(m => (m.ruta||'').toLowerCase().includes('dashboard'));
