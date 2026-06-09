@@ -2220,7 +2220,18 @@ const TABS_NAV = [
   { id:'vevol', label:'📊 Evolución' },
   { id:'v2pl',  label:'📋 P&L Operativo' },
 ];
-const PERFILES_SISTEMA = ['USUARIO', 'SUPERVISOR', 'GERENTE GENERAL', 'ADMINISTRADOR'];
+const PERFILES_DEFAULT = ['USUARIO', 'SUPERVISOR', 'GERENTE GENERAL', 'ADMINISTRADOR'];
+let PERFILES_SISTEMA = PERFILES_DEFAULT.slice();
+
+// Cargar perfiles guardados desde config
+(function() {
+  try {
+    const cfg = JSON.parse(sessionStorage.getItem('af_tab_permisos') || '{}');
+    if (Array.isArray(cfg._perfiles) && cfg._perfiles.length > 0) {
+      PERFILES_SISTEMA = cfg._perfiles;
+    }
+  } catch(e) {}
+})();
 
 function aplicarOrdenNavTabs() {
   var tabsContainer = document.querySelector('.tabs');
@@ -2278,8 +2289,16 @@ function renderTablaPermisos() {
     '<th style="padding:10px 8px;text-align:center;width:30px"></th>' +
     '<th style="padding:10px 12px;text-align:left;width:220px">Pestaña</th>';
   PERFILES_SISTEMA.forEach(function(p) {
-    html += '<th style="padding:10px 16px;text-align:center">' + p + '</th>';
+    html += '<th style="padding:6px 16px;text-align:center">' +
+      '<div style="display:flex;flex-direction:column;align-items:center;gap:3px">' +
+      '<span>' + p + '</span>' +
+      '<button onclick="eliminarPerfilDash(\'' + p.replace(/'/g,"\\'") + '\')" title="Eliminar perfil" ' +
+      'style="background:#e53935;color:#fff;border:none;border-radius:4px;padding:1px 6px;font-size:10px;cursor:pointer;line-height:1.4">✕ Eliminar</button>' +
+      '</div></th>';
   });
+  html += '<th style="padding:6px 8px;text-align:center">' +
+    '<button onclick="agregarPerfilDash()" style="background:#43a047;color:#fff;border:none;border-radius:6px;padding:4px 10px;font-size:11px;cursor:pointer;white-space:nowrap">➕ Perfil</button>' +
+    '</th>';
   html += '</tr></thead><tbody id="tbody-permisos-tabs">';
   TABS_NAV.forEach(function(tab) {
     var permitidos = permisos[tab.id] || PERFILES_SISTEMA.slice();
@@ -2292,7 +2311,7 @@ function renderTablaPermisos() {
         '<input type="checkbox" data-tab="' + tab.id + '" data-perfil="' + p + '" ' + checked +
         ' style="width:16px;height:16px;cursor:pointer"/></td>';
     });
-    html += '</tr>';
+    html += '<td></td></tr>';
   });
   html += '</tbody>';
   document.getElementById('t-permisos-tabs').innerHTML = html;
@@ -2336,6 +2355,36 @@ function initDragTablas() {
   });
 }
 
+async function agregarPerfilDash() {
+  // Cargar perfiles del sistema principal para sugerencias
+  var sugerencias = [];
+  try {
+    const tk = sessionStorage.getItem('token') || sesionActual?.token || '';
+    const r = await fetch('/api/perfiles', { headers: { Authorization: 'Bearer ' + tk } });
+    const d = await r.json();
+    if (d.success && Array.isArray(d.data)) {
+      sugerencias = d.data.map(function(p){ return (p.nombre || '').toUpperCase(); })
+        .filter(function(n){ return n && !PERFILES_SISTEMA.includes(n); });
+    }
+  } catch(e) {}
+
+  var msg = 'Nombre del nuevo perfil:';
+  if (sugerencias.length) msg += '\n(Disponibles: ' + sugerencias.join(', ') + ')';
+  var nombre = prompt(msg);
+  if (!nombre) return;
+  nombre = nombre.trim().toUpperCase();
+  if (!nombre) return;
+  if (PERFILES_SISTEMA.includes(nombre)) { alert('Ese perfil ya existe.'); return; }
+  PERFILES_SISTEMA.push(nombre);
+  renderTablaPermisos();
+}
+
+function eliminarPerfilDash(nombre) {
+  if (!confirm('¿Eliminar el perfil "' + nombre + '" de la tabla de permisos del dashboard?')) return;
+  PERFILES_SISTEMA = PERFILES_SISTEMA.filter(function(p){ return p !== nombre; });
+  renderTablaPermisos();
+}
+
 async function restaurarPermisosDefault() {
   if (!confirm('¿Restaurar el orden original y hacer visibles todas las pestañas para todos los perfiles?')) return;
   // Restaurar orden original hardcodeado
@@ -2344,8 +2393,9 @@ async function restaurarPermisosDefault() {
     var idx = TABS_NAV.findIndex(function(t){ return t.id===id; });
     if (idx !== -1 && idx !== i) { var t = TABS_NAV.splice(idx,1)[0]; TABS_NAV.splice(i,0,t); }
   });
-  // Permisos: todos los perfiles ven todas las pestañas
-  var permisos = { _order: ORDER_DEFAULT };
+  // Permisos: todos los perfiles ven todas las pestañas, restaurar lista de perfiles al default
+  PERFILES_SISTEMA = PERFILES_DEFAULT.slice();
+  var permisos = { _order: ORDER_DEFAULT, _perfiles: PERFILES_SISTEMA.slice() };
   TABS_NAV.forEach(function(tab) { permisos[tab.id] = PERFILES_SISTEMA.slice(); });
   try {
     const resp = await apiDashboard('POST', 'permisos', { permisos });
@@ -2367,6 +2417,7 @@ async function guardarPermisosTabsAdmin() {
     if (cb.checked) permisos[cb.dataset.tab].push(cb.dataset.perfil);
   });
   permisos._order = TABS_NAV.map(function(t) { return t.id; });
+  permisos._perfiles = PERFILES_SISTEMA.slice();
   var btn = document.querySelector('button[onclick="guardarPermisosTabsAdmin()"]');
   if (btn) { btn.textContent = '⏳ Guardando...'; btn.disabled = true; }
   try {
