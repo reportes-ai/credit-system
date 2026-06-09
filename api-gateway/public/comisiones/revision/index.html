@@ -271,7 +271,10 @@ async function cargar() {
       if (_ejAsignados.length === 1) sel.value = _ejAsignados[0];
     }
 
-    renderizar(datosPermitidos, mes);
+    // Aplicar filtro de ejecutivo si hay uno seleccionado
+    const ejSel = document.getElementById('filtroEj').value;
+    const datosFiltrados = ejSel ? datosPermitidos.filter(d => d.ejecutivo === ejSel) : datosPermitidos;
+    renderizar(datosFiltrados, mes);
   } catch(e) {
     document.getElementById('resultado').innerHTML = `<div class="alert alert-danger">Error al cargar: ${e.message}</div>`;
   } finally {
