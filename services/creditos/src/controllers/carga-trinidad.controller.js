@@ -270,10 +270,11 @@ exports.importar = async (req, res) => {
                estado_autofin = ?, ejecutivo_tri = ?,
                estado_credito = ?,
                estado_eval    = ?,
+               id_financiera  = COALESCE(NULLIF(id_financiera,''), ?),
                marca    = COALESCE(?, marca), modelo   = COALESCE(?, modelo),
                vendedor = COALESCE(?, vendedor), updated_at = NOW()
              WHERE num_op = ?`,
-            [f.estado_autofin, f.ejecutivo_tri, f.estado_credito, f.estado_eval, f.marca, f.modelo, f.vendedor, f.num_op]
+            [f.estado_autofin, f.ejecutivo_tri, f.estado_credito, f.estado_eval, String(f.num_op), f.marca, f.modelo, f.vendedor, f.num_op]
           );
           actualizados++;
           log.push(`✓ Actualizado ${f.num_op} → ${f.estado_autofin} / ${f.estado_credito}`);
@@ -281,14 +282,15 @@ exports.importar = async (req, res) => {
         } else {
           await pool.query(
             `INSERT INTO creditos
-               (num_op, estado_autofin, estado_credito, estado_eval,
+               (num_op, id_financiera, estado_autofin, estado_credito, estado_eval,
                 producto, ejecutivo, ejecutivo_tri, automotora, valor_vehiculo, pie, saldo_precio,
                 monto_financiado, fecha_otorgado, mes,
                 marca, modelo, vendedor,
                 financiera, created_at, updated_at)
-             VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,'AUTOFIN', NOW(), NOW())`,
+             VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,'AUTOFIN', NOW(), NOW())`,
             [
-              f.num_op, f.estado_autofin, f.estado_credito, f.estado_eval,
+              f.num_op, String(f.num_op),
+              f.estado_autofin, f.estado_credito, f.estado_eval,
               f.producto, f.ejecutivo, f.ejecutivo_tri, f.automotora,
               f.valor_vehiculo, f.pie, f.saldo_precio,
               f.monto_financiado, f.fecha_otorgado, f.mes,
