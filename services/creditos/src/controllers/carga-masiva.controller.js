@@ -2,6 +2,7 @@
 const pool = require('../../../../shared/config/database');
 const XLSX = require('xlsx');
 const { recalcularMeses, extraerMeses } = require('../utils/recalcular-mes');
+const { isMesCerrado } = require('../../../../shared/utils/mes-cerrado');
 const historial = require('./carga-historial.controller');
 
 /* ── Asegurar columnas extra en creditos ──────────────────── */
@@ -470,6 +471,15 @@ const actualizar = async (req, res) => {
         }
 
         if (setCols.length === 0) { sinCambios++; continue; }
+
+        // Verificar si el mes de la operación está cerrado
+        if (existente.mes) {
+          const mesOp = String(existente.mes).slice(0, 7);
+          if (await isMesCerrado(mesOp)) {
+            errores.push({ num_op: numOp, error: `🔒 Mes ${mesOp} cerrado — omitido` });
+            continue;
+          }
+        }
 
         setVals.push(numOp);
         await pool.query(

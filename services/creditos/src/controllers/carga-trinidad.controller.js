@@ -3,6 +3,7 @@ const pool      = require('../../../../shared/config/database');
 const XLSX      = require('xlsx');
 const historial = require('./carga-historial.controller');
 const { recalcularMeses } = require('../utils/recalcular-mes');
+const { isMesCerrado, getMesDeNumOp } = require('../../../../shared/utils/mes-cerrado');
 
 /* ── Migraciones ────────────────────────────────────────────────── */
 (async () => {
@@ -242,6 +243,16 @@ exports.importar = async (req, res) => {
 
     for (const f of filas) {
       try {
+        // Verificar mes cerrado (aplica a updates, no a inserts nuevos)
+        const _mesTriCheck = existMap[f.num_op]?.mes || null;
+        if (_mesTriCheck) {
+          const _mesTriStr = String(_mesTriCheck).slice(0, 7);
+          if (await isMesCerrado(_mesTriStr)) {
+            log.push(`⏭ Omitido ${f.num_op}: mes ${_mesTriStr} cerrado`);
+            continue;
+          }
+        }
+
         // Si ya existe un registro AUTOFIN con id_financiera = este num_op Trinidad,
         // no insertar duplicado. Actualizar estado_autofin en el registro AUTOFIN.
         if (afEquivSet.has(f.num_op)) {

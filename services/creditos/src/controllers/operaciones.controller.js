@@ -1,6 +1,7 @@
 const pool = require('../../../../shared/config/database');
 const { calcularOperacion } = require('../utils/calcular-operacion');
 const { recalcularMeses } = require('../utils/recalcular-mes');
+const { isMesCerrado, getMesDeOp } = require('../../../../shared/utils/mes-cerrado');
 
 // Migración: tabla creditos
 (async () => {
@@ -301,6 +302,11 @@ const update = async (req, res) => {
     const [[exists]] = await pool.query('SELECT id FROM creditos WHERE id = ?', [id]);
     if (!exists) return res.status(404).json({ success: false, data: null, error: 'No encontrada' });
 
+    // Verificar mes cerrado
+    const _mesUpd = await getMesDeOp(id);
+    if (_mesUpd && await isMesCerrado(_mesUpd))
+      return res.status(403).json({ success: false, data: null, error: `🔒 Mes ${_mesUpd} cerrado — no se permiten modificaciones` });
+
     if (b.rut_cliente) b.rut_cliente = b.rut_cliente.replace(/\./g, '').toUpperCase().trim();
     const { saldo_precio, pct_financiado } = calcular(b);
 
@@ -394,6 +400,9 @@ const liberarPago = async (req, res) => {
     const { id } = req.params;
     const [[exists]] = await pool.query('SELECT id, estado_fundantes FROM creditos WHERE id = ?', [id]);
     if (!exists) return res.status(404).json({ success: false, data: null, error: 'Operación no encontrada' });
+    const _mesLib = await getMesDeOp(id);
+    if (_mesLib && await isMesCerrado(_mesLib))
+      return res.status(403).json({ success: false, data: null, error: `🔒 Mes ${_mesLib} cerrado — no se permiten modificaciones` });
 
     const liberadoPor = req.usuario ? `${req.usuario.nombre} ${req.usuario.apellido || ''}`.trim() : null;
     await pool.query(
@@ -414,6 +423,9 @@ const marcarNoOtorgado = async (req, res) => {
     const { comentario } = req.body;
     const [[exists]] = await pool.query('SELECT id FROM creditos WHERE id = ?', [id]);
     if (!exists) return res.status(404).json({ success: false, data: null, error: 'Operación no encontrada' });
+    const _mesNoOt = await getMesDeOp(id);
+    if (_mesNoOt && await isMesCerrado(_mesNoOt))
+      return res.status(403).json({ success: false, data: null, error: `🔒 Mes ${_mesNoOt} cerrado — no se permiten modificaciones` });
     await pool.query(
       `UPDATE creditos SET estado_credito='NO OTORGADO',
        comentarios=CONCAT(COALESCE(comentarios,''),' | NO OTORGADO: ', COALESCE(?,'')) WHERE id=?`,
