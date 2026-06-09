@@ -258,15 +258,18 @@ function abrirModalCursados(cursados) {
       <td style="padding:8px 10px;font-size:.82rem;color:#374151;max-width:140px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${c.ejecutivo||'—'}</td>
       <td style="padding:8px 10px;font-size:.82rem;font-weight:600">${$m(c.monto_financiado)}</td>
       <td style="padding:8px 10px;text-align:center">${ingColocacion}</td>
-      <td style="padding:6px 6px"><input type="number" placeholder="0" value="${c.seguros||''}"
-        style="width:110px;padding:5px 8px;border:1.5px solid #d1d5db;border-radius:6px;font-size:.82rem"
-        data-campo="seguros" data-id="${c.id}"></td>
-      <td style="padding:6px 6px"><input type="number" placeholder="0" value="${c.comdea_real||''}"
-        style="width:110px;padding:5px 8px;border:1.5px solid #d1d5db;border-radius:6px;font-size:.82rem"
-        data-campo="comdea_real" data-id="${c.id}"></td>
-      <td style="padding:6px 6px"><input type="number" placeholder="0" value="${c.com_parque||''}"
-        style="width:110px;padding:5px 8px;border:1.5px solid #d1d5db;border-radius:6px;font-size:.82rem"
-        data-campo="com_parque" data-id="${c.id}"></td>
+      <td style="padding:6px 6px">
+        <input type="number" placeholder="Prima $" value="${c.seguro_rdh||''}"
+          style="width:120px;padding:5px 8px;border:1.5px solid #0141A2;border-radius:6px;font-size:.82rem"
+          data-campo="seguro_rdh" data-id="${c.id}">
+        <div style="font-size:.68rem;color:#6b7280;margin-top:2px">Desgravamen</div>
+      </td>
+      <td style="padding:8px 10px;text-align:center">
+        ${c.comdea_real ? `<span style="font-weight:700;color:#374151">${$m(c.comdea_real)}</span>` : `<span style="color:#9ca3af;font-size:.78rem">Se calcula al recalcular</span>`}
+      </td>
+      <td style="padding:8px 10px;text-align:center">
+        ${c.com_parque ? `<span style="font-weight:700;color:#374151">${$m(c.com_parque)}</span>` : `<span style="color:#9ca3af;font-size:.78rem">Se calcula al recalcular</span>`}
+      </td>
     </tr>`;
   }).join('');
 
@@ -278,7 +281,7 @@ function abrirModalCursados(cursados) {
       <div>
         <div style="font-size:1.1rem;font-weight:700"><i class="bi bi-cash-coin me-2"></i>Datos de ingresos — Cursados (${cursados.length})</div>
         <div style="font-size:.82rem;opacity:.8;margin-top:3px">
-          Ingreso colocación calculado automáticamente · Ingresa seguros y comisiones manualmente
+          Ingreso colocación calculado automáticamente · Ingresa la prima del seguro de desgravamen · Com. dealer y parque se calculan al recalcular comisiones
         </div>
       </div>
       <button onclick="document.getElementById('modalCursados').close()" style="background:rgba(255,255,255,.15);border:none;color:#fff;border-radius:8px;padding:6px 14px;cursor:pointer;font-size:.85rem">✕ Cerrar</button>
@@ -291,9 +294,9 @@ function abrirModalCursados(cursados) {
             <th style="padding:10px;text-align:left">Ejecutivo</th>
             <th style="padding:10px;text-align:left">Monto Pagaré</th>
             <th style="padding:10px;text-align:center">💰 Ing. Colocación<br><small style="font-weight:400;text-transform:none">(calculado)</small></th>
-            <th style="padding:10px;text-align:center">🛡 Ing. Seguros</th>
-            <th style="padding:10px;text-align:center">🏪 Com. Dealer</th>
-            <th style="padding:10px;text-align:center">🅿 Com. Parque</th>
+            <th style="padding:10px;text-align:center">🛡 Prima Desgravamen<br><small style="font-weight:400;text-transform:none">(ingresar)</small></th>
+            <th style="padding:10px;text-align:center">🏪 Com. Dealer<br><small style="font-weight:400;text-transform:none">(calculado)</small></th>
+            <th style="padding:10px;text-align:center">🅿 Com. Parque<br><small style="font-weight:400;text-transform:none">(calculado)</small></th>
           </tr>
         </thead>
         <tbody>${filas}</tbody>

@@ -611,7 +611,7 @@ const getReporteria = async (req, res) => {
 const patchDatosIngresos = async (req, res) => {
   try {
     const { id } = req.params;
-    const CAMPOS_PERMITIDOS = ['seguros', 'comdea_real', 'com_parque'];
+    const CAMPOS_PERMITIDOS = ['seguro_rdh', 'seguros', 'comdea_real', 'com_parque'];
     const sets = [];
     const vals = [];
     for (const campo of CAMPOS_PERMITIDOS) {
