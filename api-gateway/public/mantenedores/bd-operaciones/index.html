@@ -49,6 +49,14 @@
     thead th .filter-input { background:rgba(255,255,255,.15); border:1px solid rgba(255,255,255,.25); color:#fff; border-radius:5px; padding:3px 7px; font-size:.72rem; width:calc(100% - 14px); margin:0 7px 6px; box-sizing:border-box; }
     thead th .filter-input::placeholder { color:rgba(255,255,255,.5); }
     thead th .filter-input:focus { outline:none; background:rgba(255,255,255,.25); border-color:#fff; }
+    /* Fila de letras Excel */
+    .tr-letters th { background:#1e3a5f; color:rgba(255,255,255,.75); font-size:.68rem; font-weight:700;
+      text-align:center; padding:3px 4px; letter-spacing:.5px; position:sticky; top:0; z-index:10;
+      border-bottom:2px solid rgba(255,255,255,.15); min-width:0; }
+    .tr-letters th.col-letter-highlight { background:#f59e0b !important; color:#1a0050 !important; }
+    /* Columna resaltada por búsqueda */
+    th.col-highlighted { outline:3px solid #f59e0b !important; outline-offset:-3px; }
+    td.col-highlighted { background:#fffbeb !important; }
     tbody tr { border-bottom:1px solid #f0f0f0; }
     tbody tr:hover { background:#f0f7ff; }
     tbody td { padding:6px 10px; white-space:nowrap; max-width:220px; overflow:hidden; text-overflow:ellipsis; color:#374151; }
@@ -157,6 +165,17 @@
     <button class="btn btn-sm btn-outline-secondary" onclick="clearFilters()"><i class="bi bi-x-circle me-1"></i>Limpiar filtros</button>
     <button class="btn btn-sm btn-outline-primary" onclick="exportCSV()"><i class="bi bi-download me-1"></i>Exportar CSV</button>
     <button class="btn btn-sm btn-outline-warning" onclick="abrirModalRecalcular()" title="Recalcular comisiones y ejecutivos por rango de mes"><i class="bi bi-arrow-repeat me-1"></i>Recalcular</button>
+    <!-- Buscador de campos -->
+    <div style="position:relative;display:flex;align-items:center;gap:0">
+      <span style="position:absolute;left:9px;color:#9ca3af;font-size:.85rem;pointer-events:none">🔎</span>
+      <input id="colSearch" type="text" placeholder="Buscar columna..." autocomplete="off"
+        style="padding:5px 10px 5px 30px;border:1px solid #d1d5db;border-radius:8px;font-size:.8rem;width:180px;outline:none"
+        oninput="buscarColumna(this.value)"
+        onfocus="document.getElementById('colDropdown').style.display='block'"
+        onblur="setTimeout(()=>document.getElementById('colDropdown').style.display='none',200)"
+        onkeydown="navColDropdown(event)">
+      <div id="colDropdown" style="display:none;position:absolute;top:calc(100% + 4px);left:0;background:#fff;border:1px solid #e5e7eb;border-radius:10px;box-shadow:0 8px 24px rgba(0,0,0,.14);z-index:500;min-width:220px;max-height:260px;overflow-y:auto"></div>
+    </div>
     <div id="deleteBar">
       <i class="bi bi-trash-fill text-danger"></i>
       <span id="deleteCount" style="font-size:.82rem;font-weight:700;color:#dc2626"></span>
@@ -310,8 +329,29 @@ async function init() {
   }
 }
 
+/* Convierte índice numérico a letras estilo Excel: 0→A, 25→Z, 26→AA… */
+function colLetter(n) {
+  let s = '';
+  n++; // 1-based
+  while (n > 0) {
+    n--;
+    s = String.fromCharCode(65 + (n % 26)) + s;
+    n = Math.floor(n / 26);
+  }
+  return s;
+}
+
 function buildHeaders() {
+  const trLetters = document.createElement('tr');
+  trLetters.className = 'tr-letters';
+
   const tr1 = document.createElement('tr');
+
+  // Col vacía para checkbox
+  const thLetChk = document.createElement('th');
+  thLetChk.className = 'col-chk';
+  thLetChk.textContent = '#';
+  trLetters.appendChild(thLetChk);
 
   // Checkbox "select all"
   const thChk = document.createElement('th');
@@ -319,7 +359,17 @@ function buildHeaders() {
   thChk.innerHTML = '<input type="checkbox" id="chkAll" onchange="toggleSelectAll(this.checked)">';
   tr1.appendChild(thChk);
 
-  columns.forEach(col => {
+  columns.forEach((col, idx) => {
+    // Celda de letra
+    const thL = document.createElement('th');
+    thL.dataset.colIdx = idx;
+    thL.id = 'colLetter_' + idx;
+    thL.title = col.field;
+    thL.textContent = colLetter(idx);
+    thL.style.cursor = 'pointer';
+    thL.onclick = () => irAColumna(col.field, idx);
+    trLetters.appendChild(thL);
+
     const th = document.createElement('th');
     const inner = document.createElement('div');
     inner.className = 'th-inner';
@@ -343,7 +393,76 @@ function buildHeaders() {
     tr1.appendChild(th);
   });
   document.getElementById('thead').innerHTML = '';
+  document.getElementById('thead').appendChild(trLetters);
   document.getElementById('thead').appendChild(tr1);
+}
+
+/* ── Buscador de columna ───────────────────────────────────────────── */
+let _dropSel = -1;
+
+function buscarColumna(q) {
+  const dd = document.getElementById('colDropdown');
+  _dropSel = -1;
+  if (!q.trim()) { dd.innerHTML = ''; return; }
+  const qlo = q.toLowerCase();
+  const hits = columns
+    .map((c,i) => ({field:c.field, idx:i, letter:colLetter(i)}))
+    .filter(x => x.field.toLowerCase().includes(qlo) || x.letter.toLowerCase() === qlo.toLowerCase());
+  if (!hits.length) {
+    dd.innerHTML = '<div style="padding:10px 14px;color:#9ca3af;font-size:.8rem">Sin resultados</div>';
+    return;
+  }
+  dd.innerHTML = hits.map((h,i) => `
+    <div class="col-drop-item" data-idx="${h.idx}" data-field="${h.field}"
+      style="padding:8px 14px;cursor:pointer;display:flex;align-items:center;gap:10px;font-size:.83rem;border-bottom:1px solid #f3f4f6"
+      onmouseover="this.style.background='#eff6ff'"
+      onmouseout="this.style.background=''"
+      onclick="irAColumna('${h.field}',${h.idx});document.getElementById('colSearch').value='${h.field}';document.getElementById('colDropdown').style.display='none'">
+      <span style="background:#0141A2;color:#fff;border-radius:5px;padding:1px 7px;font-size:.72rem;font-weight:700;min-width:28px;text-align:center">${h.letter}</span>
+      <span>${h.field}</span>
+    </div>`).join('');
+}
+
+function navColDropdown(e) {
+  const items = document.querySelectorAll('.col-drop-item');
+  if (!items.length) return;
+  if (e.key === 'ArrowDown') { _dropSel = Math.min(_dropSel+1, items.length-1); highlightDrop(items); e.preventDefault(); }
+  else if (e.key === 'ArrowUp') { _dropSel = Math.max(_dropSel-1, 0); highlightDrop(items); e.preventDefault(); }
+  else if (e.key === 'Enter' && _dropSel >= 0) { items[_dropSel].click(); e.preventDefault(); }
+}
+
+function highlightDrop(items) {
+  items.forEach((it,i) => it.style.background = i === _dropSel ? '#eff6ff' : '');
+  if (_dropSel >= 0) items[_dropSel].scrollIntoView({block:'nearest'});
+}
+
+function irAColumna(field, idx) {
+  // Resaltar la letra
+  document.querySelectorAll('.tr-letters th').forEach(th => th.classList.remove('col-letter-highlight'));
+  const lth = document.getElementById('colLetter_' + idx);
+  if (lth) lth.classList.add('col-letter-highlight');
+
+  // Resaltar todas las celdas de esa columna
+  document.querySelectorAll('th.col-highlighted, td.col-highlighted').forEach(el => el.classList.remove('col-highlighted'));
+  // Resaltar th de cabecera (segundo tr)
+  const ths = document.querySelectorAll('#thead tr:last-child th');
+  if (ths[idx+1]) ths[idx+1].classList.add('col-highlighted');
+  // Resaltar tds de la columna
+  document.querySelectorAll(`#tbody td[data-field="${field}"]`).forEach(td => td.classList.add('col-highlighted'));
+
+  // Hacer scroll horizontal hasta la columna
+  const tableScroll = document.getElementById('tableScroll');
+  if (ths[idx+1]) {
+    const thRect = ths[idx+1].getBoundingClientRect();
+    const wrapRect = tableScroll.getBoundingClientRect();
+    const scrollLeft = tableScroll.scrollLeft + thRect.left - wrapRect.left - 60;
+    tableScroll.scrollTo({ left: scrollLeft, behavior: 'smooth' });
+  }
+  // Quitar resaltado tras 3s
+  setTimeout(() => {
+    if (lth) lth.classList.remove('col-letter-highlight');
+    document.querySelectorAll('th.col-highlighted, td.col-highlighted').forEach(el => el.classList.remove('col-highlighted'));
+  }, 3000);
 }
 
 function toggleSort(col) {
