@@ -474,6 +474,49 @@ const getModulosConFuncionalidades = async (req, res) => {
       });
     }
 
+    // ── Garantizar que "Ver Dashboard" aparece siempre en el grid de permisos ──
+    // Busca o crea la funcionalidad ver_dashboard y la inyecta en el módulo correcto
+    try {
+      let [[fd]] = await pool.query("SELECT f.id_funcionalidad, f.id_modulo FROM funcionalidades f WHERE f.codigo='ver_dashboard'");
+      if (!fd) {
+        // Buscar cualquier módulo dashboard (activo o no)
+        let [[modDash]] = await pool.query("SELECT id_modulo FROM modulos WHERE ruta LIKE '%dashboard%' LIMIT 1");
+        if (!modDash) {
+          // Crear un módulo Sistema si no hay nada
+          const [ins] = await pool.query(
+            "INSERT INTO modulos (nombre, icono, ruta, orden, estado) VALUES ('Sistema','bi-gear','/sistema/',99,'activo')"
+          );
+          modDash = { id_modulo: ins.insertId };
+        }
+        const [ins] = await pool.query(
+          "INSERT INTO funcionalidades (id_modulo, nombre, codigo, icono) VALUES (?,?,?,?)",
+          [modDash.id_modulo, 'Ver Dashboard', 'ver_dashboard', 'bi-bar-chart-line']
+        );
+        fd = { id_funcionalidad: ins.insertId, id_modulo: modDash.id_modulo };
+        // Dar acceso a Admin y Gerente por defecto
+        const [perfiles] = await pool.query('SELECT id_perfil, nombre FROM perfiles');
+        for (const p of perfiles) {
+          const hab = ['Administrador','Gerente'].includes(p.nombre) ? 1 : 0;
+          await pool.query(
+            'INSERT IGNORE INTO permisos_perfil (id_perfil, id_funcionalidad, habilitado) VALUES (?,?,?)',
+            [p.id_perfil, fd.id_funcionalidad, hab]
+          );
+        }
+      }
+      // Inyectar en el grupo correspondiente si no está ya en agrupado
+      const yaEsta = agrupado.some(g => g.funcionalidades.some(f => f.codigo === 'ver_dashboard'));
+      if (!yaEsta) {
+        // Buscar nombre del módulo al que pertenece
+        const [[modInfo]] = await pool.query("SELECT nombre, icono FROM modulos WHERE id_modulo=?", [fd.id_modulo]);
+        let grupo = agrupado.find(g => g.id_modulo === fd.id_modulo);
+        if (!grupo) {
+          grupo = { id_modulo: fd.id_modulo, nombre: modInfo?.nombre || 'Dashboard', icono: modInfo?.icono || 'bi-speedometer', funcionalidades: [] };
+          agrupado.push(grupo);
+        }
+        grupo.funcionalidades.push({ id_funcionalidad: fd.id_funcionalidad, nombre: 'Ver Dashboard', codigo: 'ver_dashboard' });
+      }
+    } catch(e) { console.error('[ver_dashboard inject]', e.message); }
+
     res.json({ success: true, data: agrupado, error: null });
   } catch (error) {
     res.status(500).json({ success: false, data: null, error: error.message });
