@@ -1721,7 +1721,9 @@ function irInfComercial() {
 function irDealernet() {
   const rut = _getRutActual();
   if (!rut) return showAlert('No hay cliente cargado');
-  window.location.href = '/informes-dealernet/?rut=' + encodeURIComponent(rut);
+  const retUrl = new URLSearchParams(window.location.search).get('return');
+  const returnParam = retUrl ? '&return=' + encodeURIComponent(retUrl) : '';
+  window.location.href = '/informes-dealernet/?rut=' + encodeURIComponent(rut) + returnParam;
 }
 
 /* ═══════════════════════════════════════════════════════════════════

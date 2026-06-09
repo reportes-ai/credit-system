@@ -623,6 +623,21 @@ if (urlRut) {
   document.getElementById('searchRut').value = urlRut;
   loadTable(urlRut);
 }
+
+// Si viene con ?return= en URL, mostrar barra de retorno
+const _retParam = new URLSearchParams(location.search).get('return');
+if (_retParam) {
+  const retNombre = _retParam.includes('cartas') ? 'Carta de Aprobación'
+                  : _retParam.includes('cotiz')  ? 'Cotización'
+                  : _retParam.includes('credito') ? 'Crédito' : 'página anterior';
+  const bar = document.createElement('div');
+  bar.style.cssText = 'position:sticky;top:0;z-index:500;background:#065f46;color:#fff;padding:10px 20px;display:flex;align-items:center;gap:14px;font-size:13px;font-weight:600;box-shadow:0 4px 12px rgba(0,0,0,.25)';
+  const sep = _retParam.includes('?') ? '&' : '?';
+  const destino = _retParam + (urlRut ? sep + 'rut=' + encodeURIComponent(urlRut) : '');
+  bar.innerHTML = `<span>✅ Consultaste el informe Dealernet — puedes volver a continuar la ${retNombre}</span>
+    <button onclick="window.location.href='${destino}'" style="background:#fff;color:#065f46;border:none;border-radius:6px;padding:6px 16px;font-size:12px;font-weight:700;cursor:pointer;margin-left:auto">← Volver a ${retNombre}</button>`;
+  document.body.insertBefore(bar, document.body.firstChild);
+}
 </script>
 </body>
 </html>
