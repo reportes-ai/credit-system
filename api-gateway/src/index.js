@@ -61,6 +61,7 @@ app.use('/api/noticias',                  require('../../services/mantenedores/s
 app.use('/api/servidor-hora',             require('../../services/mantenedores/src/routes/servidor-hora.routes'));
 app.use('/api/db-maintenance',            require('../../services/mantenedores/src/routes/db-maintenance.routes'));
 app.use('/api/alertas',                   require('../../services/mantenedores/src/routes/alertas.routes'));
+app.use('/api/meses-cerrados',            require('../../services/mantenedores/src/routes/meses-cerrados.routes'));
 
 // Cotizaciones
 app.use('/api/cotizaciones', require('../../services/cotizaciones/src/routes/cotizaciones.routes'));

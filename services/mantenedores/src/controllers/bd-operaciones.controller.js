@@ -77,6 +77,16 @@ const update = async (req, res) => {
     if (!id || !Object.keys(body).length)
       return res.status(400).json({ success: false, data: null, error: 'Sin datos' });
 
+    // Verificar si el mes de la operación está cerrado
+    const [[op]] = await pool.query('SELECT mes FROM creditos WHERE id = ? LIMIT 1', [id]);
+    if (op?.mes) {
+      const mesFmt = String(op.mes).slice(0, 7);
+      const [mc] = await pool.query('SELECT cerrado FROM meses_cerrados WHERE mes = ? LIMIT 1', [mesFmt]);
+      if (mc.length && mc[0].cerrado) {
+        return res.status(403).json({ success: false, data: null, error: `🔒 Mes ${mesFmt} cerrado — no se permiten modificaciones` });
+      }
+    }
+
     // Validar columnas
     const [colRows] = await pool.query('DESCRIBE creditos');
     const validCols = colRows.map(r => r.Field).filter(f => f !== 'id' && !EXCLUIR.includes(f));

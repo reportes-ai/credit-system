@@ -24,21 +24,67 @@
     .avatar { width:28px; height:28px; background:#90caf9; border-radius:50%; display:flex; align-items:center; justify-content:center; color:var(--navy); font-weight:700; font-size:.75rem; }
     .perfil-badge { background:rgba(144,202,249,.2); border:1px solid rgba(144,202,249,.4); color:#90caf9; border-radius:12px; padding:2px 10px; font-size:.73rem; font-weight:600; }
     .btn-logout { background:rgba(255,255,255,.1); border:1px solid rgba(255,255,255,.2); color:#fff; border-radius:8px; padding:5px 12px; font-size:.82rem; cursor:pointer; }
-    .main-content { padding:36px 40px; max-width:900px; margin:0 auto; }
+    .main-content { padding:36px 40px; max-width:1400px; margin:0 auto; }
     .page-banner { background:linear-gradient(135deg,#1a0050,#6d28d9 50%,#f59e0b); border-radius:16px; color:#fff; padding:28px 36px; margin-bottom:36px; display:flex; align-items:center; gap:20px; }
     .page-banner i { font-size:3rem; opacity:.85; }
     .page-banner h2 { font-weight:900; margin:0 0 4px; font-size:1.6rem; letter-spacing:1px; }
     .page-banner p { opacity:.8; margin:0; font-size:.9rem; }
-    .modules-grid { display:grid; grid-template-columns:repeat(2,1fr); gap:24px; }
-    @media (max-width:600px) { .modules-grid { grid-template-columns:1fr; } .main-content { padding:20px 16px; } }
-    .module-card { background:#fff; border-radius:14px; padding:32px 28px; cursor:pointer; text-decoration:none; color:inherit; border:2px solid transparent; transition:transform .18s,box-shadow .18s,border-color .18s; display:block; box-shadow:0 1px 4px rgba(0,0,0,.06); }
+
+    /* Grid 4 columnas */
+    .modules-grid { display:grid; grid-template-columns:repeat(4,1fr); gap:20px; align-items:start; }
+    @media (max-width:1100px) { .modules-grid { grid-template-columns:repeat(2,1fr); } }
+    @media (max-width:600px)  { .modules-grid { grid-template-columns:1fr; } .main-content { padding:20px 16px; } }
+
+    /* Cards de acceso */
+    .module-card { background:#fff; border-radius:14px; padding:28px 24px; cursor:pointer; text-decoration:none; color:inherit; border:2px solid transparent; transition:transform .18s,box-shadow .18s,border-color .18s; display:block; box-shadow:0 1px 4px rgba(0,0,0,.06); }
     .module-card:hover { transform:translateY(-5px); box-shadow:0 14px 36px rgba(109,40,217,.22); border-color:#6d28d9; color:inherit; }
     .card-icon { width:64px; height:64px; border-radius:18px; display:flex; align-items:center; justify-content:center; font-size:1.9rem; margin-bottom:18px; transition:all .2s; background:linear-gradient(135deg,#1a0050,#6d28d9 55%,#f59e0b); color:#fff; box-shadow:0 4px 14px rgba(109,40,217,.35); }
     .module-card:hover .card-icon { box-shadow:0 6px 20px rgba(109,40,217,.5); transform:scale(1.08); }
-    .module-card h6 { font-weight:800; font-size:1rem; margin:0 0 8px; color:#111827; }
-    .module-card p { font-size:.82rem; color:#6b7280; margin:0 0 20px; line-height:1.5; }
+    .module-card h6 { font-weight:800; font-size:.95rem; margin:0 0 8px; color:#111827; }
+    .module-card p { font-size:.8rem; color:#6b7280; margin:0 0 20px; line-height:1.5; }
     .btn-acceder { background:linear-gradient(135deg,#6d28d9,#f59e0b); color:#fff; border:none; border-radius:8px; padding:8px 18px; font-size:.83rem; font-weight:700; letter-spacing:.3px; box-shadow:0 2px 8px rgba(109,40,217,.3); transition:all .18s; display:inline-flex; align-items:center; gap:6px; }
     .module-card:hover .btn-acceder { box-shadow:0 4px 14px rgba(109,40,217,.45); filter:brightness(1.08); }
+
+    /* Card Meses Cerrados */
+    .meses-card { background:#fff; border-radius:14px; padding:24px 22px; box-shadow:0 1px 4px rgba(0,0,0,.06); border:2px solid transparent; }
+    .meses-card-header { display:flex; align-items:center; gap:12px; margin-bottom:18px; }
+    .meses-card-header .card-icon { margin-bottom:0; flex-shrink:0; }
+    .meses-card-header h6 { font-weight:800; font-size:.95rem; margin:0 0 3px; color:#111827; }
+    .meses-card-header p { font-size:.78rem; color:#6b7280; margin:0; }
+
+    /* Config dias cierre */
+    .dias-cierre-box { background:#f8f7ff; border:1.5px solid #ede9fe; border-radius:10px; padding:10px 14px; margin-bottom:14px; display:flex; align-items:center; gap:10px; flex-wrap:wrap; }
+    .dias-cierre-box label { font-size:.78rem; font-weight:600; color:#6d28d9; white-space:nowrap; }
+    .dias-cierre-box input { border:1.5px solid #c4b5fd; border-radius:7px; padding:4px 10px; font-size:.82rem; width:60px; text-align:center; outline:none; font-weight:700; color:#1a0050; }
+    .dias-cierre-box input:focus { border-color:#6d28d9; }
+    .btn-save-dias { background:#6d28d9; color:#fff; border:none; border-radius:7px; padding:4px 12px; font-size:.78rem; font-weight:700; cursor:pointer; }
+    .btn-save-dias:hover { background:#5b21b6; }
+
+    /* Lista de meses */
+    .meses-list { max-height:320px; overflow-y:auto; }
+    .mes-row { display:flex; align-items:center; gap:10px; padding:7px 8px; border-radius:8px; transition:background .12s; }
+    .mes-row:hover { background:#f9f7ff; }
+    .mes-row + .mes-row { border-top:1px solid #f3f4f6; }
+    .mes-label { flex:1; font-size:.82rem; font-weight:600; color:#374151; text-transform:capitalize; }
+    .mes-label small { display:block; font-weight:400; font-size:.72rem; color:#9ca3af; margin-top:1px; }
+    .badge-sugerido { background:#fef3c7; color:#92400e; border-radius:6px; padding:2px 7px; font-size:.68rem; font-weight:700; white-space:nowrap; }
+    .badge-cerrado  { background:#dcfce7; color:#166534; border-radius:6px; padding:2px 7px; font-size:.68rem; font-weight:700; white-space:nowrap; }
+
+    /* Toggle switch */
+    .toggle-wrap { display:flex; align-items:center; gap:6px; }
+    .toggle { position:relative; display:inline-block; width:38px; height:21px; }
+    .toggle input { opacity:0; width:0; height:0; }
+    .toggle-slider { position:absolute; inset:0; background:#d1d5db; border-radius:21px; transition:.2s; cursor:pointer; }
+    .toggle-slider:before { content:''; position:absolute; width:15px; height:15px; left:3px; bottom:3px; background:#fff; border-radius:50%; transition:.2s; box-shadow:0 1px 3px rgba(0,0,0,.2); }
+    .toggle input:checked + .toggle-slider { background:#16a34a; }
+    .toggle input:checked + .toggle-slider:before { transform:translateX(17px); }
+    .toggle input:disabled + .toggle-slider { opacity:.5; cursor:not-allowed; }
+
+    .loading-dots { display:inline-flex; gap:4px; }
+    .loading-dots span { width:6px; height:6px; background:#6d28d9; border-radius:50%; animation:dot-bounce .8s infinite; }
+    .loading-dots span:nth-child(2) { animation-delay:.15s; }
+    .loading-dots span:nth-child(3) { animation-delay:.3s; }
+    @keyframes dot-bounce { 0%,80%,100% { transform:scale(.6); opacity:.4; } 40% { transform:scale(1); opacity:1; } }
   </style>
 </head>
 <body>
@@ -46,7 +92,7 @@
   <div class="topnav-left">
     <a href="/" class="topnav-brand">
       <img src="/img/logo.png" alt="AutoFácil">
-      <span class="version-badge">v4.9</span>
+      <span class="version-badge" id="versionBadge">v4.9</span>
     </a>
     <div class="breadcrumb-nav">
       <a href="/">Inicio</a><span class="sep">›</span>
@@ -76,42 +122,158 @@
   </div>
 
   <div class="modules-grid">
+
+    <!-- BD Operaciones -->
     <a href="/mantenedores/bd-operaciones/" class="module-card">
       <div class="card-icon"><i class="bi bi-database-fill-gear"></i></div>
       <h6>BD OPERACIONES NIVEL DIOS</h6>
       <p>Todas las operaciones con todos los campos. Filtros por columna, ordenación y edición inline de cualquier registro.</p>
       <span class="btn-acceder"><i class="bi bi-arrow-right-circle"></i>Acceder</span>
     </a>
+
+    <!-- BD Clientes -->
     <a href="/mantenedores/bd-clientes/" class="module-card">
       <div class="card-icon"><i class="bi bi-person-fill-gear"></i></div>
       <h6>BD CLIENTES NIVEL DIOS</h6>
       <p>Busca por RUT y accede a todas las operaciones del cliente con todos sus campos y edición directa.</p>
       <span class="btn-acceder"><i class="bi bi-arrow-right-circle"></i>Acceder</span>
     </a>
+
+    <!-- BD Antecedentes -->
     <a href="/mantenedores/bd-antecedentes/" class="module-card">
       <div class="card-icon"><i class="bi bi-briefcase-fill"></i></div>
       <h6>BD ANTECEDENTES LABORALES NIVEL DIOS</h6>
       <p>Situación laboral, empleador, rentas fija y variable de todos los clientes. Filtros y edición inline completa.</p>
       <span class="btn-acceder"><i class="bi bi-arrow-right-circle"></i>Acceder</span>
     </a>
-    <a href="/mantenedores/bd-informacion-comercial/" class="module-card">
-      <div class="card-icon"><i class="bi bi-building-fill"></i></div>
-      <h6>BD INFORMACIÓN COMERCIAL NIVEL DIOS</h6>
-      <p>Deudas, protestos, morosidades y perfil financiero completo de cada cliente. Todos los campos editables.</p>
-      <span class="btn-acceder"><i class="bi bi-arrow-right-circle"></i>Acceder</span>
-    </a>
+
+    <!-- Meses Cerrados -->
+    <div class="meses-card">
+      <div class="meses-card-header">
+        <div class="card-icon"><i class="bi bi-calendar-lock-fill"></i></div>
+        <div>
+          <h6>MESES CERRADOS</h6>
+          <p>Bloquea meses para evitar modificaciones</p>
+        </div>
+      </div>
+
+      <!-- Config días cierre -->
+      <div class="dias-cierre-box">
+        <i class="bi bi-clock-history" style="color:#6d28d9;font-size:1rem"></i>
+        <label>Cerrar a los</label>
+        <input type="number" id="inputDiasCierre" min="1" max="365" value="35">
+        <label>días del fin de mes</label>
+        <button class="btn-save-dias" onclick="guardarDiasCierre()">
+          <i class="bi bi-floppy me-1"></i>Guardar
+        </button>
+      </div>
+
+      <!-- Lista meses -->
+      <div id="mesesList" class="meses-list">
+        <div style="padding:20px;text-align:center">
+          <div class="loading-dots"><span></span><span></span><span></span></div>
+        </div>
+      </div>
+    </div>
+
   </div>
 </div>
 
 <script src="/js/auth-guard.js"></script>
+<script src="/js/app-version.js"></script>
 <script>
   const token = sessionStorage.getItem('token');
   const yo    = JSON.parse(sessionStorage.getItem('usuario') || 'null');
   if (!token || !yo) window.location.href = '/login.html';
+  const H = { 'Content-Type':'application/json', Authorization:'Bearer '+token };
+
   document.getElementById('navNombre').textContent = `${yo?.nombre||''} ${yo?.apellido||''}`.trim();
   document.getElementById('navPerfil').textContent  = yo?.perfil || '';
   document.getElementById('avatarInicial').textContent = (yo?.nombre||'?').charAt(0).toUpperCase();
   function logout() { sessionStorage.removeItem('token'); sessionStorage.removeItem('usuario'); window.location.href='/login.html'; }
+
+  const MESES_ES = ['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
+
+  function fmtMes(mes) {
+    const [anio, m] = mes.split('-');
+    return `${MESES_ES[parseInt(m)-1]} ${anio}`;
+  }
+
+  async function cargarMeses() {
+    try {
+      const r = await fetch('/api/meses-cerrados', { headers: H });
+      const j = await r.json();
+      if (!j.success) throw new Error(j.error);
+      document.getElementById('inputDiasCierre').value = j.data.dias_cierre;
+      renderMeses(j.data.meses);
+    } catch(e) {
+      document.getElementById('mesesList').innerHTML =
+        `<div style="color:#dc2626;font-size:.8rem;padding:12px">${e.message}</div>`;
+    }
+  }
+
+  function renderMeses(meses) {
+    const el = document.getElementById('mesesList');
+    if (!meses.length) { el.innerHTML = '<div style="color:#9ca3af;font-size:.8rem;padding:12px">Sin meses</div>'; return; }
+    el.innerHTML = meses.map(m => {
+      const badge = m.cerrado
+        ? `<span class="badge-cerrado"><i class="bi bi-lock-fill me-1"></i>Cerrado</span>`
+        : m.sugerido_cerrar
+          ? `<span class="badge-sugerido">⏰ ${m.dias_transcurridos}d</span>`
+          : '';
+      return `
+        <div class="mes-row">
+          <div class="mes-label">
+            ${fmtMes(m.mes)}
+            <small>${m.cerrado ? `Bloqueado · ${m.dias_transcurridos}d transcurridos` : `${m.dias_transcurridos} días transcurridos`}</small>
+          </div>
+          ${badge}
+          <div class="toggle-wrap" title="${m.cerrado ? 'Click para abrir mes' : 'Click para cerrar mes'}">
+            <label class="toggle">
+              <input type="checkbox" ${m.cerrado ? 'checked' : ''} onchange="toggleMes('${m.mes}', this)">
+              <span class="toggle-slider"></span>
+            </label>
+          </div>
+        </div>`;
+    }).join('');
+  }
+
+  async function toggleMes(mes, chk) {
+    const cerrado = chk.checked;
+    chk.disabled = true;
+    try {
+      const r = await fetch(`/api/meses-cerrados/${mes}`, {
+        method: 'PUT', headers: H,
+        body: JSON.stringify({ cerrado })
+      });
+      const j = await r.json();
+      if (!j.success) throw new Error(j.error);
+      // Re-render para actualizar badge
+      await cargarMeses();
+    } catch(e) {
+      alert('Error: ' + e.message);
+      chk.checked = !cerrado; // revertir
+    } finally {
+      chk.disabled = false;
+    }
+  }
+
+  async function guardarDiasCierre() {
+    const dias = parseInt(document.getElementById('inputDiasCierre').value);
+    if (!dias || dias < 1) return alert('Ingresa un valor válido');
+    try {
+      const r = await fetch('/api/meses-cerrados/config/dias-cierre', {
+        method: 'PUT', headers: H, body: JSON.stringify({ dias })
+      });
+      const j = await r.json();
+      if (!j.success) throw new Error(j.error);
+      await cargarMeses();
+    } catch(e) {
+      alert('Error: ' + e.message);
+    }
+  }
+
+  cargarMeses();
 </script>
 </body>
 </html>
