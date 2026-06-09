@@ -1084,4 +1084,91 @@ const getUsuariosByPerfil = async (req, res) => {
   }
 })();
 
+/* ─── Migración v12: Meses Cerrados, limpiar Caja duplicados, limpiar Simulador ─ */
+(async () => {
+  try {
+    const [[adm]] = await pool.query("SELECT id_perfil FROM perfiles WHERE nombre='Administrador' LIMIT 1");
+    const [perfiles] = await pool.query('SELECT id_perfil, nombre FROM perfiles');
+
+    // 1) Eliminar TODAS las funcionalidades duplicadas con código 'teso-caja-operativa'
+    //    (la correcta es tesoreria_ver_cajas con id 150004)
+    const [cajaDups] = await pool.query(
+      "SELECT id_funcionalidad FROM funcionalidades WHERE codigo='teso-caja-operativa'"
+    );
+    if (cajaDups.length) {
+      const ids = cajaDups.map(r => r.id_funcionalidad);
+      // Borrar en lotes para evitar limit de parámetros
+      for (let i = 0; i < ids.length; i += 100) {
+        const chunk = ids.slice(i, i + 100);
+        await pool.query('DELETE FROM permisos_perfil WHERE id_funcionalidad IN (?)', [chunk]);
+        await pool.query('DELETE FROM funcionalidades WHERE id_funcionalidad IN (?)', [chunk]);
+      }
+      console.log(`[v12] ${cajaDups.length} duplicados Caja (teso-caja-operativa) eliminados`);
+    }
+
+    // 2) Limpiar módulo Simulador duplicado (conservar Simulador Rentabilidad)
+    const [[simDup]] = await pool.query(
+      "SELECT id_modulo FROM modulos WHERE nombre='Simulador' AND ruta='/simulador/' LIMIT 1"
+    );
+    const [[simOK]] = await pool.query(
+      "SELECT id_modulo FROM modulos WHERE nombre='Simulador Rentabilidad' AND ruta='/simulador/' LIMIT 1"
+    );
+    if (simDup && simOK && simDup.id_modulo !== simOK.id_modulo) {
+      const [simFuncs] = await pool.query(
+        "SELECT id_funcionalidad FROM funcionalidades WHERE id_modulo=?", [simDup.id_modulo]
+      );
+      if (simFuncs.length) {
+        const sids = simFuncs.map(f => f.id_funcionalidad);
+        await pool.query('DELETE FROM permisos_perfil WHERE id_funcionalidad IN (?)', [sids]);
+        await pool.query('DELETE FROM funcionalidades WHERE id_funcionalidad IN (?)', [sids]);
+      }
+      await pool.query("DELETE FROM modulos WHERE id_modulo=?", [simDup.id_modulo]);
+      console.log(`[v12] módulo Simulador duplicado (${simDup.id_modulo}) eliminado`);
+    }
+
+    // 3) Agregar funcionalidad "Meses Cerrados" bajo Mantenedores
+    const [[modMan]] = await pool.query(
+      "SELECT id_modulo FROM modulos WHERE nombre='Mantenedores' AND estado='activo'"
+    );
+    if (modMan) {
+      const [[exMC]] = await pool.query(
+        "SELECT id_funcionalidad FROM funcionalidades WHERE codigo='mant_meses_cerrados'"
+      );
+      let id_mc;
+      if (exMC) {
+        id_mc = exMC.id_funcionalidad;
+      } else {
+        const [ins] = await pool.query(
+          "INSERT INTO funcionalidades (id_modulo, nombre, codigo, href) VALUES (?,?,?,?)",
+          [modMan.id_modulo, 'Meses Cerrados', 'mant_meses_cerrados', '/mantenedores/meses-cerrados/']
+        );
+        id_mc = ins.insertId;
+        console.log('[v12] funcionalidad Meses Cerrados creada id=' + id_mc);
+      }
+      // Solo Admin puede acceder por defecto
+      for (const p of perfiles) {
+        const hab = p.nombre === 'Administrador' ? 1 : 0;
+        await pool.query(
+          'INSERT IGNORE INTO permisos_perfil (id_perfil, id_funcionalidad, habilitado) VALUES (?,?,?)',
+          [p.id_perfil, id_mc, hab]
+        );
+      }
+    }
+
+    // 4) Administrador: habilitar TODO
+    if (adm) {
+      await pool.query(
+        `INSERT INTO permisos_perfil (id_perfil, id_funcionalidad, habilitado)
+         SELECT ?, id_funcionalidad, 1 FROM funcionalidades
+         ON DUPLICATE KEY UPDATE habilitado = 1`,
+        [adm.id_perfil]
+      );
+    }
+
+    console.log('✓ Perfiles v12: Meses Cerrados agregado, duplicados Caja y Simulador eliminados');
+  } catch (e) {
+    console.error('[perfiles migration v12]', e.message);
+  }
+})();
+
 module.exports = { getAllPerfiles, getModulosConFuncionalidades, getPermisosPerfil, updatePermisosPerfil, reordenarModulos, createPerfil, updatePerfil, deletePerfil, getUsuariosByPerfil };
