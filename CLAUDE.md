@@ -88,6 +88,29 @@ shared/
 3. Frontend aplica filtros por fecha y recalcula resúmenes en calcResumen()
 4. RAW_DATA en window.RAW_DATA, resúmenes en window.DASH.feb/jan
 
+## Errores Frecuentes (aprendidos en producción)
+- `creditos` PK es `id`, NO `id_credito` (ese es solo alias en SELECT)
+- `Promise.all` con `pool.query`: destructurar `[[rows], [rows]]` NO `[[rows, rows]]`
+- Modal transparente → usar `<dialog>` nativo con `showModal()`, no divs custom
+- `</script>` accidental en un .js rompe toda la página sin mensaje de error claro
+- Stats de página vs stats totales: siempre query separada sin LIMIT para conteos reales
+
+## Flujo de Deploy
+- Push a main → Render detecta y deploya automáticamente (~2-3 min)
+- Si no deploya → entrar a Render → Manual Deploy → "Deploy latest commit"
+- Confirmar deploy: el hash del commit aparece en los logs de Render
+
+## Convenciones de Permisos
+- Administrador → ve todo sin restricciones
+- `funcionalidades` con `href NULL` → permisos de acción (crear, editar, eliminar)
+- `funcionalidades` con `href` definido → generan sub-items en menús de sección
+- `usuario_ejecutivos` → tabla que controla qué ejecutivos ve cada usuario en comisiones
+
+## Paginación Créditos
+- Server-side: 100 registros/página, máximo 500
+- Stats totales en `j.stats {ESTADO: count}` — nunca filtrar array local del cliente
+- Filtro financiera server-side: `?financiera=AUTOFIN|UNIDAD|AUTOFACIL`
+
 ## APIs Externas / Dependencias
 - TiDB Cloud (BD en la nube)
 - Render (servidor producción)
