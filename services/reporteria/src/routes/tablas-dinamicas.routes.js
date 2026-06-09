@@ -1,7 +1,7 @@
 'use strict';
 const express    = require('express');
 const router     = express.Router();
-const verifyToken = require('../../../../shared/middleware/auth');
+const { verifyToken } = require('../../../../shared/middleware/auth');
 const c          = require('../controllers/tablas-dinamicas.controller');
 
 router.get('/fuentes',           verifyToken, c.getFuentes);
