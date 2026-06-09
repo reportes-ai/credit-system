@@ -34,8 +34,9 @@ const initTablas = async () => {
 (async () => {
   try {
     await pool.query(`
-      INSERT IGNORE INTO perfiles (nombre, descripcion)
-      VALUES ('Tesorero', 'Acceso de lectura a todas las cajas')
+      INSERT INTO perfiles (nombre, descripcion)
+      SELECT 'Tesorero', 'Acceso de lectura a todas las cajas'
+      WHERE NOT EXISTS (SELECT 1 FROM perfiles WHERE nombre = 'Tesorero')
     `);
   } catch(e) { /* tabla puede no existir aún */ }
 

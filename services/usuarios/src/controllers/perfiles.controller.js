@@ -779,8 +779,8 @@ const getUsuariosByPerfil = async (req, res) => {
       }
     }
 
-    // Asegurar módulo Simulador
-    const [simMod] = await pool.query("SELECT id_modulo FROM modulos WHERE nombre='Simulador'");
+    // Asegurar módulo Simulador (buscar por ruta para no crear duplicado)
+    const [simMod] = await pool.query("SELECT id_modulo FROM modulos WHERE ruta='/simulador/'");
     if (simMod.length === 0) {
       const [ins] = await pool.query(
         `INSERT INTO modulos (nombre, descripcion, icono, ruta, orden, estado)
@@ -895,6 +895,89 @@ const getUsuariosByPerfil = async (req, res) => {
     console.log('✓ Perfiles v9: nombres alineados con cards, Solo Dios agregado, duplicados eliminados');
   } catch (e) {
     console.error('[perfiles migration v9]', e.message);
+  }
+})();
+
+/* ─── Migración v10: limpiar Tesoreros duplicados, Simulador duplicado, Dashboard permiso ── */
+(async () => {
+  try {
+    // 1) Eliminar Tesoreros duplicados — conservar solo el de menor id
+    const [[primerTesorero]] = await pool.query(
+      "SELECT MIN(id_perfil) AS id FROM perfiles WHERE nombre = 'Tesorero'"
+    );
+    if (primerTesorero?.id) {
+      // Mover permisos y usuarios al perfil que conservamos
+      await pool.query(
+        "UPDATE permisos_perfil SET id_perfil=? WHERE id_perfil IN (SELECT id_perfil FROM (SELECT id_perfil FROM perfiles WHERE nombre='Tesorero' AND id_perfil != ?) t) ON DUPLICATE KEY UPDATE habilitado=habilitado",
+        [primerTesorero.id, primerTesorero.id]
+      );
+      await pool.query(
+        "UPDATE usuarios SET id_perfil=? WHERE id_perfil IN (SELECT id_perfil FROM (SELECT id_perfil FROM perfiles WHERE nombre='Tesorero' AND id_perfil != ?) t)",
+        [primerTesorero.id, primerTesorero.id]
+      );
+      await pool.query(
+        "DELETE FROM perfiles WHERE nombre='Tesorero' AND id_perfil != ?",
+        [primerTesorero.id]
+      );
+    }
+
+    // 2) Eliminar módulo "Simulador" duplicado — conservar "Simulador Rentabilidad"
+    const [[simDup]] = await pool.query(
+      "SELECT id_modulo FROM modulos WHERE nombre='Simulador' AND ruta='/simulador/' LIMIT 1"
+    );
+    const [[simOK]] = await pool.query(
+      "SELECT id_modulo FROM modulos WHERE nombre='Simulador Rentabilidad' LIMIT 1"
+    );
+    if (simDup && simOK) {
+      // El "Simulador Rentabilidad" es el correcto — eliminar el duplicado "Simulador"
+      const [funcs] = await pool.query("SELECT id_funcionalidad FROM funcionalidades WHERE id_modulo=?", [simDup.id_modulo]);
+      if (funcs.length) {
+        const ids = funcs.map(f => f.id_funcionalidad);
+        await pool.query('DELETE FROM permisos_perfil WHERE id_funcionalidad IN (?)', [ids]);
+        await pool.query('DELETE FROM funcionalidades WHERE id_funcionalidad IN (?)', [ids]);
+      }
+      await pool.query('DELETE FROM modulos WHERE id_modulo=?', [simDup.id_modulo]);
+    }
+
+    // 3) Agregar funcionalidad "Ver Dashboard" para control de permisos
+    const [[modDash]] = await pool.query("SELECT id_modulo FROM modulos WHERE ruta LIKE '%dashboard%' AND estado='activo' LIMIT 1");
+    if (modDash) {
+      const [[exDash]] = await pool.query("SELECT id_funcionalidad FROM funcionalidades WHERE codigo='ver_dashboard'");
+      let id_func_dash;
+      if (exDash) {
+        id_func_dash = exDash.id_funcionalidad;
+      } else {
+        const [ins] = await pool.query(
+          "INSERT INTO funcionalidades (id_modulo, nombre, codigo) VALUES (?,?,?)",
+          [modDash.id_modulo, 'Ver Dashboard', 'ver_dashboard']
+        );
+        id_func_dash = ins.insertId;
+      }
+      // Asignar: Admin y Gerente = 1, resto = 0
+      const [todos] = await pool.query('SELECT id_perfil, nombre FROM perfiles');
+      for (const p of todos) {
+        const hab = ['Administrador','Gerente'].includes(p.nombre) ? 1 : 0;
+        await pool.query(
+          'INSERT IGNORE INTO permisos_perfil (id_perfil, id_funcionalidad, habilitado) VALUES (?,?,?)',
+          [p.id_perfil, id_func_dash, hab]
+        );
+      }
+    }
+
+    // 4) Administrador: habilitar TODAS
+    const [[adm]] = await pool.query("SELECT id_perfil FROM perfiles WHERE nombre='Administrador' LIMIT 1");
+    if (adm) {
+      await pool.query(
+        `INSERT INTO permisos_perfil (id_perfil, id_funcionalidad, habilitado)
+         SELECT ?, id_funcionalidad, 1 FROM funcionalidades
+         ON DUPLICATE KEY UPDATE habilitado = 1`,
+        [adm.id_perfil]
+      );
+    }
+
+    console.log('✓ Perfiles v10: Tesoreros duplicados eliminados, Simulador deduplicado, Dashboard permiso agregado');
+  } catch (e) {
+    console.error('[perfiles migration v10]', e.message);
   }
 })();
 
