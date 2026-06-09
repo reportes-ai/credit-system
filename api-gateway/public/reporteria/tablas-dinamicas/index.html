@@ -396,14 +396,21 @@ let ultimaConfig=null, ultimaData=null, modoEdicion=null;
 
 /* ── Fuentes ──────────────────────────────────────── */
 async function cargarFuentes() {
-  const r = await fetch(API+'/fuentes', { headers:hdr() });
-  const j = await r.json();
-  if (!j.success) return;
-  FUENTES = j.data;
-  const sel = document.getElementById('selFuente');
-  sel.innerHTML = FUENTES.map(f=>`<option value="${f.key}">${f.label}</option>`).join('');
-  if (FUENTES.length) onCambioFuente();
-  cargarGuardadas();
+  try {
+    const r = await fetch(API+'/fuentes', { headers:hdr() });
+    if (!r.ok) throw new Error('HTTP '+r.status);
+    const j = await r.json();
+    if (!j.success) throw new Error(j.error||'Error cargando fuentes');
+    FUENTES = j.data;
+    const sel = document.getElementById('selFuente');
+    sel.innerHTML = FUENTES.map(f=>`<option value="${f.key}">${f.label}</option>`).join('');
+    if (FUENTES.length) onCambioFuente();
+    cargarGuardadas();
+  } catch(e) {
+    document.getElementById('resultInfo').textContent = '⚠ Error cargando fuentes: '+e.message;
+    document.getElementById('resultInfo').style.color = '#ef4444';
+    console.error('[cargarFuentes]', e);
+  }
 }
 
 function onCambioFuente() {
@@ -536,9 +543,14 @@ function quitarFiltro(i){ filtros.splice(i,1); renderFiltros(); }
 const escH = s => String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
 
 /* ── Ejecutar ─────────────────────────────────────── */
+function showMsgRun(msg,color){
+  const el=document.getElementById('resultInfo');
+  el.textContent=msg; el.style.color=color||'#ef4444'; el.style.fontWeight='600';
+  setTimeout(()=>{ el.style.color=''; el.style.fontWeight=''; },3000);
+}
 async function ejecutarConsulta(){
-  if(!fuenteActual){alert('Selecciona fuente');return;}
-  if(!filas.length&&!valores.length){alert('Agrega al menos un campo de fila o valor');return;}
+  if(!fuenteActual){ showMsgRun('⚠ Selecciona una fuente de datos'); return; }
+  if(!filas.length&&!cols.length&&!valores.length){ showMsgRun('⚠ Agrega al menos un campo de fila, columna o valor'); return; }
   const btn=document.getElementById('btnRun');
   btn.disabled=true; btn.innerHTML='<span class="spinner-border spinner-border-sm me-1"></span>Ejecutando…';
   const config={
@@ -553,12 +565,13 @@ async function ejecutarConsulta(){
   try{
     const r=await fetch(API+'/ejecutar',{method:'POST',headers:hdr(),body:JSON.stringify(config)});
     const j=await r.json();
-    if(!j.success){showError(j.error);return;}
+    if(!j.success){ showError(j.error); document.getElementById('resultWrap').scrollIntoView({behavior:'smooth',block:'nearest'}); return; }
     ultimaData=j.data;
     renderTabla(j.data,config);
     document.getElementById('btnExport').style.display='';
     document.getElementById('btnGuardar').style.display='';
-  }catch(e){ showError('Error de conexión'); }
+    document.getElementById('resultWrap').scrollIntoView({behavior:'smooth',block:'nearest'});
+  }catch(e){ showError('Error de conexión: '+e.message); document.getElementById('resultWrap').scrollIntoView({behavior:'smooth',block:'nearest'}); }
   finally{ btn.disabled=false; btn.innerHTML='<i class="bi bi-play-fill"></i> Ejecutar'; }
 }
 
