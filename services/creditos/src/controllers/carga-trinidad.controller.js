@@ -274,7 +274,7 @@ exports.importar = async (req, res) => {
           );
           actualizados++;
           log.push(`✓ Actualizado ${f.num_op} → ${f.estado_autofin} / ${f.estado_credito}`);
-          if (['otorgado','aprobado'].includes((f.estado_credito||'').toLowerCase())) cursadosIds.push(f.num_op);
+          if ((f.estado_credito||'').toLowerCase() === 'otorgado') cursadosIds.push(f.num_op);
         } else {
           await pool.query(
             `INSERT INTO creditos
@@ -295,7 +295,7 @@ exports.importar = async (req, res) => {
           insertados++;
           detallesIns.push({ num_op: f.num_op, datos: f });
           log.push(`➕ Insertado  ${f.num_op} → ${f.estado_autofin} / ${f.estado_credito}`);
-          if (['otorgado','aprobado'].includes((f.estado_credito||'').toLowerCase())) cursadosIds.push(f.num_op);
+          if ((f.estado_credito||'').toLowerCase() === 'otorgado') cursadosIds.push(f.num_op);
         }
       } catch (rowErr) {
         errores++;
