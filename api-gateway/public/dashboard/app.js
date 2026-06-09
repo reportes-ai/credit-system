@@ -3758,7 +3758,17 @@ window.guardarIncompletos = async function guardarIncompletos() {
 
   if (ok > 0) {
     try {
-      await fetch('/api/operaciones/recalcular-comisiones', { method: 'POST', headers: H, body: JSON.stringify({}) });
+      // Solo recalcular los meses de las operaciones guardadas
+      const mesesGuardados = [...new Set(
+        (window._incompletos || [])
+          .filter(c => mapa[c.id] && Object.keys(mapa[c.id]).length)
+          .map(c => (c.mes || '').slice(0, 7))
+          .filter(Boolean)
+      )].sort();
+      const body = mesesGuardados.length
+        ? { mes_desde: mesesGuardados[0], mes_hasta: mesesGuardados[mesesGuardados.length - 1] }
+        : {};
+      await fetch('/api/operaciones/recalcular-comisiones', { method: 'POST', headers: H, body: JSON.stringify(body) });
     } catch {}
   }
 
