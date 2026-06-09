@@ -611,7 +611,7 @@ const getReporteria = async (req, res) => {
 const patchDatosIngresos = async (req, res) => {
   try {
     const { id } = req.params;
-    const CAMPOS_PERMITIDOS = ['seguro_rdh', 'seguros', 'comdea_real', 'com_parque'];
+    const CAMPOS_PERMITIDOS = ['plazo', 'tascli_real', 'seguro_rdh', 'seguros', 'comdea_real', 'com_parque'];
     const sets = [];
     const vals = [];
     for (const campo of CAMPOS_PERMITIDOS) {
@@ -623,7 +623,8 @@ const patchDatosIngresos = async (req, res) => {
     if (!sets.length) return res.status(400).json({ success: false, data: null, error: 'Sin campos válidos' });
     vals.push(id);
     await pool.query(`UPDATE creditos SET ${sets.join(', ')}, updated_at = NOW() WHERE id = ?`, vals);
-    res.json({ success: true, data: { id }, error: null });
+    const [[row]] = await pool.query('SELECT mes FROM creditos WHERE id = ?', [id]);
+    res.json({ success: true, data: { id, mes: row?.mes }, error: null });
   } catch (e) {
     res.status(500).json({ success: false, data: null, error: e.message });
   }

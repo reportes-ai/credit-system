@@ -241,23 +241,31 @@ function abrirModalCursados(cursados) {
   const $m = v => v != null ? '$' + Number(v).toLocaleString('es-CL') : '—';
   const fmtTasa = v => v != null ? (Number(v)*100).toFixed(4) + '%' : '—';
 
+  const faltaPlazo = cursados.some(c => !c.plazo);
+
   const filas = cursados.map(c => {
-    // Ingreso colocación: ya calculado como monto_comision_fin (se recalculó tras la importación)
-    const ingColocacion = c.monto_comision_fin != null
+    const sinPlazo = !c.plazo || !c.tascli_real;
+    const ingColocacion = (!sinPlazo && c.monto_comision_fin != null)
       ? `<span style="font-weight:700;color:#166534">${$m(c.monto_comision_fin)}</span>
          <div style="font-size:.7rem;color:#6b7280;margin-top:2px">
-           ${c.tascli_real ? 'Tasa: '+fmtTasa(c.tascli_real) : 'Sin tasa registrada'}
-           ${c.plazo ? ' · '+c.plazo+' cuotas' : ''}
+           Tasa: ${fmtTasa(c.tascli_real)} · ${c.plazo} cuotas
          </div>`
-      : `<span style="color:#d97706;font-size:.78rem">⚠ Sin datos de tasa/plazo<br>
-           <small>Carga el Excel de AutoFácil primero</small></span>`;
+      : `<div style="display:flex;flex-direction:column;gap:4px">
+           <input type="number" placeholder="Plazo (cuotas)" value="${c.plazo||''}"
+             style="width:120px;padding:4px 7px;border:1.5px solid #d97706;border-radius:6px;font-size:.78rem"
+             data-campo="plazo" data-id="${c.id}">
+           <input type="number" placeholder="Tasa anual %" step="0.01" value="${c.tascli_real ? (c.tascli_real*100).toFixed(4) : ''}"
+             style="width:120px;padding:4px 7px;border:1.5px solid #d97706;border-radius:6px;font-size:.78rem"
+             data-campo="tascli_pct" data-id="${c.id}">
+           <div style="font-size:.67rem;color:#d97706">⚠ Ingresar para calcular ing. colocación</div>
+         </div>`;
 
     return `
     <tr data-id="${c.id}" style="border-bottom:1px solid #e5e7eb">
       <td style="padding:8px 10px;font-weight:700;white-space:nowrap">${c.num_op}</td>
       <td style="padding:8px 10px;font-size:.82rem;color:#374151;max-width:140px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${c.ejecutivo||'—'}</td>
       <td style="padding:8px 10px;font-size:.82rem;font-weight:600">${$m(c.monto_financiado)}</td>
-      <td style="padding:8px 10px;text-align:center">${ingColocacion}</td>
+      <td style="padding:6px 8px;text-align:center">${ingColocacion}</td>
       <td style="padding:6px 6px">
         <input type="number" placeholder="Prima $" value="${c.seguro_rdh||''}"
           style="width:120px;padding:5px 8px;border:1.5px solid #0141A2;border-radius:6px;font-size:.82rem"
@@ -281,7 +289,7 @@ function abrirModalCursados(cursados) {
       <div>
         <div style="font-size:1.1rem;font-weight:700"><i class="bi bi-cash-coin me-2"></i>Datos de ingresos — Otorgados (${cursados.length})</div>
         <div style="font-size:.82rem;opacity:.8;margin-top:3px">
-          Ingreso colocación calculado automáticamente · Ingresa la prima del seguro de desgravamen · Com. dealer y parque se calculan al recalcular comisiones
+          ${faltaPlazo ? '⚠ Algunos créditos no tienen plazo/tasa — ingrésalos para calcular ing. colocación · ' : ''}Prima desgravamen (ingresar) · Com. dealer y parque se calculan al recalcular
         </div>
       </div>
       <button onclick="document.getElementById('modalCursados').close()" style="background:rgba(255,255,255,.15);border:none;color:#fff;border-radius:8px;padding:6px 14px;cursor:pointer;font-size:.85rem">✕ Cerrar</button>
@@ -320,10 +328,17 @@ async function guardarDatosCursados() {
     const id = inp.dataset.id;
     if (!mapa[id]) mapa[id] = {};
     const val = inp.value.trim();
-    if (val !== '') mapa[id][inp.dataset.campo] = parseFloat(val);
+    if (val === '') return;
+    if (inp.dataset.campo === 'tascli_pct') {
+      // Convertir % anual → decimal mensual (tascli_real se guarda como decimal mensual)
+      mapa[id]['tascli_real'] = parseFloat(val) / 100 / 12;
+    } else {
+      mapa[id][inp.dataset.campo] = parseFloat(val);
+    }
   });
 
   let ok = 0, err = 0;
+  const meses = new Set();
   for (const [id, campos] of Object.entries(mapa)) {
     if (!Object.keys(campos).length) continue;
     try {
@@ -333,13 +348,25 @@ async function guardarDatosCursados() {
         body: JSON.stringify(campos)
       });
       const d = await r.json();
-      if (d.success) ok++; else err++;
+      if (d.success) { ok++; if (d.data?.mes) meses.add(d.data.mes); }
+      else err++;
     } catch { err++; }
+  }
+
+  // Si se ingresó plazo/tasa, disparar recálculo para calcular monto_comision_fin
+  if (meses.size > 0 || ok > 0) {
+    try {
+      await fetch('/api/operaciones/recalcular-comisiones', {
+        method: 'POST',
+        headers: { ...H, 'Content-Type': 'application/json' },
+        body: JSON.stringify({})
+      });
+    } catch {}
   }
 
   btn.disabled = false; btn.innerHTML = '<i class="bi bi-save me-1"></i>Guardar datos';
   document.getElementById('modalCursados').close();
-  toast(err === 0 ? `✓ Datos guardados en ${ok} operaciones` : `⚠ ${ok} guardados, ${err} con error`, err===0);
+  toast(err === 0 ? `✓ Datos guardados en ${ok} operaciones · Comisiones recalculadas` : `⚠ ${ok} guardados, ${err} con error`, err===0);
 }
 </script>
 <script src="/js/app-version.js"></script>
