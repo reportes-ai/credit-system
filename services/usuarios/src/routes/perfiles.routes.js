@@ -3,7 +3,8 @@ const ctrl = require('../controllers/perfiles.controller');
 const { verifyToken, requirePerfil } = require('../../../../shared/middleware/auth');
 
 router.get('/',    verifyToken, ctrl.getAllPerfiles);
-router.post('/',   verifyToken, requirePerfil('Administrador'), ctrl.createPerfil);
+router.post('/',      verifyToken, requirePerfil('Administrador'), ctrl.createPerfil);
+router.put('/:id',    verifyToken, requirePerfil('Administrador'), ctrl.updatePerfil);
 router.delete('/:id', verifyToken, requirePerfil('Administrador'), ctrl.deletePerfil);
 router.get('/modulos-funcionalidades', verifyToken, ctrl.getModulosConFuncionalidades);
 router.get('/:id/permisos',  verifyToken, ctrl.getPermisosPerfil);
