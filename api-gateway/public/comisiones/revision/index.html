@@ -112,7 +112,7 @@
 <body>
 <nav class="topnav">
   <div class="topnav-left">
-    <a href="/" class="topnav-brand"><img src="/img/logo.png" alt="AutoFácil"><span class="version-badge">v5.6</span></a>
+    <a href="/" class="topnav-brand"><img src="/img/logo.png" alt="AutoFácil"><span class="version-badge">v5.7</span></a>
     <div class="breadcrumb-nav">
       <a href="/">Inicio</a><span class="sep">›</span>
       <a href="/comisiones/">Comisión Ejecutivos</a><span class="sep">›</span>
@@ -149,6 +149,7 @@
       <option value="">— Todos —</option>
     </select>
     <button class="btn-buscar" onclick="cargar()"><i class="bi bi-search"></i>Calcular</button>
+    <button id="btnInforme" class="btn-buscar" style="background:#374151;display:none" onclick="generarInforme()"><i class="bi bi-file-earmark-text"></i>Generar Informe</button>
     <span id="loadingSpinner" style="display:none;color:#6b7280;font-size:.85rem"><i class="bi bi-hourglass-split me-1"></i>Calculando...</span>
   </div>
 
@@ -327,6 +328,7 @@ function renderizar(data, mes) {
   }
 
   document.getElementById('resultado').innerHTML = html;
+  document.getElementById('btnInforme').style.display = 'flex';
 }
 
 function renderEjSinComision(d, idx) {
@@ -626,6 +628,245 @@ async function cambiarEstado(ejecutivo, mes, estado, incentivo_final, con_semana
     if (json.success) { toast(`${estado === 'aprobado' ? '✓ Aprobado' : '✗ Rechazado'}: ${ejecutivo}`, estado==='aprobado'); cargar(); }
     else toast('Error: ' + json.error, false);
   } catch(e) { toast('Error: ' + e.message, false); }
+}
+
+/* ── Generar Informe completo (todos los ejecutivos) ─────────────────── */
+function generarInforme() {
+  if (!datosActuales.length) { toast('Primero calcula un mes', false); return; }
+  const mes = document.getElementById('filtroMes').value;
+  const mesLabel = nombreMes(mes).replace(/^\w/, c => c.toUpperCase());
+  const ejFiltro = document.getElementById('filtroEj').value;
+  const datos = ejFiltro ? datosActuales.filter(d => d.ejecutivo === ejFiltro) : datosActuales;
+  const minimo = datos[0]?.total_financiado !== undefined
+    ? new Intl.NumberFormat('es-CL',{style:'currency',currency:'CLP',maximumFractionDigits:0}).format(30000000)
+    : '$30.000.000';
+
+  const abrevFin = f => (f||'').toUpperCase().includes('UNIDAD') ? 'UNIDAD' : 'AUTOFIN';
+  const fmtN = n => '$' + Math.round(n||0).toLocaleString('es-CL');
+  const pctN = n => ((n||0)*100).toFixed(1) + '%';
+
+  /* ── Bloque por ejecutivo ─── */
+  function bloqueEjecutivo(d) {
+    const otorgados = (d.creditos||[]).filter(c => (c.estado_credito||'').toUpperCase()==='OTORGADO');
+    const filasOps = otorgados.map((c,i) => {
+      const hasCes = (parseFloat(c.seguro_cesantia)||0) > 0;
+      const hasRep = (parseFloat(c.seguro_rep_menor)||0) > 0;
+      const hasAdl = (c.incentivo_adicional_credito||0) > 0;
+      const bg = i%2===0 ? '#f8fafc' : '#fff';
+      return `<tr style="background:${bg}">
+        <td style="padding:5px 9px;border-bottom:1px solid #e5e7eb;font-size:12px">${c.num_op||'—'}</td>
+        <td style="padding:5px 9px;border-bottom:1px solid #e5e7eb;font-size:12px">${c.nombre_cliente||'—'}</td>
+        <td style="padding:5px 9px;border-bottom:1px solid #e5e7eb;font-size:12px;text-align:center;color:#0141A2;font-weight:700">${abrevFin(c.financiera)}</td>
+        <td style="padding:5px 9px;border-bottom:1px solid #e5e7eb;font-size:12px;text-align:center">${c.plazo||'—'}c</td>
+        <td style="padding:5px 9px;border-bottom:1px solid #e5e7eb;font-size:12px;text-align:right;font-weight:600">${fmtN(c.monto_financiado)}</td>
+        <td style="padding:5px 9px;border-bottom:1px solid #e5e7eb;font-size:12px;text-align:center;color:${hasCes?'#16a34a':'#9ca3af'}">${hasCes?'✔ '+fmtN(c.seguro_cesantia):'—'}</td>
+        <td style="padding:5px 9px;border-bottom:1px solid #e5e7eb;font-size:12px;text-align:center;color:${hasRep?'#16a34a':'#9ca3af'}">${hasRep?'✔ '+fmtN(c.seguro_rep_menor):'—'}</td>
+        ${d.cumple_minimo ? `
+        <td style="padding:5px 9px;border-bottom:1px solid #e5e7eb;font-size:12px;text-align:right;font-weight:700;color:#0141A2">${fmtN(c.incentivo_base_credito||0)}</td>
+        <td style="padding:5px 9px;border-bottom:1px solid #e5e7eb;font-size:12px;text-align:right;font-weight:700;color:${hasAdl?'#16a34a':'#9ca3af'}">${hasAdl?fmtN(c.incentivo_adicional_credito):'—'}</td>` : ''}
+      </tr>`;
+    }).join('');
+
+    const thIncentivo = d.cumple_minimo ? `
+      <th style="padding:6px 9px;text-align:right;font-weight:700;color:#0141A2;font-size:11px">Inc. Base</th>
+      <th style="padding:6px 9px;text-align:right;font-weight:700;color:#16a34a;font-size:11px">Inc. Adicional</th>` : '';
+
+    const tablaOps = `
+      <div style="margin:14px 0 8px;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.8px;color:#6b7280">
+        Operaciones del período — ${otorgados.length} crédito${otorgados.length!==1?'s':''} OTORGADO${otorgados.length!==1?'S':''}
+      </div>
+      <table style="width:100%;border-collapse:collapse;font-size:12px">
+        <thead><tr style="background:#e8eaf6">
+          <th style="padding:6px 9px;text-align:left;font-weight:700;color:#374151;font-size:11px;border-bottom:2px solid #c5cae9">N° Op</th>
+          <th style="padding:6px 9px;text-align:left;font-weight:700;color:#374151;font-size:11px;border-bottom:2px solid #c5cae9">Cliente</th>
+          <th style="padding:6px 9px;text-align:center;font-weight:700;color:#374151;font-size:11px;border-bottom:2px solid #c5cae9">Financiera</th>
+          <th style="padding:6px 9px;text-align:center;font-weight:700;color:#374151;font-size:11px;border-bottom:2px solid #c5cae9">Plazo</th>
+          <th style="padding:6px 9px;text-align:right;font-weight:700;color:#374151;font-size:11px;border-bottom:2px solid #c5cae9">Monto Fin.</th>
+          <th style="padding:6px 9px;text-align:center;font-weight:700;color:#374151;font-size:11px;border-bottom:2px solid #c5cae9">Seg. Cesantía</th>
+          <th style="padding:6px 9px;text-align:center;font-weight:700;color:#374151;font-size:11px;border-bottom:2px solid #c5cae9">Seg. Rep.</th>
+          ${thIncentivo}
+        </tr></thead>
+        <tbody>${filasOps}</tbody>
+      </table>`;
+
+    /* ── SIN COMISIÓN ── */
+    if (!d.cumple_minimo) {
+      const totalFin = (d.creditos||[]).reduce((s,c)=>s+(parseFloat(c.monto_financiado)||0),0);
+      return `
+      <div style="margin-bottom:28px;border:1px solid #fca5a5;border-radius:12px;overflow:hidden;page-break-inside:avoid">
+        <!-- Header rojo -->
+        <div style="background:linear-gradient(90deg,#b91c1c,#dc2626);padding:14px 22px;color:#fff;display:flex;align-items:center;justify-content:space-between">
+          <div>
+            <div style="font-size:9px;letter-spacing:1.5px;text-transform:uppercase;opacity:.7;margin-bottom:2px">Sin comisión — No cumple mínimo</div>
+            <div style="font-size:16px;font-weight:800">${d.ejecutivo}</div>
+          </div>
+          <div style="text-align:right;font-size:12px;opacity:.85">
+            <div>Créditos: <strong>${d.total_creditos||0}</strong></div>
+            <div>Total financiado: <strong>${fmtN(totalFin)}</strong></div>
+          </div>
+        </div>
+        <!-- Explicación -->
+        <div style="background:#fee2e2;padding:14px 22px;border-bottom:1px solid #fca5a5">
+          <div style="font-size:13px;font-weight:700;color:#991b1b;margin-bottom:6px">⚠ Motivo: No alcanzó el monto mínimo requerido</div>
+          <table style="width:100%;font-size:12.5px;border-collapse:collapse">
+            <tr>
+              <td style="padding:4px 0;color:#7f1d1d;width:50%">Monto financiado del mes:</td>
+              <td style="padding:4px 0;font-weight:700;color:#dc2626">${fmtN(totalFin)}</td>
+              <td style="padding:4px 0;color:#7f1d1d">Monto mínimo requerido:</td>
+              <td style="padding:4px 0;font-weight:700;color:#7f1d1d">$30.000.000</td>
+            </tr>
+            <tr>
+              <td style="padding:4px 0;color:#7f1d1d">Créditos OTORGADOS:</td>
+              <td style="padding:4px 0;font-weight:700;color:#dc2626">${d.total_creditos||0}</td>
+              <td style="padding:4px 0;color:#7f1d1d">Diferencia:</td>
+              <td style="padding:4px 0;font-weight:700;color:#dc2626">${fmtN(totalFin - 30000000)} (${totalFin >= 30000000 ? 'sobre' : 'bajo'} el mínimo)</td>
+            </tr>
+          </table>
+        </div>
+        <!-- Operaciones de todos modos -->
+        <div style="background:#fff;padding:18px 22px">
+          <div style="font-size:11.5px;color:#6b7280;margin-bottom:4px">Las siguientes operaciones fueron registradas en el período pero <strong>no generan comisión</strong> al no alcanzar el monto mínimo mensual:</div>
+          ${tablaOps}
+        </div>
+      </div>`;
+    }
+
+    /* ── CON COMISIÓN ── */
+    const indicadores = `
+      <div style="margin:16px 0;display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px">
+        <div style="background:${d.cumple_cesantia?'#f0fdf4':'#fef2f2'};border:1px solid ${d.cumple_cesantia?'#bbf7d0':'#fecaca'};border-radius:8px;padding:10px 14px">
+          <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:#6b7280">Cruce Seg. Cesantía</div>
+          <div style="font-size:18px;font-weight:800;color:${d.cumple_cesantia?'#16a34a':'#dc2626'};margin:2px 0">${pctN(d.cruce_cesantia)} <span style="font-size:12px;font-weight:500">(${d.ncnu_cesantia||0}/${d.ncnu_total||0})</span></div>
+          <div style="font-size:11px;color:#6b7280">${d.cumple_cesantia?'✔ Cumple':'✘ No cumple'} · mín. ${pctN(d.umbral_cesantia||0.65)} · ajuste: ${pctN(d.ajuste_cesantia)}</div>
+        </div>
+        <div style="background:${d.cumple_reparaciones?'#f0fdf4':'#fef2f2'};border:1px solid ${d.cumple_reparaciones?'#bbf7d0':'#fecaca'};border-radius:8px;padding:10px 14px">
+          <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:#6b7280">Cruce Seg. Reparaciones</div>
+          <div style="font-size:18px;font-weight:800;color:${d.cumple_reparaciones?'#16a34a':'#dc2626'};margin:2px 0">${pctN(d.cruce_reparaciones)} <span style="font-size:12px;font-weight:500">(${d.ncnu_rep||0}/${d.ncnu_total||0})</span></div>
+          <div style="font-size:11px;color:#6b7280">${d.cumple_reparaciones?'✔ Cumple':'✘ No cumple'} · mín. ${pctN(d.umbral_rep||0.50)} · ajuste: ${pctN(d.ajuste_reparaciones)}</div>
+        </div>
+        <div style="background:${(d.calidad_logrado||0)>=(d.calidad_meta||3)?'#f0fdf4':(d.calidad_logrado||0)>0?'#fffbeb':'#fef2f2'};border:1px solid ${(d.calidad_logrado||0)>=(d.calidad_meta||3)?'#bbf7d0':(d.calidad_logrado||0)>0?'#fde68a':'#fecaca'};border-radius:8px;padding:10px 14px">
+          <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:#6b7280">Calidad — Créditos UNIDAD</div>
+          <div style="font-size:18px;font-weight:800;color:${(d.calidad_logrado||0)>=(d.calidad_meta||3)?'#16a34a':(d.calidad_logrado||0)>0?'#d97706':'#dc2626'};margin:2px 0">${d.calidad_logrado||0}/${d.calidad_meta||3} <span style="font-size:12px;font-weight:500">(${pctN(d.calidad)})</span></div>
+          <div style="font-size:11px;color:#6b7280">${(d.calidad_logrado||0)>=(d.calidad_meta||3)?'✔ Cumple':(d.calidad_logrado||0)>0?'⚠ Parcial':'✘ No cumple'} · ajuste: ${pctN(d.ajuste_calidad)}</div>
+        </div>
+      </div>`;
+
+    const desglose = `
+      <div style="background:#f0f4f8;border-radius:8px;padding:14px 18px;margin-top:12px;display:flex;justify-content:space-between;align-items:stretch;gap:18px">
+        <table style="font-size:12.5px;border-collapse:collapse;flex:1">
+          <tr><td style="padding:4px 0;color:#374151">Incentivo Base (0.75% ≤24c / 1.00% &gt;24c)</td><td style="padding:4px 0;text-align:right;font-weight:600;padding-left:20px">${fmtN(d.incentivo_base)}</td></tr>
+          <tr><td style="padding:4px 0;color:#374151">+ Bono Seg. Cesantía ${d.cumple_cesantia?'(cruce '+pctN(d.cruce_cesantia)+', ajuste '+pctN(d.ajuste_cesantia)+')':'— no cumple'}</td><td style="padding:4px 0;text-align:right;font-weight:600;padding-left:20px">${d.cumple_cesantia?fmtN(d.bono_cesantia):'$0'}</td></tr>
+          <tr><td style="padding:4px 0;color:#374151">+ Bono Seg. Reparaciones ${d.cumple_reparaciones?'(cruce '+pctN(d.cruce_reparaciones)+', ajuste '+pctN(d.ajuste_reparaciones)+')':'— no cumple'}</td><td style="padding:4px 0;text-align:right;font-weight:600;padding-left:20px">${d.cumple_reparaciones?fmtN(d.bono_reparaciones):'$0'}</td></tr>
+          <tr><td style="padding:4px 0;color:#374151">+ Bono Calidad (ajuste ${pctN(d.ajuste_calidad)})</td><td style="padding:4px 0;text-align:right;font-weight:600;padding-left:20px">${fmtN(d.bono_calidad)}</td></tr>
+          <tr style="border-top:2px solid #c5cae9">
+            <td style="padding:8px 0 0;font-weight:700;color:#0141A2;font-size:13px">= INCENTIVO FINAL BRUTO</td>
+            <td style="padding:8px 0 0;text-align:right;font-weight:800;color:#0141A2;font-size:14px;padding-left:20px">${fmtN(d.incentivo_final)}</td>
+          </tr>
+        </table>
+        <div style="background:linear-gradient(135deg,#012d70,#0141A2);border-radius:8px;padding:14px 20px;color:#fff;min-width:160px;display:flex;flex-direction:column;justify-content:center;text-align:center">
+          <div style="font-size:10px;opacity:.7;text-transform:uppercase;letter-spacing:.8px;margin-bottom:4px">Con Semana Corrida (×1.2)</div>
+          <div style="font-size:22px;font-weight:800">${fmtN(d.con_semana_corrida)}</div>
+        </div>
+      </div>`;
+
+    return `
+    <div style="margin-bottom:28px;border:1px solid #d1d5db;border-radius:12px;overflow:hidden;page-break-inside:avoid">
+      <!-- Header verde -->
+      <div style="background:linear-gradient(90deg,#14532d,#16a34a);padding:14px 22px;color:#fff;display:flex;align-items:center;justify-content:space-between">
+        <div>
+          <div style="font-size:9px;letter-spacing:1.5px;text-transform:uppercase;opacity:.7;margin-bottom:2px">Con comisión — Cumple mínimo</div>
+          <div style="font-size:16px;font-weight:800">${d.ejecutivo}</div>
+        </div>
+        <div style="text-align:right;font-size:12px;opacity:.85">
+          <div>Créditos OTORGADOS: <strong>${d.total_creditos}</strong></div>
+          <div>Total Financiado: <strong>${fmtN(d.total_financiado)}</strong></div>
+        </div>
+      </div>
+      <!-- Contenido -->
+      <div style="background:#fff;padding:18px 22px">
+        ${indicadores}
+        ${tablaOps}
+        ${desglose}
+      </div>
+    </div>`;
+  }
+
+  /* ── Armar documento completo ── */
+  const conComision  = datos.filter(d => d.cumple_minimo);
+  const sinComision  = datos.filter(d => !d.cumple_minimo);
+  const totalComis   = conComision.reduce((s,d)=>s+(d.incentivo_final||0),0);
+  const totalMonto   = datos.reduce((s,d)=>s+(d.total_financiado||0),0);
+
+  const seccionCon = conComision.length
+    ? `<div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:#16a34a;margin:24px 0 12px;padding-bottom:6px;border-bottom:2px solid #bbf7d0">✔ Con Comisión — ${conComision.length} ejecutivo${conComision.length!==1?'s':''}</div>
+       ${conComision.map(bloqueEjecutivo).join('')}` : '';
+
+  const seccionSin = sinComision.length
+    ? `<div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:#dc2626;margin:24px 0 12px;padding-bottom:6px;border-bottom:2px solid #fca5a5">✘ Sin Comisión — ${sinComision.length} ejecutivo${sinComision.length!==1?'s':''}</div>
+       ${sinComision.map(bloqueEjecutivo).join('')}` : '';
+
+  const docHtml = `<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<title>Informe Comisiones — ${mesLabel}</title>
+<style>
+  body { font-family:'Segoe UI',Arial,sans-serif; margin:0; color:#111827; background:#fff; }
+  @media print {
+    body { margin:0; }
+    .no-print { display:none !important; }
+    .page-break { page-break-after:always; }
+  }
+  @page { margin:1.5cm; }
+</style>
+</head>
+<body>
+<!-- Botón imprimir -->
+<div class="no-print" style="position:sticky;top:0;background:#fff;z-index:100;padding:10px 24px;border-bottom:1px solid #e5e7eb;display:flex;align-items:center;justify-content:space-between;box-shadow:0 1px 4px rgba(0,0,0,.08)">
+  <span style="font-size:.9rem;color:#374151;font-weight:600">Informe de Comisiones · ${mesLabel}</span>
+  <button onclick="window.print()" style="background:#0141A2;color:#fff;border:none;border-radius:8px;padding:8px 20px;font-size:.88rem;font-weight:700;cursor:pointer">🖨 Imprimir / Guardar PDF</button>
+</div>
+
+<div style="max-width:960px;margin:24px auto;padding:0 20px">
+
+  <!-- Portada -->
+  <div style="background:linear-gradient(135deg,#012d70,#0141A2);border-radius:14px;padding:32px 36px;color:#fff;margin-bottom:28px">
+    <div style="font-size:11px;letter-spacing:2px;text-transform:uppercase;opacity:.6;margin-bottom:4px">AutoFácil — Crédito Automotriz</div>
+    <div style="font-size:26px;font-weight:800;margin-bottom:4px">Informe de Comisiones Ejecutivos</div>
+    <div style="font-size:16px;opacity:.85;margin-bottom:20px">${mesLabel}</div>
+    <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:16px;margin-top:10px">
+      <div style="background:rgba(255,255,255,.12);border-radius:8px;padding:12px 16px">
+        <div style="font-size:10px;opacity:.7;text-transform:uppercase;letter-spacing:.5px">Ejecutivos</div>
+        <div style="font-size:20px;font-weight:800;margin-top:2px">${datos.length}</div>
+      </div>
+      <div style="background:rgba(255,255,255,.12);border-radius:8px;padding:12px 16px">
+        <div style="font-size:10px;opacity:.7;text-transform:uppercase;letter-spacing:.5px">Con Comisión</div>
+        <div style="font-size:20px;font-weight:800;margin-top:2px;color:#86efac">${conComision.length}</div>
+      </div>
+      <div style="background:rgba(255,255,255,.12);border-radius:8px;padding:12px 16px">
+        <div style="font-size:10px;opacity:.7;text-transform:uppercase;letter-spacing:.5px">Sin Comisión</div>
+        <div style="font-size:20px;font-weight:800;margin-top:2px;color:#fca5a5">${sinComision.length}</div>
+      </div>
+      <div style="background:rgba(255,255,255,.12);border-radius:8px;padding:12px 16px">
+        <div style="font-size:10px;opacity:.7;text-transform:uppercase;letter-spacing:.5px">Total Comisiones</div>
+        <div style="font-size:18px;font-weight:800;margin-top:2px">${fmtN(totalComis)}</div>
+      </div>
+    </div>
+  </div>
+
+  ${seccionCon}
+  ${seccionSin}
+
+  <div style="text-align:center;margin-top:32px;font-size:11px;color:#9ca3af;padding-bottom:24px">
+    Generado el ${new Date().toLocaleString('es-CL')} · AutoFácil Crédito Automotriz
+  </div>
+</div>
+</body>
+</html>`;
+
+  const w = window.open('', '_blank');
+  w.document.write(docHtml);
+  w.document.close();
 }
 
 cargar();
