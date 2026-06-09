@@ -215,7 +215,7 @@
     <div class="topnav-left">
       <a href="/" class="topnav-brand">
         <img src="/img/logo.png" alt="AutoFácil">
-        <span class="version-badge">v5.9</span>
+        <span class="version-badge">v6.0</span>
       </a>
     </div>
 
@@ -487,8 +487,12 @@
         const dataOrden    = await respOrden.json();
         const dataPlacement = await respPlacement.json();
 
-        // Mostrar link Dashboard solo si tiene permiso al módulo
-        const tieneDashboard = data.success && data.data.some(m => (m.ruta||'').includes('dashboard'));
+        // Mostrar link Dashboard: tiene funcionalidad ver_dashboard, o tiene módulo dashboard, o es admin/gerente
+        const perfil = yo?.perfil || '';
+        const esAdminGerente = ['Administrador','Gerente'].includes(perfil);
+        const tieneFuncDash = (data.funcionalidades||[]).includes('ver_dashboard');
+        const tieneModDash  = data.success && (data.data||[]).some(m => (m.ruta||'').toLowerCase().includes('dashboard'));
+        const tieneDashboard = esAdminGerente || tieneFuncDash || tieneModDash;
         const linkDash = document.getElementById('linkDashboard');
         if (linkDash) linkDash.style.display = tieneDashboard ? 'flex' : 'none';
 
