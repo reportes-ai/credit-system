@@ -62,6 +62,7 @@ app.use('/api/servidor-hora',             require('../../services/mantenedores/s
 app.use('/api/db-maintenance',            require('../../services/mantenedores/src/routes/db-maintenance.routes'));
 app.use('/api/alertas',                   require('../../services/mantenedores/src/routes/alertas.routes'));
 app.use('/api/meses-cerrados',            require('../../services/mantenedores/src/routes/meses-cerrados.routes'));
+app.use('/api/tablas-dinamicas',          require('../../services/reporteria/src/routes/tablas-dinamicas.routes'));
 
 // Cotizaciones
 app.use('/api/cotizaciones', require('../../services/cotizaciones/src/routes/cotizaciones.routes'));
@@ -276,6 +277,9 @@ app.get(['/cobranza/reporteria', '/cobranza/reporteria/'], (req, res) =>
 
 app.get(['/reporteria', '/reporteria/'], (req, res) =>
   res.sendFile(path.join(__dirname, '../public/reporteria/index.html')));
+
+app.get(['/reporteria/tablas-dinamicas', '/reporteria/tablas-dinamicas/'], (req, res) =>
+  res.sendFile(path.join(__dirname, '../public/reporteria/tablas-dinamicas/index.html')));
 
 app.get(['/politica', '/politica/'], (req, res) =>
   res.sendFile(path.join(__dirname, '../public/politica/index.html')));
