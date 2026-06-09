@@ -215,7 +215,7 @@
     <div class="topnav-left">
       <a href="/" class="topnav-brand">
         <img src="/img/logo.png" alt="AutoFácil">
-        <span class="version-badge">v5.7</span>
+        <span class="version-badge">v5.8</span>
       </a>
     </div>
 
@@ -370,7 +370,7 @@
         if (sortable) { sortable.destroy(); sortable = null; }
         // Restaurar href
         grid.querySelectorAll('.module-card').forEach(card => {
-          // Restaurar por data-ruta (simCard y cualquier card con ruta directa)
+          // Restaurar por data-ruta
           if (card.dataset.ruta) { card.href = card.dataset.ruta; return; }
           // Restaurar por id de módulo
           const id = parseInt(card.dataset.id);
@@ -496,26 +496,9 @@
         const placement = (dataPlacement.success && dataPlacement.data && typeof dataPlacement.data === 'object') ? dataPlacement.data : {};
         const DEFAULT_OCULTAS = ['/politica/', '/carga-masiva/', '/antecedentes-laborales/', '/informacion-comercial/'];
         const normR = r => r ? (r.endsWith('/') ? r : r + '/') : r;
-        // Fallback para módulos que no vienen de mis-permisos
-        const HOME_FALLBACK = [
-          { ruta:'/clientes/',           nombre:'Clientes',              icono:'bi-people-fill',          descripcion:'' },
-          { ruta:'/cotizaciones/',       nombre:'Cotizaciones',          icono:'bi-calculator',           descripcion:'' },
-          { ruta:'/creditos/',           nombre:'Créditos',              icono:'bi-credit-card-2-front',  descripcion:'' },
-          { ruta:'/tesoreria/',          nombre:'Tesorería',             icono:'bi-safe2',                descripcion:'' },
-          { ruta:'/crm/',                nombre:'CRM',                   icono:'bi-headset',              descripcion:'' },
-          { ruta:'/cobranza/',           nombre:'Cobranza',              icono:'bi-bell-fill',            descripcion:'' },
-          { ruta:'/reporteria/',         nombre:'Reportería',            icono:'bi-bar-chart-line-fill',  descripcion:'' },
-          { ruta:'/politica/',           nombre:'Política',              icono:'bi-shield-lock',          descripcion:'' },
-          { ruta:'/usuarios/',           nombre:'Usuarios',              icono:'bi-people',               descripcion:'' },
-          { ruta:'/mantenedores/',       nombre:'Mantenedores',          icono:'bi-gear-fill',            descripcion:'' },
-          { ruta:'/cartas-aprobacion/',  nombre:'Cartas de Aprobación',  icono:'bi-envelope-paper',       descripcion:'' },
-          { ruta:'/comisiones/',         nombre:'Comisión Ejecutivos',   icono:'bi-cash-coin',            descripcion:'' },
-          { ruta:'/carga-masiva/',       nombre:'Carga Masiva',          icono:'bi-cloud-upload',         descripcion:'' },
-        ];
-        // Construye mapa normalizado de todos los módulos disponibles
+        // Construye mapa normalizado de todos los módulos disponibles (desde BD)
         const modMap = new Map();
         data.data.forEach(m => modMap.set(normR(m.ruta), m));
-        HOME_FALLBACK.forEach(f => { const k = normR(f.ruta); if (!modMap.has(k)) modMap.set(k, { ...f, id_modulo: k }); });
 
         const isNewFmt = Object.keys(placement).some(k => Array.isArray(placement[k]));
 
@@ -548,55 +531,17 @@
               .concat(modulosData.filter(m => !ordenGuardado.includes(String(m.id_modulo))))
           : modulosData;
 
-        // Excluir /simulador/ de modsSorted porque se agrega manualmente como simCard
-        const modsSortedFiltrado = modsSorted.filter(m => normR(m.ruta) !== '/simulador/');
-
-        // Simulador Rentabilidad — incluido en el orden si ya fue guardado, sino va primero
-        const simCard = document.createElement('a');
-        simCard.href = '/simulador/';
-        simCard.dataset.ruta = '/simulador/';
-        simCard.dataset.id = 'sim';
-        simCard.className = 'module-card';
-        simCard.style.cursor = 'pointer';
-        simCard.addEventListener('click', (e) => { e.preventDefault(); window.location.href = '/simulador/'; });
-        simCard.innerHTML = `
-          <i class="bi bi-grip-vertical drag-handle"></i>
-          <div class="card-icon"><i class="bi bi-calculator"></i></div>
-          <h6>Simulador Rentabilidad</h6>
-          <p>AutoFin y Unidad de Crédito. Calcula ingresos, comisiones y cuota en tiempo real.</p>
-          <span class="btn-acceder"><i class="bi bi-arrow-right-circle me-1"></i>Acceder</span>`;
-
-        // Si hay orden guardado con 'sim', respetarlo; si no, simCard va primero
-        if (ordenGuardado && ordenGuardado.includes('sim')) {
-          const allItems = [{ id_modulo: 'sim', _el: simCard },
-            ...modsSortedFiltrado.map(m => ({ ...m, _el: null }))];
-          const reordenados = ordenGuardado
-            .map(id => allItems.find(x => String(x.id_modulo) === String(id)))
-            .filter(Boolean)
-            .concat(allItems.filter(x => !ordenGuardado.includes(String(x.id_modulo))));
-          reordenados.forEach(item => {
-            if (item._el) { grid.appendChild(item._el); return; }
-            const m = item;
-            const a = document.createElement('a');
-            a.href = m.ruta || '#'; a.className = 'module-card'; a.dataset.id = m.id_modulo;
-            a.innerHTML = `<i class="bi bi-grip-vertical drag-handle"></i>
-              <div class="card-icon"><i class="bi ${m.icono || 'bi-grid'}"></i></div>
-              <h6>${m.nombre}</h6><p>${m.descripcion || ''}</p>
-              <span class="btn-acceder"><i class="bi bi-arrow-right-circle me-1"></i>Acceder</span>`;
-            grid.appendChild(a);
-          });
-        } else {
-          grid.appendChild(simCard);
-          modsSortedFiltrado.forEach(mod => {
-            const a = document.createElement('a');
-            a.href = mod.ruta || '#'; a.className = 'module-card'; a.dataset.id = mod.id_modulo;
-            a.innerHTML = `<i class="bi bi-grip-vertical drag-handle"></i>
-              <div class="card-icon"><i class="bi ${mod.icono || 'bi-grid'}"></i></div>
-              <h6>${mod.nombre}</h6><p>${mod.descripcion || ''}</p>
-              <span class="btn-acceder"><i class="bi bi-arrow-right-circle me-1"></i>Acceder</span>`;
-            grid.appendChild(a);
-          });
-        }
+        // Renderizar todos los módulos desde BD — sin hardcodes
+        modsSorted.forEach(mod => {
+          const a = document.createElement('a');
+          a.href = mod.ruta || '#'; a.className = 'module-card'; a.dataset.id = mod.id_modulo;
+          a.dataset.ruta = mod.ruta || '';
+          a.innerHTML = `<i class="bi bi-grip-vertical drag-handle"></i>
+            <div class="card-icon"><i class="bi ${mod.icono || 'bi-grid'}"></i></div>
+            <h6>${mod.nombre}</h6><p>${mod.descripcion || ''}</p>
+            <span class="btn-acceder"><i class="bi bi-arrow-right-circle me-1"></i>Acceder</span>`;
+          grid.appendChild(a);
+        });
 
         /* 🚀 Animación: una vez por sesión */
         if (!sessionStorage.getItem('af_intro_done')) {
