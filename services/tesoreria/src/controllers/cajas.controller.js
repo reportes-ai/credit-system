@@ -83,13 +83,12 @@ const list = async (req, res) => {
     const soloLectura = !['Administrador', 'Gerente'].includes(perfil);
     const [rows] = await pool.query(
       `SELECT c.*,
-              COUNT(cu.id_asignacion) AS total_usuarios,
-              u.id_usuario AS id_usuario_asignado,
-              TRIM(CONCAT(COALESCE(u.nombre,''),' ',COALESCE(u.apellido,''))) AS nombre_usuario_asignado
+              (SELECT COUNT(*) FROM caja_usuarios cu WHERE cu.id_caja = c.id_caja AND cu.activo = 1) AS total_usuarios,
+              (SELECT cu2.id_usuario FROM caja_usuarios cu2 WHERE cu2.id_caja = c.id_caja AND cu2.activo = 1 LIMIT 1) AS id_usuario_asignado,
+              (SELECT TRIM(CONCAT(COALESCE(u2.nombre,''),' ',COALESCE(u2.apellido,'')))
+               FROM caja_usuarios cu2 JOIN usuarios u2 ON u2.id_usuario = cu2.id_usuario
+               WHERE cu2.id_caja = c.id_caja AND cu2.activo = 1 LIMIT 1) AS nombre_usuario_asignado
        FROM cajas c
-       LEFT JOIN caja_usuarios cu ON cu.id_caja = c.id_caja AND cu.activo = 1
-       LEFT JOIN usuarios u ON u.id_usuario = cu.id_usuario
-       GROUP BY c.id_caja
        ORDER BY c.nombre`
     );
     rows.forEach(r => r.solo_lectura = soloLectura);
