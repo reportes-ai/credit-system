@@ -340,8 +340,8 @@ exports.importar = async (req, res) => {
       try {
         const [rows] = await pool.query(
           `SELECT id, num_op, ejecutivo, automotora, monto_financiado, valor_vehiculo,
-                  rut_cliente, fecha_otorgado, estado_credito,
-                  ingreso_neto_total, seguros, comdea_real, com_parque
+                  rut_cliente, fecha_otorgado, estado_credito, plazo, tascli_real,
+                  monto_comision_fin, seguros, comdea_real, com_parque
            FROM creditos WHERE num_op IN (?)`,
           [cursadosIds]
         );
