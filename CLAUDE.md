@@ -12,7 +12,7 @@
 - Rutas HTTP: kebab-case
 - Funciones JS: camelCase
 - Archivos: kebab-case.js
-- Versión en badge HTML: subir en cada cambio (<!-- v1.x -->)
+- Versión en badge HTML: subir en cada cambio (<!-- v1.x -->) — OBLIGATORIO, nunca omitir
 
 ## Reglas Importantes
 1. SIEMPRE: `const pool = require('../../../shared/config/database');`
