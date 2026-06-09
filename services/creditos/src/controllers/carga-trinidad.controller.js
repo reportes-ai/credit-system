@@ -266,11 +266,12 @@ exports.importar = async (req, res) => {
           await pool.query(
             `UPDATE creditos SET
                estado_autofin = ?, ejecutivo_tri = ?,
+               estado_credito = ?,
                estado_eval    = COALESCE(NULLIF(estado_eval,''), ?),
                marca    = COALESCE(?, marca), modelo   = COALESCE(?, modelo),
                vendedor = COALESCE(?, vendedor), updated_at = NOW()
              WHERE num_op = ?`,
-            [f.estado_autofin, f.ejecutivo_tri, f.estado_eval, f.marca, f.modelo, f.vendedor, f.num_op]
+            [f.estado_autofin, f.ejecutivo_tri, f.estado_credito, f.estado_eval, f.marca, f.modelo, f.vendedor, f.num_op]
           );
           actualizados++;
           log.push(`✓ Actualizado ${f.num_op} → ${f.estado_autofin} / ${f.estado_credito}`);
