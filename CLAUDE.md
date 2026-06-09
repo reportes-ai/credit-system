@@ -88,6 +88,13 @@ shared/
 3. Frontend aplica filtros por fecha y recalcula resúmenes en calcResumen()
 4. RAW_DATA en window.RAW_DATA, resúmenes en window.DASH.feb/jan
 
+## Filosofía de Cambios (MUY IMPORTANTE)
+- **Cambios quirúrgicos siempre** — editar solo las líneas necesarias, nunca reescribir archivos completos
+- **Leer antes de tocar** — siempre leer el archivo completo antes de modificarlo
+- **Un cambio a la vez** — hacer, verificar, luego continuar. No encadenar 5 cambios sin confirmar
+- **Si algo funciona, no tocarlo** — aunque se pueda "mejorar", el riesgo no vale
+- **Nunca cambiar algo que el usuario no pidió** — fue lo que rompió cartas-aprobacion (se tocó app.js sin que se pidiera)
+
 ## Errores Frecuentes (aprendidos en producción)
 - `creditos` PK es `id`, NO `id_credito` (ese es solo alias en SELECT)
 - `Promise.all` con `pool.query`: destructurar `[[rows], [rows]]` NO `[[rows, rows]]`
