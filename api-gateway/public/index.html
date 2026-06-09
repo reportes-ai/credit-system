@@ -484,8 +484,8 @@
         ]);
         if (resp.status === 401) { logout(); return; }
         const data         = await resp.json();
-        const dataOrden    = await respOrden.json();
-        const dataPlacement = await respPlacement.json();
+        const dataOrden    = await respOrden.json().catch(() => ({ success: false, data: null }));
+        const dataPlacement = await respPlacement.json().catch(() => ({ success: false, data: {} }));
 
         // Mostrar link Dashboard: tiene funcionalidad ver_dashboard, o tiene módulo dashboard, o es admin/gerente
         const perfil = yo?.perfil || '';
