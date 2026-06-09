@@ -30,7 +30,7 @@ const initTablas = async () => {
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
   `);
 };
-// Migración: perfil Tesorero
+// Migraciones: perfil Tesorero + funcionalidad /tesoreria/caja/
 (async () => {
   try {
     await pool.query(`
@@ -38,6 +38,35 @@ const initTablas = async () => {
       VALUES ('Tesorero', 'Acceso de lectura a todas las cajas')
     `);
   } catch(e) { /* tabla puede no existir aún */ }
+
+  try {
+    // Obtener id_modulo de Tesorería
+    const [[mod]] = await pool.query(
+      `SELECT id_modulo FROM modulos WHERE ruta LIKE '%tesoreria%' LIMIT 1`
+    );
+    if (mod) {
+      await pool.query(`
+        INSERT IGNORE INTO funcionalidades (id_modulo, nombre, codigo, href, icono)
+        VALUES (?, 'Caja', 'teso-caja-operativa', '/tesoreria/caja/', 'bi-cash-coin')
+      `, [mod.id_modulo]);
+
+      // Asignar permiso al perfil Tesorero y Administrador/Gerente
+      const [[fila]] = await pool.query(
+        `SELECT id_funcionalidad FROM funcionalidades WHERE codigo = 'teso-caja-operativa' LIMIT 1`
+      );
+      if (fila) {
+        const [perfiles] = await pool.query(
+          `SELECT id_perfil FROM perfiles WHERE nombre IN ('Administrador','Gerente','Tesorero','Supervisor')`
+        );
+        for (const p of perfiles) {
+          await pool.query(`
+            INSERT IGNORE INTO permisos_perfil (id_perfil, id_funcionalidad, habilitado)
+            VALUES (?, ?, 1)
+          `, [p.id_perfil, fila.id_funcionalidad]);
+        }
+      }
+    }
+  } catch(e) { console.error('[cajas] migración funcionalidad caja:', e.message); }
 })();
 initTablas().catch(e => console.error('[cajas] init tablas:', e.message));
 
