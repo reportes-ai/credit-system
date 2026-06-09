@@ -99,13 +99,14 @@ const getFuentes = (req, res) => {
 /* ── POST /api/tablas-dinamicas/ejecutar ─────────────────────────── */
 const ejecutar = async (req, res) => {
   try {
-    const { fuente, filas = [], valores = [], filtros = [], orden_campo, orden_dir, limite = 500 } = req.body;
+    const { fuente, filas = [], cols = [], valores = [], filtros = [], orden_campo, orden_dir, limite = 500 } = req.body;
 
     if (!FUENTES[fuente]) return res.status(400).json({ success: false, data: null, error: 'Fuente inválida' });
     const { tabla, campos: camposValidos } = FUENTES[fuente];
     const camposSet = new Set(camposValidos.map(c => c.campo));
 
-    // Validar filas
+    // Validar filas + cols (cols se incluyen en GROUP BY como campo adicional)
+    const colsValidas = cols.filter(f => camposSet.has(f)).slice(0, 1); // máx 1
     const filasValidas = filas.filter(f => camposSet.has(f));
     // Validar valores: [{ campo, funcion, alias }]
     const funcioValidas = ['SUM','COUNT','AVG','MAX','MIN','COUNT_DISTINCT'];
@@ -113,7 +114,7 @@ const ejecutar = async (req, res) => {
       camposSet.has(v.campo) && funcioValidas.includes(v.funcion)
     );
 
-    if (filasValidas.length === 0 && valoresValidos.length === 0) {
+    if (filasValidas.length === 0 && colsValidas.length === 0 && valoresValidos.length === 0) {
       return res.status(400).json({ success: false, data: null, error: 'Debes seleccionar al menos un campo de fila o valor' });
     }
 
@@ -123,11 +124,12 @@ const ejecutar = async (req, res) => {
       camposSet.has(f.campo) && opValidos.includes(f.operador)
     );
 
-    // Construir SELECT
+    // Construir SELECT — filas + cols (campo pivot) + valores
+    const DATE_FMT = ['mes','fecha_otorgado','fecha_primera_cuota'];
     const selectParts = [];
-    filasValidas.forEach(f => {
-      // Para mes: formatear como YYYY-MM
-      if (f === 'mes' || f === 'fecha_otorgado' || f === 'fecha_primera_cuota') {
+    const allGroupFields = [...filasValidas, ...colsValidas];
+    allGroupFields.forEach(f => {
+      if (DATE_FMT.includes(f)) {
         selectParts.push(`DATE_FORMAT(\`${f}\`, '%Y-%m') AS \`${f}\``);
       } else {
         selectParts.push(`\`${f}\``);
@@ -157,10 +159,11 @@ const ejecutar = async (req, res) => {
       }
     });
 
-    // GROUP BY
-    const groupBy = filasValidas.length && valoresValidos.length
-      ? `GROUP BY ${filasValidas.map(f => {
-          if (f === 'mes' || f === 'fecha_otorgado') return `DATE_FORMAT(\`${f}\`, '%Y-%m')`;
+    // GROUP BY — incluye campos de fila Y de columna (pivot)
+    const groupByFields = [...filasValidas, ...colsValidas];
+    const groupBy = groupByFields.length && valoresValidos.length
+      ? `GROUP BY ${groupByFields.map(f => {
+          if (DATE_FMT.includes(f)) return `DATE_FORMAT(\`${f}\`, '%Y-%m')`;
           return `\`${f}\``;
         }).join(', ')}`
       : '';

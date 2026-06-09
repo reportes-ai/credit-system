@@ -5,14 +5,15 @@
   <link rel="icon" href="/img/favicon.png" type="image/png">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Tablas Dinámicas — AutoFácil</title>
-  <!-- v1.0 -->
+  <!-- v1.1 -->
   <link href="/css/bootstrap.min.css" rel="stylesheet">
   <link href="/css/bootstrap-icons.css" rel="stylesheet">
   <style>
     :root { --navy:#001345; --blue:#0141A2; --sky:#009AFE; --pivot:#0e7490; --pivot-light:#ecfeff; }
-    body { background:#f0f4f8; font-family:'Segoe UI',system-ui,sans-serif; }
+    *, *::before, *::after { box-sizing:border-box; }
+    body { background:#f0f4f8; font-family:'Segoe UI',system-ui,sans-serif; margin:0; overflow:hidden; }
     /* ── topnav ── */
-    .topnav { background:linear-gradient(90deg,#012d70,#0255c5); color:#fff; height:60px; padding:0 24px; display:flex; align-items:center; justify-content:space-between; position:sticky; top:0; z-index:200; box-shadow:0 2px 8px rgba(0,0,0,.3); }
+    .topnav { background:linear-gradient(90deg,#012d70,#0255c5); color:#fff; height:60px; padding:0 24px; display:flex; align-items:center; justify-content:space-between; position:sticky; top:0; z-index:300; box-shadow:0 2px 8px rgba(0,0,0,.3); }
     .topnav-left { display:flex; align-items:center; gap:16px; }
     .topnav-brand { display:flex; align-items:center; gap:8px; text-decoration:none; }
     .topnav-brand img { height:32px; filter:brightness(0) invert(1); }
@@ -26,115 +27,135 @@
     .avatar { width:28px; height:28px; background:#90caf9; border-radius:50%; display:flex; align-items:center; justify-content:center; color:#0141A2; font-weight:700; font-size:.75rem; }
     .perfil-badge { background:rgba(144,202,249,.2); border:1px solid rgba(144,202,249,.4); color:#90caf9; border-radius:12px; padding:2px 10px; font-size:.73rem; font-weight:600; }
     .btn-logout { background:rgba(255,255,255,.1); border:1px solid rgba(255,255,255,.2); color:#fff; border-radius:8px; padding:5px 12px; font-size:.82rem; cursor:pointer; }
-    /* ── layout ── */
-    .page-wrap { display:grid; grid-template-columns:300px 1fr; gap:0; height:calc(100vh - 60px); overflow:hidden; }
+
+    /* ── layout principal con resize ── */
+    .page-wrap { display:flex; height:calc(100vh - 60px); overflow:hidden; }
+    .left-panel { background:#fff; border-right:1px solid #e5e7eb; display:flex; flex-direction:column; overflow:hidden; flex-shrink:0; width:300px; min-width:200px; max-width:600px; }
+    /* ── DRAG HANDLE ── */
+    .resize-handle {
+      width:6px; flex-shrink:0; background:#e5e7eb; cursor:col-resize; position:relative;
+      transition:background .15s; z-index:10; user-select:none;
+    }
+    .resize-handle:hover, .resize-handle.dragging { background:#0e7490; }
+    .resize-handle::after {
+      content:''; position:absolute; top:50%; left:50%; transform:translate(-50%,-50%);
+      width:2px; height:32px; background:currentColor; opacity:.4; border-radius:2px;
+    }
+    .right-panel { flex:1; display:flex; flex-direction:column; overflow:hidden; min-width:0; }
+
     /* ── panel izquierdo ── */
-    .left-panel { background:#fff; border-right:1px solid #e5e7eb; display:flex; flex-direction:column; overflow:hidden; }
-    .left-panel-header { padding:16px; border-bottom:1px solid #f1f5f9; background:linear-gradient(135deg,#0c4a6e,#0e7490); color:#fff; }
-    .left-panel-header h5 { font-weight:700; font-size:.95rem; margin:0 0 2px; }
-    .left-panel-header p { font-size:.72rem; opacity:.8; margin:0; }
-    .left-panel-body { flex:1; overflow-y:auto; padding:14px; }
+    .left-panel-header { padding:14px 16px; border-bottom:1px solid #f1f5f9; background:linear-gradient(135deg,#0c4a6e,#0e7490); color:#fff; flex-shrink:0; }
+    .left-panel-header h5 { font-weight:700; font-size:.9rem; margin:0 0 1px; }
+    .left-panel-header p { font-size:.7rem; opacity:.8; margin:0; }
+    .left-panel-body { flex:1; overflow-y:auto; padding:12px 14px; }
     /* ── sección config ── */
-    .config-section { margin-bottom:14px; }
-    .config-section-title { font-size:.7rem; font-weight:700; text-transform:uppercase; letter-spacing:.08em; color:#6b7280; margin-bottom:8px; display:flex; align-items:center; gap:6px; }
+    .config-section { margin-bottom:12px; }
+    .config-section-title { font-size:.68rem; font-weight:700; text-transform:uppercase; letter-spacing:.08em; color:#6b7280; margin-bottom:7px; display:flex; align-items:center; gap:6px; }
     .config-section-title i { color:var(--pivot); }
-    select.af-select { width:100%; padding:7px 10px; border:1.5px solid #e2e8f0; border-radius:8px; font-size:.82rem; background:#fff; }
+    select.af-select { width:100%; padding:6px 9px; border:1.5px solid #e2e8f0; border-radius:7px; font-size:.8rem; background:#fff; }
     select.af-select:focus { border-color:var(--pivot); outline:none; }
     /* ── zonas drag ── */
-    .drop-zone { border:1.5px dashed #cbd5e1; border-radius:8px; min-height:56px; padding:6px; background:#fafafa; }
+    .drop-zone { border:1.5px dashed #cbd5e1; border-radius:8px; min-height:48px; padding:5px; background:#fafafa; transition:border-color .15s,background .15s; }
     .drop-zone.highlight { border-color:var(--pivot); background:#ecfeff; }
-    .field-pill { display:flex; align-items:center; justify-content:space-between; background:#fff; border:1px solid #e2e8f0; border-radius:6px; padding:5px 8px; font-size:.75rem; margin-bottom:4px; cursor:grab; user-select:none; transition:box-shadow .12s; }
+    .drop-zone.zona-filas   { border-color:#d1fae5; background:#f0fdf4; }
+    .drop-zone.zona-cols    { border-color:#fef3c7; background:#fffbeb; }
+    .drop-zone.zona-valores { border-color:#dbeafe; background:#eff6ff; }
+    .drop-zone.zona-filas.highlight   { border-color:#059669; background:#d1fae5; }
+    .drop-zone.zona-cols.highlight    { border-color:#d97706; background:#fef3c7; }
+    .drop-zone.zona-valores.highlight { border-color:#2563eb; background:#dbeafe; }
+    .field-pill { display:flex; align-items:center; justify-content:space-between; background:#fff; border:1px solid #e2e8f0; border-radius:6px; padding:4px 7px; font-size:.73rem; margin-bottom:3px; cursor:grab; user-select:none; transition:box-shadow .12s; }
     .field-pill:hover { box-shadow:0 2px 6px rgba(0,0,0,.1); }
-    .field-pill .pill-label { display:flex; align-items:center; gap:5px; color:#374151; font-weight:500; }
-    .field-pill .pill-label i { color:var(--pivot); font-size:.85rem; }
-    .field-pill .pill-remove { color:#9ca3af; cursor:pointer; font-size:.85rem; border:none; background:none; padding:0 2px; line-height:1; }
-    .field-pill .pill-remove:hover { color:#ef4444; }
-    /* agregar selector función en valor */
-    .field-pill select { font-size:.7rem; border:1px solid #e2e8f0; border-radius:4px; padding:2px 4px; color:#374151; margin-left:4px; cursor:pointer; }
+    .pill-label { display:flex; align-items:center; gap:4px; color:#374151; font-weight:500; flex:1; min-width:0; }
+    .pill-label i { color:var(--pivot); font-size:.82rem; flex-shrink:0; }
+    .pill-label span { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+    .pill-remove { color:#9ca3af; cursor:pointer; font-size:.8rem; border:none; background:none; padding:0 2px; line-height:1; flex-shrink:0; }
+    .pill-remove:hover { color:#ef4444; }
+    .field-pill select { font-size:.68rem; border:1px solid #e2e8f0; border-radius:4px; padding:1px 3px; color:#374151; margin-left:3px; cursor:pointer; max-width:72px; flex-shrink:0; }
     /* lista de campos disponibles */
-    .campos-list { max-height:180px; overflow-y:auto; border:1.5px solid #e2e8f0; border-radius:8px; }
-    .campo-item { padding:7px 10px; font-size:.78rem; cursor:pointer; border-bottom:1px solid #f1f5f9; display:flex; align-items:center; gap:6px; color:#374151; transition:background .1s; }
+    .campos-list { max-height:160px; overflow-y:auto; border:1.5px solid #e2e8f0; border-radius:8px; }
+    .campo-item { padding:6px 10px; font-size:.76rem; cursor:pointer; border-bottom:1px solid #f1f5f9; display:flex; align-items:center; gap:5px; color:#374151; transition:background .1s; }
     .campo-item:last-child { border-bottom:none; }
     .campo-item:hover { background:#ecfeff; }
-    .campo-item .tipo-badge { font-size:.63rem; padding:1px 5px; border-radius:4px; font-weight:600; }
+    .tipo-badge { font-size:.6rem; padding:1px 5px; border-radius:4px; font-weight:600; flex-shrink:0; }
     .tipo-badge.numero { background:#dbeafe; color:#1d4ed8; }
     .tipo-badge.texto  { background:#d1fae5; color:#065f46; }
     .tipo-badge.fecha  { background:#ede9fe; color:#5b21b6; }
-    .drop-empty { color:#94a3b8; font-size:.75rem; text-align:center; padding:12px 6px; }
+    .drop-empty { color:#94a3b8; font-size:.72rem; text-align:center; padding:10px 5px; }
     /* filtros */
-    .filtro-row { display:grid; grid-template-columns:1fr 80px 1fr 24px; gap:4px; margin-bottom:6px; align-items:center; }
-    .filtro-row select, .filtro-row input { font-size:.75rem; border:1.5px solid #e2e8f0; border-radius:6px; padding:5px 6px; }
+    .filtro-row { display:grid; grid-template-columns:1fr 76px 1fr 22px; gap:3px; margin-bottom:5px; align-items:center; }
+    .filtro-row select, .filtro-row input { font-size:.72rem; border:1.5px solid #e2e8f0; border-radius:6px; padding:4px 5px; }
     .filtro-row select:focus, .filtro-row input:focus { border-color:var(--pivot); outline:none; }
-    .filtro-remove { background:none; border:none; color:#9ca3af; cursor:pointer; font-size:.85rem; }
+    .filtro-remove { background:none; border:none; color:#9ca3af; cursor:pointer; font-size:.8rem; }
     .filtro-remove:hover { color:#ef4444; }
-    /* ── botones acción ── */
-    .btn-run { background:linear-gradient(135deg,#0e7490,#0891b2); color:#fff; border:none; border-radius:8px; padding:9px 18px; font-size:.85rem; font-weight:600; cursor:pointer; width:100%; display:flex; align-items:center; justify-content:center; gap:7px; transition:opacity .15s; }
+    /* botón ejecutar */
+    .btn-run { background:linear-gradient(135deg,#0e7490,#0891b2); color:#fff; border:none; border-radius:8px; padding:9px 16px; font-size:.83rem; font-weight:600; cursor:pointer; width:100%; display:flex; align-items:center; justify-content:center; gap:6px; transition:opacity .15s; margin-top:4px; }
     .btn-run:hover { opacity:.88; }
     .btn-run:disabled { opacity:.5; cursor:not-allowed; }
     /* ── panel derecho ── */
-    .right-panel { display:flex; flex-direction:column; overflow:hidden; }
-    .right-toolbar { background:#fff; border-bottom:1px solid #e5e7eb; padding:10px 16px; display:flex; align-items:center; gap:10px; flex-wrap:wrap; }
-    .right-toolbar h6 { font-weight:700; color:#111827; margin:0; font-size:.9rem; flex:1; }
-    .btn-sm-af { font-size:.78rem; font-weight:600; border-radius:7px; padding:6px 12px; cursor:pointer; display:inline-flex; align-items:center; gap:5px; border:none; transition:background .15s; }
+    .right-toolbar { background:#fff; border-bottom:1px solid #e5e7eb; padding:9px 14px; display:flex; align-items:center; gap:8px; flex-wrap:wrap; flex-shrink:0; }
+    .right-toolbar h6 { font-weight:700; color:#111827; margin:0; font-size:.87rem; flex:1; }
+    .btn-sm-af { font-size:.76rem; font-weight:600; border-radius:7px; padding:5px 11px; cursor:pointer; display:inline-flex; align-items:center; gap:4px; border:none; transition:background .15s; }
     .btn-guardar { background:#0e7490; color:#fff; }
     .btn-guardar:hover { background:#0891b2; }
     .btn-export  { background:#065f46; color:#fff; }
     .btn-export:hover  { background:#047857; }
     .btn-saved   { background:#f0fdf4; color:#065f46; border:1.5px solid #bbf7d0; }
     .btn-saved:hover { background:#dcfce7; }
-    .result-info { font-size:.75rem; color:#6b7280; }
-    /* ── tabla resultado ── */
-    .result-wrap { flex:1; overflow:auto; padding:0; }
-    .result-wrap table { border-collapse:collapse; font-size:.78rem; width:100%; }
-    .result-wrap th { background:#0c4a6e; color:#fff; padding:9px 12px; white-space:nowrap; position:sticky; top:0; z-index:5; font-weight:600; font-size:.74rem; }
+    .result-info { font-size:.73rem; color:#6b7280; }
+    /* tabla resultado */
+    .result-wrap { flex:1; overflow:auto; }
+    .result-wrap table { border-collapse:collapse; font-size:.77rem; width:100%; }
+    .result-wrap th { background:#0c4a6e; color:#fff; padding:8px 11px; white-space:nowrap; position:sticky; top:0; z-index:5; font-weight:600; font-size:.72rem; }
+    .result-wrap th.th-col-group { background:#0e7490; font-style:italic; }
     .result-wrap th.sortable { cursor:pointer; user-select:none; }
     .result-wrap th.sortable:hover { background:#0e7490; }
-    .result-wrap td { padding:7px 12px; border-bottom:1px solid #f1f5f9; color:#374151; white-space:nowrap; }
+    .result-wrap td { padding:6px 11px; border-bottom:1px solid #f1f5f9; color:#374151; white-space:nowrap; }
     .result-wrap tr:hover td { background:#ecfeff; }
     .result-wrap tr.total-row td { background:#f0fdf4; font-weight:700; color:#065f46; border-top:2px solid #bbf7d0; }
     .result-wrap .num-cell { text-align:right; font-variant-numeric:tabular-nums; }
-    .empty-state { display:flex; flex-direction:column; align-items:center; justify-content:center; height:100%; color:#9ca3af; gap:12px; }
-    .empty-state i { font-size:3.5rem; opacity:.4; }
-    /* ── modal guardar ── */
+    .empty-state { display:flex; flex-direction:column; align-items:center; justify-content:center; height:100%; color:#9ca3af; gap:12px; padding:40px; }
+    .empty-state i { font-size:3rem; opacity:.35; }
+    /* modal guardar */
     .modal-overlay { display:none; position:fixed; inset:0; background:rgba(0,0,0,.45); z-index:500; align-items:center; justify-content:center; }
     .modal-overlay.show { display:flex; }
     .modal-box { background:#fff; border-radius:14px; width:420px; box-shadow:0 20px 50px rgba(0,0,0,.2); overflow:hidden; }
-    .modal-hdr { background:linear-gradient(135deg,#0c4a6e,#0e7490); color:#fff; padding:18px 22px; font-weight:700; font-size:.95rem; display:flex; align-items:center; gap:10px; }
-    .modal-body { padding:22px; }
-    .form-field { margin-bottom:14px; }
-    .form-field label { display:block; font-size:.78rem; font-weight:700; color:#374151; margin-bottom:5px; }
-    .form-field input, .form-field textarea { width:100%; border:1.5px solid #e2e8f0; border-radius:8px; padding:8px 10px; font-size:.83rem; }
+    .modal-hdr { background:linear-gradient(135deg,#0c4a6e,#0e7490); color:#fff; padding:16px 20px; font-weight:700; font-size:.92rem; display:flex; align-items:center; gap:10px; }
+    .modal-body { padding:20px; }
+    .form-field { margin-bottom:13px; }
+    .form-field label { display:block; font-size:.76rem; font-weight:700; color:#374151; margin-bottom:5px; }
+    .form-field input, .form-field textarea { width:100%; border:1.5px solid #e2e8f0; border-radius:8px; padding:7px 10px; font-size:.82rem; }
     .form-field input:focus, .form-field textarea:focus { border-color:var(--pivot); outline:none; }
     .toggle-row { display:flex; align-items:center; justify-content:space-between; }
-    .toggle-label { font-size:.82rem; color:#374151; }
-    .toggle { position:relative; width:40px; height:22px; }
+    .toggle { position:relative; width:38px; height:20px; }
     .toggle input { opacity:0; width:0; height:0; }
-    .slider { position:absolute; inset:0; background:#cbd5e1; border-radius:22px; cursor:pointer; transition:.3s; }
-    .slider:before { content:''; position:absolute; width:16px; height:16px; left:3px; bottom:3px; background:#fff; border-radius:50%; transition:.3s; }
+    .slider { position:absolute; inset:0; background:#cbd5e1; border-radius:20px; cursor:pointer; transition:.3s; }
+    .slider:before { content:''; position:absolute; width:14px; height:14px; left:3px; bottom:3px; background:#fff; border-radius:50%; transition:.3s; }
     input:checked + .slider { background:#0e7490; }
     input:checked + .slider:before { transform:translateX(18px); }
-    .modal-ftr { padding:14px 22px 18px; display:flex; gap:8px; justify-content:flex-end; border-top:1px solid #f1f5f9; }
-    .btn-cancel { background:#f1f5f9; color:#374151; border:none; border-radius:7px; padding:8px 16px; font-size:.83rem; cursor:pointer; }
-    .btn-save   { background:#0e7490; color:#fff; border:none; border-radius:7px; padding:8px 16px; font-size:.83rem; font-weight:600; cursor:pointer; }
+    .modal-ftr { padding:12px 20px 16px; display:flex; gap:8px; justify-content:flex-end; border-top:1px solid #f1f5f9; }
+    .btn-cancel { background:#f1f5f9; color:#374151; border:none; border-radius:7px; padding:7px 15px; font-size:.81rem; cursor:pointer; }
+    .btn-save   { background:#0e7490; color:#fff; border:none; border-radius:7px; padding:7px 15px; font-size:.81rem; font-weight:600; cursor:pointer; }
     /* panel guardadas */
-    .saved-list { position:fixed; right:0; top:60px; width:320px; height:calc(100vh - 60px); background:#fff; border-left:1px solid #e5e7eb; box-shadow:-4px 0 16px rgba(0,0,0,.1); z-index:100; display:flex; flex-direction:column; transform:translateX(100%); transition:transform .25s; }
+    .saved-list { position:fixed; right:0; top:60px; width:310px; height:calc(100vh - 60px); background:#fff; border-left:1px solid #e5e7eb; box-shadow:-4px 0 16px rgba(0,0,0,.1); z-index:100; display:flex; flex-direction:column; transform:translateX(100%); transition:transform .25s; }
     .saved-list.open { transform:translateX(0); }
-    .saved-list-hdr { background:linear-gradient(135deg,#065f46,#059669); color:#fff; padding:16px; font-weight:700; font-size:.9rem; display:flex; align-items:center; justify-content:space-between; }
-    .saved-item { padding:12px 14px; border-bottom:1px solid #f1f5f9; cursor:pointer; transition:background .12s; }
+    .saved-list-hdr { background:linear-gradient(135deg,#065f46,#059669); color:#fff; padding:14px 16px; font-weight:700; font-size:.87rem; display:flex; align-items:center; justify-content:space-between; }
+    .saved-item { padding:11px 14px; border-bottom:1px solid #f1f5f9; cursor:pointer; transition:background .12s; }
     .saved-item:hover { background:#f0fdf4; }
-    .saved-item .saved-name { font-weight:600; font-size:.83rem; color:#111827; display:flex; align-items:center; gap:6px; }
-    .saved-item .saved-meta { font-size:.7rem; color:#9ca3af; margin-top:2px; }
-    .saved-item .saved-actions { display:flex; gap:4px; margin-top:6px; }
-    .saved-item .saved-actions button { font-size:.7rem; padding:3px 8px; border-radius:5px; cursor:pointer; border:none; }
-    .badge-pub  { background:#d1fae5; color:#065f46; font-size:.62rem; font-weight:700; padding:2px 6px; border-radius:4px; }
-    .badge-priv { background:#f1f5f9; color:#6b7280; font-size:.62rem; font-weight:700; padding:2px 6px; border-radius:4px; }
-    .alert-msg { padding:10px 14px; border-radius:8px; font-size:.8rem; margin-bottom:10px; display:none; }
+    .saved-item .saved-name { font-weight:600; font-size:.81rem; color:#111827; display:flex; align-items:center; gap:5px; }
+    .saved-item .saved-meta { font-size:.68rem; color:#9ca3af; margin-top:2px; }
+    .saved-item .saved-actions { display:flex; gap:4px; margin-top:5px; }
+    .saved-item .saved-actions button { font-size:.68rem; padding:3px 7px; border-radius:5px; cursor:pointer; border:none; }
+    .badge-pub  { background:#d1fae5; color:#065f46; font-size:.6rem; font-weight:700; padding:2px 5px; border-radius:4px; }
+    .badge-priv { background:#f1f5f9; color:#6b7280; font-size:.6rem; font-weight:700; padding:2px 5px; border-radius:4px; }
+    .alert-msg { padding:9px 12px; border-radius:8px; font-size:.78rem; margin-bottom:10px; display:none; }
     .alert-msg.err { background:#fef2f2; color:#dc2626; border:1px solid #fecaca; }
     .alert-msg.ok  { background:#f0fdf4; color:#16a34a; border:1px solid #bbf7d0; }
-    @media(max-width:768px){
-      .page-wrap { grid-template-columns:1fr; }
-      .left-panel { display:none; }
-    }
+    /* legend zona */
+    .zona-legend { display:flex; gap:6px; flex-wrap:wrap; margin-bottom:6px; }
+    .zona-legend span { font-size:.63rem; font-weight:700; padding:2px 7px; border-radius:10px; }
+    .leg-filas   { background:#d1fae5; color:#065f46; }
+    .leg-cols    { background:#fef3c7; color:#92400e; }
+    .leg-valores { background:#dbeafe; color:#1e40af; }
   </style>
 </head>
 <body>
@@ -143,7 +164,7 @@
   <div class="topnav-left">
     <a href="/" class="topnav-brand">
       <img src="/img/logo.png" alt="AutoFácil">
-      <span class="version-badge" id="versionBadge">v1.0</span>
+      <span class="version-badge" id="versionBadge">v1.1</span>
     </a>
     <div class="breadcrumb-nav">
       <a href="/">Inicio</a><span class="sep">›</span>
@@ -166,17 +187,17 @@
   </div>
 </nav>
 
-<div class="page-wrap">
+<div class="page-wrap" id="pageWrap">
 
-  <!-- ═══════ PANEL IZQUIERDO (configuración) ═══════ -->
-  <div class="left-panel">
+  <!-- ═══════ PANEL IZQUIERDO ═══════ -->
+  <div class="left-panel" id="leftPanel">
     <div class="left-panel-header">
-      <h5><i class="bi bi-table me-2"></i>Tabla Dinámica</h5>
-      <p>Configura filas, valores y filtros</p>
+      <h5><i class="bi bi-table me-2"></i>Configuración</h5>
+      <p>Arrastra campos a las zonas o haz clic</p>
     </div>
     <div class="left-panel-body">
 
-      <!-- Fuente de datos -->
+      <!-- Fuente -->
       <div class="config-section">
         <div class="config-section-title"><i class="bi bi-database"></i>Fuente de datos</div>
         <select class="af-select" id="selFuente" onchange="onCambioFuente()">
@@ -186,24 +207,43 @@
 
       <!-- Campos disponibles -->
       <div class="config-section">
-        <div class="config-section-title"><i class="bi bi-list-ul"></i>Campos disponibles <span id="campoBusquedaWrap"></span></div>
-        <input type="text" id="buscarCampo" placeholder="Buscar campo…" oninput="filtrarCampos()" style="width:100%;border:1.5px solid #e2e8f0;border-radius:7px;padding:6px 9px;font-size:.77rem;margin-bottom:6px;">
+        <div class="config-section-title"><i class="bi bi-list-ul"></i>Campos disponibles</div>
+        <input type="text" id="buscarCampo" placeholder="Buscar campo…" oninput="filtrarCampos()"
+          style="width:100%;border:1.5px solid #e2e8f0;border-radius:7px;padding:5px 8px;font-size:.75rem;margin-bottom:5px;">
         <div class="campos-list" id="camposDisponibles"></div>
       </div>
 
-      <!-- Filas (GROUP BY) -->
+      <!-- Leyenda de colores -->
+      <div class="zona-legend">
+        <span class="leg-filas"><i class="bi bi-layout-three-columns"></i> Filas</span>
+        <span class="leg-cols"><i class="bi bi-grid-1x2"></i> Columnas</span>
+        <span class="leg-valores"><i class="bi bi-calculator"></i> Valores</span>
+      </div>
+
+      <!-- FILAS -->
       <div class="config-section">
-        <div class="config-section-title"><i class="bi bi-layout-three-columns"></i>Filas (agrupar por)</div>
-        <div class="drop-zone" id="zonaFilas" ondragover="onDragOver(event,'filas')" ondragleave="onDragLeave(event)" ondrop="onDrop(event,'filas')">
-          <div class="drop-empty" id="emptyFilas">Arrastra campos aquí</div>
+        <div class="config-section-title" style="color:#059669"><i class="bi bi-layout-three-columns" style="color:#059669"></i>Filas <span style="font-weight:400;font-size:.62rem;color:#9ca3af">(agrupar)</span></div>
+        <div class="drop-zone zona-filas" id="zonaFilas"
+          ondragover="onDragOver(event,'filas')" ondragleave="onDragLeave(event)" ondrop="onDrop(event,'filas')">
+          <div class="drop-empty" id="emptyFilas">Arrastra aquí</div>
         </div>
       </div>
 
-      <!-- Valores (agregaciones) -->
+      <!-- COLUMNAS -->
       <div class="config-section">
-        <div class="config-section-title"><i class="bi bi-calculator"></i>Valores (calcular)</div>
-        <div class="drop-zone" id="zonaValores" ondragover="onDragOver(event,'valores')" ondragleave="onDragLeave(event)" ondrop="onDrop(event,'valores')">
-          <div class="drop-empty" id="emptyValores">Arrastra campos aquí</div>
+        <div class="config-section-title" style="color:#d97706"><i class="bi bi-grid-1x2" style="color:#d97706"></i>Columnas <span style="font-weight:400;font-size:.62rem;color:#9ca3af">(pivot)</span></div>
+        <div class="drop-zone zona-cols" id="zonaCols"
+          ondragover="onDragOver(event,'cols')" ondragleave="onDragLeave(event)" ondrop="onDrop(event,'cols')">
+          <div class="drop-empty" id="emptyCols">Arrastra aquí (opcional)</div>
+        </div>
+      </div>
+
+      <!-- VALORES -->
+      <div class="config-section">
+        <div class="config-section-title" style="color:#2563eb"><i class="bi bi-calculator" style="color:#2563eb"></i>Valores <span style="font-weight:400;font-size:.62rem;color:#9ca3af">(calcular)</span></div>
+        <div class="drop-zone zona-valores" id="zonaValores"
+          ondragover="onDragOver(event,'valores')" ondragleave="onDragLeave(event)" ondrop="onDrop(event,'valores')">
+          <div class="drop-empty" id="emptyValores">Arrastra aquí</div>
         </div>
       </div>
 
@@ -211,14 +251,14 @@
       <div class="config-section">
         <div class="config-section-title">
           <i class="bi bi-funnel"></i>Filtros
-          <button onclick="addFiltro()" style="margin-left:auto;background:var(--pivot);color:#fff;border:none;border-radius:5px;padding:2px 8px;font-size:.7rem;cursor:pointer;font-weight:600">+ Agregar</button>
+          <button onclick="addFiltro()" style="margin-left:auto;background:var(--pivot);color:#fff;border:none;border-radius:5px;padding:2px 7px;font-size:.67rem;cursor:pointer;font-weight:600">+ Agregar</button>
         </div>
         <div id="zonaFiltros"></div>
       </div>
 
       <!-- Límite -->
       <div class="config-section">
-        <div class="config-section-title"><i class="bi bi-hash"></i>Límite de filas</div>
+        <div class="config-section-title"><i class="bi bi-hash"></i>Límite</div>
         <select class="af-select" id="selLimite">
           <option value="100">100 filas</option>
           <option value="500" selected>500 filas</option>
@@ -227,36 +267,38 @@
         </select>
       </div>
 
-      <!-- Ejecutar -->
       <button class="btn-run" id="btnRun" onclick="ejecutarConsulta()">
-        <i class="bi bi-play-fill"></i> Ejecutar tabla dinámica
+        <i class="bi bi-play-fill"></i> Ejecutar
       </button>
 
     </div>
   </div>
 
-  <!-- ═══════ PANEL DERECHO (resultados) ═══════ -->
+  <!-- ═══════ DRAG HANDLE (resize) ═══════ -->
+  <div class="resize-handle" id="resizeHandle" title="Arrastrar para redimensionar"></div>
+
+  <!-- ═══════ PANEL DERECHO ═══════ -->
   <div class="right-panel">
     <div class="right-toolbar">
-      <h6><i class="bi bi-table me-2" style="color:var(--pivot)"></i>Resultados</h6>
+      <h6><i class="bi bi-table me-2" style="color:var(--pivot)"></i>Resultado</h6>
       <span class="result-info" id="resultInfo">—</span>
       <button class="btn-sm-af btn-saved" onclick="togglePanelGuardadas()">
-        <i class="bi bi-bookmark-star"></i> Guardadas <span id="countGuardadas" style="background:#0e7490;color:#fff;border-radius:10px;padding:1px 6px;font-size:.65rem;margin-left:2px">0</span>
+        <i class="bi bi-bookmark-star"></i> Guardadas
+        <span id="countGuardadas" style="background:#0e7490;color:#fff;border-radius:10px;padding:1px 6px;font-size:.62rem;margin-left:2px">0</span>
       </button>
-      <button class="btn-sm-af btn-export" id="btnExport" onclick="exportarExcel()" style="display:none">
-        <i class="bi bi-file-earmark-excel"></i> Exportar
+      <button class="btn-sm-af btn-export" id="btnExport" onclick="exportarCSV()" style="display:none">
+        <i class="bi bi-file-earmark-excel"></i> CSV
       </button>
       <button class="btn-sm-af btn-guardar" id="btnGuardar" onclick="abrirModalGuardar()" style="display:none">
         <i class="bi bi-bookmark-plus"></i> Guardar
       </button>
     </div>
-
     <div class="result-wrap" id="resultWrap">
       <div class="empty-state">
         <i class="bi bi-table"></i>
         <div style="text-align:center">
-          <div style="font-size:.9rem;font-weight:600;color:#6b7280">Configura y ejecuta tu tabla dinámica</div>
-          <div style="font-size:.78rem;margin-top:4px">Selecciona una fuente, agrega campos de fila y valores, y presiona <b>Ejecutar</b></div>
+          <div style="font-size:.88rem;font-weight:600;color:#6b7280">Configura y ejecuta tu tabla dinámica</div>
+          <div style="font-size:.76rem;margin-top:4px;color:#9ca3af">Selecciona fuente → arrastra campos → presiona <b>Ejecutar</b></div>
         </div>
       </div>
     </div>
@@ -267,13 +309,13 @@
 <div class="saved-list" id="panelGuardadas">
   <div class="saved-list-hdr">
     <span><i class="bi bi-bookmark-star me-2"></i>Tablas Guardadas</span>
-    <button onclick="togglePanelGuardadas()" style="background:none;border:none;color:#fff;cursor:pointer;font-size:1.1rem"><i class="bi bi-x-lg"></i></button>
+    <button onclick="togglePanelGuardadas()" style="background:none;border:none;color:#fff;cursor:pointer;font-size:1.05rem"><i class="bi bi-x-lg"></i></button>
   </div>
-  <div style="padding:10px 12px;border-bottom:1px solid #f1f5f9">
-    <div id="savedCountInfo" style="font-size:.75rem;color:#6b7280"></div>
+  <div style="padding:8px 12px;border-bottom:1px solid #f1f5f9">
+    <div id="savedCountInfo" style="font-size:.72rem;color:#6b7280"></div>
   </div>
   <div style="flex:1;overflow-y:auto" id="savedListBody">
-    <div style="text-align:center;color:#9ca3af;padding:24px;font-size:.8rem">Cargando…</div>
+    <div style="text-align:center;color:#9ca3af;padding:20px;font-size:.78rem">Cargando…</div>
   </div>
 </div>
 
@@ -293,14 +335,11 @@
       </div>
       <div class="form-field">
         <div class="toggle-row">
-          <span class="toggle-label"><i class="bi bi-globe me-1" style="color:#0e7490"></i>Hacer público <span style="font-size:.72rem;color:#9ca3af">(otros usuarios pueden verlo)</span></span>
-          <label class="toggle">
-            <input type="checkbox" id="checkPublica">
-            <span class="slider"></span>
-          </label>
+          <span style="font-size:.81rem;color:#374151"><i class="bi bi-globe me-1" style="color:#0e7490"></i>Hacer público <span style="font-size:.7rem;color:#9ca3af">(otros pueden verlo)</span></span>
+          <label class="toggle"><input type="checkbox" id="checkPublica"><span class="slider"></span></label>
         </div>
       </div>
-      <div style="font-size:.72rem;color:#9ca3af"><i class="bi bi-info-circle me-1"></i>Máximo 10 tablas por usuario</div>
+      <div style="font-size:.7rem;color:#9ca3af"><i class="bi bi-info-circle me-1"></i>Máximo 10 tablas por usuario</div>
     </div>
     <div class="modal-ftr">
       <button class="btn-cancel" onclick="cerrarModalGuardar()">Cancelar</button>
@@ -313,141 +352,132 @@
 <script>
 const API = '/api/tablas-dinamicas';
 const token = () => sessionStorage.getItem('token');
-const headers = () => ({ 'Content-Type':'application/json', 'Authorization':'Bearer '+token() });
+const hdr   = () => ({ 'Content-Type':'application/json', 'Authorization':'Bearer '+token() });
 
-/* ── Estado de la app ─────────────────────────────────────── */
-let FUENTES = [];
-let fuenteActual = null;  // { key, label, campos }
-let filas   = [];         // [{ campo, label, tipo }]
-let valores = [];         // [{ campo, label, tipo, funcion, alias }]
-let filtros = [];         // [{ campo, operador, valor }]
-let ultimaConfig = null;
-let ultimaData   = null;
-let modoEdicion  = null;  // id de guardada en edición
-
-/* ── Auth init ────────────────────────────────────────────── */
-(function initAuth() {
+/* ── Auth ─────────────────────────────────────────── */
+(function() {
   const yo = JSON.parse(sessionStorage.getItem('usuario') || 'null');
-  if (!yo) { window.location.href = '/login.html'; return; }
-  document.getElementById('navNombre').textContent = yo.nombre + ' ' + (yo.apellido || '');
-  document.getElementById('navPerfil').textContent = yo.perfil || '';
-  const ini = (yo.nombre || '?')[0].toUpperCase();
-  document.getElementById('avatarInicial').textContent = ini;
+  if (!yo) { window.location.href='/login.html'; return; }
+  document.getElementById('navNombre').textContent = yo.nombre + ' ' + (yo.apellido||'');
+  document.getElementById('navPerfil').textContent = yo.perfil||'';
+  document.getElementById('avatarInicial').textContent = (yo.nombre||'?')[0].toUpperCase();
 })();
-function logout() { sessionStorage.clear(); window.location.href = '/login.html'; }
+function logout(){ sessionStorage.clear(); window.location.href='/login.html'; }
 
-/* ── Cargar fuentes ───────────────────────────────────────── */
+/* ── Estado ───────────────────────────────────────── */
+let FUENTES = [], fuenteActual = null;
+let filas=[], cols=[], valores=[], filtros=[];
+let ultimaConfig=null, ultimaData=null, modoEdicion=null;
+
+/* ── Resize panel ─────────────────────────────────── */
+(function initResize() {
+  const handle = document.getElementById('resizeHandle');
+  const panel  = document.getElementById('leftPanel');
+  let dragging = false, startX = 0, startW = 0;
+  handle.addEventListener('mousedown', e => {
+    dragging = true; startX = e.clientX; startW = panel.offsetWidth;
+    handle.classList.add('dragging');
+    document.body.style.cursor = 'col-resize';
+    document.body.style.userSelect = 'none';
+  });
+  document.addEventListener('mousemove', e => {
+    if (!dragging) return;
+    const w = Math.min(600, Math.max(200, startW + e.clientX - startX));
+    panel.style.width = w + 'px';
+  });
+  document.addEventListener('mouseup', () => {
+    if (!dragging) return;
+    dragging = false;
+    handle.classList.remove('dragging');
+    document.body.style.cursor = '';
+    document.body.style.userSelect = '';
+  });
+})();
+
+/* ── Fuentes ──────────────────────────────────────── */
 async function cargarFuentes() {
-  const r = await fetch(API + '/fuentes', { headers: headers() });
+  const r = await fetch(API+'/fuentes', { headers:hdr() });
   const j = await r.json();
   if (!j.success) return;
   FUENTES = j.data;
   const sel = document.getElementById('selFuente');
-  sel.innerHTML = FUENTES.map(f => `<option value="${f.key}">${f.label}</option>`).join('');
+  sel.innerHTML = FUENTES.map(f=>`<option value="${f.key}">${f.label}</option>`).join('');
   if (FUENTES.length) onCambioFuente();
   cargarGuardadas();
 }
 
-/* ── Cambio de fuente ─────────────────────────────────────── */
 function onCambioFuente() {
   const key = document.getElementById('selFuente').value;
-  fuenteActual = FUENTES.find(f => f.key === key);
-  filas = []; valores = []; filtros = [];
-  renderZonas();
-  renderFiltros();
+  fuenteActual = FUENTES.find(f=>f.key===key);
+  filas=[]; cols=[]; valores=[]; filtros=[];
+  renderZonas(); renderFiltros();
   renderCamposDisponibles('');
 }
-
-function filtrarCampos() {
-  const q = document.getElementById('buscarCampo').value;
-  renderCamposDisponibles(q);
-}
+function filtrarCampos(){ renderCamposDisponibles(document.getElementById('buscarCampo').value); }
 
 function renderCamposDisponibles(q) {
   if (!fuenteActual) return;
-  const div = document.getElementById('camposDisponibles');
-  const usados = new Set([...filas, ...valores].map(f => f.campo));
-  const camps = fuenteActual.campos.filter(c =>
-    (!q || c.label.toLowerCase().includes(q.toLowerCase()) || c.campo.toLowerCase().includes(q.toLowerCase()))
+  const usados = new Set([...filas,...cols,...valores].map(f=>f.campo));
+  const list = fuenteActual.campos.filter(c=>
+    !q || c.label.toLowerCase().includes(q.toLowerCase()) || c.campo.toLowerCase().includes(q.toLowerCase())
   );
-  if (!camps.length) { div.innerHTML = '<div class="campo-item" style="color:#9ca3af;cursor:default">Sin resultados</div>'; return; }
-  div.innerHTML = camps.map(c => {
-    const usado = usados.has(c.campo) ? 'opacity:.45;' : '';
-    return `<div class="campo-item" style="${usado}" draggable="true"
+  const div = document.getElementById('camposDisponibles');
+  if (!list.length){ div.innerHTML='<div class="campo-item" style="color:#9ca3af;cursor:default">Sin resultados</div>'; return; }
+  div.innerHTML = list.map(c=>{
+    const op = usados.has(c.campo) ? 'opacity:.4;pointer-events:none;' : '';
+    return `<div class="campo-item" style="${op}" draggable="true"
       ondragstart="onDragStart(event,'${c.campo}')"
       onclick="agregarCampoClick('${c.campo}')">
-      <i class="bi ${iconTipo(c.tipo)} tipo-badge ${c.tipo}"></i>
-      <span style="flex:1">${c.label}</span>
+      <i class="bi ${iconTipo(c.tipo)}" style="color:${colorTipo(c.tipo)};font-size:.85rem"></i>
+      <span style="flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${c.label}</span>
       <span class="tipo-badge ${c.tipo}">${c.tipo}</span>
     </div>`;
   }).join('');
 }
+const iconTipo  = t => t==='numero'?'bi-123':t==='fecha'?'bi-calendar2':'bi-fonts';
+const colorTipo = t => t==='numero'?'#1d4ed8':t==='fecha'?'#5b21b6':'#065f46';
 
-function iconTipo(t) {
-  if (t === 'numero') return 'bi-123';
-  if (t === 'fecha')  return 'bi-calendar2';
-  return 'bi-fonts';
-}
-
-/* ── Drag & Drop ──────────────────────────────────────────── */
+/* ── Drag & drop ──────────────────────────────────── */
 let dragCampo = null;
-function onDragStart(e, campo) {
-  dragCampo = campo;
-  e.dataTransfer.effectAllowed = 'copy';
-}
-function onDragOver(e, zona) {
-  e.preventDefault();
-  e.currentTarget.classList.add('highlight');
-}
-function onDragLeave(e) { e.currentTarget.classList.remove('highlight'); }
-function onDrop(e, zona) {
-  e.preventDefault();
-  e.currentTarget.classList.remove('highlight');
-  if (!dragCampo) return;
-  agregarCampoA(dragCampo, zona);
-  dragCampo = null;
-}
+function onDragStart(e, campo){ dragCampo=campo; e.dataTransfer.effectAllowed='copy'; }
+function onDragOver(e, zona){ e.preventDefault(); e.currentTarget.classList.add('highlight'); }
+function onDragLeave(e){ e.currentTarget.classList.remove('highlight'); }
+function onDrop(e, zona){ e.preventDefault(); e.currentTarget.classList.remove('highlight'); if(dragCampo){ agregarCampoA(dragCampo,zona); dragCampo=null; } }
 
-/* Click en campo: si es número va a valores, sino a filas */
 function agregarCampoClick(campo) {
-  const c = fuenteActual.campos.find(x => x.campo === campo);
+  const c = fuenteActual.campos.find(x=>x.campo===campo);
   if (!c) return;
-  const zona = c.tipo === 'numero' ? 'valores' : 'filas';
+  // Heurística: número sin filas → valores; número → filas; texto/fecha → filas
+  const zona = (c.tipo==='numero' && filas.length>0) ? 'valores' : 'filas';
   agregarCampoA(campo, zona);
 }
 
 function agregarCampoA(campo, zona) {
-  const c = fuenteActual.campos.find(x => x.campo === campo);
+  const c = fuenteActual.campos.find(x=>x.campo===campo);
   if (!c) return;
-  const yaEn = (zona === 'filas' ? filas : valores).find(f => f.campo === campo);
-  if (yaEn) return;
-  // No permitir un campo en las dos zonas a la vez
-  const enOtra = (zona === 'filas' ? valores : filas).find(f => f.campo === campo);
-  if (enOtra) return;
-  if (zona === 'filas') {
-    filas.push({ ...c });
-  } else {
-    valores.push({ ...c, funcion: c.tipo === 'numero' ? 'SUM' : 'COUNT', alias: c.label });
-  }
+  const enFilas   = filas.find(f=>f.campo===campo);
+  const enCols    = cols.find(f=>f.campo===campo);
+  const enValores = valores.find(f=>f.campo===campo);
+  if (enFilas||enCols||enValores) return; // ya está
+  if (zona==='filas')   filas.push({...c});
+  else if (zona==='cols') { if (cols.length>0){ alert('Solo se permite 1 campo de columna'); return; } cols.push({...c}); }
+  else valores.push({...c, funcion:c.tipo==='numero'?'SUM':'COUNT', alias:c.label});
   renderZonas();
   renderCamposDisponibles(document.getElementById('buscarCampo').value);
 }
 
-/* ── Render zonas ─────────────────────────────────────────── */
-function renderZonas() {
-  renderZona('zonaFilas', filas, 'filas');
-  renderZona('zonaValores', valores, 'valores');
-}
+/* ── Render zonas ─────────────────────────────────── */
+function renderZonas(){ renderZona('zonaFilas',filas,'filas'); renderZona('zonaCols',cols,'cols'); renderZona('zonaValores',valores,'valores'); }
+
 function renderZona(id, lista, zona) {
   const div = document.getElementById(id);
-  const emptyId = zona === 'filas' ? 'emptyFilas' : 'emptyValores';
-  if (!lista.length) {
-    div.innerHTML = `<div class="drop-empty" id="${emptyId}">Arrastra campos aquí</div>`;
-    return;
+  if (!lista.length){
+    const ph = zona==='cols'?'Arrastra aquí (opcional)':'Arrastra aquí';
+    div.innerHTML=`<div class="drop-empty">${ph}</div>`; return;
   }
-  div.innerHTML = lista.map((c, i) => {
-    const funcSelect = zona === 'valores'
-      ? `<select onchange="cambiarFuncion(${i}, this.value)" title="Función">
+  div.innerHTML = lista.map((c,i)=>{
+    const funcSel = zona==='valores'
+      ? `<select onchange="cambiarFuncion(${i},this.value)" title="Función">
           <option value="SUM"${c.funcion==='SUM'?' selected':''}>SUMA</option>
           <option value="COUNT"${c.funcion==='COUNT'?' selected':''}>CONTAR</option>
           <option value="COUNT_DISTINCT"${c.funcion==='COUNT_DISTINCT'?' selected':''}>ÚNICOS</option>
@@ -455,38 +485,38 @@ function renderZona(id, lista, zona) {
           <option value="MAX"${c.funcion==='MAX'?' selected':''}>MÁXIMO</option>
           <option value="MIN"${c.funcion==='MIN'?' selected':''}>MÍNIMO</option>
         </select>` : '';
-    return `<div class="field-pill" draggable="true">
-      <div class="pill-label"><i class="bi ${iconTipo(c.tipo)}"></i>${c.label}${funcSelect}</div>
-      <button class="pill-remove" onclick="quitarCampo('${zona}',${i})" title="Quitar"><i class="bi bi-x"></i></button>
+    return `<div class="field-pill">
+      <div class="pill-label">
+        <i class="bi ${iconTipo(c.tipo)}" style="color:${colorTipo(c.tipo)}"></i>
+        <span>${c.label}</span>${funcSel}
+      </div>
+      <button class="pill-remove" onclick="quitarCampo('${zona}',${i})"><i class="bi bi-x"></i></button>
     </div>`;
   }).join('');
 }
 
-function quitarCampo(zona, idx) {
-  if (zona === 'filas') filas.splice(idx, 1);
-  else valores.splice(idx, 1);
+function quitarCampo(zona,idx){
+  if(zona==='filas') filas.splice(idx,1);
+  else if(zona==='cols') cols.splice(idx,1);
+  else valores.splice(idx,1);
   renderZonas();
   renderCamposDisponibles(document.getElementById('buscarCampo').value);
 }
-function cambiarFuncion(idx, fn) {
-  valores[idx].funcion = fn;
-  const fnLabels = { SUM:'Suma', COUNT:'Cuenta', COUNT_DISTINCT:'Únicos', AVG:'Promedio', MAX:'Máximo', MIN:'Mínimo' };
-  valores[idx].alias = `${fnLabels[fn] || fn} ${valores[idx].label}`;
+function cambiarFuncion(idx,fn){
+  const lbls={SUM:'Suma',COUNT:'Cuenta',COUNT_DISTINCT:'Únicos',AVG:'Promedio',MAX:'Máximo',MIN:'Mínimo'};
+  valores[idx].funcion=fn;
+  valores[idx].alias=`${lbls[fn]||fn} ${valores[idx].label}`;
 }
 
-/* ── Filtros ──────────────────────────────────────────────── */
-function addFiltro() {
-  if (!fuenteActual) return;
-  filtros.push({ campo: fuenteActual.campos[0]?.campo || '', operador: '=', valor: '' });
-  renderFiltros();
-}
-function renderFiltros() {
-  const div = document.getElementById('zonaFiltros');
-  if (!filtros.length) { div.innerHTML = '<div style="color:#9ca3af;font-size:.74rem;text-align:center;padding:6px">Sin filtros activos</div>'; return; }
-  const camposOpts = fuenteActual ? fuenteActual.campos.map(c => `<option value="${c.campo}">${c.label}</option>`).join('') : '';
-  div.innerHTML = filtros.map((f, i) => `
+/* ── Filtros ──────────────────────────────────────── */
+function addFiltro(){ if(!fuenteActual)return; filtros.push({campo:fuenteActual.campos[0]?.campo||'',operador:'=',valor:''}); renderFiltros(); }
+function renderFiltros(){
+  const div=document.getElementById('zonaFiltros');
+  if(!filtros.length){ div.innerHTML='<div style="color:#9ca3af;font-size:.72rem;text-align:center;padding:5px">Sin filtros</div>'; return; }
+  const opts=fuenteActual?fuenteActual.campos.map(c=>`<option value="${c.campo}">${c.label}</option>`).join(''):'';
+  div.innerHTML=filtros.map((f,i)=>`
     <div class="filtro-row">
-      <select onchange="filtros[${i}].campo=this.value">${camposOpts.replace(`value="${f.campo}"`, `value="${f.campo}" selected`)}</select>
+      <select onchange="filtros[${i}].campo=this.value">${opts.replace(`value="${f.campo}"`,`value="${f.campo}" selected`)}</select>
       <select onchange="filtros[${i}].operador=this.value">
         <option value="="${f.operador==='='?' selected':''}>=</option>
         <option value="!="${f.operador==='!='?' selected':''}>≠</option>
@@ -498,261 +528,278 @@ function renderFiltros() {
         <option value="IS NULL"${f.operador==='IS NULL'?' selected':''}>vacío</option>
         <option value="IS NOT NULL"${f.operador==='IS NOT NULL'?' selected':''}>no vacío</option>
       </select>
-      <input value="${escHtml(f.valor||'')}" oninput="filtros[${i}].valor=this.value" placeholder="Valor">
+      <input value="${escH(f.valor||'')}" oninput="filtros[${i}].valor=this.value" placeholder="Valor">
       <button class="filtro-remove" onclick="quitarFiltro(${i})"><i class="bi bi-x-circle"></i></button>
     </div>`).join('');
 }
-function quitarFiltro(i) { filtros.splice(i, 1); renderFiltros(); }
-function escHtml(s) { return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+function quitarFiltro(i){ filtros.splice(i,1); renderFiltros(); }
+const escH = s => String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
 
-/* ── Ejecutar ─────────────────────────────────────────────── */
-async function ejecutarConsulta() {
-  if (!fuenteActual) { alert('Selecciona una fuente de datos'); return; }
-  if (!filas.length && !valores.length) { alert('Agrega al menos un campo de fila o valor'); return; }
-
-  const btn = document.getElementById('btnRun');
-  btn.disabled = true;
-  btn.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Ejecutando…';
-
-  const config = {
-    fuente: fuenteActual.key,
-    filas: filas.map(f => f.campo),
-    valores: valores.map(v => ({ campo: v.campo, funcion: v.funcion, alias: v.alias || v.label })),
-    filtros: filtros.filter(f => f.campo),
-    limite: parseInt(document.getElementById('selLimite').value) || 500
+/* ── Ejecutar ─────────────────────────────────────── */
+async function ejecutarConsulta(){
+  if(!fuenteActual){alert('Selecciona fuente');return;}
+  if(!filas.length&&!valores.length){alert('Agrega al menos un campo de fila o valor');return;}
+  const btn=document.getElementById('btnRun');
+  btn.disabled=true; btn.innerHTML='<span class="spinner-border spinner-border-sm me-1"></span>Ejecutando…';
+  const config={
+    fuente:fuenteActual.key,
+    filas:filas.map(f=>f.campo),
+    cols:cols.map(f=>f.campo),
+    valores:valores.map(v=>({campo:v.campo,funcion:v.funcion,alias:v.alias||v.label})),
+    filtros:filtros.filter(f=>f.campo),
+    limite:parseInt(document.getElementById('selLimite').value)||500
   };
-  ultimaConfig = config;
-
-  try {
-    const r = await fetch(API + '/ejecutar', { method:'POST', headers: headers(), body: JSON.stringify(config) });
-    const j = await r.json();
-    if (!j.success) { showError(j.error); return; }
-    ultimaData = j.data;
-    renderTabla(j.data, config);
-    document.getElementById('btnExport').style.display = '';
-    document.getElementById('btnGuardar').style.display = '';
-  } catch(e) {
-    showError('Error de conexión');
-  } finally {
-    btn.disabled = false;
-    btn.innerHTML = '<i class="bi bi-play-fill"></i> Ejecutar tabla dinámica';
-  }
+  ultimaConfig=config;
+  try{
+    const r=await fetch(API+'/ejecutar',{method:'POST',headers:hdr(),body:JSON.stringify(config)});
+    const j=await r.json();
+    if(!j.success){showError(j.error);return;}
+    ultimaData=j.data;
+    renderTabla(j.data,config);
+    document.getElementById('btnExport').style.display='';
+    document.getElementById('btnGuardar').style.display='';
+  }catch(e){ showError('Error de conexión'); }
+  finally{ btn.disabled=false; btn.innerHTML='<i class="bi bi-play-fill"></i> Ejecutar'; }
 }
 
-/* ── Render tabla ─────────────────────────────────────────── */
-function renderTabla(data, config) {
-  const { rows, totales, sql_info } = data;
-  document.getElementById('resultInfo').textContent = sql_info;
-
-  if (!rows.length) {
-    document.getElementById('resultWrap').innerHTML = `<div class="empty-state"><i class="bi bi-inbox"></i><div style="font-size:.88rem;color:#9ca3af">Sin resultados para los filtros aplicados</div></div>`;
+/* ── Render tabla (con pivot si hay cols) ─────────── */
+function renderTabla(data, config){
+  const {rows,totales,sql_info}=data;
+  document.getElementById('resultInfo').textContent=sql_info;
+  if(!rows.length){
+    document.getElementById('resultWrap').innerHTML='<div class="empty-state"><i class="bi bi-inbox"></i><div style="font-size:.86rem;color:#9ca3af">Sin resultados para los filtros aplicados</div></div>';
     return;
   }
 
-  const cols = Object.keys(rows[0]);
-  const numCols = new Set(config.valores.map(v => v.alias || `${v.funcion}(${v.campo})`));
-
-  let html = '<table><thead><tr>';
-  cols.forEach(c => {
-    html += `<th class="sortable" onclick="ordenarPor('${c}')">${escHtml(c)} <i class="bi bi-chevron-expand" style="font-size:.6rem;opacity:.5"></i></th>`;
-  });
-  html += '</tr></thead><tbody>';
-
-  rows.forEach(row => {
-    html += '<tr>';
-    cols.forEach(c => {
-      const isNum = numCols.has(c);
-      const val = row[c];
-      const display = (isNum && val !== null && val !== undefined) ? formatNum(val) : (val ?? '—');
-      html += `<td class="${isNum ? 'num-cell' : ''}">${escHtml(String(display))}</td>`;
-    });
-    html += '</tr>';
-  });
-
-  // Fila de totales si hay valores numéricos
-  if (Object.keys(totales).length) {
-    html += '<tr class="total-row">';
-    cols.forEach(c => {
-      if (totales[c] !== undefined) {
-        html += `<td class="num-cell"><b>${formatNum(totales[c])}</b></td>`;
-      } else if (c === cols[0]) {
-        html += `<td><b>TOTAL</b></td>`;
-      } else {
-        html += `<td>—</td>`;
-      }
-    });
-    html += '</tr>';
+  const hasCols = config.cols && config.cols.length>0;
+  if (hasCols) {
+    renderPivotTabla(rows, config);
+  } else {
+    renderFlatTabla(rows, config);
   }
-
-  html += '</tbody></table>';
-  document.getElementById('resultWrap').innerHTML = html;
 }
 
-let sortCol = null, sortDir = 'asc';
-function ordenarPor(col) {
-  if (!ultimaData) return;
-  if (sortCol === col) sortDir = sortDir === 'asc' ? 'desc' : 'asc';
-  else { sortCol = col; sortDir = 'asc'; }
-  const rows = [...ultimaData.rows].sort((a, b) => {
-    const va = a[col], vb = b[col];
-    if (va === null || va === undefined) return 1;
-    if (vb === null || vb === undefined) return -1;
-    const na = parseFloat(va), nb = parseFloat(vb);
-    if (!isNaN(na) && !isNaN(nb)) return sortDir === 'asc' ? na - nb : nb - na;
-    return sortDir === 'asc' ? String(va).localeCompare(String(vb)) : String(vb).localeCompare(String(va));
+function renderFlatTabla(rows, config){
+  const allCols = Object.keys(rows[0]);
+  const numCols = new Set((config.valores||[]).map(v=>v.alias||`${v.funcion}(${v.campo})`));
+  let html='<table><thead><tr>';
+  allCols.forEach(c=>{
+    html+=`<th class="sortable" onclick="ordenarPor('${escH(c)}')">${escH(c)} <i class="bi bi-chevron-expand" style="font-size:.55rem;opacity:.4"></i></th>`;
   });
-  renderTabla({ ...ultimaData, rows }, ultimaConfig);
-}
-
-function formatNum(v) {
-  const n = parseFloat(v);
-  if (isNaN(n)) return v;
-  if (Number.isInteger(n)) return n.toLocaleString('es-CL');
-  return n.toLocaleString('es-CL', { minimumFractionDigits:0, maximumFractionDigits:2 });
-}
-
-/* ── Exportar Excel (CSV) ─────────────────────────────────── */
-function exportarExcel() {
-  if (!ultimaData?.rows?.length) return;
-  const rows = ultimaData.rows;
-  const cols = Object.keys(rows[0]);
-  let csv = cols.map(c => `"${c}"`).join(';') + '\n';
-  rows.forEach(row => {
-    csv += cols.map(c => `"${String(row[c] ?? '').replace(/"/g, '""')}"`).join(';') + '\n';
+  html+='</tr></thead><tbody>';
+  rows.forEach(row=>{
+    html+='<tr>';
+    allCols.forEach(c=>{
+      const isNum=numCols.has(c);
+      const v=row[c];
+      html+=`<td class="${isNum?'num-cell':''}">${escH(String(v??'—'))}</td>`;
+    });
+    html+='</tr>';
   });
-  const blob = new Blob(['﻿' + csv], { type:'text/csv;charset=utf-8;' });
-  const url  = URL.createObjectURL(blob);
-  const a = document.createElement('a');
-  a.href = url; a.download = 'tabla_dinamica.csv'; a.click();
-  URL.revokeObjectURL(url);
+  // totales
+  if(Object.keys(totales||{}).length){
+    html+='<tr class="total-row">';
+    allCols.forEach((c,i)=>{
+      if(totales[c]!==undefined) html+=`<td class="num-cell"><b>${formatN(totales[c])}</b></td>`;
+      else html+=`<td>${i===0?'<b>TOTAL</b>':'—'}</td>`;
+    });
+    html+='</tr>';
+  }
+  html+='</tbody></table>';
+  document.getElementById('resultWrap').innerHTML=html;
 }
 
-/* ── Modal guardar ────────────────────────────────────────── */
-function abrirModalGuardar(guardadaId) {
-  modoEdicion = guardadaId || null;
-  const modal = document.getElementById('modalGuardar');
-  document.getElementById('inputNombre').value = '';
-  document.getElementById('inputDescripcion').value = '';
-  document.getElementById('checkPublica').checked = false;
-  document.getElementById('modalAlert').style.display = 'none';
-  modal.classList.add('show');
-  document.getElementById('inputNombre').focus();
+/* Pivot: cross-tab */
+function renderPivotTabla(rows, config){
+  const colField  = config.cols[0];
+  const rowFields = config.filas || [];
+  const valFields = (config.valores||[]).map(v=>v.alias||`${v.funcion}(${v.campo})`);
+
+  // Valores únicos del campo de columna
+  const colVals = [...new Set(rows.map(r=>String(r[colField]??'—')))].sort();
+
+  // Construir clave de fila
+  const rowKey = row => rowFields.map(f=>String(row[f]??'')).join('||');
+
+  // Mapa: rowKey → { colVal → { valField → número } }
+  const map = {};
+  const rowOrder = [];
+  rows.forEach(row=>{
+    const rk = rowKey(row);
+    if (!map[rk]){ map[rk]={}; rowOrder.push(rk); }
+    const cv = String(row[colField]??'—');
+    if (!map[rk][cv]) map[rk][cv]={};
+    valFields.forEach(vf=>{ map[rk][cv][vf] = parseFloat(row[vf])||0; });
+  });
+
+  // Encabezado: campos de fila + (colVal x valFields) + TOTAL
+  let html='<table><thead>';
+  // Fila 1: campo-col span
+  if(valFields.length>1){
+    html+='<tr>';
+    rowFields.forEach(()=>html+='<th rowspan="2"></th>');
+    colVals.forEach(cv=>html+=`<th class="th-col-group" colspan="${valFields.length}">${escH(cv)}</th>`);
+    html+=`<th class="th-col-group" colspan="${valFields.length}">TOTAL</th>`;
+    html+='</tr><tr>';
+    colVals.forEach(()=>valFields.forEach(vf=>html+=`<th>${escH(vf)}</th>`));
+    valFields.forEach(vf=>html+=`<th>${escH(vf)}</th>`);
+    html+='</tr>';
+  } else {
+    html+='<tr>';
+    rowFields.forEach(f=>html+=`<th>${escH(f)}</th>`);
+    colVals.forEach(cv=>html+=`<th class="th-col-group sortable">${escH(cv)}</th>`);
+    html+=`<th class="th-col-group">TOTAL</th>`;
+    html+='</tr>';
+  }
+  html+='</thead><tbody>';
+
+  // Totales por col
+  const totCol={};
+
+  // Filas datos
+  rowOrder.forEach(rk=>{
+    const parts=rk.split('||');
+    html+='<tr>';
+    parts.forEach(p=>html+=`<td>${escH(p)}</td>`);
+    let rowTotal=0;
+    colVals.forEach(cv=>{
+      valFields.forEach(vf=>{
+        const v=(map[rk][cv]||{})[vf]||0;
+        rowTotal+=v;
+        totCol[cv+'|'+vf]=(totCol[cv+'|'+vf]||0)+v;
+        html+=`<td class="num-cell">${v?formatN(v):'—'}</td>`;
+      });
+    });
+    // total fila
+    valFields.forEach(vf=>{
+      const t = colVals.reduce((s,cv)=>s+((map[rk][cv]||{})[vf]||0), 0);
+      html+=`<td class="num-cell" style="font-weight:600">${t?formatN(t):'—'}</td>`;
+    });
+    html+='</tr>';
+  });
+
+  // Fila TOTAL
+  html+='<tr class="total-row">';
+  rowFields.forEach((f,i)=>html+=`<td>${i===0?'<b>TOTAL</b>':''}</td>`);
+  colVals.forEach(cv=>{
+    valFields.forEach(vf=>{ const t=totCol[cv+'|'+vf]||0; html+=`<td class="num-cell"><b>${t?formatN(t):'—'}</b></td>`; });
+  });
+  // Gran total
+  const grandTotal = colVals.reduce((s,cv)=>s+valFields.reduce((s2,vf)=>s2+(totCol[cv+'|'+vf]||0),0),0);
+  valFields.forEach(vf=>{
+    const t=colVals.reduce((s,cv)=>s+(totCol[cv+'|'+vf]||0),0);
+    html+=`<td class="num-cell"><b>${t?formatN(t):'—'}</b></td>`;
+  });
+  html+='</tr>';
+  html+='</tbody></table>';
+  document.getElementById('resultWrap').innerHTML=html;
 }
-function cerrarModalGuardar() { document.getElementById('modalGuardar').classList.remove('show'); }
 
-async function confirmarGuardar() {
-  const nombre = document.getElementById('inputNombre').value.trim();
-  if (!nombre) { mostrarAlertModal('El nombre es requerido', 'err'); return; }
-  if (!ultimaConfig) { mostrarAlertModal('Primero ejecuta la tabla', 'err'); return; }
-
-  const body = {
-    nombre,
-    descripcion: document.getElementById('inputDescripcion').value.trim(),
-    config: ultimaConfig,
-    publica: document.getElementById('checkPublica').checked
-  };
-
-  const url = modoEdicion ? `${API}/guardadas/${modoEdicion}` : `${API}/guardadas`;
-  const method = modoEdicion ? 'PUT' : 'POST';
-  const r = await fetch(url, { method, headers: headers(), body: JSON.stringify(body) });
-  const j = await r.json();
-  if (!j.success) { mostrarAlertModal(j.error, 'err'); return; }
-  mostrarAlertModal('Guardado correctamente', 'ok');
-  setTimeout(() => { cerrarModalGuardar(); cargarGuardadas(); }, 1000);
-}
-function mostrarAlertModal(msg, tipo) {
-  const el = document.getElementById('modalAlert');
-  el.textContent = msg;
-  el.className = 'alert-msg ' + tipo;
-  el.style.display = 'block';
+let sortCol=null, sortDir='asc';
+function ordenarPor(col){
+  if(!ultimaData)return;
+  sortDir=(sortCol===col&&sortDir==='asc')?'desc':'asc'; sortCol=col;
+  const rows=[...ultimaData.rows].sort((a,b)=>{
+    const va=a[col],vb=b[col];
+    if(va==null)return 1; if(vb==null)return -1;
+    const na=parseFloat(va),nb=parseFloat(vb);
+    if(!isNaN(na)&&!isNaN(nb)) return sortDir==='asc'?na-nb:nb-na;
+    return sortDir==='asc'?String(va).localeCompare(String(vb)):String(vb).localeCompare(String(va));
+  });
+  renderTabla({...ultimaData,rows},ultimaConfig);
 }
 
-/* ── Panel guardadas ──────────────────────────────────────── */
-async function cargarGuardadas() {
-  const r = await fetch(API + '/guardadas', { headers: headers() });
-  const j = await r.json();
-  if (!j.success) return;
-  const items = j.data;
-  document.getElementById('countGuardadas').textContent = items.length;
-  const yo = JSON.parse(sessionStorage.getItem('usuario') || '{}');
+const formatN = v=>{ const n=parseFloat(v); if(isNaN(n))return v; return Number.isInteger(n)?n.toLocaleString('es-CL'):n.toLocaleString('es-CL',{minimumFractionDigits:0,maximumFractionDigits:2}); };
 
-  const propias = items.filter(i => i.es_mia);
-  document.getElementById('savedCountInfo').textContent = `${propias.length}/10 tablas propias · ${items.length - propias.length} públicas de otros`;
+/* ── Exportar CSV ─────────────────────────────────── */
+function exportarCSV(){
+  if(!ultimaData?.rows?.length)return;
+  const rows=ultimaData.rows, cols=Object.keys(rows[0]);
+  let csv=cols.map(c=>`"${c}"`).join(';')+'\n';
+  rows.forEach(r=>{ csv+=cols.map(c=>`"${String(r[c]??'').replace(/"/g,'""')}"`).join(';')+'\n'; });
+  const a=document.createElement('a');
+  a.href=URL.createObjectURL(new Blob(['﻿'+csv],{type:'text/csv;charset=utf-8;'}));
+  a.download='tabla_dinamica.csv'; a.click();
+}
 
-  const body = document.getElementById('savedListBody');
-  if (!items.length) { body.innerHTML = '<div style="text-align:center;color:#9ca3af;padding:24px;font-size:.8rem">No hay tablas guardadas</div>'; return; }
-  body.innerHTML = items.map(i => {
-    const date = new Date(i.updated_at).toLocaleDateString('es-CL');
-    const badgeVis = i.publica ? '<span class="badge-pub">Pública</span>' : '<span class="badge-priv">Privada</span>';
-    const acciones = i.es_mia
-      ? `<button onclick="cargarGuardada(${i.id})" style="background:#ecfeff;color:#0e7490">
-           <i class="bi bi-play-fill"></i> Abrir
-         </button>
-         <button onclick="abrirModalGuardar(${i.id})" style="background:#f1f5f9;color:#374151">
-           <i class="bi bi-pencil"></i>
-         </button>
-         <button onclick="eliminarGuardada(${i.id})" style="background:#fef2f2;color:#dc2626">
-           <i class="bi bi-trash"></i>
-         </button>`
-      : `<button onclick="cargarGuardada(${i.id})" style="background:#ecfeff;color:#0e7490">
-           <i class="bi bi-play-fill"></i> Abrir
-         </button>`;
-    return `<div class="saved-item">
-      <div class="saved-name"><i class="bi bi-table" style="color:#0e7490"></i>${escHtml(i.nombre)} ${badgeVis}</div>
-      <div class="saved-meta">${i.descripcion ? escHtml(i.descripcion) + ' · ' : ''}${date}</div>
-      <div class="saved-actions">${acciones}</div>
-    </div>`;
+/* ── Guardar ──────────────────────────────────────── */
+function abrirModalGuardar(id){
+  modoEdicion=id||null;
+  document.getElementById('inputNombre').value='';
+  document.getElementById('inputDescripcion').value='';
+  document.getElementById('checkPublica').checked=false;
+  document.getElementById('modalAlert').style.display='none';
+  document.getElementById('modalGuardar').classList.add('show');
+  setTimeout(()=>document.getElementById('inputNombre').focus(),50);
+}
+function cerrarModalGuardar(){ document.getElementById('modalGuardar').classList.remove('show'); }
+
+async function confirmarGuardar(){
+  const nombre=document.getElementById('inputNombre').value.trim();
+  if(!nombre){ setAlertM('Nombre requerido','err'); return; }
+  if(!ultimaConfig){ setAlertM('Ejecuta primero la tabla','err'); return; }
+  const body={ nombre, descripcion:document.getElementById('inputDescripcion').value.trim(), config:ultimaConfig, publica:document.getElementById('checkPublica').checked };
+  const url=modoEdicion?`${API}/guardadas/${modoEdicion}`:`${API}/guardadas`;
+  const r=await fetch(url,{method:modoEdicion?'PUT':'POST',headers:hdr(),body:JSON.stringify(body)});
+  const j=await r.json();
+  if(!j.success){ setAlertM(j.error,'err'); return; }
+  setAlertM('Guardado correctamente','ok');
+  setTimeout(()=>{ cerrarModalGuardar(); cargarGuardadas(); },1000);
+}
+function setAlertM(msg,tipo){ const el=document.getElementById('modalAlert'); el.textContent=msg; el.className='alert-msg '+tipo; el.style.display='block'; }
+
+/* ── Guardadas ────────────────────────────────────── */
+async function cargarGuardadas(){
+  const r=await fetch(API+'/guardadas',{headers:hdr()});
+  const j=await r.json();
+  if(!j.success)return;
+  const items=j.data;
+  document.getElementById('countGuardadas').textContent=items.length;
+  const propias=items.filter(i=>i.es_mia);
+  document.getElementById('savedCountInfo').textContent=`${propias.length}/10 propias · ${items.length-propias.length} públicas`;
+  const body=document.getElementById('savedListBody');
+  if(!items.length){ body.innerHTML='<div style="text-align:center;color:#9ca3af;padding:20px;font-size:.78rem">No hay tablas guardadas</div>'; return; }
+  body.innerHTML=items.map(i=>{
+    const d=new Date(i.updated_at).toLocaleDateString('es-CL');
+    const bv=i.publica?'<span class="badge-pub">Pública</span>':'<span class="badge-priv">Privada</span>';
+    const ac=i.es_mia
+      ?`<button onclick="cargarGuardada(${i.id})" style="background:#ecfeff;color:#0e7490"><i class="bi bi-play-fill"></i> Abrir</button>
+         <button onclick="abrirModalGuardar(${i.id})" style="background:#f1f5f9;color:#374151"><i class="bi bi-pencil"></i></button>
+         <button onclick="eliminarGuardada(${i.id})" style="background:#fef2f2;color:#dc2626"><i class="bi bi-trash"></i></button>`
+      :`<button onclick="cargarGuardada(${i.id})" style="background:#ecfeff;color:#0e7490"><i class="bi bi-play-fill"></i> Abrir</button>`;
+    return `<div class="saved-item"><div class="saved-name"><i class="bi bi-table" style="color:#0e7490"></i>${escH(i.nombre)} ${bv}</div><div class="saved-meta">${i.descripcion?escH(i.descripcion)+' · ':''}${d}</div><div class="saved-actions">${ac}</div></div>`;
   }).join('');
 }
 
-async function cargarGuardada(id) {
-  const r = await fetch(`${API}/guardadas/${id}`, { headers: headers() });
-  const j = await r.json();
-  if (!j.success) return;
-  const config = typeof j.data.config === 'string' ? JSON.parse(j.data.config) : j.data.config;
-
-  // Restaurar estado
-  document.getElementById('selFuente').value = config.fuente;
+async function cargarGuardada(id){
+  const r=await fetch(`${API}/guardadas/${id}`,{headers:hdr()});
+  const j=await r.json(); if(!j.success)return;
+  const config=typeof j.data.config==='string'?JSON.parse(j.data.config):j.data.config;
+  document.getElementById('selFuente').value=config.fuente;
   onCambioFuente();
-
-  // Esperar a que se carguen los campos
-  setTimeout(() => {
-    filas   = (config.filas   || []).map(campo => fuenteActual?.campos.find(c => c.campo === campo)).filter(Boolean);
-    valores = (config.valores || []).map(v => {
-      const meta = fuenteActual?.campos.find(c => c.campo === v.campo);
-      return meta ? { ...meta, funcion: v.funcion, alias: v.alias } : null;
-    }).filter(Boolean);
-    filtros = config.filtros || [];
-    renderZonas();
-    renderFiltros();
+  setTimeout(()=>{
+    filas  =(config.filas  ||[]).map(c=>fuenteActual?.campos.find(x=>x.campo===c)).filter(Boolean);
+    cols   =(config.cols   ||[]).map(c=>fuenteActual?.campos.find(x=>x.campo===c)).filter(Boolean);
+    valores=(config.valores||[]).map(v=>{ const m=fuenteActual?.campos.find(x=>x.campo===v.campo); return m?{...m,funcion:v.funcion,alias:v.alias}:null; }).filter(Boolean);
+    filtros=config.filtros||[];
+    renderZonas(); renderFiltros();
     renderCamposDisponibles('');
-    ultimaConfig = config;
+    ultimaConfig=config;
     togglePanelGuardadas();
-    // Auto-ejecutar
     ejecutarConsulta();
-  }, 50);
+  },50);
 }
 
-async function eliminarGuardada(id) {
-  if (!confirm('¿Eliminar esta tabla guardada?')) return;
-  const r = await fetch(`${API}/guardadas/${id}`, { method:'DELETE', headers: headers() });
-  const j = await r.json();
-  if (j.success) cargarGuardadas();
+async function eliminarGuardada(id){
+  if(!confirm('¿Eliminar esta tabla guardada?'))return;
+  const r=await fetch(`${API}/guardadas/${id}`,{method:'DELETE',headers:hdr()});
+  const j=await r.json(); if(j.success)cargarGuardadas();
 }
 
-function togglePanelGuardadas() {
-  document.getElementById('panelGuardadas').classList.toggle('open');
-}
+function togglePanelGuardadas(){ document.getElementById('panelGuardadas').classList.toggle('open'); }
+function showError(msg){ document.getElementById('resultWrap').innerHTML=`<div class="empty-state"><i class="bi bi-exclamation-triangle-fill" style="color:#ef4444"></i><div style="color:#ef4444;font-size:.83rem">${escH(msg)}</div></div>`; }
 
-function showError(msg) {
-  document.getElementById('resultWrap').innerHTML = `
-    <div class="empty-state">
-      <i class="bi bi-exclamation-triangle-fill" style="color:#ef4444"></i>
-      <div style="color:#ef4444;font-size:.85rem">${escHtml(msg)}</div>
-    </div>`;
-}
-
-/* ── Init ─────────────────────────────────────────────────── */
+/* ── Init ─────────────────────────────────────────── */
 cargarFuentes();
 </script>
 </body>
