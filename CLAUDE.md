@@ -54,6 +54,18 @@ shared/
 - `dashboard_config` → config permisos tabs del dashboard
 - `usuarios`, `perfiles`, `permisos_perfil`, `funcionalidades`, `modulos`
 
+## Reglas Anti-Hardcode (NO negociables)
+1. **Módulos y sub-items SIEMPRE desde BD** — nunca listas JS con rutas/íconos fijos
+   - Módulos principales → tabla `modulos` (nombre, icono, ruta, orden)
+   - Sub-items de sección → tabla `funcionalidades` (nombre, codigo, href, icono)
+   - El frontend los lee via `GET /api/auth/mis-permisos` → `funcionalidadesInfo`
+2. **Agregar módulo nuevo = solo BD**, sin tocar código:
+   - INSERT en `modulos` + INSERT en `funcionalidades` con href e icono
+   - Asignar permisos en `permisos_perfil`
+3. **Nunca duplicar en HOME_FALLBACK ni ITEMS_ALL** — si algo no aparece, el problema está en BD o permisos, no en el código
+4. **Descripciones largas** (texto presentación) pueden ir en un mapa JS local `DESCS{}` — no son datos de negocio
+5. **Cobranza es excepción justificada** — sus cards tienen HTML único con stats por card
+
 ## Decisiones de Arquitectura Tomadas
 - dashboard/getDatos: deduplicación por num_op via ROW_NUMBER() OVER PARTITION
 - MAYOR/MENOR 200UF: se recalcula con UF de fecha_otorgado (no campo BD)
