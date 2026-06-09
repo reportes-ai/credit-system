@@ -55,10 +55,13 @@ const getAllUsuarios = async (req, res) => {
       `SELECT u.id_usuario, u.rut, u.nombre, u.apellido, u.email, u.telefono,
               u.id_perfil, p.nombre AS perfil, u.id_supervisor,
               CONCAT(s.nombre, ' ', s.apellido) AS supervisor_nombre,
-              u.estado, u.ultimo_acceso, u.fecha_creacion
+              u.estado, u.ultimo_acceso, u.fecha_creacion,
+              cj.id_caja, cj.nombre AS nombre_caja
        FROM usuarios u
        JOIN perfiles p ON u.id_perfil = p.id_perfil
        LEFT JOIN usuarios s ON u.id_supervisor = s.id_usuario
+       LEFT JOIN caja_usuarios cu ON cu.id_usuario = u.id_usuario AND cu.activo = 1
+       LEFT JOIN cajas cj ON cj.id_caja = cu.id_caja AND cj.activo = 1
        ${where}
        ORDER BY u.nombre, u.apellido`,
       params
