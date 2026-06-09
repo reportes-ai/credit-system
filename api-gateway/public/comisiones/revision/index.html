@@ -112,7 +112,7 @@
 <body>
 <nav class="topnav">
   <div class="topnav-left">
-    <a href="/" class="topnav-brand"><img src="/img/logo.png" alt="AutoFácil"><span class="version-badge">v5.10</span></a>
+    <a href="/" class="topnav-brand"><img src="/img/logo.png" alt="AutoFácil"><span class="version-badge">v5.11</span></a>
     <div class="breadcrumb-nav">
       <a href="/">Inicio</a><span class="sep">›</span>
       <a href="/comisiones/">Comisión Ejecutivos</a><span class="sep">›</span>
@@ -746,21 +746,17 @@ function generarInforme() {
       </div>`;
 
     const desglose = `
-      <div style="background:#f0f4f8;border-radius:8px;padding:14px 18px;margin-top:12px;display:flex;justify-content:space-between;align-items:stretch;gap:18px">
-        <table style="font-size:12.5px;border-collapse:collapse;flex:1">
-          <tr><td style="padding:4px 0;color:#374151">Incentivo Base (0.75% ≤24c / 1.00% &gt;24c)</td><td style="padding:4px 0;text-align:right;font-weight:600;padding-left:20px">${fmtN(d.incentivo_base)}</td></tr>
-          <tr><td style="padding:4px 0;color:#374151">+ Bono Seg. Cesantía ${d.cumple_cesantia?'(cruce '+pctN(d.cruce_cesantia)+', ajuste '+pctN(d.ajuste_cesantia)+')':'— no cumple'}</td><td style="padding:4px 0;text-align:right;font-weight:600;padding-left:20px">${d.cumple_cesantia?fmtN(d.bono_cesantia):'$0'}</td></tr>
-          <tr><td style="padding:4px 0;color:#374151">+ Bono Seg. Reparaciones ${d.cumple_reparaciones?'(cruce '+pctN(d.cruce_reparaciones)+', ajuste '+pctN(d.ajuste_reparaciones)+')':'— no cumple'}</td><td style="padding:4px 0;text-align:right;font-weight:600;padding-left:20px">${d.cumple_reparaciones?fmtN(d.bono_reparaciones):'$0'}</td></tr>
-          <tr><td style="padding:4px 0;color:#374151">+ Bono Calidad (ajuste ${pctN(d.ajuste_calidad)})</td><td style="padding:4px 0;text-align:right;font-weight:600;padding-left:20px">${fmtN(d.bono_calidad)}</td></tr>
+      <div style="background:#f0f4f8;border-radius:8px;padding:14px 18px;margin-top:12px">
+        <table style="width:100%;font-size:12.5px;border-collapse:collapse">
+          <tr><td style="padding:4px 0;color:#374151">Incentivo Base (0,75% ≤24c / 1,00% &gt;24c)</td><td style="padding:4px 0;text-align:right;font-weight:600">${fmtN(d.incentivo_base)}</td></tr>
+          <tr><td style="padding:4px 0;color:#374151">+ Bono Seg. Cesantía ${d.cumple_cesantia?'(cruce '+pctN(d.cruce_cesantia)+', ajuste '+pctN(d.ajuste_cesantia)+')':'— no cumple'}</td><td style="padding:4px 0;text-align:right;font-weight:600">${d.cumple_cesantia?fmtN(d.bono_cesantia):'$0'}</td></tr>
+          <tr><td style="padding:4px 0;color:#374151">+ Bono Seg. Reparaciones ${d.cumple_reparaciones?'(cruce '+pctN(d.cruce_reparaciones)+', ajuste '+pctN(d.ajuste_reparaciones)+')':'— no cumple'}</td><td style="padding:4px 0;text-align:right;font-weight:600">${d.cumple_reparaciones?fmtN(d.bono_reparaciones):'$0'}</td></tr>
+          <tr><td style="padding:4px 0;color:#374151">+ Bono Calidad (ajuste ${pctN(d.ajuste_calidad)})</td><td style="padding:4px 0;text-align:right;font-weight:600">${fmtN(d.bono_calidad)}</td></tr>
           <tr style="border-top:2px solid #c5cae9">
-            <td style="padding:8px 0 0;font-weight:700;color:#0141A2;font-size:13px">= INCENTIVO FINAL BRUTO</td>
-            <td style="padding:8px 0 0;text-align:right;font-weight:800;color:#0141A2;font-size:14px;padding-left:20px">${fmtN(d.incentivo_final)}</td>
+            <td style="padding:8px 0 0;font-weight:700;color:#0141A2;font-size:13px">= INCENTIVO FINAL</td>
+            <td style="padding:8px 0 0;text-align:right;font-weight:800;color:#0141A2;font-size:15px">${fmtN(d.incentivo_final)}</td>
           </tr>
         </table>
-        <div style="background:linear-gradient(135deg,#012d70,#0141A2);border-radius:8px;padding:14px 20px;color:#fff;min-width:160px;display:flex;flex-direction:column;justify-content:center;text-align:center">
-          <div style="font-size:10px;opacity:.7;text-transform:uppercase;letter-spacing:.8px;margin-bottom:4px">Con Semana Corrida (×1.2)</div>
-          <div style="font-size:22px;font-weight:800">${fmtN(d.con_semana_corrida)}</div>
-        </div>
       </div>`;
 
     return `
@@ -797,38 +793,116 @@ function generarInforme() {
   const mesPagoLabel = fechaPago.toLocaleString('es-CL',{month:'long',year:'numeric'})
                          .replace(/^\w/, c => c.toUpperCase());
 
-  /* ── Explicación metodología ── */
-  const explicacion = `
-    <div style="background:#f8fafc;border:1px solid #e5e7eb;border-radius:10px;padding:20px 24px;margin-top:28px">
-      <div style="font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:.8px;color:#374151;margin-bottom:14px;border-bottom:1px solid #e5e7eb;padding-bottom:8px">
-        Metodología de Cálculo de Comisiones
-      </div>
-      <p style="font-size:13px;color:#374151;margin:0 0 10px;line-height:1.6">
-        Las comisiones se calculan sobre el monto total financiado en créditos <strong>OTORGADOS</strong> durante el mes,
-        siempre que se alcance un monto mínimo mensual de <strong>$30.000.000</strong>.
-      </p>
-      <table style="width:100%;border-collapse:collapse;font-size:13px;margin-bottom:12px">
-        <thead>
-          <tr style="background:#e8eaf6">
-            <th style="padding:7px 12px;text-align:left;font-weight:700;color:#374151;border-bottom:2px solid #c5cae9">Componente</th>
-            <th style="padding:7px 12px;text-align:left;font-weight:700;color:#374151;border-bottom:2px solid #c5cae9">Condición</th>
-            <th style="padding:7px 12px;text-align:right;font-weight:700;color:#374151;border-bottom:2px solid #c5cae9">Tasa / Beneficio</th>
+  /* ── Cálculo paso a paso con números reales del ejecutivo ── */
+  function explicacionCalculo(d) {
+    const TD  = 'padding:7px 12px;border-bottom:1px solid #f1f5f9;font-size:13px';
+    const TDr = TD + ';text-align:right;font-weight:700';
+
+    /* Paso 1 — Incentivo Base */
+    const paso1 = `
+      <div style="margin-bottom:16px">
+        <div style="font-size:13px;font-weight:700;color:#0141A2;margin-bottom:8px">Paso 1 — Incentivo Base</div>
+        <table style="width:100%;border-collapse:collapse;font-size:13px">
+          <thead><tr style="background:#e8eaf6">
+            <th style="padding:7px 12px;text-align:left;font-weight:700;color:#374151;border-bottom:2px solid #c5cae9">Tramo</th>
+            <th style="padding:7px 12px;text-align:right;font-weight:700;color:#374151;border-bottom:2px solid #c5cae9">Monto financiado</th>
+            <th style="padding:7px 12px;text-align:center;font-weight:700;color:#374151;border-bottom:2px solid #c5cae9">Tasa</th>
+            <th style="padding:7px 12px;text-align:right;font-weight:700;color:#374151;border-bottom:2px solid #c5cae9">Resultado</th>
+          </tr></thead>
+          <tbody>
+            <tr style="background:#fff">
+              <td style="${TD}">Créditos con plazo ≤ 24 meses (${d.total_creditos - (d.creditos||[]).filter(c=>(c.estado_credito||'').toUpperCase()==='OTORGADO'&&parseInt(c.plazo)>24).length} ops)</td>
+              <td style="${TD};text-align:right">${fmtN(d.monto_24||0)}</td>
+              <td style="${TD};text-align:center;color:#0141A2;font-weight:700">× 0,75%</td>
+              <td style="${TD};text-align:right;font-weight:700;color:#0141A2">= ${fmtN(d.base_24||0)}</td>
+            </tr>
+            <tr style="background:#f8fafc">
+              <td style="${TD}">Créditos con plazo &gt; 24 meses (${(d.creditos||[]).filter(c=>(c.estado_credito||'').toUpperCase()==='OTORGADO'&&parseInt(c.plazo)>24).length} ops)</td>
+              <td style="${TD};text-align:right">${fmtN(d.monto_mas24||0)}</td>
+              <td style="${TD};text-align:center;color:#0141A2;font-weight:700">× 1,00%</td>
+              <td style="${TD};text-align:right;font-weight:700;color:#0141A2">= ${fmtN(d.base_mas24||0)}</td>
+            </tr>
+            <tr style="background:#e8eaf6;font-weight:700">
+              <td colspan="3" style="padding:8px 12px;font-size:13px">Total Incentivo Base</td>
+              <td style="padding:8px 12px;text-align:right;font-size:14px;color:#0141A2">${fmtN(d.incentivo_base||0)}</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>`;
+
+    if (!d.cumple_minimo) return `<div style="background:#fef2f2;border:1px solid #fecaca;border-radius:8px;padding:14px 18px;font-size:13px;color:#991b1b">
+      ⚠ No se generó comisión: el monto financiado total del período (${fmtN(d.total_financiado)}) es inferior al mínimo requerido de <strong>$30.000.000</strong>.
+      </div>`;
+
+    /* Paso 2 — Bono Cesantía */
+    const paso2 = `
+      <div style="margin-bottom:16px">
+        <div style="font-size:13px;font-weight:700;color:${d.cumple_cesantia?'#16a34a':'#dc2626'};margin-bottom:8px">Paso 2 — Bono Seguro Cesantía &nbsp;<span style="background:${d.cumple_cesantia?'#dcfce7':'#fee2e2'};padding:2px 8px;border-radius:8px;font-size:11px">${d.cumple_cesantia?'✔ Aplica':'✘ No aplica'}</span></div>
+        <table style="width:100%;border-collapse:collapse;font-size:13px">
+          <tr style="background:#f8fafc"><td style="${TD}">Créditos AUTOFIN base (NCNU)</td><td style="${TDr}">${d.ncnu_total||0} operaciones</td></tr>
+          <tr style="background:#fff"><td style="${TD}">Créditos con seguro cesantía contratado</td><td style="${TDr}">${d.ncnu_cesantia||0} de ${d.ncnu_total||0} = <span style="color:${d.cumple_cesantia?'#16a34a':'#dc2626'}">${pctN(d.cruce_cesantia)}</span></td></tr>
+          <tr style="background:#f8fafc"><td style="${TD}">Mínimo requerido</td><td style="${TDr}">65%</td></tr>
+          ${d.cumple_cesantia ? `
+          <tr style="background:#fff"><td style="${TD}">Ajuste aplicado sobre incentivo base</td><td style="${TDr};color:#16a34a">${pctN(d.ajuste_cesantia)}</td></tr>
+          <tr style="background:#e8eaf6;font-weight:700"><td style="padding:8px 12px;font-size:13px">${fmtN(d.incentivo_base)} × ${pctN(d.ajuste_cesantia)}</td><td style="padding:8px 12px;text-align:right;font-size:14px;color:#16a34a">= ${fmtN(d.bono_cesantia||0)}</td></tr>
+          ` : `<tr style="background:#fee2e2"><td colspan="2" style="padding:8px 12px;color:#dc2626;font-size:13px">No alcanza el mínimo → Bono Cesantía = $0</td></tr>`}
+        </table>
+      </div>`;
+
+    /* Paso 3 — Bono Reparaciones */
+    const paso3 = `
+      <div style="margin-bottom:16px">
+        <div style="font-size:13px;font-weight:700;color:${d.cumple_reparaciones?'#16a34a':'#dc2626'};margin-bottom:8px">Paso 3 — Bono Seguro Reparaciones Menores &nbsp;<span style="background:${d.cumple_reparaciones?'#dcfce7':'#fee2e2'};padding:2px 8px;border-radius:8px;font-size:11px">${d.cumple_reparaciones?'✔ Aplica':'✘ No aplica'}</span></div>
+        <table style="width:100%;border-collapse:collapse;font-size:13px">
+          <tr style="background:#f8fafc"><td style="${TD}">Créditos AUTOFIN base (NCNU)</td><td style="${TDr}">${d.ncnu_total||0} operaciones</td></tr>
+          <tr style="background:#fff"><td style="${TD}">Créditos con seguro reparaciones contratado</td><td style="${TDr}">${d.ncnu_rep||0} de ${d.ncnu_total||0} = <span style="color:${d.cumple_reparaciones?'#16a34a':'#dc2626'}">${pctN(d.cruce_reparaciones)}</span></td></tr>
+          <tr style="background:#f8fafc"><td style="${TD}">Mínimo requerido</td><td style="${TDr}">50%</td></tr>
+          ${d.cumple_reparaciones ? `
+          <tr style="background:#fff"><td style="${TD}">Ajuste aplicado sobre incentivo base</td><td style="${TDr};color:#16a34a">${pctN(d.ajuste_reparaciones)}</td></tr>
+          <tr style="background:#e8eaf6;font-weight:700"><td style="padding:8px 12px;font-size:13px">${fmtN(d.incentivo_base)} × ${pctN(d.ajuste_reparaciones)}</td><td style="padding:8px 12px;text-align:right;font-size:14px;color:#16a34a">= ${fmtN(d.bono_reparaciones||0)}</td></tr>
+          ` : `<tr style="background:#fee2e2"><td colspan="2" style="padding:8px 12px;color:#dc2626;font-size:13px">No alcanza el mínimo → Bono Reparaciones = $0</td></tr>`}
+        </table>
+      </div>`;
+
+    /* Paso 4 — Calidad */
+    const cumpleCalidad = (d.calidad_logrado||0) >= (d.calidad_meta||3);
+    const paso4 = `
+      <div style="margin-bottom:16px">
+        <div style="font-size:13px;font-weight:700;color:${cumpleCalidad?'#16a34a':'#dc2626'};margin-bottom:8px">Paso 4 — Bono Calidad (Créditos UNIDAD) &nbsp;<span style="background:${cumpleCalidad?'#dcfce7':'#fee2e2'};padding:2px 8px;border-radius:8px;font-size:11px">${cumpleCalidad?'✔ Aplica':'✘ No aplica'}</span></div>
+        <table style="width:100%;border-collapse:collapse;font-size:13px">
+          <tr style="background:#f8fafc"><td style="${TD}">Créditos UNIDAD de Crédito en el mes</td><td style="${TDr};color:${cumpleCalidad?'#16a34a':'#dc2626'}">${d.calidad_logrado||0} de ${d.calidad_meta||3} requeridos</td></tr>
+          <tr style="background:#fff"><td style="${TD}">Ajuste aplicado</td><td style="${TDr}">${pctN(d.ajuste_calidad)}</td></tr>
+          <tr style="background:#e8eaf6;font-weight:700"><td style="padding:8px 12px;font-size:13px">${fmtN(d.incentivo_base)} × ${pctN(d.ajuste_calidad)}</td><td style="padding:8px 12px;text-align:right;font-size:14px;color:${(d.bono_calidad||0)>0?'#16a34a':'#9ca3af'}">= ${fmtN(d.bono_calidad||0)}</td></tr>
+        </table>
+      </div>`;
+
+    /* Paso 5 — Suma final */
+    const paso5 = `
+      <div style="background:#e8eaf6;border-radius:8px;padding:14px 18px">
+        <div style="font-size:13px;font-weight:700;color:#374151;margin-bottom:10px">Paso 5 — Suma Final</div>
+        <table style="width:100%;font-size:13px;border-collapse:collapse">
+          <tr><td style="padding:5px 0;color:#374151">Incentivo Base</td><td style="padding:5px 0;text-align:right;font-weight:600">${fmtN(d.incentivo_base)}</td></tr>
+          <tr><td style="padding:5px 0;color:#374151">+ Bono Seg. Cesantía</td><td style="padding:5px 0;text-align:right;font-weight:600">${d.cumple_cesantia?fmtN(d.bono_cesantia):'$0'}</td></tr>
+          <tr><td style="padding:5px 0;color:#374151">+ Bono Seg. Reparaciones</td><td style="padding:5px 0;text-align:right;font-weight:600">${d.cumple_reparaciones?fmtN(d.bono_reparaciones):'$0'}</td></tr>
+          <tr><td style="padding:5px 0;color:#374151">+ Bono Calidad</td><td style="padding:5px 0;text-align:right;font-weight:600">${fmtN(d.bono_calidad||0)}</td></tr>
+          <tr style="border-top:3px solid #0141A2">
+            <td style="padding:10px 0 4px;font-size:15px;font-weight:800;color:#0141A2">= INCENTIVO FINAL</td>
+            <td style="padding:10px 0 4px;text-align:right;font-size:20px;font-weight:900;color:#0141A2">${fmtN(d.incentivo_final)}</td>
           </tr>
-        </thead>
-        <tbody>
-          <tr style="background:#fff"><td style="padding:7px 12px;border-bottom:1px solid #f1f5f9">Incentivo Base — Créditos ≤ 24 meses</td><td style="padding:7px 12px;border-bottom:1px solid #f1f5f9;color:#6b7280">Monto financiado de ops con plazo de hasta 24 cuotas</td><td style="padding:7px 12px;border-bottom:1px solid #f1f5f9;text-align:right;font-weight:700;color:#0141A2">0,75%</td></tr>
-          <tr style="background:#f8fafc"><td style="padding:7px 12px;border-bottom:1px solid #f1f5f9">Incentivo Base — Créditos &gt; 24 meses</td><td style="padding:7px 12px;border-bottom:1px solid #f1f5f9;color:#6b7280">Monto financiado de ops con plazo mayor a 24 cuotas</td><td style="padding:7px 12px;border-bottom:1px solid #f1f5f9;text-align:right;font-weight:700;color:#0141A2">1,00%</td></tr>
-          <tr style="background:#fff"><td style="padding:7px 12px;border-bottom:1px solid #f1f5f9">Bono Seguro Cesantía</td><td style="padding:7px 12px;border-bottom:1px solid #f1f5f9;color:#6b7280">Cruce ≥ 65% en créditos AUTOFIN (se aplica ajuste al incentivo base)</td><td style="padding:7px 12px;border-bottom:1px solid #f1f5f9;text-align:right;font-weight:700;color:#16a34a">Hasta +33%</td></tr>
-          <tr style="background:#f8fafc"><td style="padding:7px 12px;border-bottom:1px solid #f1f5f9">Bono Seguro Reparaciones Menores</td><td style="padding:7px 12px;border-bottom:1px solid #f1f5f9;color:#6b7280">Cruce ≥ 50% en créditos AUTOFIN (se aplica ajuste al incentivo base)</td><td style="padding:7px 12px;border-bottom:1px solid #f1f5f9;text-align:right;font-weight:700;color:#16a34a">Hasta +20%</td></tr>
-          <tr style="background:#fff"><td style="padding:7px 12px">Bono Calidad — Créditos UNIDAD</td><td style="padding:7px 12px;color:#6b7280">Meta de 3 créditos UNIDAD de Crédito en el mes</td><td style="padding:7px 12px;text-align:right;font-weight:700;color:#16a34a">Hasta +13%</td></tr>
-        </tbody>
-      </table>
-      <p style="font-size:12px;color:#6b7280;margin:0;line-height:1.5">
-        <strong>Nota:</strong> El cruce de seguros se mide sobre los créditos AUTOFIN sin CORFO (base NCNU).
-        Los bonos se aplican como ajuste porcentual sobre el incentivo base total del mes.
-        El valor indicado corresponde al incentivo bruto, sin considerar descuentos previsionales ni retenciones tributarias.
+        </table>
+      </div>`;
+
+    return `
+    <div style="background:#f8fafc;border:1px solid #e5e7eb;border-radius:10px;padding:20px 24px;margin-top:28px">
+      <div style="font-size:13px;font-weight:700;text-transform:uppercase;letter-spacing:.8px;color:#374151;margin-bottom:18px;border-bottom:2px solid #e5e7eb;padding-bottom:8px">
+        📊 Cómo se calculó tu comisión — ${mesLabel}
+      </div>
+      ${paso1}${paso2}${paso3}${paso4}${paso5}
+      <p style="font-size:11.5px;color:#9ca3af;margin:14px 0 0;line-height:1.5">
+        El cruce de seguros se mide sobre créditos AUTOFIN sin CORFO (base NCNU). Los bonos son ajustes sobre el incentivo base total del mes. El monto indicado es el incentivo bruto antes de descuentos previsionales y retenciones tributarias.
       </p>
     </div>`;
+  }
 
   /* ── Firma ── */
   const firma = `
@@ -845,7 +919,6 @@ function generarInforme() {
   let cuerpo;
   if (esIndividual) {
     const d = datos[0];
-    const nombreTitulo = d.ejecutivo.split(' ')[0]; // primer nombre
     const saludo = `
       <p style="font-size:14px;color:#374151;margin:0 0 14px;line-height:1.6">Estimado/a <strong>${d.ejecutivo}</strong>,</p>
       <p style="font-size:14px;color:#374151;margin:0 0 14px;line-height:1.6">
@@ -854,11 +927,11 @@ function generarInforme() {
       </p>
       <p style="font-size:14px;color:#374151;margin:0 0 22px;line-height:1.6">
         ${d.cumple_minimo
-          ? `Tu incentivo final bruto para el período es de <strong style="color:#16a34a;font-size:15px">${fmtN(d.incentivo_final)}</strong>${d.con_semana_corrida ? ` (con semana corrida aprox. <strong>${fmtN(d.con_semana_corrida)}</strong>)` : ''}.`
+          ? `Tu incentivo final bruto para el período es de <strong style="color:#16a34a;font-size:15px">${fmtN(d.incentivo_final)}</strong>.`
           : `En esta oportunidad <strong style="color:#dc2626">no se generó comisión</strong>, ya que el monto financiado del mes (<strong>${fmtN(d.total_financiado)}</strong>) no alcanzó el mínimo requerido de <strong>$30.000.000</strong>.`
         }
       </p>`;
-    cuerpo = saludo + bloqueEjecutivo(d) + explicacion + firma;
+    cuerpo = saludo + bloqueEjecutivo(d) + explicacionCalculo(d) + firma;
   } else {
     const seccionCon = conComision.length
       ? `<div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:#16a34a;margin:24px 0 12px;padding-bottom:6px;border-bottom:2px solid #bbf7d0">✔ Con Comisión — ${conComision.length} ejecutivo${conComision.length!==1?'s':''}</div>
@@ -885,6 +958,7 @@ function generarInforme() {
       </div>`;
   }
 
+  const copiarBtnId = 'btn-copiar-email-' + Date.now();
   const docHtml = `<!DOCTYPE html>
 <html lang="es">
 <head>
@@ -901,11 +975,40 @@ function generarInforme() {
 </style>
 </head>
 <body>
-<div class="no-print" style="position:sticky;top:0;background:#fff;z-index:100;padding:10px 24px;border-bottom:1px solid #e5e7eb;display:flex;align-items:center;justify-content:space-between;box-shadow:0 1px 4px rgba(0,0,0,.08)">
+<div class="no-print" style="position:sticky;top:0;background:#fff;z-index:100;padding:10px 24px;border-bottom:1px solid #e5e7eb;display:flex;align-items:center;justify-content:space-between;gap:10px;box-shadow:0 1px 4px rgba(0,0,0,.08)">
   <span style="font-size:.9rem;color:#374151;font-weight:600">${esIndividual ? datos[0].ejecutivo + ' · ' + mesLabel : 'Informe Comisiones · ' + mesLabel}</span>
-  <button onclick="window.print()" style="background:#0141A2;color:#fff;border:none;border-radius:8px;padding:8px 20px;font-size:.88rem;font-weight:700;cursor:pointer">🖨 Imprimir / Guardar PDF</button>
+  <div style="display:flex;gap:8px">
+    ${esIndividual ? `<button id="btnCopiarEmail" onclick="copiarEmailHtml()" style="background:#374151;color:#fff;border:none;border-radius:8px;padding:8px 18px;font-size:.88rem;font-weight:700;cursor:pointer">📋 Copiar para email</button>` : ''}
+    <button onclick="window.print()" style="background:#0141A2;color:#fff;border:none;border-radius:8px;padding:8px 18px;font-size:.88rem;font-weight:700;cursor:pointer">🖨 Imprimir / PDF</button>
+  </div>
 </div>
-<div style="max-width:960px;margin:24px auto;padding:0 20px">
+<script>
+function copiarEmailHtml() {
+  const contenido = document.getElementById('contenido-email');
+  const html = contenido ? contenido.innerHTML : document.body.innerHTML;
+  const blob = new Blob([html], { type: 'text/html' });
+  navigator.clipboard.write([new ClipboardItem({ 'text/html': blob })])
+    .then(() => {
+      const btn = document.getElementById('btnCopiarEmail');
+      btn.textContent = '✓ ¡Copiado!';
+      btn.style.background = '#16a34a';
+      setTimeout(() => { btn.textContent = '📋 Copiar para email'; btn.style.background = '#374151'; }, 2500);
+    })
+    .catch(() => {
+      // Fallback: seleccionar todo
+      const range = document.createRange();
+      range.selectNode(contenido || document.body);
+      window.getSelection().removeAllRanges();
+      window.getSelection().addRange(range);
+      document.execCommand('copy');
+      window.getSelection().removeAllRanges();
+      const btn = document.getElementById('btnCopiarEmail');
+      btn.textContent = '✓ Seleccionado — Ctrl+C para copiar';
+      setTimeout(() => { btn.textContent = '📋 Copiar para email'; }, 3000);
+    });
+}
+<\/script>
+<div id="contenido-email" style="max-width:960px;margin:24px auto;padding:0 20px">
   ${cuerpo}
 </div>
 </body>
