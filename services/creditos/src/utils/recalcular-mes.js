@@ -137,6 +137,15 @@ async function recalcularMeses(meses, opciones = {}) {
   const log = [];
 
   for (const mesStr of meses) {
+    // ── Saltar meses cerrados ────────────────────────────────────────
+    const [mc] = await pool.query(
+      'SELECT cerrado FROM meses_cerrados WHERE mes = ? LIMIT 1', [mesStr]
+    );
+    if (mc.length && mc[0].cerrado) {
+      log.push(`⏭ ${mesStr}: mes cerrado — omitido`);
+      continue;
+    }
+
     // ── Traer todas las ops del mes (estados activos) ────────────────
     const [ops] = await pool.query(`
       SELECT id, num_op, financiera, parque,
