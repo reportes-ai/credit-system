@@ -483,7 +483,8 @@
           fetch('/api/config/ui/placement_v2', { headers: H }),
         ]);
         if (resp.status === 401) { logout(); return; }
-        const data         = await resp.json();
+        const data         = await resp.json().catch(() => null);
+        if (!data) throw new Error(`mis-permisos retornó HTTP ${resp.status} (no JSON)`);
         const dataOrden    = await respOrden.json().catch(() => ({ success: false, data: null }));
         const dataPlacement = await respPlacement.json().catch(() => ({ success: false, data: {} }));
 
@@ -565,8 +566,9 @@
           }
           introAnimation();
         }
-      } catch {
-        document.getElementById('modulesGrid').innerHTML = '<p class="text-danger text-center py-4" style="grid-column:1/-1">Error al cargar módulos.</p>';
+      } catch(e) {
+        console.error('[cargarModulos]', e);
+        document.getElementById('modulesGrid').innerHTML = `<p class="text-danger text-center py-4" style="grid-column:1/-1">Error al cargar módulos: ${e.message}</p>`;
       }
     }
     cargarModulos();
