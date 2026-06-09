@@ -260,11 +260,11 @@ const aprobar = async (req, res) => {
 const getEjecutivos = async (req, res) => {
   try {
     const { mes } = req.query;
-    const where = mes ? `WHERE DATE_FORMAT(COALESCE(fecha_otorgado, mes), '%Y-%m') = ?` : '';
+    const where = mes ? `AND DATE_FORMAT(COALESCE(fecha_otorgado, mes), '%Y-%m') = ?` : '';
     const params = mes ? [mes] : [];
     const [rows] = await pool.query(
       `SELECT DISTINCT ejecutivo FROM creditos
-       ${where} AND ejecutivo IS NOT NULL AND ejecutivo != ''
+       WHERE ejecutivo IS NOT NULL AND ejecutivo != '' ${where}
        ORDER BY ejecutivo`,
       params
     );
