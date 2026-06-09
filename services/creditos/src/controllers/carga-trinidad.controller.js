@@ -237,7 +237,8 @@ exports.importar = async (req, res) => {
     const log          = [];
     const detallesIns  = [];   // para historial inserts
     const cambiosLog   = [];   // para historial cambios
-    const cursadosIds  = [];   // num_ops con estado Otorgado/Aprobado procesados
+    const cursadosIds        = [];   // num_ops (campo num_op en BD)
+    const cursadosIdFinanciera = []; // num_ops Trinidad que están como id_financiera en BD
 
     for (const f of filas) {
       try {
@@ -246,12 +247,14 @@ exports.importar = async (req, res) => {
         if (afEquivSet.has(f.num_op)) {
           await pool.query(
             `UPDATE creditos SET estado_autofin = ?, ejecutivo_tri = ?,
+               estado_credito = ?,
                estado_eval = COALESCE(NULLIF(estado_eval,''), ?), updated_at = NOW()
              WHERE id_financiera = ? AND financiera != 'NO APLICA'`,
-            [f.estado_autofin, f.ejecutivo_tri, f.estado_eval, String(f.num_op)]
+            [f.estado_autofin, f.ejecutivo_tri, f.estado_credito, f.estado_eval, String(f.num_op)]
           );
           actualizados++;
-          log.push(`↔ Sincronizado en AF ${f.num_op} → ${f.estado_autofin}`);
+          log.push(`↔ Sincronizado en AF ${f.num_op} → ${f.estado_autofin} / ${f.estado_credito}`);
+          if ((f.estado_credito||'').toLowerCase() === 'otorgado') cursadosIdFinanciera.push(String(f.num_op));
           continue;
         }
 
@@ -337,14 +340,18 @@ exports.importar = async (req, res) => {
 
     // Devolver datos de cursados para el popup de datos faltantes
     let cursados = [];
-    if (cursadosIds.length > 0) {
+    if (cursadosIds.length > 0 || cursadosIdFinanciera.length > 0) {
       try {
+        const conditions = [];
+        const params = [];
+        if (cursadosIds.length > 0) { conditions.push('num_op IN (?)'); params.push(cursadosIds); }
+        if (cursadosIdFinanciera.length > 0) { conditions.push('id_financiera IN (?)'); params.push(cursadosIdFinanciera); }
         const [rows] = await pool.query(
           `SELECT id, num_op, ejecutivo, automotora, monto_financiado, valor_vehiculo,
                   rut_cliente, fecha_otorgado, estado_credito, plazo, tascli_real,
-                  monto_comision_fin, seguros, comdea_real, com_parque
-           FROM creditos WHERE num_op IN (?)`,
-          [cursadosIds]
+                  monto_comision_fin, seguro_rdh, comdea_real, com_parque
+           FROM creditos WHERE ${conditions.join(' OR ')}`,
+          params
         );
         cursados = rows;
       } catch(e) { log.push(`⚠ No se pudieron cargar datos de cursados: ${e.message}`); }
