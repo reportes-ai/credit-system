@@ -3645,7 +3645,7 @@ async function cargarAlertaIncompletos() {
   } catch(e) { console.warn('[incompletos]', e.message); }
 }
 
-function abrirModalIncompletos() {
+window.abrirModalIncompletos = function abrirModalIncompletos() {
   const lista = window._incompletos || [];
   if (!lista.length) return;
   const token = sessionStorage.getItem('token');
@@ -3712,7 +3712,7 @@ function abrirModalIncompletos() {
   dlg.showModal();
 }
 
-async function guardarIncompletos() {
+window.guardarIncompletos = async function guardarIncompletos() {
   const btn = document.getElementById('btnGuardarIncompletos');
   btn.disabled = true; btn.textContent = 'Guardando...';
   const token = sessionStorage.getItem('token');
