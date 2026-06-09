@@ -65,7 +65,7 @@
     <div class="topnav-left">
       <a href="/" class="topnav-brand">
         <img src="/img/logo.png" alt="AutoFácil">
-        <span class="version-badge">v4.9</span>
+        <span class="version-badge">v5.0</span>
       </a>
       <div class="breadcrumb-nav">
         <a href="/">Inicio</a><span class="sep">›</span>
@@ -136,18 +136,13 @@
     document.getElementById('avatarInicial').textContent = (yo?.nombre||'?').charAt(0).toUpperCase();
     if (esAdmin) document.getElementById('btnReordenar').style.display = 'flex';
 
-    const ITEMS_ALL = [
-      { id: 'caja',               href: '/tesoreria/caja',               icon: 'bi-cash-coin',       titulo: 'Caja',                       desc: 'Pago de cuotas de créditos desde la caja asignada al usuario', soloAdmin: false },
-      { id: 'cajas',              href: '/tesoreria/cajas',              icon: 'bi-cash-stack',      titulo: 'Administración de Cajas',    desc: 'Gestión de cajas y permisos por usuario cajero',              soloAdmin: true  },
-      { id: 'cierre-caja',        href: '/tesoreria/cierre-caja',        icon: 'bi-journal-check',   titulo: 'Cierre de Caja',             desc: 'Movimientos por fecha, usuario o total de cajas',             soloAdmin: true  },
-      { id: 'cuentas-transitorias', href: '/tesoreria/cuentas-transitorias', icon: 'bi-arrow-left-right', titulo: 'Cuentas Transitorias', desc: 'Saldos a favor de clientes por pagos en exceso',             soloAdmin: true  },
-      { id: 'brokerage',          href: '/tesoreria/brokerage',          icon: 'bi-building-check',  titulo: 'Brokerage — Facturas y Pagos', desc: 'Recepción de facturas de dealers, liberación de pagos y registro de transferencias bancarias', soloAdmin: false },
-    ];
+    // Mapa: último segmento de href → clave placement (para compatibilidad con orden guardado)
+    const KEY = { 'caja':'teso-caja','cajas':'teso-cajas','cierre-caja':'teso-cierre-caja','cuentas-transitorias':'teso-cuentas-transitorias','brokerage':'teso-brokerage' };
 
     let sortable = null, modoReordenar = false;
 
     async function cargar() {
-      let orden = null, placement = {}, modsBD = [];
+      let orden = null, placement = {}, funcInfo = [];
       try {
         const [rO, rP, rM] = await Promise.all([
           fetch(`/api/config/ui/${CONFIG_KEY}`, { headers: H }),
@@ -157,26 +152,26 @@
         const jO = await rO.json(); const jP = await rP.json(); const jM = await rM.json();
         if (jO.success && Array.isArray(jO.data)) orden = jO.data;
         if (jP.success && jP.data) placement = jP.data;
-        if (jM.success && Array.isArray(jM.data)) modsBD = jM.data;
+        // funcionalidadesInfo: array {codigo, nombre, href, icono} desde BD
+        funcInfo = (jM.funcionalidadesInfo || []).filter(f => f.href && f.href.startsWith('/tesoreria/'));
       } catch {}
 
-      // Mapa: id interno → clave manifest
-      const KEY = { 'caja':'teso-caja','cajas':'teso-cajas','cierre-caja':'teso-cierre-caja','cuentas-transitorias':'teso-cuentas-transitorias','brokerage':'teso-brokerage' };
+      // Construir items desde funcionalidades de BD (solo los que el usuario tiene permiso)
+      const nativeHrefs = new Set(funcInfo.map(f => f.href));
+      const nativeItems = funcInfo.map(f => {
+        const seg = f.href.replace('/tesoreria/', '').replace(/\//g, '');
+        const placKey = KEY[seg];
+        const sec = placKey ? placement[placKey] : undefined;
+        if (sec && sec !== 'tesoreria') return null; // fue movido a otra sección
+        return { id: seg || f.codigo, href: f.href, icon: f.icono || 'bi-grid', titulo: f.nombre, desc: '' };
+      }).filter(Boolean);
 
-      // Nativos: mostrar si no fueron movidos a otra sección
-      const base = ITEMS_ALL.filter(i => !i.soloAdmin || esAdmin);
-      const nativeItems = base.filter(i => {
-        const k = KEY[i.id]; const sec = k ? placement[k] : undefined;
-        return !sec || sec === 'tesoreria';
-      });
-
-      // Extras de otras secciones movidos aquí
+      // Extras de otras secciones movidos aquí via placement
       const nativeManifestKeys = new Set(Object.values(KEY));
-      const nativeHrefs = new Set(ITEMS_ALL.map(i => i.href));
       const extrasSubitem = Object.entries(typeof PLACEMENT_ITEMS !== 'undefined' ? PLACEMENT_ITEMS : {})
         .filter(([k, v]) => !nativeManifestKeys.has(k) && placement[k] === 'tesoreria')
-        .map(([k, v]) => ({ id: k, href: v.href, icon: v.icon, titulo: v.titulo, desc: v.desc }));
-      const extrasMods = modsBD
+        .map(([k, v]) => ({ id: k, href: v.href, icon: v.icon, titulo: v.titulo, desc: v.desc || '' }));
+      const extrasMods = (funcInfo.length ? [] : []) // modsBD ya no necesario — funcInfo lo cubre
         .filter(m => placement[m.ruta] === 'tesoreria' && !nativeHrefs.has(m.ruta))
         .map(m => ({ id: m.ruta, href: m.ruta, icon: m.icono || 'bi-grid', titulo: m.nombre, desc: m.descripcion || '' }));
 
@@ -188,7 +183,7 @@
 
       const grid = document.getElementById('modulesGrid');
       grid.innerHTML = ordenados.map(m => `
-        <a href="${m.href}" class="module-card" data-id="${m.id}">
+        <a href="${m.href}" class="module-card" data-id="${m.id}" data-href="${m.href}">
           <i class="bi bi-grip-vertical drag-handle"></i>
           <div class="card-icon"><i class="bi ${m.icon}"></i></div>
           <h6>${m.titulo}</h6>
@@ -220,8 +215,8 @@
         btnG.style.display = 'none';
         if (sortable) { sortable.destroy(); sortable = null; }
         grid.querySelectorAll('.module-card').forEach(card => {
-          const item = ITEMS_ALL.find(i => i.id === card.dataset.id);
-          if (item) card.href = item.href;
+          // href ya está en data-href o en el propio href del card
+          if (card.dataset.href) card.href = card.dataset.href;
         });
       }
     }

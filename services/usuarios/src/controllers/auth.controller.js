@@ -105,36 +105,44 @@ const misPermisos = async (req, res) => {
       [id_perfil]
     );
 
-    // Códigos de funcionalidades habilitadas (perfil base)
+    // Funcionalidades habilitadas con detalle (perfil base)
     const [perfilFuncs] = await pool.query(
-      `SELECT f.codigo, pp.habilitado
+      `SELECT f.codigo, f.nombre, f.href, f.icono, pp.habilitado
        FROM permisos_perfil pp
        JOIN funcionalidades f ON f.id_funcionalidad = pp.id_funcionalidad
        WHERE pp.id_perfil = ?`,
       [id_perfil]
     );
     const permisosMapa = {};
-    perfilFuncs.forEach(p => { permisosMapa[p.codigo] = p.habilitado === 1; });
+    perfilFuncs.forEach(p => {
+      permisosMapa[p.codigo] = { habilitado: p.habilitado === 1, nombre: p.nombre, href: p.href, icono: p.icono };
+    });
 
     // Aplicar overrides individuales del usuario (permisos_usuario)
     try {
       const [userFuncs] = await pool.query(
-        `SELECT f.codigo, pu.habilitado
+        `SELECT f.codigo, f.nombre, f.href, f.icono, pu.habilitado
          FROM permisos_usuario pu
          JOIN funcionalidades f ON f.id_funcionalidad = pu.id_funcionalidad
          WHERE pu.id_usuario = ?`,
         [id_usuario]
       );
-      userFuncs.forEach(p => { permisosMapa[p.codigo] = p.habilitado === 1; });
+      userFuncs.forEach(p => {
+        permisosMapa[p.codigo] = { habilitado: p.habilitado === 1, nombre: p.nombre, href: p.href, icono: p.icono };
+      });
     } catch (e) { /* tabla puede no existir aún */ }
 
+    // funcionalidades → array de códigos (compatibilidad hacia atrás)
+    // funcionalidadesInfo → array de objetos {codigo, nombre, href, icono} (nuevo)
     const funcionalidades = Object.entries(permisosMapa)
-      .filter(([, v]) => v)
+      .filter(([, v]) => v.habilitado)
       .map(([codigo]) => codigo);
 
-    // data = array de módulos (compatibilidad hacia atrás)
-    // funcionalidades = array de códigos habilitados (nuevo campo)
-    res.json({ success: true, data: modulos, funcionalidades, error: null });
+    const funcionalidadesInfo = Object.entries(permisosMapa)
+      .filter(([, v]) => v.habilitado)
+      .map(([codigo, v]) => ({ codigo, nombre: v.nombre, href: v.href, icono: v.icono }));
+
+    res.json({ success: true, data: modulos, funcionalidades, funcionalidadesInfo, error: null });
   } catch (error) {
     res.status(500).json({ success: false, data: null, error: errMsg(error) });
   }
