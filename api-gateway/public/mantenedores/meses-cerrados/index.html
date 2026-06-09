@@ -57,6 +57,8 @@
     .estado-cerrado { display:inline-flex; align-items:center; gap:6px; background:#fef2f2; color:#b91c1c; border:1.5px solid #fecaca; border-radius:20px; padding:4px 14px; font-size:.8rem; font-weight:700; }
     .estado-cerrado i { font-size:.85rem; }
     .badge-sugerido { display:inline-flex; align-items:center; gap:5px; background:#fef3c7; color:#92400e; border-radius:6px; padding:2px 8px; font-size:.72rem; font-weight:700; margin-left:6px; }
+    .badge-recierre  { display:inline-flex; align-items:center; gap:5px; background:#eff6ff; color:#1d4ed8; border-radius:6px; padding:2px 8px; font-size:.72rem; font-weight:700; margin-left:6px; }
+    .badge-auto     { display:inline-flex; align-items:center; gap:5px; background:#f3f4f6; color:#6b7280; border-radius:6px; padding:2px 8px; font-size:.7rem; margin-left:4px; }
 
     /* Toggle */
     .toggle { position:relative; display:inline-block; width:44px; height:24px; }
@@ -161,6 +163,7 @@ document.getElementById('avatarInicial').textContent = (yo?.nombre||'?').charAt(
 function logout() { sessionStorage.removeItem('token'); sessionStorage.removeItem('usuario'); window.location.href='/login.html'; }
 
 const MESES_ES = ['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
+let _diasCierre = 35;
 function fmtMes(mes) {
   const [a, m] = mes.split('-');
   return `${MESES_ES[parseInt(m)-1]} ${a}`;
@@ -181,6 +184,7 @@ async function cargar() {
     const r = await fetch('/api/meses-cerrados', { headers: H });
     const j = await r.json();
     if (!j.success) throw new Error(j.error);
+    _diasCierre = j.data.dias_cierre;
     document.getElementById('inputDiasCierre').value = j.data.dias_cierre;
     renderTabla(j.data.meses);
   } catch(e) {
@@ -199,12 +203,14 @@ function renderTabla(meses) {
   }
   tb.innerHTML = meses.map(m => {
     const estadoHtml = m.cerrado
-      ? `<span class="estado-cerrado"><i class="bi bi-lock-fill"></i>Cerrado</span>`
+      ? `<span class="estado-cerrado"><i class="bi bi-lock-fill"></i>Cerrado${m.auto_cierre ? ' <small style="font-weight:400;opacity:.7">(auto)</small>' : ''}</span>`
       : `<span class="estado-abierto"><i class="bi bi-unlock-fill"></i>Abierto</span>`;
 
-    const sugeridoBadge = (!m.cerrado && m.sugerido_cerrar)
-      ? `<span class="badge-sugerido"><i class="bi bi-exclamation-triangle-fill"></i>Supera límite</span>`
-      : '';
+    const extras = [];
+    if (!m.cerrado && m.sugerido_cerrar)
+      extras.push(`<span class="badge-sugerido"><i class="bi bi-exclamation-triangle-fill"></i>Supera límite</span>`);
+    if (!m.cerrado && m.recierre_en_horas)
+      extras.push(`<span class="badge-recierre"><i class="bi bi-clock-fill"></i>Se cerrará en ${m.recierre_en_horas}h</span>`);
 
     return `
       <tr>
@@ -213,8 +219,8 @@ function renderTabla(meses) {
           <div class="mes-dias">${m.mes}</div>
         </td>
         <td>
-          <span style="font-weight:600;color:${m.dias_transcurridos >= 35 ? '#b91c1c' : '#374151'}">${m.dias_transcurridos} días</span>
-          ${sugeridoBadge}
+          <span style="font-weight:600;color:${m.dias_transcurridos >= _diasCierre ? '#b91c1c' : '#374151'}">${m.dias_transcurridos} días</span>
+          ${extras.join('')}
         </td>
         <td style="text-align:center">${estadoHtml}</td>
         <td style="text-align:center">

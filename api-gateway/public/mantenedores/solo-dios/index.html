@@ -31,17 +31,17 @@
     .page-banner p { opacity:.8; margin:0; font-size:.9rem; }
 
     /* Grid 4 columnas */
-    .modules-grid { display:grid; grid-template-columns:repeat(4,1fr); gap:20px; align-items:start; }
+    .modules-grid { display:grid; grid-template-columns:repeat(4,1fr); gap:20px; align-items:stretch; }
     @media (max-width:1100px) { .modules-grid { grid-template-columns:repeat(2,1fr); } }
     @media (max-width:600px)  { .modules-grid { grid-template-columns:1fr; } .main-content { padding:20px 16px; } }
 
     /* Cards de acceso */
-    .module-card { background:#fff; border-radius:14px; padding:28px 24px; cursor:pointer; text-decoration:none; color:inherit; border:2px solid transparent; transition:transform .18s,box-shadow .18s,border-color .18s; display:block; box-shadow:0 1px 4px rgba(0,0,0,.06); }
+    .module-card { background:#fff; border-radius:14px; padding:28px 24px; cursor:pointer; text-decoration:none; color:inherit; border:2px solid transparent; transition:transform .18s,box-shadow .18s,border-color .18s; display:flex; flex-direction:column; box-shadow:0 1px 4px rgba(0,0,0,.06); }
     .module-card:hover { transform:translateY(-5px); box-shadow:0 14px 36px rgba(109,40,217,.22); border-color:#6d28d9; color:inherit; }
     .card-icon { width:64px; height:64px; border-radius:18px; display:flex; align-items:center; justify-content:center; font-size:1.9rem; margin-bottom:18px; transition:all .2s; background:linear-gradient(135deg,#1a0050,#6d28d9 55%,#f59e0b); color:#fff; box-shadow:0 4px 14px rgba(109,40,217,.35); }
     .module-card:hover .card-icon { box-shadow:0 6px 20px rgba(109,40,217,.5); transform:scale(1.08); }
     .module-card h6 { font-weight:800; font-size:.95rem; margin:0 0 8px; color:#111827; }
-    .module-card p { font-size:.8rem; color:#6b7280; margin:0 0 20px; line-height:1.5; }
+    .module-card p { font-size:.8rem; color:#6b7280; margin:0 0 20px; line-height:1.5; flex:1; }
     .btn-acceder { background:linear-gradient(135deg,#6d28d9,#f59e0b); color:#fff; border:none; border-radius:8px; padding:8px 18px; font-size:.83rem; font-weight:700; letter-spacing:.3px; box-shadow:0 2px 8px rgba(109,40,217,.3); transition:all .18s; display:inline-flex; align-items:center; gap:6px; }
     .module-card:hover .btn-acceder { box-shadow:0 4px 14px rgba(109,40,217,.45); filter:brightness(1.08); }
 
