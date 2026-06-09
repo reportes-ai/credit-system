@@ -45,46 +45,6 @@
     .btn-acceder { background:linear-gradient(135deg,#6d28d9,#f59e0b); color:#fff; border:none; border-radius:8px; padding:8px 18px; font-size:.83rem; font-weight:700; letter-spacing:.3px; box-shadow:0 2px 8px rgba(109,40,217,.3); transition:all .18s; display:inline-flex; align-items:center; gap:6px; }
     .module-card:hover .btn-acceder { box-shadow:0 4px 14px rgba(109,40,217,.45); filter:brightness(1.08); }
 
-    /* Card Meses Cerrados */
-    .meses-card { background:#fff; border-radius:14px; padding:24px 22px; box-shadow:0 1px 4px rgba(0,0,0,.06); border:2px solid transparent; }
-    .meses-card-header { display:flex; align-items:center; gap:12px; margin-bottom:18px; }
-    .meses-card-header .card-icon { margin-bottom:0; flex-shrink:0; }
-    .meses-card-header h6 { font-weight:800; font-size:.95rem; margin:0 0 3px; color:#111827; }
-    .meses-card-header p { font-size:.78rem; color:#6b7280; margin:0; }
-
-    /* Config dias cierre */
-    .dias-cierre-box { background:#f8f7ff; border:1.5px solid #ede9fe; border-radius:10px; padding:10px 14px; margin-bottom:14px; display:flex; align-items:center; gap:10px; flex-wrap:wrap; }
-    .dias-cierre-box label { font-size:.78rem; font-weight:600; color:#6d28d9; white-space:nowrap; }
-    .dias-cierre-box input { border:1.5px solid #c4b5fd; border-radius:7px; padding:4px 10px; font-size:.82rem; width:60px; text-align:center; outline:none; font-weight:700; color:#1a0050; }
-    .dias-cierre-box input:focus { border-color:#6d28d9; }
-    .btn-save-dias { background:#6d28d9; color:#fff; border:none; border-radius:7px; padding:4px 12px; font-size:.78rem; font-weight:700; cursor:pointer; }
-    .btn-save-dias:hover { background:#5b21b6; }
-
-    /* Lista de meses */
-    .meses-list { max-height:320px; overflow-y:auto; }
-    .mes-row { display:flex; align-items:center; gap:10px; padding:7px 8px; border-radius:8px; transition:background .12s; }
-    .mes-row:hover { background:#f9f7ff; }
-    .mes-row + .mes-row { border-top:1px solid #f3f4f6; }
-    .mes-label { flex:1; font-size:.82rem; font-weight:600; color:#374151; text-transform:capitalize; }
-    .mes-label small { display:block; font-weight:400; font-size:.72rem; color:#9ca3af; margin-top:1px; }
-    .badge-sugerido { background:#fef3c7; color:#92400e; border-radius:6px; padding:2px 7px; font-size:.68rem; font-weight:700; white-space:nowrap; }
-    .badge-cerrado  { background:#dcfce7; color:#166534; border-radius:6px; padding:2px 7px; font-size:.68rem; font-weight:700; white-space:nowrap; }
-
-    /* Toggle switch */
-    .toggle-wrap { display:flex; align-items:center; gap:6px; }
-    .toggle { position:relative; display:inline-block; width:38px; height:21px; }
-    .toggle input { opacity:0; width:0; height:0; }
-    .toggle-slider { position:absolute; inset:0; background:#d1d5db; border-radius:21px; transition:.2s; cursor:pointer; }
-    .toggle-slider:before { content:''; position:absolute; width:15px; height:15px; left:3px; bottom:3px; background:#fff; border-radius:50%; transition:.2s; box-shadow:0 1px 3px rgba(0,0,0,.2); }
-    .toggle input:checked + .toggle-slider { background:#16a34a; }
-    .toggle input:checked + .toggle-slider:before { transform:translateX(17px); }
-    .toggle input:disabled + .toggle-slider { opacity:.5; cursor:not-allowed; }
-
-    .loading-dots { display:inline-flex; gap:4px; }
-    .loading-dots span { width:6px; height:6px; background:#6d28d9; border-radius:50%; animation:dot-bounce .8s infinite; }
-    .loading-dots span:nth-child(2) { animation-delay:.15s; }
-    .loading-dots span:nth-child(3) { animation-delay:.3s; }
-    @keyframes dot-bounce { 0%,80%,100% { transform:scale(.6); opacity:.4; } 40% { transform:scale(1); opacity:1; } }
   </style>
 </head>
 <body>
@@ -148,33 +108,12 @@
     </a>
 
     <!-- Meses Cerrados -->
-    <div class="meses-card">
-      <div class="meses-card-header">
-        <div class="card-icon"><i class="bi bi-calendar-lock-fill"></i></div>
-        <div>
-          <h6>MESES CERRADOS</h6>
-          <p>Bloquea meses para evitar modificaciones</p>
-        </div>
-      </div>
-
-      <!-- Config días cierre -->
-      <div class="dias-cierre-box">
-        <i class="bi bi-clock-history" style="color:#6d28d9;font-size:1rem"></i>
-        <label>Cerrar a los</label>
-        <input type="number" id="inputDiasCierre" min="1" max="365" value="35">
-        <label>días del fin de mes</label>
-        <button class="btn-save-dias" onclick="guardarDiasCierre()">
-          <i class="bi bi-floppy me-1"></i>Guardar
-        </button>
-      </div>
-
-      <!-- Lista meses -->
-      <div id="mesesList" class="meses-list">
-        <div style="padding:20px;text-align:center">
-          <div class="loading-dots"><span></span><span></span><span></span></div>
-        </div>
-      </div>
-    </div>
+    <a href="/mantenedores/meses-cerrados/" class="module-card">
+      <div class="card-icon"><i class="bi bi-calendar-lock-fill"></i></div>
+      <h6>MESES CERRADOS</h6>
+      <p>Bloquea meses anteriores para evitar modificaciones accidentales en datos ya cerrados.</p>
+      <span class="btn-acceder"><i class="bi bi-arrow-right-circle"></i>Acceder</span>
+    </a>
 
   </div>
 </div>
@@ -185,95 +124,10 @@
   const token = sessionStorage.getItem('token');
   const yo    = JSON.parse(sessionStorage.getItem('usuario') || 'null');
   if (!token || !yo) window.location.href = '/login.html';
-  const H = { 'Content-Type':'application/json', Authorization:'Bearer '+token };
-
   document.getElementById('navNombre').textContent = `${yo?.nombre||''} ${yo?.apellido||''}`.trim();
   document.getElementById('navPerfil').textContent  = yo?.perfil || '';
   document.getElementById('avatarInicial').textContent = (yo?.nombre||'?').charAt(0).toUpperCase();
   function logout() { sessionStorage.removeItem('token'); sessionStorage.removeItem('usuario'); window.location.href='/login.html'; }
-
-  const MESES_ES = ['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
-
-  function fmtMes(mes) {
-    const [anio, m] = mes.split('-');
-    return `${MESES_ES[parseInt(m)-1]} ${anio}`;
-  }
-
-  async function cargarMeses() {
-    try {
-      const r = await fetch('/api/meses-cerrados', { headers: H });
-      const j = await r.json();
-      if (!j.success) throw new Error(j.error);
-      document.getElementById('inputDiasCierre').value = j.data.dias_cierre;
-      renderMeses(j.data.meses);
-    } catch(e) {
-      document.getElementById('mesesList').innerHTML =
-        `<div style="color:#dc2626;font-size:.8rem;padding:12px">${e.message}</div>`;
-    }
-  }
-
-  function renderMeses(meses) {
-    const el = document.getElementById('mesesList');
-    if (!meses.length) { el.innerHTML = '<div style="color:#9ca3af;font-size:.8rem;padding:12px">Sin meses</div>'; return; }
-    el.innerHTML = meses.map(m => {
-      const badge = m.cerrado
-        ? `<span class="badge-cerrado"><i class="bi bi-lock-fill me-1"></i>Cerrado</span>`
-        : m.sugerido_cerrar
-          ? `<span class="badge-sugerido">⏰ ${m.dias_transcurridos}d</span>`
-          : '';
-      return `
-        <div class="mes-row">
-          <div class="mes-label">
-            ${fmtMes(m.mes)}
-            <small>${m.cerrado ? `Bloqueado · ${m.dias_transcurridos}d transcurridos` : `${m.dias_transcurridos} días transcurridos`}</small>
-          </div>
-          ${badge}
-          <div class="toggle-wrap" title="${m.cerrado ? 'Click para abrir mes' : 'Click para cerrar mes'}">
-            <label class="toggle">
-              <input type="checkbox" ${m.cerrado ? 'checked' : ''} onchange="toggleMes('${m.mes}', this)">
-              <span class="toggle-slider"></span>
-            </label>
-          </div>
-        </div>`;
-    }).join('');
-  }
-
-  async function toggleMes(mes, chk) {
-    const cerrado = chk.checked;
-    chk.disabled = true;
-    try {
-      const r = await fetch(`/api/meses-cerrados/${mes}`, {
-        method: 'PUT', headers: H,
-        body: JSON.stringify({ cerrado })
-      });
-      const j = await r.json();
-      if (!j.success) throw new Error(j.error);
-      // Re-render para actualizar badge
-      await cargarMeses();
-    } catch(e) {
-      alert('Error: ' + e.message);
-      chk.checked = !cerrado; // revertir
-    } finally {
-      chk.disabled = false;
-    }
-  }
-
-  async function guardarDiasCierre() {
-    const dias = parseInt(document.getElementById('inputDiasCierre').value);
-    if (!dias || dias < 1) return alert('Ingresa un valor válido');
-    try {
-      const r = await fetch('/api/meses-cerrados/config/dias-cierre', {
-        method: 'PUT', headers: H, body: JSON.stringify({ dias })
-      });
-      const j = await r.json();
-      if (!j.success) throw new Error(j.error);
-      await cargarMeses();
-    } catch(e) {
-      alert('Error: ' + e.message);
-    }
-  }
-
-  cargarMeses();
 </script>
 </body>
 </html>
