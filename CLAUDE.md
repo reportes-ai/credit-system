@@ -141,3 +141,88 @@ shared/
 - TiDB Cloud (BD en la nube)
 - Render (servidor producción)
 - GitHub (repositorio: reportes-ai/credit-system)
+
+---
+
+## Pendientes de Madurez del Sistema
+> Estas tareas no son urgentes pero deben abordarse antes de considerar el sistema "producción estable".
+> Ordenadas por prioridad. Marcar con ✅ cuando se implementen.
+
+### 🔴 Crítico (seguridad y datos)
+
+- [ ] **Verificar backups automáticos en TiDB Cloud**
+  - Confirmar que los backups diarios están activos en el panel de TiDB Cloud
+  - Hacer una prueba de restauración al menos una vez
+  - Documentar el procedimiento de recuperación ante desastre
+
+- [ ] **Auditar variables de entorno**
+  - Verificar que `DB_HOST`, `DB_USER`, `DB_PASSWORD`, `JWT_SECRET` estén en Render como env vars, NO en el código ni en `.env` commiteado
+  - Revisar `.gitignore` para asegurar que ningún `.env` esté en el repositorio
+  - Rotar el `JWT_SECRET` si alguna vez estuvo expuesto en GitHub
+
+- [ ] **Rate limiting en el API Gateway**
+  - Agregar `express-rate-limit` en `api-gateway/src/index.js` para evitar abuso
+  - Límite sugerido: 200 req/min por IP en rutas públicas, 500 req/min en rutas autenticadas
+  - Proteger especialmente `/api/auth/login` (máx 10 intentos/min por IP)
+
+- [ ] **HTTPS forzado**
+  - Verificar que Render redirige HTTP → HTTPS automáticamente (debería estarlo)
+  - Agregar header `Strict-Transport-Security` en respuestas
+
+### 🟡 Importante (estabilidad y operación)
+
+- [ ] **Logs de errores en producción**
+  - Integrar **Sentry** (gratuito hasta cierto volumen) o **LogTail** en el api-gateway
+  - Objetivo: recibir mail/alerta cuando ocurre un error 500 en producción, antes de que el usuario avise
+  - Instalación: `npm install @sentry/node`, 3 líneas en index.js
+
+- [ ] **Health check endpoint**
+  - Crear `GET /api/health` que retorne `{ status:'ok', db: true/false, uptime: X }`
+  - Permite a Render detectar si el servicio cayó y reiniciarlo automáticamente
+  - También útil para monitoreo manual
+
+- [ ] **Manejo de reconexión de BD**
+  - Agregar manejo de errores de pool en `shared/config/database.js` (reconexión automática si TiDB Cloud reinicia)
+  - Actualmente un corte de BD deja el servidor colgado sin error claro
+
+- [ ] **Timeout en queries largas**
+  - Configurar `connectTimeout` y `queryTimeout` en el pool de BD
+  - Evita que una query lenta bloquee el servidor indefinidamente
+
+### 🟢 Mejora de calidad (profesionalismo)
+
+- [ ] **Documentar reglas de negocio en el código**
+  - Para cada cálculo no obvio (comisiones, tramos UF, instituciones), agregar comentario:
+    `// Regla negocio: [descripción]. Ver [documento de referencia]`
+  - Especialmente en: `comisiones/`, `dashboard/getDatos`, cálculo mayor/menor 200 UF
+
+- [ ] **Checklist de pruebas manuales pre-deploy**
+  - Crear archivo `docs/test-checklist.md` con ~15 casos críticos a verificar antes de deploy importante
+  - Ejemplos: carga Excel de prueba, revisión de comisiones de un mes, generación de carta
+  - No requiere código, solo disciplina de proceso
+
+- [ ] **Paginación y límites en todos los endpoints**
+  - Auditar endpoints que hacen `SELECT *` sin `LIMIT` — con volumen alto pueden timeoutear
+  - Agregar `LIMIT` defensivo en endpoints de reportería y búsquedas
+
+- [ ] **Logs de auditoría para acciones críticas**
+  - Registrar en una tabla `audit_log` las acciones: quién hizo qué y cuándo
+  - Acciones mínimas a auditar: cerrar mes, eliminar crédito, cambiar permisos de perfil, carga masiva
+  - Esquema sugerido: `id, id_usuario, accion, detalle JSON, ip, created_at`
+
+### 🔵 Futuro (cuando el volumen lo justifique)
+
+- [ ] **Caché de consultas frecuentes**
+  - Si el dashboard o reportería se vuelven lentos, agregar Redis o caché en memoria para datos que no cambian cada minuto (UF, tablas de mantenedores)
+
+- [ ] **Separar servicio de archivos estáticos**
+  - A futuro, servir HTML/CSS/JS desde un CDN (Cloudflare Pages, Vercel) en lugar del api-gateway
+  - Mejora performance y reduce carga en Render
+
+- [ ] **Tabla de contactos múltiples para cobranza**
+  - Si cobranza necesita registrar titular + aval + familiar, agregar `cobranza_contactos`
+  - NO tocar tabla `clientes` — mantener solo el contacto principal ahí
+
+- [ ] **2FA para usuarios administradores**
+  - Agregar autenticación de dos factores (TOTP/Google Authenticator) para perfiles críticos
+  - Librerías: `speakeasy` + `qrcode` en Node.js
