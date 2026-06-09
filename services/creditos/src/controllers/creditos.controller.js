@@ -631,13 +631,20 @@ const getOtorgadosIncompletos = async (req, res) => {
 const patchDatosIngresos = async (req, res) => {
   try {
     const { id } = req.params;
-    const CAMPOS_PERMITIDOS = ['plazo', 'tascli_real', 'parque', 'seguro_rdh', 'seguro_cesantia', 'seguro_rep_menor', 'seguros', 'comdea_real', 'com_parque'];
+    const CAMPOS_NUM  = ['plazo', 'tascli_real', 'seguro_rdh', 'seguro_cesantia', 'seguro_rep_menor', 'seguros', 'comdea_real', 'com_parque'];
+    const CAMPOS_TEXT = ['parque'];
+    const CAMPOS_PERMITIDOS = [...CAMPOS_NUM, ...CAMPOS_TEXT];
     const sets = [];
     const vals = [];
     for (const campo of CAMPOS_PERMITIDOS) {
       if (req.body[campo] !== undefined) {
         sets.push(`${campo} = ?`);
-        vals.push(req.body[campo] === '' || req.body[campo] === null ? null : parseFloat(req.body[campo]));
+        const v = req.body[campo];
+        if (CAMPOS_TEXT.includes(campo)) {
+          vals.push(v === null ? null : String(v));
+        } else {
+          vals.push(v === '' || v === null ? null : parseFloat(v));
+        }
       }
     }
     if (!sets.length) return res.status(400).json({ success: false, data: null, error: 'Sin campos válidos' });
