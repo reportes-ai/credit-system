@@ -548,6 +548,9 @@
               .concat(modulosData.filter(m => !ordenGuardado.includes(String(m.id_modulo))))
           : modulosData;
 
+        // Excluir /simulador/ de modsSorted porque se agrega manualmente como simCard
+        const modsSortedFiltrado = modsSorted.filter(m => normR(m.ruta) !== '/simulador/');
+
         // Simulador Rentabilidad — incluido en el orden si ya fue guardado, sino va primero
         const simCard = document.createElement('a');
         simCard.href = '/simulador/';
@@ -566,7 +569,7 @@
         // Si hay orden guardado con 'sim', respetarlo; si no, simCard va primero
         if (ordenGuardado && ordenGuardado.includes('sim')) {
           const allItems = [{ id_modulo: 'sim', _el: simCard },
-            ...modsSorted.map(m => ({ ...m, _el: null }))];
+            ...modsSortedFiltrado.map(m => ({ ...m, _el: null }))];
           const reordenados = ordenGuardado
             .map(id => allItems.find(x => String(x.id_modulo) === String(id)))
             .filter(Boolean)
@@ -584,7 +587,7 @@
           });
         } else {
           grid.appendChild(simCard);
-          modsSorted.forEach(mod => {
+          modsSortedFiltrado.forEach(mod => {
             const a = document.createElement('a');
             a.href = mod.ruta || '#'; a.className = 'module-card'; a.dataset.id = mod.id_modulo;
             a.innerHTML = `<i class="bi bi-grip-vertical drag-handle"></i>
