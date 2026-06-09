@@ -867,6 +867,9 @@ function buildV1b() {
   // Guardar det para el modal
   window._detOps = det;
 
+  // ── Alerta otorgados con datos incompletos ──────────────────────
+  cargarAlertaIncompletos();
+
   // Tabla instituciones desde detalle_v2
   const finOt = {};
   det.forEach(r => {
@@ -3621,4 +3624,132 @@ function exportarExcelModal() {
   a.href = URL.createObjectURL(blob);
   a.download = titulo.replace(/[/\\:*?"<>|]/g, '_') + '.csv';
   a.click();
+}
+
+// ── Alerta y modal: Otorgados con datos incompletos ──────────────────────────
+async function cargarAlertaIncompletos() {
+  try {
+    const token = sessionStorage.getItem('token');
+    const r = await fetch('/api/creditos/otorgados-incompletos', {
+      headers: { 'Authorization': 'Bearer ' + token }
+    });
+    const d = await r.json();
+    const lista = d.data || [];
+    const el = document.getElementById('alerta-incompletos');
+    if (!el) return;
+    if (lista.length === 0) { el.style.display = 'none'; return; }
+    el.style.display = 'flex';
+    document.getElementById('alerta-incompletos-txt').textContent =
+      `${lista.length} crédito${lista.length>1?'s':''} OTORGADO${lista.length>1?'S':''} sin plazo/tasa — ingreso colocación sin calcular`;
+    window._incompletos = lista;
+  } catch(e) { console.warn('[incompletos]', e.message); }
+}
+
+function abrirModalIncompletos() {
+  const lista = window._incompletos || [];
+  if (!lista.length) return;
+  const token = sessionStorage.getItem('token');
+  const $m = v => v != null && v !== 0 ? '$' + Number(v).toLocaleString('es-CL') : '—';
+
+  const filas = lista.map(c => `
+    <tr data-id="${c.id}" style="border-bottom:1px solid #e5e7eb">
+      <td style="padding:8px 10px;font-weight:700;font-size:.82rem">${c.num_op}</td>
+      <td style="padding:8px 6px;font-size:.78rem;color:#374151">${c.ejecutivo||'—'}</td>
+      <td style="padding:8px 6px;font-size:.78rem">${(c.mes||'').slice(0,7)}</td>
+      <td style="padding:8px 6px;font-size:.82rem;font-weight:600">${$m(c.monto_financiado)}</td>
+      <td style="padding:5px 6px">
+        <input type="number" placeholder="Plazo" value="${c.plazo||''}"
+          style="width:80px;padding:4px 7px;border:1.5px solid #d97706;border-radius:6px;font-size:.8rem"
+          data-campo="plazo" data-id="${c.id}">
+      </td>
+      <td style="padding:5px 6px">
+        <input type="number" placeholder="Tasa % anual" step="0.01" value="${c.tascli_real ? (c.tascli_real*100*12).toFixed(4) : ''}"
+          style="width:110px;padding:4px 7px;border:1.5px solid #d97706;border-radius:6px;font-size:.8rem"
+          data-campo="tascli_pct" data-id="${c.id}">
+      </td>
+      <td style="padding:5px 6px">
+        <input type="number" placeholder="Prima $" value="${c.seguro_rdh||''}"
+          style="width:100px;padding:4px 7px;border:1.5px solid #0141A2;border-radius:6px;font-size:.8rem"
+          data-campo="seguro_rdh" data-id="${c.id}">
+      </td>
+    </tr>`).join('');
+
+  const dlg = document.createElement('dialog');
+  dlg.id = 'modalIncompletos';
+  dlg.style.cssText = 'border:none;border-radius:16px;padding:0;max-width:860px;width:96vw;box-shadow:0 20px 60px rgba(0,0,0,0.25);overflow:hidden';
+  dlg.innerHTML = `
+    <div style="background:linear-gradient(135deg,#92400e,#d97706);color:#fff;padding:18px 24px;display:flex;align-items:center;justify-content:space-between">
+      <div>
+        <div style="font-size:1rem;font-weight:700">⚠️ Otorgados con datos faltantes (${lista.length})</div>
+        <div style="font-size:.78rem;opacity:.85;margin-top:2px">Ingresa plazo, tasa y prima de desgravamen para calcular los ingresos</div>
+      </div>
+      <button onclick="document.getElementById('modalIncompletos').close()" style="background:rgba(255,255,255,.2);border:none;color:#fff;border-radius:8px;padding:5px 12px;cursor:pointer">✕</button>
+    </div>
+    <div style="padding:16px 20px;overflow-x:auto;max-height:60vh;overflow-y:auto">
+      <table style="width:100%;border-collapse:collapse;font-size:.83rem">
+        <thead>
+          <tr style="background:#fef3c7;font-size:.72rem;text-transform:uppercase;color:#78350f;letter-spacing:.4px">
+            <th style="padding:8px">N° Op</th>
+            <th style="padding:8px">Ejecutivo</th>
+            <th style="padding:8px">Mes</th>
+            <th style="padding:8px">Monto</th>
+            <th style="padding:8px">Plazo<br><small style="font-weight:400">(cuotas)</small></th>
+            <th style="padding:8px">Tasa<br><small style="font-weight:400">(% anual)</small></th>
+            <th style="padding:8px">Prima<br><small style="font-weight:400">Desgravamen $</small></th>
+          </tr>
+        </thead>
+        <tbody>${filas}</tbody>
+      </table>
+    </div>
+    <div style="padding:14px 20px;border-top:1px solid #e5e7eb;display:flex;gap:10px;justify-content:flex-end;background:#fffbeb">
+      <button onclick="document.getElementById('modalIncompletos').close()" style="padding:8px 18px;border-radius:8px;border:1.5px solid #d1d5db;background:#fff;color:#374151;font-weight:600;cursor:pointer;font-size:.85rem">Cerrar</button>
+      <button onclick="guardarIncompletos()" id="btnGuardarIncompletos" style="padding:8px 20px;border-radius:8px;border:none;background:#d97706;color:#fff;font-weight:700;cursor:pointer;font-size:.85rem">
+        💾 Guardar y recalcular
+      </button>
+    </div>`;
+  document.body.appendChild(dlg);
+  dlg.addEventListener('close', () => dlg.remove());
+  dlg.showModal();
+}
+
+async function guardarIncompletos() {
+  const btn = document.getElementById('btnGuardarIncompletos');
+  btn.disabled = true; btn.textContent = 'Guardando...';
+  const token = sessionStorage.getItem('token');
+  const H = { 'Authorization': 'Bearer ' + token, 'Content-Type': 'application/json' };
+
+  const mapa = {};
+  document.querySelectorAll('#modalIncompletos input[data-id]').forEach(inp => {
+    const id = inp.dataset.id;
+    if (!mapa[id]) mapa[id] = {};
+    const val = inp.value.trim();
+    if (val === '') return;
+    if (inp.dataset.campo === 'tascli_pct') {
+      mapa[id]['tascli_real'] = parseFloat(val) / 100 / 12;
+    } else {
+      mapa[id][inp.dataset.campo] = parseFloat(val);
+    }
+  });
+
+  let ok = 0, err = 0;
+  for (const [id, campos] of Object.entries(mapa)) {
+    if (!Object.keys(campos).length) continue;
+    try {
+      const r = await fetch(`/api/creditos/${id}/datos-ingresos`, { method: 'PATCH', headers: H, body: JSON.stringify(campos) });
+      const d = await r.json();
+      if (d.success) ok++; else err++;
+    } catch { err++; }
+  }
+
+  if (ok > 0) {
+    try {
+      await fetch('/api/operaciones/recalcular-comisiones', { method: 'POST', headers: H, body: JSON.stringify({}) });
+    } catch {}
+  }
+
+  btn.disabled = false; btn.textContent = '💾 Guardar y recalcular';
+  document.getElementById('modalIncompletos').close();
+  // Recargar alerta
+  await cargarAlertaIncompletos();
+  alert(err === 0 ? `✓ ${ok} crédito${ok>1?'s':''} actualizados. Comisiones recalculadas.` : `⚠ ${ok} guardados, ${err} con error`);
 }

@@ -608,6 +608,24 @@ const getReporteria = async (req, res) => {
 
 /* PATCH /api/creditos/:id/datos-ingresos
    Actualiza solo los campos de ingresos/comisiones que vienen del body */
+const getOtorgadosIncompletos = async (req, res) => {
+  try {
+    const [rows] = await pool.query(`
+      SELECT id, num_op, ejecutivo, automotora, monto_financiado, mes,
+             plazo, tascli_real, seguro_rdh,
+             monto_comision_fin, comdea_real, com_parque
+      FROM creditos
+      WHERE estado_eval = 'OTORGADO'
+        AND estado_credito NOT IN ('RECHAZADO','ANULADO')
+        AND (plazo IS NULL OR plazo = 0 OR tascli_real IS NULL OR tascli_real = 0)
+      ORDER BY mes DESC, num_op DESC
+    `);
+    res.json({ success: true, data: rows, error: null });
+  } catch (e) {
+    res.status(500).json({ success: false, data: null, error: e.message });
+  }
+};
+
 const patchDatosIngresos = async (req, res) => {
   try {
     const { id } = req.params;
@@ -630,4 +648,4 @@ const patchDatosIngresos = async (req, res) => {
   }
 };
 
-module.exports = { create, getAll, getById, update, getReporteria, patchDatosIngresos };
+module.exports = { create, getAll, getById, update, getReporteria, getOtorgadosIncompletos, patchDatosIngresos };
