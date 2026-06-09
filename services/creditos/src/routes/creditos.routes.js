@@ -7,6 +7,7 @@ router.get('/reporteria', verifyToken, ctrl.getReporteria);
 router.get('/',           verifyToken, ctrl.getAll);
 router.get('/:id', verifyToken, ctrl.getById);
 router.post('/',   verifyToken, ctrl.create);
-router.put('/:id', verifyToken, ctrl.update);
+router.put('/:id',                  verifyToken, ctrl.update);
+router.patch('/:id/datos-ingresos', verifyToken, ctrl.patchDatosIngresos);
 
 module.exports = router;

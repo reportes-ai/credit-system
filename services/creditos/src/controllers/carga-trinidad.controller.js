@@ -237,6 +237,7 @@ exports.importar = async (req, res) => {
     const log          = [];
     const detallesIns  = [];   // para historial inserts
     const cambiosLog   = [];   // para historial cambios
+    const cursadosIds  = [];   // num_ops con estado Otorgado/Aprobado procesados
 
     for (const f of filas) {
       try {
@@ -273,6 +274,7 @@ exports.importar = async (req, res) => {
           );
           actualizados++;
           log.push(`✓ Actualizado ${f.num_op} → ${f.estado_autofin} / ${f.estado_credito}`);
+          if (['Otorgado','Aprobado'].includes(f.estado_credito)) cursadosIds.push(f.num_op);
         } else {
           await pool.query(
             `INSERT INTO creditos
@@ -293,6 +295,7 @@ exports.importar = async (req, res) => {
           insertados++;
           detallesIns.push({ num_op: f.num_op, datos: f });
           log.push(`➕ Insertado  ${f.num_op} → ${f.estado_autofin} / ${f.estado_credito}`);
+          if (['Otorgado','Aprobado'].includes(f.estado_credito)) cursadosIds.push(f.num_op);
         }
       } catch (rowErr) {
         errores++;
@@ -331,9 +334,24 @@ exports.importar = async (req, res) => {
       }
     }
 
+    // Devolver datos de cursados para el popup de datos faltantes
+    let cursados = [];
+    if (cursadosIds.length > 0) {
+      try {
+        const [rows] = await pool.query(
+          `SELECT id, num_op, ejecutivo, automotora, monto_financiado, valor_vehiculo,
+                  rut_cliente, fecha_otorgado, estado_credito,
+                  ingreso_neto_total, seguros, comdea_real, com_parque
+           FROM creditos WHERE num_op IN (?)`,
+          [cursadosIds]
+        );
+        cursados = rows;
+      } catch(e) { log.push(`⚠ No se pudieron cargar datos de cursados: ${e.message}`); }
+    }
+
     return res.json({
       success: true,
-      data: { total: filas.length, insertados, actualizados, errores, log },
+      data: { total: filas.length, insertados, actualizados, errores, log, cursados },
     });
   } catch (e) {
     console.error('[carga-trinidad importar]', e);

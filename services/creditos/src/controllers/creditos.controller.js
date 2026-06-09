@@ -606,4 +606,27 @@ const getReporteria = async (req, res) => {
   }
 };
 
-module.exports = { create, getAll, getById, update, getReporteria };
+/* PATCH /api/creditos/:id/datos-ingresos
+   Actualiza solo los campos de ingresos/comisiones que vienen del body */
+const patchDatosIngresos = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const CAMPOS_PERMITIDOS = ['ingreso_neto_total', 'seguros', 'comdea_real', 'com_parque'];
+    const sets = [];
+    const vals = [];
+    for (const campo of CAMPOS_PERMITIDOS) {
+      if (req.body[campo] !== undefined) {
+        sets.push(`${campo} = ?`);
+        vals.push(req.body[campo] === '' || req.body[campo] === null ? null : parseFloat(req.body[campo]));
+      }
+    }
+    if (!sets.length) return res.status(400).json({ success: false, data: null, error: 'Sin campos válidos' });
+    vals.push(id);
+    await pool.query(`UPDATE creditos SET ${sets.join(', ')}, updated_at = NOW() WHERE id = ?`, vals);
+    res.json({ success: true, data: { id }, error: null });
+  } catch (e) {
+    res.status(500).json({ success: false, data: null, error: e.message });
+  }
+};
+
+module.exports = { create, getAll, getById, update, getReporteria, patchDatosIngresos };

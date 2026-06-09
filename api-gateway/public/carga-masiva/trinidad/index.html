@@ -227,8 +227,102 @@ async function triEjecutarImport() {
       </div>`;
     document.getElementById('triPaso3').style.display = '';
     toast(`✓ ${d.insertados} insertados · ${d.actualizados} actualizados`, true);
+
+    // ── Popup datos faltantes para cursados ──────────────────────────────
+    if (d.cursados && d.cursados.length > 0) {
+      setTimeout(() => abrirModalCursados(d.cursados), 600);
+    }
   } catch(ex) { toast('Error: '+ex.message, false); }
   finally { btn.disabled=false; btn.innerHTML='<i class="bi bi-cloud-upload"></i>Importar / Actualizar'; }
+}
+
+// ── Modal datos faltantes cursados ──────────────────────────────────────────
+function abrirModalCursados(cursados) {
+  const fmt = v => v ? Number(v).toLocaleString('es-CL') : '';
+  const filas = cursados.map(c => `
+    <tr data-id="${c.id}" style="border-bottom:1px solid #e5e7eb">
+      <td style="padding:8px 10px;font-weight:700;white-space:nowrap">${c.num_op}</td>
+      <td style="padding:8px 10px;font-size:.82rem;color:#6b7280;max-width:160px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${c.ejecutivo||'—'}</td>
+      <td style="padding:8px 10px;font-size:.82rem;color:#6b7280">${c.monto_financiado ? '$'+Number(c.monto_financiado).toLocaleString('es-CL') : '—'}</td>
+      <td style="padding:6px 6px"><input type="number" placeholder="0" value="${c.ingreso_neto_total||''}"
+        style="width:110px;padding:5px 8px;border:1.5px solid #d1d5db;border-radius:6px;font-size:.82rem"
+        data-campo="ingreso_neto_total" data-id="${c.id}"></td>
+      <td style="padding:6px 6px"><input type="number" placeholder="0" value="${c.seguros||''}"
+        style="width:110px;padding:5px 8px;border:1.5px solid #d1d5db;border-radius:6px;font-size:.82rem"
+        data-campo="seguros" data-id="${c.id}"></td>
+      <td style="padding:6px 6px"><input type="number" placeholder="0" value="${c.comdea_real||''}"
+        style="width:110px;padding:5px 8px;border:1.5px solid #d1d5db;border-radius:6px;font-size:.82rem"
+        data-campo="comdea_real" data-id="${c.id}"></td>
+      <td style="padding:6px 6px"><input type="number" placeholder="0" value="${c.com_parque||''}"
+        style="width:110px;padding:5px 8px;border:1.5px solid #d1d5db;border-radius:6px;font-size:.82rem"
+        data-campo="com_parque" data-id="${c.id}"></td>
+    </tr>`).join('');
+
+  const dlg = document.createElement('dialog');
+  dlg.id = 'modalCursados';
+  dlg.style.cssText = 'border:none;border-radius:16px;padding:0;max-width:1050px;width:96vw;box-shadow:0 20px 60px rgba(0,0,0,0.25);overflow:hidden';
+  dlg.innerHTML = `
+    <div style="background:linear-gradient(135deg,#012d70,#0141A2);color:#fff;padding:20px 28px;display:flex;align-items:center;justify-content:space-between">
+      <div>
+        <div style="font-size:1.1rem;font-weight:700"><i class="bi bi-cash-coin me-2"></i>Datos de ingresos — Cursados (${cursados.length})</div>
+        <div style="font-size:.82rem;opacity:.8;margin-top:3px">Completa los datos faltantes para cuadrar el dashboard</div>
+      </div>
+      <button onclick="document.getElementById('modalCursados').close()" style="background:rgba(255,255,255,.15);border:none;color:#fff;border-radius:8px;padding:6px 14px;cursor:pointer;font-size:.85rem">✕ Cerrar</button>
+    </div>
+    <div style="padding:20px 28px;overflow-x:auto;max-height:65vh;overflow-y:auto">
+      <table style="width:100%;border-collapse:collapse;font-size:.85rem">
+        <thead>
+          <tr style="background:#f8fafc;font-size:.75rem;text-transform:uppercase;color:#6b7280;letter-spacing:.5px">
+            <th style="padding:10px;text-align:left">N° Op</th>
+            <th style="padding:10px;text-align:left">Ejecutivo</th>
+            <th style="padding:10px;text-align:left">Monto</th>
+            <th style="padding:10px;text-align:center">💰 Ingreso Colocación</th>
+            <th style="padding:10px;text-align:center">🛡 Ingreso Seguros</th>
+            <th style="padding:10px;text-align:center">🏪 Comisión Dealer</th>
+            <th style="padding:10px;text-align:center">🅿 Comisión Parque</th>
+          </tr>
+        </thead>
+        <tbody>${filas}</tbody>
+      </table>
+    </div>
+    <div style="padding:16px 28px;border-top:1px solid #e5e7eb;display:flex;gap:12px;justify-content:flex-end;background:#f9fafb">
+      <button onclick="document.getElementById('modalCursados').close()" style="padding:9px 20px;border-radius:8px;border:1.5px solid #d1d5db;background:#fff;color:#374151;font-weight:600;cursor:pointer;font-size:.88rem">Omitir por ahora</button>
+      <button onclick="guardarDatosCursados()" id="btnGuardarCursados" style="padding:9px 24px;border-radius:8px;border:none;background:#0141A2;color:#fff;font-weight:700;cursor:pointer;font-size:.88rem"><i class="bi bi-save me-1"></i>Guardar datos</button>
+    </div>`;
+  document.body.appendChild(dlg);
+  dlg.showModal();
+}
+
+async function guardarDatosCursados() {
+  const btn = document.getElementById('btnGuardarCursados');
+  btn.disabled = true; btn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span>Guardando...';
+
+  // Agrupar inputs por id de crédito
+  const mapa = {};
+  document.querySelectorAll('#modalCursados input[data-id]').forEach(inp => {
+    const id = inp.dataset.id;
+    if (!mapa[id]) mapa[id] = {};
+    const val = inp.value.trim();
+    if (val !== '') mapa[id][inp.dataset.campo] = parseFloat(val);
+  });
+
+  let ok = 0, err = 0;
+  for (const [id, campos] of Object.entries(mapa)) {
+    if (!Object.keys(campos).length) continue;
+    try {
+      const r = await fetch(`/api/creditos/${id}/datos-ingresos`, {
+        method: 'PATCH',
+        headers: { ...H, 'Content-Type': 'application/json' },
+        body: JSON.stringify(campos)
+      });
+      const d = await r.json();
+      if (d.success) ok++; else err++;
+    } catch { err++; }
+  }
+
+  btn.disabled = false; btn.innerHTML = '<i class="bi bi-save me-1"></i>Guardar datos';
+  document.getElementById('modalCursados').close();
+  toast(err === 0 ? `✓ Datos guardados en ${ok} operaciones` : `⚠ ${ok} guardados, ${err} con error`, err===0);
 }
 </script>
 <script src="/js/app-version.js"></script>
