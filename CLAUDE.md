@@ -118,6 +118,24 @@ shared/
 - Stats totales en `j.stats {ESTADO: count}` — nunca filtrar array local del cliente
 - Filtro financiera server-side: `?financiera=AUTOFIN|UNIDAD|AUTOFACIL`
 
+## Gestión de Contexto de Sesión (MUY IMPORTANTE)
+
+### Cuándo compactar (`/compact`)
+- Ejecutar `/compact` cuando el uso de contexto llegue al **80-85%**
+- No esperar al 90% — compactar tarde puede colapsar la sesión y perder el hilo
+- Compactar proactivamente después de completar un bloque grande de trabajo
+
+### Alerta de cambio de sesión
+- Cuando el contexto supere el **90%** después de compactar → avisar al usuario:
+  > ⚠️ **Contexto casi lleno.** Para continuar sin riesgo, inicia una nueva sesión. El resumen de esta sesión quedará disponible en el historial.
+- Si se acerca al límite sin posibilidad de compactar → avisar de inmediato
+- **Nunca colapsar en silencio** — siempre avisar antes de que sea tarde
+
+### Rutina recomendada
+1. Al inicio de cada sesión: revisar si hay sesión anterior relevante en historial
+2. Durante la sesión: compactar al ~80% de contexto
+3. Al cerrar: hacer push si hay cambios pendientes
+
 ## APIs Externas / Dependencias
 - TiDB Cloud (BD en la nube)
 - Render (servidor producción)
