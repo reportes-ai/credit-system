@@ -612,7 +612,9 @@ const getOtorgadosIncompletos = async (req, res) => {
   try {
     const [rows] = await pool.query(`
       SELECT id, num_op, ejecutivo, automotora, monto_financiado, mes,
-             plazo, tascli_real, seguro_rdh,
+             financiera, id_financiera, parque,
+             plazo, tascli_real,
+             seguro_rdh, seguro_cesantia, seguro_rep_menor,
              monto_comision_fin, comdea_real, com_parque
       FROM creditos
       WHERE estado_eval = 'OTORGADO'
@@ -629,7 +631,7 @@ const getOtorgadosIncompletos = async (req, res) => {
 const patchDatosIngresos = async (req, res) => {
   try {
     const { id } = req.params;
-    const CAMPOS_PERMITIDOS = ['plazo', 'tascli_real', 'seguro_rdh', 'seguros', 'comdea_real', 'com_parque'];
+    const CAMPOS_PERMITIDOS = ['plazo', 'tascli_real', 'parque', 'seguro_rdh', 'seguro_cesantia', 'seguro_rep_menor', 'seguros', 'comdea_real', 'com_parque'];
     const sets = [];
     const vals = [];
     for (const campo of CAMPOS_PERMITIDOS) {

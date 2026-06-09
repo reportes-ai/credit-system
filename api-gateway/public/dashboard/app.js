@@ -3648,54 +3648,66 @@ async function cargarAlertaIncompletos() {
 window.abrirModalIncompletos = function abrirModalIncompletos() {
   const lista = window._incompletos || [];
   if (!lista.length) return;
-  const token = sessionStorage.getItem('token');
   const $m = v => v != null && v !== 0 ? '$' + Number(v).toLocaleString('es-CL') : '—';
+  const inp = (campo, id, val, ph, w='90px', color='#d97706') =>
+    `<input type="number" placeholder="${ph}" step="any" value="${val||''}"
+      style="width:${w};padding:4px 6px;border:1.5px solid ${color};border-radius:6px;font-size:.78rem;display:block"
+      data-campo="${campo}" data-id="${id}">`;
 
-  const filas = lista.map(c => `
-    <tr data-id="${c.id}" style="border-bottom:1px solid #e5e7eb">
-      <td style="padding:8px 10px;font-weight:700;font-size:.82rem">${c.num_op}</td>
-      <td style="padding:8px 6px;font-size:.78rem;color:#374151">${c.ejecutivo||'—'}</td>
-      <td style="padding:8px 6px;font-size:.78rem">${(c.mes||'').slice(0,7)}</td>
-      <td style="padding:8px 6px;font-size:.82rem;font-weight:600">${$m(c.monto_financiado)}</td>
-      <td style="padding:5px 6px">
-        <input type="number" placeholder="Plazo" value="${c.plazo||''}"
-          style="width:80px;padding:4px 7px;border:1.5px solid #d97706;border-radius:6px;font-size:.8rem"
-          data-campo="plazo" data-id="${c.id}">
+  const filas = lista.map(c => {
+    const tipoDeal = c.parque ? 'PATIO' : 'CALLE';
+    const tasaMen  = c.tascli_real ? (c.tascli_real * 100).toFixed(4) : '';
+    return `
+    <tr data-id="${c.id}" style="border-bottom:1px solid #e5e7eb;font-size:.78rem">
+      <td style="padding:7px 8px;font-weight:700;white-space:nowrap">${c.num_op}</td>
+      <td style="padding:7px 6px;color:#374151;max-width:120px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${c.ejecutivo||'—'}</td>
+      <td style="padding:7px 6px;white-space:nowrap">${(c.mes||'').slice(0,7)}</td>
+      <td style="padding:7px 6px;font-weight:600;white-space:nowrap">${$m(c.monto_financiado)}</td>
+      <td style="padding:7px 6px;color:#6b7280;font-size:.72rem">
+        <div>${c.financiera||'—'}</div>
+        <div style="color:#9ca3af">${c.id_financiera||''}</div>
       </td>
       <td style="padding:5px 6px">
-        <input type="number" placeholder="Tasa % anual" step="0.01" value="${c.tascli_real ? (c.tascli_real*100*12).toFixed(4) : ''}"
-          style="width:110px;padding:4px 7px;border:1.5px solid #d97706;border-radius:6px;font-size:.8rem"
-          data-campo="tascli_pct" data-id="${c.id}">
+        <select data-campo="parque" data-id="${c.id}"
+          style="width:80px;padding:4px 6px;border:1.5px solid #d97706;border-radius:6px;font-size:.78rem">
+          <option value="" ${!c.parque?'selected':''}>CALLE</option>
+          <option value="PARQUE" ${c.parque?'selected':''}>PATIO</option>
+        </select>
       </td>
-      <td style="padding:5px 6px">
-        <input type="number" placeholder="Prima $" value="${c.seguro_rdh||''}"
-          style="width:100px;padding:4px 7px;border:1.5px solid #0141A2;border-radius:6px;font-size:.8rem"
-          data-campo="seguro_rdh" data-id="${c.id}">
-      </td>
-    </tr>`).join('');
+      <td style="padding:5px 6px">${inp('plazo', c.id, c.plazo||'', 'Cuotas', '70px')}</td>
+      <td style="padding:5px 6px">${inp('tascli_pct', c.id, tasaMen, '% mens.', '80px')}</td>
+      <td style="padding:5px 6px">${inp('seguro_rdh',       c.id, c.seguro_rdh||'',       'Prima $', '90px', '#0141A2')}</td>
+      <td style="padding:5px 6px">${inp('seguro_cesantia',  c.id, c.seguro_cesantia||'',  'Prima $', '90px', '#0141A2')}</td>
+      <td style="padding:5px 6px">${inp('seguro_rep_menor', c.id, c.seguro_rep_menor||'', 'Prima $', '90px', '#0141A2')}</td>
+    </tr>`;
+  }).join('');
 
   const dlg = document.createElement('dialog');
   dlg.id = 'modalIncompletos';
-  dlg.style.cssText = 'border:none;border-radius:16px;padding:0;max-width:860px;width:96vw;box-shadow:0 20px 60px rgba(0,0,0,0.25);overflow:hidden';
+  dlg.style.cssText = 'border:none;border-radius:16px;padding:0;max-width:1100px;width:98vw;box-shadow:0 20px 60px rgba(0,0,0,0.25);overflow:hidden';
   dlg.innerHTML = `
     <div style="background:linear-gradient(135deg,#92400e,#d97706);color:#fff;padding:18px 24px;display:flex;align-items:center;justify-content:space-between">
       <div>
         <div style="font-size:1rem;font-weight:700">⚠️ Otorgados con datos faltantes (${lista.length})</div>
-        <div style="font-size:.78rem;opacity:.85;margin-top:2px">Ingresa plazo, tasa y prima de desgravamen para calcular los ingresos</div>
+        <div style="font-size:.78rem;opacity:.85;margin-top:2px">Tasa en % mensual · Prima en $ por tipo de seguro · Tipo dealer afecta cálculo de comisión</div>
       </div>
       <button onclick="document.getElementById('modalIncompletos').close()" style="background:rgba(255,255,255,.2);border:none;color:#fff;border-radius:8px;padding:5px 12px;cursor:pointer">✕</button>
     </div>
     <div style="padding:16px 20px;overflow-x:auto;max-height:60vh;overflow-y:auto">
-      <table style="width:100%;border-collapse:collapse;font-size:.83rem">
+      <table style="width:100%;border-collapse:collapse;font-size:.78rem">
         <thead>
-          <tr style="background:#fef3c7;font-size:.72rem;text-transform:uppercase;color:#78350f;letter-spacing:.4px">
-            <th style="padding:8px">N° Op</th>
-            <th style="padding:8px">Ejecutivo</th>
-            <th style="padding:8px">Mes</th>
-            <th style="padding:8px">Monto</th>
-            <th style="padding:8px">Plazo<br><small style="font-weight:400">(cuotas)</small></th>
-            <th style="padding:8px">Tasa<br><small style="font-weight:400">(% anual)</small></th>
-            <th style="padding:8px">Prima<br><small style="font-weight:400">Desgravamen $</small></th>
+          <tr style="background:#fef3c7;font-size:.7rem;text-transform:uppercase;color:#78350f;letter-spacing:.4px;white-space:nowrap">
+            <th style="padding:8px 8px;text-align:left">N° Op</th>
+            <th style="padding:8px 6px;text-align:left">Ejecutivo</th>
+            <th style="padding:8px 6px">Mes</th>
+            <th style="padding:8px 6px">Monto</th>
+            <th style="padding:8px 6px">Financiera</th>
+            <th style="padding:8px 6px">Tipo<br>Dealer</th>
+            <th style="padding:8px 6px">Plazo</th>
+            <th style="padding:8px 6px">Tasa<br>% Mens.</th>
+            <th style="padding:8px 6px">Prima<br>Desgrav.</th>
+            <th style="padding:8px 6px">Prima<br>Cesantía</th>
+            <th style="padding:8px 6px">Prima<br>Rep. Men.</th>
           </tr>
         </thead>
         <tbody>${filas}</tbody>
@@ -3719,15 +3731,18 @@ window.guardarIncompletos = async function guardarIncompletos() {
   const H = { 'Authorization': 'Bearer ' + token, 'Content-Type': 'application/json' };
 
   const mapa = {};
-  document.querySelectorAll('#modalIncompletos input[data-id]').forEach(inp => {
-    const id = inp.dataset.id;
+  document.querySelectorAll('#modalIncompletos input[data-id], #modalIncompletos select[data-id]').forEach(el => {
+    const id = el.dataset.id;
     if (!mapa[id]) mapa[id] = {};
-    const val = inp.value.trim();
-    if (val === '') return;
-    if (inp.dataset.campo === 'tascli_pct') {
-      mapa[id]['tascli_real'] = parseFloat(val) / 100 / 12;
+    const val = el.value.trim();
+    if (el.dataset.campo === 'parque') {
+      mapa[id]['parque'] = val; // '' = CALLE, 'PARQUE' = PATIO
+    } else if (val === '') {
+      // skip empty numeric fields
+    } else if (el.dataset.campo === 'tascli_pct') {
+      mapa[id]['tascli_real'] = parseFloat(val) / 100; // % mensual → decimal
     } else {
-      mapa[id][inp.dataset.campo] = parseFloat(val);
+      mapa[id][el.dataset.campo] = parseFloat(val);
     }
   });
 
