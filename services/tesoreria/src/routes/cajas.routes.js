@@ -2,8 +2,8 @@ const router = require('express').Router();
 const ctrl   = require('../controllers/cajas.controller');
 const { verifyToken, requirePerfil } = require('../../../../shared/middleware/auth');
 
-const soloAdmin = [verifyToken, requirePerfil('Administrador', 'Gerente')];
-const autenticado = [verifyToken];
+const soloAdmin   = [verifyToken, requirePerfil('Administrador', 'Gerente')];
+const conLectura  = [verifyToken, requirePerfil('Administrador', 'Gerente', 'Tesorero')];
 
 // Caja del usuario autenticado (cajero)
 router.get('/mi-caja', verifyToken, ctrl.miCaja);
@@ -12,7 +12,7 @@ router.get('/mi-caja', verifyToken, ctrl.miCaja);
 router.get('/todos-usuarios', ...soloAdmin, ctrl.todosUsuarios);
 
 // CRUD Cajas
-router.get('/',       ...soloAdmin,   ctrl.list);
+router.get('/',       ...conLectura,  ctrl.list);
 router.post('/',      ...soloAdmin,   ctrl.create);
 router.put('/:id',    ...soloAdmin,   ctrl.update);
 router.delete('/:id', ...soloAdmin,   ctrl.remove);

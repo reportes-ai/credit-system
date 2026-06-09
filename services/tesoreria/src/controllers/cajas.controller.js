@@ -30,6 +30,15 @@ const initTablas = async () => {
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
   `);
 };
+// Migración: perfil Tesorero
+(async () => {
+  try {
+    await pool.query(`
+      INSERT IGNORE INTO perfiles (nombre, descripcion)
+      VALUES ('Tesorero', 'Acceso de lectura a todas las cajas')
+    `);
+  } catch(e) { /* tabla puede no existir aún */ }
+})();
 initTablas().catch(e => console.error('[cajas] init tablas:', e.message));
 
 /* ── helpers ─────────────────────────────────────────────────────────────── */
@@ -41,14 +50,20 @@ const err = (res, e, code = 500) => res.status(code).json({ success: false, data
 /* GET /api/cajas */
 const list = async (req, res) => {
   try {
+    const perfil = req.usuario?.perfil_nombre;
+    const soloLectura = !['Administrador', 'Gerente'].includes(perfil);
     const [rows] = await pool.query(
       `SELECT c.*,
-              COUNT(cu.id_asignacion) AS total_usuarios
+              COUNT(cu.id_asignacion) AS total_usuarios,
+              u.id_usuario AS id_usuario_asignado,
+              TRIM(CONCAT(COALESCE(u.nombre,''),' ',COALESCE(u.apellido,''))) AS nombre_usuario_asignado
        FROM cajas c
        LEFT JOIN caja_usuarios cu ON cu.id_caja = c.id_caja AND cu.activo = 1
+       LEFT JOIN usuarios u ON u.id_usuario = cu.id_usuario
        GROUP BY c.id_caja
        ORDER BY c.nombre`
     );
+    rows.forEach(r => r.solo_lectura = soloLectura);
     ok(res, rows);
   } catch(e) { err(res, e); }
 };
