@@ -247,8 +247,7 @@ exports.importar = async (req, res) => {
         if (afEquivSet.has(f.num_op)) {
           await pool.query(
             `UPDATE creditos SET estado_autofin = ?, ejecutivo_tri = ?,
-               estado_credito = ?,
-               estado_eval = COALESCE(NULLIF(estado_eval,''), ?), updated_at = NOW()
+               estado_credito = ?, estado_eval = ?, updated_at = NOW()
              WHERE id_financiera = ? AND financiera != 'NO APLICA'`,
             [f.estado_autofin, f.ejecutivo_tri, f.estado_credito, f.estado_eval, String(f.num_op)]
           );
@@ -270,7 +269,7 @@ exports.importar = async (req, res) => {
             `UPDATE creditos SET
                estado_autofin = ?, ejecutivo_tri = ?,
                estado_credito = ?,
-               estado_eval    = COALESCE(NULLIF(estado_eval,''), ?),
+               estado_eval    = ?,
                marca    = COALESCE(?, marca), modelo   = COALESCE(?, modelo),
                vendedor = COALESCE(?, vendedor), updated_at = NOW()
              WHERE num_op = ?`,
