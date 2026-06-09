@@ -65,7 +65,7 @@
     <div class="topnav-left">
       <a href="/" class="topnav-brand">
         <img src="/img/logo.png" alt="AutoFácil" style="display:block">
-        <span class="version-badge" id="versionBadge">v4.9</span>
+        <span class="version-badge" id="versionBadge">v5.0</span>
       </a>
         <div class="breadcrumb-nav"><a href="/">Inicio</a><span class="sep">›</span><span style="color:#fff;font-weight:600"><i class="bi bi-gear me-1"></i>Mantenedores</span></div></div>
     <div class="topnav-right">
@@ -118,36 +118,37 @@
 
     function logout() { sessionStorage.removeItem('token'); sessionStorage.removeItem('usuario'); window.location.href = '/login.html'; }
 
-    const ITEMS_DEFAULT = [
-      { id: 'tasas',           href: '/mantenedores/tasas/',           icon: 'bi-percent',        titulo: 'Tasas de Interés',   desc: 'Gestión de tasas mensuales y anuales para créditos' },
-      { id: 'uf',              href: '/mantenedores/uf/',              icon: 'bi-currency-dollar', titulo: 'Valores UF',         desc: 'Registro y consulta del valor de la Unidad de Fomento' },
-      { id: 'dealers',         href: '/mantenedores/dealers/',         icon: 'bi-building',        titulo: 'Dealers',            desc: 'Administración de concesionarios y datos de contacto' },
-      { id: 'vehiculos',       href: '/mantenedores/vehiculos/',       icon: 'bi-car-front',       titulo: 'Vehículos',          desc: 'Base de tasación SII con marcas, modelos y valores' },
-      { id: 'comunas',         href: '/mantenedores/comunas/',         icon: 'bi-geo-alt',         titulo: 'Comunas',            desc: 'Gestión de regiones, provincias y comunas de Chile' },
-      { id: 'parametros',      href: '/mantenedores/parametros/',      icon: 'bi-sliders',         titulo: 'Parámetros Crédito', desc: 'Gastos operacionales fijos y comisiones del crédito' },
-      { id: 'factores-seguro',  href: '/mantenedores/factores-seguro/', icon: 'bi-shield-check', titulo: 'Factores Seguro',    desc: 'Tasas netas, factores calculados y comisiones AMBOS por plazo' },
-      { id: 'tipos-documento',  href: '/mantenedores/tipos-documento/', icon: 'bi-paperclip',    titulo: 'Tipos de Documento', desc: 'Documentos de respaldo requeridos en el proceso de aprobación de créditos' },
-      { id: 'pagares',          href: '/mantenedores/pagares/',         icon: 'bi-file-earmark-text', titulo: 'Pagarés Autofacil', desc: 'Plantillas editables de Hoja Resumen, Contrato, Pagaré y Mandatos de prenda' },
-      { id: 'cuentas-bancarias', href: '/mantenedores/cuentas-bancarias/', icon: 'bi-bank', titulo: 'Cuentas Bancarias', desc: 'Razón social, RUT, nombre de banco y número de cuenta para pagos y transferencias' },
-      { id: 'parques', href: '/mantenedores/parques/', icon: 'bi-p-circle', titulo: 'Arriendo y Comisión Parques', desc: 'Arriendo mensual y porcentaje de comisión por parque para cálculo automático en digitación brokerage' },
-      { id: 'flujo-brokerage', href: '/mantenedores/flujo-brokerage/', icon: 'bi-diagram-3', titulo: 'Flujo Crédito Brokerage', desc: 'Configura los estados, etapas y documentos del flujo de créditos brokereados (Autofin / Unidad de Crédito)' },
-      { id: 'broker-validaciones', href: '/mantenedores/broker-validaciones/', icon: 'bi-card-checklist', titulo: 'Documentos a Validar Brokers', desc: 'Administra los ítems de validación documental requeridos por AUTOFIN y UNIDAD DE CRÉDITO' },
-      { id: 'financieras', href: '/mantenedores/financieras/', icon: 'bi-calculator', titulo: 'Fórmulas Financieras', desc: 'Parámetros de cálculo de ingresos AutoFin y UAC, comisiones dealer y factores de seguros' },
-      { id: 'comisiones-seguro', href: '/mantenedores/comisiones-seguro/', icon: 'bi-shield-check', titulo: 'Comisiones de Seguro', desc: 'Porcentajes de comisión sobre prima cobrada al cliente por Desgravamen y Cesantía según plazo' },
-      { id: 'productos-financiera', href: '/mantenedores/productos-financiera/', icon: 'bi-tags-fill', titulo: 'Productos por Financiera', desc: 'Administra los productos disponibles en la digitación para AUTOFIN y UNIDAD DE CRÉDITO' },
-      { id: 'solo-dios', href: '/mantenedores/solo-dios/', icon: 'bi-lightning-charge-fill', titulo: 'SOLO DIOS', desc: 'Acceso directo a la BD sin filtros — edición total de operaciones y clientes' },
-      { id: 'servidor-hora', href: '/mantenedores/servidor-hora/', icon: 'bi-clock-history', titulo: 'Hora del Servidor', desc: 'Verifica la zona horaria del servidor y la BD — Chile / America/Santiago con cambio DST automático' },
-      { id: 'db-maintenance', href: '/mantenedores/db-maintenance/', icon: 'bi-database-gear', titulo: 'Mantenimiento BD', desc: 'Diagnóstico del estado de tablas: fragmentación, estadísticas del optimizador. Ejecuta ANALYZE TABLE con un click.' },
-      { id: 'politica', href: '/politica/', icon: 'bi-shield-lock', titulo: 'Política de Crédito', desc: 'Política de crédito AutoFácil' },
-      { id: 'carga-masiva', href: '/carga-masiva/', icon: 'bi-cloud-upload', titulo: 'Carga Masiva', desc: 'Importación masiva de operaciones desde archivo Excel. Solo Administrador.' },
-      { id: 'vista-pantallas', href: '/mantenedores/vista-pantallas/', icon: 'bi-layout-wtf', titulo: 'Vista Pantallas', desc: 'Configura qué módulos aparecen en el Home y cuáles dentro de Mantenedores' },
-    ];
+    // Descripciones por id (texto de presentación — mantenido en frontend)
+    const DESCS = {
+      'tasas':               'Gestión de tasas mensuales y anuales para créditos',
+      'uf':                  'Registro y consulta del valor de la Unidad de Fomento',
+      'dealers':             'Administración de concesionarios y datos de contacto',
+      'vehiculos':           'Base de tasación SII con marcas, modelos y valores',
+      'comunas':             'Gestión de regiones, provincias y comunas de Chile',
+      'parametros':          'Gastos operacionales fijos y comisiones del crédito',
+      'factores-seguro':     'Tasas netas, factores calculados y comisiones por plazo',
+      'tipos-documento':     'Documentos de respaldo requeridos en el proceso de aprobación',
+      'pagares':             'Plantillas editables de Hoja Resumen, Contrato, Pagaré y Mandatos',
+      'cuentas-bancarias':   'Razón social, RUT, banco y número de cuenta para transferencias',
+      'parques':             'Arriendo mensual y porcentaje de comisión por parque',
+      'flujo-brokerage':     'Estados, etapas y documentos del flujo de créditos brokereados',
+      'broker-validaciones': 'Ítems de validación documental para AUTOFIN y UNIDAD DE CRÉDITO',
+      'financieras':         'Parámetros de cálculo de ingresos AutoFin y UAC',
+      'comisiones-seguro':   'Porcentajes de comisión sobre prima por Desgravamen y Cesantía',
+      'productos-financiera':'Productos disponibles en la digitación por financiera',
+      'solo-dios':           'Acceso directo a la BD sin filtros — edición total',
+      'vista-pantallas':     'Configura qué módulos aparecen en el Home y en cada sección',
+      'bd-operaciones':      'Base de datos de operaciones de crédito',
+      'bd-clientes':         'Base de datos de clientes',
+      'bd-antecedentes':     'Base de datos de antecedentes laborales',
+      'bd-informacion-comercial': 'Base de datos de información comercial',
+    };
 
     let sortable = null, modoReordenar = false;
     const CONFIG_KEY = 'submenu_mantenedores';
 
     async function cargar() {
-      let orden = null, placement = {}, modsBD = [];
+      let orden = null, placement = {}, funcInfo = [], modsBD = [];
       try {
         const [rOrden, rPlacement, rMods] = await Promise.all([
           fetch(`/api/config/ui/${CONFIG_KEY}`, { headers: H }),
@@ -157,20 +158,25 @@
         const jOrden = await rOrden.json(); const jP = await rPlacement.json(); const jM = await rMods.json();
         if (jOrden.success && Array.isArray(jOrden.data)) orden = jOrden.data;
         if (jP.success && jP.data) placement = jP.data;
+        funcInfo = (jM.funcionalidadesInfo || []).filter(f => f.href && f.href.startsWith('/mantenedores/'));
         if (jM.success && Array.isArray(jM.data)) modsBD = jM.data;
       } catch {}
 
-      // Items nativos de mantenedores: mostrar si no fueron movidos a otra sección
-      const nativeItems = ITEMS_DEFAULT.filter(i => !placement[i.id] || placement[i.id] === 'mantenedores');
+      // Construir items desde funcionalidades BD (href + icono + nombre desde servidor)
+      const nativeHrefs = new Set(funcInfo.map(f => f.href));
+      const nativeItems = funcInfo.map(f => {
+        const seg = f.href.replace('/mantenedores/', '').replace(/\/$/, '');
+        if (placement[seg] && placement[seg] !== 'mantenedores') return null;
+        return { id: seg || f.codigo, href: f.href, icon: f.icono || 'bi-grid', titulo: f.nombre, desc: DESCS[seg] || '' };
+      }).filter(Boolean);
 
-      // Extras: sub-items de otras secciones movidos aquí
-      const nativeIds = new Set(ITEMS_DEFAULT.map(i => i.id));
+      // Extras: sub-items de otras secciones movidos aquí via placement
+      const nativeIds = new Set(nativeItems.map(i => i.id));
       const extrasSubitem = Object.entries(PLACEMENT_ITEMS || {})
         .filter(([k, v]) => !nativeIds.has(k) && placement[k] === 'mantenedores')
-        .map(([k, v]) => ({ id: k, href: v.href, icon: v.icon, titulo: v.titulo, desc: v.desc }));
+        .map(([k, v]) => ({ id: k, href: v.href, icon: v.icon, titulo: v.titulo, desc: v.desc || '' }));
 
       // Extras: módulos BD movidos aquí
-      const nativeHrefs = new Set(ITEMS_DEFAULT.map(i => i.href));
       const extrasMods = modsBD
         .filter(m => placement[m.ruta] === 'mantenedores' && !nativeHrefs.has(m.ruta))
         .map(m => ({ id: m.ruta, href: m.ruta, icon: m.icono || 'bi-grid', titulo: m.nombre, desc: m.descripcion || '' }));
@@ -183,7 +189,7 @@
 
       const grid = document.getElementById('modulesGrid');
       grid.innerHTML = items.map(m => `
-        <a href="${m.href}" class="module-card" data-id="${m.id}">
+        <a href="${m.href}" class="module-card" data-id="${m.id}" data-href="${m.href}">
           <i class="bi bi-grip-vertical drag-handle"></i>
           <div class="card-icon"><i class="bi ${m.icon}"></i></div>
           <h6>${m.titulo}</h6>
@@ -216,8 +222,7 @@
         btnG.style.display = 'none';
         if (sortable) { sortable.destroy(); sortable = null; }
         grid.querySelectorAll('.module-card').forEach(card => {
-          const item = ITEMS_DEFAULT.find(i => i.id === card.dataset.id);
-          if (item) card.href = item.href;
+          if (card.dataset.href) card.href = card.dataset.href;
         });
       }
     }
