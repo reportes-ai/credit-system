@@ -1004,4 +1004,41 @@ const getUsuariosByPerfil = async (req, res) => {
   }
 })();
 
+// ── Migración v11: asegurar funcionalidad ver_dashboard en todos los perfiles ──
+(async () => {
+  try {
+    // Buscar módulo dashboard (cualquier estado)
+    const [[modDash]] = await pool.query(
+      "SELECT id_modulo FROM modulos WHERE ruta LIKE '%dashboard%' LIMIT 1"
+    );
+    if (!modDash) { console.warn('[v11] módulo dashboard no encontrado'); return; }
+
+    // Crear funcionalidad si no existe (con icono para que aparezca en UI)
+    let [[fd]] = await pool.query("SELECT id_funcionalidad FROM funcionalidades WHERE codigo='ver_dashboard'");
+    if (!fd) {
+      const [ins] = await pool.query(
+        "INSERT INTO funcionalidades (id_modulo, nombre, codigo, icono) VALUES (?,?,?,?)",
+        [modDash.id_modulo, 'Ver Dashboard', 'ver_dashboard', 'bi-bar-chart-line']
+      );
+      fd = { id_funcionalidad: ins.insertId };
+    }
+
+    // Asegurar que TODOS los perfiles tienen un registro en permisos_perfil
+    // Admin y Gerente = habilitado, resto = deshabilitado (para que aparezca en UI)
+    const [perfiles] = await pool.query('SELECT id_perfil, nombre FROM perfiles');
+    for (const p of perfiles) {
+      const hab = ['Administrador', 'Gerente'].includes(p.nombre) ? 1 : 0;
+      await pool.query(
+        `INSERT INTO permisos_perfil (id_perfil, id_funcionalidad, habilitado)
+         VALUES (?, ?, ?)
+         ON DUPLICATE KEY UPDATE habilitado = habilitado`, // no sobreescribir si ya existe
+        [p.id_perfil, fd.id_funcionalidad, hab]
+      );
+    }
+    console.log('✓ Perfiles v11: ver_dashboard asegurado en todos los perfiles');
+  } catch (e) {
+    console.error('[perfiles migration v11]', e.message);
+  }
+})();
+
 module.exports = { getAllPerfiles, getModulosConFuncionalidades, getPermisosPerfil, updatePermisosPerfil, reordenarModulos, createPerfil, updatePerfil, deletePerfil, getUsuariosByPerfil };
