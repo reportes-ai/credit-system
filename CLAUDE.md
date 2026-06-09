@@ -13,6 +13,7 @@
 - Funciones JS: camelCase
 - Archivos: kebab-case.js
 - Versión en badge HTML: subir en cada cambio (<!-- v1.x -->) — OBLIGATORIO, nunca omitir
+- **Versión global**: SIEMPRE actualizar `api-gateway/public/js/app-version.js` (`APP_VERSION`) en cada commit con cambios frontend. Este archivo controla el badge que aparece en TODAS las páginas (topnav, login, etc.) y es la forma de confirmar que el deploy en Render ya se aplicó. Subir menor si es fix/mejora (v6.1 → v6.2), subir mayor si es feature importante (v6.x → v7.0). Nunca dejar esta versión desactualizada.
 
 ## Reglas Importantes
 1. SIEMPRE: `const pool = require('../../../shared/config/database');`
