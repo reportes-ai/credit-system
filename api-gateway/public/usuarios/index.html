@@ -1438,7 +1438,27 @@
     // Solo admin ve tab Seguridad y botón nuevo perfil
     if (esAdmin) document.getElementById('tabSegNav').style.display = '';
     if (!esAdmin) { const b = document.getElementById('btnNuevoPerfil'); if(b) b.style.display='none'; }
-    cargarUsuarios();
+
+    // Pestañas según permisos reales: sin usuarios_gestionar no ve la lista,
+    // sin usuarios_perfiles no ve Perfiles y Permisos (solo Mi Contraseña)
+    (async () => {
+      let funcs = new Set();
+      try {
+        const r = await fetch('/api/auth/mis-permisos', { headers: { Authorization: 'Bearer ' + token } });
+        const j = await r.json();
+        (j.funcionalidades || []).forEach(c => funcs.add(c));
+      } catch (e) {}
+      const tiene = c => esAdmin || funcs.has(c);
+      const puedeUsuarios = tiene('usuarios_gestionar') || tiene('usuarios_ver');
+      const puedePerfiles = tiene('usuarios_perfiles');
+      if (!puedeUsuarios) document.querySelector('[data-tab="usuarios"]').closest('li').style.display = 'none';
+      if (!puedePerfiles) document.querySelector('[data-tab="permisos"]').closest('li').style.display = 'none';
+      if (puedeUsuarios) {
+        cargarUsuarios();
+      } else {
+        switchTab(puedePerfiles ? 'permisos' : 'miclave');
+      }
+    })();
 
     // ── MODAL EJECUTIVOS ──────────────────────────────────────
     let _ejUsuarioId = null;

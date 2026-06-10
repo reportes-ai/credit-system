@@ -95,12 +95,15 @@ const misPermisos = async (req, res) => {
     const { id_perfil, id_usuario } = req.usuario;
 
     // Módulos accesibles (para el menú principal — compatible con versión anterior)
+    // Nota: 'usuarios_contrasena' no otorga la card del módulo Usuarios —
+    // cambiar la propia clave está disponible en el menú del usuario (topnav)
     const [modulos] = await pool.query(
       `SELECT DISTINCT m.id_modulo, m.nombre, m.descripcion, m.icono, m.ruta, m.orden
        FROM modulos m
        JOIN funcionalidades f ON f.id_modulo = m.id_modulo
        JOIN permisos_perfil pp ON pp.id_funcionalidad = f.id_funcionalidad
        WHERE pp.id_perfil = ? AND pp.habilitado = 1 AND m.estado = 'activo'
+         AND f.codigo <> 'usuarios_contrasena'
        ORDER BY m.orden`,
       [id_perfil]
     );
