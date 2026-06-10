@@ -1329,4 +1329,35 @@ const getUsuariosByPerfil = async (req, res) => {
   }
 })();
 
+/* ─── Migración v16: eliminar módulo fantasma "Sistema" (/sistema/) ─
+   Fue creado por código antiguo solo como contenedor del permiso
+   ver_dashboard; nunca tuvo página. Sus funcionalidades se mueven al
+   módulo Dashboard real y el módulo se elimina (o desactiva).        */
+(async () => {
+  try {
+    const [[modSis]] = await pool.query(
+      "SELECT id_modulo FROM modulos WHERE ruta='/sistema/' LIMIT 1"
+    );
+    if (!modSis) return;
+    const [[modDash]] = await pool.query(
+      "SELECT id_modulo FROM modulos WHERE ruta LIKE '%dashboard%' AND id_modulo <> ? LIMIT 1",
+      [modSis.id_modulo]
+    );
+    if (modDash) {
+      const [mv] = await pool.query(
+        'UPDATE funcionalidades SET id_modulo = ? WHERE id_modulo = ?',
+        [modDash.id_modulo, modSis.id_modulo]
+      );
+      await pool.query('DELETE FROM modulos WHERE id_modulo = ?', [modSis.id_modulo]);
+      console.log(`✓ Perfiles v16: módulo Sistema eliminado (${mv.affectedRows} funcionalidades movidas a Dashboard)`);
+    } else {
+      // Sin módulo Dashboard: solo ocultar la card, conservando permisos
+      await pool.query("UPDATE modulos SET estado='inactivo' WHERE id_modulo = ?", [modSis.id_modulo]);
+      console.log('✓ Perfiles v16: módulo Sistema desactivado (sin Dashboard destino)');
+    }
+  } catch (e) {
+    console.error('[perfiles migration v16]', e.message);
+  }
+})();
+
 module.exports = { getAllPerfiles, getModulosConFuncionalidades, getPermisosPerfil, updatePermisosPerfil, reordenarModulos, createPerfil, updatePerfil, deletePerfil, getUsuariosByPerfil };
