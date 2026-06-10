@@ -5,7 +5,7 @@
   <link rel="icon" href="/img/favicon.png" type="image/png">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Aprobaciones — AutoFácil</title>
-  <!-- v1.3 -->
+  <!-- v1.4 -->
   <link href="/css/bootstrap.min.css" rel="stylesheet">
   <link href="/css/bootstrap-icons.css" rel="stylesheet">
   <style>
@@ -374,6 +374,9 @@ const dDT   = v => { if(!v) return null; const d=new Date(v); if(isNaN(d)) retur
   document.getElementById('cFecha').value = new Date().toISOString().slice(0,10);
   renderFinancierasSelect();
   restaurarBorrador();
+  // Acceso directo a una pestaña: /aprobaciones/?tab=params|nueva|revision
+  const tabParam = new URLSearchParams(location.search).get('tab');
+  if (tabParam && ['lista','nueva','revision','params'].includes(tabParam)) showTab(tabParam);
 })();
 
 async function cargarUFyTasas(){

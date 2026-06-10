@@ -1288,4 +1288,37 @@ const getUsuariosByPerfil = async (req, res) => {
   }
 })();
 
+/* ─── Migración v15: card Preferencia Financiera en Mantenedores ─ */
+(async () => {
+  try {
+    const [[adm]] = await pool.query("SELECT id_perfil FROM perfiles WHERE nombre='Administrador' LIMIT 1");
+    const [[modMan]] = await pool.query(
+      "SELECT id_modulo FROM modulos WHERE nombre='Mantenedores' AND estado='activo' LIMIT 1"
+    );
+    if (!modMan) return;
+    const [[ex]] = await pool.query(
+      "SELECT id_funcionalidad FROM funcionalidades WHERE codigo='mant_pref_financiera'"
+    );
+    let idF;
+    if (ex) { idF = ex.id_funcionalidad; }
+    else {
+      const [ins] = await pool.query(
+        'INSERT INTO funcionalidades (id_modulo, nombre, codigo, href) VALUES (?,?,?,?)',
+        [modMan.id_modulo, 'Preferencia Financiera', 'mant_pref_financiera', '/aprobaciones/?tab=params']
+      );
+      idF = ins.insertId;
+      console.log('[v15] funcionalidad mant_pref_financiera creada id=' + idF);
+    }
+    if (adm) {
+      await pool.query(
+        'INSERT IGNORE INTO permisos_perfil (id_perfil, id_funcionalidad, habilitado) VALUES (?,?,1)',
+        [adm.id_perfil, idF]
+      );
+    }
+    console.log('✓ Perfiles v15: card Preferencia Financiera en Mantenedores');
+  } catch (e) {
+    console.error('[perfiles migration v15]', e.message);
+  }
+})();
+
 module.exports = { getAllPerfiles, getModulosConFuncionalidades, getPermisosPerfil, updatePermisosPerfil, reordenarModulos, createPerfil, updatePerfil, deletePerfil, getUsuariosByPerfil };
