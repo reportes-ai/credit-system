@@ -5,7 +5,7 @@
   <link rel="icon" href="/img/favicon.png" type="image/png">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Aprobaciones — AutoFácil</title>
-  <!-- v2.0 -->
+  <!-- v2.1 -->
   <link href="/css/bootstrap.min.css" rel="stylesheet">
   <link href="/css/bootstrap-icons.css" rel="stylesheet">
   <style>
@@ -33,14 +33,34 @@
     .tab-btn:hover { color:var(--blue); }
     .tab-btn.active { color:var(--blue); border-bottom-color:var(--blue); }
     .tab-btn .badge-n { background:#f59e0b; color:#fff; font-size:.68rem; border-radius:10px; padding:1px 7px; font-weight:700; }
-    /* ── cards del home ── */
-    .home-card { background:linear-gradient(135deg,#0b3a8c,#0141A2); color:#fff; border:none; border-radius:10px;
-      padding:26px 18px; font-size:.86rem; font-weight:800; letter-spacing:.03em; cursor:pointer; text-transform:uppercase;
-      box-shadow:0 3px 10px rgba(1,65,162,.3); transition:transform .12s, box-shadow .12s; min-height:86px; }
-    .home-card:hover { transform:translateY(-2px); box-shadow:0 6px 16px rgba(1,65,162,.4); }
-    .home-card.rojo { background:linear-gradient(135deg,#b91c1c,#dc2626); box-shadow:0 3px 10px rgba(220,38,38,.35); animation:pulseRed 1.6s infinite; }
-    @keyframes pulseRed { 0%,100%{box-shadow:0 3px 10px rgba(220,38,38,.35);} 50%{box-shadow:0 3px 18px rgba(220,38,38,.65);} }
-    .home-card .badge-n { background:#fff; color:#b91c1c; font-size:.78rem; border-radius:12px; padding:2px 9px; margin-left:6px; }
+    /* ── cards del home (mismo estilo que el menú principal) ── */
+    .ap-grid { display:grid; grid-template-columns:repeat(4,1fr); gap:18px; max-width:1180px; margin:0 auto; }
+    @media (max-width:1000px){ .ap-grid{ grid-template-columns:repeat(2,1fr);} }
+    @media (max-width:560px){ .ap-grid{ grid-template-columns:1fr;} }
+    .ap-card { position:relative; background:#fff; border-radius:14px; padding:28px 24px; cursor:pointer; text-align:left;
+      border:2px solid transparent; transition:transform .18s, box-shadow .18s, border-color .18s;
+      box-shadow:0 1px 4px rgba(0,0,0,.06); font-family:inherit; }
+    .ap-card:hover { transform:translateY(-4px); box-shadow:0 12px 32px rgba(1,65,162,.15); border-color:var(--navy); }
+    .ap-card .card-icon { width:52px; height:52px; border-radius:14px; background:linear-gradient(135deg,#e8eaf6,#c5cae9);
+      display:flex; align-items:center; justify-content:center; font-size:1.6rem; color:var(--navy); margin-bottom:16px; transition:background .18s,color .18s; }
+    .ap-card:hover .card-icon { background:linear-gradient(135deg,var(--navy),#0255c5); color:#fff; }
+    .ap-card h6 { font-weight:700; font-size:.95rem; margin:0 0 6px; color:#111827; }
+    .ap-card p { font-size:.8rem; color:#6b7280; margin:0 0 18px; line-height:1.4; }
+    .ap-card .btn-acceder { background:var(--navy); color:#fff; border:none; border-radius:8px; padding:7px 16px; font-size:.82rem; font-weight:600; }
+    .ap-card:hover .btn-acceder { background:#0255c5; }
+    .ap-badge { position:absolute; top:16px; right:16px; min-width:28px; height:28px; border-radius:14px; padding:0 8px;
+      display:none; align-items:center; justify-content:center; font-size:.82rem; font-weight:800; color:#fff; }
+    /* Revisión con pendientes → rojo */
+    .ap-card.alerta-roja { border-color:#dc2626; animation:pulseRed 1.6s infinite; }
+    .ap-card.alerta-roja .card-icon { background:linear-gradient(135deg,#fee2e2,#fecaca); color:#b91c1c; }
+    .ap-card.alerta-roja .ap-badge { display:flex; background:#dc2626; }
+    .ap-card.alerta-roja .btn-acceder { background:#dc2626; }
+    @keyframes pulseRed { 0%,100%{box-shadow:0 1px 4px rgba(220,38,38,.2);} 50%{box-shadow:0 6px 20px rgba(220,38,38,.45);} }
+    /* Impresión con aprobadas → verde */
+    .ap-card.alerta-verde { border-color:#16a34a; }
+    .ap-card.alerta-verde .card-icon { background:linear-gradient(135deg,#dcfce7,#bbf7d0); color:#15803d; }
+    .ap-card.alerta-verde .ap-badge { display:flex; background:#16a34a; }
+    .ap-card.alerta-verde .btn-acceder { background:#16a34a; }
     .est-mini { font-size:.68rem; font-weight:700; border-radius:10px; padding:2px 8px; }
     .exc-dot { display:inline-flex; align-items:center; justify-content:center; width:20px; height:20px; border-radius:50%;
       background:#dc2626; color:#fff; font-size:.7rem; font-weight:800; cursor:pointer; margin-left:5px; }
@@ -137,14 +157,44 @@
   <div style="text-align:center;margin:10px 0 26px">
     <h4 style="font-weight:800;color:var(--navy);letter-spacing:.02em">GENERADOR DE CARTAS DE APROBACIÓN Y CARTOLAS</h4>
   </div>
-  <div style="display:grid;grid-template-columns:repeat(3,minmax(220px,280px));gap:16px;justify-content:center">
-    <button class="home-card" id="cardGenerador" onclick="showTab('nueva')" style="display:none">GENERADOR DE CARTA DE APROBACIÓN</button>
-    <button class="home-card" id="cardRevision" onclick="showTab('revision')" style="display:none">REVISIÓN CARTA DE APROBACIÓN <span class="badge-n" id="badgeRevCard" style="display:none">0</span></button>
-    <button class="home-card" id="cardImpresion" onclick="showTab('impresion')">IMPRESIÓN DE CARTA DE APROBACIÓN</button>
-    <button class="home-card" id="cardMisCartas" onclick="showTab('lista')">MIS CARTAS</button>
-    <button class="home-card" id="cardInformes" onclick="showTab('informes')" style="display:none">INFORMES CARTAS DE APROBACIÓN</button>
-    <button class="home-card" id="cardCartolas" onclick="showTab('cartolas')" style="display:none">EMISIÓN DE CARTOLAS</button>
-    <button class="home-card" id="cardEnviadas" onclick="showTab('enviadas')" style="display:none">CARTOLAS ENVIADAS</button>
+  <div class="ap-grid">
+    <button class="ap-card" id="cardGenerador" onclick="showTab('nueva')" style="display:none">
+      <div class="card-icon"><i class="bi bi-file-earmark-plus"></i></div>
+      <h6>Generador de Carta</h6><p>Digita una nueva carta de aprobación de crédito</p>
+      <span class="btn-acceder"><i class="bi bi-arrow-right-circle me-1"></i>Acceder</span>
+    </button>
+    <button class="ap-card" id="cardRevision" onclick="showTab('revision')" style="display:none">
+      <span class="ap-badge" id="badgeRevCard">0</span>
+      <div class="card-icon"><i class="bi bi-check2-square"></i></div>
+      <h6>Revisión de Cartas</h6><p>Aprueba o rechaza las cartas pendientes del pool</p>
+      <span class="btn-acceder"><i class="bi bi-arrow-right-circle me-1"></i>Acceder</span>
+    </button>
+    <button class="ap-card" id="cardImpresion" onclick="showTab('impresion')">
+      <span class="ap-badge" id="badgeImpCard">0</span>
+      <div class="card-icon"><i class="bi bi-printer"></i></div>
+      <h6>Impresión de Cartas</h6><p>Imprime en PDF las cartas ya aprobadas</p>
+      <span class="btn-acceder"><i class="bi bi-arrow-right-circle me-1"></i>Acceder</span>
+    </button>
+    <button class="ap-card" id="cardMisCartas" onclick="showTab('lista')">
+      <div class="card-icon"><i class="bi bi-list-ul"></i></div>
+      <h6>Mis Cartas</h6><p>Estado de tus cartas: corrige rechazadas y haz seguimiento</p>
+      <span class="btn-acceder"><i class="bi bi-arrow-right-circle me-1"></i>Acceder</span>
+    </button>
+    <button class="ap-card" id="cardInformes" onclick="showTab('informes')" style="display:none">
+      <div class="card-icon"><i class="bi bi-graph-up"></i></div>
+      <h6>Informes de Cartas</h6><p>Filtros, excepciones, otorgados y exportación a Excel</p>
+      <span class="btn-acceder"><i class="bi bi-arrow-right-circle me-1"></i>Acceder</span>
+    </button>
+    <button class="ap-card" id="cardCartolas" onclick="showTab('cartolas')" style="display:none">
+      <div class="card-icon"><i class="bi bi-receipt"></i></div>
+      <h6>Emisión de Cartolas</h6><p>Comisiones del mes, prepagos, anulaciones y envío</p>
+      <span class="btn-acceder"><i class="bi bi-arrow-right-circle me-1"></i>Acceder</span>
+    </button>
+    <button class="ap-card" id="cardEnviadas" onclick="showTab('enviadas')" style="display:none">
+      <div class="card-icon"><i class="bi bi-envelope-check"></i></div>
+      <h6>Cartolas Enviadas</h6><p>Historial de cartolas enviadas a concesionarios</p>
+      <span class="btn-acceder"><i class="bi bi-arrow-right-circle me-1"></i>Acceder</span>
+    </button>
   </div>
 </div>
 
@@ -752,11 +802,15 @@ function renderLista(){
 }
 
 function actualizarBadge(){
-  const n = CARTAS.filter(c => c.status==='PENDIENTE' && c.creadoPor!==MI_LOGIN).length;
-  const card = document.getElementById('cardRevision');
-  const b = document.getElementById('badgeRevCard');
-  b.textContent = n; b.style.display = n ? '' : 'none';
-  card.classList.toggle('rojo', n > 0);   // rojo + pulso cuando hay pendientes
+  // Revisión: rojo pulsante con cartas pendientes del pool (de otros usuarios)
+  const nRev = CARTAS.filter(c => c.status==='PENDIENTE' && c.creadoPor!==MI_LOGIN).length;
+  document.getElementById('badgeRevCard').textContent = nRev;
+  document.getElementById('cardRevision').classList.toggle('alerta-roja', nRev > 0);
+  // Impresión: verde con contador de cartas aprobadas listas para imprimir
+  // (el server ya filtra: el ejecutivo solo recibe las suyas)
+  const nImp = CARTAS.filter(c => c.status==='APROBADA').length;
+  document.getElementById('badgeImpCard').textContent = nImp;
+  document.getElementById('cardImpresion').classList.toggle('alerta-verde', nImp > 0);
 }
 
 /* ── Formulario nueva carta ───────────────────────── */
