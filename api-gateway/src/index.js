@@ -20,6 +20,21 @@ app.use((req, res, next) => {
   next();
 });
 app.use(express.json({ limit: '10mb' }));
+
+// ── Sanitizar errores 500: el detalle técnico va al log, nunca al cliente ──
+// (los 4xx pasan intactos: son mensajes de negocio como "mes cerrado")
+app.use((req, res, next) => {
+  const _json = res.json.bind(res);
+  res.json = (body) => {
+    if (res.statusCode >= 500 && body && body.error) {
+      console.error(`[500] ${req.method} ${req.originalUrl} →`, body.error);
+      body = { ...body, error: 'Error interno del servidor. Si persiste, contacta al administrador.' };
+    }
+    return _json(body);
+  };
+  next();
+});
+
 app.use(express.static(path.join(__dirname, '../public')));
 
 // Favicon
@@ -294,6 +309,24 @@ app.get(['/informes-dealernet', '/informes-dealernet/'], (req, res) =>
   res.sendFile(path.join(__dirname, '../public/informes-dealernet/index.html')));
 
 app.use((req, res) => res.status(404).json({ success: false, error: 'Ruta no encontrada' }));
+
+// ── Errores no capturados por los controllers (ej: JSON malformado, throw síncrono) ──
+app.use((err, req, res, next) => {
+  if (err.type === 'entity.parse.failed')
+    return res.status(400).json({ success: false, data: null, error: 'JSON inválido en el body' });
+  if (err.type === 'entity.too.large')
+    return res.status(413).json({ success: false, data: null, error: 'Archivo o body demasiado grande (máx 10mb)' });
+  console.error(`[ERROR] ${req.method} ${req.originalUrl} →`, err.stack || err.message);
+  res.status(500).json({ success: false, data: null, error: 'Error interno del servidor. Si persiste, contacta al administrador.' });
+});
+
+// ── El servidor no debe caerse por una promesa sin catch ──
+process.on('unhandledRejection', (reason) => {
+  console.error('[unhandledRejection]', reason instanceof Error ? reason.stack : reason);
+});
+process.on('uncaughtException', (err) => {
+  console.error('[uncaughtException]', err.stack || err.message);
+});
 
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
