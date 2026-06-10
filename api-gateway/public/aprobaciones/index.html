@@ -5,7 +5,7 @@
   <link rel="icon" href="/img/favicon.png" type="image/png">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Aprobaciones — AutoFácil</title>
-  <!-- v1.2 -->
+  <!-- v1.3 -->
   <link href="/css/bootstrap.min.css" rel="stylesheet">
   <link href="/css/bootstrap-icons.css" rel="stylesheet">
   <style>
@@ -230,7 +230,7 @@
         </label>
       </div>
       <div class="ff"><label>Valor bruto</label><input id="cPartBruto" inputmode="numeric" readonly oninput="fmtMoney(this);partDesdeBruto()"></div>
-      <div class="ff"><label>% sobre saldo</label><input id="cPartPct" inputmode="decimal" readonly oninput="partDesdePct()"></div>
+      <div class="ff"><label>% sobre saldo</label><input id="cPartPct" inputmode="decimal" readonly oninput="partDesdePct()" onblur="fmtPctBlur(this)" onfocus="fmtPctFocus(this)"></div>
       <div class="ff"><label>Valor neto</label><input id="cPartNeto" readonly></div>
       <div class="ff"><label>Valor IVA</label><input id="cPartIVA" readonly></div>
     </div>
@@ -266,9 +266,27 @@
     </div>
   </div>
 
+  <div class="card-af" style="max-width:860px;margin-top:18px">
+    <h5 style="font-weight:800;color:var(--navy)"><i class="bi bi-bank2 me-2"></i>Financiera Preferente según Saldo Precio</h5>
+    <p style="font-size:.8rem;color:#64748b">Por tramo de cuotas, define el rango de saldo precio que cursa cada financiera. Acepta montos CLP, <b>"200 UF"</b> (usa la UF del día) o <b>"NO SE PUEDE"</b>. Grabar con una financiera distinta a la preferente registra excepción.</p>
+    <table class="tbl">
+      <thead><tr>
+        <th colspan="2" style="background:#dbeafe;text-align:center">Cuotas</th>
+        <th colspan="2" style="background:#fee2e2;text-align:center">AUTOFIN</th>
+        <th colspan="2" style="background:#fef3c7;text-align:center">UNIDAD</th>
+      </tr><tr>
+        <th>Desde</th><th>Hasta</th><th>Monto mín.</th><th>Monto máx.</th><th>Monto mín.</th><th>Monto máx.</th>
+      </tr></thead>
+      <tbody id="bodyPrefTabla"></tbody>
+    </table>
+    <div style="display:flex;justify-content:flex-end;margin-top:16px">
+      <button class="btn-af" onclick="guardarPrefTabla()"><i class="bi bi-check-lg me-1"></i>Guardar Tabla</button>
+    </div>
+  </div>
+
   <div class="card-af" style="max-width:760px;margin-top:18px">
     <h5 style="font-weight:800;color:var(--navy)"><i class="bi bi-bank me-2"></i>Financieras</h5>
-    <p style="font-size:.8rem;color:#64748b">Define cuál es preferente (se preselecciona) y con cuáles no se puede cursar (bloquea el grabado).</p>
+    <p style="font-size:.8rem;color:#64748b">Lista de financieras del selector. Las bloqueadas (⛔) impiden grabar siempre, en cualquier tramo.</p>
     <table class="tbl">
       <thead><tr><th>Financiera</th><th>Estado</th><th></th></tr></thead>
       <tbody id="bodyFinancieras"></tbody>
@@ -323,9 +341,17 @@ let FIRMA_B64 = null;
 let editandoId = null;
 let UF_HOY = null, TASAS = null, montoCredManual = false;
 let FINANCIERAS = [
-  { nombre:'AUTOFIN',           estado:'preferente' },
+  { nombre:'AUTOFIN',           estado:'normal' },
   { nombre:'UNIDAD DE CREDITO', estado:'normal' },
   { nombre:'AUTOFACIL',         estado:'normal' },
+];
+/* Tabla preferencia financiera según saldo precio y cuotas (mantenedor en BD).
+   Valores: monto CLP, "200 UF" (dinámico con UF del día) o "NO SE PUEDE". */
+let PREF_TABLA = [
+  { desde:12, hasta:23, af_min:'4000000', af_max:'200 UF',    un_min:'2000000',    un_max:'18000000' },
+  { desde:24, hasta:35, af_min:'2000000', af_max:'200 UF',    un_min:'2000000',    un_max:'18000000' },
+  { desde:36, hasta:47, af_min:'2000000', af_max:'99999999',  un_min:'2000000',    un_max:'18000000' },
+  { desde:48, hasta:60, af_min:'2000000', af_max:'99999999',  un_min:'NO SE PUEDE',un_max:'NO SE PUEDE' },
 ];
 
 /* ── Helpers ──────────────────────────────────────── */
@@ -422,7 +448,7 @@ function showTab(t){
   const btn = { lista:'tabBtnLista', nueva:'tabBtnNueva', revision:'tabBtnRevision', params:'tabBtnParams' }[t];
   document.getElementById(btn).classList.add('active');
   if (t==='revision') renderRevision();
-  if (t==='params') { renderFactores(); renderFinancierasEditor(); }
+  if (t==='params') { renderFactores(); renderFinancierasEditor(); renderPrefTabla(); }
 }
 
 /* ── Cargar datos ─────────────────────────────────── */
@@ -504,6 +530,11 @@ async function cargarFactores(){
     const r = await fetch('/api/cartas-params/financieras_config', { headers: hdr() });
     const j = await r.json();
     if (j.success && j.data) { const f = JSON.parse(j.data); if (Array.isArray(f) && f.length) FINANCIERAS = f; }
+  } catch(e) { /* usa fallback */ }
+  try {
+    const r = await fetch('/api/cartas-params/financiera_preferencia', { headers: hdr() });
+    const j = await r.json();
+    if (j.success && j.data) { const t = JSON.parse(j.data); if (Array.isArray(t) && t.length) PREF_TABLA = t; }
   } catch(e) { /* usa fallback */ }
 }
 
@@ -750,9 +781,10 @@ function recalcParticipacion(){
   if (!document.getElementById('chkCambioPart').checked) {
     const bruto = Math.round(saldo * factor);
     setMoney('cPartBruto', bruto);
-    document.getElementById('cPartPct').value = factor ? (factor*100).toFixed(2).replace('.',',') : '';
+    document.getElementById('cPartPct').value = factor ? (factor*100).toFixed(2).replace('.',',')+' %' : '';
     calcNetoIva();
   }
+  avisoFinanciera();
 }
 function toggleCambioPart(){
   const on = document.getElementById('chkCambioPart').checked;
@@ -769,10 +801,15 @@ function partDesdeBruto(){
 }
 function partDesdePct(){
   const saldo = rawMoney('cSaldo');
-  const pct = parseFloat(String(document.getElementById('cPartPct').value).replace(',','.'))||0;
+  const pct = parseFloat(String(document.getElementById('cPartPct').value).replace(/[^\d,\.]/g,'').replace(',','.'))||0;
   setMoney('cPartBruto', Math.round(saldo * pct / 100));
   calcNetoIva();
 }
+function fmtPctBlur(el){
+  const n = parseFloat(String(el.value).replace(/[^\d,\.]/g,'').replace(',','.'));
+  el.value = isNaN(n) ? '' : n.toFixed(2).replace('.',',') + ' %';
+}
+function fmtPctFocus(el){ el.value = String(el.value).replace(/[^\d,]/g,''); }
 function calcNetoIva(){
   const bruto = rawMoney('cPartBruto');
   const neto = Math.round(bruto / 1.19);
@@ -780,24 +817,66 @@ function calcNetoIva(){
   setMoney('cPartIVA', bruto - neto);
 }
 
-/* ── Financieras: preferente / bloqueada ──────────── */
+/* ── Financieras: tabla de preferencia por saldo y cuotas ── */
+function parsePrefVal(v){
+  const s = String(v??'').toUpperCase().trim();
+  if (!s || s.includes('NO SE PUEDE')) return null;            // no cursable en este tramo
+  if (s.includes('UF')) { const n = parseFloat(s.replace(/[^0-9.]/g,'')); return (UF_HOY && n) ? n*UF_HOY : null; }
+  return parseInt(s.replace(/[^0-9]/g,''))||null;
+}
+function nombreCorto(fin){
+  const n = String(fin||'').toUpperCase();
+  if (n.startsWith('AUTOFIN')) return 'AUTOFIN';
+  if (n.includes('UNIDAD'))    return 'UNIDAD';
+  return null; // sin restricción de tabla
+}
+// → { pref:'AUTOFIN'|'UNIDAD'|null, puede:{AUTOFIN,UNIDAD}, row }
+function preferenteSegunTabla(plazo, saldo){
+  const p = parseInt(plazo)||0;
+  const row = PREF_TABLA.find(r => p >= parseInt(r.desde) && p <= parseInt(r.hasta));
+  if (!row || !saldo) return { pref:null, puede:{AUTOFIN:true, UNIDAD:true}, row:null };
+  const enRango = (min,max) => {
+    const mi = parsePrefVal(min), ma = parsePrefVal(max);
+    if (mi === null && ma === null) return false;              // NO SE PUEDE
+    return saldo >= (mi??0) && saldo <= (ma??Infinity);
+  };
+  const puedeAF = enRango(row.af_min, row.af_max);
+  const puedeUN = enRango(row.un_min, row.un_max);
+  return { pref: puedeAF ? 'AUTOFIN' : (puedeUN ? 'UNIDAD' : null),
+           puede: { AUTOFIN:puedeAF, UNIDAD:puedeUN }, row };
+}
 function renderFinancierasSelect(){
   const sel = document.getElementById('cAcreedor');
   sel.innerHTML = FINANCIERAS.map(f => {
-    const tag = f.estado === 'preferente' ? ' ★ (preferente)' : f.estado === 'bloqueada' ? ' ⛔ (no cursable)' : '';
-    return `<option value="${escH(f.nombre)}" ${f.estado==='bloqueada'?'data-bloq="1"':''}>${escH(f.nombre)}${tag}</option>`;
+    const tag = f.estado === 'bloqueada' ? ' ⛔ (no cursable)' : '';
+    return `<option value="${escH(f.nombre)}">${escH(f.nombre)}${tag}</option>`;
   }).join('');
-  const pref = FINANCIERAS.find(f=>f.estado==='preferente');
-  if (pref) sel.value = pref.nombre;
   avisoFinanciera();
 }
 function avisoFinanciera(){
-  const f = FINANCIERAS.find(x=>x.nombre===document.getElementById('cAcreedor').value);
+  const sel = document.getElementById('cAcreedor').value;
   const msg = document.getElementById('finMsg');
-  if (!f) { msg.textContent=''; return; }
-  if (f.estado === 'bloqueada') { msg.style.color='#dc2626'; msg.innerHTML='<i class="bi bi-x-octagon"></i> NO CURSABLE — no se permite grabar con esta financiera'; }
-  else if (f.estado === 'preferente') { msg.style.color='#16a34a'; msg.innerHTML='<i class="bi bi-star-fill"></i> Financiera preferente'; }
-  else msg.textContent = '';
+  const f = FINANCIERAS.find(x=>x.nombre===sel);
+  if (f?.estado === 'bloqueada') {
+    msg.style.color='#dc2626';
+    msg.innerHTML='<i class="bi bi-x-octagon"></i> NO CURSABLE — financiera bloqueada';
+    return;
+  }
+  const { pref, puede } = preferenteSegunTabla(document.getElementById('cPlazo').value, rawMoney('cSaldo'));
+  const corto = nombreCorto(sel);
+  if (corto && !puede[corto]) {
+    msg.style.color='#dc2626';
+    msg.innerHTML=`<i class="bi bi-x-octagon"></i> ${corto} NO PUEDE cursar este tramo (saldo/cuotas) — no se permite grabar`;
+    return;
+  }
+  if (pref) {
+    // Preseleccionar la preferente si el usuario aún no eligió manualmente otra
+    const prefFin = FINANCIERAS.find(x=>nombreCorto(x.nombre)===pref);
+    if (corto === pref) { msg.style.color='#16a34a'; msg.innerHTML=`<i class="bi bi-star-fill"></i> Financiera preferente según tabla (${pref})`; }
+    else { msg.style.color='#d97706'; msg.innerHTML=`<i class="bi bi-exclamation-triangle"></i> Preferente según tabla: ${escH(prefFin?.nombre||pref)} — grabar con otra registra EXCEPCIÓN`; }
+  } else {
+    msg.textContent='';
+  }
 }
 function setFormAlert(msg, tipo){
   const el = document.getElementById('formAlert');
@@ -835,8 +914,16 @@ async function guardarCarta(){
   if (!rawMoney('cMontoCred')) { setFormAlert('Falta: Monto crédito'); return; }
 
   // Financiera bloqueada → no se puede grabar
-  const fin = FINANCIERAS.find(x=>x.nombre===document.getElementById('cAcreedor').value);
+  const finSel = document.getElementById('cAcreedor').value;
+  const fin = FINANCIERAS.find(x=>x.nombre===finSel);
   if (fin?.estado === 'bloqueada') { setFormAlert(`⛔ No se puede cursar crédito con ${fin.nombre} — financiera bloqueada`); return; }
+
+  // Tabla de preferencia: tramo no cursable bloquea; preferente distinta = excepción
+  const prefInfo = preferenteSegunTabla(document.getElementById('cPlazo').value, rawMoney('cSaldo'));
+  const finCorto = nombreCorto(finSel);
+  if (finCorto && !prefInfo.puede[finCorto]) {
+    setFormAlert(`⛔ ${finCorto} no puede cursar este tramo de saldo/cuotas según la tabla de preferencia`); return;
+  }
 
   // Tasa vs pizarra: sobre pizarra bloquea, bajo pizarra registra excepción
   const tasa = parseFloat(String(document.getElementById('cTasa').value).replace(',','.'));
@@ -856,7 +943,21 @@ async function guardarCarta(){
       excepciones.push('TASA_BAJO_PIZARRA');
     }
   }
-  if (document.getElementById('chkCambioPart').checked) excepciones.push('CAMBIO_PARTICIPACION');
+  // Cambio participación: solo es excepción si quedó MAYOR a la pizarra
+  if (document.getElementById('chkCambioPart').checked) {
+    const factorPiz = getFactor(document.getElementById('cPlazo').value, document.getElementById('cTipo').value);
+    const brutoPizarra = Math.round(rawMoney('cSaldo') * factorPiz);
+    if (rawMoney('cPartBruto') > brutoPizarra) {
+      if (!confirm(`La participación ${fmtCLP(rawMoney('cPartBruto'))} es MAYOR a la pizarra (${fmtCLP(brutoPizarra)}).\n\nEsto requiere EXCEPCIÓN y quedará registrado para el analista.\n\n¿Continuar?`)) return;
+      excepciones.push('PARTICIPACION_SOBRE_PIZARRA');
+    }
+  }
+  // Financiera distinta a la preferente según tabla → excepción
+  if (prefInfo.pref && finCorto && finCorto !== prefInfo.pref) {
+    const prefNombre = FINANCIERAS.find(x=>nombreCorto(x.nombre)===prefInfo.pref)?.nombre || prefInfo.pref;
+    if (!confirm(`La financiera preferente para este tramo es ${prefNombre}, pero seleccionaste ${finSel}.\n\nEsto requiere EXCEPCIÓN y quedará registrado para el analista.\n\n¿Continuar?`)) return;
+    excepciones.push('FINANCIERA_NO_PREFERENTE');
+  }
 
   const ej = EJECUTIVOS.find(x=>String(x.id)===String(document.getElementById('cEjecutivo').value));
   const base = editandoId ? CARTAS.find(x=>x.id===editandoId) : null;
@@ -989,7 +1090,8 @@ function abrirRevision(id){
   const c = CARTAS.find(x=>x.id===id);
   if (!c) return;
   document.getElementById('modalTitulo').innerHTML = '<i class="bi bi-check2-square me-2"></i>Revisión — ' + escH(c.opCarta||'');
-  const EXC_LBL = { TASA_BAJO_PIZARRA:'Tasa bajo pizarra', CAMBIO_PARTICIPACION:'Cambio de participación manual' };
+  const EXC_LBL = { TASA_BAJO_PIZARRA:'Tasa bajo pizarra', CAMBIO_PARTICIPACION:'Cambio de participación manual',
+                    PARTICIPACION_SOBRE_PIZARRA:'Participación sobre pizarra', FINANCIERA_NO_PREFERENTE:'Financiera distinta a la preferente' };
   let excBanner = '';
   if (Array.isArray(c.excepciones) && c.excepciones.length) {
     const items = c.excepciones.map(e=>EXC_LBL[e]||e).join(' · ');
@@ -1176,6 +1278,33 @@ function renderFactores(){
     <td><input value="${f.agParque}" data-i="${i}" data-k="agParque" style="width:80px;border:1px solid #e2e8f0;border-radius:6px;padding:4px 8px"></td>
   </tr>`).join('');
 }
+function renderPrefTabla(){
+  const inp = (i,k,v,w) => `<input value="${escH(v??'')}" data-i="${i}" data-k="${k}" style="width:${w||'110px'};border:1px solid #e2e8f0;border-radius:6px;padding:4px 8px">`;
+  document.getElementById('bodyPrefTabla').innerHTML = PREF_TABLA.map((r,i)=>`<tr>
+    <td>${inp(i,'desde',r.desde,'60px')}</td><td>${inp(i,'hasta',r.hasta,'60px')}</td>
+    <td>${inp(i,'af_min',r.af_min)}</td><td>${inp(i,'af_max',r.af_max)}</td>
+    <td>${inp(i,'un_min',r.un_min)}</td><td>${inp(i,'un_max',r.un_max)}</td>
+  </tr>`).join('');
+}
+async function guardarPrefTabla(){
+  const nuevos = PREF_TABLA.map(r=>({...r}));
+  document.querySelectorAll('#bodyPrefTabla input').forEach(el=>{
+    const i = parseInt(el.dataset.i), k = el.dataset.k;
+    nuevos[i][k] = (k==='desde'||k==='hasta') ? (parseInt(el.value)||0) : el.value.trim();
+  });
+  try {
+    const r = await fetch('/api/cartas-params/financiera_preferencia', {
+      method:'POST', headers: hdr(), body: JSON.stringify({ value: JSON.stringify(nuevos) }) });
+    const j = await r.json();
+    const el = document.getElementById('paramsAlert');
+    if (j.success) { PREF_TABLA = nuevos; el.textContent='Tabla de preferencia guardada en BD'; el.className='alert-inline ok'; avisoFinanciera(); }
+    else { el.textContent = j.error||'Error'; el.className='alert-inline err'; }
+  } catch(e) {
+    const el = document.getElementById('paramsAlert');
+    el.textContent='Error de conexión'; el.className='alert-inline err';
+  }
+}
+
 function renderFinancierasEditor(){
   document.getElementById('bodyFinancieras').innerHTML = FINANCIERAS.map((f,i)=>`<tr>
     <td><input value="${escH(f.nombre)}" data-i="${i}" data-k="nombre" style="width:100%;border:1px solid #e2e8f0;border-radius:6px;padding:4px 8px"></td>
