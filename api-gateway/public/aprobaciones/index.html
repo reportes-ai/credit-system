@@ -5,7 +5,7 @@
   <link rel="icon" href="/img/favicon.png" type="image/png">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Aprobaciones — AutoFácil</title>
-  <!-- v2.2 -->
+  <!-- v2.3 -->
   <link href="/css/bootstrap.min.css" rel="stylesheet">
   <link href="/css/bootstrap-icons.css" rel="stylesheet">
   <style>
@@ -814,14 +814,25 @@ function renderLista(){
   }).join('');
 }
 
+/* Cartas aprobadas ya vistas/impresas por este usuario (el aviso desaparece) */
+const LS_IMP_VISTAS = 'aprob_imp_vistas_' + MI_LOGIN;
+const impVistas = () => new Set(JSON.parse(localStorage.getItem(LS_IMP_VISTAS) || '[]'));
+function marcarImpVista(id){
+  const s = impVistas();
+  if (s.has(id)) return;
+  s.add(id);
+  localStorage.setItem(LS_IMP_VISTAS, JSON.stringify([...s]));
+  actualizarBadge();
+}
+
 function actualizarBadge(){
   // Revisión: rojo pulsante con cartas pendientes del pool (de otros usuarios)
   const nRev = CARTAS.filter(c => c.status==='PENDIENTE' && c.creadoPor!==MI_LOGIN).length;
   document.getElementById('badgeRevCard').textContent = nRev;
   document.getElementById('cardRevision').classList.toggle('alerta-roja', nRev > 0);
-  // Impresión: verde con contador de cartas aprobadas listas para imprimir
-  // (el server ya filtra: el ejecutivo solo recibe las suyas)
-  const nImp = CARTAS.filter(c => c.status==='APROBADA').length;
+  // Impresión: verde solo con cartas aprobadas que aún no se ven ni imprimen
+  const vistas = impVistas();
+  const nImp = CARTAS.filter(c => c.status==='APROBADA' && !vistas.has(c.id)).length;
   document.getElementById('badgeImpCard').textContent = nImp;
   document.getElementById('cardImpresion').classList.toggle('alerta-verde', nImp > 0);
 }
@@ -1395,6 +1406,7 @@ async function anularCarta(id){
 function verCarta(id){
   const c = CARTAS.find(x=>x.id===id);
   if (!c) return;
+  if (c.status === 'APROBADA') marcarImpVista(c.id);
   document.getElementById('modalTitulo').innerHTML = '<i class="bi bi-file-earmark-text me-2"></i>' + escH(c.opCarta||'Carta');
   const motivoBanner = (c.status==='RECHAZADA' && c.motivoRechazo)
     ? `<div style="background:#fef2f2;border:1.5px solid #fecaca;color:#b91c1c;border-radius:9px;padding:9px 14px;font-size:.83rem;margin-bottom:12px"><b><i class="bi bi-x-octagon me-1"></i>Rechazada por ${escH(c.rechazadoPorNombre||'')}:</b> ${escH(c.motivoRechazo)}</div>` : '';
@@ -1491,6 +1503,7 @@ function imprimirCarta(id){
   const c = CARTAS.find(x=>x.id===id);
   if (!c) return;
   if (c.status !== 'APROBADA') { alert('La carta debe estar APROBADA para imprimir.'); return; }
+  marcarImpVista(c.id);
   const title = `Carta de Aprobación - ${(c.cliente||'').replace(/[^a-zA-Z0-9áéíóúÁÉÍÓÚñÑ ]/g,'').trim()} - ${c.opCarta||''} - ${(c.rutCliente||'').replace(/[^0-9kK\-]/g,'')}`;
   const w = window.open('', '_blank');
   if (!w) { alert('Permite las ventanas emergentes para imprimir.'); return; }
