@@ -5,7 +5,7 @@
   <link rel="icon" href="/img/favicon.png" type="image/png">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Aprobaciones — AutoFácil</title>
-  <!-- v2.3 -->
+  <!-- v2.4 -->
   <link href="/css/bootstrap.min.css" rel="stylesheet">
   <link href="/css/bootstrap-icons.css" rel="stylesheet">
   <style>
@@ -1180,7 +1180,7 @@ async function guardarCarta(){
     setFormAlert(`⛔ ${finCorto} no puede cursar este tramo de saldo/cuotas según la tabla de preferencia`); return;
   }
 
-  // Tasa vs pizarra: sobre pizarra bloquea, bajo pizarra registra excepción
+  // ── Detección de TODAS las excepciones (modal único con comentario obligatorio c/u) ──
   const tasa = parseFloat(String(document.getElementById('cTasa').value).replace(',','.'));
   const montoCred = rawMoney('cMontoCred');
   const montoUF = UF_HOY ? montoCred / UF_HOY : null;
@@ -1190,29 +1190,26 @@ async function guardarCarta(){
       ? parseFloat(TASAS.tasa_mensual_menor ?? TASAS.tasa_menor)
       : parseFloat(TASAS.tasa_mensual_mayor ?? TASAS.tasa_mayor);
   }
-  const excepciones = [];
+  const excList = [];   // [{cod, detalle}]
   if (!isNaN(tasa) && pizarra != null && !isNaN(pizarra)) {
     if (tasa > pizarra) { setFormAlert(`⛔ Tasa ${tasa}% sobre la pizarra (${pizarra}%) — no se permite grabar`); return; }
-    if (tasa < pizarra) {
-      if (!confirm(`La tasa ${String(tasa).replace('.',',')}% está BAJO la pizarra (${String(pizarra).replace('.',',')}%).\n\nEsto requiere EXCEPCIÓN y quedará registrado en la carta para el analista.\n\n¿Continuar?`)) return;
-      excepciones.push('TASA_BAJO_PIZARRA');
-    }
+    if (tasa < pizarra) excList.push({ cod:'TASA_BAJO_PIZARRA',
+      detalle:`Tasa ${String(tasa).replace('.',',')}% bajo la pizarra (${String(pizarra).replace('.',',')}%)` });
   }
-  // Cambio participación: solo es excepción si quedó MAYOR a la pizarra
-  if (document.getElementById('chkCambioPart').checked) {
-    const factorPiz = getFactor(document.getElementById('cPlazo').value, document.getElementById('cTipo').value);
-    const brutoPizarra = Math.round(rawMoney('cSaldo') * factorPiz);
-    if (rawMoney('cPartBruto') > brutoPizarra) {
-      if (!confirm(`La participación ${fmtCLP(rawMoney('cPartBruto'))} es MAYOR a la pizarra (${fmtCLP(brutoPizarra)}).\n\nEsto requiere EXCEPCIÓN y quedará registrado para el analista.\n\n¿Continuar?`)) return;
-      excepciones.push('PARTICIPACION_SOBRE_PIZARRA');
-    }
+  // Participación mayor a pizarra (con o sin checkbox: lo que importa es el monto)
+  const factorPiz = getFactor(document.getElementById('cPlazo').value, document.getElementById('cTipo').value);
+  const brutoPizarra = Math.round(rawMoney('cSaldo') * factorPiz);
+  if (brutoPizarra > 0 && rawMoney('cPartBruto') > brutoPizarra) {
+    excList.push({ cod:'PARTICIPACION_SOBRE_PIZARRA',
+      detalle:`Participación ${fmtCLP(rawMoney('cPartBruto'))} sobre la pizarra (${fmtCLP(brutoPizarra)})` });
   }
-  // Financiera distinta a la preferente según tabla → excepción
+  // Financiera distinta a la preferente según tabla
   if (prefInfo.pref && finCorto && finCorto !== prefInfo.pref) {
     const prefNombre = FINANCIERAS.find(x=>nombreCorto(x.nombre)===prefInfo.pref)?.nombre || prefInfo.pref;
-    if (!confirm(`La financiera preferente para este tramo es ${prefNombre}, pero seleccionaste ${finSel}.\n\nEsto requiere EXCEPCIÓN y quedará registrado para el analista.\n\n¿Continuar?`)) return;
-    excepciones.push('FINANCIERA_NO_PREFERENTE');
+    excList.push({ cod:'FINANCIERA_NO_PREFERENTE',
+      detalle:`Preferente según tabla: ${prefNombre} — seleccionada: ${finSel}` });
   }
+  const excepciones = excList.map(e=>e.cod);
 
   const ej = EJECUTIVOS.find(x=>String(x.id)===String(document.getElementById('cEjecutivo').value));
   const base = editandoId ? CARTAS.find(x=>x.id===editandoId) : null;
@@ -1257,13 +1254,55 @@ async function guardarCarta(){
     carta.corregidoPor = MI_LOGIN;
   }
 
+  // Con excepciones → modal con comentario obligatorio por cada una
+  if (excList.length) { abrirModalExcepciones(carta, excList); return; }
+  await enviarCarta(carta);
+}
+
+/* ── Modal de excepciones: comentario obligatorio por cada una ───── */
+let CARTA_PENDIENTE = null, EXC_PENDIENTES = [];
+function abrirModalExcepciones(carta, excList){
+  CARTA_PENDIENTE = carta; EXC_PENDIENTES = excList;
+  document.getElementById('modalTitulo').innerHTML =
+    '<i class="bi bi-exclamation-triangle me-2"></i>Excepciones detectadas (' + excList.length + ')';
+  document.getElementById('modalBody').innerHTML = `
+    <p style="font-size:.85rem;color:#475569">Esta carta requiere <b>${excList.length} excepción(es)</b>.
+    Debes justificar <b>cada una</b> antes de enviarla a aprobación — el analista verá tus comentarios.</p>
+    ${excList.map((e,i)=>`
+      <div style="background:#fff7ed;border:1.5px solid #fed7aa;border-radius:10px;padding:12px 14px;margin-bottom:10px">
+        <div style="font-weight:700;color:#c2410c;font-size:.85rem"><i class="bi bi-exclamation-triangle me-1"></i>${i+1}. ${escH(e.detalle)}</div>
+        <textarea id="excCom${i}" rows="2" placeholder="Justificación obligatoria (ej: autorizado por gerencia, cliente preferente...)"
+          style="width:100%;margin-top:8px;border:1.5px solid #e2e8f0;border-radius:8px;padding:7px 10px;font-size:.83rem"></textarea>
+        <div id="excComErr${i}" style="display:none;color:#dc2626;font-size:.72rem;font-weight:600;margin-top:3px">Comentario obligatorio</div>
+      </div>`).join('')}`;
+  document.getElementById('modalFoot').innerHTML = `
+    <button class="btn-sec" onclick="cerrarModal()">Cancelar</button>
+    <button class="btn-af" onclick="confirmarExcepciones()"><i class="bi bi-send me-1"></i>Enviar a aprobación</button>`;
+  document.getElementById('modalCarta').classList.add('show');
+}
+async function confirmarExcepciones(){
+  const comentarios = {};
+  let falta = false;
+  EXC_PENDIENTES.forEach((e,i)=>{
+    const v = document.getElementById('excCom'+i).value.trim();
+    document.getElementById('excComErr'+i).style.display = v ? 'none' : 'block';
+    if (!v) falta = true; else comentarios[e.cod] = v;
+  });
+  if (falta) return;
+  CARTA_PENDIENTE.excepcionesComentarios = comentarios;
+  cerrarModal();
+  await enviarCarta(CARTA_PENDIENTE);
+  CARTA_PENDIENTE = null; EXC_PENDIENTES = [];
+}
+
+async function enviarCarta(carta){
   const btn = document.getElementById('btnGuardarCarta');
   btn.disabled = true;
   try {
     const r = await fetch('/api/cartas', { method:'POST', headers: hdr(), body: JSON.stringify(carta) });
     const j = await r.json();
     if (!j.success) { setFormAlert(j.error||'Error al guardar'); return; }
-    setFormAlert(editandoId ? 'Carta corregida — vuelve a revisión' : 'Carta guardada — queda pendiente de revisión por otro usuario', 'ok');
+    setFormAlert(carta.id ? 'Carta corregida — vuelve a revisión' : 'Carta guardada — queda pendiente de revisión por otro usuario', 'ok');
     limpiarForm();
     await cargarCartas();
     showTab('lista');
@@ -1349,10 +1388,16 @@ function abrirRevision(id){
                     PARTICIPACION_SOBRE_PIZARRA:'Participación sobre pizarra', FINANCIERA_NO_PREFERENTE:'Financiera distinta a la preferente' };
   let excBanner = '';
   if (Array.isArray(c.excepciones) && c.excepciones.length) {
-    const items = c.excepciones.map(e=>EXC_LBL[e]||e).join(' · ');
-    const tasaInfo = c.tasaCredito ? ` — Tasa solicitada: ${String(c.tasaCredito).replace('.',',')}%` : '';
-    const ufInfo = c.montoCreditoUF ? ` — ${parseFloat(c.montoCreditoUF).toLocaleString('es-CL',{maximumFractionDigits:2})} UF (${parseFloat(c.montoCreditoUF)<=200?'≤':'>'}200)` : '';
-    excBanner = `<div style="background:#fff7ed;border:1.5px solid #fed7aa;color:#c2410c;border-radius:9px;padding:9px 14px;font-size:.83rem;margin-bottom:12px"><b><i class="bi bi-exclamation-triangle me-1"></i>EXCEPCIONES SOLICITADAS:</b> ${escH(items)}${escH(tasaInfo)}${escH(ufInfo)}</div>`;
+    const coms = c.excepcionesComentarios || {};
+    const tasaInfo = c.tasaCredito ? ` · Tasa solicitada: ${String(c.tasaCredito).replace('.',',')}%` : '';
+    const ufInfo = c.montoCreditoUF ? ` · ${parseFloat(c.montoCreditoUF).toLocaleString('es-CL',{maximumFractionDigits:2})} UF (${parseFloat(c.montoCreditoUF)<=200?'≤':'>'}200)` : '';
+    const items = c.excepciones.map(e=>`
+      <div style="margin:6px 0;padding:7px 10px;background:#fff;border-radius:7px;border:1px solid #fed7aa">
+        <b>${escH(EXC_LBL[e]||e)}</b>
+        <div style="color:#475569;font-size:.8rem;margin-top:2px"><i class="bi bi-chat-left-text me-1"></i>${escH(coms[e]||'(sin justificación)')}</div>
+      </div>`).join('');
+    excBanner = `<div style="background:#fff7ed;border:1.5px solid #fed7aa;color:#c2410c;border-radius:9px;padding:10px 14px;font-size:.83rem;margin-bottom:12px">
+      <b><i class="bi bi-exclamation-triangle me-1"></i>EXCEPCIONES SOLICITADAS (${c.excepciones.length})</b>${escH(tasaInfo)}${escH(ufInfo)}${items}</div>`;
   }
   document.getElementById('modalBody').innerHTML = excBanner + cartaHTML(c, true);
   document.getElementById('modalFoot').innerHTML = `
@@ -1701,7 +1746,9 @@ function verExcepciones(id){
   if (!c) return;
   const EXC_LBL = { TASA_BAJO_PIZARRA:'Tasa bajo pizarra', CAMBIO_PARTICIPACION:'Cambio de participación manual',
                     PARTICIPACION_SOBRE_PIZARRA:'Participación sobre pizarra', FINANCIERA_NO_PREFERENTE:'Financiera distinta a la preferente' };
-  const items = (c.excepciones||[]).map(e=>`<li style="margin:4px 0">${escH(EXC_LBL[e]||e)}</li>`).join('');
+  const coms = c.excepcionesComentarios || {};
+  const items = (c.excepciones||[]).map(e=>`<li style="margin:6px 0">${escH(EXC_LBL[e]||e)}
+    <div style="color:#475569;font-weight:400;font-size:.82rem"><i class="bi bi-chat-left-text me-1"></i>${escH(coms[e]||'(sin justificación)')}</div></li>`).join('');
   const extra = [];
   if (c.tasaCredito)    extra.push(`Tasa solicitada: <b>${String(c.tasaCredito).replace('.',',')}%</b>`);
   if (c.montoCreditoUF) extra.push(`Monto: <b>${parseFloat(c.montoCreditoUF).toLocaleString('es-CL',{maximumFractionDigits:2})} UF</b>`);
