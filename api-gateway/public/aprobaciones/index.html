@@ -5,7 +5,7 @@
   <link rel="icon" href="/img/favicon.png" type="image/png">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Aprobaciones — AutoFácil</title>
-  <!-- v2.4 -->
+  <!-- v2.5 -->
   <link href="/css/bootstrap.min.css" rel="stylesheet">
   <link href="/css/bootstrap-icons.css" rel="stylesheet">
   <style>
@@ -317,7 +317,8 @@
           <input type="checkbox" id="chkCambioPart" onchange="toggleCambioPart()"> Cambio participación
         </label>
       </div>
-      <div class="ff"><label>Valor bruto</label><input id="cPartBruto" inputmode="numeric" readonly oninput="fmtMoney(this);partDesdeBruto()"></div>
+      <div class="ff"><label>Valor bruto</label><input id="cPartBruto" inputmode="numeric" readonly oninput="fmtMoney(this);partDesdeBruto()">
+        <div id="partMsg" style="font-size:.72rem;margin-top:3px;font-weight:700"></div></div>
       <div class="ff"><label>% sobre saldo</label><input id="cPartPct" inputmode="decimal" readonly oninput="partDesdePct()" onblur="fmtPctBlur(this)" onfocus="fmtPctFocus(this)"></div>
       <div class="ff"><label>Valor neto</label><input id="cPartNeto" readonly></div>
       <div class="ff"><label>Valor IVA</label><input id="cPartIVA" readonly></div>
@@ -1070,6 +1071,19 @@ function calcNetoIva(){
   const neto = Math.round(bruto / 1.19);
   setMoney('cPartNeto', neto);
   setMoney('cPartIVA', bruto - neto);
+  avisoParticipacion();
+}
+function avisoParticipacion(){
+  const msg = document.getElementById('partMsg');
+  const factor = getFactor(document.getElementById('cPlazo').value, document.getElementById('cTipo').value);
+  const brutoPiz = Math.round(rawMoney('cSaldo') * factor);
+  const bruto = rawMoney('cPartBruto');
+  if (brutoPiz > 0 && bruto > brutoPiz) {
+    msg.style.color = '#d97706';
+    msg.innerHTML = `<i class="bi bi-exclamation-triangle"></i> Sobre pizarra (${fmtCLP(brutoPiz)}) — REQUIERE EXCEPCIÓN`;
+  } else {
+    msg.textContent = '';
+  }
 }
 
 /* ── Financieras: tabla de preferencia por saldo y cuotas ── */
