@@ -1296,15 +1296,23 @@ const getUsuariosByPerfil = async (req, res) => {
       "SELECT id_modulo FROM modulos WHERE nombre='Mantenedores' AND estado='activo' LIMIT 1"
     );
     if (!modMan) return;
+    // href debe partir con /mantenedores/ para que la página lo muestre;
+    // el gateway redirige a /aprobaciones/?tab=params
+    const HREF_PREF = '/mantenedores/preferencia-financiera/';
     const [[ex]] = await pool.query(
-      "SELECT id_funcionalidad FROM funcionalidades WHERE codigo='mant_pref_financiera'"
+      "SELECT id_funcionalidad, href FROM funcionalidades WHERE codigo='mant_pref_financiera'"
     );
     let idF;
-    if (ex) { idF = ex.id_funcionalidad; }
-    else {
+    if (ex) {
+      idF = ex.id_funcionalidad;
+      if (ex.href !== HREF_PREF) {
+        await pool.query('UPDATE funcionalidades SET href=? WHERE id_funcionalidad=?', [HREF_PREF, idF]);
+        console.log('[v15] href mant_pref_financiera corregido');
+      }
+    } else {
       const [ins] = await pool.query(
         'INSERT INTO funcionalidades (id_modulo, nombre, codigo, href) VALUES (?,?,?,?)',
-        [modMan.id_modulo, 'Preferencia Financiera', 'mant_pref_financiera', '/aprobaciones/?tab=params']
+        [modMan.id_modulo, 'Preferencia Financiera', 'mant_pref_financiera', HREF_PREF]
       );
       idF = ins.insertId;
       console.log('[v15] funcionalidad mant_pref_financiera creada id=' + idF);

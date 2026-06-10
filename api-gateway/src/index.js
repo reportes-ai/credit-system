@@ -308,6 +308,10 @@ app.get(['/cartas-aprobacion', '/cartas-aprobacion/'], (req, res) =>
 app.get(['/aprobaciones', '/aprobaciones/'], (req, res) =>
   res.sendFile(path.join(__dirname, '../public/aprobaciones/index.html')));
 
+// Card en Mantenedores → abre la pestaña Parámetros de Aprobaciones
+app.get(['/mantenedores/preferencia-financiera', '/mantenedores/preferencia-financiera/'], (req, res) =>
+  res.redirect('/aprobaciones/?tab=params'));
+
 app.get(['/informes-dealernet', '/informes-dealernet/'], (req, res) =>
   res.sendFile(path.join(__dirname, '../public/informes-dealernet/index.html')));
 
