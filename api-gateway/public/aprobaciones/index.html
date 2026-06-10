@@ -5,7 +5,7 @@
   <link rel="icon" href="/img/favicon.png" type="image/png">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Aprobaciones — AutoFácil</title>
-  <!-- v1.1 -->
+  <!-- v1.2 -->
   <link href="/css/bootstrap.min.css" rel="stylesheet">
   <link href="/css/bootstrap-icons.css" rel="stylesheet">
   <style>
@@ -166,7 +166,7 @@
 
       <div class="sec-form">Datos de la operación</div>
       <div class="ff"><label>Tipo de carta *</label>
-        <select id="cTipo" onchange="recalcParticipacion()">
+        <select id="cTipo" onchange="onTipoCarta()">
           <option value="">— Seleccione —</option>
           <option>DEALER PARQUE</option><option>DEALER CALLE</option>
           <option>ALTA GAMA - PARQUE</option><option>ALTA GAMA - CALLE</option>
@@ -179,9 +179,17 @@
       <div class="ff"><label>Correo ejecutivo</label><input id="cEjMail" readonly></div>
 
       <div class="sec-form">Datos del cliente</div>
-      <div class="ff"><label>RUT cliente *</label><input id="cRut" placeholder="12345678-9" onblur="buscarCliente()"></div>
-      <div class="ff fg-2"><label>Nombre cliente *</label><input id="cCliente" placeholder="Nombre completo"></div>
-      <div class="ff"><label>&nbsp;</label><div id="clienteInfo" style="font-size:.74rem;color:#16a34a;padding-top:8px"></div></div>
+      <div class="ff"><label>RUT cliente *</label>
+        <div style="display:flex;gap:6px">
+          <input id="cRut" placeholder="12.345.678-9" oninput="fmtRutInput(this)" style="flex:1">
+          <button type="button" class="btn-mini bm-ver" style="padding:7px 12px" onclick="buscarCliente()"><i class="bi bi-search"></i> Buscar</button>
+        </div>
+        <div id="rutMsg" style="font-size:.72rem;margin-top:3px"></div>
+      </div>
+      <div class="ff"><label>Nombres *</label><input id="cNombres" placeholder="Nombres"></div>
+      <div class="ff"><label>Apellido paterno *</label><input id="cApPat" placeholder="Apellido paterno"></div>
+      <div class="ff"><label>Apellido materno</label><input id="cApMat" placeholder="Apellido materno"></div>
+      <div class="ff fg-4"><div id="clienteInfo" style="font-size:.76rem;color:#16a34a"></div></div>
 
       <div class="sec-form">Datos del vehículo</div>
       <div class="ff"><label>Tipo vehículo</label>
@@ -195,25 +203,36 @@
       <div class="sec-form">Montos y plazo</div>
       <div class="ff"><label>Precio venta *</label><input id="cPrecio" inputmode="numeric" oninput="fmtMoney(this);calcSaldo()"></div>
       <div class="ff"><label>Pie *</label><input id="cPie" inputmode="numeric" oninput="fmtMoney(this);calcSaldo()"></div>
-      <div class="ff"><label>Saldo precio</label><input id="cSaldo" readonly></div>
+      <div class="ff"><label>Saldo precio <span id="piePct" style="color:#0141A2;font-weight:700;text-transform:none"></span></label><input id="cSaldo" readonly></div>
       <div class="ff"><label>Plazo (cuotas) *</label>
         <select id="cPlazo" onchange="recalcParticipacion()">
           <option value="">—</option><option>6</option><option>12</option><option>18</option><option>24</option>
           <option>30</option><option>36</option><option>42</option><option>48</option><option>60</option><option>72</option>
         </select></div>
-      <div class="ff"><label>Acreedor</label><select id="cAcreedor"><option>AUTOFIN</option><option>UNIDAD LEASING</option><option>AUTOFACIL</option></select></div>
+      <div class="ff"><label>Monto crédito (CLP) *</label><input id="cMontoCred" inputmode="numeric" oninput="fmtMoney(this);montoCredManual=true;calcUFyTasa()"></div>
+      <div class="ff"><label>Monto crédito (UF) <span id="ufBadge" style="text-transform:none"></span></label><input id="cMontoUF" readonly></div>
+      <div class="ff"><label>Tasa crédito (%)</label><input id="cTasa" inputmode="decimal" placeholder="Ej: 2,7" oninput="calcUFyTasa()"></div>
+      <div class="ff"><label>Tasa pizarra (%)</label><input id="cTasaPizarra" readonly>
+        <div id="tasaMsg" style="font-size:.72rem;margin-top:3px;font-weight:700"></div></div>
+      <div class="ff fg-2"><label>Financiera / acreedor</label><select id="cAcreedor" onchange="avisoFinanciera()"></select>
+        <div id="finMsg" style="font-size:.72rem;margin-top:3px;font-weight:700"></div></div>
 
       <div class="sec-form">Parque y concesionario</div>
-      <div class="ff fg-2"><label>Parque automotriz</label><select id="cParque" onchange="filtrarConcesionarios()"><option value="">— Sin parque (calle) —</option></select></div>
+      <div class="ff fg-2" id="wrapParque"><label>Parque automotriz</label><select id="cParque" onchange="filtrarConcesionarios()"><option value="">— Sin parque (calle) —</option></select></div>
       <div class="ff fg-2"><label>Concesionario *</label><select id="cConc" onchange="onConcesionario()"><option value="">Cargando…</option></select></div>
       <div class="ff"><label>RUT concesionario</label><input id="cRutConc" readonly></div>
       <div class="ff fg-2"><label>Vendedor</label><input id="cVendedor" placeholder="Nombre vendedor"></div>
 
-      <div class="sec-form">Participación dealer <span style="font-weight:400;font-size:.68rem;color:#94a3b8;text-transform:none">(calculada por plazo y tipo — editable)</span></div>
-      <div class="ff"><label>Valor bruto</label><input id="cPartBruto" inputmode="numeric" oninput="fmtMoney(this);calcNetoIva()"></div>
+      <div class="sec-form">Participación dealer
+        <span id="comisionPizarra" style="font-weight:600;font-size:.72rem;color:#0141A2;text-transform:none;margin-left:8px"></span>
+        <label style="float:right;font-size:.72rem;text-transform:none;font-weight:600;color:#475569;cursor:pointer">
+          <input type="checkbox" id="chkCambioPart" onchange="toggleCambioPart()"> Cambio participación
+        </label>
+      </div>
+      <div class="ff"><label>Valor bruto</label><input id="cPartBruto" inputmode="numeric" readonly oninput="fmtMoney(this);partDesdeBruto()"></div>
+      <div class="ff"><label>% sobre saldo</label><input id="cPartPct" inputmode="decimal" readonly oninput="partDesdePct()"></div>
       <div class="ff"><label>Valor neto</label><input id="cPartNeto" readonly></div>
       <div class="ff"><label>Valor IVA</label><input id="cPartIVA" readonly></div>
-      <div class="ff"><label>Factor aplicado</label><input id="cFactor" readonly></div>
     </div>
 
     <div style="display:flex;justify-content:flex-end;gap:10px;margin-top:22px">
@@ -244,6 +263,19 @@
     </table>
     <div style="display:flex;justify-content:flex-end;margin-top:16px">
       <button class="btn-af" onclick="guardarFactores()"><i class="bi bi-check-lg me-1"></i>Guardar Factores</button>
+    </div>
+  </div>
+
+  <div class="card-af" style="max-width:760px;margin-top:18px">
+    <h5 style="font-weight:800;color:var(--navy)"><i class="bi bi-bank me-2"></i>Financieras</h5>
+    <p style="font-size:.8rem;color:#64748b">Define cuál es preferente (se preselecciona) y con cuáles no se puede cursar (bloquea el grabado).</p>
+    <table class="tbl">
+      <thead><tr><th>Financiera</th><th>Estado</th><th></th></tr></thead>
+      <tbody id="bodyFinancieras"></tbody>
+    </table>
+    <div style="display:flex;justify-content:space-between;margin-top:16px">
+      <button class="btn-sec" onclick="agregarFinanciera()"><i class="bi bi-plus-lg me-1"></i>Agregar</button>
+      <button class="btn-af" onclick="guardarFinancieras()"><i class="bi bi-check-lg me-1"></i>Guardar Financieras</button>
     </div>
   </div>
 </div>
@@ -289,6 +321,12 @@ let FACTORES = [   // fallback si no hay parámetro en BD
 ];
 let FIRMA_B64 = null;
 let editandoId = null;
+let UF_HOY = null, TASAS = null, montoCredManual = false;
+let FINANCIERAS = [
+  { nombre:'AUTOFIN',           estado:'preferente' },
+  { nombre:'UNIDAD DE CREDITO', estado:'normal' },
+  { nombre:'AUTOFACIL',         estado:'normal' },
+];
 
 /* ── Helpers ──────────────────────────────────────── */
 const fmtCLP = v => { const n=parseInt(v)||0; return '$' + n.toLocaleString('es-CL'); };
@@ -306,9 +344,63 @@ const dDT   = v => { if(!v) return null; const d=new Date(v); if(isNaN(d)) retur
 /* ── Init ─────────────────────────────────────────── */
 (async function init(){
   await cargarPermisos();
-  await Promise.all([cargarCartas(), cargarCatalogos(), cargarFactores(), cargarFirma()]);
+  await Promise.all([cargarCartas(), cargarCatalogos(), cargarFactores(), cargarFirma(), cargarUFyTasas()]);
   document.getElementById('cFecha').value = new Date().toISOString().slice(0,10);
+  renderFinancierasSelect();
+  restaurarBorrador();
 })();
+
+async function cargarUFyTasas(){
+  try {
+    const [rUf, rTas] = await Promise.all([
+      fetch('/api/uf/vigente', { headers: hdr() }),
+      fetch('/api/tasas/vigente', { headers: hdr() }),
+    ]);
+    const [jUf, jTas] = await Promise.all([rUf.json(), rTas.json()]);
+    const u = Array.isArray(jUf.data) ? jUf.data[0] : jUf.data;
+    if (u?.valor) UF_HOY = parseFloat(u.valor);
+    if (jTas.data) TASAS = jTas.data;
+  } catch(e) { console.error('uf/tasas', e); }
+}
+
+/* ── Borrador: ida y vuelta a Clientes ────────────── */
+const LS_DRAFT = 'aprob_borrador';
+function guardarBorrador(){
+  const d = {};
+  ['cTipo','cOpOrigen','cFecha','cEjecutivo','cRut','cNombres','cApPat','cApMat','cTipoVeh','cMarca','cModelo','cAnio','cPatente','cPrenda','cPlazo','cAcreedor','cParque','cConc','cVendedor','cTasa']
+    .forEach(id => d[id] = document.getElementById(id).value);
+  ['cPrecio','cPie','cMontoCred','cPartBruto'].forEach(id => d[id+'_raw'] = rawMoney(id));
+  sessionStorage.setItem(LS_DRAFT, JSON.stringify(d));
+}
+function restaurarBorrador(){
+  const rutParam = new URLSearchParams(location.search).get('rut');
+  const raw = sessionStorage.getItem(LS_DRAFT);
+  if (!raw && !rutParam) return;
+  if (raw) {
+    try {
+      const d = JSON.parse(raw);
+      ['cTipo','cOpOrigen','cFecha','cEjecutivo','cTipoVeh','cPatente','cPrenda','cPlazo','cAcreedor','cVendedor','cTasa','cRut','cNombres','cApPat','cApMat']
+        .forEach(id => { if(d[id]) document.getElementById(id).value = d[id]; });
+      onEjecutivo(); calcOpCarta();
+      if (d.cMarca) { document.getElementById('cMarca').value = d.cMarca; cargarModelos();
+        setTimeout(()=>{ if(d.cModelo){ document.getElementById('cModelo').value=d.cModelo; cargarAnios();
+          setTimeout(()=>{ if(d.cAnio) document.getElementById('cAnio').value=d.cAnio; },400);} },400); }
+      if (d.cParque !== undefined) { document.getElementById('cParque').value = d.cParque; }
+      filtrarConcesionarios();
+      if (d.cConc) { document.getElementById('cConc').value = d.cConc; onConcesionario(); }
+      ['cPrecio','cPie','cMontoCred','cPartBruto'].forEach(id => { if(d[id+'_raw']) setMoney(id, d[id+'_raw']); });
+      if (d.cMontoCred_raw) montoCredManual = true;
+      calcSaldo(); onTipoCarta();
+    } catch(e) {}
+    sessionStorage.removeItem(LS_DRAFT);
+  }
+  if (rutParam) {
+    document.getElementById('cRut').value = rutParam;
+    fmtRutInput(document.getElementById('cRut'));
+    setTimeout(buscarCliente, 400);
+  }
+  if (raw || rutParam) showTab('nueva');
+}
 
 async function cargarPermisos(){
   try {
@@ -330,7 +422,7 @@ function showTab(t){
   const btn = { lista:'tabBtnLista', nueva:'tabBtnNueva', revision:'tabBtnRevision', params:'tabBtnParams' }[t];
   document.getElementById(btn).classList.add('active');
   if (t==='revision') renderRevision();
-  if (t==='params') renderFactores();
+  if (t==='params') { renderFactores(); renderFinancierasEditor(); }
 }
 
 /* ── Cargar datos ─────────────────────────────────── */
@@ -408,6 +500,11 @@ async function cargarFactores(){
     const j = await r.json();
     if (j.success && j.data) { const f = JSON.parse(j.data); if (Array.isArray(f) && f.length) FACTORES = f; }
   } catch(e) { /* usa fallback */ }
+  try {
+    const r = await fetch('/api/cartas-params/financieras_config', { headers: hdr() });
+    const j = await r.json();
+    if (j.success && j.data) { const f = JSON.parse(j.data); if (Array.isArray(f) && f.length) FINANCIERAS = f; }
+  } catch(e) { /* usa fallback */ }
 }
 
 async function cargarFirma(){
@@ -476,20 +573,66 @@ function onEjecutivo(){
   document.getElementById('cEjMail').value = e?.mail||'';
   document.getElementById('cEjTel').value  = e?.tel||'';
 }
+/* ── RUT: formato + dígito verificador ────────────── */
+function calcularDV(num){
+  let suma = 0, mul = 2;
+  for (let i = String(num).length - 1; i >= 0; i--) {
+    suma += parseInt(String(num)[i]) * mul;
+    mul = mul === 7 ? 2 : mul + 1;
+  }
+  const resto = 11 - (suma % 11);
+  return resto === 11 ? '0' : resto === 10 ? 'K' : String(resto);
+}
+function fmtRutInput(input){
+  const limpio = input.value.replace(/[^0-9kK]/g,'').toUpperCase().slice(0,9);
+  const msg = document.getElementById('rutMsg');
+  if (limpio.length < 2) { input.value = limpio; msg.textContent=''; input.style.borderColor=''; return; }
+  const num = limpio.slice(0,-1), dv = limpio.slice(-1);
+  let f = '';
+  for (let i = 0; i < num.length; i++) {
+    if (i > 0 && (num.length - i) % 3 === 0) f += '.';
+    f += num[i];
+  }
+  input.value = f + '-' + dv;
+  if (num.length >= 6) {
+    const ok = calcularDV(num) === dv;
+    input.style.borderColor = ok ? '#16a34a' : '#dc2626';
+    msg.innerHTML = ok ? '<span style="color:#16a34a"><i class="bi bi-check-circle"></i> RUT válido</span>'
+                       : '<span style="color:#dc2626"><i class="bi bi-x-circle"></i> Dígito verificador incorrecto</span>';
+  } else { msg.textContent=''; input.style.borderColor=''; }
+}
+const rutLimpio = () => document.getElementById('cRut').value.replace(/[^0-9kK]/g,'').toUpperCase();
+function rutValido(){
+  const l = rutLimpio();
+  return l.length >= 7 && calcularDV(l.slice(0,-1)) === l.slice(-1);
+}
+
 async function buscarCliente(){
-  const rut = document.getElementById('cRut').value.trim();
   const info = document.getElementById('clienteInfo');
-  info.textContent = '';
-  if (!rut) return;
+  info.style.color = '#16a34a'; info.textContent = '';
+  if (!rutValido()) { info.style.color='#dc2626'; info.innerHTML='<i class="bi bi-x-circle"></i> Ingresa un RUT válido antes de buscar'; return; }
+  const rut = document.getElementById('cRut').value.trim();
+  info.innerHTML = '<i class="bi bi-hourglass-split"></i> Buscando…';
   try {
     const r = await fetch('/api/clientes/rut/'+encodeURIComponent(rut), { headers: hdr() });
     const j = await r.json();
-    if (j.success && j.data) {
-      const cl = j.data;
-      const nom = cl.nombre_completo || [cl.nombre, cl.apellido_p, cl.apellido_m].filter(Boolean).join(' ');
-      if (nom) { document.getElementById('cCliente').value = nom; info.innerHTML = '<i class="bi bi-check-circle"></i> Cliente encontrado en BD'; }
+    const cl = j.success ? j.data : null;
+    if (cl) {
+      document.getElementById('cNombres').value = cl.nombres || cl.nombre || '';
+      document.getElementById('cApPat').value   = cl.apellido_paterno || cl.apellido_p || '';
+      document.getElementById('cApMat').value   = cl.apellido_materno || cl.apellido_m || '';
+      if (!document.getElementById('cNombres').value && cl.nombre_completo)
+        document.getElementById('cNombres').value = cl.nombre_completo;
+      info.innerHTML = '<i class="bi bi-check-circle"></i> Cliente encontrado en BD';
+    } else {
+      info.style.color = '#d97706';
+      info.innerHTML = '<i class="bi bi-exclamation-triangle"></i> Cliente no existe. ';
+      if (confirm('El cliente no existe en la base de datos.\n\n¿Ir a Clientes para crearlo? Tu carta quedará guardada como borrador y volverás automáticamente al guardar.')) {
+        guardarBorrador();
+        location.href = '/clientes/?return=' + encodeURIComponent('/aprobaciones/') + '&rut=' + encodeURIComponent(rut);
+      }
     }
-  } catch(e) {}
+  } catch(e) { info.style.color='#dc2626'; info.textContent = 'Error de conexión'; }
 }
 function cargarModelos(){
   const marca = document.getElementById('cMarca').value;
@@ -526,10 +669,62 @@ function onConcesionario(){
   const opt = sel.options[sel.selectedIndex];
   document.getElementById('cRutConc').value = opt?.dataset?.rut || '';
 }
-function calcSaldo(){
-  const saldo = Math.max(0, rawMoney('cPrecio') - rawMoney('cPie'));
-  setMoney('cSaldo', saldo);
+function onTipoCarta(){
+  const tipo = document.getElementById('cTipo').value;
+  const esCalle = tipo.includes('CALLE');
+  const wrap = document.getElementById('wrapParque');
+  wrap.style.display = esCalle ? 'none' : '';
+  if (esCalle) { document.getElementById('cParque').value = ''; filtrarConcesionarios(); }
   recalcParticipacion();
+}
+function calcSaldo(){
+  const precio = rawMoney('cPrecio'), pie = rawMoney('cPie');
+  const saldo = Math.max(0, precio - pie);
+  setMoney('cSaldo', saldo);
+  document.getElementById('piePct').textContent = precio > 0 ? '· '+(pie/precio*100).toFixed(1).replace('.',',')+'% pie' : '';
+  if (!montoCredManual) setMoney('cMontoCred', saldo);
+  calcUFyTasa();
+  recalcParticipacion();
+}
+function calcUFyTasa(){
+  const monto = rawMoney('cMontoCred');
+  const ufBadge = document.getElementById('ufBadge');
+  const tasaMsg = document.getElementById('tasaMsg');
+  let esMenor200 = null;
+  if (UF_HOY && monto > 0) {
+    const uf = monto / UF_HOY;
+    document.getElementById('cMontoUF').value = uf.toLocaleString('es-CL',{minimumFractionDigits:2,maximumFractionDigits:2}) + ' UF';
+    esMenor200 = uf <= 200;
+    ufBadge.innerHTML = esMenor200
+      ? '<span style="background:#dcfce7;color:#15803d;border-radius:8px;padding:1px 8px;font-size:.66rem;font-weight:700">MENOR 200 UF</span>'
+      : '<span style="background:#fef3c7;color:#b45309;border-radius:8px;padding:1px 8px;font-size:.66rem;font-weight:700">MAYOR 200 UF</span>';
+  } else { document.getElementById('cMontoUF').value = ''; ufBadge.innerHTML = ''; }
+  // Tasa pizarra según tramo UF
+  let pizarra = null;
+  if (TASAS && esMenor200 !== null) {
+    pizarra = esMenor200
+      ? parseFloat(TASAS.tasa_mensual_menor ?? TASAS.tasa_menor)
+      : parseFloat(TASAS.tasa_mensual_mayor ?? TASAS.tasa_mayor);
+    if (!isNaN(pizarra)) {
+      document.getElementById('cTasaPizarra').value =
+        pizarra.toFixed(4).replace('.',',') + ' % (' + (esMenor200 ? '≤' : '>') + '200 UF)';
+    }
+  }
+  // Comparación tasa crédito vs pizarra
+  const tasa = parseFloat(String(document.getElementById('cTasa').value).replace(',','.'));
+  tasaMsg.textContent = ''; tasaMsg.style.color = '';
+  if (!isNaN(tasa) && pizarra != null && !isNaN(pizarra)) {
+    if (tasa > pizarra) {
+      tasaMsg.style.color = '#dc2626';
+      tasaMsg.innerHTML = '<i class="bi bi-x-octagon"></i> TASA SOBRE PIZARRA — no se puede grabar';
+    } else if (tasa < pizarra) {
+      tasaMsg.style.color = '#d97706';
+      tasaMsg.innerHTML = '<i class="bi bi-exclamation-triangle"></i> Bajo pizarra — REQUIERE EXCEPCIÓN';
+    } else {
+      tasaMsg.style.color = '#16a34a';
+      tasaMsg.innerHTML = '<i class="bi bi-check-circle"></i> Tasa pizarra exacta';
+    }
+  }
 }
 function getFactor(plazo, tipo){
   const p = parseInt(plazo)||0;
@@ -548,9 +743,34 @@ function recalcParticipacion(){
   const plazo = document.getElementById('cPlazo').value;
   const saldo = rawMoney('cSaldo');
   const factor = getFactor(plazo, tipo);
-  document.getElementById('cFactor').value = factor ? (factor*100).toFixed(2).replace('.',',')+'%' : '—';
-  const bruto = Math.round(saldo * factor);
-  setMoney('cPartBruto', bruto);
+  const lbl = document.getElementById('comisionPizarra');
+  lbl.textContent = (factor && saldo)
+    ? `Pizarra ${tipo.includes('PARQUE')?'parque':'calle'} ${plazo} cuotas: ${(factor*100).toFixed(2).replace('.',',')}% = ${fmtCLP(Math.round(saldo*factor))}`
+    : (factor ? `Pizarra: ${(factor*100).toFixed(2).replace('.',',')}%` : '');
+  if (!document.getElementById('chkCambioPart').checked) {
+    const bruto = Math.round(saldo * factor);
+    setMoney('cPartBruto', bruto);
+    document.getElementById('cPartPct').value = factor ? (factor*100).toFixed(2).replace('.',',') : '';
+    calcNetoIva();
+  }
+}
+function toggleCambioPart(){
+  const on = document.getElementById('chkCambioPart').checked;
+  document.getElementById('cPartBruto').readOnly = !on;
+  document.getElementById('cPartPct').readOnly = !on;
+  document.getElementById('cPartBruto').style.background = on ? '#eff6ff' : '';
+  document.getElementById('cPartPct').style.background = on ? '#eff6ff' : '';
+  if (!on) recalcParticipacion();
+}
+function partDesdeBruto(){
+  const saldo = rawMoney('cSaldo'), bruto = rawMoney('cPartBruto');
+  document.getElementById('cPartPct').value = saldo > 0 ? (bruto/saldo*100).toFixed(2).replace('.',',') : '';
+  calcNetoIva();
+}
+function partDesdePct(){
+  const saldo = rawMoney('cSaldo');
+  const pct = parseFloat(String(document.getElementById('cPartPct').value).replace(',','.'))||0;
+  setMoney('cPartBruto', Math.round(saldo * pct / 100));
   calcNetoIva();
 }
 function calcNetoIva(){
@@ -559,6 +779,26 @@ function calcNetoIva(){
   setMoney('cPartNeto', neto);
   setMoney('cPartIVA', bruto - neto);
 }
+
+/* ── Financieras: preferente / bloqueada ──────────── */
+function renderFinancierasSelect(){
+  const sel = document.getElementById('cAcreedor');
+  sel.innerHTML = FINANCIERAS.map(f => {
+    const tag = f.estado === 'preferente' ? ' ★ (preferente)' : f.estado === 'bloqueada' ? ' ⛔ (no cursable)' : '';
+    return `<option value="${escH(f.nombre)}" ${f.estado==='bloqueada'?'data-bloq="1"':''}>${escH(f.nombre)}${tag}</option>`;
+  }).join('');
+  const pref = FINANCIERAS.find(f=>f.estado==='preferente');
+  if (pref) sel.value = pref.nombre;
+  avisoFinanciera();
+}
+function avisoFinanciera(){
+  const f = FINANCIERAS.find(x=>x.nombre===document.getElementById('cAcreedor').value);
+  const msg = document.getElementById('finMsg');
+  if (!f) { msg.textContent=''; return; }
+  if (f.estado === 'bloqueada') { msg.style.color='#dc2626'; msg.innerHTML='<i class="bi bi-x-octagon"></i> NO CURSABLE — no se permite grabar con esta financiera'; }
+  else if (f.estado === 'preferente') { msg.style.color='#16a34a'; msg.innerHTML='<i class="bi bi-star-fill"></i> Financiera preferente'; }
+  else msg.textContent = '';
+}
 function setFormAlert(msg, tipo){
   const el = document.getElementById('formAlert');
   el.textContent = msg; el.className = 'alert-inline ' + (tipo||'err');
@@ -566,24 +806,57 @@ function setFormAlert(msg, tipo){
 }
 function limpiarForm(){
   editandoId = null;
+  montoCredManual = false;
   document.getElementById('tituloForm').innerHTML = '<i class="bi bi-plus-circle me-2"></i>Nueva Carta de Aprobación';
-  ['cTipo','cOpOrigen','cOpCarta','cEjecutivo','cEjMail','cEjTel','cRut','cCliente','cMarca','cModelo','cAnio','cPatente','cPrecio','cPie','cSaldo','cPlazo','cParque','cConc','cRutConc','cVendedor','cPartBruto','cPartNeto','cPartIVA','cFactor']
-    .forEach(id => { const el=document.getElementById(id); el.value=''; if(el.dataset) el.dataset.raw=0; });
+  ['cTipo','cOpOrigen','cOpCarta','cEjecutivo','cEjMail','cEjTel','cRut','cNombres','cApPat','cApMat','cMarca','cModelo','cAnio','cPatente','cPrecio','cPie','cSaldo','cMontoCred','cMontoUF','cTasa','cTasaPizarra','cPlazo','cParque','cConc','cRutConc','cVendedor','cPartBruto','cPartPct','cPartNeto','cPartIVA']
+    .forEach(id => { const el=document.getElementById(id); if(!el) return; el.value=''; if(el.dataset) el.dataset.raw=0; el.style.borderColor=''; });
   document.getElementById('cFecha').value = new Date().toISOString().slice(0,10);
   document.getElementById('cPrenda').value = 'SI';
-  document.getElementById('cAcreedor').value = 'AUTOFIN';
+  renderFinancierasSelect();
   document.getElementById('clienteInfo').textContent = '';
+  document.getElementById('rutMsg').textContent = '';
+  ['piePct','ufBadge','tasaMsg','comisionPizarra'].forEach(id=>document.getElementById(id).innerHTML='');
+  document.getElementById('chkCambioPart').checked = false;
+  toggleCambioPart();
+  document.getElementById('wrapParque').style.display = '';
   document.getElementById('formAlert').className = 'alert-inline';
   filtrarConcesionarios();
 }
 
 async function guardarCarta(){
   const req = { cTipo:'Tipo de carta', cOpOrigen:'N° operación origen', cEjecutivo:'Ejecutivo',
-                cRut:'RUT cliente', cCliente:'Nombre cliente', cMarca:'Marca', cPlazo:'Plazo', cConc:'Concesionario' };
+                cRut:'RUT cliente', cNombres:'Nombres del cliente', cMarca:'Marca', cPlazo:'Plazo', cConc:'Concesionario' };
   for (const [id, label] of Object.entries(req)) {
     if (!document.getElementById(id).value) { setFormAlert('Falta: ' + label); return; }
   }
   if (!rawMoney('cPrecio')) { setFormAlert('Falta: Precio venta'); return; }
+  if (!rutValido()) { setFormAlert('El RUT del cliente no es válido (dígito verificador incorrecto)'); return; }
+  if (!editandoId && !document.getElementById('cApPat').value) { setFormAlert('Falta: Apellido paterno del cliente'); return; }
+  if (!rawMoney('cMontoCred')) { setFormAlert('Falta: Monto crédito'); return; }
+
+  // Financiera bloqueada → no se puede grabar
+  const fin = FINANCIERAS.find(x=>x.nombre===document.getElementById('cAcreedor').value);
+  if (fin?.estado === 'bloqueada') { setFormAlert(`⛔ No se puede cursar crédito con ${fin.nombre} — financiera bloqueada`); return; }
+
+  // Tasa vs pizarra: sobre pizarra bloquea, bajo pizarra registra excepción
+  const tasa = parseFloat(String(document.getElementById('cTasa').value).replace(',','.'));
+  const montoCred = rawMoney('cMontoCred');
+  const montoUF = UF_HOY ? montoCred / UF_HOY : null;
+  let pizarra = null;
+  if (TASAS && montoUF != null) {
+    pizarra = montoUF <= 200
+      ? parseFloat(TASAS.tasa_mensual_menor ?? TASAS.tasa_menor)
+      : parseFloat(TASAS.tasa_mensual_mayor ?? TASAS.tasa_mayor);
+  }
+  const excepciones = [];
+  if (!isNaN(tasa) && pizarra != null && !isNaN(pizarra)) {
+    if (tasa > pizarra) { setFormAlert(`⛔ Tasa ${tasa}% sobre la pizarra (${pizarra}%) — no se permite grabar`); return; }
+    if (tasa < pizarra) {
+      if (!confirm(`La tasa ${String(tasa).replace('.',',')}% está BAJO la pizarra (${String(pizarra).replace('.',',')}%).\n\nEsto requiere EXCEPCIÓN y quedará registrado en la carta para el analista.\n\n¿Continuar?`)) return;
+      excepciones.push('TASA_BAJO_PIZARRA');
+    }
+  }
+  if (document.getElementById('chkCambioPart').checked) excepciones.push('CAMBIO_PARTICIPACION');
 
   const ej = EJECUTIVOS.find(x=>String(x.id)===String(document.getElementById('cEjecutivo').value));
   const base = editandoId ? CARTAS.find(x=>x.id===editandoId) : null;
@@ -596,7 +869,8 @@ async function guardarCarta(){
     tipo:     document.getElementById('cTipo').value,
     ejecutivoIdx: ej?.id || null,
     ejecutivoNombre: ej?.nombre || '', ejecutivoMail: ej?.mail || '', ejecutivoTel: ej?.tel || '',
-    cliente: document.getElementById('cCliente').value.trim().toUpperCase(),
+    cliente: [document.getElementById('cNombres').value, document.getElementById('cApPat').value, document.getElementById('cApMat').value]
+      .map(s=>s.trim()).filter(Boolean).join(' ').toUpperCase(),
     rutCliente: document.getElementById('cRut').value.trim(),
     tipoVehiculo: document.getElementById('cTipoVeh').value,
     marca: document.getElementById('cMarca').value, modelo: document.getElementById('cModelo').value,
@@ -611,6 +885,10 @@ async function guardarCarta(){
     vendedor: document.getElementById('cVendedor').value.trim(),
     partNeto: rawMoney('cPartNeto'), partIVA: rawMoney('cPartIVA'), partBruto: rawMoney('cPartBruto'),
     fecha: document.getElementById('cFecha').value,
+    montoCreditoCLP: montoCred,
+    montoCreditoUF: montoUF != null ? Math.round(montoUF*10000)/10000 : null,
+    tasaCredito: !isNaN(tasa) ? tasa : null,
+    excepciones: excepciones.length ? excepciones : null,
     status: 'PENDIENTE',
   };
   if (!editandoId) {
@@ -654,7 +932,10 @@ function editarCarta(id){
   document.getElementById('cEjMail').value = c.ejecutivoMail||'';
   document.getElementById('cEjTel').value = c.ejecutivoTel||'';
   document.getElementById('cRut').value = c.rutCliente||'';
-  document.getElementById('cCliente').value = c.cliente||'';
+  fmtRutInput(document.getElementById('cRut'));
+  document.getElementById('cNombres').value = c.cliente||'';
+  document.getElementById('cApPat').value = '';
+  document.getElementById('cApMat').value = '';
   document.getElementById('cTipoVeh').value = c.tipoVehiculo||'AUTOMOVIL';
   document.getElementById('cMarca').value = c.marca||'';
   cargarModelos();
@@ -670,7 +951,12 @@ function editarCarta(id){
   document.getElementById('cConc').value = c.concesionario||'';
   document.getElementById('cRutConc').value = c.rutConc||'';
   document.getElementById('cVendedor').value = c.vendedor||'';
+  if (c.montoCreditoCLP) { setMoney('cMontoCred', c.montoCreditoCLP); montoCredManual = true; }
+  if (c.tasaCredito) document.getElementById('cTasa').value = String(c.tasaCredito).replace('.',',');
   setMoney('cPartBruto', c.partBruto); setMoney('cPartNeto', c.partNeto); setMoney('cPartIVA', c.partIVA);
+  const saldoE = c.saldo||0;
+  document.getElementById('cPartPct').value = saldoE>0 ? ((c.partBruto||0)/saldoE*100).toFixed(2).replace('.',',') : '';
+  calcUFyTasa(); onTipoCarta();
 }
 
 /* ── Sanitizar carta para round-trip a BD ─────────── */
@@ -703,7 +989,15 @@ function abrirRevision(id){
   const c = CARTAS.find(x=>x.id===id);
   if (!c) return;
   document.getElementById('modalTitulo').innerHTML = '<i class="bi bi-check2-square me-2"></i>Revisión — ' + escH(c.opCarta||'');
-  document.getElementById('modalBody').innerHTML = cartaHTML(c, true);
+  const EXC_LBL = { TASA_BAJO_PIZARRA:'Tasa bajo pizarra', CAMBIO_PARTICIPACION:'Cambio de participación manual' };
+  let excBanner = '';
+  if (Array.isArray(c.excepciones) && c.excepciones.length) {
+    const items = c.excepciones.map(e=>EXC_LBL[e]||e).join(' · ');
+    const tasaInfo = c.tasaCredito ? ` — Tasa solicitada: ${String(c.tasaCredito).replace('.',',')}%` : '';
+    const ufInfo = c.montoCreditoUF ? ` — ${parseFloat(c.montoCreditoUF).toLocaleString('es-CL',{maximumFractionDigits:2})} UF (${parseFloat(c.montoCreditoUF)<=200?'≤':'>'}200)` : '';
+    excBanner = `<div style="background:#fff7ed;border:1.5px solid #fed7aa;color:#c2410c;border-radius:9px;padding:9px 14px;font-size:.83rem;margin-bottom:12px"><b><i class="bi bi-exclamation-triangle me-1"></i>EXCEPCIONES SOLICITADAS:</b> ${escH(items)}${escH(tasaInfo)}${escH(ufInfo)}</div>`;
+  }
+  document.getElementById('modalBody').innerHTML = excBanner + cartaHTML(c, true);
   document.getElementById('modalFoot').innerHTML = `
     <input id="motivoRechazo" placeholder="Motivo (obligatorio si rechazas)" style="flex:1;min-width:220px;border:1.5px solid #e2e8f0;border-radius:8px;padding:7px 10px;font-size:.83rem">
     <button class="btn-mini bm-no" style="padding:9px 18px;font-size:.85rem" onclick="resolverRevision(${c.id},'RECHAZADA')"><i class="bi bi-x-lg"></i> Rechazar</button>
@@ -882,6 +1176,47 @@ function renderFactores(){
     <td><input value="${f.agParque}" data-i="${i}" data-k="agParque" style="width:80px;border:1px solid #e2e8f0;border-radius:6px;padding:4px 8px"></td>
   </tr>`).join('');
 }
+function renderFinancierasEditor(){
+  document.getElementById('bodyFinancieras').innerHTML = FINANCIERAS.map((f,i)=>`<tr>
+    <td><input value="${escH(f.nombre)}" data-i="${i}" data-k="nombre" style="width:100%;border:1px solid #e2e8f0;border-radius:6px;padding:4px 8px"></td>
+    <td><select data-i="${i}" data-k="estado" style="border:1px solid #e2e8f0;border-radius:6px;padding:4px 8px">
+      <option value="normal" ${f.estado==='normal'?'selected':''}>Normal</option>
+      <option value="preferente" ${f.estado==='preferente'?'selected':''}>★ Preferente</option>
+      <option value="bloqueada" ${f.estado==='bloqueada'?'selected':''}>⛔ No cursable</option>
+    </select></td>
+    <td><button class="btn-mini bm-no" onclick="FINANCIERAS.splice(${i},1);renderFinancierasEditor()"><i class="bi bi-trash"></i></button></td>
+  </tr>`).join('');
+}
+function agregarFinanciera(){
+  leerFinancierasEditor();
+  FINANCIERAS.push({ nombre:'', estado:'normal' });
+  renderFinancierasEditor();
+}
+function leerFinancierasEditor(){
+  document.querySelectorAll('#bodyFinancieras input, #bodyFinancieras select').forEach(el=>{
+    const i = parseInt(el.dataset.i), k = el.dataset.k;
+    if (FINANCIERAS[i]) FINANCIERAS[i][k] = el.value;
+  });
+}
+async function guardarFinancieras(){
+  leerFinancierasEditor();
+  FINANCIERAS = FINANCIERAS.filter(f=>f.nombre.trim());
+  // Solo una preferente
+  let prefVisto = false;
+  FINANCIERAS.forEach(f=>{ if(f.estado==='preferente'){ if(prefVisto) f.estado='normal'; prefVisto=true; } });
+  try {
+    const r = await fetch('/api/cartas-params/financieras_config', {
+      method:'POST', headers: hdr(), body: JSON.stringify({ value: JSON.stringify(FINANCIERAS) }) });
+    const j = await r.json();
+    const el = document.getElementById('paramsAlert');
+    if (j.success) { el.textContent='Financieras guardadas en BD'; el.className='alert-inline ok'; renderFinancierasEditor(); renderFinancierasSelect(); }
+    else { el.textContent = j.error||'Error'; el.className='alert-inline err'; }
+  } catch(e) {
+    const el = document.getElementById('paramsAlert');
+    el.textContent='Error de conexión'; el.className='alert-inline err';
+  }
+}
+
 async function guardarFactores(){
   const nuevos = FACTORES.map((f,i)=>({...f}));
   document.querySelectorAll('#bodyFactores input').forEach(inp=>{
