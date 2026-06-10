@@ -1467,4 +1467,61 @@ const getUsuariosByPerfil = async (req, res) => {
   }
 })();
 
+/* ─── Migración v18: deduplicar perfiles + limpiar permisos heredados ─
+   1) v17 creó perfiles duplicados (la tabla no tenía UNIQUE en nombre):
+      se conserva el más antiguo, se reasignan usuarios y se fusionan
+      permisos; luego se agrega el índice único.
+   2) Los seeds antiguos regalaban Cobranza/Tesorería/CRM por defecto:
+      se apagan para Ejecutivo Comercial (config fina via Perfiles UI). */
+(async () => {
+  try {
+    // 1) Dedupe por nombre — conservar el id más bajo (el original)
+    const [dups] = await pool.query(
+      `SELECT nombre, MIN(id_perfil) AS keep_id, COUNT(*) AS n
+       FROM perfiles GROUP BY nombre HAVING n > 1`
+    );
+    for (const d of dups) {
+      const [rows] = await pool.query(
+        'SELECT id_perfil FROM perfiles WHERE nombre = ? AND id_perfil <> ?',
+        [d.nombre, d.keep_id]
+      );
+      for (const r of rows) {
+        await pool.query('UPDATE usuarios SET id_perfil = ? WHERE id_perfil = ?', [d.keep_id, r.id_perfil]);
+        // Fusionar permisos: los del original prevalecen; se copian los que falten
+        await pool.query(
+          `INSERT IGNORE INTO permisos_perfil (id_perfil, id_funcionalidad, habilitado)
+           SELECT ?, id_funcionalidad, habilitado FROM permisos_perfil WHERE id_perfil = ?`,
+          [d.keep_id, r.id_perfil]
+        );
+        await pool.query('DELETE FROM permisos_perfil WHERE id_perfil = ?', [r.id_perfil]);
+        await pool.query('DELETE FROM perfiles WHERE id_perfil = ?', [r.id_perfil]);
+      }
+      console.log(`[v18] perfil "${d.nombre}": ${rows.length} duplicado(s) fusionado(s) en id ${d.keep_id}`);
+    }
+    // Índice único para que no vuelva a pasar
+    try { await pool.query('ALTER TABLE perfiles ADD UNIQUE KEY uk_perfil_nombre (nombre)'); }
+    catch (e) { if (e.errno !== 1061) console.warn('[v18 unique]', e.message); }
+
+    // 2) Ejecutivo Comercial: apagar Cobranza, Tesorería y CRM heredados
+    const [[ej]] = await pool.query(
+      "SELECT id_perfil FROM perfiles WHERE nombre = 'Ejecutivo Comercial' LIMIT 1"
+    );
+    if (ej) {
+      const [r] = await pool.query(
+        `UPDATE permisos_perfil pp
+         JOIN funcionalidades f ON f.id_funcionalidad = pp.id_funcionalidad
+         JOIN modulos m ON m.id_modulo = f.id_modulo
+         SET pp.habilitado = 0
+         WHERE pp.id_perfil = ? AND m.ruta IN ('/cobranza/','/tesoreria/','/crm/')`,
+        [ej.id_perfil]
+      );
+      if (r.affectedRows) console.log(`[v18] Ejecutivo Comercial: ${r.affectedRows} permisos Cobranza/Tesorería/CRM apagados`);
+    }
+
+    console.log('✓ Perfiles v18: duplicados fusionados y permisos heredados limpiados');
+  } catch (e) {
+    console.error('[perfiles migration v18]', e.message);
+  }
+})();
+
 module.exports = { getAllPerfiles, getModulosConFuncionalidades, getPermisosPerfil, updatePermisosPerfil, reordenarModulos, createPerfil, updatePerfil, deletePerfil, getUsuariosByPerfil };
