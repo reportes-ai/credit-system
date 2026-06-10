@@ -1360,4 +1360,111 @@ const getUsuariosByPerfil = async (req, res) => {
   }
 })();
 
+/* ─── Migración v17: perfiles y usuarios desde planilla (UNA SOLA VEZ) ─
+   Crea los 11 perfiles del organigrama y carga/actualiza los 25
+   usuarios con clave inicial AF2026. Usuarios con perfil Administrador
+   conservan su clave y su perfil. Flag en BD evita re-ejecución
+   (los usuarios cambiarán su clave y un deploy no debe resetearla).  */
+(async () => {
+  const bcrypt = require('bcryptjs');
+  try {
+    await pool.query(`CREATE TABLE IF NOT EXISTS push_config (clave VARCHAR(50) PRIMARY KEY, valor TEXT NOT NULL)`);
+    const [[flag]] = await pool.query("SELECT valor FROM push_config WHERE clave='seed_usuarios_v17'");
+    if (flag) return;
+
+    // Asegurar columnas (puede correr antes que la migración de usuarios.controller)
+    try { await pool.query('ALTER TABLE usuarios ADD COLUMN apellido_materno VARCHAR(100) NULL DEFAULT NULL'); }
+    catch (e) { if (e.errno !== 1060) throw e; }
+    try { await pool.query('ALTER TABLE usuarios ADD COLUMN centro_costo VARCHAR(100) NULL DEFAULT NULL'); }
+    catch (e) { if (e.errno !== 1060) throw e; }
+
+    const PERFILES_NUEVOS = [
+      'Analista de Operaciones', 'Analista de Crédito', 'Analista Financiero',
+      'Asistente Administrativa', 'Auditor', 'Ejecutivo Comercial',
+      'Gerente de Finanzas', 'Gerente de Operaciones y Crédito',
+      'Gerente General', 'Jefe Comercial', 'Supervisor de Crédito',
+    ];
+    for (const nombre of PERFILES_NUEVOS) {
+      await pool.query(
+        'INSERT IGNORE INTO perfiles (nombre, descripcion) VALUES (?,?)',
+        [nombre, 'Perfil ' + nombre]
+      );
+    }
+    const [perfRows] = await pool.query('SELECT id_perfil, nombre FROM perfiles');
+    const perfId = {};
+    perfRows.forEach(p => perfId[p.nombre] = p.id_perfil);
+
+    // [rut, nombre, ap_paterno, ap_materno, perfil, centro_costo, mail]
+    const USUARIOS = [
+      ['18154450-3','Ademir','Norambuena','Coloma','Analista de Operaciones','OPERACIONES','ademir.norambuena@autofacilchile.cl'],
+      ['26790157-0','Alejandro','Arteaga','Melendez','Analista Financiero','FINANZAS','alejandro.arteaga@autofacilchile.cl'],
+      ['16579884-8','Alvaro','Vargas','Vielma','Jefe Comercial','COMERCIAL','alvaro.vargas@autofacilchile.cl'],
+      ['7818455-8','Bernardo','Ponce','Pinto','Analista de Crédito','RIESGO','bernardo.ponce@autofacilchile.cl'],
+      ['18065250-7','Brandon','Barbas','Ruz','Ejecutivo Comercial','COMERCIAL','brandon.barbas@autofacilchile.cl'],
+      ['18088259-6','Bryan','Saavedra','Rojas','Analista de Operaciones','OPERACIONES','bryan.saavedra@autofacilchile.cl'],
+      ['17008339-3','Carlo','Moreno','Lizama','Ejecutivo Comercial','COMERCIAL','carlo.moreno@autofacilchile.cl'],
+      ['13463753-6','Catherinne','Vargas','Vielma','Ejecutivo Comercial','COMERCIAL','catherinne.vargas@autofacilchile.cl'],
+      ['9766899-K','Cristina','Peña','Vega','Asistente Administrativa','ADMINISTRACION Y FINANZAS','cristina.pena@autofacilchile.cl'],
+      ['12260106-4','Dagoberto','Irribarra','Romero','Supervisor de Crédito','RIESGO','dagoberto.irribarra@autofacilchile.cl'],
+      ['15330052-6','Fabian','Miranda','Fuentes','Ejecutivo Comercial','COMERCIAL','fabian.miranda@autofacilchile.cl'],
+      ['11850529-8','Fernando','Contreras','Fernandez','Ejecutivo Comercial','COMERCIAL','fernando.contreras@autofacilchile.cl'],
+      ['15820531-9','Hans','Vargas','Vielma','Ejecutivo Comercial','COMERCIAL','hans.vargas@autofacilchile.cl'],
+      ['16693235-1','Jorge','Vargas','Castillo','Analista Financiero','ADMINISTRACION Y FINANZAS','jorge.vargas@autofacilchile.cl'],
+      ['13564642-3','Juan','Bustamante','Donoso','Gerente de Finanzas','ADMINISTRACION Y FINANZAS','juan.bustamante@autofacilchile.cl'],
+      ['12152111-3','Juan','Muñoz','Núñez','Ejecutivo Comercial','COMERCIAL','juan.muoz@autofacilchile.cl'],
+      ['19637992-4','Karen','Mendez','Caneo','Ejecutivo Comercial','COMERCIAL','karen.mendez@autofacilchile.cl'],
+      ['15821694-9','Karen','Farias','De La Torre','Ejecutivo Comercial','COMERCIAL','karen.farias@autofacilchile.cl'],
+      ['21140816-2','Katherin','Trillo','Mauricio','Analista de Crédito','RIESGO','katherine.trillo@autofacilchile.cl'],
+      ['23673582-6','Leonardo','Sevilla','Anda','Gerente General','ADMINISTRACION Y FINANZAS','leonardo.sevilla@autofacilchile.cl'],
+      ['11404149-1','Luis','Soto','Ravello','Ejecutivo Comercial','COMERCIAL','luis.soto@autofacilchile.cl'],
+      ['28817774-0','Noelia','Gonzalez','Zamora','Auditor','ADMINISTRACION Y FINANZAS','noelia.gonzalez@autofacilchile.cl'],
+      ['7031537-8','Patricio','Escobar','Pohlhammer','Gerente de Operaciones y Crédito','OPERACIONES','patricio.escobar@autofacilchile.cl'],
+      ['11478703-5','Sandra','Ayala','Rojas','Analista de Operaciones','OPERACIONES','sandra.ayala@autofacilchile.cl'],
+      ['15418615-8','Solange','Vucina','Salazar','Ejecutivo Comercial','COMERCIAL','solange.vucina@autofacilchile.cl'],
+    ];
+
+    const hashAF2026 = await bcrypt.hash('AF2026', 10);
+    let creados = 0, actualizados = 0, protegidos = 0;
+
+    for (const [rut, nombre, apP, apM, perfil, centro, mail] of USUARIOS) {
+      const idPerfil = perfId[perfil];
+      if (!idPerfil) { console.warn('[v17] perfil no encontrado:', perfil); continue; }
+      const [[ex]] = await pool.query(
+        `SELECT u.id_usuario, p.nombre AS perfil_actual
+         FROM usuarios u JOIN perfiles p ON p.id_perfil = u.id_perfil
+         WHERE u.email = ? OR u.rut = ? LIMIT 1`, [mail, rut]
+      );
+      if (ex) {
+        if (ex.perfil_actual === 'Administrador') {
+          // Administrador: conserva clave y perfil; solo se completan datos
+          await pool.query(
+            'UPDATE usuarios SET nombre=?, apellido=?, apellido_materno=?, centro_costo=? WHERE id_usuario=?',
+            [nombre, apP, apM, centro, ex.id_usuario]
+          );
+          protegidos++;
+        } else {
+          await pool.query(
+            `UPDATE usuarios SET nombre=?, apellido=?, apellido_materno=?, centro_costo=?,
+             email=?, id_perfil=?, password_hash=?, estado='activo' WHERE id_usuario=?`,
+            [nombre, apP, apM, centro, mail, idPerfil, hashAF2026, ex.id_usuario]
+          );
+          actualizados++;
+        }
+      } else {
+        await pool.query(
+          `INSERT INTO usuarios (rut, nombre, apellido, apellido_materno, centro_costo, email, password_hash, id_perfil, estado)
+           VALUES (?,?,?,?,?,?,?,?,'activo')`,
+          [rut, nombre, apP, apM, centro, mail, hashAF2026, idPerfil]
+        );
+        creados++;
+      }
+    }
+
+    await pool.query("INSERT INTO push_config (clave, valor) VALUES ('seed_usuarios_v17','done')");
+    console.log(`✓ Perfiles v17: ${PERFILES_NUEVOS.length} perfiles, ${creados} usuarios creados, ${actualizados} actualizados (clave AF2026), ${protegidos} admin protegidos`);
+  } catch (e) {
+    console.error('[perfiles migration v17]', e.message);
+  }
+})();
+
 module.exports = { getAllPerfiles, getModulosConFuncionalidades, getPermisosPerfil, updatePermisosPerfil, reordenarModulos, createPerfil, updatePerfil, deletePerfil, getUsuariosByPerfil };

@@ -6,6 +6,12 @@ const bcrypt = require('bcryptjs');
   try {
     await pool.query(`ALTER TABLE usuarios ADD COLUMN telefono VARCHAR(20) NULL DEFAULT NULL`);
   } catch (e) { if (e.errno !== 1060) console.error('[usuarios migration telefono]', e.message); }
+  try {
+    await pool.query(`ALTER TABLE usuarios ADD COLUMN apellido_materno VARCHAR(100) NULL DEFAULT NULL`);
+  } catch (e) { if (e.errno !== 1060) console.error('[usuarios migration ap_materno]', e.message); }
+  try {
+    await pool.query(`ALTER TABLE usuarios ADD COLUMN centro_costo VARCHAR(100) NULL DEFAULT NULL`);
+  } catch (e) { if (e.errno !== 1060) console.error('[usuarios migration centro_costo]', e.message); }
 })();
 
 // Tabla de permisos individuales por usuario (excepciones al perfil base)
@@ -52,7 +58,7 @@ const getAllUsuarios = async (req, res) => {
   try {
     const { where, params } = buildFiltroUsuario(req.usuario);
     const [usuarios] = await pool.query(
-      `SELECT u.id_usuario, u.rut, u.nombre, u.apellido, u.email, u.telefono,
+      `SELECT u.id_usuario, u.rut, u.nombre, u.apellido, u.apellido_materno, u.centro_costo, u.email, u.telefono,
               u.id_perfil, p.nombre AS perfil, u.id_supervisor,
               CONCAT(s.nombre, ' ', s.apellido) AS supervisor_nombre,
               u.estado, u.ultimo_acceso, u.fecha_creacion,
@@ -75,7 +81,7 @@ const getAllUsuarios = async (req, res) => {
 const getUsuarioById = async (req, res) => {
   try {
     const [rows] = await pool.query(
-      `SELECT u.id_usuario, u.rut, u.nombre, u.apellido, u.email, u.telefono,
+      `SELECT u.id_usuario, u.rut, u.nombre, u.apellido, u.apellido_materno, u.centro_costo, u.email, u.telefono,
               u.id_perfil, p.nombre AS perfil, u.id_supervisor,
               CONCAT(s.nombre, ' ', s.apellido) AS supervisor_nombre,
               u.estado, u.ultimo_acceso, u.fecha_creacion
@@ -96,7 +102,7 @@ const getUsuarioById = async (req, res) => {
 
 const createUsuario = async (req, res) => {
   try {
-    const { rut, nombre, apellido, email, password, id_perfil, id_supervisor, telefono } = req.body;
+    const { rut, nombre, apellido, apellido_materno, centro_costo, email, password, id_perfil, id_supervisor, telefono } = req.body;
 
     if (!rut || !nombre || !apellido || !email || !password || !id_perfil) {
       return res.status(400).json({ success: false, data: null, error: 'RUT, nombre, apellido, email, contraseña y perfil son requeridos' });
@@ -107,8 +113,8 @@ const createUsuario = async (req, res) => {
 
     const passwordHash = await bcrypt.hash(password, 10);
     const [result] = await pool.query(
-      'INSERT INTO usuarios (rut, nombre, apellido, email, password_hash, id_perfil, id_supervisor, telefono) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
-      [rut, nombre, apellido, email, passwordHash, id_perfil, id_supervisor || null, telefono || null]
+      'INSERT INTO usuarios (rut, nombre, apellido, apellido_materno, centro_costo, email, password_hash, id_perfil, id_supervisor, telefono) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+      [rut, nombre, apellido, apellido_materno || null, centro_costo || null, email, passwordHash, id_perfil, id_supervisor || null, telefono || null]
     );
 
     res.status(201).json({
@@ -127,15 +133,15 @@ const createUsuario = async (req, res) => {
 const updateUsuario = async (req, res) => {
   try {
     const { id } = req.params;
-    const { nombre, apellido, email, id_perfil, id_supervisor, estado, telefono } = req.body;
+    const { nombre, apellido, apellido_materno, centro_costo, email, id_perfil, id_supervisor, estado, telefono } = req.body;
 
     if (!nombre || !apellido || !email || !id_perfil) {
       return res.status(400).json({ success: false, data: null, error: 'Nombre, apellido, email y perfil son requeridos' });
     }
 
     await pool.query(
-      'UPDATE usuarios SET nombre = ?, apellido = ?, email = ?, id_perfil = ?, id_supervisor = ?, estado = ?, telefono = ? WHERE id_usuario = ?',
-      [nombre, apellido, email, id_perfil, id_supervisor || null, estado || 'activo', telefono || null, id]
+      'UPDATE usuarios SET nombre = ?, apellido = ?, apellido_materno = ?, centro_costo = ?, email = ?, id_perfil = ?, id_supervisor = ?, estado = ?, telefono = ? WHERE id_usuario = ?',
+      [nombre, apellido, apellido_materno || null, centro_costo || null, email, id_perfil, id_supervisor || null, estado || 'activo', telefono || null, id]
     );
 
     res.json({ success: true, data: { id_usuario: id, nombre, apellido, email, id_perfil, estado }, error: null });

@@ -549,16 +549,31 @@
               <input type="text" id="uNombre" class="form-control">
             </div>
             <div class="col-md-4">
-              <label class="form-label">Apellido *</label>
+              <label class="form-label">Apellido Paterno *</label>
               <input type="text" id="uApellido" class="form-control">
+            </div>
+            <div class="col-md-4">
+              <label class="form-label">Apellido Materno</label>
+              <input type="text" id="uApellidoM" class="form-control">
+            </div>
+            <div class="col-md-4">
+              <label class="form-label">Centro de Costo</label>
+              <input type="text" id="uCentroCosto" class="form-control" list="listaCentros" placeholder="Seleccionar o escribir...">
+              <datalist id="listaCentros">
+                <option value="COMERCIAL"></option>
+                <option value="OPERACIONES"></option>
+                <option value="RIESGO"></option>
+                <option value="FINANZAS"></option>
+                <option value="ADMINISTRACION Y FINANZAS"></option>
+              </datalist>
+            </div>
+            <div class="col-md-4">
+              <label class="form-label">Teléfono</label>
+              <input type="text" id="uTelefono" class="form-control" placeholder="+56 9 1234 5678">
             </div>
             <div class="col-md-6">
               <label class="form-label">Email *</label>
               <input type="email" id="uEmail" class="form-control">
-            </div>
-            <div class="col-md-6">
-              <label class="form-label">Teléfono</label>
-              <input type="text" id="uTelefono" class="form-control" placeholder="+56 9 1234 5678">
             </div>
             <div class="col-md-6" id="campoPassword">
               <label class="form-label">Contraseña *</label>
@@ -817,6 +832,8 @@
           document.getElementById('uRut').disabled = true;
           document.getElementById('uNombre').value = u.nombre;
           document.getElementById('uApellido').value = u.apellido;
+          document.getElementById('uApellidoM').value = u.apellido_materno || '';
+          document.getElementById('uCentroCosto').value = u.centro_costo || '';
           document.getElementById('uEmail').value = u.email;
           document.getElementById('uTelefono').value = u.telefono || '';
           document.getElementById('uPerfil').value = u.id_perfil;
@@ -829,6 +846,8 @@
         document.getElementById('uRut').disabled = false;
         document.getElementById('uNombre').value = '';
         document.getElementById('uApellido').value = '';
+        document.getElementById('uApellidoM').value = '';
+        document.getElementById('uCentroCosto').value = '';
         document.getElementById('uEmail').value = '';
         document.getElementById('uTelefono').value = '';
         document.getElementById('uPerfil').value = '';
@@ -855,6 +874,8 @@
         rut: document.getElementById('uRut').value.trim(),
         nombre: document.getElementById('uNombre').value.trim(),
         apellido: document.getElementById('uApellido').value.trim(),
+        apellido_materno: document.getElementById('uApellidoM').value.trim() || null,
+        centro_costo: document.getElementById('uCentroCosto').value.trim() || null,
         email: document.getElementById('uEmail').value.trim(),
         telefono: document.getElementById('uTelefono').value.trim() || null,
         id_perfil: document.getElementById('uPerfil').value,
