@@ -113,6 +113,16 @@ shared/
 - `funcionalidades` con `href NULL` → permisos de acción (crear, editar, eliminar)
 - `funcionalidades` con `href` definido → generan sub-items en menús de sección
 - `usuario_ejecutivos` → tabla que controla qué ejecutivos ve cada usuario en comisiones
+- **APIs sensibles: usar `requireFunc('codigo')`** de `shared/middleware/permisos.js` —
+  valida contra la matriz de Perfiles y Permisos en BD (Admin bypass, override
+  individual, caché 60s). NO usar `requirePerfil('NombrePerfil')` en código nuevo:
+  hardcodea nombres de perfil y no obedece la matriz.
+- **Landing pages con submódulos**: las cards deben ocultarse según
+  `mis-permisos` (ver patrón en `comisiones/index.html`). Nunca cards fijas.
+- **Auditoría**: `node scripts/audit-permisos.js` revisa integridad completa
+  (duplicados, huérfanos, matriz por perfil). Correr tras cambios de permisos
+  o creación de perfiles/usuarios masivos.
+- `perfiles.nombre` tiene UNIQUE KEY (v18) — los seeds usan INSERT IGNORE seguro
 
 ## Paginación Créditos
 - Server-side: 100 registros/página, máximo 500
