@@ -4,8 +4,9 @@ const pool = require('../../../../shared/config/database');
 
 // ─── 2. Consultas lentas ──────────────────────────────────────────────────────
 exports.getSlowQueries = async (req, res) => {
+  let conn;
   try {
-    const conn = await pool.getConnection();
+    conn = await pool.getConnection();
     let rows = [];
     try {
       const [r] = await conn.query(`
@@ -29,18 +30,20 @@ exports.getSlowQueries = async (req, res) => {
         rows = r2;
       } catch (_2) { rows = []; }
     }
-    conn.release();
     return res.json({ success: true, data: { rows, total: rows.length }, error: null });
   } catch (err) {
     console.error('[db-maintenance] getSlowQueries:', err.message);
     return res.status(500).json({ success: false, data: null, error: err.message });
+  } finally {
+    if (conn) conn.release();
   }
 };
 
 // ─── 3. Control de crecimiento ────────────────────────────────────────────────
 exports.getCrecimiento = async (req, res) => {
+  let conn;
   try {
-    const conn = await pool.getConnection();
+    conn = await pool.getConnection();
     const [actuales] = await conn.query(`
       SELECT TABLE_NAME AS tabla,
              IFNULL(TABLE_ROWS,0) AS filas,
@@ -95,7 +98,6 @@ exports.getCrecimiento = async (req, res) => {
       return { ...t, crecimiento_filas, crecimiento_mb, dias_historial: h.length };
     });
 
-    conn.release();
     return res.json({
       success: true,
       data: { actuales: resumenCrecimiento, historico, snapshot_date: hoy },
@@ -104,13 +106,16 @@ exports.getCrecimiento = async (req, res) => {
   } catch (err) {
     console.error('[db-maintenance] getCrecimiento:', err.message);
     return res.status(500).json({ success: false, data: null, error: err.message });
+  } finally {
+    if (conn) conn.release();
   }
 };
 
 // ─── 4. Integridad referencial ────────────────────────────────────────────────
 exports.getIntegridad = async (req, res) => {
+  let conn;
   try {
-    const conn = await pool.getConnection();
+    conn = await pool.getConnection();
     const checks = [];
 
     const check = async (nombre, tabla, descripcion, sql) => {
@@ -163,7 +168,6 @@ exports.getIntegridad = async (req, res) => {
        WHERE c.estado IN ('aprobado','cursado','vigente')
          AND c.fecha_otorgado IS NOT NULL AND u.fecha IS NULL`);
 
-    conn.release();
     const criticos = checks.filter(c => c.estado === 'critical').length;
     const warnings  = checks.filter(c => c.estado === 'warning').length;
     const ok        = checks.filter(c => c.estado === 'ok').length;
@@ -177,13 +181,16 @@ exports.getIntegridad = async (req, res) => {
   } catch (err) {
     console.error('[db-maintenance] getIntegridad:', err.message);
     return res.status(500).json({ success: false, data: null, error: err.message });
+  } finally {
+    if (conn) conn.release();
   }
 };
 
 // ─── 7. Conexiones activas ────────────────────────────────────────────────────
 exports.getConexiones = async (req, res) => {
+  let conn;
   try {
-    const conn = await pool.getConnection();
+    conn = await pool.getConnection();
     const [procesos] = await conn.query(`
       SELECT ID AS id, USER AS usuario, HOST AS host, DB AS base_datos,
              COMMAND AS comando, TIME AS tiempo_seg,
@@ -208,7 +215,6 @@ exports.getConexiones = async (req, res) => {
       s.forEach(r => { status[r.Variable_name] = r.Value; });
     } catch (_) {}
 
-    conn.release();
     const dormidas = procesos.filter(p => p.comando === 'Sleep').length;
     const activas  = procesos.filter(p => p.comando !== 'Sleep').length;
     const lentas   = procesos.filter(p => Number(p.tiempo_seg) > 5).length;
@@ -230,5 +236,7 @@ exports.getConexiones = async (req, res) => {
   } catch (err) {
     console.error('[db-maintenance] getConexiones:', err.message);
     return res.status(500).json({ success: false, data: null, error: err.message });
+  } finally {
+    if (conn) conn.release();
   }
 };

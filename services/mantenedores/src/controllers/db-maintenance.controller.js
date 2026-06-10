@@ -52,8 +52,9 @@ const pool = require('../../../../shared/config/database');
 
 // ─── Diagnóstico ────────────────────────────────────────────────────────────
 exports.getDiagnostico = async (req, res) => {
+  let conn;
   try {
-    const conn = await pool.getConnection();
+    conn = await pool.getConnection();
 
     // 1. Información de tablas desde information_schema
     const [tablas] = await conn.query(`
@@ -137,8 +138,6 @@ exports.getDiagnostico = async (req, res) => {
     const advertencias = diagnostico.filter(t => t.nivel === 'warning').length;
     const ok          = diagnostico.filter(t => t.nivel === 'ok').length;
 
-    conn.release();
-
     return res.json({
       success: true,
       data: {
@@ -151,6 +150,8 @@ exports.getDiagnostico = async (req, res) => {
   } catch (err) {
     console.error('[db-maintenance] getDiagnostico:', err.message);
     return res.status(500).json({ success: false, data: null, error: err.message });
+  } finally {
+    if (conn) conn.release();
   }
 };
 
@@ -201,8 +202,9 @@ exports.ejecutarMantenimiento = async (req, res) => {
   const { tablas: tablasParam = [], modo = 'analyze' } = req.body || {};
   const usuario = req.user ? (req.user.email || req.user.nombre || String(req.user.id)) : 'sistema';
 
+  let conn;
   try {
-    const conn = await pool.getConnection();
+    conn = await pool.getConnection();
 
     // Obtener lista de tablas a procesar
     let tablasTarget = tablasParam;
@@ -253,8 +255,6 @@ exports.ejecutarMantenimiento = async (req, res) => {
       resultados.push({ tabla, operacion: modo, estado, mensaje: errMsg, ms });
     }
 
-    conn.release();
-
     const exitosas = resultados.filter(r => r.estado === 'ok').length;
     const fallidas  = resultados.filter(r => r.estado === 'error').length;
 
@@ -275,6 +275,8 @@ exports.ejecutarMantenimiento = async (req, res) => {
   } catch (err) {
     console.error('[db-maintenance] ejecutarMantenimiento:', err.message);
     return res.status(500).json({ success: false, data: null, error: err.message });
+  } finally {
+    if (conn) conn.release();
   }
 };
 
@@ -314,8 +316,9 @@ async function leerIndicesActuales(conn) {
 // ─── Capturar baseline de índices ────────────────────────────────────────────
 exports.capturarBaseline = async (req, res) => {
   const usuario = req.user ? (req.user.email || req.user.nombre || String(req.user.id)) : 'sistema';
+  let conn;
   try {
-    const conn = await pool.getConnection();
+    conn = await pool.getConnection();
     const indices = await leerIndicesActuales(conn);
     await conn.query('DELETE FROM db_index_baseline');
     for (const idx of indices) {
@@ -333,7 +336,6 @@ exports.capturarBaseline = async (req, res) => {
          idx.es_unico, idx.es_pk, idx.tipo, ddl, usuario]
       );
     }
-    conn.release();
     return res.json({
       success: true,
       data: { total_indices: indices.length, capturado_at: new Date().toISOString() },
@@ -342,13 +344,16 @@ exports.capturarBaseline = async (req, res) => {
   } catch (err) {
     console.error('[db-maintenance] capturarBaseline:', err.message);
     return res.status(500).json({ success: false, data: null, error: err.message });
+  } finally {
+    if (conn) conn.release();
   }
 };
 
 // ─── Verificar índices vs baseline ───────────────────────────────────────────
 exports.verificarIndices = async (req, res) => {
+  let conn;
   try {
-    const conn = await pool.getConnection();
+    conn = await pool.getConnection();
     const actuales = await leerIndicesActuales(conn);
     const actualMap = {};
     actuales.forEach(i => { actualMap[i.tabla + '||' + i.nombre] = i; });
@@ -362,7 +367,6 @@ exports.verificarIndices = async (req, res) => {
       ORDER BY capturado_at ASC
       LIMIT 1
     `);
-    conn.release();
 
     if (!baseline.length) {
       return res.json({
@@ -406,6 +410,8 @@ exports.verificarIndices = async (req, res) => {
   } catch (err) {
     console.error('[db-maintenance] verificarIndices:', err.message);
     return res.status(500).json({ success: false, data: null, error: err.message });
+  } finally {
+    if (conn) conn.release();
   }
 };
 
@@ -413,8 +419,9 @@ exports.verificarIndices = async (req, res) => {
 exports.restaurarIndices = async (req, res) => {
   const { indices: param = [] } = req.body || {};
   const usuario = req.user ? (req.user.email || req.user.nombre || String(req.user.id)) : 'sistema';
+  let conn;
   try {
-    const conn = await pool.getConnection();
+    conn = await pool.getConnection();
     let query = 'SELECT * FROM db_index_baseline WHERE ddl_restaurar IS NOT NULL AND es_pk = 0';
     const args = [];
     if (param.length) {
@@ -448,7 +455,6 @@ exports.restaurarIndices = async (req, res) => {
                           estado: 'error', mensaje: err.message });
       }
     }
-    conn.release();
     const restaurados = resultados.filter(r => r.estado === 'restaurado').length;
     const errores     = resultados.filter(r => r.estado === 'error').length;
     return res.json({
@@ -460,5 +466,7 @@ exports.restaurarIndices = async (req, res) => {
   } catch (err) {
     console.error('[db-maintenance] restaurarIndices:', err.message);
     return res.status(500).json({ success: false, data: null, error: err.message });
+  } finally {
+    if (conn) conn.release();
   }
 };

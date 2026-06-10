@@ -215,7 +215,6 @@ const createBatch = async (req, res) => {
 
     if (totalDisponible < totalCobrado - 1) {   // margen $1 por redondeo
       await conn.rollback();
-      conn.release();
       return res.status(400).json({
         success: false, data: null,
         error: `Monto insuficiente. A cobrar: $${Math.round(totalCobrado).toLocaleString('es-CL')}, disponible: $${Math.round(totalDisponible).toLocaleString('es-CL')}`
@@ -364,11 +363,11 @@ const reversar = async (req, res) => {
       'SELECT * FROM pagos_credito WHERE id_pago = ?', [id_pago]
     );
     if (!pago) {
-      await conn.rollback(); conn.release();
+      await conn.rollback();
       return res.status(404).json({ success: false, data: null, error: 'Pago no encontrado.' });
     }
     if (pago.estado_pago !== 'PAGADO') {
-      await conn.rollback(); conn.release();
+      await conn.rollback();
       return res.status(400).json({ success: false, data: null,
         error: `Este pago ya tiene estado "${pago.estado_pago}" y no puede reversarse.` });
     }
@@ -381,7 +380,7 @@ const reversar = async (req, res) => {
       [pago.id_credito]
     );
     if (ultimaPagada?.ultima !== pago.numero_cuota) {
-      await conn.rollback(); conn.release();
+      await conn.rollback();
       return res.status(400).json({ success: false, data: null,
         error: `Solo se puede reversar la última cuota pagada (N°${ultimaPagada?.ultima}). Reversa primero las cuotas posteriores.` });
     }
@@ -395,7 +394,7 @@ const reversar = async (req, res) => {
         [pago.id_caja, u.id_usuario]
       );
       if (!permCaja?.puede_reversar_pagos) {
-        await conn.rollback(); conn.release();
+        await conn.rollback();
         return res.status(403).json({ success: false, data: null,
           error: 'No tienes permiso para reversar pagos en esta caja.' });
       }

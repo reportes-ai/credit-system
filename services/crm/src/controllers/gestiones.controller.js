@@ -4,8 +4,9 @@ const pool = require('../../../../shared/config/database');
 
 // ─── Migración automática ─────────────────────────────────────────────────────
 (async () => {
+  let conn;
   try {
-    const conn = await pool.getConnection();
+    conn = await pool.getConnection();
     await conn.query(`
       CREATE TABLE IF NOT EXISTS crm_campanas (
         id_campana      INT AUTO_INCREMENT PRIMARY KEY,
@@ -64,10 +65,11 @@ const pool = require('../../../../shared/config/database');
         INDEX idx_estado (estado)
       )
     `);
-    conn.release();
     console.log('✓ CRM: tablas crm_gestiones y crm_campanas verificadas');
   } catch (err) {
     console.error('✗ CRM migración:', err.message);
+  } finally {
+    if (conn) conn.release();
   }
 })();
 

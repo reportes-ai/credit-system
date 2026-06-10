@@ -4,8 +4,9 @@ const pool = require('../../../../shared/config/database');
 
 // ─── Migración automática ─────────────────────────────────────────────────────
 (async () => {
+  let conn;
   try {
-    const conn = await pool.getConnection();
+    conn = await pool.getConnection();
     await conn.query(`
       CREATE TABLE IF NOT EXISTS cobranza_gestiones (
         id_gestion       INT AUTO_INCREMENT PRIMARY KEY,
@@ -31,10 +32,11 @@ const pool = require('../../../../shared/config/database');
         INDEX idx_created (created_at)
       )
     `);
-    conn.release();
     console.log('✓ Cobranza: tabla cobranza_gestiones verificada');
   } catch (err) {
     console.error('✗ Cobranza migración:', err.message);
+  } finally {
+    if (conn) conn.release();
   }
 })();
 
