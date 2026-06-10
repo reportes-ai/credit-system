@@ -92,7 +92,14 @@ const cambiarClave = async (req, res) => {
 
 const misPermisos = async (req, res) => {
   try {
-    const { id_perfil, id_usuario } = req.usuario;
+    const { id_usuario } = req.usuario;
+    // Perfil SIEMPRE desde BD, no del token: si el admin cambia el perfil
+    // (o se fusionan perfiles duplicados), aplica sin esperar re-login
+    let id_perfil = req.usuario.id_perfil;
+    try {
+      const [[u]] = await pool.query('SELECT id_perfil FROM usuarios WHERE id_usuario = ?', [id_usuario]);
+      if (u) id_perfil = u.id_perfil;
+    } catch (_) { /* usa el del token como fallback */ }
 
     // Módulos accesibles (para el menú principal — compatible con versión anterior)
     // Nota: 'usuarios_contrasena' no otorga la card del módulo Usuarios —
