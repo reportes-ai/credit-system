@@ -1,0 +1,872 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <link rel="icon" href="/img/favicon.png" type="image/png">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Aprobaciones — AutoFácil</title>
+  <!-- v1.0 -->
+  <link href="/css/bootstrap.min.css" rel="stylesheet">
+  <link href="/css/bootstrap-icons.css" rel="stylesheet">
+  <style>
+    :root { --navy:#001345; --blue:#0141A2; --sky:#009AFE; --ok:#16a34a; --warn:#d97706; --bad:#dc2626; }
+    *, *::before, *::after { box-sizing:border-box; }
+    body { background:#f0f4f8; font-family:'Segoe UI',system-ui,sans-serif; margin:0; }
+    /* ── topnav corporativo ── */
+    .topnav { background:linear-gradient(90deg,#012d70,#0255c5); color:#fff; height:60px; padding:0 24px; display:flex; align-items:center; justify-content:space-between; position:sticky; top:0; z-index:300; box-shadow:0 2px 8px rgba(0,0,0,.3); }
+    .topnav-left { display:flex; align-items:center; gap:16px; }
+    .topnav-brand { display:flex; align-items:center; gap:8px; text-decoration:none; }
+    .topnav-brand img { height:32px; filter:brightness(0) invert(1); }
+    .version-badge { background:rgba(255,255,255,.15); color:rgba(255,255,255,.75); font-size:.65rem; font-weight:700; border-radius:6px; padding:2px 8px; letter-spacing:.5px; }
+    .breadcrumb-nav { color:rgba(255,255,255,.6); font-size:.85rem; display:flex; align-items:center; gap:6px; }
+    .breadcrumb-nav a { color:rgba(255,255,255,.75); text-decoration:none; }
+    .breadcrumb-nav a:hover { color:#fff; }
+    .breadcrumb-nav .sep { color:rgba(255,255,255,.35); }
+    .topnav-right { display:flex; align-items:center; gap:10px; }
+    .user-chip { background:rgba(255,255,255,.12); border-radius:24px; padding:5px 12px; display:flex; align-items:center; gap:8px; font-size:.85rem; }
+    .avatar { width:28px; height:28px; background:#90caf9; border-radius:50%; display:flex; align-items:center; justify-content:center; color:#0141A2; font-weight:700; font-size:.75rem; }
+    .perfil-badge { background:rgba(144,202,249,.2); border:1px solid rgba(144,202,249,.4); color:#90caf9; border-radius:12px; padding:2px 10px; font-size:.73rem; font-weight:600; }
+    .btn-logout { background:rgba(255,255,255,.1); border:1px solid rgba(255,255,255,.2); color:#fff; border-radius:8px; padding:5px 12px; font-size:.82rem; cursor:pointer; }
+    /* ── tabs ── */
+    .tabs-bar { background:#fff; border-bottom:1px solid #e5e7eb; padding:0 24px; display:flex; gap:4px; }
+    .tab-btn { border:none; background:none; padding:13px 18px; font-size:.88rem; font-weight:600; color:#64748b; cursor:pointer; border-bottom:3px solid transparent; display:flex; align-items:center; gap:7px; }
+    .tab-btn:hover { color:var(--blue); }
+    .tab-btn.active { color:var(--blue); border-bottom-color:var(--blue); }
+    .tab-btn .badge-n { background:#f59e0b; color:#fff; font-size:.68rem; border-radius:10px; padding:1px 7px; font-weight:700; }
+    .tab-pane { display:none; padding:22px 24px; max-width:1500px; margin:0 auto; }
+    .tab-pane.active { display:block; }
+    /* ── cards / tabla ── */
+    .card-af { background:#fff; border-radius:14px; box-shadow:0 1px 4px rgba(0,0,0,.07); padding:18px 20px; }
+    table.tbl { width:100%; border-collapse:collapse; font-size:.82rem; }
+    .tbl th { background:#f8fafc; color:#475569; font-size:.72rem; text-transform:uppercase; letter-spacing:.04em; padding:9px 10px; text-align:left; border-bottom:2px solid #e2e8f0; white-space:nowrap; }
+    .tbl td { padding:8px 10px; border-bottom:1px solid #f1f5f9; vertical-align:middle; }
+    .tbl tbody tr:hover { background:#f8fafc; }
+    .st-pill { font-size:.7rem; font-weight:700; border-radius:12px; padding:3px 10px; white-space:nowrap; }
+    .st-PENDIENTE { background:#fef3c7; color:#b45309; }
+    .st-APROBADA  { background:#dcfce7; color:#15803d; }
+    .st-RECHAZADA { background:#fee2e2; color:#b91c1c; }
+    .st-ANULADA   { background:#f1f5f9; color:#64748b; }
+    .btn-mini { border:none; border-radius:7px; padding:4px 10px; font-size:.75rem; font-weight:600; cursor:pointer; margin-right:4px; white-space:nowrap; }
+    .bm-ver   { background:#eff6ff; color:#1d4ed8; }
+    .bm-print { background:#ecfdf5; color:#047857; }
+    .bm-ok    { background:#dcfce7; color:#15803d; }
+    .bm-no    { background:#fee2e2; color:#b91c1c; }
+    .bm-edit  { background:#f1f5f9; color:#374151; }
+    .bm-anular{ background:#fff7ed; color:#c2410c; }
+    /* ── formulario ── */
+    .form-grid { display:grid; grid-template-columns:repeat(4, 1fr); gap:12px 16px; }
+    .fg-2 { grid-column:span 2; } .fg-4 { grid-column:span 4; }
+    .ff label { display:block; font-size:.72rem; font-weight:700; color:#475569; margin-bottom:4px; text-transform:uppercase; letter-spacing:.03em; }
+    .ff input, .ff select { width:100%; border:1.5px solid #e2e8f0; border-radius:8px; padding:7px 10px; font-size:.85rem; background:#fff; }
+    .ff input:focus, .ff select:focus { border-color:var(--blue); outline:none; }
+    .ff input[readonly] { background:#f8fafc; color:#64748b; }
+    .sec-form { font-size:.78rem; font-weight:800; color:var(--blue); text-transform:uppercase; letter-spacing:.06em; margin:18px 0 10px; padding-bottom:5px; border-bottom:2px solid #e0edff; grid-column:span 4; }
+    .sec-form:first-child { margin-top:0; }
+    .btn-af { background:linear-gradient(135deg,#0141A2,#0255c5); color:#fff; border:none; border-radius:9px; padding:9px 22px; font-size:.88rem; font-weight:700; cursor:pointer; }
+    .btn-af:disabled { opacity:.6; cursor:not-allowed; }
+    .btn-sec { background:#f1f5f9; color:#374151; border:none; border-radius:9px; padding:9px 18px; font-size:.88rem; font-weight:600; cursor:pointer; }
+    /* ── preview / modal ── */
+    .modal-bg { display:none; position:fixed; inset:0; background:rgba(0,0,0,.5); z-index:500; align-items:flex-start; justify-content:center; overflow-y:auto; padding:30px 14px; }
+    .modal-bg.show { display:flex; }
+    .modal-card { background:#fff; border-radius:14px; max-width:860px; width:100%; box-shadow:0 20px 60px rgba(0,0,0,.3); }
+    .modal-head { background:linear-gradient(135deg,#012d70,#0141A2); color:#fff; border-radius:14px 14px 0 0; padding:14px 20px; display:flex; align-items:center; justify-content:space-between; }
+    .modal-head h6 { margin:0; font-weight:700; }
+    .modal-body-af { padding:20px; max-height:72vh; overflow-y:auto; }
+    .modal-foot { padding:14px 20px; border-top:1px solid #f1f5f9; display:flex; justify-content:flex-end; gap:10px; flex-wrap:wrap; }
+    .close-x { background:none; border:none; color:#fff; font-size:1.3rem; cursor:pointer; line-height:1; }
+    /* carta preview reproduce el formato impreso */
+    .carta-doc { font-family:Arial,sans-serif; font-size:10px; color:#222; border:1px solid #e5e7eb; padding:18px; background:#fff; }
+    .carta-doc .sec-title { background:#d8d8d8; font-weight:bold; padding:3px 6px; margin-top:5px; font-size:9.5px; color:#111; text-transform:uppercase; }
+    .carta-doc .data-tbl { width:100%; border-collapse:collapse; table-layout:fixed; }
+    .carta-doc .data-tbl td { padding:3px 6px; font-size:9px; border:.5px solid #e0e0e0; overflow:hidden; }
+    .carta-doc .lbl { background:#eee; font-weight:bold; white-space:nowrap; }
+    .carta-doc .val { background:#fff; color:#333; }
+    .filters-bar { display:flex; gap:10px; margin-bottom:14px; flex-wrap:wrap; align-items:center; }
+    .filters-bar input, .filters-bar select { border:1.5px solid #e2e8f0; border-radius:8px; padding:6px 10px; font-size:.82rem; }
+    .alert-inline { border-radius:9px; padding:9px 14px; font-size:.83rem; margin-bottom:12px; display:none; }
+    .alert-inline.err { background:#fef2f2; border:1px solid #fecaca; color:#b91c1c; display:block; }
+    .alert-inline.ok  { background:#f0fdf4; border:1px solid #bbf7d0; color:#15803d; display:block; }
+    .stat-chip { background:#fff; border-radius:12px; box-shadow:0 1px 4px rgba(0,0,0,.06); padding:12px 18px; display:flex; flex-direction:column; gap:2px; min-width:120px; }
+    .stat-chip b { font-size:1.3rem; } .stat-chip span { font-size:.72rem; color:#64748b; font-weight:600; text-transform:uppercase; }
+    @media (max-width:900px){ .form-grid{ grid-template-columns:repeat(2,1fr);} .fg-2,.fg-4{grid-column:span 2;} .sec-form{grid-column:span 2;} }
+  </style>
+</head>
+<body>
+
+<nav class="topnav">
+  <div class="topnav-left">
+    <a href="/" class="topnav-brand">
+      <img src="/img/logo.png" alt="AutoFácil">
+      <span class="version-badge" id="versionBadge">v1.0</span>
+    </a>
+    <div class="breadcrumb-nav">
+      <a href="/">Inicio</a><span class="sep">›</span>
+      <span style="color:#fff;font-weight:600"><i class="bi bi-patch-check me-1"></i>Aprobaciones</span>
+    </div>
+  </div>
+  <div class="topnav-right">
+    <div class="user-chip">
+      <div class="avatar" id="avatarInicial">?</div>
+      <div>
+        <div style="font-weight:600;line-height:1.3;color:#fff" id="navNombre">—</div>
+        <div class="perfil-badge" id="navPerfil">—</div>
+      </div>
+    </div>
+    <button class="btn-logout" onclick="logout()"><i class="bi bi-box-arrow-right me-1"></i>Salir</button>
+  </div>
+</nav>
+
+<div class="tabs-bar">
+  <button class="tab-btn active" id="tabBtnLista" onclick="showTab('lista')"><i class="bi bi-list-ul"></i> Cartas</button>
+  <button class="tab-btn" id="tabBtnNueva" onclick="showTab('nueva')" style="display:none"><i class="bi bi-plus-circle"></i> Nueva Carta</button>
+  <button class="tab-btn" id="tabBtnRevision" onclick="showTab('revision')" style="display:none"><i class="bi bi-check2-square"></i> Revisión <span class="badge-n" id="badgeRev" style="display:none">0</span></button>
+  <button class="tab-btn" id="tabBtnParams" onclick="showTab('params')" style="display:none"><i class="bi bi-sliders"></i> Parámetros</button>
+</div>
+
+<!-- ════════ TAB: LISTADO ════════ -->
+<div class="tab-pane active" id="pane-lista">
+  <div style="display:flex;gap:14px;margin-bottom:16px;flex-wrap:wrap">
+    <div class="stat-chip"><b id="stTotal">—</b><span>Total</span></div>
+    <div class="stat-chip"><b id="stPend" style="color:#b45309">—</b><span>Pendientes</span></div>
+    <div class="stat-chip"><b id="stApr" style="color:#15803d">—</b><span>Aprobadas</span></div>
+    <div class="stat-chip"><b id="stRech" style="color:#b91c1c">—</b><span>Rechazadas</span></div>
+  </div>
+  <div class="card-af">
+    <div class="filters-bar">
+      <input type="text" id="fBuscar" placeholder="Buscar cliente, RUT u operación…" oninput="renderLista()" style="flex:1;min-width:200px">
+      <select id="fEstado" onchange="renderLista()">
+        <option value="">Todos los estados</option>
+        <option>PENDIENTE</option><option>APROBADA</option><option>RECHAZADA</option><option>ANULADA</option>
+      </select>
+      <button class="btn-sec" onclick="cargarCartas()"><i class="bi bi-arrow-clockwise"></i></button>
+    </div>
+    <div style="overflow-x:auto">
+      <table class="tbl">
+        <thead><tr>
+          <th>Operación</th><th>Fecha</th><th>Cliente</th><th>RUT</th><th>Tipo</th>
+          <th style="text-align:right">Saldo Precio</th><th>Estado</th><th>Creada por</th><th>Acciones</th>
+        </tr></thead>
+        <tbody id="bodyLista"><tr><td colspan="9" style="text-align:center;color:#94a3b8;padding:24px">Cargando…</td></tr></tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<!-- ════════ TAB: NUEVA CARTA ════════ -->
+<div class="tab-pane" id="pane-nueva">
+  <div class="card-af" style="max-width:1100px;margin:0 auto">
+    <h5 style="font-weight:800;color:var(--navy);margin-bottom:4px" id="tituloForm"><i class="bi bi-plus-circle me-2"></i>Nueva Carta de Aprobación</h5>
+    <p style="font-size:.8rem;color:#64748b;margin-bottom:18px">Los datos de parques, concesionarios, vehículos y ejecutivos provienen de los mantenedores del sistema.</p>
+    <div class="alert-inline" id="formAlert"></div>
+    <div class="form-grid">
+
+      <div class="sec-form">Datos de la operación</div>
+      <div class="ff"><label>Tipo de carta *</label>
+        <select id="cTipo" onchange="recalcParticipacion()">
+          <option value="">— Seleccione —</option>
+          <option>DEALER PARQUE</option><option>DEALER CALLE</option>
+          <option>ALTA GAMA - PARQUE</option><option>ALTA GAMA - CALLE</option>
+        </select></div>
+      <div class="ff"><label>N° Operación origen *</label><input id="cOpOrigen" oninput="calcOpCarta()" placeholder="Ej: 12345"></div>
+      <div class="ff"><label>Operación carta</label><input id="cOpCarta" readonly placeholder="Auto"></div>
+      <div class="ff"><label>Fecha *</label><input type="date" id="cFecha"></div>
+      <div class="ff fg-2"><label>Ejecutivo *</label><select id="cEjecutivo" onchange="onEjecutivo()"><option value="">Cargando…</option></select></div>
+      <div class="ff"><label>Teléfono ejecutivo</label><input id="cEjTel" readonly></div>
+      <div class="ff"><label>Correo ejecutivo</label><input id="cEjMail" readonly></div>
+
+      <div class="sec-form">Datos del cliente</div>
+      <div class="ff"><label>RUT cliente *</label><input id="cRut" placeholder="12345678-9" onblur="buscarCliente()"></div>
+      <div class="ff fg-2"><label>Nombre cliente *</label><input id="cCliente" placeholder="Nombre completo"></div>
+      <div class="ff"><label>&nbsp;</label><div id="clienteInfo" style="font-size:.74rem;color:#16a34a;padding-top:8px"></div></div>
+
+      <div class="sec-form">Datos del vehículo</div>
+      <div class="ff"><label>Tipo vehículo</label>
+        <select id="cTipoVeh"><option>AUTOMOVIL</option><option>CAMIONETA</option><option>SUV</option><option>MOTO</option><option>FURGON</option><option>OTRO</option></select></div>
+      <div class="ff"><label>Marca *</label><select id="cMarca" onchange="cargarModelos()"><option value="">Cargando…</option></select></div>
+      <div class="ff"><label>Modelo *</label><select id="cModelo" onchange="cargarAnios()"><option value="">—</option></select></div>
+      <div class="ff"><label>Año *</label><select id="cAnio"><option value="">—</option></select></div>
+      <div class="ff"><label>Patente</label><input id="cPatente" placeholder="ABCD12 (vacío si 0 km)"></div>
+      <div class="ff"><label>Prenda vehículo</label><select id="cPrenda"><option>SI</option><option>NO</option></select></div>
+
+      <div class="sec-form">Montos y plazo</div>
+      <div class="ff"><label>Precio venta *</label><input id="cPrecio" inputmode="numeric" oninput="fmtMoney(this);calcSaldo()"></div>
+      <div class="ff"><label>Pie *</label><input id="cPie" inputmode="numeric" oninput="fmtMoney(this);calcSaldo()"></div>
+      <div class="ff"><label>Saldo precio</label><input id="cSaldo" readonly></div>
+      <div class="ff"><label>Plazo (cuotas) *</label>
+        <select id="cPlazo" onchange="recalcParticipacion()">
+          <option value="">—</option><option>6</option><option>12</option><option>18</option><option>24</option>
+          <option>30</option><option>36</option><option>42</option><option>48</option><option>60</option><option>72</option>
+        </select></div>
+      <div class="ff"><label>Acreedor</label><select id="cAcreedor"><option>AUTOFIN</option><option>UNIDAD LEASING</option><option>AUTOFACIL</option></select></div>
+
+      <div class="sec-form">Parque y concesionario</div>
+      <div class="ff fg-2"><label>Parque automotriz</label><select id="cParque" onchange="filtrarConcesionarios()"><option value="">— Sin parque (calle) —</option></select></div>
+      <div class="ff fg-2"><label>Concesionario *</label><select id="cConc" onchange="onConcesionario()"><option value="">Cargando…</option></select></div>
+      <div class="ff"><label>RUT concesionario</label><input id="cRutConc" readonly></div>
+      <div class="ff fg-2"><label>Vendedor</label><input id="cVendedor" placeholder="Nombre vendedor"></div>
+
+      <div class="sec-form">Participación dealer <span style="font-weight:400;font-size:.68rem;color:#94a3b8;text-transform:none">(calculada por plazo y tipo — editable)</span></div>
+      <div class="ff"><label>Valor bruto</label><input id="cPartBruto" inputmode="numeric" oninput="fmtMoney(this);calcNetoIva()"></div>
+      <div class="ff"><label>Valor neto</label><input id="cPartNeto" readonly></div>
+      <div class="ff"><label>Valor IVA</label><input id="cPartIVA" readonly></div>
+      <div class="ff"><label>Factor aplicado</label><input id="cFactor" readonly></div>
+    </div>
+
+    <div style="display:flex;justify-content:flex-end;gap:10px;margin-top:22px">
+      <button class="btn-sec" onclick="limpiarForm()">Limpiar</button>
+      <button class="btn-af" id="btnGuardarCarta" onclick="guardarCarta()"><i class="bi bi-check-lg me-1"></i>Guardar Carta</button>
+    </div>
+  </div>
+</div>
+
+<!-- ════════ TAB: REVISIÓN ════════ -->
+<div class="tab-pane" id="pane-revision">
+  <div class="card-af">
+    <h5 style="font-weight:800;color:var(--navy)"><i class="bi bi-check2-square me-2"></i>Revisión de Cartas Pendientes</h5>
+    <p style="font-size:.8rem;color:#64748b">Principio de 4 ojos: solo puedes revisar cartas creadas por otros usuarios.</p>
+    <div id="listaRevision"></div>
+  </div>
+</div>
+
+<!-- ════════ TAB: PARÁMETROS ════════ -->
+<div class="tab-pane" id="pane-params">
+  <div class="card-af" style="max-width:760px">
+    <h5 style="font-weight:800;color:var(--navy)"><i class="bi bi-sliders me-2"></i>Factores de Participación</h5>
+    <p style="font-size:.8rem;color:#64748b">Factor que multiplica el saldo precio según plazo y tipo de carta. Se guarda en BD y aplica a todas las cartas nuevas.</p>
+    <div class="alert-inline" id="paramsAlert"></div>
+    <table class="tbl" id="tblFactores">
+      <thead><tr><th>Plazo desde</th><th>Plazo hasta</th><th>Dealer Parque</th><th>Dealer Calle</th><th>AG Calle</th><th>AG Parque</th></tr></thead>
+      <tbody id="bodyFactores"></tbody>
+    </table>
+    <div style="display:flex;justify-content:flex-end;margin-top:16px">
+      <button class="btn-af" onclick="guardarFactores()"><i class="bi bi-check-lg me-1"></i>Guardar Factores</button>
+    </div>
+  </div>
+</div>
+
+<!-- ════════ MODAL PREVIEW / REVISIÓN ════════ -->
+<div class="modal-bg" id="modalCarta">
+  <div class="modal-card">
+    <div class="modal-head">
+      <h6 id="modalTitulo"><i class="bi bi-file-earmark-text me-2"></i>Carta de Aprobación</h6>
+      <button class="close-x" onclick="cerrarModal()">&times;</button>
+    </div>
+    <div class="modal-body-af" id="modalBody"></div>
+    <div class="modal-foot" id="modalFoot"></div>
+  </div>
+</div>
+
+<script src="/js/app-version.js"></script>
+<script>
+'use strict';
+const tok = () => sessionStorage.getItem('token');
+const hdr = () => ({ 'Content-Type':'application/json', 'Authorization':'Bearer '+tok() });
+
+/* ── Sesión ───────────────────────────────────────── */
+const YO = JSON.parse(sessionStorage.getItem('usuario') || 'null');
+if (!YO) window.location.href = '/login.html';
+document.getElementById('navNombre').textContent = YO.nombre + ' ' + (YO.apellido||'');
+document.getElementById('navPerfil').textContent = YO.perfil || '';
+document.getElementById('avatarInicial').textContent = (YO.nombre||'?')[0].toUpperCase();
+function logout(){ sessionStorage.clear(); window.location.href='/login.html'; }
+
+const MIS_INICIALES = ((YO.nombre||' ')[0] + (YO.apellido||' ')[0]).toUpperCase().trim() || 'XX';
+const MI_LOGIN = YO.email || String(YO.id_usuario);
+const ES_ADMIN = (YO.perfil === 'Administrador');
+
+/* ── Estado global ────────────────────────────────── */
+let CARTAS = [], EJECUTIVOS = [], DEALERS = [], PARQUES = [], MARCAS = [];
+let PERMISOS = new Set();
+let FACTORES = [   // fallback si no hay parámetro en BD
+  {desde:1, hasta:12, parque:0,     calle:0.025, agCalle:0.005, agParque:0},
+  {desde:13,hasta:24, parque:0.025, calle:0.05,  agCalle:0.025, agParque:0.02},
+  {desde:25,hasta:36, parque:0.05,  calle:0.075, agCalle:0.035, agParque:0.03},
+  {desde:37,hasta:72, parque:0.075, calle:0.1,   agCalle:0.05,  agParque:0.045},
+];
+let FIRMA_B64 = null;
+let editandoId = null;
+
+/* ── Helpers ──────────────────────────────────────── */
+const fmtCLP = v => { const n=parseInt(v)||0; return '$' + n.toLocaleString('es-CL'); };
+const escH = s => String(s??'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+const toTitle = s => String(s||'').toLowerCase().replace(/(^|\s)\S/g, c=>c.toUpperCase());
+const fmtRUT = r => { const c=String(r||'').replace(/[^0-9kK]/g,''); if(c.length<2) return r||''; const dv=c.slice(-1), num=c.slice(0,-1); return parseInt(num).toLocaleString('es-CL')+'-'+dv.toUpperCase(); };
+const fmtFecha = f => { if(!f) return ''; const d=new Date(f); return isNaN(d)?'':d.toLocaleDateString('es-CL'); };
+function fmtMoney(input){ const raw=input.value.replace(/[^0-9]/g,''); const n=parseInt(raw,10)||0; input.dataset.raw=n; input.value=n?'$'+n.toLocaleString('es-CL'):''; }
+const rawMoney = id => parseInt(document.getElementById(id).dataset.raw||'0',10)||0;
+function setMoney(id, v){ const el=document.getElementById(id); el.dataset.raw=v||0; el.value=v?'$'+parseInt(v).toLocaleString('es-CL'):''; }
+// Fechas: normalizar para round-trip BD (mysql no acepta ISO con T/Z en strict)
+const dDate = v => v ? String(v).slice(0,10) : null;
+const dDT   = v => { if(!v) return null; const d=new Date(v); if(isNaN(d)) return null; return d.toISOString().slice(0,19).replace('T',' '); };
+
+/* ── Init ─────────────────────────────────────────── */
+(async function init(){
+  await cargarPermisos();
+  await Promise.all([cargarCartas(), cargarCatalogos(), cargarFactores(), cargarFirma()]);
+  document.getElementById('cFecha').value = new Date().toISOString().slice(0,10);
+})();
+
+async function cargarPermisos(){
+  try {
+    const r = await fetch('/api/auth/mis-permisos', { headers: hdr() });
+    const j = await r.json();
+    (j.funcionalidades||[]).forEach(c => PERMISOS.add(c));
+  } catch(e) { console.error('permisos', e); }
+  const can = c => ES_ADMIN || PERMISOS.has(c);
+  if (can('aprob_crear'))   document.getElementById('tabBtnNueva').style.display = '';
+  if (can('aprob_revisar')) document.getElementById('tabBtnRevision').style.display = '';
+  if (can('aprob_params'))  document.getElementById('tabBtnParams').style.display = '';
+}
+const puede = c => ES_ADMIN || PERMISOS.has(c);
+
+function showTab(t){
+  document.querySelectorAll('.tab-pane').forEach(p=>p.classList.remove('active'));
+  document.querySelectorAll('.tab-btn').forEach(b=>b.classList.remove('active'));
+  document.getElementById('pane-'+t).classList.add('active');
+  const btn = { lista:'tabBtnLista', nueva:'tabBtnNueva', revision:'tabBtnRevision', params:'tabBtnParams' }[t];
+  document.getElementById(btn).classList.add('active');
+  if (t==='revision') renderRevision();
+  if (t==='params') renderFactores();
+}
+
+/* ── Cargar datos ─────────────────────────────────── */
+async function cargarCartas(){
+  try {
+    const r = await fetch('/api/cartas', { headers: hdr() });
+    const j = await r.json();
+    if (j.success) { CARTAS = j.data||[]; renderLista(); actualizarBadge(); }
+  } catch(e) { console.error('cartas', e); }
+}
+
+async function cargarCatalogos(){
+  try {
+    const [rEj, rDlr, rCcs, rVeh] = await Promise.all([
+      fetch('/api/cartas-ejecutivos', { headers: hdr() }),
+      fetch('/api/dealers?limit=2000', { headers: hdr() }),
+      fetch('/api/dealers/ccs', { headers: hdr() }),
+      fetch('/api/vehiculos/cascada', { headers: hdr() }),
+    ]);
+    const [jEj, jDlr, jCcs, jVeh] = await Promise.all([rEj.json(), rDlr.json(), rCcs.json(), rVeh.json()]);
+
+    EJECUTIVOS = jEj.data || [];
+    const sel = document.getElementById('cEjecutivo');
+    sel.innerHTML = '<option value="">— Seleccione —</option>' +
+      EJECUTIVOS.map(e=>`<option value="${e.id}">${escH(e.nombre)}</option>`).join('');
+
+    DEALERS = (jDlr.data?.rows || []).map(d => ({
+      nombre: d.nombre_indexa || d.nombre_razon || '',
+      rut: d.rut || '',
+      parque: ((d.ccs_parque||'').trim().toUpperCase() !== 'PARTICULAR') ? (d.ccs_parque||'').trim().toUpperCase() : ''
+    })).filter(d=>d.nombre);
+
+    PARQUES = (jCcs.data||[]).filter(p => p && String(p).toUpperCase() !== 'PARTICULAR');
+    const pSel = document.getElementById('cParque');
+    pSel.innerHTML = '<option value="">— Sin parque (calle) —</option>' +
+      PARQUES.map(p=>`<option>${escH(p)}</option>`).join('');
+
+    MARCAS = jVeh.data?.marcas || [];
+    const mSel = document.getElementById('cMarca');
+    mSel.innerHTML = '<option value="">— Seleccione —</option>' + MARCAS.map(m=>`<option>${escH(m)}</option>`).join('');
+
+    filtrarConcesionarios();
+  } catch(e) { console.error('catalogos', e); }
+}
+
+async function cargarFactores(){
+  try {
+    const r = await fetch('/api/cartas-params/factores_participacion', { headers: hdr() });
+    const j = await r.json();
+    if (j.success && j.data) { const f = JSON.parse(j.data); if (Array.isArray(f) && f.length) FACTORES = f; }
+  } catch(e) { /* usa fallback */ }
+}
+
+async function cargarFirma(){
+  try {
+    const r = await fetch('/api/cartas-params/firma_empresa', { headers: hdr() });
+    const j = await r.json();
+    if (j.success && j.data) FIRMA_B64 = j.data;
+  } catch(e) {}
+}
+
+/* ── Listado ──────────────────────────────────────── */
+function renderLista(){
+  const q = (document.getElementById('fBuscar').value||'').toLowerCase();
+  const est = document.getElementById('fEstado').value;
+  const rows = CARTAS.filter(c => {
+    if (est && c.status !== est) return false;
+    if (!q) return true;
+    return [c.cliente, c.rutCliente, c.opCarta, c.opOrigen, c.concesionario].some(v => String(v||'').toLowerCase().includes(q));
+  });
+  document.getElementById('stTotal').textContent = CARTAS.length;
+  document.getElementById('stPend').textContent  = CARTAS.filter(c=>c.status==='PENDIENTE').length;
+  document.getElementById('stApr').textContent   = CARTAS.filter(c=>c.status==='APROBADA').length;
+  document.getElementById('stRech').textContent  = CARTAS.filter(c=>c.status==='RECHAZADA').length;
+
+  const body = document.getElementById('bodyLista');
+  if (!rows.length) { body.innerHTML = '<tr><td colspan="9" style="text-align:center;color:#94a3b8;padding:24px">Sin cartas</td></tr>'; return; }
+  body.innerHTML = rows.map(c => {
+    const acc = [];
+    acc.push(`<button class="btn-mini bm-ver" onclick="verCarta(${c.id})"><i class="bi bi-eye"></i> Ver</button>`);
+    if (c.status==='APROBADA') acc.push(`<button class="btn-mini bm-print" onclick="imprimirCarta(${c.id})"><i class="bi bi-printer"></i> Imprimir</button>`);
+    if (c.status==='PENDIENTE' && c.creadoPor===MI_LOGIN && puede('aprob_crear'))
+      acc.push(`<button class="btn-mini bm-edit" onclick="editarCarta(${c.id})"><i class="bi bi-pencil"></i></button>`);
+    if (c.status==='PENDIENTE' && c.creadoPor!==MI_LOGIN && puede('aprob_revisar'))
+      acc.push(`<button class="btn-mini bm-ok" onclick="abrirRevision(${c.id})"><i class="bi bi-check2-square"></i> Revisar</button>`);
+    if (c.status==='APROBADA' && puede('aprob_revisar'))
+      acc.push(`<button class="btn-mini bm-anular" onclick="anularCarta(${c.id})"><i class="bi bi-x-octagon"></i></button>`);
+    return `<tr>
+      <td><b>${escH(c.opCarta||'')}</b></td>
+      <td>${fmtFecha(c.fecha)}</td>
+      <td>${escH(toTitle(c.cliente||''))}</td>
+      <td>${fmtRUT(c.rutCliente)}</td>
+      <td style="font-size:.72rem">${escH(c.tipo||'')}</td>
+      <td style="text-align:right">${fmtCLP(c.saldo)}</td>
+      <td><span class="st-pill st-${escH(c.status)}">${escH(c.status)}</span></td>
+      <td style="font-size:.74rem;color:#64748b">${escH(c.creadoPorInitials||c.creadoPorNombre||'')}</td>
+      <td>${acc.join('')}</td>
+    </tr>`;
+  }).join('');
+}
+
+function actualizarBadge(){
+  const n = CARTAS.filter(c => c.status==='PENDIENTE' && c.creadoPor!==MI_LOGIN).length;
+  const b = document.getElementById('badgeRev');
+  b.textContent = n; b.style.display = n ? '' : 'none';
+}
+
+/* ── Formulario nueva carta ───────────────────────── */
+function calcOpCarta(){
+  const orig = document.getElementById('cOpOrigen').value.trim();
+  document.getElementById('cOpCarta').value = orig
+    ? new Date().getFullYear().toString().slice(-2) + orig + MIS_INICIALES : '';
+}
+function onEjecutivo(){
+  const id = document.getElementById('cEjecutivo').value;
+  const e = EJECUTIVOS.find(x=>String(x.id)===String(id));
+  document.getElementById('cEjMail').value = e?.mail||'';
+  document.getElementById('cEjTel').value  = e?.tel||'';
+}
+async function buscarCliente(){
+  const rut = document.getElementById('cRut').value.trim();
+  const info = document.getElementById('clienteInfo');
+  info.textContent = '';
+  if (!rut) return;
+  try {
+    const r = await fetch('/api/clientes/rut/'+encodeURIComponent(rut), { headers: hdr() });
+    const j = await r.json();
+    if (j.success && j.data) {
+      const cl = j.data;
+      const nom = cl.nombre_completo || [cl.nombre, cl.apellido_p, cl.apellido_m].filter(Boolean).join(' ');
+      if (nom) { document.getElementById('cCliente').value = nom; info.innerHTML = '<i class="bi bi-check-circle"></i> Cliente encontrado en BD'; }
+    }
+  } catch(e) {}
+}
+function cargarModelos(){
+  const marca = document.getElementById('cMarca').value;
+  const mSel = document.getElementById('cModelo'), aSel = document.getElementById('cAnio');
+  mSel.innerHTML = '<option value="">—</option>'; aSel.innerHTML = '<option value="">—</option>';
+  if (!marca) return;
+  fetch('/api/vehiculos/cascada?marca='+encodeURIComponent(marca), { headers: hdr() })
+    .then(r=>r.json()).then(j=>{
+      const modelos = j.data?.modelos||[];
+      mSel.innerHTML = '<option value="">—</option>' + modelos.map(m=>`<option>${escH(m)}</option>`).join('');
+    }).catch(()=>{});
+}
+function cargarAnios(){
+  const marca = document.getElementById('cMarca').value, modelo = document.getElementById('cModelo').value;
+  const aSel = document.getElementById('cAnio');
+  aSel.innerHTML = '<option value="">—</option>';
+  if (!marca||!modelo) return;
+  fetch('/api/vehiculos/cascada?marca='+encodeURIComponent(marca)+'&modelo='+encodeURIComponent(modelo), { headers: hdr() })
+    .then(r=>r.json()).then(j=>{
+      const anios = j.data?.anios||[];
+      aSel.innerHTML = '<option value="">—</option>' + anios.map(a=>`<option>${escH(a)}</option>`).join('');
+    }).catch(()=>{});
+}
+function filtrarConcesionarios(){
+  const parque = document.getElementById('cParque').value;
+  const list = parque ? DEALERS.filter(d=>d.parque===parque) : DEALERS;
+  const sel = document.getElementById('cConc');
+  sel.innerHTML = '<option value="">— Seleccione —</option>' +
+    list.map((d,i)=>`<option value="${escH(d.nombre)}" data-rut="${escH(d.rut)}">${escH(d.nombre)}</option>`).join('');
+  document.getElementById('cRutConc').value = '';
+}
+function onConcesionario(){
+  const sel = document.getElementById('cConc');
+  const opt = sel.options[sel.selectedIndex];
+  document.getElementById('cRutConc').value = opt?.dataset?.rut || '';
+}
+function calcSaldo(){
+  const saldo = Math.max(0, rawMoney('cPrecio') - rawMoney('cPie'));
+  setMoney('cSaldo', saldo);
+  recalcParticipacion();
+}
+function getFactor(plazo, tipo){
+  const p = parseInt(plazo)||0;
+  for (const f of FACTORES) {
+    if (p >= f.desde && p <= f.hasta) {
+      if (tipo==='DEALER PARQUE') return f.parque;
+      if (tipo==='DEALER CALLE') return f.calle;
+      if (tipo==='ALTA GAMA - CALLE') return f.agCalle;
+      if (tipo==='ALTA GAMA - PARQUE') return f.agParque;
+    }
+  }
+  return 0;
+}
+function recalcParticipacion(){
+  const tipo = document.getElementById('cTipo').value;
+  const plazo = document.getElementById('cPlazo').value;
+  const saldo = rawMoney('cSaldo');
+  const factor = getFactor(plazo, tipo);
+  document.getElementById('cFactor').value = factor ? (factor*100).toFixed(2).replace('.',',')+'%' : '—';
+  const bruto = Math.round(saldo * factor);
+  setMoney('cPartBruto', bruto);
+  calcNetoIva();
+}
+function calcNetoIva(){
+  const bruto = rawMoney('cPartBruto');
+  const neto = Math.round(bruto / 1.19);
+  setMoney('cPartNeto', neto);
+  setMoney('cPartIVA', bruto - neto);
+}
+function setFormAlert(msg, tipo){
+  const el = document.getElementById('formAlert');
+  el.textContent = msg; el.className = 'alert-inline ' + (tipo||'err');
+  if (tipo==='ok') setTimeout(()=>{ el.className='alert-inline'; }, 3500);
+}
+function limpiarForm(){
+  editandoId = null;
+  document.getElementById('tituloForm').innerHTML = '<i class="bi bi-plus-circle me-2"></i>Nueva Carta de Aprobación';
+  ['cTipo','cOpOrigen','cOpCarta','cEjecutivo','cEjMail','cEjTel','cRut','cCliente','cMarca','cModelo','cAnio','cPatente','cPrecio','cPie','cSaldo','cPlazo','cParque','cConc','cRutConc','cVendedor','cPartBruto','cPartNeto','cPartIVA','cFactor']
+    .forEach(id => { const el=document.getElementById(id); el.value=''; if(el.dataset) el.dataset.raw=0; });
+  document.getElementById('cFecha').value = new Date().toISOString().slice(0,10);
+  document.getElementById('cPrenda').value = 'SI';
+  document.getElementById('cAcreedor').value = 'AUTOFIN';
+  document.getElementById('clienteInfo').textContent = '';
+  document.getElementById('formAlert').className = 'alert-inline';
+  filtrarConcesionarios();
+}
+
+async function guardarCarta(){
+  const req = { cTipo:'Tipo de carta', cOpOrigen:'N° operación origen', cEjecutivo:'Ejecutivo',
+                cRut:'RUT cliente', cCliente:'Nombre cliente', cMarca:'Marca', cPlazo:'Plazo', cConc:'Concesionario' };
+  for (const [id, label] of Object.entries(req)) {
+    if (!document.getElementById(id).value) { setFormAlert('Falta: ' + label); return; }
+  }
+  if (!rawMoney('cPrecio')) { setFormAlert('Falta: Precio venta'); return; }
+
+  const ej = EJECUTIVOS.find(x=>String(x.id)===String(document.getElementById('cEjecutivo').value));
+  const base = editandoId ? CARTAS.find(x=>x.id===editandoId) : null;
+
+  const carta = {
+    ...(base ? sanitizarCarta(base) : {}),
+    id: editandoId || undefined,
+    opCarta:  document.getElementById('cOpCarta').value,
+    opOrigen: document.getElementById('cOpOrigen').value.trim(),
+    tipo:     document.getElementById('cTipo').value,
+    ejecutivoIdx: ej?.id || null,
+    ejecutivoNombre: ej?.nombre || '', ejecutivoMail: ej?.mail || '', ejecutivoTel: ej?.tel || '',
+    cliente: document.getElementById('cCliente').value.trim().toUpperCase(),
+    rutCliente: document.getElementById('cRut').value.trim(),
+    tipoVehiculo: document.getElementById('cTipoVeh').value,
+    marca: document.getElementById('cMarca').value, modelo: document.getElementById('cModelo').value,
+    anio: document.getElementById('cAnio').value, patente: document.getElementById('cPatente').value.trim().toUpperCase(),
+    prenda: document.getElementById('cPrenda').value,
+    precioVenta: rawMoney('cPrecio'), pie: rawMoney('cPie'), saldo: rawMoney('cSaldo'),
+    plazo: parseInt(document.getElementById('cPlazo').value)||null,
+    acreedor: document.getElementById('cAcreedor').value,
+    parque: document.getElementById('cParque').value,
+    concesionario: document.getElementById('cConc').value,
+    rutConc: document.getElementById('cRutConc').value,
+    vendedor: document.getElementById('cVendedor').value.trim(),
+    partNeto: rawMoney('cPartNeto'), partIVA: rawMoney('cPartIVA'), partBruto: rawMoney('cPartBruto'),
+    fecha: document.getElementById('cFecha').value,
+    status: 'PENDIENTE',
+  };
+  if (!editandoId) {
+    carta.fechaCreacion = dDT(new Date());
+    carta.creadoPor = MI_LOGIN;
+    carta.creadoPorNombre = YO.nombre + ' ' + (YO.apellido||'');
+    carta.creadoPorInitials = MIS_INICIALES;
+  } else {
+    carta.fechaCorreccion = dDT(new Date());
+    carta.corregidoPor = MI_LOGIN;
+  }
+
+  const btn = document.getElementById('btnGuardarCarta');
+  btn.disabled = true;
+  try {
+    const r = await fetch('/api/cartas', { method:'POST', headers: hdr(), body: JSON.stringify(carta) });
+    const j = await r.json();
+    if (!j.success) { setFormAlert(j.error||'Error al guardar'); return; }
+    setFormAlert(editandoId ? 'Carta corregida — vuelve a revisión' : 'Carta guardada — queda pendiente de revisión por otro usuario', 'ok');
+    limpiarForm();
+    await cargarCartas();
+    showTab('lista');
+  } catch(e) { setFormAlert('Error de conexión: '+e.message); }
+  finally { btn.disabled = false; }
+}
+
+function editarCarta(id){
+  const c = CARTAS.find(x=>x.id===id);
+  if (!c || c.status!=='PENDIENTE' || c.creadoPor!==MI_LOGIN) return;
+  editandoId = id;
+  showTab('nueva');
+  document.getElementById('tituloForm').innerHTML = '<i class="bi bi-pencil me-2"></i>Corregir Carta ' + escH(c.opCarta||'');
+  document.getElementById('cTipo').value = c.tipo||'';
+  document.getElementById('cOpOrigen').value = c.opOrigen||'';
+  document.getElementById('cOpCarta').value = c.opCarta||'';
+  document.getElementById('cFecha').value = dDate(c.fecha)||'';
+  const ej = EJECUTIVOS.find(e=>e.nombre===c.ejecutivoNombre);
+  document.getElementById('cEjecutivo').value = ej?.id||'';
+  document.getElementById('cEjMail').value = c.ejecutivoMail||'';
+  document.getElementById('cEjTel').value = c.ejecutivoTel||'';
+  document.getElementById('cRut').value = c.rutCliente||'';
+  document.getElementById('cCliente').value = c.cliente||'';
+  document.getElementById('cTipoVeh').value = c.tipoVehiculo||'AUTOMOVIL';
+  document.getElementById('cMarca').value = c.marca||'';
+  cargarModelos();
+  setTimeout(()=>{ document.getElementById('cModelo').value = c.modelo||''; cargarAnios();
+    setTimeout(()=>{ document.getElementById('cAnio').value = c.anio||''; }, 400); }, 400);
+  document.getElementById('cPatente').value = c.patente||'';
+  document.getElementById('cPrenda').value = c.prenda||'SI';
+  setMoney('cPrecio', c.precioVenta); setMoney('cPie', c.pie); setMoney('cSaldo', c.saldo);
+  document.getElementById('cPlazo').value = c.plazo||'';
+  document.getElementById('cAcreedor').value = c.acreedor||'AUTOFIN';
+  document.getElementById('cParque').value = c.parque||'';
+  filtrarConcesionarios();
+  document.getElementById('cConc').value = c.concesionario||'';
+  document.getElementById('cRutConc').value = c.rutConc||'';
+  document.getElementById('cVendedor').value = c.vendedor||'';
+  setMoney('cPartBruto', c.partBruto); setMoney('cPartNeto', c.partNeto); setMoney('cPartIVA', c.partIVA);
+}
+
+/* ── Sanitizar carta para round-trip a BD ─────────── */
+function sanitizarCarta(c){
+  const s = { ...c };
+  s.fecha = dDate(s.fecha);
+  ['fechaCreacion','fechaAprobacion','fechaRechazo','fechaAnulacion','fechaEliminacion','fechaCorreccion','fechaOtorgado']
+    .forEach(k => { s[k] = dDT(s[k]); });
+  return s;
+}
+
+/* ── Revisión (4 ojos) ────────────────────────────── */
+function pendientesRevision(){ return CARTAS.filter(c => c.status==='PENDIENTE' && c.creadoPor!==MI_LOGIN); }
+
+function renderRevision(){
+  const list = pendientesRevision();
+  const el = document.getElementById('listaRevision');
+  if (!list.length) { el.innerHTML = '<div style="text-align:center;color:#94a3b8;padding:30px"><i class="bi bi-check2-all" style="font-size:2rem"></i><div>No hay cartas pendientes de tu revisión</div></div>'; return; }
+  el.innerHTML = '<table class="tbl"><thead><tr><th>Operación</th><th>Fecha</th><th>Cliente</th><th>Tipo</th><th style="text-align:right">Saldo</th><th>Creada por</th><th></th></tr></thead><tbody>' +
+    list.map(c=>`<tr>
+      <td><b>${escH(c.opCarta||'')}</b></td><td>${fmtFecha(c.fecha)}</td>
+      <td>${escH(toTitle(c.cliente||''))}</td><td style="font-size:.72rem">${escH(c.tipo||'')}</td>
+      <td style="text-align:right">${fmtCLP(c.saldo)}</td>
+      <td style="font-size:.74rem">${escH(c.creadoPorNombre||c.creadoPor||'')}</td>
+      <td><button class="btn-mini bm-ok" onclick="abrirRevision(${c.id})"><i class="bi bi-search"></i> Revisar</button></td>
+    </tr>`).join('') + '</tbody></table>';
+}
+
+function abrirRevision(id){
+  const c = CARTAS.find(x=>x.id===id);
+  if (!c) return;
+  document.getElementById('modalTitulo').innerHTML = '<i class="bi bi-check2-square me-2"></i>Revisión — ' + escH(c.opCarta||'');
+  document.getElementById('modalBody').innerHTML = cartaHTML(c, true);
+  document.getElementById('modalFoot').innerHTML = `
+    <input id="motivoRechazo" placeholder="Motivo (obligatorio si rechazas)" style="flex:1;min-width:220px;border:1.5px solid #e2e8f0;border-radius:8px;padding:7px 10px;font-size:.83rem">
+    <button class="btn-mini bm-no" style="padding:9px 18px;font-size:.85rem" onclick="resolverRevision(${c.id},'RECHAZADA')"><i class="bi bi-x-lg"></i> Rechazar</button>
+    <button class="btn-mini bm-ok" style="padding:9px 18px;font-size:.85rem" onclick="resolverRevision(${c.id},'APROBADA')"><i class="bi bi-check-lg"></i> Aprobar</button>`;
+  document.getElementById('modalCarta').classList.add('show');
+}
+
+async function resolverRevision(id, decision){
+  const c = CARTAS.find(x=>x.id===id);
+  if (!c) return;
+  const motivo = (document.getElementById('motivoRechazo')?.value||'').trim();
+  if (decision==='RECHAZADA' && !motivo) { alert('Debes indicar el motivo del rechazo.'); return; }
+  const carta = sanitizarCarta(c);
+  carta.status = decision;
+  if (decision==='APROBADA') {
+    carta.aprobadoPor = MI_LOGIN;
+    carta.aprobadoPorNombre = YO.nombre + ' ' + (YO.apellido||'');
+    carta.aprobadoPorInitials = MIS_INICIALES;
+    carta.fechaAprobacion = dDT(new Date());
+  } else {
+    carta.rechazadoPor = MI_LOGIN;
+    carta.rechazadoPorNombre = YO.nombre + ' ' + (YO.apellido||'');
+    carta.fechaRechazo = dDT(new Date());
+    carta.motivoRechazo = motivo;
+  }
+  try {
+    const r = await fetch('/api/cartas', { method:'POST', headers: hdr(), body: JSON.stringify(carta) });
+    const j = await r.json();
+    if (!j.success) { alert(j.error||'Error'); return; }
+    cerrarModal();
+    await cargarCartas();
+    renderRevision();
+  } catch(e) { alert('Error de conexión'); }
+}
+
+async function anularCarta(id){
+  const c = CARTAS.find(x=>x.id===id);
+  if (!c || !confirm(`¿Anular la carta ${c.opCarta}? Dejará de estar disponible para impresión.`)) return;
+  const carta = sanitizarCarta(c);
+  carta.status = 'ANULADA';
+  carta.anuladoPor = MI_LOGIN;
+  carta.fechaAnulacion = dDT(new Date());
+  const r = await fetch('/api/cartas', { method:'POST', headers: hdr(), body: JSON.stringify(carta) });
+  const j = await r.json();
+  if (j.success) cargarCartas(); else alert(j.error||'Error');
+}
+
+/* ── Ver / Imprimir ───────────────────────────────── */
+function verCarta(id){
+  const c = CARTAS.find(x=>x.id===id);
+  if (!c) return;
+  document.getElementById('modalTitulo').innerHTML = '<i class="bi bi-file-earmark-text me-2"></i>' + escH(c.opCarta||'Carta');
+  document.getElementById('modalBody').innerHTML = cartaHTML(c, c.status!=='APROBADA');
+  document.getElementById('modalFoot').innerHTML =
+    (c.status==='APROBADA' ? `<button class="btn-mini bm-print" style="padding:9px 18px;font-size:.85rem" onclick="imprimirCarta(${c.id})"><i class="bi bi-printer"></i> Imprimir PDF</button>` : '') +
+    `<button class="btn-sec" onclick="cerrarModal()">Cerrar</button>`;
+  document.getElementById('modalCarta').classList.add('show');
+}
+function cerrarModal(){ document.getElementById('modalCarta').classList.remove('show'); }
+
+/* Formato de carta — fiel al documento original */
+function cartaHTML(c, preview){
+  const isParque = c.tipo && c.tipo.includes('PARQUE');
+  const banner = preview && c.status!=='APROBADA'
+    ? '<div style="background:#FFF3E0;border:2px solid #F57C00;border-radius:4px;padding:6px;margin-bottom:8px;text-align:center;font-size:9px;font-weight:bold;color:#E65100">&#9888; VISTA PREVIA — Pendiente de revisión. No habilitada para impresión.</div>' : '';
+  const validez = c.fecha ? new Date(c.fecha) : new Date();
+  validez.setDate(validez.getDate()+5);
+  const firmaImg = FIRMA_B64
+    ? `<img src="${FIRMA_B64}" style="max-width:150px;max-height:60px;display:block;margin:0 auto 4px">`
+    : '<div style="border-bottom:1px solid #555;width:160px;margin:0 auto 5px">&nbsp;</div>';
+  const parqueSec = isParque ? `
+    <div class="sec-title">DATOS DEL PARQUE Y CONCESIONARIO</div>
+    <table class="data-tbl">
+      <tr><td class="lbl">PARQUE AUTOMOTRIZ</td><td class="val">${escH(c.parque||'')}</td><td class="lbl">VENDEDOR</td><td class="val">${escH(c.vendedor||'')}</td></tr>
+      <tr><td class="lbl">CONCESIONARIO</td><td class="val" colspan="3">${escH(c.concesionario||'')}</td></tr>
+      <tr><td class="lbl">RUT</td><td class="val" colspan="3">${fmtRUT(c.rutConc||'')}</td></tr>
+    </table>` : `
+    <div class="sec-title">DATOS DEL CONCESIONARIO</div>
+    <table class="data-tbl">
+      <tr><td class="lbl">CONCESIONARIO</td><td class="val" colspan="3">${escH(c.concesionario||'')}</td></tr>
+      <tr><td class="lbl">RUT</td><td class="val">${fmtRUT(c.rutConc||'')}</td><td class="lbl">VENDEDOR</td><td class="val">${escH(c.vendedor||'')}</td></tr>
+    </table>`;
+  return `<div class="carta-doc" id="cartaDoc">
+    ${banner}
+    <div style="display:flex;align-items:flex-start;justify-content:space-between;border-bottom:2px solid #0141A2;padding-bottom:6px;margin-bottom:8px">
+      <div style="font-size:8px;color:#546E7A;line-height:1.6">Av. Presidente Kennedy 5757, Of. 1601, Las Condes<br>Santiago, Chile &middot; www.autofacilchile.cl</div>
+      <img src="${location.origin}/img/logo-autofacil.png" style="height:30px;object-fit:contain">
+    </div>
+    <div style="text-align:center;font-size:12px;font-weight:bold;color:#0141A2;letter-spacing:.5px;margin-bottom:7px;text-transform:uppercase">CARTA DE APROBACIÓN DE CRÉDITO</div>
+    <p style="font-size:9px;text-align:justify;line-height:1.5;margin:0 0 7px">Tenemos el agrado de informarle que el cliente detallado a continuación tiene aprobado un crédito de acuerdo a la información personal, demográfica, laboral y financiera entregada por él, la cual está sujeta a confirmación.</p>
+    <table class="data-tbl">
+      <tr><td class="lbl" style="width:13%">FECHA</td><td class="val" style="width:18%">${fmtFecha(c.fecha)}</td><td class="lbl" style="width:18%">VALIDEZ APROBACIÓN</td><td class="val">${validez.toLocaleDateString('es-CL')}</td></tr>
+      <tr><td class="lbl">EJECUTIVO</td><td class="val">${escH(c.ejecutivoNombre||'')}</td><td class="lbl">TELÉFONO</td><td class="val">${escH(c.ejecutivoTel||'')}</td></tr>
+      <tr><td class="lbl">CORREO</td><td class="val">${escH(c.ejecutivoMail||'')}</td><td class="lbl">OPERACIÓN</td><td class="val"><strong>${escH(c.opCarta||'')}</strong></td></tr>
+    </table>
+    <div class="sec-title">DATOS DEL CLIENTE</div>
+    <table class="data-tbl">
+      <tr><td class="lbl" style="width:13%">NOMBRE</td><td class="val" style="width:37%">${escH(toTitle(c.cliente||''))}</td><td class="lbl" style="width:13%">RUT</td><td class="val">${fmtRUT(c.rutCliente||'')}</td></tr>
+    </table>
+    <div class="sec-title">DATOS DEL VEHÍCULO</div>
+    <table class="data-tbl" style="table-layout:fixed;width:100%">
+      <colgroup><col style="width:19%"><col style="width:31%"><col style="width:19%"><col style="width:31%"></colgroup>
+      <tr><td class="lbl">TIPO</td><td class="val">${escH(c.tipoVehiculo||'')}</td><td class="lbl">MARCA</td><td class="val">${escH(c.marca||'')}</td></tr>
+      <tr><td class="lbl">MODELO</td><td class="val">${escH(c.modelo||'')}</td><td class="lbl">AÑO</td><td class="val">${escH(c.anio||'')}</td></tr>
+      <tr><td class="lbl">PRECIO VENTA</td><td class="val">${fmtCLP(c.precioVenta)}</td><td class="lbl">PLACA PATENTE</td><td class="val">${escH(c.patente||'')}</td></tr>
+      <tr><td class="lbl">PIE</td><td class="val">${fmtCLP(c.pie)}</td><td class="lbl">PRENDA VEHÍCULO</td><td class="val">${escH(c.prenda||'')}</td></tr>
+      <tr><td class="lbl">SALDO PRECIO</td><td class="val">${fmtCLP(c.saldo)}</td><td class="lbl">PLAZO</td><td class="val">${escH(c.plazo||'')} cuotas</td></tr>
+    </table>
+    ${parqueSec}
+    <div class="sec-title">PARTICIPACIÓN DEALER</div>
+    <table class="data-tbl">
+      <tr><td class="lbl" style="width:13%">VALOR NETO</td><td class="val" style="width:20%">${fmtCLP(c.partNeto)}</td><td class="lbl" style="width:13%">VALOR IVA</td><td class="val">${fmtCLP(c.partIVA)}</td></tr>
+      <tr><td class="lbl">VALOR BRUTO</td><td class="val">${fmtCLP(c.partBruto)}</td><td class="lbl">ACREEDOR</td><td class="val">${escH(c.acreedor||'')}</td></tr>
+    </table>
+    <div class="sec-title">CONSIDERACIONES</div>
+    <div style="font-size:9px;line-height:1.5;text-align:justify;margin-top:3px">
+      <p style="margin:2px 0">1. El Crédito se encuentra aprobado en las condiciones detalladas anteriormente y de acuerdo a la información entregada por el concesionario, por el cliente y los avales si correspondiera.</p>
+      <p style="margin:2px 0">2. El crédito está sujeto a validación de los antecedentes presentados y sus respaldos necesarios para la formalización del mismo, como la firma de los documentos relacionados para la entrega del crédito.</p>
+      <p style="margin:2px 0">3. AutoFácil actúa como Agente Colocador del crédito independiente del proveedor de financiamiento que cubra el producto. Por lo anterior, el Ejecutivo AutoFácil utilizará el set de documentos legales que correspondan según el producto que se esté otorgando.</p>
+      <p style="margin:2px 0">4. El pago del saldo precio, seguros, gastos y otros queda supeditado al correcto y oportuno envío de toda la información necesaria para la venta, transferencia, inscripción, prenda y entrega del vehículo que permitirán formalizar la operación de Crédito.</p>
+      <p style="margin:2px 0">5. De no contar con la documentación completa o si esta presenta errores de firma, impresión, formato u otro, tanto el Cliente, Ejecutivo AutoFácil y/o el Concesionario deberán corregir dicha situación enviando la documentación en forma correcta.</p>
+      <p style="margin:2px 0">6. La participación del Dealer queda establecida, inicialmente y de no mediar una situación especial, que la participación se obtendrá de multiplicar el saldo precio por un factor que se determina según el plazo del financiamiento.</p>
+      <p style="margin:2px 0">7. Para los casos en que se autorice un descuento en la tasa de financiamiento, la participación quedará definida de manera específica y deberá contar con la firma del representante del concesionario o dealer.</p>
+      <p style="margin:2px 0">8. El Concesionario debe entregar a Ejecutivo AutoFácil la Factura y Solicitud de Primera Inscripción o Contrato de Compraventa y Transferencia del Vehículo a más tardar al quinto (5) día corrido desde la fecha de inscripción o transferencia del vehículo, respectivamente.</p>
+      <p style="margin:2px 0">9. Al momento de la inscripción de la compra venta, se deberá incluir la inscripción de la limitación de dominio como prohibiciones de enajenar a favor de ${escH(c.acreedor||'AUTOFIN')}.</p>
+      <p style="margin:2px 0">10. En caso de que la entrega de la documentación del Vehículo al Ejecutivo AutoFácil ocurra con posterioridad al quinto (5) día corrido desde la fecha de Solicitud de Primera Inscripción o Transferencia del mismo, el Saldo de Precio será pagado por AutoFácil contra la inscripción efectiva de la Prenda.</p>
+      <p style="margin:2px 0">11. Una vez recibido el set legal de documentos firmados en conformidad, la factura e inscripción o contrato de compraventa y transferencia del vehículo dentro de los plazos señalados anteriormente, AutoFácil procederá a pagar el saldo de precio dentro de las 96 horas hábiles siguientes.</p>
+      <p style="margin:2px 0">12. El concesionario deberá inscribir una Limitación al Dominio al momento de inscribir el vehículo a nombre del cliente a favor de la entidad financiera a la que corresponda el producto de crédito otorgado.</p>
+      <p style="margin:2px 0">14. Se deja expresa constancia que AutoFácil sólo es responsable por hechos o actos imputables a su responsabilidad o la de su personal, en ningún caso a actuaciones de terceros.</p>
+      <p style="margin:2px 0">15. AutoFácil declara no tener responsabilidad alguna respecto a la venta del vehículo, ni de su calidad ni de la documentación, clonación u otros aspectos relacionados al bien financiado.</p>
+    </div>
+    <div style="margin-top:18px;text-align:center">
+      ${firmaImg}
+      <div style="font-weight:bold;font-size:10px;margin-top:3px;letter-spacing:.3px">GERENTE OPERACIONES AUTOFÁCIL SPA</div>
+    </div>
+    <div style="margin-top:8px;font-size:7.5px;color:#aaa;text-align:right;border-top:.5px solid #e0e0e0;padding-top:4px">
+      Creado por: ${escH(c.creadoPorInitials||'')} | ${c.aprobadoPorInitials ? 'Revisado por: '+escH(c.aprobadoPorInitials) : 'Pendiente de Revisión'} | Tipo: ${escH(c.tipo||'')}
+    </div>
+  </div>`;
+}
+
+function imprimirCarta(id){
+  const c = CARTAS.find(x=>x.id===id);
+  if (!c) return;
+  if (c.status !== 'APROBADA') { alert('La carta debe estar APROBADA para imprimir.'); return; }
+  const title = `Carta de Aprobación - ${(c.cliente||'').replace(/[^a-zA-Z0-9áéíóúÁÉÍÓÚñÑ ]/g,'').trim()} - ${c.opCarta||''} - ${(c.rutCliente||'').replace(/[^0-9kK\-]/g,'')}`;
+  const w = window.open('', '_blank');
+  if (!w) { alert('Permite las ventanas emergentes para imprimir.'); return; }
+  w.document.write(`<!DOCTYPE html><html><head><meta charset="UTF-8"><title>${escH(title)}</title><style>
+    @page { size: Letter; margin: 12mm 15mm; }
+    * { box-sizing:border-box; font-family:Arial,sans-serif; }
+    body { margin:0; padding:0; font-size:10px; color:#222; }
+    .carta-doc { border:none !important; padding:0 !important; }
+    .sec-title { background:#d8d8d8; font-weight:bold; padding:3px 6px; margin-top:5px; font-size:9.5px; color:#111; text-transform:uppercase; display:block; }
+    .data-tbl { width:100%; border-collapse:collapse; table-layout:fixed; }
+    .data-tbl td { padding:3px 6px; font-size:9px; border:.5px solid #e0e0e0; overflow:hidden; }
+    .lbl { background:#eee; font-weight:bold; white-space:nowrap; }
+    .val { background:#fff; color:#333; }
+    img { max-width:100%; }
+    p { margin:2px 0; }
+  </style></head><body>${cartaHTML(c, false)}</body></html>`);
+  w.document.close();
+  setTimeout(() => { w.focus(); w.print(); }, 600);
+}
+
+/* ── Parámetros (factores) ────────────────────────── */
+function renderFactores(){
+  document.getElementById('bodyFactores').innerHTML = FACTORES.map((f,i)=>`<tr>
+    <td><input value="${f.desde}"    data-i="${i}" data-k="desde"    style="width:70px;border:1px solid #e2e8f0;border-radius:6px;padding:4px 8px"></td>
+    <td><input value="${f.hasta}"    data-i="${i}" data-k="hasta"    style="width:70px;border:1px solid #e2e8f0;border-radius:6px;padding:4px 8px"></td>
+    <td><input value="${f.parque}"   data-i="${i}" data-k="parque"   style="width:80px;border:1px solid #e2e8f0;border-radius:6px;padding:4px 8px"></td>
+    <td><input value="${f.calle}"    data-i="${i}" data-k="calle"    style="width:80px;border:1px solid #e2e8f0;border-radius:6px;padding:4px 8px"></td>
+    <td><input value="${f.agCalle}"  data-i="${i}" data-k="agCalle"  style="width:80px;border:1px solid #e2e8f0;border-radius:6px;padding:4px 8px"></td>
+    <td><input value="${f.agParque}" data-i="${i}" data-k="agParque" style="width:80px;border:1px solid #e2e8f0;border-radius:6px;padding:4px 8px"></td>
+  </tr>`).join('');
+}
+async function guardarFactores(){
+  const nuevos = FACTORES.map((f,i)=>({...f}));
+  document.querySelectorAll('#bodyFactores input').forEach(inp=>{
+    const i = parseInt(inp.dataset.i), k = inp.dataset.k;
+    const v = parseFloat(String(inp.value).replace(',','.'));
+    if (!isNaN(v)) nuevos[i][k] = v;
+  });
+  try {
+    const r = await fetch('/api/cartas-params/factores_participacion', {
+      method:'POST', headers: hdr(), body: JSON.stringify({ value: JSON.stringify(nuevos) }) });
+    const j = await r.json();
+    const el = document.getElementById('paramsAlert');
+    if (j.success) { FACTORES = nuevos; el.textContent='Factores guardados en BD'; el.className='alert-inline ok'; }
+    else { el.textContent = j.error||'Error'; el.className='alert-inline err'; }
+  } catch(e) {
+    const el = document.getElementById('paramsAlert');
+    el.textContent='Error de conexión'; el.className='alert-inline err';
+  }
+}
+</script>
+</body>
+</html>

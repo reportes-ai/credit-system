@@ -305,6 +305,9 @@ app.get(['/dashboard', '/dashboard/'], (req, res) =>
 app.get(['/cartas-aprobacion', '/cartas-aprobacion/'], (req, res) =>
   res.sendFile(path.join(__dirname, '../public/cartas-aprobacion/index.html')));
 
+app.get(['/aprobaciones', '/aprobaciones/'], (req, res) =>
+  res.sendFile(path.join(__dirname, '../public/aprobaciones/index.html')));
+
 app.get(['/informes-dealernet', '/informes-dealernet/'], (req, res) =>
   res.sendFile(path.join(__dirname, '../public/informes-dealernet/index.html')));
 

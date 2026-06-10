@@ -1171,4 +1171,73 @@ const getUsuariosByPerfil = async (req, res) => {
   }
 })();
 
+/* ─── Migración v13: módulo Aprobaciones (reemplazo de Cartas de Aprobación) ─ */
+(async () => {
+  try {
+    const [[adm]] = await pool.query("SELECT id_perfil FROM perfiles WHERE nombre='Administrador' LIMIT 1");
+    const [perfiles] = await pool.query('SELECT id_perfil, nombre FROM perfiles');
+
+    // 1) Crear módulo Aprobaciones si no existe
+    let [[modAp]] = await pool.query(
+      "SELECT id_modulo FROM modulos WHERE ruta='/aprobaciones/' LIMIT 1"
+    );
+    if (!modAp) {
+      const [[{ maxOrden }]] = await pool.query('SELECT COALESCE(MAX(orden),0)+1 AS maxOrden FROM modulos');
+      const [ins] = await pool.query(
+        "INSERT INTO modulos (nombre, descripcion, icono, ruta, orden, estado) VALUES (?,?,?,?,?,'activo')",
+        ['Aprobaciones', 'Cartas de aprobación de crédito: generación, revisión e impresión',
+         'bi-patch-check', '/aprobaciones/', maxOrden]
+      );
+      modAp = { id_modulo: ins.insertId };
+      console.log('[v13] módulo Aprobaciones creado id=' + modAp.id_modulo);
+    }
+
+    // 2) Funcionalidades: 1 con href (sub-item) + 3 de acción (href NULL)
+    const funcs = [
+      ['Aprobaciones',          'aprob_ver',     '/aprobaciones/'],
+      ['Crear carta',           'aprob_crear',   null],
+      ['Revisar carta',         'aprob_revisar', null],
+      ['Editar parámetros',     'aprob_params',  null],
+    ];
+    for (const [nombre, codigo, href] of funcs) {
+      const [[ex]] = await pool.query(
+        'SELECT id_funcionalidad FROM funcionalidades WHERE codigo=?', [codigo]
+      );
+      let idF;
+      if (ex) {
+        idF = ex.id_funcionalidad;
+      } else {
+        const [ins] = await pool.query(
+          'INSERT INTO funcionalidades (id_modulo, nombre, codigo, href) VALUES (?,?,?,?)',
+          [modAp.id_modulo, nombre, codigo, href]
+        );
+        idF = ins.insertId;
+        console.log(`[v13] funcionalidad ${codigo} creada id=${idF}`);
+      }
+      // Por defecto solo Administrador habilitado
+      for (const p of perfiles) {
+        const hab = p.nombre === 'Administrador' ? 1 : 0;
+        await pool.query(
+          'INSERT IGNORE INTO permisos_perfil (id_perfil, id_funcionalidad, habilitado) VALUES (?,?,?)',
+          [p.id_perfil, idF, hab]
+        );
+      }
+    }
+
+    // 3) Administrador: habilitar todo
+    if (adm) {
+      await pool.query(
+        `INSERT INTO permisos_perfil (id_perfil, id_funcionalidad, habilitado)
+         SELECT ?, id_funcionalidad, 1 FROM funcionalidades
+         ON DUPLICATE KEY UPDATE habilitado = 1`,
+        [adm.id_perfil]
+      );
+    }
+
+    console.log('✓ Perfiles v13: módulo Aprobaciones registrado');
+  } catch (e) {
+    console.error('[perfiles migration v13]', e.message);
+  }
+})();
+
 module.exports = { getAllPerfiles, getModulosConFuncionalidades, getPermisosPerfil, updatePermisosPerfil, reordenarModulos, createPerfil, updatePerfil, deletePerfil, getUsuariosByPerfil };
