@@ -5,7 +5,7 @@
   <link rel="icon" href="/img/favicon.png" type="image/png">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Aprobaciones — AutoFácil</title>
-  <!-- v1.4 -->
+  <!-- v1.5 -->
   <link href="/css/bootstrap.min.css" rel="stylesheet">
   <link href="/css/bootstrap-icons.css" rel="stylesheet">
   <style>
@@ -251,12 +251,12 @@
   </div>
 </div>
 
-<!-- ════════ TAB: PARÁMETROS ════════ -->
+<!-- ════════ TAB: PARÁMETROS (solo via card Mantenedores) ════════ -->
 <div class="tab-pane" id="pane-params">
-  <div class="card-af" style="max-width:760px">
-    <h5 style="font-weight:800;color:var(--navy)"><i class="bi bi-sliders me-2"></i>Factores de Participación</h5>
-    <p style="font-size:.8rem;color:#64748b">Factor que multiplica el saldo precio según plazo y tipo de carta. Se guarda en BD y aplica a todas las cartas nuevas.</p>
-    <div class="alert-inline" id="paramsAlert"></div>
+  <div class="alert-inline" id="paramsAlert" style="max-width:860px"></div>
+  <div class="card-af" style="max-width:760px;display:none" id="cardFactores">
+    <h5 style="font-weight:800;color:var(--navy)"><i class="bi bi-sliders me-2"></i>Factores Alta Gama</h5>
+    <p style="font-size:.8rem;color:#64748b">Solo para cartas Alta Gama. Dealer Parque/Calle se calculan desde el mantenedor Parámetros Financieras.</p>
     <table class="tbl" id="tblFactores">
       <thead><tr><th>Plazo desde</th><th>Plazo hasta</th><th>Dealer Parque</th><th>Dealer Calle</th><th>AG Calle</th><th>AG Parque</th></tr></thead>
       <tbody id="bodyFactores"></tbody>
@@ -339,7 +339,7 @@ let FACTORES = [   // fallback si no hay parámetro en BD
 ];
 let FIRMA_B64 = null;
 let editandoId = null;
-let UF_HOY = null, TASAS = null, montoCredManual = false;
+let UF_HOY = null, TASAS = null, PARAMS_CRED = null, montoCredManual = false;
 let FINANCIERAS = [
   { nombre:'AUTOFIN',           estado:'normal' },
   { nombre:'UNIDAD DE CREDITO', estado:'normal' },
@@ -374,22 +374,29 @@ const dDT   = v => { if(!v) return null; const d=new Date(v); if(isNaN(d)) retur
   document.getElementById('cFecha').value = new Date().toISOString().slice(0,10);
   renderFinancierasSelect();
   restaurarBorrador();
-  // Acceso directo a una pestaña: /aprobaciones/?tab=params|nueva|revision
+  // ?tab=params → vista standalone desde Mantenedores (solo tablas de preferencia)
   const tabParam = new URLSearchParams(location.search).get('tab');
-  if (tabParam && ['lista','nueva','revision','params'].includes(tabParam)) showTab(tabParam);
+  if (tabParam === 'params' && puede('aprob_params')) {
+    document.querySelector('.tabs-bar').style.display = 'none';
+    showTab('params');
+  } else if (tabParam && ['lista','nueva','revision'].includes(tabParam)) {
+    showTab(tabParam);
+  }
 })();
 
 async function cargarUFyTasas(){
   try {
-    const [rUf, rTas] = await Promise.all([
+    const [rUf, rTas, rPar] = await Promise.all([
       fetch('/api/uf/vigente', { headers: hdr() }),
       fetch('/api/tasas/vigente', { headers: hdr() }),
+      fetch('/api/parametros-credito', { headers: hdr() }),
     ]);
-    const [jUf, jTas] = await Promise.all([rUf.json(), rTas.json()]);
+    const [jUf, jTas, jPar] = await Promise.all([rUf.json(), rTas.json(), rPar.json()]);
     const u = Array.isArray(jUf.data) ? jUf.data[0] : jUf.data;
     if (u?.valor) UF_HOY = parseFloat(u.valor);
     if (jTas.data) TASAS = jTas.data;
-  } catch(e) { console.error('uf/tasas', e); }
+    if (jPar.success && jPar.data?.obj) PARAMS_CRED = jPar.data.obj;
+  } catch(e) { console.error('uf/tasas/params', e); }
 }
 
 /* ── Borrador: ida y vuelta a Clientes ────────────── */
@@ -440,7 +447,7 @@ async function cargarPermisos(){
   const can = c => ES_ADMIN || PERMISOS.has(c);
   if (can('aprob_crear'))   document.getElementById('tabBtnNueva').style.display = '';
   if (can('aprob_revisar')) document.getElementById('tabBtnRevision').style.display = '';
-  if (can('aprob_params'))  document.getElementById('tabBtnParams').style.display = '';
+  // Parámetros ya no es pestaña: se accede solo desde Mantenedores → Preferencia Financiera
 }
 const puede = c => ES_ADMIN || PERMISOS.has(c);
 
@@ -762,6 +769,16 @@ function calcUFyTasa(){
 }
 function getFactor(plazo, tipo){
   const p = parseInt(plazo)||0;
+  if (!p) return 0;
+  // Dealer Parque/Calle: desde mantenedor Parámetros Financieras
+  // (claves dealer_pct_* y dealer_calle_pct_* en parametros_credito, valores en %)
+  if (PARAMS_CRED && (tipo==='DEALER PARQUE' || tipo==='DEALER CALLE')) {
+    const tramo = p<=6?'6' : p<=12?'12' : p<=24?'24' : p<=36?'36' : '99';
+    const clave = tipo==='DEALER PARQUE' ? 'dealer_pct_'+tramo : 'dealer_calle_pct_'+tramo;
+    const v = parseFloat(PARAMS_CRED[clave]);
+    if (!isNaN(v)) return v/100;
+  }
+  // Alta Gama (y fallback si parámetros no cargaron): tabla local/BD
   for (const f of FACTORES) {
     if (p >= f.desde && p <= f.hasta) {
       if (tipo==='DEALER PARQUE') return f.parque;
