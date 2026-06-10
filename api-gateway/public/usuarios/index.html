@@ -820,9 +820,14 @@
 
       const selSup = document.getElementById('uSupervisor');
       selSup.innerHTML = '<option value="">Sin supervisor</option>';
-      (sData?.data || []).filter(u => u.perfil === 'Supervisor').forEach(u => {
-        selSup.innerHTML += `<option value="${u.id_usuario}">${u.nombre} ${u.apellido}</option>`;
-      });
+      // Todos los usuarios activos pueden ser supervisores (ej: Jefe Comercial
+      // supervisa a los Ejecutivos). Se excluye al propio usuario en edición.
+      (sData?.data || [])
+        .filter(u => u.estado === 'activo' && String(u.id_usuario) !== String(id || ''))
+        .sort((a, b) => (a.nombre + a.apellido).localeCompare(b.nombre + b.apellido))
+        .forEach(u => {
+          selSup.innerHTML += `<option value="${u.id_usuario}">${u.nombre} ${u.apellido} — ${u.perfil}</option>`;
+        });
 
       if (id) {
         const d = await api('GET', `/api/usuarios/${id}`);
@@ -860,10 +865,8 @@
     }
 
     function actualizarSupervisorVisibilidad() {
-      const sel = document.getElementById('uPerfil');
-      const perfil = sel.options[sel.selectedIndex]?.text || '';
-      document.getElementById('campoSupervisor').style.display =
-        perfil === 'Ejecutivo Comercial' ? '' : 'none';
+      // El supervisor aplica a cualquier perfil (ej: Ejecutivos → Jefe Comercial)
+      document.getElementById('campoSupervisor').style.display = '';
     }
 
     async function guardarUsuario() {

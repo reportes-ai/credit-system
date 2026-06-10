@@ -262,9 +262,15 @@ const getEjecutivos = async (req, res) => {
     const { mes } = req.query;
     const where = mes ? `AND DATE_FORMAT(COALESCE(fecha_otorgado, mes), '%Y-%m') = ?` : '';
     const params = mes ? [mes] : [];
+    // Ejecutivos con operaciones + usuarios activos con perfil Ejecutivo Comercial
+    // (los recién creados aún no tienen créditos digitados y deben aparecer igual)
     const [rows] = await pool.query(
       `SELECT DISTINCT ejecutivo FROM creditos
        WHERE ejecutivo IS NOT NULL AND ejecutivo != '' ${where}
+       UNION
+       SELECT CONCAT(u.nombre, ' ', u.apellido) AS ejecutivo
+       FROM usuarios u JOIN perfiles p ON p.id_perfil = u.id_perfil
+       WHERE p.nombre = 'Ejecutivo Comercial' AND u.estado = 'activo'
        ORDER BY ejecutivo`,
       params
     );
