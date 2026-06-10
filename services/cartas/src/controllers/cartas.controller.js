@@ -1,5 +1,23 @@
 'use strict';
 const pool = require('../../../../shared/config/database');
+const { notificar } = require('../../../notificaciones/src/controllers/notificaciones.controller');
+
+/* Usuarios activos con permiso de revisar cartas (incluye Administradores) */
+async function idsRevisores(excluirEmail) {
+  const [rows] = await pool.query(
+    `SELECT u.id_usuario FROM usuarios u
+       JOIN perfiles p ON p.id_perfil = u.id_perfil
+     WHERE p.nombre = 'Administrador' AND u.estado = 'activo' AND u.email <> ?
+     UNION
+     SELECT u.id_usuario FROM usuarios u
+       JOIN permisos_perfil pp ON pp.id_perfil = u.id_perfil
+       JOIN funcionalidades f  ON f.id_funcionalidad = pp.id_funcionalidad
+     WHERE f.codigo = 'aprob_revisar' AND pp.habilitado = 1
+       AND u.estado = 'activo' AND u.email <> ?`,
+    [excluirEmail || '', excluirEmail || '']
+  );
+  return rows.map(r => r.id_usuario);
+}
 
 // Auto-migración: crea tablas si no existen
 (async () => {
@@ -239,6 +257,12 @@ const getAll = async (req, res) => {
 const upsert = async (req, res) => {
   try {
     const c = req.body;
+    // Estado previo (para detectar transiciones que generan notificación)
+    let prevStatus = null;
+    if (c.id) {
+      const [[prev]] = await pool.query('SELECT status FROM cartas_aprobacion WHERE id = ?', [c.id]);
+      prevStatus = prev?.status || null;
+    }
     const vals = [
       c.opCarta, c.opOrigen, c.tipo,
       c.ejecutivoIdx || null, c.ejecutivoNombre, c.ejecutivoMail, c.ejecutivoTel,
@@ -298,6 +322,7 @@ const upsert = async (req, res) => {
         [...vals, c.id]
       );
       res.json({ success: true, data: { id: c.id }, error: null });
+      notificarCambios(c, prevStatus);
     } else {
       // INSERT nuevo
       const [r] = await pool.query(
@@ -328,10 +353,46 @@ const upsert = async (req, res) => {
         vals
       );
       res.status(201).json({ success: true, data: { id: r.insertId }, error: null });
+      notificarCambios(c, null);
     }
   } catch (e) {
     (console.error('[error]', e), res.status(500).json({success:false,data:null,error:'Error interno del servidor'}));
   }
 };
+
+/* Notificaciones del flujo (no bloquea la respuesta HTTP) */
+function notificarCambios(c, prevStatus) {
+  (async () => {
+    try {
+      const esNuevaPendiente   = !prevStatus && c.status === 'PENDIENTE';
+      const vuelveAlPool       = prevStatus === 'RECHAZADA' && c.status === 'PENDIENTE';
+      const resuelta           = prevStatus === 'PENDIENTE' && (c.status === 'APROBADA' || c.status === 'RECHAZADA');
+
+      if (esNuevaPendiente || vuelveAlPool) {
+        const ids = await idsRevisores(c.creadoPor);
+        await notificar(ids, {
+          tipo: 'CARTA_NUEVA',
+          titulo: vuelveAlPool ? '🔁 Carta corregida para revisión' : '🛎️ Nueva carta para revisión',
+          mensaje: `${c.creadoPorNombre || 'Un ejecutivo'} envió la carta ${c.opCarta || ''} — ${c.cliente || ''}`,
+          href: '/aprobaciones/?tab=revision',
+        });
+      }
+      if (resuelta) {
+        const [[u]] = await pool.query('SELECT id_usuario FROM usuarios WHERE email = ? LIMIT 1', [c.creadoPor]);
+        if (u) {
+          const ok = c.status === 'APROBADA';
+          await notificar([u.id_usuario], {
+            tipo: 'CARTA_' + c.status,
+            titulo: ok ? '✅ Carta aprobada' : '❌ Carta rechazada',
+            mensaje: ok
+              ? `Tu carta ${c.opCarta || ''} (${c.cliente || ''}) fue aprobada — ya puedes imprimirla`
+              : `Tu carta ${c.opCarta || ''} fue rechazada${c.motivoRechazo ? ': ' + c.motivoRechazo : ''}. Corrígela y reenvíala.`,
+            href: '/aprobaciones/',
+          });
+        }
+      }
+    } catch (e) { console.error('[cartas notif]', e.message); }
+  })();
+}
 
 module.exports = { getAll, upsert };
