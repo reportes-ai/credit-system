@@ -264,17 +264,24 @@ const getEjecutivos = async (req, res) => {
     const params = mes ? [mes] : [];
     // Ejecutivos con operaciones + usuarios activos con perfil Ejecutivo Comercial
     // (los recién creados aún no tienen créditos digitados y deben aparecer igual)
-    const [rows] = await pool.query(
+    const [opsRows] = await pool.query(
       `SELECT DISTINCT ejecutivo FROM creditos
-       WHERE ejecutivo IS NOT NULL AND ejecutivo != '' ${where}
-       UNION
-       SELECT CONCAT(u.nombre, ' ', u.apellido) AS ejecutivo
-       FROM usuarios u JOIN perfiles p ON p.id_perfil = u.id_perfil
-       WHERE p.nombre = 'Ejecutivo Comercial' AND u.estado = 'activo'
-       ORDER BY ejecutivo`,
+       WHERE ejecutivo IS NOT NULL AND ejecutivo != '' ${where}`,
       params
     );
-    res.json({ success: true, data: rows.map(r => r.ejecutivo), error: null });
+    const [usrRows] = await pool.query(
+      `SELECT CONCAT(u.nombre, ' ', u.apellido) AS ejecutivo
+       FROM usuarios u JOIN perfiles p ON p.id_perfil = u.id_perfil
+       WHERE p.nombre = 'Ejecutivo Comercial' AND u.estado = 'activo'`
+    );
+    // Dedupe sin mayúsculas/tildes — gana la versión de las operaciones,
+    // que es el string contra el que cruza el cálculo de comisiones
+    const norm = s => String(s).normalize('NFD').replace(/[̀-ͯ]/g, '').toUpperCase().replace(/\s+/g, ' ').trim();
+    const mapa = new Map();
+    opsRows.forEach(r => mapa.set(norm(r.ejecutivo), r.ejecutivo));
+    usrRows.forEach(r => { const k = norm(r.ejecutivo); if (!mapa.has(k)) mapa.set(k, r.ejecutivo); });
+    const lista = [...mapa.values()].sort((a, b) => a.localeCompare(b));
+    res.json({ success: true, data: lista, error: null });
   } catch (e) {
     res.status(500).json({ success: false, data: null, error: e.message });
   }
