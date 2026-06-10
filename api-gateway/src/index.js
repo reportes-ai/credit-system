@@ -101,6 +101,7 @@ app.use('/api/brokerage',            require('../../services/tesoreria/src/route
 
 // Cartas de Aprobación
 app.use('/api/cartas',            require('../../services/cartas/src/routes/cartas.routes'));
+app.use('/api/cartolas',          require('../../services/cartas/src/routes/cartolas.routes'));
 app.use('/api/cartas-ejecutivos', require('../../services/cartas/src/routes/ejecutivos.routes'));
 app.use('/api/cartas-params',     require('../../services/cartas/src/routes/parametros.routes'));
 

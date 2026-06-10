@@ -5,7 +5,7 @@
   <link rel="icon" href="/img/favicon.png" type="image/png">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Aprobaciones — AutoFácil</title>
-  <!-- v1.5 -->
+  <!-- v2.0 -->
   <link href="/css/bootstrap.min.css" rel="stylesheet">
   <link href="/css/bootstrap-icons.css" rel="stylesheet">
   <style>
@@ -33,6 +33,17 @@
     .tab-btn:hover { color:var(--blue); }
     .tab-btn.active { color:var(--blue); border-bottom-color:var(--blue); }
     .tab-btn .badge-n { background:#f59e0b; color:#fff; font-size:.68rem; border-radius:10px; padding:1px 7px; font-weight:700; }
+    /* ── cards del home ── */
+    .home-card { background:linear-gradient(135deg,#0b3a8c,#0141A2); color:#fff; border:none; border-radius:10px;
+      padding:26px 18px; font-size:.86rem; font-weight:800; letter-spacing:.03em; cursor:pointer; text-transform:uppercase;
+      box-shadow:0 3px 10px rgba(1,65,162,.3); transition:transform .12s, box-shadow .12s; min-height:86px; }
+    .home-card:hover { transform:translateY(-2px); box-shadow:0 6px 16px rgba(1,65,162,.4); }
+    .home-card.rojo { background:linear-gradient(135deg,#b91c1c,#dc2626); box-shadow:0 3px 10px rgba(220,38,38,.35); animation:pulseRed 1.6s infinite; }
+    @keyframes pulseRed { 0%,100%{box-shadow:0 3px 10px rgba(220,38,38,.35);} 50%{box-shadow:0 3px 18px rgba(220,38,38,.65);} }
+    .home-card .badge-n { background:#fff; color:#b91c1c; font-size:.78rem; border-radius:12px; padding:2px 9px; margin-left:6px; }
+    .est-mini { font-size:.68rem; font-weight:700; border-radius:10px; padding:2px 8px; }
+    .exc-dot { display:inline-flex; align-items:center; justify-content:center; width:20px; height:20px; border-radius:50%;
+      background:#dc2626; color:#fff; font-size:.7rem; font-weight:800; cursor:pointer; margin-left:5px; }
     .tab-pane { display:none; padding:22px 24px; max-width:1500px; margin:0 auto; }
     .tab-pane.active { display:block; }
     /* ── cards / tabla ── */
@@ -116,15 +127,29 @@
   </div>
 </nav>
 
-<div class="tabs-bar">
-  <button class="tab-btn active" id="tabBtnLista" onclick="showTab('lista')"><i class="bi bi-list-ul"></i> Cartas</button>
-  <button class="tab-btn" id="tabBtnNueva" onclick="showTab('nueva')" style="display:none"><i class="bi bi-plus-circle"></i> Nueva Carta</button>
-  <button class="tab-btn" id="tabBtnRevision" onclick="showTab('revision')" style="display:none"><i class="bi bi-check2-square"></i> Revisión <span class="badge-n" id="badgeRev" style="display:none">0</span></button>
-  <button class="tab-btn" id="tabBtnParams" onclick="showTab('params')" style="display:none"><i class="bi bi-sliders"></i> Parámetros</button>
+<div class="tabs-bar" id="navBar">
+  <button class="tab-btn" id="btnMenu" onclick="showTab('home')" style="display:none;background:#f1f5f9;border-radius:8px;margin:8px 0;padding:6px 14px"><i class="bi bi-arrow-left"></i> Menú</button>
+  <span id="viewTitle" style="font-weight:800;color:var(--navy);padding:14px 8px;font-size:.95rem"></span>
+</div>
+
+<!-- ════════ HOME: MENÚ DE CARDS ════════ -->
+<div class="tab-pane active" id="pane-home">
+  <div style="text-align:center;margin:10px 0 26px">
+    <h4 style="font-weight:800;color:var(--navy);letter-spacing:.02em">GENERADOR DE CARTAS DE APROBACIÓN Y CARTOLAS</h4>
+  </div>
+  <div style="display:grid;grid-template-columns:repeat(3,minmax(220px,280px));gap:16px;justify-content:center">
+    <button class="home-card" id="cardGenerador" onclick="showTab('nueva')" style="display:none">GENERADOR DE CARTA DE APROBACIÓN</button>
+    <button class="home-card" id="cardRevision" onclick="showTab('revision')" style="display:none">REVISIÓN CARTA DE APROBACIÓN <span class="badge-n" id="badgeRevCard" style="display:none">0</span></button>
+    <button class="home-card" id="cardImpresion" onclick="showTab('impresion')">IMPRESIÓN DE CARTA DE APROBACIÓN</button>
+    <button class="home-card" id="cardMisCartas" onclick="showTab('lista')">MIS CARTAS</button>
+    <button class="home-card" id="cardInformes" onclick="showTab('informes')" style="display:none">INFORMES CARTAS DE APROBACIÓN</button>
+    <button class="home-card" id="cardCartolas" onclick="showTab('cartolas')" style="display:none">EMISIÓN DE CARTOLAS</button>
+    <button class="home-card" id="cardEnviadas" onclick="showTab('enviadas')" style="display:none">CARTOLAS ENVIADAS</button>
+  </div>
 </div>
 
 <!-- ════════ TAB: LISTADO ════════ -->
-<div class="tab-pane active" id="pane-lista">
+<div class="tab-pane" id="pane-lista">
   <div id="avisoResueltas" style="display:none;background:#eff6ff;border:1.5px solid #bfdbfe;color:#1d4ed8;border-radius:10px;padding:10px 16px;font-size:.85rem;margin-bottom:14px;align-items:center;gap:8px">
     <i class="bi bi-bell-fill"></i> <span id="avisoResueltasTxt"></span>
     <button onclick="marcarVistas()" style="margin-left:auto;border:none;background:#1d4ed8;color:#fff;border-radius:7px;padding:4px 12px;font-size:.78rem;font-weight:600;cursor:pointer">Entendido</button>
@@ -298,6 +323,120 @@
   </div>
 </div>
 
+<!-- ════════ TAB: IMPRESIÓN (solo aprobadas) ════════ -->
+<div class="tab-pane" id="pane-impresion">
+  <div class="card-af">
+    <div class="filters-bar">
+      <input type="text" id="impBuscar" placeholder="Buscar N° operación, cliente o concesionario…" oninput="renderImpresion()" style="flex:1;min-width:220px">
+    </div>
+    <div style="overflow-x:auto">
+      <table class="tbl">
+        <thead><tr><th>N° Op Carta</th><th>Tipo</th><th>Cliente</th><th>Concesionario</th><th>Estado</th><th>Aprobado por</th><th>N° Crédito</th><th>Acciones</th></tr></thead>
+        <tbody id="bodyImpresion"></tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<!-- ════════ TAB: INFORMES ════════ -->
+<div class="tab-pane" id="pane-informes">
+  <div class="card-af">
+    <div class="filters-bar">
+      <input type="date" id="infDesde" onchange="renderInformes()">
+      <input type="date" id="infHasta" onchange="renderInformes()">
+      <select id="infEstado" onchange="renderInformes()">
+        <option value="">Todos</option><option>PENDIENTE</option><option>APROBADA</option><option>RECHAZADA</option><option>ANULADA</option>
+      </select>
+      <select id="infTipo" onchange="renderInformes()">
+        <option value="">Todos</option><option>DEALER PARQUE</option><option>DEALER CALLE</option>
+        <option>ALTA GAMA - PARQUE</option><option>ALTA GAMA - CALLE</option>
+      </select>
+      <input type="text" id="infBuscar" placeholder="Cliente, concesionario…" oninput="renderInformes()" style="flex:1;min-width:180px">
+      <button class="btn-sec" onclick="limpiarInformes()">Limpiar</button>
+      <button class="btn-mini bm-ok" style="padding:8px 16px;font-size:.83rem" onclick="exportarInformes()"><i class="bi bi-file-earmark-excel"></i> Exportar Excel</button>
+    </div>
+    <div style="font-size:.78rem;color:#64748b;margin-bottom:8px" id="infCount"></div>
+    <div style="overflow-x:auto">
+      <table class="tbl">
+        <thead><tr><th>N° Op Carta</th><th>Tipo</th><th>Cliente</th><th>Concesionario</th><th>Ejecutivo</th><th>Creador</th><th>Creado</th><th>Aprobador</th><th>Aprobado</th><th>Estado</th><th style="text-align:center">Otorgado</th><th></th></tr></thead>
+        <tbody id="bodyInformes"></tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<!-- ════════ TAB: EMISIÓN DE CARTOLAS ════════ -->
+<div class="tab-pane" id="pane-cartolas">
+  <div style="display:flex;gap:8px;margin-bottom:14px">
+    <button class="btn-sec" id="subDetalle" onclick="subTabCartolas('detalle')" style="font-weight:700;border-bottom:3px solid var(--blue)">Detalle Mes</button>
+    <button class="btn-sec" id="subRevision" onclick="subTabCartolas('revision')">Revisión Cartolas</button>
+  </div>
+
+  <div id="cartolasDetalle">
+    <div class="card-af">
+      <div class="filters-bar">
+        <select id="ctaMes" onchange="cargarMovimientos()"></select>
+        <input type="text" id="ctaBuscar" placeholder="Concesionario u operación…" oninput="renderMovimientos()" style="min-width:200px">
+        <select id="ctaEstado" onchange="renderMovimientos()">
+          <option value="">Todos</option><option>PENDIENTE</option><option>A PAGAR</option><option>A DESCONTAR</option>
+        </select>
+        <button class="btn-mini bm-anular" style="padding:8px 16px;font-size:.83rem" onclick="abrirModalPrepago()"><i class="bi bi-arrow-counterclockwise"></i> Ingreso Prepago o Anulación</button>
+        <button class="btn-mini bm-ok" style="padding:8px 16px;font-size:.83rem" onclick="exportarMovimientos()"><i class="bi bi-file-earmark-excel"></i> Exportar Excel</button>
+        <span style="font-size:.78rem;color:#64748b" id="ctaCount"></span>
+      </div>
+      <div style="overflow-x:auto">
+        <table class="tbl">
+          <thead><tr><th>Corr.</th><th>Mes</th><th>N° Op</th><th>Movimiento</th><th>Concesionario</th><th>Ejecutivo</th><th>Cliente</th>
+            <th style="text-align:right">Saldo</th><th style="text-align:right">Comisión</th><th>E° Comisión</th><th>N° Carta</th><th>Acreedor</th><th>% Com.</th><th>Observaciones</th><th></th></tr></thead>
+          <tbody id="bodyMovs"></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <div id="cartolasRevision" style="display:none">
+    <div class="filters-bar" style="margin-bottom:14px">
+      <input type="text" id="revCtaBuscar" placeholder="Buscar concesionario…" oninput="renderRevCartolas()" style="min-width:220px">
+      <span style="font-size:.78rem;color:#64748b" id="revCtaCount"></span>
+    </div>
+    <div id="bloquesCartolas"></div>
+  </div>
+</div>
+
+<!-- ════════ TAB: CARTOLAS ENVIADAS ════════ -->
+<div class="tab-pane" id="pane-enviadas">
+  <div class="card-af">
+    <div class="filters-bar">
+      <select id="envMes" onchange="cargarEnviadas()"></select>
+    </div>
+    <table class="tbl">
+      <thead><tr><th>Mes</th><th>Concesionario</th><th>RUT</th><th>Mail</th><th style="text-align:right">Total Bruto</th><th>Enviada por</th><th>Fecha envío</th></tr></thead>
+      <tbody id="bodyEnviadas"></tbody>
+    </table>
+  </div>
+</div>
+
+<!-- ════════ MODAL PREPAGO / ANULACIÓN ════════ -->
+<div class="modal-bg" id="modalPrepago">
+  <div class="modal-card" style="max-width:480px">
+    <div class="modal-head"><h6><i class="bi bi-arrow-counterclockwise me-2"></i>Ingreso Prepago o Anulación</h6>
+      <button class="close-x" onclick="document.getElementById('modalPrepago').classList.remove('show')">&times;</button></div>
+    <div class="modal-body-af">
+      <div class="alert-inline" id="ppAlert"></div>
+      <div class="ff" style="margin-bottom:12px"><label>Movimiento</label>
+        <select id="ppMov"><option>PREPAGO</option><option>ANULACION</option></select></div>
+      <div class="ff" style="margin-bottom:12px"><label>N° Operación *</label><input id="ppOp" placeholder="Operación origen del crédito"></div>
+      <div class="ff" style="margin-bottom:12px"><label>Mes cartola</label><input type="month" id="ppMes"></div>
+      <div class="ff" style="margin-bottom:12px"><label>Monto a descontar *</label><input id="ppMonto" inputmode="numeric" oninput="fmtMoney(this)"></div>
+      <div class="ff"><label>Observaciones</label><input id="ppObs" placeholder="Ej: prepago cuota 4"></div>
+    </div>
+    <div class="modal-foot">
+      <button class="btn-sec" onclick="document.getElementById('modalPrepago').classList.remove('show')">Cancelar</button>
+      <button class="btn-af" onclick="guardarPrepago()"><i class="bi bi-check-lg me-1"></i>Guardar</button>
+    </div>
+  </div>
+</div>
+
 <!-- ════════ MODAL PREVIEW / REVISIÓN ════════ -->
 <div class="modal-bg" id="modalCarta">
   <div class="modal-card">
@@ -311,6 +450,8 @@
 </div>
 
 <script src="/js/app-version.js"></script>
+<script src="/js/xlsx.full.min.js"></script>
+<script src="/js/html2pdf.bundle.min.js"></script>
 <script>
 'use strict';
 const tok = () => sessionStorage.getItem('token');
@@ -445,19 +586,32 @@ async function cargarPermisos(){
     (j.funcionalidades||[]).forEach(c => PERMISOS.add(c));
   } catch(e) { console.error('permisos', e); }
   const can = c => ES_ADMIN || PERMISOS.has(c);
-  if (can('aprob_crear'))   document.getElementById('tabBtnNueva').style.display = '';
-  if (can('aprob_revisar')) document.getElementById('tabBtnRevision').style.display = '';
-  // Parámetros ya no es pestaña: se accede solo desde Mantenedores → Preferencia Financiera
+  if (can('aprob_crear'))     document.getElementById('cardGenerador').style.display = '';
+  if (can('aprob_revisar'))   document.getElementById('cardRevision').style.display = '';
+  if (can('aprob_ver_todas')) document.getElementById('cardInformes').style.display = '';
+  if (can('aprob_cartolas')) {
+    document.getElementById('cardCartolas').style.display = '';
+    document.getElementById('cardEnviadas').style.display = '';
+  }
 }
 const puede = c => ES_ADMIN || PERMISOS.has(c);
 
+const TITULOS = { home:'', lista:'Mis Cartas', nueva:'Generador de Carta de Aprobación',
+  revision:'Revisión de Cartas de Aprobación', impresion:'Impresión de Cartas de Aprobación',
+  informes:'Informes de Cartas de Aprobación', cartolas:'Emisión de Cartolas',
+  enviadas:'Cartolas Enviadas', params:'Preferencia Financiera' };
+
 function showTab(t){
   document.querySelectorAll('.tab-pane').forEach(p=>p.classList.remove('active'));
-  document.querySelectorAll('.tab-btn').forEach(b=>b.classList.remove('active'));
-  document.getElementById('pane-'+t).classList.add('active');
-  const btn = { lista:'tabBtnLista', nueva:'tabBtnNueva', revision:'tabBtnRevision', params:'tabBtnParams' }[t];
-  document.getElementById(btn).classList.add('active');
-  if (t==='revision') renderRevision();
+  const pane = document.getElementById('pane-'+t);
+  if (pane) pane.classList.add('active');
+  document.getElementById('btnMenu').style.display = (t==='home'||t==='params') ? 'none' : '';
+  document.getElementById('viewTitle').textContent = TITULOS[t]||'';
+  if (t==='revision')  renderRevision();
+  if (t==='impresion') renderImpresion();
+  if (t==='informes')  initInformes();
+  if (t==='cartolas')  initCartolas();
+  if (t==='enviadas')  initEnviadas();
   if (t==='params') { renderFactores(); renderFinancierasEditor(); renderPrefTabla(); }
 }
 
@@ -514,6 +668,7 @@ async function cargarCatalogos(){
     DEALERS = (jDlr.data?.rows || []).map(d => ({
       nombre: d.nombre_indexa || d.nombre_razon || '',
       rut: d.rut || '',
+      mail: d.mail || d.email || d.correo || d.mail_contacto || '',
       parque: ((d.ccs_parque||'').trim().toUpperCase() !== 'PARTICULAR') ? (d.ccs_parque||'').trim().toUpperCase() : ''
     })).filter(d=>d.nombre);
 
@@ -598,8 +753,10 @@ function renderLista(){
 
 function actualizarBadge(){
   const n = CARTAS.filter(c => c.status==='PENDIENTE' && c.creadoPor!==MI_LOGIN).length;
-  const b = document.getElementById('badgeRev');
+  const card = document.getElementById('cardRevision');
+  const b = document.getElementById('badgeRevCard');
   b.textContent = n; b.style.display = n ? '' : 'none';
+  card.classList.toggle('rojo', n > 0);   // rojo + pulso cuando hay pendientes
 }
 
 /* ── Formulario nueva carta ───────────────────────── */
@@ -1384,6 +1541,357 @@ async function guardarFactores(){
     const el = document.getElementById('paramsAlert');
     el.textContent='Error de conexión'; el.className='alert-inline err';
   }
+}
+
+/* ═══════════ IMPRESIÓN (solo aprobadas) ═══════════ */
+function renderImpresion(){
+  const q = (document.getElementById('impBuscar').value||'').toLowerCase();
+  const rows = CARTAS.filter(c => c.status==='APROBADA' &&
+    (!q || [c.opCarta,c.cliente,c.concesionario,c.opOrigen].some(v=>String(v||'').toLowerCase().includes(q))));
+  const body = document.getElementById('bodyImpresion');
+  if (!rows.length) { body.innerHTML='<tr><td colspan="8" style="text-align:center;color:#94a3b8;padding:24px">Sin cartas aprobadas</td></tr>'; return; }
+  body.innerHTML = rows.map(c=>`<tr>
+    <td><b>${escH(c.opCarta||'')}</b></td>
+    <td style="font-size:.72rem">${escH(c.tipo||'')}</td>
+    <td>${escH(toTitle(c.cliente||''))}</td>
+    <td>${escH(c.concesionario||'')}</td>
+    <td><span class="st-pill st-APROBADA">APROBADA</span></td>
+    <td style="font-size:.76rem">${escH(c.aprobadoPorNombre||'')}</td>
+    <td>${escH(c.numeroCreditoCreado||'—')}</td>
+    <td><button class="btn-mini bm-ver" onclick="verCarta(${c.id})"><i class="bi bi-eye"></i> Ver</button>
+        <button class="btn-mini bm-print" onclick="imprimirCarta(${c.id})"><i class="bi bi-printer"></i> Imprimir</button></td>
+  </tr>`).join('');
+}
+
+/* ═══════════ INFORMES ═══════════ */
+async function initInformes(){
+  // Sincroniza otorgados contra la tabla creditos y crea cartolas pendientes
+  try { await fetch('/api/cartolas/sync', { method:'POST', headers: hdr() }); } catch(e) {}
+  await cargarCartas();
+  renderInformes();
+}
+function limpiarInformes(){
+  ['infDesde','infHasta','infEstado','infTipo','infBuscar'].forEach(id=>document.getElementById(id).value='');
+  renderInformes();
+}
+function filtrarInformes(){
+  const d = document.getElementById('infDesde').value, h = document.getElementById('infHasta').value;
+  const est = document.getElementById('infEstado').value, tipo = document.getElementById('infTipo').value;
+  const q = (document.getElementById('infBuscar').value||'').toLowerCase();
+  return CARTAS.filter(c=>{
+    const f = dDate(c.fecha)||'';
+    if (d && f < d) return false;
+    if (h && f > h) return false;
+    if (est && c.status!==est) return false;
+    if (tipo && c.tipo!==tipo) return false;
+    if (q && ![c.cliente,c.concesionario,c.opCarta,c.opOrigen].some(v=>String(v||'').toLowerCase().includes(q))) return false;
+    return true;
+  });
+}
+function renderInformes(){
+  const rows = filtrarInformes();
+  document.getElementById('infCount').textContent = rows.length + ' carta(s) encontradas';
+  const fdt = v => { if(!v) return '—'; const d=new Date(v); return isNaN(d)?'—':d.toLocaleDateString('es-CL')+' '+d.toLocaleTimeString('es-CL',{hour:'2-digit',minute:'2-digit'}); };
+  const body = document.getElementById('bodyInformes');
+  if (!rows.length) { body.innerHTML='<tr><td colspan="12" style="text-align:center;color:#94a3b8;padding:24px">Sin resultados</td></tr>'; return; }
+  body.innerHTML = rows.map(c=>{
+    const exc = (Array.isArray(c.excepciones)&&c.excepciones.length)
+      ? `<span class="exc-dot" title="Ver excepciones" onclick="verExcepciones(${c.id})">E</span>` : '';
+    const otorg = c.otorgado
+      ? '<span style="color:#15803d;font-size:1.1rem"><i class="bi bi-check-square-fill"></i></span><div style="font-size:.62rem;color:#15803d;font-weight:700">SI</div>'
+      : '<span style="color:#cbd5e1;font-size:1.1rem"><i class="bi bi-square"></i></span><div style="font-size:.62rem;color:#94a3b8">NO</div>';
+    return `<tr>
+      <td><b>${escH(c.opCarta||'')}</b></td>
+      <td style="font-size:.7rem">${escH(c.tipo||'')}</td>
+      <td>${escH(toTitle(c.cliente||''))}</td>
+      <td style="font-size:.76rem">${escH(c.concesionario||'')}</td>
+      <td style="font-size:.76rem">${escH(c.ejecutivoNombre||'')}</td>
+      <td style="font-size:.74rem">${escH(c.creadoPorNombre||'')}</td>
+      <td style="font-size:.72rem">${fdt(c.fechaCreacion)}</td>
+      <td style="font-size:.74rem">${escH(c.aprobadoPorNombre||'—')}</td>
+      <td style="font-size:.72rem">${fdt(c.fechaAprobacion)}</td>
+      <td><span class="st-pill st-${escH(c.status)}">${escH(c.status)}</span>${exc}</td>
+      <td style="text-align:center">${otorg}</td>
+      <td><button class="btn-mini bm-ver" onclick="verCarta(${c.id})"><i class="bi bi-eye"></i></button></td>
+    </tr>`;
+  }).join('');
+}
+function verExcepciones(id){
+  const c = CARTAS.find(x=>x.id===id);
+  if (!c) return;
+  const EXC_LBL = { TASA_BAJO_PIZARRA:'Tasa bajo pizarra', CAMBIO_PARTICIPACION:'Cambio de participación manual',
+                    PARTICIPACION_SOBRE_PIZARRA:'Participación sobre pizarra', FINANCIERA_NO_PREFERENTE:'Financiera distinta a la preferente' };
+  const items = (c.excepciones||[]).map(e=>`<li style="margin:4px 0">${escH(EXC_LBL[e]||e)}</li>`).join('');
+  const extra = [];
+  if (c.tasaCredito)    extra.push(`Tasa solicitada: <b>${String(c.tasaCredito).replace('.',',')}%</b>`);
+  if (c.montoCreditoUF) extra.push(`Monto: <b>${parseFloat(c.montoCreditoUF).toLocaleString('es-CL',{maximumFractionDigits:2})} UF</b>`);
+  document.getElementById('modalTitulo').innerHTML = '<i class="bi bi-exclamation-triangle me-2"></i>Excepciones — ' + escH(c.opCarta||'');
+  document.getElementById('modalBody').innerHTML =
+    `<ul style="font-size:.9rem;color:#c2410c;font-weight:600">${items}</ul>
+     <div style="font-size:.84rem;color:#475569;margin-top:10px">${extra.join(' &middot; ')}</div>`;
+  document.getElementById('modalFoot').innerHTML = '<button class="btn-sec" onclick="cerrarModal()">Cerrar</button>';
+  document.getElementById('modalCarta').classList.add('show');
+}
+function exportarInformes(){
+  const rows = filtrarInformes().map(c=>({
+    'N° Op Carta':c.opCarta, 'Op Origen':c.opOrigen, 'Tipo':c.tipo, 'Cliente':c.cliente, 'RUT':c.rutCliente,
+    'Concesionario':c.concesionario, 'Ejecutivo':c.ejecutivoNombre, 'Creador':c.creadoPorNombre,
+    'Creado':dDT(c.fechaCreacion), 'Aprobador':c.aprobadoPorNombre, 'Aprobado':dDT(c.fechaAprobacion),
+    'Estado':c.status, 'Excepciones':(c.excepciones||[]).join(', '), 'Otorgado':c.otorgado?'SI':'NO',
+    'N° Crédito':c.numeroCreditoCreado, 'Saldo':c.saldo, 'Participación Bruta':c.partBruto,
+  }));
+  const ws = XLSX.utils.json_to_sheet(rows);
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, 'Informes');
+  XLSX.writeFile(wb, 'informe_cartas_aprobacion.xlsx');
+}
+
+/* ═══════════ CARTOLAS: DETALLE MES ═══════════ */
+let MOVS = [];
+function mesActual(){ return new Date().toISOString().slice(0,7); }
+function nombreMes(m){ const [y,mm]=String(m).split('-'); return new Date(y, mm-1, 1).toLocaleDateString('es-CL',{month:'long',year:'numeric'}); }
+
+async function initCartolas(){
+  try { await fetch('/api/cartolas/sync', { method:'POST', headers: hdr() }); } catch(e) {}
+  const sel = document.getElementById('ctaMes');
+  if (!sel.options.length) {
+    const hoy = new Date(); const ops=[];
+    for (let i=0;i<12;i++){ const d=new Date(hoy.getFullYear(), hoy.getMonth()-i, 1);
+      const v=d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0');
+      ops.push(`<option value="${v}">${nombreMes(v)}</option>`); }
+    sel.innerHTML = ops.join('');
+  }
+  await cargarMovimientos();
+}
+async function cargarMovimientos(){
+  const mes = document.getElementById('ctaMes').value || mesActual();
+  try {
+    const r = await fetch('/api/cartolas?mes='+encodeURIComponent(mes), { headers: hdr() });
+    const j = await r.json();
+    MOVS = j.success ? (j.data||[]) : [];
+  } catch(e) { MOVS = []; }
+  renderMovimientos();
+  renderRevCartolas();
+}
+function renderMovimientos(){
+  const q = (document.getElementById('ctaBuscar').value||'').toLowerCase();
+  const est = document.getElementById('ctaEstado').value;
+  const rows = MOVS.filter(m =>
+    (!est || m.estado_comision===est) &&
+    (!q || [m.concesionario,m.num_op,m.nombre_cliente].some(v=>String(v||'').toLowerCase().includes(q))));
+  document.getElementById('ctaCount').textContent = rows.length + ' registro(s)';
+  const body = document.getElementById('bodyMovs');
+  if (!rows.length) { body.innerHTML='<tr><td colspan="15" style="text-align:center;color:#94a3b8;padding:24px">Sin movimientos en este mes</td></tr>'; return; }
+  const ESTADOS = ['PENDIENTE','A PAGAR','A DESCONTAR'];
+  body.innerHTML = rows.map((m,i)=>{
+    const pct = (m.saldo>0 && m.comision) ? (m.comision/m.saldo*100).toFixed(2).replace('.',',')+'%' : '—';
+    const esManual = m.movimiento!=='COMISION';
+    return `<tr style="${esManual?'background:#fff7ed':''}">
+      <td>${i+1}</td><td style="font-size:.72rem">${nombreMes(m.mes)}</td>
+      <td><b>${escH(m.num_op||'')}</b></td>
+      <td><span class="est-mini" style="background:${esManual?'#fed7aa':'#dbeafe'};color:${esManual?'#c2410c':'#1d4ed8'}">${escH(m.movimiento)}</span></td>
+      <td style="font-size:.74rem">${escH(m.concesionario||'')}</td>
+      <td style="font-size:.74rem">${escH(m.ejecutivo||'')}</td>
+      <td style="font-size:.74rem">${escH(toTitle(m.nombre_cliente||''))}</td>
+      <td style="text-align:right">${fmtCLP(m.saldo)}</td>
+      <td style="text-align:right"><b>${fmtCLP(m.comision)}</b></td>
+      <td><select onchange="updMov(${m.id},'estado_comision',this.value)" style="border:1px solid #e2e8f0;border-radius:6px;padding:3px 6px;font-size:.74rem">
+        ${ESTADOS.map(e=>`<option${m.estado_comision===e?' selected':''}>${e}</option>`).join('')}</select></td>
+      <td style="font-size:.72rem">${escH(m.num_carta||'')}</td>
+      <td style="font-size:.72rem">${escH(m.acreedor||'')}</td>
+      <td>${pct}</td>
+      <td><input value="${escH(m.observaciones||'')}" onblur="updMov(${m.id},'observaciones',this.value)" style="border:1px solid #e2e8f0;border-radius:6px;padding:3px 6px;font-size:.72rem;width:130px"></td>
+      <td>${esManual?`<button class="btn-mini bm-no" onclick="delMov(${m.id})"><i class="bi bi-trash"></i></button>`:''}</td>
+    </tr>`;
+  }).join('');
+}
+async function updMov(id, campo, valor){
+  try {
+    await fetch('/api/cartolas/'+id, { method:'PUT', headers: hdr(), body: JSON.stringify({ [campo]: valor }) });
+    const m = MOVS.find(x=>x.id===id); if (m) m[campo]=valor;
+    renderRevCartolas();
+  } catch(e) { alert('Error al guardar'); }
+}
+async function delMov(id){
+  if (!confirm('¿Eliminar este movimiento?')) return;
+  await fetch('/api/cartolas/'+id, { method:'DELETE', headers: hdr() });
+  cargarMovimientos();
+}
+function abrirModalPrepago(){
+  document.getElementById('ppMes').value = document.getElementById('ctaMes').value || mesActual();
+  ['ppOp','ppMonto','ppObs'].forEach(id=>{ const el=document.getElementById(id); el.value=''; if(el.dataset) el.dataset.raw=0; });
+  document.getElementById('ppAlert').className='alert-inline';
+  document.getElementById('modalPrepago').classList.add('show');
+}
+async function guardarPrepago(){
+  const op = document.getElementById('ppOp').value.trim();
+  const monto = rawMoney('ppMonto');
+  const alertEl = document.getElementById('ppAlert');
+  if (!op || !monto) { alertEl.textContent='N° operación y monto son obligatorios'; alertEl.className='alert-inline err'; return; }
+  const body = {
+    mes: document.getElementById('ppMes').value || mesActual(),
+    movimiento: document.getElementById('ppMov').value,
+    num_op: op, comision: monto,
+    observaciones: document.getElementById('ppObs').value.trim(),
+    estado_comision: 'A DESCONTAR',
+  };
+  const r = await fetch('/api/cartolas', { method:'POST', headers: hdr(), body: JSON.stringify(body) });
+  const j = await r.json();
+  if (!j.success) { alertEl.textContent=j.error||'Error'; alertEl.className='alert-inline err'; return; }
+  document.getElementById('modalPrepago').classList.remove('show');
+  cargarMovimientos();
+}
+function exportarMovimientos(){
+  const rows = MOVS.map(m=>({ Mes:m.mes, 'N° Op':m.num_op, Movimiento:m.movimiento, 'RUT Conc.':m.rut_conc,
+    Concesionario:m.concesionario, Ejecutivo:m.ejecutivo, Cliente:m.nombre_cliente, 'RUT Cliente':m.rut_cliente,
+    Saldo:m.saldo, Comision:m.comision, 'E° Comisión':m.estado_comision, 'N° Carta':m.num_carta,
+    Vendedor:m.vendedor, Acreedor:m.acreedor, Observaciones:m.observaciones }));
+  const ws = XLSX.utils.json_to_sheet(rows);
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, 'Cartolas');
+  XLSX.writeFile(wb, 'cartolas_' + (document.getElementById('ctaMes').value||mesActual()) + '.xlsx');
+}
+function subTabCartolas(t){
+  document.getElementById('cartolasDetalle').style.display  = t==='detalle' ? '' : 'none';
+  document.getElementById('cartolasRevision').style.display = t==='revision' ? '' : 'none';
+  document.getElementById('subDetalle').style.cssText  = t==='detalle' ? 'font-weight:700;border-bottom:3px solid var(--blue)' : '';
+  document.getElementById('subRevision').style.cssText = t==='revision' ? 'font-weight:700;border-bottom:3px solid var(--blue)' : '';
+  if (t==='revision') renderRevCartolas();
+}
+
+/* ═══════════ CARTOLAS: REVISIÓN Y ENVÍO ═══════════ */
+function renderRevCartolas(){
+  const cont = document.getElementById('bloquesCartolas');
+  if (!cont) return;
+  const q = (document.getElementById('revCtaBuscar').value||'').toLowerCase();
+  const grupos = {};
+  MOVS.forEach(m=>{
+    const key = m.concesionario||'(sin concesionario)';
+    if (q && !key.toLowerCase().includes(q)) return;
+    (grupos[key] = grupos[key]||[]).push(m);
+  });
+  const nombres = Object.keys(grupos).sort();
+  document.getElementById('revCtaCount').textContent = nombres.length + ' concesionario(s)';
+  const mes = document.getElementById('ctaMes').value || mesActual();
+  cont.innerHTML = nombres.map((conc,gi)=>{
+    const movs = grupos[conc];
+    const rutC = movs.find(m=>m.rut_conc)?.rut_conc || '';
+    const mailBD = movs.find(m=>m.mail)?.mail || DEALERS.find(d=>d.rut===rutC)?.mail || '';
+    const comisiones = movs.filter(m=>m.movimiento==='COMISION' && m.estado_comision==='A PAGAR').reduce((s,m)=>s+(+m.comision||0),0);
+    const anulacion  = movs.filter(m=>m.movimiento==='ANULACION' && m.estado_comision==='A DESCONTAR').reduce((s,m)=>s+(+m.comision||0),0);
+    const prepago    = movs.filter(m=>m.movimiento==='PREPAGO' && m.estado_comision==='A DESCONTAR').reduce((s,m)=>s+(+m.comision||0),0);
+    const subTotal = comisiones - anulacion - prepago;
+    const neto = Math.round(subTotal/1.19), iva = subTotal - neto;
+    const filas = movs.map(m=>`<tr>
+      <td>${escH(m.num_op||'')}</td><td style="font-size:.74rem">${escH(m.movimiento)}</td>
+      <td style="font-size:.74rem">${escH(m.ejecutivo||'')}</td>
+      <td>${escH(toTitle(m.nombre_cliente||''))}</td><td>${fmtRUT(m.rut_cliente||'')}</td>
+      <td style="text-align:right">${fmtCLP(m.saldo)}</td>
+      <td style="text-align:right"><b>${m.movimiento!=='COMISION'?'−':''}${fmtCLP(m.comision)}</b></td>
+      <td><span class="est-mini" style="background:${m.estado_comision==='A PAGAR'?'#dcfce7':m.estado_comision==='A DESCONTAR'?'#fee2e2':'#f1f5f9'};color:${m.estado_comision==='A PAGAR'?'#15803d':m.estado_comision==='A DESCONTAR'?'#b91c1c':'#64748b'}">${escH(m.estado_comision)}</span></td>
+      <td style="font-size:.72rem">${escH(m.observaciones||'')}</td>
+    </tr>`).join('');
+    return `<div class="card-af" style="margin-bottom:18px;padding:0;overflow:hidden" id="bloqueCta${gi}">
+      <div style="background:linear-gradient(90deg,#012d70,#0255c5);color:#fff;padding:12px 18px;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px">
+        <div>
+          <div style="font-weight:800;font-size:.95rem">${escH(conc)}</div>
+          <div style="font-size:.72rem;opacity:.8">RUT: ${fmtRUT(rutC)} &middot; Mes: ${nombreMes(mes)}</div>
+        </div>
+        <div style="display:flex;align-items:center;gap:8px" data-html2canvas-ignore>
+          <input id="mailCta${gi}" value="${escH(mailBD)}" placeholder="correo@concesionario.cl" style="border:none;border-radius:7px;padding:6px 10px;font-size:.78rem;min-width:220px">
+          <button class="btn-mini bm-ok" style="padding:8px 14px;font-size:.82rem" onclick="enviarCartola(${gi},this.dataset.conc,this.dataset.rut,${subTotal})" data-conc="${escH(conc)}" data-rut="${escH(rutC)}"><i class="bi bi-envelope"></i> Enviar Cartola</button>
+        </div>
+      </div>
+      <div style="padding:14px 18px">
+        <table class="tbl"><thead><tr><th>N° Op</th><th>Mov.</th><th>Ejecutivo</th><th>Cliente</th><th>RUT</th><th style="text-align:right">Saldo</th><th style="text-align:right">Comisión</th><th>E° Comisión</th><th>Obs.</th></tr></thead>
+        <tbody>${filas}</tbody></table>
+        <div style="display:flex;justify-content:flex-end;margin-top:12px">
+          <table class="tbl" style="width:340px">
+            <tr><td>+ Comisiones Créditos</td><td style="text-align:right">${fmtCLP(comisiones)}</td></tr>
+            <tr><td>− Reversas por Anulación</td><td style="text-align:right;color:#b91c1c">${fmtCLP(anulacion)}</td></tr>
+            <tr><td>− Reversas por Prepago</td><td style="text-align:right;color:#b91c1c">${fmtCLP(prepago)}</td></tr>
+            <tr style="background:#fef9c3;font-weight:700"><td>Sub Total Comisión a Pagar</td><td style="text-align:right">${fmtCLP(subTotal)}</td></tr>
+            <tr><td>Comisión Neta</td><td style="text-align:right">${fmtCLP(neto)}</td></tr>
+            <tr><td>IVA (19%)</td><td style="text-align:right">${fmtCLP(iva)}</td></tr>
+            <tr style="background:#dcfce7;font-weight:800"><td>Comisión Bruta Total</td><td style="text-align:right">${fmtCLP(subTotal)}</td></tr>
+          </table>
+        </div>
+        <div style="font-size:.7rem;color:#94a3b8;margin-top:10px">Facturar a: AUTOFACIL SPA &middot; RUT: 76.545.638-K &middot; Av. Presidente Kennedy N° 5757 Piso 16 Of. 1601, Las Condes.</div>
+      </div>
+    </div>`;
+  }).join('') || '<div style="text-align:center;color:#94a3b8;padding:30px">Sin cartolas para este mes</div>';
+}
+
+async function enviarCartola(gi, conc, rutC, total){
+  const mes = document.getElementById('ctaMes').value || mesActual();
+  const mail = document.getElementById('mailCta'+gi).value.trim();
+  const bloque = document.getElementById('bloqueCta'+gi);
+  const filename = mes.replace('-','.') + ' CARTOLA COMISIONES - ' + conc.toUpperCase() + '.pdf';
+  // 1) Generar y descargar el PDF
+  try {
+    await html2pdf().set({
+      filename,
+      margin: 8,
+      image: { type:'jpeg', quality: 0.95 },
+      html2canvas: { scale: 2 },
+      jsPDF: { unit:'mm', format:'letter', orientation:'portrait' },
+    }).from(bloque).save();
+  } catch(e) { alert('Error generando PDF: '+e.message); return; }
+  // 2) Registrar el envío
+  try {
+    await fetch('/api/cartolas/enviadas', { method:'POST', headers: hdr(),
+      body: JSON.stringify({ mes, rut_conc: rutC, concesionario: conc, mail, total_bruto: total }) });
+  } catch(e) {}
+  // 3) Abrir Gmail con el texto del correo (adjuntar el PDF descargado)
+  const asunto = `CARTOLA COMISIONES ${nombreMes(mes).toUpperCase()} — ${conc.toUpperCase()}`;
+  const cuerpo =
+`Estimados ${conc}:
+
+Junto con saludar, adjuntamos la cartola de comisiones correspondiente a ${nombreMes(mes)}.
+
+Total comisión bruta a pagar: ${fmtCLP(total)}
+
+Favor emitir la factura a:
+AUTOFACIL SPA — RUT 76.545.638-K
+Av. Presidente Kennedy N° 5757, Piso 16 Of. 1601, Las Condes.
+
+Cualquier duda quedamos atentos.
+
+Saludos cordiales,
+${YO.nombre} ${YO.apellido||''}
+AutoFácil Crédito Automotriz`;
+  window.open('https://mail.google.com/mail/?view=cm&fs=1&to=' + encodeURIComponent(mail) +
+    '&su=' + encodeURIComponent(asunto) + '&body=' + encodeURIComponent(cuerpo), '_blank');
+}
+
+/* ═══════════ CARTOLAS ENVIADAS ═══════════ */
+async function initEnviadas(){
+  const sel = document.getElementById('envMes');
+  if (!sel.options.length) {
+    const hoy = new Date(); const ops=['<option value="">Todos los meses</option>'];
+    for (let i=0;i<12;i++){ const d=new Date(hoy.getFullYear(), hoy.getMonth()-i, 1);
+      const v=d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0');
+      ops.push(`<option value="${v}">${nombreMes(v)}</option>`); }
+    sel.innerHTML = ops.join('');
+  }
+  cargarEnviadas();
+}
+async function cargarEnviadas(){
+  const mes = document.getElementById('envMes').value;
+  try {
+    const r = await fetch('/api/cartolas/enviadas' + (mes?'?mes='+mes:''), { headers: hdr() });
+    const j = await r.json();
+    const rows = j.success ? (j.data||[]) : [];
+    const body = document.getElementById('bodyEnviadas');
+    if (!rows.length) { body.innerHTML='<tr><td colspan="7" style="text-align:center;color:#94a3b8;padding:24px">Sin cartolas enviadas</td></tr>'; return; }
+    body.innerHTML = rows.map(e=>`<tr>
+      <td>${nombreMes(e.mes)}</td><td><b>${escH(e.concesionario)}</b></td><td>${fmtRUT(e.rut_conc||'')}</td>
+      <td style="font-size:.76rem">${escH(e.mail||'—')}</td>
+      <td style="text-align:right">${fmtCLP(e.total_bruto)}</td>
+      <td style="font-size:.74rem">${escH(e.enviado_por||'')}</td>
+      <td style="font-size:.74rem">${new Date(e.fecha_envio).toLocaleString('es-CL')}</td>
+    </tr>`).join('');
+  } catch(e) {}
 }
 </script>
 </body>
