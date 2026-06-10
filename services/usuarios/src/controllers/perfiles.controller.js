@@ -1240,4 +1240,52 @@ const getUsuariosByPerfil = async (req, res) => {
   }
 })();
 
+/* ─── Migración v14: permisos finos módulo Aprobaciones (ver_todas, cartolas) ─ */
+(async () => {
+  try {
+    const [[adm]] = await pool.query("SELECT id_perfil FROM perfiles WHERE nombre='Administrador' LIMIT 1");
+    const [perfiles] = await pool.query('SELECT id_perfil, nombre FROM perfiles');
+    const [[modAp]] = await pool.query("SELECT id_modulo FROM modulos WHERE ruta='/aprobaciones/' LIMIT 1");
+    if (!modAp) return;
+
+    const funcs = [
+      ['Ver todas las cartas', 'aprob_ver_todas', null],
+      ['Cartolas',             'aprob_cartolas',  null],
+    ];
+    for (const [nombre, codigo, href] of funcs) {
+      const [[ex]] = await pool.query('SELECT id_funcionalidad FROM funcionalidades WHERE codigo=?', [codigo]);
+      let idF;
+      if (ex) { idF = ex.id_funcionalidad; }
+      else {
+        const [ins] = await pool.query(
+          'INSERT INTO funcionalidades (id_modulo, nombre, codigo, href) VALUES (?,?,?,?)',
+          [modAp.id_modulo, nombre, codigo, href]
+        );
+        idF = ins.insertId;
+        console.log(`[v14] funcionalidad ${codigo} creada id=${idF}`);
+      }
+      // OJO: no se insertan 0 masivos — sin registro = comportamiento legacy
+      // (ve todas). La restricción se activa al guardar la matriz en
+      // Perfiles y Permisos. Solo Admin queda habilitado de inmediato.
+      if (adm) {
+        await pool.query(
+          'INSERT IGNORE INTO permisos_perfil (id_perfil, id_funcionalidad, habilitado) VALUES (?,?,1)',
+          [adm.id_perfil, idF]
+        );
+      }
+    }
+    if (adm) {
+      await pool.query(
+        `INSERT INTO permisos_perfil (id_perfil, id_funcionalidad, habilitado)
+         SELECT ?, id_funcionalidad, 1 FROM funcionalidades
+         ON DUPLICATE KEY UPDATE habilitado = 1`,
+        [adm.id_perfil]
+      );
+    }
+    console.log('✓ Perfiles v14: aprob_ver_todas y aprob_cartolas registrados');
+  } catch (e) {
+    console.error('[perfiles migration v14]', e.message);
+  }
+})();
+
 module.exports = { getAllPerfiles, getModulosConFuncionalidades, getPermisosPerfil, updatePermisosPerfil, reordenarModulos, createPerfil, updatePerfil, deletePerfil, getUsuariosByPerfil };

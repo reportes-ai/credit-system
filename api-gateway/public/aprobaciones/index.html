@@ -5,7 +5,7 @@
   <link rel="icon" href="/img/favicon.png" type="image/png">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Aprobaciones — AutoFácil</title>
-  <!-- v1.0 -->
+  <!-- v1.1 -->
   <link href="/css/bootstrap.min.css" rel="stylesheet">
   <link href="/css/bootstrap-icons.css" rel="stylesheet">
   <style>
@@ -125,6 +125,10 @@
 
 <!-- ════════ TAB: LISTADO ════════ -->
 <div class="tab-pane active" id="pane-lista">
+  <div id="avisoResueltas" style="display:none;background:#eff6ff;border:1.5px solid #bfdbfe;color:#1d4ed8;border-radius:10px;padding:10px 16px;font-size:.85rem;margin-bottom:14px;align-items:center;gap:8px">
+    <i class="bi bi-bell-fill"></i> <span id="avisoResueltasTxt"></span>
+    <button onclick="marcarVistas()" style="margin-left:auto;border:none;background:#1d4ed8;color:#fff;border-radius:7px;padding:4px 12px;font-size:.78rem;font-weight:600;cursor:pointer">Entendido</button>
+  </div>
   <div style="display:flex;gap:14px;margin-bottom:16px;flex-wrap:wrap">
     <div class="stat-chip"><b id="stTotal">—</b><span>Total</span></div>
     <div class="stat-chip"><b id="stPend" style="color:#b45309">—</b><span>Pendientes</span></div>
@@ -334,8 +338,34 @@ async function cargarCartas(){
   try {
     const r = await fetch('/api/cartas', { headers: hdr() });
     const j = await r.json();
-    if (j.success) { CARTAS = j.data||[]; renderLista(); actualizarBadge(); }
+    if (j.success) { CARTAS = j.data||[]; renderLista(); actualizarBadge(); avisarResueltas(); }
   } catch(e) { console.error('cartas', e); }
+}
+
+/* Aviso al ejecutivo: cartas suyas aprobadas/rechazadas desde su última visita */
+const LS_VISTO = 'aprob_ultimo_visto_' + MI_LOGIN;
+function avisarResueltas(){
+  const desde = localStorage.getItem(LS_VISTO);
+  const resueltas = CARTAS.filter(c => {
+    if (c.creadoPor !== MI_LOGIN) return false;
+    if (c.status !== 'APROBADA' && c.status !== 'RECHAZADA') return false;
+    const f = c.fechaAprobacion || c.fechaRechazo;
+    return f && (!desde || new Date(f) > new Date(desde));
+  });
+  const el = document.getElementById('avisoResueltas');
+  if (!resueltas.length) { el.style.display = 'none'; return; }
+  const apr = resueltas.filter(c=>c.status==='APROBADA').length;
+  const rec = resueltas.length - apr;
+  const partes = [];
+  if (apr) partes.push(`${apr} aprobada${apr>1?'s':''}`);
+  if (rec) partes.push(`${rec} rechazada${rec>1?'s':''} — revisa el motivo y corrígela`);
+  document.getElementById('avisoResueltasTxt').textContent =
+    `Tienes ${resueltas.length} carta${resueltas.length>1?'s':''} resuelta${resueltas.length>1?'s':''} desde tu última visita: ` + partes.join(', ') + '.';
+  el.style.display = 'flex';
+}
+function marcarVistas(){
+  localStorage.setItem(LS_VISTO, new Date().toISOString());
+  document.getElementById('avisoResueltas').style.display = 'none';
 }
 
 async function cargarCatalogos(){
@@ -408,8 +438,8 @@ function renderLista(){
     const acc = [];
     acc.push(`<button class="btn-mini bm-ver" onclick="verCarta(${c.id})"><i class="bi bi-eye"></i> Ver</button>`);
     if (c.status==='APROBADA') acc.push(`<button class="btn-mini bm-print" onclick="imprimirCarta(${c.id})"><i class="bi bi-printer"></i> Imprimir</button>`);
-    if (c.status==='PENDIENTE' && c.creadoPor===MI_LOGIN && puede('aprob_crear'))
-      acc.push(`<button class="btn-mini bm-edit" onclick="editarCarta(${c.id})"><i class="bi bi-pencil"></i></button>`);
+    if ((c.status==='PENDIENTE'||c.status==='RECHAZADA') && c.creadoPor===MI_LOGIN && puede('aprob_crear'))
+      acc.push(`<button class="btn-mini bm-edit" onclick="editarCarta(${c.id})"><i class="bi bi-pencil"></i>${c.status==='RECHAZADA'?' Corregir':''}</button>`);
     if (c.status==='PENDIENTE' && c.creadoPor!==MI_LOGIN && puede('aprob_revisar'))
       acc.push(`<button class="btn-mini bm-ok" onclick="abrirRevision(${c.id})"><i class="bi bi-check2-square"></i> Revisar</button>`);
     if (c.status==='APROBADA' && puede('aprob_revisar'))
@@ -609,7 +639,9 @@ async function guardarCarta(){
 
 function editarCarta(id){
   const c = CARTAS.find(x=>x.id===id);
-  if (!c || c.status!=='PENDIENTE' || c.creadoPor!==MI_LOGIN) return;
+  if (!c || (c.status!=='PENDIENTE' && c.status!=='RECHAZADA') || c.creadoPor!==MI_LOGIN) return;
+  if (c.status==='RECHAZADA' && c.motivoRechazo)
+    setTimeout(()=>setFormAlert('Motivo del rechazo: ' + c.motivoRechazo, 'err'), 100);
   editandoId = id;
   showTab('nueva');
   document.getElementById('tituloForm').innerHTML = '<i class="bi bi-pencil me-2"></i>Corregir Carta ' + escH(c.opCarta||'');
@@ -724,7 +756,9 @@ function verCarta(id){
   const c = CARTAS.find(x=>x.id===id);
   if (!c) return;
   document.getElementById('modalTitulo').innerHTML = '<i class="bi bi-file-earmark-text me-2"></i>' + escH(c.opCarta||'Carta');
-  document.getElementById('modalBody').innerHTML = cartaHTML(c, c.status!=='APROBADA');
+  const motivoBanner = (c.status==='RECHAZADA' && c.motivoRechazo)
+    ? `<div style="background:#fef2f2;border:1.5px solid #fecaca;color:#b91c1c;border-radius:9px;padding:9px 14px;font-size:.83rem;margin-bottom:12px"><b><i class="bi bi-x-octagon me-1"></i>Rechazada por ${escH(c.rechazadoPorNombre||'')}:</b> ${escH(c.motivoRechazo)}</div>` : '';
+  document.getElementById('modalBody').innerHTML = motivoBanner + cartaHTML(c, c.status!=='APROBADA');
   document.getElementById('modalFoot').innerHTML =
     (c.status==='APROBADA' ? `<button class="btn-mini bm-print" style="padding:9px 18px;font-size:.85rem" onclick="imprimirCarta(${c.id})"><i class="bi bi-printer"></i> Imprimir PDF</button>` : '') +
     `<button class="btn-sec" onclick="cerrarModal()">Cerrar</button>`;

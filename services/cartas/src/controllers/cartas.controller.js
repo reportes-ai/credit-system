@@ -191,14 +191,46 @@ function mapRow(r) {
   };
 }
 
+// ── Permiso aprob_ver_todas: perfil base + override individual ───────────────
+// Transición segura: si el perfil NO tiene registro del permiso (no configurado
+// aún en Perfiles y Permisos), se mantiene el comportamiento histórico (ve todas).
+// Al guardar la matriz de permisos queda 0/1 explícito y se aplica la restricción.
+async function puedeVerTodas(usuario) {
+  if (!usuario) return false;
+  if (usuario.perfil_nombre === 'Administrador') return true;
+  try {
+    const [[ov]] = await pool.query(
+      `SELECT pu.habilitado FROM permisos_usuario pu
+       JOIN funcionalidades f ON f.id_funcionalidad = pu.id_funcionalidad
+       WHERE pu.id_usuario = ? AND f.codigo = 'aprob_ver_todas'`,
+      [usuario.id_usuario]
+    );
+    if (ov) return ov.habilitado === 1;
+  } catch (_) { /* tabla permisos_usuario puede no existir */ }
+  try {
+    const [[pp]] = await pool.query(
+      `SELECT pp.habilitado FROM permisos_perfil pp
+       JOIN funcionalidades f ON f.id_funcionalidad = pp.id_funcionalidad
+       WHERE pp.id_perfil = ? AND f.codigo = 'aprob_ver_todas'`,
+      [usuario.id_perfil]
+    );
+    return pp ? pp.habilitado === 1 : true; // sin registro → legacy: ve todas
+  } catch (_) { return true; }
+}
+
 // ── Controladores ─────────────────────────────────────────────────────────────
 
 const getAll = async (req, res) => {
   try {
-    const [rows] = await pool.query(
-      'SELECT * FROM cartas_aprobacion ORDER BY fecha_creacion DESC'
-    );
-    res.json({ success: true, data: rows.map(mapRow), error: null });
+    const verTodas = await puedeVerTodas(req.usuario);
+    const login = req.usuario?.email || String(req.usuario?.id_usuario || '');
+    const [rows] = verTodas
+      ? await pool.query('SELECT * FROM cartas_aprobacion ORDER BY fecha_creacion DESC')
+      : await pool.query(
+          'SELECT * FROM cartas_aprobacion WHERE creado_por = ? ORDER BY fecha_creacion DESC',
+          [login]
+        );
+    res.json({ success: true, data: rows.map(mapRow), verTodas, error: null });
   } catch (e) {
     (console.error('[error]', e), res.status(500).json({success:false,data:null,error:'Error interno del servidor'}));
   }
