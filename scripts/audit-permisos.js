@@ -85,6 +85,25 @@ const pool = require('../shared/config/database');
     ? pcu.forEach(p => mal(`"${p.nombre}" tiene ${p.usuarios} usuario(s) que no ven NADA en el home`))
     : ok('Todo perfil con usuarios ve al menos un módulo');
 
+  titulo('8. Cobertura: casillas de acción cableadas en el código');
+  const { execSync } = require('child_process');
+  const [accion] = await pool.query(
+    `SELECT f.codigo, m.nombre AS modulo FROM funcionalidades f
+     JOIN modulos m ON m.id_modulo = f.id_modulo
+     WHERE f.href IS NULL ORDER BY m.orden, f.codigo`);
+  const sinCablear = [];
+  for (const f of accion) {
+    let hit = '';
+    try { hit = execSync(`git grep -l "${f.codigo}" -- services api-gateway/public shared`, { encoding: 'utf8', cwd: __dirname + '/..' }).trim(); } catch (_) {}
+    if (!hit) sinCablear.push(`${f.modulo} :: ${f.codigo}`);
+  }
+  const total = accion.length, cabl = total - sinCablear.length;
+  console.log(`  Cableadas: ${cabl}/${total} (${Math.round(cabl / total * 100)}%)`);
+  if (sinCablear.length) {
+    console.log('  ⚠ Solo dan visibilidad de card, NO bloquean la acción de su nombre:');
+    sinCablear.forEach(x => console.log('    ', x));
+  }
+
   console.log('\n' + '─'.repeat(50));
   console.log(problemas ? `✗ ${problemas} problema(s) crítico(s) encontrados` : '✓ Integridad OK — sin problemas críticos');
   process.exit(problemas ? 1 : 0);
