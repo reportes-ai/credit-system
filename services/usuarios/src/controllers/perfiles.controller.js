@@ -975,9 +975,16 @@ const getUsuariosByPerfil = async (req, res) => {
     );
     if (primerTesorero?.id) {
       // Mover permisos y usuarios al perfil que conservamos
+      // (copiar con INSERT IGNORE y borrar origen: UPDATE no acepta ON DUPLICATE KEY)
       await pool.query(
-        "UPDATE permisos_perfil SET id_perfil=? WHERE id_perfil IN (SELECT id_perfil FROM (SELECT id_perfil FROM perfiles WHERE nombre='Tesorero' AND id_perfil != ?) t) ON DUPLICATE KEY UPDATE habilitado=habilitado",
+        `INSERT IGNORE INTO permisos_perfil (id_perfil, id_funcionalidad, habilitado)
+         SELECT ?, id_funcionalidad, habilitado FROM permisos_perfil
+         WHERE id_perfil IN (SELECT id_perfil FROM perfiles WHERE nombre='Tesorero' AND id_perfil != ?)`,
         [primerTesorero.id, primerTesorero.id]
+      );
+      await pool.query(
+        "DELETE FROM permisos_perfil WHERE id_perfil IN (SELECT id_perfil FROM (SELECT id_perfil FROM perfiles WHERE nombre='Tesorero' AND id_perfil != ?) t)",
+        [primerTesorero.id]
       );
       await pool.query(
         "UPDATE usuarios SET id_perfil=? WHERE id_perfil IN (SELECT id_perfil FROM (SELECT id_perfil FROM perfiles WHERE nombre='Tesorero' AND id_perfil != ?) t)",
