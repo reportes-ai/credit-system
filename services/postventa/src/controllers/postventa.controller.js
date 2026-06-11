@@ -163,4 +163,31 @@ const setConfig = async (req, res) => {
   }
 };
 
-module.exports = { sync, getAll, setEtapa, getConfig, setConfig };
+/* ── POST /api/postventa/marcar-historico — marca pre-2026 como totalmente pagado ── */
+const marcarHistorico = async (req, res) => {
+  try {
+    const [segs] = await pool.query(
+      `SELECT id FROM postventa_seguimiento WHERE fecha_otorgado < '2026-01-01'`
+    );
+    if (!segs.length) return res.json({ success: true, data: { marcados: 0 }, error: null });
+
+    const etapasSaldo   = ['FUNDANTES PENDIENTES','FUNDANTES RECIBIDOS','FUNDANTES ENVIADOS','LIBERADO A PAGO','FONDOS RECIBIDOS','ORDEN DE PAGO EMITIDA','SALDO PRECIO PAGADO'];
+    const etapasComision = ['COMISION A PAGAR','CARTOLA EMITIDA','CARTOLA APROBADA','CARTOLA ENVIADA','FACTURA RECIBIDA','ORDEN DE PAGO EMITIDA','COMISION PAGADA'];
+    const fecha = '2025-12-31 23:59:59';
+    const vals = [];
+    for (const s of segs) {
+      for (const e of etapasSaldo)    vals.push([s.id, 'SALDO',    e, 'Sistema', fecha]);
+      for (const e of etapasComision) vals.push([s.id, 'COMISION', e, 'Sistema', fecha]);
+    }
+    await pool.query(
+      `INSERT IGNORE INTO postventa_etapas (id_seguimiento, track, etapa, usuario, fecha) VALUES ?`,
+      [vals]
+    );
+    res.json({ success: true, data: { marcados: segs.length }, error: null });
+  } catch (e) {
+    console.error('[postventa marcarHistorico]', e.message);
+    res.status(500).json({ success: false, data: null, error: 'Error interno del servidor' });
+  }
+};
+
+module.exports = { sync, getAll, setEtapa, getConfig, setConfig, marcarHistorico };

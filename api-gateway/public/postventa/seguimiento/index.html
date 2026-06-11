@@ -5,7 +5,7 @@
   <link rel="icon" href="/img/favicon.png" type="image/png">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Seguimiento Post Venta — AutoFácil</title>
-  <!-- v1.1 -->
+  <!-- v1.2 -->
   <link href="/css/bootstrap.min.css" rel="stylesheet">
   <link href="/css/bootstrap-icons.css" rel="stylesheet">
   <style>
@@ -66,10 +66,16 @@
   <div class="filtros">
     <input type="text" id="fBuscar" placeholder="Buscar OP, RUT, dealer, ejecutivo, saldo…" oninput="render()"
       style="width:100%;border:1.5px solid #e2e8f0;border-radius:8px;padding:7px 12px;font-size:.85rem;margin-bottom:6px">
+    <div style="margin-bottom:4px">
+      <span class="flbl">Mostrar:</span>
+      <button class="toggle on" id="btnFiltroPagado" onclick="toggleFiltroPagado()"
+        style="font-size:.8rem;padding:4px 14px">≠ Pagado <span class="tsub">Ocultar completamente pagados</span></button>
+    </div>
     <div><span class="flbl">Mes Otorgamiento:</span><span id="fMeses"></span></div>
     <div><span class="flbl">Financiera:</span><span id="fFinancieras"></span></div>
     <div><span class="flbl">Etapa Saldo Precio:</span><span id="fSaldo"></span></div>
     <div><span class="flbl">Etapa Comisión:</span><span id="fComision"></span></div>
+    <div id="resumen" style="display:flex;flex-wrap:wrap;gap:8px;margin-top:8px;padding-top:8px;border-top:1px solid #f1f5f9"></div>
     <div style="font-size:.74rem;color:#64748b;margin-top:4px" id="contador"></div>
   </div>
 
@@ -92,13 +98,15 @@ const fmtF = f => { if(!f) return ''; const d=new Date(f); return isNaN(d)?'':d.
 
 let DATA = [], CFG = { etapas_saldo:[], etapas_comision:[] };
 let selFin = new Set(), selSaldo = new Set(), selCom = new Set(), selMes = new Set();
+let filtroPagado = true; // por defecto oculta completamente pagados
 const FINANCIERAS = ['AUTOFIN','UNIDAD DE CREDITO','AUTOFACIL'];
 const MESES_N = ['ENE','FEB','MAR','ABR','MAY','JUN','JUL','AGO','SEP','OCT','NOV','DIC'];
 const mesDe = f => { if(!f) return ''; const d=new Date(f); return isNaN(d)?'':d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0'); };
 const mesLbl = m => MESES_N[parseInt(m.slice(5))-1]+' '+m.slice(0,4);
 
 (async function init(){
-  try { await fetch('/api/postventa/sync', { method:'POST', headers:H }); } catch(e) {}
+  try { await fetch('/api/postventa/sync',             { method:'POST', headers:H }); } catch(e) {}
+  try { await fetch('/api/postventa/marcar-historico', { method:'POST', headers:H }); } catch(e) {}
   const [rD, rC] = await Promise.all([
     fetch('/api/postventa', { headers:H }),
     fetch('/api/postventa/config', { headers:H }),
@@ -109,6 +117,17 @@ const mesLbl = m => MESES_N[parseInt(m.slice(5))-1]+' '+m.slice(0,4);
   renderFiltros();
   render();
 })();
+
+function esPagado(r){
+  return estadoDe(etapaActual(r,'SALDO'),'SALDO') === 'PAGADO'
+      && estadoDe(etapaActual(r,'COMISION'),'COMISION') === 'PAGADO';
+}
+function toggleFiltroPagado(){
+  filtroPagado = !filtroPagado;
+  const btn = document.getElementById('btnFiltroPagado');
+  btn.classList.toggle('on', filtroPagado);
+  renderFiltros(); render();
+}
 
 /* etapa actual = última marcada según el orden de la config */
 function etapaActual(r, track){
@@ -126,7 +145,7 @@ function estadoDe(etapa, track){
 function renderFiltros(){
   const mk = (cont, items, set, cls, lblFn) => {
     document.getElementById(cont).innerHTML = items.map(i =>
-      `<button class="toggle ${cls}" data-v="${escH(i)}">${escH(lblFn?lblFn(i):i)}<span class="tsub" data-sub="${escH(i)}"></span></button>`).join('');
+      `<button class="toggle ${cls}${set.has(i)?' on':''}" data-v="${escH(i)}">${escH(lblFn?lblFn(i):i)}<span class="tsub" data-sub="${escH(i)}"></span></button>`).join('');
     document.getElementById(cont).querySelectorAll('.toggle').forEach(b=>{
       b.addEventListener('click', ()=>{
         const v=b.dataset.v;
@@ -136,9 +155,12 @@ function renderFiltros(){
       });
     });
   };
-  // financieras normalizadas según datos reales + las 3 conocidas
   const fins = [...new Set([...FINANCIERAS, ...DATA.map(r=>String(r.financiera||'').toUpperCase()).filter(Boolean)])];
-  const meses = [...new Set(DATA.map(r=>mesDe(r.fecha_otorgado)).filter(Boolean))].sort().reverse();
+  // Solo meses que tienen al menos un registro no completamente pagado
+  const todosLosMeses = [...new Set(DATA.map(r=>mesDe(r.fecha_otorgado)).filter(Boolean))].sort().reverse();
+  const meses = todosLosMeses.filter(m => DATA.some(r => mesDe(r.fecha_otorgado) === m && !esPagado(r)));
+  // Limpiar selección de meses que ya no están visibles
+  selMes.forEach(m => { if (!meses.includes(m)) selMes.delete(m); });
   mk('fMeses', meses, selMes, '', mesLbl);
   mk('fFinancieras', fins, selFin, 'fin');
   mk('fSaldo', CFG.etapas_saldo.map(x=>x.etapa), selSaldo, '');
@@ -149,6 +171,7 @@ function renderFiltros(){
 function filtrar(skip){
   const q = (document.getElementById('fBuscar').value||'').toLowerCase();
   return DATA.filter(r => {
+    if (filtroPagado && skip!=='pagado' && esPagado(r)) return false;
     if (skip!=='mes' && selMes.size && !selMes.has(mesDe(r.fecha_otorgado))) return false;
     if (skip!=='fin' && selFin.size && !selFin.has(String(r.financiera||'').toUpperCase())) return false;
     if (skip!=='saldo' && selSaldo.size && !selSaldo.has(etapaActual(r,'SALDO'))) return false;
@@ -174,14 +197,41 @@ function aggPor(rows, keyFn, montoFn){
   return agg;
 }
 
+const COLORES_EST = { PENDIENTE:{ bg:'#fef3c7',color:'#b45309' }, 'PARA PAGO':{ bg:'#dbeafe',color:'#1d4ed8' }, PAGADO:{ bg:'#dcfce7',color:'#15803d' } };
 function render(){
   const rows = filtrar();
   document.getElementById('contador').textContent = rows.length + ' crédito(s)';
-  // totales dentro de cada toggle (cada dimensión se calcula ignorando su propia selección)
+  // totales dentro de cada toggle
   setSubs('fMeses',       aggPor(filtrar('mes'),   r=>mesDe(r.fecha_otorgado),                  r=>r.saldo_precio));
   setSubs('fFinancieras', aggPor(filtrar('fin'),   r=>String(r.financiera||'').toUpperCase(),   r=>r.saldo_precio));
   setSubs('fSaldo',       aggPor(filtrar('saldo'), r=>etapaActual(r,'SALDO'),                   r=>r.saldo_precio));
   setSubs('fComision',    aggPor(filtrar('com'),   r=>etapaActual(r,'COMISION'),                r=>r.comision));
+
+  // Resumen por estado (usando filtrar() sin skip de pagado para mostrar totales reales)
+  const resData = filtrar('pagado'); // respeta todos los filtros activos excepto pagado
+  const grp = {};
+  resData.forEach(r => {
+    const estS = estadoDe(etapaActual(r,'SALDO'),'SALDO') || 'PENDIENTE';
+    const estC = estadoDe(etapaActual(r,'COMISION'),'COMISION') || 'PENDIENTE';
+    // Para el resumen usamos el estado "peor" del registro (si uno es pendiente, el registro es pendiente)
+    const est = estS === 'PENDIENTE' || estC === 'PENDIENTE' ? 'PENDIENTE'
+              : estS === 'PARA PAGO' || estC === 'PARA PAGO' ? 'PARA PAGO' : 'PAGADO';
+    grp[est] = grp[est] || { n:0, saldo:0, comision:0 };
+    grp[est].n++; grp[est].saldo += +r.saldo_precio||0; grp[est].comision += +r.comision||0;
+  });
+  const ORDEN = ['PENDIENTE','PARA PAGO','PAGADO'];
+  document.getElementById('resumen').innerHTML = ORDEN.filter(e=>grp[e]).map(e => {
+    const g = grp[e]; const c = COLORES_EST[e]||{bg:'#f1f5f9',color:'#475569'};
+    return `<div style="background:${c.bg};color:${c.color};border-radius:10px;padding:6px 14px;font-size:.73rem;font-weight:700">
+      <span style="font-size:.8rem">${escH(e)}</span>
+      <span style="margin:0 8px;font-weight:400;opacity:.8">|</span>
+      ${g.n} ops
+      <span style="margin:0 4px;opacity:.6">·</span>
+      SP: ${fmtCLP(g.saldo)}
+      <span style="margin:0 4px;opacity:.6">·</span>
+      Com: ${fmtCLP(g.comision)}
+    </div>`;
+  }).join('');
 
   const lista = document.getElementById('lista');
   if (!rows.length) { lista.innerHTML = '<div style="text-align:center;color:#94a3b8;padding:30px">Sin créditos para los filtros</div>'; return; }

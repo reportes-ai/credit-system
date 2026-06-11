@@ -4,7 +4,8 @@ const { verifyToken } = require('../../../../shared/middleware/auth');
 const { requireFunc } = require('../../../../shared/middleware/permisos');
 const c = require('../controllers/postventa.controller');
 
-router.post('/sync',        verifyToken, c.sync);
+router.post('/sync',             verifyToken, c.sync);
+router.post('/marcar-historico', verifyToken, c.marcarHistorico);
 router.get('/config',       verifyToken, c.getConfig);
 router.put('/config/:clave',verifyToken, requireFunc('postventa_mantenedores'), c.setConfig);
 router.get('/',             verifyToken, c.getAll);
