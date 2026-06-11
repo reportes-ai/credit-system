@@ -5,7 +5,7 @@
   <link rel="icon" href="/img/favicon.png" type="image/png">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Mantenedores Post Venta — AutoFácil</title>
-  <!-- v1.1 -->
+  <!-- v1.2 -->
   <link href="/css/bootstrap.min.css" rel="stylesheet">
   <link href="/css/bootstrap-icons.css" rel="stylesheet">
   <style>
@@ -54,8 +54,6 @@
 </nav>
 
 <div class="wrap">
-  <div class="alert-msg" id="msg"></div>
-
   <div class="card-af">
     <h5 style="font-weight:800;color:var(--navy)"><i class="bi bi-cash-stack me-2"></i>Estado Saldo Precio por Etapa</h5>
     <p style="font-size:.8rem;color:#64748b">Estado equivalente cuando la etapa es la máxima alcanzada del crédito. <b>Perfiles con acceso</b>: los perfiles que pueden marcar ese checkbox (vacío = todos).</p>
@@ -63,7 +61,10 @@
       <thead><tr><th>Etapa (máx. alcanzada)</th><th>Estado Saldo Precio</th><th>Perfiles con acceso</th></tr></thead>
       <tbody id="bodySaldo"></tbody>
     </table>
-    <div style="text-align:right;margin-top:12px"><button class="btn-af" onclick="guardar('saldo')"><i class="bi bi-check-lg me-1"></i>Guardar</button></div>
+    <div style="display:flex;align-items:center;justify-content:flex-end;gap:12px;margin-top:12px">
+      <span id="msg-saldo" style="font-size:.83rem;display:none"></span>
+      <button class="btn-af" id="btn-saldo" onclick="guardar('saldo')"><i class="bi bi-check-lg me-1"></i>Guardar</button>
+    </div>
   </div>
 
   <div class="card-af">
@@ -73,7 +74,10 @@
       <thead><tr><th>Etapa (máx. alcanzada)</th><th>Estado Comisión</th><th>Perfiles con acceso</th></tr></thead>
       <tbody id="bodyCom"></tbody>
     </table>
-    <div style="text-align:right;margin-top:12px"><button class="btn-af" onclick="guardar('comision')"><i class="bi bi-check-lg me-1"></i>Guardar</button></div>
+    <div style="display:flex;align-items:center;justify-content:flex-end;gap:12px;margin-top:12px">
+      <span id="msg-comision" style="font-size:.83rem;display:none"></span>
+      <button class="btn-af" id="btn-comision" onclick="guardar('comision')"><i class="bi bi-check-lg me-1"></i>Guardar</button>
+    </div>
   </div>
 </div>
 
@@ -144,22 +148,23 @@ function togglePerfil(chk, track, idx){
 }
 
 async function guardar(track){
-  const m = document.getElementById('msg');
+  const btn = document.getElementById('btn-'+track);
+  const msg = document.getElementById('msg-'+track);
+  btn.disabled = true;
+  btn.innerHTML = '<i class="bi bi-hourglass-split me-1"></i>Guardando…';
+  msg.style.display = 'none';
   try {
     const clave  = track==='saldo' ? 'etapas_saldo'         : 'etapas_comision';
     const claveP = track==='saldo' ? 'etapa_perfiles_saldo'  : 'etapa_perfiles_comision';
     const lista  = (CFG[clave]||[]).map(x=>({...x}));
     const bodyId = track==='saldo' ? 'bodySaldo' : 'bodyCom';
 
-    // Leer estados
     document.querySelectorAll(`#${bodyId} .est-sel`).forEach(s=>{
       lista[parseInt(s.dataset.i)].estado = s.value;
     });
-
-    // Leer permisos por etapa
     const permisos = lista.map((_, i) => {
       const pl = document.getElementById(`pl_${track}_${i}`);
-      if (!pl) return []; // sistema
+      if (!pl) return [];
       return [...pl.querySelectorAll('input[type=checkbox]:checked')].map(c=>c.value);
     });
 
@@ -170,14 +175,18 @@ async function guardar(track){
     const [j1, j2] = await Promise.all([r1.json(), r2.json()]);
     if (j1.success && j2.success) {
       CFG[clave] = lista; CFG[claveP] = permisos;
-      m.textContent='Guardado correctamente'; m.className='alert-msg ok';
+      msg.textContent = '✓ Guardado'; msg.style.cssText = 'display:inline;color:#15803d;font-weight:700;font-size:.83rem';
     } else {
-      m.textContent=(j1.error||j2.error||'Error al guardar'); m.className='alert-msg err';
+      msg.textContent = j1.error||j2.error||'Error al guardar';
+      msg.style.cssText = 'display:inline;color:#b91c1c;font-size:.83rem';
     }
   } catch(e) {
-    m.textContent='Error: '+e.message; m.className='alert-msg err';
+    msg.textContent = 'Error: '+e.message;
+    msg.style.cssText = 'display:inline;color:#b91c1c;font-size:.83rem';
   }
-  setTimeout(()=>m.className='alert-msg', 4000);
+  btn.disabled = false;
+  btn.innerHTML = '<i class="bi bi-check-lg me-1"></i>Guardar';
+  setTimeout(()=>{ msg.style.display='none'; }, 4000);
 }
 </script>
 <script src="/js/app-version.js"></script>
