@@ -2,7 +2,7 @@
    AutoFácil — Versión global de la aplicación
    Editar SOLO este archivo para cambiar la versión
    ───────────────────────────────────────────── */
-const APP_VERSION = 'v9.19';
+const APP_VERSION = 'v9.20';
 
 document.addEventListener('DOMContentLoaded', () => {
 

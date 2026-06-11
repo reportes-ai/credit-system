@@ -5,7 +5,7 @@
   <link rel="icon" href="/img/favicon.png" type="image/png">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Aprobaciones — AutoFácil</title>
-  <!-- v2.7 -->
+  <!-- v2.8 -->
   <link href="/css/bootstrap.min.css" rel="stylesheet">
   <link href="/css/bootstrap-icons.css" rel="stylesheet">
   <style>
@@ -1329,7 +1329,7 @@ function abrirModalExcepciones(carta, excList){
         <div style="font-weight:700;color:#c2410c;font-size:.85rem"><i class="bi bi-exclamation-triangle me-1"></i>${i+1}. ${escH(e.detalle)}</div>
         <textarea id="excCom${i}" rows="2" placeholder="Justificación obligatoria (ej: autorizado por gerencia, cliente preferente...)"
           style="width:100%;margin-top:8px;border:1.5px solid #e2e8f0;border-radius:8px;padding:7px 10px;font-size:.83rem"></textarea>
-        <div id="excComErr${i}" style="display:none;color:#dc2626;font-size:.72rem;font-weight:600;margin-top:3px">Comentario obligatorio</div>
+        <div id="excComErr${i}" style="display:none;color:#dc2626;font-size:.72rem;font-weight:600;margin-top:3px">Debes ingresar un comentario válido que justifique la excepción</div>
       </div>`).join('')}`;
   document.getElementById('modalFoot').innerHTML = `
     <button class="btn-sec" onclick="cerrarModal()">Cancelar</button>
@@ -1339,10 +1339,14 @@ function abrirModalExcepciones(carta, excList){
 async function confirmarExcepciones(){
   const comentarios = {};
   let falta = false;
+  // Comentario válido: justificación real, no relleno (regla interna, no se muestra)
+  const esValido = v => v.length >= 10 && v.includes(' ');
   EXC_PENDIENTES.forEach((e,i)=>{
-    const v = document.getElementById('excCom'+i).value.trim();
-    document.getElementById('excComErr'+i).style.display = v ? 'none' : 'block';
-    if (!v) falta = true; else comentarios[e.cod] = v;
+    const v = document.getElementById('excCom'+i).value.trim().replace(/\s+/g,' ');
+    const ok = esValido(v);
+    document.getElementById('excComErr'+i).style.display = ok ? 'none' : 'block';
+    document.getElementById('excCom'+i).style.borderColor = ok ? '#e2e8f0' : '#dc2626';
+    if (!ok) falta = true; else comentarios[e.cod] = v;
   });
   if (falta) return;
   CARTA_PENDIENTE.excepcionesComentarios = comentarios;
