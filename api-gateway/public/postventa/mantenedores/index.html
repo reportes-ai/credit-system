@@ -144,36 +144,40 @@ function togglePerfil(chk, track, idx){
 }
 
 async function guardar(track){
-  const clave  = track==='saldo' ? 'etapas_saldo'         : 'etapas_comision';
-  const claveP = track==='saldo' ? 'etapa_perfiles_saldo'  : 'etapa_perfiles_comision';
-  const lista  = (CFG[clave]||[]).map(x=>({...x}));
-  const bodyId = track==='saldo' ? 'bodySaldo' : 'bodyCom';
-
-  // Leer estados
-  document.querySelectorAll(`#${bodyId} .est-sel`).forEach(s=>{
-    lista[parseInt(s.dataset.i)].estado = s.value;
-  });
-
-  // Leer permisos por etapa
-  const permisos = lista.map((_, i) => {
-    const pl = document.getElementById(`pl_${track}_${i}`);
-    if (!pl) return []; // sistema
-    return [...pl.querySelectorAll('input[type=checkbox]:checked')].map(c=>c.value);
-  });
-
-  const [r1, r2] = await Promise.all([
-    fetch('/api/postventa/config/'+clave,  { method:'PUT', headers:H, body: JSON.stringify({ valor: lista }) }),
-    fetch('/api/postventa/config/'+claveP, { method:'PUT', headers:H, body: JSON.stringify({ valor: permisos }) }),
-  ]);
-  const [j1, j2] = await Promise.all([r1.json(), r2.json()]);
   const m = document.getElementById('msg');
-  if (j1.success && j2.success) {
-    CFG[clave] = lista; CFG[claveP] = permisos;
-    m.textContent='Guardado correctamente'; m.className='alert-msg ok';
-  } else {
-    m.textContent=(j1.error||j2.error||'Error'); m.className='alert-msg err';
+  try {
+    const clave  = track==='saldo' ? 'etapas_saldo'         : 'etapas_comision';
+    const claveP = track==='saldo' ? 'etapa_perfiles_saldo'  : 'etapa_perfiles_comision';
+    const lista  = (CFG[clave]||[]).map(x=>({...x}));
+    const bodyId = track==='saldo' ? 'bodySaldo' : 'bodyCom';
+
+    // Leer estados
+    document.querySelectorAll(`#${bodyId} .est-sel`).forEach(s=>{
+      lista[parseInt(s.dataset.i)].estado = s.value;
+    });
+
+    // Leer permisos por etapa
+    const permisos = lista.map((_, i) => {
+      const pl = document.getElementById(`pl_${track}_${i}`);
+      if (!pl) return []; // sistema
+      return [...pl.querySelectorAll('input[type=checkbox]:checked')].map(c=>c.value);
+    });
+
+    const [r1, r2] = await Promise.all([
+      fetch('/api/postventa/config/'+clave,  { method:'PUT', headers:H, body: JSON.stringify({ valor: lista }) }),
+      fetch('/api/postventa/config/'+claveP, { method:'PUT', headers:H, body: JSON.stringify({ valor: permisos }) }),
+    ]);
+    const [j1, j2] = await Promise.all([r1.json(), r2.json()]);
+    if (j1.success && j2.success) {
+      CFG[clave] = lista; CFG[claveP] = permisos;
+      m.textContent='Guardado correctamente'; m.className='alert-msg ok';
+    } else {
+      m.textContent=(j1.error||j2.error||'Error al guardar'); m.className='alert-msg err';
+    }
+  } catch(e) {
+    m.textContent='Error: '+e.message; m.className='alert-msg err';
   }
-  setTimeout(()=>m.className='alert-msg', 3000);
+  setTimeout(()=>m.className='alert-msg', 4000);
 }
 </script>
 <script src="/js/app-version.js"></script>
