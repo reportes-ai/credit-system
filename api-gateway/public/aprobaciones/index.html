@@ -5,7 +5,7 @@
   <link rel="icon" href="/img/favicon.png" type="image/png">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Aprobaciones — AutoFácil</title>
-  <!-- v2.5 -->
+  <!-- v2.6 -->
   <link href="/css/bootstrap.min.css" rel="stylesheet">
   <link href="/css/bootstrap-icons.css" rel="stylesheet">
   <style>
@@ -1114,6 +1114,44 @@ function preferenteSegunTabla(plazo, saldo){
   return { pref: puedeAF ? 'AUTOFIN' : (puedeUN ? 'UNIDAD' : null),
            puede: { AUTOFIN:puedeAF, UNIDAD:puedeUN }, row };
 }
+/* Texto legible de un valor de la tabla de preferencia */
+function fmtPrefVal(v){
+  const s = String(v??'').toUpperCase().trim();
+  if (!s || s.includes('NO SE PUEDE')) return 'no cursa';
+  if (s.includes('UF')) {
+    const n = parseFloat(s.replace(/[^0-9.]/g,''));
+    return n + ' UF' + (UF_HOY ? ` (${fmtCLP(Math.round(n*UF_HOY))})` : '');
+  }
+  return fmtCLP(parseInt(s.replace(/[^0-9]/g,''))||0);
+}
+/* Explica por qué no cursa y qué alternativas hay (texto para el aviso) */
+function explicarTramo(corto, plazo, saldo){
+  const { row, puede } = preferenteSegunTabla(plazo, saldo);
+  if (!row) return '';
+  const rango = f => {
+    const mi = f==='AUTOFIN' ? row.af_min : row.un_min;
+    const ma = f==='AUTOFIN' ? row.af_max : row.un_max;
+    if (parsePrefVal(mi)===null && parsePrefVal(ma)===null) return null;  // NO SE PUEDE
+    return `${fmtPrefVal(mi)} a ${fmtPrefVal(ma)}`;
+  };
+  const rangoSel = rango(corto);
+  let txt = rangoSel
+    ? `En ${row.desde}–${row.hasta} cuotas, ${corto} cursa de ${rangoSel} y el saldo es ${fmtCLP(saldo)}.`
+    : `${corto} no cursa créditos en el tramo de ${row.desde}–${row.hasta} cuotas.`;
+  // Alternativa 1: otra financiera que sí cursa este tramo
+  const otra = ['AUTOFIN','UNIDAD'].find(f => f!==corto && puede[f]);
+  if (otra) txt += ` Alternativa: ${otra} cursa este tramo (${rango(otra)||''}).`;
+  // Alternativa 2: tramos de cuotas donde ESTA financiera sí toma este saldo
+  const tramosOK = PREF_TABLA.filter(r => {
+    const mi = parsePrefVal(corto==='AUTOFIN'?r.af_min:r.un_min);
+    const ma = parsePrefVal(corto==='AUTOFIN'?r.af_max:r.un_max);
+    if (mi===null && ma===null) return false;
+    return saldo >= (mi??0) && saldo <= (ma??Infinity);
+  }).map(r => `${r.desde}–${r.hasta}`);
+  if (tramosOK.length) txt += ` ${corto} sí toma este saldo con ${tramosOK.join(' o ')} cuotas.`;
+  return txt;
+}
+
 function renderFinancierasSelect(){
   const sel = document.getElementById('cAcreedor');
   sel.innerHTML = FINANCIERAS.map(f => {
@@ -1135,7 +1173,8 @@ function avisoFinanciera(){
   const corto = nombreCorto(sel);
   if (corto && !puede[corto]) {
     msg.style.color='#dc2626';
-    msg.innerHTML=`<i class="bi bi-x-octagon"></i> ${corto} NO PUEDE cursar este tramo (saldo/cuotas) — no se permite grabar`;
+    msg.innerHTML=`<i class="bi bi-x-octagon"></i> ${corto} NO PUEDE cursar — no se permite grabar.<br>
+      <span style="font-weight:600;color:#b45309">${escH(explicarTramo(corto, document.getElementById('cPlazo').value, rawMoney('cSaldo')))}</span>`;
     return;
   }
   if (pref) {
@@ -1191,7 +1230,8 @@ async function guardarCarta(){
   const prefInfo = preferenteSegunTabla(document.getElementById('cPlazo').value, rawMoney('cSaldo'));
   const finCorto = nombreCorto(finSel);
   if (finCorto && !prefInfo.puede[finCorto]) {
-    setFormAlert(`⛔ ${finCorto} no puede cursar este tramo de saldo/cuotas según la tabla de preferencia`); return;
+    setFormAlert(`⛔ ${finCorto} no puede cursar este crédito. ` +
+      explicarTramo(finCorto, document.getElementById('cPlazo').value, rawMoney('cSaldo'))); return;
   }
 
   // ── Detección de TODAS las excepciones (modal único con comentario obligatorio c/u) ──
