@@ -5,7 +5,7 @@
   <link rel="icon" href="/img/favicon.png" type="image/png">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Aprobaciones — AutoFácil</title>
-  <!-- v2.9 -->
+  <!-- v3.0 -->
   <link href="/css/bootstrap.min.css" rel="stylesheet">
   <link href="/css/bootstrap-icons.css" rel="stylesheet">
   <style>
@@ -117,6 +117,15 @@
     .alert-inline { border-radius:9px; padding:9px 14px; font-size:.83rem; margin-bottom:12px; display:none; }
     .alert-inline.err { background:#fef2f2; border:1px solid #fecaca; color:#b91c1c; display:block; }
     .alert-inline.ok  { background:#f0fdf4; border:1px solid #bbf7d0; color:#15803d; display:block; }
+    /* Toast flotante */
+    #af-toast { position:fixed; bottom:24px; left:50%; transform:translateX(-50%); z-index:9999;
+      min-width:280px; max-width:520px; border-radius:12px; padding:12px 20px;
+      font-size:.87rem; font-weight:600; box-shadow:0 6px 28px rgba(0,0,0,.22);
+      display:none; cursor:pointer; text-align:center; pointer-events:auto; }
+    #af-toast.err { background:#b91c1c; color:#fff; }
+    #af-toast.ok  { background:#15803d; color:#fff; }
+    #af-toast.show { display:block; animation:toastIn .22s ease; }
+    @keyframes toastIn { from{opacity:0;transform:translateX(-50%) translateY(16px)} to{opacity:1;transform:translateX(-50%) translateY(0)} }
     .stat-chip { background:#fff; border-radius:12px; box-shadow:0 1px 4px rgba(0,0,0,.06); padding:12px 18px; display:flex; flex-direction:column; gap:2px; min-width:120px; }
     .stat-chip b { font-size:1.3rem; } .stat-chip span { font-size:.72rem; color:#64748b; font-weight:600; text-transform:uppercase; }
     @media (max-width:900px){ .form-grid{ grid-template-columns:repeat(2,1fr);} .fg-2,.fg-4{grid-column:span 2;} .sec-form{grid-column:span 2;} }
@@ -514,6 +523,7 @@
   </div>
 </div>
 
+<div id="af-toast" onclick="this.classList.remove('show')"></div>
 <script src="/js/app-version.js"></script>
 <script src="/js/xlsx.full.min.js"></script>
 <script src="/js/html2pdf.bundle.min.js"></script>
@@ -1206,9 +1216,17 @@ function avisoFinanciera(){
     msg.textContent='';
   }
 }
+let _toastTimer = null;
 function setFormAlert(msg, tipo){
   const el = document.getElementById('formAlert');
   el.textContent = msg; el.className = 'alert-inline ' + (tipo||'err');
+  // Toast flotante
+  const t = document.getElementById('af-toast');
+  if (t) {
+    t.textContent = msg; t.className = (tipo||'err') + ' show';
+    clearTimeout(_toastTimer);
+    _toastTimer = setTimeout(() => t.classList.remove('show'), tipo==='ok' ? 3500 : 6000);
+  }
   if (tipo==='ok') setTimeout(()=>{ el.className='alert-inline'; }, 3500);
 }
 function limpiarForm(){
