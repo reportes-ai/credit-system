@@ -1551,6 +1551,7 @@ const getUsuariosByPerfil = async (req, res) => {
       ['Post Venta',                          'postventa_ver',          '/postventa/'],
       ['Seguimiento Saldos y Comisiones',     'postventa_seguimiento',  null],
       ['Mantenedores Post Venta',             'postventa_mantenedores', null],
+      ['Saldos Precios a Pagar',              'postventa_saldos_pagar', null],
     ];
     for (const [nombre, codigo, href] of funcs) {
       const [[ex]] = await pool.query('SELECT id_funcionalidad FROM funcionalidades WHERE codigo=?', [codigo]);

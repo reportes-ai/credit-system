@@ -224,6 +224,54 @@ const setConfig = async (req, res) => {
   }
 };
 
+/* ── GET /api/postventa/saldos-a-pagar — ops liberadas a pago, no pagadas ── */
+const getSaldosAPagar = async (req, res) => {
+  try {
+    const [rows] = await pool.query(`
+      SELECT s.id, s.num_op, s.nombre_dealer, s.saldo_precio,
+             c.id_financiera, c.rut_concesionario AS rut_dealer,
+             d.num_cuenta, d.banco,
+             elp.fecha AS fecha_liberado
+      FROM postventa_seguimiento s
+      JOIN postventa_etapas elp
+        ON elp.id_seguimiento = s.id AND elp.track='SALDO' AND elp.etapa='LIBERADO A PAGO'
+      LEFT JOIN creditos c ON c.id = s.id_credito
+      LEFT JOIN dealers  d ON d.rut = c.rut_concesionario
+      WHERE NOT EXISTS (
+        SELECT 1 FROM postventa_etapas ep
+        WHERE ep.id_seguimiento = s.id AND ep.track='SALDO' AND ep.etapa='SALDO PRECIO PAGADO')
+      ORDER BY elp.fecha ASC, s.num_op ASC
+    `);
+    res.json({ success: true, data: rows, error: null });
+  } catch (e) {
+    console.error('[postventa saldosAPagar]', e.message);
+    res.status(500).json({ success: false, data: null, error: 'Error interno del servidor' });
+  }
+};
+
+/* ── POST /api/postventa/saldos-a-pagar/pagar { ids:[] } — marca SALDO PRECIO PAGADO ── */
+const pagarSaldos = async (req, res) => {
+  try {
+    const { ids } = req.body;
+    if (!Array.isArray(ids) || !ids.length)
+      return res.status(400).json({ success: false, data: null, error: 'Sin operaciones seleccionadas' });
+    const usuario = loginDe(req.usuario);
+    const [[cfgRow]] = await pool.query(`SELECT valor FROM postventa_config WHERE clave='etapas_saldo'`);
+    const etapas = (cfgRow ? JSON.parse(cfgRow.valor) : []).map(x => x.etapa);
+    if (!etapas.length)
+      return res.status(500).json({ success: false, data: null, error: 'Config de etapas no disponible' });
+    const vals = [];
+    for (const id of ids)
+      for (const e of etapas) vals.push([id, 'SALDO', e, usuario]);
+    await pool.query(
+      `INSERT IGNORE INTO postventa_etapas (id_seguimiento, track, etapa, usuario) VALUES ?`, [vals]);
+    res.json({ success: true, data: { pagados: ids.length }, error: null });
+  } catch (e) {
+    console.error('[postventa pagarSaldos]', e.message);
+    res.status(500).json({ success: false, data: null, error: 'Error interno del servidor' });
+  }
+};
+
 /* ── POST /api/postventa/marcar-historico — marca pre-2026 como totalmente pagado ── */
 const marcarHistorico = async (req, res) => {
   try {
@@ -251,4 +299,4 @@ const marcarHistorico = async (req, res) => {
   }
 };
 
-module.exports = { sync, getAll, setEtapa, getConfig, setConfig, marcarHistorico, getPerfiles };
+module.exports = { sync, getAll, setEtapa, getConfig, setConfig, marcarHistorico, getPerfiles, getSaldosAPagar, pagarSaldos };

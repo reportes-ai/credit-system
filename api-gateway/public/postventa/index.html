@@ -5,7 +5,7 @@
   <link rel="icon" href="/img/favicon.png" type="image/png">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Post Venta — AutoFácil</title>
-  <!-- v1.0 -->
+  <!-- v1.1 -->
   <link href="/css/bootstrap.min.css" rel="stylesheet">
   <link href="/css/bootstrap-icons.css" rel="stylesheet">
   <style>
@@ -54,6 +54,12 @@
     <p>Créditos otorgados de todas las financieras: etapas de fundantes, pago de saldo precio y ciclo de comisión por crédito.</p>
     <span class="btn-acceder"><i class="bi bi-arrow-right-circle me-1"></i>Acceder</span>
   </a>
+  <a href="/postventa/saldos-a-pagar/" class="module-card" id="cardPagar" style="display:none">
+    <div class="card-icon"><i class="bi bi-cash-coin"></i></div>
+    <h5>Saldos Precios a Pagar</h5>
+    <p>Operaciones liberadas a pago: selecciona las que se cargarán al banco y márcalas como pagadas.</p>
+    <span class="btn-acceder"><i class="bi bi-arrow-right-circle me-1"></i>Acceder</span>
+  </a>
   <a href="/postventa/mantenedores/" class="module-card" id="cardMant" style="display:none">
     <div class="card-icon"><i class="bi bi-tools"></i></div>
     <h5>Mantenedores Post Venta</h5>
@@ -82,8 +88,9 @@ function logout(){ sessionStorage.clear(); location.href='/login.html'; }
   } catch(e) {}
   const tiene = c => yo.perfil==='Administrador' || funcs.has(c);
   let alguna = false;
-  if (tiene('postventa_seguimiento'))  { document.getElementById('cardSeg').style.display='';  alguna=true; }
-  if (tiene('postventa_mantenedores')) { document.getElementById('cardMant').style.display=''; alguna=true; }
+  if (tiene('postventa_seguimiento'))  { document.getElementById('cardSeg').style.display='';   alguna=true; }
+  if (tiene('postventa_saldos_pagar')) { document.getElementById('cardPagar').style.display=''; alguna=true; }
+  if (tiene('postventa_mantenedores')) { document.getElementById('cardMant').style.display='';  alguna=true; }
   if (!alguna) document.getElementById('sinAcceso').style.display='';
 })();
 </script>
