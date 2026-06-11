@@ -76,7 +76,11 @@ const estadoExpr = `COALESCE(ob.estado,
 /* GET /api/edicion-creditos?tipo=otorgados|otros&q=&letra=&campo=&page= */
 const getCreditos = async (req, res) => {
   try {
-    const { tipo = 'otorgados', q, letra, campo, page = 1 } = req.query;
+    const { tipo = 'otorgados', q, page = 1 } = req.query;
+    const sortColReq = req.query.sort || 'id';
+    const sortDirReq = req.query.dir === 'asc' ? 'ASC' : 'DESC';
+    const colsOrden = new Set(['id','num_op','numero_credito','mes','fecha_otorgado','ejecutivo','automotora','estado','financiera','patente','marca','modelo']);
+    const safeSort = colsOrden.has(sortColReq) ? sortColReq : 'id';
     const pageNum = Math.max(1, parseInt(page) || 1);
     const limit = 100;
     const offset = (pageNum - 1) * limit;
@@ -95,9 +99,9 @@ const getCreditos = async (req, res) => {
     const params = [];
 
     if (esOtorgados) {
-      where += ` AND ${estadoExpr} = 'OTORGADO'`;
+      where += ` AND ob.estado_eval = 'OTORGADO'`;
     } else {
-      where += ` AND ${estadoExpr} != 'OTORGADO'`;
+      where += ` AND (ob.estado_eval IS NULL OR ob.estado_eval != 'OTORGADO')`;
     }
 
     if (q && q.trim()) {
@@ -106,17 +110,27 @@ const getCreditos = async (req, res) => {
       params.push(like, like, like, like, like);
     }
 
-    if (letra && letra.length === 1) {
-      const campoFiltro = campo || 'automotora';
-      const colsValidas = CAMPOS_EDIT.map(c => c.col);
-      if (colsValidas.includes(campoFiltro)) {
-        where += ` AND ob.${campoFiltro} LIKE ?`;
-        params.push(letra + '%');
-      }
+    // Filtros por columna (igual que BD Dios)
+    const colsValidas = new Set(['num_op','numero_credito','nombre_cliente','rut_cliente', ...CAMPOS_EDIT.map(c => c.col)]);
+    if (req.query.filters) {
+      try {
+        const colFilters = JSON.parse(req.query.filters);
+        for (const [col, val] of Object.entries(colFilters)) {
+          if (!val || !colsValidas.has(col)) continue;
+          if (col === 'nombre_cliente') {
+            where += ` AND cl.nombre_completo LIKE ?`;
+          } else if (col === 'rut_cliente') {
+            where += ` AND cl.rut LIKE ?`;
+          } else {
+            where += ` AND ob.${col} LIKE ?`;
+          }
+          params.push(`%${val}%`);
+        }
+      } catch (e) { /* filtros inválidos, ignorar */ }
     }
 
     const [[{ total }]] = await pool.query(
-      `SELECT COUNT(*) AS total FROM creditos ob ${where}`, params
+      `SELECT COUNT(*) AS total FROM creditos ob LEFT JOIN clientes cl ON cl.id_cliente = ob.id_cliente ${where}`, params
     );
 
     const [rows] = await pool.query(
@@ -128,7 +142,7 @@ const getCreditos = async (req, res) => {
        FROM creditos ob
        LEFT JOIN clientes cl ON cl.id_cliente = ob.id_cliente
        ${where}
-       ORDER BY ob.mes DESC, ob.id DESC
+       ORDER BY ob.${safeSort} ${sortDirReq}
        LIMIT ? OFFSET ?`,
       [...params, limit, offset]
     );

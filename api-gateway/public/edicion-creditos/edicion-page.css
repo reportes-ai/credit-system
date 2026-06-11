@@ -1,5 +1,7 @@
 :root { --navy:#001345; --blue:#0141A2; --accent:#0255c5; }
 body { background:#f0f4f8; font-family:'Segoe UI',system-ui,sans-serif; margin:0; }
+
+/* Topnav */
 .topnav { background:linear-gradient(90deg,#012d70,#0255c5); color:#fff; height:60px; padding:0 24px; display:flex; align-items:center; justify-content:space-between; position:sticky; top:0; z-index:300; box-shadow:0 2px 8px rgba(0,0,0,.3); }
 .topnav-brand { display:flex; align-items:center; gap:8px; text-decoration:none; }
 .topnav-brand img { height:32px; filter:brightness(0) invert(1); }
@@ -11,49 +13,60 @@ body { background:#f0f4f8; font-family:'Segoe UI',system-ui,sans-serif; margin:0
 .perfil-badge { background:rgba(144,202,249,.2); border:1px solid rgba(144,202,249,.4); color:#90caf9; border-radius:12px; padding:2px 10px; font-size:.73rem; font-weight:600; }
 .btn-logout { background:rgba(255,255,255,.1); border:1px solid rgba(255,255,255,.2); color:#fff; border-radius:8px; padding:5px 12px; font-size:.82rem; cursor:pointer; }
 
-/* Barra de filtros */
-.filtros-bar { background:#fff; box-shadow:0 2px 8px rgba(0,0,0,.08); padding:10px 16px; position:sticky; top:60px; z-index:200; display:flex; flex-wrap:wrap; gap:8px; align-items:center; }
-.filtros-bar input[type=text] { border:1.5px solid #e2e8f0; border-radius:8px; padding:6px 12px; font-size:.82rem; min-width:200px; }
-.filtros-bar select { border:1.5px solid #e2e8f0; border-radius:8px; padding:6px 10px; font-size:.82rem; }
-.btn-af { background:linear-gradient(135deg,#0141A2,#0255c5); color:#fff; border:none; border-radius:8px; padding:6px 16px; font-size:.82rem; font-weight:700; cursor:pointer; }
-.btn-af-sm { background:#f0f4f8; border:1.5px solid #e2e8f0; color:#475569; border-radius:6px; padding:3px 9px; font-size:.72rem; font-weight:600; cursor:pointer; margin:1px; }
-.btn-af-sm.on { background:var(--blue); border-color:var(--blue); color:#fff; }
-.letras-bar { display:flex; flex-wrap:wrap; gap:2px; }
-.contador { font-size:.75rem; color:#64748b; align-self:center; }
+/* Toolbar */
+.toolbar { background:#fff; padding:8px 16px; display:flex; align-items:center; gap:12px; position:sticky; top:60px; z-index:200; box-shadow:0 2px 6px rgba(0,0,0,.07); }
+.toolbar #colSearch { border:1.5px solid #e2e8f0; border-radius:8px; padding:6px 12px; font-size:.82rem; width:220px; }
+.toolbar #colSearch:focus { border-color:var(--blue); outline:none; }
+@keyframes spin { to { transform:rotate(360deg); } }
+.spin { display:inline-block; animation:spin .8s linear infinite; }
 
 /* Tabla */
-.wrap { overflow-x:auto; padding:12px 16px 80px; }
-table.ed-tbl { border-collapse:collapse; font-size:.76rem; min-width:100%; white-space:nowrap; }
-.ed-tbl thead th { background:var(--navy); color:#fff; padding:7px 10px; position:sticky; top:0; z-index:100; font-size:.68rem; text-transform:uppercase; letter-spacing:.03em; cursor:pointer; user-select:none; }
-.ed-tbl thead th:hover { background:#0255c5; }
-.ed-tbl thead th.sorted-asc::after  { content:' ▲'; }
-.ed-tbl thead th.sorted-desc::after { content:' ▼'; }
+.table-scroll { overflow-x:auto; overflow-y:auto; height:calc(100vh - 160px); }
+table.ed-tbl { border-collapse:collapse; font-size:.76rem; min-width:100%; white-space:nowrap; width:max-content; }
+
+/* Fila letras estilo Excel */
+.tr-letters th { background:#1e3a5f; color:rgba(255,255,255,.75); font-size:.68rem; font-weight:700; text-align:center; padding:3px 6px; position:sticky; top:0; z-index:100; border-bottom:2px solid rgba(255,255,255,.15); }
+.tr-letters th.col-letter-highlight { background:#f59e0b !important; color:#1a0050 !important; }
+
+/* Headers de columnas */
+.ed-tbl thead tr:last-child th { background:var(--navy); color:#fff; padding:0; position:sticky; top:22px; z-index:100; }
+.th-inner { display:flex; flex-direction:column; }
+.th-label { padding:6px 10px 3px; display:flex; align-items:center; gap:4px; cursor:pointer; user-select:none; font-size:.68rem; text-transform:uppercase; letter-spacing:.03em; white-space:nowrap; }
+.th-label:hover { background:rgba(255,255,255,.1); }
+.th-label.sorted-asc::after  { content:' ▲'; }
+.th-label.sorted-desc::after { content:' ▼'; }
+.filter-input { background:rgba(255,255,255,.15); border:1px solid rgba(255,255,255,.25); color:#fff; border-radius:5px; padding:3px 7px; font-size:.72rem; width:calc(100% - 14px); margin:0 7px 5px; box-sizing:border-box; }
+.filter-input::placeholder { color:rgba(255,255,255,.5); }
+.filter-input:focus { outline:none; background:rgba(255,255,255,.25); border-color:#fff; }
+
+/* Columna resaltada */
+th.col-highlighted { outline:3px solid #f59e0b !important; outline-offset:-3px; }
+td.col-highlighted { background:#fffbeb !important; }
+
+/* Body */
+.ed-tbl tbody tr { border-bottom:1px solid #f1f5f9; }
 .ed-tbl tbody tr:nth-child(even) { background:#f8fafc; }
 .ed-tbl tbody tr:hover { background:#eef2ff; }
-.ed-tbl td { padding:5px 8px; border-bottom:1px solid #f1f5f9; max-width:160px; }
-.ed-tbl td input, .ed-tbl td select { border:1px solid transparent; background:transparent; width:100%; font-size:.75rem; padding:1px 4px; border-radius:4px; }
+.ed-tbl td { padding:4px 8px; max-width:160px; }
+.ed-tbl td input, .ed-tbl td select { border:1px solid transparent; background:transparent; width:100%; font-size:.74rem; padding:1px 4px; border-radius:4px; }
 .ed-tbl td input:focus, .ed-tbl td select:focus { border-color:var(--blue); outline:none; background:#fff; box-shadow:0 0 0 2px rgba(1,65,162,.15); }
 .ed-tbl td.modified input, .ed-tbl td.modified select { border-color:#f59e0b; background:#fffbeb; }
-.ed-tbl td.num { text-align:right; }
-.ed-tbl td .fijo { color:#374151; font-size:.73rem; }
 
-/* Botón guardar fila */
-.btn-save-row { background:#15803d; color:#fff; border:none; border-radius:5px; padding:2px 9px; font-size:.71rem; cursor:pointer; display:none; }
+/* Botones fila */
+.btn-save-row { background:#15803d; color:#fff; border:none; border-radius:5px; padding:2px 8px; font-size:.71rem; cursor:pointer; display:none; }
 .btn-save-row.show { display:inline-block; }
 .btn-log-row { background:none; border:1px solid #94a3b8; color:#64748b; border-radius:5px; padding:2px 7px; font-size:.71rem; cursor:pointer; }
 
 /* Paginación */
-.pag { display:flex; gap:6px; align-items:center; justify-content:center; padding:10px; position:fixed; bottom:0; left:0; right:0; background:#fff; box-shadow:0 -2px 8px rgba(0,0,0,.08); z-index:200; }
-.pag button { border:1px solid #d1d5db; border-radius:6px; padding:4px 10px; cursor:pointer; background:#fff; }
+.pag { display:flex; gap:6px; align-items:center; justify-content:center; padding:8px; position:fixed; bottom:0; left:0; right:0; background:#fff; box-shadow:0 -2px 8px rgba(0,0,0,.08); z-index:200; }
+.pag button { border:1px solid #d1d5db; border-radius:6px; padding:4px 10px; cursor:pointer; background:#fff; font-size:.8rem; }
 .pag button.activo { background:var(--blue); color:#fff; border-color:var(--blue); font-weight:700; }
 .pag span { font-size:.78rem; color:#6b7280; }
 
 /* Toast */
-#ed-toast { position:fixed; bottom:56px; left:50%; transform:translateX(-50%); z-index:9999;
-  min-width:260px; border-radius:10px; padding:10px 20px; font-size:.85rem; font-weight:600;
-  box-shadow:0 4px 20px rgba(0,0,0,.2); display:none; text-align:center; }
-#ed-toast.ok  { background:#15803d; color:#fff; display:block; }
-#ed-toast.err { background:#b91c1c; color:#fff; display:block; }
+#ed-toast { position:fixed; bottom:52px; left:50%; transform:translateX(-50%); z-index:9999; min-width:260px; border-radius:10px; padding:10px 20px; font-size:.85rem; font-weight:600; box-shadow:0 4px 20px rgba(0,0,0,.2); text-align:center; display:none; }
+#ed-toast.ok.show  { background:#15803d; color:#fff; display:block; }
+#ed-toast.err.show { background:#b91c1c; color:#fff; display:block; }
 
 /* Modal log */
 .log-overlay { position:fixed; inset:0; background:rgba(0,0,0,.5); z-index:500; display:flex; align-items:center; justify-content:center; }

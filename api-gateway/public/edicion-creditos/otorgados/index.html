@@ -5,12 +5,11 @@
   <link rel="icon" href="/img/favicon.png" type="image/png">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Edición Créditos Otorgados — AutoFácil</title>
-  <!-- v1.0 -->
+  <!-- v1.1 -->
   <link href="/css/bootstrap.min.css" rel="stylesheet">
   <link href="/css/bootstrap-icons.css" rel="stylesheet">
-  <script>window.EDICION_TIPO='otorgados'; window.EDICION_TITULO='Créditos Otorgados';</script>
-  <script src="/edicion-creditos/edicion-page.js" defer></script>
   <link rel="stylesheet" href="/edicion-creditos/edicion-page.css">
+  <script>window.EDICION_TIPO='otorgados';</script>
 </head>
 <body>
 <nav class="topnav">
@@ -27,7 +26,27 @@
     <button class="btn-logout" onclick="logout()"><i class="bi bi-box-arrow-right me-1"></i>Salir</button>
   </div>
 </nav>
-<div id="appRoot"></div>
+
+<div class="toolbar">
+  <div id="colSearchWrap" style="position:relative">
+    <input id="colSearch" type="text" placeholder="🔍 Buscar columna…" autocomplete="off"
+      oninput="buscarColumna(this.value)" onkeydown="navColDropdown(event)">
+    <div id="colDropdown" style="display:none;position:absolute;top:100%;left:0;background:#fff;border-radius:10px;box-shadow:0 8px 24px rgba(0,0,0,.15);min-width:240px;max-height:280px;overflow-y:auto;z-index:500;margin-top:4px"></div>
+  </div>
+  <span id="ed-loading" style="display:none;font-size:.8rem;color:#64748b"><i class="bi bi-arrow-repeat spin me-1"></i>Cargando…</span>
+</div>
+
+<div id="tableScroll" class="table-scroll">
+  <table class="ed-tbl">
+    <thead id="ed-thead"></thead>
+    <tbody id="ed-tbody"><tr><td colspan="99" style="text-align:center;color:#94a3b8;padding:28px">Cargando…</td></tr></tbody>
+  </table>
+</div>
+
+<div class="pag" id="ed-pag"></div>
+<div id="ed-toast"></div>
+
 <script src="/js/app-version.js"></script>
+<script src="/edicion-creditos/edicion-page.js"></script>
 </body>
 </html>
