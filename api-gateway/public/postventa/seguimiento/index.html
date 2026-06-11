@@ -5,7 +5,7 @@
   <link rel="icon" href="/img/favicon.png" type="image/png">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Seguimiento Post Venta — AutoFácil</title>
-  <!-- v1.3 -->
+  <!-- v1.4 -->
   <link href="/css/bootstrap.min.css" rel="stylesheet">
   <link href="/css/bootstrap-icons.css" rel="stylesheet">
   <style>
@@ -23,13 +23,14 @@
     .btn-logout { background:rgba(255,255,255,.1); border:1px solid rgba(255,255,255,.2); color:#fff; border-radius:8px; padding:5px 12px; font-size:.82rem; cursor:pointer; }
     .wrap { max-width:1500px; margin:0 auto; padding:12px 24px; }
     /* filtros */
-    .filtros { background:#fff; border-radius:12px; padding:12px 16px; box-shadow:0 2px 10px rgba(0,0,0,.1); margin-bottom:14px; position:sticky; top:60px; z-index:200; }
-    .toggle { border:1.5px solid #cbd5e1; background:#fff; color:#475569; border-radius:12px; padding:3px 12px; font-size:.74rem; font-weight:600; cursor:pointer; margin:2px; text-align:center; vertical-align:top; }
-    .toggle .tsub { display:block; font-size:.62rem; font-weight:600; color:#94a3b8; line-height:1.2; }
+    .filtros { background:#fff; border-radius:10px; padding:7px 12px; box-shadow:0 2px 10px rgba(0,0,0,.1); margin-bottom:8px; position:sticky; top:60px; z-index:200; }
+    .toggle { border:1.5px solid #cbd5e1; background:#fff; color:#475569; border-radius:9px; padding:2px 8px; font-size:.66rem; font-weight:600; cursor:pointer; margin:1px; text-align:center; vertical-align:top; line-height:1.15; }
+    .toggle .tsub { display:block; font-size:.55rem; font-weight:600; color:#94a3b8; line-height:1.1; }
     .toggle.on .tsub { color:rgba(255,255,255,.85); }
     .toggle.on { background:var(--blue); border-color:var(--blue); color:#fff; }
     .toggle.fin.on { background:#0e7490; border-color:#0e7490; }
-    .flbl { font-size:.68rem; font-weight:800; text-transform:uppercase; color:#94a3b8; margin:6px 8px 2px 2px; }
+    .flbl { display:inline-block; min-width:118px; font-size:.6rem; font-weight:800; text-transform:uppercase; color:#94a3b8; margin:2px 6px 1px 2px; }
+    .filtros > div { margin-bottom:1px; }
     /* card crédito */
     .cred { background:#fff; border-radius:10px; box-shadow:0 1px 4px rgba(0,0,0,.07); margin-bottom:9px; overflow:hidden; }
     .cred-head { display:flex; flex-wrap:wrap; gap:6px 14px; padding:6px 14px; background:#f8fafc; border-bottom:1px solid #e2e8f0; font-size:.72rem; align-items:center; }
@@ -65,18 +66,18 @@
 <div class="wrap">
   <div class="filtros">
     <input type="text" id="fBuscar" placeholder="Buscar OP, RUT, dealer, ejecutivo, saldo…" oninput="render()"
-      style="width:100%;border:1.5px solid #e2e8f0;border-radius:8px;padding:7px 12px;font-size:.85rem;margin-bottom:6px">
-    <div style="margin-bottom:4px">
+      style="width:100%;border:1.5px solid #e2e8f0;border-radius:7px;padding:5px 11px;font-size:.8rem;margin-bottom:4px">
+    <div>
       <span class="flbl">Mostrar:</span>
       <button class="toggle on" id="btnFiltroPagado" onclick="toggleFiltroPagado()"
-        style="font-size:.8rem;padding:4px 14px">≠ Pagado <span class="tsub">Ocultar completamente pagados</span></button>
+        style="font-size:.7rem;padding:3px 12px">≠ Pagado <span class="tsub">Ocultar completamente pagados</span></button>
     </div>
     <div><span class="flbl">Mes Otorgamiento:</span><span id="fMeses"></span></div>
     <div><span class="flbl">Financiera:</span><span id="fFinancieras"></span></div>
     <div><span class="flbl">Etapa Saldo Precio:</span><span id="fSaldo"></span></div>
     <div><span class="flbl">Etapa Comisión:</span><span id="fComision"></span></div>
-    <div id="resumen" style="display:flex;flex-wrap:wrap;gap:8px;margin-top:8px;padding-top:8px;border-top:1px solid #f1f5f9"></div>
-    <div style="font-size:.74rem;color:#64748b;margin-top:4px" id="contador"></div>
+    <div id="resumen" style="display:flex;flex-wrap:wrap;gap:6px;margin-top:5px;padding-top:5px;border-top:1px solid #f1f5f9"></div>
+    <div style="font-size:.68rem;color:#64748b;margin-top:2px" id="contador"></div>
   </div>
 
   <div id="lista"><div style="text-align:center;color:#94a3b8;padding:30px">Cargando…</div></div>
@@ -222,8 +223,8 @@ function render(){
   const ORDEN = ['PENDIENTE','PARA PAGO','PAGADO'];
   document.getElementById('resumen').innerHTML = ORDEN.filter(e=>grp[e]).map(e => {
     const g = grp[e]; const c = COLORES_EST[e]||{bg:'#f1f5f9',color:'#475569'};
-    return `<div style="background:${c.bg};color:${c.color};border-radius:10px;padding:6px 14px;font-size:.73rem;font-weight:700">
-      <span style="font-size:.8rem">${escH(e)}</span>
+    return `<div style="background:${c.bg};color:${c.color};border-radius:8px;padding:3px 10px;font-size:.66rem;font-weight:700">
+      <span style="font-size:.72rem">${escH(e)}</span>
       <span style="margin:0 8px;font-weight:400;opacity:.8">|</span>
       ${g.n} ops
       <span style="margin:0 4px;opacity:.6">·</span>
