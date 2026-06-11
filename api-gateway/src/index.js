@@ -105,6 +105,9 @@ app.use('/api/cartolas',          require('../../services/cartas/src/routes/cart
 
 // Notificaciones (in-app + web push)
 app.use('/api/notif', require('../../services/notificaciones/src/routes/notificaciones.routes'));
+
+// Post Venta
+app.use('/api/postventa', require('../../services/postventa/src/routes/postventa.routes'));
 app.use('/api/cartas-ejecutivos', require('../../services/cartas/src/routes/ejecutivos.routes'));
 app.use('/api/cartas-params',     require('../../services/cartas/src/routes/parametros.routes'));
 
@@ -315,6 +318,14 @@ app.get(['/aprobaciones', '/aprobaciones/'], (req, res) =>
 // Card en Mantenedores → abre la pestaña Parámetros de Aprobaciones
 app.get(['/mantenedores/preferencia-financiera', '/mantenedores/preferencia-financiera/'], (req, res) =>
   res.redirect('/aprobaciones/?tab=params'));
+
+// Post Venta
+app.get(['/postventa', '/postventa/'], (req, res) =>
+  res.sendFile(path.join(__dirname, '../public/postventa/index.html')));
+app.get(['/postventa/seguimiento', '/postventa/seguimiento/'], (req, res) =>
+  res.sendFile(path.join(__dirname, '../public/postventa/seguimiento/index.html')));
+app.get(['/postventa/mantenedores', '/postventa/mantenedores/'], (req, res) =>
+  res.sendFile(path.join(__dirname, '../public/postventa/mantenedores/index.html')));
 
 app.get(['/informes-dealernet', '/informes-dealernet/'], (req, res) =>
   res.sendFile(path.join(__dirname, '../public/informes-dealernet/index.html')));

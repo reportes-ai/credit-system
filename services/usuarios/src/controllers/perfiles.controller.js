@@ -1533,4 +1533,40 @@ const getUsuariosByPerfil = async (req, res) => {
   }
 })();
 
+/* ─── Migración v19: módulo Post Venta ─ */
+(async () => {
+  try {
+    const [[adm]] = await pool.query("SELECT id_perfil FROM perfiles WHERE nombre='Administrador' LIMIT 1");
+    let [[mod]] = await pool.query("SELECT id_modulo FROM modulos WHERE ruta='/postventa/' LIMIT 1");
+    if (!mod) {
+      const [[{ maxOrden }]] = await pool.query('SELECT COALESCE(MAX(orden),0)+1 AS maxOrden FROM modulos');
+      const [ins] = await pool.query(
+        "INSERT INTO modulos (nombre, descripcion, icono, ruta, orden, estado) VALUES (?,?,?,?,?,'activo')",
+        ['Post Venta', 'Seguimiento de saldos precio y comisiones post otorgamiento',
+         'bi-truck', '/postventa/', maxOrden]);
+      mod = { id_modulo: ins.insertId };
+      console.log('[v19] módulo Post Venta creado id=' + mod.id_modulo);
+    }
+    const funcs = [
+      ['Post Venta',                          'postventa_ver',          '/postventa/'],
+      ['Seguimiento Saldos y Comisiones',     'postventa_seguimiento',  null],
+      ['Mantenedores Post Venta',             'postventa_mantenedores', null],
+    ];
+    for (const [nombre, codigo, href] of funcs) {
+      const [[ex]] = await pool.query('SELECT id_funcionalidad FROM funcionalidades WHERE codigo=?', [codigo]);
+      let idF = ex?.id_funcionalidad;
+      if (!idF) {
+        const [ins] = await pool.query(
+          'INSERT INTO funcionalidades (id_modulo, nombre, codigo, href) VALUES (?,?,?,?)',
+          [mod.id_modulo, nombre, codigo, href]);
+        idF = ins.insertId;
+      }
+      if (adm) await pool.query(
+        'INSERT IGNORE INTO permisos_perfil (id_perfil, id_funcionalidad, habilitado) VALUES (?,?,1)',
+        [adm.id_perfil, idF]);
+    }
+    console.log('✓ Perfiles v19: módulo Post Venta registrado');
+  } catch (e) { console.error('[perfiles migration v19]', e.message); }
+})();
+
 module.exports = { getAllPerfiles, getModulosConFuncionalidades, getPermisosPerfil, updatePermisosPerfil, reordenarModulos, createPerfil, updatePerfil, deletePerfil, getUsuariosByPerfil };

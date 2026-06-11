@@ -1,0 +1,13 @@
+'use strict';
+const router = require('express').Router();
+const { verifyToken } = require('../../../../shared/middleware/auth');
+const { requireFunc } = require('../../../../shared/middleware/permisos');
+const c = require('../controllers/postventa.controller');
+
+router.post('/sync',        verifyToken, c.sync);
+router.get('/config',       verifyToken, c.getConfig);
+router.put('/config/:clave',verifyToken, requireFunc('postventa_mantenedores'), c.setConfig);
+router.get('/',             verifyToken, c.getAll);
+router.put('/:id/etapa',    verifyToken, requireFunc('postventa_seguimiento'), c.setEtapa);
+
+module.exports = router;
