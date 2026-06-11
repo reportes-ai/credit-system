@@ -97,8 +97,14 @@ const sync = async (req, res) => {
 /* ── GET /api/postventa — seguimientos + etapas marcadas ─────────── */
 const getAll = async (req, res) => {
   try {
-    const [rows] = await pool.query(
-      'SELECT * FROM postventa_seguimiento ORDER BY fecha_otorgado DESC, id DESC LIMIT 1000');
+    const [rows] = await pool.query(`
+      SELECT s.id, s.id_credito, s.num_op, s.financiera, s.ejecutivo,
+             s.fecha_otorgado, s.saldo_precio, s.comision,
+             COALESCE(c.nombre_local, s.nombre_dealer)    AS nombre_dealer,
+             COALESCE(c.rut_concesionario, s.rut_dealer)  AS rut_dealer
+      FROM postventa_seguimiento s
+      LEFT JOIN creditos c ON c.id = s.id_credito
+      ORDER BY s.fecha_otorgado DESC, s.id DESC LIMIT 1000`);
     const [etapas] = await pool.query(
       `SELECT id_seguimiento, track, etapa, usuario, fecha FROM postventa_etapas
        WHERE id_seguimiento IN (SELECT id FROM postventa_seguimiento)`);
@@ -228,7 +234,8 @@ const setConfig = async (req, res) => {
 const getSaldosAPagar = async (req, res) => {
   try {
     const [rows] = await pool.query(`
-      SELECT s.id, s.num_op, s.nombre_dealer, s.saldo_precio,
+      SELECT s.id, s.num_op, s.saldo_precio,
+             COALESCE(c.nombre_local, s.nombre_dealer) AS nombre_dealer,
              c.id_financiera, c.rut_concesionario AS rut_dealer,
              d.num_cuenta, d.banco,
              elp.fecha AS fecha_liberado
