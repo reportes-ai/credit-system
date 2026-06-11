@@ -5,7 +5,7 @@
   <link rel="icon" href="/img/favicon.png" type="image/png">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Aprobaciones — AutoFácil</title>
-  <!-- v2.6 -->
+  <!-- v2.7 -->
   <link href="/css/bootstrap.min.css" rel="stylesheet">
   <link href="/css/bootstrap-icons.css" rel="stylesheet">
   <style>
@@ -299,7 +299,7 @@
         </select></div>
       <div class="ff"><label>Monto crédito (CLP) *</label><input id="cMontoCred" inputmode="numeric" oninput="fmtMoney(this);montoCredManual=true;calcUFyTasa()"></div>
       <div class="ff"><label>Monto crédito (UF) <span id="ufBadge" style="text-transform:none"></span></label><input id="cMontoUF" readonly></div>
-      <div class="ff"><label>Tasa crédito (%)</label><input id="cTasa" inputmode="decimal" placeholder="Ej: 2,7" oninput="calcUFyTasa()"></div>
+      <div class="ff"><label>Tasa crédito (%) *</label><input id="cTasa" inputmode="decimal" placeholder="Ej: 2,7" oninput="calcUFyTasa()"></div>
       <div class="ff"><label>Tasa pizarra (%)</label><input id="cTasaPizarra" readonly>
         <div id="tasaMsg" style="font-size:.72rem;margin-top:3px;font-weight:700"></div></div>
       <div class="ff fg-2"><label>Financiera / acreedor</label><select id="cAcreedor" onchange="avisoFinanciera()"></select>
@@ -1220,6 +1220,8 @@ async function guardarCarta(){
   if (!rutValido()) { setFormAlert('El RUT del cliente no es válido (dígito verificador incorrecto)'); return; }
   if (!editandoId && !document.getElementById('cApPat').value) { setFormAlert('Falta: Apellido paterno del cliente'); return; }
   if (!rawMoney('cMontoCred')) { setFormAlert('Falta: Monto crédito'); return; }
+  const tasaIngresada = parseFloat(String(document.getElementById('cTasa').value).replace(',','.'));
+  if (isNaN(tasaIngresada) || tasaIngresada <= 0) { setFormAlert('Falta: Tasa crédito (%) — obligatoria para comparar contra pizarra'); return; }
 
   // Financiera bloqueada → no se puede grabar
   const finSel = document.getElementById('cAcreedor').value;
