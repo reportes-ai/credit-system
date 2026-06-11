@@ -238,21 +238,6 @@ const getAll = async (req, res) => {
     const limitNum = Math.min(500, Math.max(1, parseInt(limit) || 100));
     const offset   = (pageNum - 1) * limitNum;
 
-    let where = WHERE_GESTION;
-    const params = [];
-
-    if (q && q.trim()) {
-      const qNorm = q.trim().toUpperCase().replace(/\./g, '');
-      const like  = `%${qNorm}%`;
-      where += ` AND (
-        UPPER(REPLACE(COALESCE(cl.rut, ''),'.',''))                        LIKE ? OR
-        UPPER(COALESCE(cl.nombre_completo, ''))                            LIKE ? OR
-        UPPER(COALESCE(ob.numero_credito, CONCAT('OP-',ob.num_op)))        LIKE ?
-      )`;
-      params.push(like, like, like);
-    }
-
-    // Stats por estado (todos los registros que coinciden, sin paginar)
     const estadoExpr = `COALESCE(ob.estado,
       CASE
         WHEN ob.financiera IN ('AUTOFIN','UNIDAD DE CREDITO') AND ob.estado_eval = 'OTORGADO' THEN 'OTORGADO'
@@ -262,21 +247,41 @@ const getAll = async (req, res) => {
         ELSE COALESCE(ob.estado_credito, ob.estado_eval)
       END)`;
 
-    if (estado && estado !== 'todos') {
-      where += ` AND ${estadoExpr} = ?`;
-      params.push(estado.toUpperCase());
+    // whereBase = q + financiera (sin estado) → para los chips de stats (siempre el desglose completo)
+    let whereBase = WHERE_GESTION;
+    const paramsBase = [];
+
+    if (q && q.trim()) {
+      const qNorm = q.trim().toUpperCase().replace(/\./g, '');
+      const like  = `%${qNorm}%`;
+      whereBase += ` AND (
+        UPPER(REPLACE(COALESCE(cl.rut, ''),'.',''))                        LIKE ? OR
+        UPPER(COALESCE(cl.nombre_completo, ''))                            LIKE ? OR
+        UPPER(COALESCE(ob.numero_credito, CONCAT('OP-',ob.num_op)))        LIKE ?
+      )`;
+      paramsBase.push(like, like, like);
     }
 
     if (financiera && financiera !== 'TODAS') {
       const fin = financiera.toUpperCase();
       if (fin === 'AUTOFACIL') {
-        where += ` AND (ob.financiera IS NULL OR ob.financiera NOT IN ('AUTOFIN','UNIDAD DE CREDITO'))`;
+        whereBase += ` AND (ob.financiera IS NULL OR ob.financiera NOT IN ('AUTOFIN','UNIDAD DE CREDITO'))`;
       } else if (fin === 'UNIDAD') {
-        where += ` AND ob.financiera = 'UNIDAD DE CREDITO'`;
+        whereBase += ` AND ob.financiera = 'UNIDAD DE CREDITO'`;
       } else {
-        where += ` AND ob.financiera = ?`;
-        params.push(fin);
+        whereBase += ` AND ob.financiera = ?`;
+        paramsBase.push(fin);
       }
+    }
+
+    // whereData = whereBase + estado → para la lista paginada y su total
+    let whereData = whereBase;
+    const paramsData = [...paramsBase];
+    if (estado === '__PROCESO__') {
+      whereData += ` AND ${estadoExpr} NOT IN ('VIGENTE','CANCELADO','PREPAGADO','CASTIGADO','EN MORA','OTORGADO','CURSADO','DESISTIDO')`;
+    } else if (estado && estado !== 'todos') {
+      whereData += ` AND ${estadoExpr} = ?`;
+      paramsData.push(estado.toUpperCase());
     }
 
     const [[statsRows], [countRows]] = await Promise.all([
@@ -285,29 +290,31 @@ const getAll = async (req, res) => {
          FROM creditos ob
          LEFT JOIN clientes cl ON cl.id_cliente = ob.id_cliente
          LEFT JOIN (SELECT id_credito, COUNT(DISTINCT numero_cuota) AS cnt FROM pagos_credito WHERE estado_pago='PAGADO' GROUP BY id_credito) pp ON pp.id_credito = ob.id
-         ${where}
+         ${whereBase}
          GROUP BY ${estadoExpr}`,
-        params
+        paramsBase
       ),
       pool.query(
         `SELECT COUNT(*) AS total FROM creditos ob
-         LEFT JOIN clientes cl ON cl.id_cliente = ob.id_cliente` + where,
-        params
+         LEFT JOIN clientes cl ON cl.id_cliente = ob.id_cliente` + whereData,
+        paramsData
       ),
     ]);
 
     const total = countRows[0].total;
     const stats = {};
-    for (const r of statsRows) stats[r.estado || 'SIN_ESTADO'] = r.cnt;
+    let statsTotal = 0;
+    for (const r of statsRows) { stats[r.estado || 'SIN_ESTADO'] = r.cnt; statsTotal += r.cnt; }
 
-    const sql = SELECT_GESTION + where +
+    const sql = SELECT_GESTION + whereData +
       ` ORDER BY ob.mes DESC, ob.id DESC LIMIT ? OFFSET ?`;
-    const [rows] = await pool.query(sql, [...params, limitNum, offset]);
+    const [rows] = await pool.query(sql, [...paramsData, limitNum, offset]);
 
     res.json({
       success: true,
       data: rows,
       stats,
+      statsTotal,
       pagination: { total, page: pageNum, limit: limitNum, pages: Math.ceil(total / limitNum) },
       error: null
     });

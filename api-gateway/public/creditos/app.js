@@ -349,9 +349,13 @@ async function buscarCreditos(page = 1) {
   const res = document.getElementById('resultadosConsulta');
   res.innerHTML = '<div class="text-center py-4 text-muted"><div class="spinner-border spinner-border-sm me-2"></div>Buscando…</div>';
   try {
+    const estadoSel = document.getElementById('searchEstado').value;
     const params = new URLSearchParams({ page, limit: _LIMIT_PAG });
     if (q) params.set('q', q);
     if (_empresasFiltro.size === 1) params.set('financiera', [..._empresasFiltro][0]);
+    // Estado: server-side (paginación correcta). EN MORA es calculado → client-side.
+    if (_filtroProceso) params.set('estado', '__PROCESO__');
+    else if (estadoSel && estadoSel !== 'EN MORA') params.set('estado', estadoSel);
     const r = await fetch('/api/creditos?' + params, { headers: apiHdr() });
     const j = await r.json();
     if (!j.success) throw new Error(j.error);
@@ -359,17 +363,15 @@ async function buscarCreditos(page = 1) {
     const pag   = j.pagination || {};
     const stats = j.stats      || {};
 
-    // Stats desde servidor (totales reales de todos los registros, no solo la página)
+    // Stats desde servidor (desglose completo, sin importar el filtro de estado activo)
     _lastStats = stats;
-    _lastTotal = pag.total || 0;
+    _lastTotal = (j.statsTotal != null ? j.statsTotal : pag.total) || 0;
     actualizarStats(_lastStats, _lastTotal);
 
-    // Render página actual con filtro client-side
-    const baseEmpresa = _filtrarPorEmpresa(_todosCreditos);
-    const listaEstado = _filtroProceso
-      ? baseEmpresa.filter(c => !ESTADOS_FUERA_PROCESO.has(c.estado))
-      : _aplicarFiltroEstado(baseEmpresa);
-    renderConsulta(listaEstado);
+    // El servidor ya filtró por estado/proceso; solo EN MORA se filtra en cliente
+    let baseEmpresa = _filtrarPorEmpresa(_todosCreditos);
+    if (estadoSel === 'EN MORA') baseEmpresa = baseEmpresa.filter(_enMoraReal);
+    renderConsulta(baseEmpresa);
     renderPaginacion(pag);
   } catch(e) {
     res.innerHTML = `<div class="empty-state" style="color:#ef4444"><i class="bi bi-exclamation-triangle"></i>${e.message}</div>`;
