@@ -1569,4 +1569,41 @@ const getUsuariosByPerfil = async (req, res) => {
   } catch (e) { console.error('[perfiles migration v19]', e.message); }
 })();
 
+/* ─── Migración v20: módulo Edición Créditos ─ */
+(async () => {
+  try {
+    const [[adm]] = await pool.query("SELECT id_perfil FROM perfiles WHERE nombre='Administrador' LIMIT 1");
+    let [[mod]] = await pool.query("SELECT id_modulo FROM modulos WHERE ruta='/edicion-creditos/' LIMIT 1");
+    if (!mod) {
+      const [[{ maxOrden }]] = await pool.query('SELECT COALESCE(MAX(orden),0)+1 AS maxOrden FROM modulos');
+      const [ins] = await pool.query(
+        "INSERT INTO modulos (nombre, descripcion, icono, ruta, orden, estado) VALUES (?,?,?,?,?,'activo')",
+        ['Edición Créditos', 'Edición completa de campos de créditos de meses no cerrados',
+         'bi-pencil-square', '/edicion-creditos/', maxOrden]);
+      mod = { id_modulo: ins.insertId };
+      console.log('[v20] módulo Edición Créditos creado id=' + mod.id_modulo);
+    }
+    const funcs = [
+      ['Edición Créditos',           'edicion_creditos_ver',    '/edicion-creditos/'],
+      ['Edición Créditos Otorgados', 'edicion_creditos_otor',   null],
+      ['Edición Otros Créditos',     'edicion_creditos_otros',  null],
+      ['Editar campos',              'edicion_creditos_editar', null],
+    ];
+    for (const [nombre, codigo, href] of funcs) {
+      const [[ex]] = await pool.query('SELECT id_funcionalidad FROM funcionalidades WHERE codigo=?', [codigo]);
+      let idF = ex?.id_funcionalidad;
+      if (!idF) {
+        const [ins] = await pool.query(
+          'INSERT INTO funcionalidades (id_modulo, nombre, codigo, href) VALUES (?,?,?,?)',
+          [mod.id_modulo, nombre, codigo, href]);
+        idF = ins.insertId;
+      }
+      if (adm) await pool.query(
+        'INSERT IGNORE INTO permisos_perfil (id_perfil, id_funcionalidad, habilitado) VALUES (?,?,1)',
+        [adm.id_perfil, idF]);
+    }
+    console.log('✓ Perfiles v20: módulo Edición Créditos registrado');
+  } catch (e) { console.error('[perfiles migration v20]', e.message); }
+})();
+
 module.exports = { getAllPerfiles, getModulosConFuncionalidades, getPermisosPerfil, updatePermisosPerfil, reordenarModulos, createPerfil, updatePerfil, deletePerfil, getUsuariosByPerfil };

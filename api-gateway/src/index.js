@@ -84,6 +84,7 @@ app.use('/api/cotizaciones', require('../../services/cotizaciones/src/routes/cot
 
 // Créditos
 app.use('/api/creditos',            require('../../services/creditos/src/routes/creditos.routes'));
+app.use('/api/edicion-creditos',    require('../../services/creditos/src/routes/edicion.routes'));
 app.use('/api/credito-documentos',  require('../../services/creditos/src/routes/credito-documentos.routes'));
 app.use('/api/documentos-af',       require('../../services/creditos/src/routes/documentos-af.routes'));
 app.use('/api/pagos-credito',       require('../../services/creditos/src/routes/pagos-credito.routes'));
@@ -326,6 +327,13 @@ app.get(['/postventa/seguimiento', '/postventa/seguimiento/'], (req, res) =>
   res.sendFile(path.join(__dirname, '../public/postventa/seguimiento/index.html')));
 app.get(['/postventa/mantenedores', '/postventa/mantenedores/'], (req, res) =>
   res.sendFile(path.join(__dirname, '../public/postventa/mantenedores/index.html')));
+
+app.get(['/edicion-creditos', '/edicion-creditos/'], (req, res) =>
+  res.sendFile(path.join(__dirname, '../public/edicion-creditos/index.html')));
+app.get(['/edicion-creditos/otorgados', '/edicion-creditos/otorgados/'], (req, res) =>
+  res.sendFile(path.join(__dirname, '../public/edicion-creditos/otorgados/index.html')));
+app.get(['/edicion-creditos/otros', '/edicion-creditos/otros/'], (req, res) =>
+  res.sendFile(path.join(__dirname, '../public/edicion-creditos/otros/index.html')));
 
 app.get(['/informes-dealernet', '/informes-dealernet/'], (req, res) =>
   res.sendFile(path.join(__dirname, '../public/informes-dealernet/index.html')));
