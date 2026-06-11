@@ -2,7 +2,7 @@
    AutoFácil — Versión global de la aplicación
    Editar SOLO este archivo para cambiar la versión
    ───────────────────────────────────────────── */
-const APP_VERSION = 'v9.16';
+const APP_VERSION = 'v9.17';
 
 document.addEventListener('DOMContentLoaded', () => {
 
@@ -388,4 +388,138 @@ document.addEventListener('DOMContentLoaded', () => {
     document.getElementById('afUserMenu')?.remove();
   });
 
+});
+
+/* ═══════════════════════════════════════════════════════════════
+   🔔 NOTIFICACIONES GLOBALES — campanita en TODAS las páginas
+   Se auto-inyecta en la barra superior. Polling 30s, doble ding de
+   hotel al llegar nuevas, dropdown con historial y push opcional.
+   ═══════════════════════════════════════════════════════════════ */
+document.addEventListener('DOMContentLoaded', () => {
+  const token = sessionStorage.getItem('token');
+  if (!token) return;                                  // login u otras sin sesión
+  if (document.getElementById('bellBtn')) return;      // página con campana propia (Aprobaciones)
+
+  // ── Punto de anclaje: junto al chip de usuario, o flotante si no hay topnav
+  const chip = document.querySelector('.user-chip');
+  const anchor = chip ? chip.parentElement : null;
+
+  const wrap = document.createElement('div');
+  wrap.id = 'afBellWrap';
+  wrap.style.cssText = anchor
+    ? 'position:relative;display:inline-flex;align-items:center;margin-right:10px'
+    : 'position:fixed;top:14px;right:14px;z-index:9000';
+  wrap.innerHTML = `
+    <button id="afBellBtn" title="Notificaciones" style="position:relative;background:rgba(255,255,255,.12);border:1px solid rgba(255,255,255,.25);color:#fff;border-radius:8px;padding:6px 11px;cursor:pointer;${anchor?'':'background:#0141A2;box-shadow:0 4px 14px rgba(0,0,0,.3)'}">
+      <i class="bi bi-bell" style="font-size:1.05rem"></i>
+      <span id="afBellCount" style="display:none;position:absolute;top:-7px;right:-7px;background:#dc2626;color:#fff;font-size:.66rem;font-weight:800;border-radius:10px;min-width:19px;height:19px;align-items:center;justify-content:center;padding:0 5px;border:2px solid #0255c5">0</span>
+    </button>
+    <div id="afBellDrop" style="display:none;position:absolute;right:0;top:44px;background:#fff;border-radius:12px;box-shadow:0 12px 40px rgba(0,0,0,.25);width:330px;max-height:420px;overflow-y:auto;z-index:9500;color:#1e293b;text-align:left">
+      <div style="padding:11px 16px;font-weight:800;font-size:.85rem;color:#012d70;border-bottom:1px solid #f1f5f9;display:flex;justify-content:space-between;align-items:center">
+        Notificaciones
+        <button id="afBtnPushOn" style="display:none;border:none;background:#eff6ff;color:#1d4ed8;border-radius:7px;padding:3px 10px;font-size:.7rem;font-weight:700;cursor:pointer"><i class="bi bi-bell-fill"></i> Activar push</button>
+      </div>
+      <div id="afBellList" style="font-size:.8rem"></div>
+    </div>`;
+  if (anchor) anchor.insertBefore(wrap, chip);
+  else document.body.appendChild(wrap);
+
+  const H = { 'Content-Type': 'application/json', Authorization: 'Bearer ' + token };
+  let unread = -1;   // -1 = primera carga, no suena
+
+  /* 🛎️ doble ding de campana de hotel */
+  function dingDing() {
+    try {
+      const ctx = new (window.AudioContext || window.webkitAudioContext)();
+      const ding = (t0) => {
+        const o1 = ctx.createOscillator(), g1 = ctx.createGain();
+        const o2 = ctx.createOscillator(), g2 = ctx.createGain();
+        o1.type = 'sine'; o1.frequency.value = 1318;
+        o2.type = 'sine'; o2.frequency.value = 1976;
+        g1.gain.setValueAtTime(0.5, t0);  g1.gain.exponentialRampToValueAtTime(0.001, t0 + 0.9);
+        g2.gain.setValueAtTime(0.18, t0); g2.gain.exponentialRampToValueAtTime(0.001, t0 + 0.6);
+        o1.connect(g1).connect(ctx.destination);
+        o2.connect(g2).connect(ctx.destination);
+        o1.start(t0); o1.stop(t0 + 1); o2.start(t0); o2.stop(t0 + 0.7);
+      };
+      ding(ctx.currentTime); ding(ctx.currentTime + 0.45);
+      setTimeout(() => ctx.close(), 2000);
+    } catch (e) {}
+  }
+  const escN = s => String(s ?? '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+
+  async function cargar() {
+    try {
+      const r = await fetch('/api/notif', { headers: H });
+      if (r.status === 401) return;
+      const j = await r.json();
+      if (!j.success) return;
+      const { rows, noLeidas } = j.data;
+      const badge = document.getElementById('afBellCount');
+      badge.textContent = noLeidas;
+      badge.style.display = noLeidas ? 'flex' : 'none';
+      if (unread >= 0 && noLeidas > unread) dingDing();
+      unread = noLeidas;
+      const list = document.getElementById('afBellList');
+      list.innerHTML = rows.length ? rows.map(n => `
+        <div data-href="${escN(n.href || '')}" class="af-notif-item" style="padding:10px 16px;border-bottom:1px solid #f8fafc;cursor:pointer;${n.leida ? '' : 'background:#eff6ff'}">
+          <div style="font-weight:700;color:#0f172a">${escN(n.titulo)}</div>
+          <div style="color:#475569;margin:2px 0">${escN(n.mensaje || '')}</div>
+          <div style="font-size:.68rem;color:#94a3b8">${new Date(n.created_at).toLocaleString('es-CL')}</div>
+        </div>`).join('')
+        : '<div style="padding:20px;text-align:center;color:#94a3b8">Sin notificaciones</div>';
+      list.querySelectorAll('.af-notif-item').forEach(el => {
+        el.addEventListener('click', () => { const h = el.dataset.href; if (h) location.href = h; });
+      });
+    } catch (e) {}
+  }
+
+  document.getElementById('afBellBtn').addEventListener('click', async (e) => {
+    e.stopPropagation();
+    const d = document.getElementById('afBellDrop');
+    const abierto = d.style.display !== 'none';
+    d.style.display = abierto ? 'none' : 'block';
+    if (!abierto) {
+      try { await fetch('/api/notif/leidas', { method: 'PUT', headers: H }); } catch (e) {}
+      unread = 0;
+      document.getElementById('afBellCount').style.display = 'none';
+    }
+  });
+  document.addEventListener('click', (e) => {
+    const d = document.getElementById('afBellDrop');
+    if (d && d.style.display !== 'none' && !e.target.closest('#afBellWrap')) d.style.display = 'none';
+  });
+
+  /* ── Web Push ── */
+  const b64ToU8 = s => {
+    const pad = '='.repeat((4 - s.length % 4) % 4);
+    const raw = atob((s + pad).replace(/-/g, '+').replace(/_/g, '/'));
+    return Uint8Array.from([...raw].map(c => c.charCodeAt(0)));
+  };
+  async function suscribir() {
+    if (!('serviceWorker' in navigator) || !('PushManager' in window)) return false;
+    try {
+      const reg = await navigator.serviceWorker.register('/sw-notif.js');
+      const rk = await fetch('/api/notif/vapid-key', { headers: H });
+      const jk = await rk.json();
+      if (!jk.success) return false;
+      const sub = await reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: b64ToU8(jk.data.publicKey) });
+      const s = sub.toJSON();
+      await fetch('/api/notif/subscribe', { method: 'POST', headers: H, body: JSON.stringify({ endpoint: s.endpoint, keys: s.keys }) });
+      return true;
+    } catch (e) { return false; }
+  }
+  const btnPush = document.getElementById('afBtnPushOn');
+  btnPush.addEventListener('click', async () => {
+    const perm = await Notification.requestPermission();
+    if (perm !== 'granted') { alert('Debes permitir las notificaciones en el navegador.'); return; }
+    if (await suscribir()) btnPush.style.display = 'none';
+  });
+
+  cargar();
+  setInterval(cargar, 30000);
+  if ('Notification' in window) {
+    if (Notification.permission === 'granted') suscribir();
+    else if (Notification.permission === 'default') btnPush.style.display = '';
+  }
 });
