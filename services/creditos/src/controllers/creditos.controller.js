@@ -1,5 +1,6 @@
 const pool  = require('../../../../shared/config/database');
 const audit = require('../../../../shared/auditoria');
+const { isMesCerrado, getMesDeOp } = require('../../../../shared/utils/mes-cerrado');
 
 // ── Migración: agregar campos de gestión a creditos ──────────────
 (async () => {
@@ -251,8 +252,18 @@ const getAll = async (req, res) => {
       params.push(like, like, like);
     }
 
+    // Stats por estado (todos los registros que coinciden, sin paginar)
+    const estadoExpr = `COALESCE(ob.estado,
+      CASE
+        WHEN ob.financiera IN ('AUTOFIN','UNIDAD DE CREDITO') AND ob.estado_eval = 'OTORGADO' THEN 'OTORGADO'
+        WHEN ob.estado_credito = 'OTORGADO' THEN 'VIGENTE'
+        WHEN ob.estado_eval    = 'OTORGADO' THEN 'VIGENTE'
+        WHEN ob.estado_eval IN ('RECHAZADO','ANULADO') THEN 'CANCELADO'
+        ELSE COALESCE(ob.estado_credito, ob.estado_eval)
+      END)`;
+
     if (estado && estado !== 'todos') {
-      where += ` AND ob.estado = ?`;
+      where += ` AND ${estadoExpr} = ?`;
       params.push(estado.toUpperCase());
     }
 
@@ -267,16 +278,6 @@ const getAll = async (req, res) => {
         params.push(fin);
       }
     }
-
-    // Stats por estado (todos los registros que coinciden, sin paginar)
-    const estadoExpr = `COALESCE(ob.estado,
-      CASE
-        WHEN ob.financiera IN ('AUTOFIN','UNIDAD DE CREDITO') AND ob.estado_eval = 'OTORGADO' THEN 'OTORGADO'
-        WHEN ob.estado_credito = 'OTORGADO' THEN 'VIGENTE'
-        WHEN ob.estado_eval    = 'OTORGADO' THEN 'VIGENTE'
-        WHEN ob.estado_eval IN ('RECHAZADO','ANULADO') THEN 'CANCELADO'
-        ELSE COALESCE(ob.estado_credito, ob.estado_eval)
-      END)`;
 
     const [[statsRows], [countRows]] = await Promise.all([
       pool.query(
@@ -344,6 +345,11 @@ const getById = async (req, res) => {
 /* ─── UPDATE ─────────────────────────────────────────────────────────────── */
 const update = async (req, res) => {
   try {
+    // Verificar mes cerrado
+    const _mesCh = await getMesDeOp(req.params.id);
+    if (_mesCh && await isMesCerrado(_mesCh))
+      return res.status(403).json({ success: false, data: null, error: `🔒 Mes ${_mesCh} cerrado — no se permiten modificaciones` });
+
     const {
       estado, observaciones, ejecutivo, dealer, patente, color, motor, chasis,
       // Campos de edición completa
@@ -631,6 +637,10 @@ const getOtorgadosIncompletos = async (req, res) => {
 const patchDatosIngresos = async (req, res) => {
   try {
     const { id } = req.params;
+    // Verificar mes cerrado
+    const _mesPatch = await getMesDeOp(id);
+    if (_mesPatch && await isMesCerrado(_mesPatch))
+      return res.status(403).json({ success: false, data: null, error: `🔒 Mes ${_mesPatch} cerrado — no se permiten modificaciones` });
     const CAMPOS_NUM  = ['plazo', 'tascli_real', 'seguro_rdh', 'seguro_cesantia', 'seguro_rep_menor', 'seguros', 'comdea_real', 'com_parque'];
     const CAMPOS_TEXT = ['parque'];
     const CAMPOS_PERMITIDOS = [...CAMPOS_NUM, ...CAMPOS_TEXT];
