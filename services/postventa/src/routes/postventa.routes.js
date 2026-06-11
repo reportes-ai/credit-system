@@ -8,7 +8,8 @@ router.post('/sync',             verifyToken, c.sync);
 router.post('/marcar-historico', verifyToken, c.marcarHistorico);
 router.get('/config',       verifyToken, c.getConfig);
 router.put('/config/:clave',verifyToken, requireFunc('postventa_mantenedores'), c.setConfig);
-router.get('/',             verifyToken, c.getAll);
+router.get('/perfiles-lista', verifyToken, c.getPerfiles);
+router.get('/',               verifyToken, c.getAll);
 router.put('/:id/etapa',    verifyToken, requireFunc('postventa_seguimiento'), c.setEtapa);
 
 module.exports = router;

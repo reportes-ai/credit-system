@@ -5,7 +5,7 @@
   <link rel="icon" href="/img/favicon.png" type="image/png">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Mantenedores Post Venta — AutoFácil</title>
-  <!-- v1.0 -->
+  <!-- v1.1 -->
   <link href="/css/bootstrap.min.css" rel="stylesheet">
   <link href="/css/bootstrap-icons.css" rel="stylesheet">
   <style>
@@ -21,16 +21,24 @@
     .avatar { width:28px; height:28px; background:#90caf9; border-radius:50%; display:flex; align-items:center; justify-content:center; color:var(--blue); font-weight:700; font-size:.75rem; }
     .perfil-badge { background:rgba(144,202,249,.2); border:1px solid rgba(144,202,249,.4); color:#90caf9; border-radius:12px; padding:2px 10px; font-size:.73rem; font-weight:600; }
     .btn-logout { background:rgba(255,255,255,.1); border:1px solid rgba(255,255,255,.2); color:#fff; border-radius:8px; padding:5px 12px; font-size:.82rem; cursor:pointer; }
-    .wrap { max-width:760px; margin:0 auto; padding:24px; }
+    .wrap { max-width:1100px; margin:0 auto; padding:24px; }
     .card-af { background:#fff; border-radius:14px; box-shadow:0 1px 4px rgba(0,0,0,.07); padding:18px 20px; margin-bottom:18px; }
     table { width:100%; border-collapse:collapse; font-size:.84rem; }
     th { background:#f8fafc; color:#475569; font-size:.72rem; text-transform:uppercase; padding:8px 10px; text-align:left; border-bottom:2px solid #e2e8f0; }
-    td { padding:7px 10px; border-bottom:1px solid #f1f5f9; }
-    select { border:1px solid #e2e8f0; border-radius:6px; padding:4px 8px; font-size:.8rem; }
+    td { padding:7px 10px; border-bottom:1px solid #f1f5f9; vertical-align:middle; }
+    select.est-sel { border:1px solid #e2e8f0; border-radius:6px; padding:4px 8px; font-size:.8rem; }
     .btn-af { background:linear-gradient(135deg,#0141A2,#0255c5); color:#fff; border:none; border-radius:9px; padding:8px 20px; font-size:.85rem; font-weight:700; cursor:pointer; }
     .alert-msg { border-radius:9px; padding:9px 14px; font-size:.83rem; margin-bottom:12px; display:none; }
-    .alert-msg.ok { background:#f0fdf4; border:1px solid #bbf7d0; color:#15803d; display:block; }
+    .alert-msg.ok  { background:#f0fdf4; border:1px solid #bbf7d0; color:#15803d; display:block; }
     .alert-msg.err { background:#fef2f2; border:1px solid #fecaca; color:#b91c1c; display:block; }
+    /* Listbox de perfiles */
+    .perfil-list { border:1px solid #e2e8f0; border-radius:8px; overflow:hidden; min-width:180px; max-width:260px; }
+    .perfil-list .pl-item { display:flex; align-items:center; gap:6px; padding:4px 8px; font-size:.78rem; cursor:pointer; border-bottom:1px solid #f1f5f9; user-select:none; }
+    .perfil-list .pl-item:last-child { border-bottom:none; }
+    .perfil-list .pl-item:hover { background:#eff6ff; }
+    .perfil-list .pl-item.sel { background:#e0eaff; color:#0141A2; font-weight:700; }
+    .perfil-list .pl-item input { margin:0; cursor:pointer; accent-color:#0141A2; }
+    .sin-restriccion { font-size:.72rem; color:#94a3b8; font-style:italic; }
   </style>
 </head>
 <body>
@@ -50,18 +58,22 @@
 
   <div class="card-af">
     <h5 style="font-weight:800;color:var(--navy)"><i class="bi bi-cash-stack me-2"></i>Estado Saldo Precio por Etapa</h5>
-    <p style="font-size:.8rem;color:#64748b">Estado equivalente cuando la etapa es la máxima alcanzada del crédito.</p>
-    <table><thead><tr><th>Etapa (máx. alcanzada)</th><th>Estado Saldo Precio</th></tr></thead>
-      <tbody id="bodySaldo"></tbody></table>
-    <div style="text-align:right;margin-top:12px"><button class="btn-af" onclick="guardar('etapas_saldo','bodySaldo')"><i class="bi bi-check-lg me-1"></i>Guardar</button></div>
+    <p style="font-size:.8rem;color:#64748b">Estado equivalente cuando la etapa es la máxima alcanzada del crédito. <b>Perfiles con acceso</b>: los perfiles que pueden marcar ese checkbox (vacío = todos).</p>
+    <table>
+      <thead><tr><th>Etapa (máx. alcanzada)</th><th>Estado Saldo Precio</th><th>Perfiles con acceso</th></tr></thead>
+      <tbody id="bodySaldo"></tbody>
+    </table>
+    <div style="text-align:right;margin-top:12px"><button class="btn-af" onclick="guardar('saldo')"><i class="bi bi-check-lg me-1"></i>Guardar</button></div>
   </div>
 
   <div class="card-af">
     <h5 style="font-weight:800;color:var(--navy)"><i class="bi bi-receipt me-2"></i>Estado Comisión por Etapa</h5>
-    <p style="font-size:.8rem;color:#64748b">Estado equivalente cuando la etapa es la máxima alcanzada del crédito.</p>
-    <table><thead><tr><th>Etapa (máx. alcanzada)</th><th>Estado Comisión</th></tr></thead>
-      <tbody id="bodyCom"></tbody></table>
-    <div style="text-align:right;margin-top:12px"><button class="btn-af" onclick="guardar('etapas_comision','bodyCom')"><i class="bi bi-check-lg me-1"></i>Guardar</button></div>
+    <p style="font-size:.8rem;color:#64748b">Estado equivalente cuando la etapa es la máxima alcanzada del crédito. <b>Perfiles con acceso</b>: los perfiles que pueden marcar ese checkbox (vacío = todos).</p>
+    <table>
+      <thead><tr><th>Etapa (máx. alcanzada)</th><th>Estado Comisión</th><th>Perfiles con acceso</th></tr></thead>
+      <tbody id="bodyCom"></tbody>
+    </table>
+    <div style="text-align:right;margin-top:12px"><button class="btn-af" onclick="guardar('comision')"><i class="bi bi-check-lg me-1"></i>Guardar</button></div>
   </div>
 </div>
 
@@ -76,32 +88,92 @@ function logout(){ sessionStorage.clear(); location.href='/login.html'; }
 const H = { 'Content-Type':'application/json', Authorization:'Bearer '+token };
 const ESTADOS = ['PENDIENTE','PARA PAGO','PAGADO'];
 const escH = s => String(s??'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
-let CFG = {};
+const ETAPAS_SISTEMA = ['FUNDANTES PENDIENTES','COMISION A PAGAR'];
+let CFG = {}, PERFILES = [];
 
 (async function init(){
-  const r = await fetch('/api/postventa/config', { headers:H });
-  const j = await r.json();
-  CFG = j.data || {};
-  pinta('etapas_saldo','bodySaldo');
-  pinta('etapas_comision','bodyCom');
+  const [rC, rP] = await Promise.all([
+    fetch('/api/postventa/config', { headers:H }),
+    fetch('/api/postventa/perfiles-lista', { headers:H }),
+  ]);
+  const jC = await rC.json(), jP = await rP.json();
+  CFG = jC.data || {};
+  PERFILES = jP.data || [];
+  pinta('saldo');
+  pinta('comision');
 })();
 
-function pinta(clave, bodyId){
-  const lista = CFG[clave]||[];
-  document.getElementById(bodyId).innerHTML = lista.map((x,i)=>`<tr>
-    <td><b>${escH(x.etapa)}</b></td>
-    <td><select data-i="${i}">${ESTADOS.map(e=>`<option${x.estado===e?' selected':''}>${e}</option>`).join('')}</select></td>
-  </tr>`).join('');
+function pinta(track){
+  const clave = track==='saldo' ? 'etapas_saldo' : 'etapas_comision';
+  const claveP = track==='saldo' ? 'etapa_perfiles_saldo' : 'etapa_perfiles_comision';
+  const lista = CFG[clave] || [];
+  const permisos = CFG[claveP] || [];
+  const bodyId = track==='saldo' ? 'bodySaldo' : 'bodyCom';
+
+  document.getElementById(bodyId).innerHTML = lista.map((x, i) => {
+    const esSistema = ETAPAS_SISTEMA.includes(x.etapa);
+    const selPerfils = permisos[i] || [];
+    const listboxHTML = esSistema
+      ? `<span class="sin-restriccion">Etapa de sistema (automática)</span>`
+      : `<div class="perfil-list" id="pl_${track}_${i}">
+          ${PERFILES.map(p => {
+            const sel = selPerfils.includes(p);
+            return `<label class="pl-item${sel?' sel':''}">
+              <input type="checkbox" value="${escH(p)}" ${sel?'checked':''}
+                onchange="togglePerfil(this,'${track}',${i})">
+              ${escH(p)}
+            </label>`;
+          }).join('')}
+          <div style="padding:3px 8px;font-size:.7rem;color:#94a3b8;border-top:1px solid #f1f5f9">
+            <i class="bi bi-info-circle me-1"></i>Vacío = todos los perfiles
+          </div>
+        </div>`;
+    return `<tr>
+      <td><b>${escH(x.etapa)}</b>${esSistema?'<span style="font-size:.68rem;color:#94a3b8;margin-left:6px">(sistema)</span>':''}</td>
+      <td><select class="est-sel" data-track="${track}" data-i="${i}"${esSistema?' disabled':''}>
+        ${ESTADOS.map(e=>`<option${x.estado===e?' selected':''}>${e}</option>`).join('')}
+      </select></td>
+      <td>${listboxHTML}</td>
+    </tr>`;
+  }).join('');
 }
 
-async function guardar(clave, bodyId){
-  const lista = (CFG[clave]||[]).map(x=>({...x}));
-  document.querySelectorAll('#'+bodyId+' select').forEach(s=>{ lista[parseInt(s.dataset.i)].estado = s.value; });
-  const r = await fetch('/api/postventa/config/'+clave, { method:'PUT', headers:H, body: JSON.stringify({ valor: lista }) });
-  const j = await r.json();
+function togglePerfil(chk, track, idx){
+  const lbl = chk.closest('label');
+  lbl.classList.toggle('sel', chk.checked);
+}
+
+async function guardar(track){
+  const clave  = track==='saldo' ? 'etapas_saldo'         : 'etapas_comision';
+  const claveP = track==='saldo' ? 'etapa_perfiles_saldo'  : 'etapa_perfiles_comision';
+  const lista  = (CFG[clave]||[]).map(x=>({...x}));
+  const bodyId = track==='saldo' ? 'bodySaldo' : 'bodyCom';
+
+  // Leer estados
+  document.querySelectorAll(`#${bodyId} .est-sel`).forEach(s=>{
+    lista[parseInt(s.dataset.i)].estado = s.value;
+  });
+
+  // Leer permisos por etapa
+  const permisos = lista.map((_, i) => {
+    const pl = document.getElementById(`pl_${track}_${i}`);
+    if (!pl) return []; // sistema
+    return [...pl.querySelectorAll('input[type=checkbox]:checked')].map(c=>c.value);
+  });
+
+  const [r1, r2] = await Promise.all([
+    fetch('/api/postventa/config/'+clave,  { method:'PUT', headers:H, body: JSON.stringify({ valor: lista }) }),
+    fetch('/api/postventa/config/'+claveP, { method:'PUT', headers:H, body: JSON.stringify({ valor: permisos }) }),
+  ]);
+  const [j1, j2] = await Promise.all([r1.json(), r2.json()]);
   const m = document.getElementById('msg');
-  if (j.success) { CFG[clave]=lista; m.textContent='Guardado en BD'; m.className='alert-msg ok'; }
-  else { m.textContent=j.error||'Error'; m.className='alert-msg err'; }
+  if (j1.success && j2.success) {
+    CFG[clave] = lista; CFG[claveP] = permisos;
+    m.textContent='Guardado correctamente'; m.className='alert-msg ok';
+  } else {
+    m.textContent=(j1.error||j2.error||'Error'); m.className='alert-msg err';
+  }
+  setTimeout(()=>m.className='alert-msg', 3000);
 }
 </script>
 <script src="/js/app-version.js"></script>

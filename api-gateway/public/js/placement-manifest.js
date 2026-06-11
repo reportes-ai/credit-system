@@ -14,7 +14,7 @@ const PLACEMENT_SECTIONS = {
   usuarios:      { label: 'Usuarios',             icon: 'bi-people',                 color: '#4b5563' },
   cartas:        { label: 'Cartas de Aprobación', icon: 'bi-envelope-paper',         color: '#5b21b6' },
   politica:      { label: 'Política',             icon: 'bi-shield-lock',            color: '#7c3aed' },
-  simulador:     { label: 'Simulador Rentabilidad', icon: 'bi-calculator',           color: '#0369a1' },
+  simulador:     { label: 'Simulador Rentabilidad', icon: 'bi-calculator',            color: '#0369a1' },
   carga_masiva:  { label: 'Carga Masiva',         icon: 'bi-cloud-upload',           color: '#0f766e' },
 };
 

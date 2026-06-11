@@ -261,10 +261,32 @@ function credHTML(r){
 function trackHTML(r, track, lista){
   const marc = {};
   r.etapas.filter(e=>e.track===track).forEach(e=>marc[e.etapa]=e);
+
+  // Índice de la última etapa marcada
+  let lastIdx = -1;
+  lista.forEach((x,i) => { if (marc[x.etapa]) lastIdx = i; });
+
+  const esAdmin = yo.perfil === 'Administrador';
+  const hoy = new Date().toISOString().slice(0,10);
+
   let fechaPrev = r.fecha_otorgado ? new Date(r.fecha_otorgado) : null;
   return lista.map((x,i) => {
     const m = marc[x.etapa];
-    const esSistema = i===0;   // primera etapa la marca el sistema al otorgar
+    const esSistema = i === 0;
+
+    // ¿Puede marcar? Etapa anterior debe estar marcada
+    const prevMarcado = i === 0 || !!marc[lista[i-1].etapa];
+    const canMark = !m && !esSistema && prevMarcado;
+
+    // ¿Puede desmarcar? Debe ser la última y marcada hoy (o admin)
+    const esHoy = m && new Date(m.fecha).toISOString().slice(0,10) === hoy;
+    const canUnmark = m && !esSistema && i === lastIdx && (esAdmin || esHoy);
+
+    const disabled = esSistema || (!m && !canMark) || (m && !canUnmark) ? 'disabled' : '';
+    let title = '';
+    if (!esSistema && !m && !canMark)   title = `Debes marcar primero "${lista[i-1]?.etapa}"`;
+    if (!esSistema && m && !canUnmark) title = esAdmin ? '' : (esHoy ? 'Solo puedes desmarcar la última etapa' : 'Solo puedes desmarcar etapas marcadas hoy');
+
     let dias = '';
     if (m && fechaPrev) {
       const d = Math.round((new Date(m.fecha) - fechaPrev)/86400000);
@@ -275,9 +297,9 @@ function trackHTML(r, track, lista){
       <div class="tit">${escH(x.etapa)}</div>
       <div class="usr">${m?escH(m.usuario||''):''}</div>
       <div>
-        <input type="checkbox" ${m?'checked':''} ${esSistema?'disabled':''}
+        <input type="checkbox" ${m?'checked':''} ${disabled} title="${escH(title)}"
           onchange="toggleEtapa(${r.id},'${track}','${escH(x.etapa)}',this)">
-        ${m?'':'<span class="pend"> Pendiente</span>'}
+        ${!m?`<span class="pend">${canMark?'Pendiente':'🔒'}</span>`:''}
       </div>
       <div class="fecha">${m?fmtF(m.fecha):''}</div>
       ${dias}

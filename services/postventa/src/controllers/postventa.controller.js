@@ -121,20 +121,81 @@ const setEtapa = async (req, res) => {
       return res.status(400).json({ success: false, data: null, error: 'track y etapa requeridos' });
     if (ETAPAS_SISTEMA.includes(etapa))
       return res.status(400).json({ success: false, data: null, error: 'Etapa de sistema — no editable' });
+
+    const esAdmin = req.usuario?.perfil === 'Administrador';
+    const usuario = loginDe(req.usuario);
+
+    // Cargar config para orden y permisos
+    const [[cfgRow]] = await pool.query(`SELECT valor FROM postventa_config WHERE clave = ?`,
+      [track === 'SALDO' ? 'etapas_saldo' : 'etapas_comision']);
+    const listaEtapas = cfgRow ? JSON.parse(cfgRow.valor) : [];
+    const idxEtapa = listaEtapas.findIndex(x => x.etapa === etapa);
+    if (idxEtapa < 0) return res.status(400).json({ success: false, data: null, error: 'Etapa no reconocida' });
+
+    // Validar permisos de perfil para esta etapa
+    if (!esAdmin) {
+      const cfgKey = track === 'SALDO' ? 'etapa_perfiles_saldo' : 'etapa_perfiles_comision';
+      const [[permRow]] = await pool.query(`SELECT valor FROM postventa_config WHERE clave = ?`, [cfgKey]);
+      if (permRow) {
+        const permisos = JSON.parse(permRow.valor); // array de arrays, índice = posición etapa
+        const permitidos = permisos[idxEtapa] || [];
+        if (permitidos.length && !permitidos.includes(req.usuario?.perfil))
+          return res.status(403).json({ success: false, data: null, error: `Tu perfil no tiene permiso para marcar "${etapa}"` });
+      }
+    }
+
+    // Etapas actualmente marcadas para este seguimiento
+    const [marcadas] = await pool.query(
+      `SELECT etapa, fecha FROM postventa_etapas WHERE id_seguimiento = ? AND track = ?`,
+      [req.params.id, track]);
+    const marcadasSet = new Set(marcadas.map(m => m.etapa));
+
     if (marcar) {
+      // Validación secuencial: la etapa anterior debe estar marcada
+      if (idxEtapa > 0) {
+        const etapaAnterior = listaEtapas[idxEtapa - 1].etapa;
+        if (!marcadasSet.has(etapaAnterior))
+          return res.status(400).json({ success: false, data: null, error: `Debes marcar primero "${etapaAnterior}"` });
+      }
       await pool.query(
         `INSERT INTO postventa_etapas (id_seguimiento, track, etapa, usuario) VALUES (?,?,?,?)
          ON DUPLICATE KEY UPDATE usuario = VALUES(usuario), fecha = NOW()`,
-        [req.params.id, track, etapa, loginDe(req.usuario)]);
+        [req.params.id, track, etapa, usuario]);
     } else {
+      // Validación desmarcar: debe ser la última marcada
+      let lastIdx = -1;
+      listaEtapas.forEach((x, i) => { if (marcadasSet.has(x.etapa)) lastIdx = i; });
+      if (idxEtapa !== lastIdx)
+        return res.status(400).json({ success: false, data: null, error: 'Solo puedes desmarcar la última etapa marcada' });
+
+      // Validación mismo día (solo no-admin)
+      if (!esAdmin) {
+        const fechaMarca = marcadas.find(m => m.etapa === etapa)?.fecha;
+        if (fechaMarca) {
+          const hoy = new Date().toISOString().slice(0, 10);
+          const diaM = new Date(fechaMarca).toISOString().slice(0, 10);
+          if (diaM !== hoy)
+            return res.status(403).json({ success: false, data: null, error: 'Solo puedes desmarcar etapas marcadas hoy' });
+        }
+      }
       await pool.query(
         'DELETE FROM postventa_etapas WHERE id_seguimiento = ? AND track = ? AND etapa = ?',
         [req.params.id, track, etapa]);
     }
-    res.json({ success: true, data: { id: Number(req.params.id), etapa, marcado: !!marcar, usuario: loginDe(req.usuario) }, error: null });
+    res.json({ success: true, data: { id: Number(req.params.id), etapa, marcado: !!marcar, usuario }, error: null });
   } catch (e) {
     console.error('[postventa etapa]', e.message);
     res.status(500).json({ success: false, data: null, error: 'Error interno del servidor' });
+  }
+};
+
+/* ── GET /api/postventa/perfiles-lista ─── */
+const getPerfiles = async (req, res) => {
+  try {
+    const [rows] = await pool.query('SELECT nombre FROM perfiles ORDER BY nombre');
+    res.json({ success: true, data: rows.map(r => r.nombre), error: null });
+  } catch (e) {
+    res.status(500).json({ success: false, data: null, error: e.message });
   }
 };
 
@@ -190,4 +251,4 @@ const marcarHistorico = async (req, res) => {
   }
 };
 
-module.exports = { sync, getAll, setEtapa, getConfig, setConfig, marcarHistorico };
+module.exports = { sync, getAll, setEtapa, getConfig, setConfig, marcarHistorico, getPerfiles };
