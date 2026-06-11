@@ -5,7 +5,7 @@
   <link rel="icon" href="/img/favicon.png" type="image/png">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Aprobaciones — AutoFácil</title>
-  <!-- v2.8 -->
+  <!-- v2.9 -->
   <link href="/css/bootstrap.min.css" rel="stylesheet">
   <link href="/css/bootstrap-icons.css" rel="stylesheet">
   <style>
@@ -285,7 +285,8 @@
       <div class="ff"><label>Marca *</label><select id="cMarca" onchange="cargarModelos()"><option value="">Cargando…</option></select></div>
       <div class="ff"><label>Modelo *</label><select id="cModelo" onchange="cargarAnios()"><option value="">—</option></select></div>
       <div class="ff"><label>Año *</label><select id="cAnio"><option value="">—</option></select></div>
-      <div class="ff"><label>Patente</label><input id="cPatente" placeholder="ABCD12 (vacío si 0 km)"></div>
+      <div class="ff"><label>Patente</label><input id="cPatente" placeholder="ABCD12 (vacío si 0 km)" maxlength="6" oninput="fmtPatente(this)">
+        <div id="patMsg" style="font-size:.72rem;margin-top:3px;font-weight:600"></div></div>
       <div class="ff"><label>Prenda vehículo</label><select id="cPrenda"><option>SI</option><option>NO</option></select></div>
 
       <div class="sec-form">Montos y plazo</div>
@@ -878,6 +879,25 @@ function fmtRutInput(input){
                        : '<span style="color:#dc2626"><i class="bi bi-x-circle"></i> Dígito verificador incorrecto</span>';
   } else { msg.textContent=''; input.style.borderColor=''; }
 }
+/* ── Patente: 4 letras + 2 números (LLLL99), mayúsculas automáticas ── */
+function fmtPatente(input){
+  // Posiciones 1-4 solo letras, 5-6 solo números; mayúsculas al vuelo
+  let v = input.value.toUpperCase().replace(/[^A-Z0-9]/g,'').slice(0,6);
+  let limpio = '';
+  for (const ch of v) {
+    if (limpio.length < 4) { if (/[A-Z]/.test(ch)) limpio += ch; }
+    else { if (/[0-9]/.test(ch)) limpio += ch; }
+  }
+  input.value = limpio;
+  const msg = document.getElementById('patMsg');
+  if (!limpio) { msg.textContent=''; input.style.borderColor=''; return; }
+  const ok = patenteValida(limpio);
+  input.style.borderColor = ok ? '#16a34a' : '#dc2626';
+  msg.innerHTML = ok ? '<span style="color:#16a34a"><i class="bi bi-check-circle"></i> Patente válida</span>'
+                     : '<span style="color:#dc2626"><i class="bi bi-x-circle"></i> Formato: 4 letras + 2 números (ABCD12)</span>';
+}
+const patenteValida = v => /^[A-Z]{4}[0-9]{2}$/.test(v);
+
 const rutLimpio = () => document.getElementById('cRut').value.replace(/[^0-9kK]/g,'').toUpperCase();
 function rutValido(){
   const l = rutLimpio();
@@ -1222,6 +1242,8 @@ async function guardarCarta(){
   if (!rawMoney('cMontoCred')) { setFormAlert('Falta: Monto crédito'); return; }
   const tasaIngresada = parseFloat(String(document.getElementById('cTasa').value).replace(',','.'));
   if (isNaN(tasaIngresada) || tasaIngresada <= 0) { setFormAlert('Falta: Tasa crédito (%) — obligatoria para comparar contra pizarra'); return; }
+  const patenteVal = document.getElementById('cPatente').value.trim();
+  if (patenteVal && !patenteValida(patenteVal)) { setFormAlert('Patente inválida — formato: 4 letras + 2 números (ABCD12), o déjala vacía si es 0 km'); return; }
 
   // Financiera bloqueada → no se puede grabar
   const finSel = document.getElementById('cAcreedor').value;
