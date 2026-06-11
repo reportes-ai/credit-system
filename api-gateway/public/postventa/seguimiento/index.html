@@ -5,7 +5,7 @@
   <link rel="icon" href="/img/favicon.png" type="image/png">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Seguimiento Post Venta — AutoFácil</title>
-  <!-- v1.0 -->
+  <!-- v1.1 -->
   <link href="/css/bootstrap.min.css" rel="stylesheet">
   <link href="/css/bootstrap-icons.css" rel="stylesheet">
   <style>
@@ -22,14 +22,11 @@
     .perfil-badge { background:rgba(144,202,249,.2); border:1px solid rgba(144,202,249,.4); color:#90caf9; border-radius:12px; padding:2px 10px; font-size:.73rem; font-weight:600; }
     .btn-logout { background:rgba(255,255,255,.1); border:1px solid rgba(255,255,255,.2); color:#fff; border-radius:8px; padding:5px 12px; font-size:.82rem; cursor:pointer; }
     .wrap { max-width:1500px; margin:0 auto; padding:18px 24px; }
-    /* chips resumen */
-    .chips { display:flex; gap:10px; flex-wrap:wrap; margin-bottom:14px; }
-    .chip { background:linear-gradient(135deg,#0b3a8c,#0255c5); color:#fff; border-radius:10px; padding:10px 16px; min-width:150px; text-align:center; box-shadow:0 2px 8px rgba(1,65,162,.25); }
-    .chip b { display:block; font-size:.78rem; letter-spacing:.02em; }
-    .chip span { font-size:.74rem; opacity:.9; }
     /* filtros */
-    .filtros { background:#fff; border-radius:12px; padding:12px 16px; box-shadow:0 1px 4px rgba(0,0,0,.07); margin-bottom:14px; }
-    .toggle { border:1.5px solid #cbd5e1; background:#fff; color:#475569; border-radius:16px; padding:3px 12px; font-size:.74rem; font-weight:600; cursor:pointer; margin:2px; }
+    .filtros { background:#fff; border-radius:12px; padding:12px 16px; box-shadow:0 2px 10px rgba(0,0,0,.1); margin-bottom:14px; position:sticky; top:60px; z-index:200; }
+    .toggle { border:1.5px solid #cbd5e1; background:#fff; color:#475569; border-radius:12px; padding:3px 12px; font-size:.74rem; font-weight:600; cursor:pointer; margin:2px; text-align:center; vertical-align:top; }
+    .toggle .tsub { display:block; font-size:.62rem; font-weight:600; color:#94a3b8; line-height:1.2; }
+    .toggle.on .tsub { color:rgba(255,255,255,.85); }
     .toggle.on { background:var(--blue); border-color:var(--blue); color:#fff; }
     .toggle.fin.on { background:#0e7490; border-color:#0e7490; }
     .flbl { font-size:.68rem; font-weight:800; text-transform:uppercase; color:#94a3b8; margin:6px 8px 2px 2px; }
@@ -66,11 +63,10 @@
 </nav>
 
 <div class="wrap">
-  <div class="chips" id="chips"></div>
-
   <div class="filtros">
     <input type="text" id="fBuscar" placeholder="Buscar OP, RUT, dealer, ejecutivo, saldo…" oninput="render()"
       style="width:100%;border:1.5px solid #e2e8f0;border-radius:8px;padding:7px 12px;font-size:.85rem;margin-bottom:6px">
+    <div><span class="flbl">Mes Otorgamiento:</span><span id="fMeses"></span></div>
     <div><span class="flbl">Financiera:</span><span id="fFinancieras"></span></div>
     <div><span class="flbl">Etapa Saldo Precio:</span><span id="fSaldo"></span></div>
     <div><span class="flbl">Etapa Comisión:</span><span id="fComision"></span></div>
@@ -95,8 +91,11 @@ const escH = s => String(s??'').replace(/&/g,'&amp;').replace(/</g,'&lt;').repla
 const fmtF = f => { if(!f) return ''; const d=new Date(f); return isNaN(d)?'':d.toLocaleDateString('es-CL'); };
 
 let DATA = [], CFG = { etapas_saldo:[], etapas_comision:[] };
-let selFin = new Set(), selSaldo = new Set(), selCom = new Set();
+let selFin = new Set(), selSaldo = new Set(), selCom = new Set(), selMes = new Set();
 const FINANCIERAS = ['AUTOFIN','UNIDAD DE CREDITO','AUTOFACIL'];
+const MESES_N = ['ENE','FEB','MAR','ABR','MAY','JUN','JUL','AGO','SEP','OCT','NOV','DIC'];
+const mesDe = f => { if(!f) return ''; const d=new Date(f); return isNaN(d)?'':d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0'); };
+const mesLbl = m => MESES_N[parseInt(m.slice(5))-1]+' '+m.slice(0,4);
 
 (async function init(){
   try { await fetch('/api/postventa/sync', { method:'POST', headers:H }); } catch(e) {}
@@ -125,9 +124,9 @@ function estadoDe(etapa, track){
 }
 
 function renderFiltros(){
-  const mk = (cont, items, set, cls, cb) => {
+  const mk = (cont, items, set, cls, lblFn) => {
     document.getElementById(cont).innerHTML = items.map(i =>
-      `<button class="toggle ${cls}" data-v="${escH(i)}">${escH(i)}</button>`).join('');
+      `<button class="toggle ${cls}" data-v="${escH(i)}">${escH(lblFn?lblFn(i):i)}<span class="tsub" data-sub="${escH(i)}"></span></button>`).join('');
     document.getElementById(cont).querySelectorAll('.toggle').forEach(b=>{
       b.addEventListener('click', ()=>{
         const v=b.dataset.v;
@@ -139,35 +138,50 @@ function renderFiltros(){
   };
   // financieras normalizadas según datos reales + las 3 conocidas
   const fins = [...new Set([...FINANCIERAS, ...DATA.map(r=>String(r.financiera||'').toUpperCase()).filter(Boolean)])];
+  const meses = [...new Set(DATA.map(r=>mesDe(r.fecha_otorgado)).filter(Boolean))].sort().reverse();
+  mk('fMeses', meses, selMes, '', mesLbl);
   mk('fFinancieras', fins, selFin, 'fin');
   mk('fSaldo', CFG.etapas_saldo.map(x=>x.etapa), selSaldo, '');
   mk('fComision', CFG.etapas_comision.map(x=>x.etapa), selCom, '');
 }
 
-function filtrar(){
+/* skip = dimensión a ignorar (para calcular los totales de sus propios toggles) */
+function filtrar(skip){
   const q = (document.getElementById('fBuscar').value||'').toLowerCase();
   return DATA.filter(r => {
-    if (selFin.size && !selFin.has(String(r.financiera||'').toUpperCase())) return false;
-    if (selSaldo.size && !selSaldo.has(etapaActual(r,'SALDO'))) return false;
-    if (selCom.size && !selCom.has(etapaActual(r,'COMISION'))) return false;
+    if (skip!=='mes' && selMes.size && !selMes.has(mesDe(r.fecha_otorgado))) return false;
+    if (skip!=='fin' && selFin.size && !selFin.has(String(r.financiera||'').toUpperCase())) return false;
+    if (skip!=='saldo' && selSaldo.size && !selSaldo.has(etapaActual(r,'SALDO'))) return false;
+    if (skip!=='com' && selCom.size && !selCom.has(etapaActual(r,'COMISION'))) return false;
     if (q && ![r.num_op, r.nombre_dealer, r.rut_dealer, r.ejecutivo, r.financiera,
                String(r.saldo_precio), String(r.comision)].some(v=>String(v||'').toLowerCase().includes(q))) return false;
     return true;
   });
 }
 
+function setSubs(cont, agg, montoLbl){
+  document.querySelectorAll('#'+cont+' .tsub').forEach(el=>{
+    const a = agg[el.dataset.sub];
+    el.textContent = a ? a.n+' ops · '+fmtCLP(a.s) : '0 ops';
+  });
+}
+function aggPor(rows, keyFn, montoFn){
+  const agg = {};
+  rows.forEach(r => {
+    const k = keyFn(r); if(!k) return;
+    (agg[k] = agg[k]||{n:0,s:0}); agg[k].n++; agg[k].s += +montoFn(r)||0;
+  });
+  return agg;
+}
+
 function render(){
   const rows = filtrar();
   document.getElementById('contador').textContent = rows.length + ' crédito(s)';
-  // chips: cuántos están HOY en cada etapa de saldo (count × suma)
-  const agg = {};
-  rows.forEach(r => {
-    const et = etapaActual(r,'SALDO') || '—';
-    (agg[et] = agg[et]||{n:0,s:0}); agg[et].n++; agg[et].s += +r.saldo_precio||0;
-  });
-  document.getElementById('chips').innerHTML = CFG.etapas_saldo
-    .filter(x=>agg[x.etapa]).map(x =>
-      `<div class="chip"><b>${escH(x.etapa)}</b><span>${agg[x.etapa].n} x ${fmtCLP(agg[x.etapa].s)}</span></div>`).join('');
+  // totales dentro de cada toggle (cada dimensión se calcula ignorando su propia selección)
+  setSubs('fMeses',       aggPor(filtrar('mes'),   r=>mesDe(r.fecha_otorgado),                  r=>r.saldo_precio));
+  setSubs('fFinancieras', aggPor(filtrar('fin'),   r=>String(r.financiera||'').toUpperCase(),   r=>r.saldo_precio));
+  setSubs('fSaldo',       aggPor(filtrar('saldo'), r=>etapaActual(r,'SALDO'),                   r=>r.saldo_precio));
+  setSubs('fComision',    aggPor(filtrar('com'),   r=>etapaActual(r,'COMISION'),                r=>r.comision));
 
   const lista = document.getElementById('lista');
   if (!rows.length) { lista.innerHTML = '<div style="text-align:center;color:#94a3b8;padding:30px">Sin créditos para los filtros</div>'; return; }
