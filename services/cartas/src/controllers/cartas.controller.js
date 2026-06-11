@@ -2,6 +2,68 @@
 const pool = require('../../../../shared/config/database');
 const { notificar } = require('../../../notificaciones/src/controllers/notificaciones.controller');
 
+/* Genera numero_credito igual que creditos.controller (YYMMXXX) */
+async function generarNumeroCreditoDesdeCartas() {
+  const hoy = new Date();
+  const yy = String(hoy.getFullYear()).slice(-2);
+  const mm = String(hoy.getMonth() + 1).padStart(2, '0');
+  const prefix = `${yy}${mm}`;
+  const [[row]] = await pool.query(
+    `SELECT numero_credito FROM creditos WHERE numero_credito LIKE ? ORDER BY id DESC LIMIT 1`,
+    [prefix + '%']
+  );
+  const seq = row ? parseInt(row.numero_credito.slice(4)) + 1 : 1;
+  return prefix + String(seq).padStart(3, '0');
+}
+
+/* Crea registro en creditos a partir de una carta y devuelve { id, numero_credito } */
+async function crearCreditoDesdeCartas(c) {
+  const rutNorm = (c.rut_cliente || c.rutCliente || '').replace(/\./g, '').toUpperCase().trim();
+  const [[cliRow]] = await pool.query('SELECT id_cliente FROM clientes WHERE rut = ? LIMIT 1', [rutNorm]).catch(() => [[null]]);
+  const numero_credito = await generarNumeroCreditoDesdeCartas();
+  // Mapear acreedor → financiera
+  const finMap = { 'AUTOFIN': 'AUTOFIN', 'AUTOFACIL': 'AUTOFACIL', 'UNIDAD': 'UNIDAD DE CREDITO', 'UNIDAD DE CREDITO': 'UNIDAD DE CREDITO' };
+  const financiera = finMap[(c.acreedor || '').toUpperCase()] || 'AUTOFACIL';
+  const saldo = c.saldo || null;
+  const precio = c.precio_venta || c.precioVenta || null;
+  const pie = c.pie || null;
+  const pct = (precio && saldo) ? saldo / precio : null;
+
+  const [r] = await pool.query(`
+    INSERT INTO creditos
+      (numero_credito, financiera, estado_eval, estado,
+       id_cliente, rut_concesionario, vendedor,
+       fecha_otorgado, mes, valor_vehiculo, pie, saldo_precio, pct_financiado,
+       monto_financiado, plazo, tascli_real,
+       tipo_vehiculo, marca, modelo, anio, patente,
+       automotora, ejecutivo, comdea_real,
+       created_at, updated_at)
+    VALUES (?,?,
+            'OTORGADO','INGRESO',
+            ?,?,?,
+            NULL, DATE_FORMAT(NOW(),'%Y-%m-01'), ?,?,?,?,
+            ?,?,?,
+            ?,?,?,?,?,
+            ?,?,?,
+            NOW(),NOW())
+  `, [
+    numero_credito, financiera,
+    cliRow?.id_cliente || null,
+    (c.rut_conc || c.rutConc || null),
+    (c.vendedor || null),
+    precio, pie, saldo, pct,
+    (c.monto_credito_clp || c.montoCreditoCLP || null),
+    (c.plazo || null),
+    (c.tasa_credito || c.tasaCredito || null),
+    (c.tipo_vehiculo || c.tipoVehiculo || null),
+    (c.marca || null), (c.modelo || null), (c.anio || null), (c.patente || null),
+    (c.concesionario || null),
+    (c.ejecutivo_nombre || c.ejecutivoNombre || null),
+    (c.part_bruto || c.partBruto || null),
+  ]);
+  return { id: r.insertId, numero_credito };
+}
+
 /* Usuarios activos con permiso de revisar cartas (incluye Administradores) */
 async function idsRevisores(excluirEmail) {
   const [rows] = await pool.query(
@@ -322,9 +384,24 @@ const upsert = async (req, res) => {
         [...vals, c.id]
       );
       res.json({ success: true, data: { id: c.id }, error: null });
+      // Sincronizar estado del crédito vinculado
+      if (c.idCreditoCreado || c.id_credito_creado) {
+        const idCred = c.idCreditoCreado || c.id_credito_creado;
+        if (c.status === 'APROBADA') {
+          pool.query(`UPDATE creditos SET estado='CARTA_APROBACION', updated_at=NOW() WHERE id=? AND estado='INGRESO'`, [idCred]).catch(e => console.error('[carta→credito estado]', e.message));
+        } else if (c.status === 'RECHAZADA') {
+          pool.query(`UPDATE creditos SET estado='INGRESO', updated_at=NOW() WHERE id=? AND estado='CARTA_APROBACION'`, [idCred]).catch(e => console.error('[carta→credito estado]', e.message));
+        }
+      }
       notificarCambios(c, prevStatus);
     } else {
-      // INSERT nuevo
+      // INSERT nuevo: crear crédito asociado primero
+      let credCreado = null;
+      try { credCreado = await crearCreditoDesdeCartas(c); } catch(e) { console.error('[carta→credito]', e.message); }
+      if (credCreado) {
+        vals[vals.length - 2] = credCreado.numero_credito; // numero_credito_creado
+        vals[vals.length - 1] = credCreado.id;             // id_credito_creado
+      }
       const [r] = await pool.query(
         `INSERT INTO cartas_aprobacion (
           op_carta, op_origen, tipo,
@@ -352,7 +429,7 @@ const upsert = async (req, res) => {
         ) VALUES (${vals.map(() => '?').join(',')})`,
         vals
       );
-      res.status(201).json({ success: true, data: { id: r.insertId }, error: null });
+      res.status(201).json({ success: true, data: { id: r.insertId, numero_credito_creado: credCreado?.numero_credito || null }, error: null });
       notificarCambios(c, null);
     }
   } catch (e) {
