@@ -122,7 +122,7 @@ const setEtapa = async (req, res) => {
     if (ETAPAS_SISTEMA.includes(etapa))
       return res.status(400).json({ success: false, data: null, error: 'Etapa de sistema — no editable' });
 
-    const esAdmin = req.usuario?.perfil === 'Administrador';
+    const esAdmin = req.usuario?.perfil_nombre === 'Administrador';
     const usuario = loginDe(req.usuario);
 
     // Cargar config para orden y permisos
@@ -139,7 +139,7 @@ const setEtapa = async (req, res) => {
       if (permRow) {
         const permisos = JSON.parse(permRow.valor); // array de arrays, índice = posición etapa
         const permitidos = permisos[idxEtapa] || [];
-        if (permitidos.length && !permitidos.includes(req.usuario?.perfil))
+        if (permitidos.length && !permitidos.includes(req.usuario?.perfil_nombre))
           return res.status(403).json({ success: false, data: null, error: `Tu perfil no tiene permiso para marcar "${etapa}"` });
       }
     }
