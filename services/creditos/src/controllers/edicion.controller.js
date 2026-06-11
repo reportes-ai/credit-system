@@ -24,8 +24,6 @@ const { isMesCerrado } = require('../../../../shared/utils/mes-cerrado');
 
 // Campos editables y sus etiquetas
 const CAMPOS_EDIT = [
-  { col:'num_op',             label:'N° Operación',        tipo:'text'   },
-  { col:'numero_credito',     label:'N° Crédito',          tipo:'text'   },
   { col:'financiera',         label:'Financiera',          tipo:'select', ops:['AUTOFACIL','AUTOFIN','UNIDAD DE CREDITO'] },
   { col:'estado',             label:'Estado',              tipo:'select', ops:['INGRESO','CARTA_APROBACION','EMISION_DOCUMENTOS','CARGA_DOCUMENTOS_AF','VALIDACION_FIRMA','VIGENTE','EN MORA','CANCELADO','PREPAGADO','CASTIGADO','OTORGADO','CURSADO','DESISTIDO'] },
   { col:'fecha_otorgado',     label:'Fecha Otorgado',      tipo:'date'   },
