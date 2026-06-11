@@ -1,5 +1,10 @@
 # Credit System — AutoFácil Crédito Automotriz
 
+## Estilo de Respuestas (OBLIGATORIO)
+- Respuestas CORTAS: solo lo necesario, sin tablas ni secciones decorativas
+- No repetir lo que el usuario ya sabe ni explicar lo obvio
+- Ahorrar tokens: ir directo al resultado y al siguiente paso si existe
+
 ## Stack
 - Backend: Express.js + Node.js (servicios independientes en /services/)
 - BD: TiDB Cloud (MySQL-compatible) — pool compartido en shared/config/database.js
