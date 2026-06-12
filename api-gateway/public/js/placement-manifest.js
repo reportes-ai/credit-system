@@ -83,6 +83,7 @@ const PLACEMENT_ITEMS = {
   'vista-pantallas':         { section:'mantenedores',  href:'/mantenedores/vista-pantallas/',    icon:'bi-layout-wtf',             titulo:'Vista Pantallas' },
   'presupuesto':             { section:'mantenedores',  href:'/mantenedores/presupuesto/',        icon:'bi-clipboard-data',         titulo:'Presupuesto' },
   'ayuda':                   { section:'mantenedores',  href:'/mantenedores/ayuda/',              icon:'bi-question-circle',        titulo:'Ayuda' },
+  'alertas':                 { section:'mantenedores',  href:'/mantenedores/alertas/',            icon:'bi-bell-fill',              titulo:'Alertas' },
   'solo-dios':               { section:'mantenedores',  href:'/mantenedores/solo-dios/',          icon:'bi-lightning-charge-fill',  titulo:'SOLO DIOS' },
   // ── CARGA MASIVA ──────────────────────────────────────────────────────────
   'cm-cargar':               { section:'carga_masiva',  href:'/carga-masiva/#secAutofacil',       icon:'bi-upload',                 titulo:'Cargar' },

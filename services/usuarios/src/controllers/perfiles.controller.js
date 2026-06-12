@@ -1654,4 +1654,26 @@ const getUsuariosByPerfil = async (req, res) => {
   } catch (e) { console.error('[perfiles migration v22]', e.message); }
 })();
 
+/* ─── Migración v23: funcionalidad Alertas bajo Mantenedores ─ */
+(async () => {
+  try {
+    const [[modMan]] = await pool.query(
+      "SELECT id_modulo FROM modulos WHERE nombre='Mantenedores' AND estado='activo'");
+    if (!modMan) return;
+    const [[adm]] = await pool.query("SELECT id_perfil FROM perfiles WHERE nombre='Administrador' LIMIT 1");
+    const [[ex]] = await pool.query("SELECT id_funcionalidad FROM funcionalidades WHERE codigo='mantenedores_alertas'");
+    let idF = ex?.id_funcionalidad;
+    if (!idF) {
+      const [ins] = await pool.query(
+        'INSERT INTO funcionalidades (id_modulo, nombre, codigo, href, icono) VALUES (?,?,?,?,?)',
+        [modMan.id_modulo, 'Alertas', 'mantenedores_alertas', '/mantenedores/alertas/', 'bi-bell-fill']);
+      idF = ins.insertId;
+    }
+    if (adm) await pool.query(
+      'INSERT IGNORE INTO permisos_perfil (id_perfil, id_funcionalidad, habilitado) VALUES (?,?,1)',
+      [adm.id_perfil, idF]);
+    console.log('✓ Perfiles v23: funcionalidad Alertas registrada');
+  } catch (e) { console.error('[perfiles migration v23]', e.message); }
+})();
+
 module.exports = { getAllPerfiles, getModulosConFuncionalidades, getPermisosPerfil, updatePermisosPerfil, reordenarModulos, createPerfil, updatePerfil, deletePerfil, getUsuariosByPerfil };

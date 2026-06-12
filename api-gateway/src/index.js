@@ -118,6 +118,9 @@ app.use('/api/dashboard', require('../../services/dashboard/src/routes/dashboard
 // Ayuda contextual (botón "?")
 app.use('/api/ayuda', require('../../services/ayuda/src/routes/ayuda.routes'));
 
+// Motor de alertas configurable
+app.use('/api/alertas', require('../../services/alertas/src/routes/alertas.routes'));
+
 // CRM
 app.use('/api/crm', require('../../services/crm/src/routes/gestiones.routes'));
 
@@ -172,6 +175,8 @@ app.get(['/mantenedores/presupuesto', '/mantenedores/presupuesto/'], (req, res) 
   res.sendFile(path.join(__dirname, '../public/mantenedores/presupuesto/index.html')));
 app.get(['/mantenedores/ayuda', '/mantenedores/ayuda/'], (req, res) =>
   res.sendFile(path.join(__dirname, '../public/mantenedores/ayuda/index.html')));
+app.get(['/mantenedores/alertas', '/mantenedores/alertas/'], (req, res) =>
+  res.sendFile(path.join(__dirname, '../public/mantenedores/alertas/index.html')));
 app.get(['/mantenedores/tasas', '/mantenedores/tasas/'], (req, res) =>
   res.sendFile(path.join(__dirname, '../public/mantenedores/tasas/index.html')));
 app.get(['/mantenedores/uf', '/mantenedores/uf/'], (req, res) =>
