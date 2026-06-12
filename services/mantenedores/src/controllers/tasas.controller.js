@@ -65,7 +65,8 @@ const create = async (req, res) => {
 
     const mensual_menor = Math.round((parseFloat(tasa_anual_menor) / 12) * 10000) / 10000;
     const mensual_mayor = Math.round((parseFloat(tasa_anual_mayor) / 12) * 10000) / 10000;
-    const sp_mayor = spread_mayor !== undefined && spread_mayor !== '' ? parseFloat(spread_mayor) : null;
+    const sp_mayor = (spread_mayor !== undefined && spread_mayor !== '' && spread_mayor !== null && !isNaN(parseFloat(spread_mayor)))
+      ? parseFloat(spread_mayor) : null;
     // CF = mensual_mayor - spread_mayor; spread implícito ≤200 = mensual_menor - CF
     const sp_menor = sp_mayor !== null
       ? Math.round((mensual_menor - mensual_mayor + sp_mayor) * 10000) / 10000
@@ -91,7 +92,8 @@ const update = async (req, res) => {
 
     const mensual_menor = Math.round((parseFloat(tasa_anual_menor) / 12) * 10000) / 10000;
     const mensual_mayor = Math.round((parseFloat(tasa_anual_mayor) / 12) * 10000) / 10000;
-    const sp_mayor = spread_mayor !== undefined && spread_mayor !== '' ? parseFloat(spread_mayor) : null;
+    const sp_mayor = (spread_mayor !== undefined && spread_mayor !== '' && spread_mayor !== null && !isNaN(parseFloat(spread_mayor)))
+      ? parseFloat(spread_mayor) : null;
     const sp_menor = sp_mayor !== null
       ? Math.round((mensual_menor - mensual_mayor + sp_mayor) * 10000) / 10000
       : null;
