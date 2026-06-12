@@ -47,11 +47,13 @@
 @media (max-width: 700px)  { .modules-grid, .cards-grid, .ap-grid, .reports-grid { grid-template-columns: repeat(2, 1fr) !important; } }
 @media (max-width: 480px)  { .modules-grid, .cards-grid, .ap-grid, .reports-grid { grid-template-columns: 1fr !important; } }
 
-/* Card: tamaño uniforme, contenido en columna, botón anclado abajo. */
-.modules-grid  > .module-card,
-.cards-grid    > .module-card,
-.ap-grid       > .ap-card,
-.reports-grid  > .report-card {
+/* Card: tamaño uniforme, contenido en columna, botón anclado abajo.
+   :not([style*="none"]) → NO forzar display en cards ocultas por permisos
+   (las que tienen style="display:none"), si no se "destaparían" sin permiso. */
+.modules-grid  > .module-card:not([style*="none"]),
+.cards-grid    > .module-card:not([style*="none"]),
+.ap-grid       > .ap-card:not([style*="none"]),
+.reports-grid  > .report-card:not([style*="none"]) {
   display: flex !important;
   flex-direction: column !important;
   min-height: 215px !important;
