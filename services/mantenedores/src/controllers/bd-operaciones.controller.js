@@ -1,5 +1,6 @@
 'use strict';
 const pool = require('../../../../shared/config/database');
+const { isMesCerrado, getMesDeOp } = require('../../../../shared/utils/mes-cerrado');
 
 /* Columnas a excluir de la vista (internas/sensibles) */
 const EXCLUIR = ['datos_json'];
@@ -78,13 +79,9 @@ const update = async (req, res) => {
       return res.status(400).json({ success: false, data: null, error: 'Sin datos' });
 
     // Verificar si el mes de la operación está cerrado
-    const [[op]] = await pool.query('SELECT mes FROM creditos WHERE id = ? LIMIT 1', [id]);
-    if (op?.mes) {
-      const mesFmt = String(op.mes).slice(0, 7);
-      const [mc] = await pool.query('SELECT cerrado FROM meses_cerrados WHERE mes = ? LIMIT 1', [mesFmt]);
-      if (mc.length && mc[0].cerrado) {
-        return res.status(403).json({ success: false, data: null, error: `🔒 Mes ${mesFmt} cerrado — no se permiten modificaciones` });
-      }
+    const mes = await getMesDeOp(id);
+    if (mes && await isMesCerrado(mes)) {
+      return res.status(403).json({ success: false, data: null, error: `🔒 Mes ${mes} cerrado — no se permiten modificaciones` });
     }
 
     // Validar columnas

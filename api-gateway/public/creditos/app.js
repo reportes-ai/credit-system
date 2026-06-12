@@ -1500,7 +1500,7 @@ async function cargarModoEdicion(idCredito) {
     document.getElementById('iRut').value          = c.rut_cliente  || '';
     document.getElementById('iNombreCliente').value = c.nombre_cliente || '';
     document.getElementById('iFinanciera').value    = c.financiera   || 'AUTOFACIL';
-    document.getElementById('iEjecutivo').value     = c.ejecutivo    || '';
+    setEjecutivoCred(c.ejecutivo || '');
     document.getElementById('iEstado').value        = c.estado       || 'INGRESO';
     document.getElementById('iObservaciones').value = c.observaciones || '';
 
@@ -1579,10 +1579,47 @@ function cancelarEdicion() {
   }
 }
 
+/* ─── Ejecutivos (select con default = usuario logueado) ───────────── */
+let _ejecutivosCred = [];
+async function cargarEjecutivosCred() {
+  const sel = document.getElementById('iEjecutivo');
+  if (!sel) return;
+  try {
+    const r = await fetch('/api/cartas-ejecutivos', { headers: apiHdr() });
+    const j = await r.json();
+    _ejecutivosCred = j.data || [];
+  } catch (e) { _ejecutivosCred = []; }
+  const prev = sel.value; // preservar valor (ej. modo edición ya cargado)
+  sel.innerHTML = '<option value="">— Seleccione —</option>' +
+    _ejecutivosCred.map(e => `<option value="${e.nombre}">${e.nombre}</option>`).join('');
+  if (prev) { setEjecutivoCred(prev); return; }
+  // Default: ejecutivo comercial = usuario logueado (calce por mail; se muestra el nombre)
+  if (!_modoEditar) {
+    const yo = JSON.parse(sessionStorage.getItem('usuario') || 'null');
+    const miMail = yo && yo.email ? yo.email.toLowerCase().trim() : '';
+    if (miMail) {
+      const m = _ejecutivosCred.find(e => (e.mail || '').toLowerCase().trim() === miMail);
+      if (m) sel.value = m.nombre;
+    }
+  }
+}
+// Setea el ejecutivo en el select; si no está en la lista, lo agrega como opción
+function setEjecutivoCred(nombre) {
+  const sel = document.getElementById('iEjecutivo');
+  if (!sel) return;
+  if (nombre && !Array.from(sel.options).some(o => o.value === nombre)) {
+    const o = document.createElement('option');
+    o.value = nombre; o.textContent = nombre;
+    sel.appendChild(o);
+  }
+  sel.value = nombre || '';
+}
+
 /* ─── Init ─────────────────────────────────────────────────────────── */
 buscarCreditos(1);
 vehCargaMarcas();
 credCargarParams();
+cargarEjecutivosCred();
 // Fechas por defecto
 (function() {
   const hoy = new Date().toISOString().split('T')[0];
