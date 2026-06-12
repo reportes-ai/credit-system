@@ -123,6 +123,13 @@
     if (tiene('comisiones_revision'))  { document.getElementById('cardRevisionCom').style.display = '';  alguna = true; }
     if (tiene('comisiones_variables')) { document.getElementById('cardVariablesCom').style.display = ''; alguna = true; }
     if (!alguna) document.getElementById('sinSubmodulos').style.display = '';
+    // DEBUG TEMPORAL — quitar luego
+    try {
+      const dbg = document.createElement('div');
+      dbg.style.cssText = 'position:fixed;bottom:8px;left:8px;z-index:99999;background:#111;color:#0f0;font:11px monospace;padding:8px 10px;border-radius:6px;max-width:90vw;word-break:break-all';
+      dbg.textContent = `DEBUG perfil="${yo?.perfil}" admin=${esAdmin} n=${funcs.size} variables=${funcs.has('comisiones_variables')} revision=${funcs.has('comisiones_revision')} :: ${[...funcs].filter(c=>/comis/i.test(c)).join(',')||'(sin comis)'}`;
+      document.body.appendChild(dbg);
+    } catch(e) {}
   })();
 </script>
 <script src="/js/app-version.js"></script>
