@@ -5,7 +5,7 @@
   <link rel="icon" href="/img/favicon.png" type="image/png">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Seguimiento Post Venta — AutoFácil</title>
-  <!-- v1.4 -->
+  <!-- v1.5 -->
   <link href="/css/bootstrap.min.css" rel="stylesheet">
   <link href="/css/bootstrap-icons.css" rel="stylesheet">
   <style>
@@ -65,8 +65,13 @@
 
 <div class="wrap">
   <div class="filtros">
-    <input type="text" id="fBuscar" placeholder="Buscar OP, RUT, dealer, ejecutivo, saldo…" oninput="render()"
-      style="width:100%;border:1.5px solid #e2e8f0;border-radius:7px;padding:5px 11px;font-size:.8rem;margin-bottom:4px">
+    <div style="display:flex;gap:8px;align-items:center;margin-bottom:4px">
+      <input type="text" id="fBuscar" placeholder="Buscar OP, RUT, dealer, ejecutivo, saldo…" oninput="render()"
+        style="flex:1;max-width:520px;border:1.5px solid #e2e8f0;border-radius:7px;padding:5px 11px;font-size:.8rem">
+      <button onclick="limpiarFiltros()" style="border:1.5px solid #cbd5e1;background:#fff;color:#475569;border-radius:7px;padding:5px 14px;font-size:.74rem;font-weight:700;cursor:pointer;white-space:nowrap">
+        <i class="bi bi-x-circle me-1"></i>Limpiar
+      </button>
+    </div>
     <div>
       <span class="flbl">Mostrar:</span>
       <button class="toggle on" id="btnFiltroPagado" onclick="toggleFiltroPagado()"
@@ -122,6 +127,11 @@ const mesLbl = m => MESES_N[parseInt(m.slice(5))-1]+' '+m.slice(0,4);
 function esPagado(r){
   return estadoDe(etapaActual(r,'SALDO'),'SALDO') === 'PAGADO'
       && estadoDe(etapaActual(r,'COMISION'),'COMISION') === 'PAGADO';
+}
+function limpiarFiltros(){
+  document.getElementById('fBuscar').value = '';
+  selFin.clear(); selSaldo.clear(); selCom.clear(); selMes.clear();
+  renderFiltros(); render();
 }
 function toggleFiltroPagado(){
   filtroPagado = !filtroPagado;
