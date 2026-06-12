@@ -2,7 +2,7 @@
    AutoFácil — Versión global de la aplicación
    Editar SOLO este archivo para cambiar la versión
    ───────────────────────────────────────────── */
-const APP_VERSION = 'v12.4';
+const APP_VERSION = 'v12.5';
 
 document.addEventListener('DOMContentLoaded', () => {
 
@@ -559,11 +559,11 @@ document.addEventListener('DOMContentLoaded', async () => {
   // Estilos
   const st = document.createElement('style');
   st.textContent = `
-    #afHelpBtn { position:fixed; right:22px; bottom:22px; z-index:9600; width:50px; height:50px; border-radius:50%;
+    #afHelpBtn { position:fixed; right:18px; bottom:18px; z-index:9600; width:38px; height:38px; border-radius:50%;
       background:linear-gradient(135deg,#0141A2,#0255c5); color:#fff; border:none; cursor:pointer;
-      box-shadow:0 6px 20px rgba(1,65,162,.4); font-size:1.5rem; display:flex; align-items:center; justify-content:center;
-      transition:transform .15s; }
-    #afHelpBtn:hover { transform:scale(1.08); }
+      box-shadow:0 4px 14px rgba(1,65,162,.35); font-size:1.05rem; display:flex; align-items:center; justify-content:center;
+      opacity:.9; transition:transform .15s, opacity .15s; }
+    #afHelpBtn:hover { transform:scale(1.1); opacity:1; }
     #afHelpOverlay { position:fixed; inset:0; background:rgba(0,0,0,.35); z-index:9700; display:none; }
     #afHelpOverlay.show { display:block; }
     #afHelpPanel { position:fixed; top:0; right:0; height:100%; width:400px; max-width:92vw; background:#fff; z-index:9800;

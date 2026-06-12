@@ -16,31 +16,200 @@ const pool = require('../../../../shared/config/database');
         updated_at  DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
       )`);
 
-    // Seed piloto: Post Venta (solo si no existe)
-    const pasos = JSON.stringify([
-      { titulo: 'Marca el avance en Seguimiento',
-        detalle: 'En "Seguimiento Saldos Precio y Comisiones" cada crédito tiene dos pistas de casillas: Saldo Precio y Comisión. Marca cada etapa a medida que se completa el trámite. Las casillas son secuenciales (no puedes marcar una si la anterior no está marcada).' },
-      { titulo: 'Paga los saldos liberados',
-        detalle: 'Cuando un crédito llega a la etapa "Liberado a pago", aparece automáticamente en "Saldos Precios a Pagar". Ahí seleccionas las operaciones, ves cuánto cargar al banco y al guardar quedan marcadas como pagadas.' },
-      { titulo: 'Configura las reglas (Admin)',
-        detalle: 'En "Mantenedores Post Venta" defines qué estado (Pendiente / Para Pago / Pagado) equivale a cada etapa y qué perfiles pueden marcar cada casilla.' },
-    ]);
-    const submodulos = JSON.stringify([
-      { nombre: 'Seguimiento Saldos Precio y Comisiones', para_que: 'Grilla por crédito con todas las etapas. Es el día a día: marcar avances.' },
-      { nombre: 'Saldos Precios a Pagar', para_que: 'Operaciones listas para pago: seleccionarlas, cargarlas al banco y marcarlas pagadas.' },
-      { nombre: 'Fundantes Pendientes', para_que: 'Consulta de operaciones con documentos fundantes pendientes (en preparación).' },
-      { nombre: 'Consulta Estado Saldos Precio', para_que: 'Consulta del estado de saldo precio por operación (en preparación).' },
-      { nombre: 'Consulta Estado Factura', para_que: 'Consulta del estado de factura y comisión (en preparación).' },
-      { nombre: 'Mantenedores Post Venta', para_que: 'Configura estados equivalentes y permisos por etapa. Solo Admin.' },
-    ]);
-    await pool.query(
-      `INSERT IGNORE INTO ayuda_paginas (ruta, titulo, icono, descripcion, pasos, submodulos, siguiente)
-       VALUES (?,?,?,?,?,?,?)`,
-      ['/postventa/', 'Post Venta', 'bi-truck',
-       'Hace seguimiento a los créditos después de otorgados: el pago del saldo precio al dealer y el ciclo de comisión, etapa por etapa. Te muestra en qué punto va cada operación y cuáles están listas para pagar.',
-       pasos, submodulos,
-       'Lo habitual: primero entra a "Seguimiento" y marca los avances. Cuando un saldo quede "Liberado a pago", ve a "Saldos Precios a Pagar" para cargarlo al banco y marcarlo pagado.']);
-    console.log('[ayuda] tabla OK');
+    // Seed inicial de ayuda por módulo (INSERT IGNORE: no pisa lo editado en el mantenedor)
+    const SEED = [
+      { ruta:'/postventa/', titulo:'Post Venta', icono:'bi-truck',
+        descripcion:'Hace seguimiento a los créditos después de otorgados: el pago del saldo precio al dealer y el ciclo de comisión, etapa por etapa. Te muestra en qué punto va cada operación y cuáles están listas para pagar.',
+        pasos:[
+          { titulo:'Marca el avance en Seguimiento', detalle:'Cada crédito tiene dos pistas de casillas: Saldo Precio y Comisión. Marca cada etapa a medida que se completa el trámite. Son secuenciales: no puedes marcar una si la anterior no está marcada.' },
+          { titulo:'Paga los saldos liberados', detalle:'Cuando un crédito llega a "Liberado a pago", aparece en "Saldos Precios a Pagar". Ahí seleccionas las operaciones, ves cuánto cargar al banco y al guardar quedan pagadas.' },
+          { titulo:'Configura las reglas (Admin)', detalle:'En "Mantenedores Post Venta" defines qué estado equivale a cada etapa y qué perfiles pueden marcar cada casilla.' },
+        ],
+        submodulos:[
+          { nombre:'Seguimiento Saldos Precio y Comisiones', para_que:'Grilla por crédito con todas las etapas. El día a día: marcar avances.' },
+          { nombre:'Saldos Precios a Pagar', para_que:'Operaciones listas para pago: seleccionarlas, cargarlas al banco y marcarlas pagadas.' },
+          { nombre:'Mantenedores Post Venta', para_que:'Configura estados equivalentes y permisos por etapa. Solo Admin.' },
+        ],
+        siguiente:'Primero marca avances en "Seguimiento". Cuando un saldo quede "Liberado a pago", ve a "Saldos Precios a Pagar" para pagarlo.' },
+
+      { ruta:'/clientes/', titulo:'Clientes', icono:'bi-people-fill',
+        descripcion:'Registro y mantención de los clientes: datos personales, antecedentes laborales e información comercial (deudas y perfil financiero).',
+        pasos:[
+          { titulo:'Busca o crea el cliente', detalle:'Busca por RUT o nombre. Si no existe, créalo con sus datos personales.' },
+          { titulo:'Completa antecedentes', detalle:'Agrega los antecedentes laborales y la información comercial para tener el perfil completo del cliente.' },
+        ],
+        submodulos:[
+          { nombre:'Antecedentes Laborales', para_que:'Situación laboral del cliente (empleador, renta, antigüedad).' },
+          { nombre:'Información Comercial', para_que:'Deudas y perfil comercial del cliente.' },
+        ],
+        siguiente:'Con el cliente completo, puedes generar una cotización o iniciar un crédito.' },
+
+      { ruta:'/cotizaciones/', titulo:'Cotizaciones', icono:'bi-calculator',
+        descripcion:'Simulador de créditos: calcula cuota, plazo y condiciones para presentar al cliente antes de cursar la operación.',
+        pasos:[
+          { titulo:'Ingresa los datos del vehículo y financiamiento', detalle:'Valor, pie, plazo y tasa. El sistema calcula la cuota y el detalle.' },
+          { titulo:'Genera y descarga', detalle:'Guarda la cotización y descárgala para enviarla al cliente.' },
+        ],
+        submodulos:[],
+        siguiente:'Si el cliente acepta, continúa en "Créditos" para cursar la operación.' },
+
+      { ruta:'/creditos/', titulo:'Créditos', icono:'bi-credit-card-2-front',
+        descripcion:'Administración de las operaciones de crédito: ingreso, documentos, validaciones, otorgamiento y gestión de cuotas.',
+        pasos:[
+          { titulo:'Ingresa o busca la operación', detalle:'Crea el crédito o búscalo por N° de operación / cliente.' },
+          { titulo:'Carga y valida documentos', detalle:'Adjunta los documentos del crédito y pásalos por las validaciones correspondientes.' },
+          { titulo:'Gestiona el ciclo', detalle:'Registra pagos de cuotas y acciones según el estado de la operación.' },
+        ],
+        submodulos:[],
+        siguiente:'Tras otorgar, el crédito pasa a "Post Venta" para el seguimiento de saldo precio y comisión.' },
+
+      { ruta:'/tesoreria/', titulo:'Tesorería', icono:'bi-safe2',
+        descripcion:'Gestión del dinero: cajas, cierres de caja, cuentas transitorias y flujo de brokerage.',
+        pasos:[
+          { titulo:'Opera la caja', detalle:'Registra movimientos en "Caja" y administra las cajas existentes.' },
+          { titulo:'Cierra la caja', detalle:'Al final del período realiza el cierre de caja para cuadrar.' },
+        ],
+        submodulos:[
+          { nombre:'Caja / Administración de Cajas', para_que:'Movimientos y gestión de las cajas.' },
+          { nombre:'Cierre de Caja', para_que:'Cuadratura y cierre del período.' },
+          { nombre:'Cuentas Transitorias', para_que:'Conciliación de cuentas transitorias contra créditos.' },
+          { nombre:'Panel Brokerage Tesorería', para_que:'Facturas y pagos del flujo brokerage.' },
+        ],
+        siguiente:'Para conciliar contra operaciones, revisa "Cuentas Transitorias".' },
+
+      { ruta:'/crm/', titulo:'CRM', icono:'bi-headset',
+        descripcion:'Gestión de relaciones con clientes: registro de contactos (inbound/outbound), campañas y estadísticas.',
+        pasos:[
+          { titulo:'Registra la gestión', detalle:'En "Gestiones de Contacto" anota cada interacción con el cliente.' },
+          { titulo:'Trabaja campañas', detalle:'Crea y gestiona campañas de outbound y revisa sus resultados.' },
+        ],
+        submodulos:[
+          { nombre:'Gestiones de Contacto', para_que:'Registro de interacciones con clientes.' },
+          { nombre:'Estadísticas CRM', para_que:'Indicadores de la gestión de contacto.' },
+          { nombre:'Campañas de Outbound', para_que:'Creación, gestión y resultados de campañas.' },
+        ],
+        siguiente:'Revisa "Estadísticas CRM" para medir el resultado de tu gestión.' },
+
+      { ruta:'/cobranza/', titulo:'Cobranza', icono:'bi-bell-fill',
+        descripcion:'Gestión de cartera morosa con cumplimiento de la Ley del Consumidor: control pre-judicial y judicial.',
+        pasos:[
+          { titulo:'Revisa las acciones urgentes', detalle:'El panel resalta los casos que requieren gestión inmediata.' },
+          { titulo:'Gestiona según etapa', detalle:'Trabaja la cartera en Pre-judicial o Judicial según corresponda.' },
+        ],
+        submodulos:[
+          { nombre:'Pre-judicial', para_que:'Gestión de cobranza antes de acciones legales.' },
+          { nombre:'Judicial', para_que:'Seguimiento de casos en etapa judicial.' },
+          { nombre:'Reportería Cobranzas', para_que:'Informes de la gestión de cobranza.' },
+        ],
+        siguiente:'Usa "Reportería Cobranzas" para medir avance y provisiones.' },
+
+      { ruta:'/reporteria/', titulo:'Reportería', icono:'bi-bar-chart-line-fill',
+        descripcion:'Informes, exportaciones y reportes personalizados del sistema.',
+        pasos:[
+          { titulo:'Elige el tipo de reporte', detalle:'"Tailor Made" para armar tu propio reporte campo por campo, o "Tablas Dinámicas" para agrupar y calcular.' },
+          { titulo:'Filtra y exporta', detalle:'Aplica filtros y exporta a Excel exactamente lo que necesitas.' },
+        ],
+        submodulos:[
+          { nombre:'Tailor Made', para_que:'Construye tu propio reporte: elige campos, filtros y exporta.' },
+          { nombre:'Tablas Dinámicas', para_que:'Agrupa, suma, cuenta y promedia. Guarda y comparte tus tablas.' },
+        ],
+        siguiente:'Para análisis visual con gráficos, revisa el Dashboard.' },
+
+      { ruta:'/comisiones/', titulo:'Comisión Ejecutivos', icono:'bi-cash-coin',
+        descripcion:'Cálculo y revisión de las comisiones mensuales de los ejecutivos.',
+        pasos:[
+          { titulo:'Revisa el cálculo del mes', detalle:'En "Revisión y Aprobación Comisiones" verifica los montos por ejecutivo.' },
+          { titulo:'Ajusta parámetros si aplica', detalle:'En "Mantenedor Variables Comisiones" configuras las reglas del cálculo.' },
+        ],
+        submodulos:[
+          { nombre:'Revisión y Aprobación Comisiones', para_que:'Verifica y aprueba las comisiones del período.' },
+          { nombre:'Mantenedor Variables Comisiones', para_que:'Parámetros configurables del cálculo.' },
+        ],
+        siguiente:'Una vez revisadas, apruébalas para cerrar el período.' },
+
+      { ruta:'/carga-masiva/', titulo:'Carga Masiva', icono:'bi-cloud-upload',
+        descripcion:'Importación masiva de operaciones desde Excel (AutoFácil y Trinidad), con equivalencias e historial.',
+        pasos:[
+          { titulo:'Carga el Excel', detalle:'En "Cargar" subes el Excel calculado de AutoFácil. Para Trinidad usa "Carga Trinidad".' },
+          { titulo:'Revisa equivalencias', detalle:'Verifica los mapeos de estados y ejecutivos de Trinidad antes de confirmar.' },
+          { titulo:'Confirma y revisa historial', detalle:'Tras cargar, revisa "Historial" para ver qué se actualizó.' },
+        ],
+        submodulos:[
+          { nombre:'Cargar / Carga Trinidad', para_que:'Importación de operaciones desde Excel.' },
+          { nombre:'Equivalencias (Estados / Ejecutivos)', para_que:'Mapeo Trinidad → AutoFácil.' },
+          { nombre:'Historial', para_que:'Registro de cargas y campos actualizados.' },
+        ],
+        siguiente:'Tras cargar, los datos alimentan el Dashboard y la reportería.' },
+
+      { ruta:'/edicion-creditos/', titulo:'Edición Créditos', icono:'bi-pencil-square',
+        descripcion:'Edición completa de los campos de créditos en meses NO cerrados, con registro de cada cambio.',
+        pasos:[
+          { titulo:'Elige el conjunto', detalle:'"Otorgados" para créditos ya otorgados, "Otros" para el resto.' },
+          { titulo:'Edita en la grilla', detalle:'Usa las letras de columna para ubicar el campo. Cada cambio queda registrado en el log.' },
+        ],
+        submodulos:[
+          { nombre:'Edición Créditos Otorgados', para_que:'Grilla editable de créditos otorgados.' },
+          { nombre:'Edición Otros Créditos', para_que:'Grilla editable del resto de créditos.' },
+        ],
+        siguiente:'Recuerda: si el mes está cerrado, no se permite editar.' },
+
+      { ruta:'/dashboard/', titulo:'Dashboard', icono:'bi-bar-chart-line',
+        descripcion:'Tablero de indicadores: colocación, instituciones, cumplimiento de presupuesto y evolución, calculado en vivo desde la base.',
+        pasos:[
+          { titulo:'Filtra por período', detalle:'Ajusta el rango de fechas para ver los indicadores del período que te interesa.' },
+          { titulo:'Revisa el presupuesto', detalle:'La pestaña de presupuesto compara lo real contra la meta. La meta se edita en Mantenedores → Presupuesto.' },
+        ],
+        submodulos:[],
+        siguiente:'Para editar la meta mensual, ve a Mantenedores → "Presupuesto".' },
+
+      { ruta:'/aprobaciones/', titulo:'Aprobaciones', icono:'bi-envelope-paper',
+        descripcion:'Generación, revisión, impresión y seguimiento de las cartas de aprobación y cartolas.',
+        pasos:[
+          { titulo:'Digita la carta', detalle:'En "Generador de Carta" creas una nueva carta de aprobación.' },
+          { titulo:'Revisa e imprime', detalle:'El pool de cartas se aprueba/rechaza en "Revisión" y luego se imprime en PDF.' },
+        ],
+        submodulos:[
+          { nombre:'Generador de Carta', para_que:'Digita una nueva carta de aprobación.' },
+          { nombre:'Revisión de Cartas', para_que:'Aprueba o rechaza las cartas pendientes.' },
+          { nombre:'Impresión de Cartas / Mis Cartas', para_que:'Imprime PDFs y haz seguimiento.' },
+        ],
+        siguiente:'Tras aprobar, imprime la carta y haz seguimiento en "Mis Cartas".' },
+
+      { ruta:'/mantenedores/', titulo:'Mantenedores', icono:'bi-gear-fill',
+        descripcion:'Configuración base del sistema: tasas, UF, dealers, parámetros, presupuesto, comisiones de seguro, permisos y bases de datos (Nivel Dios).',
+        pasos:[
+          { titulo:'Elige el mantenedor', detalle:'Cada card abre una tabla de configuración distinta.' },
+          { titulo:'Edita y guarda', detalle:'Modifica los valores y guarda. Los cambios aplican de inmediato al sistema.' },
+        ],
+        submodulos:[
+          { nombre:'Tasas / UF / Parámetros', para_que:'Valores base de cálculo de créditos.' },
+          { nombre:'Presupuesto', para_que:'Meta mensual de operaciones y monto (la usa el Dashboard).' },
+          { nombre:'SOLO DIOS', para_que:'Acceso directo a las bases (Operaciones, Clientes, etc.) con edición total.' },
+        ],
+        siguiente:'Tras cambiar permisos o perfiles, conviene revisar Usuarios → Perfiles y Permisos.' },
+
+      { ruta:'/usuarios/', titulo:'Usuarios', icono:'bi-people',
+        descripcion:'Administración de usuarios, perfiles y permisos del sistema.',
+        pasos:[
+          { titulo:'Gestiona usuarios', detalle:'Crea, edita o desactiva usuarios y resetea contraseñas.' },
+          { titulo:'Define permisos por perfil', detalle:'En "Perfiles y Permisos" marcas qué módulos y acciones ve cada perfil.' },
+        ],
+        submodulos:[
+          { nombre:'Usuarios', para_que:'Alta, edición y reseteo de contraseñas.' },
+          { nombre:'Perfiles y Permisos', para_que:'Matriz de qué puede ver/hacer cada perfil.' },
+          { nombre:'Seguridad', para_que:'Políticas de seguridad de acceso.' },
+        ],
+        siguiente:'Tras crear un perfil, asígnale permisos en "Perfiles y Permisos".' },
+    ];
+
+    for (const a of SEED) {
+      await pool.query(
+        `INSERT IGNORE INTO ayuda_paginas (ruta, titulo, icono, descripcion, pasos, submodulos, siguiente)
+         VALUES (?,?,?,?,?,?,?)`,
+        [a.ruta, a.titulo, a.icono, a.descripcion,
+         JSON.stringify(a.pasos||[]), JSON.stringify(a.submodulos||[]), a.siguiente||null]);
+    }
+    console.log('[ayuda] tabla OK + seed', SEED.length);
   } catch (e) { console.error('[ayuda migration]', e.message); }
 })();
 
@@ -70,7 +239,17 @@ const getAyuda = async (req, res) => {
   }
 };
 
-/* ── PUT /api/ayuda/:ruta — para el futuro mantenedor de Ayuda ───── */
+/* ── GET /api/ayuda/todas — lista para el mantenedor ─────────────── */
+const listAyuda = async (req, res) => {
+  try {
+    const [rows] = await pool.query('SELECT ruta, titulo, icono, updated_at FROM ayuda_paginas ORDER BY titulo');
+    res.json({ success: true, data: rows, error: null });
+  } catch (e) {
+    res.status(500).json({ success: false, data: null, error: 'Error interno del servidor' });
+  }
+};
+
+/* ── PUT /api/ayuda/:ruta — para el mantenedor de Ayuda ──────────── */
 const upsertAyuda = async (req, res) => {
   try {
     const ruta = normRuta(req.body.ruta || req.params.ruta);
@@ -90,4 +269,4 @@ const upsertAyuda = async (req, res) => {
   }
 };
 
-module.exports = { getAyuda, upsertAyuda };
+module.exports = { getAyuda, listAyuda, upsertAyuda };
