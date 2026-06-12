@@ -67,8 +67,27 @@
     }
     .submod-card.flujo   .submod-icon { background:#ede9fe; color:#5b21b6; }
     .submod-card.carga   .submod-icon { background:#e0f2fe; color:#0369a1; }
+    .submod-card.aprob   .submod-icon { background:#dcfce7; color:#15803d; }
     .submod-card.active.flujo .submod-icon { background:linear-gradient(135deg,#5b21b6,#7c3aed); color:#fff; }
     .submod-card.active.carga .submod-icon { background:linear-gradient(135deg,#0141A2,#009AFE); color:#fff; }
+    .submod-card.active.aprob .submod-icon { background:linear-gradient(135deg,#15803d,#22c55e); color:#fff; }
+
+    /* ── Política de aprobación ──────────────────────────────────────── */
+    .pol-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(220px,1fr)); gap:14px; }
+    .pol-field label { font-size:.74rem; font-weight:700; color:#374151; display:block; margin-bottom:4px; }
+    .pol-field .pol-in { display:flex; align-items:center; border:1.5px solid #d1d5db; border-radius:8px; overflow:hidden; }
+    .pol-field input { border:none; outline:none; padding:7px 10px; width:100%; font-size:.86rem; }
+    .pol-field input.changed { background:#fef9c3; }
+    .pol-field .pol-suf { background:#f3f4f6; color:#6b7280; padding:7px 10px; font-size:.78rem; font-weight:700; }
+    .pol-hint { font-size:.72rem; color:#9ca3af; margin-top:3px; }
+    .matriz-wrap { overflow-x:auto; }
+    table.matriz { border-collapse:collapse; width:100%; font-size:.78rem; }
+    table.matriz th, table.matriz td { border:1px solid #e5e7eb; padding:5px 6px; text-align:center; white-space:nowrap; }
+    table.matriz thead th { background:#0141A2; color:#fff; font-size:.72rem; position:sticky; top:0; }
+    table.matriz tbody tr:nth-child(even) { background:#f8fafc; }
+    table.matriz td.k { background:#eef2ff; font-weight:700; color:#3730a3; text-align:left; }
+    table.matriz input { width:84px; border:1px solid #d1d5db; border-radius:6px; padding:4px 6px; font-size:.78rem; text-align:right; }
+    table.matriz input.changed { background:#fef9c3; border-color:#f59e0b; }
     .submod-info h6 { font-weight:700; font-size:1rem; margin:0 0 5px; color:#111827; }
     .submod-info p  { font-size:.8rem; color:#6b7280; margin:0; line-height:1.45; }
     .submod-arrow { position:absolute; right:20px; top:50%; transform:translateY(-50%); color:#d1d5db; font-size:1.1rem; transition:color .15s, right .15s; }
@@ -199,7 +218,7 @@
   <div class="topnav-left">
     <a href="/" class="topnav-brand">
       <img src="/img/logo.png" alt="AutoFácil">
-      <span class="version-badge" id="versionBadge">v1.3</span>
+      <span class="version-badge" id="versionBadge">v1.4</span>
     </a>
     <div class="breadcrumb-nav">
       <a href="/">Inicio</a><span class="sep">›</span>
@@ -249,6 +268,15 @@
       <div class="submod-info">
         <h6>Carga Mensual</h6>
         <p>Factores (%) aplicados sobre cada tipo de deuda para evaluar capacidad de pago</p>
+      </div>
+      <i class="bi bi-chevron-right submod-arrow"></i>
+    </div>
+
+    <div class="submod-card aprob" onclick="activarPanel('aprob')">
+      <div class="submod-icon"><i class="bi bi-clipboard2-check"></i></div>
+      <div class="submod-info">
+        <h6>Política de Aprobación</h6>
+        <p>Edad, renta, pie, plazo, antigüedad y montos máximos por tipo de cliente · Restricciones</p>
       </div>
       <i class="bi bi-chevron-right submod-arrow"></i>
     </div>
@@ -314,6 +342,53 @@
         <button class="btn-prim" id="btnGuardarCM" onclick="guardarCM()" disabled>
           <i class="bi bi-floppy"></i>Guardar cambios
         </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ══════════════════════════════════════════════════════════════
+       PANEL: POLÍTICA DE APROBACIÓN
+  ══════════════════════════════════════════════════════════════ -->
+  <div class="section-panel" id="panel-aprob">
+    <div class="section-card" style="margin-bottom:18px">
+      <div class="section-header">
+        <div>
+          <div class="section-label"><i class="bi bi-sliders"></i>Parámetros Globales</div>
+          <div class="section-desc">Edades, cargas máximas y restricciones aplicables a todos los créditos AutoFácil (PC-02 v2.0)</div>
+        </div>
+        <span class="changes-badge" id="polGChangesBadge">Cambios sin guardar</span>
+      </div>
+      <div class="pol-grid" id="polGlobals"></div>
+      <div class="d-flex justify-content-end mt-3">
+        <button class="btn-prim" id="btnGuardarPolG" onclick="guardarPolGlobals()" disabled><i class="bi bi-floppy"></i>Guardar parámetros</button>
+      </div>
+    </div>
+
+    <div class="section-card">
+      <div class="section-header">
+        <div>
+          <div class="section-label"><i class="bi bi-table"></i>Matriz de Aprobación por Tipo de Cliente</div>
+          <div class="section-desc">Mínimos y máximos por Condición · Origen · Ocupación. Estos valores se usan para aprobar los créditos.</div>
+        </div>
+        <span class="changes-badge" id="polMChangesBadge">Cambios sin guardar</span>
+      </div>
+      <div class="matriz-wrap">
+        <table class="matriz">
+          <thead>
+            <tr>
+              <th>Condición</th><th>Origen</th><th>Ocupación</th>
+              <th>Edad mín</th><th>Edad máx</th><th>Renta mín $</th>
+              <th>Antig. laboral (m)</th><th>Pie mín %</th>
+              <th>Antig. vehíc. máx</th><th>Plazo máx</th><th>Máx. a financiar $</th>
+            </tr>
+          </thead>
+          <tbody id="matrizBody">
+            <tr><td colspan="11" class="text-center py-4 text-muted"><div class="spinner-border spinner-border-sm me-2"></div>Cargando…</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <div class="d-flex justify-content-end mt-3">
+        <button class="btn-prim" id="btnGuardarPolM" onclick="guardarPolMatriz()" disabled><i class="bi bi-floppy"></i>Guardar matriz</button>
       </div>
     </div>
   </div>
@@ -441,7 +516,7 @@ function showToast(msg, ok) {
 /* ═══════════════════════════════════════════════════════════════════
    NAVEGACIÓN ENTRE PANELES
 ═══════════════════════════════════════════════════════════════════ */
-const BC_LABELS = { flujo: 'Flujo de Crédito', carga: 'Carga Mensual' };
+const BC_LABELS = { flujo: 'Flujo de Crédito', carga: 'Carga Mensual', aprob: 'Política de Aprobación' };
 
 function activarPanel(id) {
   // Cards
@@ -455,6 +530,7 @@ function activarPanel(id) {
     `<i class="bi bi-shield-check me-1"></i>Política › ${BC_LABELS[id]}`;
   // Cargar datos lazy si es carga mensual
   if (id === 'carga' && !_cmCargado) cargarCM();
+  if (id === 'aprob' && !_polCargado) cargarPolitica();
 }
 
 /* ═══════════════════════════════════════════════════════════════════
@@ -757,6 +833,126 @@ async function guardarCM() {
     showToast('Parámetros guardados correctamente',true);
   } catch(e) { showToast('Error al guardar: '+e.message,false); btn.disabled=false; }
   finally { btn.innerHTML='<i class="bi bi-floppy"></i>Guardar cambios'; }
+}
+
+/* ═══════════════════════════════════════════════════════════════════
+   POLÍTICA DE APROBACIÓN
+═══════════════════════════════════════════════════════════════════ */
+let _polCargado = false;
+let _polMatriz = [];
+let _polGlobOrig = {};
+// Parámetros globales editables (clave, label, sufijo)
+const POL_GLOBALS = [
+  { k:'pol_edad_min_otorgamiento', l:'Edad mínima al otorgamiento', s:'años' },
+  { k:'pol_edad_max_otorgamiento', l:'Edad máxima al otorgamiento', s:'años' },
+  { k:'pol_edad_max_termino',      l:'Edad máxima al término',      s:'años' },
+  { k:'pol_carga_operacion_max',   l:'Carga máx. de la operación',  s:'%' },
+  { k:'pol_carga_total_max',       l:'Carga máx. total',            s:'%' },
+  { k:'pol_instituciones_max',     l:'N° instituciones → excepción', s:'inst.' },
+  { k:'pol_meses_sin_morosidad',   l:'Meses sin morosidad exigidos', s:'meses' },
+  { k:'pol_juicio_cobranza_meses', l:'Juicio cobranza: rechazo si <', s:'meses' },
+  { k:'pol_complemento_conyuge',   l:'Complemento renta cónyuge',   s:'%' },
+  { k:'pol_jubilar_renta_pct',     l:'Renta próximos a jubilar (61-65)', s:'%' },
+  { k:'pol_aval_padre_hijo_pie',   l:'Pie mín. si avala padre/hijo', s:'%' },
+];
+const MCOLS = ['edad_min','edad_max','renta_min','antiguedad_laboral_meses','pie_min_pct','antiguedad_vehiculo_max','plazo_max','monto_max_financiar'];
+
+async function cargarPolitica() {
+  try {
+    const [rg, rm] = await Promise.all([
+      fetch('/api/parametros-credito', { headers: apiHeaders() }),
+      fetch('/api/politica-aprobacion/matriz', { headers: apiHeaders() }),
+    ]);
+    const jg = await rg.json(), jm = await rm.json();
+    if (!jg.success || !jm.success) throw new Error(jg.error || jm.error);
+    renderPolGlobals(jg.data.obj);
+    _polMatriz = jm.data;
+    renderPolMatriz(_polMatriz);
+    _polCargado = true;
+  } catch(e) {
+    document.getElementById('matrizBody').innerHTML =
+      `<tr><td colspan="11" class="text-danger text-center py-3">Error al cargar: ${e.message}</td></tr>`;
+  }
+}
+
+function renderPolGlobals(obj) {
+  _polGlobOrig = {};
+  document.getElementById('polGlobals').innerHTML = POL_GLOBALS.map(g => {
+    const v = (obj[g.k] ?? 0);
+    _polGlobOrig[g.k] = Number(v);
+    const val = Number.isInteger(Number(v)) ? Number(v) : Number(v);
+    return `<div class="pol-field">
+      <label>${g.l}</label>
+      <div class="pol-in">
+        <input type="number" step="0.01" id="pg_${g.k}" value="${val}" oninput="onPolGChange('${g.k}')">
+        <span class="pol-suf">${g.s}</span>
+      </div></div>`;
+  }).join('');
+}
+
+function onPolGChange(k) {
+  const el = document.getElementById('pg_'+k);
+  el.classList.toggle('changed', Math.abs((parseFloat(el.value)||0) - (_polGlobOrig[k]||0)) > 0.00001);
+  const hay = POL_GLOBALS.some(g => document.getElementById('pg_'+g.k)?.classList.contains('changed'));
+  document.getElementById('polGChangesBadge').classList.toggle('visible', hay);
+  document.getElementById('btnGuardarPolG').disabled = !hay;
+}
+
+async function guardarPolGlobals() {
+  const btn = document.getElementById('btnGuardarPolG');
+  btn.disabled = true; btn.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Guardando…';
+  const body = {};
+  POL_GLOBALS.forEach(g => { body[g.k] = parseFloat(document.getElementById('pg_'+g.k)?.value) || 0; });
+  try {
+    const r = await fetch('/api/parametros-credito', { method:'PUT', headers:apiHeaders(), body:JSON.stringify(body) });
+    const j = await r.json();
+    if (!j.success) throw new Error(j.error);
+    Object.assign(_polGlobOrig, body);
+    POL_GLOBALS.forEach(g => document.getElementById('pg_'+g.k)?.classList.remove('changed'));
+    document.getElementById('polGChangesBadge').classList.remove('visible');
+    showToast('Parámetros globales guardados', true);
+  } catch(e) { showToast('Error al guardar: '+e.message, false); btn.disabled = false; }
+  finally { btn.innerHTML = '<i class="bi bi-floppy"></i>Guardar parámetros'; }
+}
+
+function renderPolMatriz(filas) {
+  document.getElementById('matrizBody').innerHTML = filas.map(f => `
+    <tr data-id="${f.id}">
+      <td class="k">${f.condicion}</td><td class="k">${f.origen}</td><td class="k" style="text-align:left">${f.ocupacion}</td>
+      ${MCOLS.map(c => `<td><input type="number" step="${c==='pie_min_pct'?'0.5':'1'}" data-c="${c}" value="${f[c]}" oninput="onPolMChange(this)"></td>`).join('')}
+    </tr>`).join('');
+}
+
+function onPolMChange(el) {
+  const id = el.closest('tr').dataset.id, c = el.dataset.c;
+  const orig = _polMatriz.find(x => String(x.id) === String(id));
+  el.classList.toggle('changed', orig && Math.abs((parseFloat(el.value)||0) - Number(orig[c])) > 0.00001);
+  const hay = !!document.querySelector('#matrizBody input.changed');
+  document.getElementById('polMChangesBadge').classList.toggle('visible', hay);
+  document.getElementById('btnGuardarPolM').disabled = !hay;
+}
+
+async function guardarPolMatriz() {
+  const btn = document.getElementById('btnGuardarPolM');
+  btn.disabled = true; btn.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Guardando…';
+  const filas = [...document.querySelectorAll('#matrizBody tr')].map(tr => {
+    const o = { id: Number(tr.dataset.id) };
+    tr.querySelectorAll('input').forEach(i => { o[i.dataset.c] = parseFloat(i.value) || 0; });
+    return o;
+  });
+  try {
+    const r = await fetch('/api/politica-aprobacion/matriz', { method:'PUT', headers:apiHeaders(), body:JSON.stringify({ filas }) });
+    const j = await r.json();
+    if (!j.success) throw new Error(j.error);
+    // refrescar baseline
+    const rm = await fetch('/api/politica-aprobacion/matriz', { headers:apiHeaders() });
+    _polMatriz = (await rm.json()).data;
+    renderPolMatriz(_polMatriz);
+    document.getElementById('polMChangesBadge').classList.remove('visible');
+    document.getElementById('btnGuardarPolM').disabled = true;
+    showToast('Matriz de aprobación guardada', true);
+  } catch(e) { showToast('Error al guardar: '+e.message, false); btn.disabled = false; }
+  finally { btn.innerHTML = '<i class="bi bi-floppy"></i>Guardar matriz'; }
 }
 
 /* ── Init ─────────────────────────────────────────────────────── */

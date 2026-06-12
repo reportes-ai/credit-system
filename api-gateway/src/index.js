@@ -77,6 +77,7 @@ app.use('/api/geografico',      require('../../services/mantenedores/src/routes/
 app.use('/api/vehiculos',       require('../../services/mantenedores/src/routes/vehiculos.routes'));
 app.use('/api/dealers',         require('../../services/mantenedores/src/routes/dealers.routes'));
 app.use('/api/parametros-credito', require('../../services/mantenedores/src/routes/parametros.routes'));
+app.use('/api/politica-aprobacion', require('../../services/mantenedores/src/routes/politica-aprobacion.routes'));
 app.use('/api/workflow-estados',  require('../../services/mantenedores/src/routes/workflow.routes'));
 app.use('/api/tipos-documento',      require('../../services/mantenedores/src/routes/tipos-documento.routes'));
 app.use('/api/plantillas-documento', require('../../services/mantenedores/src/routes/plantillas.routes'));
