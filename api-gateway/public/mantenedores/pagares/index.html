@@ -65,6 +65,23 @@
     textarea.code-edit { font-family:'Courier New',monospace; font-size:0.82rem; width:100%; height:460px; border:1px solid #d1d5db; border-radius:8px; padding:12px; resize:vertical; outline:none; }
     textarea.code-edit:focus { border-color:var(--navy); box-shadow:0 0 0 3px rgba(1,65,162,0.1); }
 
+    /* selector de modo Visual / HTML */
+    .mode-switch { display:inline-flex; border:1px solid #d1d5db; border-radius:8px; overflow:hidden; margin-bottom:12px; }
+    .mode-switch button { border:none; background:#fff; color:#374151; padding:6px 16px; font-size:0.82rem; font-weight:600; cursor:pointer; }
+    .mode-switch button.active { background:var(--navy); color:#fff; }
+
+    /* editor visual: documento editable, variables protegidas */
+    .visual-edit { border:1px solid #d1d5db; border-radius:8px; padding:24px 28px; height:460px; overflow:auto; outline:none; background:#fff; font-family:'Times New Roman',Times,serif; font-size:13px; color:#111; line-height:1.6; }
+    .visual-edit:focus { border-color:var(--navy); box-shadow:0 0 0 3px rgba(1,65,162,0.1); }
+    .visual-edit .doc-title { text-align:center; font-size:16px; font-weight:bold; text-transform:uppercase; margin:0 0 4px; }
+    .visual-edit .doc-subtitle { text-align:center; font-size:12px; color:#444; margin:0 0 12px; }
+    .visual-edit .sec-head { font-weight:bold; font-size:13px; margin:14px 0 6px; border-bottom:1px solid #ccc; padding-bottom:2px; }
+    .visual-edit table, .visual-edit .doc-table { width:100%; border-collapse:collapse; margin:6px 0; }
+    .visual-edit td, .visual-edit th { border:1px solid #d1d5db; padding:5px 8px; font-size:12px; vertical-align:top; }
+    .visual-edit .td-label { font-weight:bold; background:#f3f4f6; width:42%; }
+    .visual-edit p { margin:6px 0; }
+    .vchip { display:inline-block; background:#e0e7ff; color:#3730a3; border-radius:5px; padding:0 6px; font-family:monospace; font-size:11px; font-weight:700; white-space:nowrap; user-select:all; }
+
     .save-status { font-size:0.82rem; color:#16a34a; opacity:0; transition:opacity 0.3s; }
     .save-status.show { opacity:1; }
 
@@ -82,7 +99,7 @@
     <div class="topnav-left">
       <a href="/" class="topnav-brand">
         <img src="/img/logo.png" alt="AutoFácil">
-        <span class="version-badge">v1.0</span>
+        <span class="version-badge">v1.1</span>
       </a>
       <div class="breadcrumb-nav">
         <a href="/">Inicio</a><span class="sep">›</span>
@@ -111,7 +128,7 @@
       <i class="bi bi-file-earmark-text"></i>
       <div>
         <h2>Pagarés Autofacil</h2>
-        <p>Plantillas HTML editables para la documentación que firma el cliente. Las variables <code>{{NOMBRE}}</code> se sustituyen automáticamente con los datos de cada operación.</p>
+        <p>Plantillas editables para la documentación que firma el cliente. Edita en modo <b>Visual</b> (sin tocar HTML) e inserta las variables <code>{{NOMBRE}}</code>, que se sustituyen automáticamente con los datos de cada operación.</p>
       </div>
     </div>
 
@@ -175,7 +192,12 @@
             <span class="var-chip" onclick="insertVar('{{TABLA_AMORTIZACION}}')">{{TABLA_AMORTIZACION}}</span>
           </div>
         </div>
-        <textarea class="code-edit" id="codeEdit" spellcheck="false"></textarea>
+        <div class="mode-switch">
+          <button id="btnModoVisual" class="active" onclick="setModo('visual')"><i class="bi bi-eye me-1"></i>Visual</button>
+          <button id="btnModoHtml" onclick="setModo('html')"><i class="bi bi-code-slash me-1"></i>HTML</button>
+        </div>
+        <div class="visual-edit" id="visualEdit" contenteditable="true" spellcheck="false"></div>
+        <textarea class="code-edit" id="codeEdit" spellcheck="false" style="display:none"></textarea>
       </div>
       <div class="modal-footer">
         <button class="btn-reset" onclick="resetarDefault()" title="Restaurar contenido original">
@@ -245,6 +267,8 @@
         </div>`).join('');
     }
 
+    let _modo = 'visual';
+
     async function abrirEditor(codigo) {
       const res  = await fetch('/api/plantillas-documento/' + codigo, { headers: H });
       const json = await res.json();
@@ -252,8 +276,39 @@
       _editando = json.data;
       document.getElementById('modalTitulo').textContent = 'Editar: ' + json.data.nombre;
       document.getElementById('codeEdit').value = json.data.contenido;
+      document.getElementById('visualEdit').innerHTML = htmlAVisual(json.data.contenido);
+      setModo('visual');
       document.getElementById('saveStatus').classList.remove('show');
       document.getElementById('modalOverlay').classList.add('open');
+    }
+
+    // {{VAR}} → chip protegido (no editable)
+    function htmlAVisual(html) {
+      return html.replace(/\{\{([A-Z0-9_]+)\}\}/g,
+        '<span class="vchip" contenteditable="false" data-var="$1">{{$1}}</span>');
+    }
+    // chips → {{VAR}} y limpieza de artefactos del navegador
+    function visualAHtml() {
+      const tmp = document.createElement('div');
+      tmp.innerHTML = document.getElementById('visualEdit').innerHTML;
+      tmp.querySelectorAll('.vchip').forEach(ch => {
+        ch.replaceWith(document.createTextNode('{{' + (ch.dataset.var || '') + '}}'));
+      });
+      return tmp.innerHTML.replace(/&nbsp;/g, ' ');
+    }
+
+    function setModo(m) {
+      // sincroniza el contenido al cambiar de modo
+      if (m === 'html' && _modo === 'visual') {
+        document.getElementById('codeEdit').value = visualAHtml();
+      } else if (m === 'visual' && _modo === 'html') {
+        document.getElementById('visualEdit').innerHTML = htmlAVisual(document.getElementById('codeEdit').value);
+      }
+      _modo = m;
+      document.getElementById('visualEdit').style.display = m === 'visual' ? 'block' : 'none';
+      document.getElementById('codeEdit').style.display   = m === 'html'   ? 'block' : 'none';
+      document.getElementById('btnModoVisual').classList.toggle('active', m === 'visual');
+      document.getElementById('btnModoHtml').classList.toggle('active', m === 'html');
     }
 
     function cerrarModal() {
@@ -262,6 +317,26 @@
     }
 
     function insertVar(v) {
+      if (_modo === 'visual') {
+        const ve = document.getElementById('visualEdit');
+        ve.focus();
+        const code = v.replace(/[{}]/g, '');
+        const chip = document.createElement('span');
+        chip.className = 'vchip'; chip.contentEditable = 'false';
+        chip.dataset.var = code; chip.textContent = '{{' + code + '}}';
+        const sel = window.getSelection();
+        // inserta en el cursor si está dentro del editor; si no, al final
+        if (sel && sel.rangeCount && ve.contains(sel.anchorNode)) {
+          const r = sel.getRangeAt(0);
+          r.deleteContents();
+          r.insertNode(chip);
+          r.setStartAfter(chip); r.collapse(true);
+          sel.removeAllRanges(); sel.addRange(r);
+        } else {
+          ve.appendChild(chip);
+        }
+        return;
+      }
       const ta = document.getElementById('codeEdit');
       const s  = ta.selectionStart, e = ta.selectionEnd;
       ta.value = ta.value.substring(0, s) + v + ta.value.substring(e);
@@ -271,6 +346,8 @@
 
     async function guardar() {
       if (!_editando) return;
+      // si está en modo visual, serializa primero a HTML
+      if (_modo === 'visual') document.getElementById('codeEdit').value = visualAHtml();
       const contenido = document.getElementById('codeEdit').value;
       const res  = await fetch('/api/plantillas-documento/' + _editando.codigo, {
         method: 'PUT', headers: H,
