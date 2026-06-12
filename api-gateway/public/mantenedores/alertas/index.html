@@ -41,6 +41,15 @@
     #msg { font-size:.84rem; display:none; }
     .head-row { display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:12px; margin-bottom:14px; }
     .hint { font-size:.74rem; color:#94a3b8; margin:3px 0 0; }
+    /* slide toggle */
+    .sw { position:relative; display:inline-block; width:42px; height:23px; vertical-align:middle; }
+    .sw input { display:none; }
+    .sw .sl { position:absolute; inset:0; background:#cbd5e1; border-radius:23px; cursor:pointer; transition:.2s; }
+    .sw .sl:before { content:''; position:absolute; width:17px; height:17px; left:3px; top:3px; background:#fff; border-radius:50%; transition:.2s; box-shadow:0 1px 3px rgba(0,0,0,.2); }
+    .sw input:checked + .sl { background:#0141A2; }
+    .sw input:checked + .sl:before { transform:translateX(19px); }
+    .sw.snd input:checked + .sl { background:#15803d; }
+    .sw-lbl { font-size:.72rem; color:#64748b; margin-left:6px; vertical-align:middle; }
   </style>
 </head>
 <body>
@@ -75,7 +84,8 @@
       <div class="field" id="wVal2" style="display:none"><label>Valor máx</label><input id="fVal2"></div>
       <div class="field"><label>Prioridad</label><select id="fPrioridad"><option value="normal">Normal</option><option value="alta">Alta (campanita insistente)</option></select></div>
       <div class="field"><label>Notificar a (perfil)</label><select id="fDestino"></select></div>
-      <div class="field"><label>Activa</label><select id="fActivo"><option value="1">Sí</option><option value="0">No</option></select></div>
+      <div class="field"><label>Activa</label><label class="sw"><input type="checkbox" id="fActivo" checked><span class="sl"></span></label><span class="sw-lbl" id="lblActivo">Sí</span></div>
+      <div class="field"><label>Sonido</label><label class="sw snd"><input type="checkbox" id="fSonido" checked><span class="sl"></span></label><span class="sw-lbl" id="lblSonido">Con sonido</span></div>
     </div>
     <p class="hint" id="hintOp"></p>
     <div style="display:flex;justify-content:flex-end;gap:12px;align-items:center;margin-top:10px">
@@ -88,8 +98,8 @@
   <!-- Lista -->
   <div class="card-af">
     <table>
-      <thead><tr><th>Nombre</th><th>Condición</th><th>Prioridad</th><th>Destino</th><th>Estado</th><th></th></tr></thead>
-      <tbody id="body"><tr><td colspan="6" style="text-align:center;color:#94a3b8;padding:24px">Cargando…</td></tr></tbody>
+      <thead><tr><th>Nombre</th><th>Condición</th><th>Prioridad</th><th>Destino</th><th>Activa</th><th>Sonido</th><th></th></tr></thead>
+      <tbody id="body"><tr><td colspan="7" style="text-align:center;color:#94a3b8;padding:24px">Cargando…</td></tr></tbody>
     </table>
   </div>
 </div>
@@ -132,12 +142,19 @@ function onOperador(){
   document.getElementById('hintOp').textContent = hint;
 }
 
+document.addEventListener('change', e => {
+  if (e.target.id==='fActivo') document.getElementById('lblActivo').textContent = e.target.checked?'Sí':'No';
+  if (e.target.id==='fSonido') document.getElementById('lblSonido').textContent = e.target.checked?'Con sonido':'Silenciosa';
+});
+
 function nueva(){ EDIT=null; document.getElementById('formCard').style.display='';
   document.getElementById('fNombre').value=''; document.getElementById('fOrigen').selectedIndex=0; onOrigen();
   document.getElementById('fOperador').selectedIndex=0; onOperador();
   document.getElementById('fVal1').value=''; document.getElementById('fVal2').value='';
   document.getElementById('fPrioridad').value='normal'; document.getElementById('fDestino').value='Administrador';
-  document.getElementById('fActivo').value='1'; window.scrollTo({top:0,behavior:'smooth'}); }
+  document.getElementById('fActivo').checked=true; document.getElementById('fSonido').checked=true;
+  document.getElementById('lblActivo').textContent='Sí'; document.getElementById('lblSonido').textContent='Con sonido';
+  window.scrollTo({top:0,behavior:'smooth'}); }
 function cancelar(){ document.getElementById('formCard').style.display='none'; }
 
 function editar(a){ EDIT=a.id; document.getElementById('formCard').style.display='';
@@ -146,7 +163,10 @@ function editar(a){ EDIT=a.id; document.getElementById('formCard').style.display
   document.getElementById('fOperador').value=a.operador; onOperador();
   document.getElementById('fVal1').value=a.valor1||''; document.getElementById('fVal2').value=a.valor2||'';
   document.getElementById('fPrioridad').value=a.prioridad; document.getElementById('fDestino').value=a.destino;
-  document.getElementById('fActivo').value=String(a.activo); window.scrollTo({top:0,behavior:'smooth'}); }
+  document.getElementById('fActivo').checked=!!a.activo; document.getElementById('fSonido').checked=a.sonido!=0;
+  document.getElementById('lblActivo').textContent=a.activo?'Sí':'No';
+  document.getElementById('lblSonido').textContent=a.sonido!=0?'Con sonido':'Silenciosa';
+  window.scrollTo({top:0,behavior:'smooth'}); }
 
 async function guardar(){
   const msg=document.getElementById('msg'), btn=document.getElementById('btnGuardar');
@@ -154,7 +174,8 @@ async function guardar(){
     origen:document.getElementById('fOrigen').value, campo:document.getElementById('fCampo').value,
     operador:document.getElementById('fOperador').value, valor1:document.getElementById('fVal1').value.trim(),
     valor2:document.getElementById('fVal2').value.trim(), prioridad:document.getElementById('fPrioridad').value,
-    destino:document.getElementById('fDestino').value, activo:document.getElementById('fActivo').value==='1' };
+    destino:document.getElementById('fDestino').value,
+    activo:document.getElementById('fActivo').checked, sonido:document.getElementById('fSonido').checked };
   if(!body.nombre){ msg.textContent='Falta el nombre'; msg.style.cssText='display:inline;color:#b91c1c'; return; }
   btn.disabled=true; btn.innerHTML='<i class="bi bi-hourglass-split me-1"></i>…'; msg.style.display='none';
   try{
@@ -177,19 +198,30 @@ function condTexto(a){
   let v=a.operador==='entre' ? `${a.valor1} y ${a.valor2}` : a.valor1;
   return `${esc(lbl)} ${esc(opl)} <b>${esc(v)}</b>`;
 }
+let ROWS = [];
 function renderLista(rows){
+  ROWS = rows;
   const tb=document.getElementById('body');
-  if(!rows.length){ tb.innerHTML='<tr><td colspan="6" style="text-align:center;color:#94a3b8;padding:24px">Sin alertas. Crea una con "Agregar alerta".</td></tr>'; return; }
+  if(!rows.length){ tb.innerHTML='<tr><td colspan="7" style="text-align:center;color:#94a3b8;padding:24px">Sin alertas. Crea una con "Agregar alerta".</td></tr>'; return; }
   tb.innerHTML = rows.map(a=>`<tr>
     <td><b>${esc(a.nombre)}</b><br><span style="font-size:.72rem;color:#94a3b8">${esc((META.origenes.find(o=>o.id===a.origen)||{}).label||a.origen)}</span></td>
     <td>${condTexto(a)}</td>
     <td><span class="pill ${a.prioridad==='alta'?'pa':'pn'}">${a.prioridad==='alta'?'ALTA':'Normal'}</span></td>
     <td>${esc(a.destino)}</td>
-    <td>${a.activo?'<span class="on">● Activa</span>':'<span class="off">○ Inactiva</span>'}</td>
+    <td><label class="sw"><input type="checkbox" ${a.activo?'checked':''} onchange="toggleCampo(${a.id},'activo',this.checked)"><span class="sl"></span></label></td>
+    <td><label class="sw snd"><input type="checkbox" ${a.sonido!=0?'checked':''} onchange="toggleCampo(${a.id},'sonido',this.checked)"><span class="sl"></span></label></td>
     <td style="text-align:right;white-space:nowrap">
-      <button class="btn-ed" onclick='editar(${JSON.stringify(a).replace(/'/g,"&#39;")})'><i class="bi bi-pencil"></i></button>
+      <button class="btn-ed" onclick="editarId(${a.id})"><i class="bi bi-pencil"></i></button>
       <button class="btn-del" onclick="eliminar(${a.id})"><i class="bi bi-trash"></i></button>
     </td></tr>`).join('');
+}
+function editarId(id){ const a=ROWS.find(x=>x.id===id); if(a) editar(a); }
+async function toggleCampo(id, campo, val){
+  const a=ROWS.find(x=>x.id===id); if(!a) return;
+  const body={ ...a, activo:!!a.activo, sonido:a.sonido!=0 };
+  body[campo]=val;
+  await fetch('/api/alertas',{method:'POST',headers:H,body:JSON.stringify(body)});
+  const local=ROWS.find(x=>x.id===id); if(local) local[campo]=val?1:0;
 }
 </script>
 <script src="/js/app-version.js"></script>

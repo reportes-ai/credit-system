@@ -2,7 +2,7 @@
    AutoFácil — Versión global de la aplicación
    Editar SOLO este archivo para cambiar la versión
    ───────────────────────────────────────────── */
-const APP_VERSION = 'v12.7';
+const APP_VERSION = 'v12.8';
 
 document.addEventListener('DOMContentLoaded', () => {
 
@@ -444,6 +444,7 @@ document.addEventListener('DOMContentLoaded', () => {
   const H = { 'Content-Type': 'application/json', Authorization: 'Bearer ' + token };
   let unread = -1;   // -1 = primera carga, no suena
   let hiPriHasta = 0; // timestamp hasta el cual insistir (alertas alta = 5 min)
+  let hiPriSonar = false; // si la alerta alta vigente tiene el sonido activado
 
   /* 🛎️ doble ding de campana de hotel */
   function dingDing() {
@@ -476,19 +477,22 @@ document.addEventListener('DOMContentLoaded', () => {
       const badge = document.getElementById('afBellCount');
       badge.textContent = noLeidas;
       badge.style.display = noLeidas ? 'flex' : 'none';
-      if (unread >= 0 && noLeidas > unread) dingDing();
+      // Sonar al llegar nuevas solo si alguna no leída tiene el sonido activado
+      const haySonido = (rows || []).some(n => !n.leida && n.sonar !== 0);
+      if (unread >= 0 && noLeidas > unread && haySonido) dingDing();
       unread = noLeidas;
 
-      // Alertas de prioridad alta: campanita "shake" + sonido insistente por 5 min
+      // Alertas de prioridad alta: campanita "shake" (visual) + sonido insistente por 5 min
       const btnBell = document.getElementById('afBellBtn');
       const hiPri = (rows || []).filter(n => !n.leida && n.prioridad === 'alta');
       if (hiPri.length) {
         btnBell.classList.add('af-shake');
         const masReciente = Math.max(...hiPri.map(n => new Date(n.created_at).getTime() || 0));
         hiPriHasta = masReciente + 5 * 60 * 1000;   // insistir hasta 5 min desde la más reciente
+        hiPriSonar = hiPri.some(n => n.sonar !== 0); // solo suena si esa alerta tiene sonido on
       } else {
         btnBell.classList.remove('af-shake');
-        hiPriHasta = 0;
+        hiPriHasta = 0; hiPriSonar = false;
       }
       const list = document.getElementById('afBellList');
       list.innerHTML = rows.length ? rows.map(n => `
@@ -549,7 +553,7 @@ document.addEventListener('DOMContentLoaded', () => {
   cargar();
   setInterval(cargar, 30000);
   // Sonido insistente para alertas alta: ~3 veces/min mientras estén sin leer y dentro de la ventana de 5 min
-  setInterval(() => { if (hiPriHasta && Date.now() < hiPriHasta && unread > 0) dingDing(); }, 20000);
+  setInterval(() => { if (hiPriHasta && hiPriSonar && Date.now() < hiPriHasta && unread > 0) dingDing(); }, 20000);
   if ('Notification' in window) {
     if (Notification.permission === 'granted') suscribir();
     else if (Notification.permission === 'default') btnPush.style.display = '';

@@ -25,21 +25,33 @@ const pool = require('../../../../shared/config/database');
         prioridad   VARCHAR(10)  NOT NULL DEFAULT 'normal',  -- normal | alta
         destino     VARCHAR(80)  NOT NULL DEFAULT 'Administrador', -- nombre de perfil o 'TODOS'
         activo      TINYINT(1)   NOT NULL DEFAULT 1,
+        sonido      TINYINT(1)   NOT NULL DEFAULT 1,
         created_at  DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
         updated_at  DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
       )`);
-    // Columnas para la campanita: clave de dedup + prioridad
+    // Columnas para la campanita: clave de dedup + prioridad + si suena
     await pool.query(`ALTER TABLE notificaciones ADD COLUMN IF NOT EXISTS clave VARCHAR(140) DEFAULT NULL`).catch(()=>{});
     await pool.query(`ALTER TABLE notificaciones ADD COLUMN IF NOT EXISTS prioridad VARCHAR(10) DEFAULT 'normal'`).catch(()=>{});
+    await pool.query(`ALTER TABLE notificaciones ADD COLUMN IF NOT EXISTS sonar TINYINT(1) DEFAULT 1`).catch(()=>{});
+    await pool.query(`ALTER TABLE alertas_config ADD COLUMN IF NOT EXISTS sonido TINYINT(1) NOT NULL DEFAULT 1`).catch(()=>{});
     await pool.query(`CREATE INDEX idx_notif_clave ON notificaciones (clave)`).catch(()=>{});
 
-    // Ejemplo inicial (solo si la tabla está vacía): cartas pendientes > 2 min, prioridad alta
+    // Ejemplos iniciales (solo si la tabla está vacía). El usuario los edita/activa en el mantenedor.
     const [[{ c }]] = await pool.query('SELECT COUNT(*) AS c FROM alertas_config');
     if (c === 0) {
-      await pool.query(
-        `INSERT INTO alertas_config (nombre, origen, campo, operador, valor1, prioridad, destino, activo)
-         VALUES (?,?,?,?,?,?,?,1)`,
-        ['Cartas pendientes en el pool', 'cartas_pendientes', 'minutos', 'mayor', '2', 'alta', 'Administrador']);
+      const ej = [
+        ['Cartas pendientes en el pool',        'cartas_pendientes',  'minutos', 'mayor', '2',  null, 'alta',   'Administrador', 1, 1],
+        ['Carta rechazada sin corregir +1 día', 'cartas_rechazadas',  'dias',    'mayor', '1',  null, 'alta',   'Administrador', 1, 1],
+        ['Saldo liberado sin pagar +3 días',    'saldos_liberados',   'dias',    'mayor', '3',  null, 'normal', 'Administrador', 1, 1],
+        ['Fundantes pendientes +5 días',        'fundantes_pendientes','dias',   'mayor', '5',  null, 'normal', 'Administrador', 1, 0],
+        ['Comisión sin pagar +30 días',         'comision_sin_pagar', 'dias',    'mayor', '30', null, 'normal', 'Administrador', 0, 1],
+        ['Operación en INGRESO +2 días',        'creditos_ingreso',   'dias',    'mayor', '2',  null, 'normal', 'Administrador', 0, 1],
+      ];
+      for (const e of ej) {
+        await pool.query(
+          `INSERT INTO alertas_config (nombre, origen, campo, operador, valor1, valor2, prioridad, destino, activo, sonido)
+           VALUES (?,?,?,?,?,?,?,?,?,?)`, e);
+      }
     }
     console.log('[alertas] tabla OK');
   } catch (e) { console.error('[alertas migration]', e.message); }
@@ -91,6 +103,91 @@ const ORIGENES = {
         titulo: 'Saldo sin pagar',
         mensaje: `OP ${r.num_op} lleva ${r.dias} día(s) liberada a pago sin pagar ($${Number(r.saldo_precio||0).toLocaleString('es-CL')}).`,
         href: '/postventa/saldos-a-pagar/',
+      }));
+    },
+  },
+  fundantes_pendientes: {
+    label: 'Fundantes pendientes (sin liberar a pago)',
+    href: '/postventa/seguimiento/',
+    campos: [
+      { campo: 'dias',         label: 'Días desde otorgado', tipo: 'numero' },
+      { campo: 'saldo_precio', label: 'Saldo precio ($)',    tipo: 'numero' },
+    ],
+    async filas() {
+      const [rows] = await pool.query(`
+        SELECT s.id, s.num_op, s.saldo_precio, DATEDIFF(CURDATE(), s.fecha_otorgado) AS dias
+        FROM postventa_seguimiento s
+        WHERE s.fecha_otorgado IS NOT NULL
+          AND NOT EXISTS (SELECT 1 FROM postventa_etapas e WHERE e.id_seguimiento=s.id AND e.track='SALDO' AND e.etapa='LIBERADO A PAGO')
+          AND NOT EXISTS (SELECT 1 FROM postventa_etapas e WHERE e.id_seguimiento=s.id AND e.track='SALDO' AND e.etapa='SALDO PRECIO PAGADO')`);
+      return rows.map(r => ({
+        key: 'fund:' + r.id,
+        vars: { dias: r.dias, saldo_precio: r.saldo_precio },
+        titulo: 'Fundantes pendientes',
+        mensaje: `OP ${r.num_op} lleva ${r.dias} día(s) otorgada con fundantes aún sin liberar a pago.`,
+        href: '/postventa/seguimiento/',
+      }));
+    },
+  },
+  comision_sin_pagar: {
+    label: 'Comisión sin pagar',
+    href: '/postventa/seguimiento/',
+    campos: [
+      { campo: 'dias',     label: 'Días desde otorgado', tipo: 'numero' },
+      { campo: 'comision', label: 'Comisión ($)',        tipo: 'numero' },
+    ],
+    async filas() {
+      const [rows] = await pool.query(`
+        SELECT s.id, s.num_op, s.comision, DATEDIFF(CURDATE(), s.fecha_otorgado) AS dias
+        FROM postventa_seguimiento s
+        WHERE s.fecha_otorgado IS NOT NULL
+          AND NOT EXISTS (SELECT 1 FROM postventa_etapas e WHERE e.id_seguimiento=s.id AND e.track='COMISION' AND e.etapa='COMISION PAGADA')`);
+      return rows.map(r => ({
+        key: 'com:' + r.id,
+        vars: { dias: r.dias, comision: r.comision },
+        titulo: 'Comisión sin pagar',
+        mensaje: `OP ${r.num_op} lleva ${r.dias} día(s) otorgada con comisión sin pagar ($${Number(r.comision||0).toLocaleString('es-CL')}).`,
+        href: '/postventa/seguimiento/',
+      }));
+    },
+  },
+  cartas_rechazadas: {
+    label: 'Cartas rechazadas (a corregir)',
+    href: '/aprobaciones/',
+    campos: [
+      { campo: 'dias',             label: 'Días desde rechazo', tipo: 'numero' },
+      { campo: 'ejecutivo_nombre', label: 'Ejecutivo',          tipo: 'texto' },
+    ],
+    async filas() {
+      const [rows] = await pool.query(`
+        SELECT id, op_carta, ejecutivo_nombre, DATEDIFF(CURDATE(), DATE(fecha_creacion)) AS dias
+        FROM cartas_aprobacion WHERE status = 'RECHAZADO'`);
+      return rows.map(r => ({
+        key: 'rech:' + r.id,
+        vars: { dias: r.dias, ejecutivo_nombre: r.ejecutivo_nombre },
+        titulo: 'Carta rechazada',
+        mensaje: `Carta ${r.op_carta || r.id} de ${r.ejecutivo_nombre || '—'} rechazada hace ${r.dias} día(s), pendiente de corregir.`,
+        href: '/aprobaciones/',
+      }));
+    },
+  },
+  creditos_ingreso: {
+    label: 'Operaciones en INGRESO sin otorgar',
+    href: '/creditos/',
+    campos: [
+      { campo: 'dias',      label: 'Días en INGRESO', tipo: 'numero' },
+      { campo: 'ejecutivo', label: 'Ejecutivo',       tipo: 'texto' },
+    ],
+    async filas() {
+      const [rows] = await pool.query(`
+        SELECT id, num_op, ejecutivo, DATEDIFF(CURDATE(), DATE(fecha_estado)) AS dias
+        FROM creditos WHERE estado = 'INGRESO' AND fecha_estado IS NOT NULL`);
+      return rows.map(r => ({
+        key: 'ing:' + r.id,
+        vars: { dias: r.dias, ejecutivo: r.ejecutivo },
+        titulo: 'Operación en INGRESO',
+        mensaje: `OP ${r.num_op} (${r.ejecutivo || '—'}) lleva ${r.dias} día(s) en INGRESO sin otorgar.`,
+        href: '/creditos/',
       }));
     },
   },
@@ -150,9 +247,9 @@ async function evaluarAlertas() {
             'SELECT 1 FROM notificaciones WHERE id_usuario = ? AND clave = ? AND leida = 0 LIMIT 1', [uid, clave]);
           if (ex) continue; // ya notificado y sin leer → no duplicar
           await pool.query(
-            `INSERT INTO notificaciones (id_usuario, tipo, titulo, mensaje, href, clave, prioridad)
-             VALUES (?,?,?,?,?,?,?)`,
-            [uid, 'alerta', rg.nombre || f.titulo, f.mensaje, f.href, clave, rg.prioridad || 'normal']);
+            `INSERT INTO notificaciones (id_usuario, tipo, titulo, mensaje, href, clave, prioridad, sonar)
+             VALUES (?,?,?,?,?,?,?,?)`,
+            [uid, 'alerta', rg.nombre || f.titulo, f.mensaje, f.href, clave, rg.prioridad || 'normal', rg.sonido ? 1 : 0]);
         }
       }
       // Resolver: borrar notificaciones no leídas de esta regla cuyo registro ya no cumple
@@ -185,18 +282,18 @@ const listAlertas = async (req, res) => {
 
 const saveAlerta = async (req, res) => {
   try {
-    const { id, nombre, origen, campo, operador, valor1, valor2, prioridad, destino, activo } = req.body;
+    const { id, nombre, origen, campo, operador, valor1, valor2, prioridad, destino, activo, sonido } = req.body;
     if (!nombre || !ORIGENES[origen] || !OPERADORES.find(o => o.op === operador))
       return res.status(400).json({ success: false, data: null, error: 'nombre, origen y operador válidos requeridos' });
-    const params = [nombre, origen, campo, operador, valor1 ?? null, valor2 ?? null, prioridad || 'normal', destino || 'Administrador', activo ? 1 : 0];
+    const params = [nombre, origen, campo, operador, valor1 ?? null, valor2 ?? null, prioridad || 'normal', destino || 'Administrador', activo ? 1 : 0, sonido ? 1 : 0];
     if (id) {
       await pool.query(
-        `UPDATE alertas_config SET nombre=?, origen=?, campo=?, operador=?, valor1=?, valor2=?, prioridad=?, destino=?, activo=? WHERE id=?`,
+        `UPDATE alertas_config SET nombre=?, origen=?, campo=?, operador=?, valor1=?, valor2=?, prioridad=?, destino=?, activo=?, sonido=? WHERE id=?`,
         [...params, id]);
     } else {
       await pool.query(
-        `INSERT INTO alertas_config (nombre, origen, campo, operador, valor1, valor2, prioridad, destino, activo)
-         VALUES (?,?,?,?,?,?,?,?,?)`, params);
+        `INSERT INTO alertas_config (nombre, origen, campo, operador, valor1, valor2, prioridad, destino, activo, sonido)
+         VALUES (?,?,?,?,?,?,?,?,?,?)`, params);
     }
     evaluarAlertas();
     res.json({ success: true, data: { ok: true }, error: null });
