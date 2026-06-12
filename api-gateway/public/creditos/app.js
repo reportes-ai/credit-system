@@ -646,15 +646,24 @@ async function buscarClienteCred() {
                    || c.razon_social || rut;
       document.getElementById('iNombreCliente').value = nombre;
 
-      // Fechas de actualización
-      const hoy   = new Date();
-      const tresM = 90 * 24 * 60 * 60 * 1000; // 90 días
+      // Fechas de actualización (link a actualizar; ámbar >60d, rojo >90d)
+      const hoy    = new Date();
+      const DAY    = 24 * 60 * 60 * 1000;
+      const rutEnc = encodeURIComponent(rut);
+      const volver = '&return=' + encodeURIComponent('/creditos');
+      const HREFS  = {
+        'Datos Personales': '/clientes?rut='           + rutEnc + volver,
+        'Ant. Laborales':   '/antecedentes-laborales?rut=' + rutEnc + volver,
+        'Inf. Comercial':   '/informacion-comercial?rut='  + rutEnc + volver,
+      };
       const itemFecha = (label, val) => {
-        if (!val) return `<div class="fecha-item"><span class="fi-label">${label}</span><span class="fi-val stale">Sin datos</span></div>`;
-        const d     = new Date(val);
-        const stale = (hoy - d) > tresM;
-        const txt   = d.toLocaleDateString('es-CL', { day:'2-digit', month:'2-digit', year:'2-digit' });
-        return `<div class="fecha-item"><span class="fi-label">${label}</span><span class="fi-val${stale?' stale':''}">${txt}</span></div>`;
+        const href = HREFS[label];
+        if (!val) return `<div class="fecha-item"><span class="fi-label">${label}</span><a class="fi-val danger" href="${href}" title="Actualizar ${label}">Sin datos<i class="bi bi-pencil-square fi-edit"></i></a></div>`;
+        const d    = new Date(val);
+        const dias = Math.floor((hoy - d) / DAY);
+        const cls  = dias > 90 ? 'danger' : dias > 60 ? 'warn' : '';
+        const txt  = d.toLocaleDateString('es-CL', { day:'2-digit', month:'2-digit', year:'2-digit' });
+        return `<div class="fecha-item"><span class="fi-label">${label}</span><a class="fi-val${cls?' '+cls:''}" href="${href}" title="Actualizar ${label} (${dias} días)">${txt}<i class="bi bi-pencil-square fi-edit"></i></a></div>`;
       };
       const fechasHtml = [
         itemFecha('Datos Personales', c.fecha_actualizacion),
@@ -1638,6 +1647,15 @@ cargarEjecutivosCred();
   const params  = new URLSearchParams(location.search);
   const editId  = params.get('editar');
   if (editId) cargarModoEdicion(editId);
+})();
+
+// ── Volver desde actualizar datos: ?rut=<rut> → abrir Ingreso y recargar fechas ── //
+(function() {
+  const rut = new URLSearchParams(location.search).get('rut');
+  if (!rut) return;
+  cambiarTab('ingreso');
+  const el = document.getElementById('iRut');
+  if (el) { el.value = rut; buscarClienteCred(); }
 })();
 document.addEventListener('keydown', e => {
   if (e.key==='Escape') { cerrarDetalle(); cerrarCotizaciones(); cerrarAmort(); }

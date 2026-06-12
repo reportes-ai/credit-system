@@ -147,7 +147,7 @@
   <div class="topnav-left">
     <a href="/" class="topnav-brand">
       <img src="/img/logo.png" alt="AutoFácil" style="display:block">
-      <span class="version-badge" id="versionBadge">v1.3</span>
+      <span class="version-badge" id="versionBadge">v1.4</span>
     </a>
       <div class="breadcrumb-nav">
         <a href="/">Inicio</a><span class="sep">›</span>
@@ -647,8 +647,11 @@ async function guardar() {
       method:'PUT', headers: apiHeaders(), body: JSON.stringify(body),
     });
     const j = await r.json();
-    if (j.success) showToast('Guardado correctamente', true);
-    else showToast(j.error || 'Error al guardar', false);
+    if (j.success) {
+      showToast('Guardado correctamente', true);
+      const ret = params.get('return');
+      if (ret) { const sep = ret.includes('?') ? '&' : '?'; setTimeout(() => location.href = ret + sep + 'rut=' + encodeURIComponent(RUT), 800); }
+    } else showToast(j.error || 'Error al guardar', false);
   } catch(e) {
     showToast('Error de conexión', false);
   }

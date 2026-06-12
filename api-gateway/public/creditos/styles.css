@@ -286,8 +286,12 @@
     .rut-found-fechas { display:flex; gap:16px; flex-wrap:wrap; align-items:center; }
     .fecha-item { display:flex; flex-direction:column; align-items:center; gap:1px; }
     .fecha-item .fi-label { color:#6b7280; font-size:.62rem; font-weight:700; text-transform:uppercase; letter-spacing:.05em; }
-    .fecha-item .fi-val   { color:#047857; font-size:.75rem; font-weight:700; }
-    .fecha-item .fi-val.stale { color:#dc2626 !important; font-weight:800; }
+    .fecha-item .fi-val   { color:#047857; font-size:.75rem; font-weight:700; text-decoration:none; border-bottom:1px dotted currentColor; cursor:pointer; }
+    .fecha-item a.fi-val:hover { filter:brightness(.85); }
+    .fecha-item .fi-val.warn   { color:#b45309 !important; font-weight:800; }   /* >60 días — ámbar */
+    .fecha-item .fi-val.danger { color:#dc2626 !important; font-weight:800; }   /* >90 días — rojo */
+    .fecha-item .fi-val.stale  { color:#dc2626 !important; font-weight:800; }
+    .fecha-item .fi-edit { font-size:.58rem; opacity:.6; margin-left:3px; }
 
     /* Toast */
     .toast-msg { position:fixed; top:68px; right:20px; z-index:9999; border-radius:10px; padding:14px 20px; font-weight:600; font-size:.9rem; color:#fff; box-shadow:0 8px 24px rgba(0,0,0,.18); display:none; }
