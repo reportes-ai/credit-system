@@ -28,18 +28,35 @@ const audit = require('../../../../shared/auditoria');
       .catch(e => { if (e.errno !== 1060) throw e; });
     await pool.query(`ALTER TABLE credito_documentos ADD COLUMN aprobado_at DATETIME NULL`)
       .catch(e => { if (e.errno !== 1060) throw e; });
+    // Bitácora de visualizaciones (para informe de Riesgo Operacional)
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS credito_documento_vistos (
+        id             INT AUTO_INCREMENT PRIMARY KEY,
+        id_doc         INT      NOT NULL,
+        id_credito     INT      NULL,
+        id_usuario     INT      NULL,
+        usuario_nombre VARCHAR(200) NULL,
+        usuario_email  VARCHAR(200) NULL,
+        visto_at       DATETIME DEFAULT CURRENT_TIMESTAMP,
+        INDEX idx_doc (id_doc),
+        INDEX idx_credito (id_credito)
+      )
+    `);
   } catch(e) { if (e.errno !== 1050) console.error('[credito_documentos migration]', e.message); }
 })();
 
 /* ─── GET por crédito (sin datos binarios) ──────────────────────────────── */
 const getByCredito = async (req, res) => {
   try {
+    const idUser = req.usuario?.id_usuario || null;
     const [rows] = await pool.query(
-      `SELECT id_doc, id_credito, id_tipo, archivo_nombre, archivo_size, mime_type,
-              comentario, subido_at, subido_por,
-              aprobado, aprobado_por, rechazado_por, aprobado_at
-       FROM credito_documentos WHERE id_credito = ? ORDER BY id_tipo, subido_at DESC`,
-      [req.params.id_credito]
+      `SELECT cd.id_doc, cd.id_credito, cd.id_tipo, cd.archivo_nombre, cd.archivo_size, cd.mime_type,
+              cd.comentario, cd.subido_at, cd.subido_por,
+              cd.aprobado, cd.aprobado_por, cd.rechazado_por, cd.aprobado_at,
+              EXISTS(SELECT 1 FROM credito_documento_vistos v
+                     WHERE v.id_doc = cd.id_doc AND (? IS NULL OR v.id_usuario = ?)) AS visto
+       FROM credito_documentos cd WHERE cd.id_credito = ? ORDER BY cd.id_tipo, cd.subido_at DESC`,
+      [idUser, idUser, req.params.id_credito]
     );
     res.json({ success: true, data: rows, error: null });
   } catch(e) { (console.error('[error]', e), res.status(500).json({success:false,data:null,error:'Error interno del servidor'})); }
@@ -101,6 +118,14 @@ const view = async (req, res) => {
     );
     if (!rows.length) return res.status(404).json({ success: false, error: 'Documento no encontrado' });
     const doc = rows[0];
+    // Registrar visualización (bitácora Riesgo Operacional) — fire & forget
+    const u = req.usuario || {};
+    pool.query(
+      `INSERT INTO credito_documento_vistos (id_doc, id_credito, id_usuario, usuario_nombre, usuario_email)
+       SELECT ?, id_credito, ?, ?, ? FROM credito_documentos WHERE id_doc=?`,
+      [req.params.id_doc, u.id_usuario || null,
+       [u.nombre, u.apellido].filter(Boolean).join(' ') || null, u.email || null, req.params.id_doc]
+    ).catch(e => console.error('[visto log]', e.message));
     res.setHeader('Content-Type', doc.mime_type || 'application/octet-stream');
     res.setHeader('Content-Disposition', `inline; filename*=UTF-8''${encodeURIComponent(doc.archivo_nombre)}`);
     res.send(doc.archivo_data);
