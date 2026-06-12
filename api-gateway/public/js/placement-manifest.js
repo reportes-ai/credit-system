@@ -42,14 +42,14 @@ const PLACEMENT_ITEMS = {
   // ── CRÉDITOS — sub-páginas ────────────────────────────────────────────────
   // (sin sub-páginas actualmente)
   // ── COMISIONES ────────────────────────────────────────────────────────────
-  'com-revision':            { section:'comisiones',    href:'/comisiones/revision/',   icon:'bi-clipboard-check',       titulo:'Revisión Comisiones' },
-  'com-variables':           { section:'comisiones',    href:'/comisiones/variables/',  icon:'bi-sliders2',              titulo:'Variables Comisiones' },
+  'com-revision':            { section:'comisiones',    href:'/comisiones/revision/',   icon:'bi-clipboard-check',       titulo:'Revisión y Aprobación Comisiones' },
+  'com-variables':           { section:'comisiones',    href:'/comisiones/variables/',  icon:'bi-sliders2',              titulo:'Mantenedor Variables Comisiones' },
   // ── TESORERÍA ─────────────────────────────────────────────────────────────
   'teso-caja':               { section:'tesoreria',     href:'/tesoreria/caja',                 icon:'bi-cash-coin',         titulo:'Caja' },
-  'teso-cajas':              { section:'tesoreria',     href:'/tesoreria/cajas',                icon:'bi-cash-stack',        titulo:'Administración Cajas' },
+  'teso-cajas':              { section:'tesoreria',     href:'/tesoreria/cajas',                icon:'bi-cash-stack',        titulo:'Administración de Cajas' },
   'teso-cierre-caja':        { section:'tesoreria',     href:'/tesoreria/cierre-caja',          icon:'bi-journal-check',     titulo:'Cierre de Caja' },
   'teso-cuentas-transitorias':{ section:'tesoreria',    href:'/tesoreria/cuentas-transitorias', icon:'bi-arrow-left-right',  titulo:'Cuentas Transitorias' },
-  'teso-brokerage':          { section:'tesoreria',     href:'/tesoreria/brokerage',            icon:'bi-building-check',    titulo:'Brokerage' },
+  'teso-brokerage':          { section:'tesoreria',     href:'/tesoreria/brokerage',            icon:'bi-building-check',    titulo:'Panel Brokerage Tesorería' },
   // ── COBRANZA ──────────────────────────────────────────────────────────────
   'cobr-prejudicial':        { section:'cobranza',      href:'/cobranza/prejudicial', icon:'bi-exclamation-triangle-fill', titulo:'Pre-judicial' },
   'cobr-judicial':           { section:'cobranza',      href:'/cobranza/judicial',    icon:'bi-file-earmark-text-fill',    titulo:'Judicial' },
@@ -57,7 +57,7 @@ const PLACEMENT_ITEMS = {
   // ── CRM ───────────────────────────────────────────────────────────────────
   'crm-gestiones':           { section:'crm',           href:'/crm/gestiones',    icon:'bi-telephone-fill',  titulo:'Gestiones de Contacto' },
   'crm-estadisticas':        { section:'crm',           href:'/crm/estadisticas', icon:'bi-bar-chart-line',  titulo:'Estadísticas CRM' },
-  'crm-campanas':            { section:'crm',           href:'/crm/campanas',     icon:'bi-megaphone-fill',  titulo:'Campañas Outbound' },
+  'crm-campanas':            { section:'crm',           href:'/crm/campanas',     icon:'bi-megaphone-fill',  titulo:'Campañas de Outbound' },
   // ── MANTENEDORES ─────────────────────────────────────────────────────────
   'tasas':                   { section:'mantenedores',  href:'/mantenedores/tasas/',              icon:'bi-percent',               titulo:'Tasas de Interés' },
   'uf':                      { section:'mantenedores',  href:'/mantenedores/uf/',                 icon:'bi-currency-dollar',        titulo:'Valores UF' },
@@ -67,14 +67,14 @@ const PLACEMENT_ITEMS = {
   'parametros':              { section:'mantenedores',  href:'/mantenedores/parametros/',         icon:'bi-sliders',                titulo:'Parámetros Crédito' },
   'factores-seguro':         { section:'mantenedores',  href:'/mantenedores/factores-seguro/',    icon:'bi-shield-check',           titulo:'Factores Seguro' },
   'tipos-documento':         { section:'mantenedores',  href:'/mantenedores/tipos-documento/',    icon:'bi-paperclip',              titulo:'Tipos de Documento' },
-  'pagares':                 { section:'mantenedores',  href:'/mantenedores/pagares/',            icon:'bi-file-earmark-text',      titulo:'Pagarés Autofacil' },
+  'pagares':                 { section:'mantenedores',  href:'/mantenedores/pagares/',            icon:'bi-file-earmark-text',      titulo:'Pagarés AutoFácil' },
   'cuentas-bancarias':       { section:'mantenedores',  href:'/mantenedores/cuentas-bancarias/',  icon:'bi-bank',                   titulo:'Cuentas Bancarias' },
-  'parques':                 { section:'mantenedores',  href:'/mantenedores/parques/',            icon:'bi-p-circle',               titulo:'Arriendo Parques' },
-  'flujo-brokerage':         { section:'mantenedores',  href:'/mantenedores/flujo-brokerage/',    icon:'bi-diagram-3',              titulo:'Flujo Brokerage' },
-  'broker-validaciones':     { section:'mantenedores',  href:'/mantenedores/broker-validaciones/',icon:'bi-card-checklist',         titulo:'Docs Validar Brokers' },
+  'parques':                 { section:'mantenedores',  href:'/mantenedores/parques/',            icon:'bi-p-circle',               titulo:'Arriendo y Comisión Parques' },
+  'flujo-brokerage':         { section:'mantenedores',  href:'/mantenedores/flujo-brokerage/',    icon:'bi-diagram-3',              titulo:'Flujo Crédito Brokerage' },
+  'broker-validaciones':     { section:'mantenedores',  href:'/mantenedores/broker-validaciones/',icon:'bi-card-checklist',         titulo:'Documentos a Validar Brokers' },
   'financieras':             { section:'mantenedores',  href:'/mantenedores/financieras/',        icon:'bi-calculator',             titulo:'Fórmulas Financieras' },
-  'comisiones-seguro':       { section:'mantenedores',  href:'/mantenedores/comisiones-seguro/',  icon:'bi-shield-half',            titulo:'Comisiones Seguro' },
-  'productos-financiera':    { section:'mantenedores',  href:'/mantenedores/productos-financiera/', icon:'bi-tags-fill',              titulo:'Productos por Financiera' },
+  'comisiones-seguro':       { section:'mantenedores',  href:'/mantenedores/comisiones-seguro/',  icon:'bi-umbrella',               titulo:'Comisiones de Seguro' },
+  'productos-financiera':    { section:'mantenedores',  href:'/mantenedores/productos-financiera/', icon:'bi-tags-fill',              titulo:'Productos Financiera' },
   'informes-dealernet':      { section:'clientes',      href:'/informes-dealernet/',                 icon:'bi-file-earmark-bar-graph-fill', titulo:'Informes Dealernet' },
   'bd-clientes':             { section:'mantenedores',  href:'/mantenedores/bd-clientes/',               icon:'bi-database',               titulo:'BD Clientes' },
   'bd-operaciones':          { section:'mantenedores',  href:'/mantenedores/bd-operaciones/',            icon:'bi-database-gear',          titulo:'BD Operaciones' },
