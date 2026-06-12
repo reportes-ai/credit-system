@@ -65,7 +65,7 @@
     <div class="topnav-left">
       <a href="/" class="topnav-brand">
         <img src="/img/logo.png" alt="AutoFácil">
-        <span class="version-badge">v5.0</span>
+        <span class="version-badge">v5.1</span>
       </a>
       <div class="breadcrumb-nav">
         <a href="/">Inicio</a><span class="sep">›</span>
@@ -142,7 +142,7 @@
     let sortable = null, modoReordenar = false;
 
     async function cargar() {
-      let orden = null, placement = {}, funcInfo = [];
+      let orden = null, placement = {}, funcInfo = [], modsBD = [];
       try {
         const [rO, rP, rM] = await Promise.all([
           fetch(`/api/config/ui/${CONFIG_KEY}`, { headers: H }),
@@ -154,25 +154,48 @@
         if (jP.success && jP.data) placement = jP.data;
         // funcionalidadesInfo: array {codigo, nombre, href, icono} desde BD
         funcInfo = (jM.funcionalidadesInfo || []).filter(f => f.href && f.href.startsWith('/tesoreria/'));
+        if (jM.success && Array.isArray(jM.data)) modsBD = jM.data;
       } catch {}
+
+      // Soporta ambos formatos de placement: viejo (clave→sección string) y nuevo (sección→[claves])
+      const norm = r => r ? (r.endsWith('/') ? r : r + '/') : r;
+      const isNew = Object.values(placement).some(v => Array.isArray(v));
+      const sectionOf = key => {
+        if (!key) return null;
+        if (isNew) {
+          for (const [sec, arr] of Object.entries(placement))
+            if (Array.isArray(arr) && (arr.includes(key) || arr.map(norm).includes(norm(key)))) return sec;
+          return null;
+        }
+        return placement[key] || null;
+      };
 
       // Construir items desde funcionalidades de BD (solo los que el usuario tiene permiso)
       const nativeHrefs = new Set(funcInfo.map(f => f.href));
       const nativeItems = funcInfo.map(f => {
         const seg = f.href.replace('/tesoreria/', '').replace(/\//g, '');
-        const placKey = KEY[seg];
-        const sec = placKey ? placement[placKey] : undefined;
+        const sec = sectionOf(KEY[seg]);
         if (sec && sec !== 'tesoreria') return null; // fue movido a otra sección
         return { id: seg || f.codigo, href: f.href, icon: f.icono || 'bi-grid', titulo: f.nombre, desc: '' };
       }).filter(Boolean);
 
-      // Extras de otras secciones movidos aquí via placement
+      // Extras de otras secciones movidos aquí via placement (sub-ítems del manifiesto)
       const nativeManifestKeys = new Set(Object.values(KEY));
+      const nuevoIncoming = isNew ? (Array.isArray(placement['tesoreria']) ? placement['tesoreria'] : []) : null;
+      const enTeso = k => isNew ? nuevoIncoming.includes(k) : placement[k] === 'tesoreria';
       const extrasSubitem = Object.entries(typeof PLACEMENT_ITEMS !== 'undefined' ? PLACEMENT_ITEMS : {})
-        .filter(([k, v]) => !nativeManifestKeys.has(k) && placement[k] === 'tesoreria')
+        .filter(([k]) => !nativeManifestKeys.has(k) && enTeso(k))
         .map(([k, v]) => ({ id: k, href: v.href, icon: v.icon, titulo: v.titulo, desc: v.desc || '' }));
-      const extrasMods = (funcInfo.length ? [] : []) // modsBD ya no necesario — funcInfo lo cubre
-        .filter(m => placement[m.ruta] === 'tesoreria' && !nativeHrefs.has(m.ruta))
+
+      // Extras: módulos BD completos movidos aquí
+      const yaHrefTeso = new Set(nativeHrefs);
+      const incomingMods = isNew
+        ? nuevoIncoming
+        : Object.entries(placement).filter(([, s]) => s === 'tesoreria').map(([k]) => k);
+      const extrasMods = incomingMods
+        .filter(k => typeof k === 'string' && k.startsWith('/'))
+        .map(k => modsBD.find(m => norm(m.ruta) === norm(k)))
+        .filter(m => m && !yaHrefTeso.has(m.ruta))
         .map(m => ({ id: m.ruta, href: m.ruta, icon: m.icono || 'bi-grid', titulo: m.nombre, desc: m.descripcion || '' }));
 
       const allItems = [...nativeItems, ...extrasSubitem, ...extrasMods];

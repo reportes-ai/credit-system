@@ -39,7 +39,7 @@
     <div class="topnav-left">
       <a href="/" class="topnav-brand">
         <img src="/img/logo.png" alt="AutoFácil">
-        <span class="version-badge">v4.7</span>
+        <span class="version-badge">v4.8</span>
       </a>
       <div class="breadcrumb-nav">
         <a href="/">Inicio</a><span class="sep">›</span>
@@ -133,20 +133,35 @@
       const grid = document.querySelector('[style*="grid-template-columns"]');
       if (!grid) return;
 
+      // Soporta ambos formatos de placement: viejo (clave→sección string) y nuevo (sección→[claves])
+      const norm = r => r ? (r.endsWith('/') ? r : r + '/') : r;
+      const isNew = Object.values(placement).some(v => Array.isArray(v));
+      const sectionOf = key => {
+        if (!key) return null;
+        if (isNew) {
+          for (const [sec, arr] of Object.entries(placement))
+            if (Array.isArray(arr) && (arr.includes(key) || arr.map(norm).includes(norm(key)))) return sec;
+          return null;
+        }
+        return placement[key] || null;
+      };
+      const SECTION = 'crm';
+
       // Ocultar cards nativas movidas a otra sección
       grid.querySelectorAll('a[href]').forEach(a => {
-        const k = KEY[a.getAttribute('href')];
-        const sec = k ? (placement[k] || 'crm') : 'crm';
-        if (sec !== 'crm') a.style.display = 'none';
+        const sec = sectionOf(KEY[a.getAttribute('href')]);
+        if (sec && sec !== SECTION) a.style.display = 'none';
       });
 
       // Agregar módulos BD movidos aquí
-      const nativeHrefs = new Set(Object.keys(KEY));
-      Object.entries(placement).forEach(([k, sec]) => {
-        if (sec !== 'crm') return;
-        if (Object.values(KEY).includes(k)) return;
-        const mod = modsBD.find(m => m.ruta === k);
-        if (mod && !nativeHrefs.has(mod.ruta)) {
+      const nativeKeys = new Set(Object.values(KEY));
+      const incoming = isNew
+        ? (Array.isArray(placement[SECTION]) ? placement[SECTION] : [])
+        : Object.entries(placement).filter(([, s]) => s === SECTION).map(([k]) => k);
+      incoming.forEach(k => {
+        if (nativeKeys.has(k)) return;
+        const mod = modsBD.find(m => norm(m.ruta) === norm(k));
+        if (mod) {
           const a = document.createElement('a');
           a.href = mod.ruta; a.style.textDecoration = 'none';
           a.innerHTML = `<div style="background:#fff;border-radius:14px;padding:22px 20px;box-shadow:0 1px 6px rgba(0,0,0,.08);border:2px solid transparent;transition:all .2s;cursor:pointer" onmouseover="this.style.borderColor='var(--navy)';this.style.transform='translateY(-2px)'" onmouseout="this.style.borderColor='transparent';this.style.transform=''">

@@ -75,7 +75,7 @@
   <div class="topnav-left">
     <a href="/" class="topnav-brand">
       <img src="/img/logo.png" alt="AutoFácil">
-      <span class="version-badge" id="versionBadge">v5.1</span>
+      <span class="version-badge" id="versionBadge">v5.2</span>
     </a>
     <div class="breadcrumb-nav">
       <a href="/">Inicio</a><span class="sep">›</span>
@@ -371,43 +371,43 @@
     const KEY = { prejudicial:'cobr-prejudicial', judicial:'cobr-judicial', reporteria:'cobr-reporteria' };
     const grid = document.getElementById('moduleGrid');
 
+    // Soporta ambos formatos de placement: viejo (clave→sección string) y nuevo (sección→[claves])
+    const norm = r => r ? (r.endsWith('/') ? r : r + '/') : r;
+    const isNew = Object.values(placement).some(v => Array.isArray(v));
+    const sectionOf = key => {
+      if (!key) return null;
+      if (isNew) {
+        for (const [sec, arr] of Object.entries(placement))
+          if (Array.isArray(arr) && (arr.includes(key) || arr.map(norm).includes(norm(key)))) return sec;
+        return null;
+      }
+      return placement[key] || null;
+    };
+    const SECTION = 'cobranza';
+
     // Ocultar cards nativas movidas a otra sección
     grid.querySelectorAll('.module-card[data-id]').forEach(card => {
-      const k = KEY[card.dataset.id];
-      const sec = k ? (placement[k] || 'cobranza') : 'cobranza';
-      if (sec !== 'cobranza') card.style.display = 'none';
+      const sec = sectionOf(KEY[card.dataset.id]);
+      if (sec && sec !== SECTION) card.style.display = 'none';
     });
 
-    // Agregar extras de otras secciones movidos aquí
-    const nativeHrefs = new Set(['/cobranza/prejudicial','/cobranza/judicial','/cobranza/reporteria']);
-    const allExtras = [
-      ...Object.entries(placement)
-        .filter(([k, sec]) => sec === 'cobranza' && !Object.values(KEY).includes(k))
-        .map(([k]) => {
-          const mod = modsBD.find(m => m.ruta === k);
-          if (mod) return { href: mod.ruta, icon: mod.icono||'bi-grid', titulo: mod.nombre, desc: mod.descripcion||'' };
-          // sub-item from manifest (inline fallback)
-          const MANT = { 'tasas':{ href:'/mantenedores/tasas/',icon:'bi-percent',titulo:'Tasas de Interés',desc:'' },'uf':{ href:'/mantenedores/uf/',icon:'bi-currency-dollar',titulo:'Valores UF',desc:'' } };
-          return null; // otros sub-items no críticos
-        }).filter(Boolean),
-    ];
-
-    // Para sub-items del manifiesto movidos aquí, necesitamos fetch del manifiesto
-    // Usamos los datos del placement_v2 y buscamos en modsBD; el resto se renderiza igual
-    Object.entries(placement).forEach(([k, sec]) => {
-      if (sec !== 'cobranza') return;
-      if (Object.values(KEY).includes(k)) return; // ya nativo
-      const mod = modsBD.find(m => m.ruta === k);
-      if (mod && !nativeHrefs.has(mod.ruta)) {
-        const a = document.createElement('a');
-        a.href = mod.ruta; a.className = 'module-card blue'; a.dataset.id = k;
-        a.innerHTML = `<i class="bi bi-grip-vertical drag-handle"></i>
-          <div class="card-icon blue"><i class="bi ${mod.icono||'bi-grid'}"></i></div>
-          <div class="card-title">${mod.nombre}</div>
-          <div class="card-desc">${mod.descripcion||''}</div>
-          <div class="card-link blue">Acceder <i class="bi bi-arrow-right"></i></div>`;
-        grid.appendChild(a);
-      }
+    // Agregar módulos movidos aquí
+    const nativeKeys = new Set(Object.values(KEY));
+    const incoming = isNew
+      ? (Array.isArray(placement[SECTION]) ? placement[SECTION] : [])
+      : Object.entries(placement).filter(([, s]) => s === SECTION).map(([k]) => k);
+    incoming.forEach(k => {
+      if (nativeKeys.has(k)) return;
+      const mod = modsBD.find(m => norm(m.ruta) === norm(k));
+      if (!mod || grid.querySelector(`[data-id="${k}"]`)) return;
+      const a = document.createElement('a');
+      a.href = mod.ruta; a.className = 'module-card blue'; a.dataset.id = k;
+      a.innerHTML = `<i class="bi bi-grip-vertical drag-handle"></i>
+        <div class="card-icon blue"><i class="bi ${mod.icono||'bi-grid'}"></i></div>
+        <div class="card-title">${mod.nombre}</div>
+        <div class="card-desc">${mod.descripcion||''}</div>
+        <div class="card-link blue">Acceder <i class="bi bi-arrow-right"></i></div>`;
+      grid.appendChild(a);
     });
   })();
 </script>
