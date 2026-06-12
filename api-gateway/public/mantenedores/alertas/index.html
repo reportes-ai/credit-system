@@ -128,7 +128,7 @@ let META = { origenes:[], operadores:[], perfiles:[] }, EDIT = null;
   // Poblar selects fijos
   document.getElementById('fOrigen').innerHTML = META.origenes.map(o=>`<option value="${esc(o.id)}">${esc(o.label)}</option>`).join('');
   document.getElementById('fOperador').innerHTML = META.operadores.map(o=>`<option value="${esc(o.op)}">${esc(o.label)}</option>`).join('');
-  const optsDest = '<option value="">—</option><option value="TODOS">Todos los usuarios</option>' + META.perfiles.map(p=>`<option value="${esc(p)}">${esc(p)}</option>`).join('');
+  const optsDest = '<option value="">—</option><option value="CREADOR">👤 Creador (quien creó el registro)</option><option value="TODOS">Todos los usuarios</option>' + META.perfiles.map(p=>`<option value="${esc(p)}">${esc(p)}</option>`).join('');
   document.querySelectorAll('.dest').forEach(s=>s.innerHTML=optsDest);
   renderLista(jL.data||[]);
 })();

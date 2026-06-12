@@ -47,7 +47,7 @@ const pool = require('../../../../shared/config/database');
     if (c === 0) {
       const ej = [
         ['Cartas pendientes en el pool',        'cartas_pendientes',  'minutos', 'mayor', '2',  null, 'alta',   'Administrador', 1, 1],
-        ['Carta rechazada sin corregir +1 día', 'cartas_rechazadas',  'dias',    'mayor', '1',  null, 'alta',   'Administrador', 1, 1],
+        ['Carta rechazada sin corregir +1 día', 'cartas_rechazadas',  'dias',    'mayor', '1',  null, 'alta',   'CREADOR', 1, 1],
         ['Saldo liberado sin pagar +3 días',    'saldos_liberados',   'dias',    'mayor', '3',  null, 'normal', 'Administrador', 1, 1],
         ['Fundantes pendientes +5 días',        'fundantes_pendientes','dias',   'mayor', '5',  null, 'normal', 'Administrador', 1, 0],
         ['Comisión sin pagar +30 días',         'comision_sin_pagar', 'dias',    'mayor', '30', null, 'normal', 'Administrador', 0, 1],
@@ -165,14 +165,20 @@ const ORIGENES = {
       { campo: 'ejecutivo_nombre', label: 'Ejecutivo',          tipo: 'texto' },
     ],
     async filas() {
+      // creado_por (email) → usuarios.email para notificar al creador
       const [rows] = await pool.query(`
-        SELECT id, op_carta, ejecutivo_nombre, DATEDIFF(CURDATE(), DATE(fecha_creacion)) AS dias
-        FROM cartas_aprobacion WHERE status = 'RECHAZADO'`);
+        SELECT c.id, c.op_carta, c.ejecutivo_nombre,
+               DATEDIFF(CURDATE(), DATE(c.fecha_creacion)) AS dias,
+               u.id_usuario AS creador
+        FROM cartas_aprobacion c
+        LEFT JOIN usuarios u ON u.email = c.creado_por
+        WHERE c.status = 'RECHAZADO'`);
       return rows.map(r => ({
         key: 'rech:' + r.id,
         vars: { dias: r.dias, ejecutivo_nombre: r.ejecutivo_nombre },
+        creador: r.creador || null,
         titulo: 'Carta rechazada',
-        mensaje: `Carta ${r.op_carta || r.id} de ${r.ejecutivo_nombre || '—'} rechazada hace ${r.dias} día(s), pendiente de corregir.`,
+        mensaje: `Carta ${r.op_carta || r.id} rechazada hace ${r.dias} día(s). Debes corregirla.`,
         href: '/aprobaciones/',
       }));
     },
@@ -221,14 +227,18 @@ function cumple(val, op, v1, v2) {
   return false;
 }
 
-async function usuariosDestino(destino) {
+/* Usuarios fijos de la regla (por perfil o TODOS). El token 'CREADOR' se
+   resuelve por registro en el motor (no aquí). */
+async function usuariosBase(destino) {
   const lista = String(destino || '').split(',').map(s => s.trim()).filter(Boolean);
-  if (!lista.length || lista.includes('TODOS')) {
+  if (lista.includes('TODOS')) {
     const [u] = await pool.query("SELECT id_usuario FROM usuarios WHERE estado IS NULL OR estado <> 'inactivo'");
     return u.map(x => x.id_usuario);
   }
+  const perfiles = lista.filter(t => t !== 'CREADOR');
+  if (!perfiles.length) return [];
   const [u] = await pool.query(
-    `SELECT DISTINCT u.id_usuario FROM usuarios u JOIN perfiles p ON u.id_perfil = p.id_perfil WHERE p.nombre IN (?)`, [lista]);
+    `SELECT DISTINCT u.id_usuario FROM usuarios u JOIN perfiles p ON u.id_perfil = p.id_perfil WHERE p.nombre IN (?)`, [perfiles]);
   return u.map(x => x.id_usuario);
 }
 
@@ -243,12 +253,17 @@ async function evaluarAlertas() {
       if (!orig) continue;
       let filas;
       try { filas = await orig.filas(); } catch (e) { console.error('[alertas origen]', rg.origen, e.message); continue; }
-      const users = await usuariosDestino(rg.destino);
+      const base = await usuariosBase(rg.destino);
+      const usaCreador = String(rg.destino || '').split(',').map(s => s.trim()).includes('CREADOR');
       const clavesActivas = [];
       for (const f of filas) {
         if (!cumple(f.vars[rg.campo], rg.operador, rg.valor1, rg.valor2)) continue;
         const clave = `alerta:${rg.id}:${f.key}`;
         clavesActivas.push(clave);
+        // Destinatarios: base (perfiles/TODOS) + creador del registro si la regla usa 'CREADOR'
+        let users = base.slice();
+        if (usaCreador && f.creador) users.push(f.creador);
+        users = [...new Set(users)];
         for (const uid of users) {
           // Dedup + delay: no re-notificar si hay una sin leer, o una (leída o no) creada
           // dentro de la ventana de "delay" (cooldown configurable por alerta).
