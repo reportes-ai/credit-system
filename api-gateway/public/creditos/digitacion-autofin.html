@@ -89,7 +89,7 @@
   <div class="topnav-left">
     <a href="/" class="topnav-brand">
       <img src="/img/logo.png" alt="AutoFácil">
-      <span class="version-badge">v2.1</span>
+      <span class="version-badge">v2.2</span>
     </a>
     <div class="breadcrumb-nav">
       <a href="/">Inicio</a><span class="sep">›</span>
@@ -181,7 +181,7 @@
       <div class="form-grid g3" style="margin-top:14px">
         <div class="f-group">
           <label>Ejecutivo Comercial</label>
-          <input type="text" id="fEjecutivo" placeholder="Nombre del ejecutivo">
+          <select id="fEjecutivo"><option value="">— Seleccione —</option></select>
         </div>
         <div class="f-group">
           <label class="f-req">Producto AutoFin</label>
@@ -277,11 +277,11 @@
       <div class="form-grid g3" style="margin-top:14px">
         <div class="f-group">
           <label class="f-req">Valor Vehículo $</label>
-          <input type="number" id="fValorVeh" placeholder="0" min="0" oninput="calcularSaldo()">
+          <input type="text" id="fValorVeh" inputmode="numeric" placeholder="$0" oninput="fmtPesos(this);calcularSaldo()">
         </div>
         <div class="f-group">
           <label class="f-req">Pie $</label>
-          <input type="number" id="fPie" placeholder="0" min="0" oninput="calcularSaldo()">
+          <input type="text" id="fPie" inputmode="numeric" placeholder="$0" oninput="fmtPesos(this);calcularSaldo()">
         </div>
         <div class="f-group">
           <label>Saldo Precio $ <small style="color:#0369a1;font-weight:600">(calculado)</small></label>
@@ -295,7 +295,7 @@
         </div>
         <div class="f-group">
           <label>Impuesto $</label>
-          <input type="number" id="fImpuesto" placeholder="0" min="0">
+          <input type="text" id="fImpuesto" inputmode="numeric" placeholder="$0" oninput="fmtPesos(this)">
         </div>
         <div class="f-group">
           <label>Estado Impuesto</label>
@@ -352,7 +352,7 @@
         </div>
         <div class="f-group">
           <label>Monto Capitalizado $</label>
-          <input type="number" id="fMontoCap" placeholder="0" min="0">
+          <input type="text" id="fMontoCap" inputmode="numeric" placeholder="$0" oninput="fmtPesos(this)">
         </div>
       </div>
 
@@ -361,21 +361,21 @@
       <div class="form-grid g4">
         <div class="f-group">
           <label>Gastos Operacionales $</label>
-          <input type="number" id="fGastos" placeholder="0" min="0">
+          <input type="text" id="fGastos" inputmode="numeric" placeholder="$0" oninput="fmtPesos(this)">
         </div>
         <div class="f-group">
           <label>Seguro RDH+E $</label>
-          <input type="number" id="fSegRdh" placeholder="0" min="0">
+          <input type="text" id="fSegRdh" inputmode="numeric" placeholder="$0" oninput="fmtPesos(this)">
           <div class="seguro-calc">Comisión según penetración mensual (tabla RDH)</div>
         </div>
         <div class="f-group">
           <label>Seguro Cesantía $</label>
-          <input type="number" id="fSegCes" placeholder="0" min="0">
+          <input type="text" id="fSegCes" inputmode="numeric" placeholder="$0" oninput="fmtPesos(this)">
           <div class="seguro-calc">Comisión según penetración mensual (tabla Cesantía)</div>
         </div>
         <div class="f-group">
           <label>Seguro Rep. Menor $</label>
-          <input type="number" id="fSegRep" placeholder="0" min="0">
+          <input type="text" id="fSegRep" inputmode="numeric" placeholder="$0" oninput="fmtPesos(this)">
           <div class="seguro-calc">Comisión según penetración mensual (tabla Reparaciones)</div>
         </div>
       </div>
@@ -511,6 +511,28 @@
       }
     } catch { /* fallback */ }
   })();
+
+  // Cargar ejecutivos comerciales para el selector
+  (async () => {
+    try {
+      const r = await fetch('/api/cartas-ejecutivos', { headers: { Authorization: 'Bearer ' + token } });
+      const d = await r.json();
+      const sel = document.getElementById('fEjecutivo');
+      if (d.success && Array.isArray(d.data)) {
+        d.data.forEach(e => { const o = document.createElement('option'); o.value = o.textContent = e.nombre; sel.appendChild(o); });
+      }
+    } catch { /* manual */ }
+  })();
+
+  // Selecciona un ejecutivo en el combo; si no existe en la lista, lo agrega (ej. nombre de la carta)
+  function seleccionarEjecutivo(nombre) {
+    if (!nombre) return;
+    const sel = document.getElementById('fEjecutivo');
+    const norm = s => (s || '').toLowerCase().replace(/\s+/g, ' ').trim();
+    let opt = [...sel.options].find(o => norm(o.value) === norm(nombre));
+    if (!opt) { opt = new Option(nombre, nombre); sel.add(opt); }
+    sel.value = opt.value;
+  }
 
   // Poblar opciones de Plazo (cuotas) 6–72 en pasos de 6
   (function() {
@@ -687,8 +709,8 @@
 
   /* ── Calcular saldo precio ─────────────────────────────────── */
   function calcularSaldo() {
-    const val  = parseFloat(document.getElementById('fValorVeh').value) || 0;
-    const pie  = parseFloat(document.getElementById('fPie').value) || 0;
+    const val  = parsePesos(document.getElementById('fValorVeh').value) || 0;
+    const pie  = parsePesos(document.getElementById('fPie').value) || 0;
     const saldo = val - pie;
     const pct   = val > 0 ? (saldo / val * 100).toFixed(2) : 0;
     document.getElementById('fSaldo').value  = saldo > 0 ? '$' + Math.round(saldo).toLocaleString('es-CL') : '';
@@ -752,7 +774,7 @@
     if (!selVal || selVal === 'NO APLICA') { box.style.display = 'none'; return; }
     const p = parques.find(x => String(x.id) === selVal);
     if (!p) { box.style.display = 'none'; return; }
-    const saldo   = parseFloat(document.getElementById('fValorVeh').value||0) - parseFloat(document.getElementById('fPie').value||0);
+    const saldo   = parsePesos(document.getElementById('fValorVeh').value) - parsePesos(document.getElementById('fPie').value);
     const comPct  = parseFloat(p.comision_pct) || 0;
     const comMonto = Math.round(saldo * comPct);
     document.getElementById('showComParque').textContent = '$' + comMonto.toLocaleString('es-CL');
@@ -784,7 +806,7 @@
       if (d.fecha_curse) { document.getElementById('fMes').value = d.fecha_curse.slice(0,7); await autoFillNumOp(); }
       document.getElementById('fEstadoEval').value = 'APROBADO';
       document.getElementById('fEstadoCred').value = 'DIGITADO';
-      set('fEjecutivo', d.ejecutivo);
+      seleccionarEjecutivo(d.ejecutivo);
       set('fIdFinanciera', d.nro_credito);
 
       // Producto: auto-seleccionar si calza con la lista
@@ -800,15 +822,18 @@
       if (d.sucursal) set('fAutomotora', d.sucursal);
       if (d.rut_cliente) buscarCliente();
 
+      // Helper: setear monto y formatear en pesos
+      const setPeso = (id, v) => { const el = document.getElementById(id); if (el && v != null) { el.value = String(v); fmtPesos(el); } };
+
       // Vehículo
       set('fMarca', d.marca); set('fModelo', d.modelo); set('fAnio', d.anio);
-      if (d.precio != null) document.getElementById('fValorVeh').value = d.precio;
-      if (d.pie != null)    document.getElementById('fPie').value = d.pie;
+      setPeso('fValorVeh', d.precio);
+      setPeso('fPie', d.pie);
       calcularSaldo();
 
       // Financiamiento
-      set('fImpuesto', d.impuesto_timbre);
-      set('fSegRdh', d.seguro_rdh); set('fSegCes', d.seguro_cesantia); set('fSegRep', d.reparaciones);
+      setPeso('fImpuesto', d.impuesto_timbre);
+      setPeso('fSegRdh', d.seguro_rdh); setPeso('fSegCes', d.seguro_cesantia); setPeso('fSegRep', d.reparaciones);
       if (d.cuotas) document.getElementById('fPlazo').value = d.cuotas;
       if (d.total_pagare != null) document.getElementById('fMontoFin').value = '$' + Number(d.total_pagare).toLocaleString('es-CL');
       if (d.tasa != null) document.getElementById('fTasCliReal').value = d.tasa;
@@ -872,15 +897,15 @@
       anio:                parseInt(document.getElementById('fAnio').value)||null,
       tasacion:            parsePesos(document.getElementById('fTasacion').value)||null,
       permiso_circulacion: parsePesos(document.getElementById('fPermisoCir').value)||null,
-      valor_vehiculo:      parseFloat(document.getElementById('fValorVeh').value)||null,
-      pie:                 parseFloat(document.getElementById('fPie').value)||null,
-      impuesto:            parseFloat(document.getElementById('fImpuesto').value)||null,
+      valor_vehiculo:      parsePesos(document.getElementById('fValorVeh').value)||null,
+      pie:                 parsePesos(document.getElementById('fPie').value)||null,
+      impuesto:            parsePesos(document.getElementById('fImpuesto').value)||null,
       estado_impuesto:     document.getElementById('fEstadoImpto').value,
       limitacion:          document.getElementById('fLimitacion').checked ? 1 : 0,
-      gastos:              parseFloat(document.getElementById('fGastos').value)||0,
-      seguro_rdh:          parseFloat(document.getElementById('fSegRdh').value)||0,
-      seguro_cesantia:     parseFloat(document.getElementById('fSegCes').value)||0,
-      seguro_rep_menor:    parseFloat(document.getElementById('fSegRep').value)||0,
+      gastos:              parsePesos(document.getElementById('fGastos').value)||0,
+      seguro_rdh:          parsePesos(document.getElementById('fSegRdh').value)||0,
+      seguro_cesantia:     parsePesos(document.getElementById('fSegCes').value)||0,
+      seguro_rep_menor:    parsePesos(document.getElementById('fSegRep').value)||0,
       monto_financiado:    parsePesos(document.getElementById('fMontoFin').value)||null,
       plazo:               parseInt(document.getElementById('fPlazo').value)||null,
       tascli_real:         parseFloat(document.getElementById('fTasCliReal').value)/100||null,
@@ -892,7 +917,7 @@
       fecha_primera_cuota: document.getElementById('fFechaCuota').value || null,
       parque:              parqueNombre,
       mayor_menor:         document.getElementById('fMayorMenorHidden').value,
-      monto_capitalizado:  parseFloat(document.getElementById('fMontoCap').value)||0,
+      monto_capitalizado:  parsePesos(document.getElementById('fMontoCap').value)||0,
       boleta_factura:      document.getElementById('fBoleta').value.trim(),
       cantidad_docs:       parseInt(document.getElementById('fCantDoc').value)||0,
       docs_autorizados:    parseInt(document.getElementById('fDocAuth').value)||0,
