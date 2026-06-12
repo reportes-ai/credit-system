@@ -222,12 +222,12 @@ const updatePermisosUsuario = async (req, res) => {
     // Eliminar todos los overrides actuales del usuario
     await pool.query('DELETE FROM permisos_usuario WHERE id_usuario = ?', [id]);
 
-    // Insertar solo los que difieren del base (es_override = true)
-    const inserts = permisos.filter(p => p.es_override);
-    for (const p of inserts) {
+    // Insertar solo los que difieren del base (es_override = true) — un solo INSERT masivo
+    const inserts = permisos.filter(p => p.es_override && p.id_funcionalidad != null);
+    if (inserts.length) {
       await pool.query(
-        'INSERT INTO permisos_usuario (id_usuario, id_funcionalidad, habilitado) VALUES (?,?,?)',
-        [id, p.id_funcionalidad, p.habilitado ? 1 : 0]
+        'INSERT INTO permisos_usuario (id_usuario, id_funcionalidad, habilitado) VALUES ?',
+        [inserts.map(p => [id, p.id_funcionalidad, p.habilitado ? 1 : 0])]
       );
     }
 

@@ -548,18 +548,23 @@ const updatePermisosPerfil = async (req, res) => {
       return res.status(400).json({ success: false, data: null, error: 'Formato de permisos inválido' });
     }
 
-    for (const p of permisos) {
+    // Un solo INSERT masivo (antes era 1 query por funcionalidad → lento/timeout en BD remota)
+    const valores = permisos
+      .filter(p => p && p.id_funcionalidad != null)
+      .map(p => [id, p.id_funcionalidad, p.habilitado ? 1 : 0]);
+    if (valores.length) {
       await pool.query(
         `INSERT INTO permisos_perfil (id_perfil, id_funcionalidad, habilitado)
-         VALUES (?, ?, ?)
+         VALUES ?
          ON DUPLICATE KEY UPDATE habilitado = VALUES(habilitado)`,
-        [id, p.id_funcionalidad, p.habilitado ? 1 : 0]
+        [valores]
       );
     }
     limpiarCachePermisos();   // efecto inmediato en las APIs
 
     res.json({ success: true, data: { mensaje: 'Permisos actualizados' }, error: null });
   } catch (error) {
+    console.error('[updatePermisosPerfil]', error.message);
     res.status(500).json({ success: false, data: null, error: error.message });
   }
 };
@@ -594,12 +599,12 @@ const createPerfil = async (req, res) => {
     );
     const id_perfil = r.insertId;
 
-    // Copiar todas las funcionalidades con habilitado=0
+    // Copiar todas las funcionalidades con habilitado=0 (un solo INSERT masivo)
     const [funcs] = await pool.query('SELECT id_funcionalidad FROM funcionalidades');
-    for (const f of funcs) {
+    if (funcs.length) {
       await pool.query(
-        'INSERT IGNORE INTO permisos_perfil (id_perfil, id_funcionalidad, habilitado) VALUES (?,?,0)',
-        [id_perfil, f.id_funcionalidad]
+        'INSERT IGNORE INTO permisos_perfil (id_perfil, id_funcionalidad, habilitado) VALUES ?',
+        [funcs.map(f => [id_perfil, f.id_funcionalidad, 0])]
       );
     }
 
