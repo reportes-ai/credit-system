@@ -163,7 +163,7 @@
       } catch {}
 
       // BD Nivel Dios: solo accesibles dentro de la card SOLO DIOS, no como cards sueltas
-      const SOLO_DIOS = new Set(['bd-operaciones','bd-clientes','bd-antecedentes','bd-informacion-comercial']);
+      const SOLO_DIOS = new Set(['bd-operaciones','bd-clientes','bd-antecedentes','bd-informacion-comercial','meses-cerrados']);
       // Construir items desde funcionalidades BD (href + icono + nombre desde servidor)
       const nativeHrefs = new Set(funcInfo.map(f => f.href));
       const nativeItems = funcInfo.map(f => {
