@@ -97,29 +97,26 @@
     .print-header { display:none; }
     /* print */
     @media print {
-      @page { size: letter; margin: 2.3cm 1.4cm 1.4cm; }
+      @page { size: letter; margin: 1.8cm 1.4cm 1.4cm; }
       body { background:#fff !important; }
-      .topnav, .action-bar, .doc-tabs, .no-print { display:none !important; }
+      .topnav, .action-bar, .doc-tabs, .no-print, .emission-banner { display:none !important; }
       .main-content { padding:0 !important; max-width:100% !important; }
       .doc-viewer { box-shadow:none !important; border-radius:0 !important; }
       .doc-panel { display:none !important; }
       .doc-panel.print-target { display:block !important; }
       .doc-wrap { padding:20px 32px !important; }
-      /* Header fijo → se imprime en el margen superior de TODAS las páginas */
+      /* Logo fijo arriba a la derecha → se imprime en TODAS las páginas */
       .print-header {
-        display:flex !important; align-items:center; justify-content:space-between;
-        position:fixed; top:-1.5cm; left:0; right:0; height:1.4cm;
-        border-bottom:1.5px solid #0141A2; padding-bottom:4px;
+        display:block !important;
+        position:fixed; top:0.3cm; right:0.4cm;
       }
-      .print-header img { height:30px; }
-      .print-header .ph-meta { font-size:9pt; color:#374151; font-weight:600; }
+      .print-header img { height:26px; }
     }
   </style>
 </head>
 <body>
   <div class="print-header">
     <img src="/img/logo-autofacil.png" alt="AutoFácil" onerror="this.src='/img/logo.png'">
-    <span class="ph-meta" id="phMeta"></span>
   </div>
   <nav class="topnav">
     <div class="topnav-left">
@@ -544,7 +541,6 @@
         // Update header
         const _set = (id, val) => { const el = document.getElementById(id); if (el) el.textContent = val; };
         _set('bcCredito',   'Documentos N° ' + (c.numero_credito || creditId));
-        _set('phMeta',      'Operación N° '  + (c.numero_credito || creditId));
         _set('creditNumero','Operación N° '  + (c.numero_credito || creditId));
         _set('creditNombre', c.nombre_cliente || '—');
         _set('creditRut',    c.rut_cliente    || '—');
