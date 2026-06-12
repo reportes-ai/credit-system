@@ -2,7 +2,7 @@
    AutoFácil — Versión global de la aplicación
    Editar SOLO este archivo para cambiar la versión
    ───────────────────────────────────────────── */
-const APP_VERSION = 'v14.3';
+const APP_VERSION = 'v14.4';
 
 document.addEventListener('DOMContentLoaded', () => {
 
@@ -384,6 +384,10 @@ document.addEventListener('DOMContentLoaded', () => {
       <button class="af-menu-item" onclick="afOpenModal();document.getElementById('afUserMenu')?.remove()">
         <i class="bi bi-shield-lock"></i> Cambiar contraseña
       </button>
+      ${yo?.perfil === 'Administrador' ? `
+      <button class="af-menu-item" onclick="afToggleDebug();document.getElementById('afUserMenu')?.remove()">
+        <i class="bi bi-bug"></i> Modo debug <span id="afDebugState" style="margin-left:auto;font-size:.72rem;color:#94a3b8">${localStorage.getItem('af_debug')==='1'?'ON':'OFF'}</span>
+      </button>` : ''}
       <hr class="af-menu-divider">
       <button class="af-menu-item" style="color:#dc2626" onclick="sessionStorage.removeItem('token');sessionStorage.removeItem('usuario');window.location.href='/login.html'">
         <i class="bi bi-box-arrow-right" style="color:#dc2626"></i> Cerrar sesión
@@ -723,4 +727,54 @@ document.addEventListener('DOMContentLoaded', async () => {
   }
   window.afAyudaSet = cargarAyuda;
   cargarAyuda(location.pathname);
+});
+
+/* ═══════════════════════════════════════════════════════════════
+   🐞 MODO DEBUG — solo Administrador (toggle en el menú de usuario).
+   Muestra permisos recibidos y las cards en pantalla con su
+   visibilidad (👁️ visible / 🚫 oculta). Persistente en localStorage.
+   ═══════════════════════════════════════════════════════════════ */
+async function afRenderDebug() {
+  let p = document.getElementById('afDebugPanel');
+  if (!p) {
+    p = document.createElement('div'); p.id = 'afDebugPanel';
+    p.style.cssText = 'position:fixed;bottom:10px;left:10px;z-index:99998;background:#0b1220;color:#cbd5e1;font:11px/1.45 monospace;padding:10px 12px;border-radius:8px;max-width:400px;max-height:62vh;overflow:auto;box-shadow:0 8px 28px rgba(0,0,0,.45);border:1px solid #1e293b';
+    document.body.appendChild(p);
+  }
+  const yo = JSON.parse(sessionStorage.getItem('usuario') || 'null');
+  const token = sessionStorage.getItem('token');
+  const esc = s => String(s).replace(/</g, '&lt;');
+  let funcs = [];
+  try {
+    const r = await fetch('/api/auth/mis-permisos?_=' + Date.now(), { cache: 'no-store', headers: { Authorization: 'Bearer ' + token } });
+    const j = await r.json(); funcs = j.funcionalidades || [];
+  } catch (e) {}
+  const cards = [...document.querySelectorAll('.module-card,.ap-card,.report-card')].map(c => {
+    const vis = getComputedStyle(c).display !== 'none';
+    const id = c.id || (c.getAttribute('href') || '(card)');
+    return `${vis ? '👁️' : '🚫'} ${esc(id)}`;
+  });
+  p.innerHTML =
+    `<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
+       <b style="color:#4fc3f7">🐞 DEBUG ${typeof APP_VERSION !== 'undefined' ? APP_VERSION : ''}</b>
+       <span><button onclick="afRenderDebug()" title="Refrescar" style="background:#1e293b;border:none;color:#cbd5e1;border-radius:5px;padding:2px 7px;cursor:pointer">↻</button>
+       <button onclick="afToggleDebug()" title="Cerrar" style="background:#7f1d1d;border:none;color:#fff;border-radius:5px;padding:2px 7px;cursor:pointer;margin-left:4px">✕</button></span>
+     </div>
+     <div><b>Usuario:</b> ${esc((yo?.nombre || '') + ' ' + (yo?.apellido || ''))}</div>
+     <div><b>Perfil:</b> ${esc(yo?.perfil || '')}${yo?.perfil === 'Administrador' ? ' (admin)' : ''}</div>
+     <div><b>Ruta:</b> ${esc(location.pathname)}</div>
+     <div style="margin-top:6px"><b>Funcionalidades (${funcs.length}):</b><br>${funcs.length ? funcs.map(esc).join(', ') : '<i>ninguna</i>'}</div>
+     <div style="margin-top:6px"><b>Cards en pantalla:</b><br>${cards.length ? cards.join('<br>') : '<i>—</i>'}</div>`;
+}
+function afToggleDebug() {
+  const on = localStorage.getItem('af_debug') === '1';
+  localStorage.setItem('af_debug', on ? '0' : '1');
+  if (on) document.getElementById('afDebugPanel')?.remove();
+  else afRenderDebug();
+}
+window.afRenderDebug = afRenderDebug;
+window.afToggleDebug = afToggleDebug;
+document.addEventListener('DOMContentLoaded', () => {
+  const yo = JSON.parse(sessionStorage.getItem('usuario') || 'null');
+  if (yo?.perfil === 'Administrador' && localStorage.getItem('af_debug') === '1') setTimeout(afRenderDebug, 700);
 });
