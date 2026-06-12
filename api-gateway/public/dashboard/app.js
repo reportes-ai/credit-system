@@ -3121,6 +3121,14 @@ const MES_LABELS_PPTO = {
   "2026-05":"May 26","2026-06":"Jun 26","2026-07":"Jul 26","2026-08":"Ago 26",
   "2026-09":"Sep 26","2026-10":"Oct 26","2026-11":"Nov 26","2026-12":"Dic 26",
 };
+// Label dinámico para cualquier año (fallback si no está en MES_LABELS_PPTO)
+function lblPpto(mk){
+  const p = String(mk).split('-'); if (p.length<2) return mk;
+  const N = ['Ene','Feb','Mar','Abr','May','Jun','Jul','Ago','Sep','Oct','Nov','Dic'];
+  return N[parseInt(p[1])-1] + ' ' + p[0].slice(2);
+}
+// Año del presupuesto a mostrar en el dashboard (editable: selector futuro). Default = año actual.
+let PPTO_ANIO = null;
 
 function buildVPpto() {
   if (!window.RAW_DATA || window.RAW_DATA.length === 0) {
@@ -3129,6 +3137,13 @@ function buildVPpto() {
 
   const hoy = new Date();
   const mesActual = hoy.getFullYear() + '-' + String(hoy.getMonth()+1).padStart(2,'0');
+
+  // Presupuesto: mostrar solo el año vigente (o PPTO_ANIO si se selecciona).
+  // Si el año vigente no tiene presupuesto cargado, usar el último año disponible.
+  const aniosPpto = [...new Set(PPTO_DATA.map(d => String(d.mes).slice(0,4)))].sort();
+  const anioVista = PPTO_ANIO
+    || (aniosPpto.includes(mesActual.slice(0,4)) ? mesActual.slice(0,4) : (aniosPpto[aniosPpto.length-1] || mesActual.slice(0,4)));
+  const PPTO_DATA_VISTA = PPTO_DATA.filter(d => String(d.mes).slice(0,4) === anioVista);
 
   // Calcular reales desde RAW_DATA (solo OTORGADOS)
   const realesPorMes = {};
@@ -3152,11 +3167,11 @@ function buildVPpto() {
     if (!tbl) return;
 
     // Solo meses con presupuesto
-    const meses = PPTO_DATA.map(d => d.mes);
+    const meses = PPTO_DATA_VISTA.map(d => d.mes);
 
     // Calcular acumulados
     let pptoAcum = 0, realAcum = 0;
-    const rows_data = PPTO_DATA.map(d => {
+    const rows_data = PPTO_DATA_VISTA.map(d => {
       const real = realesPorMes[d.mes] ? realesPorMes[d.mes][campo === 'ops' ? 'ops' : 'monto'] : null;
       const ppto = d[campo === 'ops' ? 'ops' : 'monto'];
       pptoAcum += ppto;
@@ -3171,7 +3186,7 @@ function buildVPpto() {
 
     // Totales
     // Total anual presupuesto (12 meses)
-    const totalPptoAnio = PPTO_DATA.reduce((a,d) => a + d[campo==='ops'?'ops':'monto'], 0);
+    const totalPptoAnio = PPTO_DATA_VISTA.reduce((a,d) => a + d[campo==='ops'?'ops':'monto'], 0);
     // Total real solo meses con datos
     const mesesConDatos = rows_data.filter(d => d.real !== null);
     const totalRealAcum = mesesConDatos.length > 0 ? mesesConDatos[mesesConDatos.length-1].realAcum : 0;
@@ -3190,7 +3205,7 @@ function buildVPpto() {
     meses.forEach(m => {
       const isCurrent = m === mesActual;
       const bg = isCurrent ? '#1565C0' : '#1a3a6a';
-      thead += `<th style="padding:5px 6px;text-align:center;min-width:70px;background:${bg};border-left:1px solid #2a4070">${MES_LABELS_PPTO[m]||m}${isCurrent?' 📍':''}</th>`;
+      thead += `<th style="padding:5px 6px;text-align:center;min-width:70px;background:${bg};border-left:1px solid #2a4070">${MES_LABELS_PPTO[m]||lblPpto(m)}${isCurrent?' 📍':''}</th>`;
     });
     thead += '<th style="padding:5px 8px;text-align:center;min-width:80px;background:#0d47a1;border-left:2px solid #4fc3f7">TOTAL</th>';
     thead += '</tr></thead>';
@@ -3306,13 +3321,13 @@ function buildVPpto() {
   buildPptoTable('t-ppto-montos', 'monto', fmtMM);
 
   // ── KPIs ──
-  const mesesConReal = PPTO_DATA.filter(d => realesPorMes[d.mes]);
-  const totalPptoOps = PPTO_DATA.reduce((a,d) => a+d.ops, 0);
+  const mesesConReal = PPTO_DATA_VISTA.filter(d => realesPorMes[d.mes]);
+  const totalPptoOps = PPTO_DATA_VISTA.reduce((a,d) => a+d.ops, 0);
   const totalRealOps = mesesConReal.reduce((a,d) => a+(realesPorMes[d.mes]?.ops||0), 0);
   const pptoAcumOps  = mesesConReal.reduce((a,d) => a+d.ops, 0);
   const cumpAcumOps  = pptoAcumOps > 0 ? totalRealOps / pptoAcumOps : 0;
 
-  const totalPptoMonto = PPTO_DATA.reduce((a,d) => a+d.monto, 0);
+  const totalPptoMonto = PPTO_DATA_VISTA.reduce((a,d) => a+d.monto, 0);
   const totalRealMonto = mesesConReal.reduce((a,d) => a+(realesPorMes[d.mes]?.monto||0), 0);
   const pptoAcumMonto  = mesesConReal.reduce((a,d) => a+d.monto, 0);
   const cumpAcumMonto  = pptoAcumMonto > 0 ? totalRealMonto / pptoAcumMonto : 0;

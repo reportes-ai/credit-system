@@ -81,6 +81,7 @@ const PLACEMENT_ITEMS = {
   'bd-antecedentes':         { section:'mantenedores',  href:'/mantenedores/bd-antecedentes/',           icon:'bi-briefcase-fill',          titulo:'BD Antecedentes Laborales' },
   'bd-inf-comercial':        { section:'mantenedores',  href:'/mantenedores/bd-informacion-comercial/',  icon:'bi-building-fill',           titulo:'BD Información Comercial' },
   'vista-pantallas':         { section:'mantenedores',  href:'/mantenedores/vista-pantallas/',    icon:'bi-layout-wtf',             titulo:'Vista Pantallas' },
+  'presupuesto':             { section:'mantenedores',  href:'/mantenedores/presupuesto/',        icon:'bi-clipboard-data',         titulo:'Presupuesto' },
   'solo-dios':               { section:'mantenedores',  href:'/mantenedores/solo-dios/',          icon:'bi-lightning-charge-fill',  titulo:'SOLO DIOS' },
   // ── CARGA MASIVA ──────────────────────────────────────────────────────────
   'cm-cargar':               { section:'carga_masiva',  href:'/carga-masiva/#secAutofacil',       icon:'bi-upload',                 titulo:'Cargar' },

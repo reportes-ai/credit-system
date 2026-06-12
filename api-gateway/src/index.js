@@ -165,6 +165,8 @@ app.get(['/mantenedores', '/mantenedores/'], (req, res) =>
   res.sendFile(path.join(__dirname, '../public/mantenedores/index.html')));
 app.get(['/mantenedores/comunas', '/mantenedores/comunas/'], (req, res) =>
   res.sendFile(path.join(__dirname, '../public/mantenedores/comunas/index.html')));
+app.get(['/mantenedores/presupuesto', '/mantenedores/presupuesto/'], (req, res) =>
+  res.sendFile(path.join(__dirname, '../public/mantenedores/presupuesto/index.html')));
 app.get(['/mantenedores/tasas', '/mantenedores/tasas/'], (req, res) =>
   res.sendFile(path.join(__dirname, '../public/mantenedores/tasas/index.html')));
 app.get(['/mantenedores/uf', '/mantenedores/uf/'], (req, res) =>

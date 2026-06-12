@@ -1610,4 +1610,26 @@ const getUsuariosByPerfil = async (req, res) => {
   } catch (e) { console.error('[perfiles migration v20]', e.message); }
 })();
 
+/* ─── Migración v21: funcionalidad Presupuesto bajo Mantenedores ─ */
+(async () => {
+  try {
+    const [[modMan]] = await pool.query(
+      "SELECT id_modulo FROM modulos WHERE nombre='Mantenedores' AND estado='activo'");
+    if (!modMan) return;
+    const [[adm]] = await pool.query("SELECT id_perfil FROM perfiles WHERE nombre='Administrador' LIMIT 1");
+    const [[ex]] = await pool.query("SELECT id_funcionalidad FROM funcionalidades WHERE codigo='mantenedores_presupuesto'");
+    let idF = ex?.id_funcionalidad;
+    if (!idF) {
+      const [ins] = await pool.query(
+        'INSERT INTO funcionalidades (id_modulo, nombre, codigo, href, icono) VALUES (?,?,?,?,?)',
+        [modMan.id_modulo, 'Presupuesto', 'mantenedores_presupuesto', '/mantenedores/presupuesto/', 'bi-clipboard-data']);
+      idF = ins.insertId;
+    }
+    if (adm) await pool.query(
+      'INSERT IGNORE INTO permisos_perfil (id_perfil, id_funcionalidad, habilitado) VALUES (?,?,1)',
+      [adm.id_perfil, idF]);
+    console.log('✓ Perfiles v21: funcionalidad Presupuesto registrada');
+  } catch (e) { console.error('[perfiles migration v21]', e.message); }
+})();
+
 module.exports = { getAllPerfiles, getModulosConFuncionalidades, getPermisosPerfil, updatePermisosPerfil, reordenarModulos, createPerfil, updatePerfil, deletePerfil, getUsuariosByPerfil };
