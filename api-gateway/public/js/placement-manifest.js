@@ -30,7 +30,7 @@ const PLACEMENT_ITEMS = {
   '/politica/':              { section:'home', href:'/politica/',               icon:'bi-shield-lock',            titulo:'Política' },
   '/usuarios/':              { section:'home', href:'/usuarios/',               icon:'bi-people',                 titulo:'Usuarios' },
   '/mantenedores/':          { section:'home', href:'/mantenedores/',           icon:'bi-gear-fill',              titulo:'Mantenedores' },
-  '/cartas-aprobacion/':     { section:'home', href:'/cartas-aprobacion/',      icon:'bi-envelope-paper',         titulo:'Cartas de Aprobación' },
+  '/cartas-aprobacion/':     { section:'home', href:'/cartas-aprobacion/',      icon:'bi-envelope-paper',         titulo:'Cartas de Aprobación Antiguo' },
   '/comisiones/':            { section:'home', href:'/comisiones/',             icon:'bi-cash-coin',              titulo:'Comisión Ejecutivos' },
   '/carga-masiva/':          { section:'home', href:'/carga-masiva/',           icon:'bi-cloud-upload',           titulo:'Carga Masiva' },
   '/simulador/':             { section:'home', href:'/simulador/',              icon:'bi-calculator',             titulo:'Simulador Rentabilidad' },
