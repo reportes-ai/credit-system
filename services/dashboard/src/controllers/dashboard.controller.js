@@ -126,6 +126,59 @@ function procesarDatos(rows) {
   return { tendencia, ej_perf: { meses: mesesKeys, meses_labels: MESES_LABELS, ejecutivos: ejPerf } };
 }
 
+// ── Presupuesto (antes hardcodeado en app.js desde PRESUPUESTO.xlsx) ──────────
+const PPTO_KEY = 'presupuesto';
+const PPTO_DEFAULT = [
+  { mes:'2026-01', ops:91,  monto:618.8 },
+  { mes:'2026-02', ops:91,  monto:618.8 },
+  { mes:'2026-03', ops:109, monto:741.2 },
+  { mes:'2026-04', ops:133, monto:904.4 },
+  { mes:'2026-05', ops:161, monto:1094.8 },
+  { mes:'2026-06', ops:169, monto:1149.2 },
+  { mes:'2026-07', ops:177, monto:1203.6 },
+  { mes:'2026-08', ops:181, monto:1230.8 },
+  { mes:'2026-09', ops:181, monto:1230.8 },
+  { mes:'2026-10', ops:181, monto:1230.8 },
+  { mes:'2026-11', ops:181, monto:1230.8 },
+  { mes:'2026-12', ops:181, monto:1230.8 },
+];
+
+exports.getPresupuesto = async (req, res) => {
+  try {
+    const [rows] = await pool.query(
+      'SELECT config_value FROM dashboard_config WHERE config_key = ?', [PPTO_KEY]);
+    if (rows.length) {
+      let data; try { data = JSON.parse(rows[0].config_value); } catch { data = PPTO_DEFAULT; }
+      return res.json({ success: true, data, error: null });
+    }
+    // Primera vez: sembrar el default en BD para que sea editable sin tocar código
+    await pool.query(
+      'INSERT IGNORE INTO dashboard_config (config_key, config_value) VALUES (?, ?)',
+      [PPTO_KEY, JSON.stringify(PPTO_DEFAULT)]);
+    return res.json({ success: true, data: PPTO_DEFAULT, error: null });
+  } catch (err) {
+    console.error('[dashboard] getPresupuesto:', err);
+    return res.status(500).json({ success: false, data: null, error: 'Error interno del servidor' });
+  }
+};
+
+exports.savePresupuesto = async (req, res) => {
+  try {
+    const { presupuesto } = req.body;
+    if (!Array.isArray(presupuesto))
+      return res.status(400).json({ success: false, data: null, error: 'presupuesto debe ser un arreglo' });
+    await pool.query(`
+      INSERT INTO dashboard_config (config_key, config_value)
+      VALUES (?, ?)
+      ON DUPLICATE KEY UPDATE config_value = VALUES(config_value), updated_at = NOW()
+    `, [PPTO_KEY, JSON.stringify(presupuesto)]);
+    return res.json({ success: true, data: { filas: presupuesto.length }, error: null });
+  } catch (err) {
+    console.error('[dashboard] savePresupuesto:', err);
+    return res.status(500).json({ success: false, data: null, error: 'Error interno del servidor' });
+  }
+};
+
 // ── Permisos de pestañas ──────────────────────────────────────────────────────
 exports.getPermisos = async (req, res) => {
   try {

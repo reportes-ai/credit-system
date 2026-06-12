@@ -1294,7 +1294,7 @@ document.body.insertAdjacentHTML('afterbegin', `
 `);
 
 cargarDatos();
-// RAW_DATA se carga dinámicamente desde /data/dashboard_data.json
+// RAW_DATA se carga dinámicamente desde la API (GET /api/dashboard/datos)
 window.RAW_DATA = [];
 
 // ======== FILTRADO DINÁMICO POR FECHAS ========
@@ -3085,9 +3085,9 @@ function buildVHist() {
 // ──────────────────────────────────────────────────────────────
 // ======== PRESUPUESTO ========
 
-// Presupuesto hardcoded (desde PRESUPUESTO.xlsx)
-// Fechas Excel: 46023=Ene25, 46054=Feb25, 46082=Mar25, etc.
-const PPTO_DATA = [
+// Presupuesto: la fuente real vive en dashboard_config (GET /api/dashboard/presupuesto),
+// editable sin tocar código. Este arreglo es solo respaldo si la API falla.
+let PPTO_DATA = [
   {mes:"2026-01", ops:91,  monto:618.8},
   {mes:"2026-02", ops:91,  monto:618.8},
   {mes:"2026-03", ops:109, monto:741.2},
@@ -3101,6 +3101,17 @@ const PPTO_DATA = [
   {mes:"2026-11", ops:181, monto:1230.8},
   {mes:"2026-12", ops:181, monto:1230.8},
 ];
+
+// Cargar presupuesto desde BD (sobrescribe el respaldo); re-renderiza si la pestaña ya está visible
+(async function cargarPresupuesto() {
+  try {
+    const j = await apiDashboard('GET', 'presupuesto');
+    if (j && j.success && Array.isArray(j.data) && j.data.length) {
+      PPTO_DATA = j.data;
+      if (window.RAW_DATA && window.RAW_DATA.length) buildVPpto();
+    }
+  } catch (e) { /* se mantiene el respaldo */ }
+})();
 
 const MES_LABELS_PPTO = {
   "2025-01":"Ene 25","2025-02":"Feb 25","2025-03":"Mar 25","2025-04":"Abr 25",
