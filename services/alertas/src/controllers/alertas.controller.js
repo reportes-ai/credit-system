@@ -39,6 +39,8 @@ const pool = require('../../../../shared/config/database');
     await pool.query(`ALTER TABLE alertas_config ADD COLUMN IF NOT EXISTS delay_min INT NOT NULL DEFAULT 60`).catch(()=>{});
     await pool.query(`ALTER TABLE alertas_config ADD COLUMN IF NOT EXISTS sonido_cada_seg INT NOT NULL DEFAULT 30`).catch(()=>{});
     await pool.query(`ALTER TABLE alertas_config ADD COLUMN IF NOT EXISTS sonido_max_min INT NOT NULL DEFAULT 5`).catch(()=>{});
+    await pool.query(`ALTER TABLE alertas_config ADD COLUMN IF NOT EXISTS sonido_tipo VARCHAR(20) NOT NULL DEFAULT 'campana'`).catch(()=>{});
+    await pool.query(`ALTER TABLE notificaciones ADD COLUMN IF NOT EXISTS son_tipo VARCHAR(20) DEFAULT 'campana'`).catch(()=>{});
     await pool.query(`ALTER TABLE alertas_config MODIFY COLUMN destino VARCHAR(250) NOT NULL DEFAULT 'Administrador'`).catch(()=>{});
     await pool.query(`CREATE INDEX idx_notif_clave ON notificaciones (clave)`).catch(()=>{});
 
@@ -172,13 +174,38 @@ const ORIGENES = {
                u.id_usuario AS creador
         FROM cartas_aprobacion c
         LEFT JOIN usuarios u ON u.email = c.creado_por
-        WHERE c.status = 'RECHAZADO'`);
+        WHERE c.status = 'RECHAZADA'`);
       return rows.map(r => ({
         key: 'rech:' + r.id,
         vars: { dias: r.dias, ejecutivo_nombre: r.ejecutivo_nombre },
         creador: r.creador || null,
         titulo: 'Carta rechazada',
         mensaje: `Carta ${r.op_carta || r.id} rechazada hace ${r.dias} día(s). Debes corregirla.`,
+        href: '/aprobaciones/',
+      }));
+    },
+  },
+  cartas_aprobadas: {
+    label: 'Cartas aprobadas (avisar al creador)',
+    href: '/aprobaciones/',
+    campos: [
+      { campo: 'dias',             label: 'Días desde aprobación', tipo: 'numero' },
+      { campo: 'ejecutivo_nombre', label: 'Ejecutivo',             tipo: 'texto' },
+    ],
+    async filas() {
+      const [rows] = await pool.query(`
+        SELECT c.id, c.op_carta, c.ejecutivo_nombre,
+               DATEDIFF(CURDATE(), DATE(COALESCE(c.fecha_aprobacion, c.fecha_creacion))) AS dias,
+               u.id_usuario AS creador
+        FROM cartas_aprobacion c
+        LEFT JOIN usuarios u ON u.email = c.creado_por
+        WHERE c.status = 'APROBADA'`);
+      return rows.map(r => ({
+        key: 'aprob:' + r.id,
+        vars: { dias: r.dias, ejecutivo_nombre: r.ejecutivo_nombre },
+        creador: r.creador || null,
+        titulo: 'Carta aprobada',
+        mensaje: `Tu carta ${r.op_carta || r.id} fue aprobada. 🎉`,
         href: '/aprobaciones/',
       }));
     },
@@ -212,6 +239,13 @@ const OPERADORES = [
   { op: 'entre',    label: 'Entre (mín y máx)',    valores: 2 },
   { op: 'igual',    label: 'Igual a (=)',          valores: 1 },
   { op: 'contiene', label: 'Contiene (texto, separar con ;)', valores: 1 },
+];
+
+const SONIDOS = [
+  { id: 'campana',  label: '🛎️ Campana (hotel)' },
+  { id: 'dingdong', label: '🔔 Timbre (ding-dong)' },
+  { id: 'alarma',   label: '🚨 Alarma (sirena)' },
+  { id: 'aplausos', label: '👏 Aplausos' },
 ];
 
 function cumple(val, op, v1, v2) {
@@ -273,10 +307,10 @@ async function evaluarAlertas() {
             [uid, clave, rg.delay_min || 0]);
           if (ex) continue;
           await pool.query(
-            `INSERT INTO notificaciones (id_usuario, tipo, titulo, mensaje, href, clave, prioridad, sonar, son_cada, son_max)
-             VALUES (?,?,?,?,?,?,?,?,?,?)`,
+            `INSERT INTO notificaciones (id_usuario, tipo, titulo, mensaje, href, clave, prioridad, sonar, son_cada, son_max, son_tipo)
+             VALUES (?,?,?,?,?,?,?,?,?,?,?)`,
             [uid, 'alerta', rg.nombre || f.titulo, f.mensaje, f.href, clave, rg.prioridad || 'normal',
-             rg.sonido ? 1 : 0, rg.sonido_cada_seg || 30, rg.sonido_max_min || 5]);
+             rg.sonido ? 1 : 0, rg.sonido_cada_seg || 30, rg.sonido_max_min || 5, rg.sonido_tipo || 'campana']);
         }
       }
       // Resolver: borrar notificaciones no leídas de esta regla cuyo registro ya no cumple
@@ -296,7 +330,7 @@ const getMeta = async (req, res) => {
   try {
     const origenes = Object.entries(ORIGENES).map(([id, o]) => ({ id, label: o.label, campos: o.campos }));
     const [perfiles] = await pool.query('SELECT nombre FROM perfiles ORDER BY nombre');
-    res.json({ success: true, data: { origenes, operadores: OPERADORES, perfiles: perfiles.map(p => p.nombre) }, error: null });
+    res.json({ success: true, data: { origenes, operadores: OPERADORES, sonidos: SONIDOS, perfiles: perfiles.map(p => p.nombre) }, error: null });
   } catch (e) { res.status(500).json({ success: false, data: null, error: 'Error interno del servidor' }); }
 };
 
@@ -309,22 +343,23 @@ const listAlertas = async (req, res) => {
 
 const saveAlerta = async (req, res) => {
   try {
-    let { id, nombre, origen, campo, operador, valor1, valor2, prioridad, destino, destinos, activo, sonido, delay_min, sonido_cada_seg, sonido_max_min } = req.body;
+    let { id, nombre, origen, campo, operador, valor1, valor2, prioridad, destino, destinos, activo, sonido, delay_min, sonido_cada_seg, sonido_max_min, sonido_tipo } = req.body;
     if (!nombre || !ORIGENES[origen] || !OPERADORES.find(o => o.op === operador))
       return res.status(400).json({ success: false, data: null, error: 'nombre, origen y operador válidos requeridos' });
     // destino acepta string CSV o arreglo (hasta 3 perfiles)
     if (Array.isArray(destinos)) destino = destinos.filter(Boolean).slice(0, 3).join(',');
+    const tipoSon = SONIDOS.find(s => s.id === sonido_tipo) ? sonido_tipo : 'campana';
     const params = [nombre, origen, campo, operador, valor1 ?? null, valor2 ?? null, prioridad || 'normal',
       destino || 'Administrador', activo ? 1 : 0, sonido ? 1 : 0,
-      Math.max(0, parseInt(delay_min) || 0), Math.max(5, parseInt(sonido_cada_seg) || 30), Math.max(1, parseInt(sonido_max_min) || 5)];
+      Math.max(0, parseInt(delay_min) || 0), Math.max(5, parseInt(sonido_cada_seg) || 30), Math.max(1, parseInt(sonido_max_min) || 5), tipoSon];
     if (id) {
       await pool.query(
-        `UPDATE alertas_config SET nombre=?, origen=?, campo=?, operador=?, valor1=?, valor2=?, prioridad=?, destino=?, activo=?, sonido=?, delay_min=?, sonido_cada_seg=?, sonido_max_min=? WHERE id=?`,
+        `UPDATE alertas_config SET nombre=?, origen=?, campo=?, operador=?, valor1=?, valor2=?, prioridad=?, destino=?, activo=?, sonido=?, delay_min=?, sonido_cada_seg=?, sonido_max_min=?, sonido_tipo=? WHERE id=?`,
         [...params, id]);
     } else {
       await pool.query(
-        `INSERT INTO alertas_config (nombre, origen, campo, operador, valor1, valor2, prioridad, destino, activo, sonido, delay_min, sonido_cada_seg, sonido_max_min)
-         VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)`, params);
+        `INSERT INTO alertas_config (nombre, origen, campo, operador, valor1, valor2, prioridad, destino, activo, sonido, delay_min, sonido_cada_seg, sonido_max_min, sonido_tipo)
+         VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)`, params);
     }
     evaluarAlertas();
     res.json({ success: true, data: { ok: true }, error: null });

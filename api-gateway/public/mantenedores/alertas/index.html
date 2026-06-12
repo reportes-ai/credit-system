@@ -91,6 +91,12 @@
       <div class="field"><label>Sonar máximo (min)</label><input id="fSonMax" type="number" min="1" value="5"></div>
       <div class="field"><label>Activa</label><label class="sw"><input type="checkbox" id="fActivo" checked><span class="sl"></span></label><span class="sw-lbl" id="lblActivo">Sí</span></div>
       <div class="field"><label>Sonido</label><label class="sw snd"><input type="checkbox" id="fSonido" checked><span class="sl"></span></label><span class="sw-lbl" id="lblSonido">Con sonido</span></div>
+      <div class="field"><label>Tipo de sonido</label>
+        <div style="display:flex;gap:6px">
+          <select id="fSonTipo" style="flex:1"></select>
+          <button type="button" class="btn-ghost" style="padding:6px 11px" title="Probar" onclick="probarSonido()"><i class="bi bi-play-fill"></i></button>
+        </div>
+      </div>
     </div>
     <p class="hint" id="hintOp"></p>
     <div style="display:flex;justify-content:flex-end;gap:12px;align-items:center;margin-top:10px">
@@ -130,6 +136,7 @@ let META = { origenes:[], operadores:[], perfiles:[] }, EDIT = null;
   document.getElementById('fOperador').innerHTML = META.operadores.map(o=>`<option value="${esc(o.op)}">${esc(o.label)}</option>`).join('');
   const optsDest = '<option value="">—</option><option value="CREADOR">👤 Creador (quien creó el registro)</option><option value="TODOS">Todos los usuarios</option>' + META.perfiles.map(p=>`<option value="${esc(p)}">${esc(p)}</option>`).join('');
   document.querySelectorAll('.dest').forEach(s=>s.innerHTML=optsDest);
+  document.getElementById('fSonTipo').innerHTML = (META.sonidos||[]).map(s=>`<option value="${esc(s.id)}">${esc(s.label)}</option>`).join('');
   renderLista(jL.data||[]);
 })();
 
@@ -160,10 +167,12 @@ function nueva(){ EDIT=null; document.getElementById('formCard').style.display='
   document.getElementById('fPrioridad').value='normal';
   document.getElementById('fDestino1').value='Administrador'; document.getElementById('fDestino2').value=''; document.getElementById('fDestino3').value='';
   document.getElementById('fDelay').value=60; document.getElementById('fSonCada').value=30; document.getElementById('fSonMax').value=5;
+  document.getElementById('fSonTipo').value='campana';
   document.getElementById('fActivo').checked=true; document.getElementById('fSonido').checked=true;
   document.getElementById('lblActivo').textContent='Sí'; document.getElementById('lblSonido').textContent='Con sonido';
   window.scrollTo({top:0,behavior:'smooth'}); }
 function cancelar(){ document.getElementById('formCard').style.display='none'; }
+function probarSonido(){ const t=document.getElementById('fSonTipo').value; if(window.afPlaySound) window.afPlaySound(t); else alert('Recarga la página para probar el sonido.'); }
 
 function editar(a){ EDIT=a.id; document.getElementById('formCard').style.display='';
   document.getElementById('fNombre').value=a.nombre;
@@ -174,6 +183,7 @@ function editar(a){ EDIT=a.id; document.getElementById('formCard').style.display
   const ds=String(a.destino||'').split(',').map(s=>s.trim());
   document.getElementById('fDestino1').value=ds[0]||''; document.getElementById('fDestino2').value=ds[1]||''; document.getElementById('fDestino3').value=ds[2]||'';
   document.getElementById('fDelay').value=a.delay_min??60; document.getElementById('fSonCada').value=a.sonido_cada_seg??30; document.getElementById('fSonMax').value=a.sonido_max_min??5;
+  document.getElementById('fSonTipo').value=a.sonido_tipo||'campana';
   document.getElementById('fActivo').checked=!!a.activo; document.getElementById('fSonido').checked=a.sonido!=0;
   document.getElementById('lblActivo').textContent=a.activo?'Sí':'No';
   document.getElementById('lblSonido').textContent=a.sonido!=0?'Con sonido':'Silenciosa';
@@ -187,6 +197,7 @@ async function guardar(){
     valor2:document.getElementById('fVal2').value.trim(), prioridad:document.getElementById('fPrioridad').value,
     destinos:[document.getElementById('fDestino1').value,document.getElementById('fDestino2').value,document.getElementById('fDestino3').value].filter(Boolean),
     delay_min:document.getElementById('fDelay').value, sonido_cada_seg:document.getElementById('fSonCada').value, sonido_max_min:document.getElementById('fSonMax').value,
+    sonido_tipo:document.getElementById('fSonTipo').value,
     activo:document.getElementById('fActivo').checked, sonido:document.getElementById('fSonido').checked };
   if(!body.destinos.length) body.destinos=['Administrador'];
   if(!body.nombre){ msg.textContent='Falta el nombre'; msg.style.cssText='display:inline;color:#b91c1c'; return; }

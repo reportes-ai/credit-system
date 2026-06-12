@@ -2,7 +2,7 @@
    AutoFácil — Versión global de la aplicación
    Editar SOLO este archivo para cambiar la versión
    ───────────────────────────────────────────── */
-const APP_VERSION = 'v13.0';
+const APP_VERSION = 'v13.1';
 
 document.addEventListener('DOMContentLoaded', () => {
 
@@ -446,27 +446,66 @@ document.addEventListener('DOMContentLoaded', () => {
 
   const H = { 'Content-Type': 'application/json', Authorization: 'Bearer ' + token };
   let unread = -1;   // -1 = primera carga, no suena
-  let ringEveryMs = 0, ringUntil = 0, lastRing = 0; // sonido insistente configurable por alerta
+  let ringEveryMs = 0, ringUntil = 0, lastRing = 0, ringTipo = 'campana'; // sonido insistente por alerta
 
-  /* 🛎️ doble ding de campana de hotel */
-  function dingDing() {
+  /* ── Sonidos sintetizados (Web Audio, sin archivos) ── */
+  function sCampana(ctx) { // doble ding de campana de hotel
+    const ding = (t0) => {
+      const o1 = ctx.createOscillator(), g1 = ctx.createGain();
+      const o2 = ctx.createOscillator(), g2 = ctx.createGain();
+      o1.type = 'sine'; o1.frequency.value = 1318;
+      o2.type = 'sine'; o2.frequency.value = 1976;
+      g1.gain.setValueAtTime(0.5, t0);  g1.gain.exponentialRampToValueAtTime(0.001, t0 + 0.9);
+      g2.gain.setValueAtTime(0.18, t0); g2.gain.exponentialRampToValueAtTime(0.001, t0 + 0.6);
+      o1.connect(g1).connect(ctx.destination); o2.connect(g2).connect(ctx.destination);
+      o1.start(t0); o1.stop(t0 + 1); o2.start(t0); o2.stop(t0 + 0.7);
+    };
+    ding(ctx.currentTime); ding(ctx.currentTime + 0.45);
+  }
+  function sDingDong(ctx) { // timbre de puerta
+    const t = ctx.currentTime;
+    [[659.25, t], [523.25, t + 0.42]].forEach(([f, t0]) => {
+      const o = ctx.createOscillator(), g = ctx.createGain();
+      o.type = 'sine'; o.frequency.value = f;
+      g.gain.setValueAtTime(0.45, t0); g.gain.exponentialRampToValueAtTime(0.001, t0 + 0.55);
+      o.connect(g).connect(ctx.destination); o.start(t0); o.stop(t0 + 0.6);
+    });
+  }
+  function sAlarma(ctx) { // sirena tipo alarma
+    const t = ctx.currentTime, dur = 1.6;
+    const o = ctx.createOscillator(), g = ctx.createGain();
+    o.type = 'sawtooth'; o.frequency.setValueAtTime(440, t);
+    for (let i = 0; i < 4; i++) {
+      o.frequency.linearRampToValueAtTime(900, t + i * 0.4 + 0.2);
+      o.frequency.linearRampToValueAtTime(440, t + i * 0.4 + 0.4);
+    }
+    g.gain.setValueAtTime(0.22, t); g.gain.setValueAtTime(0.22, t + dur - 0.1); g.gain.linearRampToValueAtTime(0, t + dur);
+    o.connect(g).connect(ctx.destination); o.start(t); o.stop(t + dur);
+  }
+  function sAplausos(ctx) { // ráfaga de ruido filtrado = aplausos
+    const dur = 1.8, t0 = ctx.currentTime;
+    const buf = ctx.createBuffer(1, Math.floor(ctx.sampleRate * dur), ctx.sampleRate);
+    const d = buf.getChannelData(0);
+    for (let i = 0; i < d.length; i++) d[i] = (Math.random() * 2 - 1) * 0.6;
+    const src = ctx.createBufferSource(); src.buffer = buf;
+    const bp = ctx.createBiquadFilter(); bp.type = 'bandpass'; bp.frequency.value = 1600; bp.Q.value = 0.6;
+    const g = ctx.createGain();
+    g.gain.setValueAtTime(0, t0); g.gain.linearRampToValueAtTime(0.5, t0 + 0.15);
+    g.gain.setValueAtTime(0.5, t0 + 1.2); g.gain.linearRampToValueAtTime(0, t0 + dur);
+    src.connect(bp).connect(g).connect(ctx.destination); src.start(t0); src.stop(t0 + dur);
+  }
+  function reproducir(tipo) {
     try {
       const ctx = new (window.AudioContext || window.webkitAudioContext)();
-      const ding = (t0) => {
-        const o1 = ctx.createOscillator(), g1 = ctx.createGain();
-        const o2 = ctx.createOscillator(), g2 = ctx.createGain();
-        o1.type = 'sine'; o1.frequency.value = 1318;
-        o2.type = 'sine'; o2.frequency.value = 1976;
-        g1.gain.setValueAtTime(0.5, t0);  g1.gain.exponentialRampToValueAtTime(0.001, t0 + 0.9);
-        g2.gain.setValueAtTime(0.18, t0); g2.gain.exponentialRampToValueAtTime(0.001, t0 + 0.6);
-        o1.connect(g1).connect(ctx.destination);
-        o2.connect(g2).connect(ctx.destination);
-        o1.start(t0); o1.stop(t0 + 1); o2.start(t0); o2.stop(t0 + 0.7);
-      };
-      ding(ctx.currentTime); ding(ctx.currentTime + 0.45);
-      setTimeout(() => ctx.close(), 2000);
+      if (tipo === 'dingdong') sDingDong(ctx);
+      else if (tipo === 'alarma') sAlarma(ctx);
+      else if (tipo === 'aplausos') sAplausos(ctx);
+      else sCampana(ctx);
+      setTimeout(() => ctx.close(), 2500);
     } catch (e) {}
   }
+  const dingDing = () => reproducir(ringTipo);
+  window.afPlaySound = reproducir; // para previsualizar desde el mantenedor
   const escN = s => String(s ?? '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
 
   async function cargar() {
@@ -480,7 +519,11 @@ document.addEventListener('DOMContentLoaded', () => {
       badge.textContent = noLeidas;
       badge.style.display = noLeidas ? 'flex' : 'none';
       // Sonar al llegar nuevas solo si alguna no leída tiene el sonido activado
-      const haySonido = (rows || []).some(n => !n.leida && n.sonar !== 0);
+      const unreadSonoras = (rows || []).filter(n => !n.leida && n.sonar !== 0);
+      const haySonido = unreadSonoras.length > 0;
+      // Tipo de sonido a usar: el de la alerta ALTA sonora más reciente, o la sonora más reciente
+      const masNueva = arr => arr.slice().sort((a, b) => new Date(b.created_at) - new Date(a.created_at))[0];
+      ringTipo = ((masNueva(unreadSonoras.filter(n => n.prioridad === 'alta')) || masNueva(unreadSonoras) || {}).son_tipo) || 'campana';
       if (unread >= 0 && noLeidas > unread && haySonido) dingDing();
       unread = noLeidas;
 
