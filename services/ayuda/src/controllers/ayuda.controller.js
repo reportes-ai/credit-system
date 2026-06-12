@@ -200,6 +200,15 @@ const pool = require('../../../../shared/config/database');
           { nombre:'Seguridad', para_que:'Políticas de seguridad de acceso.' },
         ],
         siguiente:'Tras crear un perfil, asígnale permisos en "Perfiles y Permisos".' },
+
+      { ruta:'/simulador/', titulo:'Simulador Rentabilidad', icono:'bi-calculator',
+        descripcion:'Simula la rentabilidad de una operación o cartera: ingresos, comisiones y cuota en tiempo real para AutoFin y Unidad de Crédito.',
+        pasos:[
+          { titulo:'Ingresa los parámetros', detalle:'Monto, plazo, tasa y condiciones. El simulador recalcula al instante.' },
+          { titulo:'Compara escenarios', detalle:'Ajusta los valores para ver cómo cambian ingresos, comisiones y rentabilidad.' },
+        ],
+        submodulos:[],
+        siguiente:'Si el escenario te convence, genera una cotización formal en "Cotizaciones".' },
     ];
 
     for (const a of SEED) {
