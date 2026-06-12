@@ -35,7 +35,22 @@ app.use((req, res, next) => {
   next();
 });
 
-app.use(express.static(path.join(__dirname, '../public')));
+// Los HTML (páginas) nunca se cachean: así un cambio (permisos, gating, etc.) aplica al recargar.
+// Los assets con extensión (.js/.css/.png…) mantienen su caché normal para performance.
+app.use((req, res, next) => {
+  if (req.method === 'GET') {
+    const p = req.path;
+    const esHtml = p.endsWith('/') || p.endsWith('.html') || !path.extname(p);
+    if (esHtml) res.set('Cache-Control', 'no-cache, no-store, must-revalidate');
+  }
+  next();
+});
+
+app.use(express.static(path.join(__dirname, '../public'), {
+  setHeaders: (res, filePath) => {
+    if (filePath.endsWith('.html')) res.set('Cache-Control', 'no-cache, no-store, must-revalidate');
+  }
+}));
 
 // Favicon
 app.get('/favicon.ico', (req, res) =>
