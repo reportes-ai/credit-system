@@ -111,14 +111,22 @@ const reporteDiario = async (req, res) => {
       `SELECT id_usuario, login_at, last_seen, logout_at FROM sesiones_usuario
        WHERE id_usuario IN (?) AND login_at < (? + INTERVAL 1 DAY) AND COALESCE(logout_at, last_seen) >= ?`,
       [ids, hasta, desde]);
-    const [dec] = await pool.query(
-      `SELECT DATE(fecha_aprobacion) f, COUNT(*) n FROM cartas_aprobacion
-         WHERE aprobado_por IS NOT NULL AND DATE(fecha_aprobacion) BETWEEN ? AND ? GROUP BY DATE(fecha_aprobacion)`, [desde, hasta]);
-    const [rec] = await pool.query(
-      `SELECT DATE(fecha_rechazo) f, COUNT(*) n FROM cartas_aprobacion
-         WHERE rechazado_por IS NOT NULL AND DATE(fecha_rechazo) BETWEEN ? AND ? GROUP BY DATE(fecha_rechazo)`, [desde, hasta]);
-    const apMap = {}; dec.forEach(r => apMap[ymd(new Date(r.f))] = r.n);
-    const reMap = {}; rec.forEach(r => reMap[ymd(new Date(r.f))] = r.n);
+    const [creadas] = await pool.query(
+      `SELECT id, DATE(fecha_creacion) f, status FROM cartas_aprobacion WHERE DATE(fecha_creacion) BETWEEN ? AND ?`, [desde, hasta]);
+    const [aprob] = await pool.query(
+      `SELECT id, DATE(fecha_aprobacion) f FROM cartas_aprobacion
+         WHERE aprobado_por IS NOT NULL AND DATE(fecha_aprobacion) BETWEEN ? AND ?`, [desde, hasta]);
+    const [rech] = await pool.query(
+      `SELECT id, DATE(fecha_rechazo) f FROM cartas_aprobacion
+         WHERE rechazado_por IS NOT NULL AND DATE(fecha_rechazo) BETWEEN ? AND ?`, [desde, hasta]);
+    const [opened] = await pool.query(
+      `SELECT DISTINCT id_carta, DATE(ts) f FROM carta_eventos WHERE accion='abrir' AND DATE(ts) BETWEEN ? AND ?`, [desde, hasta]);
+
+    const ing = {}, pend = {}, ap = {}, re = {}, apIds = {}, reIds = {}, opIds = {};
+    creadas.forEach(c => { const k = ymd(new Date(c.f)); ing[k] = (ing[k] || 0) + 1; if (c.status === 'PENDIENTE') pend[k] = (pend[k] || 0) + 1; });
+    aprob.forEach(c => { const k = ymd(new Date(c.f)); ap[k] = (ap[k] || 0) + 1; (apIds[k] = apIds[k] || new Set()).add(c.id); });
+    rech.forEach(c => { const k = ymd(new Date(c.f)); re[k] = (re[k] || 0) + 1; (reIds[k] = reIds[k] || new Set()).add(c.id); });
+    opened.forEach(o => { const k = ymd(new Date(o.f)); (opIds[k] = opIds[k] || new Set()).add(o.id_carta); });
 
     const out = [];
     let d = new Date(desde + 'T00:00:00'), end = new Date(hasta + 'T00:00:00');
@@ -133,13 +141,19 @@ const reporteDiario = async (req, res) => {
       });
       const personas = Object.keys(conectadosMin).length;
       const totalMin = Object.values(conectadosMin).reduce((a, b) => a + b, 0);
+      // ignoradas: abiertas ese día que no fueron decididas ese día
+      const decididas = new Set([...(apIds[fk] || []), ...(reIds[fk] || [])]);
+      const ignoradas = [...(opIds[fk] || [])].filter(id => !decididas.has(id)).length;
       out.push({
         fecha: fk,
         dia_semana: DIAS[d.getDay()],
         promedio_conectados: Math.round((totalMin / 540) * 100) / 100, // 540 min = 9h
         personas,
-        aprobadas: apMap[fk] || 0,
-        rechazadas: reMap[fk] || 0,
+        ingresadas: ing[fk] || 0,
+        aprobadas: ap[fk] || 0,
+        rechazadas: re[fk] || 0,
+        ignoradas,
+        pendientes: pend[fk] || 0,
       });
       d.setDate(d.getDate() + 1);
     }

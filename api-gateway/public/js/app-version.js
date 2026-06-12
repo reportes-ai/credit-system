@@ -2,7 +2,7 @@
    AutoFácil — Versión global de la aplicación
    Editar SOLO este archivo para cambiar la versión
    ───────────────────────────────────────────── */
-const APP_VERSION = 'v13.5';
+const APP_VERSION = 'v13.6';
 
 document.addEventListener('DOMContentLoaded', () => {
 
@@ -646,16 +646,6 @@ document.addEventListener('DOMContentLoaded', async () => {
   if (!token) return;                               // login u otras sin sesión
   if (document.getElementById('afHelpBtn')) return; // evitar duplicados
 
-  let data = null;
-  try {
-    const r = await fetch('/api/ayuda?ruta=' + encodeURIComponent(location.pathname), {
-      headers: { Authorization: 'Bearer ' + token }
-    });
-    const j = await r.json();
-    if (j.success && j.data) data = j.data;
-  } catch (e) { return; }
-  if (!data) return;                                // sin ayuda para esta página → no mostrar botón
-
   const esc = s => String(s ?? '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
 
   // Estilos
@@ -691,37 +681,46 @@ document.addEventListener('DOMContentLoaded', async () => {
   `;
   document.head.appendChild(st);
 
-  // Construir contenido
-  const pasosHTML = (data.pasos||[]).map((p,i) =>
-    `<div class="afh-step"><div class="n">${i+1}</div><div class="tx"><b>${esc(p.titulo)}</b><span>${esc(p.detalle)}</span></div></div>`).join('');
-  const subsHTML = (data.submodulos||[]).map(s =>
-    `<div class="afh-sub"><b>${esc(s.nombre)}</b><span>${esc(s.para_que)}</span></div>`).join('');
-
-  const panel = document.createElement('div');
-  panel.id = 'afHelpPanel';
-  panel.innerHTML = `
-    <div class="afh-head"><i class="bi ${esc(data.icono||'bi-question-circle')}"></i>
-      <h3>${esc(data.titulo)}</h3>
-      <button class="afh-x" title="Cerrar">✕</button></div>
-    <div class="afh-body">
-      ${data.descripcion ? `<div class="afh-sec"><h4><i class="bi bi-info-circle"></i> Para qué sirve</h4><p>${esc(data.descripcion)}</p></div>` : ''}
-      ${pasosHTML ? `<div class="afh-sec"><h4><i class="bi bi-list-check"></i> Cómo se usa</h4>${pasosHTML}</div>` : ''}
-      ${subsHTML ? `<div class="afh-sec"><h4><i class="bi bi-grid"></i> Submódulos</h4>${subsHTML}</div>` : ''}
-      ${data.siguiente ? `<div class="afh-sec"><h4><i class="bi bi-signpost-2"></i> ¿Y después?</h4><div class="afh-next">${esc(data.siguiente)}</div></div>` : ''}
-    </div>`;
-
+  // Infraestructura (siempre presente; el botón se muestra solo si hay ayuda para la clave actual)
   const overlay = document.createElement('div'); overlay.id = 'afHelpOverlay';
+  const panel = document.createElement('div'); panel.id = 'afHelpPanel';
   const btn = document.createElement('button'); btn.id = 'afHelpBtn'; btn.title = 'Ayuda de esta página';
-  btn.innerHTML = '<i class="bi bi-question-lg"></i>';
-
-  document.body.appendChild(overlay);
-  document.body.appendChild(panel);
-  document.body.appendChild(btn);
+  btn.innerHTML = '<i class="bi bi-question-lg"></i>'; btn.style.display = 'none';
+  document.body.appendChild(overlay); document.body.appendChild(panel); document.body.appendChild(btn);
 
   const open = () => { overlay.classList.add('show'); panel.classList.add('show'); };
   const close = () => { overlay.classList.remove('show'); panel.classList.remove('show'); };
   btn.addEventListener('click', open);
   overlay.addEventListener('click', close);
-  panel.querySelector('.afh-x').addEventListener('click', close);
   document.addEventListener('keydown', e => { if (e.key === 'Escape') close(); });
+
+  function pintar(data) {
+    const pasosHTML = (data.pasos||[]).map((p,i) =>
+      `<div class="afh-step"><div class="n">${i+1}</div><div class="tx"><b>${esc(p.titulo)}</b><span>${esc(p.detalle)}</span></div></div>`).join('');
+    const subsHTML = (data.submodulos||[]).map(s =>
+      `<div class="afh-sub"><b>${esc(s.nombre)}</b><span>${esc(s.para_que)}</span></div>`).join('');
+    panel.innerHTML = `
+      <div class="afh-head"><i class="bi ${esc(data.icono||'bi-question-circle')}"></i>
+        <h3>${esc(data.titulo)}</h3>
+        <button class="afh-x" title="Cerrar">✕</button></div>
+      <div class="afh-body">
+        ${data.descripcion ? `<div class="afh-sec"><h4><i class="bi bi-info-circle"></i> Para qué sirve</h4><p>${esc(data.descripcion)}</p></div>` : ''}
+        ${pasosHTML ? `<div class="afh-sec"><h4><i class="bi bi-list-check"></i> Cómo se usa</h4>${pasosHTML}</div>` : ''}
+        ${subsHTML ? `<div class="afh-sec"><h4><i class="bi bi-grid"></i> Submódulos</h4>${subsHTML}</div>` : ''}
+        ${data.siguiente ? `<div class="afh-sec"><h4><i class="bi bi-signpost-2"></i> ¿Y después?</h4><div class="afh-next">${esc(data.siguiente)}</div></div>` : ''}
+      </div>`;
+    panel.querySelector('.afh-x').addEventListener('click', close);
+  }
+
+  // Carga la ayuda de una "clave" (ruta o ruta+pestaña). Páginas SPA llaman window.afAyudaSet('/x/tab').
+  async function cargarAyuda(key) {
+    try {
+      const r = await fetch('/api/ayuda?ruta=' + encodeURIComponent(key), { headers: { Authorization: 'Bearer ' + token } });
+      const j = await r.json();
+      if (j.success && j.data) { pintar(j.data); btn.style.display = 'flex'; }
+      else { btn.style.display = 'none'; close(); }
+    } catch (e) { btn.style.display = 'none'; }
+  }
+  window.afAyudaSet = cargarAyuda;
+  cargarAyuda(location.pathname);
 });

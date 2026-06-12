@@ -505,8 +505,13 @@
       <span style="font-size:.76rem;color:#94a3b8">Promedio = N° de analistas conectados en promedio entre 10:00 y 19:00. Click en un día para el detalle por persona.</span>
     </div>
     <table class="tbl" style="margin-top:14px">
-      <thead><tr><th>Día</th><th style="text-align:center">Analistas (prom. 10–19h)</th><th style="text-align:center">Personas</th><th style="text-align:center">Aprobadas</th><th style="text-align:center">Rechazadas</th></tr></thead>
-      <tbody id="bodyDesempeno"><tr><td colspan="5" style="text-align:center;color:#94a3b8;padding:20px">Selecciona un rango y presiona Ver</td></tr></tbody>
+      <thead><tr>
+        <th>Día</th>
+        <th style="text-align:center">Analistas 10–19h<br><span style="font-weight:400;font-size:.68rem;color:#94a3b8">prom (personas)</span></th>
+        <th style="text-align:center">Ingresadas</th><th style="text-align:center">Aprobadas</th>
+        <th style="text-align:center">Rechazadas</th><th style="text-align:center">Ignoradas</th><th style="text-align:center">Pendientes</th>
+      </tr></thead>
+      <tbody id="bodyDesempeno"><tr><td colspan="7" style="text-align:center;color:#94a3b8;padding:20px">Selecciona un rango y presiona Ver</td></tr></tbody>
     </table>
   </div>
   <div class="card-af" id="detalleDia" style="display:none">
@@ -719,6 +724,8 @@ function showTab(t){
   if (pane) pane.classList.add('active');
   document.getElementById('btnMenu').style.display = (t==='home'||t==='params') ? 'none' : '';
   document.getElementById('viewTitle').textContent = TITULOS[t]||'';
+  // Ayuda contextual por pestaña
+  if (window.afAyudaSet) window.afAyudaSet('/aprobaciones/' + (t==='home' ? '' : t + '/'));
   if (t==='revision')  renderRevision();
   if (t==='impresion') renderImpresion();
   if (t==='informes')  initInformes();
@@ -749,15 +756,17 @@ async function cargarDesempeno(){
     const r = await fetch('/api/desempeno/cartas?desde='+desde+'&hasta='+hasta, { headers: hdr() });
     const j = await r.json();
     const rows = j.data || [];
-    if (!rows.length){ tb.innerHTML = '<tr><td colspan="5" style="text-align:center;color:#94a3b8;padding:20px">Sin datos en el rango</td></tr>'; return; }
+    if (!rows.length){ tb.innerHTML = '<tr><td colspan="7" style="text-align:center;color:#94a3b8;padding:20px">Sin datos en el rango</td></tr>'; return; }
     tb.innerHTML = rows.map(d => `<tr style="cursor:pointer" onclick="verDetalleDia('${d.fecha}')">
       <td><b>${d.dia_semana.charAt(0).toUpperCase()+d.dia_semana.slice(1)}</b> ${d.fecha.split('-').reverse().join('-')}</td>
-      <td style="text-align:center;font-weight:700;color:#0141A2">${d.promedio_conectados}</td>
-      <td style="text-align:center">${d.personas}</td>
+      <td style="text-align:center;font-weight:700;color:#0141A2">${d.promedio_conectados}<br><span style="font-weight:400;font-size:.7rem;color:#94a3b8">${d.personas} pers.</span></td>
+      <td style="text-align:center">${d.ingresadas}</td>
       <td style="text-align:center;color:#15803d;font-weight:700">${d.aprobadas}</td>
       <td style="text-align:center;color:#b91c1c;font-weight:700">${d.rechazadas}</td>
+      <td style="text-align:center;color:#a16207">${d.ignoradas}</td>
+      <td style="text-align:center;color:#1d4ed8">${d.pendientes}</td>
     </tr>`).join('');
-  } catch(e){ tb.innerHTML = '<tr><td colspan="5" style="text-align:center;color:#b91c1c;padding:20px">Error al cargar</td></tr>'; }
+  } catch(e){ tb.innerHTML = '<tr><td colspan="7" style="text-align:center;color:#b91c1c;padding:20px">Error al cargar</td></tr>'; }
 }
 async function verDetalleDia(fecha){
   const det = document.getElementById('detalleDia'); det.style.display = '';
