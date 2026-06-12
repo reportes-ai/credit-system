@@ -170,7 +170,7 @@ const ORIGENES = {
       // creado_por (email) → usuarios.email para notificar al creador
       const [rows] = await pool.query(`
         SELECT c.id, c.op_carta, c.ejecutivo_nombre,
-               DATEDIFF(CURDATE(), DATE(c.fecha_creacion)) AS dias,
+               DATEDIFF(CURDATE(), DATE(COALESCE(c.fecha_rechazo, c.fecha_creacion))) AS dias,
                u.id_usuario AS creador
         FROM cartas_aprobacion c
         LEFT JOIN usuarios u ON u.email = c.creado_por
