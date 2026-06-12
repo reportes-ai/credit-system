@@ -45,6 +45,26 @@ const getVigente = async (req, res) => {
   }
 };
 
+// Tasa aplicable a una fecha (para TMC del día de otorgamiento)
+const getEnFecha = async (req, res) => {
+  try {
+    const fecha = req.params.fecha;
+    let [rows] = await pool.query(
+      'SELECT * FROM tasas WHERE fecha_desde <= ? AND fecha_hasta >= ? ORDER BY fecha_desde DESC LIMIT 1',
+      [fecha, fecha]
+    );
+    if (!rows.length) {
+      [rows] = await pool.query(
+        'SELECT * FROM tasas WHERE fecha_desde <= ? ORDER BY fecha_desde DESC LIMIT 1',
+        [fecha]
+      );
+    }
+    res.json({ success: true, data: rows[0] || null, error: null });
+  } catch (e) {
+    (console.error('[error]', e), res.status(500).json({success:false,data:null,error:'Error interno del servidor'}));
+  }
+};
+
 const getById = async (req, res) => {
   try {
     const [rows] = await pool.query('SELECT * FROM tasas WHERE id_tasa = ?', [req.params.id]);
@@ -117,4 +137,4 @@ const remove = async (req, res) => {
   }
 };
 
-module.exports = { getAll, getVigente, getById, create, update, remove };
+module.exports = { getAll, getVigente, getEnFecha, getById, create, update, remove };

@@ -3,6 +3,7 @@ const ctrl = require('../controllers/tasas.controller');
 const { verifyToken } = require('../../../../shared/middleware/auth');
 
 router.get('/vigente', verifyToken, ctrl.getVigente);
+router.get('/en/:fecha', verifyToken, ctrl.getEnFecha);
 router.get('/', verifyToken, ctrl.getAll);
 router.get('/:id', verifyToken, ctrl.getById);
 router.post('/', verifyToken, ctrl.create);
