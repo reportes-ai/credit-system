@@ -5,7 +5,7 @@
   <link rel="icon" href="/img/favicon.png" type="image/png">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Post Venta — AutoFácil</title>
-  <!-- v1.2 -->
+  <!-- v1.3 -->
   <link href="/css/bootstrap.min.css" rel="stylesheet">
   <link href="/css/bootstrap-icons.css" rel="stylesheet">
   <style>
@@ -21,7 +21,9 @@
     .avatar { width:28px; height:28px; background:#90caf9; border-radius:50%; display:flex; align-items:center; justify-content:center; color:var(--blue); font-weight:700; font-size:.75rem; }
     .perfil-badge { background:rgba(144,202,249,.2); border:1px solid rgba(144,202,249,.4); color:#90caf9; border-radius:12px; padding:2px 10px; font-size:.73rem; font-weight:600; }
     .btn-logout { background:rgba(255,255,255,.1); border:1px solid rgba(255,255,255,.2); color:#fff; border-radius:8px; padding:5px 12px; font-size:.82rem; cursor:pointer; }
-    .cards-grid { display:grid; grid-template-columns:repeat(2,minmax(260px,420px)); gap:24px; justify-content:center; padding:40px 24px; }
+    .cards-grid { display:grid; grid-template-columns:repeat(4,minmax(220px,1fr)); gap:20px; justify-content:center; max-width:1300px; margin:0 auto; padding:40px 24px; }
+    @media (max-width:1100px){ .cards-grid { grid-template-columns:repeat(2,minmax(220px,1fr)); } }
+    @media (max-width:620px){ .cards-grid { grid-template-columns:1fr; } }
     .module-card { background:#fff; border-radius:16px; padding:32px 28px; text-decoration:none; color:inherit; border:2px solid transparent; transition:all .18s; display:block; box-shadow:0 1px 6px rgba(0,0,0,.07); }
     .module-card:hover { border-color:var(--navy); transform:translateY(-4px); box-shadow:0 12px 32px rgba(1,65,162,.15); color:inherit; }
     .card-icon { width:58px; height:58px; border-radius:14px; background:linear-gradient(135deg,#e8eaf6,#c5cae9); display:flex; align-items:center; justify-content:center; font-size:1.7rem; color:var(--navy); margin-bottom:18px; }
