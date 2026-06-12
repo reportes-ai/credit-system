@@ -757,16 +757,60 @@ async function cargarDesempeno(){
     const j = await r.json();
     const rows = j.data || [];
     if (!rows.length){ tb.innerHTML = '<tr><td colspan="7" style="text-align:center;color:#94a3b8;padding:20px">Sin datos en el rango</td></tr>'; return; }
-    tb.innerHTML = rows.map(d => `<tr style="cursor:pointer" onclick="verDetalleDia('${d.fecha}')">
-      <td><b>${d.dia_semana.charAt(0).toUpperCase()+d.dia_semana.slice(1)}</b> ${d.fecha.split('-').reverse().join('-')}</td>
-      <td style="text-align:center;font-weight:700;color:#0141A2">${d.promedio_conectados}<br><span style="font-weight:400;font-size:.7rem;color:#94a3b8">${d.personas} pers.</span></td>
-      <td style="text-align:center">${d.ingresadas}</td>
-      <td style="text-align:center;color:#15803d;font-weight:700">${d.aprobadas}</td>
-      <td style="text-align:center;color:#b91c1c;font-weight:700">${d.rechazadas}</td>
-      <td style="text-align:center;color:#a16207">${d.ignoradas}</td>
-      <td style="text-align:center;color:#1d4ed8">${d.pendientes}</td>
-    </tr>`).join('');
+    tb.innerHTML = rows.map(d => {
+      const cel = (tipo, val, color) => val > 0
+        ? `<td style="text-align:center;cursor:pointer" onclick="event.stopPropagation();openCasos('${d.fecha}','${tipo}','${d.dia_semana}')"><span style="color:${color};font-weight:700;border-bottom:1px dashed ${color}">${val}</span></td>`
+        : `<td style="text-align:center;color:#cbd5e1">0</td>`;
+      return `<tr style="cursor:pointer" onclick="verDetalleDia('${d.fecha}')">
+        <td><b>${d.dia_semana.charAt(0).toUpperCase()+d.dia_semana.slice(1)}</b> ${d.fecha.split('-').reverse().join('-')}</td>
+        <td style="text-align:center;font-weight:700;color:#0141A2">${d.promedio_conectados}<br><span style="font-weight:400;font-size:.7rem;color:#94a3b8">${d.personas} pers.</span></td>
+        ${cel('ingresadas',d.ingresadas,'#334155')}
+        ${cel('aprobadas',d.aprobadas,'#15803d')}
+        ${cel('rechazadas',d.rechazadas,'#b91c1c')}
+        ${cel('ignoradas',d.ignoradas,'#a16207')}
+        ${cel('pendientes',d.pendientes,'#1d4ed8')}
+      </tr>`;
+    }).join('');
   } catch(e){ tb.innerHTML = '<tr><td colspan="7" style="text-align:center;color:#b91c1c;padding:20px">Error al cargar</td></tr>'; }
+}
+function fmtDT(s){ if(!s) return ''; const d=new Date(s); return isNaN(d)?'':d.toLocaleString('es-CL'); }
+async function openCasos(fecha, tipo, dia){
+  let modal = document.getElementById('casosModal');
+  if(!modal){
+    modal = document.createElement('div'); modal.id='casosModal';
+    modal.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:10000;display:flex;align-items:center;justify-content:center;padding:20px';
+    modal.innerHTML='<div style="background:#fff;border-radius:14px;max-width:840px;width:100%;max-height:85vh;display:flex;flex-direction:column;overflow:hidden">'
+      +'<div style="background:linear-gradient(135deg,#012d70,#0141A2);color:#fff;padding:15px 20px;display:flex;justify-content:space-between;align-items:center">'
+      +'<h5 id="casosTit" style="margin:0;font-weight:800"></h5>'
+      +'<button id="casosClose" style="background:rgba(255,255,255,.15);border:none;color:#fff;width:30px;height:30px;border-radius:8px;cursor:pointer">✕</button></div>'
+      +'<div id="casosBody" style="padding:16px 20px;overflow-y:auto"></div></div>';
+    modal.addEventListener('click',e=>{ if(e.target===modal) modal.style.display='none'; });
+    modal.querySelector('#casosClose').addEventListener('click',()=>{ modal.style.display='none'; });
+    document.body.appendChild(modal);
+  }
+  modal.style.display='flex';
+  const TIT={ingresadas:'Cartas ingresadas',aprobadas:'Cartas aprobadas',rechazadas:'Cartas rechazadas',ignoradas:'Cartas ignoradas',pendientes:'Cartas pendientes'};
+  document.getElementById('casosTit').textContent=(TIT[tipo]||'Casos')+' — '+(dia?dia.charAt(0).toUpperCase()+dia.slice(1)+' ':'')+fecha.split('-').reverse().join('-');
+  const body=document.getElementById('casosBody'); body.innerHTML='<p style="color:#94a3b8;text-align:center;padding:20px">Cargando…</p>';
+  try{
+    const r=await fetch('/api/desempeno/cartas/lista?fecha='+fecha+'&tipo='+tipo,{headers:hdr()});
+    const j=await r.json(); const rows=j.data||[];
+    if(!rows.length){ body.innerHTML='<p style="color:#94a3b8;text-align:center;padding:20px">Sin casos</p>'; return; }
+    body.innerHTML=rows.map(c=>{
+      let exc=''; try{ const e=JSON.parse(c.excepciones_comentarios||'[]'); if(Array.isArray(e)&&e.length) exc=e.map(x=>typeof x==='string'?x:(x.comentario||x.detalle||'')).filter(Boolean).join(' · '); else if(typeof c.excepciones_comentarios==='string') exc=c.excepciones_comentarios; }catch(_){ exc=c.excepciones_comentarios||''; }
+      const est={'APROBADA':'background:#dcfce7;color:#15803d','RECHAZADA':'background:#fee2e2;color:#b91c1c','PENDIENTE':'background:#dbeafe;color:#1d4ed8'}[c.status]||'background:#f1f5f9;color:#475569';
+      return `<div style="border:1px solid #eef2f7;border-radius:10px;padding:12px 14px;margin-bottom:10px">
+        <div style="display:flex;justify-content:space-between;align-items:center;gap:8px">
+          <b>${escH(c.op_carta||c.id)}</b>
+          <span style="${est};border-radius:8px;padding:2px 9px;font-size:.7rem;font-weight:700">${escH(c.status)}</span>
+        </div>
+        <div style="font-size:.83rem;color:#475569;margin-top:3px">${escH(c.cliente||'')} · Ejecutivo: ${escH(c.ejecutivo_nombre||'—')}</div>
+        ${exc?`<div style="margin-top:6px;font-size:.8rem"><b style="color:#c2410c">Comentario ejecutivo:</b> ${escH(exc)}</div>`:''}
+        ${c.aprobado_por_nombre?`<div style="margin-top:4px;font-size:.8rem;color:#15803d"><b>Aprobada por ${escH(c.aprobado_por_nombre)}</b> ${fmtDT(c.fecha_aprobacion)}${c.comentario_aprobacion?` — "${escH(c.comentario_aprobacion)}"`:''}</div>`:''}
+        ${c.rechazado_por_nombre?`<div style="margin-top:4px;font-size:.8rem;color:#b91c1c"><b>Rechazada por ${escH(c.rechazado_por_nombre)}</b> ${fmtDT(c.fecha_rechazo)}${c.motivo_rechazo?` — "${escH(c.motivo_rechazo)}"`:''}</div>`:''}
+      </div>`;
+    }).join('');
+  }catch(e){ body.innerHTML='<p style="color:#b91c1c;text-align:center;padding:20px">Error al cargar</p>'; }
 }
 async function verDetalleDia(fecha){
   const det = document.getElementById('detalleDia'); det.style.display = '';
@@ -1608,7 +1652,7 @@ function abrirRevision(id){
   }
   document.getElementById('modalBody').innerHTML = excBanner + cartaHTML(c, true);
   document.getElementById('modalFoot').innerHTML = `
-    <input id="motivoRechazo" placeholder="Motivo (obligatorio si rechazas)" style="flex:1;min-width:220px;border:1.5px solid #e2e8f0;border-radius:8px;padding:7px 10px;font-size:.83rem">
+    <input id="motivoRechazo" placeholder="Comentario (obligatorio si rechazas, opcional si apruebas)" style="flex:1;min-width:220px;border:1.5px solid #e2e8f0;border-radius:8px;padding:7px 10px;font-size:.83rem">
     <button class="btn-mini bm-no" style="padding:9px 18px;font-size:.85rem" onclick="resolverRevision(${c.id},'RECHAZADA')"><i class="bi bi-x-lg"></i> Rechazar</button>
     <button class="btn-mini bm-ok" style="padding:9px 18px;font-size:.85rem" onclick="resolverRevision(${c.id},'APROBADA')"><i class="bi bi-check-lg"></i> Aprobar</button>`;
   document.getElementById('modalCarta').classList.add('show');
@@ -1636,6 +1680,9 @@ async function resolverRevision(id, decision){
     const r = await fetch('/api/cartas', { method:'POST', headers: hdr(), body: JSON.stringify(carta) });
     const j = await r.json();
     if (!j.success) { alert(j.error||'Error'); return; }
+    // Comentario del aprobador al aprobar (campo aparte; al rechazar va en motivo)
+    if (decision==='APROBADA' && motivo)
+      fetch('/api/desempeno/comentario-aprob/'+id, { method:'POST', headers: hdr(), body: JSON.stringify({ comentario: motivo }) }).catch(()=>{});
     cerrarModal();
     await cargarCartas();
     renderRevision();

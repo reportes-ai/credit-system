@@ -34,6 +34,8 @@ const PERFILES_ANALISTA = ['Analista de Crédito', 'Supervisor de Crédito'];
         ts         DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
         INDEX idx_carta (id_carta), INDEX idx_user_ts (id_usuario, ts)
       )`);
+    // Comentario del aprobador al aprobar (no existía; al rechazar ya está motivo_rechazo)
+    await pool.query(`ALTER TABLE cartas_aprobacion ADD COLUMN IF NOT EXISTS comentario_aprobacion TEXT DEFAULT NULL`).catch(()=>{});
     console.log('[desempeno] tablas OK');
   } catch (e) { console.error('[desempeno migration]', e.message); }
 })();
@@ -260,4 +262,45 @@ const reporteDia = async (req, res) => {
   }
 };
 
-module.exports = { registrarLogin, ping, logout, logApertura, reporteDiario, reporteDia };
+/* ── GET /api/desempeno/cartas/lista?fecha=&tipo= — casos de una celda ── */
+const reporteCasos = async (req, res) => {
+  try {
+    const fecha = req.query.fecha, tipo = req.query.tipo;
+    if (!fecha) return res.status(400).json({ success: false, data: null, error: 'fecha requerida' });
+    const cols = `id, op_carta, cliente, ejecutivo_nombre, status,
+      fecha_creacion, aprobado_por_nombre, fecha_aprobacion,
+      rechazado_por_nombre, fecha_rechazo, motivo_rechazo,
+      excepciones_comentarios, comentario_aprobacion`;
+    let where, params = [fecha];
+    if (tipo === 'ingresadas')      where = `DATE(fecha_creacion) = ?`;
+    else if (tipo === 'aprobadas')  where = `aprobado_por IS NOT NULL AND DATE(fecha_aprobacion) = ?`;
+    else if (tipo === 'rechazadas') where = `rechazado_por IS NOT NULL AND DATE(fecha_rechazo) = ?`;
+    else if (tipo === 'pendientes') where = `status = 'PENDIENTE' AND DATE(fecha_creacion) = ?`;
+    else if (tipo === 'ignoradas') {
+      where = `id IN (SELECT DISTINCT id_carta FROM carta_eventos WHERE accion='abrir' AND DATE(ts) = ?)
+               AND id NOT IN (SELECT id FROM cartas_aprobacion
+                 WHERE (aprobado_por IS NOT NULL AND DATE(fecha_aprobacion) = ?)
+                    OR (rechazado_por IS NOT NULL AND DATE(fecha_rechazo) = ?))`;
+      params = [fecha, fecha, fecha];
+    } else return res.status(400).json({ success: false, data: null, error: 'tipo inválido' });
+
+    const [rows] = await pool.query(`SELECT ${cols} FROM cartas_aprobacion WHERE ${where} ORDER BY fecha_creacion DESC`, params);
+    res.json({ success: true, data: rows, error: null });
+  } catch (e) {
+    console.error('[desempeno casos]', e.message);
+    res.status(500).json({ success: false, data: null, error: 'Error interno del servidor' });
+  }
+};
+
+/* ── POST /api/desempeno/comentario-aprob/:id { comentario } ─────── */
+const setComentarioAprob = async (req, res) => {
+  try {
+    const id = parseInt(req.params.id);
+    const com = (req.body.comentario || '').trim() || null;
+    if (!id) return res.status(400).json({ success: false, data: null, error: 'id requerido' });
+    await pool.query('UPDATE cartas_aprobacion SET comentario_aprobacion = ? WHERE id = ?', [com, id]);
+    res.json({ success: true, data: { ok: true }, error: null });
+  } catch (e) { res.status(500).json({ success: false, data: null, error: 'Error' }); }
+};
+
+module.exports = { registrarLogin, ping, logout, logApertura, reporteDiario, reporteDia, reporteCasos, setComentarioAprob };
