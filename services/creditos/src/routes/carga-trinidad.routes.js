@@ -9,5 +9,7 @@ const soloAdmin = requirePerfil('Administrador');
 router.post('/preview',            verifyToken, soloAdmin, upload.single('archivo'), ctrl.preview);
 router.post('/importar',           verifyToken, soloAdmin, upload.single('archivo'), ctrl.importar);
 router.post('/reprocesar-estados', verifyToken, soloAdmin, ctrl.reprocesarEstados);
+// Parseo de carta de aprobación (PDF) para digitar — cualquier usuario autenticado
+router.post('/parse-carta',        verifyToken, upload.single('archivo'), ctrl.parseCarta);
 
 module.exports = router;

@@ -89,7 +89,7 @@
   <div class="topnav-left">
     <a href="/" class="topnav-brand">
       <img src="/img/logo.png" alt="AutoFácil">
-      <span class="version-badge">v2.0</span>
+      <span class="version-badge">v2.1</span>
     </a>
     <div class="breadcrumb-nav">
       <a href="/">Inicio</a><span class="sep">›</span>
@@ -122,6 +122,11 @@
       <p>Registro de créditos brokerage. Los campos de comisiones y FEI se gestionan en el seguimiento post-otorgamiento.</p>
     </div>
     <div style="margin-left:auto;display:flex;gap:10px">
+      <button type="button" onclick="document.getElementById('cartaTrinidadFile').click()" id="btnCartaTrinidad"
+        style="background:#fff;color:#0141A2;border:none;border-radius:8px;padding:7px 14px;font-size:.82rem;font-weight:700;cursor:pointer;display:flex;align-items:center;gap:6px">
+        <i class="bi bi-filetype-pdf"></i> Cargar Carta Trinidad
+      </button>
+      <input type="file" id="cartaTrinidadFile" accept="application/pdf" style="display:none" onchange="cargarCartaTrinidad(this)">
       <a href="/creditos/digitacion-unidad" style="background:rgba(255,255,255,.15);color:#fff;border:1px solid rgba(255,255,255,.3);border-radius:8px;padding:7px 14px;font-size:.82rem;text-decoration:none;display:flex;align-items:center;gap:6px">
         <i class="bi bi-arrow-left-right"></i> Ir a Unidad
       </a>
@@ -163,6 +168,7 @@
           <label class="f-req">Estado Crédito</label>
           <select id="fEstadoCred">
             <option value="">— Seleccione —</option>
+            <option>DIGITADO</option>
             <option>PENDIENTE</option>
             <option>APROBADO</option>
             <option>OTORGADO</option>
@@ -756,6 +762,78 @@
   }
 
   /* ── Guardar operación ─────────────────────────────────────── */
+  /* ── Cargar Carta de Aprobación Trinidad (PDF) y pre-llenar ───── */
+  async function cargarCartaTrinidad(input) {
+    const file = input.files[0];
+    if (!file) return;
+    const ok  = document.getElementById('alertaOk');
+    const err = document.getElementById('alertaErr');
+    ok.style.display = 'none'; err.style.display = 'none';
+    const btn = document.getElementById('btnCartaTrinidad');
+    const htmlBtn = btn.innerHTML;
+    btn.disabled = true; btn.innerHTML = '<span class="spinner-border spinner-border-sm"></span> Leyendo…';
+    try {
+      const fd = new FormData(); fd.append('archivo', file);
+      const r = await fetch('/api/carga-trinidad/parse-carta', { method:'POST', headers:{ Authorization:'Bearer '+token }, body: fd });
+      const j = await r.json();
+      if (!j.success) throw new Error(j.error || 'No se pudo leer el PDF');
+      const d = j.data;
+      const set = (id, v) => { const el = document.getElementById(id); if (el && v != null && v !== '') el.value = v; };
+
+      // Datos de la operación
+      if (d.fecha_curse) { document.getElementById('fMes').value = d.fecha_curse.slice(0,7); await autoFillNumOp(); }
+      document.getElementById('fEstadoEval').value = 'APROBADO';
+      document.getElementById('fEstadoCred').value = 'DIGITADO';
+      set('fEjecutivo', d.ejecutivo);
+      set('fIdFinanciera', d.nro_credito);
+
+      // Producto: auto-seleccionar si calza con la lista
+      if (d.producto) {
+        const selP = document.getElementById('fProducto');
+        const opt = [...selP.options].find(o => o.text.trim().toUpperCase() === d.producto.trim().toUpperCase());
+        if (opt) selP.value = opt.value;
+      }
+
+      // Cliente
+      if (d.rut_cliente) { document.getElementById('fRut').value = d.rut_cliente; formatRut(document.getElementById('fRut')); }
+      set('fNombre', d.nombre_cliente);
+      if (d.sucursal) set('fAutomotora', d.sucursal);
+      if (d.rut_cliente) buscarCliente();
+
+      // Vehículo
+      set('fMarca', d.marca); set('fModelo', d.modelo); set('fAnio', d.anio);
+      if (d.precio != null) document.getElementById('fValorVeh').value = d.precio;
+      if (d.pie != null)    document.getElementById('fPie').value = d.pie;
+      calcularSaldo();
+
+      // Financiamiento
+      set('fImpuesto', d.impuesto_timbre);
+      set('fSegRdh', d.seguro_rdh); set('fSegCes', d.seguro_cesantia); set('fSegRep', d.reparaciones);
+      if (d.cuotas) document.getElementById('fPlazo').value = d.cuotas;
+      if (d.total_pagare != null) document.getElementById('fMontoFin').value = '$' + Number(d.total_pagare).toLocaleString('es-CL');
+      if (d.tasa != null) document.getElementById('fTasCliReal').value = d.tasa;
+      if (d.fecha_curse) document.getElementById('fFechaOtorgado').value = d.fecha_curse;
+      calcularMayorMenor(); calcularCuota();
+
+      // Comentario de trazabilidad
+      const obs = `Cargado desde Carta de Aprobación Trinidad N° ${d.nro_credito || '—'}` +
+        (d.inscripcion ? ` · Inscripción $${Number(d.inscripcion).toLocaleString('es-CL')}` : '');
+      const ta = document.getElementById('fComentarios');
+      ta.value = ta.value ? ta.value + '\n' + obs : obs;
+
+      ok.innerHTML = `<i class="bi bi-check-circle me-2"></i>Carta leída: <strong>${d.nombre_cliente || ''}</strong> (N° ${d.nro_credito || '—'}). Revisa los campos antes de guardar.`;
+      ok.style.display = 'block';
+      window.scrollTo(0,0);
+    } catch(e) {
+      err.textContent = 'Error al leer la carta: ' + e.message;
+      err.style.display = 'block';
+      window.scrollTo(0,0);
+    } finally {
+      btn.disabled = false; btn.innerHTML = htmlBtn;
+      input.value = '';
+    }
+  }
+
   async function guardar() {
     const ok  = document.getElementById('alertaOk');
     const err = document.getElementById('alertaErr');

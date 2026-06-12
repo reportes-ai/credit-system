@@ -412,3 +412,85 @@ exports.reprocesarEstados = async (req, res) => {
     return res.json({ success: false, error: e.message });
   }
 };
+
+/* ── Parseo de Carta de Aprobación Trinidad (PDF) → campos de digitación ──
+   Usa coordenadas (x,y) de los items de texto para mapear etiqueta→valor,
+   tolerando el orden desordenado de la extracción plana de pdf-parse.        */
+exports.parseCarta = async (req, res) => {
+  try {
+    const pdfParse = require('pdf-parse');
+    const buf = req.file ? req.file.buffer
+              : (req.body && req.body.pdf_base64 ? Buffer.from(req.body.pdf_base64, 'base64') : null);
+    if (!buf) return res.status(400).json({ success: false, error: 'No se recibió el PDF' });
+
+    const items = [];
+    await pdfParse(buf, {
+      max: 1,
+      pagerender: (p) => p.getTextContent({ disableCombineTextItems: true }).then(tc => {
+        for (const it of tc.items) {
+          const t = it.transform;
+          items.push({ s: it.str, x: Math.round(t[4]), y: Math.round(t[5]) });
+        }
+        return '';
+      }),
+    });
+
+    // valor a la derecha de la etiqueta (mismo renglón), saltando el ":"
+    const findVal = (label) => {
+      const lab = items.find(i => i.s.trim() === label) || items.find(i => i.s.trim().startsWith(label));
+      if (!lab) return null;
+      const colon = items.filter(i => Math.abs(i.y - lab.y) <= 3 && i.s.trim() === ':' && i.x > lab.x)
+                         .sort((a, b) => a.x - b.x)[0];
+      const startX = colon ? colon.x : lab.x;
+      const cand = items.filter(i => Math.abs(i.y - lab.y) <= 3 && i.s.trim() && i.s.trim() !== ':' && i.x > startX)
+                        .sort((a, b) => a.x - b.x)[0];
+      return cand ? cand.s.trim() : null;
+    };
+
+    const firstNum = s => { const m = String(s || '').match(/\d[\d.]*(?:,\d+)?/); return m ? m[0] : null; };
+    const numCL = s => { const f = firstNum(s); if (f == null) return null; const n = parseFloat(f.replace(/\./g, '').replace(',', '.')); return isNaN(n) ? null : n; };
+    const dateCL = s => { const m = String(s || '').match(/(\d{2})\/(\d{2})\/(\d{4})/); return m ? `${m[3]}-${m[2]}-${m[1]}` : null; };
+    const allText = items.map(i => i.s).join(' ');
+    const rut = (allText.match(/\b\d{7,8}-[\dkK]\b/) || [])[0] || null;
+    const limpiaAFA = s => (s || '').replace(/\s*\(AFA\)\s*/gi, ' ').replace(/\s+/g, ' ').trim();
+
+    const data = {
+      nro_credito:      findVal('Nº Crédito'),
+      fecha_aprobacion: dateCL(findVal('Fecha Aprobación')),
+      telefono:         findVal('Telefono'),
+      rut_cliente:      rut,
+      nombre_cliente:   findVal('Cliente'),
+      email:            findVal('Email'),
+      ejecutivo:        limpiaAFA(findVal('Ejecutivo')),
+      concesionario:    findVal('Concesionario'),
+      sucursal:         limpiaAFA(findVal('Sucursal')),
+      marca:            findVal('Marca'),
+      modelo:           findVal('Modelo'),
+      anio:             numCL(findVal('Año')),
+      estado_vehiculo:  findVal('Estado'),
+      version:          findVal('Versión'),
+      precio:           numCL(findVal('Precio')),
+      pie:              numCL(findVal('Pie')),
+      producto:         findVal('Producto'),
+      tasa:             numCL(findVal('Tasa')),
+      cuotas:           numCL(findVal('Número de cuotas')),
+      total_pagare:     numCL(findVal('Total pagaré')),
+      monto_solicitado: numCL(findVal('Monto solicitado')),
+      total_recargos:   numCL(findVal('Total de recargos')),
+      seguro_rdh:       numCL(findVal('Seguro RDH+E')),
+      seguro_cesantia:  numCL(findVal('Seguro Cesantia')),
+      reparaciones:     numCL(findVal('Reparaciones Menores')),
+      seguro_desgrav:   numCL(findVal('Seguro Desgravamen')),
+      impuesto_timbre:  numCL(findVal('Impuesto timbre')),
+      inscripcion:      numCL(findVal('Inscripción')),
+      gps:              numCL(findVal('GPS')),
+      comision:         numCL(findVal('Comisión')),
+      fecha_curse:      dateCL(findVal('Fecha curse')),
+    };
+
+    return res.json({ success: true, data, error: null });
+  } catch (e) {
+    console.error('[carga-trinidad parseCarta]', e);
+    return res.status(500).json({ success: false, error: 'No se pudo leer el PDF: ' + e.message });
+  }
+};
