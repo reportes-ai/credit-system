@@ -27,7 +27,7 @@ const PLACEMENT_ITEMS = {
   '/crm/':                   { section:'home', href:'/crm/',                    icon:'bi-headset',                titulo:'CRM' },
   '/cobranza/':              { section:'home', href:'/cobranza/',               icon:'bi-bell-fill',              titulo:'Cobranza' },
   '/reporteria/':            { section:'home', href:'/reporteria/',             icon:'bi-bar-chart-line-fill',    titulo:'Reportería' },
-  '/politica/':              { section:'home', href:'/politica/',               icon:'bi-shield-lock',            titulo:'Política de Crédito' },
+  '/politica/':              { section:'home', href:'/politica/',               icon:'bi-shield-lock',            titulo:'Política' },
   '/usuarios/':              { section:'home', href:'/usuarios/',               icon:'bi-people',                 titulo:'Usuarios' },
   '/mantenedores/':          { section:'home', href:'/mantenedores/',           icon:'bi-gear-fill',              titulo:'Mantenedores' },
   '/cartas-aprobacion/':     { section:'home', href:'/cartas-aprobacion/',      icon:'bi-envelope-paper',         titulo:'Cartas de Aprobación' },
