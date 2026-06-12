@@ -28,7 +28,7 @@
   box-sizing: border-box !important;
 }
 
-/* Título: máx 2 líneas */
+/* Título: SIEMPRE reserva 2 líneas (alinea descripción y botón entre cards) */
 .modules-grid > .module-card h5,
 .modules-grid > .module-card h6,
 .cards-grid  > .module-card h5,
@@ -37,15 +37,19 @@
   -webkit-line-clamp: 2;
   -webkit-box-orient: vertical;
   overflow: hidden;
+  line-height: 1.3 !important;
+  min-height: 2.6em !important;   /* 2 líneas */
 }
 
-/* Descripción: máx 3 líneas */
+/* Descripción: SIEMPRE reserva 3 líneas */
 .modules-grid > .module-card p,
 .cards-grid  > .module-card p {
   display: -webkit-box;
   -webkit-line-clamp: 3;
   -webkit-box-orient: vertical;
   overflow: hidden;
+  line-height: 1.4 !important;
+  min-height: 4.2em !important;   /* 3 líneas */
 }
 
 /* Botón "Acceder": siempre pegado al fondo, alineado a la izquierda */
