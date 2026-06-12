@@ -11,7 +11,8 @@ router.post('/carta-apertura', verifyToken, c.logApertura);
 router.post('/comentario-aprob/:id', verifyToken, requireFunc('aprob_revisar'), c.setComentarioAprob);
 
 // Informe (permiso del submódulo)
-router.get('/cartas',     verifyToken, requireFunc('aprob_desempeno'), c.reporteDiario);
+router.get('/cartas',         verifyToken, requireFunc('aprob_desempeno'), c.reporteDiario);
+router.get('/cartas/resumen', verifyToken, requireFunc('aprob_desempeno'), c.reporteResumen);
 router.get('/cartas/dia',   verifyToken, requireFunc('aprob_desempeno'), c.reporteDia);
 router.get('/cartas/lista', verifyToken, requireFunc('aprob_desempeno'), c.reporteCasos);
 

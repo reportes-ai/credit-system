@@ -262,6 +262,57 @@ const reporteDia = async (req, res) => {
   }
 };
 
+/* ── Totales de un período (para las filas resumen) ──────────────── */
+async function _totales(d1, d2) {
+  const [creadas] = await pool.query(
+    `SELECT id, status FROM cartas_aprobacion WHERE DATE(fecha_creacion) BETWEEN ? AND ? AND status NOT IN ('ANULADA','ELIMINADA')`, [d1, d2]);
+  const ingresadas = creadas.length;
+  const aprobadas = creadas.filter(c => c.status === 'APROBADA').length;
+  const rechazadas = creadas.filter(c => c.status === 'RECHAZADA').length;
+  const pendIds = creadas.filter(c => c.status === 'PENDIENTE').map(c => c.id);
+  let ignoradas = 0;
+  if (pendIds.length) {
+    const [op] = await pool.query(`SELECT DISTINCT id_carta FROM carta_eventos WHERE accion='abrir' AND id_carta IN (?)`, [pendIds]);
+    ignoradas = op.length;
+  }
+  const pendientes = Math.max(0, ingresadas - aprobadas - rechazadas - ignoradas);
+  // analistas: promedio diario de conectados 10–19h + personas distintas
+  const [analistas] = await pool.query(
+    `SELECT u.id_usuario FROM usuarios u JOIN perfiles p ON u.id_perfil = p.id_perfil WHERE p.nombre IN (?)`, [PERFILES_ANALISTA]);
+  const ids = analistas.map(a => a.id_usuario);
+  let prom = 0; const personasSet = new Set();
+  if (ids.length) {
+    const [ses] = await pool.query(
+      `SELECT id_usuario, login_at, last_seen, logout_at FROM sesiones_usuario
+       WHERE id_usuario IN (?) AND login_at < (? + INTERVAL 1 DAY) AND COALESCE(logout_at, last_seen) >= ?`, [ids, d2, d1]);
+    let d = new Date(d1 + 'T00:00:00'), end = new Date(d2 + 'T00:00:00'), dias = 0, sumProm = 0;
+    while (d <= end) {
+      const { ini, fin } = ventana(ymd(d)); const conMin = {};
+      ses.forEach(s => { const m = overlapMin(new Date(s.login_at).getTime(), finSesion(s).getTime(), ini.getTime(), fin.getTime()); if (m > 0) { conMin[s.id_usuario] = (conMin[s.id_usuario] || 0) + m; personasSet.add(s.id_usuario); } });
+      sumProm += Object.values(conMin).reduce((a, b) => a + b, 0) / 540; dias++;
+      d.setDate(d.getDate() + 1);
+    }
+    prom = dias ? Math.round(sumProm / dias * 100) / 100 : 0;
+  }
+  return { desde: d1, hasta: d2, ingresadas, aprobadas, rechazadas, ignoradas, pendientes, prom_analistas: prom, personas: personasSet.size };
+}
+
+/* ── GET /api/desempeno/cartas/resumen?desde=&hasta= — 2 filas ──── */
+const reporteResumen = async (req, res) => {
+  try {
+    const hasta = req.query.hasta || ymd(new Date());
+    const desde = req.query.desde || hasta;
+    const mesAtras = s => { const d = new Date(s + 'T00:00:00'); d.setMonth(d.getMonth() - 1); return ymd(d); };
+    const actual = await _totales(desde, hasta);
+    const anterior = await _totales(mesAtras(desde), mesAtras(hasta));
+    const dias = Math.round((new Date(hasta + 'T00:00:00') - new Date(desde + 'T00:00:00')) / 86400000) + 1;
+    res.json({ success: true, data: { actual, anterior, dias }, error: null });
+  } catch (e) {
+    console.error('[desempeno resumen]', e.message);
+    res.status(500).json({ success: false, data: null, error: 'Error interno del servidor' });
+  }
+};
+
 /* ── GET /api/desempeno/cartas/lista?fecha=&tipo= — casos de una celda ── */
 const reporteCasos = async (req, res) => {
   try {
@@ -303,4 +354,4 @@ const setComentarioAprob = async (req, res) => {
   } catch (e) { res.status(500).json({ success: false, data: null, error: 'Error' }); }
 };
 
-module.exports = { registrarLogin, ping, logout, logApertura, reporteDiario, reporteDia, reporteCasos, setComentarioAprob };
+module.exports = { registrarLogin, ping, logout, logApertura, reporteDiario, reporteDia, reporteResumen, reporteCasos, setComentarioAprob };
