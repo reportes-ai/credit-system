@@ -1553,6 +1553,9 @@ function verCarta(id){
   const c = CARTAS.find(x=>x.id===id);
   if (!c) return;
   if (c.status === 'APROBADA') marcarImpVista(c.id);
+  // Al abrir una carta del pool/rechazada, cancelar su alerta para todos
+  if (c.status === 'PENDIENTE' || c.status === 'RECHAZADA')
+    fetch('/api/alertas/visto/'+id, { method:'POST', headers:hdr() }).catch(()=>{});
   document.getElementById('modalTitulo').innerHTML = '<i class="bi bi-file-earmark-text me-2"></i>' + escH(c.opCarta||'Carta');
   const motivoBanner = (c.status==='RECHAZADA' && c.motivoRechazo)
     ? `<div style="background:#fef2f2;border:1.5px solid #fecaca;color:#b91c1c;border-radius:9px;padding:9px 14px;font-size:.83rem;margin-bottom:12px"><b><i class="bi bi-x-octagon me-1"></i>Rechazada por ${escH(c.rechazadoPorNombre||'')}:</b> ${escH(c.motivoRechazo)}</div>` : '';

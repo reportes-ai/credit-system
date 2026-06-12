@@ -399,4 +399,34 @@ const deleteAlerta = async (req, res) => {
   } catch (e) { res.status(500).json({ success: false, data: null, error: 'Error interno del servidor' }); }
 };
 
-module.exports = { getMeta, listAlertas, saveAlerta, deleteAlerta };
+/* ── POST /api/alertas/visto/:id — al abrir una carta, cancela su alerta para TODOS ──
+   (pool: alguien la tomó para aprobar; rechazada: el ejecutivo entró a corregir) */
+const marcarVisto = async (req, res) => {
+  try {
+    const id = parseInt(req.params.id);
+    if (!id) return res.status(400).json({ success: false, data: null, error: 'id requerido' });
+    const [[carta]] = await pool.query('SELECT status FROM cartas_aprobacion WHERE id = ?', [id]);
+    if (!carta) return res.json({ success: true, data: { silenciadas: 0 }, error: null });
+
+    let origen, recordKey;
+    if (carta.status === 'PENDIENTE')      { origen = 'cartas_pendientes'; recordKey = 'carta:' + id; }
+    else if (carta.status === 'RECHAZADA') { origen = 'cartas_rechazadas'; recordKey = 'rech:' + id; }
+    else return res.json({ success: true, data: { silenciadas: 0 }, error: null });
+
+    const [reglas] = await pool.query('SELECT id FROM alertas_config WHERE origen = ? AND activo = 1', [origen]);
+    let n = 0;
+    for (const rg of reglas) {
+      const clave = `alerta:${rg.id}:${recordKey}`;
+      // Silenciar re-disparo mientras siga en este estado + borrar el aviso de todos
+      await pool.query('INSERT IGNORE INTO alertas_emitidas (clave) VALUES (?)', [clave]);
+      const [del] = await pool.query('DELETE FROM notificaciones WHERE clave = ?', [clave]);
+      n += del.affectedRows || 0;
+    }
+    res.json({ success: true, data: { silenciadas: n }, error: null });
+  } catch (e) {
+    console.error('[alertas visto]', e.message);
+    res.status(500).json({ success: false, data: null, error: 'Error interno del servidor' });
+  }
+};
+
+module.exports = { getMeta, listAlertas, saveAlerta, deleteAlerta, marcarVisto };
