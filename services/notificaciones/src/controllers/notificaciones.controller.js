@@ -146,4 +146,23 @@ const marcarLeidas = async (req, res) => {
   }
 };
 
-module.exports = { notificar, getVapidKey, subscribe, getMias, marcarLeidas };
+const borrarUna = async (req, res) => {
+  try {
+    await pool.query('DELETE FROM notificaciones WHERE id = ? AND id_usuario = ?',
+      [req.params.id, req.usuario.id_usuario]);
+    res.json({ success: true, data: { ok: true }, error: null });
+  } catch (e) {
+    res.status(500).json({ success: false, data: null, error: 'Error interno del servidor' });
+  }
+};
+
+const borrarTodas = async (req, res) => {
+  try {
+    await pool.query('DELETE FROM notificaciones WHERE id_usuario = ?', [req.usuario.id_usuario]);
+    res.json({ success: true, data: { ok: true }, error: null });
+  } catch (e) {
+    res.status(500).json({ success: false, data: null, error: 'Error interno del servidor' });
+  }
+};
+
+module.exports = { notificar, getVapidKey, subscribe, getMias, marcarLeidas, borrarUna, borrarTodas };

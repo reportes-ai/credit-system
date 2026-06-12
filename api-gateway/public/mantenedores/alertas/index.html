@@ -83,7 +83,12 @@
       <div class="field" id="wVal1"><label>Valor</label><input id="fVal1"></div>
       <div class="field" id="wVal2" style="display:none"><label>Valor máx</label><input id="fVal2"></div>
       <div class="field"><label>Prioridad</label><select id="fPrioridad"><option value="normal">Normal</option><option value="alta">Alta (campanita insistente)</option></select></div>
-      <div class="field"><label>Notificar a (perfil)</label><select id="fDestino"></select></div>
+      <div class="field"><label>Perfil 1</label><select id="fDestino1" class="dest"></select></div>
+      <div class="field"><label>Perfil 2 (opcional)</label><select id="fDestino2" class="dest"></select></div>
+      <div class="field"><label>Perfil 3 (opcional)</label><select id="fDestino3" class="dest"></select></div>
+      <div class="field"><label>No repetir por (min)</label><input id="fDelay" type="number" min="0" value="60"></div>
+      <div class="field"><label>Sonar cada (seg)</label><input id="fSonCada" type="number" min="5" value="30"></div>
+      <div class="field"><label>Sonar máximo (min)</label><input id="fSonMax" type="number" min="1" value="5"></div>
       <div class="field"><label>Activa</label><label class="sw"><input type="checkbox" id="fActivo" checked><span class="sl"></span></label><span class="sw-lbl" id="lblActivo">Sí</span></div>
       <div class="field"><label>Sonido</label><label class="sw snd"><input type="checkbox" id="fSonido" checked><span class="sl"></span></label><span class="sw-lbl" id="lblSonido">Con sonido</span></div>
     </div>
@@ -123,7 +128,8 @@ let META = { origenes:[], operadores:[], perfiles:[] }, EDIT = null;
   // Poblar selects fijos
   document.getElementById('fOrigen').innerHTML = META.origenes.map(o=>`<option value="${esc(o.id)}">${esc(o.label)}</option>`).join('');
   document.getElementById('fOperador').innerHTML = META.operadores.map(o=>`<option value="${esc(o.op)}">${esc(o.label)}</option>`).join('');
-  document.getElementById('fDestino').innerHTML = '<option value="TODOS">Todos los usuarios</option>' + META.perfiles.map(p=>`<option value="${esc(p)}">${esc(p)}</option>`).join('');
+  const optsDest = '<option value="">—</option><option value="TODOS">Todos los usuarios</option>' + META.perfiles.map(p=>`<option value="${esc(p)}">${esc(p)}</option>`).join('');
+  document.querySelectorAll('.dest').forEach(s=>s.innerHTML=optsDest);
   renderLista(jL.data||[]);
 })();
 
@@ -151,7 +157,9 @@ function nueva(){ EDIT=null; document.getElementById('formCard').style.display='
   document.getElementById('fNombre').value=''; document.getElementById('fOrigen').selectedIndex=0; onOrigen();
   document.getElementById('fOperador').selectedIndex=0; onOperador();
   document.getElementById('fVal1').value=''; document.getElementById('fVal2').value='';
-  document.getElementById('fPrioridad').value='normal'; document.getElementById('fDestino').value='Administrador';
+  document.getElementById('fPrioridad').value='normal';
+  document.getElementById('fDestino1').value='Administrador'; document.getElementById('fDestino2').value=''; document.getElementById('fDestino3').value='';
+  document.getElementById('fDelay').value=60; document.getElementById('fSonCada').value=30; document.getElementById('fSonMax').value=5;
   document.getElementById('fActivo').checked=true; document.getElementById('fSonido').checked=true;
   document.getElementById('lblActivo').textContent='Sí'; document.getElementById('lblSonido').textContent='Con sonido';
   window.scrollTo({top:0,behavior:'smooth'}); }
@@ -162,7 +170,10 @@ function editar(a){ EDIT=a.id; document.getElementById('formCard').style.display
   document.getElementById('fOrigen').value=a.origen; onOrigen(); document.getElementById('fCampo').value=a.campo;
   document.getElementById('fOperador').value=a.operador; onOperador();
   document.getElementById('fVal1').value=a.valor1||''; document.getElementById('fVal2').value=a.valor2||'';
-  document.getElementById('fPrioridad').value=a.prioridad; document.getElementById('fDestino').value=a.destino;
+  document.getElementById('fPrioridad').value=a.prioridad;
+  const ds=String(a.destino||'').split(',').map(s=>s.trim());
+  document.getElementById('fDestino1').value=ds[0]||''; document.getElementById('fDestino2').value=ds[1]||''; document.getElementById('fDestino3').value=ds[2]||'';
+  document.getElementById('fDelay').value=a.delay_min??60; document.getElementById('fSonCada').value=a.sonido_cada_seg??30; document.getElementById('fSonMax').value=a.sonido_max_min??5;
   document.getElementById('fActivo').checked=!!a.activo; document.getElementById('fSonido').checked=a.sonido!=0;
   document.getElementById('lblActivo').textContent=a.activo?'Sí':'No';
   document.getElementById('lblSonido').textContent=a.sonido!=0?'Con sonido':'Silenciosa';
@@ -174,8 +185,10 @@ async function guardar(){
     origen:document.getElementById('fOrigen').value, campo:document.getElementById('fCampo').value,
     operador:document.getElementById('fOperador').value, valor1:document.getElementById('fVal1').value.trim(),
     valor2:document.getElementById('fVal2').value.trim(), prioridad:document.getElementById('fPrioridad').value,
-    destino:document.getElementById('fDestino').value,
+    destinos:[document.getElementById('fDestino1').value,document.getElementById('fDestino2').value,document.getElementById('fDestino3').value].filter(Boolean),
+    delay_min:document.getElementById('fDelay').value, sonido_cada_seg:document.getElementById('fSonCada').value, sonido_max_min:document.getElementById('fSonMax').value,
     activo:document.getElementById('fActivo').checked, sonido:document.getElementById('fSonido').checked };
+  if(!body.destinos.length) body.destinos=['Administrador'];
   if(!body.nombre){ msg.textContent='Falta el nombre'; msg.style.cssText='display:inline;color:#b91c1c'; return; }
   btn.disabled=true; btn.innerHTML='<i class="bi bi-hourglass-split me-1"></i>…'; msg.style.display='none';
   try{
@@ -207,7 +220,7 @@ function renderLista(rows){
     <td><b>${esc(a.nombre)}</b><br><span style="font-size:.72rem;color:#94a3b8">${esc((META.origenes.find(o=>o.id===a.origen)||{}).label||a.origen)}</span></td>
     <td>${condTexto(a)}</td>
     <td><span class="pill ${a.prioridad==='alta'?'pa':'pn'}">${a.prioridad==='alta'?'ALTA':'Normal'}</span></td>
-    <td>${esc(a.destino)}</td>
+    <td>${esc(String(a.destino||'').replace(/,/g,', '))}</td>
     <td><label class="sw"><input type="checkbox" ${a.activo?'checked':''} onchange="toggleCampo(${a.id},'activo',this.checked)"><span class="sl"></span></label></td>
     <td><label class="sw snd"><input type="checkbox" ${a.sonido!=0?'checked':''} onchange="toggleCampo(${a.id},'sonido',this.checked)"><span class="sl"></span></label></td>
     <td style="text-align:right;white-space:nowrap">

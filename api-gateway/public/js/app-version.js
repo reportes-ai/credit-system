@@ -2,7 +2,7 @@
    AutoFácil — Versión global de la aplicación
    Editar SOLO este archivo para cambiar la versión
    ───────────────────────────────────────────── */
-const APP_VERSION = 'v12.8';
+const APP_VERSION = 'v12.9';
 
 document.addEventListener('DOMContentLoaded', () => {
 
@@ -424,9 +424,12 @@ document.addEventListener('DOMContentLoaded', () => {
       <span id="afBellCount" style="display:none;position:absolute;top:-7px;right:-7px;background:#dc2626;color:#fff;font-size:.66rem;font-weight:800;border-radius:10px;min-width:19px;height:19px;align-items:center;justify-content:center;padding:0 5px;border:2px solid #0255c5">0</span>
     </button>
     <div id="afBellDrop" style="display:none;position:absolute;right:0;top:44px;background:#fff;border-radius:12px;box-shadow:0 12px 40px rgba(0,0,0,.25);width:330px;max-height:420px;overflow-y:auto;z-index:9500;color:#1e293b;text-align:left">
-      <div style="padding:11px 16px;font-weight:800;font-size:.85rem;color:#012d70;border-bottom:1px solid #f1f5f9;display:flex;justify-content:space-between;align-items:center">
+      <div style="padding:11px 16px;font-weight:800;font-size:.85rem;color:#012d70;border-bottom:1px solid #f1f5f9;display:flex;justify-content:space-between;align-items:center;gap:8px">
         Notificaciones
-        <button id="afBtnPushOn" style="display:none;border:none;background:#eff6ff;color:#1d4ed8;border-radius:7px;padding:3px 10px;font-size:.7rem;font-weight:700;cursor:pointer"><i class="bi bi-bell-fill"></i> Activar push</button>
+        <div style="display:flex;gap:6px;align-items:center">
+          <button id="afBtnPushOn" style="display:none;border:none;background:#eff6ff;color:#1d4ed8;border-radius:7px;padding:3px 10px;font-size:.7rem;font-weight:700;cursor:pointer"><i class="bi bi-bell-fill"></i> Activar push</button>
+          <button id="afBtnBorrarTodas" title="Borrar todas" style="border:none;background:#fef2f2;color:#b91c1c;border-radius:7px;padding:3px 10px;font-size:.7rem;font-weight:700;cursor:pointer"><i class="bi bi-trash"></i> Borrar todas</button>
+        </div>
       </div>
       <div id="afBellList" style="font-size:.8rem"></div>
     </div>`;
@@ -443,8 +446,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
   const H = { 'Content-Type': 'application/json', Authorization: 'Bearer ' + token };
   let unread = -1;   // -1 = primera carga, no suena
-  let hiPriHasta = 0; // timestamp hasta el cual insistir (alertas alta = 5 min)
-  let hiPriSonar = false; // si la alerta alta vigente tiene el sonido activado
+  let ringEveryMs = 0, ringUntil = 0, lastRing = 0; // sonido insistente configurable por alerta
 
   /* 🛎️ doble ding de campana de hotel */
   function dingDing() {
@@ -482,21 +484,20 @@ document.addEventListener('DOMContentLoaded', () => {
       if (unread >= 0 && noLeidas > unread && haySonido) dingDing();
       unread = noLeidas;
 
-      // Alertas de prioridad alta: campanita "shake" (visual) + sonido insistente por 5 min
+      // Alertas de prioridad alta: campanita "shake" (visual) + sonido insistente configurable
       const btnBell = document.getElementById('afBellBtn');
       const hiPri = (rows || []).filter(n => !n.leida && n.prioridad === 'alta');
-      if (hiPri.length) {
-        btnBell.classList.add('af-shake');
-        const masReciente = Math.max(...hiPri.map(n => new Date(n.created_at).getTime() || 0));
-        hiPriHasta = masReciente + 5 * 60 * 1000;   // insistir hasta 5 min desde la más reciente
-        hiPriSonar = hiPri.some(n => n.sonar !== 0); // solo suena si esa alerta tiene sonido on
-      } else {
-        btnBell.classList.remove('af-shake');
-        hiPriHasta = 0; hiPriSonar = false;
-      }
+      btnBell.classList.toggle('af-shake', hiPri.length > 0);
+      // Entre las alertas alta con sonido: menor intervalo y mayor ventana
+      const sonoras = hiPri.filter(n => n.sonar !== 0);
+      if (sonoras.length) {
+        ringEveryMs = Math.min(...sonoras.map(n => (n.son_cada || 30) * 1000));
+        ringUntil   = Math.max(...sonoras.map(n => (new Date(n.created_at).getTime() || 0) + (n.son_max || 5) * 60000));
+      } else { ringEveryMs = 0; ringUntil = 0; }
       const list = document.getElementById('afBellList');
       list.innerHTML = rows.length ? rows.map(n => `
-        <div data-href="${escN(n.href || '')}" class="af-notif-item" style="padding:10px 16px;border-bottom:1px solid #f8fafc;cursor:pointer;${n.leida ? '' : 'background:#eff6ff'}">
+        <div data-href="${escN(n.href || '')}" class="af-notif-item" style="padding:10px 34px 10px 16px;border-bottom:1px solid #f8fafc;cursor:pointer;position:relative;${n.leida ? '' : 'background:#eff6ff'}">
+          <button class="af-notif-x" data-del="${n.id}" title="Borrar" style="position:absolute;top:8px;right:8px;background:none;border:none;color:#cbd5e1;cursor:pointer;font-size:.9rem;line-height:1;padding:2px 5px;border-radius:5px">✕</button>
           <div style="font-weight:700;color:#0f172a">${escN(n.titulo)}</div>
           <div style="color:#475569;margin:2px 0">${escN(n.mensaje || '')}</div>
           <div style="font-size:.68rem;color:#94a3b8">${new Date(n.created_at).toLocaleString('es-CL')}</div>
@@ -505,8 +506,23 @@ document.addEventListener('DOMContentLoaded', () => {
       list.querySelectorAll('.af-notif-item').forEach(el => {
         el.addEventListener('click', () => { const h = el.dataset.href; if (h) location.href = h; });
       });
+      list.querySelectorAll('.af-notif-x').forEach(b => {
+        b.addEventListener('click', async (e) => {
+          e.stopPropagation();
+          try { await fetch('/api/notif/' + b.dataset.del, { method: 'DELETE', headers: H }); } catch (e) {}
+          cargar();
+        });
+      });
     } catch (e) {}
   }
+
+  document.getElementById('afBtnBorrarTodas').addEventListener('click', async (e) => {
+    e.stopPropagation();
+    try { await fetch('/api/notif/todas', { method: 'DELETE', headers: H }); } catch (e) {}
+    unread = 0;
+    document.getElementById('afBellCount').style.display = 'none';
+    cargar();
+  });
 
   document.getElementById('afBellBtn').addEventListener('click', async (e) => {
     e.stopPropagation();
@@ -553,7 +569,11 @@ document.addEventListener('DOMContentLoaded', () => {
   cargar();
   setInterval(cargar, 30000);
   // Sonido insistente para alertas alta: ~3 veces/min mientras estén sin leer y dentro de la ventana de 5 min
-  setInterval(() => { if (hiPriHasta && hiPriSonar && Date.now() < hiPriHasta && unread > 0) dingDing(); }, 20000);
+  setInterval(() => {
+    if (ringUntil && Date.now() < ringUntil && unread > 0 && (Date.now() - lastRing) >= ringEveryMs) {
+      dingDing(); lastRing = Date.now();
+    }
+  }, 5000);
   if ('Notification' in window) {
     if (Notification.permission === 'granted') suscribir();
     else if (Notification.permission === 'default') btnPush.style.display = '';
