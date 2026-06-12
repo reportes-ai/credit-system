@@ -1,10 +1,25 @@
 /* ─────────────────────────────────────────────────────────────
    Cards de navegación uniformes en TODA la aplicación.
-   Scopeado a las grillas de módulos (.modules-grid / .cards-grid)
-   para NO afectar grillas de tablas, formularios ni la excepción
-   de Cobranza (.module-grid con stats propios).
+   Scopeado a las grillas de módulos de cada landing. NO afecta
+   grillas de tablas/formularios, paneles selectores (Política) ni
+   la excepción de Cobranza (.module-grid con stats por card).
    Inyectado por app-version.js en cada página.
    ───────────────────────────────────────────────────────────── */
+
+/* Banner de título uniforme (clase propia para no chocar con .page-banner) */
+.af-banner {
+  background: linear-gradient(135deg, #012d70, #0141A2 55%, #009AFE);
+  border-radius: 16px;
+  color: #fff;
+  padding: 24px 32px;
+  margin: 0 0 24px;
+  display: flex;
+  align-items: center;
+  gap: 18px;
+}
+.af-banner > i { font-size: 2.6rem; opacity: .85; }
+.af-banner h2 { font-weight: 700; margin: 0 0 3px; font-size: 1.3rem; color:#fff; }
+.af-banner p  { opacity: .82; margin: 0; font-size: .88rem; color:#fff; }
 
 /* Contenedor de landing a ancho completo y uniforme en todas las páginas */
 .main-content {
@@ -17,7 +32,9 @@
 
 /* 5 por fila; con 2 cards NO se estiran (las columnas vacías quedan libres) */
 .modules-grid,
-.cards-grid {
+.cards-grid,
+.ap-grid,
+.reports-grid {
   grid-template-columns: repeat(5, 1fr) !important;
   gap: 18px !important;
   align-items: stretch !important;
@@ -25,14 +42,16 @@
   width: 100% !important;
   justify-content: stretch !important;
 }
-@media (max-width: 1200px) { .modules-grid, .cards-grid { grid-template-columns: repeat(4, 1fr) !important; } }
-@media (max-width: 992px)  { .modules-grid, .cards-grid { grid-template-columns: repeat(3, 1fr) !important; } }
-@media (max-width: 700px)  { .modules-grid, .cards-grid { grid-template-columns: repeat(2, 1fr) !important; } }
-@media (max-width: 480px)  { .modules-grid, .cards-grid { grid-template-columns: 1fr !important; } }
+@media (max-width: 1200px) { .modules-grid, .cards-grid, .ap-grid, .reports-grid { grid-template-columns: repeat(4, 1fr) !important; } }
+@media (max-width: 992px)  { .modules-grid, .cards-grid, .ap-grid, .reports-grid { grid-template-columns: repeat(3, 1fr) !important; } }
+@media (max-width: 700px)  { .modules-grid, .cards-grid, .ap-grid, .reports-grid { grid-template-columns: repeat(2, 1fr) !important; } }
+@media (max-width: 480px)  { .modules-grid, .cards-grid, .ap-grid, .reports-grid { grid-template-columns: 1fr !important; } }
 
-/* Card: tamaño uniforme, contenido en columna, botón anclado abajo */
-.modules-grid > .module-card,
-.cards-grid  > .module-card {
+/* Card: tamaño uniforme, contenido en columna, botón anclado abajo. */
+.modules-grid  > .module-card,
+.cards-grid    > .module-card,
+.ap-grid       > .ap-card,
+.reports-grid  > .report-card {
   display: flex !important;
   flex-direction: column !important;
   min-height: 215px !important;
@@ -43,8 +62,10 @@
 /* Título: SIEMPRE reserva 2 líneas (alinea descripción y botón entre cards) */
 .modules-grid > .module-card h5,
 .modules-grid > .module-card h6,
-.cards-grid  > .module-card h5,
-.cards-grid  > .module-card h6 {
+.cards-grid   > .module-card h5,
+.cards-grid   > .module-card h6,
+.ap-grid      > .ap-card h5,
+.ap-grid      > .ap-card h6 {
   display: -webkit-box;
   -webkit-line-clamp: 2;
   -webkit-box-orient: vertical;
@@ -55,7 +76,8 @@
 
 /* Descripción: SIEMPRE reserva 3 líneas */
 .modules-grid > .module-card p,
-.cards-grid  > .module-card p {
+.cards-grid   > .module-card p,
+.ap-grid      > .ap-card p {
   display: -webkit-box;
   -webkit-line-clamp: 3;
   -webkit-box-orient: vertical;
@@ -64,9 +86,10 @@
   min-height: 4.2em !important;   /* 3 líneas */
 }
 
-/* Botón "Acceder": siempre pegado al fondo, alineado a la izquierda */
+/* Botón de acceso: siempre pegado al fondo, alineado a la izquierda */
 .modules-grid > .module-card .btn-acceder,
-.cards-grid  > .module-card .btn-acceder {
+.cards-grid   > .module-card .btn-acceder,
+.ap-grid      > .ap-card .btn-acceder {
   margin-top: auto !important;
   align-self: flex-start;
 }
