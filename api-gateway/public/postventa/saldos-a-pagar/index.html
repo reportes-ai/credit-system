@@ -5,7 +5,7 @@
   <link rel="icon" href="/img/favicon.png" type="image/png">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Saldos Precios a Pagar — AutoFácil</title>
-  <!-- v1.0 -->
+  <!-- v1.1 -->
   <link href="/css/bootstrap.min.css" rel="stylesheet">
   <link href="/css/bootstrap-icons.css" rel="stylesheet">
   <style>
@@ -41,6 +41,11 @@
     .vacio { text-align:center; color:#94a3b8; padding:40px; font-size:.9rem; }
     .badge-cnt { background:#e0eaff; color:#0141A2; border-radius:20px; padding:3px 12px; font-size:.8rem; font-weight:700; }
     #msg { font-size:.85rem; display:none; }
+    .dias-pill { display:inline-block; min-width:42px; text-align:center; border-radius:8px; padding:2px 8px; font-weight:800; font-size:.78rem; }
+    .d-red { background:#fee2e2; color:#b91c1c; }
+    .d-yel { background:#fef9c3; color:#a16207; }
+    .d-grn { background:#dcfce7; color:#15803d; }
+    .d-wht { background:transparent; color:#64748b; font-weight:600; }
   </style>
 </head>
 <body>
@@ -80,6 +85,7 @@
             <th>Cuenta Corriente</th>
             <th>Banco</th>
             <th>Fecha Liberado a Pago</th>
+            <th style="text-align:center">Días</th>
             <th class="num">Saldo Precio</th>
             <th style="text-align:center">A Pagar</th>
             <th class="num">A Cargar Banco</th>
@@ -88,7 +94,7 @@
         <tbody id="body"></tbody>
         <tfoot>
           <tr>
-            <td colspan="7" style="text-align:right">TOTALES</td>
+            <td colspan="8" style="text-align:right">TOTALES</td>
             <td class="num" id="totSaldo">$0</td>
             <td style="text-align:center" id="totCnt">0</td>
             <td class="num cargar" id="totCargar">$0</td>
@@ -118,8 +124,30 @@ let DATA = [];
   const r = await fetch('/api/postventa/saldos-a-pagar', { headers:H });
   const j = await r.json();
   DATA = j.data || [];
+  prepararDias();
   render();
 })();
+
+function prepararDias(){
+  const hoy = new Date(); hoy.setHours(0,0,0,0);
+  DATA.forEach(r => {
+    if (r.fecha_liberado){ const d = new Date(r.fecha_liberado); d.setHours(0,0,0,0); r.dias = Math.round((hoy - d)/86400000); }
+    else r.dias = null;
+  });
+  // Orden: mayor a menor días
+  DATA.sort((a,b) => (b.dias ?? -1) - (a.dias ?? -1));
+  // Quartiles sobre los que tienen > 2 días
+  const vals = DATA.filter(r => r.dias > 2).map(r => r.dias).sort((a,b) => a-b);
+  const q = p => { if (!vals.length) return Infinity; const i=(vals.length-1)*p, lo=Math.floor(i), hi=Math.ceil(i); return vals[lo] + (vals[hi]-vals[lo])*(i-lo); };
+  const Q1=q(.25), Q2=q(.5), Q3=q(.75);
+  DATA.forEach(r => {
+    if (r.dias == null || r.dias <= 2) r.dcls = 'd-wht';      // ≤2 días: blanco
+    else if (r.dias > Q3) r.dcls = 'd-red';                    // más atrasados
+    else if (r.dias > Q2) r.dcls = 'd-yel';
+    else if (r.dias > Q1) r.dcls = 'd-grn';
+    else r.dcls = 'd-wht';                                     // menos atrasados: blanco
+  });
+}
 
 function render(){
   const tb = document.getElementById('body');
@@ -135,6 +163,7 @@ function render(){
       <td>${escH(r.num_cuenta||'—')}</td>
       <td>${escH(r.banco||'—')}</td>
       <td>${fechaCL(r.fecha_liberado)}</td>
+      <td style="text-align:center"><span class="dias-pill ${r.dcls}">${r.dias==null?'—':r.dias+' d'}</span></td>
       <td class="num">${fmt(r.saldo_precio)}</td>
       <td style="text-align:center"><input type="checkbox" class="chk" data-id="${r.id}" onchange="toggle(this)"></td>
       <td class="num cargar" id="cargar_${r.id}">—</td>
@@ -177,6 +206,7 @@ async function guardar(){
     const j = await r.json();
     if (j.success){
       DATA = DATA.filter(x => !ids.includes(x.id));
+      prepararDias();
       render();
       msg.textContent = '✓ '+j.data.pagados+' pagado(s)'; msg.style.cssText='display:inline;color:#15803d;font-weight:700;font-size:.85rem';
     } else {
