@@ -2,7 +2,7 @@
    AutoFácil — Versión global de la aplicación
    Editar SOLO este archivo para cambiar la versión
    ───────────────────────────────────────────── */
-const APP_VERSION = 'v13.4';
+const APP_VERSION = 'v13.5';
 
 document.addEventListener('DOMContentLoaded', () => {
 
@@ -621,6 +621,18 @@ document.addEventListener('DOMContentLoaded', () => {
     if (Notification.permission === 'granted') suscribir();
     else if (Notification.permission === 'default') btnPush.style.display = '';
   }
+});
+
+/* ═══════════════════════════════════════════════════════════════
+   💓 HEARTBEAT DE SESIÓN — para el informe de Desempeño Analistas.
+   Marca presencia cada 60s; el logout se deriva del último latido.
+   ═══════════════════════════════════════════════════════════════ */
+document.addEventListener('DOMContentLoaded', () => {
+  const token = sessionStorage.getItem('token');
+  if (!token) return;
+  const ping = () => fetch('/api/desempeno/ping', { method: 'POST', headers: { Authorization: 'Bearer ' + token } }).catch(() => {});
+  ping();
+  setInterval(ping, 60000);
 });
 
 /* ═══════════════════════════════════════════════════════════════

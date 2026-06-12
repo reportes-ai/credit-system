@@ -31,6 +31,8 @@ const login = async (req, res) => {
     }
 
     await pool.query('UPDATE usuarios SET ultimo_acceso = NOW() WHERE id_usuario = ?', [usuario.id_usuario]);
+    // Registrar sesión para el informe de desempeño (no bloqueante)
+    try { require('../../../desempeno/src/controllers/desempeno.controller').registrarLogin(usuario); } catch (e) {}
 
     const payload = {
       id_usuario: usuario.id_usuario,

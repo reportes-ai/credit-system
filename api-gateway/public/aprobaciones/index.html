@@ -218,6 +218,11 @@
       <h6>Cartolas Enviadas</h6><p>Historial de cartolas enviadas a concesionarios</p>
       <span class="btn-acceder"><i class="bi bi-arrow-right-circle me-1"></i>Acceder</span>
     </button>
+    <button class="ap-card" id="cardDesempeno" onclick="showTab('desempeno')" style="display:none">
+      <div class="card-icon"><i class="bi bi-speedometer2"></i></div>
+      <h6>Desempeño Analistas de Crédito</h6><p>Conexión diaria, aprobadas/rechazadas/ignoradas y tiempos por analista</p>
+      <span class="btn-acceder"><i class="bi bi-arrow-right-circle me-1"></i>Acceder</span>
+    </button>
   </div>
 </div>
 
@@ -491,6 +496,36 @@
   </div>
 </div>
 
+<div class="tab-pane" id="pane-desempeno">
+  <div class="card-af">
+    <div class="filters-bar" style="display:flex;gap:10px;align-items:end;flex-wrap:wrap">
+      <div><label style="font-size:.72rem;font-weight:700;color:#64748b;display:block">Desde</label><input type="date" id="dDesde" style="border:1.5px solid #e2e8f0;border-radius:8px;padding:7px 10px"></div>
+      <div><label style="font-size:.72rem;font-weight:700;color:#64748b;display:block">Hasta</label><input type="date" id="dHasta" style="border:1.5px solid #e2e8f0;border-radius:8px;padding:7px 10px"></div>
+      <button class="btn-pri" onclick="cargarDesempeno()" style="background:#0141A2;color:#fff;border:none;border-radius:8px;padding:8px 16px;font-weight:700;cursor:pointer"><i class="bi bi-search me-1"></i>Ver</button>
+      <span style="font-size:.76rem;color:#94a3b8">Promedio = N° de analistas conectados en promedio entre 10:00 y 19:00. Click en un día para el detalle por persona.</span>
+    </div>
+    <table class="tbl" style="margin-top:14px">
+      <thead><tr><th>Día</th><th style="text-align:center">Analistas (prom. 10–19h)</th><th style="text-align:center">Personas</th><th style="text-align:center">Aprobadas</th><th style="text-align:center">Rechazadas</th></tr></thead>
+      <tbody id="bodyDesempeno"><tr><td colspan="5" style="text-align:center;color:#94a3b8;padding:20px">Selecciona un rango y presiona Ver</td></tr></tbody>
+    </table>
+  </div>
+  <div class="card-af" id="detalleDia" style="display:none">
+    <h6 style="font-weight:800;color:#001345" id="detalleTitulo"></h6>
+    <div style="overflow-x:auto">
+    <table class="tbl">
+      <thead><tr>
+        <th>Analista</th><th>Login</th><th>Logout</th><th style="text-align:center">Hrs</th>
+        <th style="text-align:center">Aprob</th><th style="text-align:center">Rech</th><th style="text-align:center">Ignor</th><th style="text-align:center">Revisó</th>
+        <th style="text-align:center">T.Aprob</th><th style="text-align:center">T.Rech</th>
+        <th style="text-align:center">%Aprob</th><th style="text-align:center">%Rech</th><th style="text-align:center">%Ignor</th><th style="text-align:center">%Revisó</th>
+      </tr></thead>
+      <tbody id="bodyDetalle"></tbody>
+    </table>
+    </div>
+    <p style="font-size:.74rem;color:#94a3b8;margin-top:8px">T.Aprob/T.Rech = minutos promedio desde que abre la carta hasta decidir. %Revisó = revisadas / cartas que entraron al pool mientras estaba conectado. Tiempos e ignoradas se acumulan desde que se activó la captura.</p>
+  </div>
+</div>
+
 <!-- ════════ MODAL PREPAGO / ANULACIÓN ════════ -->
 <div class="modal-bg" id="modalPrepago">
   <div class="modal-card" style="max-width:480px">
@@ -669,13 +704,14 @@ async function cargarPermisos(){
     document.getElementById('cardCartolas').style.display = '';
     document.getElementById('cardEnviadas').style.display = '';
   }
+  if (can('aprob_desempeno')) document.getElementById('cardDesempeno').style.display = '';
 }
 const puede = c => ES_ADMIN || PERMISOS.has(c);
 
 const TITULOS = { home:'', lista:'Mis Cartas', nueva:'Generador de Carta de Aprobación',
   revision:'Revisión de Cartas de Aprobación', impresion:'Impresión de Cartas de Aprobación',
   informes:'Informes de Cartas de Aprobación', cartolas:'Emisión de Cartolas',
-  enviadas:'Cartolas Enviadas', params:'Preferencia Financiera' };
+  enviadas:'Cartolas Enviadas', params:'Preferencia Financiera', desempeno:'Desempeño Analistas de Crédito' };
 
 function showTab(t){
   document.querySelectorAll('.tab-pane').forEach(p=>p.classList.remove('active'));
@@ -688,7 +724,68 @@ function showTab(t){
   if (t==='informes')  initInformes();
   if (t==='cartolas')  initCartolas();
   if (t==='enviadas')  initEnviadas();
+  if (t==='desempeno') initDesempeno();
   if (t==='params') { renderFactores(); renderFinancierasEditor(); renderPrefTabla(); }
+}
+
+/* ── Desempeño Analistas de Crédito ─────────────────── */
+let DESEMP_INIT = false;
+function initDesempeno(){
+  if (!DESEMP_INIT) {
+    const hoy = new Date();
+    const desde = new Date(hoy); desde.setDate(hoy.getDate() - 14);
+    document.getElementById('dHasta').value = hoy.toISOString().slice(0,10);
+    document.getElementById('dDesde').value = desde.toISOString().slice(0,10);
+    DESEMP_INIT = true;
+  }
+  cargarDesempeno();
+}
+async function cargarDesempeno(){
+  const desde = document.getElementById('dDesde').value, hasta = document.getElementById('dHasta').value;
+  document.getElementById('detalleDia').style.display = 'none';
+  const tb = document.getElementById('bodyDesempeno');
+  tb.innerHTML = '<tr><td colspan="5" style="text-align:center;color:#94a3b8;padding:20px">Cargando…</td></tr>';
+  try {
+    const r = await fetch('/api/desempeno/cartas?desde='+desde+'&hasta='+hasta, { headers: hdr() });
+    const j = await r.json();
+    const rows = j.data || [];
+    if (!rows.length){ tb.innerHTML = '<tr><td colspan="5" style="text-align:center;color:#94a3b8;padding:20px">Sin datos en el rango</td></tr>'; return; }
+    tb.innerHTML = rows.map(d => `<tr style="cursor:pointer" onclick="verDetalleDia('${d.fecha}')">
+      <td><b>${d.dia_semana.charAt(0).toUpperCase()+d.dia_semana.slice(1)}</b> ${d.fecha.split('-').reverse().join('-')}</td>
+      <td style="text-align:center;font-weight:700;color:#0141A2">${d.promedio_conectados}</td>
+      <td style="text-align:center">${d.personas}</td>
+      <td style="text-align:center;color:#15803d;font-weight:700">${d.aprobadas}</td>
+      <td style="text-align:center;color:#b91c1c;font-weight:700">${d.rechazadas}</td>
+    </tr>`).join('');
+  } catch(e){ tb.innerHTML = '<tr><td colspan="5" style="text-align:center;color:#b91c1c;padding:20px">Error al cargar</td></tr>'; }
+}
+async function verDetalleDia(fecha){
+  const det = document.getElementById('detalleDia'); det.style.display = '';
+  document.getElementById('bodyDetalle').innerHTML = '<tr><td colspan="14" style="text-align:center;color:#94a3b8;padding:16px">Cargando…</td></tr>';
+  try {
+    const r = await fetch('/api/desempeno/cartas/dia?fecha='+fecha, { headers: hdr() });
+    const j = await r.json();
+    const d = j.data || {};
+    document.getElementById('detalleTitulo').textContent =
+      (d.dia_semana ? d.dia_semana.charAt(0).toUpperCase()+d.dia_semana.slice(1)+' ' : '') + fecha.split('-').reverse().join('-');
+    const ps = d.personas || [];
+    const tb = document.getElementById('bodyDetalle');
+    if (!ps.length){ tb.innerHTML = '<tr><td colspan="14" style="text-align:center;color:#94a3b8;padding:16px">Nadie conectado/registrado ese día</td></tr>'; det.scrollIntoView({behavior:'smooth'}); return; }
+    const pct = v => v==null ? '—' : v+'%';
+    const min = v => v==null ? '—' : v+'′';
+    tb.innerHTML = ps.map(p => `<tr>
+      <td><b>${escH(p.nombre)}</b><br><span style="font-size:.7rem;color:#94a3b8">${escH(p.perfil)}</span></td>
+      <td>${p.login}</td><td>${p.logout}</td><td style="text-align:center">${p.horas}</td>
+      <td style="text-align:center;color:#15803d;font-weight:700">${p.aprobó}</td>
+      <td style="text-align:center;color:#b91c1c;font-weight:700">${p.rechazó}</td>
+      <td style="text-align:center;color:#a16207">${p.ignoró}</td>
+      <td style="text-align:center">${p.revisó}</td>
+      <td style="text-align:center">${min(p.t_aprobar)}</td><td style="text-align:center">${min(p.t_rechazar)}</td>
+      <td style="text-align:center">${pct(p.pct_aprob)}</td><td style="text-align:center">${pct(p.pct_rech)}</td>
+      <td style="text-align:center">${pct(p.pct_ignor)}</td><td style="text-align:center">${pct(p.pct_revisó)}</td>
+    </tr>`).join('');
+    det.scrollIntoView({behavior:'smooth'});
+  } catch(e){ document.getElementById('bodyDetalle').innerHTML = '<tr><td colspan="14" style="text-align:center;color:#b91c1c;padding:16px">Error</td></tr>'; }
 }
 
 /* ── Cargar datos ─────────────────────────────────── */
@@ -1556,6 +1653,9 @@ function verCarta(id){
   // Al abrir una carta del pool/rechazada, cancelar su alerta para todos
   if (c.status === 'PENDIENTE' || c.status === 'RECHAZADA')
     fetch('/api/alertas/visto/'+id, { method:'POST', headers:hdr() }).catch(()=>{});
+  // Registrar apertura (review del pool) para el informe de desempeño
+  if (c.status === 'PENDIENTE')
+    fetch('/api/desempeno/carta-apertura', { method:'POST', headers:hdr(), body:JSON.stringify({ id_carta:id }) }).catch(()=>{});
   document.getElementById('modalTitulo').innerHTML = '<i class="bi bi-file-earmark-text me-2"></i>' + escH(c.opCarta||'Carta');
   const motivoBanner = (c.status==='RECHAZADA' && c.motivoRechazo)
     ? `<div style="background:#fef2f2;border:1.5px solid #fecaca;color:#b91c1c;border-radius:9px;padding:9px 14px;font-size:.83rem;margin-bottom:12px"><b><i class="bi bi-x-octagon me-1"></i>Rechazada por ${escH(c.rechazadoPorNombre||'')}:</b> ${escH(c.motivoRechazo)}</div>` : '';

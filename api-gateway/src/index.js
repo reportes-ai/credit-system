@@ -121,6 +121,9 @@ app.use('/api/ayuda', require('../../services/ayuda/src/routes/ayuda.routes'));
 // Motor de alertas configurable
 app.use('/api/alertas', require('../../services/alertas/src/routes/alertas.routes'));
 
+// Desempeño analistas (sesiones + eventos de carta + informe)
+app.use('/api/desempeno', require('../../services/desempeno/src/routes/desempeno.routes'));
+
 // CRM
 app.use('/api/crm', require('../../services/crm/src/routes/gestiones.routes'));
 
