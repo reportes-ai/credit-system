@@ -94,6 +94,9 @@ const cambiarClave = async (req, res) => {
 
 const misPermisos = async (req, res) => {
   try {
+    // Permisos siempre frescos: nunca cachear (un cambio de permisos aplica al recargar)
+    res.set('Cache-Control', 'no-store, no-cache, must-revalidate, private');
+    res.set('Pragma', 'no-cache');
     const { id_usuario } = req.usuario;
     // Perfil SIEMPRE desde BD, no del token: si el admin cambia el perfil
     // (o se fusionan perfiles duplicados), aplica sin esperar re-login
