@@ -100,10 +100,11 @@ const getAll = async (req, res) => {
     const [rows] = await pool.query(`
       SELECT s.id, s.id_credito, s.num_op, s.financiera, s.ejecutivo,
              s.fecha_otorgado, s.saldo_precio, s.comision,
-             COALESCE(c.nombre_local, s.nombre_dealer)    AS nombre_dealer,
-             COALESCE(c.rut_concesionario, s.rut_dealer)  AS rut_dealer
+             COALESCE(c.nombre_local, d.nombre_razon, s.nombre_dealer)  AS nombre_dealer,
+             COALESCE(c.rut_concesionario, d.rut, s.rut_dealer)         AS rut_dealer
       FROM postventa_seguimiento s
       LEFT JOIN creditos c ON c.id = s.id_credito
+      LEFT JOIN dealers  d ON d.nombre_indexa = c.automotora
       ORDER BY s.fecha_otorgado DESC, s.id DESC LIMIT 1000`);
     const [etapas] = await pool.query(
       `SELECT id_seguimiento, track, etapa, usuario, fecha FROM postventa_etapas
@@ -235,15 +236,16 @@ const getSaldosAPagar = async (req, res) => {
   try {
     const [rows] = await pool.query(`
       SELECT s.id, s.num_op, s.saldo_precio,
-             COALESCE(c.nombre_local, s.nombre_dealer) AS nombre_dealer,
-             c.id_financiera, c.rut_concesionario AS rut_dealer,
+             COALESCE(c.nombre_local, d.nombre_razon, s.nombre_dealer) AS nombre_dealer,
+             c.id_financiera,
+             COALESCE(c.rut_concesionario, d.rut) AS rut_dealer,
              d.num_cuenta, d.banco,
              elp.fecha AS fecha_liberado
       FROM postventa_seguimiento s
       JOIN postventa_etapas elp
         ON elp.id_seguimiento = s.id AND elp.track='SALDO' AND elp.etapa='LIBERADO A PAGO'
       LEFT JOIN creditos c ON c.id = s.id_credito
-      LEFT JOIN dealers  d ON d.rut = c.rut_concesionario
+      LEFT JOIN dealers  d ON d.nombre_indexa = c.automotora
       WHERE NOT EXISTS (
         SELECT 1 FROM postventa_etapas ep
         WHERE ep.id_seguimiento = s.id AND ep.track='SALDO' AND ep.etapa='SALDO PRECIO PAGADO')
