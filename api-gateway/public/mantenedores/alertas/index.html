@@ -86,7 +86,7 @@
       <div class="field"><label>Perfil 1</label><select id="fDestino1" class="dest"></select></div>
       <div class="field"><label>Perfil 2 (opcional)</label><select id="fDestino2" class="dest"></select></div>
       <div class="field"><label>Perfil 3 (opcional)</label><select id="fDestino3" class="dest"></select></div>
-      <div class="field"><label>No repetir por (min)</label><input id="fDelay" type="number" min="0" value="60"></div>
+      <div class="field"><label>Repetir cada (min)</label><input id="fDelay" type="number" min="0" value="60"><p class="hint" style="margin-top:2px">0 = avisar una sola vez</p></div>
       <div class="field"><label>Sonar cada (seg)</label><input id="fSonCada" type="number" min="5" value="30"></div>
       <div class="field"><label>Sonar máximo (min)</label><input id="fSonMax" type="number" min="1" value="5"></div>
       <div class="field"><label>Activa</label><label class="sw"><input type="checkbox" id="fActivo" checked><span class="sl"></span></label><span class="sw-lbl" id="lblActivo">Sí</span></div>
@@ -148,8 +148,10 @@ function onOrigen(){
 function onOperador(){
   const op = document.getElementById('fOperador').value;
   const meta = META.operadores.find(o=>o.op===op) || {valores:1};
+  document.getElementById('wVal1').style.display = meta.valores>=1 ? '' : 'none';
   document.getElementById('wVal2').style.display = meta.valores===2 ? '' : 'none';
-  const hint = op==='contiene' ? 'Texto a buscar. Para varias opciones sepáralas con ";" (ej: AUTOFIN;UNIDAD).'
+  const hint = op==='siempre' ? 'Avisa por cada registro en este estado, sin condición de valor (ej: cualquier carta rechazada).'
+             : op==='contiene' ? 'Texto a buscar. Para varias opciones sepáralas con ";" (ej: AUTOFIN;UNIDAD).'
              : op==='entre' ? 'Se cumple si el valor está entre el mínimo y el máximo (inclusive).'
              : 'Se cumple comparando el campo con el valor indicado.';
   document.getElementById('hintOp').textContent = hint;

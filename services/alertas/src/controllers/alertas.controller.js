@@ -29,6 +29,12 @@ const pool = require('../../../../shared/config/database');
         created_at  DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
         updated_at  DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
       )`);
+    // Registro de "ya emitidas" para soportar "avisar una sola vez" y cooldown por registro
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS alertas_emitidas (
+        clave    VARCHAR(160) PRIMARY KEY,
+        fired_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
+      )`).catch(()=>{});
     // Columnas para la campanita: clave de dedup + prioridad + si suena
     await pool.query(`ALTER TABLE notificaciones ADD COLUMN IF NOT EXISTS clave VARCHAR(140) DEFAULT NULL`).catch(()=>{});
     await pool.query(`ALTER TABLE notificaciones ADD COLUMN IF NOT EXISTS prioridad VARCHAR(10) DEFAULT 'normal'`).catch(()=>{});
@@ -234,6 +240,7 @@ const ORIGENES = {
 
 /* Operadores: cuántos valores requieren (para que el mantenedor pinte 1 o 2 inputs) */
 const OPERADORES = [
+  { op: 'siempre',  label: 'Siempre (apenas aparezca)', valores: 0 },
   { op: 'mayor',    label: 'Mayor que (>)',        valores: 1 },
   { op: 'menor',    label: 'Menor que (<)',        valores: 1 },
   { op: 'entre',    label: 'Entre (mín y máx)',    valores: 2 },
@@ -249,6 +256,7 @@ const SONIDOS = [
 ];
 
 function cumple(val, op, v1, v2) {
+  if (op === 'siempre') return true;
   if (op === 'mayor') return Number(val) >  Number(v1);
   if (op === 'menor') return Number(val) <  Number(v1);
   if (op === 'entre') return Number(val) >= Number(v1) && Number(val) <= Number(v2);
@@ -290,21 +298,32 @@ async function evaluarAlertas() {
       const base = await usuariosBase(rg.destino);
       const usaCreador = String(rg.destino || '').split(',').map(s => s.trim()).includes('CREADOR');
       const clavesActivas = [];
+      const delay = rg.delay_min || 0;  // 0 = avisar una sola vez; >0 = repetir cada N min
       for (const f of filas) {
         if (!cumple(f.vars[rg.campo], rg.operador, rg.valor1, rg.valor2)) continue;
         const clave = `alerta:${rg.id}:${f.key}`;
         clavesActivas.push(clave);
+
+        // ¿Disparar este ciclo? "una sola vez" = no si ya se emitió; "repetir" = no si se emitió hace < delay min
+        let yaEmitida;
+        if (delay === 0) {
+          const [[em]] = await pool.query('SELECT 1 FROM alertas_emitidas WHERE clave = ? LIMIT 1', [clave]);
+          yaEmitida = !!em;
+        } else {
+          const [[em]] = await pool.query(
+            'SELECT 1 FROM alertas_emitidas WHERE clave = ? AND fired_at > (NOW() - INTERVAL ? MINUTE) LIMIT 1', [clave, delay]);
+          yaEmitida = !!em;
+        }
+        if (yaEmitida) continue;
+
         // Destinatarios: base (perfiles/TODOS) + creador del registro si la regla usa 'CREADOR'
         let users = base.slice();
         if (usaCreador && f.creador) users.push(f.creador);
         users = [...new Set(users)];
         for (const uid of users) {
-          // Dedup + delay: no re-notificar si hay una sin leer, o una (leída o no) creada
-          // dentro de la ventana de "delay" (cooldown configurable por alerta).
+          // No apilar duplicados sin leer al mismo usuario
           const [[ex]] = await pool.query(
-            `SELECT 1 FROM notificaciones WHERE id_usuario = ? AND clave = ?
-               AND (leida = 0 OR created_at > (NOW() - INTERVAL ? MINUTE)) LIMIT 1`,
-            [uid, clave, rg.delay_min || 0]);
+            'SELECT 1 FROM notificaciones WHERE id_usuario = ? AND clave = ? AND leida = 0 LIMIT 1', [uid, clave]);
           if (ex) continue;
           await pool.query(
             `INSERT INTO notificaciones (id_usuario, tipo, titulo, mensaje, href, clave, prioridad, sonar, son_cada, son_max, son_tipo)
@@ -312,11 +331,17 @@ async function evaluarAlertas() {
             [uid, 'alerta', rg.nombre || f.titulo, f.mensaje, f.href, clave, rg.prioridad || 'normal',
              rg.sonido ? 1 : 0, rg.sonido_cada_seg || 30, rg.sonido_max_min || 5, rg.sonido_tipo || 'campana']);
         }
+        await pool.query(
+          'INSERT INTO alertas_emitidas (clave, fired_at) VALUES (?, NOW()) ON DUPLICATE KEY UPDATE fired_at = NOW()', [clave]);
       }
-      // Resolver: borrar notificaciones no leídas de esta regla cuyo registro ya no cumple
+      // Resolver: el registro ya no cumple → borrar avisos sin leer y limpiar "emitidas"
+      // (así, si la condición vuelve a darse en el futuro, se puede volver a avisar)
       const inList = clavesActivas.length ? clavesActivas : ['__none__'];
       await pool.query(
         `DELETE FROM notificaciones WHERE clave LIKE ? AND leida = 0 AND clave NOT IN (?)`,
+        [`alerta:${rg.id}:%`, inList]);
+      await pool.query(
+        `DELETE FROM alertas_emitidas WHERE clave LIKE ? AND clave NOT IN (?)`,
         [`alerta:${rg.id}:%`, inList]);
     }
   } catch (e) { console.error('[alertas evaluar]', e.message); }
