@@ -191,7 +191,7 @@
   <a class="nav-brand" href="/creditos">
     <img src="/img/logo-autofacil.png" alt="AutoFácil" style="filter:brightness(0) invert(1);height:32px;display:block" onerror="this.style.display='none'">
     <span>Carga de Respaldos</span>
-    <span class="version-badge">v3.0</span>
+    <span class="version-badge">v3.1</span>
   </a>
   <div class="breadcrumb-nav"><a href="/">Inicio</a><span class="sep">›</span><a href="/creditos">Créditos</a><span class="sep">›</span><span style="color:#fff;font-weight:600"><i class="bi bi-folder2 me-1"></i>Respaldos</span></div>
   <div style="display:flex;align-items:center;gap:10px">
@@ -590,12 +590,37 @@ function renderDocSubido(tipo, doc) {
 }
 
 /* ── Aprobación / Rechazo por documento ── */
+// Pop-up de Riesgo Operacional (modal propio, sin el "hover pegado" del alert nativo)
+function popupRiesgo(accion, nombreDoc) {
+  const verbo = accion === 'Aprobando' ? 'Aprobarlo' : 'Rechazarlo';
+  let ov = document.getElementById('riesgoOverlay');
+  if (!ov) {
+    ov = document.createElement('div');
+    ov.id = 'riesgoOverlay';
+    ov.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:9999;display:flex;align-items:center;justify-content:center;padding:20px';
+    ov.innerHTML = `
+      <div style="background:#fff;border-radius:14px;max-width:440px;width:100%;box-shadow:0 20px 60px rgba(0,0,0,.4);overflow:hidden">
+        <div style="background:linear-gradient(135deg,#b91c1c,#ef4444);color:#fff;padding:16px 22px;display:flex;align-items:center;gap:10px;font-weight:800;font-size:1rem">
+          <i class="bi bi-exclamation-triangle-fill" style="font-size:1.4rem"></i>ALERTA DE RIESGO OPERACIONAL
+        </div>
+        <div id="riesgoMsg" style="padding:22px;color:#374151;font-size:.92rem;line-height:1.55"></div>
+        <div style="padding:0 22px 20px;text-align:right">
+          <button onclick="document.getElementById('riesgoOverlay').style.display='none'"
+            style="background:#0141A2;color:#fff;border:none;border-radius:8px;padding:9px 22px;font-size:.86rem;font-weight:700;cursor:pointer">Entendido</button>
+        </div>
+      </div>`;
+    document.body.appendChild(ov);
+  }
+  document.getElementById('riesgoMsg').innerHTML =
+    `Está <strong>${accion}</strong> un documento que <strong>no ha visto</strong>.<br><br>Favor ver y revisar el <strong>"${nombreDoc}"</strong> antes de ${verbo}.`;
+  ov.style.display = 'flex';
+}
 // Bloquea aprobar/rechazar si el documento no fue abierto con "Ver"
 function exigirVisto(idTipo, doc, accion) {
   if (_vistos.has(doc.id_doc)) return true;
   const tipo = _tipos.find(t => t.id_tipo === idTipo);
   const nombreDoc = tipo?.nombre || doc.archivo_nombre || 'documento';
-  alert(`⚠️ ALERTA DE RIESGO OPERACIONAL\n\nEstá ${accion} un documento que no ha visto.\n\nFavor ver y revisar el "${nombreDoc}" antes de ${accion === 'Aprobando' ? 'Aprobarlo' : 'Rechazarlo'}.`);
+  popupRiesgo(accion, nombreDoc);
   return false;
 }
 
