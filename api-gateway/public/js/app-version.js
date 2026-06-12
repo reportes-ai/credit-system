@@ -2,7 +2,7 @@
    AutoFácil — Versión global de la aplicación
    Editar SOLO este archivo para cambiar la versión
    ───────────────────────────────────────────── */
-const APP_VERSION = 'v14.4';
+const APP_VERSION = 'v14.5';
 
 document.addEventListener('DOMContentLoaded', () => {
 
@@ -749,11 +749,10 @@ async function afRenderDebug() {
     const r = await fetch('/api/auth/mis-permisos?_=' + Date.now(), { cache: 'no-store', headers: { Authorization: 'Bearer ' + token } });
     const j = await r.json(); funcs = j.funcionalidades || [];
   } catch (e) {}
-  const cards = [...document.querySelectorAll('.module-card,.ap-card,.report-card')].map(c => {
-    const vis = getComputedStyle(c).display !== 'none';
-    const id = c.id || (c.getAttribute('href') || '(card)');
-    return `${vis ? '👁️' : '🚫'} ${esc(id)}`;
-  });
+  const cardsEl = [...document.querySelectorAll('.module-card,.ap-card,.report-card')];
+  const cards = cardsEl.map(c => ({ vis: getComputedStyle(c).display !== 'none', id: c.id || (c.getAttribute('href') || '(card)') }))
+    .sort((a, b) => (a.vis === b.vis) ? 0 : (a.vis ? 1 : -1)); // ocultas primero
+  const nVis = cards.filter(c => c.vis).length, nOcu = cards.length - nVis;
   p.innerHTML =
     `<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
        <b style="color:#4fc3f7">🐞 DEBUG ${typeof APP_VERSION !== 'undefined' ? APP_VERSION : ''}</b>
@@ -763,8 +762,17 @@ async function afRenderDebug() {
      <div><b>Usuario:</b> ${esc((yo?.nombre || '') + ' ' + (yo?.apellido || ''))}</div>
      <div><b>Perfil:</b> ${esc(yo?.perfil || '')}${yo?.perfil === 'Administrador' ? ' (admin)' : ''}</div>
      <div><b>Ruta:</b> ${esc(location.pathname)}</div>
-     <div style="margin-top:6px"><b>Funcionalidades (${funcs.length}):</b><br>${funcs.length ? funcs.map(esc).join(', ') : '<i>ninguna</i>'}</div>
-     <div style="margin-top:6px"><b>Cards en pantalla:</b><br>${cards.length ? cards.join('<br>') : '<i>—</i>'}</div>`;
+     <div style="margin-top:7px"><b>Funcionalidades (${funcs.length}):</b>
+       <input id="afDbgFiltro" placeholder="filtrar…" style="width:100%;margin:4px 0;background:#0f1830;border:1px solid #1e293b;color:#cbd5e1;border-radius:5px;padding:3px 7px;font:11px monospace;box-sizing:border-box">
+       <div id="afDbgFuncs">${funcs.length ? funcs.map(f => `<span class="afdbg-f">${esc(f)}</span>`).join(' ') : '<i>ninguna</i>'}</div>
+     </div>
+     <div style="margin-top:7px"><b>Cards en pantalla</b> <span style="color:#94a3b8">(👁️ ${nVis} / 🚫 ${nOcu}):</span><br>
+       ${cards.length ? cards.map(c => `<span style="color:${c.vis ? '#86efac' : '#fca5a5'}">${c.vis ? '👁️' : '🚫'} ${esc(c.id)}</span>`).join('<br>') : '<i>—</i>'}</div>`;
+  const fi = p.querySelector('#afDbgFiltro');
+  if (fi) fi.addEventListener('input', () => {
+    const q = fi.value.toLowerCase();
+    p.querySelectorAll('.afdbg-f').forEach(s => s.style.display = s.textContent.toLowerCase().includes(q) ? '' : 'none');
+  });
 }
 function afToggleDebug() {
   const on = localStorage.getItem('af_debug') === '1';
