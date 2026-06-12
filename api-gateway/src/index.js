@@ -345,6 +345,8 @@ app.get(['/cartas-aprobacion', '/cartas-aprobacion/'], (req, res) =>
 
 app.get(['/aprobaciones', '/aprobaciones/'], (req, res) =>
   res.sendFile(path.join(__dirname, '../public/aprobaciones/index.html')));
+app.get(['/aprobaciones/mantenedor', '/aprobaciones/mantenedor/'], (req, res) =>
+  res.sendFile(path.join(__dirname, '../public/aprobaciones/mantenedor/index.html')));
 
 // Card en Mantenedores → abre la pestaña Parámetros de Aprobaciones
 app.get(['/mantenedores/preferencia-financiera', '/mantenedores/preferencia-financiera/'], (req, res) =>

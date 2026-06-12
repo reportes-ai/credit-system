@@ -5,7 +5,7 @@
   <link rel="icon" href="/img/favicon.png" type="image/png">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Cartas de Aprobación — AutoFácil</title>
-  <!-- v3.0 -->
+  <!-- v3.1 -->
   <link href="/css/bootstrap.min.css" rel="stylesheet">
   <link href="/css/bootstrap-icons.css" rel="stylesheet">
   <style>
@@ -221,6 +221,11 @@
     <button class="ap-card" id="cardDesempeno" onclick="showTab('desempeno')" style="display:none">
       <div class="card-icon"><i class="bi bi-speedometer2"></i></div>
       <h6>Desempeño Analistas de Crédito</h6><p>Conexión diaria, aprobadas/rechazadas/ignoradas y tiempos por analista</p>
+      <span class="btn-acceder"><i class="bi bi-arrow-right-circle me-1"></i>Acceder</span>
+    </button>
+    <button class="ap-card" id="cardMantenedor" onclick="location.href='/aprobaciones/mantenedor/'" style="display:none">
+      <div class="card-icon"><i class="bi bi-pencil-square"></i></div>
+      <h6>Mantenedor de Cartas de Aprobación</h6><p>Edita el texto de las cartas y la firma de la empresa que aparece impresa</p>
       <span class="btn-acceder"><i class="bi bi-arrow-right-circle me-1"></i>Acceder</span>
     </button>
   </div>
@@ -596,6 +601,26 @@ let FACTORES = [   // fallback si no hay parámetro en BD
   {desde:37,hasta:72, parque:0.075, calle:0.1,   agCalle:0.05,  agParque:0.045},
 ];
 let FIRMA_B64 = null;
+// Texto editable de la carta (Mantenedor). Si el parámetro en BD está vacío, se usa el default.
+const CARTA_INTRO_DEFAULT = 'Tenemos el agrado de informarle que el cliente detallado a continuación tiene aprobado un crédito de acuerdo a la información personal, demográfica, laboral y financiera entregada por él, la cual está sujeta a confirmación.';
+const CARTA_CONSID_DEFAULT = [
+  '1. El Crédito se encuentra aprobado en las condiciones detalladas anteriormente y de acuerdo a la información entregada por el concesionario, por el cliente y los avales si correspondiera.',
+  '2. El crédito está sujeto a validación de los antecedentes presentados y sus respaldos necesarios para la formalización del mismo, como la firma de los documentos relacionados para la entrega del crédito.',
+  '3. AutoFácil actúa como Agente Colocador del crédito independiente del proveedor de financiamiento que cubra el producto. Por lo anterior, el Ejecutivo AutoFácil utilizará el set de documentos legales que correspondan según el producto que se esté otorgando.',
+  '4. El pago del saldo precio, seguros, gastos y otros queda supeditado al correcto y oportuno envío de toda la información necesaria para la venta, transferencia, inscripción, prenda y entrega del vehículo que permitirán formalizar la operación de Crédito.',
+  '5. De no contar con la documentación completa o si esta presenta errores de firma, impresión, formato u otro, tanto el Cliente, Ejecutivo AutoFácil y/o el Concesionario deberán corregir dicha situación enviando la documentación en forma correcta.',
+  '6. La participación del Dealer queda establecida, inicialmente y de no mediar una situación especial, que la participación se obtendrá de multiplicar el saldo precio por un factor que se determina según el plazo del financiamiento.',
+  '7. Para los casos en que se autorice un descuento en la tasa de financiamiento, la participación quedará definida de manera específica y deberá contar con la firma del representante del concesionario o dealer.',
+  '8. El Concesionario debe entregar a Ejecutivo AutoFácil la Factura y Solicitud de Primera Inscripción o Contrato de Compraventa y Transferencia del Vehículo a más tardar al quinto (5) día corrido desde la fecha de inscripción o transferencia del vehículo, respectivamente.',
+  '9. Al momento de la inscripción de la compra venta, se deberá incluir la inscripción de la limitación de dominio como prohibiciones de enajenar a favor de {{ACREEDOR}}.',
+  '10. En caso de que la entrega de la documentación del Vehículo al Ejecutivo AutoFácil ocurra con posterioridad al quinto (5) día corrido desde la fecha de Solicitud de Primera Inscripción o Transferencia del mismo, el Saldo de Precio será pagado por AutoFácil contra la inscripción efectiva de la Prenda.',
+  '11. Una vez recibido el set legal de documentos firmados en conformidad, la factura e inscripción o contrato de compraventa y transferencia del vehículo dentro de los plazos señalados anteriormente, AutoFácil procederá a pagar el saldo de precio dentro de las 96 horas hábiles siguientes.',
+  '12. El concesionario deberá inscribir una Limitación al Dominio al momento de inscribir el vehículo a nombre del cliente a favor de la entidad financiera a la que corresponda el producto de crédito otorgado.',
+  '14. Se deja expresa constancia que AutoFácil sólo es responsable por hechos o actos imputables a su responsabilidad o la de su personal, en ningún caso a actuaciones de terceros.',
+  '15. AutoFácil declara no tener responsabilidad alguna respecto a la venta del vehículo, ni de su calidad ni de la documentación, clonación u otros aspectos relacionados al bien financiado.',
+].join('\n');
+let CARTA_INTRO = CARTA_INTRO_DEFAULT;
+let CARTA_CONSID = CARTA_CONSID_DEFAULT;
 let editandoId = null;
 let UF_HOY = null, TASAS = null, PARAMS_CRED = null, montoCredManual = false;
 let FINANCIERAS = [
@@ -711,6 +736,7 @@ async function cargarPermisos(){
     document.getElementById('cardEnviadas').style.display = '';
   }
   if (can('aprob_desempeno')) document.getElementById('cardDesempeno').style.display = '';
+  if (can('aprob_mantenedor')) document.getElementById('cardMantenedor').style.display = '';
 }
 const puede = c => ES_ADMIN || PERMISOS.has(c);
 
@@ -961,6 +987,17 @@ async function cargarFirma(){
     const r = await fetch('/api/cartas-params/firma_empresa', { headers: hdr() });
     const j = await r.json();
     if (j.success && j.data) FIRMA_B64 = j.data;
+  } catch(e) {}
+  // Texto editable de la carta (si está vacío en BD, queda el default)
+  try {
+    const r = await fetch('/api/cartas-params/carta_intro', { headers: hdr() });
+    const j = await r.json();
+    if (j.success && j.data && j.data.trim()) CARTA_INTRO = j.data;
+  } catch(e) {}
+  try {
+    const r = await fetch('/api/cartas-params/carta_consideraciones', { headers: hdr() });
+    const j = await r.json();
+    if (j.success && j.data && j.data.trim()) CARTA_CONSID = j.data;
   } catch(e) {}
 }
 
@@ -1779,7 +1816,7 @@ function cartaHTML(c, preview){
       <img src="${location.origin}/img/logo-autofacil.png" style="height:30px;object-fit:contain">
     </div>
     <div style="text-align:center;font-size:12px;font-weight:bold;color:#0141A2;letter-spacing:.5px;margin-bottom:7px;text-transform:uppercase">CARTA DE APROBACIÓN DE CRÉDITO</div>
-    <p style="font-size:9px;text-align:justify;line-height:1.5;margin:0 0 7px">Tenemos el agrado de informarle que el cliente detallado a continuación tiene aprobado un crédito de acuerdo a la información personal, demográfica, laboral y financiera entregada por él, la cual está sujeta a confirmación.</p>
+    <p style="font-size:9px;text-align:justify;line-height:1.5;margin:0 0 7px">${escH(CARTA_INTRO).replace(/\{\{ACREEDOR\}\}/g, escH(c.acreedor||'AUTOFIN'))}</p>
     <table class="data-tbl">
       <tr><td class="lbl" style="width:13%">FECHA</td><td class="val" style="width:18%">${fmtFecha(c.fecha)}</td><td class="lbl" style="width:18%">VALIDEZ APROBACIÓN</td><td class="val">${validez.toLocaleDateString('es-CL')}</td></tr>
       <tr><td class="lbl">EJECUTIVO</td><td class="val">${escH(c.ejecutivoNombre||'')}</td><td class="lbl">TELÉFONO</td><td class="val">${escH(c.ejecutivoTel||'')}</td></tr>
@@ -1806,20 +1843,7 @@ function cartaHTML(c, preview){
     </table>
     <div class="sec-title">CONSIDERACIONES</div>
     <div style="font-size:9px;line-height:1.5;text-align:justify;margin-top:3px">
-      <p style="margin:2px 0">1. El Crédito se encuentra aprobado en las condiciones detalladas anteriormente y de acuerdo a la información entregada por el concesionario, por el cliente y los avales si correspondiera.</p>
-      <p style="margin:2px 0">2. El crédito está sujeto a validación de los antecedentes presentados y sus respaldos necesarios para la formalización del mismo, como la firma de los documentos relacionados para la entrega del crédito.</p>
-      <p style="margin:2px 0">3. AutoFácil actúa como Agente Colocador del crédito independiente del proveedor de financiamiento que cubra el producto. Por lo anterior, el Ejecutivo AutoFácil utilizará el set de documentos legales que correspondan según el producto que se esté otorgando.</p>
-      <p style="margin:2px 0">4. El pago del saldo precio, seguros, gastos y otros queda supeditado al correcto y oportuno envío de toda la información necesaria para la venta, transferencia, inscripción, prenda y entrega del vehículo que permitirán formalizar la operación de Crédito.</p>
-      <p style="margin:2px 0">5. De no contar con la documentación completa o si esta presenta errores de firma, impresión, formato u otro, tanto el Cliente, Ejecutivo AutoFácil y/o el Concesionario deberán corregir dicha situación enviando la documentación en forma correcta.</p>
-      <p style="margin:2px 0">6. La participación del Dealer queda establecida, inicialmente y de no mediar una situación especial, que la participación se obtendrá de multiplicar el saldo precio por un factor que se determina según el plazo del financiamiento.</p>
-      <p style="margin:2px 0">7. Para los casos en que se autorice un descuento en la tasa de financiamiento, la participación quedará definida de manera específica y deberá contar con la firma del representante del concesionario o dealer.</p>
-      <p style="margin:2px 0">8. El Concesionario debe entregar a Ejecutivo AutoFácil la Factura y Solicitud de Primera Inscripción o Contrato de Compraventa y Transferencia del Vehículo a más tardar al quinto (5) día corrido desde la fecha de inscripción o transferencia del vehículo, respectivamente.</p>
-      <p style="margin:2px 0">9. Al momento de la inscripción de la compra venta, se deberá incluir la inscripción de la limitación de dominio como prohibiciones de enajenar a favor de ${escH(c.acreedor||'AUTOFIN')}.</p>
-      <p style="margin:2px 0">10. En caso de que la entrega de la documentación del Vehículo al Ejecutivo AutoFácil ocurra con posterioridad al quinto (5) día corrido desde la fecha de Solicitud de Primera Inscripción o Transferencia del mismo, el Saldo de Precio será pagado por AutoFácil contra la inscripción efectiva de la Prenda.</p>
-      <p style="margin:2px 0">11. Una vez recibido el set legal de documentos firmados en conformidad, la factura e inscripción o contrato de compraventa y transferencia del vehículo dentro de los plazos señalados anteriormente, AutoFácil procederá a pagar el saldo de precio dentro de las 96 horas hábiles siguientes.</p>
-      <p style="margin:2px 0">12. El concesionario deberá inscribir una Limitación al Dominio al momento de inscribir el vehículo a nombre del cliente a favor de la entidad financiera a la que corresponda el producto de crédito otorgado.</p>
-      <p style="margin:2px 0">14. Se deja expresa constancia que AutoFácil sólo es responsable por hechos o actos imputables a su responsabilidad o la de su personal, en ningún caso a actuaciones de terceros.</p>
-      <p style="margin:2px 0">15. AutoFácil declara no tener responsabilidad alguna respecto a la venta del vehículo, ni de su calidad ni de la documentación, clonación u otros aspectos relacionados al bien financiado.</p>
+      ${CARTA_CONSID.split('\n').map(l=>l.trim()).filter(Boolean).map(l=>`<p style="margin:2px 0">${escH(l).replace(/\{\{ACREEDOR\}\}/g, escH(c.acreedor||'AUTOFIN'))}</p>`).join('')}
     </div>
     <div style="margin-top:18px;text-align:center">
       ${firmaImg}

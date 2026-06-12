@@ -1,0 +1,205 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <link rel="icon" href="/img/favicon.png" type="image/png">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Mantenedor de Cartas de Aprobación — AutoFácil</title>
+  <!-- v1.0 -->
+  <link href="/css/bootstrap.min.css" rel="stylesheet">
+  <link href="/css/bootstrap-icons.css" rel="stylesheet">
+  <style>
+    :root { --navy:#012d70; --blue:#0141A2; --accent:#0255c5; --bg:#f0f4f8; }
+    body { background:var(--bg); font-family:'Segoe UI',system-ui,sans-serif; margin:0; }
+    .topnav { background:linear-gradient(90deg,#012d70,#0255c5); color:#fff; height:60px; padding:0 24px; display:flex; align-items:center; justify-content:space-between; box-shadow:0 2px 8px rgba(0,0,0,.3); }
+    .topnav-brand { display:flex; align-items:center; gap:8px; text-decoration:none; }
+    .topnav-brand img { height:32px; filter:brightness(0) invert(1); }
+    .version-badge { background:rgba(255,255,255,.15); color:rgba(255,255,255,.75); font-size:.65rem; font-weight:700; border-radius:6px; padding:2px 8px; }
+    .breadcrumb-nav { color:rgba(255,255,255,.6); font-size:.85rem; display:flex; align-items:center; gap:6px; }
+    .breadcrumb-nav a { color:rgba(255,255,255,.75); text-decoration:none; }
+    .btn-logout { background:rgba(255,255,255,.1); border:1px solid rgba(255,255,255,.2); color:#fff; border-radius:8px; padding:5px 12px; font-size:.82rem; cursor:pointer; }
+    .main { max-width:1000px; margin:0 auto; padding:32px 24px; }
+    .af-banner { background:linear-gradient(135deg,#012d70,#0141A2 55%,#009AFE); border-radius:16px; color:#fff; padding:24px 32px; margin-bottom:28px; display:flex; align-items:center; gap:18px; }
+    .af-banner i { font-size:2.4rem; opacity:.85; }
+    .af-banner h2 { font-weight:700; margin:0 0 3px; font-size:1.3rem; }
+    .af-banner p { opacity:.82; margin:0; font-size:.88rem; }
+    .cards { display:grid; grid-template-columns:repeat(2,1fr); gap:22px; }
+    @media(max-width:640px){ .cards{ grid-template-columns:1fr; } }
+    .card-m { background:#fff; border-radius:16px; padding:28px 26px; border:2px solid transparent; cursor:pointer; box-shadow:0 1px 6px rgba(0,0,0,.07); transition:.18s; text-align:left; }
+    .card-m:hover { border-color:var(--blue); transform:translateY(-4px); box-shadow:0 12px 32px rgba(1,65,162,.15); }
+    .card-m .ic { width:54px; height:54px; border-radius:14px; background:linear-gradient(135deg,#e8eaf6,#c5cae9); display:flex; align-items:center; justify-content:center; font-size:1.6rem; color:var(--navy); margin-bottom:16px; }
+    .card-m:hover .ic { background:linear-gradient(135deg,var(--navy),var(--accent)); color:#fff; }
+    .card-m h5 { font-weight:700; font-size:1.02rem; margin:0 0 6px; color:#111827; }
+    .card-m p { font-size:.82rem; color:#6b7280; margin:0; line-height:1.45; }
+    .panel { background:#fff; border-radius:16px; padding:26px 28px; box-shadow:0 1px 6px rgba(0,0,0,.07); display:none; }
+    .panel h4 { font-weight:700; font-size:1.05rem; color:var(--navy); margin:0 0 4px; }
+    .panel .hint { font-size:.8rem; color:#6b7280; margin:0 0 16px; }
+    .panel textarea { width:100%; border:1.5px solid #d1d5db; border-radius:10px; padding:12px 14px; font-size:.85rem; font-family:inherit; line-height:1.55; resize:vertical; }
+    .lbl { font-weight:700; font-size:.78rem; text-transform:uppercase; letter-spacing:.5px; color:#374151; margin:14px 0 6px; }
+    .tag { background:#eef2ff; color:#3730a3; border-radius:6px; padding:1px 7px; font-size:.74rem; font-weight:700; font-family:monospace; }
+    .firma-box { border:2px dashed #cbd5e1; border-radius:12px; min-height:150px; display:flex; align-items:center; justify-content:center; background:#f8fafc; margin-bottom:16px; }
+    .firma-box img { max-width:300px; max-height:130px; }
+    .firma-ph { color:#94a3b8; font-size:.85rem; }
+    .btn-volver { background:#e5e7eb; color:#374151; border:none; border-radius:8px; padding:7px 14px; font-size:.82rem; font-weight:600; cursor:pointer; }
+  </style>
+</head>
+<body>
+<nav class="topnav">
+  <div style="display:flex;align-items:center;gap:16px">
+    <a href="/" class="topnav-brand"><img src="/img/logo.png" alt="AutoFácil"><span class="version-badge" id="versionBadge"></span></a>
+    <div class="breadcrumb-nav">
+      <a href="/">Inicio</a><span>›</span>
+      <a href="/aprobaciones">Cartas de Aprobación</a><span>›</span>
+      <span style="color:#fff;font-weight:600">Mantenedor</span>
+    </div>
+  </div>
+  <button class="btn-logout" onclick="logout()"><i class="bi bi-box-arrow-right me-1"></i>Salir</button>
+</nav>
+
+<div class="main">
+  <div class="af-banner"><i class="bi bi-pencil-square"></i><div>
+    <h2>Mantenedor de Cartas de Aprobación</h2>
+    <p>Edita el texto de las cartas y la firma de la empresa que aparece impresa</p>
+  </div></div>
+
+  <!-- Vista de cards -->
+  <div class="cards" id="cardsView">
+    <button class="card-m" onclick="abrir('texto')">
+      <div class="ic"><i class="bi bi-file-earmark-text"></i></div>
+      <h5>Texto Cartas de Aprobación</h5>
+      <p>Edita el párrafo de introducción y las consideraciones que se imprimen en cada carta.</p>
+    </button>
+    <button class="card-m" onclick="abrir('firma')">
+      <div class="ic"><i class="bi bi-vector-pen"></i></div>
+      <h5>Firma Cartas de Aprobación</h5>
+      <p>Sube la imagen de la firma de la empresa que aparece al pie de las cartas impresas.</p>
+    </button>
+  </div>
+
+  <!-- Panel TEXTO -->
+  <div class="panel" id="panelTexto">
+    <div style="display:flex;justify-content:space-between;align-items:start">
+      <div><h4>Texto Cartas de Aprobación</h4>
+      <p class="hint">Usa el token <span class="tag">{{ACREEDOR}}</span> donde quieras que se inserte automáticamente el acreedor de cada crédito.</p></div>
+      <button class="btn-volver" onclick="volver()"><i class="bi bi-arrow-left me-1"></i>Volver</button>
+    </div>
+    <div class="lbl">Introducción</div>
+    <textarea id="taIntro" rows="3"></textarea>
+    <div class="lbl">Consideraciones (una por línea)</div>
+    <textarea id="taConsid" rows="16"></textarea>
+    <div style="margin-top:16px;text-align:right">
+      <button class="btn btn-outline-secondary me-2" onclick="restaurarTexto()"><i class="bi bi-arrow-counterclockwise me-1"></i>Restaurar default</button>
+      <button class="btn btn-primary" onclick="guardarTexto()"><i class="bi bi-floppy me-1"></i>Guardar texto</button>
+    </div>
+  </div>
+
+  <!-- Panel FIRMA -->
+  <div class="panel" id="panelFirma">
+    <div style="display:flex;justify-content:space-between;align-items:start">
+      <div><h4>Firma Cartas de Aprobación</h4>
+      <p class="hint">Esta firma aparecerá en todas las cartas de aprobación impresas. Imagen PNG o JPG (máx. 500KB, fondo blanco o transparente).</p></div>
+      <button class="btn-volver" onclick="volver()"><i class="bi bi-arrow-left me-1"></i>Volver</button>
+    </div>
+    <div class="firma-box" id="firmaBox"><span class="firma-ph" id="firmaPh">Sin firma cargada</span></div>
+    <input type="file" id="firmaInput" accept="image/png,image/jpeg" style="display:none" onchange="subirFirma(this)">
+    <button class="btn btn-primary me-2" onclick="document.getElementById('firmaInput').click()"><i class="bi bi-upload me-1"></i>Subir Firma</button>
+    <button class="btn btn-danger" onclick="eliminarFirma()"><i class="bi bi-trash me-1"></i>Eliminar Firma</button>
+  </div>
+</div>
+
+<script>
+const token = sessionStorage.getItem('token');
+const yo = JSON.parse(sessionStorage.getItem('usuario')||'null');
+if (!token || !yo) location.href='/login.html';
+function logout(){ sessionStorage.clear(); location.href='/login.html'; }
+const hdr = () => ({ 'Content-Type':'application/json', 'Authorization':'Bearer '+token });
+function toast(m){ /* simple */ alert(m); }
+
+const INTRO_DEFAULT = 'Tenemos el agrado de informarle que el cliente detallado a continuación tiene aprobado un crédito de acuerdo a la información personal, demográfica, laboral y financiera entregada por él, la cual está sujeta a confirmación.';
+const CONSID_DEFAULT = [
+  '1. El Crédito se encuentra aprobado en las condiciones detalladas anteriormente y de acuerdo a la información entregada por el concesionario, por el cliente y los avales si correspondiera.',
+  '2. El crédito está sujeto a validación de los antecedentes presentados y sus respaldos necesarios para la formalización del mismo, como la firma de los documentos relacionados para la entrega del crédito.',
+  '3. AutoFácil actúa como Agente Colocador del crédito independiente del proveedor de financiamiento que cubra el producto. Por lo anterior, el Ejecutivo AutoFácil utilizará el set de documentos legales que correspondan según el producto que se esté otorgando.',
+  '4. El pago del saldo precio, seguros, gastos y otros queda supeditado al correcto y oportuno envío de toda la información necesaria para la venta, transferencia, inscripción, prenda y entrega del vehículo que permitirán formalizar la operación de Crédito.',
+  '5. De no contar con la documentación completa o si esta presenta errores de firma, impresión, formato u otro, tanto el Cliente, Ejecutivo AutoFácil y/o el Concesionario deberán corregir dicha situación enviando la documentación en forma correcta.',
+  '6. La participación del Dealer queda establecida, inicialmente y de no mediar una situación especial, que la participación se obtendrá de multiplicar el saldo precio por un factor que se determina según el plazo del financiamiento.',
+  '7. Para los casos en que se autorice un descuento en la tasa de financiamiento, la participación quedará definida de manera específica y deberá contar con la firma del representante del concesionario o dealer.',
+  '8. El Concesionario debe entregar a Ejecutivo AutoFácil la Factura y Solicitud de Primera Inscripción o Contrato de Compraventa y Transferencia del Vehículo a más tardar al quinto (5) día corrido desde la fecha de inscripción o transferencia del vehículo, respectivamente.',
+  '9. Al momento de la inscripción de la compra venta, se deberá incluir la inscripción de la limitación de dominio como prohibiciones de enajenar a favor de {{ACREEDOR}}.',
+  '10. En caso de que la entrega de la documentación del Vehículo al Ejecutivo AutoFácil ocurra con posterioridad al quinto (5) día corrido desde la fecha de Solicitud de Primera Inscripción o Transferencia del mismo, el Saldo de Precio será pagado por AutoFácil contra la inscripción efectiva de la Prenda.',
+  '11. Una vez recibido el set legal de documentos firmados en conformidad, la factura e inscripción o contrato de compraventa y transferencia del vehículo dentro de los plazos señalados anteriormente, AutoFácil procederá a pagar el saldo de precio dentro de las 96 horas hábiles siguientes.',
+  '12. El concesionario deberá inscribir una Limitación al Dominio al momento de inscribir el vehículo a nombre del cliente a favor de la entidad financiera a la que corresponda el producto de crédito otorgado.',
+  '14. Se deja expresa constancia que AutoFácil sólo es responsable por hechos o actos imputables a su responsabilidad o la de su personal, en ningún caso a actuaciones de terceros.',
+  '15. AutoFácil declara no tener responsabilidad alguna respecto a la venta del vehículo, ni de su calidad ni de la documentación, clonación u otros aspectos relacionados al bien financiado.',
+].join('\n');
+
+async function getParam(key){
+  try { const r = await fetch('/api/cartas-params/'+key, { headers: hdr() }); const j = await r.json(); return j.success ? j.data : null; }
+  catch(e){ return null; }
+}
+async function setParam(key, value){
+  const r = await fetch('/api/cartas-params/'+key, { method:'POST', headers: hdr(), body: JSON.stringify({ value: String(value) }) });
+  const j = await r.json();
+  if (!j.success) throw new Error(j.error||'Error al guardar');
+}
+
+function abrir(cual){
+  document.getElementById('cardsView').style.display='none';
+  document.getElementById('panelTexto').style.display = cual==='texto' ? 'block' : 'none';
+  document.getElementById('panelFirma').style.display = cual==='firma' ? 'block' : 'none';
+}
+function volver(){
+  document.getElementById('cardsView').style.display='grid';
+  document.getElementById('panelTexto').style.display='none';
+  document.getElementById('panelFirma').style.display='none';
+}
+
+/* ── Texto ── */
+async function cargarTexto(){
+  const intro  = await getParam('carta_intro');
+  const consid = await getParam('carta_consideraciones');
+  document.getElementById('taIntro').value  = (intro  && intro.trim())  ? intro  : INTRO_DEFAULT;
+  document.getElementById('taConsid').value = (consid && consid.trim()) ? consid : CONSID_DEFAULT;
+}
+function restaurarTexto(){
+  document.getElementById('taIntro').value  = INTRO_DEFAULT;
+  document.getElementById('taConsid').value = CONSID_DEFAULT;
+}
+async function guardarTexto(){
+  try {
+    await setParam('carta_intro', document.getElementById('taIntro').value.trim());
+    await setParam('carta_consideraciones', document.getElementById('taConsid').value.trim());
+    toast('Texto de las cartas guardado correctamente.');
+  } catch(e){ toast('Error: '+e.message); }
+}
+
+/* ── Firma ── */
+function pintarFirma(b64){
+  const box = document.getElementById('firmaBox');
+  if (b64){ box.innerHTML = '<img src="'+b64+'" alt="Firma">'; }
+  else { box.innerHTML = '<span class="firma-ph" id="firmaPh">Sin firma cargada</span>'; }
+}
+async function cargarFirma(){ pintarFirma(await getParam('firma_empresa')); }
+function subirFirma(input){
+  const file = input.files[0]; if (!file) return;
+  if (file.size > 500*1024){ toast('La imagen supera 500KB.'); input.value=''; return; }
+  const reader = new FileReader();
+  reader.onload = async () => {
+    try { await setParam('firma_empresa', reader.result); pintarFirma(reader.result); toast('Firma guardada correctamente.'); }
+    catch(e){ toast('Error: '+e.message); }
+    input.value='';
+  };
+  reader.readAsDataURL(file);
+}
+async function eliminarFirma(){
+  if (!confirm('¿Eliminar la firma de la empresa?')) return;
+  try { await setParam('firma_empresa', ''); pintarFirma(null); toast('Firma eliminada.'); }
+  catch(e){ toast('Error: '+e.message); }
+}
+
+cargarTexto();
+cargarFirma();
+</script>
+<script src="/js/app-version.js"></script>
+</body>
+</html>
