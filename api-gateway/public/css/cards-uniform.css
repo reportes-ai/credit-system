@@ -6,12 +6,24 @@
    Inyectado por app-version.js en cada página.
    ───────────────────────────────────────────────────────────── */
 
+/* Contenedor de landing a ancho completo y uniforme en todas las páginas */
+.main-content {
+  max-width: none !important;
+  width: 100% !important;
+  box-sizing: border-box !important;
+  margin-left: 0 !important;
+  margin-right: 0 !important;
+}
+
 /* 5 por fila; con 2 cards NO se estiran (las columnas vacías quedan libres) */
 .modules-grid,
 .cards-grid {
   grid-template-columns: repeat(5, 1fr) !important;
   gap: 18px !important;
   align-items: stretch !important;
+  max-width: none !important;
+  width: 100% !important;
+  justify-content: stretch !important;
 }
 @media (max-width: 1200px) { .modules-grid, .cards-grid { grid-template-columns: repeat(4, 1fr) !important; } }
 @media (max-width: 992px)  { .modules-grid, .cards-grid { grid-template-columns: repeat(3, 1fr) !important; } }
