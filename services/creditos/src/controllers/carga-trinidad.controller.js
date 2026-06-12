@@ -454,6 +454,22 @@ exports.parseCarta = async (req, res) => {
     const rut = (allText.match(/\b\d{7,8}-[\dkK]\b/) || [])[0] || null;
     const limpiaAFA = s => (s || '').replace(/\s*\(AFA\)\s*/gi, ' ').replace(/\s+/g, ' ').trim();
 
+    // Mapeo de ejecutivo Trinidad → AutoFácil (tabla trinidad_ejecutivos, con fallback)
+    const ejecutivoRaw = limpiaAFA(findVal('Ejecutivo'));
+    const DIACRIT = new RegExp('[\\u0300-\\u036f]', 'g');
+    const normEj = s => (s || '').toLowerCase()
+      .replace(/\(afa\)|\(jl\)|\(ls\)|\bgte\b/gi, '')
+      .normalize('NFD').replace(DIACRIT, '')
+      .replace(/[^a-z ]/gi, '').replace(/\s+/g, ' ').trim();
+    let ejecutivo = ejecutivoRaw;
+    try {
+      const [rows] = await pool.query('SELECT nombre_trinidad, nombre_autofacil FROM trinidad_ejecutivos');
+      const k = normEj(ejecutivoRaw);
+      const hit = rows.find(r => normEj(r.nombre_trinidad) === k);
+      if (hit) ejecutivo = hit.nombre_autofacil;
+      else { const w = (ejecutivoRaw || '').trim().split(/\s+/); ejecutivo = w.slice(0, 2).join(' ').toUpperCase(); }
+    } catch (e) { /* usa raw */ }
+
     const data = {
       nro_credito:      findVal('Nº Crédito'),
       fecha_aprobacion: dateCL(findVal('Fecha Aprobación')),
@@ -461,7 +477,8 @@ exports.parseCarta = async (req, res) => {
       rut_cliente:      rut,
       nombre_cliente:   findVal('Cliente'),
       email:            findVal('Email'),
-      ejecutivo:        limpiaAFA(findVal('Ejecutivo')),
+      ejecutivo:        ejecutivo,
+      ejecutivo_raw:    ejecutivoRaw,
       concesionario:    findVal('Concesionario'),
       sucursal:         limpiaAFA(findVal('Sucursal')),
       marca:            findVal('Marca'),
@@ -487,6 +504,21 @@ exports.parseCarta = async (req, res) => {
       comision:         numCL(findVal('Comisión')),
       fecha_curse:      dateCL(findVal('Fecha curse')),
     };
+
+    // Gastos operacionales = Impuesto de timbre + Inscripción (van sumados en la carta)
+    data.gastos_operacionales = (data.impuesto_timbre || 0) + (data.inscripcion || 0);
+
+    // Fecha primera cuota = primera fecha del cuadro de pago (la más temprana posterior al curse)
+    const curseD = data.fecha_curse ? new Date(data.fecha_curse + 'T00:00:00') : null;
+    let primera = null;
+    for (const ds of (allText.match(/\d{2}\/\d{2}\/\d{4}/g) || [])) {
+      const m = ds.match(/(\d{2})\/(\d{2})\/(\d{4})/);
+      const d = new Date(+m[3], +m[2] - 1, +m[1]);
+      if (curseD && d > curseD && (!primera || d < primera)) primera = d;
+    }
+    data.fecha_primera_cuota = primera
+      ? `${primera.getFullYear()}-${String(primera.getMonth() + 1).padStart(2, '0')}-${String(primera.getDate()).padStart(2, '0')}`
+      : null;
 
     return res.json({ success: true, data, error: null });
   } catch (e) {

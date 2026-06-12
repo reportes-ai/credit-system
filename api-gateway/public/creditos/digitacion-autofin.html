@@ -89,7 +89,7 @@
   <div class="topnav-left">
     <a href="/" class="topnav-brand">
       <img src="/img/logo.png" alt="AutoFácil">
-      <span class="version-badge">v2.2</span>
+      <span class="version-badge">v2.3</span>
     </a>
     <div class="breadcrumb-nav">
       <a href="/">Inicio</a><span class="sep">›</span>
@@ -832,17 +832,20 @@
       calcularSaldo();
 
       // Financiamiento
-      setPeso('fImpuesto', d.impuesto_timbre);
+      // Gastos operacionales = Impuesto timbre + Inscripción (sumados). El campo Impuesto queda en 0.
+      setPeso('fGastos', d.gastos_operacionales);
+      document.getElementById('fImpuesto').value = '';
       setPeso('fSegRdh', d.seguro_rdh); setPeso('fSegCes', d.seguro_cesantia); setPeso('fSegRep', d.reparaciones);
       if (d.cuotas) document.getElementById('fPlazo').value = d.cuotas;
       if (d.total_pagare != null) document.getElementById('fMontoFin').value = '$' + Number(d.total_pagare).toLocaleString('es-CL');
       if (d.tasa != null) document.getElementById('fTasCliReal').value = d.tasa;
       if (d.fecha_curse) document.getElementById('fFechaOtorgado').value = d.fecha_curse;
+      if (d.fecha_primera_cuota) document.getElementById('fFechaCuota').value = d.fecha_primera_cuota;
       calcularMayorMenor(); calcularCuota();
 
       // Comentario de trazabilidad
       const obs = `Cargado desde Carta de Aprobación Trinidad N° ${d.nro_credito || '—'}` +
-        (d.inscripcion ? ` · Inscripción $${Number(d.inscripcion).toLocaleString('es-CL')}` : '');
+        ` · Gastos op. = Timbre $${Number(d.impuesto_timbre||0).toLocaleString('es-CL')} + Inscripción $${Number(d.inscripcion||0).toLocaleString('es-CL')}`;
       const ta = document.getElementById('fComentarios');
       ta.value = ta.value ? ta.value + '\n' + obs : obs;
 
