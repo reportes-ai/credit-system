@@ -329,6 +329,12 @@ app.get(['/postventa/mantenedores', '/postventa/mantenedores/'], (req, res) =>
   res.sendFile(path.join(__dirname, '../public/postventa/mantenedores/index.html')));
 app.get(['/postventa/saldos-a-pagar', '/postventa/saldos-a-pagar/'], (req, res) =>
   res.sendFile(path.join(__dirname, '../public/postventa/saldos-a-pagar/index.html')));
+app.get(['/postventa/fundantes-pendientes', '/postventa/fundantes-pendientes/'], (req, res) =>
+  res.sendFile(path.join(__dirname, '../public/postventa/fundantes-pendientes/index.html')));
+app.get(['/postventa/consulta-saldos', '/postventa/consulta-saldos/'], (req, res) =>
+  res.sendFile(path.join(__dirname, '../public/postventa/consulta-saldos/index.html')));
+app.get(['/postventa/consulta-factura', '/postventa/consulta-factura/'], (req, res) =>
+  res.sendFile(path.join(__dirname, '../public/postventa/consulta-factura/index.html')));
 
 app.get(['/edicion-creditos', '/edicion-creditos/'], (req, res) =>
   res.sendFile(path.join(__dirname, '../public/edicion-creditos/index.html')));
