@@ -2,9 +2,18 @@
    AutoFácil — Versión global de la aplicación
    Editar SOLO este archivo para cambiar la versión
    ───────────────────────────────────────────── */
-const APP_VERSION = 'v11.9';
+const APP_VERSION = 'v12.0';
 
 document.addEventListener('DOMContentLoaded', () => {
+
+  /* 0 ── Cards de navegación uniformes en toda la app (CSS scopeado) */
+  if (!document.getElementById('af-cards-uniform')) {
+    const lk = document.createElement('link');
+    lk.id = 'af-cards-uniform';
+    lk.rel = 'stylesheet';
+    lk.href = '/css/cards-uniform.css';
+    document.head.appendChild(lk);
+  }
 
   /* 1 ── Versión en todos los badges de la barra de navegación */
   document.querySelectorAll('.version-badge, #versionBadge').forEach(el => {

@@ -1,0 +1,56 @@
+/* ─────────────────────────────────────────────────────────────
+   Cards de navegación uniformes en TODA la aplicación.
+   Scopeado a las grillas de módulos (.modules-grid / .cards-grid)
+   para NO afectar grillas de tablas, formularios ni la excepción
+   de Cobranza (.module-grid con stats propios).
+   Inyectado por app-version.js en cada página.
+   ───────────────────────────────────────────────────────────── */
+
+/* 5 por fila; con 2 cards NO se estiran (las columnas vacías quedan libres) */
+.modules-grid,
+.cards-grid {
+  grid-template-columns: repeat(5, 1fr) !important;
+  gap: 18px !important;
+  align-items: stretch !important;
+}
+@media (max-width: 1200px) { .modules-grid, .cards-grid { grid-template-columns: repeat(4, 1fr) !important; } }
+@media (max-width: 992px)  { .modules-grid, .cards-grid { grid-template-columns: repeat(3, 1fr) !important; } }
+@media (max-width: 700px)  { .modules-grid, .cards-grid { grid-template-columns: repeat(2, 1fr) !important; } }
+@media (max-width: 480px)  { .modules-grid, .cards-grid { grid-template-columns: 1fr !important; } }
+
+/* Card: tamaño uniforme, contenido en columna, botón anclado abajo */
+.modules-grid > .module-card,
+.cards-grid  > .module-card {
+  display: flex !important;
+  flex-direction: column !important;
+  min-height: 215px !important;
+  height: 100% !important;
+  box-sizing: border-box !important;
+}
+
+/* Título: máx 2 líneas */
+.modules-grid > .module-card h5,
+.modules-grid > .module-card h6,
+.cards-grid  > .module-card h5,
+.cards-grid  > .module-card h6 {
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+/* Descripción: máx 3 líneas */
+.modules-grid > .module-card p,
+.cards-grid  > .module-card p {
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+/* Botón "Acceder": siempre pegado al fondo, alineado a la izquierda */
+.modules-grid > .module-card .btn-acceder,
+.cards-grid  > .module-card .btn-acceder {
+  margin-top: auto !important;
+  align-self: flex-start;
+}
