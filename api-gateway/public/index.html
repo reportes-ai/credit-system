@@ -478,7 +478,7 @@
       try {
         // Carga módulos y orden guardado en paralelo
         const [resp, respOrden, respPlacement] = await Promise.all([
-          fetch('/api/auth/mis-permisos', { headers: H }),
+          fetch(('/api/auth/mis-permisos?_='+Date.now()), { headers: H }),
           fetch('/api/config/ui/dashboard',  { headers: H }),
           fetch('/api/config/ui/placement_v2', { headers: H }),
         ]);

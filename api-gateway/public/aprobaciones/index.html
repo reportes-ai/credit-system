@@ -698,7 +698,7 @@ function restaurarBorrador(){
 
 async function cargarPermisos(){
   try {
-    const r = await fetch('/api/auth/mis-permisos', { headers: hdr() });
+    const r = await fetch(('/api/auth/mis-permisos?_='+Date.now()), { headers: hdr() });
     const j = await r.json();
     (j.funcionalidades||[]).forEach(c => PERMISOS.add(c));
   } catch(e) { console.error('permisos', e); }

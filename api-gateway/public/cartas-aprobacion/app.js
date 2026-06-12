@@ -2712,7 +2712,7 @@ async function doLogin(){
 
   // Validar token contra el servidor y cargar funcionalidades habilitadas
   try {
-    const r = await fetch('/api/auth/mis-permisos', {
+    const r = await fetch(('/api/auth/mis-permisos?_='+Date.now()), {
       headers:{ 'Authorization':'Bearer '+tok }
     });
     if(!r.ok){ location.href='/login.html'; return; }

@@ -248,7 +248,7 @@
       let dbList = [], placement = {};
       try {
         const [rM, rP] = await Promise.all([
-          fetch('/api/auth/mis-permisos', { headers: H }).then(r => r.json()),
+          fetch(('/api/auth/mis-permisos?_='+Date.now()), { headers: H }).then(r => r.json()),
           loadPlacementConfig(H),
         ]);
         if (rM.success) dbList = rM.data;
@@ -345,7 +345,7 @@
 
       let dbList = [];
       try {
-        const r = await fetch('/api/auth/mis-permisos', { headers: H }).then(r => r.json());
+        const r = await fetch(('/api/auth/mis-permisos?_='+Date.now()), { headers: H }).then(r => r.json());
         if (r.success) dbList = r.data;
       } catch {}
 

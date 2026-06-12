@@ -153,7 +153,7 @@
         const [rOrden, rPlacement, rMods] = await Promise.all([
           fetch(`/api/config/ui/${CONFIG_KEY}`, { headers: H }),
           fetch('/api/config/ui/placement_v2', { headers: H }),
-          fetch('/api/auth/mis-permisos', { headers: H }),
+          fetch(('/api/auth/mis-permisos?_='+Date.now()), { headers: H }),
         ]);
         const jOrden = await rOrden.json(); const jP = await rPlacement.json(); const jM = await rMods.json();
         if (jOrden.success && Array.isArray(jOrden.data)) orden = jOrden.data;

@@ -147,7 +147,7 @@
         const [rO, rP, rM] = await Promise.all([
           fetch(`/api/config/ui/${CONFIG_KEY}`, { headers: H }),
           fetch('/api/config/ui/placement_v2', { headers: H }),
-          fetch('/api/auth/mis-permisos', { headers: H }),
+          fetch(('/api/auth/mis-permisos?_='+Date.now()), { headers: H }),
         ]);
         const jO = await rO.json(); const jP = await rP.json(); const jM = await rM.json();
         if (jO.success && Array.isArray(jO.data)) orden = jO.data;

@@ -113,7 +113,7 @@
   (async () => {
     let funcs = new Set();
     try {
-      const r = await fetch('/api/auth/mis-permisos', { headers: { Authorization: 'Bearer ' + token } });
+      const r = await fetch('/api/auth/mis-permisos?_=' + Date.now(), { cache: 'no-store', headers: { Authorization: 'Bearer ' + token } });
       const j = await r.json();
       (j.funcionalidades || []).forEach(c => funcs.add(c));
     } catch (e) {}

@@ -121,7 +121,7 @@
       try {
         const [rP, rM] = await Promise.all([
           fetch('/api/config/ui/placement_v2', { headers: { Authorization:'Bearer '+token } }),
-          fetch('/api/auth/mis-permisos',       { headers: { Authorization:'Bearer '+token } }),
+          fetch(('/api/auth/mis-permisos?_='+Date.now()),       { headers: { Authorization:'Bearer '+token } }),
         ]);
         const jP = await rP.json(); const jM = await rM.json();
         if (jP.success && jP.data) placement = jP.data;
