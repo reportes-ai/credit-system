@@ -93,31 +93,26 @@
     .amort-table tr:nth-child(even) { background:#f9fafb; }
     .amort-table tr:last-child { font-weight:700; background:#f0f4f8; }
 
-    /* Encabezado con logo solo para impresión (se repite en cada hoja) */
-    .print-header { display:none; }
+    /* Logo del documento (arriba a la derecha) — solo impresión */
+    .doc-logo { display:none; }
     /* print */
     @media print {
-      @page { size: letter; margin: 1.8cm 1.4cm 1.4cm; }
+      @page { size: letter; margin: 1.4cm; }
       body { background:#fff !important; }
       .topnav, .action-bar, .doc-tabs, .no-print, .emission-banner { display:none !important; }
       .main-content { padding:0 !important; max-width:100% !important; }
       .doc-viewer { box-shadow:none !important; border-radius:0 !important; }
       .doc-panel { display:none !important; }
       .doc-panel.print-target { display:block !important; }
-      .doc-wrap { padding:20px 32px !important; }
-      /* Logo fijo arriba a la derecha → se imprime en TODAS las páginas */
-      .print-header {
-        display:block !important;
-        position:fixed; top:0.3cm; right:0.4cm;
-      }
-      .print-header img { height:26px; }
+      .doc-panel.print-target ~ .doc-panel.print-target { page-break-before:always; }
+      .doc-wrap { padding:0 !important; }
+      /* Logo arriba a la derecha, fuera de la tabla */
+      .doc-logo { display:block !important; text-align:right; margin:0 0 10px; }
+      .doc-logo img { height:30px; }
     }
   </style>
 </head>
 <body>
-  <div class="print-header">
-    <img src="/img/logo-autofacil.png" alt="AutoFácil" onerror="this.src='/img/logo.png'">
-  </div>
   <nav class="topnav">
     <div class="topnav-left">
       <a href="/" class="topnav-brand">
@@ -401,7 +396,7 @@
         panel.className = 'doc-panel' + (i === 0 ? ' active' : '');
         panel.id = 'panel-' + tpl.codigo;
         const rendered = substituir(tpl.contenido, vars);
-        panel.innerHTML = `<div class="doc-wrap">${rendered}</div>`;
+        panel.innerHTML = `<div class="doc-wrap"><div class="doc-logo"><img src="/img/logo-autofacil.png" alt="AutoFácil" onerror="this.src='/img/logo.png'"></div>${rendered}</div>`;
         viewerEl.appendChild(panel);
       });
 
