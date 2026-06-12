@@ -2,7 +2,7 @@
    AutoFácil — Versión global de la aplicación
    Editar SOLO este archivo para cambiar la versión
    ───────────────────────────────────────────── */
-const APP_VERSION = 'v12.3';
+const APP_VERSION = 'v12.4';
 
 document.addEventListener('DOMContentLoaded', () => {
 
@@ -531,4 +531,95 @@ document.addEventListener('DOMContentLoaded', () => {
     if (Notification.permission === 'granted') suscribir();
     else if (Notification.permission === 'default') btnPush.style.display = '';
   }
+});
+
+/* ═══════════════════════════════════════════════════════════════
+   ❔ AYUDA CONTEXTUAL — botón "?" flotante en cada página.
+   Lee el contenido desde /api/ayuda según la ruta actual. Solo
+   aparece si esa página tiene ayuda cargada en BD (editable, sin
+   hardcode). El contenido vive en la tabla ayuda_paginas.
+   ═══════════════════════════════════════════════════════════════ */
+document.addEventListener('DOMContentLoaded', async () => {
+  const token = sessionStorage.getItem('token');
+  if (!token) return;                               // login u otras sin sesión
+  if (document.getElementById('afHelpBtn')) return; // evitar duplicados
+
+  let data = null;
+  try {
+    const r = await fetch('/api/ayuda?ruta=' + encodeURIComponent(location.pathname), {
+      headers: { Authorization: 'Bearer ' + token }
+    });
+    const j = await r.json();
+    if (j.success && j.data) data = j.data;
+  } catch (e) { return; }
+  if (!data) return;                                // sin ayuda para esta página → no mostrar botón
+
+  const esc = s => String(s ?? '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+
+  // Estilos
+  const st = document.createElement('style');
+  st.textContent = `
+    #afHelpBtn { position:fixed; right:22px; bottom:22px; z-index:9600; width:50px; height:50px; border-radius:50%;
+      background:linear-gradient(135deg,#0141A2,#0255c5); color:#fff; border:none; cursor:pointer;
+      box-shadow:0 6px 20px rgba(1,65,162,.4); font-size:1.5rem; display:flex; align-items:center; justify-content:center;
+      transition:transform .15s; }
+    #afHelpBtn:hover { transform:scale(1.08); }
+    #afHelpOverlay { position:fixed; inset:0; background:rgba(0,0,0,.35); z-index:9700; display:none; }
+    #afHelpOverlay.show { display:block; }
+    #afHelpPanel { position:fixed; top:0; right:0; height:100%; width:400px; max-width:92vw; background:#fff; z-index:9800;
+      box-shadow:-8px 0 32px rgba(0,0,0,.2); transform:translateX(100%); transition:transform .25s ease; overflow-y:auto;
+      font-family:'Segoe UI',system-ui,sans-serif; }
+    #afHelpPanel.show { transform:translateX(0); }
+    .afh-head { background:linear-gradient(135deg,#012d70,#0141A2 60%,#0255c5); color:#fff; padding:20px 22px; display:flex; align-items:center; gap:12px; position:sticky; top:0; }
+    .afh-head i { font-size:1.7rem; }
+    .afh-head h3 { margin:0; font-weight:800; font-size:1.15rem; }
+    .afh-head .afh-x { margin-left:auto; background:rgba(255,255,255,.15); border:none; color:#fff; width:30px; height:30px; border-radius:8px; cursor:pointer; font-size:1rem; }
+    .afh-body { padding:18px 22px 40px; }
+    .afh-sec { margin-bottom:22px; }
+    .afh-sec h4 { font-size:.78rem; text-transform:uppercase; letter-spacing:.5px; color:#0141A2; font-weight:800; margin:0 0 8px; display:flex; align-items:center; gap:7px; }
+    .afh-sec p { font-size:.88rem; color:#374151; line-height:1.55; margin:0; }
+    .afh-step { display:flex; gap:11px; margin-bottom:13px; }
+    .afh-step .n { flex:0 0 24px; height:24px; border-radius:50%; background:#0141A2; color:#fff; font-weight:800; font-size:.78rem; display:flex; align-items:center; justify-content:center; }
+    .afh-step .tx b { display:block; font-size:.86rem; color:#0f172a; margin-bottom:2px; }
+    .afh-step .tx span { font-size:.83rem; color:#475569; line-height:1.5; }
+    .afh-sub { border:1px solid #eef2f7; border-radius:10px; padding:10px 12px; margin-bottom:8px; }
+    .afh-sub b { font-size:.84rem; color:#0f172a; }
+    .afh-sub span { display:block; font-size:.8rem; color:#64748b; margin-top:2px; line-height:1.45; }
+    .afh-next { background:#eff6ff; border-left:4px solid #0141A2; border-radius:8px; padding:12px 14px; font-size:.85rem; color:#1e3a5f; line-height:1.55; }
+  `;
+  document.head.appendChild(st);
+
+  // Construir contenido
+  const pasosHTML = (data.pasos||[]).map((p,i) =>
+    `<div class="afh-step"><div class="n">${i+1}</div><div class="tx"><b>${esc(p.titulo)}</b><span>${esc(p.detalle)}</span></div></div>`).join('');
+  const subsHTML = (data.submodulos||[]).map(s =>
+    `<div class="afh-sub"><b>${esc(s.nombre)}</b><span>${esc(s.para_que)}</span></div>`).join('');
+
+  const panel = document.createElement('div');
+  panel.id = 'afHelpPanel';
+  panel.innerHTML = `
+    <div class="afh-head"><i class="bi ${esc(data.icono||'bi-question-circle')}"></i>
+      <h3>${esc(data.titulo)}</h3>
+      <button class="afh-x" title="Cerrar">✕</button></div>
+    <div class="afh-body">
+      ${data.descripcion ? `<div class="afh-sec"><h4><i class="bi bi-info-circle"></i> Para qué sirve</h4><p>${esc(data.descripcion)}</p></div>` : ''}
+      ${pasosHTML ? `<div class="afh-sec"><h4><i class="bi bi-list-check"></i> Cómo se usa</h4>${pasosHTML}</div>` : ''}
+      ${subsHTML ? `<div class="afh-sec"><h4><i class="bi bi-grid"></i> Submódulos</h4>${subsHTML}</div>` : ''}
+      ${data.siguiente ? `<div class="afh-sec"><h4><i class="bi bi-signpost-2"></i> ¿Y después?</h4><div class="afh-next">${esc(data.siguiente)}</div></div>` : ''}
+    </div>`;
+
+  const overlay = document.createElement('div'); overlay.id = 'afHelpOverlay';
+  const btn = document.createElement('button'); btn.id = 'afHelpBtn'; btn.title = 'Ayuda de esta página';
+  btn.innerHTML = '<i class="bi bi-question-lg"></i>';
+
+  document.body.appendChild(overlay);
+  document.body.appendChild(panel);
+  document.body.appendChild(btn);
+
+  const open = () => { overlay.classList.add('show'); panel.classList.add('show'); };
+  const close = () => { overlay.classList.remove('show'); panel.classList.remove('show'); };
+  btn.addEventListener('click', open);
+  overlay.addEventListener('click', close);
+  panel.querySelector('.afh-x').addEventListener('click', close);
+  document.addEventListener('keydown', e => { if (e.key === 'Escape') close(); });
 });

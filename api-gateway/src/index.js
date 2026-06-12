@@ -115,6 +115,9 @@ app.use('/api/cartas-params',     require('../../services/cartas/src/routes/para
 // Dashboard analytics
 app.use('/api/dashboard', require('../../services/dashboard/src/routes/dashboard.routes'));
 
+// Ayuda contextual (botón "?")
+app.use('/api/ayuda', require('../../services/ayuda/src/routes/ayuda.routes'));
+
 // CRM
 app.use('/api/crm', require('../../services/crm/src/routes/gestiones.routes'));
 
