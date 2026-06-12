@@ -275,7 +275,8 @@ async function _totales(d1, d2) {
     const [op] = await pool.query(`SELECT DISTINCT id_carta FROM carta_eventos WHERE accion='abrir' AND id_carta IN (?)`, [pendIds]);
     ignoradas = op.length;
   }
-  const pendientes = Math.max(0, ingresadas - aprobadas - rechazadas - ignoradas);
+  // Pendientes parte del 100% (aprob+rech+pend). Ignoradas es informativo (subconjunto de pendientes: las que alguien abrió).
+  const pendientes = Math.max(0, ingresadas - aprobadas - rechazadas);
   // analistas: promedio diario de conectados 10–19h + personas distintas
   const [analistas] = await pool.query(
     `SELECT u.id_usuario FROM usuarios u JOIN perfiles p ON u.id_perfil = p.id_perfil WHERE p.nombre IN (?)`, [PERFILES_ANALISTA]);

@@ -750,12 +750,16 @@ function initDesempeno(){
 }
 function filaResumen(r, label){
   const pct = v => r.ingresadas ? Math.round(v / r.ingresadas * 100) : 0;
+  // Aprobadas + Rechazadas + Pendientes = 100% de Ingresadas
   const cel = (val,color) => `<td style="text-align:center;color:${color};font-weight:700">${val} <span style="font-weight:400;color:#94a3b8;font-size:.76rem">(${pct(val)}%)</span></td>`;
+  // Ignoradas es informativo: subconjunto de las pendientes (% sobre pendientes)
+  const pctPend = r.pendientes ? Math.round(r.ignoradas / r.pendientes * 100) : 0;
+  const celIgn = `<td style="text-align:center;color:#a16207;font-weight:700">${r.ignoradas} <span style="font-weight:400;color:#94a3b8;font-size:.76rem">(${pctPend}% de pend)</span></td>`;
   return `<tr style="background:#eef2f7">
     <td style="font-size:.8rem;color:#0f172a;font-weight:700">${label}</td>
     <td style="text-align:center;color:#0141A2;font-weight:700">${r.prom_analistas}<br><span style="font-weight:400;font-size:.7rem;color:#94a3b8">${r.personas} pers.</span></td>
     <td style="text-align:center;font-weight:700">${r.ingresadas}</td>
-    ${cel(r.aprobadas,'#15803d')}${cel(r.rechazadas,'#b91c1c')}${cel(r.ignoradas,'#a16207')}${cel(r.pendientes,'#1d4ed8')}
+    ${cel(r.aprobadas,'#15803d')}${cel(r.rechazadas,'#b91c1c')}${celIgn}${cel(r.pendientes,'#1d4ed8')}
   </tr>`;
 }
 async function cargarResumen(desde, hasta){
