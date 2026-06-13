@@ -10,6 +10,8 @@ router.get('/config',       verifyToken, c.getConfig);
 router.put('/config/:clave',verifyToken, requireFunc('postventa_mantenedores'), c.setConfig);
 router.get('/perfiles-lista', verifyToken, c.getPerfiles);
 router.get('/atribuciones',   verifyToken, c.getAtribuciones);
+router.get('/alertas-config', verifyToken, c.getAlertasConfig);
+router.put('/alertas-config', verifyToken, requireFunc('postventa_mantenedores'), c.setAlertasConfig);
 router.get('/orden-pago',             verifyToken, c.getOrdenPago);
 router.get('/orden-pago/:id/correlativo', verifyToken, c.correlativoOrden);
 router.post('/orden-pago/emitir',     verifyToken, requireFunc('pv_orden_emitir'), c.emitirOrdenPago);

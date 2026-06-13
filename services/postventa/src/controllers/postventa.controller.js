@@ -112,6 +112,89 @@ const pool = require('../../../../shared/config/database');
 
 const loginDe = u => (u?.nombre ? (u.nombre + ' ' + (u.apellido || '')).trim() : u?.email) || 'Sistema';
 
+/* ── Alertas de proceso Saldo Precio (paramétricas, event-driven) ──────────────
+   Cada transición del workflow genera una alerta (campana) a destinatarios
+   configurables por evento: perfiles + el ejecutivo de la operación + usuarios extra. */
+const EVENTOS_SALDO = [
+  { evento: 'fondos_recibidos', titulo: 'Fondos recibidos — emitir Orden de Pago',
+    mensaje: 'La operación {op} tiene FONDOS RECIBIDOS. Emite la Orden de Pago.', href: '/postventa/orden-pago/' },
+  { evento: 'orden_emitida', titulo: 'Orden de Pago emitida — cargar montos disponibles',
+    mensaje: 'Se emitió la Orden de Pago de {op}. Carga los montos disponibles para pago.', href: '/postventa/saldos-a-pagar/' },
+  { evento: 'fondos_cargados', titulo: 'Montos disponibles cargados',
+    mensaje: 'Tesorería cargó los fondos disponibles para pago de saldos precio. Define qué pagar.', href: '/postventa/saldos-a-pagar/' },
+  { evento: 'enviado_pago', titulo: 'Operaciones enviadas a pago — confirmar pago',
+    mensaje: 'Se enviaron operaciones a pago. Confirma el pago en Saldos Precios a Pagar.', href: '/postventa/saldos-a-pagar/' },
+  { evento: 'pago_realizado', titulo: 'Saldo precio pagado',
+    mensaje: 'Se registró el pago del saldo precio de {op}.', href: '/postventa/seguimiento/' },
+];
+(async () => {
+  try {
+    await pool.query(`CREATE TABLE IF NOT EXISTS postventa_alertas_config (
+      evento            VARCHAR(40) PRIMARY KEY,
+      perfiles          TEXT,
+      incluir_ejecutivo TINYINT(1) NOT NULL DEFAULT 0,
+      usuarios_extra    TEXT,
+      activo            TINYINT(1) NOT NULL DEFAULT 1
+    )`);
+    for (const e of EVENTOS_SALDO)
+      await pool.query(
+        `INSERT IGNORE INTO postventa_alertas_config (evento, perfiles, incluir_ejecutivo, usuarios_extra, activo)
+         VALUES (?,?,?,?,1)`,
+        [e.evento, 'Administrador', e.evento === 'pago_realizado' ? 1 : 0, '']);
+    console.log('[postventa] alertas_config OK');
+  } catch (e) { console.error('[postventa alertas migration]', e.message); }
+})();
+
+// Resuelve destinatarios y crea las notificaciones (campana) de un evento.
+async function notificarEventoSaldo(evento, { op, id_seguimiento, ejecutivo, claveExtra } = {}) {
+  try {
+    const def = EVENTOS_SALDO.find(e => e.evento === evento);
+    if (!def) return;
+    const [[cfg]] = await pool.query('SELECT * FROM postventa_alertas_config WHERE evento=?', [evento]);
+    if (!cfg || !cfg.activo) return;
+
+    const ids = new Set();
+    // Perfiles
+    const perfiles = String(cfg.perfiles || '').split(',').map(s => s.trim()).filter(Boolean);
+    if (perfiles.length) {
+      const [us] = await pool.query(
+        `SELECT u.id_usuario FROM usuarios u JOIN perfiles p ON p.id_perfil = u.id_perfil
+         WHERE p.nombre IN (?) AND (u.estado IS NULL OR u.estado <> 'inactivo')`, [perfiles]);
+      us.forEach(u => ids.add(u.id_usuario));
+    }
+    // Ejecutivo de la operación (vía usuario_ejecutivos)
+    if (cfg.incluir_ejecutivo && ejecutivo) {
+      try {
+        const [us] = await pool.query('SELECT id_usuario FROM usuario_ejecutivos WHERE ejecutivo = ?', [ejecutivo]);
+        us.forEach(u => ids.add(u.id_usuario));
+      } catch (_) {}
+    }
+    // Usuarios extra (CSV de id_usuario)
+    String(cfg.usuarios_extra || '').split(',').map(s => parseInt(s.trim())).filter(Boolean).forEach(id => ids.add(id));
+
+    if (!ids.size) return;
+    const mensaje = def.mensaje.replace('{op}', op != null ? ('N° ' + op) : 'una operación');
+    const clave = `pvalert:${evento}:${claveExtra || id_seguimiento || Date.now()}`;
+    for (const uid of ids) {
+      const [[ex]] = await pool.query(
+        'SELECT 1 FROM notificaciones WHERE id_usuario=? AND clave=? AND leida=0 LIMIT 1', [uid, clave]);
+      if (ex) continue;
+      await pool.query(
+        `INSERT INTO notificaciones (id_usuario, tipo, titulo, mensaje, href, clave, prioridad, sonar, son_cada, son_max, son_tipo)
+         VALUES (?,?,?,?,?,?,?,?,?,?,?)`,
+        [uid, 'alerta', def.titulo, mensaje, def.href, clave, 'normal', 1, 30, 5, 'campana']);
+    }
+  } catch (e) { console.error('[notificarEventoSaldo]', evento, e.message); }
+}
+
+// Lee num_op y ejecutivo de un seguimiento (para el contexto de la alerta)
+async function ctxSeguimiento(id) {
+  try {
+    const [[r]] = await pool.query('SELECT num_op, ejecutivo FROM postventa_seguimiento WHERE id=?', [id]);
+    return r || {};
+  } catch (_) { return {}; }
+}
+
 /* ── POST /api/postventa/sync — incluye los otorgados nuevos ─────── */
 const sync = async (req, res) => {
   try {
@@ -242,6 +325,11 @@ const setEtapa = async (req, res) => {
         'DELETE FROM postventa_etapas WHERE id_seguimiento = ? AND track = ? AND etapa = ?',
         [req.params.id, track, etapa]);
     }
+    // Alerta event-driven: al marcar FONDOS RECIBIDOS avisar para emitir Orden de Pago
+    if (marcar && track === 'SALDO' && etapa === 'FONDOS RECIBIDOS') {
+      const c = await ctxSeguimiento(req.params.id);
+      await notificarEventoSaldo('fondos_recibidos', { op: c.num_op, id_seguimiento: Number(req.params.id) });
+    }
     res.json({ success: true, data: { id: Number(req.params.id), etapa, marcado: !!marcar, usuario }, error: null });
   } catch (e) {
     console.error('[postventa etapa]', e.message);
@@ -284,6 +372,42 @@ const getAtribuciones = async (req, res) => {
 /* ── Fondos disponibles del día (compartido): Finanzas/Tesorería digita,
    Comercial decide qué pagar. Se guarda en postventa_config; el front valida
    que fecha_dia sea hoy (se "borra" al cambiar de día sin tocar BD). ── */
+// ── Config de alertas del proceso Saldo Precio (mantenedor) ──
+const getAlertasConfig = async (req, res) => {
+  try {
+    const [rows] = await pool.query('SELECT * FROM postventa_alertas_config');
+    const map = {}; rows.forEach(r => { map[r.evento] = r; });
+    // Devuelve en el orden del workflow, con título/descripción del evento
+    const data = EVENTOS_SALDO.map(e => {
+      const c = map[e.evento] || {};
+      return { evento: e.evento, titulo: e.titulo,
+        perfiles: c.perfiles || '', incluir_ejecutivo: !!c.incluir_ejecutivo,
+        usuarios_extra: c.usuarios_extra || '', activo: c.activo === undefined ? 1 : c.activo };
+    });
+    res.json({ success: true, data, error: null });
+  } catch (e) {
+    res.status(500).json({ success: false, data: null, error: 'Error interno del servidor' });
+  }
+};
+const setAlertasConfig = async (req, res) => {
+  try {
+    const lista = Array.isArray(req.body?.config) ? req.body.config : [];
+    for (const c of lista) {
+      if (!EVENTOS_SALDO.find(e => e.evento === c.evento)) continue;
+      await pool.query(
+        `INSERT INTO postventa_alertas_config (evento, perfiles, incluir_ejecutivo, usuarios_extra, activo)
+         VALUES (?,?,?,?,?)
+         ON DUPLICATE KEY UPDATE perfiles=VALUES(perfiles), incluir_ejecutivo=VALUES(incluir_ejecutivo),
+           usuarios_extra=VALUES(usuarios_extra), activo=VALUES(activo)`,
+        [c.evento, String(c.perfiles || ''), c.incluir_ejecutivo ? 1 : 0,
+         String(c.usuarios_extra || ''), c.activo ? 1 : 0]);
+    }
+    res.json({ success: true, data: { actualizados: lista.length }, error: null });
+  } catch (e) {
+    res.status(500).json({ success: false, data: null, error: 'Error interno del servidor' });
+  }
+};
+
 const getFondos = async (req, res) => {
   try {
     const [[row]] = await pool.query("SELECT valor FROM postventa_config WHERE clave='fondos_disp'");
@@ -301,6 +425,9 @@ const setFondos = async (req, res) => {
     await pool.query(
       `INSERT INTO postventa_config (clave, valor) VALUES ('fondos_disp', ?)
        ON DUPLICATE KEY UPDATE valor = VALUES(valor)`, [JSON.stringify(valor)]);
+    // Alerta: montos cargados → Gerente Comercial decide qué pagar (una vez al día)
+    if (valor.monto > 0)
+      await notificarEventoSaldo('fondos_cargados', { claveExtra: valor.fecha_dia || new Date().toISOString().slice(0, 10) });
     res.json({ success: true, data: valor, error: null });
   } catch (e) {
     res.status(500).json({ success: false, data: null, error: 'Error interno del servidor' });
@@ -443,6 +570,11 @@ const emitirOrdenPago = async (req, res) => {
     }
     await pool.query(
       `INSERT IGNORE INTO postventa_etapas (id_seguimiento, track, etapa, usuario) VALUES ?`, [vals]);
+    // Alerta: orden emitida → Tesorería carga montos disponibles
+    for (const id of ids) {
+      const c = await ctxSeguimiento(id);
+      await notificarEventoSaldo('orden_emitida', { op: c.num_op, id_seguimiento: id });
+    }
     res.json({ success: true, data: { emitidas: ids.length }, error: null });
   } catch (e) {
     console.error('[postventa emitirOrdenPago]', e.message);
@@ -467,6 +599,11 @@ const enviarAPago = async (req, res) => {
     }
     await pool.query(
       `INSERT IGNORE INTO postventa_etapas (id_seguimiento, track, etapa, usuario) VALUES ?`, [vals]);
+    // Alerta: enviado a pago → Tesorería confirma el pago
+    for (const id of ids) {
+      const c = await ctxSeguimiento(id);
+      await notificarEventoSaldo('enviado_pago', { op: c.num_op, id_seguimiento: id });
+    }
     res.json({ success: true, data: { enviadas: ids.length }, error: null });
   } catch (e) {
     console.error('[postventa enviarAPago]', e.message);
@@ -490,6 +627,11 @@ const pagarSaldos = async (req, res) => {
       for (const e of etapas) vals.push([id, 'SALDO', e, usuario]);
     await pool.query(
       `INSERT IGNORE INTO postventa_etapas (id_seguimiento, track, etapa, usuario) VALUES ?`, [vals]);
+    // Alerta: pago realizado → Gerente/Jefe Comercial, ejecutivo de la operación y extra
+    for (const id of ids) {
+      const c = await ctxSeguimiento(id);
+      await notificarEventoSaldo('pago_realizado', { op: c.num_op, id_seguimiento: id, ejecutivo: c.ejecutivo });
+    }
     res.json({ success: true, data: { pagados: ids.length }, error: null });
   } catch (e) {
     console.error('[postventa pagarSaldos]', e.message);
@@ -579,4 +721,4 @@ const marcarHistorico = async (req, res) => {
   }
 };
 
-module.exports = { sync, getAll, setEtapa, getConfig, setConfig, marcarHistorico, getPerfiles, getSaldosAPagar, enviarAPago, pagarSaldos, getOrdenPago, correlativoOrden, emitirOrdenPago, desmarcarSaldos, getAtribuciones, getFondos, setFondos };
+module.exports = { sync, getAll, setEtapa, getConfig, setConfig, marcarHistorico, getPerfiles, getSaldosAPagar, enviarAPago, pagarSaldos, getOrdenPago, correlativoOrden, emitirOrdenPago, desmarcarSaldos, getAtribuciones, getFondos, setFondos, getAlertasConfig, setAlertasConfig };

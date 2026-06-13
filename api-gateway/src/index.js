@@ -211,6 +211,8 @@ app.get(['/mantenedores/cobranza-parametros', '/mantenedores/cobranza-parametros
   res.sendFile(path.join(__dirname, '../public/mantenedores/cobranza-parametros/index.html')));
 app.get(['/mantenedores/definiciones', '/mantenedores/definiciones/'], (req, res) =>
   res.sendFile(path.join(__dirname, '../public/mantenedores/definiciones/index.html')));
+app.get(['/mantenedores/alertas-saldos', '/mantenedores/alertas-saldos/'], (req, res) =>
+  res.sendFile(path.join(__dirname, '../public/mantenedores/alertas-saldos/index.html')));
 app.get(['/mantenedores/factores-seguro', '/mantenedores/factores-seguro/'], (req, res) =>
   res.sendFile(path.join(__dirname, '../public/mantenedores/factores-seguro/index.html')));
 app.get(['/mantenedores/financieras', '/mantenedores/financieras/'], (req, res) =>
