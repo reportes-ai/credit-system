@@ -218,7 +218,7 @@
   <div class="topnav-left">
     <a href="/" class="topnav-brand">
       <img src="/img/logo.png" alt="AutoFácil">
-      <span class="version-badge">v2.1</span>
+      <span class="version-badge">v2.2</span>
     </a>
     <div class="breadcrumb-nav">
       <a href="/">Inicio</a><span class="sep">›</span>
@@ -429,6 +429,7 @@ let _miCaja       = null;
 let _tmc          = 0;
 let _ufHoy        = 0;
 let _ufMap        = new Map();
+let _cobranzaMap  = new Map();   // numero cuota → { mora, gastos, dias } (cálculo del backend)
 let _credito      = null;
 let _pagos        = [];
 let _schedule     = [];
@@ -570,8 +571,30 @@ async function abrirCredito(id) {
   _saldoAFavor = (jSaldo.success && jSaldo.data?.saldo_total) || 0;
   _schedule    = buildSchedule(_credito);
   await precargarUFDias21(_schedule);
+  await precargarCobranza(id, _schedule);
   limpiarSeleccion();
   renderPanel();
+}
+
+/* ── Cálculo de mora + gastos desde el backend (fuente única, paramétrica) ──
+   Mantenedor Parámetros Cobranza (tramos UF, día 21) + Tasas (TMC mensual por mes
+   y tramo del crédito). Si falla, calcMora/calcGastos usan el fallback local. */
+async function precargarCobranza(idCredito, sched) {
+  _cobranzaMap = new Map();
+  try {
+    const cuotas = sched.map(s => ({ numero: s.numero, monto: s.monto, fecha: s.fecha }));
+    const j = await (await API('/api/cobranza/calcular-cobranza-lote', {
+      method:'POST', body: JSON.stringify({ id_credito: idCredito, cuotas })
+    })).json();
+    if (j.success && j.data?.cuotas) {
+      j.data.cuotas.forEach(c => _cobranzaMap.set(c.numero, {
+        mora:   c.interes?.interes || 0,
+        gastos: c.gasto?.gasto_pesos || 0,
+        gastosAplica: !!c.gasto?.aplica,
+        dias:   c.dias_mora || 0,
+      }));
+    }
+  } catch (e) { /* fallback local en calcMora/calcGastos */ }
 }
 
 /* ── Amortización francesa ── */
@@ -604,12 +627,23 @@ async function precargarUFDias21(sched) {
   }));
 }
 
-/* ── Cálculos mora/gastos ── */
+/* ── Cálculos mora/gastos ──
+   Fuente principal: backend (_cobranzaMap, paramétrico). Fallback local si no cargó. */
+function _cob(fechaVenc) {
+  const s = _schedule.find(x => x.fecha === fechaVenc);
+  return s ? _cobranzaMap.get(s.numero) : null;
+}
 function calcMora(montoCuota, fechaVenc, hoy = new Date()) {
+  const c = _cob(fechaVenc);
+  if (c) return { monto: c.mora, dias: c.dias };
+  // Fallback local
   const dias = Math.max(0, Math.floor((hoy - new Date(fechaVenc+'T12:00:00')) / 86400000));
   return { monto: dias > 0 ? Math.round(montoCuota * (_tmc/100/365) * dias) : 0, dias };
 }
 function calcGastos(montoCuota, fechaVenc, hoy = new Date()) {
+  const c = _cob(fechaVenc);
+  if (c) return { monto: c.gastos, dias: c.dias, aplica: c.gastosAplica };
+  // Fallback local
   const dias = Math.max(0, Math.floor((hoy - new Date(fechaVenc+'T12:00:00')) / 86400000));
   if (dias < 21) return { monto: 0, dias, aplica: false };
   const ufVal = _ufMap.get(dia21Str(fechaVenc)) || _ufHoy;

@@ -10,6 +10,7 @@ router.get('/parametros',             verifyToken, ctrl.getParametros);
 router.put('/parametros',             verifyToken, requireFunc('mant_cobranza_parametros'), ctrl.setParametros);
 router.post('/calcular-gasto',        verifyToken, ctrl.calcularGasto);
 router.post('/calcular-cobranza',     verifyToken, ctrl.calcularCobranza);
+router.post('/calcular-cobranza-lote',verifyToken, ctrl.calcularCobranzaLote);
 
 // Rutas estáticas primero
 router.get('/diagnostico',            verifyToken, ctrl.diagnostico);

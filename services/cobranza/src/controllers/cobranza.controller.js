@@ -839,8 +839,8 @@ exports.calcularGasto = async (req, res) => {
     let uf = Number(req.body?.uf) || 0;
     let fecha_uf = null;
     if (!uf) {
-      // UF fija del día en que se cumplen los días de cobro (día 21), si hay vencimiento
-      if (req.body?.fecha_vencimiento) fecha_uf = addDias(req.body.fecha_vencimiento, gastosDias - 1);
+      // UF fija del día en que se cumplen los días de cobro (venc + gastos_dias), si hay vencimiento
+      if (req.body?.fecha_vencimiento) fecha_uf = addDias(req.body.fecha_vencimiento, gastosDias);
       else if (req.body?.fecha) fecha_uf = req.body.fecha;
       uf = await getUFporFecha(fecha_uf);
     }
@@ -872,7 +872,7 @@ exports.calcularCobranza = async (req, res) => {
     // Gasto de cobranza: solo desde el día (gastos_dias); UF fija de ese día
     let gasto = { gasto_pesos: 0, gasto_uf: 0, deuda_uf: 0, detalle: [], aplica: false, uf: 0, fecha_uf: null };
     if (diasMora >= gastosDias) {
-      const fechaUF = addDias(fechaVenc, gastosDias - 1);
+      const fechaUF = addDias(fechaVenc, gastosDias);
       const uf = await getUFporFecha(fechaUF);
       gasto = { ...calcularGastoCobranza(cuota, uf, tramos), aplica: true, uf, fecha_uf: fechaUF };
     }
@@ -887,6 +887,60 @@ exports.calcularCobranza = async (req, res) => {
       dias_mora: diasMora, gastos_dias: gastosDias,
       gasto, interes, total,
     });
+  } catch (err) {
+    fail(res, err.message, 500);
+  }
+};
+
+// ─── Calcular cobranza por LOTE (todas las cuotas de un crédito) — para Caja ────
+// body: { id_credito, cuotas:[{numero, monto, fecha}], fecha_calculo? }
+// El tramo (menor/mayor 200 UF) se deriva del crédito original (saldo precio vs umbral×UF otorgamiento).
+exports.calcularCobranzaLote = async (req, res) => {
+  try {
+    const { id_credito, cuotas } = req.body || {};
+    if (!Array.isArray(cuotas) || !cuotas.length)
+      return fail(res, 'cuotas requeridas');
+    const fechaCalc = req.body?.fecha_calculo || new Date().toLocaleDateString('sv-SE', { timeZone: 'America/Santiago' });
+
+    const cfg = await getCobranzaConfig();
+    const gastosDias = Number(cfg.gastos_dias) || 21;
+    let tramos = []; try { tramos = JSON.parse(cfg.tramos_uf); } catch (_) {}
+    const [tasas] = await pool.query('SELECT fecha_desde, fecha_hasta, tasa_mensual_menor, tasa_mensual_mayor FROM tasas');
+
+    // Tramo del crédito: saldo precio (o monto financiado) vs umbral × UF de la fecha de otorgamiento
+    let tramo = 'menor';
+    if (id_credito) {
+      const [[cr]] = await pool.query(
+        'SELECT saldo_precio, monto_financiado, DATE_FORMAT(fecha_otorgado,"%Y-%m-%d") AS fecha_otorgado FROM creditos WHERE id=?', [id_credito]);
+      if (cr) {
+        const [[um]] = await pool.query("SELECT valor FROM parametros_credito WHERE clave='umbral_uf_tramo'");
+        const umbral = um ? parseFloat(um.valor) || 200 : 200;
+        const ufOt = await getUFporFecha(cr.fecha_otorgado);
+        const base = Number(cr.saldo_precio) || Number(cr.monto_financiado) || 0;
+        if (ufOt > 0 && base > umbral * ufOt) tramo = 'mayor';
+      }
+    }
+
+    // Cache de UF por fecha-día-21 para no repetir queries
+    const ufCache = new Map();
+    const ufDe = async (f) => { if (ufCache.has(f)) return ufCache.get(f); const v = await getUFporFecha(f); ufCache.set(f, v); return v; };
+
+    const out = [];
+    for (const q of cuotas) {
+      const cuota = Number(q.monto) || 0;
+      const fechaVenc = q.fecha;
+      const diasMora = Math.max(0, Math.floor((new Date(fechaCalc + 'T00:00:00Z') - new Date(fechaVenc + 'T00:00:00Z')) / 86400000));
+      let gasto = { gasto_pesos: 0, aplica: false };
+      if (diasMora >= gastosDias) {
+        const fechaUF = addDias(fechaVenc, gastosDias);
+        const uf = await ufDe(fechaUF);
+        gasto = { ...calcularGastoCobranza(cuota, uf, tramos), aplica: true, uf, fecha_uf: fechaUF };
+      }
+      const interes = calcularInteresMora(cuota, fechaVenc, fechaCalc, tramo, tasas);
+      out.push({ numero: q.numero, dias_mora: diasMora, gasto, interes,
+        total: cuota + (gasto.gasto_pesos || 0) + (interes.interes || 0) });
+    }
+    ok(res, { tramo, gastos_dias: gastosDias, fecha_calculo: fechaCalc, cuotas: out });
   } catch (err) {
     fail(res, err.message, 500);
   }
