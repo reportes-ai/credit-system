@@ -2,7 +2,7 @@
    AutoFácil — Versión global de la aplicación
    Editar SOLO este archivo para cambiar la versión
    ───────────────────────────────────────────── */
-const APP_VERSION = 'v18.9';
+const APP_VERSION = 'v19.0';
 
 document.addEventListener('DOMContentLoaded', () => {
 
@@ -785,4 +785,97 @@ window.afToggleDebug = afToggleDebug;
 document.addEventListener('DOMContentLoaded', () => {
   const yo = JSON.parse(sessionStorage.getItem('usuario') || 'null');
   if (yo?.perfil === 'Administrador' && localStorage.getItem('af_debug') === '1') setTimeout(afRenderDebug, 700);
+});
+
+/* ═══════════════════════════════════════════════════════════════
+   🔀 REORDENAR CARDS — botón universal en landings que no tienen el
+   suyo propio. Solo Administrador puede reordenar; el orden guardado
+   se aplica a TODOS los usuarios. Persiste en config_ui por ruta.
+   ═══════════════════════════════════════════════════════════════ */
+document.addEventListener('DOMContentLoaded', () => {
+  const token = sessionStorage.getItem('token');
+  if (!token) return;
+  if (document.getElementById('btnReordenar')) return;   // la página ya tiene su reorder propio
+
+  // Buscar la grilla de cards (parent común de ≥2 module/ap/report-card)
+  const cardSel = '.module-card, .ap-card, .report-card';
+  const firstCard = document.querySelector(cardSel);
+  if (!firstCard) return;
+  const grid = firstCard.parentElement;
+  const cardsOf = () => [...grid.children].filter(c => c.matches(cardSel));
+  if (cardsOf().length < 2) return;
+
+  const clave = 'cardorder:' + location.pathname.replace(/\/+$/,'') + '/';
+  const keyOf = c => c.id || c.getAttribute('href') || (c.querySelector('h5,h6,.card-title')?.textContent || '').trim();
+  const AUTH = { Authorization: 'Bearer ' + token, 'Content-Type': 'application/json' };
+
+  // Aplicar orden guardado (para todos los usuarios)
+  (async () => {
+    try {
+      const r = await fetch('/api/config/ui/' + encodeURIComponent(clave), { headers: AUTH });
+      const j = await r.json();
+      const order = j.data;
+      if (Array.isArray(order) && order.length) {
+        const cards = cardsOf();
+        const inOrden = order.map(k => cards.find(c => keyOf(c) === k)).filter(Boolean);
+        const resto   = cards.filter(c => !order.includes(keyOf(c)));
+        [...inOrden, ...resto].forEach(c => grid.appendChild(c));
+      }
+    } catch (e) {}
+  })();
+
+  // Solo Administrador ve los botones de reordenar
+  const yo = JSON.parse(sessionStorage.getItem('usuario') || 'null');
+  if (yo?.perfil !== 'Administrador') return;
+
+  const ancla = document.querySelector('.btn-logout') || document.querySelector('.user-chip');
+  if (!ancla) return;
+
+  const mk = (txt, bg) => {
+    const b = document.createElement('button');
+    b.style.cssText = `background:${bg};border:1px solid rgba(255,255,255,.25);color:#fff;border-radius:8px;padding:5px 13px;font-size:.82rem;font-weight:600;cursor:pointer;margin-right:8px`;
+    b.innerHTML = txt;
+    return b;
+  };
+  const btnR = mk('<i class="bi bi-arrows-move me-1"></i>Reordenar', 'rgba(255,255,255,.12)');
+  const btnG = mk('<i class="bi bi-floppy me-1"></i>Guardar orden', '#16a34a');
+  btnG.style.display = 'none';
+  ancla.parentElement.insertBefore(btnR, ancla);
+  ancla.parentElement.insertBefore(btnG, ancla);
+
+  let sortable = null, modo = false;
+  const ensureSortable = cb => {
+    if (window.Sortable) return cb();
+    const s = document.createElement('script'); s.src = '/js/Sortable.min.js'; s.onload = cb; document.head.appendChild(s);
+  };
+  btnR.addEventListener('click', () => {
+    modo = !modo;
+    if (modo) {
+      btnR.innerHTML = '<i class="bi bi-x-circle me-1"></i>Cancelar';
+      btnR.style.background = '#f59e0b'; btnG.style.display = '';
+      grid.querySelectorAll(cardSel).forEach(c => { c.style.cursor = 'grab'; c.style.outline = '2px dashed #cbd5e1'; });
+      ensureSortable(() => {
+        sortable = new Sortable(grid, { animation: 180, draggable: cardSel,
+          onStart: () => grid.querySelectorAll('.module-card').forEach(c => { c.dataset._h = c.getAttribute('href')||''; c.removeAttribute('href'); }),
+          onEnd:   () => grid.querySelectorAll('.module-card').forEach(c => { if (c.dataset._h) c.setAttribute('href', c.dataset._h); }),
+        });
+      });
+    } else {
+      btnR.innerHTML = '<i class="bi bi-arrows-move me-1"></i>Reordenar';
+      btnR.style.background = 'rgba(255,255,255,.12)'; btnG.style.display = 'none';
+      grid.querySelectorAll(cardSel).forEach(c => { c.style.cursor = ''; c.style.outline = ''; if (c.dataset._h) c.setAttribute('href', c.dataset._h); });
+      if (sortable) { sortable.destroy(); sortable = null; }
+    }
+  });
+  btnG.addEventListener('click', async () => {
+    btnG.disabled = true; btnG.innerHTML = 'Guardando…';
+    try {
+      const order = cardsOf().map(keyOf);
+      const r = await fetch('/api/config/ui/' + encodeURIComponent(clave), { method:'PUT', headers: AUTH, body: JSON.stringify({ valor: order }) });
+      const j = await r.json();
+      if (!j.success) throw new Error(j.error||'Error');
+      btnR.click(); // salir del modo
+    } catch (e) { alert('Error al guardar orden: ' + e.message); }
+    btnG.disabled = false; btnG.innerHTML = '<i class="bi bi-floppy me-1"></i>Guardar orden';
+  });
 });
