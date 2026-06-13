@@ -5,7 +5,7 @@
   <link rel="icon" href="/img/favicon.png" type="image/png">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Emisión Orden de Pago — AutoFácil</title>
-  <!-- v1.1 -->
+  <!-- v1.2 -->
   <link href="/css/bootstrap.min.css" rel="stylesheet">
   <link href="/css/bootstrap-icons.css" rel="stylesheet">
   <style>
@@ -174,35 +174,51 @@ function docHTML(r){
   const periodo = periodoCL(r.fecha_fondos);
   const fechaPago = fechaCL(new Date().toISOString());
   const concepto = `Saldo Precio OP ${r.num_op||''} - ${r.financiera||''}`;
+  // Estilos INLINE: los correos descartan los <style> de clase, por eso todo va inline
+  const Sdoc = 'font-family:Arial,sans-serif;color:#1e293b;font-size:12px';
+  const Smeta = 'border-collapse:collapse;font-size:11px';
+  const Slbl = 'color:#64748b;font-weight:700;text-transform:uppercase;font-size:9px;padding:1px 8px;white-space:nowrap';
+  const Smv = 'padding:1px 8px;font-size:11px';
+  const Stbl = 'width:100%;border-collapse:collapse;margin:8px 0;font-size:11px';
+  const Sth = 'background:#dbeafe;color:#1e3a8a;border:1px solid #93c5fd;padding:5px 6px;font-size:9px;text-transform:uppercase;text-align:left';
+  const Std = 'border:1px solid #cbd5e1;padding:5px 6px';
+  const Snum = Std + ';text-align:right';
+  const Sres = 'border-collapse:collapse;margin-top:14px;max-width:430px';
+  const SresL = 'border:1px solid #cbd5e1;padding:5px 8px;font-size:11px;background:#eff6ff;font-weight:700;width:42%';
+  const SresV = 'border:1px solid #cbd5e1;padding:5px 8px;font-size:11px';
   const filas = lineas.map(l => `<tr>
-      <td>Santiago</td><td>${r.nombre_dealer||''}</td><td>${r.rut_dealer||''}</td>
-      <td>${l.detalle}</td><td>${periodo}</td><td class="num">${fmt(l.valor)}</td>
-      <td class="num">$0</td><td class="num">${fmt(l.valor)}</td><td>${fechaPago}</td>
+      <td style="${Std}">Santiago</td><td style="${Std}">${r.nombre_dealer||''}</td><td style="${Std}">${r.rut_dealer||''}</td>
+      <td style="${Std}">${l.detalle}</td><td style="${Std}">${periodo}</td><td style="${Snum}">${fmt(l.valor)}</td>
+      <td style="${Snum}">$0</td><td style="${Snum}">${fmt(l.valor)}</td><td style="${Std}">${fechaPago}</td>
     </tr>`).join('');
-  return `<div class="op-doc">
-    <div class="op-top">
-      <table class="op-meta"><tbody>
-        <tr><td class="lbl">Concepto</td><td>SOLICITUD AUTORIZACIÓN DE PAGO</td></tr>
-        <tr><td class="lbl">Compañía</td><td>AUTOFÁCIL SPA</td></tr>
-        <tr><td class="lbl">Tipo gasto</td><td>PAGO A CONCESIONARIO</td></tr>
-        <tr><td class="lbl">N° Orden</td><td>OP-${r.num_op||''}</td></tr>
-        <tr><td class="lbl">Fecha</td><td>${fechaPago}</td></tr>
-      </tbody></table>
-      <img class="op-logo" src="/img/logo-autofacil.png" onerror="this.src='/img/logo.png'">
-    </div>
-    <table class="op-tbl">
-      <thead><tr><th>Ciudad</th><th>Concesionario</th><th>RUT</th><th>Detalle</th><th>Mes</th><th>Valor Unitario</th><th>IVA</th><th>Valor Total</th><th>Fecha a pagar</th></tr></thead>
+  return `<div style="${Sdoc}">
+    <table style="width:100%;border-collapse:collapse;margin-bottom:14px"><tbody><tr>
+      <td style="vertical-align:top">
+        <table style="${Smeta}"><tbody>
+          <tr><td style="${Slbl}">Concepto</td><td style="${Smv}">SOLICITUD AUTORIZACIÓN DE PAGO</td></tr>
+          <tr><td style="${Slbl}">Compañía</td><td style="${Smv}">AUTOFÁCIL SPA</td></tr>
+          <tr><td style="${Slbl}">Tipo gasto</td><td style="${Smv}">PAGO A CONCESIONARIO</td></tr>
+          <tr><td style="${Slbl}">N° Orden</td><td style="${Smv}">OP-${r.num_op||''}</td></tr>
+          <tr><td style="${Slbl}">Fecha</td><td style="${Smv}">${fechaPago}</td></tr>
+        </tbody></table>
+      </td>
+      <td style="vertical-align:top;text-align:right">
+        <img width="150" height="34" style="height:34px;width:auto" src="${location.origin}/img/logo-autofacil.png" onerror="this.src='${location.origin}/img/logo.png'">
+      </td>
+    </tr></tbody></table>
+    <table style="${Stbl}">
+      <thead><tr><th style="${Sth}">Ciudad</th><th style="${Sth}">Concesionario</th><th style="${Sth}">RUT</th><th style="${Sth}">Detalle</th><th style="${Sth}">Mes</th><th style="${Sth}">Valor Unitario</th><th style="${Sth}">IVA</th><th style="${Sth}">Valor Total</th><th style="${Sth}">Fecha a pagar</th></tr></thead>
       <tbody>${filas}
-        <tr class="op-total"><td colspan="7" style="text-align:right">TOTAL</td><td class="num">${fmt(total)}</td><td></td></tr>
+        <tr><td colspan="7" style="${Std};text-align:right;font-weight:800;background:#f1f5f9">TOTAL</td><td style="${Snum};font-weight:800;background:#f1f5f9">${fmt(total)}</td><td style="${Std};background:#f1f5f9"></td></tr>
       </tbody>
     </table>
-    <table class="op-resumen"><tbody>
-      <tr><td class="lbl">Proveedor</td><td>${r.nombre_dealer||''}</td></tr>
-      <tr><td class="lbl">Concepto</td><td>${concepto}</td></tr>
-      <tr><td class="lbl">Período</td><td>${periodo}</td></tr>
-      <tr><td class="lbl">Destino</td><td>CTA. CTE. ${r.num_cuenta? r.num_cuenta+(r.banco?(' · '+r.banco):'') : ''}</td></tr>
-      <tr><td class="lbl">Valor total</td><td>${fmt(total)}</td></tr>
-      <tr><td class="lbl">Fecha a pagar</td><td>${fechaPago}</td></tr>
+    <table style="${Sres}"><tbody>
+      <tr><td style="${SresL}">Proveedor</td><td style="${SresV}">${r.nombre_dealer||''}</td></tr>
+      <tr><td style="${SresL}">Concepto</td><td style="${SresV}">${concepto}</td></tr>
+      <tr><td style="${SresL}">Período</td><td style="${SresV}">${periodo}</td></tr>
+      <tr><td style="${SresL}">Destino</td><td style="${SresV}">CTA. CTE. ${r.num_cuenta? r.num_cuenta+(r.banco?(' · '+r.banco):'') : ''}</td></tr>
+      <tr><td style="${SresL}">Valor total</td><td style="${SresV}">${fmt(total)}</td></tr>
+      <tr><td style="${SresL}">Fecha a pagar</td><td style="${SresV}">${fechaPago}</td></tr>
     </tbody></table>
   </div>`;
 }
