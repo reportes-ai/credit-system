@@ -782,20 +782,43 @@ exports.setParametros = async (req, res) => {
   }
 };
 
+// UF vigente a una fecha dada (la última con fecha <= fecha); fallback a la más reciente.
+async function getUFporFecha(fecha) {
+  if (fecha) {
+    const [[u]] = await pool.query('SELECT valor FROM uf WHERE fecha <= ? ORDER BY fecha DESC LIMIT 1', [fecha]);
+    if (u) return parseFloat(u.valor);
+  }
+  const [[u2]] = await pool.query('SELECT valor FROM uf ORDER BY fecha DESC LIMIT 1');
+  return u2 ? parseFloat(u2.valor) : 0;
+}
+// Suma N días a una fecha YYYY-MM-DD
+function addDias(fechaStr, n) {
+  const d = new Date(fechaStr + 'T00:00:00Z'); d.setUTCDate(d.getUTCDate() + n);
+  return d.toISOString().slice(0, 10);
+}
+
 // ─── Calcular gasto de cobranza para un monto (Caja / consultas) ───────────────
-// body: { monto, uf? }  — si no se pasa uf, se usa el último valor de la tabla uf.
+// body: { monto, uf?, fecha?, fecha_vencimiento? }
+//   - uf explícita tiene prioridad.
+//   - si se pasa fecha_vencimiento, la UF se fija en el día 21 (venc + (gastos_dias-1)).
+//   - si se pasa fecha, se usa la UF vigente a esa fecha.
 exports.calcularGasto = async (req, res) => {
   try {
     const monto = Number(req.body?.monto) || 0;
-    let uf = Number(req.body?.uf) || 0;
-    if (!uf) {
-      const [[u]] = await pool.query('SELECT valor FROM uf ORDER BY fecha DESC LIMIT 1');
-      uf = u ? parseFloat(u.valor) : 0;
-    }
     const cfg = await getCobranzaConfig();
+    const gastosDias = Number(cfg.gastos_dias) || 21;
     let tramos = []; try { tramos = JSON.parse(cfg.tramos_uf); } catch (_) {}
+
+    let uf = Number(req.body?.uf) || 0;
+    let fecha_uf = null;
+    if (!uf) {
+      // UF fija del día en que se cumplen los días de cobro (día 21), si hay vencimiento
+      if (req.body?.fecha_vencimiento) fecha_uf = addDias(req.body.fecha_vencimiento, gastosDias - 1);
+      else if (req.body?.fecha) fecha_uf = req.body.fecha;
+      uf = await getUFporFecha(fecha_uf);
+    }
     const r = calcularGastoCobranza(monto, uf, tramos);
-    ok(res, { monto, uf, gastos_dias: Number(cfg.gastos_dias) || 21, ...r });
+    ok(res, { monto, uf, fecha_uf, gastos_dias: gastosDias, ...r });
   } catch (err) {
     fail(res, err.message, 500);
   }
