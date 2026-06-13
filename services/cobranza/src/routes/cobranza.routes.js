@@ -8,6 +8,7 @@ const { requireFunc } = require('../../../../shared/middleware/permisos');
 // Parámetros de Cobranza (mantenedor)
 router.get('/parametros',             verifyToken, ctrl.getParametros);
 router.put('/parametros',             verifyToken, requireFunc('mant_cobranza_parametros'), ctrl.setParametros);
+router.post('/calcular-gasto',        verifyToken, ctrl.calcularGasto);
 
 // Rutas estáticas primero
 router.get('/diagnostico',            verifyToken, ctrl.diagnostico);

@@ -5,7 +5,7 @@
   <link rel="icon" href="/img/favicon.png" type="image/png">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Parámetros Cobranza — AutoFácil</title>
-  <!-- v1.0 -->
+  <!-- v1.1 -->
   <link href="/css/bootstrap.min.css" rel="stylesheet">
   <link href="/css/bootstrap-icons.css" rel="stylesheet">
   <style>
@@ -67,19 +67,42 @@
   <div class="card-af">
     <div class="lbl">Gastos de Cobranza</div>
     <div class="row g-3 mt-1">
-      <div class="col-sm-4">
-        <label class="fl">Días para iniciar cobro de gastos</label>
+      <div class="col-sm-5">
+        <label class="fl">Días desde el vencimiento para cobrar gastos</label>
         <input type="number" min="0" class="form-control" id="gastosDias">
-        <div class="form-text">A partir de cuántos días de mora se cobran gastos de cobranza.</div>
+        <div class="form-text">Ley 19.496: solo se cobran tras 20 días corridos del vencimiento → día 21.</div>
       </div>
     </div>
   </div>
 
-  <!-- Tramos UF -->
+  <!-- Tramos UF (marginales) -->
   <div class="card-af">
-    <div class="lbl">Tramos de Gastos (UF)</div>
-    <div class="form-text mb-2">Monto en UF y porcentaje asociado de cada tramo (editables).</div>
+    <div class="lbl">Tramos de Gasto (sobre la deuda en UF)</div>
+    <div class="form-text mb-2">Cálculo <b>marginal</b> (como tramos de impuesto): cada % se aplica solo a la porción de la deuda dentro de su tramo. Define el <b>límite superior (UF)</b> y el <b>%</b> de cada tramo; el último tramo es el resto (sin límite).</div>
     <div id="tramos"></div>
+    <div class="vars mt-2" style="border-color:#bbf7d0;background:#f0fdf4">
+      <b>Ejemplo</b> (deuda $500.000, UF $38.000 → 13,15 UF):
+      10 UF × 9% = 0,90 + 3,15 UF × 6% = 0,189 → <b>1,089 UF ≈ $41.382</b>
+    </div>
+  </div>
+
+  <!-- Probar cálculo -->
+  <div class="card-af">
+    <div class="lbl">Probar cálculo</div>
+    <div class="row g-2 mt-1 align-items-end">
+      <div class="col-sm-4">
+        <label class="fl">Monto deuda ($)</label>
+        <input type="number" min="0" class="form-control" id="testMonto" placeholder="500000">
+      </div>
+      <div class="col-sm-3">
+        <label class="fl">UF ($)</label>
+        <input type="number" step="0.01" class="form-control" id="testUF" placeholder="(actual)">
+      </div>
+      <div class="col-sm-3">
+        <button class="btn btn-outline-primary" onclick="probar()"><i class="bi bi-calculator me-1"></i>Calcular</button>
+      </div>
+    </div>
+    <div id="testResultado" class="form-text mt-2"></div>
   </div>
 
   <!-- Plantillas de mensaje -->
@@ -113,7 +136,7 @@
     <div class="tit"><i class="bi bi-diagram-3 me-1"></i>Qué afecta este mantenedor</div>
     <ul>
       <li><b>Textos Email / SMS / WhatsApp y datos de transferencia</b> → los mensajes que se generan en <a href="/cobranza/">Cobranza</a> → ficha del deudor → <i>Mensajes</i> (botón Email/SMS/WhatsApp).</li>
-      <li><b>Días y Tramos UF de gastos de cobranza</b> → parámetros del cobro de gastos de cobranza (se aplicarán en el cálculo de gastos cuando ese proceso esté en uso).</li>
+      <li><b>Días y Tramos UF de gastos de cobranza</b> → cálculo del <b>gasto de cobranza</b> (Ley 19.496, tramos marginales sobre la deuda en UF). Se expone vía <code>POST /api/cobranza/calcular-gasto</code> para usarse en <a href="/cobranza/">Cobranza</a> y en <b>Caja</b> al recibir el pago de una cuota morosa.</li>
     </ul>
   </div>
 </div>
@@ -133,18 +156,24 @@ function toast(m, err){ const t=document.getElementById('toast'); t.textContent=
 
 let TRAMOS = [];
 function pintarTramos(){
-  document.getElementById('tramos').innerHTML = TRAMOS.map((t,i) => `
+  document.getElementById('tramos').innerHTML = TRAMOS.map((t,i) => {
+    const ultimo = i === TRAMOS.length - 1;
+    return `
     <div class="tramo-row">
       <span class="tnum">Tramo ${i+1}</span>
-      <div class="input-group" style="max-width:160px">
-        <input type="number" step="0.01" class="form-control" data-tramo="${i}" data-k="uf" value="${t.uf??''}">
+      <div class="input-group" style="max-width:200px">
+        <span class="input-group-text">Hasta</span>
+        <input type="number" step="0.01" class="form-control" data-tramo="${i}" data-k="hasta_uf"
+          value="${t.hasta_uf??''}" placeholder="${ultimo?'resto':''}" ${ultimo?'disabled':''}>
         <span class="input-group-text">UF</span>
       </div>
-      <div class="input-group" style="max-width:140px">
+      <div class="input-group" style="max-width:130px">
         <input type="number" step="0.01" class="form-control" data-tramo="${i}" data-k="pct" value="${t.pct??''}">
         <span class="input-group-text">%</span>
       </div>
-    </div>`).join('');
+      ${ultimo?'<span class="form-text" style="margin-left:4px">(resto sin límite)</span>':''}
+    </div>`;
+  }).join('');
 }
 
 async function cargar(){
@@ -158,16 +187,18 @@ async function cargar(){
     document.getElementById('txtSms').value        = d.texto_sms || '';
     document.getElementById('txtEmailAsunto').value= d.texto_email_asunto || '';
     document.getElementById('txtEmail').value      = d.texto_email || '';
-    TRAMOS = Array.isArray(d.tramos_uf) && d.tramos_uf.length ? d.tramos_uf : [{uf:3,pct:0},{uf:6,pct:0},{uf:9,pct:0}];
+    TRAMOS = Array.isArray(d.tramos_uf) && d.tramos_uf.length ? d.tramos_uf : [{hasta_uf:10,pct:9},{hasta_uf:50,pct:6},{hasta_uf:null,pct:3}];
     pintarTramos();
   } catch(e){ toast('Error al cargar: '+e.message, true); }
 }
 
 async function guardar(){
-  // recolectar tramos del DOM
+  // recolectar tramos del DOM (último tramo: hasta_uf = null = resto)
   document.querySelectorAll('#tramos input').forEach(inp => {
     const i = +inp.dataset.tramo, k = inp.dataset.k;
-    TRAMOS[i] = TRAMOS[i] || {}; TRAMOS[i][k] = parseFloat(inp.value)||0;
+    TRAMOS[i] = TRAMOS[i] || {};
+    if (k === 'hasta_uf') TRAMOS[i].hasta_uf = (inp.disabled || inp.value === '') ? null : parseFloat(inp.value);
+    else TRAMOS[i][k] = parseFloat(inp.value)||0;
   });
   const payload = {
     gastos_dias: document.getElementById('gastosDias').value || '0',
@@ -187,6 +218,22 @@ async function guardar(){
     toast('Parámetros guardados');
   } catch(e){ toast(e.message, true); }
   btn.disabled = false; btn.innerHTML = '<i class="bi bi-floppy me-1"></i>Guardar cambios';
+}
+
+async function probar(){
+  const monto = parseFloat(document.getElementById('testMonto').value)||0;
+  const uf = parseFloat(document.getElementById('testUF').value)||0;
+  const el = document.getElementById('testResultado');
+  if (!monto){ el.textContent = 'Ingresa un monto.'; return; }
+  el.textContent = 'Calculando…';
+  try {
+    const r = await fetch('/api/cobranza/calcular-gasto', { method:'POST', headers:H, body: JSON.stringify({ monto, uf: uf||undefined }) });
+    const j = await r.json();
+    if (!j.success) throw new Error(j.error||'Error');
+    const d = j.data;
+    const det = (d.detalle||[]).map(t => `${t.porcion_uf.toFixed(3)} UF × ${t.pct}% = ${t.gasto_uf.toFixed(3)} UF`).join('  +  ');
+    el.innerHTML = `Deuda ${d.deuda_uf.toFixed(3)} UF (UF $${Number(d.uf).toLocaleString('es-CL')}) → ${det || '0'} = <b>${d.gasto_uf.toFixed(3)} UF ≈ $${Number(d.gasto_pesos).toLocaleString('es-CL')}</b>`;
+  } catch(e){ el.textContent = 'Error: '+e.message; }
 }
 
 cargar();

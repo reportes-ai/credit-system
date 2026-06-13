@@ -49,8 +49,11 @@ const COB_DEFAULTS = {
   texto_sms: '{trato} {nombre}, su crédito N° {numero} tiene {cuotas} cuota(s) impaga(s) por ${monto} ({dias} días mora).\n{datos}',
   texto_email_asunto: '[AutoFácil] Aviso de mora — Crédito N° {numero}',
   texto_email: '{trato} {nombre},\n\nLe informamos que su crédito N° {numero} se encuentra en mora hace {dias} días, con {cuotas} cuota(s) impaga(s) por un total de ${monto} al día de hoy.\n\nPara regularizar su situación puede realizar una transferencia con los siguientes datos:\n\n{datos}\n\nAtentamente,\nEquipo de Cobranza AutoFácil',
-  gastos_dias: '15',
-  tramos_uf: JSON.stringify([{ uf: 3, pct: 0 }, { uf: 6, pct: 0 }, { uf: 9, pct: 0 }]),
+  // Gastos de cobranza (Ley 19.496): solo después de 20 días corridos desde el
+  // vencimiento → día 21. Tramos MARGINALES sobre la deuda en UF (límite superior + %):
+  //   hasta 10 UF → 9% · entre 10 y 50 UF → 6% · sobre 50 UF → 3% (hasta_uf null = resto)
+  gastos_dias: '21',
+  tramos_uf: JSON.stringify([{ hasta_uf: 10, pct: 9 }, { hasta_uf: 50, pct: 6 }, { hasta_uf: null, pct: 3 }]),
 };
 (async () => {
   try {
@@ -61,6 +64,14 @@ const COB_DEFAULTS = {
     )`);
     for (const [clave, valor] of Object.entries(COB_DEFAULTS))
       await pool.query('INSERT IGNORE INTO cobranza_config (clave, valor) VALUES (?, ?)', [clave, valor]);
+    // Parche: migrar el modelo viejo de tramos ({uf,pct}) al legal ({hasta_uf,pct})
+    try {
+      const [[tr]] = await pool.query("SELECT valor FROM cobranza_config WHERE clave='tramos_uf'");
+      if (tr) { const a = JSON.parse(tr.valor); if (Array.isArray(a) && a.length && a[0].hasta_uf === undefined)
+        await pool.query("UPDATE cobranza_config SET valor=? WHERE clave='tramos_uf'", [COB_DEFAULTS.tramos_uf]); }
+      const [[gd]] = await pool.query("SELECT valor FROM cobranza_config WHERE clave='gastos_dias'");
+      if (gd && gd.valor === '15') await pool.query("UPDATE cobranza_config SET valor='21' WHERE clave='gastos_dias'");
+    } catch (_) {}
     console.log('✓ Cobranza: tabla cobranza_config verificada');
   } catch (err) { console.error('✗ Cobranza config migración:', err.message); }
 })();
@@ -72,6 +83,25 @@ async function getCobranzaConfig() {
   return obj;
 }
 const rellenar = (tpl, vars) => String(tpl || '').replace(/\{(\w+)\}/g, (_, k) => (vars[k] !== undefined ? vars[k] : '{' + k + '}'));
+
+// Gasto de cobranza: tramos MARGINALES sobre la deuda en UF (como tabla de tramos de impuesto).
+// tramos = [{hasta_uf, pct}, ...]; el último con hasta_uf null/∞ es el resto de la deuda.
+function calcularGastoCobranza(deudaPesos, ufValor, tramos) {
+  const uf = Number(ufValor) || 0;
+  const deudaUF = uf > 0 ? (Number(deudaPesos) || 0) / uf : 0;
+  let prev = 0, gastoUF = 0;
+  const detalle = [];
+  for (const t of (tramos || [])) {
+    const tope = (t.hasta_uf == null || t.hasta_uf === '') ? Infinity : Number(t.hasta_uf);
+    const porcion = Math.max(0, Math.min(deudaUF, tope) - prev);
+    const aporte = porcion * (Number(t.pct) || 0) / 100;
+    if (porcion > 0) detalle.push({ desde_uf: prev, hasta_uf: tope === Infinity ? null : tope, porcion_uf: porcion, pct: Number(t.pct) || 0, gasto_uf: aporte });
+    gastoUF += aporte;
+    prev = tope;
+    if (deudaUF <= tope) break;
+  }
+  return { deuda_uf: deudaUF, gasto_uf: gastoUF, gasto_pesos: Math.round(gastoUF * uf), detalle };
+}
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 function ok(res, data, status = 200) {
@@ -747,6 +777,25 @@ exports.setParametros = async (req, res) => {
          ON DUPLICATE KEY UPDATE valor = VALUES(valor)`, [clave, String(valor)]);
     }
     ok(res, { mensaje: 'Parámetros de cobranza actualizados' });
+  } catch (err) {
+    fail(res, err.message, 500);
+  }
+};
+
+// ─── Calcular gasto de cobranza para un monto (Caja / consultas) ───────────────
+// body: { monto, uf? }  — si no se pasa uf, se usa el último valor de la tabla uf.
+exports.calcularGasto = async (req, res) => {
+  try {
+    const monto = Number(req.body?.monto) || 0;
+    let uf = Number(req.body?.uf) || 0;
+    if (!uf) {
+      const [[u]] = await pool.query('SELECT valor FROM uf ORDER BY fecha DESC LIMIT 1');
+      uf = u ? parseFloat(u.valor) : 0;
+    }
+    const cfg = await getCobranzaConfig();
+    let tramos = []; try { tramos = JSON.parse(cfg.tramos_uf); } catch (_) {}
+    const r = calcularGastoCobranza(monto, uf, tramos);
+    ok(res, { monto, uf, gastos_dias: Number(cfg.gastos_dias) || 21, ...r });
   } catch (err) {
     fail(res, err.message, 500);
   }
