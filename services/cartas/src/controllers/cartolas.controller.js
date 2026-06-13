@@ -43,9 +43,17 @@ const pool = require('../../../../shared/config/database');
         INDEX idx_mes (mes)
       )
     `);
+    // Auditoría de cambio de estado de comisión + a qué cartola (mes) salió pagada
+    await pool.query(`ALTER TABLE cartolas_movimientos ADD COLUMN IF NOT EXISTS estado_usuario VARCHAR(150) DEFAULT NULL`).catch(()=>{});
+    await pool.query(`ALTER TABLE cartolas_movimientos ADD COLUMN IF NOT EXISTS estado_fecha DATETIME DEFAULT NULL`).catch(()=>{});
+    await pool.query(`ALTER TABLE cartolas_movimientos ADD COLUMN IF NOT EXISTS mes_cartola VARCHAR(7) DEFAULT NULL`).catch(()=>{});
+    await pool.query(`ALTER TABLE cartolas_movimientos ADD COLUMN IF NOT EXISTS enviada_por VARCHAR(150) DEFAULT NULL`).catch(()=>{});
+    await pool.query(`ALTER TABLE cartolas_movimientos ADD COLUMN IF NOT EXISTS enviada_fecha DATETIME DEFAULT NULL`).catch(()=>{});
+    await pool.query(`ALTER TABLE cartolas_movimientos ADD INDEX idx_mes_cartola (mes_cartola)`).catch(()=>{});
     console.log('[cartolas] tablas OK');
   } catch (e) { console.error('[cartolas migration]', e.message); }
 })();
+const nombreUsuario = u => (u?.nombre ? (u.nombre + ' ' + (u.apellido || '')).trim() : u?.email) || 'Usuario';
 
 /* ── POST /api/cartolas/sync ─────────────────────────────────────────
    1) Marca otorgado=1 en cartas cuya op_origen existe en creditos.
@@ -152,6 +160,11 @@ const updateMovimiento = async (req, res) => {
     for (const c of CAMPOS) {
       if (req.body[c] !== undefined) { sets.push(`\`${c}\` = ?`); vals.push(req.body[c]); }
     }
+    // Auditoría: al cambiar el estado de la comisión se graba quién y cuándo
+    if (req.body.estado_comision !== undefined) {
+      sets.push('estado_usuario = ?'); vals.push(nombreUsuario(req.usuario));
+      sets.push('estado_fecha = NOW()');
+    }
     if (!sets.length) return res.status(400).json({ success: false, data: null, error: 'Sin campos' });
     vals.push(req.params.id);
     await pool.query(`UPDATE cartolas_movimientos SET ${sets.join(', ')} WHERE id = ?`, vals);
@@ -191,16 +204,42 @@ const getEnviadas = async (req, res) => {
 
 const registrarEnvio = async (req, res) => {
   try {
-    const { mes, rut_conc, concesionario, mail, total_bruto } = req.body;
+    const { mes, rut_conc, concesionario, mail, total_bruto, ids } = req.body;
     if (!mes || !concesionario)
       return res.status(400).json({ success: false, data: null, error: 'mes y concesionario requeridos' });
-    const enviadoPor = req.usuario?.email || String(req.usuario?.id_usuario || '');
+    const enviadoPor = nombreUsuario(req.usuario);
     const [r] = await pool.query(
       `INSERT INTO cartolas_enviadas (mes, rut_conc, concesionario, mail, total_bruto, enviado_por)
        VALUES (?,?,?,?,?,?)`,
       [mes, rut_conc || null, concesionario, mail || null, total_bruto || null, enviadoPor]
     );
-    res.status(201).json({ success: true, data: { id: r.insertId }, error: null });
+    // Estampa el mes de la cartola en los movimientos incluidos (no re-estampa si ya salieron antes)
+    let marcados = 0;
+    const movIds = Array.isArray(ids) ? ids.map(Number).filter(Boolean) : [];
+    if (movIds.length) {
+      const ph = movIds.map(() => '?').join(',');
+      const [u] = await pool.query(
+        `UPDATE cartolas_movimientos SET mes_cartola=?, enviada_por=?, enviada_fecha=NOW()
+         WHERE id IN (${ph}) AND mes_cartola IS NULL`, [mes, enviadoPor, ...movIds]);
+      marcados = u.affectedRows;
+      // Post Venta: marca la etapa CARTOLA ENVIADA (track COMISION) de cada operación
+      try {
+        const [segs] = await pool.query(
+          `SELECT DISTINCT ps.id AS seg_id
+           FROM cartolas_movimientos m
+           JOIN cartas_aprobacion ca ON ca.id = m.id_carta
+           JOIN postventa_seguimiento ps ON ps.id_credito = ca.id_credito_creado
+           WHERE m.id IN (${ph})`, movIds);
+        if (segs.length) {
+          const etapas = ['COMISION A PAGAR','CARTOLA EMITIDA','CARTOLA APROBADA','CARTOLA ENVIADA'];
+          const vals = [];
+          for (const s of segs) for (const e of etapas) vals.push([s.seg_id, 'COMISION', e, enviadoPor]);
+          await pool.query(
+            `INSERT IGNORE INTO postventa_etapas (id_seguimiento, track, etapa, usuario) VALUES ?`, [vals]);
+        }
+      } catch (ePV) { console.error('[cartolas envio→postventa]', ePV.message); }
+    }
+    res.status(201).json({ success: true, data: { id: r.insertId, marcados }, error: null });
   } catch (e) {
     console.error('[cartolas envio]', e.message);
     res.status(500).json({ success: false, data: null, error: 'Error interno del servidor' });

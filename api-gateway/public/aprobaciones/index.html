@@ -5,7 +5,7 @@
   <link rel="icon" href="/img/favicon.png" type="image/png">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Cartas de Aprobación — AutoFácil</title>
-  <!-- v3.9 -->
+  <!-- v4.0 -->
   <link href="/css/bootstrap.min.css" rel="stylesheet">
   <link href="/css/bootstrap-icons.css" rel="stylesheet">
   <style>
@@ -477,7 +477,7 @@
       <div style="overflow-x:auto">
         <table class="tbl">
           <thead><tr><th>Corr.</th><th>Mes</th><th>N° ID</th><th>N° Operación</th><th>Movimiento</th><th>Concesionario</th><th>Ejecutivo</th><th>RUT</th><th>Cliente</th>
-            <th style="text-align:right">Saldo</th><th style="text-align:right">Comisión</th><th>E° Comisión</th><th>N° Carta</th><th>Acreedor</th><th>% Com.</th><th>Observaciones</th><th></th></tr></thead>
+            <th style="text-align:right">Saldo</th><th style="text-align:right">Comisión</th><th>E° Comisión</th><th>Mes Cartola</th><th>N° Carta</th><th>Acreedor</th><th>% Com.</th><th>Observaciones</th><th></th></tr></thead>
           <tbody id="bodyMovs"></tbody>
         </table>
       </div>
@@ -2187,6 +2187,7 @@ function aplicarMes(){
   renderMovimientos();
   renderRevCartolas();
 }
+function fdMov(v){ if(!v) return ''; const d=new Date(v); return isNaN(d)?'':d.toLocaleDateString('es-CL')+' '+d.toLocaleTimeString('es-CL',{hour:'2-digit',minute:'2-digit'}); }
 function renderMovimientos(){
   const q = (document.getElementById('ctaBuscar').value||'').toLowerCase();
   const est = document.getElementById('ctaEstado').value;
@@ -2197,7 +2198,7 @@ function renderMovimientos(){
     (!q || [m.concesionario,m.num_op,m.nuestro_num_op,m.rut_cliente,m.nombre_cliente,m.num_carta].some(v=>String(v||'').toLowerCase().includes(q))));
   document.getElementById('ctaCount').textContent = rows.length + ' registro(s)';
   const body = document.getElementById('bodyMovs');
-  if (!rows.length) { body.innerHTML=`<tr><td colspan="17" style="text-align:center;color:#94a3b8;padding:24px">${q?'Sin resultados':'Sin movimientos en este mes'}</td></tr>`; return; }
+  if (!rows.length) { body.innerHTML=`<tr><td colspan="18" style="text-align:center;color:#94a3b8;padding:24px">${q?'Sin resultados':'Sin movimientos en este mes'}</td></tr>`; return; }
   const ESTADOS = ['PENDIENTE','A PAGAR','A DESCONTAR'];
   body.innerHTML = rows.map((m,i)=>{
     const pct = (m.saldo>0 && m.comision) ? (m.comision/m.saldo*100).toFixed(2).replace('.',',')+'%' : '—';
@@ -2213,8 +2214,9 @@ function renderMovimientos(){
       <td style="font-size:.74rem">${escH(toTitle(m.nombre_cliente||''))}</td>
       <td style="text-align:right">${fmtCLP(m.saldo)}</td>
       <td style="text-align:right"><b>${fmtCLP(m.comision)}</b></td>
-      <td><select onchange="updMov(${m.id},'estado_comision',this.value)" style="border:1px solid #e2e8f0;border-radius:6px;padding:3px 6px;font-size:.74rem">
+      <td><select onchange="updMov(${m.id},'estado_comision',this.value)" title="${m.estado_usuario?`Cambiado por ${escH(m.estado_usuario)}${m.estado_fecha?' · '+fdMov(m.estado_fecha):''}`:''}" style="border:1px solid #e2e8f0;border-radius:6px;padding:3px 6px;font-size:.74rem">
         ${ESTADOS.map(e=>`<option${m.estado_comision===e?' selected':''}>${e}</option>`).join('')}</select></td>
+      <td style="font-size:.72rem">${m.mes_cartola?`<b style="color:#15803d">${escH(nombreMes(m.mes_cartola))}</b>`:'<span style="color:#cbd5e1">—</span>'}</td>
       <td style="font-size:.72rem">${escH(m.num_carta||'')}</td>
       <td style="font-size:.72rem">${escH(m.acreedor||'')}</td>
       <td>${pct}</td>
@@ -2226,7 +2228,8 @@ function renderMovimientos(){
 async function updMov(id, campo, valor){
   try {
     await fetch('/api/cartolas/'+id, { method:'PUT', headers: hdr(), body: JSON.stringify({ [campo]: valor }) });
-    const m = MOVS.find(x=>x.id===id); if (m) m[campo]=valor;
+    const m = (MOVS_ALL.find(x=>x.id===id) || MOVS.find(x=>x.id===id));
+    if (m) { m[campo]=valor; if (campo==='estado_comision'){ m.estado_usuario=(YO.nombre+' '+(YO.apellido||'')).trim(); m.estado_fecha=new Date().toISOString(); } }
     renderRevCartolas();
   } catch(e) { alert('Error al guardar'); }
 }
@@ -2262,7 +2265,9 @@ async function guardarPrepago(){
 function exportarMovimientos(){
   const rows = MOVS.map(m=>({ Mes:m.mes, 'N° ID':m.num_op, 'N° Operación':m.nuestro_num_op, Movimiento:m.movimiento, 'RUT Conc.':m.rut_conc,
     Concesionario:m.concesionario, Ejecutivo:m.ejecutivo, Cliente:m.nombre_cliente, 'RUT Cliente':m.rut_cliente,
-    Saldo:m.saldo, Comision:m.comision, 'E° Comisión':m.estado_comision, 'N° Carta':m.num_carta,
+    Saldo:m.saldo, Comision:m.comision, 'E° Comisión':m.estado_comision,
+    'Estado por':m.estado_usuario||'', 'Estado fecha':m.estado_fecha?fdMov(m.estado_fecha):'',
+    'Mes Cartola':m.mes_cartola||'', 'N° Carta':m.num_carta,
     Vendedor:m.vendedor, Acreedor:m.acreedor, Observaciones:m.observaciones }));
   const ws = XLSX.utils.json_to_sheet(rows);
   const wb = XLSX.utils.book_new();
@@ -2277,13 +2282,19 @@ function subTabCartolas(t){
   if (t==='revision') renderRevCartolas();
 }
 
-/* ═══════════ CARTOLAS: REVISIÓN Y ENVÍO ═══════════ */
+/* ═══════════ CARTOLAS: REVISIÓN Y ENVÍO ═══════════
+   La cartola incluye TODO lo pendiente (marcado A PAGAR / A DESCONTAR) que aún no
+   ha salido en una cartola anterior (mes_cartola vacío), sin importar el mes de
+   origen. El mes seleccionado arriba es el período en que se emite la cartola. */
+let REV_IDS = {};   // gi → [ids de movimientos del bloque] para el envío
 function renderRevCartolas(){
   const cont = document.getElementById('bloquesCartolas');
   if (!cont) return;
   const q = (document.getElementById('revCtaBuscar').value||'').toLowerCase();
+  REV_IDS = {};
+  const PEND = MOVS_ALL.filter(m => !m.mes_cartola && (m.estado_comision==='A PAGAR' || m.estado_comision==='A DESCONTAR'));
   const grupos = {};
-  MOVS.forEach(m=>{
+  PEND.forEach(m=>{
     const key = m.concesionario||'(sin concesionario)';
     (grupos[key] = grupos[key]||[]).push(m);
   });
@@ -2297,6 +2308,7 @@ function renderRevCartolas(){
   const mes = document.getElementById('ctaMes').value || mesActual();
   cont.innerHTML = nombres.map((conc,gi)=>{
     const movs = grupos[conc];
+    REV_IDS[gi] = movs.map(m=>m.id);
     const rutC = movs.find(m=>m.rut_conc)?.rut_conc || '';
     const mailBD = movs.find(m=>m.mail)?.mail || DEALERS.find(d=>d.rut===rutC)?.mail || '';
     const comisiones = movs.filter(m=>m.movimiento==='COMISION' && m.estado_comision==='A PAGAR').reduce((s,m)=>s+(+m.comision||0),0);
@@ -2317,7 +2329,7 @@ function renderRevCartolas(){
       <div style="background:linear-gradient(90deg,#012d70,#0255c5);color:#fff;padding:12px 18px;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px">
         <div>
           <div style="font-weight:800;font-size:.95rem">${escH(conc)}</div>
-          <div style="font-size:.72rem;opacity:.8">RUT: ${fmtRUT(rutC)} &middot; Mes: ${nombreMes(mes)}</div>
+          <div style="font-size:.72rem;opacity:.8">RUT: ${fmtRUT(rutC)} &middot; Cartola: ${nombreMes(mes)} &middot; ${movs.length} oper.</div>
         </div>
         <div style="display:flex;align-items:center;gap:8px" data-html2canvas-ignore>
           <input id="mailCta${gi}" value="${escH(mailBD)}" placeholder="correo@concesionario.cl" style="border:none;border-radius:7px;padding:6px 10px;font-size:.78rem;min-width:220px">
@@ -2341,7 +2353,7 @@ function renderRevCartolas(){
         <div style="font-size:.7rem;color:#94a3b8;margin-top:10px">Facturar a: AUTOFACIL SPA &middot; RUT: 76.545.638-K &middot; Av. Presidente Kennedy N° 5757 Piso 16 Of. 1601, Las Condes.</div>
       </div>
     </div>`;
-  }).join('') || '<div style="text-align:center;color:#94a3b8;padding:30px">Sin cartolas para este mes</div>';
+  }).join('') || '<div style="text-align:center;color:#94a3b8;padding:30px">No hay comisiones marcadas a pago pendientes de cartola.</div>';
 }
 
 async function enviarCartola(gi, conc, rutC, total){
@@ -2359,11 +2371,13 @@ async function enviarCartola(gi, conc, rutC, total){
       jsPDF: { unit:'mm', format:'letter', orientation:'portrait' },
     }).from(bloque).save();
   } catch(e) { alert('Error generando PDF: '+e.message); return; }
-  // 2) Registrar el envío
+  // 2) Registrar el envío: estampa el mes de cartola en los movimientos y marca Post Venta
   try {
     await fetch('/api/cartolas/enviadas', { method:'POST', headers: hdr(),
-      body: JSON.stringify({ mes, rut_conc: rutC, concesionario: conc, mail, total_bruto: total }) });
+      body: JSON.stringify({ mes, rut_conc: rutC, concesionario: conc, mail, total_bruto: total, ids: (REV_IDS[gi]||[]) }) });
   } catch(e) {}
+  // Refresca para que las operaciones enviadas salgan de pendientes y muestren su Mes Cartola
+  cargarMovimientos();
   // 3) Abrir Gmail con el texto del correo (adjuntar el PDF descargado)
   const asunto = `CARTOLA COMISIONES ${nombreMes(mes).toUpperCase()} — ${conc.toUpperCase()}`;
   const cuerpo =
