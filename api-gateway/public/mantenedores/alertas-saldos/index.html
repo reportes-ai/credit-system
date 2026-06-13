@@ -5,7 +5,7 @@
   <link rel="icon" href="/img/favicon.png" type="image/png">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Alertas Saldos Precio — AutoFácil</title>
-  <!-- v1.0 -->
+  <!-- v1.1 -->
   <link href="/css/bootstrap.min.css" rel="stylesheet">
   <link href="/css/bootstrap-icons.css" rel="stylesheet">
   <style>
@@ -92,6 +92,12 @@ const escH = s => String(s??'').replace(/&/g,'&amp;').replace(/</g,'&lt;').repla
 function toast(m, err){ const t=document.getElementById('toast'); t.textContent=m; t.className='toast-af'+(err?' err':''); t.style.display='block'; setTimeout(()=>t.style.display='none',2600); }
 
 let EVENTOS = [], PERFILES = [], USUARIOS = [];
+const SONIDOS = [
+  { id:'campana',  label:'🛎️ Campana' },
+  { id:'dingdong', label:'🔔 Timbre' },
+  { id:'alarma',   label:'🚨 Alarma' },
+  { id:'aplausos', label:'👏 Aplausos' },
+];
 const SUB = {
   fondos_recibidos: 'Al marcar FONDOS RECIBIDOS → avisar para emitir la Orden de Pago.',
   orden_emitida:    'Al emitir la Orden de Pago → avisar a Tesorería para cargar los montos disponibles.',
@@ -134,9 +140,27 @@ function render(){
               ${USUARIOS.map(u => `<label><input type="checkbox" class="extra" value="${u.id}" ${selU.has(String(u.id))?'checked':''}> ${escH(u.nombre)} <span style="color:#94a3b8">· ${escH(u.perfil||'')}</span></label>`).join('')}
             </div>
           </div>
-          <div style="display:flex;flex-direction:column;gap:12px;padding-top:18px">
+          <div style="display:flex;flex-direction:column;gap:10px;padding-top:6px;min-width:250px">
             <label class="sw"><input type="checkbox" class="incl-ej" ${ev.incluir_ejecutivo?'checked':''}> Incluir ejecutivo de la operación</label>
             <label class="sw"><input type="checkbox" class="activo" ${ev.activo?'checked':''}> Alerta activa</label>
+            <div style="display:flex;align-items:center;gap:8px">
+              <span class="lbl" style="margin:0">Prioridad</span>
+              <select class="prioridad form-select form-select-sm" style="width:auto">
+                <option value="normal" ${ev.prioridad!=='alta'?'selected':''}>Normal</option>
+                <option value="alta" ${ev.prioridad==='alta'?'selected':''}>Alta</option>
+              </select>
+            </div>
+            <label class="sw"><input type="checkbox" class="sonido" ${ev.sonido?'checked':''}> Suena en la campana</label>
+            <div style="display:flex;align-items:center;gap:8px">
+              <span class="lbl" style="margin:0">Sonido</span>
+              <select class="sonido-tipo form-select form-select-sm" style="width:auto">
+                ${SONIDOS.map(s => `<option value="${s.id}" ${ev.sonido_tipo===s.id?'selected':''}>${s.label}</option>`).join('')}
+              </select>
+            </div>
+            <div style="display:flex;align-items:center;gap:6px;font-size:.82rem;color:#374151">
+              Repetir cada <input type="number" min="5" class="son-cada form-control form-control-sm" style="width:70px" value="${ev.sonido_cada_seg||30}"> seg,
+              máx <input type="number" min="1" class="son-max form-control form-control-sm" style="width:60px" value="${ev.sonido_max_min||5}"> min
+            </div>
           </div>
         </div>
       </div>
@@ -154,6 +178,11 @@ async function guardar(){
       usuarios_extra,
       incluir_ejecutivo: card.querySelector('.incl-ej').checked,
       activo: card.querySelector('.activo').checked,
+      prioridad: card.querySelector('.prioridad').value,
+      sonido: card.querySelector('.sonido').checked,
+      sonido_tipo: card.querySelector('.sonido-tipo').value,
+      sonido_cada_seg: parseInt(card.querySelector('.son-cada').value) || 30,
+      sonido_max_min: parseInt(card.querySelector('.son-max').value) || 5,
     };
   });
   const btn = document.getElementById('btnGuardar');

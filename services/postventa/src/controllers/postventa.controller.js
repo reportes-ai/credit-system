@@ -127,6 +127,7 @@ const EVENTOS_SALDO = [
   { evento: 'pago_realizado', titulo: 'Saldo precio pagado',
     mensaje: 'Se registró el pago del saldo precio de {op}.', href: '/postventa/seguimiento/' },
 ];
+const SONIDOS_SALDO = ['campana', 'dingdong', 'alarma', 'aplausos'];
 (async () => {
   try {
     await pool.query(`CREATE TABLE IF NOT EXISTS postventa_alertas_config (
@@ -134,8 +135,19 @@ const EVENTOS_SALDO = [
       perfiles          TEXT,
       incluir_ejecutivo TINYINT(1) NOT NULL DEFAULT 0,
       usuarios_extra    TEXT,
-      activo            TINYINT(1) NOT NULL DEFAULT 1
+      activo            TINYINT(1) NOT NULL DEFAULT 1,
+      prioridad         VARCHAR(10) NOT NULL DEFAULT 'normal',
+      sonido            TINYINT(1) NOT NULL DEFAULT 1,
+      sonido_tipo       VARCHAR(20) NOT NULL DEFAULT 'campana',
+      sonido_cada_seg   INT NOT NULL DEFAULT 30,
+      sonido_max_min    INT NOT NULL DEFAULT 5
     )`);
+    // Columnas para instalaciones que ya tenían la tabla (mismas variables que el resto de alertas)
+    await pool.query(`ALTER TABLE postventa_alertas_config ADD COLUMN IF NOT EXISTS prioridad VARCHAR(10) NOT NULL DEFAULT 'normal'`).catch(()=>{});
+    await pool.query(`ALTER TABLE postventa_alertas_config ADD COLUMN IF NOT EXISTS sonido TINYINT(1) NOT NULL DEFAULT 1`).catch(()=>{});
+    await pool.query(`ALTER TABLE postventa_alertas_config ADD COLUMN IF NOT EXISTS sonido_tipo VARCHAR(20) NOT NULL DEFAULT 'campana'`).catch(()=>{});
+    await pool.query(`ALTER TABLE postventa_alertas_config ADD COLUMN IF NOT EXISTS sonido_cada_seg INT NOT NULL DEFAULT 30`).catch(()=>{});
+    await pool.query(`ALTER TABLE postventa_alertas_config ADD COLUMN IF NOT EXISTS sonido_max_min INT NOT NULL DEFAULT 5`).catch(()=>{});
     for (const e of EVENTOS_SALDO)
       await pool.query(
         `INSERT IGNORE INTO postventa_alertas_config (evento, perfiles, incluir_ejecutivo, usuarios_extra, activo)
@@ -175,6 +187,11 @@ async function notificarEventoSaldo(evento, { op, id_seguimiento, ejecutivo, cla
     if (!ids.size) return;
     const mensaje = def.mensaje.replace('{op}', op != null ? ('N° ' + op) : 'una operación');
     const clave = `pvalert:${evento}:${claveExtra || id_seguimiento || Date.now()}`;
+    const prioridad = cfg.prioridad || 'normal';
+    const sonar = cfg.sonido ? 1 : 0;
+    const sonTipo = SONIDOS_SALDO.includes(cfg.sonido_tipo) ? cfg.sonido_tipo : 'campana';
+    const sonCada = cfg.sonido_cada_seg || 30;
+    const sonMax = cfg.sonido_max_min || 5;
     for (const uid of ids) {
       const [[ex]] = await pool.query(
         'SELECT 1 FROM notificaciones WHERE id_usuario=? AND clave=? AND leida=0 LIMIT 1', [uid, clave]);
@@ -182,7 +199,7 @@ async function notificarEventoSaldo(evento, { op, id_seguimiento, ejecutivo, cla
       await pool.query(
         `INSERT INTO notificaciones (id_usuario, tipo, titulo, mensaje, href, clave, prioridad, sonar, son_cada, son_max, son_tipo)
          VALUES (?,?,?,?,?,?,?,?,?,?,?)`,
-        [uid, 'alerta', def.titulo, mensaje, def.href, clave, 'normal', 1, 30, 5, 'campana']);
+        [uid, 'alerta', def.titulo, mensaje, def.href, clave, prioridad, sonar, sonCada, sonMax, sonTipo]);
     }
   } catch (e) { console.error('[notificarEventoSaldo]', evento, e.message); }
 }
@@ -382,9 +399,12 @@ const getAlertasConfig = async (req, res) => {
       const c = map[e.evento] || {};
       return { evento: e.evento, titulo: e.titulo,
         perfiles: c.perfiles || '', incluir_ejecutivo: !!c.incluir_ejecutivo,
-        usuarios_extra: c.usuarios_extra || '', activo: c.activo === undefined ? 1 : c.activo };
+        usuarios_extra: c.usuarios_extra || '', activo: c.activo === undefined ? 1 : c.activo,
+        prioridad: c.prioridad || 'normal', sonido: c.sonido === undefined ? 1 : c.sonido,
+        sonido_tipo: c.sonido_tipo || 'campana', sonido_cada_seg: c.sonido_cada_seg || 30,
+        sonido_max_min: c.sonido_max_min || 5 };
     });
-    res.json({ success: true, data, error: null });
+    res.json({ success: true, data, sonidos: SONIDOS_SALDO, error: null });
   } catch (e) {
     res.status(500).json({ success: false, data: null, error: 'Error interno del servidor' });
   }
@@ -394,13 +414,17 @@ const setAlertasConfig = async (req, res) => {
     const lista = Array.isArray(req.body?.config) ? req.body.config : [];
     for (const c of lista) {
       if (!EVENTOS_SALDO.find(e => e.evento === c.evento)) continue;
+      const sonTipo = SONIDOS_SALDO.includes(c.sonido_tipo) ? c.sonido_tipo : 'campana';
       await pool.query(
-        `INSERT INTO postventa_alertas_config (evento, perfiles, incluir_ejecutivo, usuarios_extra, activo)
-         VALUES (?,?,?,?,?)
+        `INSERT INTO postventa_alertas_config (evento, perfiles, incluir_ejecutivo, usuarios_extra, activo, prioridad, sonido, sonido_tipo, sonido_cada_seg, sonido_max_min)
+         VALUES (?,?,?,?,?,?,?,?,?,?)
          ON DUPLICATE KEY UPDATE perfiles=VALUES(perfiles), incluir_ejecutivo=VALUES(incluir_ejecutivo),
-           usuarios_extra=VALUES(usuarios_extra), activo=VALUES(activo)`,
+           usuarios_extra=VALUES(usuarios_extra), activo=VALUES(activo), prioridad=VALUES(prioridad),
+           sonido=VALUES(sonido), sonido_tipo=VALUES(sonido_tipo), sonido_cada_seg=VALUES(sonido_cada_seg), sonido_max_min=VALUES(sonido_max_min)`,
         [c.evento, String(c.perfiles || ''), c.incluir_ejecutivo ? 1 : 0,
-         String(c.usuarios_extra || ''), c.activo ? 1 : 0]);
+         String(c.usuarios_extra || ''), c.activo ? 1 : 0,
+         c.prioridad === 'alta' ? 'alta' : 'normal', c.sonido ? 1 : 0, sonTipo,
+         Math.max(5, parseInt(c.sonido_cada_seg) || 30), Math.max(1, parseInt(c.sonido_max_min) || 5)]);
     }
     res.json({ success: true, data: { actualizados: lista.length }, error: null });
   } catch (e) {
