@@ -5,7 +5,7 @@
   <link rel="icon" href="/img/favicon.png" type="image/png">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Cartas de Aprobación — AutoFácil</title>
-  <!-- v3.8 -->
+  <!-- v3.9 -->
   <link href="/css/bootstrap.min.css" rel="stylesheet">
   <link href="/css/bootstrap-icons.css" rel="stylesheet">
   <style>
@@ -486,7 +486,7 @@
 
   <div id="cartolasRevision" style="display:none">
     <div class="filters-bar" style="margin-bottom:14px">
-      <input type="text" id="revCtaBuscar" placeholder="Buscar concesionario…" oninput="renderRevCartolas()" style="min-width:220px">
+      <input type="text" id="revCtaBuscar" placeholder="Concesionario, RUT, cliente, N° ID, operación…" oninput="renderRevCartolas()" style="min-width:260px">
       <span style="font-size:.78rem;color:#64748b" id="revCtaCount"></span>
     </div>
     <div id="bloquesCartolas"></div>
@@ -2285,10 +2285,14 @@ function renderRevCartolas(){
   const grupos = {};
   MOVS.forEach(m=>{
     const key = m.concesionario||'(sin concesionario)';
-    if (q && !key.toLowerCase().includes(q)) return;
     (grupos[key] = grupos[key]||[]).push(m);
   });
-  const nombres = Object.keys(grupos).sort();
+  // Búsqueda por cualquier campo: incluye el bloque completo del concesionario si
+  // su nombre o cualquiera de sus movimientos coincide con el texto.
+  let nombres = Object.keys(grupos).sort();
+  if (q) nombres = nombres.filter(key => key.toLowerCase().includes(q) ||
+    grupos[key].some(m => [m.num_op,m.nuestro_num_op,m.rut_cliente,m.nombre_cliente,m.ejecutivo,m.num_carta]
+      .some(v => String(v||'').toLowerCase().includes(q))));
   document.getElementById('revCtaCount').textContent = nombres.length + ' concesionario(s)';
   const mes = document.getElementById('ctaMes').value || mesActual();
   cont.innerHTML = nombres.map((conc,gi)=>{
@@ -2301,7 +2305,7 @@ function renderRevCartolas(){
     const subTotal = comisiones - anulacion - prepago;
     const neto = Math.round(subTotal/1.19), iva = subTotal - neto;
     const filas = movs.map(m=>`<tr>
-      <td>${escH(m.num_op||'')}</td><td style="font-size:.74rem">${escH(m.movimiento)}</td>
+      <td>${escH(m.num_op||'')}</td><td>${escH(m.nuestro_num_op||'—')}</td><td style="font-size:.74rem">${escH(m.movimiento)}</td>
       <td style="font-size:.74rem">${escH(m.ejecutivo||'')}</td>
       <td>${escH(toTitle(m.nombre_cliente||''))}</td><td>${fmtRUT(m.rut_cliente||'')}</td>
       <td style="text-align:right">${fmtCLP(m.saldo)}</td>
@@ -2321,7 +2325,7 @@ function renderRevCartolas(){
         </div>
       </div>
       <div style="padding:14px 18px">
-        <table class="tbl"><thead><tr><th>N° Op</th><th>Mov.</th><th>Ejecutivo</th><th>Cliente</th><th>RUT</th><th style="text-align:right">Saldo</th><th style="text-align:right">Comisión</th><th>E° Comisión</th><th>Obs.</th></tr></thead>
+        <table class="tbl"><thead><tr><th>N° ID</th><th>N° Operación</th><th>Mov.</th><th>Ejecutivo</th><th>Cliente</th><th>RUT</th><th style="text-align:right">Saldo</th><th style="text-align:right">Comisión</th><th>E° Comisión</th><th>Obs.</th></tr></thead>
         <tbody>${filas}</tbody></table>
         <div style="display:flex;justify-content:flex-end;margin-top:12px">
           <table class="tbl" style="width:340px">
