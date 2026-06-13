@@ -8,7 +8,7 @@ const pool = require('../../../../shared/config/database');
       CREATE TABLE IF NOT EXISTS postventa_seguimiento (
         id            INT AUTO_INCREMENT PRIMARY KEY,
         id_credito    INT NOT NULL,
-        num_op        VARCHAR(30),
+        num_op        INT DEFAULT NULL,
         financiera    VARCHAR(60),
         rut_dealer    VARCHAR(20),
         nombre_dealer VARCHAR(200),
@@ -90,7 +90,7 @@ const pool = require('../../../../shared/config/database');
         id             INT AUTO_INCREMENT PRIMARY KEY,
         num_orden      VARCHAR(30) UNIQUE,
         id_seguimiento INT NOT NULL,
-        num_op         VARCHAR(30),
+        num_op         INT DEFAULT NULL,
         monto          BIGINT,
         usuario        VARCHAR(150),
         fecha          DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
@@ -102,12 +102,19 @@ const pool = require('../../../../shared/config/database');
         id             INT AUTO_INCREMENT PRIMARY KEY,
         num_orden      VARCHAR(30) UNIQUE,
         id_seguimiento INT NOT NULL,
-        num_op         VARCHAR(30),
+        num_op         INT DEFAULT NULL,
         monto          BIGINT,
         usuario        VARCHAR(150),
         fecha          DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
         UNIQUE KEY uk_seg (id_seguimiento)
       )`);
+    // Homologación: num_op varchar->int (datos verificados 100% numéricos)
+    for (const t of ['postventa_seguimiento','postventa_ordenes','postventa_ordenes_comision']) {
+      try {
+        const [[c]] = await pool.query(`SELECT data_type dt FROM information_schema.columns WHERE table_schema=DATABASE() AND table_name=? AND column_name='num_op'`, [t]);
+        if (c && String(c.dt).toLowerCase() === 'varchar') await pool.query(`ALTER TABLE \`${t}\` MODIFY COLUMN num_op INT DEFAULT NULL`);
+      } catch(e){ console.error('[num_op->int '+t+']', e.message); }
+    }
     // Reversas de pago fuera del día (auditoría para Riesgo Operacional)
     await pool.query(`
       CREATE TABLE IF NOT EXISTS postventa_reversas (

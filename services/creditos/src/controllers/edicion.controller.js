@@ -9,7 +9,7 @@ const { isMesCerrado } = require('../../../../shared/utils/mes-cerrado');
       CREATE TABLE IF NOT EXISTS creditos_edicion_log (
         id          INT AUTO_INCREMENT PRIMARY KEY,
         id_credito  INT NOT NULL,
-        num_op      VARCHAR(30) DEFAULT NULL,
+        num_op      INT DEFAULT NULL,
         usuario     VARCHAR(150) NOT NULL,
         campo       VARCHAR(80) NOT NULL,
         valor_antes TEXT DEFAULT NULL,
@@ -19,6 +19,11 @@ const { isMesCerrado } = require('../../../../shared/utils/mes-cerrado');
         INDEX idx_fecha (fecha)
       )
     `);
+    // Homologación: num_op varchar->int (tabla vacía / datos numéricos)
+    try {
+      const [[nc]] = await pool.query(`SELECT data_type dt FROM information_schema.columns WHERE table_schema=DATABASE() AND table_name='creditos_edicion_log' AND column_name='num_op'`);
+      if (nc && String(nc.dt).toLowerCase() === 'varchar') await pool.query(`ALTER TABLE creditos_edicion_log MODIFY COLUMN num_op INT DEFAULT NULL`);
+    } catch(e){ console.error('[num_op->int creditos_edicion_log]', e.message); }
   } catch (e) { if (e.errno !== 1050) console.error('[edicion log migration]', e.message); }
 })();
 

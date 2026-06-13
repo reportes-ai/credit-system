@@ -9,7 +9,7 @@ const pool = require('../../../../shared/config/database');
         id              INT AUTO_INCREMENT PRIMARY KEY,
         mes             VARCHAR(7)  NOT NULL,
         id_carta        INT         DEFAULT NULL,
-        num_op          VARCHAR(30) DEFAULT NULL,
+        num_op          INT DEFAULT NULL,
         movimiento      ENUM('COMISION','PREPAGO','ANULACION') NOT NULL DEFAULT 'COMISION',
         rut_dealer      VARCHAR(20)  DEFAULT NULL,
         nombre_dealer   VARCHAR(200) DEFAULT NULL,
@@ -68,6 +68,11 @@ const pool = require('../../../../shared/config/database');
         if (cc.c > 0) await pool.query(`ALTER TABLE \`${t}\` CHANGE COLUMN concesionario nombre_dealer ${def}`);
       } catch(e){ console.error('[cartolas rename concesionario '+t+']', e.message); }
     }
+    // Homologación: num_op varchar->int (datos verificados 100% numéricos)
+    try {
+      const [[nc]] = await pool.query(`SELECT data_type dt FROM information_schema.columns WHERE table_schema=DATABASE() AND table_name='cartolas_movimientos' AND column_name='num_op'`);
+      if (nc && String(nc.dt).toLowerCase() === 'varchar') await pool.query(`ALTER TABLE cartolas_movimientos MODIFY COLUMN num_op INT DEFAULT NULL`);
+    } catch(e){ console.error('[num_op->int cartolas_movimientos]', e.message); }
     console.log('[cartolas] tablas OK');
   } catch (e) { console.error('[cartolas migration]', e.message); }
 })();
