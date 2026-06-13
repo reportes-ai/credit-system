@@ -268,6 +268,8 @@ function mapRow(r) {
     excepcionesComentarios:   parseJSON(r.excepciones_comentarios),
     numeroCreditoCreado:      r.numero_credito_creado || null,
     idCreditoCreado:          r.id_credito_creado || null,
+    numOp:                    r.cred_num_op || null,                                  // NUESTRO N° de operación (creditos.num_op)
+    numeroCredito:            r.cred_numero_credito || r.numero_credito_creado || null,
   };
 }
 
@@ -304,12 +306,13 @@ const getAll = async (req, res) => {
   try {
     const verTodas = await puedeVerTodas(req.usuario);
     const login = req.usuario?.email || String(req.usuario?.id_usuario || '');
+    // JOIN al crédito enlazado para exponer NUESTRO N° de operación (num_op) y numero_credito
+    const SEL = `SELECT ca.*, cr.num_op AS cred_num_op, cr.numero_credito AS cred_numero_credito
+                 FROM cartas_aprobacion ca
+                 LEFT JOIN creditos cr ON cr.id = ca.id_credito_creado`;
     const [rows] = verTodas
-      ? await pool.query('SELECT * FROM cartas_aprobacion ORDER BY fecha_creacion DESC')
-      : await pool.query(
-          'SELECT * FROM cartas_aprobacion WHERE creado_por = ? ORDER BY fecha_creacion DESC',
-          [login]
-        );
+      ? await pool.query(`${SEL} ORDER BY ca.fecha_creacion DESC`)
+      : await pool.query(`${SEL} WHERE ca.creado_por = ? ORDER BY ca.fecha_creacion DESC`, [login]);
     res.json({ success: true, data: rows.map(mapRow), verTodas, error: null });
   } catch (e) {
     (console.error('[error]', e), res.status(500).json({success:false,data:null,error:'Error interno del servidor'}));

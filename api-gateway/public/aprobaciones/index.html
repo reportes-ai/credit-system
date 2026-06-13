@@ -5,7 +5,7 @@
   <link rel="icon" href="/img/favicon.png" type="image/png">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Cartas de Aprobación — AutoFácil</title>
-  <!-- v3.3 -->
+  <!-- v3.4 -->
   <link href="/css/bootstrap.min.css" rel="stylesheet">
   <link href="/css/bootstrap-icons.css" rel="stylesheet">
   <style>
@@ -2106,7 +2106,7 @@ function renderInformes(){
       : '<span style="color:#cbd5e1;font-size:1.1rem"><i class="bi bi-square"></i></span><div style="font-size:.62rem;color:#94a3b8">NO</div>';
     return `<tr>
       <td><b>${escH(c.opCarta||'')}</b></td>
-      <td style="font-size:.78rem">${escH(c.numeroCreditoCreado||c.opOrigen||'—')}</td>
+      <td style="font-size:.78rem">${escH(c.numOp||c.numeroCredito||'—')}</td>
       <td style="font-size:.7rem">${escH(c.tipo||'')}</td>
       <td>${escH(toTitle(c.cliente||''))}</td>
       <td style="font-size:.76rem">${escH(c.concesionario||'')}</td>
@@ -2145,7 +2145,7 @@ function exportarInformes(){
     'Concesionario':c.concesionario, 'Ejecutivo':c.ejecutivoNombre, 'Creador':c.creadoPorNombre,
     'Creado':dDT(c.fechaCreacion), 'Aprobador':c.aprobadoPorNombre, 'Aprobado':dDT(c.fechaAprobacion),
     'Estado':c.status, 'Excepciones':(c.excepciones||[]).join(', '), 'Otorgado':c.otorgado?'SI':'NO',
-    'N° Crédito':c.numeroCreditoCreado||c.opOrigen||'', 'Saldo':c.saldo, 'Participación Bruta':c.partBruto,
+    'N° Crédito':c.numOp||c.numeroCredito||'', 'Saldo':c.saldo, 'Participación Bruta':c.partBruto,
   }));
   const ws = XLSX.utils.json_to_sheet(rows);
   const wb = XLSX.utils.book_new();
