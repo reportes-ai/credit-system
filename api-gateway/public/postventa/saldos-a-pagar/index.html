@@ -5,7 +5,7 @@
   <link rel="icon" href="/img/favicon.png" type="image/png">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Saldos Precios a Pagar — AutoFácil</title>
-  <!-- v2.0 -->
+  <!-- v2.1 -->
   <link href="/css/bootstrap.min.css" rel="stylesheet">
   <link href="/css/bootstrap-icons.css" rel="stylesheet">
   <style>
@@ -25,13 +25,26 @@
     .head-row { display:flex; align-items:flex-start; justify-content:space-between; flex-wrap:wrap; gap:12px; margin-bottom:14px; }
     /* Recuadro resumen arriba */
     .resumen { display:flex; gap:14px; flex-wrap:wrap; margin-bottom:16px; }
-    .stat { background:#fff; border-radius:14px; box-shadow:0 1px 4px rgba(0,0,0,.07); padding:14px 20px; min-width:210px; border-left:5px solid #cbd5e1; }
+    .stat { flex:1 1 220px; background:#fff; border-radius:14px; box-shadow:0 1px 4px rgba(0,0,0,.07); padding:14px 20px; border-left:5px solid #cbd5e1; box-sizing:border-box; }
     .stat .lbl { font-size:.72rem; text-transform:uppercase; letter-spacing:.4px; color:#64748b; font-weight:700; }
     .stat .val { font-size:1.5rem; font-weight:800; color:var(--navy); margin-top:2px; }
     .stat .sub { font-size:.82rem; color:#475569; margin-top:1px; }
     .stat.pend { border-left-color:#0141A2; }
     .stat.pag  { border-left-color:#16a34a; }
     .stat.pag .val { color:#15803d; }
+    .stat.fondos { border-left-color:#0ea5e9; }
+    .stat.fondos input { width:100%; box-sizing:border-box; margin-top:4px; border:1.5px solid #d1d5db; border-radius:8px; padding:7px 11px; font-size:1.15rem; font-weight:800; color:var(--navy); }
+    .stat.fondos input:focus { outline:none; border-color:#0ea5e9; }
+    /* Propuestas */
+    .stat.prop { cursor:default; border-left-color:#7c3aed; display:flex; flex-direction:column; }
+    .stat.prop.ant { border-left-color:#d97706; }
+    .stat.prop .row { display:flex; align-items:center; justify-content:space-between; gap:10px; margin-top:4px; }
+    .stat.prop .val { font-size:1.35rem; }
+    .btn-marcar { background:#0141A2; color:#fff; border:none; border-radius:8px; padding:7px 14px; font-size:.8rem; font-weight:700; cursor:pointer; white-space:nowrap; }
+    .stat.prop.ant .btn-marcar { background:#d97706; }
+    .btn-marcar:disabled { opacity:.45; cursor:default; }
+    tbody tr.row-prop td { box-shadow:inset 0 0 0 9999px rgba(124,58,237,.08); }
+    tbody tr.row-prop-ant td { box-shadow:inset 0 0 0 9999px rgba(217,119,6,.10); }
     .card-af { background:#fff; border-radius:14px; box-shadow:0 1px 4px rgba(0,0,0,.07); padding:6px 0 0; overflow:hidden; }
     .tbl-scroll { max-height:calc(100vh - 320px); overflow:auto; }
     table { width:100%; border-collapse:collapse; font-size:.82rem; }
@@ -91,6 +104,29 @@
       <div class="val" id="cntPag">0</div>
       <div class="sub" id="montoPag">$0</div>
     </div>
+    <div class="stat fondos">
+      <div class="lbl">Fondos disponibles</div>
+      <input id="fondos" inputmode="numeric" placeholder="$0" oninput="onFondos(this)">
+      <div class="sub" id="fondosSub">Disponible para asignar: $0</div>
+    </div>
+  </div>
+
+  <!-- Propuestas de pago según fondos disponibles -->
+  <div class="resumen" id="propBox" style="display:none">
+    <div class="stat prop max" id="propMax" onmouseenter="hl('max')" onmouseleave="hl(null)">
+      <div class="lbl">Propuesta · Máximo de operaciones</div>
+      <div class="row">
+        <div><div class="val" id="propMaxN">0 ops</div><div class="sub" id="propMaxM">Gasta $0</div></div>
+        <button class="btn-marcar" id="propMaxBtn" onclick="marcarPropuesta('max')">Marcar</button>
+      </div>
+    </div>
+    <div class="stat prop ant" id="propAnt" onmouseenter="hl('ant')" onmouseleave="hl(null)">
+      <div class="lbl">Propuesta · Prioriza antigüedad</div>
+      <div class="row">
+        <div><div class="val" id="propAntN">0 ops</div><div class="sub" id="propAntM">Gasta $0</div></div>
+        <button class="btn-marcar" id="propAntBtn" onclick="marcarPropuesta('ant')">Marcar</button>
+      </div>
+    </div>
   </div>
 
   <div class="card-af">
@@ -138,9 +174,12 @@ const fmt = n => '$'+Number(n||0).toLocaleString('es-CL');
 const escH = s => String(s??'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
 const fechaCL = f => { if(!f) return '—'; const d=new Date(f); return isNaN(d)?'—':d.toLocaleDateString('es-CL',{timeZone:'UTC'}); };
 function toast(m, err){ const t=document.getElementById('toast'); t.textContent=m; t.className='toast'+(err?' err':''); t.style.display='block'; setTimeout(()=>t.style.display='none',2800); }
-let DATA = [];
+let DATA = [], fondosVal = 0, lastProp = { max:{set:[],monto:0}, ant:{set:[],monto:0} };
 
 (async function init(){
+  // Restaurar fondos disponibles guardados (por día)
+  const guard = localStorage.getItem('pv_fondos');
+  if (guard){ fondosVal = Number(guard)||0; const inp=document.getElementById('fondos'); if(fondosVal){ inp.value = '$'+fondosVal.toLocaleString('es-CL'); } }
   try {
     const r = await fetch('/api/postventa/saldos-a-pagar', { headers:H });
     const j = await r.json();
@@ -224,17 +263,80 @@ async function toggle(chk){
   recalc();
 }
 
+const sum = arr => arr.reduce((a,r)=>a+Number(r.saldo_precio||0),0);
+
 function recalc(){
   const rows = visibles();
-  const totSaldo = rows.reduce((a,r)=>a+Number(r.saldo_precio||0),0);
-  document.getElementById('totSaldo').textContent = fmt(totSaldo);
+  document.getElementById('totSaldo').textContent = fmt(sum(rows));
   // Recuadro: pendientes vs pagados hoy (sobre TODA la data, no solo visible)
   const pend = DATA.filter(r => !r.pagado), pag = DATA.filter(r => r.pagado);
-  const sum = arr => arr.reduce((a,r)=>a+Number(r.saldo_precio||0),0);
   document.getElementById('cntPend').textContent   = pend.length;
   document.getElementById('montoPend').textContent = fmt(sum(pend));
   document.getElementById('cntPag').textContent    = pag.length;
   document.getElementById('montoPag').textContent  = fmt(sum(pag));
+  recalcPropuestas();
+}
+
+/* ── Fondos disponibles: autoformato pesos inmediato ── */
+function onFondos(inp){
+  const digits = (inp.value||'').replace(/\D/g,'');
+  fondosVal = Number(digits||0);
+  inp.value = digits ? '$'+fondosVal.toLocaleString('es-CL') : '';
+  localStorage.setItem('pv_fondos', fondosVal);
+  recalcPropuestas();
+}
+
+/* ── Propuestas sobre los fondos disponibles ──
+   Disponible para asignar = Fondos - lo ya pagado hoy.
+   Candidatas = operaciones aún pendientes.
+   · Máximo de operaciones: las más baratas primero (paga la mayor cantidad).
+   · Antigüedad: las más antiguas primero (DATA ya viene ordenada); si una no
+     alcanza, se salta y se sigue buscando otra que quepa con el saldo. */
+function recalcPropuestas(){
+  const restante = Math.max(0, fondosVal - sum(DATA.filter(r => r.pagado)));
+  document.getElementById('fondosSub').textContent = 'Disponible para asignar: ' + fmt(restante);
+  const cand = DATA.filter(r => !r.pagado);
+
+  const llenar = lista => { const set=[]; let acc=0;
+    for (const r of lista){ const v=Number(r.saldo_precio||0); if (acc+v <= restante){ set.push(r); acc+=v; } }
+    return { set, monto:acc };
+  };
+  lastProp.max = llenar(cand.slice().sort((a,b)=>Number(a.saldo_precio||0)-Number(b.saldo_precio||0)));
+  lastProp.ant = llenar(cand); // cand ya está en orden de antigüedad
+
+  const pintar = (which, nEl, mEl, btn) => {
+    const p = lastProp[which];
+    document.getElementById(nEl).textContent = p.set.length + ' ops';
+    document.getElementById(mEl).textContent = 'Gasta ' + fmt(p.monto);
+    document.getElementById(btn).disabled = p.set.length === 0;
+  };
+  pintar('max','propMaxN','propMaxM','propMaxBtn');
+  pintar('ant','propAntN','propAntM','propAntBtn');
+  document.getElementById('propBox').style.display = fondosVal > 0 ? 'flex' : 'none';
+}
+
+/* Resalta las filas de una propuesta al pasar el mouse */
+function hl(which){
+  document.querySelectorAll('tr.row-prop, tr.row-prop-ant').forEach(tr => tr.classList.remove('row-prop','row-prop-ant'));
+  if (!which) return;
+  const cls = which==='ant' ? 'row-prop-ant' : 'row-prop';
+  lastProp[which].set.forEach(r => document.getElementById('row_'+r.id)?.classList.add(cls));
+}
+
+/* Marca (paga) todas las operaciones de una propuesta */
+async function marcarPropuesta(which){
+  const set = lastProp[which].set;
+  if (!set.length) return;
+  if (!confirm(`Vas a marcar ${set.length} saldo(s) precio como PAGADO por ${fmt(lastProp[which].monto)}. ¿Confirmas?`)) return;
+  const ids = set.map(r => r.id);
+  try {
+    const resp = await fetch('/api/postventa/saldos-a-pagar/pagar', { method:'POST', headers:H, body: JSON.stringify({ ids }) });
+    const j = await resp.json();
+    if (!j.success) throw new Error(j.error||'Error');
+    set.forEach(r => r.pagado = true);
+    hl(null); render();
+    toast(`${ids.length} operación(es) marcadas como pagadas`);
+  } catch(e){ toast(e.message, true); }
 }
 </script>
 <script src="/js/app-version.js"></script>
