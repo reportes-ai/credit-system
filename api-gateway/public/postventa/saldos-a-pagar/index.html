@@ -5,7 +5,7 @@
   <link rel="icon" href="/img/favicon.png" type="image/png">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Saldos Precios a Pagar — AutoFácil</title>
-  <!-- v2.2 -->
+  <!-- v2.3 -->
   <link href="/css/bootstrap.min.css" rel="stylesheet">
   <link href="/css/bootstrap-icons.css" rel="stylesheet">
   <style>
@@ -67,6 +67,10 @@
     .d-wht { background:transparent; color:#64748b; font-weight:600; }
     .pagado-tag { color:#15803d; font-weight:700; font-size:.78rem; }
     .selchk { width:18px; height:18px; cursor:pointer; accent-color:#16a34a; }
+    .pagar-cell { display:inline-flex; align-items:center; gap:5px; }
+    .indbox { display:inline-block; width:18px; height:18px; border-radius:4px; background:#f1f5f9; border:1px solid #e2e8f0; }
+    .indbox.on-max { background:#7c3aed; border-color:#7c3aed; }
+    .indbox.on-ant { background:#d97706; border-color:#d97706; }
     .btn-revertir { display:block; margin:3px auto 0; background:#fff1f2; color:#b91c1c; border:1px solid #fecaca; border-radius:7px; padding:2px 9px; font-size:.72rem; font-weight:700; cursor:pointer; }
     /* Barra de acción: seleccionar → confirmar lote + nómina */
     .accionbar { display:flex; align-items:center; justify-content:space-between; gap:12px; flex-wrap:wrap; background:#fff; border-radius:14px; box-shadow:0 1px 4px rgba(0,0,0,.07); padding:12px 18px; margin-bottom:16px; border-left:5px solid #16a34a; }
@@ -232,7 +236,11 @@ function visibles(){
 
 function celdaAccion(r){
   if (r.pagado) return `<span class="pagado-tag">Pagado hoy</span><button class="btn-revertir" onclick="revertir(${r.id})">Revertir</button>`;
-  return `<input type="checkbox" class="selchk" data-id="${r.id}" ${r.sel?'checked':''} onchange="toggleSel(${r.id},this)">`;
+  return `<span class="pagar-cell">
+    <span class="indbox" id="indmax_${r.id}" title="En propuesta Máximo de operaciones"></span>
+    <span class="indbox" id="indant_${r.id}" title="En propuesta Prioriza antigüedad"></span>
+    <input type="checkbox" class="selchk" data-id="${r.id}" ${r.sel?'checked':''} onchange="toggleSel(${r.id},this)">
+  </span>`;
 }
 
 function render(){
@@ -332,12 +340,26 @@ function recalcPropuestas(){
   const pintar = (which, nEl, mEl, btn) => {
     const p = lastProp[which];
     document.getElementById(nEl).textContent = p.set.length + ' ops';
-    document.getElementById(mEl).textContent = 'Gasta ' + fmt(p.monto);
+    document.getElementById(mEl).textContent = 'Gasta ' + fmt(p.monto) + ' · Queda disponible ' + fmt(restante - p.monto);
     document.getElementById(btn).disabled = p.set.length === 0;
   };
   pintar('max','propMaxN','propMaxM','propMaxBtn');
   pintar('ant','propAntN','propAntM','propAntBtn');
   document.getElementById('propBox').style.display = fondosVal > 0 ? 'flex' : 'none';
+  pintarIndicadores();
+}
+
+/* Cubos junto al casillero: color de la propuesta que incluye esa op */
+function pintarIndicadores(){
+  const inMax = new Set(lastProp.max.set.map(r => r.id));
+  const inAnt = new Set(lastProp.ant.set.map(r => r.id));
+  DATA.forEach(r => {
+    if (r.pagado) return;
+    const em = document.getElementById('indmax_'+r.id);
+    const ea = document.getElementById('indant_'+r.id);
+    if (em) em.className = 'indbox' + (inMax.has(r.id) ? ' on-max' : '');
+    if (ea) ea.className = 'indbox' + (inAnt.has(r.id) ? ' on-ant' : '');
+  });
 }
 
 /* Resalta las filas de una propuesta al pasar el mouse */
