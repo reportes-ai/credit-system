@@ -5,7 +5,7 @@
   <link rel="icon" href="/img/favicon.png" type="image/png">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Parámetros Cobranza — AutoFácil</title>
-  <!-- v1.1 -->
+  <!-- v1.2 -->
   <link href="/css/bootstrap.min.css" rel="stylesheet">
   <link href="/css/bootstrap-icons.css" rel="stylesheet">
   <style>
@@ -88,21 +88,32 @@
 
   <!-- Probar cálculo -->
   <div class="card-af">
-    <div class="lbl">Probar cálculo</div>
+    <div class="lbl">Probar cálculo (gasto + interés por mora)</div>
     <div class="row g-2 mt-1 align-items-end">
-      <div class="col-sm-4">
-        <label class="fl">Monto deuda ($)</label>
+      <div class="col-sm-3">
+        <label class="fl">Valor cuota ($)</label>
         <input type="number" min="0" class="form-control" id="testMonto" placeholder="500000">
       </div>
       <div class="col-sm-3">
-        <label class="fl">UF ($)</label>
-        <input type="number" step="0.01" class="form-control" id="testUF" placeholder="(actual)">
+        <label class="fl">Fecha vencimiento</label>
+        <input type="date" class="form-control" id="testVenc">
       </div>
-      <div class="col-sm-3">
-        <button class="btn btn-outline-primary" onclick="probar()"><i class="bi bi-calculator me-1"></i>Calcular</button>
+      <div class="col-sm-2">
+        <label class="fl">Tramo</label>
+        <select class="form-control" id="testTramo">
+          <option value="menor">Menor 200 UF</option>
+          <option value="mayor">Mayor 200 UF</option>
+        </select>
+      </div>
+      <div class="col-sm-2">
+        <label class="fl">Al día (opc.)</label>
+        <input type="date" class="form-control" id="testHasta">
+      </div>
+      <div class="col-sm-2">
+        <button class="btn btn-outline-primary w-100" onclick="probar()"><i class="bi bi-calculator me-1"></i>Calcular</button>
       </div>
     </div>
-    <div id="testResultado" class="form-text mt-2"></div>
+    <div id="testResultado" class="mt-2" style="font-size:.84rem"></div>
   </div>
 
   <!-- Plantillas de mensaje -->
@@ -136,7 +147,8 @@
     <div class="tit"><i class="bi bi-diagram-3 me-1"></i>Qué afecta este mantenedor</div>
     <ul>
       <li><b>Textos Email / SMS / WhatsApp y datos de transferencia</b> → los mensajes que se generan en <a href="/cobranza/">Cobranza</a> → ficha del deudor → <i>Mensajes</i> (botón Email/SMS/WhatsApp).</li>
-      <li><b>Días y Tramos UF de gastos de cobranza</b> → cálculo del <b>gasto de cobranza</b> (Ley 19.496, tramos marginales sobre la deuda en UF). Se expone vía <code>POST /api/cobranza/calcular-gasto</code> para usarse en <a href="/cobranza/">Cobranza</a> y en <b>Caja</b> al recibir el pago de una cuota morosa.</li>
+      <li><b>Días y Tramos UF de gastos de cobranza</b> → cálculo del <b>gasto de cobranza</b> (Ley 19.496, tramos marginales sobre la deuda en UF; UF fija del día 21). Se expone vía <code>POST /api/cobranza/calcular-gasto</code> y, junto al interés, en <code>POST /api/cobranza/calcular-cobranza</code> para <a href="/cobranza/">Cobranza</a> y <b>Caja</b>.</li>
+      <li><b>Interés por mora</b> → usa las <a href="/mantenedores/tasas/">Tasas (TMC)</a> por mes y tramo; tasa diaria = TMC mensual/30 sobre la cuota original. No se edita aquí: depende del mantenedor de Tasas.</li>
     </ul>
   </div>
 </div>
@@ -220,19 +232,29 @@ async function guardar(){
   btn.disabled = false; btn.innerHTML = '<i class="bi bi-floppy me-1"></i>Guardar cambios';
 }
 
+const peso = n => '$'+Math.round(Number(n)||0).toLocaleString('es-CL');
 async function probar(){
-  const monto = parseFloat(document.getElementById('testMonto').value)||0;
-  const uf = parseFloat(document.getElementById('testUF').value)||0;
+  const monto_cuota = parseFloat(document.getElementById('testMonto').value)||0;
+  const fecha_vencimiento = document.getElementById('testVenc').value;
+  const tramo = document.getElementById('testTramo').value;
+  const fecha_calculo = document.getElementById('testHasta').value || undefined;
   const el = document.getElementById('testResultado');
-  if (!monto){ el.textContent = 'Ingresa un monto.'; return; }
+  if (!monto_cuota || !fecha_vencimiento){ el.textContent = 'Ingresa valor cuota y fecha de vencimiento.'; return; }
   el.textContent = 'Calculando…';
   try {
-    const r = await fetch('/api/cobranza/calcular-gasto', { method:'POST', headers:H, body: JSON.stringify({ monto, uf: uf||undefined }) });
+    const r = await fetch('/api/cobranza/calcular-cobranza', { method:'POST', headers:H, body: JSON.stringify({ monto_cuota, fecha_vencimiento, tramo, fecha_calculo }) });
     const j = await r.json();
     if (!j.success) throw new Error(j.error||'Error');
     const d = j.data;
-    const det = (d.detalle||[]).map(t => `${t.porcion_uf.toFixed(3)} UF × ${t.pct}% = ${t.gasto_uf.toFixed(3)} UF`).join('  +  ');
-    el.innerHTML = `Deuda ${d.deuda_uf.toFixed(3)} UF (UF $${Number(d.uf).toLocaleString('es-CL')}) → ${det || '0'} = <b>${d.gasto_uf.toFixed(3)} UF ≈ $${Number(d.gasto_pesos).toLocaleString('es-CL')}</b>`;
+    const gDet = d.gasto.aplica
+      ? (d.gasto.detalle||[]).map(t => `${t.porcion_uf.toFixed(3)} UF × ${t.pct}%`).join(' + ') + ` = ${d.gasto.gasto_uf.toFixed(3)} UF (UF día 21 $${Number(d.gasto.uf).toLocaleString('es-CL')})`
+      : `no aplica (mora < ${d.gastos_dias} días)`;
+    const iDet = (d.interes.detalle||[]).map(t => `${t.dias}d × TMC ${t.tmc_mensual}%/30 = ${peso(t.interes)}`).join(' + ') || '0';
+    el.innerHTML = `
+      <div><b>${d.dias_mora} días de mora</b></div>
+      <div>Gasto de cobranza: ${gDet} → <b>${peso(d.gasto.gasto_pesos)}</b></div>
+      <div>Interés por mora: ${iDet} → <b>${peso(d.interes.interes)}</b></div>
+      <div style="margin-top:4px;padding-top:4px;border-top:1px solid #e2e8f0">Cuota ${peso(d.monto_cuota)} + gasto + interés = <b style="color:#0f766e">Total ${peso(d.total)}</b></div>`;
   } catch(e){ el.textContent = 'Error: '+e.message; }
 }
 

@@ -103,6 +103,33 @@ function calcularGastoCobranza(deudaPesos, ufValor, tramos) {
   return { deuda_uf: deudaUF, gasto_uf: gastoUF, gasto_pesos: Math.round(gastoUF * uf), detalle };
 }
 
+// Interés por mora: diario simple sobre la cuota original. Tasa diaria = TMC mensual / 30.
+// Cada día usa la TMC vigente de SU mes (tabla tasas por rango de fechas) y el tramo del
+// crédito (menor/mayor 200 UF). Se acumulan los días de atraso (venc+1 .. fecha_calculo).
+//   tasas = filas {fecha_desde, fecha_hasta, tasa_mensual_menor, tasa_mensual_mayor}
+function calcularInteresMora(cuota, fechaVenc, fechaCalc, tramo, tasas) {
+  const c = Number(cuota) || 0;
+  if (!c || !fechaVenc) return { dias: 0, interes: 0, detalle: [] };
+  const ini = new Date(fechaVenc + 'T00:00:00Z'); ini.setUTCDate(ini.getUTCDate() + 1); // día 1 de mora
+  const fin = new Date((fechaCalc || new Date().toISOString().slice(0, 10)) + 'T00:00:00Z');
+  const campo = tramo === 'mayor' ? 'tasa_mensual_mayor' : 'tasa_mensual_menor';
+  const tmcDe = (fechaStr) => {
+    const row = (tasas || []).find(t => String(t.fecha_desde) <= fechaStr && fechaStr <= String(t.fecha_hasta));
+    return row ? (parseFloat(row[campo]) || 0) : 0; // % mensual
+  };
+  let dias = 0, interes = 0; const porPeriodo = {};
+  for (let d = new Date(ini); d <= fin; d.setUTCDate(d.getUTCDate() + 1)) {
+    const fs = d.toISOString().slice(0, 10);
+    const tmcMes = tmcDe(fs);
+    const interesDia = c * (tmcMes / 100) / 30;
+    interes += interesDia; dias++;
+    const k = tmcMes.toFixed(4);
+    porPeriodo[k] = porPeriodo[k] || { tmc_mensual: tmcMes, dias: 0, interes: 0 };
+    porPeriodo[k].dias++; porPeriodo[k].interes += interesDia;
+  }
+  return { dias, interes: Math.round(interes), detalle: Object.values(porPeriodo).map(p => ({ ...p, interes: Math.round(p.interes) })) };
+}
+
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 function ok(res, data, status = 200) {
   return res.status(status).json({ success: true, data, error: null });
@@ -819,6 +846,47 @@ exports.calcularGasto = async (req, res) => {
     }
     const r = calcularGastoCobranza(monto, uf, tramos);
     ok(res, { monto, uf, fecha_uf, gastos_dias: gastosDias, ...r });
+  } catch (err) {
+    fail(res, err.message, 500);
+  }
+};
+
+// ─── Calcular cobranza completa: gasto + interés por mora + total ──────────────
+// body: { monto_cuota, fecha_vencimiento, fecha_calculo?, tramo? ('menor'|'mayor') }
+exports.calcularCobranza = async (req, res) => {
+  try {
+    const cuota = Number(req.body?.monto_cuota) || 0;
+    const fechaVenc = req.body?.fecha_vencimiento;
+    if (!cuota || !fechaVenc)
+      return fail(res, 'monto_cuota y fecha_vencimiento son requeridos');
+    const fechaCalc = req.body?.fecha_calculo || new Date().toLocaleDateString('sv-SE', { timeZone: 'America/Santiago' });
+    const tramo = req.body?.tramo === 'mayor' ? 'mayor' : 'menor';
+
+    const cfg = await getCobranzaConfig();
+    const gastosDias = Number(cfg.gastos_dias) || 21;
+    let tramos = []; try { tramos = JSON.parse(cfg.tramos_uf); } catch (_) {}
+
+    // Días de mora (venc+1 .. fecha de cálculo)
+    const diasMora = Math.max(0, Math.floor((new Date(fechaCalc + 'T00:00:00Z') - new Date(fechaVenc + 'T00:00:00Z')) / 86400000));
+
+    // Gasto de cobranza: solo desde el día (gastos_dias); UF fija de ese día
+    let gasto = { gasto_pesos: 0, gasto_uf: 0, deuda_uf: 0, detalle: [], aplica: false, uf: 0, fecha_uf: null };
+    if (diasMora >= gastosDias) {
+      const fechaUF = addDias(fechaVenc, gastosDias - 1);
+      const uf = await getUFporFecha(fechaUF);
+      gasto = { ...calcularGastoCobranza(cuota, uf, tramos), aplica: true, uf, fecha_uf: fechaUF };
+    }
+
+    // Interés por mora: por día con la TMC mensual vigente del tramo del crédito
+    const [tasas] = await pool.query('SELECT fecha_desde, fecha_hasta, tasa_mensual_menor, tasa_mensual_mayor FROM tasas');
+    const interes = calcularInteresMora(cuota, fechaVenc, fechaCalc, tramo, tasas);
+
+    const total = cuota + (gasto.gasto_pesos || 0) + (interes.interes || 0);
+    ok(res, {
+      monto_cuota: cuota, fecha_vencimiento: fechaVenc, fecha_calculo: fechaCalc, tramo,
+      dias_mora: diasMora, gastos_dias: gastosDias,
+      gasto, interes, total,
+    });
   } catch (err) {
     fail(res, err.message, 500);
   }

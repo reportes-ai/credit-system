@@ -22,7 +22,7 @@ const pool = require('../../../../shared/config/database');
         ['Orden de Pago Emitida', 'Etapa Post Venta: se generó la orden de pago del saldo precio (correlativo OP-AAAA-NNNNN) y se envió a Contabilidad. Se marca automáticamente desde Emisión Orden de Pago.', 'Post Venta'],
         ['Enviado a Pago', 'Etapa Post Venta intermedia: el Gerente Comercial (u otro habilitado) fijó la selección de operaciones a pagar. Quedan firmes en cola para que Tesorería confirme el pago.', 'Post Venta'],
         ['Gasto de Cobranza', 'Cargo por gestión de cobranza (Ley 19.496), aplicable solo tras 20 días corridos del vencimiento (día 21). Se calcula por tramos marginales sobre la deuda en UF: hasta 10 UF → 9%, 10–50 UF → 6%, sobre 50 UF → 3%. La UF se fija en el día 21.', 'Cobranza'],
-        ['Interés por Mora', 'Interés diario simple (no compuesto) sobre el valor de la cuota original, usando la TMC vigente al día de mora, sumado por los días de atraso.', 'Cobranza'],
+        ['Interés por Mora', 'Interés diario simple (no compuesto) sobre el valor de la cuota original. Tasa diaria = TMC mensual / 30, usando el tramo (menor/mayor 200 UF) del crédito original. Cada día de atraso usa la TMC vigente de su mes (si la mora cruza meses, cada tramo de días aplica la TMC de ese mes). Se acumula desde el día siguiente al vencimiento.', 'Cobranza'],
       ];
       let orden = 1;
       for (const [termino, definicion, categoria] of seed)

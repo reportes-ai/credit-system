@@ -9,6 +9,7 @@ const { requireFunc } = require('../../../../shared/middleware/permisos');
 router.get('/parametros',             verifyToken, ctrl.getParametros);
 router.put('/parametros',             verifyToken, requireFunc('mant_cobranza_parametros'), ctrl.setParametros);
 router.post('/calcular-gasto',        verifyToken, ctrl.calcularGasto);
+router.post('/calcular-cobranza',     verifyToken, ctrl.calcularCobranza);
 
 // Rutas estáticas primero
 router.get('/diagnostico',            verifyToken, ctrl.diagnostico);
