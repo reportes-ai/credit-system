@@ -210,6 +210,14 @@ function parseJSON(val) {
 }
 
 function mapRow(r) {
+  // Participación dealer: usa lo guardado en la carta o, si no viene, deriva del
+  // crédito enlazado (comdea_real = bruto con IVA → neto = bruto/1.19).
+  const brutoStore = Number(r.part_bruto) || 0;
+  const brutoCred  = Number(r.cred_comdea_real) || 0;
+  const partBruto  = brutoStore || brutoCred || null;
+  const partNeto   = (r.part_neto != null) ? r.part_neto : (partBruto ? Math.round(partBruto / 1.19) : null);
+  const partIVA    = (r.part_iva  != null) ? r.part_iva  : (partBruto ? partBruto - Math.round(partBruto / 1.19) : null);
+  const cv = (a, b) => (a == null || a === '' || a === 0) ? (b ?? null) : a;
   return {
     id:                       r.id,
     opCarta:                  r.op_carta,
@@ -221,24 +229,24 @@ function mapRow(r) {
     ejecutivoTel:             r.ejecutivo_tel,
     cliente:                  r.cliente,
     rutCliente:               r.rut_cliente,
-    tipoVehiculo:             r.tipo_vehiculo,
-    marca:                    r.marca,
-    modelo:                   r.modelo,
-    anio:                     r.anio,
-    patente:                  r.patente,
+    tipoVehiculo:             cv(r.tipo_vehiculo, r.cred_tipo_vehiculo),
+    marca:                    cv(r.marca, r.cred_marca),
+    modelo:                   cv(r.modelo, r.cred_modelo),
+    anio:                     cv(r.anio, r.cred_anio),
+    patente:                  cv(r.patente, r.cred_patente),
     prenda:                   r.prenda,
-    precioVenta:              r.precio_venta,
-    pie:                      r.pie,
+    precioVenta:              cv(r.precio_venta, r.cred_valor_vehiculo),
+    pie:                      cv(r.pie, r.cred_pie),
     saldo:                    r.saldo,
-    plazo:                    r.plazo,
+    plazo:                    cv(r.plazo, r.cred_plazo),
     acreedor:                 r.acreedor,
     parque:                   r.parque,
     concesionario:            r.concesionario,
     rutConc:                  r.rut_conc,
     vendedor:                 r.vendedor,
-    partNeto:                 r.part_neto,
-    partIVA:                  r.part_iva,
-    partBruto:                r.part_bruto,
+    partNeto:                 partNeto,
+    partIVA:                  partIVA,
+    partBruto:                partBruto,
     fecha:                    r.fecha,
     fechaCreacion:            r.fecha_creacion,
     creadoPor:                r.creado_por,
@@ -306,8 +314,12 @@ const getAll = async (req, res) => {
   try {
     const verTodas = await puedeVerTodas(req.usuario);
     const login = req.usuario?.email || String(req.usuario?.id_usuario || '');
-    // JOIN al crédito enlazado para exponer NUESTRO N° de operación (num_op) y numero_credito
-    const SEL = `SELECT ca.*, cr.num_op AS cred_num_op, cr.numero_credito AS cred_numero_credito
+    // JOIN al crédito enlazado: NUESTRO N° de operación (num_op), numero_credito,
+    // y datos de vehículo/participación como respaldo cuando la carta no los trae.
+    const SEL = `SELECT ca.*, cr.num_op AS cred_num_op, cr.numero_credito AS cred_numero_credito,
+                   cr.tipo_vehiculo AS cred_tipo_vehiculo, cr.marca AS cred_marca, cr.modelo AS cred_modelo,
+                   cr.anio AS cred_anio, cr.patente AS cred_patente, cr.valor_vehiculo AS cred_valor_vehiculo,
+                   cr.pie AS cred_pie, cr.plazo AS cred_plazo, cr.comdea_real AS cred_comdea_real
                  FROM cartas_aprobacion ca
                  LEFT JOIN creditos cr ON cr.id = ca.id_credito_creado`;
     const [rows] = verTodas
