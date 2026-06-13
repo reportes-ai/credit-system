@@ -104,7 +104,7 @@ async function idsRevisores(excluirEmail) {
       id_financiera VARCHAR(50) DEFAULT NULL,
       tipo VARCHAR(50) DEFAULT NULL,
       ejecutivo_idx INT DEFAULT NULL,
-      ejecutivo_nombre VARCHAR(150) DEFAULT NULL,
+      ejecutivo VARCHAR(150) DEFAULT NULL,
       ejecutivo_mail VARCHAR(150) DEFAULT NULL,
       ejecutivo_tel VARCHAR(30) DEFAULT NULL,
       cliente VARCHAR(200) DEFAULT NULL,
@@ -201,6 +201,16 @@ async function idsRevisores(excluirEmail) {
     }
   } catch(e) { console.error('[cartas migration rename concesionario]', e.message); }
 
+  // Homologación: renombrar ejecutivo_nombre → ejecutivo
+  try {
+    const [[en]] = await pool.query(
+      `SELECT COUNT(*) AS c FROM information_schema.columns
+       WHERE table_schema = DATABASE() AND table_name = 'cartas_aprobacion' AND column_name = 'ejecutivo_nombre'`);
+    if (en.c > 0) {
+      await pool.query(`ALTER TABLE cartas_aprobacion CHANGE COLUMN ejecutivo_nombre ejecutivo VARCHAR(150) DEFAULT NULL`);
+    }
+  } catch(e) { console.error('[cartas migration rename ejecutivo_nombre]', e.message); }
+
   // Seed ejecutivos si la tabla está vacía
   try {
     const [[{ cnt }]] = await pool.query('SELECT COUNT(*) AS cnt FROM cartas_ejecutivos');
@@ -254,7 +264,7 @@ function mapRow(r) {
     opOrigen:                 r.id_financiera,
     tipo:                     r.tipo,
     ejecutivoIdx:             r.ejecutivo_idx,
-    ejecutivoNombre:          r.ejecutivo_nombre,
+    ejecutivoNombre:          r.ejecutivo,
     ejecutivoMail:            r.ejecutivo_mail,
     ejecutivoTel:             r.ejecutivo_tel,
     cliente:                  r.cliente,
@@ -404,7 +414,7 @@ const upsert = async (req, res) => {
       await pool.query(
         `UPDATE cartas_aprobacion SET
           op_carta=?, id_financiera=?, tipo=?,
-          ejecutivo_idx=?, ejecutivo_nombre=?, ejecutivo_mail=?, ejecutivo_tel=?,
+          ejecutivo_idx=?, ejecutivo=?, ejecutivo_mail=?, ejecutivo_tel=?,
           cliente=?, rut_cliente=?,
           tipo_vehiculo=?, marca=?, modelo=?, anio=?, patente=?, prenda=?,
           precio_venta=?, pie=?, saldo=?,
@@ -450,7 +460,7 @@ const upsert = async (req, res) => {
       const [r] = await pool.query(
         `INSERT INTO cartas_aprobacion (
           op_carta, id_financiera, tipo,
-          ejecutivo_idx, ejecutivo_nombre, ejecutivo_mail, ejecutivo_tel,
+          ejecutivo_idx, ejecutivo, ejecutivo_mail, ejecutivo_tel,
           cliente, rut_cliente,
           tipo_vehiculo, marca, modelo, anio, patente, prenda,
           precio_venta, pie, saldo,
@@ -604,7 +614,7 @@ const cargaMasivaCartas = async (req, res) => {
 
         await pool.query(
           `INSERT INTO cartas_aprobacion
-             (op_carta, id_financiera, ejecutivo_nombre, cliente, rut_cliente,
+             (op_carta, id_financiera, ejecutivo, cliente, rut_cliente,
               tipo_vehiculo, marca, modelo, anio, patente, precio_venta, pie, saldo, plazo,
               acreedor, nombre_dealer, rut_dealer, vendedor, part_bruto, fecha,
               creado_por, creado_por_nombre, status, otorgado, fecha_otorgado, fecha_aprobacion,

@@ -550,7 +550,7 @@ const update = async (req, res) => {
                 rutConc:        carta.rut_dealer || '',
                 concesionario:  carta.nombre_dealer || '',
                 mail:           dealer?.correo   || '',
-                ejecutivo:      carta.ejecutivo_nombre || '',
+                ejecutivo:      carta.ejecutivo || '',
                 nombreCliente:  carta.cliente    || '',
                 rutCliente:     carta.rut_cliente || '',
                 saldoPrecio:    carta.saldo       || 0,

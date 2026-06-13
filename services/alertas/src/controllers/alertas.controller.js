@@ -84,7 +84,7 @@ const ORIGENES = {
     ],
     async filas() {
       const [rows] = await pool.query(
-        `SELECT id, op_carta, ejecutivo_nombre, tipo, saldo,
+        `SELECT id, op_carta, ejecutivo AS ejecutivo_nombre, tipo, saldo,
                 TIMESTAMPDIFF(MINUTE, fecha_creacion, NOW()) AS minutos
          FROM cartas_aprobacion WHERE status = 'PENDIENTE'`);
       return rows.map(r => ({
@@ -175,7 +175,7 @@ const ORIGENES = {
     async filas() {
       // creado_por (email) → usuarios.email para notificar al creador
       const [rows] = await pool.query(`
-        SELECT c.id, c.op_carta, c.ejecutivo_nombre,
+        SELECT c.id, c.op_carta, c.ejecutivo AS ejecutivo_nombre,
                DATEDIFF(CURDATE(), DATE(COALESCE(c.fecha_rechazo, c.fecha_creacion))) AS dias,
                u.id_usuario AS creador
         FROM cartas_aprobacion c
@@ -200,7 +200,7 @@ const ORIGENES = {
     ],
     async filas() {
       const [rows] = await pool.query(`
-        SELECT c.id, c.op_carta, c.ejecutivo_nombre,
+        SELECT c.id, c.op_carta, c.ejecutivo AS ejecutivo_nombre,
                DATEDIFF(CURDATE(), DATE(COALESCE(c.fecha_aprobacion, c.fecha_creacion))) AS dias,
                u.id_usuario AS creador
         FROM cartas_aprobacion c

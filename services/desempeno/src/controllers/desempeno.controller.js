@@ -319,7 +319,7 @@ const reporteCasos = async (req, res) => {
   try {
     const fecha = req.query.fecha, tipo = req.query.tipo;
     if (!fecha) return res.status(400).json({ success: false, data: null, error: 'fecha requerida' });
-    const cols = `id, op_carta, cliente, ejecutivo_nombre, status,
+    const cols = `id, op_carta, cliente, ejecutivo AS ejecutivo_nombre, status,
       fecha_creacion, aprobado_por_nombre, fecha_aprobacion,
       rechazado_por_nombre, fecha_rechazo, motivo_rechazo,
       excepciones_comentarios, comentario_aprobacion`;

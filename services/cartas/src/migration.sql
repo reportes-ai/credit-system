@@ -24,7 +24,7 @@ CREATE TABLE IF NOT EXISTS cartas_aprobacion (
   id_financiera             VARCHAR(50)   DEFAULT NULL,
   tipo                      VARCHAR(50)   DEFAULT NULL,
   ejecutivo_idx             INT           DEFAULT NULL,
-  ejecutivo_nombre          VARCHAR(150)  DEFAULT NULL,
+  ejecutivo                 VARCHAR(150)  DEFAULT NULL,
   ejecutivo_mail            VARCHAR(150)  DEFAULT NULL,
   ejecutivo_tel             VARCHAR(30)   DEFAULT NULL,
   cliente                   VARCHAR(200)  DEFAULT NULL,
