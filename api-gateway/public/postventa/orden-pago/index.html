@@ -5,7 +5,7 @@
   <link rel="icon" href="/img/favicon.png" type="image/png">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Emisión Orden de Pago — AutoFácil</title>
-  <!-- v1.4 -->
+  <!-- v1.5 -->
   <link href="/css/bootstrap.min.css" rel="stylesheet">
   <link href="/css/bootstrap-icons.css" rel="stylesheet">
   <style>
@@ -175,7 +175,7 @@ function docHTML(r){
   const fechaPago = fechaCL(new Date().toISOString());
   const concepto = `Saldo Precio OP ${r.num_op||''} - ${r.financiera||''}`;
   // Estilos INLINE: los correos descartan los <style> de clase, por eso todo va inline
-  const Sdoc = 'font-family:Arial,sans-serif;color:#1e293b;font-size:12px;border:2px solid #93c5fd;border-radius:8px;padding:18px 20px';
+  const Sdoc = 'font-family:Arial,sans-serif;color:#1e293b;font-size:12px;border:2px solid #93c5fd;border-radius:8px;padding:18px 20px;display:inline-block;box-sizing:border-box';
   const Smeta = 'border-collapse:collapse;font-size:11px';
   const Slbl = 'color:#64748b;font-weight:700;text-transform:uppercase;font-size:9px;padding:1px 8px;white-space:nowrap';
   const Smv = 'padding:1px 8px;font-size:11px';
@@ -230,7 +230,7 @@ function emailHTML(r){
   const fRecep = fechaCL(r.fecha_fondos);
   const fin = r.financiera || 'Autofin';
   const p = 'font-size:14px;color:#374151;margin:0 0 14px;line-height:1.6';
-  return `<div style="font-family:Arial,sans-serif;max-width:760px">
+  return `<div style="font-family:Arial,sans-serif">
     <p style="${p}">Estimado Equipo de Contabilidad:</p>
     <p style="${p}">Adjunto encontrarán <strong>Orden de Pago N° ${nOrden}</strong> para el pago del Saldo Precio del Crédito <strong>N° ${r.num_op||''}</strong> otorgado por <strong>${fin}</strong> con fecha <strong>${fOtorg}</strong>, Saldo Precio recepcionado por AutoFácil el día <strong>${fRecep}</strong>.</p>
     <p style="${p}">Les recordamos que deben marcar en el módulo de <strong>Saldo Precio Pagado</strong>, de manera de informar al Ejecutivo Comercial y cerrar el flujo operativo de esta transacción.</p>
