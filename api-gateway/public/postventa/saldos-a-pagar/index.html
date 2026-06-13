@@ -5,7 +5,7 @@
   <link rel="icon" href="/img/favicon.png" type="image/png">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Saldos Precios a Pagar — AutoFácil</title>
-  <!-- v3.4 -->
+  <!-- v3.5 -->
   <link href="/css/bootstrap.min.css" rel="stylesheet">
   <link href="/css/bootstrap-icons.css" rel="stylesheet">
   <style>
@@ -45,7 +45,15 @@
     .stat.prop.ant { border-left-color:#d97706; }
     .stat.prop .val { color:var(--navy); }
     .stat.prop .prop-line { display:flex; align-items:center; justify-content:space-between; gap:10px; }
-    .btn-marcar { background:#0141A2; color:#fff; border:none; border-radius:8px; padding:6px 16px; font-size:.8rem; font-weight:700; cursor:pointer; white-space:nowrap; }
+    /* Toggle de propuesta */
+    .sw { position:relative; display:inline-block; width:44px; height:24px; flex:0 0 auto; }
+    .sw input { opacity:0; width:0; height:0; }
+    .sw span { position:absolute; inset:0; background:#cbd5e1; border-radius:24px; cursor:pointer; transition:.2s; }
+    .sw span:before { content:''; position:absolute; height:18px; width:18px; left:3px; top:3px; background:#fff; border-radius:50%; transition:.2s; }
+    .stat.prop.max .sw input:checked + span { background:#7c3aed; }
+    .stat.prop.ant .sw input:checked + span { background:#d97706; }
+    .sw input:checked + span:before { transform:translateX(20px); }
+    .sw input:disabled + span { opacity:.45; cursor:default; }
     .stat.prop.ant .btn-marcar { background:#d97706; }
     .btn-marcar:disabled { opacity:.45; cursor:default; }
     tbody tr.row-prop td { box-shadow:inset 0 0 0 9999px rgba(124,58,237,.08); }
@@ -148,13 +156,13 @@
     <div class="stat prop max" id="propMax" onmouseenter="hl('max')" onmouseleave="hl(null)">
       <div class="lbl">Propuesta · Máximo de operaciones</div>
       <div class="prop-line"><div class="val" id="propMaxN">0 ops X $0</div>
-        <button class="btn-marcar" id="propMaxBtn" onclick="marcarPropuesta('max')">Marcar</button></div>
+        <label class="sw"><input type="checkbox" id="propMaxTg" onchange="aplicarPropuesta('max')"><span></span></label></div>
       <div class="sub" id="propMaxM">Queda disponible $0</div>
     </div>
     <div class="stat prop ant" id="propAnt" onmouseenter="hl('ant')" onmouseleave="hl(null)">
       <div class="lbl">Propuesta · Prioriza antigüedad</div>
       <div class="prop-line"><div class="val" id="propAntN">0 ops X $0</div>
-        <button class="btn-marcar" id="propAntBtn" onclick="marcarPropuesta('ant')">Marcar</button></div>
+        <label class="sw"><input type="checkbox" id="propAntTg" onchange="aplicarPropuesta('ant')"><span></span></label></div>
       <div class="sub" id="propAntM">Queda disponible $0</div>
     </div>
   </div>
@@ -204,7 +212,7 @@ const fmt = n => '$'+Number(n||0).toLocaleString('es-CL');
 const escH = s => String(s??'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
 const fechaCL = f => { if(!f) return '—'; const d=new Date(f); return isNaN(d)?'—':d.toLocaleDateString('es-CL',{timeZone:'UTC'}); };
 function toast(m, err){ const t=document.getElementById('toast'); t.textContent=m; t.className='toast'+(err?' err':''); t.style.display='block'; setTimeout(()=>t.style.display='none',2800); }
-let DATA = [], fondosVal = 0, lastProp = { max:{set:[],monto:0}, ant:{set:[],monto:0} };
+let DATA = [], fondosVal = 0, lastProp = { max:{set:[],monto:0}, ant:{set:[],monto:0} }, propActiva = null;
 
 const HOY_CL = () => new Date().toLocaleDateString('en-CA', { timeZone:'America/Santiago' });
 let diaCargado = HOY_CL();
@@ -291,6 +299,7 @@ function render(){
 function toggleSel(id, chk){
   const r = DATA.find(x => x.id===id); if (!r) return;
   r.sel = chk.checked;
+  propActiva = null;   // selección manual: ya no corresponde a una propuesta pura
   document.getElementById('row_'+id)?.classList.toggle('row-sel', r.sel);
   recalc();
 }
@@ -304,7 +313,7 @@ async function revertir(id){
     const j = await resp.json();
     if (!j.success) throw new Error(j.error||'Error');
     if (j.data && j.data.desmarcados === 0) throw new Error('No se puede revertir: el pago no es de hoy.');
-    r.pagado = false; r.sel = false;
+    r.pagado = false; r.sel = false; propActiva = null;
     render(); toast(`OP ${r.num_op} revertida`);
   } catch(e){ toast(e.message, true); }
 }
@@ -381,27 +390,29 @@ async function guardarFondos(){
    · Antigüedad: las más antiguas primero (DATA ya viene ordenada); si una no
      alcanza, se salta y se sigue buscando otra que quepa con el saldo. */
 function recalcPropuestas(){
-  // Disponible para asignar = Fondos − pagado hoy − ya seleccionado manualmente.
-  const restante = Math.max(0, fondosVal - sum(DATA.filter(r => r.pagado)) - sum(seleccionadas()));
-  document.getElementById('fondosSub').textContent = 'Disponible para asignar: ' + fmt(restante);
-  // Candidatas: pendientes aún no seleccionadas
-  const cand = DATA.filter(r => !r.pagado && !r.sel);
+  // Base disponible = Fondos − pagado hoy (las propuestas se calculan sobre TODAS
+  // las pendientes, son alternativas; el toggle aplica una de ellas a la selección).
+  const D = Math.max(0, fondosVal - sum(DATA.filter(r => r.pagado)));
+  document.getElementById('fondosSub').textContent = 'Disponible para asignar: ' + fmt(D);
+  const cand = DATA.filter(r => !r.pagado);
 
   const llenar = lista => { const set=[]; let acc=0;
-    for (const r of lista){ const v=Number(r.saldo_precio||0); if (acc+v <= restante){ set.push(r); acc+=v; } }
+    for (const r of lista){ const v=Number(r.saldo_precio||0); if (acc+v <= D){ set.push(r); acc+=v; } }
     return { set, monto:acc };
   };
   lastProp.max = llenar(cand.slice().sort((a,b)=>Number(a.saldo_precio||0)-Number(b.saldo_precio||0)));
   lastProp.ant = llenar(cand); // cand ya está en orden de antigüedad
 
-  const pintar = (which, nEl, mEl, btn) => {
+  const pintar = (which, nEl, mEl, tg) => {
     const p = lastProp[which];
     document.getElementById(nEl).textContent = p.set.length + ' ops X ' + fmt(p.monto);
-    document.getElementById(mEl).textContent = 'Queda disponible ' + fmt(restante - p.monto);
-    document.getElementById(btn).disabled = p.set.length === 0;
+    document.getElementById(mEl).textContent = 'Queda disponible ' + fmt(D - p.monto);
+    const t = document.getElementById(tg);
+    t.checked = (propActiva === which);
+    t.disabled = (p.set.length === 0 && propActiva !== which);
   };
-  pintar('max','propMaxN','propMaxM','propMaxBtn');
-  pintar('ant','propAntN','propAntM','propAntBtn');
+  pintar('max','propMaxN','propMaxM','propMaxTg');
+  pintar('ant','propAntN','propAntM','propAntTg');
   document.getElementById('propBox').style.display = fondosVal > 0 ? 'flex' : 'none';
   pintarIndicadores();
 }
@@ -427,13 +438,20 @@ function hl(which){
   lastProp[which].set.forEach(r => document.getElementById('row_'+r.id)?.classList.add(cls));
 }
 
-/* Pre-selecciona (NO paga) las operaciones de una propuesta */
-function marcarPropuesta(which){
-  const set = lastProp[which].set;
-  if (!set.length) return;
-  set.forEach(r => r.sel = true);
+/* Toggle de propuesta: encender aplica esa estrategia a la selección
+   (reemplaza la selección por el set de la propuesta); apagar la limpia.
+   Son mutuamente excluyentes. */
+function aplicarPropuesta(which){
+  if (propActiva === which){
+    // apagar: limpiar selección
+    propActiva = null;
+    DATA.forEach(r => { if (!r.pagado) r.sel = false; });
+  } else {
+    propActiva = which;
+    const ids = new Set(lastProp[which].set.map(r => r.id));
+    DATA.forEach(r => { if (!r.pagado) r.sel = ids.has(r.id); });
+  }
   hl(null); render();
-  toast(`${set.length} operación(es) agregadas a la selección`);
 }
 
 /* Confirmar pago del lote seleccionado */
@@ -449,6 +467,7 @@ async function confirmarPago(){
     const j = await resp.json();
     if (!j.success) throw new Error(j.error||'Error');
     sel.forEach(r => { r.pagado = true; r.sel = false; });
+    propActiva = null;
     render(); toast(`${ids.length} operación(es) pagadas`);
   } catch(e){ toast(e.message, true); }
   btn.innerHTML = '<i class="bi bi-check2-all me-1"></i>Confirmar pago';
