@@ -21,7 +21,7 @@ CREATE TABLE IF NOT EXISTS cartas_parametros (
 CREATE TABLE IF NOT EXISTS cartas_aprobacion (
   id                        INT AUTO_INCREMENT PRIMARY KEY,
   op_carta                  VARCHAR(30)   DEFAULT NULL,
-  op_origen                 VARCHAR(30)   DEFAULT NULL,
+  id_financiera             VARCHAR(50)   DEFAULT NULL,
   tipo                      VARCHAR(50)   DEFAULT NULL,
   ejecutivo_idx             INT           DEFAULT NULL,
   ejecutivo_nombre          VARCHAR(150)  DEFAULT NULL,

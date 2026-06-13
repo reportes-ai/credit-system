@@ -101,7 +101,7 @@ async function idsRevisores(excluirEmail) {
     `CREATE TABLE IF NOT EXISTS cartas_aprobacion (
       id INT AUTO_INCREMENT PRIMARY KEY,
       op_carta VARCHAR(30) DEFAULT NULL,
-      op_origen VARCHAR(30) DEFAULT NULL,
+      id_financiera VARCHAR(50) DEFAULT NULL,
       tipo VARCHAR(50) DEFAULT NULL,
       ejecutivo_idx INT DEFAULT NULL,
       ejecutivo_nombre VARCHAR(150) DEFAULT NULL,
@@ -171,6 +171,16 @@ async function idsRevisores(excluirEmail) {
     await pool.query(`ALTER TABLE cartas_aprobacion ADD COLUMN IF NOT EXISTS id_credito_creado INT DEFAULT NULL`);
   } catch(e) { /* columna ya existe */ }
 
+  // Homologación: renombrar op_origen → id_financiera (alinear con creditos.id_financiera)
+  try {
+    const [[oc]] = await pool.query(
+      `SELECT COUNT(*) AS c FROM information_schema.columns
+       WHERE table_schema = DATABASE() AND table_name = 'cartas_aprobacion' AND column_name = 'op_origen'`);
+    if (oc.c > 0) {
+      await pool.query(`ALTER TABLE cartas_aprobacion CHANGE COLUMN op_origen id_financiera VARCHAR(50) DEFAULT NULL`);
+    }
+  } catch(e) { console.error('[cartas migration rename op_origen]', e.message); }
+
   // Seed ejecutivos si la tabla está vacía
   try {
     const [[{ cnt }]] = await pool.query('SELECT COUNT(*) AS cnt FROM cartas_ejecutivos');
@@ -221,7 +231,7 @@ function mapRow(r) {
   return {
     id:                       r.id,
     opCarta:                  r.op_carta,
-    opOrigen:                 r.op_origen,
+    opOrigen:                 r.id_financiera,
     tipo:                     r.tipo,
     ejecutivoIdx:             r.ejecutivo_idx,
     ejecutivoNombre:          r.ejecutivo_nombre,
@@ -373,7 +383,7 @@ const upsert = async (req, res) => {
       // UPDATE existente
       await pool.query(
         `UPDATE cartas_aprobacion SET
-          op_carta=?, op_origen=?, tipo=?,
+          op_carta=?, id_financiera=?, tipo=?,
           ejecutivo_idx=?, ejecutivo_nombre=?, ejecutivo_mail=?, ejecutivo_tel=?,
           cliente=?, rut_cliente=?,
           tipo_vehiculo=?, marca=?, modelo=?, anio=?, patente=?, prenda=?,
@@ -419,7 +429,7 @@ const upsert = async (req, res) => {
       }
       const [r] = await pool.query(
         `INSERT INTO cartas_aprobacion (
-          op_carta, op_origen, tipo,
+          op_carta, id_financiera, tipo,
           ejecutivo_idx, ejecutivo_nombre, ejecutivo_mail, ejecutivo_tel,
           cliente, rut_cliente,
           tipo_vehiculo, marca, modelo, anio, patente, prenda,
@@ -574,7 +584,7 @@ const cargaMasivaCartas = async (req, res) => {
 
         await pool.query(
           `INSERT INTO cartas_aprobacion
-             (op_carta, op_origen, ejecutivo_nombre, cliente, rut_cliente,
+             (op_carta, id_financiera, ejecutivo_nombre, cliente, rut_cliente,
               tipo_vehiculo, marca, modelo, anio, patente, precio_venta, pie, saldo, plazo,
               acreedor, concesionario, rut_conc, vendedor, part_bruto, fecha,
               creado_por, creado_por_nombre, status, otorgado, fecha_otorgado, fecha_aprobacion,

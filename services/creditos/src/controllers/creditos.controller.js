@@ -523,7 +523,7 @@ const update = async (req, res) => {
             if (!Array.isArray(cartolas)) cartolas = [];
 
             // 5. Solo agregar si no existe ya la operación
-            const yaExiste = cartolas.find(r => String(r.nOp) === String(carta.op_origen || carta.op_carta));
+            const yaExiste = cartolas.find(r => String(r.nOp) === String(carta.id_financiera || carta.op_carta));
             if (!yaExiste) {
               const nextCorr = cartolas.length > 0
                 ? Math.max(...cartolas.map(r => Number(r.correlativo) || 0)) + 1
@@ -536,7 +536,7 @@ const update = async (req, res) => {
                 correlativo:    nextCorr,
                 mes:            excelDate,
                 mesDisplay,
-                nOp:            carta.op_origen || carta.op_carta || '',
+                nOp:            carta.id_financiera || carta.op_carta || '',
                 movimiento:     'COMISION',
                 rutConc:        carta.rut_conc   || '',
                 concesionario:  carta.concesionario || '',

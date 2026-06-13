@@ -56,14 +56,14 @@ const pool = require('../../../../shared/config/database');
 const nombreUsuario = u => (u?.nombre ? (u.nombre + ' ' + (u.apellido || '')).trim() : u?.email) || 'Usuario';
 
 /* ── POST /api/cartolas/sync ─────────────────────────────────────────
-   1) Marca otorgado=1 en cartas cuya op_origen existe en creditos.
+   1) Marca otorgado=1 en cartas cuya id_financiera existe en creditos (cr.num_op).
    2) Crea el movimiento COMISION del mes para cada carta otorgada
       aprobada que aún no lo tenga.                                    */
 const sync = async (req, res) => {
   try {
     const [r1] = await pool.query(`
       UPDATE cartas_aprobacion ca
-      JOIN creditos cr ON cr.num_op = ca.op_origen
+      JOIN creditos cr ON cr.num_op = ca.id_financiera
       SET ca.otorgado = 1,
           ca.numero_credito_creado = cr.num_op,
           ca.id_credito_creado     = cr.id,
@@ -77,7 +77,7 @@ const sync = async (req, res) => {
          ejecutivo, nombre_cliente, rut_cliente, saldo, comision,
          estado_comision, num_carta, vendedor, acreedor)
       SELECT DATE_FORMAT(COALESCE(ca.fecha_otorgado, NOW()), '%Y-%m'),
-             ca.id, ca.op_origen, 'COMISION', ca.rut_conc, ca.concesionario,
+             ca.id, ca.id_financiera, 'COMISION', ca.rut_conc, ca.concesionario,
              ca.ejecutivo_nombre, ca.cliente, ca.rut_cliente, ca.saldo, ca.part_bruto,
              'PENDIENTE', ca.op_carta, ca.vendedor, ca.acreedor
       FROM cartas_aprobacion ca
@@ -101,7 +101,7 @@ const getMovimientos = async (req, res) => {
     const { mes } = req.query;
     const where = [], vals = [];
     if (mes) { where.push('m.mes = ?'); vals.push(mes); }
-    // num_op guardado = op_origen (N° ID financiera). JOIN al crédito enlazado
+    // num_op guardado = id_financiera (N° de la financiera). JOIN al crédito enlazado
     // para exponer NUESTRO N° de operación real (creditos.num_op).
     const [rows] = await pool.query(
       `SELECT m.*, cr.num_op AS nuestro_num_op
