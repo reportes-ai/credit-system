@@ -5,7 +5,7 @@
   <link rel="icon" href="/img/favicon.png" type="image/png">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Cartas de Aprobación — AutoFácil</title>
-  <!-- v3.6 -->
+  <!-- v3.7 -->
   <link href="/css/bootstrap.min.css" rel="stylesheet">
   <link href="/css/bootstrap-icons.css" rel="stylesheet">
   <style>
@@ -466,7 +466,7 @@
     <div class="card-af">
       <div class="filters-bar">
         <select id="ctaMes" onchange="cargarMovimientos()"></select>
-        <input type="text" id="ctaBuscar" placeholder="Concesionario u operación…" oninput="renderMovimientos()" style="min-width:200px">
+        <input type="text" id="ctaBuscar" placeholder="RUT, cliente, N° ID, operación, N° carta…" oninput="renderMovimientos()" style="min-width:220px">
         <select id="ctaEstado" onchange="renderMovimientos()">
           <option value="">Todos</option><option>PENDIENTE</option><option>A PAGAR</option><option>A DESCONTAR</option>
         </select>
@@ -476,7 +476,7 @@
       </div>
       <div style="overflow-x:auto">
         <table class="tbl">
-          <thead><tr><th>Corr.</th><th>Mes</th><th>N° Op</th><th>Movimiento</th><th>Concesionario</th><th>Ejecutivo</th><th>Cliente</th>
+          <thead><tr><th>Corr.</th><th>Mes</th><th>N° ID</th><th>N° Operación</th><th>Movimiento</th><th>Concesionario</th><th>Ejecutivo</th><th>RUT</th><th>Cliente</th>
             <th style="text-align:right">Saldo</th><th style="text-align:right">Comisión</th><th>E° Comisión</th><th>N° Carta</th><th>Acreedor</th><th>% Com.</th><th>Observaciones</th><th></th></tr></thead>
           <tbody id="bodyMovs"></tbody>
         </table>
@@ -2186,10 +2186,10 @@ function renderMovimientos(){
   const est = document.getElementById('ctaEstado').value;
   const rows = MOVS.filter(m =>
     (!est || m.estado_comision===est) &&
-    (!q || [m.concesionario,m.num_op,m.nombre_cliente].some(v=>String(v||'').toLowerCase().includes(q))));
+    (!q || [m.concesionario,m.num_op,m.nuestro_num_op,m.rut_cliente,m.nombre_cliente,m.num_carta].some(v=>String(v||'').toLowerCase().includes(q))));
   document.getElementById('ctaCount').textContent = rows.length + ' registro(s)';
   const body = document.getElementById('bodyMovs');
-  if (!rows.length) { body.innerHTML='<tr><td colspan="15" style="text-align:center;color:#94a3b8;padding:24px">Sin movimientos en este mes</td></tr>'; return; }
+  if (!rows.length) { body.innerHTML='<tr><td colspan="17" style="text-align:center;color:#94a3b8;padding:24px">Sin movimientos en este mes</td></tr>'; return; }
   const ESTADOS = ['PENDIENTE','A PAGAR','A DESCONTAR'];
   body.innerHTML = rows.map((m,i)=>{
     const pct = (m.saldo>0 && m.comision) ? (m.comision/m.saldo*100).toFixed(2).replace('.',',')+'%' : '—';
@@ -2197,9 +2197,11 @@ function renderMovimientos(){
     return `<tr style="${esManual?'background:#fff7ed':''}">
       <td>${i+1}</td><td style="font-size:.72rem">${nombreMes(m.mes)}</td>
       <td><b>${escH(m.num_op||'')}</b></td>
+      <td>${escH(m.nuestro_num_op||'—')}</td>
       <td><span class="est-mini" style="background:${esManual?'#fed7aa':'#dbeafe'};color:${esManual?'#c2410c':'#1d4ed8'}">${escH(m.movimiento)}</span></td>
       <td style="font-size:.74rem">${escH(m.concesionario||'')}</td>
       <td style="font-size:.74rem">${escH(m.ejecutivo||'')}</td>
+      <td style="font-size:.74rem">${escH(m.rut_cliente||'—')}</td>
       <td style="font-size:.74rem">${escH(toTitle(m.nombre_cliente||''))}</td>
       <td style="text-align:right">${fmtCLP(m.saldo)}</td>
       <td style="text-align:right"><b>${fmtCLP(m.comision)}</b></td>
@@ -2250,7 +2252,7 @@ async function guardarPrepago(){
   cargarMovimientos();
 }
 function exportarMovimientos(){
-  const rows = MOVS.map(m=>({ Mes:m.mes, 'N° Op':m.num_op, Movimiento:m.movimiento, 'RUT Conc.':m.rut_conc,
+  const rows = MOVS.map(m=>({ Mes:m.mes, 'N° ID':m.num_op, 'N° Operación':m.nuestro_num_op, Movimiento:m.movimiento, 'RUT Conc.':m.rut_conc,
     Concesionario:m.concesionario, Ejecutivo:m.ejecutivo, Cliente:m.nombre_cliente, 'RUT Cliente':m.rut_cliente,
     Saldo:m.saldo, Comision:m.comision, 'E° Comisión':m.estado_comision, 'N° Carta':m.num_carta,
     Vendedor:m.vendedor, Acreedor:m.acreedor, Observaciones:m.observaciones }));

@@ -92,10 +92,16 @@ const getMovimientos = async (req, res) => {
   try {
     const { mes } = req.query;
     const where = [], vals = [];
-    if (mes) { where.push('mes = ?'); vals.push(mes); }
+    if (mes) { where.push('m.mes = ?'); vals.push(mes); }
+    // num_op guardado = op_origen (N° ID financiera). JOIN al crédito enlazado
+    // para exponer NUESTRO N° de operación real (creditos.num_op).
     const [rows] = await pool.query(
-      `SELECT * FROM cartolas_movimientos ${where.length ? 'WHERE ' + where.join(' AND ') : ''}
-       ORDER BY mes DESC, concesionario, id`, vals
+      `SELECT m.*, cr.num_op AS nuestro_num_op
+       FROM cartolas_movimientos m
+       LEFT JOIN cartas_aprobacion ca ON ca.id = m.id_carta
+       LEFT JOIN creditos cr ON cr.id = ca.id_credito_creado
+       ${where.length ? 'WHERE ' + where.join(' AND ') : ''}
+       ORDER BY m.mes DESC, m.concesionario, m.id`, vals
     );
     res.json({ success: true, data: rows, error: null });
   } catch (e) {
