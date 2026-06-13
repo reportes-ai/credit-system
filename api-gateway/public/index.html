@@ -292,6 +292,14 @@
       <div><div class="ncp-label">📈 Finanzas & Crédito</div><div class="ncp-sublabel">google.com/news · finanzas credito chile</div></div>
       <label class="ncp-toggle"><input type="checkbox" id="ncpFeed2" checked onchange="applyNewsConfig()"><span class="slider"></span></label>
     </div>
+    <div class="ncp-row">
+      <div><div class="ncp-label">🚗 Automotriz</div><div class="ncp-sublabel">google.com/news · industria automotriz / venta autos</div></div>
+      <label class="ncp-toggle"><input type="checkbox" id="ncpFeed3" checked onchange="applyNewsConfig()"><span class="slider"></span></label>
+    </div>
+    <div class="ncp-row">
+      <div><div class="ncp-label">🏦 Banca & Tasas</div><div class="ncp-sublabel">google.com/news · banca / tasas / Banco Central</div></div>
+      <label class="ncp-toggle"><input type="checkbox" id="ncpFeed4" checked onchange="applyNewsConfig()"><span class="slider"></span></label>
+    </div>
 
     <!-- Velocidad -->
     <div class="ncp-row" style="margin-top:6px; flex-direction:column; align-items:stretch; gap:6px">
@@ -630,6 +638,12 @@ function renderTicker(noticias) {
   if (tickerRAF) { cancelAnimationFrame(tickerRAF); tickerRAF = null; }
   track.style.transform = 'translateX(0)';
 
+  // Sin fuentes activas / sin noticias → placeholder estático
+  if (!noticias || !noticias.length) {
+    track.innerHTML = '<span class="news-item"><span class="news-dot"></span>Sin fuentes de noticias activas</span>';
+    return;
+  }
+
   const html = buildHTML(noticias);
   // Dos copias exactamente iguales para loop seamless
   track.innerHTML = `<span class="ticker-half">${html}</span><span class="ticker-half">${html}</span>`;
@@ -675,19 +689,22 @@ function setTickerSpeed(speed) {
   document.getElementById('ncpSpeedLabel').textContent = NEWS_SPEED_LABELS[speed];
 }
 
-/* Filtrar noticias activas según feeds */
+/* Fuentes en el mismo orden que los toggles ncpFeed0..N */
+const NEWS_SRC_MAP = ['Google News','Economía','Finanzas','Automotriz','Banca'];
+
+/* Filtrar noticias activas según feeds. Si no hay feeds activos → vacío
+   (NO se hace fallback a todas, ese era el bug). */
 function getFilteredNoticias() {
-  const feeds   = [0,1,2].map(i => document.getElementById(`ncpFeed${i}`)?.checked ?? true);
-  const srcMap  = ['Google News','Economía','Finanzas'];
-  const activos = srcMap.filter((_,i) => feeds[i]);
-  const f = ALL_NOTICIAS.filter(n => !n.src || activos.includes(n.src));
-  return f.length ? f : ALL_NOTICIAS;
+  const feeds   = NEWS_SRC_MAP.map((_,i) => document.getElementById(`ncpFeed${i}`)?.checked ?? true);
+  const activos = NEWS_SRC_MAP.filter((_,i) => feeds[i]);
+  if (!activos.length) return [];
+  return ALL_NOTICIAS.filter(n => activos.includes(n.src));
 }
 
 function applyNewsConfig() {
   const mostrar = document.getElementById('ncpMostrar').checked;
   const speed   = parseInt(document.getElementById('ncpSpeed').value);
-  const feeds   = [0,1,2].map(i => document.getElementById(`ncpFeed${i}`)?.checked ?? true);
+  const feeds   = NEWS_SRC_MAP.map((_,i) => document.getElementById(`ncpFeed${i}`)?.checked ?? true);
 
   setTickerSpeed(speed);
   saveNewsConfig({ mostrar, speed, feeds }); // guarda en servidor + localStorage

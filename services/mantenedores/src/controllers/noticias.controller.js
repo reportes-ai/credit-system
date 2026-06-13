@@ -6,6 +6,8 @@ const FEEDS = [
   { url: 'https://news.google.com/rss/search?q=chile+noticias&hl=es-419&gl=CL&ceid=CL:es-419', src: 'Google News' },
   { url: 'https://news.google.com/rss/search?q=economia+chile&hl=es-419&gl=CL&ceid=CL:es-419', src: 'Economía' },
   { url: 'https://news.google.com/rss/search?q=finanzas+credito+chile&hl=es-419&gl=CL&ceid=CL:es-419', src: 'Finanzas' },
+  { url: 'https://news.google.com/rss/search?q=industria+automotriz+venta+autos+chile&hl=es-419&gl=CL&ceid=CL:es-419', src: 'Automotriz' },
+  { url: 'https://news.google.com/rss/search?q=banca+tasas+interes+banco+central+chile&hl=es-419&gl=CL&ceid=CL:es-419', src: 'Banca' },
 ];
 
 function fetchUrl(rawUrl, redirects = 0) {
