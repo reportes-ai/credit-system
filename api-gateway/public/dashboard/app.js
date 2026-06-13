@@ -1032,7 +1032,7 @@ function buildV1b() {
     const tblAnt = document.getElementById('t-fin1b-ant');
     if (tblAnt) tblAnt.innerHTML = '<tr><td colspan="8" style="padding:12px;color:#888;text-align:center">Actualiza los datos para ver esta comparación</td></tr>';
     if (tituloAnt) tituloAnt.textContent = 'Mismos días faltantes — ' + mesesNombres[mesAnt] + ' ' + anioAnt + ' (pendiente actualización)';
-    // NO retornar — continuar con CONCESIONARIOS, EJECUTIVOS, etc.
+    // NO retornar — continuar con DEALERS, EJECUTIVOS, etc.
   } else {
   const rawAnt = todosAntMes.filter(r => {
     if (!r.fecha_ot) return false;
@@ -1067,7 +1067,7 @@ function buildV1b() {
     '<tfoot><tr><td>Total</td><td>'+totAnt.ops+'</td><td>'+fM(totAnt.fin)+'</td><td>'+fM(totAnt.ops?totAnt.fin/totAnt.ops:0)+'</td><td>'+fM(totAnt.saldo)+'</td><td>'+fM(totAnt.com_dealer)+'</td><td>'+fM(totAnt.afa)+'</td><td>'+fM(totAnt.com_seg)+'</td></tr></tfoot>';
   } // fin else tienenFechaOt
 
-  // Concesionarios otorgados
+  // Dealers otorgados
   const ccsOt = {};
   det.forEach(r=>{ const k=r.ccs||''; if(!k) return;
     if(!ccsOt[k]) ccsOt[k]={ops:0,saldo:0,fin:0,cd:0,afa:0}; ccsOt[k].ops++; ccsOt[k].saldo+=r.saldo_precio; ccsOt[k].fin+=r.total_a_financiar; ccsOt[k].cd+=r.com_dealer; ccsOt[k].afa+=r.ing_autofacil; });
@@ -1075,7 +1075,7 @@ function buildV1b() {
   const ccsRows = topCcs.map(([n,v],i)=>`<tr><td><span class="rank">${i+1}.</span>${n.length>28?n.substring(0,28)+'…':n}</td><td>${v.ops}</td><td>${fM(v.fin)}</td><td>${fM(v.saldo/v.ops)}</td><td>${fM(v.saldo)}</td><td>${fM(v.cd)}</td><td>${fM(v.afa)}</td></tr>`).join('');
   const totCC = topCcs.reduce((a,[,v])=>({ops:a.ops+v.ops,fin:a.fin+v.fin,cd:a.cd+v.cd}),{ops:0,fin:0,cd:0});
   document.getElementById('t-ccs1b').innerHTML = `
-    <thead><tr><th>Concesionario</th><th>Q</th><th>Total Fin.</th><th>Prom.</th><th>Saldo Precio</th><th>Com Dealer</th><th>Ing. x Col.</th></tr></thead>
+    <thead><tr><th>Dealer</th><th>Q</th><th>Total Fin.</th><th>Prom.</th><th>Saldo Precio</th><th>Com Dealer</th><th>Ing. x Col.</th></tr></thead>
     <tbody>${ccsRows}</tbody>
     <tfoot><tr><td>Total</td><td>${totCC.ops}</td><td>${fM(totCC.fin)}</td><td>—</td><td>—</td><td>${fM(totCC.cd)}</td><td>—</td></tr></tfoot>`;
 
@@ -1531,7 +1531,7 @@ function buildV4() {
   det.forEach(r=>{if(!ccs4[r.ccs])ccs4[r.ccs]={ops:0,saldo:0,com_dealer:0,rentab_afa:0};ccs4[r.ccs].ops++;ccs4[r.ccs].saldo+=r.saldo_precio;ccs4[r.ccs].com_dealer+=r.com_dealer;ccs4[r.ccs].rentab_afa+=r.ing_autofacil;});
   const topCcs4=Object.entries(ccs4).sort((a,b)=>b[1].saldo-a[1].saldo);
   const totCcs4=topCcs4.reduce((a,[,v])=>({ops:a.ops+v.ops,saldo:a.saldo+v.saldo,cd:a.cd+v.com_dealer}),{ops:0,saldo:0,cd:0});
-  document.getElementById('t-ccs4').innerHTML=`<thead><tr><th>Concesionario</th><th>Q</th><th>Total Fin.</th><th>Prom.</th><th>Com Dealer</th><th>Ing. x Col.</th></tr></thead><tbody>${topCcs4.map(([nombre,v],i)=>`<tr><td><span class="rank">${i+1}.</span>${nombre.length>28?nombre.substring(0,28)+'…':nombre}</td><td>${v.ops}</td><td>${fM(v.saldo)}</td><td>${fM(v.saldo/v.ops)}</td><td>${fM(v.com_dealer)}</td><td>${fM(v.rentab_afa)}</td></tr>`).join('')}</tbody><tfoot><tr><td>Total</td><td>${totCcs4.ops}</td><td>${fM(totCcs4.saldo)}</td><td>—</td><td>${fM(totCcs4.cd)}</td><td>—</td></tr></tfoot>`;
+  document.getElementById('t-ccs4').innerHTML=`<thead><tr><th>Dealer</th><th>Q</th><th>Total Fin.</th><th>Prom.</th><th>Com Dealer</th><th>Ing. x Col.</th></tr></thead><tbody>${topCcs4.map(([nombre,v],i)=>`<tr><td><span class="rank">${i+1}.</span>${nombre.length>28?nombre.substring(0,28)+'…':nombre}</td><td>${v.ops}</td><td>${fM(v.saldo)}</td><td>${fM(v.saldo/v.ops)}</td><td>${fM(v.com_dealer)}</td><td>${fM(v.rentab_afa)}</td></tr>`).join('')}</tbody><tfoot><tr><td>Total</td><td>${totCcs4.ops}</td><td>${fM(totCcs4.saldo)}</td><td>—</td><td>${fM(totCcs4.cd)}</td><td>—</td></tr></tfoot>`;
 
   const desde=document.getElementById('sel-desde').value, hasta=document.getElementById('sel-hasta').value;
   const rawOt=window.RAW_DATA?window.RAW_DATA.filter(r=>r.mes>=desde&&r.mes<=hasta&&r.estado_eval==='OTORGADO'&&(r.financiera==='AUTOFIN'||r.financiera==='UNIDAD DE CREDITO')):[];
@@ -2850,7 +2850,7 @@ function mostrarListaOps() {
   const thead = '<thead><tr style="background:#1a3a6a;color:#fff;font-size:11px">' +
     '<th style="padding:6px 8px;text-align:left">N° Operación</th>' +
     '<th style="padding:6px 8px">Institución</th>' +
-    '<th style="padding:6px 8px">Concesionario</th>' +
+    '<th style="padding:6px 8px">Dealer</th>' +
     '<th style="padding:6px 8px">Ejecutivo</th>' +
     '<th style="padding:6px 8px;text-align:right">Saldo Precio</th>' +
     '<th style="padding:6px 8px;text-align:center">Plazo</th>' +
@@ -3596,7 +3596,7 @@ document.addEventListener('keydown', e => { if (e.key === 'Escape') cerrarModalE
 
 function _buildModalContent() {
   const { ops, titulo, totSaldo, totFin, totCD, totIng, fM } = _modalData;
-  const cols = ['N° Operación','ID Financiera','Financiera','Concesionario','Estado','Saldo Precio','Total Financiado','Plazo','Com. Dealer','Ing. x Col.'];
+  const cols = ['N° Operación','ID Financiera','Financiera','Dealer','Estado','Saldo Precio','Total Financiado','Plazo','Com. Dealer','Ing. x Col.'];
   const dataRows = ops.map(r => [
     r.op||'—', r.id_financiera||'—', r.financiera||'—',
     r.automotora||'—', r.estado_eval||'—',

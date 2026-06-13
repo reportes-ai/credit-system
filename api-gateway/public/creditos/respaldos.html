@@ -455,7 +455,7 @@ function renderPagina() {
       <i class="bi bi-clipboard2-check-fill" style="font-size:1.5rem"></i>
       <div>
         <div style="font-weight:800;font-size:.95rem">ANÁLISIS DE CRÉDITO — Analista de Crédito</div>
-        <div style="font-size:.8rem;opacity:.85">Revisa cada documento y marca <strong>Aprobar</strong> o <strong>Rechazar</strong>. Si rechazas alguno el crédito vuelve al Ejecutivo Comercial.</div>
+        <div style="font-size:.8rem;opacity:.85">Revisa cada documento y marca <strong>Aprobar</strong> o <strong>Rechazar</strong>. Si rechazas alguno el crédito vuelve al Ejecutivo.</div>
       </div>
     </div>` : `
     <div style="background:linear-gradient(135deg,var(--navy),#1a56db);border-radius:12px;padding:14px 20px;margin-bottom:16px;display:flex;align-items:center;gap:14px;color:#fff">
@@ -682,7 +682,7 @@ async function rechazarDoc(idTipo) {
   }
 
   const tipo = _tipos.find(t => t.id_tipo === idTipo);
-  if (!confirm(`⚠️ ¿Rechazar el documento "${tipo?.nombre||''}"?\n\nEl crédito será devuelto al Ejecutivo Comercial para corrección.`)) return;
+  if (!confirm(`⚠️ ¿Rechazar el documento "${tipo?.nombre||''}"?\n\nEl crédito será devuelto al Ejecutivo para corrección.`)) return;
 
   const u = getUsuario();
   const rechazado_por = u.nombre || u.email || 'Analista';
@@ -723,7 +723,7 @@ async function devolverCreditoAIngreso(nombreDoc) {
     });
     const j = await r.json();
     if (!j.success) throw new Error(j.error);
-    showToast('Crédito devuelto al Ejecutivo Comercial para corrección', false);
+    showToast('Crédito devuelto al Ejecutivo para corrección', false);
     setTimeout(() => { location.href = '/creditos'; }, 2000);
   } catch(e) {
     showToast('Error al devolver crédito: '+e.message, false);

@@ -344,8 +344,8 @@ function buildCorregirForm(c){
         </div>
       </div>
       <div class="form-row cols-3">
-        <div class="field"><label>Concesionario</label><input type="text" id="cConcesionario" value="${c.concesionario}"></div>
-        <div class="field"><label>RUT Concesionario</label><input type="text" id="cRutConc" value="${formatRUT(c.rutConc)}" oninput="autoFormatRUT(this)"></div>
+        <div class="field"><label>Dealer</label><input type="text" id="cConcesionario" value="${c.concesionario}"></div>
+        <div class="field"><label>RUT Dealer</label><input type="text" id="cRutConc" value="${formatRUT(c.rutConc)}" oninput="autoFormatRUT(this)"></div>
         <div class="field"><label>Vendedor</label><input type="text" id="cVendedor" value="${c.vendedor}"></div>
       </div>
     </div>
@@ -1591,8 +1591,8 @@ function exportCartolasExcel(){
   let cartolas = getCartolasData();
   if(!cartolas.length){ showModal('Sin datos','No hay registros en Detalle Mes.'); return; }
   
-  const headers = ['CORRELATIVO','MES','ID Financiera','MOVIMIENTO','RUT Concesionario','Concesionario',
-    'mail','Ejecutivo Comercial','Nombre del Cliente','RUT del Cliente','Saldo Precio',
+  const headers = ['CORRELATIVO','MES','ID Financiera','MOVIMIENTO','RUT Dealer','Dealer',
+    'mail','Ejecutivo','Nombre del Cliente','RUT del Cliente','Saldo Precio',
     'Comision Bruta','E° Comisión','N° CARTA APROBACIÓN','VENDEDOR','ACREEDOR','% COMISIÓN','Observaciones'];
   
   const rows = cartolas.map(r => [
@@ -1665,7 +1665,7 @@ function renderRevisionCartolas(){
   const grouped = {};
   cartolas.forEach(r => {
     if(mesFilt && r.mesDisplay !== mesFilt) return;
-    const key = r.concesionario || 'SIN CONCESIONARIO';
+    const key = r.concesionario || 'SIN DEALER';
     // Resolve mail from dealers if empty
     const mail = r.mail || getDealerMail(r.rutConc || '');
     if(!grouped[key]) grouped[key] = {rutConc: r.rutConc, mail: mail, comisiones: [], anulaciones: [], prepagos: []};
@@ -2163,7 +2163,7 @@ function exportResumenExcel(){
 
   // ── HOJA 2: Detalle de cartolas ──────────────────────────────────────────
   const detHdr = [
-    'Correlativo','Fecha Envío','Concesionario','Período',
+    'Correlativo','Fecha Envío','Dealer','Período',
     'Neto ($)','IVA ($)','Total Bruto ($)','M$ Neto','M$ Total',
     'Facturada','Fecha Factura','Pagada','Fecha Pago','Estado'
   ];
@@ -2247,9 +2247,9 @@ function buildCartolaPDF(concName, g, mes, totalComis, totalAnul, totalPrep, sub
         <div style="font-size:15px;font-weight:800;text-transform:uppercase;margin-bottom:10px;color:#111">REPORTE COMISIONES DE CRÉDITO</div>
         <table style="font-size:9.5px;border-collapse:collapse">
           <tr><td style="font-weight:700;padding:2px 10px 2px 0;color:#555">Fecha de Emisión:</td><td>${fecha}</td></tr>
-          <tr><td style="font-weight:700;padding:2px 10px 2px 0;color:#555">Nombre Concesionario:</td><td style="font-weight:600">${concName}</td></tr>
-          <tr><td style="font-weight:700;padding:2px 10px 2px 0;color:#555">Mail Concesionario:</td><td>${g.mail||'—'}</td></tr>
-          <tr><td style="font-weight:700;padding:2px 10px 2px 0;color:#555">RUT Concesionario:</td><td>${g.rutConc||'—'}</td></tr>
+          <tr><td style="font-weight:700;padding:2px 10px 2px 0;color:#555">Nombre Dealer:</td><td style="font-weight:600">${concName}</td></tr>
+          <tr><td style="font-weight:700;padding:2px 10px 2px 0;color:#555">Mail Dealer:</td><td>${g.mail||'—'}</td></tr>
+          <tr><td style="font-weight:700;padding:2px 10px 2px 0;color:#555">RUT Dealer:</td><td>${g.rutConc||'—'}</td></tr>
         </table>
       </div>
       <div style="display:inline-flex;flex-direction:column;align-items:center;margin-left:auto">
@@ -2295,7 +2295,7 @@ function openCartolaSend(concName){
   const grouped = {};
   cartolas.forEach(r => {
     if(mesFilt && r.mesDisplay !== mesFilt) return;
-    const key = r.concesionario || 'SIN CONCESIONARIO';
+    const key = r.concesionario || 'SIN DEALER';
     const mail = r.mail || getDealerMail(r.rutConc || '');
     if(!grouped[key]) grouped[key] = {rutConc:r.rutConc, mail:mail, comisiones:[], anulaciones:[], prepagos:[]};
     if(r.movimiento==='COMISION') grouped[key].comisiones.push(r);
@@ -2501,7 +2501,7 @@ function grabarPrepAbol(){
   const concesionario = document.getElementById('pa_concesionario').value.trim();
   
   if(!nOp){ alert('Ingrese el N° de Operación'); return; }
-  if(!concesionario){ alert('Ingrese el Concesionario'); return; }
+  if(!concesionario){ alert('Ingrese el Dealer'); return; }
   
   const cartolas = getCartolasData();
   const nextCorr = cartolas.length > 0 ? Math.max(...cartolas.map(r => r.correlativo||0)) + 1 : 1;
@@ -2566,7 +2566,7 @@ function fillDealerFromRut(rut){
     document.getElementById('pa_concesionario').value = dealer.nombreIndexa || dealer.nombreRS || '';
     document.getElementById('pa_mail').value = dealer.correo || '';
     const msg = document.getElementById('pa_searchMsg');
-    if(msg) msg.innerHTML = '<span style="color:#2E7D32">✓ Concesionario encontrado: ' + (dealer.nombreIndexa||dealer.nombreRS) + '</span>';
+    if(msg) msg.innerHTML = '<span style="color:#2E7D32">✓ Dealer encontrado: ' + (dealer.nombreIndexa||dealer.nombreRS) + '</span>';
   }
 }
 
@@ -3698,7 +3698,7 @@ async function grabarCarta(){
   const tipo = selectedTipoCarta;
   if(!tipo) { alert('Seleccione el tipo de carta'); return; }
   const ejVal = document.getElementById('fEjecutivo').value;
-  if(!ejVal) { alert('Seleccione un Ejecutivo Comercial'); return; }
+  if(!ejVal) { alert('Seleccione un Ejecutivo'); return; }
   const opOrigen = document.getElementById('fOpOrigen').value.trim();
   if(!opOrigen) { alert('Ingrese el ID Financiera'); return; }
   const fNombre = toTitleCase(document.getElementById('fNombre').value.trim());
@@ -3712,7 +3712,7 @@ async function grabarCarta(){
   const marca = document.getElementById('fMarca').value;
   if(!marca) { alert('Seleccione Marca'); return; }
   const conc = document.getElementById('fConcesionario').value.trim();
-  if(!conc) { alert('Seleccione Concesionario'); return; }
+  if(!conc) { alert('Seleccione Dealer'); return; }
   const precio = parseMoneyInput(document.getElementById('fPrecioVenta'));
   if(!precio) { alert('Ingrese Precio de Venta'); return; }
 
@@ -4246,7 +4246,7 @@ function exportInformesExcel(){
   if(!list.length){ showModal('Sin datos','No hay cartas para exportar con los filtros actuales.'); return; }
   
   // Build CSV with BOM for Excel UTF-8 compatibility
-  const headers = ['N° Op Carta','Tipo','Cliente','RUT Cliente','Concesionario','RUT Conc','Ejecutivo','Creador','Fecha Creación','Aprobador','Fecha Aprobación','Precio Venta','Pie','Saldo','Plazo','Marca','Modelo','Año','Patente','Part. Neto','Part. IVA','Part. Bruto','Estado','Excepciones','Comentarios Aprobación'];
+  const headers = ['N° Op Carta','Tipo','Cliente','RUT Cliente','Dealer','RUT Conc','Ejecutivo','Creador','Fecha Creación','Aprobador','Fecha Aprobación','Precio Venta','Pie','Saldo','Plazo','Marca','Modelo','Año','Patente','Part. Neto','Part. IVA','Part. Bruto','Estado','Excepciones','Comentarios Aprobación'];
   const rows = list.map(c => {
     const excTxt = (c.excepciones||[]).map(e=>`[${e.tipo}] ${e.msg}`).join(' | ');
     const comTxt = (c.excepcionesComentarios||[]).map(e=>`[${e.tipo}] ${e.comentario||''}`).join(' | ');
@@ -4305,15 +4305,15 @@ function generatePDF(c, forPrint, fromRev){
     : '';
 
   const parqueSection = isParqueType ? `
-    <div class="sec-title">DATOS DEL PARQUE Y CONCESIONARIO</div>
+    <div class="sec-title">DATOS DEL PARQUE Y DEALER</div>
     <table class="data-tbl">
       <tr><td class="lbl">PARQUE AUTOMOTRIZ</td><td class="val">${c.parque||''}</td><td class="lbl">VENDEDOR</td><td class="val">${c.vendedor||''}</td></tr>
-      <tr><td class="lbl">CONCESIONARIO</td><td class="val" colspan="3">${c.concesionario||''}</td></tr>
+      <tr><td class="lbl">DEALER</td><td class="val" colspan="3">${c.concesionario||''}</td></tr>
       <tr><td class="lbl">RUT</td><td class="val" colspan="3">${c.rutConc||''}</td></tr>
     </table>` : `
-    <div class="sec-title">DATOS DEL CONCESIONARIO</div>
+    <div class="sec-title">DATOS DEL DEALER</div>
     <table class="data-tbl">
-      <tr><td class="lbl">CONCESIONARIO</td><td class="val" colspan="3">${c.concesionario||''}</td></tr>
+      <tr><td class="lbl">DEALER</td><td class="val" colspan="3">${c.concesionario||''}</td></tr>
       <tr><td class="lbl">RUT</td><td class="val">${c.rutConc||''}</td><td class="lbl">VENDEDOR</td><td class="val">${c.vendedor||''}</td></tr>
     </table>`;
 
@@ -4358,7 +4358,7 @@ function generatePDF(c, forPrint, fromRev){
       <tr><td class="lbl">PIE</td><td class="val">${fmtCLP(c.pie)}</td><td class="lbl">PRENDA VEHÍCULO</td><td class="val">${c.prenda||''}</td></tr>
       <tr><td class="lbl">SALDO PRECIO</td><td class="val">${fmtCLP(c.saldo)}</td><td class="lbl">PLAZO</td><td class="val">${c.plazo||''} cuotas</td></tr>
     </table>
-    <!-- CONCESIONARIO -->
+    <!-- DEALER -->
     ${parqueSection}
     <!-- PARTICIPACION -->
     <div class="sec-title">PARTICIPACIÓN DEALER</div>
@@ -4373,10 +4373,10 @@ function generatePDF(c, forPrint, fromRev){
       <p style="margin:2px 0">2. El crédito está sujeto a validación de los antecedentes presentados y sus respaldos necesarios para la formalización del mismo, como la firma de los documentos relacionados para la entrega del crédito.</p>
       <p style="margin:2px 0">3. AutoFácil actúa como Agente Colocador del crédito independiente del proveedor de financiamiento que cubra el producto. Por lo anterior, el Ejecutivo AutoFácil utilizará el set de documentos legales que correspondan según el producto que se esté otorgando.</p>
       <p style="margin:2px 0">4. El pago del saldo precio, seguros, gastos y otros queda supeditado al correcto y oportuno envío de toda la información necesaria para la venta, transferencia, inscripción, prenda y entrega del vehículo que permitirán formalizar la operación de Crédito.</p>
-      <p style="margin:2px 0">5. De no contar con la documentación completa o si esta presenta errores de firma, impresión, formato u otro, tanto el Cliente, Ejecutivo AutoFácil y/o el Concesionario deberán corregir dicha situación enviando la documentación en forma correcta.</p>
+      <p style="margin:2px 0">5. De no contar con la documentación completa o si esta presenta errores de firma, impresión, formato u otro, tanto el Cliente, Ejecutivo AutoFácil y/o el Dealer deberán corregir dicha situación enviando la documentación en forma correcta.</p>
       <p style="margin:2px 0">6. La participación del Dealer queda establecida, inicialmente y de no mediar una situación especial, que la participación se obtendrá de multiplicar el saldo precio por un factor que se determina según el plazo del financiamiento.</p>
       <p style="margin:2px 0">7. Para los casos en que se autorice un descuento en la tasa de financiamiento, la participación quedará definida de manera específica y deberá contar con la firma del representante del concesionario o dealer.</p>
-      <p style="margin:2px 0">8. El Concesionario debe entregar a Ejecutivo AutoFácil la Factura y Solicitud de Primera Inscripción o Contrato de Compraventa y Transferencia del Vehículo a más tardar al quinto (5) día corrido desde la fecha de inscripción o transferencia del vehículo, respectivamente.</p>
+      <p style="margin:2px 0">8. El Dealer debe entregar a Ejecutivo AutoFácil la Factura y Solicitud de Primera Inscripción o Contrato de Compraventa y Transferencia del Vehículo a más tardar al quinto (5) día corrido desde la fecha de inscripción o transferencia del vehículo, respectivamente.</p>
       <p style="margin:2px 0">9. Al momento de la inscripción de la compra venta, se deberá incluir la inscripción de la limitación de dominio como prohibiciones de enajenar a favor de ${c.acreedor||'AUTOFIN'}.</p>
       <p style="margin:2px 0">10. En caso de que la entrega de la documentación del Vehículo al Ejecutivo AutoFácil ocurra con posterioridad al quinto (5) día corrido desde la fecha de Solicitud de Primera Inscripción o Transferencia del mismo, el Saldo de Precio será pagado por AutoFácil contra la inscripción efectiva de la Prenda.</p>
       <p style="margin:2px 0">11. Una vez recibido el set legal de documentos firmados en conformidad, la factura e inscripción o contrato de compraventa y transferencia del vehículo dentro de los plazos señalados anteriormente, AutoFácil procederá a pagar el saldo de precio dentro de las 96 horas hábiles siguientes.</p>

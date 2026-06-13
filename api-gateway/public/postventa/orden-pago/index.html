@@ -87,7 +87,7 @@
     <div style="overflow-x:auto">
       <table class="lista">
         <thead><tr>
-          <th>N° OP</th><th>Financiera</th><th>Concesionario</th><th>RUT</th>
+          <th>N° OP</th><th>Financiera</th><th>Dealer</th><th>RUT</th>
           <th style="text-align:right">Saldo Precio</th><th>Fondos</th><th>Días</th><th></th>
         </tr></thead>
         <tbody id="tbody"><tr><td colspan="8" class="vacio"><div class="spinner-border spinner-border-sm"></div> Cargando…</td></tr></tbody>
@@ -197,7 +197,7 @@ function docHTML(r){
         <table style="${Smeta}"><tbody>
           <tr><td style="${Slbl}">Concepto</td><td style="${Smv}">SOLICITUD AUTORIZACIÓN DE PAGO</td></tr>
           <tr><td style="${Slbl}">Compañía</td><td style="${Smv}">AUTOFÁCIL SPA</td></tr>
-          <tr><td style="${Slbl}">Tipo gasto</td><td style="${Smv}">PAGO A CONCESIONARIO</td></tr>
+          <tr><td style="${Slbl}">Tipo gasto</td><td style="${Smv}">PAGO A DEALER</td></tr>
           <tr><td style="${Slbl}">N° Orden</td><td style="${Smv}">${r.num_orden || ('OP-'+(r.num_op||''))}</td></tr>
           <tr><td style="${Slbl}">Fecha</td><td style="${Smv}">${fechaPago}</td></tr>
         </tbody></table>
@@ -207,7 +207,7 @@ function docHTML(r){
       </td>
     </tr></tbody></table>
     <table style="${Stbl}">
-      <thead><tr><th style="${Sth}">Concesionario</th><th style="${Sth}">RUT</th><th style="${Sth}">Detalle</th><th style="${Sth}">Mes</th><th style="${Sth}">Valor Unitario</th><th style="${Sth}">IVA</th><th style="${Sth}">Valor Total</th><th style="${Sth}">Fecha a pagar</th></tr></thead>
+      <thead><tr><th style="${Sth}">Dealer</th><th style="${Sth}">RUT</th><th style="${Sth}">Detalle</th><th style="${Sth}">Mes</th><th style="${Sth}">Valor Unitario</th><th style="${Sth}">IVA</th><th style="${Sth}">Valor Total</th><th style="${Sth}">Fecha a pagar</th></tr></thead>
       <tbody>${filas}
         <tr><td colspan="6" style="${Std};text-align:right;font-weight:800;background:#f1f5f9">TOTAL</td><td style="${Snum};font-weight:800;background:#f1f5f9">${fmt(total)}</td><td style="${Std};background:#f1f5f9"></td></tr>
       </tbody>
@@ -233,7 +233,7 @@ function emailHTML(r){
   return `<div style="font-family:Arial,sans-serif">
     <p style="${p}">Estimado Equipo de Contabilidad:</p>
     <p style="${p}">Adjunto encontrarán <strong>Orden de Pago N° ${nOrden}</strong> para el pago del Saldo Precio a <strong>${r.nombre_dealer||''}</strong> del Crédito <strong>N° ${r.num_op||''}</strong> otorgado por <strong>${fin}</strong> con fecha <strong>${fOtorg}</strong>, Saldo Precio recepcionado por AutoFácil el día <strong>${fRecep}</strong>.</p>
-    <p style="${p}">Les recordamos que deben marcar en el módulo de <strong>Saldo Precio Pagado</strong>, de manera de informar al Ejecutivo Comercial y cerrar el flujo operativo de esta transacción.</p>
+    <p style="${p}">Les recordamos que deben marcar en el módulo de <strong>Saldo Precio Pagado</strong>, de manera de informar al Ejecutivo y cerrar el flujo operativo de esta transacción.</p>
     ${docHTML(r)}
     <p style="${p};margin-top:18px">Saludos cordiales,<br><strong>Área de Operaciones</strong></p>
   </div>`;
