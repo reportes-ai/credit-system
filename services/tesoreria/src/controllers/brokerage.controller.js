@@ -6,7 +6,7 @@ const pool = require('../../../../shared/config/database');
     await pool.query(`
       CREATE TABLE IF NOT EXISTS facturas_brokerage (
         id               INT AUTO_INCREMENT PRIMARY KEY,
-        operacion_id     INT NOT NULL,
+        id_credito       INT NOT NULL,
         numero_factura   VARCHAR(50),
         rut_emisor       VARCHAR(20),
         nombre_emisor    VARCHAR(200),
@@ -21,9 +21,11 @@ const pool = require('../../../../shared/config/database');
         id_registrado_por INT,
         created_at       DATETIME DEFAULT NOW(),
         updated_at       DATETIME DEFAULT NOW() ON UPDATE NOW(),
-        INDEX idx_op (operacion_id)
+        INDEX idx_op (id_credito)
       )
     `);
+    const [[fa]] = await pool.query(`SELECT COUNT(*) AS c FROM information_schema.columns WHERE table_schema=DATABASE() AND table_name='facturas_brokerage' AND column_name='operacion_id'`);
+    if (fa.c > 0) await pool.query(`ALTER TABLE facturas_brokerage CHANGE COLUMN operacion_id id_credito INT NOT NULL`);
     console.log('✓ facturas_brokerage: tabla lista');
   } catch (e) {
     console.error('[facturas_brokerage migration]', e.message);
@@ -35,7 +37,7 @@ const pool = require('../../../../shared/config/database');
     await pool.query(`
       CREATE TABLE IF NOT EXISTS pagos_brokerage (
         id               INT AUTO_INCREMENT PRIMARY KEY,
-        operacion_id     INT NOT NULL,
+        id_credito       INT NOT NULL,
         tipo_pago        VARCHAR(50) DEFAULT 'SALDO_PRECIO',
         monto            DECIMAL(15,0),
         banco            VARCHAR(100),
@@ -48,9 +50,11 @@ const pool = require('../../../../shared/config/database');
         id_registrado_por INT,
         created_at       DATETIME DEFAULT NOW(),
         updated_at       DATETIME DEFAULT NOW() ON UPDATE NOW(),
-        INDEX idx_op (operacion_id)
+        INDEX idx_op (id_credito)
       )
     `);
+    const [[pa]] = await pool.query(`SELECT COUNT(*) AS c FROM information_schema.columns WHERE table_schema=DATABASE() AND table_name='pagos_brokerage' AND column_name='operacion_id'`);
+    if (pa.c > 0) await pool.query(`ALTER TABLE pagos_brokerage CHANGE COLUMN operacion_id id_credito INT NOT NULL`);
     console.log('✓ pagos_brokerage: tabla lista');
   } catch (e) {
     console.error('[pagos_brokerage migration]', e.message);
@@ -85,9 +89,9 @@ const getOperaciones = async (req, res) => {
       `SELECT o.*,
          COALESCE(cl.rut,             '') AS rut_cliente,
          COALESCE(cl.nombre_completo, '') AS nombre_cliente,
-         (SELECT COUNT(*) FROM facturas_brokerage f WHERE f.operacion_id = o.id) AS cnt_facturas,
-         (SELECT COUNT(*) FROM pagos_brokerage p WHERE p.operacion_id = o.id) AS cnt_pagos,
-         (SELECT SUM(p.monto) FROM pagos_brokerage p WHERE p.operacion_id = o.id AND p.estado = 'PAGADO') AS monto_pagado
+         (SELECT COUNT(*) FROM facturas_brokerage f WHERE f.id_credito = o.id) AS cnt_facturas,
+         (SELECT COUNT(*) FROM pagos_brokerage p WHERE p.id_credito = o.id) AS cnt_pagos,
+         (SELECT SUM(p.monto) FROM pagos_brokerage p WHERE p.id_credito = o.id AND p.estado = 'PAGADO') AS monto_pagado
        FROM creditos o
        LEFT JOIN clientes cl ON cl.id_cliente = o.id_cliente
        ${w}
@@ -116,15 +120,15 @@ const getOperacion = async (req, res) => {
     if (!op) return res.status(404).json({ success: false, data: null, error: 'Operación no encontrada' });
 
     const [facturas] = await pool.query(
-      'SELECT id, numero_factura, rut_emisor, nombre_emisor, monto, fecha_factura, archivo_nombre, estado, observaciones, registrado_por, created_at FROM facturas_brokerage WHERE operacion_id = ? ORDER BY created_at DESC',
+      'SELECT id, numero_factura, rut_emisor, nombre_emisor, monto, fecha_factura, archivo_nombre, estado, observaciones, registrado_por, created_at FROM facturas_brokerage WHERE id_credito = ? ORDER BY created_at DESC',
       [req.params.id]
     );
     const [pagos] = await pool.query(
-      'SELECT * FROM pagos_brokerage WHERE operacion_id = ? ORDER BY created_at DESC',
+      'SELECT *, id_credito AS operacion_id FROM pagos_brokerage WHERE id_credito = ? ORDER BY created_at DESC',
       [req.params.id]
     );
     const [fundantes] = await pool.query(
-      'SELECT id, nombre_documento, tipo, archivo_nombre, estado, subido_por, validado_por, fecha_validacion, created_at FROM fundantes_brokerage WHERE operacion_id = ? ORDER BY created_at DESC',
+      'SELECT id, nombre_documento, tipo, archivo_nombre, estado, subido_por, validado_por, fecha_validacion, created_at FROM fundantes_brokerage WHERE id_credito = ? ORDER BY created_at DESC',
       [req.params.id]
     );
 
@@ -148,7 +152,7 @@ const createFactura = async (req, res) => {
 
     const [r] = await pool.query(
       `INSERT INTO facturas_brokerage
-        (operacion_id, numero_factura, rut_emisor, nombre_emisor, monto, fecha_factura,
+        (id_credito, numero_factura, rut_emisor, nombre_emisor, monto, fecha_factura,
          archivo_nombre, mime_type, archivo_data, observaciones, estado, registrado_por, id_registrado_por)
        VALUES (?,?,?,?,?,?,?,?,?,'RECIBIDA',?,?,?)`,
       [operacion_id, numero_factura || null, rut_emisor || null, nombre_emisor || null,
@@ -156,7 +160,7 @@ const createFactura = async (req, res) => {
        buffer, observaciones || null, regPor, req.usuario?.id_usuario || null]
     );
     const [[row]] = await pool.query(
-      'SELECT id, operacion_id, numero_factura, rut_emisor, nombre_emisor, monto, fecha_factura, estado, registrado_por, created_at FROM facturas_brokerage WHERE id = ?',
+      'SELECT id, id_credito AS operacion_id, numero_factura, rut_emisor, nombre_emisor, monto, fecha_factura, estado, registrado_por, created_at FROM facturas_brokerage WHERE id = ?',
       [r.insertId]
     );
     res.status(201).json({ success: true, data: row, error: null });
@@ -205,7 +209,7 @@ const createPago = async (req, res) => {
 
     const [r] = await pool.query(
       `INSERT INTO pagos_brokerage
-        (operacion_id, tipo_pago, monto, banco, cuenta_destino, num_transaccion, fecha_pago, observaciones, estado, registrado_por, id_registrado_por)
+        (id_credito, tipo_pago, monto, banco, cuenta_destino, num_transaccion, fecha_pago, observaciones, estado, registrado_por, id_registrado_por)
        VALUES (?,?,?,?,?,?,?,?,?,?,?)`,
       [operacion_id, tipo_pago || 'SALDO_PRECIO', monto, banco || null,
        cuenta_destino || null, num_transaccion || null, fecha_pago || null,
@@ -220,7 +224,7 @@ const createPago = async (req, res) => {
       );
     }
 
-    const [[row]] = await pool.query('SELECT * FROM pagos_brokerage WHERE id = ?', [r.insertId]);
+    const [[row]] = await pool.query('SELECT *, id_credito AS operacion_id FROM pagos_brokerage WHERE id = ?', [r.insertId]);
     res.status(201).json({ success: true, data: row, error: null });
   } catch (e) {
     (console.error('[error]', e), res.status(500).json({success:false,data:null,error:'Error interno del servidor'}));
@@ -233,7 +237,7 @@ const registrarTransferencia = async (req, res) => {
     const { num_transaccion, banco, cuenta_destino, fecha_pago, observaciones } = req.body;
     if (!num_transaccion) return res.status(400).json({ success: false, data: null, error: 'num_transaccion requerido' });
 
-    const [[pago]] = await pool.query('SELECT * FROM pagos_brokerage WHERE id = ?', [req.params.id]);
+    const [[pago]] = await pool.query('SELECT *, id_credito AS operacion_id FROM pagos_brokerage WHERE id = ?', [req.params.id]);
     if (!pago) return res.status(404).json({ success: false, data: null, error: 'Pago no encontrado' });
 
     await pool.query(
@@ -249,7 +253,7 @@ const registrarTransferencia = async (req, res) => {
       [fecha_pago || null, num_transaccion, pago.operacion_id]
     );
 
-    const [[row]] = await pool.query('SELECT * FROM pagos_brokerage WHERE id = ?', [req.params.id]);
+    const [[row]] = await pool.query('SELECT *, id_credito AS operacion_id FROM pagos_brokerage WHERE id = ?', [req.params.id]);
     res.json({ success: true, data: row, error: null });
   } catch (e) {
     (console.error('[error]', e), res.status(500).json({success:false,data:null,error:'Error interno del servidor'}));

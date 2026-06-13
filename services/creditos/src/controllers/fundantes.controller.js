@@ -6,7 +6,7 @@ const pool = require('../../../../shared/config/database');
     await pool.query(`
       CREATE TABLE IF NOT EXISTS fundantes_brokerage (
         id               INT AUTO_INCREMENT PRIMARY KEY,
-        operacion_id     INT NOT NULL,
+        id_credito       INT NOT NULL,
         nombre_documento VARCHAR(200) NOT NULL,
         tipo             VARCHAR(50)  DEFAULT 'DOCUMENTO',
         url_archivo      TEXT,
@@ -22,10 +22,13 @@ const pool = require('../../../../shared/config/database');
         fecha_validacion DATETIME,
         created_at       DATETIME     DEFAULT NOW(),
         updated_at       DATETIME     DEFAULT NOW() ON UPDATE NOW(),
-        INDEX idx_op (operacion_id),
+        INDEX idx_op (id_credito),
         INDEX idx_estado (estado)
       )
     `);
+    // Homologación: operacion_id → id_credito
+    const [[fc]] = await pool.query(`SELECT COUNT(*) AS c FROM information_schema.columns WHERE table_schema=DATABASE() AND table_name='fundantes_brokerage' AND column_name='operacion_id'`);
+    if (fc.c > 0) await pool.query(`ALTER TABLE fundantes_brokerage CHANGE COLUMN operacion_id id_credito INT NOT NULL`);
     console.log('✓ fundantes_brokerage: tabla lista');
   } catch (e) {
     console.error('[fundantes migration]', e.message);
@@ -41,9 +44,9 @@ const getByOperacion = async (req, res) => {
     const { operacion_id } = req.query;
     if (!operacion_id) return res.status(400).json({ success: false, data: null, error: 'operacion_id requerido' });
     const [rows] = await pool.query(
-      `SELECT id, operacion_id, nombre_documento, tipo, archivo_nombre, mime_type,
+      `SELECT id, id_credito AS operacion_id, nombre_documento, tipo, archivo_nombre, mime_type,
               estado, comentario_rechazo, subido_por, validado_por, fecha_validacion, created_at
-       FROM fundantes_brokerage WHERE operacion_id = ? ORDER BY created_at DESC`,
+       FROM fundantes_brokerage WHERE id_credito = ? ORDER BY created_at DESC`,
       [operacion_id]
     );
     res.json({ success: true, data: rows, error: null });
@@ -82,7 +85,7 @@ const upload = async (req, res) => {
     const buffer = archivo_data ? Buffer.from(archivo_data, 'base64') : null;
     const [r] = await pool.query(
       `INSERT INTO fundantes_brokerage
-        (operacion_id, nombre_documento, tipo, archivo_nombre, mime_type, archivo_data,
+        (id_credito, nombre_documento, tipo, archivo_nombre, mime_type, archivo_data,
          subido_por, id_subido_por, estado)
        VALUES (?,?,?,?,?,?,?,?,'PENDIENTE')`,
       [
@@ -93,7 +96,7 @@ const upload = async (req, res) => {
       ]
     );
     const [[row]] = await pool.query(
-      `SELECT id, operacion_id, nombre_documento, tipo, archivo_nombre, mime_type,
+      `SELECT id, id_credito AS operacion_id, nombre_documento, tipo, archivo_nombre, mime_type,
               estado, subido_por, created_at FROM fundantes_brokerage WHERE id = ?`,
       [r.insertId]
     );
@@ -124,7 +127,7 @@ const validar = async (req, res) => {
     if (!['APROBADO', 'RECHAZADO'].includes(estado)) {
       return res.status(400).json({ success: false, data: null, error: 'estado debe ser APROBADO o RECHAZADO' });
     }
-    const [[exists]] = await pool.query('SELECT id, operacion_id FROM fundantes_brokerage WHERE id = ?', [req.params.id]);
+    const [[exists]] = await pool.query('SELECT id, id_credito AS operacion_id FROM fundantes_brokerage WHERE id = ?', [req.params.id]);
     if (!exists) return res.status(404).json({ success: false, data: null, error: 'Fundante no encontrado' });
 
     const validadoPor = `${req.usuario.nombre} ${req.usuario.apellido || ''}`.trim();
@@ -146,7 +149,7 @@ const validar = async (req, res) => {
 
 async function _recalcEstadoFundantes(operacion_id) {
   const [rows] = await pool.query(
-    'SELECT estado FROM fundantes_brokerage WHERE operacion_id = ?',
+    'SELECT estado FROM fundantes_brokerage WHERE id_credito = ?',
     [operacion_id]
   );
   if (!rows.length) return;
@@ -164,7 +167,7 @@ async function _recalcEstadoFundantes(operacion_id) {
 /* ─── DELETE /api/fundantes/:id ─────────────────────────────────────── */
 const remove = async (req, res) => {
   try {
-    const [[exists]] = await pool.query('SELECT operacion_id FROM fundantes_brokerage WHERE id = ?', [req.params.id]);
+    const [[exists]] = await pool.query('SELECT id_credito AS operacion_id FROM fundantes_brokerage WHERE id = ?', [req.params.id]);
     if (!exists) return res.status(404).json({ success: false, data: null, error: 'No encontrado' });
     await pool.query('DELETE FROM fundantes_brokerage WHERE id = ?', [req.params.id]);
     await _recalcEstadoFundantes(exists.operacion_id);
