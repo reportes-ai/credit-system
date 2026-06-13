@@ -5,7 +5,7 @@
   <link rel="icon" href="/img/favicon.png" type="image/png">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Cartas de Aprobación — AutoFácil</title>
-  <!-- v3.1 -->
+  <!-- v3.2 -->
   <link href="/css/bootstrap.min.css" rel="stylesheet">
   <link href="/css/bootstrap-icons.css" rel="stylesheet">
   <style>
@@ -747,7 +747,7 @@ async function cargarPermisos(){
 const puede = c => ES_ADMIN || PERMISOS.has(c);
 
 /* ── Carga masiva de Cartas de Aprobación (Admin): hoja "DETALLE MES" del Excel ── */
-function _normCM(s){ return String(s==null?'':s).toUpperCase().normalize('NFD').replace(/[^A-Z0-9 ]/g,' ').replace(/\s+/g,' ').trim(); }
+function _normCM(s){ return String(s==null?'':s).toUpperCase().normalize('NFD').replace(/[̀-ͯ]/g,'').replace(/[^A-Z0-9 ]/g,' ').replace(/\s+/g,' ').trim(); }
 function abrirCargaMasivaCartas(){
   const inp = document.createElement('input');
   inp.type = 'file'; inp.accept = '.xlsx,.xls';

@@ -2931,7 +2931,7 @@ async function initApp(){
 /* ── Carga masiva de Cartas de Aprobación (Admin) ──────────────────────────────
    Lee la hoja "DETALLE MES" del Excel, mapea por encabezados y la manda al backend,
    que genera op_carta, enlaza al crédito por N° OPERACIÓN y crea cliente/crédito si falta. */
-function _normCM(s){ return String(s==null?'':s).toUpperCase().normalize('NFD').replace(/[^A-Z0-9 ]/g,' ').replace(/\s+/g,' ').trim(); }
+function _normCM(s){ return String(s==null?'':s).toUpperCase().normalize('NFD').replace(/[̀-ͯ]/g,'').replace(/[^A-Z0-9 ]/g,' ').replace(/\s+/g,' ').trim(); }
 function abrirCargaMasivaCartas(){
   const inp = document.createElement('input');
   inp.type = 'file'; inp.accept = '.xlsx,.xls';
