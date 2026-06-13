@@ -128,6 +128,9 @@ const setEtapa = async (req, res) => {
       return res.status(400).json({ success: false, data: null, error: 'track y etapa requeridos' });
     if (ETAPAS_SISTEMA.includes(etapa))
       return res.status(400).json({ success: false, data: null, error: 'Etapa de sistema — no editable' });
+    // Etapas automáticas: solo se marcan desde sus módulos dedicados
+    if (track === 'SALDO' && (etapa === 'ORDEN DE PAGO EMITIDA' || etapa === 'SALDO PRECIO PAGADO'))
+      return res.status(400).json({ success: false, data: null, error: `"${etapa}" se marca automáticamente desde su módulo (Emisión Orden de Pago / Saldos Precios a Pagar)` });
 
     const esAdmin = req.usuario?.perfil_nombre === 'Administrador';
     const usuario = loginDe(req.usuario);
