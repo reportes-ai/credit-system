@@ -56,6 +56,28 @@ const pool = require('../../../../shared/config/database');
     ];
     await pool.query('INSERT IGNORE INTO postventa_config (clave, valor) VALUES (?,?),(?,?)',
       ['etapas_saldo', JSON.stringify(DEF_SALDO), 'etapas_comision', JSON.stringify(DEF_COM)]);
+    // Órdenes de pago de saldo precio: correlativo propio (una por operación)
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS postventa_ordenes (
+        id             INT AUTO_INCREMENT PRIMARY KEY,
+        num_orden      VARCHAR(30) UNIQUE,
+        id_seguimiento INT NOT NULL,
+        num_op         VARCHAR(30),
+        monto          BIGINT,
+        usuario        VARCHAR(150),
+        fecha          DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        UNIQUE KEY uk_seg (id_seguimiento)
+      )`);
+    // Reversas de pago fuera del día (auditoría para Riesgo Operacional)
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS postventa_reversas (
+        id             INT AUTO_INCREMENT PRIMARY KEY,
+        id_seguimiento INT NOT NULL,
+        etapa          VARCHAR(60) NOT NULL,
+        usuario        VARCHAR(150),
+        motivo         VARCHAR(400),
+        fecha          DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
+      )`);
     console.log('[postventa] tablas OK');
   } catch (e) { console.error('[postventa migration]', e.message); }
 })();
@@ -301,6 +323,31 @@ const getOrdenPago = async (req, res) => {
   }
 };
 
+/* ── GET /api/postventa/orden-pago/:id/correlativo — crea o devuelve el N° de orden ── */
+const correlativoOrden = async (req, res) => {
+  const id = Number(req.params.id);
+  try {
+    if (!id) return res.status(400).json({ success: false, data: null, error: 'id inválido' });
+    const [[ya]] = await pool.query('SELECT num_orden FROM postventa_ordenes WHERE id_seguimiento=?', [id]);
+    if (ya) return res.json({ success: true, data: { num_orden: ya.num_orden }, error: null });
+    const [[seg]] = await pool.query('SELECT num_op, saldo_precio FROM postventa_seguimiento WHERE id=?', [id]);
+    if (!seg) return res.status(404).json({ success: false, data: null, error: 'Operación no encontrada' });
+    const [ins] = await pool.query(
+      'INSERT INTO postventa_ordenes (id_seguimiento, num_op, monto, usuario) VALUES (?,?,?,?)',
+      [id, seg.num_op, seg.saldo_precio, loginDe(req.usuario)]);
+    const num = 'OP-' + new Date().getFullYear() + '-' + String(ins.insertId).padStart(5, '0');
+    await pool.query('UPDATE postventa_ordenes SET num_orden=? WHERE id=?', [num, ins.insertId]);
+    res.json({ success: true, data: { num_orden: num }, error: null });
+  } catch (e) {
+    if (e.code === 'ER_DUP_ENTRY') {
+      const [[row]] = await pool.query('SELECT num_orden FROM postventa_ordenes WHERE id_seguimiento=?', [id]);
+      if (row) return res.json({ success: true, data: { num_orden: row.num_orden }, error: null });
+    }
+    console.error('[postventa correlativoOrden]', e.message);
+    res.status(500).json({ success: false, data: null, error: 'Error interno del servidor' });
+  }
+};
+
 /* ── POST /api/postventa/orden-pago/emitir { ids:[] } — marca ORDEN DE PAGO EMITIDA ── */
 const emitirOrdenPago = async (req, res) => {
   try {
@@ -346,20 +393,44 @@ const pagarSaldos = async (req, res) => {
   }
 };
 
-/* ── POST /api/postventa/saldos-a-pagar/desmarcar { ids:[] } — quita SALDO PRECIO PAGADO marcado hoy ── */
+/* ── POST /api/postventa/saldos-a-pagar/desmarcar { ids:[], motivo } — revierte SALDO PRECIO PAGADO ──
+   Mismo día: cualquiera con permiso. Fuera del día: solo Administrador, con motivo (auditoría). */
 const desmarcarSaldos = async (req, res) => {
   try {
-    const { ids } = req.body;
+    const { ids, motivo } = req.body;
     if (!Array.isArray(ids) || !ids.length)
       return res.status(400).json({ success: false, data: null, error: 'Sin operaciones seleccionadas' });
-    // Solo permite desmarcar si la marca es de hoy
+    const esAdmin = req.usuario?.perfil_nombre === 'Administrador';
+    const usuario = loginDe(req.usuario);
+    const ph = ids.map(() => '?').join(',');
+
+    // ¿Alguna marca NO es de hoy? → es reversa fuera del día
+    const [[{ fuera }]] = await pool.query(
+      `SELECT COUNT(*) AS fuera FROM postventa_etapas
+       WHERE track='SALDO' AND etapa='SALDO PRECIO PAGADO' AND DATE(fecha) < CURDATE()
+         AND id_seguimiento IN (${ph})`, ids);
+
+    if (fuera > 0) {
+      if (!esAdmin)
+        return res.status(403).json({ success: false, data: null, error: 'Solo un Administrador puede revertir un pago de un día anterior.' });
+      if (!motivo || !String(motivo).trim())
+        return res.status(400).json({ success: false, data: null, error: 'Debes indicar un motivo para revertir un pago de un día anterior.' });
+      // Auditoría de la reversa
+      const logs = ids.map(id => [id, 'SALDO PRECIO PAGADO', usuario, String(motivo).trim().slice(0, 400)]);
+      await pool.query('INSERT INTO postventa_reversas (id_seguimiento, etapa, usuario, motivo) VALUES ?', [logs]);
+      const [r] = await pool.query(
+        `DELETE FROM postventa_etapas
+         WHERE track='SALDO' AND etapa='SALDO PRECIO PAGADO' AND id_seguimiento IN (${ph})`, ids);
+      return res.json({ success: true, data: { desmarcados: r.affectedRows, reversa: true }, error: null });
+    }
+
+    // Mismo día: cualquiera con permiso
     const [r] = await pool.query(
       `DELETE FROM postventa_etapas
        WHERE track='SALDO' AND etapa='SALDO PRECIO PAGADO'
          AND DATE(fecha) = CURDATE()
-         AND id_seguimiento IN (${ids.map(() => '?').join(',')})`,
-      ids);
-    res.json({ success: true, data: { desmarcados: r.affectedRows }, error: null });
+         AND id_seguimiento IN (${ph})`, ids);
+    res.json({ success: true, data: { desmarcados: r.affectedRows, reversa: false }, error: null });
   } catch (e) {
     console.error('[postventa desmarcarSaldos]', e.message);
     res.status(500).json({ success: false, data: null, error: 'Error interno del servidor' });
@@ -393,4 +464,4 @@ const marcarHistorico = async (req, res) => {
   }
 };
 
-module.exports = { sync, getAll, setEtapa, getConfig, setConfig, marcarHistorico, getPerfiles, getSaldosAPagar, pagarSaldos, getOrdenPago, emitirOrdenPago, desmarcarSaldos };
+module.exports = { sync, getAll, setEtapa, getConfig, setConfig, marcarHistorico, getPerfiles, getSaldosAPagar, pagarSaldos, getOrdenPago, correlativoOrden, emitirOrdenPago, desmarcarSaldos };

@@ -5,7 +5,7 @@
   <link rel="icon" href="/img/favicon.png" type="image/png">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Emisión Orden de Pago — AutoFácil</title>
-  <!-- v1.6 -->
+  <!-- v1.7 -->
   <link href="/css/bootstrap.min.css" rel="stylesheet">
   <link href="/css/bootstrap-icons.css" rel="stylesheet">
   <style>
@@ -198,7 +198,7 @@ function docHTML(r){
           <tr><td style="${Slbl}">Concepto</td><td style="${Smv}">SOLICITUD AUTORIZACIÓN DE PAGO</td></tr>
           <tr><td style="${Slbl}">Compañía</td><td style="${Smv}">AUTOFÁCIL SPA</td></tr>
           <tr><td style="${Slbl}">Tipo gasto</td><td style="${Smv}">PAGO A CONCESIONARIO</td></tr>
-          <tr><td style="${Slbl}">N° Orden</td><td style="${Smv}">OP-${r.num_op||''}</td></tr>
+          <tr><td style="${Slbl}">N° Orden</td><td style="${Smv}">${r.num_orden || ('OP-'+(r.num_op||''))}</td></tr>
           <tr><td style="${Slbl}">Fecha</td><td style="${Smv}">${fechaPago}</td></tr>
         </tbody></table>
       </td>
@@ -225,7 +225,7 @@ function docHTML(r){
 
 // Cuerpo del correo: saludo + cuadro orden + firma (todo inline para Gmail/Outlook)
 function emailHTML(r){
-  const nOrden = 'OP-' + (r.num_op||'');
+  const nOrden = r.num_orden || ('OP-' + (r.num_op||''));
   const fOtorg = fechaCL(r.fecha_otorgado);
   const fRecep = fechaCL(r.fecha_fondos);
   const fin = r.financiera || 'Autofin';
@@ -239,9 +239,17 @@ function emailHTML(r){
   </div>`;
 }
 
-function verOrden(id){
+async function verOrden(id){
   actual = DATA.find(r => r.id === id);
   if (!actual) return;
+  // Asignar/obtener el correlativo de la orden (una por operación) antes de mostrar
+  if (!actual.num_orden){
+    try {
+      const r = await fetch('/api/postventa/orden-pago/'+id+'/correlativo', { headers: hdr() });
+      const j = await r.json();
+      if (j.success) actual.num_orden = j.data.num_orden;
+    } catch(e){}
+  }
   document.getElementById('docWrap').innerHTML = emailHTML(actual);
   document.getElementById('ov').classList.add('open');
 }
