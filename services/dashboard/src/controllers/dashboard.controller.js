@@ -215,6 +215,9 @@ exports.savePermisos = async (req, res) => {
 // ── Controller ────────────────────────────────────────────────────────────────
 exports.getDatos = async (req, res) => {
   try {
+    // Umbral del tramo UF (editable en Tasas → Modificar Umbrales)
+    const [[umbralRow]] = await pool.query("SELECT valor FROM parametros_credito WHERE clave='umbral_uf_tramo'");
+    const umbralUF = umbralRow ? parseFloat(umbralRow.valor) || 200 : 200;
     // Cargar tabla UF completa (pequeña, ~400 filas) para lookup en JS
     const [ufRows] = await pool.query('SELECT DATE_FORMAT(fecha,"%Y-%m-%d") AS fecha, valor FROM uf ORDER BY fecha ASC');
     // Índice fecha→valor para búsqueda rápida (UF <= fecha dada)
@@ -292,7 +295,7 @@ exports.getDatos = async (req, res) => {
         plazo:              +(r.plazo)               || 0,
         mayor_mm30:         +(r.mayor_mm30)          || 0,
         // MAYOR/MENOR recalculado con la UF de la fecha de otorgamiento
-        mayor_menor:        saldo > 200 * ufOt ? 'MAYOR 200UF' : 'MENOR 200UF',
+        mayor_menor:        saldo > umbralUF * ufOt ? 'MAYOR 200UF' : 'MENOR 200UF',
       };
     });
 

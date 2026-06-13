@@ -41,6 +41,10 @@ async function calcularComisionFin(ops) {
   if (!ops.length) return 0;
   let actualizados = 0;
 
+  // Umbral del tramo UF (editable en Tasas → Modificar Umbrales)
+  const [[umbralRow]] = await pool.query("SELECT valor FROM parametros_credito WHERE clave='umbral_uf_tramo'");
+  const umbralUF = umbralRow ? parseFloat(umbralRow.valor) || 200 : 200;
+
   for (const op of ops) {
     const [rows] = await pool.query(
       'SELECT monto_financiado, monto_capitalizado, plazo, fecha_otorgado FROM creditos WHERE num_op = ? LIMIT 1',
@@ -58,7 +62,7 @@ async function calcularComisionFin(ops) {
     if (!tasa) continue;
 
     const uf         = await getUF(fechaOt);
-    const limite_200 = uf ? 200 * uf : null;
+    const limite_200 = uf ? umbralUF * uf : null;
     const esMayor200 = limite_200 ? montoCap > limite_200 : false;
     const tasa_cli   = (esMayor200
       ? parseFloat(tasa.tasa_mensual_mayor)

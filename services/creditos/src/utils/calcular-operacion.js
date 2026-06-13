@@ -109,7 +109,7 @@ async function calcularOperacion(op) {
       const tmc_mayor = (p.autofin_tmc_mayor_200 / 100) / 12;
       const spread    = (p.autofin_spread_fondo  / 100);       // mensual
       const costo_fondo = tmc_mayor - spread;                  // 1.78% fijo
-      const limite_200  = uf ? 200 * uf : null;
+      const limite_200  = uf ? (p.umbral_uf_tramo || 200) * uf : null;
       const tasa_cli    = (limite_200 && monto_cap > limite_200) ? tmc_mayor : tmc_menor;
 
       if (tasa_cli > 0 && costo_fondo > 0) {

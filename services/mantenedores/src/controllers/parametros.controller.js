@@ -95,6 +95,8 @@ const ensureTable = async () => {
     ['seg_com_cesa_36', 53.815, 'Factor comisión cesantía plazo ≥25m'],
     // ── Comisión ejecutivo ────────────────────────────────────────────────
     ['pct_ejecutivo_fin', 2.12, 'Comisión ejecutivo sobre monto financiado (%)'],
+    // ── Umbral del tramo UF (MAYOR/MENOR) — editable desde Tasas → Modificar Umbrales ──
+    ['umbral_uf_tramo', 200, 'Umbral en UF que separa el tramo MENOR/MAYOR (default 200 UF)'],
   ];
   for (const [clave, valor, descripcion] of defaults) {
     await pool.query(

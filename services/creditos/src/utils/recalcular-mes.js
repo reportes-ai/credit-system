@@ -194,7 +194,7 @@ async function recalcularMeses(meses, opciones = {}) {
         const tasa = getTasaByFecha(op.fecha_otorgado, todasTasas);
         if (tasa) {
           const uf         = await getUF(op.fecha_otorgado);
-          const limite_200 = uf ? 200 * uf : null;
+          const limite_200 = uf ? (p.umbral_uf_tramo || 200) * uf : null;
           const esMayor200 = limite_200 ? montoCap > limite_200 : false;
           const tasa_cli   = (esMayor200
             ? parseFloat(tasa.tasa_mensual_mayor)
