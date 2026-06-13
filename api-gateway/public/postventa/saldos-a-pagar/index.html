@@ -5,7 +5,7 @@
   <link rel="icon" href="/img/favicon.png" type="image/png">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Saldos Precios a Pagar — AutoFácil</title>
-  <!-- v3.1 -->
+  <!-- v3.2 -->
   <link href="/css/bootstrap.min.css" rel="stylesheet">
   <link href="/css/bootstrap-icons.css" rel="stylesheet">
   <style>
@@ -139,6 +139,7 @@
       <div class="lbl">Fondos disponibles</div>
       <input id="fondos" inputmode="numeric" placeholder="$0" oninput="onFondos(this)">
       <div class="sub" id="fondosSub">Disponible para asignar: $0</div>
+      <div class="sub" id="fondosMeta" style="font-size:.72rem;color:#94a3b8">Sin monto cargado hoy</div>
     </div>
   </div>
 
@@ -205,10 +206,11 @@ const fechaCL = f => { if(!f) return '—'; const d=new Date(f); return isNaN(d)
 function toast(m, err){ const t=document.getElementById('toast'); t.textContent=m; t.className='toast'+(err?' err':''); t.style.display='block'; setTimeout(()=>t.style.display='none',2800); }
 let DATA = [], fondosVal = 0, lastProp = { max:{set:[],monto:0}, ant:{set:[],monto:0} };
 
+const HOY_CL = () => new Date().toLocaleDateString('en-CA', { timeZone:'America/Santiago' });
+let diaCargado = HOY_CL();
+
 (async function init(){
-  // Restaurar fondos disponibles guardados (por día)
-  const guard = localStorage.getItem('pv_fondos');
-  if (guard){ fondosVal = Number(guard)||0; const inp=document.getElementById('fondos'); if(fondosVal){ inp.value = '$'+fondosVal.toLocaleString('es-CL'); } }
+  await cargarFondos();   // compartido en BD, válido solo el día de hoy
   try {
     const r = await fetch('/api/postventa/saldos-a-pagar', { headers:H });
     const j = await r.json();
@@ -217,6 +219,23 @@ let DATA = [], fondosVal = 0, lastProp = { max:{set:[],monto:0}, ant:{set:[],mon
     render();
   } catch(e){ document.getElementById('body').innerHTML = `<tr><td colspan="10" class="vacio">Error: ${e.message}</td></tr>`; }
 })();
+
+// Cada minuto: borrar al cambiar de día (00:00 Chile) y sincronizar el monto
+// compartido (para que el gerente vea lo que digita el tesorero sin recargar).
+setInterval(async () => {
+  if (HOY_CL() !== diaCargado){
+    diaCargado = HOY_CL();
+    fondosVal = 0;
+    document.getElementById('fondos').value = '';
+    pintarMetaFondos(null);
+    recalcPropuestas();
+    return;
+  }
+  if (document.activeElement !== document.getElementById('fondos')){
+    await cargarFondos();
+    recalcPropuestas();
+  }
+}, 60000);
 
 // El backend ya ordena por antigüedad (FONDOS RECIBIDOS) y entrega r.dias.
 // Coloreamos por cuartiles sobre los pendientes con > 2 días.
@@ -312,13 +331,47 @@ function recalc(){
   recalcPropuestas();
 }
 
-/* ── Fondos disponibles: autoformato pesos inmediato ── */
+/* ── Fondos disponibles: compartido en BD, válido solo el día de hoy ──
+   El tesorero digita el monto y el gerente comercial decide qué pagar.
+   Se borra automáticamente al cambiar de día (00:00 hrs). */
+let fondosTimer = null;
 function onFondos(inp){
   const digits = (inp.value||'').replace(/\D/g,'');
   fondosVal = Number(digits||0);
   inp.value = digits ? '$'+fondosVal.toLocaleString('es-CL') : '';
-  localStorage.setItem('pv_fondos', fondosVal);
   recalcPropuestas();
+  clearTimeout(fondosTimer);
+  fondosTimer = setTimeout(guardarFondos, 600);   // debounce
+}
+
+function pintarMetaFondos(d){
+  const el = document.getElementById('fondosMeta');
+  if (!el) return;
+  if (d && d.fecha_iso){
+    const f = new Date(d.fecha_iso).toLocaleString('es-CL', { timeZone:'America/Santiago', day:'2-digit', month:'2-digit', year:'numeric', hour:'2-digit', minute:'2-digit' });
+    el.textContent = `Modificado por ${d.usuario||'—'} · ${f}`;
+  } else { el.textContent = 'Sin monto cargado hoy'; }
+}
+
+async function cargarFondos(){
+  try {
+    const r = await fetch('/api/config/ui/pv_fondos_disp', { headers:H });
+    const j = await r.json();
+    const d = j.data;
+    if (d && d.fecha_dia === HOY_CL()){
+      fondosVal = Number(d.monto)||0;
+      if (fondosVal) document.getElementById('fondos').value = '$'+fondosVal.toLocaleString('es-CL');
+      pintarMetaFondos(d);
+    } else { fondosVal = 0; pintarMetaFondos(null); }  // se borró al cambiar de día
+  } catch(e){ pintarMetaFondos(null); }
+}
+
+async function guardarFondos(){
+  const payload = { monto: fondosVal, fecha_iso: new Date().toISOString(), fecha_dia: HOY_CL(), usuario: (yo.nombre+' '+(yo.apellido||'')).trim() };
+  try {
+    await fetch('/api/config/ui/pv_fondos_disp', { method:'PUT', headers:H, body: JSON.stringify({ valor: payload }) });
+    pintarMetaFondos(payload);
+  } catch(e){}
 }
 
 /* ── Propuestas sobre los fondos disponibles ──
