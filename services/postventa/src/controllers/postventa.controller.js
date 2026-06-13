@@ -235,25 +235,82 @@ const setConfig = async (req, res) => {
 const getSaldosAPagar = async (req, res) => {
   try {
     const [rows] = await pool.query(`
-      SELECT s.id, s.num_op, s.saldo_precio,
+      SELECT s.id, s.num_op, s.saldo_precio, s.financiera,
              COALESCE(c.nombre_local, d.nombre_razon, s.nombre_dealer) AS nombre_dealer,
              c.id_financiera,
              COALESCE(c.rut_concesionario, d.rut) AS rut_dealer,
              d.num_cuenta, d.banco,
-             elp.fecha AS fecha_liberado
+             efr.fecha AS fecha_fondos,
+             DATEDIFF(CURDATE(), efr.fecha) AS dias
       FROM postventa_seguimiento s
-      JOIN postventa_etapas elp
-        ON elp.id_seguimiento = s.id AND elp.track='SALDO' AND elp.etapa='LIBERADO A PAGO'
+      JOIN postventa_etapas eop
+        ON eop.id_seguimiento = s.id AND eop.track='SALDO' AND eop.etapa='ORDEN DE PAGO EMITIDA'
+      LEFT JOIN postventa_etapas efr
+        ON efr.id_seguimiento = s.id AND efr.track='SALDO' AND efr.etapa='FONDOS RECIBIDOS'
       LEFT JOIN creditos c ON c.id = s.id_credito
       LEFT JOIN dealers  d ON d.nombre_indexa = c.automotora
       WHERE NOT EXISTS (
         SELECT 1 FROM postventa_etapas ep
         WHERE ep.id_seguimiento = s.id AND ep.track='SALDO' AND ep.etapa='SALDO PRECIO PAGADO')
-      ORDER BY elp.fecha ASC, s.num_op ASC
+      ORDER BY efr.fecha ASC, s.num_op ASC
     `);
     res.json({ success: true, data: rows, error: null });
   } catch (e) {
     console.error('[postventa saldosAPagar]', e.message);
+    res.status(500).json({ success: false, data: null, error: 'Error interno del servidor' });
+  }
+};
+
+/* ── GET /api/postventa/orden-pago — casos en FONDOS RECIBIDOS sin ORDEN DE PAGO EMITIDA ── */
+const getOrdenPago = async (req, res) => {
+  try {
+    const [rows] = await pool.query(`
+      SELECT s.id, s.num_op, s.saldo_precio, s.financiera,
+             COALESCE(c.nombre_local, d.nombre_razon, s.nombre_dealer) AS nombre_dealer,
+             COALESCE(c.rut_concesionario, d.rut) AS rut_dealer,
+             d.num_cuenta, d.banco, d.rut_pago,
+             efr.fecha AS fecha_fondos,
+             DATEDIFF(CURDATE(), efr.fecha) AS dias
+      FROM postventa_seguimiento s
+      JOIN postventa_etapas efr
+        ON efr.id_seguimiento = s.id AND efr.track='SALDO' AND efr.etapa='FONDOS RECIBIDOS'
+      LEFT JOIN creditos c ON c.id = s.id_credito
+      LEFT JOIN dealers  d ON d.nombre_indexa = c.automotora
+      WHERE NOT EXISTS (
+        SELECT 1 FROM postventa_etapas ep
+        WHERE ep.id_seguimiento = s.id AND ep.track='SALDO' AND ep.etapa='ORDEN DE PAGO EMITIDA')
+      ORDER BY efr.fecha ASC, s.num_op ASC
+    `);
+    // Montos fijos AutoFin (inscripción + limitación) desde el mantenedor de parámetros
+    const [params] = await pool.query(
+      "SELECT clave, valor FROM parametros_credito WHERE clave IN ('autofin_inscripcion','autofin_limitacion')");
+    const fijos = {};
+    params.forEach(p => fijos[p.clave] = parseFloat(p.valor) || 0);
+    res.json({ success: true, data: { rows, fijos }, error: null });
+  } catch (e) {
+    console.error('[postventa getOrdenPago]', e.message);
+    res.status(500).json({ success: false, data: null, error: 'Error interno del servidor' });
+  }
+};
+
+/* ── POST /api/postventa/orden-pago/emitir { ids:[] } — marca ORDEN DE PAGO EMITIDA ── */
+const emitirOrdenPago = async (req, res) => {
+  try {
+    const { ids } = req.body;
+    if (!Array.isArray(ids) || !ids.length)
+      return res.status(400).json({ success: false, data: null, error: 'Sin operaciones seleccionadas' });
+    const usuario = loginDe(req.usuario);
+    // Marca ORDEN DE PAGO EMITIDA (y FONDOS RECIBIDOS por si faltara, para mantener secuencia)
+    const vals = [];
+    for (const id of ids) {
+      vals.push([id, 'SALDO', 'FONDOS RECIBIDOS', usuario]);
+      vals.push([id, 'SALDO', 'ORDEN DE PAGO EMITIDA', usuario]);
+    }
+    await pool.query(
+      `INSERT IGNORE INTO postventa_etapas (id_seguimiento, track, etapa, usuario) VALUES ?`, [vals]);
+    res.json({ success: true, data: { emitidas: ids.length }, error: null });
+  } catch (e) {
+    console.error('[postventa emitirOrdenPago]', e.message);
     res.status(500).json({ success: false, data: null, error: 'Error interno del servidor' });
   }
 };
@@ -277,6 +334,26 @@ const pagarSaldos = async (req, res) => {
     res.json({ success: true, data: { pagados: ids.length }, error: null });
   } catch (e) {
     console.error('[postventa pagarSaldos]', e.message);
+    res.status(500).json({ success: false, data: null, error: 'Error interno del servidor' });
+  }
+};
+
+/* ── POST /api/postventa/saldos-a-pagar/desmarcar { ids:[] } — quita SALDO PRECIO PAGADO marcado hoy ── */
+const desmarcarSaldos = async (req, res) => {
+  try {
+    const { ids } = req.body;
+    if (!Array.isArray(ids) || !ids.length)
+      return res.status(400).json({ success: false, data: null, error: 'Sin operaciones seleccionadas' });
+    // Solo permite desmarcar si la marca es de hoy
+    const [r] = await pool.query(
+      `DELETE FROM postventa_etapas
+       WHERE track='SALDO' AND etapa='SALDO PRECIO PAGADO'
+         AND DATE(fecha) = CURDATE()
+         AND id_seguimiento IN (${ids.map(() => '?').join(',')})`,
+      ids);
+    res.json({ success: true, data: { desmarcados: r.affectedRows }, error: null });
+  } catch (e) {
+    console.error('[postventa desmarcarSaldos]', e.message);
     res.status(500).json({ success: false, data: null, error: 'Error interno del servidor' });
   }
 };
@@ -308,4 +385,4 @@ const marcarHistorico = async (req, res) => {
   }
 };
 
-module.exports = { sync, getAll, setEtapa, getConfig, setConfig, marcarHistorico, getPerfiles, getSaldosAPagar, pagarSaldos };
+module.exports = { sync, getAll, setEtapa, getConfig, setConfig, marcarHistorico, getPerfiles, getSaldosAPagar, pagarSaldos, getOrdenPago, emitirOrdenPago, desmarcarSaldos };

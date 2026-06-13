@@ -9,8 +9,11 @@ router.post('/marcar-historico', verifyToken, c.marcarHistorico);
 router.get('/config',       verifyToken, c.getConfig);
 router.put('/config/:clave',verifyToken, requireFunc('postventa_mantenedores'), c.setConfig);
 router.get('/perfiles-lista', verifyToken, c.getPerfiles);
+router.get('/orden-pago',             verifyToken, c.getOrdenPago);
+router.post('/orden-pago/emitir',     verifyToken, requireFunc('postventa_seguimiento'), c.emitirOrdenPago);
 router.get('/saldos-a-pagar',       verifyToken, c.getSaldosAPagar);
 router.post('/saldos-a-pagar/pagar',verifyToken, requireFunc('postventa_saldos_pagar'), c.pagarSaldos);
+router.post('/saldos-a-pagar/desmarcar', verifyToken, requireFunc('postventa_saldos_pagar'), c.desmarcarSaldos);
 router.get('/',               verifyToken, c.getAll);
 router.put('/:id/etapa',    verifyToken, requireFunc('postventa_seguimiento'), c.setEtapa);
 

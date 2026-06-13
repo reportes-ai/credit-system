@@ -125,6 +125,16 @@
           <input type="number" step="0.01" id="p_autofin_spread_fondo" oninput="markChanged(this)">
           <span class="desc">Costo de fondo = TMC_mayor/12 − spread</span>
         </div>
+        <div class="param-row">
+          <label>Inscripción / Transferencia ($)</label>
+          <input type="number" step="1" id="p_autofin_inscripcion" oninput="markChanged(this)">
+          <span class="desc">Monto fijo que paga AutoFin por operación (orden de pago saldo precio)</span>
+        </div>
+        <div class="param-row">
+          <label>Limitación al Dominio ($)</label>
+          <input type="number" step="1" id="p_autofin_limitacion" oninput="markChanged(this)">
+          <span class="desc">Monto fijo que paga AutoFin por operación (orden de pago saldo precio)</span>
+        </div>
       </div>
     </div>
   </div>
@@ -271,7 +281,7 @@ function hdr() { return { 'Content-Type':'application/json', Authorization:'Bear
 // TMC se carga sólo desde Tasas (read-only); no se incluye en guardado
 const CLAVES_TMC  = ['autofin_tmc_menor_200','autofin_tmc_mayor_200'];
 const CLAVES = [
-  'autofin_spread_fondo',
+  'autofin_spread_fondo','autofin_inscripcion','autofin_limitacion',
   'uac_pct_tier1','uac_pct_tier2','uac_pct_tier3','uac_pct_tier4',
   'uac_ops_tier1_max','uac_ops_tier2_max','uac_ops_tier3_max',
   'dealer_pct_6','dealer_pct_12','dealer_pct_24','dealer_pct_36','dealer_pct_99','patio_pct',

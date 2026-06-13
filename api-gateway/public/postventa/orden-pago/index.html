@@ -1,0 +1,250 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <link rel="icon" href="/img/favicon.png" type="image/png">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Emisión Orden de Pago — AutoFácil</title>
+  <!-- v1.0 -->
+  <link href="/css/bootstrap.min.css" rel="stylesheet">
+  <link href="/css/bootstrap-icons.css" rel="stylesheet">
+  <style>
+    :root { --navy:#012d70; --blue:#0141A2; --accent:#0255c5; --bg:#f0f4f8; }
+    body { background:var(--bg); font-family:'Segoe UI',system-ui,sans-serif; margin:0; }
+    .topnav { background:linear-gradient(90deg,#012d70,#0255c5); color:#fff; height:60px; padding:0 24px; display:flex; align-items:center; justify-content:space-between; box-shadow:0 2px 8px rgba(0,0,0,.3); }
+    .topnav-brand { display:flex; align-items:center; gap:8px; text-decoration:none; }
+    .topnav-brand img { height:32px; filter:brightness(0) invert(1); }
+    .version-badge { background:rgba(255,255,255,.15); color:rgba(255,255,255,.75); font-size:.65rem; font-weight:700; border-radius:6px; padding:2px 8px; }
+    .breadcrumb-nav { color:rgba(255,255,255,.6); font-size:.85rem; display:flex; align-items:center; gap:6px; }
+    .breadcrumb-nav a { color:rgba(255,255,255,.75); text-decoration:none; }
+    .btn-logout { background:rgba(255,255,255,.1); border:1px solid rgba(255,255,255,.2); color:#fff; border-radius:8px; padding:5px 12px; font-size:.82rem; cursor:pointer; }
+    .main { max-width:1280px; margin:0 auto; padding:24px; }
+    .af-banner { background:linear-gradient(135deg,#012d70,#0141A2 55%,#009AFE); border-radius:16px; color:#fff; padding:22px 30px; margin-bottom:22px; display:flex; align-items:center; gap:16px; }
+    .af-banner i { font-size:2.2rem; opacity:.85; }
+    .af-banner h2 { font-weight:700; margin:0 0 2px; font-size:1.25rem; }
+    .af-banner p { opacity:.82; margin:0; font-size:.86rem; }
+    .card-box { background:#fff; border-radius:14px; box-shadow:0 1px 6px rgba(0,0,0,.07); padding:18px 20px; }
+    table.lista { width:100%; border-collapse:collapse; font-size:.84rem; }
+    table.lista th { background:#0141A2; color:#fff; font-size:.72rem; text-transform:uppercase; letter-spacing:.4px; padding:8px 10px; text-align:left; position:sticky; top:0; }
+    table.lista td { padding:8px 10px; border-bottom:1px solid #eef2f7; }
+    table.lista tr:hover td { background:#f8fafc; }
+    .pill { background:#e0e7ff; color:#3730a3; border-radius:6px; padding:1px 8px; font-size:.72rem; font-weight:700; }
+    .dias { font-weight:800; }
+    .dias.alto { color:#dc2626; } .dias.medio { color:#b45309; }
+    .btn-ver { background:#0141A2; color:#fff; border:none; border-radius:7px; padding:5px 12px; font-size:.78rem; font-weight:700; cursor:pointer; }
+    .vacio { text-align:center; color:#94a3b8; padding:40px 0; }
+    /* modal orden */
+    .ov { display:none; position:fixed; inset:0; background:rgba(0,0,0,.5); z-index:1000; align-items:flex-start; justify-content:center; padding:24px; overflow-y:auto; }
+    .ov.open { display:flex; }
+    .modal { background:#fff; border-radius:12px; width:100%; max-width:880px; margin:auto; }
+    .modal-head { display:flex; justify-content:space-between; align-items:center; padding:14px 20px; border-bottom:1px solid #e5e7eb; }
+    .modal-head h5 { margin:0; font-weight:700; font-size:1rem; }
+    .modal-body { padding:22px; }
+    .modal-foot { padding:14px 20px; border-top:1px solid #e5e7eb; display:flex; gap:10px; justify-content:flex-end; }
+    /* Documento orden de pago (igual que el PDF) */
+    .op-doc { font-family:Arial,sans-serif; color:#1e293b; font-size:12px; }
+    .op-top { display:flex; justify-content:space-between; align-items:flex-start; margin-bottom:14px; }
+    .op-meta td { padding:1px 8px; font-size:11px; }
+    .op-meta .lbl { color:#64748b; font-weight:700; text-transform:uppercase; font-size:9px; }
+    .op-logo { height:34px; }
+    table.op-tbl { width:100%; border-collapse:collapse; margin:8px 0; font-size:11px; }
+    table.op-tbl th { background:#dbeafe; color:#1e3a8a; border:1px solid #93c5fd; padding:5px 6px; font-size:9px; text-transform:uppercase; }
+    table.op-tbl td { border:1px solid #cbd5e1; padding:5px 6px; }
+    table.op-tbl td.num { text-align:right; }
+    .op-total td { font-weight:800; background:#f1f5f9; }
+    .op-resumen { margin-top:14px; border:1px solid #93c5fd; border-radius:4px; max-width:430px; }
+    .op-resumen td { border:1px solid #cbd5e1; padding:5px 8px; font-size:11px; }
+    .op-resumen .lbl { background:#eff6ff; font-weight:700; width:42%; }
+    .btn-copiar { background:#16a34a; color:#fff; border:none; border-radius:8px; padding:9px 18px; font-weight:700; cursor:pointer; }
+    .btn-emitir { background:#0141A2; color:#fff; border:none; border-radius:8px; padding:9px 18px; font-weight:700; cursor:pointer; }
+    .btn-cerrar { background:#f1f5f9; color:#374151; border:none; border-radius:8px; padding:9px 16px; font-weight:600; cursor:pointer; }
+    .toast { position:fixed; top:70px; right:20px; background:#16a34a; color:#fff; padding:12px 18px; border-radius:9px; font-weight:600; font-size:.88rem; z-index:2000; display:none; }
+  </style>
+</head>
+<body>
+<nav class="topnav">
+  <div style="display:flex;align-items:center;gap:16px">
+    <a href="/" class="topnav-brand"><img src="/img/logo.png" alt="AutoFácil"><span class="version-badge" id="versionBadge"></span></a>
+    <div class="breadcrumb-nav">
+      <a href="/">Inicio</a><span>›</span><a href="/postventa">Post Venta</a><span>›</span>
+      <span style="color:#fff;font-weight:600">Emisión Orden de Pago</span>
+    </div>
+  </div>
+  <button class="btn-logout" onclick="logout()"><i class="bi bi-box-arrow-right me-1"></i>Salir</button>
+</nav>
+
+<div class="main">
+  <div class="af-banner"><i class="bi bi-receipt"></i><div>
+    <h2>Emisión Orden de Pago — Saldo Precio</h2>
+    <p>Operaciones con <b>fondos recibidos</b> pendientes de emitir. Revisa, copia la orden para el correo y emítela.</p>
+  </div></div>
+
+  <div class="card-box">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
+      <div style="font-weight:700;color:var(--navy)" id="resumen">—</div>
+      <input id="buscar" placeholder="Buscar OP, dealer, RUT…" oninput="render()" style="border:1.5px solid #d1d5db;border-radius:8px;padding:7px 12px;font-size:.85rem;width:280px;max-width:50%">
+    </div>
+    <div style="overflow-x:auto">
+      <table class="lista">
+        <thead><tr>
+          <th>N° OP</th><th>Financiera</th><th>Concesionario</th><th>RUT</th>
+          <th style="text-align:right">Saldo Precio</th><th>Fondos</th><th>Días</th><th></th>
+        </tr></thead>
+        <tbody id="tbody"><tr><td colspan="8" class="vacio"><div class="spinner-border spinner-border-sm"></div> Cargando…</td></tr></tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<!-- Modal Orden de Pago -->
+<div class="ov" id="ov">
+  <div class="modal">
+    <div class="modal-head"><h5>Orden de Pago</h5><button class="btn-cerrar" onclick="cerrar()"><i class="bi bi-x-lg"></i></button></div>
+    <div class="modal-body"><div id="docWrap"></div></div>
+    <div class="modal-foot">
+      <button class="btn-cerrar" onclick="cerrar()">Cancelar</button>
+      <button class="btn-copiar" onclick="copiarOrden()"><i class="bi bi-clipboard me-1"></i>Copiar para correo</button>
+      <button class="btn-emitir" onclick="emitir()"><i class="bi bi-send-check me-1"></i>Emitir orden</button>
+    </div>
+  </div>
+</div>
+<div class="toast" id="toast"></div>
+
+<script>
+const token = sessionStorage.getItem('token');
+const yo = JSON.parse(sessionStorage.getItem('usuario')||'null');
+if (!token || !yo) location.href='/login.html';
+function logout(){ sessionStorage.clear(); location.href='/login.html'; }
+const hdr = () => ({ 'Content-Type':'application/json', Authorization:'Bearer '+token });
+function toast(m){ const t=document.getElementById('toast'); t.textContent=m; t.style.display='block'; setTimeout(()=>t.style.display='none',2500); }
+const fmt = n => '$' + Math.round(Number(n)||0).toLocaleString('es-CL');
+const fechaCL = d => d ? new Date(d).toLocaleDateString('es-CL',{timeZone:'UTC',day:'2-digit',month:'2-digit',year:'numeric'}) : '—';
+const MESES = ['ene','feb','mar','abr','may','jun','jul','ago','sep','oct','nov','dic'];
+const periodoCL = d => { const x = d ? new Date(d) : new Date(); return MESES[x.getUTCMonth()] + '-' + String(x.getUTCFullYear()).slice(2); };
+
+let DATA = [], FIJOS = {}, actual = null;
+
+async function cargar(){
+  try {
+    const r = await fetch('/api/postventa/orden-pago', { headers: hdr() });
+    const j = await r.json();
+    if (!j.success) throw new Error(j.error);
+    DATA = j.data.rows || []; FIJOS = j.data.fijos || {};
+    render();
+  } catch(e){ document.getElementById('tbody').innerHTML = `<tr><td colspan="8" class="vacio">Error: ${e.message}</td></tr>`; }
+}
+
+function render(){
+  const q = (document.getElementById('buscar').value||'').toLowerCase();
+  const rows = DATA.filter(r => !q || [r.num_op,r.nombre_dealer,r.rut_dealer,r.financiera].some(v => String(v||'').toLowerCase().includes(q)));
+  const total = rows.reduce((s,r)=>s+(Number(r.saldo_precio)||0),0);
+  document.getElementById('resumen').textContent = `${rows.length} operación(es) · Saldo precio total: ${fmt(total)}`;
+  const tb = document.getElementById('tbody');
+  if (!rows.length){ tb.innerHTML = '<tr><td colspan="8" class="vacio">No hay operaciones con fondos recibidos pendientes de emitir.</td></tr>'; return; }
+  tb.innerHTML = rows.map(r => {
+    const dc = r.dias>=7?'alto':r.dias>=3?'medio':'';
+    return `<tr>
+      <td><b>${r.num_op||'—'}</b></td>
+      <td><span class="pill">${r.financiera||'—'}</span></td>
+      <td>${r.nombre_dealer||'—'}</td>
+      <td>${r.rut_dealer||'—'}</td>
+      <td style="text-align:right">${fmt(r.saldo_precio)}</td>
+      <td>${fechaCL(r.fecha_fondos)}</td>
+      <td><span class="dias ${dc}">${r.dias!=null?r.dias+' d':'—'}</span></td>
+      <td><button class="btn-ver" onclick="verOrden(${r.id})"><i class="bi bi-eye me-1"></i>Ver orden</button></td>
+    </tr>`;
+  }).join('');
+}
+
+// Construye las líneas de la orden según financiera
+function lineasDe(r){
+  const esAutofin = (r.financiera||'').toUpperCase().includes('AUTOFIN');
+  const lineas = [];
+  if (esAutofin) {
+    if (FIJOS.autofin_inscripcion) lineas.push({ detalle:'Transferencia / Inscripción', valor:FIJOS.autofin_inscripcion });
+    if (FIJOS.autofin_limitacion)  lineas.push({ detalle:'Limitación al Dominio',       valor:FIJOS.autofin_limitacion });
+  }
+  lineas.push({ detalle:`Saldo Precio OP ${r.num_op||''} - ${r.financiera||''}`.trim(), valor:Number(r.saldo_precio)||0 });
+  return lineas;
+}
+
+function docHTML(r){
+  const lineas = lineasDe(r);
+  const total = lineas.reduce((s,l)=>s+l.valor,0);
+  const periodo = periodoCL(r.fecha_fondos);
+  const fechaPago = fechaCL(new Date().toISOString());
+  const concepto = `Saldo Precio OP ${r.num_op||''} - ${r.financiera||''}`;
+  const filas = lineas.map(l => `<tr>
+      <td>Santiago</td><td>${r.nombre_dealer||''}</td><td>${r.rut_dealer||''}</td>
+      <td>${l.detalle}</td><td>${periodo}</td><td class="num">${fmt(l.valor)}</td>
+      <td class="num">$0</td><td class="num">${fmt(l.valor)}</td><td>${fechaPago}</td>
+    </tr>`).join('');
+  return `<div class="op-doc">
+    <div class="op-top">
+      <table class="op-meta"><tbody>
+        <tr><td class="lbl">Concepto</td><td>SOLICITUD AUTORIZACIÓN DE PAGO</td></tr>
+        <tr><td class="lbl">Compañía</td><td>AUTOFÁCIL SPA</td></tr>
+        <tr><td class="lbl">Tipo gasto</td><td>PAGO A CONCESIONARIO</td></tr>
+        <tr><td class="lbl">N° Orden</td><td>OP-${r.num_op||''}</td></tr>
+        <tr><td class="lbl">Fecha</td><td>${fechaPago}</td></tr>
+      </tbody></table>
+      <img class="op-logo" src="/img/logo-autofacil.png" onerror="this.src='/img/logo.png'">
+    </div>
+    <table class="op-tbl">
+      <thead><tr><th>Ciudad</th><th>Concesionario</th><th>RUT</th><th>Detalle</th><th>Mes</th><th>Valor Unitario</th><th>IVA</th><th>Valor Total</th><th>Fecha a pagar</th></tr></thead>
+      <tbody>${filas}
+        <tr class="op-total"><td colspan="7" style="text-align:right">TOTAL</td><td class="num">${fmt(total)}</td><td></td></tr>
+      </tbody>
+    </table>
+    <table class="op-resumen"><tbody>
+      <tr><td class="lbl">Proveedor</td><td>${r.nombre_dealer||''}</td></tr>
+      <tr><td class="lbl">Concepto</td><td>${concepto}</td></tr>
+      <tr><td class="lbl">Período</td><td>${periodo}</td></tr>
+      <tr><td class="lbl">Destino</td><td>CTA. CTE. ${r.num_cuenta? r.num_cuenta+(r.banco?(' · '+r.banco):'') : ''}</td></tr>
+      <tr><td class="lbl">Valor total</td><td>${fmt(total)}</td></tr>
+      <tr><td class="lbl">Fecha a pagar</td><td>${fechaPago}</td></tr>
+    </tbody></table>
+  </div>`;
+}
+
+function verOrden(id){
+  actual = DATA.find(r => r.id === id);
+  if (!actual) return;
+  document.getElementById('docWrap').innerHTML = docHTML(actual);
+  document.getElementById('ov').classList.add('open');
+}
+function cerrar(){ document.getElementById('ov').classList.remove('open'); actual=null; }
+
+async function copiarOrden(){
+  const html = document.getElementById('docWrap').innerHTML;
+  const texto = document.getElementById('docWrap').innerText;
+  try {
+    if (navigator.clipboard && window.ClipboardItem) {
+      await navigator.clipboard.write([new ClipboardItem({
+        'text/html': new Blob([html], {type:'text/html'}),
+        'text/plain': new Blob([texto], {type:'text/plain'}),
+      })]);
+    } else { await navigator.clipboard.writeText(texto); }
+    toast('Orden copiada — pégala en el correo');
+  } catch(e){ toast('No se pudo copiar: '+e.message); }
+}
+
+async function emitir(){
+  if (!actual) return;
+  if (!confirm('¿Emitir la orden de pago de la OP '+(actual.num_op||'')+'? Pasará a Saldos Precios a Pagar.')) return;
+  try {
+    const r = await fetch('/api/postventa/orden-pago/emitir', { method:'POST', headers:hdr(), body:JSON.stringify({ ids:[actual.id] }) });
+    const j = await r.json();
+    if (!j.success) throw new Error(j.error);
+    DATA = DATA.filter(x => x.id !== actual.id);
+    cerrar(); render();
+    toast('Orden emitida — la operación pasó a Saldos Precios a Pagar');
+  } catch(e){ toast('Error: '+e.message); }
+}
+
+document.getElementById('ov').addEventListener('click', e => { if (e.target.id==='ov') cerrar(); });
+cargar();
+</script>
+<script src="/js/app-version.js"></script>
+</body>
+</html>

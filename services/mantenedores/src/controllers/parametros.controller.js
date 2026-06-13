@@ -59,6 +59,9 @@ const ensureTable = async () => {
     ['autofin_tmc_menor_200', 33.60, 'AutoFin — TMC anual ≤200 UF (%)'],
     ['autofin_tmc_mayor_200', 29.40, 'AutoFin — TMC anual >200 UF (%)'],
     ['autofin_spread_fondo',   0.67, 'AutoFin — Spread costo de fondo mensual (%)'],
+    // AutoFin — montos fijos que paga AutoFin por operación (orden de pago saldo precio)
+    ['autofin_inscripcion',   39240, 'AutoFin — Inscripción / Transferencia ($) por operación'],
+    ['autofin_limitacion',     6140, 'AutoFin — Limitación al Dominio ($) por operación'],
     // ── UAC (Unidad de Crédito) — ingreso por tramo de operaciones ───────
     ['uac_pct_tier1',  14.00, 'UAC — % sobre saldo precio con 1-5 ops/mes'],
     ['uac_pct_tier2',  16.00, 'UAC — % sobre saldo precio con 6-10 ops/mes'],

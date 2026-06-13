@@ -64,6 +64,12 @@
     <p>Operaciones liberadas a pago: selecciona las que se cargarán al banco y márcalas como pagadas.</p>
     <span class="btn-acceder"><i class="bi bi-arrow-right-circle me-1"></i>Acceder</span>
   </a>
+  <a href="/postventa/orden-pago/" class="module-card" id="cardOrdenPago" style="display:none">
+    <div class="card-icon"><i class="bi bi-receipt"></i></div>
+    <h5>Emisión Orden de Pago</h5>
+    <p>Operaciones con fondos recibidos: revisa, copia y emite la orden de pago de saldo precio.</p>
+    <span class="btn-acceder"><i class="bi bi-arrow-right-circle me-1"></i>Acceder</span>
+  </a>
   <a href="/postventa/fundantes-pendientes/" class="module-card" id="cardFund" style="display:none">
     <div class="card-icon"><i class="bi bi-folder2-open"></i></div>
     <h5>Fundantes Pendientes</h5>
@@ -112,6 +118,7 @@ function logout(){ sessionStorage.clear(); location.href='/login.html'; }
   let alguna = false;
   if (tiene('postventa_seguimiento'))       { document.getElementById('cardSeg').style.display='';       alguna=true; }
   if (tiene('postventa_saldos_pagar'))      { document.getElementById('cardPagar').style.display='';     alguna=true; }
+  if (tiene('postventa_saldos_pagar'))      { document.getElementById('cardOrdenPago').style.display=''; alguna=true; }
   if (tiene('postventa_fundantes'))         { document.getElementById('cardFund').style.display='';      alguna=true; }
   if (tiene('postventa_consulta_saldos'))   { document.getElementById('cardConsSaldo').style.display=''; alguna=true; }
   if (tiene('postventa_consulta_factura'))  { document.getElementById('cardConsFact').style.display='';  alguna=true; }
