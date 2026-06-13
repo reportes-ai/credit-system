@@ -5,7 +5,7 @@
   <link rel="icon" href="/img/favicon.png" type="image/png">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Saldos Precios a Pagar — AutoFácil</title>
-  <!-- v3.5 -->
+  <!-- v3.6 -->
   <link href="/css/bootstrap.min.css" rel="stylesheet">
   <link href="/css/bootstrap-icons.css" rel="stylesheet">
   <style>
@@ -45,15 +45,12 @@
     .stat.prop.ant { border-left-color:#d97706; }
     .stat.prop .val { color:var(--navy); }
     .stat.prop .prop-line { display:flex; align-items:center; justify-content:space-between; gap:10px; }
-    /* Toggle de propuesta */
-    .sw { position:relative; display:inline-block; width:44px; height:24px; flex:0 0 auto; }
-    .sw input { opacity:0; width:0; height:0; }
-    .sw span { position:absolute; inset:0; background:#cbd5e1; border-radius:24px; cursor:pointer; transition:.2s; }
-    .sw span:before { content:''; position:absolute; height:18px; width:18px; left:3px; top:3px; background:#fff; border-radius:50%; transition:.2s; }
-    .stat.prop.max .sw input:checked + span { background:#7c3aed; }
-    .stat.prop.ant .sw input:checked + span { background:#d97706; }
-    .sw input:checked + span:before { transform:translateX(20px); }
-    .sw input:disabled + span { opacity:.45; cursor:default; }
+    /* Botón-toggle de propuesta: outline = inactivo, relleno = seleccionado */
+    .btn-marcar { border:1.5px solid #7c3aed; color:#7c3aed; background:#fff; border-radius:8px; padding:6px 16px; font-size:.8rem; font-weight:700; cursor:pointer; white-space:nowrap; transition:.15s; }
+    .stat.prop.ant .btn-marcar { border-color:#d97706; color:#d97706; }
+    .btn-marcar.on { background:#7c3aed; color:#fff; }
+    .stat.prop.ant .btn-marcar.on { background:#d97706; color:#fff; }
+    .btn-marcar:disabled { opacity:.45; cursor:default; }
     .stat.prop.ant .btn-marcar { background:#d97706; }
     .btn-marcar:disabled { opacity:.45; cursor:default; }
     tbody tr.row-prop td { box-shadow:inset 0 0 0 9999px rgba(124,58,237,.08); }
@@ -156,13 +153,13 @@
     <div class="stat prop max" id="propMax" onmouseenter="hl('max')" onmouseleave="hl(null)">
       <div class="lbl">Propuesta · Máximo de operaciones</div>
       <div class="prop-line"><div class="val" id="propMaxN">0 ops X $0</div>
-        <label class="sw"><input type="checkbox" id="propMaxTg" onchange="aplicarPropuesta('max')"><span></span></label></div>
+        <button class="btn-marcar" id="propMaxBtn" onclick="aplicarPropuesta('max')">Marcar</button></div>
       <div class="sub" id="propMaxM">Queda disponible $0</div>
     </div>
     <div class="stat prop ant" id="propAnt" onmouseenter="hl('ant')" onmouseleave="hl(null)">
       <div class="lbl">Propuesta · Prioriza antigüedad</div>
       <div class="prop-line"><div class="val" id="propAntN">0 ops X $0</div>
-        <label class="sw"><input type="checkbox" id="propAntTg" onchange="aplicarPropuesta('ant')"><span></span></label></div>
+        <button class="btn-marcar" id="propAntBtn" onclick="aplicarPropuesta('ant')">Marcar</button></div>
       <div class="sub" id="propAntM">Queda disponible $0</div>
     </div>
   </div>
@@ -403,16 +400,18 @@ function recalcPropuestas(){
   lastProp.max = llenar(cand.slice().sort((a,b)=>Number(a.saldo_precio||0)-Number(b.saldo_precio||0)));
   lastProp.ant = llenar(cand); // cand ya está en orden de antigüedad
 
-  const pintar = (which, nEl, mEl, tg) => {
+  const pintar = (which, nEl, mEl, btn) => {
     const p = lastProp[which];
     document.getElementById(nEl).textContent = p.set.length + ' ops X ' + fmt(p.monto);
     document.getElementById(mEl).textContent = 'Queda disponible ' + fmt(D - p.monto);
-    const t = document.getElementById(tg);
-    t.checked = (propActiva === which);
-    t.disabled = (p.set.length === 0 && propActiva !== which);
+    const b = document.getElementById(btn);
+    const on = (propActiva === which);
+    b.classList.toggle('on', on);
+    b.textContent = on ? '✓ Seleccionada' : 'Marcar';
+    b.disabled = (p.set.length === 0 && !on);
   };
-  pintar('max','propMaxN','propMaxM','propMaxTg');
-  pintar('ant','propAntN','propAntM','propAntTg');
+  pintar('max','propMaxN','propMaxM','propMaxBtn');
+  pintar('ant','propAntN','propAntM','propAntBtn');
   document.getElementById('propBox').style.display = fondosVal > 0 ? 'flex' : 'none';
   pintarIndicadores();
 }
