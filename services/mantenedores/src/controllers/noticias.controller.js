@@ -2,12 +2,17 @@ const https = require('https');
 const http  = require('http');
 
 /* Google News RSS — siempre disponible, sin API key */
+/* Antigüedad máxima de las noticias mostradas */
+const MAX_AGE_DAYS = 7;
+const MAX_AGE_MS = MAX_AGE_DAYS * 24 * 60 * 60 * 1000;
+
+/* when:7d en la consulta limita a los últimos 7 días en el origen */
 const FEEDS = [
-  { url: 'https://news.google.com/rss/search?q=chile+noticias&hl=es-419&gl=CL&ceid=CL:es-419', src: 'Google News' },
-  { url: 'https://news.google.com/rss/search?q=economia+chile&hl=es-419&gl=CL&ceid=CL:es-419', src: 'Economía' },
-  { url: 'https://news.google.com/rss/search?q=finanzas+credito+chile&hl=es-419&gl=CL&ceid=CL:es-419', src: 'Finanzas' },
-  { url: 'https://news.google.com/rss/search?q=industria+automotriz+venta+autos+chile&hl=es-419&gl=CL&ceid=CL:es-419', src: 'Automotriz' },
-  { url: 'https://news.google.com/rss/search?q=banca+tasas+interes+banco+central+chile&hl=es-419&gl=CL&ceid=CL:es-419', src: 'Banca' },
+  { url: 'https://news.google.com/rss/search?q=chile+noticias+when:7d&hl=es-419&gl=CL&ceid=CL:es-419', src: 'Google News' },
+  { url: 'https://news.google.com/rss/search?q=economia+chile+when:7d&hl=es-419&gl=CL&ceid=CL:es-419', src: 'Economía' },
+  { url: 'https://news.google.com/rss/search?q=finanzas+credito+chile+when:7d&hl=es-419&gl=CL&ceid=CL:es-419', src: 'Finanzas' },
+  { url: 'https://news.google.com/rss/search?q=industria+automotriz+venta+autos+chile+when:7d&hl=es-419&gl=CL&ceid=CL:es-419', src: 'Automotriz' },
+  { url: 'https://news.google.com/rss/search?q=banca+tasas+interes+banco+central+chile+when:7d&hl=es-419&gl=CL&ceid=CL:es-419', src: 'Banca' },
 ];
 
 function fetchUrl(rawUrl, redirects = 0) {
@@ -35,11 +40,16 @@ function parseRSS(xml, src) {
   const itemRe  = /<item[\s>]([\s\S]*?)<\/item>/gi;
   const titleRe = /<title>(?:<!\[CDATA\[)?(.*?)(?:\]\]>)?<\/title>/i;
   const linkRe  = /<link>(.*?)<\/link>/i;
+  const dateRe  = /<pubDate>(.*?)<\/pubDate>/i;
+  const ahora = Date.now();
   let m;
   while ((m = itemRe.exec(xml)) !== null) {
     const block = m[1];
     const t = titleRe.exec(block);
     const l = linkRe.exec(block);
+    // Descartar noticias más antiguas que MAX_AGE_DAYS
+    const d = dateRe.exec(block);
+    if (d) { const ts = Date.parse(d[1]); if (!isNaN(ts) && (ahora - ts) > MAX_AGE_MS) continue; }
     if (t && t[1].trim()) {
       // Limpiar el " - Fuente" que agrega Google al final del título
       let titulo = t[1]
