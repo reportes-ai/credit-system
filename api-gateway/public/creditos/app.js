@@ -451,7 +451,7 @@ function renderConsulta(list) {
     <table class="cred-table" style="min-width:900px">
       <thead>
         <tr>
-          <th>N° Crédito</th>
+          <th>N° Operación</th>
           <th>RUT</th>
           <th>Cliente</th>
           <th>Financiera</th>

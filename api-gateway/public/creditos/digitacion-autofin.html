@@ -142,7 +142,7 @@
     <div class="sec-body">
       <div class="form-grid g4">
         <div class="f-group">
-          <label>N° OP <span id="numOpStatus" style="font-size:10px;font-weight:400;color:#6b7280"></span></label>
+          <label>N° Operación <span id="numOpStatus" style="font-size:10px;font-weight:400;color:#6b7280"></span></label>
           <div style="display:flex;gap:4px;align-items:center">
             <input type="number" id="fNumOp" placeholder="Auto al elegir mes" style="flex:1;background:#E3F2FD;font-weight:700;color:#0141A2" readonly>
             <button type="button" id="btnEditNumOp" title="Editar manualmente"
@@ -976,7 +976,7 @@
       });
       const data = await r.json();
       if (data.success) {
-        ok.innerHTML = `<i class="bi bi-check-circle me-2"></i>Operación guardada correctamente. N° Crédito: <strong>${data.data.numero_credito || data.data.num_op || '—'}</strong> (ID: ${data.data.id})`;
+        ok.innerHTML = `<i class="bi bi-check-circle me-2"></i>Operación guardada correctamente. N° Operación: <strong>${data.data.numero_credito || data.data.num_op || '—'}</strong> (ID: ${data.data.id})`;
         ok.style.display = 'block';
         window.scrollTo(0,0);
         setTimeout(() => { limpiar(); }, 1500);

@@ -129,7 +129,7 @@ function buildRecibo({ credito, pagos, cajaNombre, trxNum, idPago }) {
       <div style="border-top:1.5px solid #e5e7eb;padding:10px 0">
         <div style="font-size:.65rem;font-weight:800;text-transform:uppercase;letter-spacing:.07em;color:#9ca3af;margin-bottom:8px">Crédito</div>
         <div style="display:flex;justify-content:space-between;padding:3px 0;font-size:.83rem">
-          <span style="color:#6b7280">N° Crédito</span>
+          <span style="color:#6b7280">N° Operación</span>
           <span style="font-weight:700">${_cEsc(c.numero_credito || c.id_credito || '—')}</span>
         </div>
         <div style="display:flex;justify-content:space-between;padding:3px 0;font-size:.83rem">

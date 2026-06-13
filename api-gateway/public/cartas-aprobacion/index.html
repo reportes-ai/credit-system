@@ -434,7 +434,7 @@
       <table class="data-table" id="impTable">
         <thead>
           <tr>
-            <th>N° Op Carta</th><th>Tipo</th><th>Cliente</th><th>Concesionario</th><th>Estado</th><th>Aprobado por</th><th>N° Crédito</th><th>Acciones</th>
+            <th>N° Op Carta</th><th>Tipo</th><th>Cliente</th><th>Concesionario</th><th>Estado</th><th>Aprobado por</th><th>N° Operación</th><th>Acciones</th>
           </tr>
         </thead>
         <tbody id="impBody"></tbody>
@@ -601,7 +601,7 @@
         </div>
         <div class="field" style="min-width:150px">
           <label>N° Operación</label>
-          <input type="text" id="cartolasBuscaOp" placeholder="N° OP..." oninput="renderCartolasTable()">
+          <input type="text" id="cartolasBuscaOp" placeholder="N° Operación..." oninput="renderCartolasTable()">
         </div>
         <div class="field" style="min-width:160px">
           <label>Concesionario</label>
@@ -634,7 +634,7 @@
           <tr>
             <th>CORR.</th>
             <th>MES</th>
-            <th>N°OP/ID</th>
+            <th>ID Financiera</th>
             <th>MOVIMIENTO</th>
             <th>RUT CONC.</th>
             <th>CONCESIONARIO</th>
@@ -698,7 +698,7 @@
       <div style="display:flex;gap:10px;align-items:flex-end;margin-bottom:14px;padding:10px;background:#FFF3E0;border-radius:6px">
         <div class="field" style="flex:1">
           <label style="font-size:12px;font-weight:700">N° Operación</label>
-          <input type="text" id="prepAbolNOp" placeholder="Ingrese N° OP para buscar..." 
+          <input type="text" id="prepAbolNOp" placeholder="Ingrese N° Operación para buscar..."
             style="width:100%;padding:8px;border:2px solid #FF9800;border-radius:4px;font-size:13px;font-weight:700">
         </div>
         <button class="btn btn-primary" onclick="buscarOpParaPrepAbol()" style="padding:8px 16px;white-space:nowrap">🔍 Buscar</button>
@@ -709,7 +709,7 @@
       <div id="prepAbolForm">
         <div class="form-row cols-3">
           <div class="field"><label>MES</label><input type="text" id="pa_mes" placeholder="ej: mayo de 2026"></div>
-          <div class="field"><label>N° OP (Registro)</label><input type="text" id="pa_nOp" placeholder="N° operación original"></div>
+          <div class="field"><label>ID Financiera (Registro)</label><input type="text" id="pa_nOp" placeholder="ID de la financiera"></div>
           <div class="field"><label>RUT Concesionario</label><input type="text" id="pa_rutConc" oninput="fillDealerFromRut(this.value)"></div>
         </div>
         <div class="form-row cols-2">

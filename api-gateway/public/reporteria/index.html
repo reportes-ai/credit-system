@@ -342,7 +342,7 @@ const MODULOS = {
   creditos:{
     label:'Créditos', url:'/api/creditos/reporteria',
     campos:[
-      { key:'numero_credito',       label:'N° Crédito',           filtro:{ tipo:'texto' } },
+      { key:'numero_credito',       label:'N° Operación (formato nuevo)', filtro:{ tipo:'texto' } },
       { key:'num_op',               label:'N° Operación',         filtro:{ tipo:'texto' } },
       { key:'rut_cliente',          label:'RUT Cliente',           filtro:{ tipo:'texto' } },
       { key:'nombre_cliente',       label:'Nombre Cliente',        filtro:{ tipo:'texto' } },
@@ -441,7 +441,7 @@ const MODULOS = {
   cobranza:{
     label:'Cobranza', url:'/api/cobranza',
     campos:[
-      { key:'numero_credito', label:'N° Crédito',   filtro:{ tipo:'texto' } },
+      { key:'numero_credito', label:'N° Operación',   filtro:{ tipo:'texto' } },
       { key:'nombre_cliente', label:'Cliente',       filtro:{ tipo:'texto' } },
       { key:'cuota',          label:'Monto Cuota',  filtro:{ tipo:'monto' } },
       { key:'numero_cuota',   label:'N° Cuota',     filtro:{ tipo:'rango', sufijo:'cuota', min:1, max:96 } },

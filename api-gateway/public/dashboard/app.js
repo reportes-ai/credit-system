@@ -1948,7 +1948,7 @@ function renderTablaV6(ot, colsSP, bysp, totOps, totSaldo) {
         <label style="display:flex;align-items:center;gap:6px;cursor:pointer;font-weight:500">
           <input type="checkbox" id="chk-sp-all" onchange="toggleTodosV6(this.checked)"
             style="cursor:pointer;accent-color:#4fc3f7;width:13px;height:13px"/>
-          ${porEj ? 'Ejecutivo' : 'Dealer'} / N° OP ${filtroActivo ? `<span style="font-size:9px;background:#fff2;padding:1px 6px;border-radius:3px;margin-left:6px">🔍 ${filtroActivo}</span>` : ''}
+          ${porEj ? 'Ejecutivo' : 'Dealer'} / N° Operación ${filtroActivo ? `<span style="font-size:9px;background:#fff2;padding:1px 6px;border-radius:3px;margin-left:6px">🔍 ${filtroActivo}</span>` : ''}
         </label>
       </th>
       ${thSP}
@@ -2848,7 +2848,7 @@ function mostrarListaOps() {
     'Operaciones Otorgadas — ' + lbl + ' (' + det.length + ' ops)';
 
   const thead = '<thead><tr style="background:#1a3a6a;color:#fff;font-size:11px">' +
-    '<th style="padding:6px 8px;text-align:left">N° OP</th>' +
+    '<th style="padding:6px 8px;text-align:left">N° Operación</th>' +
     '<th style="padding:6px 8px">Institución</th>' +
     '<th style="padding:6px 8px">Concesionario</th>' +
     '<th style="padding:6px 8px">Ejecutivo</th>' +
@@ -3596,7 +3596,7 @@ document.addEventListener('keydown', e => { if (e.key === 'Escape') cerrarModalE
 
 function _buildModalContent() {
   const { ops, titulo, totSaldo, totFin, totCD, totIng, fM } = _modalData;
-  const cols = ['N° OP','N° Crédito (Fin.)','Financiera','Concesionario','Estado','Saldo Precio','Total Financiado','Plazo','Com. Dealer','Ing. x Col.'];
+  const cols = ['N° Operación','ID Financiera','Financiera','Concesionario','Estado','Saldo Precio','Total Financiado','Plazo','Com. Dealer','Ing. x Col.'];
   const dataRows = ops.map(r => [
     r.op||'—', r.id_financiera||'—', r.financiera||'—',
     r.automotora||'—', r.estado_eval||'—',
@@ -3723,7 +3723,7 @@ window.abrirModalIncompletos = function abrirModalIncompletos() {
       <table style="width:100%;border-collapse:collapse;font-size:.78rem">
         <thead>
           <tr style="background:#fef3c7;font-size:.7rem;text-transform:uppercase;color:#78350f;letter-spacing:.4px;white-space:nowrap">
-            <th style="padding:8px 8px;text-align:left">N° Op</th>
+            <th style="padding:8px 8px;text-align:left">N° Operación</th>
             <th style="padding:8px 6px;text-align:left">Ejecutivo</th>
             <th style="padding:8px 6px">Mes</th>
             <th style="padding:8px 6px">Monto</th>

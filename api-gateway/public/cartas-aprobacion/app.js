@@ -1591,7 +1591,7 @@ function exportCartolasExcel(){
   let cartolas = getCartolasData();
   if(!cartolas.length){ showModal('Sin datos','No hay registros en Detalle Mes.'); return; }
   
-  const headers = ['CORRELATIVO','MES','N°OP/ID','MOVIMIENTO','RUT Concesionario','Concesionario',
+  const headers = ['CORRELATIVO','MES','ID Financiera','MOVIMIENTO','RUT Concesionario','Concesionario',
     'mail','Ejecutivo Comercial','Nombre del Cliente','RUT del Cliente','Saldo Precio',
     'Comision Bruta','E° Comisión','N° CARTA APROBACIÓN','VENDEDOR','ACREEDOR','% COMISIÓN','Observaciones'];
   
@@ -1718,7 +1718,7 @@ function renderRevisionCartolas(){
         <div style="font-weight:700;font-size:11px;text-transform:uppercase;color:${color};margin:8px 0 4px;padding:3px 6px;background:${color}22">${label}</div>
         <table style="width:100%;border-collapse:collapse;font-size:10.5px">
           <tr style="background:#F5F5F5">
-            <th style="padding:3px 6px;border:1px solid #E0E0E0;text-align:left">N°OP/ID</th>
+            <th style="padding:3px 6px;border:1px solid #E0E0E0;text-align:left">ID Financiera</th>
             <th style="padding:3px 6px;border:1px solid #E0E0E0">Ejecutivo</th>
             <th style="padding:3px 6px;border:1px solid #E0E0E0">Cliente</th>
             <th style="padding:3px 6px;border:1px solid #E0E0E0">RUT</th>
@@ -2229,7 +2229,7 @@ function buildCartolaPDF(concName, g, mes, totalComis, totalAnul, totalPrep, sub
     <div style="background:${color};color:white;padding:4px 8px;font-weight:700;font-size:9.5px;text-transform:uppercase;margin-top:10px">${title}</div>
     <table style="width:100%;border-collapse:collapse;font-size:9px">
       <thead><tr style="background:${color};color:white">
-        <th style="${thStyle}">N°OP/ID</th><th style="${thStyle}">Ejecutivo</th><th style="${thStyle}">Nombre Cliente</th>
+        <th style="${thStyle}">ID Financiera</th><th style="${thStyle}">Ejecutivo</th><th style="${thStyle}">Nombre Cliente</th>
         <th style="${thStyle}">RUT Cliente</th><th style="${thStyle};text-align:right">Saldo Precio</th>
         <th style="${thStyle};text-align:right">Comisión Bruta</th><th style="${thStyle}">E° Comisión</th><th style="${thStyle}">Observaciones</th>
       </tr></thead>
@@ -2547,7 +2547,7 @@ function grabarPrepAbol(){
   saveCartolasData(cartolas);
   document.getElementById('prepAbolOverlay').classList.remove('active');
   renderCartolasTable();
-  showToast('✓ ' + tipo + ' registrado en Detalle Mes (N° OP: ' + nOp + ')');
+  showToast('✓ ' + tipo + ' registrado en Detalle Mes (ID Financiera: ' + nOp + ')');
 }
 
 function getDealerMail(rutConc){
@@ -3700,7 +3700,7 @@ async function grabarCarta(){
   const ejVal = document.getElementById('fEjecutivo').value;
   if(!ejVal) { alert('Seleccione un Ejecutivo Comercial'); return; }
   const opOrigen = document.getElementById('fOpOrigen').value.trim();
-  if(!opOrigen) { alert('Ingrese el ID de la Financiera (N° Operación Origen)'); return; }
+  if(!opOrigen) { alert('Ingrese el ID Financiera'); return; }
   const fNombre = toTitleCase(document.getElementById('fNombre').value.trim());
   if(!fNombre) { alert('Ingrese el Nombre del cliente'); return; }
   const fApPaterno = toTitleCase(document.getElementById('fApellidoPaterno').value.trim());

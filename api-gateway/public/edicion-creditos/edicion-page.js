@@ -43,7 +43,7 @@ function buildHeaders() {
   const thA  = document.createElement('th'); thA.innerHTML = ''; tr.appendChild(thA);
 
   // columnas fijas: num_op, numero_credito, cliente, rut
-  [['num_op','N° Op'],['numero_credito_display','N° Crédito'],['nombre_cliente','Cliente'],['rut_cliente','RUT']].forEach(([ field, label ], i) => {
+  [['num_op','N° Operación'],['numero_credito_display','N° Operación (nuevo)'],['nombre_cliente','Cliente'],['rut_cliente','RUT']].forEach(([ field, label ], i) => {
     const thL = document.createElement('th');
     thL.id = 'colLetter_fijo_' + i;
     thL.textContent = colLetter(i);
@@ -187,8 +187,8 @@ function buscarColumna(q) {
   if (!q.trim()) { dd.innerHTML = ''; dd.style.display = 'none'; return; }
   const qlo = q.toLowerCase();
   const allCols = [
-    { field: 'num_op', label: 'N° Op', idKey: 'fijo_0' },
-    { field: 'numero_credito_display', label: 'N° Crédito', idKey: 'fijo_1' },
+    { field: 'num_op', label: 'N° Operación', idKey: 'fijo_0' },
+    { field: 'numero_credito_display', label: 'N° Operación (nuevo)', idKey: 'fijo_1' },
     { field: 'nombre_cliente', label: 'Cliente', idKey: 'fijo_2' },
     { field: 'rut_cliente', label: 'RUT', idKey: 'fijo_3' },
     ...CAMPOS.map((c, i) => ({ field: c.col, label: c.label, idKey: String(4 + i) }))

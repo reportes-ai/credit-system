@@ -127,7 +127,7 @@
     <!-- Búsqueda -->
     <div class="form-card">
       <div class="search-bar">
-        <input type="text" id="searchQ" class="form-control" placeholder="Buscar por RUT, nombre o N° crédito…" autocomplete="new-password"
+        <input type="text" id="searchQ" class="form-control" placeholder="Buscar por RUT, nombre o N° operación…" autocomplete="new-password"
                onkeydown="if(event.key==='Enter') buscarCreditos()">
         <select id="searchEstado" class="form-select" onchange="_filtroProceso=false;document.getElementById('chipProceso')?.classList.remove('activo');buscarCreditos()">
           <option value="">Todos los estados</option>

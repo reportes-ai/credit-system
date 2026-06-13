@@ -5,7 +5,7 @@
   <link rel="icon" href="/img/favicon.png" type="image/png">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Cartas de Aprobación — AutoFácil</title>
-  <!-- v4.1 -->
+  <!-- v4.2 -->
   <link href="/css/bootstrap.min.css" rel="stylesheet">
   <link href="/css/bootstrap-icons.css" rel="stylesheet">
   <style>
@@ -284,7 +284,7 @@
           <option>DEALER PARQUE</option><option>DEALER CALLE</option>
           <option>ALTA GAMA - PARQUE</option><option>ALTA GAMA - CALLE</option>
         </select></div>
-      <div class="ff"><label>N° Operación origen *</label><input id="cOpOrigen" oninput="calcOpCarta()" placeholder="Ej: 12345"></div>
+      <div class="ff"><label>ID Financiera *</label><input id="cOpOrigen" oninput="calcOpCarta()" placeholder="Ej: 12345"></div>
       <div class="ff"><label>Operación carta</label><input id="cOpCarta" readonly placeholder="Auto"></div>
       <div class="ff"><label>Fecha *</label><input type="date" id="cFecha"></div>
       <div class="ff fg-2"><label>Ejecutivo *</label><select id="cEjecutivo" onchange="onEjecutivo()"><option value="">Cargando…</option></select></div>
@@ -421,7 +421,7 @@
     </div>
     <div style="overflow-x:auto">
       <table class="tbl">
-        <thead><tr><th>N° Op Carta</th><th>Tipo</th><th>Cliente</th><th>Concesionario</th><th>Estado</th><th>Aprobado por</th><th>N° Crédito</th><th>Acciones</th></tr></thead>
+        <thead><tr><th>N° Op Carta</th><th>Tipo</th><th>Cliente</th><th>Concesionario</th><th>Estado</th><th>Aprobado por</th><th>N° Operación</th><th>Acciones</th></tr></thead>
         <tbody id="bodyImpresion"></tbody>
       </table>
     </div>
@@ -441,14 +441,14 @@
         <option value="">Todos</option><option>DEALER PARQUE</option><option>DEALER CALLE</option>
         <option>ALTA GAMA - PARQUE</option><option>ALTA GAMA - CALLE</option>
       </select>
-      <input type="text" id="infBuscar" placeholder="RUT, cliente, N° crédito, op carta, ID financiera…" oninput="renderInformes()" style="flex:1;min-width:180px">
+      <input type="text" id="infBuscar" placeholder="RUT, cliente, N° operación, op carta, ID Financiera…" oninput="renderInformes()" style="flex:1;min-width:180px">
       <button class="btn-sec" onclick="limpiarInformes()">Limpiar</button>
       <button class="btn-mini bm-ok" style="padding:8px 16px;font-size:.83rem" onclick="exportarInformes()"><i class="bi bi-file-earmark-excel"></i> Exportar Excel</button>
     </div>
     <div style="font-size:.78rem;color:#64748b;margin-bottom:8px" id="infCount"></div>
     <div style="overflow-x:auto">
       <table class="tbl">
-        <thead><tr><th>N° Op Carta</th><th>N° Crédito</th><th>Tipo</th><th>RUT</th><th>Cliente</th><th>Concesionario</th><th>Ejecutivo</th><th>Creador</th><th>Creado</th><th>Aprobador</th><th>Aprobado</th><th>Estado</th><th style="text-align:center">Otorgado</th><th></th></tr></thead>
+        <thead><tr><th>N° Op Carta</th><th>N° Operación</th><th>Tipo</th><th>RUT</th><th>Cliente</th><th>Concesionario</th><th>Ejecutivo</th><th>Creador</th><th>Creado</th><th>Aprobador</th><th>Aprobado</th><th>Estado</th><th style="text-align:center">Otorgado</th><th></th></tr></thead>
         <tbody id="bodyInformes"></tbody>
       </table>
     </div>
@@ -466,7 +466,7 @@
     <div class="card-af">
       <div class="filters-bar">
         <select id="ctaMes" onchange="aplicarMes()"></select>
-        <input type="text" id="ctaBuscar" placeholder="RUT, cliente, N° ID, operación, N° carta…" oninput="renderMovimientos()" style="min-width:220px">
+        <input type="text" id="ctaBuscar" placeholder="RUT, cliente, ID Financiera, N° operación, N° carta…" oninput="renderMovimientos()" style="min-width:220px">
         <select id="ctaEstado" onchange="renderMovimientos()">
           <option value="">Todos</option><option>PENDIENTE</option><option>A PAGAR</option><option>A DESCONTAR</option>
         </select>
@@ -476,7 +476,7 @@
       </div>
       <div style="overflow-x:auto">
         <table class="tbl">
-          <thead><tr><th>Corr.</th><th>Mes</th><th>N° ID</th><th>N° Operación</th><th>Movimiento</th><th>Concesionario</th><th>Ejecutivo</th><th>RUT</th><th>Cliente</th>
+          <thead><tr><th>Corr.</th><th>Mes</th><th>ID Financiera</th><th>N° Operación</th><th>Movimiento</th><th>Concesionario</th><th>Ejecutivo</th><th>RUT</th><th>Cliente</th>
             <th style="text-align:right">Saldo</th><th style="text-align:right">Comisión</th><th>E° Comisión</th><th>Mes Cartola</th><th>N° Carta</th><th>Acreedor</th><th>% Com.</th><th>Observaciones</th><th></th></tr></thead>
           <tbody id="bodyMovs"></tbody>
         </table>
@@ -486,7 +486,7 @@
 
   <div id="cartolasRevision" style="display:none">
     <div class="filters-bar" style="margin-bottom:14px">
-      <input type="text" id="revCtaBuscar" placeholder="Concesionario, RUT, cliente, N° ID, operación…" oninput="renderRevCartolas()" style="min-width:260px">
+      <input type="text" id="revCtaBuscar" placeholder="Concesionario, RUT, cliente, ID Financiera, N° operación…" oninput="renderRevCartolas()" style="min-width:260px">
       <span style="font-size:.78rem;color:#64748b" id="revCtaCount"></span>
     </div>
     <div id="bloquesCartolas"></div>
@@ -551,7 +551,7 @@
       <div class="alert-inline" id="ppAlert"></div>
       <div class="ff" style="margin-bottom:12px"><label>Movimiento</label>
         <select id="ppMov"><option>PREPAGO</option><option>ANULACION</option></select></div>
-      <div class="ff" style="margin-bottom:12px"><label>N° Operación *</label><input id="ppOp" placeholder="Operación origen del crédito"></div>
+      <div class="ff" style="margin-bottom:12px"><label>ID Financiera *</label><input id="ppOp" placeholder="N° de la financiera (origen del crédito)"></div>
       <div class="ff" style="margin-bottom:12px"><label>Mes cartola</label><input type="month" id="ppMes"></div>
       <div class="ff" style="margin-bottom:12px"><label>Monto a descontar *</label><input id="ppMonto" inputmode="numeric" oninput="fmtMoney(this)"></div>
       <div class="ff"><label>Observaciones</label><input id="ppObs" placeholder="Ej: prepago cuota 4"></div>
@@ -1532,7 +1532,7 @@ function limpiarForm(){
 }
 
 async function guardarCarta(){
-  const req = { cTipo:'Tipo de carta', cOpOrigen:'N° operación origen', cEjecutivo:'Ejecutivo',
+  const req = { cTipo:'Tipo de carta', cOpOrigen:'ID Financiera', cEjecutivo:'Ejecutivo',
                 cRut:'RUT cliente', cNombres:'Nombres del cliente', cMarca:'Marca', cPlazo:'Plazo', cConc:'Concesionario' };
   for (const [id, label] of Object.entries(req)) {
     if (!document.getElementById(id).value) { setFormAlert('Falta: ' + label); return; }
@@ -2142,11 +2142,11 @@ function verExcepciones(id){
 }
 function exportarInformes(){
   const rows = filtrarInformes().map(c=>({
-    'N° Op Carta':c.opCarta, 'Op Origen':c.opOrigen, 'Tipo':c.tipo, 'Cliente':c.cliente, 'RUT':c.rutCliente,
+    'N° Op Carta':c.opCarta, 'ID Financiera':c.opOrigen, 'Tipo':c.tipo, 'Cliente':c.cliente, 'RUT':c.rutCliente,
     'Concesionario':c.concesionario, 'Ejecutivo':c.ejecutivoNombre, 'Creador':c.creadoPorNombre,
     'Creado':dDT(c.fechaCreacion), 'Aprobador':c.aprobadoPorNombre, 'Aprobado':dDT(c.fechaAprobacion),
     'Estado':c.status, 'Excepciones':(c.excepciones||[]).join(', '), 'Otorgado':c.otorgado?'SI':'NO',
-    'N° Crédito':c.numOp||c.numeroCredito||'', 'Saldo':c.saldo, 'Participación Bruta':c.partBruto,
+    'N° Operación':c.numOp||c.numeroCredito||'', 'Saldo':c.saldo, 'Participación Bruta':c.partBruto,
   }));
   const ws = XLSX.utils.json_to_sheet(rows);
   const wb = XLSX.utils.book_new();
@@ -2248,7 +2248,7 @@ async function guardarPrepago(){
   const op = document.getElementById('ppOp').value.trim();
   const monto = rawMoney('ppMonto');
   const alertEl = document.getElementById('ppAlert');
-  if (!op || !monto) { alertEl.textContent='N° operación y monto son obligatorios'; alertEl.className='alert-inline err'; return; }
+  if (!op || !monto) { alertEl.textContent='ID Financiera y monto son obligatorios'; alertEl.className='alert-inline err'; return; }
   const body = {
     mes: document.getElementById('ppMes').value || mesActual(),
     movimiento: document.getElementById('ppMov').value,
@@ -2263,7 +2263,7 @@ async function guardarPrepago(){
   cargarMovimientos();
 }
 function exportarMovimientos(){
-  const rows = MOVS.map(m=>({ Mes:m.mes, 'N° ID':m.num_op, 'N° Operación':m.nuestro_num_op, Movimiento:m.movimiento, 'RUT Conc.':m.rut_conc,
+  const rows = MOVS.map(m=>({ Mes:m.mes, 'ID Financiera':m.num_op, 'N° Operación':m.nuestro_num_op, Movimiento:m.movimiento, 'RUT Conc.':m.rut_conc,
     Concesionario:m.concesionario, Ejecutivo:m.ejecutivo, Cliente:m.nombre_cliente, 'RUT Cliente':m.rut_cliente,
     Saldo:m.saldo, Comision:m.comision, 'E° Comisión':m.estado_comision,
     'Estado por':m.estado_usuario||'', 'Estado fecha':m.estado_fecha?fdMov(m.estado_fecha):'',
@@ -2337,7 +2337,7 @@ function renderRevCartolas(){
         </div>
       </div>
       <div style="padding:14px 18px">
-        <table class="tbl"><thead><tr><th>N° ID</th><th>N° Operación</th><th>Mov.</th><th>Ejecutivo</th><th>Cliente</th><th>RUT</th><th style="text-align:right">Saldo</th><th style="text-align:right">Comisión</th><th>E° Comisión</th><th>Obs.</th></tr></thead>
+        <table class="tbl"><thead><tr><th>ID Financiera</th><th>N° Operación</th><th>Mov.</th><th>Ejecutivo</th><th>Cliente</th><th>RUT</th><th style="text-align:right">Saldo</th><th style="text-align:right">Comisión</th><th>E° Comisión</th><th>Obs.</th></tr></thead>
         <tbody>${filas}</tbody></table>
         <div style="display:flex;justify-content:flex-end;margin-top:12px">
           <table class="tbl" style="width:340px">

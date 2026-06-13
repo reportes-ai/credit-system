@@ -266,7 +266,7 @@
       <div class="eb-grid-3">
         <label class="eb-field"><span>Fecha Otorgamiento</span><input type="date" id="eb_fecha_otorgado"></label>
         <label class="eb-field"><span>Fecha 1ª Cuota</span><input type="date" id="eb_fecha_primera_cuota"></label>
-        <label class="eb-field"><span>N° Op. Financiera</span><input type="text" id="eb_id_financiera" placeholder="Ej: 12345"></label>
+        <label class="eb-field"><span>ID Financiera</span><input type="text" id="eb_id_financiera" placeholder="Ej: 12345"></label>
         <label class="eb-field"><span>Valor Vehículo ($)</span><input type="number" id="eb_valor_vehiculo" oninput="calcSaldoBroker()"></label>
         <label class="eb-field"><span>Pie ($)</span><input type="number" id="eb_pie" oninput="calcSaldoBroker()"></label>
         <label class="eb-field"><span>Saldo Precio ($)</span><input type="number" id="eb_saldo_precio" readonly></label>
@@ -496,7 +496,7 @@ function renderPagina(c, ant, com) {
     <!-- ── Header ── -->
     <div class="cred-header">
       <div class="ch-left">
-        <div class="ch-num"><i class="bi bi-credit-card me-1"></i>N° Crédito</div>
+        <div class="ch-num"><i class="bi bi-credit-card me-1"></i>N° Operación</div>
         <div class="ch-name">${c.numero_credito||'—'}</div>
         <div class="ch-name" style="font-size:1.1rem;margin-top:2px">${c.nombre_cliente||'—'}</div>
         <div class="ch-rut">${c.rut_cliente||'—'}</div>
