@@ -5,7 +5,7 @@
   <link rel="icon" href="/img/favicon.png" type="image/png">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Saldos Precios a Pagar — AutoFácil</title>
-  <!-- v2.1 -->
+  <!-- v2.2 -->
   <link href="/css/bootstrap.min.css" rel="stylesheet">
   <link href="/css/bootstrap-icons.css" rel="stylesheet">
   <style>
@@ -66,6 +66,17 @@
     .d-grn { background:#dcfce7; color:#15803d; }
     .d-wht { background:transparent; color:#64748b; font-weight:600; }
     .pagado-tag { color:#15803d; font-weight:700; font-size:.78rem; }
+    .selchk { width:18px; height:18px; cursor:pointer; accent-color:#16a34a; }
+    .btn-revertir { display:block; margin:3px auto 0; background:#fff1f2; color:#b91c1c; border:1px solid #fecaca; border-radius:7px; padding:2px 9px; font-size:.72rem; font-weight:700; cursor:pointer; }
+    /* Barra de acción: seleccionar → confirmar lote + nómina */
+    .accionbar { display:flex; align-items:center; justify-content:space-between; gap:12px; flex-wrap:wrap; background:#fff; border-radius:14px; box-shadow:0 1px 4px rgba(0,0,0,.07); padding:12px 18px; margin-bottom:16px; border-left:5px solid #16a34a; }
+    .accionbar .sel-info { font-size:.95rem; color:var(--navy); font-weight:700; }
+    .accionbar .acc { display:flex; gap:10px; flex-wrap:wrap; }
+    .btn-confirmar { background:#16a34a; color:#fff; border:none; border-radius:9px; padding:9px 20px; font-weight:800; cursor:pointer; }
+    .btn-confirmar:disabled { opacity:.45; cursor:default; }
+    .btn-sec { background:#eef2f7; color:#0141A2; border:none; border-radius:9px; padding:9px 14px; font-weight:700; cursor:pointer; font-size:.85rem; }
+    .btn-sec:disabled { opacity:.45; cursor:default; }
+    tbody tr.row-sel { background:#ecfdf3; }
     #buscar { border:1.5px solid #d1d5db; border-radius:8px; padding:7px 12px; font-size:.85rem; width:260px; }
     .toast { position:fixed; top:70px; right:20px; background:#16a34a; color:#fff; padding:12px 18px; border-radius:9px; font-weight:600; font-size:.88rem; z-index:2000; display:none; }
     .toast.err { background:#dc2626; }
@@ -87,7 +98,7 @@
   <div class="head-row">
     <div>
       <h5 style="font-weight:800;color:var(--navy);margin:0"><i class="bi bi-cash-coin me-2"></i>Saldos Precios a Pagar</h5>
-      <span style="font-size:.82rem;color:#64748b">Operaciones con orden de pago emitida, ordenadas por antigüedad (los más antiguos primero). Marca <b>Pagado</b> para registrar el pago del saldo precio; puedes desmarcar dentro del mismo día.</span>
+      <span style="font-size:.82rem;color:#64748b">Operaciones con orden de pago emitida, ordenadas por antigüedad. <b>Selecciona</b> las que vas a pagar (o usa una propuesta), genera la <b>nómina</b> y luego <b>Confirmar pago</b>. Las marcadas se pueden revertir dentro del mismo día.</span>
     </div>
     <input id="buscar" placeholder="Buscar OP, dealer, RUT…" oninput="render()">
   </div>
@@ -129,6 +140,16 @@
     </div>
   </div>
 
+  <!-- Barra de acción: seleccionar → confirmar pago + nómina banco -->
+  <div class="accionbar" id="accionBar" style="display:none">
+    <div class="sel-info">Seleccionadas para pagar: <span id="selN">0</span> · <span id="selM">$0</span></div>
+    <div class="acc">
+      <button class="btn-sec" id="btnNomina" onclick="copiarNomina()" disabled><i class="bi bi-clipboard me-1"></i>Copiar nómina</button>
+      <button class="btn-sec" id="btnCSV" onclick="descargarCSV()" disabled><i class="bi bi-download me-1"></i>CSV banco</button>
+      <button class="btn-confirmar" id="btnConfirmar" onclick="confirmarPago()" disabled><i class="bi bi-check2-all me-1"></i>Confirmar pago</button>
+    </div>
+  </div>
+
   <div class="card-af">
     <div class="tbl-scroll">
       <table>
@@ -143,7 +164,7 @@
             <th>Fondos Recibidos</th>
             <th style="text-align:center">Días</th>
             <th class="num">Saldo Precio</th>
-            <th style="text-align:center">Pagado</th>
+            <th style="text-align:center">Pagar</th>
           </tr>
         </thead>
         <tbody id="body"></tbody>
@@ -209,13 +230,18 @@ function visibles(){
   return DATA.filter(r => !q || [r.num_op,r.nombre_dealer,r.rut_dealer,r.financiera,r.id_financiera].some(v => String(v||'').toLowerCase().includes(q)));
 }
 
+function celdaAccion(r){
+  if (r.pagado) return `<span class="pagado-tag">Pagado hoy</span><button class="btn-revertir" onclick="revertir(${r.id})">Revertir</button>`;
+  return `<input type="checkbox" class="selchk" data-id="${r.id}" ${r.sel?'checked':''} onchange="toggleSel(${r.id},this)">`;
+}
+
 function render(){
   const tb = document.getElementById('body');
   const rows = visibles();
   if (!rows.length){ tb.innerHTML=''; document.getElementById('vacio').style.display=''; recalc(); return; }
   document.getElementById('vacio').style.display='none';
   tb.innerHTML = rows.map(r => `
-    <tr id="row_${r.id}" class="${r.pagado?'sel':''}">
+    <tr id="row_${r.id}" class="${r.pagado?'sel':(r.sel?'row-sel':'')}">
       <td><b>${escH(r.num_op)}</b></td>
       <td>${escH(r.id_financiera||r.financiera||'—')}</td>
       <td>${escH(r.rut_dealer||'—')}</td>
@@ -225,55 +251,52 @@ function render(){
       <td>${fechaCL(r.fecha_fondos)}</td>
       <td style="text-align:center"><span class="dias-pill ${r.dcls}">${r.dias==null?'—':r.dias+' d'}</span></td>
       <td class="num">${fmt(r.saldo_precio)}</td>
-      <td style="text-align:center">
-        <input type="checkbox" class="chk" data-id="${r.id}" ${r.pagado?'checked':''} onchange="toggle(this)">
-        ${r.pagado?'<div class="pagado-tag">Pagado hoy</div>':''}
-      </td>
+      <td style="text-align:center">${celdaAccion(r)}</td>
     </tr>`).join('');
   recalc();
 }
 
-async function toggle(chk){
-  const id = Number(chk.dataset.id);
-  const r = DATA.find(x => x.id===id);
-  if (!r) return;
-  const marcar = chk.checked;
-  chk.disabled = true;
-  const url = marcar ? '/api/postventa/saldos-a-pagar/pagar' : '/api/postventa/saldos-a-pagar/desmarcar';
-  try {
-    const resp = await fetch(url, { method:'POST', headers:H, body: JSON.stringify({ ids:[id] }) });
-    const j = await resp.json();
-    if (!j.success) throw new Error(j.error||'Error');
-    if (!marcar && j.data && j.data.desmarcados === 0)
-      throw new Error('No se puede desmarcar: el pago no es de hoy.');
-    r.pagado = marcar;
-    toast(marcar ? `Saldo precio OP ${r.num_op} marcado como pagado` : `OP ${r.num_op} desmarcada`);
-  } catch(e){
-    chk.checked = !marcar;            // revertir
-    toast(e.message, true);
-  }
-  chk.disabled = false;
-  // refrescar la fila (tag) y los totales
-  const row = document.getElementById('row_'+id);
-  if (row){
-    row.classList.toggle('sel', r.pagado);
-    const cell = row.lastElementChild;
-    cell.innerHTML = `<input type="checkbox" class="chk" data-id="${id}" ${r.pagado?'checked':''} onchange="toggle(this)">${r.pagado?'<div class="pagado-tag">Pagado hoy</div>':''}`;
-  }
+/* Selección (solo cliente, no paga todavía) */
+function toggleSel(id, chk){
+  const r = DATA.find(x => x.id===id); if (!r) return;
+  r.sel = chk.checked;
+  document.getElementById('row_'+id)?.classList.toggle('row-sel', r.sel);
   recalc();
 }
 
+/* Revertir un pago marcado hoy */
+async function revertir(id){
+  const r = DATA.find(x => x.id===id); if (!r) return;
+  if (!confirm(`¿Revertir el pago de la OP ${r.num_op}?`)) return;
+  try {
+    const resp = await fetch('/api/postventa/saldos-a-pagar/desmarcar', { method:'POST', headers:H, body: JSON.stringify({ ids:[id] }) });
+    const j = await resp.json();
+    if (!j.success) throw new Error(j.error||'Error');
+    if (j.data && j.data.desmarcados === 0) throw new Error('No se puede revertir: el pago no es de hoy.');
+    r.pagado = false; r.sel = false;
+    render(); toast(`OP ${r.num_op} revertida`);
+  } catch(e){ toast(e.message, true); }
+}
+
 const sum = arr => arr.reduce((a,r)=>a+Number(r.saldo_precio||0),0);
+const seleccionadas = () => DATA.filter(r => !r.pagado && r.sel);
 
 function recalc(){
   const rows = visibles();
   document.getElementById('totSaldo').textContent = fmt(sum(rows));
-  // Recuadro: pendientes vs pagados hoy (sobre TODA la data, no solo visible)
   const pend = DATA.filter(r => !r.pagado), pag = DATA.filter(r => r.pagado);
   document.getElementById('cntPend').textContent   = pend.length;
   document.getElementById('montoPend').textContent = fmt(sum(pend));
   document.getElementById('cntPag').textContent    = pag.length;
   document.getElementById('montoPag').textContent  = fmt(sum(pag));
+  // Barra de acción
+  const sel = seleccionadas();
+  document.getElementById('selN').textContent = sel.length + ' op' + (sel.length===1?'':'s');
+  document.getElementById('selM').textContent = fmt(sum(sel));
+  document.getElementById('btnConfirmar').disabled = sel.length===0;
+  document.getElementById('btnNomina').disabled    = sel.length===0;
+  document.getElementById('btnCSV').disabled        = sel.length===0;
+  document.getElementById('accionBar').style.display = DATA.some(r => !r.pagado) ? 'flex' : 'none';
   recalcPropuestas();
 }
 
@@ -293,9 +316,11 @@ function onFondos(inp){
    · Antigüedad: las más antiguas primero (DATA ya viene ordenada); si una no
      alcanza, se salta y se sigue buscando otra que quepa con el saldo. */
 function recalcPropuestas(){
-  const restante = Math.max(0, fondosVal - sum(DATA.filter(r => r.pagado)));
+  // Disponible para asignar = Fondos − pagado hoy − ya seleccionado manualmente.
+  const restante = Math.max(0, fondosVal - sum(DATA.filter(r => r.pagado)) - sum(seleccionadas()));
   document.getElementById('fondosSub').textContent = 'Disponible para asignar: ' + fmt(restante);
-  const cand = DATA.filter(r => !r.pagado);
+  // Candidatas: pendientes aún no seleccionadas
+  const cand = DATA.filter(r => !r.pagado && !r.sel);
 
   const llenar = lista => { const set=[]; let acc=0;
     for (const r of lista){ const v=Number(r.saldo_precio||0); if (acc+v <= restante){ set.push(r); acc+=v; } }
@@ -323,20 +348,70 @@ function hl(which){
   lastProp[which].set.forEach(r => document.getElementById('row_'+r.id)?.classList.add(cls));
 }
 
-/* Marca (paga) todas las operaciones de una propuesta */
-async function marcarPropuesta(which){
+/* Pre-selecciona (NO paga) las operaciones de una propuesta */
+function marcarPropuesta(which){
   const set = lastProp[which].set;
   if (!set.length) return;
-  if (!confirm(`Vas a marcar ${set.length} saldo(s) precio como PAGADO por ${fmt(lastProp[which].monto)}. ¿Confirmas?`)) return;
-  const ids = set.map(r => r.id);
+  set.forEach(r => r.sel = true);
+  hl(null); render();
+  toast(`${set.length} operación(es) agregadas a la selección`);
+}
+
+/* Confirmar pago del lote seleccionado */
+async function confirmarPago(){
+  const sel = seleccionadas();
+  if (!sel.length) return;
+  if (!confirm(`Vas a registrar el PAGO de ${sel.length} saldo(s) precio por ${fmt(sum(sel))}. ¿Confirmas?`)) return;
+  const ids = sel.map(r => r.id);
+  const btn = document.getElementById('btnConfirmar');
+  btn.disabled = true; btn.innerHTML = '<i class="bi bi-hourglass-split me-1"></i>Procesando…';
   try {
     const resp = await fetch('/api/postventa/saldos-a-pagar/pagar', { method:'POST', headers:H, body: JSON.stringify({ ids }) });
     const j = await resp.json();
     if (!j.success) throw new Error(j.error||'Error');
-    set.forEach(r => r.pagado = true);
-    hl(null); render();
-    toast(`${ids.length} operación(es) marcadas como pagadas`);
+    sel.forEach(r => { r.pagado = true; r.sel = false; });
+    render(); toast(`${ids.length} operación(es) pagadas`);
   } catch(e){ toast(e.message, true); }
+  btn.innerHTML = '<i class="bi bi-check2-all me-1"></i>Confirmar pago';
+}
+
+/* ── Nómina bancaria de las operaciones seleccionadas ── */
+function nominaRows(){ return seleccionadas(); }
+const COLS = ['RUT Beneficiario','Nombre Beneficiario','Banco','N° Cuenta','Monto','Glosa'];
+function nominaMatriz(){
+  return nominaRows().map(r => [
+    r.rut_dealer||'', r.nombre_dealer||'', r.banco||'', r.num_cuenta||'',
+    Math.round(Number(r.saldo_precio)||0), `Saldo Precio OP ${r.num_op||''}`
+  ]);
+}
+async function copiarNomina(){
+  const m = nominaMatriz();
+  if (!m.length) return;
+  const tsv = [COLS.join('\t'), ...m.map(f => f.join('\t'))].join('\n');
+  const html = `<table border="1" cellpadding="4" style="border-collapse:collapse;font-family:Arial;font-size:12px">
+    <thead><tr>${COLS.map(c=>`<th style="background:#dbeafe">${c}</th>`).join('')}</tr></thead>
+    <tbody>${m.map(f=>`<tr>${f.map((v,i)=>`<td${i===4?' align="right"':''}>${escH(i===4?fmt(v):v)}</td>`).join('')}</tr>`).join('')}</tbody></table>`;
+  try {
+    if (navigator.clipboard && window.ClipboardItem){
+      await navigator.clipboard.write([new ClipboardItem({
+        'text/html': new Blob([html],{type:'text/html'}),
+        'text/plain': new Blob([tsv],{type:'text/plain'}),
+      })]);
+    } else { await navigator.clipboard.writeText(tsv); }
+    toast(`Nómina de ${m.length} pago(s) copiada`);
+  } catch(e){ toast('No se pudo copiar: '+e.message, true); }
+}
+function descargarCSV(){
+  const m = nominaMatriz();
+  if (!m.length) return;
+  const esc = v => { const s=String(v); return /[;"\n]/.test(s) ? '"'+s.replace(/"/g,'""')+'"' : s; };
+  const csv = [COLS.join(';'), ...m.map(f => f.map(esc).join(';'))].join('\r\n');
+  const blob = new Blob(['﻿'+csv], { type:'text/csv;charset=utf-8' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = `nomina-saldo-precio-${new Date().toISOString().slice(0,10)}.csv`;
+  a.click(); URL.revokeObjectURL(a.href);
+  toast(`CSV de ${m.length} pago(s) descargado`);
 }
 </script>
 <script src="/js/app-version.js"></script>
