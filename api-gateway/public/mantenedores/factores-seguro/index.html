@@ -422,7 +422,10 @@ function renderCalcTable() {
 /* ─── RENDER TABLA 3 (AMBOS) ────────────────────────────────────────────── */
 function renderAmbos() {
   const EJ = 10000000;
-  document.getElementById('tablaAmbos').innerHTML = AMBOS_DATA.map(a => {
+  const tabla = document.getElementById('tablaAmbos');
+  const cards = document.getElementById('ambosCards');
+  if (!tabla && !cards) return;   // sección AMBOS removida: nada que renderizar
+  if (tabla) tabla.innerHTML = AMBOS_DATA.map(a => {
     const comPct  = ((a.factor - 1) * 100).toFixed(3);
     const ingBruto = EJ * a.factor;
     const comNeta  = EJ * (a.factor - 1);
@@ -438,7 +441,7 @@ function renderAmbos() {
     </tr>`;
   }).join('');
 
-  document.getElementById('ambosCards').innerHTML = AMBOS_DATA.map(a => {
+  if (cards) cards.innerHTML = AMBOS_DATA.map(a => {
     const comPct = ((a.factor - 1) * 100).toFixed(3);
     return `
     <div class="ambos-card" style="border-color:${a.color}">
