@@ -548,7 +548,7 @@ const update = async (req, res) => {
                 nOp:            carta.id_financiera || carta.op_carta || '',
                 movimiento:     'COMISION',
                 rutConc:        carta.rut_dealer || '',
-                concesionario:  carta.concesionario || '',
+                concesionario:  carta.nombre_dealer || '',
                 mail:           dealer?.correo   || '',
                 ejecutivo:      carta.ejecutivo_nombre || '',
                 nombreCliente:  carta.cliente    || '',

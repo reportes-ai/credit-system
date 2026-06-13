@@ -12,7 +12,7 @@ const pool = require('../../../../shared/config/database');
         num_op          VARCHAR(30) DEFAULT NULL,
         movimiento      ENUM('COMISION','PREPAGO','ANULACION') NOT NULL DEFAULT 'COMISION',
         rut_dealer      VARCHAR(20)  DEFAULT NULL,
-        concesionario   VARCHAR(200) DEFAULT NULL,
+        nombre_dealer   VARCHAR(200) DEFAULT NULL,
         mail            VARCHAR(200) DEFAULT NULL,
         ejecutivo       VARCHAR(150) DEFAULT NULL,
         nombre_cliente  VARCHAR(200) DEFAULT NULL,
@@ -35,7 +35,7 @@ const pool = require('../../../../shared/config/database');
         id            INT AUTO_INCREMENT PRIMARY KEY,
         mes           VARCHAR(7)   NOT NULL,
         rut_dealer    VARCHAR(20)  DEFAULT NULL,
-        concesionario VARCHAR(200) NOT NULL,
+        nombre_dealer VARCHAR(200) NOT NULL,
         mail          VARCHAR(200) DEFAULT NULL,
         total_bruto   BIGINT DEFAULT NULL,
         enviado_por   VARCHAR(150) DEFAULT NULL,
@@ -58,6 +58,15 @@ const pool = require('../../../../shared/config/database');
            WHERE table_schema=DATABASE() AND table_name=? AND column_name='rut_conc'`, [t]);
         if (rc.c > 0) await pool.query(`ALTER TABLE \`${t}\` CHANGE COLUMN rut_conc rut_dealer VARCHAR(20) DEFAULT NULL`);
       } catch(e){ console.error('[cartolas rename rut_conc '+t+']', e.message); }
+    }
+    // Homologación: concesionario → nombre_dealer
+    for (const [t, def] of [['cartolas_movimientos','VARCHAR(200) DEFAULT NULL'],['cartolas_enviadas','VARCHAR(200) NOT NULL']]) {
+      try {
+        const [[cc]] = await pool.query(
+          `SELECT COUNT(*) AS c FROM information_schema.columns
+           WHERE table_schema=DATABASE() AND table_name=? AND column_name='concesionario'`, [t]);
+        if (cc.c > 0) await pool.query(`ALTER TABLE \`${t}\` CHANGE COLUMN concesionario nombre_dealer ${def}`);
+      } catch(e){ console.error('[cartolas rename concesionario '+t+']', e.message); }
     }
     console.log('[cartolas] tablas OK');
   } catch (e) { console.error('[cartolas migration]', e.message); }
@@ -82,11 +91,11 @@ const sync = async (req, res) => {
 
     const [r2] = await pool.query(`
       INSERT INTO cartolas_movimientos
-        (mes, id_carta, num_op, movimiento, rut_dealer, concesionario,
+        (mes, id_carta, num_op, movimiento, rut_dealer, nombre_dealer,
          ejecutivo, nombre_cliente, rut_cliente, saldo, comision,
          estado_comision, num_carta, vendedor, acreedor)
       SELECT DATE_FORMAT(COALESCE(ca.fecha_otorgado, NOW()), '%Y-%m'),
-             ca.id, ca.id_financiera, 'COMISION', ca.rut_dealer, ca.concesionario,
+             ca.id, ca.id_financiera, 'COMISION', ca.rut_dealer, ca.nombre_dealer,
              ca.ejecutivo_nombre, ca.cliente, ca.rut_cliente, ca.saldo, ca.part_bruto,
              'PENDIENTE', ca.op_carta, ca.vendedor, ca.acreedor
       FROM cartas_aprobacion ca
@@ -113,12 +122,12 @@ const getMovimientos = async (req, res) => {
     // num_op guardado = id_financiera (N° de la financiera). JOIN al crédito enlazado
     // para exponer NUESTRO N° de operación real (creditos.num_op).
     const [rows] = await pool.query(
-      `SELECT m.*, m.rut_dealer AS rut_conc, cr.num_op AS nuestro_num_op
+      `SELECT m.*, m.rut_dealer AS rut_conc, m.nombre_dealer AS concesionario, cr.num_op AS nuestro_num_op
        FROM cartolas_movimientos m
        LEFT JOIN cartas_aprobacion ca ON ca.id = m.id_carta
        LEFT JOIN creditos cr ON cr.id = ca.id_credito_creado
        ${where.length ? 'WHERE ' + where.join(' AND ') : ''}
-       ORDER BY m.mes DESC, m.concesionario, m.id`, vals
+       ORDER BY m.mes DESC, m.nombre_dealer, m.id`, vals
     );
     res.json({ success: true, data: rows, error: null });
   } catch (e) {
@@ -142,11 +151,11 @@ const crearMovimiento = async (req, res) => {
     );
     const [r] = await pool.query(
       `INSERT INTO cartolas_movimientos
-        (mes, id_carta, num_op, movimiento, rut_dealer, concesionario, mail, ejecutivo,
+        (mes, id_carta, num_op, movimiento, rut_dealer, nombre_dealer, mail, ejecutivo,
          nombre_cliente, rut_cliente, saldo, comision, estado_comision, num_carta, vendedor, acreedor, observaciones)
        VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
       [m.mes, base?.id_carta || null, m.num_op, m.movimiento,
-       m.rut_conc || base?.rut_dealer || null, m.concesionario || base?.concesionario || null,
+       m.rut_conc || base?.rut_dealer || null, m.concesionario || base?.nombre_dealer || null,
        m.mail || base?.mail || null, m.ejecutivo || base?.ejecutivo || null,
        m.nombre_cliente || base?.nombre_cliente || null, m.rut_cliente || base?.rut_cliente || null,
        m.saldo ?? base?.saldo ?? null, m.comision ?? null,
@@ -201,7 +210,7 @@ const getEnviadas = async (req, res) => {
     const { mes } = req.query;
     const where = mes ? 'WHERE mes = ?' : '';
     const [rows] = await pool.query(
-      `SELECT *, rut_dealer AS rut_conc FROM cartolas_enviadas ${where} ORDER BY fecha_envio DESC LIMIT 500`,
+      `SELECT *, rut_dealer AS rut_conc, nombre_dealer AS concesionario FROM cartolas_enviadas ${where} ORDER BY fecha_envio DESC LIMIT 500`,
       mes ? [mes] : []
     );
     res.json({ success: true, data: rows, error: null });
@@ -218,7 +227,7 @@ const registrarEnvio = async (req, res) => {
       return res.status(400).json({ success: false, data: null, error: 'mes y concesionario requeridos' });
     const enviadoPor = nombreUsuario(req.usuario);
     const [r] = await pool.query(
-      `INSERT INTO cartolas_enviadas (mes, rut_dealer, concesionario, mail, total_bruto, enviado_por)
+      `INSERT INTO cartolas_enviadas (mes, rut_dealer, nombre_dealer, mail, total_bruto, enviado_por)
        VALUES (?,?,?,?,?,?)`,
       [mes, rut_conc || null, concesionario, mail || null, total_bruto || null, enviadoPor]
     );

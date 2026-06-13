@@ -41,7 +41,7 @@ CREATE TABLE IF NOT EXISTS cartas_aprobacion (
   plazo                     INT           DEFAULT NULL,
   acreedor                  VARCHAR(100)  DEFAULT NULL,
   parque                    VARCHAR(150)  DEFAULT NULL,
-  concesionario             VARCHAR(200)  DEFAULT NULL,
+  nombre_dealer             VARCHAR(200)  DEFAULT NULL,
   rut_dealer                VARCHAR(20)   DEFAULT NULL,
   vendedor                  VARCHAR(150)  DEFAULT NULL,
   part_neto                 BIGINT        DEFAULT NULL,

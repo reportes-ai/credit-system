@@ -121,7 +121,7 @@ async function idsRevisores(excluirEmail) {
       plazo INT DEFAULT NULL,
       acreedor VARCHAR(100) DEFAULT NULL,
       parque VARCHAR(150) DEFAULT NULL,
-      concesionario VARCHAR(200) DEFAULT NULL,
+      nombre_dealer VARCHAR(200) DEFAULT NULL,
       rut_dealer VARCHAR(20) DEFAULT NULL,
       vendedor VARCHAR(150) DEFAULT NULL,
       part_neto BIGINT DEFAULT NULL,
@@ -190,6 +190,16 @@ async function idsRevisores(excluirEmail) {
       await pool.query(`ALTER TABLE cartas_aprobacion CHANGE COLUMN rut_conc rut_dealer VARCHAR(20) DEFAULT NULL`);
     }
   } catch(e) { console.error('[cartas migration rename rut_conc]', e.message); }
+
+  // Homologación: renombrar concesionario → nombre_dealer
+  try {
+    const [[cc]] = await pool.query(
+      `SELECT COUNT(*) AS c FROM information_schema.columns
+       WHERE table_schema = DATABASE() AND table_name = 'cartas_aprobacion' AND column_name = 'concesionario'`);
+    if (cc.c > 0) {
+      await pool.query(`ALTER TABLE cartas_aprobacion CHANGE COLUMN concesionario nombre_dealer VARCHAR(200) DEFAULT NULL`);
+    }
+  } catch(e) { console.error('[cartas migration rename concesionario]', e.message); }
 
   // Seed ejecutivos si la tabla está vacía
   try {
@@ -261,7 +271,7 @@ function mapRow(r) {
     plazo:                    cv(r.plazo, r.cred_plazo),
     acreedor:                 r.acreedor,
     parque:                   r.parque,
-    concesionario:            r.concesionario,
+    concesionario:            r.nombre_dealer,
     rutConc:                  r.rut_dealer,
     vendedor:                 r.vendedor,
     partNeto:                 partNeto,
@@ -399,7 +409,7 @@ const upsert = async (req, res) => {
           tipo_vehiculo=?, marca=?, modelo=?, anio=?, patente=?, prenda=?,
           precio_venta=?, pie=?, saldo=?,
           plazo=?, acreedor=?, parque=?,
-          concesionario=?, rut_dealer=?, vendedor=?,
+          nombre_dealer=?, rut_dealer=?, vendedor=?,
           part_neto=?, part_iva=?, part_bruto=?,
           fecha=?, fecha_creacion=?,
           creado_por=?, creado_por_nombre=?, creado_por_initials=?,
@@ -445,7 +455,7 @@ const upsert = async (req, res) => {
           tipo_vehiculo, marca, modelo, anio, patente, prenda,
           precio_venta, pie, saldo,
           plazo, acreedor, parque,
-          concesionario, rut_dealer, vendedor,
+          nombre_dealer, rut_dealer, vendedor,
           part_neto, part_iva, part_bruto,
           fecha, fecha_creacion,
           creado_por, creado_por_nombre, creado_por_initials,
@@ -596,7 +606,7 @@ const cargaMasivaCartas = async (req, res) => {
           `INSERT INTO cartas_aprobacion
              (op_carta, id_financiera, ejecutivo_nombre, cliente, rut_cliente,
               tipo_vehiculo, marca, modelo, anio, patente, precio_venta, pie, saldo, plazo,
-              acreedor, concesionario, rut_dealer, vendedor, part_bruto, fecha,
+              acreedor, nombre_dealer, rut_dealer, vendedor, part_bruto, fecha,
               creado_por, creado_por_nombre, status, otorgado, fecha_otorgado, fecha_aprobacion,
               numero_credito_creado, id_credito_creado)
            VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
