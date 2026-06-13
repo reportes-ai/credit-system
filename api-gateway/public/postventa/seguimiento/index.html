@@ -5,7 +5,7 @@
   <link rel="icon" href="/img/favicon.png" type="image/png">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Seguimiento Post Venta — AutoFácil</title>
-  <!-- v1.6 -->
+  <!-- v1.7 -->
   <link href="/css/bootstrap.min.css" rel="stylesheet">
   <link href="/css/bootstrap-icons.css" rel="stylesheet">
   <style>
@@ -318,11 +318,28 @@ function trackHTML(r, track, lista){
         <input type="checkbox" ${m?'checked':''} ${disabled} title="${escH(title)}"
           onchange="toggleEtapa(${r.id},'${track}','${escH(x.etapa)}',this)">
         ${!m?`<span class="pend">${canMark?'Pendiente':'🔒'}</span>`:''}
+        ${(esAuto && x.etapa==='SALDO PRECIO PAGADO' && m && esAdmin)?`<button onclick="revertirPago(${r.id})" title="Revertir pago (con motivo, Administrador)" style="display:block;margin:3px auto 0;background:#fff1f2;color:#b91c1c;border:1px solid #fecaca;border-radius:6px;padding:1px 7px;font-size:.68rem;font-weight:700;cursor:pointer">↶ Revertir</button>`:''}
       </div>
       <div class="fecha">${m?fmtF(m.fecha):''}</div>
       ${dias}
     </div>`;
   }).join('');
+}
+
+async function revertirPago(id){
+  const motivo = prompt('Motivo de la reversa del pago (queda registrado para auditoría):');
+  if (motivo === null) return;
+  if (!motivo.trim()) { alert('Debes indicar un motivo.'); return; }
+  try {
+    const r = await fetch('/api/postventa/saldos-a-pagar/desmarcar', { method:'POST', headers:H,
+      body: JSON.stringify({ ids:[id], motivo }) });
+    const j = await r.json();
+    if (!j.success) { alert(j.error||'Error'); return; }
+    if (j.data && j.data.desmarcados === 0) { alert('No había pago que revertir.'); return; }
+    const row = DATA.find(x=>x.id===id);
+    if (row) row.etapas = row.etapas.filter(e=>!(e.track==='SALDO' && e.etapa==='SALDO PRECIO PAGADO'));
+    render();
+  } catch(e) { alert('Error de conexión'); }
 }
 
 async function toggleEtapa(id, track, etapa, chk){
