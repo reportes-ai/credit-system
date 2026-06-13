@@ -5,7 +5,7 @@
   <link rel="icon" href="/img/favicon.png" type="image/png">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Saldos Precios a Pagar — AutoFácil</title>
-  <!-- v2.9 -->
+  <!-- v3.0 -->
   <link href="/css/bootstrap.min.css" rel="stylesheet">
   <link href="/css/bootstrap-icons.css" rel="stylesheet">
   <style>
@@ -43,9 +43,8 @@
     /* Propuestas */
     .stat.prop { cursor:default; border-left-color:#7c3aed; display:flex; flex-direction:column; }
     .stat.prop.ant { border-left-color:#d97706; }
-    .stat.prop .row { display:flex; align-items:center; justify-content:space-between; gap:10px; margin-top:4px; }
-    .stat.prop .val { font-size:1.35rem; }
-    .btn-marcar { background:#0141A2; color:#fff; border:none; border-radius:8px; padding:7px 14px; font-size:.8rem; font-weight:700; cursor:pointer; white-space:nowrap; }
+    .stat.prop .val { color:var(--navy); }
+    .btn-marcar { width:33%; margin-top:8px; background:#0141A2; color:#fff; border:none; border-radius:8px; padding:6px 12px; font-size:.8rem; font-weight:700; cursor:pointer; white-space:nowrap; }
     .stat.prop.ant .btn-marcar { background:#d97706; }
     .btn-marcar:disabled { opacity:.45; cursor:default; }
     tbody tr.row-prop td { box-shadow:inset 0 0 0 9999px rgba(124,58,237,.08); }
@@ -146,17 +145,15 @@
   <div class="resumen" id="propBox" style="display:none">
     <div class="stat prop max" id="propMax" onmouseenter="hl('max')" onmouseleave="hl(null)">
       <div class="lbl">Propuesta · Máximo de operaciones</div>
-      <div class="row">
-        <div><div class="val" id="propMaxN">0 ops</div><div class="sub" id="propMaxM">Gasta $0</div></div>
-        <button class="btn-marcar" id="propMaxBtn" onclick="marcarPropuesta('max')">Marcar</button>
-      </div>
+      <div class="val" id="propMaxN">0 ops X $0</div>
+      <div class="sub" id="propMaxM">Queda disponible $0</div>
+      <button class="btn-marcar" id="propMaxBtn" onclick="marcarPropuesta('max')">Marcar</button>
     </div>
     <div class="stat prop ant" id="propAnt" onmouseenter="hl('ant')" onmouseleave="hl(null)">
       <div class="lbl">Propuesta · Prioriza antigüedad</div>
-      <div class="row">
-        <div><div class="val" id="propAntN">0 ops</div><div class="sub" id="propAntM">Gasta $0</div></div>
-        <button class="btn-marcar" id="propAntBtn" onclick="marcarPropuesta('ant')">Marcar</button>
-      </div>
+      <div class="val" id="propAntN">0 ops X $0</div>
+      <div class="sub" id="propAntM">Queda disponible $0</div>
+      <button class="btn-marcar" id="propAntBtn" onclick="marcarPropuesta('ant')">Marcar</button>
     </div>
   </div>
 
@@ -345,8 +342,8 @@ function recalcPropuestas(){
 
   const pintar = (which, nEl, mEl, btn) => {
     const p = lastProp[which];
-    document.getElementById(nEl).textContent = p.set.length + ' ops';
-    document.getElementById(mEl).textContent = 'Gasta ' + fmt(p.monto) + ' · Queda disponible ' + fmt(restante - p.monto);
+    document.getElementById(nEl).textContent = p.set.length + ' ops X ' + fmt(p.monto);
+    document.getElementById(mEl).textContent = 'Queda disponible ' + fmt(restante - p.monto);
     document.getElementById(btn).disabled = p.set.length === 0;
   };
   pintar('max','propMaxN','propMaxM','propMaxBtn');
