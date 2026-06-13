@@ -5,7 +5,7 @@
   <link rel="icon" href="/img/favicon.png" type="image/png">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Saldos Precios a Pagar — AutoFácil</title>
-  <!-- v3.2 -->
+  <!-- v3.3 -->
   <link href="/css/bootstrap.min.css" rel="stylesheet">
   <link href="/css/bootstrap-icons.css" rel="stylesheet">
   <style>
@@ -349,7 +349,7 @@ function pintarMetaFondos(d){
   if (!el) return;
   if (d && d.fecha_iso){
     const f = new Date(d.fecha_iso).toLocaleString('es-CL', { timeZone:'America/Santiago', day:'2-digit', month:'2-digit', year:'numeric', hour:'2-digit', minute:'2-digit' });
-    el.textContent = `Modificado por ${d.usuario||'—'} · ${f}`;
+    el.textContent = `Monto cargado por ${d.usuario||'—'} · ${f}`;
   } else { el.textContent = 'Sin monto cargado hoy'; }
 }
 
