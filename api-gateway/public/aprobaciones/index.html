@@ -5,7 +5,7 @@
   <link rel="icon" href="/img/favicon.png" type="image/png">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Cartas de Aprobación — AutoFácil</title>
-  <!-- v3.4 -->
+  <!-- v3.5 -->
   <link href="/css/bootstrap.min.css" rel="stylesheet">
   <link href="/css/bootstrap-icons.css" rel="stylesheet">
   <style>
@@ -429,7 +429,7 @@
 </div>
 
 <!-- ════════ TAB: INFORMES ════════ -->
-<div class="tab-pane" id="pane-informes">
+<div class="tab-pane" id="pane-informes" style="max-width:none">
   <div class="card-af">
     <div class="filters-bar">
       <input type="date" id="infDesde" onchange="renderInformes()">
@@ -441,14 +441,14 @@
         <option value="">Todos</option><option>DEALER PARQUE</option><option>DEALER CALLE</option>
         <option>ALTA GAMA - PARQUE</option><option>ALTA GAMA - CALLE</option>
       </select>
-      <input type="text" id="infBuscar" placeholder="Cliente, concesionario…" oninput="renderInformes()" style="flex:1;min-width:180px">
+      <input type="text" id="infBuscar" placeholder="RUT, cliente, N° crédito, op carta, ID financiera…" oninput="renderInformes()" style="flex:1;min-width:180px">
       <button class="btn-sec" onclick="limpiarInformes()">Limpiar</button>
       <button class="btn-mini bm-ok" style="padding:8px 16px;font-size:.83rem" onclick="exportarInformes()"><i class="bi bi-file-earmark-excel"></i> Exportar Excel</button>
     </div>
     <div style="font-size:.78rem;color:#64748b;margin-bottom:8px" id="infCount"></div>
     <div style="overflow-x:auto">
       <table class="tbl">
-        <thead><tr><th>N° Op Carta</th><th>N° Crédito</th><th>Tipo</th><th>Cliente</th><th>Concesionario</th><th>Ejecutivo</th><th>Creador</th><th>Creado</th><th>Aprobador</th><th>Aprobado</th><th>Estado</th><th style="text-align:center">Otorgado</th><th></th></tr></thead>
+        <thead><tr><th>N° Op Carta</th><th>N° Crédito</th><th>Tipo</th><th>RUT</th><th>Cliente</th><th>Concesionario</th><th>Ejecutivo</th><th>Creador</th><th>Creado</th><th>Aprobador</th><th>Aprobado</th><th>Estado</th><th style="text-align:center">Otorgado</th><th></th></tr></thead>
         <tbody id="bodyInformes"></tbody>
       </table>
     </div>
@@ -2088,7 +2088,7 @@ function filtrarInformes(){
     if (h && f > h) return false;
     if (est && c.status!==est) return false;
     if (tipo && c.tipo!==tipo) return false;
-    if (q && ![c.cliente,c.concesionario,c.opCarta,c.opOrigen].some(v=>String(v||'').toLowerCase().includes(q))) return false;
+    if (q && ![c.cliente,c.concesionario,c.opCarta,c.opOrigen,c.numOp,c.numeroCredito,c.rutCliente].some(v=>String(v||'').toLowerCase().includes(q))) return false;
     return true;
   });
 }
@@ -2097,7 +2097,7 @@ function renderInformes(){
   document.getElementById('infCount').textContent = rows.length + ' carta(s) encontradas';
   const fdt = v => { if(!v) return '—'; const d=new Date(v); return isNaN(d)?'—':d.toLocaleDateString('es-CL')+' '+d.toLocaleTimeString('es-CL',{hour:'2-digit',minute:'2-digit'}); };
   const body = document.getElementById('bodyInformes');
-  if (!rows.length) { body.innerHTML='<tr><td colspan="13" style="text-align:center;color:#94a3b8;padding:24px">Sin resultados</td></tr>'; return; }
+  if (!rows.length) { body.innerHTML='<tr><td colspan="14" style="text-align:center;color:#94a3b8;padding:24px">Sin resultados</td></tr>'; return; }
   body.innerHTML = rows.map(c=>{
     const exc = (Array.isArray(c.excepciones)&&c.excepciones.length)
       ? `<span class="exc-dot" title="Ver excepciones" onclick="verExcepciones(${c.id})">E</span>` : '';
@@ -2108,6 +2108,7 @@ function renderInformes(){
       <td><b>${escH(c.opCarta||'')}</b></td>
       <td style="font-size:.78rem">${escH(c.numOp||c.numeroCredito||'—')}</td>
       <td style="font-size:.7rem">${escH(c.tipo||'')}</td>
+      <td style="font-size:.76rem">${escH(c.rutCliente||'—')}</td>
       <td>${escH(toTitle(c.cliente||''))}</td>
       <td style="font-size:.76rem">${escH(c.concesionario||'')}</td>
       <td style="font-size:.76rem">${escH(c.ejecutivoNombre||'')}</td>
