@@ -265,7 +265,7 @@ const getSaldosAPagar = async (req, res) => {
 const getOrdenPago = async (req, res) => {
   try {
     const [rows] = await pool.query(`
-      SELECT s.id, s.num_op, s.saldo_precio, s.financiera,
+      SELECT s.id, s.num_op, s.saldo_precio, s.financiera, s.fecha_otorgado,
              COALESCE(c.nombre_local, d.nombre_razon, s.nombre_dealer) AS nombre_dealer,
              COALESCE(c.rut_concesionario, d.rut) AS rut_dealer,
              d.num_cuenta, d.banco, d.rut_pago,

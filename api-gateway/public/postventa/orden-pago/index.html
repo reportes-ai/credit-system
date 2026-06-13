@@ -5,7 +5,7 @@
   <link rel="icon" href="/img/favicon.png" type="image/png">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Emisión Orden de Pago — AutoFácil</title>
-  <!-- v1.2 -->
+  <!-- v1.3 -->
   <link href="/css/bootstrap.min.css" rel="stylesheet">
   <link href="/css/bootstrap-icons.css" rel="stylesheet">
   <style>
@@ -223,10 +223,26 @@ function docHTML(r){
   </div>`;
 }
 
+// Cuerpo del correo: saludo + cuadro orden + firma (todo inline para Gmail/Outlook)
+function emailHTML(r){
+  const nOrden = 'OP-' + (r.num_op||'');
+  const fOtorg = fechaCL(r.fecha_otorgado);
+  const fRecep = fechaCL(r.fecha_fondos);
+  const fin = r.financiera || 'Autofin';
+  const p = 'font-size:14px;color:#374151;margin:0 0 14px;line-height:1.6';
+  return `<div style="font-family:Arial,sans-serif;max-width:760px">
+    <p style="${p}">Estimado Equipo de Contabilidad:</p>
+    <p style="${p}">Adjunto encontrarán <strong>Orden de Pago N° ${nOrden}</strong> para el pago del Saldo Precio del Crédito <strong>N° ${r.num_op||''}</strong> otorgado por <strong>${fin}</strong> con fecha <strong>${fOtorg}</strong>, Saldo Precio recepcionado por AutoFácil el día <strong>${fRecep}</strong>.</p>
+    <p style="${p}">Les recordamos que deben marcar en el módulo de <strong>Saldo Precio Pagado</strong>, de manera de informar al Ejecutivo Comercial y cerrar el flujo operativo de esta transacción.</p>
+    ${docHTML(r)}
+    <p style="${p};margin-top:18px">Saludos cordiales,<br><strong>Área de Operaciones</strong></p>
+  </div>`;
+}
+
 function verOrden(id){
   actual = DATA.find(r => r.id === id);
   if (!actual) return;
-  document.getElementById('docWrap').innerHTML = docHTML(actual);
+  document.getElementById('docWrap').innerHTML = emailHTML(actual);
   document.getElementById('ov').classList.add('open');
 }
 function cerrar(){ document.getElementById('ov').classList.remove('open'); actual=null; }
