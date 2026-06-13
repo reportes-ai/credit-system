@@ -101,9 +101,11 @@ const sync = async (req, res) => {
          estado_comision, num_carta, vendedor, acreedor)
       SELECT DATE_FORMAT(COALESCE(ca.fecha_otorgado, NOW()), '%Y-%m'),
              ca.id, ca.id_financiera, 'COMISION', ca.rut_dealer, ca.nombre_dealer,
-             ca.ejecutivo, ca.cliente, ca.rut_cliente, ca.saldo, ca.part_bruto,
+             ca.ejecutivo, ca.cliente, ca.rut_cliente, ca.saldo,
+             COALESCE(NULLIF(ca.part_bruto,0), crx.comdea_real),
              'PENDIENTE', ca.op_carta, ca.vendedor, ca.acreedor
       FROM cartas_aprobacion ca
+      LEFT JOIN creditos crx ON crx.id = ca.id_credito_creado
       WHERE ca.otorgado = 1 AND ca.status = 'APROBADA'
         AND NOT EXISTS (
           SELECT 1 FROM cartolas_movimientos m
