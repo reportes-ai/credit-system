@@ -96,6 +96,18 @@ const pool = require('../../../../shared/config/database');
         fecha          DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
         UNIQUE KEY uk_seg (id_seguimiento)
       )`);
+    // Órdenes de pago de comisión: correlativo propio (una por operación)
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS postventa_ordenes_comision (
+        id             INT AUTO_INCREMENT PRIMARY KEY,
+        num_orden      VARCHAR(30) UNIQUE,
+        id_seguimiento INT NOT NULL,
+        num_op         VARCHAR(30),
+        monto          BIGINT,
+        usuario        VARCHAR(150),
+        fecha          DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        UNIQUE KEY uk_seg (id_seguimiento)
+      )`);
     // Reversas de pago fuera del día (auditoría para Riesgo Operacional)
     await pool.query(`
       CREATE TABLE IF NOT EXISTS postventa_reversas (
@@ -127,6 +139,22 @@ const EVENTOS_SALDO = [
   { evento: 'pago_realizado', titulo: 'Saldo precio pagado',
     mensaje: 'Se registró el pago del saldo precio de {op}.', href: '/postventa/seguimiento/' },
 ];
+/* ── Alertas de proceso Comisión (paramétricas, event-driven) ──────────────
+   Espejo del flujo de Saldo Precio: la comisión se alimenta de las cartolas,
+   se recibe la factura del concesionario, se emite la orden de pago, se
+   selecciona qué se paga (Enviar a Pago) y se paga. */
+const EVENTOS_COMISION = [
+  { evento: 'com_factura_recibida', titulo: 'Factura recibida — emitir Orden de Pago de Comisión',
+    mensaje: 'La operación {op} tiene FACTURA RECIBIDA. Emite la Orden de Pago de comisión.', href: '/postventa/orden-pago-comision/' },
+  { evento: 'com_orden_emitida', titulo: 'Orden de Pago de Comisión emitida — cargar montos disponibles',
+    mensaje: 'Se emitió la Orden de Pago de comisión de {op}. Carga los montos disponibles para pago.', href: '/postventa/comisiones-a-pagar/' },
+  { evento: 'com_fondos_cargados', titulo: 'Montos disponibles cargados (Comisión)',
+    mensaje: 'Tesorería cargó los fondos disponibles para pago de comisiones. Define qué pagar.', href: '/postventa/comisiones-a-pagar/' },
+  { evento: 'com_enviado_pago', titulo: 'Comisiones enviadas a pago — confirmar pago',
+    mensaje: 'Se enviaron comisiones a pago. Confirma el pago en Comisiones a Pagar.', href: '/postventa/comisiones-a-pagar/' },
+  { evento: 'com_pago_realizado', titulo: 'Comisión pagada',
+    mensaje: 'Se registró el pago de la comisión de {op}.', href: '/postventa/seguimiento/' },
+];
 const SONIDOS_SALDO = ['campana', 'dingdong', 'alarma', 'aplausos'];
 (async () => {
   try {
@@ -148,11 +176,11 @@ const SONIDOS_SALDO = ['campana', 'dingdong', 'alarma', 'aplausos'];
     await pool.query(`ALTER TABLE postventa_alertas_config ADD COLUMN IF NOT EXISTS sonido_tipo VARCHAR(20) NOT NULL DEFAULT 'campana'`).catch(()=>{});
     await pool.query(`ALTER TABLE postventa_alertas_config ADD COLUMN IF NOT EXISTS sonido_cada_seg INT NOT NULL DEFAULT 30`).catch(()=>{});
     await pool.query(`ALTER TABLE postventa_alertas_config ADD COLUMN IF NOT EXISTS sonido_max_min INT NOT NULL DEFAULT 5`).catch(()=>{});
-    for (const e of EVENTOS_SALDO)
+    for (const e of [...EVENTOS_SALDO, ...EVENTOS_COMISION])
       await pool.query(
         `INSERT IGNORE INTO postventa_alertas_config (evento, perfiles, incluir_ejecutivo, usuarios_extra, activo)
          VALUES (?,?,?,?,1)`,
-        [e.evento, 'Administrador', e.evento === 'pago_realizado' ? 1 : 0, '']);
+        [e.evento, 'Administrador', (e.evento === 'pago_realizado' || e.evento === 'com_pago_realizado') ? 1 : 0, '']);
     console.log('[postventa] alertas_config OK');
   } catch (e) { console.error('[postventa alertas migration]', e.message); }
 })();
@@ -160,7 +188,7 @@ const SONIDOS_SALDO = ['campana', 'dingdong', 'alarma', 'aplausos'];
 // Resuelve destinatarios y crea las notificaciones (campana) de un evento.
 async function notificarEventoSaldo(evento, { op, id_seguimiento, ejecutivo, claveExtra } = {}) {
   try {
-    const def = EVENTOS_SALDO.find(e => e.evento === evento);
+    const def = EVENTOS_SALDO.find(e => e.evento === evento) || EVENTOS_COMISION.find(e => e.evento === evento);
     if (!def) return;
     const [[cfg]] = await pool.query('SELECT * FROM postventa_alertas_config WHERE evento=?', [evento]);
     if (!cfg || !cfg.activo) return;
@@ -281,6 +309,8 @@ const setEtapa = async (req, res) => {
     // Etapas automáticas: solo se marcan desde sus módulos dedicados
     if (track === 'SALDO' && ['ORDEN DE PAGO EMITIDA','ENVIADO A PAGO','SALDO PRECIO PAGADO'].includes(etapa))
       return res.status(400).json({ success: false, data: null, error: `"${etapa}" se marca automáticamente desde su módulo (Emisión Orden de Pago / Saldos Precios a Pagar)` });
+    if (track === 'COMISION' && ['ORDEN DE PAGO EMITIDA','ENVIADO A PAGO','COMISION PAGADA'].includes(etapa))
+      return res.status(400).json({ success: false, data: null, error: `"${etapa}" se marca automáticamente desde su módulo (Emisión Orden de Pago Comisión / Comisiones a Pagar)` });
 
     const esAdmin = req.usuario?.perfil_nombre === 'Administrador';
     const usuario = loginDe(req.usuario);
@@ -347,6 +377,11 @@ const setEtapa = async (req, res) => {
       const c = await ctxSeguimiento(req.params.id);
       await notificarEventoSaldo('fondos_recibidos', { op: c.num_op, id_seguimiento: Number(req.params.id) });
     }
+    // Alerta event-driven: al marcar FACTURA RECIBIDA avisar para emitir Orden de Pago de comisión
+    if (marcar && track === 'COMISION' && etapa === 'FACTURA RECIBIDA') {
+      const c = await ctxSeguimiento(req.params.id);
+      await notificarEventoSaldo('com_factura_recibida', { op: c.num_op, id_seguimiento: Number(req.params.id) });
+    }
     res.json({ success: true, data: { id: Number(req.params.id), etapa, marcado: !!marcar, usuario }, error: null });
   } catch (e) {
     console.error('[postventa etapa]', e.message);
@@ -386,16 +421,37 @@ const getAtribuciones = async (req, res) => {
   }
 };
 
+/* ── Atribuciones del flujo Comisión: espejo de Saldo Precio, permisos propios ── */
+const CODIGOS_ATRIB_COM = ['pv_com_fondos_definir','pv_com_seleccionar','pv_com_pagar','pv_com_nomina_generar','pv_com_orden_emitir','pv_com_revertir'];
+const getAtribucionesComision = async (req, res) => {
+  try {
+    const [rows] = await pool.query(
+      `SELECT f.codigo, p.nombre AS perfil
+       FROM funcionalidades f
+       JOIN permisos_perfil pp ON pp.id_funcionalidad = f.id_funcionalidad AND pp.habilitado = 1
+       JOIN perfiles p ON p.id_perfil = pp.id_perfil
+       WHERE f.codigo IN (?)
+       ORDER BY p.nombre`, [CODIGOS_ATRIB_COM]);
+    const out = {};
+    CODIGOS_ATRIB_COM.forEach(c => out[c] = []);
+    rows.forEach(r => { (out[r.codigo] = out[r.codigo] || []).push(r.perfil); });
+    res.json({ success: true, data: out, error: null });
+  } catch (e) {
+    res.status(500).json({ success: false, data: null, error: 'Error interno del servidor' });
+  }
+};
+
 /* ── Fondos disponibles del día (compartido): Finanzas/Tesorería digita,
    Comercial decide qué pagar. Se guarda en postventa_config; el front valida
    que fecha_dia sea hoy (se "borra" al cambiar de día sin tocar BD). ── */
 // ── Config de alertas del proceso Saldo Precio (mantenedor) ──
 const getAlertasConfig = async (req, res) => {
   try {
+    const lista = req.query.track === 'comision' ? EVENTOS_COMISION : EVENTOS_SALDO;
     const [rows] = await pool.query('SELECT * FROM postventa_alertas_config');
     const map = {}; rows.forEach(r => { map[r.evento] = r; });
     // Devuelve en el orden del workflow, con título/descripción del evento
-    const data = EVENTOS_SALDO.map(e => {
+    const data = lista.map(e => {
       const c = map[e.evento] || {};
       return { evento: e.evento, titulo: e.titulo,
         perfiles: c.perfiles || '', incluir_ejecutivo: !!c.incluir_ejecutivo,
@@ -412,8 +468,9 @@ const getAlertasConfig = async (req, res) => {
 const setAlertasConfig = async (req, res) => {
   try {
     const lista = Array.isArray(req.body?.config) ? req.body.config : [];
+    const EVENTOS_TODOS = [...EVENTOS_SALDO, ...EVENTOS_COMISION];
     for (const c of lista) {
-      if (!EVENTOS_SALDO.find(e => e.evento === c.evento)) continue;
+      if (!EVENTOS_TODOS.find(e => e.evento === c.evento)) continue;
       const sonTipo = SONIDOS_SALDO.includes(c.sonido_tipo) ? c.sonido_tipo : 'campana';
       await pool.query(
         `INSERT INTO postventa_alertas_config (evento, perfiles, incluir_ejecutivo, usuarios_extra, activo, prioridad, sonido, sonido_tipo, sonido_cada_seg, sonido_max_min)
@@ -452,6 +509,32 @@ const setFondos = async (req, res) => {
     // Alerta: montos cargados → Gerente Comercial decide qué pagar (una vez al día)
     if (valor.monto > 0)
       await notificarEventoSaldo('fondos_cargados', { claveExtra: valor.fecha_dia || new Date().toISOString().slice(0, 10) });
+    res.json({ success: true, data: valor, error: null });
+  } catch (e) {
+    res.status(500).json({ success: false, data: null, error: 'Error interno del servidor' });
+  }
+};
+
+/* ── Fondos disponibles para pago de COMISIONES (compartido, válido solo hoy) ── */
+const getFondosComision = async (req, res) => {
+  try {
+    const [[row]] = await pool.query("SELECT valor FROM postventa_config WHERE clave='fondos_disp_comision'");
+    let d = null; if (row) { try { d = JSON.parse(row.valor); } catch (_) {} }
+    res.json({ success: true, data: d, error: null });
+  } catch (e) {
+    res.status(500).json({ success: false, data: null, error: 'Error interno del servidor' });
+  }
+};
+const setFondosComision = async (req, res) => {
+  try {
+    const { monto, fecha_iso, fecha_dia } = req.body || {};
+    const usuario = ((req.usuario?.nombre || '') + ' ' + (req.usuario?.apellido || '')).trim() || 'Usuario';
+    const valor = { monto: Number(monto) || 0, fecha_iso: fecha_iso || new Date().toISOString(), fecha_dia, usuario };
+    await pool.query(
+      `INSERT INTO postventa_config (clave, valor) VALUES ('fondos_disp_comision', ?)
+       ON DUPLICATE KEY UPDATE valor = VALUES(valor)`, [JSON.stringify(valor)]);
+    if (valor.monto > 0)
+      await notificarEventoSaldo('com_fondos_cargados', { claveExtra: valor.fecha_dia || new Date().toISOString().slice(0, 10) });
     res.json({ success: true, data: valor, error: null });
   } catch (e) {
     res.status(500).json({ success: false, data: null, error: 'Error interno del servidor' });
@@ -718,6 +801,223 @@ const desmarcarSaldos = async (req, res) => {
   }
 };
 
+/* ═══════════════════════════════════════════════════════════════════════
+   FLUJO COMISIÓN (espejo de Saldo Precio) — track='COMISION'
+   Cartolas → FACTURA RECIBIDA → ORDEN DE PAGO EMITIDA → ENVIADO A PAGO → COMISION PAGADA
+   ═══════════════════════════════════════════════════════════════════════ */
+
+/* ── GET /api/postventa/comisiones-a-pagar — ops con orden de pago de comisión emitida, no pagadas ── */
+const getComisionesAPagar = async (req, res) => {
+  try {
+    const [rows] = await pool.query(`
+      SELECT s.id, s.num_op, s.comision, s.financiera, s.ejecutivo,
+             COALESCE(c.nombre_local, d.nombre_razon, s.nombre_dealer) AS nombre_dealer,
+             c.id_financiera,
+             COALESCE(c.rut_concesionario, d.rut) AS rut_dealer,
+             d.num_cuenta, d.banco,
+             efa.fecha AS fecha_factura,
+             DATEDIFF(CURDATE(), efa.fecha) AS dias,
+             (epg.id IS NOT NULL) AS pagado_hoy,
+             (eev.id IS NOT NULL) AS enviado,
+             eev.usuario AS enviado_por
+      FROM postventa_seguimiento s
+      JOIN postventa_etapas eop
+        ON eop.id_seguimiento = s.id AND eop.track='COMISION' AND eop.etapa='ORDEN DE PAGO EMITIDA'
+      LEFT JOIN postventa_etapas eev
+        ON eev.id_seguimiento = s.id AND eev.track='COMISION' AND eev.etapa='ENVIADO A PAGO'
+      LEFT JOIN postventa_etapas efa
+        ON efa.id_seguimiento = s.id AND efa.track='COMISION' AND efa.etapa='FACTURA RECIBIDA'
+      LEFT JOIN postventa_etapas epg
+        ON epg.id_seguimiento = s.id AND epg.track='COMISION' AND epg.etapa='COMISION PAGADA'
+           AND DATE(epg.fecha) = CURDATE()
+      LEFT JOIN creditos c ON c.id = s.id_credito
+      LEFT JOIN dealers  d ON d.nombre_indexa = c.automotora
+      WHERE NOT EXISTS (
+        SELECT 1 FROM postventa_etapas ep
+        WHERE ep.id_seguimiento = s.id AND ep.track='COMISION' AND ep.etapa='COMISION PAGADA'
+              AND DATE(ep.fecha) < CURDATE())
+      ORDER BY efa.fecha ASC, s.num_op ASC
+    `);
+    res.json({ success: true, data: rows, error: null });
+  } catch (e) {
+    console.error('[postventa comisionesAPagar]', e.message);
+    res.status(500).json({ success: false, data: null, error: 'Error interno del servidor' });
+  }
+};
+
+/* ── GET /api/postventa/orden-pago-comision — ops en FACTURA RECIBIDA sin ORDEN DE PAGO EMITIDA ── */
+const getOrdenPagoComision = async (req, res) => {
+  try {
+    const [rows] = await pool.query(`
+      SELECT s.id, s.num_op, s.comision, s.financiera, s.fecha_otorgado,
+             COALESCE(c.nombre_local, d.nombre_razon, s.nombre_dealer) AS nombre_dealer,
+             COALESCE(c.rut_concesionario, d.rut) AS rut_dealer,
+             d.num_cuenta, d.banco, d.rut_pago,
+             efa.fecha AS fecha_factura,
+             DATEDIFF(CURDATE(), efa.fecha) AS dias
+      FROM postventa_seguimiento s
+      JOIN postventa_etapas efa
+        ON efa.id_seguimiento = s.id AND efa.track='COMISION' AND efa.etapa='FACTURA RECIBIDA'
+      LEFT JOIN creditos c ON c.id = s.id_credito
+      LEFT JOIN dealers  d ON d.nombre_indexa = c.automotora
+      WHERE NOT EXISTS (
+        SELECT 1 FROM postventa_etapas ep
+        WHERE ep.id_seguimiento = s.id AND ep.track='COMISION' AND ep.etapa='ORDEN DE PAGO EMITIDA')
+      ORDER BY efa.fecha ASC, s.num_op ASC
+    `);
+    res.json({ success: true, data: { rows }, error: null });
+  } catch (e) {
+    console.error('[postventa getOrdenPagoComision]', e.message);
+    res.status(500).json({ success: false, data: null, error: 'Error interno del servidor' });
+  }
+};
+
+/* ── GET /api/postventa/orden-pago-comision/:id/correlativo ── */
+const correlativoOrdenComision = async (req, res) => {
+  const id = Number(req.params.id);
+  try {
+    if (!id) return res.status(400).json({ success: false, data: null, error: 'id inválido' });
+    const [[ya]] = await pool.query('SELECT num_orden FROM postventa_ordenes_comision WHERE id_seguimiento=?', [id]);
+    if (ya) return res.json({ success: true, data: { num_orden: ya.num_orden }, error: null });
+    const [[seg]] = await pool.query('SELECT num_op, comision FROM postventa_seguimiento WHERE id=?', [id]);
+    if (!seg) return res.status(404).json({ success: false, data: null, error: 'Operación no encontrada' });
+    const [ins] = await pool.query(
+      'INSERT INTO postventa_ordenes_comision (id_seguimiento, num_op, monto, usuario) VALUES (?,?,?,?)',
+      [id, seg.num_op, seg.comision, loginDe(req.usuario)]);
+    const num = 'OC-' + new Date().getFullYear() + '-' + String(ins.insertId).padStart(5, '0');
+    await pool.query('UPDATE postventa_ordenes_comision SET num_orden=? WHERE id=?', [num, ins.insertId]);
+    res.json({ success: true, data: { num_orden: num }, error: null });
+  } catch (e) {
+    if (e.code === 'ER_DUP_ENTRY') {
+      const [[row]] = await pool.query('SELECT num_orden FROM postventa_ordenes_comision WHERE id_seguimiento=?', [id]);
+      if (row) return res.json({ success: true, data: { num_orden: row.num_orden }, error: null });
+    }
+    console.error('[postventa correlativoOrdenComision]', e.message);
+    res.status(500).json({ success: false, data: null, error: 'Error interno del servidor' });
+  }
+};
+
+/* ── POST /api/postventa/orden-pago-comision/emitir { ids:[] } — marca ORDEN DE PAGO EMITIDA (COMISION) ── */
+const emitirOrdenPagoComision = async (req, res) => {
+  try {
+    const { ids } = req.body;
+    if (!Array.isArray(ids) || !ids.length)
+      return res.status(400).json({ success: false, data: null, error: 'Sin operaciones seleccionadas' });
+    const usuario = loginDe(req.usuario);
+    const vals = [];
+    for (const id of ids) {
+      vals.push([id, 'COMISION', 'FACTURA RECIBIDA', usuario]);
+      vals.push([id, 'COMISION', 'ORDEN DE PAGO EMITIDA', usuario]);
+    }
+    await pool.query(`INSERT IGNORE INTO postventa_etapas (id_seguimiento, track, etapa, usuario) VALUES ?`, [vals]);
+    for (const id of ids) {
+      const c = await ctxSeguimiento(id);
+      await notificarEventoSaldo('com_orden_emitida', { op: c.num_op, id_seguimiento: id });
+    }
+    res.json({ success: true, data: { emitidas: ids.length }, error: null });
+  } catch (e) {
+    console.error('[postventa emitirOrdenPagoComision]', e.message);
+    res.status(500).json({ success: false, data: null, error: 'Error interno del servidor' });
+  }
+};
+
+/* ── POST /api/postventa/comisiones-a-pagar/enviar-a-pago { ids:[] } — marca ENVIADO A PAGO (COMISION) ── */
+const enviarAPagoComision = async (req, res) => {
+  try {
+    const { ids } = req.body;
+    if (!Array.isArray(ids) || !ids.length)
+      return res.status(400).json({ success: false, data: null, error: 'Sin operaciones seleccionadas' });
+    const usuario = loginDe(req.usuario);
+    const vals = [];
+    for (const id of ids) {
+      vals.push([id, 'COMISION', 'FACTURA RECIBIDA', usuario]);
+      vals.push([id, 'COMISION', 'ORDEN DE PAGO EMITIDA', usuario]);
+      vals.push([id, 'COMISION', 'ENVIADO A PAGO', usuario]);
+    }
+    await pool.query(`INSERT IGNORE INTO postventa_etapas (id_seguimiento, track, etapa, usuario) VALUES ?`, [vals]);
+    for (const id of ids) {
+      const c = await ctxSeguimiento(id);
+      await notificarEventoSaldo('com_enviado_pago', { op: c.num_op, id_seguimiento: id });
+    }
+    res.json({ success: true, data: { enviadas: ids.length }, error: null });
+  } catch (e) {
+    console.error('[postventa enviarAPagoComision]', e.message);
+    res.status(500).json({ success: false, data: null, error: 'Error interno del servidor' });
+  }
+};
+
+/* ── POST /api/postventa/comisiones-a-pagar/pagar { ids:[] } — marca COMISION PAGADA ── */
+const pagarComisiones = async (req, res) => {
+  try {
+    const { ids } = req.body;
+    if (!Array.isArray(ids) || !ids.length)
+      return res.status(400).json({ success: false, data: null, error: 'Sin operaciones seleccionadas' });
+    const usuario = loginDe(req.usuario);
+    const [[cfgRow]] = await pool.query(`SELECT valor FROM postventa_config WHERE clave='etapas_comision'`);
+    const etapas = (cfgRow ? JSON.parse(cfgRow.valor) : []).map(x => x.etapa);
+    if (!etapas.length)
+      return res.status(500).json({ success: false, data: null, error: 'Config de etapas no disponible' });
+    const vals = [];
+    for (const id of ids)
+      for (const e of etapas) vals.push([id, 'COMISION', e, usuario]);
+    await pool.query(`INSERT IGNORE INTO postventa_etapas (id_seguimiento, track, etapa, usuario) VALUES ?`, [vals]);
+    for (const id of ids) {
+      const c = await ctxSeguimiento(id);
+      await notificarEventoSaldo('com_pago_realizado', { op: c.num_op, id_seguimiento: id, ejecutivo: c.ejecutivo });
+    }
+    res.json({ success: true, data: { pagados: ids.length }, error: null });
+  } catch (e) {
+    console.error('[postventa pagarComisiones]', e.message);
+    res.status(500).json({ success: false, data: null, error: 'Error interno del servidor' });
+  }
+};
+
+/* ── POST /api/postventa/comisiones-a-pagar/desmarcar { ids:[], motivo, etapa } — revierte pago/envío (COMISION) ── */
+const desmarcarComisiones = async (req, res) => {
+  try {
+    const { ids, motivo } = req.body;
+    if (!Array.isArray(ids) || !ids.length)
+      return res.status(400).json({ success: false, data: null, error: 'Sin operaciones seleccionadas' });
+    const etapa = req.body.etapa === 'ENVIADO A PAGO' ? 'ENVIADO A PAGO' : 'COMISION PAGADA';
+    const esAdmin = req.usuario?.perfil_nombre === 'Administrador';
+    const usuario = loginDe(req.usuario);
+    const ph = ids.map(() => '?').join(',');
+
+    if (etapa === 'ENVIADO A PAGO') {
+      const [[{ pagadas }]] = await pool.query(
+        `SELECT COUNT(*) AS pagadas FROM postventa_etapas
+         WHERE track='COMISION' AND etapa='COMISION PAGADA' AND id_seguimiento IN (${ph})`, ids);
+      if (pagadas > 0)
+        return res.status(400).json({ success: false, data: null, error: 'No se puede deshacer el envío: la comisión ya fue pagada.' });
+    }
+
+    const [[{ fuera }]] = await pool.query(
+      `SELECT COUNT(*) AS fuera FROM postventa_etapas
+       WHERE track='COMISION' AND etapa=? AND DATE(fecha) < CURDATE()
+         AND id_seguimiento IN (${ph})`, [etapa, ...ids]);
+
+    if (fuera > 0) {
+      if (!esAdmin)
+        return res.status(403).json({ success: false, data: null, error: 'Solo un Administrador puede revertir una marca de un día anterior.' });
+      if (!motivo || !String(motivo).trim())
+        return res.status(400).json({ success: false, data: null, error: 'Debes indicar un motivo para revertir una marca de un día anterior.' });
+      const logs = ids.map(id => [id, etapa, usuario, String(motivo).trim().slice(0, 400)]);
+      await pool.query('INSERT INTO postventa_reversas (id_seguimiento, etapa, usuario, motivo) VALUES ?', [logs]);
+      const [r] = await pool.query(
+        `DELETE FROM postventa_etapas WHERE track='COMISION' AND etapa=? AND id_seguimiento IN (${ph})`, [etapa, ...ids]);
+      return res.json({ success: true, data: { desmarcados: r.affectedRows, reversa: true }, error: null });
+    }
+
+    const [r] = await pool.query(
+      `DELETE FROM postventa_etapas WHERE track='COMISION' AND etapa=?
+         AND DATE(fecha) = CURDATE() AND id_seguimiento IN (${ph})`, [etapa, ...ids]);
+    res.json({ success: true, data: { desmarcados: r.affectedRows, reversa: false }, error: null });
+  } catch (e) {
+    console.error('[postventa desmarcarComisiones]', e.message);
+    res.status(500).json({ success: false, data: null, error: 'Error interno del servidor' });
+  }
+};
+
 /* ── POST /api/postventa/marcar-historico — marca pre-2026 como totalmente pagado ── */
 const marcarHistorico = async (req, res) => {
   try {
@@ -745,4 +1045,5 @@ const marcarHistorico = async (req, res) => {
   }
 };
 
-module.exports = { sync, getAll, setEtapa, getConfig, setConfig, marcarHistorico, getPerfiles, getSaldosAPagar, enviarAPago, pagarSaldos, getOrdenPago, correlativoOrden, emitirOrdenPago, desmarcarSaldos, getAtribuciones, getFondos, setFondos, getAlertasConfig, setAlertasConfig };
+module.exports = { sync, getAll, setEtapa, getConfig, setConfig, marcarHistorico, getPerfiles, getSaldosAPagar, enviarAPago, pagarSaldos, getOrdenPago, correlativoOrden, emitirOrdenPago, desmarcarSaldos, getAtribuciones, getFondos, setFondos, getAlertasConfig, setAlertasConfig,
+  getComisionesAPagar, getOrdenPagoComision, correlativoOrdenComision, emitirOrdenPagoComision, enviarAPagoComision, pagarComisiones, desmarcarComisiones, getAtribucionesComision, getFondosComision, setFondosComision };

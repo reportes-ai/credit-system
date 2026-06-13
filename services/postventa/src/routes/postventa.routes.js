@@ -21,6 +21,17 @@ router.put('/saldos-a-pagar/fondos',verifyToken, requireFunc('pv_fondos_definir'
 router.post('/saldos-a-pagar/enviar-a-pago', verifyToken, requireFunc('pv_saldos_seleccionar'), c.enviarAPago);
 router.post('/saldos-a-pagar/pagar',verifyToken, requireFunc('postventa_saldos_pagar'), c.pagarSaldos);
 router.post('/saldos-a-pagar/desmarcar', verifyToken, requireFunc('pv_saldos_revertir'), c.desmarcarSaldos);
+// ── Flujo Comisión (espejo de Saldo Precio) ──
+router.get('/atribuciones-comision', verifyToken, c.getAtribucionesComision);
+router.get('/orden-pago-comision',          verifyToken, c.getOrdenPagoComision);
+router.get('/orden-pago-comision/:id/correlativo', verifyToken, c.correlativoOrdenComision);
+router.post('/orden-pago-comision/emitir',  verifyToken, requireFunc('pv_com_orden_emitir'), c.emitirOrdenPagoComision);
+router.get('/comisiones-a-pagar',        verifyToken, c.getComisionesAPagar);
+router.get('/comisiones-a-pagar/fondos', verifyToken, c.getFondosComision);
+router.put('/comisiones-a-pagar/fondos', verifyToken, requireFunc('pv_com_fondos_definir'), c.setFondosComision);
+router.post('/comisiones-a-pagar/enviar-a-pago', verifyToken, requireFunc('pv_com_seleccionar'), c.enviarAPagoComision);
+router.post('/comisiones-a-pagar/pagar', verifyToken, requireFunc('pv_com_pagar'), c.pagarComisiones);
+router.post('/comisiones-a-pagar/desmarcar', verifyToken, requireFunc('pv_com_revertir'), c.desmarcarComisiones);
 router.get('/',               verifyToken, c.getAll);
 router.put('/:id/etapa',    verifyToken, requireFunc('postventa_seguimiento'), c.setEtapa);
 

@@ -1844,4 +1844,39 @@ const getUsuariosByPerfil = async (req, res) => {
   } catch (e) { console.error('[perfiles migration v30]', e.message); }
 })();
 
+/* ─── Migración v31: flujo de pago de Comisiones (espejo de Saldos Precio) ─
+   Card de acceso (Comisiones a Pagar / Orden de Pago Comisión) + atribuciones
+   granulares: definir fondos, seleccionar, pagar, generar nómina, emitir orden,
+   revertir. Todas independientes de las de Saldo Precio. */
+(async () => {
+  try {
+    const [[mod]] = await pool.query("SELECT id_modulo FROM modulos WHERE ruta='/postventa/' LIMIT 1");
+    if (!mod) return;
+    const [[adm]] = await pool.query("SELECT id_perfil FROM perfiles WHERE nombre='Administrador' LIMIT 1");
+    const funcs = [
+      ['Comisiones a Pagar',                       'postventa_comisiones_pagar', null],
+      ['Definir Fondos Disponibles (Comisión)',    'pv_com_fondos_definir',  null],
+      ['Seleccionar Comisiones a Pagar',           'pv_com_seleccionar',     null],
+      ['Confirmar Pago de Comisión',               'pv_com_pagar',           null],
+      ['Generar Nómina de Pago (Comisión)',        'pv_com_nomina_generar',  null],
+      ['Emitir Orden de Pago de Comisión',         'pv_com_orden_emitir',    null],
+      ['Revertir Pago de Comisión',                'pv_com_revertir',        null],
+    ];
+    for (const [nombre, codigo, href] of funcs) {
+      const [[ex]] = await pool.query('SELECT id_funcionalidad FROM funcionalidades WHERE codigo=?', [codigo]);
+      let idF = ex?.id_funcionalidad;
+      if (!idF) {
+        const [ins] = await pool.query(
+          'INSERT INTO funcionalidades (id_modulo, nombre, codigo, href) VALUES (?,?,?,?)',
+          [mod.id_modulo, nombre, codigo, href]);
+        idF = ins.insertId;
+      }
+      if (adm) await pool.query(
+        'INSERT IGNORE INTO permisos_perfil (id_perfil, id_funcionalidad, habilitado) VALUES (?,?,1)',
+        [adm.id_perfil, idF]);
+    }
+    console.log('✓ Perfiles v31: flujo de pago de Comisiones registrado');
+  } catch (e) { console.error('[perfiles migration v31]', e.message); }
+})();
+
 module.exports = { getAllPerfiles, getModulosConFuncionalidades, getPermisosPerfil, updatePermisosPerfil, reordenarModulos, createPerfil, updatePerfil, deletePerfil, getUsuariosByPerfil };

@@ -4,8 +4,8 @@
   <meta charset="UTF-8">
   <link rel="icon" href="/img/favicon.png" type="image/png">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Alertas Saldos Precio — AutoFácil</title>
-  <!-- v1.1 -->
+  <title>Alertas Saldos Precio y Comisiones — AutoFácil</title>
+  <!-- v1.2 -->
   <link href="/css/bootstrap.min.css" rel="stylesheet">
   <link href="/css/bootstrap-icons.css" rel="stylesheet">
   <style>
@@ -59,10 +59,15 @@
 <div class="wrap">
   <div style="display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:10px;margin-bottom:14px">
     <div>
-      <h5 class="sec"><i class="bi bi-bell me-2"></i>Alertas del proceso Saldos Precio</h5>
-      <span style="font-size:.82rem;color:#64748b">Define quién recibe la alerta (campana) en cada paso del flujo de pago de saldos precio. Por perfil, el ejecutivo de la operación y/o personas específicas.</span>
+      <h5 class="sec"><i class="bi bi-bell me-2"></i>Alertas del proceso Saldos Precio y Comisiones</h5>
+      <span style="font-size:.82rem;color:#64748b">Define quién recibe la alerta (campana) en cada paso del flujo de pago. Por perfil, el ejecutivo de la operación y/o personas específicas.</span>
     </div>
     <button class="btn-guardar" id="btnGuardar" onclick="guardar()"><i class="bi bi-floppy me-1"></i>Guardar cambios</button>
+  </div>
+
+  <div style="display:inline-flex;background:#e8eef6;border-radius:10px;padding:4px;margin-bottom:16px">
+    <button class="tab-trk" data-trk="saldo" onclick="setTrack('saldo')" style="border:none;background:#fff;color:#0141A2;border-radius:7px;padding:7px 18px;font-weight:700;font-size:.85rem;cursor:pointer;box-shadow:0 1px 3px rgba(0,0,0,.1)">Saldos Precio</button>
+    <button class="tab-trk" data-trk="comision" onclick="setTrack('comision')" style="border:none;background:transparent;color:#64748b;border-radius:7px;padding:7px 18px;font-weight:700;font-size:.85rem;cursor:pointer">Comisiones</button>
   </div>
 
   <div id="eventos"></div>
@@ -70,7 +75,8 @@
   <div class="afecta-box">
     <div class="tit"><i class="bi bi-diagram-3 me-1"></i>Qué afecta este mantenedor</div>
     <ul>
-      <li><b>Destinatarios por evento</b> → generan la alerta de campana (<a href="/postventa/seguimiento/">Post Venta</a> / <a href="/postventa/saldos-a-pagar/">Saldos a Pagar</a>) cuando ocurre cada transición: Fondos Recibidos → Orden Emitida → Montos Cargados → Enviado a Pago → Pago Realizado.</li>
+      <li><b>Saldos Precio</b> → alerta de campana (<a href="/postventa/seguimiento/">Post Venta</a> / <a href="/postventa/saldos-a-pagar/">Saldos a Pagar</a>) en cada transición: Fondos Recibidos → Orden Emitida → Montos Cargados → Enviado a Pago → Pago Realizado.</li>
+      <li><b>Comisiones</b> → alerta de campana (<a href="/postventa/seguimiento/">Post Venta</a> / <a href="/postventa/comisiones-a-pagar/">Comisiones a Pagar</a>) en cada transición: Factura Recibida → Orden Emitida → Montos Cargados → Enviado a Pago → Pago Realizado.</li>
       <li><b>Incluir ejecutivo</b> → usa el ejecutivo que cursó la operación (vía asignación de ejecutivos del usuario).</li>
     </ul>
   </div>
@@ -104,12 +110,31 @@ const SUB = {
   fondos_cargados:  'Al cargar los montos disponibles → avisar al Gerente Comercial (u otro) para decidir qué pagar.',
   enviado_pago:     'Al Enviar a Pago → avisar a Tesorería para confirmar el pago.',
   pago_realizado:   'Al confirmar el pago → avisar a Gerente/Jefe Comercial, ejecutivo de la operación y persona adicional.',
+  com_factura_recibida: 'Al marcar FACTURA RECIBIDA → avisar para emitir la Orden de Pago de comisión.',
+  com_orden_emitida:    'Al emitir la Orden de Pago de comisión → avisar a Tesorería para cargar los montos disponibles.',
+  com_fondos_cargados:  'Al cargar los montos disponibles → avisar al Gerente Comercial (u otro) para decidir qué comisiones pagar.',
+  com_enviado_pago:     'Al Enviar a Pago → avisar a Tesorería para confirmar el pago de la comisión.',
+  com_pago_realizado:   'Al confirmar el pago → avisar a Gerente/Jefe Comercial, ejecutivo de la operación y persona adicional.',
 };
+
+let TRACK = 'saldo';
+function setTrack(t){
+  if (TRACK === t) return;
+  TRACK = t;
+  document.querySelectorAll('.tab-trk').forEach(b => {
+    const on = b.dataset.trk === t;
+    b.style.background = on ? '#fff' : 'transparent';
+    b.style.color = on ? '#0141A2' : '#64748b';
+    b.style.boxShadow = on ? '0 1px 3px rgba(0,0,0,.1)' : 'none';
+  });
+  cargar();
+}
 
 async function cargar(){
   try {
+    const qs = TRACK === 'comision' ? '?track=comision' : '';
     const [jE, jP, jU] = await Promise.all([
-      fetch('/api/postventa/alertas-config', { headers:H }).then(r=>r.json()),
+      fetch('/api/postventa/alertas-config'+qs, { headers:H }).then(r=>r.json()),
       fetch('/api/postventa/perfiles-lista', { headers:H }).then(r=>r.json()),
       fetch('/api/usuarios', { headers:H }).then(r=>r.json()),
     ]);
@@ -188,7 +213,8 @@ async function guardar(){
   const btn = document.getElementById('btnGuardar');
   btn.disabled = true; btn.innerHTML = '<i class="bi bi-hourglass-split me-1"></i>Guardando…';
   try {
-    const r = await fetch('/api/postventa/alertas-config', { method:'PUT', headers:H, body: JSON.stringify({ config }) });
+    const qs = TRACK === 'comision' ? '?track=comision' : '';
+    const r = await fetch('/api/postventa/alertas-config'+qs, { method:'PUT', headers:H, body: JSON.stringify({ config }) });
     const j = await r.json();
     if (!j.success) throw new Error(j.error||'Error');
     toast('Alertas guardadas');
