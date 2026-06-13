@@ -476,4 +476,109 @@ function notificarCambios(c, prevStatus) {
   })();
 }
 
-module.exports = { getAll, upsert };
+/* ── Carga masiva de Cartas de Aprobación (histórico) ──────────────────────────
+   Por cada fila: genera op_carta = YY + N°ID + iniciales ejecutivo; enlaza al crédito
+   por N° OPERACIÓN si existe (respeta sus datos), o crea cliente+crédito (YYMMxxx) si falta. */
+const _inicEjec = (nombre) => {
+  const w = String(nombre || '').trim().split(/\s+/).filter(Boolean);
+  return ((w[0]?.[0] || '') + (w[1]?.[0] || '')).toUpperCase();
+};
+const _normRut = (r) => String(r || '').replace(/[.\-\s]/g, '').toUpperCase();
+const _num = (v) => { const n = Number(String(v ?? '').replace(/[^\d.-]/g, '')); return isNaN(n) ? null : Math.round(n); };
+async function _numeroCreditoMes(yy, mm) {
+  const prefix = `${yy}${mm}`;
+  const [[row]] = await pool.query(
+    `SELECT numero_credito FROM creditos WHERE numero_credito LIKE ? ORDER BY numero_credito DESC LIMIT 1`, [prefix + '%']);
+  const seq = row && /^\d+$/.test(row.numero_credito.slice(4)) ? parseInt(row.numero_credito.slice(4)) + 1 : 1;
+  return prefix + String(seq).padStart(3, '0');
+}
+
+const cargaMasivaCartas = async (req, res) => {
+  try {
+    const rows = Array.isArray(req.body?.rows) ? req.body.rows : [];
+    if (!rows.length) return res.status(400).json({ success: false, data: null, error: 'Sin filas para cargar' });
+    const u = req.usuario || {};
+    const creadoPor = u.email || 'carga-masiva';
+    const creadoPorNombre = ((u.nombre || '') + ' ' + (u.apellido || '')).trim() || 'Carga Masiva';
+    const finMap = { AUTOFIN: 'AUTOFIN', AUTOFACIL: 'AUTOFACIL', UNIDAD: 'UNIDAD DE CREDITO', 'UNIDAD DE CREDITO': 'UNIDAD DE CREDITO' };
+
+    let creadas = 0, omitidas = 0, enlazadas = 0, creditosCreados = 0, clientesCreados = 0;
+    const errores = [];
+
+    for (const r of rows) {
+      try {
+        const nId = String(r.nId || '').trim();
+        const ejec = String(r.ejecutivo || '').trim();
+        const nOp = String(r.nOp || '').trim();
+        if (!nId || !ejec) { errores.push({ nOp, error: 'Falta N° ID o ejecutivo' }); continue; }
+
+        const fecha = r.mes ? new Date(r.mes) : null;
+        const valida = fecha && !isNaN(fecha);
+        const yy = String(valida ? fecha.getFullYear() : new Date().getFullYear()).slice(-2);
+        const mm = String((valida ? fecha.getMonth() : new Date().getMonth()) + 1).padStart(2, '0');
+        const fechaISO = valida ? fecha.toISOString().slice(0, 10) : null;
+        const opCarta = `${yy}${nId}${_inicEjec(ejec)}`;
+
+        const [[ya]] = await pool.query('SELECT id FROM cartas_aprobacion WHERE op_carta=? LIMIT 1', [opCarta]);
+        if (ya) { omitidas++; continue; }
+
+        const rutCli = _normRut(r.rutCliente);
+        const rutConc = _normRut(r.rutConc);
+        const saldo = _num(r.saldo);
+        const comision = _num(r.comision);
+        const financiera = finMap[String(r.acreedor || '').toUpperCase()] || 'AUTOFACIL';
+
+        // Enlazar a crédito existente por N° OPERACIÓN, o crear cliente+crédito
+        let idCredito = null, numeroCredito = null, veh = {};
+        let credito = null;
+        if (nOp) { const [[cr]] = await pool.query('SELECT * FROM creditos WHERE num_op=? LIMIT 1', [nOp]); credito = cr || null; }
+        if (credito) {
+          idCredito = credito.id;
+          numeroCredito = credito.numero_credito || null;
+          veh = { tipo_vehiculo: credito.tipo_vehiculo, marca: credito.marca, modelo: credito.modelo,
+                  anio: credito.anio, patente: credito.patente, precio: credito.valor_vehiculo,
+                  pie: credito.pie, plazo: credito.plazo };
+          enlazadas++;
+        } else {
+          let idCliente = null;
+          if (rutCli) {
+            const [[clx]] = await pool.query('SELECT id_cliente FROM clientes WHERE rut=? LIMIT 1', [rutCli]);
+            if (clx) idCliente = clx.id_cliente;
+            else { const [ci] = await pool.query('INSERT INTO clientes (rut, nombre_completo) VALUES (?,?)', [rutCli, r.cliente || null]); idCliente = ci.insertId; clientesCreados++; }
+          }
+          numeroCredito = await _numeroCreditoMes(yy, mm);
+          const [ci] = await pool.query(
+            `INSERT INTO creditos (numero_credito, num_op, financiera, estado_eval, estado, id_cliente,
+               rut_concesionario, vendedor, fecha_otorgado, mes, saldo_precio, automotora, ejecutivo, comdea_real, created_at, updated_at)
+             VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,NOW(),NOW())`,
+            [numeroCredito, nOp || null, financiera, 'OTORGADO', 'INGRESO', idCliente,
+             rutConc || null, r.vendedor || null, fechaISO, valida ? fechaISO.slice(0, 7) + '-01' : null,
+             saldo, r.concesionario || null, ejec, comision]);
+          idCredito = ci.insertId; creditosCreados++;
+        }
+
+        await pool.query(
+          `INSERT INTO cartas_aprobacion
+             (op_carta, op_origen, ejecutivo_nombre, cliente, rut_cliente,
+              tipo_vehiculo, marca, modelo, anio, patente, precio_venta, pie, saldo, plazo,
+              acreedor, concesionario, rut_conc, vendedor, part_bruto, fecha,
+              creado_por, creado_por_nombre, status, otorgado, fecha_otorgado, fecha_aprobacion,
+              numero_credito_creado, id_credito_creado)
+           VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
+          [opCarta, nId, ejec, r.cliente || null, rutCli || null,
+           veh.tipo_vehiculo || null, veh.marca || null, veh.modelo || null, veh.anio || null, veh.patente || null,
+           veh.precio || null, veh.pie || null, saldo, veh.plazo || null,
+           r.acreedor || null, r.concesionario || null, rutConc || null, r.vendedor || null, comision, fechaISO,
+           creadoPor, creadoPorNombre, 'APROBADA', 1, fechaISO, fechaISO,
+           numeroCredito, idCredito]);
+        creadas++;
+      } catch (eRow) { errores.push({ nOp: r.nOp, error: eRow.message }); }
+    }
+    res.json({ success: true, data: { total: rows.length, creadas, enlazadas, creditosCreados, clientesCreados, omitidas, errores }, error: null });
+  } catch (e) {
+    console.error('[cartas cargaMasiva]', e.message);
+    res.status(500).json({ success: false, data: null, error: 'Error interno del servidor' });
+  }
+};
+
+module.exports = { getAll, upsert, cargaMasivaCartas };

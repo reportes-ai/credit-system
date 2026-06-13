@@ -2900,6 +2900,7 @@ async function initApp(){
   document.getElementById('btnManten').style.display         = vis('cartas_manten_usuarios',    fallbackSuperAdmin);
   document.getElementById('btnParams').style.display         = vis('cartas_params_particip',    fallbackAdmin);
   document.getElementById('btnManten2').style.display        = vis('cartas_mantenedores',       fallbackAdmin);
+  document.getElementById('btnCargaMasiva').style.display    = vis('aprob_carga_masiva',        fallbackAdmin);
   document.getElementById('btnDealers').style.display        = fallbackAdmin ? '' : 'none';
   document.getElementById('btnCarga').style.display          = fallbackAdmin ? '' : 'none';
   document.getElementById('menuNoteAdmin').style.display     = fallbackAdmin ? '' : 'none';
@@ -2925,6 +2926,74 @@ async function initApp(){
   renderUsers();
   renderEjecutivos();
   renderParamsTable();
+}
+
+/* ── Carga masiva de Cartas de Aprobación (Admin) ──────────────────────────────
+   Lee la hoja "DETALLE MES" del Excel, mapea por encabezados y la manda al backend,
+   que genera op_carta, enlaza al crédito por N° OPERACIÓN y crea cliente/crédito si falta. */
+function _normCM(s){ return String(s==null?'':s).toUpperCase().normalize('NFD').replace(/[^A-Z0-9 ]/g,' ').replace(/\s+/g,' ').trim(); }
+function abrirCargaMasivaCartas(){
+  const inp = document.createElement('input');
+  inp.type = 'file'; inp.accept = '.xlsx,.xls';
+  inp.onchange = async () => {
+    const file = inp.files && inp.files[0]; if(!file) return;
+    try {
+      const buf = await file.arrayBuffer();
+      const wb = XLSX.read(new Uint8Array(buf), { type:'array', cellDates:true });
+      const sheetName = wb.SheetNames.find(s => _normCM(s).includes('DETALLE')) || wb.SheetNames[0];
+      const aoa = XLSX.utils.sheet_to_json(wb.Sheets[sheetName], { header:1, raw:true, defval:null });
+      // Detectar fila de encabezados
+      let hr = -1;
+      for(let i=0;i<Math.min(aoa.length,20);i++){
+        const joined = (aoa[i]||[]).map(_normCM).join('|');
+        if(joined.includes('EJECUTIVO') && joined.includes('OPERACION')){ hr=i; break; }
+      }
+      if(hr<0){ alert('No encuentro los encabezados (EJECUTIVO / OPERACIÓN) en la hoja "'+sheetName+'".'); return; }
+      const head = aoa[hr]; const idx = {};
+      head.forEach((h,i)=>{ const n=_normCM(h);
+        if(n==='MES') idx.mes=i;
+        else if(n==='N ID') idx.nId=i;
+        else if(n.includes('EJECUTIVO')) idx.ejecutivo=i;
+        else if(n.includes('NOMBRE CLIENTE')) idx.cliente=i;
+        else if(n.includes('RUT CLIENTE')) idx.rutCliente=i;
+        else if(n.includes('RUT CONCESIONARIO')) idx.rutConc=i;
+        else if(n==='CONCESIONARIO') idx.concesionario=i;
+        else if(n.includes('SALDO')) idx.saldo=i;
+        else if(n.includes('BRUTA')) idx.comision=i;
+        else if(n.includes('OPERACION')) idx.nOp=i;
+        else if(n.includes('VENDEDOR')) idx.vendedor=i;
+        else if(n.includes('ACREEDOR')) idx.acreedor=i;
+      });
+      if(idx.nId==null || idx.ejecutivo==null){ alert('No reconozco las columnas N° ID / EJECUTIVO.'); return; }
+      const rows=[];
+      for(let i=hr+1;i<aoa.length;i++){
+        const r=aoa[i]; if(!r) continue;
+        const get=k=> idx[k]!=null ? r[idx[k]] : null;
+        const nId=get('nId'), ejec=get('ejecutivo');
+        if((nId==null||nId==='') && (ejec==null||ejec==='')) continue;
+        let mes=get('mes');
+        if(mes instanceof Date) mes=mes.toISOString().slice(0,10);
+        else if(typeof mes==='number'){ const d=new Date(Math.round((mes-25569)*86400*1000)); mes=isNaN(d)?null:d.toISOString().slice(0,10); }
+        else if(mes) { const d=new Date(mes); mes=isNaN(d)?null:d.toISOString().slice(0,10); }
+        rows.push({ mes, nId:String(nId||'').trim(), ejecutivo:String(ejec||'').trim(),
+          cliente:get('cliente'), rutCliente:get('rutCliente'), rutConc:get('rutConc'),
+          concesionario:get('concesionario'), saldo:get('saldo'), comision:get('comision'),
+          nOp:get('nOp'), vendedor:get('vendedor'), acreedor:get('acreedor') });
+      }
+      if(!rows.length){ alert('No encontré filas de datos bajo los encabezados.'); return; }
+      if(!confirm(`Hoja: ${sheetName}\nSe procesarán ${rows.length} fila(s) como Cartas de Aprobación.\n\n¿Continuar?`)) return;
+      const tok=sessionStorage.getItem('token');
+      const resp=await fetch('/api/cartas/carga-masiva',{ method:'POST',
+        headers:{ 'Content-Type':'application/json','Authorization':'Bearer '+tok }, body:JSON.stringify({ rows }) });
+      const j=await resp.json();
+      if(!j.success) throw new Error(j.error||'Error');
+      const d=j.data;
+      alert(`✅ Carga completa (${d.total} filas):\n\n• Cartas creadas: ${d.creadas}\n• Enlazadas a crédito existente: ${d.enlazadas}\n• Créditos nuevos creados: ${d.creditosCreados}\n• Clientes nuevos creados: ${d.clientesCreados}\n• Omitidas (ya existían): ${d.omitidas}\n• Errores: ${d.errores.length}`);
+      if(d.errores.length) console.warn('[carga masiva cartas] errores:', d.errores);
+      if(typeof refreshApp==='function') refreshApp();
+    } catch(e){ alert('Error procesando el archivo: '+e.message); }
+  };
+  inp.click();
 }
 
 function fillEjecutivoSelect(){
