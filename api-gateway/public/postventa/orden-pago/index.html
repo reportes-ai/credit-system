@@ -5,7 +5,7 @@
   <link rel="icon" href="/img/favicon.png" type="image/png">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Emisión Orden de Pago — AutoFácil</title>
-  <!-- v1.0 -->
+  <!-- v1.1 -->
   <link href="/css/bootstrap.min.css" rel="stylesheet">
   <link href="/css/bootstrap-icons.css" rel="stylesheet">
   <style>
@@ -36,11 +36,11 @@
     /* modal orden */
     .ov { display:none; position:fixed; inset:0; background:rgba(0,0,0,.5); z-index:1000; align-items:flex-start; justify-content:center; padding:24px; overflow-y:auto; }
     .ov.open { display:flex; }
-    .modal { background:#fff; border-radius:12px; width:100%; max-width:880px; margin:auto; }
-    .modal-head { display:flex; justify-content:space-between; align-items:center; padding:14px 20px; border-bottom:1px solid #e5e7eb; }
-    .modal-head h5 { margin:0; font-weight:700; font-size:1rem; }
-    .modal-body { padding:22px; }
-    .modal-foot { padding:14px 20px; border-top:1px solid #e5e7eb; display:flex; gap:10px; justify-content:flex-end; }
+    .op-modal { background:#fff; border-radius:12px; width:100%; max-width:880px; margin:auto; }
+    .op-modal-head { display:flex; justify-content:space-between; align-items:center; padding:14px 20px; border-bottom:1px solid #e5e7eb; }
+    .op-modal-head h5 { margin:0; font-weight:700; font-size:1rem; }
+    .op-modal-body { padding:22px; }
+    .op-modal-foot { padding:14px 20px; border-top:1px solid #e5e7eb; display:flex; gap:10px; justify-content:flex-end; }
     /* Documento orden de pago (igual que el PDF) */
     .op-doc { font-family:Arial,sans-serif; color:#1e293b; font-size:12px; }
     .op-top { display:flex; justify-content:space-between; align-items:flex-start; margin-bottom:14px; }
@@ -98,10 +98,10 @@
 
 <!-- Modal Orden de Pago -->
 <div class="ov" id="ov">
-  <div class="modal">
-    <div class="modal-head"><h5>Orden de Pago</h5><button class="btn-cerrar" onclick="cerrar()"><i class="bi bi-x-lg"></i></button></div>
-    <div class="modal-body"><div id="docWrap"></div></div>
-    <div class="modal-foot">
+  <div class="op-modal">
+    <div class="op-modal-head"><h5>Orden de Pago</h5><button class="btn-cerrar" onclick="cerrar()"><i class="bi bi-x-lg"></i></button></div>
+    <div class="op-modal-body"><div id="docWrap"></div></div>
+    <div class="op-modal-foot">
       <button class="btn-cerrar" onclick="cerrar()">Cancelar</button>
       <button class="btn-copiar" onclick="copiarOrden()"><i class="bi bi-clipboard me-1"></i>Copiar para correo</button>
       <button class="btn-emitir" onclick="emitir()"><i class="bi bi-send-check me-1"></i>Emitir orden</button>
