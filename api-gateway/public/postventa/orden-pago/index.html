@@ -5,7 +5,7 @@
   <link rel="icon" href="/img/favicon.png" type="image/png">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Emisión Orden de Pago — AutoFácil</title>
-  <!-- v1.7 -->
+  <!-- v1.8 -->
   <link href="/css/bootstrap.min.css" rel="stylesheet">
   <link href="/css/bootstrap-icons.css" rel="stylesheet">
   <style>
@@ -283,6 +283,30 @@ async function emitir(){
 }
 
 document.getElementById('ov').addEventListener('click', e => { if (e.target.id==='ov') cerrar(); });
+
+// Emitir orden es una atribución (pv_orden_emitir): si no la tiene, se oculta el botón
+let CAN_EMITIR = false;
+(async function permEmitir(){
+  try {
+    const admin = (yo.perfil||'') === 'Administrador';
+    const [rp, ra] = await Promise.all([
+      fetch('/api/auth/mis-permisos', { headers:hdr() }).then(r=>r.json()).catch(()=>({})),
+      fetch('/api/postventa/atribuciones', { headers:hdr() }).then(r=>r.json()).catch(()=>({})),
+    ]);
+    CAN_EMITIR = admin || (rp.funcionalidades||[]).includes('pv_orden_emitir');
+    const btn = document.querySelector('.btn-emitir');
+    if (btn && !CAN_EMITIR){
+      btn.style.display = 'none';
+      const quienes = ((ra.data && ra.data.pv_orden_emitir) || []).filter(p=>p!=='Administrador');
+      const foot = btn.parentElement;
+      const n = document.createElement('span');
+      n.style.cssText = 'font-size:.78rem;color:#94a3b8;align-self:center';
+      n.textContent = 'Solo pueden emitir: ' + [...new Set([...quienes,'Administrador'])].join(', ');
+      foot.appendChild(n);
+    }
+  } catch(e){}
+})();
+
 cargar();
 </script>
 <script src="/js/app-version.js"></script>

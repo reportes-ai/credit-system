@@ -231,6 +231,54 @@ const getPerfiles = async (req, res) => {
   }
 };
 
+/* ── Atribuciones del flujo Saldos Precio: qué perfiles pueden cada acción ──
+   Alimenta las notas "Solo pueden modificar: …" en el front. Administrador
+   siempre puede (no se lista por separado: ya aparece habilitado en la matriz). */
+const CODIGOS_ATRIB = ['pv_fondos_definir','pv_saldos_seleccionar','postventa_saldos_pagar','pv_nomina_generar','pv_orden_emitir','pv_saldos_revertir'];
+const getAtribuciones = async (req, res) => {
+  try {
+    const [rows] = await pool.query(
+      `SELECT f.codigo, p.nombre AS perfil
+       FROM funcionalidades f
+       JOIN permisos_perfil pp ON pp.id_funcionalidad = f.id_funcionalidad AND pp.habilitado = 1
+       JOIN perfiles p ON p.id_perfil = pp.id_perfil
+       WHERE f.codigo IN (?)
+       ORDER BY p.nombre`, [CODIGOS_ATRIB]);
+    const out = {};
+    CODIGOS_ATRIB.forEach(c => out[c] = []);
+    rows.forEach(r => { (out[r.codigo] = out[r.codigo] || []).push(r.perfil); });
+    res.json({ success: true, data: out, error: null });
+  } catch (e) {
+    res.status(500).json({ success: false, data: null, error: 'Error interno del servidor' });
+  }
+};
+
+/* ── Fondos disponibles del día (compartido): Finanzas/Tesorería digita,
+   Comercial decide qué pagar. Se guarda en postventa_config; el front valida
+   que fecha_dia sea hoy (se "borra" al cambiar de día sin tocar BD). ── */
+const getFondos = async (req, res) => {
+  try {
+    const [[row]] = await pool.query("SELECT valor FROM postventa_config WHERE clave='fondos_disp'");
+    let d = null; if (row) { try { d = JSON.parse(row.valor); } catch (_) {} }
+    res.json({ success: true, data: d, error: null });
+  } catch (e) {
+    res.status(500).json({ success: false, data: null, error: 'Error interno del servidor' });
+  }
+};
+const setFondos = async (req, res) => {
+  try {
+    const { monto, fecha_iso, fecha_dia } = req.body || {};
+    const usuario = ((req.usuario?.nombre || '') + ' ' + (req.usuario?.apellido || '')).trim() || 'Usuario';
+    const valor = { monto: Number(monto) || 0, fecha_iso: fecha_iso || new Date().toISOString(), fecha_dia, usuario };
+    await pool.query(
+      `INSERT INTO postventa_config (clave, valor) VALUES ('fondos_disp', ?)
+       ON DUPLICATE KEY UPDATE valor = VALUES(valor)`, [JSON.stringify(valor)]);
+    res.json({ success: true, data: valor, error: null });
+  } catch (e) {
+    res.status(500).json({ success: false, data: null, error: 'Error interno del servidor' });
+  }
+};
+
 /* ── Config (mantenedor etapa → estado) ──────────────────────────── */
 const getConfig = async (req, res) => {
   try {
@@ -464,4 +512,4 @@ const marcarHistorico = async (req, res) => {
   }
 };
 
-module.exports = { sync, getAll, setEtapa, getConfig, setConfig, marcarHistorico, getPerfiles, getSaldosAPagar, pagarSaldos, getOrdenPago, correlativoOrden, emitirOrdenPago, desmarcarSaldos };
+module.exports = { sync, getAll, setEtapa, getConfig, setConfig, marcarHistorico, getPerfiles, getSaldosAPagar, pagarSaldos, getOrdenPago, correlativoOrden, emitirOrdenPago, desmarcarSaldos, getAtribuciones, getFondos, setFondos };

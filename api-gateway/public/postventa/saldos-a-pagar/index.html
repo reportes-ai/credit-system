@@ -5,7 +5,7 @@
   <link rel="icon" href="/img/favicon.png" type="image/png">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Saldos Precios a Pagar — AutoFácil</title>
-  <!-- v3.8 -->
+  <!-- v3.9 -->
   <link href="/css/bootstrap.min.css" rel="stylesheet">
   <link href="/css/bootstrap-icons.css" rel="stylesheet">
   <style>
@@ -211,7 +211,34 @@ let DATA = [], fondosVal = 0, lastProp = { max:{set:[],monto:0}, ant:{set:[],mon
 const HOY_CL = () => new Date().toLocaleDateString('en-CA', { timeZone:'America/Santiago' });
 let diaCargado = HOY_CL();
 
+/* ── Atribuciones: cada acción del flujo es un permiso independiente ──
+   Finanzas/Tesorería define fondos · Comercial selecciona · Tesorería paga.
+   Quien no tiene el permiso ve el control deshabilitado con la nota de quién sí. */
+let CAN = { fondos:false, seleccionar:false, nomina:false, pagar:false, revertir:false };
+let QUIEN = {};
+const MAP_COD = { fondos:'pv_fondos_definir', seleccionar:'pv_saldos_seleccionar', nomina:'pv_nomina_generar', pagar:'postventa_saldos_pagar', revertir:'pv_saldos_revertir' };
+async function cargarPermisos(){
+  try {
+    const admin = (yo.perfil||'') === 'Administrador';
+    const [rp, ra] = await Promise.all([
+      fetch('/api/auth/mis-permisos', { headers:H }).then(r=>r.json()).catch(()=>({})),
+      fetch('/api/postventa/atribuciones', { headers:H }).then(r=>r.json()).catch(()=>({})),
+    ]);
+    const fx = rp.funcionalidades || [];
+    const has = c => admin || fx.includes(c);
+    Object.keys(MAP_COD).forEach(k => CAN[k] = has(MAP_COD[k]));
+    QUIEN = (ra && ra.data) || {};
+  } catch(e){}
+}
+// Texto "Solo pueden modificar: A, B" para un control sin permiso
+function quienTxt(accion){
+  const lista = (QUIEN[MAP_COD[accion]] || []).filter(p => p !== 'Administrador');
+  const todos = [...new Set([...lista, 'Administrador'])];
+  return 'Solo pueden: ' + todos.join(', ');
+}
+
 (async function init(){
+  await cargarPermisos();
   await cargarFondos();   // compartido en BD, válido solo el día de hoy
   try {
     const r = await fetch('/api/postventa/saldos-a-pagar', { headers:H });
@@ -260,11 +287,15 @@ function visibles(){
 }
 
 function celdaAccion(r){
-  if (r.pagado) return `<span class="pagado-tag">Pagado hoy</span><button class="btn-revertir" onclick="revertir(${r.id})">Revertir</button>`;
+  if (r.pagado){
+    const rev = CAN.revertir ? `<button class="btn-revertir" onclick="revertir(${r.id})">Revertir</button>` : '';
+    return `<span class="pagado-tag">Pagado hoy</span>${rev}`;
+  }
+  const dis = CAN.seleccionar ? '' : 'disabled title="'+quienTxt('seleccionar')+'"';
   return `<span class="pagar-cell">
     <span class="indbox" id="indmax_${r.id}" title="En propuesta Máximo de operaciones"></span>
     <span class="indbox" id="indant_${r.id}" title="En propuesta Prioriza antigüedad"></span>
-    <input type="checkbox" class="selchk" data-id="${r.id}" ${r.sel?'checked':''} onchange="toggleSel(${r.id},this)">
+    <input type="checkbox" class="selchk" data-id="${r.id}" ${r.sel?'checked':''} ${dis} onchange="toggleSel(${r.id},this)">
   </span>`;
 }
 
@@ -327,9 +358,12 @@ function recalc(){
   const sel = seleccionadas();
   document.getElementById('selN').textContent = sel.length;
   document.getElementById('selM').textContent = fmt(sum(sel));
-  document.getElementById('btnConfirmar').disabled = sel.length===0;
-  document.getElementById('btnNomina').disabled    = sel.length===0;
-  document.getElementById('btnCSV').disabled        = sel.length===0;
+  const bc = document.getElementById('btnConfirmar'), bn = document.getElementById('btnNomina'), bv = document.getElementById('btnCSV');
+  bc.disabled = sel.length===0 || !CAN.pagar;
+  bn.disabled = sel.length===0 || !CAN.nomina;
+  bv.disabled = sel.length===0 || !CAN.nomina;
+  bc.title = CAN.pagar ? '' : quienTxt('pagar');
+  bn.title = bv.title = CAN.nomina ? '' : quienTxt('nomina');
   document.getElementById('accionBar').style.display = DATA.some(r => !r.pagado) ? 'flex' : 'none';
   recalcPropuestas();
 }
@@ -350,15 +384,28 @@ function onFondos(inp){
 function pintarMetaFondos(d){
   const el = document.getElementById('fondosMeta');
   if (!el) return;
+  let base;
   if (d && d.fecha_iso){
     const f = new Date(d.fecha_iso).toLocaleString('es-CL', { timeZone:'America/Santiago', day:'2-digit', month:'2-digit', year:'numeric', hour:'2-digit', minute:'2-digit' });
-    el.textContent = `Cargado por ${d.usuario||'—'} · ${f}`;
-  } else { el.textContent = 'Sin monto cargado hoy'; }
+    base = `Cargado por ${d.usuario||'—'} · ${f}`;
+  } else { base = 'Sin monto cargado hoy'; }
+  el.textContent = CAN.fondos ? base : base + ' · ' + quienTxt('fondos');
+}
+
+// Deshabilita el input de fondos para quien no tiene la atribución
+function aplicarPermFondos(){
+  const inp = document.getElementById('fondos');
+  if (!inp) return;
+  inp.disabled = !CAN.fondos;
+  inp.style.background = CAN.fondos ? '' : '#f1f5f9';
+  inp.style.cursor = CAN.fondos ? '' : 'not-allowed';
+  if (!CAN.fondos) inp.title = quienTxt('fondos');
 }
 
 async function cargarFondos(){
+  aplicarPermFondos();
   try {
-    const r = await fetch('/api/config/ui/pv_fondos_disp', { headers:H });
+    const r = await fetch('/api/postventa/saldos-a-pagar/fondos', { headers:H });
     const j = await r.json();
     const d = j.data;
     if (d && d.fecha_dia === HOY_CL()){
@@ -370,10 +417,12 @@ async function cargarFondos(){
 }
 
 async function guardarFondos(){
-  const payload = { monto: fondosVal, fecha_iso: new Date().toISOString(), fecha_dia: HOY_CL(), usuario: (yo.nombre+' '+(yo.apellido||'')).trim() };
+  if (!CAN.fondos) return;   // doble candado: el backend también lo valida
+  const payload = { monto: fondosVal, fecha_iso: new Date().toISOString(), fecha_dia: HOY_CL() };
   try {
-    await fetch('/api/config/ui/pv_fondos_disp', { method:'PUT', headers:H, body: JSON.stringify({ valor: payload }) });
-    pintarMetaFondos(payload);
+    const r = await fetch('/api/postventa/saldos-a-pagar/fondos', { method:'PUT', headers:H, body: JSON.stringify(payload) });
+    const j = await r.json();
+    pintarMetaFondos(j.data || { ...payload, usuario: (yo.nombre+' '+(yo.apellido||'')).trim() });
   } catch(e){}
 }
 
@@ -405,7 +454,8 @@ function recalcPropuestas(){
     const on = (propActiva === which);
     b.classList.toggle('on', on);
     b.textContent = on ? '✓ Seleccionada' : 'Marcar';
-    b.disabled = (p.set.length === 0 && !on);
+    b.disabled = (p.set.length === 0 && !on) || !CAN.seleccionar;
+    b.title = CAN.seleccionar ? '' : quienTxt('seleccionar');
   };
   pintar('max','propMaxN','propMaxM','propMaxBtn');
   pintar('ant','propAntN','propAntM','propAntBtn');

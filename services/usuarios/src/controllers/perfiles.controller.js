@@ -1723,4 +1723,38 @@ const getUsuariosByPerfil = async (req, res) => {
   } catch (e) { console.error('[perfiles migration v25]', e.message); }
 })();
 
+/* ─── Migración v26: atribuciones granulares del flujo Saldos Precio ─
+   Separa el proceso en acciones independientes para asignar por perfil:
+   definir fondos (Finanzas/Tesorería), seleccionar (Comercial),
+   confirmar pago (Tesorería = postventa_saldos_pagar ya existente),
+   generar nómina, emitir orden de pago y revertir pago. */
+(async () => {
+  try {
+    const [[mod]] = await pool.query("SELECT id_modulo FROM modulos WHERE ruta='/postventa/' LIMIT 1");
+    if (!mod) return;
+    const [[adm]] = await pool.query("SELECT id_perfil FROM perfiles WHERE nombre='Administrador' LIMIT 1");
+    const funcs = [
+      ['Definir Fondos Disponibles (Saldos Precio)', 'pv_fondos_definir',    null],
+      ['Seleccionar Saldos a Pagar',                 'pv_saldos_seleccionar',null],
+      ['Generar Nómina de Pago (Saldos Precio)',     'pv_nomina_generar',    null],
+      ['Emitir Orden de Pago',                       'pv_orden_emitir',      null],
+      ['Revertir Pago de Saldo Precio',              'pv_saldos_revertir',   null],
+    ];
+    for (const [nombre, codigo, href] of funcs) {
+      const [[ex]] = await pool.query('SELECT id_funcionalidad FROM funcionalidades WHERE codigo=?', [codigo]);
+      let idF = ex?.id_funcionalidad;
+      if (!idF) {
+        const [ins] = await pool.query(
+          'INSERT INTO funcionalidades (id_modulo, nombre, codigo, href) VALUES (?,?,?,?)',
+          [mod.id_modulo, nombre, codigo, href]);
+        idF = ins.insertId;
+      }
+      if (adm) await pool.query(
+        'INSERT IGNORE INTO permisos_perfil (id_perfil, id_funcionalidad, habilitado) VALUES (?,?,1)',
+        [adm.id_perfil, idF]);
+    }
+    console.log('✓ Perfiles v26: atribuciones de Saldos Precio registradas');
+  } catch (e) { console.error('[perfiles migration v26]', e.message); }
+})();
+
 module.exports = { getAllPerfiles, getModulosConFuncionalidades, getPermisosPerfil, updatePermisosPerfil, reordenarModulos, createPerfil, updatePerfil, deletePerfil, getUsuariosByPerfil };
