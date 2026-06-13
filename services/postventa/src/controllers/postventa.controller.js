@@ -279,7 +279,7 @@ const getAll = async (req, res) => {
       SELECT s.id, s.id_credito, s.num_op, s.financiera, s.ejecutivo,
              s.fecha_otorgado, s.saldo_precio, s.comision,
              COALESCE(c.nombre_local, d.nombre_razon, s.nombre_dealer)  AS nombre_dealer,
-             COALESCE(c.rut_concesionario, d.rut, s.rut_dealer)         AS rut_dealer
+             COALESCE(c.rut_dealer, d.rut, s.rut_dealer)         AS rut_dealer
       FROM postventa_seguimiento s
       LEFT JOIN creditos c ON c.id = s.id_credito
       LEFT JOIN dealers  d ON d.nombre_indexa = c.automotora
@@ -573,7 +573,7 @@ const getSaldosAPagar = async (req, res) => {
       SELECT s.id, s.num_op, s.saldo_precio, s.financiera,
              COALESCE(c.nombre_local, d.nombre_razon, s.nombre_dealer) AS nombre_dealer,
              c.id_financiera,
-             COALESCE(c.rut_concesionario, d.rut) AS rut_dealer,
+             COALESCE(c.rut_dealer, d.rut) AS rut_dealer,
              d.num_cuenta, d.banco,
              efr.fecha AS fecha_fondos,
              DATEDIFF(CURDATE(), efr.fecha) AS dias,
@@ -611,7 +611,7 @@ const getOrdenPago = async (req, res) => {
     const [rows] = await pool.query(`
       SELECT s.id, s.num_op, s.saldo_precio, s.financiera, s.fecha_otorgado,
              COALESCE(c.nombre_local, d.nombre_razon, s.nombre_dealer) AS nombre_dealer,
-             COALESCE(c.rut_concesionario, d.rut) AS rut_dealer,
+             COALESCE(c.rut_dealer, d.rut) AS rut_dealer,
              d.num_cuenta, d.banco, d.rut_pago,
              efr.fecha AS fecha_fondos,
              DATEDIFF(CURDATE(), efr.fecha) AS dias
@@ -813,7 +813,7 @@ const getComisionesAPagar = async (req, res) => {
       SELECT s.id, s.num_op, s.comision, s.financiera, s.ejecutivo,
              COALESCE(c.nombre_local, d.nombre_razon, s.nombre_dealer) AS nombre_dealer,
              c.id_financiera,
-             COALESCE(c.rut_concesionario, d.rut) AS rut_dealer,
+             COALESCE(c.rut_dealer, d.rut) AS rut_dealer,
              d.num_cuenta, d.banco,
              efa.fecha AS fecha_factura,
              DATEDIFF(CURDATE(), efa.fecha) AS dias,
@@ -851,7 +851,7 @@ const getOrdenPagoComision = async (req, res) => {
     const [rows] = await pool.query(`
       SELECT s.id, s.num_op, s.comision, s.financiera, s.fecha_otorgado,
              COALESCE(c.nombre_local, d.nombre_razon, s.nombre_dealer) AS nombre_dealer,
-             COALESCE(c.rut_concesionario, d.rut) AS rut_dealer,
+             COALESCE(c.rut_dealer, d.rut) AS rut_dealer,
              d.num_cuenta, d.banco, d.rut_pago,
              efa.fecha AS fecha_factura,
              DATEDIFF(CURDATE(), efa.fecha) AS dias

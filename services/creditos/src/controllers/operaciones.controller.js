@@ -66,7 +66,6 @@ const { isMesCerrado, getMesDeOp } = require('../../../../shared/utils/mes-cerra
 (async () => {
   const alteraciones = [
     `ALTER TABLE creditos ADD COLUMN numero_credito VARCHAR(20) NULL AFTER id`,
-    `ALTER TABLE creditos ADD COLUMN rut_concesionario VARCHAR(20) NULL`,
     `ALTER TABLE creditos ADD COLUMN vendedor VARCHAR(150) NULL`,
     `ALTER TABLE creditos ADD COLUMN estado_fundantes VARCHAR(30) NOT NULL DEFAULT 'PENDIENTE'`,
     `ALTER TABLE creditos ADD COLUMN liberado_pago TINYINT(1) NOT NULL DEFAULT 0`,
@@ -250,7 +249,7 @@ const create = async (req, res) => {
       'comdea_real','monto_comision_fin','id_financiera','fecha_primera_cuota',
       'parque','mayor_menor','monto_capitalizado',
       'boleta_factura','cantidad_docs','docs_autorizados','fecha_recep_doc',
-      'rut_concesionario','vendedor',
+      'rut_dealer','vendedor',
       'id_cliente',
       'created_by'
     ];
@@ -328,7 +327,7 @@ const update = async (req, res) => {
       'comdea_real=?','monto_comision_fin=?','id_financiera=?','fecha_primera_cuota=?',
       'parque=?','mayor_menor=?','monto_capitalizado=?',
       'boleta_factura=?','cantidad_docs=?','docs_autorizados=?','fecha_recep_doc=?',
-      'rut_concesionario=?','vendedor=?',
+      'rut_dealer=?','vendedor=?',
       'id_cliente=?',
       'updated_at=NOW()'
     ];

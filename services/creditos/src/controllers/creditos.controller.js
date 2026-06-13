@@ -36,7 +36,16 @@ const { isMesCerrado, getMesDeOp } = require('../../../../shared/utils/mes-cerra
     await addCol(`ALTER TABLE creditos ADD COLUMN gastos             BIGINT       NULL`);
     await addCol(`ALTER TABLE creditos ADD COLUMN seguros            BIGINT       NULL`);
     // Campos desde cartas de aprobación
-    await addCol(`ALTER TABLE creditos ADD COLUMN rut_concesionario  VARCHAR(20)  NULL`);
+    // Homologación: rut_concesionario → rut_dealer (race-safe entre creditos/operaciones)
+    try {
+      const [[rd]] = await pool.query(
+        `SELECT SUM(column_name='rut_concesionario') AS oldc, SUM(column_name='rut_dealer') AS newc
+         FROM information_schema.columns WHERE table_schema=DATABASE() AND table_name='creditos'`);
+      if (Number(rd.oldc) > 0 && Number(rd.newc) == 0)
+        await pool.query(`ALTER TABLE creditos CHANGE COLUMN rut_concesionario rut_dealer VARCHAR(20) NULL`);
+      else if (Number(rd.oldc) == 0 && Number(rd.newc) == 0)
+        await pool.query(`ALTER TABLE creditos ADD COLUMN rut_dealer VARCHAR(20) NULL`);
+    } catch(e) { console.error('[creditos rename rut_concesionario]', e.message); }
     await addCol(`ALTER TABLE creditos ADD COLUMN vendedor           VARCHAR(150) NULL`);
     // comdea_real ya existe en la tabla original (comisión/participación del dealer)
     // Poblar estado correcto según tipo de financiera:
@@ -108,7 +117,7 @@ const SELECT_GESTION = `
     ob.anio,
     ob.patente,
     ob.automotora                                              AS dealer,
-    ob.rut_concesionario,
+    ob.rut_dealer                                              AS rut_concesionario,
     ob.vendedor,
     ob.comdea_real                                             AS comision_dealer,
     ob.ejecutivo,
@@ -148,7 +157,7 @@ const create = async (req, res) => {
       transmision, combustible, tasacion, permiso_circulacion,
       dealer, id_dealer, tipo_ubicacion, nombre_parque,
       ejecutivo, observaciones, datos_json,
-      id_financiera, rut_concesionario, vendedor, comision_dealer,
+      id_financiera, rut_dealer, vendedor, comision_dealer,
     } = req.body;
 
     if (!rut_cliente)
@@ -180,7 +189,7 @@ const create = async (req, res) => {
          transmision, combustible, tasacion, permiso_circulacion,
          automotora, id_dealer, tipo_ubicacion, nombre_parque_mgmt,
          ejecutivo, observaciones, datos_json, id_financiera,
-         rut_concesionario, vendedor, comdea_real,
+         rut_dealer, vendedor, comdea_real,
          created_at, updated_at)
       VALUES (?,?,
               'OTORGADO',?,
@@ -369,7 +378,7 @@ const update = async (req, res) => {
       transmision, combustible, tasacion, permiso_circulacion,
       id_dealer, tipo_ubicacion, nombre_parque,
       datos_json,
-      rut_concesionario, vendedor, comision_dealer, id_financiera,
+      rut_dealer, vendedor, comision_dealer, id_financiera,
     } = req.body;
 
     const [prev] = await pool.query(
@@ -426,7 +435,7 @@ const update = async (req, res) => {
             tipo_ubicacion       = ?,
             nombre_parque_mgmt   = ?,
             datos_json           = ?,
-            rut_concesionario    = ?,
+            rut_dealer    = ?,
             vendedor             = ?,
             comdea_real          = ?,
             id_financiera        = ?,
@@ -510,7 +519,7 @@ const update = async (req, res) => {
             // 3. Obtener mail del dealer
             const [[dealer]] = await pool.query(
               `SELECT correo FROM dealers WHERE rut = ? LIMIT 1`,
-              [carta.rut_conc || '']
+              [carta.rut_dealer || '']
             ).catch(() => [[null]]);
 
             // 4. Leer cartolas actuales del parámetro
@@ -538,7 +547,7 @@ const update = async (req, res) => {
                 mesDisplay,
                 nOp:            carta.id_financiera || carta.op_carta || '',
                 movimiento:     'COMISION',
-                rutConc:        carta.rut_conc   || '',
+                rutConc:        carta.rut_dealer || '',
                 concesionario:  carta.concesionario || '',
                 mail:           dealer?.correo   || '',
                 ejecutivo:      carta.ejecutivo_nombre || '',
@@ -597,7 +606,7 @@ const getReporteria = async (req, res) => {
         ob.fecha_primera_cuota,
         ob.tipo_vehiculo, ob.marca, ob.modelo, ob.anio, ob.patente,
         ob.automotora                     AS dealer,
-        ob.rut_concesionario,
+        ob.rut_dealer                     AS rut_concesionario,
         ob.vendedor,
         ob.parque,
         ob.ejecutivo,

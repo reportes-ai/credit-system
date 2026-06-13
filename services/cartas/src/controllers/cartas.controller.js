@@ -32,7 +32,7 @@ async function crearCreditoDesdeCartas(c) {
   const [r] = await pool.query(`
     INSERT INTO creditos
       (numero_credito, financiera, estado_eval, estado,
-       id_cliente, rut_concesionario, vendedor,
+       id_cliente, rut_dealer, vendedor,
        fecha_otorgado, mes, valor_vehiculo, pie, saldo_precio, pct_financiado,
        monto_financiado, plazo, tascli_real,
        tipo_vehiculo, marca, modelo, anio, patente,
@@ -122,7 +122,7 @@ async function idsRevisores(excluirEmail) {
       acreedor VARCHAR(100) DEFAULT NULL,
       parque VARCHAR(150) DEFAULT NULL,
       concesionario VARCHAR(200) DEFAULT NULL,
-      rut_conc VARCHAR(20) DEFAULT NULL,
+      rut_dealer VARCHAR(20) DEFAULT NULL,
       vendedor VARCHAR(150) DEFAULT NULL,
       part_neto BIGINT DEFAULT NULL,
       part_iva BIGINT DEFAULT NULL,
@@ -180,6 +180,16 @@ async function idsRevisores(excluirEmail) {
       await pool.query(`ALTER TABLE cartas_aprobacion CHANGE COLUMN op_origen id_financiera VARCHAR(50) DEFAULT NULL`);
     }
   } catch(e) { console.error('[cartas migration rename op_origen]', e.message); }
+
+  // Homologación: renombrar rut_conc → rut_dealer
+  try {
+    const [[rc]] = await pool.query(
+      `SELECT COUNT(*) AS c FROM information_schema.columns
+       WHERE table_schema = DATABASE() AND table_name = 'cartas_aprobacion' AND column_name = 'rut_conc'`);
+    if (rc.c > 0) {
+      await pool.query(`ALTER TABLE cartas_aprobacion CHANGE COLUMN rut_conc rut_dealer VARCHAR(20) DEFAULT NULL`);
+    }
+  } catch(e) { console.error('[cartas migration rename rut_conc]', e.message); }
 
   // Seed ejecutivos si la tabla está vacía
   try {
@@ -252,7 +262,7 @@ function mapRow(r) {
     acreedor:                 r.acreedor,
     parque:                   r.parque,
     concesionario:            r.concesionario,
-    rutConc:                  r.rut_conc,
+    rutConc:                  r.rut_dealer,
     vendedor:                 r.vendedor,
     partNeto:                 partNeto,
     partIVA:                  partIVA,
@@ -389,7 +399,7 @@ const upsert = async (req, res) => {
           tipo_vehiculo=?, marca=?, modelo=?, anio=?, patente=?, prenda=?,
           precio_venta=?, pie=?, saldo=?,
           plazo=?, acreedor=?, parque=?,
-          concesionario=?, rut_conc=?, vendedor=?,
+          concesionario=?, rut_dealer=?, vendedor=?,
           part_neto=?, part_iva=?, part_bruto=?,
           fecha=?, fecha_creacion=?,
           creado_por=?, creado_por_nombre=?, creado_por_initials=?,
@@ -435,7 +445,7 @@ const upsert = async (req, res) => {
           tipo_vehiculo, marca, modelo, anio, patente, prenda,
           precio_venta, pie, saldo,
           plazo, acreedor, parque,
-          concesionario, rut_conc, vendedor,
+          concesionario, rut_dealer, vendedor,
           part_neto, part_iva, part_bruto,
           fecha, fecha_creacion,
           creado_por, creado_por_nombre, creado_por_initials,
@@ -574,7 +584,7 @@ const cargaMasivaCartas = async (req, res) => {
           numeroCredito = await _numeroCreditoMes(yy, mm);
           const [ci] = await pool.query(
             `INSERT INTO creditos (numero_credito, num_op, financiera, estado_eval, estado, id_cliente,
-               rut_concesionario, vendedor, fecha_otorgado, mes, saldo_precio, automotora, ejecutivo, comdea_real, created_at, updated_at)
+               rut_dealer, vendedor, fecha_otorgado, mes, saldo_precio, automotora, ejecutivo, comdea_real, created_at, updated_at)
              VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,NOW(),NOW())`,
             [numeroCredito, nOp || null, financiera, 'OTORGADO', 'INGRESO', idCliente,
              rutConc || null, r.vendedor || null, fechaISO, valida ? fechaISO.slice(0, 7) + '-01' : null,
@@ -586,7 +596,7 @@ const cargaMasivaCartas = async (req, res) => {
           `INSERT INTO cartas_aprobacion
              (op_carta, id_financiera, ejecutivo_nombre, cliente, rut_cliente,
               tipo_vehiculo, marca, modelo, anio, patente, precio_venta, pie, saldo, plazo,
-              acreedor, concesionario, rut_conc, vendedor, part_bruto, fecha,
+              acreedor, concesionario, rut_dealer, vendedor, part_bruto, fecha,
               creado_por, creado_por_nombre, status, otorgado, fecha_otorgado, fecha_aprobacion,
               numero_credito_creado, id_credito_creado)
            VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,

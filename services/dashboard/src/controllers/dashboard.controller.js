@@ -262,7 +262,7 @@ exports.getDatos = async (req, res) => {
         COALESCE(resultado_negocio, '')                       AS resultado_negocio,
         COALESCE(cl.rut, '')                                  AS rut_cliente,
         COALESCE(cl.nombre_completo, '')                      AS nombre_cliente,
-        COALESCE(ob.rut_concesionario, '')                    AS rut_dealer,
+        COALESCE(ob.rut_dealer, '')                           AS rut_dealer,
         COALESCE(ob.id_financiera, '')                        AS id_financiera
       FROM (
         SELECT *, ROW_NUMBER() OVER (PARTITION BY num_op ORDER BY id DESC) AS _rn

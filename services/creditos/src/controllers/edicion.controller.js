@@ -30,7 +30,7 @@ const CAMPOS_EDIT = [
   { col:'mes',                label:'Mes',                 tipo:'month'  },
   { col:'ejecutivo',          label:'Ejecutivo',           tipo:'text'   },
   { col:'automotora',         label:'Dealer/Automotora',   tipo:'text'   },
-  { col:'rut_concesionario',  label:'RUT Concesionario',   tipo:'text'   },
+  { col:'rut_dealer',         label:'RUT Dealer',          tipo:'text'   },
   { col:'vendedor',           label:'Vendedor',            tipo:'text'   },
   { col:'parque',             label:'Parque',              tipo:'text'   },
   { col:'tipo_vehiculo',      label:'Tipo Vehículo',       tipo:'text'   },

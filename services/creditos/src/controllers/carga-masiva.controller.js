@@ -133,7 +133,7 @@ function mapRow(row, mesOverride) {
     monto_capitalizado: i('MONTO CAPITALIZADO'),
     fecha_primera_cuota:d('FECHA PRIMERA CUOTA'),
     id_financiera:      s('ID FINANCIERA'),
-    rut_concesionario:  s('RUT DEALER'),
+    rut_dealer:         s('RUT DEALER'),
     com_rdh:            i('COM.RDH'),
     com_cesantia:       i('COM.CESANTIA'),
     com_reparaciones:   i('COM.REPARACIONES'),
