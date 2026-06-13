@@ -241,17 +241,22 @@ const getSaldosAPagar = async (req, res) => {
              COALESCE(c.rut_concesionario, d.rut) AS rut_dealer,
              d.num_cuenta, d.banco,
              efr.fecha AS fecha_fondos,
-             DATEDIFF(CURDATE(), efr.fecha) AS dias
+             DATEDIFF(CURDATE(), efr.fecha) AS dias,
+             (esp.id IS NOT NULL) AS pagado_hoy
       FROM postventa_seguimiento s
       JOIN postventa_etapas eop
         ON eop.id_seguimiento = s.id AND eop.track='SALDO' AND eop.etapa='ORDEN DE PAGO EMITIDA'
       LEFT JOIN postventa_etapas efr
         ON efr.id_seguimiento = s.id AND efr.track='SALDO' AND efr.etapa='FONDOS RECIBIDOS'
+      LEFT JOIN postventa_etapas esp
+        ON esp.id_seguimiento = s.id AND esp.track='SALDO' AND esp.etapa='SALDO PRECIO PAGADO'
+           AND DATE(esp.fecha) = CURDATE()
       LEFT JOIN creditos c ON c.id = s.id_credito
       LEFT JOIN dealers  d ON d.nombre_indexa = c.automotora
       WHERE NOT EXISTS (
         SELECT 1 FROM postventa_etapas ep
-        WHERE ep.id_seguimiento = s.id AND ep.track='SALDO' AND ep.etapa='SALDO PRECIO PAGADO')
+        WHERE ep.id_seguimiento = s.id AND ep.track='SALDO' AND ep.etapa='SALDO PRECIO PAGADO'
+              AND DATE(ep.fecha) < CURDATE())
       ORDER BY efr.fecha ASC, s.num_op ASC
     `);
     res.json({ success: true, data: rows, error: null });
