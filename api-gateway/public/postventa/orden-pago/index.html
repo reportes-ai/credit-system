@@ -5,7 +5,7 @@
   <link rel="icon" href="/img/favicon.png" type="image/png">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Emisión Orden de Pago — AutoFácil</title>
-  <!-- v1.3 -->
+  <!-- v1.4 -->
   <link href="/css/bootstrap.min.css" rel="stylesheet">
   <link href="/css/bootstrap-icons.css" rel="stylesheet">
   <style>
@@ -175,19 +175,19 @@ function docHTML(r){
   const fechaPago = fechaCL(new Date().toISOString());
   const concepto = `Saldo Precio OP ${r.num_op||''} - ${r.financiera||''}`;
   // Estilos INLINE: los correos descartan los <style> de clase, por eso todo va inline
-  const Sdoc = 'font-family:Arial,sans-serif;color:#1e293b;font-size:12px';
+  const Sdoc = 'font-family:Arial,sans-serif;color:#1e293b;font-size:12px;border:2px solid #93c5fd;border-radius:8px;padding:18px 20px';
   const Smeta = 'border-collapse:collapse;font-size:11px';
   const Slbl = 'color:#64748b;font-weight:700;text-transform:uppercase;font-size:9px;padding:1px 8px;white-space:nowrap';
   const Smv = 'padding:1px 8px;font-size:11px';
   const Stbl = 'width:100%;border-collapse:collapse;margin:8px 0;font-size:11px';
-  const Sth = 'background:#dbeafe;color:#1e3a8a;border:1px solid #93c5fd;padding:5px 6px;font-size:9px;text-transform:uppercase;text-align:left';
-  const Std = 'border:1px solid #cbd5e1;padding:5px 6px';
+  const Sth = 'background:#dbeafe;color:#1e3a8a;border:1px solid #93c5fd;padding:5px 6px;font-size:9px;text-transform:uppercase;text-align:left;white-space:nowrap';
+  const Std = 'border:1px solid #cbd5e1;padding:5px 6px;white-space:nowrap';
   const Snum = Std + ';text-align:right';
   const Sres = 'border-collapse:collapse;margin-top:14px;max-width:430px';
   const SresL = 'border:1px solid #cbd5e1;padding:5px 8px;font-size:11px;background:#eff6ff;font-weight:700;width:42%';
   const SresV = 'border:1px solid #cbd5e1;padding:5px 8px;font-size:11px';
   const filas = lineas.map(l => `<tr>
-      <td style="${Std}">Santiago</td><td style="${Std}">${r.nombre_dealer||''}</td><td style="${Std}">${r.rut_dealer||''}</td>
+      <td style="${Std}">${r.nombre_dealer||''}</td><td style="${Std}">${r.rut_dealer||''}</td>
       <td style="${Std}">${l.detalle}</td><td style="${Std}">${periodo}</td><td style="${Snum}">${fmt(l.valor)}</td>
       <td style="${Snum}">$0</td><td style="${Snum}">${fmt(l.valor)}</td><td style="${Std}">${fechaPago}</td>
     </tr>`).join('');
@@ -207,9 +207,9 @@ function docHTML(r){
       </td>
     </tr></tbody></table>
     <table style="${Stbl}">
-      <thead><tr><th style="${Sth}">Ciudad</th><th style="${Sth}">Concesionario</th><th style="${Sth}">RUT</th><th style="${Sth}">Detalle</th><th style="${Sth}">Mes</th><th style="${Sth}">Valor Unitario</th><th style="${Sth}">IVA</th><th style="${Sth}">Valor Total</th><th style="${Sth}">Fecha a pagar</th></tr></thead>
+      <thead><tr><th style="${Sth}">Concesionario</th><th style="${Sth}">RUT</th><th style="${Sth}">Detalle</th><th style="${Sth}">Mes</th><th style="${Sth}">Valor Unitario</th><th style="${Sth}">IVA</th><th style="${Sth}">Valor Total</th><th style="${Sth}">Fecha a pagar</th></tr></thead>
       <tbody>${filas}
-        <tr><td colspan="7" style="${Std};text-align:right;font-weight:800;background:#f1f5f9">TOTAL</td><td style="${Snum};font-weight:800;background:#f1f5f9">${fmt(total)}</td><td style="${Std};background:#f1f5f9"></td></tr>
+        <tr><td colspan="6" style="${Std};text-align:right;font-weight:800;background:#f1f5f9">TOTAL</td><td style="${Snum};font-weight:800;background:#f1f5f9">${fmt(total)}</td><td style="${Std};background:#f1f5f9"></td></tr>
       </tbody>
     </table>
     <table style="${Sres}"><tbody>
