@@ -53,23 +53,36 @@ const pool = require('../../../../shared/config/database');
       { etapa:'CARTOLA ENVIADA',      estado:'PENDIENTE' },
       { etapa:'FACTURA RECIBIDA',     estado:'PARA PAGO' },
       { etapa:'ORDEN DE PAGO EMITIDA',estado:'PARA PAGO' },
+      { etapa:'ENVIADO A PAGO',       estado:'PARA PAGO' },
       { etapa:'COMISION PAGADA',      estado:'PAGADO' },
     ];
     await pool.query('INSERT IGNORE INTO postventa_config (clave, valor) VALUES (?,?),(?,?)',
       ['etapas_saldo', JSON.stringify(DEF_SALDO), 'etapas_comision', JSON.stringify(DEF_COM)]);
-    // Parche: insertar ENVIADO A PAGO (antes de SALDO PRECIO PAGADO) en configs ya existentes
-    try {
-      const [[row]] = await pool.query("SELECT valor FROM postventa_config WHERE clave='etapas_saldo'");
-      if (row) {
-        const arr = JSON.parse(row.valor);
-        if (!arr.some(x => x.etapa === 'ENVIADO A PAGO')) {
-          const idx = arr.findIndex(x => x.etapa === 'SALDO PRECIO PAGADO');
-          const nueva = { etapa:'ENVIADO A PAGO', estado:'PARA PAGO' };
-          idx >= 0 ? arr.splice(idx, 0, nueva) : arr.push(nueva);
-          await pool.query("UPDATE postventa_config SET valor=? WHERE clave='etapas_saldo'", [JSON.stringify(arr)]);
-          console.log('[postventa] etapa ENVIADO A PAGO agregada a la config');
+    // Parche: insertar ENVIADO A PAGO (antes de la etapa de pagado) en configs ya existentes.
+    // claveProc = array posicional de perfiles por etapa: hay que insertar un slot vacío
+    // en la misma posición para no desalinear los permisos de las etapas posteriores.
+    const insertarEnviado = async (clave, antesDe, claveProc) => {
+      const [[row]] = await pool.query("SELECT valor FROM postventa_config WHERE clave=?", [clave]);
+      if (!row) return;
+      const arr = JSON.parse(row.valor);
+      if (arr.some(x => x.etapa === 'ENVIADO A PAGO')) return;
+      const idx = arr.findIndex(x => x.etapa === antesDe);
+      const at = idx >= 0 ? idx : arr.length;
+      arr.splice(at, 0, { etapa:'ENVIADO A PAGO', estado:'PARA PAGO' });
+      await pool.query("UPDATE postventa_config SET valor=? WHERE clave=?", [JSON.stringify(arr), clave]);
+      const [[pr]] = await pool.query("SELECT valor FROM postventa_config WHERE clave=?", [claveProc]);
+      if (pr) {
+        const perms = JSON.parse(pr.valor);
+        if (Array.isArray(perms)) {
+          perms.splice(at, 0, []);
+          await pool.query("UPDATE postventa_config SET valor=? WHERE clave=?", [JSON.stringify(perms), claveProc]);
         }
       }
+      console.log('[postventa] etapa ENVIADO A PAGO agregada a ' + clave);
+    };
+    try {
+      await insertarEnviado('etapas_saldo',    'SALDO PRECIO PAGADO', 'etapa_perfiles_saldo');
+      await insertarEnviado('etapas_comision', 'COMISION PAGADA',     'etapa_perfiles_comision');
     } catch (e) { console.error('[postventa patch ENVIADO A PAGO]', e.message); }
     // Órdenes de pago de saldo precio: correlativo propio (una por operación)
     await pool.query(`
