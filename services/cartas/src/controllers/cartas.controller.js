@@ -447,17 +447,20 @@ function notificarCambios(c, prevStatus) {
 
       if (esNuevaPendiente || vuelveAlPool) {
         const ids = await idsRevisores(c.creadoPor);
+        // Cliente esperando → alta prioridad y sonido distinto para que no pase desapercibida
         await notificar(ids, {
           tipo: 'CARTA_NUEVA',
           titulo: vuelveAlPool ? '🔁 Carta corregida para revisión' : '🛎️ Nueva carta para revisión',
           mensaje: `${c.creadoPorNombre || 'Un ejecutivo'} envió la carta ${c.opCarta || ''} — ${c.cliente || ''}`,
           href: '/aprobaciones/?tab=revision',
+          prioridad: 'alta', sonar: 1, son_tipo: 'dingdong',
         });
       }
       if (resuelta) {
         const [[u]] = await pool.query('SELECT id_usuario FROM usuarios WHERE email = ? LIMIT 1', [c.creadoPor]);
         if (u) {
           const ok = c.status === 'APROBADA';
+          // Resolución → al ejecutivo, alta prioridad (también tiene al cliente esperando)
           await notificar([u.id_usuario], {
             tipo: 'CARTA_' + c.status,
             titulo: ok ? '✅ Carta aprobada' : '❌ Carta rechazada',
@@ -465,6 +468,7 @@ function notificarCambios(c, prevStatus) {
               ? `Tu carta ${c.opCarta || ''} (${c.cliente || ''}) fue aprobada — ya puedes imprimirla`
               : `Tu carta ${c.opCarta || ''} fue rechazada${c.motivoRechazo ? ': ' + c.motivoRechazo : ''}. Corrígela y reenvíala.`,
             href: '/aprobaciones/',
+            prioridad: 'alta', sonar: 1, son_tipo: ok ? 'dingdong' : 'alarma',
           });
         }
       }
