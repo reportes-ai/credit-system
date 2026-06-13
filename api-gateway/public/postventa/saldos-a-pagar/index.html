@@ -5,7 +5,7 @@
   <link rel="icon" href="/img/favicon.png" type="image/png">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Saldos Precios a Pagar — AutoFácil</title>
-  <!-- v2.7 -->
+  <!-- v2.8 -->
   <link href="/css/bootstrap.min.css" rel="stylesheet">
   <link href="/css/bootstrap-icons.css" rel="stylesheet">
   <style>
@@ -75,13 +75,13 @@
     .indbox.on-max { background:#7c3aed; border-color:#7c3aed; }
     .indbox.on-ant { background:#d97706; border-color:#d97706; }
     .btn-revertir { display:block; margin:3px auto 0; background:#fff1f2; color:#b91c1c; border:1px solid #fecaca; border-radius:7px; padding:2px 9px; font-size:.72rem; font-weight:700; cursor:pointer; }
-    /* Barra de acción: seleccionar → confirmar lote + nómina */
-    .accionbar { display:flex; align-items:center; justify-content:space-between; gap:12px; flex-wrap:wrap; background:#fff; border-radius:14px; box-shadow:0 1px 4px rgba(0,0,0,.07); padding:12px 18px; margin-bottom:16px; border-left:5px solid #16a34a; }
-    .accionbar .sel-info { font-size:.95rem; color:var(--navy); font-weight:700; }
-    .accionbar .acc { display:flex; gap:10px; flex-wrap:wrap; }
-    .btn-confirmar { background:#16a34a; color:#fff; border:none; border-radius:9px; padding:9px 20px; font-weight:800; cursor:pointer; }
+    /* Buscador + barra de acción compacta en una sola fila */
+    .search-row { display:flex; align-items:center; justify-content:space-between; gap:12px; flex-wrap:wrap; margin-bottom:14px; }
+    .accionbar { display:flex; align-items:center; gap:10px; flex-wrap:wrap; }
+    .accionbar .sel-info { font-size:.85rem; color:var(--navy); font-weight:700; white-space:nowrap; }
+    .btn-confirmar { background:#16a34a; color:#fff; border:none; border-radius:8px; padding:7px 16px; font-weight:800; cursor:pointer; font-size:.85rem; }
     .btn-confirmar:disabled { opacity:.45; cursor:default; }
-    .btn-sec { background:#eef2f7; color:#0141A2; border:none; border-radius:9px; padding:9px 14px; font-weight:700; cursor:pointer; font-size:.85rem; }
+    .btn-sec { background:#eef2f7; color:#0141A2; border:none; border-radius:8px; padding:7px 12px; font-weight:700; cursor:pointer; font-size:.82rem; }
     .btn-sec:disabled { opacity:.45; cursor:default; }
     tbody tr.row-sel { background:#ecfdf3; }
     #buscar { border:1.5px solid #d1d5db; border-radius:8px; padding:7px 12px; font-size:.85rem; width:260px; }
@@ -107,15 +107,15 @@
       <h5 style="font-weight:800;color:var(--navy);margin:0"><i class="bi bi-cash-coin me-2"></i>Saldos Precios a Pagar</h5>
       <span style="font-size:.82rem;color:#64748b">Operaciones con orden de pago emitida, ordenadas por antigüedad. <b>Selecciona</b> las que vas a pagar (o usa una propuesta), genera la <b>nómina</b> y luego <b>Confirmar pago</b>. Las marcadas se pueden revertir dentro del mismo día.</span>
     </div>
-    <input id="buscar" placeholder="Buscar OP, dealer, RUT…" oninput="render()">
   </div>
 
-  <!-- Barra de acción: seleccionar → confirmar pago + nómina banco -->
-  <div class="accionbar" id="accionBar" style="display:none">
-    <div class="sel-info">Seleccionadas para pagar: <span id="selN">0</span> · <span id="selM">$0</span></div>
-    <div class="acc">
-      <button class="btn-sec" id="btnNomina" onclick="copiarNomina()" disabled><i class="bi bi-clipboard me-1"></i>Copiar nómina</button>
-      <button class="btn-sec" id="btnCSV" onclick="descargarCSV()" disabled><i class="bi bi-download me-1"></i>CSV banco</button>
+  <!-- Buscador + barra de acción compacta en una sola fila -->
+  <div class="search-row">
+    <input id="buscar" placeholder="Buscar OP, dealer, RUT…" oninput="render()">
+    <div class="accionbar" id="accionBar" style="display:none">
+      <div class="sel-info">Seleccionadas: <span id="selN">0</span> · <span id="selM">$0</span></div>
+      <button class="btn-sec" id="btnNomina" onclick="copiarNomina()" disabled><i class="bi bi-clipboard me-1"></i>Nómina</button>
+      <button class="btn-sec" id="btnCSV" onclick="descargarCSV()" disabled><i class="bi bi-download me-1"></i>CSV</button>
       <button class="btn-confirmar" id="btnConfirmar" onclick="confirmarPago()" disabled><i class="bi bi-check2-all me-1"></i>Confirmar pago</button>
     </div>
   </div>
