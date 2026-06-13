@@ -1757,4 +1757,26 @@ const getUsuariosByPerfil = async (req, res) => {
   } catch (e) { console.error('[perfiles migration v26]', e.message); }
 })();
 
+/* ─── Migración v27: funcionalidad Parámetros Cobranza bajo Mantenedores ─ */
+(async () => {
+  try {
+    const [[modMan]] = await pool.query(
+      "SELECT id_modulo FROM modulos WHERE nombre='Mantenedores' AND estado='activo'");
+    if (!modMan) return;
+    const [[adm]] = await pool.query("SELECT id_perfil FROM perfiles WHERE nombre='Administrador' LIMIT 1");
+    const [[ex]] = await pool.query("SELECT id_funcionalidad FROM funcionalidades WHERE codigo='mant_cobranza_parametros'");
+    let idF = ex?.id_funcionalidad;
+    if (!idF) {
+      const [ins] = await pool.query(
+        'INSERT INTO funcionalidades (id_modulo, nombre, codigo, href, icono) VALUES (?,?,?,?,?)',
+        [modMan.id_modulo, 'Parámetros Cobranza', 'mant_cobranza_parametros', '/mantenedores/cobranza-parametros/', 'bi-cash-stack']);
+      idF = ins.insertId;
+    }
+    if (adm) await pool.query(
+      'INSERT IGNORE INTO permisos_perfil (id_perfil, id_funcionalidad, habilitado) VALUES (?,?,1)',
+      [adm.id_perfil, idF]);
+    console.log('✓ Perfiles v27: funcionalidad Parámetros Cobranza registrada');
+  } catch (e) { console.error('[perfiles migration v27]', e.message); }
+})();
+
 module.exports = { getAllPerfiles, getModulosConFuncionalidades, getPermisosPerfil, updatePermisosPerfil, reordenarModulos, createPerfil, updatePerfil, deletePerfil, getUsuariosByPerfil };

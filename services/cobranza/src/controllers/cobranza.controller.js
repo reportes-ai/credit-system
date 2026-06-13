@@ -40,6 +40,39 @@ const pool = require('../../../../shared/config/database');
   }
 })();
 
+// ─── Parámetros de Cobranza (mantenedor) ───────────────────────────────────────
+// Plantillas de mensaje (con variables {trato} {nombre} {numero} {dias} {cuotas}
+// {monto} {datos}), gastos de cobranza y tramos UF. Todo editable por el Admin.
+const COB_DEFAULTS = {
+  datos_transferencia: 'Titular: AUTOFACIL SpA\nRUT: 76.545.638-K\nBanco: Banco de Chile\nCuenta Corriente: 8001829208\nMail: cobranza@autofacilchile.cl',
+  texto_whatsapp: '{trato} {nombre}, le informamos que su crédito N° {numero} se encuentra en mora hace {dias} días, con {cuotas} cuota(s) impaga(s) por un total de ${monto} al día de hoy.\n\n{datos}',
+  texto_sms: '{trato} {nombre}, su crédito N° {numero} tiene {cuotas} cuota(s) impaga(s) por ${monto} ({dias} días mora).\n{datos}',
+  texto_email_asunto: '[AutoFácil] Aviso de mora — Crédito N° {numero}',
+  texto_email: '{trato} {nombre},\n\nLe informamos que su crédito N° {numero} se encuentra en mora hace {dias} días, con {cuotas} cuota(s) impaga(s) por un total de ${monto} al día de hoy.\n\nPara regularizar su situación puede realizar una transferencia con los siguientes datos:\n\n{datos}\n\nAtentamente,\nEquipo de Cobranza AutoFácil',
+  gastos_dias: '15',
+  tramos_uf: JSON.stringify([{ uf: 3, pct: 0 }, { uf: 6, pct: 0 }, { uf: 9, pct: 0 }]),
+};
+(async () => {
+  try {
+    await pool.query(`CREATE TABLE IF NOT EXISTS cobranza_config (
+      clave VARCHAR(50) PRIMARY KEY,
+      valor TEXT,
+      fecha_actualizacion DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+    )`);
+    for (const [clave, valor] of Object.entries(COB_DEFAULTS))
+      await pool.query('INSERT IGNORE INTO cobranza_config (clave, valor) VALUES (?, ?)', [clave, valor]);
+    console.log('✓ Cobranza: tabla cobranza_config verificada');
+  } catch (err) { console.error('✗ Cobranza config migración:', err.message); }
+})();
+
+async function getCobranzaConfig() {
+  const [rows] = await pool.query('SELECT clave, valor FROM cobranza_config');
+  const obj = { ...COB_DEFAULTS };
+  rows.forEach(r => { obj[r.clave] = r.valor; });
+  return obj;
+}
+const rellenar = (tpl, vars) => String(tpl || '').replace(/\{(\w+)\}/g, (_, k) => (vars[k] !== undefined ? vars[k] : '{' + k + '}'));
+
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 function ok(res, data, status = 200) {
   return res.status(status).json({ success: true, data, error: null });
@@ -395,23 +428,14 @@ exports.mensajes = async (req, res) => {
     const telefono = credito.telefono_movil || null;
     const email    = credito.email_cliente  || null;
 
-    const datosTransferencia = `Titular: AUTOFACIL SpA\nRUT: 76.545.638-K\nBanco: Banco de Chile\nCuenta Corriente: 8001829208\nMail: cobranza@autofacilchile.cl`;
+    // Plantillas configurables (mantenedor Parámetros Cobranza)
+    const cfg = await getCobranzaConfig();
+    const vars = { trato, nombre, numero, dias, cuotas, monto, datos: cfg.datos_transferencia };
 
-    const whatsapp = `${trato} ${nombre}, le informamos que su crédito N° ${numero} se encuentra en mora hace ${dias} días, con ${cuotas} cuota${cuotas !== 1 ? 's' : ''} impaga${cuotas !== 1 ? 's' : ''} por un total de $${monto} al día de hoy.\n\n${datosTransferencia}`;
-
-    const sms = `${trato} ${nombre}, su crédito N° ${numero} tiene ${cuotas} cuota${cuotas !== 1 ? 's' : ''} impaga${cuotas !== 1 ? 's' : ''} por $${monto} (${dias} días mora).\n${datosTransferencia}`;
-
-    const emailAsunto = `[AutoFácil] Aviso de mora — Crédito N° ${numero}`;
-    const emailCuerpo = `${trato} ${nombre},
-
-Le informamos que su crédito N° ${numero} se encuentra en mora hace ${dias} días, con ${cuotas} cuota${cuotas !== 1 ? 's' : ''} impaga${cuotas !== 1 ? 's' : ''} por un total de $${monto} al día de hoy.
-
-Para regularizar su situación puede realizar una transferencia con los siguientes datos:
-
-${datosTransferencia}
-
-Atentamente,
-Equipo de Cobranza AutoFácil`;
+    const whatsapp    = rellenar(cfg.texto_whatsapp, vars);
+    const sms         = rellenar(cfg.texto_sms, vars);
+    const emailAsunto = rellenar(cfg.texto_email_asunto, vars);
+    const emailCuerpo = rellenar(cfg.texto_email, vars);
 
     ok(res, { whatsapp, sms, email: { asunto: emailAsunto, cuerpo: emailCuerpo }, telefono, emailCliente: email });
   } catch (err) {
@@ -692,6 +716,37 @@ exports.provisiones = async (req, res) => {
       provision_total: tramosResult.reduce((s, t) => s + t.provision_estimada, 0),
       tramos: tramosResult
     });
+  } catch (err) {
+    fail(res, err.message, 500);
+  }
+};
+
+// ─── Parámetros de Cobranza: get/set (mantenedor) ──────────────────────────────
+exports.getParametros = async (req, res) => {
+  try {
+    const cfg = await getCobranzaConfig();
+    // tramos_uf se entrega ya parseado para el front
+    let tramos = [];
+    try { tramos = JSON.parse(cfg.tramos_uf); } catch (_) {}
+    ok(res, { ...cfg, tramos_uf: tramos });
+  } catch (err) {
+    fail(res, err.message, 500);
+  }
+};
+
+exports.setParametros = async (req, res) => {
+  try {
+    const body = req.body || {};
+    const permitidas = ['datos_transferencia', 'texto_whatsapp', 'texto_sms', 'texto_email_asunto', 'texto_email', 'gastos_dias', 'tramos_uf'];
+    for (const clave of permitidas) {
+      if (body[clave] === undefined) continue;
+      let valor = body[clave];
+      if (clave === 'tramos_uf' && typeof valor !== 'string') valor = JSON.stringify(valor);
+      await pool.query(
+        `INSERT INTO cobranza_config (clave, valor) VALUES (?, ?)
+         ON DUPLICATE KEY UPDATE valor = VALUES(valor)`, [clave, String(valor)]);
+    }
+    ok(res, { mensaje: 'Parámetros de cobranza actualizados' });
   } catch (err) {
     fail(res, err.message, 500);
   }

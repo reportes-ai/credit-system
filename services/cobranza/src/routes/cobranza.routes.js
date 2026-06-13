@@ -3,6 +3,11 @@
 const router = require('express').Router();
 const ctrl   = require('../controllers/cobranza.controller');
 const { verifyToken } = require('../../../../shared/middleware/auth');
+const { requireFunc } = require('../../../../shared/middleware/permisos');
+
+// Parámetros de Cobranza (mantenedor)
+router.get('/parametros',             verifyToken, ctrl.getParametros);
+router.put('/parametros',             verifyToken, requireFunc('mant_cobranza_parametros'), ctrl.setParametros);
 
 // Rutas estáticas primero
 router.get('/diagnostico',            verifyToken, ctrl.diagnostico);

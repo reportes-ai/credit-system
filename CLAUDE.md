@@ -80,6 +80,17 @@ Reglas de diseño que se derivan de este principio:
 - Cuando se detecte algo hardcodeado que el negocio podría querer cambiar, **proponerlo
   como mantenedor** en vez de dejarlo fijo (ver lista de candidatos más abajo si existe).
 
+### Footer "Qué afecta este mantenedor" (OBLIGATORIO en cada mantenedor)
+- **Cada página de mantenedor debe terminar con un recuadro "Qué afecta este mantenedor"**
+  que liste, por variable/sección, **qué página y proceso impacta cada cambio, con link**
+  para verlo. Así queda trazable qué toca cada modificación.
+- **Revisar/actualizar este footer SIEMPRE que** se modifique un mantenedor, se agregue una
+  card nueva, o se agregue una variable dentro de un mantenedor. Si una variable nueva no
+  aparece en el footer, el cambio está incompleto.
+- Patrón visual: recuadro gris con borde izquierdo azul, título con ícono `bi-diagram-3` y
+  una lista `<ul>` de `<b>Variable</b> → proceso/página <a href="…">enlace</a>` (ver
+  `tasas/index.html` y `cobranza-parametros/index.html` como referencia).
+
 ## Reglas Anti-Hardcode (NO negociables)
 1. **Módulos y sub-items SIEMPRE desde BD** — nunca listas JS con rutas/íconos fijos
    - Módulos principales → tabla `modulos` (nombre, icono, ruta, orden)
