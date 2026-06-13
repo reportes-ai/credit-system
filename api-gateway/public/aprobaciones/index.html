@@ -5,7 +5,7 @@
   <link rel="icon" href="/img/favicon.png" type="image/png">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Cartas de Aprobación — AutoFácil</title>
-  <!-- v3.7 -->
+  <!-- v3.8 -->
   <link href="/css/bootstrap.min.css" rel="stylesheet">
   <link href="/css/bootstrap-icons.css" rel="stylesheet">
   <style>
@@ -456,7 +456,7 @@
 </div>
 
 <!-- ════════ TAB: EMISIÓN DE CARTOLAS ════════ -->
-<div class="tab-pane" id="pane-cartolas">
+<div class="tab-pane" id="pane-cartolas" style="max-width:none">
   <div style="display:flex;gap:8px;margin-bottom:14px">
     <button class="btn-sec" id="subDetalle" onclick="subTabCartolas('detalle')" style="font-weight:700;border-bottom:3px solid var(--blue)">Detalle Mes</button>
     <button class="btn-sec" id="subRevision" onclick="subTabCartolas('revision')">Revisión Cartolas</button>
@@ -465,7 +465,7 @@
   <div id="cartolasDetalle">
     <div class="card-af">
       <div class="filters-bar">
-        <select id="ctaMes" onchange="cargarMovimientos()"></select>
+        <select id="ctaMes" onchange="aplicarMes()"></select>
         <input type="text" id="ctaBuscar" placeholder="RUT, cliente, N° ID, operación, N° carta…" oninput="renderMovimientos()" style="min-width:220px">
         <select id="ctaEstado" onchange="renderMovimientos()">
           <option value="">Todos</option><option>PENDIENTE</option><option>A PAGAR</option><option>A DESCONTAR</option>
@@ -2171,25 +2171,33 @@ async function initCartolas(){
   }
   await cargarMovimientos();
 }
+let MOVS_ALL = [];   // todos los meses (para búsqueda global tipo Informes)
 async function cargarMovimientos(){
-  const mes = document.getElementById('ctaMes').value || mesActual();
   try {
-    const r = await fetch('/api/cartolas?mes='+encodeURIComponent(mes), { headers: hdr() });
+    const r = await fetch('/api/cartolas', { headers: hdr() });   // todos los meses
     const j = await r.json();
-    MOVS = j.success ? (j.data||[]) : [];
-  } catch(e) { MOVS = []; }
+    MOVS_ALL = j.success ? (j.data||[]) : [];
+  } catch(e) { MOVS_ALL = []; }
+  aplicarMes();
+}
+// MOVS = movimientos del mes seleccionado (Revisión Cartolas sigue siendo mensual)
+function aplicarMes(){
+  const mes = document.getElementById('ctaMes').value || mesActual();
+  MOVS = MOVS_ALL.filter(m => m.mes === mes);
   renderMovimientos();
   renderRevCartolas();
 }
 function renderMovimientos(){
   const q = (document.getElementById('ctaBuscar').value||'').toLowerCase();
   const est = document.getElementById('ctaEstado').value;
-  const rows = MOVS.filter(m =>
+  // Con búsqueda: busca en TODOS los meses (como Informes). Sin búsqueda: solo el mes.
+  const base = q ? MOVS_ALL : MOVS;
+  const rows = base.filter(m =>
     (!est || m.estado_comision===est) &&
     (!q || [m.concesionario,m.num_op,m.nuestro_num_op,m.rut_cliente,m.nombre_cliente,m.num_carta].some(v=>String(v||'').toLowerCase().includes(q))));
   document.getElementById('ctaCount').textContent = rows.length + ' registro(s)';
   const body = document.getElementById('bodyMovs');
-  if (!rows.length) { body.innerHTML='<tr><td colspan="17" style="text-align:center;color:#94a3b8;padding:24px">Sin movimientos en este mes</td></tr>'; return; }
+  if (!rows.length) { body.innerHTML=`<tr><td colspan="17" style="text-align:center;color:#94a3b8;padding:24px">${q?'Sin resultados':'Sin movimientos en este mes'}</td></tr>`; return; }
   const ESTADOS = ['PENDIENTE','A PAGAR','A DESCONTAR'];
   body.innerHTML = rows.map((m,i)=>{
     const pct = (m.saldo>0 && m.comision) ? (m.comision/m.saldo*100).toFixed(2).replace('.',',')+'%' : '—';
