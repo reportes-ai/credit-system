@@ -60,6 +60,26 @@ shared/
 - `dashboard_config` → config permisos tabs del dashboard
 - `usuarios`, `perfiles`, `permisos_perfil`, `funcionalidades`, `modulos`
 
+## Principio Rector: Aplicación Paramétrica (FILOSOFÍA CENTRAL)
+> La meta del sistema es que el **usuario Administrador pueda hacer la mayor cantidad
+> de modificaciones posible desde los mantenedores, sin tocar código y sin alterar el
+> espíritu ni el flujo de los procesos.** Así se ha construido la mayoría hasta ahora
+> (módulos, permisos, etapas Post Venta, UF, tasas, dealers, etc.).
+
+Reglas de diseño que se derivan de este principio:
+- **Antes de hardcodear un valor de negocio, preguntarse: "¿esto debería poder cambiarlo
+  el Administrador sin programador?"** Si la respuesta es sí → va a un mantenedor (tabla
+  de configuración + UI), no al código.
+- **Datos de negocio = BD/mantenedor. Solo lógica = código.** Montos, tramos, nombres de
+  estados, etapas, plazos, textos de plantillas, listas de opciones, mapeos → configurables.
+- **El flujo se respeta, los parámetros se ajustan.** Parametrizar NO significa permitir
+  romper el proceso: el orden de las etapas, las validaciones y las atribuciones siguen
+  protegidas; lo que se abre es el *contenido* (valores, textos, umbrales), no la *estructura*.
+- **Cada parámetro nuevo se expone en su mantenedor** con su permiso (`requireFunc`) y
+  respetando la matriz de Perfiles. Nunca un valor de negocio enterrado en un `.js`.
+- Cuando se detecte algo hardcodeado que el negocio podría querer cambiar, **proponerlo
+  como mantenedor** en vez de dejarlo fijo (ver lista de candidatos más abajo si existe).
+
 ## Reglas Anti-Hardcode (NO negociables)
 1. **Módulos y sub-items SIEMPRE desde BD** — nunca listas JS con rutas/íconos fijos
    - Módulos principales → tabla `modulos` (nombre, icono, ruta, orden)
