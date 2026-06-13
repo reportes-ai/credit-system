@@ -5,7 +5,7 @@
   <link rel="icon" href="/img/favicon.png" type="image/png">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Seguimiento Post Venta — AutoFácil</title>
-  <!-- v1.7 -->
+  <!-- v1.8 -->
   <link href="/css/bootstrap.min.css" rel="stylesheet">
   <link href="/css/bootstrap-icons.css" rel="stylesheet">
   <style>
@@ -287,7 +287,7 @@ function trackHTML(r, track, lista){
 
     // Etapas automáticas: se marcan desde sus módulos (Emisión Orden de Pago /
     // Saldos Precios a Pagar). No se marcan ni desmarcan a mano en Seguimiento.
-    const esAuto = track==='SALDO' && (x.etapa==='ORDEN DE PAGO EMITIDA' || x.etapa==='SALDO PRECIO PAGADO');
+    const esAuto = track==='SALDO' && ['ORDEN DE PAGO EMITIDA','ENVIADO A PAGO','SALDO PRECIO PAGADO'].includes(x.etapa);
 
     // ¿Puede marcar? Etapa anterior debe estar marcada
     const prevMarcado = i === 0 || !!marc[lista[i-1].etapa];
@@ -301,6 +301,8 @@ function trackHTML(r, track, lista){
     let title = '';
     if (esAuto) title = x.etapa==='ORDEN DE PAGO EMITIDA'
       ? 'Se marca automáticamente al emitir la orden en "Emisión Orden de Pago"'
+      : x.etapa==='ENVIADO A PAGO'
+      ? 'Se marca al presionar "Enviar a Pago" en "Saldos Precios a Pagar"'
       : 'Se marca automáticamente al registrar el pago en "Saldos Precios a Pagar"';
     else if (!esSistema && !m && !canMark)   title = `Debes marcar primero "${lista[i-1]?.etapa}"`;
     else if (!esSistema && m && !canUnmark) title = esAdmin ? '' : (esHoy ? 'Solo puedes desmarcar la última etapa' : 'Solo puedes desmarcar etapas marcadas hoy');

@@ -43,6 +43,7 @@ const pool = require('../../../../shared/config/database');
       { etapa:'LIBERADO A PAGO',      estado:'PARA PAGO' },
       { etapa:'FONDOS RECIBIDOS',     estado:'PARA PAGO' },
       { etapa:'ORDEN DE PAGO EMITIDA',estado:'PARA PAGO' },
+      { etapa:'ENVIADO A PAGO',       estado:'PARA PAGO' },
       { etapa:'SALDO PRECIO PAGADO',  estado:'PAGADO' },
     ];
     const DEF_COM = [
@@ -56,6 +57,20 @@ const pool = require('../../../../shared/config/database');
     ];
     await pool.query('INSERT IGNORE INTO postventa_config (clave, valor) VALUES (?,?),(?,?)',
       ['etapas_saldo', JSON.stringify(DEF_SALDO), 'etapas_comision', JSON.stringify(DEF_COM)]);
+    // Parche: insertar ENVIADO A PAGO (antes de SALDO PRECIO PAGADO) en configs ya existentes
+    try {
+      const [[row]] = await pool.query("SELECT valor FROM postventa_config WHERE clave='etapas_saldo'");
+      if (row) {
+        const arr = JSON.parse(row.valor);
+        if (!arr.some(x => x.etapa === 'ENVIADO A PAGO')) {
+          const idx = arr.findIndex(x => x.etapa === 'SALDO PRECIO PAGADO');
+          const nueva = { etapa:'ENVIADO A PAGO', estado:'PARA PAGO' };
+          idx >= 0 ? arr.splice(idx, 0, nueva) : arr.push(nueva);
+          await pool.query("UPDATE postventa_config SET valor=? WHERE clave='etapas_saldo'", [JSON.stringify(arr)]);
+          console.log('[postventa] etapa ENVIADO A PAGO agregada a la config');
+        }
+      }
+    } catch (e) { console.error('[postventa patch ENVIADO A PAGO]', e.message); }
     // Órdenes de pago de saldo precio: correlativo propio (una por operación)
     await pool.query(`
       CREATE TABLE IF NOT EXISTS postventa_ordenes (
@@ -151,7 +166,7 @@ const setEtapa = async (req, res) => {
     if (ETAPAS_SISTEMA.includes(etapa))
       return res.status(400).json({ success: false, data: null, error: 'Etapa de sistema — no editable' });
     // Etapas automáticas: solo se marcan desde sus módulos dedicados
-    if (track === 'SALDO' && (etapa === 'ORDEN DE PAGO EMITIDA' || etapa === 'SALDO PRECIO PAGADO'))
+    if (track === 'SALDO' && ['ORDEN DE PAGO EMITIDA','ENVIADO A PAGO','SALDO PRECIO PAGADO'].includes(etapa))
       return res.status(400).json({ success: false, data: null, error: `"${etapa}" se marca automáticamente desde su módulo (Emisión Orden de Pago / Saldos Precios a Pagar)` });
 
     const esAdmin = req.usuario?.perfil_nombre === 'Administrador';
@@ -315,10 +330,14 @@ const getSaldosAPagar = async (req, res) => {
              d.num_cuenta, d.banco,
              efr.fecha AS fecha_fondos,
              DATEDIFF(CURDATE(), efr.fecha) AS dias,
-             (esp.id IS NOT NULL) AS pagado_hoy
+             (esp.id IS NOT NULL) AS pagado_hoy,
+             (eev.id IS NOT NULL) AS enviado,
+             eev.usuario AS enviado_por
       FROM postventa_seguimiento s
       JOIN postventa_etapas eop
         ON eop.id_seguimiento = s.id AND eop.track='SALDO' AND eop.etapa='ORDEN DE PAGO EMITIDA'
+      LEFT JOIN postventa_etapas eev
+        ON eev.id_seguimiento = s.id AND eev.track='SALDO' AND eev.etapa='ENVIADO A PAGO'
       LEFT JOIN postventa_etapas efr
         ON efr.id_seguimiento = s.id AND efr.track='SALDO' AND efr.etapa='FONDOS RECIBIDOS'
       LEFT JOIN postventa_etapas esp
@@ -418,6 +437,30 @@ const emitirOrdenPago = async (req, res) => {
   }
 };
 
+/* ── POST /api/postventa/saldos-a-pagar/enviar-a-pago { ids:[] } — marca ENVIADO A PAGO ──
+   El Gerente Comercial (u otro con pv_saldos_seleccionar) fija la selección a pagar.
+   A partir de aquí queda en cola firme para que Tesorería confirme el pago. ── */
+const enviarAPago = async (req, res) => {
+  try {
+    const { ids } = req.body;
+    if (!Array.isArray(ids) || !ids.length)
+      return res.status(400).json({ success: false, data: null, error: 'Sin operaciones seleccionadas' });
+    const usuario = loginDe(req.usuario);
+    const vals = [];
+    for (const id of ids) {
+      vals.push([id, 'SALDO', 'FONDOS RECIBIDOS', usuario]);
+      vals.push([id, 'SALDO', 'ORDEN DE PAGO EMITIDA', usuario]);
+      vals.push([id, 'SALDO', 'ENVIADO A PAGO', usuario]);
+    }
+    await pool.query(
+      `INSERT IGNORE INTO postventa_etapas (id_seguimiento, track, etapa, usuario) VALUES ?`, [vals]);
+    res.json({ success: true, data: { enviadas: ids.length }, error: null });
+  } catch (e) {
+    console.error('[postventa enviarAPago]', e.message);
+    res.status(500).json({ success: false, data: null, error: 'Error interno del servidor' });
+  }
+};
+
 /* ── POST /api/postventa/saldos-a-pagar/pagar { ids:[] } — marca SALDO PRECIO PAGADO ── */
 const pagarSaldos = async (req, res) => {
   try {
@@ -448,36 +491,47 @@ const desmarcarSaldos = async (req, res) => {
     const { ids, motivo } = req.body;
     if (!Array.isArray(ids) || !ids.length)
       return res.status(400).json({ success: false, data: null, error: 'Sin operaciones seleccionadas' });
+    // Etapa a revertir: pago (default) o el envío a pago (deshacer "Enviar a Pago")
+    const etapa = req.body.etapa === 'ENVIADO A PAGO' ? 'ENVIADO A PAGO' : 'SALDO PRECIO PAGADO';
     const esAdmin = req.usuario?.perfil_nombre === 'Administrador';
     const usuario = loginDe(req.usuario);
     const ph = ids.map(() => '?').join(',');
 
+    // No se puede deshacer el envío de algo que ya fue pagado
+    if (etapa === 'ENVIADO A PAGO') {
+      const [[{ pagadas }]] = await pool.query(
+        `SELECT COUNT(*) AS pagadas FROM postventa_etapas
+         WHERE track='SALDO' AND etapa='SALDO PRECIO PAGADO' AND id_seguimiento IN (${ph})`, ids);
+      if (pagadas > 0)
+        return res.status(400).json({ success: false, data: null, error: 'No se puede deshacer el envío: la operación ya fue pagada.' });
+    }
+
     // ¿Alguna marca NO es de hoy? → es reversa fuera del día
     const [[{ fuera }]] = await pool.query(
       `SELECT COUNT(*) AS fuera FROM postventa_etapas
-       WHERE track='SALDO' AND etapa='SALDO PRECIO PAGADO' AND DATE(fecha) < CURDATE()
-         AND id_seguimiento IN (${ph})`, ids);
+       WHERE track='SALDO' AND etapa=? AND DATE(fecha) < CURDATE()
+         AND id_seguimiento IN (${ph})`, [etapa, ...ids]);
 
     if (fuera > 0) {
       if (!esAdmin)
-        return res.status(403).json({ success: false, data: null, error: 'Solo un Administrador puede revertir un pago de un día anterior.' });
+        return res.status(403).json({ success: false, data: null, error: 'Solo un Administrador puede revertir una marca de un día anterior.' });
       if (!motivo || !String(motivo).trim())
-        return res.status(400).json({ success: false, data: null, error: 'Debes indicar un motivo para revertir un pago de un día anterior.' });
+        return res.status(400).json({ success: false, data: null, error: 'Debes indicar un motivo para revertir una marca de un día anterior.' });
       // Auditoría de la reversa
-      const logs = ids.map(id => [id, 'SALDO PRECIO PAGADO', usuario, String(motivo).trim().slice(0, 400)]);
+      const logs = ids.map(id => [id, etapa, usuario, String(motivo).trim().slice(0, 400)]);
       await pool.query('INSERT INTO postventa_reversas (id_seguimiento, etapa, usuario, motivo) VALUES ?', [logs]);
       const [r] = await pool.query(
         `DELETE FROM postventa_etapas
-         WHERE track='SALDO' AND etapa='SALDO PRECIO PAGADO' AND id_seguimiento IN (${ph})`, ids);
+         WHERE track='SALDO' AND etapa=? AND id_seguimiento IN (${ph})`, [etapa, ...ids]);
       return res.json({ success: true, data: { desmarcados: r.affectedRows, reversa: true }, error: null });
     }
 
     // Mismo día: cualquiera con permiso
     const [r] = await pool.query(
       `DELETE FROM postventa_etapas
-       WHERE track='SALDO' AND etapa='SALDO PRECIO PAGADO'
+       WHERE track='SALDO' AND etapa=?
          AND DATE(fecha) = CURDATE()
-         AND id_seguimiento IN (${ph})`, ids);
+         AND id_seguimiento IN (${ph})`, [etapa, ...ids]);
     res.json({ success: true, data: { desmarcados: r.affectedRows, reversa: false }, error: null });
   } catch (e) {
     console.error('[postventa desmarcarSaldos]', e.message);
@@ -493,7 +547,7 @@ const marcarHistorico = async (req, res) => {
     );
     if (!segs.length) return res.json({ success: true, data: { marcados: 0 }, error: null });
 
-    const etapasSaldo   = ['FUNDANTES PENDIENTES','FUNDANTES RECIBIDOS','FUNDANTES ENVIADOS','LIBERADO A PAGO','FONDOS RECIBIDOS','ORDEN DE PAGO EMITIDA','SALDO PRECIO PAGADO'];
+    const etapasSaldo   = ['FUNDANTES PENDIENTES','FUNDANTES RECIBIDOS','FUNDANTES ENVIADOS','LIBERADO A PAGO','FONDOS RECIBIDOS','ORDEN DE PAGO EMITIDA','ENVIADO A PAGO','SALDO PRECIO PAGADO'];
     const etapasComision = ['COMISION A PAGAR','CARTOLA EMITIDA','CARTOLA APROBADA','CARTOLA ENVIADA','FACTURA RECIBIDA','ORDEN DE PAGO EMITIDA','COMISION PAGADA'];
     const fecha = '2025-12-31 23:59:59';
     const vals = [];
@@ -512,4 +566,4 @@ const marcarHistorico = async (req, res) => {
   }
 };
 
-module.exports = { sync, getAll, setEtapa, getConfig, setConfig, marcarHistorico, getPerfiles, getSaldosAPagar, pagarSaldos, getOrdenPago, correlativoOrden, emitirOrdenPago, desmarcarSaldos, getAtribuciones, getFondos, setFondos };
+module.exports = { sync, getAll, setEtapa, getConfig, setConfig, marcarHistorico, getPerfiles, getSaldosAPagar, enviarAPago, pagarSaldos, getOrdenPago, correlativoOrden, emitirOrdenPago, desmarcarSaldos, getAtribuciones, getFondos, setFondos };

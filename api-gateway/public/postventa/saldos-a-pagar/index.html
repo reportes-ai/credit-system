@@ -5,7 +5,7 @@
   <link rel="icon" href="/img/favicon.png" type="image/png">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Saldos Precios a Pagar — AutoFácil</title>
-  <!-- v3.9 -->
+  <!-- v4.0 -->
   <link href="/css/bootstrap.min.css" rel="stylesheet">
   <link href="/css/bootstrap-icons.css" rel="stylesheet">
   <style>
@@ -85,9 +85,15 @@
     .accionbar .sel-info { font-size:.85rem; color:var(--navy); font-weight:700; white-space:nowrap; }
     .btn-confirmar { background:#16a34a; color:#fff; border:none; border-radius:8px; padding:7px 16px; font-weight:800; cursor:pointer; font-size:.85rem; }
     .btn-confirmar:disabled { opacity:.45; cursor:default; }
+    .btn-enviar { background:#7c3aed; color:#fff; border:none; border-radius:8px; padding:7px 16px; font-weight:800; cursor:pointer; font-size:.85rem; }
+    .btn-enviar:disabled { opacity:.45; cursor:default; }
+    .accionbar .sep { width:1px; height:24px; background:#cbd5e1; margin:0 2px; }
+    .enviado-tag { color:#6d28d9; font-weight:700; font-size:.78rem; display:block; }
+    .btn-deshacer { display:block; margin:3px auto 0; background:#f5f3ff; color:#6d28d9; border:1px solid #ddd6fe; border-radius:7px; padding:2px 9px; font-size:.72rem; font-weight:700; cursor:pointer; }
     .btn-sec { background:#eef2f7; color:#0141A2; border:none; border-radius:8px; padding:7px 12px; font-weight:700; cursor:pointer; font-size:.82rem; }
     .btn-sec:disabled { opacity:.45; cursor:default; }
     tbody tr.row-sel { background:#ecfdf3; }
+    tbody tr.row-enviado { background:#f5f3ff; }
     #buscar { border:1.5px solid #d1d5db; border-radius:8px; padding:7px 12px; font-size:.85rem; width:260px; }
     .toast { position:fixed; top:70px; right:20px; background:#16a34a; color:#fff; padding:12px 18px; border-radius:9px; font-weight:600; font-size:.88rem; z-index:2000; display:none; }
     .toast.err { background:#dc2626; }
@@ -109,7 +115,7 @@
   <div class="head-row">
     <div>
       <h5 style="font-weight:800;color:var(--navy);margin:0"><i class="bi bi-cash-coin me-2"></i>Saldos Precios a Pagar</h5>
-      <span style="font-size:.82rem;color:#64748b">Operaciones con orden de pago emitida, ordenadas por antigüedad. <b>Selecciona</b> las que vas a pagar (o usa una propuesta), genera la <b>nómina</b> y luego <b>Confirmar pago</b>. Las marcadas se pueden revertir dentro del mismo día.</span>
+      <span style="font-size:.82rem;color:#64748b">Operaciones con orden de pago emitida, ordenadas por antigüedad. <b>Selecciona</b> las que se pagarán (o usa una propuesta) y presiona <b>Enviar a Pago</b> para fijarlas. Luego Tesorería genera la <b>nómina</b> y <b>Confirma el pago</b>. Las marcas se pueden revertir dentro del mismo día.</span>
     </div>
   </div>
 
@@ -117,6 +123,8 @@
   <div class="search-row">
     <input id="buscar" placeholder="Buscar OP, dealer, RUT…" oninput="render()">
     <div class="accionbar" id="accionBar" style="display:none">
+      <button class="btn-enviar" id="btnEnviar" onclick="enviarSeleccion()" disabled><i class="bi bi-send-check me-1"></i>Enviar a Pago</button>
+      <span class="sep"></span>
       <button class="btn-sec" id="btnNomina" onclick="copiarNomina()" disabled><i class="bi bi-clipboard me-1"></i>Nómina</button>
       <button class="btn-sec" id="btnCSV" onclick="descargarCSV()" disabled><i class="bi bi-download me-1"></i>CSV</button>
       <button class="btn-confirmar" id="btnConfirmar" onclick="confirmarPago()" disabled><i class="bi bi-check2-all me-1"></i>Confirmar pago</button>
@@ -243,7 +251,7 @@ function quienTxt(accion){
   try {
     const r = await fetch('/api/postventa/saldos-a-pagar', { headers:H });
     const j = await r.json();
-    DATA = (j.data || []).map(x => ({ ...x, pagado: !!Number(x.pagado_hoy) }));
+    DATA = (j.data || []).map(x => ({ ...x, pagado: !!Number(x.pagado_hoy), enviado: !!Number(x.enviado) }));
     colorearDias();
     render();
   } catch(e){ document.getElementById('body').innerHTML = `<tr><td colspan="10" class="vacio">Error: ${e.message}</td></tr>`; }
@@ -291,6 +299,11 @@ function celdaAccion(r){
     const rev = CAN.revertir ? `<button class="btn-revertir" onclick="revertir(${r.id})">Revertir</button>` : '';
     return `<span class="pagado-tag">Pagado hoy</span>${rev}`;
   }
+  if (r.enviado){
+    // Enviado a pago: fijo. Tesorería lo paga; se puede deshacer el mismo día.
+    const undo = CAN.revertir ? `<button class="btn-deshacer" onclick="revertirEnvio(${r.id})">Deshacer envío</button>` : '';
+    return `<span class="enviado-tag" title="Enviado por ${escH(r.enviado_por||'')}">✓ Enviado a pago</span>${undo}`;
+  }
   const dis = CAN.seleccionar ? '' : 'disabled title="'+quienTxt('seleccionar')+'"';
   return `<span class="pagar-cell">
     <span class="indbox" id="indmax_${r.id}" title="En propuesta Máximo de operaciones"></span>
@@ -305,7 +318,7 @@ function render(){
   if (!rows.length){ tb.innerHTML=''; document.getElementById('vacio').style.display=''; recalc(); return; }
   document.getElementById('vacio').style.display='none';
   tb.innerHTML = rows.map(r => `
-    <tr id="row_${r.id}" class="${r.pagado?'sel':(r.sel?'row-sel':'')}">
+    <tr id="row_${r.id}" class="${r.pagado?'sel':(r.enviado?'row-enviado':(r.sel?'row-sel':''))}">
       <td><b>${escH(r.num_op)}</b></td>
       <td>${escH(r.id_financiera||r.financiera||'—')}</td>
       <td>${escH(r.rut_dealer||'—')}</td>
@@ -344,7 +357,9 @@ async function revertir(id){
 }
 
 const sum = arr => arr.reduce((a,r)=>a+Number(r.saldo_precio||0),0);
-const seleccionadas = () => DATA.filter(r => !r.pagado && r.sel);
+// Selección transitoria por enviar (Comercial) vs. cola firme ya enviada (Tesorería paga)
+const seleccionadas = () => DATA.filter(r => !r.pagado && !r.enviado && r.sel);
+const enviadas      = () => DATA.filter(r => !r.pagado && r.enviado);
 
 function recalc(){
   const rows = visibles();
@@ -355,13 +370,18 @@ function recalc(){
   document.getElementById('cntPag').textContent    = pag.length;
   document.getElementById('montoPag').textContent  = fmt(sum(pag));
   // Barra de acción
-  const sel = seleccionadas();
+  const sel = seleccionadas(), env = enviadas();
   document.getElementById('selN').textContent = sel.length;
   document.getElementById('selM').textContent = fmt(sum(sel));
+  // Enviar a Pago: actúa sobre la selección transitoria (Comercial)
+  const be = document.getElementById('btnEnviar');
+  be.disabled = sel.length===0 || !CAN.seleccionar;
+  be.title = CAN.seleccionar ? '' : quienTxt('seleccionar');
+  // Nómina / Confirmar pago: actúan sobre la cola ya enviada (Tesorería)
   const bc = document.getElementById('btnConfirmar'), bn = document.getElementById('btnNomina'), bv = document.getElementById('btnCSV');
-  bc.disabled = sel.length===0 || !CAN.pagar;
-  bn.disabled = sel.length===0 || !CAN.nomina;
-  bv.disabled = sel.length===0 || !CAN.nomina;
+  bc.disabled = env.length===0 || !CAN.pagar;
+  bn.disabled = env.length===0 || !CAN.nomina;
+  bv.disabled = env.length===0 || !CAN.nomina;
   bc.title = CAN.pagar ? '' : quienTxt('pagar');
   bn.title = bv.title = CAN.nomina ? '' : quienTxt('nomina');
   document.getElementById('accionBar').style.display = DATA.some(r => !r.pagado) ? 'flex' : 'none';
@@ -435,9 +455,10 @@ async function guardarFondos(){
 function recalcPropuestas(){
   // Base disponible = Fondos − pagado hoy (las propuestas se calculan sobre TODAS
   // las pendientes, son alternativas; el toggle aplica una de ellas a la selección).
-  const D = Math.max(0, fondosVal - sum(DATA.filter(r => r.pagado)));
+  // Comprometido = ya pagado + ya enviado a pago (cola firme)
+  const D = Math.max(0, fondosVal - sum(DATA.filter(r => r.pagado || r.enviado)));
   document.getElementById('fondosSub').textContent = 'Disponible para asignar: ' + fmt(D);
-  const cand = DATA.filter(r => !r.pagado);
+  const cand = DATA.filter(r => !r.pagado && !r.enviado);
 
   const llenar = lista => { const set=[]; let acc=0;
     for (const r of lista){ const v=Number(r.saldo_precio||0); if (acc+v <= D){ set.push(r); acc+=v; } }
@@ -491,28 +512,62 @@ function aplicarPropuesta(which){
   if (propActiva === which){
     // apagar: limpiar selección
     propActiva = null;
-    DATA.forEach(r => { if (!r.pagado) r.sel = false; });
+    DATA.forEach(r => { if (!r.pagado && !r.enviado) r.sel = false; });
   } else {
     propActiva = which;
     const ids = new Set(lastProp[which].set.map(r => r.id));
-    DATA.forEach(r => { if (!r.pagado) r.sel = ids.has(r.id); });
+    DATA.forEach(r => { if (!r.pagado && !r.enviado) r.sel = ids.has(r.id); });
   }
   hl(null); render();
 }
 
-/* Confirmar pago del lote seleccionado */
-async function confirmarPago(){
+/* Enviar a Pago: fija la selección (Comercial) → marca ENVIADO A PAGO.
+   Después queda firme en la cola para que Tesorería confirme el pago. */
+async function enviarSeleccion(){
   const sel = seleccionadas();
   if (!sel.length) return;
-  if (!confirm(`Vas a registrar el PAGO de ${sel.length} saldo(s) precio por ${fmt(sum(sel))}. ¿Confirmas?`)) return;
+  if (!confirm(`Vas a ENVIAR A PAGO ${sel.length} operación(es) por ${fmt(sum(sel))}. Quedarán fijas para que Tesorería las pague. ¿Confirmas?`)) return;
   const ids = sel.map(r => r.id);
+  const btn = document.getElementById('btnEnviar');
+  btn.disabled = true; btn.innerHTML = '<i class="bi bi-hourglass-split me-1"></i>Enviando…';
+  try {
+    const resp = await fetch('/api/postventa/saldos-a-pagar/enviar-a-pago', { method:'POST', headers:H, body: JSON.stringify({ ids }) });
+    const j = await resp.json();
+    if (!j.success) throw new Error(j.error||'Error');
+    sel.forEach(r => { r.enviado = true; r.sel = false; r.enviado_por = (yo.nombre+' '+(yo.apellido||'')).trim(); });
+    propActiva = null;
+    render(); toast(`${ids.length} operación(es) enviadas a pago`);
+  } catch(e){ toast(e.message, true); }
+  btn.innerHTML = '<i class="bi bi-send-check me-1"></i>Enviar a Pago';
+}
+
+/* Deshacer envío (mismo día): saca la op de la cola firme */
+async function revertirEnvio(id){
+  const r = DATA.find(x => x.id===id); if (!r) return;
+  if (!confirm(`¿Deshacer el envío a pago de la OP ${r.num_op}? Volverá a quedar seleccionable.`)) return;
+  try {
+    const resp = await fetch('/api/postventa/saldos-a-pagar/desmarcar', { method:'POST', headers:H, body: JSON.stringify({ ids:[id], etapa:'ENVIADO A PAGO' }) });
+    const j = await resp.json();
+    if (!j.success) throw new Error(j.error||'Error');
+    if (j.data && j.data.desmarcados === 0) throw new Error('No se pudo deshacer (¿no es de hoy?).');
+    r.enviado = false; r.sel = false; propActiva = null;
+    render(); toast(`Envío de OP ${r.num_op} deshecho`);
+  } catch(e){ toast(e.message, true); }
+}
+
+/* Confirmar pago de la cola enviada (Tesorería) */
+async function confirmarPago(){
+  const env = enviadas();
+  if (!env.length) return;
+  if (!confirm(`Vas a registrar el PAGO de ${env.length} saldo(s) precio por ${fmt(sum(env))}. ¿Confirmas?`)) return;
+  const ids = env.map(r => r.id);
   const btn = document.getElementById('btnConfirmar');
   btn.disabled = true; btn.innerHTML = '<i class="bi bi-hourglass-split me-1"></i>Procesando…';
   try {
     const resp = await fetch('/api/postventa/saldos-a-pagar/pagar', { method:'POST', headers:H, body: JSON.stringify({ ids }) });
     const j = await resp.json();
     if (!j.success) throw new Error(j.error||'Error');
-    sel.forEach(r => { r.pagado = true; r.sel = false; });
+    env.forEach(r => { r.pagado = true; r.sel = false; });
     propActiva = null;
     render(); toast(`${ids.length} operación(es) pagadas`);
   } catch(e){ toast(e.message, true); }
@@ -520,7 +575,7 @@ async function confirmarPago(){
 }
 
 /* ── Nómina bancaria de las operaciones seleccionadas ── */
-function nominaRows(){ return seleccionadas(); }
+function nominaRows(){ return enviadas(); }
 const COLS = ['RUT Beneficiario','Nombre Beneficiario','Banco','N° Cuenta','Monto','Glosa'];
 function nominaMatriz(){
   return nominaRows().map(r => [
