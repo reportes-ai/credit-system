@@ -5,7 +5,7 @@
   <link rel="icon" href="/img/favicon.png" type="image/png">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Cartas de Aprobación — AutoFácil</title>
-  <!-- v4.0 -->
+  <!-- v4.1 -->
   <link href="/css/bootstrap.min.css" rel="stylesheet">
   <link href="/css/bootstrap-icons.css" rel="stylesheet">
   <style>
@@ -2305,7 +2305,7 @@ function renderRevCartolas(){
     grupos[key].some(m => [m.num_op,m.nuestro_num_op,m.rut_cliente,m.nombre_cliente,m.ejecutivo,m.num_carta]
       .some(v => String(v||'').toLowerCase().includes(q))));
   document.getElementById('revCtaCount').textContent = nombres.length + ' concesionario(s)';
-  const mes = document.getElementById('ctaMes').value || mesActual();
+  const mes = mesActual();   // la cartola se emite en el mes actual (mes de envío)
   cont.innerHTML = nombres.map((conc,gi)=>{
     const movs = grupos[conc];
     REV_IDS[gi] = movs.map(m=>m.id);
@@ -2357,7 +2357,7 @@ function renderRevCartolas(){
 }
 
 async function enviarCartola(gi, conc, rutC, total){
-  const mes = document.getElementById('ctaMes').value || mesActual();
+  const mes = mesActual();   // la cartola se emite en el mes actual (mes de envío)
   const mail = document.getElementById('mailCta'+gi).value.trim();
   const bloque = document.getElementById('bloqueCta'+gi);
   const filename = mes.replace('-','.') + ' CARTOLA COMISIONES - ' + conc.toUpperCase() + '.pdf';
