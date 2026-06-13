@@ -5,7 +5,7 @@
   <link rel="icon" href="/img/favicon.png" type="image/png">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Cartas de Aprobación — AutoFácil</title>
-  <!-- v3.2 -->
+  <!-- v3.3 -->
   <link href="/css/bootstrap.min.css" rel="stylesheet">
   <link href="/css/bootstrap-icons.css" rel="stylesheet">
   <style>
@@ -448,7 +448,7 @@
     <div style="font-size:.78rem;color:#64748b;margin-bottom:8px" id="infCount"></div>
     <div style="overflow-x:auto">
       <table class="tbl">
-        <thead><tr><th>N° Op Carta</th><th>Tipo</th><th>Cliente</th><th>Concesionario</th><th>Ejecutivo</th><th>Creador</th><th>Creado</th><th>Aprobador</th><th>Aprobado</th><th>Estado</th><th style="text-align:center">Otorgado</th><th></th></tr></thead>
+        <thead><tr><th>N° Op Carta</th><th>N° Crédito</th><th>Tipo</th><th>Cliente</th><th>Concesionario</th><th>Ejecutivo</th><th>Creador</th><th>Creado</th><th>Aprobador</th><th>Aprobado</th><th>Estado</th><th style="text-align:center">Otorgado</th><th></th></tr></thead>
         <tbody id="bodyInformes"></tbody>
       </table>
     </div>
@@ -2097,7 +2097,7 @@ function renderInformes(){
   document.getElementById('infCount').textContent = rows.length + ' carta(s) encontradas';
   const fdt = v => { if(!v) return '—'; const d=new Date(v); return isNaN(d)?'—':d.toLocaleDateString('es-CL')+' '+d.toLocaleTimeString('es-CL',{hour:'2-digit',minute:'2-digit'}); };
   const body = document.getElementById('bodyInformes');
-  if (!rows.length) { body.innerHTML='<tr><td colspan="12" style="text-align:center;color:#94a3b8;padding:24px">Sin resultados</td></tr>'; return; }
+  if (!rows.length) { body.innerHTML='<tr><td colspan="13" style="text-align:center;color:#94a3b8;padding:24px">Sin resultados</td></tr>'; return; }
   body.innerHTML = rows.map(c=>{
     const exc = (Array.isArray(c.excepciones)&&c.excepciones.length)
       ? `<span class="exc-dot" title="Ver excepciones" onclick="verExcepciones(${c.id})">E</span>` : '';
@@ -2106,6 +2106,7 @@ function renderInformes(){
       : '<span style="color:#cbd5e1;font-size:1.1rem"><i class="bi bi-square"></i></span><div style="font-size:.62rem;color:#94a3b8">NO</div>';
     return `<tr>
       <td><b>${escH(c.opCarta||'')}</b></td>
+      <td style="font-size:.78rem">${escH(c.numeroCreditoCreado||c.opOrigen||'—')}</td>
       <td style="font-size:.7rem">${escH(c.tipo||'')}</td>
       <td>${escH(toTitle(c.cliente||''))}</td>
       <td style="font-size:.76rem">${escH(c.concesionario||'')}</td>
@@ -2144,7 +2145,7 @@ function exportarInformes(){
     'Concesionario':c.concesionario, 'Ejecutivo':c.ejecutivoNombre, 'Creador':c.creadoPorNombre,
     'Creado':dDT(c.fechaCreacion), 'Aprobador':c.aprobadoPorNombre, 'Aprobado':dDT(c.fechaAprobacion),
     'Estado':c.status, 'Excepciones':(c.excepciones||[]).join(', '), 'Otorgado':c.otorgado?'SI':'NO',
-    'N° Crédito':c.numeroCreditoCreado, 'Saldo':c.saldo, 'Participación Bruta':c.partBruto,
+    'N° Crédito':c.numeroCreditoCreado||c.opOrigen||'', 'Saldo':c.saldo, 'Participación Bruta':c.partBruto,
   }));
   const ws = XLSX.utils.json_to_sheet(rows);
   const wb = XLSX.utils.book_new();
