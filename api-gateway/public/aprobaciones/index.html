@@ -5,7 +5,7 @@
   <link rel="icon" href="/img/favicon.png" type="image/png">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Cartas de Aprobación — AutoFácil</title>
-  <!-- v4.3 -->
+  <!-- v4.4 -->
   <link href="/css/bootstrap.min.css" rel="stylesheet">
   <link href="/css/bootstrap-icons.css" rel="stylesheet">
   <style>
@@ -2356,6 +2356,16 @@ function renderRevCartolas(){
   }).join('') || '<div style="text-align:center;color:#94a3b8;padding:30px">No hay comisiones marcadas a pago pendientes de cartola.</div>';
 }
 
+// Resuelve el mail de un ejecutivo por nombre contra el catálogo (tokens normalizados: maneja orden y nombres parciales)
+function _ejMail(nombre){
+  const tk = _normCM(nombre).split(' ').filter(Boolean);
+  if (!tk.length) return null;
+  const hit = (EJECUTIVOS||[]).find(e => {
+    const et = _normCM(e.nombre).split(' ').filter(Boolean);
+    return et.length && (et.every(t=>tk.includes(t)) || tk.every(t=>et.includes(t)));
+  });
+  return hit?.mail || null;
+}
 async function enviarCartola(gi, conc, rutC, total){
   const mes = mesActual();   // la cartola se emite en el mes actual (mes de envío)
   const mail = document.getElementById('mailCta'+gi).value.trim();
@@ -2379,6 +2389,10 @@ async function enviarCartola(gi, conc, rutC, total){
   // Refresca para que las operaciones enviadas salgan de pendientes y muestren su Mes Cartola
   cargarMovimientos();
   // 3) Abrir Gmail con el texto del correo (adjuntar el PDF descargado)
+  //    CC: comisiones@ + los ejecutivos que generaron las operaciones de esta cartola
+  const idsGrupo = REV_IDS[gi] || [];
+  const ejecMails = [...new Set((MOVS_ALL||[]).filter(m => idsGrupo.includes(m.id)).map(m => (m.ejecutivo_mail||'').trim() || _ejMail(m.ejecutivo)).filter(Boolean))];
+  const cc = ['comisiones@autofacilchile.cl', ...ejecMails].join(',');
   const asunto = `CARTOLA COMISIONES ${nombreMes(mes).toUpperCase()} — ${conc.toUpperCase()}`;
   const cuerpo =
 `Estimados ${conc}:
@@ -2394,9 +2408,9 @@ Av. Presidente Kennedy N° 5757, Piso 16 Of. 1601, Las Condes.
 Cualquier duda quedamos atentos.
 
 Saludos cordiales,
-${YO.nombre} ${YO.apellido||''}
 AutoFácil Crédito Automotriz`;
   window.open('https://mail.google.com/mail/?view=cm&fs=1&to=' + encodeURIComponent(mail) +
+    '&cc=' + encodeURIComponent(cc) +
     '&su=' + encodeURIComponent(asunto) + '&body=' + encodeURIComponent(cuerpo), '_blank');
 }
 

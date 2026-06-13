@@ -129,7 +129,7 @@ const getMovimientos = async (req, res) => {
     // num_op guardado = id_financiera (N° de la financiera). JOIN al crédito enlazado
     // para exponer NUESTRO N° de operación real (creditos.num_op).
     const [rows] = await pool.query(
-      `SELECT m.*, m.rut_dealer AS rut_conc, m.nombre_dealer AS concesionario, cr.num_op AS nuestro_num_op
+      `SELECT m.*, m.rut_dealer AS rut_conc, m.nombre_dealer AS concesionario, cr.num_op AS nuestro_num_op, ca.ejecutivo_mail AS ejecutivo_mail
        FROM cartolas_movimientos m
        LEFT JOIN cartas_aprobacion ca ON ca.id = m.id_carta
        LEFT JOIN creditos cr ON cr.id = ca.id_credito_creado
