@@ -5,7 +5,7 @@
   <link rel="icon" href="/img/favicon.png" type="image/png">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Saldos Precios a Pagar — AutoFácil</title>
-  <!-- v2.6 -->
+  <!-- v2.7 -->
   <link href="/css/bootstrap.min.css" rel="stylesheet">
   <link href="/css/bootstrap-icons.css" rel="stylesheet">
   <style>
@@ -110,6 +110,16 @@
     <input id="buscar" placeholder="Buscar OP, dealer, RUT…" oninput="render()">
   </div>
 
+  <!-- Barra de acción: seleccionar → confirmar pago + nómina banco -->
+  <div class="accionbar" id="accionBar" style="display:none">
+    <div class="sel-info">Seleccionadas para pagar: <span id="selN">0</span> · <span id="selM">$0</span></div>
+    <div class="acc">
+      <button class="btn-sec" id="btnNomina" onclick="copiarNomina()" disabled><i class="bi bi-clipboard me-1"></i>Copiar nómina</button>
+      <button class="btn-sec" id="btnCSV" onclick="descargarCSV()" disabled><i class="bi bi-download me-1"></i>CSV banco</button>
+      <button class="btn-confirmar" id="btnConfirmar" onclick="confirmarPago()" disabled><i class="bi bi-check2-all me-1"></i>Confirmar pago</button>
+    </div>
+  </div>
+
   <!-- Recuadro resumen arriba -->
   <div class="resumen">
     <div class="stat pend">
@@ -142,16 +152,6 @@
         <div><div class="val" id="propAntN">0 ops</div><div class="sub" id="propAntM">Gasta $0</div></div>
         <button class="btn-marcar" id="propAntBtn" onclick="marcarPropuesta('ant')">Marcar</button>
       </div>
-    </div>
-  </div>
-
-  <!-- Barra de acción: seleccionar → confirmar pago + nómina banco -->
-  <div class="accionbar" id="accionBar" style="display:none">
-    <div class="sel-info">Seleccionadas para pagar: <span id="selN">0</span> · <span id="selM">$0</span></div>
-    <div class="acc">
-      <button class="btn-sec" id="btnNomina" onclick="copiarNomina()" disabled><i class="bi bi-clipboard me-1"></i>Copiar nómina</button>
-      <button class="btn-sec" id="btnCSV" onclick="descargarCSV()" disabled><i class="bi bi-download me-1"></i>CSV banco</button>
-      <button class="btn-confirmar" id="btnConfirmar" onclick="confirmarPago()" disabled><i class="bi bi-check2-all me-1"></i>Confirmar pago</button>
     </div>
   </div>
 
