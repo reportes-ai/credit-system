@@ -1,19 +1,30 @@
 const https = require('https');
 const http  = require('http');
+const pool  = require('../../../../shared/config/database');
 
 /* Google News RSS — siempre disponible, sin API key */
-/* Antigüedad máxima de las noticias mostradas */
-const MAX_AGE_DAYS = 7;
-const MAX_AGE_MS = MAX_AGE_DAYS * 24 * 60 * 60 * 1000;
+/* Antigüedad máxima de las noticias (días) — editable en el selector de feeds.
+   Se guarda en config_ui (clave noticias_max_dias); default 7. */
+const DEFAULT_MAX_DIAS = 7;
+async function getDiasMax() {
+  try {
+    const [[row]] = await pool.query("SELECT valor FROM config_ui WHERE clave='noticias_max_dias'");
+    if (row) { const n = parseInt(JSON.parse(row.valor)); if (n > 0 && n <= 60) return n; }
+  } catch (_) { /* tabla puede no existir aún */ }
+  return DEFAULT_MAX_DIAS;
+}
 
-/* when:7d en la consulta limita a los últimos 7 días en el origen */
-const FEEDS = [
-  { url: 'https://news.google.com/rss/search?q=chile+noticias+when:7d&hl=es-419&gl=CL&ceid=CL:es-419', src: 'Google News' },
-  { url: 'https://news.google.com/rss/search?q=economia+chile+when:7d&hl=es-419&gl=CL&ceid=CL:es-419', src: 'Economía' },
-  { url: 'https://news.google.com/rss/search?q=finanzas+credito+chile+when:7d&hl=es-419&gl=CL&ceid=CL:es-419', src: 'Finanzas' },
-  { url: 'https://news.google.com/rss/search?q=industria+automotriz+venta+autos+chile+when:7d&hl=es-419&gl=CL&ceid=CL:es-419', src: 'Automotriz' },
-  { url: 'https://news.google.com/rss/search?q=banca+tasas+interes+banco+central+chile+when:7d&hl=es-419&gl=CL&ceid=CL:es-419', src: 'Banca' },
-];
+/* when:Nd en la consulta limita a los últimos N días en el origen */
+function buildFeeds(dias) {
+  const w = '+when:' + dias + 'd';
+  return [
+    { url: `https://news.google.com/rss/search?q=chile+noticias${w}&hl=es-419&gl=CL&ceid=CL:es-419`, src: 'Google News' },
+    { url: `https://news.google.com/rss/search?q=economia+chile${w}&hl=es-419&gl=CL&ceid=CL:es-419`, src: 'Economía' },
+    { url: `https://news.google.com/rss/search?q=finanzas+credito+chile${w}&hl=es-419&gl=CL&ceid=CL:es-419`, src: 'Finanzas' },
+    { url: `https://news.google.com/rss/search?q=industria+automotriz+venta+autos+chile${w}&hl=es-419&gl=CL&ceid=CL:es-419`, src: 'Automotriz' },
+    { url: `https://news.google.com/rss/search?q=banca+tasas+interes+banco+central+chile${w}&hl=es-419&gl=CL&ceid=CL:es-419`, src: 'Banca' },
+  ];
+}
 
 function fetchUrl(rawUrl, redirects = 0) {
   return new Promise((resolve, reject) => {
@@ -35,7 +46,7 @@ function fetchUrl(rawUrl, redirects = 0) {
   });
 }
 
-function parseRSS(xml, src) {
+function parseRSS(xml, src, maxAgeMs) {
   const items = [];
   const itemRe  = /<item[\s>]([\s\S]*?)<\/item>/gi;
   const titleRe = /<title>(?:<!\[CDATA\[)?(.*?)(?:\]\]>)?<\/title>/i;
@@ -47,9 +58,9 @@ function parseRSS(xml, src) {
     const block = m[1];
     const t = titleRe.exec(block);
     const l = linkRe.exec(block);
-    // Descartar noticias más antiguas que MAX_AGE_DAYS
+    // Descartar noticias más antiguas que el máximo de días configurado
     const d = dateRe.exec(block);
-    if (d) { const ts = Date.parse(d[1]); if (!isNaN(ts) && (ahora - ts) > MAX_AGE_MS) continue; }
+    if (d) { const ts = Date.parse(d[1]); if (!isNaN(ts) && (ahora - ts) > maxAgeMs) continue; }
     if (t && t[1].trim()) {
       // Limpiar el " - Fuente" que agrega Google al final del título
       let titulo = t[1]
@@ -65,17 +76,19 @@ function parseRSS(xml, src) {
   return items;
 }
 
-/* Cache 15 minutos */
-let cache = null, cacheTs = 0;
+/* Cache 15 minutos (se invalida si cambian los días configurados) */
+let cache = null, cacheTs = 0, cacheDias = null;
 const CACHE_MS = 15 * 60 * 1000;
 
 const getNoticias = async (_req, res) => {
   try {
-    if (cache && Date.now() - cacheTs < CACHE_MS)
+    const dias = await getDiasMax();
+    if (cache && cacheDias === dias && Date.now() - cacheTs < CACHE_MS)
       return res.json({ success: true, data: cache, error: null });
 
+    const maxAgeMs = dias * 24 * 60 * 60 * 1000;
     const resultados = await Promise.allSettled(
-      FEEDS.map(f => fetchUrl(f.url).then(xml => parseRSS(xml, f.src)))
+      buildFeeds(dias).map(f => fetchUrl(f.url).then(xml => parseRSS(xml, f.src, maxAgeMs)))
     );
 
     let items = [];
@@ -96,7 +109,7 @@ const getNoticias = async (_req, res) => {
     if (!mezclado.length)
       return res.json({ success: false, data: [], error: 'No se pudieron cargar noticias' });
 
-    cache = mezclado; cacheTs = Date.now();
+    cache = mezclado; cacheTs = Date.now(); cacheDias = dias;
     res.json({ success: true, data: mezclado, error: null });
   } catch (e) {
     res.status(500).json({ success: false, data: [], error: e.message });

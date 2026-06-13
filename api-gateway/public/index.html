@@ -301,6 +301,16 @@
       <label class="ncp-toggle"><input type="checkbox" id="ncpFeed4" checked onchange="applyNewsConfig()"><span class="slider"></span></label>
     </div>
 
+    <!-- Antigüedad máxima -->
+    <div class="ncp-row" style="margin-top:6px">
+      <div><div class="ncp-label">📅 Antigüedad máxima</div><div class="ncp-sublabel">descarta noticias más viejas que N días</div></div>
+      <div style="display:flex;align-items:center;gap:6px">
+        <input type="number" id="ncpDias" min="1" max="60" value="7" onchange="saveDiasNoticias()"
+          style="width:58px;background:rgba(255,255,255,.1);border:1px solid rgba(255,255,255,.25);color:#fff;border-radius:6px;padding:3px 6px;font-size:.8rem;text-align:center">
+        <span style="font-size:.72rem;color:#60a5fa">días</span>
+      </div>
+    </div>
+
     <!-- Velocidad -->
     <div class="ncp-row" style="margin-top:6px; flex-direction:column; align-items:stretch; gap:6px">
       <div style="display:flex;justify-content:space-between;align-items:center">
@@ -713,6 +723,23 @@ function applyNewsConfig() {
   renderTicker(getFilteredNoticias());
 }
 
+/* Antigüedad máxima de noticias (días) — config compartida en BD; recarga el feed */
+async function saveDiasNoticias() {
+  const el = document.getElementById('ncpDias');
+  let v = parseInt(el.value); if (!(v >= 1 && v <= 60)) { v = 7; el.value = 7; }
+  try {
+    const tk = sessionStorage.getItem('token');
+    await fetch('/api/config/ui/noticias_max_dias', {
+      method:'PUT', headers:{ 'Content-Type':'application/json', Authorization:'Bearer '+tk },
+      body: JSON.stringify({ valor: v }),
+    });
+    // Recargar noticias con el nuevo filtro (el backend invalida su caché al cambiar los días)
+    const r = await fetch('/api/noticias'); const d = await r.json();
+    ALL_NOTICIAS = (d.success && d.data?.length) ? d.data : [{ titulo:'Sin noticias disponibles en este momento', link:'#', src:'' }];
+    renderTicker(getFilteredNoticias());
+  } catch {}
+}
+
 // Panel toggle (solo admin)
 function toggleNewsPanel() {
   const yo = JSON.parse(sessionStorage.getItem('usuario') || 'null');
@@ -746,6 +773,14 @@ function closeNewsPanelOutside(e) {
   tickerPPS = NEWS_PPS[savedSpeed] || 50;
   if (cfg.feeds) cfg.feeds.forEach((v,i) => { const el = document.getElementById(`ncpFeed${i}`); if (el) el.checked = v; });
   if (cfg.mostrar === false) { const el = document.getElementById('ncpMostrar'); if (el) el.checked = false; }
+
+  // Antigüedad máxima (días) — compartida en BD
+  try {
+    const tk = sessionStorage.getItem('token');
+    const rd = await fetch('/api/config/ui/noticias_max_dias', { headers:{ Authorization:'Bearer '+tk } });
+    const dd = await rd.json();
+    const nd = parseInt(dd?.data); if (nd >= 1 && nd <= 60) document.getElementById('ncpDias').value = nd;
+  } catch {}
 
   // Ocultar controles si no es admin
   const yo = JSON.parse(sessionStorage.getItem('usuario') || 'null');
