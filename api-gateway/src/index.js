@@ -71,6 +71,7 @@ app.use('/api/informacion-comercial',  require('../../services/clientes/src/rout
 app.use('/api/informes-dealernet',     require('../../services/clientes/src/routes/informes-dealernet.routes'));
 
 // Mantenedores
+app.use('/api/impuestos',       require('../../services/mantenedores/src/routes/impuestos.routes'));
 app.use('/api/tasas',           require('../../services/mantenedores/src/routes/tasas.routes'));
 app.use('/api/uf',              require('../../services/mantenedores/src/routes/uf.routes'));
 app.use('/api/geografico',      require('../../services/mantenedores/src/routes/geografico.routes'));
