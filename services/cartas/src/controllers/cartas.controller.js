@@ -249,14 +249,19 @@ function parseJSON(val) {
   try { return JSON.parse(val); } catch { return null; }
 }
 
+// IVA paramétrico (mantenedor Impuestos). Se refresca en getAll; default 1.19.
+let _ivaFactor = 1.19;
+async function _refreshIva(){
+  try { const [[r]] = await pool.query("SELECT porcentaje FROM impuestos WHERE codigo='IVA'"); if (r) _ivaFactor = 1 + Number(r.porcentaje)/100; } catch(e) {}
+}
 function mapRow(r) {
   // Participación dealer: usa lo guardado en la carta o, si no viene, deriva del
   // crédito enlazado (comdea_real = bruto con IVA → neto = bruto/1.19).
   const brutoStore = Number(r.part_bruto) || 0;
   const brutoCred  = Number(r.cred_comdea_real) || 0;
   const partBruto  = brutoStore || brutoCred || null;
-  const partNeto   = (r.part_neto != null) ? r.part_neto : (partBruto ? Math.round(partBruto / 1.19) : null);
-  const partIVA    = (r.part_iva  != null) ? r.part_iva  : (partBruto ? partBruto - Math.round(partBruto / 1.19) : null);
+  const partNeto   = (r.part_neto != null) ? r.part_neto : (partBruto ? Math.round(partBruto / _ivaFactor) : null);
+  const partIVA    = (r.part_iva  != null) ? r.part_iva  : (partBruto ? partBruto - Math.round(partBruto / _ivaFactor) : null);
   const cv = (a, b) => (a == null || a === '' || a === 0) ? (b ?? null) : a;
   return {
     id:                       r.id,
@@ -365,6 +370,7 @@ const getAll = async (req, res) => {
     const [rows] = verTodas
       ? await pool.query(`${SEL} ORDER BY ca.fecha_creacion DESC`)
       : await pool.query(`${SEL} WHERE ca.creado_por = ? ORDER BY ca.fecha_creacion DESC`, [login]);
+    await _refreshIva();
     res.json({ success: true, data: rows.map(mapRow), verTodas, error: null });
   } catch (e) {
     (console.error('[error]', e), res.status(500).json({success:false,data:null,error:'Error interno del servidor'}));

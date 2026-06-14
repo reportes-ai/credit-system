@@ -5,7 +5,7 @@
   <link rel="icon" href="/img/favicon.png" type="image/png">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Seguimiento Post Venta — AutoFácil</title>
-  <!-- v2.1 -->
+  <!-- v2.2 -->
   <link href="/css/bootstrap.min.css" rel="stylesheet">
   <link href="/css/bootstrap-icons.css" rel="stylesheet">
   <style>
@@ -103,6 +103,7 @@ const escH = s => String(s??'').replace(/&/g,'&amp;').replace(/</g,'&lt;').repla
 const fmtF = f => { if(!f) return ''; const d=new Date(f); return isNaN(d)?'':d.toLocaleDateString('es-CL'); };
 
 let DATA = [], CFG = { etapas_saldo:[], etapas_comision:[] };
+let IMPUESTOS = { IVA:19, RETENCION_HONORARIOS:15.25 };
 let selFin = new Set(), selSaldo = new Set(), selCom = new Set(), selMes = new Set();
 let filtroPagado = true; // por defecto oculta completamente pagados
 const FINANCIERAS = ['AUTOFIN','UNIDAD DE CREDITO','AUTOFACIL'];
@@ -113,11 +114,13 @@ const mesLbl = m => MESES_N[parseInt(m.slice(5))-1]+' '+m.slice(0,4);
 (async function init(){
   try { await fetch('/api/postventa/sync',             { method:'POST', headers:H }); } catch(e) {}
   try { await fetch('/api/postventa/marcar-historico', { method:'POST', headers:H }); } catch(e) {}
-  const [rD, rC] = await Promise.all([
+  const [rD, rC, rI] = await Promise.all([
     fetch('/api/postventa', { headers:H }),
     fetch('/api/postventa/config', { headers:H }),
+    fetch('/api/impuestos/valores', { headers:H }),
   ]);
   const jD = await rD.json(), jC = await rC.json();
+  try { const jI = await rI.json(); if (jI.success && jI.data) IMPUESTOS = Object.assign(IMPUESTOS, jI.data); } catch(e){}
   DATA = jD.data || [];
   if (jC.data) CFG = { etapas_saldo: jC.data.etapas_saldo||[], etapas_comision: jC.data.etapas_comision||[] };
   renderFiltros();
@@ -358,6 +361,7 @@ function abrirModalFactura(id, chk){
   _fc('fcMonto').value = ''; _fc('fcMonto').dataset.raw = '';
   _fcSetExc('fcBtnTerceros', false); _fcSetExc('fcBtnBoleta', false);
   _fc('fcAlert').style.display = 'none';
+  fcBoletaInfo();
   document.getElementById('modalFactura').showModal();
 }
 function _fcSetExc(btnId, on){
@@ -370,7 +374,19 @@ function fcToggleTerceros(){
   if (FC.terceros){ _fc('fcRut').value=''; _fc('fcNombre').value=''; _fc('fcRut').disabled=true; _fc('fcNombre').disabled=true; }
   else { _fc('fcRut').value=FC.rut; _fc('fcNombre').value=FC.nombre; _fc('fcRut').disabled=false; _fc('fcNombre').disabled=false; }
 }
-function fcToggleBoleta(){ FC.boleta = !FC.boleta; _fcSetExc('fcBtnBoleta', FC.boleta); }
+function fcToggleBoleta(){ FC.boleta = !FC.boleta; _fcSetExc('fcBtnBoleta', FC.boleta); fcBoletaInfo(); }
+function fcBoletaInfo(){
+  const box = _fc('fcBoleta');
+  const bruto = parseInt(_fc('fcMonto').dataset.raw||'')||0;   // monto bruto de la factura (con IVA)
+  if (!FC.boleta || !bruto){ box.style.display='none'; return; }
+  const iva = Number(IMPUESTOS.IVA)||19, ret = Number(IMPUESTOS.RETENCION_HONORARIOS)||15.25;
+  const boletaBruto = Math.round(bruto / (1 + iva/100));   // líquido de la factura = bruto de la boleta
+  const retencion = Math.round(boletaBruto * ret/100);
+  const depositar = boletaBruto - retencion;
+  const clp = n => '$'+(n||0).toLocaleString('es-CL');
+  box.innerHTML = `⚠ Al cambiar a <b>Boleta</b>: el monto de la Boleta es <b>${clp(boletaBruto)}</b>, la retención (${ret}%) es <b>${clp(retencion)}</b> y el monto a depositar es <b>${clp(depositar)}</b>.`;
+  box.style.display = 'block';
+}
 function editarFactura(id){
   const r = DATA.find(x => x.id === id) || {};
   FC = { id, chk:null, modo:'editar', terceros:!!r.fac_terceros, boleta:!!r.fac_boleta, rut:r.rut_dealer||'', nombre:r.nombre_dealer||'', num_op:r.num_op||null };
@@ -381,9 +397,10 @@ function editarFactura(id){
   const m = r.fac_monto || ''; _fc('fcMonto').value = m ? '$'+parseInt(m).toLocaleString('es-CL') : ''; _fc('fcMonto').dataset.raw = m ? String(m) : '';
   _fcSetExc('fcBtnTerceros', !!r.fac_terceros); _fcSetExc('fcBtnBoleta', !!r.fac_boleta);
   _fc('fcAlert').style.display = 'none';
+  fcBoletaInfo();
   document.getElementById('modalFactura').showModal();
 }
-function fcMoneyFmt(el){ const n = el.value.replace(/\D/g,''); el.dataset.raw = n; el.value = n ? '$'+parseInt(n).toLocaleString('es-CL') : ''; }
+function fcMoneyFmt(el){ const n = el.value.replace(/\D/g,''); el.dataset.raw = n; el.value = n ? '$'+parseInt(n).toLocaleString('es-CL') : ''; fcBoletaInfo(); }
 function fcCancelar(){ document.getElementById('modalFactura').close(); if (FC.chk) FC.chk.checked = false; FC = {id:null,chk:null}; }
 async function fcGuardar(){
   const fecha = _fc('fcFecha').value, numero = _fc('fcNumero').value.trim(), monto = parseInt(_fc('fcMonto').dataset.raw||'')||0;
@@ -445,6 +462,7 @@ async function toggleEtapa(id, track, etapa, chk){
   </div>
   <div style="padding:18px 20px">
     <div id="fcAlert" style="display:none;background:#fef2f2;border:1px solid #fecaca;color:#b91c1c;border-radius:8px;padding:8px 12px;font-size:.82rem;margin-bottom:12px"></div>
+    <div id="fcBoleta" style="display:none;background:#fffbeb;border:1px solid #fde68a;color:#92400e;border-radius:8px;padding:9px 12px;font-size:.82rem;margin-bottom:12px;line-height:1.5"></div>
     <div style="display:flex;gap:8px;margin-bottom:14px">
       <button type="button" id="fcBtnTerceros" onclick="fcToggleTerceros()" style="flex:1;border:1px solid #cbd5e1;background:#eef2f7;color:#334155;border-radius:8px;padding:8px;font-size:.82rem;font-weight:700;cursor:pointer">Factura de terceros</button>
       <button type="button" id="fcBtnBoleta" onclick="fcToggleBoleta()" style="flex:1;border:1px solid #cbd5e1;background:#eef2f7;color:#334155;border-radius:8px;padding:8px;font-size:.82rem;font-weight:700;cursor:pointer">Boleta</button>

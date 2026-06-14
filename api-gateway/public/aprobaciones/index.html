@@ -5,7 +5,7 @@
   <link rel="icon" href="/img/favicon.png" type="image/png">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Cartas de Aprobación — AutoFácil</title>
-  <!-- v4.4 -->
+  <!-- v4.5 -->
   <link href="/css/bootstrap.min.css" rel="stylesheet">
   <link href="/css/bootstrap-icons.css" rel="stylesheet">
   <style>
@@ -598,6 +598,7 @@ const ES_ADMIN = (YO.perfil === 'Administrador');
 
 /* ── Estado global ────────────────────────────────── */
 let CARTAS = [], EJECUTIVOS = [], DEALERS = [], PARQUES = [], MARCAS = [];
+let IVA_FACTOR = 1.19;  // se sobrescribe con el IVA del mantenedor Impuestos
 let PERMISOS = new Set();
 let FACTORES = [   // fallback si no hay parámetro en BD
   {desde:1, hasta:12, parque:0,     calle:0.025, agCalle:0.005, agParque:0},
@@ -659,6 +660,7 @@ const dDT   = v => { if(!v) return null; const d=new Date(v); if(isNaN(d)) retur
 (async function init(){
   await cargarPermisos();
   await Promise.all([cargarCartas(), cargarCatalogos(), cargarFactores(), cargarFirma(), cargarUFyTasas()]);
+  try { const _ri = await fetch('/api/impuestos/valores', { headers: hdr() }); const _ji = await _ri.json(); if (_ji.success && _ji.data && _ji.data.IVA) IVA_FACTOR = 1 + Number(_ji.data.IVA)/100; } catch(e){}
   document.getElementById('cFecha').value = new Date().toISOString().slice(0,10);
   renderFinancierasSelect();
   restaurarBorrador();
@@ -1381,7 +1383,7 @@ function fmtPctBlur(el){
 function fmtPctFocus(el){ el.value = String(el.value).replace(/[^\d,]/g,''); }
 function calcNetoIva(){
   const bruto = rawMoney('cPartBruto');
-  const neto = Math.round(bruto / 1.19);
+  const neto = Math.round(bruto / IVA_FACTOR);
   setMoney('cPartNeto', neto);
   setMoney('cPartIVA', bruto - neto);
   avisoParticipacion();
@@ -2315,7 +2317,7 @@ function renderRevCartolas(){
     const anulacion  = movs.filter(m=>m.movimiento==='ANULACION' && m.estado_comision==='A DESCONTAR').reduce((s,m)=>s+(+m.comision||0),0);
     const prepago    = movs.filter(m=>m.movimiento==='PREPAGO' && m.estado_comision==='A DESCONTAR').reduce((s,m)=>s+(+m.comision||0),0);
     const subTotal = comisiones - anulacion - prepago;
-    const neto = Math.round(subTotal/1.19), iva = subTotal - neto;
+    const neto = Math.round(subTotal/IVA_FACTOR), iva = subTotal - neto;
     const filas = movs.map(m=>`<tr>
       <td>${escH(m.num_op||'')}</td><td>${escH(m.nuestro_num_op||'—')}</td><td style="font-size:.74rem">${escH(m.movimiento)}</td>
       <td style="font-size:.74rem">${escH(m.ejecutivo||'')}</td>
