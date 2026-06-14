@@ -5,7 +5,7 @@
   <link rel="icon" href="/img/favicon.png" type="image/png">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Emisión Orden de Pago Comisión — AutoFácil</title>
-  <!-- v1.3 -->
+  <!-- v1.4 -->
   <link href="/css/bootstrap.min.css" rel="stylesheet">
   <link href="/css/bootstrap-icons.css" rel="stylesheet">
   <style>
@@ -161,9 +161,9 @@ function docHTML(r){
   const Smeta = 'border-collapse:collapse;font-size:11px';
   const Slbl = 'color:#64748b;font-weight:700;text-transform:uppercase;font-size:9px;padding:1px 8px;white-space:nowrap';
   const Smv = 'padding:1px 8px;font-size:11px';
-  const Stbl = 'width:100%;border-collapse:collapse;margin:8px 0;font-size:11px';
-  const Sth = 'background:#dbeafe;color:#1e3a8a;border:1px solid #93c5fd;padding:5px 6px;font-size:9px;text-transform:uppercase;text-align:left;white-space:nowrap';
-  const Std = 'border:1px solid #cbd5e1;padding:5px 6px;white-space:nowrap';
+  const Stbl = 'width:100%;border-collapse:collapse;margin:8px 0;font-size:11px;table-layout:fixed';
+  const Sth = 'background:#dbeafe;color:#1e3a8a;border:1px solid #93c5fd;padding:5px 6px;font-size:9px;text-transform:uppercase;text-align:left;white-space:normal;word-break:break-word';
+  const Std = 'border:1px solid #cbd5e1;padding:5px 6px;white-space:normal;word-break:break-word';
   const Snum = Std + ';text-align:right';
   const Sres = 'border-collapse:collapse;margin-top:14px;max-width:430px';
   const SresL = 'border:1px solid #cbd5e1;padding:5px 8px;font-size:11px;background:#eff6ff;font-weight:700;width:42%';
@@ -177,7 +177,7 @@ function docHTML(r){
     <table style="width:100%;border-collapse:collapse;margin-bottom:14px"><tbody><tr>
       <td style="vertical-align:top">
         <table style="${Smeta}"><tbody>
-          <tr><td style="${Slbl}">Concepto</td><td style="${Smv}">SOLICITUD AUTORIZACIÓN DE PAGO</td></tr>
+          <tr><td style="${Slbl}">Concepto</td><td style="${Smv}">SOLICITUD DE PAGO</td></tr>
           <tr><td style="${Slbl}">Compañía</td><td style="${Smv}">AUTOFÁCIL SPA</td></tr>
           <tr><td style="${Slbl}">Tipo gasto</td><td style="${Smv}">COMISIÓN A DEALER</td></tr>
           <tr><td style="${Slbl}">N° Orden</td><td style="${Smv}">${r.num_orden || ('OC-'+(r.num_op||''))}</td></tr>
@@ -189,6 +189,7 @@ function docHTML(r){
       </td>
     </tr></tbody></table>
     <table style="${Stbl}">
+      <colgroup><col style="width:22%"><col style="width:11%"><col style="width:21%"><col style="width:7%"><col style="width:11%"><col style="width:10%"><col style="width:10%"><col style="width:8%"></colgroup>
       <thead><tr><th style="${Sth}">Dealer</th><th style="${Sth}">RUT</th><th style="${Sth}">Detalle</th><th style="${Sth}">Mes</th><th style="${Sth}">Monto Total</th><th style="${Sth}">${impLbl}</th><th style="${Sth}">A Pagar</th><th style="${Sth}">Fecha a pagar</th></tr></thead>
       <tbody>${filas}
         <tr><td colspan="6" style="${Std};text-align:right;font-weight:800;background:#f1f5f9">TOTAL</td><td style="${Snum};font-weight:800;background:#f1f5f9">${fmt(aPagar)}</td><td style="${Std};background:#f1f5f9"></td></tr>
