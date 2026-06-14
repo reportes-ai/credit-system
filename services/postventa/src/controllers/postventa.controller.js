@@ -125,6 +125,21 @@ const pool = require('../../../../shared/config/database');
         motivo         VARCHAR(400),
         fecha          DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
       )`);
+    // Datos de la factura/boleta de comisión (capturados al marcar FACTURA RECIBIDA)
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS postventa_facturas_comision (
+        id_seguimiento INT PRIMARY KEY,
+        num_op         INT DEFAULT NULL,
+        rut_dealer     VARCHAR(20) DEFAULT NULL,
+        nombre_dealer  VARCHAR(200) DEFAULT NULL,
+        fecha_factura  DATE DEFAULT NULL,
+        numero_factura VARCHAR(60) DEFAULT NULL,
+        monto_bruto    BIGINT DEFAULT NULL,
+        es_terceros    TINYINT(1) NOT NULL DEFAULT 0,
+        es_boleta      TINYINT(1) NOT NULL DEFAULT 0,
+        usuario        VARCHAR(150),
+        created_at     DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
+      )`);
     console.log('[postventa] tablas OK');
   } catch (e) { console.error('[postventa migration]', e.message); }
 })();
@@ -358,6 +373,22 @@ const setEtapa = async (req, res) => {
         `INSERT INTO postventa_etapas (id_seguimiento, track, etapa, usuario) VALUES (?,?,?,?)
          ON DUPLICATE KEY UPDATE usuario = VALUES(usuario), fecha = NOW()`,
         [req.params.id, track, etapa, usuario]);
+      // FACTURA RECIBIDA de comisión: guardar datos de la factura/boleta (incl. excepciones)
+      if (track === 'COMISION' && etapa === 'FACTURA RECIBIDA' && req.body.factura) {
+        const f = req.body.factura;
+        await pool.query(
+          `INSERT INTO postventa_facturas_comision
+             (id_seguimiento, num_op, rut_dealer, nombre_dealer, fecha_factura, numero_factura, monto_bruto, es_terceros, es_boleta, usuario)
+           VALUES (?,?,?,?,?,?,?,?,?,?)
+           ON DUPLICATE KEY UPDATE
+             num_op=VALUES(num_op), rut_dealer=VALUES(rut_dealer), nombre_dealer=VALUES(nombre_dealer),
+             fecha_factura=VALUES(fecha_factura), numero_factura=VALUES(numero_factura), monto_bruto=VALUES(monto_bruto),
+             es_terceros=VALUES(es_terceros), es_boleta=VALUES(es_boleta), usuario=VALUES(usuario), created_at=NOW()`,
+          [req.params.id, f.num_op || null, f.rut_dealer || null, f.nombre_dealer || null,
+           f.fecha_factura || null, f.numero_factura || null,
+           (f.monto_bruto != null && f.monto_bruto !== '') ? Math.round(Number(f.monto_bruto)) : null,
+           f.es_terceros ? 1 : 0, f.es_boleta ? 1 : 0, usuario]);
+      }
     } else {
       // Validación desmarcar: debe ser la última marcada
       let lastIdx = -1;
@@ -378,6 +409,9 @@ const setEtapa = async (req, res) => {
       await pool.query(
         'DELETE FROM postventa_etapas WHERE id_seguimiento = ? AND track = ? AND etapa = ?',
         [req.params.id, track, etapa]);
+      // Al desmarcar FACTURA RECIBIDA de comisión, borrar los datos de la factura
+      if (track === 'COMISION' && etapa === 'FACTURA RECIBIDA')
+        await pool.query('DELETE FROM postventa_facturas_comision WHERE id_seguimiento = ?', [req.params.id]);
     }
     // Alerta event-driven: al marcar FONDOS RECIBIDOS avisar para emitir Orden de Pago
     if (marcar && track === 'SALDO' && etapa === 'FONDOS RECIBIDOS') {

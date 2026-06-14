@@ -5,7 +5,7 @@
   <link rel="icon" href="/img/favicon.png" type="image/png">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Seguimiento Post Venta — AutoFácil</title>
-  <!-- v1.9 -->
+  <!-- v2.0 -->
   <link href="/css/bootstrap.min.css" rel="stylesheet">
   <link href="/css/bootstrap-icons.css" rel="stylesheet">
   <style>
@@ -344,7 +344,57 @@ async function revertirPago(id){
   } catch(e) { alert('Error de conexión'); }
 }
 
+/* ════════ Modal Factura Recibida (Comisión) ════════ */
+let FC = { id:null, chk:null, terceros:false, boleta:false, rut:'', nombre:'', num_op:null };
+const _fc = id => document.getElementById(id);
+function abrirModalFactura(id, chk){
+  const r = DATA.find(x => x.id === id) || {};
+  FC = { id, chk, terceros:false, boleta:false, rut:r.rut_dealer||'', nombre:r.nombre_dealer||'', num_op:r.num_op||null };
+  _fc('fcRut').value = FC.rut;       _fc('fcRut').disabled = false;
+  _fc('fcNombre').value = FC.nombre; _fc('fcNombre').disabled = false;
+  _fc('fcFecha').value = new Date().toISOString().slice(0,10);
+  _fc('fcNumero').value = '';
+  _fc('fcMonto').value = ''; _fc('fcMonto').dataset.raw = '';
+  _fcSetExc('fcBtnTerceros', false); _fcSetExc('fcBtnBoleta', false);
+  _fc('fcAlert').style.display = 'none';
+  document.getElementById('modalFactura').showModal();
+}
+function _fcSetExc(btnId, on){
+  const b = document.getElementById(btnId);
+  b.style.background = on ? '#0141A2' : '#eef2f7';
+  b.style.color = on ? '#fff' : '#334155';
+}
+function fcToggleTerceros(){
+  FC.terceros = !FC.terceros; _fcSetExc('fcBtnTerceros', FC.terceros);
+  if (FC.terceros){ _fc('fcRut').value=''; _fc('fcNombre').value=''; _fc('fcRut').disabled=true; _fc('fcNombre').disabled=true; }
+  else { _fc('fcRut').value=FC.rut; _fc('fcNombre').value=FC.nombre; _fc('fcRut').disabled=false; _fc('fcNombre').disabled=false; }
+}
+function fcToggleBoleta(){ FC.boleta = !FC.boleta; _fcSetExc('fcBtnBoleta', FC.boleta); }
+function fcMoneyFmt(el){ const n = el.value.replace(/\D/g,''); el.dataset.raw = n; el.value = n ? '$'+parseInt(n).toLocaleString('es-CL') : ''; }
+function fcCancelar(){ document.getElementById('modalFactura').close(); if (FC.chk) FC.chk.checked = false; FC = {id:null,chk:null}; }
+async function fcGuardar(){
+  const fecha = _fc('fcFecha').value, numero = _fc('fcNumero').value.trim(), monto = parseInt(_fc('fcMonto').dataset.raw||'')||0;
+  const al = _fc('fcAlert');
+  if (!fecha || !numero || !monto){ al.textContent='Completa fecha, N° de factura y monto bruto.'; al.style.display='block'; return; }
+  if (FC.terceros || FC.boleta){
+    if (!confirm('Al grabar, el usuario certifica que se autorizó la emisión de una Boleta en vez de Factura y/o la emisión de la Boleta/Factura por un tercero.\n\n¿Confirmas?')) return;
+  }
+  const factura = { num_op:FC.num_op, rut_dealer:_fc('fcRut').value.trim()||null, nombre_dealer:_fc('fcNombre').value.trim()||null,
+    fecha_factura:fecha, numero_factura:numero, monto_bruto:monto, es_terceros:FC.terceros?1:0, es_boleta:FC.boleta?1:0 };
+  try {
+    const r = await fetch('/api/postventa/'+FC.id+'/etapa', { method:'PUT', headers:H,
+      body: JSON.stringify({ track:'COMISION', etapa:'FACTURA RECIBIDA', marcar:1, factura }) });
+    const j = await r.json();
+    if (!j.success){ al.textContent=j.error||'Error'; al.style.display='block'; return; }
+    const row = DATA.find(x=>x.id===FC.id);
+    if (row){ row.etapas = row.etapas.filter(e=>!(e.track==='COMISION'&&e.etapa==='FACTURA RECIBIDA'));
+      row.etapas.push({ id_seguimiento:FC.id, track:'COMISION', etapa:'FACTURA RECIBIDA', usuario:j.data.usuario, fecha:new Date().toISOString() }); }
+    document.getElementById('modalFactura').close(); FC = {id:null,chk:null}; render();
+  } catch(e){ al.textContent='Error de conexión'; al.style.display='block'; }
+}
+
 async function toggleEtapa(id, track, etapa, chk){
+  if (chk.checked && track === 'COMISION' && etapa === 'FACTURA RECIBIDA') { abrirModalFactura(id, chk); return; }
   chk.disabled = true;
   try {
     const r = await fetch('/api/postventa/'+id+'/etapa', { method:'PUT', headers:H,
@@ -361,6 +411,39 @@ async function toggleEtapa(id, track, etapa, chk){
   finally { chk.disabled = false; }
 }
 </script>
+
+<style>
+  #modalFactura { border:none; border-radius:14px; padding:0; max-width:460px; width:92%; box-shadow:0 20px 60px rgba(0,0,0,.3); }
+  #modalFactura::backdrop { background:rgba(0,0,0,.45); }
+  #modalFactura label { display:block; font-size:.78rem; font-weight:600; color:#374151; }
+  #modalFactura input { width:100%; margin-top:3px; border:1.5px solid #d1d5db; border-radius:8px; padding:8px 10px; font-size:.88rem; box-sizing:border-box; outline:none; }
+  #modalFactura input:focus { border-color:#0141A2; }
+  #modalFactura input:disabled { background:#f1f5f9; color:#94a3b8; }
+</style>
+<dialog id="modalFactura">
+  <div style="background:linear-gradient(135deg,#012d70,#0141A2);color:#fff;padding:15px 20px;display:flex;align-items:center;gap:10px">
+    <i class="bi bi-receipt" style="font-size:1.25rem"></i>
+    <h6 style="margin:0;font-weight:700;font-size:1rem">Factura Recibida — Comisión</h6>
+  </div>
+  <div style="padding:18px 20px">
+    <div id="fcAlert" style="display:none;background:#fef2f2;border:1px solid #fecaca;color:#b91c1c;border-radius:8px;padding:8px 12px;font-size:.82rem;margin-bottom:12px"></div>
+    <div style="display:flex;gap:8px;margin-bottom:14px">
+      <button type="button" id="fcBtnTerceros" onclick="fcToggleTerceros()" style="flex:1;border:1px solid #cbd5e1;background:#eef2f7;color:#334155;border-radius:8px;padding:8px;font-size:.82rem;font-weight:700;cursor:pointer">Factura de terceros</button>
+      <button type="button" id="fcBtnBoleta" onclick="fcToggleBoleta()" style="flex:1;border:1px solid #cbd5e1;background:#eef2f7;color:#334155;border-radius:8px;padding:8px;font-size:.82rem;font-weight:700;cursor:pointer">Boleta</button>
+    </div>
+    <div style="display:grid;gap:11px">
+      <label>RUT Dealer<input id="fcRut" type="text"></label>
+      <label>Nombre Dealer<input id="fcNombre" type="text"></label>
+      <label>Fecha factura<input id="fcFecha" type="date"></label>
+      <label>N° Factura<input id="fcNumero" type="text"></label>
+      <label>Monto Bruto<input id="fcMonto" type="text" inputmode="numeric" placeholder="$0" oninput="fcMoneyFmt(this)"></label>
+    </div>
+  </div>
+  <div style="padding:12px 20px;border-top:1px solid #eef2f7;display:flex;justify-content:flex-end;gap:10px">
+    <button type="button" onclick="fcCancelar()" style="background:#f1f5f9;color:#374151;border:none;border-radius:8px;padding:8px 18px;font-weight:600;cursor:pointer">Cancelar</button>
+    <button type="button" onclick="fcGuardar()" style="background:#0141A2;color:#fff;border:none;border-radius:8px;padding:8px 20px;font-weight:700;cursor:pointer">Guardar</button>
+  </div>
+</dialog>
 <script src="/js/app-version.js"></script>
 </body>
 </html>
