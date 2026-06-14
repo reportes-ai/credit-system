@@ -290,4 +290,43 @@ const registrarEnvio = async (req, res) => {
   }
 };
 
-module.exports = { sync, getMovimientos, crearMovimiento, updateMovimiento, deleteMovimiento, getEnviadas, registrarEnvio };
+/* ── DELETE /api/cartolas/enviadas/:id — reversar un envío de cartola ──────
+   Deshace el envío: borra el registro, des-estampa Mes Cartola en los
+   movimientos de ese dealer/mes y quita la etapa CARTOLA ENVIADA en Post
+   Venta (deja la cartola lista para reenviar). Permiso: aprob_cartola_reversar. */
+const reversarEnvio = async (req, res) => {
+  try {
+    const [[env]] = await pool.query('SELECT * FROM cartolas_enviadas WHERE id = ?', [req.params.id]);
+    if (!env) return res.status(404).json({ success: false, data: null, error: 'Envío no encontrado' });
+
+    // Operaciones (seguimientos) a las que hay que quitar CARTOLA ENVIADA — calcular ANTES de des-estampar
+    const [segs] = await pool.query(
+      `SELECT DISTINCT ps.id AS seg_id
+         FROM cartolas_movimientos m
+         JOIN cartas_aprobacion ca ON ca.id = m.id_carta
+         JOIN postventa_seguimiento ps ON ps.id_credito = ca.id_credito_creado
+        WHERE m.mes_cartola = ? AND m.rut_dealer <=> ?`, [env.mes, env.rut_dealer]);
+
+    // Des-estampar los movimientos de esa cartola
+    const [u] = await pool.query(
+      `UPDATE cartolas_movimientos SET mes_cartola = NULL, enviada_por = NULL, enviada_fecha = NULL
+        WHERE mes_cartola = ? AND rut_dealer <=> ?`, [env.mes, env.rut_dealer]);
+
+    // Quitar la etapa CARTOLA ENVIADA en Post Venta (las previas se conservan)
+    if (segs.length) {
+      const ids = segs.map(s => s.seg_id);
+      const ph = ids.map(() => '?').join(',');
+      await pool.query(
+        `DELETE FROM postventa_etapas
+          WHERE track='COMISION' AND etapa='CARTOLA ENVIADA' AND id_seguimiento IN (${ph})`, ids);
+    }
+
+    await pool.query('DELETE FROM cartolas_enviadas WHERE id = ?', [req.params.id]);
+    res.json({ success: true, data: { reversado: Number(req.params.id), movimientos: u.affectedRows, operaciones: segs.length }, error: null });
+  } catch (e) {
+    console.error('[cartolas reversar]', e.message);
+    res.status(500).json({ success: false, data: null, error: 'Error interno del servidor' });
+  }
+};
+
+module.exports = { sync, getMovimientos, crearMovimiento, updateMovimiento, deleteMovimiento, getEnviadas, registrarEnvio, reversarEnvio };

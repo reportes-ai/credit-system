@@ -5,7 +5,7 @@
   <link rel="icon" href="/img/favicon.png" type="image/png">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Cartas de Aprobación — AutoFácil</title>
-  <!-- v4.5 -->
+  <!-- v4.6 -->
   <link href="/css/bootstrap.min.css" rel="stylesheet">
   <link href="/css/bootstrap-icons.css" rel="stylesheet">
   <style>
@@ -500,7 +500,7 @@
       <select id="envMes" onchange="cargarEnviadas()"></select>
     </div>
     <table class="tbl">
-      <thead><tr><th>Mes</th><th>Dealer</th><th>RUT</th><th>Mail</th><th style="text-align:right">Total Bruto</th><th>Enviada por</th><th>Fecha envío</th></tr></thead>
+      <thead><tr><th>Mes</th><th>Dealer</th><th>RUT</th><th>Mail</th><th style="text-align:right">Total Bruto</th><th>Enviada por</th><th>Fecha envío</th><th id="thRevEnv" style="display:none"></th></tr></thead>
       <tbody id="bodyEnviadas"></tbody>
     </table>
   </div>
@@ -2538,15 +2538,27 @@ async function cargarEnviadas(){
     const j = await r.json();
     const rows = j.success ? (j.data||[]) : [];
     const body = document.getElementById('bodyEnviadas');
-    if (!rows.length) { body.innerHTML='<tr><td colspan="7" style="text-align:center;color:#94a3b8;padding:24px">Sin cartolas enviadas</td></tr>'; return; }
+    const canRev = puede('aprob_cartola_reversar');
+    document.getElementById('thRevEnv').style.display = canRev ? '' : 'none';
+    if (!rows.length) { body.innerHTML=`<tr><td colspan="${canRev?8:7}" style="text-align:center;color:#94a3b8;padding:24px">Sin cartolas enviadas</td></tr>`; return; }
     body.innerHTML = rows.map(e=>`<tr>
       <td>${nombreMes(e.mes)}</td><td><b>${escH(e.concesionario)}</b></td><td>${fmtRUT(e.rut_conc||'')}</td>
       <td style="font-size:.76rem">${escH(e.mail||'—')}</td>
       <td style="text-align:right">${fmtCLP(e.total_bruto)}</td>
       <td style="font-size:.74rem">${escH(e.enviado_por||'')}</td>
       <td style="font-size:.74rem">${new Date(e.fecha_envio).toLocaleString('es-CL')}</td>
+      ${canRev?`<td style="text-align:right"><button class="btn-mini bm-anular" title="Reversar envío" onclick="reversarEnvio(${e.id},'${escH(e.concesionario)}','${escH(e.mes)}')"><i class="bi bi-arrow-counterclockwise"></i> Reversar</button></td>`:''}
     </tr>`).join('');
   } catch(e) {}
+}
+async function reversarEnvio(id, dealer, mes){
+  if (!confirm(`¿Reversar el envío de cartola de ${dealer} (${nombreMes(mes)})?\n\nEsto quita la marca CARTOLA ENVIADA y el Mes Cartola de esas operaciones, dejándolas listas para reenviar.`)) return;
+  try {
+    const r = await fetch('/api/cartolas/enviadas/'+id, { method:'DELETE', headers: hdr() });
+    const j = await r.json();
+    if (!j.success){ alert(j.error||'No se pudo reversar'); return; }
+    cargarEnviadas();
+  } catch(e){ alert('Error de conexión'); }
 }
 </script>
 </body>
