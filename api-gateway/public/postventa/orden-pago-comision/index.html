@@ -5,7 +5,7 @@
   <link rel="icon" href="/img/favicon.png" type="image/png">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Emisión Orden de Pago Comisión — AutoFácil</title>
-  <!-- v1.1 -->
+  <!-- v1.2 -->
   <link href="/css/bootstrap.min.css" rel="stylesheet">
   <link href="/css/bootstrap-icons.css" rel="stylesheet">
   <style>
@@ -106,13 +106,17 @@ const fechaCL = d => d ? new Date(d).toLocaleDateString('es-CL',{timeZone:'UTC',
 const MESES = ['ene','feb','mar','abr','may','jun','jul','ago','sep','oct','nov','dic'];
 const periodoCL = d => { const x = d ? new Date(d) : new Date(); return MESES[x.getUTCMonth()] + '-' + String(x.getUTCFullYear()).slice(2); };
 
-let DATA = [], actual = null;
+let DATA = [], actual = null, IMPUESTOS = { IVA:19, RETENCION_HONORARIOS:15.25 };
 
 async function cargar(){
   try {
-    const r = await fetch('/api/postventa/orden-pago-comision', { headers: hdr() });
+    const [r, ri] = await Promise.all([
+      fetch('/api/postventa/orden-pago-comision', { headers: hdr() }),
+      fetch('/api/impuestos/valores', { headers: hdr() })
+    ]);
     const j = await r.json();
     if (!j.success) throw new Error(j.error);
+    try { const ji = await ri.json(); if (ji.success && ji.data) IMPUESTOS = ji.data; } catch(e){}
     DATA = j.data.rows || [];
     render();
   } catch(e){ document.getElementById('tbody').innerHTML = `<tr><td colspan="8" class="vacio">Error: ${e.message}</td></tr>`; }
@@ -141,11 +145,17 @@ function render(){
 }
 
 function docHTML(r){
-  const total = Number(r.comision)||0;
+  const neto = Number(r.comision)||0;               // monto total (neto) de la comisión
+  const iva = Number(IMPUESTOS.IVA)||19, ret = Number(IMPUESTOS.RETENCION_HONORARIOS)||15.25;
+  const esBoleta = !!r.es_boleta;
+  const impLbl  = esBoleta ? `Retención ${ret}%` : `IVA ${iva}%`;
+  const impMonto = Math.round(neto * (esBoleta ? ret : iva)/100);
+  const aPagar  = esBoleta ? (neto - impMonto) : (neto + impMonto);   // monto líquido a depositar
+  const total = neto;
   const periodo = periodoCL(r.fecha_factura);
   const fechaPago = fechaCL(new Date().toISOString());
   const concepto = `Comisión OP ${r.num_op||''} - ${r.financiera||''}`;
-  const Sdoc = 'font-family:Arial,sans-serif;color:#1e293b;font-size:12px;border:2px solid #93c5fd;border-radius:8px;padding:18px 20px;display:inline-block;box-sizing:border-box';
+  const Sdoc = 'font-family:Arial,sans-serif;color:#1e293b;font-size:11px;border:2px solid #93c5fd;border-radius:8px;padding:14px 16px;display:block;width:100%;box-sizing:border-box';
   const Smeta = 'border-collapse:collapse;font-size:11px';
   const Slbl = 'color:#64748b;font-weight:700;text-transform:uppercase;font-size:9px;padding:1px 8px;white-space:nowrap';
   const Smv = 'padding:1px 8px;font-size:11px';
@@ -158,8 +168,8 @@ function docHTML(r){
   const SresV = 'border:1px solid #cbd5e1;padding:5px 8px;font-size:11px';
   const filas = `<tr>
       <td style="${Std}">${r.nombre_dealer||''}</td><td style="${Std}">${r.rut_dealer||''}</td>
-      <td style="${Std}">${concepto}</td><td style="${Std}">${periodo}</td><td style="${Snum}">${fmt(total)}</td>
-      <td style="${Snum}">$0</td><td style="${Snum}">${fmt(total)}</td><td style="${Std}">${fechaPago}</td>
+      <td style="${Std}">${concepto}</td><td style="${Std}">${periodo}</td><td style="${Snum}">${fmt(neto)}</td>
+      <td style="${Snum}">${fmt(impMonto)}</td><td style="${Snum}">${fmt(aPagar)}</td><td style="${Std}">${fechaPago}</td>
     </tr>`;
   return `<div style="${Sdoc}">
     <table style="width:100%;border-collapse:collapse;margin-bottom:14px"><tbody><tr>
@@ -177,9 +187,9 @@ function docHTML(r){
       </td>
     </tr></tbody></table>
     <table style="${Stbl}">
-      <thead><tr><th style="${Sth}">Dealer</th><th style="${Sth}">RUT</th><th style="${Sth}">Detalle</th><th style="${Sth}">Mes</th><th style="${Sth}">Valor Unitario</th><th style="${Sth}">IVA</th><th style="${Sth}">Valor Total</th><th style="${Sth}">Fecha a pagar</th></tr></thead>
+      <thead><tr><th style="${Sth}">Dealer</th><th style="${Sth}">RUT</th><th style="${Sth}">Detalle</th><th style="${Sth}">Mes</th><th style="${Sth}">Monto Total</th><th style="${Sth}">${impLbl}</th><th style="${Sth}">A Pagar</th><th style="${Sth}">Fecha a pagar</th></tr></thead>
       <tbody>${filas}
-        <tr><td colspan="6" style="${Std};text-align:right;font-weight:800;background:#f1f5f9">TOTAL</td><td style="${Snum};font-weight:800;background:#f1f5f9">${fmt(total)}</td><td style="${Std};background:#f1f5f9"></td></tr>
+        <tr><td colspan="6" style="${Std};text-align:right;font-weight:800;background:#f1f5f9">TOTAL</td><td style="${Snum};font-weight:800;background:#f1f5f9">${fmt(aPagar)}</td><td style="${Std};background:#f1f5f9"></td></tr>
       </tbody>
     </table>
     <table style="${Sres}"><tbody>
@@ -188,7 +198,9 @@ function docHTML(r){
       <tr><td style="${SresL}">Período</td><td style="${SresV}">${periodo}</td></tr>
       ${r.numero_factura?`<tr><td style="${SresL}">N° Factura</td><td style="${SresV}">${r.numero_factura}${r.es_boleta?' (Boleta)':''}${r.es_terceros?' · terceros':''}</td></tr>`:''}
       <tr><td style="${SresL}">Destino</td><td style="${SresV}">CTA. CTE. ${r.num_cuenta? r.num_cuenta+(r.banco?(' · '+r.banco):'') : ''}</td></tr>
-      <tr><td style="${SresL}">Valor total</td><td style="${SresV}">${fmt(total)}</td></tr>
+      <tr><td style="${SresL}">Monto total</td><td style="${SresV}">${fmt(neto)}</td></tr>
+      <tr><td style="${SresL}">${impLbl}</td><td style="${SresV}">${fmt(impMonto)}</td></tr>
+      <tr><td style="${SresL}">A pagar</td><td style="${SresV};font-weight:700">${fmt(aPagar)}</td></tr>
       <tr><td style="${SresL}">Fecha a pagar</td><td style="${SresV}">${fechaPago}</td></tr>
     </tbody></table>
   </div>`;
