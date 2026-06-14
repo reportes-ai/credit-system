@@ -112,7 +112,7 @@
 <body>
 <nav class="topnav">
   <div class="topnav-left">
-    <a href="/" class="topnav-brand"><img src="/img/logo.png" alt="AutoFácil"><span class="version-badge">v5.11</span></a>
+    <a href="/" class="topnav-brand"><img src="/img/logo.png" alt="AutoFácil"><span class="version-badge">v5.12</span></a>
     <div class="breadcrumb-nav">
       <a href="/">Inicio</a><span class="sep">›</span>
       <a href="/comisiones/">Comisión Ejecutivos</a><span class="sep">›</span>
@@ -350,6 +350,16 @@ function renderEjecutivo(d, idx, mes, sinComision = false) {
     <button class="btn-aprobar"  onclick="cambiarEstado('${d.ejecutivo}','${mes}','aprobado',${d.incentivo_final||0},${d.con_semana_corrida||0})"><i class="bi bi-check-lg me-1"></i>Aprobar</button>
     <button class="btn-rechazar" onclick="cambiarEstado('${d.ejecutivo}','${mes}','rechazado',${d.incentivo_final||0},${d.con_semana_corrida||0})"><i class="bi bi-x-lg me-1"></i>Rechazar</button>` : '';
 
+  // Respuesta del ejecutivo: solo aparece cuando Operaciones ya aprobó
+  const ejecEstado = d.ejec_estado || 'pendiente';
+  const _ejq = String(d.ejecutivo||'').replace(/'/g,"\\'");
+  const botonesEjec = (!esAdmin && estadoClass === 'aprobado')
+    ? (ejecEstado === 'aceptado'
+        ? `<span class="badge-estado aprobado"><i class="bi bi-patch-check-fill me-1"></i>Conformidad declarada</span>`
+        : `<button class="btn-aprobar" onclick="abrirDeclaracion('${_ejq}','${mes}')"><i class="bi bi-check2-circle me-1"></i>Aprobar</button>
+           <button class="btn-rechazar" onclick="abrirRevisionEjec('${_ejq}','${mes}')"><i class="bi bi-arrow-counterclockwise me-1"></i>Enviar a Revisión</button>`)
+    : '';
+
   // Solo créditos OTORGADOS en la tabla
   const otorgados = (d.creditos||[]).filter(c => (c.estado_credito||'').toUpperCase()==='OTORGADO');
   const credHtml = otorgados.map(c => {
@@ -375,9 +385,12 @@ function renderEjecutivo(d, idx, mes, sinComision = false) {
       </div>
       <div class="ej-acciones">
         ${botonesAdmin}
-        <button class="btn-copiar" onclick="copiarResumen('${idx}')"><i class="bi bi-clipboard"></i>Copiar para email</button>
+        ${botonesEjec}
       </div>
     </div>
+
+    ${ejecEstado === 'en_revision' ? `<div style="background:#fff7ed;border:1px solid #fed7aa;color:#9a3412;border-radius:8px;padding:9px 13px;font-size:.82rem;margin-bottom:14px"><i class="bi bi-arrow-counterclockwise me-1"></i><b>Enviada a revisión por el ejecutivo:</b> ${escHtml(d.ejec_comentario||'')}</div>` : ''}
+    ${ejecEstado === 'aceptado' ? `<div style="background:#ecfdf5;border:1px solid #a7f3d0;color:#065f46;border-radius:8px;padding:9px 13px;font-size:.82rem;margin-bottom:14px"><i class="bi bi-patch-check-fill me-1"></i>El ejecutivo declaró su conformidad con el cálculo de sus comisiones.</div>` : ''}
 
     ${sinComision ? `<div class="no-cumple" style="margin-bottom:16px"><i class="bi bi-x-circle-fill fs-5"></i>
       No cumple mínimo — Monto financiado: <strong>${fmt(d.total_financiado)}</strong> &nbsp;|&nbsp; Mínimo requerido: <strong>$30.000.000</strong> &nbsp;|&nbsp; Diferencia: <strong>${fmt(d.total_financiado - 30000000)}</strong>
@@ -625,6 +638,42 @@ async function cambiarEstado(ejecutivo, mes, estado, incentivo_final, con_semana
     if (json.success) { toast(`${estado === 'aprobado' ? '✓ Aprobado' : '✗ Rechazado'}: ${ejecutivo}`, estado==='aprobado'); cargar(); }
     else toast('Error: ' + json.error, false);
   } catch(e) { toast('Error: ' + e.message, false); }
+}
+
+/* ── Respuesta del ejecutivo: declaración de conformidad / enviar a revisión ── */
+function escHtml(s){ return String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+let _ejecCtx = { ejecutivo:null, mes:null };
+function mesSiguiente(ym){ let [y,m]=ym.split('-').map(Number); m++; if(m>12){m=1;y++;} return `${y}-${String(m).padStart(2,'0')}`; }
+function abrirDeclaracion(ejecutivo, mes){
+  _ejecCtx = { ejecutivo, mes };
+  const prod = nombreMes(mes), pago = nombreMes(mesSiguiente(mes));
+  document.getElementById('declText').textContent =
+    `Yo ${ejecutivo}, he revisado el detalle y cálculo de mis comisiones correspondientes a mi producción del mes de ${prod} que serán pagadas en mi remuneración de ${pago} y declaro que estoy de acuerdo.`;
+  document.getElementById('dlgDeclaracion').showModal();
+}
+async function confirmarDeclaracion(){
+  try {
+    const r = await fetch('/api/comisiones/ejecutivo-responder', { method:'POST', headers:H, body:JSON.stringify({ ejecutivo:_ejecCtx.ejecutivo, mes:_ejecCtx.mes, accion:'aceptar' }) });
+    const j = await r.json();
+    document.getElementById('dlgDeclaracion').close();
+    if (j.success){ toast('✓ Conformidad declarada', true); cargar(); } else toast('Error: '+(j.error||''), false);
+  } catch(e){ toast('Error: '+e.message, false); }
+}
+function abrirRevisionEjec(ejecutivo, mes){
+  _ejecCtx = { ejecutivo, mes };
+  document.getElementById('revComentario').value='';
+  document.getElementById('revErr').style.display='none';
+  document.getElementById('dlgRevision').showModal();
+}
+async function enviarRevisionEjec(){
+  const c = document.getElementById('revComentario').value.trim();
+  if (!c){ document.getElementById('revErr').style.display='block'; return; }
+  try {
+    const r = await fetch('/api/comisiones/ejecutivo-responder', { method:'POST', headers:H, body:JSON.stringify({ ejecutivo:_ejecCtx.ejecutivo, mes:_ejecCtx.mes, accion:'revision', comentario:c }) });
+    const j = await r.json();
+    document.getElementById('dlgRevision').close();
+    if (j.success){ toast('Enviada a revisión', true); cargar(); } else toast('Error: '+(j.error||''), false);
+  } catch(e){ toast('Error: '+e.message, false); }
 }
 
 /* ── Generar Informe completo (todos los ejecutivos) ─────────────────── */
@@ -1024,6 +1073,38 @@ function copiarEmailHtml() {
 
 cargar();
 </script>
+
+<dialog id="dlgDeclaracion" style="border:none;border-radius:14px;padding:0;max-width:520px;width:92%;box-shadow:0 20px 60px rgba(0,0,0,.3)">
+  <div style="background:linear-gradient(135deg,#012d70,#0141A2);color:#fff;padding:15px 20px;display:flex;align-items:center;gap:10px">
+    <i class="bi bi-patch-check" style="font-size:1.25rem"></i>
+    <h6 style="margin:0;font-weight:700;font-size:1rem">Declaración de conformidad</h6>
+  </div>
+  <div style="padding:20px">
+    <p id="declText" style="font-size:.92rem;color:#1e293b;line-height:1.6;margin:0;background:#f8fafc;border:1px solid #e2e8f0;border-radius:10px;padding:14px 16px"></p>
+    <p style="font-size:.78rem;color:#64748b;margin:12px 0 0">Al confirmar, queda registrada tu conformidad con el cálculo de tus comisiones.</p>
+  </div>
+  <div style="padding:12px 20px;border-top:1px solid #eef2f7;display:flex;justify-content:flex-end;gap:10px">
+    <button onclick="document.getElementById('dlgDeclaracion').close()" style="background:#f1f5f9;color:#374151;border:none;border-radius:8px;padding:8px 18px;font-weight:600;cursor:pointer">Cancelar</button>
+    <button onclick="confirmarDeclaracion()" style="background:#16a34a;color:#fff;border:none;border-radius:8px;padding:8px 20px;font-weight:700;cursor:pointer"><i class="bi bi-check-lg me-1"></i>Estoy de acuerdo</button>
+  </div>
+</dialog>
+
+<dialog id="dlgRevision" style="border:none;border-radius:14px;padding:0;max-width:520px;width:92%;box-shadow:0 20px 60px rgba(0,0,0,.3)">
+  <div style="background:linear-gradient(135deg,#92400e,#c2410c);color:#fff;padding:15px 20px;display:flex;align-items:center;gap:10px">
+    <i class="bi bi-arrow-counterclockwise" style="font-size:1.25rem"></i>
+    <h6 style="margin:0;font-weight:700;font-size:1rem">Enviar a revisión</h6>
+  </div>
+  <div style="padding:20px">
+    <label style="display:block;font-size:.82rem;font-weight:600;color:#374151;margin-bottom:6px">Comentario (obligatorio)</label>
+    <textarea id="revComentario" rows="4" placeholder="Describe qué debe revisarse de tu cálculo…" style="width:100%;border:1.5px solid #d1d5db;border-radius:8px;padding:10px 12px;font-size:.88rem;box-sizing:border-box;outline:none;resize:vertical"></textarea>
+    <div id="revErr" style="display:none;color:#b91c1c;font-size:.8rem;font-weight:600;margin-top:6px">El comentario es obligatorio para enviar a revisión.</div>
+  </div>
+  <div style="padding:12px 20px;border-top:1px solid #eef2f7;display:flex;justify-content:flex-end;gap:10px">
+    <button onclick="document.getElementById('dlgRevision').close()" style="background:#f1f5f9;color:#374151;border:none;border-radius:8px;padding:8px 18px;font-weight:600;cursor:pointer">Cancelar</button>
+    <button onclick="enviarRevisionEjec()" style="background:#c2410c;color:#fff;border:none;border-radius:8px;padding:8px 20px;font-weight:700;cursor:pointer"><i class="bi bi-send me-1"></i>Enviar a revisión</button>
+  </div>
+</dialog>
+
 <script src="/js/app-version.js"></script>
 </body>
 </html>

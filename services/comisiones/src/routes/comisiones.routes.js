@@ -9,5 +9,6 @@ router.put('/variables',          verifyToken, requireFunc('comisiones_variables
 router.get('/calculo',            verifyToken,                                       ctrl.getCalculo);
 router.get('/ejecutivos',         verifyToken,                                       ctrl.getEjecutivos);
 router.post('/aprobar',           verifyToken, requireFunc('comisiones_revision'),  ctrl.aprobar);
+router.post('/ejecutivo-responder', verifyToken,                                   ctrl.ejecutivoResponder);
 
 module.exports = router;

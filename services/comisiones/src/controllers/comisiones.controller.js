@@ -45,6 +45,10 @@ const pool = require('../../../../shared/config/database');
         UNIQUE KEY uk_ej_mes (ejecutivo, mes)
       )
     `);
+    // Segunda etapa: respuesta del ejecutivo (acepta / envía a revisión con comentario)
+    for (const col of ["ejec_estado VARCHAR(20) DEFAULT 'pendiente'", 'ejec_comentario TEXT', 'ejec_por INT DEFAULT NULL', 'ejec_at DATETIME DEFAULT NULL']) {
+      try { await pool.query(`ALTER TABLE comisiones_aprobaciones ADD COLUMN IF NOT EXISTS ${col}`); } catch (e) {}
+    }
   } catch (e) {
     console.error('[comisiones migration]', e.message);
   }
@@ -197,7 +201,7 @@ const getCalculo = async (req, res) => {
 
     // Obtener aprobaciones existentes
     const [aprobs] = await pool.query(
-      'SELECT ejecutivo, estado, notas, aprobado_at FROM comisiones_aprobaciones WHERE mes = ?',
+      'SELECT ejecutivo, estado, notas, aprobado_at, ejec_estado, ejec_comentario, ejec_at FROM comisiones_aprobaciones WHERE mes = ?',
       [mes]
     );
     const aprobMap = {};
@@ -226,7 +230,8 @@ const getCalculo = async (req, res) => {
         });
       }
 
-      return { ejecutivo, mes, ...calc, estado: aprob.estado, notas: aprob.notas, aprobado_at: aprob.aprobado_at, creditos: creds };
+      return { ejecutivo, mes, ...calc, estado: aprob.estado, notas: aprob.notas, aprobado_at: aprob.aprobado_at,
+        ejec_estado: aprob.ejec_estado || 'pendiente', ejec_comentario: aprob.ejec_comentario || null, ejec_at: aprob.ejec_at || null, creditos: creds };
     });
 
     resultado.sort((a, b) => a.ejecutivo.localeCompare(b.ejecutivo));
@@ -251,6 +256,31 @@ const aprobar = async (req, res) => {
       [ejecutivo, mes, estado, incentivo_final || 0, con_semana_corrida || 0, req.usuario.id_usuario, notas || null]
     );
     res.json({ success: true, data: null, error: null });
+  } catch (e) {
+    res.status(500).json({ success: false, data: null, error: e.message });
+  }
+};
+
+/* ── POST /api/comisiones/ejecutivo-responder ────────────────────────────────
+   Respuesta del ejecutivo a SU comisión, solo después de aprobada por Operaciones:
+   accion 'aceptar' (declara conformidad) o 'revision' (comentario obligatorio). */
+const ejecutivoResponder = async (req, res) => {
+  try {
+    const { ejecutivo, mes, accion, comentario } = req.body;
+    if (!ejecutivo || !mes || !['aceptar', 'revision'].includes(accion))
+      return res.status(400).json({ success: false, data: null, error: 'Faltan campos requeridos' });
+    if (accion === 'revision' && !(comentario && comentario.trim()))
+      return res.status(400).json({ success: false, data: null, error: 'El comentario es obligatorio' });
+    const [[row]] = await pool.query(
+      'SELECT estado FROM comisiones_aprobaciones WHERE ejecutivo=? AND mes=?', [ejecutivo, mes]);
+    if (!row || row.estado !== 'aprobado')
+      return res.status(400).json({ success: false, data: null, error: 'La comisión aún no ha sido aprobada por Operaciones' });
+    const ejec_estado = accion === 'aceptar' ? 'aceptado' : 'en_revision';
+    await pool.query(
+      `UPDATE comisiones_aprobaciones SET ejec_estado=?, ejec_comentario=?, ejec_por=?, ejec_at=NOW()
+       WHERE ejecutivo=? AND mes=?`,
+      [ejec_estado, accion === 'revision' ? comentario.trim() : null, req.usuario.id_usuario, ejecutivo, mes]);
+    res.json({ success: true, data: { ejec_estado }, error: null });
   } catch (e) {
     res.status(500).json({ success: false, data: null, error: e.message });
   }
@@ -287,4 +317,4 @@ const getEjecutivos = async (req, res) => {
   }
 };
 
-module.exports = { getVariables, putVariables, getCalculo, aprobar, getEjecutivos };
+module.exports = { getVariables, putVariables, getCalculo, aprobar, ejecutivoResponder, getEjecutivos };
