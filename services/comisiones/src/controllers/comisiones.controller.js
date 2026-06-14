@@ -54,6 +54,103 @@ const pool = require('../../../../shared/config/database');
   }
 })();
 
+/* ═══ Alertas del flujo de aprobación de comisiones (paramétricas) ═══════════
+   - com_rev_aprobada_ops : Operaciones aprobó → avisa al ejecutivo (espera su OK)
+   - com_rev_devuelta     : Ejecutivo NO está de acuerdo → avisa a Operaciones
+   - com_rev_auto         : Sin respuesta en N días hábiles → aprobada por el Sistema */
+const COM_PLAZO_DIAS_HABILES = 2;
+const EVENTOS_REV = [
+  { evento:'com_rev_aprobada_ops', titulo:'Comisiones aprobadas por Operaciones — esperan tu aprobación',
+    mensaje:'Tus comisiones para pago en {mesPago} están aprobadas por Operaciones y esperan tu aprobación. Si no respondes en 2 días hábiles, quedarán aprobadas por el Sistema.', href:'/comisiones/revision/' },
+  { evento:'com_rev_devuelta', titulo:'Comisiones devueltas para revisión',
+    mensaje:'Las comisiones de {ejecutivo} ({mesProd}) han sido devueltas para revisión.', href:'/comisiones/revision/' },
+  { evento:'com_rev_auto', titulo:'Comisiones aprobadas por el Sistema',
+    mensaje:'Tus comisiones de {mesProd} quedaron aprobadas por el Sistema (sin respuesta en 2 días hábiles).', href:'/comisiones/revision/' },
+];
+const SONIDOS = ['campana','dingdong','alarma','aplausos'];
+(async () => {
+  try {
+    await pool.query(`CREATE TABLE IF NOT EXISTS comisiones_alertas_config (
+      evento VARCHAR(40) PRIMARY KEY, perfiles TEXT, incluir_ejecutivo TINYINT(1) NOT NULL DEFAULT 0,
+      usuarios_extra TEXT, activo TINYINT(1) NOT NULL DEFAULT 1, prioridad VARCHAR(10) NOT NULL DEFAULT 'normal',
+      sonido TINYINT(1) NOT NULL DEFAULT 1, sonido_tipo VARCHAR(20) NOT NULL DEFAULT 'campana',
+      sonido_cada_seg INT NOT NULL DEFAULT 30, sonido_max_min INT NOT NULL DEFAULT 5 )`);
+    const seed = {
+      com_rev_aprobada_ops: { perfiles:'', incluir:1, prioridad:'alta' },
+      com_rev_devuelta:     { perfiles:'Administrador', incluir:0, prioridad:'alta' },
+      com_rev_auto:         { perfiles:'Administrador', incluir:1, prioridad:'normal' },
+    };
+    for (const e of EVENTOS_REV) {
+      const s = seed[e.evento];
+      await pool.query(
+        `INSERT IGNORE INTO comisiones_alertas_config (evento, perfiles, incluir_ejecutivo, usuarios_extra, activo, prioridad)
+         VALUES (?,?,?,?,1,?)`, [e.evento, s.perfiles, s.incluir, '', s.prioridad]);
+    }
+    console.log('[comisiones] alertas_config OK');
+  } catch (e) { console.error('[comisiones alertas migration]', e.message); }
+})();
+
+const MESES_ES = ['enero','febrero','marzo','abril','mayo','junio','julio','agosto','septiembre','octubre','noviembre','diciembre'];
+const mesNombre     = ym => { const [y,m]=String(ym).split('-'); return `${MESES_ES[parseInt(m)-1]} de ${y}`; };
+const mesPagoNombre = ym => { let [y,m]=String(ym).split('-').map(Number); m++; if(m>12){m=1;y++;} return `${MESES_ES[m-1]} de ${y}`; };
+function sumarDiasHabiles(fecha, n){ const d=new Date(fecha); let add=0; while(add<n){ d.setDate(d.getDate()+1); const w=d.getDay(); if(w!==0&&w!==6) add++; } return d; }
+
+// Crea las notificaciones (campana) de un evento del flujo de revisión.
+async function notificarComisionRev(evento, { ejecutivo, mes } = {}) {
+  try {
+    const def = EVENTOS_REV.find(e => e.evento === evento);
+    if (!def) return;
+    const [[cfg]] = await pool.query('SELECT * FROM comisiones_alertas_config WHERE evento=?', [evento]);
+    if (!cfg || !cfg.activo) return;
+    const ids = new Set();
+    const perfiles = String(cfg.perfiles||'').split(',').map(s=>s.trim()).filter(Boolean);
+    if (perfiles.length) {
+      const [us] = await pool.query(
+        `SELECT u.id_usuario FROM usuarios u JOIN perfiles p ON p.id_perfil=u.id_perfil
+         WHERE p.nombre IN (?) AND (u.estado IS NULL OR u.estado<>'inactivo')`, [perfiles]);
+      us.forEach(u=>ids.add(u.id_usuario));
+    }
+    if (cfg.incluir_ejecutivo && ejecutivo) {
+      try { const [us] = await pool.query('SELECT id_usuario FROM usuario_ejecutivos WHERE ejecutivo=?', [ejecutivo]); us.forEach(u=>ids.add(u.id_usuario)); } catch(_){}
+    }
+    String(cfg.usuarios_extra||'').split(',').map(s=>parseInt(s.trim())).filter(Boolean).forEach(id=>ids.add(id));
+    if (!ids.size) return;
+    const mensaje = def.mensaje.replace('{mesPago}', mesPagoNombre(mes)).replace('{mesProd}', mesNombre(mes)).replace('{ejecutivo}', ejecutivo||'');
+    const clave = `comrev:${evento}:${ejecutivo||''}:${mes}`;
+    const sonTipo = SONIDOS.includes(cfg.sonido_tipo) ? cfg.sonido_tipo : 'campana';
+    for (const uid of ids) {
+      const [[ex]] = await pool.query('SELECT 1 FROM notificaciones WHERE id_usuario=? AND clave=? AND leida=0 LIMIT 1', [uid, clave]);
+      if (ex) continue;
+      await pool.query(
+        `INSERT INTO notificaciones (id_usuario, tipo, titulo, mensaje, href, clave, prioridad, sonar, son_cada, son_max, son_tipo)
+         VALUES (?,?,?,?,?,?,?,?,?,?,?)`,
+        [uid,'alerta',def.titulo,mensaje,def.href,clave,cfg.prioridad||'normal',cfg.sonido?1:0,cfg.sonido_cada_seg||30,cfg.sonido_max_min||5,sonTipo]);
+    }
+  } catch (e) { console.error('[notificarComisionRev]', evento, e.message); }
+}
+
+// Auto-aprobación: comisión aprobada por Operaciones sin respuesta del ejecutivo
+// tras N días hábiles → queda 'aceptado' por el Sistema (ejec_por NULL). Corre periódicamente.
+async function autoAprobarComisiones() {
+  try {
+    const [rows] = await pool.query(
+      `SELECT ejecutivo, mes, aprobado_at FROM comisiones_aprobaciones
+       WHERE estado='aprobado' AND (ejec_estado IS NULL OR ejec_estado='pendiente') AND aprobado_at IS NOT NULL`);
+    const ahora = new Date();
+    for (const r of rows) {
+      if (ahora >= sumarDiasHabiles(r.aprobado_at, COM_PLAZO_DIAS_HABILES)) {
+        await pool.query(
+          `UPDATE comisiones_aprobaciones SET ejec_estado='aceptado', ejec_comentario=NULL, ejec_por=NULL, ejec_at=NOW()
+           WHERE ejecutivo=? AND mes=? AND estado='aprobado' AND (ejec_estado IS NULL OR ejec_estado='pendiente')`,
+          [r.ejecutivo, r.mes]);
+        await notificarComisionRev('com_rev_auto', { ejecutivo: r.ejecutivo, mes: r.mes });
+      }
+    }
+  } catch (e) { console.error('[autoAprobarComisiones]', e.message); }
+}
+setTimeout(autoAprobarComisiones, 20000);
+setInterval(autoAprobarComisiones, 30 * 60 * 1000);
+
 /* ── Helpers ─────────────────────────────────────────────────────────────── */
 async function getVars() {
   const [rows] = await pool.query('SELECT clave, valor FROM comisiones_variables');
@@ -201,7 +298,7 @@ const getCalculo = async (req, res) => {
 
     // Obtener aprobaciones existentes
     const [aprobs] = await pool.query(
-      'SELECT ejecutivo, estado, notas, aprobado_at, ejec_estado, ejec_comentario, ejec_at FROM comisiones_aprobaciones WHERE mes = ?',
+      'SELECT ejecutivo, estado, notas, aprobado_at, ejec_estado, ejec_comentario, ejec_at, ejec_por FROM comisiones_aprobaciones WHERE mes = ?',
       [mes]
     );
     const aprobMap = {};
@@ -231,7 +328,7 @@ const getCalculo = async (req, res) => {
       }
 
       return { ejecutivo, mes, ...calc, estado: aprob.estado, notas: aprob.notas, aprobado_at: aprob.aprobado_at,
-        ejec_estado: aprob.ejec_estado || 'pendiente', ejec_comentario: aprob.ejec_comentario || null, ejec_at: aprob.ejec_at || null, creditos: creds };
+        ejec_estado: aprob.ejec_estado || 'pendiente', ejec_comentario: aprob.ejec_comentario || null, ejec_at: aprob.ejec_at || null, ejec_por: aprob.ejec_por || null, creditos: creds };
     });
 
     resultado.sort((a, b) => a.ejecutivo.localeCompare(b.ejecutivo));
@@ -255,6 +352,14 @@ const aprobar = async (req, res) => {
          aprobado_at=NOW(), notas=VALUES(notas)`,
       [ejecutivo, mes, estado, incentivo_final || 0, con_semana_corrida || 0, req.usuario.id_usuario, notas || null]
     );
+    // Al aprobar Operaciones: reinicia la respuesta del ejecutivo (limpia comentario previo,
+    // reinicia el reloj de 2 días hábiles) y le avisa que espera su aprobación.
+    if (estado === 'aprobado') {
+      await pool.query(
+        `UPDATE comisiones_aprobaciones SET ejec_estado='pendiente', ejec_comentario=NULL, ejec_por=NULL, ejec_at=NULL
+         WHERE ejecutivo=? AND mes=?`, [ejecutivo, mes]);
+      await notificarComisionRev('com_rev_aprobada_ops', { ejecutivo, mes });
+    }
     res.json({ success: true, data: null, error: null });
   } catch (e) {
     res.status(500).json({ success: false, data: null, error: e.message });
@@ -280,6 +385,7 @@ const ejecutivoResponder = async (req, res) => {
       `UPDATE comisiones_aprobaciones SET ejec_estado=?, ejec_comentario=?, ejec_por=?, ejec_at=NOW()
        WHERE ejecutivo=? AND mes=?`,
       [ejec_estado, accion === 'revision' ? comentario.trim() : null, req.usuario.id_usuario, ejecutivo, mes]);
+    if (accion === 'revision') await notificarComisionRev('com_rev_devuelta', { ejecutivo, mes });
     res.json({ success: true, data: { ejec_estado }, error: null });
   } catch (e) {
     res.status(500).json({ success: false, data: null, error: e.message });
@@ -317,4 +423,41 @@ const getEjecutivos = async (req, res) => {
   }
 };
 
-module.exports = { getVariables, putVariables, getCalculo, aprobar, ejecutivoResponder, getEjecutivos };
+/* ── GET /api/comisiones/alertas-config — config paramétrica de las 3 alertas ── */
+const getAlertasConfig = async (req, res) => {
+  try {
+    const [rows] = await pool.query('SELECT * FROM comisiones_alertas_config');
+    const map = {}; rows.forEach(r => { map[r.evento] = r; });
+    const data = EVENTOS_REV.map(e => {
+      const c = map[e.evento] || {};
+      return { evento: e.evento, titulo: e.titulo,
+        perfiles: c.perfiles || '', incluir_ejecutivo: !!c.incluir_ejecutivo,
+        usuarios_extra: c.usuarios_extra || '', activo: c.activo === undefined ? 1 : c.activo,
+        prioridad: c.prioridad || 'normal', sonido: c.sonido === undefined ? 1 : c.sonido,
+        sonido_tipo: c.sonido_tipo || 'campana', sonido_cada_seg: c.sonido_cada_seg || 30,
+        sonido_max_min: c.sonido_max_min || 5 };
+    });
+    res.json({ success: true, data, sonidos: SONIDOS, error: null });
+  } catch (e) { res.status(500).json({ success: false, data: null, error: 'Error interno del servidor' }); }
+};
+const setAlertasConfig = async (req, res) => {
+  try {
+    const lista = Array.isArray(req.body?.config) ? req.body.config : [];
+    for (const c of lista) {
+      if (!EVENTOS_REV.find(e => e.evento === c.evento)) continue;
+      const sonTipo = SONIDOS.includes(c.sonido_tipo) ? c.sonido_tipo : 'campana';
+      await pool.query(
+        `INSERT INTO comisiones_alertas_config (evento, perfiles, incluir_ejecutivo, usuarios_extra, activo, prioridad, sonido, sonido_tipo, sonido_cada_seg, sonido_max_min)
+         VALUES (?,?,?,?,?,?,?,?,?,?)
+         ON DUPLICATE KEY UPDATE perfiles=VALUES(perfiles), incluir_ejecutivo=VALUES(incluir_ejecutivo),
+           usuarios_extra=VALUES(usuarios_extra), activo=VALUES(activo), prioridad=VALUES(prioridad),
+           sonido=VALUES(sonido), sonido_tipo=VALUES(sonido_tipo), sonido_cada_seg=VALUES(sonido_cada_seg), sonido_max_min=VALUES(sonido_max_min)`,
+        [c.evento, String(c.perfiles || ''), c.incluir_ejecutivo ? 1 : 0, String(c.usuarios_extra || ''), c.activo ? 1 : 0,
+         c.prioridad === 'alta' ? 'alta' : 'normal', c.sonido ? 1 : 0, sonTipo,
+         Math.max(5, parseInt(c.sonido_cada_seg) || 30), Math.max(1, parseInt(c.sonido_max_min) || 5)]);
+    }
+    res.json({ success: true, data: { actualizados: lista.length }, error: null });
+  } catch (e) { res.status(500).json({ success: false, data: null, error: 'Error interno del servidor' }); }
+};
+
+module.exports = { getVariables, putVariables, getCalculo, aprobar, ejecutivoResponder, getAlertasConfig, setAlertasConfig, getEjecutivos };

@@ -10,5 +10,7 @@ router.get('/calculo',            verifyToken,                                  
 router.get('/ejecutivos',         verifyToken,                                       ctrl.getEjecutivos);
 router.post('/aprobar',           verifyToken, requireFunc('comisiones_revision'),  ctrl.aprobar);
 router.post('/ejecutivo-responder', verifyToken,                                   ctrl.ejecutivoResponder);
+router.get('/alertas-config',     verifyToken,                                     ctrl.getAlertasConfig);
+router.put('/alertas-config',     verifyToken, requireFunc('comisiones_revision'), ctrl.setAlertasConfig);
 
 module.exports = router;
