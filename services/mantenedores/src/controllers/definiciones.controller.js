@@ -32,6 +32,61 @@ const pool = require('../../../../shared/config/database');
   } catch (e) { console.error('✗ definiciones migración:', e.message); }
 })();
 
+// Carga incremental de la base de conocimiento (idempotente: inserta solo los
+// términos que aún no existen, por nombre). Concentra glosario + fórmulas por tema.
+(async () => {
+  try {
+    const KB = [
+      // ── Glosario e identificadores ──────────────────────────────────────
+      ['N° Operación', 'Número del crédito en AutoFácil (campos num_op / numero_credito). Es el identificador propio del negocio y la llave usada en todo el sistema. NO es lo mismo que el ID Financiera.', 'Glosario'],
+      ['ID Financiera', 'Folio del crédito en la institución financiera (op_origen / id_financiera), el número que asigna la financiera (AUTOFIN, etc.). Distinto del N° Operación de AutoFácil.', 'Glosario'],
+      ['Dealer', 'Concesionario o automotora que origina la operación. Término homologado (antes "Concesionario"/"Automotora"). Llave: rut_dealer.', 'Glosario'],
+      ['Ejecutivo', 'Ejecutivo comercial responsable de la operación. Determina a quién se notifica y qué comisiones ve cada usuario (tabla usuario_ejecutivos).', 'Glosario'],
+      ['Cliente', 'Deudor del crédito. Llave: rut_cliente. Sus datos viven en clientes, antecedentes_laborales e informacion_comercial.', 'Glosario'],
+
+      // ── Créditos ────────────────────────────────────────────────────────
+      ['Institución / Financiera', 'Entidad que cursa el crédito. AUTOFIN es el default (todas las operaciones son del negocio); también UNIDAD y AUTOFACIL.', 'Créditos'],
+      ['UF de fecha de otorgamiento', 'Para clasificar MENOR/MAYOR 200 UF, el saldo precio se convierte a UF usando el valor de la UF de la fecha_otorgado (lookup en tabla uf, no un campo guardado).', 'Créditos'],
+
+      // ── Comisiones ──────────────────────────────────────────────────────
+      ['Comisión Dealer', 'Participación que AutoFácil paga al dealer por la operación. La participación que RIGE es la de la Carta de Aprobación (negociación especial); si la carta no la trae, se calcula por parámetros.', 'Comisiones'],
+      ['Comisión Bruta', 'Comisión con IVA incluido (la que traen las cartas de aprobación). Neto = Bruto / (1 + IVA).', 'Comisiones'],
+      ['% Participación / % Comisión', 'Proporción de la comisión sobre el saldo precio. Fórmula: % = Comisión / Saldo Precio.', 'Comisiones'],
+
+      // ── Impuestos (paramétricos en Mantenedor Impuestos) ────────────────
+      ['IVA', 'Impuesto al Valor Agregado, 19% (paramétrico en Mantenedor Impuestos). Sobre el neto: IVA = Neto × 19%; Bruto = Neto × 1,19. Todos los cálculos leen la tabla impuestos.', 'Impuestos'],
+      ['Retención de Honorarios', 'Retención de 15,25% (paramétrica). Aplica cuando el dealer emite Boleta de Honorarios en vez de Factura. Retención = Neto × 15,25%.', 'Impuestos'],
+      ['Factura (afecta)', 'Documento con IVA. Sobre el monto neto: IVA = Neto × 19% y Total Bruto = Neto × 1,19. AutoFácil deposita el bruto (el IVA lo entera el emisor).', 'Impuestos'],
+      ['Boleta de Honorarios', 'Excepción autorizada: el dealer emite boleta en vez de factura. La boleta se emite por el Monto Neto (líquido de la factura). Afecta a Retención 15,25%. Monto a depositar = Neto − Retención.', 'Impuestos'],
+      ['Monto a Depositar / A Pagar', 'Lo que efectivamente se transfiere al dealer. Con Factura: el Total Bruto. Con Boleta: Neto − Retención de Honorarios.', 'Impuestos'],
+
+      // ── Cartolas ────────────────────────────────────────────────────────
+      ['Cartola', 'Estado de cuenta acumulativo por dealer con las comisiones pendientes (estado A PAGAR), sin importar el mes de origen (cross-mes). Al enviarla se estampa el Mes Cartola y se marca CARTOLA ENVIADA en Post Venta.', 'Cartolas'],
+      ['Mes Cartola', 'Período en que se EMITE la cartola. Una cartola de un mes puede incluir operaciones otorgadas en meses anteriores que seguían pendientes.', 'Cartolas'],
+      ['Estado Comisión', 'PENDIENTE (recién creada) → A PAGAR (lista para salir en cartola) / A DESCONTAR (prepago o anulación) → PAGADO (comisión pagada).', 'Cartolas'],
+      ['Movimiento (cartola)', 'Tipo de fila en la cartola: COMISION (normal), PREPAGO o ANULACION (ajustes manuales, quedan en estado A DESCONTAR).', 'Cartolas'],
+      ['Reversar Envío de Cartola', 'Acción sensible (permiso aprob_cartola_reversar; solo Admin por defecto) que deshace un envío: borra el registro, limpia el Mes Cartola de los movimientos y quita la etapa CARTOLA ENVIADA, dejando las operaciones listas para reenviar.', 'Cartolas'],
+
+      // ── Post Venta (flujos y etapas) ────────────────────────────────────
+      ['Flujo Saldo Precio', 'Secuencia de etapas (track SALDO): Fundantes Pendientes → Fundantes Recibidos → … → Orden de Pago Emitida → Enviado a Pago → Saldo Precio Pagado.', 'Post Venta'],
+      ['Flujo Comisión', 'Secuencia de etapas (track COMISION): Comisión a Pagar → Cartola Emitida → Cartola Aprobada → Cartola Enviada → Factura Recibida → Orden de Pago Emitida → Enviado a Pago → Comisión Pagada.', 'Post Venta'],
+      ['Factura Recibida (Comisión)', 'Etapa donde se captura la boleta/factura del dealer: RUT y nombre del dealer, fecha, N° de documento y monto neto. Botones "Boleta" y "Factura de terceros" para las excepciones (exigen certificación al grabar).', 'Post Venta'],
+      ['Desglose Congelado', 'Al registrar la boleta/factura se guardan el % de impuesto, el monto del impuesto y el líquido a pagar. La Orden de Pago LEE esos valores y no recalcula, aunque luego cambie el % en el mantenedor Impuestos.', 'Post Venta'],
+      ['Orden de Pago de Comisión', 'Documento "Solicitud de Pago" que agrupa en una sola orden las operaciones que comparten la misma boleta/factura del mismo dealer. Muestra por operación Monto Total, Retención/IVA y A Pagar, con el total sumado.', 'Post Venta'],
+    ];
+    let [[{ mx }]] = await pool.query('SELECT COALESCE(MAX(orden),0) AS mx FROM definiciones');
+    let nuevas = 0;
+    for (const [termino, definicion, categoria] of KB) {
+      const [[ex]] = await pool.query('SELECT id FROM definiciones WHERE termino = ? LIMIT 1', [termino]);
+      if (ex) continue;
+      await pool.query('INSERT INTO definiciones (termino, definicion, categoria, orden) VALUES (?,?,?,?)',
+        [termino, definicion, categoria, ++mx]);
+      nuevas++;
+    }
+    if (nuevas) console.log(`✓ definiciones: base de conocimiento cargada (+${nuevas})`);
+  } catch (e) { console.error('✗ definiciones KB:', e.message); }
+})();
+
 const getAll = async (req, res) => {
   try {
     const [rows] = await pool.query('SELECT * FROM definiciones ORDER BY categoria, orden, termino');
