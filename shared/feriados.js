@@ -87,4 +87,4 @@ function sumarDiasHabiles(fecha, n) {
   return d;
 }
 
-module.exports = { sumarDiasHabiles, esHabil, esFeriado, cargarFeriados: cargar };
+module.exports = { sumarDiasHabiles, esHabil, esFeriado, cargarFeriados: cargar, feriadosDeAnio };

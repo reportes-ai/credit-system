@@ -1,0 +1,185 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <link rel="icon" href="/img/favicon.png" type="image/png">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Feriados — AutoFácil</title>
+  <!-- v1.0 -->
+  <link href="/css/bootstrap.min.css" rel="stylesheet">
+  <link href="/css/bootstrap-icons.css" rel="stylesheet">
+  <style>
+    :root { --navy:#001345; --blue:#0141A2; }
+    body { background:#f0f4f8; font-family:'Segoe UI',system-ui,sans-serif; margin:0; }
+    .topnav { background:linear-gradient(90deg,#012d70,#0255c5); color:#fff; height:60px; padding:0 24px; display:flex; align-items:center; justify-content:space-between; box-shadow:0 2px 8px rgba(0,0,0,.3); }
+    .topnav-brand { display:flex; align-items:center; gap:8px; text-decoration:none; }
+    .topnav-brand img { height:32px; filter:brightness(0) invert(1); }
+    .version-badge { background:rgba(255,255,255,.15); color:rgba(255,255,255,.75); font-size:.65rem; font-weight:700; border-radius:6px; padding:2px 8px; }
+    .breadcrumb-nav { color:rgba(255,255,255,.6); font-size:.85rem; display:flex; align-items:center; gap:6px; }
+    .breadcrumb-nav a { color:rgba(255,255,255,.75); text-decoration:none; }
+    .user-chip { background:rgba(255,255,255,.12); border-radius:24px; padding:5px 12px; display:flex; align-items:center; gap:8px; font-size:.85rem; }
+    .avatar { width:28px; height:28px; background:#90caf9; border-radius:50%; display:flex; align-items:center; justify-content:center; color:var(--blue); font-weight:700; font-size:.75rem; }
+    .perfil-badge { background:rgba(144,202,249,.2); border:1px solid rgba(144,202,249,.4); color:#90caf9; border-radius:12px; padding:2px 10px; font-size:.73rem; font-weight:600; }
+    .btn-logout { background:rgba(255,255,255,.1); border:1px solid rgba(255,255,255,.2); color:#fff; border-radius:8px; padding:5px 12px; font-size:.82rem; cursor:pointer; }
+    .wrap { max-width:780px; margin:0 auto; padding:22px 24px 60px; }
+    h5.sec { font-weight:800; color:var(--navy); margin:0 0 4px; }
+    .card-af { background:#fff; border-radius:14px; box-shadow:0 1px 4px rgba(0,0,0,.07); padding:16px 20px; margin-bottom:16px; }
+    .row-tools { display:flex; align-items:flex-end; gap:12px; flex-wrap:wrap; }
+    .fld label { display:block; font-size:.74rem; font-weight:700; color:#475569; margin-bottom:3px; }
+    .fld input { border:1.5px solid #d1d5db; border-radius:8px; padding:7px 10px; font-size:.9rem; }
+    .btn { border:none; border-radius:9px; padding:8px 16px; font-weight:700; cursor:pointer; font-size:.85rem; display:inline-flex; align-items:center; gap:6px; }
+    .btn-auto { background:#0d9488; color:#fff; }
+    .btn-add { background:var(--blue); color:#fff; }
+    .btn-del { background:#fef2f2; color:#b91c1c; border:1px solid #fecaca; border-radius:7px; padding:3px 9px; font-size:.78rem; font-weight:700; cursor:pointer; }
+    table.tbl { width:100%; border-collapse:collapse; font-size:.86rem; }
+    table.tbl th { text-align:left; color:#64748b; font-size:.72rem; text-transform:uppercase; letter-spacing:.4px; padding:6px 8px; border-bottom:2px solid #eef2f7; }
+    table.tbl td { padding:7px 8px; border-bottom:1px solid #f1f5f9; }
+    .yr-head td { background:#f8fafc; font-weight:800; color:var(--navy); }
+    .toast-af { position:fixed; top:70px; right:20px; background:#16a34a; color:#fff; padding:12px 18px; border-radius:9px; font-weight:600; font-size:.88rem; z-index:2000; display:none; }
+    .toast-af.err { background:#dc2626; }
+    .afecta-box { background:#f8fafc; border:1px solid #e2e8f0; border-left:4px solid #0141A2; border-radius:10px; padding:14px 18px; font-size:.85rem; color:#475569; margin-top:8px; }
+    .afecta-box .tit { font-weight:700; color:#0f2a52; margin-bottom:6px; }
+    .afecta-box ul { margin:0; padding-left:18px; }
+    .afecta-box a { color:#0141A2; }
+  </style>
+</head>
+<body>
+<nav class="topnav">
+  <div style="display:flex;align-items:center;gap:16px">
+    <a href="/" class="topnav-brand"><img src="/img/logo.png" alt="AutoFácil"><span class="version-badge" id="versionBadge"></span></a>
+    <div class="breadcrumb-nav"><a href="/">Inicio</a><span>›</span><a href="/mantenedores/">Mantenedores</a><span>›</span><span style="color:#fff;font-weight:600">Feriados</span></div>
+  </div>
+  <div style="display:flex;align-items:center;gap:10px">
+    <div class="user-chip"><div class="avatar" id="avatarInicial">?</div><div><div style="font-weight:600;line-height:1.3;color:#fff" id="navNombre">—</div><div class="perfil-badge" id="navPerfil">—</div></div></div>
+    <button class="btn-logout" onclick="logout()"><i class="bi bi-box-arrow-right me-1"></i>Salir</button>
+  </div>
+</nav>
+
+<div class="wrap">
+  <h5 class="sec"><i class="bi bi-calendar-event me-2"></i>Feriados de Chile</h5>
+  <span style="font-size:.82rem;color:#64748b">Feriados usados en los cálculos de <b>días hábiles</b> del sistema (p. ej. la auto-aprobación de comisiones a los 2 días hábiles). Puedes cargarlos automáticamente o administrarlos a mano.</span>
+
+  <!-- Carga automática -->
+  <div class="card-af" style="margin-top:16px">
+    <div style="font-weight:800;color:var(--navy);margin-bottom:8px"><i class="bi bi-magic me-1"></i>Cargar automáticamente</div>
+    <div class="row-tools">
+      <div class="fld"><label>Desde (año)</label><input id="desde" type="number" style="width:110px"></div>
+      <div class="fld"><label>Hasta (año)</label><input id="hasta" type="number" style="width:110px"></div>
+      <button class="btn btn-auto" onclick="cargarAuto()"><i class="bi bi-download"></i>Cargar feriados chilenos</button>
+    </div>
+    <div style="font-size:.76rem;color:#94a3b8;margin-top:8px">Genera los feriados legales de Chile (incluye Viernes y Sábado Santo calculados). No duplica los que ya existen.</div>
+  </div>
+
+  <!-- Alta manual -->
+  <div class="card-af">
+    <div style="font-weight:800;color:var(--navy);margin-bottom:8px"><i class="bi bi-plus-circle me-1"></i>Agregar feriado</div>
+    <div class="row-tools">
+      <div class="fld"><label>Fecha</label><input id="nf-fecha" type="date"></div>
+      <div class="fld" style="flex:1;min-width:200px"><label>Nombre</label><input id="nf-nombre" type="text" placeholder="Ej. Feriado empresa" style="width:100%"></div>
+      <button class="btn btn-add" onclick="agregar()"><i class="bi bi-plus-lg"></i>Agregar</button>
+    </div>
+  </div>
+
+  <!-- Lista -->
+  <div class="card-af">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
+      <div style="font-weight:800;color:var(--navy)"><i class="bi bi-list-ul me-1"></i>Feriados cargados <span id="cnt" style="color:#94a3b8;font-weight:600;font-size:.85rem"></span></div>
+    </div>
+    <table class="tbl"><tbody id="tbody"><tr><td style="color:#94a3b8">Cargando…</td></tr></tbody></table>
+  </div>
+
+  <div class="afecta-box">
+    <div class="tit"><i class="bi bi-diagram-3 me-1"></i>Qué afecta este mantenedor</div>
+    <ul>
+      <li><b>Feriados</b> → cálculo de <b>días hábiles</b> en la <a href="/comisiones/revision/">Revisión de Comisiones</a>: la auto-aprobación por el Sistema (2 días hábiles sin respuesta del ejecutivo) salta fines de semana y estos feriados.</li>
+      <li>Fuente compartida <code>shared/feriados.js</code> — disponible para cualquier proceso que use días hábiles (cobranza/mora, plazos, etc.).</li>
+    </ul>
+  </div>
+</div>
+
+<div id="toast" class="toast-af"></div>
+
+<script>
+const token = sessionStorage.getItem('token');
+if (!token) location.href = '/login.html';
+const YO = JSON.parse(sessionStorage.getItem('usuario') || '{}');
+const H = { 'Content-Type':'application/json', Authorization:'Bearer '+token };
+document.getElementById('navNombre').textContent = ((YO.nombre||'') + ' ' + (YO.apellido||'')).trim() || '—';
+document.getElementById('navPerfil').textContent = YO.perfil || '';
+document.getElementById('avatarInicial').textContent = (YO.nombre||'?')[0].toUpperCase();
+function logout(){ sessionStorage.clear(); location.href = '/login.html'; }
+function toast(msg, err){ const t = document.getElementById('toast'); t.textContent = msg; t.className = 'toast-af' + (err?' err':''); t.style.display='block'; setTimeout(()=>t.style.display='none', 2600); }
+const escH = s => String(s??'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+const MESES = ['ene','feb','mar','abr','may','jun','jul','ago','sep','oct','nov','dic'];
+const DIAS = ['domingo','lunes','martes','miércoles','jueves','viernes','sábado'];
+function fechaLarga(f){ const [y,m,d]=f.split('-').map(Number); const dt=new Date(y,m-1,d); return `${DIAS[dt.getDay()]} ${d} de ${MESES[m-1]}`; }
+
+const hoy = new Date().getFullYear();
+document.getElementById('desde').value = hoy;
+document.getElementById('hasta').value = hoy + 1;
+
+let DATA = [];
+async function cargar(){
+  try {
+    const r = await fetch('/api/feriados', { headers: H });
+    const j = await r.json();
+    DATA = j.success ? (j.data || []) : [];
+    render();
+  } catch(e){ document.getElementById('tbody').innerHTML = '<tr><td style="color:#dc2626">Error de conexión</td></tr>'; }
+}
+function render(){
+  const tb = document.getElementById('tbody');
+  document.getElementById('cnt').textContent = DATA.length ? `(${DATA.length})` : '';
+  if (!DATA.length){ tb.innerHTML = '<tr><td style="color:#94a3b8;padding:14px 8px">Sin feriados cargados. Usa “Cargar feriados chilenos”.</td></tr>'; return; }
+  let html = '', anioPrev = null;
+  for (const f of DATA) {
+    const anio = f.fecha.slice(0,4);
+    if (anio !== anioPrev) { html += `<tr class="yr-head"><td colspan="3">${anio}</td></tr>`; anioPrev = anio; }
+    html += `<tr>
+      <td style="white-space:nowrap;font-weight:600;color:#0f172a">${f.fecha}</td>
+      <td style="color:#475569">${escH(f.nombre)} <span style="color:#94a3b8;font-size:.78rem">· ${fechaLarga(f.fecha)}</span></td>
+      <td style="text-align:right"><button class="btn-del" onclick="eliminar('${f.fecha}')"><i class="bi bi-trash"></i></button></td>
+    </tr>`;
+  }
+  tb.innerHTML = html;
+}
+async function cargarAuto(){
+  const desde = parseInt(document.getElementById('desde').value);
+  const hasta = parseInt(document.getElementById('hasta').value);
+  try {
+    const r = await fetch('/api/feriados/cargar', { method:'POST', headers:H, body: JSON.stringify({ desde, hasta }) });
+    const j = await r.json();
+    if (!j.success) { toast(j.error||'Error', true); return; }
+    toast(`Cargados ${j.data.nuevos} feriados (${j.data.desde}–${j.data.hasta})`);
+    cargar();
+  } catch(e){ toast('Error de conexión', true); }
+}
+async function agregar(){
+  const fecha = document.getElementById('nf-fecha').value;
+  const nombre = document.getElementById('nf-nombre').value.trim();
+  if (!fecha) { toast('Indica la fecha', true); return; }
+  if (!nombre) { toast('Indica el nombre', true); return; }
+  try {
+    const r = await fetch('/api/feriados', { method:'POST', headers:H, body: JSON.stringify({ fecha, nombre }) });
+    const j = await r.json();
+    if (!j.success) { toast(j.error||'Error', true); return; }
+    document.getElementById('nf-nombre').value = '';
+    toast('Feriado agregado');
+    cargar();
+  } catch(e){ toast('Error de conexión', true); }
+}
+async function eliminar(fecha){
+  if (!confirm('¿Eliminar el feriado ' + fecha + '?')) return;
+  try {
+    const r = await fetch('/api/feriados/'+fecha, { method:'DELETE', headers:H });
+    const j = await r.json();
+    if (!j.success) { toast(j.error||'Error', true); return; }
+    toast('Feriado eliminado');
+    cargar();
+  } catch(e){ toast('Error de conexión', true); }
+}
+cargar();
+</script>
+<script src="/js/app-version.js"></script>
+</body>
+</html>
