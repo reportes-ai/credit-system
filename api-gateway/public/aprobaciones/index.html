@@ -5,7 +5,7 @@
   <link rel="icon" href="/img/favicon.png" type="image/png">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Cartas de Aprobación — AutoFácil</title>
-  <!-- v4.6 -->
+  <!-- v4.7 -->
   <link href="/css/bootstrap.min.css" rel="stylesheet">
   <link href="/css/bootstrap-icons.css" rel="stylesheet">
   <style>
@@ -2165,10 +2165,10 @@ async function initCartolas(){
   try { await fetch('/api/cartolas/sync', { method:'POST', headers: hdr() }); } catch(e) {}
   const sel = document.getElementById('ctaMes');
   if (!sel.options.length) {
-    const hoy = new Date(); const ops=[];
+    const hoy = new Date(); const ops=['<option value="">Todos los meses</option>'];
     for (let i=0;i<12;i++){ const d=new Date(hoy.getFullYear(), hoy.getMonth()-i, 1);
       const v=d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0');
-      ops.push(`<option value="${v}">${nombreMes(v)}</option>`); }
+      ops.push(`<option value="${v}" ${i===0?'selected':''}>${nombreMes(v)}</option>`); }  // default: mes actual
     sel.innerHTML = ops.join('');
   }
   await cargarMovimientos();
@@ -2184,8 +2184,8 @@ async function cargarMovimientos(){
 }
 // MOVS = movimientos del mes seleccionado (Revisión Cartolas sigue siendo mensual)
 function aplicarMes(){
-  const mes = document.getElementById('ctaMes').value || mesActual();
-  MOVS = MOVS_ALL.filter(m => m.mes === mes);
+  const mes = document.getElementById('ctaMes').value;   // '' = Todos los meses
+  MOVS = mes ? MOVS_ALL.filter(m => m.mes === mes) : MOVS_ALL.slice();
   renderMovimientos();
   renderRevCartolas();
 }
