@@ -5,7 +5,7 @@
   <link rel="icon" href="/img/favicon.png" type="image/png">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Seguimiento Post Venta — AutoFácil</title>
-  <!-- v2.4 -->
+  <!-- v2.5 -->
   <link href="/css/bootstrap.min.css" rel="stylesheet">
   <link href="/css/bootstrap-icons.css" rel="stylesheet">
   <style>
@@ -377,17 +377,25 @@ function fcToggleTerceros(){
 }
 function fcToggleBoleta(){ FC.boleta = !FC.boleta; _fcSetExc('fcBtnBoleta', FC.boleta); fcBoletaInfo(); }
 function fcBoletaInfo(){
-  const box = _fc('fcBoleta');
+  const warn = _fc('fcBoleta'), des = _fc('fcDesglose');
   const bruto = parseInt(_fc('fcMonto').dataset.raw||'')||0;   // monto bruto de la factura (con IVA)
-  if (!FC.boleta){ box.style.display='none'; return; }
-  if (!bruto){ box.innerHTML = '⚠ Ingresa el <b>Monto Bruto</b> de la factura para calcular la boleta y la retención.'; box.style.display='block'; return; }
   const iva = Number(IMPUESTOS.IVA)||19, ret = Number(IMPUESTOS.RETENCION_HONORARIOS)||15.25;
-  const boletaBruto = Math.round(bruto / (1 + iva/100));   // líquido de la factura = bruto de la boleta
-  const retencion = Math.round(boletaBruto * ret/100);
-  const depositar = boletaBruto - retencion;
-  const clp = n => '$'+(n||0).toLocaleString('es-CL');
-  box.innerHTML = `⚠ Al cambiar a <b>Boleta</b>: el monto de la Boleta es <b>${clp(boletaBruto)}</b>, la retención (${ret}%) es <b>${clp(retencion)}</b> y el monto a depositar es <b>${clp(depositar)}</b>.`;
-  box.style.display = 'block';
+  const clp = n => '$'+(Math.round(n)||0).toLocaleString('es-CL');
+  // Advertencia de certificación al cambiar a Boleta
+  warn.style.display = FC.boleta ? 'block' : 'none';
+  if (FC.boleta) warn.innerHTML = '⚠ Al cambiar a <b>Boleta</b> certificas que se autorizó la emisión de boleta de honorarios en vez de factura. Revisa el desglose y el monto líquido a depositar.';
+  // Desglose de montos
+  if (!bruto){ des.style.display='none'; return; }
+  const row = (lbl,val,strong)=>`<div style="display:flex;justify-content:space-between;padding:3px 0${strong?';border-top:1px solid #e2e8f0;margin-top:4px;padding-top:7px;font-weight:700;color:#0f172a':';color:#475569'}"><span>${lbl}</span><span${strong?'':' style="font-weight:600;color:#0f172a"'}>${clp(val)}</span></div>`;
+  if (!FC.boleta){
+    const neto = Math.round(bruto/(1+iva/100)), ivaM = bruto - neto;
+    des.innerHTML = row('Monto Bruto (con IVA)', bruto) + row(`IVA (${iva}%)`, ivaM) + row('Monto líquido a depositar', bruto, true);
+  } else {
+    const boletaBruto = Math.round(bruto/(1+iva/100));   // líquido de la factura = bruto de la boleta
+    const retencion = Math.round(boletaBruto*ret/100);
+    des.innerHTML = row('Monto Boleta (bruto)', boletaBruto) + row(`Retención honorarios (${ret}%)`, retencion) + row('Monto líquido a depositar', boletaBruto - retencion, true);
+  }
+  des.style.display = 'block';
 }
 function editarFactura(id){
   const r = DATA.find(x => x.id === id) || {};
@@ -476,6 +484,7 @@ async function toggleEtapa(id, track, etapa, chk){
       <label>N° Factura<input id="fcNumero" type="text"></label>
       <label>Monto Bruto<input id="fcMonto" type="text" inputmode="numeric" placeholder="$0" oninput="fcMoneyFmt(this)"></label>
     </div>
+    <div id="fcDesglose" style="display:none;margin-top:13px;background:#f8fafc;border:1px solid #e2e8f0;border-radius:8px;padding:10px 13px;font-size:.83rem"></div>
   </div>
   <div style="padding:12px 20px;border-top:1px solid #eef2f7;display:flex;justify-content:flex-end;gap:10px">
     <button type="button" onclick="fcCancelar()" style="background:#f1f5f9;color:#374151;border:none;border-radius:8px;padding:8px 18px;font-weight:600;cursor:pointer">Cancelar</button>
