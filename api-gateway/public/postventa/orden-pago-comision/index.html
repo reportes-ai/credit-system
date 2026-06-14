@@ -5,7 +5,7 @@
   <link rel="icon" href="/img/favicon.png" type="image/png">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Emisión Orden de Pago Comisión — AutoFácil</title>
-  <!-- v1.4 -->
+  <!-- v1.5 -->
   <link href="/css/bootstrap.min.css" rel="stylesheet">
   <link href="/css/bootstrap-icons.css" rel="stylesheet">
   <style>
@@ -122,41 +122,75 @@ async function cargar(){
   } catch(e){ document.getElementById('tbody').innerHTML = `<tr><td colspan="8" class="vacio">Error: ${e.message}</td></tr>`; }
 }
 
+// Agrupa operaciones que comparten la MISMA boleta/factura del mismo dealer
+// → una sola orden de pago. Sin número de factura quedan individuales.
+let GROUPS = [];
+function agrupar(rows){
+  const map = new Map();
+  for (const r of rows){
+    const key = r.numero_factura
+      ? ((r.rut_dealer||'')+'|'+r.numero_factura+'|'+(r.es_boleta?'B':'F'))
+      : ('op'+r.id);
+    if (!map.has(key)) map.set(key, []);
+    map.get(key).push(r);
+  }
+  return [...map.values()];
+}
 function render(){
   const q = (document.getElementById('buscar').value||'').toLowerCase();
-  const rows = DATA.filter(r => !q || [r.num_op,r.nombre_dealer,r.rut_dealer,r.financiera].some(v => String(v||'').toLowerCase().includes(q)));
+  const rows = DATA.filter(r => !q || [r.num_op,r.nombre_dealer,r.rut_dealer,r.financiera,r.numero_factura].some(v => String(v||'').toLowerCase().includes(q)));
+  GROUPS = agrupar(rows);
   const total = rows.reduce((s,r)=>s+(Number(r.comision)||0),0);
-  document.getElementById('resumen').textContent = `${rows.length} operación(es) · Comisión total: ${fmt(total)}`;
+  document.getElementById('resumen').textContent = `${rows.length} operación(es) en ${GROUPS.length} orden(es) · Comisión total: ${fmt(total)}`;
   const tb = document.getElementById('tbody');
-  if (!rows.length){ tb.innerHTML = '<tr><td colspan="8" class="vacio">No hay operaciones con factura recibida pendientes de emitir.</td></tr>'; return; }
-  tb.innerHTML = rows.map(r => {
-    const dc = r.dias>=7?'alto':r.dias>=3?'medio':'';
+  if (!GROUPS.length){ tb.innerHTML = '<tr><td colspan="8" class="vacio">No hay operaciones con factura recibida pendientes de emitir.</td></tr>'; return; }
+  tb.innerHTML = GROUPS.map((g, gi) => {
+    const f0 = g[0];
+    const sumCom = g.reduce((s,o)=>s+(Number(o.comision)||0),0);
+    const dias = Math.max(...g.map(o=>o.dias!=null?o.dias:-1));
+    const dc = dias>=7?'alto':dias>=3?'medio':'';
+    const nums = g.map(o=>o.num_op).join(', ');
+    const fins = [...new Set(g.map(o=>o.financiera))].map(f=>`<span class="pill">${f||'—'}</span>`).join(' ');
+    const fact = f0.numero_factura
+      ? `<b>${f0.numero_factura}</b> <span class="pill">${f0.es_boleta?'Boleta':'Factura'}</span>${g.length>1?` · ${g.length} ops`:''}`
+      : '—';
     return `<tr>
-      <td><b>${r.num_op||'—'}</b></td>
-      <td><span class="pill">${r.financiera||'—'}</span></td>
-      <td>${r.nombre_dealer||'—'}</td>
-      <td>${r.rut_dealer||'—'}</td>
-      <td style="text-align:right">${fmt(r.comision)}</td>
-      <td>${fechaCL(r.fecha_factura)}</td>
-      <td><span class="dias ${dc}">${r.dias!=null?r.dias+' d':'—'}</span></td>
-      <td><button class="btn-ver" onclick="verOrden(${r.id})"><i class="bi bi-eye me-1"></i>Ver orden</button></td>
+      <td><b>${nums}</b></td>
+      <td>${fins}</td>
+      <td>${f0.nombre_dealer||'—'}</td>
+      <td>${f0.rut_dealer||'—'}</td>
+      <td style="text-align:right">${fmt(sumCom)}</td>
+      <td style="font-size:.8rem">${fact}</td>
+      <td><span class="dias ${dc}">${dias>=0?dias+' d':'—'}</span></td>
+      <td><button class="btn-ver" onclick="verOrden(${gi})"><i class="bi bi-eye me-1"></i>Ver orden</button></td>
     </tr>`;
   }).join('');
 }
 
-function docHTML(r){
-  const esBoleta = !!r.es_boleta;
-  // Valores REGISTRADOS al marcar la factura/boleta (no se recalculan). Fallback solo para registros antiguos.
+// ops = array de operaciones que comparten la misma boleta/factura
+function docHTML(ops){
+  if (!Array.isArray(ops)) ops = [ops];
+  const f0 = ops[0];
   const iva = Number(IMPUESTOS.IVA)||19, ret = Number(IMPUESTOS.RETENCION_HONORARIOS)||15.25;
-  const neto = Number(r.monto_factura ?? r.comision)||0;               // monto total (neto) registrado
-  const pct  = (r.impuesto_pct != null) ? Number(r.impuesto_pct) : (esBoleta ? ret : iva);
-  const impMonto = (r.impuesto_monto != null) ? Number(r.impuesto_monto) : Math.round(neto * pct/100);
-  const aPagar   = (r.monto_liquido  != null) ? Number(r.monto_liquido)  : (esBoleta ? (neto - impMonto) : (neto + impMonto));
-  const impLbl   = `${esBoleta ? 'Retención' : 'IVA'} ${pct}%`;
-  const total = neto;
-  const periodo = periodoCL(r.fecha_factura);
+  // Desglose por operación: valores REGISTRADOS (fallback solo para registros antiguos)
+  const calc = o => {
+    const eb = !!o.es_boleta;
+    const neto = Number(o.monto_factura ?? o.comision)||0;
+    const pct  = (o.impuesto_pct != null) ? Number(o.impuesto_pct) : (eb ? ret : iva);
+    const impMonto = (o.impuesto_monto != null) ? Number(o.impuesto_monto) : Math.round(neto * pct/100);
+    const aPagar   = (o.monto_liquido  != null) ? Number(o.monto_liquido)  : (eb ? (neto - impMonto) : (neto + impMonto));
+    return { neto, pct, impMonto, aPagar, eb };
+  };
+  const cs = ops.map(calc);
+  const sumImp   = cs.reduce((s,c)=>s+c.impMonto,0);
+  const sumPagar = cs.reduce((s,c)=>s+c.aPagar,0);
+  const esBoleta = !!f0.es_boleta;
+  const pct0 = (f0.impuesto_pct != null) ? Number(f0.impuesto_pct) : (esBoleta ? ret : iva);
+  const impLbl = `${esBoleta ? 'Retención' : 'IVA'} ${pct0}%`;
   const fechaPago = fechaCL(new Date().toISOString());
-  const concepto = `Comisión OP ${r.num_op||''} - ${r.financiera||''}`;
+  const nums = ops.map(o=>o.num_op).join(', ');
+  const conceptoDet = `Comisión OP${ops.length>1?'s':''} ${nums} - ${f0.financiera||''}`;
+  const nOrden = f0.num_orden || ('OC-'+(f0.numero_factura||f0.num_op||''));
   const Sdoc = 'font-family:Arial,sans-serif;color:#1e293b;font-size:11px;border:2px solid #93c5fd;border-radius:8px;padding:14px 16px;display:block;width:100%;box-sizing:border-box';
   const Smeta = 'border-collapse:collapse;font-size:11px';
   const Slbl = 'color:#64748b;font-weight:700;text-transform:uppercase;font-size:9px;padding:1px 8px;white-space:nowrap';
@@ -168,11 +202,15 @@ function docHTML(r){
   const Sres = 'border-collapse:collapse;margin-top:14px;max-width:430px';
   const SresL = 'border:1px solid #cbd5e1;padding:5px 8px;font-size:11px;background:#eff6ff;font-weight:700;width:42%';
   const SresV = 'border:1px solid #cbd5e1;padding:5px 8px;font-size:11px';
-  const filas = `<tr>
-      <td style="${Std}">${r.nombre_dealer||''}</td><td style="${Std}">${r.rut_dealer||''}</td>
-      <td style="${Std}">${concepto}</td><td style="${Std}">${periodo}</td><td style="${Snum}">${fmt(neto)}</td>
-      <td style="${Snum}">${fmt(impMonto)}</td><td style="${Snum}">${fmt(aPagar)}</td><td style="${Std}">${fechaPago}</td>
+  const filas = ops.map((o,i)=>{
+    const c = cs[i];
+    const concepto = `Comisión OP ${o.num_op||''} - ${o.financiera||''}`;
+    return `<tr>
+      <td style="${Std}">${o.nombre_dealer||''}</td><td style="${Std}">${o.rut_dealer||''}</td>
+      <td style="${Std}">${concepto}</td><td style="${Std}">${periodoCL(o.fecha_factura)}</td><td style="${Snum}">${fmt(c.neto)}</td>
+      <td style="${Snum}">${fmt(c.impMonto)}</td><td style="${Snum}">${fmt(c.aPagar)}</td><td style="${Std}">${fechaPago}</td>
     </tr>`;
+  }).join('');
   return `<div style="${Sdoc}">
     <table style="width:100%;border-collapse:collapse;margin-bottom:14px"><tbody><tr>
       <td style="vertical-align:top">
@@ -180,7 +218,7 @@ function docHTML(r){
           <tr><td style="${Slbl}">Concepto</td><td style="${Smv}">SOLICITUD DE PAGO</td></tr>
           <tr><td style="${Slbl}">Compañía</td><td style="${Smv}">AUTOFÁCIL SPA</td></tr>
           <tr><td style="${Slbl}">Tipo gasto</td><td style="${Smv}">COMISIÓN A DEALER</td></tr>
-          <tr><td style="${Slbl}">N° Orden</td><td style="${Smv}">${r.num_orden || ('OC-'+(r.num_op||''))}</td></tr>
+          <tr><td style="${Slbl}">N° Orden</td><td style="${Smv}">${nOrden}</td></tr>
           <tr><td style="${Slbl}">Fecha</td><td style="${Smv}">${fechaPago}</td></tr>
         </tbody></table>
       </td>
@@ -192,46 +230,49 @@ function docHTML(r){
       <colgroup><col style="width:22%"><col style="width:11%"><col style="width:21%"><col style="width:7%"><col style="width:11%"><col style="width:10%"><col style="width:10%"><col style="width:8%"></colgroup>
       <thead><tr><th style="${Sth}">Dealer</th><th style="${Sth}">RUT</th><th style="${Sth}">Detalle</th><th style="${Sth}">Mes</th><th style="${Sth}">Monto Total</th><th style="${Sth}">${impLbl}</th><th style="${Sth}">A Pagar</th><th style="${Sth}">Fecha a pagar</th></tr></thead>
       <tbody>${filas}
-        <tr><td colspan="6" style="${Std};text-align:right;font-weight:800;background:#f1f5f9">TOTAL</td><td style="${Snum};font-weight:800;background:#f1f5f9">${fmt(aPagar)}</td><td style="${Std};background:#f1f5f9"></td></tr>
+        <tr><td colspan="6" style="${Std};text-align:right;font-weight:800;background:#f1f5f9">TOTAL</td><td style="${Snum};font-weight:800;background:#f1f5f9">${fmt(sumPagar)}</td><td style="${Std};background:#f1f5f9"></td></tr>
       </tbody>
     </table>
     <table style="${Sres}"><tbody>
-      <tr><td style="${SresL}">Proveedor</td><td style="${SresV}">${r.nombre_dealer||''}</td></tr>
-      <tr><td style="${SresL}">Concepto</td><td style="${SresV}">${concepto}</td></tr>
-      <tr><td style="${SresL}">Período</td><td style="${SresV}">${periodo}</td></tr>
-      ${r.numero_factura?`<tr><td style="${SresL}">N° Factura</td><td style="${SresV}">${r.numero_factura}${r.es_boleta?' (Boleta)':''}${r.es_terceros?' · terceros':''}</td></tr>`:''}
-      <tr><td style="${SresL}">Destino</td><td style="${SresV}">CTA. CTE. ${r.num_cuenta? r.num_cuenta+(r.banco?(' · '+r.banco):'') : ''}</td></tr>
-      <tr><td style="${SresL}">Monto total</td><td style="${SresV}">${fmt(neto)}</td></tr>
-      <tr><td style="${SresL}">${impLbl}</td><td style="${SresV}">${fmt(impMonto)}</td></tr>
-      <tr><td style="${SresL}">A pagar</td><td style="${SresV};font-weight:700">${fmt(aPagar)}</td></tr>
+      <tr><td style="${SresL}">Proveedor</td><td style="${SresV}">${f0.nombre_dealer||''}</td></tr>
+      <tr><td style="${SresL}">Concepto</td><td style="${SresV}">${conceptoDet}</td></tr>
+      <tr><td style="${SresL}">Período</td><td style="${SresV}">${periodoCL(f0.fecha_factura)}</td></tr>
+      ${f0.numero_factura?`<tr><td style="${SresL}">N° ${esBoleta?'Boleta':'Factura'}</td><td style="${SresV}">${f0.numero_factura}${esBoleta?' (Boleta)':''}${f0.es_terceros?' · terceros':''}${ops.length>1?` · ${ops.length} operaciones`:''}</td></tr>`:''}
+      <tr><td style="${SresL}">Destino</td><td style="${SresV}">CTA. CTE. ${f0.num_cuenta? f0.num_cuenta+(f0.banco?(' · '+f0.banco):'') : ''}</td></tr>
+      <tr><td style="${SresL}">${impLbl}</td><td style="${SresV}">${fmt(sumImp)}</td></tr>
+      <tr><td style="${SresL}">A pagar</td><td style="${SresV};font-weight:700">${fmt(sumPagar)}</td></tr>
       <tr><td style="${SresL}">Fecha a pagar</td><td style="${SresV}">${fechaPago}</td></tr>
     </tbody></table>
   </div>`;
 }
 
-function emailHTML(r){
-  const nOrden = r.num_orden || ('OC-' + (r.num_op||''));
-  const fOtorg = fechaCL(r.fecha_otorgado);
-  const fFact = fechaCL(r.fecha_factura);
-  const fin = r.financiera || 'Autofin';
+function emailHTML(ops){
+  if (!Array.isArray(ops)) ops = [ops];
+  const f0 = ops[0];
+  const nOrden = f0.num_orden || ('OC-' + (f0.numero_factura||f0.num_op||''));
+  const fFact = fechaCL(f0.fecha_factura);
+  const fin = f0.financiera || 'Autofin';
+  const nums = ops.map(o=>o.num_op).join(', ');
+  const docLbl = f0.es_boleta ? 'boleta' : 'factura';
   const p = 'font-size:14px;color:#374151;margin:0 0 14px;line-height:1.6';
   return `<div style="font-family:Arial,sans-serif">
     <p style="${p}">Estimado Equipo de Contabilidad:</p>
-    <p style="${p}">Adjunto encontrarán <strong>Orden de Pago de Comisión N° ${nOrden}</strong> para el pago de la Comisión a <strong>${r.nombre_dealer||''}</strong> del Crédito <strong>N° ${r.num_op||''}</strong> otorgado por <strong>${fin}</strong> con fecha <strong>${fOtorg}</strong>, factura ${r.numero_factura?`N° <strong>${r.numero_factura}</strong> `:''}recepcionada por AutoFácil el día <strong>${fFact}</strong>.</p>
+    <p style="${p}">Adjunto encontrarán <strong>Orden de Pago de Comisión N° ${nOrden}</strong> para el pago de la Comisión a <strong>${f0.nombre_dealer||''}</strong> del${ops.length>1?'os Créditos':' Crédito'} <strong>N° ${nums}</strong> otorgado${ops.length>1?'s':''} por <strong>${fin}</strong>, ${docLbl} ${f0.numero_factura?`N° <strong>${f0.numero_factura}</strong> `:''}recepcionada por AutoFácil el día <strong>${fFact}</strong>.</p>
     <p style="${p}">Les recordamos que deben marcar en el módulo de <strong>Comisión Pagada</strong>, de manera de informar al Ejecutivo y cerrar el flujo operativo de esta transacción.</p>
-    ${docHTML(r)}
+    ${docHTML(ops)}
     <p style="${p};margin-top:18px">Saludos cordiales,<br><strong>Área de Operaciones</strong></p>
   </div>`;
 }
 
-async function verOrden(id){
-  actual = DATA.find(r => r.id === id);
-  if (!actual) return;
-  if (!actual.num_orden){
+async function verOrden(gi){
+  actual = GROUPS[gi];
+  if (!actual || !actual.length) return;
+  const f0 = actual[0];
+  if (!f0.num_orden){
     try {
-      const r = await fetch('/api/postventa/orden-pago-comision/'+id+'/correlativo', { headers: hdr() });
+      const r = await fetch('/api/postventa/orden-pago-comision/'+f0.id+'/correlativo', { headers: hdr() });
       const j = await r.json();
-      if (j.success) actual.num_orden = j.data.num_orden;
+      if (j.success) actual.forEach(o => o.num_orden = j.data.num_orden);
     } catch(e){}
   }
   document.getElementById('docWrap').innerHTML = emailHTML(actual);
@@ -254,15 +295,17 @@ async function copiarOrden(){
 }
 
 async function emitir(){
-  if (!actual) return;
-  if (!confirm('¿Emitir la orden de pago de comisión de la OP '+(actual.num_op||'')+'? Pasará a Comisiones a Pagar.')) return;
+  if (!actual || !actual.length) return;
+  const ids = actual.map(o => o.id);
+  const nums = actual.map(o => o.num_op).join(', ');
+  if (!confirm(`¿Emitir la orden de pago de comisión de la${ids.length>1?'s':''} OP ${nums}? Pasará${ids.length>1?'n':''} a Comisiones a Pagar.`)) return;
   try {
-    const r = await fetch('/api/postventa/orden-pago-comision/emitir', { method:'POST', headers:hdr(), body:JSON.stringify({ ids:[actual.id] }) });
+    const r = await fetch('/api/postventa/orden-pago-comision/emitir', { method:'POST', headers:hdr(), body:JSON.stringify({ ids }) });
     const j = await r.json();
     if (!j.success) throw new Error(j.error);
-    DATA = DATA.filter(x => x.id !== actual.id);
+    DATA = DATA.filter(x => !ids.includes(x.id));
     cerrar(); render();
-    toast('Orden emitida — la operación pasó a Comisiones a Pagar');
+    toast(`Orden emitida — ${ids.length} operación(es) pasó a Comisiones a Pagar`);
   } catch(e){ toast('Error: '+e.message); }
 }
 
