@@ -5,7 +5,7 @@
   <link rel="icon" href="/img/favicon.png" type="image/png">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Seguimiento Post Venta — AutoFácil</title>
-  <!-- v2.2 -->
+  <!-- v2.3 -->
   <link href="/css/bootstrap.min.css" rel="stylesheet">
   <link href="/css/bootstrap-icons.css" rel="stylesheet">
   <style>
@@ -378,7 +378,8 @@ function fcToggleBoleta(){ FC.boleta = !FC.boleta; _fcSetExc('fcBtnBoleta', FC.b
 function fcBoletaInfo(){
   const box = _fc('fcBoleta');
   const bruto = parseInt(_fc('fcMonto').dataset.raw||'')||0;   // monto bruto de la factura (con IVA)
-  if (!FC.boleta || !bruto){ box.style.display='none'; return; }
+  if (!FC.boleta){ box.style.display='none'; return; }
+  if (!bruto){ box.innerHTML = '⚠ Ingresa el <b>Monto Bruto</b> de la factura para calcular la boleta y la retención.'; box.style.display='block'; return; }
   const iva = Number(IMPUESTOS.IVA)||19, ret = Number(IMPUESTOS.RETENCION_HONORARIOS)||15.25;
   const boletaBruto = Math.round(bruto / (1 + iva/100));   // líquido de la factura = bruto de la boleta
   const retencion = Math.round(boletaBruto * ret/100);
