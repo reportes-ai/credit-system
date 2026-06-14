@@ -5,7 +5,7 @@
   <link rel="icon" href="/img/favicon.png" type="image/png">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Seguimiento Post Venta — AutoFácil</title>
-  <!-- v2.3 -->
+  <!-- v2.4 -->
   <link href="/css/bootstrap.min.css" rel="stylesheet">
   <link href="/css/bootstrap-icons.css" rel="stylesheet">
   <style>
@@ -358,7 +358,8 @@ function abrirModalFactura(id, chk){
   _fc('fcNombre').value = FC.nombre; _fc('fcNombre').disabled = false;
   _fc('fcFecha').value = new Date().toISOString().slice(0,10);
   _fc('fcNumero').value = '';
-  _fc('fcMonto').value = ''; _fc('fcMonto').dataset.raw = '';
+  const com = Math.round(+r.comision||0);   // comisión bruta de la carta de aprobación (modificable)
+  _fc('fcMonto').value = com ? '$'+com.toLocaleString('es-CL') : ''; _fc('fcMonto').dataset.raw = com ? String(com) : '';
   _fcSetExc('fcBtnTerceros', false); _fcSetExc('fcBtnBoleta', false);
   _fc('fcAlert').style.display = 'none';
   fcBoletaInfo();
