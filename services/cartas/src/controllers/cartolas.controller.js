@@ -136,6 +136,25 @@ const getMovimientos = async (req, res) => {
        ${where.length ? 'WHERE ' + where.join(' AND ') : ''}
        ORDER BY m.mes DESC, m.nombre_dealer, m.id`, vals
     );
+    // Resolver mail del ejecutivo: directo de la carta, o por nombre contra catálogo
+    // combinado (cartas_ejecutivos + usuarios), con match de tokens normalizados.
+    if (rows.length) {
+      const norm = s => String(s||'').toUpperCase().normalize('NFD').replace(/[̀-ͯ]/g,'').replace(/[^A-Z0-9 ]/g,' ').replace(/\s+/g,' ').trim().split(' ').filter(Boolean);
+      const [cat] = await pool.query(
+        `SELECT nombre, mail FROM cartas_ejecutivos WHERE mail IS NOT NULL AND mail<>''
+         UNION
+         SELECT TRIM(CONCAT(nombre,' ',COALESCE(apellido,''))) AS nombre, email AS mail
+         FROM usuarios WHERE estado='activo' AND email IS NOT NULL AND email<>''`);
+      const idx = cat.map(c => ({ tk: norm(c.nombre), mail: c.mail })).filter(x => x.tk.length);
+      const resolver = nombre => {
+        const tk = norm(nombre); if (!tk.length) return null;
+        const h = idx.find(e => e.tk.every(t => tk.includes(t)) || tk.every(t => e.tk.includes(t)));
+        return h ? h.mail : null;
+      };
+      for (const r of rows) {
+        if (!r.ejecutivo_mail || !String(r.ejecutivo_mail).trim()) r.ejecutivo_mail = resolver(r.ejecutivo);
+      }
+    }
     res.json({ success: true, data: rows, error: null });
   } catch (e) {
     console.error('[cartolas get]', e.message);
