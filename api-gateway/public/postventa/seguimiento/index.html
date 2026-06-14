@@ -5,7 +5,7 @@
   <link rel="icon" href="/img/favicon.png" type="image/png">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Seguimiento Post Venta — AutoFácil</title>
-  <!-- v2.5 -->
+  <!-- v2.6 -->
   <link href="/css/bootstrap.min.css" rel="stylesheet">
   <link href="/css/bootstrap-icons.css" rel="stylesheet">
   <style>
@@ -378,22 +378,26 @@ function fcToggleTerceros(){
 function fcToggleBoleta(){ FC.boleta = !FC.boleta; _fcSetExc('fcBtnBoleta', FC.boleta); fcBoletaInfo(); }
 function fcBoletaInfo(){
   const warn = _fc('fcBoleta'), des = _fc('fcDesglose');
-  const bruto = parseInt(_fc('fcMonto').dataset.raw||'')||0;   // monto bruto de la factura (con IVA)
+  const neto = parseInt(_fc('fcMonto').dataset.raw||'')||0;   // valor NETO (viene de la carta)
   const iva = Number(IMPUESTOS.IVA)||19, ret = Number(IMPUESTOS.RETENCION_HONORARIOS)||15.25;
   const clp = n => '$'+(Math.round(n)||0).toLocaleString('es-CL');
+  // Etiquetas dinámicas según documento (factura/boleta)
+  const doc = FC.boleta ? 'Boleta' : 'Factura';
+  _fc('fcTitulo').textContent = `${doc} Recibida — Comisión`;
+  _fc('fcLblNumero').textContent = `N° ${doc}`;
+  _fc('fcLblFecha').textContent = `Fecha ${doc.toLowerCase()}`;
   // Advertencia de certificación al cambiar a Boleta
   warn.style.display = FC.boleta ? 'block' : 'none';
   if (FC.boleta) warn.innerHTML = '⚠ Al cambiar a <b>Boleta</b> certificas que se autorizó la emisión de boleta de honorarios en vez de factura. Revisa el desglose y el monto líquido a depositar.';
-  // Desglose de montos
-  if (!bruto){ des.style.display='none'; return; }
-  const row = (lbl,val,strong)=>`<div style="display:flex;justify-content:space-between;padding:3px 0${strong?';border-top:1px solid #e2e8f0;margin-top:4px;padding-top:7px;font-weight:700;color:#0f172a':';color:#475569'}"><span>${lbl}</span><span${strong?'':' style="font-weight:600;color:#0f172a"'}>${clp(val)}</span></div>`;
+  // Desglose de montos (base = neto)
+  if (!neto){ des.style.display='none'; return; }
+  const row = (lbl,val,strong)=>`<div style="display:flex;justify-content:space-between;padding:2px 0${strong?';border-top:1px solid #e2e8f0;margin-top:4px;padding-top:6px;font-weight:700;color:#0f172a':';color:#475569'}"><span>${lbl}</span><span${strong?'':' style="font-weight:600;color:#0f172a"'}>${clp(val)}</span></div>`;
   if (!FC.boleta){
-    const neto = Math.round(bruto/(1+iva/100)), ivaM = bruto - neto;
-    des.innerHTML = row('Monto Bruto (con IVA)', bruto) + row(`IVA (${iva}%)`, ivaM) + row('Monto líquido a depositar', bruto, true);
+    const ivaM = Math.round(neto*iva/100);
+    des.innerHTML = row('Monto Neto', neto) + row(`IVA (${iva}%)`, ivaM) + row('Monto líquido a depositar', neto + ivaM, true);
   } else {
-    const boletaBruto = Math.round(bruto/(1+iva/100));   // líquido de la factura = bruto de la boleta
-    const retencion = Math.round(boletaBruto*ret/100);
-    des.innerHTML = row('Monto Boleta (bruto)', boletaBruto) + row(`Retención honorarios (${ret}%)`, retencion) + row('Monto líquido a depositar', boletaBruto - retencion, true);
+    const retencion = Math.round(neto*ret/100);   // la boleta se emite por el neto
+    des.innerHTML = row('Monto Boleta', neto) + row(`Retención honorarios (${ret}%)`, retencion) + row('Monto líquido a depositar', neto - retencion, true);
   }
   des.style.display = 'block';
 }
@@ -458,37 +462,37 @@ async function toggleEtapa(id, track, etapa, chk){
 </script>
 
 <style>
-  #modalFactura { border:none; border-radius:14px; padding:0; max-width:460px; width:92%; box-shadow:0 20px 60px rgba(0,0,0,.3); }
+  #modalFactura { border:none; border-radius:14px; padding:0; max-width:440px; width:92%; max-height:96vh; box-shadow:0 20px 60px rgba(0,0,0,.3); }
   #modalFactura::backdrop { background:rgba(0,0,0,.45); }
-  #modalFactura label { display:block; font-size:.78rem; font-weight:600; color:#374151; }
-  #modalFactura input { width:100%; margin-top:3px; border:1.5px solid #d1d5db; border-radius:8px; padding:8px 10px; font-size:.88rem; box-sizing:border-box; outline:none; }
+  #modalFactura label { display:block; font-size:.76rem; font-weight:600; color:#374151; }
+  #modalFactura input { width:100%; margin-top:2px; border:1.5px solid #d1d5db; border-radius:7px; padding:6px 9px; font-size:.86rem; box-sizing:border-box; outline:none; }
   #modalFactura input:focus { border-color:#0141A2; }
   #modalFactura input:disabled { background:#f1f5f9; color:#94a3b8; }
 </style>
 <dialog id="modalFactura">
-  <div style="background:linear-gradient(135deg,#012d70,#0141A2);color:#fff;padding:15px 20px;display:flex;align-items:center;gap:10px">
-    <i class="bi bi-receipt" style="font-size:1.25rem"></i>
-    <h6 style="margin:0;font-weight:700;font-size:1rem">Factura Recibida — Comisión</h6>
+  <div style="background:linear-gradient(135deg,#012d70,#0141A2);color:#fff;padding:11px 18px;display:flex;align-items:center;gap:9px">
+    <i class="bi bi-receipt" style="font-size:1.15rem"></i>
+    <h6 id="fcTitulo" style="margin:0;font-weight:700;font-size:.97rem">Factura Recibida — Comisión</h6>
   </div>
-  <div style="padding:18px 20px">
-    <div id="fcAlert" style="display:none;background:#fef2f2;border:1px solid #fecaca;color:#b91c1c;border-radius:8px;padding:8px 12px;font-size:.82rem;margin-bottom:12px"></div>
-    <div id="fcBoleta" style="display:none;background:#fffbeb;border:1px solid #fde68a;color:#92400e;border-radius:8px;padding:9px 12px;font-size:.82rem;margin-bottom:12px;line-height:1.5"></div>
-    <div style="display:flex;gap:8px;margin-bottom:14px">
-      <button type="button" id="fcBtnTerceros" onclick="fcToggleTerceros()" style="flex:1;border:1px solid #cbd5e1;background:#eef2f7;color:#334155;border-radius:8px;padding:8px;font-size:.82rem;font-weight:700;cursor:pointer">Factura de terceros</button>
-      <button type="button" id="fcBtnBoleta" onclick="fcToggleBoleta()" style="flex:1;border:1px solid #cbd5e1;background:#eef2f7;color:#334155;border-radius:8px;padding:8px;font-size:.82rem;font-weight:700;cursor:pointer">Boleta</button>
+  <div style="padding:13px 18px">
+    <div id="fcAlert" style="display:none;background:#fef2f2;border:1px solid #fecaca;color:#b91c1c;border-radius:8px;padding:7px 11px;font-size:.8rem;margin-bottom:9px"></div>
+    <div id="fcBoleta" style="display:none;background:#fffbeb;border:1px solid #fde68a;color:#92400e;border-radius:8px;padding:8px 11px;font-size:.8rem;margin-bottom:9px;line-height:1.4"></div>
+    <div style="display:flex;gap:8px;margin-bottom:10px">
+      <button type="button" id="fcBtnTerceros" onclick="fcToggleTerceros()" style="flex:1;border:1px solid #cbd5e1;background:#eef2f7;color:#334155;border-radius:8px;padding:7px;font-size:.8rem;font-weight:700;cursor:pointer">Factura de terceros</button>
+      <button type="button" id="fcBtnBoleta" onclick="fcToggleBoleta()" style="flex:1;border:1px solid #cbd5e1;background:#eef2f7;color:#334155;border-radius:8px;padding:7px;font-size:.8rem;font-weight:700;cursor:pointer">Boleta</button>
     </div>
-    <div style="display:grid;gap:11px">
+    <div style="display:grid;gap:8px">
       <label>RUT Dealer<input id="fcRut" type="text"></label>
       <label>Nombre Dealer<input id="fcNombre" type="text"></label>
-      <label>Fecha factura<input id="fcFecha" type="date"></label>
-      <label>N° Factura<input id="fcNumero" type="text"></label>
-      <label>Monto Bruto<input id="fcMonto" type="text" inputmode="numeric" placeholder="$0" oninput="fcMoneyFmt(this)"></label>
+      <label><span id="fcLblFecha">Fecha factura</span><input id="fcFecha" type="date"></label>
+      <label><span id="fcLblNumero">N° Factura</span><input id="fcNumero" type="text"></label>
+      <label>Monto Neto<input id="fcMonto" type="text" inputmode="numeric" placeholder="$0" oninput="fcMoneyFmt(this)"></label>
     </div>
-    <div id="fcDesglose" style="display:none;margin-top:13px;background:#f8fafc;border:1px solid #e2e8f0;border-radius:8px;padding:10px 13px;font-size:.83rem"></div>
+    <div id="fcDesglose" style="display:none;margin-top:10px;background:#f8fafc;border:1px solid #e2e8f0;border-radius:8px;padding:9px 12px;font-size:.82rem"></div>
   </div>
-  <div style="padding:12px 20px;border-top:1px solid #eef2f7;display:flex;justify-content:flex-end;gap:10px">
-    <button type="button" onclick="fcCancelar()" style="background:#f1f5f9;color:#374151;border:none;border-radius:8px;padding:8px 18px;font-weight:600;cursor:pointer">Cancelar</button>
-    <button type="button" onclick="fcGuardar()" style="background:#0141A2;color:#fff;border:none;border-radius:8px;padding:8px 20px;font-weight:700;cursor:pointer">Guardar</button>
+  <div style="padding:9px 18px;border-top:1px solid #eef2f7;display:flex;justify-content:flex-end;gap:10px">
+    <button type="button" onclick="fcCancelar()" style="background:#f1f5f9;color:#374151;border:none;border-radius:8px;padding:7px 16px;font-weight:600;cursor:pointer">Cancelar</button>
+    <button type="button" onclick="fcGuardar()" style="background:#0141A2;color:#fff;border:none;border-radius:8px;padding:7px 18px;font-weight:700;cursor:pointer">Guardar</button>
   </div>
 </dialog>
 <script src="/js/app-version.js"></script>
