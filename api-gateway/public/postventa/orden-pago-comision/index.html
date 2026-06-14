@@ -5,7 +5,7 @@
   <link rel="icon" href="/img/favicon.png" type="image/png">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Emisión Orden de Pago Comisión — AutoFácil</title>
-  <!-- v1.6 -->
+  <!-- v1.7 -->
   <link href="/css/bootstrap.min.css" rel="stylesheet">
   <link href="/css/bootstrap-icons.css" rel="stylesheet">
   <style>
@@ -182,6 +182,7 @@ function docHTML(ops){
     return { neto, pct, impMonto, aPagar, eb };
   };
   const cs = ops.map(calc);
+  const sumNeto  = cs.reduce((s,c)=>s+c.neto,0);
   const sumImp   = cs.reduce((s,c)=>s+c.impMonto,0);
   const sumPagar = cs.reduce((s,c)=>s+c.aPagar,0);
   const esBoleta = !!f0.es_boleta;
@@ -239,6 +240,7 @@ function docHTML(ops){
       <tr><td style="${SresL}">Período</td><td style="${SresV}">${periodoCL(f0.fecha_factura)}</td></tr>
       ${f0.numero_factura?`<tr><td style="${SresL}">N° ${esBoleta?'Boleta':'Factura'}</td><td style="${SresV}">${f0.numero_factura}${esBoleta?' (Boleta)':''}${f0.es_terceros?' · terceros':''}${ops.length>1?` · ${ops.length} operaciones`:''}</td></tr>`:''}
       <tr><td style="${SresL}">Destino</td><td style="${SresV}">CTA. CTE. ${f0.num_cuenta? f0.num_cuenta+(f0.banco?(' · '+f0.banco):'') : ''}</td></tr>
+      <tr><td style="${SresL}">Monto total</td><td style="${SresV}">${fmt(sumNeto)}</td></tr>
       <tr><td style="${SresL}">${impLbl}</td><td style="${SresV}">${fmt(sumImp)}</td></tr>
       <tr><td style="${SresL}">A pagar</td><td style="${SresV};font-weight:700">${fmt(sumPagar)}</td></tr>
       <tr><td style="${SresL}">Fecha a pagar</td><td style="${SresV}">${fechaPago}</td></tr>
