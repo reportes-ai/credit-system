@@ -90,10 +90,10 @@ const SONIDOS = ['campana','dingdong','alarma','aplausos'];
   } catch (e) { console.error('[comisiones alertas migration]', e.message); }
 })();
 
+const { sumarDiasHabiles } = require('../../../../shared/feriados');  // días hábiles = sin fines de semana ni feriados chilenos
 const MESES_ES = ['enero','febrero','marzo','abril','mayo','junio','julio','agosto','septiembre','octubre','noviembre','diciembre'];
 const mesNombre     = ym => { const [y,m]=String(ym).split('-'); return `${MESES_ES[parseInt(m)-1]} de ${y}`; };
 const mesPagoNombre = ym => { let [y,m]=String(ym).split('-').map(Number); m++; if(m>12){m=1;y++;} return `${MESES_ES[m-1]} de ${y}`; };
-function sumarDiasHabiles(fecha, n){ const d=new Date(fecha); let add=0; while(add<n){ d.setDate(d.getDate()+1); const w=d.getDay(); if(w!==0&&w!==6) add++; } return d; }
 
 // Crea las notificaciones (campana) de un evento del flujo de revisión.
 async function notificarComisionRev(evento, { ejecutivo, mes } = {}) {
