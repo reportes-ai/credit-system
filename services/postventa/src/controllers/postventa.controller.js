@@ -137,14 +137,43 @@ const pool = require('../../../../shared/config/database');
         monto_bruto    BIGINT DEFAULT NULL,
         es_terceros    TINYINT(1) NOT NULL DEFAULT 0,
         es_boleta      TINYINT(1) NOT NULL DEFAULT 0,
+        impuesto_pct   DECIMAL(7,4) DEFAULT NULL,
+        impuesto_monto BIGINT DEFAULT NULL,
+        monto_liquido  BIGINT DEFAULT NULL,
         usuario        VARCHAR(150),
         created_at     DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
       )`);
+    // Desglose congelado al registrar la factura/boleta (no se recalcula después)
+    for (const col of ['impuesto_pct DECIMAL(7,4) DEFAULT NULL', 'impuesto_monto BIGINT DEFAULT NULL', 'monto_liquido BIGINT DEFAULT NULL']) {
+      try { await pool.query(`ALTER TABLE postventa_facturas_comision ADD COLUMN IF NOT EXISTS ${col}`); } catch (e) {}
+    }
     console.log('[postventa] tablas OK');
   } catch (e) { console.error('[postventa migration]', e.message); }
 })();
 
 const loginDe = u => (u?.nombre ? (u.nombre + ' ' + (u.apellido || '')).trim() : u?.email) || 'Sistema';
+
+// Guarda los datos de la factura/boleta de comisión con el desglose CONGELADO
+// (monto, impuesto y líquido a pagar tal como se registraron; la orden no recalcula).
+const _intOrNull = v => (v != null && v !== '') ? Math.round(Number(v)) : null;
+async function guardarFacturaComision(idSeguimiento, f, usuario) {
+  return pool.query(
+    `INSERT INTO postventa_facturas_comision
+       (id_seguimiento, num_op, rut_dealer, nombre_dealer, fecha_factura, numero_factura, monto_bruto,
+        es_terceros, es_boleta, impuesto_pct, impuesto_monto, monto_liquido, usuario)
+     VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)
+     ON DUPLICATE KEY UPDATE
+       num_op=VALUES(num_op), rut_dealer=VALUES(rut_dealer), nombre_dealer=VALUES(nombre_dealer),
+       fecha_factura=VALUES(fecha_factura), numero_factura=VALUES(numero_factura), monto_bruto=VALUES(monto_bruto),
+       es_terceros=VALUES(es_terceros), es_boleta=VALUES(es_boleta),
+       impuesto_pct=VALUES(impuesto_pct), impuesto_monto=VALUES(impuesto_monto), monto_liquido=VALUES(monto_liquido),
+       usuario=VALUES(usuario), created_at=NOW()`,
+    [idSeguimiento, f.num_op || null, f.rut_dealer || null, f.nombre_dealer || null,
+     f.fecha_factura || null, f.numero_factura || null, _intOrNull(f.monto_bruto),
+     f.es_terceros ? 1 : 0, f.es_boleta ? 1 : 0,
+     (f.impuesto_pct != null && f.impuesto_pct !== '') ? Number(f.impuesto_pct) : null,
+     _intOrNull(f.impuesto_monto), _intOrNull(f.monto_liquido), usuario]);
+}
 
 /* ── Alertas de proceso Saldo Precio (paramétricas, event-driven) ──────────────
    Cada transición del workflow genera una alerta (campana) a destinatarios
@@ -379,18 +408,7 @@ const setEtapa = async (req, res) => {
       // FACTURA RECIBIDA de comisión: guardar datos de la factura/boleta (incl. excepciones)
       if (track === 'COMISION' && etapa === 'FACTURA RECIBIDA' && req.body.factura) {
         const f = req.body.factura;
-        await pool.query(
-          `INSERT INTO postventa_facturas_comision
-             (id_seguimiento, num_op, rut_dealer, nombre_dealer, fecha_factura, numero_factura, monto_bruto, es_terceros, es_boleta, usuario)
-           VALUES (?,?,?,?,?,?,?,?,?,?)
-           ON DUPLICATE KEY UPDATE
-             num_op=VALUES(num_op), rut_dealer=VALUES(rut_dealer), nombre_dealer=VALUES(nombre_dealer),
-             fecha_factura=VALUES(fecha_factura), numero_factura=VALUES(numero_factura), monto_bruto=VALUES(monto_bruto),
-             es_terceros=VALUES(es_terceros), es_boleta=VALUES(es_boleta), usuario=VALUES(usuario), created_at=NOW()`,
-          [req.params.id, f.num_op || null, f.rut_dealer || null, f.nombre_dealer || null,
-           f.fecha_factura || null, f.numero_factura || null,
-           (f.monto_bruto != null && f.monto_bruto !== '') ? Math.round(Number(f.monto_bruto)) : null,
-           f.es_terceros ? 1 : 0, f.es_boleta ? 1 : 0, usuario]);
+        await guardarFacturaComision(req.params.id, f, usuario);
       }
     } else {
       // Validación desmarcar: debe ser la última marcada
@@ -870,18 +888,7 @@ const updateFacturaComision = async (req, res) => {
       `SELECT 1 ok FROM postventa_etapas WHERE id_seguimiento=? AND track='COMISION' AND etapa='FACTURA RECIBIDA' LIMIT 1`,
       [req.params.id]);
     if (!ex) return res.status(400).json({ success: false, data: null, error: 'La etapa FACTURA RECIBIDA no está marcada' });
-    await pool.query(
-      `INSERT INTO postventa_facturas_comision
-         (id_seguimiento, num_op, rut_dealer, nombre_dealer, fecha_factura, numero_factura, monto_bruto, es_terceros, es_boleta, usuario)
-       VALUES (?,?,?,?,?,?,?,?,?,?)
-       ON DUPLICATE KEY UPDATE
-         num_op=VALUES(num_op), rut_dealer=VALUES(rut_dealer), nombre_dealer=VALUES(nombre_dealer),
-         fecha_factura=VALUES(fecha_factura), numero_factura=VALUES(numero_factura), monto_bruto=VALUES(monto_bruto),
-         es_terceros=VALUES(es_terceros), es_boleta=VALUES(es_boleta), usuario=VALUES(usuario), created_at=NOW()`,
-      [req.params.id, f.num_op || null, f.rut_dealer || null, f.nombre_dealer || null,
-       f.fecha_factura || null, f.numero_factura || null,
-       (f.monto_bruto != null && f.monto_bruto !== '') ? Math.round(Number(f.monto_bruto)) : null,
-       f.es_terceros ? 1 : 0, f.es_boleta ? 1 : 0, usuario]);
+    await guardarFacturaComision(req.params.id, f, usuario);
     res.json({ success: true, data: { id: Number(req.params.id) }, error: null });
   } catch (e) {
     console.error('[postventa updateFacturaComision]', e.message);
@@ -901,6 +908,7 @@ const getComisionesAPagar = async (req, res) => {
              COALESCE(fc.fecha_factura, efa.fecha) AS fecha_factura,
              fc.numero_factura AS numero_factura, fc.monto_bruto AS monto_factura,
              fc.es_terceros AS es_terceros, fc.es_boleta AS es_boleta,
+             fc.impuesto_pct AS impuesto_pct, fc.impuesto_monto AS impuesto_monto, fc.monto_liquido AS monto_liquido,
              DATEDIFF(CURDATE(), efa.fecha) AS dias,
              (epg.id IS NOT NULL) AS pagado_hoy,
              (eev.id IS NOT NULL) AS enviado,
@@ -942,6 +950,7 @@ const getOrdenPagoComision = async (req, res) => {
              COALESCE(fc.fecha_factura, efa.fecha) AS fecha_factura,
              fc.numero_factura AS numero_factura, fc.monto_bruto AS monto_factura,
              fc.es_terceros AS es_terceros, fc.es_boleta AS es_boleta,
+             fc.impuesto_pct AS impuesto_pct, fc.impuesto_monto AS impuesto_monto, fc.monto_liquido AS monto_liquido,
              DATEDIFF(CURDATE(), efa.fecha) AS dias
       FROM postventa_seguimiento s
       JOIN postventa_etapas efa

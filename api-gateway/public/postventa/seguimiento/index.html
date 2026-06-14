@@ -5,7 +5,7 @@
   <link rel="icon" href="/img/favicon.png" type="image/png">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Seguimiento Post Venta — AutoFácil</title>
-  <!-- v2.7 -->
+  <!-- v2.8 -->
   <link href="/css/bootstrap.min.css" rel="stylesheet">
   <link href="/css/bootstrap-icons.css" rel="stylesheet">
   <style>
@@ -424,8 +424,14 @@ async function fcGuardar(){
   if (FC.terceros || FC.boleta){
     if (!confirm('Al grabar, el usuario certifica que se autorizó la emisión de una Boleta en vez de Factura y/o la emisión de la Boleta/Factura por un tercero.\n\n¿Confirmas?')) return;
   }
+  // Desglose congelado al registrar (la orden de pago NO recalcula)
+  const iva = Number(IMPUESTOS.IVA)||19, ret = Number(IMPUESTOS.RETENCION_HONORARIOS)||15.25;
+  const impPct = FC.boleta ? ret : iva;
+  const impMonto = Math.round(monto * impPct/100);
+  const liquido = FC.boleta ? (monto - impMonto) : (monto + impMonto);
   const factura = { num_op:FC.num_op, rut_dealer:_fc('fcRut').value.trim()||null, nombre_dealer:_fc('fcNombre').value.trim()||null,
-    fecha_factura:fecha, numero_factura:numero, monto_bruto:monto, es_terceros:FC.terceros?1:0, es_boleta:FC.boleta?1:0 };
+    fecha_factura:fecha, numero_factura:numero, monto_bruto:monto, es_terceros:FC.terceros?1:0, es_boleta:FC.boleta?1:0,
+    impuesto_pct:impPct, impuesto_monto:impMonto, monto_liquido:liquido };
   const editar = FC.modo === 'editar';
   const url = editar ? '/api/postventa/'+FC.id+'/factura-comision' : '/api/postventa/'+FC.id+'/etapa';
   const payload = editar ? factura : { track:'COMISION', etapa:'FACTURA RECIBIDA', marcar:1, factura };

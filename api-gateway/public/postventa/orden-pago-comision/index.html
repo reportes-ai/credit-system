@@ -5,7 +5,7 @@
   <link rel="icon" href="/img/favicon.png" type="image/png">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Emisión Orden de Pago Comisión — AutoFácil</title>
-  <!-- v1.2 -->
+  <!-- v1.3 -->
   <link href="/css/bootstrap.min.css" rel="stylesheet">
   <link href="/css/bootstrap-icons.css" rel="stylesheet">
   <style>
@@ -145,12 +145,14 @@ function render(){
 }
 
 function docHTML(r){
-  const neto = Number(r.comision)||0;               // monto total (neto) de la comisión
-  const iva = Number(IMPUESTOS.IVA)||19, ret = Number(IMPUESTOS.RETENCION_HONORARIOS)||15.25;
   const esBoleta = !!r.es_boleta;
-  const impLbl  = esBoleta ? `Retención ${ret}%` : `IVA ${iva}%`;
-  const impMonto = Math.round(neto * (esBoleta ? ret : iva)/100);
-  const aPagar  = esBoleta ? (neto - impMonto) : (neto + impMonto);   // monto líquido a depositar
+  // Valores REGISTRADOS al marcar la factura/boleta (no se recalculan). Fallback solo para registros antiguos.
+  const iva = Number(IMPUESTOS.IVA)||19, ret = Number(IMPUESTOS.RETENCION_HONORARIOS)||15.25;
+  const neto = Number(r.monto_factura ?? r.comision)||0;               // monto total (neto) registrado
+  const pct  = (r.impuesto_pct != null) ? Number(r.impuesto_pct) : (esBoleta ? ret : iva);
+  const impMonto = (r.impuesto_monto != null) ? Number(r.impuesto_monto) : Math.round(neto * pct/100);
+  const aPagar   = (r.monto_liquido  != null) ? Number(r.monto_liquido)  : (esBoleta ? (neto - impMonto) : (neto + impMonto));
+  const impLbl   = `${esBoleta ? 'Retención' : 'IVA'} ${pct}%`;
   const total = neto;
   const periodo = periodoCL(r.fecha_factura);
   const fechaPago = fechaCL(new Date().toISOString());
