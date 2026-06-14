@@ -5,7 +5,7 @@
   <link rel="icon" href="/img/favicon.png" type="image/png">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Seguimiento Post Venta — AutoFácil</title>
-  <!-- v2.0 -->
+  <!-- v2.1 -->
   <link href="/css/bootstrap.min.css" rel="stylesheet">
   <link href="/css/bootstrap-icons.css" rel="stylesheet">
   <style>
@@ -321,6 +321,7 @@ function trackHTML(r, track, lista){
           onchange="toggleEtapa(${r.id},'${track}','${escH(x.etapa)}',this)">
         ${!m?`<span class="pend">${canMark?'Pendiente':'🔒'}</span>`:''}
         ${(esAuto && x.etapa==='SALDO PRECIO PAGADO' && m && esAdmin)?`<button onclick="revertirPago(${r.id})" title="Revertir pago (con motivo, Administrador)" style="display:block;margin:3px auto 0;background:#fff1f2;color:#b91c1c;border:1px solid #fecaca;border-radius:6px;padding:1px 7px;font-size:.68rem;font-weight:700;cursor:pointer">↶ Revertir</button>`:''}
+        ${(track==='COMISION' && x.etapa==='FACTURA RECIBIDA' && m)?`<button onclick="editarFactura(${r.id})" title="Ver / editar datos de la factura" style="display:block;margin:3px auto 0;background:#eff6ff;color:#1d4ed8;border:1px solid #bfdbfe;border-radius:6px;padding:1px 7px;font-size:.68rem;font-weight:700;cursor:pointer">✎ Factura</button>`:''}
       </div>
       <div class="fecha">${m?fmtF(m.fecha):''}</div>
       ${dias}
@@ -349,7 +350,7 @@ let FC = { id:null, chk:null, terceros:false, boleta:false, rut:'', nombre:'', n
 const _fc = id => document.getElementById(id);
 function abrirModalFactura(id, chk){
   const r = DATA.find(x => x.id === id) || {};
-  FC = { id, chk, terceros:false, boleta:false, rut:r.rut_dealer||'', nombre:r.nombre_dealer||'', num_op:r.num_op||null };
+  FC = { id, chk, modo:'marcar', terceros:false, boleta:false, rut:r.rut_dealer||'', nombre:r.nombre_dealer||'', num_op:r.num_op||null };
   _fc('fcRut').value = FC.rut;       _fc('fcRut').disabled = false;
   _fc('fcNombre').value = FC.nombre; _fc('fcNombre').disabled = false;
   _fc('fcFecha').value = new Date().toISOString().slice(0,10);
@@ -370,6 +371,18 @@ function fcToggleTerceros(){
   else { _fc('fcRut').value=FC.rut; _fc('fcNombre').value=FC.nombre; _fc('fcRut').disabled=false; _fc('fcNombre').disabled=false; }
 }
 function fcToggleBoleta(){ FC.boleta = !FC.boleta; _fcSetExc('fcBtnBoleta', FC.boleta); }
+function editarFactura(id){
+  const r = DATA.find(x => x.id === id) || {};
+  FC = { id, chk:null, modo:'editar', terceros:!!r.fac_terceros, boleta:!!r.fac_boleta, rut:r.rut_dealer||'', nombre:r.nombre_dealer||'', num_op:r.num_op||null };
+  _fc('fcRut').value = r.fac_terceros ? '' : (r.rut_dealer||'');       _fc('fcRut').disabled = !!r.fac_terceros;
+  _fc('fcNombre').value = r.fac_terceros ? '' : (r.nombre_dealer||''); _fc('fcNombre').disabled = !!r.fac_terceros;
+  _fc('fcFecha').value = r.fac_fecha ? String(r.fac_fecha).slice(0,10) : '';
+  _fc('fcNumero').value = r.fac_numero || '';
+  const m = r.fac_monto || ''; _fc('fcMonto').value = m ? '$'+parseInt(m).toLocaleString('es-CL') : ''; _fc('fcMonto').dataset.raw = m ? String(m) : '';
+  _fcSetExc('fcBtnTerceros', !!r.fac_terceros); _fcSetExc('fcBtnBoleta', !!r.fac_boleta);
+  _fc('fcAlert').style.display = 'none';
+  document.getElementById('modalFactura').showModal();
+}
 function fcMoneyFmt(el){ const n = el.value.replace(/\D/g,''); el.dataset.raw = n; el.value = n ? '$'+parseInt(n).toLocaleString('es-CL') : ''; }
 function fcCancelar(){ document.getElementById('modalFactura').close(); if (FC.chk) FC.chk.checked = false; FC = {id:null,chk:null}; }
 async function fcGuardar(){
@@ -381,14 +394,19 @@ async function fcGuardar(){
   }
   const factura = { num_op:FC.num_op, rut_dealer:_fc('fcRut').value.trim()||null, nombre_dealer:_fc('fcNombre').value.trim()||null,
     fecha_factura:fecha, numero_factura:numero, monto_bruto:monto, es_terceros:FC.terceros?1:0, es_boleta:FC.boleta?1:0 };
+  const editar = FC.modo === 'editar';
+  const url = editar ? '/api/postventa/'+FC.id+'/factura-comision' : '/api/postventa/'+FC.id+'/etapa';
+  const payload = editar ? factura : { track:'COMISION', etapa:'FACTURA RECIBIDA', marcar:1, factura };
   try {
-    const r = await fetch('/api/postventa/'+FC.id+'/etapa', { method:'PUT', headers:H,
-      body: JSON.stringify({ track:'COMISION', etapa:'FACTURA RECIBIDA', marcar:1, factura }) });
+    const r = await fetch(url, { method:'PUT', headers:H, body: JSON.stringify(payload) });
     const j = await r.json();
     if (!j.success){ al.textContent=j.error||'Error'; al.style.display='block'; return; }
     const row = DATA.find(x=>x.id===FC.id);
-    if (row){ row.etapas = row.etapas.filter(e=>!(e.track==='COMISION'&&e.etapa==='FACTURA RECIBIDA'));
-      row.etapas.push({ id_seguimiento:FC.id, track:'COMISION', etapa:'FACTURA RECIBIDA', usuario:j.data.usuario, fecha:new Date().toISOString() }); }
+    if (row){
+      if (!editar){ row.etapas = row.etapas.filter(e=>!(e.track==='COMISION'&&e.etapa==='FACTURA RECIBIDA'));
+        row.etapas.push({ id_seguimiento:FC.id, track:'COMISION', etapa:'FACTURA RECIBIDA', usuario:(j.data&&j.data.usuario)||'', fecha:new Date().toISOString() }); }
+      row.fac_fecha=fecha; row.fac_numero=numero; row.fac_monto=monto; row.fac_terceros=factura.es_terceros; row.fac_boleta=factura.es_boleta;
+    }
     document.getElementById('modalFactura').close(); FC = {id:null,chk:null}; render();
   } catch(e){ al.textContent='Error de conexión'; al.style.display='block'; }
 }

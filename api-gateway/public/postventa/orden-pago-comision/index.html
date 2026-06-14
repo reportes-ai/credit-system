@@ -5,7 +5,7 @@
   <link rel="icon" href="/img/favicon.png" type="image/png">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Emisión Orden de Pago Comisión — AutoFácil</title>
-  <!-- v1.0 -->
+  <!-- v1.1 -->
   <link href="/css/bootstrap.min.css" rel="stylesheet">
   <link href="/css/bootstrap-icons.css" rel="stylesheet">
   <style>
@@ -186,6 +186,7 @@ function docHTML(r){
       <tr><td style="${SresL}">Proveedor</td><td style="${SresV}">${r.nombre_dealer||''}</td></tr>
       <tr><td style="${SresL}">Concepto</td><td style="${SresV}">${concepto}</td></tr>
       <tr><td style="${SresL}">Período</td><td style="${SresV}">${periodo}</td></tr>
+      ${r.numero_factura?`<tr><td style="${SresL}">N° Factura</td><td style="${SresV}">${r.numero_factura}${r.es_boleta?' (Boleta)':''}${r.es_terceros?' · terceros':''}</td></tr>`:''}
       <tr><td style="${SresL}">Destino</td><td style="${SresV}">CTA. CTE. ${r.num_cuenta? r.num_cuenta+(r.banco?(' · '+r.banco):'') : ''}</td></tr>
       <tr><td style="${SresL}">Valor total</td><td style="${SresV}">${fmt(total)}</td></tr>
       <tr><td style="${SresL}">Fecha a pagar</td><td style="${SresV}">${fechaPago}</td></tr>
@@ -201,7 +202,7 @@ function emailHTML(r){
   const p = 'font-size:14px;color:#374151;margin:0 0 14px;line-height:1.6';
   return `<div style="font-family:Arial,sans-serif">
     <p style="${p}">Estimado Equipo de Contabilidad:</p>
-    <p style="${p}">Adjunto encontrarán <strong>Orden de Pago de Comisión N° ${nOrden}</strong> para el pago de la Comisión a <strong>${r.nombre_dealer||''}</strong> del Crédito <strong>N° ${r.num_op||''}</strong> otorgado por <strong>${fin}</strong> con fecha <strong>${fOtorg}</strong>, factura recepcionada por AutoFácil el día <strong>${fFact}</strong>.</p>
+    <p style="${p}">Adjunto encontrarán <strong>Orden de Pago de Comisión N° ${nOrden}</strong> para el pago de la Comisión a <strong>${r.nombre_dealer||''}</strong> del Crédito <strong>N° ${r.num_op||''}</strong> otorgado por <strong>${fin}</strong> con fecha <strong>${fOtorg}</strong>, factura ${r.numero_factura?`N° <strong>${r.numero_factura}</strong> `:''}recepcionada por AutoFácil el día <strong>${fFact}</strong>.</p>
     <p style="${p}">Les recordamos que deben marcar en el módulo de <strong>Comisión Pagada</strong>, de manera de informar al Ejecutivo y cerrar el flujo operativo de esta transacción.</p>
     ${docHTML(r)}
     <p style="${p};margin-top:18px">Saludos cordiales,<br><strong>Área de Operaciones</strong></p>

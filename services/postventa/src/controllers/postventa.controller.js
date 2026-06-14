@@ -301,10 +301,13 @@ const getAll = async (req, res) => {
       SELECT s.id, s.id_credito, s.num_op, s.financiera, s.ejecutivo,
              s.fecha_otorgado, s.saldo_precio, s.comision,
              COALESCE(c.nombre_local, d.nombre_razon, s.nombre_dealer)  AS nombre_dealer,
-             COALESCE(c.rut_dealer, d.rut, s.rut_dealer)         AS rut_dealer
+             COALESCE(c.rut_dealer, d.rut, s.rut_dealer)         AS rut_dealer,
+             fc.fecha_factura AS fac_fecha, fc.numero_factura AS fac_numero, fc.monto_bruto AS fac_monto,
+             fc.es_terceros AS fac_terceros, fc.es_boleta AS fac_boleta
       FROM postventa_seguimiento s
       LEFT JOIN creditos c ON c.id = s.id_credito
       LEFT JOIN dealers  d ON d.nombre_indexa = c.automotora
+      LEFT JOIN postventa_facturas_comision fc ON fc.id_seguimiento = s.id
       ORDER BY s.fecha_otorgado DESC, s.id DESC LIMIT 1000`);
     const [etapas] = await pool.query(
       `SELECT id_seguimiento, track, etapa, usuario, fecha FROM postventa_etapas
@@ -847,6 +850,45 @@ const desmarcarSaldos = async (req, res) => {
    Cartolas → FACTURA RECIBIDA → ORDEN DE PAGO EMITIDA → ENVIADO A PAGO → COMISION PAGADA
    ═══════════════════════════════════════════════════════════════════════ */
 
+/* ── GET /api/postventa/:id/factura-comision — datos de la factura recibida ── */
+const getFacturaComision = async (req, res) => {
+  try {
+    const [[f]] = await pool.query('SELECT * FROM postventa_facturas_comision WHERE id_seguimiento = ?', [req.params.id]);
+    res.json({ success: true, data: f || null, error: null });
+  } catch (e) {
+    console.error('[postventa getFacturaComision]', e.message);
+    res.status(500).json({ success: false, data: null, error: 'Error interno del servidor' });
+  }
+};
+
+/* ── PUT /api/postventa/:id/factura-comision — actualizar datos de la factura (sin tocar la etapa) ── */
+const updateFacturaComision = async (req, res) => {
+  try {
+    const f = req.body || {};
+    const usuario = loginDe(req.usuario);
+    const [[ex]] = await pool.query(
+      `SELECT 1 ok FROM postventa_etapas WHERE id_seguimiento=? AND track='COMISION' AND etapa='FACTURA RECIBIDA' LIMIT 1`,
+      [req.params.id]);
+    if (!ex) return res.status(400).json({ success: false, data: null, error: 'La etapa FACTURA RECIBIDA no está marcada' });
+    await pool.query(
+      `INSERT INTO postventa_facturas_comision
+         (id_seguimiento, num_op, rut_dealer, nombre_dealer, fecha_factura, numero_factura, monto_bruto, es_terceros, es_boleta, usuario)
+       VALUES (?,?,?,?,?,?,?,?,?,?)
+       ON DUPLICATE KEY UPDATE
+         num_op=VALUES(num_op), rut_dealer=VALUES(rut_dealer), nombre_dealer=VALUES(nombre_dealer),
+         fecha_factura=VALUES(fecha_factura), numero_factura=VALUES(numero_factura), monto_bruto=VALUES(monto_bruto),
+         es_terceros=VALUES(es_terceros), es_boleta=VALUES(es_boleta), usuario=VALUES(usuario), created_at=NOW()`,
+      [req.params.id, f.num_op || null, f.rut_dealer || null, f.nombre_dealer || null,
+       f.fecha_factura || null, f.numero_factura || null,
+       (f.monto_bruto != null && f.monto_bruto !== '') ? Math.round(Number(f.monto_bruto)) : null,
+       f.es_terceros ? 1 : 0, f.es_boleta ? 1 : 0, usuario]);
+    res.json({ success: true, data: { id: Number(req.params.id) }, error: null });
+  } catch (e) {
+    console.error('[postventa updateFacturaComision]', e.message);
+    res.status(500).json({ success: false, data: null, error: 'Error interno del servidor' });
+  }
+};
+
 /* ── GET /api/postventa/comisiones-a-pagar — ops con orden de pago de comisión emitida, no pagadas ── */
 const getComisionesAPagar = async (req, res) => {
   try {
@@ -856,7 +898,9 @@ const getComisionesAPagar = async (req, res) => {
              c.id_financiera,
              COALESCE(c.rut_dealer, d.rut) AS rut_dealer,
              d.num_cuenta, d.banco,
-             efa.fecha AS fecha_factura,
+             COALESCE(fc.fecha_factura, efa.fecha) AS fecha_factura,
+             fc.numero_factura AS numero_factura, fc.monto_bruto AS monto_factura,
+             fc.es_terceros AS es_terceros, fc.es_boleta AS es_boleta,
              DATEDIFF(CURDATE(), efa.fecha) AS dias,
              (epg.id IS NOT NULL) AS pagado_hoy,
              (eev.id IS NOT NULL) AS enviado,
@@ -868,6 +912,7 @@ const getComisionesAPagar = async (req, res) => {
         ON eev.id_seguimiento = s.id AND eev.track='COMISION' AND eev.etapa='ENVIADO A PAGO'
       LEFT JOIN postventa_etapas efa
         ON efa.id_seguimiento = s.id AND efa.track='COMISION' AND efa.etapa='FACTURA RECIBIDA'
+      LEFT JOIN postventa_facturas_comision fc ON fc.id_seguimiento = s.id
       LEFT JOIN postventa_etapas epg
         ON epg.id_seguimiento = s.id AND epg.track='COMISION' AND epg.etapa='COMISION PAGADA'
            AND DATE(epg.fecha) = CURDATE()
@@ -894,11 +939,14 @@ const getOrdenPagoComision = async (req, res) => {
              COALESCE(c.nombre_local, d.nombre_razon, s.nombre_dealer) AS nombre_dealer,
              COALESCE(c.rut_dealer, d.rut) AS rut_dealer,
              d.num_cuenta, d.banco, d.rut_pago,
-             efa.fecha AS fecha_factura,
+             COALESCE(fc.fecha_factura, efa.fecha) AS fecha_factura,
+             fc.numero_factura AS numero_factura, fc.monto_bruto AS monto_factura,
+             fc.es_terceros AS es_terceros, fc.es_boleta AS es_boleta,
              DATEDIFF(CURDATE(), efa.fecha) AS dias
       FROM postventa_seguimiento s
       JOIN postventa_etapas efa
         ON efa.id_seguimiento = s.id AND efa.track='COMISION' AND efa.etapa='FACTURA RECIBIDA'
+      LEFT JOIN postventa_facturas_comision fc ON fc.id_seguimiento = s.id
       LEFT JOIN creditos c ON c.id = s.id_credito
       LEFT JOIN dealers  d ON d.nombre_indexa = c.automotora
       WHERE NOT EXISTS (
@@ -1087,4 +1135,5 @@ const marcarHistorico = async (req, res) => {
 };
 
 module.exports = { sync, getAll, setEtapa, getConfig, setConfig, marcarHistorico, getPerfiles, getSaldosAPagar, enviarAPago, pagarSaldos, getOrdenPago, correlativoOrden, emitirOrdenPago, desmarcarSaldos, getAtribuciones, getFondos, setFondos, getAlertasConfig, setAlertasConfig,
-  getComisionesAPagar, getOrdenPagoComision, correlativoOrdenComision, emitirOrdenPagoComision, enviarAPagoComision, pagarComisiones, desmarcarComisiones, getAtribucionesComision, getFondosComision, setFondosComision };
+  getComisionesAPagar, getOrdenPagoComision, correlativoOrdenComision, emitirOrdenPagoComision, enviarAPagoComision, pagarComisiones, desmarcarComisiones, getAtribucionesComision, getFondosComision, setFondosComision,
+  getFacturaComision, updateFacturaComision };

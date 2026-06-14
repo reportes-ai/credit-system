@@ -34,5 +34,7 @@ router.post('/comisiones-a-pagar/pagar', verifyToken, requireFunc('pv_com_pagar'
 router.post('/comisiones-a-pagar/desmarcar', verifyToken, requireFunc('pv_com_revertir'), c.desmarcarComisiones);
 router.get('/',               verifyToken, c.getAll);
 router.put('/:id/etapa',    verifyToken, requireFunc('postventa_seguimiento'), c.setEtapa);
+router.get('/:id/factura-comision', verifyToken, c.getFacturaComision);
+router.put('/:id/factura-comision', verifyToken, requireFunc('postventa_seguimiento'), c.updateFacturaComision);
 
 module.exports = router;
