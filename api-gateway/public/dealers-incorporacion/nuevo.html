@@ -5,7 +5,7 @@
   <link rel="icon" href="/img/favicon.png" type="image/png">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Nueva Ficha de Dealer — AutoFácil</title>
-  <!-- v1.0 -->
+  <!-- v1.1 -->
   <link href="/css/bootstrap.min.css" rel="stylesheet">
   <link href="/css/bootstrap-icons.css" rel="stylesheet">
   <style>
@@ -56,6 +56,12 @@
     .toast-af { position:fixed; bottom:80px; left:50%; transform:translateX(-50%); background:#0f172a; color:#fff; padding:11px 20px; border-radius:10px; font-size:.86rem; z-index:9999; display:none; }
     .toast-af.err { background:#b91c1c; }
     .fileinfo { font-size:.82rem; color:#16a34a; font-weight:600; margin-top:6px; display:none; }
+    .vmsg { font-size:.74rem; margin-top:3px; min-height:14px; }
+    .vmsg.ok { color:#059669; } .vmsg.bad { color:#dc2626; }
+    .filelist { margin-top:8px; display:flex; flex-direction:column; gap:6px; }
+    .filerow { display:flex; align-items:center; gap:8px; background:#f8fafc; border:1px solid #e5e7eb; border-radius:8px; padding:6px 10px; font-size:.82rem; }
+    .filerow i.fi { color:#0284c7; } .filerow .nm { flex:1; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+    .filerow a { color:#0284c7; text-decoration:none; } .filerow button { background:none; border:none; color:#dc2626; cursor:pointer; font-size:.95rem; }
     /* ── Vista de impresión ── */
     #printArea { display:none; }
     @media print {
@@ -111,11 +117,15 @@
   <div class="card-sec">
     <h3><i class="bi bi-building me-1"></i> Datos del Concesionario</h3>
     <div class="card-body grid">
-      <div class="fld"><label>RUT de Concesionario *</label><input id="rut" placeholder="76.123.456-7"></div>
+      <div class="fld"><label>RUT de Concesionario *</label><input id="rut" placeholder="76.123.456-7" maxlength="12" oninput="onRutInput(this,'rutHint')"><small id="rutHint" class="vmsg"></small></div>
       <div class="fld"><label>Nombre Razón Social *</label><input id="nombre_razon"></div>
       <div class="fld"><label>Nombre de Fantasía</label><input id="nombre_fantasia"></div>
       <div class="fld"><label id="lblDir">Dirección de Sucursal</label><input id="direccion"></div>
-      <div class="fld"><label id="lblCom">Comuna de Sucursal</label><input id="comuna"></div>
+      <div class="fld"><label id="lblCom">Comuna de Sucursal</label>
+        <input id="comuna" list="comunasList" placeholder="Escribe o elige la comuna…" oninput="onComuna()">
+        <datalist id="comunasList"></datalist></div>
+      <div class="fld"><label>Provincia / Ciudad</label><input id="provincia" readonly style="background:#f8fafc"></div>
+      <div class="fld"><label>Región</label><input id="region" readonly style="background:#f8fafc"></div>
     </div>
   </div>
 
@@ -123,8 +133,8 @@
     <h3><i class="bi bi-telephone me-1"></i> Contacto Comercial</h3>
     <div class="card-body grid">
       <div class="fld"><label>Nombre</label><input id="cc_nombre"></div>
-      <div class="fld"><label>Teléfono</label><input id="cc_telefono"></div>
-      <div class="fld full"><label>Email</label><input id="cc_email" type="email"></div>
+      <div class="fld"><label>Teléfono</label><input id="cc_telefono" inputmode="tel" placeholder="+56 9 1234 5678" oninput="onTel(this,'ccTelHint')"><small id="ccTelHint" class="vmsg"></small></div>
+      <div class="fld full"><label>Email</label><input id="cc_email" type="email" oninput="onEmail(this,'ccEmailHint')"><small id="ccEmailHint" class="vmsg"></small></div>
     </div>
   </div>
 
@@ -132,8 +142,8 @@
     <h3><i class="bi bi-cash-stack me-1"></i> Contacto Financiero</h3>
     <div class="card-body grid">
       <div class="fld"><label>Nombre</label><input id="cf_nombre"></div>
-      <div class="fld"><label>Teléfono</label><input id="cf_telefono"></div>
-      <div class="fld full"><label>Email</label><input id="cf_email" type="email"></div>
+      <div class="fld"><label>Teléfono</label><input id="cf_telefono" inputmode="tel" placeholder="+56 9 1234 5678" oninput="onTel(this,'cfTelHint')"><small id="cfTelHint" class="vmsg"></small></div>
+      <div class="fld full"><label>Email</label><input id="cf_email" type="email" oninput="onEmail(this,'cfEmailHint')"><small id="cfEmailHint" class="vmsg"></small></div>
     </div>
   </div>
 
@@ -171,10 +181,18 @@
         <label><input type="radio" name="cuenta_tipo" value="PERSONA"> Persona</label>
       </div>
       <div class="grid">
-        <div class="fld"><label>Banco de Transferencia</label><input id="banco"></div>
-        <div class="fld"><label>RUT de Cuenta</label><input id="rut_cuenta"></div>
-        <div class="fld"><label>Número de Cuenta</label><input id="num_cuenta"></div>
-        <div class="fld"><label>Correo Confirmación</label><input id="correo_confirmacion" type="email"></div>
+        <div class="fld"><label>Banco de Transferencia</label>
+          <select id="banco">
+            <option value="">— Seleccionar banco —</option>
+            <option>Banco de Chile</option><option>BancoEstado</option><option>Banco Santander</option>
+            <option>BCI</option><option>Itaú</option><option>Scotiabank</option><option>Banco Security</option>
+            <option>Banco Falabella</option><option>Banco Ripley</option><option>Banco Consorcio</option>
+            <option>Banco BICE</option><option>Banco Internacional</option><option>Banco BTG Pactual</option>
+            <option>Coopeuch</option><option>Banco del Desarrollo</option><option>HSBC</option><option>Tenpo</option><option>Mercado Pago</option>
+          </select></div>
+        <div class="fld"><label>RUT de Cuenta</label><input id="rut_cuenta" maxlength="12" oninput="onRutInput(this,'rutCtaHint')"><small id="rutCtaHint" class="vmsg"></small></div>
+        <div class="fld"><label>Número de Cuenta</label><input id="num_cuenta" inputmode="numeric"></div>
+        <div class="fld"><label>Email Confirmación</label><input id="correo_confirmacion" type="email" oninput="onEmail(this,'ecEmailHint')"><small id="ecEmailHint" class="vmsg"></small></div>
       </div>
     </div>
   </div>
@@ -183,6 +201,25 @@
     <h3><i class="bi bi-chat-left-text me-1"></i> Observaciones</h3>
     <div class="card-body">
       <div class="fld full"><textarea id="observaciones" rows="3" placeholder="Acuerdos especiales, adjuntos (estatutos/poderes), excepciones visadas…"></textarea></div>
+    </div>
+  </div>
+
+  <div class="card-sec">
+    <h3><i class="bi bi-folder2-open me-1"></i> Informes Comerciales (obligatorios)</h3>
+    <div class="card-body">
+      <p class="hint" style="margin-top:0">Adjunta los informes comerciales (PDF o imagen). Hasta <b>3 archivos por sección</b>. Son obligatorios para enviar a revisión.</p>
+      <div class="grid">
+        <div class="fld full">
+          <label><i class="bi bi-building me-1"></i> Informes Comerciales Empresa</label>
+          <input type="file" id="fileEmpresa" accept="application/pdf,image/*" multiple onchange="onInformes('EMPRESA')">
+          <div id="listEmpresa" class="filelist"></div>
+        </div>
+        <div class="fld full">
+          <label><i class="bi bi-people me-1"></i> Informes Comerciales Socios</label>
+          <input type="file" id="fileSocios" accept="application/pdf,image/*" multiple onchange="onInformes('SOCIOS')">
+          <div id="listSocios" class="filelist"></div>
+        </div>
+      </div>
     </div>
   </div>
 
@@ -227,6 +264,78 @@ function setRadio(n,v){ const el=document.querySelector(`input[name=${n}][value=
 
 $('ejecutivo_nombre').value = `${yo?.nombre||''} ${yo?.apellido||''}`.trim();
 
+/* ── Validadores ── */
+function formatRUT(raw){ let c=String(raw).replace(/[^0-9kK]/g,'').toUpperCase(); if(c.length<2)return c;
+  const dv=c.slice(-1),body=c.slice(0,-1); let f=''; for(let i=body.length;i>0;i-=3) f=body.slice(Math.max(0,i-3),i)+(f?'.'+f:''); return f+'-'+dv; }
+function calcDV(body){ const d=String(body).replace(/\D/g,''); if(!d)return null; const s=[2,3,4,5,6,7];
+  const sum=d.split('').reverse().reduce((a,n,i)=>a+parseInt(n)*s[i%6],0); const r=11-(sum%11); return r===11?'0':r===10?'K':String(r); }
+function validarRUT(clean){ if(clean.length<7||clean.length>9)return null; return calcDV(clean.slice(0,-1))===clean.slice(-1).toUpperCase(); }
+function onRutInput(el, hintId){
+  const clean=el.value.replace(/[^0-9kK]/g,'').toUpperCase(); if(clean.length>=2) el.value=formatRUT(el.value);
+  const h=$(hintId); if(!h) return;
+  if(clean.length>=7&&clean.length<=9){ const ok=validarRUT(clean);
+    el.style.borderColor=ok?'#059669':'#dc2626'; h.className='vmsg '+(ok?'ok':'bad'); h.textContent=ok?'✓ RUT válido':'✗ Dígito verificador incorrecto'; }
+  else if(clean.length>0){ el.style.borderColor=''; h.className='vmsg'; h.textContent='Ingresa el RUT con dígito verificador'; }
+  else { el.style.borderColor=''; h.className='vmsg'; h.textContent=''; }
+}
+const EMAIL_RE=/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/;
+function emailOK(v){ return EMAIL_RE.test(String(v).trim()); }
+function onEmail(el, hintId){ const v=el.value.trim(); const h=$(hintId); if(!v){el.style.borderColor='';h.textContent='';return;}
+  const ok=emailOK(v); el.style.borderColor=ok?'#059669':'#dc2626'; h.className='vmsg '+(ok?'ok':'bad'); h.textContent=ok?'✓ Email válido':'✗ Email no válido'; }
+function telDigits(v){ return String(v).replace(/\D/g,''); }
+function telOK(v){ const d=telDigits(v); return d.length>=8 && d.length<=12; }
+function onTel(el, hintId){ const v=el.value.trim(); const h=$(hintId); const d=telDigits(v); if(!v){el.style.borderColor='';h.textContent='';return;}
+  const ok=telOK(v); el.style.borderColor=ok?'#059669':'#dc2626'; h.className='vmsg '+(ok?'ok':'bad'); h.textContent=ok?'✓ Teléfono válido':`✗ Debe tener entre 8 y 12 dígitos (tiene ${d.length})`; }
+
+/* ── Geografía: comuna → provincia/región (el API ya trae los nombres) ── */
+let GEO_MAP = {};   // comuna(lower) → { provincia, region }
+async function cargarGeo(){
+  try {
+    const r=await fetch('/api/geografico/comunas',{headers:H}); const j=await r.json();
+    const dl=$('comunasList'); dl.innerHTML='';
+    (j.data||[]).forEach(c=>{ GEO_MAP[String(c.nombre).toLowerCase()]={ provincia:c.provincia||'', region:c.region||'' };
+      const o=document.createElement('option'); o.value=c.nombre; dl.appendChild(o); });
+  } catch(e){}
+}
+function onComuna(){ const g=GEO_MAP[val('comuna').toLowerCase()]; setVal('provincia', g?g.provincia:''); setVal('region', g?g.region:''); }
+
+/* ── Informes comerciales (empresa/socios) ── */
+async function ensureId(){ if(FICHA_ID) return true; return await guardar(true); }
+async function onInformes(cat){
+  const inp = cat==='EMPRESA' ? $('fileEmpresa') : $('fileSocios');
+  const files=[...inp.files]; inp.value='';
+  if(!files.length) return;
+  if(!(await ensureId())) return;
+  const yaN = document.querySelectorAll('#list'+(cat==='EMPRESA'?'Empresa':'Socios')+' .filerow').length;
+  if(yaN+files.length>3){ toast('Máximo 3 archivos en '+cat, true); return; }
+  for(const f of files){
+    if(f.size>7*1024*1024){ toast(f.name+' supera 7 MB',true); continue; }
+    const b64=await new Promise(rs=>{ const rd=new FileReader(); rd.onload=()=>rs(rd.result.split(',')[1]); rd.readAsDataURL(f); });
+    try{ const r=await fetch('/api/dealer-incorporacion/fichas/'+FICHA_ID+'/archivos',{method:'POST',headers:H,
+        body:JSON.stringify({categoria:cat,archivo_nombre:f.name,mime_type:f.type||'application/octet-stream',archivo_data:b64})});
+      const j=await r.json(); if(!j.success) throw new Error(j.error);
+    }catch(e){ toast(e.message,true); }
+  }
+  await cargarInformes();
+}
+async function cargarInformes(){
+  if(!FICHA_ID) return;
+  try{ const r=await fetch('/api/dealer-incorporacion/fichas/'+FICHA_ID+'/archivos',{headers:H}); const j=await r.json(); if(!j.success)return;
+    for(const cat of ['EMPRESA','SOCIOS']){
+      const cont=$('list'+(cat==='EMPRESA'?'Empresa':'Socios'));
+      const rows=(j.data||[]).filter(a=>a.categoria===cat);
+      cont.innerHTML = rows.map(a=>`<div class="filerow"><i class="bi bi-file-earmark-text fi"></i>
+        <a class="nm" href="/api/dealer-incorporacion/fichas/${FICHA_ID}/archivos/${a.id}?token=${encodeURIComponent(token)}" target="_blank">${(a.nombre||'archivo').replace(/</g,'&lt;')}</a>
+        ${ESTADO==='APROBADA'||ESTADO==='EN_REVISION'||ESTADO==='TOMADA'?'':`<button title="Quitar" onclick="borrarInforme(${a.id})">✕</button>`}</div>`).join('')
+        || '<div style="font-size:.78rem;color:#94a3b8">Sin archivos cargados</div>';
+    }
+  }catch(e){}
+}
+async function borrarInforme(id){
+  try{ const r=await fetch('/api/dealer-incorporacion/fichas/'+FICHA_ID+'/archivos/'+id,{method:'DELETE',headers:H}); const j=await r.json(); if(!j.success)throw new Error(j.error); await cargarInformes(); }
+  catch(e){ toast(e.message,true); }
+}
+
 function onTipo(){
   const t = getTipo();
   $('lblDir').textContent = t==='PARQUE' ? 'Dirección de Parque Automotriz' : 'Dirección de Sucursal';
@@ -252,7 +361,7 @@ function onFile(){
 function recolectar(){
   const o = { tipo:getTipo(), fecha_solicitud:val('fecha_solicitud'), rut:val('rut'),
     nombre_razon:val('nombre_razon'), nombre_fantasia:val('nombre_fantasia'),
-    direccion:val('direccion'), comuna:val('comuna'),
+    direccion:val('direccion'), comuna:val('comuna'), provincia:val('provincia'), region:val('region'),
     cc_nombre:val('cc_nombre'), cc_telefono:val('cc_telefono'), cc_email:val('cc_email'),
     cf_nombre:val('cf_nombre'), cf_telefono:val('cf_telefono'), cf_email:val('cf_email'),
     com_6_12:val('com_6_12'), com_13_24:val('com_13_24'), com_25_36:val('com_25_36'), com_37:val('com_37'),
@@ -285,7 +394,20 @@ async function guardar(silent){
   } catch(e){ toast(e.message, true); return false; }
 }
 
+function validarEnvio(){
+  const errs=[];
+  if(!val('rut')||!validarRUT(val('rut').replace(/[^0-9kK]/g,'').toUpperCase())) errs.push('RUT de concesionario válido');
+  if(!val('nombre_razon')) errs.push('Razón Social');
+  for(const [id,lbl] of [['cc_email','Email contacto comercial'],['cf_email','Email contacto financiero'],['correo_confirmacion','Email confirmación']])
+    if(val(id) && !emailOK(val(id))) errs.push(lbl+' inválido');
+  for(const [id,lbl] of [['cc_telefono','Teléfono comercial'],['cf_telefono','Teléfono financiero']])
+    if(val(id) && !telOK(val(id))) errs.push(lbl+' inválido');
+  if(val('rut_cuenta') && !validarRUT(val('rut_cuenta').replace(/[^0-9kK]/g,'').toUpperCase())) errs.push('RUT de cuenta inválido');
+  return errs;
+}
 async function enviar(){
+  const errs = validarEnvio();
+  if (errs.length){ toast('Corrige antes de enviar: '+errs.join(', '), true); return; }
   const ok = await guardar(true);
   if (!ok) return;
   let apelacion = null;
@@ -302,6 +424,7 @@ async function enviar(){
 }
 
 async function cargar(){
+  await cargarGeo();
   if (!FICHA_ID) { $('fecha_solicitud').value = new Date().toLocaleDateString('sv-SE',{timeZone:'America/Santiago'}); onTipo(); return; }
   try {
     const r = await fetch('/api/dealer-incorporacion/fichas/'+FICHA_ID, { headers:H });
@@ -310,8 +433,9 @@ async function cargar(){
     const f = j.data; ESTADO = f.estado;
     setRadio('tipo', f.tipo); onTipo();
     setVal('ejecutivo_nombre', f.ejecutivo_nombre || $('ejecutivo_nombre').value);
-    ['fecha_solicitud','rut','nombre_razon','nombre_fantasia','direccion','comuna','cc_nombre','cc_telefono','cc_email','cf_nombre','cf_telefono','cf_email','com_6_12','com_13_24','com_25_36','com_37','banco','rut_cuenta','num_cuenta','correo_confirmacion','observaciones']
+    ['fecha_solicitud','rut','nombre_razon','nombre_fantasia','direccion','comuna','provincia','region','cc_nombre','cc_telefono','cc_email','cf_nombre','cf_telefono','cf_email','com_6_12','com_13_24','com_25_36','com_37','banco','rut_cuenta','num_cuenta','correo_confirmacion','observaciones']
       .forEach(k => setVal(k, k==='fecha_solicitud' && f[k] ? String(f[k]).slice(0,10) : f[k]));
+    if (!val('provincia')) onComuna();
     setRadio('tipo_documento', f.tipo_documento); setRadio('cuenta_tipo', f.cuenta_tipo);
     const pill = $('estadoPill'); pill.textContent = f.estado.replace('_',' '); pill.className = 'estado-pill e-'+f.estado;
     if (f.tiene_ficha) { $('fileInfo').textContent = '✓ Ficha firmada ya cargada (puedes reemplazarla)'; $('fileInfo').style.display='block'; }
@@ -319,6 +443,7 @@ async function cargar(){
       const b=$('boxRechazo'); b.style.display='block';
       b.innerHTML = `<b><i class="bi bi-x-octagon me-1"></i>Ficha rechazada por ${f.revisor_nombre||'Operaciones'}:</b> ${f.motivo_rechazo}`;
     }
+    await cargarInformes();
     // Solo BORRADOR/RECHAZADA son editables
     const editable = ['BORRADOR','RECHAZADA'].includes(f.estado);
     if (!editable) {
@@ -347,7 +472,9 @@ function imprimir(){
       <tr><td class="lbl">Nombre Razón Social</td><td>${E(o.nombre_razon)}</td></tr>
       <tr><td class="lbl">Nombre de Fantasía</td><td>${E(o.nombre_fantasia)}</td></tr>
       <tr><td class="lbl">${dirLbl}</td><td>${E(o.direccion)}</td></tr>
-      <tr><td class="lbl">${comLbl}</td><td>${E(o.comuna)}</td></tr></table>
+      <tr><td class="lbl">${comLbl}</td><td>${E(o.comuna)}</td></tr>
+      <tr><td class="lbl">Provincia / Ciudad</td><td>${E(o.provincia)}</td></tr>
+      <tr><td class="lbl">Región</td><td>${E(o.region)}</td></tr></table>
     <table class="p"><tr><th colspan="2">CONTACTO COMERCIAL</th></tr>
       <tr><td class="lbl">Nombre</td><td>${E(o.cc_nombre)}</td></tr>
       <tr><td class="lbl">Teléfono</td><td>${E(o.cc_telefono)}</td></tr>

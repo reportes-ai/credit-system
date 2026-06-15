@@ -10,6 +10,12 @@ router.get('/fichas',            verifyToken, requireFunc('dealer_inc_ver', 'dea
 router.get('/fichas/:id',        verifyToken, requireFunc('dealer_inc_ver', 'dealer_ficha_crear', 'dealer_ficha_revisar'), ctrl.obtener);
 router.get('/fichas/:id/archivo', verifyToken, requireFunc('dealer_inc_ver', 'dealer_ficha_crear', 'dealer_ficha_revisar'), ctrl.verFicha);
 
+// Informes comerciales (empresa/socios) — listar/ver con acceso de lectura; subir/borrar solo el creador.
+router.get('/fichas/:id/archivos',              verifyToken, requireFunc('dealer_inc_ver', 'dealer_ficha_crear', 'dealer_ficha_revisar'), ctrl.listarArchivos);
+router.get('/fichas/:id/archivos/:archivoId',   verifyToken, requireFunc('dealer_inc_ver', 'dealer_ficha_crear', 'dealer_ficha_revisar'), ctrl.verArchivo);
+router.post('/fichas/:id/archivos',             verifyToken, requireFunc('dealer_ficha_crear'), ctrl.subirArchivo);
+router.delete('/fichas/:id/archivos/:archivoId', verifyToken, requireFunc('dealer_ficha_crear'), ctrl.eliminarArchivo);
+
 // Ejecutivo Comercial: crear, editar, subir ficha firmada, enviar a revisión, eliminar borrador.
 router.post('/fichas',           verifyToken, requireFunc('dealer_ficha_crear'), ctrl.crear);
 router.put('/fichas/:id',        verifyToken, requireFunc('dealer_ficha_crear'), ctrl.editar);

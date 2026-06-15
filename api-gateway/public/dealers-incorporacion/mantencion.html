@@ -5,7 +5,7 @@
   <link rel="icon" href="/img/favicon.png" type="image/png">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Mantención Dealers — AutoFácil</title>
-  <!-- v1.0 -->
+  <!-- v1.1 -->
   <link href="/css/bootstrap.min.css" rel="stylesheet">
   <link href="/css/bootstrap-icons.css" rel="stylesheet">
   <style>
@@ -233,18 +233,25 @@ async function verFicha(id){
     if(!j.success) throw new Error(j.error); const f=j.data;
     $('verTitulo').textContent = (f.nombre_razon||f.rut||'Ficha')+' · '+(f.tipo==='PARQUE'?'Parque':'General');
     const row=(k,v)=>`<b>${k}</b><span>${escH(v??'—')}</span>`;
+    // Adjuntos (ficha firmada + informes comerciales)
+    let adjHtml = '';
+    if (f.tiene_ficha) adjHtml += `<a class="btn btn-sky btn-sm" style="text-decoration:none" target="_blank" href="/api/dealer-incorporacion/fichas/${id}/archivo?token=${encodeURIComponent(token)}"><i class="bi bi-file-earmark-pdf"></i> Ficha firmada</a> `;
+    try {
+      const ra=await fetch('/api/dealer-incorporacion/fichas/'+id+'/archivos',{headers:H}); const ja=await ra.json();
+      (ja.data||[]).forEach(a=>{ adjHtml += `<a class="btn btn-light btn-sm" style="text-decoration:none" target="_blank" href="/api/dealer-incorporacion/fichas/${id}/archivos/${a.id}?token=${encodeURIComponent(token)}"><i class="bi bi-paperclip"></i> ${a.categoria==='EMPRESA'?'Empresa':'Socios'}: ${escH(a.nombre||'archivo')}</a> `; });
+    } catch(e){}
     $('verBody').innerHTML = `<div class="kv">
       ${row('Ejecutivo', f.ejecutivo_nombre)} ${row('Fecha solicitud', f.fecha_solicitud?String(f.fecha_solicitud).slice(0,10):'—')}
       ${row('RUT', f.rut)} ${row('Razón Social', f.nombre_razon)} ${row('Fantasía', f.nombre_fantasia)}
-      ${row('Dirección', f.direccion)} ${row('Comuna', f.comuna)}
+      ${row('Dirección', f.direccion)} ${row('Comuna', f.comuna)} ${row('Provincia/Ciudad', f.provincia)} ${row('Región', f.region)}
       ${row('Contacto comercial', `${f.cc_nombre||''} · ${f.cc_telefono||''} · ${f.cc_email||''}`)}
       ${row('Contacto financiero', `${f.cf_nombre||''} · ${f.cf_telefono||''} · ${f.cf_email||''}`)}
       ${row('Comisión 6-12 / 13-24 / 25-36 / 37+', `${f.com_6_12||0}% / ${f.com_13_24||0}% / ${f.com_25_36||0}% / ${f.com_37||0}%`)}
       ${row('Documento', f.tipo_documento)} ${row('Cuenta', `${f.cuenta_tipo||''} · ${f.banco||''} · ${f.num_cuenta||''} · RUT ${f.rut_cuenta||''}`)}
-      ${row('Correo confirmación', f.correo_confirmacion)} ${row('Observaciones', f.observaciones)}
+      ${row('Email confirmación', f.correo_confirmacion)} ${row('Observaciones', f.observaciones)}
       ${f.apelacion?row('Apelación', f.apelacion):''}
       ${f.motivo_rechazo?row('Motivo rechazo', f.motivo_rechazo):''}
-    </div>`;
+    </div><div style="margin-top:16px;display:flex;flex-wrap:wrap;gap:6px">${adjHtml||'<span style="font-size:.8rem;color:#94a3b8">Sin adjuntos</span>'}</div>`;
     dlgVer.showModal();
   } catch(e){ toast(e.message,true); }
 }

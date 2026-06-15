@@ -72,6 +72,27 @@ const COM_DEFAULT = {
     `);
   } catch (e) { if (e.errno !== 1050) console.error('[dealer_fichas migration]', e.message); }
 
+  // Columnas geográficas derivadas de la comuna (provincia/región) — incrementales.
+  try {
+    await pool.query(`ALTER TABLE dealer_fichas ADD COLUMN IF NOT EXISTS provincia VARCHAR(120) NULL`);
+    await pool.query(`ALTER TABLE dealer_fichas ADD COLUMN IF NOT EXISTS region VARCHAR(120) NULL`);
+  } catch (e) { console.error('[dealer_fichas alter geo]', e.message); }
+
+  // Archivos adjuntos múltiples (informes comerciales empresa/socios, hasta 3 c/u).
+  try {
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS dealer_ficha_archivos (
+        id          INT AUTO_INCREMENT PRIMARY KEY,
+        id_ficha    INT          NOT NULL,
+        categoria   VARCHAR(20)  NOT NULL,
+        nombre      VARCHAR(200) NULL,
+        mime        VARCHAR(100) NULL,
+        data        LONGBLOB     NULL,
+        created_at  DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        INDEX idx_ficha (id_ficha)
+      )`);
+  } catch (e) { if (e.errno !== 1050) console.error('[dealer_ficha_archivos migration]', e.message); }
+
   // Registro del módulo en el menú (idempotente).
   try {
     await pool.query(
@@ -135,10 +156,12 @@ function puedeRevisar(req) {
 }
 
 // Campos editables de la ficha (todo menos workflow/archivo).
-const CAMPOS = ['tipo','fecha_solicitud','rut','nombre_razon','nombre_fantasia','direccion','comuna',
+const CAMPOS = ['tipo','fecha_solicitud','rut','nombre_razon','nombre_fantasia','direccion','comuna','provincia','region',
   'cc_nombre','cc_telefono','cc_email','cf_nombre','cf_telefono','cf_email',
   'com_6_12','com_13_24','com_25_36','com_37','tipo_documento','cuenta_tipo','banco',
   'rut_cuenta','num_cuenta','correo_confirmacion','observaciones'];
+
+const CATEGORIAS = ['EMPRESA', 'SOCIOS'];   // informes comerciales
 
 function armarValores(body) {
   const v = {};
@@ -180,7 +203,7 @@ const obtener = async (req, res) => {
   try {
     const [[f]] = await pool.query(
       `SELECT id, tipo, estado, id_ejecutivo, ejecutivo_email, ejecutivo_nombre, fecha_solicitud,
-              rut, nombre_razon, nombre_fantasia, direccion, comuna,
+              rut, nombre_razon, nombre_fantasia, direccion, comuna, provincia, region,
               cc_nombre, cc_telefono, cc_email, cf_nombre, cf_telefono, cf_email,
               com_6_12, com_13_24, com_25_36, com_37, tipo_documento, cuenta_tipo, banco,
               rut_cuenta, num_cuenta, correo_confirmacion, observaciones,
@@ -281,6 +304,11 @@ const enviar = async (req, res) => {
       return res.status(400).json({ success: false, data: null, error: 'La ficha ya está en revisión o aprobada' });
     if (!f.ficha_data) return res.status(400).json({ success: false, data: null, error: 'Debes subir la ficha firmada (PDF o foto) antes de enviar' });
     if (!f.rut || !f.nombre_razon) return res.status(400).json({ success: false, data: null, error: 'Faltan datos obligatorios (RUT y Razón Social)' });
+    // Informes comerciales obligatorios: al menos 1 de Empresa y 1 de Socios.
+    const [cats] = await pool.query('SELECT categoria, COUNT(*) n FROM dealer_ficha_archivos WHERE id_ficha=? GROUP BY categoria', [req.params.id]);
+    const porCat = Object.fromEntries(cats.map(c => [c.categoria, c.n]));
+    if (!porCat.EMPRESA) return res.status(400).json({ success: false, data: null, error: 'Debes cargar al menos un Informe Comercial Empresa antes de enviar' });
+    if (!porCat.SOCIOS)  return res.status(400).json({ success: false, data: null, error: 'Debes cargar al menos un Informe Comercial Socios antes de enviar' });
 
     const reenvio = f.estado === 'RECHAZADA';
     const apelacion = norm(req.body.apelacion) || null;
@@ -394,6 +422,72 @@ const rechazar = async (req, res) => {
   } catch (e) { console.error('[fichas rechazar]', e.message); res.status(500).json({ success: false, data: null, error: 'Error interno del servidor' }); }
 };
 
+/* ── Archivos adjuntos (informes comerciales empresa/socios, máx 3 c/u) ───── */
+async function fichaDe(id) { const [[f]] = await pool.query('SELECT id, id_ejecutivo, estado FROM dealer_fichas WHERE id=?', [id]); return f; }
+
+const listarArchivos = async (req, res) => {
+  try {
+    const f = await fichaDe(req.params.id);
+    if (!f) return res.status(404).json({ success: false, data: null, error: 'Ficha no encontrada' });
+    if (!(await puedeRevisar(req)) && f.id_ejecutivo !== req.usuario.id_usuario)
+      return res.status(403).json({ success: false, data: null, error: 'Sin acceso' });
+    const [rows] = await pool.query('SELECT id, categoria, nombre, mime, created_at FROM dealer_ficha_archivos WHERE id_ficha=? ORDER BY id', [req.params.id]);
+    res.json({ success: true, data: rows, error: null });
+  } catch (e) { console.error('[fichas archivos listar]', e.message); res.status(500).json({ success: false, data: null, error: 'Error interno del servidor' }); }
+};
+
+const subirArchivo = async (req, res) => {
+  try {
+    const { categoria, archivo_nombre, mime_type, archivo_data } = req.body || {};
+    const cat = String(categoria || '').toUpperCase();
+    if (!CATEGORIAS.includes(cat)) return res.status(400).json({ success: false, data: null, error: 'Categoría inválida' });
+    if (!archivo_data) return res.status(400).json({ success: false, data: null, error: 'Falta el archivo' });
+    const f = await fichaDe(req.params.id);
+    if (!f) return res.status(404).json({ success: false, data: null, error: 'Ficha no encontrada' });
+    if (f.id_ejecutivo !== req.usuario.id_usuario && req.usuario.perfil_nombre !== 'Administrador')
+      return res.status(403).json({ success: false, data: null, error: 'Sin permiso' });
+    if (!['BORRADOR', 'RECHAZADA'].includes(f.estado))
+      return res.status(400).json({ success: false, data: null, error: 'No se pueden cambiar archivos en este estado' });
+    const [[{ n }]] = await pool.query('SELECT COUNT(*) n FROM dealer_ficha_archivos WHERE id_ficha=? AND categoria=?', [req.params.id, cat]);
+    if (n >= 3) return res.status(400).json({ success: false, data: null, error: 'Máximo 3 archivos por categoría' });
+    const buffer = Buffer.from(archivo_data, 'base64');
+    const [r] = await pool.query('INSERT INTO dealer_ficha_archivos (id_ficha, categoria, nombre, mime, data) VALUES (?,?,?,?,?)',
+      [req.params.id, cat, archivo_nombre || 'archivo', mime_type || 'application/octet-stream', buffer]);
+    auditar({ req, accion: 'EDITAR', modulo: 'dealers', entidad: 'dealer_ficha', entidad_id: req.params.id,
+      detalle: `Subió informe comercial (${cat}) a ficha #${req.params.id}: ${archivo_nombre || ''}` });
+    res.status(201).json({ success: true, data: { id: r.insertId }, error: null });
+  } catch (e) { console.error('[fichas archivos subir]', e.message); res.status(500).json({ success: false, data: null, error: 'Error interno del servidor' }); }
+};
+
+const verArchivo = async (req, res) => {
+  try {
+    const [[a]] = await pool.query(
+      `SELECT a.nombre, a.mime, a.data, f.id_ejecutivo FROM dealer_ficha_archivos a
+         JOIN dealer_fichas f ON f.id=a.id_ficha WHERE a.id=? AND a.id_ficha=?`, [req.params.archivoId, req.params.id]);
+    if (!a || !a.data) return res.status(404).json({ success: false, data: null, error: 'Sin archivo' });
+    if (!(await puedeRevisar(req)) && a.id_ejecutivo !== req.usuario.id_usuario)
+      return res.status(403).json({ success: false, data: null, error: 'Sin acceso' });
+    auditar({ req, accion: 'VER_DOCUMENTO', modulo: 'dealers', entidad: 'dealer_ficha', entidad_id: req.params.id,
+      detalle: `Visualizó informe comercial de ficha #${req.params.id}` });
+    res.set('Content-Type', a.mime || 'application/octet-stream');
+    res.set('Content-Disposition', `inline; filename="${(a.nombre || 'archivo').replace(/"/g, '')}"`);
+    res.send(a.data);
+  } catch (e) { console.error('[fichas archivos ver]', e.message); res.status(500).json({ success: false, data: null, error: 'Error interno del servidor' }); }
+};
+
+const eliminarArchivo = async (req, res) => {
+  try {
+    const f = await fichaDe(req.params.id);
+    if (!f) return res.status(404).json({ success: false, data: null, error: 'Ficha no encontrada' });
+    if (f.id_ejecutivo !== req.usuario.id_usuario && req.usuario.perfil_nombre !== 'Administrador')
+      return res.status(403).json({ success: false, data: null, error: 'Sin permiso' });
+    if (!['BORRADOR', 'RECHAZADA'].includes(f.estado))
+      return res.status(400).json({ success: false, data: null, error: 'No se pueden cambiar archivos en este estado' });
+    await pool.query('DELETE FROM dealer_ficha_archivos WHERE id=? AND id_ficha=?', [req.params.archivoId, req.params.id]);
+    res.json({ success: true, data: { ok: true }, error: null });
+  } catch (e) { console.error('[fichas archivos eliminar]', e.message); res.status(500).json({ success: false, data: null, error: 'Error interno del servidor' }); }
+};
+
 /* ── DELETE /fichas/:id — eliminar borrador propio ────────────────────────── */
 const eliminar = async (req, res) => {
   try {
@@ -411,4 +505,5 @@ const eliminar = async (req, res) => {
   } catch (e) { console.error('[fichas eliminar]', e.message); res.status(500).json({ success: false, data: null, error: 'Error interno del servidor' }); }
 };
 
-module.exports = { listar, obtener, crear, editar, subirFicha, verFicha, enviar, tomar, aprobar, rechazar, eliminar };
+module.exports = { listar, obtener, crear, editar, subirFicha, verFicha, enviar, tomar, aprobar, rechazar, eliminar,
+  listarArchivos, subirArchivo, verArchivo, eliminarArchivo };
