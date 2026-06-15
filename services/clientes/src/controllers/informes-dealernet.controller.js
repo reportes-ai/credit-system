@@ -359,7 +359,7 @@ const getPDF = async (req, res) => {
     const { pdf_path, pdf_filename } = rows[0];
     if (!pdf_path || !fs.existsSync(pdf_path))
       return res.status(404).json({ success: false, error: 'Archivo PDF no disponible en servidor' });
-    res.setHeader('Content-Disposition', `inline; filename="${pdf_filename}"`);
+    res.setHeader('Content-Disposition', `inline; filename="${String(pdf_filename || 'informe').replace(/"/g, '').replace(/[^\x20-\x7E]/g, '_')}"`);
     res.setHeader('Content-Type', 'application/pdf');
     fs.createReadStream(pdf_path).pipe(res);
   } catch(e) {

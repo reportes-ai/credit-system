@@ -336,6 +336,15 @@ const subirFicha = async (req, res) => {
 };
 
 /* ── GET /fichas/:id/archivo — ver/descargar ficha firmada ─────────────────── */
+// Content-Disposition seguro: el header HTTP no admite caracteres fuera de
+// Latin-1 (ej. "—" U+2014) → Node lanza ERR_INVALID_CHAR. Fallback ASCII +
+// RFC 5987 (filename*) para conservar el nombre real en navegadores modernos.
+function dispFilename(name) {
+  const n = String(name || 'archivo').replace(/"/g, '');
+  const ascii = n.replace(/[^\x20-\x7E]/g, '_');
+  return `inline; filename="${ascii}"; filename*=UTF-8''${encodeURIComponent(n)}`;
+}
+
 const verFicha = async (req, res) => {
   try {
     const [[f]] = await pool.query('SELECT id_ejecutivo, ficha_nombre, ficha_mime, ficha_data FROM dealer_fichas WHERE id=?', [req.params.id]);
@@ -345,7 +354,7 @@ const verFicha = async (req, res) => {
     auditar({ req, accion: 'VER_DOCUMENTO', modulo: 'dealers', entidad: 'dealer_ficha', entidad_id: req.params.id,
       detalle: `Visualizó ficha firmada de dealer #${req.params.id}` });
     res.set('Content-Type', f.ficha_mime || 'application/octet-stream');
-    res.set('Content-Disposition', `inline; filename="${(f.ficha_nombre || 'ficha').replace(/"/g, '')}"`);
+    res.set('Content-Disposition', dispFilename(f.ficha_nombre || 'ficha'));
     res.send(f.ficha_data);
   } catch (e) { console.error('[fichas verFicha]', e.message); res.status(500).json({ success: false, data: null, error: 'Error interno del servidor' }); }
 };
@@ -637,7 +646,7 @@ const verArchivo = async (req, res) => {
     auditar({ req, accion: 'VER_DOCUMENTO', modulo: 'dealers', entidad: 'dealer_ficha', entidad_id: req.params.id,
       detalle: `Visualizó informe comercial de ficha #${req.params.id}` });
     res.set('Content-Type', a.mime || 'application/octet-stream');
-    res.set('Content-Disposition', `inline; filename="${(a.nombre || 'archivo').replace(/"/g, '')}"`);
+    res.set('Content-Disposition', dispFilename(a.nombre || 'archivo'));
     res.send(a.data);
   } catch (e) { console.error('[fichas archivos ver]', e.message); res.status(500).json({ success: false, data: null, error: 'Error interno del servidor' }); }
 };

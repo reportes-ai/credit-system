@@ -181,7 +181,7 @@ const downloadFactura = async (req, res) => {
     );
     if (!row || !row.archivo_data) return res.status(404).json({ success: false, data: null, error: 'Archivo no encontrado' });
     res.set('Content-Type', row.mime_type || 'application/octet-stream');
-    res.set('Content-Disposition', `attachment; filename="${row.archivo_nombre || 'factura'}"`);
+    res.set('Content-Disposition', `attachment; filename="${String(row.archivo_nombre || 'factura').replace(/"/g, '').replace(/[^\x20-\x7E]/g, '_')}"`);
     res.send(row.archivo_data);
   } catch (e) {
     (console.error('[error]', e), res.status(500).json({success:false,data:null,error:'Error interno del servidor'}));
