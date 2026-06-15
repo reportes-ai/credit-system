@@ -5,7 +5,7 @@
   <link rel="icon" href="/img/favicon.png" type="image/png">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Nueva Ficha de Dealer — AutoFácil</title>
-  <!-- v1.6 -->
+  <!-- v1.7 -->
   <link href="/css/bootstrap.min.css" rel="stylesheet">
   <link href="/css/bootstrap-icons.css" rel="stylesheet">
   <style>
@@ -47,6 +47,8 @@
     .repchk { display:inline-flex; align-items:center; gap:8px; font-size:.84rem; font-weight:500; color:#0369a1; cursor:pointer; background:#eff6ff; border:1px solid #bfdbfe; border-radius:8px; padding:8px 12px; width:fit-content; }
     .repchk input { width:16px; height:16px; cursor:pointer; }
     .repchk i { color:#0284c7; }
+    .badge-auto { font-size:.82rem; font-weight:800; border-radius:20px; padding:4px 14px; background:#e2e8f0; color:#475569; }
+    .badge-auto.emp { background:#dbeafe; color:#1e40af; } .badge-auto.per { background:#dcfce7; color:#166534; }
     .actionbar { position:sticky; bottom:0; background:#fff; border-top:1px solid #e5e7eb; padding:14px 20px; display:flex; gap:10px; flex-wrap:wrap; align-items:center; justify-content:flex-end; box-shadow:0 -3px 12px rgba(0,0,0,.05); z-index:50; }
     .enviar-errs { flex:1; min-width:220px; font-size:.78rem; color:#b91c1c; line-height:1.35; display:none; }
     .enviar-errs.show { display:block; }
@@ -230,11 +232,18 @@
     <h3><i class="bi bi-bank me-1"></i> Datos para Pago (Forma de Pago Saldo Precio)</h3>
     <div class="card-body">
       <div class="opt-row" style="margin-bottom:14px">
-        <span style="font-size:.82rem;font-weight:700;color:#374151">Tipo de cuenta:</span>
-        <label><input type="radio" name="cuenta_tipo" value="EMPRESA"> Empresa</label>
-        <label><input type="radio" name="cuenta_tipo" value="PERSONA"> Persona</label>
+        <span style="font-size:.82rem;font-weight:700;color:#374151">Cuenta:</span>
+        <span id="cuentaTipoAuto" class="badge-auto">—</span>
+        <span style="font-size:.74rem;color:#94a3b8"><i class="bi bi-info-circle"></i> se determina automáticamente según el RUT de la cuenta</span>
       </div>
       <div class="grid">
+        <div class="fld"><label>RUT de Cuenta</label><input id="rut_cuenta" maxlength="12" oninput="onRutInput(this,'rutCtaHint')"><small id="rutCtaHint" class="vmsg"></small></div>
+        <div class="fld"><label>Número de Cuenta</label><input id="num_cuenta" inputmode="numeric"></div>
+        <div class="fld"><label>Tipo de Cuenta</label>
+          <select id="tipo_cuenta" onchange="onTipoCuenta()">
+            <option>Cuenta Corriente</option><option>Cuenta Vista</option><option>Cuenta RUT</option>
+          </select></div>
+        <div class="fld"><label>Nombre de la cuenta</label><input id="nombre_cuenta" placeholder="Titular de la cuenta"></div>
         <div class="fld"><label>Banco de Transferencia</label>
           <select id="banco">
             <option value="">— Seleccionar banco —</option>
@@ -244,8 +253,6 @@
             <option>Banco BICE</option><option>Banco Internacional</option><option>Banco BTG Pactual</option>
             <option>Coopeuch</option><option>Banco del Desarrollo</option><option>HSBC</option><option>Tenpo</option><option>Mercado Pago</option>
           </select></div>
-        <div class="fld"><label>RUT de Cuenta</label><input id="rut_cuenta" maxlength="12" oninput="onRutInput(this,'rutCtaHint')"><small id="rutCtaHint" class="vmsg"></small></div>
-        <div class="fld"><label>Número de Cuenta</label><input id="num_cuenta" inputmode="numeric"></div>
         <div class="fld"><label>Email Confirmación</label><input id="correo_confirmacion" type="email" oninput="onEmail(this,'ecEmailHint')"><small id="ecEmailHint" class="vmsg"></small></div>
       </div>
     </div>
@@ -383,6 +390,7 @@ function onRutInput(el, hintId){
   else if(clean.length>0){ el.style.borderColor=''; h.className='vmsg'; h.textContent='Ingresa el RUT con dígito verificador'; }
   else { el.style.borderColor=''; h.className='vmsg'; h.textContent=''; }
   actualizarTercero();
+  onTipoCuenta();
 }
 const EMAIL_RE=/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/;
 function emailOK(v){ return EMAIL_RE.test(String(v).trim()); }
@@ -404,6 +412,22 @@ async function cargarGeo(){
   } catch(e){}
 }
 function onComuna(){ const g=GEO_MAP[val('comuna').toLowerCase()]; setVal('provincia', g?g.provincia:''); setVal('region', g?g.region:''); }
+
+/* ── Cuenta: Empresa/Persona automático (RUT cuenta > 50.000.000 = Empresa) ── */
+function calcCuentaTipo(){
+  const body = val('rut_cuenta').replace(/[^0-9kK]/gi,'').slice(0,-1).replace(/\D/g,'');
+  if(!body) return '';
+  return parseInt(body,10) > 50000000 ? 'EMPRESA' : 'PERSONA';
+}
+function onTipoCuenta(){
+  const ct = calcCuentaTipo();
+  const b = $('cuentaTipoAuto');
+  b.textContent = ct==='EMPRESA' ? 'Empresa' : ct==='PERSONA' ? 'Persona' : '—';
+  b.className = 'badge-auto' + (ct==='EMPRESA'?' emp':ct==='PERSONA'?' per':'');
+  // Cuenta RUT → sólo BancoEstado (se selecciona y bloquea automáticamente)
+  if($('tipo_cuenta').value==='Cuenta RUT'){ $('banco').value='BancoEstado'; $('banco').disabled=true; }
+  else { $('banco').disabled=false; }
+}
 
 /* ── Representante Legal (puede ser el contacto comercial o financiero) ── */
 function onRepToggle(which){
@@ -472,8 +496,9 @@ function descargarPoderSimple(){
     Representante Legal, <b>solicita y autoriza</b> a AutoFácil Crédito Automotriz para que las <b>participaciones</b> producto de los créditos
     colocados a los clientes del Concesionario sean <b>depositadas</b> en la siguiente cuenta bancaria de un tercero:</p>
     <table class="p">
-      <tr><td class="lbl">Titular (RUT de la cuenta)</td><td>${E(o.rut_cuenta||'__________')}</td></tr>
-      <tr><td class="lbl">Tipo de cuenta</td><td>${E(o.cuenta_tipo||'__________')}</td></tr>
+      <tr><td class="lbl">Nombre de la cuenta</td><td>${E(o.nombre_cuenta||'__________')}</td></tr>
+      <tr><td class="lbl">RUT de la cuenta</td><td>${E(o.rut_cuenta||'__________')} (${E(o.cuenta_tipo||'—')})</td></tr>
+      <tr><td class="lbl">Tipo de cuenta</td><td>${E(o.tipo_cuenta||'__________')}</td></tr>
       <tr><td class="lbl">Banco</td><td>${E(o.banco||'__________')}</td></tr>
       <tr><td class="lbl">N° de cuenta</td><td>${E(o.num_cuenta||'__________')}</td></tr>
       <tr><td class="lbl">Email de confirmación</td><td>${E(o.correo_confirmacion||'__________')}</td></tr>
@@ -576,7 +601,8 @@ function recolectar(){
     cc_nombre:val('cc_nombre'), cc_telefono:val('cc_telefono'), cc_email:val('cc_email'),
     cf_nombre:val('cf_nombre'), cf_telefono:val('cf_telefono'), cf_email:val('cf_email'),
     com_6_12:val('com_6_12'), com_13_24:val('com_13_24'), com_25_36:val('com_25_36'), com_37:val('com_37'),
-    tipo_documento:getRadio('tipo_documento'), cuenta_tipo:getRadio('cuenta_tipo'),
+    tipo_documento:getRadio('tipo_documento'), cuenta_tipo:calcCuentaTipo(),
+    tipo_cuenta:val('tipo_cuenta'), nombre_cuenta:val('nombre_cuenta'),
     banco:val('banco'), rut_cuenta:val('rut_cuenta'), num_cuenta:val('num_cuenta'),
     correo_confirmacion:val('correo_confirmacion'), observaciones:val('observaciones') };
   const rl = repLegalData();
@@ -616,13 +642,14 @@ const REQUERIDOS = [
   ['cc_nombre','Contacto comercial: nombre'],['cc_telefono','Contacto comercial: teléfono'],['cc_email','Contacto comercial: email'],
   ['cf_nombre','Contacto financiero: nombre'],['cf_telefono','Contacto financiero: teléfono'],['cf_email','Contacto financiero: email'],
   ['com_6_12','Comisión 6-12'],['com_13_24','Comisión 13-24'],['com_25_36','Comisión 25-36'],['com_37','Comisión 37+'],
-  ['banco','Banco de transferencia'],['rut_cuenta','RUT de la cuenta'],['num_cuenta','Número de cuenta'],['correo_confirmacion','Email confirmación'],
+  ['tipo_cuenta','Tipo de cuenta'],['nombre_cuenta','Nombre de la cuenta'],['banco','Banco de transferencia'],
+  ['rut_cuenta','RUT de la cuenta'],['num_cuenta','Número de cuenta'],['correo_confirmacion','Email confirmación'],
 ];
 function validarEnvio(){
   const errs=[];
   for(const [id,lbl] of REQUERIDOS) if(!val(id)) errs.push('Falta: '+lbl);
   if(!getRadio('tipo_documento')) errs.push('Falta: Tipo de documento');
-  if(!getRadio('cuenta_tipo'))    errs.push('Falta: Tipo de cuenta');
+  if(!calcCuentaTipo())           errs.push('Falta: RUT de la cuenta (define Empresa/Persona)');
   // Validaciones de formato (solo si el campo tiene contenido)
   if(val('rut') && !validarRUT(val('rut').replace(/[^0-9kK]/g,'').toUpperCase())) errs.push('RUT del concesionario inválido');
   if(val('rut_cuenta') && !validarRUT(val('rut_cuenta').replace(/[^0-9kK]/g,'').toUpperCase())) errs.push('RUT de la cuenta inválido');
@@ -661,7 +688,7 @@ async function enviarFinal(){
 
 async function cargar(){
   await cargarGeo();
-  if (!FICHA_ID) { await cargarEjecutivos(); $('fecha_solicitud').value = new Date().toLocaleDateString('sv-SE',{timeZone:'America/Santiago'}); onTipo(); actualizarTercero(); onRepToggle(); return; }
+  if (!FICHA_ID) { await cargarEjecutivos(); $('fecha_solicitud').value = new Date().toLocaleDateString('sv-SE',{timeZone:'America/Santiago'}); onTipo(); actualizarTercero(); onRepToggle(); onTipoCuenta(); return; }
   try {
     const r = await fetch('/api/dealer-incorporacion/fichas/'+FICHA_ID, { headers:H });
     const j = await r.json();
@@ -669,10 +696,12 @@ async function cargar(){
     const f = j.data; ESTADO = f.estado;
     setRadio('tipo', f.tipo); onTipo();
     await cargarEjecutivos(f.ejecutivo_nombre);
-    ['fecha_solicitud','rut','nombre_razon','nombre_fantasia','direccion','comuna','provincia','region','cc_nombre','cc_telefono','cc_email','cf_nombre','cf_telefono','cf_email','com_6_12','com_13_24','com_25_36','com_37','banco','rut_cuenta','num_cuenta','correo_confirmacion','observaciones']
+    ['fecha_solicitud','rut','nombre_razon','nombre_fantasia','direccion','comuna','provincia','region','cc_nombre','cc_telefono','cc_email','cf_nombre','cf_telefono','cf_email','com_6_12','com_13_24','com_25_36','com_37','tipo_cuenta','nombre_cuenta','banco','rut_cuenta','num_cuenta','correo_confirmacion','observaciones']
       .forEach(k => setVal(k, k==='fecha_solicitud' && f[k] ? String(f[k]).slice(0,10) : f[k]));
     if (!val('provincia')) onComuna();
-    setRadio('tipo_documento', f.tipo_documento); setRadio('cuenta_tipo', f.cuenta_tipo);
+    setRadio('tipo_documento', f.tipo_documento);
+    if (!val('tipo_cuenta')) setVal('tipo_cuenta','Cuenta Corriente');
+    onTipoCuenta();
     // Representante Legal
     setVal('rl_nombre', f.rl_nombre); setVal('rl_telefono', f.rl_telefono); setVal('rl_email', f.rl_email);
     $('cc_rep').checked = f.rep_legal_origen==='COMERCIAL';
@@ -738,11 +767,13 @@ function imprimir(){
     <table class="p"><tr><th colspan="4">TIPO DE DOCUMENTO TRIBUTARIO</th></tr>
       <tr><td class="lbl">Tipo de documento</td><td>BOLETA: ${celdaX(o.tipo_documento,'BOLETA')}</td><td>FACTURA: ${celdaX(o.tipo_documento,'FACTURA')}</td><td></td></tr></table>
     <table class="p"><tr><th colspan="4">FORMA DE PAGO SALDO PRECIO</th></tr>
-      <tr><td class="lbl">Tipo de cuenta</td><td>EMPRESA: ${celdaX(o.cuenta_tipo,'EMPRESA')}</td><td>PERSONA: ${celdaX(o.cuenta_tipo,'PERSONA')}</td><td></td></tr>
+      <tr><td class="lbl">Cuenta</td><td>EMPRESA: ${celdaX(o.cuenta_tipo,'EMPRESA')}</td><td>PERSONA: ${celdaX(o.cuenta_tipo,'PERSONA')}</td><td></td></tr>
+      <tr><td class="lbl">Tipo de Cuenta</td><td colspan="3">${E(o.tipo_cuenta)}</td></tr>
+      <tr><td class="lbl">Nombre de la cuenta</td><td colspan="3">${E(o.nombre_cuenta)}</td></tr>
       <tr><td class="lbl">Banco de Transferencia</td><td colspan="3">${E(o.banco)}</td></tr>
       <tr><td class="lbl">Rut de Cuenta</td><td colspan="3">${E(o.rut_cuenta)}</td></tr>
       <tr><td class="lbl">Número de Cuenta</td><td colspan="3">${E(o.num_cuenta)}</td></tr>
-      <tr><td class="lbl">Correo Confirmación</td><td colspan="3">${E(o.correo_confirmacion)}</td></tr></table>
+      <tr><td class="lbl">Email Confirmación</td><td colspan="3">${E(o.correo_confirmacion)}</td></tr></table>
     <table class="p"><tr><th>OBSERVACIONES</th></tr><tr><td style="height:60px;vertical-align:top">${E(o.observaciones)}</td></tr></table>
     <div class="firma"><div class="line">Firma Representante Legal del Concesionario${o.rl_nombre?' · '+E(o.rl_nombre):''}</div></div>`);
 }

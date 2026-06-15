@@ -83,6 +83,8 @@ const COM_DEFAULT = {
     await pool.query(`ALTER TABLE dealer_fichas ADD COLUMN IF NOT EXISTS rl_nombre VARCHAR(150) NULL`);
     await pool.query(`ALTER TABLE dealer_fichas ADD COLUMN IF NOT EXISTS rl_telefono VARCHAR(40) NULL`);
     await pool.query(`ALTER TABLE dealer_fichas ADD COLUMN IF NOT EXISTS rl_email VARCHAR(150) NULL`);
+    await pool.query(`ALTER TABLE dealer_fichas ADD COLUMN IF NOT EXISTS tipo_cuenta VARCHAR(30) NULL`);
+    await pool.query(`ALTER TABLE dealer_fichas ADD COLUMN IF NOT EXISTS nombre_cuenta VARCHAR(150) NULL`);
   } catch (e) { console.error('[dealer_fichas alter cols]', e.message); }
 
   // Archivos adjuntos múltiples (informes comerciales empresa/socios, hasta 3 c/u).
@@ -166,7 +168,7 @@ function puedeRevisar(req) {
 const CAMPOS = ['tipo','ejecutivo_nombre','fecha_solicitud','rut','nombre_razon','nombre_fantasia','direccion','comuna','provincia','region',
   'cc_nombre','cc_telefono','cc_email','cf_nombre','cf_telefono','cf_email',
   'rep_legal_origen','rl_nombre','rl_telefono','rl_email',
-  'com_6_12','com_13_24','com_25_36','com_37','tipo_documento','cuenta_tipo','banco',
+  'com_6_12','com_13_24','com_25_36','com_37','tipo_documento','cuenta_tipo','tipo_cuenta','nombre_cuenta','banco',
   'rut_cuenta','num_cuenta','correo_confirmacion','observaciones'];
 
 const CATEGORIAS = ['EMPRESA', 'SOCIOS', 'PODER_SIMPLE', 'PODER_REP_LEGAL'];   // adjuntos
@@ -237,7 +239,7 @@ const obtener = async (req, res) => {
               rut, nombre_razon, nombre_fantasia, direccion, comuna, provincia, region,
               cc_nombre, cc_telefono, cc_email, cf_nombre, cf_telefono, cf_email,
               rep_legal_origen, rl_nombre, rl_telefono, rl_email,
-              com_6_12, com_13_24, com_25_36, com_37, tipo_documento, cuenta_tipo, banco,
+              com_6_12, com_13_24, com_25_36, com_37, tipo_documento, cuenta_tipo, tipo_cuenta, nombre_cuenta, banco,
               rut_cuenta, num_cuenta, correo_confirmacion, observaciones,
               excepciones, excepciones_comentarios, diferencias,
               ficha_nombre, ficha_mime, (ficha_data IS NOT NULL) AS tiene_ficha,
