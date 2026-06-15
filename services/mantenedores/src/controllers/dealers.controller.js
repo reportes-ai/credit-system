@@ -34,7 +34,7 @@ function excelDate(v) {
 
 const getDealers = async (req, res) => {
   try {
-    const { q, ccs, activo, page = 1, limit = 100 } = req.query;
+    const { q, ccs, activo, categoria, page = 1, limit = 100 } = req.query;
     const offset = (parseInt(page) - 1) * parseInt(limit);
     const conds = [], params = [];
     if (q) {
@@ -44,6 +44,10 @@ const getDealers = async (req, res) => {
     }
     if (ccs)    { conds.push('ccs_parque = ?'); params.push(ccs); }
     if (activo !== undefined && activo !== '') { conds.push('activo = ?'); params.push(parseInt(activo)); }
+    if (categoria) {
+      if (categoria === 'SIN') conds.push('(categoria_asignada IS NULL OR categoria_asignada = \'\')');
+      else { conds.push('categoria_asignada = ?'); params.push(categoria); }
+    }
     const where = conds.length ? 'WHERE ' + conds.join(' AND ') : '';
     const [[{ total }]] = await pool.query(`SELECT COUNT(*) AS total FROM dealers ${where}`, params);
     const [rows] = await pool.query(

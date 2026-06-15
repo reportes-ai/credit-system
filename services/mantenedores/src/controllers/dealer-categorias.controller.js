@@ -53,6 +53,8 @@ const SEED = [
     await pool.query(`ALTER TABLE dealers ADD COLUMN IF NOT EXISTS categoria_propuesta VARCHAR(20) NULL`);
     await pool.query(`ALTER TABLE dealers ADD COLUMN IF NOT EXISTS categoria_asignada VARCHAR(20) NULL`);
     await pool.query(`ALTER TABLE dealers ADD COLUMN IF NOT EXISTS unidades_mes_pasado INT NULL`);
+    // Renombrar tipo "PARTICULAR" → "CALLE" (idempotente).
+    await pool.query("UPDATE dealers SET ccs_parque='CALLE' WHERE UPPER(ccs_parque)='PARTICULAR'");
 
     // Registro del mantenedor en el menú (bajo Mantenedores).
     const [[mod]] = await pool.query("SELECT id_modulo FROM modulos WHERE nombre='Mantenedores' AND estado='activo' LIMIT 1");
@@ -130,17 +132,14 @@ const recalcular = async (req, res) => {
     const ventasPorRut = new Map();
     ventas.forEach(v => ventasPorRut.set(normRut(v.rut_dealer), Number(v.unidades) || 0));
 
-    const [dealers] = await pool.query('SELECT id_dealer, rut, categoria_asignada FROM dealers');
+    const [dealers] = await pool.query('SELECT id_dealer, rut FROM dealers');
     let actualizados = 0, conVentas = 0;
     for (const d of dealers) {
       const u = ventasPorRut.get(normRut(d.rut)) || 0;
       if (u > 0) conVentas++;
       const cod = categoriaPara(u, cats);
-      // Propuesta + unidades del mes pasado. La Asignada se inicializa = Propuesta solo si está vacía.
-      if (d.categoria_asignada)
-        await pool.query('UPDATE dealers SET categoria_propuesta=?, unidades_mes_pasado=? WHERE id_dealer=?', [cod, u, d.id_dealer]);
-      else
-        await pool.query('UPDATE dealers SET categoria_propuesta=?, categoria_asignada=?, unidades_mes_pasado=? WHERE id_dealer=?', [cod, cod, u, d.id_dealer]);
+      // Solo actualiza la PROPUESTA + unidades. La Asignada NO se toca (se gestiona aparte).
+      await pool.query('UPDATE dealers SET categoria_propuesta=?, unidades_mes_pasado=? WHERE id_dealer=?', [cod, u, d.id_dealer]);
       actualizados++;
     }
     const [[{ movs }]] = await pool.query('SELECT COUNT(*) movs FROM dealers WHERE categoria_propuesta IS NOT NULL AND categoria_asignada IS NOT NULL AND categoria_propuesta<>categoria_asignada');
@@ -166,4 +165,41 @@ const movimientos = async (req, res) => {
   } catch (e) { console.error('[dealer-cat movimientos]', e.message); res.status(500).json({ success: false, data: null, error: 'Error interno del servidor' }); }
 };
 
-module.exports = { listar, actualizar, asignar, recalcular, movimientos };
+/* ── GET /api/dealer-categorias/por-inactivar ──────────────────────────────
+   Dealers que pasan a INACTIVOS: sin créditos en los últimos 3 meses pero con
+   al menos uno hace 4 (su última venta cae en el 4° mes hacia atrás). */
+const porInactivar = async (req, res) => {
+  try {
+    const [ult] = await pool.query(`
+      SELECT rut_dealer, MAX(fecha_otorgado) AS ultima FROM creditos
+      WHERE rut_dealer IS NOT NULL AND fecha_otorgado IS NOT NULL
+      GROUP BY rut_dealer
+      HAVING ultima >= DATE_SUB(CURDATE(), INTERVAL 4 MONTH)
+         AND ultima <  DATE_SUB(CURDATE(), INTERVAL 3 MONTH)`);
+    const ultPorRut = new Map();
+    ult.forEach(r => ultPorRut.set(normRut(r.rut_dealer), r.ultima));
+    if (!ultPorRut.size) return res.json({ success: true, data: { rows: [] }, error: null });
+
+    const [dealers] = await pool.query('SELECT id_dealer, numero, rut, nombre_indexa, nombre_razon, activo, categoria_asignada FROM dealers');
+    const rows = [];
+    for (const d of dealers) {
+      const u = ultPorRut.get(normRut(d.rut));
+      if (u) rows.push({ ...d, ultima_venta: u });
+    }
+    rows.sort((a, b) => new Date(a.ultima_venta) - new Date(b.ultima_venta));
+    res.json({ success: true, data: { rows }, error: null });
+  } catch (e) { console.error('[dealer-cat porInactivar]', e.message); res.status(500).json({ success: false, data: null, error: 'Error interno del servidor' }); }
+};
+
+/* ── PUT /api/dealer-categorias/activo/:idDealer — marca activo/inactivo ───── */
+const setActivo = async (req, res) => {
+  try {
+    const activo = req.body.activo ? 1 : 0;
+    await pool.query('UPDATE dealers SET activo=? WHERE id_dealer=?', [activo, req.params.idDealer]);
+    auditar({ req, accion: 'EDITAR', modulo: 'mantenedores', entidad: 'dealer', entidad_id: req.params.idDealer,
+      detalle: `Marcó el dealer #${req.params.idDealer} como ${activo ? 'ACTIVO' : 'INACTIVO'}` });
+    res.json({ success: true, data: { activo }, error: null });
+  } catch (e) { console.error('[dealer-cat setActivo]', e.message); res.status(500).json({ success: false, data: null, error: 'Error interno del servidor' }); }
+};
+
+module.exports = { listar, actualizar, asignar, recalcular, movimientos, porInactivar, setActivo };

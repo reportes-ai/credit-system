@@ -141,7 +141,7 @@
   <div class="topnav-left">
     <a href="/" class="topnav-brand">
       <img src="/img/logo.png" alt="AutoFácil" style="display:block">
-      <span class="version-badge" id="versionBadge">v4.7</span>
+      <span class="version-badge" id="versionBadge">v4.8</span>
     </a>
       <div class="breadcrumb-nav"><a href="/">Inicio</a><span class="sep">›</span><a href="/mantenedores">Mantenedores</a><span class="sep">›</span><span style="color:#fff;font-weight:600"><i class="bi bi-shop me-1"></i>Dealers</span></div></div>
   <div class="topnav-right">
@@ -196,6 +196,9 @@
       <option value="1">Activos</option>
       <option value="0">Inactivos</option>
     </select>
+    <select id="filtroCat" class="form-select form-select-sm" style="width:170px" onchange="cargar(1)">
+      <option value="">Todas las categorías</option>
+    </select>
     <button class="btn-importar" onclick="document.getElementById('fileInput').click()">
       <i class="bi bi-file-earmark-excel me-1 text-success"></i>Importar Excel
     </button>
@@ -247,16 +250,14 @@
         <button class="mvbtn on" id="mvTodos" onclick="filtrarMov('TODOS')">Todos</button>
         <button class="mvbtn" id="mvSuben" onclick="filtrarMov('SUBE')"><i class="bi bi-arrow-up-circle"></i> Que suben</button>
         <button class="mvbtn" id="mvBajan" onclick="filtrarMov('BAJA')"><i class="bi bi-arrow-down-circle"></i> Que bajan</button>
+        <button class="mvbtn" id="mvInact" onclick="filtrarMov('INACTIVOS')"><i class="bi bi-power"></i> Dealers que pasan a Inactivos</button>
       </div>
       <span class="count-badge" id="mvCount" style="margin-left:auto"></span>
       <button class="btn-importar" onclick="recalcularCategorias()"><i class="bi bi-arrow-repeat me-1 text-primary"></i>Recalcular (mes pasado)</button>
     </div>
     <div class="table-wrap">
       <table>
-        <thead><tr>
-          <th>N°</th><th>DEALER</th><th>RUT</th><th>UNIDADES MES PASADO</th>
-          <th>ACTUAL (ASIGNADA)</th><th>SUGERIDA (PROPUESTA)</th><th>CONDICIÓN</th><th>ASIGNAR</th>
-        </tr></thead>
+        <thead id="mvThead"></thead>
         <tbody id="mvBody"><tr><td colspan="8" class="text-center text-muted py-5">Cargando…</td></tr></tbody>
       </table>
     </div>
@@ -431,8 +432,9 @@ function cambiarPag(d) { pag += d; cargar(); }
 
 function ccsBadge(v) {
   if (!v) return '—';
-  const cl = v.toUpperCase().startsWith('PARQUE') ? 'badge-parque'
-           : v.toUpperCase() === 'PARTICULAR' ? 'badge-particular' : 'badge-otro';
+  const u = v.toUpperCase();
+  const cl = u.startsWith('PARQUE') ? 'badge-parque'
+           : (u === 'CALLE' || u === 'PARTICULAR') ? 'badge-particular' : 'badge-otro';
   return `<span class="badge-ccs ${cl}">${v}</span>`;
 }
 function activoBadge(v) {
@@ -449,10 +451,12 @@ async function cargar(p) {
   const q      = document.getElementById('filtroQ').value;
   const ccs    = document.getElementById('filtroCcs').value;
   const activo = document.getElementById('filtroActivo').value;
+  const cat    = document.getElementById('filtroCat').value;
   const params = new URLSearchParams({ page: pag, limit: 100 });
   if (q)      params.append('q', q);
   if (ccs)    params.append('ccs', ccs);
   if (activo !== '') params.append('activo', activo);
+  if (cat)    params.append('categoria', cat);
 
   const res  = await fetch('/api/dealers?' + params, { headers: H });
   const json = await res.json();
@@ -494,6 +498,10 @@ async function cargarCategorias() {
   try {
     const r = await fetch('/api/dealer-categorias', { headers: H }); const j = await r.json();
     if (j.success) (j.data||[]).forEach(c => { c.beneficios = Array.isArray(c.beneficios)?c.beneficios:(()=>{try{return JSON.parse(c.beneficios||'[]')}catch(e){return[]}})(); CATS[c.codigo]=c; });
+    // Poblar el filtro por categoría asignada
+    const sel = document.getElementById('filtroCat');
+    Object.values(CATS).sort((a,b)=>a.nivel-b.nivel).forEach(c => sel.insertAdjacentHTML('beforeend', `<option value="${c.codigo}">${esc(c.nombre)}</option>`));
+    sel.insertAdjacentHTML('beforeend', '<option value="SIN">— Sin asignar —</option>');
   } catch(e){}
 }
 function catBadge(cod) {
@@ -525,7 +533,7 @@ async function asignarCategoria(idDealer, codigo) {
 }
 
 async function recalcularCategorias() {
-  if (!confirm('¿Recalcular la categoría PROPUESTA de todos los dealers según las ventas del mes pasado?\n\n(A los dealers sin categoría asignada se les asigna la misma que la propuesta.)')) return;
+  if (!confirm('¿Recalcular la categoría PROPUESTA de todos los dealers según las ventas del mes pasado?\n\n(La categoría ASIGNADA no se modifica.)')) return;
   try {
     const r = await fetch('/api/dealer-categorias/recalcular', { method:'POST', headers:H });
     const j = await r.json(); if (!j.success) throw new Error(j.error||'Error');
@@ -546,18 +554,49 @@ function setView(v){
 }
 function filtrarMov(f){
   MOV_FILTRO=f;
-  document.getElementById('mvTodos').classList.toggle('on', f==='TODOS');
-  document.getElementById('mvSuben').classList.toggle('on', f==='SUBE');
-  document.getElementById('mvBajan').classList.toggle('on', f==='BAJA');
-  renderMov();
+  ['mvTodos','mvSuben','mvBajan','mvInact'].forEach(id=>document.getElementById(id).classList.remove('on'));
+  document.getElementById({TODOS:'mvTodos',SUBE:'mvSuben',BAJA:'mvBajan',INACTIVOS:'mvInact'}[f]).classList.add('on');
+  if (f==='INACTIVOS') cargarInactivos(); else renderMov();
 }
 async function cargarMovimientos(){
   try {
     const r = await fetch('/api/dealer-categorias/movimientos', { headers:H });
     const j = await r.json(); if (!j.success) throw new Error(j.error);
     MOVS = j.data.rows || [];
-    renderMov();
+    if (MOV_FILTRO==='INACTIVOS') cargarInactivos(); else renderMov();
   } catch(e){ document.getElementById('mvBody').innerHTML = `<tr><td colspan="8" class="text-center text-danger py-4">${esc(e.message)}</td></tr>`; }
+}
+const fechaCorta = v => v ? new Date(v).toLocaleDateString('es-CL',{day:'2-digit',month:'2-digit',year:'numeric'}) : '—';
+async function cargarInactivos(){
+  document.getElementById('mvThead').innerHTML = `<tr>
+    <th>N°</th><th>DEALER</th><th>RUT</th><th>ÚLTIMA VENTA</th><th>CATEGORÍA</th><th>ESTADO</th><th>ACCIÓN</th></tr>`;
+  document.getElementById('mvBody').innerHTML = '<tr><td colspan="7" class="text-center text-muted py-4">Cargando…</td></tr>';
+  try {
+    const r = await fetch('/api/dealer-categorias/por-inactivar', { headers:H });
+    const j = await r.json(); if (!j.success) throw new Error(j.error);
+    const rows = j.data.rows || [];
+    document.getElementById('mvCount').textContent = `${rows.length} dealer(s) sin ventas hace 3 meses (última venta hace 4)`;
+    const tb = document.getElementById('mvBody');
+    if (!rows.length){ tb.innerHTML = '<tr><td colspan="7" class="text-center text-muted py-5">Ningún dealer pasa a inactivo (todos con ventas en los últimos 3 meses).</td></tr>'; return; }
+    tb.innerHTML = rows.map(d=>`
+      <tr>
+        <td class="td-n">${d.numero ?? '—'}</td>
+        <td class="td-nombre">${esc(d.nombre_indexa||d.nombre_razon||'—')}</td>
+        <td class="td-rut">${esc(d.rut||'—')}</td>
+        <td style="font-weight:600;color:#b45309">${fechaCorta(d.ultima_venta)}</td>
+        <td>${catBadge(d.categoria_asignada)}</td>
+        <td>${d.activo ? '<span class="activo-si">✓ Activo</span>' : '<span class="activo-no">✗ Inactivo</span>'}</td>
+        <td>${d.activo ? `<button class="btn-importar" style="padding:5px 12px" onclick="marcarInactivo(${d.id_dealer})"><i class="bi bi-power text-danger me-1"></i>Marcar inactivo</button>` : '<span class="text-muted">—</span>'}</td>
+      </tr>`).join('');
+  } catch(e){ document.getElementById('mvBody').innerHTML = `<tr><td colspan="7" class="text-center text-danger py-4">${esc(e.message)}</td></tr>`; }
+}
+async function marcarInactivo(idDealer){
+  if (!confirm('¿Marcar este dealer como INACTIVO?')) return;
+  try {
+    const r = await fetch('/api/dealer-categorias/activo/'+idDealer, { method:'PUT', headers:H, body:JSON.stringify({ activo:0 }) });
+    const j = await r.json(); if (!j.success) throw new Error(j.error||'Error');
+    cargarInactivos();
+  } catch(e){ alert('No se pudo: ' + e.message); }
 }
 function condicionMov(d){
   const prop = CATS[d.categoria_propuesta], asig = CATS[d.categoria_asignada];
@@ -567,8 +606,11 @@ function condicionMov(d){
   return `Vendió <b>${u}</b> u el mes pasado → cae bajo la meta de <b>${esc(asig?.nombre||'')}</b>; corresponde <b>${esc(prop?.nombre||'')}</b>.`;
 }
 function renderMov(){
+  document.getElementById('mvThead').innerHTML = `<tr>
+    <th>N°</th><th>DEALER</th><th>RUT</th><th>UNIDADES MES PASADO</th>
+    <th>ACTUAL (ASIGNADA)</th><th>SUGERIDA (PROPUESTA)</th><th>CONDICIÓN</th><th>ASIGNAR</th></tr>`;
   let rows = MOVS;
-  if (MOV_FILTRO!=='TODOS') rows = MOVS.filter(d=>d.direccion_mov===MOV_FILTRO);
+  if (MOV_FILTRO!=='TODOS' && MOV_FILTRO!=='INACTIVOS') rows = MOVS.filter(d=>d.direccion_mov===MOV_FILTRO);
   const nSube = MOVS.filter(d=>d.direccion_mov==='SUBE').length, nBaja = MOVS.filter(d=>d.direccion_mov==='BAJA').length;
   document.getElementById('mvCount').textContent = `${nSube} suben · ${nBaja} bajan`;
   const tb = document.getElementById('mvBody');
