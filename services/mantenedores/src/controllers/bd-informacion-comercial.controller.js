@@ -1,5 +1,6 @@
 'use strict';
 const pool = require('../../../../shared/config/database');
+const { auditar } = require('../../../../shared/audit');
 
 const TABLE = 'informacion_comercial';
 const PK    = 'id';
@@ -73,6 +74,7 @@ const update = async (req, res) => {
     vals.push(id);
     await pool.query(`UPDATE ${TABLE} SET ${sets.join(', ')}, updated_at = NOW() WHERE ${PK} = ?`, vals);
     const [[updated]] = await pool.query(`SELECT * FROM ${TABLE} WHERE ${PK} = ?`, [id]);
+    auditar({ req, accion: 'EDITAR', modulo: 'mantenedores', entidad: 'informacion_comercial', entidad_id: id, detalle: `Editó información comercial (registro #${id}) desde BD`, meta: { campos: Object.keys(body) } });
     res.json({ success: true, data: fmtDates(updated), error: null });
   } catch (e) { res.status(500).json({ success: false, data: null, error: e.message }); }
 };

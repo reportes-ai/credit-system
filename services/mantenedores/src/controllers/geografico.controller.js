@@ -1,4 +1,5 @@
 const pool = require('../../../../shared/config/database');
+const { auditar } = require('../../../../shared/audit');
 
 // REGIONES
 const getRegiones = async (req, res) => {
@@ -14,6 +15,7 @@ const createRegion = async (req, res) => {
     if (!nombre) return res.status(400).json({ success: false, data: null, error: 'Nombre requerido' });
     const [[{maxOrden}]] = await pool.query('SELECT COALESCE(MAX(orden),0)+1 AS maxOrden FROM regiones');
     const [r] = await pool.query('INSERT INTO regiones (nombre, orden) VALUES (?,?)', [nombre.trim(), maxOrden]);
+    auditar({ req, accion: 'CREAR', modulo: 'mantenedores', entidad: 'region', entidad_id: r.insertId, detalle: `Creó la región "${nombre.trim()}"` });
     res.status(201).json({ success: true, data: { id_region: r.insertId, nombre, orden: maxOrden }, error: null });
   } catch (e) { (console.error('[error]', e), res.status(500).json({success:false,data:null,error:'Error interno del servidor'})); }
 };
@@ -22,6 +24,7 @@ const updateRegion = async (req, res) => {
   try {
     const { nombre } = req.body;
     await pool.query('UPDATE regiones SET nombre=? WHERE id_region=?', [nombre.trim(), req.params.id]);
+    auditar({ req, accion: 'EDITAR', modulo: 'mantenedores', entidad: 'region', entidad_id: req.params.id, detalle: `Editó la región #${req.params.id} → "${nombre.trim()}"` });
     res.json({ success: true, data: { id_region: req.params.id, nombre }, error: null });
   } catch (e) { (console.error('[error]', e), res.status(500).json({success:false,data:null,error:'Error interno del servidor'})); }
 };
@@ -31,6 +34,7 @@ const deleteRegion = async (req, res) => {
     const [[{total}]] = await pool.query('SELECT COUNT(*) AS total FROM provincias WHERE id_region=?', [req.params.id]);
     if (total > 0) return res.status(400).json({ success: false, data: null, error: 'No se puede eliminar: tiene provincias asociadas' });
     await pool.query('DELETE FROM regiones WHERE id_region=?', [req.params.id]);
+    auditar({ req, accion: 'ELIMINAR', modulo: 'mantenedores', entidad: 'region', entidad_id: req.params.id, detalle: `Eliminó la región #${req.params.id}` });
     res.json({ success: true, data: { mensaje: 'Región eliminada' }, error: null });
   } catch (e) { (console.error('[error]', e), res.status(500).json({success:false,data:null,error:'Error interno del servidor'})); }
 };
@@ -53,6 +57,7 @@ const createProvincia = async (req, res) => {
     const { nombre, id_region } = req.body;
     if (!nombre || !id_region) return res.status(400).json({ success: false, data: null, error: 'Nombre e id_region requeridos' });
     const [r] = await pool.query('INSERT INTO provincias (id_region, nombre) VALUES (?,?)', [id_region, nombre.trim()]);
+    auditar({ req, accion: 'CREAR', modulo: 'mantenedores', entidad: 'provincia', entidad_id: r.insertId, detalle: `Creó la provincia "${nombre.trim()}"` });
     res.status(201).json({ success: true, data: { id_provincia: r.insertId, nombre, id_region }, error: null });
   } catch (e) { (console.error('[error]', e), res.status(500).json({success:false,data:null,error:'Error interno del servidor'})); }
 };
@@ -61,6 +66,7 @@ const updateProvincia = async (req, res) => {
   try {
     const { nombre, id_region } = req.body;
     await pool.query('UPDATE provincias SET nombre=?, id_region=? WHERE id_provincia=?', [nombre.trim(), id_region, req.params.id]);
+    auditar({ req, accion: 'EDITAR', modulo: 'mantenedores', entidad: 'provincia', entidad_id: req.params.id, detalle: `Editó la provincia #${req.params.id} → "${nombre.trim()}"` });
     res.json({ success: true, data: { id_provincia: req.params.id, nombre, id_region }, error: null });
   } catch (e) { (console.error('[error]', e), res.status(500).json({success:false,data:null,error:'Error interno del servidor'})); }
 };
@@ -70,6 +76,7 @@ const deleteProvincia = async (req, res) => {
     const [[{total}]] = await pool.query('SELECT COUNT(*) AS total FROM comunas WHERE id_provincia=?', [req.params.id]);
     if (total > 0) return res.status(400).json({ success: false, data: null, error: 'No se puede eliminar: tiene comunas asociadas' });
     await pool.query('DELETE FROM provincias WHERE id_provincia=?', [req.params.id]);
+    auditar({ req, accion: 'ELIMINAR', modulo: 'mantenedores', entidad: 'provincia', entidad_id: req.params.id, detalle: `Eliminó la provincia #${req.params.id}` });
     res.json({ success: true, data: { mensaje: 'Provincia eliminada' }, error: null });
   } catch (e) { (console.error('[error]', e), res.status(500).json({success:false,data:null,error:'Error interno del servidor'})); }
 };
@@ -92,6 +99,7 @@ const createComuna = async (req, res) => {
     const { nombre, id_provincia } = req.body;
     if (!nombre || !id_provincia) return res.status(400).json({ success: false, data: null, error: 'Nombre e id_provincia requeridos' });
     const [r] = await pool.query('INSERT INTO comunas (id_provincia, nombre) VALUES (?,?)', [id_provincia, nombre.trim()]);
+    auditar({ req, accion: 'CREAR', modulo: 'mantenedores', entidad: 'comuna', entidad_id: r.insertId, detalle: `Creó la comuna "${nombre.trim()}"` });
     res.status(201).json({ success: true, data: { id_comuna: r.insertId, nombre, id_provincia }, error: null });
   } catch (e) { (console.error('[error]', e), res.status(500).json({success:false,data:null,error:'Error interno del servidor'})); }
 };
@@ -100,6 +108,7 @@ const updateComuna = async (req, res) => {
   try {
     const { nombre, id_provincia } = req.body;
     await pool.query('UPDATE comunas SET nombre=?, id_provincia=? WHERE id_comuna=?', [nombre.trim(), id_provincia, req.params.id]);
+    auditar({ req, accion: 'EDITAR', modulo: 'mantenedores', entidad: 'comuna', entidad_id: req.params.id, detalle: `Editó la comuna #${req.params.id} → "${nombre.trim()}"` });
     res.json({ success: true, data: { id_comuna: req.params.id, nombre, id_provincia }, error: null });
   } catch (e) { (console.error('[error]', e), res.status(500).json({success:false,data:null,error:'Error interno del servidor'})); }
 };
@@ -107,6 +116,7 @@ const updateComuna = async (req, res) => {
 const deleteComuna = async (req, res) => {
   try {
     await pool.query('DELETE FROM comunas WHERE id_comuna=?', [req.params.id]);
+    auditar({ req, accion: 'ELIMINAR', modulo: 'mantenedores', entidad: 'comuna', entidad_id: req.params.id, detalle: `Eliminó la comuna #${req.params.id}` });
     res.json({ success: true, data: { mensaje: 'Comuna eliminada' }, error: null });
   } catch (e) { (console.error('[error]', e), res.status(500).json({success:false,data:null,error:'Error interno del servidor'})); }
 };

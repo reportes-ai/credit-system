@@ -1,4 +1,5 @@
 const pool = require('../../../../shared/config/database');
+const { auditar } = require('../../../../shared/audit');
 
 /* ─── Templates HTML content ─────────────────────────────────────────────── */
 const TEMPLATES = [
@@ -425,6 +426,7 @@ const update = async (req, res) => {
       'UPDATE plantillas_documento SET nombre=?, descripcion=?, contenido=?, activo=? WHERE codigo=?',
       [nombre, descripcion || null, contenido, activo !== false ? 1 : 0, req.params.codigo]
     );
+    auditar({ req, accion: 'EDITAR', modulo: 'mantenedores', entidad: 'plantilla', entidad_id: req.params.codigo, detalle: `Editó la plantilla de documento "${req.params.codigo}"` });
     res.json({ success: true, data: { codigo: req.params.codigo }, error: null });
   } catch (e) { (console.error('[error]', e), res.status(500).json({success:false,data:null,error:'Error interno del servidor'})); }
 };
@@ -437,6 +439,7 @@ const resetDefault = async (req, res) => {
       'UPDATE plantillas_documento SET nombre=?, descripcion=?, contenido=? WHERE codigo=?',
       [tpl.nombre, tpl.descripcion, tpl.contenido, tpl.codigo]
     );
+    auditar({ req, accion: 'EDITAR', modulo: 'mantenedores', entidad: 'plantilla', entidad_id: tpl.codigo, detalle: `Restauró la plantilla "${tpl.codigo}" a su versión por defecto` });
     res.json({ success: true, data: { codigo: tpl.codigo }, error: null });
   } catch (e) { (console.error('[error]', e), res.status(500).json({success:false,data:null,error:'Error interno del servidor'})); }
 };

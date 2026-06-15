@@ -1,4 +1,5 @@
 const pool = require('../../../../shared/config/database');
+const { auditar } = require('../../../../shared/audit');
 
 const ensureTable = () => pool.query(`CREATE TABLE IF NOT EXISTS vehiculos (
     id_vehiculo  INT AUTO_INCREMENT PRIMARY KEY,
@@ -108,6 +109,7 @@ const importar = async (req, res) => {
        combustible,transmision,marchas,traccion,pais,equipamiento,tasacion,permiso,beneficio_ley)
       VALUES ?`;
     const [result] = await pool.query(sql, [toInsert]);
+    auditar({ req, accion: 'CARGA_MASIVA', modulo: 'mantenedores', entidad: 'vehiculo', detalle: `Importó vehículos: ${result.affectedRows} insertado(s)`, meta: { insertados: result.affectedRows } });
     res.json({ success: true, data: { insertados: result.affectedRows }, error: null });
   } catch (e) { (console.error('[error]', e), res.status(500).json({success:false,data:null,error:'Error interno del servidor'})); }
 };
@@ -125,6 +127,7 @@ const createVehiculo = async (req, res) => {
        potencia, combustible, transmision, marchas, traccion, pais,
        equipamiento, tasacion, permiso, beneficio_ley]
     );
+    auditar({ req, accion: 'CREAR', modulo: 'mantenedores', entidad: 'vehiculo', entidad_id: r.insertId, detalle: `Creó vehículo ${marca || ''} ${modelo || ''} ${anio || ''}`.trim(), meta: req.body });
     res.status(201).json({ success: true, data: { id_vehiculo: r.insertId }, error: null });
   } catch (e) { (console.error('[error]', e), res.status(500).json({success:false,data:null,error:'Error interno del servidor'})); }
 };
@@ -143,6 +146,7 @@ const updateVehiculo = async (req, res) => {
        potencia, combustible, transmision, marchas, traccion, pais,
        equipamiento, tasacion, permiso, beneficio_ley, req.params.id]
     );
+    auditar({ req, accion: 'EDITAR', modulo: 'mantenedores', entidad: 'vehiculo', entidad_id: req.params.id, detalle: `Editó vehículo #${req.params.id} (${marca || ''} ${modelo || ''})`.trim(), meta: req.body });
     res.json({ success: true, data: { id_vehiculo: req.params.id }, error: null });
   } catch (e) { (console.error('[error]', e), res.status(500).json({success:false,data:null,error:'Error interno del servidor'})); }
 };
@@ -150,6 +154,7 @@ const updateVehiculo = async (req, res) => {
 const deleteVehiculo = async (req, res) => {
   try {
     await pool.query('DELETE FROM vehiculos WHERE id_vehiculo=?', [req.params.id]);
+    auditar({ req, accion: 'ELIMINAR', modulo: 'mantenedores', entidad: 'vehiculo', entidad_id: req.params.id, detalle: `Eliminó vehículo #${req.params.id}` });
     res.json({ success: true, data: { mensaje: 'Vehículo eliminado' }, error: null });
   } catch (e) { (console.error('[error]', e), res.status(500).json({success:false,data:null,error:'Error interno del servidor'})); }
 };
