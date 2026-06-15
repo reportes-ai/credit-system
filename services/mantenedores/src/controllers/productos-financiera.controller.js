@@ -1,4 +1,5 @@
 const pool = require('../../../../shared/config/database');
+const { auditar } = require('../../../../shared/audit');
 
 /* ── Migración ───────────────────────────────────────────────────────────── */
 (async () => {
@@ -72,6 +73,7 @@ const create = async (req, res) => {
       'INSERT INTO productos_financiera (financiera, producto, activo, orden) VALUES (?,?,?,?)',
       [financiera.trim(), producto.trim(), activo ? 1 : 0, parseInt(orden) || 0]
     );
+    auditar({ req, accion: 'CREAR', modulo: 'mantenedores', entidad: 'producto_financiera', entidad_id: r.insertId, detalle: `Creó producto "${producto.trim()}" (${financiera.trim()})`, meta: req.body });
     res.json({ success: true, data: { id: r.insertId }, error: null });
   } catch (e) {
     if (e.code === 'ER_DUP_ENTRY') return res.status(409).json({ success: false, data: null, error: 'Ya existe ese producto para esa financiera' });
@@ -92,6 +94,7 @@ const update = async (req, res) => {
     if (!sets.length) return res.status(400).json({ success: false, data: null, error: 'Nada que actualizar' });
     params.push(id);
     await pool.query(`UPDATE productos_financiera SET ${sets.join(',')} WHERE id=?`, params);
+    auditar({ req, accion: 'EDITAR', modulo: 'mantenedores', entidad: 'producto_financiera', entidad_id: id, detalle: `Editó producto de financiera #${id}`, meta: req.body });
     res.json({ success: true, data: null, error: null });
   } catch (e) {
     res.status(500).json({ success: false, data: null, error: e.message });
@@ -102,6 +105,7 @@ const update = async (req, res) => {
 const remove = async (req, res) => {
   try {
     await pool.query('DELETE FROM productos_financiera WHERE id=?', [req.params.id]);
+    auditar({ req, accion: 'ELIMINAR', modulo: 'mantenedores', entidad: 'producto_financiera', entidad_id: req.params.id, detalle: `Eliminó producto de financiera #${req.params.id}` });
     res.json({ success: true, data: null, error: null });
   } catch (e) {
     res.status(500).json({ success: false, data: null, error: e.message });

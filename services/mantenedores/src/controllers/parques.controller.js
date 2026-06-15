@@ -1,4 +1,5 @@
 const pool = require('../../../../shared/config/database');
+const { auditar } = require('../../../../shared/audit');
 
 // Migración: crear tabla parques_comisiones con datos iniciales del Excel
 (async () => {
@@ -73,6 +74,7 @@ const create = async (req, res) => {
       [nombre.trim().toUpperCase(), arriendo || 0, comision_pct || 0, activo ? 1 : 0, orden]
     );
     const [[row]] = await pool.query('SELECT * FROM parques_comisiones WHERE id = ?', [r.insertId]);
+    auditar({ req, accion: 'CREAR', modulo: 'mantenedores', entidad: 'parque', entidad_id: r.insertId, detalle: `Creó el parque "${nombre.trim().toUpperCase()}"`, meta: req.body });
     res.status(201).json({ success: true, data: row, error: null });
   } catch (e) {
     (console.error('[error]', e), res.status(500).json({success:false,data:null,error:'Error interno del servidor'}));
@@ -92,6 +94,7 @@ const update = async (req, res) => {
       [nombre?.trim().toUpperCase(), arriendo ?? 0, comision_pct ?? 0, activo ? 1 : 0, orden ?? 99, id]
     );
     const [[row]] = await pool.query('SELECT * FROM parques_comisiones WHERE id = ?', [id]);
+    auditar({ req, accion: 'EDITAR', modulo: 'mantenedores', entidad: 'parque', entidad_id: id, detalle: `Editó el parque #${id}`, meta: req.body });
     res.json({ success: true, data: row, error: null });
   } catch (e) {
     (console.error('[error]', e), res.status(500).json({success:false,data:null,error:'Error interno del servidor'}));
@@ -102,6 +105,7 @@ const remove = async (req, res) => {
   try {
     const { id } = req.params;
     await pool.query('UPDATE parques_comisiones SET activo = 0 WHERE id = ?', [id]);
+    auditar({ req, accion: 'ELIMINAR', modulo: 'mantenedores', entidad: 'parque', entidad_id: id, detalle: `Desactivó el parque #${id}` });
     res.json({ success: true, data: { desactivado: id }, error: null });
   } catch (e) {
     (console.error('[error]', e), res.status(500).json({success:false,data:null,error:'Error interno del servidor'}));

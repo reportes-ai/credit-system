@@ -1,5 +1,6 @@
 'use strict';
 const pool = require('../../../../shared/config/database');
+const { auditar } = require('../../../../shared/audit');
 
 const SEED_DOCS = [
   ['Carnet de Identidad',              'Ambos lados en un solo archivo',  1, 1,  10],
@@ -85,6 +86,7 @@ const create = async (req, res) => {
       'INSERT INTO tipos_documento (nombre, descripcion, obligatorio, activo, orden, financiera) VALUES (?,?,?,?,?,?)',
       [nombre, descripcion || null, obligatorio ? 1 : 0, activo !== false ? 1 : 0, orden || 0, financiera || 'AUTOFACIL']
     );
+    auditar({ req, accion: 'CREAR', modulo: 'mantenedores', entidad: 'tipo_documento', entidad_id: r.insertId, detalle: `Creó el tipo de documento "${nombre}" (${financiera || 'AUTOFACIL'})`, meta: req.body });
     res.status(201).json({ success: true, data: { id_tipo: r.insertId }, error: null });
   } catch(e) { (console.error('[error]', e), res.status(500).json({success:false,data:null,error:'Error interno del servidor'})); }
 };
@@ -97,6 +99,7 @@ const update = async (req, res) => {
       'UPDATE tipos_documento SET nombre=?, descripcion=?, obligatorio=?, activo=?, orden=?, financiera=? WHERE id_tipo=?',
       [nombre, descripcion || null, obligatorio ? 1 : 0, activo !== false ? 1 : 0, orden || 0, financiera || 'AUTOFACIL', req.params.id]
     );
+    auditar({ req, accion: 'EDITAR', modulo: 'mantenedores', entidad: 'tipo_documento', entidad_id: req.params.id, detalle: `Editó el tipo de documento "${nombre}" (#${req.params.id})`, meta: req.body });
     res.json({ success: true, data: { id_tipo: req.params.id }, error: null });
   } catch(e) { (console.error('[error]', e), res.status(500).json({success:false,data:null,error:'Error interno del servidor'})); }
 };
@@ -104,6 +107,7 @@ const update = async (req, res) => {
 const remove = async (req, res) => {
   try {
     await pool.query('DELETE FROM tipos_documento WHERE id_tipo=?', [req.params.id]);
+    auditar({ req, accion: 'ELIMINAR', modulo: 'mantenedores', entidad: 'tipo_documento', entidad_id: req.params.id, detalle: `Eliminó el tipo de documento #${req.params.id}` });
     res.json({ success: true, data: { mensaje: 'Tipo de documento eliminado' }, error: null });
   } catch(e) { (console.error('[error]', e), res.status(500).json({success:false,data:null,error:'Error interno del servidor'})); }
 };
