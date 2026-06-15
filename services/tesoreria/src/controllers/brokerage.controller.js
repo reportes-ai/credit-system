@@ -1,4 +1,5 @@
 const pool = require('../../../../shared/config/database');
+const { auditar } = require('../../../../shared/audit');
 
 /* ─── Migraciones ────────────────────────────────────────────────────── */
 (async () => {
@@ -163,6 +164,8 @@ const createFactura = async (req, res) => {
       'SELECT id, id_credito AS operacion_id, numero_factura, rut_emisor, nombre_emisor, monto, fecha_factura, estado, registrado_por, created_at FROM facturas_brokerage WHERE id = ?',
       [r.insertId]
     );
+    auditar({ req, accion: 'CREAR', modulo: 'tesoreria', entidad: 'factura_brokerage', entidad_id: r.insertId,
+      detalle: `Registró factura ${numero_factura || ''} de operación ${operacion_id}${monto ? ` — $${Math.round(monto).toLocaleString('es-CL')}` : ''}`, rut: rut_emisor, meta: { operacion_id, numero_factura, monto } });
     res.status(201).json({ success: true, data: row, error: null });
   } catch (e) {
     (console.error('[error]', e), res.status(500).json({success:false,data:null,error:'Error interno del servidor'}));
@@ -189,6 +192,7 @@ const downloadFactura = async (req, res) => {
 const deleteFactura = async (req, res) => {
   try {
     await pool.query('DELETE FROM facturas_brokerage WHERE id = ?', [req.params.id]);
+    auditar({ req, accion: 'ELIMINAR', modulo: 'tesoreria', entidad: 'factura_brokerage', entidad_id: req.params.id, detalle: `Eliminó factura brokerage #${req.params.id}` });
     res.json({ success: true, data: { eliminado: req.params.id }, error: null });
   } catch (e) {
     (console.error('[error]', e), res.status(500).json({success:false,data:null,error:'Error interno del servidor'}));
@@ -225,6 +229,8 @@ const createPago = async (req, res) => {
     }
 
     const [[row]] = await pool.query('SELECT *, id_credito AS operacion_id FROM pagos_brokerage WHERE id = ?', [r.insertId]);
+    auditar({ req, accion: 'PAGAR', modulo: 'tesoreria', entidad: 'pago_brokerage', entidad_id: r.insertId,
+      detalle: `Registró pago brokerage de operación ${operacion_id} — $${Math.round(monto).toLocaleString('es-CL')} (${estado})`, meta: { operacion_id, monto, tipo_pago: tipo_pago || 'SALDO_PRECIO', estado } });
     res.status(201).json({ success: true, data: row, error: null });
   } catch (e) {
     (console.error('[error]', e), res.status(500).json({success:false,data:null,error:'Error interno del servidor'}));
@@ -254,6 +260,8 @@ const registrarTransferencia = async (req, res) => {
     );
 
     const [[row]] = await pool.query('SELECT *, id_credito AS operacion_id FROM pagos_brokerage WHERE id = ?', [req.params.id]);
+    auditar({ req, accion: 'EDITAR', modulo: 'tesoreria', entidad: 'pago_brokerage', entidad_id: req.params.id,
+      detalle: `Registró transferencia del pago brokerage #${req.params.id} — TRX ${num_transaccion}`, meta: { num_transaccion, operacion_id: pago.operacion_id } });
     res.json({ success: true, data: row, error: null });
   } catch (e) {
     (console.error('[error]', e), res.status(500).json({success:false,data:null,error:'Error interno del servidor'}));
@@ -264,6 +272,7 @@ const registrarTransferencia = async (req, res) => {
 const deletePago = async (req, res) => {
   try {
     await pool.query('DELETE FROM pagos_brokerage WHERE id = ?', [req.params.id]);
+    auditar({ req, accion: 'ELIMINAR', modulo: 'tesoreria', entidad: 'pago_brokerage', entidad_id: req.params.id, detalle: `Eliminó pago brokerage #${req.params.id}` });
     res.json({ success: true, data: { eliminado: req.params.id }, error: null });
   } catch (e) {
     (console.error('[error]', e), res.status(500).json({success:false,data:null,error:'Error interno del servidor'}));

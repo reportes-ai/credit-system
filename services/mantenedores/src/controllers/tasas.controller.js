@@ -1,4 +1,5 @@
 const pool = require('../../../../shared/config/database');
+const { auditar } = require('../../../../shared/audit');
 
 // Migración: agrega columnas spread y rellena histórico correctamente
 // - spread_mayor: spread que el usuario ingresa (aplicado a >200 UF), ej: 0.67%
@@ -96,6 +97,7 @@ const create = async (req, res) => {
       'INSERT INTO tasas (fecha_desde, fecha_hasta, tasa_anual_menor, tasa_mensual_menor, tasa_anual_mayor, tasa_mensual_mayor, spread_menor, spread_mayor) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
       [fecha_desde, fecha_hasta, tasa_anual_menor, mensual_menor, tasa_anual_mayor, mensual_mayor, sp_menor, sp_mayor]
     );
+    auditar({ req, accion: 'CREAR', modulo: 'mantenedores', entidad: 'tasa', entidad_id: r.insertId, detalle: `Creó una tasa (vigencia ${fecha_desde} a ${fecha_hasta})`, meta: req.body });
     res.status(201).json({ success: true, data: { id_tasa: r.insertId }, error: null });
   } catch (e) {
     (console.error('[error]', e), res.status(500).json({success:false,data:null,error:'Error interno del servidor'}));
@@ -122,6 +124,7 @@ const update = async (req, res) => {
       'UPDATE tasas SET fecha_desde=?, fecha_hasta=?, tasa_anual_menor=?, tasa_mensual_menor=?, tasa_anual_mayor=?, tasa_mensual_mayor=?, spread_menor=?, spread_mayor=? WHERE id_tasa=?',
       [fecha_desde, fecha_hasta, tasa_anual_menor, mensual_menor, tasa_anual_mayor, mensual_mayor, sp_menor, sp_mayor, req.params.id]
     );
+    auditar({ req, accion: 'EDITAR', modulo: 'mantenedores', entidad: 'tasa', entidad_id: req.params.id, detalle: `Editó la tasa #${req.params.id}`, meta: req.body });
     res.json({ success: true, data: { id_tasa: req.params.id }, error: null });
   } catch (e) {
     (console.error('[error]', e), res.status(500).json({success:false,data:null,error:'Error interno del servidor'}));
@@ -131,6 +134,7 @@ const update = async (req, res) => {
 const remove = async (req, res) => {
   try {
     await pool.query('DELETE FROM tasas WHERE id_tasa=?', [req.params.id]);
+    auditar({ req, accion: 'ELIMINAR', modulo: 'mantenedores', entidad: 'tasa', entidad_id: req.params.id, detalle: `Eliminó la tasa #${req.params.id}` });
     res.json({ success: true, data: { mensaje: 'Tasa eliminada' }, error: null });
   } catch (e) {
     (console.error('[error]', e), res.status(500).json({success:false,data:null,error:'Error interno del servidor'}));

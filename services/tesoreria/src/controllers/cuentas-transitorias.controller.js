@@ -1,4 +1,5 @@
 const pool = require('../../../../shared/config/database');
+const { auditar } = require('../../../../shared/audit');
 
 /* ── Migración ── */
 (async () => {
@@ -280,6 +281,7 @@ const deleteTransitoria = async (req, res) => {
       return res.status(400).json({ success: false, data: null, error: `Esta transitoria tiene $${tr.monto_utilizado} ya utilizado. No se puede eliminar.` });
 
     await pool.query('DELETE FROM cuentas_transitorias WHERE id_transitoria = ?', [id]);
+    auditar({ req, accion: 'ELIMINAR', modulo: 'tesoreria', entidad: 'transitoria', entidad_id: id, detalle: `Eliminó la cuenta transitoria #${id}` });
     ok(res, { mensaje: 'Transitoria eliminada', id_transitoria: id });
   } catch(e) { err(res, e); }
 };

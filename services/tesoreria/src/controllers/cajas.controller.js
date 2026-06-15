@@ -1,4 +1,5 @@
 const pool = require('../../../../shared/config/database');
+const { auditar } = require('../../../../shared/audit');
 
 /* ── tabla cajas ─────────────────────────────────────────────────────────── */
 const initTablas = async () => {
@@ -107,6 +108,7 @@ const create = async (req, res) => {
       [nombre.trim(), descripcion?.trim() || null]
     );
     const [[caja]] = await pool.query(`SELECT * FROM cajas WHERE id_caja = ?`, [r.insertId]);
+    auditar({ req, accion: 'CREAR', modulo: 'tesoreria', entidad: 'caja', entidad_id: r.insertId, detalle: `Creó la caja "${nombre.trim()}"` });
     ok(res, caja);
   } catch(e) { err(res, e); }
 };
@@ -121,6 +123,7 @@ const update = async (req, res) => {
       [nombre.trim(), descripcion?.trim() || null, activo == null ? 1 : activo, req.params.id]
     );
     const [[caja]] = await pool.query(`SELECT * FROM cajas WHERE id_caja = ?`, [req.params.id]);
+    auditar({ req, accion: 'EDITAR', modulo: 'tesoreria', entidad: 'caja', entidad_id: req.params.id, detalle: `Editó la caja "${nombre.trim()}" (#${req.params.id})` });
     ok(res, caja);
   } catch(e) { err(res, e); }
 };
@@ -129,6 +132,7 @@ const update = async (req, res) => {
 const remove = async (req, res) => {
   try {
     await pool.query(`UPDATE cajas SET activo = 0 WHERE id_caja = ?`, [req.params.id]);
+    auditar({ req, accion: 'ELIMINAR', modulo: 'tesoreria', entidad: 'caja', entidad_id: req.params.id, detalle: `Desactivó la caja #${req.params.id}` });
     ok(res, { id_caja: req.params.id });
   } catch(e) { err(res, e); }
 };

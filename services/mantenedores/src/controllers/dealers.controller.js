@@ -1,4 +1,5 @@
 const pool = require('../../../../shared/config/database');
+const { auditar } = require('../../../../shared/audit');
 
 const ensureTable = () => pool.query(`CREATE TABLE IF NOT EXISTS dealers (
   id_dealer        INT AUTO_INCREMENT PRIMARY KEY,
@@ -88,6 +89,7 @@ const importar = async (req, res) => {
        activo,tiene_factura,observaciones)
       VALUES ?`;
     const [result] = await pool.query(sql, [vals]);
+    auditar({ req, accion: 'CARGA_MASIVA', modulo: 'mantenedores', entidad: 'dealer', detalle: `Importó dealers: ${result.affectedRows} insertado(s)`, meta: { insertados: result.affectedRows } });
     res.json({ success: true, data: { insertados: result.affectedRows }, error: null });
   } catch (e) { (console.error('[error]', e), res.status(500).json({success:false,data:null,error:'Error interno del servidor'})); }
 };
@@ -106,6 +108,7 @@ const createDealer = async (req, res) => {
        r.num_cuenta, r.banco, r.rut_pago,
        r.activo ? 1 : 0, r.tiene_factura ? 1 : 0, r.observaciones || null]
     );
+    auditar({ req, accion: 'CREAR', modulo: 'mantenedores', entidad: 'dealer', entidad_id: result.insertId, detalle: `Creó el dealer N°${maxN} — ${r.nombre_razon || r.nombre_indexa || ''}`, rut: r.rut, meta: req.body });
     res.status(201).json({ success: true, data: { id_dealer: result.insertId, numero: maxN }, error: null });
   } catch (e) { (console.error('[error]', e), res.status(500).json({success:false,data:null,error:'Error interno del servidor'})); }
 };
@@ -124,6 +127,7 @@ const updateDealer = async (req, res) => {
        r.activo ? 1 : 0, r.tiene_factura ? 1 : 0, r.observaciones || null,
        req.params.id]
     );
+    auditar({ req, accion: 'EDITAR', modulo: 'mantenedores', entidad: 'dealer', entidad_id: req.params.id, detalle: `Editó el dealer #${req.params.id} — ${r.nombre_razon || r.nombre_indexa || ''}`, rut: r.rut, meta: req.body });
     res.json({ success: true, data: { id_dealer: req.params.id }, error: null });
   } catch (e) { (console.error('[error]', e), res.status(500).json({success:false,data:null,error:'Error interno del servidor'})); }
 };
@@ -131,6 +135,7 @@ const updateDealer = async (req, res) => {
 const deleteDealer = async (req, res) => {
   try {
     await pool.query('DELETE FROM dealers WHERE id_dealer=?', [req.params.id]);
+    auditar({ req, accion: 'ELIMINAR', modulo: 'mantenedores', entidad: 'dealer', entidad_id: req.params.id, detalle: `Eliminó el dealer #${req.params.id}` });
     res.json({ success: true, data: { mensaje: 'Dealer eliminado' }, error: null });
   } catch (e) { (console.error('[error]', e), res.status(500).json({success:false,data:null,error:'Error interno del servidor'})); }
 };

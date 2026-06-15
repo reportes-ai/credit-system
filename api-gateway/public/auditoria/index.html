@@ -5,7 +5,7 @@
   <link rel="icon" href="/img/favicon.png" type="image/png">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Auditoría — AutoFácil</title>
-  <!-- v1.2 -->
+  <!-- v1.3 -->
   <link href="/css/bootstrap.min.css" rel="stylesheet">
   <link href="/css/bootstrap-icons.css" rel="stylesheet">
   <style>
@@ -247,6 +247,13 @@ function exportar(){
   toast('Generando Excel…');
 }
 
+// Fechas por defecto: últimos 30 días
+(function initFechas(){
+  const hoy = new Date(), hace30 = new Date(); hace30.setDate(hoy.getDate() - 30);
+  const iso = d => d.toLocaleDateString('en-CA'); // YYYY-MM-DD en hora local
+  document.getElementById('f-hasta').value = iso(hoy);
+  document.getElementById('f-desde').value = iso(hace30);
+})();
 cargarFiltros();
 cargar();
 </script>

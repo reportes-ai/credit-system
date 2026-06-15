@@ -578,6 +578,7 @@ const reordenarModulos = async (req, res) => {
     for (const m of orden) {
       await pool.query('UPDATE modulos SET orden=? WHERE id_modulo=?', [m.orden, m.id_modulo]);
     }
+    auditar({ req, accion: 'EDITAR', modulo: 'usuarios', entidad: 'modulos', entidad_id: 'orden', detalle: `Reordenó los módulos del menú (${orden.length})` });
     res.json({ success: true, data: { mensaje: 'Orden actualizado' }, error: null });
   } catch (error) {
     console.error('[reordenarModulos]', error.message);
@@ -611,6 +612,7 @@ const createPerfil = async (req, res) => {
     }
 
     const [[perfil]] = await pool.query('SELECT * FROM perfiles WHERE id_perfil = ?', [id_perfil]);
+    auditar({ req, accion: 'CREAR', modulo: 'usuarios', entidad: 'perfil', entidad_id: id_perfil, detalle: `Creó el perfil/rol "${nombre.trim()}"` });
     res.status(201).json({ success: true, data: perfil, error: null });
   } catch (e) {
     (console.error('[error]', e), res.status(500).json({success:false,data:null,error:'Error interno del servidor'}));
@@ -634,6 +636,7 @@ const updatePerfil = async (req, res) => {
 
     await pool.query('UPDATE perfiles SET nombre = ?, descripcion = ? WHERE id_perfil = ?', [nombre.trim(), descripcion || null, id]);
     const [[updated]] = await pool.query('SELECT * FROM perfiles WHERE id_perfil = ?', [id]);
+    auditar({ req, accion: 'EDITAR', modulo: 'usuarios', entidad: 'perfil', entidad_id: id, detalle: `Editó el perfil/rol #${id} → "${nombre.trim()}"` });
     res.json({ success: true, data: updated, error: null });
   } catch (e) {
     res.status(500).json({ success: false, data: null, error: e.message });
@@ -658,6 +661,7 @@ const deletePerfil = async (req, res) => {
     await pool.query('DELETE FROM permisos_perfil WHERE id_perfil = ?', [id]);
     await pool.query('DELETE FROM perfiles WHERE id_perfil = ?', [id]);
 
+    auditar({ req, accion: 'ELIMINAR', modulo: 'usuarios', entidad: 'perfil', entidad_id: id, detalle: `Eliminó el perfil/rol "${perfil.nombre}" (#${id})` });
     res.json({ success: true, data: { eliminado: id }, error: null });
   } catch (e) {
     (console.error('[error]', e), res.status(500).json({success:false,data:null,error:'Error interno del servidor'}));

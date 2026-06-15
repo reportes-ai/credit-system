@@ -118,6 +118,8 @@ const createUsuario = async (req, res) => {
       [rut, nombre, apellido, apellido_materno || null, centro_costo || null, email, passwordHash, id_perfil, id_supervisor || null, telefono || null]
     );
 
+    auditar({ req, accion: 'CREAR', modulo: 'usuarios', entidad: 'usuario', entidad_id: result.insertId,
+      detalle: `Creó el usuario ${nombre} ${apellido} (${email}) con perfil #${id_perfil}`, rut, meta: { rut, email, id_perfil } });
     res.status(201).json({
       success: true,
       data: { id_usuario: result.insertId, rut, nombre, apellido, email, id_perfil, estado: 'activo' },
@@ -145,6 +147,8 @@ const updateUsuario = async (req, res) => {
       [nombre, apellido, apellido_materno || null, centro_costo || null, email, id_perfil, id_supervisor || null, estado || 'activo', telefono || null, id]
     );
 
+    auditar({ req, accion: 'EDITAR', modulo: 'usuarios', entidad: 'usuario', entidad_id: id,
+      detalle: `Editó el usuario ${nombre} ${apellido} (${email}) — perfil #${id_perfil}, estado ${estado || 'activo'}`, meta: { email, id_perfil, estado } });
     res.json({ success: true, data: { id_usuario: id, nombre, apellido, email, id_perfil, estado }, error: null });
   } catch (error) {
     res.status(500).json({ success: false, data: null, error: error.message });
@@ -175,6 +179,7 @@ const resetClave = async (req, res) => {
     const hash = await bcrypt.hash(nuevaClave, 10);
     await pool.query('UPDATE usuarios SET password_hash = ? WHERE id_usuario = ?', [hash, id]);
 
+    auditar({ req, accion: 'EDITAR', modulo: 'usuarios', entidad: 'usuario', entidad_id: id, detalle: `Reseteó la contraseña del usuario #${id}` });
     res.json({ success: true, data: { nueva_clave: nuevaClave, mensaje: 'Contraseña reseteada. Comparte esta clave con el usuario.' }, error: null });
   } catch (error) {
     res.status(500).json({ success: false, data: null, error: error.message });
@@ -233,6 +238,8 @@ const updatePermisosUsuario = async (req, res) => {
       );
     }
 
+    auditar({ req, accion: 'PERMISOS', modulo: 'usuarios', entidad: 'usuario', entidad_id: id,
+      detalle: `Actualizó permisos individuales del usuario #${id} (${inserts.length} override/s)`, meta: { overrides: inserts.length } });
     res.json({ success: true, data: { mensaje: 'Permisos de usuario actualizados' }, error: null });
   } catch (e) {
     (console.error('[error]', e), res.status(500).json({success:false,data:null,error:'Error interno del servidor'}));
@@ -262,6 +269,8 @@ const updateEjecutivosUsuario = async (req, res) => {
       const vals = ejecutivos.map(e => [req.params.id, e]);
       await pool.query(`INSERT INTO usuario_ejecutivos (id_usuario, ejecutivo) VALUES ?`, [vals]);
     }
+    auditar({ req, accion: 'EDITAR', modulo: 'usuarios', entidad: 'usuario', entidad_id: req.params.id,
+      detalle: `Asignó ${ejecutivos.length} ejecutivo(s) al usuario #${req.params.id} (visibilidad de comisiones)`, meta: { ejecutivos } });
     res.json({ success: true, data: null, error: null });
   } catch (e) {
     res.status(500).json({ success: false, data: null, error: e.message });
