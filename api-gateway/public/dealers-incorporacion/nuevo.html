@@ -5,7 +5,7 @@
   <link rel="icon" href="/img/favicon.png" type="image/png">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Nueva Ficha de Dealer — AutoFácil</title>
-  <!-- v1.18 -->
+  <!-- v1.19 -->
   <link href="/css/bootstrap.min.css" rel="stylesheet">
   <link href="/css/bootstrap-icons.css" rel="stylesheet">
   <style>
@@ -499,10 +499,10 @@ async function cargarInformes(){
 /* ── Depósito a tercero (RUT cuenta ≠ RUT concesionario) ── */
 function esTercero(){ const a=val('rut').replace(/[^0-9kK]/gi,'').toUpperCase(), b=val('rut_cuenta').replace(/[^0-9kK]/gi,'').toUpperCase(); return !!b && !!a && a!==b; }
 function actualizarTercero(){ $('cardPoderes').style.display = esTercero() ? '' : 'none'; }
-async function gateTercero(){
-  if(!esTercero()) return true;
-  return await new Promise(res=>{ _terResolve=res; dlgTercero.showModal(); });
-}
+// El aviso de depósito a tercero ahora es la sección inline "Depósito a tercero —
+// Poderes" (se muestra sola al ingresar un RUT distinto). Ya no se usa el popup;
+// la obligatoriedad sigue en la validación de onEnviar (exige el Poder Simple).
+async function gateTercero(){ return true; }
 function descargarPoderSimple(){
   const o=recolectar();
   const E=s=>String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;');
