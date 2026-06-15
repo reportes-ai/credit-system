@@ -5,7 +5,7 @@
   <link rel="icon" href="/img/favicon.png" type="image/png">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Auditoría — AutoFácil</title>
-  <!-- v1.3 -->
+  <!-- v1.4 -->
   <link href="/css/bootstrap.min.css" rel="stylesheet">
   <link href="/css/bootstrap-icons.css" rel="stylesheet">
   <style>
@@ -132,7 +132,9 @@ document.getElementById('avatarInicial').textContent = (YO.nombre||'?')[0].toUpp
 function logout(){ sessionStorage.clear(); location.href = '/login.html'; }
 function toast(m, err){ const t=document.getElementById('toast'); t.textContent=m; t.className='toast-af'+(err?' err':''); t.style.display='block'; setTimeout(()=>t.style.display='none',2600); }
 const escH = s => String(s??'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
-const TZ = { timeZone:'America/Santiago' };
+// La BD guarda la hora ya en horario Chile, pero el driver la etiqueta como UTC.
+// Por eso formateamos en UTC: muestra el valor literal almacenado (= hora Chile real).
+const TZ = { timeZone:'UTC' };
 const fFecha = v => { if(!v) return ''; const d=new Date(v); return isNaN(d)?'':d.toLocaleDateString('es-CL',TZ); };
 const fHora  = v => { if(!v) return ''; const d=new Date(v); return isNaN(d)?'':d.toLocaleTimeString('es-CL',{...TZ,hour12:false}); };
 
