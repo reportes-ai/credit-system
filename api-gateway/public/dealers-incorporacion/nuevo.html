@@ -5,7 +5,7 @@
   <link rel="icon" href="/img/favicon.png" type="image/png">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Nueva Ficha de Dealer — AutoFácil</title>
-  <!-- v1.8 -->
+  <!-- v1.9 -->
   <link href="/css/bootstrap.min.css" rel="stylesheet">
   <link href="/css/bootstrap-icons.css" rel="stylesheet">
   <style>
@@ -71,7 +71,8 @@
     .toast-af { position:fixed; bottom:80px; left:50%; transform:translateX(-50%); background:#0f172a; color:#fff; padding:11px 20px; border-radius:10px; font-size:.86rem; z-index:9999; display:none; }
     .toast-af.err { background:#b91c1c; }
     .fileinfo { font-size:.82rem; color:#16a34a; font-weight:600; margin-top:6px; display:none; }
-    .vmsg { font-size:.74rem; margin-top:3px; min-height:14px; }
+    .vmsg { font-size:.74rem; min-height:0; }
+    .vmsg:empty { display:none; }
     .vmsg.ok { color:#059669; } .vmsg.bad { color:#dc2626; }
     .filelist { margin-top:8px; display:flex; flex-direction:column; gap:6px; }
     .filerow { display:flex; align-items:center; gap:8px; background:#f8fafc; border:1px solid #e5e7eb; border-radius:8px; padding:6px 10px; font-size:.82rem; }
