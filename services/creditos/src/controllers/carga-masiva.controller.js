@@ -4,6 +4,7 @@ const XLSX = require('xlsx');
 const { recalcularMeses, extraerMeses } = require('../utils/recalcular-mes');
 const { isMesCerrado } = require('../../../../shared/utils/mes-cerrado');
 const historial = require('./carga-historial.controller');
+const { auditar } = require('../../../../shared/audit');
 
 /* ── Asegurar columnas extra en creditos ──────────────────── */
 (async () => {
@@ -327,6 +328,9 @@ const importar = async (req, res) => {
       }).catch(() => {});
     }
 
+    auditar({ req, accion: 'CARGA_MASIVA', modulo: 'creditos', entidad: 'carga', entidad_id: req.file?.originalname || null,
+      detalle: `Carga masiva AutoFácil: ${insertados} operación(es) insertada(s) de ${data.length} del archivo${errores.length ? ` · ${errores.length} con error` : ''}`,
+      meta: { insertados, total: data.length, errores: errores.length, recalculados } });
     res.json({
       success: true,
       data: {
@@ -368,6 +372,9 @@ const eliminarPorOps = async (req, res) => {
       );
       eliminados += result.affectedRows;
     }
+    auditar({ req, accion: 'ELIMINAR', modulo: 'creditos', entidad: 'credito', entidad_id: nums.length === 1 ? nums[0] : `${nums.length} ops`,
+      detalle: `Eliminación masiva: ${eliminados} crédito(s) borrado(s) por N° de operación` + (nums.length <= 20 ? ` (${nums.join(', ')})` : ` (${nums.length} ops)`),
+      meta: { ops: nums, eliminados } });
     res.json({ success: true, data: { eliminados }, error: null });
   } catch (e) {
     console.error('[eliminarPorOps]', e.message);
@@ -390,6 +397,9 @@ const corregirMes = async (req, res) => {
       `UPDATE creditos SET mes = ? WHERE DATE_FORMAT(mes, '%Y-%m') = ?`,
       [mesCor + '-01', mesInc]
     );
+    auditar({ req, accion: 'EDITAR', modulo: 'creditos', entidad: 'credito', entidad_id: `mes ${mesInc}`,
+      detalle: `Corrigió el mes de ${result.affectedRows} crédito(s): ${mesInc} → ${mesCor}`,
+      meta: { mes_incorrecto: mesInc, mes_correcto: mesCor, afectados: result.affectedRows } });
     res.json({ success: true, data: { afectados: result.affectedRows }, error: null });
   } catch (e) {
     console.error('[corregirMes]', e.message);
@@ -505,6 +515,9 @@ const actualizar = async (req, res) => {
       }).catch(() => {});
     }
 
+    auditar({ req, accion: 'CARGA_MASIVA', modulo: 'creditos', entidad: 'carga', entidad_id: req.file?.originalname || null,
+      detalle: `Actualización masiva: ${actualizados} crédito(s) modificado(s) de ${data.length} del archivo${errores.length ? ` · ${errores.length} con error` : ''}`,
+      meta: { actualizados, total: data.length, errores: errores.length } });
     res.json({
       success: true,
       data: {

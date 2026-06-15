@@ -1,5 +1,6 @@
 'use strict';
 const pool = require('../../../../shared/config/database');
+const { auditar } = require('../../../../shared/audit');
 
 /* ── Migración ─────────────────────────────────────────────────────────── */
 (async () => {
@@ -81,6 +82,8 @@ async function ejecutarCierreAutomatico(diasCierre) {
         VALUES (?, 1, NOW(), 1)
         ON DUPLICATE KEY UPDATE cerrado=1, cerrado_at=NOW(), auto_cierre=1
       `, [mes]);
+      auditar({ accion: 'CIERRE_MES', modulo: 'meses-cerrados', entidad: 'mes', entidad_id: mes,
+        detalle: `Mes ${mes} cerrado automáticamente por el Sistema (regla de ${diasCierre} días)` });
     }
   }
 }
@@ -156,6 +159,8 @@ const toggle = async (req, res) => {
       `, [mes]);
     }
 
+    auditar({ req, accion: 'CIERRE_MES', modulo: 'meses-cerrados', entidad: 'mes', entidad_id: mes,
+      detalle: cerrado ? `Cerró el mes ${mes}` : `Reabrió el mes ${mes}` });
     res.json({ success: true, data: { mes, cerrado }, error: null });
   } catch (e) {
     res.status(500).json({ success: false, data: null, error: e.message });
@@ -169,6 +174,8 @@ const setDiasCierre = async (req, res) => {
     if (!v || v < 1 || v > 365)
       return res.status(400).json({ success: false, data: null, error: 'Valor inválido (1-365)' });
     await pool.query("UPDATE config_meses SET valor=? WHERE clave='dias_cierre'", [String(v)]);
+    auditar({ req, accion: 'EDITAR', modulo: 'meses-cerrados', entidad: 'config', entidad_id: 'dias_cierre',
+      detalle: `Cambió los días para cierre automático a ${v}` });
     res.json({ success: true, data: { dias_cierre: v }, error: null });
   } catch (e) {
     res.status(500).json({ success: false, data: null, error: e.message });

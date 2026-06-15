@@ -1,5 +1,6 @@
 const pool  = require('../../../../shared/config/database');
 const audit = require('../../../../shared/auditoria');
+const { auditar } = require('../../../../shared/audit');
 
 (async () => {
   try {
@@ -149,6 +150,9 @@ const create = async (req, res) => {
       detalle: `Cuota N°${numero_cuota} pagada — Total: $${Math.round(tp).toLocaleString('es-CL')}`,
       meta: { numero_cuota, monto_cuota: parseFloat(monto_cuota)||0, interes_mora: parseFloat(interes_mora)||0, gastos_cobranza: parseFloat(gastos_cobranza)||0, total_pagado: tp, fecha_pago: fecha_pago || null },
     });
+    auditar({ req, accion: 'PAGAR', modulo: 'pagos', entidad: 'pago', entidad_id: r.insertId,
+      detalle: `Registró pago de cuota N°${numero_cuota} (crédito ${id_credito}) — $${Math.round(tp).toLocaleString('es-CL')}`,
+      meta: { id_credito, numero_cuota, total_pagado: tp } });
     res.status(201).json({ success: true, data: { id_pago: r.insertId }, error: null });
   } catch(e) { (console.error('[error]', e), res.status(500).json({success:false,data:null,error:'Error interno del servidor'})); }
 };
@@ -168,6 +172,9 @@ const remove = async (req, res) => {
         detalle: `Pago cuota N°${prev[0].numero_cuota} eliminado (total era $${Math.round(prev[0].total_pagado||0).toLocaleString('es-CL')})`,
         meta: { numero_cuota: prev[0].numero_cuota, total_pagado: prev[0].total_pagado },
       });
+      auditar({ req, accion: 'ELIMINAR', modulo: 'pagos', entidad: 'pago', entidad_id: req.params.id_pago,
+        detalle: `Eliminó el pago de cuota N°${prev[0].numero_cuota} (crédito ${prev[0].id_credito})`,
+        meta: { id_credito: prev[0].id_credito, numero_cuota: prev[0].numero_cuota, total_pagado: prev[0].total_pagado } });
     }
     res.json({ success: true, data: { mensaje: 'Pago eliminado' }, error: null });
   } catch(e) { (console.error('[error]', e), res.status(500).json({success:false,data:null,error:'Error interno del servidor'})); }
@@ -329,6 +336,9 @@ const createBatch = async (req, res) => {
         meta: { numero_transaccion, cuotas: pagos.map(p => p.numero_cuota), totalCobrado, exceso: exceso || 0 },
       });
     } catch(_) {}
+    auditar({ req, accion: 'PAGAR', modulo: 'pagos', entidad: 'pago', entidad_id: numero_transaccion,
+      detalle: `Registró pago múltiple — ${pagos.length} cuota(s), total $${Math.round(totalCobrado).toLocaleString('es-CL')} (crédito ${id_credito}, TRX #${numero_transaccion})`,
+      meta: { id_credito, numero_transaccion, cuotas: pagos.length, totalCobrado } });
 
     res.status(201).json({ success: true, data: { numero_transaccion, totalCobrado, transitoria }, error: null });
   } catch(e) {
@@ -462,6 +472,9 @@ const reversar = async (req, res) => {
         meta: { numero_cuota: pago.numero_cuota, total_pagado: pago.total_pagado, comentario: comentario.trim() },
       });
     } catch(_) {}
+    auditar({ req, accion: 'REVERSAR', modulo: 'pagos', entidad: 'pago', entidad_id: id_pago,
+      detalle: `Reversó pago de cuota N°${pago.numero_cuota} (crédito ${pago.id_credito}) — $${Math.round(pago.total_pagado||0).toLocaleString('es-CL')} · "${comentario.trim()}"`,
+      meta: { id_credito: pago.id_credito, numero_cuota: pago.numero_cuota, total_pagado: pago.total_pagado, comentario: comentario.trim() } });
 
     res.json({ success: true,
       data: { id_pago: Number(id_pago), numero_cuota: pago.numero_cuota, estado_pago: 'REVERSADO' },
