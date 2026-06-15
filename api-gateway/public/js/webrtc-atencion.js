@@ -19,6 +19,7 @@
     micOn: true, camOn: true, screen: false, pendingIce: [], ringTimer: null, meterRAF: null,
   };
   let ui = {};
+  let pipCanvas = null, pipVideo = null, pipStream = null;
 
   /* ── Estilos ── */
   function injectCSS() {
@@ -129,6 +130,14 @@
       </div>`;
     document.body.appendChild(win);
 
+    // Canvas + video oculto para componer el nombre sobre el video en el PiP.
+    pipCanvas = document.createElement('canvas');
+    pipVideo = document.createElement('video');
+    pipVideo.muted = true; pipVideo.playsInline = true; pipVideo.autoplay = true;
+    pipVideo.style.cssText = 'position:fixed;left:-9999px;top:0;width:2px;height:2px;opacity:0';
+    document.body.appendChild(pipVideo);
+    pipVideo.addEventListener('leavepictureinpicture', stopPipCompose);
+
     ui = {
       test, inc, win,
       testVid: test.querySelector('#artc-testvid'), testMeter: test.querySelector('#artc-testmeter'), testErr: test.querySelector('#artc-testerr'),
@@ -149,7 +158,7 @@
     makeDraggable(win, win.querySelector('#artc-whead'));
     document.addEventListener('visibilitychange', () => {
       if (document.hidden && S.state === 'incall' && ui.remote.srcObject && !document.pictureInPictureElement)
-        ui.remote.requestPictureInPicture().catch(() => {});
+        enterPip();
     });
   }
 
@@ -170,7 +179,7 @@
   async function newPc() {
     const pc = new RTCPeerConnection({ iceServers: await getIce() });
     pc.onicecandidate = e => { if (e.candidate) S.signal(S.convId, 'ice', e.candidate.toJSON()); };
-    pc.ontrack = e => { ui.remote.srcObject = e.streams[0]; ui.wait.style.display = 'none'; ui.wst.classList.add('on'); };
+    pc.ontrack = e => { ui.remote.srcObject = e.streams[0]; ui.wait.style.display = 'none'; ui.wst.classList.add('on'); ui.remoteName.textContent = S.peerName || ui.remoteName.textContent; };
     pc.onconnectionstatechange = () => {
       if (['failed', 'closed', 'disconnected'].includes(pc.connectionState) && S.state === 'incall') setTimeout(() => { if (pc.connectionState !== 'connected') endLocal(); }, 1500);
     };
@@ -288,9 +297,38 @@
     ui.localVid.srcObject = S.local; ui.localVid.style.transform = 'scaleX(-1)';
     S.screen = false; ui.screen.classList.remove('act');
   }
+  // PiP con el nombre del interlocutor dibujado sobre el video (canvas).
+  function startPipCompose() {
+    if (!pipCanvas) return;
+    const v = ui.remote, ctx = pipCanvas.getContext('2d');
+    if (!pipStream) { pipStream = pipCanvas.captureStream(15); pipVideo.srcObject = pipStream; }
+    const draw = () => {
+      const w = v.videoWidth || 640, h = v.videoHeight || 480;
+      if (pipCanvas.width !== w) pipCanvas.width = w;
+      if (pipCanvas.height !== h) pipCanvas.height = h;
+      try { ctx.drawImage(v, 0, 0, w, h); } catch (_) {}
+      const name = S.peerName || 'Interlocutor';
+      const fs = Math.max(15, Math.round(h * 0.06)), bar = Math.round(fs * 1.7);
+      ctx.fillStyle = 'rgba(0,0,0,0.5)'; ctx.fillRect(0, 0, w, bar);
+      ctx.fillStyle = '#fff'; ctx.textBaseline = 'middle';
+      ctx.font = '700 ' + fs + 'px Segoe UI, system-ui, sans-serif';
+      ctx.fillText(name, Math.round(fs * 0.6), Math.round(bar / 2));
+      S._pipRAF = requestAnimationFrame(draw);
+    };
+    cancelAnimationFrame(S._pipRAF); draw();
+  }
+  function stopPipCompose() { if (S._pipRAF) cancelAnimationFrame(S._pipRAF); S._pipRAF = null; }
+  function enterPip() {
+    try {
+      startPipCompose();
+      pipVideo.play().catch(() => {});
+      const go = () => pipVideo.requestPictureInPicture().catch(() => {});
+      if (pipVideo.readyState >= 2) go(); else pipVideo.onloadedmetadata = go;
+    } catch (_) {}
+  }
   async function togglePip() {
     setMedia();
-    try { if (document.pictureInPictureElement) await document.exitPictureInPicture(); else await ui.remote.requestPictureInPicture(); } catch (_) {}
+    try { if (document.pictureInPictureElement) await document.exitPictureInPicture(); else enterPip(); } catch (_) {}
   }
 
   /* ── Medidor de micrófono (prueba) ── */
@@ -316,8 +354,9 @@
   function hangup() { S.signal(S.convId, 'hangup', {}); endLocal(); }
   function endLocal() { cleanup(); }
   function cleanup() {
-    clearTimeout(S.ringTimer); stopMeter();
+    clearTimeout(S.ringTimer); stopMeter(); stopPipCompose();
     try { if (document.pictureInPictureElement) document.exitPictureInPicture(); } catch (_) {}
+    try { if (pipStream) { pipStream.getTracks().forEach(t => t.stop()); pipStream = null; if (pipVideo) pipVideo.srcObject = null; } } catch (_) {}
     try { if ('mediaSession' in navigator) navigator.mediaSession.metadata = null; } catch (_) {}
     if (S.pc) { try { S.pc.close(); } catch (_) {} S.pc = null; }
     if (S.screenStream) { S.screenStream.getTracks().forEach(t => t.stop()); S.screenStream = null; }
