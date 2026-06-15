@@ -11,6 +11,7 @@ router.put('/productos/:id',    verifyToken, requireFunc('mant_dealernet_product
 router.delete('/productos/:id', verifyToken, requireFunc('mant_dealernet_productos'), C.deleteProducto);
 
 /* ── Consulta a la Central de Información ─────────────────────────────────── */
+router.get('/estado',     verifyToken, requireFunc('mant_dealernet_productos'), C.estado);
 router.post('/consultar', verifyToken, requireFunc('dealernet_consultar'), C.consultar);
 router.get('/consultas',  verifyToken, requireFunc('mant_dealernet_productos'), C.listConsultas);
 

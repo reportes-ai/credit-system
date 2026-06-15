@@ -224,6 +224,14 @@ const consultar = async (req, res) => {
   } catch (e) { errSrv(res, e, 'consultar'); }
 };
 
+// ¿Están cargadas las credenciales? (no hace ninguna llamada ni gasta saldo)
+const estado = async (req, res) => {
+  res.json({ success: true, data: {
+    configurado: !!(process.env.DEALERNET_USER && process.env.DEALERNET_PASS),
+    endpoint: ENDPOINT, tipocns: TIPOCNS_DEF
+  }, error: null });
+};
+
 const listConsultas = async (req, res) => {
   try {
     const [rows] = await pool.query(
@@ -232,4 +240,4 @@ const listConsultas = async (req, res) => {
   } catch (e) { errSrv(res, e, 'listConsultas'); }
 };
 
-module.exports = { getProductos, addProducto, updateProducto, deleteProducto, consultar, listConsultas };
+module.exports = { getProductos, addProducto, updateProducto, deleteProducto, consultar, listConsultas, estado };

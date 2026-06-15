@@ -5,7 +5,7 @@
   <link rel="icon" href="/img/favicon.png" type="image/png">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Productos DealerNet — AutoFácil</title>
-  <!-- v1.0 -->
+  <!-- v1.1 -->
   <link href="/css/bootstrap.min.css" rel="stylesheet">
   <link href="/css/bootstrap-icons.css" rel="stylesheet">
   <style>
@@ -90,6 +90,7 @@
   <div class="note">
     <i class="bi bi-shield-lock"></i> Las <b>credenciales</b> del Web Service van como variables de entorno en Render
     (<code>DEALERNET_USER</code> / <code>DEALERNET_PASS</code>), nunca en el código. Mientras no estén cargadas, la consulta avisará "credenciales no configuradas".
+    <div style="margin-top:8px">Estado en el servidor: <b id="credEstado">verificando…</b></div>
   </div>
 
   <div class="card">
@@ -197,7 +198,18 @@ async function probar(){
   } catch(_){ out.innerHTML='<div style="margin-top:12px"><span class="ret err">Error</span> de conexión</div>'; }
   btn.disabled=false; btn.innerHTML='<i class="bi bi-send me-1"></i>Consultar';
 }
+async function cargarEstado(){
+  try {
+    const r=await fetch('/api/dealernet/estado',{ headers:H }); const j=await r.json();
+    const el=document.getElementById('credEstado'); if(!el||!j.success) return;
+    el.innerHTML = j.data.configurado
+      ? '<span style="color:#15803d"><i class="bi bi-check-circle-fill"></i> credenciales configuradas</span>'
+      : '<span style="color:#b91c1c"><i class="bi bi-exclamation-triangle-fill"></i> credenciales NO configuradas en Render</span>';
+    el.title = 'endpoint: '+j.data.endpoint+'  ·  tipocns: '+j.data.tipocns;
+  } catch(_){}
+}
 cargar();
+cargarEstado();
 </script>
 <script src="/js/app-version.js"></script>
 </body>
