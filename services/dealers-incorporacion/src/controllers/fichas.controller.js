@@ -440,6 +440,24 @@ const tomar = async (req, res) => {
   } catch (e) { console.error('[fichas tomar]', e.message); res.status(500).json({ success: false, data: null, error: 'Error interno del servidor' }); }
 };
 
+/* Asegura que la tabla `dealers` (donde se guardan hoy los dealers) tenga las
+   columnas de la ficha. Idempotente; se ejecuta una sola vez (promesa cacheada). */
+let _dealersColsReady = null;
+function ensureDealersCols() {
+  if (_dealersColsReady) return _dealersColsReady;
+  const cols = [
+    'comuna VARCHAR(120)', 'provincia VARCHAR(120)', 'region VARCHAR(120)', 'tipo_ficha VARCHAR(10)',
+    'cf_nombre VARCHAR(150)', 'cf_telefono VARCHAR(40)', 'cf_email VARCHAR(150)',
+    'rl_nombre VARCHAR(150)', 'rl_telefono VARCHAR(40)', 'rl_email VARCHAR(150)',
+    'com_6_12 DECIMAL(5,2)', 'com_13_24 DECIMAL(5,2)', 'com_25_36 DECIMAL(5,2)', 'com_37 DECIMAL(5,2)',
+    'cuenta_tipo VARCHAR(10)', 'tipo_cuenta VARCHAR(30)', 'nombre_cuenta VARCHAR(150)',
+  ];
+  _dealersColsReady = (async () => {
+    for (const c of cols) { try { await pool.query(`ALTER TABLE dealers ADD COLUMN IF NOT EXISTS ${c} NULL`); } catch (e) {} }
+  })();
+  return _dealersColsReady;
+}
+
 /* ── POST /fichas/:id/aprobar — crea el dealer y avisa al ejecutivo ────────── */
 const aprobar = async (req, res) => {
   try {
@@ -448,15 +466,22 @@ const aprobar = async (req, res) => {
     if (!['EN_REVISION', 'TOMADA'].includes(f.estado))
       return res.status(400).json({ success: false, data: null, error: 'La ficha no está en revisión' });
 
-    // Crea el dealer en el mantenedor (número correlativo)
+    await ensureDealersCols();
+    // Crea el dealer en el mantenedor (número correlativo) con la info COMPLETA de la ficha
     const [[{ maxN }]] = await pool.query('SELECT COALESCE(MAX(numero),0)+1 AS maxN FROM dealers');
     const [d] = await pool.query(
-      `INSERT INTO dealers (numero, rut, nombre_indexa, nombre_razon, ccs_parque, direccion,
-         fecha_incorporacion, contacto, telefono, correo, num_cuenta, banco, rut_pago,
+      `INSERT INTO dealers (numero, rut, nombre_indexa, nombre_razon, ccs_parque, tipo_ficha, direccion,
+         comuna, provincia, region, fecha_incorporacion, contacto, telefono, correo,
+         cf_nombre, cf_telefono, cf_email, rl_nombre, rl_telefono, rl_email,
+         com_6_12, com_13_24, com_25_36, com_37,
+         cuenta_tipo, tipo_cuenta, nombre_cuenta, num_cuenta, banco, rut_pago,
          activo, tiene_factura, observaciones)
-       VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,1,?,?)`,
-      [maxN, f.rut, f.nombre_fantasia || f.nombre_razon, f.nombre_razon, f.tipo, f.direccion,
-       f.fecha_solicitud, f.cc_nombre, f.cc_telefono, f.cc_email, f.num_cuenta, f.banco, f.rut_cuenta,
+       VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,1,?,?)`,
+      [maxN, f.rut, f.nombre_fantasia || f.nombre_razon, f.nombre_razon, f.tipo, f.tipo, f.direccion,
+       f.comuna, f.provincia, f.region, f.fecha_solicitud, f.cc_nombre, f.cc_telefono, f.cc_email,
+       f.cf_nombre, f.cf_telefono, f.cf_email, f.rl_nombre, f.rl_telefono, f.rl_email,
+       f.com_6_12, f.com_13_24, f.com_25_36, f.com_37,
+       f.cuenta_tipo, f.tipo_cuenta, f.nombre_cuenta, f.num_cuenta, f.banco, f.rut_cuenta,
        f.tipo_documento === 'FACTURA' ? 1 : 0, f.observaciones]);
 
     const nombre = [req.usuario.nombre, req.usuario.apellido].filter(Boolean).join(' ') || req.usuario.email;

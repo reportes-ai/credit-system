@@ -5,7 +5,7 @@
   <link rel="icon" href="/img/favicon.png" type="image/png">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Nueva Ficha de Dealer — AutoFácil</title>
-  <!-- v1.9 -->
+  <!-- v1.10 -->
   <link href="/css/bootstrap.min.css" rel="stylesheet">
   <link href="/css/bootstrap-icons.css" rel="stylesheet">
   <style>
@@ -497,7 +497,7 @@ function descargarPoderSimple(){
     <h1>PODER SIMPLE</h1>
     <p style="text-align:justify;line-height:1.7">En Santiago de Chile, ${E(o.fecha_solicitud||new Date().toLocaleDateString('es-CL'))}, por medio del presente instrumento
     <b>${E(o.nombre_razon||'__________')}</b>, RUT <b>${E(o.rut||'__________')}</b> (en adelante, el "Concesionario"), representada por su
-    Representante Legal, <b>solicita y autoriza</b> a AutoFácil Crédito Automotriz para que las <b>participaciones</b> producto de los créditos
+    Representante Legal <b>${E(o.rl_nombre||'__________')}</b>${o.rl_email?` (${E(o.rl_email)})`:''}, <b>solicita y autoriza</b> a AutoFácil Crédito Automotriz para que las <b>participaciones</b> producto de los créditos
     colocados a los clientes del Concesionario sean <b>depositadas</b> en la siguiente cuenta bancaria de un tercero:</p>
     <table class="p">
       <tr><td class="lbl">Nombre de la cuenta</td><td>${E(o.nombre_cuenta||'__________')}</td></tr>
