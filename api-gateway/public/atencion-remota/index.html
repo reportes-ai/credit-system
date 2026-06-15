@@ -5,7 +5,7 @@
   <link rel="icon" href="/img/favicon.png" type="image/png">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Atención Remota — AutoFácil</title>
-  <!-- v1.1 -->
+  <!-- v1.2 -->
   <link href="/css/bootstrap.min.css" rel="stylesheet">
   <link href="/css/bootstrap-icons.css" rel="stylesheet">
   <style>
@@ -44,8 +44,19 @@
     .switch input:checked + .slider:before { transform:translateX(21px); }
     .chips-count { font-weight:800; color:var(--navy-dark); font-size:1rem; }
 
-    .atencion-grid { display:grid; grid-template-columns:300px 1fr; gap:16px; align-items:start; }
+    .atencion-grid { display:grid; grid-template-columns:280px 1fr 250px; gap:16px; align-items:start; }
+    @media(max-width:1150px){ .atencion-grid { grid-template-columns:260px 1fr; } .rr-panel { grid-column:1 / -1; } }
     @media(max-width:900px){ .atencion-grid { grid-template-columns:1fr; } }
+    .rr-panel { background:#fff; border:1px solid #e8edf3; border-radius:14px; overflow:hidden; position:sticky; top:76px; }
+    .rr-panel h3 { font-size:.8rem; text-transform:uppercase; letter-spacing:.5px; color:var(--navy-dark); margin:0; padding:14px 16px 4px; display:flex; justify-content:space-between; align-items:center; }
+    .rr-panel h3 a { font-size:.95rem; color:var(--navy); text-decoration:none; }
+    .rr-hint { font-size:.72rem; color:#94a3b8; padding:0 16px 6px; }
+    .rr-list { max-height:66vh; overflow-y:auto; padding:0 12px 14px; }
+    .rr-item { width:100%; text-align:left; background:#f7f9fc; border:1px solid #eef2f7; border-radius:9px; padding:9px 11px; margin-top:8px; cursor:pointer; transition:.12s; }
+    .rr-item:hover { background:#eef4ff; border-color:#cdddff; }
+    .rr-item b { display:block; font-size:.8rem; color:var(--navy-dark); margin-bottom:2px; }
+    .rr-item span { font-size:.76rem; color:#64748b; display:block; line-height:1.35; max-height:2.7em; overflow:hidden; }
+    .rr-empty { padding:18px 12px; text-align:center; color:#94a3b8; font-size:.82rem; }
 
     .cola { background:#fff; border:1px solid #e8edf3; border-radius:14px; overflow:hidden; }
     .cola h3 { font-size:.8rem; text-transform:uppercase; letter-spacing:.5px; color:var(--navy-dark); margin:0; padding:14px 16px 8px; display:flex; justify-content:space-between; align-items:center; }
@@ -153,6 +164,11 @@
         <div class="panels" id="panels"></div>
         <div class="no-panels" id="noPanels"><i class="bi bi-chat-square-text"></i>Sin conversaciones activas.<br>Toma una de la cola para comenzar a atender.</div>
       </div>
+      <div class="rr-panel">
+        <h3>Respuestas rápidas <a href="/mantenedores/respuestas-rapidas/" target="_blank" title="Configurar respuestas"><i class="bi bi-gear"></i></a></h3>
+        <div class="rr-hint">Un clic carga el texto en el chat activo (no lo envía).</div>
+        <div class="rr-list" id="rrList"></div>
+      </div>
     </div>
   </div>
 
@@ -252,7 +268,8 @@ document.querySelectorAll('.tab').forEach(t => t.addEventListener('click', () =>
 
 /* ════════════════ WebSocket ════════════════ */
 let ws=null, reconnTimer=null, maxChats=3;
-const panels = new Map();   // convId → { conv, el, msgs, typingEl }
+let activeConv=null, RESP=[];
+const panels = new Map();   // convId → { conv, el, seen }
 const wsDot = document.getElementById('wsDot'), wsState = document.getElementById('wsState');
 
 function wsUrl(){ return (location.protocol==='https:'?'wss':'ws')+'://'+location.host+'/ws/atencion?token='+encodeURIComponent(token); }
@@ -320,10 +337,12 @@ async function openPanel(conv){
     </div>`;
   document.getElementById('panels').appendChild(el);
   panels.set(conv.id, { conv, el, seen:new Set() });
+  activeConv = conv.id;
   refreshChips();
   wsSend({ t:'join', id:conv.id });
 
   const inp = document.getElementById('inp-'+conv.id);
+  inp.addEventListener('focus', () => { activeConv = conv.id; });
   inp.addEventListener('keydown', e => { if(e.key==='Enter') enviar(conv.id); });
   let to=null; inp.addEventListener('input', () => { wsSend({t:'typing',id:conv.id,on:true}); clearTimeout(to); to=setTimeout(()=>wsSend({t:'typing',id:conv.id,on:false}),1200); });
 
@@ -337,7 +356,9 @@ async function openPanel(conv){
 
 function removePanel(id, aviso){
   const p = panels.get(id); if(!p) return;
-  p.el.remove(); panels.delete(id); refreshChips();
+  p.el.remove(); panels.delete(id);
+  if(activeConv===id) activeConv = panels.size ? [...panels.keys()][0] : null;
+  refreshChips();
   if (aviso) toast('Conversación cerrada');
 }
 function cerrar(id){ if(confirm('¿Cerrar esta conversación?')) wsSend({ t:'close', id }); }
@@ -475,7 +496,24 @@ async function guardarConfig(){
     const j=await r.json(); toast(j.success?'Configuración guardada':(j.error||'Error'), !j.success); } catch(_){ toast('Error al guardar', true); }
 }
 
+/* ════════════════ Respuestas rápidas ════════════════ */
+async function cargarRespuestas(){
+  try { const r=await fetch('/api/atencion-remota/respuestas',{ headers:H }); const j=await r.json(); RESP=(j.success&&j.data)||[]; renderResp(); } catch(_){}
+}
+function renderResp(){
+  const el=document.getElementById('rrList');
+  if(!RESP.length){ el.innerHTML='<div class="rr-empty">Sin respuestas configuradas.</div>'; return; }
+  el.innerHTML=RESP.map((x,i)=>`<button class="rr-item" data-i="${i}"><b>${esc(x.titulo)}</b><span>${esc(x.texto)}</span></button>`).join('');
+  el.querySelectorAll('.rr-item').forEach(b=>b.addEventListener('click',()=>usarRespuesta(RESP[+b.dataset.i].texto)));
+}
+function usarRespuesta(texto){
+  if(!activeConv||!panels.has(activeConv)) return toast('Abre o haz clic en un chat primero', true);
+  const inp=document.getElementById('inp-'+activeConv); if(!inp) return;
+  inp.value = inp.value ? inp.value.replace(/\s+$/,'')+' '+texto : texto; inp.focus();
+}
+
 connect();
+cargarRespuestas();
 </script>
 <script src="/js/app-version.js"></script>
 </body>

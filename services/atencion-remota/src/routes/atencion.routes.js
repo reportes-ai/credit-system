@@ -23,4 +23,11 @@ router.put('/cuentas/:id', verifyToken, requireFunc('atencion_remota'), C.actual
 router.get('/config', verifyToken, requireFunc('atencion_remota', 'atencion_remota_config'), C.getConfig);
 router.put('/config', verifyToken, requireFunc('atencion_remota_config'), C.putConfig);
 
+/* ── Respuestas rápidas del chat ─────────────────────────────────────────── */
+router.get('/respuestas', verifyToken, C.listarRespuestas);
+router.get('/respuestas-admin', verifyToken, requireFunc('mant_respuestas_rapidas', 'atencion_remota_config'), C.listarRespuestasAdmin);
+router.post('/respuestas', verifyToken, requireFunc('mant_respuestas_rapidas', 'atencion_remota_config'), C.crearRespuesta);
+router.put('/respuestas/:id', verifyToken, requireFunc('mant_respuestas_rapidas', 'atencion_remota_config'), C.actualizarRespuesta);
+router.delete('/respuestas/:id', verifyToken, requireFunc('mant_respuestas_rapidas', 'atencion_remota_config'), C.eliminarRespuesta);
+
 module.exports = router;

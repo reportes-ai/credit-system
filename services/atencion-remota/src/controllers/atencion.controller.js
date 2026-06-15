@@ -129,6 +129,42 @@ const errSrv  = (res, e, tag) => { console.error(`[${tag}]`, e.message); res.sta
       const [[pp]] = await pool.query('SELECT 1 ok FROM permisos_perfil WHERE id_perfil=1 AND id_funcionalidad=? LIMIT 1', [idf]);
       if (!pp) await pool.query('INSERT INTO permisos_perfil (id_perfil, id_funcionalidad, habilitado) VALUES (1,?,1)', [idf]);
     }
+
+    // Respuestas rápidas del chat (mantenedor paramétrico).
+    await pool.query(`CREATE TABLE IF NOT EXISTS ar_respuestas_rapidas (
+      id         INT AUTO_INCREMENT PRIMARY KEY,
+      titulo     VARCHAR(80) NOT NULL,
+      texto      TEXT NOT NULL,
+      orden      INT DEFAULT 0,
+      activo     TINYINT(1) DEFAULT 1,
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+    )`);
+    const [[{ nr }]] = await pool.query('SELECT COUNT(*) nr FROM ar_respuestas_rapidas');
+    if (!nr) {
+      const seed = [
+        ['Saludo', 'Hola, gracias por contactarte con AutoFácil. ¿En qué te puedo ayudar?'],
+        ['Pedir RUT', '¿Me confirmas el RUT del cliente para revisar la operación?'],
+        ['Pedir documento', 'Por favor envíame una foto o PDF del documento por este mismo chat.'],
+        ['Un momento', 'Dame un momento mientras reviso la información, por favor.'],
+        ['Despedida', '¡Gracias por preferir AutoFácil! Que tengas un excelente día.'],
+      ];
+      let o = 1;
+      for (const [t, x] of seed) await pool.query('INSERT INTO ar_respuestas_rapidas (titulo, texto, orden) VALUES (?,?,?)', [t, x, o++]);
+    }
+    const [[mm]] = await pool.query("SELECT id_modulo FROM modulos WHERE nombre='Mantenedores' AND estado='activo' LIMIT 1");
+    if (mm) {
+      const [[ex]] = await pool.query("SELECT id_funcionalidad FROM funcionalidades WHERE codigo='mant_respuestas_rapidas' LIMIT 1");
+      let idf = ex && ex.id_funcionalidad;
+      if (!idf) {
+        const [r] = await pool.query(
+          `INSERT INTO funcionalidades (id_modulo, nombre, codigo, href, icono)
+           VALUES (?, 'Respuestas Rápidas del Chat', 'mant_respuestas_rapidas', '/mantenedores/respuestas-rapidas/', 'bi-chat-quote')`, [mm.id_modulo]);
+        idf = r.insertId;
+      }
+      const [[pp]] = await pool.query('SELECT 1 ok FROM permisos_perfil WHERE id_perfil=1 AND id_funcionalidad=? LIMIT 1', [idf]);
+      if (!pp) await pool.query('INSERT INTO permisos_perfil (id_perfil, id_funcionalidad, habilitado) VALUES (1,?,1)', [idf]);
+    }
+
     console.log('[atencion-remota] módulo y esquema listos');
   } catch (e) { console.error('[atencion-remota migration]', e.message); }
 })();
@@ -371,6 +407,41 @@ const descargarAdjunto = async (req, res) => {
   } catch (e) { errSrv(res, e, 'descargarAdjunto'); }
 };
 
+/* ── REST: respuestas rápidas del chat ───────────────────────────────────── */
+const listarRespuestas = async (req, res) => {
+  try { const [rows] = await pool.query('SELECT id, titulo, texto FROM ar_respuestas_rapidas WHERE activo=1 ORDER BY orden, id'); res.json({ success:true, data:rows, error:null }); }
+  catch (e) { errSrv(res, e, 'listarRespuestas'); }
+};
+const listarRespuestasAdmin = async (req, res) => {
+  try { const [rows] = await pool.query('SELECT * FROM ar_respuestas_rapidas ORDER BY orden, id'); res.json({ success:true, data:rows, error:null }); }
+  catch (e) { errSrv(res, e, 'listarRespuestasAdmin'); }
+};
+const crearRespuesta = async (req, res) => {
+  try {
+    const { titulo, texto, orden } = req.body || {};
+    if (!titulo || !texto) return res.status(400).json({ success:false, data:null, error:'Título y texto requeridos' });
+    const [r] = await pool.query('INSERT INTO ar_respuestas_rapidas (titulo, texto, orden) VALUES (?,?,?)', [String(titulo).slice(0,80), texto, parseInt(orden)||0]);
+    auditar({ req, accion:'CREAR', modulo:'atencion-remota', entidad:'respuesta_rapida', entidad_id:r.insertId, detalle:`Creó respuesta rápida "${titulo}"` });
+    res.status(201).json({ success:true, data:{ id:r.insertId }, error:null });
+  } catch (e) { errSrv(res, e, 'crearRespuesta'); }
+};
+const actualizarRespuesta = async (req, res) => {
+  try {
+    const { titulo, texto, orden, activo } = req.body || {};
+    await pool.query('UPDATE ar_respuestas_rapidas SET titulo=?, texto=?, orden=?, activo=? WHERE id=?',
+      [String(titulo||'').slice(0,80), texto||'', parseInt(orden)||0, activo?1:0, req.params.id]);
+    auditar({ req, accion:'EDITAR', modulo:'atencion-remota', entidad:'respuesta_rapida', entidad_id:req.params.id, detalle:`Editó respuesta rápida "${titulo}"` });
+    res.json({ success:true, data:{ id:req.params.id }, error:null });
+  } catch (e) { errSrv(res, e, 'actualizarRespuesta'); }
+};
+const eliminarRespuesta = async (req, res) => {
+  try {
+    await pool.query('DELETE FROM ar_respuestas_rapidas WHERE id=?', [req.params.id]);
+    auditar({ req, accion:'ELIMINAR', modulo:'atencion-remota', entidad:'respuesta_rapida', entidad_id:req.params.id, detalle:`Eliminó respuesta rápida #${req.params.id}` });
+    res.json({ success:true, data:{ ok:true }, error:null });
+  } catch (e) { errSrv(res, e, 'eliminarRespuesta'); }
+};
+
 module.exports = {
   // middlewares
   verifyDealer, verifyAny,
@@ -380,6 +451,8 @@ module.exports = {
   getCola, getMensajes,
   // comunes
   getIce, getConfig, putConfig, subirAdjunto, descargarAdjunto,
+  // respuestas rápidas
+  listarRespuestas, listarRespuestasAdmin, crearRespuesta, actualizarRespuesta, eliminarRespuesta,
   // service helpers (ws.js)
   buildIce, getCfg, crearConversacion, getConversacion, asignarConversacion,
   cerrarConversacion, persistMensaje, colaEspera, activasDe, contarActivas,
