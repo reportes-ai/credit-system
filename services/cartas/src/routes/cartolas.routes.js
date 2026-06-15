@@ -9,8 +9,8 @@ router.get('/enviadas',     verifyToken, c.getEnviadas);
 router.post('/enviadas',    verifyToken, c.registrarEnvio);
 router.delete('/enviadas/:id', verifyToken, requireFunc('aprob_cartola_reversar'), c.reversarEnvio);
 router.get('/',             verifyToken, c.getMovimientos);
-router.post('/',            verifyToken, c.crearMovimiento);
-router.put('/:id',          verifyToken, c.updateMovimiento);
-router.delete('/:id',       verifyToken, c.deleteMovimiento);
+router.post('/',            verifyToken, requireFunc('aprob_cartolas'), c.crearMovimiento);
+router.put('/:id',          verifyToken, requireFunc('aprob_cartolas'), c.updateMovimiento);
+router.delete('/:id',       verifyToken, requireFunc('aprob_cartolas'), c.deleteMovimiento);
 
 module.exports = router;
