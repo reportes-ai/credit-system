@@ -5,7 +5,7 @@
   <link rel="icon" href="/img/favicon.png" type="image/png">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Mantención Dealers — AutoFácil</title>
-  <!-- v1.8 -->
+  <!-- v1.9 -->
   <link href="/css/bootstrap.min.css" rel="stylesheet">
   <link href="/css/bootstrap-icons.css" rel="stylesheet">
   <style>
@@ -60,6 +60,9 @@
     .toast-af.err{ background:#b91c1c; }
     .motivo-line{ font-size:.78rem; color:#991b1b; margin-top:3px; }
     .apel-line{ font-size:.78rem; color:#1e40af; margin-top:3px; }
+    .alert-row{ margin-top:4px; display:flex; flex-wrap:wrap; gap:4px; }
+    .alert-chip{ font-size:.68rem; font-weight:700; border-radius:20px; padding:2px 8px; white-space:nowrap; display:inline-flex; align-items:center; gap:4px; }
+    .ac-red{ background:#fee2e2; color:#991b1b; } .ac-amber{ background:#ffedd5; color:#9a3412; }
   </style>
 </head>
 <body>
@@ -185,6 +188,13 @@ function render(){
 function comResumen(f){ return `${f.com_6_12||0}/${f.com_13_24||0}/${f.com_25_36||0}/${f.com_37||0}%`; }
 
 /* ── Pool de revisión ── */
+function alertasFila(f){
+  const a=[];
+  if (f.n_diferencias) a.push(`<span class="alert-chip ac-red"><i class="bi bi-exclamation-octagon"></i> ${f.n_diferencias} dif. sistema</span>`);
+  if (f.n_faltantes)   a.push(`<span class="alert-chip ac-red"><i class="bi bi-file-earmark-x"></i> ${f.n_faltantes} no coinciden c/ doc</span>`);
+  if (f.firma_sospecha) a.push(`<span class="alert-chip ac-amber"><i class="bi bi-pen"></i> posible SIN FIRMA</span>`);
+  return a.length ? `<div class="alert-row">${a.join(' ')}</div>` : '';
+}
 function renderRevision(){
   let rows = FICHAS.filter(f=>['EN_REVISION','TOMADA'].includes(f.estado));
   rows = filtroQ(rows, ['rut','nombre_razon','nombre_fantasia','ejecutivo_nombre']);
@@ -193,7 +203,7 @@ function renderRevision(){
     <th>Tipo</th><th>Concesionario</th><th>RUT</th><th>Ejecutivo</th><th>Comisión</th><th>Estado</th><th>Enviada</th><th></th></tr></thead><tbody>${
     rows.map(f=>`<tr>
       <td>${f.tipo==='PARQUE'?'<i class="bi bi-car-front"></i> Parque':'<i class="bi bi-shop"></i> General'}</td>
-      <td><b>${escH(f.nombre_razon||f.nombre_fantasia||'—')}</b>${f.apelacion?`<div class="apel-line"><i class="bi bi-megaphone"></i> Apelación: ${escH(f.apelacion)}</div>`:''}</td>
+      <td><b>${escH(f.nombre_razon||f.nombre_fantasia||'—')}</b>${f.apelacion?`<div class="apel-line"><i class="bi bi-megaphone"></i> Apelación: ${escH(f.apelacion)}</div>`:''}${alertasFila(f)}</td>
       <td>${escH(f.rut||'—')}</td>
       <td>${escH(f.ejecutivo_nombre||'—')}</td>
       <td>${comResumen(f)}</td>
@@ -266,6 +276,14 @@ async function verFicha(id){
         <b style="color:#991b1b;font-size:.82rem"><i class="bi bi-exclamation-octagon me-1"></i>Diferencias con los datos del sistema</b>
         ${f.diferencias.map(d=>`<div style="margin-top:6px;font-size:.82rem"><b>${escH(d.campo)}:</b> ficha "<span style="color:#991b1b">${escH(d.ficha)}</span>" · sistema "${escH(d.sistema)}"</div>`).join('')}</div>`;
     }
+    // Datos que no coinciden con el texto del documento subido
+    let faltHtml = '';
+    if (Array.isArray(f.ficha_faltantes) && f.ficha_faltantes.length) {
+      faltHtml = `<div style="margin-top:14px;border:1px solid #fca5a5;background:#fef2f2;border-radius:10px;padding:12px 14px">
+        <b style="color:#991b1b;font-size:.82rem"><i class="bi bi-file-earmark-x me-1"></i>No coinciden con el documento subido</b>
+        <div style="margin-top:2px;font-size:.76rem;color:#7f1d1d">Estos datos ingresados no se encontraron en el texto del archivo cargado:</div>
+        ${f.ficha_faltantes.map(d=>`<div style="margin-top:5px;font-size:.82rem"><b>${escH(d.campo)}:</b> "<span style="color:#991b1b">${escH(d.valor)}</span>"</div>`).join('')}</div>`;
+    }
     // Alerta de firma (heurística)
     let firmaHtml = '';
     if (f.firma_sospecha) {
@@ -293,7 +311,7 @@ async function verFicha(id){
       ${row('Email confirmación', f.correo_confirmacion)} ${row('Observaciones', f.observaciones)}
       ${f.apelacion?row('Apelación', f.apelacion):''}
       ${f.motivo_rechazo?row('Motivo rechazo', f.motivo_rechazo):''}
-    </div>${firmaHtml}${difHtml}${excHtml}<div style="margin-top:16px;display:flex;flex-wrap:wrap;gap:6px">${adjHtml||'<span style="font-size:.8rem;color:#94a3b8">Sin adjuntos</span>'}</div>`;
+    </div>${firmaHtml}${difHtml}${faltHtml}${excHtml}<div style="margin-top:16px;display:flex;flex-wrap:wrap;gap:6px">${adjHtml||'<span style="font-size:.8rem;color:#94a3b8">Sin adjuntos</span>'}</div>`;
     dlgVer.showModal();
   } catch(e){ toast(e.message,true); }
 }

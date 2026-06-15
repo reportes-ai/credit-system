@@ -88,6 +88,7 @@ const COM_DEFAULT = {
     await pool.query(`ALTER TABLE dealer_fichas ADD COLUMN IF NOT EXISTS nombre_cuenta VARCHAR(150) NULL`);
     await pool.query(`ALTER TABLE dealer_fichas ADD COLUMN IF NOT EXISTS firma_sospecha TINYINT(1) NULL`);
     await pool.query(`ALTER TABLE dealer_fichas ADD COLUMN IF NOT EXISTS firma_detalle VARCHAR(200) NULL`);
+    await pool.query(`ALTER TABLE dealer_fichas ADD COLUMN IF NOT EXISTS ficha_faltantes JSON NULL`);
   } catch (e) { console.error('[dealer_fichas alter cols]', e.message); }
 
   // Archivos adjuntos múltiples (informes comerciales empresa/socios, hasta 3 c/u).
@@ -226,7 +227,9 @@ const listar = async (req, res) => {
       `SELECT id, tipo, estado, id_ejecutivo, ejecutivo_nombre, fecha_solicitud, rut, nombre_razon, nombre_fantasia,
               comuna, direccion, apelacion, tomada_por, tomada_por_nombre, revisor_nombre, fecha_revision, motivo_rechazo,
               com_6_12, com_13_24, com_25_36, com_37, tipo_documento, cuenta_tipo, banco, num_cuenta, rut_cuenta,
-              cc_nombre, cc_telefono, cc_email, id_dealer, (ficha_data IS NOT NULL) AS tiene_ficha, created_at, updated_at
+              cc_nombre, cc_telefono, cc_email, id_dealer, (ficha_data IS NOT NULL) AS tiene_ficha,
+              firma_sospecha, JSON_LENGTH(diferencias) AS n_diferencias, JSON_LENGTH(ficha_faltantes) AS n_faltantes,
+              created_at, updated_at
        FROM dealer_fichas ${whereStr} ORDER BY
          FIELD(estado,'RECHAZADA','EN_REVISION','TOMADA','BORRADOR','APROBADA'), updated_at DESC
        LIMIT 500`, vals);
@@ -244,7 +247,7 @@ const obtener = async (req, res) => {
               rep_legal_origen, rl_nombre, rl_telefono, rl_email,
               com_6_12, com_13_24, com_25_36, com_37, tipo_documento, cuenta_tipo, tipo_cuenta, nombre_cuenta, banco,
               rut_cuenta, num_cuenta, correo_confirmacion, observaciones,
-              excepciones, excepciones_comentarios, diferencias, firma_sospecha, firma_detalle,
+              excepciones, excepciones_comentarios, diferencias, firma_sospecha, firma_detalle, ficha_faltantes,
               ficha_nombre, ficha_mime, (ficha_data IS NOT NULL) AS tiene_ficha,
               tomada_por, tomada_por_nombre, fecha_tomada, revisor_nombre, fecha_revision,
               motivo_rechazo, apelacion, id_dealer, created_at, updated_at
@@ -392,6 +395,31 @@ async function verificarFirma(buffer, mime) {
   } catch (e) { return { sospecha: 0, detalle: 'No se pudo analizar el archivo.' }; }
 }
 
+/* Compara el TEXTO del archivo subido (si es PDF con texto) contra los datos
+   ingresados en la ficha. Devuelve los campos cuyo valor no aparece en el
+   documento (solo aplica a PDFs con capa de texto; los escaneos/fotos no se
+   pueden leer y se omiten). */
+const _norm = s => String(s || '').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/[^a-z0-9]/g, '');
+async function compararFichaTexto(buffer, mime, f) {
+  try {
+    if (!buffer || !pdfParse || !String(mime || '').toLowerCase().includes('pdf')) return { revisado: false, faltantes: [] };
+    const data = await pdfParse(buffer).catch(() => null);
+    const txt = _norm((data && data.text) || '');
+    if (txt.length < 80) return { revisado: false, faltantes: [] };   // escaneo/sin texto útil
+    const campos = [
+      ['RUT concesionario', f.rut], ['Razón Social', f.nombre_razon], ['Nombre Fantasía', f.nombre_fantasia],
+      ['Dirección', f.direccion], ['Comuna', f.comuna], ['Contacto comercial', f.cc_nombre],
+      ['Representante Legal', f.rl_nombre], ['Banco', f.banco], ['N° Cuenta', f.num_cuenta], ['RUT cuenta', f.rut_cuenta],
+    ];
+    const faltantes = [];
+    for (const [label, val] of campos) {
+      const n = _norm(val);
+      if (n.length >= 3 && !txt.includes(n)) faltantes.push({ campo: label, valor: String(val) });
+    }
+    return { revisado: true, faltantes };
+  } catch (e) { return { revisado: false, faltantes: [] }; }
+}
+
 /* ── POST /fichas/:id/enviar — manda a revisión (pool) ─────────────────────── */
 const enviar = async (req, res) => {
   try {
@@ -418,13 +446,15 @@ const enviar = async (req, res) => {
     const diferencias = await calcularDiferencias(f);
     // Verifica si la ficha subida parece venir firmada (heurística).
     const firma = await verificarFirma(f.ficha_data, f.ficha_mime);
+    // Compara el texto del documento subido contra los datos ingresados.
+    const cmpTexto = await compararFichaTexto(f.ficha_data, f.ficha_mime, f);
 
     const reenvio = f.estado === 'RECHAZADA';
     const apelacion = norm(req.body.apelacion) || null;
     await pool.query(
       `UPDATE dealer_fichas SET estado='EN_REVISION', tomada_por=NULL, tomada_por_nombre=NULL, fecha_tomada=NULL,
-         motivo_rechazo=NULL, apelacion=?, diferencias=?, firma_sospecha=?, firma_detalle=?, fecha_revision=NULL, revisor_id=NULL, revisor_nombre=NULL WHERE id=?`,
-      [apelacion, JSON.stringify(diferencias), firma.sospecha, firma.detalle, req.params.id]);
+         motivo_rechazo=NULL, apelacion=?, diferencias=?, firma_sospecha=?, firma_detalle=?, ficha_faltantes=?, fecha_revision=NULL, revisor_id=NULL, revisor_nombre=NULL WHERE id=?`,
+      [apelacion, JSON.stringify(diferencias), firma.sospecha, firma.detalle, JSON.stringify(cmpTexto.faltantes), req.params.id]);
 
     // Pool: avisa a todos los revisores con una clave compartida (para anular luego al resto)
     const ids = await idsRevisores(req.usuario.id_usuario);
@@ -434,9 +464,10 @@ const enviar = async (req, res) => {
       mensaje: `${f.ejecutivo_nombre || 'Un ejecutivo'} envió la ficha de ${f.nombre_razon || f.rut || ''}`
         + (apelacion ? ` · Apelación: ${apelacion}` : '')
         + (diferencias.length ? ` · ⚠ ${diferencias.length} diferencia(s) con los datos del sistema` : '')
+        + (cmpTexto.faltantes.length ? ` · ⚠ ${cmpTexto.faltantes.length} dato(s) no coinciden con el documento subido` : '')
         + (firma.sospecha ? ' · ⚠ posible ficha SIN FIRMA' : ''),
       href: '/dealers-incorporacion/mantencion.html?tab=revision',
-      prioridad: 'alta', sonar: 1, son_tipo: (diferencias.length || firma.sospecha) ? 'alarma' : 'dingdong',
+      prioridad: 'alta', sonar: 1, son_tipo: (diferencias.length || firma.sospecha || cmpTexto.faltantes.length) ? 'alarma' : 'dingdong',
       clave: `dealerficha:${f.id}:rev`,
     });
     auditar({ req, accion: reenvio ? 'EDITAR' : 'CREAR', modulo: 'dealers', entidad: 'dealer_ficha', entidad_id: f.id,
