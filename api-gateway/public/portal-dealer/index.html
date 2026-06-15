@@ -5,7 +5,7 @@
   <link rel="icon" href="/img/favicon.png" type="image/png">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Portal Dealer — Atención AutoFácil</title>
-  <!-- v1.1 -->
+  <!-- v1.2 -->
   <link href="/css/bootstrap-icons.css" rel="stylesheet">
   <style>
     :root { --navy:#0141A2; --navy-dark:#012d70; --navy-light:#0255c5; --accent:#009AFE; }
@@ -153,6 +153,7 @@
 <input type="file" id="fileInput" class="hidden" accept="image/*,application/pdf">
 <div class="toast-af" id="toast"></div>
 
+<script src="/js/webrtc-atencion.js"></script>
 <script>
 const esc = s => String(s ?? '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
 const hora = d => new Date(d).toLocaleTimeString('es-CL',{hour:'2-digit',minute:'2-digit'});
@@ -207,6 +208,7 @@ function entrarApp(){
   document.getElementById('app').classList.remove('hidden');
   document.getElementById('hdNombre').textContent = dInfo?.nombre || 'Atención AutoFácil';
   if (dInfo?.bienvenida) document.getElementById('preMsg').textContent = dInfo.bienvenida;
+  ARTC.init({ role:'dealer', selfName: dInfo?.nombre||'Dealer', iceUrl:'/api/atencion-remota/ice', token:dToken, signal:(convId,kind,payload)=>wsSend({t:'rtc',id:convId,kind,payload}) });
   connect();
 }
 
@@ -231,6 +233,7 @@ function onMsg(m){
     case 'typing': showTyping(m.on); break;
     case 'presencia': if(m.parte==='ejecutivo') document.getElementById('hdEstado2').textContent = m.online?'Ejecutivo en línea':'Ejecutivo desconectado'; break;
     case 'cerrada': cerrada(); break;
+    case 'rtc': ARTC.onRtc(m.id_conversacion, m.kind, m.payload, m.from); break;
     case 'error': toast(m.msg||'Error', true); break;
   }
 }

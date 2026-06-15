@@ -5,7 +5,7 @@
   <link rel="icon" href="/img/favicon.png" type="image/png">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Atención Remota — AutoFácil</title>
-  <!-- v1.4 -->
+  <!-- v1.5 -->
   <link href="/css/bootstrap.min.css" rel="stylesheet">
   <link href="/css/bootstrap-icons.css" rel="stylesheet">
   <style>
@@ -282,6 +282,7 @@
 <div class="toast-af" id="toast"></div>
 
 <script src="/js/auth-guard.js"></script>
+<script src="/js/webrtc-atencion.js"></script>
 <script>
 const token = sessionStorage.getItem('token');
 const yo = JSON.parse(sessionStorage.getItem('usuario') || 'null');
@@ -347,6 +348,7 @@ function onMsg(m){
     case 'typing':  showTyping(m.id_conversacion, m.on); break;
     case 'presencia': setPresencia(m.id_conversacion, m.online); break;
     case 'cerrada': removePanel(m.id_conversacion, true); break;
+    case 'rtc':     ARTC.onRtc(m.id_conversacion, m.kind, m.payload, m.from); break;
     case 'error':   toast(m.msg||'Error', true); break;
   }
 }
@@ -378,6 +380,7 @@ async function openPanel(conv){
       <div class="ava">${esc(inicial)}</div>
       <div class="who"><b>${esc(conv.dealer_nombre||'Dealer')}</b><span>${esc(conv.dealer_rut||'')}</span></div>
       <span class="pres" id="pres-${conv.id}">conectando…</span>
+      <button title="Videollamada" onclick="videollamar(${conv.id})"><i class="bi bi-camera-video-fill"></i></button>
       <button title="Cerrar conversación" onclick="cerrar(${conv.id})"><i class="bi bi-check2-circle"></i></button>
     </div>
     <div class="interloc-bar">
@@ -418,6 +421,11 @@ function removePanel(id, aviso){
   if (aviso) toast('Conversación cerrada');
 }
 function cerrar(id){ if(confirm('¿Cerrar esta conversación?')) wsSend({ t:'close', id }); }
+function videollamar(convId){
+  const p=panels.get(convId); if(!p) return;
+  if(ARTC.busy()) return toast('Ya hay una llamada en curso', true);
+  ARTC.start(convId, { selfName:((yo?.nombre||'')+' '+(yo?.apellido||'')).trim()||'Ejecutivo', peerName: p.conv.interlocutor || p.conv.dealer_nombre || 'Dealer' });
+}
 
 function addMessage(convId, msg, noScrollForce){
   const box = document.getElementById('msgs-'+convId); if(!box) return;
@@ -654,6 +662,7 @@ cargarRespuestas();
 cargarSolicitudes();
 setInterval(cargarSolicitudes, 60000);
 (function(){ const qt=new URLSearchParams(location.search).get('tab'); if(qt){ const tb=document.querySelector('.tab[data-tab="'+qt+'"]'); if(tb) tb.click(); } })();
+ARTC.init({ role:'exec', selfName:((yo?.nombre||'')+' '+(yo?.apellido||'')).trim()||'Ejecutivo', iceUrl:'/api/atencion-remota/ice', token, signal:(convId,kind,payload)=>wsSend({t:'rtc',id:convId,kind,payload}) });
 </script>
 <script src="/js/app-version.js"></script>
 </body>
