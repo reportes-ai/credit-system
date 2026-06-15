@@ -5,7 +5,7 @@
   <link rel="icon" href="/img/favicon.png" type="image/png">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Nueva Ficha de Dealer — AutoFácil</title>
-  <!-- v1.5 -->
+  <!-- v1.6 -->
   <link href="/css/bootstrap.min.css" rel="stylesheet">
   <link href="/css/bootstrap-icons.css" rel="stylesheet">
   <style>
@@ -44,6 +44,9 @@
     .com-table input { width:78px; text-align:center; border:1.5px solid #d1d5db; border-radius:6px; padding:5px; }
     .opt-row { display:flex; gap:24px; align-items:center; flex-wrap:wrap; }
     .opt-row label { display:flex; align-items:center; gap:7px; font-size:.88rem; font-weight:600; color:#374151; cursor:pointer; }
+    .repchk { display:inline-flex; align-items:center; gap:8px; font-size:.84rem; font-weight:500; color:#0369a1; cursor:pointer; background:#eff6ff; border:1px solid #bfdbfe; border-radius:8px; padding:8px 12px; width:fit-content; }
+    .repchk input { width:16px; height:16px; cursor:pointer; }
+    .repchk i { color:#0284c7; }
     .actionbar { position:sticky; bottom:0; background:#fff; border-top:1px solid #e5e7eb; padding:14px 20px; display:flex; gap:10px; flex-wrap:wrap; align-items:center; justify-content:flex-end; box-shadow:0 -3px 12px rgba(0,0,0,.05); z-index:50; }
     .enviar-errs { flex:1; min-width:220px; font-size:.78rem; color:#b91c1c; line-height:1.35; display:none; }
     .enviar-errs.show { display:block; }
@@ -175,6 +178,7 @@
       <div class="fld"><label>Nombre</label><input id="cc_nombre"></div>
       <div class="fld"><label>Teléfono</label><input id="cc_telefono" inputmode="tel" placeholder="+56 9 1234 5678" oninput="onTel(this,'ccTelHint')"><small id="ccTelHint" class="vmsg"></small></div>
       <div class="fld full"><label>Email</label><input id="cc_email" type="email" oninput="onEmail(this,'ccEmailHint')"><small id="ccEmailHint" class="vmsg"></small></div>
+      <div class="fld full"><label class="repchk"><input type="checkbox" id="cc_rep" onchange="onRepToggle('cc')"> <i class="bi bi-person-badge"></i> Este contacto es el <b>Representante Legal</b></label></div>
     </div>
   </div>
 
@@ -184,6 +188,16 @@
       <div class="fld"><label>Nombre</label><input id="cf_nombre"></div>
       <div class="fld"><label>Teléfono</label><input id="cf_telefono" inputmode="tel" placeholder="+56 9 1234 5678" oninput="onTel(this,'cfTelHint')"><small id="cfTelHint" class="vmsg"></small></div>
       <div class="fld full"><label>Email</label><input id="cf_email" type="email" oninput="onEmail(this,'cfEmailHint')"><small id="cfEmailHint" class="vmsg"></small></div>
+      <div class="fld full"><label class="repchk"><input type="checkbox" id="cf_rep" onchange="onRepToggle('cf')"> <i class="bi bi-person-badge"></i> Este contacto es el <b>Representante Legal</b></label></div>
+    </div>
+  </div>
+
+  <div class="card-sec" id="cardRepLegal">
+    <h3><i class="bi bi-person-badge me-1"></i> Representante Legal</h3>
+    <div class="card-body grid">
+      <div class="fld"><label>Nombre</label><input id="rl_nombre"></div>
+      <div class="fld"><label>Teléfono</label><input id="rl_telefono" inputmode="tel" placeholder="+56 9 1234 5678" oninput="onTel(this,'rlTelHint')"><small id="rlTelHint" class="vmsg"></small></div>
+      <div class="fld full"><label>Email</label><input id="rl_email" type="email" oninput="onEmail(this,'rlEmailHint')"><small id="rlEmailHint" class="vmsg"></small></div>
     </div>
   </div>
 
@@ -391,6 +405,19 @@ async function cargarGeo(){
 }
 function onComuna(){ const g=GEO_MAP[val('comuna').toLowerCase()]; setVal('provincia', g?g.provincia:''); setVal('region', g?g.region:''); }
 
+/* ── Representante Legal (puede ser el contacto comercial o financiero) ── */
+function onRepToggle(which){
+  const cc=$('cc_rep'), cf=$('cf_rep');
+  if(which==='cc' && cc.checked) cf.checked=false;   // mutuamente excluyentes
+  if(which==='cf' && cf.checked) cc.checked=false;
+  $('cardRepLegal').style.display = (cc.checked||cf.checked) ? 'none' : '';
+}
+function repLegalData(){
+  if($('cc_rep').checked) return { origen:'COMERCIAL', nombre:val('cc_nombre'), telefono:val('cc_telefono'), email:val('cc_email') };
+  if($('cf_rep').checked) return { origen:'FINANCIERO', nombre:val('cf_nombre'), telefono:val('cf_telefono'), email:val('cf_email') };
+  return { origen:'PROPIO', nombre:val('rl_nombre'), telefono:val('rl_telefono'), email:val('rl_email') };
+}
+
 /* ── Adjuntos (informes empresa/socios + poderes tercero) ── */
 const CAT_UI = { EMPRESA:{input:'fileEmpresa',list:'listEmpresa'}, SOCIOS:{input:'fileSocios',list:'listSocios'},
   PODER_SIMPLE:{input:'filePoderSimple',list:'listPoderSimple'}, PODER_REP_LEGAL:{input:'filePoderRepLegal',list:'listPoderRepLegal'} };
@@ -453,7 +480,7 @@ function descargarPoderSimple(){
     </table>
     <p style="line-height:1.7">El Concesionario declara conocer y aceptar que dichos pagos se entenderán válidamente efectuados al ser depositados
     en la cuenta individualizada, liberando a AutoFácil de toda responsabilidad por los mismos.</p>
-    <div class="firma"><div class="line">Firma Representante Legal · ${E(o.nombre_razon||'')}</div></div>`, 'poder');
+    <div class="firma"><div class="line">Firma Representante Legal${o.rl_nombre?' · '+E(o.rl_nombre):''}${o.nombre_razon?' · '+E(o.nombre_razon):''}</div></div>`, 'poder');
 }
 async function borrarInforme(id){
   try{ const r=await fetch('/api/dealer-incorporacion/fichas/'+FICHA_ID+'/archivos/'+id,{method:'DELETE',headers:H}); const j=await r.json(); if(!j.success)throw new Error(j.error); await cargarInformes(); }
@@ -552,6 +579,8 @@ function recolectar(){
     tipo_documento:getRadio('tipo_documento'), cuenta_tipo:getRadio('cuenta_tipo'),
     banco:val('banco'), rut_cuenta:val('rut_cuenta'), num_cuenta:val('num_cuenta'),
     correo_confirmacion:val('correo_confirmacion'), observaciones:val('observaciones') };
+  const rl = repLegalData();
+  o.rep_legal_origen = rl.origen; o.rl_nombre = rl.nombre; o.rl_telefono = rl.telefono; o.rl_email = rl.email;
   return o;
 }
 
@@ -601,6 +630,11 @@ function validarEnvio(){
     if(val(id) && !emailOK(val(id))) errs.push(lbl+' inválido');
   for(const [id,lbl] of [['cc_telefono','Teléfono comercial'],['cf_telefono','Teléfono financiero']])
     if(val(id) && !telOK(val(id))) errs.push(lbl+' inválido');
+  // Representante Legal (del contacto marcado o del recuadro propio)
+  const rl = repLegalData();
+  if(!rl.nombre)   errs.push('Falta: Representante Legal — nombre');
+  if(!rl.telefono) errs.push('Falta: Representante Legal — teléfono'); else if(!telOK(rl.telefono)) errs.push('Representante Legal — teléfono inválido');
+  if(!rl.email)    errs.push('Falta: Representante Legal — email'); else if(!emailOK(rl.email)) errs.push('Representante Legal — email inválido');
   return errs;
 }
 function mostrarErrsEnvio(errs){
@@ -627,7 +661,7 @@ async function enviarFinal(){
 
 async function cargar(){
   await cargarGeo();
-  if (!FICHA_ID) { await cargarEjecutivos(); $('fecha_solicitud').value = new Date().toLocaleDateString('sv-SE',{timeZone:'America/Santiago'}); onTipo(); actualizarTercero(); return; }
+  if (!FICHA_ID) { await cargarEjecutivos(); $('fecha_solicitud').value = new Date().toLocaleDateString('sv-SE',{timeZone:'America/Santiago'}); onTipo(); actualizarTercero(); onRepToggle(); return; }
   try {
     const r = await fetch('/api/dealer-incorporacion/fichas/'+FICHA_ID, { headers:H });
     const j = await r.json();
@@ -639,6 +673,11 @@ async function cargar(){
       .forEach(k => setVal(k, k==='fecha_solicitud' && f[k] ? String(f[k]).slice(0,10) : f[k]));
     if (!val('provincia')) onComuna();
     setRadio('tipo_documento', f.tipo_documento); setRadio('cuenta_tipo', f.cuenta_tipo);
+    // Representante Legal
+    setVal('rl_nombre', f.rl_nombre); setVal('rl_telefono', f.rl_telefono); setVal('rl_email', f.rl_email);
+    $('cc_rep').checked = f.rep_legal_origen==='COMERCIAL';
+    $('cf_rep').checked = f.rep_legal_origen==='FINANCIERO';
+    onRepToggle();
     // Restaurar comentarios de excepciones previos (para no reescribirlos)
     (f.excepciones_comentarios||[]).forEach(c=>{ if(c&&c.tipo) EXC_COM[c.tipo]=c.comentario; });
     EXC_LIST = (f.excepciones||[]).map(e=>({tipo:e.tipo, label:e.label, comentario:(EXC_COM[e.tipo]||'')}));
@@ -689,6 +728,10 @@ function imprimir(){
       <tr><td class="lbl">Nombre</td><td>${E(o.cf_nombre)}</td></tr>
       <tr><td class="lbl">Teléfono</td><td>${E(o.cf_telefono)}</td></tr>
       <tr><td class="lbl">Email</td><td>${E(o.cf_email)}</td></tr></table>
+    <table class="p"><tr><th colspan="2">REPRESENTANTE LEGAL</th></tr>
+      <tr><td class="lbl">Nombre</td><td>${E(o.rl_nombre)}</td></tr>
+      <tr><td class="lbl">Teléfono</td><td>${E(o.rl_telefono)}</td></tr>
+      <tr><td class="lbl">Email</td><td>${E(o.rl_email)}</td></tr></table>
     <table class="p"><tr><th colspan="5">COMISIÓN PACTADA</th></tr>
       <tr><td class="lbl">Cantidad de Cuotas</td><td>6 a 12</td><td>13 a 24</td><td>25 a 36</td><td>37 y Más</td></tr>
       <tr><td class="lbl">Porcentaje de Comisión</td><td>${E(o.com_6_12)}%</td><td>${E(o.com_13_24)}%</td><td>${E(o.com_25_36)}%</td><td>${E(o.com_37)}%</td></tr></table>
@@ -701,7 +744,7 @@ function imprimir(){
       <tr><td class="lbl">Número de Cuenta</td><td colspan="3">${E(o.num_cuenta)}</td></tr>
       <tr><td class="lbl">Correo Confirmación</td><td colspan="3">${E(o.correo_confirmacion)}</td></tr></table>
     <table class="p"><tr><th>OBSERVACIONES</th></tr><tr><td style="height:60px;vertical-align:top">${E(o.observaciones)}</td></tr></table>
-    <div class="firma"><div class="line">Firma Representante Legal del Concesionario</div></div>`);
+    <div class="firma"><div class="line">Firma Representante Legal del Concesionario${o.rl_nombre?' · '+E(o.rl_nombre):''}</div></div>`);
 }
 /* Imprime cualquier HTML reutilizando el área de impresión */
 const LOGO_PRINT = '<div class="plogo"><img src="/img/logo.png" alt="AutoFácil"></div>';

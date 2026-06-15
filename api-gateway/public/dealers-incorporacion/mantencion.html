@@ -5,7 +5,7 @@
   <link rel="icon" href="/img/favicon.png" type="image/png">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Mantención Dealers — AutoFácil</title>
-  <!-- v1.5 -->
+  <!-- v1.6 -->
   <link href="/css/bootstrap.min.css" rel="stylesheet">
   <link href="/css/bootstrap-icons.css" rel="stylesheet">
   <style>
@@ -280,6 +280,7 @@ async function verFicha(id){
       ${row('Dirección', f.direccion)} ${row('Comuna', f.comuna)} ${row('Provincia/Ciudad', f.provincia)} ${row('Región', f.region)}
       ${row('Contacto comercial', `${f.cc_nombre||''} · ${f.cc_telefono||''} · ${f.cc_email||''}`)}
       ${row('Contacto financiero', `${f.cf_nombre||''} · ${f.cf_telefono||''} · ${f.cf_email||''}`)}
+      ${row('Representante Legal', `${f.rl_nombre||'—'} · ${f.rl_telefono||''} · ${f.rl_email||''}${f.rep_legal_origen&&f.rep_legal_origen!=='PROPIO'?' (es el contacto '+(f.rep_legal_origen==='COMERCIAL'?'comercial':'financiero')+')':''}`)}
       ${row('Comisión 6-12 / 13-24 / 25-36 / 37+', `${f.com_6_12||0}% / ${f.com_13_24||0}% / ${f.com_25_36||0}% / ${f.com_37||0}%`)}
       ${row('Documento', f.tipo_documento)} ${row('Cuenta', `${f.cuenta_tipo||''} · ${f.banco||''} · ${f.num_cuenta||''} · RUT ${f.rut_cuenta||''}`)}
       ${row('Email confirmación', f.correo_confirmacion)} ${row('Observaciones', f.observaciones)}
