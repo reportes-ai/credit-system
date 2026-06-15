@@ -1,6 +1,7 @@
 'use strict';
 const pool = require('../../../../shared/config/database');
 const { isMesCerrado, getMesDeOp } = require('../../../../shared/utils/mes-cerrado');
+const { auditar } = require('../../../../shared/audit');
 
 /* Columnas a excluir de la vista (internas/sensibles) */
 const EXCLUIR = ['datos_json'];
@@ -101,6 +102,8 @@ const update = async (req, res) => {
 
     const [[updated]] = await pool.query('SELECT * FROM creditos WHERE id = ?', [id]);
     EXCLUIR.forEach(f => delete updated[f]);
+    auditar({ req, accion: 'EDITAR', modulo: 'creditos', entidad: 'credito', entidad_id: id,
+      detalle: `Editó el crédito #${id} desde BD Operaciones (${sets.length} campo/s)`, meta: { campos: Object.keys(body) } });
     res.json({ success: true, data: updated, error: null });
   } catch (e) {
     console.error('[bd-operaciones update]', e.message);
@@ -123,6 +126,8 @@ const deleteMany = async (req, res) => {
     const [result] = await pool.query(
       `DELETE FROM creditos WHERE id IN (${placeholders})`, safeIds
     );
+    auditar({ req, accion: 'ELIMINAR', modulo: 'creditos', entidad: 'credito', entidad_id: safeIds.length === 1 ? safeIds[0] : `${safeIds.length} ops`,
+      detalle: `Eliminó ${result.affectedRows} crédito(s) desde BD Operaciones`, meta: { ids: safeIds, deleted: result.affectedRows } });
     res.json({ success: true, data: { deleted: result.affectedRows }, error: null });
   } catch (e) {
     console.error('[bd-operaciones delete]', e.message);

@@ -1,5 +1,6 @@
 const pool  = require('../../../../shared/config/database');
 const audit = require('../../../../shared/auditoria');
+const { auditar } = require('../../../../shared/audit');
 
 (async () => {
   try {
@@ -126,6 +127,7 @@ const view = async (req, res) => {
       [req.params.id_doc, u.id_usuario || null,
        [u.nombre, u.apellido].filter(Boolean).join(' ') || null, u.email || null, req.params.id_doc]
     ).catch(e => console.error('[visto log]', e.message));
+    auditar({ req, accion: 'VER_DOCUMENTO', modulo: 'documentos', entidad: 'documento_respaldo', entidad_id: req.params.id_doc, detalle: `Visualizó documento de respaldo: ${doc.archivo_nombre || ''}` });
     res.setHeader('Content-Type', doc.mime_type || 'application/octet-stream');
     res.setHeader('Content-Disposition', `inline; filename*=UTF-8''${encodeURIComponent(doc.archivo_nombre)}`);
     res.send(doc.archivo_data);
@@ -141,6 +143,7 @@ const download = async (req, res) => {
     );
     if (!rows.length) return res.status(404).json({ success: false, error: 'Documento no encontrado' });
     const doc = rows[0];
+    auditar({ req, accion: 'VER_DOCUMENTO', modulo: 'documentos', entidad: 'documento_respaldo', entidad_id: req.params.id_doc, detalle: `Descargó documento de respaldo: ${doc.archivo_nombre || ''}` });
     res.setHeader('Content-Type', doc.mime_type || 'application/octet-stream');
     res.setHeader('Content-Disposition', `attachment; filename*=UTF-8''${encodeURIComponent(doc.archivo_nombre)}`);
     res.send(doc.archivo_data);
@@ -232,6 +235,19 @@ const updateAprobacion = async (req, res) => {
           : `${tipoNombre} — Revisión anulada`,
       meta: { aprobado, tipo_nombre: tipoNombre, aprobado_por, rechazado_por, archivo_nombre: prev[0].archivo_nombre },
     });
+
+    if (aprobado === 1 || aprobado === 0) {
+      let sinVer = false;
+      try {
+        const [[visto]] = await pool.query(
+          'SELECT 1 ok FROM credito_documento_vistos WHERE id_doc=? AND id_usuario=? LIMIT 1',
+          [req.params.id_doc, req.usuario?.id_usuario || 0]);
+        sinVer = aprobado === 1 && !visto;
+      } catch (_) {}
+      auditar({ req, accion: aprobado === 1 ? 'VALIDAR_DOC' : 'RECHAZAR_DOC', modulo: 'documentos', entidad: 'documento_respaldo', entidad_id: req.params.id_doc,
+        detalle: (sinVer ? '⚠ SIN VER PREVIO — ' : '') + `${aprobado === 1 ? 'Aprobó' : 'Rechazó'} documento de respaldo: ${tipoNombre}`,
+        meta: { id_credito: prev[0].id_credito, tipo: tipoNombre, sin_visualizar: sinVer } });
+    }
 
     res.json({ success: true, data: { id_doc: req.params.id_doc }, error: null });
   } catch(e) { (console.error('[error]', e), res.status(500).json({success:false,data:null,error:'Error interno del servidor'})); }

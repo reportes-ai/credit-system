@@ -1,5 +1,6 @@
 'use strict';
 const pool = require('../../../../shared/config/database');
+const { auditar } = require('../../../../shared/audit');
 
 /* Campos duplicados/vacíos excluidos de la vista */
 const EXCLUIR = ['nombre', 'correo', 'telefono'];
@@ -119,6 +120,8 @@ const update = async (req, res) => {
     DATE_FIELDS.forEach(f => {
       if (updated[f] instanceof Date) updated[f] = updated[f].toISOString().slice(0, 10);
     });
+    auditar({ req, accion: 'EDITAR', modulo: 'clientes', entidad: 'cliente', entidad_id: id,
+      detalle: `Editó el cliente #${id} desde BD Clientes (${sets.length} campo/s)`, rut: body.rut, meta: { campos: Object.keys(body) } });
     res.json({ success: true, data: updated, error: null });
   } catch (e) {
     console.error('[bd-clientes update]', e.message);
@@ -157,6 +160,8 @@ const remove = async (req, res) => {
     // Eliminar informes dealernet si existen
     await pool.query(`DELETE FROM informes_dealernet WHERE rut IN (SELECT rut FROM clientes WHERE id_cliente IN (${placeholders}))`, ids).catch(() => {});
     const [result] = await pool.query(`DELETE FROM clientes WHERE id_cliente IN (${placeholders})`, ids);
+    auditar({ req, accion: 'ELIMINAR', modulo: 'clientes', entidad: 'cliente', entidad_id: ids.length === 1 ? ids[0] : `${ids.length} clientes`,
+      detalle: `Eliminó ${result.affectedRows} cliente(s) desde BD Clientes`, meta: { ids, deleted: result.affectedRows } });
     res.json({ success: true, data: { deleted: result.affectedRows }, error: null });
   } catch (e) {
     console.error('[bd-clientes delete]', e.message);

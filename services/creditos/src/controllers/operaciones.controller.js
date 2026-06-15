@@ -1,4 +1,5 @@
 const pool = require('../../../../shared/config/database');
+const { auditar } = require('../../../../shared/audit');
 const { calcularOperacion } = require('../utils/calcular-operacion');
 const { recalcularMeses } = require('../utils/recalcular-mes');
 const { isMesCerrado, getMesDeOp } = require('../../../../shared/utils/mes-cerrado');
@@ -287,6 +288,9 @@ const create = async (req, res) => {
     }
 
     const [[row]] = await pool.query('SELECT * FROM creditos WHERE id = ?', [r.insertId]);
+    auditar({ req, accion: 'CREAR', modulo: 'creditos', entidad: 'credito', entidad_id: r.insertId,
+      detalle: `Digitó operación N°${b.num_op || ''} — ${b.nombre_cliente || ''} (${b.financiera || ''})`, rut: b.rut_cliente,
+      meta: { num_op: b.num_op, financiera: b.financiera, estado: b.estado_credito } });
     res.status(201).json({ success: true, data: row, error: null });
   } catch (e) {
     (console.error('[error]', e), res.status(500).json({success:false,data:null,error:'Error interno del servidor'}));
@@ -370,6 +374,8 @@ const update = async (req, res) => {
     }
 
     const [[row]] = await pool.query('SELECT * FROM creditos WHERE id = ?', [id]);
+    auditar({ req, accion: 'EDITAR', modulo: 'creditos', entidad: 'credito', entidad_id: id,
+      detalle: `Editó la operación #${id}${b.num_op ? ` (N°${b.num_op})` : ''}`, meta: { num_op: b.num_op } });
     res.json({ success: true, data: row, error: null });
   } catch (e) {
     (console.error('[error]', e), res.status(500).json({success:false,data:null,error:'Error interno del servidor'}));
@@ -380,6 +386,7 @@ const update = async (req, res) => {
 const remove = async (req, res) => {
   try {
     await pool.query('DELETE FROM creditos WHERE id = ?', [req.params.id]);
+    auditar({ req, accion: 'ELIMINAR', modulo: 'creditos', entidad: 'credito', entidad_id: req.params.id, detalle: `Eliminó la operación #${req.params.id}` });
     res.json({ success: true, data: { eliminado: req.params.id }, error: null });
   } catch (e) {
     (console.error('[error]', e), res.status(500).json({success:false,data:null,error:'Error interno del servidor'}));
@@ -409,6 +416,7 @@ const liberarPago = async (req, res) => {
       [liberadoPor, id]
     );
     const [[row]] = await pool.query('SELECT * FROM creditos WHERE id = ?', [id]);
+    auditar({ req, accion: 'EDITAR', modulo: 'creditos', entidad: 'credito', entidad_id: id, detalle: `Liberó a pago la operación #${id}` });
     res.json({ success: true, data: row, error: null });
   } catch (e) {
     (console.error('[error]', e), res.status(500).json({success:false,data:null,error:'Error interno del servidor'}));
@@ -431,6 +439,8 @@ const marcarNoOtorgado = async (req, res) => {
       [comentario || '', id]
     );
     const [[row]] = await pool.query('SELECT * FROM creditos WHERE id = ?', [id]);
+    auditar({ req, accion: 'EDITAR', modulo: 'creditos', entidad: 'credito', entidad_id: id,
+      detalle: `Marcó como NO OTORGADO la operación #${id}${comentario ? `: ${comentario}` : ''}` });
     res.json({ success: true, data: row, error: null });
   } catch (e) {
     (console.error('[error]', e), res.status(500).json({success:false,data:null,error:'Error interno del servidor'}));

@@ -1,4 +1,5 @@
 const pool = require('../../../../shared/config/database');
+const { auditar } = require('../../../../shared/audit');
 
 /* ─── Migración ─────────────────────────────────────────────────────────── */
 (async () => {
@@ -141,6 +142,9 @@ const validar = async (req, res) => {
     await _recalcEstadoFundantes(exists.operacion_id);
 
     const [[row]] = await pool.query('SELECT * FROM fundantes_brokerage WHERE id = ?', [req.params.id]);
+    auditar({ req, accion: estado === 'APROBADO' ? 'VALIDAR_DOC' : 'RECHAZAR_DOC', modulo: 'documentos', entidad: 'fundante', entidad_id: req.params.id,
+      detalle: `${estado === 'APROBADO' ? 'Validó' : 'Rechazó'} fundante #${req.params.id} (operación ${exists.operacion_id})${comentario_rechazo ? ` — ${comentario_rechazo}` : ''}`,
+      meta: { estado, operacion_id: exists.operacion_id, comentario_rechazo: comentario_rechazo || null } });
     res.json({ success: true, data: row, error: null });
   } catch (e) {
     (console.error('[error]', e), res.status(500).json({success:false,data:null,error:'Error interno del servidor'}));
