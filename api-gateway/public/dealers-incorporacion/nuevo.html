@@ -5,7 +5,7 @@
   <link rel="icon" href="/img/favicon.png" type="image/png">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Nueva Ficha de Dealer — AutoFácil</title>
-  <!-- v1.3 -->
+  <!-- v1.4 -->
   <link href="/css/bootstrap.min.css" rel="stylesheet">
   <link href="/css/bootstrap-icons.css" rel="stylesheet">
   <style>
@@ -40,7 +40,10 @@
     .com-table input { width:78px; text-align:center; border:1.5px solid #d1d5db; border-radius:6px; padding:5px; }
     .opt-row { display:flex; gap:24px; align-items:center; flex-wrap:wrap; }
     .opt-row label { display:flex; align-items:center; gap:7px; font-size:.88rem; font-weight:600; color:#374151; cursor:pointer; }
-    .actionbar { position:sticky; bottom:0; background:#fff; border-top:1px solid #e5e7eb; padding:14px 20px; display:flex; gap:10px; flex-wrap:wrap; justify-content:flex-end; box-shadow:0 -3px 12px rgba(0,0,0,.05); z-index:50; }
+    .actionbar { position:sticky; bottom:0; background:#fff; border-top:1px solid #e5e7eb; padding:14px 20px; display:flex; gap:10px; flex-wrap:wrap; align-items:center; justify-content:flex-end; box-shadow:0 -3px 12px rgba(0,0,0,.05); z-index:50; }
+    .enviar-errs { flex:1; min-width:220px; font-size:.78rem; color:#b91c1c; line-height:1.35; display:none; }
+    .enviar-errs.show { display:block; }
+    .enviar-errs b { display:block; color:#991b1b; margin-bottom:2px; }
     .btn { border:none; border-radius:9px; padding:10px 18px; font-size:.86rem; font-weight:700; cursor:pointer; display:inline-flex; align-items:center; gap:7px; }
     .btn-light { background:#f1f5f9; color:#334155; }
     .btn-navy { background:var(--navy); color:#fff; }
@@ -68,22 +71,25 @@
     .exc-item b { font-size:.88rem; color:#92400e; display:block; }
     .exc-item textarea { width:100%; border:1.5px solid #d1d5db; border-radius:8px; padding:8px 10px; font-size:.85rem; margin-top:8px; box-sizing:border-box; }
     .exc-item textarea:focus { outline:none; border-color:#b45309; }
-    /* ── Vista de impresión ── */
+    /* ── Vista de impresión (todo en una hoja carta) ── */
     #printArea { display:none; }
+    @page { size: letter; margin: 9mm; }
     @media print {
       body * { visibility:hidden; }
       #printArea, #printArea * { visibility:visible; }
-      #printArea { display:block; position:absolute; left:0; top:0; width:100%; padding:0 6mm; }
+      #printArea { display:block; position:absolute; left:0; top:0; width:100%; padding:0; }
       .topnav, .actionbar { display:none !important; }
     }
-    #printArea { color:#111; font-size:11px; }
-    #printArea h1 { text-align:center; color:#1f3864; font-size:20px; margin:0 0 14px; letter-spacing:1px; }
-    #printArea table.p { width:100%; border-collapse:collapse; margin-bottom:10px; }
-    #printArea table.p th { background:#1f3864; color:#fff; text-align:left; padding:5px 8px; font-size:11px; }
-    #printArea table.p td { border:1px solid #94a3b8; padding:5px 8px; font-size:11px; }
+    #printArea { color:#111; font-size:9px; }
+    #printArea h1 { text-align:center; color:#1f3864; font-size:15px; margin:0 0 1px; letter-spacing:.5px; }
+    #printArea .subt { text-align:center; color:#1f3864; font-size:10px; font-weight:600; margin:0 0 8px; }
+    #printArea h1.solo { margin-bottom:10px; }
+    #printArea table.p { width:100%; border-collapse:collapse; margin-bottom:5px; }
+    #printArea table.p th { background:#1f3864; color:#fff; text-align:left; padding:2px 7px; font-size:9px; }
+    #printArea table.p td { border:1px solid #94a3b8; padding:2px 7px; font-size:9px; line-height:1.25; }
     #printArea .lbl { width:38%; font-weight:600; background:#f1f5f9; }
-    #printArea .firma { margin-top:40px; text-align:center; }
-    #printArea .firma .line { border-top:1px solid #111; width:260px; margin:0 auto; padding-top:5px; }
+    #printArea .firma { margin-top:22px; text-align:center; }
+    #printArea .firma .line { border-top:1px solid #111; width:260px; margin:0 auto; padding-top:4px; font-size:9px; }
   </style>
 </head>
 <body>
@@ -116,8 +122,7 @@
     <h3><i class="bi bi-person-badge me-1"></i> Ejecutivo Comercial</h3>
     <div class="card-body grid">
       <div class="fld"><label>Nombre Ejecutivo</label>
-        <input id="ejecutivo_nombre" list="ejecutivosList" placeholder="Ejecutivo responsable">
-        <datalist id="ejecutivosList"></datalist></div>
+        <select id="ejecutivo_nombre"><option value="">— Cargando… —</option></select></div>
       <div class="fld"><label>Fecha de solicitud</label><input type="date" id="fecha_solicitud"></div>
     </div>
   </div>
@@ -262,6 +267,7 @@
 </div>
 
 <div class="actionbar">
+  <div id="enviarErrs" class="enviar-errs"></div>
   <button class="btn btn-light" onclick="imprimir()"><i class="bi bi-printer"></i> Imprimir ficha</button>
   <button class="btn btn-ghost" id="btnGuardar" onclick="onGuardar()"><i class="bi bi-save"></i> Guardar borrador</button>
   <button class="btn btn-green" id="btnEnviar" onclick="onEnviar()"><i class="bi bi-send-check"></i> Enviar a revisión</button>
@@ -428,12 +434,19 @@ async function borrarInforme(id){
 }
 
 /* ── Ejecutivos elegibles para el campo "Nombre Ejecutivo" ── */
-async function cargarEjecutivos(){
-  try {
-    const r=await fetch('/api/dealer-incorporacion/ejecutivos',{headers:H}); const j=await r.json();
-    const dl=$('ejecutivosList'); dl.innerHTML='';
-    (j.data||[]).forEach(u=>{ const o=document.createElement('option'); o.value=u.nombre; o.textContent=`${u.nombre} — ${u.perfil}`; dl.appendChild(o); });
-  } catch(e){}
+const MI_NOMBRE = `${yo?.nombre||''} ${yo?.apellido||''}`.trim();
+async function cargarEjecutivos(preset){
+  const sel=$('ejecutivo_nombre');
+  let lista=[];
+  try { const r=await fetch('/api/dealer-incorporacion/ejecutivos',{headers:H}); const j=await r.json(); if(j.success) lista=j.data||[]; } catch(e){}
+  const nombres = lista.map(u=>u.nombre).filter(Boolean);
+  const elegido = preset || MI_NOMBRE;
+  if (elegido && !nombres.includes(elegido)) nombres.unshift(elegido);   // siempre incluir el actual
+  sel.innerHTML = '<option value="">— Selecciona ejecutivo —</option>' +
+    lista.map(u=>`<option value="${u.nombre.replace(/"/g,'&quot;')}">${u.nombre} — ${u.perfil}</option>`).join('');
+  if (elegido && !lista.some(u=>u.nombre===elegido))
+    sel.insertAdjacentHTML('beforeend', `<option value="${elegido.replace(/"/g,'&quot;')}">${elegido}</option>`);
+  sel.value = elegido || '';
 }
 
 /* ── Excepciones: comisión modificada y/o boleta ── */
@@ -470,11 +483,11 @@ async function gateExcepciones(){
 }
 async function onGuardar(){ if(!(await gateExcepciones())) return; if(!(await gateTercero())) return; await guardar(false); }
 async function onEnviar(){
-  const errs=validarEnvio(); if(errs.length){ toast('Corrige antes de enviar: '+errs.join(', '), true); return; }
-  if(esTercero() && (nArch('PODER_SIMPLE')<1 || nArch('PODER_REP_LEGAL')<1)){
-    toast('Cuenta de tercero: adjunta el Poder Simple y los Poderes del Representante Legal antes de enviar.', true);
-    if(!(await gateTercero())) return; actualizarTercero(); return;
-  }
+  const errs=validarEnvio();
+  if(esTercero() && nArch('PODER_SIMPLE')<1) errs.push('Falta: Poder Simple firmado (cuenta de tercero)');
+  if(esTercero() && nArch('PODER_REP_LEGAL')<1) errs.push('Falta: Poderes del Representante Legal (cuenta de tercero)');
+  mostrarErrsEnvio(errs);
+  if(errs.length){ if(esTercero()) await gateTercero(); return; }
   if(!(await gateExcepciones())) return;
   if(!(await gateTercero())) return;
   await enviarFinal();
@@ -540,16 +553,34 @@ async function guardar(silent){
   } catch(e){ toast(e.message, true); return false; }
 }
 
+const REQUERIDOS = [
+  ['ejecutivo_nombre','Nombre Ejecutivo'],['fecha_solicitud','Fecha de solicitud'],
+  ['rut','RUT del concesionario'],['nombre_razon','Razón Social'],['nombre_fantasia','Nombre de Fantasía'],
+  ['direccion','Dirección'],['comuna','Comuna'],['provincia','Provincia/Ciudad'],['region','Región'],
+  ['cc_nombre','Contacto comercial: nombre'],['cc_telefono','Contacto comercial: teléfono'],['cc_email','Contacto comercial: email'],
+  ['cf_nombre','Contacto financiero: nombre'],['cf_telefono','Contacto financiero: teléfono'],['cf_email','Contacto financiero: email'],
+  ['com_6_12','Comisión 6-12'],['com_13_24','Comisión 13-24'],['com_25_36','Comisión 25-36'],['com_37','Comisión 37+'],
+  ['banco','Banco de transferencia'],['rut_cuenta','RUT de la cuenta'],['num_cuenta','Número de cuenta'],['correo_confirmacion','Email confirmación'],
+];
 function validarEnvio(){
   const errs=[];
-  if(!val('rut')||!validarRUT(val('rut').replace(/[^0-9kK]/g,'').toUpperCase())) errs.push('RUT de concesionario válido');
-  if(!val('nombre_razon')) errs.push('Razón Social');
-  for(const [id,lbl] of [['cc_email','Email contacto comercial'],['cf_email','Email contacto financiero'],['correo_confirmacion','Email confirmación']])
+  for(const [id,lbl] of REQUERIDOS) if(!val(id)) errs.push('Falta: '+lbl);
+  if(!getRadio('tipo_documento')) errs.push('Falta: Tipo de documento');
+  if(!getRadio('cuenta_tipo'))    errs.push('Falta: Tipo de cuenta');
+  // Validaciones de formato (solo si el campo tiene contenido)
+  if(val('rut') && !validarRUT(val('rut').replace(/[^0-9kK]/g,'').toUpperCase())) errs.push('RUT del concesionario inválido');
+  if(val('rut_cuenta') && !validarRUT(val('rut_cuenta').replace(/[^0-9kK]/g,'').toUpperCase())) errs.push('RUT de la cuenta inválido');
+  for(const [id,lbl] of [['cc_email','Email comercial'],['cf_email','Email financiero'],['correo_confirmacion','Email confirmación']])
     if(val(id) && !emailOK(val(id))) errs.push(lbl+' inválido');
   for(const [id,lbl] of [['cc_telefono','Teléfono comercial'],['cf_telefono','Teléfono financiero']])
     if(val(id) && !telOK(val(id))) errs.push(lbl+' inválido');
-  if(val('rut_cuenta') && !validarRUT(val('rut_cuenta').replace(/[^0-9kK]/g,'').toUpperCase())) errs.push('RUT de cuenta inválido');
   return errs;
+}
+function mostrarErrsEnvio(errs){
+  const c=$('enviarErrs');
+  if(!errs.length){ c.className='enviar-errs'; c.innerHTML=''; return; }
+  c.className='enviar-errs show';
+  c.innerHTML = '<b><i class="bi bi-exclamation-triangle me-1"></i>Corrige para enviar:</b>' + errs.map(e=>`• ${e}`).join('<br>');
 }
 async function enviarFinal(){
   const ok = await guardar(true);
@@ -568,15 +599,15 @@ async function enviarFinal(){
 }
 
 async function cargar(){
-  await cargarGeo(); await cargarEjecutivos();
-  if (!FICHA_ID) { $('fecha_solicitud').value = new Date().toLocaleDateString('sv-SE',{timeZone:'America/Santiago'}); onTipo(); actualizarTercero(); return; }
+  await cargarGeo();
+  if (!FICHA_ID) { await cargarEjecutivos(); $('fecha_solicitud').value = new Date().toLocaleDateString('sv-SE',{timeZone:'America/Santiago'}); onTipo(); actualizarTercero(); return; }
   try {
     const r = await fetch('/api/dealer-incorporacion/fichas/'+FICHA_ID, { headers:H });
     const j = await r.json();
     if (!j.success) throw new Error(j.error);
     const f = j.data; ESTADO = f.estado;
     setRadio('tipo', f.tipo); onTipo();
-    setVal('ejecutivo_nombre', f.ejecutivo_nombre || $('ejecutivo_nombre').value);
+    await cargarEjecutivos(f.ejecutivo_nombre);
     ['fecha_solicitud','rut','nombre_razon','nombre_fantasia','direccion','comuna','provincia','region','cc_nombre','cc_telefono','cc_email','cf_nombre','cf_telefono','cf_email','com_6_12','com_13_24','com_25_36','com_37','banco','rut_cuenta','num_cuenta','correo_confirmacion','observaciones']
       .forEach(k => setVal(k, k==='fecha_solicitud' && f[k] ? String(f[k]).slice(0,10) : f[k]));
     if (!val('provincia')) onComuna();
@@ -611,7 +642,7 @@ function imprimir(){
   const comLbl = esP?'Comuna de Parque Automotriz':'Comuna de Sucursal';
   const E = s => String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;');
   printHTML(`
-    <h1>FICHA DE INCORPORACIÓN${esP?' PARQUE':''}</h1>
+    <h1${esP?'':' class="solo"'}>FICHA DE INCORPORACIÓN DE CONCESIONARIO</h1>${esP?'<div class="subt">Parque Automotriz</div>':''}
     <table class="p"><tr><th colspan="2">EJECUTIVO COMERCIAL</th></tr>
       <tr><td class="lbl">Nombre Ejecutivo</td><td>${E($('ejecutivo_nombre').value)}</td></tr>
       <tr><td class="lbl">Fecha de solicitud</td><td>${E(o.fecha_solicitud)}</td></tr></table>

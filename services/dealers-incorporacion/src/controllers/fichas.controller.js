@@ -78,6 +78,7 @@ const COM_DEFAULT = {
     await pool.query(`ALTER TABLE dealer_fichas ADD COLUMN IF NOT EXISTS region VARCHAR(120) NULL`);
     await pool.query(`ALTER TABLE dealer_fichas ADD COLUMN IF NOT EXISTS excepciones JSON NULL`);
     await pool.query(`ALTER TABLE dealer_fichas ADD COLUMN IF NOT EXISTS excepciones_comentarios JSON NULL`);
+    await pool.query(`ALTER TABLE dealer_fichas ADD COLUMN IF NOT EXISTS diferencias JSON NULL`);
   } catch (e) { console.error('[dealer_fichas alter cols]', e.message); }
 
   // Archivos adjuntos múltiples (informes comerciales empresa/socios, hasta 3 c/u).
@@ -232,7 +233,7 @@ const obtener = async (req, res) => {
               cc_nombre, cc_telefono, cc_email, cf_nombre, cf_telefono, cf_email,
               com_6_12, com_13_24, com_25_36, com_37, tipo_documento, cuenta_tipo, banco,
               rut_cuenta, num_cuenta, correo_confirmacion, observaciones,
-              excepciones, excepciones_comentarios,
+              excepciones, excepciones_comentarios, diferencias,
               ficha_nombre, ficha_mime, (ficha_data IS NOT NULL) AS tiene_ficha,
               tomada_por, tomada_por_nombre, fecha_tomada, revisor_nombre, fecha_revision,
               motivo_rechazo, apelacion, id_dealer, created_at, updated_at
@@ -335,6 +336,30 @@ const verFicha = async (req, res) => {
   } catch (e) { console.error('[fichas verFicha]', e.message); res.status(500).json({ success: false, data: null, error: 'Error interno del servidor' }); }
 };
 
+/* Compara la ficha contra el dealer ya existente en el sistema (match por RUT). */
+async function calcularDiferencias(f) {
+  const dif = [];
+  try {
+    const [rows] = await pool.query('SELECT * FROM dealers WHERE rut IS NOT NULL', []);
+    const dl = rows.find(d => normRut(d.rut) === normRut(f.rut));
+    if (!dl) return dif;
+    const cmp = (campo, fv, sv) => {
+      const a = (fv == null ? '' : String(fv)).trim(), b = (sv == null ? '' : String(sv)).trim();
+      if (a && a.toUpperCase() !== b.toUpperCase()) dif.push({ campo, ficha: a, sistema: b || '—' });
+    };
+    cmp('Razón Social', f.nombre_razon, dl.nombre_razon);
+    cmp('Nombre Fantasía', f.nombre_fantasia, dl.nombre_indexa);
+    cmp('Dirección', f.direccion, dl.direccion);
+    cmp('Banco', f.banco, dl.banco);
+    cmp('N° Cuenta', f.num_cuenta, dl.num_cuenta);
+    cmp('RUT Cuenta', f.rut_cuenta, dl.rut_pago);
+    const fDoc = f.tipo_documento === 'FACTURA' ? 'FACTURA' : 'BOLETA';
+    const sDoc = dl.tiene_factura ? 'FACTURA' : 'BOLETA';
+    if (fDoc !== sDoc) dif.push({ campo: 'Documento tributario', ficha: fDoc, sistema: sDoc });
+  } catch (e) { console.error('[calcularDiferencias]', e.message); }
+  return dif;
+}
+
 /* ── POST /fichas/:id/enviar — manda a revisión (pool) ─────────────────────── */
 const enviar = async (req, res) => {
   try {
@@ -357,12 +382,15 @@ const enviar = async (req, res) => {
       if (!porCat.PODER_REP_LEGAL) return res.status(400).json({ success: false, data: null, error: 'La cuenta es de un tercero: debes cargar los Poderes del Representante Legal antes de enviar' });
     }
 
+    // Compara la ficha con los datos del dealer ya cargado en el sistema (por RUT) → diferencias para el revisor.
+    const diferencias = await calcularDiferencias(f);
+
     const reenvio = f.estado === 'RECHAZADA';
     const apelacion = norm(req.body.apelacion) || null;
     await pool.query(
       `UPDATE dealer_fichas SET estado='EN_REVISION', tomada_por=NULL, tomada_por_nombre=NULL, fecha_tomada=NULL,
-         motivo_rechazo=NULL, apelacion=?, fecha_revision=NULL, revisor_id=NULL, revisor_nombre=NULL WHERE id=?`,
-      [apelacion, req.params.id]);
+         motivo_rechazo=NULL, apelacion=?, diferencias=?, fecha_revision=NULL, revisor_id=NULL, revisor_nombre=NULL WHERE id=?`,
+      [apelacion, JSON.stringify(diferencias), req.params.id]);
 
     // Pool: avisa a todos los revisores con una clave compartida (para anular luego al resto)
     const ids = await idsRevisores(req.usuario.id_usuario);
@@ -370,9 +398,10 @@ const enviar = async (req, res) => {
       tipo: 'DEALER_FICHA',
       titulo: reenvio ? '🔁 Ficha de dealer corregida' : '🛎️ Nueva ficha de dealer para revisión',
       mensaje: `${f.ejecutivo_nombre || 'Un ejecutivo'} envió la ficha de ${f.nombre_razon || f.rut || ''}`
-        + (apelacion ? ` · Apelación: ${apelacion}` : ''),
+        + (apelacion ? ` · Apelación: ${apelacion}` : '')
+        + (diferencias.length ? ` · ⚠ ${diferencias.length} diferencia(s) con los datos del sistema` : ''),
       href: '/dealers-incorporacion/mantencion.html?tab=revision',
-      prioridad: 'alta', sonar: 1, son_tipo: 'dingdong',
+      prioridad: 'alta', sonar: 1, son_tipo: diferencias.length ? 'alarma' : 'dingdong',
       clave: `dealerficha:${f.id}:rev`,
     });
     auditar({ req, accion: reenvio ? 'EDITAR' : 'CREAR', modulo: 'dealers', entidad: 'dealer_ficha', entidad_id: f.id,
