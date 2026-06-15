@@ -80,6 +80,19 @@
     .cat-info:hover .cat-tip { display:block; }
     .cat-tip-title { font-weight:800; font-size:0.78rem; margin-bottom:6px; }
     .cat-tip-li { font-size:0.74rem; line-height:1.5; color:#cbd5e1; }
+    /* Sub-tarjetas Base/Categoría */
+    .vtabs { display:grid; grid-template-columns:1fr 1fr; gap:14px; margin-bottom:16px; }
+    @media(max-width:700px){ .vtabs { grid-template-columns:1fr; } }
+    .vtab { display:flex; align-items:center; gap:14px; text-align:left; background:#fff; border:2px solid #e5e7eb; border-radius:14px; padding:16px 20px; cursor:pointer; transition:.15s; }
+    .vtab:hover { border-color:var(--navy); }
+    .vtab.on { border-color:var(--navy); background:#eff6ff; box-shadow:0 4px 16px rgba(1,65,162,.12); }
+    .vtab i { font-size:1.8rem; color:var(--navy); }
+    .vtab b { display:block; font-size:.95rem; color:#111827; letter-spacing:.3px; }
+    .vtab span { font-size:.78rem; color:#6b7280; }
+    .mvbtn { background:#fff; border:1.5px solid #e5e7eb; color:#475569; border-radius:8px; padding:7px 14px; font-size:.84rem; font-weight:700; cursor:pointer; }
+    .mvbtn.on { background:var(--navy); color:#fff; border-color:var(--navy); }
+    .mv-sube { color:#16a34a; font-weight:800; } .mv-baja { color:#dc2626; font-weight:800; }
+    .mv-cond { font-size:.78rem; color:#475569; }
 
     /* Activo */
     .activo-si { color:#16a34a; font-weight:700; font-size:0.82rem; }
@@ -128,7 +141,7 @@
   <div class="topnav-left">
     <a href="/" class="topnav-brand">
       <img src="/img/logo.png" alt="AutoFácil" style="display:block">
-      <span class="version-badge" id="versionBadge">v4.6</span>
+      <span class="version-badge" id="versionBadge">v4.7</span>
     </a>
       <div class="breadcrumb-nav"><a href="/">Inicio</a><span class="sep">›</span><a href="/mantenedores">Mantenedores</a><span class="sep">›</span><span style="color:#fff;font-weight:600"><i class="bi bi-shop me-1"></i>Dealers</span></div></div>
   <div class="topnav-right">
@@ -158,6 +171,17 @@
     </div>
   </div>
 
+  <!-- Sub-tarjetas: Base Dealer / Categoría Dealers -->
+  <div class="vtabs">
+    <button class="vtab on" id="tabBase" onclick="setView('base')">
+      <i class="bi bi-table"></i><div><b>BASE DEALER</b><span>Listado completo de dealers y datos de contacto</span></div>
+    </button>
+    <button class="vtab" id="tabCat" onclick="setView('categoria')">
+      <i class="bi bi-award"></i><div><b>CATEGORÍA DEALERS</b><span>Movimientos sugeridos: dealers que suben o bajan de categoría</span></div>
+    </button>
+  </div>
+
+  <div id="viewBase">
   <!-- Toolbar -->
   <div class="toolbar">
     <div class="search-wrap">
@@ -212,6 +236,29 @@
         <button class="btn btn-outline-secondary btn-sm" id="btnPrev" onclick="cambiarPag(-1)"><i class="bi bi-chevron-left"></i></button>
         <button class="btn btn-outline-secondary btn-sm" id="btnNext" onclick="cambiarPag(1)"><i class="bi bi-chevron-right"></i></button>
       </div>
+    </div>
+  </div>
+  </div><!-- /viewBase -->
+
+  <!-- ====== VISTA CATEGORÍA DEALERS ====== -->
+  <div id="viewCategoria" style="display:none">
+    <div class="toolbar">
+      <div style="display:flex;gap:8px;flex-wrap:wrap">
+        <button class="mvbtn on" id="mvTodos" onclick="filtrarMov('TODOS')">Todos</button>
+        <button class="mvbtn" id="mvSuben" onclick="filtrarMov('SUBE')"><i class="bi bi-arrow-up-circle"></i> Que suben</button>
+        <button class="mvbtn" id="mvBajan" onclick="filtrarMov('BAJA')"><i class="bi bi-arrow-down-circle"></i> Que bajan</button>
+      </div>
+      <span class="count-badge" id="mvCount" style="margin-left:auto"></span>
+      <button class="btn-importar" onclick="recalcularCategorias()"><i class="bi bi-arrow-repeat me-1 text-primary"></i>Recalcular (mes pasado)</button>
+    </div>
+    <div class="table-wrap">
+      <table>
+        <thead><tr>
+          <th>N°</th><th>DEALER</th><th>RUT</th><th>UNIDADES MES PASADO</th>
+          <th>ACTUAL (ASIGNADA)</th><th>SUGERIDA (PROPUESTA)</th><th>CONDICIÓN</th><th>ASIGNAR</th>
+        </tr></thead>
+        <tbody id="mvBody"><tr><td colspan="8" class="text-center text-muted py-5">Cargando…</td></tr></tbody>
+      </table>
     </div>
   </div>
 </div>
@@ -473,18 +520,70 @@ async function asignarCategoria(idDealer, codigo) {
   try {
     const r = await fetch('/api/dealer-categorias/asignar/'+idDealer, { method:'PUT', headers:H, body:JSON.stringify({ categoria_asignada: codigo }) });
     const j = await r.json(); if (!j.success) throw new Error(j.error||'Error');
-    cargar();   // refresca para mostrar/ocultar el tooltip "i"
+    if (VIEW==='categoria') cargarMovimientos(); else cargar();   // refresca la vista activa
   } catch(e){ alert('No se pudo asignar la categoría: ' + e.message); }
 }
 
 async function recalcularCategorias() {
-  if (!confirm('¿Recalcular la categoría PROPUESTA de todos los dealers según las ventas del mes pasado?')) return;
+  if (!confirm('¿Recalcular la categoría PROPUESTA de todos los dealers según las ventas del mes pasado?\n\n(A los dealers sin categoría asignada se les asigna la misma que la propuesta.)')) return;
   try {
     const r = await fetch('/api/dealer-categorias/recalcular', { method:'POST', headers:H });
     const j = await r.json(); if (!j.success) throw new Error(j.error||'Error');
-    alert(`Listo: ${j.data.actualizados} dealers recalculados (${j.data.con_ventas} con ventas el mes pasado).`);
-    cargar();
+    alert(`Listo: ${j.data.actualizados} dealers recalculados (${j.data.con_ventas} con ventas).\nMovimientos sugeridos: ${j.data.movimientos}.`);
+    if (VIEW==='categoria') cargarMovimientos(); else cargar();
   } catch(e){ alert('Error al recalcular: ' + e.message); }
+}
+
+/* ── Vista Categoría Dealers (movimientos suben/bajan) ── */
+let VIEW='base', MOVS=[], MOV_FILTRO='TODOS';
+function setView(v){
+  VIEW=v;
+  document.getElementById('tabBase').classList.toggle('on', v==='base');
+  document.getElementById('tabCat').classList.toggle('on', v==='categoria');
+  document.getElementById('viewBase').style.display = v==='base' ? '' : 'none';
+  document.getElementById('viewCategoria').style.display = v==='categoria' ? '' : 'none';
+  if (v==='categoria') cargarMovimientos();
+}
+function filtrarMov(f){
+  MOV_FILTRO=f;
+  document.getElementById('mvTodos').classList.toggle('on', f==='TODOS');
+  document.getElementById('mvSuben').classList.toggle('on', f==='SUBE');
+  document.getElementById('mvBajan').classList.toggle('on', f==='BAJA');
+  renderMov();
+}
+async function cargarMovimientos(){
+  try {
+    const r = await fetch('/api/dealer-categorias/movimientos', { headers:H });
+    const j = await r.json(); if (!j.success) throw new Error(j.error);
+    MOVS = j.data.rows || [];
+    renderMov();
+  } catch(e){ document.getElementById('mvBody').innerHTML = `<tr><td colspan="8" class="text-center text-danger py-4">${esc(e.message)}</td></tr>`; }
+}
+function condicionMov(d){
+  const prop = CATS[d.categoria_propuesta], asig = CATS[d.categoria_asignada];
+  const u = d.unidades_mes_pasado ?? 0;
+  if (d.direccion_mov==='SUBE')
+    return `Vendió <b>${u}</b> u el mes pasado → alcanza la meta de <b>${esc(prop?.nombre||'')}</b> (${esc(prop?.meta_texto||'')}).`;
+  return `Vendió <b>${u}</b> u el mes pasado → cae bajo la meta de <b>${esc(asig?.nombre||'')}</b>; corresponde <b>${esc(prop?.nombre||'')}</b>.`;
+}
+function renderMov(){
+  let rows = MOVS;
+  if (MOV_FILTRO!=='TODOS') rows = MOVS.filter(d=>d.direccion_mov===MOV_FILTRO);
+  const nSube = MOVS.filter(d=>d.direccion_mov==='SUBE').length, nBaja = MOVS.filter(d=>d.direccion_mov==='BAJA').length;
+  document.getElementById('mvCount').textContent = `${nSube} suben · ${nBaja} bajan`;
+  const tb = document.getElementById('mvBody');
+  if (!rows.length) { tb.innerHTML = '<tr><td colspan="8" class="text-center text-muted py-5">Sin movimientos. Pulsa "Recalcular" tras el cierre de mes.</td></tr>'; return; }
+  tb.innerHTML = rows.map(d=>`
+    <tr>
+      <td class="td-n">${d.numero ?? '—'}</td>
+      <td class="td-nombre">${esc(d.nombre_indexa||d.nombre_razon||'—')}</td>
+      <td class="td-rut">${esc(d.rut||'—')}</td>
+      <td style="text-align:center;font-weight:700">${d.unidades_mes_pasado ?? 0}</td>
+      <td>${catBadge(d.categoria_asignada)}</td>
+      <td>${catBadge(d.categoria_propuesta)} <span class="${d.direccion_mov==='SUBE'?'mv-sube':'mv-baja'}">${d.direccion_mov==='SUBE'?'▲ sube':'▼ baja'}</span></td>
+      <td class="mv-cond">${condicionMov(d)}</td>
+      <td>${asignadaCell(d)}</td>
+    </tr>`).join('');
 }
 
 async function cargarCcs() {

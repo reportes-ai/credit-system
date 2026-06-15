@@ -52,6 +52,7 @@ const SEED = [
     // Columnas de categoría en la tabla de dealers
     await pool.query(`ALTER TABLE dealers ADD COLUMN IF NOT EXISTS categoria_propuesta VARCHAR(20) NULL`);
     await pool.query(`ALTER TABLE dealers ADD COLUMN IF NOT EXISTS categoria_asignada VARCHAR(20) NULL`);
+    await pool.query(`ALTER TABLE dealers ADD COLUMN IF NOT EXISTS unidades_mes_pasado INT NULL`);
 
     // Registro del mantenedor en el menú (bajo Mantenedores).
     const [[mod]] = await pool.query("SELECT id_modulo FROM modulos WHERE nombre='Mantenedores' AND estado='activo' LIMIT 1");
@@ -129,18 +130,40 @@ const recalcular = async (req, res) => {
     const ventasPorRut = new Map();
     ventas.forEach(v => ventasPorRut.set(normRut(v.rut_dealer), Number(v.unidades) || 0));
 
-    const [dealers] = await pool.query('SELECT id_dealer, rut FROM dealers');
+    const [dealers] = await pool.query('SELECT id_dealer, rut, categoria_asignada FROM dealers');
     let actualizados = 0, conVentas = 0;
     for (const d of dealers) {
       const u = ventasPorRut.get(normRut(d.rut)) || 0;
       if (u > 0) conVentas++;
       const cod = categoriaPara(u, cats);
-      await pool.query('UPDATE dealers SET categoria_propuesta=? WHERE id_dealer=?', [cod, d.id_dealer]);
+      // Propuesta + unidades del mes pasado. La Asignada se inicializa = Propuesta solo si está vacía.
+      if (d.categoria_asignada)
+        await pool.query('UPDATE dealers SET categoria_propuesta=?, unidades_mes_pasado=? WHERE id_dealer=?', [cod, u, d.id_dealer]);
+      else
+        await pool.query('UPDATE dealers SET categoria_propuesta=?, categoria_asignada=?, unidades_mes_pasado=? WHERE id_dealer=?', [cod, cod, u, d.id_dealer]);
       actualizados++;
     }
+    const [[{ movs }]] = await pool.query('SELECT COUNT(*) movs FROM dealers WHERE categoria_propuesta IS NOT NULL AND categoria_asignada IS NOT NULL AND categoria_propuesta<>categoria_asignada');
     auditar({ req, accion: 'EDITAR', modulo: 'mantenedores', entidad: 'dealer', detalle: `Recalculó categoría propuesta de ${actualizados} dealers según ventas del mes pasado (${conVentas} con ventas)` });
-    res.json({ success: true, data: { actualizados, con_ventas: conVentas }, error: null });
+    res.json({ success: true, data: { actualizados, con_ventas: conVentas, movimientos: movs }, error: null });
   } catch (e) { console.error('[dealer-cat recalcular]', e.message); res.status(500).json({ success: false, data: null, error: 'Error interno del servidor' }); }
 };
 
-module.exports = { listar, actualizar, asignar, recalcular };
+/* ── GET /api/dealer-categorias/movimientos — dealers que suben/bajan (propuesta≠asignada) ── */
+const movimientos = async (req, res) => {
+  try {
+    const [cats] = await pool.query('SELECT codigo, nombre, nivel, meta_min_unidades, meta_texto, color FROM dealer_categorias');
+    const nivel = Object.fromEntries(cats.map(c => [c.codigo, c.nivel]));
+    const [rows] = await pool.query(`
+      SELECT id_dealer, numero, rut, nombre_indexa, nombre_razon, categoria_asignada, categoria_propuesta, unidades_mes_pasado
+      FROM dealers
+      WHERE categoria_propuesta IS NOT NULL AND categoria_asignada IS NOT NULL
+        AND categoria_propuesta <> categoria_asignada
+      ORDER BY nombre_indexa`);
+    const data = rows.map(d => ({ ...d,
+      direccion_mov: (nivel[d.categoria_propuesta] || 0) > (nivel[d.categoria_asignada] || 0) ? 'SUBE' : 'BAJA' }));
+    res.json({ success: true, data: { rows: data, categorias: cats }, error: null });
+  } catch (e) { console.error('[dealer-cat movimientos]', e.message); res.status(500).json({ success: false, data: null, error: 'Error interno del servidor' }); }
+};
+
+module.exports = { listar, actualizar, asignar, recalcular, movimientos };
