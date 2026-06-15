@@ -1,5 +1,6 @@
 'use strict';
 const pool = require('../../../../shared/config/database');
+const { auditar } = require('../../../../shared/audit');
 
 // Migración: agregar parámetro db_tz_override si no existe
 (async () => {
@@ -101,6 +102,7 @@ exports.setTZOverride = async (req, res) => {
       "UPDATE parametros_credito SET valor = ? WHERE clave = 'db_tz_override'", [valor]
     );
     pool.setTZOverride(valor);
+    auditar({ req, accion: 'EDITAR', modulo: 'mantenedores', entidad: 'servidor_hora', entidad_id: 'tz_override', detalle: `Cambió el override de timezone de la BD a "${valor || '(automático)'}"` });
     res.json({ success: true, data: { tz_activo: pool.getActiveTZ(), override: valor || null }, error: null });
   } catch(e) {
     res.status(500).json({ success: false, data: null, error: e.message });

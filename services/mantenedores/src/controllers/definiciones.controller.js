@@ -1,5 +1,6 @@
 'use strict';
 const pool = require('../../../../shared/config/database');
+const { auditar } = require('../../../../shared/audit');
 
 // Glosario de definiciones de negocio usadas en el sistema (editable por el Admin).
 (async () => {
@@ -101,6 +102,7 @@ const crear = async (req, res) => {
     const [[{ mx }]] = await pool.query('SELECT COALESCE(MAX(orden),0)+1 AS mx FROM definiciones');
     const [ins] = await pool.query('INSERT INTO definiciones (termino, definicion, categoria, orden) VALUES (?,?,?,?)',
       [termino, definicion, categoria || 'General', mx]);
+    auditar({ req, accion: 'CREAR', modulo: 'mantenedores', entidad: 'definicion', entidad_id: ins.insertId, detalle: `Creó la definición "${termino}"`, meta: { termino, categoria } });
     res.json({ success: true, data: { id: ins.insertId }, error: null });
   } catch (e) { res.status(500).json({ success: false, data: null, error: 'Error interno del servidor' }); }
 };
@@ -111,6 +113,7 @@ const actualizar = async (req, res) => {
     if (!termino || !definicion) return res.status(400).json({ success: false, data: null, error: 'término y definición requeridos' });
     await pool.query('UPDATE definiciones SET termino=?, definicion=?, categoria=? WHERE id=?',
       [termino, definicion, categoria || 'General', req.params.id]);
+    auditar({ req, accion: 'EDITAR', modulo: 'mantenedores', entidad: 'definicion', entidad_id: req.params.id, detalle: `Editó la definición #${req.params.id} ("${termino}")` });
     res.json({ success: true, data: { id: req.params.id }, error: null });
   } catch (e) { res.status(500).json({ success: false, data: null, error: 'Error interno del servidor' }); }
 };
@@ -118,6 +121,7 @@ const actualizar = async (req, res) => {
 const eliminar = async (req, res) => {
   try {
     await pool.query('DELETE FROM definiciones WHERE id=?', [req.params.id]);
+    auditar({ req, accion: 'ELIMINAR', modulo: 'mantenedores', entidad: 'definicion', entidad_id: req.params.id, detalle: `Eliminó la definición #${req.params.id}` });
     res.json({ success: true, data: { id: req.params.id }, error: null });
   } catch (e) { res.status(500).json({ success: false, data: null, error: 'Error interno del servidor' }); }
 };

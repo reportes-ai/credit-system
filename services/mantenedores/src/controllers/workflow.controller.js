@@ -1,5 +1,6 @@
 const pool = require('../../../../shared/config/database');
 const { verifyToken } = require('../../../../shared/middleware/auth');
+const { auditar } = require('../../../../shared/audit');
 
 const CONFIG_KEY = 'workflow_estados_v1';
 
@@ -106,6 +107,7 @@ exports.put = async (req, res) => {
       VALUES (?, ?)
       ON DUPLICATE KEY UPDATE config_value = VALUES(config_value), updated_at = NOW()
     `, [CONFIG_KEY, JSON.stringify(ordenadas)]);
+    auditar({ req, accion: 'EDITAR', modulo: 'mantenedores', entidad: 'workflow_estados', entidad_id: 'estados', detalle: `Actualizó el workflow de estados de crédito (${ordenadas.length} etapas)` });
     res.json({ success: true, data: ordenadas });
   } catch (e) {
     console.error('[workflow] put:', e);

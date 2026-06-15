@@ -1,4 +1,5 @@
 const pool = require('../../../../shared/config/database');
+const { auditar } = require('../../../../shared/audit');
 
 (async () => {
   try {
@@ -51,6 +52,7 @@ const create = async (req, res) => {
        banco?.trim()||null, tipo_cuenta?.trim()||null, activo===undefined?1:activo]
     );
     const [[row]] = await pool.query('SELECT * FROM cuentas_bancarias WHERE id_cuenta=?', [r.insertId]);
+    auditar({ req, accion: 'CREAR', modulo: 'mantenedores', entidad: 'cuenta_bancaria', entidad_id: r.insertId, detalle: `Creó cuenta bancaria ${nombre.trim()} — ${numero_cuenta.trim()}`, rut: rut, meta: { razon_social, banco } });
     res.status(201).json({ success: true, data: row, error: null });
   } catch(e) { err(res, e); }
 };
@@ -68,6 +70,7 @@ const update = async (req, res) => {
        req.params.id]
     );
     const [[row]] = await pool.query('SELECT * FROM cuentas_bancarias WHERE id_cuenta=?', [req.params.id]);
+    auditar({ req, accion: 'EDITAR', modulo: 'mantenedores', entidad: 'cuenta_bancaria', entidad_id: req.params.id, detalle: `Editó cuenta bancaria #${req.params.id} (${nombre.trim()})`, rut: rut });
     ok(res, row);
   } catch(e) { err(res, e); }
 };
@@ -75,6 +78,7 @@ const update = async (req, res) => {
 const remove = async (req, res) => {
   try {
     await pool.query('DELETE FROM cuentas_bancarias WHERE id_cuenta=?', [req.params.id]);
+    auditar({ req, accion: 'ELIMINAR', modulo: 'mantenedores', entidad: 'cuenta_bancaria', entidad_id: req.params.id, detalle: `Eliminó cuenta bancaria #${req.params.id}` });
     ok(res, null);
   } catch(e) { err(res, e); }
 };
