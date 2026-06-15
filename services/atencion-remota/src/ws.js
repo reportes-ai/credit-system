@@ -14,6 +14,7 @@ const jwt  = require('jsonwebtoken');
 const url  = require('url');
 const pool = require('../../../shared/config/database');
 const { JWT_SECRET } = require('../../../shared/middleware/auth');
+const { tieneFunc } = require('../../../shared/middleware/permisos');
 const C = require('./controllers/atencion.controller');
 
 const execs = new Map();   // id_usuario → Set<ws>   (ejecutivos conectados)
@@ -46,6 +47,9 @@ function initAtencionWS(server) {
         ? { tipo: 'dealer', id: d.id_cuenta, id_cuenta: d.id_cuenta, id_dealer: d.id_dealer, rut: d.rut, nombre: d.nombre || 'Dealer' }
         : { tipo: 'user', id: d.id_usuario, nombre: [d.nombre, d.apellido].filter(Boolean).join(' ') || 'Ejecutivo' };
     } catch { return ws.close(4001, 'auth'); }
+
+    // El ejecutivo interno necesita el permiso del módulo para operar la consola.
+    if (ident.tipo === 'user' && !(await tieneFunc(ident.id, 'atencion_remota'))) return ws.close(4003, 'forbidden');
 
     ws.ident = ident; ws.rooms = new Set(); ws.isAlive = true; ws.disponible = false;
     ws.on('pong', () => { ws.isAlive = true; });

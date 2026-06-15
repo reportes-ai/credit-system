@@ -15,6 +15,7 @@ const jwt    = require('jsonwebtoken');
 const { JWT_SECRET, JWT_EXPIRES } = require('../../../../shared/middleware/auth');
 const { auditar } = require('../../../../shared/audit');
 const { notificar } = require('../../../notificaciones/src/controllers/notificaciones.controller');
+const { tieneFunc } = require('../../../../shared/middleware/permisos');
 const crypto = require('crypto');
 
 const normRut = r => String(r || '').replace(/[.\-\s]/g, '').toUpperCase();
@@ -275,10 +276,15 @@ const verifyDealer = (req, res, next) => {
     req.dealer = d; next();
   } catch { res.status(401).json({ success: false, data: null, error: 'Token inválido o expirado' }); }
 };
-const verifyAny = (req, res, next) => {
+const verifyAny = async (req, res, next) => {
   try {
     const d = jwt.verify(rawToken(req), JWT_SECRET);
-    req.auth = d; req.esDealer = d.tipo === 'dealer'; next();
+    req.auth = d; req.esDealer = d.tipo === 'dealer';
+    // Internos: además del login, exige el permiso del módulo (los dealers
+    // pasan: su acceso se acota por pertenencia a la conversación en cada handler).
+    if (!req.esDealer && !(await tieneFunc(d.id_usuario, 'atencion_remota')))
+      return res.status(403).json({ success: false, data: null, error: 'Sin permisos suficientes (atencion_remota)' });
+    next();
   } catch { res.status(401).json({ success: false, data: null, error: 'Token inválido o expirado' }); }
 };
 
