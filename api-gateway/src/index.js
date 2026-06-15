@@ -70,6 +70,7 @@ app.use('/api/clientes',               require('../../services/clientes/src/rout
 app.use('/api/antecedentes-laborales', require('../../services/clientes/src/routes/antecedentes.routes'));
 app.use('/api/informacion-comercial',  require('../../services/clientes/src/routes/informacion-comercial.routes'));
 app.use('/api/informes-dealernet',     require('../../services/clientes/src/routes/informes-dealernet.routes'));
+app.use('/api/dealernet',              require('../../services/clientes/src/routes/dealernet-ws.routes'));
 
 // Mantenedores
 app.use('/api/impuestos',       require('../../services/mantenedores/src/routes/impuestos.routes'));
@@ -218,6 +219,8 @@ app.get(['/mantenedores/dealers', '/mantenedores/dealers/'], (req, res) =>
   res.sendFile(path.join(__dirname, '../public/mantenedores/dealers/index.html')));
 app.get(['/mantenedores/respuestas-rapidas', '/mantenedores/respuestas-rapidas/'], (req, res) =>
   res.sendFile(path.join(__dirname, '../public/mantenedores/respuestas-rapidas/index.html')));
+app.get(['/mantenedores/dealernet-productos', '/mantenedores/dealernet-productos/'], (req, res) =>
+  res.sendFile(path.join(__dirname, '../public/mantenedores/dealernet-productos/index.html')));
 app.get(['/mantenedores/parametros', '/mantenedores/parametros/'], (req, res) =>
   res.sendFile(path.join(__dirname, '../public/mantenedores/parametros/index.html')));
 app.get(['/mantenedores/cobranza-parametros', '/mantenedores/cobranza-parametros/'], (req, res) =>

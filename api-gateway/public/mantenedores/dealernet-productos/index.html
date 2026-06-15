@@ -1,0 +1,204 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <link rel="icon" href="/img/favicon.png" type="image/png">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Productos DealerNet — AutoFácil</title>
+  <!-- v1.0 -->
+  <link href="/css/bootstrap.min.css" rel="stylesheet">
+  <link href="/css/bootstrap-icons.css" rel="stylesheet">
+  <style>
+    :root { --navy:#0141A2; --navy-dark:#012d70; --navy-light:#0255c5; --accent:#009AFE; --bg:#f0f4f8; }
+    body { background:var(--bg); font-family:'Segoe UI',system-ui,sans-serif; margin:0; min-height:100vh; }
+    .topnav { background:linear-gradient(90deg,var(--navy-dark),var(--navy-light)); color:#fff; height:60px; padding:0 24px; display:flex; align-items:center; justify-content:space-between; position:sticky; top:0; z-index:200; }
+    .topnav-left { display:flex; align-items:center; gap:16px; }
+    .topnav-brand { display:flex; align-items:center; gap:8px; text-decoration:none; }
+    .topnav-brand img { height:32px; filter:brightness(0) invert(1); }
+    .version-badge { background:rgba(255,255,255,.15); color:rgba(255,255,255,.75); font-size:.65rem; font-weight:700; border-radius:6px; padding:2px 8px; }
+    .breadcrumb-nav { color:rgba(255,255,255,.6); font-size:.85rem; }
+    .breadcrumb-nav a { color:rgba(255,255,255,.75); text-decoration:none; }
+    .topnav-right { display:flex; align-items:center; gap:10px; }
+    .user-chip { background:rgba(255,255,255,.12); border-radius:24px; padding:5px 12px; display:flex; align-items:center; gap:8px; font-size:.85rem; }
+    .avatar { width:28px; height:28px; background:#90caf9; border-radius:50%; display:flex; align-items:center; justify-content:center; color:var(--navy); font-weight:700; font-size:.75rem; }
+    .perfil-badge { background:rgba(144,202,249,.2); border:1px solid rgba(144,202,249,.4); color:#90caf9; border-radius:12px; padding:2px 10px; font-size:.73rem; font-weight:600; }
+    .btn-logout { background:rgba(255,255,255,.1); border:1px solid rgba(255,255,255,.2); color:#fff; border-radius:8px; padding:5px 12px; font-size:.82rem; cursor:pointer; text-decoration:none; display:inline-flex; align-items:center; }
+    .main { max-width:1080px; margin:28px auto; padding:0 20px 60px; }
+    .page-banner { background:linear-gradient(135deg,#012d70,#0141A2 50%,#009AFE); border-radius:16px; color:#fff; padding:24px 32px; margin-bottom:22px; display:flex; align-items:center; gap:18px; }
+    .page-banner i { font-size:2.6rem; opacity:.85; }
+    .page-banner h2 { font-weight:700; margin:0 0 3px; font-size:1.3rem; }
+    .page-banner p { opacity:.8; margin:0; font-size:.88rem; }
+    .card { background:#fff; border:1px solid #e8edf3; border-radius:14px; padding:18px 20px; margin-bottom:18px; }
+    .card h3 { margin:0 0 14px; font-size:1rem; color:var(--navy-dark); }
+    .addgrid { display:grid; grid-template-columns:120px 1fr auto; gap:10px; align-items:end; }
+    @media(max-width:600px){ .addgrid { grid-template-columns:1fr; } }
+    .fld label { font-size:.74rem; font-weight:700; color:#6b7280; text-transform:uppercase; letter-spacing:.4px; display:block; margin-bottom:4px; }
+    .fld input { width:100%; border:1.5px solid #d1d5db; border-radius:8px; padding:8px 10px; font-size:.88rem; box-sizing:border-box; }
+    .fld input:focus { outline:none; border-color:var(--navy); }
+    .btn-primary2 { background:var(--navy); color:#fff; border:none; border-radius:9px; padding:9px 18px; font-weight:700; font-size:.86rem; cursor:pointer; }
+    .btn-primary2:hover { background:var(--navy-light); }
+    .btn-ghost { background:#f1f5f9; color:#334155; border:none; border-radius:7px; padding:6px 10px; font-size:.8rem; cursor:pointer; }
+    table.tb { width:100%; border-collapse:collapse; font-size:.88rem; }
+    table.tb th { text-align:left; color:#64748b; font-size:.72rem; text-transform:uppercase; letter-spacing:.4px; padding:8px; border-bottom:2px solid #eef2f7; }
+    table.tb td { padding:8px; border-bottom:1px solid #f1f5f9; }
+    .cod { font-family:ui-monospace,monospace; font-weight:700; color:var(--navy-dark); }
+    .switch { position:relative; display:inline-block; width:42px; height:23px; }
+    .switch input { display:none; }
+    .slider { position:absolute; inset:0; background:#cbd5e1; border-radius:23px; cursor:pointer; transition:.2s; }
+    .slider:before { content:''; position:absolute; height:17px; width:17px; left:3px; top:3px; background:#fff; border-radius:50%; transition:.2s; }
+    .switch input:checked + .slider { background:#16a34a; }
+    .switch input:checked + .slider:before { transform:translateX(19px); }
+    .pill { font-size:.72rem; font-weight:700; padding:2px 9px; border-radius:12px; }
+    .pill.on { background:#dcfce7; color:#15803d; } .pill.off { background:#f1f5f9; color:#64748b; }
+    .note { background:#fffbeb; border:1px solid #fde68a; color:#92400e; border-radius:10px; padding:12px 14px; font-size:.84rem; margin-bottom:18px; }
+    .note code { background:#fff7d6; padding:1px 5px; border-radius:4px; }
+    .test-grid { display:flex; gap:10px; align-items:end; flex-wrap:wrap; }
+    pre.out { background:#0b1220; color:#cbd5e1; border-radius:10px; padding:14px; font-size:.78rem; max-height:340px; overflow:auto; white-space:pre-wrap; word-break:break-word; margin-top:12px; }
+    .ret { display:inline-block; padding:3px 10px; border-radius:8px; font-weight:700; font-size:.82rem; }
+    .ret.ok { background:#dcfce7; color:#15803d; } .ret.err { background:#fee2e2; color:#b91c1c; }
+    .footer-box { margin-top:24px; background:#f1f5f9; border-left:4px solid var(--navy); border-radius:10px; padding:16px 20px; }
+    .footer-box h4 { font-size:.85rem; font-weight:800; color:var(--navy-dark); display:flex; align-items:center; gap:8px; margin:0 0 10px; }
+    .footer-box ul { margin:0; padding-left:18px; font-size:.84rem; color:#374151; line-height:1.7; }
+    .footer-box a { color:var(--navy); }
+    .toast-af { position:fixed; bottom:24px; left:50%; transform:translateX(-50%); background:#0f172a; color:#fff; padding:11px 20px; border-radius:10px; font-size:.86rem; z-index:9999; display:none; }
+    .toast-af.err { background:#b91c1c; }
+  </style>
+</head>
+<body>
+<nav class="topnav">
+  <div class="topnav-left">
+    <a href="/" class="topnav-brand"><img src="/img/logo.png" alt="AutoFácil"><span class="version-badge" id="versionBadge"></span></a>
+    <div class="breadcrumb-nav"><a href="/">Inicio</a> › <a href="/mantenedores/">Mantenedores</a> › <span style="color:#fff;font-weight:600">Productos DealerNet</span></div>
+  </div>
+  <div class="topnav-right">
+    <span class="user-chip"><div class="avatar" id="avatarInicial">?</div>
+      <div><div style="font-weight:600;line-height:1.3;color:#fff" id="navNombre">—</div>
+      <div class="perfil-badge" id="navPerfil">—</div></div></span>
+    <button class="btn-logout" onclick="logout()"><i class="bi bi-box-arrow-right me-1"></i>Salir</button>
+  </div>
+</nav>
+
+<div class="main">
+  <div class="page-banner">
+    <i class="bi bi-cloud-arrow-down"></i>
+    <div>
+      <h2>Productos DealerNet — Central de Información</h2>
+      <p>Activa los productos que el negocio consulta por RUT vía Web Service. Solo los <b>activos</b> se piden en cada consulta (cuidan el saldo).</p>
+    </div>
+  </div>
+
+  <div class="note">
+    <i class="bi bi-shield-lock"></i> Las <b>credenciales</b> del Web Service van como variables de entorno en Render
+    (<code>DEALERNET_USER</code> / <code>DEALERNET_PASS</code>), nunca en el código. Mientras no estén cargadas, la consulta avisará "credenciales no configuradas".
+  </div>
+
+  <div class="card">
+    <h3><i class="bi bi-plus-circle me-1"></i>Agregar producto</h3>
+    <div class="addgrid">
+      <div class="fld"><label>Código</label><input type="text" id="nCod" placeholder="3412"></div>
+      <div class="fld"><label>Nombre</label><input type="text" id="nNom" placeholder="Registro Automotriz"></div>
+      <button class="btn-primary2" onclick="agregar()"><i class="bi bi-check-lg me-1"></i>Agregar</button>
+    </div>
+  </div>
+
+  <div class="card">
+    <h3><i class="bi bi-list-ul me-1"></i>Catálogo de productos</h3>
+    <table class="tb">
+      <thead><tr><th style="width:90px">Código</th><th>Producto</th><th style="width:90px">Activo</th><th style="width:60px"></th></tr></thead>
+      <tbody id="body"></tbody>
+    </table>
+  </div>
+
+  <div class="card">
+    <h3><i class="bi bi-search me-1"></i>Probar consulta</h3>
+    <p style="font-size:.83rem;color:#64748b;margin:0 0 12px">Consulta los productos <b>activos</b> para un RUT. <b>Ojo:</b> con credenciales reales esto consume saldo.</p>
+    <div class="test-grid">
+      <div class="fld" style="flex:1;min-width:220px"><label>RUT (con dígito verificador)</label><input type="text" id="tRut" placeholder="12.345.678-9"></div>
+      <button class="btn-primary2" id="tBtn" onclick="probar()"><i class="bi bi-send me-1"></i>Consultar</button>
+    </div>
+    <div id="tResult"></div>
+  </div>
+
+  <div class="footer-box">
+    <h4><i class="bi bi-diagram-3"></i> Qué afecta este mantenedor</h4>
+    <ul>
+      <li><b>Productos activos</b> → definen qué pide cada <b>Consulta DealerNet</b> por RUT. Menos productos activos = menos saldo por consulta.</li>
+      <li><b>Código / Nombre</b> → identifican cada producto del catálogo DealerNet (3401–3450). Agrega aquí los códigos nuevos que te confirme DealerNet.</li>
+      <li><b>Credenciales</b> → en variables de entorno de Render; afectan a toda consulta al Web Service.</li>
+      <li>Reemplaza la carga manual de PDF en <a href="/informes-dealernet/">Informes DealerNet</a> (misma data, en vivo).</li>
+    </ul>
+  </div>
+</div>
+
+<div class="toast-af" id="toast"></div>
+
+<script src="/js/auth-guard.js"></script>
+<script>
+const token = sessionStorage.getItem('token');
+const yo = JSON.parse(sessionStorage.getItem('usuario') || 'null');
+if (!token || !yo) location.href='/login.html';
+const H = { 'Content-Type':'application/json', Authorization:'Bearer '+token };
+document.getElementById('navNombre').textContent = ((yo?.nombre||'')+' '+(yo?.apellido||'')).trim()||'—';
+document.getElementById('navPerfil').textContent = yo?.perfil||'';
+document.getElementById('avatarInicial').textContent = (yo?.nombre||'?').charAt(0).toUpperCase();
+function logout(){ sessionStorage.removeItem('token'); sessionStorage.removeItem('usuario'); location.href='/login.html'; }
+const esc = s => String(s ?? '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+function toast(m,e){ const t=document.getElementById('toast'); t.textContent=m; t.className='toast-af'+(e?' err':''); t.style.display='block'; clearTimeout(t._h); t._h=setTimeout(()=>t.style.display='none',2800); }
+
+async function cargar(){
+  try {
+    const r=await fetch('/api/dealernet/productos',{ headers:H }); const j=await r.json();
+    const b=document.getElementById('body');
+    if(!j.success){ b.innerHTML='<tr><td colspan="4" style="color:#b91c1c">'+esc(j.error||'Error')+'</td></tr>'; return; }
+    b.innerHTML=(j.data||[]).map(p=>`
+      <tr>
+        <td class="cod">${esc(p.codigo)}</td>
+        <td><input value="${esc(p.nombre)}" data-nom="${p.id}" style="width:100%;border:1px solid #e2e8f0;border-radius:6px;padding:5px 8px;font-size:.85rem" onblur="renombrar(${p.id}, this.value)"></td>
+        <td><label class="switch"><input type="checkbox" ${p.activo?'checked':''} onchange="toggle(${p.id}, this.checked)"><span class="slider"></span></label></td>
+        <td><button class="btn-ghost" onclick="eliminar(${p.id})" title="Eliminar"><i class="bi bi-trash"></i></button></td>
+      </tr>`).join('') || '<tr><td colspan="4" style="color:#94a3b8">Sin productos.</td></tr>';
+  } catch(_){ toast('Error al cargar', true); }
+}
+async function agregar(){
+  const codigo=document.getElementById('nCod').value.trim();
+  const nombre=document.getElementById('nNom').value.trim();
+  if(!codigo||!nombre) return toast('Código y nombre requeridos', true);
+  try { const r=await fetch('/api/dealernet/productos',{ method:'POST', headers:H, body:JSON.stringify({ codigo, nombre }) });
+    const j=await r.json(); if(j.success){ toast('Producto agregado'); document.getElementById('nCod').value=''; document.getElementById('nNom').value=''; cargar(); } else toast(j.error||'Error', true); } catch(_){ toast('Error', true); }
+}
+async function toggle(id, activo){
+  try { const r=await fetch('/api/dealernet/productos/'+id,{ method:'PUT', headers:H, body:JSON.stringify({ activo }) });
+    const j=await r.json(); if(!j.success) toast(j.error||'Error', true); } catch(_){}
+}
+async function renombrar(id, nombre){
+  try { await fetch('/api/dealernet/productos/'+id,{ method:'PUT', headers:H, body:JSON.stringify({ nombre }) }); } catch(_){}
+}
+async function eliminar(id){
+  if(!confirm('¿Eliminar este producto del catálogo?')) return;
+  try { const r=await fetch('/api/dealernet/productos/'+id,{ method:'DELETE', headers:H });
+    const j=await r.json(); if(j.success){ toast('Eliminado'); cargar(); } else toast(j.error||'Error', true); } catch(_){}
+}
+async function probar(){
+  const rut=document.getElementById('tRut').value.trim();
+  if(!rut) return toast('Ingresa un RUT', true);
+  const btn=document.getElementById('tBtn'), out=document.getElementById('tResult');
+  btn.disabled=true; btn.innerHTML='<i class="bi bi-hourglass-split me-1"></i>Consultando…'; out.innerHTML='';
+  try {
+    const r=await fetch('/api/dealernet/consultar',{ method:'POST', headers:H, body:JSON.stringify({ rut }) });
+    const j=await r.json();
+    if(!j.success){ out.innerHTML='<div style="margin-top:12px"><span class="ret err">Error</span> '+esc(j.error||'')+'</div>'; }
+    else {
+      const ok = String(j.data.retcode)==='0';
+      const outStr = typeof j.data.output==='string' ? j.data.output : JSON.stringify(j.data.output, null, 2);
+      out.innerHTML='<div style="margin-top:12px"><span class="ret '+(ok?'ok':'err')+'">retcode '+esc(j.data.retcode)+'</span> '+esc(j.data.retmsg||'')+
+        '  <span style="color:#94a3b8;font-size:.8rem">· productos: '+esc((j.data.productos||[]).join(', '))+'</span></div>'+
+        '<pre class="out">'+esc(outStr||'(sin output)')+'</pre>';
+    }
+  } catch(_){ out.innerHTML='<div style="margin-top:12px"><span class="ret err">Error</span> de conexión</div>'; }
+  btn.disabled=false; btn.innerHTML='<i class="bi bi-send me-1"></i>Consultar';
+}
+cargar();
+</script>
+<script src="/js/app-version.js"></script>
+</body>
+</html>
