@@ -5,7 +5,7 @@
   <link rel="icon" href="/img/favicon.png" type="image/png">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Mantención Dealers — AutoFácil</title>
-  <!-- v1.7 -->
+  <!-- v1.8 -->
   <link href="/css/bootstrap.min.css" rel="stylesheet">
   <link href="/css/bootstrap-icons.css" rel="stylesheet">
   <style>
@@ -266,6 +266,13 @@ async function verFicha(id){
         <b style="color:#991b1b;font-size:.82rem"><i class="bi bi-exclamation-octagon me-1"></i>Diferencias con los datos del sistema</b>
         ${f.diferencias.map(d=>`<div style="margin-top:6px;font-size:.82rem"><b>${escH(d.campo)}:</b> ficha "<span style="color:#991b1b">${escH(d.ficha)}</span>" · sistema "${escH(d.sistema)}"</div>`).join('')}</div>`;
     }
+    // Alerta de firma (heurística)
+    let firmaHtml = '';
+    if (f.firma_sospecha) {
+      firmaHtml = `<div style="margin-top:14px;border:1px solid #fdba74;background:#fff7ed;border-radius:10px;padding:12px 14px">
+        <b style="color:#9a3412;font-size:.82rem"><i class="bi bi-pen me-1"></i>Posible ficha SIN FIRMA</b>
+        <div style="margin-top:4px;font-size:.82rem;color:#7c2d12">${escH(f.firma_detalle||'Revisa visualmente que la ficha esté firmada.')}</div></div>`;
+    }
     // Excepciones (comisión modificada / boleta) con su comentario
     let excHtml = '';
     if (Array.isArray(f.excepciones) && f.excepciones.length) {
@@ -286,7 +293,7 @@ async function verFicha(id){
       ${row('Email confirmación', f.correo_confirmacion)} ${row('Observaciones', f.observaciones)}
       ${f.apelacion?row('Apelación', f.apelacion):''}
       ${f.motivo_rechazo?row('Motivo rechazo', f.motivo_rechazo):''}
-    </div>${difHtml}${excHtml}<div style="margin-top:16px;display:flex;flex-wrap:wrap;gap:6px">${adjHtml||'<span style="font-size:.8rem;color:#94a3b8">Sin adjuntos</span>'}</div>`;
+    </div>${firmaHtml}${difHtml}${excHtml}<div style="margin-top:16px;display:flex;flex-wrap:wrap;gap:6px">${adjHtml||'<span style="font-size:.8rem;color:#94a3b8">Sin adjuntos</span>'}</div>`;
     dlgVer.showModal();
   } catch(e){ toast(e.message,true); }
 }

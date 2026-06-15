@@ -10,6 +10,7 @@ const pool = require('../../../../shared/config/database');
 const { auditar } = require('../../../../shared/audit');
 const { notificar } = require('../../../notificaciones/src/controllers/notificaciones.controller');
 const { tieneFunc } = require('../../../../shared/middleware/permisos');
+let pdfParse = null; try { pdfParse = require('pdf-parse'); } catch (e) { /* opcional */ }
 
 /* ── Comisiones por defecto según tipo de ficha (instructivo) ─────────────── */
 const COM_DEFAULT = {
@@ -85,6 +86,8 @@ const COM_DEFAULT = {
     await pool.query(`ALTER TABLE dealer_fichas ADD COLUMN IF NOT EXISTS rl_email VARCHAR(150) NULL`);
     await pool.query(`ALTER TABLE dealer_fichas ADD COLUMN IF NOT EXISTS tipo_cuenta VARCHAR(30) NULL`);
     await pool.query(`ALTER TABLE dealer_fichas ADD COLUMN IF NOT EXISTS nombre_cuenta VARCHAR(150) NULL`);
+    await pool.query(`ALTER TABLE dealer_fichas ADD COLUMN IF NOT EXISTS firma_sospecha TINYINT(1) NULL`);
+    await pool.query(`ALTER TABLE dealer_fichas ADD COLUMN IF NOT EXISTS firma_detalle VARCHAR(200) NULL`);
   } catch (e) { console.error('[dealer_fichas alter cols]', e.message); }
 
   // Archivos adjuntos múltiples (informes comerciales empresa/socios, hasta 3 c/u).
@@ -241,7 +244,7 @@ const obtener = async (req, res) => {
               rep_legal_origen, rl_nombre, rl_telefono, rl_email,
               com_6_12, com_13_24, com_25_36, com_37, tipo_documento, cuenta_tipo, tipo_cuenta, nombre_cuenta, banco,
               rut_cuenta, num_cuenta, correo_confirmacion, observaciones,
-              excepciones, excepciones_comentarios, diferencias,
+              excepciones, excepciones_comentarios, diferencias, firma_sospecha, firma_detalle,
               ficha_nombre, ficha_mime, (ficha_data IS NOT NULL) AS tiene_ficha,
               tomada_por, tomada_por_nombre, fecha_tomada, revisor_nombre, fecha_revision,
               motivo_rechazo, apelacion, id_dealer, created_at, updated_at
@@ -368,6 +371,27 @@ async function calcularDiferencias(f) {
   return dif;
 }
 
+/* Verifica (sin IA) si la ficha subida parece venir firmada. Heurística: una ficha
+   firmada se imprime, firma y escanea/fotografía (PDF imagen o JPG/PNG, sin capa de
+   texto). Si el archivo es el PDF DIGITAL de la plantilla (con texto del formulario),
+   es muy probable que NO esté firmado → sospecha. */
+async function verificarFirma(buffer, mime) {
+  try {
+    if (!buffer) return { sospecha: 1, detalle: 'No se adjuntó la ficha firmada.' };
+    const m = String(mime || '').toLowerCase();
+    if (m.includes('pdf') && pdfParse) {
+      const data = await pdfParse(buffer).catch(() => null);
+      const txt = ((data && data.text) || '').replace(/\s+/g, ' ').trim();
+      const marcadores = ['FICHA DE INCORPORACIÓN', 'REPRESENTANTE LEGAL', 'FORMA DE PAGO', 'COMISIÓN PACTADA', 'CONTACTO COMERCIAL', 'DATOS DE CONCESIONARIO'];
+      const hits = marcadores.filter(k => txt.toUpperCase().includes(k)).length;
+      if (txt.length > 250 && hits >= 2)
+        return { sospecha: 1, detalle: 'El archivo es el PDF digital de la ficha (con texto), no un escaneo/foto: probablemente NO está firmado.' };
+      return { sospecha: 0, detalle: 'PDF escaneado (sin texto): la firma no se puede confirmar automáticamente, revisar visualmente.' };
+    }
+    return { sospecha: 0, detalle: 'Imagen (foto/escaneo): la firma no se puede confirmar automáticamente, revisar visualmente.' };
+  } catch (e) { return { sospecha: 0, detalle: 'No se pudo analizar el archivo.' }; }
+}
+
 /* ── POST /fichas/:id/enviar — manda a revisión (pool) ─────────────────────── */
 const enviar = async (req, res) => {
   try {
@@ -392,13 +416,15 @@ const enviar = async (req, res) => {
 
     // Compara la ficha con los datos del dealer ya cargado en el sistema (por RUT) → diferencias para el revisor.
     const diferencias = await calcularDiferencias(f);
+    // Verifica si la ficha subida parece venir firmada (heurística).
+    const firma = await verificarFirma(f.ficha_data, f.ficha_mime);
 
     const reenvio = f.estado === 'RECHAZADA';
     const apelacion = norm(req.body.apelacion) || null;
     await pool.query(
       `UPDATE dealer_fichas SET estado='EN_REVISION', tomada_por=NULL, tomada_por_nombre=NULL, fecha_tomada=NULL,
-         motivo_rechazo=NULL, apelacion=?, diferencias=?, fecha_revision=NULL, revisor_id=NULL, revisor_nombre=NULL WHERE id=?`,
-      [apelacion, JSON.stringify(diferencias), req.params.id]);
+         motivo_rechazo=NULL, apelacion=?, diferencias=?, firma_sospecha=?, firma_detalle=?, fecha_revision=NULL, revisor_id=NULL, revisor_nombre=NULL WHERE id=?`,
+      [apelacion, JSON.stringify(diferencias), firma.sospecha, firma.detalle, req.params.id]);
 
     // Pool: avisa a todos los revisores con una clave compartida (para anular luego al resto)
     const ids = await idsRevisores(req.usuario.id_usuario);
@@ -407,9 +433,10 @@ const enviar = async (req, res) => {
       titulo: reenvio ? '🔁 Ficha de dealer corregida' : '🛎️ Nueva ficha de dealer para revisión',
       mensaje: `${f.ejecutivo_nombre || 'Un ejecutivo'} envió la ficha de ${f.nombre_razon || f.rut || ''}`
         + (apelacion ? ` · Apelación: ${apelacion}` : '')
-        + (diferencias.length ? ` · ⚠ ${diferencias.length} diferencia(s) con los datos del sistema` : ''),
+        + (diferencias.length ? ` · ⚠ ${diferencias.length} diferencia(s) con los datos del sistema` : '')
+        + (firma.sospecha ? ' · ⚠ posible ficha SIN FIRMA' : ''),
       href: '/dealers-incorporacion/mantencion.html?tab=revision',
-      prioridad: 'alta', sonar: 1, son_tipo: diferencias.length ? 'alarma' : 'dingdong',
+      prioridad: 'alta', sonar: 1, son_tipo: (diferencias.length || firma.sospecha) ? 'alarma' : 'dingdong',
       clave: `dealerficha:${f.id}:rev`,
     });
     auditar({ req, accion: reenvio ? 'EDITAR' : 'CREAR', modulo: 'dealers', entidad: 'dealer_ficha', entidad_id: f.id,
