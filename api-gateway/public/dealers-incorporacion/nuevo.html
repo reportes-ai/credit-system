@@ -5,7 +5,7 @@
   <link rel="icon" href="/img/favicon.png" type="image/png">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Nueva Ficha de Dealer — AutoFácil</title>
-  <!-- v1.10 -->
+  <!-- v1.11 -->
   <link href="/css/bootstrap.min.css" rel="stylesheet">
   <link href="/css/bootstrap-icons.css" rel="stylesheet">
   <style>
@@ -86,25 +86,25 @@
     .exc-item textarea:focus { outline:none; border-color:#b45309; }
     /* ── Vista de impresión ── */
     #printArea { display:none; }
-    @page { size: letter; margin: 12mm; }
+    @page { size: letter; margin: 9mm; }
     @media print {
       /* display:none (no visibility) evita páginas en blanco por el layout oculto */
       body { background:#fff !important; }
       .topnav, .main, .actionbar, dialog, .toast-af { display:none !important; }
       #printArea { display:block !important; }
     }
-    #printArea { color:#111; font-size:9.5px; -webkit-print-color-adjust:exact; print-color-adjust:exact; }
-    #printArea .plogo { text-align:center; margin:0 0 10px; background:#012d70; padding:8px 0; border-radius:6px; }
-    #printArea .plogo img { height:32px; filter:brightness(0) invert(1); }
-    #printArea h1 { text-align:center; color:#1f3864; font-size:15px; margin:0 0 1px; letter-spacing:.5px; }
-    #printArea .subt { text-align:center; color:#1f3864; font-size:10px; font-weight:600; margin:0 0 8px; }
-    #printArea h1.solo { margin-bottom:10px; }
-    #printArea table.p { width:100%; border-collapse:collapse; margin-bottom:5px; }
-    #printArea table.p th { background:#1f3864; color:#fff; text-align:left; padding:3px 7px; font-size:9.5px; }
-    #printArea table.p td { border:1px solid #94a3b8; padding:3px 7px; font-size:9.5px; line-height:1.3; }
+    #printArea { color:#111; font-size:8.3px; -webkit-print-color-adjust:exact; print-color-adjust:exact; }
+    #printArea .plogo { text-align:center; margin:0 0 5px; background:#012d70; padding:4px 0; border-radius:5px; }
+    #printArea .plogo img { height:24px; filter:brightness(0) invert(1); }
+    #printArea h1 { text-align:center; color:#1f3864; font-size:13px; margin:0 0 1px; letter-spacing:.4px; }
+    #printArea .subt { text-align:center; color:#1f3864; font-size:9px; font-weight:600; margin:0 0 4px; }
+    #printArea h1.solo { margin-bottom:5px; }
+    #printArea table.p { width:100%; border-collapse:collapse; margin-bottom:3px; }
+    #printArea table.p th { background:#1f3864; color:#fff; text-align:left; padding:1.5px 6px; font-size:8.3px; }
+    #printArea table.p td { border:1px solid #94a3b8; padding:1.5px 6px; font-size:8.3px; line-height:1.15; }
     #printArea .lbl { width:38%; font-weight:600; background:#f1f5f9; }
-    #printArea .firma { margin-top:26px; text-align:center; }
-    #printArea .firma .line { border-top:1px solid #111; width:260px; margin:0 auto; padding-top:4px; font-size:9.5px; }
+    #printArea .firma { margin-top:14px; text-align:center; }
+    #printArea .firma .line { border-top:1px solid #111; width:260px; margin:0 auto; padding-top:3px; font-size:8.3px; }
     /* Poder Simple: documento más amplio (ocupa ~2/3 de la hoja) */
     #printArea.poder { font-size:13px; }
     #printArea.poder .plogo img { height:46px; }
@@ -781,7 +781,7 @@ function imprimir(){
       <tr><td class="lbl">Rut de Cuenta</td><td colspan="3">${E(o.rut_cuenta)}</td></tr>
       <tr><td class="lbl">Número de Cuenta</td><td colspan="3">${E(o.num_cuenta)}</td></tr>
       <tr><td class="lbl">Email Confirmación</td><td colspan="3">${E(o.correo_confirmacion)}</td></tr></table>
-    <table class="p"><tr><th>OBSERVACIONES</th></tr><tr><td style="height:60px;vertical-align:top">${E(o.observaciones)}</td></tr></table>
+    <table class="p"><tr><th>OBSERVACIONES</th></tr><tr><td style="height:30px;vertical-align:top">${E(o.observaciones)}</td></tr></table>
     <div class="firma"><div class="line">Firma Representante Legal del Concesionario${o.rl_nombre?' · '+E(o.rl_nombre):''}</div></div>`);
 }
 /* Imprime cualquier HTML reutilizando el área de impresión */
