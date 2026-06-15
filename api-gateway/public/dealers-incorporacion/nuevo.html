@@ -5,7 +5,7 @@
   <link rel="icon" href="/img/favicon.png" type="image/png">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Nueva Ficha de Dealer — AutoFácil</title>
-  <!-- v1.4 -->
+  <!-- v1.5 -->
   <link href="/css/bootstrap.min.css" rel="stylesheet">
   <link href="/css/bootstrap-icons.css" rel="stylesheet">
   <style>
@@ -17,7 +17,11 @@
     .version-badge { background:rgba(255,255,255,.15); color:rgba(255,255,255,.75); font-size:.65rem; font-weight:700; border-radius:6px; padding:2px 8px; }
     .breadcrumb-nav { color:rgba(255,255,255,.6); font-size:.85rem; margin-left:16px; }
     .breadcrumb-nav a { color:rgba(255,255,255,.75); text-decoration:none; }
-    .btn-logout { background:rgba(255,255,255,.1); border:1px solid rgba(255,255,255,.2); color:#fff; border-radius:8px; padding:5px 12px; font-size:.82rem; cursor:pointer; }
+    .btn-logout { background:rgba(255,255,255,.1); border:1px solid rgba(255,255,255,.2); color:#fff; border-radius:8px; padding:5px 12px; font-size:.82rem; cursor:pointer; text-decoration:none; display:inline-flex; align-items:center; }
+    .topnav-right { display:flex; align-items:center; gap:10px; }
+    .user-chip { background:rgba(255,255,255,.12); border-radius:24px; padding:5px 12px; display:flex; align-items:center; gap:8px; font-size:.85rem; }
+    .avatar { width:28px; height:28px; background:#90caf9; border-radius:50%; display:flex; align-items:center; justify-content:center; color:var(--navy); font-weight:700; font-size:.75rem; }
+    .perfil-badge { background:rgba(144,202,249,.2); border:1px solid rgba(144,202,249,.4); color:#90caf9; border-radius:12px; padding:2px 10px; font-size:.73rem; font-weight:600; }
     .main { max-width:920px; margin:28px auto; padding:0 20px 80px; }
     .card-sec { background:#fff; border-radius:14px; box-shadow:0 1px 6px rgba(0,0,0,.07); margin-bottom:22px; overflow:hidden; }
     .card-sec > h3 { background:#f1f5f9; color:var(--navy-dark); font-size:.82rem; font-weight:800; text-transform:uppercase; letter-spacing:.6px; margin:0; padding:12px 20px; border-left:4px solid var(--navy); }
@@ -71,25 +75,36 @@
     .exc-item b { font-size:.88rem; color:#92400e; display:block; }
     .exc-item textarea { width:100%; border:1.5px solid #d1d5db; border-radius:8px; padding:8px 10px; font-size:.85rem; margin-top:8px; box-sizing:border-box; }
     .exc-item textarea:focus { outline:none; border-color:#b45309; }
-    /* ── Vista de impresión (todo en una hoja carta) ── */
+    /* ── Vista de impresión ── */
     #printArea { display:none; }
-    @page { size: letter; margin: 9mm; }
+    @page { size: letter; margin: 12mm; }
     @media print {
-      body * { visibility:hidden; }
-      #printArea, #printArea * { visibility:visible; }
-      #printArea { display:block; position:absolute; left:0; top:0; width:100%; padding:0; }
-      .topnav, .actionbar { display:none !important; }
+      /* display:none (no visibility) evita páginas en blanco por el layout oculto */
+      body { background:#fff !important; }
+      .topnav, .main, .actionbar, dialog, .toast-af { display:none !important; }
+      #printArea { display:block !important; }
     }
-    #printArea { color:#111; font-size:9px; }
+    #printArea { color:#111; font-size:9.5px; -webkit-print-color-adjust:exact; print-color-adjust:exact; }
+    #printArea .plogo { text-align:center; margin:0 0 10px; background:#012d70; padding:8px 0; border-radius:6px; }
+    #printArea .plogo img { height:32px; filter:brightness(0) invert(1); }
     #printArea h1 { text-align:center; color:#1f3864; font-size:15px; margin:0 0 1px; letter-spacing:.5px; }
     #printArea .subt { text-align:center; color:#1f3864; font-size:10px; font-weight:600; margin:0 0 8px; }
     #printArea h1.solo { margin-bottom:10px; }
     #printArea table.p { width:100%; border-collapse:collapse; margin-bottom:5px; }
-    #printArea table.p th { background:#1f3864; color:#fff; text-align:left; padding:2px 7px; font-size:9px; }
-    #printArea table.p td { border:1px solid #94a3b8; padding:2px 7px; font-size:9px; line-height:1.25; }
+    #printArea table.p th { background:#1f3864; color:#fff; text-align:left; padding:3px 7px; font-size:9.5px; }
+    #printArea table.p td { border:1px solid #94a3b8; padding:3px 7px; font-size:9.5px; line-height:1.3; }
     #printArea .lbl { width:38%; font-weight:600; background:#f1f5f9; }
-    #printArea .firma { margin-top:22px; text-align:center; }
-    #printArea .firma .line { border-top:1px solid #111; width:260px; margin:0 auto; padding-top:4px; font-size:9px; }
+    #printArea .firma { margin-top:26px; text-align:center; }
+    #printArea .firma .line { border-top:1px solid #111; width:260px; margin:0 auto; padding-top:4px; font-size:9.5px; }
+    /* Poder Simple: documento más amplio (ocupa ~2/3 de la hoja) */
+    #printArea.poder { font-size:13px; }
+    #printArea.poder .plogo img { height:46px; }
+    #printArea.poder h1 { font-size:22px; margin:0 0 20px; }
+    #printArea.poder p { font-size:13px; line-height:2.1; margin:0 0 16px; }
+    #printArea.poder table.p { margin:18px 0; }
+    #printArea.poder table.p td { font-size:13px; padding:9px 12px; }
+    #printArea.poder .firma { margin-top:110px; }
+    #printArea.poder .firma .line { width:320px; font-size:13px; padding-top:6px; }
   </style>
 </head>
 <body>
@@ -98,11 +113,23 @@
     <a href="/" class="topnav-brand"><img src="/img/logo.png" alt="AutoFácil"><span class="version-badge" id="versionBadge"></span></a>
     <div class="breadcrumb-nav"><a href="/">Inicio</a> › <a href="/dealers-incorporacion/">Dealer</a> › <span style="color:#fff;font-weight:600">Nueva Ficha</span></div>
   </div>
-  <div style="display:flex;align-items:center;gap:12px">
+  <div class="topnav-right">
     <span class="estado-pill e-BORRADOR" id="estadoPill">BORRADOR</span>
     <button class="btn-logout" onclick="location.href='/dealers-incorporacion/mantencion.html'"><i class="bi bi-list-ul me-1"></i>Mis fichas</button>
+    <span class="user-chip"><div class="avatar" id="avatarInicial">?</div>
+      <div><div style="font-weight:600;line-height:1.3;color:#fff" id="navNombre">—</div>
+      <div class="perfil-badge" id="navPerfil">—</div></div></span>
+    <a class="btn-logout" href="/dealers-incorporacion/"><i class="bi bi-arrow-left me-1"></i>Volver</a>
+    <button class="btn-logout" onclick="logout()"><i class="bi bi-box-arrow-right me-1"></i>Salir</button>
   </div>
 </nav>
+<script>
+  (function(){ const u=JSON.parse(sessionStorage.getItem('usuario')||'{}');
+    document.getElementById('navNombre').textContent=((u.nombre||'')+' '+(u.apellido||'')).trim()||'—';
+    document.getElementById('navPerfil').textContent=u.perfil||'';
+    document.getElementById('avatarInicial').textContent=(u.nombre||'?')[0].toUpperCase(); })();
+  function logout(){ sessionStorage.clear(); location.href='/login.html'; }
+</script>
 
 <div class="main">
   <div class="alert-box alert-rej" id="boxRechazo" style="display:none"></div>
@@ -411,7 +438,7 @@ function descargarPoderSimple(){
   const o=recolectar();
   const E=s=>String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;');
   const cuenta = `${E(o.cuenta_tipo||'')} ${E(o.banco||'')}`.trim();
-  printHTML(`
+  printHTML(`${LOGO_PRINT}
     <h1>PODER SIMPLE</h1>
     <p style="text-align:justify;line-height:1.7">En Santiago de Chile, ${E(o.fecha_solicitud||new Date().toLocaleDateString('es-CL'))}, por medio del presente instrumento
     <b>${E(o.nombre_razon||'__________')}</b>, RUT <b>${E(o.rut||'__________')}</b> (en adelante, el "Concesionario"), representada por su
@@ -426,7 +453,7 @@ function descargarPoderSimple(){
     </table>
     <p style="line-height:1.7">El Concesionario declara conocer y aceptar que dichos pagos se entenderán válidamente efectuados al ser depositados
     en la cuenta individualizada, liberando a AutoFácil de toda responsabilidad por los mismos.</p>
-    <div class="firma" style="margin-top:60px"><div class="line">Firma Representante Legal · ${E(o.nombre_razon||'')}</div></div>`);
+    <div class="firma"><div class="line">Firma Representante Legal · ${E(o.nombre_razon||'')}</div></div>`, 'poder');
 }
 async function borrarInforme(id){
   try{ const r=await fetch('/api/dealer-incorporacion/fichas/'+FICHA_ID+'/archivos/'+id,{method:'DELETE',headers:H}); const j=await r.json(); if(!j.success)throw new Error(j.error); await cargarInformes(); }
@@ -641,7 +668,7 @@ function imprimir(){
   const dirLbl = esP?'Dirección de Parque Automotriz':'Dirección de Sucursal';
   const comLbl = esP?'Comuna de Parque Automotriz':'Comuna de Sucursal';
   const E = s => String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;');
-  printHTML(`
+  printHTML(`${LOGO_PRINT}
     <h1${esP?'':' class="solo"'}>FICHA DE INCORPORACIÓN DE CONCESIONARIO</h1>${esP?'<div class="subt">Parque Automotriz</div>':''}
     <table class="p"><tr><th colspan="2">EJECUTIVO COMERCIAL</th></tr>
       <tr><td class="lbl">Nombre Ejecutivo</td><td>${E($('ejecutivo_nombre').value)}</td></tr>
@@ -677,7 +704,8 @@ function imprimir(){
     <div class="firma"><div class="line">Firma Representante Legal del Concesionario</div></div>`);
 }
 /* Imprime cualquier HTML reutilizando el área de impresión */
-function printHTML(html){ $('printArea').innerHTML = html; window.print(); }
+const LOGO_PRINT = '<div class="plogo"><img src="/img/logo.png" alt="AutoFácil"></div>';
+function printHTML(html, cls){ const pa=$('printArea'); pa.className=cls||''; pa.innerHTML=html; window.print(); }
 
 cargar();
 </script>
