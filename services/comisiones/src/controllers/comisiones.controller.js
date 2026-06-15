@@ -77,7 +77,7 @@ const SONIDOS = ['campana','dingdong','alarma','aplausos'];
       sonido_cada_seg INT NOT NULL DEFAULT 30, sonido_max_min INT NOT NULL DEFAULT 5 )`);
     const seed = {
       com_rev_aprobada_ops: { perfiles:'', incluir:1, prioridad:'alta' },
-      com_rev_devuelta:     { perfiles:'Administrador', incluir:0, prioridad:'alta' },
+      com_rev_devuelta:     { perfiles:'Administrador,Analista de Operaciones', incluir:0, prioridad:'alta' },
       com_rev_auto:         { perfiles:'Administrador', incluir:1, prioridad:'normal' },
     };
     for (const e of EVENTOS_REV) {
@@ -86,6 +86,11 @@ const SONIDOS = ['campana','dingdong','alarma','aplausos'];
         `INSERT IGNORE INTO comisiones_alertas_config (evento, perfiles, incluir_ejecutivo, usuarios_extra, activo, prioridad)
          VALUES (?,?,?,?,1,?)`, [e.evento, s.perfiles, s.incluir, '', s.prioridad]);
     }
+    // Migración de default (una vez): la devolución también avisa a Analista de
+    // Operaciones. Solo toca la fila si sigue en el default viejo (respeta cambios del Admin).
+    await pool.query(
+      `UPDATE comisiones_alertas_config SET perfiles='Administrador,Analista de Operaciones'
+       WHERE evento='com_rev_devuelta' AND perfiles='Administrador'`).catch(()=>{});
     console.log('[comisiones] alertas_config OK');
   } catch (e) { console.error('[comisiones alertas migration]', e.message); }
 })();
@@ -380,6 +385,14 @@ const ejecutivoResponder = async (req, res) => {
       'SELECT estado FROM comisiones_aprobaciones WHERE ejecutivo=? AND mes=?', [ejecutivo, mes]);
     if (!row || row.estado !== 'aprobado')
       return res.status(400).json({ success: false, data: null, error: 'La comisión aún no ha sido aprobada por Operaciones' });
+    // La declaración de conformidad es personal: solo el ejecutivo dueño (vía
+    // usuario_ejecutivos) o un Administrador puede responder esta comisión.
+    if (req.usuario.perfil_nombre !== 'Administrador') {
+      const [[lnk]] = await pool.query(
+        'SELECT 1 FROM usuario_ejecutivos WHERE id_usuario=? AND ejecutivo=? LIMIT 1',
+        [req.usuario.id_usuario, ejecutivo]);
+      if (!lnk) return res.status(403).json({ success: false, data: null, error: 'Solo el ejecutivo puede responder su propia comisión' });
+    }
     const ejec_estado = accion === 'aceptar' ? 'aceptado' : 'en_revision';
     await pool.query(
       `UPDATE comisiones_aprobaciones SET ejec_estado=?, ejec_comentario=?, ejec_por=?, ejec_at=NOW()

@@ -50,6 +50,8 @@ const pool = require('../../../../shared/config/database');
     await pool.query(`ALTER TABLE cartolas_movimientos ADD COLUMN IF NOT EXISTS enviada_por VARCHAR(150) DEFAULT NULL`).catch(()=>{});
     await pool.query(`ALTER TABLE cartolas_movimientos ADD COLUMN IF NOT EXISTS enviada_fecha DATETIME DEFAULT NULL`).catch(()=>{});
     await pool.query(`ALTER TABLE cartolas_movimientos ADD INDEX idx_mes_cartola (mes_cartola)`).catch(()=>{});
+    // Guarda los ids de movimientos incluidos en cada envío → reverso preciso (no por dealer)
+    await pool.query(`ALTER TABLE cartolas_enviadas ADD COLUMN IF NOT EXISTS mov_ids TEXT`).catch(()=>{});
     // Homologación: rut_conc → rut_dealer en cartolas_movimientos y cartolas_enviadas
     for (const t of ['cartolas_movimientos','cartolas_enviadas']) {
       try {
@@ -252,14 +254,14 @@ const registrarEnvio = async (req, res) => {
     if (!mes || !concesionario)
       return res.status(400).json({ success: false, data: null, error: 'mes y concesionario requeridos' });
     const enviadoPor = nombreUsuario(req.usuario);
+    const movIds = Array.isArray(ids) ? ids.map(Number).filter(Boolean) : [];
     const [r] = await pool.query(
-      `INSERT INTO cartolas_enviadas (mes, rut_dealer, nombre_dealer, mail, total_bruto, enviado_por)
-       VALUES (?,?,?,?,?,?)`,
-      [mes, rut_conc || null, concesionario, mail || null, total_bruto || null, enviadoPor]
+      `INSERT INTO cartolas_enviadas (mes, rut_dealer, nombre_dealer, mail, total_bruto, enviado_por, mov_ids)
+       VALUES (?,?,?,?,?,?,?)`,
+      [mes, rut_conc || null, concesionario, mail || null, total_bruto || null, enviadoPor, movIds.length ? JSON.stringify(movIds) : null]
     );
     // Estampa el mes de la cartola en los movimientos incluidos (no re-estampa si ya salieron antes)
     let marcados = 0;
-    const movIds = Array.isArray(ids) ? ids.map(Number).filter(Boolean) : [];
     if (movIds.length) {
       const ph = movIds.map(() => '?').join(',');
       const [u] = await pool.query(
@@ -299,18 +301,34 @@ const reversarEnvio = async (req, res) => {
     const [[env]] = await pool.query('SELECT * FROM cartolas_enviadas WHERE id = ?', [req.params.id]);
     if (!env) return res.status(404).json({ success: false, data: null, error: 'Envío no encontrado' });
 
+    // Identifica los movimientos del envío por sus ids exactos (preciso). Para envíos
+    // antiguos sin mov_ids → fallback por mes_cartola + dealer (compatibilidad).
+    let movIds = [];
+    try { const p = env.mov_ids ? JSON.parse(env.mov_ids) : []; movIds = (Array.isArray(p) ? p : []).map(Number).filter(Boolean); } catch (_) {}
+    let filtroJoin, filtroUpd, fVals;
+    if (movIds.length) {
+      const ph = movIds.map(() => '?').join(',');
+      filtroJoin = `m.id IN (${ph}) AND m.mes_cartola <=> ?`;
+      filtroUpd  = `id IN (${ph}) AND mes_cartola <=> ?`;
+      fVals = [...movIds, env.mes];
+    } else {
+      filtroJoin = `m.mes_cartola = ? AND m.rut_dealer <=> ?`;
+      filtroUpd  = `mes_cartola = ? AND rut_dealer <=> ?`;
+      fVals = [env.mes, env.rut_dealer];
+    }
+
     // Operaciones (seguimientos) a las que hay que quitar CARTOLA ENVIADA — calcular ANTES de des-estampar
     const [segs] = await pool.query(
       `SELECT DISTINCT ps.id AS seg_id
          FROM cartolas_movimientos m
          JOIN cartas_aprobacion ca ON ca.id = m.id_carta
          JOIN postventa_seguimiento ps ON ps.id_credito = ca.id_credito_creado
-        WHERE m.mes_cartola = ? AND m.rut_dealer <=> ?`, [env.mes, env.rut_dealer]);
+        WHERE ${filtroJoin}`, fVals);
 
     // Des-estampar los movimientos de esa cartola
     const [u] = await pool.query(
       `UPDATE cartolas_movimientos SET mes_cartola = NULL, enviada_por = NULL, enviada_fecha = NULL
-        WHERE mes_cartola = ? AND rut_dealer <=> ?`, [env.mes, env.rut_dealer]);
+        WHERE ${filtroUpd}`, fVals);
 
     // Quitar la etapa CARTOLA ENVIADA en Post Venta (las previas se conservan)
     if (segs.length) {
