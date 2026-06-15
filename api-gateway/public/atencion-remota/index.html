@@ -5,7 +5,7 @@
   <link rel="icon" href="/img/favicon.png" type="image/png">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Atención Remota — AutoFácil</title>
-  <!-- v1.3 -->
+  <!-- v1.4 -->
   <link href="/css/bootstrap.min.css" rel="stylesheet">
   <link href="/css/bootstrap-icons.css" rel="stylesheet">
   <style>
@@ -98,6 +98,23 @@
     .msg img { max-width:100%; border-radius:8px; display:block; margin-bottom:4px; cursor:pointer; }
     .msg a.file { color:inherit; text-decoration:none; display:flex; align-items:center; gap:7px; font-weight:600; }
     .typing { font-size:.74rem; color:#94a3b8; padding:0 14px 4px; height:16px; }
+    .interloc-bar { display:flex; align-items:center; gap:8px; padding:6px 12px; background:#f1f6fd; border-bottom:1px solid #e6eef9; font-size:.8rem; }
+    .il-label { color:#64748b; font-weight:600; white-space:nowrap; }
+    .interloc-btn { background:#fff; border:1px solid #cdddff; color:var(--navy-dark); border-radius:14px; padding:3px 10px; font-size:.8rem; font-weight:700; cursor:pointer; max-width:100%; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+    .interloc-btn:hover { background:#eef4ff; }
+    .il-overlay { display:none; position:fixed; inset:0; background:rgba(0,0,0,.4); z-index:9998; align-items:center; justify-content:center; padding:16px; }
+    .il-overlay.show { display:flex; }
+    .il-box { background:#fff; border-radius:14px; width:100%; max-width:430px; box-shadow:0 20px 60px rgba(0,0,0,.25); overflow:hidden; }
+    .il-head { background:linear-gradient(135deg,var(--navy-dark),var(--navy)); color:#fff; padding:14px 18px; font-weight:700; display:flex; align-items:center; gap:9px; }
+    .il-body { padding:18px; }
+    .il-lbl { font-size:.76rem; font-weight:700; color:#475569; text-transform:uppercase; letter-spacing:.3px; display:block; margin-bottom:5px; }
+    .il-body input { width:100%; border:1.5px solid #d1d5db; border-radius:8px; padding:9px 11px; font-size:.9rem; box-sizing:border-box; }
+    .il-body input:focus { outline:none; border-color:var(--navy); }
+    .il-hist-t { font-size:.76rem; color:#64748b; margin:14px 0 8px; }
+    .il-chip { display:inline-flex; align-items:center; gap:7px; background:#f1f5f9; border:1px solid #e2e8f0; border-radius:16px; padding:5px 8px 5px 12px; margin:0 6px 6px 0; cursor:pointer; font-size:.83rem; color:#334155; }
+    .il-chip:hover { background:#eef4ff; border-color:#cdddff; }
+    .il-chip b { background:var(--navy); color:#fff; border-radius:10px; padding:0 7px; font-size:.72rem; min-width:18px; text-align:center; }
+    .il-foot { display:flex; justify-content:flex-end; gap:8px; padding:14px 18px; border-top:1px solid #f1f5f9; }
     .chat-input { display:flex; align-items:center; gap:8px; padding:10px; border-top:1px solid #eef2f7; }
     .chat-input input[type=text] { flex:1; border:1.5px solid #d1d5db; border-radius:22px; padding:9px 14px; font-size:.88rem; outline:none; }
     .chat-input input[type=text]:focus { border-color:var(--navy); }
@@ -246,6 +263,22 @@
 </div>
 
 <input type="file" id="fileInput" class="hidden" accept="image/*,application/pdf">
+
+<div class="il-overlay" id="ilModal">
+  <div class="il-box">
+    <div class="il-head"><i class="bi bi-person-vcard"></i> <span id="ilTitulo">Interlocutor</span></div>
+    <div class="il-body">
+      <label class="il-lbl">Nombre del interlocutor</label>
+      <input type="text" id="ilInput" placeholder="Ej: Juan Pérez" autocomplete="off">
+      <div id="ilHist"></div>
+    </div>
+    <div class="il-foot">
+      <button class="btn-ghost" onclick="cerrarInterloc()">Cancelar</button>
+      <button class="btn-primary2" onclick="guardarInterloc()"><i class="bi bi-check-lg me-1"></i>Guardar</button>
+    </div>
+  </div>
+</div>
+
 <div class="toast-af" id="toast"></div>
 
 <script src="/js/auth-guard.js"></script>
@@ -346,6 +379,10 @@ async function openPanel(conv){
       <div class="who"><b>${esc(conv.dealer_nombre||'Dealer')}</b><span>${esc(conv.dealer_rut||'')}</span></div>
       <span class="pres" id="pres-${conv.id}">conectando…</span>
       <button title="Cerrar conversación" onclick="cerrar(${conv.id})"><i class="bi bi-check2-circle"></i></button>
+    </div>
+    <div class="interloc-bar">
+      <span class="il-label"><i class="bi bi-person-vcard"></i> Interlocutor:</span>
+      <button class="interloc-btn" id="ilbtn-${conv.id}" onclick="abrirInterloc(${conv.id})">${conv.interlocutor?esc(conv.interlocutor):'Sin asignar'} <i class="bi bi-caret-down-fill"></i></button>
     </div>
     <div class="msgs" id="msgs-${conv.id}"></div>
     <div class="typing" id="typing-${conv.id}"></div>
@@ -575,6 +612,42 @@ function usarRespuesta(texto){
   const inp=document.getElementById('inp-'+activeConv); if(!inp) return;
   inp.value = inp.value ? inp.value.replace(/\s+$/,'')+' '+texto : texto; inp.focus();
 }
+
+/* ════════════════ Interlocutor ════════════════ */
+const escAttr = s => esc(s).replace(/"/g,'&quot;');
+let ilConv=null;
+async function abrirInterloc(convId){
+  const p=panels.get(convId); if(!p) return; ilConv=convId;
+  document.getElementById('ilTitulo').textContent='Interlocutor — '+(p.conv.dealer_nombre||'Dealer');
+  document.getElementById('ilInput').value=p.conv.interlocutor||'';
+  document.getElementById('ilHist').innerHTML='<div class="il-hist-t">Cargando…</div>';
+  document.getElementById('ilModal').classList.add('show');
+  document.getElementById('ilInput').focus();
+  try {
+    const r=await fetch('/api/atencion-remota/cuentas/'+p.conv.id_cuenta+'/interlocutores',{ headers:H });
+    const j=await r.json(); const hist=(j.success&&j.data)||[];
+    const el=document.getElementById('ilHist');
+    el.innerHTML = hist.length
+      ? '<div class="il-hist-t">Interlocutores anteriores de este dealer (clic para elegir):</div>'+
+        hist.map(x=>`<button class="il-chip" data-n="${escAttr(x.nombre)}"><span>${esc(x.nombre)}</span><b>${x.veces}</b></button>`).join('')
+      : '<div class="il-hist-t">Aún no hay interlocutores registrados para este dealer.</div>';
+    el.querySelectorAll('.il-chip').forEach(b=>b.addEventListener('click',()=>{ document.getElementById('ilInput').value=b.dataset.n; document.getElementById('ilInput').focus(); }));
+  } catch(_){ document.getElementById('ilHist').innerHTML=''; }
+}
+function cerrarInterloc(){ document.getElementById('ilModal').classList.remove('show'); ilConv=null; }
+async function guardarInterloc(){
+  if(!ilConv) return; const nombre=document.getElementById('ilInput').value.trim();
+  try {
+    const r=await fetch('/api/atencion-remota/conversaciones/'+ilConv+'/interlocutor',{ method:'PUT', headers:H, body:JSON.stringify({ nombre }) });
+    const j=await r.json();
+    if(j.success){
+      const p=panels.get(ilConv);
+      if(p){ p.conv.interlocutor=nombre; const b=document.getElementById('ilbtn-'+ilConv); if(b) b.innerHTML=(nombre?esc(nombre):'Sin asignar')+' <i class="bi bi-caret-down-fill"></i>'; }
+      toast('Interlocutor guardado'); cerrarInterloc();
+    } else toast(j.error||'Error', true);
+  } catch(_){ toast('Error al guardar', true); }
+}
+document.getElementById('ilModal').addEventListener('click', function(e){ if(e.target===this) cerrarInterloc(); });
 
 connect();
 cargarRespuestas();

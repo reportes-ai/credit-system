@@ -25,6 +25,9 @@ router.get('/solicitudes',              verifyToken, requireFunc('atencion_remot
 router.post('/solicitudes/:id/aprobar', verifyToken, requireFunc('atencion_remota'), C.aprobarSolicitud);
 router.post('/solicitudes/:id/rechazar',verifyToken, requireFunc('atencion_remota'), C.rechazarSolicitud);
 
+router.put('/conversaciones/:id/interlocutor',  verifyToken, C.setInterlocutor);
+router.get('/cuentas/:idCuenta/interlocutores', verifyToken, C.interlocutoresDe);
+
 router.get('/config', verifyToken, requireFunc('atencion_remota', 'atencion_remota_config'), C.getConfig);
 router.put('/config', verifyToken, requireFunc('atencion_remota_config'), C.putConfig);
 

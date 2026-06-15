@@ -183,6 +183,9 @@ const errSrv  = (res, e, tag) => { console.error(`[${tag}]`, e.message); res.sta
       INDEX idx_estado (estado)
     )`);
 
+    // Interlocutor (persona del dealer con quien se chatea) por conversación.
+    await pool.query('ALTER TABLE ar_conversaciones ADD COLUMN IF NOT EXISTS interlocutor VARCHAR(150) NULL');
+
     console.log('[atencion-remota] módulo y esquema listos');
   } catch (e) { console.error('[atencion-remota migration]', e.message); }
 })();
@@ -544,6 +547,29 @@ const rechazarSolicitud = async (req, res) => {
   } catch (e) { errSrv(res, e, 'rechazarSolicitud'); }
 };
 
+/* ── REST: interlocutor de la conversación + historial por dealer ────────── */
+const setInterlocutor = async (req, res) => {
+  try {
+    const nombre = String(req.body?.nombre || '').trim().slice(0, 150);
+    await pool.query('UPDATE ar_conversaciones SET interlocutor=? WHERE id=?', [nombre || null, req.params.id]);
+    auditar({ req, accion:'EDITAR', modulo:'atencion-remota', entidad:'conversacion', entidad_id:req.params.id,
+      detalle:`Asignó interlocutor "${nombre}" a la conversación #${req.params.id}` });
+    res.json({ success:true, data:{ nombre }, error:null });
+  } catch (e) { errSrv(res, e, 'setInterlocutor'); }
+};
+
+// Historial de interlocutores del dealer (por cuenta) con N° de conversaciones.
+const interlocutoresDe = async (req, res) => {
+  try {
+    const [rows] = await pool.query(
+      `SELECT interlocutor AS nombre, COUNT(*) AS veces, MAX(created_at) AS ultima
+       FROM ar_conversaciones
+       WHERE id_cuenta=? AND interlocutor IS NOT NULL AND interlocutor <> ''
+       GROUP BY interlocutor ORDER BY veces DESC, ultima DESC`, [req.params.idCuenta]);
+    res.json({ success:true, data:rows, error:null });
+  } catch (e) { errSrv(res, e, 'interlocutoresDe'); }
+};
+
 module.exports = {
   // middlewares
   verifyDealer, verifyAny,
@@ -557,6 +583,8 @@ module.exports = {
   listarRespuestas, listarRespuestasAdmin, crearRespuesta, actualizarRespuesta, eliminarRespuesta,
   // solicitudes de cuenta (autoregistro)
   solicitarCuenta, listarSolicitudes, aprobarSolicitud, rechazarSolicitud,
+  // interlocutores
+  setInterlocutor, interlocutoresDe,
   // service helpers (ws.js)
   buildIce, getCfg, crearConversacion, getConversacion, asignarConversacion,
   cerrarConversacion, persistMensaje, colaEspera, activasDe, contarActivas,
