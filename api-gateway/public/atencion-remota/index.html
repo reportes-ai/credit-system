@@ -5,7 +5,7 @@
   <link rel="icon" href="/img/favicon.png" type="image/png">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Atención Remota — AutoFácil</title>
-  <!-- v1.2 -->
+  <!-- v1.3 -->
   <link href="/css/bootstrap.min.css" rel="stylesheet">
   <link href="/css/bootstrap-icons.css" rel="stylesheet">
   <style>
@@ -28,6 +28,14 @@
     .tabs { display:flex; gap:6px; margin:14px 0 18px; flex-wrap:wrap; }
     .tab { background:#fff; border:1px solid #e2e8f0; color:#475569; border-radius:10px 10px 0 0; padding:9px 18px; font-size:.88rem; font-weight:600; cursor:pointer; }
     .tab.active { background:var(--navy); color:#fff; border-color:var(--navy); }
+    .tab-badge { background:#dc2626; color:#fff; border-radius:10px; padding:0 7px; font-size:.72rem; font-weight:800; margin-left:5px; }
+    .sol-card { display:flex; gap:14px; align-items:center; justify-content:space-between; border:1px solid #e8edf3; border-radius:12px; padding:14px 16px; margin-bottom:10px; flex-wrap:wrap; }
+    .sol-main { flex:1; min-width:240px; }
+    .sol-rut { color:#64748b; font-size:.8rem; }
+    .sol-meta { display:flex; flex-wrap:wrap; gap:14px; margin:6px 0; font-size:.82rem; color:#475569; }
+    .sol-meta i { color:var(--navy); margin-right:3px; }
+    .sol-fecha { font-size:.74rem; color:#94a3b8; }
+    .sol-acc { display:flex; gap:8px; }
     .paneview { display:none; }
     .paneview.active { display:block; }
 
@@ -141,6 +149,7 @@
   <div class="tabs">
     <div class="tab active" data-tab="atencion"><i class="bi bi-headset me-1"></i>Atención</div>
     <div class="tab" data-tab="cuentas"><i class="bi bi-person-badge me-1"></i>Cuentas de Dealers</div>
+    <div class="tab" data-tab="solicitudes"><i class="bi bi-person-plus me-1"></i>Solicitudes<span class="tab-badge" id="solBadge" style="display:none">0</span></div>
     <div class="tab hidden" id="tabConfigBtn" data-tab="config"><i class="bi bi-sliders me-1"></i>Configuración</div>
   </div>
 
@@ -193,6 +202,15 @@
             <tbody id="cuentasBody"></tbody></table>
         </div>
       </div>
+    </div>
+  </div>
+
+  <!-- ── SOLICITUDES ── -->
+  <div class="paneview" id="view-solicitudes">
+    <div class="card">
+      <h3 style="margin-top:0;font-size:1rem;color:var(--navy-dark)"><i class="bi bi-person-plus me-1"></i>Solicitudes de cuenta pendientes</h3>
+      <p style="font-size:.83rem;color:#64748b;margin:0 0 14px">Dealers que pidieron acceso desde el portal. Al aprobar defines su contraseña y se crea la cuenta.</p>
+      <div id="solList"></div>
     </div>
   </div>
 
@@ -252,6 +270,7 @@ document.querySelectorAll('.tab').forEach(t => t.addEventListener('click', () =>
   t.classList.add('active');
   document.getElementById('view-'+t.dataset.tab).classList.add('active');
   if (t.dataset.tab==='cuentas') cargarCuentas();
+  if (t.dataset.tab==='solicitudes') cargarSolicitudes();
   if (t.dataset.tab==='config')  cargarConfig();
 }));
 
@@ -496,6 +515,51 @@ async function guardarConfig(){
     const j=await r.json(); toast(j.success?'Configuración guardada':(j.error||'Error'), !j.success); } catch(_){ toast('Error al guardar', true); }
 }
 
+/* ════════════════ Solicitudes de cuenta ════════════════ */
+let SOL=[];
+async function cargarSolicitudes(){
+  try {
+    const r=await fetch('/api/atencion-remota/solicitudes',{ headers:H }); const j=await r.json();
+    SOL=(j.success&&j.data)||[];
+    const bd=document.getElementById('solBadge'); bd.textContent=SOL.length; bd.style.display=SOL.length?'inline-block':'none';
+    const el=document.getElementById('solList'); if(!el) return;
+    el.innerHTML = SOL.length ? SOL.map(s=>`
+      <div class="sol-card">
+        <div class="sol-main">
+          <div><b>${esc(s.razon_social||'—')}</b> <span class="sol-rut">${esc(s.rut||'')}</span></div>
+          <div class="sol-meta">
+            <span><i class="bi bi-person"></i>${esc(s.contacto||'—')}</span>
+            <span><i class="bi bi-telephone"></i>${esc(s.telefono||'—')}</span>
+            <span><i class="bi bi-envelope"></i>${esc(s.email||'')}</span>
+            <span><i class="bi bi-geo-alt"></i>${esc(s.direccion||'—')}</span>
+          </div>
+          <div class="sol-fecha">Solicitada: ${new Date(s.created_at).toLocaleString('es-CL')}</div>
+        </div>
+        <div class="sol-acc">
+          <button class="btn-primary2" onclick="aprobarSol(${s.id})"><i class="bi bi-check-lg"></i> Aprobar</button>
+          <button class="btn-ghost" onclick="rechazarSol(${s.id})">Rechazar</button>
+        </div>
+      </div>`).join('') : '<div style="padding:24px;text-align:center;color:#94a3b8">No hay solicitudes pendientes.</div>';
+  } catch(_){}
+}
+async function aprobarSol(id){
+  const s=SOL.find(x=>x.id===id); const email=s?s.email:'';
+  const p=prompt('Crear cuenta para '+email+'\n\nDefine la contraseña inicial (mínimo 6 caracteres):');
+  if(p===null) return;
+  if(String(p).length<6) return toast('La contraseña debe tener al menos 6 caracteres', true);
+  try {
+    const r=await fetch('/api/atencion-remota/solicitudes/'+id+'/aprobar',{ method:'POST', headers:H, body:JSON.stringify({ password:p }) });
+    const j=await r.json();
+    if(j.success){ toast('Cuenta creada para '+email); cargarSolicitudes(); cargarCuentas(); }
+    else toast(j.error||'Error', true);
+  } catch(_){ toast('Error al aprobar', true); }
+}
+async function rechazarSol(id){
+  if(!confirm('¿Rechazar esta solicitud?')) return;
+  try { const r=await fetch('/api/atencion-remota/solicitudes/'+id+'/rechazar',{ method:'POST', headers:H, body:JSON.stringify({}) });
+    const j=await r.json(); if(j.success){ toast('Solicitud rechazada'); cargarSolicitudes(); } else toast(j.error||'Error', true); } catch(_){}
+}
+
 /* ════════════════ Respuestas rápidas ════════════════ */
 async function cargarRespuestas(){
   try { const r=await fetch('/api/atencion-remota/respuestas',{ headers:H }); const j=await r.json(); RESP=(j.success&&j.data)||[]; renderResp(); } catch(_){}
@@ -514,6 +578,9 @@ function usarRespuesta(texto){
 
 connect();
 cargarRespuestas();
+cargarSolicitudes();
+setInterval(cargarSolicitudes, 60000);
+(function(){ const qt=new URLSearchParams(location.search).get('tab'); if(qt){ const tb=document.querySelector('.tab[data-tab="'+qt+'"]'); if(tb) tb.click(); } })();
 </script>
 <script src="/js/app-version.js"></script>
 </body>

@@ -5,7 +5,7 @@
   <link rel="icon" href="/img/favicon.png" type="image/png">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Portal Dealer — Atención AutoFácil</title>
-  <!-- v1.0 -->
+  <!-- v1.1 -->
   <link href="/css/bootstrap-icons.css" rel="stylesheet">
   <style>
     :root { --navy:#0141A2; --navy-dark:#012d70; --navy-light:#0255c5; --accent:#009AFE; }
@@ -87,11 +87,33 @@
       <p>Ingresa para chatear con tu ejecutivo en línea</p>
     </div>
     <div class="login-body">
-      <div class="login-err" id="loginErr"></div>
-      <div class="fld"><label>Email</label><input type="email" id="liEmail" placeholder="tucorreo@dealer.cl" autocomplete="username"></div>
-      <div class="fld"><label>Contraseña</label><input type="password" id="liPass" placeholder="Tu contraseña" autocomplete="current-password"></div>
-      <button class="btn-login" id="liBtn" onclick="login()">Ingresar</button>
-      <div class="login-foot"><i class="bi bi-shield-lock"></i> Conexión segura · AutoFácil Crédito Automotriz</div>
+      <!-- Ingreso -->
+      <div id="loginForm">
+        <div class="login-err" id="loginErr"></div>
+        <div class="fld"><label>Email</label><input type="email" id="liEmail" placeholder="tucorreo@dealer.cl" autocomplete="username"></div>
+        <div class="fld"><label>Contraseña</label><input type="password" id="liPass" placeholder="Tu contraseña" autocomplete="current-password"></div>
+        <button class="btn-login" id="liBtn" onclick="login()">Ingresar</button>
+        <div style="text-align:center;margin-top:14px"><a href="#" onclick="verRegistro(event)" style="font-size:.84rem;color:var(--navy);font-weight:600;text-decoration:none">¿No tienes cuenta? Solicítala aquí</a></div>
+        <div class="login-foot"><i class="bi bi-shield-lock"></i> Conexión segura · AutoFácil Crédito Automotriz</div>
+      </div>
+      <!-- Solicitud de cuenta -->
+      <div id="registroForm" style="display:none">
+        <div class="login-err" id="regErr"></div>
+        <div id="regOk" style="display:none;background:#f0fdf4;border:1px solid #bbf7d0;color:#15803d;border-radius:9px;padding:14px;font-size:.88rem;text-align:center">
+          <i class="bi bi-check-circle-fill"></i> ¡Solicitud enviada! Te avisaremos por teléfono cuando activemos tu cuenta.
+        </div>
+        <div id="regFields">
+          <p style="font-size:.84rem;color:#64748b;margin:0 0 14px">Completa tus datos y un ejecutivo activará tu acceso.</p>
+          <div class="fld"><label>RUT *</label><input type="text" id="rgRut" placeholder="76.123.456-7"></div>
+          <div class="fld"><label>Razón Social *</label><input type="text" id="rgRazon" placeholder="Automotora …"></div>
+          <div class="fld"><label>Dirección</label><input type="text" id="rgDir" placeholder="Calle, número, comuna"></div>
+          <div class="fld"><label>Teléfono</label><input type="text" id="rgTel" placeholder="+56 9 …"></div>
+          <div class="fld"><label>Nombre del contacto</label><input type="text" id="rgContacto" placeholder="Tu nombre"></div>
+          <div class="fld"><label>Email * (será tu acceso)</label><input type="email" id="rgEmail" placeholder="tucorreo@dealer.cl"></div>
+          <button class="btn-login" id="rgBtn" onclick="solicitar()">Enviar solicitud</button>
+        </div>
+        <div style="text-align:center;margin-top:14px"><a href="#" onclick="verLogin(event)" style="font-size:.84rem;color:var(--navy);font-weight:600;text-decoration:none">← Volver a ingresar</a></div>
+      </div>
     </div>
   </div>
 </div>
@@ -160,6 +182,23 @@ async function login(){
   } catch(_){ err.textContent='Error de conexión. Intenta nuevamente.'; err.style.display='block'; btn.disabled=false; btn.textContent='Ingresar'; }
 }
 document.getElementById('liPass').addEventListener('keydown', e=>{ if(e.key==='Enter') login(); });
+
+/* ── Solicitud de cuenta (autoregistro) ── */
+const val=id=>document.getElementById(id).value.trim();
+function verRegistro(e){ if(e) e.preventDefault(); document.getElementById('loginForm').style.display='none'; document.getElementById('registroForm').style.display='block'; }
+function verLogin(e){ if(e) e.preventDefault(); document.getElementById('registroForm').style.display='none'; document.getElementById('loginForm').style.display='block'; }
+async function solicitar(){
+  const body={ rut:val('rgRut'), razon_social:val('rgRazon'), direccion:val('rgDir'), telefono:val('rgTel'), contacto:val('rgContacto'), email:val('rgEmail') };
+  const err=document.getElementById('regErr'); err.style.display='none';
+  if(!body.rut||!body.razon_social||!body.email){ err.textContent='RUT, Razón Social y Email son obligatorios.'; err.style.display='block'; return; }
+  const btn=document.getElementById('rgBtn'); btn.disabled=true; btn.textContent='Enviando…';
+  try {
+    const r=await fetch('/api/atencion-remota/dealer/solicitar',{ method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(body) });
+    const j=await r.json();
+    if(j.success){ document.getElementById('regFields').style.display='none'; document.getElementById('regOk').style.display='block'; }
+    else { err.textContent=j.error||'No se pudo enviar la solicitud.'; err.style.display='block'; btn.disabled=false; btn.textContent='Enviar solicitud'; }
+  } catch(_){ err.textContent='Error de conexión. Intenta nuevamente.'; err.style.display='block'; btn.disabled=false; btn.textContent='Enviar solicitud'; }
+}
 
 function logoutDealer(){ sessionStorage.removeItem('dealer_token'); sessionStorage.removeItem('dealer_info'); location.reload(); }
 

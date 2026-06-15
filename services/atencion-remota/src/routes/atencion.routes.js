@@ -6,6 +6,7 @@ const C = require('../controllers/atencion.controller');
 
 /* ── Portal Dealer ───────────────────────────────────────────────────────── */
 router.post('/dealer/login', C.dealerLogin);
+router.post('/dealer/solicitar', C.solicitarCuenta);   // autoregistro (público)
 
 /* ── Compartido (ejecutivo o dealer) ─────────────────────────────────────── */
 router.get('/ice', C.verifyAny, C.getIce);
@@ -19,6 +20,10 @@ router.get('/cola', verifyToken, C.getCola);
 router.get('/cuentas',     verifyToken, requireFunc('atencion_remota'), C.listarCuentas);
 router.post('/cuentas',    verifyToken, requireFunc('atencion_remota'), C.crearCuenta);
 router.put('/cuentas/:id', verifyToken, requireFunc('atencion_remota'), C.actualizarCuenta);
+
+router.get('/solicitudes',              verifyToken, requireFunc('atencion_remota'), C.listarSolicitudes);
+router.post('/solicitudes/:id/aprobar', verifyToken, requireFunc('atencion_remota'), C.aprobarSolicitud);
+router.post('/solicitudes/:id/rechazar',verifyToken, requireFunc('atencion_remota'), C.rechazarSolicitud);
 
 router.get('/config', verifyToken, requireFunc('atencion_remota', 'atencion_remota_config'), C.getConfig);
 router.put('/config', verifyToken, requireFunc('atencion_remota_config'), C.putConfig);

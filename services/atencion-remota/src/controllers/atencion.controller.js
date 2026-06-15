@@ -14,6 +14,7 @@ const bcrypt = require('bcryptjs');
 const jwt    = require('jsonwebtoken');
 const { JWT_SECRET, JWT_EXPIRES } = require('../../../../shared/middleware/auth');
 const { auditar } = require('../../../../shared/audit');
+const { notificar } = require('../../../notificaciones/src/controllers/notificaciones.controller');
 
 const normRut = r => String(r || '').replace(/[.\-\s]/g, '').toUpperCase();
 const errSrv  = (res, e, tag) => { console.error(`[${tag}]`, e.message); res.status(500).json({ success: false, data: null, error: 'Error interno del servidor' }); };
@@ -164,6 +165,23 @@ const errSrv  = (res, e, tag) => { console.error(`[${tag}]`, e.message); res.sta
       const [[pp]] = await pool.query('SELECT 1 ok FROM permisos_perfil WHERE id_perfil=1 AND id_funcionalidad=? LIMIT 1', [idf]);
       if (!pp) await pool.query('INSERT INTO permisos_perfil (id_perfil, id_funcionalidad, habilitado) VALUES (1,?,1)', [idf]);
     }
+
+    // Solicitudes de cuenta de dealer (autoregistro desde el portal).
+    await pool.query(`CREATE TABLE IF NOT EXISTS ar_solicitudes_cuenta (
+      id           INT AUTO_INCREMENT PRIMARY KEY,
+      rut          VARCHAR(20),
+      razon_social VARCHAR(200),
+      direccion    VARCHAR(300),
+      telefono     VARCHAR(40),
+      contacto     VARCHAR(150),
+      email        VARCHAR(150),
+      estado       VARCHAR(12) DEFAULT 'PENDIENTE',
+      nota         VARCHAR(300) NULL,
+      procesada_by INT NULL,
+      procesada_at DATETIME NULL,
+      created_at   DATETIME DEFAULT CURRENT_TIMESTAMP,
+      INDEX idx_estado (estado)
+    )`);
 
     console.log('[atencion-remota] módulo y esquema listos');
   } catch (e) { console.error('[atencion-remota migration]', e.message); }
@@ -442,6 +460,90 @@ const eliminarRespuesta = async (req, res) => {
   } catch (e) { errSrv(res, e, 'eliminarRespuesta'); }
 };
 
+/* ── REST: solicitudes de cuenta (autoregistro del dealer) ───────────────── */
+const solicitarCuenta = async (req, res) => {
+  try {
+    let { rut, razon_social, direccion, telefono, contacto, email } = req.body || {};
+    rut = String(rut || '').trim();
+    razon_social = String(razon_social || '').trim();
+    email = String(email || '').toLowerCase().trim();
+    if (!rut || !razon_social || !email)
+      return res.status(400).json({ success:false, data:null, error:'RUT, Razón Social y Email son obligatorios' });
+    if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email))
+      return res.status(400).json({ success:false, data:null, error:'Email inválido' });
+    const [[ctaDup]] = await pool.query('SELECT id FROM ar_dealer_cuentas WHERE email=?', [email]);
+    if (ctaDup) return res.status(409).json({ success:false, data:null, error:'Ya existe una cuenta con ese email. Intenta iniciar sesión.' });
+    const [[solDup]] = await pool.query("SELECT id FROM ar_solicitudes_cuenta WHERE email=? AND estado='PENDIENTE'", [email]);
+    if (solDup) return res.status(409).json({ success:false, data:null, error:'Ya tienes una solicitud pendiente con ese email.' });
+    const [r] = await pool.query(
+      `INSERT INTO ar_solicitudes_cuenta (rut, razon_social, direccion, telefono, contacto, email)
+       VALUES (?,?,?,?,?,?)`,
+      [rut, razon_social, direccion || null, telefono || null, contacto || null, email]);
+    // Avisar a Administradores y ejecutivos con acceso a Atención Remota.
+    try {
+      const [us] = await pool.query(
+        `SELECT DISTINCT u.id_usuario FROM usuarios u JOIN perfiles p ON p.id_perfil=u.id_perfil
+         LEFT JOIN permisos_perfil pp ON pp.id_perfil=u.id_perfil
+         LEFT JOIN funcionalidades f ON f.id_funcionalidad=pp.id_funcionalidad AND f.codigo='atencion_remota'
+         WHERE u.estado='activo' AND (p.nombre='Administrador' OR (pp.habilitado=1 AND f.codigo='atencion_remota'))`);
+      await notificar(us.map(x => x.id_usuario), {
+        tipo:'atencion', titulo:'Nueva solicitud de cuenta dealer',
+        mensaje:`${razon_social} (${rut}) solicitó acceso al portal`,
+        href:'/atencion-remota/?tab=solicitudes', prioridad:'media', clave:'ar_sol_' + r.insertId });
+    } catch (_) {}
+    res.status(201).json({ success:true, data:{ id:r.insertId }, error:null });
+  } catch (e) { errSrv(res, e, 'solicitarCuenta'); }
+};
+
+const listarSolicitudes = async (req, res) => {
+  try {
+    const estado = (req.query.estado || 'PENDIENTE').toUpperCase();
+    const [rows] = await pool.query('SELECT * FROM ar_solicitudes_cuenta WHERE estado=? ORDER BY created_at DESC', [estado]);
+    res.json({ success:true, data:rows, error:null });
+  } catch (e) { errSrv(res, e, 'listarSolicitudes'); }
+};
+
+const aprobarSolicitud = async (req, res) => {
+  try {
+    const { password } = req.body || {};
+    if (!password || String(password).length < 6)
+      return res.status(400).json({ success:false, data:null, error:'Define una contraseña para la cuenta (mínimo 6)' });
+    const [[s]] = await pool.query('SELECT * FROM ar_solicitudes_cuenta WHERE id=?', [req.params.id]);
+    if (!s) return res.status(404).json({ success:false, data:null, error:'Solicitud no encontrada' });
+    if (s.estado !== 'PENDIENTE') return res.status(400).json({ success:false, data:null, error:'La solicitud ya fue procesada' });
+    const [[ctaDup]] = await pool.query('SELECT id FROM ar_dealer_cuentas WHERE email=?', [s.email]);
+    if (ctaDup) return res.status(409).json({ success:false, data:null, error:'Ya existe una cuenta con ese email' });
+    let id_dealer = null;
+    try {
+      const [[d]] = await pool.query(
+        "SELECT id_dealer FROM dealers WHERE REPLACE(REPLACE(REPLACE(UPPER(rut),'.',''),'-',''),' ','')=? LIMIT 1", [normRut(s.rut)]);
+      if (d) id_dealer = d.id_dealer;
+    } catch (_) {}
+    const hash = await bcrypt.hash(String(password), 10);
+    const [c] = await pool.query(
+      `INSERT INTO ar_dealer_cuentas (id_dealer, rut, nombre, email, password_hash, creado_por)
+       VALUES (?,?,?,?,?,?)`,
+      [id_dealer, s.rut, s.razon_social, s.email, hash, req.usuario.id_usuario]);
+    await pool.query("UPDATE ar_solicitudes_cuenta SET estado='APROBADA', procesada_by=?, procesada_at=NOW() WHERE id=?",
+      [req.usuario.id_usuario, req.params.id]);
+    auditar({ req, accion:'APROBAR', modulo:'atencion-remota', entidad:'solicitud_cuenta', entidad_id:req.params.id,
+      detalle:`Aprobó la solicitud de ${s.razon_social} (${s.rut}) y creó la cuenta ${s.email}`, rut:s.rut });
+    res.json({ success:true, data:{ id_cuenta:c.insertId, email:s.email }, error:null });
+  } catch (e) { errSrv(res, e, 'aprobarSolicitud'); }
+};
+
+const rechazarSolicitud = async (req, res) => {
+  try {
+    const [[s]] = await pool.query('SELECT estado FROM ar_solicitudes_cuenta WHERE id=?', [req.params.id]);
+    if (!s) return res.status(404).json({ success:false, data:null, error:'Solicitud no encontrada' });
+    await pool.query("UPDATE ar_solicitudes_cuenta SET estado='RECHAZADA', nota=?, procesada_by=?, procesada_at=NOW() WHERE id=?",
+      [String(req.body?.nota || '').slice(0, 300) || null, req.usuario.id_usuario, req.params.id]);
+    auditar({ req, accion:'RECHAZAR', modulo:'atencion-remota', entidad:'solicitud_cuenta', entidad_id:req.params.id,
+      detalle:`Rechazó la solicitud de cuenta #${req.params.id}` });
+    res.json({ success:true, data:{ ok:true }, error:null });
+  } catch (e) { errSrv(res, e, 'rechazarSolicitud'); }
+};
+
 module.exports = {
   // middlewares
   verifyDealer, verifyAny,
@@ -453,6 +555,8 @@ module.exports = {
   getIce, getConfig, putConfig, subirAdjunto, descargarAdjunto,
   // respuestas rápidas
   listarRespuestas, listarRespuestasAdmin, crearRespuesta, actualizarRespuesta, eliminarRespuesta,
+  // solicitudes de cuenta (autoregistro)
+  solicitarCuenta, listarSolicitudes, aprobarSolicitud, rechazarSolicitud,
   // service helpers (ws.js)
   buildIce, getCfg, crearConversacion, getConversacion, asignarConversacion,
   cerrarConversacion, persistMensaje, colaEspera, activasDe, contarActivas,
