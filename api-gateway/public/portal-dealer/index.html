@@ -5,7 +5,7 @@
   <link rel="icon" href="/img/favicon.png" type="image/png">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Portal Dealer — Atención AutoFácil</title>
-  <!-- v1.3 -->
+  <!-- v1.4 -->
   <link href="/css/bootstrap-icons.css" rel="stylesheet">
   <style>
     :root { --navy:#0141A2; --navy-dark:#012d70; --navy-light:#0255c5; --accent:#009AFE; }
@@ -161,9 +161,21 @@ const hora = d => new Date(d).toLocaleTimeString('es-CL',{hour:'2-digit',minute:
 const esImg = n => /\.(png|jpe?g|gif|webp|bmp)$/i.test(String(n||''));
 function toast(msg, err){ const t=document.getElementById('toast'); t.textContent=msg; t.className='toast-af'+(err?' err':''); t.style.display='block'; clearTimeout(t._h); t._h=setTimeout(()=>t.style.display='none',3000); }
 
-let dToken = sessionStorage.getItem('dealer_token');
-let dInfo  = JSON.parse(sessionStorage.getItem('dealer_info') || 'null');
+let dToken = sessionStorage.getItem('dealer_token') || localStorage.getItem('dealer_token');
+let dInfo  = JSON.parse(sessionStorage.getItem('dealer_info') || localStorage.getItem('dealer_info') || 'null');
 let conv = null, ws=null, reconnTimer=null, seen=new Set();
+
+function guardarSesion(t, info){ dToken=t; dInfo=info; sessionStorage.setItem('dealer_token',t); sessionStorage.setItem('dealer_info',JSON.stringify(info)); localStorage.setItem('dealer_token',t); localStorage.setItem('dealer_info',JSON.stringify(info)); }
+function limpiarSesion(){ ['dealer_token','dealer_info'].forEach(k=>{ sessionStorage.removeItem(k); localStorage.removeItem(k); }); }
+function tokenVigente(t){ try{ const p=JSON.parse(atob(t.split('.')[1].replace(/-/g,'+').replace(/_/g,'/'))); return !p.exp || Math.floor(Date.now()/1000) < p.exp; }catch(_){ return false; } }
+async function accederConLink(k){
+  try {
+    const r=await fetch('/api/atencion-remota/dealer/acceso',{ method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({ k }) });
+    const j=await r.json();
+    if(j.success){ const info=j.data.dealer; info.bienvenida=j.data.bienvenida; guardarSesion(j.data.token, info); history.replaceState(null,'',location.pathname); entrarApp(); return; }
+  } catch(_){}
+  const err=document.getElementById('loginErr'); if(err){ err.textContent='El link de acceso no es válido o la cuenta está deshabilitada.'; err.style.display='block'; }
+}
 
 /* ── Login ── */
 async function login(){
@@ -177,9 +189,8 @@ async function login(){
     const r=await fetch('/api/atencion-remota/dealer/login',{ method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({ email, password }) });
     const j=await r.json();
     if(!j.success){ err.textContent=j.error||'Credenciales inválidas.'; err.style.display='block'; btn.disabled=false; btn.textContent='Ingresar'; return; }
-    dToken=j.data.token; dInfo=j.data.dealer; dInfo.bienvenida=j.data.bienvenida;
-    sessionStorage.setItem('dealer_token', dToken);
-    sessionStorage.setItem('dealer_info', JSON.stringify(dInfo));
+    const info=j.data.dealer; info.bienvenida=j.data.bienvenida;
+    guardarSesion(j.data.token, info);
     entrarApp();
   } catch(_){ err.textContent='Error de conexión. Intenta nuevamente.'; err.style.display='block'; btn.disabled=false; btn.textContent='Ingresar'; }
 }
@@ -202,7 +213,7 @@ async function solicitar(){
   } catch(_){ err.textContent='Error de conexión. Intenta nuevamente.'; err.style.display='block'; btn.disabled=false; btn.textContent='Enviar solicitud'; }
 }
 
-function logoutDealer(){ sessionStorage.removeItem('dealer_token'); sessionStorage.removeItem('dealer_info'); location.reload(); }
+function logoutDealer(){ limpiarSesion(); location.href=location.pathname; }
 
 function entrarApp(){
   document.getElementById('login').classList.add('hidden');
@@ -297,7 +308,12 @@ document.getElementById('fileInput').addEventListener('change', async function()
 });
 
 /* ── Arranque ── */
-if (dToken && dInfo) entrarApp();
+(function(){
+  const k=new URLSearchParams(location.search).get('k');
+  if(k){ accederConLink(k); return; }
+  if(dToken && dInfo && tokenVigente(dToken)) entrarApp();
+  else limpiarSesion();
+})();
 </script>
 </body>
 </html>

@@ -5,7 +5,7 @@
   <link rel="icon" href="/img/favicon.png" type="image/png">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Atención Remota — AutoFácil</title>
-  <!-- v1.6 -->
+  <!-- v1.7 -->
   <link href="/css/bootstrap.min.css" rel="stylesheet">
   <link href="/css/bootstrap-icons.css" rel="stylesheet">
   <style>
@@ -218,6 +218,7 @@
       </div>
       <div class="card">
         <h3 style="margin-top:0;font-size:1rem;color:var(--navy-dark)"><i class="bi bi-people me-1"></i>Cuentas existentes</h3>
+        <p style="font-size:.8rem;color:#64748b;margin:0 0 10px"><i class="bi bi-link-45deg"></i> Copia el <b>link de acceso directo</b> (sin login) y envíaselo al dealer por WhatsApp/email.</p>
         <div style="max-height:62vh;overflow:auto">
           <table class="tb"><thead><tr><th>Dealer</th><th>Email</th><th>Estado</th><th></th></tr></thead>
             <tbody id="cuentasBody"></tbody></table>
@@ -499,6 +500,8 @@ async function cargarCuentas(){
         <td>${esc(c.email)}</td>
         <td><span class="pill ${c.activo?'ok':'no'}">${c.activo?'Activa':'Inactiva'}</span></td>
         <td style="white-space:nowrap">
+          <button class="btn-ghost" onclick="copiarLink('${c.acceso_token||''}')" title="Copiar link de acceso directo (sin login)"><i class="bi bi-link-45deg"></i></button>
+          <button class="btn-ghost" onclick="regenLink(${c.id})" title="Regenerar link"><i class="bi bi-arrow-repeat"></i></button>
           <button class="btn-ghost" onclick="resetClave(${c.id})" title="Resetear clave"><i class="bi bi-key"></i></button>
           <button class="btn-ghost" onclick="toggleCuenta(${c.id},${c.activo?0:1})" title="${c.activo?'Desactivar':'Activar'}"><i class="bi bi-${c.activo?'pause':'play'}-circle"></i></button>
         </td>
@@ -545,6 +548,19 @@ async function resetClave(id){
 async function toggleCuenta(id, activo){
   try { const r=await fetch('/api/atencion-remota/cuentas/'+id,{ method:'PUT', headers:H, body:JSON.stringify({ activo }) });
     const j=await r.json(); if(j.success) cargarCuentas(); else toast(j.error||'Error', true); } catch(_){}
+}
+function linkDe(token){ return location.origin + '/portal-dealer/?k=' + token; }
+function copiarLink(token){
+  if(!token) return toast('Esta cuenta no tiene link aún', true);
+  const url=linkDe(token);
+  if(navigator.clipboard) navigator.clipboard.writeText(url).then(()=>toast('Link copiado: '+url)).catch(()=>prompt('Copia el link del dealer:', url));
+  else prompt('Copia el link del dealer:', url);
+}
+async function regenLink(id){
+  if(!confirm('¿Regenerar el link? El link anterior dejará de funcionar.')) return;
+  try { const r=await fetch('/api/atencion-remota/cuentas/'+id+'/regenerar-link',{ method:'POST', headers:H });
+    const j=await r.json(); if(j.success){ toast('Nuevo link generado'); cargarCuentas(); copiarLink(j.data.acceso_token); } else toast(j.error||'Error', true); }
+  catch(_){ toast('Error al regenerar', true); }
 }
 
 /* ════════════════ Configuración ════════════════ */
@@ -606,7 +622,7 @@ async function aprobarSol(id){
   try {
     const r=await fetch('/api/atencion-remota/solicitudes/'+id+'/aprobar',{ method:'POST', headers:H, body:JSON.stringify({ password:p }) });
     const j=await r.json();
-    if(j.success){ toast('Cuenta creada para '+email); cargarSolicitudes(); cargarCuentas(); }
+    if(j.success){ toast('Cuenta creada para '+email); cargarSolicitudes(); cargarCuentas(); if(j.data.acceso_token) copiarLink(j.data.acceso_token); }
     else toast(j.error||'Error', true);
   } catch(_){ toast('Error al aprobar', true); }
 }
