@@ -1,0 +1,253 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <link rel="icon" href="/img/favicon.png" type="image/png">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Portal Dealer — Atención AutoFácil</title>
+  <!-- v1.0 -->
+  <link href="/css/bootstrap-icons.css" rel="stylesheet">
+  <style>
+    :root { --navy:#0141A2; --navy-dark:#012d70; --navy-light:#0255c5; --accent:#009AFE; }
+    * { box-sizing:border-box; }
+    body { margin:0; font-family:'Segoe UI',system-ui,sans-serif; background:#eef2f7; height:100vh; overflow:hidden; }
+    .hidden { display:none !important; }
+
+    /* ── Login ── */
+    #login { height:100vh; display:flex; align-items:center; justify-content:center; background:linear-gradient(135deg,var(--navy-dark),var(--navy) 55%,var(--accent)); padding:20px; }
+    .login-card { background:#fff; border-radius:20px; box-shadow:0 24px 70px rgba(0,0,0,.3); width:100%; max-width:400px; overflow:hidden; }
+    .login-head { background:linear-gradient(135deg,var(--navy-dark),var(--navy)); color:#fff; padding:30px 28px 24px; text-align:center; }
+    .login-head img { height:40px; filter:brightness(0) invert(1); margin-bottom:14px; }
+    .login-head h1 { font-size:1.2rem; margin:0; font-weight:800; }
+    .login-head p { margin:6px 0 0; opacity:.8; font-size:.85rem; }
+    .login-body { padding:26px 28px 30px; }
+    .fld { margin-bottom:16px; }
+    .fld label { display:block; font-size:.78rem; font-weight:700; color:#475569; margin-bottom:6px; }
+    .fld input { width:100%; border:1.5px solid #d1d5db; border-radius:10px; padding:12px 14px; font-size:.95rem; outline:none; }
+    .fld input:focus { border-color:var(--navy); }
+    .btn-login { width:100%; background:var(--navy); color:#fff; border:none; border-radius:10px; padding:13px; font-size:.95rem; font-weight:700; cursor:pointer; }
+    .btn-login:hover { background:var(--navy-light); }
+    .btn-login:disabled { background:#93c5fd; cursor:wait; }
+    .login-err { background:#fef2f2; border:1px solid #fecaca; color:#dc2626; border-radius:9px; padding:10px 13px; font-size:.83rem; margin-bottom:14px; display:none; }
+    .login-foot { text-align:center; font-size:.74rem; color:#94a3b8; margin-top:16px; }
+
+    /* ── App ── */
+    #app { height:100vh; display:flex; flex-direction:column; }
+    .app-head { background:linear-gradient(90deg,var(--navy-dark),var(--navy-light)); color:#fff; padding:12px 18px; display:flex; align-items:center; gap:12px; }
+    .app-head img { height:28px; filter:brightness(0) invert(1); }
+    .app-head .ti { flex:1; }
+    .app-head .ti b { display:block; font-size:.95rem; }
+    .app-head .ti span { font-size:.75rem; opacity:.85; }
+    .app-head .estado { font-size:.72rem; background:rgba(255,255,255,.18); padding:3px 10px; border-radius:12px; }
+    .app-head .estado.on { background:#16a34a; }
+    .app-head button { background:rgba(255,255,255,.14); border:none; color:#fff; border-radius:8px; padding:6px 12px; font-size:.8rem; cursor:pointer; }
+
+    /* Pre-chat */
+    #prechat { flex:1; display:flex; align-items:center; justify-content:center; padding:24px; }
+    .pre-card { background:#fff; border-radius:18px; box-shadow:0 8px 30px rgba(0,0,0,.1); padding:30px 28px; max-width:440px; width:100%; text-align:center; }
+    .pre-card .ic { width:64px; height:64px; border-radius:50%; background:#e8f1ff; color:var(--navy); display:flex; align-items:center; justify-content:center; font-size:1.8rem; margin:0 auto 16px; }
+    .pre-card h2 { font-size:1.15rem; color:var(--navy-dark); margin:0 0 8px; }
+    .pre-card p { color:#64748b; font-size:.9rem; margin:0 0 18px; }
+    .pre-card input { width:100%; border:1.5px solid #d1d5db; border-radius:10px; padding:11px 14px; font-size:.9rem; margin-bottom:14px; outline:none; }
+    .pre-card input:focus { border-color:var(--navy); }
+    .pre-card button { width:100%; background:var(--navy); color:#fff; border:none; border-radius:10px; padding:13px; font-weight:700; cursor:pointer; }
+
+    /* Chat */
+    #chat { flex:1; display:none; flex-direction:column; min-height:0; }
+    #chat.show { display:flex; }
+    .msgs { flex:1; overflow-y:auto; padding:18px; background:#eef2f7; display:flex; flex-direction:column; gap:9px; }
+    .wrapw { max-width:760px; margin:0 auto; width:100%; display:flex; flex-direction:column; gap:9px; }
+    .msg { max-width:80%; padding:9px 13px; border-radius:14px; font-size:.9rem; line-height:1.45; word-wrap:break-word; }
+    .msg .t { font-size:.64rem; opacity:.6; margin-top:3px; text-align:right; }
+    .msg.me { align-self:flex-end; background:var(--navy); color:#fff; border-bottom-right-radius:3px; }
+    .msg.them { align-self:flex-start; background:#fff; border:1px solid #e6ebf1; color:#1e293b; border-bottom-left-radius:3px; }
+    .msg.sys { align-self:center; background:#dde7f3; color:#5b6b80; font-size:.78rem; padding:5px 14px; border-radius:20px; }
+    .msg img { max-width:100%; border-radius:9px; display:block; margin-bottom:4px; cursor:pointer; }
+    .msg a.file { color:inherit; text-decoration:none; display:flex; align-items:center; gap:7px; font-weight:600; }
+    .typing { font-size:.78rem; color:#94a3b8; padding:0 18px 4px; height:18px; max-width:760px; margin:0 auto; width:100%; }
+    .composer { border-top:1px solid #e2e8f0; background:#fff; padding:12px; }
+    .composer .inner { max-width:760px; margin:0 auto; display:flex; align-items:center; gap:9px; }
+    .composer input[type=text] { flex:1; border:1.5px solid #d1d5db; border-radius:24px; padding:12px 16px; font-size:.92rem; outline:none; }
+    .composer input[type=text]:focus { border-color:var(--navy); }
+    .composer button { border:none; border-radius:50%; width:46px; height:46px; cursor:pointer; font-size:1.15rem; display:flex; align-items:center; justify-content:center; }
+    .b-attach { background:#eef2f7; color:var(--navy); }
+    .b-send { background:var(--navy); color:#fff; }
+    .toast-af { position:fixed; bottom:80px; left:50%; transform:translateX(-50%); background:#0f172a; color:#fff; padding:11px 20px; border-radius:10px; font-size:.86rem; z-index:9999; display:none; }
+    .toast-af.err { background:#b91c1c; }
+  </style>
+</head>
+<body>
+
+<!-- ── LOGIN ── -->
+<div id="login">
+  <div class="login-card">
+    <div class="login-head">
+      <img src="/img/logo.png" alt="AutoFácil">
+      <h1>Atención al Dealer</h1>
+      <p>Ingresa para chatear con tu ejecutivo en línea</p>
+    </div>
+    <div class="login-body">
+      <div class="login-err" id="loginErr"></div>
+      <div class="fld"><label>Email</label><input type="email" id="liEmail" placeholder="tucorreo@dealer.cl" autocomplete="username"></div>
+      <div class="fld"><label>Contraseña</label><input type="password" id="liPass" placeholder="Tu contraseña" autocomplete="current-password"></div>
+      <button class="btn-login" id="liBtn" onclick="login()">Ingresar</button>
+      <div class="login-foot"><i class="bi bi-shield-lock"></i> Conexión segura · AutoFácil Crédito Automotriz</div>
+    </div>
+  </div>
+</div>
+
+<!-- ── APP ── -->
+<div id="app" class="hidden">
+  <div class="app-head">
+    <img src="/img/logo.png" alt="AutoFácil">
+    <div class="ti"><b id="hdNombre">Atención AutoFácil</b><span id="hdEstado2">Conectando…</span></div>
+    <span class="estado" id="hdEstado">·</span>
+    <button onclick="logoutDealer()"><i class="bi bi-box-arrow-right"></i></button>
+  </div>
+
+  <div id="prechat">
+    <div class="pre-card">
+      <div class="ic"><i class="bi bi-chat-heart"></i></div>
+      <h2 id="preTitulo">¡Hola!</h2>
+      <p id="preMsg">Cuéntanos brevemente en qué te ayudamos y te conectamos con un ejecutivo.</p>
+      <input type="text" id="preAsunto" placeholder="Ej: Estado de mi operación, documentos, dudas…">
+      <button onclick="iniciar()"><i class="bi bi-headset me-1"></i>Iniciar atención</button>
+    </div>
+  </div>
+
+  <div id="chat">
+    <div class="msgs" id="msgs"></div>
+    <div class="typing" id="typing"></div>
+    <div class="composer">
+      <div class="inner">
+        <button class="b-attach" title="Enviar documento" onclick="document.getElementById('fileInput').click()"><i class="bi bi-paperclip"></i></button>
+        <input type="text" id="inp" placeholder="Escribe un mensaje…" autocomplete="off">
+        <button class="b-send" onclick="enviar()"><i class="bi bi-send-fill"></i></button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<input type="file" id="fileInput" class="hidden" accept="image/*,application/pdf">
+<div class="toast-af" id="toast"></div>
+
+<script>
+const esc = s => String(s ?? '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+const hora = d => new Date(d).toLocaleTimeString('es-CL',{hour:'2-digit',minute:'2-digit'});
+const esImg = n => /\.(png|jpe?g|gif|webp|bmp)$/i.test(String(n||''));
+function toast(msg, err){ const t=document.getElementById('toast'); t.textContent=msg; t.className='toast-af'+(err?' err':''); t.style.display='block'; clearTimeout(t._h); t._h=setTimeout(()=>t.style.display='none',3000); }
+
+let dToken = sessionStorage.getItem('dealer_token');
+let dInfo  = JSON.parse(sessionStorage.getItem('dealer_info') || 'null');
+let conv = null, ws=null, reconnTimer=null, seen=new Set();
+
+/* ── Login ── */
+async function login(){
+  const email=document.getElementById('liEmail').value.trim();
+  const password=document.getElementById('liPass').value;
+  const err=document.getElementById('loginErr'), btn=document.getElementById('liBtn');
+  err.style.display='none';
+  if(!email||!password){ err.textContent='Ingresa email y contraseña.'; err.style.display='block'; return; }
+  btn.disabled=true; btn.textContent='Ingresando…';
+  try {
+    const r=await fetch('/api/atencion-remota/dealer/login',{ method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({ email, password }) });
+    const j=await r.json();
+    if(!j.success){ err.textContent=j.error||'Credenciales inválidas.'; err.style.display='block'; btn.disabled=false; btn.textContent='Ingresar'; return; }
+    dToken=j.data.token; dInfo=j.data.dealer; dInfo.bienvenida=j.data.bienvenida;
+    sessionStorage.setItem('dealer_token', dToken);
+    sessionStorage.setItem('dealer_info', JSON.stringify(dInfo));
+    entrarApp();
+  } catch(_){ err.textContent='Error de conexión. Intenta nuevamente.'; err.style.display='block'; btn.disabled=false; btn.textContent='Ingresar'; }
+}
+document.getElementById('liPass').addEventListener('keydown', e=>{ if(e.key==='Enter') login(); });
+
+function logoutDealer(){ sessionStorage.removeItem('dealer_token'); sessionStorage.removeItem('dealer_info'); location.reload(); }
+
+function entrarApp(){
+  document.getElementById('login').classList.add('hidden');
+  document.getElementById('app').classList.remove('hidden');
+  document.getElementById('hdNombre').textContent = dInfo?.nombre || 'Atención AutoFácil';
+  if (dInfo?.bienvenida) document.getElementById('preMsg').textContent = dInfo.bienvenida;
+  connect();
+}
+
+/* ── WebSocket ── */
+function wsUrl(){ return (location.protocol==='https:'?'wss':'ws')+'://'+location.host+'/ws/atencion?token='+encodeURIComponent(dToken); }
+function connect(){
+  ws=new WebSocket(wsUrl());
+  ws.onopen = ()=>{ setEstado('En línea', true); };
+  ws.onclose = ()=>{ setEstado('Reconectando…', false); clearTimeout(reconnTimer); reconnTimer=setTimeout(connect,3000); };
+  ws.onerror = ()=>{ try{ws.close();}catch(_){} };
+  ws.onmessage = (ev)=>{ let m; try{ m=JSON.parse(ev.data);}catch(_){ return; } onMsg(m); };
+}
+function wsSend(o){ try{ if(ws&&ws.readyState===1) ws.send(JSON.stringify(o)); }catch(_){} }
+function setEstado(txt, on){ const e=document.getElementById('hdEstado'); e.textContent=on?'en línea':'·'; e.className='estado'+(on?' on':''); document.getElementById('hdEstado2').textContent=txt; }
+
+function onMsg(m){
+  switch(m.t){
+    case 'ready': break;  // esperamos 'started' (auto-resume) o el botón Iniciar
+    case 'started': conv=m.conversacion; abrirChat(); break;
+    case 'asignada': conv=m.conversacion||conv; document.getElementById('hdEstado2').textContent='Te atiende '+esc(m.conversacion?.ejecutivo_nombre||'un ejecutivo'); break;
+    case 'mensaje': addMessage(m.mensaje); break;
+    case 'typing': showTyping(m.on); break;
+    case 'presencia': if(m.parte==='ejecutivo') document.getElementById('hdEstado2').textContent = m.online?'Ejecutivo en línea':'Ejecutivo desconectado'; break;
+    case 'cerrada': cerrada(); break;
+    case 'error': toast(m.msg||'Error', true); break;
+  }
+}
+
+function iniciar(){ const asunto=document.getElementById('preAsunto').value.trim(); wsSend({ t:'start', asunto }); }
+
+async function abrirChat(){
+  document.getElementById('prechat').classList.add('hidden');
+  document.getElementById('chat').classList.add('show');
+  // Historial
+  try {
+    const r=await fetch('/api/atencion-remota/conversaciones/'+conv.id+'/mensajes',{ headers:{ Authorization:'Bearer '+dToken } });
+    const j=await r.json();
+    if(j.success){ seen.clear(); document.getElementById('msgs').innerHTML='<div class="wrapw" id="wrapw"></div>'; (j.data.mensajes||[]).forEach(m=>addMessage(m)); }
+  } catch(_){}
+}
+
+function addMessage(msg){
+  if(msg && msg.id){ if(seen.has(msg.id)) return; seen.add(msg.id); }
+  let w=document.getElementById('wrapw');
+  if(!w){ document.getElementById('msgs').innerHTML='<div class="wrapw" id="wrapw"></div>'; w=document.getElementById('wrapw'); }
+  const box=document.getElementById('msgs');
+  if(msg.emisor==='SISTEMA'){ w.insertAdjacentHTML('beforeend', `<div class="msg sys">${esc(msg.cuerpo||'')}</div>`); box.scrollTop=box.scrollHeight; return; }
+  const mine = msg.emisor==='DEALER';
+  let inner='';
+  if(msg.tipo==='ARCHIVO' && msg.id_adjunto){
+    const url='/api/atencion-remota/adjuntos/'+msg.id_adjunto+'?token='+encodeURIComponent(dToken);
+    inner = esImg(msg.cuerpo) ? `<img src="${url}" onclick="window.open('${url}','_blank')">`
+      : `<a class="file" href="${url}" target="_blank"><i class="bi bi-file-earmark-arrow-down"></i>${esc(msg.cuerpo||'documento')}</a>`;
+  } else inner = esc(msg.cuerpo||'');
+  w.insertAdjacentHTML('beforeend', `<div class="msg ${mine?'me':'them'}">${inner}<div class="t">${hora(msg.created_at)}</div></div>`);
+  box.scrollTop=box.scrollHeight;
+}
+function enviar(){ const inp=document.getElementById('inp'); const v=inp.value.trim(); if(!v||!conv) return; wsSend({ t:'chat', id:conv.id, cuerpo:v }); inp.value=''; wsSend({t:'typing',id:conv.id,on:false}); }
+document.getElementById('inp').addEventListener('keydown', e=>{ if(e.key==='Enter') enviar(); });
+let tto=null;
+document.getElementById('inp').addEventListener('input', ()=>{ if(!conv) return; wsSend({t:'typing',id:conv.id,on:true}); clearTimeout(tto); tto=setTimeout(()=>wsSend({t:'typing',id:conv.id,on:false}),1200); });
+let typingT=null;
+function showTyping(on){ const el=document.getElementById('typing'); el.textContent=on?'tu ejecutivo está escribiendo…':''; clearTimeout(typingT); if(on) typingT=setTimeout(()=>el.textContent='',2500); }
+function cerrada(){ addMessage({ emisor:'SISTEMA', cuerpo:'La atención fue cerrada. ¡Gracias por contactarnos!' }); }
+
+/* ── Adjuntos ── */
+document.getElementById('fileInput').addEventListener('change', async function(){
+  const f=this.files[0]; this.value=''; if(!f||!conv) return;
+  if(f.size>8*1024*1024) return toast('Máximo 8 MB por archivo', true);
+  const b64=await new Promise(res=>{ const r=new FileReader(); r.onload=()=>res(r.result); r.readAsDataURL(f); });
+  try {
+    const r=await fetch('/api/atencion-remota/conversaciones/'+conv.id+'/adjuntos',{ method:'POST',
+      headers:{ 'Content-Type':'application/json', Authorization:'Bearer '+dToken },
+      body:JSON.stringify({ nombre:f.name, mime:f.type, data_base64:b64 }) });
+    const j=await r.json(); if(!j.success) toast(j.error||'Error al enviar', true);
+  } catch(_){ toast('Error al enviar el documento', true); }
+});
+
+/* ── Arranque ── */
+if (dToken && dInfo) entrarApp();
+</script>
+</body>
+</html>

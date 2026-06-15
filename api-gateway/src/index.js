@@ -2,6 +2,7 @@
 process.env.TZ = 'America/Santiago';
 
 const express = require('express');
+const http = require('http');
 const cors = require('cors');
 const path = require('path');
 require('dotenv').config();
@@ -127,6 +128,9 @@ app.use('/api/cartolas',          require('../../services/cartas/src/routes/cart
 
 // Notificaciones (in-app + web push)
 app.use('/api/notif', require('../../services/notificaciones/src/routes/notificaciones.routes'));
+
+// Atención Remota (chat + videollamada WebRTC + documentos)
+app.use('/api/atencion-remota', require('../../services/atencion-remota/src/routes/atencion.routes'));
 
 // Post Venta
 app.use('/api/postventa', require('../../services/postventa/src/routes/postventa.routes'));
@@ -358,6 +362,12 @@ app.get(['/dashboard', '/dashboard/'], (req, res) =>
 app.get(['/auditoria', '/auditoria/'], (req, res) =>
   res.sendFile(path.join(__dirname, '../public/auditoria/index.html')));
 
+// Atención Remota — consola del ejecutivo (interno) y portal del dealer (externo)
+app.get(['/atencion-remota', '/atencion-remota/'], (req, res) =>
+  res.sendFile(path.join(__dirname, '../public/atencion-remota/index.html')));
+app.get(['/portal-dealer', '/portal-dealer/'], (req, res) =>
+  res.sendFile(path.join(__dirname, '../public/portal-dealer/index.html')));
+
 app.get(['/cartas-aprobacion', '/cartas-aprobacion/'], (req, res) =>
   res.sendFile(path.join(__dirname, '../public/cartas-aprobacion/index.html')));
 
@@ -419,7 +429,9 @@ process.on('uncaughtException', (err) => {
 });
 
 const PORT = process.env.PORT || 3000;
-app.listen(PORT, () => {
+const server = http.createServer(app);
+require('../../services/atencion-remota/src/ws').initAtencionWS(server);
+server.listen(PORT, () => {
   console.log(`✓ API Gateway en http://localhost:${PORT}`);
   console.log(`✓ Login: http://localhost:${PORT}/login.html`);
 });
