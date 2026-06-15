@@ -5,7 +5,7 @@
   <link rel="icon" href="/img/favicon.png" type="image/png">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Mantención Dealers — AutoFácil</title>
-  <!-- v1.2 -->
+  <!-- v1.3 -->
   <link href="/css/bootstrap.min.css" rel="stylesheet">
   <link href="/css/bootstrap-icons.css" rel="stylesheet">
   <style>
@@ -238,7 +238,8 @@ async function verFicha(id){
     if (f.tiene_ficha) adjHtml += `<a class="btn btn-sky btn-sm" style="text-decoration:none" target="_blank" href="/api/dealer-incorporacion/fichas/${id}/archivo?token=${encodeURIComponent(token)}"><i class="bi bi-file-earmark-pdf"></i> Ficha firmada</a> `;
     try {
       const ra=await fetch('/api/dealer-incorporacion/fichas/'+id+'/archivos',{headers:H}); const ja=await ra.json();
-      (ja.data||[]).forEach(a=>{ adjHtml += `<a class="btn btn-light btn-sm" style="text-decoration:none" target="_blank" href="/api/dealer-incorporacion/fichas/${id}/archivos/${a.id}?token=${encodeURIComponent(token)}"><i class="bi bi-paperclip"></i> ${a.categoria==='EMPRESA'?'Empresa':'Socios'}: ${escH(a.nombre||'archivo')}</a> `; });
+      const CAT_LBL={EMPRESA:'Empresa',SOCIOS:'Socios',PODER_SIMPLE:'Poder Simple',PODER_REP_LEGAL:'Poderes Rep. Legal'};
+      (ja.data||[]).forEach(a=>{ adjHtml += `<a class="btn btn-light btn-sm" style="text-decoration:none" target="_blank" href="/api/dealer-incorporacion/fichas/${id}/archivos/${a.id}?token=${encodeURIComponent(token)}"><i class="bi bi-paperclip"></i> ${CAT_LBL[a.categoria]||a.categoria}: ${escH(a.nombre||'archivo')}</a> `; });
     } catch(e){}
     // Excepciones (comisión modificada / boleta) con su comentario
     let excHtml = '';

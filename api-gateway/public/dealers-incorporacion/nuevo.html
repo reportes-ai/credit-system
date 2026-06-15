@@ -5,7 +5,7 @@
   <link rel="icon" href="/img/favicon.png" type="image/png">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Nueva Ficha de Dealer — AutoFácil</title>
-  <!-- v1.2 -->
+  <!-- v1.3 -->
   <link href="/css/bootstrap.min.css" rel="stylesheet">
   <link href="/css/bootstrap-icons.css" rel="stylesheet">
   <style>
@@ -239,6 +239,26 @@
       <div class="fileinfo" id="fileInfo"></div>
     </div>
   </div>
+
+  <div class="card-sec" id="cardPoderes" style="display:none;border:1.5px solid #fca5a5">
+    <h3 style="border-left-color:#dc2626;color:#991b1b"><i class="bi bi-shield-lock me-1"></i> Depósito a tercero — Poderes (obligatorios)</h3>
+    <div class="card-body">
+      <p class="hint" style="margin-top:0">El RUT de la cuenta es <b>distinto</b> al del concesionario (depósito a un tercero). Descarga el <b>Poder Simple</b>, hazlo firmar por el Representante Legal y adjúntalo junto con los <b>Poderes del Representante Legal</b>.</p>
+      <button class="btn btn-light" type="button" onclick="descargarPoderSimple()" style="margin-bottom:12px"><i class="bi bi-download"></i> Descargar Poder Simple</button>
+      <div class="grid">
+        <div class="fld full">
+          <label><i class="bi bi-file-earmark-text me-1"></i> Poder Simple firmado</label>
+          <input type="file" id="filePoderSimple" accept="application/pdf,image/*" multiple onchange="onInformes('PODER_SIMPLE')">
+          <div id="listPoderSimple" class="filelist"></div>
+        </div>
+        <div class="fld full">
+          <label><i class="bi bi-person-vcard me-1"></i> Poderes del Representante Legal</label>
+          <input type="file" id="filePoderRepLegal" accept="application/pdf,image/*" multiple onchange="onInformes('PODER_REP_LEGAL')">
+          <div id="listPoderRepLegal" class="filelist"></div>
+        </div>
+      </div>
+    </div>
+  </div>
 </div>
 
 <div class="actionbar">
@@ -261,6 +281,20 @@
   </div>
 </dialog>
 
+<!-- Modal aviso depósito a tercero -->
+<dialog id="dlgTercero">
+  <div style="background:linear-gradient(135deg,#991b1b,#dc2626);color:#fff;padding:16px 22px;display:flex;align-items:center;gap:10px;font-weight:700">
+    <i class="bi bi-shield-exclamation"></i> Cuenta de un tercero</div>
+  <div style="padding:18px 22px;max-height:70vh;overflow:auto;font-size:.88rem;color:#374151;line-height:1.55">
+    <p>El <b>RUT de la cuenta</b> es distinto al del concesionario. Para depositar las participaciones a un <b>tercero</b> distinto del Dealer, el Representante Legal debe firmar el <b>Poder Simple</b>.</p>
+    <p style="margin:0">Descarga el documento, hazlo firmar y adjúntalo (junto con los Poderes del Representante Legal) en la sección que se habilitó al final de la página. Sin estos poderes la ficha no podrá enviarse a revisión.</p>
+  </div>
+  <div style="padding:14px 22px;border-top:1px solid #f1f5f9;display:flex;gap:10px;justify-content:flex-end">
+    <button class="btn btn-light" type="button" onclick="descargarPoderSimple()"><i class="bi bi-download me-1"></i>Descargar Poder Simple</button>
+    <button class="btn btn-navy" onclick="dlgTercero.close();_terResolve&&(_terResolve(true),_terResolve=null)"><i class="bi bi-check-lg me-1"></i>Entendido</button>
+  </div>
+</dialog>
+
 <!-- Área de impresión (se llena al imprimir) -->
 <div id="printArea"></div>
 <div class="toast-af" id="toast"></div>
@@ -276,6 +310,7 @@ let FICHA_ID = new URLSearchParams(location.search).get('id') || null;
 let ESTADO = 'BORRADOR';
 let fileB64 = null, fileName = null, fileMime = null;
 let EXC_COM = {}, EXC_LIST = [], _excResolve = null;   // excepciones + comentarios
+let _terResolve = null;   // aviso depósito a tercero
 
 const $ = id => document.getElementById(id);
 const val = id => ($(id).value || '').trim();
@@ -300,6 +335,7 @@ function onRutInput(el, hintId){
     el.style.borderColor=ok?'#059669':'#dc2626'; h.className='vmsg '+(ok?'ok':'bad'); h.textContent=ok?'✓ RUT válido':'✗ Dígito verificador incorrecto'; }
   else if(clean.length>0){ el.style.borderColor=''; h.className='vmsg'; h.textContent='Ingresa el RUT con dígito verificador'; }
   else { el.style.borderColor=''; h.className='vmsg'; h.textContent=''; }
+  actualizarTercero();
 }
 const EMAIL_RE=/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/;
 function emailOK(v){ return EMAIL_RE.test(String(v).trim()); }
@@ -322,15 +358,16 @@ async function cargarGeo(){
 }
 function onComuna(){ const g=GEO_MAP[val('comuna').toLowerCase()]; setVal('provincia', g?g.provincia:''); setVal('region', g?g.region:''); }
 
-/* ── Informes comerciales (empresa/socios) ── */
+/* ── Adjuntos (informes empresa/socios + poderes tercero) ── */
+const CAT_UI = { EMPRESA:{input:'fileEmpresa',list:'listEmpresa'}, SOCIOS:{input:'fileSocios',list:'listSocios'},
+  PODER_SIMPLE:{input:'filePoderSimple',list:'listPoderSimple'}, PODER_REP_LEGAL:{input:'filePoderRepLegal',list:'listPoderRepLegal'} };
 async function ensureId(){ if(FICHA_ID) return true; return await guardar(true); }
 async function onInformes(cat){
-  const inp = cat==='EMPRESA' ? $('fileEmpresa') : $('fileSocios');
-  const files=[...inp.files]; inp.value='';
+  const ui=CAT_UI[cat]; const inp=$(ui.input); const files=[...inp.files]; inp.value='';
   if(!files.length) return;
   if(!(await ensureId())) return;
-  const yaN = document.querySelectorAll('#list'+(cat==='EMPRESA'?'Empresa':'Socios')+' .filerow').length;
-  if(yaN+files.length>3){ toast('Máximo 3 archivos en '+cat, true); return; }
+  const yaN = document.querySelectorAll('#'+ui.list+' .filerow').length;
+  if(yaN+files.length>3){ toast('Máximo 3 archivos en esta sección', true); return; }
   for(const f of files){
     if(f.size>7*1024*1024){ toast(f.name+' supera 7 MB',true); continue; }
     const b64=await new Promise(rs=>{ const rd=new FileReader(); rd.onload=()=>rs(rd.result.split(',')[1]); rd.readAsDataURL(f); });
@@ -341,18 +378,49 @@ async function onInformes(cat){
   }
   await cargarInformes();
 }
+function nArch(cat){ return document.querySelectorAll('#'+CAT_UI[cat].list+' .filerow').length; }
 async function cargarInformes(){
   if(!FICHA_ID) return;
   try{ const r=await fetch('/api/dealer-incorporacion/fichas/'+FICHA_ID+'/archivos',{headers:H}); const j=await r.json(); if(!j.success)return;
-    for(const cat of ['EMPRESA','SOCIOS']){
-      const cont=$('list'+(cat==='EMPRESA'?'Empresa':'Socios'));
+    const bloqueado = ['APROBADA','EN_REVISION','TOMADA'].includes(ESTADO);
+    for(const cat of Object.keys(CAT_UI)){
+      const cont=$(CAT_UI[cat].list); if(!cont) continue;
       const rows=(j.data||[]).filter(a=>a.categoria===cat);
       cont.innerHTML = rows.map(a=>`<div class="filerow"><i class="bi bi-file-earmark-text fi"></i>
         <a class="nm" href="/api/dealer-incorporacion/fichas/${FICHA_ID}/archivos/${a.id}?token=${encodeURIComponent(token)}" target="_blank">${(a.nombre||'archivo').replace(/</g,'&lt;')}</a>
-        ${ESTADO==='APROBADA'||ESTADO==='EN_REVISION'||ESTADO==='TOMADA'?'':`<button title="Quitar" onclick="borrarInforme(${a.id})">✕</button>`}</div>`).join('')
+        ${bloqueado?'':`<button title="Quitar" onclick="borrarInforme(${a.id})">✕</button>`}</div>`).join('')
         || '<div style="font-size:.78rem;color:#94a3b8">Sin archivos cargados</div>';
     }
   }catch(e){}
+}
+
+/* ── Depósito a tercero (RUT cuenta ≠ RUT concesionario) ── */
+function esTercero(){ const a=val('rut').replace(/[^0-9kK]/gi,'').toUpperCase(), b=val('rut_cuenta').replace(/[^0-9kK]/gi,'').toUpperCase(); return !!b && !!a && a!==b; }
+function actualizarTercero(){ $('cardPoderes').style.display = esTercero() ? '' : 'none'; }
+async function gateTercero(){
+  if(!esTercero()) return true;
+  return await new Promise(res=>{ _terResolve=res; dlgTercero.showModal(); });
+}
+function descargarPoderSimple(){
+  const o=recolectar();
+  const E=s=>String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;');
+  const cuenta = `${E(o.cuenta_tipo||'')} ${E(o.banco||'')}`.trim();
+  printHTML(`
+    <h1>PODER SIMPLE</h1>
+    <p style="text-align:justify;line-height:1.7">En Santiago de Chile, ${E(o.fecha_solicitud||new Date().toLocaleDateString('es-CL'))}, por medio del presente instrumento
+    <b>${E(o.nombre_razon||'__________')}</b>, RUT <b>${E(o.rut||'__________')}</b> (en adelante, el "Concesionario"), representada por su
+    Representante Legal, <b>solicita y autoriza</b> a AutoFácil Crédito Automotriz para que las <b>participaciones</b> producto de los créditos
+    colocados a los clientes del Concesionario sean <b>depositadas</b> en la siguiente cuenta bancaria de un tercero:</p>
+    <table class="p">
+      <tr><td class="lbl">Titular (RUT de la cuenta)</td><td>${E(o.rut_cuenta||'__________')}</td></tr>
+      <tr><td class="lbl">Tipo de cuenta</td><td>${E(o.cuenta_tipo||'__________')}</td></tr>
+      <tr><td class="lbl">Banco</td><td>${E(o.banco||'__________')}</td></tr>
+      <tr><td class="lbl">N° de cuenta</td><td>${E(o.num_cuenta||'__________')}</td></tr>
+      <tr><td class="lbl">Email de confirmación</td><td>${E(o.correo_confirmacion||'__________')}</td></tr>
+    </table>
+    <p style="line-height:1.7">El Concesionario declara conocer y aceptar que dichos pagos se entenderán válidamente efectuados al ser depositados
+    en la cuenta individualizada, liberando a AutoFácil de toda responsabilidad por los mismos.</p>
+    <div class="firma" style="margin-top:60px"><div class="line">Firma Representante Legal · ${E(o.nombre_razon||'')}</div></div>`);
 }
 async function borrarInforme(id){
   try{ const r=await fetch('/api/dealer-incorporacion/fichas/'+FICHA_ID+'/archivos/'+id,{method:'DELETE',headers:H}); const j=await r.json(); if(!j.success)throw new Error(j.error); await cargarInformes(); }
@@ -400,10 +468,15 @@ async function gateExcepciones(){
   if(!exc.length){ EXC_LIST=[]; return true; }
   return await abrirExcepModal(exc);
 }
-async function onGuardar(){ if(!(await gateExcepciones())) return; await guardar(false); }
+async function onGuardar(){ if(!(await gateExcepciones())) return; if(!(await gateTercero())) return; await guardar(false); }
 async function onEnviar(){
   const errs=validarEnvio(); if(errs.length){ toast('Corrige antes de enviar: '+errs.join(', '), true); return; }
+  if(esTercero() && (nArch('PODER_SIMPLE')<1 || nArch('PODER_REP_LEGAL')<1)){
+    toast('Cuenta de tercero: adjunta el Poder Simple y los Poderes del Representante Legal antes de enviar.', true);
+    if(!(await gateTercero())) return; actualizarTercero(); return;
+  }
   if(!(await gateExcepciones())) return;
+  if(!(await gateTercero())) return;
   await enviarFinal();
 }
 
@@ -496,7 +569,7 @@ async function enviarFinal(){
 
 async function cargar(){
   await cargarGeo(); await cargarEjecutivos();
-  if (!FICHA_ID) { $('fecha_solicitud').value = new Date().toLocaleDateString('sv-SE',{timeZone:'America/Santiago'}); onTipo(); return; }
+  if (!FICHA_ID) { $('fecha_solicitud').value = new Date().toLocaleDateString('sv-SE',{timeZone:'America/Santiago'}); onTipo(); actualizarTercero(); return; }
   try {
     const r = await fetch('/api/dealer-incorporacion/fichas/'+FICHA_ID, { headers:H });
     const j = await r.json();
@@ -518,6 +591,7 @@ async function cargar(){
       b.innerHTML = `<b><i class="bi bi-x-octagon me-1"></i>Ficha rechazada por ${f.revisor_nombre||'Operaciones'}:</b> ${f.motivo_rechazo}`;
     }
     await cargarInformes();
+    actualizarTercero();
     // Solo BORRADOR/RECHAZADA son editables
     const editable = ['BORRADOR','RECHAZADA'].includes(f.estado);
     if (!editable) {
@@ -536,7 +610,7 @@ function imprimir(){
   const dirLbl = esP?'Dirección de Parque Automotriz':'Dirección de Sucursal';
   const comLbl = esP?'Comuna de Parque Automotriz':'Comuna de Sucursal';
   const E = s => String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;');
-  $('printArea').innerHTML = `
+  printHTML(`
     <h1>FICHA DE INCORPORACIÓN${esP?' PARQUE':''}</h1>
     <table class="p"><tr><th colspan="2">EJECUTIVO COMERCIAL</th></tr>
       <tr><td class="lbl">Nombre Ejecutivo</td><td>${E($('ejecutivo_nombre').value)}</td></tr>
@@ -569,9 +643,10 @@ function imprimir(){
       <tr><td class="lbl">Número de Cuenta</td><td colspan="3">${E(o.num_cuenta)}</td></tr>
       <tr><td class="lbl">Correo Confirmación</td><td colspan="3">${E(o.correo_confirmacion)}</td></tr></table>
     <table class="p"><tr><th>OBSERVACIONES</th></tr><tr><td style="height:60px;vertical-align:top">${E(o.observaciones)}</td></tr></table>
-    <div class="firma"><div class="line">Firma Representante Legal del Concesionario</div></div>`;
-  window.print();
+    <div class="firma"><div class="line">Firma Representante Legal del Concesionario</div></div>`);
 }
+/* Imprime cualquier HTML reutilizando el área de impresión */
+function printHTML(html){ $('printArea').innerHTML = html; window.print(); }
 
 cargar();
 </script>

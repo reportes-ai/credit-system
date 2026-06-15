@@ -163,7 +163,8 @@ const CAMPOS = ['tipo','ejecutivo_nombre','fecha_solicitud','rut','nombre_razon'
   'com_6_12','com_13_24','com_25_36','com_37','tipo_documento','cuenta_tipo','banco',
   'rut_cuenta','num_cuenta','correo_confirmacion','observaciones'];
 
-const CATEGORIAS = ['EMPRESA', 'SOCIOS'];   // informes comerciales
+const CATEGORIAS = ['EMPRESA', 'SOCIOS', 'PODER_SIMPLE', 'PODER_REP_LEGAL'];   // adjuntos
+const normRut = r => String(r || '').replace(/[.\-\s]/g, '').toUpperCase();
 
 // Comentario de excepción válido: ≥10 caracteres y al menos un espacio (no se avisan las reglas al usuario).
 const comentarioOK = c => { const s = String(c || '').trim(); return s.length >= 10 && /\s/.test(s); };
@@ -350,6 +351,11 @@ const enviar = async (req, res) => {
     const porCat = Object.fromEntries(cats.map(c => [c.categoria, c.n]));
     if (!porCat.EMPRESA) return res.status(400).json({ success: false, data: null, error: 'Debes cargar al menos un Informe Comercial Empresa antes de enviar' });
     if (!porCat.SOCIOS)  return res.status(400).json({ success: false, data: null, error: 'Debes cargar al menos un Informe Comercial Socios antes de enviar' });
+    // Depósito a tercero (RUT de la cuenta distinto al del concesionario): exige Poder Simple + Poderes del Rep. Legal.
+    if (f.rut_cuenta && normRut(f.rut_cuenta) !== normRut(f.rut)) {
+      if (!porCat.PODER_SIMPLE)    return res.status(400).json({ success: false, data: null, error: 'La cuenta es de un tercero: debes cargar el Poder Simple firmado antes de enviar' });
+      if (!porCat.PODER_REP_LEGAL) return res.status(400).json({ success: false, data: null, error: 'La cuenta es de un tercero: debes cargar los Poderes del Representante Legal antes de enviar' });
+    }
 
     const reenvio = f.estado === 'RECHAZADA';
     const apelacion = norm(req.body.apelacion) || null;
