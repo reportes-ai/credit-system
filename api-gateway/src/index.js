@@ -152,6 +152,9 @@ app.use('/api/cobranza', require('../../services/cobranza/src/routes/cobranza.ro
 // Comisiones ejecutivos
 app.use('/api/comisiones', require('../../services/comisiones/src/routes/comisiones.routes'));
 
+// Auditoría de movimientos (logins + bitácora transversal)
+app.use('/api/auditoria-mov', require('../../services/auditoria/src/routes/auditoria.routes'));
+
 // Carga masiva de operaciones
 app.use('/api/carga-masiva',    require('../../services/creditos/src/routes/carga-masiva.routes'));
 app.use('/api/carga-trinidad',   require('../../services/creditos/src/routes/carga-trinidad.routes'));
@@ -349,6 +352,9 @@ app.get(['/politica', '/politica/'], (req, res) =>
 
 app.get(['/dashboard', '/dashboard/'], (req, res) =>
   res.sendFile(path.join(__dirname, '../public/dashboard/index.html')));
+
+app.get(['/auditoria', '/auditoria/'], (req, res) =>
+  res.sendFile(path.join(__dirname, '../public/auditoria/index.html')));
 
 app.get(['/cartas-aprobacion', '/cartas-aprobacion/'], (req, res) =>
   res.sendFile(path.join(__dirname, '../public/cartas-aprobacion/index.html')));

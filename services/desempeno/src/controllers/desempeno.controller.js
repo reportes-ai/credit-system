@@ -1,5 +1,6 @@
 'use strict';
 const pool = require('../../../../shared/config/database');
+const { auditar } = require('../../../../shared/audit');
 
 /* ════════════════════════════════════════════════════════════════
    DESEMPEÑO ANALISTAS DE CRÉDITO
@@ -74,6 +75,7 @@ const logout = async (req, res) => {
     await pool.query(
       `UPDATE sesiones_usuario SET logout_at = NOW() WHERE id_usuario = ? AND logout_at IS NULL`,
       [req.usuario.id_usuario]);
+    auditar({ req, accion: 'LOGOUT', modulo: 'auth', entidad: 'usuario', entidad_id: req.usuario.id_usuario, detalle: 'Cierre de sesión' });
     res.json({ success: true, data: { ok: true }, error: null });
   } catch (e) { res.status(500).json({ success: false, data: null, error: 'Error' }); }
 };

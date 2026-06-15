@@ -1,5 +1,6 @@
 const pool = require('../../../../shared/config/database');
 const bcrypt = require('bcryptjs');
+const { auditar } = require('../../../../shared/audit');
 
 /* ─── Migraciones ──────────────────────────────────────────────── */
 (async () => {
@@ -157,6 +158,7 @@ const deleteUsuario = async (req, res) => {
       return res.status(400).json({ success: false, data: null, error: 'No puedes eliminar tu propio usuario' });
     }
     await pool.query('UPDATE usuarios SET estado = ? WHERE id_usuario = ?', ['inactivo', id]);
+    auditar({ req, accion: 'ELIMINAR', modulo: 'usuarios', entidad: 'usuario', entidad_id: id, detalle: 'Usuario desactivado (baja lógica)' });
     res.json({ success: true, data: { mensaje: 'Usuario desactivado correctamente' }, error: null });
   } catch (error) {
     res.status(500).json({ success: false, data: null, error: error.message });

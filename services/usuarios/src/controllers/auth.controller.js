@@ -2,6 +2,7 @@ const pool = require('../../../../shared/config/database');
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const { JWT_SECRET, JWT_EXPIRES } = require('../../../../shared/middleware/auth');
+const { auditar } = require('../../../../shared/audit');
 
 const errMsg = (e) => e.message || e.code || String(e);
 
@@ -33,6 +34,7 @@ const login = async (req, res) => {
     await pool.query('UPDATE usuarios SET ultimo_acceso = NOW() WHERE id_usuario = ?', [usuario.id_usuario]);
     // Registrar sesión para el informe de desempeño (no bloqueante)
     try { require('../../../desempeno/src/controllers/desempeno.controller').registrarLogin(usuario); } catch (e) {}
+    auditar({ req, usuario, accion: 'LOGIN', modulo: 'auth', entidad: 'usuario', entidad_id: usuario.id_usuario, detalle: 'Ingreso al sistema' });
 
     const payload = {
       id_usuario: usuario.id_usuario,

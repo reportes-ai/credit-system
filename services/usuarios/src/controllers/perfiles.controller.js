@@ -1,5 +1,6 @@
 const pool = require('../../../../shared/config/database');
 const { limpiarCachePermisos } = require('../../../../shared/middleware/permisos');
+const { auditar } = require('../../../../shared/audit');
 
 // Migración: insertar módulos Tesorería, CRM, Cobranza, Reportería si no existen
 (async () => {
@@ -562,6 +563,7 @@ const updatePermisosPerfil = async (req, res) => {
     }
     limpiarCachePermisos();   // efecto inmediato en las APIs
 
+    auditar({ req, accion: 'PERMISOS', modulo: 'usuarios', entidad: 'perfil', entidad_id: id, detalle: `Actualizó permisos del perfil #${id} (${valores.length} funcionalidades)` });
     res.json({ success: true, data: { mensaje: 'Permisos actualizados' }, error: null });
   } catch (error) {
     console.error('[updatePermisosPerfil]', error.message);

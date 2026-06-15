@@ -1,4 +1,5 @@
 const pool = require('../../../../shared/config/database');
+const { auditar } = require('../../../../shared/audit');
 
 /* ── Migraciones ─────────────────────────────────────────────────────────── */
 (async () => {
@@ -149,6 +150,8 @@ async function autoAprobarComisiones() {
            WHERE ejecutivo=? AND mes=? AND estado='aprobado' AND (ejec_estado IS NULL OR ejec_estado='pendiente')`,
           [r.ejecutivo, r.mes]);
         await notificarComisionRev('com_rev_auto', { ejecutivo: r.ejecutivo, mes: r.mes });
+        auditar({ accion: 'APROBAR', modulo: 'comisiones', entidad: 'comision', entidad_id: `${r.ejecutivo}|${r.mes}`,
+          detalle: `Comisión de ${r.ejecutivo} (${r.mes}) aprobada automáticamente por el Sistema (sin respuesta del ejecutivo en ${COM_PLAZO_DIAS_HABILES} días hábiles)` });
       }
     }
   } catch (e) { console.error('[autoAprobarComisiones]', e.message); }
@@ -365,6 +368,12 @@ const aprobar = async (req, res) => {
          WHERE ejecutivo=? AND mes=?`, [ejecutivo, mes]);
       await notificarComisionRev('com_rev_aprobada_ops', { ejecutivo, mes });
     }
+    auditar({ req, accion: estado === 'aprobado' ? 'APROBAR' : (estado === 'rechazado' ? 'RECHAZAR' : 'EDITAR'),
+      modulo: 'comisiones', entidad: 'comision', entidad_id: `${ejecutivo}|${mes}`,
+      detalle: `Comisión de ${ejecutivo} (${mes}) → ${estado}`
+        + (incentivo_final ? ` · $${Math.round(incentivo_final).toLocaleString('es-CL')}` : '')
+        + (notas ? ` · "${notas}"` : ''),
+      meta: { incentivo_final: incentivo_final || 0, con_semana_corrida: con_semana_corrida || 0 } });
     res.json({ success: true, data: null, error: null });
   } catch (e) {
     res.status(500).json({ success: false, data: null, error: e.message });
@@ -399,6 +408,8 @@ const ejecutivoResponder = async (req, res) => {
        WHERE ejecutivo=? AND mes=?`,
       [ejec_estado, accion === 'revision' ? comentario.trim() : null, req.usuario.id_usuario, ejecutivo, mes]);
     if (accion === 'revision') await notificarComisionRev('com_rev_devuelta', { ejecutivo, mes });
+    auditar({ req, accion: accion === 'aceptar' ? 'APROBAR' : 'DEVOLVER', modulo: 'comisiones', entidad: 'comision', entidad_id: `${ejecutivo}|${mes}`,
+      detalle: accion === 'aceptar' ? `Ejecutivo declaró conformidad de sus comisiones (${mes})` : `Ejecutivo devolvió comisiones a revisión (${mes}): ${comentario.trim()}` });
     res.json({ success: true, data: { ejec_estado }, error: null });
   } catch (e) {
     res.status(500).json({ success: false, data: null, error: e.message });

@@ -1,5 +1,6 @@
 'use strict';
 const pool = require('../../../../shared/config/database');
+const { auditar } = require('../../../../shared/audit');
 
 /* ── Migración ───────────────────────────────────────────────────── */
 (async () => {
@@ -285,6 +286,8 @@ const registrarEnvio = async (req, res) => {
         }
       } catch (ePV) { console.error('[cartolas envio→postventa]', ePV.message); }
     }
+    auditar({ req, accion: 'ENVIAR_CARTOLA', modulo: 'cartas', entidad: 'cartola_enviada', entidad_id: r.insertId,
+      detalle: `Envió cartola — ${concesionario} (${mes})`, rut: rut_conc });
     res.status(201).json({ success: true, data: { id: r.insertId, marcados }, error: null });
   } catch (e) {
     console.error('[cartolas envio]', e.message);
@@ -340,6 +343,8 @@ const reversarEnvio = async (req, res) => {
     }
 
     await pool.query('DELETE FROM cartolas_enviadas WHERE id = ?', [req.params.id]);
+    auditar({ req, accion: 'REVERSAR', modulo: 'cartas', entidad: 'cartola_enviada', entidad_id: req.params.id,
+      detalle: `Reversó envío de cartola — ${env.nombre_dealer || ''} (${env.mes})`, rut: env.rut_dealer });
     res.json({ success: true, data: { reversado: Number(req.params.id), movimientos: u.affectedRows, operaciones: segs.length }, error: null });
   } catch (e) {
     console.error('[cartolas reversar]', e.message);
