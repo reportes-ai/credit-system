@@ -5,7 +5,7 @@
   <link rel="icon" href="/img/favicon.png" type="image/png">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Mantención Dealers — AutoFácil</title>
-  <!-- v1.1 -->
+  <!-- v1.2 -->
   <link href="/css/bootstrap.min.css" rel="stylesheet">
   <link href="/css/bootstrap-icons.css" rel="stylesheet">
   <style>
@@ -240,6 +240,14 @@ async function verFicha(id){
       const ra=await fetch('/api/dealer-incorporacion/fichas/'+id+'/archivos',{headers:H}); const ja=await ra.json();
       (ja.data||[]).forEach(a=>{ adjHtml += `<a class="btn btn-light btn-sm" style="text-decoration:none" target="_blank" href="/api/dealer-incorporacion/fichas/${id}/archivos/${a.id}?token=${encodeURIComponent(token)}"><i class="bi bi-paperclip"></i> ${a.categoria==='EMPRESA'?'Empresa':'Socios'}: ${escH(a.nombre||'archivo')}</a> `; });
     } catch(e){}
+    // Excepciones (comisión modificada / boleta) con su comentario
+    let excHtml = '';
+    if (Array.isArray(f.excepciones) && f.excepciones.length) {
+      const com = Object.fromEntries((f.excepciones_comentarios||[]).map(c=>[c.tipo,c.comentario]));
+      excHtml = `<div style="margin-top:14px;border:1px solid #fde68a;background:#fffbeb;border-radius:10px;padding:12px 14px">
+        <b style="color:#92400e;font-size:.82rem"><i class="bi bi-exclamation-triangle me-1"></i>Excepciones</b>
+        ${f.excepciones.map(e=>`<div style="margin-top:6px;font-size:.83rem"><b>${escH(e.label||e.tipo)}:</b> ${escH(com[e.tipo]||'—')}</div>`).join('')}</div>`;
+    }
     $('verBody').innerHTML = `<div class="kv">
       ${row('Ejecutivo', f.ejecutivo_nombre)} ${row('Fecha solicitud', f.fecha_solicitud?String(f.fecha_solicitud).slice(0,10):'—')}
       ${row('RUT', f.rut)} ${row('Razón Social', f.nombre_razon)} ${row('Fantasía', f.nombre_fantasia)}
@@ -251,7 +259,7 @@ async function verFicha(id){
       ${row('Email confirmación', f.correo_confirmacion)} ${row('Observaciones', f.observaciones)}
       ${f.apelacion?row('Apelación', f.apelacion):''}
       ${f.motivo_rechazo?row('Motivo rechazo', f.motivo_rechazo):''}
-    </div><div style="margin-top:16px;display:flex;flex-wrap:wrap;gap:6px">${adjHtml||'<span style="font-size:.8rem;color:#94a3b8">Sin adjuntos</span>'}</div>`;
+    </div>${excHtml}<div style="margin-top:16px;display:flex;flex-wrap:wrap;gap:6px">${adjHtml||'<span style="font-size:.8rem;color:#94a3b8">Sin adjuntos</span>'}</div>`;
     dlgVer.showModal();
   } catch(e){ toast(e.message,true); }
 }

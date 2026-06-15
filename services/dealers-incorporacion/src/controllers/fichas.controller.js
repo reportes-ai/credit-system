@@ -76,7 +76,9 @@ const COM_DEFAULT = {
   try {
     await pool.query(`ALTER TABLE dealer_fichas ADD COLUMN IF NOT EXISTS provincia VARCHAR(120) NULL`);
     await pool.query(`ALTER TABLE dealer_fichas ADD COLUMN IF NOT EXISTS region VARCHAR(120) NULL`);
-  } catch (e) { console.error('[dealer_fichas alter geo]', e.message); }
+    await pool.query(`ALTER TABLE dealer_fichas ADD COLUMN IF NOT EXISTS excepciones JSON NULL`);
+    await pool.query(`ALTER TABLE dealer_fichas ADD COLUMN IF NOT EXISTS excepciones_comentarios JSON NULL`);
+  } catch (e) { console.error('[dealer_fichas alter cols]', e.message); }
 
   // Archivos adjuntos múltiples (informes comerciales empresa/socios, hasta 3 c/u).
   try {
@@ -156,12 +158,22 @@ function puedeRevisar(req) {
 }
 
 // Campos editables de la ficha (todo menos workflow/archivo).
-const CAMPOS = ['tipo','fecha_solicitud','rut','nombre_razon','nombre_fantasia','direccion','comuna','provincia','region',
+const CAMPOS = ['tipo','ejecutivo_nombre','fecha_solicitud','rut','nombre_razon','nombre_fantasia','direccion','comuna','provincia','region',
   'cc_nombre','cc_telefono','cc_email','cf_nombre','cf_telefono','cf_email',
   'com_6_12','com_13_24','com_25_36','com_37','tipo_documento','cuenta_tipo','banco',
   'rut_cuenta','num_cuenta','correo_confirmacion','observaciones'];
 
 const CATEGORIAS = ['EMPRESA', 'SOCIOS'];   // informes comerciales
+
+// Comentario de excepción válido: ≥10 caracteres y al menos un espacio (no se avisan las reglas al usuario).
+const comentarioOK = c => { const s = String(c || '').trim(); return s.length >= 10 && /\s/.test(s); };
+
+// Normaliza el payload de excepciones y valida sus comentarios.
+function excepcionesDe(body) {
+  const exc = Array.isArray(body.excepciones) ? body.excepciones : [];
+  const com = Array.isArray(body.excepciones_comentarios) ? body.excepciones_comentarios : [];
+  return { exc, com };
+}
 
 function armarValores(body) {
   const v = {};
@@ -174,6 +186,18 @@ function armarValores(body) {
   }
   return v;
 }
+
+/* ── GET /ejecutivos — nombres elegibles para la ficha ────────────────────── */
+const ejecutivos = async (req, res) => {
+  try {
+    const [rows] = await pool.query(
+      `SELECT u.id_usuario, TRIM(CONCAT(COALESCE(u.nombre,''),' ',COALESCE(u.apellido,''))) AS nombre, p.nombre AS perfil
+       FROM usuarios u JOIN perfiles p ON p.id_perfil = u.id_perfil
+       WHERE u.estado='activo' AND p.nombre IN ('Ejecutivo Comercial','Jefe Comercial','Analista de Operaciones')
+       ORDER BY u.nombre, u.apellido`);
+    res.json({ success: true, data: rows, error: null });
+  } catch (e) { console.error('[fichas ejecutivos]', e.message); res.status(500).json({ success: false, data: null, error: 'Error interno del servidor' }); }
+};
 
 /* ── GET /fichas — lista (ejecutivo ve las suyas; revisores ven todas) ─────── */
 const listar = async (req, res) => {
@@ -207,6 +231,7 @@ const obtener = async (req, res) => {
               cc_nombre, cc_telefono, cc_email, cf_nombre, cf_telefono, cf_email,
               com_6_12, com_13_24, com_25_36, com_37, tipo_documento, cuenta_tipo, banco,
               rut_cuenta, num_cuenta, correo_confirmacion, observaciones,
+              excepciones, excepciones_comentarios,
               ficha_nombre, ficha_mime, (ficha_data IS NOT NULL) AS tiene_ficha,
               tomada_por, tomada_por_nombre, fecha_tomada, revisor_nombre, fecha_revision,
               motivo_rechazo, apelacion, id_dealer, created_at, updated_at
@@ -228,13 +253,20 @@ const crear = async (req, res) => {
     for (const k of ['com_6_12','com_13_24','com_25_36','com_37'])
       if (v[k] == null) v[k] = def[k];
     const u = req.usuario;
-    const cols = ['id_ejecutivo','ejecutivo_email','ejecutivo_nombre', ...Object.keys(v)];
+    // ejecutivo_nombre es editable (otro Ejecutivo/Jefe Comercial/Analista); default = creador.
+    if (!v.ejecutivo_nombre) v.ejecutivo_nombre = [u.nombre, u.apellido].filter(Boolean).join(' ') || null;
+    // Excepciones (comisión modificada, boleta…) — cada una requiere comentario válido.
+    const { exc, com } = excepcionesDe(req.body);
+    if (exc.length && !com.every(c => comentarioOK(c.comentario)))
+      return res.status(400).json({ success: false, data: null, error: 'Cada excepción requiere un comentario válido' });
+    const cols = ['id_ejecutivo','ejecutivo_email', ...Object.keys(v), 'excepciones','excepciones_comentarios'];
     const ph   = cols.map(() => '?').join(',');
-    const vals = [u.id_usuario, u.email || null, [u.nombre, u.apellido].filter(Boolean).join(' ') || null,
-      ...Object.values(v)];
+    const vals = [u.id_usuario, u.email || null, ...Object.values(v),
+      JSON.stringify(exc), JSON.stringify(com)];
     const [r] = await pool.query(`INSERT INTO dealer_fichas (${cols.join(',')}) VALUES (${ph})`, vals);
     auditar({ req, accion: 'CREAR', modulo: 'dealers', entidad: 'dealer_ficha', entidad_id: r.insertId,
-      detalle: `Creó ficha de incorporación (${v.tipo}) ${v.nombre_razon || v.rut || ''}`.trim(), rut: v.rut });
+      detalle: `Creó ficha de incorporación (${v.tipo}) ${v.nombre_razon || v.rut || ''}`.trim()
+        + (exc.length ? ` · ${exc.length} excepción(es)` : ''), rut: v.rut, meta: exc.length ? { excepciones: exc } : null });
     res.status(201).json({ success: true, data: { id: r.insertId }, error: null });
   } catch (e) { console.error('[fichas crear]', e.message); res.status(500).json({ success: false, data: null, error: 'Error interno del servidor' }); }
 };
@@ -249,9 +281,18 @@ const editar = async (req, res) => {
     if (!['BORRADOR', 'RECHAZADA'].includes(f.estado))
       return res.status(400).json({ success: false, data: null, error: 'La ficha está en revisión o aprobada; no se puede editar' });
     const v = armarValores(req.body);
-    if (!Object.keys(v).length) return res.status(400).json({ success: false, data: null, error: 'Sin cambios' });
-    const sets = Object.keys(v).map(k => `${k}=?`).join(',');
-    await pool.query(`UPDATE dealer_fichas SET ${sets} WHERE id=?`, [...Object.values(v), req.params.id]);
+    const setCols = Object.keys(v).map(k => `${k}=?`);
+    const setVals = Object.values(v);
+    // Excepciones (si vienen en el payload): validar comentarios y persistir.
+    if ('excepciones' in req.body) {
+      const { exc, com } = excepcionesDe(req.body);
+      if (exc.length && !com.every(c => comentarioOK(c.comentario)))
+        return res.status(400).json({ success: false, data: null, error: 'Cada excepción requiere un comentario válido' });
+      setCols.push('excepciones=?', 'excepciones_comentarios=?');
+      setVals.push(JSON.stringify(exc), JSON.stringify(com));
+    }
+    if (!setCols.length) return res.status(400).json({ success: false, data: null, error: 'Sin cambios' });
+    await pool.query(`UPDATE dealer_fichas SET ${setCols.join(',')} WHERE id=?`, [...setVals, req.params.id]);
     auditar({ req, accion: 'EDITAR', modulo: 'dealers', entidad: 'dealer_ficha', entidad_id: req.params.id,
       detalle: `Editó ficha de dealer #${req.params.id}`, meta: { campos: Object.keys(v) } });
     res.json({ success: true, data: { id: req.params.id }, error: null });
@@ -505,5 +546,5 @@ const eliminar = async (req, res) => {
   } catch (e) { console.error('[fichas eliminar]', e.message); res.status(500).json({ success: false, data: null, error: 'Error interno del servidor' }); }
 };
 
-module.exports = { listar, obtener, crear, editar, subirFicha, verFicha, enviar, tomar, aprobar, rechazar, eliminar,
+module.exports = { ejecutivos, listar, obtener, crear, editar, subirFicha, verFicha, enviar, tomar, aprobar, rechazar, eliminar,
   listarArchivos, subirArchivo, verArchivo, eliminarArchivo };

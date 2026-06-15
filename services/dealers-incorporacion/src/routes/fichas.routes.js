@@ -5,6 +5,9 @@ const { verifyToken } = require('../../../../shared/middleware/auth');
 const { requireFunc } = require('../../../../shared/middleware/permisos');
 const ctrl = require('../controllers/fichas.controller');
 
+// Nombres elegibles para el campo "Ejecutivo" (Ejecutivo/Jefe Comercial, Analista de Operaciones).
+router.get('/ejecutivos',        verifyToken, requireFunc('dealer_ficha_crear', 'dealer_ficha_revisar'), ctrl.ejecutivos);
+
 // Lectura: cualquiera con acceso al módulo (el controller filtra por rol).
 router.get('/fichas',            verifyToken, requireFunc('dealer_inc_ver', 'dealer_ficha_crear', 'dealer_ficha_revisar'), ctrl.listar);
 router.get('/fichas/:id',        verifyToken, requireFunc('dealer_inc_ver', 'dealer_ficha_crear', 'dealer_ficha_revisar'), ctrl.obtener);

@@ -5,7 +5,7 @@
   <link rel="icon" href="/img/favicon.png" type="image/png">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Nueva Ficha de Dealer — AutoFácil</title>
-  <!-- v1.1 -->
+  <!-- v1.2 -->
   <link href="/css/bootstrap.min.css" rel="stylesheet">
   <link href="/css/bootstrap-icons.css" rel="stylesheet">
   <style>
@@ -62,6 +62,12 @@
     .filerow { display:flex; align-items:center; gap:8px; background:#f8fafc; border:1px solid #e5e7eb; border-radius:8px; padding:6px 10px; font-size:.82rem; }
     .filerow i.fi { color:#0284c7; } .filerow .nm { flex:1; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
     .filerow a { color:#0284c7; text-decoration:none; } .filerow button { background:none; border:none; color:#dc2626; cursor:pointer; font-size:.95rem; }
+    dialog { border:none; border-radius:16px; padding:0; width:min(560px,94vw); box-shadow:0 20px 60px rgba(0,0,0,.3); }
+    dialog::backdrop { background:rgba(0,0,0,.45); }
+    .exc-item { border:1px solid #fde68a; background:#fffbeb; border-radius:10px; padding:12px 14px; margin-bottom:12px; }
+    .exc-item b { font-size:.88rem; color:#92400e; display:block; }
+    .exc-item textarea { width:100%; border:1.5px solid #d1d5db; border-radius:8px; padding:8px 10px; font-size:.85rem; margin-top:8px; box-sizing:border-box; }
+    .exc-item textarea:focus { outline:none; border-color:#b45309; }
     /* ── Vista de impresión ── */
     #printArea { display:none; }
     @media print {
@@ -99,7 +105,7 @@
     <h3><i class="bi bi-file-earmark-text me-1"></i> Tipo de ficha</h3>
     <div class="card-body">
       <div class="tipo-toggle">
-        <label><input type="radio" name="tipo" value="GENERAL" checked onchange="onTipo()"><span><i class="bi bi-shop me-1"></i>General (Sucursal)</span></label>
+        <label><input type="radio" name="tipo" value="GENERAL" checked onchange="onTipo()"><span><i class="bi bi-shop me-1"></i>General (Calle)</span></label>
         <label><input type="radio" name="tipo" value="PARQUE" onchange="onTipo()"><span><i class="bi bi-car-front me-1"></i>Parque Automotriz</span></label>
       </div>
       <p class="hint">El tipo ajusta los porcentajes de comisión por defecto y las etiquetas de dirección/comuna.</p>
@@ -109,7 +115,9 @@
   <div class="card-sec">
     <h3><i class="bi bi-person-badge me-1"></i> Ejecutivo Comercial</h3>
     <div class="card-body grid">
-      <div class="fld"><label>Nombre Ejecutivo</label><input id="ejecutivo_nombre" readonly></div>
+      <div class="fld"><label>Nombre Ejecutivo</label>
+        <input id="ejecutivo_nombre" list="ejecutivosList" placeholder="Ejecutivo responsable">
+        <datalist id="ejecutivosList"></datalist></div>
       <div class="fld"><label>Fecha de solicitud</label><input type="date" id="fecha_solicitud"></div>
     </div>
   </div>
@@ -235,9 +243,23 @@
 
 <div class="actionbar">
   <button class="btn btn-light" onclick="imprimir()"><i class="bi bi-printer"></i> Imprimir ficha</button>
-  <button class="btn btn-ghost" id="btnGuardar" onclick="guardar(false)"><i class="bi bi-save"></i> Guardar borrador</button>
-  <button class="btn btn-green" id="btnEnviar" onclick="enviar()"><i class="bi bi-send-check"></i> Enviar a revisión</button>
+  <button class="btn btn-ghost" id="btnGuardar" onclick="onGuardar()"><i class="bi bi-save"></i> Guardar borrador</button>
+  <button class="btn btn-green" id="btnEnviar" onclick="onEnviar()"><i class="bi bi-send-check"></i> Enviar a revisión</button>
 </div>
+
+<!-- Modal de excepciones -->
+<dialog id="dlgExcep">
+  <div style="background:linear-gradient(135deg,#92400e,#b45309);color:#fff;padding:16px 22px;display:flex;align-items:center;gap:10px;font-weight:700">
+    <i class="bi bi-exclamation-triangle-fill"></i> Excepciones detectadas</div>
+  <div style="padding:18px 22px;max-height:70vh;overflow:auto">
+    <p style="font-size:.85rem;color:#475569;margin:0 0 14px">Esta ficha tiene condiciones fuera del estándar. Justifica cada una para poder grabar.</p>
+    <div id="excList"></div>
+  </div>
+  <div style="padding:14px 22px;border-top:1px solid #f1f5f9;display:flex;gap:10px;justify-content:flex-end">
+    <button class="btn btn-light" onclick="dlgExcep.close();_excResolve&&_excResolve(false)">Cancelar</button>
+    <button class="btn btn-green" id="btnExcOk" disabled onclick="confirmarExcep()"><i class="bi bi-check-lg me-1"></i>Grabar</button>
+  </div>
+</dialog>
 
 <!-- Área de impresión (se llena al imprimir) -->
 <div id="printArea"></div>
@@ -253,6 +275,7 @@ const COM_DEFAULT = { GENERAL:{com_6_12:2.5,com_13_24:5.0,com_25_36:7.5,com_37:1
 let FICHA_ID = new URLSearchParams(location.search).get('id') || null;
 let ESTADO = 'BORRADOR';
 let fileB64 = null, fileName = null, fileMime = null;
+let EXC_COM = {}, EXC_LIST = [], _excResolve = null;   // excepciones + comentarios
 
 const $ = id => document.getElementById(id);
 const val = id => ($(id).value || '').trim();
@@ -336,6 +359,54 @@ async function borrarInforme(id){
   catch(e){ toast(e.message,true); }
 }
 
+/* ── Ejecutivos elegibles para el campo "Nombre Ejecutivo" ── */
+async function cargarEjecutivos(){
+  try {
+    const r=await fetch('/api/dealer-incorporacion/ejecutivos',{headers:H}); const j=await r.json();
+    const dl=$('ejecutivosList'); dl.innerHTML='';
+    (j.data||[]).forEach(u=>{ const o=document.createElement('option'); o.value=u.nombre; o.textContent=`${u.nombre} — ${u.perfil}`; dl.appendChild(o); });
+  } catch(e){}
+}
+
+/* ── Excepciones: comisión modificada y/o boleta ── */
+function detectarExcepciones(){
+  const out=[]; const t=getTipo(), d=COM_DEFAULT[t];
+  const cambia=['com_6_12','com_13_24','com_25_36','com_37'].some(k=>{ const v=parseFloat($(k).value); return !isNaN(v)&&v!==d[k]; });
+  if(cambia) out.push({tipo:'COMISION_MODIFICADA', label:'Comisión pactada modificada respecto al estándar'});
+  if(getRadio('tipo_documento')==='BOLETA') out.push({tipo:'DOC_BOLETA', label:'Documento tributario: Boleta'});
+  return out;
+}
+function abrirExcepModal(exc){
+  return new Promise(resolve=>{
+    _excResolve=resolve;
+    $('excList').innerHTML = exc.map(e=>`<div class="exc-item"><b><i class="bi bi-exclamation-circle me-1"></i>${e.label}</b>
+      <textarea data-tipo="${e.tipo}" rows="2" placeholder="Comentario de la excepción" oninput="valExc()">${(EXC_COM[e.tipo]||'').replace(/"/g,'&quot;')}</textarea></div>`).join('');
+    valExc(); dlgExcep.showModal();
+  });
+}
+function valExc(){
+  const tas=[...$('excList').querySelectorAll('textarea')];
+  const ok = tas.length>0 && tas.every(t=>{ const s=t.value.trim(); return s.length>=10 && /\s/.test(s); });
+  $('btnExcOk').disabled=!ok;
+}
+function confirmarExcep(){
+  const labels=Object.fromEntries(detectarExcepciones().map(e=>[e.tipo,e.label]));
+  EXC_LIST=[...$('excList').querySelectorAll('textarea')].map(t=>{ const tipo=t.dataset.tipo, comentario=t.value.trim();
+    EXC_COM[tipo]=comentario; return {tipo, label:labels[tipo]||tipo, comentario}; });
+  dlgExcep.close(); if(_excResolve){ _excResolve(true); _excResolve=null; }
+}
+async function gateExcepciones(){
+  const exc=detectarExcepciones();
+  if(!exc.length){ EXC_LIST=[]; return true; }
+  return await abrirExcepModal(exc);
+}
+async function onGuardar(){ if(!(await gateExcepciones())) return; await guardar(false); }
+async function onEnviar(){
+  const errs=validarEnvio(); if(errs.length){ toast('Corrige antes de enviar: '+errs.join(', '), true); return; }
+  if(!(await gateExcepciones())) return;
+  await enviarFinal();
+}
+
 function onTipo(){
   const t = getTipo();
   $('lblDir').textContent = t==='PARQUE' ? 'Dirección de Parque Automotriz' : 'Dirección de Sucursal';
@@ -374,6 +445,8 @@ function recolectar(){
 async function guardar(silent){
   if (!val('rut') || !val('nombre_razon')) { toast('RUT y Razón Social son obligatorios.', true); return false; }
   const body = recolectar();
+  body.excepciones = EXC_LIST.map(({tipo,label})=>({tipo,label}));
+  body.excepciones_comentarios = EXC_LIST.map(({tipo,comentario})=>({tipo,comentario}));
   try {
     let r;
     if (FICHA_ID) r = await fetch('/api/dealer-incorporacion/fichas/'+FICHA_ID, { method:'PUT', headers:H, body:JSON.stringify(body) });
@@ -405,9 +478,7 @@ function validarEnvio(){
   if(val('rut_cuenta') && !validarRUT(val('rut_cuenta').replace(/[^0-9kK]/g,'').toUpperCase())) errs.push('RUT de cuenta inválido');
   return errs;
 }
-async function enviar(){
-  const errs = validarEnvio();
-  if (errs.length){ toast('Corrige antes de enviar: '+errs.join(', '), true); return; }
+async function enviarFinal(){
   const ok = await guardar(true);
   if (!ok) return;
   let apelacion = null;
@@ -424,7 +495,7 @@ async function enviar(){
 }
 
 async function cargar(){
-  await cargarGeo();
+  await cargarGeo(); await cargarEjecutivos();
   if (!FICHA_ID) { $('fecha_solicitud').value = new Date().toLocaleDateString('sv-SE',{timeZone:'America/Santiago'}); onTipo(); return; }
   try {
     const r = await fetch('/api/dealer-incorporacion/fichas/'+FICHA_ID, { headers:H });
@@ -437,6 +508,9 @@ async function cargar(){
       .forEach(k => setVal(k, k==='fecha_solicitud' && f[k] ? String(f[k]).slice(0,10) : f[k]));
     if (!val('provincia')) onComuna();
     setRadio('tipo_documento', f.tipo_documento); setRadio('cuenta_tipo', f.cuenta_tipo);
+    // Restaurar comentarios de excepciones previos (para no reescribirlos)
+    (f.excepciones_comentarios||[]).forEach(c=>{ if(c&&c.tipo) EXC_COM[c.tipo]=c.comentario; });
+    EXC_LIST = (f.excepciones||[]).map(e=>({tipo:e.tipo, label:e.label, comentario:(EXC_COM[e.tipo]||'')}));
     const pill = $('estadoPill'); pill.textContent = f.estado.replace('_',' '); pill.className = 'estado-pill e-'+f.estado;
     if (f.tiene_ficha) { $('fileInfo').textContent = '✓ Ficha firmada ya cargada (puedes reemplazarla)'; $('fileInfo').style.display='block'; }
     if (f.estado === 'RECHAZADA' && f.motivo_rechazo) {
