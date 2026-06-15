@@ -5,7 +5,7 @@
   <link rel="icon" href="/img/favicon.png" type="image/png">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Portal Dealer — Atención AutoFácil</title>
-  <!-- v1.4 -->
+  <!-- v1.5 -->
   <link href="/css/bootstrap-icons.css" rel="stylesheet">
   <style>
     :root { --navy:#0141A2; --navy-dark:#012d70; --navy-light:#0255c5; --accent:#009AFE; }
@@ -309,10 +309,12 @@ document.getElementById('fileInput').addEventListener('change', async function()
 
 /* ── Arranque ── */
 (function(){
-  const k=new URLSearchParams(location.search).get('k');
+  const qs=new URLSearchParams(location.search);
+  const k=qs.get('k');
   if(k){ accederConLink(k); return; }
-  if(dToken && dInfo && tokenVigente(dToken)) entrarApp();
-  else limpiarSesion();
+  if(dToken && dInfo && tokenVigente(dToken)){ entrarApp(); return; }
+  limpiarSesion();
+  if(qs.get('registro')) verRegistro();   // link de registro abre directo el formulario
 })();
 </script>
 </body>

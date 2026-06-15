@@ -5,7 +5,7 @@
   <link rel="icon" href="/img/favicon.png" type="image/png">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Atención Remota — AutoFácil</title>
-  <!-- v1.7 -->
+  <!-- v1.8 -->
   <link href="/css/bootstrap.min.css" rel="stylesheet">
   <link href="/css/bootstrap-icons.css" rel="stylesheet">
   <style>
@@ -229,6 +229,18 @@
 
   <!-- ── SOLICITUDES ── -->
   <div class="paneview" id="view-solicitudes">
+    <div class="card" style="display:flex;gap:20px;align-items:center;flex-wrap:wrap;margin-bottom:16px">
+      <img id="regQr" alt="QR de registro" width="150" height="150" style="border:1px solid #eef2f7;border-radius:10px;background:#fff">
+      <div style="flex:1;min-width:240px">
+        <h3 style="margin:0 0 6px;font-size:1rem;color:var(--navy-dark)"><i class="bi bi-qr-code me-1"></i>Registro de nuevos dealers</h3>
+        <p style="font-size:.84rem;color:#64748b;margin:0 0 10px">Comparte este link o QR (web, WhatsApp, firma de correo). El dealer completa sus datos y aparece como solicitud pendiente aquí abajo.</p>
+        <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+          <input type="text" id="regLink" readonly style="flex:1;min-width:220px;border:1.5px solid #d1d5db;border-radius:8px;padding:8px 10px;font-size:.84rem;background:#f8fafc">
+          <button class="btn-primary2" onclick="copiarRegLink()"><i class="bi bi-clipboard"></i> Copiar link</button>
+          <button class="btn-ghost" onclick="verQr()"><i class="bi bi-download"></i> Ver/Descargar QR</button>
+        </div>
+      </div>
+    </div>
     <div class="card">
       <h3 style="margin-top:0;font-size:1rem;color:var(--navy-dark)"><i class="bi bi-person-plus me-1"></i>Solicitudes de cuenta pendientes</h3>
       <p style="font-size:.83rem;color:#64748b;margin:0 0 14px">Dealers que pidieron acceso desde el portal. Al aprobar defines su contraseña y se crea la cuenta.</p>
@@ -631,6 +643,14 @@ async function rechazarSol(id){
   try { const r=await fetch('/api/atencion-remota/solicitudes/'+id+'/rechazar',{ method:'POST', headers:H, body:JSON.stringify({}) });
     const j=await r.json(); if(j.success){ toast('Solicitud rechazada'); cargarSolicitudes(); } else toast(j.error||'Error', true); } catch(_){}
 }
+const REG_LINK = location.origin + '/portal-dealer/?registro=1';
+const REG_QR = s => 'https://api.qrserver.com/v1/create-qr-code/?margin=10&size='+s+'x'+s+'&data='+encodeURIComponent(REG_LINK);
+function initRegistro(){
+  const inp=document.getElementById('regLink'); if(inp) inp.value=REG_LINK;
+  const qr=document.getElementById('regQr'); if(qr) qr.src=REG_QR(300);
+}
+function copiarRegLink(){ if(navigator.clipboard) navigator.clipboard.writeText(REG_LINK).then(()=>toast('Link de registro copiado')).catch(()=>prompt('Copia el link de registro:',REG_LINK)); else prompt('Copia el link de registro:',REG_LINK); }
+function verQr(){ window.open(REG_QR(600),'_blank'); }
 
 /* ════════════════ Respuestas rápidas ════════════════ */
 async function cargarRespuestas(){
@@ -687,6 +707,7 @@ document.getElementById('ilModal').addEventListener('click', function(e){ if(e.t
 connect();
 cargarRespuestas();
 cargarSolicitudes();
+initRegistro();
 setInterval(cargarSolicitudes, 60000);
 (function(){ const qt=new URLSearchParams(location.search).get('tab'); if(qt){ const tb=document.querySelector('.tab[data-tab="'+qt+'"]'); if(tb) tb.click(); } })();
 ARTC.init({ role:'exec', selfName:((yo?.nombre||'')+' '+(yo?.apellido||'')).trim()||'Ejecutivo', iceUrl:'/api/atencion-remota/ice', token, signal:(convId,kind,payload)=>wsSend({t:'rtc',id:convId,kind,payload}) });
