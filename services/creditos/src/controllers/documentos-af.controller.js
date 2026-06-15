@@ -1,5 +1,6 @@
 const pool  = require('../../../../shared/config/database');
 const audit = require('../../../../shared/auditoria');
+const { auditar } = require('../../../../shared/audit');
 
 /* ─── Ensure table ───────────────────────────────────────────────────────── */
 (async () => {
@@ -126,6 +127,17 @@ const validar = async (req, res) => {
         detalle: `Doc. AF aprobado: ${doc[0].nombre || doc[0].codigo}`,
         meta: { codigo: doc[0].codigo, nombre: doc[0].nombre, aprobado_por: validado_por },
       });
+      // Bitácora transversal + control "validó sin haber visualizado el documento"
+      let sinVer = false;
+      try {
+        const [[visto]] = await pool.query(
+          "SELECT 1 ok FROM auditoria_movimientos WHERE accion='VER_DOCUMENTO' AND entidad='documento_af' AND entidad_id=? AND id_usuario=? LIMIT 1",
+          [String(req.params.id_doc), req.usuario?.id_usuario || 0]);
+        sinVer = !visto;
+      } catch (_) {}
+      auditar({ req, accion: 'VALIDAR_DOC', modulo: 'documentos', entidad: 'documento_af', entidad_id: req.params.id_doc,
+        detalle: (sinVer ? '⚠ SIN VER PREVIO — ' : '') + `Validó documento AF: ${doc[0].nombre || doc[0].codigo}`,
+        meta: { codigo: doc[0].codigo, nombre: doc[0].nombre, id_credito: doc[0].id_credito, sin_visualizar: sinVer } });
     }
     res.json({ success: true, data: null, error: null });
   } catch (e) { (console.error('[error]', e), res.status(500).json({success:false,data:null,error:'Error interno del servidor'})); }
@@ -152,6 +164,9 @@ const rechazar = async (req, res) => {
         detalle: `Doc. AF rechazado: ${doc[0].nombre || doc[0].codigo} — ${comentario_rechazo}`,
         meta: { codigo: doc[0].codigo, nombre: doc[0].nombre, motivo: comentario_rechazo, rechazado_por },
       });
+      auditar({ req, accion: 'RECHAZAR_DOC', modulo: 'documentos', entidad: 'documento_af', entidad_id: req.params.id_doc,
+        detalle: `Rechazó documento AF: ${doc[0].nombre || doc[0].codigo} — ${comentario_rechazo}`,
+        meta: { codigo: doc[0].codigo, nombre: doc[0].nombre, motivo: comentario_rechazo } });
     }
     res.json({ success: true, data: null, error: null });
   } catch (e) { (console.error('[error]', e), res.status(500).json({success:false,data:null,error:'Error interno del servidor'})); }
@@ -167,6 +182,7 @@ const view = async (req, res) => {
     if (!rows.length || !rows[0].contenido)
       return res.status(404).json({ success: false, error: 'Documento no encontrado' });
     const { nombre, mime_type, contenido } = rows[0];
+    auditar({ req, accion: 'VER_DOCUMENTO', modulo: 'documentos', entidad: 'documento_af', entidad_id: req.params.id_doc, detalle: `Visualizó documento AF: ${nombre || ''}` });
     res.setHeader('Content-Type', mime_type || 'application/octet-stream');
     res.setHeader('Content-Disposition', `inline; filename="${encodeURIComponent(nombre)}"`);
     res.send(contenido);
@@ -183,6 +199,7 @@ const download = async (req, res) => {
     if (!rows.length || !rows[0].contenido)
       return res.status(404).json({ success: false, error: 'Documento no encontrado' });
     const { nombre, mime_type, contenido } = rows[0];
+    auditar({ req, accion: 'VER_DOCUMENTO', modulo: 'documentos', entidad: 'documento_af', entidad_id: req.params.id_doc, detalle: `Descargó documento AF: ${nombre || ''}` });
     res.setHeader('Content-Type', mime_type || 'application/octet-stream');
     res.setHeader('Content-Disposition', `attachment; filename="${encodeURIComponent(nombre)}"`);
     res.send(contenido);

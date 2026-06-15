@@ -1,6 +1,7 @@
 'use strict';
 const pool = require('../../../../shared/config/database');
 const { notificar } = require('../../../notificaciones/src/controllers/notificaciones.controller');
+const { auditar } = require('../../../../shared/audit');
 
 /* Genera numero_credito igual que creditos.controller (YYMMXXX) */
 async function generarNumeroCreditoDesdeCartas() {
@@ -454,7 +455,7 @@ const upsert = async (req, res) => {
           pool.query(`UPDATE creditos SET estado='INGRESO', updated_at=NOW() WHERE id=? AND estado='CARTA_APROBACION'`, [idCred]).catch(e => console.error('[carta→credito estado]', e.message));
         }
       }
-      notificarCambios(c, prevStatus);
+      notificarCambios(c, prevStatus, req);
     } else {
       // INSERT nuevo: crear crédito asociado primero
       let credCreado = null;
@@ -491,7 +492,7 @@ const upsert = async (req, res) => {
         vals
       );
       res.status(201).json({ success: true, data: { id: r.insertId, numero_credito_creado: credCreado?.numero_credito || null }, error: null });
-      notificarCambios(c, null);
+      notificarCambios(c, null, req);
     }
   } catch (e) {
     (console.error('[error]', e), res.status(500).json({success:false,data:null,error:'Error interno del servidor'}));
@@ -499,7 +500,7 @@ const upsert = async (req, res) => {
 };
 
 /* Notificaciones del flujo (no bloquea la respuesta HTTP) */
-function notificarCambios(c, prevStatus) {
+function notificarCambios(c, prevStatus, req) {
   (async () => {
     try {
       const esNuevaPendiente   = !prevStatus && c.status === 'PENDIENTE';
@@ -532,6 +533,12 @@ function notificarCambios(c, prevStatus) {
             prioridad: 'alta', sonar: 1, son_tipo: ok ? 'dingdong' : 'alarma',
           });
         }
+        const excs = Array.isArray(c.excepciones) ? c.excepciones.filter(Boolean).length : 0;
+        auditar({ req, accion: c.status === 'APROBADA' ? 'APROBAR' : 'RECHAZAR', modulo: 'cartas', entidad: 'carta', entidad_id: c.id,
+          detalle: `Carta de aprobación ${c.opCarta || ''} — ${c.cliente || ''} → ${c.status}`
+            + (excs ? ` · ${excs} excepción(es)` : '')
+            + (c.motivoRechazo ? ` · "${c.motivoRechazo}"` : ''),
+          rut: c.rutCliente, meta: { excepciones: c.excepciones || [], excepciones_comentarios: c.excepcionesComentarios || null } });
       }
     } catch (e) { console.error('[cartas notif]', e.message); }
   })();
