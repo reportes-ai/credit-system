@@ -1,0 +1,298 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <link rel="icon" href="/img/favicon.png" type="image/png">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Mantención Dealers — AutoFácil</title>
+  <!-- v1.0 -->
+  <link href="/css/bootstrap.min.css" rel="stylesheet">
+  <link href="/css/bootstrap-icons.css" rel="stylesheet">
+  <style>
+    :root { --navy:#0141A2; --navy-dark:#012d70; --navy-light:#0255c5; --accent:#009AFE; --bg:#f0f4f8; }
+    body { background:var(--bg); font-family:'Segoe UI',system-ui,sans-serif; margin:0; min-height:100vh; }
+    .topnav { background:linear-gradient(90deg,var(--navy-dark),var(--navy-light)); color:#fff; height:60px; padding:0 24px; display:flex; align-items:center; justify-content:space-between; position:sticky; top:0; z-index:200; }
+    .topnav-brand { display:flex; align-items:center; gap:8px; text-decoration:none; }
+    .topnav-brand img { height:32px; filter:brightness(0) invert(1); }
+    .version-badge { background:rgba(255,255,255,.15); color:rgba(255,255,255,.75); font-size:.65rem; font-weight:700; border-radius:6px; padding:2px 8px; }
+    .breadcrumb-nav { color:rgba(255,255,255,.6); font-size:.85rem; margin-left:16px; }
+    .breadcrumb-nav a { color:rgba(255,255,255,.75); text-decoration:none; }
+    .btn-logout { background:rgba(255,255,255,.1); border:1px solid rgba(255,255,255,.2); color:#fff; border-radius:8px; padding:5px 12px; font-size:.82rem; cursor:pointer; }
+    .main { max-width:1180px; margin:24px auto; padding:0 18px 60px; }
+    .tabs { display:flex; gap:8px; margin-bottom:18px; flex-wrap:wrap; }
+    .tab { background:#fff; border:1.5px solid #e2e8f0; color:#475569; border-radius:10px; padding:9px 18px; font-size:.86rem; font-weight:700; cursor:pointer; display:flex; align-items:center; gap:7px; }
+    .tab.on { background:var(--navy); color:#fff; border-color:var(--navy); }
+    .tab .badge-n { background:#ef4444; color:#fff; border-radius:10px; font-size:.7rem; padding:1px 7px; }
+    .toolbar { display:flex; gap:10px; margin-bottom:14px; flex-wrap:wrap; }
+    .toolbar input { border:1.5px solid #d1d5db; border-radius:8px; padding:8px 12px; font-size:.85rem; min-width:240px; }
+    .btn { border:none; border-radius:9px; padding:8px 15px; font-size:.83rem; font-weight:700; cursor:pointer; display:inline-flex; align-items:center; gap:6px; }
+    .btn-navy { background:var(--navy); color:#fff; } .btn-green{ background:#16a34a; color:#fff; }
+    .btn-red{ background:#dc2626; color:#fff; } .btn-amber{ background:#f59e0b; color:#fff; }
+    .btn-light{ background:#f1f5f9; color:#334155; } .btn-sky{ background:#0284c7; color:#fff; }
+    .btn-sm{ padding:5px 10px; font-size:.78rem; border-radius:7px; }
+    .panel { background:#fff; border-radius:14px; box-shadow:0 1px 6px rgba(0,0,0,.07); overflow:hidden; }
+    table.tb { width:100%; border-collapse:collapse; font-size:.83rem; }
+    table.tb th { background:#f8fafc; color:#475569; text-align:left; padding:10px 12px; font-size:.74rem; text-transform:uppercase; letter-spacing:.4px; border-bottom:1px solid #e5e7eb; }
+    table.tb td { padding:10px 12px; border-bottom:1px solid #f1f5f9; vertical-align:middle; }
+    table.tb tr:hover td { background:#f8fafc; }
+    .estado-pill { font-size:.7rem; font-weight:800; border-radius:20px; padding:3px 10px; white-space:nowrap; }
+    .e-BORRADOR{ background:#e2e8f0; color:#475569; } .e-EN_REVISION{ background:#fef9c3; color:#854d0e; }
+    .e-TOMADA{ background:#fde68a; color:#92400e; } .e-APROBADA{ background:#dcfce7; color:#166534; } .e-RECHAZADA{ background:#fee2e2; color:#991b1b; }
+    .acts { display:flex; gap:5px; flex-wrap:wrap; justify-content:flex-end; }
+    .vacio { text-align:center; color:#94a3b8; padding:40px 0; }
+    /* modal */
+    dialog { border:none; border-radius:16px; padding:0; width:min(640px,94vw); box-shadow:0 20px 60px rgba(0,0,0,.3); }
+    dialog::backdrop { background:rgba(0,0,0,.45); }
+    .dlg-head { background:linear-gradient(135deg,#012d70,#0141A2); color:#fff; padding:16px 22px; display:flex; align-items:center; gap:10px; font-weight:700; }
+    .dlg-body { padding:20px 22px; max-height:70vh; overflow:auto; }
+    .dlg-foot { padding:14px 22px; border-top:1px solid #f1f5f9; display:flex; gap:10px; justify-content:flex-end; }
+    .kv { display:grid; grid-template-columns:160px 1fr; gap:6px 14px; font-size:.85rem; }
+    .kv b { color:#475569; font-weight:600; }
+    .grid2 { display:grid; grid-template-columns:repeat(2,1fr); gap:12px 16px; }
+    .grid2 .full{ grid-column:1/-1; }
+    .fld { display:flex; flex-direction:column; gap:4px; } .fld label{ font-size:.76rem; font-weight:600; color:#374151; }
+    .fld input,.fld select,.fld textarea{ border:1.5px solid #d1d5db; border-radius:8px; padding:8px 10px; font-size:.85rem; }
+    .toast-af { position:fixed; bottom:24px; left:50%; transform:translateX(-50%); background:#0f172a; color:#fff; padding:11px 20px; border-radius:10px; font-size:.86rem; z-index:9999; display:none; }
+    .toast-af.err{ background:#b91c1c; }
+    .motivo-line{ font-size:.78rem; color:#991b1b; margin-top:3px; }
+    .apel-line{ font-size:.78rem; color:#1e40af; margin-top:3px; }
+  </style>
+</head>
+<body>
+<nav class="topnav">
+  <div style="display:flex;align-items:center">
+    <a href="/" class="topnav-brand"><img src="/img/logo.png" alt="AutoFácil"><span class="version-badge" id="versionBadge"></span></a>
+    <div class="breadcrumb-nav"><a href="/">Inicio</a> › <a href="/dealers-incorporacion/">Dealer</a> › <span style="color:#fff;font-weight:600">Mantención Dealers</span></div>
+  </div>
+  <button class="btn-logout" onclick="location.href='/dealers-incorporacion/nuevo.html'"><i class="bi bi-plus-lg me-1"></i>Nueva ficha</button>
+</nav>
+
+<div class="main">
+  <div class="tabs" id="tabs"></div>
+  <div class="toolbar"><input id="buscar" placeholder="Buscar por RUT, razón social o ejecutivo…" oninput="render()"></div>
+  <div class="panel"><div id="contenido"></div></div>
+</div>
+
+<dialog id="dlgVer">
+  <div class="dlg-head"><i class="bi bi-building"></i> <span id="verTitulo">Ficha</span></div>
+  <div class="dlg-body" id="verBody"></div>
+  <div class="dlg-foot"><button class="btn btn-light" onclick="dlgVer.close()">Cerrar</button></div>
+</dialog>
+
+<dialog id="dlgDealer">
+  <div class="dlg-head"><i class="bi bi-pencil-square"></i> Editar Dealer</div>
+  <div class="dlg-body">
+    <input type="hidden" id="d_id">
+    <div class="grid2">
+      <div class="fld"><label>RUT</label><input id="d_rut"></div>
+      <div class="fld"><label>Nombre Razón Social</label><input id="d_nombre_razon"></div>
+      <div class="fld"><label>Nombre Fantasía (indexa)</label><input id="d_nombre_indexa"></div>
+      <div class="fld"><label>Categoría (CCS/Parque)</label><input id="d_ccs_parque"></div>
+      <div class="fld full"><label>Dirección</label><input id="d_direccion"></div>
+      <div class="fld"><label>Contacto</label><input id="d_contacto"></div>
+      <div class="fld"><label>Teléfono</label><input id="d_telefono"></div>
+      <div class="fld"><label>Correo</label><input id="d_correo"></div>
+      <div class="fld"><label>Banco</label><input id="d_banco"></div>
+      <div class="fld"><label>N° Cuenta</label><input id="d_num_cuenta"></div>
+      <div class="fld"><label>RUT Pago</label><input id="d_rut_pago"></div>
+      <div class="fld"><label>Activo</label><select id="d_activo"><option value="1">Sí</option><option value="0">No</option></select></div>
+      <div class="fld"><label>Emite Factura</label><select id="d_tiene_factura"><option value="1">Sí</option><option value="0">No (Boleta)</option></select></div>
+      <div class="fld full"><label>Observaciones</label><textarea id="d_observaciones" rows="2"></textarea></div>
+    </div>
+  </div>
+  <div class="dlg-foot"><button class="btn btn-light" onclick="dlgDealer.close()">Cancelar</button>
+    <button class="btn btn-navy" onclick="guardarDealer()"><i class="bi bi-save me-1"></i>Guardar</button></div>
+</dialog>
+
+<div class="toast-af" id="toast"></div>
+
+<script src="/js/auth-guard.js"></script>
+<script>
+const token = sessionStorage.getItem('token');
+const yo    = JSON.parse(sessionStorage.getItem('usuario') || 'null');
+if (!token || !yo) location.href='/login.html';
+const H = { 'Content-Type':'application/json', Authorization:'Bearer '+token };
+const MI_ID = yo?.id_usuario;
+const escH = s => String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+const $ = id => document.getElementById(id);
+function toast(m,err){ const t=$('toast'); t.textContent=m; t.className='toast-af'+(err?' err':''); t.style.display='block'; setTimeout(()=>t.style.display='none',2800); }
+const fH = s => s ? new Date(s).toLocaleString('es-CL',{timeZone:'America/Santiago',dateStyle:'short',timeStyle:'short'}) : '—';
+
+let PERMS = new Set(), ESADMIN = false, FICHAS = [], DEALERS = [], TAB = (new URLSearchParams(location.search).get('tab')||'');
+const tiene = (...cs) => ESADMIN || cs.some(c=>PERMS.has(c));
+
+async function init(){
+  try { const r=await fetch('/api/auth/mis-permisos?_='+Date.now(),{cache:'no-store',headers:H}); const j=await r.json(); (j.funcionalidades||[]).forEach(c=>PERMS.add(c)); } catch(e){}
+  ESADMIN = yo?.perfil==='Administrador';
+  const canRev = tiene('dealer_ficha_revisar'), canCrear = tiene('dealer_ficha_crear'), canMant = tiene('dealer_mantener');
+  const tabs=[];
+  if (canRev)   tabs.push(['revision','Revisión (pool)','bi-clipboard-check']);
+  if (canCrear) tabs.push(['mias','Mis fichas','bi-folder']);
+  if (canMant)  tabs.push(['dealers','Dealers vigentes','bi-building']);
+  if (!tabs.length){ $('contenido').innerHTML='<div class="vacio"><i class="bi bi-lock"></i><br>Sin acceso.</div>'; return; }
+  if (!tabs.find(t=>t[0]===TAB)) TAB = tabs[0][0];
+  window._tabs = tabs;
+  await cargar();
+}
+
+async function cargar(){
+  try {
+    const r = await fetch('/api/dealer-incorporacion/fichas', { headers:H });
+    const j = await r.json(); if (j.success) FICHAS = j.data.rows||[];
+  } catch(e){}
+  if (tiene('dealer_mantener')) { try { const r=await fetch('/api/dealers?limit=500',{headers:H}); const j=await r.json(); if(j.success) DEALERS=j.data.rows||[]; } catch(e){} }
+  pintarTabs(); render();
+}
+
+function pintarTabs(){
+  const pend = FICHAS.filter(f=>['EN_REVISION','TOMADA'].includes(f.estado)).length;
+  $('tabs').innerHTML = window._tabs.map(([id,label,ic])=>{
+    const n = (id==='revision' && pend) ? `<span class="badge-n">${pend}</span>` : '';
+    return `<button class="tab ${id===TAB?'on':''}" onclick="setTab('${id}')"><i class="bi ${ic}"></i> ${label} ${n}</button>`;
+  }).join('');
+}
+function setTab(t){ TAB=t; history.replaceState(null,'','?tab='+t); pintarTabs(); render(); }
+
+function filtroQ(arr, campos){
+  const q=$('buscar').value.trim().toLowerCase(); if(!q) return arr;
+  return arr.filter(o=>campos.some(c=>String(o[c]||'').toLowerCase().includes(q)));
+}
+
+function render(){
+  if (TAB==='revision') return renderRevision();
+  if (TAB==='mias')     return renderMias();
+  if (TAB==='dealers')  return renderDealers();
+}
+
+function comResumen(f){ return `${f.com_6_12||0}/${f.com_13_24||0}/${f.com_25_36||0}/${f.com_37||0}%`; }
+
+/* ── Pool de revisión ── */
+function renderRevision(){
+  let rows = FICHAS.filter(f=>['EN_REVISION','TOMADA'].includes(f.estado));
+  rows = filtroQ(rows, ['rut','nombre_razon','nombre_fantasia','ejecutivo_nombre']);
+  if (!rows.length) { $('contenido').innerHTML='<div class="vacio"><i class="bi bi-inbox" style="font-size:1.6rem"></i><br>No hay fichas pendientes de revisión.</div>'; return; }
+  $('contenido').innerHTML = `<table class="tb"><thead><tr>
+    <th>Tipo</th><th>Concesionario</th><th>RUT</th><th>Ejecutivo</th><th>Comisión</th><th>Estado</th><th>Enviada</th><th></th></tr></thead><tbody>${
+    rows.map(f=>`<tr>
+      <td>${f.tipo==='PARQUE'?'<i class="bi bi-car-front"></i> Parque':'<i class="bi bi-shop"></i> General'}</td>
+      <td><b>${escH(f.nombre_razon||f.nombre_fantasia||'—')}</b>${f.apelacion?`<div class="apel-line"><i class="bi bi-megaphone"></i> Apelación: ${escH(f.apelacion)}</div>`:''}</td>
+      <td>${escH(f.rut||'—')}</td>
+      <td>${escH(f.ejecutivo_nombre||'—')}</td>
+      <td>${comResumen(f)}</td>
+      <td><span class="estado-pill e-${f.estado}">${f.estado.replace('_',' ')}</span>${f.tomada_por_nombre?`<div style="font-size:.72rem;color:#92400e">por ${escH(f.tomada_por_nombre)}</div>`:''}</td>
+      <td>${fH(f.updated_at)}</td>
+      <td><div class="acts">
+        <button class="btn btn-light btn-sm" onclick="verFicha(${f.id})"><i class="bi bi-eye"></i></button>
+        ${f.tiene_ficha?`<button class="btn btn-sky btn-sm" onclick="abrirArchivo(${f.id})" title="Ficha firmada"><i class="bi bi-file-earmark-pdf"></i></button>`:''}
+        ${f.estado==='EN_REVISION'?`<button class="btn btn-amber btn-sm" onclick="tomar(${f.id})"><i class="bi bi-hand-index"></i> Tomar</button>`:''}
+        <button class="btn btn-green btn-sm" onclick="aprobar(${f.id})"><i class="bi bi-check-lg"></i> Aprobar</button>
+        <button class="btn btn-red btn-sm" onclick="rechazar(${f.id})"><i class="bi bi-x-lg"></i> Rechazar</button>
+      </div></td></tr>`).join('')}</tbody></table>`;
+}
+
+/* ── Mis fichas (ejecutivo) ── */
+function renderMias(){
+  let rows = FICHAS.filter(f=>f.id_ejecutivo===MI_ID || ESADMIN);
+  rows = filtroQ(rows, ['rut','nombre_razon','nombre_fantasia']);
+  if (!rows.length) { $('contenido').innerHTML='<div class="vacio">No tienes fichas. <a href="/dealers-incorporacion/nuevo.html">Crear una nueva</a>.</div>'; return; }
+  $('contenido').innerHTML = `<table class="tb"><thead><tr>
+    <th>Tipo</th><th>Concesionario</th><th>RUT</th><th>Estado</th><th>Actualizada</th><th>N° Dealer</th><th></th></tr></thead><tbody>${
+    rows.map(f=>`<tr>
+      <td>${f.tipo==='PARQUE'?'Parque':'General'}</td>
+      <td><b>${escH(f.nombre_razon||f.nombre_fantasia||'—')}</b>${f.estado==='RECHAZADA'&&f.motivo_rechazo?`<div class="motivo-line"><i class="bi bi-x-octagon"></i> ${escH(f.motivo_rechazo)}</div>`:''}</td>
+      <td>${escH(f.rut||'—')}</td>
+      <td><span class="estado-pill e-${f.estado}">${f.estado.replace('_',' ')}</span></td>
+      <td>${fH(f.updated_at)}</td>
+      <td>${f.id_dealer?'<span class="estado-pill e-APROBADA">creado</span>':'—'}</td>
+      <td><div class="acts">
+        <button class="btn btn-light btn-sm" onclick="verFicha(${f.id})"><i class="bi bi-eye"></i></button>
+        ${['BORRADOR','RECHAZADA'].includes(f.estado)?`<button class="btn btn-navy btn-sm" onclick="location.href='/dealers-incorporacion/nuevo.html?id=${f.id}'"><i class="bi bi-pencil"></i> ${f.estado==='RECHAZADA'?'Corregir':'Editar'}</button>`:''}
+        ${['BORRADOR','RECHAZADA'].includes(f.estado)?`<button class="btn btn-red btn-sm" onclick="eliminar(${f.id})"><i class="bi bi-trash"></i></button>`:''}
+      </div></td></tr>`).join('')}</tbody></table>`;
+}
+
+/* ── Dealers vigentes ── */
+function renderDealers(){
+  let rows = filtroQ(DEALERS, ['rut','nombre_razon','nombre_indexa','ccs_parque']);
+  if (!rows.length) { $('contenido').innerHTML='<div class="vacio">Sin dealers.</div>'; return; }
+  $('contenido').innerHTML = `<table class="tb"><thead><tr>
+    <th>N°</th><th>Razón Social</th><th>Fantasía</th><th>RUT</th><th>Categoría</th><th>Factura</th><th>Activo</th><th></th></tr></thead><tbody>${
+    rows.map(d=>`<tr>
+      <td>${d.numero||'—'}</td><td><b>${escH(d.nombre_razon||'—')}</b></td><td>${escH(d.nombre_indexa||'—')}</td>
+      <td>${escH(d.rut||'—')}</td><td>${escH(d.ccs_parque||'—')}</td>
+      <td>${d.tiene_factura?'Factura':'Boleta'}</td>
+      <td>${d.activo?'<span class="estado-pill e-APROBADA">Sí</span>':'<span class="estado-pill e-RECHAZADA">No</span>'}</td>
+      <td><div class="acts"><button class="btn btn-navy btn-sm" onclick="editarDealer(${d.id_dealer})"><i class="bi bi-pencil"></i> Editar</button></div></td>
+    </tr>`).join('')}</tbody></table>`;
+}
+
+/* ── Acciones ficha ── */
+async function verFicha(id){
+  try {
+    const r=await fetch('/api/dealer-incorporacion/fichas/'+id,{headers:H}); const j=await r.json();
+    if(!j.success) throw new Error(j.error); const f=j.data;
+    $('verTitulo').textContent = (f.nombre_razon||f.rut||'Ficha')+' · '+(f.tipo==='PARQUE'?'Parque':'General');
+    const row=(k,v)=>`<b>${k}</b><span>${escH(v??'—')}</span>`;
+    $('verBody').innerHTML = `<div class="kv">
+      ${row('Ejecutivo', f.ejecutivo_nombre)} ${row('Fecha solicitud', f.fecha_solicitud?String(f.fecha_solicitud).slice(0,10):'—')}
+      ${row('RUT', f.rut)} ${row('Razón Social', f.nombre_razon)} ${row('Fantasía', f.nombre_fantasia)}
+      ${row('Dirección', f.direccion)} ${row('Comuna', f.comuna)}
+      ${row('Contacto comercial', `${f.cc_nombre||''} · ${f.cc_telefono||''} · ${f.cc_email||''}`)}
+      ${row('Contacto financiero', `${f.cf_nombre||''} · ${f.cf_telefono||''} · ${f.cf_email||''}`)}
+      ${row('Comisión 6-12 / 13-24 / 25-36 / 37+', `${f.com_6_12||0}% / ${f.com_13_24||0}% / ${f.com_25_36||0}% / ${f.com_37||0}%`)}
+      ${row('Documento', f.tipo_documento)} ${row('Cuenta', `${f.cuenta_tipo||''} · ${f.banco||''} · ${f.num_cuenta||''} · RUT ${f.rut_cuenta||''}`)}
+      ${row('Correo confirmación', f.correo_confirmacion)} ${row('Observaciones', f.observaciones)}
+      ${f.apelacion?row('Apelación', f.apelacion):''}
+      ${f.motivo_rechazo?row('Motivo rechazo', f.motivo_rechazo):''}
+    </div>`;
+    dlgVer.showModal();
+  } catch(e){ toast(e.message,true); }
+}
+function abrirArchivo(id){ window.open('/api/dealer-incorporacion/fichas/'+id+'/archivo?token='+encodeURIComponent(token),'_blank'); }
+
+async function accion(id, path, body, okMsg){
+  try {
+    const r=await fetch('/api/dealer-incorporacion/fichas/'+id+'/'+path,{method:'POST',headers:H,body:JSON.stringify(body||{})});
+    const j=await r.json(); if(!j.success) throw new Error(j.error);
+    toast(okMsg); await cargar();
+  } catch(e){ toast(e.message,true); }
+}
+const tomar   = id => accion(id,'tomar',{},'Ficha tomada — el resto del pool ya no la verá pendiente.');
+const aprobar = id => { if(confirm('¿Aprobar la ficha y crear el dealer en el sistema?')) accion(id,'aprobar',{},'Dealer creado ✓ (se notificó al ejecutivo).'); };
+function rechazar(id){
+  const m=prompt('Motivo del rechazo (obligatorio, mínimo 5 caracteres):'); if(m==null) return;
+  if(m.trim().length<5){ toast('Motivo demasiado corto.',true); return; }
+  accion(id,'rechazar',{motivo:m.trim()},'Ficha rechazada (se notificó al ejecutivo).');
+}
+async function eliminar(id){
+  if(!confirm('¿Eliminar esta ficha?')) return;
+  try{ const r=await fetch('/api/dealer-incorporacion/fichas/'+id,{method:'DELETE',headers:H}); const j=await r.json(); if(!j.success)throw new Error(j.error); toast('Eliminada'); await cargar(); }catch(e){ toast(e.message,true); }
+}
+
+/* ── Editar dealer vigente ── */
+function editarDealer(id){
+  const d=DEALERS.find(x=>x.id_dealer===id); if(!d) return;
+  $('d_id').value=d.id_dealer;
+  const set=(k,v)=>{ $('d_'+k).value = v==null?'':v; };
+  ['rut','nombre_razon','nombre_indexa','ccs_parque','direccion','contacto','telefono','correo','banco','num_cuenta','rut_pago','observaciones'].forEach(k=>set(k,d[k]));
+  $('d_activo').value = d.activo?'1':'0'; $('d_tiene_factura').value = d.tiene_factura?'1':'0';
+  dlgDealer.showModal();
+}
+async function guardarDealer(){
+  const id=$('d_id').value;
+  const body={ numero_ind:DEALERS.find(x=>x.id_dealer==id)?.numero_ind||null,
+    rut:$('d_rut').value.trim(), nombre_razon:$('d_nombre_razon').value.trim(), nombre_indexa:$('d_nombre_indexa').value.trim(),
+    ccs_parque:$('d_ccs_parque').value.trim(), direccion:$('d_direccion').value.trim(),
+    fecha_incorporacion:DEALERS.find(x=>x.id_dealer==id)?.fecha_incorporacion||null,
+    contacto:$('d_contacto').value.trim(), telefono:$('d_telefono').value.trim(), correo:$('d_correo').value.trim(),
+    num_cuenta:$('d_num_cuenta').value.trim(), banco:$('d_banco').value.trim(), rut_pago:$('d_rut_pago').value.trim(),
+    activo:+$('d_activo').value, tiene_factura:+$('d_tiene_factura').value, observaciones:$('d_observaciones').value.trim() };
+  try{ const r=await fetch('/api/dealers/'+id,{method:'PUT',headers:H,body:JSON.stringify(body)}); const j=await r.json(); if(!j.success)throw new Error(j.error);
+    toast('Dealer actualizado ✓'); dlgDealer.close(); await cargar(); }catch(e){ toast(e.message,true); }
+}
+
+init();
+</script>
+<script src="/js/app-version.js"></script>
+</body>
+</html>

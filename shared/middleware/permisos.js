@@ -69,4 +69,11 @@ const requireFunc = (...codigos) => async (req, res, next) => {
 // Invalida el caché (llamar al guardar permisos para efecto inmediato)
 const limpiarCachePermisos = () => cache.clear();
 
-module.exports = { requireFunc, limpiarCachePermisos };
+// Chequeo programático (mismo caché que requireFunc): ¿el usuario tiene alguna de las funcs?
+// Admin pasa siempre. Útil para ramificar lógica dentro de un controller (no para bloquear rutas).
+async function tieneFunc(id_usuario, ...codigos) {
+  const p = await permisosDe(id_usuario);
+  return p.esAdmin || codigos.some(c => p.funcs.has(c));
+}
+
+module.exports = { requireFunc, limpiarCachePermisos, tieneFunc };

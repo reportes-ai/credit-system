@@ -68,7 +68,7 @@ setTimeout(initVapid, 3000);
 
 /* ── Núcleo: notificar a una lista de usuarios ───────────────────
    Inserta la notificación in-app y envía web push a sus dispositivos. */
-async function notificar(idUsuarios, { tipo, titulo, mensaje, href, prioridad, sonar, son_tipo, son_cada, son_max } = {}) {
+async function notificar(idUsuarios, { tipo, titulo, mensaje, href, prioridad, sonar, son_tipo, son_cada, son_max, clave } = {}) {
   const ids = [...new Set((idUsuarios || []).filter(Boolean))];
   if (!ids.length) return;
   // Sonido/prioridad opcionales (compatibles hacia atrás): si no se pasan, usan los
@@ -78,12 +78,14 @@ async function notificar(idUsuarios, { tipo, titulo, mensaje, href, prioridad, s
   const sTipo = son_tipo || 'campana';
   const sCada = Math.max(5, parseInt(son_cada) || 30);
   const sMax  = Math.max(1, parseInt(son_max) || 5);
+  // clave: agrupa avisos del mismo evento (p.ej. un pool); permite anularlos de golpe
+  // para el resto cuando alguien lo toma (DELETE ... WHERE clave = ?).
   try {
     for (const id of ids) {
       await pool.query(
-        `INSERT INTO notificaciones (id_usuario, tipo, titulo, mensaje, href, prioridad, sonar, son_cada, son_max, son_tipo)
-         VALUES (?,?,?,?,?,?,?,?,?,?)`,
-        [id, tipo || null, titulo, mensaje || null, href || null, prio, son, sCada, sMax, sTipo]
+        `INSERT INTO notificaciones (id_usuario, tipo, titulo, mensaje, href, prioridad, sonar, son_cada, son_max, son_tipo, clave)
+         VALUES (?,?,?,?,?,?,?,?,?,?,?)`,
+        [id, tipo || null, titulo, mensaje || null, href || null, prio, son, sCada, sMax, sTipo, clave || null]
       );
     }
   } catch (e) { console.error('[notif insert]', e.message); }

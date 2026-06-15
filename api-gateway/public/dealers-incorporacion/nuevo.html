@@ -1,0 +1,379 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <link rel="icon" href="/img/favicon.png" type="image/png">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Nueva Ficha de Dealer — AutoFácil</title>
+  <!-- v1.0 -->
+  <link href="/css/bootstrap.min.css" rel="stylesheet">
+  <link href="/css/bootstrap-icons.css" rel="stylesheet">
+  <style>
+    :root { --navy:#0141A2; --navy-dark:#012d70; --navy-light:#0255c5; --accent:#009AFE; --bg:#f0f4f8; }
+    body { background:var(--bg); font-family:'Segoe UI',system-ui,sans-serif; margin:0; min-height:100vh; }
+    .topnav { background:linear-gradient(90deg,var(--navy-dark),var(--navy-light)); color:#fff; height:60px; padding:0 24px; display:flex; align-items:center; justify-content:space-between; position:sticky; top:0; z-index:200; }
+    .topnav-brand { display:flex; align-items:center; gap:8px; text-decoration:none; }
+    .topnav-brand img { height:32px; filter:brightness(0) invert(1); }
+    .version-badge { background:rgba(255,255,255,.15); color:rgba(255,255,255,.75); font-size:.65rem; font-weight:700; border-radius:6px; padding:2px 8px; }
+    .breadcrumb-nav { color:rgba(255,255,255,.6); font-size:.85rem; margin-left:16px; }
+    .breadcrumb-nav a { color:rgba(255,255,255,.75); text-decoration:none; }
+    .btn-logout { background:rgba(255,255,255,.1); border:1px solid rgba(255,255,255,.2); color:#fff; border-radius:8px; padding:5px 12px; font-size:.82rem; cursor:pointer; }
+    .main { max-width:920px; margin:28px auto; padding:0 20px 80px; }
+    .card-sec { background:#fff; border-radius:14px; box-shadow:0 1px 6px rgba(0,0,0,.07); margin-bottom:22px; overflow:hidden; }
+    .card-sec > h3 { background:#f1f5f9; color:var(--navy-dark); font-size:.82rem; font-weight:800; text-transform:uppercase; letter-spacing:.6px; margin:0; padding:12px 20px; border-left:4px solid var(--navy); }
+    .card-body { padding:18px 20px; }
+    .grid { display:grid; grid-template-columns:repeat(2,1fr); gap:14px 20px; }
+    @media(max-width:640px){ .grid { grid-template-columns:1fr; } }
+    .fld { display:flex; flex-direction:column; gap:4px; }
+    .fld.full { grid-column:1 / -1; }
+    .fld label { font-size:.78rem; font-weight:600; color:#374151; }
+    .fld input, .fld select, .fld textarea { border:1.5px solid #d1d5db; border-radius:8px; padding:9px 11px; font-size:.88rem; outline:none; transition:border-color .15s; }
+    .fld input:focus, .fld select:focus, .fld textarea:focus { border-color:var(--navy); }
+    .tipo-toggle { display:flex; gap:10px; }
+    .tipo-toggle label { flex:1; border:2px solid #d1d5db; border-radius:10px; padding:12px; text-align:center; cursor:pointer; font-weight:700; color:#475569; font-size:.9rem; }
+    .tipo-toggle input { display:none; }
+    .tipo-toggle input:checked + span { color:var(--navy); }
+    .tipo-toggle label:has(input:checked) { border-color:var(--navy); background:#eff6ff; }
+    .com-table { width:100%; border-collapse:collapse; font-size:.85rem; }
+    .com-table th, .com-table td { border:1px solid #e5e7eb; padding:7px 8px; text-align:center; }
+    .com-table th { background:#f8fafc; color:#475569; font-weight:700; }
+    .com-table input { width:78px; text-align:center; border:1.5px solid #d1d5db; border-radius:6px; padding:5px; }
+    .opt-row { display:flex; gap:24px; align-items:center; flex-wrap:wrap; }
+    .opt-row label { display:flex; align-items:center; gap:7px; font-size:.88rem; font-weight:600; color:#374151; cursor:pointer; }
+    .actionbar { position:sticky; bottom:0; background:#fff; border-top:1px solid #e5e7eb; padding:14px 20px; display:flex; gap:10px; flex-wrap:wrap; justify-content:flex-end; box-shadow:0 -3px 12px rgba(0,0,0,.05); z-index:50; }
+    .btn { border:none; border-radius:9px; padding:10px 18px; font-size:.86rem; font-weight:700; cursor:pointer; display:inline-flex; align-items:center; gap:7px; }
+    .btn-light { background:#f1f5f9; color:#334155; }
+    .btn-navy { background:var(--navy); color:#fff; }
+    .btn-green { background:#16a34a; color:#fff; }
+    .btn-ghost { background:#fff; color:var(--navy); border:1.5px solid var(--navy); }
+    .btn:disabled { opacity:.5; cursor:not-allowed; }
+    .hint { font-size:.78rem; color:#64748b; margin:6px 0 0; }
+    .estado-pill { font-size:.74rem; font-weight:800; border-radius:20px; padding:3px 12px; }
+    .e-BORRADOR{ background:#e2e8f0; color:#475569; } .e-EN_REVISION,.e-TOMADA{ background:#fef9c3; color:#854d0e; }
+    .e-APROBADA{ background:#dcfce7; color:#166534; } .e-RECHAZADA{ background:#fee2e2; color:#991b1b; }
+    .alert-box { border-radius:10px; padding:12px 16px; font-size:.85rem; margin-bottom:18px; }
+    .alert-rej { background:#fef2f2; border:1px solid #fecaca; color:#991b1b; }
+    .toast-af { position:fixed; bottom:80px; left:50%; transform:translateX(-50%); background:#0f172a; color:#fff; padding:11px 20px; border-radius:10px; font-size:.86rem; z-index:9999; display:none; }
+    .toast-af.err { background:#b91c1c; }
+    .fileinfo { font-size:.82rem; color:#16a34a; font-weight:600; margin-top:6px; display:none; }
+    /* ── Vista de impresión ── */
+    #printArea { display:none; }
+    @media print {
+      body * { visibility:hidden; }
+      #printArea, #printArea * { visibility:visible; }
+      #printArea { display:block; position:absolute; left:0; top:0; width:100%; padding:0 6mm; }
+      .topnav, .actionbar { display:none !important; }
+    }
+    #printArea { color:#111; font-size:11px; }
+    #printArea h1 { text-align:center; color:#1f3864; font-size:20px; margin:0 0 14px; letter-spacing:1px; }
+    #printArea table.p { width:100%; border-collapse:collapse; margin-bottom:10px; }
+    #printArea table.p th { background:#1f3864; color:#fff; text-align:left; padding:5px 8px; font-size:11px; }
+    #printArea table.p td { border:1px solid #94a3b8; padding:5px 8px; font-size:11px; }
+    #printArea .lbl { width:38%; font-weight:600; background:#f1f5f9; }
+    #printArea .firma { margin-top:40px; text-align:center; }
+    #printArea .firma .line { border-top:1px solid #111; width:260px; margin:0 auto; padding-top:5px; }
+  </style>
+</head>
+<body>
+<nav class="topnav">
+  <div style="display:flex;align-items:center">
+    <a href="/" class="topnav-brand"><img src="/img/logo.png" alt="AutoFácil"><span class="version-badge" id="versionBadge"></span></a>
+    <div class="breadcrumb-nav"><a href="/">Inicio</a> › <a href="/dealers-incorporacion/">Dealer</a> › <span style="color:#fff;font-weight:600">Nueva Ficha</span></div>
+  </div>
+  <div style="display:flex;align-items:center;gap:12px">
+    <span class="estado-pill e-BORRADOR" id="estadoPill">BORRADOR</span>
+    <button class="btn-logout" onclick="location.href='/dealers-incorporacion/mantencion.html'"><i class="bi bi-list-ul me-1"></i>Mis fichas</button>
+  </div>
+</nav>
+
+<div class="main">
+  <div class="alert-box alert-rej" id="boxRechazo" style="display:none"></div>
+
+  <div class="card-sec">
+    <h3><i class="bi bi-file-earmark-text me-1"></i> Tipo de ficha</h3>
+    <div class="card-body">
+      <div class="tipo-toggle">
+        <label><input type="radio" name="tipo" value="GENERAL" checked onchange="onTipo()"><span><i class="bi bi-shop me-1"></i>General (Sucursal)</span></label>
+        <label><input type="radio" name="tipo" value="PARQUE" onchange="onTipo()"><span><i class="bi bi-car-front me-1"></i>Parque Automotriz</span></label>
+      </div>
+      <p class="hint">El tipo ajusta los porcentajes de comisión por defecto y las etiquetas de dirección/comuna.</p>
+    </div>
+  </div>
+
+  <div class="card-sec">
+    <h3><i class="bi bi-person-badge me-1"></i> Ejecutivo Comercial</h3>
+    <div class="card-body grid">
+      <div class="fld"><label>Nombre Ejecutivo</label><input id="ejecutivo_nombre" readonly></div>
+      <div class="fld"><label>Fecha de solicitud</label><input type="date" id="fecha_solicitud"></div>
+    </div>
+  </div>
+
+  <div class="card-sec">
+    <h3><i class="bi bi-building me-1"></i> Datos del Concesionario</h3>
+    <div class="card-body grid">
+      <div class="fld"><label>RUT de Concesionario *</label><input id="rut" placeholder="76.123.456-7"></div>
+      <div class="fld"><label>Nombre Razón Social *</label><input id="nombre_razon"></div>
+      <div class="fld"><label>Nombre de Fantasía</label><input id="nombre_fantasia"></div>
+      <div class="fld"><label id="lblDir">Dirección de Sucursal</label><input id="direccion"></div>
+      <div class="fld"><label id="lblCom">Comuna de Sucursal</label><input id="comuna"></div>
+    </div>
+  </div>
+
+  <div class="card-sec">
+    <h3><i class="bi bi-telephone me-1"></i> Contacto Comercial</h3>
+    <div class="card-body grid">
+      <div class="fld"><label>Nombre</label><input id="cc_nombre"></div>
+      <div class="fld"><label>Teléfono</label><input id="cc_telefono"></div>
+      <div class="fld full"><label>Email</label><input id="cc_email" type="email"></div>
+    </div>
+  </div>
+
+  <div class="card-sec">
+    <h3><i class="bi bi-cash-stack me-1"></i> Contacto Financiero</h3>
+    <div class="card-body grid">
+      <div class="fld"><label>Nombre</label><input id="cf_nombre"></div>
+      <div class="fld"><label>Teléfono</label><input id="cf_telefono"></div>
+      <div class="fld full"><label>Email</label><input id="cf_email" type="email"></div>
+    </div>
+  </div>
+
+  <div class="card-sec">
+    <h3><i class="bi bi-percent me-1"></i> Comisión Pactada</h3>
+    <div class="card-body">
+      <table class="com-table">
+        <thead><tr><th>Cantidad de Cuotas</th><th>6 a 12</th><th>13 a 24</th><th>25 a 36</th><th>37 y Más</th></tr></thead>
+        <tbody><tr>
+          <td style="background:#f8fafc;font-weight:700;text-align:left">Porcentaje de Comisión (%)</td>
+          <td><input id="com_6_12" type="number" step="0.1"></td>
+          <td><input id="com_13_24" type="number" step="0.1"></td>
+          <td><input id="com_25_36" type="number" step="0.1"></td>
+          <td><input id="com_37" type="number" step="0.1"></td>
+        </tr></tbody>
+      </table>
+      <p class="hint">Pre-cargado según el tipo de ficha. Ajústalo solo si hubo una negociación especial con el concesionario.</p>
+    </div>
+  </div>
+
+  <div class="card-sec">
+    <h3><i class="bi bi-receipt me-1"></i> Tipo de Documento Tributario</h3>
+    <div class="card-body opt-row">
+      <label><input type="radio" name="tipo_documento" value="BOLETA"> Boleta</label>
+      <label><input type="radio" name="tipo_documento" value="FACTURA"> Factura</label>
+    </div>
+  </div>
+
+  <div class="card-sec">
+    <h3><i class="bi bi-bank me-1"></i> Datos para Pago (Forma de Pago Saldo Precio)</h3>
+    <div class="card-body">
+      <div class="opt-row" style="margin-bottom:14px">
+        <span style="font-size:.82rem;font-weight:700;color:#374151">Tipo de cuenta:</span>
+        <label><input type="radio" name="cuenta_tipo" value="EMPRESA"> Empresa</label>
+        <label><input type="radio" name="cuenta_tipo" value="PERSONA"> Persona</label>
+      </div>
+      <div class="grid">
+        <div class="fld"><label>Banco de Transferencia</label><input id="banco"></div>
+        <div class="fld"><label>RUT de Cuenta</label><input id="rut_cuenta"></div>
+        <div class="fld"><label>Número de Cuenta</label><input id="num_cuenta"></div>
+        <div class="fld"><label>Correo Confirmación</label><input id="correo_confirmacion" type="email"></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="card-sec">
+    <h3><i class="bi bi-chat-left-text me-1"></i> Observaciones</h3>
+    <div class="card-body">
+      <div class="fld full"><textarea id="observaciones" rows="3" placeholder="Acuerdos especiales, adjuntos (estatutos/poderes), excepciones visadas…"></textarea></div>
+    </div>
+  </div>
+
+  <div class="card-sec">
+    <h3><i class="bi bi-cloud-upload me-1"></i> Ficha firmada por el cliente</h3>
+    <div class="card-body">
+      <p class="hint" style="margin-top:0">1) Guarda · 2) <b>Imprime</b> la ficha · 3) hazla <b>firmar</b> por el cliente · 4) sube el <b>PDF o foto</b> · 5) <b>envía a revisión</b>.</p>
+      <input type="file" id="fileFicha" accept="application/pdf,image/*" onchange="onFile()">
+      <div class="fileinfo" id="fileInfo"></div>
+    </div>
+  </div>
+</div>
+
+<div class="actionbar">
+  <button class="btn btn-light" onclick="imprimir()"><i class="bi bi-printer"></i> Imprimir ficha</button>
+  <button class="btn btn-ghost" id="btnGuardar" onclick="guardar(false)"><i class="bi bi-save"></i> Guardar borrador</button>
+  <button class="btn btn-green" id="btnEnviar" onclick="enviar()"><i class="bi bi-send-check"></i> Enviar a revisión</button>
+</div>
+
+<!-- Área de impresión (se llena al imprimir) -->
+<div id="printArea"></div>
+<div class="toast-af" id="toast"></div>
+
+<script src="/js/auth-guard.js"></script>
+<script>
+const token = sessionStorage.getItem('token');
+const yo    = JSON.parse(sessionStorage.getItem('usuario') || 'null');
+if (!token || !yo) location.href = '/login.html';
+const H = { 'Content-Type':'application/json', Authorization:'Bearer '+token };
+const COM_DEFAULT = { GENERAL:{com_6_12:2.5,com_13_24:5.0,com_25_36:7.5,com_37:10.0}, PARQUE:{com_6_12:0.0,com_13_24:2.5,com_25_36:5.0,com_37:7.5} };
+let FICHA_ID = new URLSearchParams(location.search).get('id') || null;
+let ESTADO = 'BORRADOR';
+let fileB64 = null, fileName = null, fileMime = null;
+
+const $ = id => document.getElementById(id);
+const val = id => ($(id).value || '').trim();
+const setVal = (id,v) => { if($(id)) $(id).value = v==null?'':v; };
+function toast(m, err){ const t=$('toast'); t.textContent=m; t.className='toast-af'+(err?' err':''); t.style.display='block'; setTimeout(()=>t.style.display='none',2800); }
+function getTipo(){ return document.querySelector('input[name=tipo]:checked').value; }
+function getRadio(n){ const el=document.querySelector(`input[name=${n}]:checked`); return el?el.value:null; }
+function setRadio(n,v){ const el=document.querySelector(`input[name=${n}][value="${v}"]`); if(el) el.checked=true; }
+
+$('ejecutivo_nombre').value = `${yo?.nombre||''} ${yo?.apellido||''}`.trim();
+
+function onTipo(){
+  const t = getTipo();
+  $('lblDir').textContent = t==='PARQUE' ? 'Dirección de Parque Automotriz' : 'Dirección de Sucursal';
+  $('lblCom').textContent = t==='PARQUE' ? 'Comuna de Parque Automotriz' : 'Comuna de Sucursal';
+  // Solo precarga defaults si los campos están vacíos o coinciden con el otro default (no pisa edición manual)
+  const d = COM_DEFAULT[t], o = COM_DEFAULT[t==='PARQUE'?'GENERAL':'PARQUE'];
+  for (const k of ['com_6_12','com_13_24','com_25_36','com_37']) {
+    const cur = $(k).value;
+    if (cur==='' || parseFloat(cur)===o[k]) $(k).value = d[k];
+  }
+}
+
+function onFile(){
+  const f = $('fileFicha').files[0];
+  if (!f) return;
+  if (f.size > 7*1024*1024) { toast('El archivo supera 7 MB. Comprime el PDF o reduce la foto.', true); $('fileFicha').value=''; return; }
+  const rd = new FileReader();
+  rd.onload = () => { fileB64 = rd.result.split(',')[1]; fileName = f.name; fileMime = f.type || 'application/octet-stream';
+    $('fileInfo').textContent = '✓ ' + f.name + ' listo para subir'; $('fileInfo').style.display='block'; };
+  rd.readAsDataURL(f);
+}
+
+function recolectar(){
+  const o = { tipo:getTipo(), fecha_solicitud:val('fecha_solicitud'), rut:val('rut'),
+    nombre_razon:val('nombre_razon'), nombre_fantasia:val('nombre_fantasia'),
+    direccion:val('direccion'), comuna:val('comuna'),
+    cc_nombre:val('cc_nombre'), cc_telefono:val('cc_telefono'), cc_email:val('cc_email'),
+    cf_nombre:val('cf_nombre'), cf_telefono:val('cf_telefono'), cf_email:val('cf_email'),
+    com_6_12:val('com_6_12'), com_13_24:val('com_13_24'), com_25_36:val('com_25_36'), com_37:val('com_37'),
+    tipo_documento:getRadio('tipo_documento'), cuenta_tipo:getRadio('cuenta_tipo'),
+    banco:val('banco'), rut_cuenta:val('rut_cuenta'), num_cuenta:val('num_cuenta'),
+    correo_confirmacion:val('correo_confirmacion'), observaciones:val('observaciones') };
+  return o;
+}
+
+async function guardar(silent){
+  if (!val('rut') || !val('nombre_razon')) { toast('RUT y Razón Social son obligatorios.', true); return false; }
+  const body = recolectar();
+  try {
+    let r;
+    if (FICHA_ID) r = await fetch('/api/dealer-incorporacion/fichas/'+FICHA_ID, { method:'PUT', headers:H, body:JSON.stringify(body) });
+    else          r = await fetch('/api/dealer-incorporacion/fichas',           { method:'POST', headers:H, body:JSON.stringify(body) });
+    const j = await r.json();
+    if (!j.success) throw new Error(j.error||'Error');
+    if (!FICHA_ID) { FICHA_ID = j.data.id; history.replaceState(null,'', '?id='+FICHA_ID); }
+    // Subir archivo si hay uno nuevo seleccionado
+    if (fileB64) {
+      const ru = await fetch('/api/dealer-incorporacion/fichas/'+FICHA_ID+'/archivo', { method:'POST', headers:H,
+        body: JSON.stringify({ archivo_nombre:fileName, mime_type:fileMime, archivo_data:fileB64 }) });
+      const ju = await ru.json();
+      if (!ju.success) throw new Error(ju.error||'Error al subir archivo');
+      fileB64 = null;
+    }
+    if (!silent) toast('Guardado ✓');
+    return true;
+  } catch(e){ toast(e.message, true); return false; }
+}
+
+async function enviar(){
+  const ok = await guardar(true);
+  if (!ok) return;
+  let apelacion = null;
+  if (ESTADO === 'RECHAZADA') {
+    apelacion = prompt('Esta ficha fue rechazada. Puedes escribir una apelación o nota para Operaciones (opcional):') || null;
+  }
+  try {
+    const r = await fetch('/api/dealer-incorporacion/fichas/'+FICHA_ID+'/enviar', { method:'POST', headers:H, body:JSON.stringify({ apelacion }) });
+    const j = await r.json();
+    if (!j.success) throw new Error(j.error||'Error');
+    toast('Enviada a revisión de Operaciones ✓');
+    setTimeout(()=>location.href='/dealers-incorporacion/mantencion.html', 1200);
+  } catch(e){ toast(e.message, true); }
+}
+
+async function cargar(){
+  if (!FICHA_ID) { $('fecha_solicitud').value = new Date().toLocaleDateString('sv-SE',{timeZone:'America/Santiago'}); onTipo(); return; }
+  try {
+    const r = await fetch('/api/dealer-incorporacion/fichas/'+FICHA_ID, { headers:H });
+    const j = await r.json();
+    if (!j.success) throw new Error(j.error);
+    const f = j.data; ESTADO = f.estado;
+    setRadio('tipo', f.tipo); onTipo();
+    setVal('ejecutivo_nombre', f.ejecutivo_nombre || $('ejecutivo_nombre').value);
+    ['fecha_solicitud','rut','nombre_razon','nombre_fantasia','direccion','comuna','cc_nombre','cc_telefono','cc_email','cf_nombre','cf_telefono','cf_email','com_6_12','com_13_24','com_25_36','com_37','banco','rut_cuenta','num_cuenta','correo_confirmacion','observaciones']
+      .forEach(k => setVal(k, k==='fecha_solicitud' && f[k] ? String(f[k]).slice(0,10) : f[k]));
+    setRadio('tipo_documento', f.tipo_documento); setRadio('cuenta_tipo', f.cuenta_tipo);
+    const pill = $('estadoPill'); pill.textContent = f.estado.replace('_',' '); pill.className = 'estado-pill e-'+f.estado;
+    if (f.tiene_ficha) { $('fileInfo').textContent = '✓ Ficha firmada ya cargada (puedes reemplazarla)'; $('fileInfo').style.display='block'; }
+    if (f.estado === 'RECHAZADA' && f.motivo_rechazo) {
+      const b=$('boxRechazo'); b.style.display='block';
+      b.innerHTML = `<b><i class="bi bi-x-octagon me-1"></i>Ficha rechazada por ${f.revisor_nombre||'Operaciones'}:</b> ${f.motivo_rechazo}`;
+    }
+    // Solo BORRADOR/RECHAZADA son editables
+    const editable = ['BORRADOR','RECHAZADA'].includes(f.estado);
+    if (!editable) {
+      document.querySelectorAll('.main input, .main select, .main textarea').forEach(el=>el.disabled=true);
+      $('btnGuardar').disabled = true; $('btnEnviar').disabled = true; $('fileFicha').disabled = true;
+      $('btnEnviar').title = 'La ficha está en revisión o aprobada';
+    }
+  } catch(e){ toast(e.message||'Error al cargar', true); }
+}
+
+/* ── Impresión: arma la ficha replicando el documento oficial ── */
+function celdaX(v,target){ return v===target ? 'X' : ''; }
+function imprimir(){
+  const o = recolectar();
+  const esP = o.tipo==='PARQUE';
+  const dirLbl = esP?'Dirección de Parque Automotriz':'Dirección de Sucursal';
+  const comLbl = esP?'Comuna de Parque Automotriz':'Comuna de Sucursal';
+  const E = s => String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;');
+  $('printArea').innerHTML = `
+    <h1>FICHA DE INCORPORACIÓN${esP?' PARQUE':''}</h1>
+    <table class="p"><tr><th colspan="2">EJECUTIVO COMERCIAL</th></tr>
+      <tr><td class="lbl">Nombre Ejecutivo</td><td>${E($('ejecutivo_nombre').value)}</td></tr>
+      <tr><td class="lbl">Fecha de solicitud</td><td>${E(o.fecha_solicitud)}</td></tr></table>
+    <table class="p"><tr><th colspan="2">DATOS DE CONCESIONARIO</th></tr>
+      <tr><td class="lbl">Rut de Concesionario</td><td>${E(o.rut)}</td></tr>
+      <tr><td class="lbl">Nombre Razón Social</td><td>${E(o.nombre_razon)}</td></tr>
+      <tr><td class="lbl">Nombre de Fantasía</td><td>${E(o.nombre_fantasia)}</td></tr>
+      <tr><td class="lbl">${dirLbl}</td><td>${E(o.direccion)}</td></tr>
+      <tr><td class="lbl">${comLbl}</td><td>${E(o.comuna)}</td></tr></table>
+    <table class="p"><tr><th colspan="2">CONTACTO COMERCIAL</th></tr>
+      <tr><td class="lbl">Nombre</td><td>${E(o.cc_nombre)}</td></tr>
+      <tr><td class="lbl">Teléfono</td><td>${E(o.cc_telefono)}</td></tr>
+      <tr><td class="lbl">Email</td><td>${E(o.cc_email)}</td></tr></table>
+    <table class="p"><tr><th colspan="2">CONTACTO FINANCIERO</th></tr>
+      <tr><td class="lbl">Nombre</td><td>${E(o.cf_nombre)}</td></tr>
+      <tr><td class="lbl">Teléfono</td><td>${E(o.cf_telefono)}</td></tr>
+      <tr><td class="lbl">Email</td><td>${E(o.cf_email)}</td></tr></table>
+    <table class="p"><tr><th colspan="5">COMISIÓN PACTADA</th></tr>
+      <tr><td class="lbl">Cantidad de Cuotas</td><td>6 a 12</td><td>13 a 24</td><td>25 a 36</td><td>37 y Más</td></tr>
+      <tr><td class="lbl">Porcentaje de Comisión</td><td>${E(o.com_6_12)}%</td><td>${E(o.com_13_24)}%</td><td>${E(o.com_25_36)}%</td><td>${E(o.com_37)}%</td></tr></table>
+    <table class="p"><tr><th colspan="4">TIPO DE DOCUMENTO TRIBUTARIO</th></tr>
+      <tr><td class="lbl">Tipo de documento</td><td>BOLETA: ${celdaX(o.tipo_documento,'BOLETA')}</td><td>FACTURA: ${celdaX(o.tipo_documento,'FACTURA')}</td><td></td></tr></table>
+    <table class="p"><tr><th colspan="4">FORMA DE PAGO SALDO PRECIO</th></tr>
+      <tr><td class="lbl">Tipo de cuenta</td><td>EMPRESA: ${celdaX(o.cuenta_tipo,'EMPRESA')}</td><td>PERSONA: ${celdaX(o.cuenta_tipo,'PERSONA')}</td><td></td></tr>
+      <tr><td class="lbl">Banco de Transferencia</td><td colspan="3">${E(o.banco)}</td></tr>
+      <tr><td class="lbl">Rut de Cuenta</td><td colspan="3">${E(o.rut_cuenta)}</td></tr>
+      <tr><td class="lbl">Número de Cuenta</td><td colspan="3">${E(o.num_cuenta)}</td></tr>
+      <tr><td class="lbl">Correo Confirmación</td><td colspan="3">${E(o.correo_confirmacion)}</td></tr></table>
+    <table class="p"><tr><th>OBSERVACIONES</th></tr><tr><td style="height:60px;vertical-align:top">${E(o.observaciones)}</td></tr></table>
+    <div class="firma"><div class="line">Firma Representante Legal del Concesionario</div></div>`;
+  window.print();
+}
+
+cargar();
+</script>
+<script src="/js/app-version.js"></script>
+</body>
+</html>
