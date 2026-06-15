@@ -5,7 +5,7 @@
   <link rel="icon" href="/img/favicon.png" type="image/png">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Atención Remota — AutoFácil</title>
-  <!-- v1.8 -->
+  <!-- v1.9 -->
   <link href="/css/bootstrap.min.css" rel="stylesheet">
   <link href="/css/bootstrap-icons.css" rel="stylesheet">
   <style>
@@ -300,6 +300,7 @@
 
 <script src="/js/auth-guard.js"></script>
 <script src="/js/webrtc-atencion.js"></script>
+<script src="/js/qrcode-generator.js"></script>
 <script>
 const token = sessionStorage.getItem('token');
 const yo = JSON.parse(sessionStorage.getItem('usuario') || 'null');
@@ -644,13 +645,14 @@ async function rechazarSol(id){
     const j=await r.json(); if(j.success){ toast('Solicitud rechazada'); cargarSolicitudes(); } else toast(j.error||'Error', true); } catch(_){}
 }
 const REG_LINK = location.origin + '/portal-dealer/?registro=1';
-const REG_QR = s => 'https://api.qrserver.com/v1/create-qr-code/?margin=10&size='+s+'x'+s+'&data='+encodeURIComponent(REG_LINK);
+// QR generado 100% local (qrcode-generator), sin servicios externos.
+function qrDataURL(cell){ try{ const qr=qrcode(0,'M'); qr.addData(REG_LINK); qr.make(); return qr.createDataURL(cell, 4); }catch(_){ return ''; } }
 function initRegistro(){
   const inp=document.getElementById('regLink'); if(inp) inp.value=REG_LINK;
-  const qr=document.getElementById('regQr'); if(qr) qr.src=REG_QR(300);
+  const qr=document.getElementById('regQr'); if(qr) qr.src=qrDataURL(6);
 }
 function copiarRegLink(){ if(navigator.clipboard) navigator.clipboard.writeText(REG_LINK).then(()=>toast('Link de registro copiado')).catch(()=>prompt('Copia el link de registro:',REG_LINK)); else prompt('Copia el link de registro:',REG_LINK); }
-function verQr(){ window.open(REG_QR(600),'_blank'); }
+function verQr(){ const d=qrDataURL(12); if(!d) return; const a=document.createElement('a'); a.href=d; a.download='registro-dealers-qr.gif'; document.body.appendChild(a); a.click(); a.remove(); toast('QR descargado'); }
 
 /* ════════════════ Respuestas rápidas ════════════════ */
 async function cargarRespuestas(){
