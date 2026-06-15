@@ -67,6 +67,16 @@ const pool = require('../../../../shared/config/database');
            VALUES (?,?,?,?,?,?,?,?,?,?)`, e);
       }
     }
+    // Orígenes nuevos (dealers): regla por defecto si aún no hay ninguna para ese origen.
+    for (const e of [
+      ['Fichas de dealer pendientes en el pool',      'dealer_fichas_pendientes',      'minutos', 'mayor', '30', null, 'alta',   'Administrador', 1, 1],
+      ['Solicitud de cuenta dealer pendiente +1 día', 'dealer_solicitudes_pendientes', 'dias',    'mayor', '1',  null, 'normal', 'Administrador', 1, 1],
+    ]) {
+      const [[ex]] = await pool.query('SELECT 1 v FROM alertas_config WHERE origen = ? LIMIT 1', [e[1]]);
+      if (!ex) await pool.query(
+        `INSERT INTO alertas_config (nombre, origen, campo, operador, valor1, valor2, prioridad, destino, activo, sonido)
+         VALUES (?,?,?,?,?,?,?,?,?,?)`, e);
+    }
     console.log('[alertas] tabla OK');
   } catch (e) { console.error('[alertas migration]', e.message); }
 })();
@@ -233,6 +243,51 @@ const ORIGENES = {
         titulo: 'Operación en INGRESO',
         mensaje: `OP ${r.num_op} (${r.ejecutivo || '—'}) lleva ${r.dias} día(s) en INGRESO sin otorgar.`,
         href: '/creditos/',
+      }));
+    },
+  },
+  dealer_fichas_pendientes: {
+    label: 'Fichas de dealer pendientes en el pool',
+    href: '/dealers-incorporacion/mantencion.html?tab=revision',
+    campos: [
+      { campo: 'minutos', label: 'Minutos en el pool', tipo: 'numero' },
+      { campo: 'horas',   label: 'Horas en el pool',   tipo: 'numero' },
+      { campo: 'ejecutivo_nombre', label: 'Ejecutivo', tipo: 'texto' },
+    ],
+    async filas() {
+      const [rows] = await pool.query(`
+        SELECT id, nombre_razon, rut, ejecutivo_nombre,
+               TIMESTAMPDIFF(MINUTE, updated_at, NOW()) AS minutos,
+               TIMESTAMPDIFF(HOUR, updated_at, NOW()) AS horas
+        FROM dealer_fichas WHERE estado = 'EN_REVISION'`);
+      return rows.map(r => ({
+        key: 'dficha:' + r.id,
+        vars: { minutos: r.minutos, horas: r.horas, ejecutivo_nombre: r.ejecutivo_nombre },
+        titulo: 'Ficha de dealer pendiente',
+        mensaje: `Ficha de ${r.nombre_razon || r.rut || ('#' + r.id)} lleva ${r.minutos} min en el pool sin tomar.`,
+        href: '/dealers-incorporacion/mantencion.html?tab=revision',
+      }));
+    },
+  },
+  dealer_solicitudes_pendientes: {
+    label: 'Solicitudes de cuenta dealer pendientes',
+    href: '/atencion-remota/?tab=solicitudes',
+    campos: [
+      { campo: 'dias',  label: 'Días pendiente',  tipo: 'numero' },
+      { campo: 'horas', label: 'Horas pendiente', tipo: 'numero' },
+    ],
+    async filas() {
+      const [rows] = await pool.query(`
+        SELECT id, razon_social, rut,
+               TIMESTAMPDIFF(HOUR, created_at, NOW()) AS horas,
+               DATEDIFF(CURDATE(), DATE(created_at)) AS dias
+        FROM ar_solicitudes_cuenta WHERE estado = 'PENDIENTE'`);
+      return rows.map(r => ({
+        key: 'arsol:' + r.id,
+        vars: { dias: r.dias, horas: r.horas },
+        titulo: 'Solicitud de cuenta dealer',
+        mensaje: `${r.razon_social || r.rut || ('#' + r.id)} solicitó acceso al portal hace ${r.dias} día(s); aún sin aprobar.`,
+        href: '/atencion-remota/?tab=solicitudes',
       }));
     },
   },
