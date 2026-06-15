@@ -254,7 +254,15 @@
     ui.wait.style.display = 'flex'; ui.wst.classList.remove('on');
     ui.mic.classList.remove('off'); ui.cam.classList.remove('off'); ui.screen.classList.remove('act');
     S.micOn = true; S.camOn = true; S.screen = false;
+    setMedia();
     show(ui.win);
+  }
+  // Nombre del interlocutor en la ventana PiP del sistema (en vez de la URL).
+  function setMedia() {
+    try {
+      if ('mediaSession' in navigator)
+        navigator.mediaSession.metadata = new MediaMetadata({ title: S.peerName || 'Interlocutor', artist: 'AutoFácil · Atención Remota' });
+    } catch (_) {}
   }
   function toggleMic() { if (!S.local) return; S.micOn = !S.micOn; S.local.getAudioTracks().forEach(t => t.enabled = S.micOn); ui.mic.classList.toggle('off', !S.micOn); ui.mic.innerHTML = `<i class="bi bi-mic${S.micOn ? '-fill' : '-mute-fill'}"></i>`; }
   function toggleCam() { if (!S.local) return; S.camOn = !S.camOn; S.local.getVideoTracks().forEach(t => t.enabled = S.camOn); ui.cam.classList.toggle('off', !S.camOn); ui.cam.innerHTML = `<i class="bi bi-camera-video${S.camOn ? '-fill' : '-off-fill'}"></i>`; }
@@ -281,6 +289,7 @@
     S.screen = false; ui.screen.classList.remove('act');
   }
   async function togglePip() {
+    setMedia();
     try { if (document.pictureInPictureElement) await document.exitPictureInPicture(); else await ui.remote.requestPictureInPicture(); } catch (_) {}
   }
 
@@ -309,6 +318,7 @@
   function cleanup() {
     clearTimeout(S.ringTimer); stopMeter();
     try { if (document.pictureInPictureElement) document.exitPictureInPicture(); } catch (_) {}
+    try { if ('mediaSession' in navigator) navigator.mediaSession.metadata = null; } catch (_) {}
     if (S.pc) { try { S.pc.close(); } catch (_) {} S.pc = null; }
     if (S.screenStream) { S.screenStream.getTracks().forEach(t => t.stop()); S.screenStream = null; }
     if (S.local) { S.local.getTracks().forEach(t => t.stop()); S.local = null; }

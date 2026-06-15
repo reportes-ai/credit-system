@@ -5,7 +5,7 @@
   <link rel="icon" href="/img/favicon.png" type="image/png">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Portal Dealer — Atención AutoFácil</title>
-  <!-- v1.2 -->
+  <!-- v1.3 -->
   <link href="/css/bootstrap-icons.css" rel="stylesheet">
   <style>
     :root { --navy:#0141A2; --navy-dark:#012d70; --navy-light:#0255c5; --accent:#009AFE; }
@@ -124,6 +124,7 @@
     <img src="/img/logo.png" alt="AutoFácil">
     <div class="ti"><b id="hdNombre">Atención AutoFácil</b><span id="hdEstado2">Conectando…</span></div>
     <span class="estado" id="hdEstado">·</span>
+    <button id="btnVideoReq" onclick="solicitarVideo()" style="display:none;background:#16a34a;align-items:center;gap:6px"><i class="bi bi-camera-video-fill"></i> Videollamada</button>
     <button onclick="logoutDealer()"><i class="bi bi-box-arrow-right"></i></button>
   </div>
 
@@ -233,12 +234,19 @@ function onMsg(m){
     case 'typing': showTyping(m.on); break;
     case 'presencia': if(m.parte==='ejecutivo') document.getElementById('hdEstado2').textContent = m.online?'Ejecutivo en línea':'Ejecutivo desconectado'; break;
     case 'cerrada': cerrada(); break;
-    case 'rtc': ARTC.onRtc(m.id_conversacion, m.kind, m.payload, m.from); break;
+    case 'rtc':
+      if(m.kind==='avail'){ const b=document.getElementById('btnVideoReq'); if(b) b.style.display=(m.payload&&m.payload.on)?'inline-flex':'none'; break; }
+      ARTC.onRtc(m.id_conversacion, m.kind, m.payload, m.from); break;
     case 'error': toast(m.msg||'Error', true); break;
   }
 }
 
 function iniciar(){ const asunto=document.getElementById('preAsunto').value.trim(); wsSend({ t:'start', asunto }); }
+function solicitarVideo(){
+  if(!conv){ toast('Aún no estás en una conversación', true); return; }
+  if(window.ARTC && ARTC.busy()){ toast('Ya hay una llamada en curso', true); return; }
+  ARTC.start(conv.id, { selfName: dInfo?.nombre||'Dealer', peerName: conv.ejecutivo_nombre||'Ejecutivo' });
+}
 
 async function abrirChat(){
   document.getElementById('prechat').classList.add('hidden');
@@ -273,7 +281,7 @@ let tto=null;
 document.getElementById('inp').addEventListener('input', ()=>{ if(!conv) return; wsSend({t:'typing',id:conv.id,on:true}); clearTimeout(tto); tto=setTimeout(()=>wsSend({t:'typing',id:conv.id,on:false}),1200); });
 let typingT=null;
 function showTyping(on){ const el=document.getElementById('typing'); el.textContent=on?'tu ejecutivo está escribiendo…':''; clearTimeout(typingT); if(on) typingT=setTimeout(()=>el.textContent='',2500); }
-function cerrada(){ addMessage({ emisor:'SISTEMA', cuerpo:'La atención fue cerrada. ¡Gracias por contactarnos!' }); }
+function cerrada(){ addMessage({ emisor:'SISTEMA', cuerpo:'La atención fue cerrada. ¡Gracias por contactarnos!' }); const b=document.getElementById('btnVideoReq'); if(b) b.style.display='none'; }
 
 /* ── Adjuntos ── */
 document.getElementById('fileInput').addEventListener('change', async function(){
