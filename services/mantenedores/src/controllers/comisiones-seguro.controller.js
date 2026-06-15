@@ -1,4 +1,5 @@
 const pool = require('../../../../shared/config/database');
+const { auditar } = require('../../../../shared/audit');
 
 (async () => {
   try {
@@ -56,6 +57,7 @@ const update = async (req, res) => {
        WHERE id=?`,
       [pct_cesantia, pct_desgravamen, pct_ambos, factor, estado || 'activo', id]
     );
+    auditar({ req, accion: 'EDITAR', modulo: 'mantenedores', entidad: 'comision_seguro', entidad_id: id, detalle: `Editó comisión de seguro por plazo #${id}`, meta: req.body });
     res.json({ success: true, data: null, error: null });
   } catch (e) {
     res.status(500).json({ success: false, data: null, error: e.message });
@@ -117,6 +119,7 @@ const updatePen = async (req, res) => {
       'UPDATE comisiones_seguro_penetracion SET pen_min=?, pct_comision=?, estado=? WHERE id=?',
       [pen_min, pct_comision, estado || 'activo', id]
     );
+    auditar({ req, accion: 'EDITAR', modulo: 'mantenedores', entidad: 'comision_seguro_pen', entidad_id: id, detalle: `Editó tramo de comisión por penetración #${id}`, meta: req.body });
     res.json({ success: true, data: null, error: null });
   } catch (e) {
     res.status(500).json({ success: false, data: null, error: e.message });

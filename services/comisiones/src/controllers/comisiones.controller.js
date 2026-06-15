@@ -268,6 +268,7 @@ const putVariables = async (req, res) => {
         [parseFloat(valor), clave]
       );
     }
+    auditar({ req, accion: 'EDITAR', modulo: 'comisiones', entidad: 'comision_variable', entidad_id: 'variables', detalle: `Actualizó variables de comisiones (${Object.keys(updates).length} variable/s)`, meta: updates });
     res.json({ success: true, data: null, error: null });
   } catch (e) {
     res.status(500).json({ success: false, data: null, error: e.message });

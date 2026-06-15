@@ -1,5 +1,6 @@
 'use strict';
 const pool = require('../../../../shared/config/database');
+const { auditar } = require('../../../../shared/audit');
 
 /* ─────────────────────────────────────────────────────────────────────────
    Política de Aprobación Crédito AutoFácil (PC-02 v2.0)
@@ -119,6 +120,7 @@ const updateMatriz = async (req, res) => {
          num(f.pie_min_pct), num(f.antiguedad_vehiculo_max), num(f.plazo_max), num(f.monto_max_financiar), f.id]
       );
     }
+    auditar({ req, accion: 'EDITAR', modulo: 'mantenedores', entidad: 'politica_matriz', entidad_id: 'matriz', detalle: `Actualizó la matriz de política de aprobación (${filas.length} fila/s)`, meta: { filas } });
     res.json({ success: true, data: { mensaje: 'Matriz actualizada' }, error: null });
   } catch (e) {
     (console.error('[error]', e), res.status(500).json({success:false,data:null,error:'Error interno del servidor'}));

@@ -1,4 +1,5 @@
 const pool = require('../../../../shared/config/database');
+const { auditar } = require('../../../../shared/audit');
 
 /* ── Migración: tabla de impuestos paramétricos + seed + registro en el menú ── */
 (async () => {
@@ -53,6 +54,7 @@ const update = async (req, res) => {
     const usuario = (req.usuario?.nombre ? (req.usuario.nombre + ' ' + (req.usuario.apellido || '')).trim() : req.usuario?.email) || 'Usuario';
     const [r] = await pool.query('UPDATE impuestos SET porcentaje = ?, actualizado_por = ? WHERE codigo = ?', [pct, usuario, codigo]);
     if (!r.affectedRows) return res.status(404).json({ success: false, data: null, error: 'Impuesto no encontrado' });
+    auditar({ req, accion: 'EDITAR', modulo: 'mantenedores', entidad: 'impuesto', entidad_id: codigo, detalle: `Cambió ${codigo} a ${pct}%`, meta: { codigo, porcentaje: pct } });
     res.json({ success: true, data: { codigo, porcentaje: pct }, error: null });
   } catch (e) { console.error('[impuestos update]', e.message); res.status(500).json({ success: false, data: null, error: 'Error interno del servidor' }); }
 };

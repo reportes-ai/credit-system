@@ -1,4 +1,5 @@
 const pool = require('../../../../shared/config/database');
+const { auditar } = require('../../../../shared/audit');
 
 const ensureTable = async () => {
   await pool.query(`
@@ -135,6 +136,7 @@ const updateAll = async (req, res) => {
         [clave, parseFloat(valor)]
       );
     }
+    auditar({ req, accion: 'EDITAR', modulo: 'mantenedores', entidad: 'parametros_credito', entidad_id: 'parametros', detalle: `Actualizó parámetros de crédito (${Object.keys(params).length} parámetro/s)`, meta: params });
     res.json({ success: true, data: { mensaje: 'Parámetros actualizados' }, error: null });
   } catch (e) {
     (console.error('[error]', e), res.status(500).json({success:false,data:null,error:'Error interno del servidor'}));

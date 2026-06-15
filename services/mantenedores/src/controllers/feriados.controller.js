@@ -1,5 +1,6 @@
 const pool = require('../../../../shared/config/database');
 const { feriadosDeAnio, cargarFeriados } = require('../../../../shared/feriados');
+const { auditar } = require('../../../../shared/audit');
 
 /* ── Registro del mantenedor en el menú (la tabla la crea shared/feriados.js) ── */
 (async () => {
@@ -25,6 +26,7 @@ const crear = async (req, res) => {
     if (!nombre || !nombre.trim()) return res.status(400).json({ success: false, data: null, error: 'Nombre requerido' });
     await pool.query('INSERT INTO feriados (fecha, nombre) VALUES (?,?) ON DUPLICATE KEY UPDATE nombre=VALUES(nombre)', [fecha, nombre.trim()]);
     await cargarFeriados();
+    auditar({ req, accion: 'CREAR', modulo: 'mantenedores', entidad: 'feriado', entidad_id: fecha, detalle: `Agregó feriado ${fecha} — ${nombre.trim()}` });
     res.json({ success: true, data: { fecha }, error: null });
   } catch (e) { console.error('[feriados crear]', e.message); res.status(500).json({ success: false, data: null, error: 'Error interno del servidor' }); }
 };
@@ -33,6 +35,7 @@ const eliminar = async (req, res) => {
   try {
     await pool.query('DELETE FROM feriados WHERE fecha = ?', [req.params.fecha]);
     await cargarFeriados();
+    auditar({ req, accion: 'ELIMINAR', modulo: 'mantenedores', entidad: 'feriado', entidad_id: req.params.fecha, detalle: `Eliminó feriado ${req.params.fecha}` });
     res.json({ success: true, data: { fecha: req.params.fecha }, error: null });
   } catch (e) { console.error('[feriados eliminar]', e.message); res.status(500).json({ success: false, data: null, error: 'Error interno del servidor' }); }
 };
@@ -54,6 +57,7 @@ const cargarAuto = async (req, res) => {
       }
     }
     await cargarFeriados();
+    auditar({ req, accion: 'CARGA_MASIVA', modulo: 'mantenedores', entidad: 'feriado', detalle: `Cargó feriados chilenos ${desde}–${hasta}: ${nuevos} nuevo(s)`, meta: { desde, hasta, nuevos } });
     res.json({ success: true, data: { desde, hasta, nuevos }, error: null });
   } catch (e) { console.error('[feriados cargarAuto]', e.message); res.status(500).json({ success: false, data: null, error: 'Error interno del servidor' }); }
 };

@@ -1,6 +1,7 @@
 'use strict';
 
 const pool = require('../../../../shared/config/database');
+const { auditar } = require('../../../../shared/audit');
 
 // ─── Migración automática ─────────────────────────────────────────────────────
 (async () => {
@@ -803,6 +804,7 @@ exports.setParametros = async (req, res) => {
         `INSERT INTO cobranza_config (clave, valor) VALUES (?, ?)
          ON DUPLICATE KEY UPDATE valor = VALUES(valor)`, [clave, String(valor)]);
     }
+    auditar({ req, accion: 'EDITAR', modulo: 'cobranza', entidad: 'cobranza_parametros', entidad_id: 'parametros', detalle: 'Actualizó parámetros de cobranza', meta: Object.keys(req.body || {}) });
     ok(res, { mensaje: 'Parámetros de cobranza actualizados' });
   } catch (err) {
     fail(res, err.message, 500);
