@@ -5,7 +5,7 @@
   <link rel="icon" href="/img/favicon.png" type="image/png">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Nueva Ficha de Dealer — AutoFácil</title>
-  <!-- v1.17 -->
+  <!-- v1.18 -->
   <link href="/css/bootstrap.min.css" rel="stylesheet">
   <link href="/css/bootstrap-icons.css" rel="stylesheet">
   <style>
@@ -375,6 +375,18 @@ let _terResolve = null;   // aviso depósito a tercero
 const $ = id => document.getElementById(id);
 const val = id => ($(id).value || '').trim();
 const setVal = (id,v) => { if($(id)) $(id).value = v==null?'':v; };
+// Nombre estándar de la ficha: "Ficha Concesionario NOMBRE - RUT - MMYYYY".
+function nombreFichaBase(){
+  const nombre = (val('nombre_razon') || val('nombre_fantasia') || 'Concesionario');
+  const rut = val('rut');
+  const d = new Date();
+  const my = String(d.getMonth()+1).padStart(2,'0') + d.getFullYear();
+  return 'Ficha Concesionario ' + nombre + (rut ? (' - ' + rut) : '') + ' - ' + my;
+}
+function nombreFichaArchivo(){
+  const ext = (typeof fileName === 'string' && fileName.includes('.')) ? fileName.slice(fileName.lastIndexOf('.')) : '.pdf';
+  return nombreFichaBase() + ext;
+}
 function toast(m, err){ const t=$('toast'); t.textContent=m; t.className='toast-af'+(err?' err':''); t.style.display='block'; setTimeout(()=>t.style.display='none',2800); }
 function getTipo(){ return document.querySelector('input[name=tipo]:checked').value; }
 function getRadio(n){ const el=document.querySelector(`input[name=${n}]:checked`); return el?el.value:null; }
@@ -631,7 +643,7 @@ async function guardar(silent){
     // Subir archivo si hay uno nuevo seleccionado
     if (fileB64) {
       const ru = await fetch('/api/dealer-incorporacion/fichas/'+FICHA_ID+'/archivo', { method:'POST', headers:H,
-        body: JSON.stringify({ archivo_nombre:fileName, mime_type:fileMime, archivo_data:fileB64 }) });
+        body: JSON.stringify({ archivo_nombre:nombreFichaArchivo(), mime_type:fileMime, archivo_data:fileB64 }) });
       const ju = await ru.json();
       if (!ju.success) throw new Error(ju.error||'Error al subir archivo');
       fileB64 = null;
@@ -741,6 +753,9 @@ async function cargar(){
 function celdaX(v,target){ return v===target ? 'X' : ''; }
 function imprimir(){
   const o = recolectar();
+  const _prevTitle = document.title;
+  document.title = nombreFichaBase();   // nombre sugerido al "Guardar como PDF"
+  window.addEventListener('afterprint', function _r(){ document.title = _prevTitle; window.removeEventListener('afterprint', _r); });
   const esP = o.tipo==='PARQUE';
   const dirLbl = esP?'Dirección de Parque Automotriz':'Dirección de Sucursal';
   const comLbl = esP?'Comuna de Parque Automotriz':'Comuna de Sucursal';
