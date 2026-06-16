@@ -5,7 +5,7 @@
   <link rel="icon" href="/img/favicon.png" type="image/png">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Informes DealerNet — AutoFácil</title>
-  <!-- v1.4 -->
+  <!-- v1.5 -->
   <link href="/css/bootstrap.min.css" rel="stylesheet">
   <link href="/css/bootstrap-icons.css" rel="stylesheet">
   <style>
@@ -536,10 +536,12 @@ async function descargarTodos(){
       fetch('/api/dealernet/informes?rut='+encodeURIComponent(rut), { headers:H }).then(r=>r.json())
     ]);
     if(!rh.success || !(rh.data||[]).length) return toast('No hay informes en el repositorio para este RUT', true);
-    const ordenCods = (rp.success ? rp.data : []).map(p=>String(p.codigo));   // orden del mantenedor (solo activos)
+    const ordenCods = (rp.success ? rp.data : []).map(p=>String(p.codigo));   // orden del mantenedor
     const latest = {}; for(const x of rh.data){ const c=String(x.codigo_producto); if(!latest[c]) latest[c]=x; } // DESC = último primero
-    const orden = ordenCods.filter(c=>latest[c]);
-    if(!orden.length) return toast('No hay informes de los productos activos para este RUT', true);
+    // Último de CADA informe que exista para el RUT: activos primero (en orden del
+    // mantenedor), y cualquier otro presente al final.
+    const orden = ordenCods.filter(c=>latest[c]).concat(Object.keys(latest).filter(c=>!ordenCods.includes(c)));
+    if(!orden.length) return toast('No hay informes para este RUT', true);
     toast('Generando documento…');
     const partes = [];
     for(const cod of orden){
