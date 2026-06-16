@@ -161,6 +161,8 @@ function parseExcel(buffer, mapaEstados = {}, mapaEjecutivos = {}) {
         marca:           normStr(get('Marca')),
         modelo:          normStr(get('Modelo')),
         vendedor:        normStr(get('Vendedor')),
+        rut_cliente:     normRut(get('Rut Cliente')),
+        nombre_cliente:  normStr(get('Nombre')),
       };
     })
     .filter(Boolean);
@@ -235,6 +237,7 @@ exports.importar = async (req, res) => {
     let insertados   = 0;
     let actualizados = 0;
     let errores      = 0;
+    const clienteCache = {};   // rut → id_cliente (resuelto/creado en tabla clientes)
     const log          = [];
     const detallesIns  = [];   // para historial inserts
     const cambiosLog   = [];   // para historial cambios
@@ -268,6 +271,24 @@ exports.importar = async (req, res) => {
           continue;
         }
 
+        // Resolver id_cliente desde rut/nombre del Excel (viven en la tabla
+        // clientes; el dashboard y el listado hacen JOIN por id_cliente).
+        let idCliente = null;
+        if (f.rut_cliente) {
+          if (clienteCache[f.rut_cliente] === undefined) {
+            const [[cl]] = await pool.query('SELECT id_cliente FROM clientes WHERE rut = ?', [f.rut_cliente]);
+            if (cl) clienteCache[f.rut_cliente] = cl.id_cliente;
+            else {
+              const [insCli] = await pool.query(
+                `INSERT INTO clientes (rut, nombre_completo) VALUES (?, ?)
+                 ON DUPLICATE KEY UPDATE id_cliente = LAST_INSERT_ID(id_cliente)`,
+                [f.rut_cliente, f.nombre_cliente || null]);
+              clienteCache[f.rut_cliente] = insCli.insertId;
+            }
+          }
+          idCliente = clienteCache[f.rut_cliente] || null;
+        }
+
         if (existMap[f.num_op]) {
           const actual = existMap[f.num_op];
           // Solo registrar cambio de estado_autofin (estado_credito NO se pisa — viene de AutoFácil)
@@ -282,10 +303,11 @@ exports.importar = async (req, res) => {
                estado_credito = ?,
                estado_eval    = ?,
                id_financiera  = COALESCE(NULLIF(id_financiera,''), ?),
+               id_cliente     = COALESCE(id_cliente, ?),
                marca    = COALESCE(?, marca), modelo   = COALESCE(?, modelo),
                vendedor = COALESCE(?, vendedor), updated_at = NOW()
              WHERE num_op = ?`,
-            [f.estado_autofin, f.ejecutivo_tri, f.estado_credito, f.estado_eval, String(f.num_op), f.marca, f.modelo, f.vendedor, f.num_op]
+            [f.estado_autofin, f.ejecutivo_tri, f.estado_credito, f.estado_eval, String(f.num_op), idCliente, f.marca, f.modelo, f.vendedor, f.num_op]
           );
           actualizados++;
           log.push(`✓ Actualizado ${f.num_op} → ${f.estado_autofin} / ${f.estado_credito}`);
@@ -296,16 +318,16 @@ exports.importar = async (req, res) => {
                (num_op, id_financiera, estado_autofin, estado_credito, estado_eval,
                 producto, ejecutivo, ejecutivo_tri, automotora, valor_vehiculo, pie, saldo_precio,
                 monto_financiado, fecha_otorgado, mes,
-                marca, modelo, vendedor,
+                marca, modelo, vendedor, id_cliente,
                 financiera, created_at, updated_at)
-             VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,'AUTOFIN', NOW(), NOW())`,
+             VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,'AUTOFIN', NOW(), NOW())`,
             [
               f.num_op, String(f.num_op),
               f.estado_autofin, f.estado_credito, f.estado_eval,
               f.producto, f.ejecutivo, f.ejecutivo_tri, f.automotora,
               f.valor_vehiculo, f.pie, f.saldo_precio,
               f.monto_financiado, f.fecha_otorgado, f.mes,
-              f.marca, f.modelo, f.vendedor,
+              f.marca, f.modelo, f.vendedor, idCliente,
             ]
           );
           insertados++;
