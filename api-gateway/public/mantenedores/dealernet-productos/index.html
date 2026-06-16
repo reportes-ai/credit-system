@@ -5,7 +5,7 @@
   <link rel="icon" href="/img/favicon.png" type="image/png">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Productos DealerNet — AutoFácil</title>
-  <!-- v1.4 -->
+  <!-- v1.5 -->
   <link href="/css/bootstrap.min.css" rel="stylesheet">
   <link href="/css/bootstrap-icons.css" rel="stylesheet">
   <style>
@@ -104,8 +104,9 @@
 
   <div class="card">
     <h3><i class="bi bi-list-ul me-1"></i>Catálogo de productos</h3>
+    <p style="font-size:.8rem;color:#64748b;margin:-6px 0 12px"><i class="bi bi-grip-vertical"></i> Arrastra las filas para cambiar el orden. Ese orden rige la selección y el <a href="/dealernet-informes/">Descargar todos</a> en Informes DealerNet.</p>
     <table class="tb">
-      <thead><tr><th style="width:90px">Código</th><th>Producto</th><th style="width:90px">Activo</th><th style="width:60px"></th></tr></thead>
+      <thead><tr><th style="width:28px"></th><th style="width:90px">Código</th><th>Producto</th><th style="width:90px">Activo</th><th style="width:60px"></th></tr></thead>
       <tbody id="body"></tbody>
     </table>
   </div>
@@ -164,13 +165,27 @@ async function cargar(){
     const b=document.getElementById('body');
     if(!j.success){ b.innerHTML='<tr><td colspan="4" style="color:#b91c1c">'+esc(j.error||'Error')+'</td></tr>'; return; }
     b.innerHTML=(j.data||[]).map(p=>`
-      <tr>
+      <tr data-id="${p.id}">
+        <td class="drag-handle" title="Arrastrar para reordenar" style="cursor:grab;color:#94a3b8;text-align:center"><i class="bi bi-grip-vertical"></i></td>
         <td class="cod">${esc(p.codigo)}</td>
         <td><input value="${esc(p.nombre)}" data-nom="${p.id}" style="width:100%;border:1px solid #e2e8f0;border-radius:6px;padding:5px 8px;font-size:.85rem" onblur="renombrar(${p.id}, this.value)"></td>
         <td><label class="switch"><input type="checkbox" ${p.activo?'checked':''} onchange="toggle(${p.id}, this.checked)"><span class="slider"></span></label></td>
         <td><button class="btn-ghost" onclick="eliminar(${p.id})" title="Eliminar"><i class="bi bi-trash"></i></button></td>
-      </tr>`).join('') || '<tr><td colspan="4" style="color:#94a3b8">Sin productos.</td></tr>';
+      </tr>`).join('') || '<tr><td colspan="5" style="color:#94a3b8">Sin productos.</td></tr>';
+    initSortable();
   } catch(_){ toast('Error al cargar', true); }
+}
+function initSortable(){
+  const tb = document.getElementById('body');
+  const go = () => { if(window.Sortable && !tb._sortable){ tb._sortable = new Sortable(tb, { handle:'.drag-handle', animation:160, onEnd: guardarOrden }); } };
+  if(window.Sortable) go();
+  else if(!window._sortLoading){ window._sortLoading=true; const s=document.createElement('script'); s.src='/js/Sortable.min.js'; s.onload=go; document.head.appendChild(s); }
+}
+async function guardarOrden(){
+  const ids = [...document.querySelectorAll('#body tr[data-id]')].map(tr=>tr.dataset.id);
+  if(!ids.length) return;
+  try { const r=await fetch('/api/dealernet/productos/orden',{ method:'PUT', headers:H, body:JSON.stringify({ orden:ids }) });
+    const j=await r.json(); if(j.success) toast('Orden actualizado'); else toast(j.error||'Error', true); } catch(_){ toast('Error al guardar orden', true); }
 }
 async function agregar(){
   const codigo=document.getElementById('nCod').value.trim();

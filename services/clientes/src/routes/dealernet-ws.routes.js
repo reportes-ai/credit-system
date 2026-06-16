@@ -7,6 +7,7 @@ const C = require('../controllers/dealernet-ws.controller');
 /* ── Mantenedor de productos ─────────────────────────────────────────────── */
 router.get('/productos',        verifyToken, requireFunc('mant_dealernet_productos'), C.getProductos);
 router.post('/productos',       verifyToken, requireFunc('mant_dealernet_productos'), C.addProducto);
+router.put('/productos/orden',  verifyToken, requireFunc('mant_dealernet_productos'), C.reordenarProductos);
 router.put('/productos/:id',    verifyToken, requireFunc('mant_dealernet_productos'), C.updateProducto);
 router.delete('/productos/:id', verifyToken, requireFunc('mant_dealernet_productos'), C.deleteProducto);
 

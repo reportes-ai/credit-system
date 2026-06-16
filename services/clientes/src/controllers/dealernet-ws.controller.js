@@ -262,6 +262,18 @@ const deleteProducto = async (req, res) => {
     res.json({ success: true, data: { ok: true }, error: null });
   } catch (e) { errSrv(res, e, 'deleteProducto'); }
 };
+// Reordenar productos (drag&drop en el mantenedor): el orden rige la selección
+// y el "Descargar todos" en Informes DealerNet.
+const reordenarProductos = async (req, res) => {
+  try {
+    const ids = Array.isArray(req.body?.orden) ? req.body.orden : null;
+    if (!ids || !ids.length) return res.status(400).json({ success: false, data: null, error: 'Orden inválido' });
+    let i = 1;
+    for (const id of ids) await pool.query('UPDATE dealernet_productos SET orden=? WHERE id=?', [i++, id]);
+    auditar({ req, accion: 'EDITAR', modulo: 'dealernet', entidad: 'producto', detalle: `Reordenó productos DealerNet (${ids.length})` });
+    res.json({ success: true, data: { ok: true }, error: null });
+  } catch (e) { errSrv(res, e, 'reordenarProductos'); }
+};
 
 /* ── REST: consulta a la Central ─────────────────────────────────────────── */
 const consultar = async (req, res) => {
@@ -512,5 +524,5 @@ const updateConfigEndpoint = async (req, res) => {
   } catch (e) { errSrv(res, e, 'updateConfigEndpoint'); }
 };
 
-module.exports = { getProductos, addProducto, updateProducto, deleteProducto, consultar, listConsultas, estado,
+module.exports = { getProductos, addProducto, updateProducto, deleteProducto, reordenarProductos, consultar, listConsultas, estado,
   verificarRepositorio, solicitarInformes, productosActivos, historicos, verInforme, descargarPdf, getConfigEndpoint, updateConfigEndpoint };
