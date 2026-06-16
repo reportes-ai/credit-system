@@ -5,7 +5,7 @@
   <link rel="icon" href="/img/favicon.png" type="image/png">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Informes DealerNet — AutoFácil</title>
-  <!-- v1.1 -->
+  <!-- v1.2 -->
   <link href="/css/bootstrap.min.css" rel="stylesheet">
   <link href="/css/bootstrap-icons.css" rel="stylesheet">
   <style>
@@ -335,12 +335,132 @@ function bodyPension(d, cont){
     <td><span class="pill-${sin?'ok':'bad'}">${esc((inddeu||'SIN DEUDA').toUpperCase())}</span></td><td>${accion}</td></tr></tbody></table>
     ${d.pdf_url?'<div class="muted" style="margin-top:8px"><i class="bi bi-shield-check"></i> Se conserva el <b>certificado</b> emitido por el Registro Civil.</div>':''}`;
 }
+/* ── Helpers de navegación / formato ─────────────────────────────────────── */
+function gp(o, ...keys){ for(const k of keys){ if(o==null) return undefined; o=o[k]; } return o; }
+function arr(x){ return x==null?[]:(Array.isArray(x)?x:[x]); }
+function fmtMiles(n){ const v=Number(n); return isNaN(v)?esc(String(n??'')):v.toLocaleString('es-CL'); }
+function rutFmt(num,dv){ const n=Number(num); if(!n) return ''; return n.toLocaleString('es-CL')+'-'+(dv??''); }
+function anomes(a){ const s=String(a||''); return s.length===6 ? s.slice(4)+'/'+s.slice(0,4) : esc(s); }
+function relList(rel){ return arr(gp(rel,'relacion')).filter(Boolean).map(esc).join(', '); }
+const secEmpty = () => '<span class="muted">No se registra información</span>';
+const noinfo = () => '<div class="rep-kv" style="margin-top:8px">'+secEmpty()+'</div>';
+
+/* ── Tablas reutilizables (Perfil Comercial) ─────────────────────────────── */
+function tblContactos(nodo){
+  const ds = arr(gp(nodo,'d')); if(!ds.length) return secEmpty();
+  return '<table class="rep-tb"><thead><tr><th>Dato</th><th>Detalle</th><th>Relación</th></tr></thead><tbody>'+
+    ds.map(x=>{
+      const val = x.telefono||x.correo||x.direccion||'';
+      const det = [x.ubicacion, x.locacion, x.clasificacion==='C'?'Celular':(x.clasificacion==='F'?'Fijo':''), x.ind_whatsapp?'WhatsApp':''].filter(Boolean).join(' · ');
+      return '<tr><td>'+esc(val)+'</td><td class="muted">'+esc(det)+'</td><td>'+relList(x.relacionados)+'</td></tr>';
+    }).join('')+'</tbody></table>';
+}
+function tblVehiculos(nodo){
+  const ds = arr(gp(nodo,'d')); if(!ds.length) return secEmpty();
+  return '<table class="rep-tb"><thead><tr><th>Patente</th><th>Marca / Modelo</th><th>Año</th></tr></thead><tbody>'+
+    ds.map(v=>'<tr><td>'+esc(v.patente)+'</td><td>'+esc((v.marca||'')+' / '+(v.modelo||''))+'</td><td>'+esc(v.agno)+'</td></tr>').join('')+'</tbody></table>';
+}
+function tblRelacionados(nodo){
+  const ds = arr(gp(nodo,'d')); if(!ds.length) return secEmpty();
+  return '<table class="rep-tb"><thead><tr><th>RUT</th><th>Nombre</th><th>Relación</th></tr></thead><tbody>'+
+    ds.map(r=>{ const nom=(r.organizacion||((r.nombres||'')+' '+(r.apellidos||''))).trim();
+      return '<tr><td>'+esc(rutFmt(r.rut,r.dv))+'</td><td>'+esc(nom)+'</td><td>'+esc(r.relacion)+'</td></tr>'; }).join('')+'</tbody></table>';
+}
+function tblSociedades(nodo){
+  const ds = arr(gp(nodo,'d')); if(!ds.length) return secEmpty();
+  return '<table class="rep-tb"><thead><tr><th>RUT</th><th>Nombre</th><th>Participación</th></tr></thead><tbody>'+
+    ds.map(s=>'<tr><td>'+esc(rutFmt(s.rut,s.dv))+'</td><td>'+esc(s.nombre)+'</td><td>'+(s.participacion!=null&&s.participacion!==''?esc(s.participacion)+'%':'--')+'</td></tr>').join('')+'</tbody></table>';
+}
+function bodyTributaria(dtrib){
+  if(!dtrib) return secEmpty();
+  const actList = arr(gp(dtrib,'actividades','ACTIVIDADES','ACTIVIDAD'));
+  const docYear = gp(arr(gp(dtrib,'documentos','DOCUMENTOS','DOCUMENTO'))[0]||{}, 'YEAR');
+  let html = '<div class="rep-kv"><b>Fecha inicio actividades:</b> '+esc(gp(dtrib,'fch_inicio_actividades')||'—')+'</div>'+
+    '<div class="rep-kv"><b>Año último timbraje (Boletas Honorarios Electrónicas):</b> '+esc(docYear||'—')+'</div>';
+  if(actList.length) html += '<table class="rep-tb"><thead><tr><th>Actividad económica vigente</th><th>Código</th><th>Categoría</th><th>Afecta IVA</th><th>Fecha</th></tr></thead><tbody>'+
+    actList.map(a=>'<tr><td>'+esc(a.NOMBRE)+'</td><td>'+esc(a.CODIGO)+'</td><td>'+esc(a.CATEGORIA)+'</td><td>'+esc(a.AFECTO==='S'?'Sí':'No')+'</td><td>'+esc(a.FECHA)+'</td></tr>').join('')+'</tbody></table>';
+  const obs = gp(dtrib,'OBSERVACION','TEXTO');
+  if(obs) html += '<div class="muted" style="margin-top:6px;font-size:.72rem;line-height:1.45">'+esc(obs)+'</div>';
+  return html;
+}
+
+/* ── Cuerpos por producto (formato DealerNet) ────────────────────────────── */
+function bodyComportamiento(prd){
+  const r = prd.r1603 || {}; const cab = r.r16031 || {}; const periodos = arr(r.r16032);
+  if(!periodos.length && cab['@_anomes']==null) return noinfo();
+  const rows = [
+    ['AL DÍA E IMPAGOS < 30 DÍAS','deuda_direc_vig'],['IMPAGOS 30 Y 90 DÍAS','deuda_morosa'],
+    ['IMPAGOS 90 Y 180 DÍAS','deuda_venci_direc'],['IMPAGOS 180 DÍAS Y 3 AÑOS','deuda_dir_venc_180d_3anos'],
+    ['IMPAGOS >= 3 AÑOS','deuda_cast_directa'],['CRÉDITOS DE CONSUMO','deuda_cred_consumo'],
+    ['NRO. ENTIDADES CRED. CONSUMO','nro_acree_cred_consumo'],['CRÉDITOS PARA VIVIENDA','deuda_cred_hipoteca'],
+    ['OPERACIONES FINANCIERAS','deuda_ope_c_pacto'],['INSTRUM. DEUDAS ADQUIRIDOS','deuda_inv_finan'],
+    ['CRÉDITOS COMERCIALES','deuda_comercial'],['DEUDA COM. VIGENTE MEX','mto_deuda_com_vig_mdaext'],
+    ['DEUDA COM. VENCIDA MEX','mto_deuda_com_venci_mdaext'],['INDIRECTA IMPAGOS < 30 DÍAS','deuda_indirec_vig'],
+    ['INDIRECTA IMPAGOS 30 DÍAS Y 3 AÑOS','deuda_indirec_venci'],['INDIRECTA IMPAGOS >= 3 AÑOS','deuda_cast_indirecta'],
+    ['LÍNEA CRÉDITO DISPONIBLE','linea_cred_disponible'],['CRÉDITOS CONTINGENTES','deuda_cred_contingentes'],
+    ['NRO. ENTIDADES CRED. COMER.','nro_inst_cred_com'],['CRÉDITOS LEASING AL DÍA','deuda_leasing'],
+    ['CRÉDITOS LEASING IMPAGO','deuda_morosa_leasing'],
+  ];
+  const head = '<tr><th>Variables / Periodos</th>'+periodos.map(p=>'<th style="text-align:right">'+anomes(p['@_ano_y_mes_deuda'])+'</th>').join('')+'</tr>';
+  const bd = rows.map(([lbl,key])=>'<tr><td>'+lbl+'</td>'+periodos.map(p=>'<td style="text-align:right">'+fmtMiles(p['@_'+key])+'</td>').join('')+'</tr>').join('');
+  return '<div class="rep-h">Resumen</div>'+
+    '<div class="rep-kv"><b>Deuda Total:</b> '+fmtMiles(cab['@_deuda_total'])+'</div>'+
+    '<div class="rep-kv"><b>Año y Mes Deuda:</b> '+anomes(cab['@_anomes'])+'</div>'+
+    '<div class="rep-kv"><b>Nombre:</b> '+esc(cab['@_nom_superinten']||'')+'</div>'+
+    '<div class="rep-h">Historial de Documentos M$</div>'+
+    '<table class="rep-tb"><thead>'+head+'</thead><tbody>'+bd+'</tbody></table>';
+}
+function bodyPerfilComercial(prd){
+  const colect = gp(prd,'DLNTPERCOMDLNTWS','ROOT','D','result','colect');
+  if(!colect) return noinfo();
+  const titular = colect.titular || {};
+  const civ = gp(titular,'det','detalle_rut','datos_civiles','d') || {};
+  const trib = gp(titular,'det','detalle_rut','detalle_rut','xmldatos','xmldata','d');
+  const sec = (t,h) => '<div class="rep-h">'+t+'</div>'+h;
+  const idRows = [
+    ['NACIONALIDAD', civ.nacionalidad],['FECHA DE NACIMIENTO', civ.fch_nacimiento],
+    ['LUGAR DE NACIMIENTO', civ.nacimiento_lugar],['SEXO', civ.sexo],
+    ['EDAD', civ.edad!=null?civ.edad+' Años':''],['OCUPACIÓN', gp(civ,'ocupacion','profesion')],
+    ['PERFIL SOCIO ECONÓMICO', civ.perfil_socioeconomico],['ESTADO CIVIL', civ.matrimonio_estado_civil],
+    ['HIJOS', gp(civ,'asignacion_familiar','hijos')],['CÓNYUGE', gp(civ,'asignacion_familiar','conyuge')],
+  ];
+  const idHtml = '<table class="rep-tb"><tbody>'+idRows.map(([k,v])=>'<tr><th style="width:42%">'+k+'</th><td>'+esc(v!=null&&v!==''?v:'—')+'</td></tr>').join('')+'</tbody></table>';
+  let h = sec('Identificación', idHtml);
+  h += sec('Vehículos Motorizados Históricos', tblVehiculos(gp(titular,'activos','activo_detalle_vehiculo_historico')));
+  h += sec('Teléfonos más probables de contacto', tblContactos(gp(colect,'telefonos','telefono_contacto_probable')));
+  h += sec('Teléfonos alternativos', tblContactos(gp(colect,'telefonos','telefono_contacto_alternativo')));
+  h += sec('Teléfonos laborales', tblContactos(gp(colect,'telefonos','telefono_contacto_laboral')));
+  h += sec('Direcciones más probables de residencia', tblContactos(gp(colect,'direcciones','residencia_probable')));
+  h += sec('Direcciones alternativas', tblContactos(gp(colect,'direcciones','residencia_alternativa')));
+  h += sec('Dirección laboral', tblContactos(gp(colect,'direcciones','direccion_laboral')));
+  h += sec('Correos electrónicos más probables', tblContactos(gp(colect,'correos','correo_contacto_probable')));
+  h += sec('Correos electrónicos alternativos', tblContactos(gp(colect,'correos','correo_contacto_alternativo')));
+  h += sec('Situación tributaria', bodyTributaria(trib));
+  h += sec('Participaciones en sociedades', tblSociedades(gp(titular,'sociedades','empresa')));
+  h += sec('Relacionados', tblRelacionados(titular.relacionados));
+  h += sec('Fuentes', (arr(gp(titular,'fuentes','fuente')).map(esc).join(', ')||secEmpty()));
+  return h;
+}
+function bodyBoletinSimple(prd){
+  const wsTag = Object.keys(prd).filter(k=>!k.startsWith('@_'))[0];
+  const body = wsTag ? prd[wsTag] : null;
+  const dnode = gp(body,'ROOT','D');
+  const hasDetail = dnode && Object.keys(dnode).some(k=>!k.startsWith('@_') && k!=='param');
+  if(!hasDetail) return noinfo();
+  return '<div class="rep-tree">'+renderTree(body)+'</div>';
+}
+
 function renderInforme(d){
   let cont = d.contenido; if(typeof cont==='string'){ try{cont=JSON.parse(cont);}catch(_){ } }
+  const prd = cont || {};
   const cod = String(d.codigo_producto);
-  const titular = deepFind(cont,['nombre']) || '';
-  const body = cod==='2101' ? bodyPension(d, cont)
-    : '<div class="rep-note">Formato detallado en preparación para este producto. Datos recibidos del Web Service:</div><div class="rep-tree">'+renderTree(cont)+'</div>';
+  const titular = deepFind(prd,['nombre']) || '';
+  let body;
+  if(cod==='2101') body = bodyPension(d, prd);
+  else if(cod==='16') body = bodyComportamiento(prd);
+  else if(cod==='3435') body = bodyPerfilComercial(prd);
+  else if(cod==='3425') body = bodyBoletinSimple(prd);
+  else body = '<div class="rep-note">Datos recibidos del Web Service:</div><div class="rep-tree">'+renderTree(prd)+'</div>';
   const f = new Date(d.created_at);
   const meta = `<div class="rep-meta">
     <span><b>Gestor:</b> ${esc(d.usuario_nombre||'—')}</span>
@@ -349,7 +469,7 @@ function renderInforme(d){
     <span><b>Resolución:</b> On Line</span>
     <span><b>Hora Consulta:</b> ${f.toLocaleTimeString('es-CL',{hour:'2-digit',minute:'2-digit'})}</span></div>`;
   return `<div class="report">
-    <div class="rep-titularbar"><b>${esc(titular||'')}</b><span>${esc(d.rut)}-${esc(d.dv||'')}</span></div>
+    <div class="rep-titularbar"><b>${esc(titular||'')}</b><span>${esc(rutFmt(d.rut,d.dv)||(d.rut+'-'+(d.dv||'')))}</span></div>
     <div class="rep-title">${esc(d.nombre_producto||cod)}</div>
     ${meta}
     <div class="rep-body">${body}</div>
