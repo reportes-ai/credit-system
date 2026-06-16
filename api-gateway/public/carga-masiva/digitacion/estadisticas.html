@@ -25,8 +25,8 @@
     .controls { display:flex; gap:10px; align-items:center; margin-bottom:18px; flex-wrap:wrap; }
     .controls label { font-size:.8rem; font-weight:700; color:#475569; }
     .controls select { border:1.5px solid #d1d5db; border-radius:8px; padding:7px 10px; font-size:.88rem; }
-    .cards { display:grid; grid-template-columns:repeat(3,1fr); gap:16px; margin-bottom:22px; }
-    @media(max-width:640px){ .cards { grid-template-columns:1fr; } }
+    .cards { display:grid; grid-template-columns:repeat(auto-fit,minmax(165px,1fr)); gap:16px; margin-bottom:22px; }
+    @media(max-width:640px){ .cards { grid-template-columns:repeat(2,1fr); } }
     .kpi { background:#fff; border-radius:14px; padding:20px 22px; box-shadow:0 1px 6px rgba(0,0,0,.07); }
     .kpi .lbl { font-size:.74rem; font-weight:700; color:#64748b; text-transform:uppercase; letter-spacing:.4px; }
     .kpi .val { font-size:2rem; font-weight:800; color:var(--navy-dark); margin-top:4px; }
@@ -83,6 +83,7 @@ const H = { Authorization:'Bearer '+token };
 const esc = s => String(s ?? '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
 const fday = d => { try { return new Date(d).toLocaleDateString('es-CL',{day:'2-digit',month:'short'}); } catch { return d; } };
 const barHTML = p => `<span class="bar" style="width:120px"><span style="width:${Math.min(100,p)}%"></span></span> ${p}%`;
+const fmtDur = s => { if (s == null) return '—'; const m=Math.floor(s/60), sec=Math.round(s%60); return m ? (m+'m'+(sec?(' '+sec+'s'):'')) : (sec+'s'); };
 
 async function cargar(){
   const dias = document.getElementById('selDias').value;
@@ -93,23 +94,25 @@ async function cargar(){
     const j = await r.json();
     if (!j.success) { cont.innerHTML = '<div class="card" style="color:#b91c1c">'+esc(j.error||'Error')+'</div>'; return; }
     const d = j.data;
-    const dia = d.porDia.map(x => `<tr><td>${fday(x.dia)}</td><td class="num">${x.creditos}</td><td class="num">${x.llenados}/${x.faltantes}</td><td>${barHTML(x.pct)}</td></tr>`).join('')
-      || '<tr><td colspan="4" class="muted">Sin digitaciones en el periodo.</td></tr>';
-    const usr = d.porUsuario.map(x => `<tr><td>${esc(x.usuario||'—')}</td><td class="num">${x.creditos}</td><td>${barHTML(x.pct)}</td></tr>`).join('')
-      || '<tr><td colspan="3" class="muted">Sin datos.</td></tr>';
+    const dia = d.porDia.map(x => `<tr><td>${fday(x.dia)}</td><td class="num">${x.creditos}</td><td class="num">${x.llenados}/${x.faltantes}</td><td>${barHTML(x.pct)}</td><td class="num">${x.saltos}</td><td class="num">${fmtDur(x.seg_prom)}</td></tr>`).join('')
+      || '<tr><td colspan="6" class="muted">Sin digitaciones en el periodo.</td></tr>';
+    const usr = d.porUsuario.map(x => `<tr><td>${esc(x.usuario||'—')}</td><td class="num">${x.creditos}</td><td>${barHTML(x.pct)}</td><td class="num">${x.saltos}</td><td class="num">${fmtDur(x.seg_prom)}</td></tr>`).join('')
+      || '<tr><td colspan="5" class="muted">Sin datos.</td></tr>';
     cont.innerHTML = `
       <div class="cards">
         <div class="kpi"><div class="lbl">Créditos digitados</div><div class="val">${d.resumen.creditos}</div><div class="sub">en ${d.dias} días</div></div>
         <div class="kpi"><div class="lbl">% campos faltantes completados</div><div class="val">${d.resumen.pct_completado}%</div><div class="sub">del total que faltaba</div></div>
         <div class="kpi"><div class="lbl">Promedio por día</div><div class="val">${d.resumen.promedio_dia}</div><div class="sub">créditos / día activo</div></div>
+        <div class="kpi"><div class="lbl">Casos saltados</div><div class="val">${d.resumen.saltos}</div><div class="sub">en el periodo</div></div>
+        <div class="kpi"><div class="lbl">Tiempo promedio</div><div class="val">${fmtDur(d.resumen.seg_prom)}</div><div class="sub">desde que cae hasta grabar</div></div>
       </div>
       <div class="card">
         <h3><i class="bi bi-calendar3"></i> Por día</h3>
-        <table class="tb"><thead><tr><th>Día</th><th class="num">Créditos</th><th class="num">Campos compl.</th><th>% completado</th></tr></thead><tbody>${dia}</tbody></table>
+        <table class="tb"><thead><tr><th>Día</th><th class="num">Créditos</th><th class="num">Campos compl.</th><th>% completado</th><th class="num">Saltos</th><th class="num">T. prom.</th></tr></thead><tbody>${dia}</tbody></table>
       </div>
       <div class="card">
         <h3><i class="bi bi-people"></i> Por digitador</h3>
-        <table class="tb"><thead><tr><th>Usuario</th><th class="num">Créditos</th><th>% completado</th></tr></thead><tbody>${usr}</tbody></table>
+        <table class="tb"><thead><tr><th>Usuario</th><th class="num">Créditos</th><th>% completado</th><th class="num">Saltos</th><th class="num">T. prom.</th></tr></thead><tbody>${usr}</tbody></table>
       </div>`;
   } catch(e){ cont.innerHTML = '<div class="card" style="color:#b91c1c">Error de conexión</div>'; }
 }

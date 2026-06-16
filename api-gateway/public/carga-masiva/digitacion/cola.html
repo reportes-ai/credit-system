@@ -207,7 +207,7 @@ async function guardar(){
 }
 async function saltar(){
   if (!ACTUAL) return;
-  try { await fetch('/api/digitacion-faltantes/'+ACTUAL.id+'/liberar', { method:'POST', headers:H }); } catch(_){}
+  try { await fetch('/api/digitacion-faltantes/'+ACTUAL.id+'/liberar?motivo=saltar&tipo='+TIPO, { method:'POST', headers:H }); } catch(_){}
   cargarSiguiente();
 }
 function liberarSync(){
