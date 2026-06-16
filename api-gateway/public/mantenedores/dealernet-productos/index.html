@@ -5,7 +5,7 @@
   <link rel="icon" href="/img/favicon.png" type="image/png">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Productos DealerNet — AutoFácil</title>
-  <!-- v1.3 -->
+  <!-- v1.4 -->
   <link href="/css/bootstrap.min.css" rel="stylesheet">
   <link href="/css/bootstrap-icons.css" rel="stylesheet">
   <style>
@@ -111,6 +111,17 @@
   </div>
 
   <div class="card">
+    <h3><i class="bi bi-clock-history me-1"></i>Vigencia de informes (repositorio)</h3>
+    <p style="font-size:.83rem;color:#64748b;margin:0 0 12px">Controla cuándo se reutiliza un informe del repositorio compartido en <a href="/dealernet-informes/">Informes DealerNet</a>, sin tocar código.</p>
+    <div class="addgrid" style="grid-template-columns:1fr 1fr auto">
+      <div class="fld"><label>Bloqueo (días)</label><input type="number" id="cfgBloqueo" min="1" placeholder="15"></div>
+      <div class="fld"><label>Vigencia (días)</label><input type="number" id="cfgVigencia" min="1" placeholder="180"></div>
+      <button class="btn-primary2" onclick="guardarConfig()"><i class="bi bi-check-lg me-1"></i>Guardar</button>
+    </div>
+    <p style="font-size:.78rem;color:#94a3b8;margin:8px 0 0">Menos del <b>bloqueo</b>: obliga a usar el histórico (no deja consultar). Entre bloqueo y <b>vigencia</b>: pregunta si reutilizar o pedir nuevo. Más que la vigencia: consulta directa.</p>
+  </div>
+
+  <div class="card">
     <h3><i class="bi bi-search me-1"></i>Probar consulta</h3>
     <p style="font-size:.83rem;color:#64748b;margin:0 0 12px">Consulta los productos <b>activos</b> para un RUT. <b>Ojo:</b> con credenciales reales esto consume saldo.</p>
     <div class="test-grid">
@@ -125,8 +136,9 @@
     <ul>
       <li><b>Productos activos</b> → definen qué pide cada <b>Consulta DealerNet</b> por RUT. Menos productos activos = menos saldo por consulta.</li>
       <li><b>Código / Nombre</b> → identifican cada producto del catálogo DealerNet (rango 3401–3450 y códigos propios como <code>16</code> Comportamiento Vigente o <code>2101</code> Boletín Deudores de Pensión). Agrega aquí los códigos nuevos que te confirme DealerNet.</li>
+      <li><b>Vigencia de informes (bloqueo / vigencia)</b> → controlan la reutilización del repositorio en <a href="/dealernet-informes/">Informes DealerNet</a>: bajo el bloqueo no deja consultar (usa histórico), entre bloqueo y vigencia pregunta, sobre la vigencia consulta directo.</li>
       <li><b>Credenciales</b> → en variables de entorno de Render; afectan a toda consulta al Web Service.</li>
-      <li>Reemplaza la carga manual de PDF en <a href="/informes-dealernet/">Informes DealerNet</a> (misma data, en vivo).</li>
+      <li>El módulo <a href="/dealernet-informes/">Informes DealerNet</a> (consulta en vivo + repositorio compartido) reemplaza la carga manual de PDF de <a href="/informes-dealernet/">Informes Comerciales Dealernet</a>.</li>
     </ul>
   </div>
 </div>
@@ -200,6 +212,16 @@ async function probar(){
   } catch(_){ out.innerHTML='<div style="margin-top:12px"><span class="ret err">Error</span> de conexión</div>'; }
   btn.disabled=false; btn.innerHTML='<i class="bi bi-send me-1"></i>Consultar';
 }
+async function cargarConfig(){
+  try { const r=await fetch('/api/dealernet/config',{ headers:H }); const j=await r.json();
+    if(j.success){ document.getElementById('cfgBloqueo').value=j.data.dias_bloqueo; document.getElementById('cfgVigencia').value=j.data.dias_vigencia; } } catch(_){}
+}
+async function guardarConfig(){
+  const dias_bloqueo=parseInt(document.getElementById('cfgBloqueo').value,10);
+  const dias_vigencia=parseInt(document.getElementById('cfgVigencia').value,10);
+  try { const r=await fetch('/api/dealernet/config',{ method:'PUT', headers:H, body:JSON.stringify({ dias_bloqueo, dias_vigencia }) });
+    const j=await r.json(); if(j.success) toast('Vigencia actualizada'); else toast(j.error||'Error', true); } catch(_){ toast('Error', true); }
+}
 async function copiarDlnt(btn){
   try {
     await navigator.clipboard.writeText(window._lastDlnt || '');
@@ -219,6 +241,7 @@ async function cargarEstado(){
 }
 cargar();
 cargarEstado();
+cargarConfig();
 </script>
 <script src="/js/app-version.js"></script>
 </body>

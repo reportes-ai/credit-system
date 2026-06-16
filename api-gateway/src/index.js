@@ -413,6 +413,9 @@ app.get(['/edicion-creditos/otros', '/edicion-creditos/otros/'], (req, res) =>
 app.get(['/informes-dealernet', '/informes-dealernet/'], (req, res) =>
   res.sendFile(path.join(__dirname, '../public/informes-dealernet/index.html')));
 
+app.get(['/dealernet-informes', '/dealernet-informes/'], (req, res) =>
+  res.sendFile(path.join(__dirname, '../public/dealernet-informes/index.html')));
+
 app.use((req, res) => res.status(404).json({ success: false, error: 'Ruta no encontrada' }));
 
 // ── Errores no capturados por los controllers (ej: JSON malformado, throw síncrono) ──

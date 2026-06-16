@@ -1,0 +1,309 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <link rel="icon" href="/img/favicon.png" type="image/png">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Informes DealerNet — AutoFácil</title>
+  <!-- v1.0 -->
+  <link href="/css/bootstrap.min.css" rel="stylesheet">
+  <link href="/css/bootstrap-icons.css" rel="stylesheet">
+  <style>
+    :root { --navy:#0141A2; --navy-dark:#012d70; --navy-light:#0255c5; --accent:#009AFE; --bg:#f0f4f8; }
+    body { background:var(--bg); font-family:'Segoe UI',system-ui,sans-serif; margin:0; min-height:100vh; }
+    .topnav { background:linear-gradient(90deg,var(--navy-dark),var(--navy-light)); color:#fff; height:60px; padding:0 24px; display:flex; align-items:center; justify-content:space-between; position:sticky; top:0; z-index:200; }
+    .topnav-left { display:flex; align-items:center; gap:16px; }
+    .topnav-brand { display:flex; align-items:center; gap:8px; text-decoration:none; }
+    .topnav-brand img { height:32px; filter:brightness(0) invert(1); }
+    .version-badge { background:rgba(255,255,255,.15); color:rgba(255,255,255,.75); font-size:.65rem; font-weight:700; border-radius:6px; padding:2px 8px; }
+    .breadcrumb-nav { color:rgba(255,255,255,.6); font-size:.85rem; }
+    .breadcrumb-nav a { color:rgba(255,255,255,.75); text-decoration:none; }
+    .topnav-right { display:flex; align-items:center; gap:10px; }
+    .user-chip { background:rgba(255,255,255,.12); border-radius:24px; padding:5px 12px; display:flex; align-items:center; gap:8px; font-size:.85rem; }
+    .avatar { width:28px; height:28px; background:#90caf9; border-radius:50%; display:flex; align-items:center; justify-content:center; color:var(--navy); font-weight:700; font-size:.75rem; }
+    .perfil-badge { background:rgba(144,202,249,.2); border:1px solid rgba(144,202,249,.4); color:#90caf9; border-radius:12px; padding:2px 10px; font-size:.73rem; font-weight:600; }
+    .btn-logout { background:rgba(255,255,255,.1); border:1px solid rgba(255,255,255,.2); color:#fff; border-radius:8px; padding:5px 12px; font-size:.82rem; cursor:pointer; text-decoration:none; display:inline-flex; align-items:center; }
+    .main { max-width:1180px; margin:28px auto; padding:0 20px 60px; }
+    .page-banner { background:linear-gradient(135deg,#012d70,#0141A2 50%,#009AFE); border-radius:16px; color:#fff; padding:24px 32px; margin-bottom:22px; display:flex; align-items:center; gap:18px; }
+    .page-banner i { font-size:2.6rem; opacity:.85; }
+    .page-banner h2 { font-weight:700; margin:0 0 3px; font-size:1.3rem; }
+    .page-banner p { opacity:.8; margin:0; font-size:.88rem; }
+    .grid { display:grid; grid-template-columns:1fr 1fr; gap:18px; align-items:start; }
+    @media(max-width:840px){ .grid { grid-template-columns:1fr; } }
+    .card { background:#fff; border:1px solid #e8edf3; border-radius:14px; padding:18px 20px; margin-bottom:18px; }
+    .card h3 { margin:0 0 14px; font-size:1rem; color:var(--navy-dark); display:flex; align-items:center; gap:8px; }
+    .fld label { font-size:.74rem; font-weight:700; color:#6b7280; text-transform:uppercase; letter-spacing:.4px; display:block; margin-bottom:4px; }
+    .fld input.rut { width:100%; border:1.5px solid #d1d5db; border-radius:8px; padding:10px 12px; font-size:.95rem; box-sizing:border-box; }
+    .fld input.rut:focus { outline:none; border-color:var(--navy); }
+    .prods { margin:14px 0 6px; display:flex; flex-direction:column; gap:9px; }
+    .prod-item { display:flex; align-items:center; gap:10px; padding:9px 12px; border:1px solid #e8edf3; border-radius:9px; font-size:.9rem; cursor:pointer; transition:.12s; }
+    .prod-item:hover { background:#f8fafc; border-color:#cbd5e1; }
+    .prod-item input { width:17px; height:17px; accent-color:var(--navy); cursor:pointer; }
+    .prod-item .cod { font-family:ui-monospace,monospace; font-size:.72rem; color:#94a3b8; }
+    .btn-primary2 { background:var(--navy); color:#fff; border:none; border-radius:10px; padding:11px 18px; font-weight:700; font-size:.92rem; cursor:pointer; width:100%; margin-top:8px; }
+    .btn-primary2:hover { background:var(--navy-light); }
+    .btn-primary2:disabled { background:#93c5fd; cursor:not-allowed; }
+    .btn-ghost { background:#f1f5f9; color:#334155; border:none; border-radius:7px; padding:5px 11px; font-size:.78rem; cursor:pointer; }
+    .btn-ghost:hover { background:#e2e8f0; }
+    .selrow { display:flex; gap:8px; margin-top:4px; }
+    .selrow button { background:none; border:none; color:var(--navy); font-size:.78rem; font-weight:700; cursor:pointer; padding:0; }
+    .res { margin-top:14px; }
+    .alertbox { border-radius:10px; padding:12px 14px; font-size:.86rem; margin-bottom:10px; line-height:1.5; }
+    .alertbox.block { background:#fef2f2; border:1px solid #fecaca; color:#b91c1c; }
+    .alertbox.warn { background:#fffbeb; border:1px solid #fde68a; color:#92400e; }
+    .alertbox.ok { background:#f0fdf4; border:1px solid #bbf7d0; color:#15803d; }
+    .alertbox b { font-weight:800; }
+    table.tb { width:100%; border-collapse:collapse; font-size:.85rem; }
+    table.tb th { text-align:left; color:#64748b; font-size:.7rem; text-transform:uppercase; letter-spacing:.4px; padding:7px 8px; border-bottom:2px solid #eef2f7; }
+    table.tb td { padding:8px; border-bottom:1px solid #f1f5f9; vertical-align:middle; }
+    .badge-dias { font-size:.72rem; font-weight:700; padding:2px 8px; border-radius:11px; white-space:nowrap; }
+    .badge-dias.fresh { background:#fee2e2; color:#b91c1c; }   /* < bloqueo */
+    .badge-dias.mid { background:#fef3c7; color:#92400e; }      /* bloqueo–vigencia */
+    .badge-dias.old { background:#dcfce7; color:#15803d; }      /* >= vigencia */
+    .muted { color:#94a3b8; font-size:.8rem; }
+    .acts button { margin-right:4px; }
+    dialog { border:none; border-radius:16px; padding:0; max-width:560px; width:92vw; box-shadow:0 24px 64px rgba(0,0,0,.3); }
+    dialog::backdrop { background:rgba(2,12,30,.45); }
+    .dlg-head { background:linear-gradient(135deg,#012d70,#0141A2 60%,#0255c5); color:#fff; padding:18px 22px; display:flex; align-items:center; gap:12px; }
+    .dlg-head i { font-size:1.5rem; } .dlg-head h4 { margin:0; font-weight:700; font-size:1.05rem; }
+    .dlg-body { padding:20px 22px; font-size:.9rem; color:#334155; line-height:1.55; max-height:62vh; overflow:auto; }
+    .dlg-foot { padding:14px 22px 18px; display:flex; gap:10px; justify-content:flex-end; border-top:1px solid #f1f5f9; flex-wrap:wrap; }
+    .btn-b { padding:9px 16px; border-radius:9px; font-weight:700; font-size:.86rem; cursor:pointer; border:none; }
+    .btn-b.new { background:var(--navy); color:#fff; } .btn-b.hist { background:#0d9488; color:#fff; } .btn-b.cancel { background:#f1f5f9; color:#475569; }
+    pre.out { background:#0b1220; color:#cbd5e1; border-radius:10px; padding:14px; font-size:.76rem; max-height:48vh; overflow:auto; white-space:pre-wrap; word-break:break-word; }
+    .toast-af { position:fixed; bottom:24px; left:50%; transform:translateX(-50%); background:#0f172a; color:#fff; padding:11px 20px; border-radius:10px; font-size:.86rem; z-index:9999; display:none; }
+    .toast-af.err { background:#b91c1c; }
+  </style>
+</head>
+<body>
+<nav class="topnav">
+  <div class="topnav-left">
+    <a href="/" class="topnav-brand"><img src="/img/logo.png" alt="AutoFácil"><span class="version-badge" id="versionBadge"></span></a>
+    <div class="breadcrumb-nav"><a href="/">Inicio</a> › <span style="color:#fff;font-weight:600">Informes DealerNet</span></div>
+  </div>
+  <div class="topnav-right">
+    <span class="user-chip"><div class="avatar" id="avatarInicial">?</div>
+      <div><div style="font-weight:600;line-height:1.3;color:#fff" id="navNombre">—</div>
+      <div class="perfil-badge" id="navPerfil">—</div></div></span>
+    <button class="btn-logout" onclick="logout()"><i class="bi bi-box-arrow-right me-1"></i>Salir</button>
+  </div>
+</nav>
+
+<div class="main">
+  <div class="page-banner">
+    <i class="bi bi-clipboard-data"></i>
+    <div>
+      <h2>Informes DealerNet</h2>
+      <p>Antecedentes por RUT vía Web Service. Antes de gastar saldo se revisa el <b>repositorio compartido</b>: si hay un informe reciente, se reutiliza.</p>
+    </div>
+  </div>
+
+  <div class="grid">
+    <!-- Solicitud -->
+    <div>
+      <div class="card">
+        <h3><i class="bi bi-search"></i> Solicitar informes</h3>
+        <div class="fld">
+          <label>RUT (con dígito verificador)</label>
+          <input type="text" class="rut" id="rut" placeholder="12.345.678-9" onkeydown="if(event.key==='Enter')solicitar()">
+        </div>
+        <div class="prods" id="prods"><div class="muted">Cargando productos…</div></div>
+        <div class="selrow"><button onclick="marcarTodos(true)">Marcar todos</button><button onclick="marcarTodos(false)">Desmarcar</button></div>
+        <button class="btn-primary2" id="btnSolicitar" onclick="solicitar()"><i class="bi bi-send me-1"></i>Solicitar informes</button>
+        <div class="res" id="res"></div>
+      </div>
+    </div>
+
+    <!-- Históricos del repositorio -->
+    <div class="card">
+      <h3><i class="bi bi-archive"></i> Informes históricos <span class="muted" id="histRut"></span></h3>
+      <div id="hist"><div class="muted">Ingresa un RUT y solicita o consulta para ver su historial.</div></div>
+    </div>
+  </div>
+</div>
+
+<dialog id="dlgWarn">
+  <div class="dlg-head"><i class="bi bi-exclamation-triangle-fill"></i><h4>Informe ya disponible en el repositorio</h4></div>
+  <div class="dlg-body" id="dlgWarnBody"></div>
+  <div class="dlg-foot">
+    <button class="btn-b cancel" onclick="document.getElementById('dlgWarn').close('cancel')">Cancelar</button>
+    <button class="btn-b hist"   onclick="document.getElementById('dlgWarn').close('hist')"><i class="bi bi-archive me-1"></i>Usar histórico</button>
+    <button class="btn-b new"    onclick="document.getElementById('dlgWarn').close('new')"><i class="bi bi-send me-1"></i>Hacer consulta nueva</button>
+  </div>
+</dialog>
+
+<dialog id="dlgVer">
+  <div class="dlg-head"><i class="bi bi-file-earmark-text"></i><h4 id="dlgVerTit">Informe</h4></div>
+  <div class="dlg-body" id="dlgVerBody"></div>
+  <div class="dlg-foot"><button class="btn-b cancel" onclick="document.getElementById('dlgVer').close()">Cerrar</button></div>
+</dialog>
+
+<div class="toast-af" id="toast"></div>
+
+<script src="/js/auth-guard.js"></script>
+<script>
+const token = sessionStorage.getItem('token');
+const yo = JSON.parse(sessionStorage.getItem('usuario') || 'null');
+if (!token || !yo) location.href = '/login.html';
+const H = { 'Content-Type':'application/json', Authorization:'Bearer '+token };
+document.getElementById('navNombre').textContent = ((yo?.nombre||'')+' '+(yo?.apellido||'')).trim() || '—';
+document.getElementById('navPerfil').textContent = yo?.perfil || '';
+document.getElementById('avatarInicial').textContent = (yo?.nombre||'?').charAt(0).toUpperCase();
+function logout(){ sessionStorage.removeItem('token'); sessionStorage.removeItem('usuario'); location.href='/login.html'; }
+const esc = s => String(s ?? '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+function toast(m,e){ const t=document.getElementById('toast'); t.textContent=m; t.className='toast-af'+(e?' err':''); t.style.display='block'; clearTimeout(t._h); t._h=setTimeout(()=>t.style.display='none',3000); }
+const fmtFecha = d => { try { return new Date(d).toLocaleDateString('es-CL'); } catch { return d; } };
+let CFG = { dias_bloqueo:15, dias_vigencia:180 };
+const claseDias = (dias) => dias < CFG.dias_bloqueo ? 'fresh' : (dias < CFG.dias_vigencia ? 'mid' : 'old');
+
+/* ── Productos ───────────────────────────────────────────────────────────── */
+async function cargarProductos(){
+  try {
+    const r = await fetch('/api/dealernet/informes/productos', { headers:H });
+    const j = await r.json();
+    const box = document.getElementById('prods');
+    if (!j.success){ box.innerHTML='<div class="muted" style="color:#b91c1c">'+esc(j.error||'Error')+'</div>'; return; }
+    if (!j.data.length){ box.innerHTML='<div class="muted">No hay productos activos. Pídele al administrador activarlos en el mantenedor.</div>'; return; }
+    box.innerHTML = j.data.map(p => `
+      <label class="prod-item">
+        <input type="checkbox" value="${esc(p.codigo)}" checked>
+        <span style="flex:1">${esc(p.nombre)}</span>
+        <span class="cod">${esc(p.codigo)}</span>
+      </label>`).join('');
+  } catch(_){ document.getElementById('prods').innerHTML='<div class="muted" style="color:#b91c1c">Error al cargar productos</div>'; }
+}
+function selectedProductos(){ return [...document.querySelectorAll('#prods input:checked')].map(c=>c.value); }
+function marcarTodos(v){ document.querySelectorAll('#prods input[type=checkbox]').forEach(c=>c.checked=v); }
+function nombreProd(cod){ const el=document.querySelector('#prods input[value="'+cod+'"]'); return el ? el.closest('.prod-item').querySelector('span').textContent : cod; }
+
+/* ── Históricos ──────────────────────────────────────────────────────────── */
+async function cargarHistoricos(rut){
+  const box = document.getElementById('hist');
+  document.getElementById('histRut').textContent = rut ? '· '+rut : '';
+  try {
+    const r = await fetch('/api/dealernet/informes?rut='+encodeURIComponent(rut||''), { headers:H });
+    const j = await r.json();
+    if (!j.success){ box.innerHTML='<div class="muted" style="color:#b91c1c">'+esc(j.error||'Error')+'</div>'; return; }
+    if (!j.data.length){ box.innerHTML='<div class="muted">Sin informes en el repositorio para este RUT.</div>'; return; }
+    box.innerHTML = `<table class="tb"><thead><tr><th>Producto</th><th>Fecha</th><th>Antigüedad</th><th>Solicitó</th><th></th></tr></thead><tbody>`+
+      j.data.map(x=>`
+        <tr>
+          <td>${esc(x.nombre_producto||x.codigo_producto)}</td>
+          <td>${fmtFecha(x.created_at)}</td>
+          <td><span class="badge-dias ${claseDias(Number(x.dias))}">${Number(x.dias)} días</span></td>
+          <td class="muted">${esc(x.usuario_nombre||'—')}</td>
+          <td class="acts">
+            <button class="btn-ghost" onclick="verInforme(${x.id})"><i class="bi bi-eye"></i> Ver</button>
+            ${Number(x.tiene_pdf) ? `<button class="btn-ghost" onclick="descargarPdf(${x.id})"><i class="bi bi-file-earmark-pdf"></i> PDF</button>` : ''}
+          </td>
+        </tr>`).join('')+`</tbody></table>`;
+  } catch(_){ box.innerHTML='<div class="muted" style="color:#b91c1c">Error al cargar histórico</div>'; }
+}
+
+/* ── Solicitar (flujo con repositorio) ───────────────────────────────────── */
+async function solicitar(){
+  const rut = document.getElementById('rut').value.trim();
+  const productos = selectedProductos();
+  const res = document.getElementById('res');
+  if (!rut) return toast('Ingresa un RUT', true);
+  if (!productos.length) return toast('Selecciona al menos un informe', true);
+
+  const btn = document.getElementById('btnSolicitar');
+  btn.disabled = true; btn.innerHTML = '<i class="bi bi-hourglass-split me-1"></i>Revisando repositorio…'; res.innerHTML='';
+
+  // 1) Revisar repositorio (no gasta saldo)
+  let v;
+  try {
+    const r = await fetch('/api/dealernet/informes/verificar', { method:'POST', headers:H, body:JSON.stringify({ rut, productos }) });
+    v = await r.json();
+    if (!v.success) throw new Error(v.error||'Error');
+  } catch(e){ res.innerHTML='<div class="alertbox block">'+esc(e.message)+'</div>'; resetBtn(); return; }
+
+  CFG = v.data.config || CFG;
+  await cargarHistoricos(v.data.rut);
+
+  const bloqueados = v.data.items.filter(i=>i.estado==='bloqueado');
+  const advert     = v.data.items.filter(i=>i.estado==='advertencia');
+  const libres      = v.data.items.filter(i=>i.estado==='libre');
+
+  let html = '';
+  if (bloqueados.length){
+    html += '<div class="alertbox block"><b>Hay copia vigente en el repositorio.</b> No se vuelven a pedir (menos de '+CFG.dias_bloqueo+' días):<ul style="margin:6px 0 0;padding-left:18px">'+
+      bloqueados.map(b=>'<li>'+esc(b.nombre)+' — <b>'+b.ultimo.dias+' días</b>. Usa ese informe.</li>').join('')+'</ul></div>';
+  }
+
+  // 2) Productos a consultar = libres + (advertencia si el usuario elige "nueva")
+  let aConsultar = libres.map(i=>i.codigo);
+
+  if (advert.length){
+    const dlg = document.getElementById('dlgWarn');
+    document.getElementById('dlgWarnBody').innerHTML =
+      'Hay informe(s) igual(es) al solicitado en el repositorio:<ul style="margin:8px 0;padding-left:18px">'+
+      advert.map(a=>'<li><b>'+esc(a.nombre)+'</b> — '+a.ultimo.dias+' días</li>').join('')+'</ul>'+
+      '¿Quieres <b>informes nuevos</b> (gasta saldo) o prefieres <b>usar los históricos</b>?';
+    const choice = await new Promise(resolve=>{
+      dlg.onclose = ()=>resolve(dlg.returnValue);
+      dlg.showModal();
+    });
+    if (choice === 'cancel'){ res.innerHTML = html || '<div class="muted">Cancelado.</div>'; resetBtn(); return; }
+    if (choice === 'new') aConsultar = aConsultar.concat(advert.map(i=>i.codigo));
+    else html += '<div class="alertbox warn">Se usarán los <b>históricos</b> para: '+advert.map(a=>esc(a.nombre)).join(', ')+'.</div>';
+  }
+
+  if (!aConsultar.length){
+    res.innerHTML = (html || '<div class="alertbox ok">Todo resuelto con el repositorio.</div>') +
+      '<div class="muted" style="margin-top:6px">No se hizo ninguna consulta nueva (no se gastó saldo).</div>';
+    resetBtn(); return;
+  }
+
+  // 3) Solicitar a DealerNet (gasta saldo)
+  btn.innerHTML = '<i class="bi bi-hourglass-split me-1"></i>Consultando DealerNet…';
+  try {
+    const r = await fetch('/api/dealernet/informes/solicitar', { method:'POST', headers:H, body:JSON.stringify({ rut, productos: aConsultar }) });
+    const j = await r.json();
+    if (!j.success){ res.innerHTML = html + '<div class="alertbox block">'+esc(j.error||'Error')+'</div>'; resetBtn(); return; }
+    const ok = String(j.data.retcode)==='0';
+    html += '<div class="alertbox '+(ok?'ok':'block')+'">'+(ok
+      ? '<b>Informes obtenidos.</b> Se agregaron al repositorio: '+aConsultar.map(c=>esc(nombreProd(c))).join(', ')+'.'
+      : 'DealerNet respondió retcode '+esc(j.data.retcode)+' — '+esc(j.data.retmsg||''))+'</div>';
+    res.innerHTML = html;
+    await cargarHistoricos(j.data.rut);
+  } catch(e){ res.innerHTML = html + '<div class="alertbox block">Error de conexión</div>'; }
+  resetBtn();
+}
+function resetBtn(){ const b=document.getElementById('btnSolicitar'); b.disabled=false; b.innerHTML='<i class="bi bi-send me-1"></i>Solicitar informes'; }
+
+/* ── Ver / Descargar ─────────────────────────────────────────────────────── */
+async function verInforme(id){
+  try {
+    const r = await fetch('/api/dealernet/informes/'+id, { headers:H });
+    const j = await r.json();
+    if (!j.success) return toast(j.error||'Error', true);
+    const d = j.data;
+    document.getElementById('dlgVerTit').textContent = (d.nombre_producto||d.codigo_producto)+' · '+d.rut+'-'+(d.dv||'');
+    let cont = d.contenido;
+    if (typeof cont === 'string'){ try { cont = JSON.parse(cont); } catch(_){} }
+    document.getElementById('dlgVerBody').innerHTML =
+      '<div class="muted" style="margin-bottom:8px">Fecha: '+fmtFecha(d.created_at)+' · Solicitó: '+esc(d.usuario_nombre||'—')+
+      (d.pdf_url?' · <a href="javascript:void(0)" onclick="descargarPdf('+d.id+')">Descargar PDF</a>':'')+'</div>'+
+      '<pre class="out">'+esc(JSON.stringify(cont, null, 2))+'</pre>';
+    document.getElementById('dlgVer').showModal();
+  } catch(_){ toast('Error al abrir informe', true); }
+}
+async function descargarPdf(id){
+  try {
+    const r = await fetch('/api/dealernet/informes/'+id+'/pdf', { headers:H });
+    if (!r.ok){ const j=await r.json().catch(()=>({})); return toast(j.error||'No se pudo abrir el PDF', true); }
+    const blob = await r.blob();
+    const url = URL.createObjectURL(blob);
+    window.open(url, '_blank');
+    setTimeout(()=>URL.revokeObjectURL(url), 60000);
+  } catch(_){ toast('Error al descargar PDF', true); }
+}
+
+document.getElementById('rut').addEventListener('blur', ()=>{ const v=document.getElementById('rut').value.trim(); if(v) cargarHistoricos(v); });
+cargarProductos();
+</script>
+<script src="/js/app-version.js"></script>
+</body>
+</html>
