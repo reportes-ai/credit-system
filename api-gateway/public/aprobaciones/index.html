@@ -1879,7 +1879,7 @@ async function udRenderDocs(idCarta){
     const btns=docs.map(d=>`<button class="btn-mini bm-ver" style="padding:6px 12px;margin:0 6px 0 0" onclick="udVerDoc(${d.id})"><i class="bi bi-filetype-pdf"></i> ${lbl[d.tipo]||d.tipo}</button>`).join('');
     const panel=document.createElement('div');
     panel.style.cssText='background:#eff6ff;border:1px solid #bfdbfe;border-radius:10px;padding:10px 14px;margin-bottom:12px';
-    panel.innerHTML=`<div style="font-size:.8rem;font-weight:700;color:#1e40af;margin-bottom:6px"><i class="bi bi-paperclip me-1"></i>Documentos Unidad adjuntos</div>${btns}`;
+    panel.innerHTML=`<div style="font-size:.8rem;font-weight:700;color:#1e40af;margin-bottom:6px"><i class="bi bi-paperclip me-1"></i>Documentos adjuntos (Unidad / Autofin) — revisar antes de aprobar</div>${btns}`;
     cont.insertBefore(panel, cont.firstChild);
   } catch(e){ console.error('udRenderDocs',e); }
 }
@@ -1982,6 +1982,7 @@ function abrirRevision(id){
       <b><i class="bi bi-exclamation-triangle me-1"></i>EXCEPCIONES SOLICITADAS (${c.excepciones.length})</b>${escH(tasaInfo)}${escH(ufInfo)}${items}</div>`;
   }
   document.getElementById('modalBody').innerHTML = excBanner + cartaHTML(c, true);
+  udRenderDocs(c.id);   // adjuntar documentos Unidad/Autofin para que el analista los revise
   document.getElementById('modalFoot').innerHTML = `
     <input id="motivoRechazo" placeholder="Comentario (obligatorio si rechazas, opcional si apruebas)" style="flex:1;min-width:220px;border:1.5px solid #e2e8f0;border-radius:8px;padding:7px 10px;font-size:.83rem">
     <button class="btn-mini bm-no" style="padding:9px 18px;font-size:.85rem" onclick="resolverRevision(${c.id},'RECHAZADA')"><i class="bi bi-x-lg"></i> Rechazar</button>
