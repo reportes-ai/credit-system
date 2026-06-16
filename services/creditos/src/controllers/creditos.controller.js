@@ -91,7 +91,7 @@ async function generarNumero() {
 const SELECT_GESTION = `
   SELECT
     ob.id                                                      AS id_credito,
-    COALESCE(ob.numero_credito, CONCAT('OP-',ob.num_op))       AS numero_credito,
+    COALESCE(ob.numero_credito, CAST(ob.num_op AS CHAR))       AS numero_credito,
     COALESCE(cl.rut,             '')    AS rut_cliente,
     COALESCE(cl.nombre_completo, '')   AS nombre_cliente,
     COALESCE(ob.financiera, 'AUTOFACIL')                       AS financiera,
@@ -266,7 +266,7 @@ const getAll = async (req, res) => {
       whereBase += ` AND (
         UPPER(REPLACE(COALESCE(cl.rut, ''),'.',''))                        LIKE ? OR
         UPPER(COALESCE(cl.nombre_completo, ''))                            LIKE ? OR
-        UPPER(COALESCE(ob.numero_credito, CONCAT('OP-',ob.num_op)))        LIKE ?
+        UPPER(COALESCE(ob.numero_credito, CAST(ob.num_op AS CHAR)))        LIKE ?
       )`;
       paramsBase.push(like, like, like);
     }
@@ -339,7 +339,7 @@ const getById = async (req, res) => {
     const [rows] = await pool.query(
       `SELECT ob.*,
               ob.id                                                AS id_credito,
-              COALESCE(ob.numero_credito, CONCAT('OP-',ob.num_op)) AS numero_credito_fmt,
+              COALESCE(ob.numero_credito, CAST(ob.num_op AS CHAR)) AS numero_credito_fmt,
               ob.automotora                                         AS dealer,
               ob.tascli_real                                        AS tasa_mensual,
               ob.fecha_otorgado                                     AS fecha_otorgamiento,
@@ -590,7 +590,7 @@ const getReporteria = async (req, res) => {
   try {
     const [rows] = await pool.query(`
       SELECT
-        COALESCE(ob.numero_credito, CONCAT('OP-',ob.num_op)) AS numero_credito,
+        COALESCE(ob.numero_credito, CAST(ob.num_op AS CHAR)) AS numero_credito,
         ob.num_op,
         COALESCE(cl.rut,             '')  AS rut_cliente,
         COALESCE(cl.nombre_completo, '')  AS nombre_cliente,

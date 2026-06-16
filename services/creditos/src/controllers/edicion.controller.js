@@ -138,7 +138,7 @@ const getCreditos = async (req, res) => {
 
     const [rows] = await pool.query(
       `SELECT ob.id, ob.num_op, ob.mes,
-              COALESCE(ob.numero_credito, CONCAT('OP-',ob.num_op)) AS numero_credito_display,
+              COALESCE(ob.numero_credito, CAST(ob.num_op AS CHAR)) AS numero_credito_display,
               ${COLS_SELECT},
               ${estadoExpr} AS estado_calc,
               cl.nombre_completo AS nombre_cliente, cl.rut AS rut_cliente
