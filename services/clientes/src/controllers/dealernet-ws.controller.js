@@ -428,7 +428,11 @@ const solicitarInformes = async (req, res) => {
     const { num, dv } = splitRut(req.body?.rut || '');
     if (!num || !dv) return res.status(400).json({ success: false, data: null, error: 'RUT inválido' });
     let productos = Array.isArray(req.body?.productos) ? req.body.productos.map(String) : [];
-    if (!productos.length) return res.status(400).json({ success: false, data: null, error: 'Selecciona al menos un producto' });
+    if (!productos.length) {
+      const [act] = await pool.query("SELECT codigo FROM dealernet_productos WHERE activo=1 ORDER BY orden");
+      productos = act.map(r => r.codigo);
+    }
+    if (!productos.length) return res.status(400).json({ success: false, data: null, error: 'No hay productos activos para solicitar' });
 
     const cfg = await getConfig();
     const bloqueados = [], aPedir = [];

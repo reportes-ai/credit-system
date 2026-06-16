@@ -411,11 +411,18 @@
     <div class="form-card">
       <div class="section-label d-flex align-items-center justify-content-between">
         <span><i class="bi bi-person-badge me-1"></i>Datos personales</span>
-        <button type="button" class="btn btn-sm" id="btnDealernetForm"
-          onclick="abrirModalDealernet()"
-          style="background:#fff7ed;color:#c2410c;border:1px solid #ea580c;font-size:.78rem;padding:3px 10px;border-radius:6px">
-          <i class="bi bi-file-earmark-bar-graph me-1"></i>Cargar desde Dealernet
-        </button>
+        <div class="d-flex" style="gap:8px;flex-wrap:wrap">
+          <button type="button" class="btn btn-sm" id="btnDealernetOnline"
+            onclick="consultarDealernetOnline()"
+            style="background:#eff6ff;color:#1d4ed8;border:1px solid #2563eb;font-size:.78rem;padding:3px 10px;border-radius:6px">
+            <i class="bi bi-cloud-arrow-down me-1"></i>Consultar Dealernet en línea
+          </button>
+          <button type="button" class="btn btn-sm" id="btnDealernetForm"
+            onclick="abrirModalDealernet()"
+            style="background:#fff7ed;color:#c2410c;border:1px solid #ea580c;font-size:.78rem;padding:3px 10px;border-radius:6px">
+            <i class="bi bi-file-earmark-bar-graph me-1"></i>Cargar desde Dealernet
+          </button>
+        </div>
       </div>
       <div class="row g-2">
         <div class="col-md-4 col-lg-3">
@@ -1900,6 +1907,25 @@ document.addEventListener('keydown', e => {
   </div>
 </div>
 
+<!-- Popup: informes en la biblioteca (usar / pedir nuevos) -->
+<div id="dlntPopupOverlay" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:9100;align-items:center;justify-content:center">
+  <div style="background:#fff;border-radius:14px;max-width:470px;width:92%;box-shadow:0 20px 60px rgba(0,0,0,.3);overflow:hidden">
+    <div style="background:linear-gradient(135deg,#1e3a8a,#2563eb);color:#fff;padding:16px 20px;display:flex;align-items:center;gap:10px">
+      <i class="bi bi-cloud-arrow-down" style="font-size:1.4rem"></i>
+      <div style="font-weight:700">Informes DealerNet en la biblioteca</div>
+    </div>
+    <div style="padding:20px;font-size:.92rem;color:#334155">
+      Este cliente ya tiene informes en la biblioteca al <b id="dlntPopupFecha">—</b>.<br>¿Usamos esos informes o pedimos nuevos a DealerNet?
+      <div style="font-size:.78rem;color:#94a3b8;margin-top:8px">Pedir nuevos puede consumir saldo (según la vigencia configurada).</div>
+    </div>
+    <div style="padding:14px 20px;display:flex;gap:10px;justify-content:flex-end;border-top:1px solid #f1f5f9;flex-wrap:wrap">
+      <button onclick="cerrarPopupDlnt()" style="background:#f1f5f9;color:#475569;border:none;border-radius:9px;padding:9px 16px;font-weight:700;font-size:.85rem;cursor:pointer">Cancelar</button>
+      <button onclick="dlntPedirNuevos()" style="background:#fff7ed;color:#c2410c;border:1px solid #ea580c;border-radius:9px;padding:9px 16px;font-weight:700;font-size:.85rem;cursor:pointer"><i class="bi bi-send me-1"></i>Pedir nuevos</button>
+      <button onclick="dlntUsarEstos()" style="background:#2563eb;color:#fff;border:none;border-radius:9px;padding:9px 16px;font-weight:700;font-size:.85rem;cursor:pointer"><i class="bi bi-archive me-1"></i>Usar estos</button>
+    </div>
+  </div>
+</div>
+
 <script>
 /* ── Modal Dealernet (formulario cliente) ────────────────────────── */
 let _dealerParsed = null;
@@ -2105,6 +2131,86 @@ function resetDzCliente() {
 document.getElementById('modalDealernetOverlay').addEventListener('click', function(e) {
   if (e.target === this) cerrarModalDealernet();
 });
+
+/* ── Consultar DealerNet en línea (Web Service + biblioteca) ─────── */
+const _dwHdr = () => ({ 'Content-Type':'application/json', 'Authorization':'Bearer '+(sessionStorage.getItem('token')||'') });
+const _dwGp = (o,...ks)=>{ for(const k of ks){ if(o==null) return undefined; o=o[k]; } return o; };
+const _dwArr = x => x==null?[]:(Array.isArray(x)?x:[x]);
+const _dwRel = x => _dwArr(_dwGp(x,'relacionados','relacion')).join(' ');
+function _dwToast(msg, err){
+  let t=document.getElementById('_dwToast');
+  if(!t){ t=document.createElement('div'); t.id='_dwToast'; t.style.cssText='position:fixed;bottom:24px;left:50%;transform:translateX(-50%);color:#fff;padding:11px 20px;border-radius:10px;font-size:.88rem;z-index:9999;box-shadow:0 8px 24px rgba(0,0,0,.25)'; document.body.appendChild(t); }
+  t.textContent=msg; t.style.background=err?'#b91c1c':'#0f172a'; t.style.display='block';
+  clearTimeout(t._h); t._h=setTimeout(()=>t.style.display='none', 3200);
+}
+function _dwRut(){ try{ return (typeof getRutActual==='function'?getRutActual():'') || document.getElementById('inputRut').value.trim().toUpperCase(); }catch(_){ return ''; } }
+
+async function consultarDealernetOnline(){
+  const rut = _dwRut();
+  if(!rut) return _dwToast('Ingresa y busca un RUT primero', true);
+  try {
+    const j = await (await fetch('/api/dealernet/informes?rut='+encodeURIComponent(rut), { headers:_dwHdr() })).json();
+    if(!j.success){ _dwToast(j.error||'Sin acceso a la biblioteca DealerNet', true); return; }
+    if(j.data && j.data.length){
+      document.getElementById('dlntPopupFecha').textContent = new Date(j.data[0].created_at).toLocaleDateString('es-CL');
+      const ov=document.getElementById('dlntPopupOverlay'); ov.dataset.rut=rut; ov.style.display='flex';
+    } else {
+      await _dwPedirYllenar(rut);
+    }
+  } catch(e){ _dwToast('Error de conexión', true); }
+}
+function cerrarPopupDlnt(){ document.getElementById('dlntPopupOverlay').style.display='none'; }
+async function dlntUsarEstos(){ const rut=document.getElementById('dlntPopupOverlay').dataset.rut; cerrarPopupDlnt(); await _dwLlenar(rut); }
+async function dlntPedirNuevos(){ const rut=document.getElementById('dlntPopupOverlay').dataset.rut; cerrarPopupDlnt(); await _dwPedirYllenar(rut); }
+
+async function _dwPedirYllenar(rut){
+  _dwToast('Solicitando informes a DealerNet…');
+  try {
+    const j = await (await fetch('/api/dealernet/informes/solicitar', { method:'POST', headers:_dwHdr(), body:JSON.stringify({ rut }) })).json();
+    if(!j.success){ _dwToast(j.error||'No se pudo solicitar', true); return; }
+  } catch(e){ _dwToast('Error al solicitar informes', true); return; }
+  await _dwLlenar(rut);
+}
+
+async function _dwLlenar(rut){
+  try {
+    const list = await (await fetch('/api/dealernet/informes?rut='+encodeURIComponent(rut), { headers:_dwHdr() })).json();
+    if(!list.success || !(list.data||[]).length){ _dwToast('No hay informes en la biblioteca para este RUT', true); return; }
+    const latest={}; for(const x of list.data){ const c=String(x.codigo_producto); if(!latest[c]) latest[c]=x; }
+    const cont = async cod => { if(!latest[cod]) return null; const r=await (await fetch('/api/dealernet/informes/'+latest[cod].id,{headers:_dwHdr()})).json(); if(!r.success) return null; let c=r.data.contenido; if(typeof c==='string'){ try{c=JSON.parse(c);}catch(_){ } } return c; };
+    const perfil = await cont('3435');
+    if(perfil){ _dwLlenarPersonal(perfil); _dwToast('Datos personales cargados. La deuda vigente quedará en Inf. Comercial.'); }
+    else _dwToast('No se encontró Perfil Comercial en los informes', true);
+  } catch(e){ _dwToast('Error al leer los informes', true); }
+}
+
+function _dwLlenarPersonal(prd){
+  const root = _dwGp(prd,'DLNTPERCOMDLNTWS','ROOT','D');
+  const colect = _dwGp(root,'result','colect');
+  const civ = _dwGp(colect,'titular','det','detalle_rut','datos_civiles','d') || {};
+  const setV = (id,v)=>{ const el=document.getElementById(id); if(el && v!=null && String(v).trim()!=='') el.value=v; };
+  setV('pApPaterno', String(root&&root['@_ape1ro']||'').toUpperCase());
+  setV('pApMaterno', String(root&&root['@_ape2do']||'').toUpperCase());
+  setV('pNombres',   String(root&&root['@_dspnom']||'').toUpperCase());
+  const fn=civ.fch_nacimiento; if(fn){ const iso=parseFechaEspanol(fn); if(iso){ document.getElementById('pFechaNac').value=iso; if(typeof calcularEdad==='function') calcularEdad(); } }
+  if(civ.matrimonio_estado_civil){ const ec=String(civ.matrimonio_estado_civil).toUpperCase(); const s=document.getElementById('pEstadoCivil'); const o=[...s.options].find(x=>x.value.toUpperCase()===ec||x.text.toUpperCase()===ec); if(o){ s.value=o.value; if(typeof onEstadoCivilChange==='function') onEstadoCivilChange(); } }
+  if(civ.sexo){ const s=document.getElementById('pSexo'); if(s) s.value=String(civ.sexo).toUpperCase(); }
+  if(civ.nacionalidad){ const n=document.getElementById('pNacionalidad'); if(n){ const nv=String(civ.nacionalidad).toUpperCase(); const o=[...n.options].find(x=>x.value.toUpperCase()===nv||x.text.toUpperCase()===nv); if(o){ n.value=o.value; if(typeof onNacionalidadChange==='function') onNacionalidadChange(); } } }
+  const hijos=_dwGp(civ,'asignacion_familiar','hijos'); if(hijos!=null){ const c=document.getElementById('pCargas'); if(c&&!c.value) c.value=hijos; }
+  const tels=_dwArr(_dwGp(colect,'telefonos','telefono_contacto_probable','d'));
+  const tT=tels.find(t=>/titular/i.test(_dwRel(t)))||tels[0];
+  if(tT&&tT.telefono){ const dg=String(tT.telefono).replace(/\D/g,'').replace(/^569/,''); if(dg.length===8){ const e=document.getElementById('pTelefono'); if(e&&(!e.value||e.value==='+56 9 ')) e.value='+56 9 '+dg.slice(0,4)+' '+dg.slice(4); } }
+  const mails=_dwArr(_dwGp(colect,'correos','correo_contacto_probable','d'));
+  const mT=mails.find(m=>/titular/i.test(_dwRel(m)))||mails[0];
+  if(mT&&mT.correo){ const e=document.getElementById('pCorreo'); if(e&&!e.value) e.value=String(mT.correo).toLowerCase(); }
+  const dirs=_dwArr(_dwGp(colect,'direcciones','residencia_probable','d'));
+  const dT=dirs.find(d=>/titular/i.test(_dwRel(d)))||dirs[0];
+  if(dT&&dT.direccion){ const e=document.getElementById('pDireccion'); if(e&&!e.value) e.value=String(dT.direccion).toUpperCase();
+    const com=(String(dT.ubicacion||'').split(',')[0]||'').trim().toUpperCase();
+    if(com&&typeof todasComunas!=='undefined'){ const cc=todasComunas.find(c=>c.nombre.toUpperCase()===com||c.nombre.toUpperCase().includes(com)||com.includes(c.nombre.toUpperCase())); if(cc&&typeof seleccionarComuna==='function') seleccionarComuna('p', cc.id_comuna, cc.id_provincia, cc.nombre); } }
+  ['pApPaterno','pApMaterno','pNombres','pFechaNac','pSexo','pNacionalidad','pCorreo','pDireccion','pTelefono'].forEach(id=>{ const el=document.getElementById(id); if(el&&el.value){ el.style.transition='background .4s'; el.style.background='#d1fae5'; setTimeout(()=>el.style.background='',1800);} });
+}
+document.getElementById('dlntPopupOverlay').addEventListener('click', function(e){ if(e.target===this) cerrarPopupDlnt(); });
 </script>
 </body>
 </html>

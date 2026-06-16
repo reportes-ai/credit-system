@@ -204,6 +204,17 @@
     </button>
   </div>
 
+  <!-- ── Banner Dealernet en línea (Web Service) ───────────────────── -->
+  <div id="dealernetWsBanner" style="display:none;background:#eff6ff;border:1px solid #bfdbfe;border-radius:10px;padding:.7rem 1rem;margin-bottom:.8rem;align-items:center;justify-content:space-between;gap:.5rem;flex-wrap:wrap">
+    <div style="font-size:.88rem;color:#1e40af">
+      <i class="bi bi-cloud-arrow-down-fill me-1"></i>
+      <strong>Informe DealerNet en línea</strong> — deuda vigente al <span id="dealernetWsMes"></span>
+    </div>
+    <button onclick="cargarDeudaWs()" style="background:#2563eb;color:#fff;border:none;border-radius:7px;padding:5px 14px;font-size:.82rem;font-weight:600;cursor:pointer">
+      <i class="bi bi-cloud-download me-1"></i>Cargar deuda vigente
+    </button>
+  </div>
+
   <!-- ── Protestos ────────────────────────────────────────────────── -->
   <div class="form-card">
     <div class="section-label"><i class="bi bi-exclamation-triangle-fill me-1"></i>Protestos</div>
@@ -745,9 +756,78 @@ function cargarDesdeDealernet(silencioso = false) {
 
 }
 
+/* ─── DealerNet en línea (Web Service): deuda vigente último mes ──── */
+let _wsComer = null;
+function _wgp(o,...ks){ for(const k of ks){ if(o==null) return undefined; o=o[k]; } return o; }
+function _warr(x){ return x==null?[]:(Array.isArray(x)?x:[x]); }
+function extraerDeudaWs(prd){
+  const cab = _wgp(prd,'r1603','r16031') || {};
+  const per = _warr(_wgp(prd,'r1603','r16032'))[0]; // primer periodo = más reciente
+  if(!per && cab['@_anomes']==null) return null;
+  const p = per || {};
+  const K = 1000;                                    // M$ → pesos
+  const n = v => { const x=Number(v); return isNaN(x)?0:x*K; };
+  const am = String(cab['@_anomes'] || p['@_ano_y_mes_deuda'] || '');
+  return {
+    mes: am.length===6 ? am.slice(4)+'/'+am.slice(0,4) : am,
+    deuda_vigente_total: n(p['@_deuda_direc_vig']),
+    deuda_vigente_inst:  (Number(p['@_nro_acree_cred_consumo'])||0)+(Number(p['@_nro_inst_cred_com'])||0),
+    deuda_hipotecaria:   n(p['@_deuda_cred_hipoteca']),
+    deuda_comercial:     n(p['@_deuda_comercial']),
+    deuda_comercial_inst:Number(p['@_nro_inst_cred_com'])||0,
+    deuda_consumo:       n(p['@_deuda_cred_consumo']),
+    deuda_consumo_inst:  Number(p['@_nro_acree_cred_consumo'])||0,
+    deuda_morosa:        n(p['@_deuda_morosa']),
+    deuda_vencida:       n(p['@_deuda_venci_direc']),
+    deuda_castigada:     n(p['@_deuda_cast_directa']),
+    linea_disponible:    n(p['@_linea_cred_disponible']),
+  };
+}
+async function verificarDealernetWS(){
+  if(!RUT) return;
+  try {
+    const r = await fetch('/api/dealernet/informes?rut=' + encodeURIComponent(RUT), { headers: apiHeaders() });
+    const j = await r.json();
+    if(!j.success || !(j.data||[]).length) return;
+    const inf = j.data.find(x => String(x.codigo_producto)==='16');  // Comportamiento Vigente más reciente
+    if(!inf) return;
+    const jc = await (await fetch('/api/dealernet/informes/' + inf.id, { headers: apiHeaders() })).json();
+    if(!jc.success) return;
+    let cont = jc.data.contenido; if(typeof cont==='string'){ try{cont=JSON.parse(cont);}catch(_){ } }
+    _wsComer = extraerDeudaWs(cont);
+    if(!_wsComer) return;
+    document.getElementById('dealernetWsMes').textContent = _wsComer.mes || '';
+    document.getElementById('dealernetWsBanner').style.display = 'flex';
+    if(camposFinancierosVacios()) cargarDeudaWs(true);   // cliente nuevo → aplicar auto
+  } catch(e){ console.warn('[dealernet-ws]', e.message); }
+}
+function cargarDeudaWs(silencioso){
+  if(!_wsComer) return;
+  const d = _wsComer;
+  const setM = (id,v)=>{ const el=document.getElementById(id); if(!el) return; const num=parseInt(v)||0; if(!num) return; el.value='$'+num.toLocaleString('es-CL'); if(typeof checkDeudaVigente==='function') checkDeudaVigente(); };
+  const setN = (id,v)=>{ const el=document.getElementById(id); if(el&&v) el.value=v; };
+  setM('fDeudaVigenteTotal', d.deuda_vigente_total);
+  setM('fDeudaHipotecaria',  d.deuda_hipotecaria);
+  setM('fDeudaComercial',    d.deuda_comercial);
+  setM('fDeudaConsumo',      d.deuda_consumo);
+  setM('fDeudaMorosa',       d.deuda_morosa);
+  setM('fDeudaVencida',      d.deuda_vencida);
+  setM('fDeudaCastigada',    d.deuda_castigada);
+  setM('fLineaDisponible',   d.linea_disponible);
+  setN('fDeudaVigenteInst',  d.deuda_vigente_inst);
+  setN('fDeudaConsumoInst',  d.deuda_consumo_inst);
+  setN('fDeudaComercialInst',d.deuda_comercial_inst);
+  if(typeof calcCargas==='function') calcCargas();
+  if(typeof calcArriendo==='function') calcArriendo();
+  document.getElementById('dealernetWsBanner').style.display = 'none';
+  if(!silencioso && typeof showToast==='function') showToast('Deuda vigente cargada desde DealerNet en línea ✓', true);
+  ['fDeudaVigenteTotal','fDeudaHipotecaria','fDeudaComercial','fDeudaConsumo','fDeudaMorosa','fDeudaVencida','fDeudaCastigada','fLineaDisponible'].forEach(id=>{ const el=document.getElementById(id); if(el&&el.value&&el.value!=='$0'){ el.style.transition='background .4s'; el.style.background='#dbeafe'; setTimeout(()=>el.style.background='',2000);} });
+}
+
 // Ejecutar DESPUÉS de que cargarDatos() tenga tiempo de completar
 // (cargarDatos se invoca desde cargarPoliticaYRenta().then(...))
 if (RUT) setTimeout(verificarDealernet, 1400);
+if (RUT) setTimeout(verificarDealernetWS, 1700);
 </script>
 <script src="/js/app-version.js"></script>
 </body>
