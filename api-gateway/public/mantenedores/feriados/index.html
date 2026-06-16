@@ -132,7 +132,8 @@ function render(){
   document.getElementById('cnt').textContent = DATA.length ? `(${DATA.length})` : '';
   if (!DATA.length){ tb.innerHTML = '<tr><td style="color:#94a3b8;padding:14px 8px">Sin feriados cargados. Usa “Cargar feriados chilenos”.</td></tr>'; return; }
   let html = '', anioPrev = null;
-  for (const f of DATA) {
+  const rows = [...DATA].sort((a, b) => b.fecha.localeCompare(a.fecha)); // descendente
+  for (const f of rows) {
     const anio = f.fecha.slice(0,4);
     if (anio !== anioPrev) { html += `<tr class="yr-head"><td colspan="3">${anio}</td></tr>`; anioPrev = anio; }
     html += `<tr>
