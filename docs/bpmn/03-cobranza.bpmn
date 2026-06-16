@@ -1,0 +1,137 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<bpmn:definitions xmlns:bpmn="http://www.omg.org/spec/BPMN/20100524/MODEL"
+                  xmlns:bpmndi="http://www.omg.org/spec/BPMN/20100524/DI"
+                  xmlns:omgdc="http://www.omg.org/spec/DD/20100524/DC"
+                  xmlns:omgdi="http://www.omg.org/spec/DD/20100524/DI"
+                  xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+                  id="Defs_Cobranza" targetNamespace="http://autofacil.cl/bpmn">
+  <bpmn:process id="Cobranza" name="Proceso de Cobranza" isExecutable="false">
+    <bpmn:startEvent id="s" name="Cuota vencida / mora">
+      <bpmn:outgoing>f1</bpmn:outgoing>
+    </bpmn:startEvent>
+    <bpmn:task id="t1" name="Genera gestión de cobranza (CRM)">
+      <bpmn:incoming>f1</bpmn:incoming>
+      <bpmn:incoming>f4</bpmn:incoming>
+      <bpmn:outgoing>f2</bpmn:outgoing>
+    </bpmn:task>
+    <bpmn:exclusiveGateway id="g1" name="¿Contacto exitoso?">
+      <bpmn:incoming>f2</bpmn:incoming>
+      <bpmn:outgoing>f3</bpmn:outgoing>
+      <bpmn:outgoing>f5</bpmn:outgoing>
+    </bpmn:exclusiveGateway>
+    <bpmn:task id="t2" name="Reagenda nuevo intento">
+      <bpmn:incoming>f3</bpmn:incoming>
+      <bpmn:outgoing>f4</bpmn:outgoing>
+    </bpmn:task>
+    <bpmn:task id="t3" name="Acuerdo / compromiso de pago">
+      <bpmn:incoming>f5</bpmn:incoming>
+      <bpmn:outgoing>f6</bpmn:outgoing>
+    </bpmn:task>
+    <bpmn:exclusiveGateway id="g2" name="¿Paga?">
+      <bpmn:incoming>f6</bpmn:incoming>
+      <bpmn:outgoing>f7</bpmn:outgoing>
+      <bpmn:outgoing>f9</bpmn:outgoing>
+    </bpmn:exclusiveGateway>
+    <bpmn:task id="t4" name="Emite carta de cobranza / deriva">
+      <bpmn:incoming>f7</bpmn:incoming>
+      <bpmn:outgoing>f8</bpmn:outgoing>
+    </bpmn:task>
+    <bpmn:endEvent id="e1" name="Deriva a cobranza judicial/externa">
+      <bpmn:incoming>f8</bpmn:incoming>
+    </bpmn:endEvent>
+    <bpmn:task id="t5" name="Registra pago / regulariza">
+      <bpmn:incoming>f9</bpmn:incoming>
+      <bpmn:outgoing>f10</bpmn:outgoing>
+    </bpmn:task>
+    <bpmn:endEvent id="e2" name="Cuota al día">
+      <bpmn:incoming>f10</bpmn:incoming>
+    </bpmn:endEvent>
+    <bpmn:sequenceFlow id="f1" sourceRef="s" targetRef="t1" />
+    <bpmn:sequenceFlow id="f2" sourceRef="t1" targetRef="g1" />
+    <bpmn:sequenceFlow id="f3" sourceRef="g1" targetRef="t2" name="No" />
+    <bpmn:sequenceFlow id="f4" sourceRef="t2" targetRef="t1" name="reintento" />
+    <bpmn:sequenceFlow id="f5" sourceRef="g1" targetRef="t3" name="Sí" />
+    <bpmn:sequenceFlow id="f6" sourceRef="t3" targetRef="g2" />
+    <bpmn:sequenceFlow id="f7" sourceRef="g2" targetRef="t4" name="No" />
+    <bpmn:sequenceFlow id="f8" sourceRef="t4" targetRef="e1" />
+    <bpmn:sequenceFlow id="f9" sourceRef="g2" targetRef="t5" name="Sí" />
+    <bpmn:sequenceFlow id="f10" sourceRef="t5" targetRef="e2" />
+  </bpmn:process>
+  <bpmndi:BPMNDiagram id="Cobranza_diagram">
+    <bpmndi:BPMNPlane id="Cobranza_plane" bpmnElement="Cobranza">
+      <bpmndi:BPMNShape id="s_di" bpmnElement="s">
+        <omgdc:Bounds x="222" y="92" width="36" height="36" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="t1_di" bpmnElement="t1">
+        <omgdc:Bounds x="160" y="212" width="160" height="76" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="g1_di" bpmnElement="g1" isMarkerVisible="true">
+        <omgdc:Bounds x="215" y="365" width="50" height="50" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="t2_di" bpmnElement="t2">
+        <omgdc:Bounds x="420" y="352" width="160" height="76" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="t3_di" bpmnElement="t3">
+        <omgdc:Bounds x="160" y="492" width="160" height="76" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="g2_di" bpmnElement="g2" isMarkerVisible="true">
+        <omgdc:Bounds x="215" y="645" width="50" height="50" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="t4_di" bpmnElement="t4">
+        <omgdc:Bounds x="420" y="632" width="160" height="76" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="e1_di" bpmnElement="e1">
+        <omgdc:Bounds x="482" y="792" width="36" height="36" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="t5_di" bpmnElement="t5">
+        <omgdc:Bounds x="160" y="772" width="160" height="76" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="e2_di" bpmnElement="e2">
+        <omgdc:Bounds x="222" y="932" width="36" height="36" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNEdge id="f1_di" bpmnElement="f1">
+        <omgdi:waypoint x="240" y="128" />
+        <omgdi:waypoint x="240" y="212" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="f2_di" bpmnElement="f2">
+        <omgdi:waypoint x="240" y="288" />
+        <omgdi:waypoint x="240" y="365" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="f3_di" bpmnElement="f3">
+        <omgdi:waypoint x="265" y="390" />
+        <omgdi:waypoint x="420" y="390" />
+        <omgdi:waypoint x="420" y="390" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="f4_di" bpmnElement="f4">
+        <omgdi:waypoint x="500" y="352" />
+        <omgdi:waypoint x="500" y="250" />
+        <omgdi:waypoint x="320" y="250" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="f5_di" bpmnElement="f5">
+        <omgdi:waypoint x="240" y="415" />
+        <omgdi:waypoint x="240" y="492" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="f6_di" bpmnElement="f6">
+        <omgdi:waypoint x="240" y="568" />
+        <omgdi:waypoint x="240" y="645" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="f7_di" bpmnElement="f7">
+        <omgdi:waypoint x="265" y="670" />
+        <omgdi:waypoint x="420" y="670" />
+        <omgdi:waypoint x="420" y="670" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="f8_di" bpmnElement="f8">
+        <omgdi:waypoint x="500" y="708" />
+        <omgdi:waypoint x="500" y="792" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="f9_di" bpmnElement="f9">
+        <omgdi:waypoint x="240" y="695" />
+        <omgdi:waypoint x="240" y="772" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="f10_di" bpmnElement="f10">
+        <omgdi:waypoint x="240" y="848" />
+        <omgdi:waypoint x="240" y="932" />
+      </bpmndi:BPMNEdge>
+    </bpmndi:BPMNPlane>
+  </bpmndi:BPMNDiagram>
+</bpmn:definitions>
