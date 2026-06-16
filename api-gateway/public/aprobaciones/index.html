@@ -145,19 +145,7 @@
     </div>
   </div>
   <div class="topnav-right">
-    <div style="position:relative">
-      <button class="btn-logout" id="bellBtn" onclick="toggleBell()" title="Notificaciones" style="position:relative;padding:5px 11px">
-        <i class="bi bi-bell" style="font-size:1.05rem"></i>
-        <span id="bellCount" style="display:none;position:absolute;top:-7px;right:-7px;background:#dc2626;color:#fff;font-size:.66rem;font-weight:800;border-radius:10px;min-width:19px;height:19px;align-items:center;justify-content:center;padding:0 5px;border:2px solid #0255c5">0</span>
-      </button>
-      <div id="bellDrop" style="display:none;position:absolute;right:0;top:46px;background:#fff;border-radius:12px;box-shadow:0 12px 40px rgba(0,0,0,.25);width:340px;max-height:420px;overflow-y:auto;z-index:500;color:#1e293b">
-        <div style="padding:11px 16px;font-weight:800;font-size:.85rem;color:#012d70;border-bottom:1px solid #f1f5f9;display:flex;justify-content:space-between;align-items:center">
-          Notificaciones
-          <button id="btnPushOn" onclick="activarPush()" style="display:none;border:none;background:#eff6ff;color:#1d4ed8;border-radius:7px;padding:3px 10px;font-size:.7rem;font-weight:700;cursor:pointer"><i class="bi bi-bell-fill"></i> Activar push</button>
-        </div>
-        <div id="bellList" style="font-size:.8rem"></div>
-      </div>
-    </div>
+    <!-- Campana de notificaciones: la inyecta app-version.js (global, animada) en todas las páginas -->
     <div class="user-chip">
       <div class="avatar" id="avatarInicial">?</div>
       <div>
@@ -2739,7 +2727,7 @@ async function initNotifs(){
   else if (Notification.permission === 'default')
     document.getElementById('btnPushOn').style.display = '';          // ofrecer activar
 }
-initNotifs();
+// initNotifs(); — la campana global animada (app-version.js) maneja las notificaciones en todas las páginas
 
 async function cargarEnviadas(){
   const mes = document.getElementById('envMes').value;
