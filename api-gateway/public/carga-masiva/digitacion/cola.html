@@ -74,16 +74,49 @@ function toast(m,e){ const t=document.getElementById('toast'); t.textContent=m; 
 
 let ACTUAL = null;   // { id, campos, faltantes }
 
-function inputHTML(c, val, falta){
+/* Formato peso en vivo */
+function fmtPesoStr(v){ const s=String(v??''); const d=s.replace(/[^\d]/g,''); return (s.trim()===''||d==='') ? '' : '$'+parseInt(d,10).toLocaleString('es-CL'); }
+function fmtPeso(el){ const d=el.value.replace(/[^\d]/g,''); el.value = d ? '$'+parseInt(d,10).toLocaleString('es-CL') : ''; }
+
+function inputHTML(c, val){
   const v = (val === null || val === undefined) ? '' : val;
   const id = 'f_' + c.col;
   if (c.tipo === 'select') {
     const ops = (c.ops||[]).map(o => `<option value="${esc(o)}" ${String(o)===String(v)?'selected':''}>${esc(o)}</option>`).join('');
     return `<select id="${id}"><option value="">—</option>${ops}</select>`;
   }
+  if (c.money) {
+    return `<input id="${id}" type="text" inputmode="numeric" data-money="1" value="${esc(fmtPesoStr(v))}" oninput="fmtPeso(this)">`;
+  }
+  if (c.col === 'rut_dealer') {
+    return `<div style="display:flex;gap:6px">
+        <input id="${id}" type="text" value="${esc(v)}" style="flex:1">
+        <button type="button" onclick="buscarDealer()" title="Buscar RUT por nombre del dealer" style="border:1px solid #cbd5e1;background:#eff6ff;color:#1d4ed8;border-radius:8px;padding:0 11px;cursor:pointer"><i class="bi bi-search"></i></button>
+      </div>
+      <div id="dealerResults" style="display:none;margin-top:6px;border:1px solid #e2e8f0;border-radius:8px;max-height:180px;overflow:auto;background:#fff"></div>`;
+  }
   const type = c.tipo === 'date' ? 'date' : c.tipo === 'month' ? 'month' : (c.tipo === 'number' || c.tipo === 'decimal') ? 'number' : 'text';
   const step = c.tipo === 'decimal' ? ' step="0.0001"' : c.tipo === 'number' ? ' step="1"' : '';
   return `<input id="${id}" type="${type}"${step} value="${esc(v)}">`;
+}
+
+async function buscarDealer(){
+  const nombre = (document.getElementById('f_automotora')?.value || '').trim();
+  const res = document.getElementById('dealerResults');
+  if (nombre.length < 2) { toast('Escribe el nombre en Dealer/Automotora primero', true); return; }
+  res.style.display='block'; res.innerHTML='<div style="padding:8px;color:#94a3b8;font-size:.85rem">Buscando…</div>';
+  try {
+    const r = await fetch('/api/digitacion-faltantes/dealer-buscar?q='+encodeURIComponent(nombre), { headers:H });
+    const j = await r.json();
+    if (!j.success || !j.data.length) { res.innerHTML='<div style="padding:8px;color:#94a3b8;font-size:.85rem">Sin coincidencias</div>'; return; }
+    res.innerHTML = j.data.map(d => `<div onclick="pickDealer('${esc(d.rut)}','${esc(d.tipo)}')" style="padding:8px 10px;border-bottom:1px solid #f1f5f9;cursor:pointer;font-size:.85rem"><b>${esc(d.rut)}</b> · ${esc(d.nombre)} <span style="color:#64748b">(${esc(d.tipo||'?')})</span></div>`).join('');
+  } catch(e){ res.innerHTML='<div style="padding:8px;color:#b91c1c;font-size:.85rem">Error de conexión</div>'; }
+}
+function pickDealer(rut, tipo){
+  const r=document.getElementById('f_rut_dealer'); if(r){ r.value=rut; r.closest('.fld')?.classList.remove('falta'); }
+  if (tipo){ const u=document.getElementById('f_tipo_ubicacion'); if(u) u.value=tipo; const p=document.getElementById('f_parque'); if(p && !p.value) p.value=tipo; }
+  const res=document.getElementById('dealerResults'); if(res) res.style.display='none';
+  toast('Dealer aplicado: '+rut+(tipo?(' · '+tipo):''));
 }
 
 function render(d){
@@ -105,6 +138,7 @@ function render(d){
       <div>
         <div class="op">N° Operación ${esc(cr.numero_credito)} <span class="pill-tipo ${d.tipo==='otorgados'?'otorg':'otros'}">${d.tipo==='otorgados'?'OTORGADO':'OTROS'}</span></div>
         <div class="cli">${esc(cr.nombre_cliente||'—')} <span class="rut">${esc(cr.rut_cliente||'')}</span></div>
+        <div style="font-size:.8rem;color:#64748b;margin-top:2px">ID Financiera: <b>${esc(cr.id_financiera||'—')}</b></div>
       </div>
       <span class="pend"><i class="bi bi-stack me-1"></i>${d.pendientes} por digitar</span>
     </div>
@@ -148,7 +182,8 @@ function recolectar(){
   const campos = {};
   document.querySelectorAll('[id^="f_"]').forEach(el => {
     let v = el.value;
-    if (el.type === 'month' && v) v = v + '-01';   // mes → fecha válida
+    if (el.dataset.money) { const d = String(v).replace(/[^\d]/g,''); v = d === '' ? '' : d; }  // $ → entero
+    else if (el.type === 'month' && v) v = v + '-01';                                            // mes → fecha válida
     campos[el.id.slice(2)] = v;
   });
   return campos;

@@ -27,28 +27,31 @@ const CAMPOS = [
   { col:'modelo',             label:'Modelo',              tipo:'text'   },
   { col:'anio',               label:'Año',                 tipo:'number' },
   { col:'patente',            label:'Patente',             tipo:'text'   },
-  { col:'valor_vehiculo',     label:'Valor Vehículo',      tipo:'number' },
-  { col:'pie',                label:'Pie',                 tipo:'number' },
-  { col:'saldo_precio',       label:'Saldo Precio',        tipo:'number' },
-  { col:'monto_financiado',   label:'Monto Financiado',    tipo:'number' },
+  { col:'valor_vehiculo',     label:'Valor Vehículo',      tipo:'number', money:true },
+  { col:'pie',                label:'Pie',                 tipo:'number', money:true },
+  { col:'saldo_precio',       label:'Saldo Precio',        tipo:'number', money:true },
+  { col:'monto_financiado',   label:'Monto Financiado',    tipo:'number', money:true },
   { col:'plazo',              label:'Plazo (cuotas)',       tipo:'number' },
   { col:'tascli_real',        label:'Tasa Mensual (%)',     tipo:'decimal'},
-  { col:'cuota',              label:'Cuota',               tipo:'number' },
+  { col:'cuota',              label:'Cuota',               tipo:'number', money:true },
   { col:'fecha_primera_cuota',label:'Fecha 1ª Cuota',      tipo:'date'   },
-  { col:'seguros',            label:'Primas de Seguro',    tipo:'number' },
-  { col:'comdea_real',        label:'Comisión Dealer',     tipo:'number' },
-  { col:'com_parque',         label:'Comisión Parque',     tipo:'number' },
-  { col:'monto_comision_fin', label:'Comisión Financiera', tipo:'number' },
-  { col:'gastos',             label:'Gastos Op.',          tipo:'number' },
+  { col:'seguros',            label:'Primas de Seguro',    tipo:'number', money:true },
+  { col:'comdea_real',        label:'Comisión Dealer',     tipo:'number', money:true },
+  { col:'com_parque',         label:'Comisión Parque',     tipo:'number', money:true },
+  { col:'monto_comision_fin', label:'Comisión Financiera', tipo:'number', money:true },
+  { col:'gastos',             label:'Gastos Op.',          tipo:'number', money:true },
+  { col:'tipo_ubicacion',     label:'Parque / Calle',      tipo:'select', ops:['PARQUE','CALLE'] },
   { col:'id_financiera',      label:'ID Financiera',       tipo:'text'   },
   { col:'observaciones',      label:'Observaciones',       tipo:'text'   },
 ];
 
 // Campos obligatorios que definen si un crédito está "incompleto" (entra a la cola).
 const REQUERIDOS = {
-  otorgados: ['tascli_real','plazo','cuota','seguros','automotora'],
-  otros:     ['tascli_real','plazo','cuota','automotora'],
+  otorgados: ['fecha_otorgado','tascli_real','plazo','cuota','seguros','automotora','rut_dealer',
+              'tipo_vehiculo','marca','modelo','anio','patente'],
+  otros:     ['tascli_real','plazo','cuota','automotora','rut_dealer'],
 };
+const CAMPO = Object.fromEntries(CAMPOS.map(c => [c.col, c]));
 
 /* ── Migración: columnas de bloqueo del pool ────────────────────────────── */
 (async () => {
@@ -65,14 +68,16 @@ function estadoCond(tipo) {
     ? `ob.estado_eval = 'OTORGADO'`
     : `(ob.estado_eval IS NULL OR ob.estado_eval <> 'OTORGADO')`;
 }
+function colVacioSQL(col) {
+  const c = CAMPO[col] || {};
+  if (col === 'seguros') return `(ob.${col} IS NULL)`;                       // 0 = sin seguro, válido
+  if (c.tipo === 'text' || c.tipo === 'select') return `(ob.${col} IS NULL OR ob.${col} = '')`;
+  if (c.tipo === 'date' || c.tipo === 'month')  return `(ob.${col} IS NULL)`;
+  return `(ob.${col} IS NULL OR ob.${col} = 0)`;                            // number/decimal
+}
 function faltanteCond(tipo) {
   const reqs = REQUERIDOS[tipo] || REQUERIDOS.otros;
-  const parts = reqs.map(c => {
-    if (c === 'automotora') return `(ob.automotora IS NULL OR ob.automotora = '')`;
-    if (c === 'seguros')    return `(ob.seguros IS NULL)`;
-    return `(ob.${c} IS NULL OR ob.${c} = 0)`;
-  });
-  return '(' + parts.join(' OR ') + ')';
+  return '(' + reqs.map(colVacioSQL).join(' OR ') + ')';
 }
 function pendingWhere(tipo) {
   return `
@@ -86,10 +91,11 @@ function pendingWhere(tipo) {
 
 function esVacio(col, v) {
   if (v === null || v === undefined) return true;
-  if (col === 'automotora') return String(v).trim() === '';
-  if (col === 'seguros') return false;                      // null ya cubierto arriba
-  if (['tascli_real','plazo','cuota'].includes(col)) return Number(v) === 0;
-  return String(v).trim() === '';
+  const c = CAMPO[col] || {};
+  if (col === 'seguros') return false;
+  if (c.tipo === 'text' || c.tipo === 'select') return String(v).trim() === '';
+  if (c.tipo === 'date' || c.tipo === 'month') return false;
+  return Number(v) === 0;
 }
 const errSrv = (res, e, tag) => { console.error(`[${tag}]`, e.message); res.status(500).json({ success:false, data:null, error:'Error interno del servidor' }); };
 
@@ -200,4 +206,25 @@ exports.liberar = async (req, res) => {
       [id, req.usuario.id_usuario]);
     res.json({ success:true, data:{ id }, error:null });
   } catch (e) { errSrv(res, e, 'digit liberar'); }
+};
+
+/* ── GET /dealer-buscar?q= → RUT y Parque/Calle del dealer por nombre ────── */
+exports.dealerBuscar = async (req, res) => {
+  try {
+    const q = String(req.query.q || '').trim();
+    if (q.length < 2) return res.json({ success:true, data:[], error:null });
+    const like = '%' + q + '%';
+    const [rows] = await pool.query(
+      `SELECT numero, rut, nombre_indexa, nombre_razon, ccs_parque
+       FROM dealers
+       WHERE (nombre_indexa LIKE ? OR nombre_razon LIKE ? OR rut LIKE ? OR numero LIKE ?)
+         AND (activo IS NULL OR activo = 1)
+       ORDER BY nombre_indexa LIMIT 20`, [like, like, like, like]);
+    const data = rows.map(r => {
+      const t = String(r.ccs_parque || '').toUpperCase();
+      return { numero: r.numero, rut: r.rut, nombre: r.nombre_indexa || r.nombre_razon || '',
+               tipo: t.includes('PARQUE') ? 'PARQUE' : (t ? 'CALLE' : '') };
+    });
+    res.json({ success:true, data, error:null });
+  } catch (e) { errSrv(res, e, 'digit dealerBuscar'); }
 };

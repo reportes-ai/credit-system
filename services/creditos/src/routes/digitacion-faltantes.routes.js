@@ -7,6 +7,7 @@ const ctrl = require('../controllers/digitacion-faltantes.controller');
 // Pool de digitación de datos faltantes (créditos incompletos por carga masiva).
 router.get ('/conteo',           verifyToken, requireFunc('digitacion_faltantes'), ctrl.conteo);
 router.get ('/siguiente',        verifyToken, requireFunc('digitacion_faltantes'), ctrl.siguiente);
+router.get ('/dealer-buscar',    verifyToken, requireFunc('digitacion_faltantes'), ctrl.dealerBuscar);
 router.post('/:id(\\d+)',        verifyToken, requireFunc('digitacion_faltantes'), ctrl.guardar);
 router.post('/:id(\\d+)/liberar',verifyToken, requireFunc('digitacion_faltantes'), ctrl.liberar);
 
