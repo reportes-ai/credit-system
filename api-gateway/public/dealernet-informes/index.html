@@ -5,7 +5,7 @@
   <link rel="icon" href="/img/favicon.png" type="image/png">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Informes DealerNet — AutoFácil</title>
-  <!-- v1.0 -->
+  <!-- v1.1 -->
   <link href="/css/bootstrap.min.css" rel="stylesheet">
   <link href="/css/bootstrap-icons.css" rel="stylesheet">
   <style>
@@ -135,7 +135,11 @@
 <dialog id="dlgVer">
   <div class="dlg-head"><i class="bi bi-file-earmark-text"></i><h4 id="dlgVerTit">Informe</h4></div>
   <div class="dlg-body" id="dlgVerBody"></div>
-  <div class="dlg-foot"><button class="btn-b cancel" onclick="document.getElementById('dlgVer').close()">Cerrar</button></div>
+  <div class="dlg-foot">
+    <button class="btn-b cancel" onclick="document.getElementById('dlgVer').close()">Cerrar</button>
+    <button class="btn-b hist" id="btnJson" onclick="toggleJson()"><i class="bi bi-braces me-1"></i>Ver datos (JSON)</button>
+    <button class="btn-b new" onclick="printInforme()"><i class="bi bi-printer me-1"></i>Imprimir / PDF</button>
+  </div>
 </dialog>
 
 <div class="toast-af" id="toast"></div>
@@ -274,21 +278,114 @@ async function solicitar(){
 function resetBtn(){ const b=document.getElementById('btnSolicitar'); b.disabled=false; b.innerHTML='<i class="bi bi-send me-1"></i>Solicitar informes'; }
 
 /* ── Ver / Descargar ─────────────────────────────────────────────────────── */
+/* ── Render de informe con el formato DealerNet ──────────────────────────── */
+const FTE = { '16':'Digitación', '2101':'Registro Civil', '3425':'DealerNET', '3435':'DealerNET' };
+const REPORT_CSS = `
+  .report { background:#fff; color:#1f2937; font-size:.84rem; }
+  .rep-titularbar { display:flex; justify-content:space-between; align-items:baseline; border-bottom:2px solid #0141A2; padding-bottom:6px; margin-bottom:4px; }
+  .rep-titularbar b { font-size:.95rem; color:#012d70; }
+  .rep-titularbar span { font-family:ui-monospace,monospace; color:#475569; }
+  .rep-title { font-size:1.15rem; font-weight:800; color:#012d70; margin:10px 0 6px; }
+  .rep-meta { display:flex; flex-wrap:wrap; gap:4px 18px; font-size:.76rem; color:#475569; background:#f8fafc; border:1px solid #eef2f7; border-radius:8px; padding:8px 12px; margin-bottom:14px; }
+  .rep-h { font-size:.8rem; font-weight:800; color:#fff; background:#0141A2; border-radius:6px; padding:5px 10px; margin:14px 0 8px; }
+  .rep-kv { margin:3px 0; } .rep-kv b { color:#374151; }
+  .rep-tb { width:100%; border-collapse:collapse; font-size:.8rem; margin:6px 0; }
+  .rep-tb th { background:#eef4fb; color:#012d70; text-align:left; padding:6px 8px; border:1px solid #dbe6f3; font-size:.72rem; text-transform:uppercase; }
+  .rep-tb td { padding:6px 8px; border:1px solid #eef2f7; vertical-align:top; }
+  .pill-ok { background:#dcfce7; color:#15803d; font-weight:800; padding:2px 10px; border-radius:11px; }
+  .pill-bad { background:#fee2e2; color:#b91c1c; font-weight:800; padding:2px 10px; border-radius:11px; }
+  .rep-note { background:#fffbeb; border:1px solid #fde68a; color:#92400e; border-radius:8px; padding:8px 12px; font-size:.78rem; margin-bottom:10px; }
+  .rep-sep { border:none; border-top:1px dashed #e2e8f0; margin:8px 0; }
+  .rep-legal { margin-top:18px; padding-top:8px; border-top:1px solid #eef2f7; font-size:.68rem; color:#94a3b8; font-style:italic; }
+  .rep-tree { font-size:.8rem; } .rep-tree b { color:#374151; }`;
+(function(){ const st=document.createElement('style'); st.textContent=REPORT_CSS; document.head.appendChild(st); })();
+
+// Busca el primer valor escalar cuya clave (sin @_) coincida, recursivo.
+function deepFind(o, names, depth=0){
+  if(!o || typeof o!=='object' || depth>12) return null;
+  for(const k of Object.keys(o)){
+    const kn=k.replace(/^@_/,'').toLowerCase();
+    if(names.includes(kn) && o[k]!=null && typeof o[k]!=='object' && String(o[k]).trim()!=='') return o[k];
+  }
+  for(const k of Object.keys(o)){ if(o[k]&&typeof o[k]==='object'){ const r=deepFind(o[k],names,depth+1); if(r!=null) return r; } }
+  return null;
+}
+// Render genérico (fallback) estilizado, mientras se afina el formato exacto.
+function renderTree(o, depth=0){
+  if(o==null) return '<span class="muted">—</span>';
+  if(typeof o!=='object') return esc(String(o));
+  if(Array.isArray(o)) return o.map(x=>renderTree(x,depth)).join('<hr class="rep-sep">');
+  return Object.keys(o).filter(k=>k!=='#text').map(k=>{
+    const label=k.replace(/^@_/,''); const v=o[k];
+    if(v && typeof v==='object') return '<div class="rep-kv"><b>'+esc(label)+'</b></div><div style="padding-left:14px">'+renderTree(v,depth+1)+'</div>';
+    return '<div class="rep-kv"><b>'+esc(label)+':</b> '+esc(String(v))+'</div>';
+  }).join('');
+}
+// Boletín de Deudores de Pensión de Alimentos (2101): informe + se conserva el certificado.
+function bodyPension(d, cont){
+  const nombre = deepFind(cont,['nombre']) || '';
+  const inddeu = String(deepFind(cont,['inddeu']) || '').trim();
+  const sin = !inddeu || /sin/i.test(inddeu);
+  const accion = d.pdf_url ? `<button class="btn-ghost" onclick="descargarPdf(${d.id})"><i class="bi bi-file-earmark-pdf"></i> Certificado</button>` : '—';
+  return `<div class="rep-kv"><b>Nombre:</b> ${esc(nombre)||'—'}</div>
+    <div class="rep-kv"><b>Rut:</b> ${esc(d.rut)}-${esc(d.dv||'')}</div>
+    <div class="rep-h">Resultado Búsqueda</div>
+    <table class="rep-tb"><thead><tr><th>Ruta deudor</th><th>Nombre deudor</th><th>Resultado consulta</th><th>Acción</th></tr></thead>
+    <tbody><tr><td>${esc(d.rut)}-${esc(d.dv||'')}</td><td>${esc(nombre||'—')}</td>
+    <td><span class="pill-${sin?'ok':'bad'}">${esc((inddeu||'SIN DEUDA').toUpperCase())}</span></td><td>${accion}</td></tr></tbody></table>
+    ${d.pdf_url?'<div class="muted" style="margin-top:8px"><i class="bi bi-shield-check"></i> Se conserva el <b>certificado</b> emitido por el Registro Civil.</div>':''}`;
+}
+function renderInforme(d){
+  let cont = d.contenido; if(typeof cont==='string'){ try{cont=JSON.parse(cont);}catch(_){ } }
+  const cod = String(d.codigo_producto);
+  const titular = deepFind(cont,['nombre']) || '';
+  const body = cod==='2101' ? bodyPension(d, cont)
+    : '<div class="rep-note">Formato detallado en preparación para este producto. Datos recibidos del Web Service:</div><div class="rep-tree">'+renderTree(cont)+'</div>';
+  const f = new Date(d.created_at);
+  const meta = `<div class="rep-meta">
+    <span><b>Gestor:</b> ${esc(d.usuario_nombre||'—')}</span>
+    <span><b>Fecha Consulta:</b> ${f.toLocaleDateString('es-CL')}</span>
+    <span><b>Fte. Proveedora:</b> ${esc(FTE[cod]||'DealerNET')}</span>
+    <span><b>Resolución:</b> On Line</span>
+    <span><b>Hora Consulta:</b> ${f.toLocaleTimeString('es-CL',{hour:'2-digit',minute:'2-digit'})}</span></div>`;
+  return `<div class="report">
+    <div class="rep-titularbar"><b>${esc(titular||'')}</b><span>${esc(d.rut)}-${esc(d.dv||'')}</span></div>
+    <div class="rep-title">${esc(d.nombre_producto||cod)}</div>
+    ${meta}
+    <div class="rep-body">${body}</div>
+    <div class="rep-legal">El presente informe ha sido emitido de conformidad con la ley N° 19.628 a partir de fuentes de información de acceso público. La información comprendida en este informe es para uso exclusivo de nuestros suscriptores y sólo puede ser utilizada con fines estrictamente comerciales.</div>
+  </div>`;
+}
 async function verInforme(id){
   try {
     const r = await fetch('/api/dealernet/informes/'+id, { headers:H });
     const j = await r.json();
     if (!j.success) return toast(j.error||'Error', true);
-    const d = j.data;
+    const d = j.data; window._verActual = d; window._verJson = false;
     document.getElementById('dlgVerTit').textContent = (d.nombre_producto||d.codigo_producto)+' · '+d.rut+'-'+(d.dv||'');
-    let cont = d.contenido;
-    if (typeof cont === 'string'){ try { cont = JSON.parse(cont); } catch(_){} }
-    document.getElementById('dlgVerBody').innerHTML =
-      '<div class="muted" style="margin-bottom:8px">Fecha: '+fmtFecha(d.created_at)+' · Solicitó: '+esc(d.usuario_nombre||'—')+
-      (d.pdf_url?' · <a href="javascript:void(0)" onclick="descargarPdf('+d.id+')">Descargar PDF</a>':'')+'</div>'+
-      '<pre class="out">'+esc(JSON.stringify(cont, null, 2))+'</pre>';
+    document.getElementById('dlgVerBody').innerHTML = renderInforme(d);
+    const bj=document.getElementById('btnJson'); if(bj) bj.innerHTML='<i class="bi bi-braces me-1"></i>Ver datos (JSON)';
     document.getElementById('dlgVer').showModal();
   } catch(_){ toast('Error al abrir informe', true); }
+}
+function toggleJson(){
+  const d = window._verActual; if(!d) return;
+  window._verJson = !window._verJson;
+  let cont = d.contenido; if(typeof cont==='string'){ try{cont=JSON.parse(cont);}catch(_){ } }
+  document.getElementById('dlgVerBody').innerHTML = window._verJson
+    ? '<pre class="out">'+esc(JSON.stringify(cont,null,2))+'</pre>' : renderInforme(d);
+  const bj=document.getElementById('btnJson'); if(bj) bj.innerHTML = window._verJson
+    ? '<i class="bi bi-file-earmark-text me-1"></i>Ver informe' : '<i class="bi bi-braces me-1"></i>Ver datos (JSON)';
+}
+function printInforme(){
+  const d = window._verActual; if(!d) return;
+  const w = window.open('', '_blank', 'width=860,height=920');
+  if(!w) return toast('Permite ventanas emergentes para imprimir', true);
+  w.document.write('<html><head><meta charset="utf-8"><title>Informe '+esc(d.rut)+'</title>'+
+    '<link href="/css/bootstrap-icons.css" rel="stylesheet"><style>'+REPORT_CSS+
+    'body{font-family:Segoe UI,system-ui,sans-serif;padding:28px;color:#1f2937}</style></head><body>'+
+    renderInforme(d)+'</body></html>');
+  w.document.close(); w.focus(); setTimeout(()=>w.print(), 350);
 }
 async function descargarPdf(id){
   try {
