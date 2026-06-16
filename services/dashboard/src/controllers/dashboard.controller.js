@@ -229,10 +229,13 @@ exports.getDatos = async (req, res) => {
       return val;
     };
 
-    // Deduplicar: si hay num_op repetido, quedarse con el registro de mayor id
+    // Deduplicar por operación, quedándose con el registro de mayor id.
+    // OJO: PARTITION BY num_op solo agrupa todos los num_op NULL en UNA partición
+    // (botaría todos menos uno). Por eso se deduplica por num_op y, si falta, por
+    // numero_credito; y si ambos faltan, por el id (único → nunca se descarta).
     const [rows] = await pool.query(`
       SELECT
-        num_op                                                  AS op,
+        COALESCE(NULLIF(num_op,''), numero_credito)             AS op,
         DATE_FORMAT(mes, '%Y-%m')                              AS mes,
         COALESCE(ejecutivo, '')                                AS ejecutivo,
         COALESCE(financiera, '')                               AS financiera,
@@ -265,7 +268,9 @@ exports.getDatos = async (req, res) => {
         COALESCE(ob.rut_dealer, '')                           AS rut_dealer,
         COALESCE(ob.id_financiera, '')                        AS id_financiera
       FROM (
-        SELECT *, ROW_NUMBER() OVER (PARTITION BY num_op ORDER BY id DESC) AS _rn
+        SELECT *, ROW_NUMBER() OVER (
+                 PARTITION BY COALESCE(NULLIF(num_op,''), NULLIF(numero_credito,''), CONCAT('__id', id))
+                 ORDER BY id DESC) AS _rn
         FROM creditos WHERE mes IS NOT NULL
       ) ob
       LEFT JOIN clientes cl ON cl.id_cliente = ob.id_cliente
