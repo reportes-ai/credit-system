@@ -277,6 +277,35 @@
     <div class="alert-inline" id="formAlert"></div>
     <div class="form-grid">
 
+      <div class="sec-form">Autocompletar desde documentos
+        <span style="font-weight:600;font-size:.72rem;color:#475569;text-transform:none;margin-left:8px">sube los PDF y se llenan los datos; quedan adjuntos para la revisión del analista</span>
+      </div>
+      <div class="ff fg-2">
+        <div style="border:1.5px solid #fb923c;background:#fff7ed;border-radius:10px;padding:12px 14px;height:100%">
+          <div style="font-weight:700;color:#c2410c;font-size:.82rem;margin-bottom:9px"><i class="bi bi-bank2 me-1"></i>UNIDAD — Carta Compromiso + Cotización</div>
+          <div style="display:flex;gap:12px;flex-wrap:wrap;align-items:center">
+            <input type="file" id="docCompromiso" accept="application/pdf" style="display:none" onchange="onUnidadDoc(this,'COMPROMISO_UNIDAD')">
+            <button type="button" onclick="document.getElementById('docCompromiso').click()" style="background:#f97316;color:#fff;border:none;border-radius:8px;padding:8px 16px;font-size:.82rem;font-weight:700;cursor:pointer"><i class="bi bi-file-earmark-arrow-up me-1"></i>Subir Carta Compromiso</button>
+            <span id="docCompromisoName" style="font-size:.74rem;color:#16a34a;font-weight:600"></span>
+            <input type="file" id="docCotizacion" accept="application/pdf" style="display:none" onchange="onUnidadDoc(this,'COTIZACION_UNIDAD')">
+            <button type="button" onclick="document.getElementById('docCotizacion').click()" style="background:#f97316;color:#fff;border:none;border-radius:8px;padding:8px 16px;font-size:.82rem;font-weight:700;cursor:pointer"><i class="bi bi-file-earmark-arrow-up me-1"></i>Subir Cotización</button>
+            <span id="docCotizacionName" style="font-size:.74rem;color:#16a34a;font-weight:600"></span>
+          </div>
+          <div id="unidadDocsMsg" style="display:none;margin-top:9px;font-size:.78rem;padding:7px 10px;border-radius:8px"></div>
+        </div>
+      </div>
+      <div class="ff fg-2">
+        <div style="border:1.5px solid #111827;background:#f8fafc;border-radius:10px;padding:12px 14px;height:100%">
+          <div style="font-weight:700;color:#111827;font-size:.82rem;margin-bottom:9px"><i class="bi bi-bank me-1"></i>AUTOFIN — Carta de Aprobación</div>
+          <div style="display:flex;gap:12px;flex-wrap:wrap;align-items:center">
+            <input type="file" id="docAutofin" accept="application/pdf" style="display:none" onchange="onAutofinDoc(this)">
+            <button type="button" onclick="document.getElementById('docAutofin').click()" style="background:#111827;color:#fff;border:none;border-radius:8px;padding:8px 16px;font-size:.82rem;font-weight:700;cursor:pointer"><i class="bi bi-file-earmark-arrow-up me-1"></i>Subir Carta Aprobación</button>
+            <span id="docAutofinName" style="font-size:.74rem;color:#16a34a;font-weight:600"></span>
+          </div>
+          <div id="autofinDocsMsg" style="display:none;margin-top:9px;font-size:.78rem;padding:7px 10px;border-radius:8px"></div>
+        </div>
+      </div>
+
       <div class="sec-form">Datos de la operación</div>
       <div class="ff"><label>Tipo de carta *</label>
         <select id="cTipo" onchange="onTipoCarta()">
@@ -286,7 +315,7 @@
         </select></div>
       <div class="ff"><label>ID Financiera *</label><input id="cOpOrigen" oninput="calcOpCarta()" placeholder="Ej: 12345"></div>
       <div class="ff"><label>Operación carta</label><input id="cOpCarta" readonly placeholder="Auto"></div>
-      <div class="ff"><label>Fecha *</label><input type="date" id="cFecha"></div>
+      <div class="ff"><label>Fecha *</label><input type="date" id="cFecha" onchange="onFechaCarta()"></div>
       <div class="ff fg-2"><label>Ejecutivo *</label><select id="cEjecutivo" onchange="onEjecutivo()"><option value="">Cargando…</option></select></div>
       <div class="ff"><label>Teléfono ejecutivo</label><input id="cEjTel" readonly></div>
       <div class="ff"><label>Correo ejecutivo</label><input id="cEjMail" readonly></div>
@@ -1531,6 +1560,8 @@ function limpiarForm(){
   document.getElementById('wrapParque').style.display = '';
   document.getElementById('formAlert').className = 'alert-inline';
   filtrarConcesionarios();
+  udLimpiar();
+  onFechaCarta();   // restaura UF/pizarra del día (la fecha vuelve a hoy)
 }
 
 async function guardarCarta(){
@@ -1687,12 +1718,190 @@ async function enviarCarta(carta){
     const r = await fetch('/api/cartas', { method:'POST', headers: hdr(), body: JSON.stringify(carta) });
     const j = await r.json();
     if (!j.success) { setFormAlert(j.error||'Error al guardar'); return; }
+    await udSubir(carta.id || (j.data && j.data.id));   // adjuntar los PDF de Unidad a la carta
     setFormAlert(carta.id ? 'Carta corregida — vuelve a revisión' : 'Carta guardada — queda pendiente de revisión por otro usuario', 'ok');
     limpiarForm();
     await cargarCartas();
     showTab('lista');
   } catch(e) { setFormAlert('Error de conexión: '+e.message); }
   finally { btn.disabled = false; }
+}
+
+/* ── Autocompletar desde documentos Unidad (Carta Compromiso + Cotización) ── */
+window._unidadDocs = window._unidadDocs || {};
+function udFileB64(file){
+  return new Promise((res,rej)=>{ const r=new FileReader(); r.onload=()=>res(String(r.result).replace(/^data:[^;]+;base64,/,'')); r.onerror=rej; r.readAsDataURL(file); });
+}
+function udMsg(msg, kind, elId){
+  const el=document.getElementById(elId||'unidadDocsMsg'); if(!el) return;
+  const c={ok:['#dcfce7','#166534'],info:['#dbeafe','#1e40af'],warn:['#fef3c7','#92400e'],err:['#fee2e2','#991b1b']}[kind]||['#eef2f7','#334155'];
+  el.style.display='block'; el.style.background=c[0]; el.style.color=c[1]; el.textContent=msg;
+}
+function udSetVal(id, v, fireInput){
+  const el=document.getElementById(id); if(!el || v==null || v==='') return;
+  el.value=v; if(fireInput) el.dispatchEvent(new Event('input'));
+}
+function udSetSel(id, v, fireChange){
+  const el=document.getElementById(id); if(!el || v==null || v==='') return false;
+  const want=String(v).trim().toUpperCase();
+  const opt=[...el.options].find(o=>o.value.toUpperCase()===want || o.textContent.trim().toUpperCase()===want);
+  if(opt){ el.value=opt.value; if(fireChange) el.dispatchEvent(new Event('change')); return true; }
+  return false;
+}
+function udAddOpt(id, v){  // inyecta una opción y la selecciona (valor del PDF fuera del catálogo)
+  const el=document.getElementById(id); if(!el || v==null || v==='') return;
+  const o=document.createElement('option'); o.value=v; o.textContent=v; el.appendChild(o); el.value=v;
+}
+// UF y tasa pizarra de la FECHA de la carta (no la de hoy) → todo el cálculo usa esa fecha
+async function onFechaCarta(){
+  const fecha = document.getElementById('cFecha').value;
+  if(!fecha) return;
+  try {
+    const [ru,rt] = await Promise.all([ fetch('/api/uf/en/'+fecha,{headers:hdr()}), fetch('/api/tasas/en/'+fecha,{headers:hdr()}) ]);
+    const [ju,jt] = await Promise.all([ru.json(), rt.json()]);
+    if(ju.success && ju.data && ju.data.valor) UF_HOY = parseFloat(ju.data.valor);
+    if(jt.success && jt.data) TASAS = jt.data;
+  } catch(e){ console.error('onFechaCarta',e); }
+  if(typeof calcUFyTasa==='function') calcUFyTasa();
+  if(typeof recalcParticipacion==='function') recalcParticipacion();
+}
+async function udFill(f){
+  if(!f) return;
+  udSetVal('cOpOrigen', f.opOrigen, true);
+  if(f.fecha){ udSetVal('cFecha', f.fecha); await onFechaCarta(); }   // carga UF/pizarra de la fecha de la carta
+  if(f.rutCliente) udSetVal('cRut', f.rutCliente, true);
+  udSetVal('cNombres', f.nombres);
+  udSetVal('cApPat', f.apPaterno);
+  udSetVal('cApMat', f.apMaterno);
+  // Si el cliente ya existe en la BD, usar sus nombres tal como están guardados
+  if(f.rutCliente){ try {
+    const jc = await (await fetch('/api/clientes/rut/'+encodeURIComponent(f.rutCliente),{headers:hdr()})).json();
+    const cl = jc.success ? jc.data : null;
+    if(cl){
+      if(cl.nombres||cl.nombre) document.getElementById('cNombres').value = cl.nombres||cl.nombre;
+      if(cl.apellido_paterno)   document.getElementById('cApPat').value   = cl.apellido_paterno;
+      if(cl.apellido_materno)   document.getElementById('cApMat').value   = cl.apellido_materno;
+    }
+  } catch(_){} }
+  // Acreedor: financiera del selector que coincida (UNIDAD para Unidad; AUTOFIN para Autofin)
+  if(f.acreedor){
+    const el=document.getElementById('cAcreedor');
+    if(el){ const want=String(f.acreedor).toUpperCase();
+      const key = want.includes('UNIDAD') ? 'UNIDAD' : want.includes('AUTOFIN') ? 'AUTOFIN' : want;
+      const o=[...el.options].find(x=>x.value.toUpperCase().includes(key)||x.textContent.toUpperCase().includes(key)); if(o){ el.value=o.value; el.dispatchEvent(new Event('change')); } }
+  }
+  // Ejecutivo (lo trae Autofin): coincidencia por prefijo de nombre
+  if(f.ejecutivo){
+    const el=document.getElementById('cEjecutivo');
+    if(el){ const want=String(f.ejecutivo).toUpperCase();
+      const o=[...el.options].find(x=>{ const tx=x.textContent.trim().toUpperCase(); return tx.length>3 && (want.startsWith(tx)||tx.startsWith(want)); });
+      if(o){ el.value=o.value; el.dispatchEvent(new Event('change')); } }
+  }
+  udSetSel('cTipoVeh', f.tipoVehiculo, false);
+  // Vehículo: marca → modelo → año desde el catálogo (cascada async). Si el valor del PDF
+  // no está en el catálogo, se inyecta como opción para no perderlo.
+  if(f.marca){
+    if(!udSetSel('cMarca', f.marca, false)) udAddOpt('cMarca', f.marca);
+    try {
+      const jm = await (await fetch('/api/vehiculos/cascada?marca='+encodeURIComponent(f.marca),{headers:hdr()})).json();
+      const modelos = (jm.data && jm.data.modelos) || [];
+      document.getElementById('cModelo').innerHTML = '<option value="">—</option>' + modelos.map(m=>'<option>'+escH(m)+'</option>').join('');
+      if(f.modelo){
+        if(!udSetSel('cModelo', f.modelo, false)) udAddOpt('cModelo', f.modelo);
+        const mv = document.getElementById('cModelo').value;
+        const ja = await (await fetch('/api/vehiculos/cascada?marca='+encodeURIComponent(f.marca)+'&modelo='+encodeURIComponent(mv),{headers:hdr()})).json();
+        const anios = (ja.data && ja.data.anios) || [];
+        document.getElementById('cAnio').innerHTML = '<option value="">—</option>' + anios.map(a=>'<option>'+escH(a)+'</option>').join('');
+        if(f.anio && !udSetSel('cAnio', f.anio, false)) udAddOpt('cAnio', f.anio);
+      }
+    } catch(_){ if(f.modelo) udAddOpt('cModelo', f.modelo); if(f.anio) udAddOpt('cAnio', f.anio); }
+  }
+  udSetVal('cPatente', f.patente, true);
+  if(f.precioVenta) udSetVal('cPrecio', f.precioVenta, true);
+  if(f.pie) udSetVal('cPie', f.pie, true);
+  udSetSel('cPlazo', f.plazo, true);
+  if(f.montoCreditoCLP) udSetVal('cMontoCred', f.montoCreditoCLP, true);
+  if(f.tasaCredito) udSetVal('cTasa', String(f.tasaCredito).replace('.',','), true);
+  // Dealer: solo si coincide en el mantenedor (el F&I del PDF NO es el vendedor del dealer → no se rellena)
+  if(!udSetSel('cConc', f.concesionario, true) && f.rutConc) udSetVal('cRutConc', f.rutConc);
+}
+async function onUnidadDoc(input, tipo){
+  const file = input.files && input.files[0];
+  if(!file) return;
+  if(file.type!=='application/pdf' && !/\.pdf$/i.test(file.name)){ udMsg('Solo se aceptan archivos PDF.','err'); input.value=''; return; }
+  const span = tipo==='COMPROMISO_UNIDAD' ? 'docCompromisoName' : 'docCotizacionName';
+  try {
+    const b64 = await udFileB64(file);
+    window._unidadDocs[tipo] = { nombre:file.name, base64:b64 };
+    const sp=document.getElementById(span); if(sp) sp.textContent='✓ '+file.name;
+    udMsg('Leyendo el documento…','info');
+    const body={};
+    if(window._unidadDocs.COMPROMISO_UNIDAD) body.compromiso_base64=window._unidadDocs.COMPROMISO_UNIDAD.base64;
+    if(window._unidadDocs.COTIZACION_UNIDAD) body.cotizacion_base64=window._unidadDocs.COTIZACION_UNIDAD.base64;
+    const r = await fetch('/api/cartas/parse-unidad', { method:'POST', headers:hdr(), body:JSON.stringify(body) });
+    const j = await r.json();
+    if(!j.success){ udMsg(j.error||'No se pudo leer el documento.','err'); return; }
+    await udFill(j.data.fields);
+    const f=j.data.fields||{};
+    const part = f.partBruto ? ('Participación Unidad: $'+Number(f.partBruto).toLocaleString('es-CL')+' (IVA incl.) — aplícala con "Cambio participación" si corresponde. ') : '';
+    const warn = (j.data.warnings||[]).join(' ');
+    udMsg('✓ Datos cargados desde Unidad. '+part+'Selecciona el Tipo de Carta y revisa antes de guardar. '+(warn?('⚠ '+warn):''), warn?'warn':'ok');
+  } catch(e){ console.error('onUnidadDoc',e); udMsg('Error al procesar el documento.','err'); }
+}
+async function onAutofinDoc(input){
+  const file = input.files && input.files[0];
+  if(!file) return;
+  if(file.type!=='application/pdf' && !/\.pdf$/i.test(file.name)){ udMsg('Solo se aceptan archivos PDF.','err','autofinDocsMsg'); input.value=''; return; }
+  try {
+    const b64 = await udFileB64(file);
+    window._unidadDocs.CARTA_AUTOFIN = { nombre:file.name, base64:b64 };
+    const sp=document.getElementById('docAutofinName'); if(sp) sp.textContent='✓ '+file.name;
+    udMsg('Leyendo la carta…','info','autofinDocsMsg');
+    const r = await fetch('/api/cartas/parse-autofin', { method:'POST', headers:hdr(), body:JSON.stringify({ carta_base64:b64 }) });
+    const j = await r.json();
+    if(!j.success){ udMsg(j.error||'No se pudo leer la carta.','err','autofinDocsMsg'); return; }
+    await udFill(j.data.fields);
+    const warn = (j.data.warnings||[]).join(' ');
+    udMsg('✓ Datos cargados desde Autofin. Selecciona el Tipo de Carta y revisa antes de guardar. '+(warn?('⚠ '+warn):''), warn?'warn':'ok','autofinDocsMsg');
+  } catch(e){ console.error('onAutofinDoc',e); udMsg('Error al procesar la carta.','err','autofinDocsMsg'); }
+}
+async function udSubir(idCarta){
+  if(!idCarta || !window._unidadDocs) return;
+  for(const tipo of Object.keys(window._unidadDocs)){
+    const d=window._unidadDocs[tipo]; if(!d) continue;
+    try { await fetch('/api/cartas/'+idCarta+'/documentos', { method:'POST', headers:hdr(), body:JSON.stringify({ tipo, nombre:d.nombre, mime:'application/pdf', data_base64:d.base64 }) }); }
+    catch(e){ console.error('udSubir',e); }
+  }
+}
+function udLimpiar(){
+  window._unidadDocs={};
+  ['docCompromisoName','docCotizacionName','docAutofinName'].forEach(id=>{ const el=document.getElementById(id); if(el) el.textContent=''; });
+  ['docCompromiso','docCotizacion','docAutofin'].forEach(id=>{ const el=document.getElementById(id); if(el) el.value=''; });
+  ['unidadDocsMsg','autofinDocsMsg'].forEach(id=>{ const m=document.getElementById(id); if(m) m.style.display='none'; });
+}
+// Panel de documentos Unidad adjuntos en la revisión del analista
+async function udRenderDocs(idCarta){
+  const cont=document.getElementById('modalBody'); if(!cont) return;
+  try {
+    const r=await fetch('/api/cartas/'+idCarta+'/documentos',{ headers:hdr() });
+    const j=await r.json();
+    const docs=(j&&j.success&&j.data)?j.data:[];
+    if(!docs.length) return;
+    const lbl={COMPROMISO_UNIDAD:'Carta Compromiso Unidad',COTIZACION_UNIDAD:'Cotización Unidad',CARTA_AUTOFIN:'Carta Aprobación Autofin'};
+    const btns=docs.map(d=>`<button class="btn-mini bm-ver" style="padding:6px 12px;margin:0 6px 0 0" onclick="udVerDoc(${d.id})"><i class="bi bi-filetype-pdf"></i> ${lbl[d.tipo]||d.tipo}</button>`).join('');
+    const panel=document.createElement('div');
+    panel.style.cssText='background:#eff6ff;border:1px solid #bfdbfe;border-radius:10px;padding:10px 14px;margin-bottom:12px';
+    panel.innerHTML=`<div style="font-size:.8rem;font-weight:700;color:#1e40af;margin-bottom:6px"><i class="bi bi-paperclip me-1"></i>Documentos Unidad adjuntos</div>${btns}`;
+    cont.insertBefore(panel, cont.firstChild);
+  } catch(e){ console.error('udRenderDocs',e); }
+}
+async function udVerDoc(docId){
+  try {
+    const r=await fetch('/api/cartas/documentos/'+docId,{ headers:hdr() });
+    if(!r.ok){ alert('No se pudo abrir el documento.'); return; }
+    const blob=await r.blob(); const url=URL.createObjectURL(blob);
+    window.open(url,'_blank'); setTimeout(()=>URL.revokeObjectURL(url),60000);
+  } catch(e){ console.error('udVerDoc',e); alert('Error al abrir el documento.'); }
 }
 
 function editarCarta(id){
@@ -1850,6 +2059,7 @@ function verCarta(id){
   const motivoBanner = (c.status==='RECHAZADA' && c.motivoRechazo)
     ? `<div style="background:#fef2f2;border:1.5px solid #fecaca;color:#b91c1c;border-radius:9px;padding:9px 14px;font-size:.83rem;margin-bottom:12px"><b><i class="bi bi-x-octagon me-1"></i>Rechazada por ${escH(c.rechazadoPorNombre||'')}:</b> ${escH(c.motivoRechazo)}</div>` : '';
   document.getElementById('modalBody').innerHTML = motivoBanner + cartaHTML(c, c.status!=='APROBADA');
+  udRenderDocs(c.id);
   document.getElementById('modalFoot').innerHTML =
     (c.status==='APROBADA' ? `<button class="btn-mini bm-print" style="padding:9px 18px;font-size:.85rem" onclick="imprimirCarta(${c.id})"><i class="bi bi-printer"></i> Imprimir PDF</button>` : '') +
     `<button class="btn-sec" onclick="cerrarModal()">Cerrar</button>`;

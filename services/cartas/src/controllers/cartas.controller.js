@@ -2,6 +2,7 @@
 const pool = require('../../../../shared/config/database');
 const { notificar } = require('../../../notificaciones/src/controllers/notificaciones.controller');
 const { auditar } = require('../../../../shared/audit');
+const pdf = require('pdf-parse');
 
 /* Genera numero_credito igual que creditos.controller (YYMMXXX) */
 async function generarNumeroCreditoDesdeCartas() {
@@ -159,6 +160,20 @@ async function idsRevisores(excluirEmail) {
       INDEX idx_fecha (fecha),
       INDEX idx_rut_cliente (rut_cliente),
       INDEX idx_creado_por (creado_por)
+    )`,
+    `CREATE TABLE IF NOT EXISTS cartas_documentos (
+      id INT AUTO_INCREMENT PRIMARY KEY,
+      id_carta INT NULL,
+      tipo VARCHAR(30) NOT NULL,
+      nombre VARCHAR(255) DEFAULT NULL,
+      mime VARCHAR(100) DEFAULT 'application/pdf',
+      tamano INT DEFAULT NULL,
+      data LONGBLOB,
+      extracted JSON NULL,
+      subido_por VARCHAR(150) DEFAULT NULL,
+      id_subido_por INT NULL,
+      created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      INDEX idx_carta (id_carta)
     )`
   ];
   for (const sql of sqls) {
@@ -649,4 +664,179 @@ const cargaMasivaCartas = async (req, res) => {
   }
 };
 
-module.exports = { getAll, upsert, cargaMasivaCartas };
+/* ── Documentos Unidad: parseo (autocompletar) + almacenamiento (revisión) ──
+   La Carta Compromiso de pago trae la mayoría de los datos; la Cotización
+   confirma N° de operación y cifras. Ambos PDF se guardan asociados a la carta
+   para que el Analista de Crédito los revise al recibir la solicitud. */
+const _numU   = v => { const n = parseInt(String(v == null ? '' : v).replace(/[^\d]/g, ''), 10); return isNaN(n) ? null : n; };
+const _fechaU = s => { const m = String(s || '').match(/(\d{2})-(\d{2})-(\d{4})/); return m ? `${m[3]}-${m[2]}-${m[1]}` : null; };
+function _splitNombre(full) {
+  const t = String(full || '').trim().split(/\s+/).filter(Boolean);
+  if (t.length >= 4) return { nombres: t.slice(0, t.length - 2).join(' '), apPaterno: t[t.length - 2], apMaterno: t[t.length - 1] };
+  if (t.length === 3) return { nombres: t[0], apPaterno: t[1], apMaterno: t[2] };
+  if (t.length === 2) return { nombres: t[0], apPaterno: t[1], apMaterno: '' };
+  return { nombres: full || '', apPaterno: '', apMaterno: '' };
+}
+function parseCartaCompromiso(t) {
+  const g = (re, i = 1) => { const m = t.match(re); return m ? String(m[i]).trim() : null; };
+  const nombre = g(/Nombre:\s*([^\n]+)/), sp = _splitNombre(nombre);
+  return {
+    opOrigen:        g(/N° Operación\s*\n?\s*(\d{4,})/),
+    fecha:           _fechaU(g(/Fecha:\s*(\d{2}-\d{2}-\d{4})/)),
+    rutCliente:      g(/Rut:\s*([\d.]+-[\dkK])/),
+    nombre, nombres: sp.nombres, apPaterno: sp.apPaterno, apMaterno: sp.apMaterno,
+    plazo:           _numU(g(/Número de cuotas:\s*(\d+)/)),
+    saldo:           _numU(g(/Saldo precio:\s*([\d.]+)/)),
+    tasaCredito:     (g(/Tasa de interés Nominal:\s*([\d,]+)/) || '').replace(',', '.') || null,
+    montoCreditoCLP: _numU(g(/Total a pagar:\s*([\d.]+)/)),
+    concesionario:   g(/Dealers:\s*([^\n]+?)Sucursal/),
+    vendedor:        g(/F&I:\s*([^\n]+?)Ejecutivo/),
+    patente:         g(/placa patente\s+([A-Z0-9]+)\s+Marca/),
+    marca:           g(/Marca\s+([A-ZÁÉÍÓÚ]+)\s*,/),
+    modelo:          g(/Modelo\s+([A-ZÁÉÍÓÚ0-9 ]+?)\s*,\s*año/),
+    anio:            g(/año\s+(\d{4})/),
+    precioVenta:     _numU(g(/precio de venta[^$]*\$\s*([\d.]+)/)),
+    pie:             _numU(g(/pie entregado[^$]*\$\s*([\d.]+)/)),
+    partBruto:       _numU(g(/Participación\s*\$\s*([\d.]+)\s*IVA/)),
+    rutConc:         (g(/RUT\s+([\d,]+-[\dkK])/) || '').replace(/,/g, '.').toUpperCase() || null,
+    acreedor:        /Unidad Cr[eé]ditos/i.test(t) ? 'UNIDAD DE CREDITO' : null,
+  };
+}
+function parseCotizacion(t) {
+  const g = (re, i = 1) => { const m = t.match(re); return m ? String(m[i]).trim() : null; };
+  return {
+    opOrigen: g(/N°\s*0*(\d{4,})/),
+    cae:      g(/CAE\s*::\s*([\d,]+)\s*%/),
+    titular:  g(/Titular[\s\S]*?::\s*([A-ZÁÉÍÓÚÑ ]+?)\s*\n/),
+  };
+}
+// Carta de Aprobación Autofin (formato 2 columnas; pdf-parse lo aplana → anclas por contexto).
+function parseCartaAutofin(t) {
+  const g = (re, i = 1) => { const m = t.match(re); return m ? String(m[i]).trim() : null; };
+  const nameOp = t.match(/\n([A-ZÁÉÍÓÚÑ][A-ZÁÉÍÓÚÑ ]{5,}?)\n(\d{6,8})\n:/);   // nombre cliente + N° crédito
+  const nombre = nameOp ? nameOp[1].trim() : null, sp = _splitNombre(nombre);
+  const tasaRaw = g(/\n(\d{1,2},\d{3,6})\n/);
+  const cuadro = (t.match(/CUADRO DE PAGO([\s\S]*?)(?:DOCUMENTOS|$)/i) || [, ''])[1];
+  const plazo = (cuadro.match(/\d{2}\/\d{2}\/\d{4}/g) || []).length || null;   // 1 fecha de vencimiento por cuota
+  const precioVenta = _numU(g(/([\d.]+)\n\d{7,8}-[\dkK]/));        // valor antes del RUT
+  const pie = _numU(g(/([\d.]+)\s*\(\d{1,3},\d{1,2}\s*%\)/));      // el monto con % es el PIE (producto "70% PIE")
+  const saldo = (precioVenta != null && pie != null) ? Math.max(0, precioVenta - pie) : null;  // saldo precio = monto solicitado
+  // Total pagaré (monto del crédito) = valor tras el RUT y el saldo (en el PDF va pegado al total de recargos).
+  const totalPagare = _numU(g(/\d{7,8}-[\dkK]\n[\d.]+\n(\d{1,3}(?:\.\d{3})+)/));
+  const fechaRaw = g(/(\d{2}\/\d{2}\/\d{4})/);
+  return {
+    opOrigen: nameOp ? nameOp[2] : null,
+    fecha: fechaRaw ? fechaRaw.split('/').reverse().join('-') : null,
+    rutCliente: g(/(\d{7,8}-[\dkK])/),
+    nombre, nombres: sp.nombres, apPaterno: sp.apPaterno, apMaterno: sp.apMaterno,
+    marca: g(/\n([A-ZÁÉÍÓÚ]{3,})\n(?::\n)+[\d.]+\n\d{7,8}-/),
+    modelo: g(/\n([A-Z0-9][A-Z0-9 ]{0,11})\nModelo\n/),
+    anio: g(/\n(\d{4})\n:?Año/),
+    patente: g(/PPU\s+([A-Z]{4}\d{2}|[A-Z]{2}\d{4})/),
+    precioVenta, pie, saldo, plazo,
+    tasaCredito: tasaRaw ? Number(tasaRaw.replace(',', '.')).toFixed(2) : null,
+    montoCreditoCLP: totalPagare != null ? totalPagare : saldo,
+    ejecutivo: g(/\n([A-ZÁÉÍÓÚ][A-ZÁÉÍÓÚ ]+?) \(AFA\)\n/),
+    acreedor: 'AUTOFIN',
+  };
+}
+const _toBuf = b64 => Buffer.from(String(b64).replace(/^data:[^;]+;base64,/, ''), 'base64');
+
+// POST /api/cartas/parse-unidad → extrae campos sin guardar (autocompletar)
+const parseUnidad = async (req, res) => {
+  try {
+    const { compromiso_base64, cotizacion_base64 } = req.body || {};
+    if (!compromiso_base64 && !cotizacion_base64)
+      return res.status(400).json({ success: false, data: null, error: 'Adjunta al menos un documento' });
+    const out = { warnings: [] };
+    if (compromiso_base64) {
+      try { out.compromiso = parseCartaCompromiso((await pdf(_toBuf(compromiso_base64))).text); }
+      catch (e) { out.warnings.push('No se pudo leer la Carta Compromiso: ' + e.message); }
+    }
+    if (cotizacion_base64) {
+      try { out.cotizacion = parseCotizacion((await pdf(_toBuf(cotizacion_base64))).text); }
+      catch (e) { out.warnings.push('No se pudo leer la Cotización: ' + e.message); }
+    }
+    const c = out.compromiso || {}, q = out.cotizacion || {};
+    out.fields = {
+      opOrigen: c.opOrigen || q.opOrigen || null, fecha: c.fecha || null, rutCliente: c.rutCliente || null,
+      nombres: c.nombres || null, apPaterno: c.apPaterno || null, apMaterno: c.apMaterno || null,
+      acreedor: c.acreedor || 'UNIDAD DE CREDITO',
+      marca: c.marca || null, modelo: c.modelo || null, anio: c.anio || null, patente: c.patente || null,
+      precioVenta: c.precioVenta || null, pie: c.pie || null, saldo: c.saldo || null,
+      plazo: c.plazo || null, tasaCredito: c.tasaCredito || null, montoCreditoCLP: c.montoCreditoCLP || null,
+      partBruto: c.partBruto || null,
+      concesionario: c.concesionario || null, rutConc: c.rutConc || null, vendedor: c.vendedor || null,
+    };
+    if (c.opOrigen && q.opOrigen && c.opOrigen !== q.opOrigen)
+      out.warnings.push(`El N° de operación no coincide: Carta ${c.opOrigen} vs Cotización ${q.opOrigen}`);
+    res.json({ success: true, data: out, error: null });
+  } catch (e) { console.error('[parseUnidad]', e.message); res.status(500).json({ success: false, data: null, error: 'No se pudo procesar el documento' }); }
+};
+
+// POST /api/cartas/parse-autofin → extrae campos de la Carta de Aprobación Autofin
+const parseAutofin = async (req, res) => {
+  try {
+    const b64 = req.body && (req.body.carta_base64 || req.body.compromiso_base64);
+    if (!b64) return res.status(400).json({ success: false, data: null, error: 'Adjunta la Carta de Aprobación (PDF)' });
+    const out = { warnings: [] };
+    try { out.carta = parseCartaAutofin((await pdf(_toBuf(b64))).text); }
+    catch (e) { return res.status(422).json({ success: false, data: null, error: 'No se pudo leer la carta: ' + e.message }); }
+    const c = out.carta || {};
+    out.fields = {
+      opOrigen: c.opOrigen || null, fecha: c.fecha || null, rutCliente: c.rutCliente || null,
+      nombres: c.nombres || null, apPaterno: c.apPaterno || null, apMaterno: c.apMaterno || null,
+      acreedor: 'AUTOFIN',
+      marca: c.marca || null, modelo: c.modelo || null, anio: c.anio || null, patente: c.patente || null,
+      precioVenta: c.precioVenta || null, pie: c.pie || null, saldo: c.saldo || null,
+      plazo: c.plazo || null, tasaCredito: c.tasaCredito || null, montoCreditoCLP: c.montoCreditoCLP || null,
+      ejecutivo: c.ejecutivo || null,
+    };
+    res.json({ success: true, data: out, error: null });
+  } catch (e) { console.error('[parseAutofin]', e.message); res.status(500).json({ success: false, data: null, error: 'No se pudo procesar la carta' }); }
+};
+
+// POST /api/cartas/:id/documentos → guarda el PDF asociado a la carta
+const subirDocumento = async (req, res) => {
+  try {
+    const idCarta = parseInt(req.params.id, 10) || null;
+    const { tipo, nombre, mime, data_base64, extracted } = req.body || {};
+    if (!data_base64) return res.status(400).json({ success: false, data: null, error: 'Archivo requerido' });
+    if (!['COMPROMISO_UNIDAD', 'COTIZACION_UNIDAD', 'CARTA_AUTOFIN'].includes(String(tipo)))
+      return res.status(400).json({ success: false, data: null, error: 'Tipo de documento inválido' });
+    const buf = _toBuf(data_base64);
+    if (!buf.length) return res.status(400).json({ success: false, data: null, error: 'Archivo vacío' });
+    if (buf.length > 12 * 1024 * 1024) return res.status(413).json({ success: false, data: null, error: 'Máximo 12 MB por archivo' });
+    if (idCarta) await pool.query('DELETE FROM cartas_documentos WHERE id_carta=? AND tipo=?', [idCarta, tipo]); // re-subida: reemplaza
+    const [r] = await pool.query(
+      `INSERT INTO cartas_documentos (id_carta, tipo, nombre, mime, tamano, data, extracted, subido_por, id_subido_por)
+       VALUES (?,?,?,?,?,?,?,?,?)`,
+      [idCarta, tipo, nombre || 'documento.pdf', mime || 'application/pdf', buf.length, buf,
+       extracted ? JSON.stringify(extracted) : null, req.usuario?.email || null, req.usuario?.id_usuario || null]);
+    res.status(201).json({ success: true, data: { id: r.insertId }, error: null });
+  } catch (e) { console.error('[subirDocumento]', e.message); res.status(500).json({ success: false, data: null, error: 'Error interno del servidor' }); }
+};
+
+// GET /api/cartas/:id/documentos → lista (sin blob)
+const listarDocumentos = async (req, res) => {
+  try {
+    const [rows] = await pool.query(
+      'SELECT id, tipo, nombre, mime, tamano, created_at FROM cartas_documentos WHERE id_carta=? ORDER BY tipo', [req.params.id]);
+    res.json({ success: true, data: rows, error: null });
+  } catch (e) { console.error('[listarDocumentos]', e.message); res.status(500).json({ success: false, data: null, error: 'Error interno del servidor' }); }
+};
+
+// GET /api/cartas/documentos/:docId → stream inline del PDF
+const verDocumento = async (req, res) => {
+  try {
+    const [[d]] = await pool.query('SELECT nombre, mime, data FROM cartas_documentos WHERE id=?', [req.params.docId]);
+    if (!d || !d.data) return res.status(404).json({ success: false, data: null, error: 'Documento no encontrado' });
+    const fname = String(d.nombre || 'documento.pdf');
+    const safe = fname.replace(/"/g, '').replace(/[^\x20-\x7E]/g, '_');
+    res.setHeader('Content-Type', d.mime || 'application/pdf');
+    res.setHeader('Content-Disposition', `inline; filename="${safe}"; filename*=UTF-8''${encodeURIComponent(fname)}`);
+    res.send(d.data);
+  } catch (e) { console.error('[verDocumento]', e.message); res.status(500).json({ success: false, data: null, error: 'Error interno del servidor' }); }
+};
+
+module.exports = { getAll, upsert, cargaMasivaCartas, parseUnidad, parseAutofin, subirDocumento, listarDocumentos, verDocumento };
