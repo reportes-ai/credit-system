@@ -5,7 +5,7 @@
   <link rel="icon" href="/img/favicon.png" type="image/png">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Informes DealerNet — AutoFácil</title>
-  <!-- v1.2 -->
+  <!-- v1.3 -->
   <link href="/css/bootstrap.min.css" rel="stylesheet">
   <link href="/css/bootstrap-icons.css" rel="stylesheet">
   <style>
@@ -116,7 +116,10 @@
 
     <!-- Históricos del repositorio -->
     <div class="card">
-      <h3><i class="bi bi-archive"></i> Informes históricos <span class="muted" id="histRut"></span></h3>
+      <div style="display:flex;justify-content:space-between;align-items:center;gap:10px;margin-bottom:10px">
+        <h3 style="margin:0"><i class="bi bi-archive"></i> Informes históricos <span class="muted" id="histRut"></span></h3>
+        <button class="btn-ghost" id="btnTodos" onclick="descargarTodos()" style="display:none"><i class="bi bi-file-earmark-arrow-down me-1"></i>Descargar todos</button>
+      </div>
       <div id="hist"><div class="muted">Ingresa un RUT y solicita o consulta para ver su historial.</div></div>
     </div>
   </div>
@@ -183,12 +186,14 @@ function nombreProd(cod){ const el=document.querySelector('#prods input[value="'
 /* ── Históricos ──────────────────────────────────────────────────────────── */
 async function cargarHistoricos(rut){
   const box = document.getElementById('hist');
+  const bt = document.getElementById('btnTodos'); if(bt) bt.style.display='none';
   document.getElementById('histRut').textContent = rut ? '· '+rut : '';
   try {
     const r = await fetch('/api/dealernet/informes?rut='+encodeURIComponent(rut||''), { headers:H });
     const j = await r.json();
     if (!j.success){ box.innerHTML='<div class="muted" style="color:#b91c1c">'+esc(j.error||'Error')+'</div>'; return; }
     if (!j.data.length){ box.innerHTML='<div class="muted">Sin informes en el repositorio para este RUT.</div>'; return; }
+    if(bt) bt.style.display='';
     box.innerHTML = `<table class="tb"><thead><tr><th>Producto</th><th>Fecha</th><th>Antigüedad</th><th>Solicitó</th><th></th></tr></thead><tbody>`+
       j.data.map(x=>`
         <tr>
@@ -198,7 +203,8 @@ async function cargarHistoricos(rut){
           <td class="muted">${esc(x.usuario_nombre||'—')}</td>
           <td class="acts">
             <button class="btn-ghost" onclick="verInforme(${x.id})"><i class="bi bi-eye"></i> Ver</button>
-            ${Number(x.tiene_pdf) ? `<button class="btn-ghost" onclick="descargarPdf(${x.id})"><i class="bi bi-file-earmark-pdf"></i> PDF</button>` : ''}
+            <button class="btn-ghost" onclick="printInformeById(${x.id})"><i class="bi bi-file-earmark-arrow-down"></i> PDF</button>
+            ${Number(x.tiene_pdf) ? `<button class="btn-ghost" onclick="descargarPdf(${x.id})"><i class="bi bi-patch-check"></i> Certificado</button>` : ''}
           </td>
         </tr>`).join('')+`</tbody></table>`;
   } catch(_){ box.innerHTML='<div class="muted" style="color:#b91c1c">Error al cargar histórico</div>'; }
@@ -280,6 +286,8 @@ function resetBtn(){ const b=document.getElementById('btnSolicitar'); b.disabled
 /* ── Ver / Descargar ─────────────────────────────────────────────────────── */
 /* ── Render de informe con el formato DealerNet ──────────────────────────── */
 const FTE = { '16':'Digitación', '2101':'Registro Civil', '3425':'DealerNET', '3435':'DealerNET' };
+const LOGO = (location && location.origin ? location.origin : '') + '/img/logo.png';
+const ORDEN_PROD = ['3435','16','3425','2101']; // Perfil Comercial, Comportamiento, Impagos, Pensión
 const REPORT_CSS = `
   .report { background:#fff; color:#1f2937; font-size:.84rem; }
   .rep-titularbar { display:flex; justify-content:space-between; align-items:baseline; border-bottom:2px solid #0141A2; padding-bottom:6px; margin-bottom:4px; }
@@ -297,7 +305,9 @@ const REPORT_CSS = `
   .rep-note { background:#fffbeb; border:1px solid #fde68a; color:#92400e; border-radius:8px; padding:8px 12px; font-size:.78rem; margin-bottom:10px; }
   .rep-sep { border:none; border-top:1px dashed #e2e8f0; margin:8px 0; }
   .rep-legal { margin-top:18px; padding-top:8px; border-top:1px solid #eef2f7; font-size:.68rem; color:#94a3b8; font-style:italic; }
-  .rep-tree { font-size:.8rem; } .rep-tree b { color:#374151; }`;
+  .rep-tree { font-size:.8rem; } .rep-tree b { color:#374151; }
+  .rep-logo { margin-bottom:12px; } .rep-logo img { height:40px; width:auto; }
+  @media print { .rep-page { page-break-after:always; } .rep-page:last-child { page-break-after:auto; } }`;
 (function(){ const st=document.createElement('style'); st.textContent=REPORT_CSS; document.head.appendChild(st); })();
 
 // Busca el primer valor escalar cuya clave (sin @_) coincida, recursivo.
@@ -469,6 +479,7 @@ function renderInforme(d){
     <span><b>Resolución:</b> On Line</span>
     <span><b>Hora Consulta:</b> ${f.toLocaleTimeString('es-CL',{hour:'2-digit',minute:'2-digit'})}</span></div>`;
   return `<div class="report">
+    <div class="rep-logo"><img src="${LOGO}" alt="AutoFácil"></div>
     <div class="rep-titularbar"><b>${esc(titular||'')}</b><span>${esc(rutFmt(d.rut,d.dv)||(d.rut+'-'+(d.dv||'')))}</span></div>
     <div class="rep-title">${esc(d.nombre_producto||cod)}</div>
     ${meta}
@@ -497,15 +508,43 @@ function toggleJson(){
   const bj=document.getElementById('btnJson'); if(bj) bj.innerHTML = window._verJson
     ? '<i class="bi bi-file-earmark-text me-1"></i>Ver informe' : '<i class="bi bi-braces me-1"></i>Ver datos (JSON)';
 }
-function printInforme(){
-  const d = window._verActual; if(!d) return;
-  const w = window.open('', '_blank', 'width=860,height=920');
-  if(!w) return toast('Permite ventanas emergentes para imprimir', true);
-  w.document.write('<html><head><meta charset="utf-8"><title>Informe '+esc(d.rut)+'</title>'+
-    '<link href="/css/bootstrap-icons.css" rel="stylesheet"><style>'+REPORT_CSS+
-    'body{font-family:Segoe UI,system-ui,sans-serif;padding:28px;color:#1f2937}</style></head><body>'+
-    renderInforme(d)+'</body></html>');
-  w.document.close(); w.focus(); setTimeout(()=>w.print(), 350);
+function openPrintWindow(title, inner){
+  const w = window.open('', '_blank', 'width=900,height=950');
+  if(!w){ toast('Permite ventanas emergentes para descargar el PDF', true); return; }
+  w.document.write('<html><head><meta charset="utf-8"><title>'+esc(title)+'</title>'+
+    '<link href="'+location.origin+'/css/bootstrap-icons.css" rel="stylesheet"><style>'+REPORT_CSS+
+    'body{font-family:Segoe UI,system-ui,sans-serif;padding:28px;color:#1f2937}</style></head><body>'+inner+'</body></html>');
+  w.document.close(); w.focus();
+  setTimeout(()=>{ try{ w.print(); }catch(_){ } }, 500);
+}
+function printInforme(){ const d = window._verActual; if(d) openPrintWindow('Informe '+d.rut, '<div class="rep-page">'+renderInforme(d)+'</div>'); }
+async function printInformeById(id){
+  try {
+    const r = await fetch('/api/dealernet/informes/'+id, { headers:H }); const j = await r.json();
+    if(!j.success) return toast(j.error||'Error', true);
+    openPrintWindow('Informe '+j.data.rut, '<div class="rep-page">'+renderInforme(j.data)+'</div>');
+  } catch(_){ toast('Error al generar el PDF', true); }
+}
+// Descarga TODOS los informes del RUT en un solo documento, en el orden pedido.
+async function descargarTodos(){
+  const rut = document.getElementById('rut').value.trim();
+  if(!rut) return toast('Ingresa un RUT', true);
+  try {
+    const r = await fetch('/api/dealernet/informes?rut='+encodeURIComponent(rut), { headers:H });
+    const j = await r.json();
+    if(!j.success || !(j.data||[]).length) return toast('No hay informes en el repositorio para este RUT', true);
+    const latest = {}; for(const x of j.data){ if(!latest[x.codigo_producto]) latest[x.codigo_producto] = x; } // lista viene DESC = último primero
+    const orden = ORDEN_PROD.filter(c=>latest[c]).concat(Object.keys(latest).filter(c=>!ORDEN_PROD.includes(c)));
+    if(!orden.length) return toast('No hay informes', true);
+    toast('Generando documento…');
+    const partes = [];
+    for(const cod of orden){
+      const rr = await fetch('/api/dealernet/informes/'+latest[cod].id, { headers:H }); const jj = await rr.json();
+      if(jj.success) partes.push('<div class="rep-page">'+renderInforme(jj.data)+'</div>');
+    }
+    if(!partes.length) return toast('No se pudo armar el documento', true);
+    openPrintWindow('Informes '+rut, partes.join(''));
+  } catch(_){ toast('Error al descargar los informes', true); }
 }
 async function descargarPdf(id){
   try {
