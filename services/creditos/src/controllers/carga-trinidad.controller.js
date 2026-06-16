@@ -256,21 +256,6 @@ exports.importar = async (req, res) => {
           }
         }
 
-        // Si ya existe un registro AUTOFIN con id_financiera = este num_op Trinidad,
-        // no insertar duplicado. Actualizar estado_autofin en el registro AUTOFIN.
-        if (afEquivSet.has(f.num_op)) {
-          await pool.query(
-            `UPDATE creditos SET estado_autofin = ?, ejecutivo_tri = ?,
-               estado_credito = ?, estado_eval = ?, updated_at = NOW()
-             WHERE id_financiera = ? AND financiera != 'NO APLICA'`,
-            [f.estado_autofin, f.ejecutivo_tri, f.estado_credito, f.estado_eval, String(f.num_op)]
-          );
-          actualizados++;
-          log.push(`↔ Sincronizado en AF ${f.num_op} → ${f.estado_autofin} / ${f.estado_credito}`);
-          if ((f.estado_credito||'').toLowerCase() === 'otorgado') cursadosIdFinanciera.push(String(f.num_op));
-          continue;
-        }
-
         // Resolver id_cliente desde rut/nombre del Excel (viven en la tabla
         // clientes; el dashboard y el listado hacen JOIN por id_cliente).
         let idCliente = null;
@@ -287,6 +272,21 @@ exports.importar = async (req, res) => {
             }
           }
           idCliente = clienteCache[f.rut_cliente] || null;
+        }
+
+        // Si ya existe un registro AUTOFIN con id_financiera = este num_op Trinidad,
+        // no insertar duplicado. Actualizar estado_autofin (y el cliente si falta).
+        if (afEquivSet.has(f.num_op)) {
+          await pool.query(
+            `UPDATE creditos SET estado_autofin = ?, ejecutivo_tri = ?,
+               estado_credito = ?, estado_eval = ?, id_cliente = COALESCE(id_cliente, ?), updated_at = NOW()
+             WHERE id_financiera = ? AND financiera != 'NO APLICA'`,
+            [f.estado_autofin, f.ejecutivo_tri, f.estado_credito, f.estado_eval, idCliente, String(f.num_op)]
+          );
+          actualizados++;
+          log.push(`↔ Sincronizado en AF ${f.num_op} → ${f.estado_autofin} / ${f.estado_credito}`);
+          if ((f.estado_credito||'').toLowerCase() === 'otorgado') cursadosIdFinanciera.push(String(f.num_op));
+          continue;
         }
 
         if (existMap[f.num_op]) {
