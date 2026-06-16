@@ -24,8 +24,9 @@ const TIPOCNS_DEF = process.env.DEALERNET_TIPOCNS || 'O';
 
 const errSrv = (res, e, tag) => { console.error(`[${tag}]`, e.message); res.status(500).json({ success: false, data: null, error: 'Error interno del servidor' }); };
 
-// Catálogo del protocolo general v14 (códigos 3401–3450). Activos por defecto
-// los que pidió el negocio y ya tienen código confirmado.
+// Catálogo del protocolo general v14 (códigos 3401–3450) + productos con código
+// propio fuera de ese rango (16, 2101). Activos por defecto los que pidió el
+// negocio y ya tienen código confirmado.
 const CATALOGO = [
   ['3401','Comportamiento Civil'], ['3402','Comportamiento Laboral'], ['3403','Comportamiento Penal'],
   ['3404','Boletín Concursal'], ['3407','Contactabilidad'], ['3408','Verificación Múltiple'],
@@ -38,8 +39,13 @@ const CATALOGO = [
   ['3432','Índice Judicial Laboral'], ['3433','Índice Judicial Penal'], ['3434','Índice Judicial Cobranza'],
   ['3435','Perfil Comercial'], ['3439','Boletín de Procesos Penales'], ['3440','Identificación'],
   ['3443','Registro Propiedades'], ['3450','Persona Expuesta Políticamente (PEP)'],
+  // Códigos propios (fuera del rango 3401–3450), confirmados por DealerNet:
+  ['16','Comportamiento Vigente'], ['2101','Boletín Deudores de Pensión de Alimentos'],
 ];
-const ACTIVOS_DEFAULT = ['3435', '3425'];
+const ACTIVOS_DEFAULT = ['3435', '3425', '16', '2101'];
+// Productos con código propio: alta idempotente para BD ya sembradas antes de
+// tener estos códigos (no fuerza 'activo' tras el alta — eso lo maneja el admin).
+const EXTRA_CODIGOS = ['16', '2101'];
 
 (async () => {
   try {
@@ -56,6 +62,14 @@ const ACTIVOS_DEFAULT = ['3435', '3425'];
       for (const [cod, nom] of CATALOGO)
         await pool.query('INSERT IGNORE INTO dealernet_productos (codigo, nombre, activo, orden) VALUES (?,?,?,?)',
           [cod, nom, ACTIVOS_DEFAULT.includes(cod) ? 1 : 0, o++]);
+    }
+    // Alta idempotente de los códigos propios (16, 2101) para BD ya sembradas.
+    const [[{ mo }]] = await pool.query('SELECT COALESCE(MAX(orden),0) mo FROM dealernet_productos');
+    let oExtra = mo;
+    for (const cod of EXTRA_CODIGOS) {
+      const nom = (CATALOGO.find(c => c[0] === cod) || [, cod])[1];
+      await pool.query('INSERT IGNORE INTO dealernet_productos (codigo, nombre, activo, orden) VALUES (?,?,1,?)',
+        [cod, nom, ++oExtra]);
     }
 
     await pool.query(`CREATE TABLE IF NOT EXISTS dealernet_consultas (
