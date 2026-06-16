@@ -190,6 +190,8 @@ app.get(['/carga-masiva/digitacion', '/carga-masiva/digitacion/'], (req, res) =>
   res.sendFile(path.join(__dirname, '../public/carga-masiva/digitacion/index.html')));
 app.get(['/carga-masiva/digitacion/cola', '/carga-masiva/digitacion/cola/'], (req, res) =>
   res.sendFile(path.join(__dirname, '../public/carga-masiva/digitacion/cola.html')));
+app.get(['/carga-masiva/digitacion/estadisticas', '/carga-masiva/digitacion/estadisticas/'], (req, res) =>
+  res.sendFile(path.join(__dirname, '../public/carga-masiva/digitacion/estadisticas.html')));
 
 // Comisiones SPA
 app.get(['/comisiones', '/comisiones/'], (req, res) =>

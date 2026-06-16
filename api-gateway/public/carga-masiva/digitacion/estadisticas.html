@@ -1,0 +1,120 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <link rel="icon" href="/img/favicon.png" type="image/png">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Estadísticas de Digitación — AutoFácil</title>
+  <link href="/css/bootstrap.min.css" rel="stylesheet">
+  <link href="/css/bootstrap-icons.css" rel="stylesheet">
+  <style>
+    :root { --navy:#0141A2; --navy-dark:#012d70; --navy-light:#0255c5; --accent:#009AFE; --bg:#f0f4f8; --teal:#0f766e; }
+    body { background:var(--bg); font-family:'Segoe UI',system-ui,sans-serif; margin:0; min-height:100vh; }
+    .topnav { background:linear-gradient(90deg,var(--navy-dark),var(--navy-light)); color:#fff; height:60px; padding:0 24px; display:flex; align-items:center; justify-content:space-between; position:sticky; top:0; z-index:200; }
+    .topnav-brand { display:flex; align-items:center; gap:8px; text-decoration:none; }
+    .topnav-brand img { height:32px; filter:brightness(0) invert(1); }
+    .version-badge { background:rgba(255,255,255,.15); color:rgba(255,255,255,.75); font-size:.65rem; font-weight:700; border-radius:6px; padding:2px 8px; }
+    .breadcrumb-nav { color:rgba(255,255,255,.6); font-size:.85rem; margin-left:16px; }
+    .breadcrumb-nav a { color:rgba(255,255,255,.75); text-decoration:none; }
+    .btn-logout { background:rgba(255,255,255,.1); border:1px solid rgba(255,255,255,.2); color:#fff; border-radius:8px; padding:5px 12px; font-size:.82rem; cursor:pointer; }
+    .main { max-width:1000px; margin:0 auto; padding:28px 24px; }
+    .page-banner { background:linear-gradient(135deg,#0f766e,#14b8a6); border-radius:16px; color:#fff; padding:22px 30px; margin-bottom:22px; display:flex; align-items:center; gap:18px; }
+    .page-banner i { font-size:2.3rem; opacity:.9; }
+    .page-banner h2 { font-weight:700; margin:0 0 3px; font-size:1.25rem; }
+    .page-banner p { opacity:.85; margin:0; font-size:.85rem; }
+    .controls { display:flex; gap:10px; align-items:center; margin-bottom:18px; flex-wrap:wrap; }
+    .controls label { font-size:.8rem; font-weight:700; color:#475569; }
+    .controls select { border:1.5px solid #d1d5db; border-radius:8px; padding:7px 10px; font-size:.88rem; }
+    .cards { display:grid; grid-template-columns:repeat(3,1fr); gap:16px; margin-bottom:22px; }
+    @media(max-width:640px){ .cards { grid-template-columns:1fr; } }
+    .kpi { background:#fff; border-radius:14px; padding:20px 22px; box-shadow:0 1px 6px rgba(0,0,0,.07); }
+    .kpi .lbl { font-size:.74rem; font-weight:700; color:#64748b; text-transform:uppercase; letter-spacing:.4px; }
+    .kpi .val { font-size:2rem; font-weight:800; color:var(--navy-dark); margin-top:4px; }
+    .kpi .sub { font-size:.78rem; color:#94a3b8; }
+    .card { background:#fff; border-radius:14px; padding:18px 22px; box-shadow:0 1px 6px rgba(0,0,0,.07); margin-bottom:18px; }
+    .card h3 { font-size:.95rem; color:var(--navy-dark); margin:0 0 12px; display:flex; align-items:center; gap:8px; }
+    table.tb { width:100%; border-collapse:collapse; font-size:.86rem; }
+    table.tb th { text-align:left; color:#64748b; font-size:.72rem; text-transform:uppercase; letter-spacing:.4px; padding:8px; border-bottom:2px solid #eef2f7; }
+    table.tb td { padding:8px; border-bottom:1px solid #f1f5f9; }
+    table.tb td.num, table.tb th.num { text-align:right; }
+    .bar { background:#e2e8f0; border-radius:6px; height:8px; overflow:hidden; min-width:80px; display:inline-block; vertical-align:middle; }
+    .bar > span { display:block; height:100%; background:linear-gradient(90deg,#14b8a6,#0f766e); }
+    .muted { color:#94a3b8; }
+  </style>
+</head>
+<body>
+<nav class="topnav">
+  <div style="display:flex;align-items:center">
+    <a href="/" class="topnav-brand"><img src="/img/logo.png" alt="AutoFácil"><span class="version-badge" id="versionBadge"></span></a>
+    <div class="breadcrumb-nav"><a href="/carga-masiva/digitacion/">Digitación</a> › <span style="color:#fff;font-weight:600">Estadísticas</span></div>
+  </div>
+  <button class="btn-logout" onclick="location.href='/carga-masiva/digitacion/'"><i class="bi bi-box-arrow-left me-1"></i>Volver</button>
+</nav>
+
+<div class="main">
+  <div class="page-banner">
+    <i class="bi bi-graph-up-arrow"></i>
+    <div>
+      <h2>Estadísticas de Digitación</h2>
+      <p>Créditos digitados y % de campos faltantes completados, por día y promedio del periodo.</p>
+    </div>
+  </div>
+
+  <div class="controls">
+    <label>Periodo:</label>
+    <select id="selDias" onchange="cargar()">
+      <option value="7">Últimos 7 días</option>
+      <option value="30" selected>Últimos 30 días</option>
+      <option value="60">Últimos 60 días</option>
+      <option value="90">Últimos 90 días</option>
+    </select>
+  </div>
+
+  <div id="cont"><div class="card muted" style="text-align:center;padding:30px"><i class="bi bi-hourglass-split"></i> Cargando…</div></div>
+</div>
+
+<script src="/js/auth-guard.js"></script>
+<script>
+const token = sessionStorage.getItem('token');
+const yo = JSON.parse(sessionStorage.getItem('usuario') || 'null');
+if (!token || !yo) location.href = '/login.html';
+if (!['Administrador','Supervisor de Crédito','Supervisor de Credito'].includes(yo?.perfil)) { alert('Solo Administrador / Supervisor de Crédito'); location.href='/carga-masiva/digitacion/'; }
+const H = { Authorization:'Bearer '+token };
+const esc = s => String(s ?? '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+const fday = d => { try { return new Date(d).toLocaleDateString('es-CL',{day:'2-digit',month:'short'}); } catch { return d; } };
+const barHTML = p => `<span class="bar" style="width:120px"><span style="width:${Math.min(100,p)}%"></span></span> ${p}%`;
+
+async function cargar(){
+  const dias = document.getElementById('selDias').value;
+  const cont = document.getElementById('cont');
+  cont.innerHTML = '<div class="card muted" style="text-align:center;padding:30px"><i class="bi bi-hourglass-split"></i> Cargando…</div>';
+  try {
+    const r = await fetch('/api/digitacion-faltantes/estadisticas?dias='+dias, { headers:H });
+    const j = await r.json();
+    if (!j.success) { cont.innerHTML = '<div class="card" style="color:#b91c1c">'+esc(j.error||'Error')+'</div>'; return; }
+    const d = j.data;
+    const dia = d.porDia.map(x => `<tr><td>${fday(x.dia)}</td><td class="num">${x.creditos}</td><td class="num">${x.llenados}/${x.faltantes}</td><td>${barHTML(x.pct)}</td></tr>`).join('')
+      || '<tr><td colspan="4" class="muted">Sin digitaciones en el periodo.</td></tr>';
+    const usr = d.porUsuario.map(x => `<tr><td>${esc(x.usuario||'—')}</td><td class="num">${x.creditos}</td><td>${barHTML(x.pct)}</td></tr>`).join('')
+      || '<tr><td colspan="3" class="muted">Sin datos.</td></tr>';
+    cont.innerHTML = `
+      <div class="cards">
+        <div class="kpi"><div class="lbl">Créditos digitados</div><div class="val">${d.resumen.creditos}</div><div class="sub">en ${d.dias} días</div></div>
+        <div class="kpi"><div class="lbl">% campos faltantes completados</div><div class="val">${d.resumen.pct_completado}%</div><div class="sub">del total que faltaba</div></div>
+        <div class="kpi"><div class="lbl">Promedio por día</div><div class="val">${d.resumen.promedio_dia}</div><div class="sub">créditos / día activo</div></div>
+      </div>
+      <div class="card">
+        <h3><i class="bi bi-calendar3"></i> Por día</h3>
+        <table class="tb"><thead><tr><th>Día</th><th class="num">Créditos</th><th class="num">Campos compl.</th><th>% completado</th></tr></thead><tbody>${dia}</tbody></table>
+      </div>
+      <div class="card">
+        <h3><i class="bi bi-people"></i> Por digitador</h3>
+        <table class="tb"><thead><tr><th>Usuario</th><th class="num">Créditos</th><th>% completado</th></tr></thead><tbody>${usr}</tbody></table>
+      </div>`;
+  } catch(e){ cont.innerHTML = '<div class="card" style="color:#b91c1c">Error de conexión</div>'; }
+}
+cargar();
+</script>
+<script src="/js/app-version.js"></script>
+</body>
+</html>

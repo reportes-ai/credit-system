@@ -8,6 +8,7 @@ const ctrl = require('../controllers/digitacion-faltantes.controller');
 router.get ('/conteo',           verifyToken, requireFunc('digitacion_faltantes'), ctrl.conteo);
 router.get ('/siguiente',        verifyToken, requireFunc('digitacion_faltantes'), ctrl.siguiente);
 router.get ('/dealer-buscar',    verifyToken, requireFunc('digitacion_faltantes'), ctrl.dealerBuscar);
+router.get ('/estadisticas',     verifyToken, ctrl.estadisticas);   // gateado por perfil dentro
 router.post('/:id(\\d+)',        verifyToken, requireFunc('digitacion_faltantes'), ctrl.guardar);
 router.post('/:id(\\d+)/liberar',verifyToken, requireFunc('digitacion_faltantes'), ctrl.liberar);
 

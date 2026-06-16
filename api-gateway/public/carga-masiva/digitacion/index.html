@@ -73,6 +73,10 @@
   </div>
 
   <div class="note"><i class="bi bi-info-circle me-1"></i> El número de cada tarjeta es la cantidad de créditos pendientes de digitar. Si otra persona está digitando uno, a ti te toca el siguiente automáticamente.</div>
+
+  <div id="statsLink" style="display:none;margin-top:18px;text-align:center">
+    <a href="/carga-masiva/digitacion/estadisticas/" style="display:inline-flex;align-items:center;gap:8px;background:#0f766e;color:#fff;text-decoration:none;padding:10px 20px;border-radius:10px;font-weight:700;font-size:.9rem"><i class="bi bi-graph-up-arrow"></i> Estadísticas de digitación</a>
+  </div>
 </div>
 
 <script src="/js/auth-guard.js"></script>
@@ -82,6 +86,8 @@ const yo = JSON.parse(sessionStorage.getItem('usuario') || 'null');
 if (!token || !yo) location.href = '/login.html';
 function logout(){ sessionStorage.removeItem('token'); sessionStorage.removeItem('usuario'); location.href='/login.html'; }
 function setBadge(id, n){ const b=document.getElementById(id); b.textContent=n; b.classList.toggle('zero', !n); }
+if (['Administrador','Supervisor de Crédito','Supervisor de Credito'].includes(yo?.perfil))
+  document.getElementById('statsLink').style.display = 'block';
 (async () => {
   try {
     const r = await fetch('/api/digitacion-faltantes/conteo', { headers:{ Authorization:'Bearer '+token } });

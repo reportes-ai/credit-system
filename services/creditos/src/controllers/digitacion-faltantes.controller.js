@@ -32,7 +32,7 @@ const CAMPOS = [
   { col:'saldo_precio',       label:'Saldo Precio',        tipo:'number', money:true },
   { col:'monto_financiado',   label:'Monto Financiado',    tipo:'number', money:true },
   { col:'plazo',              label:'Plazo (cuotas)',       tipo:'number' },
-  { col:'tascli_real',        label:'Tasa Mensual (%)',     tipo:'decimal'},
+  { col:'tascli_real',        label:'Tasa Mensual (%)',     tipo:'decimal', pct:true },
   { col:'cuota',              label:'Cuota',               tipo:'number', money:true },
   { col:'fecha_primera_cuota',label:'Fecha 1ª Cuota',      tipo:'date'   },
   { col:'seguros',            label:'Primas de Seguro',    tipo:'number', money:true },
@@ -47,7 +47,8 @@ const CAMPOS = [
 
 // Campos obligatorios que definen si un crédito está "incompleto" (entra a la cola).
 const REQUERIDOS = {
-  otorgados: ['fecha_otorgado','tascli_real','plazo','cuota','seguros','automotora','rut_dealer',
+  otorgados: ['fecha_otorgado','fecha_primera_cuota','tascli_real','plazo','cuota','seguros',
+              'automotora','rut_dealer','vendedor','id_financiera',
               'tipo_vehiculo','marca','modelo','anio','patente'],
   otros:     ['tascli_real','plazo','cuota','automotora','rut_dealer'],
 };
@@ -60,6 +61,21 @@ const CAMPO = Object.fromEntries(CAMPOS.map(c => [c.col, c]));
     `ALTER TABLE creditos ADD COLUMN digit_lock_nombre VARCHAR(150) NULL`,
     `ALTER TABLE creditos ADD COLUMN digit_lock_at     DATETIME     NULL`,
   ]) { try { await pool.query(ddl); } catch (e) { if (e.errno !== 1060) console.error('[digit-faltantes migration]', e.message); } }
+  // Log de digitación (para las estadísticas de productividad)
+  try {
+    await pool.query(`CREATE TABLE IF NOT EXISTS digitacion_log (
+      id                   INT AUTO_INCREMENT PRIMARY KEY,
+      id_credito           INT NOT NULL,
+      num_op               INT NULL,
+      tipo                 VARCHAR(12),
+      id_usuario           INT NULL,
+      usuario              VARCHAR(150),
+      campos_llenados      INT DEFAULT 0,
+      requeridos_faltantes INT DEFAULT 0,
+      fecha                DATETIME DEFAULT CURRENT_TIMESTAMP,
+      INDEX idx_fecha (fecha)
+    )`);
+  } catch (e) { if (e.errno !== 1050) console.error('[digitacion_log migration]', e.message); }
 })();
 
 /* ── Construcción del WHERE de pendientes ───────────────────────────────── */
@@ -169,11 +185,12 @@ exports.guardar = async (req, res) => {
   try {
     const id = parseInt(req.params.id);
     const campos = req.body && req.body.campos;
+    const tipo = (req.body && req.body.tipo === 'otros') ? 'otros' : 'otorgados';
     if (!id || !campos || typeof campos !== 'object')
       return res.status(400).json({ success:false, data:null, error:'Datos inválidos' });
 
     const valid = new Set(CAMPOS.map(c => c.col));
-    const [[antes]] = await pool.query(`SELECT ${CAMPOS.map(c => c.col).join(', ')} FROM creditos WHERE id=?`, [id]);
+    const [[antes]] = await pool.query(`SELECT num_op, ${CAMPOS.map(c => c.col).join(', ')} FROM creditos WHERE id=?`, [id]);
     if (!antes) return res.status(404).json({ success:false, data:null, error:'Crédito no encontrado' });
 
     const sets = [], vals = [], cambios = [];
@@ -183,18 +200,27 @@ exports.guardar = async (req, res) => {
       sets.push(`\`${col}\` = ?`); vals.push(v);
       if (String(antes[col] ?? '') !== String(v ?? '')) cambios.push({ col, antes: antes[col], despues: v });
     }
+    const usuario = ((req.usuario.nombre||'') + ' ' + (req.usuario.apellido||'')).trim() || req.usuario.email || '';
     if (sets.length) {
       vals.push(id);
       await pool.query(`UPDATE creditos SET ${sets.join(', ')}, updated_at=NOW() WHERE id=?`, vals);
-      const usuario = ((req.usuario.nombre||'') + ' ' + (req.usuario.apellido||'')).trim() || req.usuario.email || '';
       for (const c of cambios) {
         pool.query(`INSERT INTO creditos_edicion_log (id_credito, num_op, usuario, campo, valor_antes, valor_despues)
-                    SELECT ?, num_op, ?, ?, ?, ? FROM creditos WHERE id=?`,
-          [id, usuario, c.col, c.antes == null ? null : String(c.antes), c.despues == null ? null : String(c.despues), id]).catch(() => {});
+                    VALUES (?, ?, ?, ?, ?, ?)`,
+          [id, antes.num_op, usuario, c.col, c.antes == null ? null : String(c.antes), c.despues == null ? null : String(c.despues)]).catch(() => {});
       }
     }
+
+    // Métrica: cuántos requeridos estaban faltantes y cuántos se completaron en este guardado.
+    const reqs = REQUERIDOS[tipo];
+    const faltAntes = reqs.filter(c => esVacio(c, antes[c]));
+    const llenados = faltAntes.filter(c => !esVacio(c, campos[c] === '' ? null : campos[c])).length;
+    pool.query(`INSERT INTO digitacion_log (id_credito, num_op, tipo, id_usuario, usuario, campos_llenados, requeridos_faltantes)
+                VALUES (?,?,?,?,?,?,?)`,
+      [id, antes.num_op, tipo, req.usuario.id_usuario, usuario, llenados, faltAntes.length]).catch(() => {});
+
     await pool.query(`UPDATE creditos SET digit_lock_por=NULL, digit_lock_nombre=NULL, digit_lock_at=NULL WHERE id=?`, [id]);
-    res.json({ success:true, data:{ id, cambios: cambios.length }, error:null });
+    res.json({ success:true, data:{ id, cambios: cambios.length, llenados, faltantes: faltAntes.length }, error:null });
   } catch (e) { errSrv(res, e, 'digit guardar'); }
 };
 
@@ -227,4 +253,42 @@ exports.dealerBuscar = async (req, res) => {
     });
     res.json({ success:true, data, error:null });
   } catch (e) { errSrv(res, e, 'digit dealerBuscar'); }
+};
+
+/* ── GET /estadisticas?dias=30 → productividad de digitación ─────────────── */
+const PERFILES_STATS = ['Administrador', 'Supervisor de Crédito', 'Supervisor de Credito'];
+exports.estadisticas = async (req, res) => {
+  try {
+    const perfil = req.usuario.perfil_nombre || req.usuario.perfil || '';
+    if (!PERFILES_STATS.includes(perfil))
+      return res.status(403).json({ success:false, data:null, error:'Solo Administrador / Supervisor de Crédito' });
+    const dias = Math.min(365, Math.max(1, parseInt(req.query.dias) || 30));
+    const pct = t => (t.faltantes > 0 ? Math.round((t.llenados / t.faltantes) * 1000) / 10 : 0);
+
+    const [porDia] = await pool.query(`
+      SELECT DATE(fecha) dia, COUNT(DISTINCT id_credito) creditos,
+             SUM(campos_llenados) llenados, SUM(requeridos_faltantes) faltantes
+      FROM digitacion_log WHERE fecha >= (NOW() - INTERVAL ? DAY)
+      GROUP BY DATE(fecha) ORDER BY dia DESC`, [dias]);
+    const [porUsuario] = await pool.query(`
+      SELECT usuario, COUNT(DISTINCT id_credito) creditos,
+             SUM(campos_llenados) llenados, SUM(requeridos_faltantes) faltantes
+      FROM digitacion_log WHERE fecha >= (NOW() - INTERVAL ? DAY)
+      GROUP BY usuario ORDER BY creditos DESC`, [dias]);
+    const [[r0]] = await pool.query(`
+      SELECT COUNT(DISTINCT id_credito) creditos, SUM(campos_llenados) llenados,
+             SUM(requeridos_faltantes) faltantes, COUNT(DISTINCT DATE(fecha)) dias_activos
+      FROM digitacion_log WHERE fecha >= (NOW() - INTERVAL ? DAY)`, [dias]);
+
+    res.json({ success:true, data: {
+      dias,
+      resumen: {
+        creditos: r0.creditos || 0,
+        pct_completado: pct(r0),
+        promedio_dia: r0.dias_activos ? Math.round((r0.creditos / r0.dias_activos) * 10) / 10 : 0,
+      },
+      porDia: porDia.map(d => ({ dia: d.dia, creditos: d.creditos, pct: pct(d), llenados: Number(d.llenados)||0, faltantes: Number(d.faltantes)||0 })),
+      porUsuario: porUsuario.map(u => ({ usuario: u.usuario, creditos: u.creditos, pct: pct(u) })),
+    }, error:null });
+  } catch (e) { errSrv(res, e, 'digit estadisticas'); }
 };
