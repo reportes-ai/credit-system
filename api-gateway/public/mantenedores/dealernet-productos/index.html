@@ -5,7 +5,7 @@
   <link rel="icon" href="/img/favicon.png" type="image/png">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Productos DealerNet — AutoFácil</title>
-  <!-- v1.2 -->
+  <!-- v1.3 -->
   <link href="/css/bootstrap.min.css" rel="stylesheet">
   <link href="/css/bootstrap-icons.css" rel="stylesheet">
   <style>
@@ -191,12 +191,21 @@ async function probar(){
     else {
       const ok = String(j.data.retcode)==='0';
       const outStr = typeof j.data.output==='string' ? j.data.output : JSON.stringify(j.data.output, null, 2);
-      out.innerHTML='<div style="margin-top:12px"><span class="ret '+(ok?'ok':'err')+'">retcode '+esc(j.data.retcode)+'</span> '+esc(j.data.retmsg||'')+
-        '  <span style="color:#94a3b8;font-size:.8rem">· productos: '+esc((j.data.productos||[]).join(', '))+'</span></div>'+
+      window._lastDlnt = JSON.stringify(j.data, null, 2);
+      out.innerHTML='<div style="margin-top:12px;display:flex;align-items:center;gap:10px;flex-wrap:wrap"><span class="ret '+(ok?'ok':'err')+'">retcode '+esc(j.data.retcode)+'</span> '+esc(j.data.retmsg||'')+
+        '  <span style="color:#94a3b8;font-size:.8rem">· productos: '+esc((j.data.productos||[]).join(', '))+'</span>'+
+        '<button class="btn-ghost" onclick="copiarDlnt(this)"><i class="bi bi-clipboard me-1"></i>Copiar respuesta</button></div>'+
         '<pre class="out">'+esc(outStr||'(sin output)')+'</pre>';
     }
   } catch(_){ out.innerHTML='<div style="margin-top:12px"><span class="ret err">Error</span> de conexión</div>'; }
   btn.disabled=false; btn.innerHTML='<i class="bi bi-send me-1"></i>Consultar';
+}
+async function copiarDlnt(btn){
+  try {
+    await navigator.clipboard.writeText(window._lastDlnt || '');
+    if(btn){ const h=btn.innerHTML; btn.innerHTML='<i class="bi bi-check-lg me-1"></i>Copiado'; setTimeout(()=>btn.innerHTML=h,1600); }
+    toast('Respuesta copiada al portapapeles');
+  } catch(_){ toast('No se pudo copiar', true); }
 }
 async function cargarEstado(){
   try {
