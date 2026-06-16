@@ -1,0 +1,13 @@
+'use strict';
+const router = require('express').Router();
+const { verifyToken } = require('../../../../shared/middleware/auth');
+const { requireFunc } = require('../../../../shared/middleware/permisos');
+const ctrl = require('../controllers/digitacion-faltantes.controller');
+
+// Pool de digitación de datos faltantes (créditos incompletos por carga masiva).
+router.get ('/conteo',           verifyToken, requireFunc('digitacion_faltantes'), ctrl.conteo);
+router.get ('/siguiente',        verifyToken, requireFunc('digitacion_faltantes'), ctrl.siguiente);
+router.post('/:id(\\d+)',        verifyToken, requireFunc('digitacion_faltantes'), ctrl.guardar);
+router.post('/:id(\\d+)/liberar',verifyToken, requireFunc('digitacion_faltantes'), ctrl.liberar);
+
+module.exports = router;

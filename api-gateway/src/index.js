@@ -108,6 +108,7 @@ app.use('/api/cotizaciones', require('../../services/cotizaciones/src/routes/cot
 // Créditos
 app.use('/api/creditos',            require('../../services/creditos/src/routes/creditos.routes'));
 app.use('/api/edicion-creditos',    require('../../services/creditos/src/routes/edicion.routes'));
+app.use('/api/digitacion-faltantes', require('../../services/creditos/src/routes/digitacion-faltantes.routes'));
 app.use('/api/credito-documentos',  require('../../services/creditos/src/routes/credito-documentos.routes'));
 app.use('/api/documentos-af',       require('../../services/creditos/src/routes/documentos-af.routes'));
 app.use('/api/pagos-credito',       require('../../services/creditos/src/routes/pagos-credito.routes'));
@@ -185,6 +186,10 @@ app.get(['/mantenedores/comisiones-seguro', '/mantenedores/comisiones-seguro/'],
 // Carga masiva SPA
 app.get(['/carga-masiva', '/carga-masiva/'], (req, res) =>
   res.sendFile(path.join(__dirname, '../public/carga-masiva/index.html')));
+app.get(['/carga-masiva/digitacion', '/carga-masiva/digitacion/'], (req, res) =>
+  res.sendFile(path.join(__dirname, '../public/carga-masiva/digitacion/index.html')));
+app.get(['/carga-masiva/digitacion/cola', '/carga-masiva/digitacion/cola/'], (req, res) =>
+  res.sendFile(path.join(__dirname, '../public/carga-masiva/digitacion/cola.html')));
 
 // Comisiones SPA
 app.get(['/comisiones', '/comisiones/'], (req, res) =>

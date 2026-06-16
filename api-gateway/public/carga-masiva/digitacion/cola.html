@@ -1,0 +1,187 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <link rel="icon" href="/img/favicon.png" type="image/png">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Digitación — Cola — AutoFácil</title>
+  <link href="/css/bootstrap.min.css" rel="stylesheet">
+  <link href="/css/bootstrap-icons.css" rel="stylesheet">
+  <style>
+    :root { --navy:#0141A2; --navy-dark:#012d70; --navy-light:#0255c5; --accent:#009AFE; --bg:#f0f4f8; }
+    body { background:var(--bg); font-family:'Segoe UI',system-ui,sans-serif; margin:0; min-height:100vh; }
+    .topnav { background:linear-gradient(90deg,var(--navy-dark),var(--navy-light)); color:#fff; height:60px; padding:0 24px; display:flex; align-items:center; justify-content:space-between; position:sticky; top:0; z-index:200; }
+    .topnav-brand { display:flex; align-items:center; gap:8px; text-decoration:none; }
+    .topnav-brand img { height:32px; filter:brightness(0) invert(1); }
+    .version-badge { background:rgba(255,255,255,.15); color:rgba(255,255,255,.75); font-size:.65rem; font-weight:700; border-radius:6px; padding:2px 8px; }
+    .breadcrumb-nav { color:rgba(255,255,255,.6); font-size:.85rem; margin-left:16px; }
+    .breadcrumb-nav a { color:rgba(255,255,255,.75); text-decoration:none; }
+    .btn-logout { background:rgba(255,255,255,.1); border:1px solid rgba(255,255,255,.2); color:#fff; border-radius:8px; padding:5px 12px; font-size:.82rem; cursor:pointer; }
+    .main { max-width:1000px; margin:0 auto; padding:24px; }
+    .hdr { background:#fff; border-radius:14px; padding:16px 22px; margin-bottom:16px; display:flex; align-items:center; justify-content:space-between; gap:16px; flex-wrap:wrap; box-shadow:0 1px 6px rgba(0,0,0,.07); }
+    .hdr .op { font-weight:800; color:var(--navy-dark); font-size:1.15rem; }
+    .hdr .cli { color:#475569; font-size:.9rem; }
+    .hdr .rut { font-family:ui-monospace,monospace; color:#64748b; font-size:.82rem; }
+    .pill-tipo { font-size:.72rem; font-weight:800; padding:3px 10px; border-radius:11px; }
+    .pill-tipo.otorg { background:#dcfce7; color:#15803d; } .pill-tipo.otros { background:#dbeafe; color:#1e40af; }
+    .pend { background:#fef3c7; color:#92400e; font-weight:800; font-size:.8rem; padding:4px 12px; border-radius:11px; }
+    .card { background:#fff; border-radius:14px; padding:20px 22px; box-shadow:0 1px 6px rgba(0,0,0,.07); margin-bottom:16px; }
+    .sec-title { font-size:.82rem; font-weight:800; text-transform:uppercase; letter-spacing:.4px; margin:0 0 12px; display:flex; align-items:center; gap:8px; }
+    .sec-title.falt { color:#b91c1c; } .sec-title.todos { color:var(--navy); }
+    .grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(220px,1fr)); gap:14px; }
+    .fld label { font-size:.74rem; font-weight:700; color:#6b7280; text-transform:uppercase; letter-spacing:.3px; display:block; margin-bottom:4px; }
+    .fld input, .fld select { width:100%; border:1.5px solid #d1d5db; border-radius:8px; padding:8px 10px; font-size:.9rem; box-sizing:border-box; background:#fff; }
+    .fld input:focus, .fld select:focus { outline:none; border-color:var(--navy); }
+    .fld.falta label { color:#b91c1c; }
+    .fld.falta input, .fld.falta select { border-color:#ef4444; background:#fff5f5; }
+    .fld .tag-falta { color:#b91c1c; font-size:.66rem; font-weight:800; margin-left:6px; }
+    .foot { position:sticky; bottom:0; background:#fff; border-top:1px solid #e2e8f0; padding:14px 22px; display:flex; gap:10px; justify-content:flex-end; flex-wrap:wrap; box-shadow:0 -4px 14px rgba(0,0,0,.06); border-radius:0 0 14px 14px; }
+    .btn { border:none; border-radius:9px; padding:10px 20px; font-weight:700; font-size:.88rem; cursor:pointer; display:inline-flex; align-items:center; gap:6px; }
+    .btn-save { background:#16a34a; color:#fff; } .btn-save:hover { background:#15803d; }
+    .btn-skip { background:#f1f5f9; color:#475569; } .btn-skip:hover { background:#e2e8f0; }
+    .btn-exit { background:#fff; color:#b91c1c; border:1px solid #fecaca; }
+    .empty { background:#fff; border-radius:14px; padding:48px 24px; text-align:center; box-shadow:0 1px 6px rgba(0,0,0,.07); }
+    .empty i { font-size:3rem; color:#16a34a; } .empty h3 { margin:14px 0 6px; color:#0f172a; }
+    .toast-af { position:fixed; bottom:90px; left:50%; transform:translateX(-50%); background:#0f172a; color:#fff; padding:11px 20px; border-radius:10px; font-size:.86rem; z-index:9999; display:none; }
+    .toast-af.err { background:#b91c1c; }
+  </style>
+</head>
+<body>
+<nav class="topnav">
+  <div style="display:flex;align-items:center">
+    <a href="/" class="topnav-brand"><img src="/img/logo.png" alt="AutoFácil"><span class="version-badge" id="versionBadge"></span></a>
+    <div class="breadcrumb-nav"><a href="/carga-masiva/digitacion/">Digitación</a> › <span style="color:#fff;font-weight:600" id="bcTipo">—</span></div>
+  </div>
+  <button class="btn-logout" onclick="salir()"><i class="bi bi-box-arrow-left me-1"></i>Volver</button>
+</nav>
+
+<div class="main" id="main">
+  <div class="card"><div style="text-align:center;color:#94a3b8;padding:30px"><i class="bi bi-hourglass-split"></i> Cargando…</div></div>
+</div>
+
+<div class="toast-af" id="toast"></div>
+
+<script src="/js/auth-guard.js"></script>
+<script>
+const token = sessionStorage.getItem('token');
+const yo = JSON.parse(sessionStorage.getItem('usuario') || 'null');
+if (!token || !yo) location.href = '/login.html';
+const H = { 'Content-Type':'application/json', Authorization:'Bearer '+token };
+const TIPO = (new URLSearchParams(location.search).get('tipo') === 'otros') ? 'otros' : 'otorgados';
+document.getElementById('bcTipo').textContent = TIPO === 'otorgados' ? 'Créditos Otorgados' : 'Otros Créditos';
+const esc = s => String(s ?? '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+function toast(m,e){ const t=document.getElementById('toast'); t.textContent=m; t.className='toast-af'+(e?' err':''); t.style.display='block'; clearTimeout(t._h); t._h=setTimeout(()=>t.style.display='none',2800); }
+
+let ACTUAL = null;   // { id, campos, faltantes }
+
+function inputHTML(c, val, falta){
+  const v = (val === null || val === undefined) ? '' : val;
+  const id = 'f_' + c.col;
+  if (c.tipo === 'select') {
+    const ops = (c.ops||[]).map(o => `<option value="${esc(o)}" ${String(o)===String(v)?'selected':''}>${esc(o)}</option>`).join('');
+    return `<select id="${id}"><option value="">—</option>${ops}</select>`;
+  }
+  const type = c.tipo === 'date' ? 'date' : c.tipo === 'month' ? 'month' : (c.tipo === 'number' || c.tipo === 'decimal') ? 'number' : 'text';
+  const step = c.tipo === 'decimal' ? ' step="0.0001"' : c.tipo === 'number' ? ' step="1"' : '';
+  return `<input id="${id}" type="${type}"${step} value="${esc(v)}">`;
+}
+
+function render(d){
+  ACTUAL = { id: d.credito.id, tipo: d.tipo, faltantes: d.faltantes };
+  const cr = d.credito, faltSet = new Set(d.faltantes);
+  // Ordenar: faltantes primero (en orden de CAMPOS), luego el resto
+  const campos = d.campos;
+  const falt = campos.filter(c => faltSet.has(c.col));
+  const resto = campos.filter(c => !faltSet.has(c.col));
+  const fldHTML = (c) => {
+    const isF = faltSet.has(c.col);
+    return `<div class="fld ${isF?'falta':''}">
+      <label>${esc(c.label)}${isF?'<span class="tag-falta">FALTA</span>':''}</label>
+      ${inputHTML(c, cr[c.col], isF)}
+    </div>`;
+  };
+  document.getElementById('main').innerHTML = `
+    <div class="hdr">
+      <div>
+        <div class="op">N° Operación ${esc(cr.numero_credito)} <span class="pill-tipo ${d.tipo==='otorgados'?'otorg':'otros'}">${d.tipo==='otorgados'?'OTORGADO':'OTROS'}</span></div>
+        <div class="cli">${esc(cr.nombre_cliente||'—')} <span class="rut">${esc(cr.rut_cliente||'')}</span></div>
+      </div>
+      <span class="pend"><i class="bi bi-stack me-1"></i>${d.pendientes} por digitar</span>
+    </div>
+    ${falt.length ? `<div class="card">
+      <div class="sec-title falt"><i class="bi bi-exclamation-triangle-fill"></i> Datos faltantes (${falt.length})</div>
+      <div class="grid">${falt.map(fldHTML).join('')}</div>
+    </div>` : ''}
+    <div class="card">
+      <div class="sec-title todos"><i class="bi bi-card-list"></i> Todos los datos del crédito</div>
+      <div class="grid">${resto.map(fldHTML).join('')}</div>
+    </div>
+    <div class="foot">
+      <button class="btn btn-exit" onclick="salir()"><i class="bi bi-box-arrow-left"></i> Salir</button>
+      <button class="btn btn-skip" onclick="saltar()"><i class="bi bi-skip-forward"></i> Saltar este</button>
+      <button class="btn btn-save" onclick="guardar()"><i class="bi bi-check-lg"></i> Guardar y siguiente</button>
+    </div>`;
+}
+
+function renderVacio(pendientes){
+  ACTUAL = null;
+  document.getElementById('main').innerHTML = `
+    <div class="empty">
+      <i class="bi bi-check-circle-fill"></i>
+      <h3>¡No hay créditos pendientes!</h3>
+      <p style="color:#64748b">No quedan ${TIPO==='otorgados'?'créditos otorgados':'otros créditos'} con datos faltantes.</p>
+      <a class="btn btn-skip" style="text-decoration:none" href="/carga-masiva/digitacion/"><i class="bi bi-arrow-left"></i> Volver</a>
+    </div>`;
+}
+
+async function cargarSiguiente(){
+  document.getElementById('main').innerHTML = '<div class="card"><div style="text-align:center;color:#94a3b8;padding:30px"><i class="bi bi-hourglass-split"></i> Buscando el siguiente…</div></div>';
+  try {
+    const r = await fetch('/api/digitacion-faltantes/siguiente?tipo='+TIPO, { headers:H });
+    const j = await r.json();
+    if (!j.success) { document.getElementById('main').innerHTML = '<div class="empty"><h3>'+esc(j.error||'Error')+'</h3><a class="btn btn-skip" href="/carga-masiva/digitacion/">Volver</a></div>'; return; }
+    if (!j.data.credito) renderVacio(j.data.pendientes); else render(j.data);
+  } catch(e){ toast('Error de conexión', true); }
+}
+
+function recolectar(){
+  const campos = {};
+  document.querySelectorAll('[id^="f_"]').forEach(el => {
+    let v = el.value;
+    if (el.type === 'month' && v) v = v + '-01';   // mes → fecha válida
+    campos[el.id.slice(2)] = v;
+  });
+  return campos;
+}
+
+async function guardar(){
+  if (!ACTUAL) return;
+  const id = ACTUAL.id;
+  try {
+    const r = await fetch('/api/digitacion-faltantes/'+id, { method:'POST', headers:H, body:JSON.stringify({ campos: recolectar() }) });
+    const j = await r.json();
+    if (!j.success) { toast(j.error||'Error al guardar', true); return; }
+    toast('Guardado ✓');
+    cargarSiguiente();
+  } catch(e){ toast('Error de conexión', true); }
+}
+async function saltar(){
+  if (!ACTUAL) return;
+  try { await fetch('/api/digitacion-faltantes/'+ACTUAL.id+'/liberar', { method:'POST', headers:H }); } catch(_){}
+  cargarSiguiente();
+}
+function liberarSync(){
+  if (!ACTUAL) return;
+  try { navigator.sendBeacon && navigator.sendBeacon('/api/digitacion-faltantes/'+ACTUAL.id+'/liberar'); } catch(_){}
+}
+async function salir(){
+  if (ACTUAL) { try { await fetch('/api/digitacion-faltantes/'+ACTUAL.id+'/liberar', { method:'POST', headers:H }); } catch(_){} }
+  location.href = '/carga-masiva/digitacion/';
+}
+window.addEventListener('beforeunload', liberarSync);   // respaldo: si no, el lock vence solo en 20 min
+
+cargarSiguiente();
+</script>
+<script src="/js/app-version.js"></script>
+</body>
+</html>

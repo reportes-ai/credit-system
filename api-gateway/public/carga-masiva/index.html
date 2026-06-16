@@ -108,6 +108,14 @@
       <button class="btn-acceder"><i class="bi bi-arrow-right-circle"></i>Acceder</button>
     </a>
 
+    <a class="module-card" href="/carga-masiva/digitacion/" style="position:relative">
+      <div class="mc-icon"><i class="bi bi-pencil-square"></i></div>
+      <h6>Digitación Datos Faltantes</h6>
+      <p>Completa, uno por uno, los créditos que quedaron incompletos por la carga masiva</p>
+      <button class="btn-acceder"><i class="bi bi-arrow-right-circle"></i>Acceder</button>
+      <span id="cmDigitBadge" style="display:none;position:absolute;top:14px;right:14px;background:#dc2626;color:#fff;font-size:.72rem;font-weight:800;border-radius:12px;min-width:22px;height:22px;padding:0 7px;align-items:center;justify-content:center">0</span>
+    </a>
+
   </div>
 </div>
 
@@ -121,6 +129,17 @@ document.getElementById('navNombre').textContent = `${yo?.nombre||''} ${yo?.apel
 document.getElementById('navPerfil').textContent  = yo?.perfil || '';
 document.getElementById('avatarInicial').textContent = (yo?.nombre||'?').charAt(0).toUpperCase();
 function logout() { sessionStorage.removeItem('token'); sessionStorage.removeItem('usuario'); window.location.href = '/login.html'; }
+(async () => {
+  try {
+    const r = await fetch('/api/digitacion-faltantes/conteo', { headers:{ Authorization:'Bearer '+token } });
+    const j = await r.json();
+    if (j.success) {
+      const total = (j.data.otorgados||0) + (j.data.otros||0);
+      const b = document.getElementById('cmDigitBadge');
+      if (total > 0) { b.textContent = total; b.style.display = 'flex'; }
+    }
+  } catch(_) {}
+})();
 </script>
 <script src="/js/app-version.js"></script>
 </body>

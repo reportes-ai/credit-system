@@ -1,0 +1,96 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <link rel="icon" href="/img/favicon.png" type="image/png">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Digitación Datos Faltantes — AutoFácil</title>
+  <link href="/css/bootstrap.min.css" rel="stylesheet">
+  <link href="/css/bootstrap-icons.css" rel="stylesheet">
+  <style>
+    :root { --navy:#0141A2; --navy-dark:#012d70; --navy-light:#0255c5; --accent:#009AFE; --bg:#f0f4f8; }
+    body { background:var(--bg); font-family:'Segoe UI',system-ui,sans-serif; margin:0; min-height:100vh; }
+    .topnav { background:linear-gradient(90deg,var(--navy-dark),var(--navy-light)); color:#fff; height:60px; padding:0 24px; display:flex; align-items:center; justify-content:space-between; position:sticky; top:0; z-index:200; }
+    .topnav-brand { display:flex; align-items:center; gap:8px; text-decoration:none; }
+    .topnav-brand img { height:32px; filter:brightness(0) invert(1); }
+    .version-badge { background:rgba(255,255,255,.15); color:rgba(255,255,255,.75); font-size:.65rem; font-weight:700; border-radius:6px; padding:2px 8px; }
+    .breadcrumb-nav { color:rgba(255,255,255,.6); font-size:.85rem; margin-left:16px; }
+    .breadcrumb-nav a { color:rgba(255,255,255,.75); text-decoration:none; }
+    .btn-logout { background:rgba(255,255,255,.1); border:1px solid rgba(255,255,255,.2); color:#fff; border-radius:8px; padding:5px 12px; font-size:.82rem; cursor:pointer; }
+    .main { max-width:900px; margin:0 auto; padding:32px 24px; }
+    .page-banner { background:linear-gradient(135deg,#012d70,#0141A2 50%,#009AFE); border-radius:16px; color:#fff; padding:24px 32px; margin-bottom:30px; display:flex; align-items:center; gap:18px; }
+    .page-banner i { font-size:2.4rem; opacity:.85; }
+    .page-banner h2 { font-weight:700; margin:0 0 3px; font-size:1.3rem; }
+    .page-banner p { opacity:.8; margin:0; font-size:.86rem; }
+    .grid { display:grid; grid-template-columns:repeat(2,1fr); gap:24px; }
+    @media(max-width:640px){ .grid { grid-template-columns:1fr; } }
+    .qcard { background:#fff; border-radius:16px; padding:30px 26px; text-decoration:none; color:inherit; border:2px solid transparent; transition:.18s; display:block; box-shadow:0 1px 6px rgba(0,0,0,.07); position:relative; }
+    .qcard:hover { border-color:var(--navy); transform:translateY(-4px); box-shadow:0 14px 36px rgba(1,65,162,.16); color:inherit; }
+    .qcard .ic { width:56px; height:56px; border-radius:14px; display:flex; align-items:center; justify-content:center; font-size:1.7rem; color:#fff; margin-bottom:16px; }
+    .qcard.otorg .ic { background:linear-gradient(135deg,#16a34a,#22c55e); }
+    .qcard.otros .ic { background:linear-gradient(135deg,#0141A2,#009AFE); }
+    .qcard h5 { font-weight:700; font-size:1.08rem; margin:0 0 6px; color:#111827; }
+    .qcard p { font-size:.82rem; color:#6b7280; margin:0 0 14px; line-height:1.45; }
+    .qcard .cta { font-size:.85rem; font-weight:700; color:var(--navy); }
+    .qbadge { position:absolute; top:18px; right:18px; min-width:42px; height:42px; border-radius:21px; background:#dc2626; color:#fff; font-weight:800; font-size:1.05rem; display:flex; align-items:center; justify-content:center; padding:0 12px; box-shadow:0 4px 12px rgba(220,38,38,.35); }
+    .qbadge.zero { background:#94a3b8; box-shadow:none; }
+    .note { background:#eff6ff; border:1px solid #bfdbfe; color:#1e40af; border-radius:10px; padding:12px 16px; font-size:.84rem; margin-top:24px; }
+  </style>
+</head>
+<body>
+<nav class="topnav">
+  <div style="display:flex;align-items:center">
+    <a href="/" class="topnav-brand"><img src="/img/logo.png" alt="AutoFácil"><span class="version-badge" id="versionBadge"></span></a>
+    <div class="breadcrumb-nav"><a href="/">Inicio</a> › <a href="/carga-masiva/">Carga Masiva</a> › <span style="color:#fff;font-weight:600">Digitación Datos Faltantes</span></div>
+  </div>
+  <button class="btn-logout" onclick="logout()"><i class="bi bi-box-arrow-right me-1"></i>Salir</button>
+</nav>
+
+<div class="main">
+  <div class="page-banner">
+    <i class="bi bi-pencil-square"></i>
+    <div>
+      <h2>Digitación de Datos Faltantes</h2>
+      <p>Créditos incompletos por la carga masiva. Se digitan de a uno, del más antiguo al más reciente.</p>
+    </div>
+  </div>
+
+  <div class="grid">
+    <a class="qcard otorg" href="/carga-masiva/digitacion/cola/?tipo=otorgados">
+      <span class="qbadge zero" id="badgeOtorg">—</span>
+      <div class="ic"><i class="bi bi-check-circle"></i></div>
+      <h5>Digitación Créditos Otorgados</h5>
+      <p>Faltan: primas de seguro, plazo, cuota, tasa, dealer. Se editan todos los campos.</p>
+      <span class="cta">Digitar <i class="bi bi-arrow-right"></i></span>
+    </a>
+    <a class="qcard otros" href="/carga-masiva/digitacion/cola/?tipo=otros">
+      <span class="qbadge zero" id="badgeOtros">—</span>
+      <div class="ic"><i class="bi bi-list-ul"></i></div>
+      <h5>Digitación Otros Créditos</h5>
+      <p>Créditos en otros estados con datos faltantes. Se editan todos los campos.</p>
+      <span class="cta">Digitar <i class="bi bi-arrow-right"></i></span>
+    </a>
+  </div>
+
+  <div class="note"><i class="bi bi-info-circle me-1"></i> El número de cada tarjeta es la cantidad de créditos pendientes de digitar. Si otra persona está digitando uno, a ti te toca el siguiente automáticamente.</div>
+</div>
+
+<script src="/js/auth-guard.js"></script>
+<script>
+const token = sessionStorage.getItem('token');
+const yo = JSON.parse(sessionStorage.getItem('usuario') || 'null');
+if (!token || !yo) location.href = '/login.html';
+function logout(){ sessionStorage.removeItem('token'); sessionStorage.removeItem('usuario'); location.href='/login.html'; }
+function setBadge(id, n){ const b=document.getElementById(id); b.textContent=n; b.classList.toggle('zero', !n); }
+(async () => {
+  try {
+    const r = await fetch('/api/digitacion-faltantes/conteo', { headers:{ Authorization:'Bearer '+token } });
+    const j = await r.json();
+    if (j.success){ setBadge('badgeOtorg', j.data.otorgados||0); setBadge('badgeOtros', j.data.otros||0); }
+    else { setBadge('badgeOtorg', 0); setBadge('badgeOtros', 0); }
+  } catch(_) { setBadge('badgeOtorg', 0); setBadge('badgeOtros', 0); }
+})();
+</script>
+<script src="/js/app-version.js"></script>
+</body>
+</html>
