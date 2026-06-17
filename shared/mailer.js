@@ -52,7 +52,7 @@ async function enviarCorreo({ to, subject, html, text, replyTo } = {}) {
       subject: subject || '(sin asunto)',
       text: text || undefined,
       html: html || undefined,
-      replyTo: replyTo || undefined,
+      replyTo: replyTo || process.env.MAIL_REPLY_TO || undefined,
     });
     return { ok: true, messageId: info.messageId };
   } catch (e) {
