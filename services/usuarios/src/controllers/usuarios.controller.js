@@ -45,6 +45,50 @@ const { tieneFunc } = require('../../../../shared/middleware/permisos');
   } catch (e) { console.error('[usuario_ejecutivos migration]', e.message); }
 })();
 
+/* ─── Migración (UNA sola vez): los ejecutivos del listado viejo (cartas_ejecutivos)
+   que no son usuarios se crean como usuarios SUSPENDIDOS (estado='inactivo', perfil
+   Ejecutivo Comercial), para que aparezcan en "Usuarios Suspendidos" y su nombre quede
+   en el roster. No pueden loguear (inactivo + clave aleatoria). Idempotente por flag. */
+(async () => {
+  try {
+    await pool.query(`CREATE TABLE IF NOT EXISTS migraciones_aplicadas (
+      clave VARCHAR(80) PRIMARY KEY, aplicada_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP)`);
+    const [[ya]] = await pool.query("SELECT 1 ok FROM migraciones_aplicadas WHERE clave='ejecutivos_a_usuarios_v1'");
+    if (ya) return;
+    // ¿Existe la tabla origen? Si no, marcar como aplicada y salir.
+    let ejecs;
+    try { [ejecs] = await pool.query('SELECT id, nombre, mail, tel FROM cartas_ejecutivos WHERE activo = 1'); }
+    catch (_) { await pool.query("INSERT IGNORE INTO migraciones_aplicadas (clave) VALUES ('ejecutivos_a_usuarios_v1')"); return; }
+    const [[perf]] = await pool.query(
+      "SELECT id_perfil FROM perfiles WHERE nombre IN ('Ejecutivo Comercial','Ejecutivo') ORDER BY (nombre='Ejecutivo Comercial') DESC LIMIT 1");
+    if (!perf) { console.warn('[ejecutivos_a_usuarios_v1] no existe perfil Ejecutivo/Comercial'); return; }
+    let creados = 0;
+    for (const e of (ejecs || [])) {
+      const nombreFull = String(e.nombre || '').trim();
+      if (!nombreFull) continue;
+      const partes = nombreFull.split(/\s+/);
+      const nombre = partes.shift();
+      const apellido = partes.join(' ') || '—';
+      const email = (e.mail && String(e.mail).trim()) ? String(e.mail).trim() : `exej-${e.id}@autofacilchile.cl`;
+      // ¿Ya es usuario? (por email o por nombre+apellido)
+      const [[dup]] = await pool.query(
+        "SELECT 1 ok FROM usuarios WHERE LOWER(email)=LOWER(?) OR LOWER(TRIM(CONCAT(nombre,' ',COALESCE(apellido,''))))=LOWER(?) LIMIT 1",
+        [email, nombreFull]);
+      if (dup) continue;
+      const hash = await bcrypt.hash('EXEJ-' + Math.random().toString(36).slice(2) + Date.now(), 10);
+      try {
+        await pool.query(
+          `INSERT INTO usuarios (rut, nombre, apellido, email, password_hash, id_perfil, telefono, estado)
+           VALUES (?, ?, ?, ?, ?, ?, ?, 'inactivo')`,
+          [`EXEJ-${e.id}`, nombre, apellido, email, hash, perf.id_perfil, e.tel || null]);
+        creados++;
+      } catch (err) { /* rut/email duplicado u otra restricción: saltar */ }
+    }
+    await pool.query("INSERT IGNORE INTO migraciones_aplicadas (clave) VALUES ('ejecutivos_a_usuarios_v1')");
+    if (creados) console.log(`[ejecutivos_a_usuarios_v1] ${creados} ex-ejecutivo(s) creados como usuarios suspendidos`);
+  } catch (e) { console.error('[ejecutivos_a_usuarios_v1]', e.message); }
+})();
+
 const PERFILES_GLOBALES = ['Administrador', 'Gerente'];
 
 const buildFiltroUsuario = async (usuario) => {
@@ -167,8 +211,20 @@ const deleteUsuario = async (req, res) => {
       return res.status(400).json({ success: false, data: null, error: 'No puedes eliminar tu propio usuario' });
     }
     await pool.query('UPDATE usuarios SET estado = ? WHERE id_usuario = ?', ['inactivo', id]);
-    auditar({ req, accion: 'ELIMINAR', modulo: 'usuarios', entidad: 'usuario', entidad_id: id, detalle: 'Usuario desactivado (baja lógica)' });
-    res.json({ success: true, data: { mensaje: 'Usuario desactivado correctamente' }, error: null });
+    auditar({ req, accion: 'ELIMINAR', modulo: 'usuarios', entidad: 'usuario', entidad_id: id, detalle: 'Usuario suspendido (baja lógica)' });
+    res.json({ success: true, data: { mensaje: 'Usuario suspendido correctamente' }, error: null });
+  } catch (error) {
+    res.status(500).json({ success: false, data: null, error: error.message });
+  }
+};
+
+const reactivarUsuario = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const [r] = await pool.query('UPDATE usuarios SET estado = ? WHERE id_usuario = ?', ['activo', id]);
+    if (!r.affectedRows) return res.status(404).json({ success: false, data: null, error: 'Usuario no encontrado' });
+    auditar({ req, accion: 'EDITAR', modulo: 'usuarios', entidad: 'usuario', entidad_id: id, detalle: 'Usuario reactivado' });
+    res.json({ success: true, data: { mensaje: 'Usuario reactivado correctamente' }, error: null });
   } catch (error) {
     res.status(500).json({ success: false, data: null, error: error.message });
   }
@@ -295,4 +351,4 @@ const misEjecutivos = async (req, res) => {
   }
 };
 
-module.exports = { getAllUsuarios, getUsuarioById, createUsuario, updateUsuario, deleteUsuario, resetClave, getPermisosUsuario, updatePermisosUsuario, getEjecutivosUsuario, updateEjecutivosUsuario, misEjecutivos };
+module.exports = { getAllUsuarios, getUsuarioById, createUsuario, updateUsuario, deleteUsuario, reactivarUsuario, resetClave, getPermisosUsuario, updatePermisosUsuario, getEjecutivosUsuario, updateEjecutivosUsuario, misEjecutivos };

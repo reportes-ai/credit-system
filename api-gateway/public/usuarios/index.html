@@ -197,6 +197,11 @@
           <i class="bi bi-person-lines-fill me-1"></i>Usuarios
         </button>
       </li>
+      <li class="nav-item" id="tabSuspNav" style="display:none">
+        <button class="nav-link" data-tab="suspendidos" onclick="switchTab('suspendidos')">
+          <i class="bi bi-person-slash me-1"></i>Usuarios Suspendidos
+        </button>
+      </li>
       <li class="nav-item">
         <button class="nav-link" data-tab="permisos" onclick="switchTab('permisos')">
           <i class="bi bi-shield-check me-1"></i>Perfiles y Permisos
@@ -245,6 +250,40 @@
               </thead>
               <tbody id="tbodyUsuarios">
                 <tr><td colspan="9" class="text-center py-4 text-muted">Cargando...</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- TAB: USUARIOS SUSPENDIDOS -->
+    <div id="tab-suspendidos" style="display:none">
+      <div class="card">
+        <div class="card-body">
+          <div class="d-flex justify-content-between align-items-center mb-3">
+            <div class="search-bar" style="width:280px">
+              <i class="bi bi-search"></i>
+              <input type="text" id="buscadorSusp" class="form-control" placeholder="Buscar suspendido..." oninput="filtrarSuspendidos()">
+            </div>
+            <span class="text-muted" style="font-size:.82rem"><i class="bi bi-info-circle me-1"></i>Usuarios dados de baja. Su nombre se conserva en créditos, cartas y cotizaciones.</span>
+          </div>
+          <div class="table-responsive">
+            <table class="table table-hover align-middle mb-0">
+              <thead>
+                <tr>
+                  <th>Nombre</th>
+                  <th>RUT</th>
+                  <th>Email</th>
+                  <th>Teléfono</th>
+                  <th>Perfil</th>
+                  <th>Estado</th>
+                  <th>Último acceso</th>
+                  <th style="width:130px">Acciones</th>
+                </tr>
+              </thead>
+              <tbody id="tbodySuspendidos">
+                <tr><td colspan="8" class="text-center py-4 text-muted">Cargando...</td></tr>
               </tbody>
             </table>
           </div>
@@ -738,8 +777,8 @@
 
     // ── TABS ──────────────────────────────────────────────────
     function switchTab(tab) {
-      ['usuarios', 'permisos', 'miclave', 'seguridad'].forEach(t => {
-        document.getElementById(`tab-${t}`).style.display = t === tab ? '' : 'none';
+      ['usuarios', 'suspendidos', 'permisos', 'miclave', 'seguridad'].forEach(t => {
+        const el = document.getElementById(`tab-${t}`); if (el) el.style.display = t === tab ? '' : 'none';
       });
       document.querySelectorAll('.nav-tabs .nav-link').forEach(b => {
         b.classList.toggle('active', b.dataset.tab === tab);
@@ -748,24 +787,31 @@
       if (tab === 'seguridad') cargarSeguridad();
       if (tab === 'usuarios') {
         document.getElementById('buscador').value = '';
-        renderUsuarios(usuariosData);
+        renderUsuarios(activos());
+      }
+      if (tab === 'suspendidos') {
+        document.getElementById('buscadorSusp').value = '';
+        renderSuspendidos(suspendidos());
       }
     }
 
     // ── USUARIOS ──────────────────────────────────────────────
     let usuariosData = [];
+    const activos      = () => usuariosData.filter(u => (u.estado || '') === 'activo');
+    const suspendidos  = () => usuariosData.filter(u => (u.estado || '') !== 'activo');
 
     async function cargarUsuarios() {
       const data = await api('GET', '/api/usuarios');
       if (!data?.success) return;
       usuariosData = data.data;
-      renderUsuarios(usuariosData);
+      renderUsuarios(activos());
+      renderSuspendidos(suspendidos());
     }
 
     function renderUsuarios(lista) {
       const tbody = document.getElementById('tbodyUsuarios');
       if (!lista.length) {
-        tbody.innerHTML = '<tr><td colspan="9" class="text-center py-4 text-muted">Sin usuarios registrados.</td></tr>';
+        tbody.innerHTML = '<tr><td colspan="10" class="text-center py-4 text-muted">Sin usuarios activos.</td></tr>';
         return;
       }
       tbody.innerHTML = lista.map(u => `
@@ -784,7 +830,32 @@
               <button class="btn btn-outline-primary btn-sm me-1" title="Editar" onclick="abrirModalUsuario(${u.id_usuario})"><i class="bi bi-pencil"></i></button>
               <button class="btn btn-outline-success btn-sm me-1" title="Ejecutivos asignados" onclick="abrirModalEjecutivos(${u.id_usuario}, '${u.nombre} ${u.apellido}')"><i class="bi bi-people"></i></button>
               <button class="btn btn-outline-warning btn-sm me-1" title="Resetear clave" onclick="abrirResetClave(${u.id_usuario}, '${u.nombre} ${u.apellido}')"><i class="bi bi-key"></i></button>
-              <button class="btn btn-outline-danger btn-sm" title="Desactivar" onclick="desactivarUsuario(${u.id_usuario})"><i class="bi bi-person-x"></i></button>
+              <button class="btn btn-outline-danger btn-sm" title="Suspender" onclick="desactivarUsuario(${u.id_usuario})"><i class="bi bi-person-x"></i></button>
+            ` : '—'}
+          </td>
+        </tr>
+      `).join('');
+    }
+
+    function renderSuspendidos(lista) {
+      const tbody = document.getElementById('tbodySuspendidos');
+      if (!lista.length) {
+        tbody.innerHTML = '<tr><td colspan="8" class="text-center py-4 text-muted">Sin usuarios suspendidos.</td></tr>';
+        return;
+      }
+      tbody.innerHTML = lista.map(u => `
+        <tr>
+          <td><strong>${u.nombre} ${u.apellido}</strong></td>
+          <td class="text-muted">${u.rut}</td>
+          <td>${u.email}</td>
+          <td class="text-muted">${u.telefono || '—'}</td>
+          <td><span class="badge-perfil">${u.perfil}</span></td>
+          <td><span class="badge-estado badge-${u.estado}">${u.estado}</span></td>
+          <td class="text-muted" style="font-size:0.8rem">${u.ultimo_acceso ? new Date(u.ultimo_acceso).toLocaleString('es-CL') : 'Nunca'}</td>
+          <td>
+            ${puedeGestionarUsuarios ? `
+              <button class="btn btn-success btn-sm me-1" title="Reactivar" onclick="reactivarUsuarioUI(${u.id_usuario})"><i class="bi bi-arrow-counterclockwise me-1"></i>Reactivar</button>
+              <button class="btn btn-outline-primary btn-sm" title="Editar" onclick="abrirModalUsuario(${u.id_usuario})"><i class="bi bi-pencil"></i></button>
             ` : '—'}
           </td>
         </tr>
@@ -793,9 +864,23 @@
 
     function filtrarUsuarios() {
       const q = document.getElementById('buscador').value.toLowerCase();
-      renderUsuarios(usuariosData.filter(u =>
+      renderUsuarios(activos().filter(u =>
         `${u.nombre} ${u.apellido} ${u.email} ${u.rut} ${u.perfil}`.toLowerCase().includes(q)
       ));
+    }
+
+    function filtrarSuspendidos() {
+      const q = document.getElementById('buscadorSusp').value.toLowerCase();
+      renderSuspendidos(suspendidos().filter(u =>
+        `${u.nombre} ${u.apellido} ${u.email} ${u.rut} ${u.perfil}`.toLowerCase().includes(q)
+      ));
+    }
+
+    async function reactivarUsuarioUI(id) {
+      if (!confirm('¿Reactivar este usuario?')) return;
+      const r = await api('POST', `/api/usuarios/${id}/reactivar`);
+      if (r?.success) { showToast('Usuario reactivado'); cargarUsuarios(); }
+      else showToast(r?.error || 'Error al reactivar', 'danger');
     }
 
     // ── MODAL USUARIO ─────────────────────────────────────────
@@ -905,9 +990,9 @@
     }
 
     async function desactivarUsuario(id) {
-      if (!confirm('¿Desactivar este usuario?')) return;
+      if (!confirm('¿Suspender este usuario? Quedará en "Usuarios Suspendidos" y no podrá ingresar. Su nombre se conserva en créditos, cartas y cotizaciones.')) return;
       const data = await api('DELETE', `/api/usuarios/${id}`);
-      if (data?.success) { showToast('Usuario desactivado'); cargarUsuarios(); }
+      if (data?.success) { showToast('Usuario suspendido'); cargarUsuarios(); }
       else showToast(data?.error || 'Error', 'danger');
     }
 
@@ -1463,6 +1548,8 @@
       // Tab Seguridad por permiso usuarios_seguridad (Admin incluido vía tiene())
       const _tabSeg = document.getElementById('tabSegNav');
       if (_tabSeg) _tabSeg.style.display = tiene('usuarios_seguridad') ? '' : 'none';
+      const _tabSusp = document.getElementById('tabSuspNav');
+      if (_tabSusp) _tabSusp.style.display = puedeUsuarios ? '' : 'none';
       if (!puedeUsuarios) document.querySelector('[data-tab="usuarios"]').closest('li').style.display = 'none';
       if (!puedePerfiles) document.querySelector('[data-tab="permisos"]').closest('li').style.display = 'none';
       if (puedeUsuarios) {
