@@ -47,15 +47,18 @@ const initTablas = async () => {
       `SELECT id_modulo FROM modulos WHERE ruta LIKE '%tesoreria%' LIMIT 1`
     );
     if (mod) {
-      await pool.query(`
-        INSERT IGNORE INTO funcionalidades (id_modulo, nombre, codigo, href, icono)
-        VALUES (?, 'Caja', 'teso-caja-operativa', '/tesoreria/caja/', 'bi-cash-coin')
-      `, [mod.id_modulo]);
-
-      // Asignar permiso al perfil Tesorero y Administrador/Gerente
-      const [[fila]] = await pool.query(
+      // Crear la funcionalidad "Caja" SOLO si no existe (evita acumular duplicados por arranque)
+      let [[fila]] = await pool.query(
         `SELECT id_funcionalidad FROM funcionalidades WHERE codigo = 'teso-caja-operativa' LIMIT 1`
       );
+      if (!fila) {
+        const [ins] = await pool.query(
+          `INSERT INTO funcionalidades (id_modulo, nombre, codigo, href, icono)
+           VALUES (?, 'Caja', 'teso-caja-operativa', '/tesoreria/caja/', 'bi-cash-coin')`,
+          [mod.id_modulo]
+        );
+        fila = { id_funcionalidad: ins.insertId };
+      }
       if (fila) {
         const [perfiles] = await pool.query(
           `SELECT id_perfil FROM perfiles WHERE nombre IN ('Administrador','Gerente','Tesorero','Supervisor')`

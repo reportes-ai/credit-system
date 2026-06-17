@@ -1910,4 +1910,54 @@ const getUsuariosByPerfil = async (req, res) => {
   } catch (e) { console.error('[perfiles migration v32]', e.message); }
 })();
 
+/* ─── Migración: deduplicar funcionalidades por código + UNIQUE(codigo) ─────────
+   Causa raíz de checkboxes duplicados (p.ej. "Caja", "Documentos del Crédito"):
+   varias migraciones hacían INSERT sin que `codigo` fuera UNIQUE, acumulando
+   filas con el mismo código en cada arranque. Se consolida a UNA fila por código
+   (la de menor id), re-apuntando sus permisos, y se agrega UNIQUE(codigo) para
+   que no vuelva a ocurrir. Idempotente y seguro de correr en cada boot. */
+(async () => {
+  try {
+    const [dups] = await pool.query(
+      `SELECT codigo, MIN(id_funcionalidad) AS keep_id, COUNT(*) AS n
+       FROM funcionalidades WHERE codigo IS NOT NULL AND codigo <> ''
+       GROUP BY codigo HAVING n > 1`
+    );
+    for (const d of dups) {
+      const [rows] = await pool.query(
+        'SELECT id_funcionalidad FROM funcionalidades WHERE codigo=? AND id_funcionalidad<>?',
+        [d.codigo, d.keep_id]
+      );
+      for (const r of rows) {
+        const id = r.id_funcionalidad;
+        // Conservar el permiso si el usuario/perfil lo tenía habilitado en CUALQUIER duplicado
+        await pool.query(
+          `UPDATE permisos_perfil pp
+              JOIN (SELECT id_perfil, MAX(habilitado) h FROM permisos_perfil WHERE id_funcionalidad IN (?,?) GROUP BY id_perfil) x
+                ON x.id_perfil = pp.id_perfil
+             SET pp.habilitado = x.h
+           WHERE pp.id_funcionalidad = ?`, [d.keep_id, id, d.keep_id]).catch(()=>{});
+        await pool.query(
+          'INSERT IGNORE INTO permisos_perfil (id_perfil, id_funcionalidad, habilitado) ' +
+          'SELECT id_perfil, ?, habilitado FROM permisos_perfil WHERE id_funcionalidad=?',
+          [d.keep_id, id]);
+        await pool.query('DELETE FROM permisos_perfil WHERE id_funcionalidad=?', [id]);
+        try {
+          await pool.query(
+            'INSERT IGNORE INTO permisos_usuario (id_usuario, id_funcionalidad, habilitado) ' +
+            'SELECT id_usuario, ?, habilitado FROM permisos_usuario WHERE id_funcionalidad=?',
+            [d.keep_id, id]);
+          await pool.query('DELETE FROM permisos_usuario WHERE id_funcionalidad=?', [id]);
+        } catch (_) { /* tabla puede no existir */ }
+        await pool.query('DELETE FROM funcionalidades WHERE id_funcionalidad=?', [id]);
+      }
+    }
+    if (dups.length) console.log(`[func-dedup] ${dups.length} código(s) consolidado(s)`);
+    try {
+      await pool.query('ALTER TABLE funcionalidades ADD UNIQUE KEY uq_func_codigo (codigo)');
+      console.log('[func-dedup] UNIQUE(codigo) agregado');
+    } catch (e) { if (e.errno !== 1061 && e.errno !== 1062) console.error('[func-dedup uniq]', e.message); }
+  } catch (e) { console.error('[func-dedup]', e.message); }
+})();
+
 module.exports = { getAllPerfiles, getModulosConFuncionalidades, getPermisosPerfil, updatePermisosPerfil, reordenarModulos, createPerfil, updatePerfil, deletePerfil, getUsuariosByPerfil };
