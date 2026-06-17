@@ -1949,6 +1949,31 @@ const getUsuariosByPerfil = async (req, res) => {
   } catch (e) { console.error('[func-obsoletas]', e.message); }
 })();
 
+/* ─── Migración: funcionalidad "Configurar Dashboard" (dashboard_config) ────────
+   Gatea POST /api/dashboard/permisos y /presupuesto. Antes eran Admin-only
+   (requirePerfil); se mantiene Admin-only por defecto (habilitado=1 solo Admin)
+   y queda configurable desde la matriz. */
+(async () => {
+  try {
+    const [[modDash]] = await pool.query("SELECT id_modulo FROM modulos WHERE ruta LIKE '%dashboard%' LIMIT 1");
+    if (!modDash) return;
+    const [[ex]] = await pool.query("SELECT id_funcionalidad FROM funcionalidades WHERE codigo='dashboard_config'");
+    let idF;
+    if (ex) idF = ex.id_funcionalidad;
+    else {
+      const [ins] = await pool.query(
+        "INSERT INTO funcionalidades (id_modulo, nombre, codigo, icono) VALUES (?,?,?,?)",
+        [modDash.id_modulo, 'Configurar Dashboard', 'dashboard_config', 'bi-gear']);
+      idF = ins.insertId;
+    }
+    const [perfiles] = await pool.query('SELECT id_perfil, nombre FROM perfiles');
+    for (const p of perfiles) {
+      const hab = p.nombre === 'Administrador' ? 1 : 0;
+      await pool.query('INSERT IGNORE INTO permisos_perfil (id_perfil, id_funcionalidad, habilitado) VALUES (?,?,?)', [p.id_perfil, idF, hab]);
+    }
+  } catch (e) { console.error('[dashboard_config seed]', e.message); }
+})();
+
 /* ─── Migración: deduplicar funcionalidades por código + UNIQUE(codigo) ─────────
    Causa raíz de checkboxes duplicados (p.ej. "Caja", "Documentos del Crédito"):
    varias migraciones hacían INSERT sin que `codigo` fuera UNIQUE, acumulando

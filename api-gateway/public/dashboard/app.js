@@ -16,10 +16,13 @@ let sesionActual = _usuario ? {
   usuario: _usuario.email || ''
 } : { nombre: 'Usuario', perfil: 'USUARIO', usuario: '' };
 
-// Helper: comparar perfil sin importar mayúsculas/minúsculas
+// Funcionalidades del usuario (matriz Perfiles y Permisos); se llena en cargarPermisosDesdeAPI
+let _funcsDash = new Set();
+// "Admin" del dashboard = Administrador O quien tenga 'dashboard_config' (config de tabs/presupuesto)
 function esAdmin() {
-  return sesionActual && sesionActual.perfil &&
-    sesionActual.perfil.toLowerCase() === 'administrador';
+  if (sesionActual && sesionActual.perfil &&
+      sesionActual.perfil.toLowerCase() === 'administrador') return true;
+  return _funcsDash.has('dashboard_config');
 }
 
 function actualizarTopbarUsuario() {
@@ -58,6 +61,12 @@ async function cargarPermisosDesdeAPI() {
       sessionStorage.setItem('af_tab_permisos', JSON.stringify(data.permisos));
     }
   } catch(e) { console.warn('No se pudieron cargar permisos:', e); }
+  // Funcionalidades del usuario (para dashboard_config y futuros gates)
+  try {
+    const r = await fetch('/api/auth/mis-permisos?_='+Date.now(), { headers:{ Authorization:'Bearer '+_token } });
+    const j = await r.json();
+    _funcsDash = new Set(j.funcionalidades || []);
+  } catch(e) { /* sin permisos extra */ }
 }
 
 document.addEventListener('DOMContentLoaded', async function() {
