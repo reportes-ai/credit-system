@@ -1,12 +1,13 @@
 const router = require('express').Router();
 const ctrl = require('../controllers/parques.controller');
-const { verifyToken, requirePerfil } = require('../../../../shared/middleware/auth');
+const { verifyToken } = require('../../../../shared/middleware/auth');
+const { requireFunc } = require('../../../../shared/middleware/permisos');
 
-const soloAdmin = requirePerfil('Administrador');
+const puedeGestionar = requireFunc('mantenedores_parques');
 
 router.get('/',       verifyToken, ctrl.getAll);
-router.post('/',      verifyToken, soloAdmin, ctrl.create);
-router.put('/:id',    verifyToken, soloAdmin, ctrl.update);
-router.delete('/:id', verifyToken, soloAdmin, ctrl.remove);
+router.post('/',      verifyToken, puedeGestionar, ctrl.create);
+router.put('/:id',    verifyToken, puedeGestionar, ctrl.update);
+router.delete('/:id', verifyToken, puedeGestionar, ctrl.remove);
 
 module.exports = router;

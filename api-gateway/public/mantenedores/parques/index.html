@@ -203,8 +203,9 @@
   document.getElementById('avatarInicial').textContent = (yo?.nombre||'?').charAt(0).toUpperCase();
   function logout() { sessionStorage.removeItem('token'); sessionStorage.removeItem('usuario'); window.location.href = '/login.html'; }
 
-  const esAdmin = yo?.perfil === 'Administrador';
-  if (!esAdmin) { document.getElementById('btnNuevo').style.display = 'none'; }
+  // Edición y botón "Nuevo" por PERMISO (matriz Perfiles y Permisos), no solo Admin
+  let esAdmin = yo?.perfil === 'Administrador';
+  document.getElementById('btnNuevo').style.display = 'none'; // se muestra en el init si hay permiso
 
   let parques = [];
 
@@ -322,7 +323,17 @@
     await cargar();
   }
 
-  cargar();
+  (async () => {
+    if (!esAdmin) {
+      try {
+        const r = await fetch('/api/auth/mis-permisos?_='+Date.now(), { headers: { Authorization:'Bearer '+token } });
+        const j = await r.json();
+        if ((j.funcionalidades||[]).includes('mantenedores_parques')) esAdmin = true;
+      } catch(e){}
+    }
+    if (esAdmin) document.getElementById('btnNuevo').style.display = '';
+    cargar();
+  })();
 </script>
 <script src="/js/app-version.js"></script>
 </body>

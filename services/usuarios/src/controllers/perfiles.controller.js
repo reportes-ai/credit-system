@@ -158,6 +158,8 @@ const { auditar } = require('../../../../shared/audit');
       ['CRM', 'Ver Estadísticas CRM',                'crm_estadisticas',             0],
       // ── Mantenedores ────────────────────────────────────────
       ['Mantenedores', 'Gestionar Cuentas Bancarias','mantenedores_cuentas_bancarias',0],
+      ['Mantenedores', 'Gestionar Comisiones de Seguro','mantenedores_comisiones_seguro',0],
+      ['Mantenedores', 'Gestionar Parques',          'mantenedores_parques',         0],
       ['Mantenedores', 'Gestionar Tasas',            'mantenedores_tasas',           0],
       ['Mantenedores', 'Gestionar Factores de Seguro','mantenedores_factores_seguro',0],
       ['Mantenedores', 'Gestionar UF',               'mantenedores_uf',              0],

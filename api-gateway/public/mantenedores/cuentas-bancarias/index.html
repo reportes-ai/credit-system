@@ -140,7 +140,7 @@
       <option value="1">Activos</option>
       <option value="0">Inactivos</option>
     </select>
-    <button class="btn-nuevo" onclick="abrirNuevo()">
+    <button class="btn-nuevo" id="btnNuevaCuenta" onclick="abrirNuevo()" style="display:none">
       <i class="bi bi-plus-circle me-1"></i>+ Nueva Cuenta
     </button>
     <span class="count-badge" id="countBadge"></span>
@@ -266,7 +266,8 @@ document.getElementById('avatarInicial').textContent = (yo?.nombre||'?').charAt(
 function logout() { sessionStorage.removeItem('token'); sessionStorage.removeItem('usuario'); window.location.href = '/login.html'; }
 
 const H = { 'Content-Type':'application/json', 'Authorization':'Bearer '+token };
-const esAdmin = ['Administrador','Gerente'].includes(yo?.perfil);
+// Edición y botón "Nueva Cuenta" por PERMISO (matriz Perfiles y Permisos), no solo Admin/Gerente
+let esAdmin = ['Administrador','Gerente'].includes(yo?.perfil);
 
 let _todos = [], _filtrado = [], pag = 1, perPag = 100, debTimer;
 let modalBS;
@@ -415,7 +416,17 @@ async function eliminar(id) {
 document.getElementById('filtroQ').addEventListener('input', debounceCargar);
 document.getElementById('filtroActivo').addEventListener('change', filtrar);
 
-cargar();
+(async () => {
+  if (!esAdmin) {
+    try {
+      const r = await fetch('/api/auth/mis-permisos?_='+Date.now(), { headers: H });
+      const j = await r.json();
+      if ((j.funcionalidades||[]).includes('mantenedores_cuentas_bancarias')) esAdmin = true;
+    } catch(e){}
+  }
+  if (esAdmin) document.getElementById('btnNuevaCuenta').style.display = '';
+  cargar();
+})();
 </script>
 <script src="/js/app-version.js"></script>
 </body>

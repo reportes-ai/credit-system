@@ -111,7 +111,8 @@ const token = sessionStorage.getItem('token');
 const yo    = JSON.parse(sessionStorage.getItem('usuario') || 'null');
 if (!token || !yo) window.location.href = '/login.html';
 const H = { 'Content-Type': 'application/json', Authorization: 'Bearer ' + token };
-const esAdmin = yo?.perfil === 'Administrador';
+// Editabilidad por PERMISO (matriz Perfiles y Permisos), no solo Admin. Se amplía en el init.
+let esAdmin = yo?.perfil === 'Administrador';
 
 document.getElementById('navNombre').textContent = `${yo?.nombre||''} ${yo?.apellido||''}`.trim();
 document.getElementById('navPerfil').textContent  = yo?.perfil || '';
@@ -235,8 +236,17 @@ async function guardarPen(id) {
   finally { if (btn) btn.disabled = false; }
 }
 
-cargar();
-cargarPen();
+(async () => {
+  if (!esAdmin) {
+    try {
+      const r = await fetch('/api/auth/mis-permisos?_='+Date.now(), { headers: H });
+      const j = await r.json();
+      if ((j.funcionalidades||[]).includes('mantenedores_comisiones_seguro')) esAdmin = true;
+    } catch(e){}
+  }
+  cargar();
+  cargarPen();
+})();
 </script>
 <script src="/js/app-version.js"></script>
 </body>
