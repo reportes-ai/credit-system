@@ -74,6 +74,18 @@ const { auditar } = require('../../../../shared/audit');
       ['Factura Recibida (Comisión)', 'Etapa donde se captura la boleta/factura del dealer: RUT y nombre del dealer, fecha, N° de documento y monto neto. Botones "Boleta" y "Factura de terceros" para las excepciones (exigen certificación al grabar).', 'Post Venta'],
       ['Desglose Congelado', 'Al registrar la boleta/factura se guardan el % de impuesto, el monto del impuesto y el líquido a pagar. La Orden de Pago LEE esos valores y no recalcula, aunque luego cambie el % en el mantenedor Impuestos.', 'Post Venta'],
       ['Orden de Pago de Comisión', 'Documento "Solicitud de Pago" que agrupa en una sola orden las operaciones que comparten la misma boleta/factura del mismo dealer. Muestra por operación Monto Total, Retención/IVA y A Pagar, con el total sumado.', 'Post Venta'],
+
+      // ── Estados del Crédito (mantenedor Estado Créditos, ámbito brokerage) ──
+      ['Estados del Crédito (Brokerage)', 'Máquina de estados paramétrica del crédito para operaciones brokerage (AutoFin y Unidad), administrada en el mantenedor Estado Créditos. Puertas de entrada: DIGITADO (por digitación o Carga Masiva) y CARTA DE APROBACIÓN (vía Cartas de Aprobación). Flujo: Digitado → Aprobado / Rechazado; Aprobado → Carta de Aprobación / Otorgado / Desistido; Rechazado → Apelado / Otorgado / Rechazado; Carta de Aprobación → Otorgado / Desistido; Otorgado → Prepagado / Anulado.', 'Estados del Crédito'],
+      ['Estado: Digitado', 'Estado inicial cuando el crédito nace por digitación manual o por Carga Masiva. Desde Digitado el crédito pasa a Aprobado o Rechazado.', 'Estados del Crédito'],
+      ['Estado: Aprobado', 'El crédito digitado fue aprobado en la evaluación. Puede pasar a Carta de Aprobación, Otorgado o Desistido.', 'Estados del Crédito'],
+      ['Estado: Rechazado', 'El crédito digitado fue rechazado en la evaluación. Puede pasar a Apelado (si se apela), a Otorgado (si se revierte) o mantenerse Rechazado.', 'Estados del Crédito'],
+      ['Estado: Apelado', 'Resultado de apelar un crédito rechazado. Estado final en la fase actual del flujo.', 'Estados del Crédito'],
+      ['Estado: Carta de Aprobación', 'Estado inicial cuando el crédito ingresa vía Cartas de Aprobación (Unidad y AutoFácil). Pasa a Otorgado o Desistido.', 'Estados del Crédito'],
+      ['Estado: Otorgado', 'El crédito fue cursado/otorgado. Posteriormente puede quedar Prepagado o Anulado.', 'Estados del Crédito'],
+      ['Estado: Desistido', 'La operación se desiste antes de cursarse. Estado final.', 'Estados del Crédito'],
+      ['Estado: Prepagado', 'Crédito otorgado que se paga anticipadamente en su totalidad. Estado final.', 'Estados del Crédito'],
+      ['Estado: Anulado', 'Crédito otorgado que se anula. Estado final.', 'Estados del Crédito'],
     ];
     let [[{ mx }]] = await pool.query('SELECT COALESCE(MAX(orden),0) AS mx FROM definiciones');
     let nuevas = 0;
