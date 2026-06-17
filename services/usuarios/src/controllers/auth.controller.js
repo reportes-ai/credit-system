@@ -58,7 +58,9 @@ const login = async (req, res) => {
           apellido: usuario.apellido,
           email: usuario.email,
           perfil: usuario.perfil_nombre
-        }
+        },
+        // El frontend del login obliga a cambiar la clave antes de entrar
+        debe_cambiar_clave: usuario.debe_cambiar_clave === 1
       },
       error: null
     });
@@ -86,7 +88,8 @@ const cambiarClave = async (req, res) => {
     }
 
     const hash = await bcrypt.hash(password_nuevo, 10);
-    await pool.query('UPDATE usuarios SET password_hash = ? WHERE id_usuario = ?', [hash, id_usuario]);
+    // Al cambiar la clave se limpia la marca de "primer ingreso"
+    await pool.query('UPDATE usuarios SET password_hash = ?, debe_cambiar_clave = 0 WHERE id_usuario = ?', [hash, id_usuario]);
 
     res.json({ success: true, data: { mensaje: 'Contraseña actualizada correctamente' }, error: null });
   } catch (error) {

@@ -2,6 +2,53 @@ const pool = require('../../../../shared/config/database');
 const bcrypt = require('bcryptjs');
 const { auditar } = require('../../../../shared/audit');
 const { tieneFunc } = require('../../../../shared/middleware/permisos');
+const { enviarCorreo } = require('../../../../shared/mailer');
+
+// URL base para los enlaces de los correos (configurable por env, fallback a producción)
+const APP_URL = (process.env.APP_URL || 'https://credit-system-45em.onrender.com').replace(/\/+$/, '');
+
+// Clave temporal aleatoria (alta entropía, sin caracteres ambiguos)
+const generarClaveTemporal = () => {
+  const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghjkmnpqrstuvwxyz23456789!@#';
+  let c = '';
+  for (let i = 0; i < 10; i++) c += chars[Math.floor(Math.random() * chars.length)];
+  return c;
+};
+
+// Correo con la clave (alta de usuario o reset). El usuario la cambia en su primer ingreso.
+const correoClave = (nombre, email, clave, esReset = false) => {
+  const login = `${APP_URL}/login.html`;
+  const subject = esReset
+    ? 'Restablecimiento de contraseña — AutoFácil Business Suite'
+    : 'Tu acceso a AutoFácil Business Suite';
+  const intro = esReset
+    ? 'Se restableció la contraseña de tu cuenta. Estos son tus nuevos datos de acceso:'
+    : 'Se creó tu cuenta en el sistema. Estos son tus datos de acceso:';
+  const text = `Hola ${nombre},\n\n${intro}\n\nUsuario (correo): ${email}\nContraseña temporal: ${clave}\n\nIngresa en ${login}\nPor seguridad, el sistema te pedirá cambiar la contraseña en tu primer ingreso.\n\nSi no esperabas este correo, avísale a tu administrador.`;
+  const html = `
+    <div style="font-family:Segoe UI,Arial,sans-serif;max-width:520px;margin:auto;border:1px solid #e5e7eb;border-radius:14px;overflow:hidden">
+      <div style="background:linear-gradient(135deg,#012d70,#0141A2 60%,#009AFE);color:#fff;padding:22px 26px">
+        <div style="font-size:1.15rem;font-weight:700">AutoFácil Business Suite</div>
+        <div style="font-size:.85rem;opacity:.85">Acceso al sistema</div>
+      </div>
+      <div style="padding:24px 26px;color:#1e293b;font-size:.92rem;line-height:1.6">
+        <p>Hola <b>${nombre}</b>,</p>
+        <p>${intro}</p>
+        <div style="background:#f8fafc;border:1px solid #e5e7eb;border-radius:10px;padding:14px 16px;margin:14px 0">
+          <div style="font-size:.8rem;color:#64748b">Usuario (correo)</div>
+          <div style="font-weight:600;margin-bottom:8px">${email}</div>
+          <div style="font-size:.8rem;color:#64748b">Contraseña temporal</div>
+          <div style="font-family:monospace;font-size:1.2rem;font-weight:700;color:#0141A2;letter-spacing:1px">${clave}</div>
+        </div>
+        <p>Por seguridad, <b>el sistema te pedirá cambiar esta contraseña</b> en tu primer ingreso.</p>
+        <p style="text-align:center;margin:22px 0">
+          <a href="${login}" style="background:#0141A2;color:#fff;text-decoration:none;padding:11px 26px;border-radius:8px;font-weight:600;display:inline-block">Ingresar al sistema</a>
+        </p>
+        <p style="font-size:.8rem;color:#94a3b8">Si no esperabas este correo, avísale a tu administrador.</p>
+      </div>
+    </div>`;
+  return { subject, text, html };
+};
 
 /* ─── Migraciones ──────────────────────────────────────────────── */
 (async () => {
@@ -14,6 +61,9 @@ const { tieneFunc } = require('../../../../shared/middleware/permisos');
   try {
     await pool.query(`ALTER TABLE usuarios ADD COLUMN centro_costo VARCHAR(100) NULL DEFAULT NULL`);
   } catch (e) { if (e.errno !== 1060) console.error('[usuarios migration centro_costo]', e.message); }
+  try {
+    await pool.query(`ALTER TABLE usuarios ADD COLUMN debe_cambiar_clave TINYINT(1) NOT NULL DEFAULT 0`);
+  } catch (e) { if (e.errno !== 1060) console.error('[usuarios migration debe_cambiar_clave]', e.message); }
 })();
 
 // Tabla de permisos individuales por usuario (excepciones al perfil base)
@@ -152,26 +202,35 @@ const getUsuarioById = async (req, res) => {
 
 const createUsuario = async (req, res) => {
   try {
-    const { rut, nombre, apellido, apellido_materno, centro_costo, email, password, id_perfil, id_supervisor, telefono } = req.body;
+    const { rut, nombre, apellido, apellido_materno, centro_costo, email, id_perfil, id_supervisor, telefono } = req.body;
 
-    if (!rut || !nombre || !apellido || !email || !password || !id_perfil) {
-      return res.status(400).json({ success: false, data: null, error: 'RUT, nombre, apellido, email, contraseña y perfil son requeridos' });
-    }
-    if (password.length < 6) {
-      return res.status(400).json({ success: false, data: null, error: 'La contraseña debe tener al menos 6 caracteres' });
+    if (!rut || !nombre || !apellido || !email || !id_perfil) {
+      return res.status(400).json({ success: false, data: null, error: 'RUT, nombre, apellido, email y perfil son requeridos' });
     }
 
-    const passwordHash = await bcrypt.hash(password, 10);
+    // La clave se genera automáticamente y se envía por correo; el usuario debe cambiarla en su primer ingreso.
+    const claveTemporal = generarClaveTemporal();
+    const passwordHash = await bcrypt.hash(claveTemporal, 10);
     const [result] = await pool.query(
-      'INSERT INTO usuarios (rut, nombre, apellido, apellido_materno, centro_costo, email, password_hash, id_perfil, id_supervisor, telefono) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+      'INSERT INTO usuarios (rut, nombre, apellido, apellido_materno, centro_costo, email, password_hash, id_perfil, id_supervisor, telefono, debe_cambiar_clave) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1)',
       [rut, nombre, apellido, apellido_materno || null, centro_costo || null, email, passwordHash, id_perfil, id_supervisor || null, telefono || null]
     );
 
     auditar({ req, accion: 'CREAR', modulo: 'usuarios', entidad: 'usuario', entidad_id: result.insertId,
       detalle: `Creó el usuario ${nombre} ${apellido} (${email}) con perfil #${id_perfil}`, rut, meta: { rut, email, id_perfil } });
+
+    // Enviar la clave temporal por correo. Si falla, se devuelve para entrega manual (no aborta la creación).
+    const c = correoClave(nombre, email, claveTemporal, false);
+    const envio = await enviarCorreo({ to: email, subject: c.subject, html: c.html, text: c.text });
+
     res.status(201).json({
       success: true,
-      data: { id_usuario: result.insertId, rut, nombre, apellido, email, id_perfil, estado: 'activo' },
+      data: {
+        id_usuario: result.insertId, rut, nombre, apellido, email, id_perfil, estado: 'activo',
+        correo_enviado: envio.ok,
+        clave_temporal: envio.ok ? null : claveTemporal,
+        correo_error: envio.ok ? null : envio.error
+      },
       error: null
     });
   } catch (error) {
@@ -233,15 +292,31 @@ const reactivarUsuario = async (req, res) => {
 const resetClave = async (req, res) => {
   try {
     const { id } = req.params;
-    const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghjkmnpqrstuvwxyz23456789!@#';
-    let nuevaClave = '';
-    for (let i = 0; i < 10; i++) nuevaClave += chars[Math.floor(Math.random() * chars.length)];
+    const nuevaClave = generarClaveTemporal();
 
     const hash = await bcrypt.hash(nuevaClave, 10);
-    await pool.query('UPDATE usuarios SET password_hash = ? WHERE id_usuario = ?', [hash, id]);
+    // Forzar cambio en el próximo ingreso (igual que en el alta)
+    await pool.query('UPDATE usuarios SET password_hash = ?, debe_cambiar_clave = 1 WHERE id_usuario = ?', [hash, id]);
 
     auditar({ req, accion: 'EDITAR', modulo: 'usuarios', entidad: 'usuario', entidad_id: id, detalle: `Reseteó la contraseña del usuario #${id}` });
-    res.json({ success: true, data: { nueva_clave: nuevaClave, mensaje: 'Contraseña reseteada. Comparte esta clave con el usuario.' }, error: null });
+
+    // Enviar la nueva clave por correo al usuario (si tiene email). Se sigue devolviendo la clave como respaldo.
+    let correo_enviado = false;
+    try {
+      const [[u]] = await pool.query('SELECT nombre, email FROM usuarios WHERE id_usuario = ?', [id]);
+      if (u && u.email) {
+        const c = correoClave(u.nombre, u.email, nuevaClave, true);
+        const envio = await enviarCorreo({ to: u.email, subject: c.subject, html: c.html, text: c.text });
+        correo_enviado = envio.ok;
+      }
+    } catch (_) { /* el envío no debe romper el reset */ }
+
+    res.json({ success: true, data: {
+      nueva_clave: nuevaClave, correo_enviado,
+      mensaje: correo_enviado
+        ? 'Contraseña reseteada y enviada al correo del usuario.'
+        : 'Contraseña reseteada. Comparte esta clave con el usuario.'
+    }, error: null });
   } catch (error) {
     res.status(500).json({ success: false, data: null, error: error.message });
   }

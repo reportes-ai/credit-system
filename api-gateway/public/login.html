@@ -143,6 +143,35 @@
           </span>
         </button>
       </form>
+
+      <!-- Cambio de contraseña obligatorio en el primer ingreso -->
+      <form id="formNuevaClave" novalidate style="display:none">
+        <p style="font-size:0.85rem;color:#374151;margin-bottom:14px">
+          <i class="bi bi-shield-lock text-primary me-1"></i>
+          Por seguridad, define tu contraseña antes de continuar.
+        </p>
+        <div class="mb-3">
+          <label class="form-label">Nueva contraseña</label>
+          <div class="input-group">
+            <span class="input-group-text"><i class="bi bi-lock"></i></span>
+            <input type="password" id="nuevaClave" class="form-control" placeholder="Mínimo 6 caracteres" autocomplete="new-password">
+          </div>
+        </div>
+        <div class="mb-4">
+          <label class="form-label">Confirmar contraseña</label>
+          <div class="input-group">
+            <span class="input-group-text"><i class="bi bi-lock-fill"></i></span>
+            <input type="password" id="confirmaClave" class="form-control" placeholder="Repite la contraseña" autocomplete="new-password">
+          </div>
+        </div>
+        <button type="submit" class="btn-login" id="btnNuevaClave">
+          <span id="btnTextNC"><i class="bi bi-shield-check me-2"></i>Guardar y entrar</span>
+          <span id="btnSpinnerNC" class="d-none">
+            <span class="spinner-border spinner-border-sm me-2"></span>Guardando...
+          </span>
+        </button>
+      </form>
+
       <p class="version">AutoFácil <strong>v5.2</strong> &nbsp;·&nbsp; 2026</p>
       <p class="version" style="margin-top:4px;font-size:0.68rem;color:#c4c9d4">Desarrollado por Patricio Escobar Pohlhammer</p>
     </div>
@@ -151,6 +180,18 @@
   <script>
     // Si ya hay sesión, redirigir al inicio
     if (sessionStorage.getItem('token')) window.location.href = '/';
+
+    // Clave usada al ingresar — sirve como "contraseña actual" en el cambio obligatorio.
+    // La sesión NO se persiste hasta cambiar la clave (evita saltarse el paso recargando).
+    let _loginPassword = '';
+    let _pendingToken = null;
+    let _pendingUsuario = null;
+
+    function dissolveEntrar() {
+      document.querySelector('.login-card').classList.add('dissolving');
+      document.getElementById('bgOverlay').classList.add('active');
+      setTimeout(() => { window.location.href = '/'; }, 780);
+    }
 
     document.getElementById('togglePass').addEventListener('click', () => {
       const inp = document.getElementById('password');
@@ -180,6 +221,21 @@
         const data = await resp.json();
 
         if (data.success) {
+          /* ── Primer ingreso: forzar cambio de contraseña (sesión no se guarda aún) ── */
+          if (data.data.debe_cambiar_clave) {
+            _loginPassword = password;
+            _pendingToken = data.data.token;
+            _pendingUsuario = data.data.usuario;
+            btnLogin.disabled = false;
+            document.getElementById('btnText').classList.remove('d-none');
+            document.getElementById('btnSpinner').classList.add('d-none');
+            document.getElementById('formLogin').style.display = 'none';
+            document.getElementById('formNuevaClave').style.display = '';
+            alerta.style.display = 'none';
+            document.getElementById('nuevaClave').focus();
+            return;
+          }
+
           sessionStorage.setItem('token', data.data.token);
           sessionStorage.setItem('usuario', JSON.stringify(data.data.usuario));
 
@@ -190,11 +246,7 @@
           btnLogin.style.background = 'linear-gradient(135deg,#059669,#10b981)';
 
           /* ── Dissolve + redirect ── */
-          setTimeout(() => {
-            document.querySelector('.login-card').classList.add('dissolving');
-            document.getElementById('bgOverlay').classList.add('active');
-            setTimeout(() => { window.location.href = '/'; }, 780);
-          }, 320);
+          setTimeout(dissolveEntrar, 320);
 
         } else {
           alerta.textContent = data.error || 'Error al iniciar sesión';
@@ -209,6 +261,54 @@
         btnLogin.disabled = false;
         document.getElementById('btnText').classList.remove('d-none');
         document.getElementById('btnSpinner').classList.add('d-none');
+      }
+    });
+
+    /* ── Cambio de contraseña obligatorio (primer ingreso) ── */
+    document.getElementById('formNuevaClave').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const nueva    = document.getElementById('nuevaClave').value;
+      const confirma = document.getElementById('confirmaClave').value;
+      const alerta   = document.getElementById('alerta');
+      const btn      = document.getElementById('btnNuevaClave');
+
+      alerta.style.display = 'none';
+      if (nueva.length < 6) { alerta.textContent = 'La contraseña debe tener al menos 6 caracteres'; alerta.style.display = 'block'; return; }
+      if (nueva !== confirma) { alerta.textContent = 'Las contraseñas no coinciden'; alerta.style.display = 'block'; return; }
+
+      btn.disabled = true;
+      document.getElementById('btnTextNC').classList.add('d-none');
+      document.getElementById('btnSpinnerNC').classList.remove('d-none');
+
+      try {
+        const r = await fetch('/api/auth/cambiar-clave', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + _pendingToken },
+          body: JSON.stringify({ password_actual: _loginPassword, password_nuevo: nueva })
+        });
+        const data = await r.json();
+        if (data.success) {
+          // Recién ahora se persiste la sesión
+          sessionStorage.setItem('token', _pendingToken);
+          sessionStorage.setItem('usuario', JSON.stringify(_pendingUsuario));
+          document.getElementById('btnSpinnerNC').classList.add('d-none');
+          document.getElementById('btnTextNC').classList.remove('d-none');
+          document.getElementById('btnTextNC').innerHTML = '<i class="bi bi-check-circle-fill me-2"></i>¡Listo!';
+          btn.style.background = 'linear-gradient(135deg,#059669,#10b981)';
+          setTimeout(dissolveEntrar, 420);
+        } else {
+          alerta.textContent = data.error || 'No se pudo cambiar la contraseña';
+          alerta.style.display = 'block';
+          btn.disabled = false;
+          document.getElementById('btnTextNC').classList.remove('d-none');
+          document.getElementById('btnSpinnerNC').classList.add('d-none');
+        }
+      } catch {
+        alerta.textContent = 'Error de conexión con el servidor';
+        alerta.style.display = 'block';
+        btn.disabled = false;
+        document.getElementById('btnTextNC').classList.remove('d-none');
+        document.getElementById('btnSpinnerNC').classList.add('d-none');
       }
     });
   </script>
