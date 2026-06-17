@@ -58,7 +58,6 @@ const { auditar } = require('../../../../shared/audit');
       ['Clientes',     'Ver Antecedentes Laborales',      'clientes_antecedentes',       1],
       ['Clientes',     'Ver Información Comercial',        'clientes_info_comercial',     1],
       // Créditos
-      ['Créditos',     'Cargar Documentos Respaldo',       'creditos_cargar_doc',         1],
       ['Créditos',     'Validar Documentos AF',            'creditos_validar_doc_af',     0],
       ['Créditos',     'Pagar Cuotas',                     'creditos_pagar_cuotas',       0],
       ['Créditos',     'Reversar Pagos',                   'creditos_reversar_pagos',     0],
@@ -314,7 +313,6 @@ const { auditar } = require('../../../../shared/audit');
       // Créditos
       ['creditos_revisar',           'Revisión de Crédito'],
       ['creditos_ver_respaldos',     'Carga de Respaldos'],
-      ['creditos_cargar_doc',        'Documentos del Crédito'],
       ['creditos_documentos_af',     'Carga Documentos AutoFácil'],
       ['creditos_validar_doc_af',    'Validación de Documentos AF'],
       ['creditos_auditoria',         'Auditoría de Crédito'],
@@ -1908,6 +1906,26 @@ const getUsuariosByPerfil = async (req, res) => {
       [adm.id_perfil, idF]);
     console.log('✓ Perfiles v32: permiso Reversar Envío de Cartola registrado');
   } catch (e) { console.error('[perfiles migration v32]', e.message); }
+})();
+
+/* ─── Migración: eliminar funcionalidades duplicadas por NOMBRE (códigos distintos) ─
+   Caso: dos funcionalidades con el mismo nombre visible y códigos diferentes (la
+   dedup por código no las junta). Se conserva la canónica y se elimina la sobrante,
+   no usada como gate. Lista extensible. */
+(async () => {
+  // codigo a eliminar → (canónica que se conserva, solo informativo)
+  const OBSOLETAS = ['creditos_cargar_doc']; // "Documentos del Crédito" dup → canónica: creditos_documentos
+  try {
+    for (const cod of OBSOLETAS) {
+      const [rows] = await pool.query('SELECT id_funcionalidad FROM funcionalidades WHERE codigo=?', [cod]);
+      for (const r of rows) {
+        await pool.query('DELETE FROM permisos_perfil WHERE id_funcionalidad=?', [r.id_funcionalidad]);
+        try { await pool.query('DELETE FROM permisos_usuario WHERE id_funcionalidad=?', [r.id_funcionalidad]); } catch (_) {}
+        await pool.query('DELETE FROM funcionalidades WHERE id_funcionalidad=?', [r.id_funcionalidad]);
+      }
+      if (rows.length) console.log(`[func-obsoletas] eliminada '${cod}' (${rows.length})`);
+    }
+  } catch (e) { console.error('[func-obsoletas]', e.message); }
 })();
 
 /* ─── Migración: deduplicar funcionalidades por código + UNIQUE(codigo) ─────────
