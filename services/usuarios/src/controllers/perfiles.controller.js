@@ -144,6 +144,7 @@ const { auditar } = require('../../../../shared/audit');
       ['Créditos', 'Ver Respaldos de Crédito',      'creditos_ver_respaldos',       1],
       ['Créditos', 'Validación de Firma',            'creditos_validacion_firma',    0],
       ['Créditos', 'Revisar Crédito (Analista)',     'creditos_revisar',             0],
+      ['Créditos', 'Recalcular Comisiones',          'creditos_recalcular_comisiones', 0],
       // ── Tesorería ───────────────────────────────────────────
       ['Tesorería', 'Cuentas Transitorias',          'tesoreria_cuentas_transitorias', 0],
       // ── Cobranza ────────────────────────────────────────────

@@ -452,10 +452,7 @@ const marcarNoOtorgado = async (req, res) => {
 // Pre-carga params y UF una sola vez. UPDATEs en chunks de 500.
 const recalcularComisiones = async (req, res) => {
   try {
-    const perfil = req.usuario?.perfil_nombre || '';
-    if (perfil !== 'Administrador')
-      return res.status(403).json({ success: false, data: null, error: 'Solo Administrador puede ejecutar el recálculo' });
-
+    // Acceso por matriz (requireFunc('creditos_recalcular_comisiones') en la ruta).
     const { mes_desde, mes_hasta } = req.body || {};
 
     // Determinar los meses a recalcular

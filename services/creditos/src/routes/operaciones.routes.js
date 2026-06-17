@@ -4,7 +4,7 @@ const { verifyToken } = require('../../../../shared/middleware/auth');
 const { requireFunc } = require('../../../../shared/middleware/permisos');
 
 router.get('/next-op',                    verifyToken, ctrl.nextOp);
-router.post('/recalcular-comisiones',     verifyToken, ctrl.recalcularComisiones);
+router.post('/recalcular-comisiones',     verifyToken, requireFunc('creditos_recalcular_comisiones'), ctrl.recalcularComisiones);
 router.get('/',                 verifyToken, ctrl.getAll);
 router.get('/:id',              verifyToken, ctrl.getOne);
 router.post('/',                verifyToken, ctrl.create);
