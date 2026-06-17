@@ -11,6 +11,10 @@ const configSeguridad = requireFunc('usuarios_seguridad');
 router.get('/seguridad',      verifyToken,                ctrl.getConfig);
 router.put('/seguridad',      verifyToken, configSeguridad, ctrl.putConfig);
 
+// Correo del sistema: estado + envío de prueba
+router.get('/mail/status',    verifyToken,                ctrl.mailStatus);
+router.post('/mail/test',     verifyToken, configSeguridad, ctrl.testEmail);
+
 router.get('/ui/ping',        verifyToken,            uiCtrl.ping);
 router.get('/ui/:clave',      verifyToken,            uiCtrl.getUiConfig);
 router.put('/ui/:clave',      verifyToken,            uiCtrl.putUiConfig);

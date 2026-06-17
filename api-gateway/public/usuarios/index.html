@@ -355,6 +355,27 @@
     <div id="tab-seguridad" style="display:none">
       <div class="row g-4">
 
+        <!-- Correo del sistema -->
+        <div class="col-12">
+          <div class="seg-section">
+            <div class="seg-section-header"><i class="bi bi-envelope-at"></i>Correo del Sistema</div>
+            <div class="seg-section-body">
+              <p style="font-size:.85rem;color:#64748b;margin-bottom:10px">
+                Para enviar claves y alertas. Se configura con las variables <code>MAIL_*</code> en el servidor (Render); aquí solo se verifica.
+              </p>
+              <div class="d-flex align-items-center flex-wrap gap-2 mb-2">
+                <span id="mailEstado" class="badge-estado badge-inactivo">Verificando…</span>
+                <span id="mailFrom" class="text-muted" style="font-size:.82rem"></span>
+              </div>
+              <div class="d-flex align-items-center flex-wrap gap-2">
+                <input type="email" id="mailTestTo" class="form-control" style="max-width:280px" placeholder="correo de destino (opcional)">
+                <button class="btn btn-outline-primary btn-sm" onclick="enviarCorreoPrueba()"><i class="bi bi-send me-1"></i>Enviar correo de prueba</button>
+              </div>
+              <div id="mailTestMsg" class="mt-2" style="font-size:.85rem"></div>
+            </div>
+          </div>
+        </div>
+
         <!-- Columna izquierda -->
         <div class="col-lg-6">
 
@@ -1330,6 +1351,7 @@
     let _segCargado = false;
 
     async function cargarSeguridad() {
+      cargarMailStatus();
       if (_segCargado) return;
       const data = await api('GET', '/api/config/seguridad');
       if (!data?.success) return;
@@ -1338,6 +1360,33 @@
       _segCargado = true;
       actualizarFortaleza();
       actualizarHistorial();
+    }
+
+    async function cargarMailStatus() {
+      const badge = document.getElementById('mailEstado');
+      const from  = document.getElementById('mailFrom');
+      try {
+        const r = await api('GET', '/api/config/mail/status');
+        const ok = r?.data?.configurado;
+        badge.className = 'badge-estado ' + (ok ? 'badge-activo' : 'badge-inactivo');
+        badge.textContent = ok ? 'Configurado' : 'No configurado';
+        from.textContent  = r?.data?.from ? ('Remitente: ' + r.data.from) : '';
+      } catch (e) {
+        badge.className = 'badge-estado badge-inactivo';
+        badge.textContent = 'No se pudo verificar';
+      }
+    }
+
+    async function enviarCorreoPrueba() {
+      const to = document.getElementById('mailTestTo').value.trim();
+      const msg = document.getElementById('mailTestMsg');
+      msg.innerHTML = '<span class="text-muted"><i class="bi bi-hourglass-split me-1"></i>Enviando…</span>';
+      const r = await api('POST', '/api/config/mail/test', to ? { to } : {});
+      if (r?.success) {
+        msg.innerHTML = `<span style="color:#166534"><i class="bi bi-check-circle me-1"></i>Enviado a <b>${r.data.to}</b>. Revisa la bandeja (y spam la primera vez).</span>`;
+      } else {
+        msg.innerHTML = `<span style="color:#991b1b"><i class="bi bi-x-circle me-1"></i>${r?.error || 'Error al enviar'}</span>`;
+      }
     }
 
     function _aplicarConfig(c) {
