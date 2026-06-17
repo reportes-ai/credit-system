@@ -156,6 +156,7 @@ const { auditar } = require('../../../../shared/audit');
       ['CRM', 'Ver Estadísticas CRM',                'crm_estadisticas',             0],
       // ── Mantenedores ────────────────────────────────────────
       ['Mantenedores', 'Gestionar Cuentas Bancarias','mantenedores_cuentas_bancarias',0],
+      ['Mantenedores', 'Configurar Workflow Brokerage','mantenedores_workflow',        0],
       ['Mantenedores', 'Gestionar Tasas',            'mantenedores_tasas',           0],
       ['Mantenedores', 'Gestionar Factores de Seguro','mantenedores_factores_seguro',0],
       ['Mantenedores', 'Gestionar UF',               'mantenedores_uf',              0],
@@ -2028,6 +2029,26 @@ const getUsuariosByPerfil = async (req, res) => {
     await pool.query("INSERT IGNORE INTO migraciones_aplicadas (clave) VALUES ('tesoreria_requirefunc_v1')");
     console.log('[tesoreria_requirefunc_v1] permisos históricos preservados');
   } catch (e) { console.error('[tesoreria_requirefunc_v1]', e.message); }
+})();
+
+/* ─── Migración (UNA sola vez): preservar acceso al migrar meses-cerrados →
+   requireFunc. Antes era Admin+Gerente; Admin pasa por bypass, así que solo hay
+   que otorgar a Gerente. (workflow era solo Admin → no requiere grant). */
+(async () => {
+  try {
+    await pool.query(`CREATE TABLE IF NOT EXISTS migraciones_aplicadas (
+      clave VARCHAR(80) PRIMARY KEY,
+      aplicada_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP)`);
+    const [[ya]] = await pool.query("SELECT 1 ok FROM migraciones_aplicadas WHERE clave='meses_cerrados_requirefunc_v1'");
+    if (ya) return;
+    const [[f]] = await pool.query("SELECT id_funcionalidad FROM funcionalidades WHERE codigo='mant_meses_cerrados' LIMIT 1");
+    const [[p]] = await pool.query("SELECT id_perfil FROM perfiles WHERE nombre='Gerente' LIMIT 1");
+    if (f && p) await pool.query(
+      'INSERT INTO permisos_perfil (id_perfil, id_funcionalidad, habilitado) VALUES (?,?,1) ' +
+      'ON DUPLICATE KEY UPDATE habilitado=1', [p.id_perfil, f.id_funcionalidad]);
+    await pool.query("INSERT IGNORE INTO migraciones_aplicadas (clave) VALUES ('meses_cerrados_requirefunc_v1')");
+    console.log('[meses_cerrados_requirefunc_v1] permiso histórico (Gerente) preservado');
+  } catch (e) { console.error('[meses_cerrados_requirefunc_v1]', e.message); }
 })();
 
 module.exports = { getAllPerfiles, getModulosConFuncionalidades, getPermisosPerfil, updatePermisosPerfil, reordenarModulos, createPerfil, updatePerfil, deletePerfil, getUsuariosByPerfil };
