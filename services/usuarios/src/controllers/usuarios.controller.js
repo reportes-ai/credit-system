@@ -2,7 +2,7 @@ const pool = require('../../../../shared/config/database');
 const bcrypt = require('bcryptjs');
 const { auditar } = require('../../../../shared/audit');
 const { tieneFunc } = require('../../../../shared/middleware/permisos');
-const { enviarCorreo } = require('../../../../shared/mailer');
+const { enviarCorreo, envolverHTML } = require('../../../../shared/mailer');
 // Job en segundo plano: avisa por correo el vencimiento de clave (carga al boot)
 require('../jobs/aviso-vencimiento-clave');
 
@@ -25,31 +25,28 @@ const correoClave = (nombre, email, clave, esReset = false) => {
     : 'Tu acceso a AutoFácil Business Suite';
   const intro = esReset
     ? 'Se restableció la contraseña de tu cuenta. Estos son tus nuevos datos de acceso:'
-    : 'Se creó tu cuenta en el sistema. Estos son tus datos de acceso:';
-  const text = `Hola ${nombre},\n\n${intro}\n\nUsuario (correo): ${email}\nContraseña temporal: ${clave}\n\nIngresa en ${login}\nPor seguridad, el sistema te pedirá cambiar la contraseña en tu primer ingreso.\n\nSi no esperabas este correo, avísale a tu administrador.`;
-  const html = `
-    <div style="font-family:Segoe UI,Arial,sans-serif;max-width:520px;margin:auto;border:1px solid #e5e7eb;border-radius:14px;overflow:hidden">
-      <div style="background:linear-gradient(135deg,#012d70,#0141A2 60%,#009AFE);color:#fff;padding:22px 26px">
-        <div style="font-size:1.15rem;font-weight:700">AutoFácil Business Suite</div>
-        <div style="font-size:.85rem;opacity:.85">Acceso al sistema</div>
-      </div>
-      <div style="padding:24px 26px;color:#1e293b;font-size:.92rem;line-height:1.6">
-        <p>Hola <b>${nombre}</b>,</p>
-        <p>${intro}</p>
-        <div style="background:#f8fafc;border:1px solid #e5e7eb;border-radius:10px;padding:14px 16px;margin:14px 0">
-          <div style="font-size:.8rem;color:#64748b">Usuario (correo)</div>
-          <div style="font-weight:600;margin-bottom:8px">${email}</div>
-          <div style="font-size:.8rem;color:#64748b">Contraseña temporal</div>
-          <div style="font-family:monospace;font-size:1.2rem;font-weight:700;color:#0141A2;letter-spacing:1px">${clave}</div>
-        </div>
-        <p>Por seguridad, <b>el sistema te pedirá cambiar esta contraseña</b> en tu primer ingreso.</p>
-        <p style="text-align:center;margin:22px 0">
-          <a href="${login}" style="background:#0141A2;color:#fff;text-decoration:none;padding:11px 26px;border-radius:8px;font-weight:600;display:inline-block">Ingresar al sistema</a>
-        </p>
-        <p style="font-size:.8rem;color:#94a3b8">Si no esperabas este correo, avísale a tu administrador.</p>
-      </div>
-    </div>`;
-  return { subject, text, html };
+    : 'Te damos la bienvenida a AutoFácil Business Suite. Tu cuenta ya está creada; estos son tus datos de acceso:';
+  const text = `Hola ${nombre},\n\n${intro}\n\nUsuario (correo): ${email}\nContraseña temporal: ${clave}\n\nPor seguridad, el sistema te pedirá cambiar la contraseña en tu primer ingreso.\nIngresa en ${login}\n\nSi no esperabas este correo, avísale a tu administrador.\n\nSaludos,\nAutoFácil Business Suite`;
+  const cuerpo = `
+    <p style="margin:0 0 14px">Hola <b>${nombre}</b>,</p>
+    <p style="margin:0 0 18px">${intro}</p>
+    <table role="presentation" width="100%" style="border-collapse:collapse;background:#f8fafc;border:1px solid #e5e7eb;border-radius:12px">
+      <tr><td style="padding:16px 18px 6px">
+        <div style="font-size:12px;color:#64748b;text-transform:uppercase;letter-spacing:.4px">Usuario (correo)</div>
+        <div style="font-size:15px;font-weight:600;color:#0f172a">${email}</div>
+      </td></tr>
+      <tr><td style="padding:6px 18px 18px">
+        <div style="font-size:12px;color:#64748b;text-transform:uppercase;letter-spacing:.4px">Contraseña temporal</div>
+        <div style="font-family:'Courier New',monospace;font-size:22px;font-weight:700;color:#0141A2;letter-spacing:2px;background:#ffffff;border:1px dashed #93c5fd;border-radius:8px;padding:11px 14px;margin-top:6px;text-align:center;-webkit-user-select:all;user-select:all">${clave}</div>
+        <div style="font-size:11px;color:#94a3b8;margin-top:6px;text-align:center">En el celular, mantén presionada la clave para copiarla.</div>
+      </td></tr>
+    </table>
+    <p style="margin:18px 0 0">Por seguridad, <b>el sistema te pedirá cambiar esta contraseña</b> en tu primer ingreso.</p>
+    <p style="text-align:center;margin:24px 0 4px">
+      <a href="${login}" style="background:#0141A2;color:#fff;text-decoration:none;padding:12px 30px;border-radius:8px;font-weight:600;display:inline-block;font-size:15px">Ingresar al sistema</a>
+    </p>
+    <p style="font-size:12px;color:#94a3b8;margin:14px 0 0">Si no esperabas este correo, avísale a tu administrador.</p>`;
+  return { subject, text, html: envolverHTML(cuerpo) };
 };
 
 /* ─── Migraciones ──────────────────────────────────────────────── */

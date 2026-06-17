@@ -9,7 +9,7 @@
    cambiarla (ver auth.controller.js); aquí solo se avisa antes.
    ════════════════════════════════════════════════════════════════ */
 const pool = require('../../../../shared/config/database');
-const { enviarCorreo, mailConfigurado } = require('../../../../shared/mailer');
+const { enviarCorreo, mailConfigurado, envolverHTML } = require('../../../../shared/mailer');
 
 const APP_URL = (process.env.APP_URL || 'https://credit-system-45em.onrender.com').replace(/\/+$/, '');
 const DIAS_AVISO_DEFAULT = 5; // días de anticipación por defecto (configurable en Seguridad)
@@ -28,26 +28,20 @@ function correoVencimiento(nombre, dias) {
   const login = `${APP_URL}/login.html`;
   const cuando = dias <= 1 ? 'mañana' : `en ${dias} días`;
   const subject = `Tu contraseña vence ${cuando} — AutoFácil Business Suite`;
-  const text = `Hola ${nombre},\n\nTu contraseña del sistema vence ${cuando}. Por seguridad, cámbiala antes de que expire.\n\nIngresa en ${login}, abre el menú de tu usuario (arriba a la derecha) y elige "Cambiar contraseña".\n\nSi no la cambias antes del vencimiento, el sistema te pedirá hacerlo en tu próximo ingreso.\n\nSeguirás recibiendo este aviso a diario hasta que cambies la contraseña.`;
-  const html = `
-    <div style="font-family:Segoe UI,Arial,sans-serif;max-width:520px;margin:auto;border:1px solid #e5e7eb;border-radius:14px;overflow:hidden">
-      <div style="background:linear-gradient(135deg,#012d70,#0141A2 60%,#009AFE);color:#fff;padding:22px 26px">
-        <div style="font-size:1.15rem;font-weight:700">AutoFácil Business Suite</div>
-        <div style="font-size:.85rem;opacity:.85">Vencimiento de contraseña</div>
-      </div>
-      <div style="padding:24px 26px;color:#1e293b;font-size:.92rem;line-height:1.6">
-        <p>Hola <b>${nombre}</b>,</p>
-        <p>Tu contraseña del sistema <b>vence ${cuando}</b>. Por seguridad, cámbiala antes de que expire.</p>
-        <div style="background:#fff7ed;border:1px solid #fed7aa;border-radius:10px;padding:12px 16px;margin:14px 0;color:#9a3412;font-size:.88rem">
-          <i>⏰</i> Para cambiarla: ingresa al sistema, abre el menú de tu usuario (arriba a la derecha) y elige <b>“Cambiar contraseña”</b>.
-        </div>
-        <p style="text-align:center;margin:22px 0">
-          <a href="${login}" style="background:#0141A2;color:#fff;text-decoration:none;padding:11px 26px;border-radius:8px;font-weight:600;display:inline-block">Ingresar al sistema</a>
-        </p>
-        <p style="font-size:.8rem;color:#94a3b8">Si no la cambias antes del vencimiento, el sistema te pedirá hacerlo en tu próximo ingreso. Seguirás recibiendo este aviso a diario hasta que la cambies.</p>
-      </div>
-    </div>`;
-  return { subject, text, html };
+  const text = `Hola ${nombre},\n\nTu contraseña del sistema vence ${cuando}. Por seguridad, te recomendamos cambiarla antes de que expire.\n\nCómo cambiarla: ingresa al sistema, abre el menú de tu usuario (arriba a la derecha) y elige "Cambiar contraseña".\nIngresa en ${login}\n\nSi no la cambias antes del vencimiento, el sistema te pedirá hacerlo en tu próximo ingreso. Seguirás recibiendo este aviso a diario hasta que la cambies.\n\nSaludos,\nAutoFácil Business Suite`;
+  const cuerpo = `
+    <p style="margin:0 0 14px">Hola <b>${nombre}</b>,</p>
+    <p style="margin:0 0 16px">Tu contraseña del sistema <b>vence ${cuando}</b>. Por seguridad, te recomendamos cambiarla antes de que expire.</p>
+    <table role="presentation" width="100%" style="border-collapse:collapse;background:#fff7ed;border:1px solid #fed7aa;border-radius:12px">
+      <tr><td style="padding:14px 18px;color:#9a3412;font-size:14px;line-height:1.55">
+        <b>Cómo cambiarla:</b> ingresa al sistema, abre el menú de tu usuario (arriba a la derecha) y elige <b>“Cambiar contraseña”</b>.
+      </td></tr>
+    </table>
+    <p style="text-align:center;margin:24px 0 4px">
+      <a href="${login}" style="background:#0141A2;color:#fff;text-decoration:none;padding:12px 30px;border-radius:8px;font-weight:600;display:inline-block;font-size:15px">Ingresar al sistema</a>
+    </p>
+    <p style="font-size:12px;color:#94a3b8;margin:14px 0 0">Si no la cambias antes del vencimiento, el sistema te pedirá hacerlo en tu próximo ingreso. Seguirás recibiendo este aviso a diario hasta que la cambies.</p>`;
+  return { subject, text, html: envolverHTML(cuerpo) };
 }
 
 let corriendo = false;

@@ -39,6 +39,29 @@ function remitente() {
   return process.env.MAIL_FROM || 'AutoFácil <afbs@autofacilchile.cl>';
 }
 
+// URL base para imágenes/enlaces de los correos
+const APP_URL = (process.env.APP_URL || 'https://credit-system-45em.onrender.com').replace(/\/+$/, '');
+
+// Envuelve el contenido en la plantilla corporativa: barra superior, cierre "Saludos,"
+// y el logo de Business Suite al pie. `cuerpoHtml` es el contenido específico del correo.
+function envolverHTML(cuerpoHtml) {
+  const logo = `${APP_URL}/img/logo-bs.png`;
+  return `
+  <div style="background:#eef2f7;padding:26px 12px;font-family:'Segoe UI',Arial,sans-serif">
+    <div style="max-width:540px;margin:0 auto;background:#ffffff;border:1px solid #e5e7eb;border-radius:16px;overflow:hidden;box-shadow:0 8px 28px rgba(2,32,82,.08)">
+      <div style="height:6px;background:linear-gradient(90deg,#012d70,#0141A2 55%,#009AFE)"></div>
+      <div style="padding:30px 32px;color:#1e293b;font-size:15px;line-height:1.65">
+        ${cuerpoHtml}
+        <p style="margin:28px 0 8px;color:#1e293b">Saludos,</p>
+        <img src="${logo}" alt="AutoFácil Business Suite" width="160" style="display:block;height:auto;max-width:160px;margin-top:2px">
+      </div>
+    </div>
+    <p style="max-width:540px;margin:14px auto 0;text-align:center;color:#94a3b8;font-size:11px;line-height:1.5">
+      Correo automático de AutoFácil Business Suite · por favor no respondas a este mensaje.
+    </p>
+  </div>`;
+}
+
 // Nunca lanza: devuelve { ok, error?, messageId? } para no romper el flujo que lo llama.
 async function enviarCorreo({ to, subject, html, text, replyTo } = {}) {
   try {
@@ -61,4 +84,4 @@ async function enviarCorreo({ to, subject, html, text, replyTo } = {}) {
   }
 }
 
-module.exports = { enviarCorreo, mailConfigurado, remitente };
+module.exports = { enviarCorreo, mailConfigurado, remitente, envolverHTML };

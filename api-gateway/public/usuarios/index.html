@@ -748,6 +748,7 @@
             <div class="nueva-clave-box">
               <div style="font-size:0.82rem; color:#713f12; font-weight:600">Clave temporal generada:</div>
               <div class="clave" id="claveGenerada"></div>
+              <button class="btn btn-sm btn-outline-primary mt-1 mb-2" id="btnCopiarClave" onclick="copiarClaveReset()"><i class="bi bi-clipboard me-1"></i>Copiar clave</button>
               <div style="font-size:0.75rem; color:#92400e" id="resetNota">Copia y entrega esta clave al usuario.</div>
             </div>
           </div>
@@ -1065,6 +1066,15 @@
         <button class="btn btn-warning" onclick="confirmarReset()"><i class="bi bi-arrow-clockwise me-1"></i>Resetear</button>
       `;
       bootstrap.Modal.getOrCreateInstance(document.getElementById('modalResetClave')).show();
+    }
+
+    function copiarClaveReset() {
+      const txt = document.getElementById('claveGenerada').textContent;
+      const b = document.getElementById('btnCopiarClave');
+      navigator.clipboard.writeText(txt).then(() => {
+        b.innerHTML = '<i class="bi bi-check2 me-1"></i>Copiada';
+        setTimeout(() => { b.innerHTML = '<i class="bi bi-clipboard me-1"></i>Copiar clave'; }, 1600);
+      }).catch(() => { b.innerHTML = '<i class="bi bi-x me-1"></i>No se pudo copiar'; });
     }
 
     async function confirmarReset() {
