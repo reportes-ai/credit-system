@@ -320,7 +320,16 @@ async function toggleCartola(id_credito) {
   }
 }
 
-const esAdmin = ['Administrador','Gerente'].includes(yo?.perfil);
+// Acciones admin (borrar/fix transitoria) por permiso (matriz), no por nombre de perfil
+let esAdmin = yo?.perfil === 'Administrador';
+(async () => {
+  if (esAdmin) return;
+  try {
+    const r = await fetch('/api/auth/mis-permisos?_='+Date.now(), { headers: H });
+    const j = await r.json();
+    if ((j.funcionalidades||[]).includes('tesoreria_cuentas_transitorias')) esAdmin = true;
+  } catch(e){}
+})();
 
 function renderCartola(data, id_credito) {
   const movs  = data.movimientos || [];

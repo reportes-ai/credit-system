@@ -1,10 +1,12 @@
 const router = require('express').Router();
 const ctrl   = require('../controllers/cierre-caja.controller');
-const { verifyToken, requirePerfil } = require('../../../../shared/middleware/auth');
+const { verifyToken } = require('../../../../shared/middleware/auth');
+const { requireFunc } = require('../../../../shared/middleware/permisos');
 
-const soloAdmin = [verifyToken, requirePerfil('Administrador', 'Gerente', 'Supervisor', 'Tesorero')];
+// Acceso por matriz (Perfiles y Permisos), no por nombre de perfil. Admin pasa por bypass.
+const puede = [verifyToken, requireFunc('tesoreria_cierre_caja')];
 
-router.get('/cajeros', ...soloAdmin, ctrl.getCajeros);
-router.get('/',        ...soloAdmin, ctrl.getCierre);
+router.get('/cajeros', ...puede, ctrl.getCajeros);
+router.get('/',        ...puede, ctrl.getCierre);
 
 module.exports = router;

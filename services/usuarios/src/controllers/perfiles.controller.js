@@ -1998,4 +1998,36 @@ const getUsuariosByPerfil = async (req, res) => {
   } catch (e) { console.error('[func-dedup]', e.message); }
 })();
 
+/* ─── Migración (UNA sola vez): preservar acceso histórico al migrar las rutas de
+   Tesorería de requirePerfil → requireFunc. Otorga por defecto el permiso a los
+   perfiles que antes accedían por nombre. Guardada en migraciones_aplicadas para
+   NO volver a correr y NO pisar cambios posteriores del Administrador. */
+(async () => {
+  try {
+    await pool.query(`CREATE TABLE IF NOT EXISTS migraciones_aplicadas (
+      clave VARCHAR(80) PRIMARY KEY,
+      aplicada_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP)`);
+    const [[ya]] = await pool.query("SELECT 1 ok FROM migraciones_aplicadas WHERE clave='tesoreria_requirefunc_v1'");
+    if (ya) return;
+    const grants = {
+      'tesoreria_cajas':                ['Gerente'],
+      'tesoreria_cierre_caja':          ['Gerente', 'Supervisor', 'Tesorero'],
+      'tesoreria_cuentas_transitorias': ['Gerente'],
+    };
+    for (const [cod, perfilesNom] of Object.entries(grants)) {
+      const [[f]] = await pool.query('SELECT id_funcionalidad FROM funcionalidades WHERE codigo=? LIMIT 1', [cod]);
+      if (!f) continue;
+      for (const nom of perfilesNom) {
+        const [[p]] = await pool.query('SELECT id_perfil FROM perfiles WHERE nombre=? LIMIT 1', [nom]);
+        if (!p) continue;
+        await pool.query(
+          'INSERT INTO permisos_perfil (id_perfil, id_funcionalidad, habilitado) VALUES (?,?,1) ' +
+          'ON DUPLICATE KEY UPDATE habilitado=1', [p.id_perfil, f.id_funcionalidad]);
+      }
+    }
+    await pool.query("INSERT IGNORE INTO migraciones_aplicadas (clave) VALUES ('tesoreria_requirefunc_v1')");
+    console.log('[tesoreria_requirefunc_v1] permisos históricos preservados');
+  } catch (e) { console.error('[tesoreria_requirefunc_v1]', e.message); }
+})();
+
 module.exports = { getAllPerfiles, getModulosConFuncionalidades, getPermisosPerfil, updatePermisosPerfil, reordenarModulos, createPerfil, updatePerfil, deletePerfil, getUsuariosByPerfil };

@@ -294,9 +294,17 @@
 const token = sessionStorage.getItem('token');
 const yo    = JSON.parse(sessionStorage.getItem('usuario') || 'null');
 if (!token || !yo) window.location.href = '/login.html';
-if (!['Administrador','Gerente','Supervisor'].includes(yo?.perfil)) {
-  alert('Acceso restringido'); window.location.href = '/tesoreria';
-}
+// Acceso por permiso (matriz Perfiles y Permisos), no por nombre de perfil. Admin pasa por bypass.
+(async () => {
+  if (yo?.perfil === 'Administrador') return;
+  let ok = false;
+  try {
+    const r = await fetch('/api/auth/mis-permisos?_='+Date.now(), { headers:{ Authorization:'Bearer '+token } });
+    const j = await r.json();
+    ok = (j.funcionalidades||[]).includes('tesoreria_cierre_caja');
+  } catch(e){}
+  if (!ok) { alert('Acceso restringido'); window.location.href = '/tesoreria'; }
+})();
 document.getElementById('navNombre').textContent = `${yo?.nombre||''} ${yo?.apellido||''}`.trim();
 document.getElementById('navPerfil').textContent  = yo?.perfil || '';
 document.getElementById('avatarInicial').textContent = (yo?.nombre||'?').charAt(0).toUpperCase();
