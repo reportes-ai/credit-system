@@ -17,6 +17,17 @@ const pool = require('../../../../shared/config/database');
 const axios = require('axios');
 const { XMLParser } = require('fast-xml-parser');
 const { auditar } = require('../../../../shared/audit');
+const { enviarCorreo, envolverHTML, mailConfigurado } = require('../../../../shared/mailer');
+
+// Cuerpo numérico del RUT (sin puntos, sin guión, sin dígito verificador) para comparar
+// con dealernet_informes.rut (que se guarda solo con el número).
+function rutNum(r) {
+  const clean = String(r || '').replace(/[.\s]/g, '').toUpperCase();
+  const m = clean.match(/^(\d+)-?[0-9K]$/);
+  if (m) return m[1];
+  const d = clean.replace(/[^0-9]/g, '');
+  return d.length > 1 ? d.slice(0, -1) : d;
+}
 
 const ENDPOINT    = process.env.DEALERNET_ENDPOINT || 'https://infows.dealernet.cl/wsinfodlnt.asmx';
 const SOAP_ACTION = 'http://dealernet.cl/webservices/CentralDeInformacion';
@@ -167,6 +178,37 @@ const EXTRA_CODIGOS = ['16', '2101'];
     }
     console.log('[dealernet-ws] repositorio de informes y card listos');
   } catch (e) { console.error('[dealernet-informes migration]', e.message); }
+})();
+
+/* ── Migración: auditoría de uso + aviso a supervisor/RRHH ────────────────── */
+(async () => {
+  try {
+    // Bitácora de avisos enviados cuando alguien consulta su propio RUT o el de un colega
+    await pool.query(`CREATE TABLE IF NOT EXISTS dealernet_avisos_uso (
+      id              INT AUTO_INCREMENT PRIMARY KEY,
+      id_usuario      INT NULL,
+      usuario_nombre  VARCHAR(160),
+      rut_consultado  VARCHAR(14),
+      motivo          VARCHAR(40),                 -- 'propio' | 'empresa'
+      detalle         VARCHAR(255),
+      destinatarios   VARCHAR(400),
+      enviado         TINYINT(1) DEFAULT 0,
+      created_at      DATETIME DEFAULT CURRENT_TIMESTAMP,
+      INDEX idx_av_usr (id_usuario, created_at)
+    )`);
+    // Correo de RRHH (paramétrico). También se detectan usuarios con perfil "Recursos Humanos".
+    await pool.query("INSERT IGNORE INTO dealernet_config (clave, valor) VALUES ('rrhh_email','')");
+    // Funcionalidad para ver la auditoría (módulo Informes DealerNet 380001)
+    const [[ex]] = await pool.query("SELECT id_funcionalidad FROM funcionalidades WHERE codigo='dealernet_auditoria' LIMIT 1");
+    let idf = ex && ex.id_funcionalidad;
+    if (!idf) {
+      const [r] = await pool.query("INSERT INTO funcionalidades (id_modulo, nombre, codigo, href, icono) VALUES (380001,'Auditoría de Uso','dealernet_auditoria',NULL,'bi-graph-up')");
+      idf = r.insertId;
+    }
+    const [[pp]] = await pool.query('SELECT 1 ok FROM permisos_perfil WHERE id_perfil=1 AND id_funcionalidad=? LIMIT 1', [idf]);
+    if (!pp) await pool.query('INSERT INTO permisos_perfil (id_perfil, id_funcionalidad, habilitado) VALUES (1,?,1)', [idf]);
+    console.log('[dealernet-ws] auditoría de uso lista');
+  } catch (e) { console.error('[dealernet-auditoria migration]', e.message); }
 })();
 
 /* ── Utilidades RUT ──────────────────────────────────────────────────────── */
@@ -389,6 +431,89 @@ async function guardarInformes({ num, dv, productosPedidos, r, idConsulta, usuar
   return ids;
 }
 
+/* ── Auditoría de uso: clasificación de RUT + aviso a supervisor/RRHH ──────── */
+// ¿El RUT consultado es el propio del usuario o el de otro usuario de la empresa?
+async function clasificarRutParaUsuario(usuario, rut) {
+  const num = rutNum(rut);
+  const out = { esPropio: false, esUsuarioEmpresa: false, usuarioEmpresa: null };
+  if (!num || !usuario) return out;
+  const [[me]] = await pool.query('SELECT rut FROM usuarios WHERE id_usuario=?', [usuario.id_usuario]);
+  if (me && rutNum(me.rut) === num) { out.esPropio = true; return out; }
+  const [users] = await pool.query("SELECT id_usuario, nombre, apellido, rut FROM usuarios WHERE rut IS NOT NULL AND rut<>''");
+  const match = users.find(u => rutNum(u.rut) === num);
+  if (match) { out.esUsuarioEmpresa = true; out.usuarioEmpresa = { id_usuario: match.id_usuario, nombre: `${match.nombre} ${match.apellido || ''}`.trim() }; }
+  return out;
+}
+
+// Destinatarios RRHH: config rrhh_email (coma/; ) + usuarios con perfil "Recursos Humanos"/"RRHH".
+async function destinatariosRRHH() {
+  const set = new Set();
+  try {
+    const [[c]] = await pool.query("SELECT valor FROM dealernet_config WHERE clave='rrhh_email'");
+    (c?.valor || '').split(/[,;\s]+/).map(s => s.trim().toLowerCase()).filter(s => s.includes('@')).forEach(e => set.add(e));
+  } catch (_) {}
+  try {
+    const [rows] = await pool.query(`SELECT u.email FROM usuarios u JOIN perfiles p ON p.id_perfil=u.id_perfil
+      WHERE u.estado='activo' AND u.email IS NOT NULL AND u.email<>''
+        AND (LOWER(p.nombre) LIKE '%recursos humanos%' OR LOWER(p.nombre) LIKE '%rrhh%')`);
+    rows.forEach(r => set.add(String(r.email).toLowerCase()));
+  } catch (_) {}
+  return [...set];
+}
+
+// Envía el "Aviso de uso de DealerNet" al supervisor + RRHH y lo registra en la bitácora.
+async function notificarUsoDealernet({ usuario, rutConsultado, motivo, usuarioEmpresa, productos }) {
+  let supEmail = null, solicitante = null;
+  try {
+    const [[row]] = await pool.query(
+      `SELECT u.nombre, u.apellido, u.email, s.email sup_email
+       FROM usuarios u LEFT JOIN usuarios s ON s.id_usuario=u.id_supervisor WHERE u.id_usuario=?`, [usuario.id_usuario]);
+    if (row) { solicitante = row; supEmail = row.sup_email; }
+  } catch (_) {}
+  const rrhh = await destinatariosRRHH();
+  const to = [...new Set([supEmail, ...rrhh].filter(Boolean))];
+  const nombreSol = solicitante ? `${solicitante.nombre} ${solicitante.apellido || ''}`.trim() : (usuario.nombre || '');
+  const detalle = motivo === 'propio'
+    ? `consultó su propio RUT (${rutConsultado})`
+    : `consultó el RUT de ${usuarioEmpresa?.nombre || 'un usuario de la empresa'} (${rutConsultado})`;
+
+  let enviado = false;
+  if (to.length && mailConfigurado()) {
+    const cuerpo = `
+      <p style="margin:0 0 14px">Estimado/a,</p>
+      <p style="margin:0 0 14px">Se registró un uso de la herramienta <b>DealerNet</b> (informes comerciales pagados) que requiere su atención:</p>
+      <table role="presentation" width="100%" style="border-collapse:collapse;background:#f8fafc;border:1px solid #e5e7eb;border-radius:12px">
+        <tr><td style="padding:12px 16px;line-height:1.75;font-size:14px">
+          <b>Usuario:</b> ${nombreSol}<br>
+          <b>Acción:</b> ${detalle}<br>
+          <b>Informes solicitados:</b> ${(productos || []).join(', ') || '—'}<br>
+          <b>Fecha:</b> ${new Date().toLocaleString('es-CL')}
+        </td></tr>
+      </table>
+      <p style="margin:16px 0 0">DealerNet es una herramienta pagada de AutoFácil SpA destinada al análisis de negocios. Este aviso se genera de forma automática cuando un usuario consulta su propio RUT o el de otro funcionario de la empresa.</p>`;
+    const r = await enviarCorreo({
+      to: to.join(','), subject: `Aviso de uso de DealerNet — ${nombreSol}`, html: envolverHTML(cuerpo),
+      text: `Aviso de uso de DealerNet.\n\nUsuario: ${nombreSol}\nAcción: ${detalle}\nInformes: ${(productos || []).join(', ')}\nFecha: ${new Date().toLocaleString('es-CL')}`
+    });
+    enviado = !!r.ok;
+  }
+  try {
+    await pool.query(
+      `INSERT INTO dealernet_avisos_uso (id_usuario, usuario_nombre, rut_consultado, motivo, detalle, destinatarios, enviado)
+       VALUES (?,?,?,?,?,?,?)`,
+      [usuario.id_usuario, nombreSol, rutConsultado, motivo, detalle, to.join(','), enviado ? 1 : 0]);
+  } catch (_) {}
+  return { enviado, destinatarios: to };
+}
+
+// El frontend lo usa para mostrar el pop-up ANTES de solicitar.
+const clasificarRut = async (req, res) => {
+  try {
+    if (!req.body?.rut) return res.status(400).json({ success: false, data: null, error: 'RUT requerido' });
+    res.json({ success: true, data: await clasificarRutParaUsuario(req.usuario, req.body.rut), error: null });
+  } catch (e) { errSrv(res, e, 'clasificarRut'); }
+};
+
 /* ── Repositorio de informes: endpoints ──────────────────────────────────── */
 // Revisa el repositorio ANTES de gastar saldo: por producto devuelve el último
 // informe y su estado (bloqueado <bloqueo, advertencia entre bloqueo y vigencia, libre).
@@ -465,7 +590,20 @@ const solicitarInformes = async (req, res) => {
       : [];
     auditar({ req, accion: 'CONSULTAR', modulo: 'dealernet', entidad: 'informe', entidad_id: ins.insertId,
       detalle: `Solicitó informes DealerNet RUT ${num}-${dv} (productos ${aPedir.join(',')}) → retcode ${r.retcode}`, rut: `${num}-${dv}` });
-    res.json({ success: true, data: { rut: `${num}-${dv}`, retcode: r.retcode, retmsg: r.retmsg, pedidos: aPedir, bloqueados, guardados }, error: null });
+
+    // Aviso automático: si consultó su propio RUT o el de otro usuario de la empresa,
+    // se notifica al supervisor + RRHH (no bloquea la respuesta).
+    let aviso = null;
+    try {
+      const cls = await clasificarRutParaUsuario(req.usuario, `${num}-${dv}`);
+      if (cls.esPropio || cls.esUsuarioEmpresa) {
+        const n = await notificarUsoDealernet({ usuario: req.usuario, rutConsultado: `${num}-${dv}`,
+          motivo: cls.esPropio ? 'propio' : 'empresa', usuarioEmpresa: cls.usuarioEmpresa, productos: aPedir });
+        aviso = { motivo: cls.esPropio ? 'propio' : 'empresa', ...n };
+      }
+    } catch (e) { console.error('[dealernet aviso]', e.message); }
+
+    res.json({ success: true, data: { rut: `${num}-${dv}`, retcode: r.retcode, retmsg: r.retmsg, pedidos: aPedir, bloqueados, guardados, aviso }, error: null });
   } catch (e) { errSrv(res, e, 'solicitarInformes'); }
 };
 
@@ -512,21 +650,76 @@ const descargarPdf = async (req, res) => {
 };
 
 /* ── Config paramétrica (umbrales) para el mantenedor ────────────────────── */
+async function leerRRHHEmail() {
+  try { const [[c]] = await pool.query("SELECT valor FROM dealernet_config WHERE clave='rrhh_email'"); return c?.valor || ''; }
+  catch { return ''; }
+}
 const getConfigEndpoint = async (req, res) => {
-  try { res.json({ success: true, data: await getConfig(), error: null }); }
+  try { res.json({ success: true, data: { ...(await getConfig()), rrhh_email: await leerRRHHEmail() }, error: null }); }
   catch (e) { errSrv(res, e, 'getConfigEndpoint'); }
 };
 const updateConfigEndpoint = async (req, res) => {
   try {
-    const b = parseInt(req.body?.dias_bloqueo, 10), v = parseInt(req.body?.dias_vigencia, 10);
-    if (!(b > 0) || !(v > 0) || v <= b)
-      return res.status(400).json({ success: false, data: null, error: 'Días inválidos (vigencia debe ser mayor que bloqueo, ambos > 0)' });
-    await pool.query("UPDATE dealernet_config SET valor=? WHERE clave='dias_bloqueo'", [String(b)]);
-    await pool.query("UPDATE dealernet_config SET valor=? WHERE clave='dias_vigencia'", [String(v)]);
-    auditar({ req, accion: 'EDITAR', modulo: 'dealernet', entidad: 'config', detalle: `Umbrales informes: bloqueo ${b}d, vigencia ${v}d` });
-    res.json({ success: true, data: { dias_bloqueo: b, dias_vigencia: v }, error: null });
+    if (req.body?.dias_bloqueo !== undefined || req.body?.dias_vigencia !== undefined) {
+      const b = parseInt(req.body?.dias_bloqueo, 10), v = parseInt(req.body?.dias_vigencia, 10);
+      if (!(b > 0) || !(v > 0) || v <= b)
+        return res.status(400).json({ success: false, data: null, error: 'Días inválidos (vigencia debe ser mayor que bloqueo, ambos > 0)' });
+      await pool.query("UPDATE dealernet_config SET valor=? WHERE clave='dias_bloqueo'", [String(b)]);
+      await pool.query("UPDATE dealernet_config SET valor=? WHERE clave='dias_vigencia'", [String(v)]);
+    }
+    if (req.body?.rrhh_email !== undefined) {
+      await pool.query("INSERT INTO dealernet_config (clave, valor) VALUES ('rrhh_email', ?) ON DUPLICATE KEY UPDATE valor=VALUES(valor)",
+        [String(req.body.rrhh_email || '').trim()]);
+    }
+    auditar({ req, accion: 'EDITAR', modulo: 'dealernet', entidad: 'config', detalle: 'Actualizó configuración DealerNet (umbrales / RRHH)' });
+    res.json({ success: true, data: { ...(await getConfig()), rrhh_email: await leerRRHHEmail() }, error: null });
   } catch (e) { errSrv(res, e, 'updateConfigEndpoint'); }
 };
 
+/* ── Auditoría de uso (promedios por día por tipo + auto/empresa) ──────────── */
+const auditoria = async (req, res) => {
+  try {
+    const dias = Math.min(365, Math.max(1, parseInt(req.query.dias) || 30));
+    const [rows] = await pool.query(
+      `SELECT id_usuario, usuario_nombre, codigo_producto, nombre_producto, COUNT(*) n
+       FROM dealernet_informes
+       WHERE retcode='0' AND created_at >= NOW() - INTERVAL ? DAY
+       GROUP BY id_usuario, codigo_producto, usuario_nombre, nombre_producto`, [dias]);
+    const usuarios = {};
+    for (const r of rows) {
+      const k = r.id_usuario != null ? 'u' + r.id_usuario : 'n' + (r.usuario_nombre || '');
+      if (!usuarios[k]) usuarios[k] = { id_usuario: r.id_usuario, usuario: r.usuario_nombre || '—', total: 0, porTipo: [] };
+      usuarios[k].porTipo.push({ codigo: r.codigo_producto, nombre: r.nombre_producto || r.codigo_producto, n: Number(r.n) });
+      usuarios[k].total += Number(r.n);
+    }
+    const porUsuario = Object.values(usuarios)
+      .map(u => ({ ...u, promedio_dia: +(u.total / dias).toFixed(2) }))
+      .sort((a, b) => b.total - a.total);
+
+    // Auto-consultas (RUT propio) y consultas a otros usuarios de la empresa — últimos 90 días.
+    const [users] = await pool.query("SELECT id_usuario, nombre, apellido, rut FROM usuarios WHERE rut IS NOT NULL AND rut<>''");
+    const rutToUser = {}, myRut = {};
+    users.forEach(u => { const n = rutNum(u.rut); if (n) { rutToUser[n] = `${u.nombre} ${u.apellido || ''}`.trim(); myRut[u.id_usuario] = n; } });
+    const [inf90] = await pool.query(
+      `SELECT id_usuario, usuario_nombre, rut FROM dealernet_informes
+       WHERE retcode='0' AND created_at >= NOW() - INTERVAL 90 DAY AND id_usuario IS NOT NULL`);
+    const propio = {}, empresa = {};
+    for (const r of inf90) {
+      const n = String(r.rut), nombre = r.usuario_nombre || '—';
+      if (myRut[r.id_usuario] && myRut[r.id_usuario] === n) {
+        (propio[r.id_usuario] ||= { id_usuario: r.id_usuario, usuario: nombre, n: 0 }).n++;
+      } else if (rutToUser[n]) {
+        (empresa[r.id_usuario] ||= { id_usuario: r.id_usuario, usuario: nombre, n: 0 }).n++;
+      }
+    }
+    res.json({ success: true, data: {
+      dias, porUsuario,
+      autoConsulta: Object.values(propio).sort((a, b) => b.n - a.n),
+      consultaEmpresa: Object.values(empresa).sort((a, b) => b.n - a.n),
+    }, error: null });
+  } catch (e) { errSrv(res, e, 'auditoria'); }
+};
+
 module.exports = { getProductos, addProducto, updateProducto, deleteProducto, reordenarProductos, consultar, listConsultas, estado,
-  verificarRepositorio, solicitarInformes, productosActivos, historicos, verInforme, descargarPdf, getConfigEndpoint, updateConfigEndpoint };
+  verificarRepositorio, solicitarInformes, productosActivos, historicos, verInforme, descargarPdf, getConfigEndpoint, updateConfigEndpoint,
+  clasificarRut, auditoria };

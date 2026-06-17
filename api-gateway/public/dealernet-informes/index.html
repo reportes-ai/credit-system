@@ -123,6 +123,20 @@
       <div id="hist"><div class="muted">Ingresa un RUT y solicita o consulta para ver su historial.</div></div>
     </div>
   </div>
+
+  <!-- Auditoría de uso (visible solo con permiso) -->
+  <div class="card" id="audCard" style="display:none">
+    <div style="display:flex;justify-content:space-between;align-items:center;gap:10px;margin-bottom:10px;flex-wrap:wrap">
+      <h3 style="margin:0"><i class="bi bi-graph-up"></i> Auditoría de uso</h3>
+      <div>
+        <button class="btn-ghost aud-d" data-d="7" onclick="cargarAuditoria(7)">7 días</button>
+        <button class="btn-ghost aud-d" data-d="30" onclick="cargarAuditoria(30)">30 días</button>
+        <button class="btn-ghost aud-d" data-d="90" onclick="cargarAuditoria(90)">90 días</button>
+      </div>
+    </div>
+    <div class="muted" style="margin:-4px 0 10px">Informes solicitados por usuario, promedio por día y por tipo. Auto-consultas y consultas a otros usuarios de la empresa: últimos 90 días.</div>
+    <div id="audBody"><div class="muted">Cargando…</div></div>
+  </div>
 </div>
 
 <dialog id="dlgWarn">
@@ -132,6 +146,19 @@
     <button class="btn-b cancel" onclick="document.getElementById('dlgWarn').close('cancel')">Cancelar</button>
     <button class="btn-b hist"   onclick="document.getElementById('dlgWarn').close('hist')"><i class="bi bi-archive me-1"></i>Usar histórico</button>
     <button class="btn-b new"    onclick="document.getElementById('dlgWarn').close('new')"><i class="bi bi-send me-1"></i>Hacer consulta nueva</button>
+  </div>
+</dialog>
+
+<dialog id="dlgUso">
+  <div class="dlg-head" style="background:linear-gradient(135deg,#7f1d1d,#b91c1c 60%,#dc2626)"><i class="bi bi-shield-exclamation"></i><h4>Advertencia</h4></div>
+  <div class="dlg-body">
+    Esta es una herramienta <b>pagada de AutoFácil SpA</b> y está dirigida al análisis de negocios.
+    El mal uso de esta herramienta será informado en forma automática a su supervisor.
+    <div style="margin-top:12px;font-weight:700">¿Desea continuar con la solicitud?</div>
+  </div>
+  <div class="dlg-foot">
+    <button class="btn-b cancel" onclick="document.getElementById('dlgUso').close('cancel')">Cancelar</button>
+    <button class="btn-b new" style="background:#b91c1c" onclick="document.getElementById('dlgUso').close('ok')"><i class="bi bi-check-lg me-1"></i>Continuar</button>
   </div>
 </dialog>
 
@@ -266,6 +293,17 @@ async function solicitar(){
     resetBtn(); return;
   }
 
+  // 2.5) Advertencia si consulta su propio RUT o el de un usuario de la empresa
+  try {
+    const rc = await fetch('/api/dealernet/informes/clasificar-rut', { method:'POST', headers:H, body:JSON.stringify({ rut }) });
+    const cj = await rc.json();
+    if (cj.success && (cj.data.esPropio || cj.data.esUsuarioEmpresa)) {
+      const dlg = document.getElementById('dlgUso');
+      const choice = await new Promise(resolve => { dlg.onclose = () => resolve(dlg.returnValue); dlg.showModal(); });
+      if (choice !== 'ok') { res.innerHTML = html || '<div class="muted">Solicitud cancelada.</div>'; resetBtn(); return; }
+    }
+  } catch(_) {}
+
   // 3) Solicitar a DealerNet (gasta saldo)
   btn.innerHTML = '<i class="bi bi-hourglass-split me-1"></i>Consultando DealerNet…';
   try {
@@ -276,6 +314,11 @@ async function solicitar(){
     html += '<div class="alertbox '+(ok?'ok':'block')+'">'+(ok
       ? '<b>Informes obtenidos.</b> Se agregaron al repositorio: '+aConsultar.map(c=>esc(nombreProd(c))).join(', ')+'.'
       : 'DealerNet respondió retcode '+esc(j.data.retcode)+' — '+esc(j.data.retmsg||''))+'</div>';
+    if (j.data.aviso) {
+      html += '<div class="alertbox warn"><i class="bi bi-shield-exclamation"></i> '+
+        (j.data.aviso.motivo==='propio' ? 'Consultaste tu propio RUT.' : 'Consultaste el RUT de un usuario de la empresa.')+
+        ' Se '+(j.data.aviso.enviado ? 'notificó automáticamente a tu supervisor y a RRHH.' : 'registró el evento (el correo no se pudo enviar).')+'</div>';
+    }
     res.innerHTML = html;
     await cargarHistoricos(j.data.rut);
   } catch(e){ res.innerHTML = html + '<div class="alertbox block">Error de conexión</div>'; }
@@ -563,8 +606,41 @@ async function descargarPdf(id){
   } catch(_){ toast('Error al descargar PDF', true); }
 }
 
+/* ── Auditoría de uso (solo con permiso dealernet_auditoria) ─────────────── */
+async function cargarAuditoria(dias=30){
+  const card = document.getElementById('audCard');
+  try {
+    const r = await fetch('/api/dealernet/informes/auditoria?dias='+dias, { headers:H });
+    if (r.status === 403){ card.style.display='none'; return; }
+    const j = await r.json();
+    if (!j.success){ card.style.display='none'; return; }
+    card.style.display='';
+    document.querySelectorAll('.aud-d').forEach(b=>b.style.background = (+b.dataset.d===dias)?'#dbe6f3':'');
+    renderAuditoria(j.data);
+  } catch(_){ card.style.display='none'; }
+}
+function renderAuditoria(d){
+  const tipos = [...new Set(d.porUsuario.flatMap(u=>u.porTipo.map(t=>t.nombre)))];
+  let h = '<div style="overflow:auto"><table class="tb"><thead><tr><th>Usuario</th><th>Informes ('+d.dias+'d)</th><th>Prom./día</th>'+
+    tipos.map(t=>'<th>'+esc(t)+'</th>').join('')+'</tr></thead><tbody>';
+  if(!d.porUsuario.length) h += '<tr><td colspan="'+(3+tipos.length)+'" class="muted">Sin actividad en el período.</td></tr>';
+  h += d.porUsuario.map(u=>{
+    const byName={}; u.porTipo.forEach(t=>byName[t.nombre]=t.n);
+    return '<tr><td>'+esc(u.usuario)+'</td><td><b>'+u.total+'</b></td><td>'+u.promedio_dia+'</td>'+
+      tipos.map(t=>'<td>'+(byName[t]||0)+'</td>').join('')+'</tr>';
+  }).join('')+'</tbody></table></div>';
+  h += '<div class="grid" style="margin-top:14px">';
+  h += '<div><div class="rep-h" style="background:#b91c1c">Consultas a su propio RUT (90 días)</div>'+
+    (d.autoConsulta.length ? '<table class="tb"><tbody>'+d.autoConsulta.map(x=>'<tr><td>'+esc(x.usuario)+'</td><td style="text-align:right"><b>'+x.n+'</b></td></tr>').join('')+'</tbody></table>' : '<div class="muted">Ninguna.</div>')+'</div>';
+  h += '<div><div class="rep-h" style="background:#92400e">Consultas a RUT de otros usuarios de la empresa (90 días)</div>'+
+    (d.consultaEmpresa.length ? '<table class="tb"><tbody>'+d.consultaEmpresa.map(x=>'<tr><td>'+esc(x.usuario)+'</td><td style="text-align:right"><b>'+x.n+'</b></td></tr>').join('')+'</tbody></table>' : '<div class="muted">Ninguna.</div>')+'</div>';
+  h += '</div>';
+  document.getElementById('audBody').innerHTML = h;
+}
+
 document.getElementById('rut').addEventListener('blur', ()=>{ const v=document.getElementById('rut').value.trim(); if(v) cargarHistoricos(v); });
 cargarProductos();
+cargarAuditoria(30);
 </script>
 <script src="/js/app-version.js"></script>
 </body>

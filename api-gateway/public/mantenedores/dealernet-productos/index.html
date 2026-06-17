@@ -119,6 +119,9 @@
       <div class="fld"><label>Vigencia (días)</label><input type="number" id="cfgVigencia" min="1" placeholder="180"></div>
       <button class="btn-primary2" onclick="guardarConfig()"><i class="bi bi-check-lg me-1"></i>Guardar</button>
     </div>
+    <div class="fld" style="margin-top:12px"><label>Correo(s) de RRHH para avisos de uso (separar con coma)</label>
+      <input type="text" id="cfgRRHH" placeholder="rrhh@autofacilchile.cl"></div>
+    <p style="font-size:.78rem;color:#94a3b8;margin:6px 0 0">Cuando alguien consulta su propio RUT o el de otro usuario de la empresa, se avisa automáticamente a su <b>supervisor</b> y a estos correos de <b>RRHH</b>. También se incluyen los usuarios con perfil "Recursos Humanos".</p>
     <p style="font-size:.78rem;color:#94a3b8;margin:8px 0 0">Menos del <b>bloqueo</b>: obliga a usar el histórico (no deja consultar). Entre bloqueo y <b>vigencia</b>: pregunta si reutilizar o pedir nuevo. Más que la vigencia: consulta directa.</p>
   </div>
 
@@ -229,13 +232,15 @@ async function probar(){
 }
 async function cargarConfig(){
   try { const r=await fetch('/api/dealernet/config',{ headers:H }); const j=await r.json();
-    if(j.success){ document.getElementById('cfgBloqueo').value=j.data.dias_bloqueo; document.getElementById('cfgVigencia').value=j.data.dias_vigencia; } } catch(_){}
+    if(j.success){ document.getElementById('cfgBloqueo').value=j.data.dias_bloqueo; document.getElementById('cfgVigencia').value=j.data.dias_vigencia;
+      const rr=document.getElementById('cfgRRHH'); if(rr) rr.value=j.data.rrhh_email||''; } } catch(_){}
 }
 async function guardarConfig(){
   const dias_bloqueo=parseInt(document.getElementById('cfgBloqueo').value,10);
   const dias_vigencia=parseInt(document.getElementById('cfgVigencia').value,10);
-  try { const r=await fetch('/api/dealernet/config',{ method:'PUT', headers:H, body:JSON.stringify({ dias_bloqueo, dias_vigencia }) });
-    const j=await r.json(); if(j.success) toast('Vigencia actualizada'); else toast(j.error||'Error', true); } catch(_){ toast('Error', true); }
+  const rrhh_email=(document.getElementById('cfgRRHH')?.value||'').trim();
+  try { const r=await fetch('/api/dealernet/config',{ method:'PUT', headers:H, body:JSON.stringify({ dias_bloqueo, dias_vigencia, rrhh_email }) });
+    const j=await r.json(); if(j.success) toast('Configuración actualizada'); else toast(j.error||'Error', true); } catch(_){ toast('Error', true); }
 }
 async function copiarDlnt(btn){
   try {

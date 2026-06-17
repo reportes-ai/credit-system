@@ -29,4 +29,8 @@ router.get('/informes',            verifyToken, requireFunc('dealernet_informes_
 router.get('/informes/:id(\\d+)',     verifyToken, requireFunc('dealernet_informes_ver'), C.verInforme);
 router.get('/informes/:id(\\d+)/pdf', verifyToken, requireFunc('dealernet_informes_ver'), C.descargarPdf);
 
+/* ── Auditoría de uso + clasificación de RUT (pop-up de advertencia) ──────── */
+router.post('/informes/clasificar-rut', verifyToken, requireFunc('dealernet_consultar'), C.clasificarRut);
+router.get('/informes/auditoria',       verifyToken, requireFunc('dealernet_auditoria', 'usuarios_gestionar'), C.auditoria);
+
 module.exports = router;
