@@ -842,6 +842,7 @@
     // Se setea según permisos reales en el IIFE de init (no por ser Admin)
     let puedeGestionarUsuarios = esAdmin;
     let puedeEliminarDef = esAdmin;
+    let puedeEditarPermisos = esAdmin;
 
     document.getElementById('avatarInicial').textContent = (yo?.nombre || '?').charAt(0).toUpperCase();
     document.getElementById('navNombre').textContent = `${yo?.nombre || ''} ${yo?.apellido || ''}`.trim();
@@ -1284,7 +1285,7 @@
               const link = tgt ? `<a class="permiso-link" href="${tgt}" target="_blank" rel="noopener" title="Ir a ${f.nombre}" onclick="event.stopPropagation()"><i class="bi bi-box-arrow-up-right"></i></a>` : '';
               return `
                 <label class="permiso-check ${checkedClass}" id="pc-${f.id_funcionalidad}">
-                  <input type="checkbox" ${checked} ${!esAdmin ? 'disabled' : ''}
+                  <input type="checkbox" ${checked} ${puedeEditarPermisos ? '' : 'disabled'}
                     onchange="togglePermiso(${f.id_funcionalidad}, this.checked)"
                     data-id="${f.id_funcionalidad}">
                   <span>${f.nombre}</span>${link}
@@ -1370,7 +1371,7 @@
               const link = tgt ? `<a class="permiso-link" href="${tgt}" target="_blank" rel="noopener" title="Ir a ${f.nombre}" onclick="event.stopPropagation()"><i class="bi bi-box-arrow-up-right"></i></a>` : '';
               return `
                 <label class="permiso-check ${checkedClass}" id="pcu-${fid}" style="${labelStyle}">
-                  <input type="checkbox" ${efectivo ? 'checked' : ''} ${!esAdmin ? 'disabled' : ''}
+                  <input type="checkbox" ${efectivo ? 'checked' : ''} ${puedeEditarPermisos ? '' : 'disabled'}
                     onchange="togglePermisoUsuario(${fid}, this.checked)"
                     data-id="${fid}">
                   <span>${f.nombre}</span>${link}
@@ -1792,6 +1793,8 @@
         || tiene('usuarios.eliminar') || tiene('usuarios.reset_clave');
       // Borrado definitivo: solo con el permiso explícito "Eliminar Usuarios"
       puedeEliminarDef = tiene('usuarios.eliminar');
+      // Editar la matriz de permisos: requiere "Perfiles y Permisos" o "Gestionar Permisos" (igual que el backend)
+      puedeEditarPermisos = tiene('usuarios_perfiles') || tiene('usuarios.permisos');
       const _btnNuevo = document.getElementById('btnNuevoUsuario');
       if (_btnNuevo) _btnNuevo.style.display = puedeCrear ? '' : 'none';
       // Tab Seguridad por permiso usuarios_seguridad (Admin incluido vía tiene())
