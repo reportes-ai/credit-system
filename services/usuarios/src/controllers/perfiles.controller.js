@@ -1949,6 +1949,56 @@ const getUsuariosByPerfil = async (req, res) => {
   } catch (e) { console.error('[func-obsoletas]', e.message); }
 })();
 
+/* ─── Migración: Carga Masiva paramétrica. Adopta las funcionalidades existentes
+   (por href o por nombre viejo) y les fija código canónico + href, para que gateen
+   cada card del landing y sus rutas. Si no existen, las crea. Admin=1 por defecto
+   (preserva el Admin-only previo); el resto en 0. Idempotente. */
+(async () => {
+  try {
+    const [[mod]] = await pool.query("SELECT id_modulo FROM modulos WHERE ruta LIKE '%carga-masiva%' LIMIT 1");
+    if (!mod) return;
+    const CM = [
+      ['cm_ver',          'Ver Carga Masiva',          '/carga-masiva/',             'bi-cloud-upload',      ['Ver Carga Masiva']],
+      ['cm_cargar',       'Cargar (Excel AutoFácil)',  '/carga-masiva/cargar/',      'bi-cloud-upload-fill', ['Cargar AutoFácil (Excel)','Cargar AutoFácil','Cargar']],
+      ['cm_trinidad',     'Carga Trinidad',            '/carga-masiva/trinidad/',    'bi-diagram-3-fill',    ['Cargar Trinidad','Carga Trinidad']],
+      ['cm_eq_estados',   'Equivalencias Trinidad',    '/carga-masiva/eq-estados/',  'bi-arrow-left-right',  ['Equivalencias Estados','Equivalencia Estados','Equivalencias Trinidad']],
+      ['cm_eq_ejecutivos','Equivalencia Ejecutivos',   '/carga-masiva/eq-ejecutivos/','bi-people-fill',      ['Equivalencias Ejecutivos','Equivalencia Ejecutivos']],
+      ['cm_historial',    'Historial de Cargas',       '/carga-masiva/historial/',   'bi-clock-history',     ['Historial de Cargas','Historial']],
+    ];
+    const [perfiles] = await pool.query('SELECT id_perfil, nombre FROM perfiles');
+    for (const [cod, nombre, href, icono, viejos] of CM) {
+      const nameList = [nombre, ...viejos];
+      const [cands] = await pool.query(
+        `SELECT id_funcionalidad, codigo FROM funcionalidades
+         WHERE codigo=? OR href=? OR (id_modulo=? AND nombre IN (${nameList.map(() => '?').join(',')}))
+         ORDER BY (codigo=?) DESC, id_funcionalidad ASC`,
+        [cod, href, mod.id_modulo, ...nameList, cod]);
+      let keepId;
+      if (cands.length) {
+        keepId = cands[0].id_funcionalidad;
+        for (let i = 1; i < cands.length; i++) {
+          const dupId = cands[i].id_funcionalidad;
+          await pool.query('INSERT IGNORE INTO permisos_perfil (id_perfil,id_funcionalidad,habilitado) SELECT id_perfil,?,habilitado FROM permisos_perfil WHERE id_funcionalidad=?', [keepId, dupId]);
+          await pool.query('DELETE FROM permisos_perfil WHERE id_funcionalidad=?', [dupId]);
+          try { await pool.query('DELETE FROM permisos_usuario WHERE id_funcionalidad=?', [dupId]); } catch (_) {}
+          await pool.query('DELETE FROM funcionalidades WHERE id_funcionalidad=?', [dupId]);
+        }
+        try {
+          await pool.query('UPDATE funcionalidades SET codigo=?, nombre=?, href=?, icono=?, id_modulo=? WHERE id_funcionalidad=?',
+            [cod, nombre, href, icono, mod.id_modulo, keepId]);
+        } catch (e) { /* código ya en uso por otra fila: dejar el existente */ }
+      } else {
+        const [ins] = await pool.query('INSERT INTO funcionalidades (id_modulo,nombre,codigo,href,icono) VALUES (?,?,?,?,?)', [mod.id_modulo, nombre, cod, href, icono]);
+        keepId = ins.insertId;
+      }
+      for (const p of perfiles) {
+        const hab = p.nombre === 'Administrador' ? 1 : 0;
+        await pool.query('INSERT IGNORE INTO permisos_perfil (id_perfil,id_funcionalidad,habilitado) VALUES (?,?,?)', [p.id_perfil, keepId, hab]);
+      }
+    }
+  } catch (e) { console.error('[carga-masiva paramétrico]', e.message); }
+})();
+
 /* ─── Migración: funcionalidad "Configurar Dashboard" (dashboard_config) ────────
    Gatea POST /api/dashboard/permisos y /presupuesto. Antes eran Admin-only
    (requirePerfil); se mantiene Admin-only por defecto (habilitado=1 solo Admin)

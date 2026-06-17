@@ -1,20 +1,23 @@
 const router = require('express').Router();
 const ctrl   = require('../controllers/trinidad-config.controller');
-const { verifyToken, requirePerfil } = require('../../../../shared/middleware/auth');
+const { verifyToken } = require('../../../../shared/middleware/auth');
+const { requireFunc } = require('../../../../shared/middleware/permisos');
 
-const soloAdmin = requirePerfil('Administrador');
+// Acceso por matriz (Perfiles y Permisos), no por nombre de perfil. Admin pasa por bypass.
+const puedeEstados    = requireFunc('cm_eq_estados');
+const puedeEjecutivos = requireFunc('cm_eq_ejecutivos');
 
-// Estados
+// Estados (Equivalencias Trinidad)
 router.get   ('/estados',       verifyToken, ctrl.getEstados);
-router.post  ('/estados',       verifyToken, soloAdmin, ctrl.createEstado);
-router.put   ('/estados/:id',   verifyToken, soloAdmin, ctrl.updateEstado);
-router.delete('/estados/:id',   verifyToken, soloAdmin, ctrl.deleteEstado);
+router.post  ('/estados',       verifyToken, puedeEstados, ctrl.createEstado);
+router.put   ('/estados/:id',   verifyToken, puedeEstados, ctrl.updateEstado);
+router.delete('/estados/:id',   verifyToken, puedeEstados, ctrl.deleteEstado);
 
-// Ejecutivos
+// Ejecutivos (Equivalencia Ejecutivos)
 router.get   ('/ejecutivos-af',   verifyToken, ctrl.getEjecutivosAF);
 router.get   ('/ejecutivos',      verifyToken, ctrl.getEjecutivos);
-router.post  ('/ejecutivos',      verifyToken, soloAdmin, ctrl.createEjecutivo);
-router.put   ('/ejecutivos/:id',  verifyToken, soloAdmin, ctrl.updateEjecutivo);
-router.delete('/ejecutivos/:id',  verifyToken, soloAdmin, ctrl.deleteEjecutivo);
+router.post  ('/ejecutivos',      verifyToken, puedeEjecutivos, ctrl.createEjecutivo);
+router.put   ('/ejecutivos/:id',  verifyToken, puedeEjecutivos, ctrl.updateEjecutivo);
+router.delete('/ejecutivos/:id',  verifyToken, puedeEjecutivos, ctrl.deleteEjecutivo);
 
 module.exports = router;

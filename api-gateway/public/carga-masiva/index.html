@@ -73,42 +73,42 @@
 
   <div class="modules-grid">
 
-    <a class="module-card" href="/carga-masiva/cargar/">
+    <a class="module-card" href="/carga-masiva/cargar/" data-func="cm_cargar">
       <div class="mc-icon"><i class="bi bi-cloud-upload-fill"></i></div>
       <h6>Cargar</h6>
       <p>Importación masiva de operaciones desde el Excel calculado AutoFácil</p>
       <button class="btn-acceder"><i class="bi bi-arrow-right-circle"></i>Acceder</button>
     </a>
 
-    <a class="module-card" href="/carga-masiva/trinidad/">
+    <a class="module-card" href="/carga-masiva/trinidad/" data-func="cm_trinidad">
       <div class="mc-icon"><i class="bi bi-diagram-3-fill"></i></div>
       <h6>Carga Trinidad</h6>
       <p>Carga y actualiza créditos desde el sistema Trinidad</p>
       <button class="btn-acceder"><i class="bi bi-arrow-right-circle"></i>Acceder</button>
     </a>
 
-    <a class="module-card" href="/carga-masiva/eq-estados/">
+    <a class="module-card" href="/carga-masiva/eq-estados/" data-func="cm_eq_estados">
       <div class="mc-icon"><i class="bi bi-arrow-left-right"></i></div>
       <h6>Equivalencias Trinidad</h6>
       <p>Mapeo editable de estados Trinidad → estados AutoFácil</p>
       <button class="btn-acceder"><i class="bi bi-arrow-right-circle"></i>Acceder</button>
     </a>
 
-    <a class="module-card" href="/carga-masiva/eq-ejecutivos/">
+    <a class="module-card" href="/carga-masiva/eq-ejecutivos/" data-func="cm_eq_ejecutivos">
       <div class="mc-icon"><i class="bi bi-people-fill"></i></div>
       <h6>Equivalencia Ejecutivos</h6>
       <p>Mapeo de nombres de ejecutivos Trinidad → AutoFácil</p>
       <button class="btn-acceder"><i class="bi bi-arrow-right-circle"></i>Acceder</button>
     </a>
 
-    <a class="module-card" href="/carga-masiva/historial/">
+    <a class="module-card" href="/carga-masiva/historial/" data-func="cm_historial">
       <div class="mc-icon"><i class="bi bi-clock-history"></i></div>
       <h6>Historial</h6>
       <p>Registro de cargas realizadas y campos actualizados por carga</p>
       <button class="btn-acceder"><i class="bi bi-arrow-right-circle"></i>Acceder</button>
     </a>
 
-    <a class="module-card" href="/carga-masiva/digitacion/" style="position:relative">
+    <a class="module-card" href="/carga-masiva/digitacion/" data-func="digitacion_faltantes" style="position:relative">
       <div class="mc-icon"><i class="bi bi-pencil-square"></i></div>
       <h6>Digitación Datos Faltantes</h6>
       <p>Completa, uno por uno, los créditos que quedaron incompletos por la carga masiva</p>
@@ -124,7 +124,27 @@
 const token = sessionStorage.getItem('token');
 const yo    = JSON.parse(sessionStorage.getItem('usuario') || 'null');
 if (!token || !yo) window.location.href = '/login.html';
-if (yo?.perfil !== 'Administrador') { alert('Solo Administradores pueden acceder a Carga Masiva'); window.location.href = '/'; }
+// Acceso paramétrico por matriz (Perfiles y Permisos): cada card se muestra según su
+// funcionalidad (data-func). Admin pasa por bypass. Sin ninguna card → sin acceso.
+(async () => {
+  const esAdmin = yo?.perfil === 'Administrador';
+  let funcs = new Set();
+  if (!esAdmin) {
+    try {
+      const r = await fetch('/api/auth/mis-permisos?_='+Date.now(), { headers:{ Authorization:'Bearer '+token } });
+      const j = await r.json();
+      funcs = new Set(j.funcionalidades || []);
+    } catch(e){}
+  }
+  const tiene = c => esAdmin || funcs.has(c);
+  let visibles = 0;
+  document.querySelectorAll('.module-card[data-func]').forEach(card => {
+    const ok = tiene(card.getAttribute('data-func'));
+    card.style.display = ok ? '' : 'none';
+    if (ok) visibles++;
+  });
+  if (!visibles) { alert('No tienes acceso a Carga Masiva.'); window.location.href = '/'; }
+})();
 document.getElementById('navNombre').textContent = `${yo?.nombre||''} ${yo?.apellido||''}`.trim();
 document.getElementById('navPerfil').textContent  = yo?.perfil || '';
 document.getElementById('avatarInicial').textContent = (yo?.nombre||'?').charAt(0).toUpperCase();
