@@ -77,6 +77,8 @@
     .permiso-check input[type=checkbox] { cursor: pointer; accent-color: var(--navy); width: 15px; height: 15px; }
     .permiso-check label { cursor: pointer; font-size: 0.82rem; margin: 0; color: #374151; }
     .permiso-check.checked { background: #eef2ff; border-color: #c5cae9; }
+    .permiso-link { margin-left: 4px; color: #0d6efd; opacity: 0.55; text-decoration: none; font-size: 0.78rem; line-height: 1; }
+    .permiso-link:hover { opacity: 1; }
 
     /* MODAL */
     .modal-header { background: linear-gradient(135deg, var(--navy), var(--accent)); color: #fff; border-radius: 12px 12px 0 0; }
@@ -796,6 +798,7 @@
     const esAdmin = yo?.perfil === 'Administrador';
     // Se setea según permisos reales en el IIFE de init (no por ser Admin)
     let puedeGestionarUsuarios = esAdmin;
+    let puedeEliminarDef = esAdmin;
 
     document.getElementById('avatarInicial').textContent = (yo?.nombre || '?').charAt(0).toUpperCase();
     document.getElementById('navNombre').textContent = `${yo?.nombre || ''} ${yo?.apellido || ''}`.trim();
@@ -907,7 +910,8 @@
           <td>
             ${puedeGestionarUsuarios ? `
               <button class="btn btn-success btn-sm me-1" title="Reactivar" onclick="reactivarUsuarioUI(${u.id_usuario})"><i class="bi bi-arrow-counterclockwise me-1"></i>Reactivar</button>
-              <button class="btn btn-outline-primary btn-sm" title="Editar" onclick="abrirModalUsuario(${u.id_usuario})"><i class="bi bi-pencil"></i></button>
+              <button class="btn btn-outline-primary btn-sm me-1" title="Editar" onclick="abrirModalUsuario(${u.id_usuario})"><i class="bi bi-pencil"></i></button>
+              ${puedeEliminarDef ? `<button class="btn btn-outline-danger btn-sm" title="Eliminar definitivamente" onclick="eliminarDefinitivoUI(${u.id_usuario}, '${(u.nombre + ' ' + u.apellido).replace(/'/g, "\\'")}')"><i class="bi bi-trash"></i></button>` : ''}
             ` : '—'}
           </td>
         </tr>
@@ -933,6 +937,13 @@
       const r = await api('POST', `/api/usuarios/${id}/reactivar`);
       if (r?.success) { showToast('Usuario reactivado'); cargarUsuarios(); }
       else showToast(r?.error || 'Error al reactivar', 'danger');
+    }
+
+    async function eliminarDefinitivoUI(id, nombre) {
+      if (!confirm(`¿Eliminar DEFINITIVAMENTE a ${nombre}?\n\nEsta acción NO se puede deshacer: se borra el usuario y sus permisos.\nSu nombre se conserva en créditos, cartas y cotizaciones (se guardan como texto).`)) return;
+      const r = await api('DELETE', `/api/usuarios/${id}/definitivo`);
+      if (r?.success) { showToast('Usuario eliminado definitivamente'); cargarUsuarios(); }
+      else showToast(r?.error || 'Error al eliminar', 'danger');
     }
 
     // ── MODAL USUARIO ─────────────────────────────────────────
@@ -1225,12 +1236,14 @@
             ${mod.funcionalidades.map(f => {
               const checked = permisosActuales[f.id_funcionalidad] ? 'checked' : '';
               const checkedClass = permisosActuales[f.id_funcionalidad] ? 'checked' : '';
+              const tgt = f.href || mod.ruta;
+              const link = tgt ? `<a class="permiso-link" href="${tgt}" target="_blank" rel="noopener" title="Ir a ${f.nombre}" onclick="event.stopPropagation()"><i class="bi bi-box-arrow-up-right"></i></a>` : '';
               return `
                 <label class="permiso-check ${checkedClass}" id="pc-${f.id_funcionalidad}">
                   <input type="checkbox" ${checked} ${!esAdmin ? 'disabled' : ''}
                     onchange="togglePermiso(${f.id_funcionalidad}, this.checked)"
                     data-id="${f.id_funcionalidad}">
-                  <span>${f.nombre}</span>
+                  <span>${f.nombre}</span>${link}
                 </label>`;
             }).join('')}
           </div>
@@ -1309,12 +1322,14 @@
               const borderCol = esExtra ? '#28a745' : esFalta ? '#dc3545' : '';
               const labelStyle = bgColor ? `background:${bgColor};border-color:${borderCol}` : '';
               const checkedClass = efectivo ? 'checked' : '';
+              const tgt = f.href || mod.ruta;
+              const link = tgt ? `<a class="permiso-link" href="${tgt}" target="_blank" rel="noopener" title="Ir a ${f.nombre}" onclick="event.stopPropagation()"><i class="bi bi-box-arrow-up-right"></i></a>` : '';
               return `
                 <label class="permiso-check ${checkedClass}" id="pcu-${fid}" style="${labelStyle}">
                   <input type="checkbox" ${efectivo ? 'checked' : ''} ${!esAdmin ? 'disabled' : ''}
                     onchange="togglePermisoUsuario(${fid}, this.checked)"
                     data-id="${fid}">
-                  <span>${f.nombre}</span>
+                  <span>${f.nombre}</span>${link}
                 </label>`;
             }).join('')}
           </div>
@@ -1657,6 +1672,8 @@
       const puedeCrear = tiene('usuarios_gestionar') || tiene('usuarios.crear') || tiene('usuarios_crear');
       puedeGestionarUsuarios = tiene('usuarios_gestionar') || tiene('usuarios.editar')
         || tiene('usuarios.eliminar') || tiene('usuarios.reset_clave');
+      // Borrado definitivo: solo con el permiso explícito "Eliminar Usuarios"
+      puedeEliminarDef = tiene('usuarios.eliminar');
       const _btnNuevo = document.getElementById('btnNuevoUsuario');
       if (_btnNuevo) _btnNuevo.style.display = puedeCrear ? '' : 'none';
       // Tab Seguridad por permiso usuarios_seguridad (Admin incluido vía tiene())

@@ -451,8 +451,8 @@ const getAllPerfiles = async (req, res) => {
 const getModulosConFuncionalidades = async (req, res) => {
   try {
     const [modulos] = await pool.query(
-      `SELECT m.id_modulo, m.nombre AS modulo, m.icono,
-              f.id_funcionalidad, f.nombre AS funcionalidad, f.codigo
+      `SELECT m.id_modulo, m.nombre AS modulo, m.icono, m.ruta,
+              f.id_funcionalidad, f.nombre AS funcionalidad, f.codigo, f.href
        FROM modulos m
        JOIN funcionalidades f ON f.id_modulo = m.id_modulo
        WHERE m.estado = 'activo'
@@ -464,13 +464,14 @@ const getModulosConFuncionalidades = async (req, res) => {
     const mapaModulos = {};
     for (const row of modulos) {
       if (!mapaModulos[row.id_modulo]) {
-        mapaModulos[row.id_modulo] = { id_modulo: row.id_modulo, nombre: row.modulo, icono: row.icono, funcionalidades: [] };
+        mapaModulos[row.id_modulo] = { id_modulo: row.id_modulo, nombre: row.modulo, icono: row.icono, ruta: row.ruta, funcionalidades: [] };
         agrupado.push(mapaModulos[row.id_modulo]);
       }
       mapaModulos[row.id_modulo].funcionalidades.push({
         id_funcionalidad: row.id_funcionalidad,
         nombre: row.funcionalidad,
-        codigo: row.codigo
+        codigo: row.codigo,
+        href: row.href   // sub-item/página (NULL = permiso de acción)
       });
     }
 

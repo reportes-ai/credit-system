@@ -281,6 +281,38 @@ const deleteUsuario = async (req, res) => {
   }
 };
 
+// Borrado DEFINITIVO (hard delete). Solo sobre usuarios ya suspendidos.
+// El nombre del ejecutivo se guarda como TEXTO en créditos/cartas/cotizaciones,
+// así que borrar el usuario NO altera el histórico.
+const eliminarDefinitivo = async (req, res) => {
+  try {
+    const { id } = req.params;
+    if (parseInt(id) === req.usuario.id_usuario) {
+      return res.status(400).json({ success: false, data: null, error: 'No puedes eliminar tu propio usuario' });
+    }
+    const [[u]] = await pool.query('SELECT nombre, apellido, email, estado FROM usuarios WHERE id_usuario = ?', [id]);
+    if (!u) return res.status(404).json({ success: false, data: null, error: 'Usuario no encontrado' });
+    if ((u.estado || '') === 'activo') {
+      return res.status(400).json({ success: false, data: null, error: 'Primero debes suspender al usuario; solo se eliminan los suspendidos.' });
+    }
+
+    // Limpiar dependencias para no dejar huérfanos (tablas sin FK formal)
+    await pool.query('UPDATE usuarios SET id_supervisor = NULL WHERE id_supervisor = ?', [id]).catch(() => {});
+    await pool.query('DELETE FROM permisos_usuario WHERE id_usuario = ?', [id]).catch(() => {});
+    await pool.query('DELETE FROM usuario_ejecutivos WHERE id_usuario = ?', [id]).catch(() => {});
+    await pool.query('DELETE FROM avisos_clave_vencimiento WHERE id_usuario = ?', [id]).catch(() => {});
+    await pool.query('DELETE FROM caja_usuarios WHERE id_usuario = ?', [id]).catch(() => {});
+    await pool.query('DELETE FROM notificaciones WHERE id_usuario = ?', [id]).catch(() => {});
+    await pool.query('DELETE FROM usuarios WHERE id_usuario = ?', [id]);
+
+    auditar({ req, accion: 'ELIMINAR', modulo: 'usuarios', entidad: 'usuario', entidad_id: id,
+      detalle: `Eliminó DEFINITIVAMENTE al usuario ${u.nombre} ${u.apellido} (${u.email})`, meta: { email: u.email } });
+    res.json({ success: true, data: { mensaje: 'Usuario eliminado definitivamente' }, error: null });
+  } catch (error) {
+    res.status(500).json({ success: false, data: null, error: error.message });
+  }
+};
+
 const reactivarUsuario = async (req, res) => {
   try {
     const { id } = req.params;
@@ -430,4 +462,4 @@ const misEjecutivos = async (req, res) => {
   }
 };
 
-module.exports = { getAllUsuarios, getUsuarioById, createUsuario, updateUsuario, deleteUsuario, reactivarUsuario, resetClave, getPermisosUsuario, updatePermisosUsuario, getEjecutivosUsuario, updateEjecutivosUsuario, misEjecutivos };
+module.exports = { getAllUsuarios, getUsuarioById, createUsuario, updateUsuario, deleteUsuario, eliminarDefinitivo, reactivarUsuario, resetClave, getPermisosUsuario, updatePermisosUsuario, getEjecutivosUsuario, updateEjecutivosUsuario, misEjecutivos };
