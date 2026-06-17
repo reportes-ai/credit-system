@@ -399,6 +399,7 @@ function resetBtn(){ const b=document.getElementById('btnSolicitar'); b.disabled
 /* ── Render de informe con el formato DealerNet ──────────────────────────── */
 const FTE = { '16':'Digitación', '2101':'Registro Civil', '3425':'DealerNET', '3435':'DealerNET' };
 const LOGO = (location && location.origin ? location.origin : '') + '/img/logo.png';
+const LOGO_DN = (location && location.origin ? location.origin : '') + '/img/logo-dealernet.svg';
 const REPORT_CSS = `
   .report { background:#fff; color:#1f2937; font-size:.84rem; }
   .rep-titularbar { display:flex; justify-content:space-between; align-items:baseline; border-bottom:2px solid #0141A2; padding-bottom:6px; margin-bottom:4px; }
@@ -417,7 +418,7 @@ const REPORT_CSS = `
   .rep-sep { border:none; border-top:1px dashed #e2e8f0; margin:8px 0; }
   .rep-legal { margin-top:18px; padding-top:8px; border-top:1px solid #eef2f7; font-size:.68rem; color:#94a3b8; font-style:italic; }
   .rep-tree { font-size:.8rem; } .rep-tree b { color:#374151; }
-  .rep-logo { margin-bottom:12px; } .rep-logo img { height:40px; width:auto; }
+  .rep-logo { margin-bottom:12px; display:flex; justify-content:space-between; align-items:center; } .rep-logo img.l-af { height:40px; width:auto; } .rep-logo img.l-dn { height:30px; width:auto; }
   .rep-page { margin-bottom:56px; }
   @media print { .rep-page { page-break-after:always; margin-bottom:0; } .rep-page:last-child { page-break-after:auto; } }`;
 (function(){ const st=document.createElement('style'); st.textContent=REPORT_CSS; document.head.appendChild(st); })();
@@ -591,7 +592,7 @@ function renderInforme(d){
     <span><b>Resolución:</b> On Line</span>
     <span><b>Hora Consulta:</b> ${f.toLocaleTimeString('es-CL',{hour:'2-digit',minute:'2-digit'})}</span></div>`;
   return `<div class="report">
-    <div class="rep-logo"><img src="${LOGO}" alt="AutoFácil"></div>
+    <div class="rep-logo"><img class="l-af" src="${LOGO}" alt="AutoFácil"><img class="l-dn" src="${LOGO_DN}" alt="DealerNET"></div>
     <div class="rep-titularbar"><b>${esc(titular||'')}</b><span>${esc(rutFmt(d.rut,d.dv)||(d.rut+'-'+(d.dv||'')))}</span></div>
     <div class="rep-title">${esc(d.nombre_producto||cod)}</div>
     ${meta}
