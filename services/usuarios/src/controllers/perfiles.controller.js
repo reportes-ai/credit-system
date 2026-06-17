@@ -146,7 +146,6 @@ const { auditar } = require('../../../../shared/audit');
       ['Créditos', 'Validación de Firma',            'creditos_validacion_firma',    0],
       ['Créditos', 'Revisar Crédito (Analista)',     'creditos_revisar',             0],
       // ── Tesorería ───────────────────────────────────────────
-      ['Tesorería', 'Ver Cajas',                     'tesoreria_ver_cajas',          1],
       ['Tesorería', 'Cuentas Transitorias',          'tesoreria_cuentas_transitorias', 0],
       // ── Cobranza ────────────────────────────────────────────
       ['Cobranza', 'Ver Pre-judicial',               'cobranza_prejudicial',         1],
@@ -287,7 +286,6 @@ const { auditar } = require('../../../../shared/audit');
     const renombrar = [
       // Tesorería
       ['tesoreria_cajas',            'Administración de Cajas'],
-      ['tesoreria_ver_cajas',        'Caja'],
       // CRM
       ['crm_gestiones',              'Gestiones de Contacto'],
       ['crm_estadisticas',           'Estadísticas CRM'],
@@ -1112,10 +1110,11 @@ const getUsuariosByPerfil = async (req, res) => {
     const [[adm]] = await pool.query("SELECT id_perfil FROM perfiles WHERE nombre='Administrador' LIMIT 1");
     const [perfiles] = await pool.query('SELECT id_perfil, nombre FROM perfiles');
 
-    // 1) Eliminar TODAS las funcionalidades duplicadas con código 'teso-caja-operativa'
-    //    (la correcta es tesoreria_ver_cajas con id 150004)
+    // 1) "Caja" duplicada por nombre. La canónica es 'teso-caja-operativa' (tiene
+    //    href /tesoreria/caja/, ícono y genera el menú; la mantiene cajas.controller).
+    //    'tesoreria_ver_cajas' quedó sin href y sin uso → se elimina para no duplicar "Caja".
     const [cajaDups] = await pool.query(
-      "SELECT id_funcionalidad FROM funcionalidades WHERE codigo='teso-caja-operativa'"
+      "SELECT id_funcionalidad FROM funcionalidades WHERE codigo='tesoreria_ver_cajas'"
     );
     if (cajaDups.length) {
       const ids = cajaDups.map(r => r.id_funcionalidad);
@@ -1125,7 +1124,7 @@ const getUsuariosByPerfil = async (req, res) => {
         await pool.query('DELETE FROM permisos_perfil WHERE id_funcionalidad IN (?)', [chunk]);
         await pool.query('DELETE FROM funcionalidades WHERE id_funcionalidad IN (?)', [chunk]);
       }
-      console.log(`[v12] ${cajaDups.length} duplicados Caja (teso-caja-operativa) eliminados`);
+      console.log(`[v12b] funcionalidad Caja duplicada (tesoreria_ver_cajas) eliminada`);
     }
 
     // 2) Limpiar módulo Simulador duplicado (conservar Simulador Rentabilidad)
