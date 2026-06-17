@@ -2076,4 +2076,26 @@ const getUsuariosByPerfil = async (req, res) => {
   } catch (e) { console.error('[meses_cerrados_requirefunc_v1]', e.message); }
 })();
 
+/* ─── Migración (UNA sola vez): preservar acceso al migrar CRM campañas →
+   requireFunc. Antes create/update de campañas era Admin+Gerente; se otorga a
+   Gerente (Admin pasa por bypass). */
+(async () => {
+  try {
+    await pool.query(`CREATE TABLE IF NOT EXISTS migraciones_aplicadas (
+      clave VARCHAR(80) PRIMARY KEY,
+      aplicada_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP)`);
+    const [[ya]] = await pool.query("SELECT 1 ok FROM migraciones_aplicadas WHERE clave='crm_campanas_requirefunc_v1'");
+    if (ya) return;
+    const [[p]] = await pool.query("SELECT id_perfil FROM perfiles WHERE nombre='Gerente' LIMIT 1");
+    if (p) for (const cod of ['crm_campanas_crear', 'crm_campanas_gestionar']) {
+      const [[f]] = await pool.query('SELECT id_funcionalidad FROM funcionalidades WHERE codigo=? LIMIT 1', [cod]);
+      if (f) await pool.query(
+        'INSERT INTO permisos_perfil (id_perfil, id_funcionalidad, habilitado) VALUES (?,?,1) ' +
+        'ON DUPLICATE KEY UPDATE habilitado=1', [p.id_perfil, f.id_funcionalidad]);
+    }
+    await pool.query("INSERT IGNORE INTO migraciones_aplicadas (clave) VALUES ('crm_campanas_requirefunc_v1')");
+    console.log('[crm_campanas_requirefunc_v1] permiso histórico (Gerente) preservado');
+  } catch (e) { console.error('[crm_campanas_requirefunc_v1]', e.message); }
+})();
+
 module.exports = { getAllPerfiles, getModulosConFuncionalidades, getPermisosPerfil, updatePermisosPerfil, reordenarModulos, createPerfil, updatePerfil, deletePerfil, getUsuariosByPerfil };

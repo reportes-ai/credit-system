@@ -1,12 +1,15 @@
 const router = require('express').Router();
 const ctrl      = require('../controllers/seguridad.controller');
 const uiCtrl    = require('../controllers/ui-config.controller');
-const { verifyToken, requirePerfil } = require('../../../../shared/middleware/auth');
+const { verifyToken } = require('../../../../shared/middleware/auth');
+const { requireFunc } = require('../../../../shared/middleware/permisos');
 
-const soloAdmin = requirePerfil('Administrador');
+// Config de seguridad por matriz (Perfiles y Permisos), no por nombre de perfil.
+// Admin pasa por bypass; el resto requiere 'usuarios_seguridad'.
+const configSeguridad = requireFunc('usuarios_seguridad');
 
-router.get('/seguridad',      verifyToken,            ctrl.getConfig);
-router.put('/seguridad',      verifyToken, soloAdmin, ctrl.putConfig);
+router.get('/seguridad',      verifyToken,                ctrl.getConfig);
+router.put('/seguridad',      verifyToken, configSeguridad, ctrl.putConfig);
 
 router.get('/ui/ping',        verifyToken,            uiCtrl.ping);
 router.get('/ui/:clave',      verifyToken,            uiCtrl.getUiConfig);

@@ -1437,8 +1437,9 @@
     }
 
     // ── INIT ──────────────────────────────────────────────────
-    // Solo admin ve tab Seguridad y botón nuevo perfil
-    if (esAdmin) document.getElementById('tabSegNav').style.display = '';
+    // Tab Seguridad por permiso (usuarios_seguridad), no por ser Admin: oculto por
+    // defecto, se muestra en el IIFE de permisos de abajo. Botón nuevo perfil = Admin.
+    document.getElementById('tabSegNav').style.display = 'none';
     if (!esAdmin) { const b = document.getElementById('btnNuevoPerfil'); if(b) b.style.display='none'; }
 
     // Pestañas según permisos reales: sin usuarios_gestionar no ve la lista,
@@ -1459,6 +1460,9 @@
         || tiene('usuarios.eliminar') || tiene('usuarios.reset_clave');
       const _btnNuevo = document.getElementById('btnNuevoUsuario');
       if (_btnNuevo) _btnNuevo.style.display = puedeCrear ? '' : 'none';
+      // Tab Seguridad por permiso usuarios_seguridad (Admin incluido vía tiene())
+      const _tabSeg = document.getElementById('tabSegNav');
+      if (_tabSeg) _tabSeg.style.display = tiene('usuarios_seguridad') ? '' : 'none';
       if (!puedeUsuarios) document.querySelector('[data-tab="usuarios"]').closest('li').style.display = 'none';
       if (!puedePerfiles) document.querySelector('[data-tab="permisos"]').closest('li').style.display = 'none';
       if (puedeUsuarios) {
