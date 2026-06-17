@@ -520,15 +520,16 @@ function renderRows(rows) {
       const val = row[col.field];
       td.dataset.field = col.field;
       td.dataset.id    = row.id;
+      const editable = !col.readonly && col.field !== 'id';
       if (val === null || val === undefined || val === '') {
         td.textContent = '—';
-        td.className = 'null-val editable';
+        td.className = 'null-val' + (editable ? ' editable' : '');
       } else {
         td.textContent = val;
-        td.className = 'editable';
+        td.className = editable ? 'editable' : '';
         td.title = String(val);
       }
-      td.ondblclick = () => startEdit(tr, td, col, val);
+      if (editable) td.ondblclick = () => startEdit(tr, td, col, val);
       tr.appendChild(td);
     });
     tbody.appendChild(tr);
@@ -538,7 +539,7 @@ function renderRows(rows) {
 /* ── Edición inline ── */
 function startEdit(tr, td, col, oldVal) {
   if (editCell) cancelEdit();
-  if (col.field === 'id') return; // id no editable
+  if (col.field === 'id' || col.readonly) return; // id y columnas derivadas no editables
   editCell = {tr, td, col, oldVal};
   const inp = document.createElement('input');
   inp.className = 'edit-cell-input';

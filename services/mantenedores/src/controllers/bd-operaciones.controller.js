@@ -13,6 +13,10 @@ const getColumns = async (req, res) => {
     const cols = rows
       .filter(r => !EXCLUIR.includes(r.Field))
       .map(r => ({ field: r.Field, type: r.Type, nullable: r.Null === 'YES', key: r.Key }));
+    // Columna derivada: RUT del cliente (viene de clientes.rut vía id_cliente). Solo lectura.
+    const rutCol = { field: 'rut_cliente', type: 'varchar (cliente)', nullable: true, key: '', readonly: true };
+    const idx = cols.findIndex(c => c.field === 'id_cliente');
+    if (idx >= 0) cols.splice(idx + 1, 0, rutCol); else cols.push(rutCol);
     res.json({ success: true, data: cols, error: null });
   } catch (e) {
     res.status(500).json({ success: false, data: null, error: e.message });
@@ -31,23 +35,29 @@ const getAll = async (req, res) => {
     // Validar nombre de columna para evitar SQL injection
     const [colRows] = await pool.query('DESCRIBE creditos');
     const validCols = colRows.map(r => r.Field);
-    const safeSort  = validCols.includes(sortCol) ? sortCol : 'id';
+    // Orden: columnas de creditos con alias cr.; rut_cliente es derivada (cl.rut)
+    const sortExpr = sortCol === 'rut_cliente'
+      ? 'cl.rut'
+      : 'cr.`' + (validCols.includes(sortCol) ? sortCol : 'id') + '`';
 
     // Construir WHERE desde filters JSON
     const filters = req.query.filters ? JSON.parse(req.query.filters) : {};
     const where = [], vals = [];
     for (const [col, val] of Object.entries(filters)) {
-      if (!validCols.includes(col) || val === '' || val === null || val === undefined) continue;
-      where.push(`LOWER(\`${col}\`) LIKE LOWER(?)`);
+      if (val === '' || val === null || val === undefined) continue;
+      if (col === 'rut_cliente') { where.push('LOWER(cl.rut) LIKE LOWER(?)'); vals.push(`%${val}%`); continue; }
+      if (!validCols.includes(col)) continue;
+      where.push(`LOWER(cr.\`${col}\`) LIKE LOWER(?)`);
       vals.push(`%${val}%`);
     }
     const whereStr = where.length ? 'WHERE ' + where.join(' AND ') : '';
+    const FROM = 'FROM creditos cr LEFT JOIN clientes cl ON cl.id_cliente = cr.id_cliente';
 
     const [[{ total }]] = await pool.query(
-      `SELECT COUNT(*) AS total FROM creditos ${whereStr}`, vals
+      `SELECT COUNT(*) AS total ${FROM} ${whereStr}`, vals
     );
     const [rows] = await pool.query(
-      `SELECT * FROM creditos ${whereStr} ORDER BY \`${safeSort}\` ${sortDir} LIMIT ? OFFSET ?`,
+      `SELECT cr.*, cl.rut AS rut_cliente ${FROM} ${whereStr} ORDER BY ${sortExpr} ${sortDir} LIMIT ? OFFSET ?`,
       [...vals, limit, offset]
     );
 
