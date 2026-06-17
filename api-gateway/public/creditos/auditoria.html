@@ -287,12 +287,21 @@ async function cargarPagina() {
     document.getElementById('pageWrap').innerHTML = '<div class="no-data"><i class="bi bi-exclamation-triangle"></i>ID de crédito no especificado</div>';
     return;
   }
-  if (!PERFILES_AUDIT.includes(yo?.perfil)) {
+  // Acceso por permiso (creditos_auditoria), no por nombre de perfil. Admin pasa por bypass.
+  let _puedeAudit = (yo?.perfil === 'Administrador');
+  if (!_puedeAudit) {
+    try {
+      const rp = await fetch('/api/auth/mis-permisos?_='+Date.now(), { headers: apiHdr() });
+      const jp = await rp.json();
+      _puedeAudit = (jp.funcionalidades||[]).includes('creditos_auditoria');
+    } catch(e){}
+  }
+  if (!_puedeAudit) {
     document.getElementById('pageWrap').innerHTML = `
       <div class="acceso-denegado">
         <i class="bi bi-shield-lock-fill"></i>
         <h2>Acceso restringido</h2>
-        <p>La auditoría de crédito solo está disponible para Administrador y Gerente.</p>
+        <p>No tienes permiso para ver la auditoría de crédito.</p>
       </div>`;
     return;
   }
