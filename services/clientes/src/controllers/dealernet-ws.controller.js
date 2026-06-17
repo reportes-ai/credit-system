@@ -211,6 +211,59 @@ const EXTRA_CODIGOS = ['16', '2101'];
   } catch (e) { console.error('[dealernet-auditoria migration]', e.message); }
 })();
 
+/* ── Migración: costos en UF + facturación prepago ───────────────────────── */
+// Precio unitario en UF por informe (columna Plan N°5 = 40 UF mín. mensual, el contratado).
+const PLANES_UF = [10, 20, 40, 80];
+const PRECIO_UF_SEED = {
+  '3435': 0.0085, '3407': 0.0054, '3409': 0.0020, '3410': 0.0025, '3411': 0.0015,
+  '3414': 0.0080, '3443': 0.0065, '3412': 0.0061, '3404': 0.0035, '3429': 0.0051,
+  '3425': 0.0047, '3426': 0.0031, '3427': 0.0035, '3428': 0.0025, '3439': 0.0035,
+  '3430': 0.0058, '3423': 0.0020, '3421': 0.0020, '3401': 0.0058, '3402': 0.0048,
+  '3403': 0.0054, '3420': 0.0058, '3419': 0.0058, '3431': 0.0029, '3434': 0.0029,
+  '3432': 0.0024, '3433': 0.0027,
+};
+(async () => {
+  try {
+    try { await pool.query('ALTER TABLE dealernet_productos ADD COLUMN precio_uf DECIMAL(8,4) NOT NULL DEFAULT 0'); }
+    catch (e) { if (e.errno !== 1060) throw e; }
+    // Sembrar precios sólo donde aún está en 0 (no piso ediciones del admin)
+    for (const [cod, uf] of Object.entries(PRECIO_UF_SEED))
+      await pool.query('UPDATE dealernet_productos SET precio_uf=? WHERE codigo=? AND (precio_uf=0 OR precio_uf IS NULL)', [uf, cod]);
+    // Plan prepago contratado (UF/mes)
+    await pool.query("INSERT IGNORE INTO dealernet_config (clave, valor) VALUES ('plan_uf','40')");
+    // Facturación mensual: consumo calculado vs monto real facturado
+    await pool.query(`CREATE TABLE IF NOT EXISTS dealernet_facturacion (
+      mes               CHAR(7) PRIMARY KEY,        -- 'YYYY-MM'
+      consumo_uf        DECIMAL(12,4) DEFAULT 0,
+      uf_valor          DECIMAL(12,2) DEFAULT 0,    -- UF del último día del mes
+      consumo_clp       DECIMAL(14,2) DEFAULT 0,
+      plan_uf           DECIMAL(8,2)  DEFAULT 0,
+      facturado_real_clp DECIMAL(14,2) NULL,
+      recomendacion     VARCHAR(20),
+      plan_recomendado_uf DECIMAL(8,2) NULL,
+      detalle           JSON NULL,
+      created_at        DATETIME DEFAULT CURRENT_TIMESTAMP,
+      updated_at        DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+    )`);
+    // Funcionalidades: mantenedor de costos + pestaña Facturación
+    const [[modM]] = await pool.query("SELECT id_modulo FROM modulos WHERE nombre='Mantenedores' AND estado='activo' LIMIT 1");
+    if (modM) {
+      const [[ex]] = await pool.query("SELECT id_funcionalidad FROM funcionalidades WHERE codigo='mant_dealernet_costos' LIMIT 1");
+      let idf = ex && ex.id_funcionalidad;
+      if (!idf) { const [r] = await pool.query("INSERT INTO funcionalidades (id_modulo, nombre, codigo, href, icono) VALUES (?,?,?,?,?)",
+        [modM.id_modulo, 'Costo DealerNet', 'mant_dealernet_costos', '/mantenedores/dealernet-costos/', 'bi-cash-coin']); idf = r.insertId; }
+      const [[pp]] = await pool.query('SELECT 1 ok FROM permisos_perfil WHERE id_perfil=1 AND id_funcionalidad=? LIMIT 1', [idf]);
+      if (!pp) await pool.query('INSERT INTO permisos_perfil (id_perfil, id_funcionalidad, habilitado) VALUES (1,?,1)', [idf]);
+    }
+    const [[exF]] = await pool.query("SELECT id_funcionalidad FROM funcionalidades WHERE codigo='dealernet_facturacion' LIMIT 1");
+    let idF = exF && exF.id_funcionalidad;
+    if (!idF) { const [r] = await pool.query("INSERT INTO funcionalidades (id_modulo, nombre, codigo, href, icono) VALUES (380001,'Facturación',?,NULL,'bi-receipt')", ['dealernet_facturacion']); idF = r.insertId; }
+    const [[ppF]] = await pool.query('SELECT 1 ok FROM permisos_perfil WHERE id_perfil=1 AND id_funcionalidad=? LIMIT 1', [idF]);
+    if (!ppF) await pool.query('INSERT INTO permisos_perfil (id_perfil, id_funcionalidad, habilitado) VALUES (1,?,1)', [idF]);
+    console.log('[dealernet-ws] costos y facturación listos');
+  } catch (e) { console.error('[dealernet-costos migration]', e.message); }
+})();
+
 /* ── Utilidades RUT ──────────────────────────────────────────────────────── */
 function splitRut(rut) {
   const clean = String(rut || '').replace(/[.\s]/g, '').toUpperCase();
@@ -720,6 +773,111 @@ const auditoria = async (req, res) => {
   } catch (e) { errSrv(res, e, 'auditoria'); }
 };
 
+/* ── Costos en UF + facturación prepago ───────────────────────────────────── */
+async function ufUltimoDiaMes(mes) {
+  const [y, m] = mes.split('-').map(Number);
+  const lastDay = new Date(y, m, 0).getDate();
+  const fstr = `${y}-${String(m).padStart(2, '0')}-${String(lastDay).padStart(2, '0')}`;
+  const [[u]] = await pool.query('SELECT valor FROM uf WHERE fecha <= ? ORDER BY fecha DESC LIMIT 1', [fstr]);
+  return u ? Number(u.valor) : 0;
+}
+function mesAnterior() {
+  const d = new Date(); d.setDate(1); d.setMonth(d.getMonth() - 1);
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+}
+function recomendarPlan(consumo_uf, plan_uf) {
+  let rec = PLANES_UF.find(t => t >= consumo_uf);
+  if (rec == null) rec = PLANES_UF[PLANES_UF.length - 1];
+  if (consumo_uf <= 0) rec = PLANES_UF[0];
+  const accion = rec > plan_uf ? 'subir' : rec < plan_uf ? 'bajar' : 'mantener';
+  return { accion, plan_recomendado_uf: rec };
+}
+async function calcularConsumoMes(mes) {
+  const ini = mes + '-01';
+  const [y, m] = mes.split('-').map(Number);
+  const sigY = m === 12 ? y + 1 : y, sigM = m === 12 ? 1 : m + 1;
+  const fin = `${sigY}-${String(sigM).padStart(2, '0')}-01`;
+  const [prods] = await pool.query('SELECT codigo, nombre, precio_uf FROM dealernet_productos');
+  const pmap = {}; prods.forEach(p => pmap[String(p.codigo)] = p);
+  const [cnt] = await pool.query(
+    `SELECT codigo_producto, COUNT(*) n FROM dealernet_informes
+     WHERE retcode='0' AND created_at >= ? AND created_at < ? GROUP BY codigo_producto`, [ini, fin]);
+  const uf = await ufUltimoDiaMes(mes);
+  let consumo_uf = 0;
+  const items = cnt.map(c => {
+    const p = pmap[String(c.codigo_producto)] || { nombre: c.codigo_producto, precio_uf: 0 };
+    const sub_uf = Number(c.n) * Number(p.precio_uf || 0);
+    consumo_uf += sub_uf;
+    return { codigo: c.codigo_producto, nombre: p.nombre, n: Number(c.n), precio_uf: Number(p.precio_uf || 0),
+      subtotal_uf: +sub_uf.toFixed(4), subtotal_clp: Math.round(sub_uf * uf) };
+  }).sort((a, b) => b.subtotal_uf - a.subtotal_uf);
+  return { mes, uf, items, consumo_uf: +consumo_uf.toFixed(4), consumo_clp: Math.round(consumo_uf * uf) };
+}
+
+const getCostos = async (req, res) => {
+  try {
+    const [prods] = await pool.query('SELECT codigo, nombre, precio_uf, activo, orden FROM dealernet_productos ORDER BY orden, codigo');
+    const [[c]] = await pool.query("SELECT valor FROM dealernet_config WHERE clave='plan_uf'");
+    res.json({ success: true, data: { productos: prods, plan_uf: Number(c?.valor) || 40, planes: PLANES_UF }, error: null });
+  } catch (e) { errSrv(res, e, 'getCostos'); }
+};
+const updateCostos = async (req, res) => {
+  try {
+    const precios = req.body?.precios || {};
+    for (const [cod, v] of Object.entries(precios)) {
+      const n = Number(v);
+      if (!isNaN(n) && n >= 0) await pool.query('UPDATE dealernet_productos SET precio_uf=? WHERE codigo=?', [n, cod]);
+    }
+    if (req.body?.plan_uf !== undefined) {
+      const p = Number(req.body.plan_uf);
+      if (p > 0) await pool.query("INSERT INTO dealernet_config (clave, valor) VALUES ('plan_uf', ?) ON DUPLICATE KEY UPDATE valor=VALUES(valor)", [String(p)]);
+    }
+    auditar({ req, accion: 'EDITAR', modulo: 'dealernet', entidad: 'costos', detalle: 'Actualizó costos/plan DealerNet' });
+    res.json({ success: true, data: { ok: true }, error: null });
+  } catch (e) { errSrv(res, e, 'updateCostos'); }
+};
+const facturacion = async (req, res) => {
+  try {
+    const mes = /^\d{4}-\d{2}$/.test(req.query.mes || '') ? req.query.mes : mesAnterior();
+    const calc = await calcularConsumoMes(mes);
+    const [[c]] = await pool.query("SELECT valor FROM dealernet_config WHERE clave='plan_uf'");
+    const plan_uf = Number(c?.valor) || 40;
+    const rec = recomendarPlan(calc.consumo_uf, plan_uf);
+    const [[guardado]] = await pool.query('SELECT * FROM dealernet_facturacion WHERE mes=?', [mes]);
+    res.json({ success: true, data: { ...calc, plan_uf, plan_clp: Math.round(plan_uf * calc.uf), ...rec, guardado: guardado || null }, error: null });
+  } catch (e) { errSrv(res, e, 'facturacion'); }
+};
+const guardarFacturacion = async (req, res) => {
+  try {
+    const mes = /^\d{4}-\d{2}$/.test(req.body?.mes || '') ? req.body.mes : null;
+    if (!mes) return res.status(400).json({ success: false, data: null, error: 'Mes inválido (YYYY-MM)' });
+    const calc = await calcularConsumoMes(mes);
+    const [[c]] = await pool.query("SELECT valor FROM dealernet_config WHERE clave='plan_uf'");
+    const plan_uf = Number(c?.valor) || 40;
+    const rec = recomendarPlan(calc.consumo_uf, plan_uf);
+    let facturado = req.body?.facturado_real_clp;
+    facturado = (facturado === '' || facturado == null) ? null : Number(facturado);
+    await pool.query(
+      `INSERT INTO dealernet_facturacion (mes, consumo_uf, uf_valor, consumo_clp, plan_uf, facturado_real_clp, recomendacion, plan_recomendado_uf, detalle)
+       VALUES (?,?,?,?,?,?,?,?,?)
+       ON DUPLICATE KEY UPDATE consumo_uf=VALUES(consumo_uf), uf_valor=VALUES(uf_valor), consumo_clp=VALUES(consumo_clp), plan_uf=VALUES(plan_uf),
+         facturado_real_clp=COALESCE(VALUES(facturado_real_clp), facturado_real_clp), recomendacion=VALUES(recomendacion),
+         plan_recomendado_uf=VALUES(plan_recomendado_uf), detalle=VALUES(detalle)`,
+      [mes, calc.consumo_uf, calc.uf, calc.consumo_clp, plan_uf, facturado, rec.accion, rec.plan_recomendado_uf, JSON.stringify(calc.items)]);
+    auditar({ req, accion: 'EDITAR', modulo: 'dealernet', entidad: 'facturacion', detalle: `Guardó facturación ${mes}: ${calc.consumo_uf} UF` });
+    res.json({ success: true, data: { ok: true }, error: null });
+  } catch (e) { errSrv(res, e, 'guardarFacturacion'); }
+};
+const historialFacturacion = async (req, res) => {
+  try {
+    const [rows] = await pool.query(
+      `SELECT mes, consumo_uf, uf_valor, consumo_clp, plan_uf, facturado_real_clp, recomendacion, plan_recomendado_uf,
+        (facturado_real_clp - consumo_clp) AS diff_clp, updated_at
+       FROM dealernet_facturacion ORDER BY mes DESC LIMIT 36`);
+    res.json({ success: true, data: rows, error: null });
+  } catch (e) { errSrv(res, e, 'historialFacturacion'); }
+};
+
 module.exports = { getProductos, addProducto, updateProducto, deleteProducto, reordenarProductos, consultar, listConsultas, estado,
   verificarRepositorio, solicitarInformes, productosActivos, historicos, verInforme, descargarPdf, getConfigEndpoint, updateConfigEndpoint,
-  clasificarRut, auditoria };
+  clasificarRut, auditoria, getCostos, updateCostos, facturacion, guardarFacturacion, historialFacturacion };

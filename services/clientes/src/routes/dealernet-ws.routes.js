@@ -33,4 +33,13 @@ router.get('/informes/:id(\\d+)/pdf', verifyToken, requireFunc('dealernet_inform
 router.post('/informes/clasificar-rut', verifyToken, requireFunc('dealernet_consultar'), C.clasificarRut);
 router.get('/informes/auditoria',       verifyToken, requireFunc('dealernet_auditoria', 'usuarios_gestionar'), C.auditoria);
 
+/* ── Costo DealerNet (mantenedor) ────────────────────────────────────────── */
+router.get('/costos', verifyToken, requireFunc('mant_dealernet_costos'), C.getCostos);
+router.put('/costos', verifyToken, requireFunc('mant_dealernet_costos'), C.updateCostos);
+
+/* ── Facturación prepago (pestaña en Informes DealerNet) ─────────────────── */
+router.get('/facturacion',           verifyToken, requireFunc('dealernet_facturacion', 'usuarios_gestionar'), C.facturacion);
+router.post('/facturacion',          verifyToken, requireFunc('dealernet_facturacion', 'usuarios_gestionar'), C.guardarFacturacion);
+router.get('/facturacion/historial', verifyToken, requireFunc('dealernet_facturacion', 'usuarios_gestionar'), C.historialFacturacion);
+
 module.exports = router;

@@ -104,6 +104,7 @@
   <div class="tabs">
     <button class="tabbtn active" data-t="consultar" onclick="tab('consultar')"><i class="bi bi-search me-1"></i>Consultar</button>
     <button class="tabbtn" id="tabAudBtn" data-t="auditoria" onclick="tab('auditoria')" style="display:none"><i class="bi bi-graph-up me-1"></i>Auditoría de uso</button>
+    <button class="tabbtn" id="tabFacBtn" data-t="facturacion" onclick="tab('facturacion')" style="display:none"><i class="bi bi-receipt me-1"></i>Facturación</button>
   </div>
 
   <div id="tab-consultar">
@@ -151,6 +152,25 @@
     <div id="audBody"><div class="muted">Cargando…</div></div>
   </div>
   </div><!-- /tab-auditoria -->
+
+  <!-- Facturación (pestaña con permiso) -->
+  <div id="tab-facturacion" style="display:none">
+    <div class="card">
+      <div style="display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:12px">
+        <h3 style="margin:0"><i class="bi bi-receipt"></i> Facturación prepago</h3>
+        <div style="display:flex;align-items:center;gap:8px">
+          <label class="muted" style="font-size:.8rem">Mes</label>
+          <input type="month" id="facMes" onchange="cargarFacturacion()" style="border:1.5px solid #d1d5db;border-radius:8px;padding:6px 10px;font-size:.9rem">
+        </div>
+      </div>
+      <div class="muted" style="margin:-4px 0 12px">Consumo = N° de consultas del mes × precio UF de cada informe × valor UF del último día del mes. El precio UF se edita en el mantenedor <a href="/mantenedores/dealernet-costos/">Costo DealerNet</a>.</div>
+      <div id="facBody"><div class="muted">Cargando…</div></div>
+    </div>
+    <div class="card">
+      <h3 style="margin:0 0 10px"><i class="bi bi-clock-history"></i> Historial (consumo calculado vs. facturado real)</h3>
+      <div id="facHist"><div class="muted">—</div></div>
+    </div>
+  </div>
 </div>
 
 <dialog id="dlgWarn">
@@ -688,24 +708,94 @@ function renderAuditoria(d){
 }
 
 /* ── Pestañas ────────────────────────────────────────────────────────────── */
-let _audCargada = false;
+let _audCargada = false, _facCargada = false;
 function tab(t){
-  document.getElementById('tab-consultar').style.display = t==='consultar' ? '' : 'none';
-  document.getElementById('tab-auditoria').style.display = t==='auditoria' ? '' : 'none';
+  ['consultar','auditoria','facturacion'].forEach(x=>{ const el=document.getElementById('tab-'+x); if(el) el.style.display = x===t ? '' : 'none'; });
   document.querySelectorAll('.tabbtn').forEach(b=>b.classList.toggle('active', b.dataset.t===t));
   if(t==='auditoria' && !_audCargada){ _audCargada = true; cargarAuditoria(30); }
+  if(t==='facturacion' && !_facCargada){ _facCargada = true; cargarFacturacion(); }
 }
-// La pestaña Auditoría se muestra solo con permiso (dealernet_auditoria o gestionar usuarios; Admin siempre).
+// Pestañas Auditoría/Facturación: solo con permiso (Admin siempre).
 (async () => {
-  let puede = (yo?.perfil === 'Administrador');
+  const esAdmin = (yo?.perfil === 'Administrador');
+  let pAud = esAdmin, pFac = esAdmin;
   try {
     const r = await fetch('/api/auth/mis-permisos', { headers:H });
     const j = await r.json();
     const f = j.funcionalidades || [];
-    if (f.includes('dealernet_auditoria') || f.includes('usuarios_gestionar')) puede = true;
+    const g = f.includes('usuarios_gestionar');
+    if (f.includes('dealernet_auditoria') || g) pAud = true;
+    if (f.includes('dealernet_facturacion') || g) pFac = true;
   } catch(_){}
-  document.getElementById('tabAudBtn').style.display = puede ? '' : 'none';
+  document.getElementById('tabAudBtn').style.display = pAud ? '' : 'none';
+  document.getElementById('tabFacBtn').style.display = pFac ? '' : 'none';
 })();
+
+/* ── Facturación prepago ─────────────────────────────────────────────────── */
+const fmtCLP = n => '$'+Math.round(Number(n||0)).toLocaleString('es-CL');
+const fmtUF  = n => Number(n||0).toLocaleString('es-CL',{minimumFractionDigits:2,maximumFractionDigits:4})+' UF';
+function facCard(lbl,val){ return '<div style="background:#f8fafc;border:1px solid #eef2f7;border-radius:10px;padding:12px 14px"><div style="font-size:.72rem;color:#64748b;text-transform:uppercase">'+lbl+'</div><div style="font-weight:800;font-size:1rem;color:#012d70;margin-top:2px">'+val+'</div></div>'; }
+async function cargarFacturacion(){
+  const mes = document.getElementById('facMes').value;
+  const body = document.getElementById('facBody');
+  body.innerHTML = '<div class="muted">Calculando…</div>';
+  try {
+    const r = await fetch('/api/dealernet/facturacion'+(mes?('?mes='+mes):''), { headers:H });
+    if (r.status===403){ document.getElementById('tabFacBtn').style.display='none'; tab('consultar'); return; }
+    const j = await r.json();
+    if (!j.success){ body.innerHTML='<div class="alertbox block">'+esc(j.error||'Error')+'</div>'; return; }
+    if (!mes) document.getElementById('facMes').value = j.data.mes;
+    renderFacturacion(j.data);
+    cargarHistorialFac();
+  } catch(_){ body.innerHTML='<div class="alertbox block">Error de conexión</div>'; }
+}
+function renderFacturacion(d){
+  const rec=d.accion, col = rec==='subir'?'#b91c1c':rec==='bajar'?'#92400e':'#15803d';
+  const recTxt = rec==='subir' ? 'Subir el plan a '+d.plan_recomendado_uf+' UF'
+    : rec==='bajar' ? 'Bajar el plan a '+d.plan_recomendado_uf+' UF' : 'Mantener el plan ('+d.plan_uf+' UF)';
+  const g = d.guardado;
+  let h = '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px;margin-bottom:14px">'+
+    facCard('Consumo del mes', fmtUF(d.consumo_uf)) +
+    facCard('Consumo en pesos', fmtCLP(d.consumo_clp)+'<div class="muted" style="font-size:.7rem">UF '+esc(d.mes)+': $'+Number(d.uf).toLocaleString('es-CL')+'</div>') +
+    facCard('Plan contratado', d.plan_uf+' UF<div class="muted" style="font-size:.7rem">'+fmtCLP(d.plan_clp)+'</div>') +
+    '<div style="background:'+col+';color:#fff;border-radius:10px;padding:12px 14px"><div style="font-size:.72rem;opacity:.85;text-transform:uppercase">Recomendación</div><div style="font-weight:800;font-size:1rem;margin-top:2px">'+recTxt+'</div></div></div>';
+  h += '<div style="overflow:auto"><table class="tb"><thead><tr><th>Informe</th><th style="text-align:right">N°</th><th style="text-align:right">Precio UF</th><th style="text-align:right">Subtotal UF</th><th style="text-align:right">Subtotal $</th></tr></thead><tbody>';
+  if(!d.items.length) h += '<tr><td colspan="5" class="muted">Sin consultas facturables en el mes.</td></tr>';
+  h += d.items.map(it=>'<tr><td>'+esc(it.nombre)+'</td><td style="text-align:right">'+it.n+'</td><td style="text-align:right">'+Number(it.precio_uf).toFixed(4)+'</td><td style="text-align:right">'+Number(it.subtotal_uf).toFixed(4)+'</td><td style="text-align:right">'+fmtCLP(it.subtotal_clp)+'</td></tr>').join('');
+  h += '<tr style="font-weight:800;border-top:2px solid #e2e8f0"><td>Total</td><td></td><td></td><td style="text-align:right">'+Number(d.consumo_uf).toFixed(4)+'</td><td style="text-align:right">'+fmtCLP(d.consumo_clp)+'</td></tr></tbody></table></div>';
+  const real = (g && g.facturado_real_clp!=null) ? g.facturado_real_clp : '';
+  h += '<div style="display:flex;align-items:end;gap:12px;flex-wrap:wrap;margin-top:14px;border-top:1px solid #f1f5f9;padding-top:12px">'+
+    '<div><label class="muted" style="font-size:.74rem;display:block;margin-bottom:4px">Monto real facturado (CLP)</label>'+
+    '<input type="number" id="facReal" min="0" step="1" value="'+real+'" style="border:1.5px solid #d1d5db;border-radius:8px;padding:7px 10px;width:160px"></div>'+
+    '<button class="btn-primary2" style="width:auto" onclick="guardarFacturacion()"><i class="bi bi-save me-1"></i>Guardar mes</button>';
+  if (g && g.facturado_real_clp!=null){ const diff=Number(g.facturado_real_clp)-Number(d.consumo_clp);
+    h += '<div class="muted" style="font-size:.85rem">Diferencia (real − calculado): <b style="color:'+(diff>0?'#b91c1c':'#15803d')+'">'+fmtCLP(diff)+'</b></div>'; }
+  h += '</div>';
+  document.getElementById('facBody').innerHTML = h;
+}
+async function guardarFacturacion(){
+  const mes = document.getElementById('facMes').value;
+  const facturado_real_clp = document.getElementById('facReal').value;
+  try {
+    const r = await fetch('/api/dealernet/facturacion', { method:'POST', headers:H, body:JSON.stringify({ mes, facturado_real_clp }) });
+    const j = await r.json();
+    if (j.success){ toast('Facturación guardada'); cargarFacturacion(); } else toast(j.error||'Error', true);
+  } catch(_){ toast('Error al guardar', true); }
+}
+async function cargarHistorialFac(){
+  try {
+    const r = await fetch('/api/dealernet/facturacion/historial', { headers:H });
+    const j = await r.json();
+    const box = document.getElementById('facHist');
+    if (!j.success || !j.data.length){ box.innerHTML='<div class="muted">Aún no hay meses guardados.</div>'; return; }
+    box.innerHTML = '<div style="overflow:auto"><table class="tb"><thead><tr><th>Mes</th><th style="text-align:right">Consumo UF</th><th style="text-align:right">Calculado $</th><th style="text-align:right">Facturado real $</th><th style="text-align:right">Diferencia $</th><th>Recom.</th></tr></thead><tbody>'+
+      j.data.map(x=>{ const diff = x.facturado_real_clp!=null ? Number(x.facturado_real_clp)-Number(x.consumo_clp) : null;
+        return '<tr><td><b>'+esc(x.mes)+'</b></td><td style="text-align:right">'+Number(x.consumo_uf).toFixed(2)+'</td><td style="text-align:right">'+fmtCLP(x.consumo_clp)+'</td>'+
+          '<td style="text-align:right">'+(x.facturado_real_clp!=null?fmtCLP(x.facturado_real_clp):'<span class="muted">—</span>')+'</td>'+
+          '<td style="text-align:right">'+(diff!=null?('<b style="color:'+(diff>0?'#b91c1c':'#15803d')+'">'+fmtCLP(diff)+'</b>'):'<span class="muted">—</span>')+'</td>'+
+          '<td>'+esc(x.recomendacion||'')+(x.plan_recomendado_uf?(' '+x.plan_recomendado_uf+'UF'):'')+'</td></tr>'; }).join('')+'</tbody></table></div>';
+  } catch(_){}
+}
 
 document.getElementById('rut').addEventListener('blur', ()=>{ const v=document.getElementById('rut').value.trim(); if(v) cargarHistoricos(v); });
 cargarProductos();

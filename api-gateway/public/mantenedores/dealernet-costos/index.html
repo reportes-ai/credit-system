@@ -1,0 +1,130 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <link rel="icon" href="/img/favicon.png" type="image/png">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Costo DealerNet — AutoFácil</title>
+  <link href="/css/bootstrap.min.css" rel="stylesheet">
+  <link href="/css/bootstrap-icons.css" rel="stylesheet">
+  <style>
+    :root { --navy:#0141A2; --navy-dark:#012d70; --navy-light:#0255c5; --accent:#009AFE; --bg:#f0f4f8; }
+    body { background:var(--bg); font-family:'Segoe UI',system-ui,sans-serif; margin:0; min-height:100vh; }
+    .topnav { background:linear-gradient(90deg,var(--navy-dark),var(--navy-light)); color:#fff; height:60px; padding:0 24px; display:flex; align-items:center; justify-content:space-between; position:sticky; top:0; z-index:200; }
+    .topnav-brand { display:flex; align-items:center; gap:8px; text-decoration:none; }
+    .topnav-brand img { height:32px; filter:brightness(0) invert(1); }
+    .version-badge { background:rgba(255,255,255,.15); color:rgba(255,255,255,.75); font-size:.65rem; font-weight:700; border-radius:6px; padding:2px 8px; }
+    .breadcrumb-nav { color:rgba(255,255,255,.6); font-size:.85rem; margin-left:12px; }
+    .breadcrumb-nav a { color:rgba(255,255,255,.75); text-decoration:none; }
+    .btn-logout { background:rgba(255,255,255,.1); border:1px solid rgba(255,255,255,.2); color:#fff; border-radius:8px; padding:5px 12px; font-size:.82rem; cursor:pointer; }
+    .main { max-width:1000px; margin:26px auto; padding:0 20px 60px; }
+    .page-banner { background:linear-gradient(135deg,#012d70,#0141A2 50%,#009AFE); border-radius:16px; color:#fff; padding:22px 30px; margin-bottom:20px; display:flex; align-items:center; gap:16px; }
+    .page-banner i { font-size:2.4rem; opacity:.85; } .page-banner h2 { font-weight:700; margin:0 0 2px; font-size:1.25rem; } .page-banner p { opacity:.8; margin:0; font-size:.86rem; }
+    .card2 { background:#fff; border:1px solid #e8edf3; border-radius:14px; padding:18px 22px; margin-bottom:18px; }
+    table.tb { width:100%; border-collapse:collapse; font-size:.88rem; }
+    table.tb th { text-align:left; color:#64748b; font-size:.72rem; text-transform:uppercase; letter-spacing:.4px; padding:8px; border-bottom:2px solid #eef2f7; }
+    table.tb td { padding:7px 8px; border-bottom:1px solid #f1f5f9; }
+    table.tb input.uf { width:110px; border:1.5px solid #d1d5db; border-radius:7px; padding:5px 8px; font-size:.86rem; text-align:right; }
+    table.tb input.uf:focus { outline:none; border-color:var(--navy); }
+    .cod { font-family:ui-monospace,monospace; font-size:.78rem; color:#94a3b8; }
+    .badge-off { background:#f1f5f9; color:#94a3b8; border-radius:11px; font-size:.7rem; padding:2px 8px; }
+    .badge-on { background:#dcfce7; color:#15803d; border-radius:11px; font-size:.7rem; padding:2px 8px; }
+    .btn-primary2 { background:var(--navy); color:#fff; border:none; border-radius:10px; padding:10px 20px; font-weight:700; font-size:.9rem; cursor:pointer; }
+    .btn-primary2:hover { background:var(--navy-light); }
+    .plan-input { width:120px; border:1.5px solid #d1d5db; border-radius:8px; padding:8px 10px; font-size:.95rem; }
+    .footer-afecta { background:#f8fafc; border-left:4px solid var(--navy); border-radius:8px; padding:14px 18px; font-size:.84rem; color:#334155; }
+    .footer-afecta h4 { font-size:.92rem; color:var(--navy-dark); margin:0 0 8px; display:flex; align-items:center; gap:8px; }
+    .footer-afecta ul { margin:0; padding-left:18px; line-height:1.7; }
+    .toast-af { position:fixed; bottom:24px; left:50%; transform:translateX(-50%); background:#0f172a; color:#fff; padding:11px 20px; border-radius:10px; font-size:.86rem; z-index:9999; display:none; }
+    .toast-af.err { background:#b91c1c; }
+  </style>
+</head>
+<body>
+<nav class="topnav">
+  <div style="display:flex;align-items:center">
+    <a href="/" class="topnav-brand"><img src="/img/logo.png" alt="AutoFácil"><span class="version-badge" id="versionBadge"></span></a>
+    <div class="breadcrumb-nav"><a href="/">Inicio</a> › <a href="/mantenedores/">Mantenedores</a> › <span style="color:#fff;font-weight:600">Costo DealerNet</span></div>
+  </div>
+  <button class="btn-logout" onclick="logout()"><i class="bi bi-box-arrow-right me-1"></i>Salir</button>
+</nav>
+
+<div class="main">
+  <div class="page-banner">
+    <i class="bi bi-cash-coin"></i>
+    <div><h2>Costo DealerNet</h2><p>Precio unitario en UF por informe y plan prepago contratado. Alimenta la pestaña <b>Facturación</b> de Informes DealerNet.</p></div>
+  </div>
+
+  <div class="card2">
+    <div style="display:flex;align-items:end;gap:18px;flex-wrap:wrap">
+      <div>
+        <label style="font-size:.74rem;font-weight:700;color:#6b7280;text-transform:uppercase;display:block;margin-bottom:4px">Plan prepago contratado (UF/mes)</label>
+        <input type="number" id="planUF" class="plan-input" min="1" step="1">
+      </div>
+      <div style="font-size:.8rem;color:#94a3b8;padding-bottom:8px">Planes de referencia: <b>10 · 20 · 40 · 80 UF</b> (facturación mínima mensual)</div>
+      <div style="flex:1"></div>
+      <button class="btn-primary2" onclick="guardar()"><i class="bi bi-check-lg me-1"></i>Guardar cambios</button>
+    </div>
+  </div>
+
+  <div class="card2">
+    <h3 style="margin:0 0 12px;font-size:1rem;color:var(--navy-dark)"><i class="bi bi-list-columns-reverse me-2"></i>Precio unitario por informe (UF)</h3>
+    <div style="overflow:auto">
+      <table class="tb">
+        <thead><tr><th style="width:90px">Código</th><th>Producto</th><th style="width:90px">Estado</th><th style="width:140px;text-align:right">Precio UF</th></tr></thead>
+        <tbody id="tbody"><tr><td colspan="4" style="color:#94a3b8;padding:14px">Cargando…</td></tr></tbody>
+      </table>
+    </div>
+  </div>
+
+  <div class="footer-afecta">
+    <h4><i class="bi bi-diagram-3"></i>Qué afecta este mantenedor</h4>
+    <ul>
+      <li><b>Precio UF por informe</b> → cálculo del consumo en la pestaña <a href="/dealernet-informes/">Informes DealerNet → Facturación</a> (consumo = N° consultas × precio UF × valor UF del último día del mes).</li>
+      <li><b>Plan prepago contratado</b> → base para la recomendación <b>mantener / bajar / subir</b> el plan según el consumo del mes cerrado.</li>
+    </ul>
+  </div>
+</div>
+
+<div class="toast-af" id="toast"></div>
+
+<script src="/js/auth-guard.js"></script>
+<script>
+const token = sessionStorage.getItem('token');
+if (!token) location.href = '/login.html';
+const H = { 'Content-Type':'application/json', Authorization:'Bearer '+token };
+const esc = s => String(s ?? '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+function logout(){ sessionStorage.removeItem('token'); sessionStorage.removeItem('usuario'); location.href='/login.html'; }
+function toast(m,e){ const t=document.getElementById('toast'); t.textContent=m; t.className='toast-af'+(e?' err':''); t.style.display='block'; clearTimeout(t._h); t._h=setTimeout(()=>t.style.display='none',2600); }
+
+let PRODS = [];
+async function cargar(){
+  try {
+    const r = await fetch('/api/dealernet/costos', { headers:H });
+    const j = await r.json();
+    if (!j.success){ document.getElementById('tbody').innerHTML='<tr><td colspan="4" style="color:#b91c1c;padding:14px">'+esc(j.error||'Error')+'</td></tr>'; return; }
+    PRODS = j.data.productos;
+    document.getElementById('planUF').value = j.data.plan_uf;
+    document.getElementById('tbody').innerHTML = PRODS.map(p=>`
+      <tr>
+        <td class="cod">${esc(p.codigo)}</td>
+        <td>${esc(p.nombre)}</td>
+        <td>${p.activo ? '<span class="badge-on">Activo</span>' : '<span class="badge-off">Inactivo</span>'}</td>
+        <td style="text-align:right"><input type="number" class="uf" min="0" step="0.0001" data-cod="${esc(p.codigo)}" value="${Number(p.precio_uf||0)}"></td>
+      </tr>`).join('');
+  } catch(_){ document.getElementById('tbody').innerHTML='<tr><td colspan="4" style="color:#b91c1c;padding:14px">Error de conexión</td></tr>'; }
+}
+async function guardar(){
+  const precios = {};
+  document.querySelectorAll('input.uf').forEach(i=>{ precios[i.dataset.cod] = i.value; });
+  const plan_uf = document.getElementById('planUF').value;
+  try {
+    const r = await fetch('/api/dealernet/costos', { method:'PUT', headers:H, body:JSON.stringify({ precios, plan_uf }) });
+    const j = await r.json();
+    if (j.success) toast('Costos y plan guardados'); else toast(j.error||'Error', true);
+  } catch(_){ toast('Error al guardar', true); }
+}
+cargar();
+</script>
+<script src="/js/app-version.js"></script>
+</body>
+</html>
