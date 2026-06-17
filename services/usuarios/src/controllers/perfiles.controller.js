@@ -258,6 +258,7 @@ const { auditar } = require('../../../../shared/audit');
 
     // ── Usuarios: Seguridad ────────────────────────────────────────────────
     await addFunc('Usuarios', 'Gestionar Configuración de Seguridad', 'usuarios_seguridad', 0);
+    await addFunc('Usuarios', 'Enviar Correos', 'usuarios_mails', 0);
 
     // ── Créditos: nuevas acciones ──────────────────────────────────────────
     await addFunc('Créditos', 'Ver Documentos AF',       'creditos_documentos_af',  0);
@@ -439,8 +440,9 @@ const { auditar } = require('../../../../shared/audit');
 
 const getAllPerfiles = async (req, res) => {
   try {
+    // Administrador siempre primero; el resto en orden alfabético descendente (Z→A)
     const [perfiles] = await pool.query(
-      'SELECT * FROM perfiles ORDER BY id_perfil'
+      "SELECT * FROM perfiles ORDER BY (nombre='Administrador') DESC, nombre DESC"
     );
     res.json({ success: true, data: perfiles, error: null });
   } catch (error) {
@@ -456,7 +458,7 @@ const getModulosConFuncionalidades = async (req, res) => {
        FROM modulos m
        JOIN funcionalidades f ON f.id_modulo = m.id_modulo
        WHERE m.estado = 'activo'
-       ORDER BY m.orden, f.id_funcionalidad`
+       ORDER BY m.nombre, f.id_funcionalidad`
     );
 
     // Agrupar por módulo

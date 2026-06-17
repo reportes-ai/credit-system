@@ -1,5 +1,6 @@
 const pool = require('../../../../shared/config/database');
-const { enviarCorreo, mailConfigurado, remitente } = require('../../../../shared/mailer');
+const { enviarCorreo, mailConfigurado, remitente, envolverHTML } = require('../../../../shared/mailer');
+const { auditar } = require('../../../../shared/audit');
 
 /* ─── Migración ──────────────────────────────────────────────────────────── */
 (async () => {
@@ -98,4 +99,43 @@ const testEmail = async (req, res) => {
   }
 };
 
-module.exports = { getConfig, putConfig, mailStatus, testEmail };
+/* ─── Envío de correos a usuarios (por perfil / individuales / combinación) ──── */
+const enviarMails = async (req, res) => {
+  try {
+    const { perfiles = [], usuarios = [], asunto, mensaje } = req.body || {};
+    if (!asunto || !String(asunto).trim()) return res.status(400).json({ success: false, data: null, error: 'El asunto es requerido' });
+    if (!mensaje || !String(mensaje).trim()) return res.status(400).json({ success: false, data: null, error: 'El mensaje es requerido' });
+    if (!perfiles.length && !usuarios.length) return res.status(400).json({ success: false, data: null, error: 'Selecciona al menos un perfil o usuario' });
+    if (!mailConfigurado()) return res.status(400).json({ success: false, data: null, error: 'El correo del sistema no está configurado (faltan variables MAIL_*).' });
+
+    // Resolver destinatarios: activos, con email; dedupe por email
+    const conds = [], params = [];
+    if (perfiles.length) { conds.push('id_perfil IN (?)'); params.push(perfiles.map(Number)); }
+    if (usuarios.length) { conds.push('id_usuario IN (?)'); params.push(usuarios.map(Number)); }
+    const [rows] = await pool.query(
+      `SELECT DISTINCT nombre, email FROM usuarios
+       WHERE estado='activo' AND email IS NOT NULL AND email <> '' AND (${conds.join(' OR ')})`,
+      params);
+    if (!rows.length) return res.status(400).json({ success: false, data: null, error: 'No hay destinatarios activos con correo.' });
+
+    // Mensaje (texto plano del admin) → HTML seguro con párrafos
+    const esc = s => String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+    const cuerpoMsg = esc(mensaje).split(/\n{2,}/).map(p => `<p style="margin:0 0 12px">${p.replace(/\n/g, '<br>')}</p>`).join('');
+
+    let enviados = 0, fallidos = 0;
+    for (const u of rows) {
+      const primerNombre = (String(u.nombre || '').trim().split(/\s+/)[0]) || 'usuario';
+      const cuerpo = `<p style="margin:0 0 14px">Hola <b>${esc(primerNombre)}</b>,</p>${cuerpoMsg}`;
+      const r = await enviarCorreo({ to: u.email, subject: String(asunto).trim(), html: envolverHTML(cuerpo), text: `Hola ${primerNombre},\n\n${mensaje}\n\nSaludos,\nAutoFácil Business Suite` });
+      if (r.ok) enviados++; else fallidos++;
+    }
+
+    auditar({ req, accion: 'EDITAR', modulo: 'usuarios', entidad: 'correo', entidad_id: null,
+      detalle: `Envió un correo "${String(asunto).trim()}" a ${enviados} destinatario(s)`, meta: { enviados, fallidos, total: rows.length } });
+    res.json({ success: true, data: { enviados, fallidos, total: rows.length }, error: null });
+  } catch (e) {
+    (console.error('[enviarMails]', e), res.status(500).json({ success: false, data: null, error: 'Error interno del servidor' }));
+  }
+};
+
+module.exports = { getConfig, putConfig, mailStatus, testEmail, enviarMails };

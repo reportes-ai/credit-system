@@ -219,6 +219,11 @@
           <i class="bi bi-shield-lock me-1"></i>Seguridad
         </button>
       </li>
+      <li class="nav-item" id="tabMailsNav" style="display:none">
+        <button class="nav-link" data-tab="mails" onclick="switchTab('mails')">
+          <i class="bi bi-envelope-paper me-1"></i>Mails
+        </button>
+      </li>
     </ul>
 
     <!-- TAB: USUARIOS -->
@@ -617,6 +622,44 @@
         </div>
       </div>
     </div>
+
+    <!-- TAB: MAILS -->
+    <div id="tab-mails" style="display:none">
+      <div class="card"><div class="card-body">
+        <h6 class="fw-bold mb-1"><i class="bi bi-envelope-paper me-2 text-primary"></i>Enviar correo a usuarios</h6>
+        <p class="text-muted" style="font-size:.85rem">Elige destinatarios por perfil, individuales o ambos. El correo usa el formato corporativo: se antepone <b>“Hola {nombre},”</b> y se firma con el logo de Business Suite.</p>
+        <div class="row g-3">
+          <div class="col-md-5">
+            <label class="form-label fw-semibold mb-1">Por perfil</label>
+            <div id="mailPerfiles" class="border rounded p-2" style="max-height:230px;overflow:auto">
+              <div class="text-muted text-center py-2" style="font-size:.85rem">Cargando…</div>
+            </div>
+          </div>
+          <div class="col-md-7">
+            <label class="form-label fw-semibold mb-1">Usuarios individuales</label>
+            <div class="search-bar mb-2" style="max-width:320px"><i class="bi bi-search"></i>
+              <input type="text" id="mailBuscaUsuario" class="form-control" placeholder="Buscar usuario..." oninput="filtrarMailUsuarios()">
+            </div>
+            <div id="mailUsuarios" class="border rounded p-2" style="max-height:185px;overflow:auto">
+              <div class="text-muted text-center py-2" style="font-size:.85rem">Cargando…</div>
+            </div>
+          </div>
+        </div>
+        <div class="mt-3">
+          <label class="form-label fw-semibold mb-1">Asunto</label>
+          <input type="text" id="mailAsunto" class="form-control" maxlength="180" placeholder="Asunto del correo">
+        </div>
+        <div class="mt-3">
+          <label class="form-label fw-semibold mb-1">Mensaje</label>
+          <textarea id="mailMensaje" class="form-control" rows="7" placeholder="Escribe el mensaje…"></textarea>
+        </div>
+        <div class="d-flex justify-content-between align-items-center mt-3">
+          <div class="text-muted" style="font-size:.85rem"><i class="bi bi-people me-1"></i><span id="mailResumen">0 destinatario(s)</span></div>
+          <button class="btn btn-primary" id="btnEnviarMails" onclick="enviarMails()"><i class="bi bi-send me-1"></i>Enviar correo</button>
+        </div>
+        <div id="mailResultado" class="mt-2" style="font-size:.88rem"></div>
+      </div></div>
+    </div>
   </div>
 
   <!-- MODAL USUARIO -->
@@ -832,7 +875,7 @@
 
     // ── TABS ──────────────────────────────────────────────────
     function switchTab(tab) {
-      ['usuarios', 'suspendidos', 'permisos', 'miclave', 'seguridad'].forEach(t => {
+      ['usuarios', 'suspendidos', 'permisos', 'miclave', 'seguridad', 'mails'].forEach(t => {
         const el = document.getElementById(`tab-${t}`); if (el) el.style.display = t === tab ? '' : 'none';
       });
       document.querySelectorAll('.nav-tabs .nav-link').forEach(b => {
@@ -840,6 +883,7 @@
       });
       if (tab === 'permisos' && !perfilesData.length) cargarPerfiles();
       if (tab === 'seguridad') cargarSeguridad();
+      if (tab === 'mails') cargarMails();
       if (tab === 'usuarios') {
         document.getElementById('buscador').value = '';
         renderUsuarios(activos());
@@ -1452,6 +1496,80 @@
       }
     }
 
+    // ── MAILS (envío a usuarios) ──────────────────────────────
+    let _mailsCargado = false;
+    let _mailUsuarios = [];
+
+    async function cargarMails() {
+      if (_mailsCargado) { actualizarResumenMails(); return; }
+      const [pData, uData] = await Promise.all([ api('GET', '/api/perfiles'), api('GET', '/api/usuarios') ]);
+      const perfiles = (pData?.data || []);
+      _mailUsuarios = (uData?.data || []).filter(u => (u.estado || '') === 'activo' && u.email);
+      document.getElementById('mailPerfiles').innerHTML = perfiles.length ? perfiles.map(p => `
+        <label class="d-flex align-items-center gap-2 py-1" style="cursor:pointer">
+          <input type="checkbox" class="mail-perfil form-check-input mt-0" value="${p.id_perfil}" onchange="actualizarResumenMails()">
+          <span style="font-size:.86rem">${p.nombre}</span>
+        </label>`).join('') : '<div class="text-muted text-center py-2" style="font-size:.85rem">Sin perfiles.</div>';
+      renderMailUsuarios(_mailUsuarios);
+      _mailsCargado = true;
+      actualizarResumenMails();
+    }
+
+    function renderMailUsuarios(lista) {
+      document.getElementById('mailUsuarios').innerHTML = lista.length ? lista.map(u => `
+        <label class="d-flex align-items-center gap-2 py-1 mail-usuario-row" data-txt="${(u.nombre + ' ' + u.apellido + ' ' + u.email).toLowerCase()}" style="cursor:pointer">
+          <input type="checkbox" class="mail-usuario form-check-input mt-0" value="${u.id_usuario}" onchange="actualizarResumenMails()">
+          <span style="font-size:.84rem">${u.nombre} ${u.apellido} <span class="text-muted">— ${u.perfil}</span></span>
+        </label>`).join('') : '<div class="text-muted text-center py-2" style="font-size:.85rem">Sin usuarios activos.</div>';
+    }
+
+    function filtrarMailUsuarios() {
+      const q = document.getElementById('mailBuscaUsuario').value.toLowerCase();
+      document.querySelectorAll('#mailUsuarios .mail-usuario-row').forEach(r => {
+        r.style.display = r.dataset.txt.includes(q) ? '' : 'none';
+      });
+    }
+
+    function _mailDestinatarios() {
+      const perfilesSel = new Set([...document.querySelectorAll('.mail-perfil:checked')].map(c => +c.value));
+      const usuariosSel = new Set([...document.querySelectorAll('.mail-usuario:checked')].map(c => +c.value));
+      const ids = new Set();
+      (_mailUsuarios || []).forEach(u => {
+        if (perfilesSel.has(u.id_perfil) || usuariosSel.has(u.id_usuario)) ids.add(u.id_usuario);
+      });
+      return { perfiles: [...perfilesSel], usuarios: [...usuariosSel], total: ids.size };
+    }
+
+    function actualizarResumenMails() {
+      document.getElementById('mailResumen').textContent = `${_mailDestinatarios().total} destinatario(s)`;
+    }
+
+    async function enviarMails() {
+      const asunto  = document.getElementById('mailAsunto').value.trim();
+      const mensaje = document.getElementById('mailMensaje').value.trim();
+      const d = _mailDestinatarios();
+      const res = document.getElementById('mailResultado');
+      res.innerHTML = '';
+      if (!d.perfiles.length && !d.usuarios.length) { res.innerHTML = '<span style="color:#991b1b">Selecciona al menos un perfil o usuario.</span>'; return; }
+      if (!asunto)  { res.innerHTML = '<span style="color:#991b1b">Escribe el asunto.</span>'; return; }
+      if (!mensaje) { res.innerHTML = '<span style="color:#991b1b">Escribe el mensaje.</span>'; return; }
+      if (!confirm(`¿Enviar este correo a ${d.total} destinatario(s)?`)) return;
+
+      const btn = document.getElementById('btnEnviarMails');
+      const old = btn.innerHTML; btn.disabled = true; btn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span>Enviando…';
+      const r = await api('POST', '/api/config/mail/enviar', { perfiles: d.perfiles, usuarios: d.usuarios, asunto, mensaje });
+      btn.disabled = false; btn.innerHTML = old;
+      if (r?.success) {
+        res.innerHTML = `<span style="color:#166534"><i class="bi bi-check-circle me-1"></i>Enviado a ${r.data.enviados} de ${r.data.total}.${r.data.fallidos ? ' ' + r.data.fallidos + ' fallaron.' : ''}</span>`;
+        document.getElementById('mailAsunto').value = '';
+        document.getElementById('mailMensaje').value = '';
+        document.querySelectorAll('.mail-perfil:checked, .mail-usuario:checked').forEach(c => c.checked = false);
+        actualizarResumenMails();
+      } else {
+        res.innerHTML = `<span style="color:#991b1b"><i class="bi bi-x-circle me-1"></i>${r?.error || 'Error al enviar'}</span>`;
+      }
+    }
+
     function _aplicarConfig(c) {
       _setVal('sTimeout',       c.timeout_inactividad || '60');
       _setVal('sDiasVenc',      c.dias_venc_clave     || '0');
@@ -1679,6 +1797,9 @@
       // Tab Seguridad por permiso usuarios_seguridad (Admin incluido vía tiene())
       const _tabSeg = document.getElementById('tabSegNav');
       if (_tabSeg) _tabSeg.style.display = tiene('usuarios_seguridad') ? '' : 'none';
+      // Tab Mails por permiso usuarios_mails o gestionar usuarios
+      const _tabMails = document.getElementById('tabMailsNav');
+      if (_tabMails) _tabMails.style.display = (tiene('usuarios_mails') || tiene('usuarios_gestionar')) ? '' : 'none';
       const _tabSusp = document.getElementById('tabSuspNav');
       if (_tabSusp) _tabSusp.style.display = puedeUsuarios ? '' : 'none';
       if (!puedeUsuarios) document.querySelector('[data-tab="usuarios"]').closest('li').style.display = 'none';

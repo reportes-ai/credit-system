@@ -14,6 +14,8 @@ router.put('/seguridad',      verifyToken, configSeguridad, ctrl.putConfig);
 // Correo del sistema: estado + envío de prueba
 router.get('/mail/status',    verifyToken,                ctrl.mailStatus);
 router.post('/mail/test',     verifyToken, configSeguridad, ctrl.testEmail);
+// Envío de correos a usuarios (por perfil / individuales / combinación)
+router.post('/mail/enviar',   verifyToken, requireFunc('usuarios_mails', 'usuarios_gestionar'), ctrl.enviarMails);
 
 router.get('/ui/ping',        verifyToken,            uiCtrl.ping);
 router.get('/ui/:clave',      verifyToken,            uiCtrl.getUiConfig);
