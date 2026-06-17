@@ -212,23 +212,36 @@ const EXTRA_CODIGOS = ['16', '2101'];
 })();
 
 /* ── Migración: costos en UF + facturación prepago ───────────────────────── */
-// Precio unitario en UF por informe (columna Plan N°5 = 40 UF mín. mensual, el contratado).
+// Precio unitario en UF por informe, por tramo de plan [10, 20, 40, 80] UF mín. mensual.
 const PLANES_UF = [10, 20, 40, 80];
-const PRECIO_UF_SEED = {
-  '3435': 0.0085, '3407': 0.0054, '3409': 0.0020, '3410': 0.0025, '3411': 0.0015,
-  '3414': 0.0080, '3443': 0.0065, '3412': 0.0061, '3404': 0.0035, '3429': 0.0051,
-  '3425': 0.0047, '3426': 0.0031, '3427': 0.0035, '3428': 0.0025, '3439': 0.0035,
-  '3430': 0.0058, '3423': 0.0020, '3421': 0.0020, '3401': 0.0058, '3402': 0.0048,
-  '3403': 0.0054, '3420': 0.0058, '3419': 0.0058, '3431': 0.0029, '3434': 0.0029,
-  '3432': 0.0024, '3433': 0.0027,
+const COLS_UF = { 10: 'precio_uf_10', 20: 'precio_uf_20', 40: 'precio_uf_40', 80: 'precio_uf_80' };
+const PRECIO_UF4 = {
+  '3435':[0.0132,0.0098,0.0085,0.0073], '3407':[0.0070,0.0064,0.0054,0.0045], '3409':[0.0026,0.0024,0.0020,0.0018],
+  '3410':[0.0032,0.0030,0.0025,0.0023], '3411':[0.0020,0.0015,0.0015,0.0014], '3414':[0.0122,0.0111,0.0080,0.0065],
+  '3443':[0.0084,0.0076,0.0065,0.0053], '3412':[0.0079,0.0072,0.0061,0.0050], '3404':[0.0050,0.0042,0.0035,0.0030],
+  '3429':[0.0065,0.0060,0.0051,0.0043], '3425':[0.0060,0.0055,0.0047,0.0038], '3426':[0.0040,0.0038,0.0031,0.0029],
+  '3427':[0.0050,0.0042,0.0035,0.0030], '3428':[0.0032,0.0030,0.0025,0.0023], '3439':[0.0050,0.0042,0.0035,0.0030],
+  '3430':[0.0075,0.0068,0.0058,0.0048], '3423':[0.0026,0.0024,0.0020,0.0018], '3421':[0.0026,0.0024,0.0020,0.0018],
+  '3401':[0.0075,0.0068,0.0058,0.0048], '3402':[0.0062,0.0056,0.0048,0.0039], '3403':[0.0070,0.0064,0.0054,0.0045],
+  '3420':[0.0075,0.0068,0.0058,0.0048], '3419':[0.0075,0.0068,0.0058,0.0048], '3431':[0.0038,0.0034,0.0029,0.0024],
+  '3434':[0.0038,0.0034,0.0029,0.0024], '3432':[0.0031,0.0028,0.0024,0.0020], '3433':[0.0035,0.0032,0.0027,0.0023],
 };
 (async () => {
   try {
-    try { await pool.query('ALTER TABLE dealernet_productos ADD COLUMN precio_uf DECIMAL(8,4) NOT NULL DEFAULT 0'); }
-    catch (e) { if (e.errno !== 1060) throw e; }
-    // Sembrar precios sólo donde aún está en 0 (no piso ediciones del admin)
-    for (const [cod, uf] of Object.entries(PRECIO_UF_SEED))
-      await pool.query('UPDATE dealernet_productos SET precio_uf=? WHERE codigo=? AND (precio_uf=0 OR precio_uf IS NULL)', [uf, cod]);
+    for (const c of ['precio_uf', ...Object.values(COLS_UF)]) {
+      try { await pool.query(`ALTER TABLE dealernet_productos ADD COLUMN ${c} DECIMAL(8,4) NOT NULL DEFAULT 0`); }
+      catch (e) { if (e.errno !== 1060) throw e; }
+    }
+    // Sembrar los 4 tramos sólo donde aún están en 0 (no piso ediciones del admin)
+    for (const [cod, p] of Object.entries(PRECIO_UF4)) {
+      await pool.query(
+        `UPDATE dealernet_productos SET
+           precio_uf_10 = IF(precio_uf_10=0, ?, precio_uf_10),
+           precio_uf_20 = IF(precio_uf_20=0, ?, precio_uf_20),
+           precio_uf_40 = IF(precio_uf_40=0, ?, precio_uf_40),
+           precio_uf_80 = IF(precio_uf_80=0, ?, precio_uf_80)
+         WHERE codigo=?`, [p[0], p[1], p[2], p[3], cod]);
+    }
     // Plan prepago contratado (UF/mes)
     await pool.query("INSERT IGNORE INTO dealernet_config (clave, valor) VALUES ('plan_uf','40')");
     // Facturación mensual: consumo calculado vs monto real facturado
@@ -797,7 +810,11 @@ async function calcularConsumoMes(mes) {
   const [y, m] = mes.split('-').map(Number);
   const sigY = m === 12 ? y + 1 : y, sigM = m === 12 ? 1 : m + 1;
   const fin = `${sigY}-${String(sigM).padStart(2, '0')}-01`;
-  const [prods] = await pool.query('SELECT codigo, nombre, precio_uf FROM dealernet_productos');
+  // Precio del tramo del plan contratado
+  const [[cfg]] = await pool.query("SELECT valor FROM dealernet_config WHERE clave='plan_uf'");
+  const plan_uf = Number(cfg?.valor) || 40;
+  const col = COLS_UF[plan_uf] || 'precio_uf_40';
+  const [prods] = await pool.query(`SELECT codigo, nombre, ${col} AS precio_uf FROM dealernet_productos`);
   const pmap = {}; prods.forEach(p => pmap[String(p.codigo)] = p);
   const [cnt] = await pool.query(
     `SELECT codigo_producto, COUNT(*) n FROM dealernet_informes
@@ -816,17 +833,23 @@ async function calcularConsumoMes(mes) {
 
 const getCostos = async (req, res) => {
   try {
-    const [prods] = await pool.query('SELECT codigo, nombre, precio_uf, activo, orden FROM dealernet_productos ORDER BY orden, codigo');
+    const [prods] = await pool.query('SELECT codigo, nombre, precio_uf_10, precio_uf_20, precio_uf_40, precio_uf_80, activo, orden FROM dealernet_productos ORDER BY orden, codigo');
     const [[c]] = await pool.query("SELECT valor FROM dealernet_config WHERE clave='plan_uf'");
     res.json({ success: true, data: { productos: prods, plan_uf: Number(c?.valor) || 40, planes: PLANES_UF }, error: null });
   } catch (e) { errSrv(res, e, 'getCostos'); }
 };
 const updateCostos = async (req, res) => {
   try {
+    // precios = { codigo: { '10':n, '20':n, '40':n, '80':n } }
     const precios = req.body?.precios || {};
-    for (const [cod, v] of Object.entries(precios)) {
-      const n = Number(v);
-      if (!isNaN(n) && n >= 0) await pool.query('UPDATE dealernet_productos SET precio_uf=? WHERE codigo=?', [n, cod]);
+    for (const [cod, tramos] of Object.entries(precios)) {
+      if (!tramos || typeof tramos !== 'object') continue;
+      const sets = [], vals = [];
+      for (const t of PLANES_UF) {
+        const n = Number(tramos[t]);
+        if (!isNaN(n) && n >= 0) { sets.push(`${COLS_UF[t]}=?`); vals.push(n); }
+      }
+      if (sets.length) { vals.push(cod); await pool.query(`UPDATE dealernet_productos SET ${sets.join(', ')} WHERE codigo=?`, vals); }
     }
     if (req.body?.plan_uf !== undefined) {
       const p = Number(req.body.plan_uf);

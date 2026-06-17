@@ -58,20 +58,31 @@
     <div style="display:flex;align-items:end;gap:18px;flex-wrap:wrap">
       <div>
         <label style="font-size:.74rem;font-weight:700;color:#6b7280;text-transform:uppercase;display:block;margin-bottom:4px">Plan prepago contratado (UF/mes)</label>
-        <input type="number" id="planUF" class="plan-input" min="1" step="1">
+        <select id="planUF" class="plan-input" onchange="marcarPlan()">
+          <option value="10">10 UF</option>
+          <option value="20">20 UF</option>
+          <option value="40">40 UF</option>
+          <option value="80">80 UF</option>
+        </select>
       </div>
-      <div style="font-size:.8rem;color:#94a3b8;padding-bottom:8px">Planes de referencia: <b>10 · 20 · 40 · 80 UF</b> (facturación mínima mensual)</div>
+      <div style="font-size:.8rem;color:#94a3b8;padding-bottom:8px">Facturación mínima mensual. La columna del plan elegido queda <b>resaltada</b> en la tabla y es la que usa la Facturación.</div>
       <div style="flex:1"></div>
       <button class="btn-primary2" onclick="guardar()"><i class="bi bi-check-lg me-1"></i>Guardar cambios</button>
     </div>
   </div>
 
   <div class="card2">
-    <h3 style="margin:0 0 12px;font-size:1rem;color:var(--navy-dark)"><i class="bi bi-list-columns-reverse me-2"></i>Precio unitario por informe (UF)</h3>
+    <h3 style="margin:0 0 12px;font-size:1rem;color:var(--navy-dark)"><i class="bi bi-list-columns-reverse me-2"></i>Precio unitario por informe (UF) — los 4 tramos de plan</h3>
     <div style="overflow:auto">
       <table class="tb">
-        <thead><tr><th style="width:90px">Código</th><th>Producto</th><th style="width:90px">Estado</th><th style="width:140px;text-align:right">Precio UF</th></tr></thead>
-        <tbody id="tbody"><tr><td colspan="4" style="color:#94a3b8;padding:14px">Cargando…</td></tr></tbody>
+        <thead><tr>
+          <th style="width:80px">Código</th><th>Producto</th><th style="width:80px">Estado</th>
+          <th class="th-uf" data-t="10" style="text-align:right">10 UF</th>
+          <th class="th-uf" data-t="20" style="text-align:right">20 UF</th>
+          <th class="th-uf" data-t="40" style="text-align:right">40 UF</th>
+          <th class="th-uf" data-t="80" style="text-align:right">80 UF</th>
+        </tr></thead>
+        <tbody id="tbody"><tr><td colspan="7" style="color:#94a3b8;padding:14px">Cargando…</td></tr></tbody>
       </table>
     </div>
   </div>
@@ -103,19 +114,25 @@ async function cargar(){
     const j = await r.json();
     if (!j.success){ document.getElementById('tbody').innerHTML='<tr><td colspan="4" style="color:#b91c1c;padding:14px">'+esc(j.error||'Error')+'</td></tr>'; return; }
     PRODS = j.data.productos;
-    document.getElementById('planUF').value = j.data.plan_uf;
+    document.getElementById('planUF').value = String(j.data.plan_uf);
     document.getElementById('tbody').innerHTML = PRODS.map(p=>`
       <tr>
         <td class="cod">${esc(p.codigo)}</td>
         <td>${esc(p.nombre)}</td>
         <td>${p.activo ? '<span class="badge-on">Activo</span>' : '<span class="badge-off">Inactivo</span>'}</td>
-        <td style="text-align:right"><input type="number" class="uf" min="0" step="0.0001" data-cod="${esc(p.codigo)}" value="${Number(p.precio_uf||0)}"></td>
+        ${[10,20,40,80].map(t=>`<td style="text-align:right"><input type="number" class="uf" data-t="${t}" min="0" step="0.0001" data-cod="${esc(p.codigo)}" value="${Number(p['precio_uf_'+t]||0)}"></td>`).join('')}
       </tr>`).join('');
-  } catch(_){ document.getElementById('tbody').innerHTML='<tr><td colspan="4" style="color:#b91c1c;padding:14px">Error de conexión</td></tr>'; }
+    marcarPlan();
+  } catch(_){ document.getElementById('tbody').innerHTML='<tr><td colspan="7" style="color:#b91c1c;padding:14px">Error de conexión</td></tr>'; }
+}
+function marcarPlan(){
+  const plan = document.getElementById('planUF').value;
+  document.querySelectorAll('.th-uf').forEach(th=>{ const on=th.dataset.t===plan; th.style.color=on?'#0141A2':''; th.style.fontWeight=on?'800':''; });
+  document.querySelectorAll('input.uf').forEach(i=>{ const on=i.dataset.t===plan; i.style.background=on?'#eff6ff':'#fff'; i.style.borderColor=on?'#93c5fd':'#d1d5db'; });
 }
 async function guardar(){
   const precios = {};
-  document.querySelectorAll('input.uf').forEach(i=>{ precios[i.dataset.cod] = i.value; });
+  document.querySelectorAll('input.uf').forEach(i=>{ (precios[i.dataset.cod]=precios[i.dataset.cod]||{})[i.dataset.t]=i.value; });
   const plan_uf = document.getElementById('planUF').value;
   try {
     const r = await fetch('/api/dealernet/costos', { method:'PUT', headers:H, body:JSON.stringify({ precios, plan_uf }) });
