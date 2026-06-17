@@ -23,7 +23,10 @@
     .avatar { width:28px; height:28px; background:#90caf9; border-radius:50%; display:flex; align-items:center; justify-content:center; color:var(--navy); font-weight:700; font-size:.75rem; }
     .perfil-badge { background:rgba(144,202,249,.2); border:1px solid rgba(144,202,249,.4); color:#90caf9; border-radius:12px; padding:2px 10px; font-size:.73rem; font-weight:600; }
     .btn-logout { background:rgba(255,255,255,.1); border:1px solid rgba(255,255,255,.2); color:#fff; border-radius:8px; padding:5px 12px; font-size:.82rem; cursor:pointer; text-decoration:none; display:inline-flex; align-items:center; }
-    .main { max-width:1180px; margin:28px auto; padding:0 20px 60px; }
+    .main { max-width:none; margin:28px 0; padding:0 28px 60px; }
+    .tabs { display:flex; gap:6px; margin-bottom:18px; border-bottom:2px solid #e2e8f0; }
+    .tabbtn { background:none; border:none; padding:10px 18px; font-size:.92rem; font-weight:600; color:#64748b; cursor:pointer; border-bottom:3px solid transparent; margin-bottom:-2px; }
+    .tabbtn.active { color:var(--navy); border-bottom-color:var(--navy); }
     .page-banner { background:linear-gradient(135deg,#012d70,#0141A2 50%,#009AFE); border-radius:16px; color:#fff; padding:24px 32px; margin-bottom:22px; display:flex; align-items:center; gap:18px; }
     .page-banner i { font-size:2.6rem; opacity:.85; }
     .page-banner h2 { font-weight:700; margin:0 0 3px; font-size:1.3rem; }
@@ -98,6 +101,12 @@
     </div>
   </div>
 
+  <div class="tabs">
+    <button class="tabbtn active" data-t="consultar" onclick="tab('consultar')"><i class="bi bi-search me-1"></i>Consultar</button>
+    <button class="tabbtn" id="tabAudBtn" data-t="auditoria" onclick="tab('auditoria')" style="display:none"><i class="bi bi-graph-up me-1"></i>Auditoría de uso</button>
+  </div>
+
+  <div id="tab-consultar">
   <div class="grid">
     <!-- Solicitud -->
     <div>
@@ -124,8 +133,11 @@
     </div>
   </div>
 
-  <!-- Auditoría de uso (visible solo con permiso) -->
-  <div class="card" id="audCard" style="display:none">
+  </div><!-- /tab-consultar -->
+
+  <!-- Auditoría de uso (pestaña con permiso) -->
+  <div id="tab-auditoria" style="display:none">
+  <div class="card" id="audCard">
     <div style="display:flex;justify-content:space-between;align-items:center;gap:10px;margin-bottom:10px;flex-wrap:wrap">
       <h3 style="margin:0"><i class="bi bi-graph-up"></i> Auditoría de uso</h3>
       <div>
@@ -137,6 +149,7 @@
     <div class="muted" style="margin:-4px 0 10px">Informes solicitados por usuario, promedio por día y por tipo. Auto-consultas y consultas a otros usuarios de la empresa: últimos 90 días.</div>
     <div id="audBody"><div class="muted">Cargando…</div></div>
   </div>
+  </div><!-- /tab-auditoria -->
 </div>
 
 <dialog id="dlgWarn">
@@ -638,9 +651,28 @@ function renderAuditoria(d){
   document.getElementById('audBody').innerHTML = h;
 }
 
+/* ── Pestañas ────────────────────────────────────────────────────────────── */
+let _audCargada = false;
+function tab(t){
+  document.getElementById('tab-consultar').style.display = t==='consultar' ? '' : 'none';
+  document.getElementById('tab-auditoria').style.display = t==='auditoria' ? '' : 'none';
+  document.querySelectorAll('.tabbtn').forEach(b=>b.classList.toggle('active', b.dataset.t===t));
+  if(t==='auditoria' && !_audCargada){ _audCargada = true; cargarAuditoria(30); }
+}
+// La pestaña Auditoría se muestra solo con permiso (dealernet_auditoria o gestionar usuarios; Admin siempre).
+(async () => {
+  let puede = (yo?.perfil === 'Administrador');
+  try {
+    const r = await fetch('/api/auth/mis-permisos', { headers:H });
+    const j = await r.json();
+    const f = j.funcionalidades || [];
+    if (f.includes('dealernet_auditoria') || f.includes('usuarios_gestionar')) puede = true;
+  } catch(_){}
+  document.getElementById('tabAudBtn').style.display = puede ? '' : 'none';
+})();
+
 document.getElementById('rut').addEventListener('blur', ()=>{ const v=document.getElementById('rut').value.trim(); if(v) cargarHistoricos(v); });
 cargarProductos();
-cargarAuditoria(30);
 </script>
 <script src="/js/app-version.js"></script>
 </body>
