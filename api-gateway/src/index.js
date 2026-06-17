@@ -74,6 +74,7 @@ app.use('/api/dealernet',              require('../../services/clientes/src/rout
 
 // Mantenedores
 app.use('/api/impuestos',       require('../../services/mantenedores/src/routes/impuestos.routes'));
+app.use('/api/estado-creditos', require('../../services/mantenedores/src/routes/estado-creditos.routes'));
 app.use('/api/tasas',           require('../../services/mantenedores/src/routes/tasas.routes'));
 app.use('/api/uf',              require('../../services/mantenedores/src/routes/uf.routes'));
 app.use('/api/geografico',      require('../../services/mantenedores/src/routes/geografico.routes'));
@@ -279,6 +280,9 @@ app.get(['/mantenedores/parques', '/mantenedores/parques/'], (req, res) =>
 
 app.get(['/mantenedores/flujo-brokerage', '/mantenedores/flujo-brokerage/'], (req, res) =>
   res.sendFile(path.join(__dirname, '../public/mantenedores/flujo-brokerage/index.html')));
+
+app.get(['/mantenedores/estado-creditos', '/mantenedores/estado-creditos/'], (req, res) =>
+  res.sendFile(path.join(__dirname, '../public/mantenedores/estado-creditos/index.html')));
 
 app.get(['/mantenedores/broker-validaciones', '/mantenedores/broker-validaciones/'], (req, res) =>
   res.sendFile(path.join(__dirname, '../public/mantenedores/broker-validaciones/index.html')));

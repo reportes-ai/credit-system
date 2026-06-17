@@ -1,0 +1,342 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <link rel="icon" href="/img/favicon.png" type="image/png">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Estado Créditos — AutoFácil</title>
+  <link href="/css/bootstrap.min.css" rel="stylesheet">
+  <link href="/css/bootstrap-icons.css" rel="stylesheet">
+  <!-- v1.0 -->
+  <style>
+    :root { --navy:#0141A2; --navy-dark:#012d70; --navy-light:#0255c5; --accent:#009AFE; --bg:#f0f4f8; }
+    body { background:var(--bg); font-family:'Segoe UI',system-ui,sans-serif; margin:0; min-height:100vh; color:#1e293b; }
+    .topnav { background:linear-gradient(90deg,var(--navy-dark),var(--navy-light)); color:#fff; height:60px; padding:0 24px; display:flex; align-items:center; justify-content:space-between; position:sticky; top:0; z-index:200; box-shadow:0 2px 8px rgba(0,0,0,.3); }
+    .topnav-left { display:flex; align-items:center; gap:16px; }
+    .topnav-brand { display:flex; align-items:center; gap:8px; text-decoration:none; }
+    .topnav-brand img { height:34px; filter:brightness(0) invert(1); }
+    .version-badge { background:rgba(255,255,255,.15); color:rgba(255,255,255,.75); font-size:.65rem; font-weight:700; border-radius:6px; padding:2px 8px; }
+    .breadcrumb-nav { color:rgba(255,255,255,.6); font-size:.85rem; }
+    .breadcrumb-nav a { color:rgba(255,255,255,.75); text-decoration:none; }
+    .breadcrumb-nav .sep { color:rgba(255,255,255,.35); margin:0 6px; }
+    .btn-nav { background:rgba(255,255,255,.12); border:1px solid rgba(255,255,255,.25); color:#fff; border-radius:8px; padding:6px 13px; font-size:.82rem; font-weight:600; cursor:pointer; text-decoration:none; display:inline-flex; align-items:center; gap:6px; }
+    .btn-nav:hover { background:rgba(255,255,255,.22); }
+    .main { max-width:1200px; margin:0 auto; padding:30px 28px 80px; }
+    .page-banner { background:linear-gradient(135deg,#012d70,#0141A2 50%,#009AFE); border-radius:16px; color:#fff; padding:24px 32px; margin-bottom:26px; display:flex; align-items:center; gap:18px; }
+    .page-banner i.big { font-size:2.6rem; opacity:.85; }
+    .page-banner h2 { font-weight:700; margin:0 0 3px; font-size:1.3rem; }
+    .page-banner p { opacity:.82; margin:0; font-size:.86rem; }
+
+    .toolbar { display:flex; align-items:center; gap:12px; margin-bottom:18px; flex-wrap:wrap; }
+    .toolbar label { font-size:.8rem; font-weight:700; color:#475569; }
+    .toolbar select { border:1.5px solid #d1d5db; border-radius:8px; padding:7px 10px; font-size:.88rem; }
+    .btn-primary2 { background:var(--navy); color:#fff; border:none; border-radius:8px; padding:8px 15px; font-size:.84rem; font-weight:700; cursor:pointer; display:inline-flex; align-items:center; gap:6px; }
+    .btn-primary2:hover { background:var(--accent); }
+    .spacer { flex:1; }
+
+    .card-box { background:#fff; border-radius:14px; box-shadow:0 1px 6px rgba(0,0,0,.07); padding:18px 22px; margin-bottom:22px; }
+    .card-box h3 { font-size:.78rem; font-weight:800; text-transform:uppercase; letter-spacing:.07em; color:var(--navy-dark); margin:0 0 14px; display:flex; align-items:center; gap:8px; }
+
+    .entries { display:flex; gap:10px; flex-wrap:wrap; }
+    .entry-chip { display:inline-flex; align-items:center; gap:8px; border:1.5px solid #cbd5e1; border-radius:24px; padding:7px 15px; font-weight:700; font-size:.85rem; background:#f8fafc; }
+    .dot { width:12px; height:12px; border-radius:50%; flex-shrink:0; }
+
+    .grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(300px,1fr)); gap:16px; }
+    .estado-card { background:#fff; border:1.5px solid #e5e7eb; border-left-width:6px; border-radius:12px; padding:14px 16px; box-shadow:0 1px 4px rgba(0,0,0,.05); display:flex; flex-direction:column; }
+    .ec-head { display:flex; align-items:center; gap:9px; }
+    .ec-name { font-weight:800; font-size:1rem; color:#0f172a; }
+    .ec-code { font-size:.68rem; color:#94a3b8; font-weight:700; letter-spacing:.03em; }
+    .ec-badges { display:flex; gap:5px; margin-left:auto; }
+    .badge2 { font-size:.62rem; font-weight:800; border-radius:5px; padding:2px 7px; text-transform:uppercase; letter-spacing:.03em; }
+    .b-ini { background:#dbeafe; color:#1d4ed8; }
+    .b-fin { background:#fee2e2; color:#b91c1c; }
+    .b-off { background:#f1f5f9; color:#94a3b8; }
+    .ec-trans { margin-top:11px; }
+    .ec-trans .lbl { font-size:.68rem; font-weight:700; color:#64748b; text-transform:uppercase; letter-spacing:.04em; margin-bottom:5px; }
+    .trans-chips { display:flex; flex-wrap:wrap; gap:5px; min-height:22px; }
+    .tchip { display:inline-flex; align-items:center; gap:5px; background:#f1f5f9; border:1px solid #e2e8f0; border-radius:6px; padding:2px 8px; font-size:.72rem; font-weight:700; color:#334155; }
+    .tchip.none { color:#94a3b8; font-style:italic; font-weight:600; }
+    .ec-actions { display:flex; gap:6px; margin-top:13px; border-top:1px solid #f1f5f9; padding-top:10px; }
+    .ec-actions button { flex:1; background:#f8fafc; border:1px solid #e2e8f0; border-radius:7px; padding:6px; font-size:.74rem; font-weight:700; cursor:pointer; color:#475569; display:inline-flex; align-items:center; justify-content:center; gap:5px; }
+    .ec-actions button:hover { background:#eff6ff; border-color:#bfdbfe; color:var(--navy); }
+    .ec-actions button.del:hover { background:#fef2f2; border-color:#fca5a5; color:#b91c1c; }
+
+    dialog { border:none; border-radius:16px; padding:0; box-shadow:0 24px 60px rgba(0,0,0,.3); max-width:480px; width:92%; }
+    dialog::backdrop { background:rgba(15,23,42,.45); }
+    .dlg-head { background:linear-gradient(90deg,var(--navy-dark),var(--navy-light)); color:#fff; padding:16px 22px; font-weight:700; font-size:1rem; display:flex; align-items:center; gap:9px; }
+    .dlg-body { padding:20px 22px; }
+    .dlg-body label { display:block; font-size:.78rem; font-weight:700; color:#475569; margin:0 0 4px; }
+    .dlg-body .field { margin-bottom:14px; }
+    .dlg-body input[type=text], .dlg-body input[type=number] { width:100%; border:1.5px solid #d1d5db; border-radius:8px; padding:8px 10px; font-size:.9rem; box-sizing:border-box; }
+    .dlg-body input[readonly] { background:#f1f5f9; color:#64748b; }
+    .row2 { display:flex; gap:12px; }
+    .row2 > div { flex:1; }
+    .chkline { display:flex; align-items:center; gap:8px; font-size:.85rem; font-weight:600; color:#334155; cursor:pointer; }
+    .chkbox-list { max-height:230px; overflow:auto; border:1.5px solid #e5e7eb; border-radius:8px; padding:8px 10px; }
+    .chkbox-list .chkline { padding:5px 2px; }
+    .dlg-foot { padding:14px 22px; border-top:1px solid #eef2f7; display:flex; justify-content:flex-end; gap:9px; }
+    .btn-cancel { background:#fff; border:1.5px solid #d1d5db; color:#475569; border-radius:8px; padding:8px 16px; font-size:.84rem; font-weight:700; cursor:pointer; }
+    .btn-ok { background:var(--navy); border:none; color:#fff; border-radius:8px; padding:8px 18px; font-size:.84rem; font-weight:700; cursor:pointer; }
+    .btn-ok:hover { background:var(--accent); }
+
+    .afecta { background:#f8fafc; border:1px solid #e5e7eb; border-left:4px solid var(--navy); border-radius:10px; padding:16px 20px; margin-top:8px; }
+    .afecta h4 { font-size:.82rem; font-weight:800; color:var(--navy-dark); margin:0 0 10px; display:flex; align-items:center; gap:8px; }
+    .afecta ul { margin:0; padding-left:20px; }
+    .afecta li { font-size:.82rem; color:#475569; margin-bottom:6px; line-height:1.45; }
+    .afecta a { color:var(--navy); font-weight:600; text-decoration:none; }
+    .afecta a:hover { text-decoration:underline; }
+
+    .toast { position:fixed; top:70px; right:22px; z-index:9999; border-radius:10px; padding:12px 18px; font-weight:600; font-size:.88rem; color:#fff; box-shadow:0 8px 24px rgba(0,0,0,.2); display:none; }
+    .toast.ok { background:#059669; } .toast.err { background:#dc2626; }
+    .muted { color:#94a3b8; }
+  </style>
+</head>
+<body>
+  <nav class="topnav">
+    <div class="topnav-left">
+      <a href="/" class="topnav-brand"><img src="/img/logo.png" alt="AutoFácil"><span class="version-badge" id="versionBadge">v1.0</span></a>
+      <div class="breadcrumb-nav"><a href="/">Inicio</a><span class="sep">›</span><a href="/mantenedores">Mantenedores</a><span class="sep">›</span><span style="color:#fff;font-weight:600"><i class="bi bi-diagram-3-fill me-1"></i>Estado Créditos</span></div>
+    </div>
+    <a href="/mantenedores" class="btn-nav"><i class="bi bi-arrow-left"></i>Mantenedores</a>
+  </nav>
+
+  <div class="main">
+    <div class="page-banner">
+      <i class="bi bi-diagram-3-fill big"></i>
+      <div>
+        <h2>Estado Créditos</h2>
+        <p>Estados del crédito y sus transiciones permitidas. Define el flujo brokerage de forma paramétrica.</p>
+      </div>
+    </div>
+
+    <div class="toolbar">
+      <label>Ámbito:</label>
+      <select id="selAmbito" onchange="cargar()">
+        <option value="brokerage" selected>Brokerage (AutoFin / Unidad)</option>
+      </select>
+      <span class="spacer"></span>
+      <button class="btn-primary2" id="btnNuevo" onclick="abrirNuevo()" style="display:none"><i class="bi bi-plus-lg"></i> Agregar estado</button>
+    </div>
+
+    <div class="card-box">
+      <h3><i class="bi bi-door-open"></i> Puertas de entrada (estado al ingresar)</h3>
+      <div class="entries" id="entries"><span class="muted">Cargando…</span></div>
+    </div>
+
+    <div class="card-box">
+      <h3><i class="bi bi-diagram-2"></i> Estados y transiciones</h3>
+      <div class="grid" id="grid"><span class="muted">Cargando…</span></div>
+    </div>
+
+    <div class="afecta">
+      <h4><i class="bi bi-diagram-3"></i> Qué afecta este mantenedor</h4>
+      <ul>
+        <li><b>Estados y transiciones (Brokerage)</b> → dibujan el <a href="/mantenedores/flujo-brokerage/">Flujo Crédito Brokerage</a> (estados que aparecen y a qué estados puede pasar cada crédito de AutoFin/Unidad).</li>
+        <li><b>Puertas de entrada</b> → reflejan cómo nace un crédito: <i>Digitado</i> (digitación o <a href="/carga-masiva/">Carga Masiva</a>) y <i>Carta de Aprobación</i> (vía <a href="/cartas-aprobacion/">Cartas de Aprobación</a>).</li>
+        <li><b>Nombre y color de cada estado</b> → etiqueta y badge con que se muestra el estado en el flujo y la documentación del proceso.</li>
+        <li><b>Ámbito</b> → permite definir a futuro un set propio para los créditos <i>AutoFácil</i> (recursos propios) sin alterar el de brokerage.</li>
+        <li class="muted">Nota: en esta fase el mantenedor <b>no bloquea</b> los cambios de estado en <a href="/creditos">Gestión de Créditos</a>; es la fuente de verdad y dibuja el flujo. El bloqueo de transiciones inválidas se activará cuando el mapa esté validado.</li>
+      </ul>
+    </div>
+  </div>
+
+  <!-- Dialog estado -->
+  <dialog id="dlgEstado">
+    <div class="dlg-head"><i class="bi bi-pencil-square"></i><span id="dlgTitle">Nuevo estado</span></div>
+    <div class="dlg-body">
+      <div class="row2">
+        <div class="field"><label>Código</label><input type="text" id="fCodigo" placeholder="EJ: APROBADO" maxlength="40"></div>
+        <div class="field" style="max-width:90px"><label>Orden</label><input type="number" id="fOrden" value="0"></div>
+      </div>
+      <div class="field"><label>Nombre visible</label><input type="text" id="fNombre" placeholder="Ej: Aprobado" maxlength="80"></div>
+      <div class="row2">
+        <div class="field" style="max-width:120px"><label>Color</label><input type="color" id="fColor" value="#64748b" style="width:100%;height:40px;border:1.5px solid #d1d5db;border-radius:8px;padding:2px;cursor:pointer"></div>
+        <div class="field">
+          <label>Marcas</label>
+          <label class="chkline" style="margin-bottom:4px"><input type="checkbox" id="fInicial"> Es puerta de entrada (inicial)</label>
+          <label class="chkline"><input type="checkbox" id="fFinal"> Es estado final</label>
+        </div>
+      </div>
+    </div>
+    <div class="dlg-foot">
+      <button class="btn-cancel" onclick="document.getElementById('dlgEstado').close()">Cancelar</button>
+      <button class="btn-ok" id="btnGuardarEstado" onclick="guardarEstado()">Guardar</button>
+    </div>
+  </dialog>
+
+  <!-- Dialog transiciones -->
+  <dialog id="dlgTrans">
+    <div class="dlg-head"><i class="bi bi-arrow-right-circle"></i><span>Transiciones de <span id="trOrigen"></span></span></div>
+    <div class="dlg-body">
+      <p style="font-size:.82rem;color:#64748b;margin:0 0 10px">Marca los estados a los que <b id="trOrigen2"></b> puede pasar:</p>
+      <div class="chkbox-list" id="trList"></div>
+    </div>
+    <div class="dlg-foot">
+      <button class="btn-cancel" onclick="document.getElementById('dlgTrans').close()">Cancelar</button>
+      <button class="btn-ok" onclick="guardarTrans()">Guardar transiciones</button>
+    </div>
+  </dialog>
+
+  <div class="toast" id="toast"></div>
+
+  <script src="/js/auth-guard.js"></script>
+  <script>
+    const token = sessionStorage.getItem('token');
+    const yo = JSON.parse(sessionStorage.getItem('usuario') || 'null');
+    if (!token || !yo) location.href = '/login.html';
+    const esAdmin = yo?.perfil === 'Administrador';
+    const H = { 'Content-Type':'application/json', Authorization:'Bearer '+token };
+    const esc = s => String(s ?? '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+
+    let ESTADOS = [];          // [{codigo,nombre,color,orden,es_inicial,es_final,activo,destinos:[]}]
+    let editCodigo = null;     // código en edición (null = nuevo)
+    const ambito = () => document.getElementById('selAmbito').value;
+
+    function toast(msg, ok=true){ const t=document.getElementById('toast'); t.textContent=msg; t.className='toast '+(ok?'ok':'err'); t.style.display='block'; setTimeout(()=>t.style.display='none',2800); }
+
+    async function cargar(){
+      if (esAdmin) document.getElementById('btnNuevo').style.display='inline-flex';
+      try {
+        const r = await fetch('/api/estado-creditos?ambito='+ambito(), { headers:H });
+        const j = await r.json();
+        if (!j.success) throw new Error(j.error||'Error');
+        ESTADOS = j.data.estados || [];
+      } catch(e){ toast('Error al cargar: '+e.message, false); ESTADOS=[]; }
+      render();
+    }
+
+    function nombreDe(cod){ const e=ESTADOS.find(x=>x.codigo===cod); return e?e.nombre:cod; }
+    function colorDe(cod){ const e=ESTADOS.find(x=>x.codigo===cod); return e?e.color:'#94a3b8'; }
+
+    function render(){
+      // Puertas de entrada
+      const ini = ESTADOS.filter(e=>e.es_inicial);
+      document.getElementById('entries').innerHTML = ini.length
+        ? ini.map(e=>`<span class="entry-chip"><span class="dot" style="background:${esc(e.color)}"></span>${esc(e.nombre)}</span>`).join('')
+        : '<span class="muted">Ningún estado marcado como inicial.</span>';
+
+      // Grilla de estados
+      const grid = document.getElementById('grid');
+      if (!ESTADOS.length){ grid.innerHTML='<span class="muted">Sin estados. Usa “Agregar estado”.</span>'; return; }
+      grid.innerHTML = ESTADOS.map(e=>{
+        const badges = [];
+        if (e.es_inicial) badges.push('<span class="badge2 b-ini">Inicial</span>');
+        if (e.es_final)   badges.push('<span class="badge2 b-fin">Final</span>');
+        if (!e.activo)    badges.push('<span class="badge2 b-off">Inactivo</span>');
+        const chips = e.destinos.length
+          ? e.destinos.map(d=>`<span class="tchip"><span class="dot" style="width:8px;height:8px;background:${esc(colorDe(d))}"></span>${esc(nombreDe(d))}</span>`).join('')
+          : '<span class="tchip none">— sin salida (final) —</span>';
+        const actions = esAdmin ? `
+          <div class="ec-actions">
+            <button onclick="abrirTrans('${esc(e.codigo)}')"><i class="bi bi-arrow-right-circle"></i>Transiciones</button>
+            <button onclick="abrirEditar('${esc(e.codigo)}')"><i class="bi bi-pencil"></i>Editar</button>
+            <button class="del" onclick="eliminar('${esc(e.codigo)}')"><i class="bi bi-trash"></i></button>
+          </div>` : '';
+        return `
+          <div class="estado-card" style="border-left-color:${esc(e.color)}">
+            <div class="ec-head">
+              <span class="dot" style="background:${esc(e.color)}"></span>
+              <div><div class="ec-name">${esc(e.nombre)}</div><div class="ec-code">${esc(e.codigo)}</div></div>
+              <div class="ec-badges">${badges.join('')}</div>
+            </div>
+            <div class="ec-trans">
+              <div class="lbl">Permite pasar a</div>
+              <div class="trans-chips">${chips}</div>
+            </div>
+            ${actions}
+          </div>`;
+      }).join('');
+    }
+
+    // ── Alta / edición ──
+    function abrirNuevo(){
+      editCodigo = null;
+      document.getElementById('dlgTitle').textContent = 'Nuevo estado';
+      document.getElementById('fCodigo').value=''; document.getElementById('fCodigo').removeAttribute('readonly');
+      document.getElementById('fNombre').value='';
+      document.getElementById('fColor').value='#64748b';
+      document.getElementById('fOrden').value = (Math.max(0,...ESTADOS.map(e=>e.orden))+10);
+      document.getElementById('fInicial').checked=false;
+      document.getElementById('fFinal').checked=false;
+      document.getElementById('dlgEstado').showModal();
+    }
+    function abrirEditar(cod){
+      const e = ESTADOS.find(x=>x.codigo===cod); if(!e) return;
+      editCodigo = cod;
+      document.getElementById('dlgTitle').textContent = 'Editar estado';
+      document.getElementById('fCodigo').value=e.codigo; document.getElementById('fCodigo').setAttribute('readonly','readonly');
+      document.getElementById('fNombre').value=e.nombre;
+      document.getElementById('fColor').value=/^#[0-9a-fA-F]{6}$/.test(e.color)?e.color:'#64748b';
+      document.getElementById('fOrden').value=e.orden;
+      document.getElementById('fInicial').checked=!!e.es_inicial;
+      document.getElementById('fFinal').checked=!!e.es_final;
+      document.getElementById('dlgEstado').showModal();
+    }
+    async function guardarEstado(){
+      const codigo = document.getElementById('fCodigo').value.trim().toUpperCase().replace(/\s+/g,'_').replace(/[^A-Z0-9_]/g,'');
+      const nombre = document.getElementById('fNombre').value.trim();
+      if(!codigo) return toast('Código obligatorio', false);
+      if(!nombre) return toast('Nombre obligatorio', false);
+      const body = {
+        codigo, nombre, ambito: ambito(),
+        color: document.getElementById('fColor').value,
+        orden: parseInt(document.getElementById('fOrden').value,10)||0,
+        es_inicial: document.getElementById('fInicial').checked,
+        es_final: document.getElementById('fFinal').checked,
+        activo: true
+      };
+      const btn = document.getElementById('btnGuardarEstado'); btn.disabled=true;
+      try {
+        const url = editCodigo ? '/api/estado-creditos/'+encodeURIComponent(editCodigo) : '/api/estado-creditos';
+        const method = editCodigo ? 'PUT' : 'POST';
+        const r = await fetch(url, { method, headers:H, body:JSON.stringify(body) });
+        const j = await r.json();
+        if(!j.success) throw new Error(j.error||'Error');
+        document.getElementById('dlgEstado').close();
+        toast(editCodigo?'Estado actualizado':'Estado creado');
+        await cargar();
+      } catch(e){ toast('Error: '+e.message, false); } finally { btn.disabled=false; }
+    }
+    async function eliminar(cod){
+      if(!confirm('¿Eliminar el estado '+cod+'? También se quitan sus transiciones.')) return;
+      try {
+        const r = await fetch('/api/estado-creditos/'+encodeURIComponent(cod)+'?ambito='+ambito(), { method:'DELETE', headers:H });
+        const j = await r.json();
+        if(!j.success) throw new Error(j.error||'Error');
+        toast('Estado eliminado'); await cargar();
+      } catch(e){ toast('Error: '+e.message, false); }
+    }
+
+    // ── Transiciones ──
+    let transOrigen = null;
+    function abrirTrans(cod){
+      const e = ESTADOS.find(x=>x.codigo===cod); if(!e) return;
+      transOrigen = cod;
+      document.getElementById('trOrigen').textContent = e.nombre;
+      document.getElementById('trOrigen2').textContent = e.nombre;
+      const sel = new Set(e.destinos);
+      document.getElementById('trList').innerHTML = ESTADOS.map(x=>`
+        <label class="chkline">
+          <input type="checkbox" value="${esc(x.codigo)}" ${sel.has(x.codigo)?'checked':''}>
+          <span class="dot" style="background:${esc(x.color)}"></span> ${esc(x.nombre)} <span class="ec-code">${esc(x.codigo)}</span>
+        </label>`).join('');
+      document.getElementById('dlgTrans').showModal();
+    }
+    async function guardarTrans(){
+      const destinos = [...document.querySelectorAll('#trList input:checked')].map(i=>i.value);
+      try {
+        const r = await fetch('/api/estado-creditos/'+encodeURIComponent(transOrigen)+'/transiciones', {
+          method:'PUT', headers:H, body:JSON.stringify({ ambito:ambito(), destinos })
+        });
+        const j = await r.json();
+        if(!j.success) throw new Error(j.error||'Error');
+        document.getElementById('dlgTrans').close();
+        toast('Transiciones guardadas'); await cargar();
+      } catch(e){ toast('Error: '+e.message, false); }
+    }
+
+    cargar();
+  </script>
+  <script src="/js/app-version.js"></script>
+</body>
+</html>

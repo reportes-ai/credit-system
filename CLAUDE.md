@@ -58,7 +58,16 @@ shared/
 - `comisiones_variables` → parámetros configurables de comisiones
 - `uf` → valores históricos UF (fecha, valor)
 - `dashboard_config` → config permisos tabs del dashboard
+- `estados_credito` → máquina de estados paramétrica (PK: ambito+codigo; nombre, color, orden, es_inicial, es_final)
+- `estados_transicion` → transiciones permitidas (ambito, origen, destino) — mantenedor Estado Créditos
 - `usuarios`, `perfiles`, `permisos_perfil`, `funcionalidades`, `modulos`
+
+## Estados del Crédito (mantenedor Estado Créditos, /mantenedores/estado-creditos/)
+- Máquina de estados PARAMÉTRICA por `ambito` (hoy `brokerage` = AutoFin+Unidad; a futuro `autofacil` = recursos propios).
+- API `/api/estado-creditos` (controller/routes en services/mantenedores). CRUD estados + `PUT /:codigo/transiciones`.
+- Fase actual: **solo configura y dibuja el flujo; NO bloquea transiciones en créditos** (activar el enforcement cuando el mapa esté validado).
+- El **Flujo Brokerage** (`/mantenedores/flujo-brokerage/`) lee estos estados/transiciones en vivo.
+- Mapa brokerage sembrado: **iniciales** DIGITADO (digitación/carga masiva) y CARTA_APROBACION (vía cartas). DIGITADO→{APROBADO,RECHAZADO}; APROBADO→{CARTA_APROBACION,OTORGADO,DESISTIDO}; RECHAZADO→{APELADO,OTORGADO,RECHAZADO}; CARTA_APROBACION→{OTORGADO,DESISTIDO}; OTORGADO→{PREPAGADO,ANULADO}.
 
 ## Principio Rector: Aplicación Paramétrica (FILOSOFÍA CENTRAL)
 > La meta del sistema es que el **usuario Administrador pueda hacer la mayor cantidad

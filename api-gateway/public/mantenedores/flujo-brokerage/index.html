@@ -97,6 +97,21 @@
 
   .spinner{ width:20px; height:20px; border:.2em solid #e2e8f0; border-top-color:var(--blue); border-radius:50%; animation:spin .7s linear infinite; margin:20px auto; }
   @keyframes spin{ to{ transform:rotate(360deg); } }
+
+  /* Estados (leídos del mantenedor Estado Créditos) */
+  .estados-box{ background:var(--card); border:1px solid var(--border); border-radius:14px; padding:16px 18px; margin-bottom:24px; box-shadow:0 2px 10px rgba(0,0,0,.05); }
+  .estados-box .eb-head{ display:flex; align-items:center; justify-content:space-between; margin-bottom:12px; }
+  .estados-box .eb-title{ font-size:.72rem; font-weight:800; text-transform:uppercase; letter-spacing:.06em; color:var(--navy); }
+  .eb-edit{ font-size:.74rem; font-weight:700; color:var(--blue); text-decoration:none; }
+  .eb-sub{ font-size:.66rem; font-weight:700; text-transform:uppercase; letter-spacing:.05em; color:var(--muted); margin:6px 0 6px; }
+  .eb-entries{ display:flex; flex-wrap:wrap; gap:7px; margin-bottom:8px; }
+  .pill{ display:inline-flex; align-items:center; gap:6px; border-radius:20px; padding:4px 11px; font-size:.78rem; font-weight:700; color:#fff; }
+  .pill.sm{ padding:2px 8px; font-size:.72rem; }
+  .eb-row{ display:flex; align-items:center; gap:8px; flex-wrap:wrap; padding:7px 0; border-top:1px dashed #eef1f6; }
+  .eb-row:first-of-type{ border-top:none; }
+  .eb-arrow{ color:#94a3b8; font-size:.9rem; }
+  .eb-dests{ display:flex; flex-wrap:wrap; gap:6px; }
+  .eb-final{ font-size:.72rem; color:#94a3b8; font-style:italic; }
 </style>
 </head>
 <body>
@@ -105,7 +120,7 @@
   <a class="topnav-brand" href="/mantenedores">
     <img src="/img/logo.png" alt="AutoFácil" onerror="this.style.display='none'">
     <span>Flujo Crédito Brokerage</span>
-    <span class="version-badge">v2.0</span>
+    <span class="version-badge">v2.1</span>
   </a>
   <div class="breadcrumb-nav">
     <a href="/">Inicio</a><span class="sep">›</span>
@@ -123,6 +138,14 @@
   <div class="note">
     <i class="bi bi-info-circle-fill"></i>
     <div>Haz clic en <strong><i class="bi bi-pencil"></i></strong> en cualquier paso para editar su nombre o descripción. Los documentos de la <strong>Carga de Documentos</strong> se toman automáticamente desde el mantenedor <a href="/mantenedores/tipos-documento/" style="color:#92400e;font-weight:700">Tipos de Documento</a>.</div>
+  </div>
+
+  <div class="estados-box" id="estadosBox">
+    <div class="eb-head">
+      <span class="eb-title"><i class="bi bi-diagram-3-fill"></i> Estados del crédito (Brokerage)</span>
+      <a class="eb-edit" href="/mantenedores/estado-creditos/"><i class="bi bi-pencil-square"></i> Editar estados</a>
+    </div>
+    <div id="estadosFlujo"><div class="spinner"></div></div>
   </div>
 
   <div class="sec-title" style="margin-bottom:18px"><i class="bi bi-diagram-3"></i>Flujo por Institución</div>
@@ -205,9 +228,48 @@ const _state = {
 
 // ── Cargar datos ──────────────────────────────────────────────────────────────
 async function cargarTodo(){
+  cargarEstados();
   await Promise.all([cargarFinanciera('AUTOFIN'), cargarFinanciera('UNIDAD')]);
   renderGrid();
 }
+
+// ── Estados del crédito (desde el mantenedor Estado Créditos) ──────────────────
+async function cargarEstados(){
+  const cont = document.getElementById('estadosFlujo');
+  try{
+    const r = await fetch('/api/estado-creditos?ambito=brokerage', { headers:HDR() });
+    const j = await r.json();
+    if(!j.success) throw new Error(j.error||'Error');
+    renderEstados(j.data.estados || []);
+  }catch(e){ cont.innerHTML = `<div style="font-size:.8rem;color:#94a3b8">No se pudieron cargar los estados (${e.message}). <a href="/mantenedores/estado-creditos/" style="color:var(--blue)">Configurar</a></div>`; }
+}
+
+function renderEstados(estados){
+  const cont = document.getElementById('estadosFlujo');
+  if(!estados.length){ cont.innerHTML = '<div style="font-size:.8rem;color:#94a3b8">Sin estados configurados. <a href="/mantenedores/estado-creditos/" style="color:var(--blue)">Crear estados</a></div>'; return; }
+  const byCode = {}; estados.forEach(e=>byCode[e.codigo]=e);
+  const pill = (cod, sm) => { const e=byCode[cod]; const c=e?e.color:'#94a3b8'; const n=e?e.nombre:cod; return `<span class="pill ${sm?'sm':''}" style="background:${c}">${escapeHtml(n)}</span>`; };
+
+  const ini = estados.filter(e=>e.es_inicial);
+  const entries = ini.length
+    ? ini.map(e=>pill(e.codigo)).join('')
+    : '<span class="eb-final">Sin estados de ingreso definidos</span>';
+
+  const rows = estados.filter(e=>e.destinos && e.destinos.length).map(e=>`
+    <div class="eb-row">
+      ${pill(e.codigo)}
+      <i class="bi bi-arrow-right eb-arrow"></i>
+      <div class="eb-dests">${e.destinos.map(d=>pill(d,true)).join('')}</div>
+    </div>`).join('');
+
+  cont.innerHTML = `
+    <div class="eb-sub">Puertas de entrada (estado al ingresar)</div>
+    <div class="eb-entries">${entries}</div>
+    <div class="eb-sub" style="margin-top:10px">Transiciones permitidas</div>
+    ${rows || '<div class="eb-final">Ningún estado tiene transiciones configuradas.</div>'}`;
+}
+
+function escapeHtml(s){ return String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
 
 async function cargarFinanciera(fin){
   // 1. Config guardada
