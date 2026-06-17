@@ -12,7 +12,7 @@ const pool = require('../../../../shared/config/database');
 const { enviarCorreo, mailConfigurado } = require('../../../../shared/mailer');
 
 const APP_URL = (process.env.APP_URL || 'https://credit-system-45em.onrender.com').replace(/\/+$/, '');
-const DIAS_AVISO = 5; // avisar cuando falten 5 días o menos
+const DIAS_AVISO_DEFAULT = 5; // días de anticipación por defecto (configurable en Seguridad)
 
 (async () => {
   try {
@@ -56,9 +56,14 @@ async function revisar() {
   try {
     if (!mailConfigurado()) return; // sin correo configurado no hay nada que enviar
 
-    const [[cfg]] = await pool.query("SELECT valor FROM config_seguridad WHERE clave = 'dias_venc_clave'");
-    const diasVenc = parseInt(cfg && cfg.valor) || 0;
-    if (diasVenc <= 0) return; // sin política de vencimiento → no se avisa
+    // Política desde Seguridad: vencimiento, si se avisa por correo y la anticipación
+    const [cfgRows] = await pool.query(
+      "SELECT clave, valor FROM config_seguridad WHERE clave IN ('dias_venc_clave','aviso_venc_correo','aviso_venc_dias')");
+    const cfg = {}; cfgRows.forEach(r => { cfg[r.clave] = r.valor; });
+    const diasVenc = parseInt(cfg.dias_venc_clave) || 0;
+    if (diasVenc <= 0) return;                       // sin política de vencimiento → no se avisa
+    if (cfg.aviso_venc_correo === '0') return;       // aviso por correo desactivado
+    const diasAviso = Math.min(60, Math.max(1, parseInt(cfg.aviso_venc_dias) || DIAS_AVISO_DEFAULT));
 
     // Usuarios activos con clave por vencer (1..DIAS_AVISO días) que aún no recibieron aviso hoy
     const [rows] = await pool.query(`
@@ -72,7 +77,7 @@ async function revisar() {
         AND u.password_updated_at IS NOT NULL
         AND (a.last_sent IS NULL OR a.last_sent < CURDATE())
       HAVING dias_restantes BETWEEN 1 AND ?`,
-      [diasVenc, DIAS_AVISO]);
+      [diasVenc, diasAviso]);
 
     let enviados = 0;
     for (const u of rows) {

@@ -16,6 +16,8 @@ const { enviarCorreo, mailConfigurado, remitente } = require('../../../../shared
     const defaults = [
       ['timeout_inactividad',   '60'],   // minutos (0 = nunca)
       ['dias_venc_clave',       '0'],    // días (0 = nunca)
+      ['aviso_venc_correo',     '1'],    // avisar por correo antes del vencimiento (1/0)
+      ['aviso_venc_dias',       '5'],    // días de anticipación del aviso
       ['longitud_minima',       '6'],
       ['req_mayusculas',        '0'],
       ['req_numeros',           '0'],
@@ -50,7 +52,7 @@ const getConfig = async (req, res) => {
 const putConfig = async (req, res) => {
   try {
     const allowed = [
-      'timeout_inactividad', 'dias_venc_clave',
+      'timeout_inactividad', 'dias_venc_clave', 'aviso_venc_correo', 'aviso_venc_dias',
       'longitud_minima', 'req_mayusculas', 'req_numeros', 'req_especiales',
       'permitir_misma_clave', 'historial_claves',
     ];
