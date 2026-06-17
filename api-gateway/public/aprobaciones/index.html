@@ -673,6 +673,21 @@ function setMoney(id, v){ const el=document.getElementById(id); el.dataset.raw=v
 const dDate = v => v ? String(v).slice(0,10) : null;
 const dDT   = v => { if(!v) return null; const d=new Date(v); if(isNaN(d)) return null; return d.toISOString().slice(0,19).replace('T',' '); };
 
+/* ── Standalone desde Mantenedores (?tab=params): oculta el menú (evita el
+      flash a "Cartas de Aprobación") y corrige el breadcrumb ANTES de cargar
+      datos. La pestaña se rellena luego en showTab('params'). ───────────── */
+(function preStandalone(){
+  if (new URLSearchParams(location.search).get('tab') !== 'params') return;
+  const tb = document.querySelector('.tabs-bar'); if (tb) tb.style.display = 'none';
+  const home = document.getElementById('pane-home'); if (home) home.classList.remove('active');
+  const params = document.getElementById('pane-params'); if (params) params.classList.add('active');
+  const bc = document.querySelector('.breadcrumb-nav');
+  if (bc) bc.innerHTML =
+    '<a href="/">Inicio</a><span class="sep">›</span>' +
+    '<a href="/mantenedores">Mantenedores</a><span class="sep">›</span>' +
+    '<span style="color:#fff;font-weight:600"><i class="bi bi-sliders me-1"></i>Preferencia Financiera</span>';
+})();
+
 /* ── Init ─────────────────────────────────────────── */
 (async function init(){
   await cargarPermisos();
