@@ -114,7 +114,8 @@
         <h3><i class="bi bi-search"></i> Solicitar informes</h3>
         <div class="fld">
           <label>RUT (con dígito verificador)</label>
-          <input type="text" class="rut" id="rut" placeholder="12.345.678-9" onkeydown="if(event.key==='Enter')solicitar()">
+          <input type="text" class="rut" id="rut" placeholder="12.345.678-9" maxlength="12" oninput="onRutInput(this)" onkeydown="if(event.key==='Enter')solicitar()">
+          <div id="rutHint" style="font-size:.76rem;margin-top:4px;min-height:14px;color:#9ca3af"></div>
         </div>
         <div class="prods" id="prods"><div class="muted">Cargando productos…</div></div>
         <div class="selrow"><button onclick="marcarTodos(true)">Marcar todos</button><button onclick="marcarTodos(false)">Desmarcar</button></div>
@@ -200,6 +201,38 @@ function logout(){ sessionStorage.removeItem('token'); sessionStorage.removeItem
 const esc = s => String(s ?? '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
 function toast(m,e){ const t=document.getElementById('toast'); t.textContent=m; t.className='toast-af'+(e?' err':''); t.style.display='block'; clearTimeout(t._h); t._h=setTimeout(()=>t.style.display='none',3000); }
 const fmtFecha = d => { try { return new Date(d).toLocaleDateString('es-CL'); } catch { return d; } };
+
+/* ── RUT: formato xx.xxx.xxx-y en vivo + validación de dígito verificador ─── */
+function formatRUT(raw){
+  let clean = raw.replace(/[^0-9kK]/g,'').toUpperCase();
+  if (clean.length < 2) return clean;
+  const dv = clean.slice(-1), body = clean.slice(0,-1);
+  let fmt = '';
+  for (let i = body.length; i > 0; i -= 3) fmt = body.slice(Math.max(0,i-3),i) + (fmt ? '.'+fmt : '');
+  return fmt + '-' + dv;
+}
+function calcDV(body){
+  const digits = String(body).replace(/\D/g,'');
+  if (!digits) return null;
+  const serie = [2,3,4,5,6,7];
+  const suma = digits.split('').reverse().reduce((a,d,i)=>a + parseInt(d)*serie[i%6], 0);
+  const resto = 11 - (suma % 11);
+  return resto === 11 ? '0' : resto === 10 ? 'K' : String(resto);
+}
+function validarRUT(clean){
+  if (clean.length < 7 || clean.length > 9) return null;
+  return calcDV(clean.slice(0,-1)) === clean.slice(-1).toUpperCase();
+}
+function onRutInput(el){
+  const clean = el.value.replace(/[^0-9kK]/g,'').toUpperCase();
+  if (clean.length >= 2) el.value = formatRUT(el.value);
+  const hint = document.getElementById('rutHint');
+  if (clean.length >= 7 && clean.length <= 9){
+    if (validarRUT(clean)){ el.style.borderColor='#059669'; hint.style.color='#059669'; hint.textContent='✓ RUT válido'; }
+    else { el.style.borderColor='#dc2626'; hint.style.color='#dc2626'; hint.textContent='✗ Dígito verificador incorrecto (debería ser '+calcDV(clean.slice(0,-1))+')'; }
+  } else if (clean.length > 0){ el.style.borderColor=''; hint.style.color='#9ca3af'; hint.textContent='Ingresa el RUT completo con dígito verificador'; }
+  else { el.style.borderColor=''; hint.textContent=''; }
+}
 let CFG = { dias_bloqueo:15, dias_vigencia:180 };
 const claseDias = (dias) => dias < CFG.dias_bloqueo ? 'fresh' : (dias < CFG.dias_vigencia ? 'mid' : 'old');
 
@@ -256,6 +289,9 @@ async function solicitar(){
   const productos = selectedProductos();
   const res = document.getElementById('res');
   if (!rut) return toast('Ingresa un RUT', true);
+  const cleanRut = rut.replace(/[^0-9kK]/g,'').toUpperCase();
+  if (validarRUT(cleanRut) === false) return toast('RUT inválido: dígito verificador incorrecto (debería ser '+calcDV(cleanRut.slice(0,-1))+')', true);
+  if (validarRUT(cleanRut) === null) return toast('Ingresa el RUT completo con dígito verificador', true);
   if (!productos.length) return toast('Selecciona al menos un informe', true);
 
   const btn = document.getElementById('btnSolicitar');
