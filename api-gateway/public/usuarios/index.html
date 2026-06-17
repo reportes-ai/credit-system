@@ -703,6 +703,8 @@
     if (!token || !yo) { window.location.href = '/login.html'; }
 
     const esAdmin = yo?.perfil === 'Administrador';
+    // Se setea según permisos reales en el IIFE de init (no por ser Admin)
+    let puedeGestionarUsuarios = esAdmin;
 
     document.getElementById('avatarInicial').textContent = (yo?.nombre || '?').charAt(0).toUpperCase();
     document.getElementById('navNombre').textContent = `${yo?.nombre || ''} ${yo?.apellido || ''}`.trim();
@@ -778,7 +780,7 @@
           <td><span class="badge-estado badge-${u.estado}">${u.estado}</span></td>
           <td class="text-muted" style="font-size:0.8rem">${u.ultimo_acceso ? new Date(u.ultimo_acceso).toLocaleString('es-CL') : 'Nunca'}</td>
           <td>
-            ${esAdmin ? `
+            ${puedeGestionarUsuarios ? `
               <button class="btn btn-outline-primary btn-sm me-1" title="Editar" onclick="abrirModalUsuario(${u.id_usuario})"><i class="bi bi-pencil"></i></button>
               <button class="btn btn-outline-success btn-sm me-1" title="Ejecutivos asignados" onclick="abrirModalEjecutivos(${u.id_usuario}, '${u.nombre} ${u.apellido}')"><i class="bi bi-people"></i></button>
               <button class="btn btn-outline-warning btn-sm me-1" title="Resetear clave" onclick="abrirResetClave(${u.id_usuario}, '${u.nombre} ${u.apellido}')"><i class="bi bi-key"></i></button>
@@ -1449,8 +1451,14 @@
         (j.funcionalidades || []).forEach(c => funcs.add(c));
       } catch (e) {}
       const tiene = c => esAdmin || funcs.has(c);
-      const puedeUsuarios = tiene('usuarios_gestionar') || tiene('usuarios_ver');
+      const puedeUsuarios = tiene('usuarios_gestionar') || tiene('usuarios_ver') || tiene('usuarios.ver');
       const puedePerfiles = tiene('usuarios_perfiles');
+      // Botón "Nuevo Usuario" y acciones por fila según permiso (no por ser Admin)
+      const puedeCrear = tiene('usuarios_gestionar') || tiene('usuarios.crear') || tiene('usuarios_crear');
+      puedeGestionarUsuarios = tiene('usuarios_gestionar') || tiene('usuarios.editar')
+        || tiene('usuarios.eliminar') || tiene('usuarios.reset_clave');
+      const _btnNuevo = document.getElementById('btnNuevoUsuario');
+      if (_btnNuevo) _btnNuevo.style.display = puedeCrear ? '' : 'none';
       if (!puedeUsuarios) document.querySelector('[data-tab="usuarios"]').closest('li').style.display = 'none';
       if (!puedePerfiles) document.querySelector('[data-tab="permisos"]').closest('li').style.display = 'none';
       if (puedeUsuarios) {

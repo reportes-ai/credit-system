@@ -1,6 +1,7 @@
 const pool = require('../../../../shared/config/database');
 const bcrypt = require('bcryptjs');
 const { auditar } = require('../../../../shared/audit');
+const { tieneFunc } = require('../../../../shared/middleware/permisos');
 
 /* ─── Migraciones ──────────────────────────────────────────────── */
 (async () => {
@@ -46,9 +47,13 @@ const { auditar } = require('../../../../shared/audit');
 
 const PERFILES_GLOBALES = ['Administrador', 'Gerente'];
 
-const buildFiltroUsuario = (usuario) => {
+const buildFiltroUsuario = async (usuario) => {
   const { id_usuario, perfil_nombre } = usuario;
   if (PERFILES_GLOBALES.includes(perfil_nombre)) return { where: '', params: [] };
+  // Visibilidad global por PERMISO (matriz de Perfiles/Permisos), no por nombre de perfil:
+  // quien puede gestionar o ver usuarios ve la lista completa.
+  if (await tieneFunc(id_usuario, 'usuarios_gestionar', 'usuarios.ver', 'usuarios_ver'))
+    return { where: '', params: [] };
   if (perfil_nombre === 'Supervisor') {
     return { where: 'WHERE u.id_supervisor = ? OR u.id_usuario = ?', params: [id_usuario, id_usuario] };
   }
@@ -57,7 +62,7 @@ const buildFiltroUsuario = (usuario) => {
 
 const getAllUsuarios = async (req, res) => {
   try {
-    const { where, params } = buildFiltroUsuario(req.usuario);
+    const { where, params } = await buildFiltroUsuario(req.usuario);
     const [usuarios] = await pool.query(
       `SELECT u.id_usuario, u.rut, u.nombre, u.apellido, u.apellido_materno, u.centro_costo, u.email, u.telefono,
               u.id_perfil, p.nombre AS perfil, u.id_supervisor,
