@@ -156,8 +156,6 @@ const { auditar } = require('../../../../shared/audit');
       ['CRM', 'Ver Estadísticas CRM',                'crm_estadisticas',             0],
       // ── Mantenedores ────────────────────────────────────────
       ['Mantenedores', 'Gestionar Cuentas Bancarias','mantenedores_cuentas_bancarias',0],
-      ['Mantenedores', 'Gestionar Comisiones de Seguro','mantenedores_comisiones_seguro',0],
-      ['Mantenedores', 'Gestionar Parques',          'mantenedores_parques',         0],
       ['Mantenedores', 'Gestionar Tasas',            'mantenedores_tasas',           0],
       ['Mantenedores', 'Gestionar Factores de Seguro','mantenedores_factores_seguro',0],
       ['Mantenedores', 'Gestionar UF',               'mantenedores_uf',              0],
@@ -1906,6 +1904,28 @@ const getUsuariosByPerfil = async (req, res) => {
       [adm.id_perfil, idF]);
     console.log('✓ Perfiles v32: permiso Reversar Envío de Cartola registrado');
   } catch (e) { console.error('[perfiles migration v32]', e.message); }
+})();
+
+/* ─── Migración: consolidar "Parques". Había la card huérfana "Parques y Comisiones"
+   (con href, generaba el menú) además del permiso canónico mantenedores_parques
+   (sin href). Se le da el href al canónico y se elimina la huérfana. */
+(async () => {
+  try {
+    await pool.query(
+      "UPDATE funcionalidades SET href='/mantenedores/parques/', icono=COALESCE(NULLIF(icono,''),'bi-tree') " +
+      "WHERE codigo='mantenedores_parques' AND (href IS NULL OR href='')"
+    );
+    const [orphans] = await pool.query(
+      "SELECT id_funcionalidad FROM funcionalidades WHERE codigo <> 'mantenedores_parques' " +
+      "AND (nombre='Parques y Comisiones' OR href='/mantenedores/parques/')"
+    );
+    for (const o of orphans) {
+      await pool.query('DELETE FROM permisos_perfil WHERE id_funcionalidad=?', [o.id_funcionalidad]);
+      try { await pool.query('DELETE FROM permisos_usuario WHERE id_funcionalidad=?', [o.id_funcionalidad]); } catch (_) {}
+      await pool.query('DELETE FROM funcionalidades WHERE id_funcionalidad=?', [o.id_funcionalidad]);
+    }
+    if (orphans.length) console.log(`[parques-consolidar] ${orphans.length} funcionalidad(es) sobrante(s) eliminada(s)`);
+  } catch (e) { console.error('[parques-consolidar]', e.message); }
 })();
 
 /* ─── Migración: eliminar funcionalidades duplicadas por NOMBRE (códigos distintos) ─
