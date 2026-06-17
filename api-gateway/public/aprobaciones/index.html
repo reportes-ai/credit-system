@@ -5,7 +5,9 @@
   <link rel="icon" href="/img/favicon.png" type="image/png">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Cartas de Aprobación — AutoFácil</title>
-  <!-- v4.7 -->
+  <!-- v4.8 -->
+  <!-- Standalone desde Mantenedores: marca la clase ANTES de pintar para no mostrar el menú -->
+  <script>try{if(new URLSearchParams(location.search).get('tab')==='params')document.documentElement.classList.add('standalone-params');}catch(e){}</script>
   <link href="/css/bootstrap.min.css" rel="stylesheet">
   <link href="/css/bootstrap-icons.css" rel="stylesheet">
   <style>
@@ -66,6 +68,15 @@
       background:#dc2626; color:#fff; font-size:.7rem; font-weight:800; cursor:pointer; margin-left:5px; }
     .tab-pane { display:none; padding:22px 24px; max-width:1500px; margin:0 auto; }
     .tab-pane.active { display:block; }
+    /* Vista standalone (?tab=params desde Mantenedores): sin flash del menú */
+    .bc-normal, .bc-params { align-items:center; gap:6px; }
+    .bc-normal { display:inline-flex; }
+    .bc-params { display:none; }
+    html.standalone-params .tabs-bar { display:none !important; }
+    html.standalone-params #pane-home { display:none !important; }
+    html.standalone-params #pane-params { display:block !important; }
+    html.standalone-params .bc-normal { display:none !important; }
+    html.standalone-params .bc-params { display:inline-flex !important; }
     /* ── cards / tabla ── */
     .card-af { background:#fff; border-radius:14px; box-shadow:0 1px 4px rgba(0,0,0,.07); padding:18px 20px; }
     table.tbl { width:100%; border-collapse:collapse; font-size:.82rem; }
@@ -140,8 +151,15 @@
       <span class="version-badge" id="versionBadge">v1.0</span>
     </a>
     <div class="breadcrumb-nav">
-      <a href="/">Inicio</a><span class="sep">›</span>
-      <span style="color:#fff;font-weight:600"><i class="bi bi-patch-check me-1"></i>Cartas de Aprobación</span>
+      <span class="bc-normal">
+        <a href="/">Inicio</a><span class="sep">›</span>
+        <span style="color:#fff;font-weight:600"><i class="bi bi-patch-check me-1"></i>Cartas de Aprobación</span>
+      </span>
+      <span class="bc-params">
+        <a href="/">Inicio</a><span class="sep">›</span>
+        <a href="/mantenedores">Mantenedores</a><span class="sep">›</span>
+        <span style="color:#fff;font-weight:600"><i class="bi bi-sliders me-1"></i>Preferencia Financiera</span>
+      </span>
     </div>
   </div>
   <div class="topnav-right">
@@ -673,37 +691,23 @@ function setMoney(id, v){ const el=document.getElementById(id); el.dataset.raw=v
 const dDate = v => v ? String(v).slice(0,10) : null;
 const dDT   = v => { if(!v) return null; const d=new Date(v); if(isNaN(d)) return null; return d.toISOString().slice(0,19).replace('T',' '); };
 
-/* ── Standalone desde Mantenedores (?tab=params): oculta el menú (evita el
-      flash a "Cartas de Aprobación") y corrige el breadcrumb ANTES de cargar
-      datos. La pestaña se rellena luego en showTab('params'). ───────────── */
-(function preStandalone(){
-  if (new URLSearchParams(location.search).get('tab') !== 'params') return;
-  const tb = document.querySelector('.tabs-bar'); if (tb) tb.style.display = 'none';
-  const home = document.getElementById('pane-home'); if (home) home.classList.remove('active');
-  const params = document.getElementById('pane-params'); if (params) params.classList.add('active');
-  const bc = document.querySelector('.breadcrumb-nav');
-  if (bc) bc.innerHTML =
-    '<a href="/">Inicio</a><span class="sep">›</span>' +
-    '<a href="/mantenedores">Mantenedores</a><span class="sep">›</span>' +
-    '<span style="color:#fff;font-weight:600"><i class="bi bi-sliders me-1"></i>Preferencia Financiera</span>';
-})();
-
 /* ── Init ─────────────────────────────────────────── */
 (async function init(){
   await cargarPermisos();
+  const tabParam = new URLSearchParams(location.search).get('tab');
+  // Standalone desde Mantenedores (?tab=params): carga SOLO lo que usa la tabla
+  // de preferencia y termina — no espera cartas/catálogos (más rápido). El menú
+  // ya quedó oculto por CSS en el <head>, así que no hay flash.
+  if (tabParam === 'params') {
+    if (puede('aprob_params')) { await cargarFactores(); showTab('params'); }
+    return;
+  }
   await Promise.all([cargarCartas(), cargarCatalogos(), cargarFactores(), cargarFirma(), cargarUFyTasas()]);
   try { const _ri = await fetch('/api/impuestos/valores', { headers: hdr() }); const _ji = await _ri.json(); if (_ji.success && _ji.data && _ji.data.IVA) IVA_FACTOR = 1 + Number(_ji.data.IVA)/100; } catch(e){}
   document.getElementById('cFecha').value = new Date().toISOString().slice(0,10);
   renderFinancierasSelect();
   restaurarBorrador();
-  // ?tab=params → vista standalone desde Mantenedores (solo tablas de preferencia)
-  const tabParam = new URLSearchParams(location.search).get('tab');
-  if (tabParam === 'params' && puede('aprob_params')) {
-    document.querySelector('.tabs-bar').style.display = 'none';
-    showTab('params');
-  } else if (tabParam && ['lista','nueva','revision'].includes(tabParam)) {
-    showTab(tabParam);
-  }
+  if (tabParam && ['lista','nueva','revision'].includes(tabParam)) showTab(tabParam);
 })();
 
 async function cargarUFyTasas(){
