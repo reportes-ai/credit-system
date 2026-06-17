@@ -138,6 +138,7 @@
       'comisiones-seguro':   'Porcentajes de comisión sobre prima por Desgravamen y Cesantía',
       'productos-financiera':'Productos disponibles en la digitación por financiera',
       'solo-dios':           'Acceso directo a la BD sin filtros — edición total',
+      'dealernet':           'Productos y costos de la integración DealerNet',
       'vista-pantallas':     'Configura qué módulos aparecen en el Home y en cada sección',
       'bd-operaciones':      'Base de datos de operaciones de crédito',
       'bd-clientes':         'Base de datos de clientes',
@@ -165,11 +166,13 @@
 
       // BD Nivel Dios: solo accesibles dentro de la card SOLO DIOS, no como cards sueltas
       const SOLO_DIOS = new Set(['bd-operaciones','bd-clientes','bd-antecedentes','bd-informacion-comercial','meses-cerrados']);
+      // DealerNet: las 2 cards van dentro de la card "Mantenedor DealerNet" (/mantenedores/dealernet/)
+      const DEALERNET = new Set(['dealernet-productos','dealernet-costos']);
       // Construir items desde funcionalidades BD (href + icono + nombre desde servidor)
       const nativeHrefs = new Set(funcInfo.map(f => f.href));
       const nativeItems = funcInfo.map(f => {
         const seg = f.href.replace('/mantenedores/', '').replace(/\/$/, '');
-        if (SOLO_DIOS.has(seg)) return null;
+        if (SOLO_DIOS.has(seg) || DEALERNET.has(seg)) return null;
         if (placement[seg] && placement[seg] !== 'mantenedores') return null;
         return { id: seg || f.codigo, href: f.href, icon: f.icono || 'bi-grid', titulo: f.nombre, desc: DESCS[seg] || '' };
       }).filter(Boolean);

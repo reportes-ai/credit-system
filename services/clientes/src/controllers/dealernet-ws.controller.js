@@ -258,15 +258,27 @@ const PRECIO_UF4 = {
       created_at        DATETIME DEFAULT CURRENT_TIMESTAMP,
       updated_at        DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
     )`);
-    // Funcionalidades: mantenedor de costos + pestaña Facturación
+    // Funcionalidades: mantenedor de costos + card-grupo "Mantenedor DealerNet" + pestaña Facturación
     const [[modM]] = await pool.query("SELECT id_modulo FROM modulos WHERE nombre='Mantenedores' AND estado='activo' LIMIT 1");
     if (modM) {
-      const [[ex]] = await pool.query("SELECT id_funcionalidad FROM funcionalidades WHERE codigo='mant_dealernet_costos' LIMIT 1");
-      let idf = ex && ex.id_funcionalidad;
-      if (!idf) { const [r] = await pool.query("INSERT INTO funcionalidades (id_modulo, nombre, codigo, href, icono) VALUES (?,?,?,?,?)",
-        [modM.id_modulo, 'Costo DealerNet', 'mant_dealernet_costos', '/mantenedores/dealernet-costos/', 'bi-cash-coin']); idf = r.insertId; }
-      const [[pp]] = await pool.query('SELECT 1 ok FROM permisos_perfil WHERE id_perfil=1 AND id_funcionalidad=? LIMIT 1', [idf]);
-      if (!pp) await pool.query('INSERT INTO permisos_perfil (id_perfil, id_funcionalidad, habilitado) VALUES (1,?,1)', [idf]);
+      for (const f of [
+        { nombre: 'Costo DealerNet',      codigo: 'mant_dealernet_costos', href: '/mantenedores/dealernet-costos/', icono: 'bi-cash-coin' },
+        { nombre: 'Mantenedor DealerNet', codigo: 'mant_dealernet',         href: '/mantenedores/dealernet/',        icono: 'bi-cloud-arrow-down' },
+      ]) {
+        const [[ex]] = await pool.query('SELECT id_funcionalidad FROM funcionalidades WHERE codigo=? LIMIT 1', [f.codigo]);
+        let idf = ex && ex.id_funcionalidad;
+        if (!idf) { const [r] = await pool.query("INSERT INTO funcionalidades (id_modulo, nombre, codigo, href, icono) VALUES (?,?,?,?,?)",
+          [modM.id_modulo, f.nombre, f.codigo, f.href, f.icono]); idf = r.insertId; }
+        const [[pp]] = await pool.query('SELECT 1 ok FROM permisos_perfil WHERE id_perfil=1 AND id_funcionalidad=? LIMIT 1', [idf]);
+        if (!pp) await pool.query('INSERT INTO permisos_perfil (id_perfil, id_funcionalidad, habilitado) VALUES (1,?,1)', [idf]);
+      }
+      // Quien ya tenía acceso a Productos o Costo DealerNet, también ve el card-grupo (sin regresión)
+      const [[grp]] = await pool.query("SELECT id_funcionalidad FROM funcionalidades WHERE codigo='mant_dealernet' LIMIT 1");
+      if (grp) await pool.query(
+        `INSERT IGNORE INTO permisos_perfil (id_perfil, id_funcionalidad, habilitado)
+         SELECT DISTINCT pp.id_perfil, ?, 1 FROM permisos_perfil pp
+         JOIN funcionalidades f ON f.id_funcionalidad=pp.id_funcionalidad
+         WHERE f.codigo IN ('mant_dealernet_productos','mant_dealernet_costos') AND pp.habilitado=1`, [grp.id_funcionalidad]);
     }
     const [[exF]] = await pool.query("SELECT id_funcionalidad FROM funcionalidades WHERE codigo='dealernet_facturacion' LIMIT 1");
     let idF = exF && exF.id_funcionalidad;

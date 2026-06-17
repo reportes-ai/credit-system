@@ -1,0 +1,81 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <link rel="icon" href="/img/favicon.png" type="image/png">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Mantenedor DealerNet — AutoFácil</title>
+  <link href="/css/bootstrap.min.css" rel="stylesheet">
+  <link href="/css/bootstrap-icons.css" rel="stylesheet">
+  <style>
+    :root { --navy:#0141A2; --navy-dark:#012d70; --navy-light:#0255c5; --accent:#009AFE; --bg:#f0f4f8; }
+    body { background:var(--bg); font-family:'Segoe UI',system-ui,sans-serif; margin:0; min-height:100vh; }
+    .topnav { background:linear-gradient(90deg,var(--navy-dark),var(--navy-light)); color:#fff; height:60px; padding:0 24px; display:flex; align-items:center; justify-content:space-between; position:sticky; top:0; z-index:200; }
+    .topnav-brand { display:flex; align-items:center; gap:8px; text-decoration:none; }
+    .topnav-brand img { height:32px; filter:brightness(0) invert(1); }
+    .version-badge { background:rgba(255,255,255,.15); color:rgba(255,255,255,.75); font-size:.65rem; font-weight:700; border-radius:6px; padding:2px 8px; }
+    .breadcrumb-nav { color:rgba(255,255,255,.6); font-size:.85rem; margin-left:12px; }
+    .breadcrumb-nav a { color:rgba(255,255,255,.75); text-decoration:none; }
+    .btn-logout { background:rgba(255,255,255,.1); border:1px solid rgba(255,255,255,.2); color:#fff; border-radius:8px; padding:5px 12px; font-size:.82rem; cursor:pointer; }
+    .main { max-width:980px; margin:26px auto; padding:0 20px 60px; }
+    .page-banner { background:linear-gradient(135deg,#012d70,#0141A2 50%,#009AFE); border-radius:16px; color:#fff; padding:22px 30px; margin-bottom:22px; display:flex; align-items:center; gap:16px; }
+    .page-banner i { font-size:2.4rem; opacity:.85; } .page-banner h2 { font-weight:700; margin:0 0 2px; font-size:1.25rem; } .page-banner p { opacity:.8; margin:0; font-size:.86rem; }
+    .grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(260px,1fr)); gap:18px; }
+    .module-card { background:#fff; border-radius:14px; padding:24px 22px; cursor:pointer; text-decoration:none; color:inherit; border:2px solid transparent; transition:transform .18s, box-shadow .18s, border-color .18s; display:flex; flex-direction:column; min-height:200px; box-shadow:0 1px 4px rgba(0,0,0,.06); }
+    .module-card:hover { transform:translateY(-4px); box-shadow:0 12px 32px rgba(1,65,162,.15); border-color:var(--navy); }
+    .card-icon { width:52px; height:52px; border-radius:12px; background:#eef4fb; color:var(--navy); display:flex; align-items:center; justify-content:center; font-size:1.5rem; margin-bottom:14px; transition:.18s; }
+    .module-card:hover .card-icon { background:linear-gradient(135deg,var(--navy),var(--accent)); color:#fff; }
+    .module-card h6 { font-weight:700; font-size:.98rem; margin:0 0 6px; color:#111827; }
+    .module-card p { font-size:.82rem; color:#6b7280; margin:0 0 16px; line-height:1.45; flex:1; }
+    .btn-acceder { background:var(--navy); color:#fff; border-radius:8px; padding:7px 0; text-align:center; font-size:.82rem; font-weight:600; transition:.18s; }
+    .module-card:hover .btn-acceder { background:var(--accent); }
+  </style>
+</head>
+<body>
+<nav class="topnav">
+  <div style="display:flex;align-items:center">
+    <a href="/" class="topnav-brand"><img src="/img/logo.png" alt="AutoFácil"><span class="version-badge" id="versionBadge"></span></a>
+    <div class="breadcrumb-nav"><a href="/">Inicio</a> › <a href="/mantenedores/">Mantenedores</a> › <span style="color:#fff;font-weight:600">Mantenedor DealerNet</span></div>
+  </div>
+  <button class="btn-logout" onclick="logout()"><i class="bi bi-box-arrow-right me-1"></i>Salir</button>
+</nav>
+
+<div class="main">
+  <div class="page-banner">
+    <i class="bi bi-cloud-arrow-down"></i>
+    <div><h2>Mantenedor DealerNet</h2><p>Configuración de la integración DealerNet: productos disponibles y costos en UF.</p></div>
+  </div>
+  <div class="grid" id="grid"><div class="text-muted">Cargando…</div></div>
+</div>
+
+<script src="/js/auth-guard.js"></script>
+<script>
+const token = sessionStorage.getItem('token');
+if (!token) location.href = '/login.html';
+const H = { Authorization:'Bearer '+token };
+function logout(){ sessionStorage.removeItem('token'); sessionStorage.removeItem('usuario'); location.href='/login.html'; }
+
+const CARDS = [
+  { perm:'mant_dealernet_productos', href:'/mantenedores/dealernet-productos/', icon:'bi-cloud-arrow-down', titulo:'Productos DealerNet', desc:'Catálogo de informes (códigos), activos/inactivos, orden y umbrales de reutilización del repositorio.' },
+  { perm:'mant_dealernet_costos',    href:'/mantenedores/dealernet-costos/',    icon:'bi-cash-coin',        titulo:'Costo DealerNet',     desc:'Precio unitario en UF por informe (4 tramos) y plan prepago contratado. Alimenta la Facturación.' },
+];
+
+(async () => {
+  let funcs = [];
+  try { const r = await fetch('/api/auth/mis-permisos?_='+Date.now(), { headers:H }); const j = await r.json(); funcs = j.funcionalidades || []; } catch(_){}
+  const yo = JSON.parse(sessionStorage.getItem('usuario')||'null');
+  const esAdmin = yo?.perfil === 'Administrador';
+  const visibles = CARDS.filter(c => esAdmin || funcs.includes(c.perm));
+  const grid = document.getElementById('grid');
+  grid.innerHTML = visibles.length ? visibles.map(c => `
+    <a href="${c.href}" class="module-card">
+      <div class="card-icon"><i class="bi ${c.icon}"></i></div>
+      <h6>${c.titulo}</h6>
+      <p>${c.desc}</p>
+      <div class="btn-acceder">Acceder →</div>
+    </a>`).join('') : '<div class="text-muted">No tienes acceso a los mantenedores de DealerNet.</div>';
+})();
+</script>
+<script src="/js/app-version.js"></script>
+</body>
+</html>

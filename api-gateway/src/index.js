@@ -231,6 +231,8 @@ app.get(['/mantenedores/dealernet-productos', '/mantenedores/dealernet-productos
   res.sendFile(path.join(__dirname, '../public/mantenedores/dealernet-productos/index.html')));
 app.get(['/mantenedores/dealernet-costos', '/mantenedores/dealernet-costos/'], (req, res) =>
   res.sendFile(path.join(__dirname, '../public/mantenedores/dealernet-costos/index.html')));
+app.get(['/mantenedores/dealernet', '/mantenedores/dealernet/'], (req, res) =>
+  res.sendFile(path.join(__dirname, '../public/mantenedores/dealernet/index.html')));
 app.get(['/mantenedores/parametros', '/mantenedores/parametros/'], (req, res) =>
   res.sendFile(path.join(__dirname, '../public/mantenedores/parametros/index.html')));
 app.get(['/mantenedores/cobranza-parametros', '/mantenedores/cobranza-parametros/'], (req, res) =>
