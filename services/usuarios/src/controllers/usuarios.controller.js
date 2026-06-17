@@ -3,6 +3,8 @@ const bcrypt = require('bcryptjs');
 const { auditar } = require('../../../../shared/audit');
 const { tieneFunc } = require('../../../../shared/middleware/permisos');
 const { enviarCorreo } = require('../../../../shared/mailer');
+// Job en segundo plano: avisa por correo el vencimiento de clave (carga al boot)
+require('../jobs/aviso-vencimiento-clave');
 
 // URL base para los enlaces de los correos (configurable por env, fallback a producción)
 const APP_URL = (process.env.APP_URL || 'https://credit-system-45em.onrender.com').replace(/\/+$/, '');
@@ -64,6 +66,11 @@ const correoClave = (nombre, email, clave, esReset = false) => {
   try {
     await pool.query(`ALTER TABLE usuarios ADD COLUMN debe_cambiar_clave TINYINT(1) NOT NULL DEFAULT 0`);
   } catch (e) { if (e.errno !== 1060) console.error('[usuarios migration debe_cambiar_clave]', e.message); }
+  try {
+    // Fecha del último cambio de clave (para calcular el vencimiento). Backfill a la creación.
+    await pool.query(`ALTER TABLE usuarios ADD COLUMN password_updated_at DATETIME NULL DEFAULT NULL`);
+    await pool.query(`UPDATE usuarios SET password_updated_at = COALESCE(fecha_creacion, NOW()) WHERE password_updated_at IS NULL`);
+  } catch (e) { if (e.errno !== 1060) console.error('[usuarios migration password_updated_at]', e.message); }
 })();
 
 // Tabla de permisos individuales por usuario (excepciones al perfil base)
@@ -212,7 +219,7 @@ const createUsuario = async (req, res) => {
     const claveTemporal = generarClaveTemporal();
     const passwordHash = await bcrypt.hash(claveTemporal, 10);
     const [result] = await pool.query(
-      'INSERT INTO usuarios (rut, nombre, apellido, apellido_materno, centro_costo, email, password_hash, id_perfil, id_supervisor, telefono, debe_cambiar_clave) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1)',
+      'INSERT INTO usuarios (rut, nombre, apellido, apellido_materno, centro_costo, email, password_hash, id_perfil, id_supervisor, telefono, debe_cambiar_clave, password_updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1, NOW())',
       [rut, nombre, apellido, apellido_materno || null, centro_costo || null, email, passwordHash, id_perfil, id_supervisor || null, telefono || null]
     );
 
@@ -296,7 +303,7 @@ const resetClave = async (req, res) => {
 
     const hash = await bcrypt.hash(nuevaClave, 10);
     // Forzar cambio en el próximo ingreso (igual que en el alta)
-    await pool.query('UPDATE usuarios SET password_hash = ?, debe_cambiar_clave = 1 WHERE id_usuario = ?', [hash, id]);
+    await pool.query('UPDATE usuarios SET password_hash = ?, debe_cambiar_clave = 1, password_updated_at = NOW() WHERE id_usuario = ?', [hash, id]);
 
     auditar({ req, accion: 'EDITAR', modulo: 'usuarios', entidad: 'usuario', entidad_id: id, detalle: `Reseteó la contraseña del usuario #${id}` });
 

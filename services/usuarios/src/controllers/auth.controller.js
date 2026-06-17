@@ -31,6 +31,19 @@ const login = async (req, res) => {
       return res.status(401).json({ success: false, data: null, error: 'Credenciales inválidas' });
     }
 
+    // Vencimiento de clave: si la política exige cambio cada N días y ya venció, forzar cambio.
+    let debeForzar = usuario.debe_cambiar_clave === 1;
+    try {
+      if (!debeForzar && usuario.password_updated_at) {
+        const [[cfg]] = await pool.query("SELECT valor FROM config_seguridad WHERE clave = 'dias_venc_clave'");
+        const diasVenc = parseInt(cfg && cfg.valor) || 0;
+        if (diasVenc > 0) {
+          const diasDesde = Math.floor((Date.now() - new Date(usuario.password_updated_at).getTime()) / 86400000);
+          if (diasDesde >= diasVenc) debeForzar = true;
+        }
+      }
+    } catch (_) { /* si falla la consulta de política, no se fuerza */ }
+
     await pool.query('UPDATE usuarios SET ultimo_acceso = NOW() WHERE id_usuario = ?', [usuario.id_usuario]);
     // Registrar sesión para el informe de desempeño (no bloqueante)
     try { require('../../../desempeno/src/controllers/desempeno.controller').registrarLogin(usuario); } catch (e) {}
@@ -60,7 +73,8 @@ const login = async (req, res) => {
           perfil: usuario.perfil_nombre
         },
         // El frontend del login obliga a cambiar la clave antes de entrar
-        debe_cambiar_clave: usuario.debe_cambiar_clave === 1
+        // (primer ingreso, reset, o clave vencida según la política)
+        debe_cambiar_clave: debeForzar
       },
       error: null
     });
@@ -88,8 +102,8 @@ const cambiarClave = async (req, res) => {
     }
 
     const hash = await bcrypt.hash(password_nuevo, 10);
-    // Al cambiar la clave se limpia la marca de "primer ingreso"
-    await pool.query('UPDATE usuarios SET password_hash = ?, debe_cambiar_clave = 0 WHERE id_usuario = ?', [hash, id_usuario]);
+    // Al cambiar la clave se limpia la marca de "primer ingreso" y se reinicia el reloj de vencimiento
+    await pool.query('UPDATE usuarios SET password_hash = ?, debe_cambiar_clave = 0, password_updated_at = NOW() WHERE id_usuario = ?', [hash, id_usuario]);
 
     res.json({ success: true, data: { mensaje: 'Contraseña actualizada correctamente' }, error: null });
   } catch (error) {
