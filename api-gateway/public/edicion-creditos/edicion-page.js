@@ -283,6 +283,11 @@ function markMod(el) {
   window._MODS[rowId][td.dataset.col] = el.value;
   const btn = document.getElementById('save-' + rowId);
   if (btn) btn.classList.add('show');
+  // Auto-guardar la fila poco después del cambio: cambiar un valor lo graba solo
+  // (el botón de guardar queda como respaldo, pero ya no hay que buscarlo).
+  window._autoSaveT = window._autoSaveT || {};
+  clearTimeout(window._autoSaveT[rowId]);
+  window._autoSaveT[rowId] = setTimeout(() => guardarFila(rowId), 700);
 }
 
 async function guardarFila(rowId) {

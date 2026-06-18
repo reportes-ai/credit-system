@@ -190,7 +190,12 @@ const updateCredito = async (req, res) => {
     const [[cred]] = await pool.query('SELECT id, num_op, mes FROM creditos WHERE id = ?', [id]);
     if (!cred) return res.status(404).json({ success: false, data: null, error: 'Crédito no encontrado' });
 
-    const mes = cred.mes ? String(cred.mes).slice(0, 7) : null;
+    // mes a 'YYYY-MM' (cred.mes llega como Date a medianoche UTC; usar getUTC* para no correrlo de mes)
+    const mes = cred.mes
+      ? (cred.mes instanceof Date
+          ? cred.mes.getUTCFullYear() + '-' + String(cred.mes.getUTCMonth() + 1).padStart(2, '0')
+          : String(cred.mes).slice(0, 7))
+      : null;
     if (mes && await isMesCerrado(mes))
       return res.status(403).json({ success: false, data: null, error: `Mes ${mes} cerrado — no se permiten modificaciones` });
 
