@@ -274,7 +274,7 @@
   <div class="topnav-left">
     <a href="/" class="topnav-brand">
       <img src="/img/logo.png" alt="AutoFácil" style="display:block">
-      <span class="version-badge" id="versionBadge">v4.19</span>
+      <span class="version-badge" id="versionBadge">v4.20</span>
     </a>
       <div class="breadcrumb-nav">
         <a href="/">Inicio</a><span class="sep">›</span>
@@ -1537,6 +1537,9 @@ async function guardar(tipo) {
       // Recargar datos antes de ocultar el formulario
       const rutBuscar = body.rut || clienteActual.rut;
       await recargarCliente(rutBuscar);
+      // También grabar la Información Comercial desde el informe DealerNet (Comportamiento 16),
+      // sin tener que entrar a esa página. Se ejecuta antes de redirigir a Crédito.
+      await _guardarInfoComercialDesdeDealernet(rutBuscar);
       // El toast se muestra DESPUÉS de recargarCliente (que llama hideAll)
       showToast(msg);
       // Si llegamos desde otra página con ?return=, redirigir automáticamente con el RUT
@@ -2211,6 +2214,58 @@ function _dwLlenarPersonal(prd){
   ['pApPaterno','pApMaterno','pNombres','pFechaNac','pSexo','pNacionalidad','pCorreo','pDireccion','pTelefono'].forEach(id=>{ const el=document.getElementById(id); if(el&&el.value){ el.style.transition='background .4s'; el.style.background='#d1fae5'; setTimeout(()=>el.style.background='',1800);} });
 }
 document.getElementById('dlntPopupOverlay').addEventListener('click', function(e){ if(e.target===this) cerrarPopupDlnt(); });
+
+/* ── Guardar Información Comercial desde el informe DealerNet (Comportamiento 16) ──
+   Permite grabar la deuda vigente JUNTO con los datos personales, sin entrar a la
+   página de Información Comercial. Mismo mapeo que esa página (M$ → pesos). Solo
+   aplica si el cliente aún no tiene info comercial con datos (no sobrescribe carga
+   manual) y si existe un informe código 16 en la biblioteca DealerNet. ── */
+function _icGp(o,...ks){ for(const k of ks){ if(o==null) return undefined; o=o[k]; } return o; }
+function _icArr(x){ return x==null?[]:(Array.isArray(x)?x:[x]); }
+function _extraerDeudaIC(prd){
+  const cab = _icGp(prd,'r1603','r16031') || {};
+  const per = _icArr(_icGp(prd,'r1603','r16032'))[0]; // primer periodo = más reciente
+  if(!per && cab['@_anomes']==null) return null;
+  const p = per || {};
+  const n = v => { const x=Number(v); return isNaN(x)?0:x*1000; }; // M$ → pesos
+  return {
+    deuda_vigente_total: n(p['@_deuda_direc_vig']),
+    deuda_vigente_inst:  (Number(p['@_nro_acree_cred_consumo'])||0)+(Number(p['@_nro_inst_cred_com'])||0),
+    deuda_hipotecaria:   n(p['@_deuda_cred_hipoteca']),
+    deuda_comercial:     n(p['@_deuda_comercial']),
+    deuda_comercial_inst:Number(p['@_nro_inst_cred_com'])||0,
+    deuda_consumo:       n(p['@_deuda_cred_consumo']),
+    deuda_consumo_inst:  Number(p['@_nro_acree_cred_consumo'])||0,
+    deuda_morosa:        n(p['@_deuda_morosa']),
+    deuda_vencida:       n(p['@_deuda_venci_direc']),
+    deuda_castigada:     n(p['@_deuda_cast_directa']),
+    linea_disponible:    n(p['@_linea_cred_disponible']),
+  };
+}
+async function _guardarInfoComercialDesdeDealernet(rut){
+  try {
+    if(!rut) return;
+    rut = String(rut).replace(/\./g,'').toUpperCase().trim();
+    // No sobrescribir info comercial que ya tenga datos (cargados manualmente o antes)
+    const ex = await (await fetch('/api/informacion-comercial/'+encodeURIComponent(rut), { headers: apiHeaders() })).json();
+    if(ex.success && ex.data && (ex.data.deuda_vigente_total||ex.data.deuda_consumo||ex.data.deuda_comercial||ex.data.deuda_morosa||ex.data.deuda_hipotecaria)) return;
+    // Buscar el informe Comportamiento (16) más reciente en la biblioteca DealerNet
+    const list = await (await fetch('/api/dealernet/informes?rut='+encodeURIComponent(rut), { headers: apiHeaders() })).json();
+    if(!list.success || !(list.data||[]).length) return;
+    const inf = (list.data||[]).find(x => String(x.codigo_producto)==='16');
+    if(!inf) return;
+    const jc = await (await fetch('/api/dealernet/informes/'+inf.id, { headers: apiHeaders() })).json();
+    if(!jc.success) return;
+    let cont = jc.data.contenido; if(typeof cont==='string'){ try{cont=JSON.parse(cont);}catch(_){ } }
+    const d = _extraerDeudaIC(cont);
+    if(!d) return;
+    const r = await fetch('/api/informacion-comercial/'+encodeURIComponent(rut), {
+      method:'PUT', headers: apiHeaders(), body: JSON.stringify(d)
+    });
+    const jr = await r.json();
+    if(jr.success && typeof showToast==='function') showToast('Información comercial guardada desde DealerNet ✓');
+  } catch(e){ console.warn('[info-comercial auto]', e.message); }
+}
 </script>
 </body>
 </html>
