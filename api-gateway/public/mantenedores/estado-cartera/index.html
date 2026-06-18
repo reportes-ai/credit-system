@@ -1,0 +1,301 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Estado Cartera — AutoFácil</title>
+  <!-- v1.0 -->
+  <link href="/css/bootstrap.min.css" rel="stylesheet">
+  <link href="/css/bootstrap-icons.css" rel="stylesheet">
+  <style>
+    :root { --navy:#012d70; --blue:#0141A2; }
+    body { background:#f0f4f8; font-family:'Segoe UI',system-ui,sans-serif; color:#1f2937; }
+    .wrap { max-width:1000px; margin:0 auto; padding:22px 16px 80px; }
+    .intro { background:linear-gradient(135deg,var(--navy),var(--blue)); color:#fff; border-radius:14px; padding:18px 22px; margin-bottom:20px; }
+    .intro h2 { font-size:1.1rem; font-weight:800; margin:0 0 4px; }
+    .intro p { margin:0; font-size:.85rem; opacity:.85; line-height:1.5; }
+    .card-af { background:#fff; border-radius:14px; box-shadow:0 1px 4px rgba(0,0,0,.06); padding:18px 20px; margin-bottom:18px; }
+    .card-af h3 { font-size:.95rem; font-weight:800; color:var(--navy); margin:0 0 4px; display:flex; align-items:center; gap:8px; }
+    .card-af .sub { font-size:.78rem; color:#64748b; margin:0 0 14px; }
+    .estado-row { display:flex; align-items:center; gap:12px; padding:12px 0; border-bottom:1px solid #f1f5f9; flex-wrap:wrap; }
+    .estado-row:last-child { border-bottom:none; }
+    .swatch { width:14px; height:14px; border-radius:4px; flex:0 0 auto; }
+    .est-nombre { font-weight:700; font-size:.9rem; }
+    .est-cod { font-size:.7rem; color:#94a3b8; font-family:monospace; }
+    .badge-af { font-size:.64rem; font-weight:700; border-radius:6px; padding:2px 7px; text-transform:uppercase; letter-spacing:.3px; }
+    .b-ini { background:#dcfce7; color:#15803d; }
+    .b-fin { background:#ede9fe; color:#6d28d9; }
+    .b-auto { background:#dbeafe; color:#1d4ed8; }
+    .est-actions { margin-left:auto; display:flex; gap:6px; }
+    .btn-mini { border:1px solid #d1d5db; background:#f8fafc; color:#374151; border-radius:7px; padding:4px 10px; font-size:.76rem; cursor:pointer; }
+    .btn-mini:hover { background:#eef2f7; }
+    .btn-mini.danger { color:#b91c1c; border-color:#fecaca; background:#fef2f2; }
+    .trans-box { width:100%; padding-left:26px; }
+    .trans-chip { display:inline-flex; align-items:center; gap:5px; font-size:.72rem; border:1.5px solid #e2e8f0; border-radius:20px; padding:3px 10px; margin:3px 4px 0 0; cursor:pointer; color:#475569; user-select:none; }
+    .trans-chip.on { background:#0141A2; border-color:#0141A2; color:#fff; }
+    .um-grid { display:grid; grid-template-columns:repeat(3,1fr); gap:14px; }
+    .um-grid label { font-size:.76rem; font-weight:700; color:#374151; display:block; margin-bottom:5px; }
+    .um-grid input { width:100%; padding:8px 10px; border:1.5px solid #d1d5db; border-radius:8px; font-size:.9rem; }
+    .um-hint { font-size:.72rem; color:#64748b; margin-top:4px; }
+    .btn-primary-af { background:var(--blue); color:#fff; border:none; border-radius:8px; padding:8px 18px; font-size:.85rem; font-weight:600; cursor:pointer; }
+    .btn-primary-af:hover { background:#0255c5; }
+    .btn-ghost-af { background:#f0f4f8; color:var(--navy); border:1px solid #d1d5db; border-radius:8px; padding:8px 16px; font-size:.85rem; font-weight:600; cursor:pointer; }
+    .afecta { background:#f8fafc; border-left:4px solid var(--blue); border-radius:8px; padding:14px 18px; margin-top:6px; }
+    .afecta h4 { font-size:.85rem; font-weight:800; color:var(--navy); margin:0 0 8px; display:flex; align-items:center; gap:7px; }
+    .afecta ul { margin:0; padding-left:18px; font-size:.8rem; color:#475569; line-height:1.7; }
+    dialog { border:none; border-radius:14px; padding:0; box-shadow:0 20px 60px rgba(0,0,0,.25); max-width:440px; width:92%; }
+    dialog::backdrop { background:rgba(0,0,0,.45); }
+    .dlg-head { background:linear-gradient(135deg,var(--navy),var(--blue)); color:#fff; padding:16px 20px; font-weight:700; }
+    .dlg-body { padding:18px 20px; }
+    .dlg-body label { font-size:.78rem; font-weight:700; color:#374151; display:block; margin:10px 0 5px; }
+    .dlg-body input[type=text], .dlg-body input[type=number] { width:100%; padding:8px 10px; border:1.5px solid #d1d5db; border-radius:8px; font-size:.9rem; }
+    .dlg-body .chk { display:flex; gap:16px; margin-top:10px; flex-wrap:wrap; }
+    .dlg-body .chk label { display:flex; align-items:center; gap:6px; font-weight:600; margin:0; }
+    .dlg-foot { padding:14px 20px; display:flex; justify-content:flex-end; gap:10px; border-top:1px solid #f1f5f9; }
+    .toast-af { position:fixed; bottom:20px; left:50%; transform:translateX(-50%); background:#0f172a; color:#fff; padding:11px 20px; border-radius:10px; font-size:.85rem; opacity:0; transition:.3s; z-index:9999; }
+    .toast-af.show { opacity:1; }
+  </style>
+</head>
+<body>
+
+<!-- Barra superior única (componente) -->
+<div id="af-topnav"></div>
+<script>
+  window.AF_TOPNAV = {
+    breadcrumb: [
+      { label:'Inicio', href:'/' },
+      { label:'Mantenedores', href:'/mantenedores' },
+      { label:'Estado Cartera', icon:'bi-wallet2', current:true }
+    ]
+  };
+</script>
+
+<div class="wrap">
+  <div class="intro">
+    <h2><i class="bi bi-wallet2 me-1"></i>Estado Cartera</h2>
+    <p>Ciclo de vida del crédito de <b>recursos propios</b> que AutoFácil administra. Es la segunda dimensión, distinta de la <b>Etapa</b> (originación). Arranca en <b>VIGENTE</b> cuando la Etapa llega a <b>OTORGADO</b>. Vigente/Mora/Vencido los calcula el motor por días de atraso; Terminado/Prepagado/Castigado son cierres.</p>
+  </div>
+
+  <!-- Umbrales -->
+  <div class="card-af">
+    <h3><i class="bi bi-sliders"></i>Umbrales de atraso (días)</h3>
+    <p class="sub">Definen cuándo un crédito pasa de Vigente → Mora → Vencido, y desde qué día se <b>sugiere</b> castigarlo (el castigo es siempre manual y discrecional).</p>
+    <div class="um-grid">
+      <div>
+        <label>En Mora desde (días ≥)</label>
+        <input type="number" id="umMora" min="0" step="1">
+        <div class="um-hint">Atraso de la cuota impaga más antigua.</div>
+      </div>
+      <div>
+        <label>Vencido desde (días ≥)</label>
+        <input type="number" id="umVencido" min="0" step="1">
+        <div class="um-hint">Cartera vencida (típicamente 91 = más de 90).</div>
+      </div>
+      <div>
+        <label>Castigo sugerido (días ≥)</label>
+        <input type="number" id="umCastigo" min="0" step="1">
+        <div class="um-hint">Solo alerta; el castigo lo marca una persona.</div>
+      </div>
+    </div>
+    <div style="margin-top:14px;display:flex;justify-content:flex-end">
+      <button class="btn-primary-af" onclick="guardarUmbrales()"><i class="bi bi-save me-1"></i>Guardar umbrales</button>
+    </div>
+  </div>
+
+  <!-- Estados -->
+  <div class="card-af">
+    <h3><i class="bi bi-diagram-3-fill"></i>Estados y transiciones</h3>
+    <p class="sub">Cada estado, su color y sus reglas. En <b>Transiciones</b> marca a qué estados puede pasar (los chips encendidos son los destinos permitidos).</p>
+    <div id="estadosBox"><div class="sub">Cargando…</div></div>
+    <div style="margin-top:14px;display:flex;justify-content:flex-end">
+      <button class="btn-primary-af" onclick="abrirNuevo()"><i class="bi bi-plus-lg me-1"></i>Nuevo estado</button>
+    </div>
+  </div>
+
+  <!-- Footer Qué afecta -->
+  <div class="afecta">
+    <h4><i class="bi bi-diagram-3"></i>Qué afecta este mantenedor</h4>
+    <ul>
+      <li><b>Estados y colores</b> → el <b>Estado de Cartera</b> que se muestra en la ficha del crédito (<a href="/creditos/revisar">Revisar Crédito</a>) y en los listados de cartera propia.</li>
+      <li><b>Umbrales (mora / vencido / castigo)</b> → el motor que clasifica cada crédito por días de atraso, usando el calendario de <a href="/creditos/pagar-cuotas">Pagar Cuotas</a> (misma fuente que mora y gastos de cobranza).</li>
+      <li><b>Transiciones</b> → los pasos permitidos del ciclo (Vigente↔Mora↔Vencido, y cierres Prepagado/Terminado/Castigado). Hoy solo configura/dibuja; el enforcement se activará cuando se valide.</li>
+      <li><b>Castigado</b> → marca manual de incobrable (write-off); se sugiere desde el umbral pero no es automático.</li>
+    </ul>
+  </div>
+</div>
+
+<!-- Modal crear/editar estado -->
+<dialog id="dlgEstado">
+  <div class="dlg-head" id="dlgTit">Nuevo estado</div>
+  <div class="dlg-body">
+    <label>Código</label>
+    <input type="text" id="fCodigo" placeholder="EJ: REPACTADO" maxlength="40">
+    <label>Nombre</label>
+    <input type="text" id="fNombre" placeholder="Ej: Repactado" maxlength="80">
+    <div style="display:flex;gap:14px;margin-top:4px">
+      <div style="flex:0 0 90px">
+        <label>Color</label>
+        <input type="color" id="fColor" value="#64748b" style="width:100%;height:38px;border:1px solid #d1d5db;border-radius:8px;background:#fff">
+      </div>
+      <div style="flex:1">
+        <label>Orden</label>
+        <input type="number" id="fOrden" value="0" step="10">
+      </div>
+    </div>
+    <div class="chk">
+      <label><input type="checkbox" id="fInicial"> Inicial</label>
+      <label><input type="checkbox" id="fFinal"> Final (cierre)</label>
+      <label><input type="checkbox" id="fAuto"> Automático (por atraso)</label>
+    </div>
+  </div>
+  <div class="dlg-foot">
+    <button class="btn-ghost-af" onclick="document.getElementById('dlgEstado').close()">Cancelar</button>
+    <button class="btn-primary-af" onclick="guardarEstado()"><i class="bi bi-save me-1"></i>Guardar</button>
+  </div>
+</dialog>
+
+<div class="toast-af" id="toast"></div>
+
+<script src="/js/auth-guard.js"></script>
+<script>
+const token = sessionStorage.getItem('token');
+if (!token) location.href = '/login.html';
+const H = { 'Content-Type':'application/json', Authorization:'Bearer '+token };
+let _estados = [], _editCod = null;
+
+const esc = s => String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+function toast(msg, ok=true){ const t=document.getElementById('toast'); t.textContent=msg; t.style.background=ok?'#0f172a':'#b91c1c'; t.classList.add('show'); setTimeout(()=>t.classList.remove('show'),2600); }
+
+async function cargar(){
+  try {
+    const r = await fetch('/api/estado-cartera', { headers:H });
+    const j = await r.json();
+    if (!j.success) return toast(j.error||'Error', false);
+    _estados = j.data.estados || [];
+    const p = j.data.parametros || {};
+    document.getElementById('umMora').value    = p.mora_desde ?? 1;
+    document.getElementById('umVencido').value = p.vencido_desde ?? 91;
+    document.getElementById('umCastigo').value = p.castigo_sugerido ?? 181;
+    render();
+  } catch(_){ toast('Error de conexión', false); }
+}
+
+function render(){
+  const box = document.getElementById('estadosBox');
+  if (!_estados.length){ box.innerHTML = '<div class="sub">Sin estados.</div>'; return; }
+  box.innerHTML = _estados.map(e => {
+    const badges = [
+      e.es_inicial ? '<span class="badge-af b-ini">Inicial</span>' : '',
+      e.es_final   ? '<span class="badge-af b-fin">Final</span>'   : '',
+      e.automatico ? '<span class="badge-af b-auto">Automático</span>' : ''
+    ].join(' ');
+    const chips = _estados.filter(d => d.codigo !== e.codigo).map(d => {
+      const on = (e.destinos||[]).includes(d.codigo);
+      return `<span class="trans-chip ${on?'on':''}" onclick="toggleTrans('${e.codigo}','${d.codigo}')">`+
+             `${on?'<i class=\"bi bi-check\"></i>':''}${esc(d.nombre)}</span>`;
+    }).join('');
+    return `<div class="estado-row">
+      <span class="swatch" style="background:${esc(e.color)}"></span>
+      <div><div class="est-nombre">${esc(e.nombre)}</div><div class="est-cod">${esc(e.codigo)}</div></div>
+      ${badges}
+      <div class="est-actions">
+        <button class="btn-mini" onclick="abrirEditar('${e.codigo}')"><i class="bi bi-pencil"></i> Editar</button>
+        <button class="btn-mini danger" onclick="eliminar('${e.codigo}')"><i class="bi bi-trash"></i></button>
+      </div>
+      <div class="trans-box"><span style="font-size:.7rem;color:#94a3b8;text-transform:uppercase;letter-spacing:.4px">Puede pasar a:</span><br>${chips || '<span class="sub">—</span>'}</div>
+    </div>`;
+  }).join('');
+}
+
+async function toggleTrans(origen, destino){
+  const e = _estados.find(x => x.codigo === origen); if (!e) return;
+  const set = new Set(e.destinos||[]);
+  set.has(destino) ? set.delete(destino) : set.add(destino);
+  const destinos = [...set];
+  try {
+    const r = await fetch('/api/estado-cartera/'+encodeURIComponent(origen)+'/transiciones', { method:'PUT', headers:H, body:JSON.stringify({ destinos }) });
+    const j = await r.json();
+    if (!j.success) return toast(j.error||'Error', false);
+    e.destinos = destinos; render();
+  } catch(_){ toast('Error de conexión', false); }
+}
+
+function abrirNuevo(){
+  _editCod = null;
+  document.getElementById('dlgTit').textContent = 'Nuevo estado';
+  document.getElementById('fCodigo').value = ''; document.getElementById('fCodigo').disabled = false;
+  document.getElementById('fNombre').value = '';
+  document.getElementById('fColor').value = '#64748b';
+  document.getElementById('fOrden').value = (_estados.length+1)*10;
+  document.getElementById('fInicial').checked = false;
+  document.getElementById('fFinal').checked = false;
+  document.getElementById('fAuto').checked = false;
+  document.getElementById('dlgEstado').showModal();
+}
+function abrirEditar(cod){
+  const e = _estados.find(x => x.codigo === cod); if (!e) return;
+  _editCod = cod;
+  document.getElementById('dlgTit').textContent = 'Editar ' + e.codigo;
+  document.getElementById('fCodigo').value = e.codigo; document.getElementById('fCodigo').disabled = true;
+  document.getElementById('fNombre').value = e.nombre;
+  document.getElementById('fColor').value = /^#[0-9a-fA-F]{6}$/.test(e.color)?e.color:'#64748b';
+  document.getElementById('fOrden').value = e.orden;
+  document.getElementById('fInicial').checked = !!e.es_inicial;
+  document.getElementById('fFinal').checked = !!e.es_final;
+  document.getElementById('fAuto').checked = !!e.automatico;
+  document.getElementById('dlgEstado').showModal();
+}
+
+async function guardarEstado(){
+  const body = {
+    codigo:  document.getElementById('fCodigo').value,
+    nombre:  document.getElementById('fNombre').value,
+    color:   document.getElementById('fColor').value,
+    orden:   parseInt(document.getElementById('fOrden').value,10)||0,
+    es_inicial: document.getElementById('fInicial').checked,
+    es_final:   document.getElementById('fFinal').checked,
+    automatico: document.getElementById('fAuto').checked,
+  };
+  if (!body.nombre.trim()) return toast('El nombre es obligatorio', false);
+  const editing = !!_editCod;
+  const url = editing ? '/api/estado-cartera/'+encodeURIComponent(_editCod) : '/api/estado-cartera';
+  try {
+    const r = await fetch(url, { method: editing?'PUT':'POST', headers:H, body:JSON.stringify(body) });
+    const j = await r.json();
+    if (!j.success) return toast(j.error||'Error', false);
+    document.getElementById('dlgEstado').close();
+    toast(editing?'Estado actualizado':'Estado creado');
+    cargar();
+  } catch(_){ toast('Error de conexión', false); }
+}
+
+async function eliminar(cod){
+  if (!confirm('¿Eliminar el estado '+cod+'? También se quitan sus transiciones.')) return;
+  try {
+    const r = await fetch('/api/estado-cartera/'+encodeURIComponent(cod), { method:'DELETE', headers:H });
+    const j = await r.json();
+    if (!j.success) return toast(j.error||'Error', false);
+    toast('Estado eliminado'); cargar();
+  } catch(_){ toast('Error de conexión', false); }
+}
+
+async function guardarUmbrales(){
+  const body = {
+    mora_desde:       parseInt(document.getElementById('umMora').value,10),
+    vencido_desde:    parseInt(document.getElementById('umVencido').value,10),
+    castigo_sugerido: parseInt(document.getElementById('umCastigo').value,10),
+  };
+  try {
+    const r = await fetch('/api/estado-cartera/parametros', { method:'PUT', headers:H, body:JSON.stringify(body) });
+    const j = await r.json();
+    if (!j.success) return toast(j.error||'Error', false);
+    toast('Umbrales guardados');
+  } catch(_){ toast('Error de conexión', false); }
+}
+
+cargar();
+</script>
+<script src="/js/topnav.js"></script>
+<script src="/js/app-version.js"></script>
+</body>
+</html>
