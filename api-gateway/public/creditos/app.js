@@ -649,7 +649,7 @@ async function guardarEstadoDetalle() {
 /* ═══════════════════════════════════════════════════════════════════
    INGRESO DE CRÉDITOS
 ═══════════════════════════════════════════════════════════════════ */
-async function buscarClienteCred() {
+async function buscarClienteCred(fromReturn = false) {
   const rut = document.getElementById('iRut').value.trim().toUpperCase();
   if (!rut) return;
   const v = validarRUT(rut);
@@ -703,9 +703,17 @@ async function buscarClienteCred() {
         <div class="rut-found-fechas">${fechasHtml}</div>
       </div>`;
       msg.style.display = 'block';
-    } else {
+    } else if (fromReturn) {
+      // Volvimos de crear el cliente y aún no aparece → permitir ingreso manual (evita bucle de redirección)
       msg.innerHTML = `<div style="color:#ef4444;font-size:.82rem"><i class="bi bi-exclamation-circle me-1"></i>Cliente no encontrado. Ingresa el nombre manualmente.</div>`;
       msg.style.display = 'block';
+    } else {
+      // Igual que en Cartas de Aprobación: abrir el formulario de creación de cliente y volver con el RUT
+      const rutEnc = encodeURIComponent(rut);
+      msg.innerHTML = `<div style="color:#c2410c;font-size:.82rem"><i class="bi bi-exclamation-triangle-fill me-1"></i>Cliente no encontrado — se abrirá el formulario de creación…</div>`;
+      msg.style.display = 'block';
+      setTimeout(() => { window.location.href = '/clientes/?rutPre=' + rutEnc + '&return=/creditos'; }, 1500);
+      return;
     }
     // Habilitar botón cotizaciones
     const btnCotiz = document.getElementById('btnVerCotiz');
@@ -1682,7 +1690,7 @@ cargarEjecutivosCred();
   if (!rut) return;
   cambiarTab('ingreso');
   const el = document.getElementById('iRut');
-  if (el) { el.value = rut; buscarClienteCred(); }
+  if (el) { el.value = rut; onRutInputCred(el); buscarClienteCred(true); }
 })();
 document.addEventListener('keydown', e => {
   if (e.key==='Escape') { cerrarDetalle(); cerrarCotizaciones(); cerrarAmort(); }
