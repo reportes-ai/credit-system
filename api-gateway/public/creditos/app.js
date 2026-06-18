@@ -1277,10 +1277,54 @@ function cerrarCotizaciones() {
   document.getElementById('cotOverlay').classList.remove('open');
 }
 
+/* ── Campos obligatorios del Ingreso de Créditos ──────────────────────────────
+   Principales de captura (Cliente, Vehículo, Financiamiento). Quedan fuera los
+   calculados/automáticos (Saldo, Tasación, Permiso, Gastos, Cuota, Monto Fin.),
+   las comisiones y Observaciones. */
+const REQUERIDOS_CRED = [
+  ['iRut','RUT Cliente'], ['iNombreCliente','Nombre Cliente'], ['iEjecutivo','Ejecutivo'],
+  ['iTipoVehiculo','Tipo Vehículo'], ['iMarca','Marca'], ['iModelo','Modelo'], ['iAnio','Año'],
+  ['iPatente','Patente'],
+  ['iValorVehiculo','Valor Vehículo','money'], ['iPie','Pie','money'],
+  ['iPlazo','Plazo'], ['iTasa','Tasa'],
+  ['iFechaOtorg','Fecha Otorgamiento'], ['iFechaPrimeraCuota','Fecha 1ª Cuota'],
+];
+function _marcarRequeridosCred(){
+  const marca = id => {
+    const el = document.getElementById(id); if(!el) return;
+    const cont = el.closest('[class*="col-"]') || el.parentElement;
+    const lab = cont && cont.querySelector('label.form-label');
+    if(lab && !lab.querySelector('.req-star')) lab.insertAdjacentHTML('beforeend',' <span class="req-star" style="color:#dc2626">*</span>');
+  };
+  REQUERIDOS_CRED.forEach(([id]) => marca(id));
+  marca('iDealerBuscar'); // Dealer
+}
+function _validarRequeridosCred(){
+  const faltan = [];
+  const flag = (el,ok) => { if(el) el.style.borderColor = ok ? '' : '#dc2626'; };
+  for(const [id,label,tipo] of REQUERIDOS_CRED){
+    const el = document.getElementById(id); if(!el) continue;
+    const v = (el.value||'').trim();
+    const ok = tipo==='money' ? (parseInt(v.replace(/[^0-9]/g,''))||0) > 0 : v !== '';
+    flag(el, ok); if(!ok) faltan.push(label);
+  }
+  // RUT: además, dígito verificador correcto
+  const rut = (document.getElementById('iRut').value||'').trim();
+  if(rut && validarRUT(rut)===false){ flag(document.getElementById('iRut'), false); faltan.push('RUT (dígito verificador)'); }
+  // Dealer: input de búsqueda u oculto
+  const dealer = (document.getElementById('iDealer').value || document.getElementById('iDealerBuscar').value || '').trim();
+  flag(document.getElementById('iDealerBuscar'), !!dealer); if(!dealer) faltan.push('Dealer');
+  return faltan;
+}
+
 async function guardarCredito() {
   const rut    = document.getElementById('iRut').value.trim().toUpperCase();
   const nombre = document.getElementById('iNombreCliente').value.trim();
-  if (!rut || !nombre) { showToast('RUT y nombre del cliente son obligatorios', false); return; }
+  const faltan = _validarRequeridosCred();
+  if (faltan.length) {
+    showToast('Faltan campos obligatorios: ' + faltan.slice(0,5).join(', ') + (faltan.length>5?'…':''), false);
+    return;
+  }
 
   const body = {
     rut_cliente:         rut,
@@ -1692,6 +1736,8 @@ cargarEjecutivosCred();
   const el = document.getElementById('iRut');
   if (el) { el.value = rut; onRutInputCred(el); buscarClienteCred(true); }
 })();
+// ── Marcar con * los campos obligatorios del Ingreso de Créditos ── //
+(function(){ try { _marcarRequeridosCred(); } catch(_){} })();
 document.addEventListener('keydown', e => {
   if (e.key==='Escape') { cerrarDetalle(); cerrarCotizaciones(); cerrarAmort(); }
 });
