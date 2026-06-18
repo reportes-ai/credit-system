@@ -1,6 +1,7 @@
 const pool  = require('../../../../shared/config/database');
 const audit = require('../../../../shared/auditoria');
 const { isMesCerrado, getMesDeOp } = require('../../../../shared/utils/mes-cerrado');
+const { marcarForzadosCalculo } = require('../utils/recalcular-mes');
 
 // ── Migración: agregar campos de gestión a creditos ──────────────
 (async () => {
@@ -248,6 +249,12 @@ const create = async (req, res) => {
       detalle: `Crédito N°${numero_credito} creado para ${nombre_cliente}`,
       meta: { numero_credito, cliente: nombre_cliente, rut: rut_cliente, financiera: fin, monto_financiado: monto_financiado || null },
     });
+
+    // Si se digitó una Comisión Dealer distinta a la calculada → forzado (negociación puntual)
+    if (comision_dealer != null && String(comision_dealer).trim() !== '') {
+      try { await marcarForzadosCalculo(r.insertId, { campos: ['comdea_real'] }); }
+      catch (e) { console.error('[forzados digitacion]', e.message); }
+    }
 
     res.status(201).json({ success: true, data: { id_credito: r.insertId, numero_credito }, error: null });
   } catch (e) {

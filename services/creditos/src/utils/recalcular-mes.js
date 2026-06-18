@@ -132,6 +132,79 @@ function getTierUAC(cnt, p) {
    meses   : array de strings 'YYYY-MM'
    opciones: { soloFinancieras: ['AUTOFIN','UNIDAD DE CREDITO'] }
    ═══════════════════════════════════════════════════════════════════════ */
+/* ── Cálculo por operación (Ing x Colocaciones, Comisión Dealer y Parque) ───
+   Misma fórmula que usa el recálculo, aislada para reusarla en la detección
+   de campos forzados. p=params, parqMap=parques, todasTasas. */
+async function calcularValoresOp(op, p, parqMap, todasTasas) {
+  const parqKey  = (op.parque || '').toUpperCase().trim();
+  const esParque = parqKey.includes('PARQUE');
+  const saldo    = parseFloat(op.saldo_precio)       || 0;
+  const montoFin = parseFloat(op.monto_financiado)   || 0;
+  const montoCap = parseFloat(op.monto_capitalizado) || montoFin;
+  const plazo    = parseInt(op.plazo)                || 0;
+
+  let monto_comision_fin = 0;
+  if (plazo > 0 && montoCap > 0) {
+    const tasa = getTasaByFecha(op.fecha_otorgado, todasTasas);
+    if (tasa) {
+      const uf         = await getUF(op.fecha_otorgado);
+      const limite_200 = uf ? (p.umbral_uf_tramo || 200) * uf : null;
+      const esMayor200 = limite_200 ? montoCap > limite_200 : false;
+      const tasa_cli   = (esMayor200 ? parseFloat(tasa.tasa_mensual_mayor) : parseFloat(tasa.tasa_mensual_menor)) / 100;
+      const spread_val = (esMayor200 ? parseFloat(tasa.spread_mayor) : parseFloat(tasa.spread_menor)) / 100;
+      const costo_fondo = tasa_cli - spread_val;
+      if (tasa_cli > 0 && costo_fondo > 0) {
+        const cuota = montoCap * tasa_cli * Math.pow(1 + tasa_cli, plazo) / (Math.pow(1 + tasa_cli, plazo) - 1);
+        const pv = cuota * (1 - Math.pow(1 + costo_fondo, -plazo)) / costo_fondo;
+        monto_comision_fin = Math.round(pv - montoCap);
+      }
+    }
+  }
+
+  let comdea_real = 0, com_parque = 0, arriendo = 0;
+  if (saldo > 0 && plazo > 0) {
+    if (esParque) {
+      const parqData = parqMap[parqKey];
+      const patioPct = parqData ? parseFloat(parqData.comision_pct) : (p.patio_pct / 100);
+      arriendo    = parqData ? parseFloat(parqData.arriendo) || 0 : 0;
+      comdea_real = Math.round(saldo * getDealerPct(plazo, p));
+      com_parque  = Math.round(saldo * patioPct);
+    } else {
+      comdea_real = Math.round(saldo * getDealerCallePct(plazo, p));
+    }
+  }
+  return { monto_comision_fin, comdea_real, com_parque, arriendo };
+}
+
+/* ── Detectar y marcar campos forzados ──────────────────────────────────────
+   Compara el valor GUARDADO de los campos calculados con el que daría la
+   fórmula; si difieren (más que la tolerancia), marca el campo como forzado
+   (negociación puntual). Si coinciden, lo desmarca. Solo evalúa `campos` (los
+   recién ingresados/editados). Úsese al guardar en edición, digitación o carta. */
+async function marcarForzadosCalculo(opIds, opts = {}) {
+  const ids = (Array.isArray(opIds) ? opIds : [opIds]).map(Number).filter(Boolean);
+  if (!ids.length) return;
+  const CAMPOS = ['monto_comision_fin', 'comdea_real', 'com_parque'];
+  const campos = (opts.campos || CAMPOS).filter(c => CAMPOS.includes(c));
+  if (!campos.length) return;
+  const tol = opts.tol != null ? opts.tol : 1; // $ de tolerancia por redondeo
+  const [p, parqMap, todasTasas] = await Promise.all([cargarParams(), cargarParques(), cargarTasas()]);
+  const [ops] = await pool.query(
+    `SELECT id, financiera, parque, saldo_precio, monto_financiado, monto_capitalizado, plazo, fecha_otorgado,
+            monto_comision_fin, comdea_real, com_parque, campos_forzados
+     FROM creditos WHERE id IN (?)`, [ids]);
+  for (const op of ops) {
+    const calc = await calcularValoresOp(op, p, parqMap, todasTasas);
+    const forz = forzadosSet(op.campos_forzados);
+    for (const campo of campos) {
+      const dif = Math.abs((parseFloat(op[campo]) || 0) - (parseFloat(calc[campo]) || 0)) > tol;
+      if (dif) forz.add(campo); else forz.delete(campo);
+    }
+    await pool.query('UPDATE creditos SET campos_forzados = ? WHERE id = ?',
+      [forz.size ? JSON.stringify([...forz]) : null, op.id]);
+  }
+}
+
 async function recalcularMeses(meses, opciones = {}) {
   if (!meses || !meses.length) return { actualizados: 0, log: [] };
 
@@ -185,67 +258,17 @@ async function recalcularMeses(meses, opciones = {}) {
 
     // ── Paso 3: recalcular cada op ───────────────────────────────────
     for (const op of ops) {
-      const fin       = (op.financiera || '').toUpperCase();
-      const parqKey   = (op.parque || '').toUpperCase().trim();
-      const esParque  = parqKey.includes('PARQUE');
-      const esUAC     = fin.includes('UNIDAD') || fin.includes('UAC');
-      const esAF      = fin.includes('AUTOFIN') || fin.includes('AUTOF');
+      // 1-3. Valores calculados por fórmula (Ing x Colocaciones, Comisión Dealer, Parque)
+      const calc = await calcularValoresOp(op, p, parqMap, todasTasas);
+      const monto_comision_fin = calc.monto_comision_fin;
+      const com_parque_val     = calc.com_parque;
+      const arriendo_val       = calc.arriendo;
+      const comdea_real        = calc.comdea_real;
 
-      const saldo    = parseFloat(op.saldo_precio)       || 0;
-      const montoFin = parseFloat(op.monto_financiado)   || 0;
-      const montoCap = parseFloat(op.monto_capitalizado) || montoFin;
-      const plazo    = parseInt(op.plazo)                || 0;
-
-      let monto_comision_fin = 0;
-
-      // 1. Ing x Colocaciones — fórmula PV spread con tasas históricas ──
-      if (plazo > 0 && montoCap > 0) {
-        const tasa = getTasaByFecha(op.fecha_otorgado, todasTasas);
-        if (tasa) {
-          const uf         = await getUF(op.fecha_otorgado);
-          const limite_200 = uf ? (p.umbral_uf_tramo || 200) * uf : null;
-          const esMayor200 = limite_200 ? montoCap > limite_200 : false;
-          const tasa_cli   = (esMayor200
-            ? parseFloat(tasa.tasa_mensual_mayor)
-            : parseFloat(tasa.tasa_mensual_menor)) / 100;
-          const spread_val = (esMayor200
-            ? parseFloat(tasa.spread_mayor)
-            : parseFloat(tasa.spread_menor)) / 100;
-          const costo_fondo = tasa_cli - spread_val;
-
-          if (tasa_cli > 0 && costo_fondo > 0) {
-            const cuota = montoCap * tasa_cli * Math.pow(1 + tasa_cli, plazo)
-                        / (Math.pow(1 + tasa_cli, plazo) - 1);
-            const pv = cuota * (1 - Math.pow(1 + costo_fondo, -plazo)) / costo_fondo;
-            monto_comision_fin = Math.round(pv - montoCap);
-          }
-        }
-      }
-
-      // 2. Comisiones de seguros — vienen del Excel (leídas desde BD) ──
-      // No se recalculan aquí. Se usan para ingreso_neto_total.
+      // Comisiones de seguros — vienen del Excel (leídas desde BD). No se recalculan.
       const com_rdh          = parseFloat(op.com_rdh)          || 0;
       const com_cesantia     = parseFloat(op.com_cesantia)     || 0;
       const com_reparaciones = parseFloat(op.com_reparaciones) || 0;
-
-      // 3. Comisión Dealer ────────────────────────────────────────────
-      let comdea_real    = 0;
-      let com_parque_val = 0;
-      let arriendo_val   = 0;
-
-      if (saldo > 0 && plazo > 0) {
-        if (esParque) {
-          const parqData = parqMap[parqKey];
-          const patioPct = parqData ? parseFloat(parqData.comision_pct) : (p.patio_pct / 100);
-          arriendo_val   = parqData ? parseFloat(parqData.arriendo) || 0 : 0;
-          comdea_real    = Math.round(saldo * getDealerPct(plazo, p));
-          com_parque_val = Math.round(saldo * patioPct);
-        } else {
-          comdea_real    = Math.round(saldo * getDealerCallePct(plazo, p));
-          com_parque_val = 0;
-          arriendo_val   = 0;
-        }
-      }
 
       // 4. Respetar campos forzados ───────────────────────────────────
       // Si un campo calculado fue digitado a mano (forzado), se conserva el
@@ -355,4 +378,4 @@ function extraerMeses(ops) {
   return [...set];
 }
 
-module.exports = { recalcularMeses, recalcularMesesAbiertos, extraerMeses, normalizarEjecutivosMes };
+module.exports = { recalcularMeses, recalcularMesesAbiertos, marcarForzadosCalculo, extraerMeses, normalizarEjecutivosMes };

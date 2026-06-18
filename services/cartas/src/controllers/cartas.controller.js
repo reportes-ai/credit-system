@@ -2,6 +2,7 @@
 const pool = require('../../../../shared/config/database');
 const { notificar } = require('../../../notificaciones/src/controllers/notificaciones.controller');
 const { auditar } = require('../../../../shared/audit');
+const { marcarForzadosCalculo } = require('../../../creditos/src/utils/recalcular-mes');
 const pdf = require('pdf-parse');
 
 /* Genera numero_credito igual que creditos.controller (YYMMXXX) */
@@ -63,6 +64,13 @@ async function crearCreditoDesdeCartas(c) {
     (c.ejecutivo_nombre || c.ejecutivoNombre || null),
     (c.part_bruto || c.partBruto || null),
   ]);
+  // La participación de la carta (part_bruto) es una negociación especial: si difiere
+  // del cálculo, comdea_real queda forzado (no se sobrescribe en el recálculo).
+  const partCarta = c.part_bruto ?? c.partBruto;
+  if (partCarta != null && String(partCarta).trim() !== '') {
+    try { await marcarForzadosCalculo(r.insertId, { campos: ['comdea_real'] }); }
+    catch (e) { console.error('[forzados carta]', e.message); }
+  }
   return { id: r.insertId, numero_credito };
 }
 
@@ -638,6 +646,11 @@ const cargaMasivaCartas = async (req, res) => {
              rutConc || null, r.vendedor || null, fechaISO, valida ? fechaISO.slice(0, 7) + '-01' : null,
              saldo, r.concesionario || null, ejec, comision]);
           idCredito = ci.insertId; creditosCreados++;
+          // Participación de la carta distinta al cálculo → comdea_real forzado
+          if (comision != null && String(comision).trim() !== '') {
+            try { await marcarForzadosCalculo(idCredito, { campos: ['comdea_real'] }); }
+            catch (e) { console.error('[forzados carta bulk]', e.message); }
+          }
         }
 
         await pool.query(

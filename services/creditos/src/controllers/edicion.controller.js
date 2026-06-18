@@ -1,6 +1,7 @@
 'use strict';
 const pool = require('../../../../shared/config/database');
 const { isMesCerrado } = require('../../../../shared/utils/mes-cerrado');
+const { marcarForzadosCalculo } = require('../utils/recalcular-mes');
 
 // Migración: tabla log de ediciones
 (async () => {
@@ -218,16 +219,8 @@ const updateCredito = async (req, res) => {
 
     if (!sets.length) return res.status(400).json({ success: false, data: null, error: 'Sin campos para actualizar' });
 
-    // Si se editó a mano un campo CALCULADO, marcarlo como forzado (negociación puntual).
+    // Campos calculados editados a mano: se evalúan luego contra la fórmula.
     const calcEditados = Object.keys(cambios).filter(c => CAMPOS_CALCULADOS.includes(c) && colsValidas.has(c));
-    if (calcEditados.length) {
-      let lista = [];
-      const raw = actual?.campos_forzados;
-      try { lista = Array.isArray(raw) ? raw : (raw ? JSON.parse(raw) : []); } catch (_) { lista = []; }
-      const merged = [...new Set([...lista, ...calcEditados])];
-      sets.push('campos_forzados = ?');
-      vals.push(JSON.stringify(merged));
-    }
 
     await pool.query(`UPDATE creditos SET ${sets.join(', ')}, updated_at = NOW() WHERE id = ?`, [...vals, id]);
 
@@ -236,6 +229,13 @@ const updateCredito = async (req, res) => {
         `INSERT INTO creditos_edicion_log (id_credito, num_op, usuario, campo, valor_antes, valor_despues) VALUES ?`,
         [logEntries]
       );
+    }
+
+    // Marcar/desmarcar forzado comparando el valor guardado contra el calculado:
+    // si el valor digitado difiere del que daría la fórmula → forzado (rojo).
+    if (calcEditados.length) {
+      try { await marcarForzadosCalculo(id, { campos: calcEditados }); }
+      catch (e) { console.error('[forzados edicion]', e.message); }
     }
 
     res.json({ success: true, data: { id, campos_actualizados: sets.length }, error: null });
