@@ -176,6 +176,14 @@ const create = async (req, res) => {
     const id_usuario = req.usuario?.id_usuario || null;
     const fin = financiera || 'AUTOFACIL';
 
+    // Numeración (ver regla de negocio): num_op = N° OP AutoFácil correlativo/único.
+    // id_financiera = N° de la financiera; en AutoFácil (sin financiera externa) repite el N° OP.
+    const numOpVal   = parseInt(numero_credito) || null;
+    const esBrokerage = ['AUTOFIN', 'UNIDAD DE CREDITO'].includes(String(fin).toUpperCase());
+    const idFinVal   = (id_financiera && String(id_financiera).trim())
+      ? String(id_financiera).trim()
+      : (esBrokerage ? null : (numOpVal != null ? String(numOpVal) : null));
+
     // Resolver id_cliente
     const rutNorm = rut_cliente.replace(/\./g, '').toUpperCase().trim();
     const [[cliRow]] = await pool.query('SELECT id_cliente FROM clientes WHERE rut = ?', [rutNorm]);
@@ -214,7 +222,7 @@ const create = async (req, res) => {
               ?,?,?,
               NOW(), NOW())
     `, [
-      parseInt(numero_credito) || null, numero_credito, fin,
+      numOpVal, numero_credito, fin,
       estado || 'INGRESO',
       id_cotizacion || null, id_usuario, id_cliente_resolved,
       fecha_otorgamiento || null, fecha_otorgamiento || null,
@@ -228,7 +236,7 @@ const create = async (req, res) => {
       dealer || null, id_dealer || null, tipo_ubicacion || null, nombre_parque || null,
       ejecutivo || null, observaciones || null,
       datos_json ? JSON.stringify(datos_json) : null,
-      id_financiera || null,
+      idFinVal,
       rut_dealer || null,
       vendedor || null,
       comision_dealer != null ? Math.round(parseFloat(comision_dealer)) : null,
