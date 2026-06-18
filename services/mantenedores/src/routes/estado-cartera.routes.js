@@ -6,6 +6,7 @@ const { requireFunc } = require('../../../../shared/middleware/permisos');
 const FUNC = 'mantenedores_estado_cartera';
 
 router.get('/',                     verifyToken, ctrl.getAll);
+router.post('/recalcular',          verifyToken, requireFunc(FUNC), ctrl.recalcular);
 router.put('/parametros',           verifyToken, requireFunc(FUNC), ctrl.setParametros);
 router.post('/',                    verifyToken, requireFunc(FUNC), ctrl.crear);
 router.put('/:codigo/transiciones', verifyToken, requireFunc(FUNC), ctrl.setTransiciones);

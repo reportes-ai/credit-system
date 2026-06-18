@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Estado Cartera — AutoFácil</title>
-  <!-- v1.0 -->
+  <!-- v1.1 -->
   <link href="/css/bootstrap.min.css" rel="stylesheet">
   <link href="/css/bootstrap-icons.css" rel="stylesheet">
   <style>
@@ -99,6 +99,16 @@
     </div>
     <div style="margin-top:14px;display:flex;justify-content:flex-end">
       <button class="btn-primary-af" onclick="guardarUmbrales()"><i class="bi bi-save me-1"></i>Guardar umbrales</button>
+    </div>
+  </div>
+
+  <!-- Motor -->
+  <div class="card-af">
+    <h3><i class="bi bi-cpu"></i>Motor de clasificación</h3>
+    <p class="sub">Recorre los créditos de <b>cartera propia</b>, calcula el día de atraso de la cuota impaga más antigua (mismo calendario que Pagar Cuotas) y asigna Vigente/Mora/Vencido. Detecta saldo 0 → Terminado/Prepagado. <b>Respeta los Castigados</b> (manuales) y <b>no toca</b> el resto del flujo. Corre cuando lo pidas (luego lo dejamos diario).</p>
+    <div style="display:flex;align-items:center;gap:14px;flex-wrap:wrap">
+      <button class="btn-primary-af" onclick="recalcular()" id="btnRecalc"><i class="bi bi-arrow-repeat me-1"></i>Recalcular ahora</button>
+      <div id="recalcRes" style="font-size:.82rem;color:#475569"></div>
     </div>
   </div>
 
@@ -277,6 +287,21 @@ async function eliminar(cod){
     if (!j.success) return toast(j.error||'Error', false);
     toast('Estado eliminado'); cargar();
   } catch(_){ toast('Error de conexión', false); }
+}
+
+async function recalcular(){
+  const btn = document.getElementById('btnRecalc'); const out = document.getElementById('recalcRes');
+  btn.disabled = true; btn.innerHTML = '<i class="bi bi-hourglass-split me-1"></i>Calculando…'; out.textContent = '';
+  try {
+    const r = await fetch('/api/estado-cartera/recalcular', { method:'POST', headers:H });
+    const j = await r.json();
+    if (!j.success){ out.textContent = j.error||'Error'; return; }
+    const d = j.data; const pe = d.porEstado||{};
+    const dist = Object.keys(pe).length ? Object.entries(pe).map(([k,v])=>`${k}: <b>${v}</b>`).join(' · ') : 'sin créditos de cartera propia';
+    out.innerHTML = `✓ ${d.procesados} procesados, ${d.cambios} cambios — ${dist}`;
+    toast('Recálculo listo');
+  } catch(_){ out.textContent = 'Error de conexión'; }
+  finally { btn.disabled = false; btn.innerHTML = '<i class="bi bi-arrow-repeat me-1"></i>Recalcular ahora'; }
 }
 
 async function guardarUmbrales(){

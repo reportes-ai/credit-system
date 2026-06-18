@@ -1,5 +1,6 @@
 const pool = require('../../../../shared/config/database');
 const { auditar } = require('../../../../shared/audit');
+const { recalcularEstadoCartera } = require('../../../creditos/src/utils/recalcular-estado-cartera');
 
 /* ─────────────────────────────────────────────────────────────────────────────
    Mantenedor "Estado Cartera" — ciclo de vida del crédito de RECURSOS PROPIOS
@@ -210,4 +211,13 @@ const setParametros = async (req, res) => {
   } catch (e) { console.error('[estado-cartera setParametros]', e.message); res.status(500).json({ success: false, data: null, error: 'Error interno del servidor' }); }
 };
 
-module.exports = { getAll, crear, actualizar, eliminar, setTransiciones, setParametros };
+/* POST /api/estado-cartera/recalcular → corre el motor (calcula y muestra, sin enforcement) */
+const recalcular = async (req, res) => {
+  try {
+    const r = await recalcularEstadoCartera();
+    auditar({ req, accion: 'EDITAR', modulo: 'mantenedores', entidad: 'estado_cartera', entidad_id: 'recalculo', detalle: `Recalculó estado de cartera: ${r.procesados} procesados, ${r.cambios} cambios`, meta: r });
+    res.json({ success: true, data: r, error: null });
+  } catch (e) { console.error('[estado-cartera recalcular]', e.message); res.status(500).json({ success: false, data: null, error: 'Error interno del servidor' }); }
+};
+
+module.exports = { getAll, crear, actualizar, eliminar, setTransiciones, setParametros, recalcular };
