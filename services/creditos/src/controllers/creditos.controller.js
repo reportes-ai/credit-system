@@ -113,6 +113,7 @@ const SELECT_GESTION = `
         WHEN ob.estado_eval IN ('RECHAZADO','ANULADO') THEN 'CANCELADO'
         ELSE COALESCE(ob.estado_credito, ob.estado_eval)
       END)                                                     AS estado,
+    ob.estado_cartera,
     ob.fecha_otorgado                                          AS fecha_otorgamiento,
     ob.valor_vehiculo,
     ob.pie,

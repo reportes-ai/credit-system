@@ -490,6 +490,13 @@ function renderConsulta(list) {
     const color = f==='AUTOFIN'?'#dbeafe;color:#1d4ed8' : f&&f.includes('UNIDAD')?'#fce7f3;color:#9d174d':'#f1f5f9;color:#374151';
     return `<span style="font-size:.7rem;font-weight:700;background:${color};border-radius:4px;padding:2px 7px">${f||'—'}</span>`;
   };
+  // Estado de CARTERA (2da dimensión, solo recursos propios). Etapa = c.estado.
+  const CART_COL = { VIGENTE:'#16a34a', MORA:'#d97706', 'EN MORA':'#d97706', VENCIDO:'#dc2626', TERMINADO:'#0f766e', PREPAGADO:'#7c3aed', CASTIGADO:'#111827' };
+  const carteraTag = ec => {
+    if (!ec) return '<span style="color:#cbd5e1">—</span>';
+    const col = CART_COL[ec] || '#64748b';
+    return `<span style="font-size:.68rem;font-weight:800;color:#fff;background:${col};border-radius:10px;padding:2px 9px">${ec}</span>`;
+  };
   const sArrow = col => { const a = _sortColCred===col; return `<span style="color:${a?'#0141A2':'#cbd5e1'};font-size:.72em">${a?(_sortDirCred==='asc'?'▲':'▼'):'⇅'}</span>`; };
   const sTh = (label, col, cls='', st='') => `<th class="${cls}" onclick="toggleSortCred('${col}')" style="cursor:pointer;user-select:none;white-space:nowrap;${st}" title="Ordenar mayor/menor">${label} ${sArrow(col)}</th>`;
   res.innerHTML = `<div class="table-responsive">
@@ -506,7 +513,8 @@ function renderConsulta(list) {
           <th>Vehículo</th>
           ${sTh('Cuota','cuota','num')}
           ${sTh('Plazo','plazo','','text-align:center')}
-          ${sTh('Estado','estado','','text-align:center')}
+          ${sTh('Etapa','estado','','text-align:center')}
+          <th style="text-align:center;white-space:nowrap">Estado</th>
           <th></th>
         </tr>
       </thead>
@@ -524,6 +532,7 @@ function renderConsulta(list) {
           <td class="num" style="color:var(--navy);font-weight:800">${fmtPeso(c.cuota)}</td>
           <td style="text-align:center">${c.plazo?c.plazo+' m':'—'}</td>
           <td style="text-align:center"><span class="badge-estado badge-${(c.estado||'').replace(' ','-')}">${c.estado||'—'}</span></td>
+          <td style="text-align:center">${carteraTag(c.estado_cartera)}</td>
           <td style="text-align:center">
             <button class="btn-ver-detalle" onclick="location.href='/creditos/revisar?id=${c.id_credito}'">
               <i class="bi bi-eye me-1"></i>Ver
