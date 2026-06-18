@@ -220,7 +220,7 @@ const create = async (req, res) => {
       ejecutivo || null, observaciones || null,
       datos_json ? JSON.stringify(datos_json) : null,
       id_financiera || null,
-      rut_concesionario || null,
+      rut_dealer || null,
       vendedor || null,
       comision_dealer != null ? Math.round(parseFloat(comision_dealer)) : null,
     ]);
@@ -456,7 +456,7 @@ const update = async (req, res) => {
         transmision || null, combustible || null, tasacion || null, permiso_circulacion || null,
         id_dealer || null, tipo_ubicacion || null, nombre_parque || null,
         datos_json ? JSON.stringify(datos_json) : null,
-        rut_concesionario || null,
+        rut_dealer || null,
         vendedor || null,
         comision_dealer != null ? Math.round(parseFloat(comision_dealer)) : null,
         id_financiera || null,
