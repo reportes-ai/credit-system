@@ -246,7 +246,10 @@ function toggleFinanciera(el) {
 function _setEmpresaIngreso(empresa) {
   document.getElementById('iEmpresa').value = empresa;
   const selFin = document.getElementById('iFinanciera');
-  if (selFin) { const opt = Array.from(selFin.options).find(o => o.value === empresa); if (opt) selFin.value = empresa; }
+  if (selFin) {
+    if (selFin.options) { const opt = Array.from(selFin.options).find(o => o.value === empresa); if (opt) selFin.value = empresa; }
+    else selFin.value = empresa;   // input hidden (página solo AutoFácil)
+  }
 }
 
 function sincronizarEmpresaCard(empresa) {
