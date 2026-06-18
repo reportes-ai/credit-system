@@ -5,7 +5,7 @@
   <link rel="icon" href="/img/favicon.png" type="image/png">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Informes DealerNet — AutoFácil</title>
-  <!-- v1.5 -->
+  <!-- v1.6 -->
   <link href="/css/bootstrap.min.css" rel="stylesheet">
   <link href="/css/bootstrap-icons.css" rel="stylesheet">
   <style>
@@ -202,7 +202,7 @@
   <div class="dlg-foot">
     <button class="btn-b cancel" onclick="document.getElementById('dlgVer').close()">Cerrar</button>
     <button class="btn-b hist" id="btnJson" onclick="toggleJson()"><i class="bi bi-braces me-1"></i>Ver datos (JSON)</button>
-    <button class="btn-b new" onclick="printInforme()"><i class="bi bi-printer me-1"></i>Imprimir / PDF</button>
+    <button class="btn-b new" onclick="printInforme()"><i class="bi bi-file-earmark-arrow-down me-1"></i>Descargar PDF</button>
   </div>
 </dialog>
 
@@ -572,6 +572,55 @@ function bodyBoletinSimple(prd){
   if(!hasDetail) return noinfo();
   return '<div class="rep-tree">'+renderTree(body)+'</div>';
 }
+// Boletín Impagos Vigentes (3425): Resumen (tipo acreedor × año) + Detalle de causas.
+function bodyBoletinImpagos(prd){
+  const wsTag = Object.keys(prd).filter(k=>!k.startsWith('@_'))[0];
+  const P = gp(prd, wsTag, 'ROOT','D','result','PRODUCTO');
+  if(!P) return bodyBoletinSimple(prd);                 // estructura inesperada → árbol crudo
+  const detalle  = arr(gp(P,'detalle','d'));
+  const indice   = arr(gp(P,'indice','d'));
+  const totalano = arr(gp(P,'totalano','d'));
+  if(!detalle.length && !indice.length) return noinfo();
+
+  // Años (columnas) de mayor a menor
+  let anos = totalano.map(x=>String(x['@_a'])).filter(Boolean);
+  if(!anos.length) anos = indice.flatMap(r=>arr(r.a).map(a=>String(a['@_n'])));
+  anos = [...new Set(anos)].sort((a,b)=>Number(b)-Number(a));
+
+  const cell = v => (v==null||v===''||Number(v)===0) ? '--' : esc(String(v));
+
+  // ── Resumen ──
+  let h = '<div class="rep-h">Resumen</div>'+
+    '<table class="rep-tb"><thead>'+
+    '<tr><th rowspan="2">Tipo Acreedor</th><th colspan="'+(anos.length||1)+'" style="text-align:center">Cantidad</th></tr>'+
+    '<tr>'+(anos.length?anos:['']).map(a=>'<th style="text-align:right">'+esc(a)+'</th>').join('')+'</tr>'+
+    '</thead><tbody>';
+  indice.forEach(r=>{
+    const byYear={}; arr(r.a).forEach(a=>byYear[String(a['@_n'])]=a['@_valor']);
+    h += '<tr><td>'+esc(r['@_nombre']||'')+'</td>'+anos.map(a=>'<td style="text-align:right">'+cell(byYear[a])+'</td>').join('')+'</tr>';
+  });
+  const totPorAno={}; totalano.forEach(x=>totPorAno[String(x['@_a'])]=x['@_c']);
+  const granTotal = arr(gp(P,'total','d')).reduce((s,x)=>s+(Number(x['@_c'])||0),0);
+  h += '<tr style="font-weight:700"><td>Total</td>'+anos.map(a=>'<td style="text-align:right">'+cell(totPorAno[a])+'</td>').join('')+'</tr>';
+  h += '</tbody></table>';
+  if(granTotal) h += '<div class="rep-kv" style="margin-top:4px"><b>Total impagos vigentes:</b> '+granTotal+'</div>';
+
+  // ── Detalle ──
+  h += '<div class="rep-h">Detalle</div>';
+  if(!detalle.length){ h += noinfo(); return h; }
+  h += '<table class="rep-tb"><thead><tr>'+
+    ['Identificación','Tipo Acreedor','Acreedor','Fecha Publicación','Documento / Fuente','Días en Cobranza','RUT','Clasificación','Referencia']
+      .map(t=>'<th>'+t+'</th>').join('')+'</tr></thead><tbody>'+
+    detalle.map(x=>{
+      const ref = x.referencia||x.url;
+      const refLink = ref ? '<a href="'+esc(ref)+'" target="_blank" rel="noopener">ver Causa</a>' : '—';
+      const fuente = esc(x.fuente||'') + (x.proceso?'<div class="muted" style="font-size:.68rem">'+esc(x.proceso)+'</div>':'');
+      return '<tr><td>'+esc(x.identificacion||'')+'</td><td>'+esc(x.glscodacteco||'')+'</td><td>'+esc(x.acreedor||'')+'</td>'+
+        '<td>'+esc(x.fecha||'')+'</td><td>'+fuente+'</td><td style="text-align:right">'+fmtMiles(x.diamora)+'</td>'+
+        '<td>'+esc(rutFmt(x.rutacreedor,x.digacreedor)||'')+'</td><td>'+esc(x.clasificacion||'')+'</td><td>'+refLink+'</td></tr>';
+    }).join('')+'</tbody></table>';
+  return h;
+}
 
 function renderInforme(d){
   let cont = d.contenido; if(typeof cont==='string'){ try{cont=JSON.parse(cont);}catch(_){ } }
@@ -582,7 +631,7 @@ function renderInforme(d){
   if(cod==='2101') body = bodyPension(d, prd);
   else if(cod==='16') body = bodyComportamiento(prd);
   else if(cod==='3435') body = bodyPerfilComercial(prd);
-  else if(cod==='3425') body = bodyBoletinSimple(prd);
+  else if(cod==='3425') body = bodyBoletinImpagos(prd);
   else body = '<div class="rep-note">Datos recibidos del Web Service:</div><div class="rep-tree">'+renderTree(prd)+'</div>';
   const f = new Date(d.created_at);
   const meta = `<div class="rep-meta">
@@ -630,12 +679,20 @@ function openPrintWindow(title, inner){
   w.document.close(); w.focus();
   setTimeout(()=>{ try{ w.print(); }catch(_){ } }, 500);
 }
-function printInforme(){ const d = window._verActual; if(d) openPrintWindow('Informe '+d.rut, '<div class="rep-page">'+renderInforme(d)+'</div>'); }
+// Nombre del archivo PDF = nombre y RUT del cliente (Chrome usa el title como
+// nombre por defecto al "Guardar como PDF").
+function nombreArchivo(d){
+  let cont=d.contenido; if(typeof cont==='string'){ try{cont=JSON.parse(cont);}catch(_){ } }
+  const titular = (deepFind(cont||{},['nombre']) || '').trim();
+  const rut = rutFmt(d.rut,d.dv) || (d.rut+'-'+(d.dv||''));
+  return (titular ? titular+' ' : '') + rut;
+}
+function printInforme(){ const d = window._verActual; if(d) openPrintWindow(nombreArchivo(d), '<div class="rep-page">'+renderInforme(d)+'</div>'); }
 async function printInformeById(id){
   try {
     const r = await fetch('/api/dealernet/informes/'+id, { headers:H }); const j = await r.json();
     if(!j.success) return toast(j.error||'Error', true);
-    openPrintWindow('Informe '+j.data.rut, '<div class="rep-page">'+renderInforme(j.data)+'</div>');
+    openPrintWindow(nombreArchivo(j.data), '<div class="rep-page">'+renderInforme(j.data)+'</div>');
   } catch(_){ toast('Error al generar el PDF', true); }
 }
 // Descarga en un solo documento el último informe de cada producto ACTIVO del
@@ -656,13 +713,13 @@ async function descargarTodos(){
     const orden = ordenCods.filter(c=>latest[c]).concat(Object.keys(latest).filter(c=>!ordenCods.includes(c)));
     if(!orden.length) return toast('No hay informes para este RUT', true);
     toast('Generando documento…');
-    const partes = [];
+    const partes = []; let nomArch = 'Informes '+rut;
     for(const cod of orden){
       const rr = await fetch('/api/dealernet/informes/'+latest[cod].id, { headers:H }); const jj = await rr.json();
-      if(jj.success) partes.push('<div class="rep-page">'+renderInforme(jj.data)+'</div>');
+      if(jj.success){ partes.push('<div class="rep-page">'+renderInforme(jj.data)+'</div>'); if(partes.length===1) nomArch = nombreArchivo(jj.data); }
     }
     if(!partes.length) return toast('No se pudo armar el documento', true);
-    openPrintWindow('Informes '+rut, partes.join(''));
+    openPrintWindow(nomArch, partes.join(''));
   } catch(_){ toast('Error al descargar los informes', true); }
 }
 async function descargarPdf(id){
