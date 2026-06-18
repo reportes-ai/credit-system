@@ -251,7 +251,7 @@ const create = async (req, res) => {
 /* ─── GET ALL ────────────────────────────────────────────────────────────── */
 const getAll = async (req, res) => {
   try {
-    const { q, page, limit, estado, financiera } = req.query;
+    const { q, page, limit, estado, financiera, fecha_desde, fecha_hasta, sort, dir } = req.query;
     const pageNum  = Math.max(1, parseInt(page)  || 1);
     const limitNum = Math.min(500, Math.max(1, parseInt(limit) || 100));
     const offset   = (pageNum - 1) * limitNum;
@@ -292,6 +292,12 @@ const getAll = async (req, res) => {
       }
     }
 
+    // Rango de fecha (sobre la fecha mostrada: fecha_otorgado con fallback created_at)
+    const fd = /^\d{4}-\d{2}-\d{2}$/.test(fecha_desde || '') ? fecha_desde : null;
+    const fh = /^\d{4}-\d{2}-\d{2}$/.test(fecha_hasta || '') ? fecha_hasta : null;
+    if (fd) { whereBase += ` AND DATE(COALESCE(ob.fecha_otorgado, ob.created_at)) >= ?`; paramsBase.push(fd); }
+    if (fh) { whereBase += ` AND DATE(COALESCE(ob.fecha_otorgado, ob.created_at)) <= ?`; paramsBase.push(fh); }
+
     // whereData = whereBase + estado → para la lista paginada y su total
     let whereData = whereBase;
     const paramsData = [...paramsBase];
@@ -324,8 +330,24 @@ const getAll = async (req, res) => {
     let statsTotal = 0;
     for (const r of statsRows) { stats[r.estado || 'SIN_ESTADO'] = r.cnt; statsTotal += r.cnt; }
 
-    const sql = SELECT_GESTION + whereData +
-      ` ORDER BY ob.mes DESC, ob.id DESC LIMIT ? OFFSET ?`;
+    // Orden por columna (whitelist) — default: mes/id desc
+    const SORT_MAP = {
+      numero_credito:     'CAST(COALESCE(ob.numero_credito, CAST(ob.num_op AS CHAR)) AS UNSIGNED)',
+      rut_cliente:        'cl.rut',
+      nombre_cliente:     'cl.nombre_completo',
+      financiera:         'ob.financiera',
+      id_financiera:      'ob.id_financiera',
+      fecha_otorgamiento: 'ob.fecha_otorgado',
+      monto_financiado:   'ob.monto_financiado',
+      cuota:              'ob.cuota',
+      plazo:              'ob.plazo',
+      estado:             estadoExpr,
+    };
+    const sortExpr = SORT_MAP[sort] || null;
+    const sortDir  = String(dir).toLowerCase() === 'asc' ? 'ASC' : 'DESC';
+    const orderBy  = sortExpr ? `${sortExpr} ${sortDir}, ob.id DESC` : `ob.mes DESC, ob.id DESC`;
+
+    const sql = SELECT_GESTION + whereData + ` ORDER BY ${orderBy} LIMIT ? OFFSET ?`;
     const [rows] = await pool.query(sql, [...paramsData, limitNum, offset]);
 
     res.json({

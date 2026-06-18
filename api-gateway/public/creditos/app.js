@@ -366,6 +366,19 @@ let _paginaActual = 1;
 const _LIMIT_PAG  = 100;
 let _lastStats = {};
 let _lastTotal  = 0;
+let _sortColCred = '';      // columna de orden (vacío = orden por defecto: mes/id desc)
+let _sortDirCred = 'desc';
+
+function toggleSortCred(col) {
+  if (_sortColCred === col) _sortDirCred = (_sortDirCred === 'asc') ? 'desc' : 'asc';
+  else { _sortColCred = col; _sortDirCred = 'asc'; }
+  buscarCreditos(1);
+}
+function limpiarRangoFecha() {
+  const a = document.getElementById('searchFDesde'), b = document.getElementById('searchFHasta');
+  if (a) a.value = ''; if (b) b.value = '';
+  buscarCreditos(1);
+}
 
 async function buscarCreditos(page = 1) {
   _paginaActual = page;
@@ -377,6 +390,11 @@ async function buscarCreditos(page = 1) {
     const params = new URLSearchParams({ page, limit: _LIMIT_PAG });
     if (q) params.set('q', q);
     if (_empresasFiltro.size === 1) params.set('financiera', [..._empresasFiltro][0]);
+    const fDesde = document.getElementById('searchFDesde')?.value || '';
+    const fHasta = document.getElementById('searchFHasta')?.value || '';
+    if (fDesde) params.set('fecha_desde', fDesde);
+    if (fHasta) params.set('fecha_hasta', fHasta);
+    if (_sortColCred) { params.set('sort', _sortColCred); params.set('dir', _sortDirCred); }
     // Estado: server-side (paginación correcta). EN MORA es calculado → client-side.
     if (_filtroProceso) params.set('estado', '__PROCESO__');
     else if (estadoSel && estadoSel !== 'EN MORA') params.set('estado', estadoSel);
@@ -432,7 +450,8 @@ function actualizarStats(stats, totalServidor) {
   document.getElementById('statProceso').textContent   = Math.max(0, proceso);
   document.getElementById('statVigentes').textContent  = g('VIGENTE');
   document.getElementById('statMora').textContent      = g('EN MORA') || 0;
-  document.getElementById('statCancelados').textContent= g('CANCELADO');
+  const elCanc = document.getElementById('statCancelados');
+  if (elCanc) elCanc.textContent = g('CANCELADO');
   const elOtorg = document.getElementById('statOtorgados');
   if (elOtorg) elOtorg.textContent = g('OTORGADO');
   const elCurs = document.getElementById('statCursados');
@@ -471,21 +490,23 @@ function renderConsulta(list) {
     const color = f==='AUTOFIN'?'#dbeafe;color:#1d4ed8' : f&&f.includes('UNIDAD')?'#fce7f3;color:#9d174d':'#f1f5f9;color:#374151';
     return `<span style="font-size:.7rem;font-weight:700;background:${color};border-radius:4px;padding:2px 7px">${f||'—'}</span>`;
   };
+  const sArrow = col => { const a = _sortColCred===col; return `<span style="color:${a?'#0141A2':'#cbd5e1'};font-size:.72em">${a?(_sortDirCred==='asc'?'▲':'▼'):'⇅'}</span>`; };
+  const sTh = (label, col, cls='', st='') => `<th class="${cls}" onclick="toggleSortCred('${col}')" style="cursor:pointer;user-select:none;white-space:nowrap;${st}" title="Ordenar mayor/menor">${label} ${sArrow(col)}</th>`;
   res.innerHTML = `<div class="table-responsive">
     <table class="cred-table" style="min-width:900px">
       <thead>
         <tr>
-          <th>N° Operación</th>
-          <th>RUT</th>
-          <th>Cliente</th>
-          <th>Financiera</th>
-          <th>ID Financiera</th>
-          <th>Fecha</th>
-          <th class="num">Monto</th>
+          ${sTh('N° Operación','numero_credito')}
+          ${sTh('RUT','rut_cliente')}
+          ${sTh('Cliente','nombre_cliente')}
+          ${sTh('Financiera','financiera')}
+          ${sTh('ID Financiera','id_financiera')}
+          ${sTh('Fecha','fecha_otorgamiento')}
+          ${sTh('Monto','monto_financiado','num')}
           <th>Vehículo</th>
-          <th class="num">Cuota</th>
-          <th>Plazo</th>
-          <th style="text-align:center">Estado</th>
+          ${sTh('Cuota','cuota','num')}
+          ${sTh('Plazo','plazo','','text-align:center')}
+          ${sTh('Estado','estado','','text-align:center')}
           <th></th>
         </tr>
       </thead>
