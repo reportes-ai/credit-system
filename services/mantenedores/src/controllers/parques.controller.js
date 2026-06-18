@@ -1,5 +1,11 @@
 const pool = require('../../../../shared/config/database');
 const { auditar } = require('../../../../shared/audit');
+const { recalcularMesesAbiertos } = require('../../../creditos/src/utils/recalcular-mes');
+// Cambiar la comisión/arriendo de un parque dispara el recálculo de los meses
+// abiertos (fire-and-forget, respeta los campos forzados).
+const dispararRecalc = () => recalcularMesesAbiertos()
+  .then(r => { if (r.actualizados) console.log(`[recalc auto] ${r.actualizados} ops recalculadas`); })
+  .catch(e => console.error('[recalc auto]', e.message));
 
 // Migración: crear tabla parques_comisiones con datos iniciales del Excel
 (async () => {
@@ -75,6 +81,7 @@ const create = async (req, res) => {
     );
     const [[row]] = await pool.query('SELECT * FROM parques_comisiones WHERE id = ?', [r.insertId]);
     auditar({ req, accion: 'CREAR', modulo: 'mantenedores', entidad: 'parque', entidad_id: r.insertId, detalle: `Creó el parque "${nombre.trim().toUpperCase()}"`, meta: req.body });
+    dispararRecalc();
     res.status(201).json({ success: true, data: row, error: null });
   } catch (e) {
     (console.error('[error]', e), res.status(500).json({success:false,data:null,error:'Error interno del servidor'}));
@@ -95,6 +102,7 @@ const update = async (req, res) => {
     );
     const [[row]] = await pool.query('SELECT * FROM parques_comisiones WHERE id = ?', [id]);
     auditar({ req, accion: 'EDITAR', modulo: 'mantenedores', entidad: 'parque', entidad_id: id, detalle: `Editó el parque #${id}`, meta: req.body });
+    dispararRecalc();
     res.json({ success: true, data: row, error: null });
   } catch (e) {
     (console.error('[error]', e), res.status(500).json({success:false,data:null,error:'Error interno del servidor'}));
@@ -106,6 +114,7 @@ const remove = async (req, res) => {
     const { id } = req.params;
     await pool.query('UPDATE parques_comisiones SET activo = 0 WHERE id = ?', [id]);
     auditar({ req, accion: 'ELIMINAR', modulo: 'mantenedores', entidad: 'parque', entidad_id: id, detalle: `Desactivó el parque #${id}` });
+    dispararRecalc();
     res.json({ success: true, data: { desactivado: id }, error: null });
   } catch (e) {
     (console.error('[error]', e), res.status(500).json({success:false,data:null,error:'Error interno del servidor'}));

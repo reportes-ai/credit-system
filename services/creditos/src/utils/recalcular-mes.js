@@ -19,6 +19,14 @@
 
 const pool = require('../../../../shared/config/database');
 
+// Campos calculados que el usuario puede dejar "forzados" (negociación puntual).
+// El recálculo los respeta: conserva el valor guardado y solo recalcula los demás.
+function forzadosSet(raw) {
+  if (!raw) return new Set();
+  try { const a = Array.isArray(raw) ? raw : JSON.parse(raw); return new Set(Array.isArray(a) ? a : []); }
+  catch (_) { return new Set(); }
+}
+
 /* ── Parámetros configurables ───────────────────────────────────────── */
 async function cargarParams() {
   const [rows] = await pool.query('SELECT clave, valor FROM parametros_credito');
@@ -153,7 +161,8 @@ async function recalcularMeses(meses, opciones = {}) {
              plazo, fecha_otorgado, mes,
              seguro_rdh, seguro_cesantia, seguro_rep_menor,
              com_rdh, com_cesantia, com_reparaciones,
-             tascli_real
+             tascli_real,
+             campos_forzados, monto_comision_fin, comdea_real, com_parque
       FROM creditos
       WHERE DATE_FORMAT(mes, '%Y-%m') = ?
         AND estado_eval NOT IN ('RECHAZADO','ANULADO')
@@ -238,12 +247,20 @@ async function recalcularMeses(meses, opciones = {}) {
         }
       }
 
-      // 4. Ingreso neto total ─────────────────────────────────────────
-      const com_seguros_total  = com_rdh + com_cesantia + com_reparaciones;
-      const ingreso_neto_total = monto_comision_fin + com_seguros_total
-                               - comdea_real - com_parque_val - arriendo_val;
+      // 4. Respetar campos forzados ───────────────────────────────────
+      // Si un campo calculado fue digitado a mano (forzado), se conserva el
+      // valor guardado; solo se recalculan los no forzados. ingreso_neto_total
+      // se recalcula siempre con los valores EFECTIVOS (forzado o calculado).
+      const forz   = forzadosSet(op.campos_forzados);
+      const eff_mcf = forz.has('monto_comision_fin') ? (parseFloat(op.monto_comision_fin) || 0) : monto_comision_fin;
+      const eff_cdr = forz.has('comdea_real')        ? (parseFloat(op.comdea_real)        || 0) : comdea_real;
+      const eff_cpq = forz.has('com_parque')         ? (parseFloat(op.com_parque)         || 0) : com_parque_val;
 
-      // 5. UPDATE ─────────────────────────────────────────────────────
+      // 5. Ingreso neto total ─────────────────────────────────────────
+      const com_seguros_total  = com_rdh + com_cesantia + com_reparaciones;
+      const ingreso_neto_total = eff_mcf + com_seguros_total - eff_cdr - eff_cpq - arriendo_val;
+
+      // 6. UPDATE (los forzados se reescriben con su propio valor guardado) ──
       await pool.query(`
         UPDATE creditos SET
           monto_comision_fin  = ?,
@@ -254,9 +271,9 @@ async function recalcularMeses(meses, opciones = {}) {
           updated_at          = NOW()
         WHERE id = ?
       `, [
-        monto_comision_fin,
-        comdea_real,
-        com_parque_val,
+        eff_mcf,
+        eff_cdr,
+        eff_cpq,
         arriendo_val,
         ingreso_neto_total,
         op.id,
@@ -311,6 +328,23 @@ async function normalizarEjecutivosMes(mesStr, log = []) {
   if (normalizados > 0) log.push(`Ejecutivos normalizados: ${normalizados}`);
 }
 
+/* ── Recalcular TODOS los meses abiertos (no cerrados) ──────────────────
+   Se usa cuando cambia un parámetro global que afecta el cálculo (tasas,
+   % dealer/parque, umbrales, parques): el cambio impacta todas las ops. */
+async function recalcularMesesAbiertos() {
+  const [rows] = await pool.query(`
+    SELECT DISTINCT DATE_FORMAT(c.mes, '%Y-%m') AS mes
+    FROM creditos c
+    WHERE c.mes IS NOT NULL
+      AND NOT EXISTS (
+        SELECT 1 FROM meses_cerrados mc
+        WHERE mc.mes = DATE_FORMAT(c.mes, '%Y-%m') AND mc.cerrado = 1
+      )`);
+  const meses = rows.map(r => r.mes).filter(Boolean);
+  if (!meses.length) return { actualizados: 0, log: [] };
+  return recalcularMeses(meses);
+}
+
 /* ── Extraer meses únicos de una lista de ops ───────────────────────── */
 function extraerMeses(ops) {
   const set = new Set();
@@ -321,4 +355,4 @@ function extraerMeses(ops) {
   return [...set];
 }
 
-module.exports = { recalcularMeses, extraerMeses, normalizarEjecutivosMes };
+module.exports = { recalcularMeses, recalcularMesesAbiertos, extraerMeses, normalizarEjecutivosMes };

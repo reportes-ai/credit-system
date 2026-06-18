@@ -1,5 +1,11 @@
 const pool = require('../../../../shared/config/database');
 const { auditar } = require('../../../../shared/audit');
+const { recalcularMesesAbiertos } = require('../../../creditos/src/utils/recalcular-mes');
+// Cambiar un parámetro que afecta el cálculo dispara el recálculo de los meses
+// abiertos (fire-and-forget, respeta los campos forzados).
+const dispararRecalc = () => recalcularMesesAbiertos()
+  .then(r => { if (r.actualizados) console.log(`[recalc auto] ${r.actualizados} ops recalculadas`); })
+  .catch(e => console.error('[recalc auto]', e.message));
 
 const ensureTable = async () => {
   await pool.query(`
@@ -137,6 +143,7 @@ const updateAll = async (req, res) => {
       );
     }
     auditar({ req, accion: 'EDITAR', modulo: 'mantenedores', entidad: 'parametros_credito', entidad_id: 'parametros', detalle: `Actualizó parámetros de crédito (${Object.keys(params).length} parámetro/s)`, meta: params });
+    dispararRecalc();
     res.json({ success: true, data: { mensaje: 'Parámetros actualizados' }, error: null });
   } catch (e) {
     (console.error('[error]', e), res.status(500).json({success:false,data:null,error:'Error interno del servidor'}));
