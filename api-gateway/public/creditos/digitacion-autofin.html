@@ -51,8 +51,9 @@
     .f-group input.readonly { background:#f8fafc; color:#6b7280; }
     .f-req::after { content:' *'; color:#ef4444; }
     /* RUT autocomplete */
-    .rut-wrap { position:relative; }
-    .rut-wrap .rut-btn { position:absolute; right:6px; top:50%; transform:translateY(-50%); background:var(--navy); color:#fff; border:none; border-radius:6px; padding:4px 10px; font-size:.8rem; cursor:pointer; }
+    .rut-wrap { display:flex; align-items:center; gap:6px; }
+    .rut-wrap input { flex:1; min-width:0; }
+    .rut-wrap .rut-btn { flex:0 0 auto; background:var(--navy); color:#fff; border:none; border-radius:8px; padding:8px 12px; font-size:.9rem; cursor:pointer; }
     /* Resultado busqueda RUT */
     .cliente-found { background:#f0fdf4; border:1px solid #86efac; border-radius:8px; padding:10px 14px; font-size:.83rem; color:#166534; margin-top:6px; display:none; }
     /* Parque + calcs */
@@ -89,7 +90,7 @@
   <div class="topnav-left">
     <a href="/" class="topnav-brand">
       <img src="/img/logo.png" alt="AutoFácil">
-      <span class="version-badge">v2.7</span>
+      <span class="version-badge">v2.8</span>
     </a>
     <div class="breadcrumb-nav">
       <a href="/">Inicio</a><span class="sep">›</span>
@@ -201,7 +202,7 @@
   <div class="sec">
     <div class="sec-header"><i class="bi bi-person-fill"></i><span>Cliente</span></div>
     <div class="sec-body">
-      <div class="form-grid g2">
+      <div class="form-grid g2" style="grid-template-columns:1fr 3fr">
         <div class="f-group">
           <label class="f-req">RUT Cliente</label>
           <div class="rut-wrap">
