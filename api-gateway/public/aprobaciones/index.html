@@ -5,7 +5,7 @@
   <link rel="icon" href="/img/favicon.png" type="image/png">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Cartas de Aprobación — AutoFácil</title>
-  <!-- v4.9 -->
+  <!-- v4.10 -->
   <!-- Standalone desde Mantenedores: marca la clase ANTES de pintar para no mostrar el menú -->
   <script>try{if(new URLSearchParams(location.search).get('tab')==='params')document.documentElement.classList.add('standalone-params');}catch(e){}</script>
   <link href="/css/bootstrap.min.css" rel="stylesheet">
@@ -1338,9 +1338,10 @@ function calcUFyTasa(){
         pizarra.toFixed(4).replace('.',',') + ' % (' + (esMenor200 ? '≤' : '>') + '200 UF)';
     }
   }
-  // Comparación tasa crédito vs pizarra (solo décimas y centésimas: trunca a 2 decimales)
+  // Comparación tasa crédito vs pizarra: SOLO décimas y centésimas (a 2 decimales).
+  // La tasa ingresada conserva 3 decimales; el truncado es solo para decidir excepción.
   const tasa = tope2(parseFloat(String(document.getElementById('cTasa').value).replace(',','.')));
-  if (pizarra != null && !isNaN(pizarra)) pizarra = tope2(pizarra);  // tope = pizarra truncada a 2 dec
+  if (pizarra != null && !isNaN(pizarra)) pizarra = tope2(pizarra);
   tasaMsg.textContent = ''; tasaMsg.style.color = '';
   if (!isNaN(tasa) && pizarra != null && !isNaN(pizarra)) {
     if (tasa > pizarra) {
@@ -1604,7 +1605,7 @@ async function guardarCarta(){
   }
 
   // ── Detección de TODAS las excepciones (modal único con comentario obligatorio c/u) ──
-  const tasa = tope2(parseFloat(String(document.getElementById('cTasa').value).replace(',','.')));
+  const tasa = parseFloat(String(document.getElementById('cTasa').value).replace(',','.'));  // 3 decimales: se guarda y se usa en el cálculo por diferencial
   const montoCred = rawMoney('cMontoCred');
   const montoUF = UF_HOY ? montoCred / UF_HOY : null;
   let pizarra = null;
@@ -1612,13 +1613,14 @@ async function guardarCarta(){
     pizarra = montoUF <= 200
       ? parseFloat(TASAS.tasa_mensual_menor ?? TASAS.tasa_menor)
       : parseFloat(TASAS.tasa_mensual_mayor ?? TASAS.tasa_mayor);
-    if (!isNaN(pizarra)) pizarra = tope2(pizarra);  // tope = pizarra truncada a 2 dec
   }
+  // Excepción se evalúa SOLO a 2 decimales (décimas/centésimas); el valor guardado mantiene 3
+  const tasaCmp = tope2(tasa), pizCmp = tope2(pizarra);
   const excList = [];   // [{cod, detalle}]
-  if (!isNaN(tasa) && pizarra != null && !isNaN(pizarra)) {
-    if (tasa > pizarra) { setFormAlert(`⛔ Tasa ${tasa}% sobre la pizarra (${pizarra}%) — no se permite grabar`); return; }
-    if (tasa < pizarra) excList.push({ cod:'TASA_BAJO_PIZARRA',
-      detalle:`Tasa ${String(tasa).replace('.',',')}% bajo la pizarra (${String(pizarra).replace('.',',')}%)` });
+  if (!isNaN(tasaCmp) && pizCmp != null && !isNaN(pizCmp)) {
+    if (tasaCmp > pizCmp) { setFormAlert(`⛔ Tasa ${tasaCmp}% sobre la pizarra (${pizCmp}%) — no se permite grabar`); return; }
+    if (tasaCmp < pizCmp) excList.push({ cod:'TASA_BAJO_PIZARRA',
+      detalle:`Tasa ${String(tasaCmp).replace('.',',')}% bajo la pizarra (${String(pizCmp).replace('.',',')}%)` });
   }
   // Participación mayor a pizarra (con o sin checkbox: lo que importa es el monto)
   const factorPiz = getFactor(document.getElementById('cPlazo').value, document.getElementById('cTipo').value);
