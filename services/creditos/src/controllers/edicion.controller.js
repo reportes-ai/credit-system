@@ -24,8 +24,16 @@ const { isMesCerrado } = require('../../../../shared/utils/mes-cerrado');
       const [[nc]] = await pool.query(`SELECT data_type dt FROM information_schema.columns WHERE table_schema=DATABASE() AND table_name='creditos_edicion_log' AND column_name='num_op'`);
       if (nc && String(nc.dt).toLowerCase() === 'varchar') await pool.query(`ALTER TABLE creditos_edicion_log MODIFY COLUMN num_op INT DEFAULT NULL`);
     } catch(e){ console.error('[num_op->int creditos_edicion_log]', e.message); }
+    // Marca de campos forzados: lista (JSON) de campos calculados que se digitaron a mano
+    // por una negociación puntual. El recálculo los respeta; en pantalla van en rojo.
+    await pool.query(`ALTER TABLE creditos ADD COLUMN campos_forzados JSON NULL`)
+      .catch(e => { if (e.errno !== 1060) console.error('[creditos campos_forzados]', e.message); });
   } catch (e) { if (e.errno !== 1050) console.error('[edicion log migration]', e.message); }
 })();
+
+// Campos CALCULADOS por el motor (recalcular-mes.js) que aparecen en esta grilla.
+// Si uno se edita a mano queda "forzado" (rojo) y el recálculo no lo sobrescribe.
+const CAMPOS_CALCULADOS = ['monto_comision_fin', 'comdea_real', 'com_parque'];
 
 // Campos editables y sus etiquetas
 const CAMPOS_EDIT = [
@@ -132,12 +140,17 @@ const getCreditos = async (req, res) => {
       } catch (e) { /* filtros inválidos, ignorar */ }
     }
 
+    // Filtro: solo operaciones con algún campo calculado forzado
+    if (req.query.solo_forzados === '1') {
+      where += ` AND ob.campos_forzados IS NOT NULL AND JSON_LENGTH(ob.campos_forzados) > 0`;
+    }
+
     const [[{ total }]] = await pool.query(
       `SELECT COUNT(*) AS total FROM creditos ob LEFT JOIN clientes cl ON cl.id_cliente = ob.id_cliente ${where}`, params
     );
 
     const [rows] = await pool.query(
-      `SELECT ob.id, ob.num_op, ob.mes,
+      `SELECT ob.id, ob.num_op, ob.mes, ob.campos_forzados,
               COALESCE(ob.numero_credito, CAST(ob.num_op AS CHAR)) AS numero_credito_display,
               ${COLS_SELECT},
               ${estadoExpr} AS estado_calc,
@@ -154,6 +167,7 @@ const getCreditos = async (req, res) => {
       success: true,
       data: rows,
       campos: CAMPOS_EDIT,
+      calculados: CAMPOS_CALCULADOS,
       pagination: { total, page: pageNum, limit, pages: Math.ceil(total / limit) },
       error: null,
     });
@@ -184,9 +198,9 @@ const updateCredito = async (req, res) => {
     const colsValidas = new Set(CAMPOS_EDIT.map(c => c.col));
     const sets = [], vals = [], logEntries = [];
 
-    // Obtener valores actuales para el log
+    // Obtener valores actuales para el log + la marca de forzados
     const colsSel = [...colsValidas].join(', ');
-    const [[actual]] = await pool.query(`SELECT ${colsSel} FROM creditos WHERE id = ?`, [id]);
+    const [[actual]] = await pool.query(`SELECT ${colsSel}, campos_forzados FROM creditos WHERE id = ?`, [id]);
 
     for (const [campo, nuevoVal] of Object.entries(cambios)) {
       if (!colsValidas.has(campo)) continue;
@@ -198,6 +212,17 @@ const updateCredito = async (req, res) => {
     }
 
     if (!sets.length) return res.status(400).json({ success: false, data: null, error: 'Sin campos para actualizar' });
+
+    // Si se editó a mano un campo CALCULADO, marcarlo como forzado (negociación puntual).
+    const calcEditados = Object.keys(cambios).filter(c => CAMPOS_CALCULADOS.includes(c) && colsValidas.has(c));
+    if (calcEditados.length) {
+      let lista = [];
+      const raw = actual?.campos_forzados;
+      try { lista = Array.isArray(raw) ? raw : (raw ? JSON.parse(raw) : []); } catch (_) { lista = []; }
+      const merged = [...new Set([...lista, ...calcEditados])];
+      sets.push('campos_forzados = ?');
+      vals.push(JSON.stringify(merged));
+    }
 
     await pool.query(`UPDATE creditos SET ${sets.join(', ')}, updated_at = NOW() WHERE id = ?`, [...vals, id]);
 

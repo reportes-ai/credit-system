@@ -23,6 +23,17 @@ const COLS_FIJAS = [
   { field:'rut_cliente',            label:'RUT',                   edit:false },
 ];
 const camposVis = () => CAMPOS.filter(c => c.col !== 'id_financiera');
+
+// Campos calculados (azul) y forzados (rojo). El backend envía la lista en `calculados`.
+let CALC = new Set();
+let _soloForzados = false;
+const CALC_STYLE    = 'color:#0141A2';                 // azul = calculado por fórmula
+const FORZADO_STYLE = 'color:#dc2626;font-weight:700'; // rojo = digitado a mano (forzado)
+function parseForzados(raw) {
+  if (!raw) return new Set();
+  try { const a = Array.isArray(raw) ? raw : JSON.parse(raw); return new Set(Array.isArray(a) ? a : []); }
+  catch (_) { return new Set(); }
+}
 const escH = s => String(s ?? '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
 const debounce = (fn, ms) => { let t; return (...a) => { clearTimeout(t); t = setTimeout(() => fn(...a), ms); }; };
 
@@ -125,15 +136,17 @@ function renderRows(rows) {
       return `<td data-field="${c.field}"${style}>${escH(r[c.field]||'')}</td>`;
     }).join('');
 
+    const fzSet = parseForzados(r.campos_forzados);
     const editTds = camposVis().map(c => {
       const v = r[c.col];
+      const stl = CALC.has(c.col) ? (fzSet.has(c.col) ? FORZADO_STYLE : CALC_STYLE) : '';
       if (c.tipo === 'select') {
         const opts = c.ops.map(o => `<option${v===o?' selected':''}>${escH(o)}</option>`).join('');
-        return `<td data-field="${c.col}" data-id="${rowId}" data-col="${c.col}"><select onchange="markMod(this)">${opts}</select></td>`;
+        return `<td data-field="${c.col}" data-id="${rowId}" data-col="${c.col}"><select onchange="markMod(this)" style="${stl}">${opts}</select></td>`;
       }
       const itype = c.tipo === 'date' ? 'date' : c.tipo === 'month' ? 'month' : 'text';
       const val = c.tipo === 'date' ? String(v||'').slice(0,10) : c.tipo === 'month' ? String(v||'').slice(0,7) : (v??'');
-      return `<td data-field="${c.col}" data-id="${rowId}" data-col="${c.col}"><input type="${itype}" value="${escH(String(val))}" onchange="markMod(this)"></td>`;
+      return `<td data-field="${c.col}" data-id="${rowId}" data-col="${c.col}"><input type="${itype}" value="${escH(String(val))}" onchange="markMod(this)" style="${stl}"></td>`;
     }).join('');
 
     return `<tr id="row-${rowId}">
@@ -162,12 +175,14 @@ async function load() {
   const activeFilters = Object.fromEntries(Object.entries(filters).filter(([,v]) => v !== ''));
   const params = new URLSearchParams({ tipo: TIPO, page, sort: sortCol, dir: sortDir });
   if (Object.keys(activeFilters).length) params.set('filters', JSON.stringify(activeFilters));
+  if (_soloForzados) params.set('solo_forzados', '1');
   try {
     const r = await fetch('/api/edicion-creditos?' + params, { headers: H });
     const j = await r.json();
     if (!j.success) throw new Error(j.error);
     const first = !CAMPOS.length;
     CAMPOS = j.campos || [];
+    CALC = new Set(j.calculados || []);
     if (first) buildHeaders();
     renderRows(j.data || []);
     const pg = j.pagination || {};
@@ -261,6 +276,8 @@ function markMod(el) {
   const td = el.closest('td');
   const rowId = td.dataset.id;
   td.classList.add('modified');
+  // Editar a mano un campo calculado lo deja forzado → feedback inmediato en rojo
+  if (CALC.has(td.dataset.col)) { el.style.color = '#dc2626'; el.style.fontWeight = '700'; }
   window._MODS = window._MODS || {};
   window._MODS[rowId] = window._MODS[rowId] || {};
   window._MODS[rowId][td.dataset.col] = el.value;
@@ -325,5 +342,22 @@ document.addEventListener('click', e => {
     if (dd) dd.style.display = 'none';
   }
 });
+
+// Botón "Solo forzados": filtra las operaciones con algún campo calculado forzado (rojo)
+(function injectForzadosBtn() {
+  const tb = document.querySelector('.toolbar');
+  if (!tb || document.getElementById('btnForzados')) return;
+  const b = document.createElement('button');
+  b.id = 'btnForzados'; b.type = 'button';
+  b.style.cssText = 'margin-left:auto;border:1px solid #fecaca;background:#fff;color:#dc2626;border-radius:8px;padding:6px 12px;font-size:.82rem;font-weight:600;cursor:pointer;display:inline-flex;align-items:center;gap:6px';
+  b.innerHTML = '<i class="bi bi-flag-fill"></i> Solo forzados';
+  b.onclick = () => {
+    _soloForzados = !_soloForzados;
+    b.style.background = _soloForzados ? '#dc2626' : '#fff';
+    b.style.color = _soloForzados ? '#fff' : '#dc2626';
+    page = 1; load();
+  };
+  tb.appendChild(b);
+})();
 
 load();
