@@ -410,17 +410,24 @@
     }
 
     /* ── Print functions ── */
+    // Chrome usa el document.title como nombre por defecto al "Guardar como PDF".
+    function _printConNombre() {
+      const orig = document.title;
+      if (window._docMeta) document.title = window._docMeta;
+      window.print();
+      setTimeout(() => { document.title = orig; }, 800);
+    }
     function imprimirActual() {
       document.querySelectorAll('.doc-panel').forEach(p => {
         p.classList.remove('print-target');
         if (p.id === 'panel-' + _activeTab) p.classList.add('print-target');
       });
-      window.print();
+      _printConNombre();
     }
 
     function imprimirTodos() {
       document.querySelectorAll('.doc-panel').forEach(p => p.classList.add('print-target'));
-      window.print();
+      _printConNombre();
       setTimeout(() => document.querySelectorAll('.doc-panel').forEach(p => p.classList.remove('print-target')), 500);
     }
 
@@ -539,6 +546,9 @@
         _set('creditNumero','Operación N° '  + (c.numero_credito || creditId));
         _set('creditNombre', c.nombre_cliente || '—');
         _set('creditRut',    c.rut_cliente    || '—');
+        // Nombre del PDF al imprimir = N° crédito + RUT + nombre del cliente
+        window._docMeta = [ (c.numero_credito || creditId), c.rut_cliente, c.nombre_cliente ]
+          .map(x => String(x || '').trim()).filter(Boolean).join(' ');
 
         // Activate emission mode if state is EMISION_DOCUMENTOS
         if (c.estado === 'EMISION_DOCUMENTOS') activarModoEmision();
