@@ -286,9 +286,30 @@ function formatRUT(raw) {
   for (let i=body.length; i>0; i-=3) fmt=body.slice(Math.max(0,i-3),i)+(fmt?'.'+fmt:'');
   return fmt+'-'+dv;
 }
+// Dígito verificador (módulo 11) — misma lógica que el resto de las páginas
+function calcDV(body) {
+  const digits = String(body).replace(/\D/g,'');
+  if (!digits) return null;
+  const serie = [2,3,4,5,6,7];
+  const suma = digits.split('').reverse().reduce((a,d,i)=>a + parseInt(d)*serie[i%6], 0);
+  const resto = 11 - (suma % 11);
+  return resto === 11 ? '0' : resto === 10 ? 'K' : String(resto);
+}
+// true = válido, false = DV incorrecto, null = incompleto
+function validarRUT(clean) {
+  clean = String(clean).replace(/[^0-9kK]/g,'').toUpperCase();
+  if (clean.length < 7 || clean.length > 9) return null;
+  return calcDV(clean.slice(0,-1)) === clean.slice(-1).toUpperCase();
+}
 function onRutInputCred(el) {
-  const c=el.value.replace(/[^0-9kK]/g,'');
+  const c=el.value.replace(/[^0-9kK]/g,'').toUpperCase();
   if (c.length>=2) el.value=formatRUT(el.value);
+  const hint=document.getElementById('iRutHint');
+  const v=validarRUT(c);
+  if (v===true)      { el.style.borderColor='#059669'; if(hint){hint.style.color='#059669'; hint.textContent='✓ RUT válido';} }
+  else if (v===false){ el.style.borderColor='#dc2626'; if(hint){hint.style.color='#dc2626'; hint.textContent='✗ Dígito verificador incorrecto (debería ser '+calcDV(c.slice(0,-1))+')';} }
+  else if (c.length>0){ el.style.borderColor=''; if(hint){hint.style.color='#9ca3af'; hint.textContent='Ingresa el RUT completo con dígito verificador';} }
+  else               { el.style.borderColor=''; if(hint) hint.textContent=''; }
 }
 
 /* ═══════════════════════════════════════════════════════════════════
@@ -628,6 +649,9 @@ async function guardarEstadoDetalle() {
 async function buscarClienteCred() {
   const rut = document.getElementById('iRut').value.trim().toUpperCase();
   if (!rut) return;
+  const v = validarRUT(rut);
+  if (v === false) { showToast('RUT inválido: dígito verificador incorrecto', false); return; }
+  if (v === null)  { showToast('Ingresa el RUT completo con dígito verificador', false); return; }
   const msg = document.getElementById('rutClienteFoundMsg');
   try {
     // Traer datos del cliente y los tres timestamps en paralelo
