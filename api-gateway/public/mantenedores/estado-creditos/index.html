@@ -4,38 +4,37 @@
   <meta charset="UTF-8">
   <link rel="icon" href="/img/favicon.png" type="image/png">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Estado Créditos — AutoFácil</title>
+  <title>Etapas y Estados de Créditos — AutoFácil</title>
   <link href="/css/bootstrap.min.css" rel="stylesheet">
   <link href="/css/bootstrap-icons.css" rel="stylesheet">
-  <!-- v1.0 -->
+  <!-- v2.0 -->
   <style>
     :root { --navy:#0141A2; --navy-dark:#012d70; --navy-light:#0255c5; --accent:#009AFE; --bg:#f0f4f8; }
     body { background:var(--bg); font-family:'Segoe UI',system-ui,sans-serif; margin:0; min-height:100vh; color:#1e293b; }
-    .topnav { background:linear-gradient(90deg,var(--navy-dark),var(--navy-light)); color:#fff; height:60px; padding:0 24px; display:flex; align-items:center; justify-content:space-between; position:sticky; top:0; z-index:200; box-shadow:0 2px 8px rgba(0,0,0,.3); }
-    .topnav-left { display:flex; align-items:center; gap:16px; }
-    .topnav-brand { display:flex; align-items:center; gap:8px; text-decoration:none; }
-    .topnav-brand img { height:34px; filter:brightness(0) invert(1); }
-    .version-badge { background:rgba(255,255,255,.15); color:rgba(255,255,255,.75); font-size:.65rem; font-weight:700; border-radius:6px; padding:2px 8px; }
-    .breadcrumb-nav { color:rgba(255,255,255,.6); font-size:.85rem; }
-    .breadcrumb-nav a { color:rgba(255,255,255,.75); text-decoration:none; }
-    .breadcrumb-nav .sep { color:rgba(255,255,255,.35); margin:0 6px; }
-    .btn-nav { background:rgba(255,255,255,.12); border:1px solid rgba(255,255,255,.25); color:#fff; border-radius:8px; padding:6px 13px; font-size:.82rem; font-weight:600; cursor:pointer; text-decoration:none; display:inline-flex; align-items:center; gap:6px; }
-    .btn-nav:hover { background:rgba(255,255,255,.22); }
-    .main { max-width:1200px; margin:0 auto; padding:30px 28px 80px; }
-    .page-banner { background:linear-gradient(135deg,#012d70,#0141A2 50%,#009AFE); border-radius:16px; color:#fff; padding:24px 32px; margin-bottom:26px; display:flex; align-items:center; gap:18px; }
-    .page-banner i.big { font-size:2.6rem; opacity:.85; }
+    .main { max-width:1200px; margin:0 auto; padding:24px 28px 80px; }
+    .page-banner { background:linear-gradient(135deg,#012d70,#0141A2 50%,#009AFE); border-radius:16px; color:#fff; padding:22px 30px; margin-bottom:18px; display:flex; align-items:center; gap:18px; }
+    .page-banner i.big { font-size:2.5rem; opacity:.85; }
     .page-banner h2 { font-weight:700; margin:0 0 3px; font-size:1.3rem; }
     .page-banner p { opacity:.82; margin:0; font-size:.86rem; }
 
-    .toolbar { display:flex; align-items:center; gap:12px; margin-bottom:18px; flex-wrap:wrap; }
-    .toolbar label { font-size:.8rem; font-weight:700; color:#475569; }
-    .toolbar select { border:1.5px solid #d1d5db; border-radius:8px; padding:7px 10px; font-size:.88rem; }
+    /* Tabs */
+    .tabs { display:flex; gap:8px; margin-bottom:22px; border-bottom:2px solid #e2e8f0; }
+    .tab { background:none; border:none; border-bottom:3px solid transparent; margin-bottom:-2px; padding:11px 22px; font-size:.92rem; font-weight:700; color:#64748b; cursor:pointer; display:flex; align-items:center; gap:8px; }
+    .tab.active { color:var(--navy); border-bottom-color:var(--navy); }
+    .tab:hover { color:var(--navy); }
+    .panel { animation:fade .2s ease; }
+    @keyframes fade { from{opacity:0} to{opacity:1} }
+
+    .sec-head { display:flex; align-items:center; gap:12px; margin:6px 0 14px; }
+    .sec-head h3 { font-size:1rem; font-weight:800; color:var(--navy-dark); margin:0; display:flex; align-items:center; gap:9px; }
+    .sec-head .desc { font-size:.8rem; color:#64748b; }
+    .sec-head .spacer { flex:1; }
     .btn-primary2 { background:var(--navy); color:#fff; border:none; border-radius:8px; padding:8px 15px; font-size:.84rem; font-weight:700; cursor:pointer; display:inline-flex; align-items:center; gap:6px; }
     .btn-primary2:hover { background:var(--accent); }
-    .spacer { flex:1; }
 
     .card-box { background:#fff; border-radius:14px; box-shadow:0 1px 6px rgba(0,0,0,.07); padding:18px 22px; margin-bottom:22px; }
     .card-box h3 { font-size:.78rem; font-weight:800; text-transform:uppercase; letter-spacing:.07em; color:var(--navy-dark); margin:0 0 14px; display:flex; align-items:center; gap:8px; }
+    .card-box .sub { font-size:.78rem; color:#64748b; font-weight:500; text-transform:none; letter-spacing:0; margin:-8px 0 14px; }
 
     .entries { display:flex; gap:10px; flex-wrap:wrap; }
     .entry-chip { display:inline-flex; align-items:center; gap:8px; border:1.5px solid #cbd5e1; border-radius:24px; padding:7px 15px; font-weight:700; font-size:.85rem; background:#f8fafc; }
@@ -46,10 +45,11 @@
     .ec-head { display:flex; align-items:center; gap:9px; }
     .ec-name { font-weight:800; font-size:1rem; color:#0f172a; }
     .ec-code { font-size:.68rem; color:#94a3b8; font-weight:700; letter-spacing:.03em; }
-    .ec-badges { display:flex; gap:5px; margin-left:auto; }
+    .ec-badges { display:flex; gap:5px; margin-left:auto; flex-wrap:wrap; justify-content:flex-end; }
     .badge2 { font-size:.62rem; font-weight:800; border-radius:5px; padding:2px 7px; text-transform:uppercase; letter-spacing:.03em; }
     .b-ini { background:#dbeafe; color:#1d4ed8; }
     .b-fin { background:#fee2e2; color:#b91c1c; }
+    .b-auto { background:#dcfce7; color:#15803d; }
     .b-off { background:#f1f5f9; color:#94a3b8; }
     .ec-trans { margin-top:11px; }
     .ec-trans .lbl { font-size:.68rem; font-weight:700; color:#64748b; text-transform:uppercase; letter-spacing:.04em; margin-bottom:5px; }
@@ -60,6 +60,12 @@
     .ec-actions button { flex:1; background:#f8fafc; border:1px solid #e2e8f0; border-radius:7px; padding:6px; font-size:.74rem; font-weight:700; cursor:pointer; color:#475569; display:inline-flex; align-items:center; justify-content:center; gap:5px; }
     .ec-actions button:hover { background:#eff6ff; border-color:#bfdbfe; color:var(--navy); }
     .ec-actions button.del:hover { background:#fef2f2; border-color:#fca5a5; color:#b91c1c; }
+
+    .um-grid { display:grid; grid-template-columns:repeat(3,1fr); gap:14px; }
+    .um-grid label { font-size:.76rem; font-weight:700; color:#374151; display:block; margin-bottom:5px; }
+    .um-grid input { width:100%; padding:8px 10px; border:1.5px solid #d1d5db; border-radius:8px; font-size:.9rem; box-sizing:border-box; }
+    .um-hint { font-size:.72rem; color:#64748b; margin-top:4px; }
+    .motor-row { display:flex; align-items:center; gap:14px; flex-wrap:wrap; margin-top:6px; }
 
     dialog { border:none; border-radius:16px; padding:0; box-shadow:0 24px 60px rgba(0,0,0,.3); max-width:480px; width:92%; }
     dialog::backdrop { background:rgba(15,23,42,.45); }
@@ -92,57 +98,113 @@
   </style>
 </head>
 <body>
-  <nav class="topnav">
-    <div class="topnav-left">
-      <a href="/" class="topnav-brand"><img src="/img/logo.png" alt="AutoFácil"><span class="version-badge" id="versionBadge">v1.0</span></a>
-      <div class="breadcrumb-nav"><a href="/">Inicio</a><span class="sep">›</span><a href="/mantenedores">Mantenedores</a><span class="sep">›</span><span style="color:#fff;font-weight:600"><i class="bi bi-diagram-3-fill me-1"></i>Estado Créditos</span></div>
-    </div>
-    <a href="/mantenedores" class="btn-nav"><i class="bi bi-arrow-left"></i>Mantenedores</a>
-  </nav>
+  <!-- Barra superior única (componente) -->
+  <div id="af-topnav"></div>
+  <script>
+    window.AF_TOPNAV = {
+      breadcrumb: [
+        { label:'Inicio', href:'/' },
+        { label:'Mantenedores', href:'/mantenedores' },
+        { label:'Etapas y Estados', icon:'bi-diagram-3-fill', current:true }
+      ],
+      actions: [ { label:'Mantenedores', icon:'bi-arrow-left', href:'/mantenedores' } ]
+    };
+  </script>
 
   <div class="main">
     <div class="page-banner">
       <i class="bi bi-diagram-3-fill big"></i>
       <div>
-        <h2>Estado Créditos</h2>
-        <p>Estados del crédito y sus transiciones permitidas. Define el flujo brokerage de forma paramétrica.</p>
+        <h2>Etapas y Estados de Créditos</h2>
+        <p>Dos dimensiones del crédito: la <b>Etapa</b> (originación, por línea de negocio) y, para recursos propios, el <b>Estado de Cartera</b> (situación de pago). Todo paramétrico.</p>
       </div>
     </div>
 
-    <div class="toolbar">
-      <label>Ámbito:</label>
-      <select id="selAmbito" onchange="cargar()">
-        <option value="brokerage" selected>Brokerage (AutoFin / Unidad)</option>
-      </select>
-      <span class="spacer"></span>
-      <button class="btn-primary2" id="btnNuevo" onclick="abrirNuevo()" style="display:none"><i class="bi bi-plus-lg"></i> Agregar estado</button>
+    <!-- Pestañas -->
+    <div class="tabs">
+      <button class="tab active" id="tab-bro" onclick="showTab('bro')"><i class="bi bi-people"></i> Brokerage</button>
+      <button class="tab" id="tab-af" onclick="showTab('af')"><i class="bi bi-house-gear"></i> AutoFácil</button>
     </div>
 
-    <div class="card-box">
-      <h3><i class="bi bi-door-open"></i> Puertas de entrada (estado al ingresar)</h3>
-      <div class="entries" id="entries"><span class="muted">Cargando…</span></div>
+    <!-- ───────── Panel Brokerage ───────── -->
+    <div class="panel" id="panel-bro">
+      <div class="sec-head">
+        <h3><i class="bi bi-signpost-split"></i> Etapas (originación)</h3>
+        <span class="desc">AutoFin / Unidad de Crédito — el flujo de brokerage.</span>
+        <span class="spacer"></span>
+        <button class="btn-primary2 adminBtn" onclick="abrirNuevo('bro')" style="display:none"><i class="bi bi-plus-lg"></i> Agregar etapa</button>
+      </div>
+      <div class="card-box">
+        <h3><i class="bi bi-door-open"></i> Puertas de entrada (etapa al ingresar)</h3>
+        <div class="entries" id="entries-bro"><span class="muted">Cargando…</span></div>
+      </div>
+      <div class="card-box">
+        <h3><i class="bi bi-diagram-2"></i> Etapas y transiciones</h3>
+        <div class="grid" id="grid-bro"><span class="muted">Cargando…</span></div>
+      </div>
     </div>
 
-    <div class="card-box">
-      <h3><i class="bi bi-diagram-2"></i> Estados y transiciones</h3>
-      <div class="grid" id="grid"><span class="muted">Cargando…</span></div>
+    <!-- ───────── Panel AutoFácil ───────── -->
+    <div class="panel" id="panel-af" style="display:none">
+      <!-- Etapas propias -->
+      <div class="sec-head">
+        <h3><i class="bi bi-signpost-split"></i> Etapas (originación)</h3>
+        <span class="desc">Cómo nace y se cursa un crédito de recursos propios. Termina en <b>Otorgado</b>.</span>
+        <span class="spacer"></span>
+        <button class="btn-primary2 adminBtn" onclick="abrirNuevo('af')" style="display:none"><i class="bi bi-plus-lg"></i> Agregar etapa</button>
+      </div>
+      <div class="card-box">
+        <h3><i class="bi bi-door-open"></i> Puertas de entrada (etapa al ingresar)</h3>
+        <div class="entries" id="entries-af"><span class="muted">Cargando…</span></div>
+      </div>
+      <div class="card-box">
+        <h3><i class="bi bi-diagram-2"></i> Etapas y transiciones</h3>
+        <div class="grid" id="grid-af"><span class="muted">Cargando…</span></div>
+      </div>
+
+      <!-- Estados de Cartera -->
+      <div class="sec-head" style="margin-top:26px">
+        <h3><i class="bi bi-wallet2"></i> Estados de Cartera</h3>
+        <span class="desc">Situación de pago del crédito vivo (segunda dimensión). Arranca en <b>Vigente</b> al otorgar.</span>
+        <span class="spacer"></span>
+        <button class="btn-primary2 adminBtn" onclick="abrirNuevo('car')" style="display:none"><i class="bi bi-plus-lg"></i> Agregar estado</button>
+      </div>
+      <div class="card-box">
+        <h3><i class="bi bi-sliders"></i> Umbrales de atraso (días)</h3>
+        <div class="sub">Definen el paso Vigente → Mora → Vencido (cuota impaga más antigua) y desde qué día se <b>sugiere</b> castigar (el castigo es manual).</div>
+        <div class="um-grid">
+          <div><label>En Mora desde (≥)</label><input type="number" id="umMora" min="0" step="1"><div class="um-hint">Típico: 1 día.</div></div>
+          <div><label>Vencido desde (≥)</label><input type="number" id="umVencido" min="0" step="1"><div class="um-hint">Típico: 91 (más de 90).</div></div>
+          <div><label>Castigo sugerido (≥)</label><input type="number" id="umCastigo" min="0" step="1"><div class="um-hint">Solo alerta; manual.</div></div>
+        </div>
+        <div class="motor-row">
+          <button class="btn-primary2 adminBtn" onclick="guardarUmbrales()" style="display:none"><i class="bi bi-save"></i> Guardar umbrales</button>
+          <button class="btn-primary2 adminBtn" onclick="recalcular()" id="btnRecalc" style="display:none;background:#0f766e"><i class="bi bi-arrow-repeat"></i> Recalcular cartera ahora</button>
+          <div id="recalcRes" style="font-size:.82rem;color:#475569"></div>
+        </div>
+      </div>
+      <div class="card-box">
+        <h3><i class="bi bi-diagram-2"></i> Estados y transiciones</h3>
+        <div class="sub">Vigente/Mora/Vencido los mueve el motor por atraso (chip <span class="badge2 b-auto">Auto</span>). Terminado/Prepagado/Castigado son cierres.</div>
+        <div class="grid" id="grid-car"><span class="muted">Cargando…</span></div>
+      </div>
     </div>
 
     <div class="afecta">
       <h4><i class="bi bi-diagram-3"></i> Qué afecta este mantenedor</h4>
       <ul>
-        <li><b>Estados y transiciones (Brokerage)</b> → dibujan el <a href="/mantenedores/flujo-brokerage/">Flujo Crédito Brokerage</a> (estados que aparecen y a qué estados puede pasar cada crédito de AutoFin/Unidad).</li>
-        <li><b>Puertas de entrada</b> → reflejan cómo nace un crédito: <i>Digitado</i> (digitación o <a href="/carga-masiva/">Carga Masiva</a>) y <i>Carta de Aprobación</i> (vía <a href="/cartas-aprobacion/">Cartas de Aprobación</a>).</li>
-        <li><b>Nombre y color de cada estado</b> → etiqueta y badge con que se muestra el estado en el flujo y la documentación del proceso.</li>
-        <li><b>Ámbito</b> → permite definir a futuro un set propio para los créditos <i>AutoFácil</i> (recursos propios) sin alterar el de brokerage.</li>
-        <li class="muted">Nota: en esta fase el mantenedor <b>no bloquea</b> los cambios de estado en <a href="/creditos">Gestión de Créditos</a>; es la fuente de verdad y dibuja el flujo. El bloqueo de transiciones inválidas se activará cuando el mapa esté validado.</li>
+        <li><b>Etapas Brokerage</b> → dibujan el <a href="/mantenedores/flujo-brokerage/">Flujo Crédito Brokerage</a> (qué etapas existen y a cuáles puede pasar cada crédito de AutoFin/Unidad).</li>
+        <li><b>Etapas AutoFácil</b> → ciclo de originación de los créditos de recursos propios; termina en <i>Otorgado</i>, donde toma el control el Estado de Cartera.</li>
+        <li><b>Estados de Cartera</b> → el <b>Estado</b> que se muestra en la ficha del crédito propio y los listados de cartera (Vigente/Mora/Vencido/Terminado/Prepagado/Castigado).</li>
+        <li><b>Umbrales (mora / vencido / castigo)</b> → el motor que clasifica por días de atraso, usando el calendario de <a href="/creditos/pagar-cuotas">Pagar Cuotas</a> (misma fuente que mora y gastos de cobranza).</li>
+        <li class="muted">Nota: fase de configuración. No <b>bloquea</b> transiciones ni mueve nada por sí solo todavía; es la fuente de verdad y dibuja el flujo. El enforcement se activará cuando el mapa esté validado.</li>
       </ul>
     </div>
   </div>
 
-  <!-- Dialog estado -->
+  <!-- Dialog estado/etapa -->
   <dialog id="dlgEstado">
-    <div class="dlg-head"><i class="bi bi-pencil-square"></i><span id="dlgTitle">Nuevo estado</span></div>
+    <div class="dlg-head"><i class="bi bi-pencil-square"></i><span id="dlgTitle">Nuevo</span></div>
     <div class="dlg-body">
       <div class="row2">
         <div class="field"><label>Código</label><input type="text" id="fCodigo" placeholder="EJ: APROBADO" maxlength="40"></div>
@@ -154,7 +216,8 @@
         <div class="field">
           <label>Marcas</label>
           <label class="chkline" style="margin-bottom:4px"><input type="checkbox" id="fInicial"> Es puerta de entrada (inicial)</label>
-          <label class="chkline"><input type="checkbox" id="fFinal"> Es estado final</label>
+          <label class="chkline" style="margin-bottom:4px"><input type="checkbox" id="fFinal"> Es estado final (cierre)</label>
+          <label class="chkline" id="rowAuto" style="display:none"><input type="checkbox" id="fAuto"> Automático (lo mueve el motor por atraso)</label>
         </div>
       </div>
     </div>
@@ -187,50 +250,63 @@
     const esAdmin = yo?.perfil === 'Administrador';
     const H = { 'Content-Type':'application/json', Authorization:'Bearer '+token };
     const esc = s => String(s ?? '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
-
-    let ESTADOS = [];          // [{codigo,nombre,color,orden,es_inicial,es_final,activo,destinos:[]}]
-    let editCodigo = null;     // código en edición (null = nuevo)
-    const ambito = () => document.getElementById('selAmbito').value;
-
     function toast(msg, ok=true){ const t=document.getElementById('toast'); t.textContent=msg; t.className='toast '+(ok?'ok':'err'); t.style.display='block'; setTimeout(()=>t.style.display='none',2800); }
 
-    async function cargar(){
-      if (esAdmin) document.getElementById('btnNuevo').style.display='inline-flex';
+    // Contextos: bro/af = ETAPAS (estado-creditos por ámbito); car = ESTADO de cartera.
+    const CTX = {
+      bro: { base:'/api/estado-creditos', ambito:'brokerage', hasAuto:false, entries:'entries-bro', grid:'grid-bro', states:[], loaded:false },
+      af:  { base:'/api/estado-creditos', ambito:'autofacil', hasAuto:false, entries:'entries-af',  grid:'grid-af',  states:[], loaded:false },
+      car: { base:'/api/estado-cartera',  ambito:null,        hasAuto:true,  entries:null,          grid:'grid-car', states:[], loaded:false },
+    };
+    let ACTIVE = null;          // ctx key activo para los diálogos
+    let editCodigo = null;
+
+    function nombreDe(key,cod){ const e=CTX[key].states.find(x=>x.codigo===cod); return e?e.nombre:cod; }
+    function colorDe(key,cod){ const e=CTX[key].states.find(x=>x.codigo===cod); return e?e.color:'#94a3b8'; }
+
+    async function loadCtx(key){
+      const c = CTX[key];
       try {
-        const r = await fetch('/api/estado-creditos?ambito='+ambito(), { headers:H });
+        const url = c.ambito ? c.base+'?ambito='+c.ambito : c.base;
+        const r = await fetch(url, { headers:H });
         const j = await r.json();
         if (!j.success) throw new Error(j.error||'Error');
-        ESTADOS = j.data.estados || [];
-      } catch(e){ toast('Error al cargar: '+e.message, false); ESTADOS=[]; }
-      render();
+        c.states = j.data.estados || [];
+        if (key==='car' && j.data.parametros) {
+          const p = j.data.parametros;
+          document.getElementById('umMora').value    = p.mora_desde ?? 1;
+          document.getElementById('umVencido').value = p.vencido_desde ?? 91;
+          document.getElementById('umCastigo').value = p.castigo_sugerido ?? 181;
+        }
+        c.loaded = true;
+      } catch(e){ toast('Error al cargar: '+e.message, false); c.states=[]; }
+      renderCtx(key);
     }
 
-    function nombreDe(cod){ const e=ESTADOS.find(x=>x.codigo===cod); return e?e.nombre:cod; }
-    function colorDe(cod){ const e=ESTADOS.find(x=>x.codigo===cod); return e?e.color:'#94a3b8'; }
-
-    function render(){
-      // Puertas de entrada
-      const ini = ESTADOS.filter(e=>e.es_inicial);
-      document.getElementById('entries').innerHTML = ini.length
-        ? ini.map(e=>`<span class="entry-chip"><span class="dot" style="background:${esc(e.color)}"></span>${esc(e.nombre)}</span>`).join('')
-        : '<span class="muted">Ningún estado marcado como inicial.</span>';
-
-      // Grilla de estados
-      const grid = document.getElementById('grid');
-      if (!ESTADOS.length){ grid.innerHTML='<span class="muted">Sin estados. Usa “Agregar estado”.</span>'; return; }
-      grid.innerHTML = ESTADOS.map(e=>{
+    function renderCtx(key){
+      const c = CTX[key];
+      if (c.entries){
+        const ini = c.states.filter(e=>e.es_inicial);
+        document.getElementById(c.entries).innerHTML = ini.length
+          ? ini.map(e=>`<span class="entry-chip"><span class="dot" style="background:${esc(e.color)}"></span>${esc(e.nombre)}</span>`).join('')
+          : '<span class="muted">Ningún estado marcado como inicial.</span>';
+      }
+      const grid = document.getElementById(c.grid);
+      if (!c.states.length){ grid.innerHTML='<span class="muted">Sin estados.</span>'; return; }
+      grid.innerHTML = c.states.map(e=>{
         const badges = [];
         if (e.es_inicial) badges.push('<span class="badge2 b-ini">Inicial</span>');
         if (e.es_final)   badges.push('<span class="badge2 b-fin">Final</span>');
+        if (e.automatico) badges.push('<span class="badge2 b-auto">Auto</span>');
         if (!e.activo)    badges.push('<span class="badge2 b-off">Inactivo</span>');
-        const chips = e.destinos.length
-          ? e.destinos.map(d=>`<span class="tchip"><span class="dot" style="width:8px;height:8px;background:${esc(colorDe(d))}"></span>${esc(nombreDe(d))}</span>`).join('')
+        const chips = (e.destinos&&e.destinos.length)
+          ? e.destinos.map(d=>`<span class="tchip"><span class="dot" style="width:8px;height:8px;background:${esc(colorDe(key,d))}"></span>${esc(nombreDe(key,d))}</span>`).join('')
           : '<span class="tchip none">— sin salida (final) —</span>';
         const actions = esAdmin ? `
           <div class="ec-actions">
-            <button onclick="abrirTrans('${esc(e.codigo)}')"><i class="bi bi-arrow-right-circle"></i>Transiciones</button>
-            <button onclick="abrirEditar('${esc(e.codigo)}')"><i class="bi bi-pencil"></i>Editar</button>
-            <button class="del" onclick="eliminar('${esc(e.codigo)}')"><i class="bi bi-trash"></i></button>
+            <button onclick="abrirTrans('${key}','${esc(e.codigo)}')"><i class="bi bi-arrow-right-circle"></i>Transiciones</button>
+            <button onclick="abrirEditar('${key}','${esc(e.codigo)}')"><i class="bi bi-pencil"></i>Editar</button>
+            <button class="del" onclick="eliminar('${key}','${esc(e.codigo)}')"><i class="bi bi-trash"></i></button>
           </div>` : '';
         return `
           <div class="estado-card" style="border-left-color:${esc(e.color)}">
@@ -239,83 +315,101 @@
               <div><div class="ec-name">${esc(e.nombre)}</div><div class="ec-code">${esc(e.codigo)}</div></div>
               <div class="ec-badges">${badges.join('')}</div>
             </div>
-            <div class="ec-trans">
-              <div class="lbl">Permite pasar a</div>
-              <div class="trans-chips">${chips}</div>
-            </div>
+            <div class="ec-trans"><div class="lbl">Permite pasar a</div><div class="trans-chips">${chips}</div></div>
             ${actions}
           </div>`;
       }).join('');
     }
 
-    // ── Alta / edición ──
-    function abrirNuevo(){
-      editCodigo = null;
-      document.getElementById('dlgTitle').textContent = 'Nuevo estado';
+    // ── Pestañas ──
+    function showTab(key){
+      document.getElementById('tab-bro').classList.toggle('active', key==='bro');
+      document.getElementById('tab-af').classList.toggle('active', key==='af');
+      document.getElementById('panel-bro').style.display = key==='bro' ? '' : 'none';
+      document.getElementById('panel-af').style.display  = key==='af'  ? '' : 'none';
+      if (key==='bro' && !CTX.bro.loaded) loadCtx('bro');
+      if (key==='af'){ if(!CTX.af.loaded) loadCtx('af'); if(!CTX.car.loaded) loadCtx('car'); }
+    }
+
+    // ── Alta / edición de estado/etapa ──
+    function abrirNuevo(key){
+      ACTIVE = key; editCodigo = null;
+      const c = CTX[key];
+      document.getElementById('dlgTitle').textContent = c.hasAuto ? 'Nuevo estado de cartera' : 'Nueva etapa';
       document.getElementById('fCodigo').value=''; document.getElementById('fCodigo').removeAttribute('readonly');
       document.getElementById('fNombre').value='';
       document.getElementById('fColor').value='#64748b';
-      document.getElementById('fOrden').value = (Math.max(0,...ESTADOS.map(e=>e.orden))+10);
+      document.getElementById('fOrden').value = (Math.max(0,...c.states.map(e=>e.orden||0))+10);
       document.getElementById('fInicial').checked=false;
       document.getElementById('fFinal').checked=false;
+      document.getElementById('fAuto').checked=false;
+      document.getElementById('rowAuto').style.display = c.hasAuto ? 'flex' : 'none';
       document.getElementById('dlgEstado').showModal();
     }
-    function abrirEditar(cod){
-      const e = ESTADOS.find(x=>x.codigo===cod); if(!e) return;
+    function abrirEditar(key,cod){
+      ACTIVE = key;
+      const e = CTX[key].states.find(x=>x.codigo===cod); if(!e) return;
       editCodigo = cod;
-      document.getElementById('dlgTitle').textContent = 'Editar estado';
+      document.getElementById('dlgTitle').textContent = 'Editar '+e.codigo;
       document.getElementById('fCodigo').value=e.codigo; document.getElementById('fCodigo').setAttribute('readonly','readonly');
       document.getElementById('fNombre').value=e.nombre;
       document.getElementById('fColor').value=/^#[0-9a-fA-F]{6}$/.test(e.color)?e.color:'#64748b';
       document.getElementById('fOrden').value=e.orden;
       document.getElementById('fInicial').checked=!!e.es_inicial;
       document.getElementById('fFinal').checked=!!e.es_final;
+      document.getElementById('fAuto').checked=!!e.automatico;
+      document.getElementById('rowAuto').style.display = CTX[key].hasAuto ? 'flex' : 'none';
       document.getElementById('dlgEstado').showModal();
     }
     async function guardarEstado(){
+      const c = CTX[ACTIVE];
       const codigo = document.getElementById('fCodigo').value.trim().toUpperCase().replace(/\s+/g,'_').replace(/[^A-Z0-9_]/g,'');
       const nombre = document.getElementById('fNombre').value.trim();
       if(!codigo) return toast('Código obligatorio', false);
       if(!nombre) return toast('Nombre obligatorio', false);
       const body = {
-        codigo, nombre, ambito: ambito(),
+        codigo, nombre,
         color: document.getElementById('fColor').value,
         orden: parseInt(document.getElementById('fOrden').value,10)||0,
         es_inicial: document.getElementById('fInicial').checked,
         es_final: document.getElementById('fFinal').checked,
         activo: true
       };
+      if (c.hasAuto) body.automatico = document.getElementById('fAuto').checked;
+      if (c.ambito) body.ambito = c.ambito;
       const btn = document.getElementById('btnGuardarEstado'); btn.disabled=true;
       try {
-        const url = editCodigo ? '/api/estado-creditos/'+encodeURIComponent(editCodigo) : '/api/estado-creditos';
-        const method = editCodigo ? 'PUT' : 'POST';
-        const r = await fetch(url, { method, headers:H, body:JSON.stringify(body) });
+        const url = editCodigo ? c.base+'/'+encodeURIComponent(editCodigo) : c.base;
+        const r = await fetch(url, { method: editCodigo?'PUT':'POST', headers:H, body:JSON.stringify(body) });
         const j = await r.json();
         if(!j.success) throw new Error(j.error||'Error');
         document.getElementById('dlgEstado').close();
-        toast(editCodigo?'Estado actualizado':'Estado creado');
-        await cargar();
+        toast(editCodigo?'Guardado':'Creado');
+        await loadCtx(ACTIVE);
       } catch(e){ toast('Error: '+e.message, false); } finally { btn.disabled=false; }
     }
-    async function eliminar(cod){
-      if(!confirm('¿Eliminar el estado '+cod+'? También se quitan sus transiciones.')) return;
+    async function eliminar(key,cod){
+      if(!confirm('¿Eliminar '+cod+'? También se quitan sus transiciones.')) return;
+      const c = CTX[key];
       try {
-        const r = await fetch('/api/estado-creditos/'+encodeURIComponent(cod)+'?ambito='+ambito(), { method:'DELETE', headers:H });
+        const url = c.base+'/'+encodeURIComponent(cod)+(c.ambito?('?ambito='+c.ambito):'');
+        const r = await fetch(url, { method:'DELETE', headers:H });
         const j = await r.json();
         if(!j.success) throw new Error(j.error||'Error');
-        toast('Estado eliminado'); await cargar();
+        toast('Eliminado'); await loadCtx(key);
       } catch(e){ toast('Error: '+e.message, false); }
     }
 
     // ── Transiciones ──
     let transOrigen = null;
-    function abrirTrans(cod){
-      const e = ESTADOS.find(x=>x.codigo===cod); if(!e) return;
-      transOrigen = cod;
+    function abrirTrans(key,cod){
+      ACTIVE = key; transOrigen = cod;
+      const c = CTX[key];
+      const e = c.states.find(x=>x.codigo===cod); if(!e) return;
       document.getElementById('trOrigen').textContent = e.nombre;
       document.getElementById('trOrigen2').textContent = e.nombre;
-      const sel = new Set(e.destinos);
-      document.getElementById('trList').innerHTML = ESTADOS.map(x=>`
+      const sel = new Set(e.destinos||[]);
+      document.getElementById('trList').innerHTML = c.states.map(x=>`
         <label class="chkline">
           <input type="checkbox" value="${esc(x.codigo)}" ${sel.has(x.codigo)?'checked':''}>
           <span class="dot" style="background:${esc(x.color)}"></span> ${esc(x.nombre)} <span class="ec-code">${esc(x.codigo)}</span>
@@ -323,20 +417,52 @@
       document.getElementById('dlgTrans').showModal();
     }
     async function guardarTrans(){
+      const c = CTX[ACTIVE];
       const destinos = [...document.querySelectorAll('#trList input:checked')].map(i=>i.value);
+      const body = { destinos };
+      if (c.ambito) body.ambito = c.ambito;
       try {
-        const r = await fetch('/api/estado-creditos/'+encodeURIComponent(transOrigen)+'/transiciones', {
-          method:'PUT', headers:H, body:JSON.stringify({ ambito:ambito(), destinos })
-        });
+        const r = await fetch(c.base+'/'+encodeURIComponent(transOrigen)+'/transiciones', { method:'PUT', headers:H, body:JSON.stringify(body) });
         const j = await r.json();
         if(!j.success) throw new Error(j.error||'Error');
         document.getElementById('dlgTrans').close();
-        toast('Transiciones guardadas'); await cargar();
+        toast('Transiciones guardadas'); await loadCtx(ACTIVE);
       } catch(e){ toast('Error: '+e.message, false); }
     }
 
-    cargar();
+    // ── Cartera: umbrales + motor ──
+    async function guardarUmbrales(){
+      const body = {
+        mora_desde:       parseInt(document.getElementById('umMora').value,10),
+        vencido_desde:    parseInt(document.getElementById('umVencido').value,10),
+        castigo_sugerido: parseInt(document.getElementById('umCastigo').value,10),
+      };
+      try {
+        const r = await fetch('/api/estado-cartera/parametros', { method:'PUT', headers:H, body:JSON.stringify(body) });
+        const j = await r.json();
+        if(!j.success) throw new Error(j.error||'Error');
+        toast('Umbrales guardados');
+      } catch(e){ toast('Error: '+e.message, false); }
+    }
+    async function recalcular(){
+      const btn=document.getElementById('btnRecalc'), out=document.getElementById('recalcRes');
+      btn.disabled=true; const html0=btn.innerHTML; btn.innerHTML='<i class="bi bi-hourglass-split"></i> Calculando…'; out.textContent='';
+      try {
+        const r = await fetch('/api/estado-cartera/recalcular', { method:'POST', headers:H });
+        const j = await r.json();
+        if(!j.success) throw new Error(j.error||'Error');
+        const d=j.data, pe=d.porEstado||{};
+        const dist = Object.keys(pe).length ? Object.entries(pe).map(([k,v])=>`${k}: <b>${v}</b>`).join(' · ') : 'sin créditos de cartera propia';
+        out.innerHTML = `✓ ${d.procesados} procesados, ${d.cambios} cambios — ${dist}`;
+        toast('Recálculo listo');
+      } catch(e){ out.textContent='Error: '+e.message; } finally { btn.disabled=false; btn.innerHTML=html0; }
+    }
+
+    // Botones de admin visibles
+    if (esAdmin) document.querySelectorAll('.adminBtn').forEach(b=>b.style.display='inline-flex');
+    showTab('bro');
   </script>
+  <script src="/js/topnav.js"></script>
   <script src="/js/app-version.js"></script>
 </body>
 </html>

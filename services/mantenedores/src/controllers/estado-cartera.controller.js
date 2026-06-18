@@ -82,11 +82,15 @@ const { recalcularEstadoCartera } = require('../../../creditos/src/utils/recalcu
     // Campo en creditos: el Estado de cartera vive en la operación (solo propios).
     await pool.query(`ALTER TABLE creditos ADD COLUMN IF NOT EXISTS estado_cartera VARCHAR(40) NULL`).catch(() => {});
 
-    // Registrar el mantenedor en el menú (funcionalidad) si no existe
+    // El Estado de Cartera ahora vive DENTRO del mantenedor unificado "Etapas y
+    // Estados" (/mantenedores/estado-creditos/, pestaña AutoFácil). Mantenemos la
+    // funcionalidad para permisos/API, pero su card del menú apunta a la página
+    // unificada para no duplicar el editor.
     const [[ex]] = await pool.query("SELECT 1 ok FROM funcionalidades WHERE codigo='mantenedores_estado_cartera' LIMIT 1");
     if (!ex) await pool.query(
       `INSERT INTO funcionalidades (id_modulo, nombre, codigo, href, icono)
-       VALUES (30001, 'Estado Cartera', 'mantenedores_estado_cartera', '/mantenedores/estado-cartera/', 'bi-wallet2')`);
+       VALUES (30001, 'Estado Cartera', 'mantenedores_estado_cartera', '/mantenedores/estado-creditos/', 'bi-wallet2')`);
+    await pool.query("UPDATE funcionalidades SET href='/mantenedores/estado-creditos/' WHERE codigo='mantenedores_estado_cartera'").catch(() => {});
   } catch (e) { console.error('[estado-cartera migration]', e.message); }
 })();
 

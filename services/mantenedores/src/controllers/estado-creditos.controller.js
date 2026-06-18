@@ -61,11 +61,33 @@ const { auditar } = require('../../../../shared/audit');
           ('brokerage','OTORGADO','ANULADO')`);
     }
 
+    // ── Seed AutoFácil / recursos propios: ETAPAS de originación (solo si vacío) ──
+    // La etapa propia termina en OTORGADO (es_final): ahí se congela y la segunda
+    // dimensión (Estado de Cartera, mantenedor estados_cartera) toma el control.
+    const [[cntAF]] = await pool.query("SELECT COUNT(*) n FROM estados_credito WHERE ambito='autofacil'");
+    if (!cntAF.n) {
+      await pool.query(
+        `INSERT IGNORE INTO estados_credito (ambito, codigo, nombre, color, orden, es_inicial, es_final) VALUES
+          ('autofacil','DIGITADO','Digitado','#6366f1',10,1,0),
+          ('autofacil','APROBADO','Aprobado','#16a34a',20,0,0),
+          ('autofacil','RECHAZADO','Rechazado','#dc2626',30,0,1),
+          ('autofacil','OTORGADO','Otorgado','#0f766e',40,0,1),
+          ('autofacil','DESISTIDO','Desistido','#b91c1c',50,0,1)`);
+      await pool.query(
+        `INSERT IGNORE INTO estados_transicion (ambito, origen, destino) VALUES
+          ('autofacil','DIGITADO','APROBADO'),
+          ('autofacil','DIGITADO','RECHAZADO'),
+          ('autofacil','APROBADO','OTORGADO'),
+          ('autofacil','APROBADO','DESISTIDO')`);
+    }
+
     // Registrar el mantenedor en el menú (funcionalidad) si no existe
     const [[ex]] = await pool.query("SELECT 1 ok FROM funcionalidades WHERE codigo='mantenedores_estado_creditos' LIMIT 1");
     if (!ex) await pool.query(
       `INSERT INTO funcionalidades (id_modulo, nombre, codigo, href, icono)
-       VALUES (30001, 'Estado Créditos', 'mantenedores_estado_creditos', '/mantenedores/estado-creditos/', 'bi-diagram-3-fill')`);
+       VALUES (30001, 'Etapas y Estados', 'mantenedores_estado_creditos', '/mantenedores/estado-creditos/', 'bi-diagram-3-fill')`);
+    // La página ahora unifica Etapas (brokerage/autofácil) + Estado de Cartera.
+    await pool.query("UPDATE funcionalidades SET nombre='Etapas y Estados' WHERE codigo='mantenedores_estado_creditos'").catch(() => {});
   } catch (e) { console.error('[estado-creditos migration]', e.message); }
 })();
 
