@@ -17,6 +17,13 @@ const getColumns = async (req, res) => {
     const rutCol = { field: 'rut_cliente', type: 'varchar (cliente)', nullable: true, key: '', readonly: true };
     const idx = cols.findIndex(c => c.field === 'id_cliente');
     if (idx >= 0) cols.splice(idx + 1, 0, rutCol); else cols.push(rutCol);
+    // Mostrar id_financiera (número de la institución) justo después de num_op (columna C)
+    const idxFin = cols.findIndex(c => c.field === 'id_financiera');
+    if (idxFin >= 0) {
+      const [finCol] = cols.splice(idxFin, 1);
+      const idxNumOp = cols.findIndex(c => c.field === 'num_op');
+      if (idxNumOp >= 0) cols.splice(idxNumOp + 1, 0, finCol); else cols.push(finCol);
+    }
     res.json({ success: true, data: cols, error: null });
   } catch (e) {
     res.status(500).json({ success: false, data: null, error: e.message });
