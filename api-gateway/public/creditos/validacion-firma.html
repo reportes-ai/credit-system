@@ -246,7 +246,7 @@
       <i class="bi bi-arrow-counterclockwise"></i>Devolver a Carga
     </button>
     <button class="btn-accion btn-aprobar" id="btnAprobar" onclick="aprobarCredito()" disabled>
-      <i class="bi bi-check-circle-fill"></i>Aprobar — Marcar Vigente
+      <i class="bi bi-check-circle-fill"></i>Aprobar — Marcar Otorgado
     </button>
   </div>
 </div>
@@ -509,14 +509,14 @@ async function confirmarRechazo(codigo, idDoc) {
   } catch(e) { showToast('Error: '+e.message, false); }
 }
 
-/* ── Approve credit → VIGENTE ── */
+/* ── Approve credit → OTORGADO ── */
 async function aprobarCredito() {
-  if (!confirm('¿Aprobar todos los documentos y marcar el crédito como VIGENTE?')) return;
+  if (!confirm('¿Aprobar todos los documentos y marcar el crédito como OTORGADO?')) return;
   try {
     const r = await fetch('/api/creditos/'+creditId, {
       method:'PUT', headers:apiHdr(),
       body: JSON.stringify({
-        estado:'VIGENTE',
+        estado:'OTORGADO',
         observaciones: _credito.observaciones||null,
         ejecutivo:     _credito.ejecutivo||null,
         dealer:        _credito.dealer||null,
