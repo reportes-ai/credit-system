@@ -25,6 +25,10 @@ function rutNum(r) {
   const clean = String(r || '').replace(/[.\s]/g, '').toUpperCase();
   const m = clean.match(/^(\d+)-?[0-9K]$/);
   if (m) return m[1];
+  // Sin formato de RUT válido: si quedan letras es un placeholder (ej. 'EXEJ-123'
+  // de ex-ejecutivos migrados), no un RUT real → descartar para no generar falsos
+  // positivos en la clasificación/auditoría de uso.
+  if (/[A-Z]/.test(clean)) return '';
   const d = clean.replace(/[^0-9]/g, '');
   return d.length > 1 ? d.slice(0, -1) : d;
 }
