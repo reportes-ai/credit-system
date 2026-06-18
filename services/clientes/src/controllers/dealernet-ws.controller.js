@@ -762,20 +762,29 @@ const updateConfigEndpoint = async (req, res) => {
 const auditoria = async (req, res) => {
   try {
     const dias = Math.min(365, Math.max(1, parseInt(req.query.dias) || 30));
-    const [rows] = await pool.query(
-      `SELECT id_usuario, usuario_nombre, codigo_producto, nombre_producto, COUNT(*) n
-       FROM dealernet_informes
-       WHERE retcode='0' AND created_at >= NOW() - INTERVAL ? DAY
-       GROUP BY id_usuario, codigo_producto, usuario_nombre, nombre_producto`, [dias]);
+    // SOLO llamadas reales a DealerNet (gastan saldo): se cuenta sobre dealernet_consultas,
+    // NO sobre dealernet_informes (que es el repositorio). La reutilización del repositorio
+    // nunca inserta en dealernet_consultas, por lo que no infla la auditoría.
+    const [prods] = await pool.query('SELECT codigo, nombre FROM dealernet_productos');
+    const nombreProd = c => (prods.find(p => String(p.codigo) === String(c)) || {}).nombre || c;
+    const [cons] = await pool.query(
+      `SELECT c.id_usuario, c.productos, TRIM(CONCAT(u.nombre,' ',COALESCE(u.apellido,''))) usuario_nombre
+       FROM dealernet_consultas c LEFT JOIN usuarios u ON u.id_usuario = c.id_usuario
+       WHERE c.retcode='0' AND c.created_at >= NOW() - INTERVAL ? DAY`, [dias]);
     const usuarios = {};
-    for (const r of rows) {
+    for (const r of cons) {
       const k = r.id_usuario != null ? 'u' + r.id_usuario : 'n' + (r.usuario_nombre || '');
-      if (!usuarios[k]) usuarios[k] = { id_usuario: r.id_usuario, usuario: r.usuario_nombre || '—', total: 0, porTipo: [] };
-      usuarios[k].porTipo.push({ codigo: r.codigo_producto, nombre: r.nombre_producto || r.codigo_producto, n: Number(r.n) });
-      usuarios[k].total += Number(r.n);
+      if (!usuarios[k]) usuarios[k] = { id_usuario: r.id_usuario, usuario: r.usuario_nombre || '—', total: 0, _porTipo: {} };
+      const codigos = String(r.productos || '').split(',').map(s => s.trim()).filter(Boolean);
+      for (const cod of codigos) {
+        usuarios[k]._porTipo[cod] = (usuarios[k]._porTipo[cod] || 0) + 1;
+        usuarios[k].total += 1;
+      }
     }
     const porUsuario = Object.values(usuarios)
-      .map(u => ({ ...u, promedio_dia: +(u.total / dias).toFixed(2) }))
+      .map(u => ({ id_usuario: u.id_usuario, usuario: u.usuario, total: u.total,
+        promedio_dia: +(u.total / dias).toFixed(2),
+        porTipo: Object.entries(u._porTipo).map(([codigo, n]) => ({ codigo, nombre: nombreProd(codigo), n })) }))
       .sort((a, b) => b.total - a.total);
 
     // Auto-consultas (RUT propio) y consultas a otros usuarios de la empresa — últimos 90 días.
@@ -783,8 +792,9 @@ const auditoria = async (req, res) => {
     const rutToUser = {}, myRut = {};
     users.forEach(u => { const n = rutNum(u.rut); if (n) { rutToUser[n] = `${u.nombre} ${u.apellido || ''}`.trim(); myRut[u.id_usuario] = n; } });
     const [inf90] = await pool.query(
-      `SELECT id_usuario, usuario_nombre, rut FROM dealernet_informes
-       WHERE retcode='0' AND created_at >= NOW() - INTERVAL 90 DAY AND id_usuario IS NOT NULL`);
+      `SELECT c.id_usuario, TRIM(CONCAT(u.nombre,' ',COALESCE(u.apellido,''))) usuario_nombre, c.rut
+       FROM dealernet_consultas c LEFT JOIN usuarios u ON u.id_usuario = c.id_usuario
+       WHERE c.retcode='0' AND c.created_at >= NOW() - INTERVAL 90 DAY AND c.id_usuario IS NOT NULL`);
     const propio = {}, empresa = {};
     for (const r of inf90) {
       const n = String(r.rut), nombre = r.usuario_nombre || '—';
