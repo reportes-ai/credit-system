@@ -479,6 +479,7 @@ function renderConsulta(list) {
           <th>RUT</th>
           <th>Cliente</th>
           <th>Financiera</th>
+          <th>ID Financiera</th>
           <th>Fecha</th>
           <th class="num">Monto</th>
           <th>Vehículo</th>
@@ -495,6 +496,7 @@ function renderConsulta(list) {
           <td class="mono">${c.rut_cliente||'—'}</td>
           <td>${c.nombre_cliente||'—'}</td>
           <td>${finTag(c.financiera)}</td>
+          <td class="mono" style="font-size:.78rem;color:#6b7280">${c.id_financiera||'—'}</td>
           <td style="white-space:nowrap;font-size:.78rem;color:#6b7280">${fmtF(c.fecha_otorgamiento||c.created_at)}</td>
           <td class="num" style="color:#059669;font-weight:700">${fmtM(c.monto_financiado)}</td>
           <td style="font-size:.8rem">${[c.marca,c.modelo,c.anio].filter(Boolean).join(' ')||'—'}</td>
