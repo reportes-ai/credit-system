@@ -5,7 +5,7 @@
   <link rel="icon" href="/img/favicon.png" type="image/png">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Cartas de Aprobación — AutoFácil</title>
-  <!-- v4.8 -->
+  <!-- v4.9 -->
   <!-- Standalone desde Mantenedores: marca la clase ANTES de pintar para no mostrar el menú -->
   <script>try{if(new URLSearchParams(location.search).get('tab')==='params')document.documentElement.classList.add('standalone-params');}catch(e){}</script>
   <link href="/css/bootstrap.min.css" rel="stylesheet">
@@ -1338,8 +1338,9 @@ function calcUFyTasa(){
         pizarra.toFixed(4).replace('.',',') + ' % (' + (esMenor200 ? '≤' : '>') + '200 UF)';
     }
   }
-  // Comparación tasa crédito vs pizarra
-  const tasa = parseFloat(String(document.getElementById('cTasa').value).replace(',','.'));
+  // Comparación tasa crédito vs pizarra (solo décimas y centésimas: trunca a 2 decimales)
+  const tasa = tope2(parseFloat(String(document.getElementById('cTasa').value).replace(',','.')));
+  if (pizarra != null && !isNaN(pizarra)) pizarra = tope2(pizarra);  // tope = pizarra truncada a 2 dec
   tasaMsg.textContent = ''; tasaMsg.style.color = '';
   if (!isNaN(tasa) && pizarra != null && !isNaN(pizarra)) {
     if (tasa > pizarra) {
@@ -1354,6 +1355,9 @@ function calcUFyTasa(){
     }
   }
 }
+// Trunca a 2 decimales hacia abajo (décimas y centésimas). Nunca redondea hacia arriba:
+// así la tasa nunca supera la TMC (2,8683% → tope 2,86%). El +1e-6 protege valores exactos.
+function tope2(n){ return (n==null || isNaN(n)) ? n : Math.floor(n*100 + 1e-6)/100; }
 function getFactor(plazo, tipo){
   const p = parseInt(plazo)||0;
   if (!p) return 0;
@@ -1600,7 +1604,7 @@ async function guardarCarta(){
   }
 
   // ── Detección de TODAS las excepciones (modal único con comentario obligatorio c/u) ──
-  const tasa = parseFloat(String(document.getElementById('cTasa').value).replace(',','.'));
+  const tasa = tope2(parseFloat(String(document.getElementById('cTasa').value).replace(',','.')));
   const montoCred = rawMoney('cMontoCred');
   const montoUF = UF_HOY ? montoCred / UF_HOY : null;
   let pizarra = null;
@@ -1608,6 +1612,7 @@ async function guardarCarta(){
     pizarra = montoUF <= 200
       ? parseFloat(TASAS.tasa_mensual_menor ?? TASAS.tasa_menor)
       : parseFloat(TASAS.tasa_mensual_mayor ?? TASAS.tasa_mayor);
+    if (!isNaN(pizarra)) pizarra = tope2(pizarra);  // tope = pizarra truncada a 2 dec
   }
   const excList = [];   // [{cod, detalle}]
   if (!isNaN(tasa) && pizarra != null && !isNaN(pizarra)) {
