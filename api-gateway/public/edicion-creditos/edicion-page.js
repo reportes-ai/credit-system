@@ -12,6 +12,17 @@ document.getElementById('avatarInicial').textContent = (yo.nombre || '?')[0].toU
 function logout() { sessionStorage.clear(); location.href = '/login.html'; }
 
 let CAMPOS = [], page = 1, sortCol = 'id', sortDir = 'desc', filters = {};
+// Columnas fijas a la izquierda. id_financiera va junto al N° Operación y es editable
+// (el backend lo sigue aceptando porque está en CAMPOS_EDIT; en el front lo sacamos del
+// bloque editable de la derecha para no duplicarlo).
+const COLS_FIJAS = [
+  { field:'num_op',                 label:'N° Operación',         edit:false },
+  { field:'id_financiera',          label:'ID Financiera',         edit:true  },
+  { field:'numero_credito_display', label:'N° Operación (nuevo)',  edit:false },
+  { field:'nombre_cliente',         label:'Cliente',               edit:false },
+  { field:'rut_cliente',            label:'RUT',                   edit:false },
+];
+const camposVis = () => CAMPOS.filter(c => c.col !== 'id_financiera');
 const escH = s => String(s ?? '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
 const debounce = (fn, ms) => { let t; return (...a) => { clearTimeout(t); t = setTimeout(() => fn(...a), ms); }; };
 
@@ -42,8 +53,8 @@ function buildHeaders() {
   const thLA = document.createElement('th'); thLA.textContent = '#'; trL.appendChild(thLA);
   const thA  = document.createElement('th'); thA.innerHTML = ''; tr.appendChild(thA);
 
-  // columnas fijas: num_op, numero_credito, cliente, rut
-  [['num_op','N° Operación'],['numero_credito_display','N° Operación (nuevo)'],['nombre_cliente','Cliente'],['rut_cliente','RUT']].forEach(([ field, label ], i) => {
+  // columnas fijas (incluye ID Financiera junto al N° Operación)
+  COLS_FIJAS.forEach(({ field, label }, i) => {
     const thL = document.createElement('th');
     thL.id = 'colLetter_fijo_' + i;
     thL.textContent = colLetter(i);
@@ -65,8 +76,8 @@ function buildHeaders() {
   });
 
   // columnas editables
-  const startIdx = 4;
-  CAMPOS.forEach((c, i) => {
+  const startIdx = COLS_FIJAS.length;
+  camposVis().forEach((c, i) => {
     const idx = startIdx + i;
     const thL = document.createElement('th');
     thL.id = 'colLetter_' + idx;
@@ -106,14 +117,15 @@ function renderRows(rows) {
   }
   tbody.innerHTML = rows.map(r => {
     const rowId = r.id;
-    const fijosTds = [
-      `<td data-field="num_op">${escH(r.num_op||'')}</td>`,
-      `<td data-field="numero_credito_display">${escH(r.numero_credito_display||'')}</td>`,
-      `<td data-field="nombre_cliente" style="max-width:130px;overflow:hidden;text-overflow:ellipsis">${escH(r.nombre_cliente||'')}</td>`,
-      `<td data-field="rut_cliente">${escH(r.rut_cliente||'')}</td>`,
-    ].join('');
+    const fijosTds = COLS_FIJAS.map(c => {
+      if (c.edit) {
+        return `<td data-field="${c.field}" data-id="${rowId}" data-col="${c.field}"><input type="text" value="${escH(String(r[c.field]??''))}" onchange="markMod(this)"></td>`;
+      }
+      const style = c.field === 'nombre_cliente' ? ' style="max-width:130px;overflow:hidden;text-overflow:ellipsis"' : '';
+      return `<td data-field="${c.field}"${style}>${escH(r[c.field]||'')}</td>`;
+    }).join('');
 
-    const editTds = CAMPOS.map(c => {
+    const editTds = camposVis().map(c => {
       const v = r[c.col];
       if (c.tipo === 'select') {
         const opts = c.ops.map(o => `<option${v===o?' selected':''}>${escH(o)}</option>`).join('');
@@ -187,11 +199,8 @@ function buscarColumna(q) {
   if (!q.trim()) { dd.innerHTML = ''; dd.style.display = 'none'; return; }
   const qlo = q.toLowerCase();
   const allCols = [
-    { field: 'num_op', label: 'N° Operación', idKey: 'fijo_0' },
-    { field: 'numero_credito_display', label: 'N° Operación (nuevo)', idKey: 'fijo_1' },
-    { field: 'nombre_cliente', label: 'Cliente', idKey: 'fijo_2' },
-    { field: 'rut_cliente', label: 'RUT', idKey: 'fijo_3' },
-    ...CAMPOS.map((c, i) => ({ field: c.col, label: c.label, idKey: String(4 + i) }))
+    ...COLS_FIJAS.map((c, i) => ({ field: c.field, label: c.label, idKey: 'fijo_' + i })),
+    ...camposVis().map((c, i) => ({ field: c.col, label: c.label, idKey: String(COLS_FIJAS.length + i) }))
   ];
   const hits = allCols.filter(c => c.label.toLowerCase().includes(qlo) || c.field.toLowerCase().includes(qlo) || colLetter(parseInt(c.idKey.replace('fijo_','')) || 0).toLowerCase() === qlo);
   if (!hits.length) {

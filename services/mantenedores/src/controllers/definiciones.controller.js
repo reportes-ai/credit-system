@@ -86,6 +86,13 @@ const { auditar } = require('../../../../shared/audit');
       ['Estado: Desistido', 'La operación se desiste antes de cursarse. Estado final.', 'Estados del Crédito'],
       ['Estado: Prepagado', 'Crédito otorgado que se paga anticipadamente en su totalidad. Estado final.', 'Estados del Crédito'],
       ['Estado: Anulado', 'Crédito otorgado que se anula. Estado final.', 'Estados del Crédito'],
+
+      // ── Cálculos: campos calculados vs forzados ─────────────────────────
+      ['Campo Calculado', 'Campo cuyo valor lo determina el sistema con una fórmula (no se digita): Ing x Colocaciones (monto_comision_fin), Comisión Dealer (comdea_real), Comisión Parque (com_parque), Arriendo Parque, Ingreso por Seguros e Ingreso Neto Total. Se recalculan en recalcular-mes.js a partir de parámetros (tasas, UF, % dealer/parque, tramos). En pantalla se muestran en AZUL.', 'Cálculos'],
+      ['Campo Forzado', 'Campo que DEBERÍA ser calculado pero fue digitado manualmente, sobrescribiendo la fórmula. Ocurre por una negociación puntual que cambia las condiciones de esa operación. En pantalla se muestra en ROJO. Al recalcular, los campos forzados se RESPETAN (no se sobrescriben); solo se recalculan los no forzados de esa operación.', 'Cálculos'],
+      ['Ingreso por Crédito (Colocaciones)', 'monto_comision_fin: utilidad por la colocación. Se calcula por valor presente del spread (tasa cliente − costo de fondo) sobre el monto capitalizado a lo largo del plazo, usando la tasa/TMC vigente y el tramo MENOR/MAYOR 200 UF de la fecha de otorgamiento.', 'Cálculos'],
+      ['Ingreso por Seguros', 'Comisión que AutoFácil gana por los seguros intermediados (com_rdh + com_cesantia + com_reparaciones). Alimenta el Ingreso Neto Total. Si se digita a mano queda forzado (rojo).', 'Cálculos'],
+      ['Recálculo (cuándo corre)', 'Los campos calculados se recalculan cuando cambia un parámetro que afecta el ingreso por crédito o por seguros (tasas, UF, % dealer/parque, tramos, o los datos de la operación). Si no cambia nada que afecte el cálculo, no se recalcula. En operaciones con campos forzados, el recálculo toca solo los campos no forzados.', 'Cálculos'],
     ];
     let [[{ mx }]] = await pool.query('SELECT COALESCE(MAX(orden),0) AS mx FROM definiciones');
     let nuevas = 0;
