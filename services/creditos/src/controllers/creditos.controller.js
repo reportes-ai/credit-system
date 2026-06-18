@@ -65,6 +65,15 @@ const { isMesCerrado, getMesDeOp } = require('../../../../shared/utils/mes-cerra
         AND (estado IS NULL OR estado = '')
         AND (financiera IS NULL OR financiera NOT IN ('AUTOFIN', 'UNIDAD DE CREDITO'))
     `);
+    // Backfill num_op para créditos manuales (alta AutoFácil) que generaron
+    // numero_credito pero quedaron sin num_op: la clave de negocio = ese número.
+    await pool.query(`
+      UPDATE creditos
+      SET num_op = CAST(numero_credito AS UNSIGNED)
+      WHERE num_op IS NULL
+        AND numero_credito IS NOT NULL
+        AND numero_credito REGEXP '^[0-9]+$'
+    `).catch(e => console.error('[creditos backfill num_op]', e.message));
 
   } catch (e) {
     if (e.errno !== 1050) console.error('[creditos migration]', e.message);
@@ -178,7 +187,7 @@ const create = async (req, res) => {
 
     const [r] = await pool.query(`
       INSERT INTO creditos
-        (numero_credito, financiera,
+        (num_op, numero_credito, financiera,
          estado_eval, estado,
          id_cotizacion, id_usuario, id_cliente,
          fecha_otorgado, mes,
@@ -191,7 +200,7 @@ const create = async (req, res) => {
          ejecutivo, observaciones, datos_json, id_financiera,
          rut_dealer, vendedor, comdea_real,
          created_at, updated_at)
-      VALUES (?,?,
+      VALUES (?,?,?,
               'OTORGADO',?,
               ?,?,?,
               ?,DATE_FORMAT(COALESCE(?, NOW()), '%Y-%m-01'),
@@ -205,7 +214,7 @@ const create = async (req, res) => {
               ?,?,?,
               NOW(), NOW())
     `, [
-      numero_credito, fin,
+      parseInt(numero_credito) || null, numero_credito, fin,
       estado || 'INGRESO',
       id_cotizacion || null, id_usuario, id_cliente_resolved,
       fecha_otorgamiento || null, fecha_otorgamiento || null,
