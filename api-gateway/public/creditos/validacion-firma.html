@@ -15,14 +15,7 @@
     * { box-sizing:border-box; margin:0; padding:0; }
     body { font-family:'Segoe UI',system-ui,sans-serif; background:var(--bg); color:var(--text); }
 
-    /* Navbar */
-    .navbar { background:linear-gradient(135deg,var(--navy),var(--blue)); padding:0 24px; height:52px; display:flex; align-items:center; justify-content:space-between; }
-    .nav-brand { display:flex; align-items:center; gap:10px; color:#fff; font-weight:800; font-size:1rem; text-decoration:none; }
-    .nav-brand img { height:28px; }
-    .nav-actions { display:flex; align-items:center; gap:10px; }
-    .btn-back { background:rgba(255,255,255,.15); border:1px solid rgba(255,255,255,.3); color:#fff; border-radius:8px; padding:6px 14px; font-size:.82rem; font-weight:600; cursor:pointer; display:flex; align-items:center; gap:6px; text-decoration:none; }
-    .btn-back:hover { background:rgba(255,255,255,.25); }
-    .version-badge { background:rgba(255,255,255,.15); color:rgba(255,255,255,.75); font-size:.65rem; font-weight:700; border-radius:6px; padding:2px 8px; margin-left:4px; }
+    /* Navbar: la provee el componente /js/topnav.js (CSS propio) */
 
     /* Page */
     .page-wrap { max-width:900px; margin:0 auto; padding:24px 16px 120px; }
@@ -204,35 +197,25 @@
 
     .ced-loading { text-align:center; padding:40px 16px; color:#64748b; font-size:.82rem; }
 
-    /* Botón navbar para abrir panel */
-    .btn-ced { background:rgba(255,255,255,.18); border:1px solid rgba(255,255,255,.3); color:#fff; border-radius:8px; padding:6px 13px; font-size:.82rem; font-weight:600; cursor:pointer; display:flex; align-items:center; gap:5px; }
-    .btn-ced:hover { background:rgba(255,255,255,.28); }
-    .breadcrumb-nav { color:rgba(255,255,255,.6); font-size:.85rem; display:flex; align-items:center; gap:6px; }
-    .breadcrumb-nav a { color:rgba(255,255,255,.75); text-decoration:none; }
-    .breadcrumb-nav a:hover { color:#fff; }
-    .breadcrumb-nav .sep { color:rgba(255,255,255,.35); }  </style>
+  </style>
 </head>
 <body>
 
-<nav class="navbar">
-  <a href="/creditos" class="nav-brand">
-    <img src="/img/logo-autofacil.png" alt="AutoFácil" style="filter:brightness(0) invert(1);height:32px;display:block" onerror="this.style.display='none'">
-    <span>Validación de Firma</span>
-    <span class="version-badge">v1.3</span>
-  </a>
-  <div class="breadcrumb-nav">
-  <a href="/">Inicio</a><span class="sep">›</span>
-  <a href="/creditos">Créditos</a><span class="sep">›</span>
-  <span style="color:#fff;font-weight:600"><i class="bi bi-vector-pen me-1"></i>Validación de Firma</span>
-  </div>
-  <div class="nav-actions">
-    <span id="navUser" class="user-chip" style="color:rgba(255,255,255,.75);font-size:.82rem"></span>
-    <button class="btn-ced" onclick="toggleCedPanel()" id="btnCedula" title="Ver firma en cédula de identidad">
-      <i class="bi bi-person-vcard-fill"></i>Ver Firma Cédula
-    </button>
-    <a href="/creditos" class="btn-back"><i class="bi bi-arrow-left"></i>Volver</a>
-  </div>
-</nav>
+<!-- Barra superior única (componente /js/topnav.js) -->
+<div id="af-topnav"></div>
+<script>
+  window.AF_TOPNAV = {
+    breadcrumb: [
+      { label:'Inicio', href:'/' },
+      { label:'Créditos', href:'/creditos' },
+      { label:'Validación de Firma', icon:'bi-vector-pen', current:true }
+    ],
+    actions: [
+      { label:'Ver Firma Cédula', icon:'bi-person-vcard-fill', onclick:'toggleCedPanel()', id:'btnCedula', title:'Ver firma en cédula de identidad' },
+      { label:'Volver', icon:'bi-arrow-left', href:'/creditos' }
+    ]
+  };
+</script>
 
 <div class="page-wrap" id="pageWrap">
   <div class="spinner-wrap"><i class="bi bi-hourglass-split" style="font-size:2rem;display:block;margin-bottom:12px"></i>Cargando…</div>
@@ -296,7 +279,6 @@ const token = sessionStorage.getItem('token');
 const yo    = JSON.parse(sessionStorage.getItem('usuario') || 'null');
 if (!token || !yo) window.location.href = '/login.html';
 function apiHdr() { return { 'Content-Type':'application/json', Authorization:'Bearer '+token }; }
-document.getElementById('navUser').textContent = `${yo?.nombre||''} ${yo?.apellido||''}`.trim();
 
 const USUARIO_NOMBRE = `${yo?.nombre||''} ${yo?.apellido||''}`.trim() || yo?.email || 'Usuario';
 
@@ -868,6 +850,7 @@ function minimizarCed() {
   });
 })();
 </script>
+<script src="/js/topnav.js"></script>
 <script src="/js/app-version.js"></script>
 </body>
 </html>
