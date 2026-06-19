@@ -170,10 +170,16 @@
       const DEALERNET = new Set(['dealernet-productos','dealernet-costos']);
       // Construir items desde funcionalidades BD (href + icono + nombre desde servidor)
       const nativeHrefs = new Set(funcInfo.map(f => f.href));
+      // keys asignadas explícitamente a OTRA sección (formato nuevo {sec:[keys]}) → no van aquí
+      const asignadasFuera = new Set();
+      Object.entries(placement).forEach(([sec, arr]) => {
+        if (sec !== 'mantenedores' && Array.isArray(arr)) arr.forEach(k => asignadasFuera.add(k));
+      });
       const nativeItems = funcInfo.map(f => {
         const seg = f.href.replace('/mantenedores/', '').replace(/\/$/, '');
         if (SOLO_DIOS.has(seg) || DEALERNET.has(seg)) return null;
         if (placement[seg] && placement[seg] !== 'mantenedores') return null;
+        if (asignadasFuera.has(seg)) return null;
         return { id: seg || f.codigo, href: f.href, icon: f.icono || 'bi-grid', titulo: f.nombre, desc: DESCS[seg] || '' };
       }).filter(Boolean);
 

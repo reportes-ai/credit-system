@@ -9,6 +9,7 @@
   <link href="/css/bootstrap-icons.css" rel="stylesheet">
   <script src="/js/Sortable.min.js"></script>
   <script src="/js/orden-toast.js"></script>
+  <script src="/js/placement-manifest.js"></script>
   <style>
     :root { --navy: #0141A2; --navy-dark: #012d70; --navy-light: #0255c5; --accent: #009AFE; --bg: #f0f4f8; }
     body { background: var(--bg); font-family: 'Segoe UI', system-ui, sans-serif; margin: 0; min-height: 100vh; }
@@ -559,10 +560,27 @@
               .concat(modulosData.filter(m => !ordenGuardado.includes(String(m.id_modulo))))
           : modulosData;
 
-        // Renderizar todos los módulos desde BD — sin hardcodes
-        modsSorted.forEach(mod => {
+        // Sub-items colocados en Home vía Vista Pantallas (placement['home']).
+        // Antes la home SÓLO pintaba módulos; ahora también pinta sub-items asignados
+        // a Home, gateados por permiso (rutas de módulos + funcionalidadesInfo del usuario).
+        let subItemCards = [];
+        if (isNewFmt && Array.isArray(placement['home']) && window.PLACEMENT_ITEMS) {
+          const allowedHref = new Set();
+          data.data.forEach(m => allowedHref.add(normR(m.ruta)));
+          (data.funcionalidadesInfo || []).forEach(f => { if (f.href) allowedHref.add(normR(f.href)); });
+          const yaModulo = new Set([...modMap.keys()]);
+          subItemCards = placement['home']
+            .filter(k => !yaModulo.has(normR(k)))
+            .map(k => (window.PLACEMENT_ITEMS || {})[k])
+            .filter(it => it && !yaModulo.has(normR(it.href)) && allowedHref.has(normR(it.href)))
+            .map(it => ({ ruta: it.href, icono: it.icon, nombre: it.titulo, descripcion: '' }));
+        }
+
+        // Renderizar módulos + sub-items colocados en Home (todo desde BD/manifiesto)
+        [...modsSorted, ...subItemCards].forEach(mod => {
           const a = document.createElement('a');
-          a.href = mod.ruta || '#'; a.className = 'module-card'; a.dataset.id = mod.id_modulo;
+          a.href = mod.ruta || '#'; a.className = 'module-card';
+          a.dataset.id = (mod.id_modulo != null) ? mod.id_modulo : (mod.ruta || '');
           a.dataset.ruta = mod.ruta || '';
           a.innerHTML = `<i class="bi bi-grip-vertical drag-handle"></i>
             <div class="card-icon"><i class="bi ${mod.icono || 'bi-grid'}"></i></div>
