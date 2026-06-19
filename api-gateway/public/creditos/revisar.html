@@ -502,9 +502,15 @@ function renderPagina(c, ant, com) {
         <div class="ch-rut">${c.rut_cliente||'—'}</div>
       </div>
       <div class="ch-right">
-        <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;justify-content:flex-end">
-          <span class="estado-badge eb-${estadoKey}">${estadoEstado(c.estado)}</span>
-          ${(()=>{ if(c.estado!=='VIGENTE') return ''; const ep=getEstadoPago(c); return `<span class="pago-estado-badge pago-${ep.cls}">${ep.label}</span>`; })()}
+        <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;justify-content:flex-end">
+          <span style="font-size:.58rem;color:#94a3b8;font-weight:800;letter-spacing:.06em">ETAPA</span>
+          <span class="estado-badge eb-${estadoKey}" title="Etapa (originación)">${estadoEstado(c.estado)}</span>
+          ${(()=>{
+            const M = { VIGENTE:'#16a34a', MORA:'#d97706', 'EN MORA':'#d97706', VENCIDO:'#dc2626', TERMINADO:'#0f766e', PREPAGADO:'#7c3aed', CASTIGADO:'#111827' };
+            if (c.estado_cartera) return `<span style="font-size:.58rem;color:#94a3b8;font-weight:800;letter-spacing:.06em">ESTADO</span><span class="estado-badge" style="background:${M[c.estado_cartera]||'#64748b'};color:#fff" title="Estado de cartera">${c.estado_cartera}</span>`;
+            if (c.estado!=='VIGENTE') return '';
+            const ep=getEstadoPago(c); return `<span class="pago-estado-badge pago-${ep.cls}">${ep.label}</span>`;
+          })()}
         </div>
         ${c.financiera ? `<span class="ch-financiera">${c.financiera}</span>` : ''}
         <div class="ch-updated"><i class="bi bi-clock me-1"></i>Actualizado: ${fmtDT(c.updated_at||c.created_at)}</div>
