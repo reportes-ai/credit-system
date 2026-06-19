@@ -2,7 +2,7 @@
    AutoFácil — Versión global de la aplicación
    Editar SOLO este archivo para cambiar la versión
    ───────────────────────────────────────────── */
-const APP_VERSION = 'v43.62';
+const APP_VERSION = 'v43.63';
 
 document.addEventListener('DOMContentLoaded', () => {
 
@@ -898,11 +898,12 @@ document.addEventListener('DOMContentLoaded', async () => {
 
   const st = document.createElement('style');
   st.textContent = `
-    #afMntOverlay { position:fixed; inset:0; z-index:100000; display:flex; align-items:center; justify-content:center;
-      background:rgba(15,23,42,.62); backdrop-filter:blur(4px); animation:afMntFade .25s ease; padding:20px; }
+    #afMntOverlay { position:fixed; inset:0; z-index:1000000; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:32px;
+      background:linear-gradient(160deg,#eef1f6,#d8dde6); animation:afMntFade .25s ease; padding:24px; overflow:auto; }
     @keyframes afMntFade { from{opacity:0} to{opacity:1} }
+    #afMntOverlay .bs-logo { width:min(380px,74vw); height:auto; filter:drop-shadow(0 10px 26px rgba(1,65,162,.16)); }
     #afMntOverlay .box { background:#fff; border-radius:20px; max-width:480px; width:100%; text-align:center;
-      padding:34px 34px 28px; box-shadow:0 30px 70px rgba(0,0,0,.5); border-top:7px solid #d97706;
+      padding:30px 34px 26px; box-shadow:0 24px 60px rgba(0,0,0,.22); border-top:7px solid #d97706;
       animation:afMntPop .3s cubic-bezier(.18,.89,.32,1.28); }
     @keyframes afMntPop { from{opacity:0;transform:scale(.9) translateY(10px)} to{opacity:1;transform:none} }
     #afMntOverlay .ico { width:70px; height:70px; margin:0 auto 16px; border-radius:50%;
@@ -915,14 +916,18 @@ document.addEventListener('DOMContentLoaded', async () => {
   document.head.appendChild(st);
 
   const esc = s => String(s == null ? '' : s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+  document.body.style.overflow = 'hidden';                       // bloquea el scroll del fondo
   const ov = document.createElement('div');
   ov.id = 'afMntOverlay';
-  ov.innerHTML = `<div class="box">
-      <div class="ico"><i class="bi bi-cone-striped"></i></div>
-      <div class="kicker">Aviso</div>
-      <div class="msg">${esc(data.mensaje)}</div>
-      <button class="ok">Entendido</button>
-    </div>`;
+  ov.innerHTML = `
+      <img class="bs-logo" src="/img/logo-bs.png" alt="AutoFácil Business Suite">
+      <div class="box">
+        <div class="ico"><i class="bi bi-cone-striped"></i></div>
+        <div class="kicker">Aviso</div>
+        <div class="msg">${esc(data.mensaje)}</div>
+        <button class="ok">Entendido</button>
+      </div>`;
   document.body.appendChild(ov);
-  ov.querySelector('.ok').addEventListener('click', () => ov.remove());
+  // "Entendido" colapsa el mensaje pero deja la pantalla gris con el logo (sigue bloqueado).
+  ov.querySelector('.ok').addEventListener('click', () => { const b = ov.querySelector('.box'); if (b) b.remove(); });
 });
