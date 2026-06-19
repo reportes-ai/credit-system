@@ -573,7 +573,7 @@
             .filter(k => !yaModulo.has(normR(k)))
             .map(k => ITEMS[k])
             .filter(it => it && !yaModulo.has(normR(it.href)) && allowedHref.has(normR(it.href)))
-            .map(it => ({ ruta: it.href, icono: it.icon, nombre: it.titulo, descripcion: '' }));
+            .map(it => ({ ruta: it.href, icono: it.icon, nombre: it.titulo, descripcion: it.desc || '' }));
         }
 
         // Renderizar módulos + sub-items colocados en Home (todo desde BD/manifiesto)

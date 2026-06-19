@@ -103,6 +103,44 @@ const PLACEMENT_ITEMS = {
   'cm-historial':            { section:'carga_masiva',  href:'/carga-masiva/#secHistorial',       icon:'bi-clock-history',          titulo:'Historial' },
 };
 
+// Descripciones (subtítulo) por key — se muestran cuando un sub-item se coloca en Home.
+const PLACEMENT_DESCS = {
+  // Clientes
+  'ant-laborales':'Antecedentes laborales del cliente', 'inf-comercial':'Información comercial y perfil de deudas',
+  'informes-dealernet':'Informes de la integración DealerNet',
+  // Comisiones
+  'com-revision':'Revisión y aprobación de comisiones de ejecutivos', 'com-variables':'Variables y parámetros del cálculo de comisiones',
+  // Tesorería
+  'teso-caja':'Operación de caja diaria', 'teso-cajas':'Administración de cajas', 'teso-cierre-caja':'Cierre y cuadratura de caja',
+  'teso-cuentas-transitorias':'Conciliación de cuentas transitorias', 'teso-brokerage':'Panel de tesorería brokerage',
+  // Cobranza
+  'cobr-prejudicial':'Gestión de cobranza pre-judicial', 'cobr-judicial':'Gestión de cobranza judicial', 'cobr-reporteria':'Reportería de cobranzas',
+  // CRM
+  'crm-gestiones':'Gestiones de contacto con clientes', 'crm-estadisticas':'Estadísticas y métricas de CRM', 'crm-campanas':'Campañas de contacto saliente',
+  // Mantenedores
+  'tasas':'Gestión de tasas mensuales y anuales para créditos', 'uf':'Registro y consulta del valor de la UF',
+  'dealers':'Administración de concesionarios y datos de contacto', 'vehiculos':'Base de tasación SII con marcas, modelos y valores',
+  'comunas':'Gestión de regiones, provincias y comunas de Chile', 'parametros':'Gastos operacionales fijos y comisiones del crédito',
+  'factores-seguro':'Tasas netas, factores y comisiones por plazo', 'tipos-documento':'Documentos de respaldo requeridos en la aprobación',
+  'pagares':'Plantillas de Hoja Resumen, Contrato, Pagaré y Mandatos', 'cuentas-bancarias':'Razón social, RUT, banco y cuenta para transferencias',
+  'parques':'Arriendo mensual y porcentaje de comisión por parque', 'flujo-brokerage':'Estados, etapas y documentos del flujo brokerage',
+  'broker-validaciones':'Ítems de validación documental AUTOFIN y UAC', 'financieras':'Parámetros de cálculo de ingresos AutoFin y UAC',
+  'comisiones-seguro':'Porcentajes de comisión por Desgravamen y Cesantía', 'productos-financiera':'Productos disponibles en la digitación por financiera',
+  'bd-clientes':'Base de datos de clientes', 'bd-operaciones':'Base de datos de operaciones de crédito',
+  'bd-antecedentes':'Base de datos de antecedentes laborales', 'bd-inf-comercial':'Base de datos de información comercial',
+  'vista-pantallas':'Configura qué cards aparecen en Home y cada sección', 'presupuesto':'Presupuesto y metas del periodo',
+  'ayuda':'Documentación y ayuda del sistema', 'alertas':'Configuración de alertas del sistema',
+  'solo-dios':'Acceso directo a la BD sin filtros — edición total', 'dealer-categorias':'Niveles, metas y potencial de venta por dealer',
+  'impuestos':'IVA y retención de honorarios (paramétrico)', 'definiciones':'Glosario de términos del sistema',
+  'feriados':'Calendario de feriados para cálculos de plazos', 'estado-creditos':'Etapas y estados del crédito y sus transiciones',
+  'cobranza-parametros':'Tramos de mora, provisiones y parámetros de cobranza', 'preferencia-financiera':'Orden de preferencia de financieras',
+  'respuestas-rapidas':'Respuestas predefinidas del chat de atención', 'alertas-saldos':'Alertas por saldos de precio pendientes',
+  'dealernet':'Productos y costos de la integración DealerNet',
+  // Carga Masiva
+  'cm-cargar':'Carga masiva de operaciones (Excel)', 'cm-trinidad':'Carga de archivos Trinidad', 'cm-eq-estados':'Equivalencias de estados Trinidad',
+  'cm-eq-ejecs':'Equivalencia de ejecutivos', 'cm-historial':'Historial de cargas masivas',
+};
+
 // ── Registro COMBINADO de sub-items: manifiesto (curado) + funcionalidades de BD ──
 // Evita que el manifiesto se desincronice: cualquier funcionalidad con href que el
 // manifiesto no cubra se agrega sola (clave = último segmento del href). El manifiesto
@@ -123,7 +161,7 @@ function sectionFromHref(href) {
 
 function buildPlacementItems(funcionalidadesInfo, moduleRoutes) {
   const items = {};
-  for (const [k, v] of Object.entries(PLACEMENT_ITEMS)) items[k] = { ...v };
+  for (const [k, v] of Object.entries(PLACEMENT_ITEMS)) items[k] = { ...v, desc: PLACEMENT_DESCS[k] || v.desc || '' };
   const cubiertos = new Set(Object.values(items).map(i => _phNorm(i.href)));
   const mods = moduleRoutes instanceof Set ? moduleRoutes : new Set(moduleRoutes || []);
   (funcionalidadesInfo || []).forEach(f => {
@@ -132,7 +170,7 @@ function buildPlacementItems(funcionalidadesInfo, moduleRoutes) {
     if (cubiertos.has(h) || mods.has(h)) return;        // ya cubierto por el manifiesto o es un módulo
     const seg = String(f.href).replace(/^\/+|\/+$/g, '').split('/').pop();
     if (!seg || items[seg]) return;                     // sin segmento o choque de clave
-    items[seg] = { section: sectionFromHref(f.href), href: f.href, icon: f.icono || 'bi-grid', titulo: f.nombre || seg };
+    items[seg] = { section: sectionFromHref(f.href), href: f.href, icon: f.icono || 'bi-grid', titulo: f.nombre || seg, desc: PLACEMENT_DESCS[seg] || '' };
     cubiertos.add(h);
   });
   return items;
