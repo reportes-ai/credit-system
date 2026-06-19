@@ -795,14 +795,10 @@ async function cargarProvisiones() {
         tramoInfo = `<div class="mora-box mb-2"><div class="mora-box-label">Saldo insoluto (capital adeudado)</div><div class="mora-box-value" style="color:#0f172a">${fmt(saldo_c)}</div></div>
                      <div class="mora-box mb-3"><div class="mora-box-label">Provisión estimada (${t.tramo} días · ${t.pct_provision}% del capital)</div><div class="mora-box-value" style="color:#dc2626">${fmt(saldo_c * t.pct_provision / 100)}</div></div>`; }
     }
+    // Panel por crédito → SOLO la provisión de ESTE crédito (no la cartera global).
     document.getElementById('provisionesContent').innerHTML = `
-      ${tramoInfo}
-      <div style="font-size:0.78rem;color:#64748b;margin-bottom:6px">La provisión se calcula sobre el <b>capital adeudado</b> (saldo insoluto), no sobre las cuotas morosas.</div>
-      <table class="table table-sm" style="font-size:0.82rem">
-        <thead><tr><th>Tramo</th><th>Casos</th><th>Saldo insoluto</th><th>% Prov.</th><th>Provisión</th></tr></thead>
-        <tbody>${data.tramos.map(t => `<tr><td>${t.tramo} días</td><td>${t.casos}</td><td>${fmt(t.saldo_insoluto)}</td><td>${t.pct_provision}%</td><td style="font-weight:700;color:#dc2626">${fmt(t.provision_estimada)}</td></tr>`).join('')}</tbody>
-        <tfoot><tr style="font-weight:700"><td>Total</td><td></td><td>${fmt(data.capital_insoluto)}</td><td></td><td style="color:#dc2626">${fmt(data.provision_total)}</td></tr></tfoot>
-      </table>`;
+      ${tramoInfo || '<div class="mora-box"><div class="mora-box-label">Provisión</div><div class="mora-box-value">—</div></div>'}
+      <div style="font-size:0.78rem;color:#64748b">La provisión se calcula sobre el <b>capital adeudado</b> (saldo insoluto) de este crédito, no sobre las cuotas morosas.</div>`;
   } catch(e) {
     document.getElementById('provisionesContent').innerHTML = '<div class="text-danger">Error</div>';
   }
