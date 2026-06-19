@@ -179,6 +179,9 @@
     <button class="vtab" id="tabCat" onclick="setView('categoria')">
       <i class="bi bi-award"></i><div><b>CATEGORÍA DEALERS</b><span>Movimientos sugeridos: dealers que suben o bajan de categoría. Dealers que pasan a Inactivos.</span></div>
     </button>
+    <button class="vtab" id="tabPot" onclick="setView('potencial')">
+      <i class="bi bi-graph-up-arrow"></i><div><b>POTENCIAL PARQUE/DEALER</b><span>Cuánto más podría crecer AutoFácil con cada dealer. Abre un parque para ver sus dealers.</span></div>
+    </button>
   </div>
 
   <div id="viewBase">
@@ -205,9 +208,6 @@
     <input type="file" id="fileInput" accept=".xlsx" style="display:none" onchange="onFileSelected(this)">
     <button class="btn-importar" onclick="recalcularCategorias()" title="Propone la categoría de cada dealer según las ventas del mes pasado">
       <i class="bi bi-arrow-repeat me-1 text-primary"></i>Recalcular categorías
-    </button>
-    <button class="btn-importar" onclick="location.href='/mantenedores/potencial-dealer/'" title="Análisis de potencial por parque y dealer">
-      <i class="bi bi-graph-up-arrow me-1 text-primary"></i>Potencial Parque/Dealer
     </button>
     <button class="btn-nuevo" onclick="abrirNuevo()">
       <i class="bi bi-plus-circle me-1"></i>+ Nuevo Dealer
@@ -283,6 +283,38 @@
         <button class="btn-det-editar" onclick="abrirEditar()"><i class="bi bi-pencil me-1"></i>Editar</button>
       </div>
     </div>
+  </div>
+</div>
+
+<!-- ====== VISTA POTENCIAL PARQUE/DEALER ====== -->
+<style>
+  #viewPotencial .pt-table { width:100%; border-collapse:collapse; font-size:.8rem; }
+  #viewPotencial .pt-table th { background:#012d70; color:#fff; font-size:.65rem; font-weight:700; text-transform:uppercase; padding:8px; text-align:right; white-space:nowrap; }
+  #viewPotencial .pt-table th.l { text-align:left; }
+  #viewPotencial .pt-table td { padding:7px 8px; border-bottom:1px solid #f1f5f9; text-align:right; white-space:nowrap; }
+  #viewPotencial .pt-table td.l { text-align:left; }
+  #viewPotencial .row-parque { background:#eef2f9; cursor:pointer; font-weight:800; color:#012d70; }
+  #viewPotencial .row-parque:hover { background:#e2e8f5; }
+  #viewPotencial .row-dealer:hover td { background:#f8fafc; }
+  #viewPotencial .caret { display:inline-block; width:14px; }
+  #viewPotencial .diag { display:inline-block; font-size:.65rem; font-weight:800; color:#fff; border-radius:10px; padding:2px 8px; }
+  #viewPotencial .pos { color:#16a34a; } #viewPotencial .neg { color:#dc2626; }
+  #viewPotencial .tbl-wrap { overflow:auto; max-height:70vh; border:1px solid #e5e7eb; border-radius:12px; }
+</style>
+<div id="viewPotencial" style="display:none">
+  <div style="background:#fff;border-radius:12px;padding:14px 18px;margin-bottom:14px;display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap">
+    <div style="font-size:.83rem;color:#475569" id="potMeses">Cargando…</div>
+    <a href="/mantenedores/potencial-dealer/" class="btn-importar"><i class="bi bi-sliders me-1"></i>Editar datos y variables</a>
+  </div>
+  <div class="tbl-wrap">
+    <table class="pt-table">
+      <thead><tr>
+        <th class="l">Parque / Dealer</th><th>Posiciones</th><th>Ventas mens.</th><th>Rotación ×pos</th>
+        <th>Ventas c/créd</th><th>% c/créd</th><th id="potM0"></th><th id="potM1"></th><th id="potM2"></th>
+        <th>Créd. prom</th><th>Ventas pot.</th><th>Potencial</th><th class="l">Diagnóstico</th>
+      </tr></thead>
+      <tbody id="potBody"><tr><td colspan="13" style="text-align:center;padding:20px;color:#94a3b8">Cargando…</td></tr></tbody>
+    </table>
   </div>
 </div>
 
@@ -551,9 +583,51 @@ function setView(v){
   VIEW=v;
   document.getElementById('tabBase').classList.toggle('on', v==='base');
   document.getElementById('tabCat').classList.toggle('on', v==='categoria');
+  document.getElementById('tabPot').classList.toggle('on', v==='potencial');
   document.getElementById('viewBase').style.display = v==='base' ? '' : 'none';
   document.getElementById('viewCategoria').style.display = v==='categoria' ? '' : 'none';
+  document.getElementById('viewPotencial').style.display = v==='potencial' ? '' : 'none';
   if (v==='categoria') cargarMovimientos();
+  if (v==='potencial') loadPotencial();
+}
+
+/* ── Potencial Parque/Dealer (vista de solo lectura; datos/variables en el mantenedor) ── */
+async function loadPotencial(){
+  try {
+    const r = await fetch('/api/dealer-potencial', { headers:H });
+    const j = await r.json();
+    if (!j.success) return;
+    const D = j.data, ms = D.meses||[];
+    document.getElementById('potM0').textContent = ms[0]||'M-3';
+    document.getElementById('potM1').textContent = ms[1]||'M-2';
+    document.getElementById('potM2').textContent = ms[2]||'M-1';
+    document.getElementById('potMeses').innerHTML = 'Créditos por mes: <b>'+ms.join(' · ')+'</b> (del sistema). Factor: <b>'+D.factor+'%</b>.';
+    renderPot(D);
+  } catch(_){}
+}
+function renderPot(D){
+  const fN=n=>(n==null||isNaN(n))?'—':Math.round(n).toLocaleString('es-CL');
+  const f1=n=>(n==null||isNaN(n))?'—':(Math.round(n*100)/100).toLocaleString('es-CL',{maximumFractionDigits:2});
+  const fPct=n=>(n==null||isNaN(n))?'—':Math.round(n*100)+'%';
+  const fPot=n=>(n==null||isNaN(n))?'—':(n>=0?'+':'')+Math.round(n*100)+'%';
+  const e=s=>String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+  const diag=(t,c)=>t&&t!=='—'?`<span class="diag" style="background:${e(c)}">${e(t)}</span>`:'<span style="color:#94a3b8">—</span>';
+  const pc=n=>n==null?'':(n>=0?'pos':'neg');
+  const tb=document.getElementById('potBody');
+  if(!D.parques.length){ tb.innerHTML='<tr><td colspan="13" style="text-align:center;padding:20px;color:#94a3b8">Sin dealers.</td></tr>'; return; }
+  let html='';
+  D.parques.forEach((p,pi)=>{
+    html+=`<tr class="row-parque" onclick="togglePot(${pi})"><td class="l"><span class="caret" id="pcar${pi}">▶</span> ${e(p.parque)} <span style="color:#94a3b8;font-weight:600">(${p.n_dealers})</span></td><td>${fN(p.posiciones)}</td><td>${fN(p.ventas_mensuales)}</td><td>${f1(p.rotacion)}</td><td>${fN(p.ventas_con_credito)}</td><td>${fPct(p.pct_credito)}</td><td>${fN(p.cred_meses[0])}</td><td>${fN(p.cred_meses[1])}</td><td>${fN(p.cred_meses[2])}</td><td>${f1(p.cred_prom)}</td><td>${fN(p.ventas_potencial)}</td><td class="${pc(p.potencial)}" style="font-weight:800">${fPot(p.potencial)}</td><td class="l">${diag(p.diagnostico,p.diag_color)}</td></tr>`;
+    p.dealers.forEach(d=>{
+      html+=`<tr class="row-dealer ppq${pi}" style="display:none"><td class="l" style="padding-left:28px">${e(d.dealer)}</td><td>${fN(d.posiciones)}</td><td>${fN(d.ventas_mensuales)}</td><td>${f1(d.rotacion)}</td><td>${fN(d.ventas_con_credito)}</td><td>${fPct(d.pct_credito)}</td><td>${fN(d.cred_meses[0])}</td><td>${fN(d.cred_meses[1])}</td><td>${fN(d.cred_meses[2])}</td><td>${f1(d.cred_prom)}</td><td>${fN(d.ventas_potencial)}</td><td class="${pc(d.potencial)}" style="font-weight:800">${fPot(d.potencial)}</td><td class="l">${diag(d.diagnostico,d.diag_color)}</td></tr>`;
+    });
+  });
+  tb.innerHTML=html;
+}
+function togglePot(pi){
+  const c=document.getElementById('pcar'+pi); const open=c.textContent==='▶';
+  c.textContent=open?'▼':'▶';
+  document.querySelectorAll('.ppq'+pi).forEach(tr=>tr.style.display=open?'':'none');
 }
 function filtrarMov(f){
   MOV_FILTRO=f;
