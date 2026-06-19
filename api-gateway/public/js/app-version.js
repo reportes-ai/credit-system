@@ -2,7 +2,7 @@
    AutoFácil — Versión global de la aplicación
    Editar SOLO este archivo para cambiar la versión
    ───────────────────────────────────────────── */
-const APP_VERSION = 'v43.61';
+const APP_VERSION = 'v43.62';
 
 document.addEventListener('DOMContentLoaded', () => {
 
@@ -888,13 +888,11 @@ document.addEventListener('DOMContentLoaded', () => {
 document.addEventListener('DOMContentLoaded', async () => {
   const token = sessionStorage.getItem('token');
   if (!token) return;                                          // sin sesión (login)
-  const yo = JSON.parse(sessionStorage.getItem('usuario') || 'null');
-  if (yo && yo.protegido) return;                              // BG-ADMIN no ve el aviso
   let data;
   try {
     const r = await fetch('/api/mantenimiento', { headers: { Authorization: 'Bearer ' + token } });
     const j = await r.json();
-    if (!j.success || !j.data.activo) return;
+    if (!j.success || !j.data.activo || j.data.es_bg) return;  // BG-ADMIN (servidor) no ve el aviso
     data = j.data;
   } catch (e) { return; }                                      // si falla, no bloquea
 

@@ -150,7 +150,7 @@
     const CONFIG_KEY = 'submenu_mantenedores';
 
     async function cargar() {
-      let orden = null, placement = {}, funcInfo = [], modsBD = [];
+      let orden = null, placement = {}, funcInfo = [], modsBD = [], esProt = false;
       try {
         const [rOrden, rPlacement, rMods] = await Promise.all([
           fetch(`/api/config/ui/${CONFIG_KEY}`, { headers: H }),
@@ -162,6 +162,7 @@
         if (jP.success && jP.data) placement = jP.data;
         funcInfo = (jM.funcionalidadesInfo || []).filter(f => f.href && f.href.startsWith('/mantenedores/'));
         if (jM.success && Array.isArray(jM.data)) modsBD = jM.data;
+        esProt = !!jM.protegido;   // BG-ADMIN (servidor), no de la sesión
       } catch {}
 
       // BD Nivel Dios: solo accesibles dentro de la card SOLO DIOS, no como cards sueltas
@@ -205,7 +206,7 @@
 
       const allItems = [...nativeItems, ...extrasSubitem, ...extrasMods, ...extrasModsNew];
       // Card exclusiva de BG-ADMIN (no pasa por la matriz de permisos: ni otros admin la ven)
-      if (yo && yo.protegido) allItems.push({ id:'mantencion-sistema', href:'/mantenedores/mantencion-sistema/', icon:'bi-cone-striped', titulo:'Mantención de Sistema', desc:'Aviso de mantención para todos los usuarios — solo BG-ADMIN' });
+      if (esProt) allItems.push({ id:'mantencion-sistema', href:'/mantenedores/mantencion-sistema/', icon:'bi-cone-striped', titulo:'Mantención de Sistema', desc:'Aviso de mantención para todos los usuarios — solo BG-ADMIN' });
       const items = orden
         ? orden.map(id => allItems.find(i => i.id === id)).filter(Boolean)
             .concat(allItems.filter(i => !orden.includes(i.id)))

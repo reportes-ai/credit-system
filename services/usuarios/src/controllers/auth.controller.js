@@ -122,9 +122,10 @@ const misPermisos = async (req, res) => {
     // Perfil SIEMPRE desde BD, no del token: si el admin cambia el perfil
     // (o se fusionan perfiles duplicados), aplica sin esperar re-login
     let id_perfil = req.usuario.id_perfil;
+    let _protegido = false;
     try {
-      const [[u]] = await pool.query('SELECT id_perfil FROM usuarios WHERE id_usuario = ?', [id_usuario]);
-      if (u) id_perfil = u.id_perfil;
+      const [[u]] = await pool.query('SELECT id_perfil, protegido FROM usuarios WHERE id_usuario = ?', [id_usuario]);
+      if (u) { id_perfil = u.id_perfil; _protegido = u.protegido === 1; }
     } catch (_) { /* usa el del token como fallback */ }
 
     // Módulos accesibles (para el menú principal — compatible con versión anterior)
@@ -178,7 +179,7 @@ const misPermisos = async (req, res) => {
       .filter(([, v]) => v.habilitado)
       .map(([codigo, v]) => ({ codigo, nombre: v.nombre, href: v.href, icono: v.icono }));
 
-    res.json({ success: true, data: modulos, funcionalidades, funcionalidadesInfo, error: null });
+    res.json({ success: true, data: modulos, funcionalidades, funcionalidadesInfo, protegido: _protegido, error: null });
   } catch (error) {
     res.status(500).json({ success: false, data: null, error: errMsg(error) });
   }
