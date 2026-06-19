@@ -388,10 +388,15 @@ function renderPagina() {
     } else countPendiente++;
   });
 
-  const esMora = c.estado === 'EN MORA';
-  const pill   = esMora
-    ? '<span class="estado-pill mora">EN MORA</span>'
-    : '<span class="estado-pill">VIGENTE</span>';
+  // Estado de cartera real (estado_cartera_disp viene del getById en tiempo real).
+  // Antes pedía c.estado==='EN MORA', pero ahora los propios cursados son OTORGADO.
+  const ec     = String(c.estado_cartera_disp || c.estado_cartera || '').toUpperCase();
+  const esMora = ec === 'MORA' || ec === 'EN MORA' || ec === 'VENCIDO';
+  const pill   = ec === 'VENCIDO'
+    ? '<span class="estado-pill" style="background:#fee2e2;color:#991b1b;border-color:#fca5a5">VENCIDO</span>'
+    : esMora
+      ? '<span class="estado-pill mora">EN MORA</span>'
+      : `<span class="estado-pill">${ec || 'VIGENTE'}</span>`;
 
   let rows='';
   _amort.forEach(r => {
