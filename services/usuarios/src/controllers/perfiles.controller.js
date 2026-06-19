@@ -216,6 +216,50 @@ const { auditar } = require('../../../../shared/audit');
   }
 })();
 
+/* ─── Migración: Dealers como card de acceso directo en la página principal ──
+   Dealers es un sub-ítem de Mantenedores (funcionalidad mantenedores_dealers).
+   La home sólo pinta MÓDULOS, así que para tener su card ahí se registra como
+   módulo (sigue además dentro de Mantenedores). El gate de permiso 'home_dealers'
+   se otorga a los mismos perfiles que ya acceden a Dealers. Idempotente. */
+(async () => {
+  try {
+    const RUTA = '/mantenedores/dealers/';
+    let [[mod]] = await pool.query('SELECT id_modulo FROM modulos WHERE ruta = ? LIMIT 1', [RUTA]);
+    if (!mod) {
+      const [[{ ord }]] = await pool.query('SELECT COALESCE(MAX(orden),0)+1 AS ord FROM modulos');
+      const [r] = await pool.query(
+        `INSERT INTO modulos (nombre, descripcion, icono, ruta, orden, estado)
+         VALUES ('Dealers','Administración de concesionarios y datos de contacto','bi-building',?,?,'activo')`,
+        [RUTA, ord]
+      );
+      mod = { id_modulo: r.insertId };
+    }
+    let [[fn]] = await pool.query("SELECT id_funcionalidad FROM funcionalidades WHERE codigo = 'home_dealers' LIMIT 1");
+    if (!fn) {
+      const [r2] = await pool.query(
+        'INSERT INTO funcionalidades (id_modulo, nombre, codigo, icono) VALUES (?,?,?,?)',
+        [mod.id_modulo, 'Dealers (acceso directo)', 'home_dealers', 'bi-building']
+      );
+      fn = { id_funcionalidad: r2.insertId };
+    }
+    // Mismos perfiles que ya acceden a Dealers (Administrador, Supervisor, Analista de Operaciones, …)
+    const [perfilesDealer] = await pool.query(
+      `SELECT DISTINCT pp.id_perfil FROM permisos_perfil pp
+       JOIN funcionalidades f ON f.id_funcionalidad = pp.id_funcionalidad
+       WHERE f.codigo = 'mantenedores_dealers' AND pp.habilitado = 1`
+    );
+    for (const p of perfilesDealer) {
+      await pool.query(
+        'INSERT IGNORE INTO permisos_perfil (id_perfil, id_funcionalidad, habilitado) VALUES (?,?,1)',
+        [p.id_perfil, fn.id_funcionalidad]
+      );
+    }
+    console.log('✓ Dealers disponible como card en la página principal (módulo + home_dealers)');
+  } catch (e) {
+    console.error('[migracion home Dealers]', e.message);
+  }
+})();
+
 /* ─── Migración v3: nuevos módulos y funcionalidades ─────────────────────── */
 (async () => {
   try {
