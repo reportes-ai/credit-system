@@ -347,8 +347,9 @@ function _cuotasVencidas(c) {
   return Math.min(Number(c.plazo) || 0, Math.max(0, diff + ajuste));
 }
 function _enMoraReal(c) {
-  if (c.estado !== 'VIGENTE') return false;
-  // null = brokerage importado sin tracking de pagos → mora no aplica
+  // Solo cartera propia (tiene estado_cartera); brokerage → null → no aplica.
+  if (!c.estado_cartera) return false;
+  // null = importado sin tracking de pagos → mora no aplica
   if (c.cuotas_pagadas === null || c.cuotas_pagadas === undefined) return false;
   return (_cuotasVencidas(c) - Number(c.cuotas_pagadas || 0)) > 0;
 }

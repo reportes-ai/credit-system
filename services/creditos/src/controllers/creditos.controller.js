@@ -105,15 +105,27 @@ const SELECT_GESTION = `
     COALESCE(cl.rut,             '')    AS rut_cliente,
     COALESCE(cl.nombre_completo, '')   AS nombre_cliente,
     COALESCE(ob.financiera, 'AUTOFACIL')                       AS financiera,
-    COALESCE(ob.estado,
+    -- ETAPA (originación). Para propios cursados la etapa se congela en OTORGADO;
+    -- las palabras de cartera que históricamente se guardaron en ob.estado
+    -- (VIGENTE/EN MORA/…) se reinterpretan como OTORGADO (su etapa real).
+    CASE
+      WHEN ob.estado IN ('VIGENTE','EN MORA','VENCIDO','PREPAGADO','CASTIGADO') THEN 'OTORGADO'
+      WHEN ob.estado IS NOT NULL AND ob.estado <> '' THEN ob.estado
+      WHEN ob.financiera IN ('AUTOFIN','UNIDAD DE CREDITO') AND ob.estado_eval = 'OTORGADO' THEN 'OTORGADO'
+      WHEN ob.estado_credito = 'OTORGADO' OR ob.estado_eval = 'OTORGADO' THEN 'OTORGADO'
+      WHEN ob.estado_eval IN ('RECHAZADO','ANULADO') THEN 'CANCELADO'
+      ELSE COALESCE(ob.estado_credito, ob.estado_eval)
+    END                                                        AS estado,
+    -- ESTADO de cartera (2da dimensión, solo propios). Del campo estado_cartera
+    -- (motor); fallback derivado para los que aún no recalcula el motor.
+    COALESCE(ob.estado_cartera,
       CASE
-        WHEN ob.financiera IN ('AUTOFIN','UNIDAD DE CREDITO') AND ob.estado_eval = 'OTORGADO' THEN 'OTORGADO'
-        WHEN ob.estado_credito = 'OTORGADO' THEN 'VIGENTE'
-        WHEN ob.estado_eval    = 'OTORGADO' THEN 'VIGENTE'
-        WHEN ob.estado_eval IN ('RECHAZADO','ANULADO') THEN 'CANCELADO'
-        ELSE COALESCE(ob.estado_credito, ob.estado_eval)
-      END)                                                     AS estado,
-    ob.estado_cartera,
+        WHEN ob.estado = 'EN MORA' THEN 'MORA'
+        WHEN ob.estado IN ('VIGENTE','VENCIDO','PREPAGADO','CASTIGADO') THEN ob.estado
+        WHEN (ob.financiera IS NULL OR ob.financiera NOT IN ('AUTOFIN','UNIDAD DE CREDITO'))
+             AND (ob.estado_credito = 'OTORGADO' OR ob.estado_eval = 'OTORGADO') THEN 'VIGENTE'
+        ELSE NULL
+      END)                                                     AS estado_cartera,
     ob.fecha_otorgado                                          AS fecha_otorgamiento,
     ob.valor_vehiculo,
     ob.pie,
@@ -272,14 +284,27 @@ const getAll = async (req, res) => {
     const limitNum = Math.min(500, Math.max(1, parseInt(limit) || 100));
     const offset   = (pageNum - 1) * limitNum;
 
-    const estadoExpr = `COALESCE(ob.estado,
+    // "Bucket de display" para chips y filtro: para PROPIOS cursados muestra el
+    // ESTADO de cartera (VIGENTE/EN MORA/…) — así los chips Vigentes/En Mora siguen
+    // andando; para BROKERAGE muestra la ETAPA. (La columna ETAPA de la fila usa la
+    // expresión de SELECT_GESTION, que para propios da OTORGADO.)
+    const estadoExpr = `
       CASE
+        WHEN (ob.financiera IS NULL OR ob.financiera NOT IN ('AUTOFIN','UNIDAD DE CREDITO'))
+             AND (ob.estado IN ('VIGENTE','EN MORA','VENCIDO','PREPAGADO','CASTIGADO')
+                  OR ob.estado_cartera IS NOT NULL
+                  OR ob.estado_credito = 'OTORGADO' OR ob.estado_eval = 'OTORGADO')
+        THEN CASE
+               WHEN ob.estado_cartera = 'MORA' THEN 'EN MORA'
+               WHEN ob.estado_cartera IS NOT NULL AND ob.estado_cartera <> '' THEN ob.estado_cartera
+               WHEN ob.estado IN ('VIGENTE','EN MORA','VENCIDO','PREPAGADO','CASTIGADO') THEN ob.estado
+               ELSE 'VIGENTE'
+             END
         WHEN ob.financiera IN ('AUTOFIN','UNIDAD DE CREDITO') AND ob.estado_eval = 'OTORGADO' THEN 'OTORGADO'
-        WHEN ob.estado_credito = 'OTORGADO' THEN 'VIGENTE'
-        WHEN ob.estado_eval    = 'OTORGADO' THEN 'VIGENTE'
+        WHEN ob.estado IS NOT NULL AND ob.estado <> '' THEN ob.estado
         WHEN ob.estado_eval IN ('RECHAZADO','ANULADO') THEN 'CANCELADO'
         ELSE COALESCE(ob.estado_credito, ob.estado_eval)
-      END)`;
+      END`;
 
     // whereBase = q + financiera (sin estado) → para los chips de stats (siempre el desglose completo)
     let whereBase = WHERE_GESTION;
@@ -390,6 +415,24 @@ const getById = async (req, res) => {
               ob.automotora                                         AS dealer,
               ob.tascli_real                                        AS tasa_mensual,
               ob.fecha_otorgado                                     AS fecha_otorgamiento,
+              -- ETAPA derivada (propios cursados → OTORGADO). ob.estado se conserva
+              -- intacto (VIGENTE/…) para no alterar los flujos de pago de la ficha.
+              CASE
+                WHEN ob.estado IN ('VIGENTE','EN MORA','VENCIDO','PREPAGADO','CASTIGADO') THEN 'OTORGADO'
+                WHEN ob.estado IS NOT NULL AND ob.estado <> '' THEN ob.estado
+                WHEN ob.financiera IN ('AUTOFIN','UNIDAD DE CREDITO') AND ob.estado_eval = 'OTORGADO' THEN 'OTORGADO'
+                WHEN ob.estado_credito = 'OTORGADO' OR ob.estado_eval = 'OTORGADO' THEN 'OTORGADO'
+                WHEN ob.estado_eval IN ('RECHAZADO','ANULADO') THEN 'CANCELADO'
+                ELSE COALESCE(ob.estado_credito, ob.estado_eval)
+              END                                                  AS estado_etapa,
+              COALESCE(ob.estado_cartera,
+                CASE
+                  WHEN ob.estado = 'EN MORA' THEN 'MORA'
+                  WHEN ob.estado IN ('VIGENTE','VENCIDO','PREPAGADO','CASTIGADO') THEN ob.estado
+                  WHEN (ob.financiera IS NULL OR ob.financiera NOT IN ('AUTOFIN','UNIDAD DE CREDITO'))
+                       AND (ob.estado_credito = 'OTORGADO' OR ob.estado_eval = 'OTORGADO') THEN 'VIGENTE'
+                  ELSE NULL
+                END)                                               AS estado_cartera_disp,
               COALESCE(cl.rut,             '') AS rut_cliente,
               COALESCE(cl.nombre_completo, '') AS nombre_cliente
        FROM creditos ob

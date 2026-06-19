@@ -504,10 +504,11 @@ function renderPagina(c, ant, com) {
       <div class="ch-right">
         <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;justify-content:flex-end">
           <span style="font-size:.58rem;color:#94a3b8;font-weight:800;letter-spacing:.06em">ETAPA</span>
-          <span class="estado-badge eb-${estadoKey}" title="Etapa (originación)">${estadoEstado(c.estado)}</span>
+          <span class="estado-badge eb-${(c.estado_etapa||c.estado||'').replace(' ','-')}" title="Etapa (originación)">${estadoEstado(c.estado_etapa||c.estado)}</span>
           ${(()=>{
+            const ec = c.estado_cartera_disp || c.estado_cartera;
             const M = { VIGENTE:'#16a34a', MORA:'#d97706', 'EN MORA':'#d97706', VENCIDO:'#dc2626', TERMINADO:'#0f766e', PREPAGADO:'#7c3aed', CASTIGADO:'#111827' };
-            if (c.estado_cartera) return `<span style="font-size:.58rem;color:#94a3b8;font-weight:800;letter-spacing:.06em">ESTADO</span><span class="estado-badge" style="background:${M[c.estado_cartera]||'#64748b'};color:#fff" title="Estado de cartera">${c.estado_cartera}</span>`;
+            if (ec) return `<span style="font-size:.58rem;color:#94a3b8;font-weight:800;letter-spacing:.06em">ESTADO</span><span class="estado-badge" style="background:${M[ec]||'#64748b'};color:#fff" title="Estado de cartera">${ec}</span>`;
             if (c.estado!=='VIGENTE') return '';
             const ep=getEstadoPago(c); return `<span class="pago-estado-badge pago-${ep.cls}">${ep.label}</span>`;
           })()}
