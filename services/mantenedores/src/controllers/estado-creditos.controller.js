@@ -64,21 +64,36 @@ const { auditar } = require('../../../../shared/audit');
     // ── Seed AutoFácil / recursos propios: ETAPAS de originación (solo si vacío) ──
     // La etapa propia termina en OTORGADO (es_final): ahí se congela y la segunda
     // dimensión (Estado de Cartera, mantenedor estados_cartera) toma el control.
-    const [[cntAF]] = await pool.query("SELECT COUNT(*) n FROM estados_credito WHERE ambito='autofacil'");
-    if (!cntAF.n) {
+    // Etapas reales de originación AutoFácil (recursos propios). Se siembra/repara
+    // una vez (cuando falta INGRESO). Flujo: Ingresado → Carga Respaldos → En Análisis
+    // → Emisión Documentos → Carga Docs AF → Validación Firma → OTORGADO (final: ahí
+    // toma el control el Estado de Cartera).
+    const [rIng] = await pool.query("SELECT 1 FROM estados_credito WHERE ambito='autofacil' AND codigo='INGRESO' LIMIT 1");
+    if (!rIng.length) {
+      await pool.query("DELETE FROM estados_transicion WHERE ambito='autofacil'");
+      await pool.query("DELETE FROM estados_credito WHERE ambito='autofacil'");
       await pool.query(
         `INSERT IGNORE INTO estados_credito (ambito, codigo, nombre, color, orden, es_inicial, es_final) VALUES
-          ('autofacil','DIGITADO','Digitado','#6366f1',10,1,0),
-          ('autofacil','APROBADO','Aprobado','#16a34a',20,0,0),
-          ('autofacil','RECHAZADO','Rechazado','#dc2626',30,0,1),
-          ('autofacil','OTORGADO','Otorgado','#0f766e',40,0,1),
-          ('autofacil','DESISTIDO','Desistido','#b91c1c',50,0,1)`);
+          ('autofacil','INGRESO','Ingresado','#6366f1',10,1,0),
+          ('autofacil','CARGA_RESPALDOS','Carga Respaldos','#8b5cf6',20,0,0),
+          ('autofacil','EN_ANALISIS','En Análisis','#0ea5e9',30,0,0),
+          ('autofacil','EMISION_DOCUMENTOS','Emisión Documentos','#f59e0b',40,0,0),
+          ('autofacil','CARGA_DOCUMENTOS_AF','Carga Docs. AF','#d97706',50,0,0),
+          ('autofacil','VALIDACION_FIRMA','Validación Firma','#0ea5e9',60,0,0),
+          ('autofacil','OTORGADO','Otorgado','#0f766e',70,0,1),
+          ('autofacil','RECHAZADO','Rechazado','#dc2626',80,0,1),
+          ('autofacil','DESISTIDO','Desistido','#b91c1c',90,0,1)`);
       await pool.query(
         `INSERT IGNORE INTO estados_transicion (ambito, origen, destino) VALUES
-          ('autofacil','DIGITADO','APROBADO'),
-          ('autofacil','DIGITADO','RECHAZADO'),
-          ('autofacil','APROBADO','OTORGADO'),
-          ('autofacil','APROBADO','DESISTIDO')`);
+          ('autofacil','INGRESO','CARGA_RESPALDOS'),
+          ('autofacil','INGRESO','RECHAZADO'),
+          ('autofacil','CARGA_RESPALDOS','EN_ANALISIS'),
+          ('autofacil','EN_ANALISIS','EMISION_DOCUMENTOS'),
+          ('autofacil','EN_ANALISIS','RECHAZADO'),
+          ('autofacil','EMISION_DOCUMENTOS','CARGA_DOCUMENTOS_AF'),
+          ('autofacil','CARGA_DOCUMENTOS_AF','VALIDACION_FIRMA'),
+          ('autofacil','VALIDACION_FIRMA','OTORGADO'),
+          ('autofacil','VALIDACION_FIRMA','DESISTIDO')`);
     }
 
     // Registrar el mantenedor en el menú (funcionalidad) si no existe

@@ -124,7 +124,7 @@ const SELECT_GESTION = `
         WHEN ob.estado = 'EN MORA' THEN 'MORA'
         WHEN ob.estado IN ('VIGENTE','VENCIDO','PREPAGADO','CASTIGADO') THEN ob.estado
         WHEN (ob.financiera IS NULL OR ob.financiera NOT IN ('AUTOFIN','UNIDAD DE CREDITO'))
-             AND (ob.estado_credito = 'OTORGADO' OR ob.estado_eval = 'OTORGADO') THEN 'VIGENTE'
+             AND ob.estado = 'OTORGADO' THEN 'VIGENTE'
         ELSE NULL
       END)                                                     AS estado_cartera,
     ob.fecha_otorgado                                          AS fecha_otorgamiento,
@@ -466,7 +466,7 @@ const getById = async (req, res) => {
                   WHEN ob.estado = 'EN MORA' THEN 'MORA'
                   WHEN ob.estado IN ('VIGENTE','VENCIDO','PREPAGADO','CASTIGADO') THEN ob.estado
                   WHEN (ob.financiera IS NULL OR ob.financiera NOT IN ('AUTOFIN','UNIDAD DE CREDITO'))
-                       AND (ob.estado_credito = 'OTORGADO' OR ob.estado_eval = 'OTORGADO') THEN 'VIGENTE'
+                       AND ob.estado = 'OTORGADO' THEN 'VIGENTE'
                   ELSE NULL
                 END)                                               AS estado_cartera_disp,
               COALESCE(cl.rut,             '') AS rut_cliente,
@@ -486,9 +486,12 @@ const getById = async (req, res) => {
       const esPropio = finUp !== 'AUTOFIN' && finUp !== 'UNIDAD DE CREDITO';
       const stored = String(c.estado_cartera || '').toUpperCase();
       const manualTerm = ['CASTIGADO', 'PREPAGADO', 'TERMINADO'].includes(stored);
+      // La cartera (Estado) solo existe cuando la ETAPA ya es OTORGADO. Antes de eso
+      // (Ingresado, En Análisis, Validación Firma, etc.) NO hay Estado de cartera ni pago.
+      const etapaOtorgado = String(c.estado_etapa || '').toUpperCase() === 'OTORGADO';
       if (manualTerm) {
         c.estado_cartera_disp = c.estado_cartera;
-      } else if (esPropio && c.fecha_primera_cuota && Number(c.plazo) > 0) {
+      } else if (esPropio && etapaOtorgado && c.fecha_primera_cuota && Number(c.plazo) > 0) {
         const [pg] = await pool.query("SELECT DISTINCT numero_cuota FROM pagos_credito WHERE id_credito=? AND estado_pago='PAGADO'", [c.id]);
         const paid = new Set(pg.map(p => parseInt(p.numero_cuota, 10)));
         const [ump] = await pool.query('SELECT clave, valor FROM cartera_parametros');
