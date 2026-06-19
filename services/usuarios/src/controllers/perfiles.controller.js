@@ -726,7 +726,7 @@ const getUsuariosByPerfil = async (req, res) => {
     // Usuarios activos con este perfil
     const [users] = await pool.query(
       `SELECT id_usuario, nombre, apellido, email, estado
-       FROM usuarios WHERE id_perfil = ? AND estado = 'activo'
+       FROM usuarios WHERE id_perfil = ? AND estado = 'activo' AND protegido = 0
        ORDER BY nombre, apellido`,
       [id]
     );

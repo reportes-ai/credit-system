@@ -198,6 +198,8 @@ const buildFiltroUsuario = async (usuario) => {
 const getAllUsuarios = async (req, res) => {
   try {
     const { where, params } = await buildFiltroUsuario(req.usuario);
+    // Ocultar la cuenta break-glass (protegida) de toda la lista.
+    const wProt = where ? where + ' AND u.protegido = 0' : 'WHERE u.protegido = 0';
     const [usuarios] = await pool.query(
       `SELECT u.id_usuario, u.rut, u.nombre, u.apellido, u.apellido_materno, u.centro_costo, u.email, u.telefono,
               u.id_perfil, p.nombre AS perfil, u.id_supervisor,
@@ -209,7 +211,7 @@ const getAllUsuarios = async (req, res) => {
        LEFT JOIN usuarios s ON u.id_supervisor = s.id_usuario
        LEFT JOIN caja_usuarios cu ON cu.id_usuario = u.id_usuario AND cu.activo = 1
        LEFT JOIN cajas cj ON cj.id_caja = cu.id_caja AND cj.activo = 1
-       ${where}
+       ${wProt}
        ORDER BY u.nombre, u.apellido`,
       params
     );
