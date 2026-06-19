@@ -172,13 +172,14 @@
               <th>Días mora</th>
               <th>Días en judicial</th>
               <th>Monto mora</th>
+              <th>Saldo insoluto</th>
               <th>Última gestión</th>
               <th>Disponibilidad</th>
               <th></th>
             </tr>
           </thead>
           <tbody id="tablaBody">
-            <tr><td colspan="10" class="empty-state"><div class="spinner"></div> Cargando...</td></tr>
+            <tr><td colspan="11" class="empty-state"><div class="spinner"></div> Cargando...</td></tr>
           </tbody>
         </table>
       </div>
@@ -294,7 +295,7 @@ async function cargarCartera() {
   const params = new URLSearchParams({ tipo: 'judicial', page: state.page, limit: 30 });
   if (q) params.set('q', q);
 
-  document.getElementById('tablaBody').innerHTML = '<tr><td colspan="10" class="empty-state"><div class="spinner"></div> Cargando...</td></tr>';
+  document.getElementById('tablaBody').innerHTML = '<tr><td colspan="11" class="empty-state"><div class="spinner"></div> Cargando...</td></tr>';
 
   try {
     const r = await fetch('/api/cobranza/cartera?' + params, { headers: { 'Authorization': 'Bearer ' + token } });
@@ -316,7 +317,7 @@ async function cargarCartera() {
     document.getElementById('btnAnterior').disabled = data.page <= 1;
     document.getElementById('btnSiguiente').disabled = data.page >= data.pages;
   } catch (e) {
-    document.getElementById('tablaBody').innerHTML = '<tr><td colspan="10" class="empty-state text-danger">Error cargando datos</td></tr>';
+    document.getElementById('tablaBody').innerHTML = '<tr><td colspan="11" class="empty-state text-danger">Error cargando datos</td></tr>';
   }
 }
 
@@ -327,7 +328,7 @@ function dispBadge(row) {
 
 function renderTabla(rows) {
   if (!rows.length) {
-    document.getElementById('tablaBody').innerHTML = '<tr><td colspan="10" class="empty-state">Sin créditos en judicial</td></tr>';
+    document.getElementById('tablaBody').innerHTML = '<tr><td colspan="11" class="empty-state">Sin créditos en judicial</td></tr>';
     return;
   }
   document.getElementById('tablaBody').innerHTML = rows.map(r => {
@@ -341,6 +342,7 @@ function renderTabla(rows) {
       <td><span class="dias-judicial">${r.dias_mora}d</span></td>
       <td><span style="color:#b91c1c;font-weight:700">${diasJudicial}d</span></td>
       <td style="font-weight:700;color:#dc2626">${fmt(r.monto_mora)}</td>
+      <td style="font-weight:700;color:#0f172a">${fmt(r.saldo_insoluto)}</td>
       <td style="font-size:0.78rem;color:#64748b">${r.ultima_tipo ? `${r.ultima_tipo}<br><span style="color:#94a3b8">${fmtFechaHora(r.ultima_gestion_fecha)}</span>` : '<span style="color:#94a3b8">—</span>'}</td>
       <td>${dispBadge(r)}</td>
       <td><button class="btn-gestionar" onclick="abrirDrawer(${r.id_credito})"><i class="bi bi-file-earmark-plus me-1"></i>Gestionar</button></td>
@@ -363,6 +365,7 @@ async function abrirDrawer(id_credito) {
     <div class="mora-box"><div class="mora-box-label">Días en judicial</div><div class="mora-box-value" style="color:#b91c1c">${Math.max(0, Number(row?.dias_mora||0) - 90)}</div></div>
     <div class="mora-box"><div class="mora-box-label">Cuotas mora</div><div class="mora-box-value">${row?.cuotas_mora || 0}</div></div>
     <div class="mora-box"><div class="mora-box-label">Monto mora</div><div class="mora-box-value">${fmt(row?.monto_mora)}</div></div>
+    <div class="mora-box" style="grid-column:1/-1"><div class="mora-box-label">Saldo insoluto (capital adeudado)</div><div class="mora-box-value" style="color:#0f172a">${fmt(row?.saldo_insoluto)}</div></div>
   `;
 
   document.getElementById('drawerOverlay').style.display = '';
@@ -560,13 +563,15 @@ async function cargarProvisiones() {
     const { success, data } = await r.json();
     if (!success) return;
     const c = creditoActual;
-    const monto_mora = c ? Number(c.monto_mora) : 0;
+    const saldo_c = c ? Number(c.saldo_insoluto || 0) : 0;
     const prov_pct = 80;
     document.getElementById('provisionesContent').innerHTML = `
-      ${c ? `<div class="mora-box mb-3"><div class="mora-box-label">Provisión estimada crédito (91+ días · 80%)</div><div class="mora-box-value" style="color:#dc2626">${fmt(monto_mora * prov_pct / 100)}</div></div>` : ''}
+      ${c ? `<div class="mora-box mb-2"><div class="mora-box-label">Saldo insoluto (capital adeudado)</div><div class="mora-box-value" style="color:#0f172a">${fmt(saldo_c)}</div></div>
+             <div class="mora-box mb-3"><div class="mora-box-label">Provisión estimada crédito (91+ días · 80% del capital)</div><div class="mora-box-value" style="color:#dc2626">${fmt(saldo_c * prov_pct / 100)}</div></div>` : ''}
+      <div style="font-size:0.78rem;color:#64748b;margin-bottom:6px">La provisión se calcula sobre el <b>capital adeudado</b> (saldo insoluto), no sobre las cuotas morosas.</div>
       <table class="table table-sm" style="font-size:0.82rem">
-        <thead><tr><th>Tramo</th><th>Casos</th><th>Monto mora</th><th>% Prov.</th><th>Provisión</th></tr></thead>
-        <tbody>${data.tramos.map(t => `<tr ${t.tramo === '91+' ? 'style="background:#fff5f5"' : ''}><td>${t.tramo}d</td><td>${t.casos}</td><td>${fmt(t.monto)}</td><td>${t.pct_provision}%</td><td style="font-weight:700;color:#dc2626">${fmt(t.provision_estimada)}</td></tr>`).join('')}</tbody>
+        <thead><tr><th>Tramo</th><th>Casos</th><th>Saldo insoluto</th><th>% Prov.</th><th>Provisión</th></tr></thead>
+        <tbody>${data.tramos.map(t => `<tr ${t.tramo === '91+' ? 'style="background:#fff5f5"' : ''}><td>${t.tramo}d</td><td>${t.casos}</td><td>${fmt(t.saldo_insoluto)}</td><td>${t.pct_provision}%</td><td style="font-weight:700;color:#dc2626">${fmt(t.provision_estimada)}</td></tr>`).join('')}</tbody>
       </table>`;
   } catch(e) {}
 }

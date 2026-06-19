@@ -162,6 +162,19 @@ const CV = `LEAST(c.plazo,
     CASE WHEN DAY(CURDATE()) >= DAY(c.fecha_primera_cuota) THEN 1 ELSE 0 END
   )`;
 
+// Saldo insoluto = capital adeudado (lo que falta amortizar). Sistema francés:
+// B_p = P * ((1+i)^n - (1+i)^p) / ((1+i)^n - 1), con i = tasa mensual, n = plazo,
+// p = cuotas PAGADAS (las efectivamente abonadas). i=0 → amortización lineal.
+const SALDO = `ROUND(
+    CASE
+      WHEN COALESCE(c.tascli_real, 0) <= 0
+        THEN COALESCE(c.monto_financiado, 0) * (c.plazo - LEAST(COALESCE(pp.cnt, 0), c.plazo)) / NULLIF(c.plazo, 0)
+      ELSE COALESCE(c.monto_financiado, 0)
+        * (POW(1 + c.tascli_real/100, c.plazo) - POW(1 + c.tascli_real/100, LEAST(COALESCE(pp.cnt, 0), c.plazo)))
+        / NULLIF(POW(1 + c.tascli_real/100, c.plazo) - 1, 0)
+    END
+  )`;
+
 // Query base plana — whereExtra va dentro del WHERE, havingExtra dentro del HAVING
 const MORA_SQL = (whereExtra = '', havingExtra = '') => `
   SELECT
@@ -178,7 +191,8 @@ const MORA_SQL = (whereExtra = '', havingExtra = '') => `
                DATE_ADD(c.fecha_primera_cuota,
                  INTERVAL COALESCE(pp.cnt, 0) MONTH))
       ELSE 0
-    END AS dias_mora
+    END AS dias_mora,
+    ${SALDO} AS saldo_insoluto
   FROM creditos c
   LEFT JOIN clientes cl_m ON cl_m.id_cliente = c.id_cliente
   LEFT JOIN (
@@ -213,6 +227,7 @@ const MORA_CREDITO_SQL = `
                  INTERVAL COALESCE(pp.cnt, 0) MONTH))
       ELSE 0
     END AS dias_mora,
+    ${SALDO} AS saldo_insoluto,
     COALESCE(cl.rut,             '') AS rut_cliente,
     COALESCE(cl.nombre_completo, '') AS nombre_cliente,
     cl.sexo           AS sexo_cliente,
@@ -753,26 +768,32 @@ exports.provisiones = async (req, res) => {
       { tramo: '91+',   min: 91, max: Infinity, pct_provision: 80 }
     ];
 
-    let deuda_mora_total = 0;
+    // La provisión se calcula sobre el CAPITAL ADEUDADO (saldo insoluto), no sobre
+    // las cuotas morosas. Se informan ambos (monto en mora y capital) por tramo.
+    let deuda_mora_total = 0, capital_total = 0;
     const tramosResult = tramos.map(t => {
       const filtered = moraRows.filter(r => {
         const d = Number(r.dias_mora);
         return d >= t.min && d <= t.max;
       });
-      const monto = filtered.reduce((s, r) => s + Number(r.monto_mora), 0);
+      const monto   = filtered.reduce((s, r) => s + Number(r.monto_mora), 0);
+      const capital = filtered.reduce((s, r) => s + Number(r.saldo_insoluto || 0), 0);
       deuda_mora_total += monto;
+      capital_total    += capital;
       return {
         tramo: t.tramo,
         casos: filtered.length,
         monto: Math.round(monto),
+        saldo_insoluto: Math.round(capital),
         pct_provision: t.pct_provision,
-        provision_estimada: Math.round(monto * t.pct_provision / 100)
+        provision_estimada: Math.round(capital * t.pct_provision / 100)
       };
     });
 
     ok(res, {
       deuda_total: Math.round(Number(deuda_total)),
       deuda_mora: Math.round(deuda_mora_total),
+      capital_insoluto: Math.round(capital_total),
       provision_total: tramosResult.reduce((s, t) => s + t.provision_estimada, 0),
       tramos: tramosResult
     });
