@@ -216,51 +216,45 @@ const { auditar } = require('../../../../shared/audit');
   }
 })();
 
-/* ─── Migración: Dealers MOVIDO de Mantenedores a la página principal ────────
-   Dealers era un sub-ítem de Mantenedores (funcionalidad mantenedores_dealers).
-   La home sólo pinta MÓDULOS, así que se registra Dealers como módulo y se otorga
-   el gate 'home_dealers' a los mismos perfiles que ya acceden a Dealers. Para que
-   NO quede duplicado, se le quita el href a 'mantenedores_dealers' (deja de ser
-   card en la landing de Mantenedores; sigue siendo el permiso de la página). Idempotente. */
+/* ─── Migración: Dealers como sub-item en Home (limpia el módulo "falso") ─────
+   Antes registramos Dealers como módulo para que apareciera en Home. Con el render
+   unificado (la home ya pinta sub-items colocados vía Vista Pantallas), eso ya no
+   hace falta: Dealers vuelve a ser un sub-item normal y se coloca en Home por
+   placement. Este bloque revierte el módulo falso + el gate 'home_dealers', restaura
+   el href de 'mantenedores_dealers', y —una sola vez— mueve 'dealers' a la sección Home. */
 (async () => {
   try {
-    const RUTA = '/mantenedores/dealers/';
-    let [[mod]] = await pool.query('SELECT id_modulo FROM modulos WHERE ruta = ? LIMIT 1', [RUTA]);
-    if (!mod) {
-      const [[{ ord }]] = await pool.query('SELECT COALESCE(MAX(orden),0)+1 AS ord FROM modulos');
-      const [r] = await pool.query(
-        `INSERT INTO modulos (nombre, descripcion, icono, ruta, orden, estado)
-         VALUES ('Dealers','Administración de concesionarios y datos de contacto','bi-building',?,?,'activo')`,
-        [RUTA, ord]
-      );
-      mod = { id_modulo: r.insertId };
+    // 1) Restaurar el sub-item Dealers (su href de menú)
+    await pool.query("UPDATE funcionalidades SET href = '/mantenedores/dealers/' WHERE codigo = 'mantenedores_dealers' AND (href IS NULL OR href <> '/mantenedores/dealers/')");
+
+    // 2) Eliminar el módulo "falso" + su funcionalidad-gate 'home_dealers'
+    const [[hf]] = await pool.query("SELECT id_funcionalidad, id_modulo FROM funcionalidades WHERE codigo = 'home_dealers' LIMIT 1");
+    if (hf) {
+      await pool.query('DELETE FROM permisos_perfil WHERE id_funcionalidad = ?', [hf.id_funcionalidad]);
+      await pool.query('DELETE FROM funcionalidades WHERE id_funcionalidad = ?', [hf.id_funcionalidad]);
+      const [[{ n }]] = await pool.query('SELECT COUNT(*) AS n FROM funcionalidades WHERE id_modulo = ?', [hf.id_modulo]);
+      if (n === 0) await pool.query("DELETE FROM modulos WHERE id_modulo = ? AND ruta = '/mantenedores/dealers/'", [hf.id_modulo]);
     }
-    let [[fn]] = await pool.query("SELECT id_funcionalidad FROM funcionalidades WHERE codigo = 'home_dealers' LIMIT 1");
-    if (!fn) {
-      const [r2] = await pool.query(
-        'INSERT INTO funcionalidades (id_modulo, nombre, codigo, icono) VALUES (?,?,?,?)',
-        [mod.id_modulo, 'Dealers (acceso directo)', 'home_dealers', 'bi-building']
-      );
-      fn = { id_funcionalidad: r2.insertId };
+
+    // 3) Una sola vez: mover 'dealers' a la sección Home en placement_v2 (config global).
+    //    Con flag para no pelear con reubicaciones futuras en Vista Pantallas.
+    const [[done]] = await pool.query("SELECT 1 AS y FROM migraciones_aplicadas WHERE clave = 'dealers_a_home_placement' LIMIT 1");
+    if (!done) {
+      const [[cfg]] = await pool.query("SELECT valor FROM config_ui WHERE clave = 'placement_v2' LIMIT 1");
+      if (cfg && cfg.valor) {
+        let pl = null; try { pl = JSON.parse(cfg.valor); } catch (_) {}
+        if (pl && typeof pl === 'object') {
+          Object.keys(pl).forEach(sec => { if (Array.isArray(pl[sec])) pl[sec] = pl[sec].filter(k => k !== 'dealers'); });
+          if (!Array.isArray(pl.home)) pl.home = [];
+          pl.home.push('dealers');
+          await pool.query("UPDATE config_ui SET valor = ? WHERE clave = 'placement_v2'", [JSON.stringify(pl)]);
+        }
+      }
+      await pool.query("INSERT IGNORE INTO migraciones_aplicadas (clave) VALUES ('dealers_a_home_placement')");
     }
-    // Mismos perfiles que ya acceden a Dealers (Administrador, Supervisor, Analista de Operaciones, …)
-    const [perfilesDealer] = await pool.query(
-      `SELECT DISTINCT pp.id_perfil FROM permisos_perfil pp
-       JOIN funcionalidades f ON f.id_funcionalidad = pp.id_funcionalidad
-       WHERE f.codigo = 'mantenedores_dealers' AND pp.habilitado = 1`
-    );
-    for (const p of perfilesDealer) {
-      await pool.query(
-        'INSERT IGNORE INTO permisos_perfil (id_perfil, id_funcionalidad, habilitado) VALUES (?,?,1)',
-        [p.id_perfil, fn.id_funcionalidad]
-      );
-    }
-    // Quitar la card de Dealers de la landing de Mantenedores (queda sólo en Home).
-    // 'mantenedores_dealers' se mantiene como permiso de la página; sólo pierde el href de menú.
-    await pool.query("UPDATE funcionalidades SET href = NULL WHERE codigo = 'mantenedores_dealers' AND href IS NOT NULL");
-    console.log('✓ Dealers movido a la página principal (módulo + home_dealers; fuera de Mantenedores)');
+    console.log('✓ Dealers: módulo falso revertido; queda como sub-item colocado en Home');
   } catch (e) {
-    console.error('[migracion home Dealers]', e.message);
+    console.error('[migracion revert Dealers]', e.message);
   }
 })();
 
