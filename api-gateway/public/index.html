@@ -564,14 +564,14 @@
         // Antes la home SÓLO pintaba módulos; ahora también pinta sub-items asignados
         // a Home, gateados por permiso (rutas de módulos + funcionalidadesInfo del usuario).
         let subItemCards = [];
-        if (isNewFmt && Array.isArray(placement['home']) && window.PLACEMENT_ITEMS) {
-          const allowedHref = new Set();
-          data.data.forEach(m => allowedHref.add(normR(m.ruta)));
-          (data.funcionalidadesInfo || []).forEach(f => { if (f.href) allowedHref.add(normR(f.href)); });
+        if (isNewFmt && Array.isArray(placement['home']) && typeof buildPlacementItems === 'function') {
           const yaModulo = new Set([...modMap.keys()]);
+          const allowedHref = new Set([...yaModulo]);
+          (data.funcionalidadesInfo || []).forEach(f => { if (f.href) allowedHref.add(normR(f.href)); });
+          const ITEMS = buildPlacementItems(data.funcionalidadesInfo, yaModulo);  // manifiesto + BD
           subItemCards = placement['home']
             .filter(k => !yaModulo.has(normR(k)))
-            .map(k => (window.PLACEMENT_ITEMS || {})[k])
+            .map(k => ITEMS[k])
             .filter(it => it && !yaModulo.has(normR(it.href)) && allowedHref.has(normR(it.href)))
             .map(it => ({ ruta: it.href, icono: it.icon, nombre: it.titulo, descripcion: '' }));
         }

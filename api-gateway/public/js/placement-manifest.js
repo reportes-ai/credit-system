@@ -103,6 +103,41 @@ const PLACEMENT_ITEMS = {
   'cm-historial':            { section:'carga_masiva',  href:'/carga-masiva/#secHistorial',       icon:'bi-clock-history',          titulo:'Historial' },
 };
 
+// ── Registro COMBINADO de sub-items: manifiesto (curado) + funcionalidades de BD ──
+// Evita que el manifiesto se desincronice: cualquier funcionalidad con href que el
+// manifiesto no cubra se agrega sola (clave = último segmento del href). El manifiesto
+// "manda" cuando coincide el href (permite títulos/íconos/secciones curados).
+function _phNorm(r) { return r ? (r.endsWith('/') ? r : r + '/') : r; }
+
+function sectionFromHref(href) {
+  const h = (href || '').toLowerCase();
+  if (h.startsWith('/mantenedores/')) return 'mantenedores';
+  if (h.startsWith('/tesoreria/'))    return 'tesoreria';
+  if (h.startsWith('/cobranza/'))     return 'cobranza';
+  if (h.startsWith('/crm/'))          return 'crm';
+  if (h.startsWith('/comisiones/'))   return 'comisiones';
+  if (h.startsWith('/carga-masiva/')) return 'carga_masiva';
+  if (h.startsWith('/clientes/') || h.startsWith('/antecedentes-laborales/') || h.startsWith('/informacion-comercial/')) return 'clientes';
+  return 'home';
+}
+
+function buildPlacementItems(funcionalidadesInfo, moduleRoutes) {
+  const items = {};
+  for (const [k, v] of Object.entries(PLACEMENT_ITEMS)) items[k] = { ...v };
+  const cubiertos = new Set(Object.values(items).map(i => _phNorm(i.href)));
+  const mods = moduleRoutes instanceof Set ? moduleRoutes : new Set(moduleRoutes || []);
+  (funcionalidadesInfo || []).forEach(f => {
+    if (!f || !f.href) return;                          // permisos de acción (href null) → no son cards
+    const h = _phNorm(f.href);
+    if (cubiertos.has(h) || mods.has(h)) return;        // ya cubierto por el manifiesto o es un módulo
+    const seg = String(f.href).replace(/^\/+|\/+$/g, '').split('/').pop();
+    if (!seg || items[seg]) return;                     // sin segmento o choque de clave
+    items[seg] = { section: sectionFromHref(f.href), href: f.href, icon: f.icono || 'bi-grid', titulo: f.nombre || seg };
+    cubiertos.add(h);
+  });
+  return items;
+}
+
 async function loadPlacementConfig(headers) {
   try {
     const r = await fetch('/api/config/ui/placement_v2', { headers });

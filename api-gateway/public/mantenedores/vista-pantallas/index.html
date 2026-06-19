@@ -225,7 +225,7 @@
     const norm = r => r ? (r.endsWith('/') ? r : r + '/') : r;
 
     // Construye el mapa completo de todos los items conocidos: key → { nombre, icono, type, defaultSection }
-    function buildMasterList(dbList) {
+    function buildMasterList(dbList, funcInfo) {
       const master = new Map();
       // 1. Módulos de BD
       dbList.forEach(m => master.set(norm(m.ruta), { nombre: m.nombre, icono: m.icono || 'bi-grid', type: 'module', defaultSection: 'home' }));
@@ -234,8 +234,10 @@
         const k = norm(f.ruta);
         if (!master.has(k)) master.set(k, { nombre: f.nombre, icono: f.icono, type: 'module', defaultSection: 'home' });
       });
-      // 3. Sub-items del manifiesto
-      Object.entries(PLACEMENT_ITEMS).forEach(([key, item]) => {
+      // 3. Sub-items: manifiesto (curado) + funcionalidades de BD (auto, sin mantener a mano)
+      const moduleRoutes = new Set([...master.keys()]);
+      const ITEMS = buildPlacementItems(funcInfo, moduleRoutes);
+      Object.entries(ITEMS).forEach(([key, item]) => {
         if (!master.has(key)) master.set(key, { nombre: item.titulo, icono: item.icon || 'bi-grid', type: 'subitem', defaultSection: item.section });
       });
       return master;
@@ -245,13 +247,13 @@
       const grid = document.getElementById('groupsGrid');
       grid.innerHTML = '<p style="grid-column:1/-1;text-align:center;color:#6b7280;padding:40px"><span class="spinner-border spinner-border-sm me-2"></span>Cargando módulos…</p>';
 
-      let dbList = [], placement = {};
+      let dbList = [], funcInfo = [], placement = {};
       try {
         const [rM, rP] = await Promise.all([
           fetch(('/api/auth/mis-permisos?_='+Date.now()), { headers: H }).then(r => r.json()),
           loadPlacementConfig(H),
         ]);
-        if (rM.success) dbList = rM.data;
+        if (rM.success) { dbList = rM.data; funcInfo = rM.funcionalidadesInfo || []; }
         placement = rP;
       } catch(e) {
         grid.innerHTML = `<p style="grid-column:1/-1;text-align:center;color:#dc2626;padding:40px"><i class="bi bi-exclamation-triangle me-2"></i>Error al cargar: ${e.message}</p>`;
@@ -260,7 +262,7 @@
 
       grid.innerHTML = '';
 
-      const master = buildMasterList(dbList);
+      const master = buildMasterList(dbList, funcInfo);
       const zones = {};
       Object.keys(PLACEMENT_SECTIONS).forEach(s => { zones[s] = []; });
 
@@ -343,14 +345,14 @@
       btn.disabled = true;
       btn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span>Actualizando…';
 
-      let dbList = [];
+      let dbList = [], funcInfo = [];
       try {
         const r = await fetch(('/api/auth/mis-permisos?_='+Date.now()), { headers: H }).then(r => r.json());
-        if (r.success) dbList = r.data;
+        if (r.success) { dbList = r.data; funcInfo = r.funcionalidadesInfo || []; }
       } catch {}
 
       // Master list con normalización de rutas
-      const master = buildMasterList(dbList);
+      const master = buildMasterList(dbList, funcInfo);
 
       // Keys ya presentes (en ambas formas: con y sin slash final)
       const yaPresentes = new Set();
