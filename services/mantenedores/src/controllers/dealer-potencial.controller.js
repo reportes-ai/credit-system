@@ -15,6 +15,8 @@ const { auditar } = require('../../../../shared/audit');
    ───────────────────────────────────────────────────────────────────────────── */
 
 const normRut = s => String(s || '').toUpperCase().replace(/[^0-9K]/g, '');
+const normTxt = s => String(s || '').toUpperCase().replace(/\s+/g, ' ').trim();
+const SINPARQUE_ORF = '(DIRECTO / SIN PARQUE)';   // bucket de créditos sin dealer ni parque reconocible
 
 (async () => {
   try {
@@ -56,18 +58,27 @@ function mesesUltimos3() {
   return out;
 }
 
-// Créditos AutoFácil por rut_dealer y mes (últimos 3 meses cerrados).
-async function creditosPorDealer() {
-  const [rows] = await pool.query(`
-    SELECT rut_dealer, DATE_FORMAT(fecha_otorgado,'%Y-%m') AS mes, COUNT(*) AS n
+/* Cuenta TODOS los créditos otorgados en los últimos 3 meses cerrados y los atribuye con
+   prioridad: 1) por rut_dealer si calza con un dealer activo; 2) si no, por el texto 'parque'
+   del crédito (carga masiva brokerage no trae el RUT del dealer, sólo el parque); 3) si el
+   parque tampoco calza, al bucket DIRECTO/SIN PARQUE. Así el total por mes reconcilia con el
+   total real de créditos colocados (antes se perdían los que no traían rut_dealer).
+   Devuelve { byDealer: {rutNorm:{mes:n}}, orphanByParque: {parqueDisplay:{mes:n}} }. */
+async function contarCreditos(activeRut, parqueCanon) {
+  const [creds] = await pool.query(`
+    SELECT rut_dealer, parque, DATE_FORMAT(fecha_otorgado,'%Y-%m') AS mes
     FROM creditos
     WHERE fecha_otorgado IS NOT NULL
       AND fecha_otorgado >= DATE_FORMAT(DATE_SUB(CURDATE(), INTERVAL 3 MONTH),'%Y-%m-01')
-      AND fecha_otorgado <  DATE_FORMAT(CURDATE(),'%Y-%m-01')
-    GROUP BY rut_dealer, DATE_FORMAT(fecha_otorgado,'%Y-%m')`);
-  const map = {};
-  rows.forEach(r => { const k = normRut(r.rut_dealer); if (!k) return; (map[k] = map[k] || {})[r.mes] = Number(r.n); });
-  return map;
+      AND fecha_otorgado <  DATE_FORMAT(CURDATE(),'%Y-%m-01')`);
+  const byDealer = {}, orphanByParque = {};
+  const bump = (obj, key, mes) => { (obj[key] = obj[key] || {})[mes] = (obj[key][mes] || 0) + 1; };
+  creds.forEach(c => {
+    const rk = normRut(c.rut_dealer);
+    if (rk && activeRut.has(rk)) return bump(byDealer, rk, c.mes);
+    bump(orphanByParque, parqueCanon.get(normTxt(c.parque)) || SINPARQUE_ORF, c.mes);
+  });
+  return { byDealer, orphanByParque };
 }
 
 function calcDealer(d, credMeses, factor, rangos) {
@@ -90,14 +101,24 @@ function calcDealer(d, credMeses, factor, rangos) {
 const getPotencial = async (req, res) => {
   try {
     const { factor, rangos } = await getConfig();
-    const credMap = await creditosPorDealer();
     const meses = mesesUltimos3();
     const [dealers] = await pool.query(
       `SELECT id_dealer, rut, nombre_indexa, nombre_razon, ccs_parque, posiciones, ventas_mensuales, ventas_con_credito
        FROM dealers WHERE activo = 1 ORDER BY ccs_parque, nombre_indexa`);
 
+    // Ruts de dealers activos + nombre canónico de cada parque (para atribuir huérfanos por texto)
+    const activeRut = new Set();
+    const parqueCanon = new Map();   // normTxt(ccs_parque) -> ccs_parque (display)
+    dealers.forEach(d => {
+      const k = normRut(d.rut); if (k) activeRut.add(k);
+      const pq = (d.ccs_parque || '').trim();
+      if (pq) parqueCanon.set(normTxt(pq), pq);
+    });
+
+    const { byDealer, orphanByParque } = await contarCreditos(activeRut, parqueCanon);
+
     const filas = dealers.map(d => {
-      const cred = credMap[normRut(d.rut)] || {};
+      const cred = byDealer[normRut(d.rut)] || {};
       const credMeses = meses.map(m => cred[m] || 0);
       const f = calcDealer(d, credMeses, factor, rangos);
       f.parque = (d.ccs_parque || '').trim() || '(SIN PARQUE)';
@@ -106,17 +127,30 @@ const getPotencial = async (req, res) => {
 
     const map = {};
     filas.forEach(f => { (map[f.parque] = map[f.parque] || []).push(f); });
+    // parques que sólo tienen créditos huérfanos (sin dealers registrados) también deben aparecer
+    Object.keys(orphanByParque).forEach(pq => { if (!map[pq]) map[pq] = []; });
+
     const parques = Object.entries(map).map(([parque, ds]) => {
-      const sum = k => ds.reduce((a, x) => a + (Number(x[k]) || 0), 0);
+      const orf = orphanByParque[parque] || {};
+      const orfMeses = meses.map(m => orf[m] || 0);
+      const orfTotal = orfMeses.reduce((a, b) => a + b, 0);
+      const sum = k => ds.reduce((a, x) => a + (Number(x[k]) || 0), 0);   // datos manuales: sólo dealers reales
       const avg = k => { const v = ds.map(x => x[k]).filter(x => x != null); return v.length ? v.reduce((a, b) => a + b, 0) / v.length : null; };
       const vc = sum('ventas_con_credito');
-      const cred_prom = sum('cred_prom');
+      const cred_prom = sum('cred_prom') + orfTotal / (meses.length || 1);   // créditos del parque = dealers + huérfanos
       const ventas_potencial = vc * (factor / 100);
       const potencial = cred_prom ? (ventas_potencial / cred_prom - 1) : null;
       const diag = diagnosticar(potencial, rangos);
-      const cred_meses = meses.map((_, i) => ds.reduce((a, x) => a + (x.cred_meses[i] || 0), 0));
+      const cred_meses = meses.map((_, i) => ds.reduce((a, x) => a + (x.cred_meses[i] || 0), 0) + (orfMeses[i] || 0));
+      const dealersOut = ds.slice();
+      if (orfTotal > 0) dealersOut.push({   // fila visible que carga los créditos sin dealer asignado → el detalle reconcilia
+        id_dealer: null, rut: null, dealer: '› Sin dealer identificado (carga masiva)',
+        posiciones: null, ventas_mensuales: null, ventas_con_credito: null,
+        rotacion: null, pct_credito: null, cred_meses: orfMeses, cred_prom: orfTotal / (meses.length || 1),
+        ventas_potencial: null, potencial: null, diagnostico: '—', diag_color: '#94a3b8', _huerfano: true,
+      });
       return {
-        parque, n_dealers: ds.length, dealers: ds,
+        parque, n_dealers: ds.length, dealers: dealersOut,
         posiciones: sum('posiciones'), ventas_mensuales: sum('ventas_mensuales'), ventas_con_credito: vc,
         rotacion: avg('rotacion'), pct_credito: avg('pct_credito'),
         cred_meses, cred_prom, ventas_potencial, potencial, diagnostico: diag.texto, diag_color: diag.color,
