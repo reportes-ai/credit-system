@@ -10,7 +10,7 @@ const pool = mysql.createPool({
   user:     process.env.DB_USER     || 'root',
   password: process.env.DB_PASSWORD || '',
   database: process.env.DB_NAME     || 'credit_system',
-  timezone: '+00:00',   // TiDB Cloud almacena en UTC
+  timezone: getChileAutoOffset(),   // DEBE coincidir con el SET time_zone de la conexión (Chile); si no, las horas se desfasan
   waitForConnections: true,
   connectionLimit: 10,
   queueLimit: 0,
