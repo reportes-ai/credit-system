@@ -2,7 +2,7 @@
    AutoFácil — Versión global de la aplicación
    Editar SOLO este archivo para cambiar la versión
    ───────────────────────────────────────────── */
-const APP_VERSION = 'v43.63';
+const APP_VERSION = 'v43.64';
 
 document.addEventListener('DOMContentLoaded', () => {
 
@@ -899,9 +899,9 @@ document.addEventListener('DOMContentLoaded', async () => {
   const st = document.createElement('style');
   st.textContent = `
     #afMntOverlay { position:fixed; inset:0; z-index:1000000; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:32px;
-      background:linear-gradient(160deg,#eef1f6,#d8dde6); animation:afMntFade .25s ease; padding:24px; overflow:auto; }
+      background:#ffffff; animation:afMntFade .25s ease; padding:24px; overflow:auto; }
     @keyframes afMntFade { from{opacity:0} to{opacity:1} }
-    #afMntOverlay .bs-logo { width:min(380px,74vw); height:auto; filter:drop-shadow(0 10px 26px rgba(1,65,162,.16)); }
+    #afMntOverlay .bs-logo { width:min(1140px,90vw); height:auto; }
     #afMntOverlay .box { background:#fff; border-radius:20px; max-width:480px; width:100%; text-align:center;
       padding:30px 34px 26px; box-shadow:0 24px 60px rgba(0,0,0,.22); border-top:7px solid #d97706;
       animation:afMntPop .3s cubic-bezier(.18,.89,.32,1.28); }
