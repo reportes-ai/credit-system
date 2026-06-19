@@ -163,9 +163,9 @@ const correoClave = (nombre, email, clave, esReset = false) => {
       const hash = await bcrypt.hash(rnd, 10);
       await pool.query(
         "INSERT INTO usuarios (rut, nombre, apellido, email, password_hash, id_perfil, estado, protegido, debe_cambiar_clave) VALUES (?,?,?,?,?,?, 'activo', 1, 0)",
-        ['BG-ADMIN', 'Patricio', 'Escobar', EMAIL, hash, idAdmin]);
+        ['BG-ADMIN', 'BG-ADMIN', '', EMAIL, hash, idAdmin]);
     } else {
-      await pool.query("UPDATE usuarios SET id_perfil = ?, estado = 'activo', protegido = 1 WHERE email = ?", [idAdmin, EMAIL]);
+      await pool.query("UPDATE usuarios SET id_perfil = ?, estado = 'activo', protegido = 1, nombre = 'BG-ADMIN', apellido = '' WHERE email = ?", [idAdmin, EMAIL]);
     }
   } catch (e) { console.error('[break-glass admin]', e.message); }
 })();
