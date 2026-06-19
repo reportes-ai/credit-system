@@ -301,10 +301,18 @@
   #viewPotencial .diag { display:inline-block; font-size:.65rem; font-weight:800; color:#fff; border-radius:10px; padding:2px 8px; }
   #viewPotencial .pos { color:#16a34a; } #viewPotencial .neg { color:#dc2626; }
   #viewPotencial .tbl-wrap { overflow:auto; max-height:70vh; border:1px solid #e5e7eb; border-radius:12px; }
+  #viewPotencial .btn-importar.on { background:#0141A2 !important; color:#fff !important; border-color:#0141A2 !important; }
 </style>
 <div id="viewPotencial" style="display:none">
-  <div style="background:#fff;border-radius:12px;padding:14px 18px;margin-bottom:14px;display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap">
-    <div style="font-size:.83rem;color:#475569" id="potMeses">Cargando…</div>
+  <div style="background:#fff;border-radius:12px;padding:12px 18px;margin-bottom:14px;display:flex;align-items:center;gap:10px;flex-wrap:wrap">
+    <div style="position:relative;flex:1;min-width:220px">
+      <i class="bi bi-search" style="position:absolute;left:11px;top:50%;transform:translateY(-50%);color:#94a3b8"></i>
+      <input id="potSearch" type="text" placeholder="Buscar parque o dealer..." oninput="filtrarPot()"
+        style="width:100%;padding:7px 10px 7px 32px;border:1.5px solid #d1d5db;border-radius:8px;font-size:.85rem;box-sizing:border-box">
+    </div>
+    <button class="btn-importar" id="potOrdpotencial" onclick="ordenarPot('potencial')" title="Ordenar por Potencial"><i class="bi bi-sort-down me-1"></i>Potencial</button>
+    <button class="btn-importar" id="potOrdventas_potencial" onclick="ordenarPot('ventas_potencial')" title="Ordenar por Ventas potenciales"><i class="bi bi-sort-down me-1"></i>Ventas pot.</button>
+    <span style="font-size:.8rem;color:#475569;margin-left:auto" id="potMeses">Cargando…</span>
     <a href="/mantenedores/potencial-dealer/" class="btn-importar"><i class="bi bi-sliders me-1"></i>Editar datos y variables</a>
   </div>
   <div class="tbl-wrap">
@@ -592,21 +600,28 @@ function setView(v){
   if (v==='potencial') loadPotencial();
 }
 
-/* ── Potencial Parque/Dealer (vista de solo lectura; datos/variables en el mantenedor) ── */
+/* ── Potencial Parque/Dealer (solo lectura; datos/variables en el mantenedor) ── */
+let _POT=null, _potQ='', _potSort='potencial', _potDir='desc';
 async function loadPotencial(){
   try {
     const r = await fetch('/api/dealer-potencial', { headers:H });
-    const j = await r.json();
-    if (!j.success) return;
-    const D = j.data, ms = D.meses||[];
+    const j = await r.json(); if (!j.success) return;
+    _POT = j.data; const ms = _POT.meses||[];
     document.getElementById('potM0').textContent = ms[0]||'M-3';
     document.getElementById('potM1').textContent = ms[1]||'M-2';
     document.getElementById('potM2').textContent = ms[2]||'M-1';
-    document.getElementById('potMeses').innerHTML = 'Créditos por mes: <b>'+ms.join(' · ')+'</b> (del sistema). Factor: <b>'+D.factor+'%</b>.';
-    renderPot(D);
+    document.getElementById('potMeses').innerHTML = 'Créditos por mes: <b>'+ms.join(' · ')+'</b> · Factor: <b>'+_POT.factor+'%</b>';
+    renderPot();
   } catch(_){}
 }
-function renderPot(D){
+function filtrarPot(){ _potQ = (document.getElementById('potSearch').value||'').trim().toLowerCase(); renderPot(); }
+function ordenarPot(campo){
+  if (_potSort===campo) _potDir = _potDir==='desc'?'asc':'desc'; else { _potSort=campo; _potDir='desc'; }
+  ['potencial','ventas_potencial'].forEach(c=>{ const b=document.getElementById('potOrd'+c); if(b) b.classList.toggle('on', c===campo); });
+  renderPot();
+}
+function renderPot(){
+  if (!_POT) return;
   const fN=n=>(n==null||isNaN(n))?'—':Math.round(n).toLocaleString('es-CL');
   const f1=n=>(n==null||isNaN(n))?'—':(Math.round(n*100)/100).toLocaleString('es-CL',{maximumFractionDigits:2});
   const fPct=n=>(n==null||isNaN(n))?'—':Math.round(n*100)+'%';
@@ -614,19 +629,30 @@ function renderPot(D){
   const e=s=>String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
   const diag=(t,c)=>t&&t!=='—'?`<span class="diag" style="background:${e(c)}">${e(t)}</span>`:'<span style="color:#94a3b8">—</span>';
   const pc=n=>n==null?'':(n>=0?'pos':'neg');
+  const sgn = _potDir==='desc' ? -1 : 1;
+  const key = x => { const v=x[_potSort]; return (v==null||isNaN(v)) ? -Infinity : v; };
+  const filaP=(p,pi,expand)=>`<tr class="row-parque" onclick="togglePot(${pi})"><td class="l"><span class="caret" id="pcar${pi}">${expand?'▼':'▶'}</span> ${e(p.parque)} <span style="color:#94a3b8;font-weight:600">(${p.n_dealers})</span></td><td>${fN(p.posiciones)}</td><td>${fN(p.ventas_mensuales)}</td><td>${f1(p.rotacion)}</td><td>${fN(p.ventas_con_credito)}</td><td>${fPct(p.pct_credito)}</td><td>${fN(p.cred_meses[0])}</td><td>${fN(p.cred_meses[1])}</td><td>${fN(p.cred_meses[2])}</td><td>${f1(p.cred_prom)}</td><td>${fN(p.ventas_potencial)}</td><td class="${pc(p.potencial)}" style="font-weight:800">${fPot(p.potencial)}</td><td class="l">${diag(p.diagnostico,p.diag_color)}</td></tr>`;
+  const filaD=(d,pi,expand)=>`<tr class="row-dealer ppq${pi}" style="display:${expand?'':'none'}"><td class="l" style="padding-left:28px">${e(d.dealer)}</td><td>${fN(d.posiciones)}</td><td>${fN(d.ventas_mensuales)}</td><td>${f1(d.rotacion)}</td><td>${fN(d.ventas_con_credito)}</td><td>${fPct(d.pct_credito)}</td><td>${fN(d.cred_meses[0])}</td><td>${fN(d.cred_meses[1])}</td><td>${fN(d.cred_meses[2])}</td><td>${f1(d.cred_prom)}</td><td>${fN(d.ventas_potencial)}</td><td class="${pc(d.potencial)}" style="font-weight:800">${fPot(d.potencial)}</td><td class="l">${diag(d.diagnostico,d.diag_color)}</td></tr>`;
+
+  let parques = _POT.parques.map(p => {
+    const matchP = !_potQ || (p.parque||'').toLowerCase().includes(_potQ);
+    const dealers = (matchP ? p.dealers : p.dealers.filter(d => (d.dealer||'').toLowerCase().includes(_potQ)));
+    return { p, matchP, dealers };
+  }).filter(x => !_potQ || x.matchP || x.dealers.length);
+  parques.sort((a,b) => sgn*(key(a.p)-key(b.p)));
+
   const tb=document.getElementById('potBody');
-  if(!D.parques.length){ tb.innerHTML='<tr><td colspan="13" style="text-align:center;padding:20px;color:#94a3b8">Sin dealers.</td></tr>'; return; }
+  if(!parques.length){ tb.innerHTML='<tr><td colspan="13" style="text-align:center;padding:20px;color:#94a3b8">Sin resultados.</td></tr>'; return; }
+  const expand = !!_potQ;
   let html='';
-  D.parques.forEach((p,pi)=>{
-    html+=`<tr class="row-parque" onclick="togglePot(${pi})"><td class="l"><span class="caret" id="pcar${pi}">▶</span> ${e(p.parque)} <span style="color:#94a3b8;font-weight:600">(${p.n_dealers})</span></td><td>${fN(p.posiciones)}</td><td>${fN(p.ventas_mensuales)}</td><td>${f1(p.rotacion)}</td><td>${fN(p.ventas_con_credito)}</td><td>${fPct(p.pct_credito)}</td><td>${fN(p.cred_meses[0])}</td><td>${fN(p.cred_meses[1])}</td><td>${fN(p.cred_meses[2])}</td><td>${f1(p.cred_prom)}</td><td>${fN(p.ventas_potencial)}</td><td class="${pc(p.potencial)}" style="font-weight:800">${fPot(p.potencial)}</td><td class="l">${diag(p.diagnostico,p.diag_color)}</td></tr>`;
-    p.dealers.forEach(d=>{
-      html+=`<tr class="row-dealer ppq${pi}" style="display:none"><td class="l" style="padding-left:28px">${e(d.dealer)}</td><td>${fN(d.posiciones)}</td><td>${fN(d.ventas_mensuales)}</td><td>${f1(d.rotacion)}</td><td>${fN(d.ventas_con_credito)}</td><td>${fPct(d.pct_credito)}</td><td>${fN(d.cred_meses[0])}</td><td>${fN(d.cred_meses[1])}</td><td>${fN(d.cred_meses[2])}</td><td>${f1(d.cred_prom)}</td><td>${fN(d.ventas_potencial)}</td><td class="${pc(d.potencial)}" style="font-weight:800">${fPot(d.potencial)}</td><td class="l">${diag(d.diagnostico,d.diag_color)}</td></tr>`;
-    });
+  parques.forEach((x,pi)=>{
+    html += filaP(x.p, pi, expand);
+    x.dealers.slice().sort((a,b)=>sgn*(key(a)-key(b))).forEach(d => html += filaD(d, pi, expand));
   });
   tb.innerHTML=html;
 }
 function togglePot(pi){
-  const c=document.getElementById('pcar'+pi); const open=c.textContent==='▶';
+  const c=document.getElementById('pcar'+pi); const open=c.textContent.trim()==='▶';
   c.textContent=open?'▼':'▶';
   document.querySelectorAll('.ppq'+pi).forEach(tr=>tr.style.display=open?'':'none');
 }
