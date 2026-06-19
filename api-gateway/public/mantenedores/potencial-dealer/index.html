@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Potencial Parque/Dealer — AutoFácil</title>
-  <!-- v1.1 -->
+  <!-- v1.2 -->
   <link href="/css/bootstrap-icons.css" rel="stylesheet">
   <style>
     :root { --navy:#012d70; --blue:#0141A2; }
@@ -77,6 +77,15 @@
     .mx-chips { display:flex; flex-wrap:wrap; gap:4px; }
     .mx-chip { background:#f1f5f9; border-radius:6px; padding:1px 7px; font-size:.68rem; color:#334155; max-width:130px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
     .qbadge { display:inline-block; color:#fff; font-size:.66rem; font-weight:800; border-radius:8px; padding:2px 8px; }
+    /* Explicación */
+    .explica p { font-size:.82rem; color:#334155; line-height:1.5; margin:0 0 8px; }
+    .explica ul { margin:0; padding-left:18px; }
+    .explica li { font-size:.82rem; color:#334155; line-height:1.55; margin-bottom:6px; }
+    .explica .por { color:#64748b; font-style:italic; }
+    /* Editor de segmentos */
+    .seg-edit { display:flex; align-items:center; gap:8px; margin-bottom:6px; flex-wrap:wrap; }
+    .seg-edit input[type=text] { padding:5px 8px; border:1.5px solid #d1d5db; border-radius:7px; font-size:.84rem; }
+    .seg-edit input[type=color] { width:36px; height:30px; border:1px solid #d1d5db; border-radius:6px; padding:1px; }
   </style>
 </head>
 <body>
@@ -106,6 +115,21 @@
 
     <!-- ░░ PRIORIZACIÓN ░░ -->
     <div id="viewPrioriz">
+      <div class="card-af">
+        <h3><i class="bi bi-info-circle"></i>Cómo se calcula y por qué</h3>
+        <div class="explica">
+          <p><b>Objetivo:</b> decidir <b>dónde poner el esfuerzo de venta</b> con criterio, no por intuición. Cruza <i>cuánto</i> puedes crecer (Pareto / cuartiles) con <i>qué tipo</i> de acción conviene (segmentos).</p>
+          <ul>
+            <li><b>Potencial absoluto</b> = ventas potencial − créditos actuales = <b>cuántos créditos más</b> podrías colocar. <span class="por">Por qué absoluto y no %: un +500% sobre un dealer chico vale menos que un +30% sobre uno grande; los recursos se reparten por cantidad real.</span></li>
+            <li><b>Pareto / cuartiles:</b> se ordena por potencial absoluto; normalmente el <b>~20% concentra ~80%</b> del potencial → ese grupo (Q1) recibe el mayor esfuerzo. <span class="por">Por qué: foco donde está el retorno.</span></li>
+            <li><b>Penetración AutoFácil</b> = créditos AutoFácil ÷ ventas con crédito del dealer = cuánto de <b>su</b> negocio de crédito ya capturas. <span class="por">Por qué: separa a quién <i>conquistar</i> de a quién <i>defender</i>.</span></li>
+            <li><b>% vendido con crédito</b> = ventas con crédito ÷ ventas totales. <span class="por">Por qué: si vende pocos autos con crédito, quizás <b>no lo ofrece</b> → oportunidad de educarlo y agrandar la torta.</span></li>
+            <li><b>Matriz de segmentos:</b> cruza esos dos ejes con corte en la <b>mediana</b> de cada uno. <span class="por">Por qué mediana: se autoajusta a tus datos, sin umbrales fijos que envejecen.</span></li>
+            <li><b>Tendencia</b> = créditos del último mes vs. el primero de la ventana (▲ sube / ▬ estable / ▼ baja). <span class="por">Por qué: un dealer en alza con buena participación se defiende; uno en baja se recupera.</span></li>
+          </ul>
+          <p class="muted" style="margin:6px 0 0">Nombres, colores y acciones de cada segmento y cuartil se editan en <a href="#" onclick="setSub('vars');return false">Variables del cálculo</a> (también el factor y los rangos).</p>
+        </div>
+      </div>
       <div class="card-af">
         <h3><i class="bi bi-bullseye"></i>Priorización comercial</h3>
         <div class="sub"><b>Pareto:</b> los dealers de más arriba concentran la mayor parte del potencial capturable → ahí van los recursos. <b>Segmentos:</b> el <i>tipo</i> de acción según cuánto vende con crédito y cuánto ya capturamos (cortes en la mediana).</div>
@@ -144,6 +168,17 @@
         <button class="btn-primary-af" onclick="guardarVariables()"><i class="bi bi-save me-1"></i>Guardar variables</button>
       </div>
     </div>
+
+    <!-- Segmentos y cuartiles de la Priorización (paramétricos) -->
+    <div class="card-af">
+      <h3><i class="bi bi-bullseye"></i>Segmentos y cuartiles de priorización</h3>
+      <div class="sub">Nombre, color y acción de cada <b>segmento</b> de la matriz, y la <b>acción/esfuerzo</b> por cuartil. La lógica de la matriz (ejes) y los cortes en la mediana no cambian.</div>
+      <div id="segEdit"></div>
+      <div style="margin-top:12px"><label style="font-size:.74rem;font-weight:700;color:#374151;display:block;margin-bottom:6px">Acción por cuartil (Q1 = más esfuerzo)</label><div id="cuartEdit"></div></div>
+      <div style="margin-top:12px;display:flex;justify-content:flex-end">
+        <button class="btn-primary-af" onclick="guardarVariables()"><i class="bi bi-save me-1"></i>Guardar variables</button>
+      </div>
+    </div>
     </div><!-- /viewVariables -->
 
 
@@ -155,6 +190,8 @@
         <li><b>Rangos de diagnóstico</b> → el texto/color que se muestra según el valor del Potencial.</li>
         <li><b>Créditos por mes</b> → automáticos, contados de <a href="/creditos">Gestión de Créditos</a> por RUT del dealer (últimos 3 meses cerrados).</li>
         <li><b>Priorización</b> → vista de <b>solo lectura</b>: ordena dónde poner el esfuerzo comercial (Pareto por potencial + matriz de segmentos) con estos mismos datos y variables. No modifica nada.</li>
+        <li><b>Segmentos de priorización</b> (nombre / color / acción) → etiquetas y recomendaciones que se ven en la matriz y el ranking de la pestaña <b>Priorización</b>.</li>
+        <li><b>Acciones por cuartil</b> → el texto de esfuerzo sugerido (tooltip Q1–Q4) del ranking en <b>Priorización</b>.</li>
       </ul>
     </div>
   </div>
@@ -166,7 +203,7 @@
     const token = sessionStorage.getItem('token');
     if (!token) location.href = '/login.html';
     const H = { 'Content-Type':'application/json', Authorization:'Bearer '+token };
-    let DATA = null, _rangos = [];
+    let DATA = null, _rangos = [], _seg = {}, _cuart = {};
     const esc = s => String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
     const fN  = n => (n==null||isNaN(n)) ? '—' : Math.round(n).toLocaleString('es-CL');
     const f1  = n => (n==null||isNaN(n)) ? '—' : (Math.round(n*100)/100).toLocaleString('es-CL',{minimumFractionDigits:0,maximumFractionDigits:2});
@@ -181,8 +218,11 @@
         if (!j.success) return toast(j.error||'Error', false);
         DATA = j.data;
         _rangos = (j.data.rangos||[]).slice();
+        _seg = {}; SEG_KEYS.forEach(k => { const s=(j.data.segmentos||{})[k]||{}; _seg[k]={ nombre:s.nombre||k, color:s.color||'#64748b', accion:s.accion||'' }; });
+        _cuart = {}; ['1','2','3','4'].forEach(q => { _cuart[q]=((j.data.cuartiles||{})[q])||''; });
         document.getElementById('vFactor').value = j.data.factor;
         renderRangos();
+        renderSegEdit();
         renderPrioriz();
       } catch(_){ toast('Error de conexión', false); }
     }
@@ -199,10 +239,22 @@
     }
     function addRango(){ _rangos.push({ max:null, texto:'Nuevo', color:'#64748b' }); renderRangos(); }
 
+    function renderSegEdit(){
+      const ge=document.getElementById('segEdit'); if(!ge) return;
+      ge.innerHTML = SEG_KEYS.map(k=>{ const s=_seg[k]||{};
+        return `<div class="seg-edit">
+          <input type="color" value="${/^#[0-9a-fA-F]{6}$/.test(s.color||'')?s.color:'#64748b'}" onchange="_seg['${k}'].color=this.value" title="Color">
+          <input type="text" value="${esc(s.nombre||k)}" onchange="_seg['${k}'].nombre=this.value" style="width:130px" placeholder="Nombre">
+          <input type="text" value="${esc(s.accion||'')}" onchange="_seg['${k}'].accion=this.value" style="flex:1;min-width:220px" placeholder="Acción sugerida">
+        </div>`; }).join('');
+      const ce=document.getElementById('cuartEdit'); if(!ce) return;
+      ce.innerHTML = ['1','2','3','4'].map(q=>`<div class="rango-item"><span style="font-size:.78rem;color:#64748b;font-weight:700;width:24px">Q${q}</span><input type="text" value="${esc(_cuart[q]||'')}" onchange="_cuart['${q}']=this.value" style="flex:1"></div>`).join('');
+    }
+
     async function guardarVariables(){
       const factor = parseFloat(document.getElementById('vFactor').value);
       try {
-        const r = await fetch('/api/dealer-potencial/config', { method:'PUT', headers:H, body:JSON.stringify({ factor, rangos:_rangos }) });
+        const r = await fetch('/api/dealer-potencial/config', { method:'PUT', headers:H, body:JSON.stringify({ factor, rangos:_rangos, segmentos:_seg, cuartiles:_cuart }) });
         const j = await r.json();
         if (!j.success) return toast(j.error||'Error', false);
         toast('Variables guardadas — recalculando…'); cargar();
@@ -269,14 +321,13 @@
 
     /* ───────────── Priorización comercial (solo lectura) ───────────── */
     const median = arr => { const a=arr.filter(x=>x!=null&&isFinite(x)).sort((x,y)=>x-y); if(!a.length) return null; const m=Math.floor(a.length/2); return a.length%2?a[m]:(a[m-1]+a[m])/2; };
-    const SEG = {
-      ATACAR:     { nom:'Atacar',      color:'#16a34a', ico:'bi-megaphone',     accion:'Vende mucho con crédito pero poco con AutoFácil → máxima prioridad: visita y oferta.' },
-      DEFENDER:   { nom:'Defender',    color:'#0141A2', ico:'bi-shield-check',  accion:'Campeón (alto crédito + alta participación) → cuidar la relación y el servicio.' },
-      EDUCAR:     { nom:'Educar',      color:'#d97706', ico:'bi-mortarboard',   accion:'Vende poco con crédito → enseñarle a ofrecer crédito y entrar con AutoFácil.' },
-      DESARROLLAR:{ nom:'Desarrollar', color:'#64748b', ico:'bi-arrow-up-right',accion:'Ya tienes su poco crédito → ayúdalo a vender más con crédito (agrandar la torta).' },
-    };
-    const QAC  = { 1:'Esfuerzo máximo: visita + gestor dedicado', 2:'Esfuerzo alto: contacto regular y campañas dirigidas', 3:'Esfuerzo medio: seguimiento digital', 4:'Mantención: autoservicio / campañas masivas' };
+    // Segmentos y cuartiles son PARAMÉTRICOS: vienen de DATA.segmentos / DATA.cuartiles (editables en "Variables").
+    // Las claves son estructurales (cuadrante de la matriz); sólo el ícono y el color de cuartil son de presentación.
+    const SEG_KEYS = ['ATACAR','DEFENDER','EDUCAR','DESARROLLAR'];
+    const SEG_ICO  = { ATACAR:'bi-megaphone', DEFENDER:'bi-shield-check', EDUCAR:'bi-mortarboard', DESARROLLAR:'bi-arrow-up-right' };
     const QCOL = { 1:'#16a34a', 2:'#0141A2', 3:'#d97706', 4:'#94a3b8' };
+    const segOf = k => { const c=((DATA&&DATA.segmentos)||{})[k]||{}; return { nom:c.nombre||k, color:c.color||'#64748b', accion:c.accion||'', ico:SEG_ICO[k]||'bi-tag' }; };
+    const qacOf = q => (((DATA&&DATA.cuartiles)||{})[q])||'';
 
     function calcPrioriz(){
       const ds = (DATA && DATA.parques ? DATA.parques : []).flatMap(p => p.dealers.map(d => ({ ...d, parque:p.parque })));
@@ -315,8 +366,8 @@
       }
       const bySeg = k => P.cd.filter(d=>d._seg===k);
       // tarjetas resumen
-      segEl.innerHTML = Object.keys(SEG).map(k=>{
-        const arr=bySeg(k), s=SEG[k];
+      segEl.innerHTML = SEG_KEYS.map(k=>{
+        const arr=bySeg(k), s=segOf(k);
         const pot=arr.reduce((a,d)=>a+(d._potAbs>0?d._potAbs:0),0);
         return `<div class="seg-card" style="--c:${s.color}">
           <div class="seg-h"><i class="bi ${s.ico}"></i> ${s.nom}</div>
@@ -326,7 +377,7 @@
         </div>`;
       }).join('');
       // matriz 2×2
-      const cell = k => { const arr=bySeg(k).sort((a,b)=>(b._potAbs||0)-(a._potAbs||0)), s=SEG[k];
+      const cell = k => { const arr=bySeg(k).sort((a,b)=>(b._potAbs||0)-(a._potAbs||0)), s=segOf(k);
         const chips = arr.slice(0,6).map(d=>`<span class="mx-chip" title="${esc(d.dealer)} · +${fN(d._potAbs)} créditos">${esc(d.dealer)}</span>`).join('');
         return `<div class="mx-cell" style="--c:${s.color}"><div class="mx-t">${s.nom} <b>${arr.length}</b></div><div class="mx-chips">${chips||'<span class="muted">—</span>'}</div></div>`;
       };
@@ -343,7 +394,7 @@
       // ranking Pareto
       hEl.innerHTML = `<tr><th>#</th><th class="l">Dealer</th><th class="l">Parque</th><th>Vol. créd.</th><th>Penetr.</th><th>% Créd.</th><th>Tend.</th><th>Pot. abs.</th><th>Acum.</th><th>Cuartil</th><th class="l">Segmento</th></tr>`;
       bEl.innerHTML = P.ranked.map((d,i)=>{
-        const s=SEG[d._seg];
+        const s=segOf(d._seg);
         const tend = d._tend>0?'<span class="pos">▲</span>':(d._tend<0?'<span class="neg">▼</span>':'<span class="muted">▬</span>');
         return `<tr>
           <td>${i+1}</td>
@@ -355,7 +406,7 @@
           <td>${tend}</td>
           <td class="num-strong ${d._potAbs>=0?'pos':'neg'}">${d._potAbs>=0?'+':''}${fN(d._potAbs)}</td>
           <td>${d._acum==null?'—':Math.round(d._acum*100)+'%'}</td>
-          <td><span class="qbadge" style="background:${QCOL[d._q]}" title="${esc(QAC[d._q])}">Q${d._q}</span></td>
+          <td><span class="qbadge" style="background:${QCOL[d._q]}" title="${esc(qacOf(d._q))}">Q${d._q}</span></td>
           <td class="l"><span class="diag" style="background:${s.color}">${s.nom}</span></td>
         </tr>`;
       }).join('') + (P.sinDatos? `<tr><td colspan="11" class="muted" style="text-align:center;padding:10px">+ ${P.sinDatos} dealers sin datos cargados (no entran en la priorización).</td></tr>`:'');

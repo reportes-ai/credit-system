@@ -18,6 +18,22 @@ const normRut = s => String(s || '').toUpperCase().replace(/[^0-9K]/g, '');
 const normTxt = s => String(s || '').toUpperCase().replace(/\s+/g, ' ').trim();
 const SINPARQUE_ORF = '(DIRECTO / SIN PARQUE)';   // bucket de créditos sin dealer ni parque reconocible
 
+// Defaults de la Priorización (paramétricos: el Admin los edita en el mantenedor).
+// Las CLAVES (ATACAR/DEFENDER/EDUCAR/DESARROLLAR) son estructurales (cuadrante de la matriz);
+// el Admin sólo cambia nombre/color/acción. Los cortes de la matriz son la mediana (auto).
+const DEFAULT_SEG = {
+  ATACAR:      { nombre: 'Atacar',      color: '#16a34a', accion: 'Vende mucho con crédito pero poco con AutoFácil → máxima prioridad: visita y oferta.' },
+  DEFENDER:    { nombre: 'Defender',    color: '#0141A2', accion: 'Campeón (alto crédito + alta participación) → cuidar la relación y el servicio.' },
+  EDUCAR:      { nombre: 'Educar',      color: '#d97706', accion: 'Vende poco con crédito → enseñarle a ofrecer crédito y entrar con AutoFácil.' },
+  DESARROLLAR: { nombre: 'Desarrollar', color: '#64748b', accion: 'Ya tienes su poco crédito → ayúdalo a vender más con crédito (agrandar la torta).' },
+};
+const DEFAULT_CUART = {
+  '1': 'Esfuerzo máximo: visita + gestor dedicado',
+  '2': 'Esfuerzo alto: contacto regular y campañas dirigidas',
+  '3': 'Esfuerzo medio: seguimiento digital',
+  '4': 'Mantención: autoservicio / campañas masivas',
+};
+
 (async () => {
   try {
     const addCol = sql => pool.query(sql).catch(() => {});
@@ -26,6 +42,7 @@ const SINPARQUE_ORF = '(DIRECTO / SIN PARQUE)';   // bucket de créditos sin dea
     await addCol(`ALTER TABLE dealers ADD COLUMN ventas_con_credito INT NULL`);
     await pool.query(`CREATE TABLE IF NOT EXISTS dealer_potencial_config (
       clave VARCHAR(40) PRIMARY KEY, valor VARCHAR(800) NOT NULL )`);
+    await pool.query(`ALTER TABLE dealer_potencial_config MODIFY valor VARCHAR(2000) NOT NULL`).catch(() => {});  // segmentos/acciones editables
     await pool.query(
       `INSERT IGNORE INTO dealer_potencial_config (clave, valor) VALUES ('factor_ventas','50'), ('diagnostico_rangos', ?)`,
       [JSON.stringify([
@@ -34,15 +51,20 @@ const SINPARQUE_ORF = '(DIRECTO / SIN PARQUE)';   // bucket de créditos sin dea
         { max: 3,    texto: 'Mediano',                      color: '#d97706' },
         { max: null, texto: 'Oportunidad — aumentar ventas', color: '#16a34a' },
       ])]);
+    await pool.query(
+      `INSERT IGNORE INTO dealer_potencial_config (clave, valor) VALUES ('prioriz_segmentos', ?), ('prioriz_cuartiles', ?)`,
+      [JSON.stringify(DEFAULT_SEG), JSON.stringify(DEFAULT_CUART)]);
   } catch (e) { console.error('[dealer-potencial migration]', e.message); }
 })();
 
 async function getConfig() {
   const [rows] = await pool.query('SELECT clave, valor FROM dealer_potencial_config');
   const m = {}; rows.forEach(r => { m[r.clave] = r.valor; });
-  let rangos = [];
+  let rangos = [], segmentos = DEFAULT_SEG, cuartiles = DEFAULT_CUART;
   try { rangos = JSON.parse(m.diagnostico_rangos || '[]'); } catch (_) {}
-  return { factor: parseFloat(m.factor_ventas) || 50, rangos };
+  try { if (m.prioriz_segmentos) segmentos = { ...DEFAULT_SEG, ...JSON.parse(m.prioriz_segmentos) }; } catch (_) {}
+  try { if (m.prioriz_cuartiles) cuartiles = { ...DEFAULT_CUART, ...JSON.parse(m.prioriz_cuartiles) }; } catch (_) {}
+  return { factor: parseFloat(m.factor_ventas) || 50, rangos, segmentos, cuartiles };
 }
 
 function diagnosticar(pot, rangos) {
@@ -100,7 +122,7 @@ function calcDealer(d, credMeses, factor, rangos) {
 /* GET /api/dealer-potencial → parques (con dealers) + métricas calculadas */
 const getPotencial = async (req, res) => {
   try {
-    const { factor, rangos } = await getConfig();
+    const { factor, rangos, segmentos, cuartiles } = await getConfig();
     const meses = mesesUltimos3();
     const [dealers] = await pool.query(
       `SELECT id_dealer, rut, nombre_indexa, nombre_razon, ccs_parque, posiciones, ventas_mensuales, ventas_con_credito
@@ -157,7 +179,7 @@ const getPotencial = async (req, res) => {
       };
     }).sort((a, b) => (b.potencial ?? -99) - (a.potencial ?? -99));
 
-    res.json({ success: true, data: { meses, factor, rangos, parques }, error: null });
+    res.json({ success: true, data: { meses, factor, rangos, segmentos, cuartiles, parques }, error: null });
   } catch (e) { console.error('[dealer-potencial getPotencial]', e.message); res.status(500).json({ success: false, data: null, error: 'Error interno del servidor' }); }
 };
 
@@ -194,8 +216,29 @@ const setConfig = async (req, res) => {
       .filter(r => r.texto);
     await pool.query('INSERT INTO dealer_potencial_config (clave, valor) VALUES (?,?) ON DUPLICATE KEY UPDATE valor=VALUES(valor)', ['factor_ventas', String(factor)]);
     await pool.query('INSERT INTO dealer_potencial_config (clave, valor) VALUES (?,?) ON DUPLICATE KEY UPDATE valor=VALUES(valor)', ['diagnostico_rangos', JSON.stringify(rangos)]);
-    auditar({ req, accion: 'EDITAR', modulo: 'mantenedores', entidad: 'dealer_potencial_config', entidad_id: 'variables', detalle: `Factor ${factor}% · ${rangos.length} rangos`, meta: { factor, rangos } });
-    res.json({ success: true, data: { factor, rangos }, error: null });
+
+    // Segmentos de priorización (sólo se aceptan las claves estructurales conocidas)
+    if (req.body.segmentos && typeof req.body.segmentos === 'object') {
+      const seg = {};
+      for (const k of Object.keys(DEFAULT_SEG)) {
+        const s = req.body.segmentos[k] || {};
+        seg[k] = {
+          nombre: String(s.nombre || DEFAULT_SEG[k].nombre).slice(0, 40),
+          color: /^#[0-9a-fA-F]{6}$/.test(s.color || '') ? s.color : DEFAULT_SEG[k].color,
+          accion: String(s.accion || DEFAULT_SEG[k].accion).slice(0, 300),
+        };
+      }
+      await pool.query('INSERT INTO dealer_potencial_config (clave, valor) VALUES (?,?) ON DUPLICATE KEY UPDATE valor=VALUES(valor)', ['prioriz_segmentos', JSON.stringify(seg)]);
+    }
+    // Acciones por cuartil
+    if (req.body.cuartiles && typeof req.body.cuartiles === 'object') {
+      const cu = {};
+      for (const k of ['1', '2', '3', '4']) cu[k] = String(req.body.cuartiles[k] || DEFAULT_CUART[k]).slice(0, 200);
+      await pool.query('INSERT INTO dealer_potencial_config (clave, valor) VALUES (?,?) ON DUPLICATE KEY UPDATE valor=VALUES(valor)', ['prioriz_cuartiles', JSON.stringify(cu)]);
+    }
+
+    auditar({ req, accion: 'EDITAR', modulo: 'mantenedores', entidad: 'dealer_potencial_config', entidad_id: 'variables', detalle: `Factor ${factor}% · ${rangos.length} rangos · priorización`, meta: { factor, rangos } });
+    res.json({ success: true, data: await getConfig(), error: null });
   } catch (e) { console.error('[dealer-potencial setConfig]', e.message); res.status(500).json({ success: false, data: null, error: 'Error interno del servidor' }); }
 };
 
