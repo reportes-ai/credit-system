@@ -81,6 +81,7 @@ app.use('/api/uf',              require('../../services/mantenedores/src/routes/
 app.use('/api/geografico',      require('../../services/mantenedores/src/routes/geografico.routes'));
 app.use('/api/vehiculos',       require('../../services/mantenedores/src/routes/vehiculos.routes'));
 app.use('/api/dealers',         require('../../services/mantenedores/src/routes/dealers.routes'));
+app.use('/api/dealer-potencial', require('../../services/mantenedores/src/routes/dealer-potencial.routes'));
 app.use('/api/dealer-incorporacion', require('../../services/dealers-incorporacion/src/routes/fichas.routes'));
 app.use('/api/dealer-categorias',    require('../../services/mantenedores/src/routes/dealer-categorias.routes'));
 app.use('/api/parametros-credito', require('../../services/mantenedores/src/routes/parametros.routes'));
