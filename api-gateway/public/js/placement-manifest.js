@@ -129,6 +129,7 @@ const PLACEMENT_DESCS = {
   'bd-clientes':'Base de datos de clientes', 'bd-operaciones':'Base de datos de operaciones de crédito',
   'bd-antecedentes':'Base de datos de antecedentes laborales', 'bd-inf-comercial':'Base de datos de información comercial',
   'vista-pantallas':'Configura qué cards aparecen en Home y cada sección', 'presupuesto':'Presupuesto y metas del periodo',
+  'servidor-hora':'Hora de BD, servidor y navegador; offsets y ajuste manual de zona',
   'ayuda':'Documentación y ayuda del sistema', 'alertas':'Configuración de alertas del sistema',
   'solo-dios':'Acceso directo a la BD sin filtros — edición total', 'dealer-categorias':'Niveles, metas y potencial de venta por dealer',
   'impuestos':'IVA y retención de honorarios (paramétrico)', 'definiciones':'Glosario de términos del sistema',

@@ -9,7 +9,20 @@ const { auditar } = require('../../../../shared/audit');
       INSERT IGNORE INTO parametros_credito (clave, valor, descripcion)
       VALUES ('db_tz_override', '', 'Override manual timezone BD (vacío = automático Chile DST)')
     `);
-  } catch(e) {}
+    // Card en Mantenedores (funcionalidad + permiso Administrador)
+    const [[m]] = await pool.query("SELECT id_modulo FROM modulos WHERE nombre = 'Mantenedores' LIMIT 1");
+    if (m) {
+      let [[f]] = await pool.query("SELECT id_funcionalidad FROM funcionalidades WHERE codigo = 'mant_servidor_hora' LIMIT 1");
+      if (!f) {
+        const [r] = await pool.query(
+          "INSERT INTO funcionalidades (id_modulo, nombre, codigo, href, icono) VALUES (?,?,?,?,?)",
+          [m.id_modulo, 'Hora del Servidor', 'mant_servidor_hora', '/mantenedores/servidor-hora/', 'bi-clock-history']);
+        f = { id_funcionalidad: r.insertId };
+      }
+      const [[adm]] = await pool.query("SELECT id_perfil FROM perfiles WHERE nombre = 'Administrador' LIMIT 1");
+      if (adm) await pool.query("INSERT IGNORE INTO permisos_perfil (id_perfil, id_funcionalidad, habilitado) VALUES (?,?,1)", [adm.id_perfil, f.id_funcionalidad]);
+    }
+  } catch(e) { console.error('[servidor-hora migration]', e.message); }
 })();
 
 /* Próximo cambio de horario DST en Chile */
@@ -78,6 +91,7 @@ exports.getInfo = async (req, res) => {
       tz_bd_activo:     tzActivo,
       tz_bd_override:   tzOverride || '',
       tz_bd_auto:       tzAuto,
+      tz_mysql2:        (typeof pool.getMysql2TZ === 'function') ? pool.getMysql2TZ() : null,
       bd_now:           bdRow?.ahora_bd,
       bd_tz_global:     bdRow?.tz_global,
       bd_tz_session:    bdRow?.tz_session,

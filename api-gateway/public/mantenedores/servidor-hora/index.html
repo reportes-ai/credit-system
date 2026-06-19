@@ -71,7 +71,7 @@
 <nav class="topnav">
   <div class="topnav-left">
     <a class="topnav-brand" href="/"><img src="/img/logo.png" alt="AutoFácil"></a>
-    <span class="version-badge">v1.0</span>
+    <span class="version-badge">v1.1</span>
     <nav class="breadcrumb-nav">
       <a href="/">Inicio</a><span class="sep">›</span>
       <a href="/mantenedores/">Mantenedores</a><span class="sep">›</span>
@@ -147,6 +147,7 @@
       <p style="font-size:.85rem;color:#6b7280;margin:0 0 14px">
         Por defecto el sistema usa <strong>America/Santiago automático</strong> (cambia con DST sin intervención).<br>
         Solo usa el override manual si hay un problema y necesitas forzar un offset específico.
+        <br><span style="color:#d97706">⚠ Si fuerzas un offset distinto al automático, la BD puede quedar <b>desalineada</b> (mira "Alineación BD" arriba) hasta el próximo despliegue.</span>
       </p>
       <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap">
         <div>
@@ -236,11 +237,16 @@ async function cargar(){
 
     /* Panel BD */
     const bdFecha = d.bd_now ? new Date(d.bd_now).toLocaleString('es-CL',{timeZone:'America/Santiago',day:'2-digit',month:'2-digit',year:'numeric',hour:'2-digit',minute:'2-digit',second:'2-digit',hour12:false}) : '—';
+    const guardaTZ = d.bd_tz_session || '—';
+    const leeTZ    = d.tz_mysql2 || '—';
+    const alineado = guardaTZ !== '—' && leeTZ !== '—' && guardaTZ === leeTZ;
     document.getElementById('panelBD').innerHTML = `
       <table class="info-table">
         <tr><td>NOW() según la BD</td><td>${d.bd_now || '—'}</td></tr>
         <tr><td>NOW() formateado Chile</td><td>${bdFecha}</td></tr>
-        <tr><td>time_zone activo (sesión)</td><td class="ok">${d.bd_tz_session || '—'}</td></tr>
+        <tr><td>Guarda con (SET time_zone)</td><td class="ok">${guardaTZ}</td></tr>
+        <tr><td>Lee con (mysql2)</td><td class="${alineado?'ok':'err'}">${leeTZ}</td></tr>
+        <tr><td>Alineación BD</td><td class="${alineado?'ok':'err'}">${alineado ? '✓ Alineado — las horas salen correctas' : '✗ DESFASE — guarda y lee con zonas distintas; las horas saldrán corridas'}</td></tr>
         <tr><td>time_zone global (TiDB)</td><td>${d.bd_tz_global || '—'}</td></tr>
         <tr><td>TZ Node → BD</td><td>${d.tz_bd_activo || '—'} ${d.tz_bd_override ? '<span style="color:#d97706;font-size:.75rem">(override manual activo)</span>' : '<span style="color:#16a34a;font-size:.75rem">(automático)</span>'}</td></tr>
       </table>`;

@@ -4,13 +4,17 @@ require('dotenv').config();
 const host = process.env.DB_HOST || 'localhost';
 const needsSSL = host !== 'localhost' && !host.includes('railway.internal');
 
+// Zona con la que mysql2 INTERPRETA los DATETIME al leerlos. DEBE coincidir con el SET time_zone
+// de la conexión (Chile); si no, todas las horas se desfasan. getChileAutoOffset() está hoisted.
+const MYSQL2_TZ = getChileAutoOffset();
+
 const pool = mysql.createPool({
   host,
   port:     parseInt(process.env.DB_PORT) || 3306,
   user:     process.env.DB_USER     || 'root',
   password: process.env.DB_PASSWORD || '',
   database: process.env.DB_NAME     || 'credit_system',
-  timezone: getChileAutoOffset(),   // DEBE coincidir con el SET time_zone de la conexión (Chile); si no, las horas se desfasan
+  timezone: MYSQL2_TZ,
   waitForConnections: true,
   connectionLimit: 10,
   queueLimit: 0,
@@ -69,6 +73,7 @@ pool.getTZOverride     = () => _tzOverride;
 pool.setTZOverride     = (val) => { _tzOverride = (val && val.trim() !== '') ? val.trim() : null; };
 pool.getActiveTZ       = () => _tzOverride || getChileAutoOffset();
 pool.getChileAutoOffset  = getChileAutoOffset;
+pool.getMysql2TZ       = () => MYSQL2_TZ;
 pool.loadTZOverride    = loadTZOverride;
 
 // Cargar override al arrancar (2s para que la BD esté lista)
