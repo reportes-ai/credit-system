@@ -739,7 +739,7 @@ exports.provisiones = async (req, res) => {
       SELECT COALESCE(SUM(monto_financiado), 0) AS deuda_total
       FROM creditos
       WHERE estado IN ('VIGENTE','EN MORA','OTORGADO')
-        AND (empresa IS NULL OR empresa != 'BROKERAGE')
+        AND (financiera = 'AUTOFACIL' OR financiera IS NULL)
     `);
 
     // Mora por crédito usando el cálculo correcto
