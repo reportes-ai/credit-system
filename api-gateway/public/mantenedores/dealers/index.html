@@ -81,8 +81,9 @@
     .cat-tip-title { font-weight:800; font-size:0.78rem; margin-bottom:6px; }
     .cat-tip-li { font-size:0.74rem; line-height:1.5; color:#cbd5e1; }
     /* Sub-tarjetas Base/Categoría */
-    .vtabs { display:grid; grid-template-columns:1fr 1fr; gap:14px; margin-bottom:16px; }
-    @media(max-width:700px){ .vtabs { grid-template-columns:1fr; } }
+    .vtabs { display:grid; grid-template-columns:repeat(3,1fr); gap:14px; margin-bottom:16px; }
+    @media(max-width:900px){ .vtabs { grid-template-columns:1fr; } }
+    .vtab i { flex-shrink:0; }
     .vtab { display:flex; align-items:center; gap:14px; text-align:left; background:#fff; border:2px solid #e5e7eb; border-radius:14px; padding:16px 20px; cursor:pointer; transition:.15s; }
     .vtab:hover { border-color:var(--navy); }
     .vtab.on { border-color:var(--navy); background:#eff6ff; box-shadow:0 4px 16px rgba(1,65,162,.12); }
