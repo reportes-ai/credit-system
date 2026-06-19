@@ -3,6 +3,21 @@ const audit = require('../../../../shared/auditoria');
 const { isMesCerrado, getMesDeOp } = require('../../../../shared/utils/mes-cerrado');
 const { marcarForzadosCalculo } = require('../utils/recalcular-mes');
 const { clasificar: clasificarCartera } = require('../utils/recalcular-estado-cartera');
+const { notificar } = require('../../../notificaciones/src/controllers/notificaciones.controller');
+
+/* Pool de quienes analizan/aprueban un crédito: Analistas de Crédito + Supervisor
+   de Crédito (+ Administrador), activos. Excluye al actor para no auto-notificar. */
+async function idsAnalistasCredito(excluirId) {
+  const [rows] = await pool.query(
+    `SELECT u.id_usuario FROM usuarios u
+       JOIN perfiles p ON p.id_perfil = u.id_perfil
+     WHERE u.estado = 'activo'
+       AND p.nombre IN ('Analista de Crédito','Supervisor de Crédito','Administrador')
+       AND u.id_usuario <> ?`,
+    [excluirId || 0]
+  );
+  return rows.map(r => r.id_usuario);
+}
 
 // ── Migración: agregar campos de gestión a creditos ──────────────
 (async () => {
@@ -533,7 +548,7 @@ const update = async (req, res) => {
     } = req.body;
 
     const [prev] = await pool.query(
-      `SELECT c.estado, c.numero_credito,
+      `SELECT c.estado, c.numero_credito, c.id_usuario AS creador_id, c.financiera,
               COALESCE(cl.nombre_completo, '') AS nombre_cliente
        FROM creditos c
        LEFT JOIN clientes cl ON cl.id_cliente = c.id_cliente
@@ -648,6 +663,43 @@ const update = async (req, res) => {
         detalle: `Estado: ${estadoAntes} → ${estado}`,
         meta: { estado_antes: estadoAntes, estado_despues: estado },
       });
+
+      // ── Alertas de análisis de crédito (mismo patrón que Cartas de Aprobación) ──
+      try {
+        const actorId   = req.usuario?.id_usuario || null;
+        const actor     = (req.usuario?.nombre ? (req.usuario.nombre + ' ' + (req.usuario.apellido || '')).trim() : 'Un usuario');
+        const nCred     = prev[0].numero_credito || ('#' + req.params.id);
+        const nCli      = prev[0].nombre_cliente || '';
+        const creadorId = prev[0].creador_id || null;
+        const FORWARD_APROB = ['EMISION_DOCUMENTOS', 'CARGA_DOCUMENTOS_AF', 'VALIDACION_FIRMA', 'OTORGADO'];
+
+        // 1) Entra a Análisis → alerta al POOL de analistas/supervisor de crédito
+        if (estado === 'EN_ANALISIS') {
+          const ids = await idsAnalistasCredito(actorId);
+          if (ids.length) await notificar(ids, {
+            tipo: 'CREDITO_ANALISIS',
+            titulo: '🛎️ Nuevo crédito para análisis',
+            mensaje: `${actor} envió a análisis el crédito N°${nCred}${nCli ? ' — ' + nCli : ''}`,
+            href: '/creditos/respaldos?id=' + req.params.id,
+            prioridad: 'alta', sonar: 1, son_tipo: 'dingdong',
+          });
+        }
+
+        // 2) Resolución del análisis → avisa al que GENERÓ el crédito
+        const aprobado  = estadoAntes === 'EN_ANALISIS' && FORWARD_APROB.includes(estado);
+        const rechazado = estadoAntes === 'EN_ANALISIS' && estado === 'RECHAZADO';
+        if ((aprobado || rechazado) && creadorId && creadorId !== actorId) {
+          await notificar([creadorId], {
+            tipo: aprobado ? 'CREDITO_APROBADO' : 'CREDITO_RECHAZADO',
+            titulo: aprobado ? '✅ Crédito aprobado' : '❌ Crédito rechazado',
+            mensaje: aprobado
+              ? `Tu crédito N°${nCred}${nCli ? ' (' + nCli + ')' : ''} pasó el análisis${estado === 'EMISION_DOCUMENTOS' ? ' y avanza a Emisión de Documentos' : ''}.`
+              : `Tu crédito N°${nCred}${nCli ? ' (' + nCli + ')' : ''} fue rechazado en análisis${observaciones ? ': ' + observaciones : ''}.`,
+            href: '/creditos/revisar?id=' + req.params.id,
+            prioridad: 'alta', sonar: 1, son_tipo: aprobado ? 'dingdong' : 'alarma',
+          });
+        }
+      } catch (e) { console.error('[creditos notif análisis]', e.message); }
 
       // Crédito cursado → marcar carta como otorgada + agregar entrada a cartolas
       if (estado === 'OTORGADO') {
