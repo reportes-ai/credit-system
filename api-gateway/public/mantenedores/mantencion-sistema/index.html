@@ -1,0 +1,159 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Mantención de Sistema — AutoFácil</title>
+  <!-- v1.0 -->
+  <link href="/css/bootstrap-icons.css" rel="stylesheet">
+  <style>
+    :root { --navy:#012d70; --blue:#0141A2; }
+    body { background:#f0f4f8; font-family:'Segoe UI',system-ui,sans-serif; color:#1f2937; margin:0; }
+    .wrap { max-width:880px; margin:0 auto; padding:20px 16px 80px; }
+    .intro { background:linear-gradient(135deg,#7c2d12,#b45309 60%,#d97706); color:#fff; border-radius:14px; padding:18px 22px; margin-bottom:18px; }
+    .intro h2 { font-size:1.1rem; font-weight:800; margin:0 0 4px; }
+    .intro p { margin:0; font-size:.85rem; opacity:.9; line-height:1.5; }
+    .card-af { background:#fff; border-radius:14px; box-shadow:0 1px 4px rgba(0,0,0,.06); padding:18px 20px; margin-bottom:18px; }
+    .card-af h3 { font-size:.95rem; font-weight:800; color:var(--navy); margin:0 0 4px; display:flex; align-items:center; gap:8px; }
+    .card-af .sub { font-size:.78rem; color:#64748b; margin:0 0 14px; }
+    /* Switch */
+    .sw-row { display:flex; align-items:center; gap:14px; padding:10px 0; }
+    .switch { position:relative; width:58px; height:32px; flex-shrink:0; }
+    .switch input { opacity:0; width:0; height:0; }
+    .slider { position:absolute; inset:0; background:#cbd5e1; border-radius:32px; cursor:pointer; transition:.2s; }
+    .slider::before { content:''; position:absolute; width:24px; height:24px; left:4px; top:4px; background:#fff; border-radius:50%; transition:.2s; box-shadow:0 1px 3px rgba(0,0,0,.3); }
+    .switch input:checked + .slider { background:#dc2626; }
+    .switch input:checked + .slider::before { transform:translateX(26px); }
+    .sw-estado { font-weight:800; font-size:.95rem; }
+    .sw-estado.on { color:#dc2626; } .sw-estado.off { color:#16a34a; }
+    label.lbl { font-size:.74rem; font-weight:700; color:#374151; display:block; margin-bottom:6px; }
+    textarea { width:100%; box-sizing:border-box; border:1.5px solid #d1d5db; border-radius:9px; padding:10px 12px; font-size:.95rem; resize:vertical; min-height:80px; }
+    textarea:focus { outline:none; border-color:var(--blue); box-shadow:0 0 0 2px rgba(1,65,162,.12); }
+    .btn-primary-af { background:var(--blue); color:#fff; border:none; border-radius:9px; padding:9px 18px; font-size:.88rem; font-weight:700; cursor:pointer; }
+    .btn-primary-af:hover { background:#0255c5; }
+    .afecta { background:#f8fafc; border-left:4px solid var(--blue); border-radius:8px; padding:14px 18px; margin-top:14px; }
+    .afecta h4 { font-size:.85rem; font-weight:800; color:var(--navy); margin:0 0 8px; }
+    .afecta ul { margin:0; padding-left:18px; font-size:.8rem; color:#475569; line-height:1.7; }
+    .toast-af { position:fixed; bottom:20px; left:50%; transform:translateX(-50%); background:#0f172a; color:#fff; padding:11px 20px; border-radius:10px; font-size:.85rem; opacity:0; transition:.3s; z-index:9999; }
+    .toast-af.show { opacity:1; }
+    .restringido { background:#fff; border-radius:14px; padding:40px; text-align:center; color:#64748b; box-shadow:0 1px 4px rgba(0,0,0,.06); }
+    .restringido i { font-size:2.4rem; color:#dc2626; display:block; margin-bottom:10px; }
+
+    /* ── Recuadro de Mantención (preview = mismo look del overlay real) ── */
+    .mnt-preview { display:flex; justify-content:center; padding:18px; background:#0f172a; border-radius:12px; }
+    .mnt-box { background:#fff; border-radius:18px; max-width:460px; width:100%; text-align:center; padding:30px 32px 26px; box-shadow:0 24px 60px rgba(0,0,0,.4); border-top:6px solid #d97706; position:relative; overflow:hidden; }
+    .mnt-box::before { content:''; position:absolute; inset:0 0 auto 0; height:0; }
+    .mnt-ico { width:64px; height:64px; margin:0 auto 14px; border-radius:50%; background:linear-gradient(135deg,#f59e0b,#d97706); display:flex; align-items:center; justify-content:center; color:#fff; font-size:1.9rem; box-shadow:0 6px 18px rgba(217,119,6,.4); }
+    .mnt-kicker { font-size:.72rem; font-weight:800; letter-spacing:.18em; text-transform:uppercase; color:#d97706; margin-bottom:6px; }
+    .mnt-msg { font-family:Georgia,'Times New Roman',serif; font-size:1.35rem; line-height:1.4; color:#1f2937; font-weight:600; }
+  </style>
+</head>
+<body>
+  <div id="af-topnav"></div>
+  <script>
+    window.AF_TOPNAV = {
+      breadcrumb: [
+        { label:'Inicio', href:'/' },
+        { label:'Mantenedores', href:'/mantenedores' },
+        { label:'Mantención de Sistema', icon:'bi-cone-striped', current:true }
+      ]
+    };
+  </script>
+
+  <div class="wrap">
+    <div class="intro">
+      <h2><i class="bi bi-cone-striped me-1"></i>Mantención de Sistema</h2>
+      <p>Activa un aviso de mantención que verán todos los usuarios al ingresar o cambiar de pantalla. Control exclusivo de <b>BG-ADMIN</b>.</p>
+    </div>
+
+    <div id="contenido"></div>
+  </div>
+
+  <div class="toast-af" id="toast"></div>
+
+  <script src="/js/auth-guard.js"></script>
+  <script>
+    const token = sessionStorage.getItem('token');
+    if (!token) location.href = '/login.html';
+    const H = { 'Content-Type':'application/json', Authorization:'Bearer '+token };
+    const esc = s => String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+    function toast(m, ok=true){ const t=document.getElementById('toast'); t.textContent=m; t.style.background=ok?'#0f172a':'#b91c1c'; t.classList.add('show'); setTimeout(()=>t.classList.remove('show'),2400); }
+
+    async function cargar(){
+      let j;
+      try { const r = await fetch('/api/mantenimiento', { headers:H }); j = await r.json(); }
+      catch(_){ return; }
+      const cont = document.getElementById('contenido');
+      // Gate server-authoritative: solo BG-ADMIN ve y edita.
+      if (!j.success || !j.data.es_bg) {
+        cont.innerHTML = `<div class="restringido"><i class="bi bi-shield-lock"></i><b>Acceso restringido.</b><br>Esta sección es exclusiva de <b>BG-ADMIN</b>.</div>`;
+        return;
+      }
+      cont.innerHTML = `
+        <div class="card-af">
+          <h3><i class="bi bi-toggle-on"></i>Estado de la mantención</h3>
+          <div class="sub">Al activar, todos los usuarios (menos BG-ADMIN) verán el aviso en cada pantalla.</div>
+          <div class="sw-row">
+            <label class="switch"><input type="checkbox" id="swActivo" onchange="onSwitch()"><span class="slider"></span></label>
+            <span class="sw-estado off" id="swTxt">Desactivada</span>
+          </div>
+        </div>
+        <div class="card-af">
+          <h3><i class="bi bi-pencil-square"></i>Mensaje a mostrar</h3>
+          <div class="sub">Texto del aviso. Se ve en el recuadro de abajo tal cual aparecerá.</div>
+          <label class="lbl">Mensaje</label>
+          <textarea id="msg" maxlength="500" oninput="renderPreview()" placeholder="AVISO. El sistema se encuentra en Mantención."></textarea>
+          <label class="lbl" style="margin-top:14px">Vista previa</label>
+          <div class="mnt-preview">
+            <div class="mnt-box">
+              <div class="mnt-ico"><i class="bi bi-cone-striped"></i></div>
+              <div class="mnt-kicker">Aviso</div>
+              <div class="mnt-msg" id="pvMsg"></div>
+            </div>
+          </div>
+          <div style="margin-top:16px;display:flex;justify-content:flex-end">
+            <button class="btn-primary-af" onclick="guardar()"><i class="bi bi-save me-1"></i>Guardar</button>
+          </div>
+        </div>
+
+        <div class="afecta">
+          <h4><i class="bi bi-diagram-3"></i> Qué afecta este mantenedor</h4>
+          <ul>
+            <li><b>Switch de mantención</b> → cuando está activo, <b>todos los usuarios</b> (excepto BG-ADMIN) ven un aviso centrado al ingresar o cambiar de pantalla, en cualquier página del sistema.</li>
+            <li><b>Mensaje</b> → el texto que aparece en ese aviso.</li>
+            <li><b>Acceso</b> → este mantenedor y la activación son <b>exclusivos de BG-ADMIN</b>; ningún otro usuario (ni Administrador) puede verlo ni activarlo.</li>
+          </ul>
+        </div>`;
+      document.getElementById('swActivo').checked = !!j.data.activo;
+      document.getElementById('msg').value = j.data.mensaje || 'AVISO. El sistema se encuentra en Mantención.';
+      onSwitch(); renderPreview();
+    }
+
+    function onSwitch(){
+      const on = document.getElementById('swActivo').checked;
+      const t = document.getElementById('swTxt');
+      t.textContent = on ? 'ACTIVADA' : 'Desactivada';
+      t.className = 'sw-estado ' + (on ? 'on' : 'off');
+    }
+    function renderPreview(){
+      const v = document.getElementById('msg').value.trim() || 'AVISO. El sistema se encuentra en Mantención.';
+      document.getElementById('pvMsg').textContent = v;
+    }
+
+    async function guardar(){
+      const activo = document.getElementById('swActivo').checked;
+      const mensaje = document.getElementById('msg').value;
+      try {
+        const r = await fetch('/api/mantenimiento', { method:'PUT', headers:H, body:JSON.stringify({ activo, mensaje }) });
+        const j = await r.json();
+        if (!j.success) return toast(j.error||'Error', false);
+        toast(activo ? 'Mantención ACTIVADA' : 'Mantención desactivada');
+      } catch(_){ toast('Error de conexión', false); }
+    }
+
+    cargar();
+  </script>
+  <script src="/js/topnav.js"></script>
+  <script src="/js/app-version.js"></script>
+</body>
+</html>

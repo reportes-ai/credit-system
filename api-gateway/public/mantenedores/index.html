@@ -204,6 +204,8 @@
         .map(id => { const m = modsByRuta.get(normR(id)); return { id: m.ruta, href: m.ruta, icon: m.icono || 'bi-grid', titulo: m.nombre, desc: m.descripcion || '' }; });
 
       const allItems = [...nativeItems, ...extrasSubitem, ...extrasMods, ...extrasModsNew];
+      // Card exclusiva de BG-ADMIN (no pasa por la matriz de permisos: ni otros admin la ven)
+      if (yo && yo.protegido) allItems.push({ id:'mantencion-sistema', href:'/mantenedores/mantencion-sistema/', icon:'bi-cone-striped', titulo:'Mantención de Sistema', desc:'Aviso de mantención para todos los usuarios — solo BG-ADMIN' });
       const items = orden
         ? orden.map(id => allItems.find(i => i.id === id)).filter(Boolean)
             .concat(allItems.filter(i => !orden.includes(i.id)))

@@ -2,7 +2,7 @@
    AutoFácil — Versión global de la aplicación
    Editar SOLO este archivo para cambiar la versión
    ───────────────────────────────────────────── */
-const APP_VERSION = 'v43.60';
+const APP_VERSION = 'v43.61';
 
 document.addEventListener('DOMContentLoaded', () => {
 
@@ -878,4 +878,53 @@ document.addEventListener('DOMContentLoaded', () => {
     } catch (e) { alert('Error al guardar orden: ' + e.message); }
     btnG.disabled = false; btnG.innerHTML = '<i class="bi bi-floppy me-1"></i>Guardar orden';
   });
+});
+
+/* ═══════════════════════════════════════════════════════════════
+   🛠️ AVISO DE MANTENCIÓN — overlay global activado por BG-ADMIN.
+   Se muestra a TODOS los usuarios (menos BG-ADMIN, que puede operar
+   y apagarlo) al ingresar o cambiar de pantalla. Fail-open.
+   ═══════════════════════════════════════════════════════════════ */
+document.addEventListener('DOMContentLoaded', async () => {
+  const token = sessionStorage.getItem('token');
+  if (!token) return;                                          // sin sesión (login)
+  const yo = JSON.parse(sessionStorage.getItem('usuario') || 'null');
+  if (yo && yo.protegido) return;                              // BG-ADMIN no ve el aviso
+  let data;
+  try {
+    const r = await fetch('/api/mantenimiento', { headers: { Authorization: 'Bearer ' + token } });
+    const j = await r.json();
+    if (!j.success || !j.data.activo) return;
+    data = j.data;
+  } catch (e) { return; }                                      // si falla, no bloquea
+
+  const st = document.createElement('style');
+  st.textContent = `
+    #afMntOverlay { position:fixed; inset:0; z-index:100000; display:flex; align-items:center; justify-content:center;
+      background:rgba(15,23,42,.62); backdrop-filter:blur(4px); animation:afMntFade .25s ease; padding:20px; }
+    @keyframes afMntFade { from{opacity:0} to{opacity:1} }
+    #afMntOverlay .box { background:#fff; border-radius:20px; max-width:480px; width:100%; text-align:center;
+      padding:34px 34px 28px; box-shadow:0 30px 70px rgba(0,0,0,.5); border-top:7px solid #d97706;
+      animation:afMntPop .3s cubic-bezier(.18,.89,.32,1.28); }
+    @keyframes afMntPop { from{opacity:0;transform:scale(.9) translateY(10px)} to{opacity:1;transform:none} }
+    #afMntOverlay .ico { width:70px; height:70px; margin:0 auto 16px; border-radius:50%;
+      background:linear-gradient(135deg,#f59e0b,#d97706); display:flex; align-items:center; justify-content:center;
+      color:#fff; font-size:2.1rem; box-shadow:0 8px 22px rgba(217,119,6,.45); }
+    #afMntOverlay .kicker { font-size:.74rem; font-weight:800; letter-spacing:.2em; text-transform:uppercase; color:#d97706; margin-bottom:8px; }
+    #afMntOverlay .msg { font-family:Georgia,'Times New Roman',serif; font-size:1.45rem; line-height:1.42; color:#1f2937; font-weight:600; }
+    #afMntOverlay .ok { margin-top:22px; background:#0141A2; color:#fff; border:none; border-radius:10px; padding:10px 26px; font-size:.9rem; font-weight:700; cursor:pointer; }
+    #afMntOverlay .ok:hover { background:#0255c5; }`;
+  document.head.appendChild(st);
+
+  const esc = s => String(s == null ? '' : s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+  const ov = document.createElement('div');
+  ov.id = 'afMntOverlay';
+  ov.innerHTML = `<div class="box">
+      <div class="ico"><i class="bi bi-cone-striped"></i></div>
+      <div class="kicker">Aviso</div>
+      <div class="msg">${esc(data.mensaje)}</div>
+      <button class="ok">Entendido</button>
+    </div>`;
+  document.body.appendChild(ov);
+  ov.querySelector('.ok').addEventListener('click', () => ov.remove());
 });

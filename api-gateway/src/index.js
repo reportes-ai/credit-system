@@ -82,6 +82,7 @@ app.use('/api/geografico',      require('../../services/mantenedores/src/routes/
 app.use('/api/vehiculos',       require('../../services/mantenedores/src/routes/vehiculos.routes'));
 app.use('/api/dealers',         require('../../services/mantenedores/src/routes/dealers.routes'));
 app.use('/api/dealer-potencial', require('../../services/mantenedores/src/routes/dealer-potencial.routes'));
+app.use('/api/mantenimiento',    require('../../services/mantenedores/src/routes/mantenimiento.routes'));
 app.use('/api/dealer-incorporacion', require('../../services/dealers-incorporacion/src/routes/fichas.routes'));
 app.use('/api/dealer-categorias',    require('../../services/mantenedores/src/routes/dealer-categorias.routes'));
 app.use('/api/parametros-credito', require('../../services/mantenedores/src/routes/parametros.routes'));
@@ -229,6 +230,8 @@ app.get(['/mantenedores/dealers', '/mantenedores/dealers/'], (req, res) =>
   res.sendFile(path.join(__dirname, '../public/mantenedores/dealers/index.html')));
 app.get(['/mantenedores/potencial-dealer', '/mantenedores/potencial-dealer/'], (req, res) =>
   res.sendFile(path.join(__dirname, '../public/mantenedores/potencial-dealer/index.html')));
+app.get(['/mantenedores/mantencion-sistema', '/mantenedores/mantencion-sistema/'], (req, res) =>
+  res.sendFile(path.join(__dirname, '../public/mantenedores/mantencion-sistema/index.html')));
 app.get(['/mantenedores/respuestas-rapidas', '/mantenedores/respuestas-rapidas/'], (req, res) =>
   res.sendFile(path.join(__dirname, '../public/mantenedores/respuestas-rapidas/index.html')));
 app.get(['/mantenedores/dealernet-productos', '/mantenedores/dealernet-productos/'], (req, res) =>

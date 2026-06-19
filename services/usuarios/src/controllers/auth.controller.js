@@ -71,7 +71,8 @@ const login = async (req, res) => {
           nombre: usuario.nombre,
           apellido: usuario.apellido,
           email: usuario.email,
-          perfil: usuario.perfil_nombre
+          perfil: usuario.perfil_nombre,
+          protegido: usuario.protegido === 1
         },
         // El frontend del login obliga a cambiar la clave antes de entrar
         // (primer ingreso, reset, o clave vencida según la política)
