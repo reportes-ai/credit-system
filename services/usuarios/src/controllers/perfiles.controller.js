@@ -216,11 +216,12 @@ const { auditar } = require('../../../../shared/audit');
   }
 })();
 
-/* ─── Migración: Dealers como card de acceso directo en la página principal ──
-   Dealers es un sub-ítem de Mantenedores (funcionalidad mantenedores_dealers).
-   La home sólo pinta MÓDULOS, así que para tener su card ahí se registra como
-   módulo (sigue además dentro de Mantenedores). El gate de permiso 'home_dealers'
-   se otorga a los mismos perfiles que ya acceden a Dealers. Idempotente. */
+/* ─── Migración: Dealers MOVIDO de Mantenedores a la página principal ────────
+   Dealers era un sub-ítem de Mantenedores (funcionalidad mantenedores_dealers).
+   La home sólo pinta MÓDULOS, así que se registra Dealers como módulo y se otorga
+   el gate 'home_dealers' a los mismos perfiles que ya acceden a Dealers. Para que
+   NO quede duplicado, se le quita el href a 'mantenedores_dealers' (deja de ser
+   card en la landing de Mantenedores; sigue siendo el permiso de la página). Idempotente. */
 (async () => {
   try {
     const RUTA = '/mantenedores/dealers/';
@@ -254,7 +255,10 @@ const { auditar } = require('../../../../shared/audit');
         [p.id_perfil, fn.id_funcionalidad]
       );
     }
-    console.log('✓ Dealers disponible como card en la página principal (módulo + home_dealers)');
+    // Quitar la card de Dealers de la landing de Mantenedores (queda sólo en Home).
+    // 'mantenedores_dealers' se mantiene como permiso de la página; sólo pierde el href de menú.
+    await pool.query("UPDATE funcionalidades SET href = NULL WHERE codigo = 'mantenedores_dealers' AND href IS NOT NULL");
+    console.log('✓ Dealers movido a la página principal (módulo + home_dealers; fuera de Mantenedores)');
   } catch (e) {
     console.error('[migracion home Dealers]', e.message);
   }
