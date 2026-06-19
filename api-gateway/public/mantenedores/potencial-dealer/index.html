@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Potencial Parque/Dealer — AutoFácil</title>
-  <!-- v1.0 -->
+  <!-- v1.1 -->
   <link href="/css/bootstrap-icons.css" rel="stylesheet">
   <style>
     :root { --navy:#012d70; --blue:#0141A2; }
@@ -53,6 +53,30 @@
     .toast-af { position:fixed; bottom:20px; left:50%; transform:translateX(-50%); background:#0f172a; color:#fff; padding:11px 20px; border-radius:10px; font-size:.85rem; opacity:0; transition:.3s; z-index:9999; }
     .toast-af.show { opacity:1; }
     .muted { color:#94a3b8; }
+    /* Sub-pestañas */
+    .subtabs { display:flex; gap:8px; border-bottom:2px solid #e2e8f0; margin-bottom:16px; }
+    .subtab { background:none; border:none; border-bottom:3px solid transparent; margin-bottom:-2px; padding:10px 20px; font-size:.9rem; font-weight:700; color:#64748b; cursor:pointer; }
+    .subtab.on { color:var(--blue); border-bottom-color:var(--blue); font-weight:800; }
+    /* Priorización — tarjetas de segmento */
+    .seg-cards { display:grid; grid-template-columns:repeat(4,1fr); gap:12px; }
+    @media(max-width:900px){ .seg-cards { grid-template-columns:repeat(2,1fr); } }
+    .seg-card { border:1px solid #e2e8f0; border-top:4px solid var(--c); border-radius:10px; padding:12px 14px; }
+    .seg-h { font-size:.82rem; font-weight:800; color:var(--c); display:flex; align-items:center; gap:6px; }
+    .seg-n { font-size:1.5rem; font-weight:800; color:#0f172a; margin:4px 0 0; } .seg-n span { font-size:.7rem; font-weight:600; color:#94a3b8; }
+    .seg-p { font-size:.74rem; font-weight:700; color:#16a34a; margin-bottom:6px; }
+    .seg-a { font-size:.72rem; color:#64748b; line-height:1.4; }
+    /* Matriz 2×2 */
+    .mx-grid { display:flex; gap:6px; align-items:stretch; }
+    .mx-ylab { display:flex; align-items:center; justify-content:center; font-size:.68rem; font-weight:700; color:#64748b; writing-mode:vertical-rl; transform:rotate(180deg); padding:2px; }
+    .mx-col { flex:1; }
+    .mx-axis-top { display:flex; justify-content:space-between; font-size:.66rem; color:#94a3b8; font-weight:700; margin-bottom:4px; }
+    .mx-axis-bottom { text-align:center; font-size:.66rem; color:#94a3b8; margin-top:4px; }
+    .mx-row { display:grid; grid-template-columns:1fr 1fr; gap:6px; margin-bottom:6px; }
+    .mx-cell { border:1px solid #e2e8f0; border-left:4px solid var(--c); border-radius:8px; padding:8px 10px; min-height:72px; background:#fff; }
+    .mx-t { font-size:.78rem; font-weight:800; color:var(--c); margin-bottom:5px; } .mx-t b { color:#0f172a; }
+    .mx-chips { display:flex; flex-wrap:wrap; gap:4px; }
+    .mx-chip { background:#f1f5f9; border-radius:6px; padding:1px 7px; font-size:.68rem; color:#334155; max-width:130px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+    .qbadge { display:inline-block; color:#fff; font-size:.66rem; font-weight:800; border-radius:8px; padding:2px 8px; }
   </style>
 </head>
 <body>
@@ -71,10 +95,36 @@
 
   <div class="wrap">
     <div class="intro">
-      <h2><i class="bi bi-sliders me-1"></i>Variables del Potencial Dealer</h2>
-      <p>Configura el <b>factor</b> y los <b>rangos de diagnóstico</b> que usa el cálculo de potencial. La tabla con los datos de cada dealer (editable) está en <a href="/mantenedores/dealers/" style="color:#fff;text-decoration:underline">Dealers → Potencial Parque/Dealer</a>. Potencial = ventas potencial ÷ créditos promedio − 1.</p>
+      <h2><i class="bi bi-bullseye me-1"></i>Potencial Dealer</h2>
+      <p>Prioriza dónde poner el esfuerzo comercial según el potencial de cada dealer, y ajusta las variables del cálculo. Los datos de cada dealer (posiciones, ventas) se cargan en <a href="/mantenedores/dealers/" style="color:#fff;text-decoration:underline">Dealers → Potencial Parque/Dealer</a>.</p>
     </div>
 
+    <div class="subtabs">
+      <button id="stPrioriz" class="subtab on" onclick="setSub('prioriz')"><i class="bi bi-bullseye me-1"></i>Priorización</button>
+      <button id="stVars" class="subtab" onclick="setSub('vars')"><i class="bi bi-sliders me-1"></i>Variables del cálculo</button>
+    </div>
+
+    <!-- ░░ PRIORIZACIÓN ░░ -->
+    <div id="viewPrioriz">
+      <div class="card-af">
+        <h3><i class="bi bi-bullseye"></i>Priorización comercial</h3>
+        <div class="sub"><b>Pareto:</b> los dealers de más arriba concentran la mayor parte del potencial capturable → ahí van los recursos. <b>Segmentos:</b> el <i>tipo</i> de acción según cuánto vende con crédito y cuánto ya capturamos (cortes en la mediana).</div>
+        <div id="segCards" class="seg-cards"></div>
+      </div>
+      <div class="card-af">
+        <h3><i class="bi bi-grid-3x3-gap"></i>Matriz de segmentos</h3>
+        <div class="sub">Vertical: % que el dealer vende con crédito. Horizontal: penetración AutoFácil (cuánto de su crédito ya capturamos). Cada celda lista sus dealers ordenados por potencial.</div>
+        <div id="matriz"></div>
+      </div>
+      <div class="card-af">
+        <h3><i class="bi bi-bar-chart-steps"></i>Ranking de potencial (Pareto / cuartiles)</h3>
+        <div class="sub">Ordenado por <b>potencial absoluto</b> = créditos que aún podrías capturar (ventas potencial − créditos actuales). <b>Q1</b> = donde más conviene invertir esfuerzo comercial.</div>
+        <div class="tbl-wrap"><table class="pt-table"><thead id="rkHead"></thead><tbody id="rkBody"></tbody></table></div>
+      </div>
+    </div>
+
+    <!-- ░░ VARIABLES ░░ -->
+    <div id="viewVariables" style="display:none">
     <!-- Variables -->
     <div class="card-af">
       <h3><i class="bi bi-sliders"></i>Variables del cálculo</h3>
@@ -94,6 +144,7 @@
         <button class="btn-primary-af" onclick="guardarVariables()"><i class="bi bi-save me-1"></i>Guardar variables</button>
       </div>
     </div>
+    </div><!-- /viewVariables -->
 
 
     <div class="afecta">
@@ -103,6 +154,7 @@
         <li><b>Factor ventas potencial</b> → % de las ventas con crédito que AutoFácil podría capturar (ventas potencial = ventas con crédito × factor).</li>
         <li><b>Rangos de diagnóstico</b> → el texto/color que se muestra según el valor del Potencial.</li>
         <li><b>Créditos por mes</b> → automáticos, contados de <a href="/creditos">Gestión de Créditos</a> por RUT del dealer (últimos 3 meses cerrados).</li>
+        <li><b>Priorización</b> → vista de <b>solo lectura</b>: ordena dónde poner el esfuerzo comercial (Pareto por potencial + matriz de segmentos) con estos mismos datos y variables. No modifica nada.</li>
       </ul>
     </div>
   </div>
@@ -127,9 +179,11 @@
         const r = await fetch('/api/dealer-potencial', { headers:H });
         const j = await r.json();
         if (!j.success) return toast(j.error||'Error', false);
+        DATA = j.data;
         _rangos = (j.data.rangos||[]).slice();
         document.getElementById('vFactor').value = j.data.factor;
         renderRangos();
+        renderPrioriz();
       } catch(_){ toast('Error de conexión', false); }
     }
 
@@ -211,6 +265,108 @@
           toast('Guardado — recalculando…'); cargar();
         } catch(_){ toast('Error de conexión', false); }
       }, 600);
+    }
+
+    /* ───────────── Priorización comercial (solo lectura) ───────────── */
+    const median = arr => { const a=arr.filter(x=>x!=null&&isFinite(x)).sort((x,y)=>x-y); if(!a.length) return null; const m=Math.floor(a.length/2); return a.length%2?a[m]:(a[m-1]+a[m])/2; };
+    const SEG = {
+      ATACAR:     { nom:'Atacar',      color:'#16a34a', ico:'bi-megaphone',     accion:'Vende mucho con crédito pero poco con AutoFácil → máxima prioridad: visita y oferta.' },
+      DEFENDER:   { nom:'Defender',    color:'#0141A2', ico:'bi-shield-check',  accion:'Campeón (alto crédito + alta participación) → cuidar la relación y el servicio.' },
+      EDUCAR:     { nom:'Educar',      color:'#d97706', ico:'bi-mortarboard',   accion:'Vende poco con crédito → enseñarle a ofrecer crédito y entrar con AutoFácil.' },
+      DESARROLLAR:{ nom:'Desarrollar', color:'#64748b', ico:'bi-arrow-up-right',accion:'Ya tienes su poco crédito → ayúdalo a vender más con crédito (agrandar la torta).' },
+    };
+    const QAC  = { 1:'Esfuerzo máximo: visita + gestor dedicado', 2:'Esfuerzo alto: contacto regular y campañas dirigidas', 3:'Esfuerzo medio: seguimiento digital', 4:'Mantención: autoservicio / campañas masivas' };
+    const QCOL = { 1:'#16a34a', 2:'#0141A2', 3:'#d97706', 4:'#94a3b8' };
+
+    function calcPrioriz(){
+      const ds = (DATA && DATA.parques ? DATA.parques : []).flatMap(p => p.dealers.map(d => ({ ...d, parque:p.parque })));
+      ds.forEach(d => {
+        d._vc = Number(d.ventas_con_credito)||0;
+        d._cp = Number(d.cred_prom)||0;
+        d._pen = d._vc>0 ? d._cp/d._vc : null;                               // penetración AutoFácil
+        d._pct = d.pct_credito;                                              // % vendido con crédito
+        d._potAbs = d._vc>0 ? (Number(d.ventas_potencial)||0) - d._cp : null;// créditos capturables
+        d._tend = ((d.cred_meses&&d.cred_meses[2])||0) - ((d.cred_meses&&d.cred_meses[0])||0);
+        d._con = d._vc>0;
+      });
+      const cd = ds.filter(d=>d._con);
+      const medPen = median(cd.map(d=>d._pen));
+      const medPct = median(cd.map(d=>d._pct));
+      cd.forEach(d=>{
+        const hiPct = d._pct!=null && medPct!=null && d._pct>=medPct;
+        const hiPen = d._pen!=null && medPen!=null && d._pen>=medPen;
+        d._seg = hiPct ? (hiPen?'DEFENDER':'ATACAR') : (hiPen?'DESARROLLAR':'EDUCAR');
+      });
+      const ranked = cd.filter(d=>d._potAbs!=null).sort((a,b)=> b._potAbs - a._potAbs);
+      const n = ranked.length;
+      const totalPos = ranked.filter(d=>d._potAbs>0).reduce((a,d)=>a+d._potAbs,0);
+      let acc=0;
+      ranked.forEach((d,i)=>{ d._q = n? Math.min(4, Math.ceil((i+1)/(n/4))) : 1; if(d._potAbs>0) acc+=d._potAbs; d._acum = totalPos? acc/totalPos : null; });
+      return { ds, cd, ranked, sinDatos: ds.length - cd.length };
+    }
+
+    function renderPrioriz(){
+      if (!DATA) return;
+      const P = calcPrioriz();
+      const segEl=document.getElementById('segCards'), mxEl=document.getElementById('matriz'), hEl=document.getElementById('rkHead'), bEl=document.getElementById('rkBody');
+      if (!P.cd.length){
+        segEl.innerHTML = `<div class="muted" style="padding:14px;grid-column:1/-1">Aún no hay datos cargados. Ingresa posiciones y ventas en <a href="/mantenedores/dealers/">Dealers → Potencial Parque/Dealer</a> para ver la priorización.</div>`;
+        mxEl.innerHTML=''; hEl.innerHTML=''; bEl.innerHTML=''; return;
+      }
+      const bySeg = k => P.cd.filter(d=>d._seg===k);
+      // tarjetas resumen
+      segEl.innerHTML = Object.keys(SEG).map(k=>{
+        const arr=bySeg(k), s=SEG[k];
+        const pot=arr.reduce((a,d)=>a+(d._potAbs>0?d._potAbs:0),0);
+        return `<div class="seg-card" style="--c:${s.color}">
+          <div class="seg-h"><i class="bi ${s.ico}"></i> ${s.nom}</div>
+          <div class="seg-n">${arr.length} <span>dealers</span></div>
+          <div class="seg-p">+${fN(pot)} créditos potenciales</div>
+          <div class="seg-a">${s.accion}</div>
+        </div>`;
+      }).join('');
+      // matriz 2×2
+      const cell = k => { const arr=bySeg(k).sort((a,b)=>(b._potAbs||0)-(a._potAbs||0)), s=SEG[k];
+        const chips = arr.slice(0,6).map(d=>`<span class="mx-chip" title="${esc(d.dealer)} · +${fN(d._potAbs)} créditos">${esc(d.dealer)}</span>`).join('');
+        return `<div class="mx-cell" style="--c:${s.color}"><div class="mx-t">${s.nom} <b>${arr.length}</b></div><div class="mx-chips">${chips||'<span class="muted">—</span>'}</div></div>`;
+      };
+      mxEl.innerHTML = `
+        <div class="mx-grid">
+          <div class="mx-ylab">▲ mayor % vendido con crédito</div>
+          <div class="mx-col">
+            <div class="mx-axis-top"><span>← menor penetración AutoFácil</span><span>mayor penetración →</span></div>
+            <div class="mx-row">${cell('ATACAR')}${cell('DEFENDER')}</div>
+            <div class="mx-row">${cell('EDUCAR')}${cell('DESARROLLAR')}</div>
+            <div class="mx-axis-bottom">Penetración AutoFácil = créditos AutoFácil ÷ ventas con crédito · cortes en la mediana</div>
+          </div>
+        </div>`;
+      // ranking Pareto
+      hEl.innerHTML = `<tr><th>#</th><th class="l">Dealer</th><th class="l">Parque</th><th>Vol. créd.</th><th>Penetr.</th><th>% Créd.</th><th>Tend.</th><th>Pot. abs.</th><th>Acum.</th><th>Cuartil</th><th class="l">Segmento</th></tr>`;
+      bEl.innerHTML = P.ranked.map((d,i)=>{
+        const s=SEG[d._seg];
+        const tend = d._tend>0?'<span class="pos">▲</span>':(d._tend<0?'<span class="neg">▼</span>':'<span class="muted">▬</span>');
+        return `<tr>
+          <td>${i+1}</td>
+          <td class="l">${esc(d.dealer)}</td>
+          <td class="l muted">${esc(d.parque)}</td>
+          <td>${fN(d._vc)}</td>
+          <td>${fPct(d._pen)}</td>
+          <td>${fPct(d._pct)}</td>
+          <td>${tend}</td>
+          <td class="num-strong ${d._potAbs>=0?'pos':'neg'}">${d._potAbs>=0?'+':''}${fN(d._potAbs)}</td>
+          <td>${d._acum==null?'—':Math.round(d._acum*100)+'%'}</td>
+          <td><span class="qbadge" style="background:${QCOL[d._q]}" title="${esc(QAC[d._q])}">Q${d._q}</span></td>
+          <td class="l"><span class="diag" style="background:${s.color}">${s.nom}</span></td>
+        </tr>`;
+      }).join('') + (P.sinDatos? `<tr><td colspan="11" class="muted" style="text-align:center;padding:10px">+ ${P.sinDatos} dealers sin datos cargados (no entran en la priorización).</td></tr>`:'');
+    }
+
+    function setSub(v){
+      const pz = v==='prioriz';
+      document.getElementById('viewPrioriz').style.display = pz?'':'none';
+      document.getElementById('viewVariables').style.display = pz?'none':'';
+      document.getElementById('stPrioriz').classList.toggle('on', pz);
+      document.getElementById('stVars').classList.toggle('on', !pz);
     }
 
     cargar();
