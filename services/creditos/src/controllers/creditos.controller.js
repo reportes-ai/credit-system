@@ -2,6 +2,7 @@ const pool  = require('../../../../shared/config/database');
 const audit = require('../../../../shared/auditoria');
 const { isMesCerrado, getMesDeOp } = require('../../../../shared/utils/mes-cerrado');
 const { marcarForzadosCalculo } = require('../utils/recalcular-mes');
+const { clasificar: clasificarCartera } = require('../utils/recalcular-estado-cartera');
 
 // ── Migración: agregar campos de gestión a creditos ──────────────
 (async () => {
@@ -442,7 +443,29 @@ const getById = async (req, res) => {
     );
     if (!rows.length)
       return res.status(404).json({ success: false, data: null, error: 'Crédito no encontrado' });
-    res.json({ success: true, data: rows[0], error: null });
+    const c = rows[0];
+    // ESTADO de cartera en TIEMPO REAL para la ficha (no espera al motor): si es
+    // cartera propia y no es un cierre manual, clasifica por días de atraso ahora.
+    try {
+      const finUp = String(c.financiera || '').toUpperCase();
+      const esPropio = finUp !== 'AUTOFIN' && finUp !== 'UNIDAD DE CREDITO';
+      const stored = String(c.estado_cartera || '').toUpperCase();
+      const manualTerm = ['CASTIGADO', 'PREPAGADO', 'TERMINADO'].includes(stored);
+      if (manualTerm) {
+        c.estado_cartera_disp = c.estado_cartera;
+      } else if (esPropio && c.fecha_primera_cuota && Number(c.plazo) > 0) {
+        const [pg] = await pool.query("SELECT DISTINCT numero_cuota FROM pagos_credito WHERE id_credito=? AND estado_pago='PAGADO'", [c.id]);
+        const paid = new Set(pg.map(p => parseInt(p.numero_cuota, 10)));
+        const [ump] = await pool.query('SELECT clave, valor FROM cartera_parametros');
+        const UM = {}; ump.forEach(u => { UM[u.clave] = parseInt(u.valor, 10); });
+        const um = { mora: Number.isFinite(UM.mora_desde) ? UM.mora_desde : 1, vencido: Number.isFinite(UM.vencido_desde) ? UM.vencido_desde : 91 };
+        const now = new Date();
+        const hoy = Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate());
+        const cls = clasificarCartera(c, paid, hoy, um);
+        if (cls) { c.estado_cartera_disp = cls.estado; c.dias_atraso = cls.dias; }
+      }
+    } catch (_) { /* deja el fallback del SELECT */ }
+    res.json({ success: true, data: c, error: null });
   } catch (e) {
     (console.error('[error]', e), res.status(500).json({success:false,data:null,error:'Error interno del servidor'}));
   }

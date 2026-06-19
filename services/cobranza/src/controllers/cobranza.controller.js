@@ -186,7 +186,7 @@ const MORA_SQL = (whereExtra = '', havingExtra = '') => `
     WHERE estado_pago = 'PAGADO'
     GROUP BY id_credito
   ) pp ON pp.id_credito = c.id_credito
-  WHERE c.estado = 'VIGENTE'
+  WHERE c.estado IN ('VIGENTE','EN MORA','OTORGADO')
     AND (c.financiera = 'AUTOFACIL' OR c.financiera IS NULL)
     AND c.plazo IS NOT NULL
     AND c.plazo > 0
@@ -736,7 +736,7 @@ exports.provisiones = async (req, res) => {
     const [[{ deuda_total }]] = await pool.query(`
       SELECT COALESCE(SUM(monto_financiado), 0) AS deuda_total
       FROM creditos
-      WHERE estado = 'VIGENTE'
+      WHERE estado IN ('VIGENTE','EN MORA','OTORGADO')
         AND (empresa IS NULL OR empresa != 'BROKERAGE')
     `);
 

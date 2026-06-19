@@ -91,6 +91,14 @@ const { recalcularEstadoCartera } = require('../../../creditos/src/utils/recalcu
       `INSERT INTO funcionalidades (id_modulo, nombre, codigo, href, icono)
        VALUES (30001, 'Estado Cartera', 'mantenedores_estado_cartera', '/mantenedores/estado-creditos/', 'bi-wallet2')`);
     await pool.query("UPDATE funcionalidades SET href='/mantenedores/estado-creditos/' WHERE codigo='mantenedores_estado_cartera'").catch(() => {});
+
+    // Corre el motor una vez al bootear (deferido para no demorar el arranque),
+    // así el Estado de cartera queda poblado sin recálculo manual. Idempotente.
+    setTimeout(() => {
+      recalcularEstadoCartera()
+        .then(r => console.log('[estado-cartera] motor inicial:', r.procesados, 'procesados,', r.cambios, 'cambios'))
+        .catch(e => console.error('[estado-cartera] motor inicial', e.message));
+    }, 8000);
   } catch (e) { console.error('[estado-cartera migration]', e.message); }
 })();
 

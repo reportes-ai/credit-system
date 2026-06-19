@@ -388,6 +388,11 @@ let _uf          = null;      // valor UF hoy (fallback)
 let _ufPorFecha  = new Map(); // UF del día-21 de mora por cuota: 'YYYY-MM-DD' → valor
 
 const ESTADOS_CURSADOS  = new Set(['VIGENTE','EN MORA','CANCELADO','PREPAGADO','CASTIGADO']);
+// ¿Es cartera propia (tiene Estado de cartera)? Sirve para gatear pago/historial sin
+// depender de que la ETAPA sea VIGENTE (ahora los propios cursados son OTORGADO).
+const _ec = c => String(c.estado_cartera_disp || c.estado_cartera || '').toUpperCase();
+const enCartera = c => !!_ec(c);
+const pagableCartera = c => enCartera(c) && !['TERMINADO','PREPAGADO','CASTIGADO'].includes(_ec(c));
 // Broker: estados finales de créditos AUTOFIN/UNIDAD (no se puede trackear pagos)
 const ESTADOS_BROKER    = new Set(['OTORGADO','CARTA_APROBACION','CURSADO','DESISTIDO']);
 const esBroker = () => _credito && ['AUTOFIN','UNIDAD DE CREDITO'].includes(_credito.financiera);
@@ -674,7 +679,7 @@ function renderPagina(c, ant, com) {
     </div>
 
     <!-- ── Historial de Pagos (solo créditos cursados) ── -->
-    ${ESTADOS_CURSADOS.has(c.estado) ? renderHistorialPagos(c) : ''}
+    ${(ESTADOS_CURSADOS.has(c.estado) || enCartera(c)) ? renderHistorialPagos(c) : ''}
 
     <!-- ── Estado y Observaciones ── -->
     <div class="section">
@@ -727,8 +732,8 @@ function renderPagina(c, ant, com) {
       </button>` : ''}
     </div>
     <div class="action-bar-right">
-      ${ESTADOS_CURSADOS.has(c.estado) ? `
-      ${(c.estado === 'VIGENTE' || c.estado === 'EN MORA') ? `
+      ${(ESTADOS_CURSADOS.has(c.estado) || enCartera(c)) ? `
+      ${pagableCartera(c) ? `
       <button class="btn-accion" style="background:linear-gradient(135deg,#16a34a,#15803d);color:#fff"
         onclick="location.href='/creditos/pagar-cuotas?id=${c.id_credito}'">
         <i class="bi bi-cash-coin"></i>Pagar Cuotas
@@ -950,7 +955,7 @@ function renderHistorialPagos(c) {
   });
 
   // Para financieras externas: el resumen muestra cuotas al corriente, no mora
-  const puedesPagar = !finExt && (c.estado==='VIGENTE'||c.estado==='EN MORA');
+  const puedesPagar = !finExt && pagableCartera(c);
   const resumenHtml = finExt
     ? `<span style="font-size:.72rem;color:var(--muted)">
          <span style="color:#6d28d9;font-weight:700"><i class="bi bi-building"></i> ${c.financiera}</span> &nbsp;·&nbsp;
