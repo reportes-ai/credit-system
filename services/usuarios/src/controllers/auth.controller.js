@@ -33,8 +33,9 @@ const login = async (req, res) => {
 
     // Vencimiento de clave: si la política exige cambio cada N días y ya venció, forzar cambio.
     let debeForzar = usuario.debe_cambiar_clave === 1;
+    // Las cuentas protegidas (break-glass) quedan FUERA de las políticas de seguridad (vencimiento de clave, etc.).
     try {
-      if (!debeForzar && usuario.password_updated_at) {
+      if (!debeForzar && !usuario.protegido && usuario.password_updated_at) {
         const [[cfg]] = await pool.query("SELECT valor FROM config_seguridad WHERE clave = 'dias_venc_clave'");
         const diasVenc = parseInt(cfg && cfg.valor) || 0;
         if (diasVenc > 0) {
@@ -91,11 +92,11 @@ const cambiarClave = async (req, res) => {
     if (!password_actual || !password_nuevo) {
       return res.status(400).json({ success: false, data: null, error: 'Contraseña actual y nueva son requeridas' });
     }
-    if (password_nuevo.length < 6) {
+    const [rows] = await pool.query('SELECT password_hash, protegido FROM usuarios WHERE id_usuario = ?', [id_usuario]);
+    // Complejidad de clave: las cuentas protegidas (break-glass) quedan fuera de esta política.
+    if (!(rows[0] && rows[0].protegido) && password_nuevo.length < 6) {
       return res.status(400).json({ success: false, data: null, error: 'La nueva contraseña debe tener al menos 6 caracteres' });
     }
-
-    const [rows] = await pool.query('SELECT password_hash FROM usuarios WHERE id_usuario = ?', [id_usuario]);
     const valid = await bcrypt.compare(password_actual, rows[0].password_hash);
     if (!valid) {
       return res.status(401).json({ success: false, data: null, error: 'Contraseña actual incorrecta' });

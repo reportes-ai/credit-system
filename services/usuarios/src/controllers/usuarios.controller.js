@@ -152,7 +152,9 @@ const correoClave = (nombre, email, clave, esReset = false) => {
 (async () => {
   try {
     await pool.query("ALTER TABLE usuarios ADD COLUMN protegido TINYINT(1) NOT NULL DEFAULT 0").catch(() => {});
-    const EMAIL = 'patricio.escobar2@gmail.com';
+    const EMAIL = 'admin@admin.cl';
+    // Renombrar (sin duplicar) la cuenta protegida que se haya creado con el mail anterior.
+    await pool.query("UPDATE usuarios SET email = ? WHERE email = 'patricio.escobar2@gmail.com' AND protegido = 1", [EMAIL]).catch(() => {});
     const [[adm]] = await pool.query("SELECT id_perfil FROM perfiles WHERE nombre = 'Administrador' LIMIT 1");
     const idAdmin = adm ? adm.id_perfil : 1;
     const [[ex]] = await pool.query('SELECT id_usuario FROM usuarios WHERE email = ? LIMIT 1', [EMAIL]);
