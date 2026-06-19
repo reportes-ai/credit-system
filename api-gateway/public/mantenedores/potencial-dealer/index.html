@@ -1,0 +1,249 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Potencial Parque/Dealer — AutoFácil</title>
+  <!-- v1.0 -->
+  <link href="/css/bootstrap-icons.css" rel="stylesheet">
+  <style>
+    :root { --navy:#012d70; --blue:#0141A2; }
+    body { background:#f0f4f8; font-family:'Segoe UI',system-ui,sans-serif; color:#1f2937; margin:0; }
+    .wrap { max-width:1280px; margin:0 auto; padding:20px 16px 80px; }
+    .intro { background:linear-gradient(135deg,var(--navy),var(--blue)); color:#fff; border-radius:14px; padding:18px 22px; margin-bottom:18px; }
+    .intro h2 { font-size:1.1rem; font-weight:800; margin:0 0 4px; }
+    .intro p { margin:0; font-size:.85rem; opacity:.85; line-height:1.5; }
+    .card-af { background:#fff; border-radius:14px; box-shadow:0 1px 4px rgba(0,0,0,.06); padding:16px 18px; margin-bottom:18px; }
+    .card-af h3 { font-size:.95rem; font-weight:800; color:var(--navy); margin:0 0 4px; display:flex; align-items:center; gap:8px; }
+    .card-af .sub { font-size:.78rem; color:#64748b; margin:0 0 12px; }
+    /* Variables */
+    .var-row { display:flex; align-items:flex-end; gap:18px; flex-wrap:wrap; }
+    .var-row label { font-size:.74rem; font-weight:700; color:#374151; display:block; margin-bottom:4px; }
+    .var-row input[type=number] { width:90px; padding:7px 9px; border:1.5px solid #d1d5db; border-radius:8px; font-size:.9rem; }
+    .rangos { margin-top:12px; }
+    .rango-item { display:flex; align-items:center; gap:8px; margin-bottom:6px; flex-wrap:wrap; }
+    .rango-item input[type=number] { width:80px; padding:5px 8px; border:1.5px solid #d1d5db; border-radius:7px; font-size:.84rem; }
+    .rango-item input[type=text] { flex:1; min-width:140px; padding:5px 8px; border:1.5px solid #d1d5db; border-radius:7px; font-size:.84rem; }
+    .rango-item input[type=color] { width:36px; height:30px; border:1px solid #d1d5db; border-radius:6px; padding:1px; }
+    .btn-primary-af { background:var(--blue); color:#fff; border:none; border-radius:8px; padding:8px 16px; font-size:.84rem; font-weight:700; cursor:pointer; }
+    .btn-primary-af:hover { background:#0255c5; }
+    .btn-ghost-af { background:#f0f4f8; color:var(--navy); border:1px solid #d1d5db; border-radius:8px; padding:6px 12px; font-size:.8rem; font-weight:600; cursor:pointer; }
+    /* Tabla */
+    .pt-table { width:100%; border-collapse:collapse; font-size:.8rem; }
+    .pt-table th { background:var(--navy); color:#fff; font-size:.66rem; font-weight:700; text-transform:uppercase; letter-spacing:.03em; padding:8px 8px; text-align:right; white-space:nowrap; position:sticky; top:0; }
+    .pt-table th.l { text-align:left; }
+    .pt-table td { padding:6px 8px; border-bottom:1px solid #f1f5f9; text-align:right; white-space:nowrap; }
+    .pt-table td.l { text-align:left; }
+    .row-parque { background:#eef2f9; cursor:pointer; font-weight:800; color:var(--navy); }
+    .row-parque:hover { background:#e2e8f5; }
+    .row-parque td { border-bottom:1.5px solid #cbd5e1; }
+    .row-dealer td { color:#334155; }
+    .row-dealer:hover td { background:#f8fafc; }
+    .caret { display:inline-block; width:14px; transition:transform .15s; }
+    .caret.open { transform:rotate(90deg); }
+    .inp-edit { width:74px; padding:3px 6px; border:1px solid #d1d5db; border-radius:6px; font-size:.8rem; text-align:right; }
+    .inp-edit:focus { outline:none; border-color:var(--blue); box-shadow:0 0 0 2px rgba(1,65,162,.12); }
+    .diag { display:inline-block; font-size:.66rem; font-weight:800; color:#fff; border-radius:10px; padding:2px 9px; }
+    .num-strong { font-weight:800; }
+    .pos { color:#16a34a; } .neg { color:#dc2626; }
+    .tbl-wrap { overflow:auto; max-height:70vh; border-radius:12px; }
+    .afecta { background:#f8fafc; border-left:4px solid var(--blue); border-radius:8px; padding:14px 18px; margin-top:14px; }
+    .afecta h4 { font-size:.85rem; font-weight:800; color:var(--navy); margin:0 0 8px; }
+    .afecta ul { margin:0; padding-left:18px; font-size:.8rem; color:#475569; line-height:1.7; }
+    .toast-af { position:fixed; bottom:20px; left:50%; transform:translateX(-50%); background:#0f172a; color:#fff; padding:11px 20px; border-radius:10px; font-size:.85rem; opacity:0; transition:.3s; z-index:9999; }
+    .toast-af.show { opacity:1; }
+    .muted { color:#94a3b8; }
+  </style>
+</head>
+<body>
+  <div id="af-topnav"></div>
+  <script>
+    window.AF_TOPNAV = {
+      breadcrumb: [
+        { label:'Inicio', href:'/' },
+        { label:'Mantenedores', href:'/mantenedores' },
+        { label:'Categoría y Potencial Dealer', href:'/mantenedores/dealer-categorias/' },
+        { label:'Potencial Parque/Dealer', icon:'bi-graph-up-arrow', current:true }
+      ],
+      actions: [ { label:'Dealers', icon:'bi-buildings', href:'/mantenedores/dealers/' } ]
+    };
+  </script>
+
+  <div class="wrap">
+    <div class="intro">
+      <h2><i class="bi bi-graph-up-arrow me-1"></i>Potencial Parque/Dealer</h2>
+      <p>Cuánto más podría crecer AutoFácil con cada dealer. Abre un parque para ver sus dealers. Edita Posiciones / Ventas / Ventas con crédito (se guardan al instante); los créditos salen del sistema. Potencial = ventas potencial ÷ créditos promedio − 1.</p>
+    </div>
+
+    <!-- Variables -->
+    <div class="card-af">
+      <h3><i class="bi bi-sliders"></i>Variables del cálculo</h3>
+      <div class="sub">El <b>factor</b> es el % de las ventas con crédito que AutoFácil podría capturar (maqueta: 50%). El <b>diagnóstico</b> sale por rangos del potencial.</div>
+      <div class="var-row">
+        <div>
+          <label>Factor ventas potencial (%)</label>
+          <input type="number" id="vFactor" min="0" step="5">
+        </div>
+        <div style="flex:1">
+          <label>Rangos de diagnóstico (potencial &lt; máximo → texto)</label>
+          <div class="rangos" id="rangos"></div>
+          <button class="btn-ghost-af" onclick="addRango()" style="margin-top:4px"><i class="bi bi-plus-lg"></i> Agregar rango</button>
+        </div>
+      </div>
+      <div style="margin-top:12px;display:flex;justify-content:flex-end">
+        <button class="btn-primary-af" onclick="guardarVariables()"><i class="bi bi-save me-1"></i>Guardar variables</button>
+      </div>
+    </div>
+
+    <!-- Tabla -->
+    <div class="card-af">
+      <h3><i class="bi bi-diagram-3-fill"></i>Parques y dealers</h3>
+      <div class="sub" id="mesesSub"></div>
+      <div class="tbl-wrap">
+        <table class="pt-table">
+          <thead><tr>
+            <th class="l">Parque / Dealer</th>
+            <th>Posiciones</th>
+            <th>Ventas mens.</th>
+            <th>Rotación ×pos</th>
+            <th>Ventas c/créd</th>
+            <th>% c/créd</th>
+            <th id="thM0"></th><th id="thM1"></th><th id="thM2"></th>
+            <th>Créd. prom</th>
+            <th>Ventas pot.</th>
+            <th>Potencial</th>
+            <th class="l">Diagnóstico</th>
+          </tr></thead>
+          <tbody id="tbody"><tr><td colspan="13" class="muted" style="text-align:center;padding:20px">Cargando…</td></tr></tbody>
+        </table>
+      </div>
+    </div>
+
+    <div class="afecta">
+      <h4><i class="bi bi-diagram-3"></i> Qué afecta este mantenedor</h4>
+      <ul>
+        <li><b>Posiciones / Ventas mensuales / Ventas con crédito</b> → datos manuales del dealer; alimentan el cálculo de potencial. Se guardan en la ficha del dealer (<a href="/mantenedores/dealers/">Dealers</a>).</li>
+        <li><b>Factor ventas potencial</b> → % de las ventas con crédito que AutoFácil podría capturar (ventas potencial = ventas con crédito × factor).</li>
+        <li><b>Rangos de diagnóstico</b> → el texto/color que se muestra según el valor del Potencial.</li>
+        <li><b>Créditos por mes</b> → automáticos, contados de <a href="/creditos">Gestión de Créditos</a> por RUT del dealer (últimos 3 meses cerrados).</li>
+      </ul>
+    </div>
+  </div>
+
+  <div class="toast-af" id="toast"></div>
+
+  <script src="/js/auth-guard.js"></script>
+  <script>
+    const token = sessionStorage.getItem('token');
+    if (!token) location.href = '/login.html';
+    const H = { 'Content-Type':'application/json', Authorization:'Bearer '+token };
+    let DATA = null, _rangos = [];
+    const esc = s => String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+    const fN  = n => (n==null||isNaN(n)) ? '—' : Math.round(n).toLocaleString('es-CL');
+    const f1  = n => (n==null||isNaN(n)) ? '—' : (Math.round(n*100)/100).toLocaleString('es-CL',{minimumFractionDigits:0,maximumFractionDigits:2});
+    const fPct= n => (n==null||isNaN(n)) ? '—' : Math.round(n*100)+'%';
+    const fPot= n => (n==null||isNaN(n)) ? '—' : (n>=0?'+':'')+Math.round(n*100)+'%';
+    function toast(m, ok=true){ const t=document.getElementById('toast'); t.textContent=m; t.style.background=ok?'#0f172a':'#b91c1c'; t.classList.add('show'); setTimeout(()=>t.classList.remove('show'),2400); }
+
+    async function cargar(){
+      try {
+        const r = await fetch('/api/dealer-potencial', { headers:H });
+        const j = await r.json();
+        if (!j.success) return toast(j.error||'Error', false);
+        DATA = j.data; _rangos = (j.data.rangos||[]).slice();
+        document.getElementById('vFactor').value = j.data.factor;
+        const ms = j.data.meses||[];
+        document.getElementById('thM0').textContent = ms[0]||'M-3';
+        document.getElementById('thM1').textContent = ms[1]||'M-2';
+        document.getElementById('thM2').textContent = ms[2]||'M-1';
+        document.getElementById('mesesSub').innerHTML = 'Créditos por mes: <b>'+ms.join(' · ')+'</b> (automáticos del sistema).';
+        renderRangos(); renderTabla();
+      } catch(_){ toast('Error de conexión', false); }
+    }
+
+    function renderRangos(){
+      document.getElementById('rangos').innerHTML = _rangos.map((r,i)=>`
+        <div class="rango-item">
+          <span style="font-size:.78rem;color:#64748b">potencial &lt;</span>
+          <input type="number" step="0.1" value="${r.max==null?'':r.max}" placeholder="∞" onchange="_rangos[${i}].max=this.value===''?null:Number(this.value)">
+          <input type="text" value="${esc(r.texto)}" onchange="_rangos[${i}].texto=this.value">
+          <input type="color" value="${/^#[0-9a-fA-F]{6}$/.test(r.color)?r.color:'#64748b'}" onchange="_rangos[${i}].color=this.value">
+          <button class="btn-ghost-af" onclick="_rangos.splice(${i},1);renderRangos()" title="Quitar"><i class="bi bi-x"></i></button>
+        </div>`).join('');
+    }
+    function addRango(){ _rangos.push({ max:null, texto:'Nuevo', color:'#64748b' }); renderRangos(); }
+
+    async function guardarVariables(){
+      const factor = parseFloat(document.getElementById('vFactor').value);
+      try {
+        const r = await fetch('/api/dealer-potencial/config', { method:'PUT', headers:H, body:JSON.stringify({ factor, rangos:_rangos }) });
+        const j = await r.json();
+        if (!j.success) return toast(j.error||'Error', false);
+        toast('Variables guardadas — recalculando…'); cargar();
+      } catch(_){ toast('Error de conexión', false); }
+    }
+
+    function diagBadge(texto, color){ return texto && texto!=='—' ? `<span class="diag" style="background:${esc(color)}">${esc(texto)}</span>` : '<span class="muted">—</span>'; }
+    function potCls(n){ return n==null?'':(n>=0?'pos':'neg'); }
+
+    function renderTabla(){
+      const tb = document.getElementById('tbody');
+      if (!DATA.parques.length){ tb.innerHTML='<tr><td colspan="13" class="muted" style="text-align:center;padding:20px">Sin dealers.</td></tr>'; return; }
+      let html = '';
+      DATA.parques.forEach((p, pi) => {
+        html += `<tr class="row-parque" onclick="toggleParque(${pi})">
+          <td class="l"><span class="caret" id="car${pi}">▶</span> ${esc(p.parque)} <span class="muted" style="font-weight:600">(${p.n_dealers})</span></td>
+          <td>${fN(p.posiciones)}</td><td>${fN(p.ventas_mensuales)}</td><td>${f1(p.rotacion)}</td>
+          <td>${fN(p.ventas_con_credito)}</td><td>${fPct(p.pct_credito)}</td>
+          <td>${fN(p.cred_meses[0])}</td><td>${fN(p.cred_meses[1])}</td><td>${fN(p.cred_meses[2])}</td>
+          <td>${f1(p.cred_prom)}</td><td>${fN(p.ventas_potencial)}</td>
+          <td class="num-strong ${potCls(p.potencial)}">${fPot(p.potencial)}</td>
+          <td class="l">${diagBadge(p.diagnostico,p.diag_color)}</td>
+        </tr>`;
+        p.dealers.forEach(d => {
+          html += `<tr class="row-dealer pq${pi}" style="display:none">
+            <td class="l" style="padding-left:28px">${esc(d.dealer)}</td>
+            <td><input class="inp-edit" type="number" value="${d.posiciones||''}" onchange="guardarDealer(${d.id_dealer},'posiciones',this.value)"></td>
+            <td><input class="inp-edit" type="number" value="${d.ventas_mensuales||''}" onchange="guardarDealer(${d.id_dealer},'ventas_mensuales',this.value)"></td>
+            <td>${f1(d.rotacion)}</td>
+            <td><input class="inp-edit" type="number" value="${d.ventas_con_credito||''}" onchange="guardarDealer(${d.id_dealer},'ventas_con_credito',this.value)"></td>
+            <td>${fPct(d.pct_credito)}</td>
+            <td>${fN(d.cred_meses[0])}</td><td>${fN(d.cred_meses[1])}</td><td>${fN(d.cred_meses[2])}</td>
+            <td>${f1(d.cred_prom)}</td><td>${fN(d.ventas_potencial)}</td>
+            <td class="num-strong ${potCls(d.potencial)}">${fPot(d.potencial)}</td>
+            <td class="l">${diagBadge(d.diagnostico,d.diag_color)}</td>
+          </tr>`;
+        });
+      });
+      tb.innerHTML = html;
+    }
+    function toggleParque(pi){
+      const open = document.getElementById('car'+pi).classList.toggle('open');
+      document.getElementById('car'+pi).textContent = open ? '▼' : '▶';
+      document.querySelectorAll('.pq'+pi).forEach(tr => tr.style.display = open ? '' : 'none');
+    }
+
+    let _saveT = {};
+    async function guardarDealer(id, campo, valor){
+      // junta los 3 valores actuales del row para mandar todo (el backend pisa los 3)
+      const find = () => { for (const p of DATA.parques){ const d=p.dealers.find(x=>x.id_dealer===id); if(d) return d; } return null; };
+      const d = find(); if (!d) return;
+      d[campo] = valor===''?null:Number(valor);
+      clearTimeout(_saveT[id]);
+      _saveT[id] = setTimeout(async () => {
+        try {
+          const r = await fetch('/api/dealer-potencial/'+id, { method:'PUT', headers:H,
+            body: JSON.stringify({ posiciones:d.posiciones, ventas_mensuales:d.ventas_mensuales, ventas_con_credito:d.ventas_con_credito }) });
+          const j = await r.json();
+          if (!j.success) return toast(j.error||'Error', false);
+          toast('Guardado — recalculando…'); cargar();
+        } catch(_){ toast('Error de conexión', false); }
+      }, 600);
+    }
+
+    cargar();
+  </script>
+  <script src="/js/topnav.js"></script>
+  <script src="/js/app-version.js"></script>
+</body>
+</html>

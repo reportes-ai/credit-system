@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <link rel="icon" href="/img/favicon.png" type="image/png">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Categorías de Dealers — AutoFácil</title>
+  <title>Categoría y Potencial Dealer — AutoFácil</title>
   <!-- v1.0 -->
   <link href="/css/bootstrap.min.css" rel="stylesheet">
   <link href="/css/bootstrap-icons.css" rel="stylesheet">
@@ -56,7 +56,7 @@
 <nav class="topnav">
   <div class="topnav-left">
     <a href="/" class="topnav-brand"><img src="/img/logo.png" alt="AutoFácil"><span class="version-badge" id="versionBadge"></span></a>
-    <div class="breadcrumb-nav"><a href="/">Inicio</a> › <a href="/mantenedores/">Mantenedores</a> › <span style="color:#fff;font-weight:600">Categorías de Dealers</span></div>
+    <div class="breadcrumb-nav"><a href="/">Inicio</a> › <a href="/mantenedores/">Mantenedores</a> › <span style="color:#fff;font-weight:600">Categoría y Potencial Dealer</span></div>
   </div>
   <div class="topnav-right">
     <span class="user-chip"><div class="avatar" id="avatarInicial">?</div>
@@ -74,6 +74,12 @@
       <h2>Programa de Segmentación de Dealers</h2>
       <p>Niveles, metas (unidades/mes) y beneficios. La meta define la categoría que el sistema propone según las ventas del mes pasado.</p>
     </div>
+  </div>
+
+  <!-- Pestañas: Categorías | Potencial Dealer -->
+  <div style="display:flex;gap:8px;border-bottom:2px solid #e2e8f0;margin-bottom:22px">
+    <button style="background:none;border:none;border-bottom:3px solid #0141A2;margin-bottom:-2px;padding:11px 22px;font-size:.92rem;font-weight:800;color:#0141A2;cursor:pointer"><i class="bi bi-award me-1"></i>Categorías</button>
+    <button onclick="location.href='/mantenedores/potencial-dealer/'" style="background:none;border:none;border-bottom:3px solid transparent;margin-bottom:-2px;padding:11px 22px;font-size:.92rem;font-weight:700;color:#64748b;cursor:pointer"><i class="bi bi-graph-up-arrow me-1"></i>Potencial Dealer</button>
   </div>
 
   <div class="cards" id="cards"></div>

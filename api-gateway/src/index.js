@@ -227,6 +227,8 @@ app.get(['/mantenedores/vehiculos', '/mantenedores/vehiculos/'], (req, res) =>
   res.sendFile(path.join(__dirname, '../public/mantenedores/vehiculos/index.html')));
 app.get(['/mantenedores/dealers', '/mantenedores/dealers/'], (req, res) =>
   res.sendFile(path.join(__dirname, '../public/mantenedores/dealers/index.html')));
+app.get(['/mantenedores/potencial-dealer', '/mantenedores/potencial-dealer/'], (req, res) =>
+  res.sendFile(path.join(__dirname, '../public/mantenedores/potencial-dealer/index.html')));
 app.get(['/mantenedores/respuestas-rapidas', '/mantenedores/respuestas-rapidas/'], (req, res) =>
   res.sendFile(path.join(__dirname, '../public/mantenedores/respuestas-rapidas/index.html')));
 app.get(['/mantenedores/dealernet-productos', '/mantenedores/dealernet-productos/'], (req, res) =>
