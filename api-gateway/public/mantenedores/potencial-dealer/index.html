@@ -71,8 +71,8 @@
 
   <div class="wrap">
     <div class="intro">
-      <h2><i class="bi bi-graph-up-arrow me-1"></i>Potencial Parque/Dealer</h2>
-      <p>Cuánto más podría crecer AutoFácil con cada dealer. Abre un parque para ver sus dealers. Edita Posiciones / Ventas / Ventas con crédito (se guardan al instante); los créditos salen del sistema. Potencial = ventas potencial ÷ créditos promedio − 1.</p>
+      <h2><i class="bi bi-sliders me-1"></i>Variables del Potencial Dealer</h2>
+      <p>Configura el <b>factor</b> y los <b>rangos de diagnóstico</b> que usa el cálculo de potencial. La tabla con los datos de cada dealer (editable) está en <a href="/mantenedores/dealers/" style="color:#fff;text-decoration:underline">Dealers → Potencial Parque/Dealer</a>. Potencial = ventas potencial ÷ créditos promedio − 1.</p>
     </div>
 
     <!-- Variables -->
@@ -95,29 +95,6 @@
       </div>
     </div>
 
-    <!-- Tabla -->
-    <div class="card-af">
-      <h3><i class="bi bi-diagram-3-fill"></i>Parques y dealers</h3>
-      <div class="sub" id="mesesSub"></div>
-      <div class="tbl-wrap">
-        <table class="pt-table">
-          <thead><tr>
-            <th class="l">Parque / Dealer</th>
-            <th>Posiciones</th>
-            <th>Ventas mens.</th>
-            <th>Rotación ×pos</th>
-            <th>Ventas c/créd</th>
-            <th>% c/créd</th>
-            <th id="thM0"></th><th id="thM1"></th><th id="thM2"></th>
-            <th>Créd. prom</th>
-            <th>Ventas pot.</th>
-            <th>Potencial</th>
-            <th class="l">Diagnóstico</th>
-          </tr></thead>
-          <tbody id="tbody"><tr><td colspan="13" class="muted" style="text-align:center;padding:20px">Cargando…</td></tr></tbody>
-        </table>
-      </div>
-    </div>
 
     <div class="afecta">
       <h4><i class="bi bi-diagram-3"></i> Qué afecta este mantenedor</h4>
@@ -150,14 +127,9 @@
         const r = await fetch('/api/dealer-potencial', { headers:H });
         const j = await r.json();
         if (!j.success) return toast(j.error||'Error', false);
-        DATA = j.data; _rangos = (j.data.rangos||[]).slice();
+        _rangos = (j.data.rangos||[]).slice();
         document.getElementById('vFactor').value = j.data.factor;
-        const ms = j.data.meses||[];
-        document.getElementById('thM0').textContent = ms[0]||'M-3';
-        document.getElementById('thM1').textContent = ms[1]||'M-2';
-        document.getElementById('thM2').textContent = ms[2]||'M-1';
-        document.getElementById('mesesSub').innerHTML = 'Créditos por mes: <b>'+ms.join(' · ')+'</b> (automáticos del sistema).';
-        renderRangos(); renderTabla();
+        renderRangos();
       } catch(_){ toast('Error de conexión', false); }
     }
 
