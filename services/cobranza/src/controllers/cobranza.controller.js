@@ -166,6 +166,7 @@ const CV = `LEAST(c.plazo,
 const MORA_SQL = (whereExtra = '', havingExtra = '') => `
   SELECT
     c.*,
+    c.id                                      AS id_credito,
     COALESCE(cl_m.rut,             '')    AS rut_cliente,
     COALESCE(cl_m.nombre_completo, '') AS nombre_cliente,
     COALESCE(pp.cnt, 0)                        AS cuotas_pagadas,
@@ -185,7 +186,7 @@ const MORA_SQL = (whereExtra = '', havingExtra = '') => `
     FROM pagos_credito
     WHERE estado_pago = 'PAGADO'
     GROUP BY id_credito
-  ) pp ON pp.id_credito = c.id_credito
+  ) pp ON pp.id_credito = c.id
   WHERE c.estado IN ('VIGENTE','EN MORA','OTORGADO')
     AND (c.financiera = 'AUTOFACIL' OR c.financiera IS NULL)
     AND c.plazo IS NOT NULL
@@ -201,6 +202,7 @@ const MORA_SQL = (whereExtra = '', havingExtra = '') => `
 const MORA_CREDITO_SQL = `
   SELECT
     c.*,
+    c.id                                      AS id_credito,
     COALESCE(pp.cnt, 0)                        AS cuotas_pagadas,
     GREATEST(0, ${CV} - COALESCE(pp.cnt, 0))   AS cuotas_mora,
     GREATEST(0, ${CV} - COALESCE(pp.cnt, 0)) * COALESCE(c.cuota, 0) AS monto_mora,
@@ -222,9 +224,9 @@ const MORA_CREDITO_SQL = `
     FROM pagos_credito
     WHERE id_credito = ? AND estado_pago = 'PAGADO'
     GROUP BY id_credito
-  ) pp ON pp.id_credito = c.id_credito
+  ) pp ON pp.id_credito = c.id
   LEFT JOIN clientes cl ON cl.id_cliente = c.id_cliente
-  WHERE c.id_credito = ?
+  WHERE c.id = ?
 `;
 
 // Formatea nombre en Title Case
@@ -634,7 +636,7 @@ exports.misGestiones = async (req, res) => {
              COALESCE(cl.nombre_completo,'') AS nombre_cliente,
              COALESCE(cl.rut,'') AS rut_cliente
       FROM cobranza_gestiones g
-      LEFT JOIN creditos c ON c.id_credito = g.id_credito
+      LEFT JOIN creditos c ON c.id = g.id_credito
       LEFT JOIN clientes cl ON cl.id_cliente = c.id_cliente
       WHERE g.id_usuario = ? AND g.resultado = 'PROMESA_PAGO'
         AND g.fecha_promesa IS NOT NULL AND g.fecha_promesa >= CURDATE()
@@ -645,7 +647,7 @@ exports.misGestiones = async (req, res) => {
       SELECT g.*, c.numero_credito,
              COALESCE(cl.nombre_completo,'') AS nombre_cliente
       FROM cobranza_gestiones g
-      LEFT JOIN creditos c ON c.id_credito = g.id_credito
+      LEFT JOIN creditos c ON c.id = g.id_credito
       LEFT JOIN clientes cl ON cl.id_cliente = c.id_cliente
       WHERE g.id_usuario = ? AND g.resultado = 'PROMESA_PAGO'
         AND g.fecha_promesa IS NOT NULL AND g.fecha_promesa < CURDATE()

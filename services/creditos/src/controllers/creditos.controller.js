@@ -277,6 +277,32 @@ const create = async (req, res) => {
   }
 };
 
+// ESTADO de cartera en VIVO para el listado (mismo cálculo de días que Cobranza):
+// usa cuotas_pagadas + fecha_primera_cuota + plazo. Respeta cierres manuales del
+// motor (CASTIGADO/PREPAGADO/TERMINADO). Devuelve el estado o el original si no aplica.
+function carteraLiveRow(row, um) {
+  if (!row.estado_cartera) return row.estado_cartera;          // brokerage / no-cartera → sin cambio
+  const stored = String(row.estado_cartera).toUpperCase();
+  if (['CASTIGADO', 'PREPAGADO', 'TERMINADO'].includes(stored)) return row.estado_cartera;
+  const plazo = parseInt(row.plazo, 10) || 0;
+  if (!plazo || !row.fecha_primera_cuota) return row.estado_cartera;
+  const fp = row.fecha_primera_cuota instanceof Date
+    ? row.fecha_primera_cuota
+    : new Date(String(row.fecha_primera_cuota).slice(0, 10) + 'T00:00:00Z');
+  const fpY = fp.getUTCFullYear(), fpM = fp.getUTCMonth(), fpD = fp.getUTCDate();
+  const now = new Date();
+  const nY = now.getUTCFullYear(), nM = now.getUTCMonth(), nD = now.getUTCDate();
+  const meses = (nY - fpY) * 12 + (nM - fpM) + (nD >= fpD ? 1 : 0);
+  const CV = Math.min(plazo, Math.max(0, meses));              // cuotas vencidas
+  const pagadas = parseInt(row.cuotas_pagadas, 10) || 0;
+  if (CV - pagadas <= 0) return 'VIGENTE';                     // al día
+  const due = Date.UTC(fpY, fpM + pagadas, fpD);               // venc. cuota impaga más antigua
+  const dias = Math.max(0, Math.floor((Date.UTC(nY, nM, nD) - due) / 86400000));
+  if (dias >= um.vencido) return 'VENCIDO';
+  if (dias >= um.mora) return 'MORA';
+  return 'VIGENTE';
+}
+
 /* ─── GET ALL ────────────────────────────────────────────────────────────── */
 const getAll = async (req, res) => {
   try {
@@ -391,6 +417,15 @@ const getAll = async (req, res) => {
 
     const sql = SELECT_GESTION + whereData + ` ORDER BY ${orderBy} LIMIT ? OFFSET ?`;
     const [rows] = await pool.query(sql, [...paramsData, limitNum, offset]);
+
+    // ESTADO de cartera EN VIVO (no depende de cuándo corrió el motor): recalcula
+    // por días de atraso con los umbrales del mantenedor. Solo afecta a propios.
+    try {
+      const [ump] = await pool.query('SELECT clave, valor FROM cartera_parametros');
+      const UM = {}; ump.forEach(u => { UM[u.clave] = parseInt(u.valor, 10); });
+      const um = { mora: Number.isFinite(UM.mora_desde) ? UM.mora_desde : 1, vencido: Number.isFinite(UM.vencido_desde) ? UM.vencido_desde : 91 };
+      rows.forEach(r => { r.estado_cartera = carteraLiveRow(r, um); });
+    } catch (_) { /* deja el valor del SELECT */ }
 
     res.json({
       success: true,
