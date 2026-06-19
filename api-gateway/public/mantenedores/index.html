@@ -180,14 +180,14 @@
         if (SOLO_DIOS.has(seg) || DEALERNET.has(seg)) return null;
         if (placement[seg] && placement[seg] !== 'mantenedores') return null;
         if (asignadasFuera.has(seg)) return null;
-        return { id: seg || f.codigo, href: f.href, icon: f.icono || 'bi-grid', titulo: f.nombre, desc: DESCS[seg] || '' };
+        return { id: seg || f.codigo, href: f.href, icon: f.icono || 'bi-grid', titulo: f.nombre, desc: DESCS[seg] || (typeof PLACEMENT_DESCS !== 'undefined' && PLACEMENT_DESCS[seg]) || '' };
       }).filter(Boolean);
 
       // Extras: sub-items de otras secciones movidos aquí via placement
       const nativeIds = new Set(nativeItems.map(i => i.id));
       const extrasSubitem = Object.entries(PLACEMENT_ITEMS || {})
         .filter(([k, v]) => !nativeIds.has(k) && placement[k] === 'mantenedores')
-        .map(([k, v]) => ({ id: k, href: v.href, icon: v.icon, titulo: v.titulo, desc: v.desc || '' }));
+        .map(([k, v]) => ({ id: k, href: v.href, icon: v.icon, titulo: v.titulo, desc: DESCS[k] || (typeof PLACEMENT_DESCS !== 'undefined' && PLACEMENT_DESCS[k]) || v.desc || '' }));
 
       // Extras: módulos BD movidos aquí (formato viejo: placement[ruta] === 'mantenedores')
       const extrasMods = modsBD
