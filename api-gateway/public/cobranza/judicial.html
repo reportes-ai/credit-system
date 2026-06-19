@@ -438,6 +438,25 @@ function renderAcciones() {
   if (m) {
     html += `<hr style="margin:12px 0">
       <div style="font-size:0.82rem;font-weight:700;color:#64748b;text-transform:uppercase;margin-bottom:10px">Gestiones Remotas</div>
+      <!-- Contacto registrado del cliente (editable + guardable) -->
+      <div style="background:#f8fafc;border:1.5px solid #e2e8f0;border-radius:10px;padding:10px 12px;margin-bottom:12px">
+        <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px">
+          <i class="bi bi-telephone-fill" style="color:#0141A2;flex-shrink:0"></i>
+          <input id="ctTelefono" type="tel" value="${(m.telefono || '').replace(/"/g,'&quot;')}" placeholder="+56 9 XXXX XXXX"
+            style="flex:1;border:1px solid #d1d5db;border-radius:7px;padding:5px 10px;font-size:.9rem;font-weight:700;color:#111827;min-width:0;outline:none">
+          <button onclick="copiarVal('ctTelefono')" title="Copiar" style="background:#e2e8f0;border:none;border-radius:7px;padding:5px 9px;cursor:pointer;color:#374151"><i class="bi bi-clipboard"></i></button>
+        </div>
+        <div style="display:flex;align-items:center;gap:8px">
+          <i class="bi bi-envelope-fill" style="color:#0891b2;flex-shrink:0"></i>
+          <input id="ctEmail" type="email" value="${(m.emailCliente || '').replace(/"/g,'&quot;')}" placeholder="correo@ejemplo.cl"
+            style="flex:1;border:1px solid #d1d5db;border-radius:7px;padding:5px 10px;font-size:.9rem;font-weight:700;color:#111827;min-width:0;outline:none">
+          <button onclick="copiarVal('ctEmail')" title="Copiar" style="background:#e2e8f0;border:none;border-radius:7px;padding:5px 9px;cursor:pointer;color:#374151"><i class="bi bi-clipboard"></i></button>
+        </div>
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-top:8px">
+          <span id="ctMsg" style="font-size:.72rem;font-weight:600"></span>
+          <button onclick="guardarContacto()" style="background:#0141A2;color:#fff;border:none;border-radius:7px;padding:5px 12px;font-size:.78rem;font-weight:700;cursor:pointer"><i class="bi bi-save me-1"></i>Guardar contacto</button>
+        </div>
+      </div>
       <div class="d-flex flex-wrap gap-2 mb-3">
         <button class="btn-action btn-whatsapp" onclick="mostrarMensaje('whatsapp')" ${!puedeRemota?'disabled':''}><i class="bi bi-whatsapp"></i>WhatsApp</button>
         <button class="btn-action btn-sms" onclick="mostrarMensaje('sms')" ${!puedeRemota?'disabled':''}><i class="bi bi-chat-text-fill"></i>SMS</button>
@@ -455,6 +474,34 @@ function renderAcciones() {
   }
 
   document.getElementById('accionesContent').innerHTML = html;
+}
+
+function copiarVal(id) {
+  const val = document.getElementById(id)?.value || '';
+  if (!val) return;
+  navigator.clipboard.writeText(val);
+  const btn = event.currentTarget, old = btn.innerHTML;
+  btn.innerHTML = '<i class="bi bi-check2"></i>';
+  setTimeout(() => btn.innerHTML = old, 1500);
+}
+
+async function guardarContacto() {
+  if (!creditoActual) return;
+  const telefono = (document.getElementById('ctTelefono')?.value || '').trim();
+  const email    = (document.getElementById('ctEmail')?.value || '').trim();
+  const msg = document.getElementById('ctMsg');
+  try {
+    const r = await fetch(`/api/cobranza/contacto/${creditoActual.id_credito}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token },
+      body: JSON.stringify({ telefono, email }),
+    });
+    const j = await r.json();
+    if (!j.success) { msg.style.color = '#dc2626'; msg.textContent = j.error || 'Error'; return; }
+    if (mensajesActual) { mensajesActual.telefono = telefono; mensajesActual.emailCliente = email; }
+    msg.style.color = '#16a34a'; msg.textContent = '✓ Contacto guardado';
+    setTimeout(() => { msg.textContent = ''; }, 2500);
+  } catch (e) { msg.style.color = '#dc2626'; msg.textContent = 'Error de conexión'; }
 }
 
 function mostrarMensaje(tipo) {

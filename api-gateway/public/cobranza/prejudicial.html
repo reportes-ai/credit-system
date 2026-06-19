@@ -563,22 +563,26 @@ function renderAcciones() {
   // Remotas
   const puedeRemota = !d || (d.puede_remota && d.dias_para_proxima_remota === 0);
   if (m) {
-    const telRaw = (m.telefono || '').replace(/\D/g, '').replace(/^0/, '');
-    const tel56  = telRaw.startsWith('56') ? telRaw : (telRaw ? '56' + telRaw : '');
     html += `<hr style="margin:12px 0">
       <div style="font-size:0.82rem;font-weight:700;color:#64748b;text-transform:uppercase;margin-bottom:10px">Gestiones Remotas ${!puedeRemota && d ? '<span style="color:#f59e0b">(No disponible)</span>' : ''}</div>
-      <!-- Campo destino (teléfono o email según canal) -->
-      <div id="campoDestino" style="display:flex;align-items:center;gap:8px;margin-bottom:12px;background:#f8fafc;border:1.5px solid #e2e8f0;border-radius:10px;padding:8px 12px">
-        <i id="iconoDestino" class="bi bi-telephone-fill" style="color:#0141A2;font-size:1rem;flex-shrink:0"></i>
-        <span id="labelDestino" style="font-size:.78rem;color:#64748b;font-weight:600;white-space:nowrap">Celular destino</span>
-        <input id="inputDestino" type="tel" value="${m.telefono || ''}"
-          data-tel="${m.telefono || ''}" data-email="${m.emailCliente || ''}"
-          style="flex:1;border:1px solid #d1d5db;border-radius:7px;padding:4px 10px;font-size:.9rem;font-weight:700;color:#111827;outline:none;min-width:0"
-          placeholder="+56 9 XXXX XXXX">
-        <button onclick="copiarDestino()" title="Copiar"
-          style="background:#e2e8f0;border:none;border-radius:7px;padding:4px 10px;cursor:pointer;font-size:.82rem;color:#374151;white-space:nowrap">
-          <i class="bi bi-clipboard"></i>
-        </button>
+      <!-- Contacto registrado del cliente (editable + guardable) -->
+      <div style="background:#f8fafc;border:1.5px solid #e2e8f0;border-radius:10px;padding:10px 12px;margin-bottom:12px">
+        <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px">
+          <i class="bi bi-telephone-fill" style="color:#0141A2;flex-shrink:0"></i>
+          <input id="ctTelefono" type="tel" value="${(m.telefono || '').replace(/"/g,'&quot;')}" placeholder="+56 9 XXXX XXXX"
+            style="flex:1;border:1px solid #d1d5db;border-radius:7px;padding:5px 10px;font-size:.9rem;font-weight:700;color:#111827;min-width:0;outline:none">
+          <button onclick="copiarVal('ctTelefono')" title="Copiar" style="background:#e2e8f0;border:none;border-radius:7px;padding:5px 9px;cursor:pointer;color:#374151"><i class="bi bi-clipboard"></i></button>
+        </div>
+        <div style="display:flex;align-items:center;gap:8px">
+          <i class="bi bi-envelope-fill" style="color:#0891b2;flex-shrink:0"></i>
+          <input id="ctEmail" type="email" value="${(m.emailCliente || '').replace(/"/g,'&quot;')}" placeholder="correo@ejemplo.cl"
+            style="flex:1;border:1px solid #d1d5db;border-radius:7px;padding:5px 10px;font-size:.9rem;font-weight:700;color:#111827;min-width:0;outline:none">
+          <button onclick="copiarVal('ctEmail')" title="Copiar" style="background:#e2e8f0;border:none;border-radius:7px;padding:5px 9px;cursor:pointer;color:#374151"><i class="bi bi-clipboard"></i></button>
+        </div>
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-top:8px">
+          <span id="ctMsg" style="font-size:.72rem;font-weight:600"></span>
+          <button onclick="guardarContacto()" style="background:#0141A2;color:#fff;border:none;border-radius:7px;padding:5px 12px;font-size:.78rem;font-weight:700;cursor:pointer"><i class="bi bi-save me-1"></i>Guardar contacto</button>
+        </div>
       </div>
       <!-- Botones canal -->
       <div class="d-flex flex-wrap gap-2 mb-3">
@@ -605,47 +609,38 @@ function renderAcciones() {
 
 let tipoMensajeActual = '';
 
-function copiarDestino() {
-  const val = document.getElementById('inputDestino')?.value || '';
+function copiarVal(id) {
+  const val = document.getElementById(id)?.value || '';
   if (!val) return;
   navigator.clipboard.writeText(val);
-  const btn = event.currentTarget;
+  const btn = event.currentTarget, old = btn.innerHTML;
   btn.innerHTML = '<i class="bi bi-check2"></i>';
-  setTimeout(() => btn.innerHTML = '<i class="bi bi-clipboard"></i>', 1800);
+  setTimeout(() => btn.innerHTML = old, 1500);
 }
 
-function _setModoDestino(tipo) {
-  const inp   = document.getElementById('inputDestino');
-  const icon  = document.getElementById('iconoDestino');
-  const label = document.getElementById('labelDestino');
-  if (!inp) return;
-  if (tipo === 'email') {
-    inp.type        = 'email';
-    inp.placeholder = 'correo@ejemplo.cl';
-    inp.value       = inp.dataset.email || '';
-    icon.className  = 'bi bi-envelope-fill';
-    icon.style.color= '#0891b2';
-    label.textContent = 'Email destino';
-  } else {
-    inp.type        = 'tel';
-    inp.placeholder = '+56 9 XXXX XXXX';
-    inp.value       = inp.dataset.tel || '';
-    icon.className  = 'bi bi-telephone-fill';
-    icon.style.color= '#0141A2';
-    label.textContent = 'Celular destino';
-  }
-  // guardar el valor actual al cambiar de modo
-  inp.oninput = () => {
-    if (inp.type === 'email') inp.dataset.email = inp.value;
-    else                      inp.dataset.tel   = inp.value;
-  };
+async function guardarContacto() {
+  if (!creditoActual) return;
+  const telefono = (document.getElementById('ctTelefono')?.value || '').trim();
+  const email    = (document.getElementById('ctEmail')?.value || '').trim();
+  const msg = document.getElementById('ctMsg');
+  try {
+    const r = await fetch(`/api/cobranza/contacto/${creditoActual.id_credito}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token },
+      body: JSON.stringify({ telefono, email }),
+    });
+    const j = await r.json();
+    if (!j.success) { msg.style.color = '#dc2626'; msg.textContent = j.error || 'Error'; return; }
+    if (mensajesActual) { mensajesActual.telefono = telefono; mensajesActual.emailCliente = email; }
+    msg.style.color = '#16a34a'; msg.textContent = '✓ Contacto guardado';
+    setTimeout(() => { msg.textContent = ''; }, 2500);
+  } catch (e) { msg.style.color = '#dc2626'; msg.textContent = 'Error de conexión'; }
 }
 
 function mostrarMensaje(tipo) {
   tipoMensajeActual = tipo;
   const m = mensajesActual;
   if (!m) return;
-  _setModoDestino(tipo);
   let txt = '';
   if (tipo === 'whatsapp') txt = m.whatsapp;
   else if (tipo === 'sms')  txt = m.sms;

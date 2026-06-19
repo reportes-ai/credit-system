@@ -518,6 +518,22 @@ exports.mensajes = async (req, res) => {
   }
 };
 
+// ─── guardarContacto ──────────────────────────────────────────────────────────
+// Actualiza el teléfono móvil y/o el email registrados del cliente del crédito,
+// desde el panel de cobranza (para gestionar WhatsApp/SMS/Email).
+exports.guardarContacto = async (req, res) => {
+  try {
+    const { id_credito } = req.params;
+    let telefono = (req.body.telefono || '').trim() || null;
+    let email    = (req.body.email || '').trim() || null;
+    if (email && !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) return fail(res, 'Email inválido', 400);
+    const [[cr]] = await pool.query('SELECT id_cliente FROM creditos WHERE id = ? LIMIT 1', [id_credito]);
+    if (!cr || !cr.id_cliente) return fail(res, 'Crédito o cliente no encontrado', 404);
+    await pool.query('UPDATE clientes SET telefono_movil = ?, email = ? WHERE id_cliente = ?', [telefono, email, cr.id_cliente]);
+    ok(res, { telefono, email });
+  } catch (err) { fail(res, err.message, 500); }
+};
+
 // ─── crearGestion ─────────────────────────────────────────────────────────────
 exports.crearGestion = async (req, res) => {
   try {
