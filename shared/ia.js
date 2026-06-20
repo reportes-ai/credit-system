@@ -30,6 +30,21 @@ const DEFAULT_PRECIOS = {
   'claude-fable-5':    { nombre: 'Claude Fable 5',    in: 10, out: 50 },
 };
 
+// Catálogo de análisis con IA (roadmap) + modelo recomendado por defecto (editable
+// en el mantenedor). Criterio: extracción/clasificación/resumen → Haiku (barato);
+// análisis/redacción/interpretación → Sonnet; dictamen/cruce crítico → Opus.
+const CATALOGO = [
+  { codigo: 'liq_sueldo',             nombre: 'Análisis de liquidaciones de sueldo',     descripcion: 'Extrae líquido/imponible, AFP/Isapre y los cruza con la renta declarada', modelo: 'claude-haiku-4-5' },
+  { codigo: 'informe_crediticio',     nombre: 'Análisis de informe crediticio (DICOM)',  descripcion: 'Resume deudas, morosidades y nivel de riesgo',                            modelo: 'claude-sonnet-4-6' },
+  { codigo: 'carpeta_tributaria',     nombre: 'Análisis de carpeta tributaria (SII)',    descripcion: 'Extrae rentas e IVA y valida consistencia (documento largo)',             modelo: 'claude-sonnet-4-6' },
+  { codigo: 'declaracion_f22',        nombre: 'Análisis de declaración de impuestos (F22)', descripcion: 'Extrae rentas y datos clave del Formulario 22',                         modelo: 'claude-haiku-4-5' },
+  { codigo: 'firmas',                 nombre: 'Revisión de firmas',                       descripcion: 'Compara firmas y marca diferencias o documentos alterados (no es verificación forense)', modelo: 'claude-sonnet-4-6' },
+  { codigo: 'cobranza_copiloto',      nombre: 'Copiloto de cobranza',                     descripcion: 'Prioriza cartera, redacta la gestión/carta y clasifica el resultado',     modelo: 'claude-sonnet-4-6' },
+  { codigo: 'crm_resumen',            nombre: 'Resumen de gestiones CRM',                 descripcion: 'Resume hilos largos y extrae compromisos de pago',                        modelo: 'claude-haiku-4-5' },
+  { codigo: 'carga_validador',        nombre: 'Validador inteligente de carga masiva',    descripcion: 'Detecta anomalías en el Excel antes de insertar (RUT, montos, dealer, fechas)', modelo: 'claude-haiku-4-5' },
+  { codigo: 'evaluacion_consistencia', nombre: 'Evaluación de consistencia / scoring',    descripcion: 'Cruza todos los documentos del cliente y entrega alertas y scoring asistido', modelo: 'claude-opus-4-8' },
+];
+
 (async () => {
   try {
     await pool.query(`CREATE TABLE IF NOT EXISTS ia_config (
@@ -38,7 +53,9 @@ const DEFAULT_PRECIOS = {
       codigo      VARCHAR(60)  PRIMARY KEY,
       nombre      VARCHAR(160) NOT NULL,
       descripcion VARCHAR(400) NULL,
+      modelo      VARCHAR(60)  NULL,
       activa      TINYINT      NOT NULL DEFAULT 0,
+      disponible  TINYINT      NOT NULL DEFAULT 0,
       creado      DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP )`);
     await pool.query(`CREATE TABLE IF NOT EXISTS ia_modelos (
       modelo     VARCHAR(60)  PRIMARY KEY,
@@ -61,6 +78,14 @@ const DEFAULT_PRECIOS = {
       await pool.query('INSERT IGNORE INTO ia_config (clave, valor) VALUES (?,?)', [k, v]);
     for (const [m, p] of Object.entries(DEFAULT_PRECIOS))
       await pool.query('INSERT IGNORE INTO ia_modelos (modelo, nombre, precio_in, precio_out) VALUES (?,?,?,?)', [m, p.nombre, p.in, p.out]);
+    // Columnas nuevas en BD existentes (TiDB soporta IF NOT EXISTS; 1060 = ya existe)
+    for (const col of ['ADD COLUMN IF NOT EXISTS modelo VARCHAR(60) NULL', 'ADD COLUMN IF NOT EXISTS disponible TINYINT NOT NULL DEFAULT 0']) {
+      try { await pool.query('ALTER TABLE ia_funcionalidades ' + col); } catch (e) { if (e.errno !== 1060) console.error('[ia alter]', e.message); }
+    }
+    // Roadmap de análisis con su modelo recomendado. INSERT IGNORE → no pisa lo que el admin ya ajustó.
+    for (const f of CATALOGO)
+      await pool.query('INSERT IGNORE INTO ia_funcionalidades (codigo, nombre, descripcion, modelo, activa, disponible) VALUES (?,?,?,?,0,0)',
+        [f.codigo, f.nombre, f.descripcion, f.modelo]);
   } catch (e) { if (e.errno !== 1050) console.error('[ia migration]', e.message); }
 })();
 
@@ -76,8 +101,13 @@ async function getConfig(force = false) {
   } catch (_) {}
   let funcs = [];
   try {
-    const [fr] = await pool.query('SELECT codigo, nombre, descripcion, activa FROM ia_funcionalidades ORDER BY nombre');
-    funcs = fr.map(f => ({ codigo: f.codigo, nombre: f.nombre, descripcion: f.descripcion || '', activa: f.activa === 1 }));
+    const [fr] = await pool.query('SELECT codigo, nombre, descripcion, modelo, activa, disponible FROM ia_funcionalidades ORDER BY disponible DESC, nombre');
+    funcs = fr.map(f => ({ codigo: f.codigo, nombre: f.nombre, descripcion: f.descripcion || '', modelo: f.modelo || '', activa: f.activa === 1, disponible: f.disponible === 1 }));
+  } catch (_) {}
+  let modelos = [];
+  try {
+    const [mr] = await pool.query('SELECT modelo, nombre FROM ia_modelos WHERE activo = 1 ORDER BY precio_in');
+    modelos = mr.map(m => ({ modelo: m.modelo, nombre: m.nombre }));
   } catch (_) {}
   _cache = {
     activa:           cfg.activa === '1',
@@ -85,6 +115,7 @@ async function getConfig(force = false) {
     texto_analizado:  cfg.texto_analizado  || DEFAULTS.texto_analizado,
     mostrar_logo:     cfg.mostrar_logo !== '0',
     funcionalidades:  funcs,
+    modelos:          modelos,
   };
   _cacheAt = Date.now();
   return _cache;
@@ -101,14 +132,22 @@ async function iaActiva(codigo) {
   return !!(f && f.activa);
 }
 
-/** Auto-registro idempotente de una funcionalidad de IA (arranca DESACTIVADA). */
-async function registrarFuncionalidad({ codigo, nombre, descripcion }) {
+/** Modelo configurado para una funcionalidad (fallback Haiku, el más barato). */
+async function modeloDe(codigo) {
+  const cfg = await getConfig();
+  const f = cfg.funcionalidades.find(x => x.codigo === codigo);
+  return (f && f.modelo) || 'claude-haiku-4-5';
+}
+
+/** Auto-registro idempotente de una funcionalidad de IA (arranca DESACTIVADA).
+    Al registrarse marca disponible=1; conserva el modelo/activa elegidos por el admin. */
+async function registrarFuncionalidad({ codigo, nombre, descripcion, modelo }) {
   if (!codigo || !nombre) return;
   try {
     await pool.query(
-      `INSERT INTO ia_funcionalidades (codigo, nombre, descripcion, activa) VALUES (?,?,?,0)
-       ON DUPLICATE KEY UPDATE nombre = VALUES(nombre), descripcion = VALUES(descripcion)`,
-      [codigo, nombre, descripcion || null]);
+      `INSERT INTO ia_funcionalidades (codigo, nombre, descripcion, modelo, activa, disponible) VALUES (?,?,?,?,0,1)
+       ON DUPLICATE KEY UPDATE nombre = VALUES(nombre), descripcion = VALUES(descripcion), disponible = 1`,
+      [codigo, nombre, descripcion || null, modelo || null]);
     invalidar();
   } catch (e) { console.error('[ia registrar]', e.message); }
 }
@@ -124,7 +163,8 @@ async function setConfig({ activa, texto_analizando, texto_analizado, mostrar_lo
   if (Array.isArray(funcionalidades)) {
     for (const f of funcionalidades) {
       if (!f || !f.codigo) continue;
-      await pool.query('UPDATE ia_funcionalidades SET activa = ? WHERE codigo = ?', [f.activa ? 1 : 0, f.codigo]);
+      if (f.modelo) await pool.query('UPDATE ia_funcionalidades SET activa = ?, modelo = ? WHERE codigo = ?', [f.activa ? 1 : 0, f.modelo, f.codigo]);
+      else          await pool.query('UPDATE ia_funcionalidades SET activa = ? WHERE codigo = ?', [f.activa ? 1 : 0, f.codigo]);
     }
   }
   invalidar();
@@ -211,4 +251,4 @@ async function getUso({ dias = 90 } = {}) {
   };
 }
 
-module.exports = { getConfig, setConfig, iaActiva, registrarFuncionalidad, invalidar, precioModelo, registrarUso, getUso };
+module.exports = { getConfig, setConfig, iaActiva, modeloDe, registrarFuncionalidad, invalidar, precioModelo, registrarUso, getUso };

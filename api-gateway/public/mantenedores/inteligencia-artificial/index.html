@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Inteligencia Artificial — AutoFácil</title>
-  <!-- v1.1 -->
+  <!-- v1.2 -->
   <link href="/css/bootstrap-icons.css" rel="stylesheet">
   <style>
     :root { --navy:#012d70; --blue:#0141A2; --coral:#D97757; }
@@ -37,6 +37,9 @@
     .feat .tx { flex:1; }
     .feat .tx b { font-size:.88rem; color:#0f172a; display:block; }
     .feat .tx span { font-size:.78rem; color:#64748b; }
+    .msel { border:1.5px solid #d1d5db; border-radius:8px; padding:6px 8px; font-size:.78rem; color:#334155; background:#fff; max-width:170px; }
+    .msel:focus { outline:none; border-color:var(--blue); }
+    .badge-soon { font-size:.6rem; font-weight:800; text-transform:uppercase; letter-spacing:.04em; color:#9a4a2c; background:#fdf3ee; border:1px solid #f2d3c4; border-radius:999px; padding:2px 7px; vertical-align:middle; }
     .vacio { text-align:center; color:#94a3b8; font-size:.85rem; padding:18px; }
     .vacio i { font-size:1.8rem; display:block; margin-bottom:8px; color:#cbd5e1; }
     .preview { background:#f8fafc; border:1px dashed #d1d5db; border-radius:10px; padding:16px; display:flex; align-items:center; gap:12px; flex-wrap:wrap; }
@@ -110,7 +113,7 @@
     <!-- Funcionalidades -->
     <div class="card-af">
       <h3><i class="bi bi-grid-3x3-gap"></i>Funcionalidades con IA</h3>
-      <div class="sub">Cada función de IA se registra sola cuando se desarrolla y aparece aquí para prenderla o apagarla.</div>
+      <div class="sub">Catálogo de análisis con IA. Elige el <b>modelo</b> de cada uno (viene con el recomendado); las marcadas «Próximamente» se activan cuando se desarrollen.</div>
       <div id="listaFeats"></div>
     </div>
 
@@ -145,6 +148,7 @@
       <ul>
         <li><b>Interruptor maestro</b> → habilita/inhabilita TODA la IA del sistema. Apagado, ninguna función de IA llama a Anthropic ni gasta saldo.</li>
         <li><b>Funcionalidades con IA</b> → prende o apaga cada análisis por separado (ej. liquidaciones, informe crediticio, carpeta tributaria). Cada una se registra sola al desarrollarse.</li>
+        <li><b>Modelo por funcionalidad</b> → qué modelo de Anthropic usa cada análisis (más barato como Haiku vs más capaz como Opus). Viene con el recomendado; el costo se refleja en la pestaña <b>Uso IA</b>.</li>
         <li><b>Mostrar logo</b> → si el aviso y el sello incluyen el logo de Anthropic.</li>
         <li><b>Texto mientras analiza</b> → el aviso animado que aparece en la pantalla durante el análisis.</li>
         <li><b>Texto del sello</b> → la marca "Analizado con IA de Anthropic" que se estampa en el resultado o informe.</li>
@@ -172,7 +176,7 @@
     const esc = s => String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
     const DEF_ANDO = 'Analizando con Inteligencia Artificial de Anthropic…';
     const DEF_ADO  = 'Analizado con Inteligencia Artificial de Anthropic';
-    let FEATS = [];
+    let FEATS = [], MODELOS = [];
     function toast(m, ok=true){ const t=document.getElementById('toast'); t.textContent=m; t.style.background=ok?'#0f172a':'#b91c1c'; t.classList.add('show'); setTimeout(()=>t.classList.remove('show'),2400); }
 
     async function cargar(){
@@ -182,6 +186,7 @@
       document.getElementById('txtAnalizando').value = c.texto_analizando || DEF_ANDO;
       document.getElementById('txtAnalizado').value  = c.texto_analizado  || DEF_ADO;
       FEATS = c.funcionalidades || [];
+      MODELOS = c.modelos || [];
       renderFeats(); onMaster(); renderPrev();
     }
 
@@ -193,8 +198,12 @@
       }
       cont.innerHTML = FEATS.map((f,i) => `
         <div class="feat">
-          <div class="tx"><b>${esc(f.nombre)}</b><span>${esc(f.descripcion||'')}</span></div>
-          <label class="switch"><input type="checkbox" data-i="${i}" ${f.activa?'checked':''}><span class="slider"></span></label>
+          <div class="tx"><b>${esc(f.nombre)}${ f.disponible ? '' : ' <span class="badge-soon">Próximamente</span>' }</b><span>${esc(f.descripcion||'')}</span></div>
+          <select class="msel" data-i="${i}" title="Modelo de IA para esta funcionalidad">
+            ${ MODELOS.map(m => `<option value="${esc(m.modelo)}" ${m.modelo===f.modelo?'selected':''}>${esc(m.nombre)}</option>`).join('') }
+          </select>
+          <label class="switch" title="${ f.disponible ? '' : 'Se activa cuando se desarrolle' }">
+            <input type="checkbox" data-i="${i}" ${f.activa?'checked':''} ${f.disponible?'':'disabled'}><span class="slider"></span></label>
         </div>`).join('');
     }
 
@@ -223,8 +232,11 @@
         mostrar_logo:     document.getElementById('swLogo').checked,
         texto_analizando: document.getElementById('txtAnalizando').value,
         texto_analizado:  document.getElementById('txtAnalizado').value,
-        funcionalidades:  [...document.querySelectorAll('#listaFeats input[type=checkbox]')]
-                            .map(ch => ({ codigo: FEATS[+ch.dataset.i].codigo, activa: ch.checked })),
+        funcionalidades:  FEATS.map((f,i) => {
+          const cb  = document.querySelector('#listaFeats input[type=checkbox][data-i="'+i+'"]');
+          const sel = document.querySelector('#listaFeats select.msel[data-i="'+i+'"]');
+          return { codigo: f.codigo, activa: cb ? cb.checked : f.activa, modelo: sel ? sel.value : f.modelo };
+        }),
       };
       try {
         const r = await fetch('/api/ia-config', { method:'PUT', headers:H, body:JSON.stringify(body) });
