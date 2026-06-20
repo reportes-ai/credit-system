@@ -84,6 +84,7 @@ app.use('/api/dealers',         require('../../services/mantenedores/src/routes/
 app.use('/api/dealer-potencial', require('../../services/mantenedores/src/routes/dealer-potencial.routes'));
 app.use('/api/mantenimiento',    require('../../services/mantenedores/src/routes/mantenimiento.routes'));
 app.use('/api/ia-config',        require('../../services/mantenedores/src/routes/ia-config.routes'));
+app.use('/api/ia',               require('../../services/ia/src/routes/ia.routes'));
 app.use('/api/dealer-incorporacion', require('../../services/dealers-incorporacion/src/routes/fichas.routes'));
 app.use('/api/dealer-categorias',    require('../../services/mantenedores/src/routes/dealer-categorias.routes'));
 app.use('/api/parametros-credito', require('../../services/mantenedores/src/routes/parametros.routes'));
@@ -235,6 +236,8 @@ app.get(['/mantenedores/mantencion-sistema', '/mantenedores/mantencion-sistema/'
   res.sendFile(path.join(__dirname, '../public/mantenedores/mantencion-sistema/index.html')));
 app.get(['/mantenedores/inteligencia-artificial', '/mantenedores/inteligencia-artificial/'], (req, res) =>
   res.sendFile(path.join(__dirname, '../public/mantenedores/inteligencia-artificial/index.html')));
+app.get(['/ia/liquidaciones', '/ia/liquidaciones/'], (req, res) =>
+  res.sendFile(path.join(__dirname, '../public/ia/liquidaciones/index.html')));
 app.get(['/mantenedores/respuestas-rapidas', '/mantenedores/respuestas-rapidas/'], (req, res) =>
   res.sendFile(path.join(__dirname, '../public/mantenedores/respuestas-rapidas/index.html')));
 app.get(['/mantenedores/dealernet-productos', '/mantenedores/dealernet-productos/'], (req, res) =>
