@@ -111,7 +111,7 @@
 
     /* ── Timbre "Asistido por IA de Anthropic" — se estampa al cargar ── */
     .af-stamp {
-      position: absolute; right: 8px; bottom: 10px; width: 122px; height: 122px;
+      position: absolute; left: 10px; bottom: 12px; width: 118px; height: 118px;
       pointer-events: none; z-index: 6; opacity: 0; mix-blend-mode: multiply;
       transform-origin: center; transform: rotate(-12deg) scale(2.5);
       animation: afStampIn 0.55s cubic-bezier(0.2,0.75,0.3,1) 0.55s forwards;
@@ -207,18 +207,17 @@
           <path id="afArcTop" d="M 30 100 A 70 70 0 0 1 170 100"/>
           <path id="afArcBot" d="M 32 102 A 68 68 0 0 0 168 102"/>
         </defs>
-        <g filter="url(#afStampRough)" fill="#D97757" font-family="'Segoe UI',Arial,sans-serif">
-          <circle cx="100" cy="100" r="92" fill="none" stroke="#D97757" stroke-width="4.5"/>
-          <circle cx="100" cy="100" r="80" fill="none" stroke="#D97757" stroke-width="2"/>
+        <g filter="url(#afStampRough)" fill="#111111" font-family="'Segoe UI',Arial,sans-serif">
+          <circle cx="100" cy="100" r="92" fill="none" stroke="#111111" stroke-width="4.5"/>
+          <circle cx="100" cy="100" r="80" fill="none" stroke="#111111" stroke-width="2"/>
           <text font-weight="800" font-size="15" letter-spacing="3" text-anchor="middle">
             <textPath href="#afArcTop" xlink:href="#afArcTop" startOffset="50%">ASISTIDO POR</textPath>
           </text>
           <text font-weight="800" font-size="12.5" letter-spacing="2" text-anchor="middle">
             <textPath href="#afArcBot" xlink:href="#afArcBot" startOffset="50%">★ ANTHROPIC ★</textPath>
           </text>
-          <text x="100" y="70" font-size="19" text-anchor="middle">✦</text>
-          <text x="100" y="122" font-weight="900" font-size="50" letter-spacing="2" text-anchor="middle">IA</text>
-          <text x="100" y="140" font-weight="700" font-size="8.5" letter-spacing="3.5" text-anchor="middle">ASSISTED</text>
+          <text x="100" y="74" font-size="20" text-anchor="middle">✦</text>
+          <text x="100" y="120" font-weight="900" font-size="50" letter-spacing="2" text-anchor="middle">IA</text>
         </g>
       </svg>
     </div>
