@@ -137,6 +137,7 @@ const PLACEMENT_DESCS = {
   'cobranza-parametros':'Tramos de mora, provisiones y parámetros de cobranza', 'preferencia-financiera':'Orden de preferencia de financieras',
   'respuestas-rapidas':'Respuestas predefinidas del chat de atención', 'alertas-saldos':'Alertas por saldos de precio pendientes',
   'dealernet':'Productos y costos de la integración DealerNet',
+  'inteligencia-artificial':'Activa la IA (Anthropic) y prende cada análisis por separado',
   // Carga Masiva
   'cm-cargar':'Carga masiva de operaciones (Excel)', 'cm-trinidad':'Carga de archivos Trinidad', 'cm-eq-estados':'Equivalencias de estados Trinidad',
   'cm-eq-ejecs':'Equivalencia de ejecutivos', 'cm-historial':'Historial de cargas masivas',

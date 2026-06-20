@@ -1,0 +1,204 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Inteligencia Artificial — AutoFácil</title>
+  <!-- v1.0 -->
+  <link href="/css/bootstrap-icons.css" rel="stylesheet">
+  <style>
+    :root { --navy:#012d70; --blue:#0141A2; --coral:#D97757; }
+    body { background:#f0f4f8; font-family:'Segoe UI',system-ui,sans-serif; color:#1f2937; margin:0; }
+    .wrap { max-width:920px; margin:0 auto; padding:20px 16px 80px; }
+    .intro { background:linear-gradient(135deg,#7c3aed,#0141A2 70%,#0255c5); color:#fff; border-radius:14px; padding:18px 22px; margin-bottom:18px; }
+    .intro h2 { font-size:1.1rem; font-weight:800; margin:0 0 4px; display:flex; align-items:center; gap:8px; }
+    .intro p { margin:0; font-size:.85rem; opacity:.92; line-height:1.5; }
+    .card-af { background:#fff; border-radius:14px; box-shadow:0 1px 4px rgba(0,0,0,.06); padding:18px 20px; margin-bottom:18px; }
+    .card-af h3 { font-size:.95rem; font-weight:800; color:var(--navy); margin:0 0 4px; display:flex; align-items:center; gap:8px; }
+    .card-af .sub { font-size:.78rem; color:#64748b; margin:0 0 14px; }
+    .sw-row { display:flex; align-items:center; gap:14px; padding:8px 0; }
+    .switch { position:relative; width:54px; height:30px; flex-shrink:0; }
+    .switch input { opacity:0; width:0; height:0; }
+    .slider { position:absolute; inset:0; background:#cbd5e1; border-radius:30px; cursor:pointer; transition:.2s; }
+    .slider::before { content:''; position:absolute; width:22px; height:22px; left:4px; top:4px; background:#fff; border-radius:50%; transition:.2s; box-shadow:0 1px 3px rgba(0,0,0,.3); }
+    .switch input:checked + .slider { background:#16a34a; }
+    .switch input:checked + .slider::before { transform:translateX(24px); }
+    .sw-estado { font-weight:800; font-size:.95rem; }
+    .sw-estado.on { color:#16a34a; } .sw-estado.off { color:#94a3b8; }
+    label.lbl { font-size:.74rem; font-weight:700; color:#374151; display:block; margin-bottom:6px; }
+    input.txt { width:100%; box-sizing:border-box; border:1.5px solid #d1d5db; border-radius:9px; padding:10px 12px; font-size:.92rem; }
+    input.txt:focus { outline:none; border-color:var(--blue); box-shadow:0 0 0 2px rgba(1,65,162,.12); }
+    .btn-primary-af { background:var(--blue); color:#fff; border:none; border-radius:9px; padding:9px 18px; font-size:.88rem; font-weight:700; cursor:pointer; }
+    .btn-primary-af:hover { background:#0255c5; }
+    .btn-ghost { background:#f1f5f9; color:#334155; border:none; border-radius:9px; padding:8px 14px; font-size:.83rem; font-weight:700; cursor:pointer; }
+    .btn-ghost:hover { background:#e2e8f0; }
+    .feat { display:flex; align-items:center; gap:14px; padding:12px 0; border-top:1px solid #f1f5f9; }
+    .feat:first-of-type { border-top:none; }
+    .feat .tx { flex:1; }
+    .feat .tx b { font-size:.88rem; color:#0f172a; display:block; }
+    .feat .tx span { font-size:.78rem; color:#64748b; }
+    .vacio { text-align:center; color:#94a3b8; font-size:.85rem; padding:18px; }
+    .vacio i { font-size:1.8rem; display:block; margin-bottom:8px; color:#cbd5e1; }
+    .preview { background:#f8fafc; border:1px dashed #d1d5db; border-radius:10px; padding:16px; display:flex; align-items:center; gap:12px; flex-wrap:wrap; }
+    .afecta { background:#f8fafc; border-left:4px solid var(--blue); border-radius:8px; padding:14px 18px; margin-top:14px; }
+    .afecta h4 { font-size:.85rem; font-weight:800; color:var(--navy); margin:0 0 8px; }
+    .afecta ul { margin:0; padding-left:18px; font-size:.8rem; color:#475569; line-height:1.7; }
+    .afecta a { color:var(--blue); }
+    .toast-af { position:fixed; bottom:20px; left:50%; transform:translateX(-50%); background:#0f172a; color:#fff; padding:11px 20px; border-radius:10px; font-size:.85rem; opacity:0; transition:.3s; z-index:9999; }
+    .toast-af.show { opacity:1; }
+    .nota { background:#eff6ff; border-radius:8px; padding:10px 14px; font-size:.8rem; color:#1e3a5f; line-height:1.5; }
+  </style>
+</head>
+<body>
+  <div id="af-topnav"></div>
+  <script>
+    window.AF_TOPNAV = {
+      breadcrumb: [
+        { label:'Inicio', href:'/' },
+        { label:'Mantenedores', href:'/mantenedores' },
+        { label:'Inteligencia Artificial', icon:'bi-robot', current:true }
+      ]
+    };
+  </script>
+
+  <div class="wrap">
+    <div class="intro">
+      <h2><i class="bi bi-robot"></i>Inteligencia Artificial</h2>
+      <p>Activa o desactiva la IA (Anthropic) en todo el sistema, prende cada funcionalidad por separado y ajusta los textos del aviso. Todo paramétrico, sin tocar código.</p>
+    </div>
+
+    <!-- Interruptor maestro -->
+    <div class="card-af">
+      <h3><i class="bi bi-toggle-on"></i>Interruptor maestro</h3>
+      <div class="sub">Si está apagado, ninguna funcionalidad de IA opera, aunque esté prendida individualmente.</div>
+      <div class="sw-row">
+        <label class="switch"><input type="checkbox" id="swActiva" onchange="onMaster()"><span class="slider"></span></label>
+        <span class="sw-estado off" id="txtActiva">Desactivada</span>
+      </div>
+    </div>
+
+    <!-- Funcionalidades -->
+    <div class="card-af">
+      <h3><i class="bi bi-grid-3x3-gap"></i>Funcionalidades con IA</h3>
+      <div class="sub">Cada función de IA se registra sola cuando se desarrolla y aparece aquí para prenderla o apagarla.</div>
+      <div id="listaFeats"></div>
+    </div>
+
+    <!-- Branding -->
+    <div class="card-af">
+      <h3><i class="bi bi-stars"></i>Aviso y sello "con IA de Anthropic"</h3>
+      <div class="sub">Textos que ve el usuario mientras la IA trabaja y en el resultado. Se muestran con el logo de Anthropic.</div>
+
+      <div class="sw-row" style="margin-bottom:6px">
+        <label class="switch"><input type="checkbox" id="swLogo"><span class="slider"></span></label>
+        <span style="font-size:.85rem;color:#334155;font-weight:600">Mostrar el logo de Anthropic</span>
+      </div>
+
+      <label class="lbl" style="margin-top:10px">Texto mientras analiza</label>
+      <input class="txt" id="txtAnalizando" maxlength="200" oninput="renderPrev()" placeholder="Analizando con Inteligencia Artificial de Anthropic…">
+
+      <label class="lbl" style="margin-top:14px">Texto del sello en el resultado / informe</label>
+      <input class="txt" id="txtAnalizado" maxlength="200" oninput="renderPrev()" placeholder="Analizado con Inteligencia Artificial de Anthropic">
+
+      <label class="lbl" style="margin-top:16px">Vista previa del sello</label>
+      <div class="preview"><div id="prevBadge"></div>
+        <button class="btn-ghost" type="button" onclick="verAviso()"><i class="bi bi-eye me-1"></i>Ver el aviso animado</button>
+      </div>
+
+      <div style="margin-top:16px;display:flex;justify-content:flex-end">
+        <button class="btn-primary-af" onclick="guardar()"><i class="bi bi-save me-1"></i>Guardar</button>
+      </div>
+    </div>
+
+    <div class="afecta">
+      <h4><i class="bi bi-diagram-3"></i> Qué afecta este mantenedor</h4>
+      <ul>
+        <li><b>Interruptor maestro</b> → habilita/inhabilita TODA la IA del sistema. Apagado, ninguna función de IA llama a Anthropic ni gasta saldo.</li>
+        <li><b>Funcionalidades con IA</b> → prende o apaga cada análisis por separado (ej. liquidaciones, informe crediticio, carpeta tributaria). Cada una se registra sola al desarrollarse.</li>
+        <li><b>Mostrar logo</b> → si el aviso y el sello incluyen el logo de Anthropic.</li>
+        <li><b>Texto mientras analiza</b> → el aviso animado que aparece en la pantalla durante el análisis.</li>
+        <li><b>Texto del sello</b> → la marca "Analizado con IA de Anthropic" que se estampa en el resultado o informe.</li>
+      </ul>
+    </div>
+  </div>
+
+  <div class="toast-af" id="toast"></div>
+
+  <script src="/js/auth-guard.js"></script>
+  <script src="/js/ia-branding.js"></script>
+  <script>
+    const token = sessionStorage.getItem('token');
+    if (!token) location.href = '/login.html';
+    const H = { 'Content-Type':'application/json', Authorization:'Bearer '+token };
+    const esc = s => String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+    const DEF_ANDO = 'Analizando con Inteligencia Artificial de Anthropic…';
+    const DEF_ADO  = 'Analizado con Inteligencia Artificial de Anthropic';
+    let FEATS = [];
+    function toast(m, ok=true){ const t=document.getElementById('toast'); t.textContent=m; t.style.background=ok?'#0f172a':'#b91c1c'; t.classList.add('show'); setTimeout(()=>t.classList.remove('show'),2400); }
+
+    async function cargar(){
+      const c = await AF_IA.config(true);
+      document.getElementById('swActiva').checked = !!c.activa;
+      document.getElementById('swLogo').checked   = c.mostrar_logo !== false;
+      document.getElementById('txtAnalizando').value = c.texto_analizando || DEF_ANDO;
+      document.getElementById('txtAnalizado').value  = c.texto_analizado  || DEF_ADO;
+      FEATS = c.funcionalidades || [];
+      renderFeats(); onMaster(); renderPrev();
+    }
+
+    function renderFeats(){
+      const cont = document.getElementById('listaFeats');
+      if (!FEATS.length) {
+        cont.innerHTML = `<div class="vacio"><i class="bi bi-robot"></i>Todavía no hay funcionalidades de IA. Aparecerán aquí en cuanto se desarrolle la primera.</div>`;
+        return;
+      }
+      cont.innerHTML = FEATS.map((f,i) => `
+        <div class="feat">
+          <div class="tx"><b>${esc(f.nombre)}</b><span>${esc(f.descripcion||'')}</span></div>
+          <label class="switch"><input type="checkbox" data-i="${i}" ${f.activa?'checked':''}><span class="slider"></span></label>
+        </div>`).join('');
+    }
+
+    function onMaster(){
+      const on = document.getElementById('swActiva').checked;
+      const t = document.getElementById('txtActiva');
+      t.textContent = on ? 'ACTIVADA' : 'Desactivada';
+      t.className = 'sw-estado ' + (on ? 'on' : 'off');
+    }
+    function renderPrev(){
+      const texto = document.getElementById('txtAnalizado').value.trim() || DEF_ADO;
+      const logo  = document.getElementById('swLogo').checked;
+      document.getElementById('prevBadge').innerHTML = AF_IA.badge({ texto, logo });
+    }
+    document.getElementById('swLogo').addEventListener('change', renderPrev);
+
+    function verAviso(){
+      const texto = document.getElementById('txtAnalizando').value.trim() || DEF_ANDO;
+      const h = AF_IA.analizando(texto);
+      setTimeout(() => h.cerrar(), 2600);
+    }
+
+    async function guardar(){
+      const body = {
+        activa:           document.getElementById('swActiva').checked,
+        mostrar_logo:     document.getElementById('swLogo').checked,
+        texto_analizando: document.getElementById('txtAnalizando').value,
+        texto_analizado:  document.getElementById('txtAnalizado').value,
+        funcionalidades:  [...document.querySelectorAll('#listaFeats input[type=checkbox]')]
+                            .map(ch => ({ codigo: FEATS[+ch.dataset.i].codigo, activa: ch.checked })),
+      };
+      try {
+        const r = await fetch('/api/ia-config', { method:'PUT', headers:H, body:JSON.stringify(body) });
+        const j = await r.json();
+        if (!j.success) return toast(j.error||'Error al guardar', false);
+        await AF_IA.config(true);
+        toast('Configuración de IA guardada');
+      } catch(_){ toast('Error de conexión', false); }
+    }
+
+    cargar();
+  </script>
+  <script src="/js/topnav.js"></script>
+  <script src="/js/app-version.js"></script>
+</body>
+</html>

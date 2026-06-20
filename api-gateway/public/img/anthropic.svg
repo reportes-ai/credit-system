@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Lockup de atribución "Anthropic". Reemplazable por el asset oficial
+     (anthropic.com/brand) manteniendo este nombre de archivo: /img/anthropic.svg -->
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 560 110" role="img" aria-label="Anthropic">
+  <rect x="6" y="15" width="80" height="80" rx="18" fill="#D97757"/>
+  <text x="46" y="77" text-anchor="middle" font-family="'Segoe UI',Helvetica,Arial,sans-serif" font-size="56" font-weight="700" fill="#ffffff">A</text>
+  <text x="108" y="78" font-family="'Segoe UI',Helvetica,Arial,sans-serif" font-size="56" font-weight="600" letter-spacing="-1.5" fill="#181818">Anthropic</text>
+</svg>
