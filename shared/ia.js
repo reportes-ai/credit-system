@@ -35,7 +35,7 @@ const DEFAULT_PRECIOS = {
 // análisis/redacción/interpretación → Sonnet; dictamen/cruce crítico → Opus.
 const CATALOGO = [
   { codigo: 'liq_sueldo',             nombre: 'Análisis de liquidaciones de sueldo',     descripcion: 'Extrae líquido/imponible, AFP/Isapre y los cruza con la renta declarada', modelo: 'claude-haiku-4-5' },
-  { codigo: 'informe_crediticio',     nombre: 'Análisis de informe crediticio (DICOM)',  descripcion: 'Resume deudas, morosidades y nivel de riesgo',                            modelo: 'claude-sonnet-4-6' },
+  { codigo: 'informe_crediticio',     nombre: 'Análisis de informe crediticio (DealerNet)', descripcion: 'Analiza los antecedentes que trae DealerNet (deudas, morosidades) y resume el nivel de riesgo', modelo: 'claude-sonnet-4-6' },
   { codigo: 'carpeta_tributaria',     nombre: 'Análisis de carpeta tributaria (SII)',    descripcion: 'Extrae rentas e IVA y valida consistencia (documento largo)',             modelo: 'claude-sonnet-4-6' },
   { codigo: 'declaracion_f22',        nombre: 'Análisis de declaración de impuestos (F22)', descripcion: 'Extrae rentas y datos clave del Formulario 22',                         modelo: 'claude-haiku-4-5' },
   { codigo: 'firmas',                 nombre: 'Revisión de firmas',                       descripcion: 'Compara firmas y marca diferencias o documentos alterados (no es verificación forense)', modelo: 'claude-sonnet-4-6' },
@@ -82,9 +82,11 @@ const CATALOGO = [
     for (const col of ['ADD COLUMN IF NOT EXISTS modelo VARCHAR(60) NULL', 'ADD COLUMN IF NOT EXISTS disponible TINYINT NOT NULL DEFAULT 0']) {
       try { await pool.query('ALTER TABLE ia_funcionalidades ' + col); } catch (e) { if (e.errno !== 1060) console.error('[ia alter]', e.message); }
     }
-    // Roadmap de análisis con su modelo recomendado. INSERT IGNORE → no pisa lo que el admin ya ajustó.
+    // Roadmap de análisis. Mantiene nombre/descripción al día; respeta el modelo/activa que el admin eligió.
     for (const f of CATALOGO)
-      await pool.query('INSERT IGNORE INTO ia_funcionalidades (codigo, nombre, descripcion, modelo, activa, disponible) VALUES (?,?,?,?,0,0)',
+      await pool.query(
+        `INSERT INTO ia_funcionalidades (codigo, nombre, descripcion, modelo, activa, disponible) VALUES (?,?,?,?,0,0)
+         ON DUPLICATE KEY UPDATE nombre = VALUES(nombre), descripcion = VALUES(descripcion)`,
         [f.codigo, f.nombre, f.descripcion, f.modelo]);
   } catch (e) { if (e.errno !== 1050) console.error('[ia migration]', e.message); }
 })();
