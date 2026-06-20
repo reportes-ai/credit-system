@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Inteligencia Artificial — AutoFácil</title>
-  <!-- v1.0 -->
+  <!-- v1.1 -->
   <link href="/css/bootstrap-icons.css" rel="stylesheet">
   <style>
     :root { --navy:#012d70; --blue:#0141A2; --coral:#D97757; }
@@ -47,6 +47,29 @@
     .toast-af { position:fixed; bottom:20px; left:50%; transform:translateX(-50%); background:#0f172a; color:#fff; padding:11px 20px; border-radius:10px; font-size:.85rem; opacity:0; transition:.3s; z-index:9999; }
     .toast-af.show { opacity:1; }
     .nota { background:#eff6ff; border-radius:8px; padding:10px 14px; font-size:.8rem; color:#1e3a5f; line-height:1.5; }
+    /* Pestañas */
+    .tabs { display:flex; gap:6px; margin-bottom:16px; }
+    .tab { background:#fff; border:1px solid #e2e8f0; border-radius:10px 10px 0 0; padding:9px 18px; font-size:.88rem; font-weight:700; color:#64748b; cursor:pointer; }
+    .tab.active { color:var(--blue); box-shadow:0 -2px 0 var(--blue) inset; }
+    /* Uso IA */
+    .ucards { display:grid; grid-template-columns:repeat(3,1fr); gap:14px; margin-bottom:18px; }
+    .ucard { background:#fff; border-radius:14px; box-shadow:0 1px 4px rgba(0,0,0,.06); padding:16px 18px; border-top:4px solid var(--blue); }
+    .ucard-h { font-size:.78rem; color:#64748b; font-weight:700; }
+    .ucard-cost { font-size:1.7rem; font-weight:800; color:var(--navy); margin:4px 0 2px; }
+    .ucard-sub { font-size:.74rem; color:#94a3b8; }
+    .uso-head { display:flex; align-items:center; justify-content:space-between; gap:10px; flex-wrap:wrap; }
+    .uso-head h3 { margin:0; }
+    .ventana { font-size:.78rem; color:#64748b; display:flex; align-items:center; gap:6px; }
+    .vbtn { border:1px solid #d1d5db; background:#fff; border-radius:7px; padding:4px 10px; font-size:.78rem; font-weight:700; cursor:pointer; color:#475569; }
+    .vbtn.on { background:var(--blue); color:#fff; border-color:var(--blue); }
+    .utab { width:100%; border-collapse:collapse; font-size:.84rem; margin-top:10px; }
+    .utab th { text-align:left; font-size:.7rem; text-transform:uppercase; letter-spacing:.04em; color:#94a3b8; border-bottom:2px solid #eef2f7; padding:8px 10px; }
+    .utab td { padding:8px 10px; border-bottom:1px solid #f3f4f6; color:#334155; }
+    .utab td.r, .utab th.r { text-align:right; }
+    .utab tr.tot td { font-weight:800; color:var(--navy); border-top:2px solid #e2e8f0; background:#f8fafc; }
+    .vacio2 { text-align:center; color:#94a3b8; padding:16px; }
+    .uso-refresh { background:#f1f5f9; border:none; border-radius:8px; padding:6px 12px; font-size:.8rem; font-weight:700; color:#334155; cursor:pointer; }
+    @media (max-width:640px){ .ucards { grid-template-columns:1fr; } }
   </style>
 </head>
 <body>
@@ -66,6 +89,13 @@
       <h2><i class="bi bi-robot"></i>Inteligencia Artificial</h2>
       <p>Activa o desactiva la IA (Anthropic) en todo el sistema, prende cada funcionalidad por separado y ajusta los textos del aviso. Todo paramétrico, sin tocar código.</p>
     </div>
+
+    <div class="tabs">
+      <button class="tab active" data-tab="config"><i class="bi bi-sliders me-1"></i>Configuración</button>
+      <button class="tab" data-tab="uso"><i class="bi bi-graph-up me-1"></i>Uso IA</button>
+    </div>
+
+    <div id="tab-config">
 
     <!-- Interruptor maestro -->
     <div class="card-af">
@@ -119,6 +149,15 @@
         <li><b>Texto mientras analiza</b> → el aviso animado que aparece en la pantalla durante el análisis.</li>
         <li><b>Texto del sello</b> → la marca "Analizado con IA de Anthropic" que se estampa en el resultado o informe.</li>
       </ul>
+    </div>
+    </div><!-- /tab-config -->
+
+    <div id="tab-uso" style="display:none">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;gap:10px;flex-wrap:wrap">
+        <div style="font-size:.8rem;color:#64748b">Consumo de IA (Anthropic). Se actualiza al recargar y cada 30 s.</div>
+        <button class="uso-refresh" onclick="renderUso()"><i class="bi bi-arrow-clockwise me-1"></i>Actualizar</button>
+      </div>
+      <div id="usoBody"><div class="vacio"><i class="bi bi-graph-up"></i>Cargando…</div></div>
     </div>
   </div>
 
@@ -194,6 +233,63 @@
         await AF_IA.config(true);
         toast('Configuración de IA guardada');
       } catch(_){ toast('Error de conexión', false); }
+    }
+
+    /* ── Pestañas ── */
+    let _usoTimer = null, _usoDias = 90;
+    function showTab(t){
+      document.querySelectorAll('.tab').forEach(b => b.classList.toggle('active', b.dataset.tab === t));
+      document.getElementById('tab-config').style.display = (t==='config') ? '' : 'none';
+      document.getElementById('tab-uso').style.display    = (t==='uso')    ? '' : 'none';
+      if (t==='uso'){ renderUso(); if(!_usoTimer) _usoTimer = setInterval(renderUso, 30000); }
+      else if (_usoTimer){ clearInterval(_usoTimer); _usoTimer = null; }
+    }
+    document.querySelectorAll('.tab').forEach(b => b.addEventListener('click', () => showTab(b.dataset.tab)));
+
+    /* ── Uso IA ── */
+    const fmtTok = n => (Number(n)||0).toLocaleString('es-CL');
+    const fmtUSD = n => { n = Number(n)||0; const dec = (Math.abs(n) < 1 && n !== 0) ? 4 : 2; return '$' + n.toLocaleString('en-US',{ minimumFractionDigits:dec, maximumFractionDigits:dec }); };
+
+    async function renderUso(){
+      let j;
+      try { const r = await fetch('/api/ia-config/uso?dias='+_usoDias, { headers:H }); j = await r.json(); }
+      catch(_){ return; }
+      const cont = document.getElementById('usoBody');
+      if (!j.success){ cont.innerHTML = '<div class="vacio">No se pudo cargar el uso.</div>'; return; }
+      const d = j.data, hay = d.total.llamadas > 0;
+      const cards = [['30',d.ventanas.d30],['60',d.ventanas.d60],['90',d.ventanas.d90]].map(([dd,v]) => `
+        <div class="ucard"><div class="ucard-h">Últimos ${dd} días</div>
+          <div class="ucard-cost">${fmtUSD(v.costo)}</div>
+          <div class="ucard-sub">${fmtTok(v.tokens)} tokens · ${fmtTok(v.llamadas)} llamadas</div></div>`).join('');
+      const rowsF = d.por_funcionalidad.length ? d.por_funcionalidad.map(f => `
+        <tr><td>${esc(f.nombre)}</td><td class="r">${fmtTok(f.llamadas)}</td><td class="r">${fmtTok(f.tokens_in)}</td><td class="r">${fmtTok(f.tokens_out)}</td><td class="r">${fmtUSD(f.costo)}</td></tr>`).join('')
+        : '<tr><td colspan="5" class="vacio2">Sin uso en el período</td></tr>';
+      const rowsM = d.por_modelo.length ? d.por_modelo.map(m => `
+        <tr><td>${esc(m.nombre)}</td><td class="r">${fmtTok(m.llamadas)}</td><td class="r">${fmtTok(m.tokens_in)}</td><td class="r">${fmtTok(m.tokens_out)}</td><td class="r">${fmtUSD(m.costo)}</td></tr>`).join('')
+        : '<tr><td colspan="5" class="vacio2">Sin uso en el período</td></tr>';
+      const totRow = `<tr class="tot"><td>Total</td><td class="r">${fmtTok(d.total.llamadas)}</td><td class="r">${fmtTok(d.total.tokens_in)}</td><td class="r">${fmtTok(d.total.tokens_out)}</td><td class="r">${fmtUSD(d.total.costo)}</td></tr>`;
+      const precios = d.precios.map(p => `<tr><td>${esc(p.nombre)}</td><td class="r">${fmtUSD(p.precio_in)}</td><td class="r">${fmtUSD(p.precio_out)}</td></tr>`).join('');
+      const venBtns = [30,60,90].map(x => `<button class="vbtn ${x===d.dias?'on':''}" data-d="${x}">${x} días</button>`).join('');
+      cont.innerHTML = `
+        <div class="ucards">${cards}</div>
+        ${ !hay ? '<div class="card-af"><div class="vacio"><i class="bi bi-robot"></i>Aún no hay consumo registrado. Esta pestaña se llena sola cuando se use la IA.</div></div>' : '' }
+        <div class="card-af">
+          <div class="uso-head"><h3><i class="bi bi-grid-3x3-gap"></i>Por funcionalidad</h3>
+            <div class="ventana">Ventana: ${venBtns}</div></div>
+          <table class="utab"><thead><tr><th>Funcionalidad</th><th class="r">Llamadas</th><th class="r">Tokens entrada</th><th class="r">Tokens salida</th><th class="r">Costo USD</th></tr></thead>
+            <tbody>${rowsF}${totRow}</tbody></table>
+        </div>
+        <div class="card-af">
+          <h3><i class="bi bi-cpu"></i>Por modelo <span style="font-weight:600;color:#94a3b8;font-size:.8rem">· últimos ${d.dias} días</span></h3>
+          <table class="utab"><thead><tr><th>Modelo</th><th class="r">Llamadas</th><th class="r">Tokens entrada</th><th class="r">Tokens salida</th><th class="r">Costo USD</th></tr></thead>
+            <tbody>${rowsM}${totRow}</tbody></table>
+        </div>
+        <div class="card-af">
+          <h3><i class="bi bi-tags"></i>Precios vigentes <span style="font-weight:600;color:#94a3b8;font-size:.8rem">· USD por 1M tokens</span></h3>
+          <table class="utab"><thead><tr><th>Modelo</th><th class="r">Entrada</th><th class="r">Salida</th></tr></thead><tbody>${precios}</tbody></table>
+          <div class="nota" style="margin-top:10px">El costo se calcula y se guarda en cada llamada con el precio vigente; el histórico no cambia si luego varían los precios.</div>
+        </div>`;
+      cont.querySelectorAll('.vbtn').forEach(b => b.addEventListener('click', () => { _usoDias = +b.dataset.d; renderUso(); }));
     }
 
     cargar();

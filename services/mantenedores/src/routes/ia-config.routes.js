@@ -4,6 +4,7 @@ const { verifyToken } = require('../../../../shared/middleware/auth');
 const { requireFunc } = require('../../../../shared/middleware/permisos');
 const C = require('../controllers/ia-config.controller');
 
+router.get('/uso', verifyToken, requireFunc('mant_ia'), C.getUso);  // métricas de consumo (Admin / con permiso)
 router.get('/', verifyToken, C.getConfig);                         // lo lee el branding (cualquier usuario)
 router.put('/', verifyToken, requireFunc('mant_ia'), C.setConfig); // editar — Admin / con permiso
 

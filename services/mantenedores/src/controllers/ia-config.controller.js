@@ -45,4 +45,10 @@ const setConfig = async (req, res) => {
   } catch (e) { console.error('[ia-config setConfig]', e.message); res.status(500).json({ success: false, data: null, error: 'Error interno del servidor' }); }
 };
 
-module.exports = { getConfig, setConfig };
+/* GET /api/ia-config/uso?dias=30|60|90 → métricas de consumo (gate requireFunc('mant_ia')) */
+const getUso = async (req, res) => {
+  try { res.json({ success: true, data: await ia.getUso({ dias: req.query.dias }), error: null }); }
+  catch (e) { console.error('[ia-config getUso]', e.message); res.status(500).json({ success: false, data: null, error: 'Error interno del servidor' }); }
+};
+
+module.exports = { getConfig, setConfig, getUso };
