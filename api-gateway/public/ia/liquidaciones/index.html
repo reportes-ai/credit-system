@@ -4,88 +4,112 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Análisis de Liquidaciones (IA) — AutoFácil</title>
-  <!-- v1.1 -->
+  <!-- v2.0 -->
   <link href="/css/bootstrap-icons.css" rel="stylesheet">
   <style>
     :root { --navy:#012d70; --blue:#0141A2; --coral:#D97757; }
     body { background:#f0f4f8; font-family:'Segoe UI',system-ui,sans-serif; color:#1f2937; margin:0; }
-    .wrap { max-width:880px; margin:0 auto; padding:20px 16px 80px; }
+    .wrap { max-width:920px; margin:0 auto; padding:20px 16px 80px; }
     .intro { background:linear-gradient(135deg,#7c3aed,#0141A2 70%,#0255c5); color:#fff; border-radius:14px; padding:18px 22px; margin-bottom:18px; }
     .intro h2 { font-size:1.1rem; font-weight:800; margin:0 0 4px; display:flex; align-items:center; gap:8px; }
     .intro p { margin:0; font-size:.85rem; opacity:.92; line-height:1.5; }
     .card-af { background:#fff; border-radius:14px; box-shadow:0 1px 4px rgba(0,0,0,.06); padding:20px; margin-bottom:18px; }
-    .drop { border:2px dashed #cbd5e1; border-radius:12px; padding:30px 20px; text-align:center; cursor:pointer; transition:.15s; }
+    .reglas { font-size:.78rem; color:#64748b; line-height:1.6; margin:0 0 14px; }
+    .reglas b { color:#334155; }
+    .drop { border:2px dashed #cbd5e1; border-radius:12px; padding:26px 20px; text-align:center; cursor:pointer; transition:.15s; }
     .drop:hover, .drop.over { border-color:var(--blue); background:#f8fbff; }
-    .drop i { font-size:2.2rem; color:var(--blue); display:block; margin-bottom:8px; }
-    .drop b { color:var(--navy); }
-    .drop small { color:#94a3b8; display:block; margin-top:4px; }
-    .file-row { display:flex; align-items:center; gap:10px; margin-top:14px; font-size:.85rem; color:#334155; }
-    .file-row .bi { color:var(--blue); }
-    .btn-af { background:var(--blue); color:#fff; border:none; border-radius:9px; padding:11px 22px; font-size:.92rem; font-weight:700; cursor:pointer; margin-top:16px; }
+    .drop i { font-size:2rem; color:var(--blue); display:block; margin-bottom:6px; }
+    .drop b { color:var(--navy); } .drop small { color:#94a3b8; display:block; margin-top:4px; }
+    .flist { margin-top:12px; display:flex; flex-direction:column; gap:6px; }
+    .frow { display:flex; align-items:center; gap:10px; font-size:.84rem; color:#334155; background:#f8fafc; border-radius:8px; padding:7px 10px; }
+    .frow .bi-file-earmark { color:var(--blue); } .frow .x { margin-left:auto; cursor:pointer; color:#cbd5e1; border:none; background:none; font-size:1rem; }
+    .frow .x:hover { color:#dc2626; }
+    .btn-af { background:var(--blue); color:#fff; border:none; border-radius:9px; padding:11px 22px; font-size:.92rem; font-weight:700; cursor:pointer; margin-top:14px; }
     .btn-af:hover { background:#0255c5; } .btn-af:disabled { background:#93c5fd; cursor:not-allowed; }
+    .btn-done { background:#16a34a !important; }
     .warn { background:#fffbeb; border:1px solid #fde68a; color:#92400e; border-radius:10px; padding:12px 16px; font-size:.85rem; margin-bottom:18px; display:none; }
     .warn a { color:#0141A2; font-weight:700; }
-    .res-grid { display:grid; grid-template-columns:repeat(2,1fr); gap:12px 18px; }
-    .fld { border-bottom:1px solid #f1f5f9; padding:8px 0; }
-    .fld .k { font-size:.7rem; text-transform:uppercase; letter-spacing:.04em; color:#94a3b8; font-weight:700; }
-    .fld .v { font-size:1rem; color:#0f172a; font-weight:600; margin-top:2px; }
-    .fld.big .v { font-size:1.35rem; color:var(--navy); font-weight:800; }
-    .fld.big { background:#f0f7ff; border-radius:10px; border:none; padding:12px 14px; }
-    .obs { background:#f8fafc; border-left:4px solid var(--coral); border-radius:8px; padding:12px 16px; font-size:.86rem; color:#475569; margin-top:16px; }
+    .hero { display:flex; align-items:center; gap:20px; flex-wrap:wrap; }
+    .hero .renta { font-size:2rem; font-weight:800; color:var(--navy); }
+    .hero .renta small { display:block; font-size:.72rem; color:#94a3b8; font-weight:700; text-transform:uppercase; letter-spacing:.04em; }
+    .tipo-ctrl { display:flex; gap:6px; align-items:center; }
+    .tbtn { border:1.5px solid #d1d5db; background:#fff; border-radius:8px; padding:6px 14px; font-size:.82rem; font-weight:700; color:#475569; cursor:pointer; }
+    .tbtn.on { background:var(--blue); color:#fff; border-color:var(--blue); }
+    .tipo-auto { font-size:.72rem; color:#94a3b8; margin-top:6px; }
+    .tipo-auto a { color:var(--blue); cursor:pointer; }
+    .ident { display:flex; gap:18px; flex-wrap:wrap; font-size:.84rem; color:#475569; margin:14px 0; }
+    .ident b { color:#0f172a; }
+    .adv { background:#fffbeb; border-left:4px solid #f59e0b; border-radius:8px; padding:10px 14px; font-size:.82rem; color:#92400e; margin:12px 0; }
+    .ltab { width:100%; border-collapse:collapse; font-size:.82rem; margin-top:8px; }
+    .ltab th { text-align:left; font-size:.68rem; text-transform:uppercase; letter-spacing:.04em; color:#94a3b8; border-bottom:2px solid #eef2f7; padding:7px 9px; }
+    .ltab td { padding:7px 9px; border-bottom:1px solid #f3f4f6; color:#334155; }
+    .ltab td.r, .ltab th.r { text-align:right; } .ltab td.c, .ltab th.c { text-align:center; }
+    .ltab tr.desc { color:#94a3b8; text-decoration:line-through; }
+    .pill { font-size:.66rem; font-weight:800; border-radius:999px; padding:2px 8px; }
+    .pill.ok { background:#ecfdf5; color:#16a34a; } .pill.no { background:#fef2f2; color:#dc2626; }
+    .informe { background:#f8fafc; border-left:4px solid var(--coral); border-radius:8px; padding:14px 16px; font-size:.86rem; color:#374151; line-height:1.6; margin-top:16px; }
     .sello-row { display:flex; align-items:center; justify-content:space-between; gap:12px; flex-wrap:wrap; margin-top:18px; padding-top:14px; border-top:1px solid #f1f5f9; }
     .sello-meta { font-size:.74rem; color:#94a3b8; }
-    .toast-af { position:fixed; bottom:20px; left:50%; transform:translateX(-50%); background:#0f172a; color:#fff; padding:11px 20px; border-radius:10px; font-size:.85rem; opacity:0; transition:.3s; z-index:9999; }
-    .toast-af.show { opacity:1; }
     .htab { width:100%; border-collapse:collapse; font-size:.82rem; }
     .htab th { text-align:left; font-size:.68rem; text-transform:uppercase; letter-spacing:.04em; color:#94a3b8; border-bottom:2px solid #eef2f7; padding:7px 9px; }
     .htab td { padding:7px 9px; border-bottom:1px solid #f3f4f6; color:#334155; }
     .htab td.r, .htab th.r { text-align:right; } .htab td.c, .htab th.c { text-align:center; }
-    .btn-done { background:#16a34a !important; }
-    @media (max-width:640px){ .res-grid { grid-template-columns:1fr; } }
+    .toast-af { position:fixed; bottom:20px; left:50%; transform:translateX(-50%); background:#0f172a; color:#fff; padding:11px 20px; border-radius:10px; font-size:.85rem; opacity:0; transition:.3s; z-index:9999; }
+    .toast-af.show { opacity:1; }
   </style>
 </head>
 <body>
   <div id="af-topnav"></div>
   <script>
-    window.AF_TOPNAV = {
-      breadcrumb: [
-        { label:'Inicio', href:'/' },
-        { label:'Análisis de Liquidaciones (IA)', icon:'bi-robot', current:true }
-      ]
-    };
+    window.AF_TOPNAV = { breadcrumb: [ { label:'Inicio', href:'/' }, { label:'Análisis de Liquidaciones (IA)', icon:'bi-robot', current:true } ] };
   </script>
 
   <div class="wrap">
     <div class="intro">
       <h2><i class="bi bi-file-earmark-person"></i>Análisis de Liquidaciones de Sueldo</h2>
-      <p>Sube la liquidación (PDF o foto) y la IA extrae sueldo líquido, imponible, AFP y salud automáticamente.</p>
+      <p>Sube las liquidaciones; la IA extrae los datos, determina el tipo de renta y calcula la renta líquida según las reglas.</p>
     </div>
 
     <div class="warn" id="warn"></div>
 
     <div class="card-af">
+      <p class="reglas">
+        <b>Reglas:</b> Renta <b>fija</b> → 1 liquidación (mes pasado). Renta <b>variable</b> → últimos 3 meses.
+        Si hubo meses con días incompletos (ej. licencia) → sube <b>6 meses</b>; se descartan los meses incompletos y se promedian los completos.
+      </p>
       <div class="drop" id="drop">
         <i class="bi bi-cloud-arrow-up"></i>
-        <b>Arrastra la liquidación aquí</b> o haz click para elegir
-        <small>PDF, JPG o PNG · 1 archivo · máx 12 MB</small>
-        <input type="file" id="file" accept=".pdf,image/*" hidden>
+        <b>Arrastra las liquidaciones aquí</b> o haz click para elegir
+        <small>PDF, JPG o PNG · hasta 6 archivos · máx 12 MB c/u</small>
+        <input type="file" id="file" accept=".pdf,image/*" multiple hidden>
       </div>
-      <div class="file-row" id="fileRow" style="display:none"><i class="bi bi-paperclip"></i><span id="fileName"></span></div>
-      <button class="btn-af" id="btnGo" disabled><i class="bi bi-stars me-1"></i>Analizar con IA</button>
+      <div class="flist" id="flist"></div>
+      <button class="btn-af" id="btnGo" disabled><i class="bi bi-stars me-1"></i>Evaluar renta con IA</button>
     </div>
 
     <div class="card-af" id="resCard" style="display:none">
-      <h3 style="font-size:.95rem;font-weight:800;color:var(--navy);margin:0 0 16px;display:flex;align-items:center;gap:8px"><i class="bi bi-clipboard-check"></i>Resultado</h3>
-      <div class="res-grid" id="resGrid"></div>
-      <div class="obs" id="resObs" style="display:none"></div>
-      <div id="saveRow" style="margin-top:18px;display:flex;align-items:center;gap:12px;flex-wrap:wrap">
+      <div class="hero">
+        <div class="renta"><small>Renta líquida calculada</small><span id="resRenta">—</span></div>
+        <div style="margin-left:auto">
+          <div class="tipo-ctrl">
+            <button class="tbtn" data-tipo="FIJA" id="tFija">Fija</button>
+            <button class="tbtn" data-tipo="VARIABLE" id="tVar">Variable</button>
+          </div>
+          <div class="tipo-auto" id="tipoAuto"></div>
+        </div>
+      </div>
+      <div class="ident" id="resIdent"></div>
+      <div class="adv" id="resAdv" style="display:none"></div>
+      <table class="ltab">
+        <thead><tr><th>Período</th><th class="c">Días</th><th class="c">Mes</th><th class="r">Imponible</th><th class="r">Líquido</th><th class="c">Uso</th></tr></thead>
+        <tbody id="resLiqs"></tbody>
+      </table>
+      <div class="informe" id="resInforme"></div>
+      <div style="margin-top:16px;display:flex;align-items:center;gap:12px;flex-wrap:wrap">
         <button class="btn-af" id="btnSave" style="margin-top:0"><i class="bi bi-person-check me-1"></i>Guardar en el cliente</button>
         <span style="font-size:.8rem;color:#64748b" id="saveHint"></span>
       </div>
-      <div class="sello-row">
-        <div id="resSello"></div>
-        <div class="sello-meta" id="resMeta"></div>
-      </div>
+      <div class="sello-row"><div id="resSello"></div><div class="sello-meta" id="resMeta"></div></div>
     </div>
 
     <div class="card-af">
@@ -105,109 +129,135 @@
     const CLP = n => (n==null || isNaN(n)) ? '—' : '$' + Number(n).toLocaleString('es-CL');
     function toast(m, ok=true){ const t=document.getElementById('toast'); t.textContent=m; t.style.background=ok?'#0f172a':'#b91c1c'; t.classList.add('show'); setTimeout(()=>t.classList.remove('show'),3000); }
 
-    let archivo = null, analisisId = null;
-    const drop = document.getElementById('drop'), file = document.getElementById('file'), btn = document.getElementById('btnGo');
+    let files = [], evalId = null;
+    const drop = document.getElementById('drop'), fileInp = document.getElementById('file'), btn = document.getElementById('btnGo');
 
-    drop.addEventListener('click', () => file.click());
+    drop.addEventListener('click', () => fileInp.click());
     drop.addEventListener('dragover', e => { e.preventDefault(); drop.classList.add('over'); });
     drop.addEventListener('dragleave', () => drop.classList.remove('over'));
-    drop.addEventListener('drop', e => { e.preventDefault(); drop.classList.remove('over'); if (e.dataTransfer.files[0]) setFile(e.dataTransfer.files[0]); });
-    file.addEventListener('change', () => { if (file.files[0]) setFile(file.files[0]); });
+    drop.addEventListener('drop', e => { e.preventDefault(); drop.classList.remove('over'); addFiles(e.dataTransfer.files); });
+    fileInp.addEventListener('change', () => addFiles(fileInp.files));
 
-    function setFile(f){
-      archivo = f;
-      document.getElementById('fileName').textContent = f.name + ' (' + (f.size/1024/1024).toFixed(2) + ' MB)';
-      document.getElementById('fileRow').style.display = 'flex';
-      btn.disabled = false;
+    function addFiles(list){
+      for (const f of list){
+        if (files.length >= 6){ toast('Máximo 6 liquidaciones', false); break; }
+        if (!files.some(x => x.name===f.name && x.size===f.size)) files.push(f);
+      }
+      renderFiles();
+    }
+    function renderFiles(){
+      document.getElementById('flist').innerHTML = files.map((f,i) =>
+        `<div class="frow"><i class="bi bi-file-earmark"></i><span>${esc(f.name)}</span><span style="color:#94a3b8">${(f.size/1024/1024).toFixed(2)} MB</span><button class="x" data-i="${i}">✕</button></div>`).join('');
+      document.querySelectorAll('#flist .x').forEach(b => b.addEventListener('click', () => { files.splice(+b.dataset.i,1); renderFiles(); }));
+      btn.disabled = files.length === 0;
     }
 
-    btn.addEventListener('click', analizar);
-
-    async function analizar(){
-      if (!archivo) return;
-      const h = AF_IA.analizando('Analizando la liquidación con Inteligencia Artificial de Anthropic…');
+    btn.addEventListener('click', evaluar);
+    async function evaluar(){
+      if (!files.length) return;
+      const h = AF_IA.analizando('Evaluando las liquidaciones con Inteligencia Artificial de Anthropic…');
       btn.disabled = true;
       try {
-        const fd = new FormData(); fd.append('archivo', archivo);
-        const r = await fetch('/api/ia/liquidacion', { method:'POST', headers:{ Authorization:'Bearer '+token }, body: fd });
+        const fd = new FormData(); files.forEach(f => fd.append('archivos', f));
+        const r = await fetch('/api/ia/liquidaciones/evaluar', { method:'POST', headers:{ Authorization:'Bearer '+token }, body: fd });
         const j = await r.json();
         h.cerrar(); btn.disabled = false;
-        if (!j.success) return toast(j.error || 'No se pudo analizar', false);
+        if (!j.success) return toast(j.error || 'No se pudo evaluar', false);
         render(j.data);
       } catch(e){ h.cerrar(); btn.disabled = false; toast('Error de conexión', false); }
     }
 
+    async function recalcular(tipo){
+      if (!evalId) return;
+      const h = AF_IA.analizando('Recalculando…');
+      try {
+        const r = await fetch('/api/ia/evaluacion/'+evalId+'/recalcular?tipo='+tipo, { method:'POST', headers:{ Authorization:'Bearer '+token } });
+        const j = await r.json(); h.cerrar();
+        if (!j.success) return toast(j.error||'Error', false);
+        render(j.data);
+      } catch(e){ h.cerrar(); toast('Error de conexión', false); }
+    }
+
     function render(d){
-      const x = d.extraccion || {};
-      const fields = [
-        ['Trabajador', esc(x.trabajador), false], ['RUT', esc(x.rut_trabajador), false],
-        ['Empleador', esc(x.empleador), false], ['Período', esc(x.periodo), false],
-        ['Sueldo base', CLP(x.sueldo_base), false], ['Total imponible', CLP(x.total_imponible), true],
-        ['AFP', (x.afp_nombre? esc(x.afp_nombre)+' · ':'') + CLP(x.afp_monto), false],
-        ['Salud', (x.salud_nombre? esc(x.salud_nombre)+' · ':'') + CLP(x.salud_monto), false],
-        ['Total descuentos', CLP(x.total_descuentos), false], ['Sueldo líquido', CLP(x.sueldo_liquido), true],
-      ];
-      document.getElementById('resGrid').innerHTML = fields.map(([k,v,big]) =>
-        `<div class="fld ${big?'big':''}"><div class="k">${k}</div><div class="v">${v||'—'}</div></div>`).join('');
-      const obs = document.getElementById('resObs');
-      if (x.observaciones){ obs.style.display='block'; obs.innerHTML = '<b><i class="bi bi-lightbulb me-1"></i>Observación:</b> ' + esc(x.observaciones); }
-      else obs.style.display='none';
-      document.getElementById('resSello').innerHTML = AF_IA.badge();
-      document.getElementById('resMeta').textContent = `${d.modelo} · ${(d.tokens_in+d.tokens_out).toLocaleString('es-CL')} tokens · $${Number(d.costo||0).toFixed(4)}`;
+      evalId = d.id;
+      document.getElementById('resRenta').textContent = CLP(d.renta_liquida);
+      document.getElementById('tFija').classList.toggle('on', d.tipo_renta==='FIJA');
+      document.getElementById('tVar').classList.toggle('on', d.tipo_renta==='VARIABLE');
+      const ta = document.getElementById('tipoAuto');
+      ta.innerHTML = `Detección automática: <b>${esc(d.tipo_auto)}</b>` + (d.tipo_renta!==d.tipo_auto ? ' · <a id="lnkAuto">volver a automático</a>' : '');
+      const la = document.getElementById('lnkAuto'); if (la) la.addEventListener('click', ()=>recalcular('auto'));
 
-      analisisId = d.id;
+      const id = d.identidad || {};
+      document.getElementById('resIdent').innerHTML =
+        `<div><b>${esc(id.trabajador)||'—'}</b></div><div>RUT: <b>${esc(id.rut_trabajador)||'—'}</b></div><div>Empleador: <b>${esc(id.empleador)||'—'}</b></div>`;
+
+      const adv = document.getElementById('resAdv');
+      if (d.advertencia){ adv.style.display='block'; adv.innerHTML = '<i class="bi bi-exclamation-triangle me-1"></i>'+esc(d.advertencia); } else adv.style.display='none';
+
+      document.getElementById('resLiqs').innerHTML = (d.items||[]).map(it => `
+        <tr class="${it.usada?'':'desc'}">
+          <td>${esc(it.periodo)||'—'}</td>
+          <td class="c">${it.dias!=null?it.dias:'—'}</td>
+          <td class="c">${it.completo?'<span class="pill ok">Completo</span>':'<span class="pill no">Incompleto</span>'}</td>
+          <td class="r">${CLP(it.imponible)}</td>
+          <td class="r">${CLP(it.liquido)}</td>
+          <td class="c">${it.usada?'<span style="color:#16a34a" title="Usada en el cálculo">✓</span>':'<span title="Descartada">—</span>'}</td>
+        </tr>`).join('');
+
+      document.getElementById('resInforme').innerHTML = '<b><i class="bi bi-journal-text me-1"></i>Informe:</b> ' + esc(d.explicacion);
+
       const btnS = document.getElementById('btnSave');
-      btnS.className = 'btn-af'; btnS.style.marginTop = '0';
-      btnS.innerHTML = '<i class="bi bi-person-check me-1"></i>Guardar en el cliente';
-      const rutT = x.rut_trabajador || '';
-      document.getElementById('saveHint').textContent = rutT
-        ? 'Se guardará en antecedentes laborales del RUT ' + rutT
-        : 'Sin RUT del trabajador: no se puede asociar a un cliente.';
-      btnS.disabled = !rutT || !analisisId;
+      btnS.className='btn-af'; btnS.style.marginTop='0'; btnS.innerHTML='<i class="bi bi-person-check me-1"></i>Guardar en el cliente';
+      const rutT = id.rut_trabajador || '';
+      document.getElementById('saveHint').textContent = rutT ? 'Guarda la renta en antecedentes del RUT '+rutT : 'Sin RUT del trabajador: no se puede asociar a un cliente.';
+      btnS.disabled = !rutT || !evalId || d.renta_liquida==null;
 
-      document.getElementById('resCard').style.display = 'block';
+      document.getElementById('resSello').innerHTML = AF_IA.badge();
+      document.getElementById('resMeta').textContent = `${d.modelo} · ${((d.tokens_in||0)+(d.tokens_out||0)).toLocaleString('es-CL')} tokens · $${Number(d.costo||0).toFixed(4)}`;
+      document.getElementById('resCard').style.display='block';
       document.getElementById('resCard').scrollIntoView({ behavior:'smooth', block:'nearest' });
       loadHistorial();
     }
 
+    document.getElementById('tFija').addEventListener('click', ()=>recalcular('FIJA'));
+    document.getElementById('tVar').addEventListener('click', ()=>recalcular('VARIABLE'));
+
     document.getElementById('btnSave').addEventListener('click', guardarCliente);
     async function guardarCliente(){
-      if (!analisisId) return;
+      if (!evalId) return;
       const b = document.getElementById('btnSave');
       b.disabled = true; b.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span>Guardando…';
       try {
-        const r = await fetch('/api/ia/liquidacion/' + analisisId + '/guardar-cliente', { method:'POST', headers:{ Authorization:'Bearer '+token } });
+        const r = await fetch('/api/ia/evaluacion/'+evalId+'/guardar-cliente', { method:'POST', headers:{ Authorization:'Bearer '+token } });
         const j = await r.json();
-        if (!j.success){ b.disabled = false; b.innerHTML = '<i class="bi bi-person-check me-1"></i>Guardar en el cliente'; return toast(j.error || 'No se pudo guardar', false); }
-        b.className = 'btn-af btn-done'; b.innerHTML = '<i class="bi bi-check-lg me-1"></i>Guardado en el cliente';
-        toast('Guardado en antecedentes de ' + j.data.cliente);
+        if (!j.success){ b.disabled=false; b.innerHTML='<i class="bi bi-person-check me-1"></i>Guardar en el cliente'; return toast(j.error||'No se pudo guardar', false); }
+        b.className='btn-af btn-done'; b.innerHTML='<i class="bi bi-check-lg me-1"></i>Guardado en el cliente';
+        toast('Renta guardada en antecedentes de '+j.data.cliente);
         loadHistorial();
-      } catch(e){ b.disabled = false; b.innerHTML = '<i class="bi bi-person-check me-1"></i>Guardar en el cliente'; toast('Error de conexión', false); }
+      } catch(e){ b.disabled=false; b.innerHTML='<i class="bi bi-person-check me-1"></i>Guardar en el cliente'; toast('Error de conexión', false); }
     }
 
     function loadHistorial(){
-      fetch('/api/ia/liquidaciones?limit=10', { headers:{ Authorization:'Bearer '+token } })
-        .then(r => r.json()).then(j => {
+      fetch('/api/ia/evaluaciones?limit=10', { headers:{ Authorization:'Bearer '+token } })
+        .then(r=>r.json()).then(j=>{
           const b = document.getElementById('histBody');
-          if (!j.success || !j.data.length){ b.innerHTML = '<div style="color:#94a3b8;font-size:.85rem;text-align:center;padding:14px">Aún no hay análisis.</div>'; return; }
-          b.innerHTML = '<table class="htab"><thead><tr><th>Fecha</th><th>Trabajador</th><th>Período</th><th class="r">Imponible</th><th class="r">Líquido</th><th class="c">En cliente</th></tr></thead><tbody>'
-            + j.data.map(h => `<tr>
+          if (!j.success || !j.data.length){ b.innerHTML='<div style="color:#94a3b8;font-size:.85rem;text-align:center;padding:14px">Aún no hay evaluaciones.</div>'; return; }
+          b.innerHTML = '<table class="htab"><thead><tr><th>Fecha</th><th>Trabajador</th><th class="c">Tipo</th><th class="c">Liq.</th><th class="r">Renta líquida</th><th class="c">En cliente</th></tr></thead><tbody>'
+            + j.data.map(h=>`<tr>
                 <td>${new Date(h.fecha).toLocaleDateString('es-CL')}</td>
                 <td>${esc(h.trabajador||'—')}<div style="font-size:.72rem;color:#94a3b8">${esc(h.rut_trabajador||'')}</div></td>
-                <td>${esc(h.periodo||'—')}</td>
-                <td class="r">${CLP(h.total_imponible)}</td>
-                <td class="r">${CLP(h.sueldo_liquido)}</td>
-                <td class="c">${h.guardado_cliente ? '<span style="color:#16a34a" title="Guardado en el cliente">✓</span>' : '<span style="color:#cbd5e1">—</span>'}</td>
+                <td class="c">${esc(h.tipo_renta||'—')}</td>
+                <td class="c">${h.n_liquidaciones||0}</td>
+                <td class="r">${CLP(h.renta_liquida)}</td>
+                <td class="c">${h.guardado_cliente?'<span style="color:#16a34a">✓</span>':'<span style="color:#cbd5e1">—</span>'}</td>
               </tr>`).join('') + '</tbody></table>';
         }).catch(()=>{});
     }
 
-    // Aviso si la funcionalidad está apagada
     (async () => {
       const activa = await AF_IA.activa('liq_sueldo');
       if (!activa){
-        const w = document.getElementById('warn');
-        w.style.display = 'block';
+        const w = document.getElementById('warn'); w.style.display='block';
         w.innerHTML = 'La IA de liquidaciones está <b>desactivada</b>. Actívala en <a href="/mantenedores/inteligencia-artificial/">Mantenedores → Inteligencia Artificial</a> (interruptor maestro + esta funcionalidad).';
       }
     })();
