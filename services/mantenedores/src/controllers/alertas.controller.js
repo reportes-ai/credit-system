@@ -105,6 +105,24 @@ exports.getVencimientos = async (req, res) => {
       }
     }
 
+    // ── Errores de la sincronización automática (UF/UTM/TMC) ──────────────
+    try {
+      const [rows] = await pool.query(
+        "SELECT clave, valor FROM parametros_credito WHERE clave IN ('sync_uf','sync_utm','sync_tmc') AND valor <> ''");
+      for (const r of rows) {
+        alertas.push({
+          tipo:    r.clave,
+          nivel:   'advertencia',
+          titulo:  'Sincronización automática con problemas',
+          mensaje: 'No se pudo actualizar automáticamente: ' + r.valor,
+          ultimo_valor: null,
+          dias_atraso:  0,
+          url: '/mantenedores/uf/',
+          boton: 'Ir a indicadores',
+        });
+      }
+    } catch (_) { /* parametros_credito no disponible */ }
+
     return res.json({
       success: true,
       data: {
