@@ -22,11 +22,16 @@ const DEFAULTS = {
   mostrar_logo:     '1',
 };
 
-// Parámetros de cálculo (paramétricos, editables en el mantenedor IA → "Reglas de cálculo")
+// Parámetros de cálculo (paramétricos, editables en el mantenedor IA → "Parámetros de Renta")
 const PARAMS_DEF = {
   liq_mes_completo:    '30',  // días para considerar un mes COMPLETO en liquidaciones
   liq_umbral_variable: '5',   // % de variación del imponible sobre el cual la renta es VARIABLE
+  salud_pct:           '7',   // % obligatorio de salud sobre el imponible
+  afp_cotizacion_pct:  '10',  // % cotización obligatoria AFP (base, sin comisión)
 };
+
+// AFPs con su comisión % (editable en el mantenedor). Total descuento ≈ afp_cotizacion + comisión.
+const AFPS_DEF = [['Capital', 1.44], ['Cuprum', 1.44], ['Habitat', 1.27], ['Modelo', 0.58], ['PlanVital', 1.16], ['ProVida', 1.45], ['Uno', 0.49]];
 
 // Precios USD por 1.000.000 de tokens (entrada/salida). Tabla ia_modelos (paramétrica).
 const DEFAULT_PRECIOS = {
@@ -84,6 +89,13 @@ const CATALOGO = [
       await pool.query('INSERT IGNORE INTO ia_config (clave, valor) VALUES (?,?)', [k, v]);
     for (const [k, v] of Object.entries(PARAMS_DEF))
       await pool.query('INSERT IGNORE INTO ia_config (clave, valor) VALUES (?,?)', [k, v]);
+    await pool.query(`CREATE TABLE IF NOT EXISTS parametros_afp (
+      nombre   VARCHAR(60) PRIMARY KEY,
+      comision DECIMAL(5,2) NOT NULL DEFAULT 0,
+      activo   TINYINT NOT NULL DEFAULT 1 )`);
+    const [[{ na }]] = await pool.query('SELECT COUNT(*) na FROM parametros_afp');
+    if (na === 0) for (const [n, c] of AFPS_DEF)
+      await pool.query('INSERT IGNORE INTO parametros_afp (nombre, comision) VALUES (?,?)', [n, c]);
     for (const [m, p] of Object.entries(DEFAULT_PRECIOS))
       await pool.query('INSERT IGNORE INTO ia_modelos (modelo, nombre, precio_in, precio_out) VALUES (?,?,?,?)', [m, p.nombre, p.in, p.out]);
     // Columnas nuevas en BD existentes (TiDB soporta IF NOT EXISTS; 1060 = ya existe)
@@ -119,6 +131,11 @@ async function getConfig(force = false) {
     const [mr] = await pool.query('SELECT modelo, nombre FROM ia_modelos WHERE activo = 1 ORDER BY precio_in');
     modelos = mr.map(m => ({ modelo: m.modelo, nombre: m.nombre }));
   } catch (_) {}
+  let afps = [];
+  try {
+    const [ar] = await pool.query('SELECT nombre, comision FROM parametros_afp WHERE activo = 1 ORDER BY nombre');
+    afps = ar.map(a => ({ nombre: a.nombre, comision: Number(a.comision) }));
+  } catch (_) {}
   _cache = {
     activa:           cfg.activa === '1',
     texto_analizando: cfg.texto_analizando || DEFAULTS.texto_analizando,
@@ -126,9 +143,12 @@ async function getConfig(force = false) {
     mostrar_logo:     cfg.mostrar_logo !== '0',
     funcionalidades:  funcs,
     modelos:          modelos,
+    afps:             afps,
     params: {
       liq_mes_completo:    parseInt(cfg.liq_mes_completo)      || 30,
       liq_umbral_variable: parseFloat(cfg.liq_umbral_variable) || 5,
+      salud_pct:           parseFloat(cfg.salud_pct)           || 7,
+      afp_cotizacion_pct:  parseFloat(cfg.afp_cotizacion_pct)  || 10,
     },
   };
   _cacheAt = Date.now();
@@ -167,22 +187,26 @@ async function registrarFuncionalidad({ codigo, nombre, descripcion, modelo }) {
 }
 
 /** Guardar config (master + textos + toggles + parámetros de cálculo). Devuelve la config nueva. */
-async function setConfig({ activa, texto_analizando, texto_analizado, mostrar_logo, funcionalidades, params } = {}) {
+async function setConfig({ activa, texto_analizando, texto_analizado, mostrar_logo, funcionalidades, params, afps } = {}) {
   const up = (k, v) => pool.query(
     'INSERT INTO ia_config (clave, valor) VALUES (?,?) ON DUPLICATE KEY UPDATE valor = VALUES(valor)', [k, String(v)]);
+  const pct = (v, def) => { let x = parseFloat(v); if (isNaN(x)) x = def; return Math.min(Math.max(x, 0), 100); };
   if (activa != null)           await up('activa', activa ? '1' : '0');
   if (texto_analizando != null) await up('texto_analizando', String(texto_analizando).slice(0, 200));
   if (texto_analizado != null)  await up('texto_analizado',  String(texto_analizado).slice(0, 200));
   if (mostrar_logo != null)     await up('mostrar_logo', mostrar_logo ? '1' : '0');
   if (params && typeof params === 'object') {
-    if (params.liq_mes_completo != null) {
-      const d = Math.min(Math.max(parseInt(params.liq_mes_completo) || 30, 1), 31);
-      await up('liq_mes_completo', d);
-    }
-    if (params.liq_umbral_variable != null) {
-      let u = parseFloat(params.liq_umbral_variable); if (isNaN(u)) u = 5;
-      u = Math.min(Math.max(u, 0), 100);
-      await up('liq_umbral_variable', u);
+    if (params.liq_mes_completo != null)    await up('liq_mes_completo', Math.min(Math.max(parseInt(params.liq_mes_completo) || 30, 1), 31));
+    if (params.liq_umbral_variable != null) await up('liq_umbral_variable', pct(params.liq_umbral_variable, 5));
+    if (params.salud_pct != null)           await up('salud_pct', pct(params.salud_pct, 7));
+    if (params.afp_cotizacion_pct != null)  await up('afp_cotizacion_pct', pct(params.afp_cotizacion_pct, 10));
+  }
+  if (Array.isArray(afps)) {
+    await pool.query('DELETE FROM parametros_afp');
+    for (const a of afps) {
+      if (!a || !a.nombre) continue;
+      await pool.query('INSERT INTO parametros_afp (nombre, comision, activo) VALUES (?,?,1) ON DUPLICATE KEY UPDATE comision=VALUES(comision)',
+        [String(a.nombre).trim().slice(0, 60), pct(a.comision, 0)]);
     }
   }
   if (Array.isArray(funcionalidades)) {

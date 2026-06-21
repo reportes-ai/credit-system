@@ -76,18 +76,29 @@ const PROMPT = `Extrae los datos de esta liquidación de sueldo y responde EXACT
 "periodo" en formato "Mes Año" (ej "Mayo 2026").`;
 
 /* Detecta inconsistencias entre/dentro de las liquidaciones (determinístico) */
-function detectarInconsistencias(items) {
+function detectarInconsistencias(items, cfg = {}) {
   const inc = [];
   const clp = n => '$' + Number(n).toLocaleString('es-CL');
+  const saludPct = Number(cfg.saludPct) || 7;
+  const afpCot = Number(cfg.afpCotizacion) || 10;
+  const afps = Array.isArray(cfg.afps) ? cfg.afps : [];
+  const norm = s => String(s || '').toUpperCase().replace(/[^A-Z]/g, '');
   for (const it of items) {
     const per = it.periodo || 's/período';
     if (it.imponible && it.salud_monto != null) {
       const pct = it.salud_monto / it.imponible * 100;
-      if (pct < 6.9) inc.push(`Salud bajo el 7% obligatorio en ${per} (${pct.toFixed(1)}% del imponible).`);
+      if (pct < saludPct - 0.1) inc.push(`Salud bajo el ${saludPct}% obligatorio en ${per} (${pct.toFixed(1)}% del imponible).`);
     }
     if (it.imponible && it.afp_monto != null) {
       const pct = it.afp_monto / it.imponible * 100;
-      if (pct < 9.5 || pct > 14) inc.push(`Descuento de AFP fuera del rango esperado (~10–13%) en ${per} (${pct.toFixed(1)}%).`);
+      const af = afps.find(a => a.nombre && it.afp_nombre && (norm(it.afp_nombre).includes(norm(a.nombre)) || norm(a.nombre).includes(norm(it.afp_nombre))));
+      if (af) {
+        const esp = afpCot + Number(af.comision || 0);
+        if (Math.abs(pct - esp) > 0.6)
+          inc.push(`AFP ${af.nombre} en ${per}: descuento ${pct.toFixed(1)}% no coincide con lo esperado ${esp.toFixed(2)}% (${afpCot}% + comisión ${af.comision}%).`);
+      } else if (pct < afpCot - 0.5 || pct > afpCot + 4) {
+        inc.push(`Descuento de AFP fuera de rango (~${afpCot}–${afpCot + 3}%) en ${per} (${pct.toFixed(1)}%)${it.afp_nombre ? ` — "${it.afp_nombre}" no está en el mantenedor de AFP` : ''}.`);
+      }
     }
     if (it.haberes != null && it.descuentos != null && it.liquido != null) {
       const dif = Math.abs((it.haberes - it.descuentos) - it.liquido);
@@ -162,7 +173,7 @@ function calcularRenta(rawLiqs, tipoForzado, params = {}) {
   else if (incompletos.length && completos.length < 3) adv = 'Hay meses incompletos y menos de 3 completos; pide hasta 6 meses.';
   if (items.some(i => !i.diasConocidos)) adv = (adv ? adv + ' ' : '') + 'En alguna liquidación no se detectaron los días trabajados (se asumió mes completo).';
 
-  const inconsistencias = detectarInconsistencias(items);
+  const inconsistencias = detectarInconsistencias(items, { saludPct: params.saludPct, afpCotizacion: params.afpCotizacion, afps: params.afps });
 
   return { tipo_renta: tipo, tipo_auto: tipoAuto, renta_liquida, renta_imponible,
     meses_usados: mUsados.join(', '), meses_descartados: mDesc.join(', '), explicacion: exp, advertencia: adv, items,
@@ -218,8 +229,9 @@ exports.evaluar = async (req, res) => {
     }
     if (!raw.length) return res.status(422).json({ success: false, data: null, error: 'No se pudo interpretar ninguna liquidación. Prueba con imágenes más nítidas o PDF.' });
 
-    const cfgP = (await ia.getConfig()).params || {};
-    const calc = calcularRenta(raw, null, { mesCompleto: cfgP.liq_mes_completo, umbral: cfgP.liq_umbral_variable });
+    const cfg = await ia.getConfig();
+    const cfgP = cfg.params || {};
+    const calc = calcularRenta(raw, null, { mesCompleto: cfgP.liq_mes_completo, umbral: cfgP.liq_umbral_variable, saludPct: cfgP.salud_pct, afpCotizacion: cfgP.afp_cotizacion_pct, afps: cfg.afps });
     const ident = raw.find(l => l.rut_trabajador) || raw[0] || {};
 
     let id = null;
@@ -265,8 +277,9 @@ exports.recalcular = async (req, res) => {
     const [[ev]] = await pool.query('SELECT * FROM ia_evaluaciones_renta WHERE id = ? LIMIT 1', [req.params.id]);
     if (!ev) return res.status(404).json({ success: false, data: null, error: 'Evaluación no encontrada.' });
     const tipo = (req.query.tipo || '').toUpperCase();
-    const cfgP = (await ia.getConfig()).params || {};
-    const calc = calcularRenta(parseLiqs(ev.liquidaciones), (tipo === 'FIJA' || tipo === 'VARIABLE') ? tipo : null, { mesCompleto: cfgP.liq_mes_completo, umbral: cfgP.liq_umbral_variable });
+    const cfg = await ia.getConfig();
+    const cfgP = cfg.params || {};
+    const calc = calcularRenta(parseLiqs(ev.liquidaciones), (tipo === 'FIJA' || tipo === 'VARIABLE') ? tipo : null, { mesCompleto: cfgP.liq_mes_completo, umbral: cfgP.liq_umbral_variable, saludPct: cfgP.salud_pct, afpCotizacion: cfgP.afp_cotizacion_pct, afps: cfg.afps });
     await pool.query(
       `UPDATE ia_evaluaciones_renta SET tipo_renta=?, renta_liquida=?, renta_imponible=?, meses_usados=?, meses_descartados=?, explicacion=?, advertencia=?, inconsistencias=? WHERE id=?`,
       [calc.tipo_renta, calc.renta_liquida, calc.renta_imponible, calc.meses_usados, calc.meses_descartados, calc.explicacion, calc.advertencia, JSON.stringify(calc.inconsistencias || []), ev.id]);

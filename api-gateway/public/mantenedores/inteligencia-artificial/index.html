@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Inteligencia Artificial — AutoFácil</title>
-  <!-- v1.3 -->
+  <!-- v1.4 -->
   <link href="/css/bootstrap-icons.css" rel="stylesheet">
   <style>
     :root { --navy:#012d70; --blue:#0141A2; --coral:#D97757; }
@@ -96,7 +96,7 @@
     <div class="tabs">
       <button class="tab active" data-tab="config"><i class="bi bi-sliders me-1"></i>Configuración</button>
       <button class="tab" data-tab="uso"><i class="bi bi-graph-up me-1"></i>Uso IA</button>
-      <button class="tab" data-tab="reglas"><i class="bi bi-sliders me-1"></i>Reglas de cálculo</button>
+      <button class="tab" data-tab="reglas"><i class="bi bi-sliders me-1"></i>Parámetros de Renta</button>
     </div>
 
     <div id="tab-config">
@@ -167,27 +167,36 @@
 
     <div id="tab-reglas" style="display:none">
       <div class="card-af">
-        <h3><i class="bi bi-sliders"></i>Reglas de cálculo — Liquidaciones</h3>
-        <div class="sub">Parámetros que usa el cálculo de renta a partir de las liquidaciones de sueldo.</div>
-
-        <label class="lbl">Días de un mes completo</label>
-        <input class="txt" type="number" id="pMes" min="1" max="31" style="max-width:160px">
-        <div style="font-size:.74rem;color:#94a3b8;margin-top:4px">Una liquidación con menos días que esto se considera mes incompleto (licencia/ausencia) y se descarta del promedio.</div>
-
-        <label class="lbl" style="margin-top:16px">Umbral de renta variable (%)</label>
-        <input class="txt" type="number" id="pUmbral" min="0" max="100" step="0.5" style="max-width:160px">
-        <div style="font-size:.74rem;color:#94a3b8;margin-top:4px">Si el imponible entre meses completos varía más que este %, la renta se considera variable (promedio de meses); si no, fija.</div>
-
+        <h3><i class="bi bi-sliders"></i>Parámetros de Renta</h3>
+        <div class="sub">Parámetros del cálculo de renta y de los chequeos de inconsistencia en liquidaciones.</div>
+        <div style="display:flex;gap:18px;flex-wrap:wrap">
+          <div><label class="lbl">Días de un mes completo</label><input class="txt" type="number" id="pMes" min="1" max="31" style="max-width:150px"></div>
+          <div><label class="lbl">Umbral renta variable (%)</label><input class="txt" type="number" id="pUmbral" min="0" max="100" step="0.5" style="max-width:150px"></div>
+          <div><label class="lbl">Salud obligatoria (%)</label><input class="txt" type="number" id="pSalud" min="0" max="100" step="0.5" style="max-width:150px"></div>
+          <div><label class="lbl">Cotización AFP base (%)</label><input class="txt" type="number" id="pAfpCot" min="0" max="100" step="0.5" style="max-width:150px"></div>
+        </div>
+        <div style="font-size:.74rem;color:#94a3b8;margin-top:8px">Mes incompleto (días &lt; lo indicado) se descarta · Salud bajo el % se marca como inconsistencia · Descuento AFP esperado = cotización base + comisión de la AFP.</div>
         <div style="margin-top:18px;display:flex;justify-content:flex-end">
-          <button class="btn-primary-af" onclick="guardarReglas()"><i class="bi bi-save me-1"></i>Guardar</button>
+          <button class="btn-primary-af" onclick="guardarReglas()"><i class="bi bi-save me-1"></i>Guardar parámetros</button>
         </div>
+      </div>
 
-        <div class="afecta">
-          <h4><i class="bi bi-diagram-3"></i> Qué afecta este mantenedor</h4>
-          <ul>
-            <li><b>Días de mes completo</b> y <b>Umbral de renta variable</b> → el cálculo de renta en <a href="/ia/liquidaciones/">Análisis de Liquidaciones (IA)</a>: qué meses se descartan y si la renta se trata como fija o variable.</li>
-          </ul>
+      <div class="card-af">
+        <h3><i class="bi bi-bank"></i>Porcentajes de AFP (comisión)</h3>
+        <div class="sub">Comisión de cada AFP. El descuento total esperado en la liquidación = cotización base + esta comisión.</div>
+        <table class="utab"><thead><tr><th>AFP</th><th class="r">Comisión (%)</th><th></th></tr></thead><tbody id="afpRows"></tbody></table>
+        <div style="margin-top:12px;display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap">
+          <button class="btn-ghost" onclick="addAfp()"><i class="bi bi-plus-lg me-1"></i>Agregar AFP</button>
+          <button class="btn-primary-af" onclick="guardarReglas()"><i class="bi bi-save me-1"></i>Guardar AFP</button>
         </div>
+      </div>
+
+      <div class="afecta">
+        <h4><i class="bi bi-diagram-3"></i> Qué afecta este mantenedor</h4>
+        <ul>
+          <li><b>Días de mes completo</b> y <b>Umbral de renta variable</b> → cómo se calcula la renta en <a href="/ia/liquidaciones/">Análisis de Liquidaciones (IA)</a>.</li>
+          <li><b>Salud %</b>, <b>Cotización AFP base</b> y <b>Comisiones AFP</b> → los chequeos de inconsistencia (salud bajo el mínimo, AFP que no cuadra) en las liquidaciones.</li>
+        </ul>
       </div>
     </div>
   </div>
@@ -203,7 +212,7 @@
     const esc = s => String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
     const DEF_ANDO = 'Analizando con Inteligencia Artificial de Anthropic…';
     const DEF_ADO  = 'Analizado con Inteligencia Artificial de Anthropic';
-    let FEATS = [], MODELOS = [];
+    let FEATS = [], MODELOS = [], AFPS = [];
     function toast(m, ok=true){ const t=document.getElementById('toast'); t.textContent=m; t.style.background=ok?'#0f172a':'#b91c1c'; t.classList.add('show'); setTimeout(()=>t.classList.remove('show'),2400); }
 
     async function cargar(){
@@ -217,6 +226,9 @@
       const p = c.params || {};
       document.getElementById('pMes').value    = p.liq_mes_completo    != null ? p.liq_mes_completo    : 30;
       document.getElementById('pUmbral').value = p.liq_umbral_variable != null ? p.liq_umbral_variable : 5;
+      document.getElementById('pSalud').value  = p.salud_pct           != null ? p.salud_pct           : 7;
+      document.getElementById('pAfpCot').value = p.afp_cotizacion_pct  != null ? p.afp_cotizacion_pct  : 10;
+      AFPS = c.afps || []; renderAfps();
       renderFeats(); onMaster(); renderPrev();
     }
 
@@ -278,18 +290,41 @@
     }
 
     async function guardarReglas(){
-      const body = { params: {
-        liq_mes_completo:    document.getElementById('pMes').value,
-        liq_umbral_variable: document.getElementById('pUmbral').value,
-      } };
+      syncAfps();
+      const body = {
+        params: {
+          liq_mes_completo:    document.getElementById('pMes').value,
+          liq_umbral_variable: document.getElementById('pUmbral').value,
+          salud_pct:           document.getElementById('pSalud').value,
+          afp_cotizacion_pct:  document.getElementById('pAfpCot').value,
+        },
+        afps: AFPS.filter(a => a.nombre && a.nombre.trim()),
+      };
       try {
         const r = await fetch('/api/ia-config', { method:'PUT', headers:H, body:JSON.stringify(body) });
         const j = await r.json();
         if (!j.success) return toast(j.error||'Error al guardar', false);
         await AF_IA.config(true);
-        toast('Reglas de cálculo guardadas');
+        toast('Parámetros de renta guardados');
       } catch(_){ toast('Error de conexión', false); }
     }
+
+    function renderAfps(){
+      document.getElementById('afpRows').innerHTML = AFPS.length ? AFPS.map((a,i)=>`
+        <tr>
+          <td><input class="txt" style="width:170px;padding:6px 8px;font-size:.85rem" value="${esc(a.nombre)}" data-k="nombre"></td>
+          <td class="r"><input class="txt" type="number" step="0.01" min="0" style="width:90px;padding:6px 8px;font-size:.85rem;text-align:right" value="${a.comision}" data-k="comision"></td>
+          <td class="r"><button class="btn-ghost" style="padding:5px 10px" onclick="delAfp(${i})"><i class="bi bi-trash"></i></button></td>
+        </tr>`).join('') : '<tr><td colspan="3" style="color:#94a3b8;text-align:center;padding:12px">Sin AFP. Agrega una.</td></tr>';
+    }
+    function syncAfps(){
+      AFPS = [...document.querySelectorAll('#afpRows tr')].map(tr=>{
+        const n=tr.querySelector('[data-k=nombre]'), c=tr.querySelector('[data-k=comision]');
+        return n ? { nombre:n.value, comision:parseFloat(c.value)||0 } : null;
+      }).filter(Boolean);
+    }
+    function addAfp(){ syncAfps(); AFPS.push({nombre:'',comision:0}); renderAfps(); }
+    function delAfp(i){ syncAfps(); AFPS.splice(i,1); renderAfps(); }
 
     /* ── Pestañas ── */
     let _usoTimer = null, _usoDias = 90;
