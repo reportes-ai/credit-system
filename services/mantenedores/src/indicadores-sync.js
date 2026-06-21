@@ -47,7 +47,7 @@ async function sincronizar(opts = {}) {
 
   // Diarios: UF y dólar
   for (const [rec, tab] of [['uf', 'uf'], ['dolar', 'dolar']]) {
-    try { out[tab] = await syncTabla(rec, tab, y, m, false); await setEstado('sync_' + tab, ''); }
+    try { out[tab] = await syncTabla(rec, tab, y, m, false); await setEstado('sync_' + tab, ''); await setEstado('sync_' + tab + '_ts', new Date().toISOString()); }
     catch (e) { out[tab] = { error: e.message }; await setEstado('sync_' + tab, eMsg(tab.toUpperCase(), e)); if (e.code !== 'NOCMF') console.error('[indicadores]', tab, e.message); }
   }
   // Mensuales: UTM e IPC (mes actual + anterior)
@@ -58,13 +58,18 @@ async function sincronizar(opts = {}) {
       try { b = await syncTabla(rec, tab, py, pm, true); } catch (_) {}
       out[tab] = { nuevos: a.nuevos + b.nuevos, total: a.total + b.total };
       await setEstado('sync_' + tab, '');
+      await setEstado('sync_' + tab + '_ts', new Date().toISOString());
     } catch (e) { out[tab] = { error: e.message }; await setEstado('sync_' + tab, eMsg(tab.toUpperCase(), e)); if (e.code !== 'NOCMF') console.error('[indicadores]', tab, e.message); }
   }
   // TMC: desde el día 13 y hasta cargar el período del mes
   try {
     if (force || dia >= 13) {
-      if (!force && await periodoTMCcargado()) { out.tmc = { sin_cambios: true, motivo: 'período del mes ya cargado' }; await setEstado('sync_tmc', ''); }
-      else { out.tmc = await sincronizarTMC(); await setEstado('sync_tmc', out.tmc.ok ? '' : ('TMC: ' + (out.tmc.motivo || 'no se pudo sincronizar'))); }
+      if (!force && await periodoTMCcargado()) { out.tmc = { sin_cambios: true, motivo: 'período del mes ya cargado' }; await setEstado('sync_tmc', ''); await setEstado('sync_tmc_ts', new Date().toISOString()); }
+      else {
+        out.tmc = await sincronizarTMC();
+        if (out.tmc.ok) { await setEstado('sync_tmc', ''); await setEstado('sync_tmc_ts', new Date().toISOString()); }
+        else await setEstado('sync_tmc', 'TMC: ' + (out.tmc.motivo || 'no se pudo sincronizar'));
+      }
     } else out.tmc = { skipped: true, motivo: 'la TMC se busca desde el día 13' };
   } catch (e) {
     out.tmc = e.code === 'NOCMF' ? { ok: false, motivo: 'falta CMF_API_KEY' } : { error: e.message };

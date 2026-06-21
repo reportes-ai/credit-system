@@ -4,6 +4,7 @@ const { verifyToken } = require('../../../../shared/middleware/auth');
 const { requireFunc } = require('../../../../shared/middleware/permisos');
 
 router.get('/', verifyToken, ctrl.getAll);
+router.get('/estado-sync', verifyToken, ctrl.estadoSync);
 router.get('/vigente', verifyToken, ctrl.getVigente);
 router.get('/en/:fecha', verifyToken, ctrl.getEnFecha);
 router.post('/importar', verifyToken, requireFunc('mantenedores_uf'), ctrl.importarCSV);

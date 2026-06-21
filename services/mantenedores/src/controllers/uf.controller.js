@@ -1,6 +1,6 @@
 const pool = require('../../../../shared/config/database');
 const { auditar } = require('../../../../shared/audit');
-const { sincronizar } = require('../indicadores-sync');   // sync automático UF/UTM desde mindicador.cl
+const { sincronizar } = require('../indicadores-sync');   // sync automático de indicadores desde la CMF
 
 const getAll = async (req, res) => {
   try {
@@ -96,13 +96,32 @@ const importarCSV = async (req, res) => {
   }
 };
 
-// Fuerza la sincronización UF/UTM desde mindicador.cl (el auto-sync corre solo cada 12h)
+// Fuerza la sincronización de todos los indicadores desde la CMF (el auto-sync corre solo cada 24h)
 const sincronizarManual = async (req, res) => {
   try {
     const r = await sincronizar({ force: true });
-    auditar({ req, accion: 'CARGA_MASIVA', modulo: 'mantenedores', entidad: 'uf', detalle: `Sincronizó UF/UTM desde mindicador.cl (UF +${r.uf?.nuevos || 0}, UTM +${r.utm?.nuevos || 0})`, meta: r });
+    auditar({ req, accion: 'CARGA_MASIVA', modulo: 'mantenedores', entidad: 'uf', detalle: `Sincronizó indicadores desde la CMF (UF +${r.uf?.nuevos || 0}, UTM +${r.utm?.nuevos || 0})`, meta: r });
     res.json({ success: true, data: r, error: null });
   } catch (e) { console.error('[uf sincronizar]', e.message); res.status(500).json({ success: false, data: null, error: 'No se pudo sincronizar: ' + e.message }); }
 };
 
-module.exports = { getAll, getVigente, getEnFecha, create, update, remove, importarCSV, sincronizarManual };
+// Estado de la última sincronización automática por indicador (fecha/hora + error si lo hubo).
+// Lo escribe indicadores-sync.js en parametros_credito (sync_<ind> = error '' si OK, sync_<ind>_ts = ISO).
+const estadoSync = async (req, res) => {
+  try {
+    const inds = ['uf', 'utm', 'dolar', 'ipc', 'tmc'];
+    const claves = [];
+    inds.forEach(i => claves.push('sync_' + i, 'sync_' + i + '_ts'));
+    const [rows] = await pool.query(
+      `SELECT clave, valor FROM parametros_credito WHERE clave IN (${claves.map(() => '?').join(',')})`, claves);
+    const map = {};
+    for (const r of rows) map[r.clave] = r.valor;
+    const data = {};
+    for (const i of inds) data[i] = { ts: map['sync_' + i + '_ts'] || null, error: map['sync_' + i] || '' };
+    res.json({ success: true, data, error: null });
+  } catch (e) {
+    res.json({ success: true, data: {}, error: null });   // fail-soft: no debe romper la página
+  }
+};
+
+module.exports = { getAll, getVigente, getEnFecha, create, update, remove, importarCSV, sincronizarManual, estadoSync };
