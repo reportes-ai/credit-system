@@ -33,6 +33,19 @@ const PARAMS_DEF = {
 // AFPs con su comisión % (editable en el mantenedor). Total descuento ≈ afp_cotizacion + comisión.
 const AFPS_DEF = [['Capital', 1.44], ['Cuprum', 1.44], ['Habitat', 1.27], ['Modelo', 0.58], ['PlanVital', 1.16], ['ProVida', 1.45], ['Uno', 0.49]];
 
+// Tramos del Impuesto Único de 2ª Categoría (mensual, expresados en UTM). Editable en el mantenedor.
+// Formato: [desde_utm, hasta_utm (null = sin tope), factor, rebaja_utm]. Regla SII vigente.
+const TRAMOS_IUSC_DEF = [
+  [0,     13.5, 0,     0],
+  [13.5,  30,   0.04,  0.54],
+  [30,    50,   0.08,  1.74],
+  [50,    70,   0.135, 4.49],
+  [70,    90,   0.23,  11.14],
+  [90,    120,  0.304, 17.80],
+  [120,   310,  0.35,  23.32],
+  [310,   null, 0.40,  54.32],
+];
+
 // Precios USD por 1.000.000 de tokens (entrada/salida). Tabla ia_modelos (paramétrica).
 const DEFAULT_PRECIOS = {
   'claude-opus-4-8':   { nombre: 'Claude Opus 4.8',   in: 5,  out: 25 },
@@ -96,6 +109,16 @@ const CATALOGO = [
     const [[{ na }]] = await pool.query('SELECT COUNT(*) na FROM parametros_afp');
     if (na === 0) for (const [n, c] of AFPS_DEF)
       await pool.query('INSERT IGNORE INTO parametros_afp (nombre, comision) VALUES (?,?)', [n, c]);
+    await pool.query(`CREATE TABLE IF NOT EXISTS tramos_iusc (
+      id         INT AUTO_INCREMENT PRIMARY KEY,
+      desde_utm  DECIMAL(8,2) NOT NULL DEFAULT 0,
+      hasta_utm  DECIMAL(8,2) NULL,
+      factor     DECIMAL(6,4) NOT NULL DEFAULT 0,
+      rebaja_utm DECIMAL(8,2) NOT NULL DEFAULT 0,
+      activo     TINYINT NOT NULL DEFAULT 1 )`);
+    const [[{ nt }]] = await pool.query('SELECT COUNT(*) nt FROM tramos_iusc');
+    if (nt === 0) for (const [d, h, f, r] of TRAMOS_IUSC_DEF)
+      await pool.query('INSERT INTO tramos_iusc (desde_utm, hasta_utm, factor, rebaja_utm) VALUES (?,?,?,?)', [d, h, f, r]);
     for (const [m, p] of Object.entries(DEFAULT_PRECIOS))
       await pool.query('INSERT IGNORE INTO ia_modelos (modelo, nombre, precio_in, precio_out) VALUES (?,?,?,?)', [m, p.nombre, p.in, p.out]);
     // Columnas nuevas en BD existentes (TiDB soporta IF NOT EXISTS; 1060 = ya existe)
@@ -136,6 +159,11 @@ async function getConfig(force = false) {
     const [ar] = await pool.query('SELECT nombre, comision FROM parametros_afp WHERE activo = 1 ORDER BY nombre');
     afps = ar.map(a => ({ nombre: a.nombre, comision: Number(a.comision) }));
   } catch (_) {}
+  let tramos_iusc = [];
+  try {
+    const [tr] = await pool.query('SELECT id, desde_utm, hasta_utm, factor, rebaja_utm FROM tramos_iusc WHERE activo = 1 ORDER BY desde_utm');
+    tramos_iusc = tr.map(t => ({ id: t.id, desde_utm: Number(t.desde_utm), hasta_utm: t.hasta_utm == null ? null : Number(t.hasta_utm), factor: Number(t.factor), rebaja_utm: Number(t.rebaja_utm) }));
+  } catch (_) {}
   _cache = {
     activa:           cfg.activa === '1',
     texto_analizando: cfg.texto_analizando || DEFAULTS.texto_analizando,
@@ -144,6 +172,7 @@ async function getConfig(force = false) {
     funcionalidades:  funcs,
     modelos:          modelos,
     afps:             afps,
+    tramos_iusc:      tramos_iusc,
     params: {
       liq_mes_completo:    parseInt(cfg.liq_mes_completo)      || 30,
       liq_umbral_variable: parseFloat(cfg.liq_umbral_variable) || 5,
@@ -187,7 +216,7 @@ async function registrarFuncionalidad({ codigo, nombre, descripcion, modelo }) {
 }
 
 /** Guardar config (master + textos + toggles + parámetros de cálculo). Devuelve la config nueva. */
-async function setConfig({ activa, texto_analizando, texto_analizado, mostrar_logo, funcionalidades, params, afps } = {}) {
+async function setConfig({ activa, texto_analizando, texto_analizado, mostrar_logo, funcionalidades, params, afps, tramos } = {}) {
   const up = (k, v) => pool.query(
     'INSERT INTO ia_config (clave, valor) VALUES (?,?) ON DUPLICATE KEY UPDATE valor = VALUES(valor)', [k, String(v)]);
   const pct = (v, def) => { let x = parseFloat(v); if (isNaN(x)) x = def; return Math.min(Math.max(x, 0), 100); };
@@ -209,6 +238,19 @@ async function setConfig({ activa, texto_analizando, texto_analizado, mostrar_lo
         [String(a.nombre).trim().slice(0, 60), pct(a.comision, 0)]);
     }
   }
+  if (Array.isArray(tramos)) {
+    await pool.query('DELETE FROM tramos_iusc');
+    for (const t of tramos) {
+      if (!t) continue;
+      const desde = parseFloat(t.desde_utm); if (isNaN(desde)) continue;
+      let hasta = (t.hasta_utm == null || t.hasta_utm === '') ? null : parseFloat(t.hasta_utm);
+      if (hasta != null && isNaN(hasta)) hasta = null;
+      let factor = parseFloat(t.factor); if (isNaN(factor)) factor = 0; factor = Math.min(Math.max(factor, 0), 1);
+      let rebaja = parseFloat(t.rebaja_utm); if (isNaN(rebaja) || rebaja < 0) rebaja = 0;
+      await pool.query('INSERT INTO tramos_iusc (desde_utm, hasta_utm, factor, rebaja_utm, activo) VALUES (?,?,?,?,1)',
+        [Math.max(desde, 0), hasta, factor, rebaja]);
+    }
+  }
   if (Array.isArray(funcionalidades)) {
     for (const f of funcionalidades) {
       if (!f || !f.codigo) continue;
@@ -218,6 +260,24 @@ async function setConfig({ activa, texto_analizando, texto_analizado, mostrar_lo
   }
   invalidar();
   return getConfig(true);
+}
+
+/** Impuesto Único de 2ª Categoría (mensual) sobre una base tributable en pesos,
+ *  dada la UTM del mes y los tramos (en UTM). Devuelve el impuesto en pesos (≥0) o null. */
+function impuestoUnicoMensual(base, utm, tramos) {
+  base = Number(base) || 0; utm = Number(utm) || 0;
+  if (base <= 0 || utm <= 0 || !Array.isArray(tramos) || !tramos.length) return null;
+  const ords = tramos.slice().sort((a, b) => Number(a.desde_utm) - Number(b.desde_utm));
+  const baseUTM = base / utm;
+  let tr = null;
+  for (const t of ords) {
+    const desde = Number(t.desde_utm) || 0;
+    const hasta = (t.hasta_utm == null || t.hasta_utm === '') ? Infinity : Number(t.hasta_utm);
+    if (baseUTM >= desde && baseUTM < hasta) { tr = t; break; }
+  }
+  if (!tr) tr = ords[ords.length - 1];
+  const imp = base * Number(tr.factor || 0) - Number(tr.rebaja_utm || 0) * utm;
+  return Math.max(0, Math.round(imp));
 }
 
 // ── Consumo (tokens + USD) ──────────────────────────────────────────────────
@@ -300,4 +360,4 @@ async function getUso({ dias = 90 } = {}) {
   };
 }
 
-module.exports = { getConfig, setConfig, iaActiva, modeloDe, registrarFuncionalidad, invalidar, precioModelo, registrarUso, getUso };
+module.exports = { getConfig, setConfig, iaActiva, modeloDe, registrarFuncionalidad, invalidar, precioModelo, registrarUso, getUso, impuestoUnicoMensual };

@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Inteligencia Artificial — AutoFácil</title>
-  <!-- v1.4 -->
+  <!-- v1.5 -->
   <link href="/css/bootstrap-icons.css" rel="stylesheet">
   <style>
     :root { --navy:#012d70; --blue:#0141A2; --coral:#D97757; }
@@ -191,11 +191,22 @@
         </div>
       </div>
 
+      <div class="card-af">
+        <h3><i class="bi bi-percent"></i>Impuesto Único de 2ª Categoría (tramos en UTM)</h3>
+        <div class="sub">Tabla del SII para sueldos. La IA la usa para verificar que el impuesto retenido en cada liquidación esté bien calculado (tramos × UTM del mes). El <b>Factor</b> va en decimal (ej. 0,04 = 4%); deja <b>Hasta</b> vacío en el último tramo (sin tope).</div>
+        <table class="utab"><thead><tr><th>Desde (UTM)</th><th>Hasta (UTM)</th><th class="r">Factor</th><th class="r">Rebaja (UTM)</th><th></th></tr></thead><tbody id="tramoRows"></tbody></table>
+        <div style="margin-top:12px;display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap">
+          <button class="btn-ghost" onclick="addTramo()"><i class="bi bi-plus-lg me-1"></i>Agregar tramo</button>
+          <button class="btn-primary-af" onclick="guardarReglas()"><i class="bi bi-save me-1"></i>Guardar tramos</button>
+        </div>
+      </div>
+
       <div class="afecta">
         <h4><i class="bi bi-diagram-3"></i> Qué afecta este mantenedor</h4>
         <ul>
           <li><b>Días de mes completo</b> y <b>Umbral de renta variable</b> → cómo se calcula la renta en <a href="/ia/liquidaciones/">Análisis de Liquidaciones (IA)</a>.</li>
           <li><b>Salud %</b>, <b>Cotización AFP base</b> y <b>Comisiones AFP</b> → los chequeos de inconsistencia (salud bajo el mínimo, AFP que no cuadra) en las liquidaciones.</li>
+          <li><b>Impuesto Único 2ª Categoría (tramos)</b> → verificación de que el impuesto retenido en cada liquidación cuadre con los tramos × <a href="/mantenedores/uf/">UTM</a> del mes, en <a href="/ia/liquidaciones/">Análisis de Liquidaciones (IA)</a>.</li>
         </ul>
       </div>
     </div>
@@ -212,7 +223,7 @@
     const esc = s => String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
     const DEF_ANDO = 'Analizando con Inteligencia Artificial de Anthropic…';
     const DEF_ADO  = 'Analizado con Inteligencia Artificial de Anthropic';
-    let FEATS = [], MODELOS = [], AFPS = [];
+    let FEATS = [], MODELOS = [], AFPS = [], TRAMOS = [];
     function toast(m, ok=true){ const t=document.getElementById('toast'); t.textContent=m; t.style.background=ok?'#0f172a':'#b91c1c'; t.classList.add('show'); setTimeout(()=>t.classList.remove('show'),2400); }
 
     async function cargar(){
@@ -229,6 +240,7 @@
       document.getElementById('pSalud').value  = p.salud_pct           != null ? p.salud_pct           : 7;
       document.getElementById('pAfpCot').value = p.afp_cotizacion_pct  != null ? p.afp_cotizacion_pct  : 10;
       AFPS = c.afps || []; renderAfps();
+      TRAMOS = c.tramos_iusc || []; renderTramos();
       renderFeats(); onMaster(); renderPrev();
     }
 
@@ -290,7 +302,7 @@
     }
 
     async function guardarReglas(){
-      syncAfps();
+      syncAfps(); syncTramos();
       const body = {
         params: {
           liq_mes_completo:    document.getElementById('pMes').value,
@@ -299,6 +311,7 @@
           afp_cotizacion_pct:  document.getElementById('pAfpCot').value,
         },
         afps: AFPS.filter(a => a.nombre && a.nombre.trim()),
+        tramos: TRAMOS,
       };
       try {
         const r = await fetch('/api/ia-config', { method:'PUT', headers:H, body:JSON.stringify(body) });
@@ -325,6 +338,26 @@
     }
     function addAfp(){ syncAfps(); AFPS.push({nombre:'',comision:0}); renderAfps(); }
     function delAfp(i){ syncAfps(); AFPS.splice(i,1); renderAfps(); }
+
+    function renderTramos(){
+      document.getElementById('tramoRows').innerHTML = TRAMOS.length ? TRAMOS.map((t,i)=>`
+        <tr>
+          <td><input class="txt" type="number" step="0.01" min="0" style="width:100px;padding:6px 8px;font-size:.85rem" value="${t.desde_utm}" data-k="desde_utm"></td>
+          <td><input class="txt" type="number" step="0.01" min="0" style="width:100px;padding:6px 8px;font-size:.85rem" value="${t.hasta_utm==null?'':t.hasta_utm}" placeholder="sin tope" data-k="hasta_utm"></td>
+          <td class="r"><input class="txt" type="number" step="0.0001" min="0" max="1" style="width:90px;padding:6px 8px;font-size:.85rem;text-align:right" value="${t.factor}" data-k="factor"></td>
+          <td class="r"><input class="txt" type="number" step="0.01" min="0" style="width:100px;padding:6px 8px;font-size:.85rem;text-align:right" value="${t.rebaja_utm}" data-k="rebaja_utm"></td>
+          <td class="r"><button class="btn-ghost" style="padding:5px 10px" onclick="delTramo(${i})"><i class="bi bi-trash"></i></button></td>
+        </tr>`).join('') : '<tr><td colspan="5" style="color:#94a3b8;text-align:center;padding:12px">Sin tramos. Agrega uno.</td></tr>';
+    }
+    function syncTramos(){
+      TRAMOS = [...document.querySelectorAll('#tramoRows tr')].map(tr=>{
+        const d=tr.querySelector('[data-k=desde_utm]'); if(!d) return null;
+        const h=tr.querySelector('[data-k=hasta_utm]'), f=tr.querySelector('[data-k=factor]'), r=tr.querySelector('[data-k=rebaja_utm]');
+        return { desde_utm:parseFloat(d.value)||0, hasta_utm: h.value===''?null:parseFloat(h.value), factor:parseFloat(f.value)||0, rebaja_utm:parseFloat(r.value)||0 };
+      }).filter(Boolean);
+    }
+    function addTramo(){ syncTramos(); TRAMOS.push({desde_utm:0,hasta_utm:null,factor:0,rebaja_utm:0}); renderTramos(); }
+    function delTramo(i){ syncTramos(); TRAMOS.splice(i,1); renderTramos(); }
 
     /* ── Pestañas ── */
     let _usoTimer = null, _usoDias = 90;

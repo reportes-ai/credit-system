@@ -60,6 +60,51 @@ function periodoOrden(p) {
   if (!m) { const mm = s.match(/\b(0?[1-9]|1[0-2])\b/); if (mm) m = parseInt(mm[1]); }
   return (y ? parseInt(y) : 0) * 100 + m;
 }
+// "Mayo 2026" → "2026-05-01" (o null si no se puede resolver el período)
+function periodoFecha(p) {
+  const o = periodoOrden(p);
+  const y = Math.floor(o / 100), m = o % 100;
+  if (!y || !m) return null;
+  return `${y}-${String(m).padStart(2, '0')}-01`;
+}
+// UTM vigente para la fecha del período (cacheada por mes para no re-consultar).
+async function utmDe(fecha, cache) {
+  if (!fecha) return null;
+  const ym = fecha.slice(0, 7);
+  if (cache[ym] !== undefined) return cache[ym];
+  let v = null;
+  try { const [[r]] = await pool.query('SELECT valor FROM utm WHERE fecha <= ? ORDER BY fecha DESC LIMIT 1', [fecha]); if (r) v = Number(r.valor); } catch (_) {}
+  cache[ym] = v;
+  return v;
+}
+
+/* Verifica el Impuesto Único de 2ª Categoría de cada liquidación contra los tramos × UTM del período.
+   Base tributable = imponible − AFP − salud legal (tope saludPct%). Tolerancia amplia para evitar
+   falsos positivos (topes imponibles, APV, cargas). Solo marca diferencias claras. */
+async function verificarImpuestoUnico(items, tramos, saludPct) {
+  const inc = [];
+  if (!Array.isArray(tramos) || !tramos.length) return inc;
+  const clp = n => '$' + Number(n).toLocaleString('es-CL');
+  const sp = (Number(saludPct) || 7) / 100;
+  const cache = {};
+  for (const it of items || []) {
+    if (it.imponible == null || it.impuesto == null) continue;       // sin dato → no se verifica
+    const utm = await utmDe(periodoFecha(it.periodo), cache);
+    if (!utm) continue;                                              // sin UTM del período → no se verifica
+    const saludLegal = Math.min(it.salud_monto || 0, Math.round(it.imponible * sp));
+    const base = it.imponible - (it.afp_monto || 0) - saludLegal;
+    if (base <= 0) continue;
+    const esp = ia.impuestoUnicoMensual(base, utm, tramos);
+    if (esp == null) continue;
+    const per = it.periodo || 's/período';
+    if (esp === 0 && it.impuesto > 5000) {
+      inc.push(`Impuesto único en ${per}: se descontó ${clp(it.impuesto)} pero la base tributable (${clp(base)}) cae en el tramo exento.`);
+    } else if (esp > 0 && Math.abs(it.impuesto - esp) > Math.max(5000, esp * 0.15)) {
+      inc.push(`Impuesto único en ${per}: descontado ${clp(it.impuesto)} vs esperado ≈ ${clp(esp)} según tramos × UTM del mes (${clp(utm)}).`);
+    }
+  }
+  return inc;
+}
 
 const SYSTEM = `Eres un analista de crédito chileno experto en liquidaciones de sueldo.
 Extrae los datos con precisión. Los montos van en pesos chilenos como números ENTEROS, sin puntos, comas ni símbolos.
@@ -71,9 +116,10 @@ const PROMPT = `Extrae los datos de esta liquidación de sueldo y responde EXACT
   "periodo":"string|null","dias_trabajados":"number|null",
   "sueldo_base":"number|null","total_imponible":"number|null","total_haberes":"number|null",
   "afp_nombre":"string|null","afp_monto":"number|null","salud_nombre":"string|null","salud_monto":"number|null",
-  "total_descuentos":"number|null","sueldo_liquido":"number|null"
+  "impuesto_unico":"number|null","total_descuentos":"number|null","sueldo_liquido":"number|null"
 }
-"periodo" en formato "Mes Año" (ej "Mayo 2026").`;
+"periodo" en formato "Mes Año" (ej "Mayo 2026").
+"impuesto_unico" es el impuesto único de segunda categoría retenido en la liquidación (si no aparece, null).`;
 
 /* Detecta inconsistencias entre/dentro de las liquidaciones (determinístico) */
 function detectarInconsistencias(items, cfg = {}) {
@@ -128,7 +174,8 @@ function calcularRenta(rawLiqs, tipoForzado, params = {}) {
       imponible: ent(l.total_imponible), liquido: ent(l.sueldo_liquido),
       haberes: ent(l.total_haberes), descuentos: ent(l.total_descuentos),
       afp_nombre: l.afp_nombre || null, afp_monto: ent(l.afp_monto),
-      salud_nombre: l.salud_nombre || null, salud_monto: ent(l.salud_monto), usada: false,
+      salud_nombre: l.salud_nombre || null, salud_monto: ent(l.salud_monto),
+      impuesto: ent(l.impuesto_unico), usada: false,
     };
   }).sort((a, b) => b.orden - a.orden);
 
@@ -232,6 +279,10 @@ exports.evaluar = async (req, res) => {
     const cfg = await ia.getConfig();
     const cfgP = cfg.params || {};
     const calc = calcularRenta(raw, null, { mesCompleto: cfgP.liq_mes_completo, umbral: cfgP.liq_umbral_variable, saludPct: cfgP.salud_pct, afpCotizacion: cfgP.afp_cotizacion_pct, afps: cfg.afps });
+    try {
+      const incImp = await verificarImpuestoUnico(calc.items, cfg.tramos_iusc, cfgP.salud_pct);
+      if (incImp.length) calc.inconsistencias = [...(calc.inconsistencias || []), ...incImp];
+    } catch (e) { console.error('[ia impuesto]', e.message); }
     const ident = raw.find(l => l.rut_trabajador) || raw[0] || {};
 
     let id = null;
@@ -280,6 +331,10 @@ exports.recalcular = async (req, res) => {
     const cfg = await ia.getConfig();
     const cfgP = cfg.params || {};
     const calc = calcularRenta(parseLiqs(ev.liquidaciones), (tipo === 'FIJA' || tipo === 'VARIABLE') ? tipo : null, { mesCompleto: cfgP.liq_mes_completo, umbral: cfgP.liq_umbral_variable, saludPct: cfgP.salud_pct, afpCotizacion: cfgP.afp_cotizacion_pct, afps: cfg.afps });
+    try {
+      const incImp = await verificarImpuestoUnico(calc.items, cfg.tramos_iusc, cfgP.salud_pct);
+      if (incImp.length) calc.inconsistencias = [...(calc.inconsistencias || []), ...incImp];
+    } catch (e) { console.error('[ia impuesto]', e.message); }
     await pool.query(
       `UPDATE ia_evaluaciones_renta SET tipo_renta=?, renta_liquida=?, renta_imponible=?, meses_usados=?, meses_descartados=?, explicacion=?, advertencia=?, inconsistencias=? WHERE id=?`,
       [calc.tipo_renta, calc.renta_liquida, calc.renta_imponible, calc.meses_usados, calc.meses_descartados, calc.explicacion, calc.advertencia, JSON.stringify(calc.inconsistencias || []), ev.id]);
