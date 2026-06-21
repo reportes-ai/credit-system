@@ -1,36 +1,16 @@
 'use strict';
 /**
- * Sincronizador automático de indicadores (UF y UTM) desde mindicador.cl.
- * - Corre al arrancar (tras 15s) y cada 12 horas.
- * - INSERT IGNORE: solo agrega fechas que falten; NUNCA pisa valores ya cargados
- *   ni ediciones del administrador.
- * - UF se publica con valores diarios (la API trae ~31 días); UTM es mensual.
+ * Sincronizador de indicadores — fuente única: API oficial CMF (cmf-api.js).
+ *  - UF y dólar: DIARIOS (siempre).
+ *  - UTM e IPC: MENSUALES (mes actual + anterior, por la publicación tardía del IPC).
+ *  - TMC: desde el DÍA 13 y hasta encontrar el período nuevo del mes (tmc-sync.js).
+ * Corre al arrancar (force) y cada 24h. Requiere CMF_API_KEY (sin ella, falla suave y avisa).
  */
 const pool = require('../../../shared/config/database');
-const axios = require('axios');
+const { cmfGet } = require('./cmf-api');
 const { sincronizarTMC } = require('./tmc-sync');
 
-async function fetchSerie(ind) {
-  const r = await axios.get(`https://mindicador.cl/api/${ind}`, { timeout: 15000, headers: { Accept: 'application/json' } });
-  const serie = (r.data && r.data.serie) || [];
-  return serie
-    .map(s => ({ fecha: String(s.fecha).slice(0, 10), valor: Number(s.valor) }))
-    .filter(s => /^\d{4}-\d{2}-\d{2}$/.test(s.fecha) && isFinite(s.valor) && s.valor > 0);
-}
-
-async function syncTabla(ind, tabla) {
-  const serie = await fetchSerie(ind);
-  let nuevos = 0;
-  for (const s of serie) {
-    const fecha = ind === 'utm' ? s.fecha.slice(0, 7) + '-01' : s.fecha; // UTM: 1 registro por mes
-    const [r] = await pool.query(`INSERT IGNORE INTO ${tabla} (fecha, valor) VALUES (?, ?)`, [fecha, s.valor]);
-    if (r.affectedRows === 1) nuevos++;
-  }
-  return { total: serie.length, nuevos };
-}
-
-// Guarda el estado de la última sincronización por indicador ('' = OK) para que el
-// módulo de Alertas avise si algo no se pudo sincronizar.
+// Estado de la última sincronización por indicador ('' = OK) → lo usa el módulo de Alertas.
 async function setEstado(clave, valor) {
   try {
     await pool.query(
@@ -39,58 +19,65 @@ async function setEstado(clave, valor) {
   } catch (_) {}
 }
 
-async function mesUTMcargado() {
-  try { const [[r]] = await pool.query("SELECT 1 ok FROM utm WHERE DATE_FORMAT(fecha,'%Y-%m')=DATE_FORMAT(CURDATE(),'%Y-%m') LIMIT 1"); return !!r; }
-  catch { return false; }
+async function syncTabla(recurso, tabla, year, month, mensual) {
+  const serie = await cmfGet(recurso, year, month);
+  let nuevos = 0;
+  for (const s of serie) {
+    const fecha = mensual ? s.fecha.slice(0, 7) + '-01' : s.fecha;   // mensuales → día 1 del mes
+    const [r] = await pool.query(`INSERT IGNORE INTO ${tabla} (fecha, valor) VALUES (?, ?)`, [fecha, s.valor]);
+    if (r.affectedRows === 1) nuevos++;
+  }
+  return { total: serie.length, nuevos };
 }
+
 async function periodoTMCcargado() {
   try { const [[r]] = await pool.query("SELECT 1 ok FROM tasas WHERE fecha_desde >= DATE_FORMAT(CURDATE(),'%Y-%m-01') LIMIT 1"); return !!r; }
   catch { return false; }
 }
 
-/**
- * Cadencia: corre cada 24h (y al arrancar / botón con force=true).
- *  - UF : DIARIA, siempre (la API trae los últimos ~31 días).
- *  - UTM: MENSUAL, solo si falta el valor del mes en curso.
- *  - TMC: desde el DÍA 13 y hasta encontrar el período nuevo del mes (luego deja de buscar).
- * force=true (arranque / botón "Actualizar") ignora esas ventanas (sirve para calibrar la TMC).
- */
+const eMsg = (lbl, e) => `${lbl}: ${e.code === 'NOCMF' ? 'falta CMF_API_KEY' : e.message}`;
+
 async function sincronizar(opts = {}) {
   const force = !!opts.force;
   const dia = new Date().getDate();
+  const now = new Date();
+  const y = now.getFullYear(), m = now.getMonth() + 1;
+  const py = m === 1 ? y - 1 : y, pm = m === 1 ? 12 : m - 1;
   const out = {};
 
-  // UF — diaria
-  try { out.uf = await syncTabla('uf', 'uf'); await setEstado('sync_uf', ''); console.log(`[indicadores] UF: ${out.uf.nuevos}/${out.uf.total}`); }
-  catch (e) { out.uf = { error: e.message }; await setEstado('sync_uf', 'UF: ' + e.message); console.error('[indicadores] UF:', e.message); }
-
-  // UTM — mensual: solo si aún no está el mes en curso
-  try {
-    if (force || !(await mesUTMcargado())) { out.utm = await syncTabla('utm', 'utm'); console.log(`[indicadores] UTM: ${out.utm.nuevos}/${out.utm.total}`); }
-    else out.utm = { sin_cambios: true };
-    await setEstado('sync_utm', '');
-  } catch (e) { out.utm = { error: e.message }; await setEstado('sync_utm', 'UTM: ' + e.message); console.error('[indicadores] UTM:', e.message); }
-
-  // TMC — desde el día 13 y hasta cargar el período del mes
+  // Diarios: UF y dólar
+  for (const [rec, tab] of [['uf', 'uf'], ['dolar', 'dolar']]) {
+    try { out[tab] = await syncTabla(rec, tab, y, m, false); await setEstado('sync_' + tab, ''); }
+    catch (e) { out[tab] = { error: e.message }; await setEstado('sync_' + tab, eMsg(tab.toUpperCase(), e)); if (e.code !== 'NOCMF') console.error('[indicadores]', tab, e.message); }
+  }
+  // Mensuales: UTM e IPC (mes actual + anterior)
+  for (const [rec, tab] of [['utm', 'utm'], ['ipc', 'ipc']]) {
+    try {
+      const a = await syncTabla(rec, tab, y, m, true);
+      let b = { nuevos: 0, total: 0 };
+      try { b = await syncTabla(rec, tab, py, pm, true); } catch (_) {}
+      out[tab] = { nuevos: a.nuevos + b.nuevos, total: a.total + b.total };
+      await setEstado('sync_' + tab, '');
+    } catch (e) { out[tab] = { error: e.message }; await setEstado('sync_' + tab, eMsg(tab.toUpperCase(), e)); if (e.code !== 'NOCMF') console.error('[indicadores]', tab, e.message); }
+  }
+  // TMC: desde el día 13 y hasta cargar el período del mes
   try {
     if (force || dia >= 13) {
       if (!force && await periodoTMCcargado()) { out.tmc = { sin_cambios: true, motivo: 'período del mes ya cargado' }; await setEstado('sync_tmc', ''); }
       else { out.tmc = await sincronizarTMC(); await setEstado('sync_tmc', out.tmc.ok ? '' : ('TMC: ' + (out.tmc.motivo || 'no se pudo sincronizar'))); }
-    } else {
-      out.tmc = { skipped: true, motivo: 'la TMC se busca desde el día 13' };
-    }
-    console.log('[indicadores] TMC:', JSON.stringify(out.tmc));
+    } else out.tmc = { skipped: true, motivo: 'la TMC se busca desde el día 13' };
   } catch (e) {
     out.tmc = e.code === 'NOCMF' ? { ok: false, motivo: 'falta CMF_API_KEY' } : { error: e.message };
-    await setEstado('sync_tmc', 'TMC: ' + (e.code === 'NOCMF' ? 'falta CMF_API_KEY' : e.message));
-    if (e.code !== 'NOCMF') console.error('[indicadores] TMC:', e.message);
+    await setEstado('sync_tmc', eMsg('TMC', e));
+    if (e.code !== 'NOCMF') console.error('[indicadores] TMC', e.message);
   }
 
   await setEstado('sync_ultima', new Date().toISOString());
+  console.log('[indicadores]', JSON.stringify(out));
   return out;
 }
 
-// Al arrancar: puesta al día (force). Luego cada 24h (UF diaria; UTM/TMC según ventana).
+// Al arrancar: puesta al día (force). Luego cada 24h.
 setTimeout(() => { sincronizar({ force: true }); }, 15000);
 setInterval(() => { sincronizar(); }, 24 * 60 * 60 * 1000);
 

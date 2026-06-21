@@ -11,17 +11,10 @@
  * de meses abiertos, igual que una carga manual). INSERT solo de períodos nuevos; nunca pisa.
  */
 const pool = require('../../../shared/config/database');
-const axios = require('axios');
+const { cmfGet } = require('./cmf-api');
 const { recalcularMesesAbiertos } = require('../../creditos/src/utils/recalcular-mes');
 
 const round4 = n => Math.round(n * 10000) / 10000;
-
-function normFecha(s) {
-  s = String(s || '').trim();
-  let m = s.match(/^(\d{4})-(\d{2})-(\d{2})/);            if (m) return `${m[1]}-${m[2]}-${m[3]}`;
-  m = s.match(/^(\d{2})[-/](\d{2})[-/](\d{4})/);          if (m) return `${m[3]}-${m[2]}-${m[1]}`;
-  return '';
-}
 
 async function getParam(clave) {
   try { const [[r]] = await pool.query('SELECT valor FROM parametros_credito WHERE clave=? LIMIT 1', [clave]); return r ? r.valor : null; }
@@ -29,20 +22,6 @@ async function getParam(clave) {
 }
 async function setParam(clave, valor, desc) {
   await pool.query('INSERT INTO parametros_credito (clave, valor, descripcion) VALUES (?,?,?) ON DUPLICATE KEY UPDATE valor=VALUES(valor)', [clave, String(valor), desc || '']);
-}
-
-async function fetchTMC(year, month) {
-  const key = process.env.CMF_API_KEY;
-  if (!key) { const e = new Error('Falta CMF_API_KEY'); e.code = 'NOCMF'; throw e; }
-  const url = `https://api.cmfchile.cl/api-sbifv3/recursos_api/tmc/${year}/${month}?apikey=${encodeURIComponent(key)}&formato=json`;
-  const r = await axios.get(url, { timeout: 15000, headers: { Accept: 'application/json' } });
-  const arr = (r.data && (r.data.TMCs || r.data.tmcs || r.data.TMC)) || [];
-  return arr.map(x => ({
-    tipo:  String(x.Tipo ?? x.tipo ?? '').trim(),
-    valor: parseFloat(String(x.Valor ?? x.valor ?? '').replace(',', '.')),
-    desde: normFecha(x.Fecha ?? x.fecha),
-    hasta: normFecha(x.Hasta ?? x.hasta),
-  })).filter(x => x.tipo && isFinite(x.valor) && x.valor > 0);
 }
 
 // Identifica los tipos de TMC que coinciden con los valores ya cargados (verificación "idéntico al cargado").
@@ -59,7 +38,7 @@ async function calibrar(tmcs) {
 
 async function sincronizarTMC() {
   const now = new Date();
-  const tmcs = await fetchTMC(now.getFullYear(), now.getMonth() + 1);
+  const tmcs = await cmfGet('tmc', now.getFullYear(), now.getMonth() + 1);
   if (!tmcs.length) return { ok: false, motivo: 'La CMF no devolvió datos de TMC para el mes.' };
 
   let tipoMenor = await getParam('tmc_tipo_menor');
@@ -75,7 +54,7 @@ async function sincronizarTMC() {
   const eMayor = tmcs.find(x => x.tipo === String(tipoMayor));
   if (!eMenor || !eMayor) return { ok: false, motivo: 'La CMF no trae este mes los tipos de TMC calibrados.' };
 
-  const desde = eMenor.desde || eMayor.desde;
+  const desde = eMenor.fecha || eMayor.fecha;
   const hasta = eMenor.hasta || eMayor.hasta;
   if (!desde || !hasta) return { ok: false, motivo: 'La CMF no entregó fechas de vigencia válidas.' };
 
