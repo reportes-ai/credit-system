@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Inteligencia Artificial — AutoFácil</title>
-  <!-- v1.2 -->
+  <!-- v1.3 -->
   <link href="/css/bootstrap-icons.css" rel="stylesheet">
   <style>
     :root { --navy:#012d70; --blue:#0141A2; --coral:#D97757; }
@@ -96,6 +96,7 @@
     <div class="tabs">
       <button class="tab active" data-tab="config"><i class="bi bi-sliders me-1"></i>Configuración</button>
       <button class="tab" data-tab="uso"><i class="bi bi-graph-up me-1"></i>Uso IA</button>
+      <button class="tab" data-tab="reglas"><i class="bi bi-sliders me-1"></i>Reglas de cálculo</button>
     </div>
 
     <div id="tab-config">
@@ -163,6 +164,32 @@
       </div>
       <div id="usoBody"><div class="vacio"><i class="bi bi-graph-up"></i>Cargando…</div></div>
     </div>
+
+    <div id="tab-reglas" style="display:none">
+      <div class="card-af">
+        <h3><i class="bi bi-sliders"></i>Reglas de cálculo — Liquidaciones</h3>
+        <div class="sub">Parámetros que usa el cálculo de renta a partir de las liquidaciones de sueldo.</div>
+
+        <label class="lbl">Días de un mes completo</label>
+        <input class="txt" type="number" id="pMes" min="1" max="31" style="max-width:160px">
+        <div style="font-size:.74rem;color:#94a3b8;margin-top:4px">Una liquidación con menos días que esto se considera mes incompleto (licencia/ausencia) y se descarta del promedio.</div>
+
+        <label class="lbl" style="margin-top:16px">Umbral de renta variable (%)</label>
+        <input class="txt" type="number" id="pUmbral" min="0" max="100" step="0.5" style="max-width:160px">
+        <div style="font-size:.74rem;color:#94a3b8;margin-top:4px">Si el imponible entre meses completos varía más que este %, la renta se considera variable (promedio de meses); si no, fija.</div>
+
+        <div style="margin-top:18px;display:flex;justify-content:flex-end">
+          <button class="btn-primary-af" onclick="guardarReglas()"><i class="bi bi-save me-1"></i>Guardar</button>
+        </div>
+
+        <div class="afecta">
+          <h4><i class="bi bi-diagram-3"></i> Qué afecta este mantenedor</h4>
+          <ul>
+            <li><b>Días de mes completo</b> y <b>Umbral de renta variable</b> → el cálculo de renta en <a href="/ia/liquidaciones/">Análisis de Liquidaciones (IA)</a>: qué meses se descartan y si la renta se trata como fija o variable.</li>
+          </ul>
+        </div>
+      </div>
+    </div>
   </div>
 
   <div class="toast-af" id="toast"></div>
@@ -187,6 +214,9 @@
       document.getElementById('txtAnalizado').value  = c.texto_analizado  || DEF_ADO;
       FEATS = c.funcionalidades || [];
       MODELOS = c.modelos || [];
+      const p = c.params || {};
+      document.getElementById('pMes').value    = p.liq_mes_completo    != null ? p.liq_mes_completo    : 30;
+      document.getElementById('pUmbral').value = p.liq_umbral_variable != null ? p.liq_umbral_variable : 5;
       renderFeats(); onMaster(); renderPrev();
     }
 
@@ -247,12 +277,25 @@
       } catch(_){ toast('Error de conexión', false); }
     }
 
+    async function guardarReglas(){
+      const body = { params: {
+        liq_mes_completo:    document.getElementById('pMes').value,
+        liq_umbral_variable: document.getElementById('pUmbral').value,
+      } };
+      try {
+        const r = await fetch('/api/ia-config', { method:'PUT', headers:H, body:JSON.stringify(body) });
+        const j = await r.json();
+        if (!j.success) return toast(j.error||'Error al guardar', false);
+        await AF_IA.config(true);
+        toast('Reglas de cálculo guardadas');
+      } catch(_){ toast('Error de conexión', false); }
+    }
+
     /* ── Pestañas ── */
     let _usoTimer = null, _usoDias = 90;
     function showTab(t){
       document.querySelectorAll('.tab').forEach(b => b.classList.toggle('active', b.dataset.tab === t));
-      document.getElementById('tab-config').style.display = (t==='config') ? '' : 'none';
-      document.getElementById('tab-uso').style.display    = (t==='uso')    ? '' : 'none';
+      ['config','uso','reglas'].forEach(x => { const el = document.getElementById('tab-'+x); if (el) el.style.display = (x===t) ? '' : 'none'; });
       if (t==='uso'){ renderUso(); if(!_usoTimer) _usoTimer = setInterval(renderUso, 30000); }
       else if (_usoTimer){ clearInterval(_usoTimer); _usoTimer = null; }
     }

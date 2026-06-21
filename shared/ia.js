@@ -22,6 +22,12 @@ const DEFAULTS = {
   mostrar_logo:     '1',
 };
 
+// Parámetros de cálculo (paramétricos, editables en el mantenedor IA → "Reglas de cálculo")
+const PARAMS_DEF = {
+  liq_mes_completo:    '30',  // días para considerar un mes COMPLETO en liquidaciones
+  liq_umbral_variable: '5',   // % de variación del imponible sobre el cual la renta es VARIABLE
+};
+
 // Precios USD por 1.000.000 de tokens (entrada/salida). Tabla ia_modelos (paramétrica).
 const DEFAULT_PRECIOS = {
   'claude-opus-4-8':   { nombre: 'Claude Opus 4.8',   in: 5,  out: 25 },
@@ -76,6 +82,8 @@ const CATALOGO = [
       INDEX idx_fecha (fecha), INDEX idx_codigo (codigo), INDEX idx_modelo (modelo) )`);
     for (const [k, v] of Object.entries(DEFAULTS))
       await pool.query('INSERT IGNORE INTO ia_config (clave, valor) VALUES (?,?)', [k, v]);
+    for (const [k, v] of Object.entries(PARAMS_DEF))
+      await pool.query('INSERT IGNORE INTO ia_config (clave, valor) VALUES (?,?)', [k, v]);
     for (const [m, p] of Object.entries(DEFAULT_PRECIOS))
       await pool.query('INSERT IGNORE INTO ia_modelos (modelo, nombre, precio_in, precio_out) VALUES (?,?,?,?)', [m, p.nombre, p.in, p.out]);
     // Columnas nuevas en BD existentes (TiDB soporta IF NOT EXISTS; 1060 = ya existe)
@@ -118,6 +126,10 @@ async function getConfig(force = false) {
     mostrar_logo:     cfg.mostrar_logo !== '0',
     funcionalidades:  funcs,
     modelos:          modelos,
+    params: {
+      liq_mes_completo:    parseInt(cfg.liq_mes_completo)      || 30,
+      liq_umbral_variable: parseFloat(cfg.liq_umbral_variable) || 5,
+    },
   };
   _cacheAt = Date.now();
   return _cache;
@@ -154,14 +166,25 @@ async function registrarFuncionalidad({ codigo, nombre, descripcion, modelo }) {
   } catch (e) { console.error('[ia registrar]', e.message); }
 }
 
-/** Guardar config (master + textos + toggles por funcionalidad). Devuelve la config nueva. */
-async function setConfig({ activa, texto_analizando, texto_analizado, mostrar_logo, funcionalidades } = {}) {
+/** Guardar config (master + textos + toggles + parámetros de cálculo). Devuelve la config nueva. */
+async function setConfig({ activa, texto_analizando, texto_analizado, mostrar_logo, funcionalidades, params } = {}) {
   const up = (k, v) => pool.query(
     'INSERT INTO ia_config (clave, valor) VALUES (?,?) ON DUPLICATE KEY UPDATE valor = VALUES(valor)', [k, String(v)]);
   if (activa != null)           await up('activa', activa ? '1' : '0');
   if (texto_analizando != null) await up('texto_analizando', String(texto_analizando).slice(0, 200));
   if (texto_analizado != null)  await up('texto_analizado',  String(texto_analizado).slice(0, 200));
   if (mostrar_logo != null)     await up('mostrar_logo', mostrar_logo ? '1' : '0');
+  if (params && typeof params === 'object') {
+    if (params.liq_mes_completo != null) {
+      const d = Math.min(Math.max(parseInt(params.liq_mes_completo) || 30, 1), 31);
+      await up('liq_mes_completo', d);
+    }
+    if (params.liq_umbral_variable != null) {
+      let u = parseFloat(params.liq_umbral_variable); if (isNaN(u)) u = 5;
+      u = Math.min(Math.max(u, 0), 100);
+      await up('liq_umbral_variable', u);
+    }
+  }
   if (Array.isArray(funcionalidades)) {
     for (const f of funcionalidades) {
       if (!f || !f.codigo) continue;

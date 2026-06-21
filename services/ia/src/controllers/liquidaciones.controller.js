@@ -75,13 +75,15 @@ const PROMPT = `Extrae los datos de esta liquidación de sueldo y responde EXACT
 "periodo" en formato "Mes Año" (ej "Mayo 2026").`;
 
 /* Núcleo determinístico: aplica las reglas de cálculo de renta */
-function calcularRenta(rawLiqs, tipoForzado) {
+function calcularRenta(rawLiqs, tipoForzado, params = {}) {
+  const MES = parseInt(params.mesCompleto) || MES_COMPLETO_DIAS;
+  const UMBRAL = (params.umbral != null && !isNaN(parseFloat(params.umbral))) ? parseFloat(params.umbral) : UMBRAL_VARIABLE_PCT;
   const forz = (tipoForzado || '').toString().toUpperCase();
   const items = (rawLiqs || []).map(l => {
     const dias = ent(l.dias_trabajados);
     return {
       periodo: l.periodo || null, orden: periodoOrden(l.periodo),
-      dias, diasConocidos: dias != null, completo: dias == null ? true : dias >= MES_COMPLETO_DIAS,
+      dias, diasConocidos: dias != null, completo: dias == null ? true : dias >= MES,
       imponible: ent(l.total_imponible), liquido: ent(l.sueldo_liquido),
       afp_nombre: l.afp_nombre || null, salud_nombre: l.salud_nombre || null, usada: false,
     };
@@ -96,7 +98,7 @@ function calcularRenta(rawLiqs, tipoForzado) {
   if (impc.length >= 2) {
     const max = Math.max(...impc), min = Math.min(...impc);
     const varia = min > 0 ? ((max - min) / min) * 100 : 0;
-    tipoAuto = varia > UMBRAL_VARIABLE_PCT ? 'VARIABLE' : 'FIJA';
+    tipoAuto = varia > UMBRAL ? 'VARIABLE' : 'FIJA';
   }
   const tipo = (forz === 'FIJA' || forz === 'VARIABLE') ? forz : tipoAuto;
 
@@ -158,7 +160,8 @@ exports.evaluar = async (req, res) => {
     }
     if (!raw.length) return res.status(422).json({ success: false, data: null, error: 'No se pudo interpretar ninguna liquidación. Prueba con imágenes más nítidas o PDF.' });
 
-    const calc = calcularRenta(raw, null);
+    const cfgP = (await ia.getConfig()).params || {};
+    const calc = calcularRenta(raw, null, { mesCompleto: cfgP.liq_mes_completo, umbral: cfgP.liq_umbral_variable });
     const ident = raw.find(l => l.rut_trabajador) || raw[0] || {};
 
     let id = null;
@@ -193,7 +196,8 @@ exports.recalcular = async (req, res) => {
     const [[ev]] = await pool.query('SELECT * FROM ia_evaluaciones_renta WHERE id = ? LIMIT 1', [req.params.id]);
     if (!ev) return res.status(404).json({ success: false, data: null, error: 'Evaluación no encontrada.' });
     const tipo = (req.query.tipo || '').toUpperCase();
-    const calc = calcularRenta(parseLiqs(ev.liquidaciones), (tipo === 'FIJA' || tipo === 'VARIABLE') ? tipo : null);
+    const cfgP = (await ia.getConfig()).params || {};
+    const calc = calcularRenta(parseLiqs(ev.liquidaciones), (tipo === 'FIJA' || tipo === 'VARIABLE') ? tipo : null, { mesCompleto: cfgP.liq_mes_completo, umbral: cfgP.liq_umbral_variable });
     await pool.query(
       `UPDATE ia_evaluaciones_renta SET tipo_renta=?, renta_liquida=?, renta_imponible=?, meses_usados=?, meses_descartados=?, explicacion=?, advertencia=? WHERE id=?`,
       [calc.tipo_renta, calc.renta_liquida, calc.renta_imponible, calc.meses_usados, calc.meses_descartados, calc.explicacion, calc.advertencia, ev.id]);
