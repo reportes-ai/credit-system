@@ -1,5 +1,6 @@
 const pool = require('../../../../shared/config/database');
 const { auditar } = require('../../../../shared/audit');
+const { sincronizar } = require('../indicadores-sync');   // sync automático UF/UTM desde mindicador.cl
 
 const getAll = async (req, res) => {
   try {
@@ -95,4 +96,13 @@ const importarCSV = async (req, res) => {
   }
 };
 
-module.exports = { getAll, getVigente, getEnFecha, create, update, remove, importarCSV };
+// Fuerza la sincronización UF/UTM desde mindicador.cl (el auto-sync corre solo cada 12h)
+const sincronizarManual = async (req, res) => {
+  try {
+    const r = await sincronizar();
+    auditar({ req, accion: 'CARGA_MASIVA', modulo: 'mantenedores', entidad: 'uf', detalle: `Sincronizó UF/UTM desde mindicador.cl (UF +${r.uf?.nuevos || 0}, UTM +${r.utm?.nuevos || 0})`, meta: r });
+    res.json({ success: true, data: r, error: null });
+  } catch (e) { console.error('[uf sincronizar]', e.message); res.status(500).json({ success: false, data: null, error: 'No se pudo sincronizar: ' + e.message }); }
+};
+
+module.exports = { getAll, getVigente, getEnFecha, create, update, remove, importarCSV, sincronizarManual };

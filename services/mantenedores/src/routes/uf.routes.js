@@ -7,6 +7,7 @@ router.get('/', verifyToken, ctrl.getAll);
 router.get('/vigente', verifyToken, ctrl.getVigente);
 router.get('/en/:fecha', verifyToken, ctrl.getEnFecha);
 router.post('/importar', verifyToken, requireFunc('mantenedores_uf'), ctrl.importarCSV);
+router.post('/sincronizar', verifyToken, requireFunc('mantenedores_uf'), ctrl.sincronizarManual);
 router.post('/', verifyToken, requireFunc('mantenedores_uf'), ctrl.create);
 router.put('/:id', verifyToken, requireFunc('mantenedores_uf'), ctrl.update);
 router.delete('/:id', verifyToken, requireFunc('mantenedores_uf'), ctrl.remove);
