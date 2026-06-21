@@ -87,6 +87,61 @@
       : '<button type="button"' + id + ' class="' + cls + '" onclick="' + esc(a.onclick || '') + '"' + title + '>' + ic + esc(a.label) + '</button>';
   }
 
+  // Secciones (pantallas) → crumb padre. Refleja PLACEMENT_SECTIONS de placement-manifest.js.
+  // 'home' = card de nivel superior → el breadcrumb queda solo "Inicio › Título".
+  var SECTIONS = {
+    clientes:     { label: 'Clientes',             href: '/clientes/' },
+    cotizaciones: { label: 'Cotizaciones',         href: '/cotizaciones/' },
+    creditos:     { label: 'Créditos',             href: '/creditos/' },
+    tesoreria:    { label: 'Tesorería',            href: '/tesoreria/' },
+    crm:          { label: 'CRM',                  href: '/crm/' },
+    cobranza:     { label: 'Cobranza',             href: '/cobranza/' },
+    reporteria:   { label: 'Reportería',           href: '/reporteria/' },
+    comisiones:   { label: 'Comisión Ejecutivos',  href: '/comisiones/' },
+    mantenedores: { label: 'Mantenedores',         href: '/mantenedores/' },
+    usuarios:     { label: 'Usuarios',             href: '/usuarios/' },
+    cartas:       { label: 'Cartas de Aprobación', href: '/aprobaciones/' },
+    politica:     { label: 'Política',             href: '/politica/' },
+    simulador:    { label: 'Simulador',            href: '/simulador/' },
+    carga_masiva: { label: 'Carga Masiva',         href: '/carga-masiva/' },
+  };
+
+  // Construye el breadcrumb desde self + la sección resuelta: Inicio › [Sección] › Título › [extra…]
+  function selfCrumbs(self, section) {
+    var items = [{ label: 'Inicio', href: '/' }];
+    var sec = SECTIONS[section];
+    if (sec) items.push({ label: sec.label, href: sec.href });
+    var extra = self.extra && self.extra.length ? self.extra : null;
+    items.push(extra
+      ? { label: self.title, icon: self.icon, href: self.selfHref || '#' }
+      : { label: self.title, icon: self.icon, current: true });
+    if (extra) extra.forEach(function (e, i) {
+      items.push({ label: e.label, icon: e.icon, href: e.href, current: i === extra.length - 1 });
+    });
+    return items;
+  }
+
+  // Resuelve la sección donde está colocado el card (placement_v2 manda; defaultSection si no está).
+  function resolveSection(self, cb) {
+    var def = self.defaultSection || 'home';
+    var token = null; try { token = sessionStorage.getItem('token'); } catch (_) {}
+    if (!token) return cb(def);
+    fetch('/api/config/ui/placement_v2', { headers: { Authorization: 'Bearer ' + token } })
+      .then(function (r) { return r.json(); })
+      .then(function (j) {
+        var p = (j && j.success && j.data && typeof j.data === 'object') ? j.data : {};
+        var keys = [self.key, self.selfHref].filter(Boolean);
+        for (var sec in p) {                                  // formato nuevo: { seccion: [keys] }
+          if (Array.isArray(p[sec]) && p[sec].some(function (k) { return keys.indexOf(k) >= 0; })) return cb(sec);
+        }
+        for (var i = 0; i < keys.length; i++) {               // formato viejo: { key: 'seccion' }
+          if (typeof p[keys[i]] === 'string') return cb(p[keys[i]]);
+        }
+        cb(def);
+      })
+      .catch(function () { cb(def); });
+  }
+
   function render() {
     const mount = document.getElementById('af-topnav');
     if (!mount) return;                       // página aún no migrada → no hace nada
@@ -100,6 +155,11 @@
       : '<a class="af-dash" href="/dashboard" title="Dashboard Analytics"><i class="bi bi-bar-chart-line" style="font-size:15px"></i> Dashboard</a>';
     const actions = (cfg.actions || []).map(actionHTML).join('');
 
+    // Breadcrumb: estático si la página lo define; si declara self, se arma desde el placement
+    // (provisional con defaultSection y se refina al resolver placement_v2 — sigue al card si se mueve).
+    let bcItems = cfg.breadcrumb;
+    if (!bcItems && cfg.self) bcItems = selfCrumbs(cfg.self, cfg.self.defaultSection || 'home');
+
     mount.outerHTML =
       '<nav class="topnav">' +
         '<div class="topnav-left">' +
@@ -107,7 +167,7 @@
             '<img src="/img/logo.png" alt="AutoFácil">' +
             '<span class="version-badge" id="versionBadge">v—</span>' +
           '</a>' +
-          breadcrumbHTML(cfg.breadcrumb) +
+          breadcrumbHTML(bcItems) +
         '</div>' +
         '<div class="topnav-right">' +
           actions + dash +
@@ -121,6 +181,16 @@
           '<button type="button" class="btn-logout" onclick="(window.logout||window.afLogout)()"><i class="bi bi-box-arrow-right me-1"></i>Salir</button>' +
         '</div>' +
       '</nav>';
+
+    // Refina el breadcrumb con la sección real del placement (cuando la página declara self).
+    if (!cfg.breadcrumb && cfg.self) {
+      resolveSection(cfg.self, function (sec) {
+        const html = breadcrumbHTML(selfCrumbs(cfg.self, sec));
+        const el = document.querySelector('.topnav .breadcrumb-nav');
+        if (el) el.outerHTML = html;
+        else { const left = document.querySelector('.topnav .topnav-left'); if (left) left.insertAdjacentHTML('beforeend', html); }
+      });
+    }
   }
 
   // Logout estándar (si la página no define el suyo).

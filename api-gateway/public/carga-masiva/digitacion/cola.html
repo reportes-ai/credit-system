@@ -212,7 +212,7 @@ cargarSiguiente();
   (function(){
     var t = (new URLSearchParams(location.search).get('tipo') === 'otros') ? 'Otros Créditos' : 'Créditos Otorgados';
     window.AF_TOPNAV = {
-      breadcrumb: [{ label:'Inicio', href:'/' }, { label:'Mantenedores', href:'/mantenedores/' }, { label:'Digitación', href:'/carga-masiva/digitacion/' }, { label:t, icon:'bi-pencil-square', current:true }],
+      self: { key:'digitacion', selfHref:'/carga-masiva/digitacion/', title:'Digitación', defaultSection:'mantenedores', extra:[{ label:t, icon:'bi-pencil-square' }] },
       actions: [{ label:'Volver', icon:'bi-arrow-left', onclick:'salir()' }],
       dashboard: false
     };
