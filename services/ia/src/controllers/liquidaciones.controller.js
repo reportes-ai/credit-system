@@ -44,6 +44,7 @@ const UMBRAL_VARIABLE_PCT = 5;   // variación de imponible sobre la cual la ren
       guardado_cliente  TINYINT NOT NULL DEFAULT 0,
       rut_cliente       VARCHAR(15) NULL,
       INDEX idx_fecha (fecha), INDEX idx_rut (rut_trabajador) )`);
+    try { await pool.query('ALTER TABLE ia_evaluaciones_renta ADD COLUMN IF NOT EXISTS inconsistencias JSON NULL'); } catch (e) { if (e.errno !== 1060) console.error('[ia eval alter]', e.message); }
   } catch (e) { console.error('[ia liquidaciones init]', e.message); }
 })();
 
@@ -74,6 +75,35 @@ const PROMPT = `Extrae los datos de esta liquidación de sueldo y responde EXACT
 }
 "periodo" en formato "Mes Año" (ej "Mayo 2026").`;
 
+/* Detecta inconsistencias entre/dentro de las liquidaciones (determinístico) */
+function detectarInconsistencias(items) {
+  const inc = [];
+  const clp = n => '$' + Number(n).toLocaleString('es-CL');
+  for (const it of items) {
+    const per = it.periodo || 's/período';
+    if (it.imponible && it.salud_monto != null) {
+      const pct = it.salud_monto / it.imponible * 100;
+      if (pct < 6.9) inc.push(`Salud bajo el 7% obligatorio en ${per} (${pct.toFixed(1)}% del imponible).`);
+    }
+    if (it.imponible && it.afp_monto != null) {
+      const pct = it.afp_monto / it.imponible * 100;
+      if (pct < 9.5 || pct > 14) inc.push(`Descuento de AFP fuera del rango esperado (~10–13%) en ${per} (${pct.toFixed(1)}%).`);
+    }
+    if (it.haberes != null && it.descuentos != null && it.liquido != null) {
+      const dif = Math.abs((it.haberes - it.descuentos) - it.liquido);
+      if (dif > Math.max(1500, it.liquido * 0.01))
+        inc.push(`El líquido de ${per} no cuadra: haberes − descuentos = ${clp(it.haberes - it.descuentos)} vs líquido informado ${clp(it.liquido)}.`);
+    }
+  }
+  // Renta imponible que baja entre meses completos consecutivos (recientes primero)
+  const comp = items.filter(i => i.completo && i.imponible != null);
+  for (let k = 0; k < comp.length - 1; k++) {
+    if (comp[k].imponible < comp[k + 1].imponible * 0.98)
+      inc.push(`La renta imponible baja en ${comp[k].periodo} (${clp(comp[k].imponible)}) respecto a ${comp[k + 1].periodo} (${clp(comp[k + 1].imponible)}).`);
+  }
+  return inc;
+}
+
 /* Núcleo determinístico: aplica las reglas de cálculo de renta */
 function calcularRenta(rawLiqs, tipoForzado, params = {}) {
   const MES = parseInt(params.mesCompleto) || MES_COMPLETO_DIAS;
@@ -85,7 +115,9 @@ function calcularRenta(rawLiqs, tipoForzado, params = {}) {
       periodo: l.periodo || null, orden: periodoOrden(l.periodo),
       dias, diasConocidos: dias != null, completo: dias == null ? true : dias >= MES,
       imponible: ent(l.total_imponible), liquido: ent(l.sueldo_liquido),
-      afp_nombre: l.afp_nombre || null, salud_nombre: l.salud_nombre || null, usada: false,
+      haberes: ent(l.total_haberes), descuentos: ent(l.total_descuentos),
+      afp_nombre: l.afp_nombre || null, afp_monto: ent(l.afp_monto),
+      salud_nombre: l.salud_nombre || null, salud_monto: ent(l.salud_monto), usada: false,
     };
   }).sort((a, b) => b.orden - a.orden);
 
@@ -130,8 +162,11 @@ function calcularRenta(rawLiqs, tipoForzado, params = {}) {
   else if (incompletos.length && completos.length < 3) adv = 'Hay meses incompletos y menos de 3 completos; pide hasta 6 meses.';
   if (items.some(i => !i.diasConocidos)) adv = (adv ? adv + ' ' : '') + 'En alguna liquidación no se detectaron los días trabajados (se asumió mes completo).';
 
+  const inconsistencias = detectarInconsistencias(items);
+
   return { tipo_renta: tipo, tipo_auto: tipoAuto, renta_liquida, renta_imponible,
     meses_usados: mUsados.join(', '), meses_descartados: mDesc.join(', '), explicacion: exp, advertencia: adv, items,
+    inconsistencias,
     variacion, n_recibidas: items.length, n_usados: usados.length,
     metodo: tipo === 'FIJA' ? 'Último mes completo' : 'Promedio de meses completos',
     params: { mes_completo: MES, umbral_variable: UMBRAL } };
@@ -193,11 +228,11 @@ exports.evaluar = async (req, res) => {
         `INSERT INTO ia_evaluaciones_renta
           (id_usuario, rut_trabajador, trabajador, empleador, rut_empleador, tipo_renta, tipo_auto,
            renta_liquida, renta_imponible, n_liquidaciones, liquidaciones, meses_usados, meses_descartados,
-           explicacion, advertencia, modelo, tokens_in, tokens_out, costo_usd)
-         VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
+           explicacion, advertencia, inconsistencias, modelo, tokens_in, tokens_out, costo_usd)
+         VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
         [req.usuario?.id_usuario || null, normRut(ident.rut_trabajador), ident.trabajador || null, ident.empleador || null, normRut(ident.rut_empleador),
          calc.tipo_renta, calc.tipo_auto, calc.renta_liquida, calc.renta_imponible, raw.length, JSON.stringify(raw),
-         calc.meses_usados, calc.meses_descartados, calc.explicacion, calc.advertencia, modelo, tin, tout, costo]);
+         calc.meses_usados, calc.meses_descartados, calc.explicacion, calc.advertencia, JSON.stringify(calc.inconsistencias || []), modelo, tin, tout, costo]);
       id = ins.insertId;
     } catch (e) { console.error('[ia eval insert]', e.message); }
 
@@ -233,8 +268,8 @@ exports.recalcular = async (req, res) => {
     const cfgP = (await ia.getConfig()).params || {};
     const calc = calcularRenta(parseLiqs(ev.liquidaciones), (tipo === 'FIJA' || tipo === 'VARIABLE') ? tipo : null, { mesCompleto: cfgP.liq_mes_completo, umbral: cfgP.liq_umbral_variable });
     await pool.query(
-      `UPDATE ia_evaluaciones_renta SET tipo_renta=?, renta_liquida=?, renta_imponible=?, meses_usados=?, meses_descartados=?, explicacion=?, advertencia=? WHERE id=?`,
-      [calc.tipo_renta, calc.renta_liquida, calc.renta_imponible, calc.meses_usados, calc.meses_descartados, calc.explicacion, calc.advertencia, ev.id]);
+      `UPDATE ia_evaluaciones_renta SET tipo_renta=?, renta_liquida=?, renta_imponible=?, meses_usados=?, meses_descartados=?, explicacion=?, advertencia=?, inconsistencias=? WHERE id=?`,
+      [calc.tipo_renta, calc.renta_liquida, calc.renta_imponible, calc.meses_usados, calc.meses_descartados, calc.explicacion, calc.advertencia, JSON.stringify(calc.inconsistencias || []), ev.id]);
 
     let guardado = { ok: false, cliente: null, motivo: null };
     try {
