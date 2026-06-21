@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Análisis de Liquidaciones (IA) — AutoFácil</title>
-  <!-- v2.0 -->
+  <!-- v2.1 -->
   <link href="/css/bootstrap-icons.css" rel="stylesheet">
   <style>
     :root { --navy:#012d70; --blue:#0141A2; --coral:#D97757; }
@@ -50,6 +50,13 @@
     .informe { background:#f8fafc; border-left:4px solid var(--coral); border-radius:8px; padding:14px 16px; font-size:.86rem; color:#374151; line-height:1.6; margin-top:16px; }
     .sello-row { display:flex; align-items:center; justify-content:space-between; gap:12px; flex-wrap:wrap; margin-top:18px; padding-top:14px; border-top:1px solid #f1f5f9; }
     .sello-meta { font-size:.74rem; color:#94a3b8; }
+    .resumen-calc { background:#f8fafc; border:1px solid #eef2f7; border-radius:10px; padding:14px 16px; margin-top:16px; }
+    .rc-row { display:flex; gap:12px; padding:5px 0; border-bottom:1px dashed #eef2f7; font-size:.84rem; }
+    .rc-row:last-of-type { border-bottom:none; }
+    .rc-k { flex:0 0 190px; color:#64748b; font-weight:700; }
+    .rc-v { color:#0f172a; }
+    .rc-narr { margin-top:10px; padding-top:10px; border-top:1px solid #eef2f7; font-size:.82rem; color:#475569; line-height:1.55; font-style:italic; }
+    @media (max-width:560px){ .rc-row{ flex-direction:column; gap:2px; } .rc-k{ flex-basis:auto; } }
     .htab { width:100%; border-collapse:collapse; font-size:.82rem; }
     .htab th { text-align:left; font-size:.68rem; text-transform:uppercase; letter-spacing:.04em; color:#94a3b8; border-bottom:2px solid #eef2f7; padding:7px 9px; }
     .htab td { padding:7px 9px; border-bottom:1px solid #f3f4f6; color:#334155; }
@@ -104,12 +111,12 @@
         <thead><tr><th>Período</th><th class="c">Días</th><th class="c">Mes</th><th class="r">Imponible</th><th class="r">Líquido</th><th class="c">Uso</th></tr></thead>
         <tbody id="resLiqs"></tbody>
       </table>
-      <div class="informe" id="resInforme"></div>
       <div style="margin-top:16px;display:flex;align-items:center;gap:12px;flex-wrap:wrap">
         <button class="btn-af" id="btnSave" style="margin-top:0"><i class="bi bi-person-check me-1"></i>Guardar en el cliente</button>
         <span style="font-size:.8rem;color:#64748b" id="saveHint"></span>
       </div>
       <div class="sello-row"><div id="resSello"></div><div class="sello-meta" id="resMeta"></div></div>
+      <div class="resumen-calc" id="resResumen"></div>
     </div>
 
     <div class="card-af">
@@ -204,16 +211,40 @@
           <td class="c">${it.usada?'<span style="color:#16a34a" title="Usada en el cálculo">✓</span>':'<span title="Descartada">—</span>'}</td>
         </tr>`).join('');
 
-      document.getElementById('resInforme').innerHTML = '<b><i class="bi bi-journal-text me-1"></i>Informe:</b> ' + esc(d.explicacion);
-
-      const btnS = document.getElementById('btnSave');
-      btnS.className='btn-af'; btnS.style.marginTop='0'; btnS.innerHTML='<i class="bi bi-person-check me-1"></i>Guardar en el cliente';
-      const rutT = id.rut_trabajador || '';
-      document.getElementById('saveHint').textContent = rutT ? 'Guarda la renta en antecedentes del RUT '+rutT : 'Sin RUT del trabajador: no se puede asociar a un cliente.';
-      btnS.disabled = !rutT || !evalId || d.renta_liquida==null;
+      // Estado del guardado automático en antecedentes
+      const g = d.guardado || { ok:false };
+      const btnS = document.getElementById('btnSave'), hint = document.getElementById('saveHint');
+      btnS.style.marginTop = '0';
+      if (g.ok){
+        btnS.className='btn-af btn-done'; btnS.disabled=true; btnS.innerHTML='<i class="bi bi-check-lg me-1"></i>Guardado en el cliente';
+        hint.style.color='#16a34a'; hint.textContent='Antecedentes de '+g.cliente+' actualizados automáticamente.';
+      } else {
+        btnS.className='btn-af'; btnS.innerHTML='<i class="bi bi-person-check me-1"></i>Guardar en el cliente';
+        const rutT = id.rut_trabajador || '';
+        btnS.disabled = !rutT || !evalId || d.renta_liquida==null;
+        hint.style.color='#92400e'; hint.textContent=(g.motivo?g.motivo+' ':'') + (rutT?'Crea el cliente en Clientes y reintenta.':'');
+      }
 
       document.getElementById('resSello').innerHTML = AF_IA.badge();
       document.getElementById('resMeta').textContent = `${d.modelo} · ${((d.tokens_in||0)+(d.tokens_out||0)).toLocaleString('es-CL')} tokens · $${Number(d.costo||0).toFixed(4)}`;
+
+      // Resumen del cálculo (al final)
+      const pr = d.params || {};
+      const filas = [
+        ['Parámetros aplicados', `Mes completo: ${pr.mes_completo||30} días · Umbral variable: ${pr.umbral_variable||5}%`],
+        ['Liquidaciones recibidas', String(d.n_recibidas||0)],
+        ['Meses usados', (d.meses_usados||'—') + (d.n_usados?` (${d.n_usados})`:'')],
+        ['Meses descartados', d.meses_descartados || 'Ninguno'],
+        ['Tipo de renta', `${d.tipo_renta}` + (d.variacion!=null?` · variación imponible ${d.variacion}%`:'') + ` · detección automática: ${d.tipo_auto}`],
+        ['Método', d.metodo || '—'],
+        ['Renta líquida calculada', CLP(d.renta_liquida)],
+        ['Procesado con', `Inteligencia Artificial de Anthropic (${d.modelo||'—'})`],
+      ];
+      document.getElementById('resResumen').innerHTML =
+        '<h3 style="font-size:.9rem;font-weight:800;color:var(--navy);margin:0 0 10px;display:flex;align-items:center;gap:8px"><i class="bi bi-journal-text"></i>Resumen del cálculo</h3>'
+        + filas.map(([k,v]) => `<div class="rc-row"><span class="rc-k">${esc(k)}</span><span class="rc-v">${esc(v)}</span></div>`).join('')
+        + `<div class="rc-narr">${esc(d.explicacion)}</div>`;
+
       document.getElementById('resCard').style.display='block';
       document.getElementById('resCard').scrollIntoView({ behavior:'smooth', block:'nearest' });
       loadHistorial();

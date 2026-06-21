@@ -93,12 +93,12 @@ function calcularRenta(rawLiqs, tipoForzado, params = {}) {
   const incompletos = items.filter(i => !i.completo);
 
   // Tipo de renta
-  let tipoAuto = 'FIJA';
+  let tipoAuto = 'FIJA', variacion = null;
   const impc = completos.map(i => i.imponible).filter(v => v != null);
   if (impc.length >= 2) {
     const max = Math.max(...impc), min = Math.min(...impc);
-    const varia = min > 0 ? ((max - min) / min) * 100 : 0;
-    tipoAuto = varia > UMBRAL ? 'VARIABLE' : 'FIJA';
+    variacion = min > 0 ? Math.round(((max - min) / min) * 1000) / 10 : 0;
+    tipoAuto = variacion > UMBRAL ? 'VARIABLE' : 'FIJA';
   }
   const tipo = (forz === 'FIJA' || forz === 'VARIABLE') ? forz : tipoAuto;
 
@@ -131,10 +131,33 @@ function calcularRenta(rawLiqs, tipoForzado, params = {}) {
   if (items.some(i => !i.diasConocidos)) adv = (adv ? adv + ' ' : '') + 'En alguna liquidación no se detectaron los días trabajados (se asumió mes completo).';
 
   return { tipo_renta: tipo, tipo_auto: tipoAuto, renta_liquida, renta_imponible,
-    meses_usados: mUsados.join(', '), meses_descartados: mDesc.join(', '), explicacion: exp, advertencia: adv, items };
+    meses_usados: mUsados.join(', '), meses_descartados: mDesc.join(', '), explicacion: exp, advertencia: adv, items,
+    variacion, n_recibidas: items.length, n_usados: usados.length,
+    metodo: tipo === 'FIJA' ? 'Último mes completo' : 'Promedio de meses completos',
+    params: { mes_completo: MES, umbral_variable: UMBRAL } };
 }
 
 const parseLiqs = v => { try { return typeof v === 'string' ? JSON.parse(v) : (v || []); } catch { return []; } };
+
+/* Aplica la renta calculada en antecedentes_laborales del cliente (upsert PARCIAL, por RUT). */
+async function aplicarEnCliente(rutRaw, empleador, rutEmp, rentaLiquida) {
+  const rut = normRut(rutRaw);
+  if (!rut) return { ok: false, cliente: null, rut: null, motivo: 'La liquidación no trae el RUT del trabajador.' };
+  const [[cli]] = await pool.query('SELECT id_cliente, nombres, apellido_paterno, apellido_materno FROM clientes WHERE rut = ? LIMIT 1', [rut]);
+  if (!cli) return { ok: false, cliente: null, rut, motivo: `No existe un cliente con RUT ${rut}.` };
+  await pool.query(
+    `INSERT INTO antecedentes_laborales (rut_cliente, tipo_trabajador, empleador, rut_empresa, renta_fija_liquida)
+     VALUES (?, 'Dependiente', ?, ?, ?)
+     ON DUPLICATE KEY UPDATE
+       empleador          = VALUES(empleador),
+       rut_empresa        = COALESCE(VALUES(rut_empresa), rut_empresa),
+       renta_fija_liquida = VALUES(renta_fija_liquida),
+       tipo_trabajador    = COALESCE(tipo_trabajador, VALUES(tipo_trabajador)),
+       updated_at         = CURRENT_TIMESTAMP`,
+    [rut, empleador || null, normRut(rutEmp) || null, rentaLiquida != null ? rentaLiquida : null]);
+  const nombre = [cli.nombres, cli.apellido_paterno, cli.apellido_materno].filter(Boolean).join(' ') || rut;
+  return { ok: true, cliente: nombre, rut, motivo: null };
+}
 
 /* POST /api/ia/liquidaciones/evaluar (multipart: archivos[]) → extrae + calcula + guarda */
 exports.evaluar = async (req, res) => {
@@ -181,7 +204,18 @@ exports.evaluar = async (req, res) => {
     auditar({ req, accion: 'ANALIZAR', modulo: 'ia', entidad: 'evaluacion_renta', entidad_id: id,
       detalle: `Evaluó renta con IA: ${calc.tipo_renta}, ${raw.length} liquidación(es) (${modelo})`, meta: { tokens_in: tin, tokens_out: tout } });
 
-    res.json({ success: true, data: { id, identidad: { trabajador: ident.trabajador, rut_trabajador: ident.rut_trabajador, empleador: ident.empleador }, ...calc, modelo, tokens_in: tin, tokens_out: tout, costo }, error: null });
+    // Auto-actualiza los antecedentes laborales del cliente (si existe por RUT)
+    let guardado = { ok: false, cliente: null, motivo: null };
+    try {
+      guardado = await aplicarEnCliente(ident.rut_trabajador, ident.empleador, ident.rut_empleador, calc.renta_liquida);
+      if (guardado.ok) {
+        await pool.query('UPDATE ia_evaluaciones_renta SET guardado_cliente = 1, rut_cliente = ? WHERE id = ?', [guardado.rut, id]);
+        auditar({ req, accion: 'GUARDAR', modulo: 'ia', entidad: 'antecedentes_laborales', entidad_id: guardado.rut,
+          detalle: `Actualizó renta ${calc.tipo_renta} (IA) en antecedentes de ${guardado.cliente}: $${Number(calc.renta_liquida || 0).toLocaleString('es-CL')}`, rut: guardado.rut });
+      }
+    } catch (e) { console.error('[ia auto guardar]', e.message); }
+
+    res.json({ success: true, data: { id, identidad: { trabajador: ident.trabajador, rut_trabajador: ident.rut_trabajador, empleador: ident.empleador }, ...calc, guardado, modelo, tokens_in: tin, tokens_out: tout, costo }, error: null });
   } catch (e) {
     if (e.code === 'NO_KEY') return res.status(503).json({ success: false, data: null, error: 'La IA no está configurada en el servidor (falta ANTHROPIC_API_KEY).' });
     if (e.code === 'IA_OFF') return res.status(403).json({ success: false, data: null, error: 'La IA para liquidaciones está desactivada. Actívala en Mantenedores → Inteligencia Artificial.' });
@@ -201,7 +235,14 @@ exports.recalcular = async (req, res) => {
     await pool.query(
       `UPDATE ia_evaluaciones_renta SET tipo_renta=?, renta_liquida=?, renta_imponible=?, meses_usados=?, meses_descartados=?, explicacion=?, advertencia=? WHERE id=?`,
       [calc.tipo_renta, calc.renta_liquida, calc.renta_imponible, calc.meses_usados, calc.meses_descartados, calc.explicacion, calc.advertencia, ev.id]);
-    res.json({ success: true, data: { id: ev.id, identidad: { trabajador: ev.trabajador, rut_trabajador: ev.rut_trabajador, empleador: ev.empleador }, ...calc, modelo: ev.modelo, tokens_in: ev.tokens_in, tokens_out: ev.tokens_out, costo: Number(ev.costo_usd) }, error: null });
+
+    let guardado = { ok: false, cliente: null, motivo: null };
+    try {
+      guardado = await aplicarEnCliente(ev.rut_trabajador, ev.empleador, ev.rut_empleador, calc.renta_liquida);
+      if (guardado.ok) await pool.query('UPDATE ia_evaluaciones_renta SET guardado_cliente = 1, rut_cliente = ? WHERE id = ?', [guardado.rut, ev.id]);
+    } catch (e) { console.error('[ia auto guardar]', e.message); }
+
+    res.json({ success: true, data: { id: ev.id, identidad: { trabajador: ev.trabajador, rut_trabajador: ev.rut_trabajador, empleador: ev.empleador }, ...calc, guardado, modelo: ev.modelo, tokens_in: ev.tokens_in, tokens_out: ev.tokens_out, costo: Number(ev.costo_usd) }, error: null });
   } catch (e) { console.error('[ia recalcular]', e.message); res.status(500).json({ success: false, data: null, error: 'Error al recalcular: ' + e.message }); }
 };
 
@@ -210,27 +251,12 @@ exports.guardarCliente = async (req, res) => {
   try {
     const [[ev]] = await pool.query('SELECT * FROM ia_evaluaciones_renta WHERE id = ? LIMIT 1', [req.params.id]);
     if (!ev) return res.status(404).json({ success: false, data: null, error: 'Evaluación no encontrada.' });
-    const rut = normRut(ev.rut_trabajador);
-    if (!rut) return res.status(400).json({ success: false, data: null, error: 'La evaluación no trae el RUT del trabajador; no se puede asociar a un cliente.' });
-    const [[cli]] = await pool.query('SELECT id_cliente, nombres, apellido_paterno, apellido_materno FROM clientes WHERE rut = ? LIMIT 1', [rut]);
-    if (!cli) return res.status(404).json({ success: false, data: null, error: `No existe un cliente con RUT ${rut}. Créalo primero en Clientes.` });
-
-    await pool.query(
-      `INSERT INTO antecedentes_laborales (rut_cliente, tipo_trabajador, empleador, rut_empresa, renta_fija_liquida)
-       VALUES (?, 'Dependiente', ?, ?, ?)
-       ON DUPLICATE KEY UPDATE
-         empleador          = VALUES(empleador),
-         rut_empresa        = COALESCE(VALUES(rut_empresa), rut_empresa),
-         renta_fija_liquida = VALUES(renta_fija_liquida),
-         tipo_trabajador    = COALESCE(tipo_trabajador, VALUES(tipo_trabajador)),
-         updated_at         = CURRENT_TIMESTAMP`,
-      [rut, ev.empleador || null, ev.rut_empleador || null, ev.renta_liquida != null ? ev.renta_liquida : null]);
-    await pool.query('UPDATE ia_evaluaciones_renta SET guardado_cliente = 1, rut_cliente = ? WHERE id = ?', [rut, ev.id]);
-
-    const nombre = [cli.nombres, cli.apellido_paterno, cli.apellido_materno].filter(Boolean).join(' ') || rut;
-    auditar({ req, accion: 'GUARDAR', modulo: 'ia', entidad: 'antecedentes_laborales', entidad_id: rut,
-      detalle: `Guardó renta ${ev.tipo_renta} (IA) en antecedentes de ${nombre}: $${Number(ev.renta_liquida || 0).toLocaleString('es-CL')}`, rut });
-    res.json({ success: true, data: { rut_cliente: rut, cliente: nombre }, error: null });
+    const g = await aplicarEnCliente(ev.rut_trabajador, ev.empleador, ev.rut_empleador, ev.renta_liquida);
+    if (!g.ok) return res.status(404).json({ success: false, data: null, error: g.motivo + (g.rut ? ' Créalo primero en Clientes.' : '') });
+    await pool.query('UPDATE ia_evaluaciones_renta SET guardado_cliente = 1, rut_cliente = ? WHERE id = ?', [g.rut, ev.id]);
+    auditar({ req, accion: 'GUARDAR', modulo: 'ia', entidad: 'antecedentes_laborales', entidad_id: g.rut,
+      detalle: `Guardó renta ${ev.tipo_renta} (IA) en antecedentes de ${g.cliente}: $${Number(ev.renta_liquida || 0).toLocaleString('es-CL')}`, rut: g.rut });
+    res.json({ success: true, data: { rut_cliente: g.rut, cliente: g.cliente }, error: null });
   } catch (e) { console.error('[ia guardarCliente]', e.message); res.status(500).json({ success: false, data: null, error: 'Error al guardar: ' + e.message }); }
 };
 
