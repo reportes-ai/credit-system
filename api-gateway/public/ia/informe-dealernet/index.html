@@ -1,0 +1,165 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Análisis Informe Crediticio (IA) — AutoFácil</title>
+  <!-- v1.0 -->
+  <link href="/css/bootstrap-icons.css" rel="stylesheet">
+  <style>
+    :root { --navy:#012d70; --blue:#0141A2; --coral:#D97757; }
+    body { background:#f0f4f8; font-family:'Segoe UI',system-ui,sans-serif; color:#1f2937; margin:0; }
+    .wrap { max-width:880px; margin:0 auto; padding:20px 16px 80px; }
+    .intro { background:linear-gradient(135deg,#7c3aed,#0141A2 70%,#0255c5); color:#fff; border-radius:14px; padding:18px 22px; margin-bottom:18px; }
+    .intro h2 { font-size:1.1rem; font-weight:800; margin:0 0 4px; display:flex; align-items:center; gap:8px; }
+    .intro p { margin:0; font-size:.85rem; opacity:.92; line-height:1.5; }
+    .card-af { background:#fff; border-radius:14px; box-shadow:0 1px 4px rgba(0,0,0,.06); padding:20px; margin-bottom:18px; }
+    .row-rut { display:flex; gap:10px; align-items:flex-end; flex-wrap:wrap; }
+    label.lbl { font-size:.74rem; font-weight:700; color:#374151; display:block; margin-bottom:6px; }
+    input.txt { box-sizing:border-box; border:1.5px solid #d1d5db; border-radius:9px; padding:11px 14px; font-size:1rem; width:220px; }
+    input.txt:focus { outline:none; border-color:var(--blue); box-shadow:0 0 0 2px rgba(1,65,162,.12); }
+    .btn-af { background:var(--blue); color:#fff; border:none; border-radius:9px; padding:11px 22px; font-size:.92rem; font-weight:700; cursor:pointer; }
+    .btn-af:hover { background:#0255c5; } .btn-af:disabled { background:#93c5fd; cursor:not-allowed; }
+    .warn { background:#fffbeb; border:1px solid #fde68a; color:#92400e; border-radius:10px; padding:12px 16px; font-size:.85rem; margin-bottom:18px; display:none; }
+    .warn a { color:#0141A2; font-weight:700; }
+    .riesgo { display:inline-flex; align-items:center; gap:8px; font-size:1.05rem; font-weight:800; padding:8px 16px; border-radius:999px; }
+    .riesgo.BAJO { background:#ecfdf5; color:#16a34a; } .riesgo.MEDIO { background:#fffbeb; color:#b45309; } .riesgo.ALTO { background:#fef2f2; color:#dc2626; }
+    .sec { margin-top:16px; } .sec h4 { font-size:.74rem; text-transform:uppercase; letter-spacing:.04em; color:#0141A2; font-weight:800; margin:0 0 6px; }
+    .sec p { margin:0; font-size:.9rem; color:#334155; line-height:1.55; }
+    .lst { margin:0; padding-left:18px; font-size:.88rem; line-height:1.6; }
+    .lst.alerta li { color:#b91c1c; } .lst.pos li { color:#15803d; }
+    .meta-inf { font-size:.76rem; color:#94a3b8; margin-top:4px; }
+    .sello-row { display:flex; align-items:center; justify-content:space-between; gap:12px; flex-wrap:wrap; margin-top:18px; padding-top:14px; border-top:1px solid #f1f5f9; }
+    .sello-meta { font-size:.74rem; color:#94a3b8; }
+    .htab { width:100%; border-collapse:collapse; font-size:.82rem; }
+    .htab th { text-align:left; font-size:.68rem; text-transform:uppercase; letter-spacing:.04em; color:#94a3b8; border-bottom:2px solid #eef2f7; padding:7px 9px; }
+    .htab td { padding:7px 9px; border-bottom:1px solid #f3f4f6; color:#334155; vertical-align:top; }
+    .htab .rb { font-weight:800; } .rb.BAJO{color:#16a34a} .rb.MEDIO{color:#b45309} .rb.ALTO{color:#dc2626}
+    .toast-af { position:fixed; bottom:20px; left:50%; transform:translateX(-50%); background:#0f172a; color:#fff; padding:11px 20px; border-radius:10px; font-size:.85rem; opacity:0; transition:.3s; z-index:9999; }
+    .toast-af.show { opacity:1; }
+  </style>
+</head>
+<body>
+  <div id="af-topnav"></div>
+  <script>
+    window.AF_TOPNAV = { breadcrumb: [ { label:'Inicio', href:'/' }, { label:'Análisis Informe Crediticio (IA)', icon:'bi-robot', current:true } ] };
+  </script>
+
+  <div class="wrap">
+    <div class="intro">
+      <h2><i class="bi bi-clipboard-data"></i>Análisis de Informe Crediticio (DealerNet)</h2>
+      <p>Ingresa el RUT y la IA resume el riesgo crediticio a partir de los antecedentes que ya trajo DealerNet (no gasta saldo DealerNet).</p>
+    </div>
+
+    <div class="warn" id="warn"></div>
+
+    <div class="card-af">
+      <div class="row-rut">
+        <div><label class="lbl">RUT del cliente</label><input class="txt" id="rut" placeholder="12.345.678-9" autocomplete="off"></div>
+        <button class="btn-af" id="btnGo"><i class="bi bi-stars me-1"></i>Analizar con IA</button>
+      </div>
+      <div style="font-size:.78rem;color:#94a3b8;margin-top:10px">Usa los informes ya solicitados en <a href="/dealernet-informes/" style="color:#0141A2">Informes DealerNet</a>. Si no hay, solicítalos primero ahí.</div>
+    </div>
+
+    <div class="card-af" id="resCard" style="display:none">
+      <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap">
+        <h3 style="font-size:.95rem;font-weight:800;color:var(--navy);margin:0;display:flex;align-items:center;gap:8px"><i class="bi bi-shield-check"></i>Evaluación de riesgo</h3>
+        <span class="riesgo" id="resRiesgo">—</span>
+      </div>
+      <div class="meta-inf" id="resMetaInf"></div>
+
+      <div class="sec"><h4>Resumen</h4><p id="resResumen"></p></div>
+      <div class="sec"><h4>Deudas / morosidades</h4><p id="resDeudas"></p></div>
+      <div class="sec" id="secAlertas"><h4>Alertas</h4><ul class="lst alerta" id="resAlertas"></ul></div>
+      <div class="sec" id="secFactores"><h4>Factores positivos</h4><ul class="lst pos" id="resFactores"></ul></div>
+      <div class="sec"><h4>Recomendación para el analista</h4><p id="resRecom"></p></div>
+
+      <div class="sello-row"><div id="resSello"></div><div class="sello-meta" id="resMeta"></div></div>
+    </div>
+
+    <div class="card-af">
+      <h3 style="font-size:.95rem;font-weight:800;color:var(--navy);margin:0 0 14px;display:flex;align-items:center;gap:8px"><i class="bi bi-clock-history"></i>Historial reciente</h3>
+      <div id="histBody"><div style="color:#94a3b8;font-size:.85rem;text-align:center;padding:14px">Cargando…</div></div>
+    </div>
+  </div>
+
+  <div class="toast-af" id="toast"></div>
+
+  <script src="/js/auth-guard.js"></script>
+  <script src="/js/ia-branding.js"></script>
+  <script>
+    const token = sessionStorage.getItem('token');
+    if (!token) location.href = '/login.html';
+    const esc = s => String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+    function toast(m, ok=true){ const t=document.getElementById('toast'); t.textContent=m; t.style.background=ok?'#0f172a':'#b91c1c'; t.classList.add('show'); setTimeout(()=>t.classList.remove('show'),3200); }
+
+    const btn = document.getElementById('btnGo'), rutI = document.getElementById('rut');
+    btn.addEventListener('click', analizar);
+    rutI.addEventListener('keydown', e => { if (e.key==='Enter') analizar(); });
+
+    async function analizar(){
+      const rut = rutI.value.trim();
+      if (!rut) return toast('Ingresa el RUT', false);
+      const h = AF_IA.analizando('Analizando el informe crediticio con Inteligencia Artificial de Anthropic…');
+      btn.disabled = true;
+      try {
+        const r = await fetch('/api/ia/informe-dealernet', { method:'POST', headers:{ 'Content-Type':'application/json', Authorization:'Bearer '+token }, body:JSON.stringify({ rut }) });
+        const j = await r.json();
+        h.cerrar(); btn.disabled = false;
+        if (!j.success) return toast(j.error || 'No se pudo analizar', false);
+        render(j.data);
+      } catch(e){ h.cerrar(); btn.disabled = false; toast('Error de conexión', false); }
+    }
+
+    function lista(el, items){
+      const arr = Array.isArray(items) ? items.filter(Boolean) : [];
+      el.innerHTML = arr.length ? arr.map(x => `<li>${esc(x)}</li>`).join('') : '<li style="color:#94a3b8;list-style:none;margin-left:-18px">—</li>';
+      return arr.length;
+    }
+
+    function render(d){
+      const nivel = String(d.nivel_riesgo||'').toUpperCase();
+      const rb = document.getElementById('resRiesgo');
+      rb.className = 'riesgo ' + (['BAJO','MEDIO','ALTO'].includes(nivel)?nivel:'');
+      rb.innerHTML = `<i class="bi bi-${nivel==='ALTO'?'exclamation-octagon':nivel==='MEDIO'?'exclamation-triangle':'check-circle'}"></i>Riesgo ${esc(nivel||'—')}`;
+      document.getElementById('resMetaInf').textContent = `RUT ${esc(d.rut)} · ${d.n_informes} informe(s): ${esc(d.productos||'—')}` + (d.fecha_informes?` · informes del ${new Date(d.fecha_informes).toLocaleDateString('es-CL')}`:'');
+      document.getElementById('resResumen').textContent = d.resumen || '—';
+      document.getElementById('resDeudas').textContent = d.deudas_morosidades || '—';
+      document.getElementById('secAlertas').style.display = lista(document.getElementById('resAlertas'), d.alertas) ? '' : 'none';
+      document.getElementById('secFactores').style.display = lista(document.getElementById('resFactores'), d.factores_positivos) ? '' : 'none';
+      document.getElementById('resRecom').textContent = d.recomendacion || '—';
+      document.getElementById('resSello').innerHTML = AF_IA.badge();
+      document.getElementById('resMeta').textContent = `${d.modelo} · ${((d.tokens_in||0)+(d.tokens_out||0)).toLocaleString('es-CL')} tokens · $${Number(d.costo||0).toFixed(4)}`;
+      document.getElementById('resCard').style.display = 'block';
+      document.getElementById('resCard').scrollIntoView({ behavior:'smooth', block:'nearest' });
+      loadHistorial();
+    }
+
+    function loadHistorial(){
+      fetch('/api/ia/informe-dealernet/historial?limit=10', { headers:{ Authorization:'Bearer '+token } })
+        .then(r=>r.json()).then(j=>{
+          const b = document.getElementById('histBody');
+          if (!j.success || !j.data.length){ b.innerHTML='<div style="color:#94a3b8;font-size:.85rem;text-align:center;padding:14px">Aún no hay análisis.</div>'; return; }
+          b.innerHTML = '<table class="htab"><thead><tr><th>Fecha</th><th>RUT</th><th>Riesgo</th><th>Resumen</th></tr></thead><tbody>'
+            + j.data.map(h=>`<tr>
+                <td>${new Date(h.fecha).toLocaleDateString('es-CL')}</td>
+                <td>${esc(h.rut||'—')}</td>
+                <td class="rb ${esc(h.nivel_riesgo||'')}">${esc(h.nivel_riesgo||'—')}</td>
+                <td>${esc((h.resumen||'').slice(0,120))}${(h.resumen||'').length>120?'…':''}</td>
+              </tr>`).join('') + '</tbody></table>';
+        }).catch(()=>{});
+    }
+
+    (async () => {
+      const activa = await AF_IA.activa('informe_crediticio');
+      if (!activa){
+        const w = document.getElementById('warn'); w.style.display='block';
+        w.innerHTML = 'La IA de informe crediticio está <b>desactivada</b>. Actívala en <a href="/mantenedores/inteligencia-artificial/">Mantenedores → Inteligencia Artificial</a> (interruptor maestro + esta funcionalidad).';
+      }
+    })();
+    loadHistorial();
+  </script>
+  <script src="/js/topnav.js"></script>
+  <script src="/js/app-version.js"></script>
+</body>
+</html>

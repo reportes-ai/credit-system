@@ -238,6 +238,8 @@ app.get(['/mantenedores/inteligencia-artificial', '/mantenedores/inteligencia-ar
   res.sendFile(path.join(__dirname, '../public/mantenedores/inteligencia-artificial/index.html')));
 app.get(['/ia/liquidaciones', '/ia/liquidaciones/'], (req, res) =>
   res.sendFile(path.join(__dirname, '../public/ia/liquidaciones/index.html')));
+app.get(['/ia/informe-dealernet', '/ia/informe-dealernet/'], (req, res) =>
+  res.sendFile(path.join(__dirname, '../public/ia/informe-dealernet/index.html')));
 app.get(['/mantenedores/respuestas-rapidas', '/mantenedores/respuestas-rapidas/'], (req, res) =>
   res.sendFile(path.join(__dirname, '../public/mantenedores/respuestas-rapidas/index.html')));
 app.get(['/mantenedores/dealernet-productos', '/mantenedores/dealernet-productos/'], (req, res) =>
