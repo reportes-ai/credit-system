@@ -10,13 +10,6 @@
   <style>
     :root { --navy:#0141A2; --navy-dark:#012d70; --navy-light:#0255c5; --accent:#009AFE; --bg:#f0f4f8; --teal:#0f766e; }
     body { background:var(--bg); font-family:'Segoe UI',system-ui,sans-serif; margin:0; min-height:100vh; }
-    .topnav { background:linear-gradient(90deg,var(--navy-dark),var(--navy-light)); color:#fff; height:60px; padding:0 24px; display:flex; align-items:center; justify-content:space-between; position:sticky; top:0; z-index:200; }
-    .topnav-brand { display:flex; align-items:center; gap:8px; text-decoration:none; }
-    .topnav-brand img { height:32px; filter:brightness(0) invert(1); }
-    .version-badge { background:rgba(255,255,255,.15); color:rgba(255,255,255,.75); font-size:.65rem; font-weight:700; border-radius:6px; padding:2px 8px; }
-    .breadcrumb-nav { color:rgba(255,255,255,.6); font-size:.85rem; margin-left:16px; }
-    .breadcrumb-nav a { color:rgba(255,255,255,.75); text-decoration:none; }
-    .btn-logout { background:rgba(255,255,255,.1); border:1px solid rgba(255,255,255,.2); color:#fff; border-radius:8px; padding:5px 12px; font-size:.82rem; cursor:pointer; }
     .main { max-width:1000px; margin:0 auto; padding:28px 24px; }
     .page-banner { background:linear-gradient(135deg,#0f766e,#14b8a6); border-radius:16px; color:#fff; padding:22px 30px; margin-bottom:22px; display:flex; align-items:center; gap:18px; }
     .page-banner i { font-size:2.3rem; opacity:.9; }
@@ -43,13 +36,7 @@
   </style>
 </head>
 <body>
-<nav class="topnav">
-  <div style="display:flex;align-items:center">
-    <a href="/" class="topnav-brand"><img src="/img/logo.png" alt="AutoFácil"><span class="version-badge" id="versionBadge"></span></a>
-    <div class="breadcrumb-nav"><a href="/carga-masiva/digitacion/">Digitación</a> › <span style="color:#fff;font-weight:600">Estadísticas</span></div>
-  </div>
-  <button class="btn-logout" onclick="location.href='/carga-masiva/digitacion/'"><i class="bi bi-box-arrow-left me-1"></i>Volver</button>
-</nav>
+<div id="af-topnav"></div>
 
 <div class="main">
   <div class="page-banner">
@@ -118,6 +105,13 @@ async function cargar(){
 }
 cargar();
 </script>
+<script>
+  window.AF_TOPNAV = {
+    breadcrumb: [{ label:'Digitación', href:'/carga-masiva/digitacion/' }, { label:'Estadísticas', icon:'bi-graph-up-arrow', current:true }],
+    actions: [{ label:'Volver', icon:'bi-arrow-left', href:'/carga-masiva/digitacion/' }]
+  };
+</script>
+<script src="/js/topnav.js"></script>
 <script src="/js/app-version.js"></script>
 </body>
 </html>

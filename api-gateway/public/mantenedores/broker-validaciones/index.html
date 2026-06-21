@@ -11,16 +11,6 @@
     * { box-sizing:border-box; margin:0; padding:0; }
     body { font-family:'Segoe UI',system-ui,sans-serif; background:var(--bg); color:var(--text); }
 
-    .topnav { background:linear-gradient(90deg,var(--navy-dark),var(--navy)); color:#fff; height:56px; padding:0 24px; display:flex; align-items:center; justify-content:space-between; position:sticky; top:0; z-index:200; box-shadow:0 2px 8px rgba(0,0,0,.25); }
-    .nav-brand { display:flex; align-items:center; gap:10px; color:#fff; font-weight:800; font-size:1rem; text-decoration:none; }
-    .nav-brand img { height:28px; filter:brightness(0) invert(1); }
-    .version-badge { background:rgba(255,255,255,.15); color:rgba(255,255,255,.75); font-size:.65rem; font-weight:700; border-radius:6px; padding:2px 8px; letter-spacing:.5px; }
-    .breadcrumb-nav { color:rgba(255,255,255,.6); font-size:.85rem; display:flex; align-items:center; gap:6px; }
-    .breadcrumb-nav a { color:rgba(255,255,255,.75); text-decoration:none; }
-    .breadcrumb-nav a:hover { color:#fff; }
-    .breadcrumb-nav .sep { color:rgba(255,255,255,.35); }
-    .btn-back { background:rgba(255,255,255,.15); border:1px solid rgba(255,255,255,.3); color:#fff; border-radius:8px; padding:6px 14px; font-size:.82rem; font-weight:600; cursor:pointer; display:flex; align-items:center; gap:6px; text-decoration:none; transition:background .15s; }
-    .btn-back:hover { background:rgba(255,255,255,.25); }
 
     .page-wrap { max-width:900px; margin:0 auto; padding:28px 16px 60px; }
     .page-banner { background:linear-gradient(135deg,var(--navy-dark),var(--navy) 60%,var(--accent)); border-radius:14px; color:#fff; padding:22px 28px; margin-bottom:28px; display:flex; align-items:center; gap:16px; }
@@ -87,21 +77,7 @@
 </head>
 <body>
 
-<nav class="topnav">
-  <div style="display:flex;align-items:center;gap:16px">
-    <a class="nav-brand" href="/mantenedores">
-      <img src="/img/logo.png" alt="AutoFácil" onerror="this.style.display='none'">
-      <span>Mantenedores</span>
-      <span class="version-badge">v1.0</span>
-    </a>
-    <div class="breadcrumb-nav">
-      <a href="/">Inicio</a><span class="sep">›</span>
-      <a href="/mantenedores">Mantenedores</a><span class="sep">›</span>
-      <span style="color:#fff;font-weight:600"><i class="bi bi-card-checklist me-1"></i>Docs a Validar Brokers</span>
-    </div>
-  </div>
-  <a href="/mantenedores" class="btn-back"><i class="bi bi-arrow-left"></i>Volver</a>
-</nav>
+<div id="af-topnav"></div>
 
 <div class="page-wrap">
   <div class="page-banner">
@@ -270,6 +246,13 @@ document.getElementById('modalOverlay').addEventListener('click', e => { if (e.t
 
 cargarItems();
 </script>
+<script>
+  window.AF_TOPNAV = {
+    breadcrumb: [{ label:'Inicio', href:'/' }, { label:'Mantenedores', href:'/mantenedores' }, { label:'Docs a Validar Brokers', icon:'bi-card-checklist', current:true }],
+    actions: [{ label:'Volver', icon:'bi-arrow-left', href:'/mantenedores' }]
+  };
+</script>
+<script src="/js/topnav.js"></script>
 <script src="/js/app-version.js"></script>
 </body>
 </html>

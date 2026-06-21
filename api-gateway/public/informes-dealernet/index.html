@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Informes Comerciales Dealernet — AutoFácil</title>
-  <!-- v1.0 -->
+  <!-- v1.1 -->
   <link rel="stylesheet" href="/css/bootstrap.min.css">
   <link rel="stylesheet" href="/css/bootstrap-icons.css">
   <style>
@@ -14,11 +14,6 @@
     }
     body { background: #f0f4f8; font-family: 'Segoe UI', sans-serif; }
 
-    /* ── Topnav ── */
-    .topnav { background: var(--navy); padding: .55rem 1.2rem; display:flex; align-items:center; justify-content:space-between; }
-    .topnav .brand { color:#fff; font-weight:700; font-size:1.1rem; text-decoration:none; }
-    .topnav .brand span { color:var(--accent); }
-    .topnav .ver-badge { background: var(--accent); color:#fff; font-size:.65rem; padding:1px 6px; border-radius:99px; margin-left:6px; }
 
     /* ── Page header ── */
     .page-header { background: linear-gradient(135deg, var(--navy) 0%, var(--navy2) 100%);
@@ -90,26 +85,9 @@
 <body>
 
 <!-- ── Topnav ── -->
-<nav class="topnav">
-  <a class="brand" href="/"><span>AutoFácil</span> Crédito Automotriz
-    <span class="ver-badge">v1.0</span>
-  </a>
-  <div class="d-flex align-items-center gap-2">
-    <a href="/dashboard/" class="btn btn-sm btn-outline-light"><i class="bi bi-speedometer2"></i> Dashboard</a>
-    <span class="text-white-50 small" id="userBadge"></span>
-    <a href="#" onclick="logout()" class="btn btn-sm btn-outline-light"><i class="bi bi-box-arrow-right"></i> Salir</a>
-  </div>
-</nav>
+<div id="af-topnav"></div>
 
 <div class="container-fluid py-3 px-4">
-
-  <!-- Breadcrumb -->
-  <nav aria-label="breadcrumb" class="mb-2">
-    <ol class="breadcrumb mb-0">
-      <li class="breadcrumb-item"><a href="/">Inicio</a></li>
-      <li class="breadcrumb-item active">Informes Comerciales Dealernet</li>
-    </ol>
-  </nav>
 
   <!-- Header -->
   <div class="page-header">
@@ -259,7 +237,7 @@ const TOKEN = sessionStorage.getItem('token');
 if (!TOKEN) location.href = '/login.html';
 try {
   const pl = JSON.parse(atob(TOKEN.split('.')[1]));
-  document.getElementById('userBadge').textContent = pl.nombre || '';
+  const ub = document.getElementById('userBadge'); if (ub) ub.textContent = pl.nombre || '';
 } catch(_) {}
 
 function logout() {
@@ -639,6 +617,12 @@ if (_retParam) {
   document.body.insertBefore(bar, document.body.firstChild);
 }
 </script>
+<script>
+  window.AF_TOPNAV = {
+    breadcrumb: [{ label:'Inicio', href:'/' }, { label:'Informes Comerciales DealerNet', icon:'bi-hdd-network', current:true }]
+  };
+</script>
+<script src="/js/topnav.js"></script>
 <script src="/js/app-version.js"></script>
 </body>
 </html>

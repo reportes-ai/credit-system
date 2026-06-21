@@ -2,7 +2,7 @@
    AutoFácil — Versión global de la aplicación
    Editar SOLO este archivo para cambiar la versión
    ───────────────────────────────────────────── */
-const APP_VERSION = 'v43.92';
+const APP_VERSION = 'v43.93';
 
 document.addEventListener('DOMContentLoaded', () => {
 
@@ -413,9 +413,28 @@ document.addEventListener('DOMContentLoaded', () => {
   if (!token) return;                                  // login u otras sin sesión
   if (document.getElementById('bellBtn')) return;      // página con campana propia (Aprobaciones)
 
-  // ── Punto de anclaje: junto al chip de usuario, o flotante si no hay topnav
+  // ── Punto de anclaje: junto al chip de usuario; si no hay chip, junto al botón
+  //    Volver/Salir de la barra (agrupándolos para no romper el space-between);
+  //    si no hay barra, flotante arriba a la derecha.
   const chip = document.querySelector('.user-chip');
-  const anchor = chip ? chip.parentElement : null;
+  let anchor = null, before = null;
+  if (chip) { anchor = chip.parentElement; before = chip; }
+  else {
+    const nav = document.querySelector('nav.topnav, .topnav');
+    // Control de la derecha: botón/link de Volver/Salir (por clase, por onclick, o cualquier botón)
+    const ctrl = nav && (
+      nav.querySelector('.btn-logout, .btn-volver, .btn-salir, .btn-back')
+      || nav.querySelector('[onclick*="logout"], [onclick*="salir"], [onclick*="volver"]')
+      || nav.querySelector('button'));
+    if (nav && ctrl) {
+      if (ctrl.parentElement === nav) {            // control suelto en barra space-between → agrupar
+        const grp = document.createElement('div');
+        grp.style.cssText = 'display:flex;align-items:center;gap:10px';
+        nav.insertBefore(grp, ctrl); grp.appendChild(ctrl);
+        anchor = grp; before = ctrl;
+      } else { anchor = ctrl.parentElement; before = ctrl; }  // ya está en un grupo a la derecha
+    }
+  }
 
   const wrap = document.createElement('div');
   wrap.id = 'afBellWrap';
@@ -437,7 +456,7 @@ document.addEventListener('DOMContentLoaded', () => {
       </div>
       <div id="afBellList" style="font-size:.8rem"></div>
     </div>`;
-  if (anchor) anchor.insertBefore(wrap, chip);
+  if (anchor) anchor.insertBefore(wrap, before);
   else document.body.appendChild(wrap);
 
   // Animación de "shake" para alertas de prioridad alta
