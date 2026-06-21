@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <link rel="icon" href="/img/favicon.png" type="image/png">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>UF — AutoFácil</title>
+  <title>UF y UTM — AutoFácil</title>
   <link href="/css/bootstrap.min.css" rel="stylesheet">
   <link href="/css/bootstrap-icons.css" rel="stylesheet">
   <style>
@@ -25,9 +25,6 @@
     .btn-logout { background: rgba(255,255,255,0.1); border: 1px solid rgba(255,255,255,0.2); color: #fff; border-radius: 8px; padding: 5px 12px; font-size: 0.82rem; cursor: pointer; }
     .btn-logout:hover { background: rgba(255,255,255,0.2); }
     .page-content { padding: 28px 32px; max-width: 900px; margin: 0 auto; }
-    .page-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 24px; flex-wrap: wrap; gap: 10px; }
-    .page-header h4 { font-weight: 700; color: #111827; margin: 0; display: flex; align-items: center; gap: 10px; }
-    .page-header h4 i { color: var(--navy); }
     .card { border: none; border-radius: 12px; box-shadow: 0 1px 4px rgba(0,0,0,0.07); }
     .uf-vigente-card { background: linear-gradient(135deg, var(--navy), var(--accent)); border-radius: 14px; color: #fff; padding: 24px 28px; margin-bottom: 24px; display: flex; align-items: center; justify-content: space-between; }
     .uf-vigente-card .label { font-size: 0.82rem; opacity: 0.8; font-weight: 600; letter-spacing: 0.5px; }
@@ -56,10 +53,13 @@
     .toast-container { position: fixed; top: 70px; right: 20px; z-index: 9999; }
     .import-info { background: #f0f9ff; border: 1px solid #bae6fd; border-radius: 8px; padding: 12px 16px; font-size: 0.84rem; color: #0369a1; margin-bottom: 12px; }
     .import-info strong { display: block; margin-bottom: 4px; }
-    .page-banner { background: linear-gradient(135deg, #012d70, #0141A2 50%, #009AFE); border-radius: 16px; color: #fff; padding: 28px 36px; margin-bottom: 36px; display: flex; align-items: center; gap: 20px; }
+    .page-banner { background: linear-gradient(135deg, #012d70, #0141A2 50%, #009AFE); border-radius: 16px; color: #fff; padding: 28px 36px; margin-bottom: 28px; display: flex; align-items: center; gap: 20px; }
     .page-banner > i { font-size: 3rem; opacity: 0.8; }
     .page-banner h2 { font-weight: 700; margin: 0 0 4px; font-size: 1.4rem; }
     .page-banner p { opacity: 0.8; margin: 0; font-size: 0.9rem; }
+    .nav-tabs { border-bottom: 2px solid #e5e7eb; margin-bottom: 20px; }
+    .nav-tabs .nav-link { color: #64748b; font-weight: 700; border: none; border-bottom: 3px solid transparent; }
+    .nav-tabs .nav-link.active { color: var(--navy); border-bottom-color: var(--navy); background: none; }
   </style>
 </head>
 <body>
@@ -69,9 +69,8 @@
         <img src="/img/logo.png" alt="AutoFácil" style="display:block">
         <span class="version-badge" id="versionBadge">v4.5</span>
       </a>
-        <div class="breadcrumb-nav"><a href="/">Inicio</a><span class="sep">›</span><a href="/mantenedores">Mantenedores</a><span class="sep">›</span><span style="color:#fff;font-weight:600"><i class="bi bi-currency-dollar me-1"></i>UF</span></div></div>
+        <div class="breadcrumb-nav"><a href="/">Inicio</a><span class="sep">›</span><a href="/mantenedores">Mantenedores</a><span class="sep">›</span><span style="color:#fff;font-weight:600"><i class="bi bi-currency-dollar me-1"></i>UF y UTM</span></div></div>
     <div class="topnav-right">
-      
     <a href="/dashboard" title="Dashboard Analytics" style="display:flex;align-items:center;gap:5px;color:rgba(255,255,255,0.85);text-decoration:none;font-size:12px;font-weight:500;padding:5px 10px;border:1px solid rgba(255,255,255,0.25);border-radius:6px;transition:.15s" onmouseover="this.style.background='rgba(255,255,255,0.1)'" onmouseout="this.style.background='transparent'">
       <i class="bi bi-bar-chart-line" style="font-size:15px"></i> Dashboard
     </a>
@@ -97,103 +96,108 @@
     <div class="page-banner">
       <i class="bi bi-currency-dollar"></i>
       <div>
-        <h2>Valores UF</h2>
-        <p>Registro y consulta del valor de la Unidad de Fomento</p>
+        <h2>Valores UF y UTM</h2>
+        <p>Registro y consulta de la Unidad de Fomento (UF) y la Unidad Tributaria Mensual (UTM)</p>
       </div>
     </div>
-    <div style="display:flex;justify-content:flex-end;gap:8px;margin-bottom:16px;">
-      <button class="btn btn-success btn-sm" onclick="document.getElementById('csvInput').click()">
-        <i class="bi bi-upload me-1"></i>Importar CSV
-      </button>
-      <button class="btn btn-primary btn-sm" onclick="abrirModal()">
-        <i class="bi bi-plus-lg me-1"></i>Ingresar UF
-      </button>
-      <input type="file" id="csvInput" accept=".csv" style="display:none" onchange="procesarCSV(this)">
-    </div>
 
-    <div class="uf-vigente-card" id="ufVigenteCard">
-      <div>
-        <div class="label">UF VIGENTE HOY</div>
-        <div class="valor" id="ufValor">—</div>
-        <div class="fecha" id="ufFecha">—</div>
-        <div class="fallback" id="ufFallback" style="display:none">* Último valor disponible (sin dato para hoy)</div>
-      </div>
-      <i class="bi bi-currency-dollar icon"></i>
-    </div>
+    <ul class="nav nav-tabs">
+      <li class="nav-item"><button class="nav-link active" data-bs-toggle="tab" data-bs-target="#pane-uf">Valores UF</button></li>
+      <li class="nav-item"><button class="nav-link" data-bs-toggle="tab" data-bs-target="#pane-utm">Valores UTM</button></li>
+    </ul>
 
-    <div class="card">
-      <div class="card-body p-3">
-        <div class="mb-3 search-bar" style="max-width:260px">
-          <i class="bi bi-search"></i>
-          <input type="text" id="buscador" class="form-control" placeholder="Buscar por fecha..." oninput="filtrar()">
+    <div class="tab-content">
+      <!-- ── UF ── -->
+      <div class="tab-pane fade show active" id="pane-uf">
+        <div style="display:flex;justify-content:flex-end;gap:8px;margin-bottom:16px;">
+          <button class="btn btn-success btn-sm" onclick="document.getElementById('csvInput').click()"><i class="bi bi-upload me-1"></i>Importar CSV</button>
+          <button class="btn btn-primary btn-sm" onclick="abrirModal('uf')"><i class="bi bi-plus-lg me-1"></i>Ingresar UF</button>
+          <input type="file" id="csvInput" accept=".csv" style="display:none" onchange="procesarCSV(this)">
         </div>
-        <div class="table-responsive">
-          <table class="table table-hover align-middle mb-0">
+        <div class="uf-vigente-card">
+          <div>
+            <div class="label">UF VIGENTE HOY</div>
+            <div class="valor" id="ufValor">—</div>
+            <div class="fecha" id="ufFecha">—</div>
+            <div class="fallback" id="ufFallback" style="display:none">* Último valor disponible (sin dato para hoy)</div>
+          </div>
+          <i class="bi bi-currency-dollar icon"></i>
+        </div>
+        <div class="card"><div class="card-body p-3">
+          <div class="mb-3 search-bar" style="max-width:260px"><i class="bi bi-search"></i>
+            <input type="text" id="buscador_uf" class="form-control" placeholder="Buscar por fecha..." oninput="filtrar('uf')"></div>
+          <div class="table-responsive"><table class="table table-hover align-middle mb-0">
             <thead><tr><th>Fecha</th><th>Valor UF</th><th style="width:90px">Acciones</th></tr></thead>
-            <tbody id="tbody"><tr><td colspan="3" class="text-center py-4 text-muted">Cargando...</td></tr></tbody>
-          </table>
+            <tbody id="tbody_uf"><tr><td colspan="3" class="text-center py-4 text-muted">Cargando...</td></tr></tbody>
+          </table></div>
+        </div></div>
+      </div>
+
+      <!-- ── UTM ── -->
+      <div class="tab-pane fade" id="pane-utm">
+        <div style="display:flex;justify-content:flex-end;gap:8px;margin-bottom:16px;">
+          <button class="btn btn-primary btn-sm" onclick="abrirModal('utm')"><i class="bi bi-plus-lg me-1"></i>Ingresar UTM</button>
         </div>
+        <div class="uf-vigente-card" style="background:linear-gradient(135deg,#7c3aed,#0141A2 70%,#0255c5)">
+          <div>
+            <div class="label">UTM VIGENTE</div>
+            <div class="valor" id="utmValor">—</div>
+            <div class="fecha" id="utmFecha">—</div>
+            <div class="fallback" id="utmFallback" style="display:none">* Último valor disponible (sin UTM del mes)</div>
+          </div>
+          <i class="bi bi-receipt icon"></i>
+        </div>
+        <div class="card"><div class="card-body p-3">
+          <div class="mb-3 search-bar" style="max-width:260px"><i class="bi bi-search"></i>
+            <input type="text" id="buscador_utm" class="form-control" placeholder="Buscar por fecha..." oninput="filtrar('utm')"></div>
+          <div class="table-responsive"><table class="table table-hover align-middle mb-0">
+            <thead><tr><th>Mes</th><th>Valor UTM</th><th style="width:90px">Acciones</th></tr></thead>
+            <tbody id="tbody_utm"><tr><td colspan="3" class="text-center py-4 text-muted">Cargando...</td></tr></tbody>
+          </table></div>
+        </div></div>
       </div>
     </div>
   </div>
 
-  <!-- MODAL INGRESO MANUAL -->
+  <!-- MODAL INGRESO MANUAL (UF/UTM) -->
   <div class="modal fade" id="modal" tabindex="-1">
-    <div class="modal-dialog modal-sm">
-      <div class="modal-content">
-        <div class="modal-header">
-          <h5 class="modal-title" id="modalTitulo">Ingresar UF</h5>
-          <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
-        </div>
-        <div class="modal-body">
-          <div class="mb-3">
-            <label class="form-label">Fecha *</label>
-            <input type="date" id="fFecha" class="form-control">
-          </div>
-          <div class="mb-2">
-            <label class="form-label">Valor UF *</label>
-            <div class="input-group">
-              <span class="input-group-text">$</span>
-              <input type="text" id="fValor" class="form-control" placeholder="39.750,00" inputmode="decimal">
-            </div>
-          </div>
-          <div id="modalError" class="alert alert-danger mt-3 d-none"></div>
-        </div>
-        <div class="modal-footer">
-          <button class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
-          <button class="btn btn-primary" onclick="guardar()"><i class="bi bi-floppy me-1"></i>Guardar</button>
-        </div>
+    <div class="modal-dialog modal-sm"><div class="modal-content">
+      <div class="modal-header"><h5 class="modal-title" id="modalTitulo">Ingresar</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
+      <div class="modal-body">
+        <div class="mb-3"><label class="form-label">Fecha *</label><input type="date" id="fFecha" class="form-control"></div>
+        <div class="mb-2"><label class="form-label" id="lblValor">Valor *</label>
+          <div class="input-group"><span class="input-group-text">$</span>
+            <input type="text" id="fValor" class="form-control" placeholder="39.750,00" inputmode="decimal"></div></div>
+        <div id="modalError" class="alert alert-danger mt-3 d-none"></div>
       </div>
-    </div>
+      <div class="modal-footer">
+        <button class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+        <button class="btn btn-primary" onclick="guardar()"><i class="bi bi-floppy me-1"></i>Guardar</button>
+      </div>
+    </div></div>
   </div>
 
-  <!-- MODAL PREVIA IMPORTACION -->
+  <!-- MODAL PREVIA IMPORTACION (UF) -->
   <div class="modal fade" id="modalImport" tabindex="-1">
-    <div class="modal-dialog">
-      <div class="modal-content">
-        <div class="modal-header">
-          <h5 class="modal-title"><i class="bi bi-upload me-2"></i>Importar CSV UF</h5>
-          <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
-        </div>
-        <div class="modal-body">
-          <div class="import-info">
-            <strong id="importResumen">—</strong>
-            <span id="importDetalle">—</span>
-          </div>
-          <p class="text-muted" style="font-size:0.84rem">Solo se importarán fechas nuevas. Los valores existentes no serán modificados.</p>
-          <div id="importError" class="alert alert-danger d-none"></div>
-        </div>
-        <div class="modal-footer">
-          <button class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
-          <button class="btn btn-success" id="btnConfirmarImport" onclick="confirmarImport()"><i class="bi bi-check-lg me-1"></i>Importar</button>
-        </div>
+    <div class="modal-dialog"><div class="modal-content">
+      <div class="modal-header"><h5 class="modal-title"><i class="bi bi-upload me-2"></i>Importar CSV UF</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
+      <div class="modal-body">
+        <div class="import-info"><strong id="importResumen">—</strong><span id="importDetalle">—</span></div>
+        <p class="text-muted" style="font-size:0.84rem">Solo se importarán fechas nuevas. Los valores existentes no serán modificados.</p>
+        <div id="importError" class="alert alert-danger d-none"></div>
       </div>
-    </div>
+      <div class="modal-footer">
+        <button class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+        <button class="btn btn-success" id="btnConfirmarImport" onclick="confirmarImport()"><i class="bi bi-check-lg me-1"></i>Importar</button>
+      </div>
+    </div></div>
   </div>
 
   <script src="/js/bootstrap.bundle.min.js"></script>
   <script src="/js/auth-guard.js"></script>
-<script src="/js/cl-numbers.js"></script>
+  <script src="/js/cl-numbers.js"></script>
   <script>
     document.addEventListener('DOMContentLoaded', () => setupCLInput(document.getElementById('fValor'), 2));
     const token = sessionStorage.getItem('token');
@@ -216,51 +220,60 @@
       bootstrap.Toast.getOrCreateInstance(el, { delay: 4000 }).show();
     };
 
-    let datos = [], editId = null, registrosCSV = [];
+    const ENT = {
+      uf:  { api:'/api/uf',  idf:'id_uf',  label:'UF',  dec:2 },
+      utm: { api:'/api/utm', idf:'id_utm', label:'UTM', dec:0 },
+    };
+    const datos = { uf:[], utm:[] };
+    let cur = 'uf', editId = null, registrosCSV = [];
+    const fmtVal = (v, dec) => parseFloat(v).toLocaleString('es-CL', { minimumFractionDigits: dec, maximumFractionDigits: dec });
 
-    async function cargar() {
-      const [dAll, dVig] = await Promise.all([api('GET', '/api/uf'), api('GET', '/api/uf/vigente')]);
-      if (dAll?.success) { datos = dAll.data; renderizar(datos); }
+    async function cargar(ent) {
+      const c = ENT[ent];
+      const [dAll, dVig] = await Promise.all([api('GET', c.api), api('GET', c.api + '/vigente')]);
+      if (dAll?.success) { datos[ent] = dAll.data; renderizar(ent, datos[ent]); }
       if (dVig?.success && dVig.data) {
         const hoy = new Date().toISOString().split('T')[0];
-        const fechaUF = dVig.data.fecha?.split('T')[0] || dVig.data.fecha;
-        document.getElementById('ufValor').textContent = `$ ${parseFloat(dVig.data.valor).toLocaleString('es-CL', {minimumFractionDigits:2})}`;
-        document.getElementById('ufFecha').textContent = `Al ${new Date(dVig.data.fecha).toLocaleDateString('es-CL', {timeZone:'UTC'})}`;
-        if (fechaUF < hoy) document.getElementById('ufFallback').style.display = '';
+        const fechaV = dVig.data.fecha?.split('T')[0] || dVig.data.fecha;
+        document.getElementById(ent + 'Valor').textContent = `$ ${fmtVal(dVig.data.valor, c.dec)}`;
+        document.getElementById(ent + 'Fecha').textContent = `Al ${new Date(dVig.data.fecha).toLocaleDateString('es-CL', { timeZone:'UTC' })}`;
+        document.getElementById(ent + 'Fallback').style.display = (fechaV < hoy) ? '' : 'none';
       }
     }
 
-    function renderizar(lista) {
-      const tbody = document.getElementById('tbody');
-      if (!lista.length) { tbody.innerHTML = '<tr><td colspan="3" class="text-center py-4 text-muted">Sin registros UF.</td></tr>'; return; }
-      tbody.innerHTML = lista.map(u => `
+    function renderizar(ent, lista) {
+      const c = ENT[ent], tb = document.getElementById('tbody_' + ent);
+      if (!lista.length) { tb.innerHTML = `<tr><td colspan="3" class="text-center py-4 text-muted">Sin registros ${c.label}.</td></tr>`; return; }
+      tb.innerHTML = lista.map(u => `
         <tr>
-          <td>${new Date(u.fecha).toLocaleDateString('es-CL', {timeZone:'UTC'})}</td>
-          <td><span class="valor-uf">$ ${parseFloat(u.valor).toLocaleString('es-CL', {minimumFractionDigits:2})}</span></td>
+          <td>${new Date(u.fecha).toLocaleDateString('es-CL', { timeZone:'UTC' })}</td>
+          <td><span class="valor-uf">$ ${fmtVal(u.valor, c.dec)}</span></td>
           <td>
-            <button class="btn btn-outline-primary btn-sm me-1" onclick="editar(${u.id_uf}, '${u.fecha?.split('T')[0]}', ${u.valor})"><i class="bi bi-pencil"></i></button>
-            <button class="btn btn-outline-danger btn-sm" onclick="eliminar(${u.id_uf})"><i class="bi bi-trash"></i></button>
+            <button class="btn btn-outline-primary btn-sm me-1" onclick="editar('${ent}', ${u[c.idf]}, '${u.fecha?.split('T')[0]}', ${u.valor})"><i class="bi bi-pencil"></i></button>
+            <button class="btn btn-outline-danger btn-sm" onclick="eliminar('${ent}', ${u[c.idf]})"><i class="bi bi-trash"></i></button>
           </td>
         </tr>`).join('');
     }
 
-    function filtrar() {
-      const q = document.getElementById('buscador').value.toLowerCase();
-      renderizar(datos.filter(u => new Date(u.fecha).toLocaleDateString('es-CL').includes(q)));
+    function filtrar(ent) {
+      const q = document.getElementById('buscador_' + ent).value.toLowerCase();
+      renderizar(ent, datos[ent].filter(u => new Date(u.fecha).toLocaleDateString('es-CL').includes(q)));
     }
 
-    function abrirModal() {
-      editId = null;
-      document.getElementById('modalTitulo').textContent = 'Ingresar UF';
+    function abrirModal(ent) {
+      cur = ent; editId = null;
+      document.getElementById('modalTitulo').textContent = 'Ingresar ' + ENT[ent].label;
+      document.getElementById('lblValor').textContent = 'Valor ' + ENT[ent].label + ' *';
       document.getElementById('fFecha').value = new Date().toISOString().split('T')[0];
       document.getElementById('fValor').value = '';
       document.getElementById('modalError').classList.add('d-none');
       bootstrap.Modal.getOrCreateInstance(document.getElementById('modal')).show();
     }
 
-    function editar(id, fecha, valor) {
-      editId = id;
-      document.getElementById('modalTitulo').textContent = 'Editar UF';
+    function editar(ent, id, fecha, valor) {
+      cur = ent; editId = id;
+      document.getElementById('modalTitulo').textContent = 'Editar ' + ENT[ent].label;
+      document.getElementById('lblValor').textContent = 'Valor ' + ENT[ent].label + ' *';
       document.getElementById('fFecha').value = fecha;
       document.getElementById('fValor').value = formatCL(valor, 2);
       document.getElementById('modalError').classList.add('d-none');
@@ -268,35 +281,32 @@
     }
 
     async function guardar() {
+      const c = ENT[cur];
       const body = { fecha: document.getElementById('fFecha').value, valor: parseCL(document.getElementById('fValor').value) };
-      const url = editId ? `/api/uf/${editId}` : '/api/uf';
+      const url = editId ? `${c.api}/${editId}` : c.api;
       const d = await api(editId ? 'PUT' : 'POST', url, body);
       if (d?.success) {
         bootstrap.Modal.getInstance(document.getElementById('modal')).hide();
-        showToast(editId ? 'UF actualizada' : 'UF ingresada');
-        cargar();
+        showToast(editId ? `${c.label} actualizada` : `${c.label} ingresada`);
+        cargar(cur);
       } else {
-        const el = document.getElementById('modalError');
-        el.textContent = d?.error || 'Error al guardar'; el.classList.remove('d-none');
+        const el = document.getElementById('modalError'); el.textContent = d?.error || 'Error al guardar'; el.classList.remove('d-none');
       }
     }
 
-    async function eliminar(id) {
-      if (!confirm('¿Eliminar este registro UF?')) return;
-      const d = await api('DELETE', `/api/uf/${id}`);
-      if (d?.success) { showToast('Registro eliminado'); cargar(); }
-      else showToast(d?.error || 'Error', 'danger');
+    async function eliminar(ent, id) {
+      if (!confirm(`¿Eliminar este registro ${ENT[ent].label}?`)) return;
+      const d = await api('DELETE', `${ENT[ent].api}/${id}`);
+      if (d?.success) { showToast('Registro eliminado'); cargar(ent); } else showToast(d?.error || 'Error', 'danger');
     }
 
-    // --- IMPORTACIÓN CSV ---
+    // --- IMPORTACIÓN CSV (solo UF) ---
     function procesarCSV(input) {
       const file = input.files[0];
       if (!file) return;
       const reader = new FileReader();
       reader.onload = e => {
-        const text = e.target.result;
-        registrosCSV = parsearCSVUF(text);
-        const meses = { 'Ene':1,'Feb':2,'Mar':3,'Abr':4,'May':5,'Jun':6,'Jul':7,'Ago':8,'Sep':9,'Oct':10,'Nov':11,'Dic':12 };
+        registrosCSV = parsearCSVUF(e.target.result);
         document.getElementById('importResumen').textContent = `Archivo: ${file.name}`;
         document.getElementById('importDetalle').textContent = `${registrosCSV.length} valores encontrados (${registrosCSV[0]?.fecha || '?'} al ${registrosCSV[registrosCSV.length-1]?.fecha || '?'})`;
         document.getElementById('importError').classList.add('d-none');
@@ -337,14 +347,14 @@
       if (d?.success) {
         bootstrap.Modal.getInstance(document.getElementById('modalImport')).hide();
         showToast(`Importados: ${d.data.insertados} nuevos · Omitidos: ${d.data.omitidos} ya existían`);
-        cargar();
+        cargar('uf');
       } else {
         document.getElementById('importError').textContent = d?.error || 'Error al importar';
         document.getElementById('importError').classList.remove('d-none');
       }
     }
 
-    cargar();
+    cargar('uf'); cargar('utm');
   </script>
 <script src="/js/app-version.js"></script>
 </body>

@@ -60,7 +60,7 @@ const PLACEMENT_ITEMS = {
   'crm-campanas':            { section:'crm',           href:'/crm/campanas',     icon:'bi-megaphone-fill',  titulo:'Campañas de Outbound' },
   // ── MANTENEDORES ─────────────────────────────────────────────────────────
   'tasas':                   { section:'mantenedores',  href:'/mantenedores/tasas/',              icon:'bi-percent',               titulo:'Tasas de Interés' },
-  'uf':                      { section:'mantenedores',  href:'/mantenedores/uf/',                 icon:'bi-currency-dollar',        titulo:'Valores UF' },
+  'uf':                      { section:'mantenedores',  href:'/mantenedores/uf/',                 icon:'bi-currency-dollar',        titulo:'Valores UF y UTM' },
   'dealers':                 { section:'home',          href:'/mantenedores/dealers/',            icon:'bi-building',               titulo:'Dealers' },
   'vehiculos':               { section:'mantenedores',  href:'/mantenedores/vehiculos/',          icon:'bi-car-front',              titulo:'Vehículos' },
   'comunas':                 { section:'mantenedores',  href:'/mantenedores/comunas/',            icon:'bi-geo-alt',                titulo:'Comunas' },
@@ -118,7 +118,7 @@ const PLACEMENT_DESCS = {
   // CRM
   'crm-gestiones':'Gestiones de contacto con clientes', 'crm-estadisticas':'Estadísticas y métricas de CRM', 'crm-campanas':'Campañas de contacto saliente',
   // Mantenedores
-  'tasas':'Gestión de tasas mensuales y anuales para créditos', 'uf':'Registro y consulta del valor de la UF',
+  'tasas':'Gestión de tasas mensuales y anuales para créditos', 'uf':'Registro y consulta de la UF y la UTM',
   'dealers':'Administración de concesionarios y datos de contacto', 'vehiculos':'Base de tasación SII con marcas, modelos y valores',
   'comunas':'Gestión de regiones, provincias y comunas de Chile', 'parametros':'Gastos operacionales fijos y comisiones del crédito',
   'factores-seguro':'Tasas netas, factores y comisiones por plazo', 'tipos-documento':'Documentos de respaldo requeridos en la aprobación',

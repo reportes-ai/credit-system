@@ -78,6 +78,7 @@ app.use('/api/estado-creditos', require('../../services/mantenedores/src/routes/
 app.use('/api/estado-cartera',  require('../../services/mantenedores/src/routes/estado-cartera.routes'));
 app.use('/api/tasas',           require('../../services/mantenedores/src/routes/tasas.routes'));
 app.use('/api/uf',              require('../../services/mantenedores/src/routes/uf.routes'));
+app.use('/api/utm',             require('../../services/mantenedores/src/routes/utm.routes'));
 app.use('/api/geografico',      require('../../services/mantenedores/src/routes/geografico.routes'));
 app.use('/api/vehiculos',       require('../../services/mantenedores/src/routes/vehiculos.routes'));
 app.use('/api/dealers',         require('../../services/mantenedores/src/routes/dealers.routes'));

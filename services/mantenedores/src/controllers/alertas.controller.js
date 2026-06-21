@@ -30,6 +30,30 @@ exports.getVencimientos = async (req, res) => {
       });
     }
 
+    // ── UTM (mensual) ─────────────────────────────────────────────────────
+    try {
+      const [[utmRow]] = await pool.query(
+        `SELECT MAX(fecha) AS ultima_fecha,
+                DATE_FORMAT(MAX(fecha),'%Y-%m') AS ym_ult,
+                DATE_FORMAT(CURDATE(),'%Y-%m')  AS ym_hoy
+         FROM utm`
+      );
+      if (!utmRow || !utmRow.ultima_fecha || utmRow.ym_ult < utmRow.ym_hoy) {
+        alertas.push({
+          tipo:    'utm',
+          nivel:   'advertencia',
+          titulo:  'UTM del mes no cargada',
+          mensaje: (utmRow && utmRow.ultima_fecha)
+            ? `La UTM del mes actual no está cargada. Último valor: ${fmtFecha(utmRow.ultima_fecha)}.`
+            : 'No hay valores de UTM registrados en el sistema.',
+          ultimo_valor: (utmRow && utmRow.ultima_fecha) ? utmRow.ultima_fecha : null,
+          dias_atraso:  0,
+          url: '/mantenedores/uf/',
+          boton: 'Ir a UTM',
+        });
+      }
+    } catch (_) { /* tabla utm aún no disponible */ }
+
     // ── Tasas de interés ─────────────────────────────────────────────────
     const [[tasaVigente]] = await pool.query(
       `SELECT id_tasa, fecha_desde, fecha_hasta,
