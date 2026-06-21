@@ -101,6 +101,7 @@ const PLACEMENT_ITEMS = {
   'cm-eq-estados':           { section:'carga_masiva',  href:'/carga-masiva/#secEqEstados',       icon:'bi-arrow-left-right',       titulo:'Equivalencias Trinidad' },
   'cm-eq-ejecs':             { section:'carga_masiva',  href:'/carga-masiva/#secEqEjecs',         icon:'bi-person-lines-fill',      titulo:'Equivalencia Ejecutivos' },
   'cm-historial':            { section:'carga_masiva',  href:'/carga-masiva/#secHistorial',       icon:'bi-clock-history',          titulo:'Historial' },
+  'digitacion':              { section:'carga_masiva',  href:'/carga-masiva/digitacion/',         icon:'bi-pencil-square',          titulo:'Digitación Datos Faltantes' },
 };
 
 // Descripciones (subtítulo) por key — se muestran cuando un sub-item se coloca en Home.
@@ -141,6 +142,7 @@ const PLACEMENT_DESCS = {
   // Carga Masiva
   'cm-cargar':'Carga masiva de operaciones (Excel)', 'cm-trinidad':'Carga de archivos Trinidad', 'cm-eq-estados':'Equivalencias de estados Trinidad',
   'cm-eq-ejecs':'Equivalencia de ejecutivos', 'cm-historial':'Historial de cargas masivas',
+  'digitacion':'Completa los créditos incompletos por la carga masiva, uno por uno',
 };
 
 // ── Registro COMBINADO de sub-items: manifiesto (curado) + funcionalidades de BD ──

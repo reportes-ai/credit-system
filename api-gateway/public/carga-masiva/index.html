@@ -128,18 +128,22 @@ if (!token || !yo) window.location.href = '/login.html';
 // funcionalidad (data-func). Admin pasa por bypass. Sin ninguna card → sin acceso.
 (async () => {
   const esAdmin = yo?.perfil === 'Administrador';
-  let funcs = new Set();
-  if (!esAdmin) {
-    try {
-      const r = await fetch('/api/auth/mis-permisos?_='+Date.now(), { headers:{ Authorization:'Bearer '+token } });
-      const j = await r.json();
-      funcs = new Set(j.funcionalidades || []);
-    } catch(e){}
-  }
+  let funcs = new Set(), placement = {};
+  try {
+    const [rPerm, rPl] = await Promise.all([
+      esAdmin ? Promise.resolve(null) : fetch('/api/auth/mis-permisos?_='+Date.now(), { headers:{ Authorization:'Bearer '+token } }),
+      fetch('/api/config/ui/placement_v2', { headers:{ Authorization:'Bearer '+token } }),
+    ]);
+    if (rPerm) { const j = await rPerm.json(); funcs = new Set(j.funcionalidades || []); }
+    const jPl = await rPl.json(); if (jPl.success && jPl.data) placement = jPl.data;
+  } catch(e){}
   const tiene = c => esAdmin || funcs.has(c);
+  // Si Digitación fue movida a otra pantalla (placement), no se muestra aquí (es gestionable)
+  const digitMovida = Object.entries(placement).some(([sec, arr]) => sec !== 'carga_masiva' && Array.isArray(arr) && arr.includes('digitacion'));
   let visibles = 0;
   document.querySelectorAll('.module-card[data-func]').forEach(card => {
-    const ok = tiene(card.getAttribute('data-func'));
+    let ok = tiene(card.getAttribute('data-func'));
+    if (ok && card.getAttribute('data-func') === 'digitacion_faltantes' && digitMovida) ok = false;
     card.style.display = ok ? '' : 'none';
     if (ok) visibles++;
   });
