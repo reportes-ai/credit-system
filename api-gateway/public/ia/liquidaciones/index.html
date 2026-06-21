@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Análisis de Liquidaciones (IA) — AutoFácil</title>
-  <!-- v1.0 -->
+  <!-- v1.1 -->
   <link href="/css/bootstrap-icons.css" rel="stylesheet">
   <style>
     :root { --navy:#012d70; --blue:#0141A2; --coral:#D97757; }
@@ -36,6 +36,11 @@
     .sello-meta { font-size:.74rem; color:#94a3b8; }
     .toast-af { position:fixed; bottom:20px; left:50%; transform:translateX(-50%); background:#0f172a; color:#fff; padding:11px 20px; border-radius:10px; font-size:.85rem; opacity:0; transition:.3s; z-index:9999; }
     .toast-af.show { opacity:1; }
+    .htab { width:100%; border-collapse:collapse; font-size:.82rem; }
+    .htab th { text-align:left; font-size:.68rem; text-transform:uppercase; letter-spacing:.04em; color:#94a3b8; border-bottom:2px solid #eef2f7; padding:7px 9px; }
+    .htab td { padding:7px 9px; border-bottom:1px solid #f3f4f6; color:#334155; }
+    .htab td.r, .htab th.r { text-align:right; } .htab td.c, .htab th.c { text-align:center; }
+    .btn-done { background:#16a34a !important; }
     @media (max-width:640px){ .res-grid { grid-template-columns:1fr; } }
   </style>
 </head>
@@ -73,10 +78,19 @@
       <h3 style="font-size:.95rem;font-weight:800;color:var(--navy);margin:0 0 16px;display:flex;align-items:center;gap:8px"><i class="bi bi-clipboard-check"></i>Resultado</h3>
       <div class="res-grid" id="resGrid"></div>
       <div class="obs" id="resObs" style="display:none"></div>
+      <div id="saveRow" style="margin-top:18px;display:flex;align-items:center;gap:12px;flex-wrap:wrap">
+        <button class="btn-af" id="btnSave" style="margin-top:0"><i class="bi bi-person-check me-1"></i>Guardar en el cliente</button>
+        <span style="font-size:.8rem;color:#64748b" id="saveHint"></span>
+      </div>
       <div class="sello-row">
         <div id="resSello"></div>
         <div class="sello-meta" id="resMeta"></div>
       </div>
+    </div>
+
+    <div class="card-af">
+      <h3 style="font-size:.95rem;font-weight:800;color:var(--navy);margin:0 0 14px;display:flex;align-items:center;gap:8px"><i class="bi bi-clock-history"></i>Historial reciente</h3>
+      <div id="histBody"><div style="color:#94a3b8;font-size:.85rem;text-align:center;padding:14px">Cargando…</div></div>
     </div>
   </div>
 
@@ -91,7 +105,7 @@
     const CLP = n => (n==null || isNaN(n)) ? '—' : '$' + Number(n).toLocaleString('es-CL');
     function toast(m, ok=true){ const t=document.getElementById('toast'); t.textContent=m; t.style.background=ok?'#0f172a':'#b91c1c'; t.classList.add('show'); setTimeout(()=>t.classList.remove('show'),3000); }
 
-    let archivo = null;
+    let archivo = null, analisisId = null;
     const drop = document.getElementById('drop'), file = document.getElementById('file'), btn = document.getElementById('btnGo');
 
     drop.addEventListener('click', () => file.click());
@@ -140,8 +154,52 @@
       else obs.style.display='none';
       document.getElementById('resSello').innerHTML = AF_IA.badge();
       document.getElementById('resMeta').textContent = `${d.modelo} · ${(d.tokens_in+d.tokens_out).toLocaleString('es-CL')} tokens · $${Number(d.costo||0).toFixed(4)}`;
+
+      analisisId = d.id;
+      const btnS = document.getElementById('btnSave');
+      btnS.className = 'btn-af'; btnS.style.marginTop = '0';
+      btnS.innerHTML = '<i class="bi bi-person-check me-1"></i>Guardar en el cliente';
+      const rutT = x.rut_trabajador || '';
+      document.getElementById('saveHint').textContent = rutT
+        ? 'Se guardará en antecedentes laborales del RUT ' + rutT
+        : 'Sin RUT del trabajador: no se puede asociar a un cliente.';
+      btnS.disabled = !rutT || !analisisId;
+
       document.getElementById('resCard').style.display = 'block';
       document.getElementById('resCard').scrollIntoView({ behavior:'smooth', block:'nearest' });
+      loadHistorial();
+    }
+
+    document.getElementById('btnSave').addEventListener('click', guardarCliente);
+    async function guardarCliente(){
+      if (!analisisId) return;
+      const b = document.getElementById('btnSave');
+      b.disabled = true; b.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span>Guardando…';
+      try {
+        const r = await fetch('/api/ia/liquidacion/' + analisisId + '/guardar-cliente', { method:'POST', headers:{ Authorization:'Bearer '+token } });
+        const j = await r.json();
+        if (!j.success){ b.disabled = false; b.innerHTML = '<i class="bi bi-person-check me-1"></i>Guardar en el cliente'; return toast(j.error || 'No se pudo guardar', false); }
+        b.className = 'btn-af btn-done'; b.innerHTML = '<i class="bi bi-check-lg me-1"></i>Guardado en el cliente';
+        toast('Guardado en antecedentes de ' + j.data.cliente);
+        loadHistorial();
+      } catch(e){ b.disabled = false; b.innerHTML = '<i class="bi bi-person-check me-1"></i>Guardar en el cliente'; toast('Error de conexión', false); }
+    }
+
+    function loadHistorial(){
+      fetch('/api/ia/liquidaciones?limit=10', { headers:{ Authorization:'Bearer '+token } })
+        .then(r => r.json()).then(j => {
+          const b = document.getElementById('histBody');
+          if (!j.success || !j.data.length){ b.innerHTML = '<div style="color:#94a3b8;font-size:.85rem;text-align:center;padding:14px">Aún no hay análisis.</div>'; return; }
+          b.innerHTML = '<table class="htab"><thead><tr><th>Fecha</th><th>Trabajador</th><th>Período</th><th class="r">Imponible</th><th class="r">Líquido</th><th class="c">En cliente</th></tr></thead><tbody>'
+            + j.data.map(h => `<tr>
+                <td>${new Date(h.fecha).toLocaleDateString('es-CL')}</td>
+                <td>${esc(h.trabajador||'—')}<div style="font-size:.72rem;color:#94a3b8">${esc(h.rut_trabajador||'')}</div></td>
+                <td>${esc(h.periodo||'—')}</td>
+                <td class="r">${CLP(h.total_imponible)}</td>
+                <td class="r">${CLP(h.sueldo_liquido)}</td>
+                <td class="c">${h.guardado_cliente ? '<span style="color:#16a34a" title="Guardado en el cliente">✓</span>' : '<span style="color:#cbd5e1">—</span>'}</td>
+              </tr>`).join('') + '</tbody></table>';
+        }).catch(()=>{});
     }
 
     // Aviso si la funcionalidad está apagada
@@ -153,6 +211,7 @@
         w.innerHTML = 'La IA de liquidaciones está <b>desactivada</b>. Actívala en <a href="/mantenedores/inteligencia-artificial/">Mantenedores → Inteligencia Artificial</a> (interruptor maestro + esta funcionalidad).';
       }
     })();
+    loadHistorial();
   </script>
   <script src="/js/topnav.js"></script>
   <script src="/js/app-version.js"></script>
