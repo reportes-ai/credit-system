@@ -39,32 +39,58 @@ async function setEstado(clave, valor) {
   } catch (_) {}
 }
 
+async function mesUTMcargado() {
+  try { const [[r]] = await pool.query("SELECT 1 ok FROM utm WHERE DATE_FORMAT(fecha,'%Y-%m')=DATE_FORMAT(CURDATE(),'%Y-%m') LIMIT 1"); return !!r; }
+  catch { return false; }
+}
+async function periodoTMCcargado() {
+  try { const [[r]] = await pool.query("SELECT 1 ok FROM tasas WHERE fecha_desde >= DATE_FORMAT(CURDATE(),'%Y-%m-01') LIMIT 1"); return !!r; }
+  catch { return false; }
+}
+
 /**
- * @param {object} opts  { force } — force=true ignora la ventana del día 13 (botón manual / arranque)
- * El sync automático corre cada 24h pero solo ACTÚA desde el día 13 de cada mes
- * (cuando se publican UF/UTM/TMC del nuevo período).
+ * Cadencia: corre cada 24h (y al arrancar / botón con force=true).
+ *  - UF : DIARIA, siempre (la API trae los últimos ~31 días).
+ *  - UTM: MENSUAL, solo si falta el valor del mes en curso.
+ *  - TMC: desde el DÍA 13 y hasta encontrar el período nuevo del mes (luego deja de buscar).
+ * force=true (arranque / botón "Actualizar") ignora esas ventanas (sirve para calibrar la TMC).
  */
 async function sincronizar(opts = {}) {
-  if (!opts.force && new Date().getDate() < 13) return { skipped: true, motivo: 'fuera de ventana (se sincroniza desde el día 13)' };
+  const force = !!opts.force;
+  const dia = new Date().getDate();
   const out = {};
+
+  // UF — diaria
   try { out.uf = await syncTabla('uf', 'uf'); await setEstado('sync_uf', ''); console.log(`[indicadores] UF: ${out.uf.nuevos}/${out.uf.total}`); }
-  catch (e) { out.uf = { error: e.message }; await setEstado('sync_uf', 'UF: ' + e.message); console.error('[indicadores] UF sync:', e.message); }
-  try { out.utm = await syncTabla('utm', 'utm'); await setEstado('sync_utm', ''); console.log(`[indicadores] UTM: ${out.utm.nuevos}/${out.utm.total}`); }
-  catch (e) { out.utm = { error: e.message }; await setEstado('sync_utm', 'UTM: ' + e.message); console.error('[indicadores] UTM sync:', e.message); }
+  catch (e) { out.uf = { error: e.message }; await setEstado('sync_uf', 'UF: ' + e.message); console.error('[indicadores] UF:', e.message); }
+
+  // UTM — mensual: solo si aún no está el mes en curso
   try {
-    out.tmc = await sincronizarTMC();
-    await setEstado('sync_tmc', out.tmc.ok ? '' : ('TMC: ' + (out.tmc.motivo || 'no se pudo sincronizar')));
+    if (force || !(await mesUTMcargado())) { out.utm = await syncTabla('utm', 'utm'); console.log(`[indicadores] UTM: ${out.utm.nuevos}/${out.utm.total}`); }
+    else out.utm = { sin_cambios: true };
+    await setEstado('sync_utm', '');
+  } catch (e) { out.utm = { error: e.message }; await setEstado('sync_utm', 'UTM: ' + e.message); console.error('[indicadores] UTM:', e.message); }
+
+  // TMC — desde el día 13 y hasta cargar el período del mes
+  try {
+    if (force || dia >= 13) {
+      if (!force && await periodoTMCcargado()) { out.tmc = { sin_cambios: true, motivo: 'período del mes ya cargado' }; await setEstado('sync_tmc', ''); }
+      else { out.tmc = await sincronizarTMC(); await setEstado('sync_tmc', out.tmc.ok ? '' : ('TMC: ' + (out.tmc.motivo || 'no se pudo sincronizar'))); }
+    } else {
+      out.tmc = { skipped: true, motivo: 'la TMC se busca desde el día 13' };
+    }
     console.log('[indicadores] TMC:', JSON.stringify(out.tmc));
   } catch (e) {
     out.tmc = e.code === 'NOCMF' ? { ok: false, motivo: 'falta CMF_API_KEY' } : { error: e.message };
     await setEstado('sync_tmc', 'TMC: ' + (e.code === 'NOCMF' ? 'falta CMF_API_KEY' : e.message));
-    if (e.code !== 'NOCMF') console.error('[indicadores] TMC sync:', e.message);
+    if (e.code !== 'NOCMF') console.error('[indicadores] TMC:', e.message);
   }
+
   await setEstado('sync_ultima', new Date().toISOString());
   return out;
 }
 
-// Al arrancar: una puesta al día (force). Luego cada 24h, actuando solo desde el día 13.
+// Al arrancar: puesta al día (force). Luego cada 24h (UF diaria; UTM/TMC según ventana).
 setTimeout(() => { sincronizar({ force: true }); }, 15000);
 setInterval(() => { sincronizar(); }, 24 * 60 * 60 * 1000);
 
