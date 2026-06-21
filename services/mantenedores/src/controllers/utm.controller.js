@@ -2,6 +2,14 @@ const pool = require('../../../../shared/config/database');
 const { auditar } = require('../../../../shared/audit');
 
 // La UTM es mensual. Mismo patrón que UF (fecha + valor), un registro por mes.
+// Siembra inicial con valores reales (fuente: mindicador.cl). Editables en el mantenedor.
+const UTM_SEED = [
+  ['2025-01-01', 67429], ['2025-02-01', 67294], ['2025-03-01', 68034], ['2025-04-01', 68306],
+  ['2025-05-01', 68648], ['2025-06-01', 68785], ['2025-07-01', 68923], ['2025-08-01', 68647],
+  ['2025-09-01', 69265], ['2025-10-01', 69265], ['2025-11-01', 69542], ['2025-12-01', 69542],
+  ['2026-01-01', 69751], ['2026-02-01', 69611], ['2026-03-01', 69889], ['2026-04-01', 69889],
+  ['2026-05-01', 70588], ['2026-06-01', 71506], ['2026-07-01', 71649],
+];
 (async () => {
   try {
     await pool.query(`CREATE TABLE IF NOT EXISTS utm (
@@ -9,6 +17,9 @@ const { auditar } = require('../../../../shared/audit');
       fecha      DATE NOT NULL UNIQUE,
       valor      DECIMAL(12,2) NOT NULL,
       created_at DATETIME DEFAULT CURRENT_TIMESTAMP )`);
+    const [[{ n }]] = await pool.query('SELECT COUNT(*) n FROM utm');
+    if (n === 0) for (const [f, v] of UTM_SEED)
+      await pool.query('INSERT IGNORE INTO utm (fecha, valor) VALUES (?,?)', [f, v]);
   } catch (e) { if (e.errno !== 1050) console.error('[utm migration]', e.message); }
 })();
 
