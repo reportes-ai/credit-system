@@ -8,6 +8,7 @@
  */
 const pool = require('../../../shared/config/database');
 const axios = require('axios');
+const { sincronizarTMC } = require('./tmc-sync');
 
 async function fetchSerie(ind) {
   const r = await axios.get(`https://mindicador.cl/api/${ind}`, { timeout: 15000, headers: { Accept: 'application/json' } });
@@ -34,6 +35,8 @@ async function sincronizar() {
   catch (e) { out.uf = { error: e.message }; console.error('[indicadores] UF sync:', e.message); }
   try { out.utm = await syncTabla('utm', 'utm'); console.log(`[indicadores] UTM: ${out.utm.nuevos} nuevos / ${out.utm.total}`); }
   catch (e) { out.utm = { error: e.message }; console.error('[indicadores] UTM sync:', e.message); }
+  try { out.tmc = await sincronizarTMC(); console.log('[indicadores] TMC:', JSON.stringify(out.tmc)); }
+  catch (e) { out.tmc = e.code === 'NOCMF' ? { ok: false, motivo: 'CMF_API_KEY no configurada' } : { error: e.message }; if (e.code !== 'NOCMF') console.error('[indicadores] TMC sync:', e.message); }
   return out;
 }
 

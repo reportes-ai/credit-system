@@ -102,7 +102,7 @@
     </div>
 
     <div style="display:flex;justify-content:flex-end;margin-bottom:12px">
-      <button class="btn btn-outline-primary btn-sm" id="btnSync" onclick="sincronizarWeb()" title="Trae los valores nuevos de UF y UTM desde mindicador.cl"><i class="bi bi-cloud-download me-1"></i>Actualizar desde internet</button>
+      <button class="btn btn-outline-primary btn-sm" id="btnSync" onclick="sincronizarWeb()" title="Trae los valores nuevos de UF y UTM (mindicador.cl) y la TMC (CMF)"><i class="bi bi-cloud-download me-1"></i>Actualizar desde internet</button>
     </div>
 
     <ul class="nav nav-tabs">
@@ -363,8 +363,12 @@
       b.disabled = true; b.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span>Actualizando...';
       const d = await api('POST', '/api/uf/sincronizar');
       b.disabled = false; b.innerHTML = '<i class="bi bi-cloud-download me-1"></i>Actualizar desde internet';
-      if (d?.success) { showToast(`Actualizado · UF +${d.data.uf?.nuevos || 0} · UTM +${d.data.utm?.nuevos || 0} valores nuevos`); cargar('uf'); cargar('utm'); }
-      else showToast(d?.error || 'Error al sincronizar', 'danger');
+      if (d?.success) {
+        const t = d.data.tmc || {};
+        const tmcMsg = t.insertado ? 'TMC actualizada' : t.sin_cambios ? 'TMC al día' : (t.motivo ? 'TMC pendiente' : '');
+        showToast(`UF +${d.data.uf?.nuevos || 0} · UTM +${d.data.utm?.nuevos || 0}${tmcMsg ? ' · ' + tmcMsg : ''}`);
+        cargar('uf'); cargar('utm');
+      } else showToast(d?.error || 'Error al sincronizar', 'danger');
     }
 
     cargar('uf'); cargar('utm');
