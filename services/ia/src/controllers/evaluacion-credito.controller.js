@@ -170,7 +170,7 @@ exports.evaluar = async (req, res) => {
     try { modeloUsar = await ia.modeloDe(CODIGO); } catch (_) {}
     const THINKING_OK = ['claude-opus-4-8', 'claude-opus-4-7', 'claude-opus-4-6', 'claude-sonnet-4-6', 'claude-fable-5'];
     const usarThinking = THINKING_OK.includes(modeloUsar);
-    const baseArgs = { codigo: CODIGO, id_usuario: req.usuario?.id_usuario, system: SYSTEM, prompt: promptDe(ctx), json: true, max_tokens: 6000, thinking: usarThinking };
+    const baseArgs = { codigo: CODIGO, id_usuario: req.usuario?.id_usuario, system: SYSTEM, prompt: promptDe(ctx), json: true, max_tokens: 12000, thinking: usarThinking };
     let r, docsError = null;
     try {
       r = await analizar({ ...baseArgs, documentos });
@@ -182,8 +182,13 @@ exports.evaluar = async (req, res) => {
         r = await analizar({ ...baseArgs, documentos: [] });
       } else { throw e1; }
     }
-    const x = r.datos;
-    if (!x) return res.status(422).json({ success: false, data: { texto: r.texto }, error: 'La IA respondió pero no se pudo leer el resultado. Intenta de nuevo.' });
+    // Rescate: si el parser no obtuvo JSON, intenta extraer el bloque {...} del texto.
+    let x = r.datos;
+    if (!x && r.texto) {
+      const m = r.texto.match(/\{[\s\S]*\}/);
+      if (m) { try { x = JSON.parse(m[0]); } catch (_) {} }
+    }
+    if (!x) return res.status(422).json({ success: false, data: { texto: (r.texto || '').slice(0, 400) }, error: 'La IA respondió pero no se pudo leer el resultado (posible respuesta cortada). Intenta de nuevo.' });
     if (docsError) {
       x.documentos = x.documentos || {};
       x.documentos.aviso = 'No se pudieron analizar los archivos adjuntos (la API los rechazó: ' + docsError + '). La evaluación se hizo sin revisar los documentos.';
