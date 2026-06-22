@@ -87,6 +87,7 @@ const ensureTable = async () => {
     `ALTER TABLE clientes ADD COLUMN IF NOT EXISTS id_region INT`,
     `ALTER TABLE clientes ADD COLUMN IF NOT EXISTS fecha_creacion DATETIME DEFAULT CURRENT_TIMESTAMP`,
     `ALTER TABLE clientes ADD COLUMN IF NOT EXISTS fecha_actualizacion DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP`,
+    `ALTER TABLE clientes ADD COLUMN IF NOT EXISTS origen_dn JSON`,
   ];
 
   // Quitar IF NOT EXISTS y capturar sólo el error "Duplicate column" (1060)
@@ -136,6 +137,69 @@ const calcNombreCompleto = (tipo, b) => {
     .filter(Boolean).join(' ') || null;
 };
 
+/* ─── Datos personales desde el Perfil Comercial DealerNet (cód. 3435) ───────
+   Rellena SOLO los campos vacíos del cliente y deja traza en clientes.origen_dn
+   (lista de campos que vinieron de DealerNet → la ficha les pone asterisco azul). */
+const _wgp  = (o, ...ks) => { for (const k of ks) { if (o == null) return undefined; o = o[k]; } return o; };
+const _warr = x => x == null ? [] : (Array.isArray(x) ? x : [x]);
+function extraerPersonalDN(cont) {
+  const colect = _wgp(cont, 'DLNTPERCOMDLNTWS', 'ROOT', 'D', 'result', 'colect');
+  if (!colect) return null;
+  const titular = colect.titular || {};
+  const nom  = _wgp(titular, 'nombre', 'd') || {};
+  const civ  = _wgp(titular, 'det', 'detalle_rut', 'datos_civiles', 'd') || {};
+  const tel  = _warr(_wgp(colect, 'telefonos',  'telefono_contacto_probable', 'd'))[0] || {};
+  const dir  = _warr(_wgp(colect, 'direcciones','residencia_probable',        'd'))[0] || {};
+  const mail = _warr(_wgp(colect, 'correos',    'correo_contacto_probable',   'd'))[0] || {};
+  const partesAp = String(nom.apellidos || '').trim().split(/\s+/).filter(Boolean);
+  const fnac = (civ.fch_nacimiento_ano && civ.fch_nacimiento_mes && civ.fch_nacimiento_dia)
+    ? `${civ.fch_nacimiento_ano}-${String(civ.fch_nacimiento_mes).padStart(2, '0')}-${String(civ.fch_nacimiento_dia).padStart(2, '0')}` : null;
+  const out = {
+    apellido_paterno: partesAp[0] || null,
+    apellido_materno: partesAp.slice(1).join(' ') || null,
+    nombres: String(nom.nombres || '').trim() || null,
+    fecha_nacimiento: fnac,
+    estado_civil: civ.matrimonio_estado_civil || null,
+    sexo: civ.sexo || null,
+    nacionalidad: civ.nacionalidad || null,
+    cargas: (civ.asignacion_familiar && civ.asignacion_familiar.hijos != null) ? Number(civ.asignacion_familiar.hijos) : null,
+    telefono_movil: tel.telefono || null,
+    email: mail.correo || null,
+    direccion: dir.direccion || null,
+  };
+  Object.keys(out).forEach(k => { if (out[k] == null || out[k] === '') delete out[k]; });
+  return Object.keys(out).length ? out : null;
+}
+async function sincronizarPersonalDealernet(rutDash) {
+  try {
+    const dig = rutDash.replace(/[.\s-]/g, '').toUpperCase();
+    const rutDN = dig.length > 1 ? dig.slice(0, -1) : dig;     // dealernet_informes guarda el RUT sin DV
+    const [[inf]] = await pool.query(
+      "SELECT contenido FROM dealernet_informes WHERE rut=? AND codigo_producto='3435' AND retcode='0' ORDER BY created_at DESC LIMIT 1", [rutDN]);
+    if (!inf) return false;
+    let cont = inf.contenido; if (typeof cont === 'string') { try { cont = JSON.parse(cont); } catch { return false; } }
+    const d = extraerPersonalDN(cont);
+    if (!d) return false;
+    const [[cli]] = await pool.query('SELECT * FROM clientes WHERE rut=? LIMIT 1', [rutDash]);
+    if (!cli) return false;
+    let origen = [];
+    try { origen = Array.isArray(cli.origen_dn) ? cli.origen_dn : JSON.parse(cli.origen_dn || '[]'); } catch { origen = []; }
+    const origenSet = new Set(origen);
+    const set = {};
+    for (const [k, v] of Object.entries(d)) {
+      const actual = cli[k];
+      const vacio = actual == null || actual === '' || (k === 'cargas' && Number(actual) === 0);
+      if (vacio && v != null && v !== '') { set[k] = v; origenSet.add(k); }
+    }
+    const cols = Object.keys(set);
+    if (!cols.length) return false;
+    await pool.query(
+      `UPDATE clientes SET ${cols.map(c => `${c}=?`).join(', ')}, origen_dn=? WHERE rut=?`,
+      [...cols.map(c => set[c]), JSON.stringify([...origenSet]), rutDash]);
+    return true;
+  } catch (e) { console.error('[sincronizarPersonalDealernet]', e.message); return false; }
+}
+
 /* ─── GET /rut/:rut ─────────────────────────────────────────────────────── */
 const getByRut = async (req, res) => {
   try {
@@ -143,7 +207,18 @@ const getByRut = async (req, res) => {
 
     // 1. Buscar en tabla clientes (datos completos)
     const [rows] = await pool.query('SELECT * FROM clientes WHERE rut = ?', [rut]);
-    if (rows.length) return res.json({ success: true, data: rows[0], error: null });
+    if (rows.length) {
+      const cli = rows[0];
+      // Completa datos personales vacíos desde el Perfil Comercial DealerNet
+      if (cli.tipo_cliente === 'PERSONA' && (!cli.nombres || !cli.apellido_paterno || !cli.fecha_nacimiento)) {
+        const cambio = await sincronizarPersonalDealernet(rut);
+        if (cambio) {
+          const [r2] = await pool.query('SELECT * FROM clientes WHERE rut = ?', [rut]);
+          return res.json({ success: true, data: r2[0] || cli, error: null });
+        }
+      }
+      return res.json({ success: true, data: cli, error: null });
+    }
 
     // 2. Fallback: buscar en creditos (datos básicos del Excel)
     const [ops] = await pool.query(`

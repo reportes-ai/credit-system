@@ -224,6 +224,8 @@
       text-transform: uppercase; min-height: 38px;
     }
     .field-display.empty { color: #9ca3af; font-weight: 400; text-transform: none; font-style: italic; }
+    .dn-star { color: #2563eb; font-weight: 800; cursor: help; }
+    .dn-legend { font-size: .78rem; font-weight: 600; color: #2563eb; }
 
     /* ── Activity / Comuna search ────────────────────────────────── */
     .search-wrap { position: relative; }
@@ -274,7 +276,7 @@
   <div class="topnav-left">
     <a href="/" class="topnav-brand">
       <img src="/img/logo.png" alt="AutoFácil" style="display:block">
-      <span class="version-badge" id="versionBadge">v4.20</span>
+      <span class="version-badge" id="versionBadge">v4.21</span>
     </a>
       <div class="breadcrumb-nav">
         <a href="/">Inicio</a><span class="sep">›</span>
@@ -1096,30 +1098,34 @@ function mostrarFechas(c) {
 /* ═══════════════════════════════════════════════════════════════════
    Vista lectura dinámica
 ═══════════════════════════════════════════════════════════════════ */
-function dv(label, value) {
+let _DN_SET = new Set();   // campos del cliente actual obtenidos desde DealerNet
+function dv(label, value, dnField) {
   const v = value && String(value).trim() ? String(value).trim() : null;
+  const star = (dnField && v && _DN_SET.has(dnField))
+    ? ' <span class="dn-star" title="Información obtenida desde Dealernet">*</span>' : '';
   return `
     <div class="col-md-4 mb-2">
-      <div class="form-label">${label}</div>
+      <div class="form-label">${label}${star}</div>
       <div class="field-display ${v ? '' : 'empty'}">${v || '—'}</div>
     </div>`;
 }
 
 function mostrarVistaLectura(c) {
   let html = '<div class="row">';
+  try { _DN_SET = new Set(Array.isArray(c.origen_dn) ? c.origen_dn : JSON.parse(c.origen_dn || '[]')); } catch { _DN_SET = new Set(); }
 
   if (c.tipo_cliente === 'PERSONA') {
     html += '<div class="col-12 mb-2"><div class="section-label"><i class="bi bi-person-badge me-1"></i>Datos personales</div></div>';
-    html += dv('Apellido Paterno', c.apellido_paterno);
-    html += dv('Apellido Materno', c.apellido_materno);
-    html += dv('Nombres', c.nombres);
-    html += dv('Fecha Nacimiento', fmtFecha(c.fecha_nacimiento));
-    html += dv('Edad', c.fecha_nacimiento ? calcEdadStr(c.fecha_nacimiento) : null);
-    html += dv('Estado Civil', c.estado_civil);
-    html += dv('Sexo', c.sexo);
-    html += dv('Cargas', c.cargas);
+    html += dv('Apellido Paterno', c.apellido_paterno, 'apellido_paterno');
+    html += dv('Apellido Materno', c.apellido_materno, 'apellido_materno');
+    html += dv('Nombres', c.nombres, 'nombres');
+    html += dv('Fecha Nacimiento', fmtFecha(c.fecha_nacimiento), 'fecha_nacimiento');
+    html += dv('Edad', c.fecha_nacimiento ? calcEdadStr(c.fecha_nacimiento) : null, 'fecha_nacimiento');
+    html += dv('Estado Civil', c.estado_civil, 'estado_civil');
+    html += dv('Sexo', c.sexo, 'sexo');
+    html += dv('Cargas', c.cargas, 'cargas');
     html += dv('Régimen', c.regimen);
-    html += dv('Nacionalidad', c.nacionalidad);
+    html += dv('Nacionalidad', c.nacionalidad, 'nacionalidad');
     html += dv('Tipo Visa', c.tipo_visa);
     html += dv('Fecha Visa', fmtFecha(c.fecha_visa));
   } else {
@@ -1143,9 +1149,9 @@ function mostrarVistaLectura(c) {
   }
 
   html += '<div class="col-12 mt-2 mb-1"><div class="section-label"><i class="bi bi-envelope me-1"></i>Contacto y domicilio</div></div>';
-  html += dv('Teléfono Móvil', c.telefono_movil);
-  html += dv('Correo', c.email);
-  html += dv('Dirección', c.direccion);
+  html += dv('Teléfono Móvil', c.telefono_movil, 'telefono_movil');
+  html += dv('Correo', c.email, 'email');
+  html += dv('Dirección', c.direccion, 'direccion');
   // Resolve region/provincia/comuna names from loaded data
   const regionNombre   = regionesData.find(r => r.id_region   == c.id_region  )?.nombre || c.id_region   || null;
   const provinciaNombre= todasProvincias.find(p=> p.id_provincia==c.id_provincia)?.nombre|| c.id_provincia|| null;
@@ -1154,6 +1160,7 @@ function mostrarVistaLectura(c) {
   html += dv('Provincia', provinciaNombre);
   html += dv('Comuna', comunaNombre);
 
+  if (_DN_SET.size) html += '<div class="col-12 mt-2"><div class="dn-legend"><span class="dn-star">*</span> Información obtenida desde Dealernet</div></div>';
   html += '</div>';
   document.getElementById('vistaLectura').innerHTML = html;
 }
