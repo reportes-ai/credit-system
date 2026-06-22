@@ -149,7 +149,7 @@
     <div class="topnav-left">
       <a href="/" class="topnav-brand">
         <img src="/img/logo.png" alt="AutoFácil" style="display:block">
-        <span class="version-badge" id="versionBadge">v44.0</span>
+        <span class="version-badge" id="versionBadge">v44.1</span>
       </a>
       <div class="breadcrumb-nav">
         <a href="/">Inicio</a><span class="sep">›</span>
@@ -832,6 +832,7 @@
 
   <script src="/js/bootstrap.bundle.min.js"></script>
   <script src="/js/auth-guard.js"></script>
+  <script src="/js/placement-manifest.js"></script>
 <script>
     // ── AUTH ──────────────────────────────────────────────────
     const token = sessionStorage.getItem('token');
@@ -1151,9 +1152,89 @@
 
     // ── PERFILES Y PERMISOS ───────────────────────────────────
     let perfilesData = [];
-    let modulosData = [];
+    let modulosData = [];      // ya agrupado por SECCIÓN de placement_v2 (lo que renderiza la grilla)
+    let modulosRaw  = [];      // crudo desde BD (agrupado por módulo)
+    let placementCfg = {};     // placement_v2 — override de secciones (mueve cards entre pantallas)
     let perfilActualId = null;
     let permisosActuales = {};
+
+    // ── Reagrupar permisos por placement_v2 (no por módulo BD) ──────────────
+    // Cada funcionalidad-página (con href) cae en la sección donde vive su card
+    // según placement_v2; las de acción (href null) siguen a la sección de su
+    // módulo. Total y sin pérdidas: si falta el manifiesto, cae al agrupado BD.
+    function _plKey(href) {
+      if (!href) return null;
+      if (typeof PLACEMENT_ITEMS !== 'undefined') {
+        if (PLACEMENT_ITEMS[href]) return href;
+        const n = href.endsWith('/') ? href : href + '/';
+        if (PLACEMENT_ITEMS[n]) return n;
+      }
+      return String(href).replace(/^\/+|\/+$/g, '').split('/').pop();
+    }
+    function _plOverride(key) {
+      if (!key) return null;
+      for (const sec in placementCfg) {
+        if (Array.isArray(placementCfg[sec]) && placementCfg[sec].indexOf(key) >= 0) return sec;
+      }
+      if (typeof placementCfg[key] === 'string') return placementCfg[key];   // formato viejo
+      return null;
+    }
+    function _plSeccion(f, mod) {
+      if (f.href) {
+        const key = _plKey(f.href);
+        const ov = _plOverride(key);
+        if (ov) return ov;
+        if (typeof PLACEMENT_ITEMS !== 'undefined' && PLACEMENT_ITEMS[key]) return PLACEMENT_ITEMS[key].section;
+        if (typeof sectionFromHref === 'function') return sectionFromHref(f.href);
+      }
+      if (typeof sectionFromHref === 'function') return sectionFromHref(mod.ruta || '');   // acción → sección del módulo
+      return '_otros';
+    }
+    function agruparPorPlacement(raw) {
+      if (typeof PLACEMENT_SECTIONS === 'undefined') return raw;   // fallback: agrupado BD
+      const orden = Object.keys(PLACEMENT_SECTIONS);
+      const map = {};
+      const ensure = (sec) => {
+        if (!map[sec]) {
+          const meta = PLACEMENT_SECTIONS[sec];
+          map[sec] = { nombre: meta ? meta.label : 'Otros', icono: meta ? meta.icon : 'bi-grid', ruta: '', _keys: [], funcionalidades: [] };
+        }
+        return map[sec];
+      };
+      for (const mod of raw) {
+        for (const f of (mod.funcionalidades || [])) {
+          let sec = _plSeccion(f, mod);
+          if (!PLACEMENT_SECTIONS[sec]) sec = '_otros';
+          const g = ensure(sec);
+          f._ruta = mod.ruta;                 // preserva link de fallback de las acciones
+          g.funcionalidades.push(f);
+          g._keys.push(_plKey(f.href));
+        }
+      }
+      const secs = Object.keys(map).sort((a, b) => {
+        const ia = a === '_otros' ? 999 : (orden.indexOf(a) < 0 ? 998 : orden.indexOf(a));
+        const ib = b === '_otros' ? 999 : (orden.indexOf(b) < 0 ? 998 : orden.indexOf(b));
+        return ia - ib;
+      });
+      return secs.map(sec => {
+        const g = map[sec];
+        const arr = Array.isArray(placementCfg[sec]) ? placementCfg[sec] : [];
+        if (arr.length) {
+          g.funcionalidades = g.funcionalidades
+            .map((f, i) => ({ f, i, k: g._keys[i] }))
+            .sort((x, y) => {
+              const ix = arr.indexOf(x.k), iy = arr.indexOf(y.k);
+              if (ix < 0 && iy < 0) return x.i - y.i;
+              if (ix < 0) return 1;
+              if (iy < 0) return -1;
+              return ix - iy;
+            })
+            .map(o => o.f);
+        }
+        delete g._keys;
+        return g;
+      });
+    }
 
     // Estado para expansión de usuarios por perfil
     let perfilesExpandidos = {};       // { id_perfil: bool }
@@ -1167,12 +1248,15 @@
     let permisosUsuarioDelta = {};     // { id_func: bool } — estado actual editado
 
     async function cargarPerfiles() {
-      const [pData, mData] = await Promise.all([
+      const [pData, mData, plData] = await Promise.all([
         api('GET', '/api/perfiles'),
-        api('GET', '/api/perfiles/modulos-funcionalidades')
+        api('GET', '/api/perfiles/modulos-funcionalidades'),
+        api('GET', '/api/config/ui/placement_v2')
       ]);
       perfilesData = pData?.data || [];
-      modulosData  = mData?.data || [];
+      modulosRaw   = mData?.data || [];
+      placementCfg = (plData && plData.success && plData.data && typeof plData.data === 'object') ? plData.data : {};
+      modulosData  = agruparPorPlacement(modulosRaw);
       renderListaPerfiles();
     }
 
@@ -1281,7 +1365,7 @@
             ${mod.funcionalidades.map(f => {
               const checked = permisosActuales[f.id_funcionalidad] ? 'checked' : '';
               const checkedClass = permisosActuales[f.id_funcionalidad] ? 'checked' : '';
-              const tgt = f.href || mod.ruta;
+              const tgt = f.href || f._ruta || mod.ruta;
               const link = tgt ? `<a class="permiso-link" href="${tgt}" target="_blank" title="Ir a ${f.nombre}" onclick="event.stopPropagation()"><i class="bi bi-box-arrow-up-right"></i></a>` : '';
               return `
                 <label class="permiso-check ${checkedClass}" id="pc-${f.id_funcionalidad}">
@@ -1367,7 +1451,7 @@
               const borderCol = esExtra ? '#28a745' : esFalta ? '#dc3545' : '';
               const labelStyle = bgColor ? `background:${bgColor};border-color:${borderCol}` : '';
               const checkedClass = efectivo ? 'checked' : '';
-              const tgt = f.href || mod.ruta;
+              const tgt = f.href || f._ruta || mod.ruta;
               const link = tgt ? `<a class="permiso-link" href="${tgt}" target="_blank" title="Ir a ${f.nombre}" onclick="event.stopPropagation()"><i class="bi bi-box-arrow-up-right"></i></a>` : '';
               return `
                 <label class="permiso-check ${checkedClass}" id="pcu-${fid}" style="${labelStyle}">
