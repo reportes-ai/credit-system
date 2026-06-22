@@ -1,4 +1,5 @@
 const pool = require('../../../../shared/config/database');
+const { analizar } = require('../../../../shared/anthropic');
 
 /* ──────────────────────────────────────────────────────────────────────────
  * Evaluación Crediticia
@@ -73,6 +74,10 @@ async function sincronizarComercialDealernet(rutDash) {
         UNIQUE KEY uq_rut_doc (rut_cliente, documento),
         INDEX idx_evdoc_rut (rut_cliente)
       )`);
+    for (const sql of [
+      'ALTER TABLE evaluacion_documentos ADD COLUMN validado TINYINT NULL',          // 1 ok · 0 observado · null sin validar
+      'ALTER TABLE evaluacion_documentos ADD COLUMN validacion_texto VARCHAR(255) NULL',
+    ]) { try { await pool.query(sql); } catch (e) { if (e.errno !== 1060) console.error('[evdoc alter]', e.message); } }
 
     // Módulo/card propio "Evaluación Crediticia" en el Home.
     await pool.query(
@@ -198,7 +203,7 @@ const getDocumentos = async (req, res) => {
     const rut = normRut(decodeURIComponent(req.params.rut || ''));
     if (!rut) return res.status(400).json({ success: false, data: null, error: 'RUT requerido' });
     const [rows] = await pool.query(
-      `SELECT id, ocupacion, documento, archivo_nombre, archivo_size, mime_type, created_at
+      `SELECT id, ocupacion, documento, archivo_nombre, archivo_size, mime_type, validado, validacion_texto, created_at
        FROM evaluacion_documentos WHERE rut_cliente=? ORDER BY id`, [rut]);
     res.json({ success: true, data: rows, error: null });
   } catch (e) {
@@ -261,4 +266,63 @@ const removeDocumento = async (req, res) => {
   }
 };
 
-module.exports = { ficha, getDocumentos, subirDocumento, verDocumento, removeDocumento };
+/* POST /api/evaluacion-crediticia/documento/:id/validar-afp — la IA valida el
+   certificado de cotizaciones de AFP: que sea genuino, RUT del cliente y períodos. */
+const SYSTEM_AFP = `Eres un validador documental de una financiera automotriz chilena. Recibes un archivo que DEBERÍA ser un Certificado de Cotizaciones de AFP. Determina si es ese documento, extrae sus datos y verifica que correspondan al cliente. No es verificación forense ni de folio en la AFP; es validación de contenido.`;
+const promptAFP = (rutCliente) => `Valida el documento adjunto como Certificado de Cotizaciones de AFP del cliente con RUT ${rutCliente}. Responde SOLO este JSON:
+{
+  "es_cotizaciones_afp": true|false,
+  "afp": "nombre de la AFP o null",
+  "rut_documento": "RUT que aparece en el documento o null",
+  "rut_coincide": true|false,
+  "folio": "folio si aparece o null",
+  "n_periodos": number,
+  "ultimo_periodo": "MM/AAAA o null",
+  "veredicto": "validado|observado|no_es_certificado",
+  "motivo": "1 frase: por qué es válido, o qué falla (RUT no coincide, ilegible, faltan períodos, no es certificado de cotizaciones, etc.)"
+}`;
+
+const validarAfp = async (req, res) => {
+  try {
+    const [[doc]] = await pool.query('SELECT id, rut_cliente, documento, mime_type, archivo_data FROM evaluacion_documentos WHERE id=?', [req.params.id]);
+    if (!doc) return res.status(404).json({ success: false, data: null, error: 'Documento no encontrado' });
+    const mt = (doc.mime_type || '').toLowerCase();
+    if (!doc.archivo_data || !(mt.includes('pdf') || mt.startsWith('image/')))
+      return res.json({ success: true, data: { validado: null, texto: 'Solo se valida PDF o imagen' }, error: null });
+
+    const documentos = mt.includes('pdf')
+      ? [{ tipo: 'pdf', data: Buffer.from(doc.archivo_data).toString('base64') }]
+      : [{ tipo: 'image', media_type: mt, data: Buffer.from(doc.archivo_data).toString('base64') }];
+
+    let x = null, texto = null, validado = null;
+    try {
+      const r = await analizar({
+        codigo: 'evaluacion_consistencia', id_usuario: req.usuario?.id_usuario,
+        system: SYSTEM_AFP, prompt: promptAFP(doc.rut_cliente), documentos, json: true, max_tokens: 800, thinking: false,
+      });
+      x = r.datos;
+      if (!x && r.texto) { const m = r.texto.match(/\{[\s\S]*\}/); if (m) { try { x = JSON.parse(m[0]); } catch (_) {} } }
+    } catch (e) {
+      if (e.code === 'IA_OFF') return res.json({ success: true, data: { validado: null, texto: 'IA desactivada' }, error: null });
+      if (e.code === 'NO_KEY') return res.json({ success: true, data: { validado: null, texto: 'IA no configurada' }, error: null });
+      throw e;
+    }
+    if (!x) return res.json({ success: true, data: { validado: null, texto: 'No se pudo leer la validación' }, error: null });
+
+    if (x.es_cotizaciones_afp && x.rut_coincide && x.veredicto === 'validado') {
+      validado = 1;
+      texto = 'Validado en Certificado de Cotizaciones' + (x.afp ? ' · ' + String(x.afp).slice(0, 40) : '') + (x.n_periodos ? ' · ' + x.n_periodos + ' períodos' : '');
+    } else {
+      validado = 0;
+      texto = 'Revisar: ' + (x.motivo || (!x.es_cotizaciones_afp ? 'no parece un certificado de cotizaciones' : !x.rut_coincide ? 'el RUT no coincide' : 'observado'));
+    }
+    texto = texto.slice(0, 255);
+    await pool.query('UPDATE evaluacion_documentos SET validado=?, validacion_texto=? WHERE id=?', [validado, texto, doc.id]);
+    res.json({ success: true, data: { validado, texto, detalle: x }, error: null });
+  } catch (e) {
+    console.error('[evaluacion validarAfp]', e.message);
+    res.status(422).json({ success: false, data: null, error: 'No se pudo validar: ' + (e.message || 'error') });
+  }
+};
+
+module.exports = { ficha, getDocumentos, subirDocumento, verDocumento, removeDocumento, validarAfp };

@@ -8,6 +8,7 @@ router.get('/ficha/:rut', verifyToken, ctrl.ficha);
 router.get('/documentos/:rut',     verifyToken, ctrl.getDocumentos);
 router.post('/documento',          verifyToken, ctrl.subirDocumento);
 router.get('/documento/:id/view',  verifyToken, ctrl.verDocumento);
+router.post('/documento/:id/validar-afp', verifyToken, ctrl.validarAfp);
 router.delete('/documento/:id',    verifyToken, ctrl.removeDocumento);
 
 module.exports = router;

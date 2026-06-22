@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- v45.8 -->
+<!-- v45.9 -->
 <html lang="es">
 <head>
   <meta charset="UTF-8">
@@ -82,6 +82,10 @@
     .btn-mini.danger { color:#b91c1c; border-color:#fecaca; }
     .doc-ok { font-size:.82rem; font-weight:700; color:#166534; display:inline-flex; align-items:center; gap:4px; }
     .doc-ok i { color:#16a34a; }
+    .doc-val { flex-basis:100%; font-size:.8rem; font-weight:800; margin-top:3px; }
+    .doc-val.ok { color:#dc2626; }      /* rojo, como se pidió */
+    .doc-val.bad { color:#b45309; }
+    .doc-val.pend { color:#6b7280; font-weight:600; }
     .ev-pregunta { background:#fffbeb; border:1px solid #fde68a; border-radius:12px; padding:18px 20px; }
     .pulse-dot { display:inline-block; width:9px; height:9px; border-radius:50%; background:#10b981; margin-right:6px; }
     .fr-nombre { font-size:1.1rem; font-weight:800; color:#111827; margin-bottom:10px; }
@@ -421,11 +425,19 @@
   let DOCS_ACTUALES = [];           // documentos de la ocupación seleccionada
   let DOCS_CARGADOS = {};           // { documento(texto): {id, nombre} } — archivos ya subidos para el RUT
 
+  function esDocAfp(t){ return String(t || '').toLowerCase().includes('afp'); }
+
   function docActions(i, d){
     const carg = DOCS_CARGADOS[d.documento];
-    if (carg) return `<span class="doc-ok"><i class="bi bi-check-circle-fill"></i>${escapeHtml(carg.nombre)}</span>
-      <button class="btn-mini" onclick="verDoc(${carg.id})"><i class="bi bi-eye"></i> Ver</button>
-      <button class="btn-mini danger" onclick="quitarDoc(${carg.id})"><i class="bi bi-x-lg"></i> Quitar</button>`;
+    if (carg) {
+      let val = '';
+      if (carg.validando)        val = '<div class="doc-val pend"><span class="spinner-border spinner-border-sm me-1" style="width:.8rem;height:.8rem"></span>Validando certificado con IA…</div>';
+      else if (carg.validado === 1) val = '<div class="doc-val ok"><i class="bi bi-patch-check-fill me-1"></i>' + escapeHtml(carg.vtexto || 'Validado en Certificado de Cotizaciones') + '</div>';
+      else if (carg.validado === 0) val = '<div class="doc-val bad"><i class="bi bi-exclamation-triangle-fill me-1"></i>' + escapeHtml(carg.vtexto || 'Revisar') + '</div>';
+      return `<span class="doc-ok"><i class="bi bi-check-circle-fill"></i>${escapeHtml(carg.nombre)}</span>
+        <button class="btn-mini" onclick="verDoc(${carg.id})"><i class="bi bi-eye"></i> Ver</button>
+        <button class="btn-mini danger" onclick="quitarDoc(${carg.id})"><i class="bi bi-x-lg"></i> Quitar</button>${val}`;
+    }
     return `<input type="file" id="file-${i}" style="display:none" onchange="subirDoc(${i}, this)">
       <button class="btn-mini up" onclick="document.getElementById('file-${i}').click()"><i class="bi bi-upload me-1"></i>Cargar archivo</button>`;
   }
@@ -470,6 +482,21 @@
       DOCS_CARGADOS[d.documento] = { id: j.data.id, nombre: file.name };
     } catch (e) { alert('No se pudo subir el archivo: ' + e.message); }
     act.innerHTML = docActions(i, d);
+    // Certificado de cotizaciones AFP → validar automáticamente con IA
+    if (DOCS_CARGADOS[d.documento] && esDocAfp(d.documento)) validarAfpDoc(i, d);
+  }
+
+  async function validarAfpDoc(i, d){
+    const carg = DOCS_CARGADOS[d.documento]; if (!carg) return;
+    carg.validando = true;
+    let act = document.getElementById('doc-act-' + i); if (act) act.innerHTML = docActions(i, d);
+    try {
+      const r = await fetch('/api/evaluacion-crediticia/documento/' + carg.id + '/validar-afp', { method:'POST', headers: H });
+      const j = await r.json();
+      if (j.success && j.data) { carg.validado = j.data.validado; carg.vtexto = j.data.texto; }
+    } catch (_) {}
+    carg.validando = false;
+    act = document.getElementById('doc-act-' + i); if (act) act.innerHTML = docActions(i, d);
   }
 
   async function verDoc(id){
@@ -496,7 +523,7 @@
     try {
       const r = await fetch('/api/evaluacion-crediticia/documentos/' + encodeURIComponent(rut), { headers: H });
       const j = await r.json();
-      (j.data || []).forEach(d => { DOCS_CARGADOS[d.documento] = { id: d.id, nombre: d.archivo_nombre }; });
+      (j.data || []).forEach(d => { DOCS_CARGADOS[d.documento] = { id: d.id, nombre: d.archivo_nombre, validado: d.validado, vtexto: d.validacion_texto }; });
     } catch (_) {}
   }
 
