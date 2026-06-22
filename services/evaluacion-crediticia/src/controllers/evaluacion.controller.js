@@ -10,6 +10,51 @@ const pool = require('../../../../shared/config/database');
 
 const normRut = v => v ? String(v).replace(/\./g, '').toUpperCase().trim() : null;
 
+// ── Sincroniza la deuda vigente del informe DealerNet (cód. 16) a informacion_comercial ──
+// Mismo mapeo que usa la página de Información Comercial (r1603, M$ → pesos ×1000).
+const _wgp = (o, ...ks) => { for (const k of ks) { if (o == null) return undefined; o = o[k]; } return o; };
+const _warr = x => x == null ? [] : (Array.isArray(x) ? x : [x]);
+function extraerDeudaDN(cont) {
+  const cab = _wgp(cont, 'r1603', 'r16031') || {};
+  const per = _warr(_wgp(cont, 'r1603', 'r16032'))[0];
+  if (!per && cab['@_anomes'] == null) return null;
+  const p = per || {};
+  const n = v => { const x = Number(v); return isNaN(x) ? 0 : Math.round(x * 1000); };
+  return {
+    deuda_vigente_total: n(p['@_deuda_direc_vig']),
+    deuda_vigente_inst:  (Number(p['@_nro_acree_cred_consumo']) || 0) + (Number(p['@_nro_inst_cred_com']) || 0),
+    deuda_hipotecaria:   n(p['@_deuda_cred_hipoteca']),
+    deuda_comercial:     n(p['@_deuda_comercial']),
+    deuda_comercial_inst: Number(p['@_nro_inst_cred_com']) || 0,
+    deuda_consumo:       n(p['@_deuda_cred_consumo']),
+    deuda_consumo_inst:  Number(p['@_nro_acree_cred_consumo']) || 0,
+    deuda_morosa:        n(p['@_deuda_morosa']),
+    deuda_vencida:       n(p['@_deuda_venci_direc']),
+    deuda_castigada:     n(p['@_deuda_cast_directa']),
+    linea_disponible:    n(p['@_linea_cred_disponible']),
+  };
+}
+async function sincronizarComercialDealernet(rutDash) {
+  try {
+    const dig = rutDash.replace(/[.\s-]/g, '').toUpperCase();
+    const rutDN = dig.length > 1 ? dig.slice(0, -1) : dig;     // dealernet_informes guarda el RUT sin DV
+    const [[inf]] = await pool.query(
+      "SELECT contenido, created_at FROM dealernet_informes WHERE rut=? AND codigo_producto='16' AND retcode='0' ORDER BY created_at DESC LIMIT 1", [rutDN]);
+    if (!inf) return false;
+    const [[ic]] = await pool.query('SELECT updated_at FROM informacion_comercial WHERE rut_cliente=? LIMIT 1', [rutDash]);
+    if (ic && ic.updated_at && new Date(ic.updated_at) >= new Date(inf.created_at)) return false;  // ya sincronizado, no pisar ediciones
+    let cont = inf.contenido; if (typeof cont === 'string') { try { cont = JSON.parse(cont); } catch { return false; } }
+    const d = extraerDeudaDN(cont);
+    if (!d) return false;
+    const cols = ['deuda_vigente_total', 'deuda_vigente_inst', 'deuda_hipotecaria', 'deuda_comercial', 'deuda_comercial_inst', 'deuda_consumo', 'deuda_consumo_inst', 'deuda_morosa', 'deuda_vencida', 'deuda_castigada', 'linea_disponible'];
+    await pool.query(
+      `INSERT INTO informacion_comercial (rut_cliente, ${cols.join(', ')}) VALUES (${['?', ...cols.map(() => '?')].join(', ')})
+       ON DUPLICATE KEY UPDATE ${cols.map(c => `${c}=VALUES(${c})`).join(', ')}, updated_at=CURRENT_TIMESTAMP`,
+      [rutDash, ...cols.map(c => d[c])]);
+    return true;
+  } catch (e) { console.error('[sincronizarComercialDealernet]', e.message); return false; }
+}
+
 (async () => {
   try {
     // Documentos que el ejecutivo carga para evaluar (por RUT + documento requerido).
@@ -102,7 +147,10 @@ const ficha = async (req, res) => {
       };
     } catch (_) {}
 
-    // 2b) Informes comerciales: tabla propia y/o el informe DealerNet (de donde
+    // 2b) Carga la deuda del informe DealerNet a la información del cliente (si hay informe nuevo)
+    await sincronizarComercialDealernet(rut);
+
+    // 2c) Informes comerciales: tabla propia y/o el informe DealerNet (de donde
     //     sale la data comercial de muchos clientes). Se muestra la fecha más reciente.
     let comercial = null;
     const fechasCom = [];
