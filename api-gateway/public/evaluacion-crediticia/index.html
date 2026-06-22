@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- v46.1 -->
+<!-- v46.2 -->
 <html lang="es">
 <head>
   <meta charset="UTF-8">
@@ -632,23 +632,33 @@
     const iaOv = (window.AF_IA && AF_IA.analizando) ? AF_IA.analizando('Trayendo antecedentes de DealerNet y evaluando con IA…') : null;
     try {
       // 1) Asegura el informe DealerNet (lo trae si no hay) y sincroniza la info del cliente
-      await asegurarDealernetYSync(rut);
+      const dn = await asegurarDealernetYSync(rut);
+      let aviso = '';
+      if (dn.error)        aviso = `<div class="alert alert-warning py-2 px-3" style="font-size:.84rem;margin-bottom:10px"><i class="bi bi-exclamation-triangle me-1"></i>No se pudo traer el informe de DealerNet: ${escapeHtml(dn.error)}. La evaluación se hace solo con lo disponible.</div>`;
+      else if (dn.informe) aviso = `<div class="alert alert-success py-2 px-3" style="font-size:.84rem;margin-bottom:10px"><i class="bi bi-check-circle me-1"></i>Informe DealerNet en el repositorio · datos del cliente sincronizados.</div>`;
       // 2) Evalúa con IA
       const r = await fetch('/api/ia/evaluacion-credito', { method:'POST', headers:H, body: JSON.stringify({ rut, cotizacion_id: cotSel }) });
       const j = await r.json();
-      if (!j.success) { out.innerHTML = `<div class="alert alert-warning mb-0" style="font-size:.88rem"><i class="bi bi-exclamation-triangle me-1"></i>${escapeHtml(j.error || 'No se pudo evaluar')}</div>`; return; }
-      out.innerHTML = renderEvalIA(j.data);
+      if (!j.success) { out.innerHTML = aviso + `<div class="alert alert-warning mb-0" style="font-size:.88rem"><i class="bi bi-exclamation-triangle me-1"></i>${escapeHtml(j.error || 'No se pudo evaluar')}</div>`; return; }
+      out.innerHTML = aviso + renderEvalIA(j.data);
     } catch (e) { out.innerHTML = `<div class="alert alert-danger mb-0" style="font-size:.88rem">Error: ${escapeHtml(e.message)}</div>`; }
     finally { if (iaOv) iaOv.cerrar(); btn.disabled = false; btn.innerHTML = '<i class="bi bi-stars me-1"></i>Evaluar con IA (Política V3.0)'; }
   }
 
-  // Trae el informe DealerNet (si no hay en el repositorio) y sincroniza la info del cliente
+  // Trae el informe DealerNet (si no hay en el repositorio) y sincroniza la info del cliente.
+  // Devuelve { informe:bool, error:string|null } para que el resultado sea visible.
   async function asegurarDealernetYSync(rut){
+    let informe = false, error = null;
     try {
-      const informes = await cargarInformesRepo(rut);
-      if (!informes.length) { try { await solicitarInformes(rut); } catch (_) {} }   // pide a DealerNet (gasta saldo solo si no hay)
+      let informes = await cargarInformesRepo(rut);
+      if (!informes.length) {
+        try { await solicitarInformes(rut); informes = await cargarInformesRepo(rut); }
+        catch (e) { error = e.message || 'no se pudo consultar DealerNet'; }
+      }
+      informe = informes.length > 0;
       await sincronizarClienteDesdeDealernet(rut);
-    } catch (_) {}
+    } catch (e) { error = error || e.message; }
+    return { informe, error };
   }
 
   // Dispara la sincronización server-side (personal en clientes + comercial en informacion_comercial) y refresca las fechas
