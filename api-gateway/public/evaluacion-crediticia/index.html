@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- v44.8 -->
+<!-- v45.1 -->
 <html lang="es">
 <head>
   <meta charset="UTF-8">
@@ -529,6 +529,7 @@
         <div class="ia-monto"><div class="n">${fmt(cap.monto_maximo_prestar)}</div><div class="l">Monto máximo a prestar</div></div>
       </div>
       <div class="ia-body">
+        ${docs.aviso ? `<div class="alert alert-warning py-2 px-3" style="font-size:.84rem;margin-bottom:10px"><i class="bi bi-exclamation-triangle me-1"></i>${escapeHtml(docs.aviso)}</div>` : ''}
         ${kos.length ? `<div class="ia-ko"><i class="bi bi-x-octagon-fill me-1"></i>Rechazo por regla excluyente: ${kos.map(k => escapeHtml(k.codigo + ' — ' + (k.motivo || ''))).join('; ')}</div>` : ''}
         ${d.resumen ? `<div class="ia-sec-t">Resumen</div><div style="font-size:.9rem;line-height:1.5">${escapeHtml(d.resumen)}</div>` : ''}
         <div class="ia-sec-t">Capacidad y monto</div>

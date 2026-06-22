@@ -112,7 +112,7 @@ exports.evaluar = async (req, res) => {
     const cotizacionId = req.body?.cotizacion_id || null;
 
     // 1) Cliente + antecedentes + información comercial
-    const [[cli]]  = await pool.query('SELECT rut, nombre_completo, nombres, apellido_paterno, apellido_materno, fecha_nacimiento, comuna, region FROM clientes WHERE rut=? LIMIT 1', [rutDash]).catch(() => [[null]]);
+    const [[cli]]  = await pool.query('SELECT rut, nombre_completo, nombres, apellido_paterno, apellido_materno, fecha_nacimiento, nacionalidad, estado_civil, sexo, cargas, direccion FROM clientes WHERE rut=? LIMIT 1', [rutDash]).catch(() => [[null]]);
     const [[ant]]  = await pool.query('SELECT tipo_trabajador, empleador, antiguedad_meses, renta_fija_liquida, renta_var_mes1, renta_var_mes2, renta_var_mes3, updated_at FROM antecedentes_laborales WHERE rut_cliente=? LIMIT 1', [rutDash]).catch(() => [[null]]);
     const [[com]]  = await pool.query('SELECT deuda_vigente_total, deuda_morosa, deuda_castigada, monto_protestos, protestos_vigentes_q FROM informacion_comercial WHERE rut_cliente=? LIMIT 1', [rutDash]).catch(() => [[null]]);
     const clienteTxt = JSON.stringify({ cliente: cli || null, antecedentes_laborales: ant || null, informacion_comercial: com || null }, null, 1);
@@ -140,11 +140,14 @@ exports.evaluar = async (req, res) => {
     // 4) Documentos cargados → adjuntos para visión (pdf/imagen)
     const [docsRows] = await pool.query(
       'SELECT documento, archivo_nombre, mime_type, archivo_data, archivo_size FROM evaluacion_documentos WHERE rut_cliente=? ORDER BY id', [rutDash]).catch(() => [[]]);
-    const documentos = []; const docsLista = [];
+    const documentos = []; const docsLista = []; let totalBytes = 0;
+    const MAX_TOTAL = 18 * 1024 * 1024;   // presupuesto total (la API limita ~32MB/100 págs por request)
     for (const d of (docsRows || [])) {
       docsLista.push(`- ${d.documento} (${d.archivo_nombre || 's/n'})`);
       const mt = (d.mime_type || '').toLowerCase();
-      if (!d.archivo_data || d.archivo_size > 5 * 1024 * 1024 || documentos.length >= 6) continue;
+      const size = d.archivo_size || (d.archivo_data ? d.archivo_data.length : 0);
+      if (!d.archivo_data || size > 5 * 1024 * 1024 || documentos.length >= 6 || totalBytes + size > MAX_TOTAL) continue;
+      totalBytes += size;
       if (mt.includes('pdf')) documentos.push({ tipo: 'pdf', data: Buffer.from(d.archivo_data).toString('base64') });
       else if (mt.startsWith('image/')) documentos.push({ tipo: 'image', media_type: mt, data: Buffer.from(d.archivo_data).toString('base64') });
     }
@@ -159,13 +162,26 @@ exports.evaluar = async (req, res) => {
 
     const ctx = { cliente: clienteTxt, dealernet: dealernetTxt, cotizacion: cotizacionTxt, docsLista: docsLista.join('\n'), politica: politicaTxt };
 
-    // 6) Llamada a la IA
-    const r = await analizar({
-      codigo: CODIGO, id_usuario: req.usuario?.id_usuario, system: SYSTEM, prompt: promptDe(ctx),
-      documentos, json: true, max_tokens: 6000, thinking: true,
-    });
+    // 6) Llamada a la IA. Si la API rechaza los adjuntos (PDF muy grandes / muchas
+    //    páginas), se reintenta SIN documentos para igual entregar la evaluación.
+    const baseArgs = { codigo: CODIGO, id_usuario: req.usuario?.id_usuario, system: SYSTEM, prompt: promptDe(ctx), json: true, max_tokens: 6000, thinking: true };
+    let r, docsError = null;
+    try {
+      r = await analizar({ ...baseArgs, documentos });
+    } catch (e1) {
+      if (e1.code === 'NO_KEY' || e1.code === 'IA_OFF') throw e1;
+      if (documentos.length) {
+        docsError = e1.message;
+        console.error('[ia eval-credito] adjuntos rechazados, reintento sin documentos:', e1.message);
+        r = await analizar({ ...baseArgs, documentos: [] });
+      } else { throw e1; }
+    }
     const x = r.datos;
-    if (!x) return res.status(422).json({ success: false, data: { texto: r.texto }, error: 'No se pudo generar la evaluación. Intenta de nuevo.' });
+    if (!x) return res.status(422).json({ success: false, data: { texto: r.texto }, error: 'La IA respondió pero no se pudo leer el resultado. Intenta de nuevo.' });
+    if (docsError) {
+      x.documentos = x.documentos || {};
+      x.documentos.aviso = 'No se pudieron analizar los archivos adjuntos (la API los rechazó: ' + docsError + '). La evaluación se hizo sin revisar los documentos.';
+    }
 
     // 7) Persistir
     let id = null;
@@ -184,10 +200,11 @@ exports.evaluar = async (req, res) => {
 
     res.json({ success: true, data: { id, rut: rutDash, ...x, n_documentos: documentos.length, modelo: r.modelo, tokens_in: r.tokens_in, tokens_out: r.tokens_out, costo: r.costo }, error: null });
   } catch (e) {
-    if (e.code === 'NO_KEY') return res.status(503).json({ success: false, data: null, error: 'La IA no está configurada (falta ANTHROPIC_API_KEY).' });
+    // 4xx: el gateway NO los reescribe → el mensaje real llega al usuario para diagnóstico.
+    if (e.code === 'NO_KEY') return res.status(400).json({ success: false, data: null, error: 'La IA no está configurada (falta ANTHROPIC_API_KEY en el servidor).' });
     if (e.code === 'IA_OFF') return res.status(403).json({ success: false, data: null, error: 'La IA de evaluación está desactivada. Actívala en Mantenedores → Inteligencia Artificial (Evaluación de consistencia / scoring).' });
-    console.error('[ia eval-credito]', e.message);
-    res.status(500).json({ success: false, data: null, error: 'Error al evaluar: ' + e.message });
+    console.error('[ia eval-credito]', e.stack || e.message);
+    res.status(422).json({ success: false, data: null, error: 'La IA no pudo evaluar: ' + (e.message || 'error desconocido') });
   }
 };
 
