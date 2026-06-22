@@ -102,13 +102,22 @@ const ficha = async (req, res) => {
       };
     } catch (_) {}
 
-    // 2b) Información comercial (fecha)
+    // 2b) Informes comerciales: tabla propia y/o el informe DealerNet (de donde
+    //     sale la data comercial de muchos clientes). Se muestra la fecha más reciente.
     let comercial = null;
+    const fechasCom = [];
     try {
-      const [[ic]] = await pool.query(
-        'SELECT updated_at, created_at FROM informacion_comercial WHERE rut_cliente=? LIMIT 1', [rut]);
-      if (ic) comercial = { existe: true, fecha: ic.updated_at || ic.created_at };
+      const [[ic]] = await pool.query('SELECT updated_at, created_at FROM informacion_comercial WHERE rut_cliente=? LIMIT 1', [rut]);
+      if (ic) fechasCom.push(ic.updated_at || ic.created_at);
     } catch (_) {}
+    try {
+      const dig = rut.replace(/[.\s-]/g, '').toUpperCase();
+      const rutDN = dig.length > 1 ? dig.slice(0, -1) : dig;   // dealernet_informes guarda el RUT sin DV
+      const [[dn]] = await pool.query("SELECT MAX(created_at) AS fecha FROM dealernet_informes WHERE rut=? AND retcode='0'", [rutDN]);
+      if (dn && dn.fecha) fechasCom.push(dn.fecha);
+    } catch (_) {}
+    const ordenadas = fechasCom.filter(Boolean).map(f => new Date(f)).sort((a, b) => b - a);
+    if (ordenadas.length) comercial = { existe: true, fecha: ordenadas[0] };
 
     // 3) Cotizaciones guardadas (última primero)
     let cotizaciones = [];
