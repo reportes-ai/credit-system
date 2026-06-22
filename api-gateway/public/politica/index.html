@@ -78,6 +78,22 @@
     .submod-card.active.flujo .submod-icon { background:linear-gradient(135deg,#5b21b6,#7c3aed); color:#fff; }
     .submod-card.active.carga .submod-icon { background:linear-gradient(135deg,#0141A2,#009AFE); color:#fff; }
     .submod-card.active.aprob .submod-icon { background:linear-gradient(135deg,#15803d,#22c55e); color:#fff; }
+    .submod-card.v3      .submod-icon { background:#fee2e2; color:#b91c1c; }
+    .submod-card.active.v3 .submod-icon { background:linear-gradient(135deg,#b91c1c,#ef4444); color:#fff; }
+    /* ── Cuadros Política V3.0 ── */
+    .v3-sec-title { font-size:.78rem; font-weight:800; letter-spacing:.06em; text-transform:uppercase; color:#0141A2; margin:22px 0 10px; padding-bottom:6px; border-bottom:2px solid #e5e7eb; }
+    .v3-card { background:#fff; border:1px solid #e5e7eb; border-radius:12px; padding:14px 16px; margin-bottom:14px; }
+    .v3-card-head { display:flex; justify-content:space-between; align-items:center; gap:10px; flex-wrap:wrap; margin-bottom:10px; }
+    .v3-card-title { font-size:.92rem; font-weight:700; color:#1f2937; display:flex; align-items:center; gap:8px; }
+    .v3-badge { font-size:.66rem; font-weight:800; letter-spacing:.04em; text-transform:uppercase; border-radius:20px; padding:2px 9px; }
+    .v3-badge.param { background:#dcfce7; color:#166534; }
+    .v3-badge.fijo  { background:#e5e7eb; color:#4b5563; }
+    .v3-actions { display:flex; gap:6px; }
+    .v3-tabla { border-collapse:collapse; width:100%; font-size:.78rem; }
+    .v3-tabla th { background:#0141A2; color:#fff; font-size:.7rem; text-transform:uppercase; letter-spacing:.03em; padding:6px 9px; text-align:left; white-space:nowrap; }
+    .v3-tabla td { border:1px solid #eef2f7; padding:5px 9px; vertical-align:top; }
+    .v3-tabla tbody tr:nth-child(even) { background:#f8fafc; }
+    .v3-tabla td.v3-editing { background:#fef9c3; outline:1px solid #f59e0b; }
 
     /* ── Política de aprobación ──────────────────────────────────────── */
     .pol-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(220px,1fr)); gap:14px; }
@@ -225,7 +241,7 @@
   <div class="topnav-left">
     <a href="/" class="topnav-brand">
       <img src="/img/logo.png" alt="AutoFácil">
-      <span class="version-badge" id="versionBadge">v1.6</span>
+      <span class="version-badge" id="versionBadge">v1.7</span>
     </a>
     <div class="breadcrumb-nav">
       <a href="/">Inicio</a><span class="sep">›</span>
@@ -293,6 +309,15 @@
       <div class="submod-info">
         <h6>Documentos de Respaldo</h6>
         <p>Documentos aceptados para validar renta, antigüedad, domicilio, estado civil y residencia</p>
+      </div>
+      <i class="bi bi-chevron-right submod-arrow"></i>
+    </div>
+
+    <div class="submod-card v3" onclick="activarPanel('v3')">
+      <div class="submod-icon"><i class="bi bi-clipboard-pulse"></i></div>
+      <div class="submod-info">
+        <h6>Política de Crédito V3.0</h6>
+        <p>Scorecard (1000 pts · 4 bloques) · Reglas K1–K11 · PD por segmento · Quintiles · Matriz de decisión · Cuadros paramétricos y fijos</p>
       </div>
       <i class="bi bi-chevron-right submod-arrow"></i>
     </div>
@@ -429,6 +454,21 @@
     </div>
   </div>
 
+  <!-- ══════════════════════════════════════════════════════════════
+       PANEL: POLÍTICA DE CRÉDITO V3.0 (scorecard)
+  ══════════════════════════════════════════════════════════════ -->
+  <div class="section-panel" id="panel-v3">
+    <div class="section-card">
+      <div class="section-header">
+        <div>
+          <div class="section-label"><i class="bi bi-clipboard-pulse"></i>Política de Crédito Automotriz V3.0</div>
+          <div class="section-desc">Complemento operativo de la V2.0 (PC-02): scorecard de 1000 pts en 4 bloques → quintil (Q1–Q5) → matriz de decisión. <b>Paramétrico</b> = editable por el Administrador; <b>Fijo</b> = referencia.</div>
+        </div>
+      </div>
+      <div id="v3Tablas"><div class="text-muted" style="padding:20px">Cargando cuadros…</div></div>
+    </div>
+  </div>
+
 </div><!-- /page-wrap -->
 
 <!-- Toasts -->
@@ -552,7 +592,7 @@ function showToast(msg, ok) {
 /* ═══════════════════════════════════════════════════════════════════
    NAVEGACIÓN ENTRE PANELES
 ═══════════════════════════════════════════════════════════════════ */
-const BC_LABELS = { flujo: 'Flujo de Crédito', carga: 'Carga Mensual', aprob: 'Política de Aprobación', docs: 'Documentos de Respaldo' };
+const BC_LABELS = { flujo: 'Flujo de Crédito', carga: 'Carga Mensual', aprob: 'Política de Aprobación', docs: 'Documentos de Respaldo', v3: 'Política V3.0' };
 
 function activarPanel(id) {
   // Cards
@@ -568,6 +608,84 @@ function activarPanel(id) {
   if (id === 'carga' && !_cmCargado) cargarCM();
   if (id === 'aprob' && !_polCargado) cargarPolitica();
   if (id === 'docs'  && !_docsCargado) cargarDocs();
+  if (id === 'v3'    && !_v3Cargado) cargarV3();
+}
+
+/* ═══════════════════════════════════════════════════════════════════
+   POLÍTICA DE CRÉDITO V3.0 — cuadros paramétricos y fijos
+═══════════════════════════════════════════════════════════════════ */
+let _v3Cargado = false;
+let V3_DATA = [];
+const escV3 = s => String(s ?? '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+
+async function cargarV3() {
+  _v3Cargado = true;
+  const cont = document.getElementById('v3Tablas');
+  try {
+    const r = await fetch('/api/politica-v3/tablas', { headers: apiHeaders() });
+    const j = await r.json();
+    if (!j.success) throw new Error(j.error || 'Error');
+    V3_DATA = j.data || [];
+    renderV3();
+  } catch (e) {
+    _v3Cargado = false;
+    cont.innerHTML = '<div class="text-danger" style="padding:20px">Error al cargar los cuadros: ' + escV3(e.message) + '</div>';
+  }
+}
+
+function renderV3() {
+  const cont = document.getElementById('v3Tablas');
+  const secciones = [], bySec = {};
+  V3_DATA.forEach(t => { if (!bySec[t.seccion]) { bySec[t.seccion] = []; secciones.push(t.seccion); } bySec[t.seccion].push(t); });
+  cont.innerHTML = secciones.map(sec =>
+    `<div class="v3-sec-title">${escV3(sec)}</div>` + bySec[sec].map(v3TablaHtml).join('')
+  ).join('');
+}
+
+function v3TablaHtml(t) {
+  const editable = t.tipo === 'parametrico';
+  const badge = editable ? '<span class="v3-badge param">Paramétrico</span>' : '<span class="v3-badge fijo">Fijo</span>';
+  const head = '<tr>' + (t.columnas || []).map(c => '<th>' + escV3(c) + '</th>').join('') + '</tr>';
+  const body = (t.filas || []).map((f, ri) =>
+    '<tr>' + (t.columnas || []).map((_, ci) =>
+      '<td data-r="' + ri + '" data-c="' + ci + '">' + escV3(f[ci] != null ? f[ci] : '') + '</td>'
+    ).join('') + '</tr>'
+  ).join('');
+  return `
+    <div class="v3-card" id="v3-${t.clave}">
+      <div class="v3-card-head">
+        <div class="v3-card-title">${escV3(t.titulo)} ${badge}</div>
+        ${editable ? `<div class="v3-actions">
+          <button class="btn-sec v3-edit" onclick="v3Editar('${t.clave}')"><i class="bi bi-pencil"></i> Editar</button>
+          <button class="btn-prim v3-save" style="display:none" onclick="v3Guardar('${t.clave}')"><i class="bi bi-floppy"></i> Guardar</button>
+          <button class="btn-sec v3-cancel" style="display:none" onclick="renderV3()">Cancelar</button>
+        </div>` : ''}
+      </div>
+      <div style="overflow-x:auto"><table class="v3-tabla">${head}${body}</table></div>
+    </div>`;
+}
+
+function v3Editar(clave) {
+  const card = document.getElementById('v3-' + clave);
+  card.querySelectorAll('td').forEach(td => { td.setAttribute('contenteditable', 'true'); td.classList.add('v3-editing'); });
+  card.querySelector('.v3-edit').style.display = 'none';
+  card.querySelector('.v3-save').style.display = '';
+  card.querySelector('.v3-cancel').style.display = '';
+}
+
+async function v3Guardar(clave) {
+  const card = document.getElementById('v3-' + clave);
+  const t = V3_DATA.find(x => x.clave === clave);
+  const filas = t.filas.map(f => f.slice());
+  card.querySelectorAll('td').forEach(td => { filas[+td.dataset.r][+td.dataset.c] = td.innerText.trim(); });
+  try {
+    const r = await fetch('/api/politica-v3/tablas/' + clave, { method: 'PUT', headers: apiHeaders(), body: JSON.stringify({ filas }) });
+    const j = await r.json();
+    if (!j.success) throw new Error(j.error || 'Error');
+    t.filas = filas;
+    showToast('Cuadro actualizado', true);
+    renderV3();
+  } catch (e) { showToast('Error: ' + e.message, false); }
 }
 
 /* ═══════════════════════════════════════════════════════════════════

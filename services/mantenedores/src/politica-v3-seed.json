@@ -1,0 +1,2418 @@
+[
+ {
+  "clave": "reglas_excluyentes",
+  "titulo": "Capa 1 — Reglas excluyentes (knock-out K1–K11)",
+  "tipo": "fijo",
+  "seccion": "Capa 1 · Admisión",
+  "orden": 0,
+  "columnas": [
+   "Codigo",
+   "Regla excluyente",
+   "Detalle",
+   "Origen",
+   "Excepcionable",
+   "Nivel exc."
+  ],
+  "filas": [
+   [
+    "K1",
+    "Procedimiento concursal / insolvencia",
+    "En curso o pasado",
+    "V2.0",
+    "NO",
+    "-"
+   ],
+   [
+    "K2",
+    "Juicio de cobranza o comercial",
+    "En curso o en los ultimos 24 meses",
+    "V2.0",
+    "Solo >24m",
+    "N? excepcion"
+   ],
+   [
+    "K3",
+    "Morosidad / protesto / deuda vencida o castigada VIGENTE",
+    "Ultimos 3 meses y cierre del ano anterior",
+    "V2.0",
+    "Solo nivel 3+",
+    "N3+"
+   ],
+   [
+    "K4",
+    "Deuda directa CASTIGADA en sistema financiero",
+    "Reportada en CMF",
+    "V2.0 / CMF",
+    "NO",
+    "-"
+   ],
+   [
+    "K5",
+    "Vehiculo sobre antiguedad maxima",
+    "China >4 anos / Otros >7 anos",
+    "V2.0",
+    "Solo comite",
+    "N5"
+   ],
+   [
+    "K6",
+    "Vehiculo con impedimento registral",
+    "Encargo por robo / prenda vigente no alzada / siniestrado-perdida total previa",
+    "Registral",
+    "NO",
+    "-"
+   ],
+   [
+    "K7",
+    "Edad al termino del credito > 79 anos",
+    "Otorgamiento > 74 anos",
+    "V2.0",
+    "NO",
+    "-"
+   ],
+   [
+    "K8",
+    "Carga financiera TOTAL > 60% de ingresos",
+    "Incluye la cuota en evaluacion",
+    "V2.0",
+    "Si, por nivel",
+    "N1-N5"
+   ],
+   [
+    "K9",
+    "Concesionario en black list",
+    "Prohibicion comercial de operar",
+    "V2.0",
+    "NO",
+    "-"
+   ],
+   [
+    "K10",
+    "Extranjero sin estatus migratorio minimo",
+    "No acredita residencia/tramite (ver hoja 09)",
+    "V2.0 / SERMIG",
+    "NO",
+    "-"
+   ],
+   [
+    "K11",
+    "Sin consentimiento expreso de consulta",
+    "Buro / SFA / datos personales",
+    "Fintech",
+    "NO",
+    "-"
+   ]
+  ]
+ },
+ {
+  "clave": "scorecard_bloques",
+  "titulo": "Capa 2 — Bloques del scorecard (pesos)",
+  "tipo": "parametrico",
+  "seccion": "Capa 2 · Scorecard",
+  "orden": 1,
+  "columnas": [
+   "Bloque",
+   "Nombre",
+   "Puntos max",
+   "Peso %",
+   "Que mide"
+  ],
+  "filas": [
+   [
+    "A",
+    "Comportamiento crediticio (buro + SFA)",
+    "400",
+    "40%",
+    "Predictor mas fuerte del pago futuro"
+   ],
+   [
+    "B",
+    "Capacidad de pago",
+    "250",
+    "25%",
+    "Holgura real para servir la cuota"
+   ],
+   [
+    "C",
+    "Perfil sociodemografico / segmento",
+    "200",
+    "20%",
+    "PD historica por edad, GSE, geografia, ocupacion"
+   ],
+   [
+    "D",
+    "Estructura de la operacion (colateral)",
+    "150",
+    "15%",
+    "Pie/LTV, vehiculo y plazo: controlan la LGD"
+   ],
+   [
+    "",
+    "TOTAL",
+    "1000",
+    "100%",
+    ""
+   ]
+  ]
+ },
+ {
+  "clave": "scorecard_variables",
+  "titulo": "Capa 2 — Variables, tramos y puntos",
+  "tipo": "parametrico",
+  "seccion": "Capa 2 · Scorecard",
+  "orden": 2,
+  "columnas": [
+   "Bloque",
+   "Variable",
+   "Pts max",
+   "Tramo (bin)",
+   "Puntos",
+   "Nota"
+  ],
+  "filas": [
+   [
+    "A",
+    "Historial de pagos",
+    "140",
+    "Limpio (sin mora historica)",
+    "140",
+    ""
+   ],
+   [
+    "A",
+    "Historial de pagos",
+    "140",
+    "Mora leve resuelta > 12m",
+    "90",
+    ""
+   ],
+   [
+    "A",
+    "Historial de pagos",
+    "140",
+    "Repactaciones",
+    "50",
+    ""
+   ],
+   [
+    "A",
+    "Historial de pagos",
+    "140",
+    "Mora reciente resuelta",
+    "25",
+    ""
+   ],
+   [
+    "A",
+    "Historial de pagos",
+    "140",
+    "Mora vigente",
+    "0",
+    "-> KO K3"
+   ],
+   [
+    "A",
+    "Uso de cupos (utilizacion)",
+    "120",
+    "< 30%",
+    "120",
+    ""
+   ],
+   [
+    "A",
+    "Uso de cupos (utilizacion)",
+    "120",
+    "30 - 50%",
+    "85",
+    ""
+   ],
+   [
+    "A",
+    "Uso de cupos (utilizacion)",
+    "120",
+    "50 - 70%",
+    "50",
+    ""
+   ],
+   [
+    "A",
+    "Uso de cupos (utilizacion)",
+    "120",
+    "70 - 90%",
+    "25",
+    ""
+   ],
+   [
+    "A",
+    "Uso de cupos (utilizacion)",
+    "120",
+    "> 90%",
+    "5",
+    ""
+   ],
+   [
+    "A",
+    "Antiguedad crediticia",
+    "60",
+    ">= 10 anos",
+    "60",
+    ""
+   ],
+   [
+    "A",
+    "Antiguedad crediticia",
+    "60",
+    "5 - 10 anos",
+    "45",
+    ""
+   ],
+   [
+    "A",
+    "Antiguedad crediticia",
+    "60",
+    "2 - 5 anos",
+    "30",
+    ""
+   ],
+   [
+    "A",
+    "Antiguedad crediticia",
+    "60",
+    "< 2 anos",
+    "15",
+    ""
+   ],
+   [
+    "A",
+    "Antiguedad crediticia",
+    "60",
+    "Sin historial",
+    "0",
+    "-> ruta colateral/Fast"
+   ],
+   [
+    "A",
+    "Nuevas solicitudes (90 dias)",
+    "40",
+    "0 - 1",
+    "40",
+    ""
+   ],
+   [
+    "A",
+    "Nuevas solicitudes (90 dias)",
+    "40",
+    "2 - 3",
+    "25",
+    ""
+   ],
+   [
+    "A",
+    "Nuevas solicitudes (90 dias)",
+    "40",
+    "4 - 5",
+    "12",
+    ""
+   ],
+   [
+    "A",
+    "Nuevas solicitudes (90 dias)",
+    "40",
+    ">= 6 instituciones",
+    "0",
+    "excepcion V2.0"
+   ],
+   [
+    "A",
+    "Mix de creditos",
+    "40",
+    "Diversificado sano",
+    "40",
+    ""
+   ],
+   [
+    "A",
+    "Mix de creditos",
+    "40",
+    "Solo consumo",
+    "25",
+    ""
+   ],
+   [
+    "A",
+    "Mix de creditos",
+    "40",
+    "Solo retail",
+    "15",
+    ""
+   ],
+   [
+    "A",
+    "Mix de creditos",
+    "40",
+    "Nulo",
+    "10",
+    ""
+   ],
+   [
+    "B",
+    "Carga de la cuota (DTI cuota)",
+    "130",
+    "<= 15%",
+    "130",
+    ""
+   ],
+   [
+    "B",
+    "Carga de la cuota (DTI cuota)",
+    "130",
+    "15 - 20%",
+    "105",
+    ""
+   ],
+   [
+    "B",
+    "Carga de la cuota (DTI cuota)",
+    "130",
+    "20 - 25%",
+    "80",
+    ""
+   ],
+   [
+    "B",
+    "Carga de la cuota (DTI cuota)",
+    "130",
+    "25 - 30%",
+    "50",
+    ""
+   ],
+   [
+    "B",
+    "Carga de la cuota (DTI cuota)",
+    "130",
+    "> 30%",
+    "0",
+    "-> excepcion (tope V2.0 30%)"
+   ],
+   [
+    "B",
+    "Carga financiera total",
+    "80",
+    "<= 35%",
+    "80",
+    ""
+   ],
+   [
+    "B",
+    "Carga financiera total",
+    "80",
+    "35 - 45%",
+    "60",
+    ""
+   ],
+   [
+    "B",
+    "Carga financiera total",
+    "80",
+    "45 - 55%",
+    "40",
+    ""
+   ],
+   [
+    "B",
+    "Carga financiera total",
+    "80",
+    "55 - 60%",
+    "20",
+    ""
+   ],
+   [
+    "B",
+    "Carga financiera total",
+    "80",
+    "> 60%",
+    "0",
+    "-> KO K8"
+   ],
+   [
+    "B",
+    "Antiguedad laboral / estabilidad",
+    "40",
+    ">= 48m",
+    "40",
+    ""
+   ],
+   [
+    "B",
+    "Antiguedad laboral / estabilidad",
+    "40",
+    "24 - 48m",
+    "30",
+    ""
+   ],
+   [
+    "B",
+    "Antiguedad laboral / estabilidad",
+    "40",
+    "12 - 24m",
+    "20",
+    ""
+   ],
+   [
+    "B",
+    "Antiguedad laboral / estabilidad",
+    "40",
+    "< 12m",
+    "8",
+    "aval si independiente"
+   ],
+   [
+    "C",
+    "Tramo de edad",
+    "70",
+    "18 - 24",
+    "50",
+    "thin-file: apoyar en bloque A"
+   ],
+   [
+    "C",
+    "Tramo de edad",
+    "70",
+    "25 - 29",
+    "40",
+    ""
+   ],
+   [
+    "C",
+    "Tramo de edad",
+    "70",
+    "30 - 44",
+    "30",
+    "mayor mora absoluta"
+   ],
+   [
+    "C",
+    "Tramo de edad",
+    "70",
+    "45 - 59",
+    "35",
+    ""
+   ],
+   [
+    "C",
+    "Tramo de edad",
+    "70",
+    "60 +",
+    "55",
+    "renta jubilacion / tope edad"
+   ],
+   [
+    "C",
+    "GSE / nivel de ingreso",
+    "70",
+    "ABC1",
+    "70",
+    ""
+   ],
+   [
+    "C",
+    "GSE / nivel de ingreso",
+    "70",
+    "C2",
+    "60",
+    ""
+   ],
+   [
+    "C",
+    "GSE / nivel de ingreso",
+    "70",
+    "C3",
+    "40",
+    ""
+   ],
+   [
+    "C",
+    "GSE / nivel de ingreso",
+    "70",
+    "D",
+    "25",
+    ""
+   ],
+   [
+    "C",
+    "GSE / nivel de ingreso",
+    "70",
+    "E",
+    "10",
+    ""
+   ],
+   [
+    "C",
+    "Geografia (region/comuna)",
+    "40",
+    "Banda baja (<=24,5%)",
+    "40",
+    "ver hoja 04"
+   ],
+   [
+    "C",
+    "Geografia (region/comuna)",
+    "40",
+    "Banda media (24,5-26,5%)",
+    "28",
+    ""
+   ],
+   [
+    "C",
+    "Geografia (region/comuna)",
+    "40",
+    "Banda alta (>=26,5%)",
+    "15",
+    ""
+   ],
+   [
+    "C",
+    "Geografia (region/comuna)",
+    "40",
+    "Hotspot comunal",
+    "-5",
+    "descuento adicional"
+   ],
+   [
+    "C",
+    "Ocupacion / uso del vehiculo",
+    "20",
+    "Empleado dependiente indefinido",
+    "20",
+    ""
+   ],
+   [
+    "C",
+    "Ocupacion / uso del vehiculo",
+    "20",
+    "Jubilado con renta estable",
+    "16",
+    ""
+   ],
+   [
+    "C",
+    "Ocupacion / uso del vehiculo",
+    "20",
+    "Independiente formal (24m + F22)",
+    "14",
+    ""
+   ],
+   [
+    "C",
+    "Ocupacion / uso del vehiculo",
+    "20",
+    "Uso intensivo (taxi/transporte)",
+    "8",
+    "GPS sin excepcion"
+   ],
+   [
+    "D",
+    "Pie aportado / LTV",
+    "90",
+    ">= 40%",
+    "90",
+    ""
+   ],
+   [
+    "D",
+    "Pie aportado / LTV",
+    "90",
+    "30 - 40%",
+    "70",
+    ""
+   ],
+   [
+    "D",
+    "Pie aportado / LTV",
+    "90",
+    "25 - 30%",
+    "50",
+    ""
+   ],
+   [
+    "D",
+    "Pie aportado / LTV",
+    "90",
+    "20 - 25%",
+    "30",
+    ""
+   ],
+   [
+    "D",
+    "Pie aportado / LTV",
+    "90",
+    "< minimo de tabla",
+    "0",
+    "-> rechazo"
+   ],
+   [
+    "D",
+    "Antiguedad + origen del vehiculo",
+    "40",
+    "Otros 0 - 3 anos",
+    "40",
+    ""
+   ],
+   [
+    "D",
+    "Antiguedad + origen del vehiculo",
+    "40",
+    "Otros 4 - 7 anos",
+    "28",
+    ""
+   ],
+   [
+    "D",
+    "Antiguedad + origen del vehiculo",
+    "40",
+    "China 0 - 2 anos",
+    "25",
+    ""
+   ],
+   [
+    "D",
+    "Antiguedad + origen del vehiculo",
+    "40",
+    "China 3 - 4 anos",
+    "15",
+    ""
+   ],
+   [
+    "D",
+    "Plazo solicitado",
+    "20",
+    "<= 24m",
+    "20",
+    ""
+   ],
+   [
+    "D",
+    "Plazo solicitado",
+    "20",
+    "36m",
+    "16",
+    ""
+   ],
+   [
+    "D",
+    "Plazo solicitado",
+    "20",
+    "48m",
+    "10",
+    ""
+   ],
+   [
+    "D",
+    "Plazo solicitado",
+    "20",
+    "60m",
+    "6",
+    ""
+   ]
+  ]
+ },
+ {
+  "clave": "pd_edad",
+  "titulo": "PD por tramo de edad (semilla USS-Equifax)",
+  "tipo": "fijo",
+  "seccion": "Capa 2 · PD por segmento",
+  "orden": 3,
+  "columnas": [
+   "Tramo",
+   "Tasa morosidad",
+   "Mora prom. real ($)",
+   "Puntos score",
+   "Nota"
+  ],
+  "filas": [
+   [
+    "18-24",
+    "8,1%",
+    "348.015",
+    "50",
+    "thin-file"
+   ],
+   [
+    "25-29",
+    "26,2%",
+    "1.061.594",
+    "40",
+    ""
+   ],
+   [
+    "30-44",
+    "34,7%",
+    "2.855.635",
+    "30",
+    "max crecimiento"
+   ],
+   [
+    "45-59",
+    "29,6%",
+    "3.010.098",
+    "35",
+    ""
+   ],
+   [
+    "60 +",
+    "17,2%",
+    "2.092.849",
+    "55",
+    ""
+   ]
+  ]
+ },
+ {
+  "clave": "pd_gse",
+  "titulo": "PD por GSE (grupo socioeconómico)",
+  "tipo": "fijo",
+  "seccion": "Capa 2 · PD por segmento",
+  "orden": 4,
+  "columnas": [
+   "GSE",
+   "Tasa morosidad",
+   "Mora prom. real ($)",
+   "Ratio deuda/ingreso",
+   "Puntos score"
+  ],
+  "filas": [
+   [
+    "ABC1",
+    "13,5%",
+    "5.262.151",
+    "1,5x",
+    "70"
+   ],
+   [
+    "C2",
+    "15,6%",
+    "3.582.004",
+    "2,3x",
+    "60"
+   ],
+   [
+    "C3",
+    "24,4%",
+    "2.583.538",
+    "2,6x",
+    "40"
+   ],
+   [
+    "D",
+    "34,9%",
+    "1.885.832",
+    "3,3x",
+    "25"
+   ],
+   [
+    "E",
+    "46,0%",
+    "1.500.316",
+    "5,1x",
+    "10"
+   ]
+  ]
+ },
+ {
+  "clave": "pd_geografia",
+  "titulo": "PD por región",
+  "tipo": "fijo",
+  "seccion": "Capa 2 · PD por segmento",
+  "orden": 5,
+  "columnas": [
+   "Region",
+   "Tasa morosidad",
+   "Banda",
+   "Puntos score"
+  ],
+  "filas": [
+   [
+    "O'Higgins",
+    "24,0%",
+    "Baja",
+    "40"
+   ],
+   [
+    "Nuble",
+    "23,7%",
+    "Baja",
+    "40"
+   ],
+   [
+    "Metropolitana",
+    "24,3%",
+    "Baja",
+    "40"
+   ],
+   [
+    "Arica y Parinacota",
+    "25,2%",
+    "Media",
+    "28"
+   ],
+   [
+    "Tarapaca",
+    "25,4%",
+    "Media",
+    "28"
+   ],
+   [
+    "Coquimbo",
+    "25,8%",
+    "Media",
+    "28"
+   ],
+   [
+    "Valparaiso",
+    "25,2%",
+    "Media",
+    "28"
+   ],
+   [
+    "Maule",
+    "25,6%",
+    "Media",
+    "28"
+   ],
+   [
+    "La Araucania",
+    "25,2%",
+    "Media",
+    "28"
+   ],
+   [
+    "Biobio",
+    "26,3%",
+    "Media",
+    "28"
+   ],
+   [
+    "Los Rios",
+    "26,7%",
+    "Alta",
+    "15"
+   ],
+   [
+    "Los Lagos",
+    "27,6%",
+    "Alta",
+    "15"
+   ],
+   [
+    "Atacama",
+    "27,8%",
+    "Alta",
+    "15"
+   ],
+   [
+    "Aysen",
+    "26,8%",
+    "Alta",
+    "15"
+   ],
+   [
+    "Magallanes",
+    "27,1%",
+    "Alta",
+    "15"
+   ],
+   [
+    "Antofagasta",
+    "32,8%",
+    "Alta",
+    "15"
+   ]
+  ]
+ },
+ {
+  "clave": "pd_hotspots",
+  "titulo": "Hotspots comunales (alerta −5 pts)",
+  "tipo": "fijo",
+  "seccion": "Capa 2 · PD por segmento",
+  "orden": 6,
+  "columnas": [
+   "Comuna",
+   "Region",
+   "Tasa morosidad",
+   "Mora prom. ($)"
+  ],
+  "filas": [
+   [
+    "Santa Barbara",
+    "Biobio",
+    "35,1%",
+    "-"
+   ],
+   [
+    "Mafil",
+    "Los Rios",
+    "31,1%",
+    "1.991.738"
+   ],
+   [
+    "Bulnes",
+    "Nuble",
+    "26,4%",
+    "1.801.644"
+   ],
+   [
+    "Valdivia",
+    "Los Rios",
+    "26,4%",
+    "2.332.186"
+   ]
+  ]
+ },
+ {
+  "clave": "quintiles",
+  "titulo": "Quintiles de riesgo (cortes y PD)",
+  "tipo": "parametrico",
+  "seccion": "Capa 2 · Decisión",
+  "orden": 7,
+  "columnas": [
+   "Quintil",
+   "Puntaje min",
+   "Puntaje max",
+   "PD estimada",
+   "Etiqueta",
+   "Lectura"
+  ],
+  "filas": [
+   [
+    "Q1",
+    "820",
+    "1000",
+    "< 3%",
+    "Premium",
+    "Mejor pagador"
+   ],
+   [
+    "Q2",
+    "680",
+    "819",
+    "3 - 6%",
+    "Preferente",
+    "Bajo riesgo"
+   ],
+   [
+    "Q3",
+    "540",
+    "679",
+    "6 - 12%",
+    "Estandar",
+    "Riesgo medio"
+   ],
+   [
+    "Q4",
+    "400",
+    "539",
+    "12 - 22%",
+    "Condicionado (Flex)",
+    "Riesgo medio-alto"
+   ],
+   [
+    "Q5",
+    "0",
+    "399",
+    "> 22%",
+    "Alto riesgo",
+    "Solo colateral o rechazo"
+   ]
+  ]
+ },
+ {
+  "clave": "matriz_decision",
+  "titulo": "Matriz de decisión por quintil",
+  "tipo": "parametrico",
+  "seccion": "Capa 2 · Decisión",
+  "orden": 8,
+  "columnas": [
+   "Quintil",
+   "Decision",
+   "Ajuste pie",
+   "Ajuste plazo",
+   "Tasa",
+   "Garantias / condiciones"
+  ],
+  "filas": [
+   [
+    "Q1",
+    "Aprobacion automatica",
+    "Minimo de tabla",
+    "Maximo permitido",
+    "Preferente",
+    "Estandar (prenda+GPS+seguros)"
+   ],
+   [
+    "Q2",
+    "Aprobacion automatica",
+    "Minimo de tabla",
+    "Maximo permitido",
+    "Estandar",
+    "Estandar"
+   ],
+   [
+    "Q3",
+    "Automatica si monto bajo; analista si alto",
+    "+5% sobre minimo",
+    "Max -12m si uso intensivo",
+    "Estandar-alta",
+    "GPS sin excepcion"
+   ],
+   [
+    "Q4",
+    "Analisis manual obligatorio",
+    "+10% sobre minimo",
+    "Max -12m",
+    "Alta",
+    "Aval si <24m actividad; tasacion reforzada"
+   ],
+   [
+    "Q5",
+    "Solo ruta colateral (Fast) o rechazo",
+    ">= 40%",
+    "<= 24-36m",
+    "Tope (dentro de TMC)",
+    "Comite; sin mora vigente; monto acotado"
+   ]
+  ]
+ },
+ {
+  "clave": "condiciones_base",
+  "titulo": "Condiciones base por producto (V2.0)",
+  "tipo": "parametrico",
+  "seccion": "Sección 6 · Condiciones",
+  "orden": 9,
+  "columnas": [
+   "Tipo",
+   "Origen marca",
+   "Pie minimo",
+   "Antiguedad max vehiculo",
+   "Plazo max (cuotas)",
+   "Monto max a financiar",
+   "Renta minima"
+  ],
+  "filas": [
+   [
+    "Usado",
+    "China",
+    "40%",
+    "4 anos",
+    "48",
+    "$12.000.000",
+    "$750.000 *"
+   ],
+   [
+    "Usado",
+    "Otros",
+    "25%",
+    "7 anos",
+    "60",
+    "$15.000.000",
+    "$750.000 *"
+   ],
+   [
+    "Nuevo",
+    "China",
+    "20%",
+    "-",
+    "48",
+    "$15.000.000",
+    "$750.000 *"
+   ],
+   [
+    "Nuevo",
+    "Otros",
+    "20%",
+    "-",
+    "60",
+    "$15.000.000",
+    "$750.000 *"
+   ]
+  ]
+ },
+ {
+  "clave": "origen_marcas",
+  "titulo": "Clasificación de marcas: China vs Otros",
+  "tipo": "fijo",
+  "seccion": "Sección 3 · Vehículo",
+  "orden": 10,
+  "columnas": [
+   "Marca",
+   "Origen",
+   "Clase (China/Otros)"
+  ],
+  "filas": [
+   [
+    "ARO",
+    "China",
+    "China"
+   ],
+   [
+    "AUTORRAD",
+    "China",
+    "China"
+   ],
+   [
+    "BAIC",
+    "China",
+    "China"
+   ],
+   [
+    "BAJAJ",
+    "China",
+    "China"
+   ],
+   [
+    "BASHAN",
+    "China",
+    "China"
+   ],
+   [
+    "BEIGING",
+    "China",
+    "China"
+   ],
+   [
+    "BENYI",
+    "China",
+    "China"
+   ],
+   [
+    "BENZHOU",
+    "China",
+    "China"
+   ],
+   [
+    "BRILLIANCE",
+    "China",
+    "China"
+   ],
+   [
+    "BYD",
+    "China",
+    "China"
+   ],
+   [
+    "CFMOTO",
+    "China",
+    "China"
+   ],
+   [
+    "CHANGAN",
+    "China",
+    "China"
+   ],
+   [
+    "CHANGFENG",
+    "China",
+    "China"
+   ],
+   [
+    "CHANGHE",
+    "China",
+    "China"
+   ],
+   [
+    "CHERY",
+    "China",
+    "China"
+   ],
+   [
+    "DFM",
+    "China",
+    "China"
+   ],
+   [
+    "DFSK",
+    "China",
+    "China"
+   ],
+   [
+    "DONGFENG",
+    "China",
+    "China"
+   ],
+   [
+    "EXEED",
+    "China",
+    "China"
+   ],
+   [
+    "FAW",
+    "China",
+    "China"
+   ],
+   [
+    "FOTON",
+    "China",
+    "China"
+   ],
+   [
+    "GAC",
+    "China",
+    "China"
+   ],
+   [
+    "GEELY",
+    "China",
+    "China"
+   ],
+   [
+    "GREAT_WALL",
+    "China",
+    "China"
+   ],
+   [
+    "HAFEI",
+    "China",
+    "China"
+   ],
+   [
+    "HAIMA",
+    "China",
+    "China"
+   ],
+   [
+    "HAVAL",
+    "China",
+    "China"
+   ],
+   [
+    "JAC",
+    "China",
+    "China"
+   ],
+   [
+    "JAECOO",
+    "China",
+    "China"
+   ],
+   [
+    "JETOUR",
+    "China",
+    "China"
+   ],
+   [
+    "JINBEI",
+    "China",
+    "China"
+   ],
+   [
+    "JMC",
+    "China",
+    "China"
+   ],
+   [
+    "KAIYI",
+    "China",
+    "China"
+   ],
+   [
+    "KARRY",
+    "China",
+    "China"
+   ],
+   [
+    "LANDWIND",
+    "China",
+    "China"
+   ],
+   [
+    "LIFAN",
+    "China",
+    "China"
+   ],
+   [
+    "MAXUS",
+    "China",
+    "China"
+   ],
+   [
+    "MG",
+    "China",
+    "China"
+   ],
+   [
+    "OMODA",
+    "China",
+    "China"
+   ],
+   [
+    "SWM",
+    "China",
+    "China"
+   ],
+   [
+    "ZNA",
+    "China",
+    "China"
+   ],
+   [
+    "ZOTYE",
+    "China",
+    "China"
+   ],
+   [
+    "ALFA_ROMEO",
+    "Italia",
+    "Otros"
+   ],
+   [
+    "AUDI",
+    "Alemania",
+    "Otros"
+   ],
+   [
+    "BMW",
+    "Alemania",
+    "Otros"
+   ],
+   [
+    "CHEVROLET",
+    "USA",
+    "Otros"
+   ],
+   [
+    "CITROEN",
+    "Francia",
+    "Otros"
+   ],
+   [
+    "CUPRA",
+    "Espana",
+    "Otros"
+   ],
+   [
+    "DACIA",
+    "Rumania",
+    "Otros"
+   ],
+   [
+    "DAEWOO",
+    "Corea",
+    "Otros"
+   ],
+   [
+    "DODGE",
+    "USA",
+    "Otros"
+   ],
+   [
+    "DS_AUTOMOBILES",
+    "Francia",
+    "Otros"
+   ],
+   [
+    "FIAT",
+    "Italia",
+    "Otros"
+   ],
+   [
+    "FORD",
+    "USA",
+    "Otros"
+   ],
+   [
+    "HONDA",
+    "Japon",
+    "Otros"
+   ],
+   [
+    "HYUNDAI",
+    "Corea",
+    "Otros"
+   ],
+   [
+    "JAGUAR",
+    "Inglaterra",
+    "Otros"
+   ],
+   [
+    "JEEP",
+    "USA",
+    "Otros"
+   ],
+   [
+    "KIA",
+    "Corea",
+    "Otros"
+   ],
+   [
+    "LAND_ROVER",
+    "Inglaterra",
+    "Otros"
+   ],
+   [
+    "LEXUS",
+    "Japon",
+    "Otros"
+   ],
+   [
+    "MAHINDRA",
+    "India",
+    "Otros"
+   ],
+   [
+    "MAZDA",
+    "Japon",
+    "Otros"
+   ],
+   [
+    "MERCEDES_BENZ",
+    "Alemania",
+    "Otros"
+   ],
+   [
+    "MINI",
+    "Alemania",
+    "Otros"
+   ],
+   [
+    "MITSUBISHI",
+    "Japon",
+    "Otros"
+   ],
+   [
+    "NISSAN",
+    "Japon",
+    "Otros"
+   ],
+   [
+    "OPEL",
+    "Alemania",
+    "Otros"
+   ],
+   [
+    "PEUGEOT",
+    "Francia",
+    "Otros"
+   ],
+   [
+    "PORSCHE",
+    "Alemania",
+    "Otros"
+   ],
+   [
+    "PROTON",
+    "Malasia",
+    "Otros"
+   ],
+   [
+    "RAM",
+    "USA",
+    "Otros"
+   ],
+   [
+    "RENAULT",
+    "Francia",
+    "Otros"
+   ],
+   [
+    "SAAB",
+    "Suecia",
+    "Otros"
+   ],
+   [
+    "SEAT",
+    "Espana",
+    "Otros"
+   ],
+   [
+    "SKODA",
+    "Republica Checa",
+    "Otros"
+   ],
+   [
+    "SSANGYONG",
+    "Corea",
+    "Otros"
+   ],
+   [
+    "SUBARU",
+    "Japon",
+    "Otros"
+   ],
+   [
+    "SUZUKI",
+    "Japon",
+    "Otros"
+   ],
+   [
+    "TATA",
+    "India",
+    "Otros"
+   ],
+   [
+    "TOYOTA",
+    "Japon",
+    "Otros"
+   ],
+   [
+    "VOLKSWAGEN",
+    "Alemania",
+    "Otros"
+   ],
+   [
+    "VOLVO",
+    "Suecia",
+    "Otros"
+   ]
+  ]
+ },
+ {
+  "clave": "reglas_migratorias",
+  "titulo": "Admisión por nacionalidad / estatus migratorio",
+  "tipo": "parametrico",
+  "seccion": "Sección 7 · Extranjeros",
+  "orden": 11,
+  "columnas": [
+   "Situacion",
+   "Admitido",
+   "Pie min",
+   "Monto max",
+   "Plazo max",
+   "Requisitos / aval",
+   "Origen"
+  ],
+  "filas": [
+   [
+    "Chileno",
+    "Si",
+    "Tabla",
+    "Tabla",
+    "Tabla",
+    "CI vigente",
+    "V2.0"
+   ],
+   [
+    "Residencia Definitiva > 3 anos",
+    "Si",
+    "Tabla",
+    "Tabla",
+    "Tabla",
+    "CI extranjero + cert. RD",
+    "V2.0"
+   ],
+   [
+    "Residencia Definitiva 1 - 3 anos",
+    "Si",
+    "Tabla",
+    "Tabla",
+    "Tabla",
+    "Aval que califique",
+    "V2.0"
+   ],
+   [
+    "Residencia Definitiva < 1 ano",
+    "Si (nuevo)",
+    ">= 30%",
+    "Tabla",
+    "Tabla",
+    "Aval RD/chileno",
+    "V3.0 NUEVO"
+   ],
+   [
+    "Residencia Temporal / en tramite",
+    "Si - ruta Fast (nuevo)",
+    ">= 40%",
+    "$18.000.000",
+    "36m",
+    "Pasaporte+CI+comprobante SERMIG; flujo SFA 6m; aval RD/chileno si plazo > visa; sin mora",
+    "V3.0 NUEVO"
+   ]
+  ]
+ },
+ {
+  "clave": "parametros_generales",
+  "titulo": "Parámetros generales del modelo",
+  "tipo": "parametrico",
+  "seccion": "General",
+  "orden": 12,
+  "columnas": [
+   "Parametro",
+   "Valor",
+   "Origen",
+   "Nota"
+  ],
+  "filas": [
+   [
+    "Definicion de default",
+    "90+ dias de mora",
+    "V2.0/CMF",
+    "Consistente con recompra de cartera"
+   ],
+   [
+    "Carga de la cuota maxima (DTI)",
+    "30%",
+    "V2.0",
+    "Sobre este % -> excepcion"
+   ],
+   [
+    "Carga financiera total maxima",
+    "60%",
+    "V2.0",
+    "Knock-out K8"
+   ],
+   [
+    "Factor carga - credito hipotecario",
+    "0,5% de la deuda",
+    "V2.0",
+    ""
+   ],
+   [
+    "Factor carga - arriendo (si no hay hipotecario)",
+    "20% del ingreso",
+    "V2.0",
+    ""
+   ],
+   [
+    "Factor carga - deuda comercial",
+    "5% de la deuda",
+    "V2.0",
+    ""
+   ],
+   [
+    "Factor carga - deuda de consumo",
+    "3,5% de la deuda",
+    "V2.0",
+    ""
+   ],
+   [
+    "Edad minima al otorgamiento",
+    "18 anos",
+    "V2.0",
+    ""
+   ],
+   [
+    "Edad maxima al otorgamiento",
+    "74 anos",
+    "V2.0",
+    ""
+   ],
+   [
+    "Edad maxima al termino del credito",
+    "79 anos",
+    "V2.0",
+    "Knock-out K7"
+   ],
+   [
+    "Complemento de renta conyuge/conviviente",
+    "50% de la renta",
+    "V2.0",
+    "con hijos en comun"
+   ],
+   [
+    "Complemento de renta padre/hijo",
+    "Pie >= 40%, sin excepciones",
+    "V2.0",
+    ""
+   ],
+   [
+    "Proximos a jubilar (61-65 anos)",
+    "Se considera 50% de la renta",
+    "V2.0",
+    ""
+   ],
+   [
+    "6+ instituciones con linea",
+    "Excepcion",
+    "V2.0",
+    "cliente riesgoso"
+   ],
+   [
+    "Gasto de administracion",
+    "UF 16,5 (~$601.000) con 50% dcto",
+    "V2.0",
+    "financiable"
+   ],
+   [
+    "NPL 90+ objetivo de cartera",
+    "< 2,5%",
+    "V3.0",
+    "KPI"
+   ],
+   [
+    "Recompra (venta con responsabilidad)",
+    "+90 dias mora, sin acuerdo en el mes",
+    "V2.0",
+    ""
+   ],
+   [
+    "Recalibracion del scorecard",
+    "Semestral (WoE/IV)",
+    "V3.0",
+    "gobierno de modelo"
+   ],
+   [
+    "Genero en score individual",
+    "NO USAR (solo monitoreo)",
+    "V3.0",
+    "Ley 20.609"
+   ]
+  ]
+ },
+ {
+  "clave": "mapeo_mantenedores",
+  "titulo": "Mapeo a mantenedores del sistema",
+  "tipo": "fijo",
+  "seccion": "Referencia",
+  "orden": 13,
+  "columnas": [
+   "Hoja / Tabla",
+   "Mantenedor destino",
+   "Seccion politica",
+   "Estado"
+  ],
+  "filas": [
+   [
+    "01_Reglas_Excluyentes",
+    "Reglas de Admision",
+    "Capa 1 / sec.3",
+    "NUEVO"
+   ],
+   [
+    "02_Scorecard_Bloques",
+    "Scorecard / Politica de Riesgo",
+    "sec.4",
+    "NUEVO"
+   ],
+   [
+    "03_Scorecard_Variables",
+    "Scorecard / Politica de Riesgo",
+    "sec.4",
+    "NUEVO"
+   ],
+   [
+    "04_PD_por_Segmento",
+    "PD por Segmento (recarga al calibrar)",
+    "sec.4.C",
+    "NUEVO"
+   ],
+   [
+    "05_Quintiles",
+    "Quintiles de Riesgo",
+    "sec.5",
+    "NUEVO"
+   ],
+   [
+    "06_Matriz_Decision",
+    "Condiciones por Producto",
+    "sec.6",
+    "Extiende V2.0"
+   ],
+   [
+    "07_Condiciones_Base",
+    "Condiciones por Producto",
+    "sec.6",
+    "V2.0"
+   ],
+   [
+    "08_Origen_Marcas",
+    "Vehiculos / Origen de Marca",
+    "sec.3 K5",
+    "V2.0 (parcial)"
+   ],
+   [
+    "09_Reglas_Migratorias",
+    "Politica de Riesgo - Extranjeros",
+    "sec.7",
+    "V2.0 + NUEVO"
+   ],
+   [
+    "10_Parametros_Generales",
+    "Politica de Riesgo / Tasas / Costos",
+    "varias",
+    "V2.0 + V3.0"
+   ],
+   [
+    "12_Campos_a_Capturar",
+    "Captura de datos / dataset de calibracion",
+    "sec.9",
+    "NUEVO"
+   ]
+  ]
+ },
+ {
+  "clave": "campos_captura",
+  "titulo": "Campos a capturar (dataset de calibración)",
+  "tipo": "fijo",
+  "seccion": "Sección 9 · Captura",
+  "orden": 14,
+  "columnas": [
+   "Grupo",
+   "Campo (snake_case)",
+   "Tipo",
+   "Para que sirve / variable del scorecard",
+   "Cuando se captura",
+   "Oblig."
+  ],
+  "filas": [
+   [
+    "Solicitud",
+    "id_solicitud",
+    "num",
+    "ID unico de la solicitud (clave del dataset)",
+    "Al originar",
+    "Si"
+   ],
+   [
+    "Solicitud",
+    "fecha_solicitud",
+    "fecha",
+    "Fecha de ingreso (define la cosecha/vintage)",
+    "Al originar",
+    "Si"
+   ],
+   [
+    "Solicitud",
+    "rut_cliente",
+    "texto",
+    "Identificador del cliente",
+    "Al originar",
+    "Si"
+   ],
+   [
+    "Solicitud",
+    "dealer_id",
+    "texto",
+    "Concesionario / canal de origen",
+    "Al originar",
+    "Si"
+   ],
+   [
+    "Solicitud",
+    "ejecutivo",
+    "texto",
+    "Quien curso la operacion",
+    "Al originar",
+    "No"
+   ],
+   [
+    "Cliente",
+    "fecha_nacimiento",
+    "fecha",
+    "-> tramo de edad (bloque C)",
+    "Al originar",
+    "Si"
+   ],
+   [
+    "Cliente",
+    "nacionalidad",
+    "enum",
+    "chileno / extranjero",
+    "Al originar",
+    "Si"
+   ],
+   [
+    "Cliente",
+    "estatus_migratorio",
+    "enum",
+    "RD>3a / RD1-3a / RD<1a / temporal (hoja 09)",
+    "Al originar",
+    "Si si extranjero"
+   ],
+   [
+    "Cliente",
+    "comuna",
+    "texto",
+    "-> banda geografica y hotspot (bloque C)",
+    "Al originar",
+    "Si"
+   ],
+   [
+    "Cliente",
+    "region",
+    "texto",
+    "-> banda geografica (bloque C)",
+    "Al originar",
+    "Si"
+   ],
+   [
+    "Cliente",
+    "gse",
+    "enum",
+    "ABC1..E (o derivado del ingreso) (bloque C)",
+    "Al originar",
+    "Si"
+   ],
+   [
+    "Cliente",
+    "ocupacion",
+    "enum",
+    "empleado/independiente/jubilado/taxista/transporte",
+    "Al originar",
+    "Si"
+   ],
+   [
+    "Cliente",
+    "uso_vehiculo",
+    "enum",
+    "particular / intensivo (bloque C)",
+    "Al originar",
+    "Si"
+   ],
+   [
+    "Cliente",
+    "ingreso_liquido",
+    "num $",
+    "Renta acreditada (capacidad de pago)",
+    "Al originar",
+    "Si"
+   ],
+   [
+    "Cliente",
+    "fuente_renta",
+    "enum",
+    "liquidacion / boleta / F22 / presunta",
+    "Al originar",
+    "Si"
+   ],
+   [
+    "Cliente",
+    "antiguedad_laboral_meses",
+    "num",
+    "Estabilidad laboral (bloque B)",
+    "Al originar",
+    "Si"
+   ],
+   [
+    "Cliente",
+    "renta_complemento",
+    "num $",
+    "Aval conyuge/codeudor (50%)",
+    "Al originar",
+    "No"
+   ],
+   [
+    "DealerNet",
+    "tiene_mora_vigente",
+    "bool",
+    "Knock-out K3",
+    "Al originar",
+    "Si"
+   ],
+   [
+    "DealerNet",
+    "protestos_vigentes",
+    "bool",
+    "Knock-out K3",
+    "Al originar",
+    "Si"
+   ],
+   [
+    "DealerNet",
+    "deuda_castigada",
+    "bool",
+    "Knock-out K4",
+    "Al originar",
+    "Si"
+   ],
+   [
+    "DealerNet",
+    "historial_pagos",
+    "enum",
+    "limpio/leve/repactado/reciente (bloque A)",
+    "Al originar",
+    "Si"
+   ],
+   [
+    "DealerNet",
+    "utilizacion_cupos_pct",
+    "num %",
+    "Uso de cupos (bloque A)",
+    "Al originar",
+    "Si"
+   ],
+   [
+    "DealerNet",
+    "antiguedad_crediticia_anios",
+    "num",
+    "Antiguedad crediticia (bloque A)",
+    "Al originar",
+    "Si"
+   ],
+   [
+    "DealerNet",
+    "consultas_90d",
+    "num",
+    "Nuevas solicitudes 90d (bloque A)",
+    "Al originar",
+    "Si"
+   ],
+   [
+    "DealerNet",
+    "mix_creditos",
+    "enum",
+    "Mix de creditos (bloque A)",
+    "Al originar",
+    "No"
+   ],
+   [
+    "DealerNet",
+    "n_instituciones_linea",
+    "num",
+    "Excepcion si 6+ (V2.0)",
+    "Al originar",
+    "Si"
+   ],
+   [
+    "DealerNet",
+    "dealernet_informe_id",
+    "num",
+    "Referencia del informe DealerNet (Central de Informacion) consultado",
+    "Al originar",
+    "No"
+   ],
+   [
+    "DealerNet",
+    "flujo_sfa_6m",
+    "num $",
+    "Flujo SFA 6m (independientes/extranjeros)",
+    "Al originar",
+    "No"
+   ],
+   [
+    "DealerNet",
+    "deuda_hipotecaria",
+    "num $",
+    "Carga total (factor 0,5%)",
+    "Al originar",
+    "Si"
+   ],
+   [
+    "DealerNet",
+    "deuda_comercial",
+    "num $",
+    "Carga total (factor 5%)",
+    "Al originar",
+    "Si"
+   ],
+   [
+    "DealerNet",
+    "deuda_consumo",
+    "num $",
+    "Carga total (factor 3,5%)",
+    "Al originar",
+    "Si"
+   ],
+   [
+    "DealerNet",
+    "arriendo_mensual",
+    "num $",
+    "Carga total (20% si no hay hipotecario)",
+    "Al originar",
+    "No"
+   ],
+   [
+    "Vehiculo",
+    "marca",
+    "texto",
+    "-> origen china/otros (hoja 08)",
+    "Al originar",
+    "Si"
+   ],
+   [
+    "Vehiculo",
+    "origen_marca",
+    "enum",
+    "china / otros (hoja 08)",
+    "Al originar",
+    "Si"
+   ],
+   [
+    "Vehiculo",
+    "anio_vehiculo",
+    "num",
+    "Ano de fabricacion (-> antiguedad)",
+    "Al originar",
+    "Si"
+   ],
+   [
+    "Vehiculo",
+    "antiguedad_veh",
+    "num",
+    "Anos (Knock-out K5 / bloque D)",
+    "Al originar",
+    "Si"
+   ],
+   [
+    "Vehiculo",
+    "tipo_vehiculo",
+    "enum",
+    "liviano / comercial liviano <5000kg",
+    "Al originar",
+    "Si"
+   ],
+   [
+    "Vehiculo",
+    "precio_compraventa",
+    "num $",
+    "Base del LTV",
+    "Al originar",
+    "Si"
+   ],
+   [
+    "Vehiculo",
+    "valor_tasacion",
+    "num $",
+    "Base del LTV (sec.8)",
+    "Al originar",
+    "Si"
+   ],
+   [
+    "Vehiculo",
+    "impedimento_registral",
+    "bool",
+    "Encargo robo / prenda no alzada (K6)",
+    "Al originar",
+    "Si"
+   ],
+   [
+    "Decision",
+    "monto_financiado",
+    "num $",
+    "EAD inicial (exposicion)",
+    "Decision",
+    "Si"
+   ],
+   [
+    "Decision",
+    "pie_pct",
+    "num %",
+    "Pie aportado (bloque D)",
+    "Decision",
+    "Si"
+   ],
+   [
+    "Decision",
+    "ltv_pct",
+    "num %",
+    "Loan-to-value (bloque D)",
+    "Decision",
+    "Si"
+   ],
+   [
+    "Decision",
+    "plazo_meses",
+    "num",
+    "Plazo otorgado (bloque D)",
+    "Decision",
+    "Si"
+   ],
+   [
+    "Decision",
+    "tasa_pct",
+    "num %",
+    "Tasa aplicada (dentro de TMC)",
+    "Decision",
+    "Si"
+   ],
+   [
+    "Decision",
+    "cuota",
+    "num $",
+    "Valor cuota mensual",
+    "Decision",
+    "Si"
+   ],
+   [
+    "Decision",
+    "carga_cuota_pct",
+    "num %",
+    "DTI cuota (bloque B)",
+    "Decision",
+    "Si"
+   ],
+   [
+    "Decision",
+    "carga_total_pct",
+    "num %",
+    "Carga total (bloque B / K8)",
+    "Decision",
+    "Si"
+   ],
+   [
+    "Decision",
+    "score_obtenido",
+    "num 0-1000",
+    "Resultado del scorecard",
+    "Decision",
+    "Si"
+   ],
+   [
+    "Decision",
+    "quintil",
+    "enum",
+    "Q1..Q5 asignado",
+    "Decision",
+    "Si"
+   ],
+   [
+    "Decision",
+    "pd_estimada",
+    "num %",
+    "PD del modelo experto al momento",
+    "Decision",
+    "Si"
+   ],
+   [
+    "Decision",
+    "decision",
+    "enum",
+    "aprobar/condicionado/analisis/rechazar",
+    "Decision",
+    "Si"
+   ],
+   [
+    "Decision",
+    "motivos",
+    "texto",
+    "Factores que mas restaron puntaje",
+    "Decision",
+    "Si"
+   ],
+   [
+    "Decision",
+    "knockouts_gatillados",
+    "texto",
+    "K1..K11 activados (si rechazo)",
+    "Decision",
+    "Si"
+   ],
+   [
+    "Decision",
+    "excepcion_aplicada",
+    "texto",
+    "Que excepcion y por que",
+    "Decision",
+    "No"
+   ],
+   [
+    "Decision",
+    "nivel_aprobacion",
+    "num",
+    "N1..N5 que aprobo",
+    "Decision",
+    "No"
+   ],
+   [
+    "Decision",
+    "gps_instalado",
+    "bool",
+    "Mitigante de LGD",
+    "Decision",
+    "No"
+   ],
+   [
+    "Decision",
+    "seguros_contratados",
+    "texto",
+    "cesantia/desgravamen/perdida total",
+    "Decision",
+    "No"
+   ],
+   [
+    "Decision",
+    "tiene_aval",
+    "bool",
+    "Codeudor solidario",
+    "Decision",
+    "No"
+   ],
+   [
+    "Desenlace",
+    "estado_credito",
+    "enum",
+    "vigente/mora/prepagado/castigado",
+    "Seguimiento",
+    "Si"
+   ],
+   [
+    "Desenlace",
+    "dias_mora_actual",
+    "num",
+    "Dias de atraso a la fecha",
+    "Seguimiento",
+    "Si"
+   ],
+   [
+    "Desenlace",
+    "mora_maxima_alcanzada",
+    "num dias",
+    "Para definir el 'malo'",
+    "Seguimiento",
+    "Si"
+   ],
+   [
+    "Desenlace",
+    "default_90",
+    "bool",
+    "VARIABLE OBJETIVO (target): 90+ dias de mora",
+    "Seguimiento",
+    "Si"
+   ],
+   [
+    "Desenlace",
+    "fecha_primer_default",
+    "fecha",
+    "Para analisis de cosechas (vintage)",
+    "Seguimiento",
+    "No"
+   ],
+   [
+    "Desenlace",
+    "prepagado",
+    "bool",
+    "Termino anticipado",
+    "Seguimiento",
+    "No"
+   ],
+   [
+    "Desenlace",
+    "recompra_realizada",
+    "bool",
+    "Recompra a 90d (venta con responsabilidad)",
+    "Seguimiento",
+    "No"
+   ],
+   [
+    "Desenlace",
+    "monto_recuperado",
+    "num $",
+    "Para medir la LGD efectiva",
+    "Seguimiento",
+    "No"
+   ],
+   [
+    "Desenlace",
+    "meses_en_cartera",
+    "num",
+    "Madurez de la operacion (vintage)",
+    "Seguimiento",
+    "Si"
+   ],
+   [
+    "Regla del 'malo' (target): default_90 = TRUE si mora_maxima_alcanzada >= 90 dias. Es la variable que el WoE/IV usa para recalibrar pesos.",
+    "",
+    "",
+    "",
+    "",
+    ""
+   ],
+   [
+    "Minimo util para calibrar: algunos cientos de operaciones con desenlace observado (~12-18 meses de captura).",
+    "",
+    "",
+    "",
+    "",
+    ""
+   ]
+  ]
+ }
+]
