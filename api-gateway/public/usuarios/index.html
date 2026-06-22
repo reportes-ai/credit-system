@@ -149,7 +149,7 @@
     <div class="topnav-left">
       <a href="/" class="topnav-brand">
         <img src="/img/logo.png" alt="AutoFácil" style="display:block">
-        <span class="version-badge" id="versionBadge">v41.0</span>
+        <span class="version-badge" id="versionBadge">v44.0</span>
       </a>
       <div class="breadcrumb-nav">
         <a href="/">Inicio</a><span class="sep">›</span>
@@ -1282,7 +1282,7 @@
               const checked = permisosActuales[f.id_funcionalidad] ? 'checked' : '';
               const checkedClass = permisosActuales[f.id_funcionalidad] ? 'checked' : '';
               const tgt = f.href || mod.ruta;
-              const link = tgt ? `<a class="permiso-link" href="${tgt}" target="_blank" rel="noopener" title="Ir a ${f.nombre}" onclick="event.stopPropagation()"><i class="bi bi-box-arrow-up-right"></i></a>` : '';
+              const link = tgt ? `<a class="permiso-link" href="${tgt}" target="_blank" title="Ir a ${f.nombre}" onclick="event.stopPropagation()"><i class="bi bi-box-arrow-up-right"></i></a>` : '';
               return `
                 <label class="permiso-check ${checkedClass}" id="pc-${f.id_funcionalidad}">
                   <input type="checkbox" ${checked} ${puedeEditarPermisos ? '' : 'disabled'}
@@ -1368,7 +1368,7 @@
               const labelStyle = bgColor ? `background:${bgColor};border-color:${borderCol}` : '';
               const checkedClass = efectivo ? 'checked' : '';
               const tgt = f.href || mod.ruta;
-              const link = tgt ? `<a class="permiso-link" href="${tgt}" target="_blank" rel="noopener" title="Ir a ${f.nombre}" onclick="event.stopPropagation()"><i class="bi bi-box-arrow-up-right"></i></a>` : '';
+              const link = tgt ? `<a class="permiso-link" href="${tgt}" target="_blank" title="Ir a ${f.nombre}" onclick="event.stopPropagation()"><i class="bi bi-box-arrow-up-right"></i></a>` : '';
               return `
                 <label class="permiso-check ${checkedClass}" id="pcu-${fid}" style="${labelStyle}">
                   <input type="checkbox" ${efectivo ? 'checked' : ''} ${puedeEditarPermisos ? '' : 'disabled'}
