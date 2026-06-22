@@ -5,36 +5,35 @@
   <link rel="icon" href="/img/favicon.png" type="image/png">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Tipos de Documento — AutoFácil</title>
+<!-- v3.0 -->
 <link rel="stylesheet" href="/css/bootstrap-icons.css">
 <style>
   :root { --navy:#0f2d6b; --blue:#1565c0; --bg:#f0f4f8; --card:#fff; --border:#e2e8f0; --text:#1e293b; --muted:#64748b; }
   * { box-sizing:border-box; margin:0; padding:0; }
   body { font-family:'Segoe UI',system-ui,sans-serif; background:var(--bg); color:var(--text); }
 
-  /* Navbar */
-  .topnav { background:linear-gradient(135deg,var(--navy),var(--blue)); padding:0 24px; height:52px; display:flex; align-items:center; justify-content:space-between; }
-  .topnav-brand { display:flex; align-items:center; gap:10px; color:#fff; font-weight:800; font-size:1rem; text-decoration:none; }
-  .topnav-brand img { height:28px; filter:brightness(0) invert(1); }
-  .version-badge { background:rgba(255,255,255,.15); color:rgba(255,255,255,.75); font-size:.65rem; font-weight:700; border-radius:6px; padding:2px 8px; letter-spacing:.5px; margin-left:4px; }
-  .topnav-right { display:flex; align-items:center; gap:12px; }
-  .btn-nav { background:rgba(255,255,255,.15); border:1px solid rgba(255,255,255,.3); color:#fff; border-radius:8px; padding:6px 14px; font-size:.82rem; font-weight:600; cursor:pointer; text-decoration:none; display:flex; align-items:center; gap:6px; }
-  .btn-nav:hover { background:rgba(255,255,255,.25); }
-  .breadcrumb-nav { color:rgba(255,255,255,.6); font-size:.85rem; display:flex; align-items:center; gap:6px; }
-  .breadcrumb-nav a { color:rgba(255,255,255,.75); text-decoration:none; }
-  .breadcrumb-nav a:hover { color:#fff; }
-  .breadcrumb-nav .sep { color:rgba(255,255,255,.35); }
-
   /* Layout */
-  .page { max-width:860px; margin:0 auto; padding:24px 16px 60px; display:flex; flex-direction:column; gap:28px; }
+  .page { max-width:880px; margin:0 auto; padding:24px 16px 60px; display:flex; flex-direction:column; gap:20px; }
 
-  /* Card financiera */
+  /* Pestañas */
+  .tabs { display:flex; gap:6px; border-bottom:2px solid var(--border); }
+  .tab-btn { border:none; background:none; padding:11px 20px; font-size:.9rem; font-weight:800; color:var(--muted); cursor:pointer; border-bottom:3px solid transparent; margin-bottom:-2px; display:flex; align-items:center; gap:8px; }
+  .tab-btn:hover { color:var(--blue); }
+  .tab-btn.active { color:var(--navy); border-bottom-color:var(--navy); }
+  .tab-pane { display:none; flex-direction:column; gap:24px; }
+  .tab-pane.active { display:flex; }
+  .tab-intro { font-size:.84rem; color:var(--muted); margin-top:-4px; }
+
+  /* Card financiera / ocupación */
   .fin-card { background:var(--card); border-radius:14px; border:1px solid var(--border); overflow:hidden; box-shadow:0 2px 8px rgba(0,0,0,.05); }
-  .fin-card-head { display:flex; align-items:center; justify-content:space-between; padding:14px 20px; border-bottom:2px solid var(--border); }
+  .fin-card-head { display:flex; align-items:center; justify-content:space-between; padding:14px 20px; border-bottom:2px solid var(--border); gap:12px; flex-wrap:wrap; }
   .fin-card-title { font-size:1rem; font-weight:900; color:var(--navy); display:flex; align-items:center; gap:9px; }
   .fin-badge { border-radius:8px; padding:3px 10px; font-size:.72rem; font-weight:800; letter-spacing:.05em; }
   .fin-af  { background:#e0f2fe; color:#0369a1; }
   .fin-afin{ background:#ede9fe; color:#5b21b6; }
   .fin-uc  { background:#fef9c3; color:#854d0e; }
+  .fin-ocu { background:#dcfce7; color:#166534; }
+  .ocu-count { background:#f1f5f9; color:#64748b; border-radius:20px; padding:2px 10px; font-size:.72rem; font-weight:800; }
 
   /* Tabla */
   table { width:100%; border-collapse:collapse; font-size:.85rem; }
@@ -94,104 +93,81 @@
   .no-data { text-align:center; padding:28px; color:#94a3b8; font-size:.88rem; }
   .spinner-border { width:1.5rem; height:1.5rem; border:.2em solid #cbd5e1; border-top-color:var(--blue); border-radius:50%; animation:spin .7s linear infinite; display:block; margin:28px auto; }
   @keyframes spin { to { transform:rotate(360deg); } }
+
+  /* Footer "Qué afecta" */
+  .afecta-box { background:#f8fafc; border:1px solid #e2e8f0; border-left:4px solid var(--blue); border-radius:10px; padding:14px 18px; font-size:.84rem; color:#475569; }
+  .afecta-box .tit { font-weight:800; color:#0f2a52; margin-bottom:6px; display:flex; align-items:center; gap:7px; }
+  .afecta-box ul { margin:0; padding-left:18px; }
+  .afecta-box a { color:var(--blue); }
 </style>
 </head>
 <body>
 
-<nav class="topnav">
-  <a class="topnav-brand" href="/mantenedores">
-    <img src="/img/logo.png" alt="AutoFácil" onerror="this.style.display='none'">
-    <span>Tipos de Documento</span>
-    <span class="version-badge">v2.0</span>
-  </a>
-  <div class="breadcrumb-nav">
-    <a href="/">Inicio</a><span class="sep">›</span>
-    <a href="/mantenedores">Mantenedores</a><span class="sep">›</span>
-    <span style="color:#fff;font-weight:600"><i class="bi bi-file-earmark-ruled me-1"></i>Tipos de Documento</span>
-  </div>
-  <div class="topnav-right">
-    <a href="/dashboard" title="Dashboard" style="display:flex;align-items:center;gap:5px;color:rgba(255,255,255,0.85);text-decoration:none;font-size:12px;font-weight:500;padding:5px 10px;border:1px solid rgba(255,255,255,0.25);border-radius:6px;transition:.15s" onmouseover="this.style.background='rgba(255,255,255,0.1)'" onmouseout="this.style.background='transparent'">
-      <i class="bi bi-bar-chart-line" style="font-size:15px"></i> Dashboard
-    </a>
-    <span id="navUser" class="user-chip" style="color:rgba(255,255,255,.75);font-size:.82rem"></span>
-    <a href="/mantenedores" class="btn-nav"><i class="bi bi-arrow-left"></i>Mantenedores</a>
-  </div>
-</nav>
+<div id="af-topnav"></div>
 
 <div class="page">
 
-  <!-- ── Card AutoFácil ── -->
-  <div class="fin-card">
-    <div class="fin-card-head">
-      <div class="fin-card-title">
-        <i class="bi bi-paperclip"></i>
-        Documentos AutoFácil
-        <span class="fin-badge fin-af">AUTOFACIL</span>
-      </div>
-      <button class="btn-pri" onclick="abrirModal(null,'AUTOFACIL')">
-        <i class="bi bi-plus-lg"></i>Agregar Documento
-      </button>
-    </div>
-    <div id="spinnerAUTOFACIL"><div class="spinner-border"></div></div>
-    <table id="tablaAUTOFACIL" style="display:none">
-      <thead><tr>
-        <th class="td-orden">Orden</th><th>Nombre del Documento</th><th>Descripción</th>
-        <th class="td-toggle">Obligatorio</th><th class="td-toggle">Activo</th><th class="td-acts">Acciones</th>
-      </tr></thead>
-      <tbody id="tbodyAUTOFACIL"></tbody>
-    </table>
-    <div id="noDataAUTOFACIL" class="no-data" style="display:none">Sin documentos registrados</div>
+  <div class="tabs">
+    <button class="tab-btn active" id="btn-brokerage" onclick="showTab('brokerage')"><i class="bi bi-building-check"></i>Brokerage</button>
+    <button class="tab-btn" id="btn-autofacil" onclick="showTab('autofacil')"><i class="bi bi-person-vcard"></i>AutoFácil</button>
   </div>
 
-  <!-- ── Card Autofin ── -->
-  <div class="fin-card">
-    <div class="fin-card-head">
-      <div class="fin-card-title">
-        <i class="bi bi-paperclip"></i>
-        Documentos Autofin
-        <span class="fin-badge fin-afin">AUTOFIN</span>
+  <!-- ════════ PESTAÑA BROKERAGE ════════ -->
+  <div class="tab-pane active" id="tab-brokerage">
+    <div class="tab-intro">Documentos de respaldo requeridos por financiera del brokerage (Autofin y Unidad de Crédito).</div>
+
+    <!-- Autofin -->
+    <div class="fin-card">
+      <div class="fin-card-head">
+        <div class="fin-card-title"><i class="bi bi-paperclip"></i>Documentos Autofin <span class="fin-badge fin-afin">AUTOFIN</span></div>
+        <button class="btn-pri" onclick="abrirModal(null,'AUTOFIN')"><i class="bi bi-plus-lg"></i>Agregar Documento</button>
       </div>
-      <button class="btn-pri" onclick="abrirModal(null,'AUTOFIN')">
-        <i class="bi bi-plus-lg"></i>Agregar Documento
-      </button>
+      <div id="spinnerAUTOFIN"><div class="spinner-border"></div></div>
+      <table id="tablaAUTOFIN" style="display:none">
+        <thead><tr><th class="td-orden">Orden</th><th>Nombre del Documento</th><th>Descripción</th><th class="td-toggle">Obligatorio</th><th class="td-toggle">Activo</th><th class="td-acts">Acciones</th></tr></thead>
+        <tbody id="tbodyAUTOFIN"></tbody>
+      </table>
+      <div id="noDataAUTOFIN" class="no-data" style="display:none">Sin documentos registrados</div>
     </div>
-    <div id="spinnerAUTOFIN"><div class="spinner-border"></div></div>
-    <table id="tablaAUTOFIN" style="display:none">
-      <thead><tr>
-        <th class="td-orden">Orden</th><th>Nombre del Documento</th><th>Descripción</th>
-        <th class="td-toggle">Obligatorio</th><th class="td-toggle">Activo</th><th class="td-acts">Acciones</th>
-      </tr></thead>
-      <tbody id="tbodyAUTOFIN"></tbody>
-    </table>
-    <div id="noDataAUTOFIN" class="no-data" style="display:none">Sin documentos registrados</div>
+
+    <!-- Unidad de Crédito -->
+    <div class="fin-card">
+      <div class="fin-card-head">
+        <div class="fin-card-title"><i class="bi bi-paperclip"></i>Documentos Unidad de Crédito <span class="fin-badge fin-uc">UNIDAD</span></div>
+        <button class="btn-pri" onclick="abrirModal(null,'UNIDAD')"><i class="bi bi-plus-lg"></i>Agregar Documento</button>
+      </div>
+      <div id="spinnerUNIDAD"><div class="spinner-border"></div></div>
+      <table id="tablaUNIDAD" style="display:none">
+        <thead><tr><th class="td-orden">Orden</th><th>Nombre del Documento</th><th>Descripción</th><th class="td-toggle">Obligatorio</th><th class="td-toggle">Activo</th><th class="td-acts">Acciones</th></tr></thead>
+        <tbody id="tbodyUNIDAD"></tbody>
+      </table>
+      <div id="noDataUNIDAD" class="no-data" style="display:none">Sin documentos registrados</div>
+    </div>
   </div>
 
-  <!-- ── Card Unidad de Crédito ── -->
-  <div class="fin-card">
-    <div class="fin-card-head">
-      <div class="fin-card-title">
-        <i class="bi bi-paperclip"></i>
-        Documentos Unidad de Crédito
-        <span class="fin-badge fin-uc">UNIDAD</span>
-      </div>
-      <button class="btn-pri" onclick="abrirModal(null,'UNIDAD')">
-        <i class="bi bi-plus-lg"></i>Agregar Documento
-      </button>
+  <!-- ════════ PESTAÑA AUTOFÁCIL (por ocupación) ════════ -->
+  <div class="tab-pane" id="tab-autofacil">
+    <div class="fin-card-head" style="border:none;padding:0">
+      <div class="tab-intro" style="margin:0">Check-list de documentos según la <b>ocupación del cliente</b> para créditos AutoFácil (recursos propios).</div>
+      <button class="btn-pri" onclick="abrirModalOcup(null)"><i class="bi bi-plus-lg"></i>Agregar Documento</button>
     </div>
-    <div id="spinnerUNIDAD"><div class="spinner-border"></div></div>
-    <table id="tablaUNIDAD" style="display:none">
-      <thead><tr>
-        <th class="td-orden">Orden</th><th>Nombre del Documento</th><th>Descripción</th>
-        <th class="td-toggle">Obligatorio</th><th class="td-toggle">Activo</th><th class="td-acts">Acciones</th>
-      </tr></thead>
-      <tbody id="tbodyUNIDAD"></tbody>
-    </table>
-    <div id="noDataUNIDAD" class="no-data" style="display:none">Sin documentos registrados</div>
+    <div id="spinnerOcup"><div class="spinner-border"></div></div>
+    <div id="ocupContainer" style="display:flex;flex-direction:column;gap:18px"></div>
+    <div id="noDataOcup" class="no-data" style="display:none">Sin documentos por ocupación</div>
+  </div>
+
+  <!-- Footer Qué afecta -->
+  <div class="afecta-box">
+    <div class="tit"><i class="bi bi-diagram-3"></i>Qué afecta este mantenedor</div>
+    <ul>
+      <li><b>Brokerage (Autofin / Unidad)</b> → check-list de documentos de respaldo requeridos en la aprobación de operaciones brokerage por financiera.</li>
+      <li><b>AutoFácil (por ocupación)</b> → documentos exigidos a cada cliente según su ocupación en los créditos de recursos propios (Dependiente, Independiente, Persona Jurídica, Jubilado, etc.).</li>
+    </ul>
   </div>
 
 </div>
 
-<!-- Modal Agregar / Editar -->
+<!-- Modal Brokerage (Agregar / Editar por financiera) -->
 <div class="modal-overlay" id="modalOverlay" onclick="if(event.target===this)cerrarModal()">
   <div class="modal-box">
     <div class="modal-head">
@@ -199,32 +175,44 @@
       <button style="background:none;border:none;color:rgba(255,255,255,.8);font-size:1.2rem;cursor:pointer" onclick="cerrarModal()"><i class="bi bi-x-lg"></i></button>
     </div>
     <div class="modal-body">
-      <div class="form-group">
-        <label class="form-label">Nombre del Documento *</label>
-        <input id="fNombre" class="form-input" placeholder="Ej: Carnet de Identidad">
-      </div>
-      <div class="form-group">
-        <label class="form-label">Descripción</label>
-        <textarea id="fDesc" class="form-textarea" placeholder="Indicaciones adicionales (opcional)"></textarea>
-      </div>
+      <div class="form-group"><label class="form-label">Nombre del Documento *</label><input id="fNombre" class="form-input" placeholder="Ej: Carnet de Identidad"></div>
+      <div class="form-group"><label class="form-label">Descripción</label><textarea id="fDesc" class="form-textarea" placeholder="Indicaciones adicionales (opcional)"></textarea></div>
       <div class="form-row">
-        <label class="form-check">
-          <input type="checkbox" id="fObligatorio" checked>
-          Obligatorio
-        </label>
-        <label class="form-check">
-          <input type="checkbox" id="fActivo" checked>
-          Activo
-        </label>
-        <div class="form-group">
-          <label class="form-label">Orden</label>
-          <input id="fOrden" class="form-input" type="number" min="0" value="0">
-        </div>
+        <label class="form-check"><input type="checkbox" id="fObligatorio" checked>Obligatorio</label>
+        <label class="form-check"><input type="checkbox" id="fActivo" checked>Activo</label>
+        <div class="form-group"><label class="form-label">Orden</label><input id="fOrden" class="form-input" type="number" min="0" value="0"></div>
       </div>
     </div>
     <div class="modal-foot">
       <button class="btn-cancel" onclick="cerrarModal()">Cancelar</button>
       <button class="btn-save"   onclick="guardar()"><i class="bi bi-floppy me-1"></i>Guardar</button>
+    </div>
+  </div>
+</div>
+
+<!-- Modal AutoFácil (Agregar / Editar por ocupación) -->
+<div class="modal-overlay" id="modalOcup" onclick="if(event.target===this)cerrarModalOcup()">
+  <div class="modal-box">
+    <div class="modal-head">
+      <h6 id="modalOcupTitulo"><i class="bi bi-person-vcard me-2"></i>Nuevo Documento por Ocupación</h6>
+      <button style="background:none;border:none;color:rgba(255,255,255,.8);font-size:1.2rem;cursor:pointer" onclick="cerrarModalOcup()"><i class="bi bi-x-lg"></i></button>
+    </div>
+    <div class="modal-body">
+      <div class="form-group">
+        <label class="form-label">Ocupación *</label>
+        <input id="oOcupacion" class="form-input" list="ocupList" placeholder="Ej: Dependiente Renta Fija">
+        <datalist id="ocupList"></datalist>
+      </div>
+      <div class="form-group"><label class="form-label">Documento *</label><textarea id="oDocumento" class="form-textarea" placeholder="Ej: Últimas 3 liquidaciones de sueldos"></textarea></div>
+      <div class="form-row">
+        <label class="form-check"><input type="checkbox" id="oObligatorio" checked>Obligatorio</label>
+        <label class="form-check"><input type="checkbox" id="oActivo" checked>Activo</label>
+        <div class="form-group"><label class="form-label">Orden</label><input id="oOrden" class="form-input" type="number" min="0" value="0"></div>
+      </div>
+    </div>
+    <div class="modal-foot">
+      <button class="btn-cancel" onclick="cerrarModalOcup()">Cancelar</button>
+      <button class="btn-save"   onclick="guardarOcup()"><i class="bi bi-floppy me-1"></i>Guardar</button>
     </div>
   </div>
 </div>
@@ -235,11 +223,9 @@
 <script>
 function getToken() { return sessionStorage.getItem('token'); }
 function apiHdr()   { return { 'Content-Type':'application/json', 'Authorization':'Bearer '+getToken() }; }
+const esc = s => String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
 
-(function() {
-  if (!getToken()) { location.href='/login.html'; return; }
-  try { const u=JSON.parse(sessionStorage.getItem('usuario')||'{}'); document.getElementById('navUser').textContent=u.nombre||''; } catch(e){}
-})();
+(function() { if (!getToken()) { location.href='/login.html'; return; } })();
 
 function showToast(msg, ok) {
   const el=document.getElementById('toastMsg');
@@ -247,10 +233,16 @@ function showToast(msg, ok) {
   el.style.display='block'; setTimeout(()=>{ el.style.display='none'; },3000);
 }
 
-// Datos por financiera
-const _datos = { AUTOFACIL:[], AUTOFIN:[], UNIDAD:[] };
-let _editId       = null;
-let _editFinanciera = null;
+function showTab(t) {
+  document.querySelectorAll('.tab-btn').forEach(b => b.classList.toggle('active', b.id === 'btn-'+t));
+  document.querySelectorAll('.tab-pane').forEach(p => p.classList.toggle('active', p.id === 'tab-'+t));
+  if (t === 'autofacil' && !_ocupCargado) { _ocupCargado = true; cargarOcupaciones(); }
+}
+
+/* ═══════════ BROKERAGE (por financiera) ═══════════ */
+const _datos = { AUTOFIN:[], UNIDAD:[] };
+let _editId = null, _editFinanciera = null;
+const FIN_LABELS = { AUTOFIN:'Autofin', UNIDAD:'Unidad de Crédito' };
 
 async function cargarFinanciera(fin) {
   try {
@@ -263,36 +255,18 @@ async function cargarFinanciera(fin) {
 }
 
 function renderTabla(fin) {
-  const tabla  = document.getElementById('tabla'+fin);
-  const tbody  = document.getElementById('tbody'+fin);
-  const noData = document.getElementById('noData'+fin);
-  const datos  = _datos[fin];
-  tabla.style.display  = datos.length ? 'table' : 'none';
-  noData.style.display = datos.length ? 'none'  : 'block';
+  const tabla=document.getElementById('tabla'+fin), tbody=document.getElementById('tbody'+fin), noData=document.getElementById('noData'+fin);
+  const datos=_datos[fin];
+  tabla.style.display=datos.length?'table':'none';
+  noData.style.display=datos.length?'none':'block';
   if (!datos.length) return;
   tbody.innerHTML = datos.map(t => `
     <tr>
       <td class="td-orden">${t.orden}</td>
-      <td class="td-nombre">${t.nombre}</td>
-      <td class="td-desc">${t.descripcion||'—'}</td>
-      <td class="td-toggle">
-        <div class="toggle-wrap">
-          <label class="toggle">
-            <input type="checkbox" ${t.obligatorio?'checked':''} onchange="toggleCampo(${t.id_tipo},'${fin}','obligatorio',this.checked)">
-            <span class="slider"></span>
-          </label>
-          <span class="toggle-lbl">${t.obligatorio?'Sí':'No'}</span>
-        </div>
-      </td>
-      <td class="td-toggle">
-        <div class="toggle-wrap">
-          <label class="toggle">
-            <input type="checkbox" ${t.activo?'checked':''} onchange="toggleCampo(${t.id_tipo},'${fin}','activo',this.checked)">
-            <span class="slider"></span>
-          </label>
-          <span class="toggle-lbl">${t.activo?'Sí':'No'}</span>
-        </div>
-      </td>
+      <td class="td-nombre">${esc(t.nombre)}</td>
+      <td class="td-desc">${esc(t.descripcion)||'—'}</td>
+      <td class="td-toggle"><div class="toggle-wrap"><label class="toggle"><input type="checkbox" ${t.obligatorio?'checked':''} onchange="toggleCampo(${t.id_tipo},'${fin}','obligatorio',this.checked)"><span class="slider"></span></label><span class="toggle-lbl">${t.obligatorio?'Sí':'No'}</span></div></td>
+      <td class="td-toggle"><div class="toggle-wrap"><label class="toggle"><input type="checkbox" ${t.activo?'checked':''} onchange="toggleCampo(${t.id_tipo},'${fin}','activo',this.checked)"><span class="slider"></span></label><span class="toggle-lbl">${t.activo?'Sí':'No'}</span></div></td>
       <td class="td-acts">
         <button class="btn-sm btn-edit" onclick="abrirModal(${t.id_tipo},'${fin}')" title="Editar"><i class="bi bi-pencil"></i></button>
         <button class="btn-sm btn-del"  onclick="eliminar(${t.id_tipo},'${fin}')"   title="Eliminar"><i class="bi bi-trash"></i></button>
@@ -307,57 +281,35 @@ async function toggleCampo(id, fin, campo, valor) {
   body[campo] = valor;
   try {
     const r = await fetch('/api/tipos-documento/'+id, { method:'PUT', headers:apiHdr(), body:JSON.stringify(body) });
-    const j = await r.json();
-    if (!j.success) throw new Error(j.error);
-    t[campo] = valor;
-    renderTabla(fin);
+    const j = await r.json(); if (!j.success) throw new Error(j.error);
+    t[campo] = valor; renderTabla(fin);
   } catch(e) { showToast('Error: '+e.message, false); cargarFinanciera(fin); }
 }
 
-const FIN_LABELS = { AUTOFACIL:'AutoFácil', AUTOFIN:'Autofin', UNIDAD:'Unidad de Crédito' };
-
 function abrirModal(id, fin) {
-  _editId         = id   || null;
-  _editFinanciera = fin  || 'AUTOFACIL';
+  _editId = id || null; _editFinanciera = fin || 'AUTOFIN';
   const t = id ? _datos[_editFinanciera].find(x => x.id_tipo === id) : null;
-  document.getElementById('modalTitulo').innerHTML = id
-    ? `<i class="bi bi-pencil me-2"></i>Editar — ${FIN_LABELS[_editFinanciera]}`
-    : `<i class="bi bi-plus-lg me-2"></i>Nuevo — ${FIN_LABELS[_editFinanciera]}`;
-  document.getElementById('fNombre').value          = t?.nombre      || '';
-  document.getElementById('fDesc').value             = t?.descripcion  || '';
-  document.getElementById('fObligatorio').checked   = t ? !!t.obligatorio : true;
-  document.getElementById('fActivo').checked         = t ? !!t.activo      : true;
-  document.getElementById('fOrden').value            = t?.orden ?? 0;
+  document.getElementById('modalTitulo').innerHTML = id ? `<i class="bi bi-pencil me-2"></i>Editar — ${FIN_LABELS[_editFinanciera]}` : `<i class="bi bi-plus-lg me-2"></i>Nuevo — ${FIN_LABELS[_editFinanciera]}`;
+  document.getElementById('fNombre').value = t?.nombre || '';
+  document.getElementById('fDesc').value = t?.descripcion || '';
+  document.getElementById('fObligatorio').checked = t ? !!t.obligatorio : true;
+  document.getElementById('fActivo').checked = t ? !!t.activo : true;
+  document.getElementById('fOrden').value = t?.orden ?? 0;
   document.getElementById('modalOverlay').classList.add('open');
   document.getElementById('fNombre').focus();
 }
-
-function cerrarModal() {
-  document.getElementById('modalOverlay').classList.remove('open');
-  _editId = null; _editFinanciera = null;
-}
+function cerrarModal() { document.getElementById('modalOverlay').classList.remove('open'); _editId=null; _editFinanciera=null; }
 
 async function guardar() {
   const nombre = document.getElementById('fNombre').value.trim();
   if (!nombre) { showToast('El nombre es obligatorio', false); return; }
-  const body = {
-    nombre,
-    descripcion:  document.getElementById('fDesc').value.trim() || null,
-    obligatorio:  document.getElementById('fObligatorio').checked,
-    activo:       document.getElementById('fActivo').checked,
-    orden:        parseInt(document.getElementById('fOrden').value) || 0,
-    financiera:   _editFinanciera,
-  };
+  const body = { nombre, descripcion:document.getElementById('fDesc').value.trim()||null, obligatorio:document.getElementById('fObligatorio').checked, activo:document.getElementById('fActivo').checked, orden:parseInt(document.getElementById('fOrden').value)||0, financiera:_editFinanciera };
   try {
-    const url    = _editId ? '/api/tipos-documento/'+_editId : '/api/tipos-documento';
-    const method = _editId ? 'PUT' : 'POST';
-    const r = await fetch(url, { method, headers:apiHdr(), body:JSON.stringify(body) });
-    const j = await r.json();
-    if (!j.success) throw new Error(j.error);
-    showToast(_editId ? 'Actualizado correctamente' : 'Creado correctamente', true);
-    const fin = _editFinanciera;
-    cerrarModal();
-    cargarFinanciera(fin);
+    const url = _editId ? '/api/tipos-documento/'+_editId : '/api/tipos-documento';
+    const r = await fetch(url, { method:_editId?'PUT':'POST', headers:apiHdr(), body:JSON.stringify(body) });
+    const j = await r.json(); if (!j.success) throw new Error(j.error);
+    showToast(_editId?'Actualizado correctamente':'Creado correctamente', true);
+    const fin=_editFinanciera; cerrarModal(); cargarFinanciera(fin);
   } catch(e) { showToast('Error: '+e.message, false); }
 }
 
@@ -366,20 +318,126 @@ async function eliminar(id, fin) {
   if (!confirm(`¿Eliminar "${t?.nombre}"?\nEsto no afecta documentos ya cargados.`)) return;
   try {
     const r = await fetch('/api/tipos-documento/'+id, { method:'DELETE', headers:apiHdr() });
-    const j = await r.json();
-    if (!j.success) throw new Error(j.error);
-    showToast('Eliminado', true);
-    cargarFinanciera(fin);
+    const j = await r.json(); if (!j.success) throw new Error(j.error);
+    showToast('Eliminado', true); cargarFinanciera(fin);
   } catch(e) { showToast('Error: '+e.message, false); }
 }
 
-document.addEventListener('keydown', e => { if(e.key==='Escape') cerrarModal(); });
+/* ═══════════ AUTOFÁCIL (por ocupación) ═══════════ */
+let _ocupData = [], _ocupCargado = false, _editOcupId = null;
 
-// Cargar las 3 financieras en paralelo
-cargarFinanciera('AUTOFACIL');
+async function cargarOcupaciones() {
+  document.getElementById('spinnerOcup').style.display = 'block';
+  try {
+    const r = await fetch('/api/tipos-documento/ocupaciones', { headers:apiHdr() });
+    const j = await r.json();
+    _ocupData = j.success ? j.data : [];
+    renderOcupaciones();
+  } catch(e) { showToast('Error al cargar ocupaciones: '+e.message, false); }
+  document.getElementById('spinnerOcup').style.display = 'none';
+}
+
+function renderOcupaciones() {
+  const cont = document.getElementById('ocupContainer'), noData = document.getElementById('noDataOcup');
+  // Agrupar por ocupación preservando orden de aparición
+  const grupos = [];
+  const idx = {};
+  _ocupData.forEach(d => {
+    if (idx[d.ocupacion] === undefined) { idx[d.ocupacion] = grupos.length; grupos.push({ ocupacion:d.ocupacion, docs:[] }); }
+    grupos[idx[d.ocupacion]].docs.push(d);
+  });
+  // datalist de ocupaciones
+  document.getElementById('ocupList').innerHTML = grupos.map(g => `<option value="${esc(g.ocupacion)}">`).join('');
+  noData.style.display = grupos.length ? 'none' : 'block';
+  cont.innerHTML = grupos.map(g => `
+    <div class="fin-card">
+      <div class="fin-card-head">
+        <div class="fin-card-title"><i class="bi bi-person-badge"></i>${esc(g.ocupacion)} <span class="ocu-count">${g.docs.length} doc${g.docs.length===1?'':'s'}</span></div>
+        <button class="btn-pri" onclick="abrirModalOcup(null,'${esc(g.ocupacion).replace(/'/g,"\\'")}')"><i class="bi bi-plus-lg"></i>Agregar</button>
+      </div>
+      <table>
+        <thead><tr><th class="td-orden">Orden</th><th>Documento</th><th class="td-toggle">Obligatorio</th><th class="td-toggle">Activo</th><th class="td-acts">Acciones</th></tr></thead>
+        <tbody>${g.docs.map(d => `
+          <tr>
+            <td class="td-orden">${d.orden}</td>
+            <td class="td-nombre">${esc(d.documento)}</td>
+            <td class="td-toggle"><div class="toggle-wrap"><label class="toggle"><input type="checkbox" ${d.obligatorio?'checked':''} onchange="toggleOcup(${d.id},'obligatorio',this.checked)"><span class="slider"></span></label><span class="toggle-lbl">${d.obligatorio?'Sí':'No'}</span></div></td>
+            <td class="td-toggle"><div class="toggle-wrap"><label class="toggle"><input type="checkbox" ${d.activo?'checked':''} onchange="toggleOcup(${d.id},'activo',this.checked)"><span class="slider"></span></label><span class="toggle-lbl">${d.activo?'Sí':'No'}</span></div></td>
+            <td class="td-acts">
+              <button class="btn-sm btn-edit" onclick="abrirModalOcup(${d.id})" title="Editar"><i class="bi bi-pencil"></i></button>
+              <button class="btn-sm btn-del"  onclick="eliminarOcup(${d.id})"   title="Eliminar"><i class="bi bi-trash"></i></button>
+            </td>
+          </tr>`).join('')}
+        </tbody>
+      </table>
+    </div>`).join('');
+}
+
+async function toggleOcup(id, campo, valor) {
+  const d = _ocupData.find(x => x.id === id); if (!d) return;
+  const body = { ocupacion:d.ocupacion, documento:d.documento, obligatorio:d.obligatorio, activo:d.activo, orden:d.orden };
+  body[campo] = valor;
+  try {
+    const r = await fetch('/api/tipos-documento/ocupaciones/'+id, { method:'PUT', headers:apiHdr(), body:JSON.stringify(body) });
+    const j = await r.json(); if (!j.success) throw new Error(j.error);
+    d[campo] = valor ? 1 : 0; renderOcupaciones();
+  } catch(e) { showToast('Error: '+e.message, false); cargarOcupaciones(); }
+}
+
+function abrirModalOcup(id, ocupacionPre) {
+  _editOcupId = id || null;
+  const d = id ? _ocupData.find(x => x.id === id) : null;
+  document.getElementById('modalOcupTitulo').innerHTML = id ? '<i class="bi bi-pencil me-2"></i>Editar Documento' : '<i class="bi bi-plus-lg me-2"></i>Nuevo Documento por Ocupación';
+  document.getElementById('oOcupacion').value = d?.ocupacion || ocupacionPre || '';
+  document.getElementById('oDocumento').value = d?.documento || '';
+  document.getElementById('oObligatorio').checked = d ? !!d.obligatorio : true;
+  document.getElementById('oActivo').checked = d ? !!d.activo : true;
+  document.getElementById('oOrden').value = d?.orden ?? (ocupacionPre ? siguienteOrden(ocupacionPre) : 0);
+  document.getElementById('modalOcup').classList.add('open');
+  document.getElementById(d || ocupacionPre ? 'oDocumento' : 'oOcupacion').focus();
+}
+function siguienteOrden(ocup) {
+  const docs = _ocupData.filter(x => x.ocupacion === ocup);
+  return docs.length ? Math.max(...docs.map(x => x.orden)) + 10 : 10;
+}
+function cerrarModalOcup() { document.getElementById('modalOcup').classList.remove('open'); _editOcupId=null; }
+
+async function guardarOcup() {
+  const ocupacion = document.getElementById('oOcupacion').value.trim();
+  const documento = document.getElementById('oDocumento').value.trim();
+  if (!ocupacion || !documento) { showToast('Ocupación y documento son obligatorios', false); return; }
+  const body = { ocupacion, documento, obligatorio:document.getElementById('oObligatorio').checked, activo:document.getElementById('oActivo').checked, orden:parseInt(document.getElementById('oOrden').value)||0 };
+  try {
+    const url = _editOcupId ? '/api/tipos-documento/ocupaciones/'+_editOcupId : '/api/tipos-documento/ocupaciones';
+    const r = await fetch(url, { method:_editOcupId?'PUT':'POST', headers:apiHdr(), body:JSON.stringify(body) });
+    const j = await r.json(); if (!j.success) throw new Error(j.error);
+    showToast(_editOcupId?'Actualizado correctamente':'Creado correctamente', true);
+    cerrarModalOcup(); cargarOcupaciones();
+  } catch(e) { showToast('Error: '+e.message, false); }
+}
+
+async function eliminarOcup(id) {
+  const d = _ocupData.find(x => x.id === id);
+  if (!confirm(`¿Eliminar "${d?.documento}"?`)) return;
+  try {
+    const r = await fetch('/api/tipos-documento/ocupaciones/'+id, { method:'DELETE', headers:apiHdr() });
+    const j = await r.json(); if (!j.success) throw new Error(j.error);
+    showToast('Eliminado', true); cargarOcupaciones();
+  } catch(e) { showToast('Error: '+e.message, false); }
+}
+
+document.addEventListener('keydown', e => { if(e.key==='Escape') { cerrarModal(); cerrarModalOcup(); } });
+
+// Brokerage carga al inicio; AutoFácil carga al entrar a su pestaña
 cargarFinanciera('AUTOFIN');
 cargarFinanciera('UNIDAD');
 </script>
+<script>
+  window.AF_TOPNAV = {
+    self: { key:'tipos-documento', title:'Tipos de Documento', icon:'bi-file-earmark-ruled', defaultSection:'mantenedores' }
+  };
+</script>
+<script src="/js/topnav.js"></script>
 <script src="/js/app-version.js"></script>
 </body>
 </html>
