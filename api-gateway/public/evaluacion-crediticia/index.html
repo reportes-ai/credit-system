@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- v45.3 -->
+<!-- v45.4 -->
 <html lang="es">
 <head>
   <meta charset="UTF-8">
@@ -244,11 +244,27 @@
         });
       }
       pintarFicha();
+      cargarUltimaEvalIA(rut);
     } catch (e) {
       alert('No se pudo cargar la información: ' + e.message);
     } finally {
       btn.disabled = false; btn.innerHTML = '<i class="bi bi-search me-1"></i>Buscar';
     }
+  }
+
+  // Carga y muestra la última evaluación con IA guardada para el RUT (si existe)
+  async function cargarUltimaEvalIA(rut){
+    const out = document.getElementById('iaResultado');
+    out.innerHTML = '';
+    try {
+      const r = await fetch('/api/ia/evaluacion-credito/' + encodeURIComponent(rut), { headers: H });
+      const j = await r.json();
+      if (j.success && j.data && j.data.resultado) {
+        const d = { ...j.data.resultado, modelo: j.data.modelo };
+        out.innerHTML = `<div class="text-muted" style="font-size:.82rem;margin-bottom:8px"><i class="bi bi-clock-history me-1"></i>Última evaluación guardada — ${fmtFecha(j.data.fecha)} · puedes regenerarla con "Evaluar con IA"</div>` + renderEvalIA(d);
+        document.getElementById('secEvaluar').style.display = '';
+      }
+    } catch (_) {}
   }
 
   function pintarFicha(){
