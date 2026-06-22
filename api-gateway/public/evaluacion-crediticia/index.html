@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- v46.0 -->
+<!-- v46.1 -->
 <html lang="es">
 <head>
   <meta charset="UTF-8">
@@ -551,6 +551,7 @@
       out.innerHTML = informes.length
         ? renderInformesHtml(informes, origen)
         : '<div class="alert alert-warning mb-0" style="font-size:.88rem"><i class="bi bi-exclamation-triangle me-1"></i>No se obtuvieron informes para este RUT.</div>';
+      if (informes.length) sincronizarClienteDesdeDealernet(rut);   // actualiza info personal + comercial del cliente
     } catch (e) {
       out.innerHTML = `<div class="alert alert-danger mb-0" style="font-size:.88rem">Error: ${escapeHtml(e.message)}</div>`;
     } finally {
@@ -628,14 +629,42 @@
     const out = document.getElementById('iaResultado');
     btn.disabled = true; btn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span>Evaluando con IA…';
     out.innerHTML = '';
-    const iaOv = (window.AF_IA && AF_IA.analizando) ? AF_IA.analizando('Evaluando al cliente con IA según la Política V3.0…') : null;
+    const iaOv = (window.AF_IA && AF_IA.analizando) ? AF_IA.analizando('Trayendo antecedentes de DealerNet y evaluando con IA…') : null;
     try {
+      // 1) Asegura el informe DealerNet (lo trae si no hay) y sincroniza la info del cliente
+      await asegurarDealernetYSync(rut);
+      // 2) Evalúa con IA
       const r = await fetch('/api/ia/evaluacion-credito', { method:'POST', headers:H, body: JSON.stringify({ rut, cotizacion_id: cotSel }) });
       const j = await r.json();
       if (!j.success) { out.innerHTML = `<div class="alert alert-warning mb-0" style="font-size:.88rem"><i class="bi bi-exclamation-triangle me-1"></i>${escapeHtml(j.error || 'No se pudo evaluar')}</div>`; return; }
       out.innerHTML = renderEvalIA(j.data);
     } catch (e) { out.innerHTML = `<div class="alert alert-danger mb-0" style="font-size:.88rem">Error: ${escapeHtml(e.message)}</div>`; }
     finally { if (iaOv) iaOv.cerrar(); btn.disabled = false; btn.innerHTML = '<i class="bi bi-stars me-1"></i>Evaluar con IA (Política V3.0)'; }
+  }
+
+  // Trae el informe DealerNet (si no hay en el repositorio) y sincroniza la info del cliente
+  async function asegurarDealernetYSync(rut){
+    try {
+      const informes = await cargarInformesRepo(rut);
+      if (!informes.length) { try { await solicitarInformes(rut); } catch (_) {} }   // pide a DealerNet (gasta saldo solo si no hay)
+      await sincronizarClienteDesdeDealernet(rut);
+    } catch (_) {}
+  }
+
+  // Dispara la sincronización server-side (personal en clientes + comercial en informacion_comercial) y refresca las fechas
+  async function sincronizarClienteDesdeDealernet(rut){
+    try {
+      await fetch('/api/clientes/rut/' + encodeURIComponent(rut), { headers: H }).catch(() => {});          // sync datos personales (3435)
+      const rf = await fetch('/api/evaluacion-crediticia/ficha/' + encodeURIComponent(rut), { headers: H }); // sync deuda comercial (16)
+      const jf = await rf.json().catch(() => null);
+      if (jf && jf.success && jf.data) {
+        FICHA = jf.data;
+        const c = FICHA.cliente, com = FICHA.comercial;
+        if (c && c.nombre) { const el = document.getElementById('frNombre'); if (el) el.textContent = c.nombre; }
+        const fp = document.getElementById('frFechaPersonal'); if (fp) fp.textContent = (c && c.fecha) ? fmtFecha(c.fecha) : '—';
+        const fc = document.getElementById('frFechaComercial'); if (fc) fc.textContent = (com && com.existe && com.fecha) ? fmtFecha(com.fecha) : '—';
+      }
+    } catch (_) {}
   }
 
   function renderEvalIA(d){
