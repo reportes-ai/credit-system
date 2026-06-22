@@ -163,14 +163,10 @@ exports.evaluar = async (req, res) => {
 
     const ctx = { cliente: clienteTxt, dealernet: dealernetTxt, cotizacion: cotizacionTxt, docsLista: docsLista.join('\n'), politica: politicaTxt };
 
-    // 6) Llamada a la IA. El thinking adaptativo solo va si el modelo configurado
-    //    lo soporta (Haiku/Sonnet viejos lo rechazan). Si la API rechaza los
+    // 6) Llamada a la IA. SIN thinking: el razonamiento adaptativo consumía el
+    //    presupuesto de salida y dejaba el JSON cortado. Si la API rechaza los
     //    adjuntos (PDF muy grandes / muchas páginas), se reintenta SIN documentos.
-    let modeloUsar = null;
-    try { modeloUsar = await ia.modeloDe(CODIGO); } catch (_) {}
-    const THINKING_OK = ['claude-opus-4-8', 'claude-opus-4-7', 'claude-opus-4-6', 'claude-sonnet-4-6', 'claude-fable-5'];
-    const usarThinking = THINKING_OK.includes(modeloUsar);
-    const baseArgs = { codigo: CODIGO, id_usuario: req.usuario?.id_usuario, system: SYSTEM, prompt: promptDe(ctx), json: true, max_tokens: 12000, thinking: usarThinking };
+    const baseArgs = { codigo: CODIGO, id_usuario: req.usuario?.id_usuario, system: SYSTEM, prompt: promptDe(ctx), json: true, max_tokens: 12000, thinking: false };
     let r, docsError = null;
     try {
       r = await analizar({ ...baseArgs, documentos });
