@@ -34,6 +34,7 @@ const PLACEMENT_ITEMS = {
   '/comisiones/':            { section:'home', href:'/comisiones/',             icon:'bi-cash-coin',              titulo:'Comisión Ejecutivos' },
   '/carga-masiva/':          { section:'home', href:'/carga-masiva/',           icon:'bi-cloud-upload',           titulo:'Carga Masiva' },
   '/simulador/':             { section:'home', href:'/simulador/',              icon:'bi-calculator',             titulo:'Simulador Rentabilidad' },
+  '/evaluacion-crediticia/': { section:'home', href:'/evaluacion-crediticia/',  icon:'bi-clipboard-pulse',        titulo:'Evaluación Crediticia' },
   // ── CLIENTES — sub-páginas ────────────────────────────────────────────────
   'ant-laborales':           { section:'clientes',      href:'/antecedentes-laborales/', icon:'bi-briefcase',             titulo:'Antecedentes Laborales' },
   'inf-comercial':           { section:'clientes',      href:'/informacion-comercial/',  icon:'bi-building',              titulo:'Información Comercial' },

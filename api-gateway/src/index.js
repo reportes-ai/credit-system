@@ -114,6 +114,9 @@ app.use('/api/tablas-dinamicas',          require('../../services/reporteria/src
 // Cotizaciones
 app.use('/api/cotizaciones', require('../../services/cotizaciones/src/routes/cotizaciones.routes'));
 
+// Evaluación Crediticia (ficha por RUT + módulo Home)
+app.use('/api/evaluacion-crediticia', require('../../services/evaluacion-crediticia/src/routes/evaluacion.routes'));
+
 // Créditos
 app.use('/api/creditos',            require('../../services/creditos/src/routes/creditos.routes'));
 app.use('/api/edicion-creditos',    require('../../services/creditos/src/routes/edicion.routes'));

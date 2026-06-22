@@ -1,0 +1,343 @@
+<!DOCTYPE html>
+<!-- v44.3 -->
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Evaluación Crediticia — AutoFácil</title>
+  <link href="/css/bootstrap.min.css" rel="stylesheet">
+  <link href="/css/bootstrap-icons.css" rel="stylesheet">
+  <style>
+    body { background:#f3f4f6; }
+    .version-badge { background:rgba(255,255,255,0.15); color:rgba(255,255,255,0.75); font-size:.65rem; font-weight:700; border-radius:6px; padding:2px 8px; letter-spacing:.5px; margin-left:2px; }
+    .page-wrap { max-width:980px; margin:24px auto; padding:0 20px 80px; }
+    .ev-card { background:#fff; border:1px solid #e5e7eb; border-radius:14px; padding:22px 24px; margin-bottom:18px; box-shadow:0 1px 3px rgba(0,0,0,.04); }
+    .ev-card h5 { font-size:1rem; font-weight:700; color:#1f2937; margin-bottom:14px; display:flex; align-items:center; gap:8px; }
+    .ev-card h5 i { color:#1e3a5f; }
+    .rut-box { display:flex; gap:12px; align-items:flex-end; flex-wrap:wrap; }
+    .rut-box .form-control { max-width:240px; font-size:1.05rem; font-weight:600; letter-spacing:.5px; }
+    .hint { font-size:.78rem; color:#9ca3af; margin-top:4px; min-height:1.1em; }
+    .ficha-grid { display:grid; grid-template-columns:1fr 1fr; gap:14px; }
+    @media(max-width:640px){ .ficha-grid{ grid-template-columns:1fr; } }
+    .dato { background:#f9fafb; border:1px solid #eef2f7; border-radius:10px; padding:12px 14px; }
+    .dato .lbl { font-size:.72rem; text-transform:uppercase; letter-spacing:.4px; color:#6b7280; font-weight:700; }
+    .dato .val { font-size:1.05rem; font-weight:700; color:#111827; margin-top:2px; }
+    .badge-dias { font-size:.72rem; font-weight:700; border-radius:20px; padding:2px 10px; }
+    .badge-fresco { background:#dcfce7; color:#166534; }
+    .badge-viejo  { background:#fee2e2; color:#991b1b; }
+    .cot-row { display:flex; align-items:center; gap:12px; border:1px solid #e5e7eb; border-radius:10px; padding:12px 14px; margin-bottom:8px; cursor:pointer; transition:.15s; }
+    .cot-row:hover { border-color:#93c5fd; background:#f8fafc; }
+    .cot-row.sel { border-color:#2563eb; background:#eff6ff; box-shadow:0 0 0 2px #bfdbfe inset; }
+    .cot-row input { margin:0; }
+    .cot-info { display:grid; grid-template-columns:1.4fr 1fr 1fr 1fr; gap:10px; flex:1; }
+    @media(max-width:640px){ .cot-info{ grid-template-columns:1fr 1fr; } }
+    .cot-info .k { font-size:.68rem; text-transform:uppercase; letter-spacing:.3px; color:#6b7280; font-weight:700; }
+    .cot-info .v { font-size:.95rem; font-weight:700; color:#111827; }
+    .btn-eval { background:#1e3a5f; border:none; color:#fff; font-weight:700; padding:12px 26px; border-radius:10px; }
+    .btn-eval:hover { background:#162d49; color:#fff; }
+    .btn-eval:disabled { opacity:.5; }
+    .doc-item { display:flex; align-items:flex-start; gap:8px; padding:7px 0; border-bottom:1px dashed #eef2f7; font-size:.92rem; }
+    .doc-item:last-child { border-bottom:none; }
+    .doc-item i { color:#1e3a5f; margin-top:2px; }
+    .ev-pregunta { background:#fffbeb; border:1px solid #fde68a; border-radius:12px; padding:18px 20px; }
+    .pulse-dot { display:inline-block; width:9px; height:9px; border-radius:50%; background:#10b981; margin-right:6px; }
+    .res-box { background:#0f172a; color:#e2e8f0; border-radius:10px; padding:14px 16px; font-family:ui-monospace,Menlo,monospace; font-size:.8rem; white-space:pre-wrap; word-break:break-word; max-height:340px; overflow:auto; }
+  </style>
+</head>
+<body>
+<div id="af-topnav"></div>
+
+<div class="page-wrap">
+
+  <!-- Paso 1: RUT -->
+  <div class="ev-card">
+    <h5><i class="bi bi-person-vcard"></i>Cliente a evaluar</h5>
+    <div class="rut-box">
+      <div>
+        <label class="form-label mb-1" style="font-size:.8rem;font-weight:600;color:#374151">RUT del cliente</label>
+        <input type="text" id="inRut" class="form-control" placeholder="12.345.678-9"
+               autocomplete="off" maxlength="12" oninput="onRutInput(this)" onkeydown="if(event.key==='Enter')buscarFicha()">
+        <div class="hint" id="rutHint">Ingresa el RUT con dígito verificador</div>
+      </div>
+      <button class="btn btn-eval" id="btnBuscar" onclick="buscarFicha()" disabled>
+        <i class="bi bi-search me-1"></i>Buscar
+      </button>
+    </div>
+  </div>
+
+  <!-- Paso 2: Ficha -->
+  <div class="ev-card" id="secFicha" style="display:none">
+    <h5><i class="bi bi-clipboard-data"></i>Antecedentes del cliente</h5>
+    <div class="ficha-grid">
+      <div class="dato">
+        <div class="lbl">Nombre</div>
+        <div class="val" id="datoNombre">—</div>
+      </div>
+      <div class="dato">
+        <div class="lbl">Antecedentes laborales</div>
+        <div class="val" id="datoAntecedentes">—</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Paso 3: Cotizaciones -->
+  <div class="ev-card" id="secCotizaciones" style="display:none">
+    <h5><i class="bi bi-car-front"></i>Cotizaciones guardadas <span class="text-muted" style="font-weight:500;font-size:.8rem" id="cotCount"></span></h5>
+    <div id="cotLista"></div>
+  </div>
+
+  <!-- Paso 4: Decisión (<30 días) -->
+  <div class="ev-card" id="secDecision" style="display:none">
+    <div class="ev-pregunta">
+      <div style="font-weight:700;color:#92400e;margin-bottom:6px"><i class="bi bi-info-circle me-1"></i>Antecedentes recientes</div>
+      <div id="decisionTexto" style="font-size:.92rem;color:#78350f;margin-bottom:14px"></div>
+      <div class="d-flex gap-2 flex-wrap">
+        <button class="btn btn-eval" onclick="usarCargados()"><i class="bi bi-check2-circle me-1"></i>Evaluar con la información cargada</button>
+        <button class="btn btn-outline-secondary" onclick="cargarNueva()"><i class="bi bi-cloud-arrow-down me-1"></i>Cargar información nueva</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Paso 5: Ocupación + documentos -->
+  <div class="ev-card" id="secOcupacion" style="display:none">
+    <h5><i class="bi bi-briefcase"></i>Ocupación del cliente</h5>
+    <p class="text-muted" style="font-size:.85rem;margin-bottom:10px">Selecciona la ocupación para ver qué información se requiere para evaluar al cliente.</p>
+    <select id="selOcupacion" class="form-select" style="max-width:360px" onchange="renderDocs()">
+      <option value="">— Selecciona una ocupación —</option>
+    </select>
+    <div id="docsDetalle" style="margin-top:16px"></div>
+  </div>
+
+  <!-- Paso 6: Evaluar -->
+  <div class="ev-card" id="secEvaluar" style="display:none">
+    <h5><i class="bi bi-clipboard-pulse"></i>Iniciar evaluación</h5>
+    <p class="text-muted" style="font-size:.86rem">Al comenzar, se traerán los antecedentes del cliente en vivo desde <b>DealerNet</b> para el análisis.</p>
+    <button class="btn btn-eval" id="btnEvaluar" onclick="comenzarEvaluacion()">
+      <span class="pulse-dot"></span>Comenzar Evaluación
+    </button>
+    <div id="evalResultado" style="margin-top:16px"></div>
+  </div>
+
+</div>
+
+<script src="/js/bootstrap.bundle.min.js"></script>
+<script src="/js/auth-guard.js"></script>
+<script>
+  const token = sessionStorage.getItem('token');
+  const H = { Authorization: 'Bearer ' + token, 'Content-Type': 'application/json' };
+
+  let FICHA = null;     // { cliente, antecedentes, cotizaciones }
+  let OCUPACIONES = {};  // { ocupacion: [{documento,...}] }
+  let cotSel = null;     // id cotización seleccionada
+  let lastRut = '';
+
+  // ── Validador RUT (módulo 11) ───────────────────────────────────────────
+  function formatRUT(raw){
+    let clean = raw.replace(/[^0-9kK]/g,'').toUpperCase();
+    if (clean.length < 2) return clean;
+    const dv = clean.slice(-1), body = clean.slice(0,-1);
+    let fmt = '';
+    for (let i = body.length; i > 0; i -= 3) fmt = body.slice(Math.max(0,i-3),i) + (fmt ? '.'+fmt : '');
+    return fmt + '-' + dv;
+  }
+  function calcDV(body){
+    const digits = String(body).replace(/\D/g,'');
+    if (!digits) return null;
+    const serie = [2,3,4,5,6,7];
+    const suma = digits.split('').reverse().reduce((a,d,i)=>a + parseInt(d)*serie[i%6], 0);
+    const resto = 11 - (suma % 11);
+    return resto === 11 ? '0' : resto === 10 ? 'K' : String(resto);
+  }
+  function validarRUT(clean){
+    if (clean.length < 7 || clean.length > 9) return false;
+    return calcDV(clean.slice(0,-1)) === clean.slice(-1).toUpperCase();
+  }
+  function onRutInput(el){
+    const clean = el.value.replace(/[^0-9kK]/g,'').toUpperCase();
+    if (clean.length >= 2) el.value = formatRUT(el.value);
+    const hint = document.getElementById('rutHint');
+    const btn  = document.getElementById('btnBuscar');
+    const ok = clean.length >= 7 && clean.length <= 9 && validarRUT(clean);
+    btn.disabled = !ok;
+    if (clean.length >= 7 && clean.length <= 9){
+      if (ok){ el.style.borderColor='#059669'; hint.style.color='#059669'; hint.textContent='✓ RUT válido'; }
+      else { el.style.borderColor='#dc2626'; hint.style.color='#dc2626'; hint.textContent='✗ Dígito verificador incorrecto (debería ser '+calcDV(clean.slice(0,-1))+')'; }
+    } else if (clean.length > 0){ el.style.borderColor=''; hint.style.color='#9ca3af'; hint.textContent='Ingresa el RUT completo con dígito verificador'; }
+    else { el.style.borderColor=''; hint.style.color='#9ca3af'; hint.textContent='Ingresa el RUT con dígito verificador'; }
+  }
+
+  // ── Helpers ─────────────────────────────────────────────────────────────
+  const fmtPeso  = n => (n || n === 0) && Number(n) ? '$' + Number(n).toLocaleString('es-CL') : '—';
+  const fmtFecha = d => { if (!d) return '—'; const x = new Date(d); return isNaN(x) ? '—' :
+    String(x.getDate()).padStart(2,'0')+'-'+String(x.getMonth()+1).padStart(2,'0')+'-'+x.getFullYear(); };
+  const rutLimpio = () => document.getElementById('inRut').value.replace(/[^0-9kK]/g,'').toUpperCase();
+  const rutConGuion = () => { const c = rutLimpio(); return c.slice(0,-1)+'-'+c.slice(-1); };
+  function ocultarDesde(...ids){ ids.forEach(id => { const e=document.getElementById(id); if(e) e.style.display='none'; }); }
+
+  // ── Buscar ficha ────────────────────────────────────────────────────────
+  async function buscarFicha(){
+    const clean = rutLimpio();
+    if (!validarRUT(clean)) return;
+    const rut = rutConGuion();
+    if (rut === lastRut && FICHA) return;
+    lastRut = rut;
+    cotSel = null;
+    ocultarDesde('secDecision','secOcupacion','secEvaluar');
+
+    const btn = document.getElementById('btnBuscar');
+    btn.disabled = true; btn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span>Buscando…';
+    try {
+      // Ficha + ocupaciones (en paralelo; ocupaciones se cachea)
+      const [rf, ro] = await Promise.all([
+        fetch('/api/evaluacion-crediticia/ficha/' + encodeURIComponent(rut), { headers: H }),
+        Object.keys(OCUPACIONES).length ? Promise.resolve(null) : fetch('/api/tipos-documento/ocupaciones', { headers: H })
+      ]);
+      const jf = await rf.json();
+      if (!jf.success) throw new Error(jf.error || 'Error al cargar ficha');
+      FICHA = jf.data;
+      if (ro) {
+        const jo = await ro.json();
+        OCUPACIONES = {};
+        (jo.data || []).forEach(d => {
+          if (d.activo === 0) return;
+          (OCUPACIONES[d.ocupacion] = OCUPACIONES[d.ocupacion] || []).push(d);
+        });
+      }
+      pintarFicha();
+    } catch (e) {
+      alert('No se pudo cargar la información: ' + e.message);
+    } finally {
+      btn.disabled = false; btn.innerHTML = '<i class="bi bi-search me-1"></i>Buscar';
+    }
+  }
+
+  function pintarFicha(){
+    const c = FICHA.cliente, a = FICHA.antecedentes, cots = FICHA.cotizaciones || [];
+
+    // Cliente + antecedentes
+    document.getElementById('datoNombre').textContent = (c && c.nombre) ? c.nombre : 'Cliente no registrado';
+    const antEl = document.getElementById('datoAntecedentes');
+    if (a && a.existe){
+      const cls = a.dias != null && a.dias < 30 ? 'badge-fresco' : 'badge-viejo';
+      const dtxt = a.dias != null ? a.dias + (a.dias === 1 ? ' día' : ' días') : 's/f';
+      antEl.innerHTML = fmtFecha(a.fecha) + ' <span class="badge-dias ' + cls + '">' + dtxt + '</span>';
+    } else {
+      antEl.innerHTML = '<span class="text-muted" style="font-weight:500">Sin antecedentes cargados</span>';
+    }
+    document.getElementById('secFicha').style.display = '';
+
+    // Cotizaciones
+    const cont = document.getElementById('cotLista');
+    document.getElementById('cotCount').textContent = cots.length ? '(' + cots.length + ')' : '';
+    if (!cots.length){
+      cont.innerHTML = '<div class="text-muted" style="font-size:.9rem">Sin cotizaciones guardadas para este cliente.</div>';
+    } else {
+      cont.innerHTML = cots.map(q => `
+        <label class="cot-row" id="cot-${q.id}" onclick="selCot(${q.id})">
+          <input type="radio" name="cot" value="${q.id}">
+          <div class="cot-info">
+            <div><div class="k">Auto (valor)</div><div class="v">${fmtPeso(q.valor_vehiculo)}</div></div>
+            <div><div class="k">Saldo Precio</div><div class="v">${fmtPeso(q.saldo_precio)}</div></div>
+            <div><div class="k">Monto Crédito</div><div class="v">${fmtPeso(q.monto_credito)}</div></div>
+            <div><div class="k">Fecha</div><div class="v" style="font-weight:600">${fmtFecha(q.fecha)}</div></div>
+          </div>
+        </label>`).join('');
+    }
+    document.getElementById('secCotizaciones').style.display = '';
+
+    // Decisión: <30 días pregunta; sino, cargar info nueva directo
+    if (a && a.existe && a.dias != null && a.dias < 30){
+      document.getElementById('decisionTexto').textContent =
+        'Los antecedentes del cliente tienen ' + a.dias + (a.dias === 1 ? ' día' : ' días') +
+        ' (menos de 30). ¿Quieres evaluar con la información ya cargada o cargar información nueva?';
+      document.getElementById('secDecision').style.display = '';
+      ocultarDesde('secOcupacion','secEvaluar');
+    } else {
+      // Sin antecedentes o ≥30 días → se requiere información nueva
+      cargarNueva();
+    }
+  }
+
+  function selCot(id){
+    cotSel = id;
+    document.querySelectorAll('.cot-row').forEach(r => r.classList.remove('sel'));
+    const el = document.getElementById('cot-' + id);
+    if (el){ el.classList.add('sel'); const r = el.querySelector('input'); if (r) r.checked = true; }
+  }
+
+  // ── Caminos de decisión ─────────────────────────────────────────────────
+  function usarCargados(){
+    ocultarDesde('secOcupacion');
+    document.getElementById('secEvaluar').style.display = '';
+    document.getElementById('secEvaluar').scrollIntoView({ behavior:'smooth', block:'center' });
+  }
+
+  function cargarNueva(){
+    const sel = document.getElementById('selOcupacion');
+    const ocs = Object.keys(OCUPACIONES).sort();
+    sel.innerHTML = '<option value="">— Selecciona una ocupación —</option>' +
+      ocs.map(o => `<option value="${o.replace(/"/g,'&quot;')}">${o}</option>`).join('');
+    document.getElementById('docsDetalle').innerHTML = '';
+    document.getElementById('secOcupacion').style.display = '';
+    ocultarDesde('secEvaluar');
+    document.getElementById('secOcupacion').scrollIntoView({ behavior:'smooth', block:'center' });
+  }
+
+  function renderDocs(){
+    const oc = document.getElementById('selOcupacion').value;
+    const cont = document.getElementById('docsDetalle');
+    if (!oc){ cont.innerHTML = ''; ocultarDesde('secEvaluar'); return; }
+    const docs = OCUPACIONES[oc] || [];
+    cont.innerHTML = `
+      <div style="font-weight:700;color:#1f2937;font-size:.9rem;margin-bottom:8px">
+        <i class="bi bi-list-check me-1"></i>Información requerida para evaluar (${docs.length})
+      </div>
+      ${docs.length ? docs.map(d => `
+        <div class="doc-item">
+          <i class="bi bi-${d.obligatorio ? 'exclamation-circle-fill' : 'circle'}"></i>
+          <div>${d.documento}${d.obligatorio ? ' <span style="color:#dc2626;font-size:.72rem;font-weight:700">(obligatorio)</span>' : ''}</div>
+        </div>`).join('')
+        : '<div class="text-muted" style="font-size:.88rem">No hay documentos configurados para esta ocupación.</div>'}`;
+    document.getElementById('secEvaluar').style.display = '';
+  }
+
+  // ── Evaluación (pull DealerNet) ─────────────────────────────────────────
+  async function comenzarEvaluacion(){
+    const rut = rutConGuion();
+    const btn = document.getElementById('btnEvaluar');
+    const out = document.getElementById('evalResultado');
+    btn.disabled = true; btn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span>Consultando DealerNet…';
+    out.innerHTML = '';
+    try {
+      const r = await fetch('/api/dealernet/consultar', { method:'POST', headers:H, body: JSON.stringify({ rut }) });
+      const j = await r.json();
+      if (!j.success){
+        out.innerHTML = `<div class="alert alert-warning mb-0" style="font-size:.88rem"><i class="bi bi-exclamation-triangle me-1"></i>${j.error || 'No se pudo consultar DealerNet'}</div>`;
+        return;
+      }
+      const d = j.data || {};
+      const resumen = cotSel ? (FICHA.cotizaciones || []).find(q => q.id === cotSel) : null;
+      out.innerHTML = `
+        <div class="alert alert-success" style="font-size:.88rem"><i class="bi bi-check-circle me-1"></i>
+          Información traída desde DealerNet${d.retmsg ? ' — ' + d.retmsg : ''}.</div>
+        ${resumen ? `<div class="dato mb-2"><div class="lbl">Cotización seleccionada</div>
+          <div class="val" style="font-size:.95rem">Auto ${fmtPeso(resumen.valor_vehiculo)} · Saldo ${fmtPeso(resumen.saldo_precio)} · Crédito ${fmtPeso(resumen.monto_credito)}</div></div>` : ''}
+        <div class="res-box">${escapeHtml(typeof d.output === 'string' ? d.output : JSON.stringify(d, null, 2))}</div>`;
+    } catch (e) {
+      out.innerHTML = `<div class="alert alert-danger mb-0" style="font-size:.88rem">Error: ${e.message}</div>`;
+    } finally {
+      btn.disabled = false; btn.innerHTML = '<span class="pulse-dot"></span>Comenzar Evaluación';
+    }
+  }
+  function escapeHtml(s){ return String(s||'').replace(/[&<>]/g, m => ({'&':'&amp;','<':'&lt;','>':'&gt;'}[m])); }
+</script>
+
+<script>
+  window.AF_TOPNAV = {
+    self: { key:'evaluacion-crediticia', selfHref:'/evaluacion-crediticia/', title:'Evaluación Crediticia', icon:'bi-clipboard-pulse', defaultSection:'home' }
+  };
+</script>
+<script src="/js/topnav.js"></script>
+<script src="/js/app-version.js"></script>
+</body>
+</html>
