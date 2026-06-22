@@ -65,14 +65,15 @@ const ficha = async (req, res) => {
     const rut = normRut(decodeURIComponent(req.params.rut || ''));
     if (!rut) return res.status(400).json({ success: false, data: null, error: 'RUT requerido' });
 
-    // 1) Cliente (nombre)
+    // 1) Cliente (nombre + fecha antecedentes personales)
     let cliente = null;
     try {
       const [[c]] = await pool.query(
-        'SELECT rut, nombre_completo, nombres, apellido_paterno, apellido_materno FROM clientes WHERE rut=? LIMIT 1', [rut]);
+        'SELECT rut, nombre_completo, nombres, apellido_paterno, apellido_materno, fecha_actualizacion, fecha_creacion FROM clientes WHERE rut=? LIMIT 1', [rut]);
       if (c) {
         const armado = [c.nombres, c.apellido_paterno, c.apellido_materno].filter(Boolean).join(' ').trim();
-        cliente = { rut: c.rut, nombre: (c.nombre_completo && c.nombre_completo.trim()) || armado || null };
+        cliente = { rut: c.rut, nombre: (c.nombre_completo && c.nombre_completo.trim()) || armado || null,
+                    fecha: c.fecha_actualizacion || c.fecha_creacion || null };
       }
     } catch (_) {}
     // Fallback: nombre desde créditos (carga masiva) si no está en clientes
@@ -101,6 +102,14 @@ const ficha = async (req, res) => {
       };
     } catch (_) {}
 
+    // 2b) Información comercial (fecha)
+    let comercial = null;
+    try {
+      const [[ic]] = await pool.query(
+        'SELECT updated_at, created_at FROM informacion_comercial WHERE rut_cliente=? LIMIT 1', [rut]);
+      if (ic) comercial = { existe: true, fecha: ic.updated_at || ic.created_at };
+    } catch (_) {}
+
     // 3) Cotizaciones guardadas (última primero)
     let cotizaciones = [];
     try {
@@ -119,7 +128,7 @@ const ficha = async (req, res) => {
       }));
     } catch (_) {}
 
-    res.json({ success: true, data: { cliente, antecedentes, cotizaciones }, error: null });
+    res.json({ success: true, data: { cliente, antecedentes, comercial, cotizaciones }, error: null });
   } catch (e) {
     console.error('[evaluacion ficha]', e);
     res.status(500).json({ success: false, data: null, error: 'Error interno del servidor' });

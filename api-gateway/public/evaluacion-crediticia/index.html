@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- v44.6 -->
+<!-- v44.7 -->
 <html lang="es">
 <head>
   <meta charset="UTF-8">
@@ -74,6 +74,11 @@
     .doc-ok i { color:#16a34a; }
     .ev-pregunta { background:#fffbeb; border:1px solid #fde68a; border-radius:12px; padding:18px 20px; }
     .pulse-dot { display:inline-block; width:9px; height:9px; border-radius:50%; background:#10b981; margin-right:6px; }
+    .fr-nombre { font-size:1.1rem; font-weight:800; color:#111827; margin-bottom:10px; }
+    .fr-fechas { display:flex; gap:30px; flex-wrap:wrap; }
+    .fr-fechas > div { display:flex; flex-direction:column; gap:1px; }
+    .fr-l { font-size:.68rem; text-transform:uppercase; letter-spacing:.4px; color:#6b7280; font-weight:700; }
+    .fr-v { font-size:.95rem; font-weight:700; color:#111827; }
     .res-box { background:#0f172a; color:#e2e8f0; border-radius:10px; padding:14px 16px; font-family:ui-monospace,Menlo,monospace; font-size:.8rem; white-space:pre-wrap; word-break:break-word; max-height:340px; overflow:auto; }
   </style>
 </head>
@@ -96,19 +101,13 @@
         <i class="bi bi-search me-1"></i>Buscar
       </button>
     </div>
-  </div>
 
-  <!-- Paso 2: Ficha -->
-  <div class="ev-card" id="secFicha" style="display:none">
-    <h5><i class="bi bi-clipboard-data"></i>Antecedentes del cliente</h5>
-    <div class="ficha-grid">
-      <div class="dato">
-        <div class="lbl">Nombre</div>
-        <div class="val" id="datoNombre">—</div>
-      </div>
-      <div class="dato">
-        <div class="lbl">Antecedentes laborales</div>
-        <div class="val" id="datoAntecedentes">—</div>
+    <div id="fichaResumen" style="display:none;margin-top:14px;border-top:1px solid #eef2f7;padding-top:12px">
+      <div class="fr-nombre" id="frNombre">—</div>
+      <div class="fr-fechas">
+        <div><span class="fr-l">Antecedentes personales</span><span class="fr-v" id="frFechaPersonal">—</span></div>
+        <div><span class="fr-l">Antecedentes laborales</span><span class="fr-v" id="frFechaLaboral">—</span></div>
+        <div><span class="fr-l">Informes comerciales</span><span class="fr-v" id="frFechaComercial">—</span></div>
       </div>
     </div>
   </div>
@@ -253,19 +252,21 @@
   }
 
   function pintarFicha(){
-    const c = FICHA.cliente, a = FICHA.antecedentes, cots = FICHA.cotizaciones || [];
+    const c = FICHA.cliente, a = FICHA.antecedentes, com = FICHA.comercial, cots = FICHA.cotizaciones || [];
 
-    // Cliente + antecedentes
-    document.getElementById('datoNombre').textContent = (c && c.nombre) ? c.nombre : 'Cliente no registrado';
-    const antEl = document.getElementById('datoAntecedentes');
+    // Nombre + fechas de la información del cliente (en el recuadro de búsqueda)
+    document.getElementById('frNombre').textContent = (c && c.nombre) ? c.nombre : 'Cliente no registrado';
+    document.getElementById('frFechaPersonal').textContent = (c && c.fecha) ? fmtFecha(c.fecha) : '—';
+    const labEl = document.getElementById('frFechaLaboral');
     if (a && a.existe){
       const cls = a.dias != null && a.dias < 30 ? 'badge-fresco' : 'badge-viejo';
       const dtxt = a.dias != null ? a.dias + (a.dias === 1 ? ' día' : ' días') : 's/f';
-      antEl.innerHTML = fmtFecha(a.fecha) + ' <span class="badge-dias ' + cls + '">' + dtxt + '</span>';
+      labEl.innerHTML = fmtFecha(a.fecha) + ' <span class="badge-dias ' + cls + '">' + dtxt + '</span>';
     } else {
-      antEl.innerHTML = '<span class="text-muted" style="font-weight:500">Sin antecedentes cargados</span>';
+      labEl.innerHTML = '<span class="text-muted" style="font-weight:500">Sin cargar</span>';
     }
-    document.getElementById('secFicha').style.display = '';
+    document.getElementById('frFechaComercial').textContent = (com && com.existe && com.fecha) ? fmtFecha(com.fecha) : '—';
+    document.getElementById('fichaResumen').style.display = '';
 
     // Cotizaciones
     const cont = document.getElementById('cotLista');
