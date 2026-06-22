@@ -149,7 +149,7 @@
     <div class="topnav-left">
       <a href="/" class="topnav-brand">
         <img src="/img/logo.png" alt="AutoFácil" style="display:block">
-        <span class="version-badge" id="versionBadge">v44.1</span>
+        <span class="version-badge" id="versionBadge">v44.2</span>
       </a>
       <div class="breadcrumb-nav">
         <a href="/">Inicio</a><span class="sep">›</span>
@@ -1152,16 +1152,18 @@
 
     // ── PERFILES Y PERMISOS ───────────────────────────────────
     let perfilesData = [];
-    let modulosData = [];      // ya agrupado por SECCIÓN de placement_v2 (lo que renderiza la grilla)
+    let modulosData = [];      // agrupado para la grilla: cabecera = módulo + cards movidas relocalizadas
     let modulosRaw  = [];      // crudo desde BD (agrupado por módulo)
     let placementCfg = {};     // placement_v2 — override de secciones (mueve cards entre pantallas)
     let perfilActualId = null;
     let permisosActuales = {};
 
-    // ── Reagrupar permisos por placement_v2 (no por módulo BD) ──────────────
-    // Cada funcionalidad-página (con href) cae en la sección donde vive su card
-    // según placement_v2; las de acción (href null) siguen a la sección de su
-    // módulo. Total y sin pérdidas: si falta el manifiesto, cae al agrupado BD.
+    // ── Agrupar permisos: cabecera = MÓDULO (como siempre) + relocalización ──
+    // Headers = los módulos del home (igual que antes). Solo las cards que el
+    // usuario MOVIÓ explícitamente en Vista Pantallas (override en placement_v2
+    // a una sección distinta a la de su módulo) se relocalizan: si las movió al
+    // Home, quedan en su propia cabecera (ej. Dealers); si a otra sección, bajo
+    // el módulo de esa sección. Sin manifiesto → agrupado por módulo puro.
     function _plKey(href) {
       if (!href) return null;
       if (typeof PLACEMENT_ITEMS !== 'undefined') {
@@ -1171,7 +1173,7 @@
       }
       return String(href).replace(/^\/+|\/+$/g, '').split('/').pop();
     }
-    function _plOverride(key) {
+    function _plOverride(key) {                 // sección asignada en placement_v2 (override explícito)
       if (!key) return null;
       for (const sec in placementCfg) {
         if (Array.isArray(placementCfg[sec]) && placementCfg[sec].indexOf(key) >= 0) return sec;
@@ -1179,60 +1181,49 @@
       if (typeof placementCfg[key] === 'string') return placementCfg[key];   // formato viejo
       return null;
     }
-    function _plSeccion(f, mod) {
-      if (f.href) {
-        const key = _plKey(f.href);
-        const ov = _plOverride(key);
-        if (ov) return ov;
-        if (typeof PLACEMENT_ITEMS !== 'undefined' && PLACEMENT_ITEMS[key]) return PLACEMENT_ITEMS[key].section;
-        if (typeof sectionFromHref === 'function') return sectionFromHref(f.href);
-      }
-      if (typeof sectionFromHref === 'function') return sectionFromHref(mod.ruta || '');   // acción → sección del módulo
-      return '_otros';
+    function _modSec(mod) {                     // sección "natural" de un módulo (por su ruta)
+      return (typeof sectionFromHref === 'function') ? sectionFromHref(mod.ruta || '') : 'home';
     }
     function agruparPorPlacement(raw) {
-      if (typeof PLACEMENT_SECTIONS === 'undefined') return raw;   // fallback: agrupado BD
-      const orden = Object.keys(PLACEMENT_SECTIONS);
-      const map = {};
-      const ensure = (sec) => {
-        if (!map[sec]) {
-          const meta = PLACEMENT_SECTIONS[sec];
-          map[sec] = { nombre: meta ? meta.label : 'Otros', icono: meta ? meta.icon : 'bi-grid', ruta: '', _keys: [], funcionalidades: [] };
-        }
-        return map[sec];
+      if (!Array.isArray(raw) || !raw.length) return raw;
+      // índice sección → módulo (destino al relocalizar una card movida)
+      const secToMod = {};
+      for (const m of raw) { const s = _modSec(m); if (!secToMod[s]) secToMod[s] = m; }
+
+      const groups = {}; let ord = 0;
+      const ensure = (key, nombre, icono, ruta) => {
+        if (!groups[key]) groups[key] = { key, nombre, icono: icono || 'bi-grid', ruta: ruta || '', _ord: ord++, funcionalidades: [] };
+        return groups[key];
       };
+
       for (const mod of raw) {
         for (const f of (mod.funcionalidades || [])) {
-          let sec = _plSeccion(f, mod);
-          if (!PLACEMENT_SECTIONS[sec]) sec = '_otros';
-          const g = ensure(sec);
-          f._ruta = mod.ruta;                 // preserva link de fallback de las acciones
+          f._ruta = mod.ruta;                  // preserva link de fallback de las acciones
+          let g;
+          const key = f.href ? _plKey(f.href) : null;
+          const ov  = key ? _plOverride(key) : null;
+          if (f.href && ov && ov !== _modSec(mod)) {
+            // card movida por el usuario a una sección distinta a la de su módulo
+            if (ov === 'home') {
+              const meta = (typeof PLACEMENT_ITEMS !== 'undefined' && PLACEMENT_ITEMS[key]) || {};
+              g = ensure('_home_' + key, meta.titulo || f.nombre || key, meta.icon || 'bi-house-door-fill', f.href);
+            } else if (secToMod[ov] && secToMod[ov] !== mod) {
+              const t = secToMod[ov];
+              g = ensure('_mod_' + t.id_modulo, t.nombre, t.icono, t.ruta);
+            } else {
+              g = ensure('_mod_' + mod.id_modulo, mod.nombre, mod.icono, mod.ruta);
+            }
+          } else {
+            g = ensure('_mod_' + mod.id_modulo, mod.nombre, mod.icono, mod.ruta);
+          }
           g.funcionalidades.push(f);
-          g._keys.push(_plKey(f.href));
         }
       }
-      const secs = Object.keys(map).sort((a, b) => {
-        const ia = a === '_otros' ? 999 : (orden.indexOf(a) < 0 ? 998 : orden.indexOf(a));
-        const ib = b === '_otros' ? 999 : (orden.indexOf(b) < 0 ? 998 : orden.indexOf(b));
-        return ia - ib;
-      });
-      return secs.map(sec => {
-        const g = map[sec];
-        const arr = Array.isArray(placementCfg[sec]) ? placementCfg[sec] : [];
-        if (arr.length) {
-          g.funcionalidades = g.funcionalidades
-            .map((f, i) => ({ f, i, k: g._keys[i] }))
-            .sort((x, y) => {
-              const ix = arr.indexOf(x.k), iy = arr.indexOf(y.k);
-              if (ix < 0 && iy < 0) return x.i - y.i;
-              if (ix < 0) return 1;
-              if (iy < 0) return -1;
-              return ix - iy;
-            })
-            .map(o => o.f);
-        }
-        delete g._keys;
-        return g;
+      // cards promovidas al Home primero; el resto por orden de aparición (= orden BD)
+      return Object.values(groups).sort((a, b) => {
+        const ha = a.key.indexOf('_home_') === 0 ? 0 : 1;
+        const hb = b.key.indexOf('_home_') === 0 ? 0 : 1;
+        return ha !== hb ? ha - hb : a._ord - b._ord;
       });
     }
 
