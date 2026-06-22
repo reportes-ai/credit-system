@@ -58,7 +58,7 @@ const SYSTEM = `Eres un analista experto de riesgo crediticio automotriz en Chil
 1) Revisar los DOCUMENTOS adjuntos (liquidaciones, cédula, AFP, etc.) y validarlos contra los datos declarados: detecta inconsistencias (nombres/RUT/montos/fechas que no calzan, documentos vencidos, ilegibles, alterados o faltantes). No es verificación forense.
 2) Puntuar al cliente con el SCORECARD V3.0 (1000 pts en 4 bloques A/B/C/D), usando los tramos y puntos de las tablas que se te entregan. Si falta un dato para un tramo, usa el supuesto más conservador y decláralo.
 3) Aplicar primero las REGLAS EXCLUYENTES (K1–K11): si alguna se gatilla con la evidencia, es RECHAZO automático.
-4) Asignar el QUINTIL según el puntaje, la decisión según la matriz, y calcular CUÁNTO SE LE PUEDE PRESTAR (el menor entre: el monto máximo de las condiciones base por tipo/origen, y la capacidad de pago = cuota máx. 30% de la renta líquida menos cargas actuales, llevada a monto según plazo y tasa de la cotización).
+4) Asignar el QUINTIL según el puntaje, la decisión según la matriz, y calcular CUÁNTO SE LE PUEDE PRESTAR (el menor entre: el monto máximo de las condiciones base por tipo/origen, y la capacidad de pago = cuota máx. 30% de la renta líquida menos cargas actuales, llevada a monto según plazo y tasa). Si NO hay cotización/vehículo, calcula igual el monto por CAPACIDAD (cuota máx. a 48 meses y tasa de referencia ~1,8%/mes), acotado por el tope de condiciones base, y márcalo como PRELIMINAR en explicacion_monto. NUNCA devuelvas monto_maximo_prestar = 0 si la renta permite pagar una cuota; 0 solo si hay rechazo o la capacidad es nula.
 Reglas: sé CONSERVADOR y objetivo; NO inventes datos; si algo no aparece, decláralo como faltante en vez de asumir a favor. Tu análisis ASISTE al analista, no reemplaza su decisión.`;
 
 const promptDe = (ctx) => `Evalúa al cliente con la Política V3.0. Usa SOLO la evidencia entregada y las tablas paramétricas. Responde EXACTAMENTE este JSON:
@@ -80,7 +80,7 @@ const promptDe = (ctx) => `Evalúa al cliente con la Política V3.0. Usa SOLO la
   "capacidad": {
     "renta_liquida": number, "cargas_actuales": number,
     "cuota_maxima": number, "carga_cuota_pct": number, "carga_total_pct": number,
-    "monto_maximo_prestar": number, "explicacion_monto": "cómo se obtuvo el monto máximo y qué lo limita"
+    "monto_maximo_prestar": number, "monto_es_preliminar": true|false, "explicacion_monto": "cómo se obtuvo el monto máximo y qué lo limita (preliminar si falta el vehículo)"
   },
   "resumen": "4 a 7 frases: panorama, factores que más sumaron/restaron, y la recomendación final",
   "alertas": [ "banderas rojas relevantes para la decisión" ],

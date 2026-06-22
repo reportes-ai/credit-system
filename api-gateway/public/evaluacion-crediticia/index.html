@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- v45.2 -->
+<!-- v45.3 -->
 <html lang="es">
 <head>
   <meta charset="UTF-8">
@@ -526,7 +526,7 @@
         <div class="ia-score"><div class="n">${d.puntaje_total != null ? d.puntaje_total : '—'}</div><div class="l">Puntaje / 1000</div></div>
         <div class="ia-q">${escapeHtml(d.quintil || '—')}<div style="font-size:.58rem;font-weight:600;opacity:.85;text-align:center">${escapeHtml(d.etiqueta || '')}</div></div>
         <div class="ia-dec ${dec}">${escapeHtml(decLabel)}</div>
-        <div class="ia-monto"><div class="n">${fmt(cap.monto_maximo_prestar)}</div><div class="l">Monto máximo a prestar</div></div>
+        <div class="ia-monto"><div class="n">${fmt(cap.monto_maximo_prestar)}</div><div class="l">Monto máximo a prestar${cap.monto_es_preliminar ? ' · preliminar' : ''}</div></div>
       </div>
       <div class="ia-body">
         ${docs.aviso ? `<div class="alert alert-warning py-2 px-3" style="font-size:.84rem;margin-bottom:10px"><i class="bi bi-exclamation-triangle me-1"></i>${escapeHtml(docs.aviso)}</div>` : ''}
