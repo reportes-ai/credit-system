@@ -77,6 +77,7 @@ async function sincronizarComercialDealernet(rutDash) {
     for (const sql of [
       'ALTER TABLE evaluacion_documentos ADD COLUMN validado TINYINT NULL',          // 1 ok · 0 observado · null sin validar
       'ALTER TABLE evaluacion_documentos ADD COLUMN validacion_texto VARCHAR(255) NULL',
+      'ALTER TABLE evaluacion_documentos ADD COLUMN validacion_url VARCHAR(300) NULL', // validador de la AFP detectada
     ]) { try { await pool.query(sql); } catch (e) { if (e.errno !== 1060) console.error('[evdoc alter]', e.message); } }
 
     // Módulo/card propio "Evaluación Crediticia" en el Home.
@@ -203,7 +204,7 @@ const getDocumentos = async (req, res) => {
     const rut = normRut(decodeURIComponent(req.params.rut || ''));
     if (!rut) return res.status(400).json({ success: false, data: null, error: 'RUT requerido' });
     const [rows] = await pool.query(
-      `SELECT id, ocupacion, documento, archivo_nombre, archivo_size, mime_type, validado, validacion_texto, created_at
+      `SELECT id, ocupacion, documento, archivo_nombre, archivo_size, mime_type, validado, validacion_texto, validacion_url, created_at
        FROM evaluacion_documentos WHERE rut_cliente=? ORDER BY id`, [rut]);
     res.json({ success: true, data: rows, error: null });
   } catch (e) {
@@ -309,6 +310,17 @@ const validarAfp = async (req, res) => {
     }
     if (!x) return res.json({ success: true, data: { validado: null, texto: 'No se pudo leer la validación' }, error: null });
 
+    // URL del validador de la AFP detectada (desde el mantenedor de AFP)
+    let urlValidador = null;
+    if (x.afp) {
+      try {
+        const [[afpRow]] = await pool.query(
+          "SELECT url_validador FROM parametros_afp WHERE url_validador IS NOT NULL AND url_validador<>'' AND ? LIKE CONCAT('%', nombre, '%') ORDER BY CHAR_LENGTH(nombre) DESC LIMIT 1",
+          [String(x.afp)]);
+        if (afpRow) urlValidador = afpRow.url_validador;
+      } catch (_) {}
+    }
+
     if (x.es_cotizaciones_afp && x.rut_coincide && x.veredicto === 'validado') {
       validado = 1;
       texto = 'Validado en Certificado de Cotizaciones' + (x.afp ? ' · ' + String(x.afp).slice(0, 40) : '') + (x.n_periodos ? ' · ' + x.n_periodos + ' períodos' : '');
@@ -317,8 +329,8 @@ const validarAfp = async (req, res) => {
       texto = 'Revisar: ' + (x.motivo || (!x.es_cotizaciones_afp ? 'no parece un certificado de cotizaciones' : !x.rut_coincide ? 'el RUT no coincide' : 'observado'));
     }
     texto = texto.slice(0, 255);
-    await pool.query('UPDATE evaluacion_documentos SET validado=?, validacion_texto=? WHERE id=?', [validado, texto, doc.id]);
-    res.json({ success: true, data: { validado, texto, detalle: x }, error: null });
+    await pool.query('UPDATE evaluacion_documentos SET validado=?, validacion_texto=?, validacion_url=? WHERE id=?', [validado, texto, urlValidador, doc.id]);
+    res.json({ success: true, data: { validado, texto, url: urlValidador, detalle: x }, error: null });
   } catch (e) {
     console.error('[evaluacion validarAfp]', e.message);
     res.status(422).json({ success: false, data: null, error: 'No se pudo validar: ' + (e.message || 'error') });

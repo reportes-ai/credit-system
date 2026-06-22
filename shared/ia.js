@@ -32,6 +32,16 @@ const PARAMS_DEF = {
 
 // AFPs con su comisión % (editable en el mantenedor). Total descuento ≈ afp_cotizacion + comisión.
 const AFPS_DEF = [['Capital', 1.44], ['Cuprum', 1.44], ['Habitat', 1.27], ['Modelo', 0.58], ['PlanVital', 1.16], ['ProVida', 1.45], ['Uno', 0.49]];
+// URL oficial del validador de certificados por AFP (editable en el mantenedor)
+const AFPS_URL_DEF = [
+  ['Capital',   'https://www.afpcapital.cl/empresas/validar-certificados'],
+  ['Cuprum',    'https://www6.cuprum.cl/ayuda/validacion-de-certificados'],
+  ['Habitat',   'https://www.afphabitat.cl/herramientas-y-servicios/validar-certificados/'],
+  ['Modelo',    'https://nueva.afpmodelo.cl/empleadores/herramientas-empleadores/validar-certificados'],
+  ['PlanVital', 'https://www.planvital.cl/afiliado/asesoria/certificados/validar'],
+  ['ProVida',   'https://www.provida.cl/tramites-servicios/certificados-de-afp/validador/'],
+  ['Uno',       'https://www.uno.cl/ayuda/validador-certificados'],
+];
 
 // Tramos del Impuesto Único de 2ª Categoría (mensual, expresados en UTM). Editable en el mantenedor.
 // Formato: [desde_utm, hasta_utm (null = sin tope), factor, rebaja_utm]. Regla SII vigente.
@@ -109,6 +119,11 @@ const CATALOGO = [
     const [[{ na }]] = await pool.query('SELECT COUNT(*) na FROM parametros_afp');
     if (na === 0) for (const [n, c] of AFPS_DEF)
       await pool.query('INSERT IGNORE INTO parametros_afp (nombre, comision) VALUES (?,?)', [n, c]);
+    // URL del validador de certificados por AFP (para verificar el folio en el sitio oficial)
+    try { await pool.query('ALTER TABLE parametros_afp ADD COLUMN url_validador VARCHAR(300) NULL'); }
+    catch (e) { if (e.errno !== 1060) console.error('[ia afp url]', e.message); }
+    for (const [n, u] of AFPS_URL_DEF)
+      await pool.query("UPDATE parametros_afp SET url_validador=? WHERE nombre=? AND (url_validador IS NULL OR url_validador='')", [u, n]);
     await pool.query(`CREATE TABLE IF NOT EXISTS tramos_iusc (
       id         INT AUTO_INCREMENT PRIMARY KEY,
       desde_utm  DECIMAL(8,2) NOT NULL DEFAULT 0,
@@ -156,8 +171,8 @@ async function getConfig(force = false) {
   } catch (_) {}
   let afps = [];
   try {
-    const [ar] = await pool.query('SELECT nombre, comision FROM parametros_afp WHERE activo = 1 ORDER BY nombre');
-    afps = ar.map(a => ({ nombre: a.nombre, comision: Number(a.comision) }));
+    const [ar] = await pool.query('SELECT nombre, comision, url_validador FROM parametros_afp WHERE activo = 1 ORDER BY nombre');
+    afps = ar.map(a => ({ nombre: a.nombre, comision: Number(a.comision), url_validador: a.url_validador || '' }));
   } catch (_) {}
   let tramos_iusc = [];
   try {
@@ -234,8 +249,8 @@ async function setConfig({ activa, texto_analizando, texto_analizado, mostrar_lo
     await pool.query('DELETE FROM parametros_afp');
     for (const a of afps) {
       if (!a || !a.nombre) continue;
-      await pool.query('INSERT INTO parametros_afp (nombre, comision, activo) VALUES (?,?,1) ON DUPLICATE KEY UPDATE comision=VALUES(comision)',
-        [String(a.nombre).trim().slice(0, 60), pct(a.comision, 0)]);
+      await pool.query('INSERT INTO parametros_afp (nombre, comision, url_validador, activo) VALUES (?,?,?,1) ON DUPLICATE KEY UPDATE comision=VALUES(comision), url_validador=VALUES(url_validador)',
+        [String(a.nombre).trim().slice(0, 60), pct(a.comision, 0), (a.url_validador ? String(a.url_validador).trim().slice(0, 300) : null)]);
     }
   }
   if (Array.isArray(tramos)) {

@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Inteligencia Artificial — AutoFácil</title>
-  <!-- v1.5 -->
+  <!-- v1.6 -->
   <link href="/css/bootstrap-icons.css" rel="stylesheet">
   <style>
     :root { --navy:#012d70; --blue:#0141A2; --coral:#D97757; }
@@ -184,7 +184,7 @@
       <div class="card-af">
         <h3><i class="bi bi-bank"></i>Porcentajes de AFP (comisión)</h3>
         <div class="sub">Comisión de cada AFP. El descuento total esperado en la liquidación = cotización base + esta comisión.</div>
-        <table class="utab"><thead><tr><th>AFP</th><th class="r">Comisión (%)</th><th></th></tr></thead><tbody id="afpRows"></tbody></table>
+        <table class="utab"><thead><tr><th>AFP</th><th class="r">Comisión (%)</th><th>URL validador de certificados</th><th></th></tr></thead><tbody id="afpRows"></tbody></table>
         <div style="margin-top:12px;display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap">
           <button class="btn-ghost" onclick="addAfp()"><i class="bi bi-plus-lg me-1"></i>Agregar AFP</button>
           <button class="btn-primary-af" onclick="guardarReglas()"><i class="bi bi-save me-1"></i>Guardar AFP</button>
@@ -206,6 +206,7 @@
         <ul>
           <li><b>Días de mes completo</b> y <b>Umbral de renta variable</b> → cómo se calcula la renta en <a href="/ia/liquidaciones/">Análisis de Liquidaciones (IA)</a>.</li>
           <li><b>Salud %</b>, <b>Cotización AFP base</b> y <b>Comisiones AFP</b> → los chequeos de inconsistencia (salud bajo el mínimo, AFP que no cuadra) en las liquidaciones.</li>
+          <li><b>URL validador de certificados (por AFP)</b> → el botón "Verificar folio en la AFP" que aparece al validar el certificado de cotizaciones en <a href="/evaluacion-crediticia/">Evaluación Crediticia</a>.</li>
           <li><b>Impuesto Único 2ª Categoría (tramos)</b> → verificación de que el impuesto retenido en cada liquidación cuadre con los tramos × <a href="/mantenedores/uf/">UTM</a> del mes, en <a href="/ia/liquidaciones/">Análisis de Liquidaciones (IA)</a>.</li>
         </ul>
       </div>
@@ -325,18 +326,19 @@
     function renderAfps(){
       document.getElementById('afpRows').innerHTML = AFPS.length ? AFPS.map((a,i)=>`
         <tr>
-          <td><input class="txt" style="width:170px;padding:6px 8px;font-size:.85rem" value="${esc(a.nombre)}" data-k="nombre"></td>
-          <td class="r"><input class="txt" type="number" step="0.01" min="0" style="width:90px;padding:6px 8px;font-size:.85rem;text-align:right" value="${a.comision}" data-k="comision"></td>
+          <td><input class="txt" style="width:140px;padding:6px 8px;font-size:.85rem" value="${esc(a.nombre)}" data-k="nombre"></td>
+          <td class="r"><input class="txt" type="number" step="0.01" min="0" style="width:80px;padding:6px 8px;font-size:.85rem;text-align:right" value="${a.comision}" data-k="comision"></td>
+          <td><input class="txt" type="url" placeholder="https://… validador de la AFP" style="width:100%;min-width:240px;padding:6px 8px;font-size:.82rem" value="${esc(a.url_validador||'')}" data-k="url"></td>
           <td class="r"><button class="btn-ghost" style="padding:5px 10px" onclick="delAfp(${i})"><i class="bi bi-trash"></i></button></td>
-        </tr>`).join('') : '<tr><td colspan="3" style="color:#94a3b8;text-align:center;padding:12px">Sin AFP. Agrega una.</td></tr>';
+        </tr>`).join('') : '<tr><td colspan="4" style="color:#94a3b8;text-align:center;padding:12px">Sin AFP. Agrega una.</td></tr>';
     }
     function syncAfps(){
       AFPS = [...document.querySelectorAll('#afpRows tr')].map(tr=>{
-        const n=tr.querySelector('[data-k=nombre]'), c=tr.querySelector('[data-k=comision]');
-        return n ? { nombre:n.value, comision:parseFloat(c.value)||0 } : null;
+        const n=tr.querySelector('[data-k=nombre]'), c=tr.querySelector('[data-k=comision]'), u=tr.querySelector('[data-k=url]');
+        return n ? { nombre:n.value, comision:parseFloat(c.value)||0, url_validador:(u?u.value.trim():'') } : null;
       }).filter(Boolean);
     }
-    function addAfp(){ syncAfps(); AFPS.push({nombre:'',comision:0}); renderAfps(); }
+    function addAfp(){ syncAfps(); AFPS.push({nombre:'',comision:0,url_validador:''}); renderAfps(); }
     function delAfp(i){ syncAfps(); AFPS.splice(i,1); renderAfps(); }
 
     function renderTramos(){

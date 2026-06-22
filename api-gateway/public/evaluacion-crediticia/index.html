@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- v45.9 -->
+<!-- v46.0 -->
 <html lang="es">
 <head>
   <meta charset="UTF-8">
@@ -86,6 +86,8 @@
     .doc-val.ok { color:#dc2626; }      /* rojo, como se pidió */
     .doc-val.bad { color:#b45309; }
     .doc-val.pend { color:#6b7280; font-weight:600; }
+    .doc-verif { color:#1d4ed8; font-weight:700; text-decoration:none; margin-left:8px; }
+    .doc-verif:hover { text-decoration:underline; }
     .ev-pregunta { background:#fffbeb; border:1px solid #fde68a; border-radius:12px; padding:18px 20px; }
     .pulse-dot { display:inline-block; width:9px; height:9px; border-radius:50%; background:#10b981; margin-right:6px; }
     .fr-nombre { font-size:1.1rem; font-weight:800; color:#111827; margin-bottom:10px; }
@@ -430,10 +432,11 @@
   function docActions(i, d){
     const carg = DOCS_CARGADOS[d.documento];
     if (carg) {
+      const verif = carg.url ? ' <a href="' + escapeHtml(carg.url) + '" target="_blank" rel="noopener" class="doc-verif"><i class="bi bi-box-arrow-up-right me-1"></i>Verificar folio en la AFP</a>' : '';
       let val = '';
       if (carg.validando)        val = '<div class="doc-val pend"><span class="spinner-border spinner-border-sm me-1" style="width:.8rem;height:.8rem"></span>Validando certificado con IA…</div>';
-      else if (carg.validado === 1) val = '<div class="doc-val ok"><i class="bi bi-patch-check-fill me-1"></i>' + escapeHtml(carg.vtexto || 'Validado en Certificado de Cotizaciones') + '</div>';
-      else if (carg.validado === 0) val = '<div class="doc-val bad"><i class="bi bi-exclamation-triangle-fill me-1"></i>' + escapeHtml(carg.vtexto || 'Revisar') + '</div>';
+      else if (carg.validado === 1) val = '<div class="doc-val ok"><i class="bi bi-patch-check-fill me-1"></i>' + escapeHtml(carg.vtexto || 'Validado en Certificado de Cotizaciones') + verif + '</div>';
+      else if (carg.validado === 0) val = '<div class="doc-val bad"><i class="bi bi-exclamation-triangle-fill me-1"></i>' + escapeHtml(carg.vtexto || 'Revisar') + verif + '</div>';
       return `<span class="doc-ok"><i class="bi bi-check-circle-fill"></i>${escapeHtml(carg.nombre)}</span>
         <button class="btn-mini" onclick="verDoc(${carg.id})"><i class="bi bi-eye"></i> Ver</button>
         <button class="btn-mini danger" onclick="quitarDoc(${carg.id})"><i class="bi bi-x-lg"></i> Quitar</button>${val}`;
@@ -493,7 +496,7 @@
     try {
       const r = await fetch('/api/evaluacion-crediticia/documento/' + carg.id + '/validar-afp', { method:'POST', headers: H });
       const j = await r.json();
-      if (j.success && j.data) { carg.validado = j.data.validado; carg.vtexto = j.data.texto; }
+      if (j.success && j.data) { carg.validado = j.data.validado; carg.vtexto = j.data.texto; carg.url = j.data.url || null; }
     } catch (_) {}
     carg.validando = false;
     act = document.getElementById('doc-act-' + i); if (act) act.innerHTML = docActions(i, d);
@@ -523,7 +526,7 @@
     try {
       const r = await fetch('/api/evaluacion-crediticia/documentos/' + encodeURIComponent(rut), { headers: H });
       const j = await r.json();
-      (j.data || []).forEach(d => { DOCS_CARGADOS[d.documento] = { id: d.id, nombre: d.archivo_nombre, validado: d.validado, vtexto: d.validacion_texto }; });
+      (j.data || []).forEach(d => { DOCS_CARGADOS[d.documento] = { id: d.id, nombre: d.archivo_nombre, validado: d.validado, vtexto: d.validacion_texto, url: d.validacion_url || null }; });
     } catch (_) {}
   }
 
