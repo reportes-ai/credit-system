@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- v45.4 -->
+<!-- v45.5 -->
 <html lang="es">
 <head>
   <meta charset="UTF-8">
@@ -60,6 +60,16 @@
     .ia-bloque summary { cursor:pointer; padding:9px 13px; font-weight:700; font-size:.86rem; display:flex; justify-content:space-between; align-items:center; }
     .ia-bloque table { width:100%; border-collapse:collapse; font-size:.8rem; }
     .ia-bloque td { border-top:1px solid #f1f5f9; padding:5px 13px; }
+    .ia-bloque-just { padding:9px 13px; font-size:.83rem; color:#4b5563; background:#faf5ff; border-bottom:1px solid #eef2f7; }
+    .ia-var-com td { color:#6b7280; font-size:.76rem; font-style:italic; border-top:none; padding-top:0; padding-bottom:7px; }
+    /* ── Pestañas + historial ── */
+    .ev-tabs { display:flex; gap:6px; margin-bottom:18px; }
+    .ev-tab { background:#fff; border:1px solid #e5e7eb; border-radius:10px; padding:9px 16px; font-weight:700; font-size:.88rem; color:#6b7280; cursor:pointer; }
+    .ev-tab.active { background:#1e3a5f; border-color:#1e3a5f; color:#fff; }
+    .hist-row { display:flex; align-items:center; gap:14px; border:1px solid #e5e7eb; border-radius:10px; padding:12px 14px; margin-bottom:8px; }
+    .hist-pts { font-size:1.2rem; font-weight:800; color:#1e3a5f; min-width:54px; }
+    .hist-q { font-weight:800; background:#eef2ff; color:#3730a3; border-radius:8px; padding:3px 9px; font-size:.82rem; }
+    .hist-meta { flex:1; font-size:.82rem; color:#6b7280; }
     .ia-ko { background:#fee2e2; border:1px solid #fecaca; color:#991b1b; border-radius:10px; padding:10px 14px; font-size:.86rem; font-weight:600; }
     .ia-meta { font-size:.72rem; color:#9ca3af; margin-top:12px; text-align:right; }
     .doc-item { display:flex; align-items:flex-start; gap:8px; padding:10px 0; border-bottom:1px dashed #eef2f7; font-size:.92rem; }
@@ -86,6 +96,13 @@
 <div id="af-topnav"></div>
 
 <div class="page-wrap">
+
+  <div class="ev-tabs">
+    <div class="ev-tab active" id="tabBtnEval" onclick="mostrarTab('eval')"><i class="bi bi-clipboard-pulse me-1"></i>Evaluación</div>
+    <div class="ev-tab" id="tabBtnHist" onclick="mostrarTab('hist')"><i class="bi bi-clock-history me-1"></i>Evaluaciones Históricas</div>
+  </div>
+
+  <div id="tabEvaluacion">
 
   <!-- Paso 1: RUT -->
   <div class="ev-card">
@@ -154,6 +171,16 @@
     </div>
     <div id="iaResultado" style="margin-top:16px"></div>
     <div id="evalResultado" style="margin-top:16px"></div>
+  </div>
+
+  </div><!-- /tabEvaluacion -->
+
+  <div id="tabHistoricas" style="display:none">
+    <div class="ev-card">
+      <h5><i class="bi bi-clock-history"></i>Evaluaciones históricas <span class="text-muted" style="font-weight:500;font-size:.8rem" id="histCount"></span></h5>
+      <div id="histLista"><div class="text-muted" style="font-size:.9rem">Busca un cliente en la pestaña Evaluación para ver sus evaluaciones.</div></div>
+      <div id="histDetalle" style="margin-top:16px"></div>
+    </div>
   </div>
 
 </div>
@@ -265,6 +292,55 @@
         document.getElementById('secEvaluar').style.display = '';
       }
     } catch (_) {}
+  }
+
+  // ── Pestañas ────────────────────────────────────────────────────────────
+  function mostrarTab(t){
+    const esEval = t === 'eval';
+    document.getElementById('tabEvaluacion').style.display = esEval ? '' : 'none';
+    document.getElementById('tabHistoricas').style.display = esEval ? 'none' : '';
+    document.getElementById('tabBtnEval').classList.toggle('active', esEval);
+    document.getElementById('tabBtnHist').classList.toggle('active', !esEval);
+    if (!esEval) cargarHistoricas();
+  }
+
+  function cargarHistoricas(){
+    const cont = document.getElementById('histLista');
+    document.getElementById('histDetalle').innerHTML = '';
+    const clean = rutLimpio();
+    if (!validarRUT(clean)) {
+      document.getElementById('histCount').textContent = '';
+      cont.innerHTML = '<div class="text-muted" style="font-size:.9rem">Ingresa y busca un RUT válido en la pestaña Evaluación primero.</div>';
+      return;
+    }
+    const rut = rutConGuion();
+    cont.innerHTML = '<div class="text-muted"><span class="spinner-border spinner-border-sm me-1"></span>Cargando…</div>';
+    fetch('/api/ia/evaluacion-credito/' + encodeURIComponent(rut) + '/historial', { headers: H })
+      .then(r => r.json()).then(j => {
+        const rows = (j.success && j.data) ? j.data : [];
+        document.getElementById('histCount').textContent = rows.length ? '(' + rows.length + ')' : '';
+        if (!rows.length) { cont.innerHTML = '<div class="text-muted" style="font-size:.9rem">Sin evaluaciones guardadas para este cliente.</div>'; return; }
+        const decLabel = d => ({ aprobar:'Aprobar', condicionado:'Condicionado', analisis:'Análisis', rechazar:'Rechazar' }[String(d || '').toLowerCase()] || d || '—');
+        cont.innerHTML = rows.map(e => `
+          <div class="hist-row">
+            <div class="hist-pts">${e.puntaje != null ? e.puntaje : '—'}</div>
+            <div class="hist-q">${escapeHtml(e.quintil || '—')}</div>
+            <div class="hist-meta">${fmtFecha(e.fecha)} · ${escapeHtml(decLabel(e.decision))} · monto ${e.monto_maximo ? '$' + Number(e.monto_maximo).toLocaleString('es-CL') : '—'}<div style="font-size:.72rem;color:#9ca3af">${escapeHtml(e.modelo || '')}</div></div>
+            <button class="btn btn-sm btn-outline-secondary" onclick="verEvalHistorica(${e.id})"><i class="bi bi-eye me-1"></i>Ver</button>
+          </div>`).join('');
+      }).catch(() => { cont.innerHTML = '<div class="text-danger" style="font-size:.9rem">Error al cargar el historial.</div>'; });
+  }
+
+  function verEvalHistorica(id){
+    const det = document.getElementById('histDetalle');
+    det.innerHTML = '<div class="text-muted"><span class="spinner-border spinner-border-sm me-1"></span>Cargando informe…</div>';
+    fetch('/api/ia/evaluacion-credito/detalle/' + id, { headers: H })
+      .then(r => r.json()).then(j => {
+        if (!j.success || !j.data || !j.data.resultado) { det.innerHTML = '<div class="text-danger">No se pudo cargar el informe.</div>'; return; }
+        const d = { ...j.data.resultado, modelo: j.data.modelo };
+        det.innerHTML = `<div class="text-muted" style="font-size:.82rem;margin-bottom:8px"><i class="bi bi-clock-history me-1"></i>Evaluación del ${fmtFecha(j.data.fecha)}</div>` + renderEvalIA(d);
+        det.scrollIntoView({ behavior:'smooth', block:'start' });
+      }).catch(() => { det.innerHTML = '<div class="text-danger">Error al cargar el informe.</div>'; });
   }
 
   function pintarFicha(){
@@ -557,9 +633,13 @@
           <div class="ia-inc"><ul class="ia-list" style="color:#991b1b">${docs.inconsistencias.map(i => '<li>' + escapeHtml(i) + '</li>').join('')}</ul></div>` : ''}
         ${(docs.revisados && docs.revisados.length) ? `<div class="ia-sec-t">Documentos revisados</div>
           <ul class="ia-list">${docs.revisados.map(r => '<li><b>' + escapeHtml(r.documento || '') + '</b> — ' + escapeHtml(r.estado || '') + (r.comentario ? ': ' + escapeHtml(r.comentario) : '') + '</li>').join('')}</ul>` : ''}
-        ${(d.bloques && d.bloques.length) ? `<div class="ia-sec-t">Scorecard por bloque</div>
+        ${(d.bloques && d.bloques.length) ? `<div class="ia-sec-t">Scorecard por bloque — por qué se asignó cada puntaje</div>
           ${d.bloques.map(b => `<details class="ia-bloque"><summary><span>${escapeHtml(b.bloque)} · ${escapeHtml(b.nombre || '')}</span><span>${b.puntos}/${b.puntos_max}</span></summary>
-            <table><tbody>${(b.variables || []).map(v => '<tr><td>' + escapeHtml(v.variable || '') + '</td><td class="text-muted">' + escapeHtml(v.tramo_asignado || '') + '</td><td style="text-align:right;font-weight:600">' + (v.puntos != null ? v.puntos : '') + '</td></tr>').join('')}</tbody></table>
+            ${b.justificacion ? `<div class="ia-bloque-just">${escapeHtml(b.justificacion)}</div>` : ''}
+            <table><tbody>${(b.variables || []).map(v =>
+              '<tr><td>' + escapeHtml(v.variable || '') + '</td><td class="text-muted">' + escapeHtml(v.tramo_asignado || '') + '</td><td style="text-align:right;font-weight:600">' + (v.puntos != null ? v.puntos : '') + '</td></tr>' +
+              (v.comentario ? '<tr class="ia-var-com"><td colspan="3">' + escapeHtml(v.comentario) + '</td></tr>' : '')
+            ).join('')}</tbody></table>
           </details>`).join('')}` : ''}
         ${(d.alertas && d.alertas.length) ? `<div class="ia-sec-t">Alertas</div><ul class="ia-list">${d.alertas.map(a => '<li>' + escapeHtml(a) + '</li>').join('')}</ul>` : ''}
         ${(d.datos_faltantes && d.datos_faltantes.length) ? `<div class="ia-sec-t">Datos faltantes por capturar</div><ul class="ia-list">${d.datos_faltantes.map(a => '<li>' + escapeHtml(a) + '</li>').join('')}</ul>` : ''}

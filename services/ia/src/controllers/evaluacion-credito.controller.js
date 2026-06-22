@@ -56,7 +56,7 @@ function tablaTexto(t) {
 
 const SYSTEM = `Eres un analista experto de riesgo crediticio automotriz en Chile, que evalúa según la POLÍTICA DE CRÉDITO AUTOFÁCIL V3.0 para autos usados. Tu trabajo:
 1) Revisar los DOCUMENTOS adjuntos (liquidaciones, cédula, AFP, etc.) y validarlos contra los datos declarados: detecta inconsistencias (nombres/RUT/montos/fechas que no calzan, documentos vencidos, ilegibles, alterados o faltantes). No es verificación forense.
-2) Puntuar al cliente con el SCORECARD V3.0 (1000 pts en 4 bloques A/B/C/D), usando los tramos y puntos de las tablas que se te entregan. Si falta un dato para un tramo, usa el supuesto más conservador y decláralo.
+2) Puntuar al cliente con el SCORECARD V3.0 (1000 pts en 4 bloques A/B/C/D), usando los tramos y puntos de las tablas que se te entregan. Si falta un dato para un tramo, usa el supuesto más conservador y decláralo. Para CADA bloque escribe en "justificacion" POR QUÉ obtuvo ese puntaje sobre el máximo (qué variables/tramos sumaron y cuáles restaron, con sus puntos), y en cada variable un "comentario" con la razón del tramo asignado y la evidencia usada.
 3) Aplicar primero las REGLAS EXCLUYENTES (K1–K11): si alguna se gatilla con la evidencia, es RECHAZO automático.
 4) Asignar el QUINTIL según el puntaje, la decisión según la matriz, y calcular CUÁNTO SE LE PUEDE PRESTAR (el menor entre: el monto máximo de las condiciones base por tipo/origen, y la capacidad de pago = cuota máx. 30% de la renta líquida menos cargas actuales, llevada a monto según plazo y tasa). Si NO hay cotización/vehículo, calcula igual el monto por CAPACIDAD (cuota máx. a 48 meses y tasa de referencia ~1,8%/mes), acotado por el tope de condiciones base, y márcalo como PRELIMINAR en explicacion_monto. NUNCA devuelvas monto_maximo_prestar = 0 si la renta permite pagar una cuota; 0 solo si hay rechazo o la capacidad es nula.
 Reglas: sé CONSERVADOR y objetivo; NO inventes datos; si algo no aparece, decláralo como faltante en vez de asumir a favor. Tu análisis ASISTE al analista, no reemplaza su decisión.`;
@@ -71,7 +71,8 @@ const promptDe = (ctx) => `Evalúa al cliente con la Política V3.0. Usa SOLO la
   },
   "bloques": [
     { "bloque": "A|B|C|D", "nombre": "string", "puntos_max": number, "puntos": number,
-      "variables": [ { "variable": "string", "tramo_asignado": "string", "puntos": number, "comentario": "string" } ] }
+      "justificacion": "por qué el bloque obtuvo ese puntaje sobre el maximo: qué tramos sumaron y cuáles restaron, con sus puntos",
+      "variables": [ { "variable": "string", "tramo_asignado": "string", "puntos": number, "comentario": "razón del tramo y evidencia usada" } ] }
   ],
   "puntaje_total": number,         // 0 a 1000 (suma de bloques)
   "quintil": "Q1|Q2|Q3|Q4|Q5",
@@ -210,6 +211,33 @@ exports.evaluar = async (req, res) => {
     if (e.code === 'IA_OFF') return res.status(403).json({ success: false, data: null, error: 'La IA de evaluación está desactivada. Actívala en Mantenedores → Inteligencia Artificial (Evaluación de consistencia / scoring).' });
     console.error('[ia eval-credito]', e.stack || e.message);
     res.status(422).json({ success: false, data: null, error: 'La IA no pudo evaluar: ' + (e.message || 'error desconocido') });
+  }
+};
+
+/* GET /api/ia/evaluacion-credito/:rut/historial → todas las evaluaciones del RUT */
+exports.historial = async (req, res) => {
+  try {
+    const rut = normCli(req.params.rut);
+    const [rows] = await pool.query(
+      `SELECT id, fecha, puntaje, quintil, decision, monto_maximo, modelo, costo_usd
+       FROM ia_evaluaciones_credito WHERE rut=? ORDER BY fecha DESC LIMIT 50`, [rut]);
+    res.json({ success: true, data: rows, error: null });
+  } catch (e) {
+    console.error('[ia eval-credito historial]', e.message);
+    res.status(500).json({ success: false, data: null, error: 'Error interno del servidor' });
+  }
+};
+
+/* GET /api/ia/evaluacion-credito/detalle/:id → evaluación completa por id */
+exports.detalle = async (req, res) => {
+  try {
+    const [[row]] = await pool.query('SELECT id, fecha, rut, puntaje, quintil, decision, monto_maximo, resultado, modelo FROM ia_evaluaciones_credito WHERE id=?', [req.params.id]);
+    if (!row) return res.status(404).json({ success: false, data: null, error: 'Evaluación no encontrada' });
+    let resultado = row.resultado; try { resultado = typeof resultado === 'object' ? resultado : JSON.parse(resultado); } catch {}
+    res.json({ success: true, data: { ...row, resultado }, error: null });
+  } catch (e) {
+    console.error('[ia eval-credito detalle]', e.message);
+    res.status(500).json({ success: false, data: null, error: 'Error interno del servidor' });
   }
 };
 

@@ -17,6 +17,8 @@ router.post('/informe-dealernet', verifyToken, informeDn.analizar);
 router.get('/informe-dealernet/historial', verifyToken, informeDn.historial);
 
 router.post('/evaluacion-credito', verifyToken, evalCredito.evaluar);
+router.get('/evaluacion-credito/detalle/:id', verifyToken, evalCredito.detalle);
+router.get('/evaluacion-credito/:rut/historial', verifyToken, evalCredito.historial);
 router.get('/evaluacion-credito/:rut', verifyToken, evalCredito.ultima);
 
 module.exports = router;
