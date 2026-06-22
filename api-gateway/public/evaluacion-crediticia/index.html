@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- v44.4 -->
+<!-- v44.6 -->
 <html lang="es">
 <head>
   <meta charset="UTF-8">
@@ -36,6 +36,32 @@
     .btn-eval { background:#1e3a5f; border:none; color:#fff; font-weight:700; padding:12px 26px; border-radius:10px; }
     .btn-eval:hover { background:#162d49; color:#fff; }
     .btn-eval:disabled { opacity:.5; }
+    .btn-ia { background:linear-gradient(135deg,#6d28d9,#9333ea); border:none; color:#fff; font-weight:700; padding:12px 22px; border-radius:10px; }
+    .btn-ia:hover { background:linear-gradient(135deg,#5b21b6,#7e22ce); color:#fff; }
+    .btn-ia:disabled { opacity:.55; }
+    /* ── Resultado IA ── */
+    .ia-wrap { border:1px solid #e9d5ff; border-radius:14px; overflow:hidden; }
+    .ia-head { background:linear-gradient(135deg,#6d28d9,#9333ea); color:#fff; padding:16px 20px; display:flex; align-items:center; gap:22px; flex-wrap:wrap; }
+    .ia-score { text-align:center; }
+    .ia-score .n { font-size:2.2rem; font-weight:800; line-height:1; }
+    .ia-score .l { font-size:.66rem; text-transform:uppercase; letter-spacing:.08em; opacity:.85; }
+    .ia-q { font-size:1.5rem; font-weight:800; background:rgba(255,255,255,.18); border-radius:10px; padding:6px 14px; }
+    .ia-dec { font-size:.95rem; font-weight:700; padding:6px 14px; border-radius:20px; background:#fff; }
+    .ia-dec.aprobar { color:#166534; } .ia-dec.condicionado { color:#92400e; } .ia-dec.analisis { color:#1e40af; } .ia-dec.rechazar { color:#b91c1c; }
+    .ia-monto { margin-left:auto; text-align:right; }
+    .ia-monto .n { font-size:1.4rem; font-weight:800; }
+    .ia-monto .l { font-size:.66rem; text-transform:uppercase; letter-spacing:.06em; opacity:.85; }
+    .ia-body { padding:18px 20px; background:#fff; }
+    .ia-sec-t { font-size:.74rem; font-weight:800; text-transform:uppercase; letter-spacing:.05em; color:#6d28d9; margin:16px 0 8px; }
+    .ia-list { margin:0; padding-left:18px; font-size:.86rem; }
+    .ia-list li { margin:3px 0; }
+    .ia-inc { background:#fef2f2; border:1px solid #fecaca; border-radius:10px; padding:10px 14px; }
+    .ia-bloque { border:1px solid #eef2f7; border-radius:10px; margin-bottom:8px; }
+    .ia-bloque summary { cursor:pointer; padding:9px 13px; font-weight:700; font-size:.86rem; display:flex; justify-content:space-between; align-items:center; }
+    .ia-bloque table { width:100%; border-collapse:collapse; font-size:.8rem; }
+    .ia-bloque td { border-top:1px solid #f1f5f9; padding:5px 13px; }
+    .ia-ko { background:#fee2e2; border:1px solid #fecaca; color:#991b1b; border-radius:10px; padding:10px 14px; font-size:.86rem; font-weight:600; }
+    .ia-meta { font-size:.72rem; color:#9ca3af; margin-top:12px; text-align:right; }
     .doc-item { display:flex; align-items:flex-start; gap:8px; padding:10px 0; border-bottom:1px dashed #eef2f7; font-size:.92rem; }
     .doc-item:last-child { border-bottom:none; }
     .doc-item > i { color:#1e3a5f; margin-top:3px; }
@@ -118,10 +144,16 @@
   <!-- Paso 6: Evaluar -->
   <div class="ev-card" id="secEvaluar" style="display:none">
     <h5><i class="bi bi-clipboard-pulse"></i>Iniciar evaluación</h5>
-    <p class="text-muted" style="font-size:.86rem">Al comenzar, se traerán los antecedentes del cliente en vivo desde <b>DealerNet</b> para el análisis.</p>
-    <button class="btn btn-eval" id="btnEvaluar" onclick="comenzarEvaluacion()">
-      <span class="pulse-dot"></span>Comenzar Evaluación
-    </button>
+    <p class="text-muted" style="font-size:.86rem">Trae los antecedentes desde <b>DealerNet</b> y, con <b>IA</b>, valida los documentos, busca inconsistencias y entrega el puntaje, el quintil y cuánto se le puede prestar según la <b>Política V3.0</b>.</p>
+    <div class="d-flex gap-2 flex-wrap">
+      <button class="btn btn-eval" id="btnEvaluar" onclick="comenzarEvaluacion()">
+        <span class="pulse-dot"></span>Comenzar Evaluación
+      </button>
+      <button class="btn btn-ia" id="btnEvaluarIA" onclick="evaluarIA()">
+        <i class="bi bi-stars me-1"></i>Evaluar con IA (Política V3.0)
+      </button>
+    </div>
+    <div id="iaResultado" style="margin-top:16px"></div>
     <div id="evalResultado" style="margin-top:16px"></div>
   </div>
 
@@ -463,6 +495,59 @@
       const b = await r.blob(); const u = URL.createObjectURL(b);
       window.open(u, '_blank'); setTimeout(() => URL.revokeObjectURL(u), 60000);
     } catch (e) { alert('Error al abrir el PDF'); }
+  }
+
+  // ── Evaluación con IA (Política V3.0) ───────────────────────────────────
+  async function evaluarIA(){
+    const rut = rutConGuion();
+    const btn = document.getElementById('btnEvaluarIA');
+    const out = document.getElementById('iaResultado');
+    btn.disabled = true; btn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span>Evaluando con IA…';
+    out.innerHTML = '<div class="text-muted" style="font-size:.86rem"><span class="spinner-border spinner-border-sm me-1"></span>La IA está revisando los documentos y aplicando la Política V3.0… (puede tardar unos segundos)</div>';
+    try {
+      const r = await fetch('/api/ia/evaluacion-credito', { method:'POST', headers:H, body: JSON.stringify({ rut, cotizacion_id: cotSel }) });
+      const j = await r.json();
+      if (!j.success) { out.innerHTML = `<div class="alert alert-warning mb-0" style="font-size:.88rem"><i class="bi bi-exclamation-triangle me-1"></i>${escapeHtml(j.error || 'No se pudo evaluar')}</div>`; return; }
+      out.innerHTML = renderEvalIA(j.data);
+    } catch (e) { out.innerHTML = `<div class="alert alert-danger mb-0" style="font-size:.88rem">Error: ${escapeHtml(e.message)}</div>`; }
+    finally { btn.disabled = false; btn.innerHTML = '<i class="bi bi-stars me-1"></i>Evaluar con IA (Política V3.0)'; }
+  }
+
+  function renderEvalIA(d){
+    const cap = d.capacidad || {}, docs = d.documentos || {};
+    const dec = String(d.decision || '').toLowerCase();
+    const decLabel = { aprobar:'Aprobar', condicionado:'Condicionado', analisis:'Análisis manual', rechazar:'Rechazar' }[dec] || (d.decision || '—');
+    const kos = (d.knockouts || []).filter(k => k.gatillado);
+    const fmt = n => (n || n === 0) && Number(n) ? '$' + Number(n).toLocaleString('es-CL') : '—';
+    return `
+    <div class="ia-wrap">
+      <div class="ia-head">
+        <div class="ia-score"><div class="n">${d.puntaje_total != null ? d.puntaje_total : '—'}</div><div class="l">Puntaje / 1000</div></div>
+        <div class="ia-q">${escapeHtml(d.quintil || '—')}<div style="font-size:.58rem;font-weight:600;opacity:.85;text-align:center">${escapeHtml(d.etiqueta || '')}</div></div>
+        <div class="ia-dec ${dec}">${escapeHtml(decLabel)}</div>
+        <div class="ia-monto"><div class="n">${fmt(cap.monto_maximo_prestar)}</div><div class="l">Monto máximo a prestar</div></div>
+      </div>
+      <div class="ia-body">
+        ${kos.length ? `<div class="ia-ko"><i class="bi bi-x-octagon-fill me-1"></i>Rechazo por regla excluyente: ${kos.map(k => escapeHtml(k.codigo + ' — ' + (k.motivo || ''))).join('; ')}</div>` : ''}
+        ${d.resumen ? `<div class="ia-sec-t">Resumen</div><div style="font-size:.9rem;line-height:1.5">${escapeHtml(d.resumen)}</div>` : ''}
+        <div class="ia-sec-t">Capacidad y monto</div>
+        <div style="font-size:.86rem">
+          Renta líquida ${fmt(cap.renta_liquida)} · Cargas actuales ${fmt(cap.cargas_actuales)} · Cuota máx. ${fmt(cap.cuota_maxima)}${cap.carga_cuota_pct != null ? ` · DTI cuota ${cap.carga_cuota_pct}%` : ''}${cap.carga_total_pct != null ? ` · Carga total ${cap.carga_total_pct}%` : ''}
+          ${cap.explicacion_monto ? `<div class="text-muted" style="margin-top:4px">${escapeHtml(cap.explicacion_monto)}</div>` : ''}
+        </div>
+        ${(docs.inconsistencias && docs.inconsistencias.length) ? `<div class="ia-sec-t">Inconsistencias detectadas</div>
+          <div class="ia-inc"><ul class="ia-list" style="color:#991b1b">${docs.inconsistencias.map(i => '<li>' + escapeHtml(i) + '</li>').join('')}</ul></div>` : ''}
+        ${(docs.revisados && docs.revisados.length) ? `<div class="ia-sec-t">Documentos revisados</div>
+          <ul class="ia-list">${docs.revisados.map(r => '<li><b>' + escapeHtml(r.documento || '') + '</b> — ' + escapeHtml(r.estado || '') + (r.comentario ? ': ' + escapeHtml(r.comentario) : '') + '</li>').join('')}</ul>` : ''}
+        ${(d.bloques && d.bloques.length) ? `<div class="ia-sec-t">Scorecard por bloque</div>
+          ${d.bloques.map(b => `<details class="ia-bloque"><summary><span>${escapeHtml(b.bloque)} · ${escapeHtml(b.nombre || '')}</span><span>${b.puntos}/${b.puntos_max}</span></summary>
+            <table><tbody>${(b.variables || []).map(v => '<tr><td>' + escapeHtml(v.variable || '') + '</td><td class="text-muted">' + escapeHtml(v.tramo_asignado || '') + '</td><td style="text-align:right;font-weight:600">' + (v.puntos != null ? v.puntos : '') + '</td></tr>').join('')}</tbody></table>
+          </details>`).join('')}` : ''}
+        ${(d.alertas && d.alertas.length) ? `<div class="ia-sec-t">Alertas</div><ul class="ia-list">${d.alertas.map(a => '<li>' + escapeHtml(a) + '</li>').join('')}</ul>` : ''}
+        ${(d.datos_faltantes && d.datos_faltantes.length) ? `<div class="ia-sec-t">Datos faltantes por capturar</div><ul class="ia-list">${d.datos_faltantes.map(a => '<li>' + escapeHtml(a) + '</li>').join('')}</ul>` : ''}
+        <div class="ia-meta">IA: ${escapeHtml(d.modelo || '')} · ${d.n_documentos || 0} documento(s) analizados${d.costo != null ? ' · US$ ' + Number(d.costo).toFixed(4) : ''}</div>
+      </div>
+    </div>`;
   }
 
   function escapeHtml(s){ return String(s||'').replace(/[&<>]/g, m => ({'&':'&amp;','<':'&lt;','>':'&gt;'}[m])); }

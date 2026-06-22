@@ -4,6 +4,7 @@ const multer = require('multer');
 const { verifyToken } = require('../../../../shared/middleware/auth');
 const liquidaciones = require('../controllers/liquidaciones.controller');
 const informeDn = require('../controllers/informe-dealernet.controller');
+const evalCredito = require('../controllers/evaluacion-credito.controller');
 
 const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 12 * 1024 * 1024, files: 6 } });
 
@@ -14,5 +15,8 @@ router.get('/evaluaciones', verifyToken, liquidaciones.historial);
 
 router.post('/informe-dealernet', verifyToken, informeDn.analizar);
 router.get('/informe-dealernet/historial', verifyToken, informeDn.historial);
+
+router.post('/evaluacion-credito', verifyToken, evalCredito.evaluar);
+router.get('/evaluacion-credito/:rut', verifyToken, evalCredito.ultima);
 
 module.exports = router;
