@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- v46.2 -->
+<!-- v46.3 -->
 <html lang="es">
 <head>
   <meta charset="UTF-8">
@@ -622,6 +622,20 @@
     } catch (e) { alert('Error al abrir el PDF'); }
   }
 
+  // Overlay branded de IA con mensajes que van cambiando (rotación por tiempo)
+  function iaProgreso(mensajes, intervalo){
+    const ov = (window.AF_IA && AF_IA.analizando) ? AF_IA.analizando(mensajes[0]) : null;
+    const setMsg = txt => { const el = ov && ov.el && ov.el.querySelector('.af-ia-msg'); if (el) el.textContent = txt; };
+    let i = 0, timer = null;
+    if (ov && mensajes.length > 1) {
+      timer = setInterval(() => {
+        if (i >= mensajes.length - 1) { clearInterval(timer); timer = null; return; }
+        setMsg(mensajes[++i]);
+      }, intervalo || 2300);
+    }
+    return { set: setMsg, cerrar(){ if (timer) clearInterval(timer); if (ov) ov.cerrar(); } };
+  }
+
   // ── Evaluación con IA (Política V3.0) ───────────────────────────────────
   async function evaluarIA(){
     const rut = rutConGuion();
@@ -629,7 +643,18 @@
     const out = document.getElementById('iaResultado');
     btn.disabled = true; btn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span>Evaluando con IA…';
     out.innerHTML = '';
-    const iaOv = (window.AF_IA && AF_IA.analizando) ? AF_IA.analizando('Trayendo antecedentes de DealerNet y evaluando con IA…') : null;
+    const iaOv = iaProgreso([
+      'Trayendo antecedentes desde DealerNet…',
+      'Sincronizando datos del cliente…',
+      'Validando documentos cargados…',
+      'Validando renta (liquidaciones)…',
+      'Validando descuento de AFP…',
+      'Validando certificado de cotizaciones AFP…',
+      'Verificando el Impuesto Único…',
+      'Aplicando reglas excluyentes (K1–K11)…',
+      'Calculando el scorecard por bloque…',
+      'Asignando quintil y monto a prestar…',
+    ]);
     try {
       // 1) Asegura el informe DealerNet (lo trae si no hay) y sincroniza la info del cliente
       const dn = await asegurarDealernetYSync(rut);
