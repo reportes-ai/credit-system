@@ -5,7 +5,7 @@
   <link rel="icon" href="/img/favicon.png" type="image/png">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Fundantes Pendientes — AutoFácil</title>
-  <!-- v1.0 -->
+  <!-- v1.1 -->
   <link href="/css/bootstrap.min.css" rel="stylesheet">
   <link href="/css/bootstrap-icons.css" rel="stylesheet">
   <style>
@@ -21,10 +21,34 @@
     .avatar { width:28px; height:28px; background:#90caf9; border-radius:50%; display:flex; align-items:center; justify-content:center; color:var(--blue); font-weight:700; font-size:.75rem; }
     .perfil-badge { background:rgba(144,202,249,.2); border:1px solid rgba(144,202,249,.4); color:#90caf9; border-radius:12px; padding:2px 10px; font-size:.73rem; font-weight:600; }
     .btn-logout { background:rgba(255,255,255,.1); border:1px solid rgba(255,255,255,.2); color:#fff; border-radius:8px; padding:5px 12px; font-size:.82rem; cursor:pointer; }
-    .empty { max-width:600px; margin:80px auto; text-align:center; background:#fff; border-radius:16px; padding:48px 32px; box-shadow:0 1px 6px rgba(0,0,0,.07); }
-    .empty i { font-size:3rem; color:#cbd5e1; }
-    .empty h4 { font-weight:800; color:var(--navy); margin:16px 0 8px; }
-    .empty p { color:#64748b; font-size:.9rem; }
+    .wrap { max-width:none; margin:0; padding:22px 28px; }
+    .card-af { background:#fff; border-radius:14px; box-shadow:0 1px 4px rgba(0,0,0,.07); padding:16px 18px; margin-bottom:16px; }
+    .head-row { display:flex; align-items:center; gap:10px; margin-bottom:14px; }
+    .head-row h5 { font-weight:800; color:var(--navy); margin:0; }
+    label { font-size:.7rem; font-weight:800; text-transform:uppercase; color:#64748b; letter-spacing:.3px; display:block; margin:0 0 4px; }
+    input { width:100%; border:1.5px solid #e2e8f0; border-radius:8px; padding:9px 11px; font-size:.85rem; box-sizing:border-box; font-family:inherit; }
+    input:focus { border-color:#0141A2; outline:none; }
+    .filtros { display:grid; grid-template-columns:2fr 1fr auto auto auto; gap:10px; align-items:end; }
+    .btn-af { background:linear-gradient(135deg,#0141A2,#0255c5); color:#fff; border:none; border-radius:9px; padding:10px 18px; font-size:.85rem; font-weight:700; cursor:pointer; white-space:nowrap; }
+    .btn-ghost { background:#fff; border:1.5px solid #cbd5e1; color:#475569; border-radius:9px; padding:9px 16px; font-size:.83rem; font-weight:700; cursor:pointer; white-space:nowrap; }
+    .btn-tog { background:#fff; border:1.5px solid #16a34a; color:#16a34a; border-radius:9px; padding:9px 14px; font-size:.83rem; font-weight:700; cursor:pointer; white-space:nowrap; }
+    .btn-tog.on { background:#16a34a; color:#fff; }
+    .resumen { display:inline-flex; gap:7px; align-items:center; background:#fff7ed; color:#b45309; border:1px solid #fed7aa; border-radius:9px; padding:7px 13px; font-size:.83rem; font-weight:600; }
+    table { width:100%; border-collapse:collapse; font-size:.82rem; }
+    th { background:#f8fafc; color:#475569; font-size:.68rem; text-transform:uppercase; padding:9px 10px; text-align:left; border-bottom:2px solid #e2e8f0; white-space:nowrap; }
+    td { padding:9px 10px; border-bottom:1px solid #f1f5f9; vertical-align:middle; }
+    tr.op-row { cursor:pointer; } tr.op-row:hover td { background:#fafbff; }
+    .num { text-align:right; font-variant-numeric:tabular-nums; white-space:nowrap; }
+    .pill { font-size:.66rem; font-weight:800; border-radius:10px; padding:3px 9px; white-space:nowrap; display:inline-block; }
+    .pg { background:#dcfce7; color:#15803d; } .pp { background:#dbeafe; color:#1d4ed8; } .ps { background:#f1f5f9; color:#94a3b8; }
+    .paso { font-size:.66rem; color:#94a3b8; margin-top:2px; }
+    .muted { color:#94a3b8; }
+    .timeline { background:#f8fafc; border-radius:10px; padding:12px 14px; }
+    .tl-step { display:flex; align-items:center; gap:10px; padding:3px 0; font-size:.8rem; }
+    .tl-dot { width:18px; text-align:center; }
+    .tl-done { color:#15803d; } .tl-pend { color:#cbd5e1; }
+    .tl-fecha { color:#94a3b8; font-size:.72rem; margin-left:auto; white-space:nowrap; }
+    .count { font-size:.8rem; color:#64748b; margin-bottom:10px; }
   </style>
 </head>
 <body>
@@ -39,10 +63,33 @@
   </div>
 </nav>
 
-<div class="empty">
-  <i class="bi bi-folder2-open"></i>
-  <h4>Fundantes Pendientes</h4>
-  <p>Módulo en construcción. Define qué información y columnas necesitas y lo armamos.</p>
+<div class="wrap">
+  <div class="card-af">
+    <div class="head-row"><i class="bi bi-folder2-open" style="color:var(--blue);font-size:1.2rem"></i><h5>Fundantes Pendientes</h5></div>
+    <div class="filtros">
+      <div><label>Buscar (N° OP, RUT o nombre dealer, ejecutivo, parque)</label><input id="fq" placeholder="Ej: 12345, 76.xxx, Automotora, Juan Pérez…" autofocus></div>
+      <div><label>Parque</label><input id="fParque" placeholder="Filtrar por parque"></div>
+      <button class="btn-af" onclick="buscar()"><i class="bi bi-search me-1"></i>Buscar</button>
+      <button class="btn-ghost" onclick="limpiar()">Limpiar</button>
+      <button class="btn-tog" id="btnRec7" onclick="toggleRec7()"><i class="bi bi-inbox me-1"></i>Recibido últimos 7 días</button>
+    </div>
+  </div>
+
+  <div class="card-af">
+    <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;margin-bottom:10px">
+      <div class="resumen" id="resumen"></div>
+      <div class="count" id="count">Cargando…</div>
+    </div>
+    <div style="overflow-x:auto">
+      <table>
+        <thead><tr>
+          <th>N° OP</th><th>Dealer</th><th>Ejecutivo</th><th>Parque</th><th>Financiera</th>
+          <th class="num">Saldo Precio</th><th>Otorgado</th><th>Estado actual</th>
+        </tr></thead>
+        <tbody id="body"><tr><td colspan="8" style="text-align:center;color:#94a3b8;padding:24px">Cargando…</td></tr></tbody>
+      </table>
+    </div>
+  </div>
 </div>
 
 <script>
@@ -53,6 +100,73 @@ document.getElementById('navNombre').textContent = yo.nombre+' '+(yo.apellido||'
 document.getElementById('navPerfil').textContent = yo.perfil||'';
 document.getElementById('avatarInicial').textContent = (yo.nombre||'?')[0].toUpperCase();
 function logout(){ sessionStorage.clear(); location.href='/login.html'; }
+const H = { Authorization:'Bearer '+token };
+const esc = s => String(s??'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+const money = n => '$'+Number(n||0).toLocaleString('es-CL');
+const fdate = s => s ? new Date(s).toLocaleDateString('es-CL') : '—';
+let ORDEN = [], DATA = [], soloRec7 = false;
+
+function pillClase(estado){
+  if(estado==='SIN ETAPAS') return 'ps';
+  const i = ORDEN.indexOf(estado), r = ORDEN.indexOf('FUNDANTES RECIBIDOS');
+  return (i>=0 && r>=0 && i>=r) ? 'pg' : 'pp';
+}
+
+async function buscar(){
+  const q = document.getElementById('fq').value.trim();
+  const parque = document.getElementById('fParque').value.trim();
+  document.getElementById('count').textContent = 'Buscando…';
+  document.getElementById('body').innerHTML = '<tr><td colspan="8" style="text-align:center;color:#94a3b8;padding:24px">Buscando…</td></tr>';
+  try{
+    const url = '/api/postventa/consulta-fundantes?q='+encodeURIComponent(q)+'&parque='+encodeURIComponent(parque)+(soloRec7?'&recibido7=1':'');
+    const j = await (await fetch(url,{headers:H})).json();
+    ORDEN = j.orden || []; DATA = j.data || [];
+    renderResumen(j.resumen);
+    render();
+  }catch(e){
+    document.getElementById('count').textContent = 'Error al consultar.';
+    document.getElementById('body').innerHTML = '<tr><td colspan="8" style="text-align:center;color:#b91c1c;padding:24px">Error al consultar.</td></tr>';
+  }
+}
+function limpiar(){ document.getElementById('fq').value=''; document.getElementById('fParque').value=''; soloRec7=false; document.getElementById('btnRec7').classList.remove('on'); buscar(); }
+function toggleRec7(){ soloRec7=!soloRec7; document.getElementById('btnRec7').classList.toggle('on', soloRec7); buscar(); }
+function renderResumen(r){
+  const el=document.getElementById('resumen');
+  if(!r){ el.innerHTML=''; return; }
+  el.innerHTML = '<i class="bi bi-folder2-open"></i> Fundantes pendientes: <b>'+Number(r.pendientes||0).toLocaleString('es-CL')+'</b> operación(es) · <b>'+money(r.monto)+'</b>';
+}
+
+function render(){
+  const tb = document.getElementById('body');
+  document.getElementById('count').textContent = DATA.length + (DATA.length>=300?'+ resultados (refina la búsqueda)':' resultado(s)') + (soloRec7?' · recibidos últimos 7 días':'');
+  if(!DATA.length){ tb.innerHTML='<tr><td colspan="8" style="text-align:center;color:#94a3b8;padding:24px">Sin resultados.</td></tr>'; return; }
+  tb.innerHTML = DATA.map((r,i)=>`
+    <tr class="op-row" onclick="toggle(${i})">
+      <td><b>${esc(r.num_op||'—')}</b></td>
+      <td>${esc(r.nombre_dealer||'—')}<br><span class="muted" style="font-size:.72rem">${esc(r.rut_dealer||'')}</span></td>
+      <td>${esc(r.ejecutivo||'—')}</td>
+      <td>${esc(r.parque||'—')}</td>
+      <td>${esc(r.financiera||'—')}</td>
+      <td class="num">${money(r.saldo_precio)}</td>
+      <td>${fdate(r.fecha_otorgado)}</td>
+      <td><span class="pill ${pillClase(r.estado)}">${esc(r.estado)}</span><div class="paso">paso ${r.paso}/${r.total} · ${fdate(r.fecha_estado)}</div></td>
+    </tr>
+    <tr id="det${i}" style="display:none"><td colspan="8" style="padding:0 10px 12px">${timeline(r)}</td></tr>`).join('');
+}
+function timeline(r){
+  const reached = {}; (r.etapas||[]).forEach(e=>{ reached[e.etapa]=e.fecha; });
+  const steps = ORDEN.map(et=>{
+    const f = reached[et];
+    return `<div class="tl-step"><span class="tl-dot ${f?'tl-done':'tl-pend'}">${f?'<i class="bi bi-check-circle-fill"></i>':'<i class="bi bi-circle"></i>'}</span>
+      <span style="${f?'':'color:#cbd5e1'}">${esc(et)}</span>${f?`<span class="tl-fecha">${new Date(f).toLocaleString('es-CL')}</span>`:''}</div>`;
+  }).join('');
+  return `<div class="timeline">${steps}</div>`;
+}
+function toggle(i){ const d=document.getElementById('det'+i); if(d) d.style.display = d.style.display==='none'?'':'none'; }
+
+document.getElementById('fq').addEventListener('keydown', e=>{ if(e.key==='Enter') buscar(); });
+document.getElementById('fParque').addEventListener('keydown', e=>{ if(e.key==='Enter') buscar(); });
+buscar();
 </script>
 <script src="/js/app-version.js"></script>
 </body>

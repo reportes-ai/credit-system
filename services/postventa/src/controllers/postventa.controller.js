@@ -1269,6 +1269,51 @@ const consultaFacturas = async (req, res) => {
   } catch (e) { console.error('[consultaFacturas]', e.message); res.status(500).json({ success: false, data: null, error: 'Error interno del servidor' }); }
 };
 
+const consultaFundantes = async (req, res) => {
+  try {
+    const q = String(req.query.q || '').trim();
+    const parque = String(req.query.parque || '').trim();
+    const recibido7 = req.query.recibido7 === '1' || req.query.recibido7 === 'true';
+    const limit = Math.min(500, Math.max(1, parseInt(req.query.limit) || 300));
+    const filt = []; const fp = [];
+    const vis = await visibilidadEjecutivo(req);
+    if (!vis.all) {
+      if (!vis.lista.length) return res.json({ success: true, data: [], orden: ORDEN_SALDO, resumen: { pendientes: 0, monto: 0 }, error: null });
+      filt.push('s.ejecutivo IN (?)'); fp.push(vis.lista);
+    }
+    if (q) {
+      filt.push(`(s.num_op LIKE ? OR s.rut_dealer LIKE ? OR s.nombre_dealer LIKE ? OR s.ejecutivo LIKE ? OR cr.parque LIKE ? OR cr.nombre_parque_mgmt LIKE ?)`);
+      const lk = '%' + q + '%'; fp.push(lk, lk, lk, lk, lk, lk);
+    }
+    if (parque) { filt.push(`(cr.parque LIKE ? OR cr.nombre_parque_mgmt LIKE ?)`); const lk = '%' + parque + '%'; fp.push(lk, lk); }
+    const baseWhere = 'WHERE 1=1' + (filt.length ? ' AND ' + filt.join(' AND ') : '');
+    const RECIBIDO = `EXISTS (SELECT 1 FROM postventa_etapas e WHERE e.id_seguimiento=s.id AND e.track='SALDO' AND e.etapa='FUNDANTES RECIBIDOS'`;
+    // Por defecto: fundantes pendientes (aún sin recibir). Toggle: recibidos en los últimos 7 días.
+    const tablaWhere = baseWhere + (recibido7 ? ' AND ' + RECIBIDO + ' AND e.fecha >= (NOW() - INTERVAL 7 DAY))' : ' AND NOT ' + RECIBIDO + ')');
+    const [rows] = await pool.query(`
+      SELECT s.id, s.num_op, s.financiera, s.rut_dealer, s.nombre_dealer, s.ejecutivo,
+             s.fecha_otorgado, s.saldo_precio,
+             COALESCE(NULLIF(cr.parque,''), cr.nombre_parque_mgmt) AS parque
+      FROM postventa_seguimiento s
+      LEFT JOIN creditos cr ON cr.id = s.id_credito
+      ${tablaWhere}
+      ORDER BY s.fecha_otorgado ASC, s.num_op ASC
+      LIMIT ?`, [...fp, limit]);
+    const ids = rows.map(r => r.id);
+    const etapas = await etapasPorTrack(ids, 'SALDO', ORDEN_SALDO);
+    const data = rows.map(r => { const e = etapas[r.id] || {};
+      return { ...r, estado: e.estado || 'SIN ETAPAS', fecha_estado: e.fecha_estado || null,
+        paso: e.paso || 0, total: ORDEN_SALDO.length, etapas: e.etapas || [] }; });
+    // Resumen: fundantes pendientes (sin FUNDANTES RECIBIDOS), sobre el filtro q/parque/ejecutivo.
+    const [[resumen]] = await pool.query(`
+      SELECT COUNT(*) AS pendientes, COALESCE(SUM(s.saldo_precio),0) AS monto
+      FROM postventa_seguimiento s
+      LEFT JOIN creditos cr ON cr.id = s.id_credito
+      ${baseWhere} AND NOT ${RECIBIDO})`, fp);
+    res.json({ success: true, data, orden: ORDEN_SALDO, resumen, error: null });
+  } catch (e) { console.error('[consultaFundantes]', e.message); res.status(500).json({ success: false, data: null, error: 'Error interno del servidor' }); }
+};
+
 module.exports = { sync, getAll, setEtapa, getConfig, setConfig, marcarHistorico, getPerfiles, getSaldosAPagar, enviarAPago, pagarSaldos, getOrdenPago, correlativoOrden, emitirOrdenPago, desmarcarSaldos, getAtribuciones, getFondos, setFondos, getAlertasConfig, setAlertasConfig,
   getComisionesAPagar, getOrdenPagoComision, correlativoOrdenComision, emitirOrdenPagoComision, enviarAPagoComision, pagarComisiones, desmarcarComisiones, getAtribucionesComision, getFondosComision, setFondosComision,
-  getFacturaComision, updateFacturaComision, consultaSaldos, consultaFacturas };
+  getFacturaComision, updateFacturaComision, consultaSaldos, consultaFacturas, consultaFundantes };
