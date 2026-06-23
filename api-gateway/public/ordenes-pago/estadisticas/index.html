@@ -1,0 +1,176 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <link rel="icon" href="/img/favicon.png" type="image/png">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Estadísticas de Compra — AutoFácil</title>
+  <!-- v1.0 -->
+  <link href="/css/bootstrap.min.css" rel="stylesheet">
+  <link href="/css/bootstrap-icons.css" rel="stylesheet">
+  <style>
+    :root { --navy:#001345; --blue:#0141A2; }
+    body { background:#f0f4f8; font-family:'Segoe UI',system-ui,sans-serif; margin:0; }
+    .topnav { background:linear-gradient(90deg,#012d70,#0255c5); color:#fff; height:60px; padding:0 24px; display:flex; align-items:center; justify-content:space-between; box-shadow:0 2px 8px rgba(0,0,0,.3); }
+    .topnav-brand { display:flex; align-items:center; gap:8px; text-decoration:none; }
+    .topnav-brand img { height:32px; filter:brightness(0) invert(1); }
+    .version-badge { background:rgba(255,255,255,.15); color:rgba(255,255,255,.75); font-size:.65rem; font-weight:700; border-radius:6px; padding:2px 8px; }
+    .breadcrumb-nav { color:rgba(255,255,255,.6); font-size:.85rem; display:flex; align-items:center; gap:6px; }
+    .breadcrumb-nav a { color:rgba(255,255,255,.75); text-decoration:none; }
+    .user-chip { background:rgba(255,255,255,.12); border-radius:24px; padding:5px 12px; display:flex; align-items:center; gap:8px; font-size:.85rem; }
+    .avatar { width:28px; height:28px; background:#90caf9; border-radius:50%; display:flex; align-items:center; justify-content:center; color:var(--blue); font-weight:700; font-size:.75rem; }
+    .perfil-badge { background:rgba(144,202,249,.2); border:1px solid rgba(144,202,249,.4); color:#90caf9; border-radius:12px; padding:2px 10px; font-size:.73rem; font-weight:600; }
+    .btn-logout { background:rgba(255,255,255,.1); border:1px solid rgba(255,255,255,.2); color:#fff; border-radius:8px; padding:5px 12px; font-size:.82rem; cursor:pointer; }
+    .main-content { padding:24px; }
+    .card-af { background:#fff; border-radius:14px; box-shadow:0 1px 4px rgba(0,0,0,.07); padding:18px 20px; margin-bottom:16px; }
+    .toolbar { display:flex; gap:12px; align-items:center; flex-wrap:wrap; }
+    .toolbar select { border:1.5px solid #e2e8f0; border-radius:8px; padding:8px 12px; font-size:.86rem; }
+    .kpis { display:flex; gap:14px; flex-wrap:wrap; }
+    .kpi { background:#f8fafc; border:1px solid #eef2f7; border-radius:12px; padding:12px 18px; min-width:150px; }
+    .kpi .lbl { font-size:.7rem; text-transform:uppercase; color:#94a3b8; font-weight:700; letter-spacing:.3px; }
+    .kpi .val { font-size:1.25rem; font-weight:800; color:#0141A2; }
+    .bars { display:flex; align-items:flex-end; gap:8px; height:160px; padding-top:10px; }
+    .bar-col { flex:1; display:flex; flex-direction:column; align-items:center; justify-content:flex-end; gap:4px; }
+    .bar { width:70%; background:linear-gradient(180deg,#0255c5,#012d70); border-radius:5px 5px 0 0; min-height:2px; transition:height .3s; }
+    .bar-col .m { font-size:.66rem; color:#94a3b8; }
+    .bar-col .v { font-size:.62rem; color:#475569; font-weight:700; }
+    table { width:100%; border-collapse:collapse; font-size:.8rem; }
+    th { background:#f8fafc; color:#475569; font-size:.68rem; text-transform:uppercase; padding:8px 8px; border-bottom:2px solid #e2e8f0; white-space:nowrap; }
+    th.r, td.r { text-align:right; }
+    td { padding:7px 8px; border-bottom:1px solid #f1f5f9; white-space:nowrap; }
+    td.prov { text-align:left; font-weight:600; color:#1e293b; position:sticky; left:0; background:#fff; }
+    th.prov { text-align:left; position:sticky; left:0; }
+    tr.tot td { font-weight:800; background:#f1f5f9; border-top:2px solid #cbd5e1; }
+    td.z { color:#cbd5e1; }
+    .wrap-tab { overflow-x:auto; }
+  </style>
+</head>
+<body>
+<nav class="topnav">
+  <div style="display:flex;align-items:center;gap:16px">
+    <a href="/" class="topnav-brand"><img src="/img/logo.png" alt="AutoFácil"><span class="version-badge" id="versionBadge"></span></a>
+    <div class="breadcrumb-nav"><a href="/">Inicio</a><span>›</span><a href="/ordenes-pago/">Órdenes de Pago</a><span>›</span><span style="color:#fff;font-weight:600">Estadísticas</span></div>
+  </div>
+  <div style="display:flex;align-items:center;gap:10px">
+    <div class="user-chip"><div class="avatar" id="avatarInicial">?</div><div><div style="font-weight:600;line-height:1.3;color:#fff" id="navNombre">—</div><div class="perfil-badge" id="navPerfil">—</div></div></div>
+    <button class="btn-logout" onclick="logout()"><i class="bi bi-box-arrow-right me-1"></i>Salir</button>
+  </div>
+</nav>
+
+<div class="main-content">
+  <div class="card-af">
+    <div class="toolbar">
+      <span style="font-weight:800;color:var(--navy)"><i class="bi bi-bar-chart me-2"></i>Compras por proveedor</span>
+      <span style="color:#94a3b8;font-size:.82rem">Año</span>
+      <select id="anio" onchange="cargar()"><option>—</option></select>
+      <span style="color:#94a3b8;font-size:.78rem">Excluye órdenes anuladas</span>
+    </div>
+  </div>
+
+  <div class="card-af">
+    <div class="kpis" id="kpis"><div class="kpi"><div class="lbl">Cargando…</div></div></div>
+  </div>
+
+  <div class="card-af">
+    <div style="font-size:.78rem;color:#94a3b8;text-transform:uppercase;font-weight:700;margin-bottom:6px">Total de compras por mes</div>
+    <div class="bars" id="bars"></div>
+  </div>
+
+  <div class="card-af">
+    <div class="wrap-tab">
+      <table id="tabla">
+        <thead><tr id="thead"></tr></thead>
+        <tbody id="tbody"><tr><td style="text-align:center;color:#94a3b8;padding:24px">Cargando…</td></tr></tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<script>
+const token = sessionStorage.getItem('token');
+const yo = JSON.parse(sessionStorage.getItem('usuario')||'null');
+if (!token || !yo) location.href='/login.html';
+document.getElementById('navNombre').textContent = yo.nombre+' '+(yo.apellido||'');
+document.getElementById('navPerfil').textContent = yo.perfil||'';
+document.getElementById('avatarInicial').textContent = (yo.nombre||'?')[0].toUpperCase();
+function logout(){ sessionStorage.clear(); location.href='/login.html'; }
+const H = { Authorization:'Bearer '+token };
+const escH = s => String(s??'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+const MESES = ['Ene','Feb','Mar','Abr','May','Jun','Jul','Ago','Sep','Oct','Nov','Dic'];
+const fmtMon = n => '$'+Number(n||0).toLocaleString('es-CL');
+const fmtK = n => { n=Number(n||0); if(n>=1e6) return '$'+(n/1e6).toFixed(1)+'M'; if(n>=1e3) return '$'+Math.round(n/1e3)+'K'; return '$'+n; };
+let primera = true;
+
+async function cargar(){
+  const anioSel = primera ? '' : document.getElementById('anio').value;
+  try {
+    const r = await fetch('/api/ordenes-pago/estadisticas'+(anioSel?('?anio='+anioSel):''), { headers:H });
+    const j = await r.json();
+    const d = j.data || { anios:[], filas:[], anio:null };
+    // Selector de años
+    if (primera) {
+      const sel = document.getElementById('anio');
+      sel.innerHTML = (d.anios.length? d.anios : [d.anio||new Date().getFullYear()]).map(a=>`<option value="${a}">${a}</option>`).join('');
+      sel.value = d.anio;
+      primera = false;
+    }
+    pinta(d);
+  } catch(e) {
+    document.getElementById('tbody').innerHTML = '<tr><td style="text-align:center;color:#b91c1c;padding:24px">Error al cargar.</td></tr>';
+  }
+}
+
+function pinta(d){
+  // Pivot proveedor × mes
+  const provs = {};            // nombre → [12]
+  const totMes = new Array(12).fill(0);
+  let granTotal = 0, totN = 0;
+  (d.filas||[]).forEach(f => {
+    const m = (f.mes||1)-1;
+    if (!provs[f.proveedor]) provs[f.proveedor] = new Array(12).fill(0);
+    provs[f.proveedor][m] += Number(f.total||0);
+    totMes[m] += Number(f.total||0);
+    granTotal += Number(f.total||0);
+    totN += Number(f.n||0);
+  });
+  const nombres = Object.keys(provs).sort((a,b)=> provs[b].reduce((x,y)=>x+y,0) - provs[a].reduce((x,y)=>x+y,0));
+
+  // KPIs
+  document.getElementById('kpis').innerHTML = `
+    <div class="kpi"><div class="lbl">Total comprado ${d.anio}</div><div class="val">${fmtMon(granTotal)}</div></div>
+    <div class="kpi"><div class="lbl">Órdenes</div><div class="val">${totN}</div></div>
+    <div class="kpi"><div class="lbl">Proveedores</div><div class="val">${nombres.length}</div></div>
+    <div class="kpi"><div class="lbl">Promedio mensual</div><div class="val">${fmtMon(Math.round(granTotal/12))}</div></div>`;
+
+  // Barras por mes
+  const maxMes = Math.max(1, ...totMes);
+  document.getElementById('bars').innerHTML = totMes.map((v,i)=>{
+    const h = Math.round((v/maxMes)*130);
+    return `<div class="bar-col"><div class="v">${v?fmtK(v):''}</div><div class="bar" style="height:${h}px" title="${MESES[i]}: ${fmtMon(v)}"></div><div class="m">${MESES[i]}</div></div>`;
+  }).join('');
+
+  // Tabla pivote
+  document.getElementById('thead').innerHTML =
+    '<th class="prov">Proveedor</th>' + MESES.map(m=>`<th class="r">${m}</th>`).join('') + '<th class="r">Total</th>';
+  if (!nombres.length) {
+    document.getElementById('tbody').innerHTML = '<tr><td colspan="14" style="text-align:center;color:#94a3b8;padding:24px">Sin compras registradas en '+d.anio+'.</td></tr>';
+    return;
+  }
+  let html = nombres.map(nom=>{
+    const arr = provs[nom];
+    const tot = arr.reduce((x,y)=>x+y,0);
+    return `<tr><td class="prov">${escH(nom)}</td>` +
+      arr.map(v=>`<td class="r ${v?'':'z'}">${v?fmtMon(v):'·'}</td>`).join('') +
+      `<td class="r"><b>${fmtMon(tot)}</b></td></tr>`;
+  }).join('');
+  html += `<tr class="tot"><td class="prov">TOTAL</td>` +
+    totMes.map(v=>`<td class="r">${v?fmtMon(v):'·'}</td>`).join('') +
+    `<td class="r">${fmtMon(granTotal)}</td></tr>`;
+  document.getElementById('tbody').innerHTML = html;
+}
+
+cargar();
+</script>
+<script src="/js/app-version.js"></script>
+</body>
+</html>

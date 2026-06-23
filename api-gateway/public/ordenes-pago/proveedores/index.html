@@ -1,0 +1,229 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <link rel="icon" href="/img/favicon.png" type="image/png">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Base de Proveedores — AutoFácil</title>
+  <!-- v1.0 -->
+  <link href="/css/bootstrap.min.css" rel="stylesheet">
+  <link href="/css/bootstrap-icons.css" rel="stylesheet">
+  <style>
+    :root { --navy:#001345; --blue:#0141A2; }
+    body { background:#f0f4f8; font-family:'Segoe UI',system-ui,sans-serif; margin:0; }
+    .topnav { background:linear-gradient(90deg,#012d70,#0255c5); color:#fff; height:60px; padding:0 24px; display:flex; align-items:center; justify-content:space-between; box-shadow:0 2px 8px rgba(0,0,0,.3); }
+    .topnav-brand { display:flex; align-items:center; gap:8px; text-decoration:none; }
+    .topnav-brand img { height:32px; filter:brightness(0) invert(1); }
+    .version-badge { background:rgba(255,255,255,.15); color:rgba(255,255,255,.75); font-size:.65rem; font-weight:700; border-radius:6px; padding:2px 8px; }
+    .breadcrumb-nav { color:rgba(255,255,255,.6); font-size:.85rem; display:flex; align-items:center; gap:6px; }
+    .breadcrumb-nav a { color:rgba(255,255,255,.75); text-decoration:none; }
+    .user-chip { background:rgba(255,255,255,.12); border-radius:24px; padding:5px 12px; display:flex; align-items:center; gap:8px; font-size:.85rem; }
+    .avatar { width:28px; height:28px; background:#90caf9; border-radius:50%; display:flex; align-items:center; justify-content:center; color:var(--blue); font-weight:700; font-size:.75rem; }
+    .perfil-badge { background:rgba(144,202,249,.2); border:1px solid rgba(144,202,249,.4); color:#90caf9; border-radius:12px; padding:2px 10px; font-size:.73rem; font-weight:600; }
+    .btn-logout { background:rgba(255,255,255,.1); border:1px solid rgba(255,255,255,.2); color:#fff; border-radius:8px; padding:5px 12px; font-size:.82rem; cursor:pointer; }
+    .wrap { max-width:1200px; margin:0 auto; padding:24px; }
+    .card-af { background:#fff; border-radius:14px; box-shadow:0 1px 4px rgba(0,0,0,.07); padding:18px 20px; margin-bottom:18px; }
+    .toolbar { display:flex; gap:10px; align-items:center; flex-wrap:wrap; margin-bottom:14px; }
+    .toolbar input[type=text] { border:1.5px solid #e2e8f0; border-radius:8px; padding:8px 12px; font-size:.85rem; min-width:260px; }
+    table { width:100%; border-collapse:collapse; font-size:.84rem; }
+    th { background:#f8fafc; color:#475569; font-size:.72rem; text-transform:uppercase; padding:9px 10px; text-align:left; border-bottom:2px solid #e2e8f0; }
+    td { padding:8px 10px; border-bottom:1px solid #f1f5f9; vertical-align:middle; }
+    tr.inactivo td { color:#94a3b8; }
+    .btn-af { background:linear-gradient(135deg,#0141A2,#0255c5); color:#fff; border:none; border-radius:9px; padding:8px 18px; font-size:.85rem; font-weight:700; cursor:pointer; }
+    .btn-ghost { background:#fff; border:1.5px solid #e2e8f0; border-radius:8px; padding:7px 12px; font-size:.82rem; cursor:pointer; color:#334155; }
+    .icon-btn { background:none; border:none; cursor:pointer; font-size:1rem; padding:3px 6px; border-radius:6px; }
+    .icon-btn:hover { background:#eff6ff; }
+    .pill { font-size:.7rem; font-weight:700; border-radius:10px; padding:2px 9px; }
+    .pill.on { background:#dcfce7; color:#15803d; } .pill.off { background:#fee2e2; color:#b91c1c; }
+    dialog { border:none; border-radius:16px; padding:0; box-shadow:0 20px 60px rgba(0,0,0,.3); max-width:640px; width:94%; }
+    dialog::backdrop { background:rgba(15,23,42,.55); }
+    .dlg-head { background:linear-gradient(135deg,#012d70,#0255c5); color:#fff; padding:16px 22px; font-weight:700; display:flex; justify-content:space-between; align-items:center; }
+    .dlg-body { padding:20px 22px; }
+    .grid2 { display:grid; grid-template-columns:1fr 1fr; gap:14px; }
+    .fld { margin-bottom:2px; }
+    .fld label { display:block; font-size:.7rem; font-weight:800; text-transform:uppercase; color:#64748b; letter-spacing:.3px; margin:0 0 4px; }
+    .fld input, .fld select { width:100%; border:1.5px solid #e2e8f0; border-radius:8px; padding:8px 11px; font-size:.84rem; box-sizing:border-box; }
+    .fld input:focus, .fld select:focus { border-color:#0141A2; outline:none; }
+    .fld input.ok { border-color:#16a34a; } .fld input.bad { border-color:#dc2626; }
+    .dlg-foot { padding:14px 22px; border-top:1px solid #eef2f7; display:flex; justify-content:flex-end; gap:10px; align-items:center; }
+    .footer-afecta { background:#f8fafc; border-left:4px solid #0141A2; border-radius:8px; padding:12px 14px; font-size:.8rem; color:#475569; line-height:1.7; }
+    @media(max-width:680px){ .grid2{ grid-template-columns:1fr; } }
+  </style>
+</head>
+<body>
+<nav class="topnav">
+  <div style="display:flex;align-items:center;gap:16px">
+    <a href="/" class="topnav-brand"><img src="/img/logo.png" alt="AutoFácil"><span class="version-badge" id="versionBadge"></span></a>
+    <div class="breadcrumb-nav"><a href="/">Inicio</a><span>›</span><a href="/ordenes-pago/">Órdenes de Pago</a><span>›</span><span style="color:#fff;font-weight:600">Base de Proveedores</span></div>
+  </div>
+  <div style="display:flex;align-items:center;gap:10px">
+    <div class="user-chip"><div class="avatar" id="avatarInicial">?</div><div><div style="font-weight:600;line-height:1.3;color:#fff" id="navNombre">—</div><div class="perfil-badge" id="navPerfil">—</div></div></div>
+    <button class="btn-logout" onclick="logout()"><i class="bi bi-box-arrow-right me-1"></i>Salir</button>
+  </div>
+</nav>
+
+<div class="wrap">
+  <div class="card-af">
+    <div class="toolbar">
+      <input type="text" id="q" placeholder="Buscar por nombre, RUT o giro…" oninput="debounced()">
+      <label style="font-size:.82rem;color:#475569;display:flex;align-items:center;gap:6px"><input type="checkbox" id="verInactivos" onchange="cargar()"> Ver inactivos</label>
+      <div style="flex:1"></div>
+      <button class="btn-af" id="btnNuevo" onclick="abrirNuevo()"><i class="bi bi-plus-lg me-1"></i>Nuevo proveedor</button>
+    </div>
+    <div style="overflow-x:auto">
+      <table>
+        <thead><tr><th>Nombre</th><th>RUT</th><th>Giro</th><th>Contacto</th><th>Cuenta</th><th>Estado</th><th></th></tr></thead>
+        <tbody id="tbody"><tr><td colspan="7" style="text-align:center;color:#94a3b8;padding:24px">Cargando…</td></tr></tbody>
+      </table>
+    </div>
+  </div>
+
+  <div class="footer-afecta">
+    <b><i class="bi bi-diagram-3 me-1"></i>Qué afecta esta página</b><br>
+    • <b>Proveedores</b> → alimentan el selector de proveedor en <a href="/ordenes-pago/emision/">Emisión de Órdenes de Pago</a> y agrupan las <a href="/ordenes-pago/estadisticas/">Estadísticas</a> de compra mensual.<br>
+    • <b>Desactivar</b> un proveedor lo oculta del selector de emisión, pero conserva su historial de órdenes.
+  </div>
+</div>
+
+<dialog id="dlg">
+  <form id="frm" method="dialog">
+    <div class="dlg-head"><span id="dlgTitulo">Nuevo proveedor</span><i class="bi bi-x-lg" style="cursor:pointer" onclick="document.getElementById('dlg').close()"></i></div>
+    <div class="dlg-body">
+      <input type="hidden" id="fId">
+      <div class="grid2">
+        <div class="fld"><label>Nombre / Razón social *</label><input id="fNombre" maxlength="200"></div>
+        <div class="fld"><label>RUT</label><input id="fRut" maxlength="20" placeholder="76.123.456-7" oninput="onRut()"></div>
+        <div class="fld"><label>Giro</label><input id="fGiro" maxlength="200"></div>
+        <div class="fld"><label>Contacto</label><input id="fContacto" maxlength="150"></div>
+        <div class="fld"><label>Email</label><input id="fEmail" maxlength="150"></div>
+        <div class="fld"><label>Teléfono</label><input id="fTelefono" maxlength="40"></div>
+        <div class="fld" style="grid-column:1 / -1"><label>Dirección</label><input id="fDireccion" maxlength="300"></div>
+        <div class="fld"><label>Banco</label><input id="fBanco" maxlength="80"></div>
+        <div class="fld"><label>Tipo de cuenta</label>
+          <select id="fTipoCuenta"><option value="">—</option><option>Cuenta Corriente</option><option>Cuenta Vista</option><option>Cuenta de Ahorro</option><option>Chequera Electrónica</option></select>
+        </div>
+        <div class="fld"><label>N° de cuenta</label><input id="fNumCuenta" maxlength="60"></div>
+      </div>
+    </div>
+    <div class="dlg-foot">
+      <span id="dlgMsg" style="font-size:.82rem;color:#b91c1c;margin-right:auto;display:none"></span>
+      <button type="button" class="btn-ghost" onclick="document.getElementById('dlg').close()">Cancelar</button>
+      <button type="button" class="btn-af" id="btnGuardar" onclick="guardar()"><i class="bi bi-check-lg me-1"></i>Guardar</button>
+    </div>
+  </form>
+</dialog>
+
+<script>
+const token = sessionStorage.getItem('token');
+const yo = JSON.parse(sessionStorage.getItem('usuario')||'null');
+if (!token || !yo) location.href='/login.html';
+document.getElementById('navNombre').textContent = yo.nombre+' '+(yo.apellido||'');
+document.getElementById('navPerfil').textContent = yo.perfil||'';
+document.getElementById('avatarInicial').textContent = (yo.nombre||'?')[0].toUpperCase();
+function logout(){ sessionStorage.clear(); location.href='/login.html'; }
+const H = { 'Content-Type':'application/json', Authorization:'Bearer '+token };
+const escH = s => String(s??'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+let DATA = [];
+
+/* ── Validador RUT (DV módulo 11) — snippet canónico ── */
+function formatRUT(v){ let x=String(v||'').replace(/[^0-9kK]/g,'').toUpperCase(); if(!x) return ''; const dv=x.slice(-1); let n=x.slice(0,-1); n=n.replace(/\B(?=(\d{3})+(?!\d))/g,'.'); return n?`${n}-${dv}`:dv; }
+function calcDV(n){ let s=1,m=0; for(;n;n=Math.floor(n/10)){ s=(s+n%10*(9-m++%6))%11; } return s?String(s-1):'K'; }
+function validarRUT(v){ const x=String(v||'').replace(/[^0-9kK]/g,'').toUpperCase(); if(x.length<2) return false; const dv=x.slice(-1), n=parseInt(x.slice(0,-1),10); if(isNaN(n)) return false; return calcDV(n)===dv; }
+function onRut(){ const el=document.getElementById('fRut'); el.value=formatRUT(el.value); el.classList.remove('ok','bad'); if(el.value.replace(/[^0-9kK]/gi,'').length>1) el.classList.add(validarRUT(el.value)?'ok':'bad'); }
+
+const fmtMon = n => '$'+Number(n||0).toLocaleString('es-CL');
+let tmr=null; function debounced(){ clearTimeout(tmr); tmr=setTimeout(cargar, 280); }
+
+async function cargar(){
+  const q = encodeURIComponent(document.getElementById('q').value.trim());
+  const inc = document.getElementById('verInactivos').checked ? '&incluir_inactivos=1' : '';
+  const tb = document.getElementById('tbody');
+  tb.innerHTML = '<tr><td colspan="7" style="text-align:center;color:#94a3b8;padding:24px">Cargando…</td></tr>';
+  try {
+    const r = await fetch(`/api/ordenes-pago/proveedores?q=${q}${inc}`, { headers:H });
+    const j = await r.json();
+    DATA = j.data || [];
+    if (!DATA.length) { tb.innerHTML = '<tr><td colspan="7" style="text-align:center;color:#94a3b8;padding:24px">Sin proveedores.</td></tr>'; return; }
+    tb.innerHTML = DATA.map(p => {
+      const cuenta = [p.banco, p.tipo_cuenta, p.numero_cuenta].filter(Boolean).join(' · ') || '—';
+      const contacto = [p.contacto, p.telefono, p.email].filter(Boolean).join(' · ') || '—';
+      return `<tr class="${p.activo? '':'inactivo'}">
+        <td><b>${escH(p.nombre)}</b></td>
+        <td>${escH(p.rut? formatRUT(p.rut):'—')}</td>
+        <td>${escH(p.giro||'—')}</td>
+        <td style="font-size:.78rem">${escH(contacto)}</td>
+        <td style="font-size:.78rem">${escH(cuenta)}</td>
+        <td><span class="pill ${p.activo?'on':'off'}">${p.activo?'Activo':'Inactivo'}</span></td>
+        <td style="white-space:nowrap;text-align:right">
+          <button class="icon-btn" title="Editar" onclick="abrirEdit(${p.id})"><i class="bi bi-pencil"></i></button>
+          <button class="icon-btn" title="${p.activo?'Desactivar':'Reactivar'}" onclick="toggle(${p.id})"><i class="bi ${p.activo?'bi-toggle-on':'bi-toggle-off'}" style="color:${p.activo?'#16a34a':'#94a3b8'}"></i></button>
+        </td>
+      </tr>`;
+    }).join('');
+  } catch(e) {
+    tb.innerHTML = '<tr><td colspan="7" style="text-align:center;color:#b91c1c;padding:24px">Error al cargar.</td></tr>';
+  }
+}
+
+function setForm(p){
+  document.getElementById('fId').value = p.id||'';
+  document.getElementById('fNombre').value = p.nombre||'';
+  document.getElementById('fRut').value = p.rut? formatRUT(p.rut):'';
+  document.getElementById('fGiro').value = p.giro||'';
+  document.getElementById('fContacto').value = p.contacto||'';
+  document.getElementById('fEmail').value = p.email||'';
+  document.getElementById('fTelefono').value = p.telefono||'';
+  document.getElementById('fDireccion').value = p.direccion||'';
+  document.getElementById('fBanco').value = p.banco||'';
+  document.getElementById('fTipoCuenta').value = p.tipo_cuenta||'';
+  document.getElementById('fNumCuenta').value = p.numero_cuenta||'';
+  document.getElementById('fRut').classList.remove('ok','bad');
+  document.getElementById('dlgMsg').style.display='none';
+}
+function abrirNuevo(){ setForm({}); document.getElementById('dlgTitulo').textContent='Nuevo proveedor'; document.getElementById('dlg').showModal(); }
+function abrirEdit(id){ const p=DATA.find(x=>x.id===id); if(!p) return; setForm(p); document.getElementById('dlgTitulo').textContent='Editar proveedor'; document.getElementById('dlg').showModal(); }
+
+async function guardar(){
+  const id = document.getElementById('fId').value;
+  const nombre = document.getElementById('fNombre').value.trim();
+  const rut = document.getElementById('fRut').value.trim();
+  const msg = document.getElementById('dlgMsg');
+  if (!nombre) { msg.textContent='El nombre es obligatorio.'; msg.style.display='inline'; return; }
+  if (rut && !validarRUT(rut)) { msg.textContent='El RUT no es válido.'; msg.style.display='inline'; return; }
+  const body = {
+    nombre, rut,
+    giro: document.getElementById('fGiro').value.trim(),
+    contacto: document.getElementById('fContacto').value.trim(),
+    email: document.getElementById('fEmail').value.trim(),
+    telefono: document.getElementById('fTelefono').value.trim(),
+    direccion: document.getElementById('fDireccion').value.trim(),
+    banco: document.getElementById('fBanco').value.trim(),
+    tipo_cuenta: document.getElementById('fTipoCuenta').value,
+    numero_cuenta: document.getElementById('fNumCuenta').value.trim(),
+  };
+  const btn = document.getElementById('btnGuardar'); btn.disabled=true;
+  try {
+    const url = id ? `/api/ordenes-pago/proveedores/${id}` : '/api/ordenes-pago/proveedores';
+    const r = await fetch(url, { method: id?'PUT':'POST', headers:H, body: JSON.stringify(body) });
+    const j = await r.json();
+    if (j.success) { document.getElementById('dlg').close(); cargar(); }
+    else { msg.textContent = j.error||'Error al guardar.'; msg.style.display='inline'; }
+  } catch(e) { msg.textContent='Error de red.'; msg.style.display='inline'; }
+  btn.disabled=false;
+}
+
+async function toggle(id){
+  const p = DATA.find(x=>x.id===id); if(!p) return;
+  if (!confirm(`¿${p.activo?'Desactivar':'Reactivar'} a ${p.nombre}?`)) return;
+  try {
+    const r = await fetch(`/api/ordenes-pago/proveedores/${id}`, { method:'DELETE', headers:H });
+    const j = await r.json();
+    if (j.success) cargar(); else alert(j.error||'Error');
+  } catch(e) { alert('Error de red'); }
+}
+
+cargar();
+</script>
+<script src="/js/app-version.js"></script>
+</body>
+</html>

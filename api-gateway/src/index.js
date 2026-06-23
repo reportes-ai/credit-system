@@ -151,6 +151,7 @@ app.use('/api/atencion-remota', require('../../services/atencion-remota/src/rout
 app.use('/api/postventa', require('../../services/postventa/src/routes/postventa.routes'));
 app.use('/api/correos-programados', require('../../services/correos-programados/src/routes/correos.routes'));
 app.use('/api/backups', require('../../services/backups/src/routes/backups.routes'));
+app.use('/api/ordenes-pago', require('../../services/ordenes-pago/src/routes/ordenes-pago.routes'));
 app.use('/api/cartas-ejecutivos', require('../../services/cartas/src/routes/ejecutivos.routes'));
 app.use('/api/cartas-params',     require('../../services/cartas/src/routes/parametros.routes'));
 
@@ -448,6 +449,18 @@ app.get(['/postventa/consulta-saldos', '/postventa/consulta-saldos/'], (req, res
   res.sendFile(path.join(__dirname, '../public/postventa/consulta-saldos/index.html')));
 app.get(['/postventa/consulta-factura', '/postventa/consulta-factura/'], (req, res) =>
   res.sendFile(path.join(__dirname, '../public/postventa/consulta-factura/index.html')));
+
+// Órdenes de Pago (módulo general de cuentas por pagar a proveedores)
+app.get(['/ordenes-pago', '/ordenes-pago/'], (req, res) =>
+  res.sendFile(path.join(__dirname, '../public/ordenes-pago/index.html')));
+app.get(['/ordenes-pago/emision', '/ordenes-pago/emision/'], (req, res) =>
+  res.sendFile(path.join(__dirname, '../public/ordenes-pago/emision/index.html')));
+app.get(['/ordenes-pago/historial', '/ordenes-pago/historial/'], (req, res) =>
+  res.sendFile(path.join(__dirname, '../public/ordenes-pago/historial/index.html')));
+app.get(['/ordenes-pago/proveedores', '/ordenes-pago/proveedores/'], (req, res) =>
+  res.sendFile(path.join(__dirname, '../public/ordenes-pago/proveedores/index.html')));
+app.get(['/ordenes-pago/estadisticas', '/ordenes-pago/estadisticas/'], (req, res) =>
+  res.sendFile(path.join(__dirname, '../public/ordenes-pago/estadisticas/index.html')));
 
 app.get(['/edicion-creditos', '/edicion-creditos/'], (req, res) =>
   res.sendFile(path.join(__dirname, '../public/edicion-creditos/index.html')));
