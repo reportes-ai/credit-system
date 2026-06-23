@@ -98,7 +98,8 @@ const getByCredito = async (req, res) => {
 const getById = async (req, res) => {
   try {
     const [rows] = await pool.query(
-      `SELECT pc.*, cj.nombre AS nombre_caja
+      `SELECT pc.*, cj.nombre AS nombre_caja,
+              DATE_FORMAT(pc.created_at,'%H:%i:%s') AS hora_pago_fmt
        FROM pagos_credito pc
        LEFT JOIN cajas cj ON cj.id_caja = pc.id_caja
        WHERE pc.id_pago = ?`,

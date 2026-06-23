@@ -408,11 +408,20 @@ const getDocumento = async (req, res) => {
     const ocId = parseInt(req.params.id);
     const [[oc]] = await pool.query('SELECT * FROM op_correlativos WHERE id=?', [ocId]);
     if (!oc) return res.status(404).json({ success: false, data: null, error: 'Orden no encontrada' });
-    if (oc.snapshot_json) {
-      try { return res.json({ success: true, data: Object.assign(JSON.parse(oc.snapshot_json), { congelada: true }), error: null }); } catch (_) {}
-    }
-    const data = await construirDocumento(oc);
+    let data = null, congelada = false;
+    if (oc.snapshot_json) { try { data = JSON.parse(oc.snapshot_json); congelada = true; } catch (_) { data = null; } }
+    if (!data) data = await construirDocumento(oc);
     if (!data) return res.status(404).json({ success: false, data: null, error: 'Orden no encontrada' });
+    if (congelada) data.congelada = true;
+    // Datos del timbre "PAGADO" (caja, fecha y hora del pago), formateados en hora de Chile.
+    if (oc.pagada) {
+      try {
+        const [[p]] = await pool.query(
+          `SELECT DATE_FORMAT(o.fecha_pagada,'%d-%m-%Y') AS fecha, DATE_FORMAT(o.fecha_pagada,'%H:%i:%s') AS hora, cj.nombre AS caja
+           FROM op_correlativos o LEFT JOIN cajas cj ON cj.id_caja = o.id_caja WHERE o.id = ?`, [oc.id]);
+        if (p) data.pago = { caja: p.caja || (oc.id_caja ? 'Caja #' + oc.id_caja : null), fecha: p.fecha, hora: p.hora };
+      } catch (_) {}
+    }
     res.json({ success: true, data, error: null });
   } catch (e) {
     console.error('[ordenes-pago getDocumento]', e.message);

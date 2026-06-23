@@ -14,6 +14,15 @@ const _cEsc = s => String(s || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').re
 const _cFmtNow = () => new Date().toLocaleDateString('es-CL', {
   day:'2-digit', month:'2-digit', year:'numeric', hour:'2-digit', minute:'2-digit'
 });
+// Hora HH:MM:SS del pago (prefiere el formato del backend; si no, deriva de created_at/fecha_pago).
+const _cHora = p => {
+  if (!p) return '';
+  if (p.hora_pago_fmt) return p.hora_pago_fmt;
+  const s = p.created_at || p.fecha_pago;
+  if (!s) return '';
+  if (typeof s === 'string') { const t = s.slice(11, 19); return /^\d/.test(t) ? t : ''; }
+  try { return new Date(s).toLocaleTimeString('es-CL', { hour12: false }); } catch (_) { return ''; }
+};
 
 /**
  * buildRecibo(opts) → string HTML
@@ -114,9 +123,14 @@ function buildRecibo({ credito, pagos, cajaNombre, trxNum, idPago }) {
       </div>`;
   }
 
-  return `
-    <div id="compPrint" style="font-family:'Segoe UI',system-ui,sans-serif;padding:28px 32px;max-width:480px;margin:0 auto;background:#fff">
+  // Timbre "PAGADO" (caja, fecha y hora del pago).
+  const sello = (typeof window !== 'undefined' && window.timbrePagado)
+    ? `<div style="position:absolute;top:14px;right:6px;z-index:3">${window.timbrePagado({ caja: cajaNombre || '', fecha: _cFmtD(primerPago.fecha_pago), hora: _cHora(primerPago) })}</div>`
+    : '';
 
+  return `
+    <div id="compPrint" style="position:relative;font-family:'Segoe UI',system-ui,sans-serif;padding:28px 32px;max-width:480px;margin:0 auto;background:#fff">
+      ${sello}
       <!-- Logo + título -->
       <div style="text-align:center;margin-bottom:14px">
         <img src="/img/logo.png" alt="" style="height:38px;display:block;margin:0 auto"
