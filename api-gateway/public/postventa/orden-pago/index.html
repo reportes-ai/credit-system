@@ -5,7 +5,7 @@
   <link rel="icon" href="/img/favicon.png" type="image/png">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Emisión Orden de Pago — AutoFácil</title>
-  <!-- v2.1 -->
+  <!-- v2.2 -->
   <link href="/css/bootstrap.min.css" rel="stylesheet">
   <link href="/css/bootstrap-icons.css" rel="stylesheet">
   <style>
@@ -132,7 +132,7 @@ const periodoCL = d => { const x = d ? new Date(d) : new Date(); return MESES[x.
 let DATA = [], FIJOS = {}, actual = null;
 // Plantilla editable del correo (mantenedor Post Venta → config correo_orden_saldo)
 let CORREO = {
-  asunto: 'Orden de Pago N° {nOrden} — Saldo Precio {dealer} (OP {num_op})',
+  asunto: 'Orden de Pago Saldo Precio N° {nOrden} — {dealer} (OP {num_op})',
   cuerpo: 'Estimado Equipo de Contabilidad:\n\nAdjunto encontrarán Orden de Pago N° {nOrden} para el pago del Saldo Precio a {dealer} del Crédito N° {num_op} otorgado por {financiera} con fecha {fecha_otorgado}, Saldo Precio recepcionado por AutoFácil el día {fecha_recepcion}.\n\nLes recordamos que deben marcar en el módulo de Saldo Precio Pagado, de manera de informar al Ejecutivo y cerrar el flujo operativo de esta transacción.',
   firma: 'Saludos cordiales,\nÁrea de Operaciones',
 };

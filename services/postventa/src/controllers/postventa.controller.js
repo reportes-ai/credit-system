@@ -60,7 +60,7 @@ const pool = require('../../../../shared/config/database');
       ['etapas_saldo', JSON.stringify(DEF_SALDO), 'etapas_comision', JSON.stringify(DEF_COM)]);
     // Plantillas editables del correo a Contabilidad al emitir la Orden de Pago (saldo y comisión).
     const CORREO_SALDO = {
-      asunto: 'Orden de Pago N° {nOrden} — Saldo Precio {dealer} (OP {num_op})',
+      asunto: 'Orden de Pago Saldo Precio N° {nOrden} — {dealer} (OP {num_op})',
       cuerpo: 'Estimado Equipo de Contabilidad:\n\nAdjunto encontrarán Orden de Pago N° {nOrden} para el pago del Saldo Precio a {dealer} del Crédito N° {num_op} otorgado por {financiera} con fecha {fecha_otorgado}, Saldo Precio recepcionado por AutoFácil el día {fecha_recepcion}.\n\nLes recordamos que deben marcar en el módulo de Saldo Precio Pagado, de manera de informar al Ejecutivo y cerrar el flujo operativo de esta transacción.',
       firma: 'Saludos cordiales,\nÁrea de Operaciones',
     };
@@ -73,6 +73,16 @@ const pool = require('../../../../shared/config/database');
       ['correo_orden_saldo', JSON.stringify(CORREO_SALDO),
        'correo_orden_comision', JSON.stringify(CORREO_COMISION),
        'correo_contabilidad', JSON.stringify('contabilidad@autofacilchile.cl')]);
+    // Parche idempotente: alinear el asunto del saldo al formato de comisión (solo si conserva el default viejo).
+    try {
+      const [[rc]] = await pool.query("SELECT valor FROM postventa_config WHERE clave='correo_orden_saldo'");
+      if (rc) { const v = JSON.parse(rc.valor);
+        if (v && v.asunto === 'Orden de Pago N° {nOrden} — Saldo Precio {dealer} (OP {num_op})') {
+          v.asunto = 'Orden de Pago Saldo Precio N° {nOrden} — {dealer} (OP {num_op})';
+          await pool.query("UPDATE postventa_config SET valor=? WHERE clave='correo_orden_saldo'", [JSON.stringify(v)]);
+        }
+      }
+    } catch (_) {}
     // Parche: insertar ENVIADO A PAGO (antes de la etapa de pagado) en configs ya existentes.
     // claveProc = array posicional de perfiles por etapa: hay que insertar un slot vacío
     // en la misma posición para no desalinear los permisos de las etapas posteriores.
