@@ -5,7 +5,7 @@
   <link rel="icon" href="/img/favicon.png" type="image/png">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Emisión de Orden de Pago — AutoFácil</title>
-  <!-- v1.1 -->
+  <!-- v1.2 -->
   <link href="/css/bootstrap.min.css" rel="stylesheet">
   <link href="/css/bootstrap-icons.css" rel="stylesheet">
   <style>
@@ -76,25 +76,26 @@
         <input id="fCategoria" list="catList" maxlength="80" placeholder="Ej: Arriendo, Servicios, Insumos…">
         <datalist id="catList"><option>Arriendo</option><option>Servicios Básicos</option><option>Honorarios</option><option>Insumos</option><option>Marketing</option><option>Tecnología</option><option>Mantención</option><option>Otros</option></datalist>
       </div>
-      <div class="fld"><label>Tratamiento tributario *</label>
-        <select id="fTratamiento" onchange="recalc()">
-          <option value="AFECTO">Afecto a IVA (19%)</option>
-          <option value="EXENTO">Exento</option>
-          <option value="HONORARIOS">Boleta de Honorarios (retención)</option>
+      <div class="fld"><label>Tipo de Documento *</label>
+        <select id="fTipoDoc" onchange="onTipo()">
+          <option value="Factura">Factura</option>
+          <option value="Factura Exenta">Factura Exenta</option>
+          <option value="Boleta de Honorarios">Boleta de Honorarios</option>
+          <option value="Boleta Exenta">Boleta Exenta</option>
+          <option value="Nota de Cobro">Nota de Cobro</option>
+          <option value="Otros">Otros</option>
         </select>
       </div>
-      <div class="fld monto-box"><label>Monto neto (CLP) *</label><input id="fMonto" inputmode="numeric" placeholder="0" oninput="fmtMonto()"></div>
-      <div class="fld full" id="previewBox" style="display:none">
-        <div style="background:#f8fafc;border:1px solid #eef2f7;border-radius:10px;padding:10px 14px;display:flex;gap:24px;flex-wrap:wrap;font-size:.86rem;align-items:center">
-          <span>Neto: <b id="pvNeto">$0</b></span>
-          <span id="pvImpWrap"><span id="pvImpLbl">IVA 19%</span>: <b id="pvImp">$0</b></span>
-          <span style="color:#0141A2;font-weight:800">A pagar: <span id="pvPagar">$0</span></span>
+
+      <div class="fld full">
+        <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:14px;align-items:end">
+          <div class="fld monto-box" style="margin:0"><label>Monto Bruto (CLP) *</label><input id="fBruto" inputmode="numeric" placeholder="0" oninput="onMonto('BRUTO')"></div>
+          <div class="fld" style="margin:0" id="impBox"><label id="impLbl">IVA 19%</label><input id="fImp" readonly placeholder="$0" style="background:#f1f5f9;color:#475569;font-weight:700"></div>
+          <div class="fld monto-box" style="margin:0"><label>Monto Neto (CLP) *</label><input id="fNeto" inputmode="numeric" placeholder="0" oninput="onMonto('NETO')"></div>
         </div>
+        <div style="margin-top:10px;font-size:.92rem;font-weight:700;color:#334155">A pagar: <span id="pvPagar" style="color:#0141A2;font-weight:800;font-size:1.08rem">$0</span></div>
       </div>
 
-      <div class="fld"><label>Tipo de documento</label>
-        <select id="fTipoDoc"><option value="">—</option><option>Factura</option><option>Boleta</option><option>Boleta de Honorarios</option><option>Nota de Cobro</option><option>Sin documento</option></select>
-      </div>
       <div class="fld"><label>N° de documento</label><input id="fNumDoc" maxlength="40"></div>
 
       <div class="fld"><label>Fecha del documento</label><input id="fFechaDoc" type="date"></div>
@@ -130,33 +131,57 @@ const escH = s => String(s??'').replace(/&/g,'&amp;').replace(/</g,'&lt;').repla
 
 function formatRUT(v){ let x=String(v||'').replace(/[^0-9kK]/g,'').toUpperCase(); if(!x) return ''; const dv=x.slice(-1); let n=x.slice(0,-1); n=n.replace(/\B(?=(\d{3})+(?!\d))/g,'.'); return n?`${n}-${dv}`:dv; }
 function onRut(){ const el=document.getElementById('fProvRut'); el.value=formatRUT(el.value); }
-function fmtMonto(){ const el=document.getElementById('fMonto'); const n=el.value.replace(/\D/g,''); el.value=n? Number(n).toLocaleString('es-CL'):''; recalc(); }
-function montoNum(){ return Number(document.getElementById('fMonto').value.replace(/\D/g,''))||0; }
 const money = n => '$'+Number(Math.round(n)||0).toLocaleString('es-CL');
+const numEl = id => Number(String(document.getElementById(id).value).replace(/\D/g,''))||0;
+function fmtInput(id){ const el=document.getElementById(id); const n=el.value.replace(/\D/g,''); el.value=n? Number(n).toLocaleString('es-CL'):''; }
+let lastBase = 'NETO';   // qué campo escribió el usuario por última vez
 
 let IMPUESTOS = { IVA:19, RETENCION_HONORARIOS:15.25 };
 async function cargarImpuestos(){
   try { const r = await fetch('/api/impuestos/valores', { headers:H }); const j = await r.json(); if (j.success && j.data) IMPUESTOS = { ...IMPUESTOS, ...j.data }; } catch(e){}
-  recalc();
+  onTipo();
 }
-// Calcula impuesto y A pagar según tratamiento (espejo del backend).
-function calcMontos(neto, trat){
-  if (trat==='EXENTO') return { pct:0, imp:0, pagar:neto, lbl:'Exento' };
-  if (trat==='HONORARIOS'){ const pct=Number(IMPUESTOS.RETENCION_HONORARIOS)||15.25; const imp=Math.round(neto*pct/100); return { pct, imp, pagar:neto-imp, lbl:`Retención ${pct}%` }; }
-  const pct=Number(IMPUESTOS.IVA)||19; const imp=Math.round(neto*pct/100); return { pct, imp, pagar:neto+imp, lbl:`IVA ${pct}%` };
+// Clase tributaria según el tipo de documento.
+function claseDoc(tipo){ if(tipo==='Factura') return 'IVA'; if(tipo==='Boleta de Honorarios') return 'RET'; return 'EXENTO'; }
+// Calcula los 3 montos + A pagar (espejo del backend). bruto = neto + impuesto.
+function calcDoc(tipo, base, valor){
+  const clase = claseDoc(tipo);
+  if (clase==='EXENTO') return { clase, pct:0, neto:valor, bruto:valor, imp:0, pagar:valor };
+  if (clase==='IVA'){ const pct=Number(IMPUESTOS.IVA)||19;
+    if (base==='BRUTO'){ const bruto=valor, neto=Math.round(bruto/(1+pct/100)), imp=bruto-neto; return {clase,pct,neto,bruto,imp,pagar:bruto}; }
+    const neto=valor, imp=Math.round(neto*pct/100), bruto=neto+imp; return {clase,pct,neto,bruto,imp,pagar:bruto};
+  }
+  const pct=Number(IMPUESTOS.RETENCION_HONORARIOS)||15.25;
+  if (base==='BRUTO'){ const bruto=valor, imp=Math.round(bruto*pct/100), neto=bruto-imp; return {clase,pct,neto,bruto,imp,pagar:neto}; }
+  const neto=valor, bruto=Math.round(neto/(1-pct/100)), imp=bruto-neto; return {clase,pct,neto,bruto,imp,pagar:neto};
 }
-function recalc(){
-  const neto = montoNum();
-  const trat = document.getElementById('fTratamiento').value;
-  const box = document.getElementById('previewBox');
-  if (!neto){ box.style.display='none'; return; }
-  const m = calcMontos(neto, trat);
-  document.getElementById('pvNeto').textContent = money(neto);
-  document.getElementById('pvImpWrap').style.display = (trat==='EXENTO')?'none':'';
-  document.getElementById('pvImpLbl').textContent = m.lbl + (trat==='HONORARIOS'?' (−)':'');
-  document.getElementById('pvImp').textContent = money(m.imp);
+function lblImp(clase, pct){ return clase==='IVA'?`IVA ${pct}%` : clase==='RET'?`Retención ${pct}%` : 'Exento'; }
+function pintarMontos(m){
+  document.getElementById('fBruto').value = m.bruto? Number(m.bruto).toLocaleString('es-CL') : '';
+  document.getElementById('fNeto').value  = m.neto?  Number(m.neto).toLocaleString('es-CL')  : '';
+  document.getElementById('fImp').value   = m.clase==='EXENTO' ? '—' : money(m.imp);
+  document.getElementById('impLbl').textContent = lblImp(m.clase, m.pct);
+  document.getElementById('impBox').style.opacity = m.clase==='EXENTO' ? '.5' : '1';
   document.getElementById('pvPagar').textContent = money(m.pagar);
-  box.style.display='';
+}
+// El usuario edita Bruto o Neto → formatea ese campo y calcula el resto.
+function onMonto(which){
+  lastBase = which;
+  fmtInput(which==='BRUTO'?'fBruto':'fNeto');
+  const tipo = document.getElementById('fTipoDoc').value;
+  const valor = which==='BRUTO'? numEl('fBruto') : numEl('fNeto');
+  if (!valor){ document.getElementById('fImp').value=''; document.getElementById('pvPagar').textContent='$0';
+    document.getElementById(which==='BRUTO'?'fNeto':'fBruto').value=''; return; }
+  pintarMontos(calcDoc(tipo, which, valor));
+}
+// Cambió el tipo de documento → recalcula desde el último campo escrito.
+function onTipo(){
+  const tipo = document.getElementById('fTipoDoc').value;
+  const base = numEl(lastBase==='BRUTO'?'fBruto':'fNeto') ? lastBase
+             : (numEl('fNeto') ? 'NETO' : (numEl('fBruto') ? 'BRUTO' : null));
+  if (!base){ document.getElementById('impLbl').textContent = lblImp(claseDoc(tipo), claseDoc(tipo)==='IVA'?(Number(IMPUESTOS.IVA)||19):(Number(IMPUESTOS.RETENCION_HONORARIOS)||15.25)); document.getElementById('impBox').style.opacity = claseDoc(tipo)==='EXENTO'?'.5':'1'; return; }
+  lastBase = base;
+  pintarMontos(calcDoc(tipo, base, numEl(base==='BRUTO'?'fBruto':'fNeto')));
 }
 
 async function cargarProv(){
@@ -181,12 +206,14 @@ async function emitir(){
   const err = document.getElementById('errMsg'); err.style.display='none';
   const provSel = document.getElementById('fProv').value;
   const concepto = document.getElementById('fConcepto').value.trim();
-  const monto = montoNum();
+  const monto = lastBase==='BRUTO' ? numEl('fBruto') : numEl('fNeto');
   if (!provSel) { return fail('Selecciona un proveedor.'); }
-  let body = { concepto, monto_neto: monto,
-    tratamiento: document.getElementById('fTratamiento').value,
-    categoria: document.getElementById('fCategoria').value.trim(),
+  let body = { concepto,
     tipo_documento: document.getElementById('fTipoDoc').value,
+    monto_base: lastBase,
+    monto_bruto: numEl('fBruto'),
+    monto_neto: numEl('fNeto'),
+    categoria: document.getElementById('fCategoria').value.trim(),
     numero_documento: document.getElementById('fNumDoc').value.trim(),
     fecha_documento: document.getElementById('fFechaDoc').value || null,
     fecha_emision: document.getElementById('fFechaEmision').value || null,
@@ -199,7 +226,7 @@ async function emitir(){
     body.proveedor_rut = document.getElementById('fProvRut').value.trim();
   } else { body.id_proveedor = parseInt(provSel); }
   if (!concepto) return fail('El concepto es obligatorio.');
-  if (monto<=0) return fail('El monto neto debe ser mayor a 0.');
+  if (monto<=0) return fail('Ingresa el monto (bruto o neto).');
 
   const btn = document.getElementById('btnEmitir'); btn.disabled=true; btn.innerHTML='<i class="bi bi-hourglass-split me-1"></i>Emitiendo…';
   try {

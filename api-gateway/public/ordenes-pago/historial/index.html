@@ -5,7 +5,7 @@
   <link rel="icon" href="/img/favicon.png" type="image/png">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Historial de Órdenes de Pago — AutoFácil</title>
-  <!-- v1.1 -->
+  <!-- v1.2 -->
   <link href="/css/bootstrap.min.css" rel="stylesheet">
   <link href="/css/bootstrap-icons.css" rel="stylesheet">
   <style>
@@ -180,13 +180,16 @@ function pintaChips(rs, total){
 const MESES = ['ene','feb','mar','abr','may','jun','jul','ago','sep','oct','nov','dic'];
 const periodoCL = d => { if(!d) return '—'; const x=new Date(String(d).slice(0,10)); if(isNaN(x)) return '—'; return MESES[x.getUTCMonth()]+'-'+String(x.getUTCFullYear()).slice(2); };
 function impInfo(o){
-  const trat = o.tratamiento || 'AFECTO';
-  const neto = Number(o.monto_neto != null ? o.monto_neto : o.monto)||0;
-  const imp  = Number(o.impuesto_monto != null ? o.impuesto_monto : 0)||0;
-  const pagar= Number(o.monto)||0;
-  const pct  = Number(o.impuesto_pct != null ? o.impuesto_pct : (trat==='HONORARIOS'?15.25:trat==='EXENTO'?0:19));
-  const lbl  = trat==='HONORARIOS' ? `Retención ${pct}%` : trat==='EXENTO' ? 'Exento' : `IVA ${pct}%`;
-  return { trat, neto, imp, pagar, pct, lbl };
+  const t = o.tratamiento || '';
+  const esRet = (t==='RET'||t==='HONORARIOS');
+  const esEx  = (t==='EXENTO');
+  const neto  = Number(o.monto_neto != null ? o.monto_neto : o.monto)||0;
+  const imp   = Number(o.impuesto_monto)||0;
+  const bruto = Number(o.monto_bruto != null ? o.monto_bruto : (neto + imp))||0;
+  const pagar = Number(o.monto)||0;
+  const pct   = Number(o.impuesto_pct != null ? o.impuesto_pct : (esRet?15.25:esEx?0:19));
+  const lbl   = esRet ? `Retención ${pct}%` : esEx ? 'Exento' : `IVA ${pct}%`;
+  return { neto, bruto, imp, pagar, pct, lbl, esRet, esEx };
 }
 function docHTML(o){
   const i = impInfo(o);
@@ -219,23 +222,24 @@ function docHTML(o){
       </td>
     </tr></tbody></table>
     <table style="${Stbl}">
-      <colgroup><col style="width:24%"><col style="width:12%"><col style="width:22%"><col style="width:8%"><col style="width:12%"><col style="width:11%"><col style="width:11%"></colgroup>
-      <thead><tr><th style="${Sth}">Proveedor</th><th style="${Sth}">RUT</th><th style="${Sth}">Detalle</th><th style="${Sth}">Mes</th><th style="${Sth}">Monto Neto</th><th style="${Sth}">${escH(i.lbl)}</th><th style="${Sth}">A Pagar</th></tr></thead>
+      <colgroup><col style="width:23%"><col style="width:12%"><col style="width:21%"><col style="width:8%"><col style="width:12%"><col style="width:12%"><col style="width:12%"></colgroup>
+      <thead><tr><th style="${Sth}">Proveedor</th><th style="${Sth}">RUT</th><th style="${Sth}">Detalle</th><th style="${Sth}">Mes</th><th style="${Sth}">Monto Bruto</th><th style="${Sth}">${escH(i.lbl)}</th><th style="${Sth}">Monto Neto</th></tr></thead>
       <tbody>
         <tr><td style="${Std}">${escH(o.proveedor_nombre||'')}</td><td style="${Std}">${escH(o.proveedor_rut||'')}</td>
           <td style="${Std}">${escH(o.concepto||'')}</td><td style="${Std}">${periodo}</td>
-          <td style="${Snum}">${fmtMon(i.neto)}</td><td style="${Snum}">${fmtMon(i.imp)}</td><td style="${Snum}">${fmtMon(i.pagar)}</td></tr>
-        <tr><td colspan="6" style="${Std};text-align:right;font-weight:800;background:#f1f5f9">TOTAL</td><td style="${Snum};font-weight:800;background:#f1f5f9">${fmtMon(i.pagar)}</td></tr>
+          <td style="${Snum}">${fmtMon(i.bruto)}</td><td style="${Snum}">${i.esEx?'—':fmtMon(i.imp)}</td><td style="${Snum}">${fmtMon(i.neto)}</td></tr>
+        <tr><td colspan="6" style="${Std};text-align:right;font-weight:800;background:#f1f5f9">A PAGAR</td><td style="${Snum};font-weight:800;background:#dbeafe;color:#1e3a8a">${fmtMon(i.pagar)}</td></tr>
       </tbody>
     </table>
     <table style="${Sres}"><tbody>
       <tr><td style="${SresL}">Proveedor</td><td style="${SresV}">${escH(o.proveedor_nombre||'')}</td></tr>
       <tr><td style="${SresL}">Concepto</td><td style="${SresV}">${escH(o.concepto||'')}</td></tr>
       <tr><td style="${SresL}">Período</td><td style="${SresV}">${periodo}</td></tr>
-      ${docNum?`<tr><td style="${SresL}">Documento</td><td style="${SresV}">${escH(docNum)}${o.fecha_documento?' · '+fdate(o.fecha_documento):''}</td></tr>`:''}
+      <tr><td style="${SresL}">Documento</td><td style="${SresV}">${escH(o.tipo_documento||'—')}${docNum&&o.numero_documento?' N° '+escH(o.numero_documento):''}${o.fecha_documento?' · '+fdate(o.fecha_documento):''}</td></tr>
       <tr><td style="${SresL}">Destino</td><td style="${SresV}">${escH(o.destino||'—')}</td></tr>
+      <tr><td style="${SresL}">Monto bruto</td><td style="${SresV}">${fmtMon(i.bruto)}</td></tr>
+      <tr><td style="${SresL}">${escH(i.lbl)}</td><td style="${SresV}">${i.esEx?'—':fmtMon(i.imp)}</td></tr>
       <tr><td style="${SresL}">Monto neto</td><td style="${SresV}">${fmtMon(i.neto)}</td></tr>
-      <tr><td style="${SresL}">${escH(i.lbl)}</td><td style="${SresV}">${fmtMon(i.imp)}</td></tr>
       <tr><td style="${SresL}">A pagar</td><td style="${SresV};font-weight:700">${fmtMon(i.pagar)}</td></tr>
       <tr><td style="${SresL}">Fecha a pagar</td><td style="${SresV}">${fechaPagar}</td></tr>
     </tbody></table>

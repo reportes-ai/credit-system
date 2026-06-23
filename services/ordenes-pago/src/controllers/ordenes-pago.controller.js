@@ -81,6 +81,7 @@ const { emitirCorrelativo, anularCorrelativo } = require('../../../../shared/ord
     await pool.query(`ALTER TABLE ordenes_pago ADD COLUMN IF NOT EXISTS monto_neto DECIMAL(14,2) NULL`);
     await pool.query(`ALTER TABLE ordenes_pago ADD COLUMN IF NOT EXISTS impuesto_pct DECIMAL(7,4) NULL`);
     await pool.query(`ALTER TABLE ordenes_pago ADD COLUMN IF NOT EXISTS impuesto_monto DECIMAL(14,2) NULL`);
+    await pool.query(`ALTER TABLE ordenes_pago ADD COLUMN IF NOT EXISTS monto_bruto DECIMAL(14,2) NULL`);
     await pool.query(`ALTER TABLE ordenes_pago ADD COLUMN IF NOT EXISTS destino VARCHAR(200) NULL`);
   } catch (e) { console.error('[ordenes_pago alter impuestos]', e.message); }
 
@@ -119,7 +120,6 @@ const norm = s => String(s ?? '').trim();
 const normRut = r => String(r || '').replace(/[.\-\s]/g, '').toUpperCase();
 const num = v => { const n = Number(String(v ?? '').replace(/\./g, '').replace(',', '.').replace(/[^\d.-]/g, '')); return isNaN(n) ? null : n; };
 const ESTADOS = ['EMITIDA', 'PAGADA', 'ANULADA'];
-const TRATAMIENTOS = ['AFECTO', 'EXENTO', 'HONORARIOS'];
 const fdate = v => { const s = norm(v); return /^\d{4}-\d{2}-\d{2}$/.test(s) ? s : null; };
 const nombreUsuario = req => norm(`${(req.usuario || {}).nombre || ''} ${(req.usuario || {}).apellido || ''}`) || (req.usuario || {}).email || '—';
 
@@ -129,15 +129,36 @@ async function pctImpuesto(codigo, def) {
   catch (e) { return def; }
 }
 
-// Dado neto + tratamiento, devuelve { pct, impuesto, aPagar }.
-// AFECTO: a pagar = neto + IVA.  EXENTO: a pagar = neto.  HONORARIOS: a pagar = neto - retención.
-async function calcularMontos(neto, tratamiento) {
-  const t = TRATAMIENTOS.includes(tratamiento) ? tratamiento : 'AFECTO';
-  if (t === 'EXENTO') return { tratamiento: t, pct: 0, impuesto: 0, aPagar: Math.round(neto) };
-  const pct = t === 'HONORARIOS' ? await pctImpuesto('RETENCION_HONORARIOS', 15.25) : await pctImpuesto('IVA', 19);
-  const impuesto = Math.round(neto * pct / 100);
-  const aPagar = t === 'HONORARIOS' ? Math.round(neto) - impuesto : Math.round(neto) + impuesto;
-  return { tratamiento: t, pct, impuesto, aPagar };
+// Clase tributaria según el tipo de documento.
+function claseDeTipo(tipo) {
+  const t = String(tipo || '').trim();
+  if (t === 'Factura') return 'IVA';                 // afecto a IVA
+  if (t === 'Boleta de Honorarios') return 'RET';    // retención
+  return 'EXENTO';                                   // Factura Exenta, Boleta Exenta, Nota de Cobro, Otros
+}
+
+// Dado tipo de documento + qué monto se ingresó (BRUTO|NETO) + su valor,
+// calcula los tres montos + el A pagar. Relación: bruto = neto + impuesto.
+//  IVA:       impuesto = neto·% ; a pagar = bruto (total con IVA).
+//  Retención: impuesto = bruto·% ; a pagar = neto (líquido).
+//  Exento:    impuesto = 0 ; bruto = neto = a pagar.
+async function calcularDoc(tipo, base, valor) {
+  const clase = claseDeTipo(tipo);
+  const v = Math.round(Number(valor) || 0);
+  const fromBruto = String(base || '').toUpperCase() === 'BRUTO';
+  if (clase === 'EXENTO') return { clase, pct: 0, neto: v, bruto: v, imp: 0, aPagar: v };
+  if (clase === 'IVA') {
+    const pct = await pctImpuesto('IVA', 19);
+    let neto, bruto, imp;
+    if (fromBruto) { bruto = v; neto = Math.round(bruto / (1 + pct / 100)); imp = bruto - neto; }
+    else { neto = v; imp = Math.round(neto * pct / 100); bruto = neto + imp; }
+    return { clase, pct, neto, bruto, imp, aPagar: bruto };
+  }
+  const pct = await pctImpuesto('RETENCION_HONORARIOS', 15.25);
+  let neto, bruto, imp;
+  if (fromBruto) { bruto = v; imp = Math.round(bruto * pct / 100); neto = bruto - imp; }
+  else { neto = v; bruto = Math.round(neto / (1 - pct / 100)); imp = bruto - neto; }
+  return { clase, pct, neto, bruto, imp, aPagar: neto };
 }
 
 /* ════════════════ PROVEEDORES ════════════════ */
@@ -269,9 +290,12 @@ const crearOrden = async (req, res) => {
   try {
     const b = req.body || {};
     const concepto = norm(b.concepto);
-    const neto = num(b.monto_neto != null ? b.monto_neto : b.monto);   // se ingresa el NETO
     if (!concepto) return res.status(400).json({ success: false, data: null, error: 'El concepto es obligatorio' });
-    if (neto == null || neto <= 0) return res.status(400).json({ success: false, data: null, error: 'El monto neto debe ser mayor a 0' });
+    // Tipo de documento define el impuesto; el usuario ingresa Bruto o Neto y el sistema calcula el resto.
+    const tipoDoc = norm(b.tipo_documento) || 'Factura';
+    const base = String(b.monto_base || '').toUpperCase() === 'BRUTO' ? 'BRUTO' : 'NETO';
+    const valor = num(base === 'BRUTO' ? b.monto_bruto : b.monto_neto);
+    if (valor == null || valor <= 0) return res.status(400).json({ success: false, data: null, error: 'El monto debe ser mayor a 0' });
 
     // Proveedor: por id (de la base) o nombre libre.
     let idProv = parseInt(b.id_proveedor) || null;
@@ -287,18 +311,18 @@ const crearOrden = async (req, res) => {
     }
     if (!provNombre) return res.status(400).json({ success: false, data: null, error: 'Debe indicar el proveedor' });
 
-    // Tratamiento tributario: el sistema calcula impuesto y A pagar a partir del neto.
-    const m = await calcularMontos(neto, norm(b.tratamiento).toUpperCase());
+    // El sistema calcula bruto/neto/impuesto y A pagar a partir del tipo de documento.
+    const m = await calcularDoc(tipoDoc, base, valor);
 
     const fechaEmision = fdate(b.fecha_emision) || new Date().toISOString().slice(0, 10);
     const [r] = await pool.query(
       `INSERT INTO ordenes_pago
         (id_proveedor, proveedor_nombre, proveedor_rut, concepto, categoria, tipo_documento, numero_documento, fecha_documento,
-         tratamiento, monto_neto, impuesto_pct, impuesto_monto, monto, destino, fecha_emision, metodo_pago, estado, observaciones, id_usuario, usuario_nombre)
-       VALUES (?,?,?,?,?,?,?,?, ?,?,?,?,?,?,?,?, 'EMITIDA', ?,?,?)`,
-      [idProv, provNombre, provRut, concepto, norm(b.categoria) || null, norm(b.tipo_documento) || null,
+         tratamiento, monto_bruto, monto_neto, impuesto_pct, impuesto_monto, monto, destino, fecha_emision, metodo_pago, estado, observaciones, id_usuario, usuario_nombre)
+       VALUES (?,?,?,?,?,?,?,?, ?,?,?,?,?,?,?,?,?, 'EMITIDA', ?,?,?)`,
+      [idProv, provNombre, provRut, concepto, norm(b.categoria) || null, tipoDoc,
        norm(b.numero_documento) || null, fdate(b.fecha_documento),
-       m.tratamiento, Math.round(neto), m.pct, m.impuesto, m.aPagar, destino, fechaEmision, norm(b.metodo_pago) || null,
+       m.clase, m.bruto, m.neto, m.pct, m.imp, m.aPagar, destino, fechaEmision, norm(b.metodo_pago) || null,
        norm(b.observaciones) || null, (req.usuario || {}).id_usuario || null, nombreUsuario(req)]);
 
     // Correlativo global único ODP- (libro central op_correlativos)
