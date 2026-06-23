@@ -5,7 +5,7 @@
   <link rel="icon" href="/img/favicon.png" type="image/png">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Seguimiento Post Venta — AutoFácil</title>
-  <!-- v2.9 -->
+  <!-- v3.0 -->
   <link href="/css/bootstrap.min.css" rel="stylesheet">
   <link href="/css/bootstrap-icons.css" rel="stylesheet">
   <style>
@@ -350,44 +350,41 @@ async function revertirPago(id){
 
 /* ════════ Modal Factura Recibida (Comisión) ════════ */
 let FC = { id:null, chk:null, terceros:false, boleta:false, rut:'', nombre:'', num_op:null };
+let fcLast = 'NETO';   // último campo de monto editado (NETO|BRUTO)
 const _fc = id => document.getElementById(id);
 
-/* ── Autocompletado de dealer (busca por RUT o por nombre; el otro se completa) ── */
-const _dlrRut = new Map();   // rut normalizado → {rut, nombre}
-const _dlrNom = new Map();   // nombre en mayúsculas → {rut, nombre}
-const _rutN = s => String(s||'').replace(/[.\-\s]/g,'').toUpperCase();
+/* ── Autocompletado de dealer (dropdown propio scrolleable; busca por RUT o nombre) ── */
 const _dlrNombre = d => String(d.nombre_razon || d.nombre_indexa || '').trim();
-function _dlrCache(rows){ rows.forEach(d => { const o = { rut: d.rut || '', nombre: _dlrNombre(d) }; if (o.rut) _dlrRut.set(_rutN(o.rut), o); if (o.nombre) _dlrNom.set(o.nombre.toUpperCase(), o); }); }
-let _tDlrR = null, _tDlrN = null;
+let _dlrResults = [], _tDlrR = null, _tDlrN = null;
+function fcDropHide(id){ setTimeout(() => { const d = _fc(id); if (d) d.style.display='none'; }, 150); }
+function _dlrRender(dropId, rows){
+  _dlrResults = rows;
+  const d = _fc(dropId);
+  if (!rows.length){ d.innerHTML=''; d.style.display='none'; return; }
+  d.innerHTML = rows.map((r,i) => `<div class="opt" onmousedown="fcPickDealer(${i})">${escH(_dlrNombre(r))} <small>${escH(r.rut||'')}</small></div>`).join('');
+  d.style.display='block';
+}
+function fcPickDealer(i){
+  const r = _dlrResults[i]; if (!r) return;
+  _fc('fcRut').value = r.rut || '';
+  _fc('fcNombre').value = _dlrNombre(r);
+  _fc('fcDropRut').style.display='none'; _fc('fcDropNombre').style.display='none';
+}
+async function _dlrBuscar(q){
+  const r = await fetch('/api/dealers?limit=30&q='+encodeURIComponent(q), { headers:H });
+  const j = await r.json(); return (j.data && j.data.rows) || [];
+}
 function fcBuscarRut(){
   clearTimeout(_tDlrR);
   const v = _fc('fcRut').value.trim();
-  const hit = _dlrRut.get(_rutN(v)); if (hit && hit.nombre) _fc('fcNombre').value = hit.nombre;
-  if (v.replace(/[^0-9kK]/g,'').length < 2) return;
-  _tDlrR = setTimeout(async () => {
-    try {
-      const r = await fetch('/api/dealers?limit=20&q='+encodeURIComponent(v), { headers:H });
-      const j = await r.json(); const rows = (j.data && j.data.rows) || [];
-      _fc('dlRut').innerHTML = rows.map(d => `<option value="${escH(d.rut||'')}">${escH(_dlrNombre(d))}</option>`).join('');
-      _dlrCache(rows);
-      const h2 = _dlrRut.get(_rutN(_fc('fcRut').value.trim())); if (h2 && h2.nombre) _fc('fcNombre').value = h2.nombre;
-    } catch(e){}
-  }, 250);
+  if (v.replace(/[^0-9kK]/g,'').length < 2){ _fc('fcDropRut').style.display='none'; return; }
+  _tDlrR = setTimeout(async () => { try { _dlrRender('fcDropRut', await _dlrBuscar(v)); } catch(e){} }, 250);
 }
 function fcBuscarNombre(){
   clearTimeout(_tDlrN);
   const v = _fc('fcNombre').value.trim();
-  const hit = _dlrNom.get(v.toUpperCase()); if (hit && hit.rut) _fc('fcRut').value = hit.rut;
-  if (v.length < 2) return;
-  _tDlrN = setTimeout(async () => {
-    try {
-      const r = await fetch('/api/dealers?limit=20&q='+encodeURIComponent(v), { headers:H });
-      const j = await r.json(); const rows = (j.data && j.data.rows) || [];
-      _fc('dlNombre').innerHTML = rows.map(d => `<option value="${escH(_dlrNombre(d))}"></option>`).join('');
-      _dlrCache(rows);
-      const h2 = _dlrNom.get(_fc('fcNombre').value.trim().toUpperCase()); if (h2 && h2.rut) _fc('fcRut').value = h2.rut;
-    } catch(e){}
-  }, 250);
+  if (v.length < 2){ _fc('fcDropNombre').style.display='none'; return; }
+  _tDlrN = setTimeout(async () => { try { _dlrRender('fcDropNombre', await _dlrBuscar(v)); } catch(e){} }, 250);
 }
 function abrirModalFactura(id, chk){
   const r = DATA.find(x => x.id === id) || {};
@@ -396,8 +393,10 @@ function abrirModalFactura(id, chk){
   _fc('fcNombre').value = FC.nombre; _fc('fcNombre').disabled = false;
   _fc('fcFecha').value = new Date().toISOString().slice(0,10);
   _fc('fcNumero').value = '';
-  const com = Math.round(+r.comision||0);   // comisión bruta de la carta de aprobación (modificable)
+  const com = Math.round(+r.comision||0);   // comisión NETA de la carta de aprobación (modificable)
+  fcLast = 'NETO';
   _fc('fcMonto').value = com ? '$'+com.toLocaleString('es-CL') : ''; _fc('fcMonto').dataset.raw = com ? String(com) : '';
+  _fc('fcBruto').value = ''; _fc('fcBruto').dataset.raw = '';
   _fcSetExc('fcBtnTerceros', false); _fcSetExc('fcBtnBoleta', false);
   _fc('fcAlert').style.display = 'none';
   fcBoletaInfo();
@@ -415,29 +414,52 @@ function fcToggleTerceros(){
 }
 function fcToggleBoleta(){ FC.boleta = !FC.boleta; _fcSetExc('fcBtnBoleta', FC.boleta); fcBoletaInfo(); }
 function fcBoletaInfo(){
-  const warn = _fc('fcBoleta'), des = _fc('fcDesglose');
-  const neto = parseInt(_fc('fcMonto').dataset.raw||'')||0;   // valor NETO (viene de la carta)
-  const iva = Number(IMPUESTOS.IVA)||19, ret = Number(IMPUESTOS.RETENCION_HONORARIOS)||15.25;
-  const clp = n => '$'+(Math.round(n)||0).toLocaleString('es-CL');
   // Etiquetas dinámicas según documento (factura/boleta)
   const doc = FC.boleta ? 'Boleta' : 'Factura';
   _fc('fcTitulo').textContent = `${doc} Recibida — Comisión`;
   _fc('fcLblNumero').textContent = `N° ${doc}`;
   _fc('fcLblFecha').textContent = `Fecha ${doc.toLowerCase()}`;
   // Advertencia de certificación al cambiar a Boleta
+  const warn = _fc('fcBoleta');
   warn.style.display = FC.boleta ? 'block' : 'none';
   if (FC.boleta) warn.innerHTML = '⚠ Al cambiar a <b>Boleta</b> certificas que se autorizó la emisión de boleta de honorarios en vez de factura. Revisa el desglose y el monto líquido a depositar.';
-  // Desglose de montos (base = neto)
-  if (!neto){ des.style.display='none'; return; }
+  fcCalc();   // recalcula montos + desglose (la relación impuesto cambia según factura/boleta)
+}
+// Calcula el campo no editado + el desglose, a partir de fcLast. bruto = neto + impuesto.
+//  Factura: IVA sobre el neto → bruto = neto·(1+iva).   Boleta: retención sobre el bruto → neto = bruto·(1-ret).
+function fcCalc(){
+  const iva = Number(IMPUESTOS.IVA)||19, ret = Number(IMPUESTOS.RETENCION_HONORARIOS)||15.25;
+  let neto = parseInt(_fc('fcMonto').dataset.raw||'')||0;
+  let bruto = parseInt(_fc('fcBruto').dataset.raw||'')||0;
+  if (!FC.boleta){
+    if (fcLast==='BRUTO') neto = Math.round(bruto/(1+iva/100)); else bruto = Math.round(neto*(1+iva/100));
+  } else {
+    if (fcLast==='NETO') bruto = Math.round(neto/(1-ret/100)); else neto = Math.round(bruto*(1-ret/100));
+  }
+  const set = (id,v) => { _fc(id).dataset.raw = v?String(v):''; _fc(id).value = v?'$'+v.toLocaleString('es-CL'):''; };
+  set('fcMonto', neto); set('fcBruto', bruto);
+  fcDesglose(neto, bruto);
+}
+function fcDesglose(neto, bruto){
+  const des = _fc('fcDesglose');
+  const iva = Number(IMPUESTOS.IVA)||19, ret = Number(IMPUESTOS.RETENCION_HONORARIOS)||15.25;
+  const clp = n => '$'+(Math.round(n)||0).toLocaleString('es-CL');
+  if (!neto && !bruto){ des.style.display='none'; return; }
   const row = (lbl,val,strong)=>`<div style="display:flex;justify-content:space-between;padding:2px 0${strong?';border-top:1px solid #e2e8f0;margin-top:4px;padding-top:6px;font-weight:700;color:#0f172a':';color:#475569'}"><span>${lbl}</span><span${strong?'':' style="font-weight:600;color:#0f172a"'}>${clp(val)}</span></div>`;
   if (!FC.boleta){
-    const ivaM = Math.round(neto*iva/100);
-    des.innerHTML = row('Monto Neto', neto) + row(`IVA (${iva}%)`, ivaM) + row('Monto líquido a depositar', neto + ivaM, true);
+    des.innerHTML = row('Monto Neto', neto) + row(`IVA (${iva}%)`, bruto - neto) + row('Monto líquido a depositar', bruto, true);
   } else {
-    const retencion = Math.round(neto*ret/100);   // la boleta se emite por el neto
-    des.innerHTML = row('Monto Boleta', neto) + row(`Retención honorarios (${ret}%)`, retencion) + row('Monto líquido a depositar', neto - retencion, true);
+    des.innerHTML = row('Monto Bruto (honorario)', bruto) + row(`Retención honorarios (${ret}%)`, bruto - neto) + row('Monto líquido a depositar', neto, true);
   }
   des.style.display = 'block';
+}
+// El usuario edita Neto o Bruto → formatea ese campo, recuerda cuál y recalcula el otro.
+function onMontoCom(which){
+  fcLast = which;
+  const id = which==='NETO' ? 'fcMonto' : 'fcBruto';
+  const el = _fc(id); const n = el.value.replace(/\D/g,'');
+  el.dataset.raw = n; el.value = n ? '$'+parseInt(n).toLocaleString('es-CL') : '';
+  fcCalc();
 }
 function editarFactura(id){
   const r = DATA.find(x => x.id === id) || {};
@@ -446,29 +468,34 @@ function editarFactura(id){
   _fc('fcNombre').value = r.fac_terceros ? '' : (r.nombre_dealer||''); _fc('fcNombre').disabled = !!r.fac_terceros;
   _fc('fcFecha').value = r.fac_fecha ? String(r.fac_fecha).slice(0,10) : '';
   _fc('fcNumero').value = r.fac_numero || '';
-  const m = r.fac_monto || ''; _fc('fcMonto').value = m ? '$'+parseInt(m).toLocaleString('es-CL') : ''; _fc('fcMonto').dataset.raw = m ? String(m) : '';
+  // fac_monto = base guardada: NETO si es factura, BRUTO si es boleta. fcCalc reconstruye el otro.
+  const m = parseInt(r.fac_monto||'')||0;
+  const setM = (id,v) => { _fc(id).dataset.raw = v?String(v):''; _fc(id).value = v?'$'+v.toLocaleString('es-CL'):''; };
+  if (r.fac_boleta){ fcLast='BRUTO'; setM('fcBruto', m); setM('fcMonto', 0); }
+  else { fcLast='NETO'; setM('fcMonto', m); setM('fcBruto', 0); }
   _fcSetExc('fcBtnTerceros', !!r.fac_terceros); _fcSetExc('fcBtnBoleta', !!r.fac_boleta);
   _fc('fcAlert').style.display = 'none';
   fcBoletaInfo();
   document.getElementById('modalFactura').showModal();
 }
-function fcMoneyFmt(el){ const n = el.value.replace(/\D/g,''); el.dataset.raw = n; el.value = n ? '$'+parseInt(n).toLocaleString('es-CL') : ''; fcBoletaInfo(); }
 function fcCancelar(){ document.getElementById('modalFactura').close(); if (FC.chk) FC.chk.checked = false; FC = {id:null,chk:null}; }
 async function fcGuardar(){
-  const fecha = _fc('fcFecha').value, numero = _fc('fcNumero').value.trim(), monto = parseInt(_fc('fcMonto').dataset.raw||'')||0;
+  const fecha = _fc('fcFecha').value, numero = _fc('fcNumero').value.trim();
+  const neto = parseInt(_fc('fcMonto').dataset.raw||'')||0;
+  const bruto = parseInt(_fc('fcBruto').dataset.raw||'')||0;
   const al = _fc('fcAlert');
   const doc = FC.boleta ? 'boleta' : 'factura';
-  if (!fecha || !numero || !monto){ al.textContent=`Completa fecha, N° de ${doc} y monto neto.`; al.style.display='block'; return; }
+  if (!fecha || !numero || !neto || !bruto){ al.textContent=`Completa fecha, N° de ${doc} y montos (bruto/neto).`; al.style.display='block'; return; }
   if (FC.terceros || FC.boleta){
     if (!confirm('Al grabar, el usuario certifica que se autorizó la emisión de una Boleta en vez de Factura y/o la emisión de la Boleta/Factura por un tercero.\n\n¿Confirmas?')) return;
   }
-  // Desglose congelado al registrar (la orden de pago NO recalcula)
-  const iva = Number(IMPUESTOS.IVA)||19, ret = Number(IMPUESTOS.RETENCION_HONORARIOS)||15.25;
-  const impPct = FC.boleta ? ret : iva;
-  const impMonto = Math.round(monto * impPct/100);
-  const liquido = FC.boleta ? (monto - impMonto) : (monto + impMonto);
+  // Desglose congelado al registrar (la orden de pago NO recalcula). Relación: bruto = neto + impuesto.
+  const impPct = FC.boleta ? (Number(IMPUESTOS.RETENCION_HONORARIOS)||15.25) : (Number(IMPUESTOS.IVA)||19);
+  const impMonto = bruto - neto;
+  const base = FC.boleta ? bruto : neto;       // valor sobre el que la orden de pago calcula su desglose
+  const liquido = FC.boleta ? neto : bruto;    // monto líquido a depositar (a pagar)
   const factura = { num_op:FC.num_op, rut_dealer:_fc('fcRut').value.trim()||null, nombre_dealer:_fc('fcNombre').value.trim()||null,
-    fecha_factura:fecha, numero_factura:numero, monto_bruto:monto, es_terceros:FC.terceros?1:0, es_boleta:FC.boleta?1:0,
+    fecha_factura:fecha, numero_factura:numero, monto_bruto:base, es_terceros:FC.terceros?1:0, es_boleta:FC.boleta?1:0,
     impuesto_pct:impPct, impuesto_monto:impMonto, monto_liquido:liquido };
   const editar = FC.modo === 'editar';
   const url = editar ? '/api/postventa/'+FC.id+'/factura-comision' : '/api/postventa/'+FC.id+'/etapa';
@@ -513,6 +540,10 @@ async function toggleEtapa(id, track, etapa, chk){
   #modalFactura input { width:100%; margin-top:2px; border:1.5px solid #d1d5db; border-radius:7px; padding:6px 9px; font-size:.86rem; box-sizing:border-box; outline:none; }
   #modalFactura input:focus { border-color:#0141A2; }
   #modalFactura input:disabled { background:#f1f5f9; color:#94a3b8; }
+  #modalFactura .fc-drop { position:absolute; top:100%; left:0; right:0; z-index:60; background:#fff; border:1px solid #cbd5e1; border-radius:0 0 8px 8px; max-height:220px; overflow-y:auto; box-shadow:0 10px 28px rgba(0,0,0,.18); display:none; }
+  #modalFactura .fc-drop .opt { padding:7px 10px; font-size:.82rem; cursor:pointer; border-bottom:1px solid #f1f5f9; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  #modalFactura .fc-drop .opt:hover { background:#eff6ff; }
+  #modalFactura .fc-drop .opt small { color:#94a3b8; }
 </style>
 <dialog id="modalFactura">
   <div style="background:linear-gradient(135deg,#012d70,#0141A2);color:#fff;padding:11px 18px;display:flex;align-items:center;gap:9px">
@@ -526,11 +557,24 @@ async function toggleEtapa(id, track, etapa, chk){
       <button type="button" id="fcBtnBoleta" onclick="fcToggleBoleta()" style="flex:1;border:1px solid #cbd5e1;background:#eef2f7;color:#334155;border-radius:8px;padding:7px;font-size:.8rem;font-weight:700;cursor:pointer">Boleta</button>
     </div>
     <div style="display:grid;gap:8px">
-      <label>RUT Dealer<input id="fcRut" type="text" list="dlRut" autocomplete="off" oninput="fcBuscarRut()" placeholder="Busca por RUT…"><datalist id="dlRut"></datalist></label>
-      <label>Nombre Dealer<input id="fcNombre" type="text" list="dlNombre" autocomplete="off" oninput="fcBuscarNombre()" placeholder="Busca por nombre…"><datalist id="dlNombre"></datalist></label>
+      <label>RUT Dealer
+        <div style="position:relative">
+          <input id="fcRut" type="text" autocomplete="off" oninput="fcBuscarRut()" onblur="fcDropHide('fcDropRut')" placeholder="Busca por RUT…">
+          <div id="fcDropRut" class="fc-drop"></div>
+        </div>
+      </label>
+      <label>Nombre Dealer
+        <div style="position:relative">
+          <input id="fcNombre" type="text" autocomplete="off" oninput="fcBuscarNombre()" onblur="fcDropHide('fcDropNombre')" placeholder="Busca por nombre…">
+          <div id="fcDropNombre" class="fc-drop"></div>
+        </div>
+      </label>
       <label><span id="fcLblFecha">Fecha factura</span><input id="fcFecha" type="date"></label>
       <label><span id="fcLblNumero">N° Factura</span><input id="fcNumero" type="text"></label>
-      <label>Monto Neto<input id="fcMonto" type="text" inputmode="numeric" placeholder="$0" oninput="fcMoneyFmt(this)"></label>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
+        <label>Monto Neto<input id="fcMonto" type="text" inputmode="numeric" placeholder="$0" oninput="onMontoCom('NETO')"></label>
+        <label>Monto Bruto<input id="fcBruto" type="text" inputmode="numeric" placeholder="$0" oninput="onMontoCom('BRUTO')"></label>
+      </div>
     </div>
     <div id="fcDesglose" style="display:none;margin-top:10px;background:#f8fafc;border:1px solid #e2e8f0;border-radius:8px;padding:9px 12px;font-size:.82rem"></div>
   </div>
