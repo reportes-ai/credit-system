@@ -5,7 +5,7 @@
   <link rel="icon" href="/img/favicon.png" type="image/png">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Historial de Órdenes de Pago — AutoFácil</title>
-  <!-- v1.4 -->
+  <!-- v1.5 -->
   <link href="/css/bootstrap.min.css" rel="stylesheet">
   <link href="/css/bootstrap-icons.css" rel="stylesheet">
   <style>
@@ -136,6 +136,7 @@ function chk401(r){ if(r && r.status===401){ sessionStorage.clear(); location.hr
 const fdate = d => d? String(d).slice(0,10).split('-').reverse().join('-') : '—';
 const fdatetime = d => { if(!d) return '—'; const s=String(d); const f=fdate(s); const hm=(s.slice(11,16)||''); return hm? f+' '+hm : f; };
 let DATA = [], PUEDE = (yo.perfil==='Administrador'), ORIGEN='';
+const isAdmin = (yo.perfil==='Administrador');   // solo Admin puede anular
 
 let tmr=null; function debounced(){ clearTimeout(tmr); tmr=setTimeout(cargar, 280); }
 function limpiar(){ document.getElementById('q').value=''; document.getElementById('fEstado').value=''; document.getElementById('fDesde').value=''; document.getElementById('fHasta').value=''; cargar(); }
@@ -163,9 +164,11 @@ async function cargar(){
     pintaChips(j.resumen||{}, DATA.length);
     if (!DATA.length) { tb.innerHTML='<tr><td colspan="10" style="text-align:center;color:#94a3b8;padding:24px">Sin órdenes para el filtro.</td></tr>'; return; }
     tb.innerHTML = DATA.map(o => {
-      const acc = (PUEDE && o.editable && o.estado==='EMITIDA')
-        ? `<button class="icon-btn" title="Marcar pagada" onclick="marcar(${o.id},'PAGADA')"><i class="bi bi-cash-coin" style="color:#16a34a"></i></button>
-           <button class="icon-btn" title="Anular" onclick="marcar(${o.id},'ANULADA')"><i class="bi bi-x-octagon" style="color:#dc2626"></i></button>` : '';
+      let acc = '';
+      if (o.editable && o.estado==='EMITIDA'){
+        if (PUEDE)   acc += `<button class="icon-btn" title="Marcar pagada" onclick="marcar(${o.id},'PAGADA')"><i class="bi bi-cash-coin" style="color:#16a34a"></i></button>`;
+        if (isAdmin) acc += `<button class="icon-btn" title="Anular (solo Admin)" onclick="marcar(${o.id},'ANULADA')"><i class="bi bi-x-octagon" style="color:#dc2626"></i></button>`;
+      }
       return `<tr>
         <td><b>${escH(o.numero||'—')}</b></td>
         <td><span class="tipo-badge tipo-${o.origen}">${escH(o.origen_label)}</span></td>
@@ -305,8 +308,11 @@ async function ver(id){
   else if (full.estado==='PAGADA') extra = `<p style="color:#15803d;font-size:.82rem;margin:0 0 10px"><i class="bi bi-check-circle me-1"></i>Pagada el ${fdate(full.fecha_pago)}${full.metodo_pago?' · '+escH(full.metodo_pago):''}</p>`;
   document.getElementById('dBody').innerHTML = extra + docHTML(full);
   const foot = document.getElementById('dFoot');
-  const accAdmin = (PUEDE && full.estado==='EMITIDA')
-    ? `<button class="btn-ghost" onclick="marcarVista('ANULADA')">Anular</button><button class="btn-ghost" onclick="marcarVista('PAGADA')"><i class="bi bi-cash-coin me-1"></i>Marcar pagada</button>` : '';
+  let accAdmin = '';
+  if (full.estado==='EMITIDA'){
+    if (isAdmin) accAdmin += `<button class="btn-ghost" onclick="marcarVista('ANULADA')">Anular</button>`;
+    if (PUEDE)   accAdmin += `<button class="btn-ghost" onclick="marcarVista('PAGADA')"><i class="bi bi-cash-coin me-1"></i>Marcar pagada</button>`;
+  }
   const enviar = PUEDE ? `<button class="btn-af" id="btnEnviar" onclick="enviarCorreo()"><i class="bi bi-envelope-paper me-1"></i>Enviar a Contabilidad</button>` : '';
   foot.innerHTML = `<button class="btn-ghost" onclick="document.getElementById('dlg').close()">Cerrar</button>
     <button class="btn-ghost" onclick="copiarDoc()"><i class="bi bi-clipboard me-1"></i>Copiar</button>

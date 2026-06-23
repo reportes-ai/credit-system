@@ -385,6 +385,9 @@ const cambiarEstadoOrden = async (req, res) => {
     const id = parseInt(req.params.id);
     const estado = norm((req.body || {}).estado).toUpperCase();
     if (!ESTADOS.includes(estado)) return res.status(400).json({ success: false, data: null, error: 'Estado inválido' });
+    // Solo el Administrador puede ANULAR órdenes de pago.
+    if (estado === 'ANULADA' && (req.usuario || {}).perfil_nombre !== 'Administrador')
+      return res.status(403).json({ success: false, data: null, error: 'Solo el Administrador puede anular órdenes de pago' });
     const [[o]] = await pool.query('SELECT numero, estado FROM ordenes_pago WHERE id=?', [id]);
     if (!o) return res.status(404).json({ success: false, data: null, error: 'Orden no encontrada' });
 
