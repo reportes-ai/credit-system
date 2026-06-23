@@ -246,29 +246,69 @@ const eliminarProveedor = async (req, res) => {
 
 /* ════════════════ ÓRDENES DE PAGO ════════════════ */
 
-/* GET /api/ordenes-pago/ordenes?estado=&q=&desde=&hasta=&id_proveedor= */
+/* GET /api/ordenes-pago/ordenes?estado=&origen=&q=&desde=&hasta=
+   Ledger UNIFICADO: TODAS las órdenes de pago (libro central op_correlativos):
+   GENERAL (módulo proveedores), SALDO y COMISION (Post Venta). */
 const listarOrdenes = async (req, res) => {
   try {
-    const where = [];
+    const where = ['1=1'];
     const args = [];
-    const estado = norm(req.query.estado).toUpperCase();
-    if (ESTADOS.includes(estado)) { where.push('estado = ?'); args.push(estado); }
-    const idProv = parseInt(req.query.id_proveedor);
-    if (idProv) { where.push('id_proveedor = ?'); args.push(idProv); }
+    const origen = norm(req.query.origen).toUpperCase();
+    if (['SALDO', 'COMISION', 'GENERAL'].includes(origen)) { where.push('oc.origen = ?'); args.push(origen); }
     const desde = fdate(req.query.desde), hasta = fdate(req.query.hasta);
-    if (desde) { where.push('fecha_emision >= ?'); args.push(desde); }
-    if (hasta) { where.push('fecha_emision <= ?'); args.push(hasta); }
+    if (desde) { where.push('DATE(oc.created_at) >= ?'); args.push(desde); }
+    if (hasta) { where.push('DATE(oc.created_at) <= ?'); args.push(hasta); }
     const q = norm(req.query.q);
-    if (q) { where.push('(numero LIKE ? OR proveedor_nombre LIKE ? OR proveedor_rut LIKE ? OR concepto LIKE ? OR numero_documento LIKE ?)'); args.push(`%${q}%`, `%${q}%`, `%${q}%`, `%${q}%`, `%${q}%`); }
-    const [rows] = await pool.query(
-      `SELECT * FROM ordenes_pago ${where.length ? 'WHERE ' + where.join(' AND ') : ''} ORDER BY fecha_emision DESC, id DESC LIMIT 1000`, args);
-    // Resumen rápido (sobre el filtro aplicado).
+    if (q) {
+      where.push('(oc.numero LIKE ? OR oc.concepto LIKE ? OR op.proveedor_nombre LIKE ? OR spv.nombre_dealer LIKE ? OR cpv.nombre_dealer LIKE ?)');
+      args.push(`%${q}%`, `%${q}%`, `%${q}%`, `%${q}%`, `%${q}%`);
+    }
+    const [rows] = await pool.query(`
+      SELECT oc.id, oc.numero, oc.origen, oc.origen_id, oc.concepto, oc.monto, oc.created_at AS fecha_emision,
+             oc.usuario_nombre, oc.anulada, oc.anulada_nombre, oc.fecha_anulada,
+             op.proveedor_nombre AS g_prov, op.tipo_documento AS g_tipodoc, op.numero_documento AS g_numdoc,
+             op.estado AS g_estado, op.fecha_pago AS g_fechapago,
+             poc.numero_factura AS c_factura,
+             spv.nombre_dealer AS s_dealer, cpv.nombre_dealer AS c_dealer,
+             (SELECT 1 FROM postventa_etapas pe WHERE pe.id_seguimiento=spo.id_seguimiento AND pe.track='SALDO' AND pe.etapa='SALDO PRECIO PAGADO' LIMIT 1) AS saldo_pagado,
+             (SELECT 1 FROM postventa_etapas pe WHERE pe.id_seguimiento=poc.id_seguimiento AND pe.track='COMISION' AND pe.etapa='COMISION PAGADA' LIMIT 1) AS comision_pagada
+      FROM op_correlativos oc
+      LEFT JOIN ordenes_pago op  ON oc.origen='GENERAL'  AND op.id  = oc.origen_id
+      LEFT JOIN postventa_ordenes spo          ON oc.origen='SALDO'    AND spo.id = oc.origen_id
+      LEFT JOIN postventa_seguimiento spv      ON spv.id = spo.id_seguimiento
+      LEFT JOIN postventa_ordenes_comision poc ON oc.origen='COMISION' AND poc.id = oc.origen_id
+      LEFT JOIN postventa_seguimiento cpv      ON cpv.id = poc.id_seguimiento
+      WHERE ${where.join(' AND ')}
+      ORDER BY oc.created_at DESC, oc.id DESC LIMIT 1000`, args);
+
+    const ORIGEN_LBL = { SALDO: 'Saldo Precio', COMISION: 'Comisión', GENERAL: 'Otros' };
+    const estFiltro = norm(req.query.estado).toUpperCase();
+    let data = rows.map(r => {
+      const esGen = r.origen === 'GENERAL';
+      const proveedor = esGen ? r.g_prov : (r.origen === 'SALDO' ? r.s_dealer : r.c_dealer);
+      let estado;
+      if (r.anulada) estado = 'ANULADA';
+      else if (esGen) estado = r.g_estado || 'EMITIDA';
+      else estado = (r.origen === 'SALDO' ? r.saldo_pagado : r.comision_pagada) ? 'PAGADA' : 'EMITIDA';
+      const documento = esGen ? [r.g_tipodoc, r.g_numdoc].filter(Boolean).join(' ')
+                              : (r.origen === 'COMISION' && r.c_factura ? 'Factura ' + r.c_factura : '');
+      return {
+        id: r.id, op_id: r.origen_id, origen: r.origen, origen_label: ORIGEN_LBL[r.origen] || r.origen,
+        numero: r.numero, concepto: r.concepto || '—', monto: r.monto, fecha_emision: r.fecha_emision,
+        usuario_nombre: r.usuario_nombre, proveedor_nombre: proveedor || '—', documento: documento || '—',
+        estado, fecha_pago: esGen ? r.g_fechapago : null,
+        anulada_nombre: r.anulada_nombre, fecha_anulada: r.fecha_anulada,
+        editable: esGen,   // solo las generales se gestionan en este módulo
+      };
+    });
+    if (ESTADOS.includes(estFiltro)) data = data.filter(o => o.estado === estFiltro);
+
     const resumen = { emitidas: 0, pagadas: 0, monto_emitido: 0, monto_pagado: 0 };
-    rows.forEach(o => {
+    data.forEach(o => {
       if (o.estado === 'EMITIDA') { resumen.emitidas++; resumen.monto_emitido += Number(o.monto || 0); }
       if (o.estado === 'PAGADA')  { resumen.pagadas++;  resumen.monto_pagado  += Number(o.monto || 0); }
     });
-    res.json({ success: true, data: rows, resumen, error: null });
+    res.json({ success: true, data, resumen, error: null });
   } catch (e) {
     res.status(500).json({ success: false, data: null, error: e.message });
   }

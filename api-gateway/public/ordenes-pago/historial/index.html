@@ -5,7 +5,7 @@
   <link rel="icon" href="/img/favicon.png" type="image/png">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Historial de Órdenes de Pago — AutoFácil</title>
-  <!-- v1.2 -->
+  <!-- v1.3 -->
   <link href="/css/bootstrap.min.css" rel="stylesheet">
   <link href="/css/bootstrap-icons.css" rel="stylesheet">
   <style>
@@ -38,6 +38,12 @@
     .est.EMITIDA { background:#fef9c3; color:#854d0e; }
     .est.PAGADA  { background:#dcfce7; color:#15803d; }
     .est.ANULADA { background:#fee2e2; color:#b91c1c; }
+    .ofilt { border:1.5px solid #e2e8f0; background:#fff; color:#475569; border-radius:8px; padding:5px 12px; font-size:.78rem; font-weight:700; cursor:pointer; }
+    .ofilt.on { background:#0141A2; border-color:#0141A2; color:#fff; }
+    .tipo-badge { font-size:.66rem; font-weight:700; border-radius:8px; padding:2px 8px; white-space:nowrap; }
+    .tipo-COMISION { background:#ede9fe; color:#6d28d9; }
+    .tipo-SALDO { background:#cffafe; color:#0e7490; }
+    .tipo-GENERAL { background:#f1f5f9; color:#475569; }
     .icon-btn { background:none; border:none; cursor:pointer; font-size:.95rem; padding:3px 6px; border-radius:6px; color:#475569; }
     .icon-btn:hover { background:#eff6ff; }
     .btn-ghost { background:#fff; border:1.5px solid #e2e8f0; border-radius:8px; padding:7px 12px; font-size:.82rem; cursor:pointer; color:#334155; }
@@ -81,6 +87,13 @@
       <div style="flex:1"></div>
       <a class="btn-af" href="/ordenes-pago/emision/" style="text-decoration:none"><i class="bi bi-plus-lg me-1"></i>Nueva orden</a>
     </div>
+    <div style="display:flex;gap:6px;margin-top:10px;flex-wrap:wrap;align-items:center">
+      <span style="font-size:.72rem;font-weight:700;text-transform:uppercase;color:#94a3b8;margin-right:4px">Tipo:</span>
+      <button class="ofilt on" data-o="" onclick="setOrigen(this)">Todas</button>
+      <button class="ofilt" data-o="COMISION" onclick="setOrigen(this)">Comisiones</button>
+      <button class="ofilt" data-o="SALDO" onclick="setOrigen(this)">Saldos Precio</button>
+      <button class="ofilt" data-o="GENERAL" onclick="setOrigen(this)">Otros</button>
+    </div>
   </div>
 
   <div class="card-af" style="padding:14px 18px">
@@ -91,10 +104,10 @@
     <div style="overflow-x:auto">
       <table>
         <thead><tr>
-          <th>N° Orden</th><th>Fecha</th><th>Proveedor</th><th>Concepto</th><th>Documento</th>
+          <th>N° Orden</th><th>Tipo</th><th>Fecha</th><th>Proveedor / Dealer</th><th>Concepto</th><th>Documento</th>
           <th class="r">Monto</th><th>Estado</th><th>Pago</th><th></th>
         </tr></thead>
-        <tbody id="tbody"><tr><td colspan="9" style="text-align:center;color:#94a3b8;padding:24px">Cargando…</td></tr></tbody>
+        <tbody id="tbody"><tr><td colspan="10" style="text-align:center;color:#94a3b8;padding:24px">Cargando…</td></tr></tbody>
       </table>
     </div>
   </div>
@@ -121,10 +134,11 @@ const fmtMon = n => '$'+Number(n||0).toLocaleString('es-CL');
 function toast(m){ const t=document.getElementById('toast'); t.textContent=m; t.style.display='block'; clearTimeout(t._t); t._t=setTimeout(()=>t.style.display='none',3000); }
 const fdate = d => d? String(d).slice(0,10).split('-').reverse().join('-') : '—';
 const fdatetime = d => { if(!d) return '—'; const s=String(d); const f=fdate(s); const hm=(s.slice(11,16)||''); return hm? f+' '+hm : f; };
-let DATA = [], PUEDE = (yo.perfil==='Administrador');
+let DATA = [], PUEDE = (yo.perfil==='Administrador'), ORIGEN='';
 
 let tmr=null; function debounced(){ clearTimeout(tmr); tmr=setTimeout(cargar, 280); }
 function limpiar(){ document.getElementById('q').value=''; document.getElementById('fEstado').value=''; document.getElementById('fDesde').value=''; document.getElementById('fHasta').value=''; cargar(); }
+function setOrigen(btn){ ORIGEN = btn.dataset.o||''; document.querySelectorAll('.ofilt').forEach(b=>b.classList.toggle('on', b===btn)); cargar(); }
 
 async function permisos(){
   if (yo.perfil==='Administrador') { PUEDE=true; return; }
@@ -135,27 +149,28 @@ async function cargar(){
   const p = new URLSearchParams();
   const q = document.getElementById('q').value.trim(); if (q) p.set('q', q);
   const est = document.getElementById('fEstado').value; if (est) p.set('estado', est);
+  if (ORIGEN) p.set('origen', ORIGEN);
   const d = document.getElementById('fDesde').value; if (d) p.set('desde', d);
   const h = document.getElementById('fHasta').value; if (h) p.set('hasta', h);
   const tb = document.getElementById('tbody');
-  tb.innerHTML = '<tr><td colspan="9" style="text-align:center;color:#94a3b8;padding:24px">Cargando…</td></tr>';
+  tb.innerHTML = '<tr><td colspan="10" style="text-align:center;color:#94a3b8;padding:24px">Cargando…</td></tr>';
   try {
     const r = await fetch('/api/ordenes-pago/ordenes?'+p.toString(), { headers:H });
     const j = await r.json();
     DATA = j.data || [];
     pintaChips(j.resumen||{}, DATA.length);
-    if (!DATA.length) { tb.innerHTML='<tr><td colspan="9" style="text-align:center;color:#94a3b8;padding:24px">Sin órdenes para el filtro.</td></tr>'; return; }
+    if (!DATA.length) { tb.innerHTML='<tr><td colspan="10" style="text-align:center;color:#94a3b8;padding:24px">Sin órdenes para el filtro.</td></tr>'; return; }
     tb.innerHTML = DATA.map(o => {
-      const doc = [o.tipo_documento, o.numero_documento].filter(Boolean).join(' ') || '—';
-      const acc = (PUEDE && o.estado==='EMITIDA')
+      const acc = (PUEDE && o.editable && o.estado==='EMITIDA')
         ? `<button class="icon-btn" title="Marcar pagada" onclick="marcar(${o.id},'PAGADA')"><i class="bi bi-cash-coin" style="color:#16a34a"></i></button>
            <button class="icon-btn" title="Anular" onclick="marcar(${o.id},'ANULADA')"><i class="bi bi-x-octagon" style="color:#dc2626"></i></button>` : '';
       return `<tr>
         <td><b>${escH(o.numero||'—')}</b></td>
+        <td><span class="tipo-badge tipo-${o.origen}">${escH(o.origen_label)}</span></td>
         <td>${fdate(o.fecha_emision)}</td>
         <td>${escH(o.proveedor_nombre||'—')}</td>
         <td>${escH(o.concepto||'—')}</td>
-        <td style="font-size:.78rem">${escH(doc)}</td>
+        <td style="font-size:.78rem">${escH(o.documento||'—')}</td>
         <td class="r"><b>${fmtMon(o.monto)}</b></td>
         <td><span class="est ${o.estado}">${o.estado}</span></td>
         <td>${o.estado==='PAGADA'? fdate(o.fecha_pago):'—'}</td>
@@ -165,7 +180,7 @@ async function cargar(){
       </tr>`;
     }).join('');
   } catch(e) {
-    tb.innerHTML = '<tr><td colspan="9" style="text-align:center;color:#b91c1c;padding:24px">Error al cargar.</td></tr>';
+    tb.innerHTML = '<tr><td colspan="10" style="text-align:center;color:#b91c1c;padding:24px">Error al cargar.</td></tr>';
   }
 }
 
@@ -257,27 +272,49 @@ function emailHTML(o){
 const asuntoDe = o => `Orden de Pago ${o.numero||''} — ${o.proveedor_nombre||''}`;
 
 let VISTA = null;   // orden actualmente abierta
-function ver(id){
-  const o = DATA.find(x=>x.id===id); if(!o) return;
-  VISTA = o;
-  document.getElementById('dTitulo').textContent = o.numero||'Orden';
+async function ver(id){
+  const row = DATA.find(x=>x.id===id); if(!row) return;
+  // Saldo Precio / Comisión: se gestionan en Post Venta → detalle de solo lectura.
+  if (!row.editable){
+    document.getElementById('dTitulo').textContent = row.numero||'Orden';
+    document.getElementById('dBody').innerHTML = `<div class="kv">
+      <span class="k">Tipo</span><span>${escH(row.origen_label)}</span>
+      <span class="k">Concepto</span><span>${escH(row.concepto)}</span>
+      <span class="k">Proveedor / Dealer</span><span>${escH(row.proveedor_nombre)}</span>
+      <span class="k">Documento</span><span>${escH(row.documento||'—')}</span>
+      <span class="k">Monto</span><span><b>${fmtMon(row.monto)}</b></span>
+      <span class="k">Emisión</span><span>${fdate(row.fecha_emision)}</span>
+      <span class="k">Estado</span><span><span class="est ${row.estado}">${row.estado}</span></span>
+      <span class="k">Emitida por</span><span>${escH(row.usuario_nombre||'—')}</span>
+      ${row.estado==='ANULADA'?`<span class="k" style="color:#b91c1c">Anulada por</span><span style="color:#b91c1c">${escH(row.anulada_nombre||'—')}${row.fecha_anulada?' · '+fdatetime(row.fecha_anulada):''}</span>`:''}
+    </div><p style="margin-top:12px;font-size:.8rem;color:#94a3b8"><i class="bi bi-info-circle me-1"></i>Esta orden (${escH(row.origen_label)}) se emite y gestiona en Post Venta.</p>`;
+    document.getElementById('dFoot').innerHTML = `<button class="btn-ghost" onclick="document.getElementById('dlg').close()">Cerrar</button>`;
+    document.getElementById('dlg').showModal();
+    return;
+  }
+  // Orden general → traer la orden completa y mostrar el documento Solicitud de Pago.
+  let full;
+  try { const r=await fetch('/api/ordenes-pago/ordenes/'+row.op_id,{headers:H}); const j=await r.json(); if(!j.success||!j.data) throw 0; full=j.data; }
+  catch(e){ toast('No se pudo cargar la orden'); return; }
+  VISTA = full;
+  document.getElementById('dTitulo').textContent = full.numero||'Orden';
   let extra = '';
-  if (o.estado==='ANULADA') extra = `<p style="color:#b91c1c;font-size:.82rem;margin:0 0 10px"><i class="bi bi-x-octagon me-1"></i>Anulada por ${escH(o.anulada_nombre||'—')}${o.fecha_anulada?' · '+fdatetime(o.fecha_anulada):''}</p>`;
-  else if (o.estado==='PAGADA') extra = `<p style="color:#15803d;font-size:.82rem;margin:0 0 10px"><i class="bi bi-check-circle me-1"></i>Pagada el ${fdate(o.fecha_pago)}${o.metodo_pago?' · '+escH(o.metodo_pago):''}</p>`;
-  document.getElementById('dBody').innerHTML = extra + docHTML(o);
+  if (full.estado==='ANULADA') extra = `<p style="color:#b91c1c;font-size:.82rem;margin:0 0 10px"><i class="bi bi-x-octagon me-1"></i>Anulada por ${escH(full.anulada_nombre||'—')}${full.fecha_anulada?' · '+fdatetime(full.fecha_anulada):''}</p>`;
+  else if (full.estado==='PAGADA') extra = `<p style="color:#15803d;font-size:.82rem;margin:0 0 10px"><i class="bi bi-check-circle me-1"></i>Pagada el ${fdate(full.fecha_pago)}${full.metodo_pago?' · '+escH(full.metodo_pago):''}</p>`;
+  document.getElementById('dBody').innerHTML = extra + docHTML(full);
   const foot = document.getElementById('dFoot');
-  const accAdmin = (PUEDE && o.estado==='EMITIDA')
-    ? `<button class="btn-ghost" onclick="marcar(${o.id},'ANULADA')">Anular</button><button class="btn-ghost" onclick="marcar(${o.id},'PAGADA')"><i class="bi bi-cash-coin me-1"></i>Marcar pagada</button>` : '';
-  const enviar = PUEDE ? `<button class="btn-af" id="btnEnviar" onclick="enviarCorreo(${o.id})"><i class="bi bi-envelope-paper me-1"></i>Enviar a Contabilidad</button>` : '';
+  const accAdmin = (PUEDE && full.estado==='EMITIDA')
+    ? `<button class="btn-ghost" onclick="marcarVista('ANULADA')">Anular</button><button class="btn-ghost" onclick="marcarVista('PAGADA')"><i class="bi bi-cash-coin me-1"></i>Marcar pagada</button>` : '';
+  const enviar = PUEDE ? `<button class="btn-af" id="btnEnviar" onclick="enviarCorreo()"><i class="bi bi-envelope-paper me-1"></i>Enviar a Contabilidad</button>` : '';
   foot.innerHTML = `<button class="btn-ghost" onclick="document.getElementById('dlg').close()">Cerrar</button>
-    <button class="btn-ghost" onclick="copiarDoc(${o.id})"><i class="bi bi-clipboard me-1"></i>Copiar</button>
-    <button class="btn-ghost" onclick="descargarDoc(${o.id})"><i class="bi bi-download me-1"></i>Descargar</button>
+    <button class="btn-ghost" onclick="copiarDoc()"><i class="bi bi-clipboard me-1"></i>Copiar</button>
+    <button class="btn-ghost" onclick="descargarDoc()"><i class="bi bi-download me-1"></i>Descargar</button>
     ${accAdmin}${enviar}`;
   document.getElementById('dlg').showModal();
 }
 
-async function copiarDoc(id){
-  const o = DATA.find(x=>x.id===id); if(!o) return;
+async function copiarDoc(){
+  const o = VISTA; if(!o) return;
   const html = emailHTML(o);
   const plano = (o.numero||'')+' — '+(o.proveedor_nombre||'')+' — A pagar '+fmtMon(impInfo(o).pagar);
   try {
@@ -297,8 +334,8 @@ async function copiarDoc(id){
   }
 }
 
-function descargarDoc(id){
-  const o = DATA.find(x=>x.id===id); if(!o) return;
+function descargarDoc(){
+  const o = VISTA; if(!o) return;
   const w = window.open('', '_blank');
   if (!w) { alert('Permite las ventanas emergentes para descargar.'); return; }
   w.document.write(`<!DOCTYPE html><html><head><meta charset="utf-8"><title>${escH(o.numero||'Orden de Pago')}</title></head>
@@ -307,12 +344,12 @@ function descargarDoc(id){
   w.document.close();
 }
 
-async function enviarCorreo(id){
-  const o = DATA.find(x=>x.id===id); if(!o) return;
+async function enviarCorreo(){
+  const o = VISTA; if(!o) return;
   if (!confirm(`¿Enviar la Orden de Pago ${o.numero||''} por correo a Contabilidad? Quedarás en copia.`)) return;
   const btn = document.getElementById('btnEnviar'); if(btn){ btn.disabled=true; btn.innerHTML='<i class="bi bi-hourglass-split me-1"></i>Enviando…'; }
   try {
-    const r = await fetch(`/api/ordenes-pago/ordenes/${id}/enviar-correo`, { method:'POST', headers:H,
+    const r = await fetch(`/api/ordenes-pago/ordenes/${o.id}/enviar-correo`, { method:'POST', headers:H,
       body: JSON.stringify({ asunto: asuntoDe(o), html: emailHTML(o) }) });
     const j = await r.json();
     if (!j.success) throw new Error(j.error||'No se pudo enviar');
@@ -321,12 +358,15 @@ async function enviarCorreo(id){
   if(btn){ btn.disabled=false; btn.innerHTML='<i class="bi bi-envelope-paper me-1"></i>Enviar a Contabilidad'; }
 }
 
-async function marcar(id, estado){
-  const o = DATA.find(x=>x.id===id);
+// Marcar desde la tabla (fila): usa el id de la orden general (op_id).
+async function marcar(id, estado){ const row = DATA.find(x=>x.id===id); if(!row||!row.editable) return; await doMarcar(row.op_id, row.numero, estado); }
+// Marcar desde el modal abierto (VISTA = orden general completa).
+async function marcarVista(estado){ if(!VISTA) return; await doMarcar(VISTA.id, VISTA.numero, estado); }
+async function doMarcar(opId, numero, estado){
   const label = estado==='PAGADA'?'marcar como PAGADA':'ANULAR';
-  if (!confirm(`¿${label} la orden ${o?.numero||id}?`)) return;
+  if (!confirm(`¿${label} la orden ${numero||opId}?`)) return;
   try {
-    const r = await fetch(`/api/ordenes-pago/ordenes/${id}/estado`, { method:'PUT', headers:H, body: JSON.stringify({ estado }) });
+    const r = await fetch(`/api/ordenes-pago/ordenes/${opId}/estado`, { method:'PUT', headers:H, body: JSON.stringify({ estado }) });
     const j = await r.json();
     if (j.success) { try{document.getElementById('dlg').close();}catch(e){} cargar(); }
     else alert(j.error||'Error');
