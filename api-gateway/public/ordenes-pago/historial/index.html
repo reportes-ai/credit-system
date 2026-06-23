@@ -5,7 +5,7 @@
   <link rel="icon" href="/img/favicon.png" type="image/png">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Historial de Órdenes de Pago — AutoFácil</title>
-  <!-- v1.11 -->
+  <!-- v1.12 -->
   <link href="/css/bootstrap.min.css" rel="stylesheet">
   <link href="/css/bootstrap-icons.css" rel="stylesheet">
   <style>
@@ -175,7 +175,8 @@ function renderCajaStatus(){
   const c = abierta ? {bg:'#dcfce7',fg:'#15803d',bd:'#bbf7d0'} : {bg:'#fee2e2',fg:'#b91c1c',bd:'#fecaca'};
   const hayCuenta = restr && h.segundos>0 && (h.proximo==='CIERRE'||h.proximo==='APERTURA');
   const sub = hayCuenta ? `<div id="cajaCountdown" style="font-size:.66rem;color:#64748b;margin-top:4px;font-weight:700;letter-spacing:.2px"></div>` : '';
-  el.innerHTML = `<span title="${escH(MICAJA.nombre||'')}" style="display:inline-flex;align-items:center;gap:7px;background:${c.bg};color:${c.fg};border:1px solid ${c.bd};border-radius:999px;padding:6px 14px;font-size:.82rem;font-weight:800"><i class="bi bi-cash-stack"></i>CAJA #${MICAJA.id_caja} · ${estadoTxt}</span>${sub}`;
+  const nombreCaja = MICAJA.nombre || ('Caja #'+MICAJA.id_caja);
+  el.innerHTML = `<span title="Caja #${MICAJA.id_caja}" style="display:inline-flex;align-items:center;gap:7px;background:${c.bg};color:${c.fg};border:1px solid ${c.bd};border-radius:999px;padding:6px 14px;font-size:.82rem;font-weight:800"><i class="bi bi-cash-stack"></i>${escH(nombreCaja)} · ${estadoTxt}</span>${sub}`;
   if(hayCuenta){
     cajaDeadline = Date.now() + h.segundos*1000;
     cajaModo = h.proximo==='CIERRE' ? 'Cierra en' : 'Abre en';
