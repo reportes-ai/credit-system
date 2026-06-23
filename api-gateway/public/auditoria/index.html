@@ -5,7 +5,7 @@
   <link rel="icon" href="/img/favicon.png" type="image/png">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Auditoría — AutoFácil</title>
-  <!-- v1.4 -->
+  <!-- v1.5 -->
   <link href="/css/bootstrap.min.css" rel="stylesheet">
   <link href="/css/bootstrap-icons.css" rel="stylesheet">
   <style>
@@ -89,6 +89,7 @@
   <div class="tabs">
     <div class="tab on" id="tabLogins" onclick="setTab('logins')"><i class="bi bi-box-arrow-in-right"></i>Logins</div>
     <div class="tab" id="tabMov" onclick="setTab('mov')"><i class="bi bi-list-columns-reverse"></i>Movimientos</div>
+    <div class="tab" id="tabBackups" onclick="setTab('backups')"><i class="bi bi-people"></i>BackUps <b style="color:#ef4444">*</b></div>
   </div>
 
   <div class="filtros">
@@ -144,10 +145,13 @@ function setTab(t){
   TAB = t; PAGE = 1;
   document.getElementById('tabLogins').classList.toggle('on', t==='logins');
   document.getElementById('tabMov').classList.toggle('on', t==='mov');
-  const mov = t==='mov';
+  document.getElementById('tabBackups').classList.toggle('on', t==='backups');
+  const mov = t==='mov', bk = t==='backups';
   document.getElementById('wrapAccion').style.display = mov?'':'none';
   document.getElementById('wrapModulo').style.display = mov?'':'none';
   document.getElementById('wrapQ').style.display      = mov?'':'none';
+  document.querySelector('.filtros').style.display = bk?'none':'';
+  document.querySelector('.pager').style.display   = bk?'none':'';
   cargar();
 }
 
@@ -180,6 +184,17 @@ async function cargarFiltros(){
 async function cargar(){
   const tb = document.getElementById('tbody');
   tb.innerHTML = '<tr><td class="vacio">Cargando…</td></tr>';
+  if (TAB==='backups'){
+    try {
+      const r = await fetch('/api/auditoria-mov/backups', { headers:H });
+      const j = await r.json();
+      if (!j.success){ tb.innerHTML = '<tr><td class="vacio">Error al cargar</td></tr>'; return; }
+      document.getElementById('resumen').textContent = `${j.data.rows.length} periodo(s) de backup`;
+      document.getElementById('rango').textContent = '';
+      renderBackups(j.data.rows);
+    } catch(e){ tb.innerHTML = '<tr><td class="vacio">Error de conexión</td></tr>'; }
+    return;
+  }
   const url = (TAB==='mov'?'/api/auditoria-mov/movimientos?':'/api/auditoria-mov/logins?') + qs({ page:PAGE, limit:100 }).toString();
   try {
     const r = await fetch(url, { headers:H });
@@ -218,10 +233,14 @@ function renderMov(rows){
   tb.innerHTML = rows.map(r => {
     const acc = String(r.accion||'').toUpperCase().replace(/[^A-Z_]/g,'');
     const esSis = (r.usuario === 'Sistema') || (r.id_usuario == null);
+    const viaBackup = r.id_titular && r.titular_nombre;
+    const userTd = viaBackup
+      ? `<td class="c-user" style="color:#fca5a5" title="Realizado por ${escH(r.usuario||'')} como backup">${escH(r.titular_nombre)} <b style="color:#ef4444">*</b></td>`
+      : `<td class="c-user"${esSis?' style="color:#67e8f9"':''}>${esSis?'<i class="bi bi-robot"></i> ':''}${escH(r.usuario||'Sistema')}</td>`;
     return `<tr>
       <td class="c-fecha">${fFecha(r.fecha)}</td>
       <td>${fHora(r.fecha)}</td>
-      <td class="c-user"${esSis?' style="color:#67e8f9"':''}>${esSis?'<i class="bi bi-robot"></i> ':''}${escH(r.usuario||'Sistema')}</td>
+      ${userTd}
       <td class="c-perfil">${escH(r.perfil||'')}</td>
       <td class="c-mod">${escH(r.modulo||'')}</td>
       <td><span class="acc ${acc}">${escH(r.accion||'')}</span></td>
@@ -230,6 +249,21 @@ function renderMov(rows){
       <td class="c-ip">${escH(r.ip||'')}</td>
     </tr>`;
   }).join('');
+}
+
+function renderBackups(rows){
+  document.getElementById('thead').innerHTML =
+    '<tr><th>Titular <b style="color:#ef4444">*</b></th><th>BackUp</th><th>Categorías</th><th>Desde</th><th>Hasta</th><th>Activado por</th></tr>';
+  const tb = document.getElementById('tbody');
+  if (!rows.length){ tb.innerHTML='<tr><td colspan="6" class="vacio">Sin backups activados aún</td></tr>'; return; }
+  tb.innerHTML = rows.map(r => `<tr>
+    <td class="c-user" style="color:#fca5a5">${escH(r.titular||'—')} <b style="color:#ef4444">*</b></td>
+    <td class="c-user">${escH(r.suplente||'—')}</td>
+    <td>${escH(r.categorias||'')}</td>
+    <td class="c-fecha">${fFecha(r.desde)} ${fHora(r.desde)}</td>
+    <td>${r.hasta?(fFecha(r.hasta)+' '+fHora(r.hasta)):'<span class="estado-on">● Vigente</span>'}</td>
+    <td class="c-perfil">${escH(r.activado_por||'')}</td>
+  </tr>`).join('');
 }
 
 function aplicar(){ PAGE = 1; cargar(); }

@@ -9,5 +9,6 @@ router.get('/movimientos/export', verifyToken, requireFunc('auditoria_ver'), ctr
 router.get('/logins',             verifyToken, requireFunc('auditoria_ver'), ctrl.getLogins);
 router.get('/logins/export',      verifyToken, requireFunc('auditoria_ver'), ctrl.exportLogins);
 router.get('/filtros',            verifyToken, requireFunc('auditoria_ver'), ctrl.getFiltros);
+router.get('/backups',            verifyToken, requireFunc('auditoria_ver'), ctrl.getBackups);
 
 module.exports = router;

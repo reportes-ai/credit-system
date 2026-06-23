@@ -60,7 +60,7 @@ const getMovimientos = async (req, res) => {
     const { whereStr, vals } = whereMovimientos(req.query);
     const [[{ total }]] = await pool.query(`SELECT COUNT(*) total FROM auditoria_movimientos ${whereStr}`, vals);
     const [rows] = await pool.query(
-      `SELECT id, fecha, id_usuario, usuario, perfil, modulo, accion, entidad, entidad_id, detalle, rut, ip
+      `SELECT id, fecha, id_usuario, usuario, perfil, modulo, accion, entidad, entidad_id, detalle, rut, ip, id_titular, titular_nombre
        FROM auditoria_movimientos ${whereStr} ORDER BY fecha DESC, id DESC LIMIT ? OFFSET ?`,
       [...vals, limit, offset]);
     res.json({ success: true, data: { rows, total, page, limit, pages: Math.ceil(total / limit) }, error: null });
@@ -145,4 +145,23 @@ const exportLogins = async (req, res) => {
   } catch (e) { console.error('[auditoria export logins]', e.message); res.status(500).json({ success: false, data: null, error: 'Error interno del servidor' }); }
 };
 
-module.exports = { getMovimientos, getLogins, getFiltros, exportMovimientos, exportLogins };
+/* ── GET /api/auditoria-mov/backups — periodos de vigencia de cada backup ──── */
+const getBackups = async (req, res) => {
+  try {
+    const [rows] = await pool.query(
+      `SELECT bp.id, bp.id_titular, bp.id_suplente, bp.categorias, bp.desde, bp.hasta, bp.activado_por,
+              TRIM(CONCAT(t.nombre,' ',COALESCE(t.apellido,''))) AS titular,
+              TRIM(CONCAT(s.nombre,' ',COALESCE(s.apellido,''))) AS suplente
+         FROM backup_periodos bp
+         LEFT JOIN usuarios t ON t.id_usuario = bp.id_titular
+         LEFT JOIN usuarios s ON s.id_usuario = bp.id_suplente
+        ORDER BY (bp.hasta IS NULL) DESC, bp.desde DESC
+        LIMIT 1000`);
+    res.json({ success: true, data: { rows }, error: null });
+  } catch (e) {
+    // Si la tabla aún no existe (módulo backups no inicializado), devuelve vacío.
+    res.json({ success: true, data: { rows: [] }, error: null });
+  }
+};
+
+module.exports = { getMovimientos, getLogins, getFiltros, exportMovimientos, exportLogins, getBackups };

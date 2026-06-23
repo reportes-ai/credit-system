@@ -28,6 +28,17 @@ const CATS = [
       updated_at  DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
       INDEX idx_suplente (id_suplente)
     )`);
+    // Periodos de backup (para la pestaña BackUps de Auditoría): desde/hasta de cada vigencia.
+    await pool.query(`CREATE TABLE IF NOT EXISTS backup_periodos (
+      id           BIGINT AUTO_INCREMENT PRIMARY KEY,
+      id_titular   INT NOT NULL,
+      id_suplente  INT DEFAULT NULL,
+      categorias   VARCHAR(120) DEFAULT NULL,
+      desde        DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      hasta        DATETIME DEFAULT NULL,
+      activado_por VARCHAR(200) DEFAULT NULL,
+      INDEX idx_titular (id_titular), INDEX idx_abierto (hasta)
+    )`);
     // Registrar el mantenedor en el menú (funcionalidad) si no existe
     const [[ex]] = await pool.query("SELECT 1 ok FROM funcionalidades WHERE codigo='mantenedores_backups' LIMIT 1");
     if (!ex) await pool.query(
@@ -85,7 +96,7 @@ async function avisarSuplente({ suplente, titularNombre, autorNombre, activeCats
       <p style="font-size:15px;color:#1e293b">Estimado ${esc(ns)}:</p>
       <p style="font-size:15px;color:#334155">Por instrucciones de <strong>${esc(autorNombre)}</strong> se ha suspendido la funcionalidad de Back Up de <strong>${esc(titularNombre)}</strong>. Ya no recibirás las funcionalidades que estaban redirigidas a ti.</p>`;
   }
-  const asunto = activado ? 'Back Up Designado Activado' : 'Back Up Designado Suspendido';
+  const asunto = activado ? 'Back Up Designado Activado' : 'Back Up Designado Desactivado';
   try { await enviarCorreo({ to: suplente.email, subject: asunto, html: envolverHTML(cuerpo) }); } catch (_) {}
 }
 
@@ -137,6 +148,29 @@ const guardar = async (req, res) => {
     // Invalida el caché de permisos (las funciones heredadas cambian)
     try { require('../../../../shared/middleware/permisos').limpiarCachePermisos(); } catch (_) {}
 
+    // Vigencia: activo = hay suplente y al menos una categoría encendida.
+    const wasActive = !!(old.id_suplente && (old.b_funciones || old.b_alertas || old.b_correos));
+    const nowActive = !!(id_suplente && (nv.b_funciones || nv.b_alertas || nv.b_correos));
+    const activeCats = ['b_alertas', 'b_funciones', 'b_correos'].filter(k => nv[k] === 1).map(k => CAT_MAIL[k]);
+    const catsCsv = activeCats.join(', ');
+    const autorNombre = `${(req.usuario.nombre || '')} ${(req.usuario.apellido || '')}`.trim() || 'la Administración';
+
+    // Periodos de backup (pestaña BackUps de Auditoría): abre/cierra la vigencia.
+    try {
+      if (!wasActive && nowActive) {
+        await pool.query('INSERT INTO backup_periodos (id_titular, id_suplente, categorias, activado_por) VALUES (?,?,?,?)', [idTit, id_suplente, catsCsv, autorNombre]);
+      } else if (wasActive && !nowActive) {
+        await pool.query('UPDATE backup_periodos SET hasta=NOW() WHERE id_titular=? AND hasta IS NULL', [idTit]);
+      } else if (wasActive && nowActive) {
+        if (old.id_suplente !== id_suplente) {  // cambió el suplente → cierra y abre nuevo
+          await pool.query('UPDATE backup_periodos SET hasta=NOW() WHERE id_titular=? AND hasta IS NULL', [idTit]);
+          await pool.query('INSERT INTO backup_periodos (id_titular, id_suplente, categorias, activado_por) VALUES (?,?,?,?)', [idTit, id_suplente, catsCsv, autorNombre]);
+        } else {
+          await pool.query('UPDATE backup_periodos SET categorias=? WHERE id_titular=? AND hasta IS NULL', [catsCsv, idTit]);
+        }
+      }
+    } catch (_) {}
+
     // Un solo correo al suplente, al guardar, si hubo algún cambio de categoría.
     let cambio = false;
     for (const cat of CATS) {
@@ -146,10 +180,8 @@ const guardar = async (req, res) => {
     if (cambio && id_suplente) {
       const titular = await nombreDe(idTit);
       const suplente = await nombreDe(id_suplente);
-      const activeCats = ['b_alertas', 'b_funciones', 'b_correos'].filter(k => nv[k] === 1).map(k => CAT_MAIL[k]);
-      const autorNombre = `${(req.usuario.nombre || '')} ${(req.usuario.apellido || '')}`.trim() || 'la Administración';
       const titularNombre = titular ? `${titular.nombre || ''} ${titular.apellido || ''}`.trim() : '';
-      await avisarSuplente({ suplente, titularNombre, autorNombre, activeCats, activado: activeCats.length > 0 });
+      await avisarSuplente({ suplente, titularNombre, autorNombre, activeCats, activado: nowActive });
     }
     res.json({ success: true, data: { ok: true }, error: null });
   } catch (e) { console.error('[backups guardar]', e.message); res.status(500).json({ success: false, data: null, error: 'Error interno del servidor' }); }
