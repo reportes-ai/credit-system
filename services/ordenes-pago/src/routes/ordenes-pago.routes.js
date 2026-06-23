@@ -15,6 +15,7 @@ router.get('/ordenes',            verifyToken, c.listarOrdenes);
 router.get('/ordenes/:id',        verifyToken, c.getOrden);
 router.post('/ordenes',           verifyToken, requireFunc('ordenes_pago_emitir'), c.crearOrden);
 router.put('/ordenes/:id/estado', verifyToken, requireFunc('ordenes_pago_emitir'), c.cambiarEstadoOrden);
+router.post('/ordenes/:id/enviar-correo', verifyToken, requireFunc('ordenes_pago_emitir'), c.enviarCorreoOrden);
 
 // Estadísticas
 router.get('/estadisticas',       verifyToken, c.estadisticas);

@@ -5,7 +5,7 @@
   <link rel="icon" href="/img/favicon.png" type="image/png">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Historial de Órdenes de Pago — AutoFácil</title>
-  <!-- v1.0 -->
+  <!-- v1.1 -->
   <link href="/css/bootstrap.min.css" rel="stylesheet">
   <link href="/css/bootstrap-icons.css" rel="stylesheet">
   <style>
@@ -41,7 +41,9 @@
     .icon-btn { background:none; border:none; cursor:pointer; font-size:.95rem; padding:3px 6px; border-radius:6px; color:#475569; }
     .icon-btn:hover { background:#eff6ff; }
     .btn-ghost { background:#fff; border:1.5px solid #e2e8f0; border-radius:8px; padding:7px 12px; font-size:.82rem; cursor:pointer; color:#334155; }
-    dialog { border:none; border-radius:16px; padding:0; box-shadow:0 20px 60px rgba(0,0,0,.3); max-width:520px; width:94%; }
+    dialog { border:none; border-radius:16px; padding:0; box-shadow:0 20px 60px rgba(0,0,0,.3); max-width:880px; width:96%; }
+    .dlg-foot { flex-wrap:wrap; }
+    .toast { position:fixed; top:70px; right:20px; background:#16a34a; color:#fff; padding:12px 18px; border-radius:9px; font-weight:600; font-size:.86rem; z-index:3000; display:none; max-width:360px; }
     dialog::backdrop { background:rgba(15,23,42,.55); }
     .dlg-head { background:linear-gradient(135deg,#012d70,#0255c5); color:#fff; padding:15px 20px; font-weight:700; display:flex; justify-content:space-between; }
     .dlg-body { padding:18px 20px; font-size:.86rem; color:#334155; line-height:1.7; }
@@ -103,6 +105,7 @@
   <div class="dlg-body" id="dBody"></div>
   <div class="dlg-foot" id="dFoot"></div>
 </dialog>
+<div class="toast" id="toast"></div>
 
 <script>
 const token = sessionStorage.getItem('token');
@@ -115,6 +118,7 @@ function logout(){ sessionStorage.clear(); location.href='/login.html'; }
 const H = { 'Content-Type':'application/json', Authorization:'Bearer '+token };
 const escH = s => String(s??'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
 const fmtMon = n => '$'+Number(n||0).toLocaleString('es-CL');
+function toast(m){ const t=document.getElementById('toast'); t.textContent=m; t.style.display='block'; clearTimeout(t._t); t._t=setTimeout(()=>t.style.display='none',3000); }
 const fdate = d => d? String(d).slice(0,10).split('-').reverse().join('-') : '—';
 const fdatetime = d => { if(!d) return '—'; const s=String(d); const f=fdate(s); const hm=(s.slice(11,16)||''); return hm? f+' '+hm : f; };
 let DATA = [], PUEDE = (yo.perfil==='Administrador');
@@ -172,28 +176,145 @@ function pintaChips(rs, total){
      <span class="chip pag">Pagadas: <b>${rs.pagadas||0}</b> · ${fmtMon(rs.monto_pagado)}</span>`;
 }
 
+/* ── Documento "Solicitud de Pago" (formato AutoFácil) ── */
+const MESES = ['ene','feb','mar','abr','may','jun','jul','ago','sep','oct','nov','dic'];
+const periodoCL = d => { if(!d) return '—'; const x=new Date(String(d).slice(0,10)); if(isNaN(x)) return '—'; return MESES[x.getUTCMonth()]+'-'+String(x.getUTCFullYear()).slice(2); };
+function impInfo(o){
+  const trat = o.tratamiento || 'AFECTO';
+  const neto = Number(o.monto_neto != null ? o.monto_neto : o.monto)||0;
+  const imp  = Number(o.impuesto_monto != null ? o.impuesto_monto : 0)||0;
+  const pagar= Number(o.monto)||0;
+  const pct  = Number(o.impuesto_pct != null ? o.impuesto_pct : (trat==='HONORARIOS'?15.25:trat==='EXENTO'?0:19));
+  const lbl  = trat==='HONORARIOS' ? `Retención ${pct}%` : trat==='EXENTO' ? 'Exento' : `IVA ${pct}%`;
+  return { trat, neto, imp, pagar, pct, lbl };
+}
+function docHTML(o){
+  const i = impInfo(o);
+  const docNum = [o.tipo_documento, o.numero_documento].filter(Boolean).join(' ');
+  const periodo = periodoCL(o.fecha_documento || o.fecha_emision);
+  const fechaPagar = fdate(o.fecha_pago || o.fecha_emision);
+  const tipoGasto = (o.categoria || 'PAGO A PROVEEDOR').toUpperCase();
+  const Sdoc='font-family:Arial,sans-serif;color:#1e293b;font-size:11px;border:2px solid #93c5fd;border-radius:8px;padding:14px 16px;display:block;width:100%;box-sizing:border-box';
+  const Smeta='border-collapse:collapse;font-size:11px';
+  const Slbl='color:#64748b;font-weight:700;text-transform:uppercase;font-size:9px;padding:1px 8px;white-space:nowrap';
+  const Smv='padding:1px 8px;font-size:11px';
+  const Stbl='width:100%;border-collapse:collapse;margin:8px 0;font-size:11px;table-layout:fixed';
+  const Sth='background:#dbeafe;color:#1e3a8a;border:1px solid #93c5fd;padding:5px 6px;font-size:9px;text-transform:uppercase;text-align:left;white-space:normal;word-break:break-word';
+  const Std='border:1px solid #cbd5e1;padding:5px 6px;white-space:normal;word-break:break-word';
+  const Snum=Std+';text-align:right';
+  const Sres='border-collapse:collapse;margin-top:14px;max-width:430px';
+  const SresL='border:1px solid #cbd5e1;padding:5px 8px;font-size:11px;background:#eff6ff;font-weight:700;width:42%';
+  const SresV='border:1px solid #cbd5e1;padding:5px 8px;font-size:11px';
+  return `<div style="${Sdoc}">
+    <table style="width:100%;border-collapse:collapse;margin-bottom:14px"><tbody><tr>
+      <td style="vertical-align:top"><table style="${Smeta}"><tbody>
+        <tr><td style="${Slbl}">Concepto</td><td style="${Smv}">SOLICITUD DE PAGO</td></tr>
+        <tr><td style="${Slbl}">Compañía</td><td style="${Smv}">AUTOFÁCIL SPA</td></tr>
+        <tr><td style="${Slbl}">Tipo gasto</td><td style="${Smv}">${escH(tipoGasto)}</td></tr>
+        <tr><td style="${Slbl}">N° Orden</td><td style="${Smv}">${escH(o.numero||'—')}</td></tr>
+        <tr><td style="${Slbl}">Fecha</td><td style="${Smv}">${fdate(o.fecha_emision)}</td></tr>
+      </tbody></table></td>
+      <td style="vertical-align:top;text-align:right">
+        <img width="150" height="34" style="height:34px;width:auto" src="${location.origin}/img/logo-autofacil.png" onerror="this.src='${location.origin}/img/logo.png'">
+      </td>
+    </tr></tbody></table>
+    <table style="${Stbl}">
+      <colgroup><col style="width:24%"><col style="width:12%"><col style="width:22%"><col style="width:8%"><col style="width:12%"><col style="width:11%"><col style="width:11%"></colgroup>
+      <thead><tr><th style="${Sth}">Proveedor</th><th style="${Sth}">RUT</th><th style="${Sth}">Detalle</th><th style="${Sth}">Mes</th><th style="${Sth}">Monto Neto</th><th style="${Sth}">${escH(i.lbl)}</th><th style="${Sth}">A Pagar</th></tr></thead>
+      <tbody>
+        <tr><td style="${Std}">${escH(o.proveedor_nombre||'')}</td><td style="${Std}">${escH(o.proveedor_rut||'')}</td>
+          <td style="${Std}">${escH(o.concepto||'')}</td><td style="${Std}">${periodo}</td>
+          <td style="${Snum}">${fmtMon(i.neto)}</td><td style="${Snum}">${fmtMon(i.imp)}</td><td style="${Snum}">${fmtMon(i.pagar)}</td></tr>
+        <tr><td colspan="6" style="${Std};text-align:right;font-weight:800;background:#f1f5f9">TOTAL</td><td style="${Snum};font-weight:800;background:#f1f5f9">${fmtMon(i.pagar)}</td></tr>
+      </tbody>
+    </table>
+    <table style="${Sres}"><tbody>
+      <tr><td style="${SresL}">Proveedor</td><td style="${SresV}">${escH(o.proveedor_nombre||'')}</td></tr>
+      <tr><td style="${SresL}">Concepto</td><td style="${SresV}">${escH(o.concepto||'')}</td></tr>
+      <tr><td style="${SresL}">Período</td><td style="${SresV}">${periodo}</td></tr>
+      ${docNum?`<tr><td style="${SresL}">Documento</td><td style="${SresV}">${escH(docNum)}${o.fecha_documento?' · '+fdate(o.fecha_documento):''}</td></tr>`:''}
+      <tr><td style="${SresL}">Destino</td><td style="${SresV}">${escH(o.destino||'—')}</td></tr>
+      <tr><td style="${SresL}">Monto neto</td><td style="${SresV}">${fmtMon(i.neto)}</td></tr>
+      <tr><td style="${SresL}">${escH(i.lbl)}</td><td style="${SresV}">${fmtMon(i.imp)}</td></tr>
+      <tr><td style="${SresL}">A pagar</td><td style="${SresV};font-weight:700">${fmtMon(i.pagar)}</td></tr>
+      <tr><td style="${SresL}">Fecha a pagar</td><td style="${SresV}">${fechaPagar}</td></tr>
+    </tbody></table>
+  </div>`;
+}
+const PARR = 'font-size:14px;color:#374151;margin:0 0 14px;line-height:1.6';
+function emailHTML(o){
+  const i = impInfo(o);
+  const cuerpo = `<p style="${PARR}">Estimado Equipo de Contabilidad:</p>
+    <p style="${PARR}">Adjunto encontrarán la Orden de Pago N° <strong>${escH(o.numero||'')}</strong> para el pago a <strong>${escH(o.proveedor_nombre||'')}</strong> por concepto de <strong>${escH(o.concepto||'')}</strong>, por un monto a pagar de <strong>${fmtMon(i.pagar)}</strong>.</p>
+    <p style="${PARR}">Les agradezco coordinar el pago según los datos indicados en el documento.</p>`;
+  const firma = `<div style="margin-top:18px"><p style="${PARR}">Saludos cordiales,<br><strong>${escH(o.usuario_nombre||'')}</strong><br>AutoFácil SpA</p></div>`;
+  return `<div style="font-family:Arial,sans-serif">${cuerpo}${docHTML(o)}${firma}</div>`;
+}
+const asuntoDe = o => `Orden de Pago ${o.numero||''} — ${o.proveedor_nombre||''}`;
+
+let VISTA = null;   // orden actualmente abierta
 function ver(id){
   const o = DATA.find(x=>x.id===id); if(!o) return;
+  VISTA = o;
   document.getElementById('dTitulo').textContent = o.numero||'Orden';
-  const doc = [o.tipo_documento, o.numero_documento].filter(Boolean).join(' ') || '—';
-  document.getElementById('dBody').innerHTML = `<div class="kv">
-    <span class="k">Proveedor</span><span>${escH(o.proveedor_nombre||'—')}${o.proveedor_rut?' · '+escH(o.proveedor_rut):''}</span>
-    <span class="k">Concepto</span><span>${escH(o.concepto||'—')}</span>
-    <span class="k">Categoría</span><span>${escH(o.categoria||'—')}</span>
-    <span class="k">Documento</span><span>${escH(doc)}${o.fecha_documento?' · '+fdate(o.fecha_documento):''}</span>
-    <span class="k">Monto</span><span><b>${fmtMon(o.monto)}</b></span>
-    <span class="k">Emisión</span><span>${fdate(o.fecha_emision)}</span>
-    <span class="k">Método pago</span><span>${escH(o.metodo_pago||'—')}</span>
-    <span class="k">Estado</span><span><span class="est ${o.estado}">${o.estado}</span>${o.estado==='PAGADA'?' · '+fdate(o.fecha_pago):''}</span>
-    <span class="k">Observaciones</span><span>${escH(o.observaciones||'—')}</span>
-    <span class="k">Emitida por</span><span>${escH(o.usuario_nombre||'—')}</span>
-    ${o.estado==='ANULADA'?`<span class="k" style="color:#b91c1c">Anulada por</span><span style="color:#b91c1c">${escH(o.anulada_nombre||'—')}${o.fecha_anulada?' · '+fdatetime(o.fecha_anulada):''}</span>`:''}
-  </div>`;
+  let extra = '';
+  if (o.estado==='ANULADA') extra = `<p style="color:#b91c1c;font-size:.82rem;margin:0 0 10px"><i class="bi bi-x-octagon me-1"></i>Anulada por ${escH(o.anulada_nombre||'—')}${o.fecha_anulada?' · '+fdatetime(o.fecha_anulada):''}</p>`;
+  else if (o.estado==='PAGADA') extra = `<p style="color:#15803d;font-size:.82rem;margin:0 0 10px"><i class="bi bi-check-circle me-1"></i>Pagada el ${fdate(o.fecha_pago)}${o.metodo_pago?' · '+escH(o.metodo_pago):''}</p>`;
+  document.getElementById('dBody').innerHTML = extra + docHTML(o);
   const foot = document.getElementById('dFoot');
-  foot.innerHTML = (PUEDE && o.estado==='EMITIDA')
-    ? `<button class="btn-ghost" onclick="marcar(${o.id},'ANULADA')">Anular</button><button class="btn-af" onclick="marcar(${o.id},'PAGADA')"><i class="bi bi-cash-coin me-1"></i>Marcar pagada</button>`
-    : `<button class="btn-ghost" onclick="document.getElementById('dlg').close()">Cerrar</button>`;
+  const accAdmin = (PUEDE && o.estado==='EMITIDA')
+    ? `<button class="btn-ghost" onclick="marcar(${o.id},'ANULADA')">Anular</button><button class="btn-ghost" onclick="marcar(${o.id},'PAGADA')"><i class="bi bi-cash-coin me-1"></i>Marcar pagada</button>` : '';
+  const enviar = PUEDE ? `<button class="btn-af" id="btnEnviar" onclick="enviarCorreo(${o.id})"><i class="bi bi-envelope-paper me-1"></i>Enviar a Contabilidad</button>` : '';
+  foot.innerHTML = `<button class="btn-ghost" onclick="document.getElementById('dlg').close()">Cerrar</button>
+    <button class="btn-ghost" onclick="copiarDoc(${o.id})"><i class="bi bi-clipboard me-1"></i>Copiar</button>
+    <button class="btn-ghost" onclick="descargarDoc(${o.id})"><i class="bi bi-download me-1"></i>Descargar</button>
+    ${accAdmin}${enviar}`;
   document.getElementById('dlg').showModal();
+}
+
+async function copiarDoc(id){
+  const o = DATA.find(x=>x.id===id); if(!o) return;
+  const html = emailHTML(o);
+  const plano = (o.numero||'')+' — '+(o.proveedor_nombre||'')+' — A pagar '+fmtMon(impInfo(o).pagar);
+  try {
+    if (navigator.clipboard && window.ClipboardItem){
+      await navigator.clipboard.write([new ClipboardItem({
+        'text/html': new Blob([html],{type:'text/html'}),
+        'text/plain': new Blob([plano],{type:'text/plain'})
+      })]);
+    } else throw new Error('no-clipboard');
+    toast('Documento copiado — pégalo en tu correo');
+  } catch(e) {
+    const tmp = document.createElement('div'); tmp.contentEditable='true'; tmp.style.cssText='position:fixed;left:-9999px'; tmp.innerHTML=html;
+    document.body.appendChild(tmp); const rg=document.createRange(); rg.selectNodeContents(tmp);
+    const sel=getSelection(); sel.removeAllRanges(); sel.addRange(rg);
+    try { document.execCommand('copy'); toast('Documento copiado'); } catch(_) { alert('No se pudo copiar.'); }
+    sel.removeAllRanges(); tmp.remove();
+  }
+}
+
+function descargarDoc(id){
+  const o = DATA.find(x=>x.id===id); if(!o) return;
+  const w = window.open('', '_blank');
+  if (!w) { alert('Permite las ventanas emergentes para descargar.'); return; }
+  w.document.write(`<!DOCTYPE html><html><head><meta charset="utf-8"><title>${escH(o.numero||'Orden de Pago')}</title></head>
+    <body style="margin:24px">${docHTML(o)}
+    <script>window.onload=function(){setTimeout(function(){window.print();},200);}<\/script></body></html>`);
+  w.document.close();
+}
+
+async function enviarCorreo(id){
+  const o = DATA.find(x=>x.id===id); if(!o) return;
+  if (!confirm(`¿Enviar la Orden de Pago ${o.numero||''} por correo a Contabilidad? Quedarás en copia.`)) return;
+  const btn = document.getElementById('btnEnviar'); if(btn){ btn.disabled=true; btn.innerHTML='<i class="bi bi-hourglass-split me-1"></i>Enviando…'; }
+  try {
+    const r = await fetch(`/api/ordenes-pago/ordenes/${id}/enviar-correo`, { method:'POST', headers:H,
+      body: JSON.stringify({ asunto: asuntoDe(o), html: emailHTML(o) }) });
+    const j = await r.json();
+    if (!j.success) throw new Error(j.error||'No se pudo enviar');
+    toast('Correo enviado a '+(j.data?.to||'Contabilidad')+(j.data?.cc?(' (CC '+j.data.cc+')'):''));
+  } catch(e){ toast('No se pudo enviar: '+e.message); }
+  if(btn){ btn.disabled=false; btn.innerHTML='<i class="bi bi-envelope-paper me-1"></i>Enviar a Contabilidad'; }
 }
 
 async function marcar(id, estado){

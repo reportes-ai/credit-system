@@ -5,7 +5,7 @@
   <link rel="icon" href="/img/favicon.png" type="image/png">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Emisión de Orden de Pago — AutoFácil</title>
-  <!-- v1.0 -->
+  <!-- v1.1 -->
   <link href="/css/bootstrap.min.css" rel="stylesheet">
   <link href="/css/bootstrap-icons.css" rel="stylesheet">
   <style>
@@ -76,7 +76,21 @@
         <input id="fCategoria" list="catList" maxlength="80" placeholder="Ej: Arriendo, Servicios, Insumos…">
         <datalist id="catList"><option>Arriendo</option><option>Servicios Básicos</option><option>Honorarios</option><option>Insumos</option><option>Marketing</option><option>Tecnología</option><option>Mantención</option><option>Otros</option></datalist>
       </div>
-      <div class="fld monto-box"><label>Monto (CLP) *</label><input id="fMonto" inputmode="numeric" placeholder="0" oninput="fmtMonto()"></div>
+      <div class="fld"><label>Tratamiento tributario *</label>
+        <select id="fTratamiento" onchange="recalc()">
+          <option value="AFECTO">Afecto a IVA (19%)</option>
+          <option value="EXENTO">Exento</option>
+          <option value="HONORARIOS">Boleta de Honorarios (retención)</option>
+        </select>
+      </div>
+      <div class="fld monto-box"><label>Monto neto (CLP) *</label><input id="fMonto" inputmode="numeric" placeholder="0" oninput="fmtMonto()"></div>
+      <div class="fld full" id="previewBox" style="display:none">
+        <div style="background:#f8fafc;border:1px solid #eef2f7;border-radius:10px;padding:10px 14px;display:flex;gap:24px;flex-wrap:wrap;font-size:.86rem;align-items:center">
+          <span>Neto: <b id="pvNeto">$0</b></span>
+          <span id="pvImpWrap"><span id="pvImpLbl">IVA 19%</span>: <b id="pvImp">$0</b></span>
+          <span style="color:#0141A2;font-weight:800">A pagar: <span id="pvPagar">$0</span></span>
+        </div>
+      </div>
 
       <div class="fld"><label>Tipo de documento</label>
         <select id="fTipoDoc"><option value="">—</option><option>Factura</option><option>Boleta</option><option>Boleta de Honorarios</option><option>Nota de Cobro</option><option>Sin documento</option></select>
@@ -116,8 +130,34 @@ const escH = s => String(s??'').replace(/&/g,'&amp;').replace(/</g,'&lt;').repla
 
 function formatRUT(v){ let x=String(v||'').replace(/[^0-9kK]/g,'').toUpperCase(); if(!x) return ''; const dv=x.slice(-1); let n=x.slice(0,-1); n=n.replace(/\B(?=(\d{3})+(?!\d))/g,'.'); return n?`${n}-${dv}`:dv; }
 function onRut(){ const el=document.getElementById('fProvRut'); el.value=formatRUT(el.value); }
-function fmtMonto(){ const el=document.getElementById('fMonto'); const n=el.value.replace(/\D/g,''); el.value=n? Number(n).toLocaleString('es-CL'):''; }
+function fmtMonto(){ const el=document.getElementById('fMonto'); const n=el.value.replace(/\D/g,''); el.value=n? Number(n).toLocaleString('es-CL'):''; recalc(); }
 function montoNum(){ return Number(document.getElementById('fMonto').value.replace(/\D/g,''))||0; }
+const money = n => '$'+Number(Math.round(n)||0).toLocaleString('es-CL');
+
+let IMPUESTOS = { IVA:19, RETENCION_HONORARIOS:15.25 };
+async function cargarImpuestos(){
+  try { const r = await fetch('/api/impuestos/valores', { headers:H }); const j = await r.json(); if (j.success && j.data) IMPUESTOS = { ...IMPUESTOS, ...j.data }; } catch(e){}
+  recalc();
+}
+// Calcula impuesto y A pagar según tratamiento (espejo del backend).
+function calcMontos(neto, trat){
+  if (trat==='EXENTO') return { pct:0, imp:0, pagar:neto, lbl:'Exento' };
+  if (trat==='HONORARIOS'){ const pct=Number(IMPUESTOS.RETENCION_HONORARIOS)||15.25; const imp=Math.round(neto*pct/100); return { pct, imp, pagar:neto-imp, lbl:`Retención ${pct}%` }; }
+  const pct=Number(IMPUESTOS.IVA)||19; const imp=Math.round(neto*pct/100); return { pct, imp, pagar:neto+imp, lbl:`IVA ${pct}%` };
+}
+function recalc(){
+  const neto = montoNum();
+  const trat = document.getElementById('fTratamiento').value;
+  const box = document.getElementById('previewBox');
+  if (!neto){ box.style.display='none'; return; }
+  const m = calcMontos(neto, trat);
+  document.getElementById('pvNeto').textContent = money(neto);
+  document.getElementById('pvImpWrap').style.display = (trat==='EXENTO')?'none':'';
+  document.getElementById('pvImpLbl').textContent = m.lbl + (trat==='HONORARIOS'?' (−)':'');
+  document.getElementById('pvImp').textContent = money(m.imp);
+  document.getElementById('pvPagar').textContent = money(m.pagar);
+  box.style.display='';
+}
 
 async function cargarProv(){
   try {
@@ -143,7 +183,8 @@ async function emitir(){
   const concepto = document.getElementById('fConcepto').value.trim();
   const monto = montoNum();
   if (!provSel) { return fail('Selecciona un proveedor.'); }
-  let body = { concepto, monto,
+  let body = { concepto, monto_neto: monto,
+    tratamiento: document.getElementById('fTratamiento').value,
     categoria: document.getElementById('fCategoria').value.trim(),
     tipo_documento: document.getElementById('fTipoDoc').value,
     numero_documento: document.getElementById('fNumDoc').value.trim(),
@@ -158,7 +199,7 @@ async function emitir(){
     body.proveedor_rut = document.getElementById('fProvRut').value.trim();
   } else { body.id_proveedor = parseInt(provSel); }
   if (!concepto) return fail('El concepto es obligatorio.');
-  if (monto<=0) return fail('El monto debe ser mayor a 0.');
+  if (monto<=0) return fail('El monto neto debe ser mayor a 0.');
 
   const btn = document.getElementById('btnEmitir'); btn.disabled=true; btn.innerHTML='<i class="bi bi-hourglass-split me-1"></i>Emitiendo…';
   try {
@@ -178,6 +219,7 @@ function nueva(){ location.reload(); }
 
 document.getElementById('fFechaEmision').value = new Date().toISOString().slice(0,10);
 cargarProv();
+cargarImpuestos();
 </script>
 <script src="/js/app-version.js"></script>
 </body>

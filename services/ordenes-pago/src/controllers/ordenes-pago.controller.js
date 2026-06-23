@@ -75,6 +75,15 @@ const { emitirCorrelativo, anularCorrelativo } = require('../../../../shared/ord
     await pool.query(`ALTER TABLE ordenes_pago ADD COLUMN IF NOT EXISTS fecha_anulada DATETIME NULL`);
   } catch (e) { console.error('[ordenes_pago alter cols]', e.message); }
 
+  // Tratamiento tributario: neto + impuesto (IVA/retención) = a pagar (monto). Incremental.
+  try {
+    await pool.query(`ALTER TABLE ordenes_pago ADD COLUMN IF NOT EXISTS tratamiento VARCHAR(20) NULL`);
+    await pool.query(`ALTER TABLE ordenes_pago ADD COLUMN IF NOT EXISTS monto_neto DECIMAL(14,2) NULL`);
+    await pool.query(`ALTER TABLE ordenes_pago ADD COLUMN IF NOT EXISTS impuesto_pct DECIMAL(7,4) NULL`);
+    await pool.query(`ALTER TABLE ordenes_pago ADD COLUMN IF NOT EXISTS impuesto_monto DECIMAL(14,2) NULL`);
+    await pool.query(`ALTER TABLE ordenes_pago ADD COLUMN IF NOT EXISTS destino VARCHAR(200) NULL`);
+  } catch (e) { console.error('[ordenes_pago alter impuestos]', e.message); }
+
   // Registro del módulo/card en el Home (idempotente).
   try {
     await pool.query(
@@ -110,8 +119,26 @@ const norm = s => String(s ?? '').trim();
 const normRut = r => String(r || '').replace(/[.\-\s]/g, '').toUpperCase();
 const num = v => { const n = Number(String(v ?? '').replace(/\./g, '').replace(',', '.').replace(/[^\d.-]/g, '')); return isNaN(n) ? null : n; };
 const ESTADOS = ['EMITIDA', 'PAGADA', 'ANULADA'];
+const TRATAMIENTOS = ['AFECTO', 'EXENTO', 'HONORARIOS'];
 const fdate = v => { const s = norm(v); return /^\d{4}-\d{2}-\d{2}$/.test(s) ? s : null; };
 const nombreUsuario = req => norm(`${(req.usuario || {}).nombre || ''} ${(req.usuario || {}).apellido || ''}`) || (req.usuario || {}).email || '—';
+
+// % de impuesto desde el mantenedor Impuestos (con defaults si no existe la fila).
+async function pctImpuesto(codigo, def) {
+  try { const [[r]] = await pool.query('SELECT porcentaje FROM impuestos WHERE codigo=?', [codigo]); return r ? Number(r.porcentaje) : def; }
+  catch (e) { return def; }
+}
+
+// Dado neto + tratamiento, devuelve { pct, impuesto, aPagar }.
+// AFECTO: a pagar = neto + IVA.  EXENTO: a pagar = neto.  HONORARIOS: a pagar = neto - retención.
+async function calcularMontos(neto, tratamiento) {
+  const t = TRATAMIENTOS.includes(tratamiento) ? tratamiento : 'AFECTO';
+  if (t === 'EXENTO') return { tratamiento: t, pct: 0, impuesto: 0, aPagar: Math.round(neto) };
+  const pct = t === 'HONORARIOS' ? await pctImpuesto('RETENCION_HONORARIOS', 15.25) : await pctImpuesto('IVA', 19);
+  const impuesto = Math.round(neto * pct / 100);
+  const aPagar = t === 'HONORARIOS' ? Math.round(neto) - impuesto : Math.round(neto) + impuesto;
+  return { tratamiento: t, pct, impuesto, aPagar };
+}
 
 /* ════════════════ PROVEEDORES ════════════════ */
 
@@ -242,37 +269,45 @@ const crearOrden = async (req, res) => {
   try {
     const b = req.body || {};
     const concepto = norm(b.concepto);
-    const monto = num(b.monto);
+    const neto = num(b.monto_neto != null ? b.monto_neto : b.monto);   // se ingresa el NETO
     if (!concepto) return res.status(400).json({ success: false, data: null, error: 'El concepto es obligatorio' });
-    if (monto == null || monto <= 0) return res.status(400).json({ success: false, data: null, error: 'El monto debe ser mayor a 0' });
+    if (neto == null || neto <= 0) return res.status(400).json({ success: false, data: null, error: 'El monto neto debe ser mayor a 0' });
 
     // Proveedor: por id (de la base) o nombre libre.
     let idProv = parseInt(b.id_proveedor) || null;
     let provNombre = norm(b.proveedor_nombre);
     let provRut = b.proveedor_rut ? normRut(b.proveedor_rut) : null;
+    let destino = null;
     if (idProv) {
-      const [[p]] = await pool.query('SELECT nombre, rut FROM proveedores WHERE id=?', [idProv]);
+      const [[p]] = await pool.query('SELECT nombre, rut, banco, tipo_cuenta, numero_cuenta FROM proveedores WHERE id=?', [idProv]);
       if (!p) return res.status(400).json({ success: false, data: null, error: 'Proveedor no encontrado' });
       provNombre = p.nombre; provRut = p.rut;
+      destino = [p.tipo_cuenta, p.numero_cuenta].filter(Boolean).join(' ') + (p.banco ? ' · ' + p.banco : '');
+      destino = norm(destino) || null;
     }
     if (!provNombre) return res.status(400).json({ success: false, data: null, error: 'Debe indicar el proveedor' });
+
+    // Tratamiento tributario: el sistema calcula impuesto y A pagar a partir del neto.
+    const m = await calcularMontos(neto, norm(b.tratamiento).toUpperCase());
 
     const fechaEmision = fdate(b.fecha_emision) || new Date().toISOString().slice(0, 10);
     const [r] = await pool.query(
       `INSERT INTO ordenes_pago
-        (id_proveedor, proveedor_nombre, proveedor_rut, concepto, categoria, tipo_documento, numero_documento, fecha_documento, monto, fecha_emision, metodo_pago, estado, observaciones, id_usuario, usuario_nombre)
-       VALUES (?,?,?,?,?,?,?,?,?,?,?, 'EMITIDA', ?,?,?)`,
+        (id_proveedor, proveedor_nombre, proveedor_rut, concepto, categoria, tipo_documento, numero_documento, fecha_documento,
+         tratamiento, monto_neto, impuesto_pct, impuesto_monto, monto, destino, fecha_emision, metodo_pago, estado, observaciones, id_usuario, usuario_nombre)
+       VALUES (?,?,?,?,?,?,?,?, ?,?,?,?,?,?,?,?, 'EMITIDA', ?,?,?)`,
       [idProv, provNombre, provRut, concepto, norm(b.categoria) || null, norm(b.tipo_documento) || null,
-       norm(b.numero_documento) || null, fdate(b.fecha_documento), monto, fechaEmision, norm(b.metodo_pago) || null,
+       norm(b.numero_documento) || null, fdate(b.fecha_documento),
+       m.tratamiento, Math.round(neto), m.pct, m.impuesto, m.aPagar, destino, fechaEmision, norm(b.metodo_pago) || null,
        norm(b.observaciones) || null, (req.usuario || {}).id_usuario || null, nombreUsuario(req)]);
 
     // Correlativo global único ODP- (libro central op_correlativos)
     const { numero } = await emitirCorrelativo({
       origen: 'GENERAL', origen_id: r.insertId, concepto: `${concepto} — ${provNombre}`,
-      monto, id_usuario: (req.usuario || {}).id_usuario || null, usuario_nombre: nombreUsuario(req) });
+      monto: m.aPagar, id_usuario: (req.usuario || {}).id_usuario || null, usuario_nombre: nombreUsuario(req) });
     await pool.query('UPDATE ordenes_pago SET numero=? WHERE id=?', [numero, r.insertId]);
 
-    auditar({ req, accion: 'CREAR', modulo: 'ordenes-pago', entidad: 'orden_pago', entidad_id: r.insertId, detalle: `Emitió ${numero} a ${provNombre} por $${monto.toLocaleString('es-CL')}` });
+    auditar({ req, accion: 'CREAR', modulo: 'ordenes-pago', entidad: 'orden_pago', entidad_id: r.insertId, detalle: `Emitió ${numero} a ${provNombre} por $${m.aPagar.toLocaleString('es-CL')}` });
     res.json({ success: true, data: { id: r.insertId, numero }, error: null });
   } catch (e) {
     res.status(500).json({ success: false, data: null, error: e.message });
@@ -335,7 +370,40 @@ const estadisticas = async (req, res) => {
   }
 };
 
+/* ════════════════ ENVÍO A CONTABILIDAD ════════════════ */
+
+// POST /api/ordenes-pago/ordenes/:id/enviar-correo — envía la orden a Contabilidad.
+// Destinatario server-controlled (config correo_contabilidad, compartida con Post Venta);
+// CC al usuario que envía. El cuerpo (html) lo arma el frontend con el documento y la firma del emisor.
+const enviarCorreoOrden = async (req, res) => {
+  try {
+    const id = parseInt(req.params.id);
+    const { asunto, html } = req.body || {};
+    if (!html || typeof html !== 'string' || !html.trim())
+      return res.status(400).json({ success: false, data: null, error: 'Falta el contenido del correo' });
+    if (html.length > 500000)
+      return res.status(400).json({ success: false, data: null, error: 'El contenido del correo es demasiado grande' });
+    const [[o]] = await pool.query('SELECT numero FROM ordenes_pago WHERE id=?', [id]);
+    if (!o) return res.status(404).json({ success: false, data: null, error: 'Orden no encontrada' });
+
+    let to = 'contabilidad@autofacilchile.cl';
+    try {
+      const [[row]] = await pool.query("SELECT valor FROM postventa_config WHERE clave='correo_contabilidad'");
+      if (row) { const v = JSON.parse(row.valor); if (v && String(v).trim()) to = String(v).trim(); }
+    } catch (_) {}
+    const cc = (req.usuario && req.usuario.email) || undefined;
+    const { enviarCorreo } = require('../../../../shared/mailer');
+    const r = await enviarCorreo({ to, cc, subject: asunto || `Orden de Pago ${o.numero || ''} — AutoFácil`, html });
+    if (!r.ok) return res.status(422).json({ success: false, data: null, error: r.error || 'No se pudo enviar el correo' });
+    auditar({ req, accion: 'ENVIAR', modulo: 'ordenes-pago', entidad: 'orden_pago', entidad_id: id, detalle: `Envió por correo la Orden de Pago ${o.numero || id} a ${to}, CC ${cc || '—'}` });
+    res.json({ success: true, data: { to, cc }, error: null });
+  } catch (e) {
+    console.error('[ordenes-pago enviarCorreoOrden]', e.message);
+    res.status(500).json({ success: false, data: null, error: 'Error interno del servidor' });
+  }
+};
+
 module.exports = {
   listarProveedores, crearProveedor, actualizarProveedor, eliminarProveedor,
-  listarOrdenes, getOrden, crearOrden, cambiarEstadoOrden, estadisticas,
+  listarOrdenes, getOrden, crearOrden, cambiarEstadoOrden, estadisticas, enviarCorreoOrden,
 };
