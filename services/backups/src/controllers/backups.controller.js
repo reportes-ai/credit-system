@@ -33,6 +33,9 @@ const CATS = [
     if (!ex) await pool.query(
       `INSERT INTO funcionalidades (id_modulo, nombre, codigo, href, icono)
        VALUES (30001, 'Backups del Sistema', 'mantenedores_backups', '/mantenedores/backups/', 'bi-people')`);
+    // Cuentas protegidas (BG-ADMIN): nunca participan en backups — limpiar lo ya sembrado.
+    await pool.query("DELETE FROM usuario_backups WHERE id_titular IN (SELECT id_usuario FROM usuarios WHERE protegido=1)").catch(() => {});
+    await pool.query("UPDATE usuario_backups SET id_suplente=NULL, b_funciones=0, b_alertas=0, b_correos=0 WHERE id_suplente IN (SELECT id_usuario FROM usuarios WHERE protegido=1)").catch(() => {});
     await sembrarDefaults();
     console.log('[backups] tabla OK');
   } catch (e) { console.error('[backups migration]', e.message); }
@@ -42,7 +45,7 @@ const CATS = [
 async function sembrarDefaults() {
   try {
     const [users] = await pool.query(
-      "SELECT id_usuario, id_perfil FROM usuarios WHERE estado='activo' ORDER BY id_perfil, id_usuario");
+      "SELECT id_usuario, id_perfil FROM usuarios WHERE estado='activo' AND COALESCE(protegido,0)=0 ORDER BY id_perfil, id_usuario");
     const [yatiene] = await pool.query('SELECT id_titular FROM usuario_backups');
     const con = new Set(yatiene.map(r => r.id_titular));
     const porPerfil = {};
@@ -128,12 +131,12 @@ const listar = async (req, res) => {
          JOIN perfiles p ON p.id_perfil = u.id_perfil
          LEFT JOIN usuario_backups b ON b.id_titular = u.id_usuario
          LEFT JOIN usuarios s ON s.id_usuario = b.id_suplente
-        WHERE u.estado='activo'
+        WHERE u.estado='activo' AND COALESCE(u.protegido,0)=0
         ORDER BY p.nombre, nombre`);
     const [usuarios] = await pool.query(
       `SELECT u.id_usuario, TRIM(CONCAT(u.nombre,' ',COALESCE(u.apellido,''))) AS nombre, u.id_perfil, p.nombre AS perfil
          FROM usuarios u JOIN perfiles p ON p.id_perfil=u.id_perfil
-        WHERE u.estado='activo' ORDER BY nombre`);
+        WHERE u.estado='activo' AND COALESCE(u.protegido,0)=0 ORDER BY nombre`);
     res.json({ success: true, data: { filas, usuarios }, error: null });
   } catch (e) { console.error('[backups listar]', e.message); res.status(500).json({ success: false, data: null, error: 'Error interno del servidor' }); }
 };
