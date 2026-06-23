@@ -5,7 +5,7 @@
   <link rel="icon" href="/img/favicon.png" type="image/png">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Emisión de Orden de Pago — AutoFácil</title>
-  <!-- v1.2 -->
+  <!-- v1.3 -->
   <link href="/css/bootstrap.min.css" rel="stylesheet">
   <link href="/css/bootstrap-icons.css" rel="stylesheet">
   <style>
@@ -99,7 +99,6 @@
       <div class="fld"><label>N° de documento</label><input id="fNumDoc" maxlength="40"></div>
 
       <div class="fld"><label>Fecha del documento</label><input id="fFechaDoc" type="date"></div>
-      <div class="fld"><label>Fecha de emisión *</label><input id="fFechaEmision" type="date"></div>
 
       <div class="fld"><label>Método de pago</label>
         <select id="fMetodo"><option value="">—</option><option>Transferencia</option><option>Cheque</option><option>Efectivo</option><option>Tarjeta</option></select>
@@ -216,7 +215,6 @@ async function emitir(){
     categoria: document.getElementById('fCategoria').value.trim(),
     numero_documento: document.getElementById('fNumDoc').value.trim(),
     fecha_documento: document.getElementById('fFechaDoc').value || null,
-    fecha_emision: document.getElementById('fFechaEmision').value || null,
     metodo_pago: document.getElementById('fMetodo').value,
     observaciones: document.getElementById('fObs').value.trim() };
   if (provSel==='__otro') {
@@ -244,7 +242,6 @@ async function emitir(){
 function fail(m){ const e=document.getElementById('errMsg'); e.textContent=m; e.style.display='inline'; const b=document.getElementById('btnEmitir'); b.disabled=false; b.innerHTML='<i class="bi bi-send-check me-1"></i>Emitir orden'; }
 function nueva(){ location.reload(); }
 
-document.getElementById('fFechaEmision').value = new Date().toISOString().slice(0,10);
 cargarProv();
 cargarImpuestos();
 </script>
