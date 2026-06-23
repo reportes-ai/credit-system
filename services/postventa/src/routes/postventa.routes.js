@@ -32,6 +32,9 @@ router.put('/comisiones-a-pagar/fondos', verifyToken, requireFunc('pv_com_fondos
 router.post('/comisiones-a-pagar/enviar-a-pago', verifyToken, requireFunc('pv_com_seleccionar'), c.enviarAPagoComision);
 router.post('/comisiones-a-pagar/pagar', verifyToken, requireFunc('pv_com_pagar'), c.pagarComisiones);
 router.post('/comisiones-a-pagar/desmarcar', verifyToken, requireFunc('pv_com_revertir'), c.desmarcarComisiones);
+// ── Consultas de estado (read-only) ──
+router.get('/consulta-saldos',   verifyToken, c.consultaSaldos);
+router.get('/consulta-facturas', verifyToken, c.consultaFacturas);
 router.get('/',               verifyToken, c.getAll);
 router.put('/:id/etapa',    verifyToken, requireFunc('postventa_seguimiento'), c.setEtapa);
 router.get('/:id/factura-comision', verifyToken, c.getFacturaComision);

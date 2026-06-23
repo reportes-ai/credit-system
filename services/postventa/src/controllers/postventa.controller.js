@@ -1143,6 +1143,94 @@ const marcarHistorico = async (req, res) => {
   }
 };
 
+/* ════════════════════════════════════════════════════════════════
+   CONSULTAS DE ESTADO (read-only) — Saldos Precio y Facturas/Comisión.
+   Estado actual = etapa más avanzada del track según el orden canónico.
+   ════════════════════════════════════════════════════════════════ */
+const ORDEN_SALDO    = ['FUNDANTES PENDIENTES','FUNDANTES ENVIADOS','FUNDANTES RECIBIDOS','FONDOS RECIBIDOS','LIBERADO A PAGO','ORDEN DE PAGO EMITIDA','ENVIADO A PAGO','SALDO PRECIO PAGADO'];
+const ORDEN_COMISION = ['COMISION A PAGAR','CARTOLA EMITIDA','CARTOLA ENVIADA','CARTOLA APROBADA','FACTURA RECIBIDA','ORDEN DE PAGO EMITIDA','COMISION PAGADA'];
+
+// id_seguimiento → { estado, fecha_estado, paso, etapas:[{etapa,fecha,usuario}] }
+async function etapasPorTrack(ids, track, orden) {
+  const map = {};
+  if (!ids.length) return map;
+  const [rows] = await pool.query(
+    'SELECT id_seguimiento, etapa, fecha, usuario FROM postventa_etapas WHERE track=? AND id_seguimiento IN (?) ORDER BY fecha ASC',
+    [track, ids]);
+  for (const r of rows) {
+    const m = map[r.id_seguimiento] || (map[r.id_seguimiento] = { etapas: [], estado: null, fecha_estado: null, paso: 0 });
+    m.etapas.push({ etapa: r.etapa, fecha: r.fecha, usuario: r.usuario });
+  }
+  for (const id of Object.keys(map)) {
+    const m = map[id]; let best = -1, bestEt = null, bestF = null;
+    for (const e of m.etapas) { const idx = orden.indexOf(e.etapa); if (idx > best) { best = idx; bestEt = e.etapa; bestF = e.fecha; } }
+    m.estado = bestEt; m.fecha_estado = bestF; m.paso = best + 1;
+  }
+  return map;
+}
+
+const consultaSaldos = async (req, res) => {
+  try {
+    const q = String(req.query.q || '').trim();
+    const parque = String(req.query.parque || '').trim();
+    const limit = Math.min(500, Math.max(1, parseInt(req.query.limit) || 300));
+    const params = []; let where = 'WHERE 1=1';
+    if (q) {
+      where += ` AND (s.num_op LIKE ? OR s.rut_dealer LIKE ? OR s.nombre_dealer LIKE ? OR s.ejecutivo LIKE ? OR cr.parque LIKE ? OR cr.nombre_parque_mgmt LIKE ?)`;
+      const lk = '%' + q + '%'; params.push(lk, lk, lk, lk, lk, lk);
+    }
+    if (parque) { where += ` AND (cr.parque LIKE ? OR cr.nombre_parque_mgmt LIKE ?)`; const lk = '%' + parque + '%'; params.push(lk, lk); }
+    const [rows] = await pool.query(`
+      SELECT s.id, s.num_op, s.financiera, s.rut_dealer, s.nombre_dealer, s.ejecutivo,
+             s.fecha_otorgado, s.saldo_precio,
+             COALESCE(NULLIF(cr.parque,''), cr.nombre_parque_mgmt) AS parque,
+             (SELECT op.num_orden FROM postventa_ordenes op WHERE op.id_seguimiento = s.id ORDER BY op.fecha DESC LIMIT 1) AS orden_pago
+      FROM postventa_seguimiento s
+      LEFT JOIN creditos cr ON cr.id = s.id_credito
+      ${where}
+      ORDER BY s.fecha_otorgado DESC, s.num_op DESC
+      LIMIT ?`, [...params, limit]);
+    const ids = rows.map(r => r.id);
+    const etapas = await etapasPorTrack(ids, 'SALDO', ORDEN_SALDO);
+    const data = rows.map(r => { const e = etapas[r.id] || {};
+      return { ...r, estado: e.estado || 'SIN ETAPAS', fecha_estado: e.fecha_estado || null,
+        paso: e.paso || 0, total: ORDEN_SALDO.length, etapas: e.etapas || [] }; });
+    res.json({ success: true, data, orden: ORDEN_SALDO, error: null });
+  } catch (e) { console.error('[consultaSaldos]', e.message); res.status(500).json({ success: false, data: null, error: 'Error interno del servidor' }); }
+};
+
+const consultaFacturas = async (req, res) => {
+  try {
+    const q = String(req.query.q || '').trim();
+    const mes = String(req.query.mes || '').trim();          // YYYY-MM
+    const factura = String(req.query.factura || '').trim();
+    const limit = Math.min(500, Math.max(1, parseInt(req.query.limit) || 300));
+    const params = []; let where = 'WHERE 1=1';
+    if (q) {
+      where += ` AND (s.num_op LIKE ? OR s.rut_dealer LIKE ? OR s.nombre_dealer LIKE ? OR s.ejecutivo LIKE ? OR f.numero_factura LIKE ?)`;
+      const lk = '%' + q + '%'; params.push(lk, lk, lk, lk, lk);
+    }
+    if (mes)     { where += ` AND DATE_FORMAT(f.fecha_factura,'%Y-%m') = ?`; params.push(mes); }
+    if (factura) { where += ` AND f.numero_factura LIKE ?`; params.push('%' + factura + '%'); }
+    const [rows] = await pool.query(`
+      SELECT s.id, s.num_op, s.financiera, s.rut_dealer, s.nombre_dealer, s.ejecutivo, s.comision,
+             f.fecha_factura, f.numero_factura, f.monto_bruto, f.monto_liquido, f.es_terceros, f.es_boleta,
+             DATE_FORMAT(f.fecha_factura,'%Y-%m') AS mes_fact,
+             (SELECT oc.num_orden FROM postventa_ordenes_comision oc WHERE oc.id_seguimiento = s.id ORDER BY oc.fecha DESC LIMIT 1) AS orden_comision
+      FROM postventa_seguimiento s
+      LEFT JOIN postventa_facturas_comision f ON f.id_seguimiento = s.id
+      ${where}
+      ORDER BY s.fecha_otorgado DESC, s.num_op DESC
+      LIMIT ?`, [...params, limit]);
+    const ids = rows.map(r => r.id);
+    const etapas = await etapasPorTrack(ids, 'COMISION', ORDEN_COMISION);
+    const data = rows.map(r => { const e = etapas[r.id] || {};
+      return { ...r, estado: e.estado || 'SIN ETAPAS', fecha_estado: e.fecha_estado || null,
+        paso: e.paso || 0, total: ORDEN_COMISION.length, etapas: e.etapas || [] }; });
+    res.json({ success: true, data, orden: ORDEN_COMISION, error: null });
+  } catch (e) { console.error('[consultaFacturas]', e.message); res.status(500).json({ success: false, data: null, error: 'Error interno del servidor' }); }
+};
+
 module.exports = { sync, getAll, setEtapa, getConfig, setConfig, marcarHistorico, getPerfiles, getSaldosAPagar, enviarAPago, pagarSaldos, getOrdenPago, correlativoOrden, emitirOrdenPago, desmarcarSaldos, getAtribuciones, getFondos, setFondos, getAlertasConfig, setAlertasConfig,
   getComisionesAPagar, getOrdenPagoComision, correlativoOrdenComision, emitirOrdenPagoComision, enviarAPagoComision, pagarComisiones, desmarcarComisiones, getAtribucionesComision, getFondosComision, setFondosComision,
-  getFacturaComision, updateFacturaComision };
+  getFacturaComision, updateFacturaComision, consultaSaldos, consultaFacturas };
