@@ -5,7 +5,7 @@
   <link rel="icon" href="/img/favicon.png" type="image/png">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Mantenedores Post Venta — AutoFácil</title>
-  <!-- v1.4 -->
+  <!-- v1.5 -->
   <link href="/css/bootstrap.min.css" rel="stylesheet">
   <link href="/css/bootstrap-icons.css" rel="stylesheet">
   <style>
@@ -113,7 +113,7 @@
         <div class="fld"><label>Asunto</label><input id="cAsunto"></div>
         <div class="fld"><label>Cuerpo (antes del cuadro de la orden)</label><textarea id="cCuerpo"></textarea></div>
         <div class="fld"><label>Firma (después del cuadro)</label><textarea id="cFirma" style="min-height:70px"></textarea></div>
-        <div class="ph">Variables: <code>{nOrden}</code> <code>{dealer}</code> <code>{num_op}</code> <code>{financiera}</code> <code>{numero_factura}</code> <code>{fecha_factura}</code> <code>{doc}</code></div>
+        <div class="ph">Variables: <code>{nOrden}</code> <code>{dealer}</code> <code>{num_op}</code> <code>{financiera}</code> <code>{numero_factura}</code> <code>{fecha_factura}</code> <code>{fecha_recepcion}</code> <code>{doc}</code></div>
       </div>
     </div>
 
@@ -158,7 +158,7 @@ let CFG = {}, PERFILES = [];
 })();
 
 const DEF_SALDO_C = { asunto:'Orden de Pago Saldo Precio N° {nOrden} — {dealer} (OP {num_op})', cuerpo:'Estimado Equipo de Contabilidad:\n\nAdjunto encontrarán Orden de Pago N° {nOrden} para el pago del Saldo Precio a {dealer} del Crédito N° {num_op} otorgado por {financiera} con fecha {fecha_otorgado}, Saldo Precio recepcionado por AutoFácil el día {fecha_recepcion}.\n\nLes recordamos que deben marcar en el módulo de Saldo Precio Pagado, de manera de informar al Ejecutivo y cerrar el flujo operativo de esta transacción.', firma:'Saludos cordiales,\nÁrea de Operaciones' };
-const DEF_COM_C = { asunto:'Orden de Pago de Comisión N° {nOrden} — {dealer} (OP {num_op})', cuerpo:'Estimado Equipo de Contabilidad:\n\nAdjunto encontrarán Orden de Pago de Comisión N° {nOrden} para el pago de la Comisión a {dealer} del Crédito N° {num_op} otorgado por {financiera}, {doc} N° {numero_factura} recepcionada por AutoFácil el día {fecha_factura}.\n\nLes recordamos que deben marcar en el módulo de Comisión Pagada, de manera de informar al Ejecutivo y cerrar el flujo operativo de esta transacción.', firma:'Saludos cordiales,\nÁrea de Operaciones' };
+const DEF_COM_C = { asunto:'Orden de Pago de Comisión N° {nOrden} — {dealer} (OP {num_op})', cuerpo:'Estimado Equipo de Contabilidad:\n\nAdjunto encontrarán Orden de Pago de Comisión N° {nOrden} para el pago de la Comisión a {dealer} del Crédito N° {num_op} otorgado por {financiera}, {doc} N° {numero_factura} recepcionada por AutoFácil el día {fecha_recepcion}.\n\nLes recordamos que deben marcar en el módulo de Comisión Pagada, de manera de informar al Ejecutivo y cerrar el flujo operativo de esta transacción.', firma:'Saludos cordiales,\nÁrea de Operaciones' };
 
 function pintaCorreos(){
   document.getElementById('cCont').value = (typeof CFG.correo_contabilidad === 'string' ? CFG.correo_contabilidad : 'contabilidad@autofacilchile.cl');

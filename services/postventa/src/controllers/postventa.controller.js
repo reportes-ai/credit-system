@@ -67,7 +67,7 @@ const { emitirCorrelativo } = require('../../../../shared/ordenes-pago');
     };
     const CORREO_COMISION = {
       asunto: 'Orden de Pago de Comisión N° {nOrden} — {dealer} (OP {num_op})',
-      cuerpo: 'Estimado Equipo de Contabilidad:\n\nAdjunto encontrarán Orden de Pago de Comisión N° {nOrden} para el pago de la Comisión a {dealer} del Crédito N° {num_op} otorgado por {financiera}, {doc} N° {numero_factura} recepcionada por AutoFácil el día {fecha_factura}.\n\nLes recordamos que deben marcar en el módulo de Comisión Pagada, de manera de informar al Ejecutivo y cerrar el flujo operativo de esta transacción.',
+      cuerpo: 'Estimado Equipo de Contabilidad:\n\nAdjunto encontrarán Orden de Pago de Comisión N° {nOrden} para el pago de la Comisión a {dealer} del Crédito N° {num_op} otorgado por {financiera}, {doc} N° {numero_factura} recepcionada por AutoFácil el día {fecha_recepcion}.\n\nLes recordamos que deben marcar en el módulo de Comisión Pagada, de manera de informar al Ejecutivo y cerrar el flujo operativo de esta transacción.',
       firma: 'Saludos cordiales,\nÁrea de Operaciones',
     };
     await pool.query('INSERT IGNORE INTO postventa_config (clave, valor) VALUES (?,?),(?,?),(?,?)',
@@ -81,6 +81,16 @@ const { emitirCorrelativo } = require('../../../../shared/ordenes-pago');
         if (v && v.asunto === 'Orden de Pago N° {nOrden} — Saldo Precio {dealer} (OP {num_op})') {
           v.asunto = 'Orden de Pago Saldo Precio N° {nOrden} — {dealer} (OP {num_op})';
           await pool.query("UPDATE postventa_config SET valor=? WHERE clave='correo_orden_saldo'", [JSON.stringify(v)]);
+        }
+      }
+    } catch (_) {}
+    // Parche idempotente: en comisión, la fecha de "recepcionada" debe ser la de RECEPCIÓN (no la de la factura).
+    try {
+      const [[rc]] = await pool.query("SELECT valor FROM postventa_config WHERE clave='correo_orden_comision'");
+      if (rc) { const v = JSON.parse(rc.valor);
+        if (v && typeof v.cuerpo === 'string' && v.cuerpo.includes('recepcionada por AutoFácil el día {fecha_factura}')) {
+          v.cuerpo = v.cuerpo.replace('recepcionada por AutoFácil el día {fecha_factura}', 'recepcionada por AutoFácil el día {fecha_recepcion}');
+          await pool.query("UPDATE postventa_config SET valor=? WHERE clave='correo_orden_comision'", [JSON.stringify(v)]);
         }
       }
     } catch (_) {}
@@ -979,6 +989,7 @@ const getOrdenPagoComision = async (req, res) => {
              COALESCE(c.rut_dealer, d.rut) AS rut_dealer,
              d.num_cuenta, d.banco, d.rut_pago,
              COALESCE(fc.fecha_factura, efa.fecha) AS fecha_factura,
+             COALESCE(fc.created_at, efa.fecha) AS fac_recepcion,
              fc.numero_factura AS numero_factura, fc.monto_bruto AS monto_factura,
              fc.es_terceros AS es_terceros, fc.es_boleta AS es_boleta,
              fc.impuesto_pct AS impuesto_pct, fc.impuesto_monto AS impuesto_monto, fc.monto_liquido AS monto_liquido,

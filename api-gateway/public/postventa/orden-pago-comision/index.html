@@ -5,7 +5,7 @@
   <link rel="icon" href="/img/favicon.png" type="image/png">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Emisión Orden de Pago Comisión — AutoFácil</title>
-  <!-- v2.2 -->
+  <!-- v2.3 -->
   <link href="/css/bootstrap.min.css" rel="stylesheet">
   <link href="/css/bootstrap-icons.css" rel="stylesheet">
   <style>
@@ -117,7 +117,7 @@ let DATA = [], actual = null, IMPUESTOS = { IVA:19, RETENCION_HONORARIOS:15.25 }
 // Plantilla editable del correo (mantenedor Post Venta → config correo_orden_comision)
 let CORREO = {
   asunto: 'Orden de Pago de Comisión N° {nOrden} — {dealer} (OP {num_op})',
-  cuerpo: 'Estimado Equipo de Contabilidad:\n\nAdjunto encontrarán Orden de Pago de Comisión N° {nOrden} para el pago de la Comisión a {dealer} del Crédito N° {num_op} otorgado por {financiera}, {doc} N° {numero_factura} recepcionada por AutoFácil el día {fecha_factura}.\n\nLes recordamos que deben marcar en el módulo de Comisión Pagada, de manera de informar al Ejecutivo y cerrar el flujo operativo de esta transacción.',
+  cuerpo: 'Estimado Equipo de Contabilidad:\n\nAdjunto encontrarán Orden de Pago de Comisión N° {nOrden} para el pago de la Comisión a {dealer} del Crédito N° {num_op} otorgado por {financiera}, {doc} N° {numero_factura} recepcionada por AutoFácil el día {fecha_recepcion}.\n\nLes recordamos que deben marcar en el módulo de Comisión Pagada, de manera de informar al Ejecutivo y cerrar el flujo operativo de esta transacción.',
   firma: 'Saludos cordiales,\nÁrea de Operaciones',
 };
 const escH = s => String(s??'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
@@ -131,6 +131,7 @@ function valsDe(ops){
     financiera: f0.financiera || 'Autofin',
     numero_factura: f0.numero_factura || '',
     fecha_factura: fechaCL(f0.fecha_factura),
+    fecha_recepcion: fechaCL(f0.fac_recepcion),
     doc: f0.es_boleta ? 'boleta' : 'factura',
   };
 }
