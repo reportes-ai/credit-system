@@ -5,7 +5,7 @@
   <link rel="icon" href="/img/favicon.png" type="image/png">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Seguimiento Post Venta — AutoFácil</title>
-  <!-- v2.8 -->
+  <!-- v2.9 -->
   <link href="/css/bootstrap.min.css" rel="stylesheet">
   <link href="/css/bootstrap-icons.css" rel="stylesheet">
   <style>
@@ -351,6 +351,44 @@ async function revertirPago(id){
 /* ════════ Modal Factura Recibida (Comisión) ════════ */
 let FC = { id:null, chk:null, terceros:false, boleta:false, rut:'', nombre:'', num_op:null };
 const _fc = id => document.getElementById(id);
+
+/* ── Autocompletado de dealer (busca por RUT o por nombre; el otro se completa) ── */
+const _dlrRut = new Map();   // rut normalizado → {rut, nombre}
+const _dlrNom = new Map();   // nombre en mayúsculas → {rut, nombre}
+const _rutN = s => String(s||'').replace(/[.\-\s]/g,'').toUpperCase();
+const _dlrNombre = d => String(d.nombre_razon || d.nombre_indexa || '').trim();
+function _dlrCache(rows){ rows.forEach(d => { const o = { rut: d.rut || '', nombre: _dlrNombre(d) }; if (o.rut) _dlrRut.set(_rutN(o.rut), o); if (o.nombre) _dlrNom.set(o.nombre.toUpperCase(), o); }); }
+let _tDlrR = null, _tDlrN = null;
+function fcBuscarRut(){
+  clearTimeout(_tDlrR);
+  const v = _fc('fcRut').value.trim();
+  const hit = _dlrRut.get(_rutN(v)); if (hit && hit.nombre) _fc('fcNombre').value = hit.nombre;
+  if (v.replace(/[^0-9kK]/g,'').length < 2) return;
+  _tDlrR = setTimeout(async () => {
+    try {
+      const r = await fetch('/api/dealers?limit=20&q='+encodeURIComponent(v), { headers:H });
+      const j = await r.json(); const rows = (j.data && j.data.rows) || [];
+      _fc('dlRut').innerHTML = rows.map(d => `<option value="${escH(d.rut||'')}">${escH(_dlrNombre(d))}</option>`).join('');
+      _dlrCache(rows);
+      const h2 = _dlrRut.get(_rutN(_fc('fcRut').value.trim())); if (h2 && h2.nombre) _fc('fcNombre').value = h2.nombre;
+    } catch(e){}
+  }, 250);
+}
+function fcBuscarNombre(){
+  clearTimeout(_tDlrN);
+  const v = _fc('fcNombre').value.trim();
+  const hit = _dlrNom.get(v.toUpperCase()); if (hit && hit.rut) _fc('fcRut').value = hit.rut;
+  if (v.length < 2) return;
+  _tDlrN = setTimeout(async () => {
+    try {
+      const r = await fetch('/api/dealers?limit=20&q='+encodeURIComponent(v), { headers:H });
+      const j = await r.json(); const rows = (j.data && j.data.rows) || [];
+      _fc('dlNombre').innerHTML = rows.map(d => `<option value="${escH(_dlrNombre(d))}"></option>`).join('');
+      _dlrCache(rows);
+      const h2 = _dlrNom.get(_fc('fcNombre').value.trim().toUpperCase()); if (h2 && h2.rut) _fc('fcRut').value = h2.rut;
+    } catch(e){}
+  }, 250);
+}
 function abrirModalFactura(id, chk){
   const r = DATA.find(x => x.id === id) || {};
   FC = { id, chk, modo:'marcar', terceros:false, boleta:false, rut:r.rut_dealer||'', nombre:r.nombre_dealer||'', num_op:r.num_op||null };
@@ -488,8 +526,8 @@ async function toggleEtapa(id, track, etapa, chk){
       <button type="button" id="fcBtnBoleta" onclick="fcToggleBoleta()" style="flex:1;border:1px solid #cbd5e1;background:#eef2f7;color:#334155;border-radius:8px;padding:7px;font-size:.8rem;font-weight:700;cursor:pointer">Boleta</button>
     </div>
     <div style="display:grid;gap:8px">
-      <label>RUT Dealer<input id="fcRut" type="text"></label>
-      <label>Nombre Dealer<input id="fcNombre" type="text"></label>
+      <label>RUT Dealer<input id="fcRut" type="text" list="dlRut" autocomplete="off" oninput="fcBuscarRut()" placeholder="Busca por RUT…"><datalist id="dlRut"></datalist></label>
+      <label>Nombre Dealer<input id="fcNombre" type="text" list="dlNombre" autocomplete="off" oninput="fcBuscarNombre()" placeholder="Busca por nombre…"><datalist id="dlNombre"></datalist></label>
       <label><span id="fcLblFecha">Fecha factura</span><input id="fcFecha" type="date"></label>
       <label><span id="fcLblNumero">N° Factura</span><input id="fcNumero" type="text"></label>
       <label>Monto Neto<input id="fcMonto" type="text" inputmode="numeric" placeholder="$0" oninput="fcMoneyFmt(this)"></label>
