@@ -316,7 +316,7 @@ const listarOrdenes = async (req, res) => {
   }
 };
 
-/* GET /api/ordenes-pago/ordenes/:id */
+/* GET /api/ordenes-pago/ordenes/:id  (:id = ordenes_pago.id) — orden general */
 const getOrden = async (req, res) => {
   try {
     const [[o]] = await pool.query('SELECT * FROM ordenes_pago WHERE id=?', [parseInt(req.params.id)]);
@@ -324,6 +324,79 @@ const getOrden = async (req, res) => {
     res.json({ success: true, data: o, error: null });
   } catch (e) {
     res.status(500).json({ success: false, data: null, error: e.message });
+  }
+};
+
+const ORIGEN_LBL = { SALDO: 'Saldo Precio', COMISION: 'Comisión', GENERAL: 'Otros' };
+const soloFecha = v => v ? String(v).slice(0, 10) : null;
+
+/* GET /api/ordenes-pago/ordenes/:id/documento  (:id = op_correlativos.id)
+   Documento "Solicitud de Pago" UNIFICADO para cualquier origen (GENERAL/SALDO/COMISION),
+   para que el historial muestre TODAS las órdenes con el mismo formato. */
+const getDocumento = async (req, res) => {
+  try {
+    const ocId = parseInt(req.params.id);
+    const [[oc]] = await pool.query('SELECT * FROM op_correlativos WHERE id=?', [ocId]);
+    if (!oc) return res.status(404).json({ success: false, data: null, error: 'Orden no encontrada' });
+
+    // GENERAL: la orden vive completa en ordenes_pago (mismo shape que getOrden).
+    if (oc.origen === 'GENERAL') {
+      const [[op]] = await pool.query('SELECT * FROM ordenes_pago WHERE id=?', [oc.origen_id]);
+      if (!op) return res.status(404).json({ success: false, data: null, error: 'Orden no encontrada' });
+      const estado = oc.anulada ? 'ANULADA' : (oc.pagada ? 'PAGADA' : (op.estado || 'EMITIDA'));
+      return res.json({ success: true, data: Object.assign({}, op, {
+        origen: 'GENERAL', origen_label: ORIGEN_LBL.GENERAL, numero: oc.numero || op.numero, estado,
+        fecha_pago: soloFecha(oc.fecha_pagada) || op.fecha_pago, metodo_pago: oc.metodo_pago || op.metodo_pago,
+        anulada_nombre: oc.anulada_nombre || op.anulada_nombre, fecha_anulada: oc.fecha_anulada || op.fecha_anulada,
+      }), error: null });
+    }
+
+    // SALDO / COMISION (Post Venta): se arma el documento desde el seguimiento + dealer (+ factura en comisión).
+    const esCom = oc.origen === 'COMISION';
+    const sql = esCom
+      ? `SELECT s.id AS id_seg, s.num_op,
+                COALESCE(c.nombre_local, d.nombre_razon, s.nombre_dealer) AS dealer_nombre,
+                COALESCE(c.rut_dealer, d.rut) AS dealer_rut, d.num_cuenta, d.banco,
+                fc.numero_factura, fc.es_boleta, fc.fecha_factura,
+                (SELECT 1 FROM postventa_etapas pe WHERE pe.id_seguimiento=s.id AND pe.track='COMISION' AND pe.etapa='COMISION PAGADA' LIMIT 1) AS pagado
+           FROM postventa_ordenes_comision poc
+           JOIN postventa_seguimiento s ON s.id = poc.id_seguimiento
+           LEFT JOIN creditos c ON c.id = s.id_credito
+           LEFT JOIN dealers  d ON d.nombre_indexa = c.automotora
+           LEFT JOIN postventa_facturas_comision fc ON fc.id_seguimiento = s.id
+          WHERE poc.id = ?`
+      : `SELECT s.id AS id_seg, s.num_op,
+                COALESCE(c.nombre_local, d.nombre_razon, s.nombre_dealer) AS dealer_nombre,
+                COALESCE(c.rut_dealer, d.rut) AS dealer_rut, d.num_cuenta, d.banco,
+                (SELECT 1 FROM postventa_etapas pe WHERE pe.id_seguimiento=s.id AND pe.track='SALDO' AND pe.etapa='SALDO PRECIO PAGADO' LIMIT 1) AS pagado
+           FROM postventa_ordenes spo
+           JOIN postventa_seguimiento s ON s.id = spo.id_seguimiento
+           LEFT JOIN creditos c ON c.id = s.id_credito
+           LEFT JOIN dealers  d ON d.nombre_indexa = c.automotora
+          WHERE spo.id = ?`;
+    const [rws] = await pool.query(sql, [oc.origen_id]);
+    const row = rws[0] || {};
+    const monto = Number(oc.monto) || 0;
+    const estado = oc.anulada ? 'ANULADA' : ((oc.pagada || row.pagado) ? 'PAGADA' : 'EMITIDA');
+    const destino = [row.num_cuenta, row.banco].filter(Boolean).join(' · ') || null;
+    const data = {
+      id: oc.id, origen: oc.origen, origen_label: ORIGEN_LBL[oc.origen] || oc.origen,
+      numero: oc.numero, concepto: oc.concepto || (esCom ? 'Comisión' : 'Saldo Precio'),
+      categoria: esCom ? 'PAGO DE COMISIÓN' : 'SALDO DE PRECIO',
+      proveedor_nombre: row.dealer_nombre || '—', proveedor_rut: row.dealer_rut || '',
+      tipo_documento: esCom ? (row.es_boleta ? 'Boleta de Honorarios' : 'Factura') : null,
+      numero_documento: esCom ? (row.numero_factura || null) : null,
+      fecha_documento: esCom ? soloFecha(row.fecha_factura) : null,
+      // El monto del correlativo ya es el líquido a pagar (saldo/comisión); sin desglose tributario por línea.
+      tratamiento: 'EXENTO', monto_bruto: monto, monto_neto: monto, impuesto_pct: 0, impuesto_monto: 0, monto,
+      destino, fecha_emision: soloFecha(oc.created_at), fecha_pago: soloFecha(oc.fecha_pagada),
+      metodo_pago: oc.metodo_pago, estado, usuario_nombre: oc.usuario_nombre,
+      anulada_nombre: oc.anulada_nombre, fecha_anulada: oc.fecha_anulada, num_op: row.num_op,
+    };
+    res.json({ success: true, data, error: null });
+  } catch (e) {
+    console.error('[ordenes-pago getDocumento]', e.message);
+    res.status(500).json({ success: false, data: null, error: 'Error interno del servidor' });
   }
 };
 
@@ -536,6 +609,6 @@ const miCajaOP = async (req, res) => {
 
 module.exports = {
   listarProveedores, crearProveedor, actualizarProveedor, eliminarProveedor,
-  listarOrdenes, getOrden, crearOrden, cambiarEstadoOrden, estadisticas, enviarCorreoOrden,
+  listarOrdenes, getOrden, getDocumento, crearOrden, cambiarEstadoOrden, estadisticas, enviarCorreoOrden,
   pagarOrden, miCajaOP,
 };

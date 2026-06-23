@@ -5,7 +5,7 @@
   <link rel="icon" href="/img/favicon.png" type="image/png">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Historial de Órdenes de Pago — AutoFácil</title>
-  <!-- v1.6 -->
+  <!-- v1.7 -->
   <link href="/css/bootstrap.min.css" rel="stylesheet">
   <link href="/css/bootstrap-icons.css" rel="stylesheet">
   <style>
@@ -295,30 +295,11 @@ function emailHTML(o){
 const asuntoDe = o => `Orden de Pago ${o.numero||''} — ${o.proveedor_nombre||''}`;
 
 let VISTA = null;   // orden actualmente abierta
+// TODAS las órdenes (comisión, saldo precio, generales) se ven con el mismo documento Solicitud de Pago.
 async function ver(id){
   const row = DATA.find(x=>x.id===id); if(!row) return;
-  // Saldo Precio / Comisión: se gestionan en Post Venta → detalle de solo lectura.
-  if (!row.editable){
-    document.getElementById('dTitulo').textContent = row.numero||'Orden';
-    document.getElementById('dBody').innerHTML = `<div class="kv">
-      <span class="k">Tipo</span><span>${escH(row.origen_label)}</span>
-      <span class="k">Concepto</span><span>${escH(row.concepto)}</span>
-      <span class="k">Proveedor / Dealer</span><span>${escH(row.proveedor_nombre)}</span>
-      <span class="k">Documento</span><span>${escH(row.documento||'—')}</span>
-      <span class="k">Monto</span><span><b>${fmtMon(row.monto)}</b></span>
-      <span class="k">Emisión</span><span>${fdate(row.fecha_emision)}</span>
-      <span class="k">Estado</span><span><span class="est ${row.estado}">${row.estado}</span></span>
-      <span class="k">Emitida por</span><span>${escH(row.usuario_nombre||'—')}</span>
-      ${row.estado==='ANULADA'?`<span class="k" style="color:#b91c1c">Anulada por</span><span style="color:#b91c1c">${escH(row.anulada_nombre||'—')}${row.fecha_anulada?' · '+fdatetime(row.fecha_anulada):''}</span>`:''}
-    </div><p style="margin-top:12px;font-size:.8rem;color:#94a3b8"><i class="bi bi-info-circle me-1"></i>Esta orden (${escH(row.origen_label)}) se emite y gestiona en Post Venta.</p>`;
-    const pagarBtn = (row.pagable && MICAJA) ? `<button class="btn-af" onclick="pagar(${row.id})"><i class="bi bi-cash-coin me-1"></i>Pagar</button>` : '';
-    document.getElementById('dFoot').innerHTML = `<button class="btn-ghost" onclick="document.getElementById('dlg').close()">Cerrar</button>${pagarBtn}`;
-    document.getElementById('dlg').showModal();
-    return;
-  }
-  // Orden general → traer la orden completa y mostrar el documento Solicitud de Pago.
   let full;
-  try { const r=await fetch('/api/ordenes-pago/ordenes/'+row.op_id,{headers:H}); if(chk401(r)) return; const j=await r.json(); if(!j.success||!j.data) throw 0; full=j.data; }
+  try { const r=await fetch('/api/ordenes-pago/ordenes/'+row.id+'/documento',{headers:H}); if(chk401(r)) return; const j=await r.json(); if(!j.success||!j.data) throw 0; full=j.data; }
   catch(e){ toast('No se pudo cargar la orden'); return; }
   VISTA = full;
   document.getElementById('dTitulo').textContent = full.numero||'Orden';
@@ -327,9 +308,10 @@ async function ver(id){
   else if (full.estado==='PAGADA') extra = `<p style="color:#15803d;font-size:.82rem;margin:0 0 10px"><i class="bi bi-check-circle me-1"></i>Pagada el ${fdate(full.fecha_pago)}${full.metodo_pago?' · '+escH(full.metodo_pago):''}</p>`;
   document.getElementById('dBody').innerHTML = extra + docHTML(full);
   const foot = document.getElementById('dFoot');
-  const anularBtn = (full.estado==='EMITIDA' && isAdmin) ? `<button class="btn-ghost" onclick="marcarVista('ANULADA')">Anular</button>` : '';
+  // Anular y Enviar a Contabilidad solo aplican a órdenes generales (las de Post Venta se gestionan allí).
+  const anularBtn = (row.editable && full.estado==='EMITIDA' && isAdmin) ? `<button class="btn-ghost" onclick="marcarVista('ANULADA')">Anular</button>` : '';
+  const enviar    = (row.editable && PUEDE) ? `<button class="btn-af" id="btnEnviar" onclick="enviarCorreo()"><i class="bi bi-envelope-paper me-1"></i>Enviar a Contabilidad</button>` : '';
   const pagarBtn  = (row.pagable && MICAJA) ? `<button class="btn-af" onclick="pagar(${row.id})"><i class="bi bi-cash-coin me-1"></i>Pagar</button>` : '';
-  const enviar = PUEDE ? `<button class="btn-af" id="btnEnviar" onclick="enviarCorreo()"><i class="bi bi-envelope-paper me-1"></i>Enviar a Contabilidad</button>` : '';
   foot.innerHTML = `<button class="btn-ghost" onclick="document.getElementById('dlg').close()">Cerrar</button>
     <button class="btn-ghost" onclick="copiarDoc()"><i class="bi bi-clipboard me-1"></i>Copiar</button>
     <button class="btn-ghost" onclick="descargarDoc()"><i class="bi bi-download me-1"></i>Descargar</button>
