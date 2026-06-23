@@ -123,6 +123,21 @@ const { emitirCorrelativo, anularCorrelativo } = require('../../../../shared/ord
     for (const r of pend) await congelarDocumento(r.id);
     if (pend.length) console.log('[ordenes-pago] órdenes pagadas congeladas en duro (backfill):', pend.length);
   } catch (e) { console.error('[ordenes-pago snapshot backfill]', e.message); }
+
+  // Reparación idempotente: re-congelar snapshots con fecha mal formateada (bug soloFecha sobre Date).
+  try {
+    const [snaps] = await pool.query(`SELECT id, snapshot_json FROM op_correlativos WHERE snapshot_json IS NOT NULL LIMIT 2000`);
+    let fixed = 0;
+    for (const r of snaps) {
+      let okFecha = false;
+      try { const s = JSON.parse(r.snapshot_json); okFecha = /^\d{4}-\d{2}-\d{2}$/.test(String(s.fecha_emision || '')); } catch (_) {}
+      if (okFecha) continue;
+      const [[oc]] = await pool.query('SELECT * FROM op_correlativos WHERE id=?', [r.id]);
+      const snap = oc && await construirDocumento(oc);
+      if (snap) { await pool.query('UPDATE op_correlativos SET snapshot_json=? WHERE id=?', [JSON.stringify(snap), r.id]); fixed++; }
+    }
+    if (fixed) console.log('[ordenes-pago] snapshots con fecha reparados:', fixed);
+  } catch (e) { console.error('[ordenes-pago snapshot repair]', e.message); }
 })();
 
 /* ── Helpers ────────────────────────────────────────────────────────────────── */
@@ -338,7 +353,13 @@ const getOrden = async (req, res) => {
 };
 
 const ORIGEN_LBL = { SALDO: 'Saldo Precio', COMISION: 'Comisión', GENERAL: 'Otros' };
-const soloFecha = v => v ? String(v).slice(0, 10) : null;
+// YYYY-MM-DD. mysql2 devuelve DATETIME/DATE como objeto Date: formatear en hora de Chile
+// (NO usar String(Date).slice, que da "Tue Jun 23"). Si ya viene string ISO, recortar.
+const soloFecha = v => {
+  if (!v) return null;
+  if (v instanceof Date) return v.toLocaleDateString('en-CA', { timeZone: 'America/Santiago' });
+  return String(v).slice(0, 10);
+};
 
 /* Construye el documento "Solicitud de Pago" EN VIVO desde las tablas fuente
    (GENERAL en ordenes_pago; SALDO/COMISION desde el seguimiento + dealer + factura).
