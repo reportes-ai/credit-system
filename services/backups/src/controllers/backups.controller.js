@@ -61,25 +61,8 @@ async function sembrarDefaults() {
   } catch (e) { console.error('[backups sembrarDefaults]', e.message); }
 }
 
-/* ── Funcionalidades a las que accede un usuario (para el correo) ── */
-async function funcionalidadesDe(idUsuario) {
-  try {
-    const [[u]] = await pool.query(
-      'SELECT p.nombre perfil FROM usuarios u JOIN perfiles p ON p.id_perfil=u.id_perfil WHERE u.id_usuario=?', [idUsuario]);
-    if (u && u.perfil === 'Administrador') return ['(Todas las funciones — perfil Administrador)'];
-    const [rows] = await pool.query(
-      `SELECT DISTINCT f.nombre FROM funcionalidades f
-         JOIN permisos_perfil pp ON pp.id_funcionalidad=f.id_funcionalidad AND pp.habilitado=1
-         JOIN usuarios u ON u.id_perfil=pp.id_perfil
-        WHERE u.id_usuario=? AND f.nombre IS NOT NULL AND f.nombre<>''
-       UNION
-       SELECT DISTINCT f.nombre FROM funcionalidades f
-         JOIN permisos_usuario pu ON pu.id_funcionalidad=f.id_funcionalidad AND pu.habilitado=1
-        WHERE pu.id_usuario=? AND f.nombre IS NOT NULL AND f.nombre<>''
-       ORDER BY 1`, [idUsuario, idUsuario]);
-    return rows.map(r => r.nombre);
-  } catch (_) { return []; }
-}
+// Etiquetas de las categorías tal como van en el correo al suplente.
+const CAT_MAIL = { b_alertas: 'Alertas', b_funciones: 'Funciones (atribuciones)', b_correos: 'Recepción Correos del Business Suite' };
 
 const nombreDe = async (id) => {
   try { const [[u]] = await pool.query('SELECT nombre, apellido, email FROM usuarios WHERE id_usuario=?', [id]); return u || null; }
@@ -87,33 +70,23 @@ const nombreDe = async (id) => {
 };
 const esc = s => String(s ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
 
-// Avisa por correo al titular y al suplente del cambio de una categoría.
-async function avisarCambio({ titular, suplente, catLabel, activado, funcs }) {
-  if (!titular || !suplente) return;
-  const nt = `${titular.nombre || ''} ${titular.apellido || ''}`.trim();
+// Un SOLO correo al suplente al guardar: avisa qué Back Up se le designó (o se le suspendió).
+async function avisarSuplente({ suplente, titularNombre, autorNombre, activeCats, activado }) {
+  if (!suplente || !suplente.email) return;
   const ns = `${suplente.nombre || ''} ${suplente.apellido || ''}`.trim();
-  const verbo = activado ? 'activó' : 'desactivó';
-  const listaFuncs = (funcs && funcs.length)
-    ? `<div style="margin:12px 0 4px;font-weight:700;color:#0f172a">Funcionalidades involucradas:</div>
-       <ul style="margin:0 0 8px 18px;padding:0;color:#334155;font-size:14px">${funcs.map(f => `<li>${esc(f)}</li>`).join('')}</ul>`
-    : '';
-  const cuerpoSup = `
-    <p style="font-size:15px;color:#1e293b">Hola ${esc(ns)},</p>
-    <p style="font-size:15px;color:#334155">Se <strong>${verbo}</strong> el respaldo de <strong>${esc(catLabel)}</strong> de <strong>${esc(nt)}</strong> hacia ti.</p>
-    <p style="font-size:15px;color:#334155">${activado
-      ? `A partir de ahora ${catLabel.includes('Funciones') ? 'tienes acceso a sus atribuciones' : catLabel.includes('Alertas') ? 'recibirás sus alertas en la campana' : 'recibirás copia de sus correos'} mientras el respaldo esté activo.`
-      : `Ya no ${catLabel.includes('Funciones') ? 'tienes sus atribuciones' : catLabel.includes('Alertas') ? 'recibirás sus alertas' : 'recibirás copia de sus correos'}.`}</p>
-    ${activado ? listaFuncs : ''}`;
-  const cuerpoTit = `
-    <p style="font-size:15px;color:#1e293b">Hola ${esc(nt)},</p>
-    <p style="font-size:15px;color:#334155">Se <strong>${verbo}</strong> tu respaldo de <strong>${esc(catLabel)}</strong> hacia <strong>${esc(ns)}</strong>.</p>
-    <p style="font-size:15px;color:#334155">${activado
-      ? `${ns} ${catLabel.includes('Funciones') ? 'podrá usar tus atribuciones' : catLabel.includes('Alertas') ? 'recibirá tus alertas' : 'recibirá copia de tus correos'} mientras esté activo.`
-      : 'El respaldo quedó suspendido.'}</p>
-    ${activado ? listaFuncs : ''}`;
-  const asunto = `Respaldo de ${catLabel} ${activado ? 'activado' : 'suspendido'} — AutoFácil`;
-  try { if (suplente.email) await enviarCorreo({ to: suplente.email, subject: asunto, html: envolverHTML(cuerpoSup) }); } catch (_) {}
-  try { if (titular.email) await enviarCorreo({ to: titular.email, subject: asunto, html: envolverHTML(cuerpoTit) }); } catch (_) {}
+  let cuerpo;
+  if (activado) {
+    cuerpo = `
+      <p style="font-size:15px;color:#1e293b">Estimado ${esc(ns)}:</p>
+      <p style="font-size:15px;color:#334155">Por instrucciones de <strong>${esc(autorNombre)}</strong> se ha procedido a activar la funcionalidad de Back Up de <strong>${esc(titularNombre)}</strong>, por lo que las siguientes funcionalidades serán redirigidas a ti:</p>
+      <ul style="font-size:15px;color:#334155;margin:6px 0 6px 18px;padding:0">${activeCats.map(c => `<li>${esc(c)}</li>`).join('')}</ul>`;
+  } else {
+    cuerpo = `
+      <p style="font-size:15px;color:#1e293b">Estimado ${esc(ns)}:</p>
+      <p style="font-size:15px;color:#334155">Por instrucciones de <strong>${esc(autorNombre)}</strong> se ha suspendido la funcionalidad de Back Up de <strong>${esc(titularNombre)}</strong>. Ya no recibirás las funcionalidades que estaban redirigidas a ti.</p>`;
+  }
+  const asunto = activado ? 'Back Up Designado Activado' : 'Back Up Designado Suspendido';
+  try { await enviarCorreo({ to: suplente.email, subject: asunto, html: envolverHTML(cuerpo) }); } catch (_) {}
 }
 
 /* ── Endpoints ── */
@@ -164,15 +137,19 @@ const guardar = async (req, res) => {
     // Invalida el caché de permisos (las funciones heredadas cambian)
     try { require('../../../../shared/middleware/permisos').limpiarCachePermisos(); } catch (_) {}
 
-    // Avisos por correo de los cambios de categoría
-    const titular = await nombreDe(idTit);
-    const suplente = id_suplente ? await nombreDe(id_suplente) : null;
-    const funcs = (nv.b_funciones && suplente) ? await funcionalidadesDe(idTit) : [];
+    // Un solo correo al suplente, al guardar, si hubo algún cambio de categoría.
+    let cambio = false;
     for (const cat of CATS) {
       const antes = old.id_suplente === id_suplente ? old[cat.key] : 0;  // si cambió el suplente, lo previo ya no aplica
-      if (nv[cat.key] !== antes) {
-        await avisarCambio({ titular, suplente, catLabel: cat.label, activado: nv[cat.key] === 1, funcs: cat.key === 'b_funciones' ? funcs : null });
-      }
+      if (nv[cat.key] !== antes) cambio = true;
+    }
+    if (cambio && id_suplente) {
+      const titular = await nombreDe(idTit);
+      const suplente = await nombreDe(id_suplente);
+      const activeCats = ['b_alertas', 'b_funciones', 'b_correos'].filter(k => nv[k] === 1).map(k => CAT_MAIL[k]);
+      const autorNombre = `${(req.usuario.nombre || '')} ${(req.usuario.apellido || '')}`.trim() || 'la Administración';
+      const titularNombre = titular ? `${titular.nombre || ''} ${titular.apellido || ''}`.trim() : '';
+      await avisarSuplente({ suplente, titularNombre, autorNombre, activeCats, activado: activeCats.length > 0 });
     }
     res.json({ success: true, data: { ok: true }, error: null });
   } catch (e) { console.error('[backups guardar]', e.message); res.status(500).json({ success: false, data: null, error: 'Error interno del servidor' }); }
