@@ -4,15 +4,15 @@
  *
  * Todas las órdenes del sistema —Saldo Precio (Post Venta), Comisión (Post Venta)
  * y las generales a proveedores— toman su número desde aquí, con el formato
- * `ODP-AAAA-NNNNNN` (ODP = Orden De Pago; NO confundir con el N° OP de Operación
- * del crédito). El correlativo NUNCA se reutiliza: si una orden se anula,
- * el número queda reservado, marcado como anulado, con quién la anuló y cuándo.
+ * `ODPaannnn` → `ODP260001` (ODP = Orden De Pago; `26` = año; `0001` = correlativo
+ * del año). NO confundir con el N° OP de Operación del crédito.
+ * El correlativo NUNCA se reutiliza: si una orden se anula, el número queda
+ * reservado, marcado como anulado, con quién la anuló y cuándo.
  *
- * Tabla central `op_correlativos` = libro único de correlativos.
- *   origen: SALDO | COMISION | GENERAL    origen_id: id de la orden en su módulo.
- *
- * El AUTO_INCREMENT arranca alto (100001) para no chocar con los números de
- * prueba antiguos de Post Venta (OP-/OC- de ≤5 dígitos).
+ * Tablas:
+ *   op_correlativos = libro único de correlativos (origen SALDO|COMISION|GENERAL,
+ *                     origen_id = id de la orden en su módulo, quién generó/anuló).
+ *   op_secuencia    = contador por año (reinicia en 0001 cada enero), atómico.
  */
 const pool = require('./config/database');
 
@@ -35,14 +35,40 @@ const pool = require('./config/database');
         created_at     DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP,
         INDEX idx_origen (origen, origen_id),
         INDEX idx_anulada (anulada)
-      ) AUTO_INCREMENT=100001`);
+      )`);
   } catch (e) { if (e.errno !== 1050) console.error('[op_correlativos migration]', e.message); }
+  try {
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS op_secuencia (
+        anio   INT NOT NULL PRIMARY KEY,
+        ultimo INT NOT NULL DEFAULT 0
+      )`);
+  } catch (e) { if (e.errno !== 1050) console.error('[op_secuencia migration]', e.message); }
 })();
 
-const fmt = id => 'ODP-' + new Date().getFullYear() + '-' + String(id).padStart(6, '0');
+// Próximo correlativo del año (atómico: lock de fila con FOR UPDATE).
+async function nextSeq(anio) {
+  const conn = await pool.getConnection();
+  try {
+    await conn.beginTransaction();
+    await conn.query('INSERT INTO op_secuencia (anio, ultimo) VALUES (?, 0) ON DUPLICATE KEY UPDATE anio=anio', [anio]);
+    const [[row]] = await conn.query('SELECT ultimo FROM op_secuencia WHERE anio=? FOR UPDATE', [anio]);
+    const next = (row.ultimo || 0) + 1;
+    await conn.query('UPDATE op_secuencia SET ultimo=? WHERE anio=?', [next, anio]);
+    await conn.commit();
+    return next;
+  } catch (e) {
+    try { await conn.rollback(); } catch (_) {}
+    throw e;
+  } finally {
+    conn.release();
+  }
+}
+
+const fmt = (anio, seq) => 'ODP' + String(anio).slice(-2) + String(seq).padStart(4, '0');
 
 /**
- * Asigna el próximo correlativo global y lo registra. Devuelve { id, numero }.
+ * Asigna el próximo correlativo único y lo registra. Devuelve { id, numero }.
  * @param {object} o
  * @param {'SALDO'|'COMISION'|'GENERAL'} o.origen
  * @param {number} [o.origen_id]  id de la orden en su tabla de módulo
@@ -52,12 +78,13 @@ const fmt = id => 'ODP-' + new Date().getFullYear() + '-' + String(id).padStart(
  * @param {string} [o.usuario_nombre]  nombre de quién la generó
  */
 async function emitirCorrelativo({ origen, origen_id = null, concepto = null, monto = null, id_usuario = null, usuario_nombre = null }) {
+  const anio = new Date().getFullYear();
+  const seq = await nextSeq(anio);
+  const numero = fmt(anio, seq);
   const [ins] = await pool.query(
-    `INSERT INTO op_correlativos (origen, origen_id, concepto, monto, id_usuario, usuario_nombre)
-     VALUES (?,?,?,?,?,?)`,
-    [origen, origen_id, concepto, monto != null ? Math.round(Number(monto) || 0) : null, id_usuario, usuario_nombre]);
-  const numero = fmt(ins.insertId);
-  await pool.query('UPDATE op_correlativos SET numero=? WHERE id=?', [numero, ins.insertId]);
+    `INSERT INTO op_correlativos (numero, origen, origen_id, concepto, monto, id_usuario, usuario_nombre)
+     VALUES (?,?,?,?,?,?,?)`,
+    [numero, origen, origen_id, concepto, monto != null ? Math.round(Number(monto) || 0) : null, id_usuario, usuario_nombre]);
   return { id: ins.insertId, numero };
 }
 

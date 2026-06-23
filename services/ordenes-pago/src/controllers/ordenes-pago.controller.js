@@ -5,7 +5,7 @@
  * se llenan a mano. Incluye base de proveedores, historial y estadísticas.
  *
  * Tablas: proveedores, ordenes_pago.
- * Numeración: correlativo global único ODP-AAAA-NNNNNN (libro central shared/ordenes-pago.js).
+ * Numeración: correlativo único ODPaannnn → ODP260001 (libro central shared/ordenes-pago.js).
  */
 const pool = require('../../../../shared/config/database');
 const { auditar } = require('../../../../shared/audit');
