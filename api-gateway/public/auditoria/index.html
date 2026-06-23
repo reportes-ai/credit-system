@@ -5,7 +5,7 @@
   <link rel="icon" href="/img/favicon.png" type="image/png">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Auditoría — AutoFácil</title>
-  <!-- v1.5 -->
+  <!-- v1.6 -->
   <link href="/css/bootstrap.min.css" rel="stylesheet">
   <link href="/css/bootstrap-icons.css" rel="stylesheet">
   <style>
@@ -209,6 +209,23 @@ async function cargar(){
   } catch(e){ tb.innerHTML = '<tr><td class="vacio">Error de conexión</td></tr>'; }
 }
 
+// Diferencia de días (por fecha en UTC: la BD guarda hora Chile etiquetada UTC).
+function diaDelta(desde, hasta){
+  if(!desde||!hasta) return 0;
+  const a=new Date(desde), b=new Date(hasta); if(isNaN(a)||isNaN(b)) return 0;
+  const k=d=>Date.UTC(d.getUTCFullYear(),d.getUTCMonth(),d.getUTCDate());
+  return Math.round((k(b)-k(a))/86400000);
+}
+// Hora de salida: real (logout) o estimada (última actividad). +N si cae otro día.
+function salidaHtml(r){
+  const sal = r.logout_at || r.last_seen;
+  if(!sal) return '<span class="estado-off">—</span>';
+  const d = diaDelta(r.login_at, sal);
+  const sub = d>0 ? `<sub style="color:#fbbf24;font-weight:700">+${d}</sub>` : '';
+  return r.logout_at
+    ? `${fHora(sal)}${sub}`
+    : `<span style="color:#94a3b8;font-style:italic" title="Estimada — última actividad (sesión sin cierre)">~${fHora(sal)}${sub}</span>`;
+}
 function renderLogins(rows){
   document.getElementById('thead').innerHTML =
     '<tr><th>Usuario</th><th>Perfil</th><th>Fecha</th><th>Hora ingreso</th><th>Salida</th><th>Min</th><th>Estado</th></tr>';
@@ -219,7 +236,7 @@ function renderLogins(rows){
     <td class="c-perfil">${escH(r.perfil||'')}</td>
     <td class="c-fecha">${fFecha(r.login_at)}</td>
     <td>${fHora(r.login_at)}</td>
-    <td class="c-fecha">${r.logout_at?fHora(r.logout_at):'<span class="estado-off">—</span>'}</td>
+    <td class="c-fecha">${salidaHtml(r)}</td>
     <td>${r.minutos!=null?r.minutos:''}</td>
     <td>${r.logout_at?'<span class="estado-off">cerrada</span>':'<span class="estado-on">● activa</span>'}</td>
   </tr>`).join('');
