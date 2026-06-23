@@ -5,7 +5,7 @@
   <link rel="icon" href="/img/favicon.png" type="image/png">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Emisión Orden de Pago Comisión — AutoFácil</title>
-  <!-- v2.0 -->
+  <!-- v2.1 -->
   <link href="/css/bootstrap.min.css" rel="stylesheet">
   <link href="/css/bootstrap-icons.css" rel="stylesheet">
   <style>
@@ -203,27 +203,23 @@ function render(){
   }).join('');
 }
 
-// ops = array de operaciones que comparten la misma boleta/factura
+// ops = array de operaciones que comparten la misma factura/cartola.
+// La factura es por el TOTAL de la cartola (mismo monto en cada operación) → se toma UNA vez.
+// El total se reparte entre las comisiones de las operaciones cargadas (deben cuadrar).
 function docHTML(ops){
   if (!Array.isArray(ops)) ops = [ops];
   const f0 = ops[0];
   const iva = Number(IMPUESTOS.IVA)||19, ret = Number(IMPUESTOS.RETENCION_HONORARIOS)||15.25;
-  // Desglose por operación: valores REGISTRADOS (fallback solo para registros antiguos)
-  const calc = o => {
-    const eb = !!o.es_boleta;
-    const neto = Number(o.monto_factura ?? o.comision)||0;
-    const pct  = (o.impuesto_pct != null) ? Number(o.impuesto_pct) : (eb ? ret : iva);
-    const impMonto = (o.impuesto_monto != null) ? Number(o.impuesto_monto) : Math.round(neto * pct/100);
-    const aPagar   = (o.monto_liquido  != null) ? Number(o.monto_liquido)  : (eb ? (neto - impMonto) : (neto + impMonto));
-    return { neto, pct, impMonto, aPagar, eb };
-  };
-  const cs = ops.map(calc);
-  const sumNeto  = cs.reduce((s,c)=>s+c.neto,0);
-  const sumImp   = cs.reduce((s,c)=>s+c.impMonto,0);
-  const sumPagar = cs.reduce((s,c)=>s+c.aPagar,0);
   const esBoleta = !!f0.es_boleta;
   const pct0 = (f0.impuesto_pct != null) ? Number(f0.impuesto_pct) : (esBoleta ? ret : iva);
   const impLbl = `${esBoleta ? 'Retención' : 'IVA'} ${pct0}%`;
+  // Factura (total de la cartola) — UNA sola vez desde f0
+  const facturaNeto  = Number(f0.monto_factura ?? f0.comision)||0;
+  const facturaImp   = (f0.impuesto_monto != null) ? Number(f0.impuesto_monto) : Math.round(facturaNeto*pct0/100);
+  const facturaPagar = (f0.monto_liquido  != null) ? Number(f0.monto_liquido)  : (esBoleta ? (facturaNeto - facturaImp) : (facturaNeto + facturaImp));
+  // Comisiones de las operaciones cargadas (de la carta) → deben sumar el monto de la factura
+  const sumComision = ops.reduce((s,o)=>s+(Number(o.comision)||0),0);
+  const cuadra = Math.abs(sumComision - facturaNeto) <= 1;   // tolerancia de redondeo
   const fechaPago = fechaCL(new Date().toISOString());
   const nums = ops.map(o=>o.num_op).join(', ');
   const conceptoDet = `Comisión OP${ops.length>1?'s':''} ${nums} - ${f0.financiera||''}`;
@@ -239,15 +235,15 @@ function docHTML(ops){
   const Sres = 'border-collapse:collapse;margin-top:14px;max-width:430px';
   const SresL = 'border:1px solid #cbd5e1;padding:5px 8px;font-size:11px;background:#eff6ff;font-weight:700;width:42%';
   const SresV = 'border:1px solid #cbd5e1;padding:5px 8px;font-size:11px';
-  const filas = ops.map((o,i)=>{
-    const c = cs[i];
+  const filas = ops.map(o=>{
     const concepto = `Comisión OP ${o.num_op||''} - ${o.financiera||''}`;
     return `<tr>
       <td style="${Std}">${o.nombre_dealer||''}</td><td style="${Std}">${o.rut_dealer||''}</td>
-      <td style="${Std}">${concepto}</td><td style="${Std}">${periodoCL(o.fecha_factura)}</td><td style="${Snum}">${fmt(c.neto)}</td>
-      <td style="${Snum}">${fmt(c.impMonto)}</td><td style="${Snum}">${fmt(c.aPagar)}</td><td style="${Std}">${fechaPago}</td>
+      <td style="${Std}">${concepto}</td><td style="${Std}">${periodoCL(o.fecha_factura)}</td><td style="${Snum}">${fmt(Number(o.comision)||0)}</td>
     </tr>`;
   }).join('');
+  const aviso = cuadra ? '' : `<div style="margin:10px 0;padding:9px 12px;border:1.5px solid #fca5a5;background:#fef2f2;color:#b91c1c;border-radius:7px;font-size:11px;font-weight:800;line-height:1.45">
+      ⚠ ORDEN DE PAGO NO CUADRA CON FACTURA Y CARTOLA. La comisión de las operaciones cargadas suman ${fmt(sumComision)}, y la factura es por ${fmt(facturaNeto)} (diferencia ${fmt(Math.abs(sumComision-facturaNeto))}). Cargue todas las operaciones de la cartola antes de emitir.</div>`;
   return `<div style="${Sdoc}">
     <table style="width:100%;border-collapse:collapse;margin-bottom:14px"><tbody><tr>
       <td style="vertical-align:top">
@@ -264,21 +260,22 @@ function docHTML(ops){
       </td>
     </tr></tbody></table>
     <table style="${Stbl}">
-      <colgroup><col style="width:22%"><col style="width:11%"><col style="width:21%"><col style="width:7%"><col style="width:11%"><col style="width:10%"><col style="width:10%"><col style="width:8%"></colgroup>
-      <thead><tr><th style="${Sth}">Dealer</th><th style="${Sth}">RUT</th><th style="${Sth}">Detalle</th><th style="${Sth}">Mes</th><th style="${Sth}">Monto Total</th><th style="${Sth}">${impLbl}</th><th style="${Sth}">A Pagar</th><th style="${Sth}">Fecha a pagar</th></tr></thead>
+      <colgroup><col style="width:30%"><col style="width:15%"><col style="width:33%"><col style="width:10%"><col style="width:12%"></colgroup>
+      <thead><tr><th style="${Sth}">Dealer</th><th style="${Sth}">RUT</th><th style="${Sth}">Detalle</th><th style="${Sth}">Mes</th><th style="${Sth}">Comisión</th></tr></thead>
       <tbody>${filas}
-        <tr><td colspan="6" style="${Std};text-align:right;font-weight:800;background:#f1f5f9">TOTAL</td><td style="${Snum};font-weight:800;background:#f1f5f9">${fmt(sumPagar)}</td><td style="${Std};background:#f1f5f9"></td></tr>
+        <tr><td colspan="4" style="${Std};text-align:right;font-weight:800;background:#f1f5f9">TOTAL COMISIONES (${ops.length} op${ops.length>1?'s':''})</td><td style="${Snum};font-weight:800;background:${cuadra?'#f1f5f9':'#fee2e2'};color:${cuadra?'#0f172a':'#b91c1c'}">${fmt(sumComision)}</td></tr>
       </tbody>
     </table>
+    ${aviso}
     <table style="${Sres}"><tbody>
       <tr><td style="${SresL}">Proveedor</td><td style="${SresV}">${f0.nombre_dealer||''}</td></tr>
       <tr><td style="${SresL}">Concepto</td><td style="${SresV}">${conceptoDet}</td></tr>
       <tr><td style="${SresL}">Período</td><td style="${SresV}">${periodoCL(f0.fecha_factura)}</td></tr>
       ${f0.numero_factura?`<tr><td style="${SresL}">N° ${esBoleta?'Boleta':'Factura'}</td><td style="${SresV}">${f0.numero_factura}${esBoleta?' (Boleta)':''}${f0.es_terceros?' · terceros':''}${ops.length>1?` · ${ops.length} operaciones`:''}</td></tr>`:''}
       <tr><td style="${SresL}">Destino</td><td style="${SresV}">CTA. CTE. ${f0.num_cuenta? f0.num_cuenta+(f0.banco?(' · '+f0.banco):'') : ''}</td></tr>
-      <tr><td style="${SresL}">Monto total</td><td style="${SresV}">${fmt(sumNeto)}</td></tr>
-      <tr><td style="${SresL}">${impLbl}</td><td style="${SresV}">${fmt(sumImp)}</td></tr>
-      <tr><td style="${SresL}">A pagar</td><td style="${SresV};font-weight:700">${fmt(sumPagar)}</td></tr>
+      <tr><td style="${SresL}">Monto ${esBoleta?'bruto':'neto'} factura</td><td style="${SresV}">${fmt(facturaNeto)}</td></tr>
+      <tr><td style="${SresL}">${impLbl}</td><td style="${SresV}">${fmt(facturaImp)}</td></tr>
+      <tr><td style="${SresL}">A pagar</td><td style="${SresV};font-weight:700">${fmt(facturaPagar)}</td></tr>
       <tr><td style="${SresL}">Fecha a pagar</td><td style="${SresV}">${fechaPago}</td></tr>
     </tbody></table>
   </div>`;
