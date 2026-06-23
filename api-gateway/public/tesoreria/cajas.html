@@ -86,7 +86,7 @@
   <div class="topnav-left">
     <a href="/" class="topnav-brand">
       <img src="/img/logo.png" alt="AutoFácil">
-      <span class="version-badge">v1.8</span>
+      <span class="version-badge">v1.9</span>
     </a>
     <div class="breadcrumb-nav">
       <a href="/">Inicio</a><span class="sep">›</span>
@@ -554,13 +554,12 @@ function cerrarPermisos() {
   document.getElementById('permPanel').style.display = 'none';
 }
 
-async function guardarPermisos() {
-  if (!_usuarioSeleccionado || !_cajaActual) return;
-  const { id_usuario } = _usuarioSeleccionado;
+// Arma el body de atribuciones desde el panel (lee toggles + topes).
+function permBody() {
   const permCI = document.getElementById('permCondI').checked;
   const permCG = document.getElementById('permCondG').checked;
-  const body = {
-    id_usuario,
+  return {
+    id_usuario: _usuarioSeleccionado.id_usuario,
     puede_pagar_cuotas:       document.getElementById('permPagar').checked    ? 1 : 0,
     puede_reversar_pagos:     document.getElementById('permReversar').checked ? 1 : 0,
     puede_condonar_intereses: permCI ? 1 : 0,
@@ -569,15 +568,21 @@ async function guardarPermisos() {
     tope_gastos:              permCG ? (parseFloat(document.getElementById('topeG').value)||0) : 0,
     activo:                   document.getElementById('permActivo').checked ? 1 : 0,
   };
-  const r = await API(`/api/cajas/${_cajaActual.id_caja}/usuarios`, { method:'POST', body:JSON.stringify(body) });
+}
+// Persiste las atribuciones del usuario abierto SIN cerrar el panel. Devuelve true/false.
+async function persistirPermisos() {
+  if (!_usuarioSeleccionado || !_cajaActual) return true;   // no hay panel abierto: nada que guardar
+  const r = await API(`/api/cajas/${_cajaActual.id_caja}/usuarios`, { method:'POST', body: JSON.stringify(permBody()) });
   const j = await r.json();
-  if (!j.success) return alert('Error: ' + j.error);
+  if (!j.success) { alert('Error: ' + j.error); return false; }
+  return true;
+}
+async function guardarPermisos() {
+  if (!_usuarioSeleccionado || !_cajaActual) return;
+  if (!(await persistirPermisos())) return;
   await recargarAsigCaja(_cajaActual.id_caja);
   cerrarPermisos();
   renderUserList(document.getElementById('buscarUsuario').value.toLowerCase());
-  // pequeño feedback
-  const btn = document.querySelector('#permPanel .btn-primary');
-  if (btn) { btn.textContent = '✓ Guardado'; setTimeout(() => btn.innerHTML = '<i class="bi bi-check2 me-1"></i>Guardar permisos', 1500); }
 }
 
 async function quitarDeEstaCaja() {
@@ -607,6 +612,9 @@ async function guardarCaja() {
   const r = await API(id ? `/api/cajas/${id}` : '/api/cajas', { method: id ? 'PUT' : 'POST', body:JSON.stringify(body) });
   const j = await r.json();
   if (!j.success) return alert('Error: ' + j.error);
+
+  // Si hay atribuciones abiertas en el panel, guardarlas también (un solo Guardar persiste todo).
+  if (_usuarioSeleccionado && _cajaActual) { if (!(await persistirPermisos())) return; }
 
   await cargarCajas();
   await cargarTodasAsignaciones();
