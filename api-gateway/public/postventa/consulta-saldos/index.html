@@ -5,7 +5,7 @@
   <link rel="icon" href="/img/favicon.png" type="image/png">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Consulta Estado Saldos Precio — AutoFácil</title>
-  <!-- v1.1 -->
+  <!-- v1.2 -->
   <link href="/css/bootstrap.min.css" rel="stylesheet">
   <link href="/css/bootstrap-icons.css" rel="stylesheet">
   <style>
@@ -21,16 +21,19 @@
     .avatar { width:28px; height:28px; background:#90caf9; border-radius:50%; display:flex; align-items:center; justify-content:center; color:var(--blue); font-weight:700; font-size:.75rem; }
     .perfil-badge { background:rgba(144,202,249,.2); border:1px solid rgba(144,202,249,.4); color:#90caf9; border-radius:12px; padding:2px 10px; font-size:.73rem; font-weight:600; }
     .btn-logout { background:rgba(255,255,255,.1); border:1px solid rgba(255,255,255,.2); color:#fff; border-radius:8px; padding:5px 12px; font-size:.82rem; cursor:pointer; }
-    .wrap { max-width:1240px; margin:0 auto; padding:22px 24px; }
+    .wrap { max-width:none; margin:0; padding:22px 28px; }
     .card-af { background:#fff; border-radius:14px; box-shadow:0 1px 4px rgba(0,0,0,.07); padding:16px 18px; margin-bottom:16px; }
     .head-row { display:flex; align-items:center; gap:10px; margin-bottom:14px; }
     .head-row h5 { font-weight:800; color:var(--navy); margin:0; }
     label { font-size:.7rem; font-weight:800; text-transform:uppercase; color:#64748b; letter-spacing:.3px; display:block; margin:0 0 4px; }
     input { width:100%; border:1.5px solid #e2e8f0; border-radius:8px; padding:9px 11px; font-size:.85rem; box-sizing:border-box; font-family:inherit; }
     input:focus { border-color:#0141A2; outline:none; }
-    .filtros { display:grid; grid-template-columns:2fr 1fr auto auto; gap:10px; align-items:end; }
+    .filtros { display:grid; grid-template-columns:2fr 1fr auto auto auto; gap:10px; align-items:end; }
     .btn-af { background:linear-gradient(135deg,#0141A2,#0255c5); color:#fff; border:none; border-radius:9px; padding:10px 18px; font-size:.85rem; font-weight:700; cursor:pointer; white-space:nowrap; }
     .btn-ghost { background:#fff; border:1.5px solid #cbd5e1; color:#475569; border-radius:9px; padding:9px 16px; font-size:.83rem; font-weight:700; cursor:pointer; white-space:nowrap; }
+    .btn-tog { background:#fff; border:1.5px solid #16a34a; color:#16a34a; border-radius:9px; padding:9px 14px; font-size:.83rem; font-weight:700; cursor:pointer; white-space:nowrap; }
+    .btn-tog.on { background:#16a34a; color:#fff; }
+    .resumen { display:inline-flex; gap:7px; align-items:center; background:#fff7ed; color:#b45309; border:1px solid #fed7aa; border-radius:9px; padding:7px 13px; font-size:.83rem; font-weight:600; }
     table { width:100%; border-collapse:collapse; font-size:.82rem; }
     th { background:#f8fafc; color:#475569; font-size:.68rem; text-transform:uppercase; padding:9px 10px; text-align:left; border-bottom:2px solid #e2e8f0; white-space:nowrap; }
     td { padding:9px 10px; border-bottom:1px solid #f1f5f9; vertical-align:middle; }
@@ -68,11 +71,15 @@
       <div><label>Parque</label><input id="fParque" placeholder="Filtrar por parque"></div>
       <button class="btn-af" onclick="buscar()"><i class="bi bi-search me-1"></i>Buscar</button>
       <button class="btn-ghost" onclick="limpiar()">Limpiar</button>
+      <button class="btn-tog" id="btnPag7" onclick="togglePag7()"><i class="bi bi-cash-coin me-1"></i>Pagados últimos 7 días</button>
     </div>
   </div>
 
   <div class="card-af">
-    <div class="count" id="count">Cargando…</div>
+    <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;margin-bottom:10px">
+      <div class="resumen" id="resumen"></div>
+      <div class="count" id="count">Cargando…</div>
+    </div>
     <div style="overflow-x:auto">
       <table>
         <thead><tr>
@@ -97,7 +104,7 @@ const H = { Authorization:'Bearer '+token };
 const esc = s => String(s??'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
 const money = n => '$'+Number(n||0).toLocaleString('es-CL');
 const fdate = s => s ? new Date(s).toLocaleDateString('es-CL') : '—';
-let ORDEN = [], DATA = [];
+let ORDEN = [], DATA = [], soloPag7 = false;
 
 function pillClase(estado){ return estado==='SALDO PRECIO PAGADO'?'pg':(estado==='SIN ETAPAS'?'ps':'pp'); }
 
@@ -107,16 +114,23 @@ async function buscar(){
   document.getElementById('count').textContent = 'Buscando…';
   document.getElementById('body').innerHTML = '<tr><td colspan="9" style="text-align:center;color:#94a3b8;padding:24px">Buscando…</td></tr>';
   try{
-    const url = '/api/postventa/consulta-saldos?q='+encodeURIComponent(q)+'&parque='+encodeURIComponent(parque);
+    const url = '/api/postventa/consulta-saldos?q='+encodeURIComponent(q)+'&parque='+encodeURIComponent(parque)+(soloPag7?'&pagados7=1':'');
     const j = await (await fetch(url,{headers:H})).json();
     ORDEN = j.orden || []; DATA = j.data || [];
+    renderResumen(j.resumen);
     render();
   }catch(e){
     document.getElementById('count').textContent = 'Error al consultar.';
     document.getElementById('body').innerHTML = '<tr><td colspan="9" style="text-align:center;color:#b91c1c;padding:24px">Error al consultar.</td></tr>';
   }
 }
-function limpiar(){ document.getElementById('fq').value=''; document.getElementById('fParque').value=''; buscar(); }
+function limpiar(){ document.getElementById('fq').value=''; document.getElementById('fParque').value=''; soloPag7=false; document.getElementById('btnPag7').classList.remove('on'); buscar(); }
+function togglePag7(){ soloPag7=!soloPag7; document.getElementById('btnPag7').classList.toggle('on', soloPag7); buscar(); }
+function renderResumen(r){
+  const el=document.getElementById('resumen');
+  if(!r){ el.innerHTML=''; return; }
+  el.innerHTML = '<i class="bi bi-hourglass-split"></i> Pendientes de pago: <b>'+Number(r.pendientes||0).toLocaleString('es-CL')+'</b> operación(es) · <b>'+money(r.monto)+'</b>';
+}
 
 function render(){
   const tb = document.getElementById('body');

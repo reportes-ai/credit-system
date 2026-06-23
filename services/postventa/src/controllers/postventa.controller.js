@@ -1173,13 +1173,17 @@ const consultaSaldos = async (req, res) => {
   try {
     const q = String(req.query.q || '').trim();
     const parque = String(req.query.parque || '').trim();
+    const pagados7 = req.query.pagados7 === '1' || req.query.pagados7 === 'true';
     const limit = Math.min(500, Math.max(1, parseInt(req.query.limit) || 300));
-    const params = []; let where = 'WHERE 1=1';
+    const filt = []; const fp = [];
     if (q) {
-      where += ` AND (s.num_op LIKE ? OR s.rut_dealer LIKE ? OR s.nombre_dealer LIKE ? OR s.ejecutivo LIKE ? OR cr.parque LIKE ? OR cr.nombre_parque_mgmt LIKE ?)`;
-      const lk = '%' + q + '%'; params.push(lk, lk, lk, lk, lk, lk);
+      filt.push(`(s.num_op LIKE ? OR s.rut_dealer LIKE ? OR s.nombre_dealer LIKE ? OR s.ejecutivo LIKE ? OR cr.parque LIKE ? OR cr.nombre_parque_mgmt LIKE ?)`);
+      const lk = '%' + q + '%'; fp.push(lk, lk, lk, lk, lk, lk);
     }
-    if (parque) { where += ` AND (cr.parque LIKE ? OR cr.nombre_parque_mgmt LIKE ?)`; const lk = '%' + parque + '%'; params.push(lk, lk); }
+    if (parque) { filt.push(`(cr.parque LIKE ? OR cr.nombre_parque_mgmt LIKE ?)`); const lk = '%' + parque + '%'; fp.push(lk, lk); }
+    const baseWhere = 'WHERE 1=1' + (filt.length ? ' AND ' + filt.join(' AND ') : '');
+    const PAGADO = `EXISTS (SELECT 1 FROM postventa_etapas e WHERE e.id_seguimiento=s.id AND e.track='SALDO' AND e.etapa='SALDO PRECIO PAGADO'`;
+    const tablaWhere = baseWhere + (pagados7 ? ' AND ' + PAGADO + ' AND e.fecha >= (NOW() - INTERVAL 7 DAY))' : '');
     const [rows] = await pool.query(`
       SELECT s.id, s.num_op, s.financiera, s.rut_dealer, s.nombre_dealer, s.ejecutivo,
              s.fecha_otorgado, s.saldo_precio,
@@ -1187,15 +1191,21 @@ const consultaSaldos = async (req, res) => {
              (SELECT op.num_orden FROM postventa_ordenes op WHERE op.id_seguimiento = s.id ORDER BY op.fecha DESC LIMIT 1) AS orden_pago
       FROM postventa_seguimiento s
       LEFT JOIN creditos cr ON cr.id = s.id_credito
-      ${where}
-      ORDER BY s.fecha_otorgado DESC, s.num_op DESC
-      LIMIT ?`, [...params, limit]);
+      ${tablaWhere}
+      ORDER BY s.fecha_otorgado ASC, s.num_op ASC
+      LIMIT ?`, [...fp, limit]);
     const ids = rows.map(r => r.id);
     const etapas = await etapasPorTrack(ids, 'SALDO', ORDEN_SALDO);
     const data = rows.map(r => { const e = etapas[r.id] || {};
       return { ...r, estado: e.estado || 'SIN ETAPAS', fecha_estado: e.fecha_estado || null,
         paso: e.paso || 0, total: ORDEN_SALDO.length, etapas: e.etapas || [] }; });
-    res.json({ success: true, data, orden: ORDEN_SALDO, error: null });
+    // Resumen: operaciones pendientes de pago (sin SALDO PRECIO PAGADO), sobre el filtro q/parque (sin límite).
+    const [[resumen]] = await pool.query(`
+      SELECT COUNT(*) AS pendientes, COALESCE(SUM(s.saldo_precio),0) AS monto
+      FROM postventa_seguimiento s
+      LEFT JOIN creditos cr ON cr.id = s.id_credito
+      ${baseWhere} AND NOT ${PAGADO})`, fp);
+    res.json({ success: true, data, orden: ORDEN_SALDO, resumen, error: null });
   } catch (e) { console.error('[consultaSaldos]', e.message); res.status(500).json({ success: false, data: null, error: 'Error interno del servidor' }); }
 };
 
@@ -1204,14 +1214,18 @@ const consultaFacturas = async (req, res) => {
     const q = String(req.query.q || '').trim();
     const mes = String(req.query.mes || '').trim();          // YYYY-MM
     const factura = String(req.query.factura || '').trim();
+    const pagados7 = req.query.pagados7 === '1' || req.query.pagados7 === 'true';
     const limit = Math.min(500, Math.max(1, parseInt(req.query.limit) || 300));
-    const params = []; let where = 'WHERE 1=1';
+    const filt = []; const fp = [];
     if (q) {
-      where += ` AND (s.num_op LIKE ? OR s.rut_dealer LIKE ? OR s.nombre_dealer LIKE ? OR s.ejecutivo LIKE ? OR f.numero_factura LIKE ?)`;
-      const lk = '%' + q + '%'; params.push(lk, lk, lk, lk, lk);
+      filt.push(`(s.num_op LIKE ? OR s.rut_dealer LIKE ? OR s.nombre_dealer LIKE ? OR s.ejecutivo LIKE ? OR f.numero_factura LIKE ?)`);
+      const lk = '%' + q + '%'; fp.push(lk, lk, lk, lk, lk);
     }
-    if (mes)     { where += ` AND DATE_FORMAT(f.fecha_factura,'%Y-%m') = ?`; params.push(mes); }
-    if (factura) { where += ` AND f.numero_factura LIKE ?`; params.push('%' + factura + '%'); }
+    if (mes)     { filt.push(`DATE_FORMAT(f.fecha_factura,'%Y-%m') = ?`); fp.push(mes); }
+    if (factura) { filt.push(`f.numero_factura LIKE ?`); fp.push('%' + factura + '%'); }
+    const baseWhere = 'WHERE 1=1' + (filt.length ? ' AND ' + filt.join(' AND ') : '');
+    const PAGADA = `EXISTS (SELECT 1 FROM postventa_etapas e WHERE e.id_seguimiento=s.id AND e.track='COMISION' AND e.etapa='COMISION PAGADA'`;
+    const tablaWhere = baseWhere + (pagados7 ? ' AND ' + PAGADA + ' AND e.fecha >= (NOW() - INTERVAL 7 DAY))' : '');
     const [rows] = await pool.query(`
       SELECT s.id, s.num_op, s.financiera, s.rut_dealer, s.nombre_dealer, s.ejecutivo, s.comision,
              f.fecha_factura, f.numero_factura, f.monto_bruto, f.monto_liquido, f.es_terceros, f.es_boleta,
@@ -1219,15 +1233,21 @@ const consultaFacturas = async (req, res) => {
              (SELECT oc.num_orden FROM postventa_ordenes_comision oc WHERE oc.id_seguimiento = s.id ORDER BY oc.fecha DESC LIMIT 1) AS orden_comision
       FROM postventa_seguimiento s
       LEFT JOIN postventa_facturas_comision f ON f.id_seguimiento = s.id
-      ${where}
-      ORDER BY s.fecha_otorgado DESC, s.num_op DESC
-      LIMIT ?`, [...params, limit]);
+      ${tablaWhere}
+      ORDER BY s.fecha_otorgado ASC, s.num_op ASC
+      LIMIT ?`, [...fp, limit]);
     const ids = rows.map(r => r.id);
     const etapas = await etapasPorTrack(ids, 'COMISION', ORDEN_COMISION);
     const data = rows.map(r => { const e = etapas[r.id] || {};
       return { ...r, estado: e.estado || 'SIN ETAPAS', fecha_estado: e.fecha_estado || null,
         paso: e.paso || 0, total: ORDEN_COMISION.length, etapas: e.etapas || [] }; });
-    res.json({ success: true, data, orden: ORDEN_COMISION, error: null });
+    // Resumen: comisiones/facturas pendientes de pago (sin COMISION PAGADA), sobre el filtro (sin límite).
+    const [[resumen]] = await pool.query(`
+      SELECT COUNT(*) AS pendientes, COALESCE(SUM(s.comision),0) AS monto
+      FROM postventa_seguimiento s
+      LEFT JOIN postventa_facturas_comision f ON f.id_seguimiento = s.id
+      ${baseWhere} AND NOT ${PAGADA})`, fp);
+    res.json({ success: true, data, orden: ORDEN_COMISION, resumen, error: null });
   } catch (e) { console.error('[consultaFacturas]', e.message); res.status(500).json({ success: false, data: null, error: 'Error interno del servidor' }); }
 };
 
