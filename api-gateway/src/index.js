@@ -149,6 +149,7 @@ app.use('/api/atencion-remota', require('../../services/atencion-remota/src/rout
 
 // Post Venta
 app.use('/api/postventa', require('../../services/postventa/src/routes/postventa.routes'));
+app.use('/api/correos-programados', require('../../services/correos-programados/src/routes/correos.routes'));
 app.use('/api/cartas-ejecutivos', require('../../services/cartas/src/routes/ejecutivos.routes'));
 app.use('/api/cartas-params',     require('../../services/cartas/src/routes/parametros.routes'));
 
@@ -229,6 +230,8 @@ app.get(['/mantenedores/ayuda', '/mantenedores/ayuda/'], (req, res) =>
   res.sendFile(path.join(__dirname, '../public/mantenedores/ayuda/index.html')));
 app.get(['/mantenedores/alertas', '/mantenedores/alertas/'], (req, res) =>
   res.sendFile(path.join(__dirname, '../public/mantenedores/alertas/index.html')));
+app.get(['/mantenedores/correos-programados', '/mantenedores/correos-programados/'], (req, res) =>
+  res.sendFile(path.join(__dirname, '../public/mantenedores/correos-programados/index.html')));
 app.get(['/mantenedores/tasas', '/mantenedores/tasas/'], (req, res) =>
   res.sendFile(path.join(__dirname, '../public/mantenedores/tasas/index.html')));
 app.get(['/mantenedores/uf', '/mantenedores/uf/'], (req, res) =>
