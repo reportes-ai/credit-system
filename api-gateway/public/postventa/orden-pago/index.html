@@ -5,7 +5,7 @@
   <link rel="icon" href="/img/favicon.png" type="image/png">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Emisión Orden de Pago — AutoFácil</title>
-  <!-- v2.2 -->
+  <!-- v2.3 -->
   <link href="/css/bootstrap.min.css" rel="stylesheet">
   <link href="/css/bootstrap-icons.css" rel="stylesheet">
   <style>
@@ -139,7 +139,7 @@ let CORREO = {
 const escH = s => String(s??'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
 function valsDe(r){
   return {
-    nOrden: r.num_orden || ('OP-' + (r.num_op||'')),
+    nOrden: r.num_orden || ('ODP-' + (r.num_op||'')),
     dealer: r.nombre_dealer || '',
     num_op: r.num_op || '',
     financiera: r.financiera || 'Autofin',
@@ -234,7 +234,7 @@ function docHTML(r){
           <tr><td style="${Slbl}">Concepto</td><td style="${Smv}">SOLICITUD DE PAGO</td></tr>
           <tr><td style="${Slbl}">Compañía</td><td style="${Smv}">AUTOFÁCIL SPA</td></tr>
           <tr><td style="${Slbl}">Tipo gasto</td><td style="${Smv}">PAGO A DEALER</td></tr>
-          <tr><td style="${Slbl}">N° Orden</td><td style="${Smv}">${r.num_orden || ('OP-'+(r.num_op||''))}</td></tr>
+          <tr><td style="${Slbl}">N° Orden</td><td style="${Smv}">${r.num_orden || ('ODP-'+(r.num_op||''))}</td></tr>
           <tr><td style="${Slbl}">Fecha</td><td style="${Smv}">${fechaPago}</td></tr>
         </tbody></table>
       </td>

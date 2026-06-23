@@ -739,7 +739,7 @@ const correlativoOrden = async (req, res) => {
     const [ins] = await pool.query(
       'INSERT INTO postventa_ordenes (id_seguimiento, num_op, monto, usuario) VALUES (?,?,?,?)',
       [id, seg.num_op, seg.saldo_precio, loginDe(req.usuario)]);
-    // Correlativo global único OP- (libro central op_correlativos)
+    // Correlativo global único ODP- (libro central op_correlativos)
     const { numero: num } = await emitirCorrelativo({
       origen: 'SALDO', origen_id: ins.insertId, concepto: 'Saldo Precio OP ' + (seg.num_op || ''),
       monto: seg.saldo_precio, id_usuario: req.usuario && req.usuario.id_usuario, usuario_nombre: loginDe(req.usuario) });
@@ -1013,7 +1013,7 @@ const correlativoOrdenComision = async (req, res) => {
     const [ins] = await pool.query(
       'INSERT INTO postventa_ordenes_comision (id_seguimiento, num_op, monto, usuario) VALUES (?,?,?,?)',
       [id, seg.num_op, seg.comision, loginDe(req.usuario)]);
-    // Correlativo global único OP- (libro central op_correlativos)
+    // Correlativo global único ODP- (libro central op_correlativos)
     const { numero: num } = await emitirCorrelativo({
       origen: 'COMISION', origen_id: ins.insertId, concepto: 'Comisión OP ' + (seg.num_op || ''),
       monto: seg.comision, id_usuario: req.usuario && req.usuario.id_usuario, usuario_nombre: loginDe(req.usuario) });

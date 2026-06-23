@@ -5,7 +5,7 @@
   <link rel="icon" href="/img/favicon.png" type="image/png">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Emisión Orden de Pago Comisión — AutoFácil</title>
-  <!-- v1.9 -->
+  <!-- v2.0 -->
   <link href="/css/bootstrap.min.css" rel="stylesheet">
   <link href="/css/bootstrap-icons.css" rel="stylesheet">
   <style>
@@ -125,7 +125,7 @@ function valsDe(ops){
   if (!Array.isArray(ops)) ops = [ops];
   const f0 = ops[0] || {};
   return {
-    nOrden: f0.num_orden || ('OP-' + (f0.numero_factura||f0.num_op||'')),
+    nOrden: f0.num_orden || ('ODP-' + (f0.numero_factura||f0.num_op||'')),
     dealer: f0.nombre_dealer || '',
     num_op: ops.map(o=>o.num_op).join(', '),
     financiera: f0.financiera || 'Autofin',
@@ -227,7 +227,7 @@ function docHTML(ops){
   const fechaPago = fechaCL(new Date().toISOString());
   const nums = ops.map(o=>o.num_op).join(', ');
   const conceptoDet = `Comisión OP${ops.length>1?'s':''} ${nums} - ${f0.financiera||''}`;
-  const nOrden = f0.num_orden || ('OP-'+(f0.numero_factura||f0.num_op||''));
+  const nOrden = f0.num_orden || ('ODP-'+(f0.numero_factura||f0.num_op||''));
   const Sdoc = 'font-family:Arial,sans-serif;color:#1e293b;font-size:11px;border:2px solid #93c5fd;border-radius:8px;padding:14px 16px;display:block;width:100%;box-sizing:border-box';
   const Smeta = 'border-collapse:collapse;font-size:11px';
   const Slbl = 'color:#64748b;font-weight:700;text-transform:uppercase;font-size:9px;padding:1px 8px;white-space:nowrap';

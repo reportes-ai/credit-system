@@ -5,7 +5,7 @@
  * se llenan a mano. Incluye base de proveedores, historial y estadísticas.
  *
  * Tablas: proveedores, ordenes_pago.
- * Numeración: OPP-YYYY-NNNNN (correlativo propio por id de tabla).
+ * Numeración: correlativo global único ODP-AAAA-NNNNNN (libro central shared/ordenes-pago.js).
  */
 const pool = require('../../../../shared/config/database');
 const { auditar } = require('../../../../shared/audit');
@@ -258,7 +258,7 @@ const crearOrden = async (req, res) => {
        norm(b.numero_documento) || null, fdate(b.fecha_documento), monto, fechaEmision, norm(b.metodo_pago) || null,
        norm(b.observaciones) || null, (req.usuario || {}).id_usuario || null, nombreUsuario(req)]);
 
-    // Correlativo global único OP- (libro central op_correlativos)
+    // Correlativo global único ODP- (libro central op_correlativos)
     const { numero } = await emitirCorrelativo({
       origen: 'GENERAL', origen_id: r.insertId, concepto: `${concepto} — ${provNombre}`,
       monto, id_usuario: (req.usuario || {}).id_usuario || null, usuario_nombre: nombreUsuario(req) });

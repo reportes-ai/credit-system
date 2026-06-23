@@ -4,7 +4,8 @@
  *
  * Todas las órdenes del sistema —Saldo Precio (Post Venta), Comisión (Post Venta)
  * y las generales a proveedores— toman su número desde aquí, con el formato
- * `OP-AAAA-NNNNNN`. El correlativo NUNCA se reutiliza: si una orden se anula,
+ * `ODP-AAAA-NNNNNN` (ODP = Orden De Pago; NO confundir con el N° OP de Operación
+ * del crédito). El correlativo NUNCA se reutiliza: si una orden se anula,
  * el número queda reservado, marcado como anulado, con quién la anuló y cuándo.
  *
  * Tabla central `op_correlativos` = libro único de correlativos.
@@ -38,7 +39,7 @@ const pool = require('./config/database');
   } catch (e) { if (e.errno !== 1050) console.error('[op_correlativos migration]', e.message); }
 })();
 
-const fmt = id => 'OP-' + new Date().getFullYear() + '-' + String(id).padStart(6, '0');
+const fmt = id => 'ODP-' + new Date().getFullYear() + '-' + String(id).padStart(6, '0');
 
 /**
  * Asigna el próximo correlativo global y lo registra. Devuelve { id, numero }.
