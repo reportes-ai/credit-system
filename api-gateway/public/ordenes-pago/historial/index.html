@@ -5,7 +5,7 @@
   <link rel="icon" href="/img/favicon.png" type="image/png">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Historial de Órdenes de Pago — AutoFácil</title>
-  <!-- v1.8 -->
+  <!-- v1.9 -->
   <link href="/css/bootstrap.min.css" rel="stylesheet">
   <link href="/css/bootstrap-icons.css" rel="stylesheet">
   <style>
@@ -306,7 +306,7 @@ async function ver(id){
   document.getElementById('dTitulo').textContent = full.numero||'Orden';
   let extra = '';
   if (full.estado==='ANULADA') extra = `<p style="color:#b91c1c;font-size:.82rem;margin:0 0 10px"><i class="bi bi-x-octagon me-1"></i>Anulada por ${escH(full.anulada_nombre||'—')}${full.fecha_anulada?' · '+fdatetime(full.fecha_anulada):''}</p>`;
-  else if (full.estado==='PAGADA') extra = `<p style="color:#15803d;font-size:.82rem;margin:0 0 10px"><i class="bi bi-check-circle me-1"></i>Pagada el ${fdate(full.fecha_pago)}${full.metodo_pago?' · '+escH(full.metodo_pago):''}</p>`;
+  else if (full.estado==='PAGADA') extra = `<p style="color:#15803d;font-size:.82rem;margin:0 0 10px"><i class="bi bi-check-circle me-1"></i>Pagada el ${fdate(full.fecha_pago)}${full.metodo_pago?' · '+escH(full.metodo_pago):''}${full.congelada?' · <i class="bi bi-lock-fill"></i> documento en duro (inmutable)':''}</p>`;
   document.getElementById('dBody').innerHTML = extra + docHTML(full);
   const foot = document.getElementById('dFoot');
   // Anular y Enviar a Contabilidad solo aplican a órdenes generales (las de Post Venta se gestionan allí).

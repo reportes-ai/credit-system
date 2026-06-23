@@ -113,6 +113,16 @@ const { emitirCorrelativo, anularCorrelativo } = require('../../../../shared/ord
     }
     console.log('[ordenes-pago] módulo registrado');
   } catch (e) { console.error('[ordenes-pago migration]', e.message); }
+
+  // Backfill: congelar "en duro" las órdenes YA pagadas sin snapshot (retroactivo, 1 vez por orden).
+  // Asegura primero que la columna exista (idempotente) para evitar carrera con shared/ordenes-pago.js.
+  try {
+    await pool.query(`ALTER TABLE op_correlativos ADD COLUMN IF NOT EXISTS snapshot_json LONGTEXT NULL`);
+    await pool.query(`ALTER TABLE op_correlativos ADD COLUMN IF NOT EXISTS snapshot_at DATETIME NULL`);
+    const [pend] = await pool.query(`SELECT id FROM op_correlativos WHERE pagada=1 AND snapshot_json IS NULL LIMIT 1000`);
+    for (const r of pend) await congelarDocumento(r.id);
+    if (pend.length) console.log('[ordenes-pago] órdenes pagadas congeladas en duro (backfill):', pend.length);
+  } catch (e) { console.error('[ordenes-pago snapshot backfill]', e.message); }
 })();
 
 /* ── Helpers ────────────────────────────────────────────────────────────────── */
@@ -330,75 +340,96 @@ const getOrden = async (req, res) => {
 const ORIGEN_LBL = { SALDO: 'Saldo Precio', COMISION: 'Comisión', GENERAL: 'Otros' };
 const soloFecha = v => v ? String(v).slice(0, 10) : null;
 
+/* Construye el documento "Solicitud de Pago" EN VIVO desde las tablas fuente
+   (GENERAL en ordenes_pago; SALDO/COMISION desde el seguimiento + dealer + factura).
+   Devuelve el objeto de datos del documento, o null si la orden de origen no existe. */
+async function construirDocumento(oc) {
+  // GENERAL: la orden vive completa en ordenes_pago (mismo shape que getOrden).
+  if (oc.origen === 'GENERAL') {
+    const [[op]] = await pool.query('SELECT * FROM ordenes_pago WHERE id=?', [oc.origen_id]);
+    if (!op) return null;
+    const estado = oc.anulada ? 'ANULADA' : (oc.pagada ? 'PAGADA' : (op.estado || 'EMITIDA'));
+    return Object.assign({}, op, {
+      origen: 'GENERAL', origen_label: ORIGEN_LBL.GENERAL, numero: oc.numero || op.numero, estado,
+      fecha_pago: soloFecha(oc.fecha_pagada) || op.fecha_pago, metodo_pago: oc.metodo_pago || op.metodo_pago,
+      anulada_nombre: oc.anulada_nombre || op.anulada_nombre, fecha_anulada: oc.fecha_anulada || op.fecha_anulada,
+    });
+  }
+  // SALDO / COMISION (Post Venta): se arma el documento desde el seguimiento + dealer (+ factura en comisión).
+  const esCom = oc.origen === 'COMISION';
+  const sql = esCom
+    ? `SELECT s.id AS id_seg, s.num_op,
+              COALESCE(c.nombre_local, d.nombre_razon, s.nombre_dealer) AS dealer_nombre,
+              COALESCE(c.rut_dealer, d.rut) AS dealer_rut, d.num_cuenta, d.banco,
+              fc.numero_factura, fc.es_boleta, fc.fecha_factura,
+              (SELECT 1 FROM postventa_etapas pe WHERE pe.id_seguimiento=s.id AND pe.track='COMISION' AND pe.etapa='COMISION PAGADA' LIMIT 1) AS pagado
+         FROM postventa_ordenes_comision poc
+         JOIN postventa_seguimiento s ON s.id = poc.id_seguimiento
+         LEFT JOIN creditos c ON c.id = s.id_credito
+         LEFT JOIN dealers  d ON d.nombre_indexa = c.automotora
+         LEFT JOIN postventa_facturas_comision fc ON fc.id_seguimiento = s.id
+        WHERE poc.id = ?`
+    : `SELECT s.id AS id_seg, s.num_op,
+              COALESCE(c.nombre_local, d.nombre_razon, s.nombre_dealer) AS dealer_nombre,
+              COALESCE(c.rut_dealer, d.rut) AS dealer_rut, d.num_cuenta, d.banco,
+              (SELECT 1 FROM postventa_etapas pe WHERE pe.id_seguimiento=s.id AND pe.track='SALDO' AND pe.etapa='SALDO PRECIO PAGADO' LIMIT 1) AS pagado
+         FROM postventa_ordenes spo
+         JOIN postventa_seguimiento s ON s.id = spo.id_seguimiento
+         LEFT JOIN creditos c ON c.id = s.id_credito
+         LEFT JOIN dealers  d ON d.nombre_indexa = c.automotora
+        WHERE spo.id = ?`;
+  const [rws] = await pool.query(sql, [oc.origen_id]);
+  const row = rws[0] || {};
+  const monto = Number(oc.monto) || 0;
+  const estado = oc.anulada ? 'ANULADA' : ((oc.pagada || row.pagado) ? 'PAGADA' : 'EMITIDA');
+  const destino = [row.num_cuenta, row.banco].filter(Boolean).join(' · ') || null;
+  return {
+    id: oc.id, origen: oc.origen, origen_label: ORIGEN_LBL[oc.origen] || oc.origen,
+    numero: oc.numero, concepto: oc.concepto || (esCom ? 'Comisión' : 'Saldo Precio'),
+    categoria: esCom ? 'PAGO DE COMISIÓN' : 'SALDO DE PRECIO',
+    proveedor_nombre: row.dealer_nombre || '—', proveedor_rut: row.dealer_rut || '',
+    tipo_documento: esCom ? (row.es_boleta ? 'Boleta de Honorarios' : 'Factura') : null,
+    numero_documento: esCom ? (row.numero_factura || null) : null,
+    fecha_documento: esCom ? soloFecha(row.fecha_factura) : null,
+    // El monto del correlativo ya es el líquido a pagar (saldo/comisión); sin desglose tributario por línea.
+    tratamiento: 'EXENTO', monto_bruto: monto, monto_neto: monto, impuesto_pct: 0, impuesto_monto: 0, monto,
+    destino, fecha_emision: soloFecha(oc.created_at), fecha_pago: soloFecha(oc.fecha_pagada),
+    metodo_pago: oc.metodo_pago, estado, usuario_nombre: oc.usuario_nombre,
+    anulada_nombre: oc.anulada_nombre, fecha_anulada: oc.fecha_anulada, num_op: row.num_op,
+  };
+}
+
 /* GET /api/ordenes-pago/ordenes/:id/documento  (:id = op_correlativos.id)
-   Documento "Solicitud de Pago" UNIFICADO para cualquier origen (GENERAL/SALDO/COMISION),
-   para que el historial muestre TODAS las órdenes con el mismo formato. */
+   Documento "Solicitud de Pago" UNIFICADO (GENERAL/SALDO/COMISION).
+   Si la orden está congelada (snapshot_json), devuelve el documento EN DURO sin
+   recalcular: una orden pagada nunca cambia aunque cambien las tablas fuente. */
 const getDocumento = async (req, res) => {
   try {
     const ocId = parseInt(req.params.id);
     const [[oc]] = await pool.query('SELECT * FROM op_correlativos WHERE id=?', [ocId]);
     if (!oc) return res.status(404).json({ success: false, data: null, error: 'Orden no encontrada' });
-
-    // GENERAL: la orden vive completa en ordenes_pago (mismo shape que getOrden).
-    if (oc.origen === 'GENERAL') {
-      const [[op]] = await pool.query('SELECT * FROM ordenes_pago WHERE id=?', [oc.origen_id]);
-      if (!op) return res.status(404).json({ success: false, data: null, error: 'Orden no encontrada' });
-      const estado = oc.anulada ? 'ANULADA' : (oc.pagada ? 'PAGADA' : (op.estado || 'EMITIDA'));
-      return res.json({ success: true, data: Object.assign({}, op, {
-        origen: 'GENERAL', origen_label: ORIGEN_LBL.GENERAL, numero: oc.numero || op.numero, estado,
-        fecha_pago: soloFecha(oc.fecha_pagada) || op.fecha_pago, metodo_pago: oc.metodo_pago || op.metodo_pago,
-        anulada_nombre: oc.anulada_nombre || op.anulada_nombre, fecha_anulada: oc.fecha_anulada || op.fecha_anulada,
-      }), error: null });
+    if (oc.snapshot_json) {
+      try { return res.json({ success: true, data: Object.assign(JSON.parse(oc.snapshot_json), { congelada: true }), error: null }); } catch (_) {}
     }
-
-    // SALDO / COMISION (Post Venta): se arma el documento desde el seguimiento + dealer (+ factura en comisión).
-    const esCom = oc.origen === 'COMISION';
-    const sql = esCom
-      ? `SELECT s.id AS id_seg, s.num_op,
-                COALESCE(c.nombre_local, d.nombre_razon, s.nombre_dealer) AS dealer_nombre,
-                COALESCE(c.rut_dealer, d.rut) AS dealer_rut, d.num_cuenta, d.banco,
-                fc.numero_factura, fc.es_boleta, fc.fecha_factura,
-                (SELECT 1 FROM postventa_etapas pe WHERE pe.id_seguimiento=s.id AND pe.track='COMISION' AND pe.etapa='COMISION PAGADA' LIMIT 1) AS pagado
-           FROM postventa_ordenes_comision poc
-           JOIN postventa_seguimiento s ON s.id = poc.id_seguimiento
-           LEFT JOIN creditos c ON c.id = s.id_credito
-           LEFT JOIN dealers  d ON d.nombre_indexa = c.automotora
-           LEFT JOIN postventa_facturas_comision fc ON fc.id_seguimiento = s.id
-          WHERE poc.id = ?`
-      : `SELECT s.id AS id_seg, s.num_op,
-                COALESCE(c.nombre_local, d.nombre_razon, s.nombre_dealer) AS dealer_nombre,
-                COALESCE(c.rut_dealer, d.rut) AS dealer_rut, d.num_cuenta, d.banco,
-                (SELECT 1 FROM postventa_etapas pe WHERE pe.id_seguimiento=s.id AND pe.track='SALDO' AND pe.etapa='SALDO PRECIO PAGADO' LIMIT 1) AS pagado
-           FROM postventa_ordenes spo
-           JOIN postventa_seguimiento s ON s.id = spo.id_seguimiento
-           LEFT JOIN creditos c ON c.id = s.id_credito
-           LEFT JOIN dealers  d ON d.nombre_indexa = c.automotora
-          WHERE spo.id = ?`;
-    const [rws] = await pool.query(sql, [oc.origen_id]);
-    const row = rws[0] || {};
-    const monto = Number(oc.monto) || 0;
-    const estado = oc.anulada ? 'ANULADA' : ((oc.pagada || row.pagado) ? 'PAGADA' : 'EMITIDA');
-    const destino = [row.num_cuenta, row.banco].filter(Boolean).join(' · ') || null;
-    const data = {
-      id: oc.id, origen: oc.origen, origen_label: ORIGEN_LBL[oc.origen] || oc.origen,
-      numero: oc.numero, concepto: oc.concepto || (esCom ? 'Comisión' : 'Saldo Precio'),
-      categoria: esCom ? 'PAGO DE COMISIÓN' : 'SALDO DE PRECIO',
-      proveedor_nombre: row.dealer_nombre || '—', proveedor_rut: row.dealer_rut || '',
-      tipo_documento: esCom ? (row.es_boleta ? 'Boleta de Honorarios' : 'Factura') : null,
-      numero_documento: esCom ? (row.numero_factura || null) : null,
-      fecha_documento: esCom ? soloFecha(row.fecha_factura) : null,
-      // El monto del correlativo ya es el líquido a pagar (saldo/comisión); sin desglose tributario por línea.
-      tratamiento: 'EXENTO', monto_bruto: monto, monto_neto: monto, impuesto_pct: 0, impuesto_monto: 0, monto,
-      destino, fecha_emision: soloFecha(oc.created_at), fecha_pago: soloFecha(oc.fecha_pagada),
-      metodo_pago: oc.metodo_pago, estado, usuario_nombre: oc.usuario_nombre,
-      anulada_nombre: oc.anulada_nombre, fecha_anulada: oc.fecha_anulada, num_op: row.num_op,
-    };
+    const data = await construirDocumento(oc);
+    if (!data) return res.status(404).json({ success: false, data: null, error: 'Orden no encontrada' });
     res.json({ success: true, data, error: null });
   } catch (e) {
     console.error('[ordenes-pago getDocumento]', e.message);
     res.status(500).json({ success: false, data: null, error: 'Error interno del servidor' });
   }
 };
+
+// Congela el documento "en duro": guarda el snapshot inmutable en el libro central.
+// Idempotente (no re-congela si ya tiene snapshot). Se llama al pagar.
+async function congelarDocumento(ocId) {
+  try {
+    const [[oc]] = await pool.query('SELECT * FROM op_correlativos WHERE id=?', [ocId]);
+    if (!oc || oc.snapshot_json) return;
+    const snap = await construirDocumento(oc);
+    if (snap) await pool.query('UPDATE op_correlativos SET snapshot_json=?, snapshot_at=NOW() WHERE id=?', [JSON.stringify(snap), ocId]);
+  } catch (e) { console.error('[ordenes-pago congelarDocumento]', e.message); }
+}
 
 /* POST /api/ordenes-pago/ordenes — emisión manual */
 const crearOrden = async (req, res) => {
@@ -464,6 +495,9 @@ const cambiarEstadoOrden = async (req, res) => {
       return res.status(403).json({ success: false, data: null, error: 'Solo el Administrador puede anular órdenes de pago' });
     const [[o]] = await pool.query('SELECT numero, estado FROM ordenes_pago WHERE id=?', [id]);
     if (!o) return res.status(404).json({ success: false, data: null, error: 'Orden no encontrada' });
+    // Orden ya pagada = EN DURO: no se puede modificar ni anular.
+    if (o.estado === 'PAGADA')
+      return res.status(409).json({ success: false, data: null, error: 'La orden ya está pagada y queda en duro: no puede modificarse ni anularse' });
 
     const fechaPago = estado === 'PAGADA' ? (fdate((req.body || {}).fecha_pago) || new Date().toISOString().slice(0, 10)) : null;
     const metodo = estado === 'PAGADA' ? (norm((req.body || {}).metodo_pago) || null) : null;
@@ -591,6 +625,9 @@ const pagarOrden = async (req, res) => {
       const [[s]] = await pool.query('SELECT id_seguimiento FROM postventa_ordenes_comision WHERE id=?', [oc.origen_id]);
       if (s) await pool.query(`INSERT IGNORE INTO postventa_etapas (id_seguimiento, track, etapa, usuario) VALUES (?, 'COMISION', 'COMISION PAGADA', ?)`, [s.id_seguimiento, quien]);
     }
+
+    // 3) Congelar el documento "en duro": snapshot inmutable. La orden pagada ya no se recalcula.
+    await congelarDocumento(id);
 
     auditar({ req, accion: 'PAGAR', modulo: 'ordenes-pago', entidad: 'orden_pago', entidad_id: id,
       detalle: `Pagó ${oc.numero || id} ($${Number(oc.monto || 0).toLocaleString('es-CL')}) desde caja ${caja.nombre}${metodo ? ' · ' + metodo : ''}` });

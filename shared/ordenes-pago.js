@@ -53,6 +53,12 @@ const pool = require('./config/database');
     await pool.query(`ALTER TABLE op_correlativos ADD COLUMN IF NOT EXISTS id_caja INT NULL`);
     await pool.query(`ALTER TABLE op_correlativos ADD COLUMN IF NOT EXISTS metodo_pago VARCHAR(40) NULL`);
   } catch (e) { console.error('[op_correlativos pago cols]', e.message); }
+  // Snapshot inmutable "en duro": al pagar se congela el documento completo (JSON) y deja
+  // de recalcularse desde las tablas fuente. Garantiza que una orden pagada nunca cambie.
+  try {
+    await pool.query(`ALTER TABLE op_correlativos ADD COLUMN IF NOT EXISTS snapshot_json LONGTEXT NULL`);
+    await pool.query(`ALTER TABLE op_correlativos ADD COLUMN IF NOT EXISTS snapshot_at DATETIME NULL`);
+  } catch (e) { console.error('[op_correlativos snapshot col]', e.message); }
 })();
 
 // Próximo correlativo del año (atómico: lock de fila con FOR UPDATE).
