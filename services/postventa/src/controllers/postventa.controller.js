@@ -1169,6 +1169,14 @@ async function etapasPorTrack(ids, track, orden) {
   return map;
 }
 
+// Visibilidad por ejecutivo (misma lógica que Comisiones): Administrador ve todo;
+// el resto solo los ejecutivos asignados en usuario_ejecutivos. { all:true } o { all:false, lista:[...] }.
+async function visibilidadEjecutivo(req) {
+  if (req.usuario && req.usuario.perfil_nombre === 'Administrador') return { all: true, lista: null };
+  const [asg] = await pool.query('SELECT ejecutivo FROM usuario_ejecutivos WHERE id_usuario = ?', [req.usuario.id_usuario]);
+  return { all: false, lista: asg.map(r => r.ejecutivo) };
+}
+
 const consultaSaldos = async (req, res) => {
   try {
     const q = String(req.query.q || '').trim();
@@ -1176,6 +1184,11 @@ const consultaSaldos = async (req, res) => {
     const pagados7 = req.query.pagados7 === '1' || req.query.pagados7 === 'true';
     const limit = Math.min(500, Math.max(1, parseInt(req.query.limit) || 300));
     const filt = []; const fp = [];
+    const vis = await visibilidadEjecutivo(req);
+    if (!vis.all) {
+      if (!vis.lista.length) return res.json({ success: true, data: [], orden: ORDEN_SALDO, resumen: { pendientes: 0, monto: 0 }, error: null });
+      filt.push('s.ejecutivo IN (?)'); fp.push(vis.lista);
+    }
     if (q) {
       filt.push(`(s.num_op LIKE ? OR s.rut_dealer LIKE ? OR s.nombre_dealer LIKE ? OR s.ejecutivo LIKE ? OR cr.parque LIKE ? OR cr.nombre_parque_mgmt LIKE ?)`);
       const lk = '%' + q + '%'; fp.push(lk, lk, lk, lk, lk, lk);
@@ -1217,6 +1230,11 @@ const consultaFacturas = async (req, res) => {
     const pagados7 = req.query.pagados7 === '1' || req.query.pagados7 === 'true';
     const limit = Math.min(500, Math.max(1, parseInt(req.query.limit) || 300));
     const filt = []; const fp = [];
+    const vis = await visibilidadEjecutivo(req);
+    if (!vis.all) {
+      if (!vis.lista.length) return res.json({ success: true, data: [], orden: ORDEN_COMISION, resumen: { pendientes: 0, monto: 0 }, error: null });
+      filt.push('s.ejecutivo IN (?)'); fp.push(vis.lista);
+    }
     if (q) {
       filt.push(`(s.num_op LIKE ? OR s.rut_dealer LIKE ? OR s.nombre_dealer LIKE ? OR s.ejecutivo LIKE ? OR f.numero_factura LIKE ?)`);
       const lk = '%' + q + '%'; fp.push(lk, lk, lk, lk, lk);
