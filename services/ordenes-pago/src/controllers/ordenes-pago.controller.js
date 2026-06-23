@@ -9,6 +9,7 @@
  */
 const pool = require('../../../../shared/config/database');
 const { auditar } = require('../../../../shared/audit');
+const { emitirCorrelativo, anularCorrelativo } = require('../../../../shared/ordenes-pago');
 
 /* ── Migración: tablas + módulo/funcionalidades/permisos (idempotente) ──────── */
 (async () => {
@@ -60,6 +61,13 @@ const { auditar } = require('../../../../shared/audit');
         INDEX idx_fecha (fecha_emision), INDEX idx_numero (numero)
       )`);
   } catch (e) { if (e.errno !== 1050) console.error('[ordenes_pago migration]', e.message); }
+
+  // Auditoría de anulación (quién anuló y cuándo) — incremental.
+  try {
+    await pool.query(`ALTER TABLE ordenes_pago ADD COLUMN IF NOT EXISTS anulada_por INT NULL`);
+    await pool.query(`ALTER TABLE ordenes_pago ADD COLUMN IF NOT EXISTS anulada_nombre VARCHAR(200) NULL`);
+    await pool.query(`ALTER TABLE ordenes_pago ADD COLUMN IF NOT EXISTS fecha_anulada DATETIME NULL`);
+  } catch (e) { console.error('[ordenes_pago alter cols]', e.message); }
 
   // Registro del módulo/card en el Home (idempotente).
   try {
@@ -250,7 +258,10 @@ const crearOrden = async (req, res) => {
        norm(b.numero_documento) || null, fdate(b.fecha_documento), monto, fechaEmision, norm(b.metodo_pago) || null,
        norm(b.observaciones) || null, (req.usuario || {}).id_usuario || null, nombreUsuario(req)]);
 
-    const numero = 'OPP-' + new Date(fechaEmision).getFullYear() + '-' + String(r.insertId).padStart(5, '0');
+    // Correlativo global único OP- (libro central op_correlativos)
+    const { numero } = await emitirCorrelativo({
+      origen: 'GENERAL', origen_id: r.insertId, concepto: `${concepto} — ${provNombre}`,
+      monto, id_usuario: (req.usuario || {}).id_usuario || null, usuario_nombre: nombreUsuario(req) });
     await pool.query('UPDATE ordenes_pago SET numero=? WHERE id=?', [numero, r.insertId]);
 
     auditar({ req, accion: 'CREAR', modulo: 'ordenes-pago', entidad: 'orden_pago', entidad_id: r.insertId, detalle: `Emitió ${numero} a ${provNombre} por $${monto.toLocaleString('es-CL')}` });
@@ -271,9 +282,19 @@ const cambiarEstadoOrden = async (req, res) => {
 
     const fechaPago = estado === 'PAGADA' ? (fdate((req.body || {}).fecha_pago) || new Date().toISOString().slice(0, 10)) : null;
     const metodo = estado === 'PAGADA' ? (norm((req.body || {}).metodo_pago) || null) : null;
-    await pool.query(
-      `UPDATE ordenes_pago SET estado=?, fecha_pago=?, metodo_pago=COALESCE(?, metodo_pago) WHERE id=?`,
-      [estado, fechaPago, metodo, id]);
+
+    if (estado === 'ANULADA') {
+      // El correlativo NO se libera: queda reservado y marcado como anulado, con quién y cuándo.
+      const quien = nombreUsuario(req), idU = (req.usuario || {}).id_usuario || null;
+      await pool.query(
+        `UPDATE ordenes_pago SET estado='ANULADA', anulada_por=?, anulada_nombre=?, fecha_anulada=NOW() WHERE id=?`,
+        [idU, quien, id]);
+      await anularCorrelativo({ numero: o.numero, origen: 'GENERAL', origen_id: id, id_usuario: idU, usuario_nombre: quien });
+    } else {
+      await pool.query(
+        `UPDATE ordenes_pago SET estado=?, fecha_pago=?, metodo_pago=COALESCE(?, metodo_pago) WHERE id=?`,
+        [estado, fechaPago, metodo, id]);
+    }
     auditar({ req, accion: estado === 'PAGADA' ? 'PAGAR' : (estado === 'ANULADA' ? 'ANULAR' : 'EDITAR'), modulo: 'ordenes-pago', entidad: 'orden_pago', entidad_id: id, detalle: `${o.numero || id}: ${o.estado} → ${estado}` });
     res.json({ success: true, data: { id, estado, fecha_pago: fechaPago }, error: null });
   } catch (e) {

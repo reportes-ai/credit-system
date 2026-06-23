@@ -1,5 +1,6 @@
 'use strict';
 const pool = require('../../../../shared/config/database');
+const { emitirCorrelativo } = require('../../../../shared/ordenes-pago');
 
 /* ── Migración ───────────────────────────────────────────────────── */
 (async () => {
@@ -738,7 +739,10 @@ const correlativoOrden = async (req, res) => {
     const [ins] = await pool.query(
       'INSERT INTO postventa_ordenes (id_seguimiento, num_op, monto, usuario) VALUES (?,?,?,?)',
       [id, seg.num_op, seg.saldo_precio, loginDe(req.usuario)]);
-    const num = 'OP-' + new Date().getFullYear() + '-' + String(ins.insertId).padStart(5, '0');
+    // Correlativo global único OP- (libro central op_correlativos)
+    const { numero: num } = await emitirCorrelativo({
+      origen: 'SALDO', origen_id: ins.insertId, concepto: 'Saldo Precio OP ' + (seg.num_op || ''),
+      monto: seg.saldo_precio, id_usuario: req.usuario && req.usuario.id_usuario, usuario_nombre: loginDe(req.usuario) });
     await pool.query('UPDATE postventa_ordenes SET num_orden=? WHERE id=?', [num, ins.insertId]);
     res.json({ success: true, data: { num_orden: num }, error: null });
   } catch (e) {
@@ -1009,7 +1013,10 @@ const correlativoOrdenComision = async (req, res) => {
     const [ins] = await pool.query(
       'INSERT INTO postventa_ordenes_comision (id_seguimiento, num_op, monto, usuario) VALUES (?,?,?,?)',
       [id, seg.num_op, seg.comision, loginDe(req.usuario)]);
-    const num = 'OC-' + new Date().getFullYear() + '-' + String(ins.insertId).padStart(5, '0');
+    // Correlativo global único OP- (libro central op_correlativos)
+    const { numero: num } = await emitirCorrelativo({
+      origen: 'COMISION', origen_id: ins.insertId, concepto: 'Comisión OP ' + (seg.num_op || ''),
+      monto: seg.comision, id_usuario: req.usuario && req.usuario.id_usuario, usuario_nombre: loginDe(req.usuario) });
     await pool.query('UPDATE postventa_ordenes_comision SET num_orden=? WHERE id=?', [num, ins.insertId]);
     res.json({ success: true, data: { num_orden: num }, error: null });
   } catch (e) {

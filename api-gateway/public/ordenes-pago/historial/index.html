@@ -116,6 +116,7 @@ const H = { 'Content-Type':'application/json', Authorization:'Bearer '+token };
 const escH = s => String(s??'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
 const fmtMon = n => '$'+Number(n||0).toLocaleString('es-CL');
 const fdate = d => d? String(d).slice(0,10).split('-').reverse().join('-') : '—';
+const fdatetime = d => { if(!d) return '—'; const s=String(d); const f=fdate(s); const hm=(s.slice(11,16)||''); return hm? f+' '+hm : f; };
 let DATA = [], PUEDE = (yo.perfil==='Administrador');
 
 let tmr=null; function debounced(){ clearTimeout(tmr); tmr=setTimeout(cargar, 280); }
@@ -186,6 +187,7 @@ function ver(id){
     <span class="k">Estado</span><span><span class="est ${o.estado}">${o.estado}</span>${o.estado==='PAGADA'?' · '+fdate(o.fecha_pago):''}</span>
     <span class="k">Observaciones</span><span>${escH(o.observaciones||'—')}</span>
     <span class="k">Emitida por</span><span>${escH(o.usuario_nombre||'—')}</span>
+    ${o.estado==='ANULADA'?`<span class="k" style="color:#b91c1c">Anulada por</span><span style="color:#b91c1c">${escH(o.anulada_nombre||'—')}${o.fecha_anulada?' · '+fdatetime(o.fecha_anulada):''}</span>`:''}
   </div>`;
   const foot = document.getElementById('dFoot');
   foot.innerHTML = (PUEDE && o.estado==='EMITIDA')
