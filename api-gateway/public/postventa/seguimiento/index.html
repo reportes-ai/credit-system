@@ -5,7 +5,7 @@
   <link rel="icon" href="/img/favicon.png" type="image/png">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Seguimiento Post Venta — AutoFácil</title>
-  <!-- v3.1 -->
+  <!-- v3.2 -->
   <link href="/css/bootstrap.min.css" rel="stylesheet">
   <link href="/css/bootstrap-icons.css" rel="stylesheet">
   <style>
@@ -400,6 +400,7 @@ function abrirModalFactura(id, chk){
   _fcSetExc('fcBtnTerceros', false); _fcSetExc('fcBtnBoleta', false);
   _fc('fcAlert').style.display = 'none';
   fcBoletaInfo();
+  fcClipInfo();
   document.getElementById('modalFactura').showModal();
 }
 function _fcSetExc(btnId, on){
@@ -461,6 +462,38 @@ function onMontoCom(which){
   el.dataset.raw = n; el.value = n ? '$'+parseInt(n).toLocaleString('es-CL') : '';
   fcCalc();
 }
+/* ── Copiar/Pegar datos de factura entre operaciones (misma factura/cartola) ── */
+function fcClipInfo(){
+  const raw = sessionStorage.getItem('pv_fc_clip');
+  const btn = _fc('fcBtnPegar'), info = _fc('fcClipInfo');
+  if (!raw){ btn.disabled=true; btn.style.opacity='.5'; btn.style.cursor='default'; info.textContent=''; return; }
+  let c={}; try{ c=JSON.parse(raw); }catch(e){}
+  btn.disabled=false; btn.style.opacity='1'; btn.style.cursor='pointer';
+  info.textContent = c.numero ? `copiado: ${c.boleta?'Boleta':'Factura'} N° ${c.numero} · $${(c.bruto||c.neto||0).toLocaleString('es-CL')}` : '';
+}
+function fcCopiar(){
+  const clip = {
+    rut: _fc('fcRut').value.trim(), nombre: _fc('fcNombre').value.trim(),
+    fecha: _fc('fcFecha').value, numero: _fc('fcNumero').value.trim(),
+    neto: parseInt(_fc('fcMonto').dataset.raw||'')||0, bruto: parseInt(_fc('fcBruto').dataset.raw||'')||0,
+    terceros: !!FC.terceros, boleta: !!FC.boleta
+  };
+  sessionStorage.setItem('pv_fc_clip', JSON.stringify(clip));
+  fcClipInfo();
+}
+function fcPegar(){
+  const raw = sessionStorage.getItem('pv_fc_clip'); if(!raw) return;
+  let c; try{ c=JSON.parse(raw); }catch(e){ return; }
+  FC.terceros = !!c.terceros; FC.boleta = !!c.boleta;
+  _fcSetExc('fcBtnTerceros', FC.terceros); _fcSetExc('fcBtnBoleta', FC.boleta);
+  if (FC.terceros){ _fc('fcRut').value=''; _fc('fcNombre').value=''; _fc('fcRut').disabled=true; _fc('fcNombre').disabled=true; }
+  else { _fc('fcRut').disabled=false; _fc('fcNombre').disabled=false; _fc('fcRut').value=c.rut||''; _fc('fcNombre').value=c.nombre||''; }
+  _fc('fcFecha').value = c.fecha||''; _fc('fcNumero').value = c.numero||'';
+  fcLast = 'NETO';
+  const setM=(id,v)=>{ _fc(id).dataset.raw=v?String(v):''; _fc(id).value=v?'$'+v.toLocaleString('es-CL'):''; };
+  setM('fcMonto', c.neto||0); setM('fcBruto', c.bruto||0);
+  fcBoletaInfo();
+}
 function editarFactura(id){
   const r = DATA.find(x => x.id === id) || {};
   FC = { id, chk:null, modo:'editar', terceros:!!r.fac_terceros, boleta:!!r.fac_boleta, rut:r.rut_dealer||'', nombre:r.nombre_dealer||'', num_op:r.num_op||null };
@@ -476,6 +509,7 @@ function editarFactura(id){
   _fcSetExc('fcBtnTerceros', !!r.fac_terceros); _fcSetExc('fcBtnBoleta', !!r.fac_boleta);
   _fc('fcAlert').style.display = 'none';
   fcBoletaInfo();
+  fcClipInfo();
   document.getElementById('modalFactura').showModal();
 }
 function fcCancelar(){ document.getElementById('modalFactura').close(); if (FC.chk) FC.chk.checked = false; FC = {id:null,chk:null}; }
@@ -552,9 +586,14 @@ async function toggleEtapa(id, track, etapa, chk){
   </div>
   <div style="padding:13px 18px">
     <div id="fcBoleta" style="display:none;background:#fffbeb;border:1px solid #fde68a;color:#92400e;border-radius:8px;padding:8px 11px;font-size:.8rem;margin-bottom:9px;line-height:1.4"></div>
-    <div style="display:flex;gap:8px;margin-bottom:10px">
+    <div style="display:flex;gap:8px;margin-bottom:8px">
       <button type="button" id="fcBtnTerceros" onclick="fcToggleTerceros()" style="flex:1;border:1px solid #cbd5e1;background:#eef2f7;color:#334155;border-radius:8px;padding:7px;font-size:.8rem;font-weight:700;cursor:pointer">Factura de terceros</button>
       <button type="button" id="fcBtnBoleta" onclick="fcToggleBoleta()" style="flex:1;border:1px solid #cbd5e1;background:#eef2f7;color:#334155;border-radius:8px;padding:7px;font-size:.8rem;font-weight:700;cursor:pointer">Boleta</button>
+    </div>
+    <div style="display:flex;gap:8px;margin-bottom:10px;align-items:center">
+      <button type="button" onclick="fcCopiar()" style="border:1px solid #cbd5e1;background:#fff;color:#0141A2;border-radius:8px;padding:5px 10px;font-size:.74rem;font-weight:700;cursor:pointer"><i class="bi bi-clipboard me-1"></i>Copiar datos</button>
+      <button type="button" id="fcBtnPegar" onclick="fcPegar()" style="border:1px solid #cbd5e1;background:#fff;color:#0141A2;border-radius:8px;padding:5px 10px;font-size:.74rem;font-weight:700;cursor:pointer"><i class="bi bi-clipboard-check me-1"></i>Pegar datos</button>
+      <span id="fcClipInfo" style="font-size:.7rem;color:#94a3b8"></span>
     </div>
     <div style="display:grid;gap:8px">
       <label>RUT Dealer
