@@ -5,7 +5,7 @@
   <link rel="icon" href="/img/favicon.png" type="image/png">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Mantenedores Post Venta — AutoFácil</title>
-  <!-- v1.2 -->
+  <!-- v1.3 -->
   <link href="/css/bootstrap.min.css" rel="stylesheet">
   <link href="/css/bootstrap-icons.css" rel="stylesheet">
   <style>
@@ -39,6 +39,16 @@
     .perfil-list .pl-item.sel { background:#e0eaff; color:#0141A2; font-weight:700; }
     .perfil-list .pl-item input { margin:0; cursor:pointer; accent-color:#0141A2; }
     .sin-restriccion { font-size:.72rem; color:#94a3b8; font-style:italic; }
+    .fld { margin-bottom:12px; }
+    .fld label { display:block; font-size:.72rem; font-weight:800; text-transform:uppercase; color:#64748b; letter-spacing:.3px; margin:0 0 4px; }
+    .fld input, .fld textarea { width:100%; border:1.5px solid #e2e8f0; border-radius:8px; padding:8px 11px; font-size:.84rem; box-sizing:border-box; font-family:inherit; }
+    .fld input:focus, .fld textarea:focus { border-color:#0141A2; outline:none; }
+    .fld textarea { min-height:120px; resize:vertical; line-height:1.5; }
+    .correo-cols { display:grid; grid-template-columns:1fr 1fr; gap:18px; }
+    .ph { font-size:.72rem; color:#64748b; background:#f8fafc; border:1px solid #eef2f7; border-radius:8px; padding:8px 10px; margin-top:6px; line-height:1.6; }
+    .ph code { background:#eef2f7; padding:1px 5px; border-radius:4px; color:#0141A2; }
+    .footer-afecta { background:#f8fafc; border-left:4px solid #0141A2; border-radius:8px; padding:12px 14px; font-size:.8rem; color:#475569; line-height:1.7; }
+    @media(max-width:760px){ .correo-cols{ grid-template-columns:1fr; } }
   </style>
 </head>
 <body>
@@ -79,6 +89,45 @@
       <button class="btn-af" id="btn-comision" onclick="guardar('comision')"><i class="bi bi-check-lg me-1"></i>Guardar</button>
     </div>
   </div>
+
+  <!-- Correo de Orden de Pago a Contabilidad -->
+  <div class="card-af">
+    <h5 style="font-weight:800;color:var(--navy)"><i class="bi bi-envelope-paper me-2"></i>Correo de Orden de Pago a Contabilidad</h5>
+    <p style="font-size:.8rem;color:#64748b">Texto del correo que se envía a Contabilidad al pulsar <b>Enviar Correo</b> en Emisión de Orden de Pago (Saldo Precio y Comisión). El correo sale desde la aplicación; el usuario que lo envía queda en <b>copia (CC)</b>.</p>
+
+    <div class="fld" style="max-width:420px">
+      <label>Destinatario (grupo Contabilidad)</label>
+      <input id="cCont" placeholder="contabilidad@autofacilchile.cl">
+    </div>
+
+    <div class="correo-cols">
+      <div>
+        <h6 style="font-weight:800;color:#0141A2;margin:6px 0 10px"><i class="bi bi-cash-stack me-1"></i>Saldo Precio</h6>
+        <div class="fld"><label>Asunto</label><input id="sAsunto"></div>
+        <div class="fld"><label>Cuerpo (antes del cuadro de la orden)</label><textarea id="sCuerpo"></textarea></div>
+        <div class="fld"><label>Firma (después del cuadro)</label><textarea id="sFirma" style="min-height:70px"></textarea></div>
+        <div class="ph">Variables: <code>{nOrden}</code> <code>{dealer}</code> <code>{num_op}</code> <code>{financiera}</code> <code>{fecha_otorgado}</code> <code>{fecha_recepcion}</code></div>
+      </div>
+      <div>
+        <h6 style="font-weight:800;color:#0141A2;margin:6px 0 10px"><i class="bi bi-receipt me-1"></i>Comisión</h6>
+        <div class="fld"><label>Asunto</label><input id="cAsunto"></div>
+        <div class="fld"><label>Cuerpo (antes del cuadro de la orden)</label><textarea id="cCuerpo"></textarea></div>
+        <div class="fld"><label>Firma (después del cuadro)</label><textarea id="cFirma" style="min-height:70px"></textarea></div>
+        <div class="ph">Variables: <code>{nOrden}</code> <code>{dealer}</code> <code>{num_op}</code> <code>{financiera}</code> <code>{numero_factura}</code> <code>{fecha_factura}</code> <code>{doc}</code></div>
+      </div>
+    </div>
+
+    <div style="display:flex;align-items:center;justify-content:flex-end;gap:12px;margin:14px 0 16px">
+      <span id="msg-correo" style="font-size:.83rem;display:none"></span>
+      <button class="btn-af" id="btn-correo" onclick="guardarCorreos()"><i class="bi bi-check-lg me-1"></i>Guardar correos</button>
+    </div>
+
+    <div class="footer-afecta">
+      <b><i class="bi bi-diagram-3 me-1"></i>Qué afecta este recuadro</b><br>
+      • <b>Destinatario</b> → a quién llega el correo de la orden de pago (<a href="/postventa/orden-pago/">Emisión Orden de Pago Saldo Precio</a> y <a href="/postventa/orden-pago-comision/">Emisión Orden de Pago Comisión</a>).<br>
+      • <b>Asunto / Cuerpo / Firma</b> → el texto del correo que arma cada página al pulsar «Enviar Correo». El cuadro de la orden se inserta automáticamente entre el cuerpo y la firma.
+    </div>
+  </div>
 </div>
 
 <script>
@@ -105,7 +154,41 @@ let CFG = {}, PERFILES = [];
   PERFILES = jP.data || [];
   pinta('saldo');
   pinta('comision');
+  pintaCorreos();
 })();
+
+const DEF_SALDO_C = { asunto:'Orden de Pago N° {nOrden} — Saldo Precio {dealer} (OP {num_op})', cuerpo:'Estimado Equipo de Contabilidad:\n\nAdjunto encontrarán Orden de Pago N° {nOrden} para el pago del Saldo Precio a {dealer} del Crédito N° {num_op} otorgado por {financiera} con fecha {fecha_otorgado}, Saldo Precio recepcionado por AutoFácil el día {fecha_recepcion}.\n\nLes recordamos que deben marcar en el módulo de Saldo Precio Pagado, de manera de informar al Ejecutivo y cerrar el flujo operativo de esta transacción.', firma:'Saludos cordiales,\nÁrea de Operaciones' };
+const DEF_COM_C = { asunto:'Orden de Pago de Comisión N° {nOrden} — {dealer} (OP {num_op})', cuerpo:'Estimado Equipo de Contabilidad:\n\nAdjunto encontrarán Orden de Pago de Comisión N° {nOrden} para el pago de la Comisión a {dealer} del Crédito N° {num_op} otorgado por {financiera}, {doc} N° {numero_factura} recepcionada por AutoFácil el día {fecha_factura}.\n\nLes recordamos que deben marcar en el módulo de Comisión Pagada, de manera de informar al Ejecutivo y cerrar el flujo operativo de esta transacción.', firma:'Saludos cordiales,\nÁrea de Operaciones' };
+
+function pintaCorreos(){
+  document.getElementById('cCont').value = (typeof CFG.correo_contabilidad === 'string' ? CFG.correo_contabilidad : 'contabilidad@autofacilchile.cl');
+  const s = { ...DEF_SALDO_C, ...(CFG.correo_orden_saldo||{}) };
+  const c = { ...DEF_COM_C,   ...(CFG.correo_orden_comision||{}) };
+  document.getElementById('sAsunto').value = s.asunto; document.getElementById('sCuerpo').value = s.cuerpo; document.getElementById('sFirma').value = s.firma;
+  document.getElementById('cAsunto').value = c.asunto; document.getElementById('cCuerpo').value = c.cuerpo; document.getElementById('cFirma').value = c.firma;
+}
+
+async function guardarCorreos(){
+  const btn = document.getElementById('btn-correo'), msg = document.getElementById('msg-correo');
+  btn.disabled = true; btn.innerHTML = '<i class="bi bi-hourglass-split me-1"></i>Guardando…'; msg.style.display='none';
+  const cont = document.getElementById('cCont').value.trim() || 'contabilidad@autofacilchile.cl';
+  const saldo = { asunto:document.getElementById('sAsunto').value, cuerpo:document.getElementById('sCuerpo').value, firma:document.getElementById('sFirma').value };
+  const com   = { asunto:document.getElementById('cAsunto').value, cuerpo:document.getElementById('cCuerpo').value, firma:document.getElementById('cFirma').value };
+  try {
+    const [r1, r2, r3] = await Promise.all([
+      fetch('/api/postventa/config/correo_contabilidad',    { method:'PUT', headers:H, body: JSON.stringify({ valor: cont }) }),
+      fetch('/api/postventa/config/correo_orden_saldo',     { method:'PUT', headers:H, body: JSON.stringify({ valor: saldo }) }),
+      fetch('/api/postventa/config/correo_orden_comision',  { method:'PUT', headers:H, body: JSON.stringify({ valor: com }) }),
+    ]);
+    const ok = (await Promise.all([r1.json(),r2.json(),r3.json()])).every(j=>j.success);
+    if (ok) {
+      CFG.correo_contabilidad = cont; CFG.correo_orden_saldo = saldo; CFG.correo_orden_comision = com;
+      msg.textContent = '✓ Guardado'; msg.style.cssText = 'display:inline;color:#15803d;font-weight:700;font-size:.83rem';
+    } else { msg.textContent = 'Error al guardar'; msg.style.cssText = 'display:inline;color:#b91c1c;font-size:.83rem'; }
+  } catch(e){ msg.textContent = 'Error: '+e.message; msg.style.cssText='display:inline;color:#b91c1c;font-size:.83rem'; }
+  btn.disabled = false; btn.innerHTML = '<i class="bi bi-check-lg me-1"></i>Guardar correos';
+  setTimeout(()=>{ msg.style.display='none'; }, 4000);
+}
 
 function pinta(track){
   const clave = track==='saldo' ? 'etapas_saldo' : 'etapas_comision';

@@ -63,7 +63,7 @@ function envolverHTML(cuerpoHtml) {
 }
 
 // Nunca lanza: devuelve { ok, error?, messageId? } para no romper el flujo que lo llama.
-async function enviarCorreo({ to, subject, html, text, replyTo } = {}) {
+async function enviarCorreo({ to, cc, subject, html, text, replyTo } = {}) {
   try {
     if (!nodemailer) return { ok: false, error: 'Falta la dependencia nodemailer en el servidor' };
     const tx = getTransporter();
@@ -72,6 +72,7 @@ async function enviarCorreo({ to, subject, html, text, replyTo } = {}) {
     const info = await tx.sendMail({
       from: remitente(),
       to,
+      cc: cc || undefined,
       subject: subject || '(sin asunto)',
       text: text || undefined,
       html: html || undefined,

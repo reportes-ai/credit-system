@@ -5,7 +5,7 @@
   <link rel="icon" href="/img/favicon.png" type="image/png">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Emisión Orden de Pago Comisión — AutoFácil</title>
-  <!-- v1.8 -->
+  <!-- v1.9 -->
   <link href="/css/bootstrap.min.css" rel="stylesheet">
   <link href="/css/bootstrap-icons.css" rel="stylesheet">
   <style>
@@ -67,7 +67,7 @@
 <div class="main">
   <div class="af-banner"><i class="bi bi-receipt"></i><div>
     <h2>Emisión Orden de Pago — Comisión</h2>
-    <p>Operaciones con <b>factura recibida</b> pendientes de emitir. Revisa, copia la orden para el correo y emítela.</p>
+    <p>Operaciones con <b>factura recibida</b> pendientes de emitir. Revisa, envía a Contabilidad y emítela.</p>
   </div></div>
 
   <div class="card-box">
@@ -93,7 +93,7 @@
     <div class="op-modal-body"><div id="docWrap"></div></div>
     <div class="op-modal-foot">
       <button class="btn-cerrar" onclick="cerrar()">Cancelar</button>
-      <button class="btn-copiar" onclick="copiarOrden()"><i class="bi bi-clipboard me-1"></i>Copiar para correo</button>
+      <button class="btn-copiar" id="btnEnviar" onclick="enviarOrdenCorreo()"><i class="bi bi-envelope-paper me-1"></i>Enviar Correo</button>
       <button class="btn-emitir" onclick="emitir()"><i class="bi bi-send-check me-1"></i>Emitir orden</button>
     </div>
   </div>
@@ -114,16 +114,45 @@ const MESES = ['ene','feb','mar','abr','may','jun','jul','ago','sep','oct','nov'
 const periodoCL = d => { const x = d ? new Date(d) : new Date(); return MESES[x.getUTCMonth()] + '-' + String(x.getUTCFullYear()).slice(2); };
 
 let DATA = [], actual = null, IMPUESTOS = { IVA:19, RETENCION_HONORARIOS:15.25 };
+// Plantilla editable del correo (mantenedor Post Venta → config correo_orden_comision)
+let CORREO = {
+  asunto: 'Orden de Pago de Comisión N° {nOrden} — {dealer} (OP {num_op})',
+  cuerpo: 'Estimado Equipo de Contabilidad:\n\nAdjunto encontrarán Orden de Pago de Comisión N° {nOrden} para el pago de la Comisión a {dealer} del Crédito N° {num_op} otorgado por {financiera}, {doc} N° {numero_factura} recepcionada por AutoFácil el día {fecha_factura}.\n\nLes recordamos que deben marcar en el módulo de Comisión Pagada, de manera de informar al Ejecutivo y cerrar el flujo operativo de esta transacción.',
+  firma: 'Saludos cordiales,\nÁrea de Operaciones',
+};
+const escH = s => String(s??'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+function valsDe(ops){
+  if (!Array.isArray(ops)) ops = [ops];
+  const f0 = ops[0] || {};
+  return {
+    nOrden: f0.num_orden || ('OC-' + (f0.numero_factura||f0.num_op||'')),
+    dealer: f0.nombre_dealer || '',
+    num_op: ops.map(o=>o.num_op).join(', '),
+    financiera: f0.financiera || 'Autofin',
+    numero_factura: f0.numero_factura || '',
+    fecha_factura: fechaCL(f0.fecha_factura),
+    doc: f0.es_boleta ? 'boleta' : 'factura',
+  };
+}
+function bloque(tpl, vals){
+  let t = escH(String(tpl||'').trim());
+  for (const k in vals) t = t.split('{'+k+'}').join('<strong>'+escH(vals[k])+'</strong>');
+  const P = 'font-size:14px;color:#374151;margin:0 0 14px;line-height:1.6';
+  return t.split(/\n\s*\n/).map(par => `<p style="${P}">${par.replace(/\n/g,'<br>')}</p>`).join('');
+}
+function asuntoDe(ops){ let s = String(CORREO.asunto||''); const v = valsDe(ops); for (const k in v) s = s.split('{'+k+'}').join(v[k]); return s; }
 
 async function cargar(){
   try {
-    const [r, ri] = await Promise.all([
+    const [r, ri, rc] = await Promise.all([
       fetch('/api/postventa/orden-pago-comision', { headers: hdr() }),
-      fetch('/api/impuestos/valores', { headers: hdr() })
+      fetch('/api/impuestos/valores', { headers: hdr() }),
+      fetch('/api/postventa/config', { headers: hdr() })
     ]);
     const j = await r.json();
     if (!j.success) throw new Error(j.error);
     try { const ji = await ri.json(); if (ji.success && ji.data) IMPUESTOS = ji.data; } catch(e){}
+    try { const jc = await rc.json(); if (jc.success && jc.data && jc.data.correo_orden_comision) CORREO = { ...CORREO, ...jc.data.correo_orden_comision }; } catch(_){}
     DATA = j.data.rows || [];
     render();
   } catch(e){ document.getElementById('tbody').innerHTML = `<tr><td colspan="8" class="vacio">Error: ${e.message}</td></tr>`; }
@@ -257,19 +286,11 @@ function docHTML(ops){
 
 function emailHTML(ops){
   if (!Array.isArray(ops)) ops = [ops];
-  const f0 = ops[0];
-  const nOrden = f0.num_orden || ('OC-' + (f0.numero_factura||f0.num_op||''));
-  const fFact = fechaCL(f0.fecha_factura);
-  const fin = f0.financiera || 'Autofin';
-  const nums = ops.map(o=>o.num_op).join(', ');
-  const docLbl = f0.es_boleta ? 'boleta' : 'factura';
-  const p = 'font-size:14px;color:#374151;margin:0 0 14px;line-height:1.6';
+  const vals = valsDe(ops);
   return `<div style="font-family:Arial,sans-serif">
-    <p style="${p}">Estimado Equipo de Contabilidad:</p>
-    <p style="${p}">Adjunto encontrarán <strong>Orden de Pago de Comisión N° ${nOrden}</strong> para el pago de la Comisión a <strong>${f0.nombre_dealer||''}</strong> del${ops.length>1?'os Créditos':' Crédito'} <strong>N° ${nums}</strong> otorgado${ops.length>1?'s':''} por <strong>${fin}</strong>, ${docLbl} ${f0.numero_factura?`N° <strong>${f0.numero_factura}</strong> `:''}recepcionada por AutoFácil el día <strong>${fFact}</strong>.</p>
-    <p style="${p}">Les recordamos que deben marcar en el módulo de <strong>Comisión Pagada</strong>, de manera de informar al Ejecutivo y cerrar el flujo operativo de esta transacción.</p>
+    ${bloque(CORREO.cuerpo, vals)}
     ${docHTML(ops)}
-    <p style="${p};margin-top:18px">Saludos cordiales,<br><strong>Área de Operaciones</strong></p>
+    <div style="margin-top:18px">${bloque(CORREO.firma, vals)}</div>
   </div>`;
 }
 
@@ -289,18 +310,21 @@ async function verOrden(gi){
 }
 function cerrar(){ document.getElementById('ov').classList.remove('open'); actual=null; }
 
-async function copiarOrden(){
-  const html = document.getElementById('docWrap').innerHTML;
-  const texto = document.getElementById('docWrap').innerText;
+async function enviarOrdenCorreo(){
+  if (!actual || !actual.length) return;
+  const btn = document.getElementById('btnEnviar');
+  const nums = actual.map(o=>o.num_op).join(', ');
+  if (!confirm('¿Enviar la Orden de Pago de Comisión (OP '+nums+') por correo a Contabilidad? Quedarás en copia.')) return;
+  btn.disabled = true; const txt = btn.innerHTML; btn.innerHTML = '<i class="bi bi-hourglass-split me-1"></i>Enviando…';
   try {
-    if (navigator.clipboard && window.ClipboardItem) {
-      await navigator.clipboard.write([new ClipboardItem({
-        'text/html': new Blob([html], {type:'text/html'}),
-        'text/plain': new Blob([texto], {type:'text/plain'}),
-      })]);
-    } else { await navigator.clipboard.writeText(texto); }
-    toast('Orden copiada — pégala en el correo');
-  } catch(e){ toast('No se pudo copiar: '+e.message); }
+    const html = document.getElementById('docWrap').innerHTML;
+    const r = await fetch('/api/postventa/enviar-correo-orden', { method:'POST', headers:hdr(),
+      body: JSON.stringify({ asunto: asuntoDe(actual), html, num_op: nums, tipo:'comision' }) });
+    const j = await r.json();
+    if (!j.success) throw new Error(j.error || 'No se pudo enviar');
+    toast('Correo enviado a ' + (j.data?.to||'Contabilidad') + (j.data?.cc?(' (CC '+j.data.cc+')'):''));
+  } catch(e){ toast('No se pudo enviar: '+e.message); }
+  btn.disabled = false; btn.innerHTML = txt;
 }
 
 async function emitir(){

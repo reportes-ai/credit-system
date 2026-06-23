@@ -58,6 +58,21 @@ const pool = require('../../../../shared/config/database');
     ];
     await pool.query('INSERT IGNORE INTO postventa_config (clave, valor) VALUES (?,?),(?,?)',
       ['etapas_saldo', JSON.stringify(DEF_SALDO), 'etapas_comision', JSON.stringify(DEF_COM)]);
+    // Plantillas editables del correo a Contabilidad al emitir la Orden de Pago (saldo y comisión).
+    const CORREO_SALDO = {
+      asunto: 'Orden de Pago N° {nOrden} — Saldo Precio {dealer} (OP {num_op})',
+      cuerpo: 'Estimado Equipo de Contabilidad:\n\nAdjunto encontrarán Orden de Pago N° {nOrden} para el pago del Saldo Precio a {dealer} del Crédito N° {num_op} otorgado por {financiera} con fecha {fecha_otorgado}, Saldo Precio recepcionado por AutoFácil el día {fecha_recepcion}.\n\nLes recordamos que deben marcar en el módulo de Saldo Precio Pagado, de manera de informar al Ejecutivo y cerrar el flujo operativo de esta transacción.',
+      firma: 'Saludos cordiales,\nÁrea de Operaciones',
+    };
+    const CORREO_COMISION = {
+      asunto: 'Orden de Pago de Comisión N° {nOrden} — {dealer} (OP {num_op})',
+      cuerpo: 'Estimado Equipo de Contabilidad:\n\nAdjunto encontrarán Orden de Pago de Comisión N° {nOrden} para el pago de la Comisión a {dealer} del Crédito N° {num_op} otorgado por {financiera}, {doc} N° {numero_factura} recepcionada por AutoFácil el día {fecha_factura}.\n\nLes recordamos que deben marcar en el módulo de Comisión Pagada, de manera de informar al Ejecutivo y cerrar el flujo operativo de esta transacción.',
+      firma: 'Saludos cordiales,\nÁrea de Operaciones',
+    };
+    await pool.query('INSERT IGNORE INTO postventa_config (clave, valor) VALUES (?,?),(?,?),(?,?)',
+      ['correo_orden_saldo', JSON.stringify(CORREO_SALDO),
+       'correo_orden_comision', JSON.stringify(CORREO_COMISION),
+       'correo_contabilidad', JSON.stringify('contabilidad@autofacilchile.cl')]);
     // Parche: insertar ENVIADO A PAGO (antes de la etapa de pagado) en configs ya existentes.
     // claveProc = array posicional de perfiles por etapa: hay que insertar un slot vacío
     // en la misma posición para no desalinear los permisos de las etapas posteriores.
@@ -1314,6 +1329,34 @@ const consultaFundantes = async (req, res) => {
   } catch (e) { console.error('[consultaFundantes]', e.message); res.status(500).json({ success: false, data: null, error: 'Error interno del servidor' }); }
 };
 
+// POST /api/postventa/enviar-correo-orden — envía la Orden de Pago a Contabilidad por correo.
+// El destinatario es server-controlled (config correo_contabilidad); CC al usuario que la genera.
+// El cuerpo (html) lo arma el frontend con la plantilla editable del mantenedor.
+const enviarCorreoOrden = async (req, res) => {
+  try {
+    const { asunto, html, num_op, tipo } = req.body || {};
+    if (!html || typeof html !== 'string' || !html.trim())
+      return res.status(400).json({ success: false, data: null, error: 'Falta el contenido del correo' });
+    if (html.length > 500000)
+      return res.status(400).json({ success: false, data: null, error: 'El contenido del correo es demasiado grande' });
+    let to = 'contabilidad@autofacilchile.cl';
+    try {
+      const [[row]] = await pool.query("SELECT valor FROM postventa_config WHERE clave='correo_contabilidad'");
+      if (row) { const v = JSON.parse(row.valor); if (v && String(v).trim()) to = String(v).trim(); }
+    } catch (_) {}
+    const cc = (req.usuario && req.usuario.email) || undefined;
+    const { enviarCorreo } = require('../../../../shared/mailer');
+    const r = await enviarCorreo({ to, cc, subject: asunto || 'Orden de Pago — AutoFácil', html });
+    if (!r.ok) return res.status(422).json({ success: false, data: null, error: r.error || 'No se pudo enviar el correo' });
+    try {
+      const { auditar } = require('../../../../shared/audit');
+      auditar({ req, accion: 'ENVIAR', modulo: 'postventa', entidad: 'orden_pago', entidad_id: num_op || null,
+        detalle: `Envió por correo la Orden de Pago ${tipo === 'comision' ? 'de Comisión ' : ''}(OP ${num_op || '—'}) a ${to}, CC ${cc || '—'}` });
+    } catch (_) {}
+    res.json({ success: true, data: { to, cc }, error: null });
+  } catch (e) { console.error('[enviarCorreoOrden]', e.message); res.status(500).json({ success: false, data: null, error: 'Error interno del servidor' }); }
+};
+
 module.exports = { sync, getAll, setEtapa, getConfig, setConfig, marcarHistorico, getPerfiles, getSaldosAPagar, enviarAPago, pagarSaldos, getOrdenPago, correlativoOrden, emitirOrdenPago, desmarcarSaldos, getAtribuciones, getFondos, setFondos, getAlertasConfig, setAlertasConfig,
   getComisionesAPagar, getOrdenPagoComision, correlativoOrdenComision, emitirOrdenPagoComision, enviarAPagoComision, pagarComisiones, desmarcarComisiones, getAtribucionesComision, getFondosComision, setFondosComision,
-  getFacturaComision, updateFacturaComision, consultaSaldos, consultaFacturas, consultaFundantes };
+  getFacturaComision, updateFacturaComision, consultaSaldos, consultaFacturas, consultaFundantes, enviarCorreoOrden };
