@@ -35,6 +35,11 @@ const MESES = ['enero', 'febrero', 'marzo', 'abril', 'mayo', 'junio', 'julio', '
         'Créditos otorgados acumulados del mes por Ejecutivo Comercial, ordenados de mayor a menor cantidad de operaciones.',
         '08:30', '1,2,3,4,5,6',
         'grupo.comercial@autofacilchile.cl, operaciones@autofacilchile.cl, validacion@autofacilchile.cl']);
+    // Registrar el mantenedor en el menú (funcionalidad) si no existe
+    const [[ex]] = await pool.query("SELECT 1 ok FROM funcionalidades WHERE codigo='mantenedores_correos_programados' LIMIT 1");
+    if (!ex) await pool.query(
+      `INSERT INTO funcionalidades (id_modulo, nombre, codigo, href, icono)
+       VALUES (30001, 'Correos Programados', 'mantenedores_correos_programados', '/mantenedores/correos-programados/', 'bi-envelope-at')`);
     console.log('[correos-programados] tabla OK');
   } catch (e) { console.error('[correos-programados migration]', e.message); }
 })();
