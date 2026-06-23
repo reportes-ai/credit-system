@@ -5,7 +5,7 @@
   <link rel="icon" href="/img/favicon.png" type="image/png">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Auditoría — AutoFácil</title>
-  <!-- v1.6 -->
+  <!-- v1.7 -->
   <link href="/css/bootstrap.min.css" rel="stylesheet">
   <link href="/css/bootstrap-icons.css" rel="stylesheet">
   <style>
@@ -222,9 +222,8 @@ function salidaHtml(r){
   if(!sal) return '<span class="estado-off">—</span>';
   const d = diaDelta(r.login_at, sal);
   const sub = d>0 ? `<sub style="color:#fbbf24;font-weight:700">+${d}</sub>` : '';
-  return r.logout_at
-    ? `${fHora(sal)}${sub}`
-    : `<span style="color:#94a3b8;font-style:italic" title="Estimada — última actividad (sesión sin cierre)">~${fHora(sal)}${sub}</span>`;
+  const tip = r.logout_at ? '' : ' title="Estimada — última actividad (sesión sin cierre)"';
+  return `<span style="color:#e2e8f0"${tip}>${fHora(sal)}${sub}</span>`;
 }
 function renderLogins(rows){
   document.getElementById('thead').innerHTML =
