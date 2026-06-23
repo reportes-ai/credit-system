@@ -5,7 +5,7 @@
   <link rel="icon" href="/img/favicon.png" type="image/png">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Historial de Órdenes de Pago — AutoFácil</title>
-  <!-- v1.7 -->
+  <!-- v1.8 -->
   <link href="/css/bootstrap.min.css" rel="stylesheet">
   <link href="/css/bootstrap-icons.css" rel="stylesheet">
   <style>
@@ -243,8 +243,8 @@ function docHTML(o){
   const Sth='background:#dbeafe;color:#1e3a8a;border:1px solid #93c5fd;padding:5px 6px;font-size:9px;text-transform:uppercase;text-align:left;white-space:normal;word-break:break-word';
   const Std='border:1px solid #cbd5e1;padding:5px 6px;white-space:normal;word-break:break-word';
   const Snum=Std+';text-align:right';
-  const Sres='border-collapse:collapse;margin-top:14px;max-width:430px';
-  const SresL='border:1px solid #cbd5e1;padding:5px 8px;font-size:11px;background:#eff6ff;font-weight:700;width:42%';
+  const Sres='border-collapse:collapse;margin-top:14px;width:100%;max-width:860px';
+  const SresL='border:1px solid #cbd5e1;padding:5px 8px;font-size:11px;background:#eff6ff;font-weight:700;width:22%;white-space:nowrap';
   const SresV='border:1px solid #cbd5e1;padding:5px 8px;font-size:11px';
   return `<div style="${Sdoc}">
     <table style="width:100%;border-collapse:collapse;margin-bottom:14px"><tbody><tr>
@@ -253,6 +253,7 @@ function docHTML(o){
         <tr><td style="${Slbl}">Compañía</td><td style="${Smv}">AUTOFÁCIL SPA</td></tr>
         <tr><td style="${Slbl}">Tipo gasto</td><td style="${Smv}">${escH(tipoGasto)}</td></tr>
         <tr><td style="${Slbl}">N° Orden</td><td style="${Smv}">${escH(o.numero||'—')}</td></tr>
+        <tr><td style="${Slbl}">Solicitante</td><td style="${Smv}">${escH(o.usuario_nombre||'—')}</td></tr>
         <tr><td style="${Slbl}">Fecha</td><td style="${Smv}">${fdate(o.fecha_emision)}</td></tr>
       </tbody></table></td>
       <td style="vertical-align:top;text-align:right">
