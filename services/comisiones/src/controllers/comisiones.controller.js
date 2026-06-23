@@ -121,10 +121,12 @@ async function notificarComisionRev(evento, { ejecutivo, mes } = {}) {
     }
     String(cfg.usuarios_extra||'').split(',').map(s=>parseInt(s.trim())).filter(Boolean).forEach(id=>ids.add(id));
     if (!ids.size) return;
+    let dest = [...ids];
+    try { dest = await require('../../../../shared/backups').expandirAlerta(dest); } catch(_){}
     const mensaje = def.mensaje.replace('{mesPago}', mesPagoNombre(mes)).replace('{mesProd}', mesNombre(mes)).replace('{ejecutivo}', ejecutivo||'');
     const clave = `comrev:${evento}:${ejecutivo||''}:${mes}`;
     const sonTipo = SONIDOS.includes(cfg.sonido_tipo) ? cfg.sonido_tipo : 'campana';
-    for (const uid of ids) {
+    for (const uid of dest) {
       const [[ex]] = await pool.query('SELECT 1 FROM notificaciones WHERE id_usuario=? AND clave=? AND leida=0 LIMIT 1', [uid, clave]);
       if (ex) continue;
       await pool.query(

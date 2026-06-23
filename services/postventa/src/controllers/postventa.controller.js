@@ -279,6 +279,8 @@ async function notificarEventoSaldo(evento, { op, id_seguimiento, ejecutivo, cla
     String(cfg.usuarios_extra || '').split(',').map(s => parseInt(s.trim())).filter(Boolean).forEach(id => ids.add(id));
 
     if (!ids.size) return;
+    let dest = [...ids];
+    try { dest = await require('../../../../shared/backups').expandirAlerta(dest); } catch (_) {}
     const mensaje = def.mensaje.replace('{op}', op != null ? ('N° ' + op) : 'una operación');
     const clave = `pvalert:${evento}:${claveExtra || id_seguimiento || Date.now()}`;
     const prioridad = cfg.prioridad || 'normal';
@@ -286,7 +288,7 @@ async function notificarEventoSaldo(evento, { op, id_seguimiento, ejecutivo, cla
     const sonTipo = SONIDOS_SALDO.includes(cfg.sonido_tipo) ? cfg.sonido_tipo : 'campana';
     const sonCada = cfg.sonido_cada_seg || 30;
     const sonMax = cfg.sonido_max_min || 5;
-    for (const uid of ids) {
+    for (const uid of dest) {
       const [[ex]] = await pool.query(
         'SELECT 1 FROM notificaciones WHERE id_usuario=? AND clave=? AND leida=0 LIMIT 1', [uid, clave]);
       if (ex) continue;

@@ -69,8 +69,10 @@ setTimeout(initVapid, 3000);
 /* ── Núcleo: notificar a una lista de usuarios ───────────────────
    Inserta la notificación in-app y envía web push a sus dispositivos. */
 async function notificar(idUsuarios, { tipo, titulo, mensaje, href, prioridad, sonar, son_tipo, son_cada, son_max, clave } = {}) {
-  const ids = [...new Set((idUsuarios || []).filter(Boolean))];
+  let ids = [...new Set((idUsuarios || []).filter(Boolean))];
   if (!ids.length) return;
+  // Suplencias: agrega a los suplentes activos (categoría Alertas) de cada destinatario.
+  try { ids = await require('../../../../shared/backups').expandirAlerta(ids); } catch (_) {}
   // Sonido/prioridad opcionales (compatibles hacia atrás): si no se pasan, usan los
   // defaults de la campana (sonar=1, campana, normal).
   const prio = prioridad === 'alta' ? 'alta' : 'normal';

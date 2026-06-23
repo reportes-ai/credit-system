@@ -69,10 +69,20 @@ async function enviarCorreo({ to, cc, subject, html, text, replyTo } = {}) {
     const tx = getTransporter();
     if (!tx) return { ok: false, error: 'Correo no configurado (faltan variables MAIL_* en el servidor)' };
     if (!to) return { ok: false, error: 'Destinatario (to) requerido' };
+    // Suplencias: agrega al CC los suplentes activos (categoría Correos) de los destinatarios.
+    let ccFinal = cc;
+    try {
+      const { ccCorreos } = require('./backups');
+      const extra = await ccCorreos(to);
+      if (extra && extra.length) {
+        const base = (Array.isArray(cc) ? cc : String(cc || '').split(/[,;]/)).map(s => String(s).trim()).filter(Boolean);
+        ccFinal = [...new Set([...base, ...extra].map(s => s.toLowerCase()))].join(',');
+      }
+    } catch (_) { /* backups opcional */ }
     const info = await tx.sendMail({
       from: remitente(),
       to,
-      cc: cc || undefined,
+      cc: ccFinal || undefined,
       subject: subject || '(sin asunto)',
       text: text || undefined,
       html: html || undefined,

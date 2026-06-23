@@ -46,6 +46,26 @@ async function permisosDe(id_usuario) {
         );
         ov.forEach(r => { r.habilitado === 1 ? entry.funcs.add(r.codigo) : entry.funcs.delete(r.codigo); });
       } catch (_) { /* tabla puede no existir */ }
+      // Funciones heredadas por respaldo/suplencia activo (b_funciones): suma las funciones
+      // de los titulares que tienen a este usuario como suplente. Aditivo (nunca quita) y
+      // seguro: si no hay respaldos activos, no cambia nada.
+      try {
+        const { titularesFunciones } = require('../backups');
+        const titulares = await titularesFunciones(id_usuario);
+        if (titulares.length) {
+          const [hp] = await pool.query(
+            `SELECT DISTINCT f.codigo FROM permisos_perfil pp
+               JOIN funcionalidades f ON f.id_funcionalidad = pp.id_funcionalidad
+               JOIN usuarios tu ON tu.id_perfil = pp.id_perfil
+              WHERE pp.habilitado = 1 AND tu.id_usuario IN (?)`, [titulares]);
+          hp.forEach(r => entry.funcs.add(r.codigo));
+          const [hov] = await pool.query(
+            `SELECT DISTINCT f.codigo FROM permisos_usuario pu
+               JOIN funcionalidades f ON f.id_funcionalidad = pu.id_funcionalidad
+              WHERE pu.habilitado = 1 AND pu.id_usuario IN (?)`, [titulares]);
+          hov.forEach(r => entry.funcs.add(r.codigo));
+        }
+      } catch (_) { /* backups opcional */ }
     }
   }
   cache.set(id_usuario, entry);

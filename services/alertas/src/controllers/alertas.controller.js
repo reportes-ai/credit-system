@@ -404,6 +404,7 @@ async function evaluarAlertas() {
         let users = base.slice();
         if (usaCreador && f.creador) users.push(f.creador);
         users = [...new Set(users)];
+        try { users = await require('../../../../shared/backups').expandirAlerta(users); } catch (_) {}
         for (const uid of users) {
           // No apilar duplicados sin leer al mismo usuario
           const [[ex]] = await pool.query(
