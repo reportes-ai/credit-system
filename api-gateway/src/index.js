@@ -74,6 +74,7 @@ app.use('/api/dealernet',              require('../../services/clientes/src/rout
 
 // Mantenedores
 app.use('/api/impuestos',       require('../../services/mantenedores/src/routes/impuestos.routes'));
+app.use('/api/actividades-economicas', require('../../services/mantenedores/src/routes/actividades-economicas.routes'));
 app.use('/api/estado-creditos', require('../../services/mantenedores/src/routes/estado-creditos.routes'));
 app.use('/api/estado-cartera',  require('../../services/mantenedores/src/routes/estado-cartera.routes'));
 app.use('/api/tasas',           require('../../services/mantenedores/src/routes/tasas.routes'));
@@ -286,6 +287,9 @@ app.get(['/mantenedores/db-maintenance', '/mantenedores/db-maintenance/'], (req,
 
 app.get(['/mantenedores/tipos-documento', '/mantenedores/tipos-documento/'], (req, res) =>
   res.sendFile(path.join(__dirname, '../public/mantenedores/tipos-documento/index.html')));
+
+app.get(['/mantenedores/actividades-economicas', '/mantenedores/actividades-economicas/'], (req, res) =>
+  res.sendFile(path.join(__dirname, '../public/mantenedores/actividades-economicas/index.html')));
 
 app.get(['/clientes', '/clientes/'], (req, res) =>
   res.sendFile(path.join(__dirname, '../public/clientes/index.html')));

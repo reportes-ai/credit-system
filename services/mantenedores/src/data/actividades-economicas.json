@@ -1,0 +1,4046 @@
+[
+{
+"codigo": "11101",
+"descripcion": "CULTIVO DE TRIGO",
+"afecto_iva": 1,
+"categoria_tributaria": 1
+},
+{
+"codigo": "11102",
+"descripcion": "CULTIVO DE MAÍZ",
+"afecto_iva": 1,
+"categoria_tributaria": 1
+},
+{
+"codigo": "11103",
+"descripcion": "CULTIVO DE AVENA",
+"afecto_iva": 1,
+"categoria_tributaria": 1
+},
+{
+"codigo": "11104",
+"descripcion": "CULTIVO DE CEBADA",
+"afecto_iva": 1,
+"categoria_tributaria": 1
+},
+{
+"codigo": "11105",
+"descripcion": "CULTIVO DE OTROS CEREALES (EXCEPTO TRIGO, MAÍZ, AVENA Y CEBADA)",
+"afecto_iva": 1,
+"categoria_tributaria": 1
+},
+{
+"codigo": "11106",
+"descripcion": "CULTIVO DE POROTOS",
+"afecto_iva": 1,
+"categoria_tributaria": 1
+},
+{
+"codigo": "11107",
+"descripcion": "CULTIVO DE LUPINO",
+"afecto_iva": 1,
+"categoria_tributaria": 1
+},
+{
+"codigo": "11108",
+"descripcion": "CULTIVO DE OTRAS LEGUMBRES (EXCEPTO POROTOS Y LUPINO)",
+"afecto_iva": 1,
+"categoria_tributaria": 1
+},
+{
+"codigo": "11109",
+"descripcion": "CULTIVO DE SEMILLAS DE RAPS",
+"afecto_iva": 1,
+"categoria_tributaria": 1
+},
+{
+"codigo": "11110",
+"descripcion": "CULTIVO DE SEMILLAS DE MARAVILLA (GIRASOL)",
+"afecto_iva": 1,
+"categoria_tributaria": 1
+},
+{
+"codigo": "11111",
+"descripcion": "CULTIVO DE SEMILLAS DE CEREALES, LEGUMBRES Y OLEAGINOSAS (EXCEPTO SEMILLAS DE RAPS Y MARAVILLA)",
+"afecto_iva": 1,
+"categoria_tributaria": 1
+},
+{
+"codigo": "11200",
+"descripcion": "CULTIVO DE ARROZ",
+"afecto_iva": 1,
+"categoria_tributaria": 1
+},
+{
+"codigo": "11301",
+"descripcion": "CULTIVO DE PAPAS",
+"afecto_iva": 1,
+"categoria_tributaria": 1
+},
+{
+"codigo": "11302",
+"descripcion": "CULTIVO DE CAMOTES",
+"afecto_iva": 1,
+"categoria_tributaria": 1
+},
+{
+"codigo": "11303",
+"descripcion": "CULTIVO DE OTROS TUBÉRCULOS (EXCEPTO PAPAS Y CAMOTES)",
+"afecto_iva": 1,
+"categoria_tributaria": 1
+},
+{
+"codigo": "11304",
+"descripcion": "CULTIVO DE REMOLACHA AZUCARERA",
+"afecto_iva": 1,
+"categoria_tributaria": 1
+},
+{
+"codigo": "11305",
+"descripcion": "CULTIVO DE SEMILLAS DE HORTALIZAS",
+"afecto_iva": 1,
+"categoria_tributaria": 1
+},
+{
+"codigo": "11306",
+"descripcion": "CULTIVO DE HORTALIZAS Y MELONES",
+"afecto_iva": 1,
+"categoria_tributaria": 1
+},
+{
+"codigo": "11400",
+"descripcion": "CULTIVO DE CAÑA DE AZÚCAR",
+"afecto_iva": 1,
+"categoria_tributaria": 1
+},
+{
+"codigo": "11500",
+"descripcion": "CULTIVO DE TABACO",
+"afecto_iva": 1,
+"categoria_tributaria": 1
+},
+{
+"codigo": "11600",
+"descripcion": "CULTIVO DE PLANTAS DE FIBRA",
+"afecto_iva": 1,
+"categoria_tributaria": 1
+},
+{
+"codigo": "11901",
+"descripcion": "CULTIVO DE FLORES",
+"afecto_iva": 1,
+"categoria_tributaria": 1
+},
+{
+"codigo": "11902",
+"descripcion": "CULTIVOS FORRAJEROS EN PRADERAS MEJORADAS O SEMBRADAS; CULTIVOS SUPLEMENTARIOS FORRAJEROS",
+"afecto_iva": 1,
+"categoria_tributaria": 1
+},
+{
+"codigo": "11903",
+"descripcion": "CULTIVOS DE SEMILLAS DE FLORES; CULTIVO DE SEMILLAS DE PLANTAS FORRAJERAS",
+"afecto_iva": 1,
+"categoria_tributaria": 1
+},
+{
+"codigo": "12111",
+"descripcion": "CULTIVO DE UVA DESTINADA A LA PRODUCCIÓN DE PISCO Y AGUARDIENTE",
+"afecto_iva": 1,
+"categoria_tributaria": 1
+},
+{
+"codigo": "12112",
+"descripcion": "CULTIVO DE UVA DESTINADA A LA PRODUCCIÓN DE VINO",
+"afecto_iva": 1,
+"categoria_tributaria": 1
+},
+{
+"codigo": "12120",
+"descripcion": "CULTIVO DE UVA PARA MESA",
+"afecto_iva": 1,
+"categoria_tributaria": 1
+},
+{
+"codigo": "12200",
+"descripcion": "CULTIVO DE FRUTAS TROPICALES Y SUBTROPICALES (INCLUYE EL CULTIVO DE PALTAS)",
+"afecto_iva": 1,
+"categoria_tributaria": 1
+},
+{
+"codigo": "12300",
+"descripcion": "CULTIVO DE CÍTRICOS",
+"afecto_iva": 1,
+"categoria_tributaria": 1
+},
+{
+"codigo": "12400",
+"descripcion": "CULTIVO DE FRUTAS DE PEPITA Y DE HUESO",
+"afecto_iva": 1,
+"categoria_tributaria": 1
+},
+{
+"codigo": "12501",
+"descripcion": "CULTIVO DE SEMILLAS DE FRUTAS",
+"afecto_iva": 1,
+"categoria_tributaria": 1
+},
+{
+"codigo": "12502",
+"descripcion": "CULTIVO DE OTROS FRUTOS Y NUECES DE ÁRBOLES Y ARBUSTOS",
+"afecto_iva": 1,
+"categoria_tributaria": 1
+},
+{
+"codigo": "12600",
+"descripcion": "CULTIVO DE FRUTOS OLEAGINOSOS (INCLUYE EL CULTIVO DE ACEITUNAS)",
+"afecto_iva": 1,
+"categoria_tributaria": 1
+},
+{
+"codigo": "12700",
+"descripcion": "CULTIVO DE PLANTAS CON LAS QUE SE PREPARAN BEBIDAS (INCLUYE EL CULTIVO DE CAFÉ, TÉ Y MATE)",
+"afecto_iva": 1,
+"categoria_tributaria": 1
+},
+{
+"codigo": "12801",
+"descripcion": "CULTIVO DE ESPECIAS",
+"afecto_iva": 1,
+"categoria_tributaria": 1
+},
+{
+"codigo": "12802",
+"descripcion": "CULTIVO DE PLANTAS AROMÁTICAS, MEDICINALES Y FARMACÉUTICAS",
+"afecto_iva": 1,
+"categoria_tributaria": 1
+},
+{
+"codigo": "12900",
+"descripcion": "CULTIVO DE OTRAS PLANTAS PERENNES",
+"afecto_iva": 1,
+"categoria_tributaria": 1
+},
+{
+"codigo": "13000",
+"descripcion": "CULTIVO DE PLANTAS VIVAS INCLUIDA LA PRODUCCIÓN EN VIVEROS (EXCEPTO VIVEROS FORESTALES)",
+"afecto_iva": 1,
+"categoria_tributaria": 1
+},
+{
+"codigo": "14101",
+"descripcion": "CRÍA DE GANADO BOVINO PARA LA PRODUCCIÓN LECHERA",
+"afecto_iva": 1,
+"categoria_tributaria": 1
+},
+{
+"codigo": "14102",
+"descripcion": "CRÍA DE GANADO BOVINO PARA LA PRODUCCIÓN DE CARNE O COMO GANADO REPRODUCTOR",
+"afecto_iva": 1,
+"categoria_tributaria": 1
+},
+{
+"codigo": "14200",
+"descripcion": "CRÍA DE CABALLOS Y OTROS EQUINOS",
+"afecto_iva": 1,
+"categoria_tributaria": 1
+},
+{
+"codigo": "14300",
+"descripcion": "CRÍA DE LLAMAS, ALPACAS, VICUÑAS, GUANACOS Y OTROS CAMÉLIDOS",
+"afecto_iva": 1,
+"categoria_tributaria": 1
+},
+{
+"codigo": "14410",
+"descripcion": "CRÍA DE OVEJAS (OVINOS)",
+"afecto_iva": 1,
+"categoria_tributaria": 1
+},
+{
+"codigo": "14420",
+"descripcion": "CRÍA DE CABRAS (CAPRINOS)",
+"afecto_iva": 1,
+"categoria_tributaria": 1
+},
+{
+"codigo": "14500",
+"descripcion": "CRÍA DE CERDOS",
+"afecto_iva": 1,
+"categoria_tributaria": 1
+},
+{
+"codigo": "14601",
+"descripcion": "CRÍA DE AVES DE CORRAL PARA LA PRODUCCIÓN DE CARNE",
+"afecto_iva": 1,
+"categoria_tributaria": 1
+},
+{
+"codigo": "14602",
+"descripcion": "CRÍA DE AVES DE CORRAL PARA LA PRODUCCIÓN DE HUEVOS",
+"afecto_iva": 1,
+"categoria_tributaria": 1
+},
+{
+"codigo": "14901",
+"descripcion": "APICULTURA",
+"afecto_iva": 1,
+"categoria_tributaria": 1
+},
+{
+"codigo": "14909",
+"descripcion": "CRÍA DE OTROS ANIMALES N.C.P.",
+"afecto_iva": 1,
+"categoria_tributaria": 1
+},
+{
+"codigo": "15000",
+"descripcion": "CULTIVO DE PRODUCTOS AGRÍCOLAS EN COMBINACIÓN CON LA CRÍA DE ANIMALES (EXPLOTACIÓN MIXTA)",
+"afecto_iva": 1,
+"categoria_tributaria": 1
+},
+{
+"codigo": "16100",
+"descripcion": "ACTIVIDADES DE APOYO A LA AGRICULTURA",
+"afecto_iva": 1,
+"categoria_tributaria": 1
+},
+{
+"codigo": "16200",
+"descripcion": "ACTIVIDADES DE APOYO A LA GANADERÍA",
+"afecto_iva": 1,
+"categoria_tributaria": 1
+},
+{
+"codigo": "16300",
+"descripcion": "ACTIVIDADES POSCOSECHA",
+"afecto_iva": 1,
+"categoria_tributaria": 1
+},
+{
+"codigo": "16400",
+"descripcion": "TRATAMIENTO DE SEMILLAS PARA PROPAGACIÓN",
+"afecto_iva": 1,
+"categoria_tributaria": 1
+},
+{
+"codigo": "17000",
+"descripcion": "CAZA ORDINARIA Y MEDIANTE TRAMPAS Y ACTIVIDADES DE SERVICIOS CONEXAS",
+"afecto_iva": 1,
+"categoria_tributaria": 1
+},
+{
+"codigo": "21001",
+"descripcion": "EXPLOTACIÓN DE VIVEROS FORESTALES",
+"afecto_iva": 1,
+"categoria_tributaria": 1
+},
+{
+"codigo": "21002",
+"descripcion": "SILVICULTURA Y OTRAS ACTIVIDADES FORESTALES (EXCEPTO EXPLOTACIÓN DE VIVEROS FORESTALES)",
+"afecto_iva": 1,
+"categoria_tributaria": 1
+},
+{
+"codigo": "22000",
+"descripcion": "EXTRACCIÓN DE MADERA",
+"afecto_iva": 1,
+"categoria_tributaria": 1
+},
+{
+"codigo": "23000",
+"descripcion": "RECOLECCIÓN DE PRODUCTOS FORESTALES DISTINTOS DE LA MADERA",
+"afecto_iva": 1,
+"categoria_tributaria": 1
+},
+{
+"codigo": "24001",
+"descripcion": "SERVICIOS DE FORESTACIÓN A CAMBIO DE UNA RETRIBUCIÓN O POR CONTRATA",
+"afecto_iva": 1,
+"categoria_tributaria": 1
+},
+{
+"codigo": "24002",
+"descripcion": "SERVICIOS DE CORTA DE MADERA A CAMBIO DE UNA RETRIBUCIÓN O POR CONTRATA",
+"afecto_iva": 1,
+"categoria_tributaria": 1
+},
+{
+"codigo": "24003",
+"descripcion": "SERVICIOS DE EXTINCIÓN Y PREVENCIÓN DE INCENDIOS FORESTALES",
+"afecto_iva": 1,
+"categoria_tributaria": 1
+},
+{
+"codigo": "24009",
+"descripcion": "OTROS SERVICIOS DE APOYO A LA SILVICULTURA N.C.P.",
+"afecto_iva": 1,
+"categoria_tributaria": 1
+},
+{
+"codigo": "31110",
+"descripcion": "PESCA MARÍTIMA INDUSTRIAL, EXCEPTO DE BARCOS FACTORÍA",
+"afecto_iva": 1,
+"categoria_tributaria": 1
+},
+{
+"codigo": "31120",
+"descripcion": "PESCA MARÍTIMA ARTESANAL",
+"afecto_iva": 1,
+"categoria_tributaria": 1
+},
+{
+"codigo": "31130",
+"descripcion": "RECOLECCIÓN Y EXTRACCIÓN DE PRODUCTOS MARINOS",
+"afecto_iva": 1,
+"categoria_tributaria": 1
+},
+{
+"codigo": "31140",
+"descripcion": "SERVICIOS RELACIONADOS CON LA PESCA MARÍTIMA",
+"afecto_iva": 1,
+"categoria_tributaria": 1
+},
+{
+"codigo": "31200",
+"descripcion": "PESCA DE AGUA DULCE",
+"afecto_iva": 1,
+"categoria_tributaria": 1
+},
+{
+"codigo": "32110",
+"descripcion": "CULTIVO Y CRIANZA DE PECES MARINOS",
+"afecto_iva": 1,
+"categoria_tributaria": 1
+},
+{
+"codigo": "32120",
+"descripcion": "CULTIVO, REPRODUCCIÓN Y MANEJO DE ALGAS MARINAS",
+"afecto_iva": 1,
+"categoria_tributaria": 1
+},
+{
+"codigo": "32130",
+"descripcion": "REPRODUCCIÓN Y CRÍA DE MOLUSCOS, CRUSTÁCEOS Y GUSANOS MARINOS",
+"afecto_iva": 1,
+"categoria_tributaria": 1
+},
+{
+"codigo": "32140",
+"descripcion": "SERVICIOS RELACIONADOS CON LA ACUICULTURA MARINA",
+"afecto_iva": 1,
+"categoria_tributaria": 1
+},
+{
+"codigo": "32200",
+"descripcion": "ACUICULTURA DE AGUA DULCE",
+"afecto_iva": 1,
+"categoria_tributaria": 1
+},
+{
+"codigo": "40000",
+"descripcion": "EXTRACCIÓN Y PROCESAMIENTO DE COBRE",
+"afecto_iva": 1,
+"categoria_tributaria": 1
+},
+{
+"codigo": "51000",
+"descripcion": "EXTRACCIÓN DE CARBÓN DE PIEDRA",
+"afecto_iva": 1,
+"categoria_tributaria": 1
+},
+{
+"codigo": "52000",
+"descripcion": "EXTRACCIÓN DE LIGNITO",
+"afecto_iva": 1,
+"categoria_tributaria": 1
+},
+{
+"codigo": "61000",
+"descripcion": "EXTRACCIÓN DE PETRÓLEO CRUDO",
+"afecto_iva": 1,
+"categoria_tributaria": 1
+},
+{
+"codigo": "62000",
+"descripcion": "EXTRACCIÓN DE GAS NATURAL",
+"afecto_iva": 1,
+"categoria_tributaria": 1
+},
+{
+"codigo": "71000",
+"descripcion": "EXTRACCIÓN DE MINERALES DE HIERRO",
+"afecto_iva": 1,
+"categoria_tributaria": 1
+},
+{
+"codigo": "72100",
+"descripcion": "EXTRACCIÓN DE MINERALES DE URANIO Y TORIO",
+"afecto_iva": 1,
+"categoria_tributaria": 1
+},
+{
+"codigo": "72910",
+"descripcion": "EXTRACCIÓN DE ORO Y PLATA",
+"afecto_iva": 1,
+"categoria_tributaria": 1
+},
+{
+"codigo": "72991",
+"descripcion": "EXTRACCIÓN DE ZINC Y PLOMO",
+"afecto_iva": 1,
+"categoria_tributaria": 1
+},
+{
+"codigo": "72992",
+"descripcion": "EXTRACCIÓN DE MANGANESO",
+"afecto_iva": 1,
+"categoria_tributaria": 1
+},
+{
+"codigo": "72999",
+"descripcion": "EXTRACCIÓN DE OTROS MINERALES METALÍFEROS NO FERROSOS N.C.P. (EXCEPTO ZINC, PLOMO Y MANGANESO)",
+"afecto_iva": 1,
+"categoria_tributaria": 1
+},
+{
+"codigo": "81000",
+"descripcion": "EXTRACCIÓN DE PIEDRA, ARENA Y ARCILLA",
+"afecto_iva": 1,
+"categoria_tributaria": 1
+},
+{
+"codigo": "89110",
+"descripcion": "EXTRACCIÓN Y PROCESAMIENTO DE LITIO",
+"afecto_iva": 1,
+"categoria_tributaria": 1
+},
+{
+"codigo": "89190",
+"descripcion": "EXTRACCIÓN DE MINERALES PARA LA FABRICACIÓN DE ABONOS Y PRODUCTOS QUÍMICOS N.C.P.",
+"afecto_iva": 1,
+"categoria_tributaria": 1
+},
+{
+"codigo": "89200",
+"descripcion": "EXTRACCIÓN DE TURBA",
+"afecto_iva": 1,
+"categoria_tributaria": 1
+},
+{
+"codigo": "89300",
+"descripcion": "EXTRACCIÓN DE SAL",
+"afecto_iva": 1,
+"categoria_tributaria": 1
+},
+{
+"codigo": "89900",
+"descripcion": "EXPLOTACIÓN DE OTRAS MINAS Y CANTERAS N.C.P.",
+"afecto_iva": 1,
+"categoria_tributaria": 1
+},
+{
+"codigo": "91001",
+"descripcion": "ACTIVIDADES DE APOYO PARA LA EXTRACCIÓN DE PETRÓLEO Y GAS NATURAL PRESTADOS POR EMPRESAS",
+"afecto_iva": 1,
+"categoria_tributaria": 1
+},
+{
+"codigo": "91002",
+"descripcion": "ACTIVIDADES DE APOYO PARA LA EXTRACCIÓN DE PETRÓLEO Y GAS NATURAL PRESTADOS POR PROFESIONALES",
+"afecto_iva": 0,
+"categoria_tributaria": null
+},
+{
+"codigo": "99001",
+"descripcion": "ACTIVIDADES DE APOYO PARA LA EXPLOTACIÓN DE OTRAS MINAS Y CANTERAS PRESTADOS POR EMPRESAS",
+"afecto_iva": 1,
+"categoria_tributaria": 1
+},
+{
+"codigo": "99002",
+"descripcion": "ACTIVIDADES DE APOYO PARA LA EXPLOTACIÓN DE OTRAS MINAS Y CANTERAS PRESTADOS POR PROFESIONALES",
+"afecto_iva": 0,
+"categoria_tributaria": null
+},
+{
+"codigo": "101011",
+"descripcion": "EXPLOTACIÓN DE MATADEROS DE BOVINOS, OVINOS, EQUINOS, CAPRINOS, PORCINOS Y CAMÉLIDOS",
+"afecto_iva": 1,
+"categoria_tributaria": 1
+},
+{
+"codigo": "101019",
+"descripcion": "EXPLOTACIÓN DE MATADEROS DE AVES Y DE OTROS TIPOS DE ANIMALES N.C.P.",
+"afecto_iva": 1,
+"categoria_tributaria": 1
+},
+{
+"codigo": "101020",
+"descripcion": "ELABORACIÓN Y CONSERVACIÓN DE CARNE Y PRODUCTOS CÁRNICOS",
+"afecto_iva": 1,
+"categoria_tributaria": 1
+},
+{
+"codigo": "102010",
+"descripcion": "PRODUCCIÓN DE HARINA DE PESCADO",
+"afecto_iva": 1,
+"categoria_tributaria": 1
+},
+{
+"codigo": "102020",
+"descripcion": "ELABORACIÓN Y CONSERVACIÓN DE SALMÓNIDOS",
+"afecto_iva": 1,
+"categoria_tributaria": 1
+},
+{
+"codigo": "102030",
+"descripcion": "ELABORACIÓN Y CONSERVACIÓN DE OTROS PESCADOS, EN PLANTAS EN TIERRA (EXCEPTO BARCOS FACTORÍA)",
+"afecto_iva": 1,
+"categoria_tributaria": 1
+},
+{
+"codigo": "102040",
+"descripcion": "ELABORACIÓN Y CONSERVACIÓN DE CRUSTÁCEOS, MOLUSCOS Y OTROS PRODUCTOS ACUÁTICOS, EN PLANTAS EN TIERRA",
+"afecto_iva": 1,
+"categoria_tributaria": 1
+},
+{
+"codigo": "102050",
+"descripcion": "ACTIVIDADES DE ELABORACIÓN Y CONSERVACIÓN DE PESCADO, REALIZADAS EN BARCOS FACTORÍA",
+"afecto_iva": 1,
+"categoria_tributaria": 1
+},
+{
+"codigo": "102060",
+"descripcion": "ELABORACIÓN Y PROCESAMIENTO DE ALGAS",
+"afecto_iva": 1,
+"categoria_tributaria": 1
+},
+{
+"codigo": "103000",
+"descripcion": "ELABORACIÓN Y CONSERVACIÓN DE FRUTAS, LEGUMBRES Y HORTALIZAS",
+"afecto_iva": 1,
+"categoria_tributaria": 1
+},
+{
+"codigo": "104000",
+"descripcion": "ELABORACIÓN DE ACEITES Y GRASAS DE ORIGEN VEGETAL Y ANIMAL (EXCEPTO ELABORACIÓN DE MANTEQUILLA)",
+"afecto_iva": 1,
+"categoria_tributaria": 1
+},
+{
+"codigo": "105000",
+"descripcion": "ELABORACIÓN DE PRODUCTOS LÁCTEOS",
+"afecto_iva": 1,
+"categoria_tributaria": 1
+},
+{
+"codigo": "106101",
+"descripcion": "MOLIENDA DE TRIGO: PRODUCCIÓN DE HARINA, SÉMOLA Y GRÁNULOS",
+"afecto_iva": 1,
+"categoria_tributaria": 1
+},
+{
+"codigo": "106102",
+"descripcion": "MOLIENDA DE ARROZ; PRODUCCIÓN DE HARINA DE ARROZ",
+"afecto_iva": 1,
+"categoria_tributaria": 1
+},
+{
+"codigo": "106109",
+"descripcion": "ELABORACIÓN DE OTROS PRODUCTOS DE MOLINERÍA N.C.P.",
+"afecto_iva": 1,
+"categoria_tributaria": 1
+},
+{
+"codigo": "106200",
+"descripcion": "ELABORACIÓN DE ALMIDONES Y PRODUCTOS DERIVADOS DEL ALMIDÓN",
+"afecto_iva": 1,
+"categoria_tributaria": 1
+},
+{
+"codigo": "107100",
+"descripcion": "ELABORACIÓN DE PRODUCTOS DE PANADERÍA Y PASTELERÍA",
+"afecto_iva": 1,
+"categoria_tributaria": 1
+},
+{
+"codigo": "107200",
+"descripcion": "ELABORACIÓN DE AZÚCAR",
+"afecto_iva": 1,
+"categoria_tributaria": 1
+},
+{
+"codigo": "107300",
+"descripcion": "ELABORACIÓN DE CACAO, CHOCOLATE Y DE PRODUCTOS DE CONFITERÍA",
+"afecto_iva": 1,
+"categoria_tributaria": 1
+},
+{
+"codigo": "107400",
+"descripcion": "ELABORACIÓN DE MACARRONES, FIDEOS, ALCUZCUZ Y PRODUCTOS FARINÁCEOS SIMILARES",
+"afecto_iva": 1,
+"categoria_tributaria": 1
+},
+{
+"codigo": "107500",
+"descripcion": "ELABORACIÓN DE COMIDAS Y PLATOS PREPARADOS ENVASADOS, ROTULADOS Y CON INFORMACIÓN NUTRICIONAL",
+"afecto_iva": 1,
+"categoria_tributaria": 1
+},
+{
+"codigo": "107901",
+"descripcion": "ELABORACIÓN DE TÉ, CAFÉ, MATE E INFUSIONES DE HIERBAS",
+"afecto_iva": 1,
+"categoria_tributaria": 1
+},
+{
+"codigo": "107902",
+"descripcion": "ELABORACIÓN DE LEVADURAS NATURALES O ARTIFICIALES",
+"afecto_iva": 1,
+"categoria_tributaria": 1
+},
+{
+"codigo": "107903",
+"descripcion": "ELABORACIÓN DE VINAGRES, MOSTAZAS, MAYONESAS Y CONDIMENTOS EN GENERAL",
+"afecto_iva": 1,
+"categoria_tributaria": 1
+},
+{
+"codigo": "107909",
+"descripcion": "ELABORACIÓN DE OTROS PRODUCTOS ALIMENTICIOS N.C.P.",
+"afecto_iva": 1,
+"categoria_tributaria": 1
+},
+{
+"codigo": "108000",
+"descripcion": "ELABORACIÓN DE PIENSOS PREPARADOS PARA ANIMALES",
+"afecto_iva": 1,
+"categoria_tributaria": 1
+},
+{
+"codigo": "110110",
+"descripcion": "ELABORACIÓN DE PISCO (INDUSTRIAS PISQUERAS)",
+"afecto_iva": 1,
+"categoria_tributaria": 1
+},
+{
+"codigo": "110120",
+"descripcion": "DESTILACIÓN, RECTIFICACIÓN Y MEZCLAS DE BEBIDAS ALCOHÓLICAS; EXCEPTO PISCO",
+"afecto_iva": 1,
+"categoria_tributaria": 1
+},
+{
+"codigo": "110200",
+"descripcion": "ELABORACIÓN DE VINOS",
+"afecto_iva": 1,
+"categoria_tributaria": 1
+},
+{
+"codigo": "110300",
+"descripcion": "ELABORACIÓN DE BEBIDAS MALTEADAS Y DE MALTA",
+"afecto_iva": 1,
+"categoria_tributaria": 1
+},
+{
+"codigo": "110401",
+"descripcion": "ELABORACIÓN DE BEBIDAS NO ALCOHÓLICAS",
+"afecto_iva": 1,
+"categoria_tributaria": 1
+},
+{
+"codigo": "110402",
+"descripcion": "PRODUCCIÓN DE AGUAS MINERALES Y OTRAS AGUAS EMBOTELLADAS",
+"afecto_iva": 1,
+"categoria_tributaria": 1
+},
+{
+"codigo": "120001",
+"descripcion": "ELABORACIÓN DE CIGARROS Y CIGARRILLOS",
+"afecto_iva": 1,
+"categoria_tributaria": 1
+},
+{
+"codigo": "120009",
+"descripcion": "ELABORACIÓN DE OTROS PRODUCTOS DE TABACO N.C.P.",
+"afecto_iva": 1,
+"categoria_tributaria": 1
+},
+{
+"codigo": "131100",
+"descripcion": "PREPARACIÓN E HILATURA DE FIBRAS TEXTILES",
+"afecto_iva": 1,
+"categoria_tributaria": 1
+},
+{
+"codigo": "131200",
+"descripcion": "TEJEDURA DE PRODUCTOS TEXTILES",
+"afecto_iva": 1,
+"categoria_tributaria": 1
+},
+{
+"codigo": "131300",
+"descripcion": "ACABADO DE PRODUCTOS TEXTILES",
+"afecto_iva": 1,
+"categoria_tributaria": 1
+},
+{
+"codigo": "139100",
+"descripcion": "FABRICACIÓN DE TEJIDOS DE PUNTO Y GANCHILLO",
+"afecto_iva": 1,
+"categoria_tributaria": 1
+},
+{
+"codigo": "139200",
+"descripcion": "FABRICACIÓN DE ARTÍCULOS CONFECCIONADOS DE MATERIALES TEXTILES, EXCEPTO PRENDAS DE VESTIR",
+"afecto_iva": 1,
+"categoria_tributaria": 1
+},
+{
+"codigo": "139300",
+"descripcion": "FABRICACIÓN DE TAPICES Y ALFOMBRAS",
+"afecto_iva": 1,
+"categoria_tributaria": 1
+},
+{
+"codigo": "139400",
+"descripcion": "FABRICACIÓN DE CUERDAS, CORDELES, BRAMANTES Y REDES",
+"afecto_iva": 1,
+"categoria_tributaria": 1
+},
+{
+"codigo": "139900",
+"descripcion": "FABRICACIÓN DE OTROS PRODUCTOS TEXTILES N.C.P.",
+"afecto_iva": 1,
+"categoria_tributaria": 1
+},
+{
+"codigo": "141001",
+"descripcion": "FABRICACIÓN DE PRENDAS DE VESTIR DE MATERIALES TEXTILES Y SIMILARES",
+"afecto_iva": 1,
+"categoria_tributaria": 1
+},
+{
+"codigo": "141002",
+"descripcion": "FABRICACIÓN DE PRENDAS DE VESTIR DE CUERO NATURAL O ARTIFICIAL",
+"afecto_iva": 1,
+"categoria_tributaria": 1
+},
+{
+"codigo": "141003",
+"descripcion": "FABRICACIÓN DE ACCESORIOS DE VESTIR",
+"afecto_iva": 1,
+"categoria_tributaria": 1
+},
+{
+"codigo": "141004",
+"descripcion": "FABRICACIÓN DE ROPA DE TRABAJO",
+"afecto_iva": 1,
+"categoria_tributaria": 1
+},
+{
+"codigo": "142000",
+"descripcion": "FABRICACIÓN DE ARTÍCULOS DE PIEL",
+"afecto_iva": 1,
+"categoria_tributaria": 1
+},
+{
+"codigo": "143000",
+"descripcion": "FABRICACIÓN DE ARTÍCULOS DE PUNTO Y GANCHILLO",
+"afecto_iva": 1,
+"categoria_tributaria": 1
+},
+{
+"codigo": "151100",
+"descripcion": "CURTIDO Y ADOBO DE CUEROS; ADOBO Y TEÑIDO DE PIELES",
+"afecto_iva": 1,
+"categoria_tributaria": 1
+},
+{
+"codigo": "151200",
+"descripcion": "FABRICACIÓN DE MALETAS, BOLSOS Y ARTÍCULOS SIMILARES, ARTÍCULOS DE TALABARTERÍA Y GUARNICIONERÍA",
+"afecto_iva": 1,
+"categoria_tributaria": 1
+},
+{
+"codigo": "152000",
+"descripcion": "FABRICACIÓN DE CALZADO",
+"afecto_iva": 1,
+"categoria_tributaria": 1
+},
+{
+"codigo": "161000",
+"descripcion": "ASERRADO Y ACEPILLADURA DE MADERA",
+"afecto_iva": 1,
+"categoria_tributaria": 1
+},
+{
+"codigo": "162100",
+"descripcion": "FABRICACIÓN DE HOJAS DE MADERA PARA ENCHAPADO Y TABLEROS A BASE DE MADERA",
+"afecto_iva": 1,
+"categoria_tributaria": 1
+},
+{
+"codigo": "162200",
+"descripcion": "FABRICACIÓN DE PARTES Y PIEZAS DE CARPINTERÍA PARA EDIFICIOS Y CONSTRUCCIONES",
+"afecto_iva": 1,
+"categoria_tributaria": 1
+},
+{
+"codigo": "162300",
+"descripcion": "FABRICACIÓN DE RECIPIENTES DE MADERA",
+"afecto_iva": 1,
+"categoria_tributaria": 1
+},
+{
+"codigo": "162900",
+"descripcion": "FABRICACIÓN DE OTROS PRODUCTOS DE MADERA, DE ARTÍCULOS DE CORCHO, PAJA Y MATERIALES TRENZABLES",
+"afecto_iva": 1,
+"categoria_tributaria": 1
+},
+{
+"codigo": "170110",
+"descripcion": "FABRICACIÓN DE CELULOSA Y OTRAS PASTAS DE MADERA",
+"afecto_iva": 1,
+"categoria_tributaria": 1
+},
+{
+"codigo": "170190",
+"descripcion": "FABRICACIÓN DE PAPEL Y CARTÓN PARA SU POSTERIOR USO INDUSTRIAL N.C.P.",
+"afecto_iva": 1,
+"categoria_tributaria": 1
+},
+{
+"codigo": "170200",
+"descripcion": "FABRICACIÓN DE PAPEL Y CARTÓN ONDULADO Y DE ENVASES DE PAPEL Y CARTÓN",
+"afecto_iva": 1,
+"categoria_tributaria": 1
+},
+{
+"codigo": "170900",
+"descripcion": "FABRICACIÓN DE OTROS ARTÍCULOS DE PAPEL Y CARTÓN",
+"afecto_iva": 1,
+"categoria_tributaria": 1
+},
+{
+"codigo": "181101",
+"descripcion": "IMPRESIÓN DE LIBROS",
+"afecto_iva": 1,
+"categoria_tributaria": 1
+},
+{
+"codigo": "181109",
+"descripcion": "OTRAS ACTIVIDADES DE IMPRESIÓN N.C.P.",
+"afecto_iva": 1,
+"categoria_tributaria": 1
+},
+{
+"codigo": "181200",
+"descripcion": "ACTIVIDADES DE SERVICIOS RELACIONADAS CON LA IMPRESIÓN",
+"afecto_iva": 1,
+"categoria_tributaria": 1
+},
+{
+"codigo": "182000",
+"descripcion": "REPRODUCCIÓN DE GRABACIONES",
+"afecto_iva": 1,
+"categoria_tributaria": 1
+},
+{
+"codigo": "191000",
+"descripcion": "FABRICACIÓN DE PRODUCTOS DE HORNOS DE COQUE",
+"afecto_iva": 1,
+"categoria_tributaria": 1
+},
+{
+"codigo": "192000",
+"descripcion": "FABRICACIÓN DE PRODUCTOS DE LA REFINACIÓN DEL PETRÓLEO",
+"afecto_iva": 1,
+"categoria_tributaria": 1
+},
+{
+"codigo": "201101",
+"descripcion": "FABRICACIÓN DE CARBÓN VEGETAL (EXCEPTO ACTIVADO); FABRICACIÓN DE BRIQUETAS DE CARBÓN VEGETAL",
+"afecto_iva": 1,
+"categoria_tributaria": 1
+},
+{
+"codigo": "201109",
+"descripcion": "FABRICACIÓN DE OTRAS SUSTANCIAS QUÍMICAS BÁSICAS N.C.P.",
+"afecto_iva": 1,
+"categoria_tributaria": 1
+},
+{
+"codigo": "201200",
+"descripcion": "FABRICACIÓN DE ABONOS Y COMPUESTOS DE NITRÓGENO",
+"afecto_iva": 1,
+"categoria_tributaria": 1
+},
+{
+"codigo": "201300",
+"descripcion": "FABRICACIÓN DE PLÁSTICOS Y CAUCHO SINTÉTICO EN FORMAS PRIMARIAS",
+"afecto_iva": 1,
+"categoria_tributaria": 1
+},
+{
+"codigo": "202100",
+"descripcion": "FABRICACIÓN DE PLAGUICIDAS Y OTROS PRODUCTOS QUÍMICOS DE USO AGROPECUARIO",
+"afecto_iva": 1,
+"categoria_tributaria": 1
+},
+{
+"codigo": "202200",
+"descripcion": "FABRICACIÓN DE PINTURAS, BARNICES Y PRODUCTOS DE REVESTIMIENTO, TINTAS DE IMPRENTA Y MASILLAS",
+"afecto_iva": 1,
+"categoria_tributaria": 1
+},
+{
+"codigo": "202300",
+"descripcion": "FABRICACIÓN DE JABONES Y DETERGENTES, PREPARADOS PARA LIMPIAR, PERFUMES Y PREPARADOS DE TOCADOR",
+"afecto_iva": 1,
+"categoria_tributaria": 1
+},
+{
+"codigo": "202901",
+"descripcion": "FABRICACIÓN DE EXPLOSIVOS Y PRODUCTOS PIROTÉCNICOS",
+"afecto_iva": 1,
+"categoria_tributaria": 1
+},
+{
+"codigo": "202909",
+"descripcion": "FABRICACIÓN DE OTROS PRODUCTOS QUÍMICOS N.C.P.",
+"afecto_iva": 1,
+"categoria_tributaria": 1
+},
+{
+"codigo": "203000",
+"descripcion": "FABRICACIÓN DE FIBRAS ARTIFICIALES",
+"afecto_iva": 1,
+"categoria_tributaria": 1
+},
+{
+"codigo": "210000",
+"descripcion": "FABRICACIÓN DE PRODUCTOS FARMACÉUTICOS, SUSTANCIAS QUÍMICAS MEDICINALES Y PRODUCTOS BOTÁNICOS",
+"afecto_iva": 1,
+"categoria_tributaria": 1
+},
+{
+"codigo": "221100",
+"descripcion": "FABRICACIÓN DE CUBIERTAS Y CÁMARAS DE CAUCHO; RECAUCHUTADO Y RENOVACIÓN DE CUBIERTAS DE CAUCHO",
+"afecto_iva": 1,
+"categoria_tributaria": 1
+},
+{
+"codigo": "221900",
+"descripcion": "FABRICACIÓN DE OTROS PRODUCTOS DE CAUCHO",
+"afecto_iva": 1,
+"categoria_tributaria": 1
+},
+{
+"codigo": "222000",
+"descripcion": "FABRICACIÓN DE PRODUCTOS DE PLÁSTICO",
+"afecto_iva": 1,
+"categoria_tributaria": 1
+},
+{
+"codigo": "231001",
+"descripcion": "FABRICACIÓN DE VIDRIO PLANO",
+"afecto_iva": 1,
+"categoria_tributaria": 1
+},
+{
+"codigo": "231002",
+"descripcion": "FABRICACIÓN DE VIDRIO HUECO",
+"afecto_iva": 1,
+"categoria_tributaria": 1
+},
+{
+"codigo": "231003",
+"descripcion": "FABRICACIÓN DE FIBRAS DE VIDRIO",
+"afecto_iva": 1,
+"categoria_tributaria": 1
+},
+{
+"codigo": "231009",
+"descripcion": "FABRICACIÓN DE PRODUCTOS DE VIDRIO N.C.P.",
+"afecto_iva": 1,
+"categoria_tributaria": 1
+},
+{
+"codigo": "239100",
+"descripcion": "FABRICACIÓN DE PRODUCTOS REFRACTARIOS",
+"afecto_iva": 1,
+"categoria_tributaria": 1
+},
+{
+"codigo": "239200",
+"descripcion": "FABRICACIÓN DE MATERIALES DE CONSTRUCCIÓN DE ARCILLA",
+"afecto_iva": 1,
+"categoria_tributaria": 1
+},
+{
+"codigo": "239300",
+"descripcion": "FABRICACIÓN DE OTROS PRODUCTOS DE PORCELANA Y DE CERÁMICA",
+"afecto_iva": 1,
+"categoria_tributaria": 1
+},
+{
+"codigo": "239400",
+"descripcion": "FABRICACIÓN DE CEMENTO, CAL Y YESO",
+"afecto_iva": 1,
+"categoria_tributaria": 1
+},
+{
+"codigo": "239500",
+"descripcion": "FABRICACIÓN DE ARTÍCULOS DE HORMIGÓN, CEMENTO Y YESO",
+"afecto_iva": 1,
+"categoria_tributaria": 1
+},
+{
+"codigo": "239600",
+"descripcion": "CORTE, TALLA Y ACABADO DE LA PIEDRA",
+"afecto_iva": 1,
+"categoria_tributaria": 1
+},
+{
+"codigo": "239900",
+"descripcion": "FABRICACIÓN DE OTROS PRODUCTOS MINERALES NO METÁLICOS N.C.P.",
+"afecto_iva": 1,
+"categoria_tributaria": 1
+},
+{
+"codigo": "241000",
+"descripcion": "INDUSTRIAS BÁSICAS DE HIERRO Y ACERO",
+"afecto_iva": 1,
+"categoria_tributaria": 1
+},
+{
+"codigo": "242001",
+"descripcion": "FABRICACIÓN DE PRODUCTOS PRIMARIOS DE COBRE",
+"afecto_iva": 1,
+"categoria_tributaria": 1
+},
+{
+"codigo": "242002",
+"descripcion": "FABRICACIÓN DE PRODUCTOS PRIMARIOS DE ALUMINIO",
+"afecto_iva": 1,
+"categoria_tributaria": 1
+},
+{
+"codigo": "242009",
+"descripcion": "FABRICACIÓN DE PRODUCTOS PRIMARIOS DE METALES PRECIOSOS Y DE OTROS METALES NO FERROSOS N.C.P.",
+"afecto_iva": 1,
+"categoria_tributaria": 1
+},
+{
+"codigo": "243100",
+"descripcion": "FUNDICIÓN DE HIERRO Y ACERO",
+"afecto_iva": 1,
+"categoria_tributaria": 1
+},
+{
+"codigo": "243200",
+"descripcion": "FUNDICIÓN DE METALES NO FERROSOS",
+"afecto_iva": 1,
+"categoria_tributaria": 1
+},
+{
+"codigo": "251100",
+"descripcion": "FABRICACIÓN DE PRODUCTOS METÁLICOS PARA USO ESTRUCTURAL",
+"afecto_iva": 1,
+"categoria_tributaria": 1
+},
+{
+"codigo": "251201",
+"descripcion": "FABRICACIÓN DE RECIPIENTES DE METAL PARA GASES COMPRIMIDOS O LICUADOS",
+"afecto_iva": 1,
+"categoria_tributaria": 1
+},
+{
+"codigo": "251209",
+"descripcion": "FABRICACIÓN DE TANQUES, DEPÓSITOS Y RECIPIENTES DE METAL N.C.P.",
+"afecto_iva": 1,
+"categoria_tributaria": 1
+},
+{
+"codigo": "251300",
+"descripcion": "FABRICACIÓN DE GENERADORES DE VAPOR, EXCEPTO CALDERAS DE AGUA CALIENTE PARA CALEFACCIÓN CENTRAL",
+"afecto_iva": 1,
+"categoria_tributaria": 1
+},
+{
+"codigo": "252000",
+"descripcion": "FABRICACIÓN DE ARMAS Y MUNICIONES",
+"afecto_iva": 1,
+"categoria_tributaria": 1
+},
+{
+"codigo": "259100",
+"descripcion": "FORJA, PRENSADO, ESTAMPADO Y LAMINADO DE METALES; PULVIMETALURGIA",
+"afecto_iva": 1,
+"categoria_tributaria": 1
+},
+{
+"codigo": "259200",
+"descripcion": "TRATAMIENTO Y REVESTIMIENTO DE METALES; MAQUINADO",
+"afecto_iva": 1,
+"categoria_tributaria": 1
+},
+{
+"codigo": "259300",
+"descripcion": "FABRICACIÓN DE ARTÍCULOS DE CUCHILLERÍA, HERRAMIENTAS DE MANO Y ARTÍCULOS DE FERRETERÍA",
+"afecto_iva": 1,
+"categoria_tributaria": 1
+},
+{
+"codigo": "259900",
+"descripcion": "FABRICACIÓN DE OTROS PRODUCTOS ELABORADOS DE METAL N.C.P.",
+"afecto_iva": 1,
+"categoria_tributaria": 1
+},
+{
+"codigo": "261000",
+"descripcion": "FABRICACIÓN DE COMPONENTES Y TABLEROS ELECTRÓNICOS",
+"afecto_iva": 1,
+"categoria_tributaria": 1
+},
+{
+"codigo": "262000",
+"descripcion": "FABRICACIÓN DE COMPUTADORES Y EQUIPO PERIFÉRICO",
+"afecto_iva": 1,
+"categoria_tributaria": 1
+},
+{
+"codigo": "263000",
+"descripcion": "FABRICACIÓN DE EQUIPO DE COMUNICACIONES",
+"afecto_iva": 1,
+"categoria_tributaria": 1
+},
+{
+"codigo": "264000",
+"descripcion": "FABRICACIÓN DE APARATOS ELECTRÓNICOS DE CONSUMO",
+"afecto_iva": 1,
+"categoria_tributaria": 1
+},
+{
+"codigo": "265100",
+"descripcion": "FABRICACIÓN DE EQUIPO DE MEDICIÓN, PRUEBA, NAVEGACIÓN Y CONTROL",
+"afecto_iva": 1,
+"categoria_tributaria": 1
+},
+{
+"codigo": "265200",
+"descripcion": "FABRICACIÓN DE RELOJES",
+"afecto_iva": 1,
+"categoria_tributaria": 1
+},
+{
+"codigo": "266000",
+"descripcion": "FABRICACIÓN DE EQUIPO DE IRRADIACIÓN Y EQUIPO ELECTRÓNICO DE USO MÉDICO Y TERAPÉUTICO",
+"afecto_iva": 1,
+"categoria_tributaria": 1
+},
+{
+"codigo": "267000",
+"descripcion": "FABRICACIÓN DE INSTRUMENTOS ÓPTICOS Y EQUIPO FOTOGRÁFICO",
+"afecto_iva": 1,
+"categoria_tributaria": 1
+},
+{
+"codigo": "268000",
+"descripcion": "FABRICACIÓN DE SOPORTES MAGNÉTICOS Y ÓPTICOS",
+"afecto_iva": 1,
+"categoria_tributaria": 1
+},
+{
+"codigo": "271000",
+"descripcion": "FABRICACIÓN DE MOTORES, GENERADORES Y TRANSFORMADORES ELÉCTRICOS, APARATOS DE DISTRIBUCIÓN Y CONTROL",
+"afecto_iva": 1,
+"categoria_tributaria": 1
+},
+{
+"codigo": "272000",
+"descripcion": "FABRICACIÓN DE PILAS, BATERÍAS Y ACUMULADORES",
+"afecto_iva": 1,
+"categoria_tributaria": 1
+},
+{
+"codigo": "273100",
+"descripcion": "FABRICACIÓN DE CABLES DE FIBRA ÓPTICA",
+"afecto_iva": 1,
+"categoria_tributaria": 1
+},
+{
+"codigo": "273200",
+"descripcion": "FABRICACIÓN DE OTROS HILOS Y CABLES ELÉCTRICOS",
+"afecto_iva": 1,
+"categoria_tributaria": 1
+},
+{
+"codigo": "273300",
+"descripcion": "FABRICACIÓN DE DISPOSITIVOS DE CABLEADO",
+"afecto_iva": 1,
+"categoria_tributaria": 1
+},
+{
+"codigo": "274000",
+"descripcion": "FABRICACIÓN DE EQUIPO ELÉCTRICO DE ILUMINACIÓN",
+"afecto_iva": 1,
+"categoria_tributaria": 1
+},
+{
+"codigo": "275000",
+"descripcion": "FABRICACIÓN DE APARATOS DE USO DOMÉSTICO",
+"afecto_iva": 1,
+"categoria_tributaria": 1
+},
+{
+"codigo": "279000",
+"descripcion": "FABRICACIÓN DE OTROS TIPOS DE EQUIPO ELÉCTRICO",
+"afecto_iva": 1,
+"categoria_tributaria": 1
+},
+{
+"codigo": "281100",
+"descripcion": "FABRICACIÓN DE MOTORES Y TURBINAS, EXCEPTO PARA AERONAVES, VEHÍCULOS AUTOMOTORES Y MOTOCICLETAS",
+"afecto_iva": 1,
+"categoria_tributaria": 1
+},
+{
+"codigo": "281200",
+"descripcion": "FABRICACIÓN DE EQUIPO DE PROPULSIÓN DE FLUIDOS",
+"afecto_iva": 1,
+"categoria_tributaria": 1
+},
+{
+"codigo": "281300",
+"descripcion": "FABRICACIÓN DE OTRAS BOMBAS, COMPRESORES, GRIFOS Y VÁLVULAS",
+"afecto_iva": 1,
+"categoria_tributaria": 1
+},
+{
+"codigo": "281400",
+"descripcion": "FABRICACIÓN DE COJINETES, ENGRANAJES, TRENES DE ENGRANAJES Y PIEZAS DE TRANSMISIÓN",
+"afecto_iva": 1,
+"categoria_tributaria": 1
+},
+{
+"codigo": "281500",
+"descripcion": "FABRICACIÓN DE HORNOS, CALDERAS Y QUEMADORES",
+"afecto_iva": 1,
+"categoria_tributaria": 1
+},
+{
+"codigo": "281600",
+"descripcion": "FABRICACIÓN DE EQUIPO DE ELEVACIÓN Y MANIPULACIÓN",
+"afecto_iva": 1,
+"categoria_tributaria": 1
+},
+{
+"codigo": "281700",
+"descripcion": "FABRICACIÓN DE MAQUINARIA Y EQUIPO DE OFICINA (EXCEPTO COMPUTADORES Y EQUIPO PERIFÉRICO)",
+"afecto_iva": 1,
+"categoria_tributaria": 1
+},
+{
+"codigo": "281800",
+"descripcion": "FABRICACIÓN DE HERRAMIENTAS DE MANO MOTORIZADAS",
+"afecto_iva": 1,
+"categoria_tributaria": 1
+},
+{
+"codigo": "281900",
+"descripcion": "FABRICACIÓN DE OTROS TIPOS DE MAQUINARIA DE USO GENERAL",
+"afecto_iva": 1,
+"categoria_tributaria": 1
+},
+{
+"codigo": "282100",
+"descripcion": "FABRICACIÓN DE MAQUINARIA AGROPECUARIA Y FORESTAL",
+"afecto_iva": 1,
+"categoria_tributaria": 1
+},
+{
+"codigo": "282200",
+"descripcion": "FABRICACIÓN DE MAQUINARIA PARA LA CONFORMACIÓN DE METALES Y DE MÁQUINAS HERRAMIENTA",
+"afecto_iva": 1,
+"categoria_tributaria": 1
+},
+{
+"codigo": "282300",
+"descripcion": "FABRICACIÓN DE MAQUINARIA METALÚRGICA",
+"afecto_iva": 1,
+"categoria_tributaria": 1
+},
+{
+"codigo": "282400",
+"descripcion": "FABRICACIÓN DE MAQUINARIA PARA LA EXPLOTACIÓN DE MINAS Y CANTERAS Y PARA OBRAS DE CONSTRUCCIÓN",
+"afecto_iva": 1,
+"categoria_tributaria": 1
+},
+{
+"codigo": "282500",
+"descripcion": "FABRICACIÓN DE MAQUINARIA PARA LA ELABORACIÓN DE ALIMENTOS, BEBIDAS Y TABACO",
+"afecto_iva": 1,
+"categoria_tributaria": 1
+},
+{
+"codigo": "282600",
+"descripcion": "FABRICACIÓN DE MAQUINARIA PARA LA ELABORACIÓN DE PRODUCTOS TEXTILES, PRENDAS DE VESTIR Y CUEROS",
+"afecto_iva": 1,
+"categoria_tributaria": 1
+},
+{
+"codigo": "282900",
+"descripcion": "FABRICACIÓN DE OTROS TIPOS DE MAQUINARIA DE USO ESPECIAL",
+"afecto_iva": 1,
+"categoria_tributaria": 1
+},
+{
+"codigo": "291000",
+"descripcion": "FABRICACIÓN DE VEHÍCULOS AUTOMOTORES",
+"afecto_iva": 1,
+"categoria_tributaria": 1
+},
+{
+"codigo": "292000",
+"descripcion": "FABRICACIÓN DE CARROCERÍAS PARA VEHÍCULOS AUTOMOTORES; FABRICACIÓN DE REMOLQUES Y SEMIRREMOLQUES",
+"afecto_iva": 1,
+"categoria_tributaria": 1
+},
+{
+"codigo": "293000",
+"descripcion": "FABRICACIÓN DE PARTES, PIEZAS Y ACCESORIOS PARA VEHÍCULOS AUTOMOTORES",
+"afecto_iva": 1,
+"categoria_tributaria": 1
+},
+{
+"codigo": "301100",
+"descripcion": "CONSTRUCCIÓN DE BUQUES, EMBARCACIONES MENORES Y ESTRUCTURAS FLOTANTES",
+"afecto_iva": 1,
+"categoria_tributaria": 1
+},
+{
+"codigo": "301200",
+"descripcion": "CONSTRUCCIÓN DE EMBARCACIONES DE RECREO Y DE DEPORTE",
+"afecto_iva": 1,
+"categoria_tributaria": 1
+},
+{
+"codigo": "302000",
+"descripcion": "FABRICACIÓN DE LOCOMOTORAS Y MATERIAL RODANTE",
+"afecto_iva": 1,
+"categoria_tributaria": 1
+},
+{
+"codigo": "303000",
+"descripcion": "FABRICACIÓN DE AERONAVES, NAVES ESPACIALES Y MAQUINARIA CONEXA",
+"afecto_iva": 1,
+"categoria_tributaria": 1
+},
+{
+"codigo": "304000",
+"descripcion": "FABRICACIÓN DE VEHÍCULOS MILITARES DE COMBATE",
+"afecto_iva": 1,
+"categoria_tributaria": 1
+},
+{
+"codigo": "309100",
+"descripcion": "FABRICACIÓN DE MOTOCICLETAS",
+"afecto_iva": 1,
+"categoria_tributaria": 1
+},
+{
+"codigo": "309200",
+"descripcion": "FABRICACIÓN DE BICICLETAS Y DE SILLAS DE RUEDAS",
+"afecto_iva": 1,
+"categoria_tributaria": 1
+},
+{
+"codigo": "309900",
+"descripcion": "FABRICACIÓN DE OTROS TIPOS DE EQUIPO DE TRANSPORTE N.C.P.",
+"afecto_iva": 1,
+"categoria_tributaria": 1
+},
+{
+"codigo": "310001",
+"descripcion": "FABRICACIÓN DE MUEBLES PRINCIPALMENTE DE MADERA",
+"afecto_iva": 1,
+"categoria_tributaria": 1
+},
+{
+"codigo": "310009",
+"descripcion": "FABRICACIÓN DE COLCHONES; FABRICACIÓN DE OTROS MUEBLES N.C.P.",
+"afecto_iva": 1,
+"categoria_tributaria": 1
+},
+{
+"codigo": "321100",
+"descripcion": "FABRICACIÓN DE JOYAS Y ARTÍCULOS CONEXOS",
+"afecto_iva": 1,
+"categoria_tributaria": 1
+},
+{
+"codigo": "321200",
+"descripcion": "FABRICACIÓN DE BISUTERÍA Y ARTÍCULOS CONEXOS",
+"afecto_iva": 1,
+"categoria_tributaria": 1
+},
+{
+"codigo": "322000",
+"descripcion": "FABRICACIÓN DE INSTRUMENTOS MUSICALES",
+"afecto_iva": 1,
+"categoria_tributaria": 1
+},
+{
+"codigo": "323000",
+"descripcion": "FABRICACIÓN DE ARTÍCULOS DE DEPORTE",
+"afecto_iva": 1,
+"categoria_tributaria": 1
+},
+{
+"codigo": "324000",
+"descripcion": "FABRICACIÓN DE JUEGOS Y JUGUETES",
+"afecto_iva": 1,
+"categoria_tributaria": 1
+},
+{
+"codigo": "325001",
+"descripcion": "ACTIVIDADES DE LABORATORIOS DENTALES",
+"afecto_iva": 1,
+"categoria_tributaria": 1
+},
+{
+"codigo": "325009",
+"descripcion": "FABRICACIÓN DE INSTRUMENTOS Y MATERIALES MÉDICOS, OFTALMOLÓGICOS Y ODONTOLÓGICOS N.C.P.",
+"afecto_iva": 1,
+"categoria_tributaria": 1
+},
+{
+"codigo": "329000",
+"descripcion": "OTRAS INDUSTRIAS MANUFACTURERAS N.C.P.",
+"afecto_iva": 1,
+"categoria_tributaria": 1
+},
+{
+"codigo": "331100",
+"descripcion": "REPARACIÓN DE PRODUCTOS ELABORADOS DE METAL",
+"afecto_iva": 1,
+"categoria_tributaria": 1
+},
+{
+"codigo": "331201",
+"descripcion": "REPARACIÓN DE MAQUINARIA AGROPECUARIA Y FORESTAL",
+"afecto_iva": 1,
+"categoria_tributaria": 1
+},
+{
+"codigo": "331202",
+"descripcion": "REPARACIÓN DE MAQUINARIA METALÚRGICA, PARA LA MINERÍA, EXTRACCIÓN DE PETRÓLEO Y PARA LA CONSTRUCCIÓN",
+"afecto_iva": 1,
+"categoria_tributaria": 1
+},
+{
+"codigo": "331203",
+"descripcion": "REPARACIÓN DE MAQUINARIA PARA LA ELABORACIÓN DE ALIMENTOS, BEBIDAS Y TABACO",
+"afecto_iva": 1,
+"categoria_tributaria": 1
+},
+{
+"codigo": "331204",
+"descripcion": "REPARACIÓN DE MAQUINARIA PARA PRODUCIR TEXTILES, PRENDAS DE VESTIR, ARTÍCULOS DE CUERO Y CALZADO",
+"afecto_iva": 1,
+"categoria_tributaria": 1
+},
+{
+"codigo": "331209",
+"descripcion": "REPARACIÓN DE OTRO TIPO DE MAQUINARIA Y EQUIPOS INDUSTRIALES N.C.P.",
+"afecto_iva": 1,
+"categoria_tributaria": 1
+},
+{
+"codigo": "331301",
+"descripcion": "REPARACIÓN DE EQUIPO DE MEDICIÓN, PRUEBA, NAVEGACIÓN Y CONTROL",
+"afecto_iva": 1,
+"categoria_tributaria": 1
+},
+{
+"codigo": "331309",
+"descripcion": "REPARACIÓN DE OTROS EQUIPOS ELECTRÓNICOS Y ÓPTICOS N.C.P.",
+"afecto_iva": 1,
+"categoria_tributaria": 1
+},
+{
+"codigo": "331400",
+"descripcion": "REPARACIÓN DE EQUIPO ELÉCTRICO (EXCEPTO REPARACIÓN DE EQUIPO Y ENSERES DOMÉSTICOS)",
+"afecto_iva": 1,
+"categoria_tributaria": 1
+},
+{
+"codigo": "331501",
+"descripcion": "REPARACIÓN DE BUQUES, EMBARCACIONES MENORES Y ESTRUCTURAS FLOTANTES",
+"afecto_iva": 1,
+"categoria_tributaria": 1
+},
+{
+"codigo": "331502",
+"descripcion": "REPARACIÓN DE AERONAVES Y NAVES ESPACIALES",
+"afecto_iva": 1,
+"categoria_tributaria": 1
+},
+{
+"codigo": "331509",
+"descripcion": "REPARACIÓN DE OTROS EQUIPOS DE TRANSPORTE N.C.P., EXCEPTO VEHÍCULOS AUTOMOTORES",
+"afecto_iva": 1,
+"categoria_tributaria": 1
+},
+{
+"codigo": "331900",
+"descripcion": "REPARACIÓN DE OTROS TIPOS DE EQUIPO",
+"afecto_iva": 1,
+"categoria_tributaria": 1
+},
+{
+"codigo": "332000",
+"descripcion": "INSTALACIÓN DE MAQUINARIA Y EQUIPOS INDUSTRIALES",
+"afecto_iva": 1,
+"categoria_tributaria": 1
+},
+{
+"codigo": "351011",
+"descripcion": "GENERACIÓN DE ENERGÍA ELÉCTRICA EN CENTRALES HIDROELÉCTRICAS",
+"afecto_iva": 1,
+"categoria_tributaria": 1
+},
+{
+"codigo": "351012",
+"descripcion": "GENERACIÓN DE ENERGÍA ELÉCTRICA EN CENTRALES TERMOELÉCTRICAS",
+"afecto_iva": 1,
+"categoria_tributaria": 1
+},
+{
+"codigo": "351019",
+"descripcion": "GENERACIÓN DE ENERGÍA ELÉCTRICA EN OTRAS CENTRALES N.C.P.",
+"afecto_iva": 1,
+"categoria_tributaria": 1
+},
+{
+"codigo": "351020",
+"descripcion": "TRANSMISIÓN DE ENERGÍA ELÉCTRICA",
+"afecto_iva": 1,
+"categoria_tributaria": 1
+},
+{
+"codigo": "351030",
+"descripcion": "DISTRIBUCIÓN DE ENERGÍA ELÉCTRICA",
+"afecto_iva": 1,
+"categoria_tributaria": 1
+},
+{
+"codigo": "352010",
+"descripcion": "REGASIFICACIÓN DE GAS NATURAL LICUADO (GNL)",
+"afecto_iva": 1,
+"categoria_tributaria": 1
+},
+{
+"codigo": "352020",
+"descripcion": "FABRICACIÓN DE GAS; DISTRIBUCIÓN DE COMBUSTIBLES GASEOSOS POR TUBERÍA, EXCEPTO REGASIFICACIÓN DE GNL",
+"afecto_iva": 1,
+"categoria_tributaria": 1
+},
+{
+"codigo": "353001",
+"descripcion": "SUMINISTRO DE VAPOR Y DE AIRE ACONDICIONADO",
+"afecto_iva": 1,
+"categoria_tributaria": 1
+},
+{
+"codigo": "353002",
+"descripcion": "ELABORACIÓN DE HIELO (EXCEPTO FABRICACIÓN DE HIELO SECO)",
+"afecto_iva": 1,
+"categoria_tributaria": 1
+},
+{
+"codigo": "360000",
+"descripcion": "CAPTACIÓN, TRATAMIENTO Y DISTRIBUCIÓN DE AGUA",
+"afecto_iva": 1,
+"categoria_tributaria": 1
+},
+{
+"codigo": "370000",
+"descripcion": "EVACUACIÓN Y TRATAMIENTO DE AGUAS SERVIDAS",
+"afecto_iva": 1,
+"categoria_tributaria": 1
+},
+{
+"codigo": "381100",
+"descripcion": "RECOGIDA DE DESECHOS NO PELIGROSOS",
+"afecto_iva": 1,
+"categoria_tributaria": 1
+},
+{
+"codigo": "381200",
+"descripcion": "RECOGIDA DE DESECHOS PELIGROSOS",
+"afecto_iva": 1,
+"categoria_tributaria": 1
+},
+{
+"codigo": "382100",
+"descripcion": "TRATAMIENTO Y ELIMINACIÓN DE DESECHOS NO PELIGROSOS",
+"afecto_iva": 1,
+"categoria_tributaria": 1
+},
+{
+"codigo": "382200",
+"descripcion": "TRATAMIENTO Y ELIMINACIÓN DE DESECHOS PELIGROSOS",
+"afecto_iva": 1,
+"categoria_tributaria": 1
+},
+{
+"codigo": "383001",
+"descripcion": "RECUPERACIÓN Y RECICLAMIENTO DE DESPERDICIOS Y DESECHOS METÁLICOS",
+"afecto_iva": 1,
+"categoria_tributaria": 1
+},
+{
+"codigo": "383002",
+"descripcion": "RECUPERACIÓN Y RECICLAMIENTO DE PAPEL",
+"afecto_iva": 1,
+"categoria_tributaria": 1
+},
+{
+"codigo": "383003",
+"descripcion": "RECUPERACIÓN Y RECICLAMIENTO DE VIDRIO",
+"afecto_iva": 1,
+"categoria_tributaria": 1
+},
+{
+"codigo": "383009",
+"descripcion": "RECUPERACIÓN Y RECICLAMIENTO DE OTROS DESPERDICIOS Y DESECHOS N.C.P.",
+"afecto_iva": 1,
+"categoria_tributaria": 1
+},
+{
+"codigo": "390000",
+"descripcion": "ACTIVIDADES DE DESCONTAMINACIÓN Y OTROS SERVICIOS DE GESTIÓN DE DESECHOS",
+"afecto_iva": 1,
+"categoria_tributaria": 1
+},
+{
+"codigo": "410010",
+"descripcion": "CONSTRUCCIÓN DE EDIFICIOS PARA USO RESIDENCIAL",
+"afecto_iva": 1,
+"categoria_tributaria": 1
+},
+{
+"codigo": "410020",
+"descripcion": "CONSTRUCCIÓN DE EDIFICIOS PARA USO NO RESIDENCIAL",
+"afecto_iva": 1,
+"categoria_tributaria": 1
+},
+{
+"codigo": "421000",
+"descripcion": "CONSTRUCCIÓN DE CARRETERAS Y LÍNEAS DE FERROCARRIL",
+"afecto_iva": 1,
+"categoria_tributaria": 1
+},
+{
+"codigo": "422000",
+"descripcion": "CONSTRUCCIÓN DE PROYECTOS DE SERVICIO PÚBLICO",
+"afecto_iva": 1,
+"categoria_tributaria": 1
+},
+{
+"codigo": "429000",
+"descripcion": "CONSTRUCCIÓN DE OTRAS OBRAS DE INGENIERÍA CIVIL",
+"afecto_iva": 1,
+"categoria_tributaria": 1
+},
+{
+"codigo": "431100",
+"descripcion": "DEMOLICIÓN",
+"afecto_iva": 1,
+"categoria_tributaria": 1
+},
+{
+"codigo": "431200",
+"descripcion": "PREPARACIÓN DEL TERRENO",
+"afecto_iva": 1,
+"categoria_tributaria": 1
+},
+{
+"codigo": "432100",
+"descripcion": "INSTALACIONES ELÉCTRICAS",
+"afecto_iva": 1,
+"categoria_tributaria": 1
+},
+{
+"codigo": "432200",
+"descripcion": "INSTALACIONES DE GASFITERÍA, CALEFACCIÓN Y AIRE ACONDICIONADO",
+"afecto_iva": 1,
+"categoria_tributaria": 1
+},
+{
+"codigo": "432900",
+"descripcion": "OTRAS INSTALACIONES PARA OBRAS DE CONSTRUCCIÓN",
+"afecto_iva": 1,
+"categoria_tributaria": 1
+},
+{
+"codigo": "433000",
+"descripcion": "TERMINACIÓN Y ACABADO DE EDIFICIOS",
+"afecto_iva": 1,
+"categoria_tributaria": 1
+},
+{
+"codigo": "439000",
+"descripcion": "OTRAS ACTIVIDADES ESPECIALIZADAS DE CONSTRUCCIÓN",
+"afecto_iva": 1,
+"categoria_tributaria": 1
+},
+{
+"codigo": "451001",
+"descripcion": "VENTA AL POR MAYOR DE VEHÍCULOS AUTOMOTORES",
+"afecto_iva": 1,
+"categoria_tributaria": 1
+},
+{
+"codigo": "451002",
+"descripcion": "VENTA AL POR MENOR DE VEHÍCULOS AUTOMOTORES NUEVOS O USADOS (INCLUYE COMPRAVENTA)",
+"afecto_iva": 1,
+"categoria_tributaria": 1
+},
+{
+"codigo": "452001",
+"descripcion": "SERVICIO DE LAVADO DE VEHÍCULOS AUTOMOTORES",
+"afecto_iva": 1,
+"categoria_tributaria": 1
+},
+{
+"codigo": "452002",
+"descripcion": "MANTENIMIENTO Y REPARACIÓN DE VEHÍCULOS AUTOMOTORES",
+"afecto_iva": 1,
+"categoria_tributaria": 1
+},
+{
+"codigo": "453000",
+"descripcion": "VENTA DE PARTES, PIEZAS Y ACCESORIOS PARA VEHÍCULOS AUTOMOTORES",
+"afecto_iva": 1,
+"categoria_tributaria": 1
+},
+{
+"codigo": "454001",
+"descripcion": "VENTA DE MOTOCICLETAS",
+"afecto_iva": 1,
+"categoria_tributaria": 1
+},
+{
+"codigo": "454002",
+"descripcion": "VENTA DE PARTES, PIEZAS Y ACCESORIOS DE MOTOCICLETAS",
+"afecto_iva": 1,
+"categoria_tributaria": 1
+},
+{
+"codigo": "454003",
+"descripcion": "MANTENIMIENTO Y REPARACIÓN DE MOTOCICLETAS",
+"afecto_iva": 1,
+"categoria_tributaria": 1
+},
+{
+"codigo": "461001",
+"descripcion": "CORRETAJE AL POR MAYOR DE PRODUCTOS AGRÍCOLAS",
+"afecto_iva": 1,
+"categoria_tributaria": 1
+},
+{
+"codigo": "461002",
+"descripcion": "CORRETAJE AL POR MAYOR DE GANADO",
+"afecto_iva": 1,
+"categoria_tributaria": 1
+},
+{
+"codigo": "461009",
+"descripcion": "OTROS TIPOS DE CORRETAJES O REMATES AL POR MAYOR N.C.P.",
+"afecto_iva": 1,
+"categoria_tributaria": 1
+},
+{
+"codigo": "462010",
+"descripcion": "VENTA AL POR MAYOR DE MATERIAS PRIMAS AGRÍCOLAS",
+"afecto_iva": 1,
+"categoria_tributaria": 1
+},
+{
+"codigo": "462020",
+"descripcion": "VENTA AL POR MAYOR DE ANIMALES VIVOS",
+"afecto_iva": 1,
+"categoria_tributaria": 1
+},
+{
+"codigo": "462090",
+"descripcion": "VENTA AL POR MAYOR DE OTRAS MATERIAS PRIMAS AGROPECUARIAS N.C.P.",
+"afecto_iva": 1,
+"categoria_tributaria": 1
+},
+{
+"codigo": "463011",
+"descripcion": "VENTA AL POR MAYOR DE FRUTAS Y VERDURAS",
+"afecto_iva": 1,
+"categoria_tributaria": 1
+},
+{
+"codigo": "463012",
+"descripcion": "VENTA AL POR MAYOR DE CARNE Y PRODUCTOS CÁRNICOS",
+"afecto_iva": 1,
+"categoria_tributaria": 1
+},
+{
+"codigo": "463013",
+"descripcion": "VENTA AL POR MAYOR DE PRODUCTOS DEL MAR (PESCADOS, MARISCOS Y ALGAS)",
+"afecto_iva": 1,
+"categoria_tributaria": 1
+},
+{
+"codigo": "463014",
+"descripcion": "VENTA AL POR MAYOR DE PRODUCTOS DE CONFITERÍA",
+"afecto_iva": 1,
+"categoria_tributaria": 1
+},
+{
+"codigo": "463019",
+"descripcion": "VENTA AL POR MAYOR DE HUEVOS, LÁCTEOS, ABARROTES Y DE OTROS ALIMENTOS N.C.P.",
+"afecto_iva": 1,
+"categoria_tributaria": 1
+},
+{
+"codigo": "463020",
+"descripcion": "VENTA AL POR MAYOR DE BEBIDAS ALCOHÓLICAS Y NO ALCOHÓLICAS",
+"afecto_iva": 1,
+"categoria_tributaria": 1
+},
+{
+"codigo": "463030",
+"descripcion": "VENTA AL POR MAYOR DE TABACO",
+"afecto_iva": 1,
+"categoria_tributaria": 1
+},
+{
+"codigo": "464100",
+"descripcion": "VENTA AL POR MAYOR DE PRODUCTOS TEXTILES, PRENDAS DE VESTIR Y CALZADO",
+"afecto_iva": 1,
+"categoria_tributaria": 1
+},
+{
+"codigo": "464901",
+"descripcion": "VENTA AL POR MAYOR DE MUEBLES, EXCEPTO MUEBLES DE OFICINA",
+"afecto_iva": 1,
+"categoria_tributaria": 1
+},
+{
+"codigo": "464902",
+"descripcion": "VENTA AL POR MAYOR DE ARTÍCULOS ELÉCTRICOS Y ELECTRÓNICOS PARA EL HOGAR",
+"afecto_iva": 1,
+"categoria_tributaria": 1
+},
+{
+"codigo": "464903",
+"descripcion": "VENTA AL POR MAYOR DE ARTÍCULOS DE PERFUMERÍA, DE TOCADOR Y COSMÉTICOS",
+"afecto_iva": 1,
+"categoria_tributaria": 1
+},
+{
+"codigo": "464904",
+"descripcion": "VENTA AL POR MAYOR DE ARTÍCULOS DE PAPELERÍA Y ESCRITORIO",
+"afecto_iva": 1,
+"categoria_tributaria": 1
+},
+{
+"codigo": "464905",
+"descripcion": "VENTA AL POR MAYOR DE LIBROS",
+"afecto_iva": 1,
+"categoria_tributaria": 1
+},
+{
+"codigo": "464906",
+"descripcion": "VENTA AL POR MAYOR DE DIARIOS Y REVISTAS",
+"afecto_iva": 1,
+"categoria_tributaria": 1
+},
+{
+"codigo": "464907",
+"descripcion": "VENTA AL POR MAYOR DE PRODUCTOS FARMACÉUTICOS Y MEDICINALES",
+"afecto_iva": 1,
+"categoria_tributaria": 1
+},
+{
+"codigo": "464908",
+"descripcion": "VENTA AL POR MAYOR DE INSTRUMENTOS CIENTÍFICOS Y QUIRÚRGICOS",
+"afecto_iva": 1,
+"categoria_tributaria": 1
+},
+{
+"codigo": "464909",
+"descripcion": "VENTA AL POR MAYOR DE OTROS ENSERES DOMÉSTICOS N.C.P.",
+"afecto_iva": 1,
+"categoria_tributaria": 1
+},
+{
+"codigo": "465100",
+"descripcion": "VENTA AL POR MAYOR DE COMPUTADORES, EQUIPO PERIFÉRICO Y PROGRAMAS INFORMÁTICOS",
+"afecto_iva": 1,
+"categoria_tributaria": 1
+},
+{
+"codigo": "465200",
+"descripcion": "VENTA AL POR MAYOR DE EQUIPO, PARTES Y PIEZAS ELECTRÓNICOS Y DE TELECOMUNICACIONES",
+"afecto_iva": 1,
+"categoria_tributaria": 1
+},
+{
+"codigo": "465300",
+"descripcion": "VENTA AL POR MAYOR DE MAQUINARIA, EQUIPO Y MATERIALES AGROPECUARIOS",
+"afecto_iva": 1,
+"categoria_tributaria": 1
+},
+{
+"codigo": "465901",
+"descripcion": "VENTA AL POR MAYOR DE MAQUINARIA METALÚRGICA, PARA LA MINERÍA, EXTRACCIÓN DE PETRÓLEO Y CONSTRUCCIÓN",
+"afecto_iva": 1,
+"categoria_tributaria": 1
+},
+{
+"codigo": "465902",
+"descripcion": "VENTA AL POR MAYOR DE MAQUINARIA PARA LA ELABORACIÓN DE ALIMENTOS, BEBIDAS Y TABACO",
+"afecto_iva": 1,
+"categoria_tributaria": 1
+},
+{
+"codigo": "465903",
+"descripcion": "VENTA AL POR MAYOR DE MAQUINARIA PARA LA INDUSTRIA TEXTIL, DEL CUERO Y DEL CALZADO",
+"afecto_iva": 1,
+"categoria_tributaria": 1
+},
+{
+"codigo": "465904",
+"descripcion": "VENTA AL POR MAYOR DE MAQUINARIA Y EQUIPO DE OFICINA; VENTA AL POR MAYOR DE MUEBLES DE OFICINA",
+"afecto_iva": 1,
+"categoria_tributaria": 1
+},
+{
+"codigo": "465905",
+"descripcion": "VENTA AL POR MAYOR DE EQUIPO DE TRANSPORTE(EXCEPTO VEHÍCULOS AUTOMOTORES, MOTOCICLETAS Y BICICLETAS)",
+"afecto_iva": 1,
+"categoria_tributaria": 1
+},
+{
+"codigo": "465909",
+"descripcion": "VENTA AL POR MAYOR DE OTROS TIPOS DE MAQUINARIA Y EQUIPO N.C.P.",
+"afecto_iva": 1,
+"categoria_tributaria": 1
+},
+{
+"codigo": "466100",
+"descripcion": "VENTA AL POR MAYOR DE COMBUSTIBLES SÓLIDOS, LÍQUIDOS Y GASEOSOS Y PRODUCTOS CONEXOS",
+"afecto_iva": 1,
+"categoria_tributaria": 1
+},
+{
+"codigo": "466200",
+"descripcion": "VENTA AL POR MAYOR DE METALES Y MINERALES METALÍFEROS",
+"afecto_iva": 1,
+"categoria_tributaria": 1
+},
+{
+"codigo": "466301",
+"descripcion": "VENTA AL POR MAYOR DE MADERA EN BRUTO Y PRODUCTOS PRIMARIOS DE LA ELABORACIÓN DE MADERA",
+"afecto_iva": 1,
+"categoria_tributaria": 1
+},
+{
+"codigo": "466302",
+"descripcion": "VENTA AL POR MAYOR DE MATERIALES DE CONSTRUCCIÓN, ARTÍCULOS DE FERRETERÍA, GASFITERÍA Y CALEFACCIÓN",
+"afecto_iva": 1,
+"categoria_tributaria": 1
+},
+{
+"codigo": "466901",
+"descripcion": "VENTA AL POR MAYOR DE PRODUCTOS QUÍMICOS",
+"afecto_iva": 1,
+"categoria_tributaria": 1
+},
+{
+"codigo": "466902",
+"descripcion": "VENTA AL POR MAYOR DE DESECHOS METÁLICOS (CHATARRA)",
+"afecto_iva": 1,
+"categoria_tributaria": 1
+},
+{
+"codigo": "466909",
+"descripcion": "VENTA AL POR MAYOR DE DESPERDICIOS, DESECHOS Y OTROS PRODUCTOS N.C.P.",
+"afecto_iva": 1,
+"categoria_tributaria": 1
+},
+{
+"codigo": "469000",
+"descripcion": "VENTA AL POR MAYOR NO ESPECIALIZADA",
+"afecto_iva": 1,
+"categoria_tributaria": 1
+},
+{
+"codigo": "471100",
+"descripcion": "VENTA AL POR MENOR EN COMERCIOS DE ALIMENTOS, BEBIDAS O TABACO (SUPERMERCADOS E HIPERMERCADOS)",
+"afecto_iva": 1,
+"categoria_tributaria": 1
+},
+{
+"codigo": "471910",
+"descripcion": "VENTA AL POR MENOR EN COMERCIOS DE VESTUARIO Y PRODUCTOS PARA EL HOGAR (GRANDES TIENDAS)",
+"afecto_iva": 1,
+"categoria_tributaria": 1
+},
+{
+"codigo": "471990",
+"descripcion": "OTRAS ACTIVIDADES DE VENTA AL POR MENOR EN COMERCIOS NO ESPECIALIZADOS N.C.P.",
+"afecto_iva": 1,
+"categoria_tributaria": 1
+},
+{
+"codigo": "472101",
+"descripcion": "VENTA AL POR MENOR DE ALIMENTOS EN COMERCIOS ESPECIALIZADOS (ALMACENES PEQUEÑOS Y MINIMARKET)",
+"afecto_iva": 1,
+"categoria_tributaria": 1
+},
+{
+"codigo": "472102",
+"descripcion": "VENTA AL POR MENOR EN COMERCIOS ESPECIALIZADOS DE CARNE Y PRODUCTOS CÁRNICOS",
+"afecto_iva": 1,
+"categoria_tributaria": 1
+},
+{
+"codigo": "472103",
+"descripcion": "VENTA AL POR MENOR EN COMERCIOS ESPECIALIZADOS DE FRUTAS Y VERDURAS (VERDULERÍAS)",
+"afecto_iva": 1,
+"categoria_tributaria": 1
+},
+{
+"codigo": "472104",
+"descripcion": "VENTA AL POR MENOR EN COMERCIOS ESPECIALIZADOS DE PESCADO, MARISCOS Y PRODUCTOS CONEXOS",
+"afecto_iva": 1,
+"categoria_tributaria": 1
+},
+{
+"codigo": "472105",
+"descripcion": "VENTA AL POR MENOR EN COMERCIOS ESPECIALIZADOS DE PRODUCTOS DE PANADERÍA Y PASTELERÍA",
+"afecto_iva": 1,
+"categoria_tributaria": 1
+},
+{
+"codigo": "472109",
+"descripcion": "VENTA AL POR MENOR EN COMERCIOS ESPECIALIZADOS DE HUEVOS, CONFITES Y PRODUCTOS ALIMENTICIOS N.C.P.",
+"afecto_iva": 1,
+"categoria_tributaria": 1
+},
+{
+"codigo": "472200",
+"descripcion": "VENTA AL POR MENOR DE BEBIDAS ALCOHÓLICAS Y NO ALCOHÓLICAS EN COMERCIOS ESPECIALIZADOS (BOTILLERÍAS)",
+"afecto_iva": 1,
+"categoria_tributaria": 1
+},
+{
+"codigo": "472300",
+"descripcion": "VENTA AL POR MENOR DE TABACO Y PRODUCTOS DE TABACO EN COMERCIOS ESPECIALIZADOS",
+"afecto_iva": 1,
+"categoria_tributaria": 1
+},
+{
+"codigo": "473000",
+"descripcion": "VENTA AL POR MENOR DE COMBUSTIBLES PARA VEHÍCULOS AUTOMOTORES EN COMERCIOS ESPECIALIZADOS",
+"afecto_iva": 1,
+"categoria_tributaria": 1
+},
+{
+"codigo": "474100",
+"descripcion": "VENTA AL POR MENOR DE COMPUTADORES, EQUIPO PERIFÉRICO, PROGRAMAS INFORMÁTICOS Y EQUIPO DE TELECOM.",
+"afecto_iva": 1,
+"categoria_tributaria": 1
+},
+{
+"codigo": "474200",
+"descripcion": "VENTA AL POR MENOR DE EQUIPO DE SONIDO Y DE VIDEO EN COMERCIOS ESPECIALIZADOS",
+"afecto_iva": 1,
+"categoria_tributaria": 1
+},
+{
+"codigo": "475100",
+"descripcion": "VENTA AL POR MENOR DE TELAS, LANAS, HILOS Y SIMILARES EN COMERCIOS ESPECIALIZADOS",
+"afecto_iva": 1,
+"categoria_tributaria": 1
+},
+{
+"codigo": "475201",
+"descripcion": "VENTA AL POR MENOR DE ARTÍCULOS DE FERRETERÍA Y MATERIALES DE CONSTRUCCIÓN",
+"afecto_iva": 1,
+"categoria_tributaria": 1
+},
+{
+"codigo": "475202",
+"descripcion": "VENTA AL POR MENOR DE PINTURAS, BARNICES Y LACAS EN COMERCIOS ESPECIALIZADOS",
+"afecto_iva": 1,
+"categoria_tributaria": 1
+},
+{
+"codigo": "475203",
+"descripcion": "VENTA AL POR MENOR DE PRODUCTOS DE VIDRIO EN COMERCIOS ESPECIALIZADOS",
+"afecto_iva": 1,
+"categoria_tributaria": 1
+},
+{
+"codigo": "475300",
+"descripcion": "VENTA AL POR MENOR DE TAPICES, ALFOMBRAS Y CUBRIMIENTOS PARA PAREDES Y PISOS",
+"afecto_iva": 1,
+"categoria_tributaria": 1
+},
+{
+"codigo": "475901",
+"descripcion": "VENTA AL POR MENOR DE MUEBLES Y COLCHONES EN COMERCIOS ESPECIALIZADOS",
+"afecto_iva": 1,
+"categoria_tributaria": 1
+},
+{
+"codigo": "475902",
+"descripcion": "VENTA AL POR MENOR DE INSTRUMENTOS MUSICALES EN COMERCIOS ESPECIALIZADOS",
+"afecto_iva": 1,
+"categoria_tributaria": 1
+},
+{
+"codigo": "475909",
+"descripcion": "VENTA AL POR MENOR DE APARATOS ELÉCTRICOS, TEXTILES PARA EL HOGAR Y OTROS ENSERES DOMÉSTICOS N.C.P.",
+"afecto_iva": 1,
+"categoria_tributaria": 1
+},
+{
+"codigo": "476101",
+"descripcion": "VENTA AL POR MENOR DE LIBROS EN COMERCIOS ESPECIALIZADOS",
+"afecto_iva": 1,
+"categoria_tributaria": 1
+},
+{
+"codigo": "476102",
+"descripcion": "VENTA AL POR MENOR DE DIARIOS Y REVISTAS EN COMERCIOS ESPECIALIZADOS",
+"afecto_iva": 1,
+"categoria_tributaria": 1
+},
+{
+"codigo": "476103",
+"descripcion": "VENTA AL POR MENOR DE ARTÍCULOS DE PAPELERÍA Y ESCRITORIO EN COMERCIOS ESPECIALIZADOS",
+"afecto_iva": 1,
+"categoria_tributaria": 1
+},
+{
+"codigo": "476200",
+"descripcion": "VENTA AL POR MENOR DE GRABACIONES DE MÚSICA Y DE VIDEO EN COMERCIOS ESPECIALIZADOS",
+"afecto_iva": 1,
+"categoria_tributaria": 1
+},
+{
+"codigo": "476301",
+"descripcion": "VENTA AL POR MENOR DE ARTÍCULOS DE CAZA Y PESCA EN COMERCIOS ESPECIALIZADOS",
+"afecto_iva": 1,
+"categoria_tributaria": 1
+},
+{
+"codigo": "476302",
+"descripcion": "VENTA AL POR MENOR DE BICICLETAS Y SUS REPUESTOS EN COMERCIOS ESPECIALIZADOS",
+"afecto_iva": 1,
+"categoria_tributaria": 1
+},
+{
+"codigo": "476309",
+"descripcion": "VENTA AL POR MENOR DE OTROS ARTÍCULOS Y EQUIPOS DE DEPORTE N.C.P.",
+"afecto_iva": 1,
+"categoria_tributaria": 1
+},
+{
+"codigo": "476400",
+"descripcion": "VENTA AL POR MENOR DE JUEGOS Y JUGUETES EN COMERCIOS ESPECIALIZADOS",
+"afecto_iva": 1,
+"categoria_tributaria": 1
+},
+{
+"codigo": "477101",
+"descripcion": "VENTA AL POR MENOR DE CALZADO EN COMERCIOS ESPECIALIZADOS",
+"afecto_iva": 1,
+"categoria_tributaria": 1
+},
+{
+"codigo": "477102",
+"descripcion": "VENTA AL POR MENOR DE PRENDAS Y ACCESORIOS DE VESTIR EN COMERCIOS ESPECIALIZADOS",
+"afecto_iva": 1,
+"categoria_tributaria": 1
+},
+{
+"codigo": "477103",
+"descripcion": "VENTA AL POR MENOR DE CARTERAS, MALETAS Y OTROS ACCESORIOS DE VIAJE EN COMERCIOS ESPECIALIZADOS",
+"afecto_iva": 1,
+"categoria_tributaria": 1
+},
+{
+"codigo": "477201",
+"descripcion": "VENTA AL POR MENOR DE PRODUCTOS FARMACÉUTICOS Y MEDICINALES EN COMERCIOS ESPECIALIZADOS",
+"afecto_iva": 1,
+"categoria_tributaria": 1
+},
+{
+"codigo": "477202",
+"descripcion": "VENTA AL POR MENOR DE ARTÍCULOS ORTOPÉDICOS EN COMERCIOS ESPECIALIZADOS",
+"afecto_iva": 1,
+"categoria_tributaria": 1
+},
+{
+"codigo": "477203",
+"descripcion": "VENTA AL POR MENOR DE ARTÍCULOS DE PERFUMERÍA, DE TOCADOR Y COSMÉTICOS EN COMERCIOS ESPECIALIZADOS",
+"afecto_iva": 1,
+"categoria_tributaria": 1
+},
+{
+"codigo": "477310",
+"descripcion": "VENTA AL POR MENOR DE GAS LICUADO EN BOMBONAS (CILINDROS) EN COMERCIOS ESPECIALIZADOS",
+"afecto_iva": 1,
+"categoria_tributaria": 1
+},
+{
+"codigo": "477391",
+"descripcion": "VENTA AL POR MENOR DE ALIMENTO Y ACCESORIOS PARA MASCOTAS EN COMERCIOS ESPECIALIZADOS",
+"afecto_iva": 1,
+"categoria_tributaria": 1
+},
+{
+"codigo": "477392",
+"descripcion": "VENTA AL POR MENOR DE ARMAS Y MUNICIONES EN COMERCIOS ESPECIALIZADOS",
+"afecto_iva": 1,
+"categoria_tributaria": 1
+},
+{
+"codigo": "477393",
+"descripcion": "VENTA AL POR MENOR DE ARTÍCULOS ÓPTICOS EN COMERCIOS ESPECIALIZADOS",
+"afecto_iva": 1,
+"categoria_tributaria": 1
+},
+{
+"codigo": "477394",
+"descripcion": "VENTA AL POR MENOR DE ARTÍCULOS DE JOYERÍA, BISUTERÍA Y RELOJERÍA EN COMERCIOS ESPECIALIZADOS",
+"afecto_iva": 1,
+"categoria_tributaria": 1
+},
+{
+"codigo": "477395",
+"descripcion": "VENTA AL POR MENOR DE CARBÓN, LEÑA Y OTROS COMBUSTIBLES DE USO DOMÉSTICO EN COMERCIOS ESPECIALIZADOS",
+"afecto_iva": 1,
+"categoria_tributaria": 1
+},
+{
+"codigo": "477396",
+"descripcion": "VENTA AL POR MENOR DE RECUERDOS, ARTESANÍAS Y ARTÍCULOS RELIGIOSOS EN COMERCIOS ESPECIALIZADOS",
+"afecto_iva": 1,
+"categoria_tributaria": 1
+},
+{
+"codigo": "477397",
+"descripcion": "VENTA AL POR MENOR DE FLORES, PLANTAS, ARBOLES, SEMILLAS Y ABONOS EN COMERCIOS ESPECIALIZADOS",
+"afecto_iva": 1,
+"categoria_tributaria": 1
+},
+{
+"codigo": "477398",
+"descripcion": "VENTA AL POR MENOR DE MASCOTAS EN COMERCIOS ESPECIALIZADOS",
+"afecto_iva": 1,
+"categoria_tributaria": 1
+},
+{
+"codigo": "477399",
+"descripcion": "VENTA AL POR MENOR DE OTROS PRODUCTOS EN COMERCIOS ESPECIALIZADOS N.C.P.",
+"afecto_iva": 1,
+"categoria_tributaria": 1
+},
+{
+"codigo": "477401",
+"descripcion": "VENTA AL POR MENOR DE ANTIGÜEDADES EN COMERCIOS",
+"afecto_iva": 1,
+"categoria_tributaria": 1
+},
+{
+"codigo": "477402",
+"descripcion": "VENTA AL POR MENOR DE ROPA USADA EN COMERCIOS",
+"afecto_iva": 1,
+"categoria_tributaria": 1
+},
+{
+"codigo": "477409",
+"descripcion": "VENTA AL POR MENOR DE OTROS ARTÍCULOS DE SEGUNDA MANO EN COMERCIOS N.C.P.",
+"afecto_iva": 1,
+"categoria_tributaria": 1
+},
+{
+"codigo": "478100",
+"descripcion": "VENTA AL POR MENOR DE ALIMENTOS, BEBIDAS Y TABACO EN PUESTOS DE VENTA Y MERCADOS (INCLUYE FERIAS)",
+"afecto_iva": 1,
+"categoria_tributaria": 1
+},
+{
+"codigo": "478200",
+"descripcion": "VENTA AL POR MENOR DE PRODUCTOS TEXTILES, PRENDAS DE VESTIR Y CALZADO EN PUESTOS DE VENTA Y MERCADOS",
+"afecto_iva": 1,
+"categoria_tributaria": 1
+},
+{
+"codigo": "478900",
+"descripcion": "VENTA AL POR MENOR DE OTROS PRODUCTOS EN PUESTOS DE VENTA Y MERCADOS (INCLUYE FERIAS)",
+"afecto_iva": 1,
+"categoria_tributaria": 1
+},
+{
+"codigo": "479100",
+"descripcion": "VENTA AL POR MENOR POR CORREO, POR INTERNET Y VÍA TELEFÓNICA",
+"afecto_iva": 1,
+"categoria_tributaria": 1
+},
+{
+"codigo": "479901",
+"descripcion": "VENTA AL POR MENOR REALIZADA POR INDEPENDIENTES EN LA LOCOMOCIÓN COLECTIVA (LEY 20.388)",
+"afecto_iva": 1,
+"categoria_tributaria": 1
+},
+{
+"codigo": "479902",
+"descripcion": "VENTA AL POR MENOR MEDIANTE MAQUINAS EXPENDEDORAS",
+"afecto_iva": 1,
+"categoria_tributaria": 1
+},
+{
+"codigo": "479903",
+"descripcion": "VENTA AL POR MENOR POR COMISIONISTAS (NO DEPENDIENTES DE COMERCIOS)",
+"afecto_iva": 1,
+"categoria_tributaria": 1
+},
+{
+"codigo": "479909",
+"descripcion": "OTRAS ACTIVIDADES DE VENTA POR MENOR NO REALIZADAS EN COMERCIOS, PUESTOS DE VENTA O MERCADOS N.C.P.",
+"afecto_iva": 1,
+"categoria_tributaria": 1
+},
+{
+"codigo": "491100",
+"descripcion": "TRANSPORTE INTERURBANO DE PASAJEROS POR FERROCARRIL",
+"afecto_iva": 0,
+"categoria_tributaria": 1
+},
+{
+"codigo": "491200",
+"descripcion": "TRANSPORTE DE CARGA POR FERROCARRIL",
+"afecto_iva": 1,
+"categoria_tributaria": 1
+},
+{
+"codigo": "492110",
+"descripcion": "TRANSPORTE URBANO Y SUBURBANO DE PASAJEROS VÍA METRO Y METROTREN",
+"afecto_iva": 0,
+"categoria_tributaria": 1
+},
+{
+"codigo": "492120",
+"descripcion": "TRANSPORTE URBANO Y SUBURBANO DE PASAJEROS VÍA LOCOMOCIÓN COLECTIVA",
+"afecto_iva": 0,
+"categoria_tributaria": 1
+},
+{
+"codigo": "492130",
+"descripcion": "TRANSPORTE DE PASAJEROS VÍA TAXI COLECTIVO",
+"afecto_iva": 0,
+"categoria_tributaria": 1
+},
+{
+"codigo": "492190",
+"descripcion": "OTRAS ACTIVIDADES DE TRANSPORTE URBANO Y SUBURBANO DE PASAJEROS POR VÍA TERRESTRE N.C.P.",
+"afecto_iva": 0,
+"categoria_tributaria": 1
+},
+{
+"codigo": "492210",
+"descripcion": "SERVICIOS DE TRANSPORTE DE ESCOLARES",
+"afecto_iva": 0,
+"categoria_tributaria": 1
+},
+{
+"codigo": "492220",
+"descripcion": "SERVICIOS DE TRANSPORTE DE TRABAJADORES",
+"afecto_iva": 0,
+"categoria_tributaria": 1
+},
+{
+"codigo": "492230",
+"descripcion": "SERVICIOS DE TRANSPORTE DE PASAJEROS EN TAXIS LIBRES Y RADIOTAXIS",
+"afecto_iva": 0,
+"categoria_tributaria": 1
+},
+{
+"codigo": "492240",
+"descripcion": "SERVICIOS DE TRANSPORTE A TURISTAS",
+"afecto_iva": 0,
+"categoria_tributaria": 1
+},
+{
+"codigo": "492250",
+"descripcion": "TRANSPORTE DE PASAJEROS EN BUSES INTERURBANOS",
+"afecto_iva": 0,
+"categoria_tributaria": 1
+},
+{
+"codigo": "492290",
+"descripcion": "OTRAS ACTIVIDADES DE TRANSPORTE DE PASAJEROS POR VÍA TERRESTRE N.C.P.",
+"afecto_iva": 0,
+"categoria_tributaria": 1
+},
+{
+"codigo": "492300",
+"descripcion": "TRANSPORTE DE CARGA POR CARRETERA",
+"afecto_iva": 1,
+"categoria_tributaria": 1
+},
+{
+"codigo": "493010",
+"descripcion": "TRANSPORTE POR OLEODUCTOS",
+"afecto_iva": 1,
+"categoria_tributaria": 1
+},
+{
+"codigo": "493020",
+"descripcion": "TRANSPORTE POR GASODUCTOS",
+"afecto_iva": 1,
+"categoria_tributaria": 1
+},
+{
+"codigo": "493090",
+"descripcion": "OTRAS ACTIVIDADES DE TRANSPORTE POR TUBERÍAS N.C.P.",
+"afecto_iva": 1,
+"categoria_tributaria": 1
+},
+{
+"codigo": "501100",
+"descripcion": "TRANSPORTE DE PASAJEROS MARÍTIMO Y DE CABOTAJE",
+"afecto_iva": 0,
+"categoria_tributaria": 1
+},
+{
+"codigo": "501200",
+"descripcion": "TRANSPORTE DE CARGA MARÍTIMO Y DE CABOTAJE",
+"afecto_iva": 1,
+"categoria_tributaria": 1
+},
+{
+"codigo": "502100",
+"descripcion": "TRANSPORTE DE PASAJEROS POR VÍAS DE NAVEGACIÓN INTERIORES",
+"afecto_iva": 0,
+"categoria_tributaria": 1
+},
+{
+"codigo": "502200",
+"descripcion": "TRANSPORTE DE CARGA POR VÍAS DE NAVEGACIÓN INTERIORES",
+"afecto_iva": 1,
+"categoria_tributaria": 1
+},
+{
+"codigo": "511000",
+"descripcion": "TRANSPORTE DE PASAJEROS POR VÍA AÉREA",
+"afecto_iva": 0,
+"categoria_tributaria": 1
+},
+{
+"codigo": "512000",
+"descripcion": "TRANSPORTE DE CARGA POR VÍA AÉREA",
+"afecto_iva": 1,
+"categoria_tributaria": 1
+},
+{
+"codigo": "521001",
+"descripcion": "EXPLOTACIÓN DE FRIGORÍFICOS PARA ALMACENAMIENTO Y DEPÓSITO",
+"afecto_iva": 1,
+"categoria_tributaria": 1
+},
+{
+"codigo": "521009",
+"descripcion": "OTROS SERVICIOS DE ALMACENAMIENTO Y DEPÓSITO N.C.P.",
+"afecto_iva": 1,
+"categoria_tributaria": 1
+},
+{
+"codigo": "522110",
+"descripcion": "EXPLOTACIÓN DE TERMINALES TERRESTRES DE PASAJEROS",
+"afecto_iva": 1,
+"categoria_tributaria": 1
+},
+{
+"codigo": "522120",
+"descripcion": "EXPLOTACIÓN DE ESTACIONAMIENTOS DE VEHÍCULOS AUTOMOTORES Y PARQUÍMETROS",
+"afecto_iva": 1,
+"categoria_tributaria": 1
+},
+{
+"codigo": "522130",
+"descripcion": "SERVICIOS PRESTADOS POR CONCESIONARIOS DE CARRETERAS",
+"afecto_iva": 1,
+"categoria_tributaria": 1
+},
+{
+"codigo": "522190",
+"descripcion": "ACTIVIDADES DE SERVICIOS VINCULADAS AL TRANSPORTE TERRESTRE N.C.P.",
+"afecto_iva": 1,
+"categoria_tributaria": 1
+},
+{
+"codigo": "522200",
+"descripcion": "ACTIVIDADES DE SERVICIOS VINCULADAS AL TRANSPORTE ACUÁTICO",
+"afecto_iva": 1,
+"categoria_tributaria": 1
+},
+{
+"codigo": "522300",
+"descripcion": "ACTIVIDADES DE SERVICIOS VINCULADAS AL TRANSPORTE AÉREO",
+"afecto_iva": 1,
+"categoria_tributaria": 1
+},
+{
+"codigo": "522400",
+"descripcion": "MANIPULACIÓN DE LA CARGA",
+"afecto_iva": 1,
+"categoria_tributaria": 1
+},
+{
+"codigo": "522910",
+"descripcion": "AGENCIAS DE ADUANAS",
+"afecto_iva": 1,
+"categoria_tributaria": 1
+},
+{
+"codigo": "522920",
+"descripcion": "AGENCIAS DE NAVES",
+"afecto_iva": 1,
+"categoria_tributaria": 1
+},
+{
+"codigo": "522990",
+"descripcion": "OTRAS ACTIVIDADES DE APOYO AL TRANSPORTE N.C.P.",
+"afecto_iva": 1,
+"categoria_tributaria": 1
+},
+{
+"codigo": "531000",
+"descripcion": "ACTIVIDADES POSTALES",
+"afecto_iva": 1,
+"categoria_tributaria": 1
+},
+{
+"codigo": "532000",
+"descripcion": "ACTIVIDADES DE MENSAJERÍA",
+"afecto_iva": 1,
+"categoria_tributaria": 1
+},
+{
+"codigo": "551001",
+"descripcion": "ACTIVIDADES DE HOTELES",
+"afecto_iva": 1,
+"categoria_tributaria": 1
+},
+{
+"codigo": "551002",
+"descripcion": "ACTIVIDADES DE MOTELES",
+"afecto_iva": 1,
+"categoria_tributaria": 1
+},
+{
+"codigo": "551003",
+"descripcion": "ACTIVIDADES DE RESIDENCIALES PARA TURISTAS",
+"afecto_iva": 1,
+"categoria_tributaria": 1
+},
+{
+"codigo": "551009",
+"descripcion": "OTRAS ACTIVIDADES DE ALOJAMIENTO PARA TURISTAS N.C.P.",
+"afecto_iva": 1,
+"categoria_tributaria": 1
+},
+{
+"codigo": "552000",
+"descripcion": "ACTIVIDADES DE CAMPING Y DE PARQUES PARA CASAS RODANTES",
+"afecto_iva": 1,
+"categoria_tributaria": 1
+},
+{
+"codigo": "559001",
+"descripcion": "ACTIVIDADES DE RESIDENCIALES PARA ESTUDIANTES Y TRABAJADORES",
+"afecto_iva": 1,
+"categoria_tributaria": 1
+},
+{
+"codigo": "559009",
+"descripcion": "OTRAS ACTIVIDADES DE ALOJAMIENTO N.C.P.",
+"afecto_iva": 1,
+"categoria_tributaria": 1
+},
+{
+"codigo": "561000",
+"descripcion": "ACTIVIDADES DE RESTAURANTES Y DE SERVICIO MÓVIL DE COMIDAS",
+"afecto_iva": 1,
+"categoria_tributaria": 1
+},
+{
+"codigo": "562100",
+"descripcion": "SUMINISTRO DE COMIDAS POR ENCARGO (SERVICIOS DE BANQUETERÍA)",
+"afecto_iva": 1,
+"categoria_tributaria": 1
+},
+{
+"codigo": "562900",
+"descripcion": "SUMINISTRO INDUSTRIAL DE COMIDAS POR ENCARGO; CONCESIÓN DE SERVICIOS DE ALIMENTACIÓN",
+"afecto_iva": 1,
+"categoria_tributaria": 1
+},
+{
+"codigo": "563001",
+"descripcion": "ACTIVIDADES DE DISCOTECAS Y CABARET (NIGHT CLUB), CON PREDOMINIO DEL SERVICIO DE BEBIDAS",
+"afecto_iva": 1,
+"categoria_tributaria": 1
+},
+{
+"codigo": "563009",
+"descripcion": "OTRAS ACTIVIDADES DE SERVICIO DE BEBIDAS N.C.P.",
+"afecto_iva": 1,
+"categoria_tributaria": 1
+},
+{
+"codigo": "581100",
+"descripcion": "EDICIÓN DE LIBROS",
+"afecto_iva": 1,
+"categoria_tributaria": 1
+},
+{
+"codigo": "581200",
+"descripcion": "EDICIÓN DE DIRECTORIOS Y LISTAS DE CORREO",
+"afecto_iva": 1,
+"categoria_tributaria": 1
+},
+{
+"codigo": "581300",
+"descripcion": "EDICIÓN DE DIARIOS, REVISTAS Y OTRAS PUBLICACIONES PERIÓDICAS",
+"afecto_iva": 1,
+"categoria_tributaria": 1
+},
+{
+"codigo": "581900",
+"descripcion": "OTRAS ACTIVIDADES DE EDICIÓN",
+"afecto_iva": 1,
+"categoria_tributaria": 1
+},
+{
+"codigo": "582000",
+"descripcion": "EDICIÓN DE PROGRAMAS INFORMÁTICOS",
+"afecto_iva": 1,
+"categoria_tributaria": 1
+},
+{
+"codigo": "591100",
+"descripcion": "ACTIVIDADES DE PRODUCCIÓN DE PELÍCULAS CINEMATOGRÁFICAS, VIDEOS Y PROGRAMAS DE TELEVISIÓN",
+"afecto_iva": 0,
+"categoria_tributaria": null
+},
+{
+"codigo": "591200",
+"descripcion": "ACTIVIDADES DE POSTPRODUCCIÓN DE PELÍCULAS CINEMATOGRÁFICAS, VIDEOS Y PROGRAMAS DE TELEVISIÓN",
+"afecto_iva": 0,
+"categoria_tributaria": null
+},
+{
+"codigo": "591300",
+"descripcion": "ACTIVIDADES DE DISTRIBUCIÓN DE PELÍCULAS CINEMATOGRÁFICAS, VIDEOS Y PROGRAMAS DE TELEVISIÓN",
+"afecto_iva": 1,
+"categoria_tributaria": 1
+},
+{
+"codigo": "591400",
+"descripcion": "ACTIVIDADES DE EXHIBICIÓN DE PELÍCULAS CINEMATOGRÁFICAS Y CINTAS DE VIDEO",
+"afecto_iva": 0,
+"categoria_tributaria": null
+},
+{
+"codigo": "592000",
+"descripcion": "ACTIVIDADES DE GRABACIÓN DE SONIDO Y EDICIÓN DE MÚSICA",
+"afecto_iva": 0,
+"categoria_tributaria": null
+},
+{
+"codigo": "601000",
+"descripcion": "TRANSMISIONES DE RADIO",
+"afecto_iva": 0,
+"categoria_tributaria": 1
+},
+{
+"codigo": "602000",
+"descripcion": "PROGRAMACIÓN Y TRANSMISIONES DE TELEVISIÓN",
+"afecto_iva": 0,
+"categoria_tributaria": 1
+},
+{
+"codigo": "611010",
+"descripcion": "TELEFONÍA FIJA",
+"afecto_iva": 1,
+"categoria_tributaria": 1
+},
+{
+"codigo": "611020",
+"descripcion": "TELEFONÍA LARGA DISTANCIA",
+"afecto_iva": 1,
+"categoria_tributaria": 1
+},
+{
+"codigo": "611030",
+"descripcion": "TELEVISIÓN DE PAGO POR CABLE",
+"afecto_iva": 1,
+"categoria_tributaria": 1
+},
+{
+"codigo": "611090",
+"descripcion": "OTROS SERVICIOS DE TELECOMUNICACIONES ALÁMBRICAS N.C.P.",
+"afecto_iva": 1,
+"categoria_tributaria": 1
+},
+{
+"codigo": "612010",
+"descripcion": "TELEFONÍA MÓVIL CELULAR",
+"afecto_iva": 1,
+"categoria_tributaria": 1
+},
+{
+"codigo": "612020",
+"descripcion": "RADIOCOMUNICACIONES MÓVILES",
+"afecto_iva": 1,
+"categoria_tributaria": 1
+},
+{
+"codigo": "612030",
+"descripcion": "TELEVISIÓN DE PAGO INALÁMBRICA",
+"afecto_iva": 1,
+"categoria_tributaria": 1
+},
+{
+"codigo": "612090",
+"descripcion": "OTROS SERVICIOS DE TELECOMUNICACIONES INALÁMBRICAS N.C.P.",
+"afecto_iva": 1,
+"categoria_tributaria": 1
+},
+{
+"codigo": "613010",
+"descripcion": "TELEFONÍA MÓVIL SATELITAL",
+"afecto_iva": 1,
+"categoria_tributaria": 1
+},
+{
+"codigo": "613020",
+"descripcion": "TELEVISIÓN DE PAGO SATELITAL",
+"afecto_iva": 1,
+"categoria_tributaria": 1
+},
+{
+"codigo": "613090",
+"descripcion": "OTROS SERVICIOS DE TELECOMUNICACIONES POR SATÉLITE N.C.P.",
+"afecto_iva": 1,
+"categoria_tributaria": 1
+},
+{
+"codigo": "619010",
+"descripcion": "CENTROS DE LLAMADOS Y CENTROS DE ACCESO A INTERNET",
+"afecto_iva": 1,
+"categoria_tributaria": 1
+},
+{
+"codigo": "619090",
+"descripcion": "OTRAS ACTIVIDADES DE TELECOMUNICACIONES N.C.P.",
+"afecto_iva": 1,
+"categoria_tributaria": 1
+},
+{
+"codigo": "620100",
+"descripcion": "ACTIVIDADES DE PROGRAMACIÓN INFORMÁTICA",
+"afecto_iva": 0,
+"categoria_tributaria": null
+},
+{
+"codigo": "620200",
+"descripcion": "ACTIVIDADES DE CONSULTORÍA DE INFORMÁTICA Y DE GESTIÓN DE INSTALACIONES INFORMÁTICAS",
+"afecto_iva": 1,
+"categoria_tributaria": 1
+},
+{
+"codigo": "620900",
+"descripcion": "OTRAS ACTIVIDADES DE TECNOLOGÍA DE LA INFORMACIÓN Y DE SERVICIOS INFORMÁTICOS",
+"afecto_iva": 1,
+"categoria_tributaria": 1
+},
+{
+"codigo": "631100",
+"descripcion": "PROCESAMIENTO DE DATOS, HOSPEDAJE Y ACTIVIDADES CONEXAS",
+"afecto_iva": 1,
+"categoria_tributaria": 1
+},
+{
+"codigo": "631200",
+"descripcion": "PORTALES WEB",
+"afecto_iva": 1,
+"categoria_tributaria": 1
+},
+{
+"codigo": "639100",
+"descripcion": "ACTIVIDADES DE AGENCIAS DE NOTICIAS",
+"afecto_iva": 0,
+"categoria_tributaria": 1
+},
+{
+"codigo": "639900",
+"descripcion": "OTRAS ACTIVIDADES DE SERVICIOS DE INFORMACIÓN N.C.P.",
+"afecto_iva": 1,
+"categoria_tributaria": 1
+},
+{
+"codigo": "641100",
+"descripcion": "BANCA CENTRAL",
+"afecto_iva": 1,
+"categoria_tributaria": 1
+},
+{
+"codigo": "641910",
+"descripcion": "ACTIVIDADES BANCARIAS",
+"afecto_iva": 1,
+"categoria_tributaria": 1
+},
+{
+"codigo": "641990",
+"descripcion": "OTROS TIPOS DE INTERMEDIACIÓN MONETARIA N.C.P.",
+"afecto_iva": 1,
+"categoria_tributaria": 1
+},
+{
+"codigo": "642000",
+"descripcion": "ACTIVIDADES DE SOCIEDADES DE CARTERA",
+"afecto_iva": 1,
+"categoria_tributaria": 1
+},
+{
+"codigo": "643000",
+"descripcion": "FONDOS Y SOCIEDADES DE INVERSIÓN Y ENTIDADES FINANCIERAS SIMILARES",
+"afecto_iva": 1,
+"categoria_tributaria": 1
+},
+{
+"codigo": "649100",
+"descripcion": "LEASING FINANCIERO",
+"afecto_iva": 1,
+"categoria_tributaria": 1
+},
+{
+"codigo": "649201",
+"descripcion": "FINANCIERAS",
+"afecto_iva": 1,
+"categoria_tributaria": 1
+},
+{
+"codigo": "649202",
+"descripcion": "ACTIVIDADES DE CRÉDITO PRENDARIO",
+"afecto_iva": 1,
+"categoria_tributaria": 1
+},
+{
+"codigo": "649203",
+"descripcion": "CAJAS DE COMPENSACIÓN",
+"afecto_iva": 0,
+"categoria_tributaria": 1
+},
+{
+"codigo": "649209",
+"descripcion": "OTRAS ACTIVIDADES DE CONCESIÓN DE CRÉDITO N.C.P.",
+"afecto_iva": 1,
+"categoria_tributaria": 1
+},
+{
+"codigo": "649900",
+"descripcion": "OTRAS ACTIVIDADES DE SERVICIOS FINANCIEROS, EXCEPTO LAS DE SEGUROS Y FONDOS DE PENSIONES N.C.P.",
+"afecto_iva": 1,
+"categoria_tributaria": 1
+},
+{
+"codigo": "651100",
+"descripcion": "SEGUROS DE VIDA",
+"afecto_iva": 1,
+"categoria_tributaria": 1
+},
+{
+"codigo": "651210",
+"descripcion": "SEGUROS GENERALES, EXCEPTO ACTIVIDADES DE ISAPRES",
+"afecto_iva": 1,
+"categoria_tributaria": 1
+},
+{
+"codigo": "651220",
+"descripcion": "ACTIVIDADES DE ISAPRES",
+"afecto_iva": 1,
+"categoria_tributaria": 1
+},
+{
+"codigo": "652000",
+"descripcion": "REASEGUROS",
+"afecto_iva": 1,
+"categoria_tributaria": 1
+},
+{
+"codigo": "653000",
+"descripcion": "FONDOS DE PENSIONES",
+"afecto_iva": 1,
+"categoria_tributaria": 1
+},
+{
+"codigo": "661100",
+"descripcion": "ADMINISTRACIÓN DE MERCADOS FINANCIEROS",
+"afecto_iva": 1,
+"categoria_tributaria": 1
+},
+{
+"codigo": "661201",
+"descripcion": "ACTIVIDADES DE SECURITIZADORAS",
+"afecto_iva": 1,
+"categoria_tributaria": 1
+},
+{
+"codigo": "661202",
+"descripcion": "CORREDORES DE BOLSA",
+"afecto_iva": 1,
+"categoria_tributaria": 1
+},
+{
+"codigo": "661203",
+"descripcion": "AGENTES DE VALORES",
+"afecto_iva": 1,
+"categoria_tributaria": 1
+},
+{
+"codigo": "661204",
+"descripcion": "ACTIVIDADES DE CASAS DE CAMBIO Y OPERADORES DE DIVISA",
+"afecto_iva": 0,
+"categoria_tributaria": 1
+},
+{
+"codigo": "661209",
+"descripcion": "OTROS SERVICIOS DE CORRETAJE DE VALORES Y COMMODITIES N.C.P.",
+"afecto_iva": 1,
+"categoria_tributaria": 1
+},
+{
+"codigo": "661901",
+"descripcion": "ACTIVIDADES DE CÁMARAS DE COMPENSACIÓN",
+"afecto_iva": 1,
+"categoria_tributaria": 1
+},
+{
+"codigo": "661902",
+"descripcion": "ADMINISTRACIÓN DE TARJETAS DE CRÉDITO",
+"afecto_iva": 1,
+"categoria_tributaria": 1
+},
+{
+"codigo": "661903",
+"descripcion": "EMPRESAS DE ASESORÍA Y CONSULTORÍA EN INVERSIÓN FINANCIERA; SOCIEDADES DE APOYO AL GIRO",
+"afecto_iva": 1,
+"categoria_tributaria": 1
+},
+{
+"codigo": "661904",
+"descripcion": "ACTIVIDADES DE CLASIFICADORAS DE RIESGO",
+"afecto_iva": 1,
+"categoria_tributaria": 1
+},
+{
+"codigo": "661909",
+"descripcion": "OTRAS ACTIVIDADES AUXILIARES DE LAS ACTIVIDADES DE SERVICIOS FINANCIEROS N.C.P.",
+"afecto_iva": 1,
+"categoria_tributaria": 1
+},
+{
+"codigo": "662100",
+"descripcion": "EVALUACIÓN DE RIESGOS Y DAÑOS (INCLUYE ACTIVIDADES DE LIQUIDADORES DE SEGUROS)",
+"afecto_iva": 0,
+"categoria_tributaria": null
+},
+{
+"codigo": "662200",
+"descripcion": "ACTIVIDADES DE AGENTES Y CORREDORES DE SEGUROS",
+"afecto_iva": 1,
+"categoria_tributaria": 1
+},
+{
+"codigo": "662900",
+"descripcion": "OTRAS ACTIVIDADES AUXILIARES DE LAS ACTIVIDADES DE SEGUROS Y FONDOS DE PENSIONES",
+"afecto_iva": 0,
+"categoria_tributaria": null
+},
+{
+"codigo": "663010",
+"descripcion": "ADMINISTRADORAS DE FONDOS DE PENSIONES (AFP)",
+"afecto_iva": 1,
+"categoria_tributaria": 1
+},
+{
+"codigo": "663091",
+"descripcion": "ADMINISTRADORAS DE FONDOS DE INVERSIÓN",
+"afecto_iva": 1,
+"categoria_tributaria": 1
+},
+{
+"codigo": "663092",
+"descripcion": "ADMINISTRADORAS DE FONDOS MUTUOS",
+"afecto_iva": 1,
+"categoria_tributaria": 1
+},
+{
+"codigo": "663093",
+"descripcion": "ADMINISTRADORAS DE FICES (FONDOS DE INVERSIÓN DE CAPITAL EXTRANJERO)",
+"afecto_iva": 1,
+"categoria_tributaria": 1
+},
+{
+"codigo": "663094",
+"descripcion": "ADMINISTRADORAS DE FONDOS PARA LA VIVIENDA",
+"afecto_iva": 1,
+"categoria_tributaria": 1
+},
+{
+"codigo": "663099",
+"descripcion": "ADMINISTRADORAS DE FONDOS PARA OTROS FINES N.C.P.",
+"afecto_iva": 1,
+"categoria_tributaria": 1
+},
+{
+"codigo": "681011",
+"descripcion": "ALQUILER DE BIENES INMUEBLES AMOBLADOS O CON EQUIPOS Y MAQUINARIAS",
+"afecto_iva": 1,
+"categoria_tributaria": 1
+},
+{
+"codigo": "681012",
+"descripcion": "COMPRA, VENTA Y ALQUILER (EXCEPTO AMOBLADOS) DE INMUEBLES",
+"afecto_iva": 0,
+"categoria_tributaria": 1
+},
+{
+"codigo": "681020",
+"descripcion": "SERVICIOS IMPUTADOS DE ALQUILER DE VIVIENDAS",
+"afecto_iva": 0,
+"categoria_tributaria": 1
+},
+{
+"codigo": "682000",
+"descripcion": "ACTIVIDADES INMOBILIARIAS REALIZADAS A CAMBIO DE UNA RETRIBUCIÓN O POR CONTRATA",
+"afecto_iva": 0,
+"categoria_tributaria": null
+},
+{
+"codigo": "691001",
+"descripcion": "SERVICIOS DE ASESORAMIENTO Y REPRESENTACIÓN JURÍDICA",
+"afecto_iva": 0,
+"categoria_tributaria": null
+},
+{
+"codigo": "691002",
+"descripcion": "SERVICIO NOTARIAL",
+"afecto_iva": 0,
+"categoria_tributaria": 2
+},
+{
+"codigo": "691003",
+"descripcion": "CONSERVADOR DE BIENES RAÍCES",
+"afecto_iva": 0,
+"categoria_tributaria": 2
+},
+{
+"codigo": "691004",
+"descripcion": "RECEPTORES JUDICIALES",
+"afecto_iva": 0,
+"categoria_tributaria": 2
+},
+{
+"codigo": "691009",
+"descripcion": "SERVICIOS DE ARBITRAJE; SÍNDICOS DE QUIEBRA Y PERITOS JUDICIALES; OTRAS ACTIVIDADES JURÍDICAS N.C.P.",
+"afecto_iva": 0,
+"categoria_tributaria": null
+},
+{
+"codigo": "692000",
+"descripcion": "ACTIVIDADES DE CONTABILIDAD, TENEDURÍA DE LIBROS Y AUDITORÍA; CONSULTORÍA FISCAL",
+"afecto_iva": 0,
+"categoria_tributaria": null
+},
+{
+"codigo": "701000",
+"descripcion": "ACTIVIDADES DE OFICINAS PRINCIPALES",
+"afecto_iva": 0,
+"categoria_tributaria": null
+},
+{
+"codigo": "702000",
+"descripcion": "ACTIVIDADES DE CONSULTORÍA DE GESTIÓN",
+"afecto_iva": 0,
+"categoria_tributaria": null
+},
+{
+"codigo": "711001",
+"descripcion": "SERVICIOS DE ARQUITECTURA (DISEÑO DE EDIFICIOS, DIBUJO DE PLANOS DE CONSTRUCCIÓN, ENTRE OTROS)",
+"afecto_iva": 0,
+"categoria_tributaria": null
+},
+{
+"codigo": "711002",
+"descripcion": "EMPRESAS DE SERVICIOS DE INGENIERÍA Y ACTIVIDADES CONEXAS DE CONSULTORÍA TÉCNICA",
+"afecto_iva": 1,
+"categoria_tributaria": 1
+},
+{
+"codigo": "711003",
+"descripcion": "SERVICIOS PROFESIONALES DE INGENIERÍA Y ACTIVIDADES CONEXAS DE CONSULTORÍA TÉCNICA",
+"afecto_iva": 0,
+"categoria_tributaria": null
+},
+{
+"codigo": "712001",
+"descripcion": "ACTIVIDADES DE PLANTAS DE REVISIÓN TÉCNICA PARA VEHÍCULOS AUTOMOTORES",
+"afecto_iva": 1,
+"categoria_tributaria": 1
+},
+{
+"codigo": "712009",
+"descripcion": "OTROS SERVICIOS DE ENSAYOS Y ANÁLISIS TÉCNICOS (EXCEPTO ACTIVIDADES DE PLANTAS DE REVISIÓN TÉCNICA)",
+"afecto_iva": 1,
+"categoria_tributaria": 1
+},
+{
+"codigo": "721000",
+"descripcion": "INVESTIGACIONES Y DESARROLLO EXPERIMENTAL EN EL CAMPO DE LAS CIENCIAS NATURALES Y LA INGENIERÍA",
+"afecto_iva": 0,
+"categoria_tributaria": null
+},
+{
+"codigo": "722000",
+"descripcion": "INVESTIGACIONES Y DESARROLLO EXPERIMENTAL EN EL CAMPO DE LAS CIENCIAS SOCIALES Y LAS HUMANIDADES",
+"afecto_iva": 0,
+"categoria_tributaria": null
+},
+{
+"codigo": "731001",
+"descripcion": "SERVICIOS DE PUBLICIDAD PRESTADOS POR EMPRESAS",
+"afecto_iva": 1,
+"categoria_tributaria": 1
+},
+{
+"codigo": "731002",
+"descripcion": "SERVICIOS DE PUBLICIDAD PRESTADOS POR PROFESIONALES",
+"afecto_iva": 0,
+"categoria_tributaria": null
+},
+{
+"codigo": "732000",
+"descripcion": "ESTUDIOS DE MERCADO Y ENCUESTAS DE OPINIÓN PÚBLICA",
+"afecto_iva": 0,
+"categoria_tributaria": null
+},
+{
+"codigo": "741001",
+"descripcion": "ACTIVIDADES DE DISEÑO DE VESTUARIO",
+"afecto_iva": 0,
+"categoria_tributaria": null
+},
+{
+"codigo": "741002",
+"descripcion": "ACTIVIDADES DE DISEÑO Y DECORACIÓN DE INTERIORES",
+"afecto_iva": 0,
+"categoria_tributaria": null
+},
+{
+"codigo": "741009",
+"descripcion": "OTRAS ACTIVIDADES ESPECIALIZADAS DE DISEÑO N.C.P.",
+"afecto_iva": 0,
+"categoria_tributaria": null
+},
+{
+"codigo": "742001",
+"descripcion": "SERVICIOS DE REVELADO, IMPRESIÓN Y AMPLIACIÓN DE FOTOGRAFÍAS",
+"afecto_iva": 1,
+"categoria_tributaria": 1
+},
+{
+"codigo": "742002",
+"descripcion": "SERVICIOS Y ACTIVIDADES DE FOTOGRAFÍA",
+"afecto_iva": 0,
+"categoria_tributaria": null
+},
+{
+"codigo": "742003",
+"descripcion": "SERVICIOS PERSONALES DE FOTOGRAFÍA",
+"afecto_iva": 0,
+"categoria_tributaria": null
+},
+{
+"codigo": "749001",
+"descripcion": "ASESORÍA Y GESTIÓN EN LA COMPRA O VENTA DE PEQUEÑAS Y MEDIANAS EMPRESAS",
+"afecto_iva": 1,
+"categoria_tributaria": 1
+},
+{
+"codigo": "749002",
+"descripcion": "SERVICIOS DE TRADUCCIÓN E INTERPRETACIÓN PRESTADOS POR EMPRESAS",
+"afecto_iva": 0,
+"categoria_tributaria": 1
+},
+{
+"codigo": "749003",
+"descripcion": "SERVICIOS PERSONALES DE TRADUCCIÓN E INTERPRETACIÓN",
+"afecto_iva": 0,
+"categoria_tributaria": null
+},
+{
+"codigo": "749004",
+"descripcion": "ACTIVIDADES DE AGENCIAS Y AGENTES DE REPRESENTACIÓN DE ACTORES, DEPORTISTAS Y OTRAS FIGURAS PÚBLICAS",
+"afecto_iva": 1,
+"categoria_tributaria": 1
+},
+{
+"codigo": "749009",
+"descripcion": "OTRAS ACTIVIDADES PROFESIONALES, CIENTÍFICAS Y TÉCNICAS N.C.P.",
+"afecto_iva": 0,
+"categoria_tributaria": null
+},
+{
+"codigo": "750001",
+"descripcion": "ACTIVIDADES DE CLÍNICAS VETERINARIAS",
+"afecto_iva": 1,
+"categoria_tributaria": 1
+},
+{
+"codigo": "750002",
+"descripcion": "ACTIVIDADES DE VETERINARIOS, TÉCNICOS Y OTRO PERSONAL AUXILIAR, PRESTADOS DE FORMA INDEPENDIENTE",
+"afecto_iva": 0,
+"categoria_tributaria": 2
+},
+{
+"codigo": "771000",
+"descripcion": "ALQUILER DE VEHÍCULOS AUTOMOTORES SIN CHOFER",
+"afecto_iva": 1,
+"categoria_tributaria": 1
+},
+{
+"codigo": "772100",
+"descripcion": "ALQUILER Y ARRENDAMIENTO DE EQUIPO RECREATIVO Y DEPORTIVO",
+"afecto_iva": 1,
+"categoria_tributaria": 1
+},
+{
+"codigo": "772200",
+"descripcion": "ALQUILER DE CINTAS DE VIDEO Y DISCOS",
+"afecto_iva": 1,
+"categoria_tributaria": 1
+},
+{
+"codigo": "772900",
+"descripcion": "ALQUILER DE OTROS EFECTOS PERSONALES Y ENSERES DOMÉSTICOS (INCLUYE MOBILIARIO PARA EVENTOS)",
+"afecto_iva": 1,
+"categoria_tributaria": 1
+},
+{
+"codigo": "773001",
+"descripcion": "ALQUILER DE EQUIPOS DE TRANSPORTE SIN OPERARIO, EXCEPTO VEHÍCULOS AUTOMOTORES",
+"afecto_iva": 1,
+"categoria_tributaria": 1
+},
+{
+"codigo": "773002",
+"descripcion": "ALQUILER DE MAQUINARIA Y EQUIPO AGROPECUARIO, FORESTAL, DE CONSTRUCCIÓN E ING. CIVIL, SIN OPERARIOS",
+"afecto_iva": 1,
+"categoria_tributaria": 1
+},
+{
+"codigo": "773003",
+"descripcion": "ALQUILER DE MAQUINARIA Y EQUIPO DE OFICINA, SIN OPERARIOS (SIN SERVICIO ADMINISTRATIVO)",
+"afecto_iva": 1,
+"categoria_tributaria": 1
+},
+{
+"codigo": "773009",
+"descripcion": "ALQUILER DE OTROS TIPOS DE MAQUINARIAS Y EQUIPOS SIN OPERARIO N.C.P.",
+"afecto_iva": 1,
+"categoria_tributaria": 1
+},
+{
+"codigo": "774000",
+"descripcion": "ARRENDAMIENTO DE PROPIEDAD INTELECTUAL Y SIMILARES, EXCEPTO OBRAS PROTEGIDAS POR DERECHOS DE AUTOR",
+"afecto_iva": 1,
+"categoria_tributaria": 1
+},
+{
+"codigo": "781000",
+"descripcion": "ACTIVIDADES DE AGENCIAS DE EMPLEO",
+"afecto_iva": 1,
+"categoria_tributaria": 1
+},
+{
+"codigo": "782000",
+"descripcion": "ACTIVIDADES DE AGENCIAS DE EMPLEO TEMPORAL (INCLUYE EMPRESAS DE SERVICIOS TRANSITORIOS)",
+"afecto_iva": 1,
+"categoria_tributaria": 1
+},
+{
+"codigo": "783000",
+"descripcion": "OTRAS ACTIVIDADES DE DOTACIÓN DE RECURSOS HUMANOS",
+"afecto_iva": 1,
+"categoria_tributaria": 1
+},
+{
+"codigo": "791100",
+"descripcion": "ACTIVIDADES DE AGENCIAS DE VIAJES",
+"afecto_iva": 1,
+"categoria_tributaria": 1
+},
+{
+"codigo": "791200",
+"descripcion": "ACTIVIDADES DE OPERADORES TURÍSTICOS",
+"afecto_iva": 1,
+"categoria_tributaria": 1
+},
+{
+"codigo": "799000",
+"descripcion": "OTROS SERVICIOS DE RESERVAS Y ACTIVIDADES CONEXAS (INCLUYE VENTA DE ENTRADAS PARA TEATRO, Y OTROS)",
+"afecto_iva": 1,
+"categoria_tributaria": 1
+},
+{
+"codigo": "801001",
+"descripcion": "SERVICIOS DE SEGURIDAD PRIVADA PRESTADOS POR EMPRESAS",
+"afecto_iva": 1,
+"categoria_tributaria": 1
+},
+{
+"codigo": "801002",
+"descripcion": "SERVICIO DE TRANSPORTE DE VALORES EN VEHÍCULOS BLINDADOS",
+"afecto_iva": 1,
+"categoria_tributaria": 1
+},
+{
+"codigo": "801003",
+"descripcion": "SERVICIOS DE SEGURIDAD PRIVADA PRESTADOS POR INDEPENDIENTES",
+"afecto_iva": 0,
+"categoria_tributaria": 2
+},
+{
+"codigo": "802000",
+"descripcion": "ACTIVIDADES DE SERVICIOS DE SISTEMAS DE SEGURIDAD (INCLUYE SERVICIOS DE CERRAJERÍA)",
+"afecto_iva": 1,
+"categoria_tributaria": 1
+},
+{
+"codigo": "803000",
+"descripcion": "ACTIVIDADES DE INVESTIGACIÓN (INCLUYE ACTIVIDADES DE INVESTIGADORES Y DETECTIVES PRIVADOS)",
+"afecto_iva": 0,
+"categoria_tributaria": null
+},
+{
+"codigo": "811000",
+"descripcion": "ACTIVIDADES COMBINADAS DE APOYO A INSTALACIONES",
+"afecto_iva": 0,
+"categoria_tributaria": null
+},
+{
+"codigo": "812100",
+"descripcion": "LIMPIEZA GENERAL DE EDIFICIOS",
+"afecto_iva": 1,
+"categoria_tributaria": 1
+},
+{
+"codigo": "812901",
+"descripcion": "DESRATIZACIÓN, DESINFECCIÓN Y EXTERMINIO DE PLAGAS NO AGRÍCOLAS",
+"afecto_iva": 1,
+"categoria_tributaria": 1
+},
+{
+"codigo": "812909",
+"descripcion": "OTRAS ACTIVIDADES DE LIMPIEZA DE EDIFICIOS E INSTALACIONES INDUSTRIALES N.C.P.",
+"afecto_iva": 1,
+"categoria_tributaria": 1
+},
+{
+"codigo": "813000",
+"descripcion": "ACTIVIDADES DE PAISAJISMO, SERVICIOS DE JARDINERÍA Y SERVICIOS CONEXOS",
+"afecto_iva": 1,
+"categoria_tributaria": 1
+},
+{
+"codigo": "821100",
+"descripcion": "ACTIVIDADES COMBINADAS DE SERVICIOS ADMINISTRATIVOS DE OFICINA",
+"afecto_iva": 1,
+"categoria_tributaria": 1
+},
+{
+"codigo": "821900",
+"descripcion": "FOTOCOPIADO, PREPARACIÓN DE DOCUMENTOS Y OTRAS ACTIVIDADES ESPECIALIZADAS DE APOYO DE OFICINA",
+"afecto_iva": 1,
+"categoria_tributaria": 1
+},
+{
+"codigo": "822000",
+"descripcion": "ACTIVIDADES DE CALL-CENTER",
+"afecto_iva": 1,
+"categoria_tributaria": 1
+},
+{
+"codigo": "823000",
+"descripcion": "ORGANIZACIÓN DE CONVENCIONES Y EXPOSICIONES COMERCIALES",
+"afecto_iva": 1,
+"categoria_tributaria": 1
+},
+{
+"codigo": "829110",
+"descripcion": "ACTIVIDADES DE AGENCIAS DE COBRO",
+"afecto_iva": 1,
+"categoria_tributaria": 1
+},
+{
+"codigo": "829120",
+"descripcion": "ACTIVIDADES DE AGENCIAS DE CALIFICACIÓN CREDITICIA",
+"afecto_iva": 1,
+"categoria_tributaria": 1
+},
+{
+"codigo": "829200",
+"descripcion": "ACTIVIDADES DE ENVASADO Y EMPAQUETADO",
+"afecto_iva": 1,
+"categoria_tributaria": 1
+},
+{
+"codigo": "829900",
+"descripcion": "OTRAS ACTIVIDADES DE SERVICIOS DE APOYO A LAS EMPRESAS N.C.P.",
+"afecto_iva": 1,
+"categoria_tributaria": 1
+},
+{
+"codigo": "841100",
+"descripcion": "ACTIVIDADES DE LA ADMINISTRACIÓN PÚBLICA EN GENERAL",
+"afecto_iva": 1,
+"categoria_tributaria": 1
+},
+{
+"codigo": "841200",
+"descripcion": "REGULACIÓN DE LAS ACTIVIDADES DE ORGANISMOS QUE PRESTAN SERVICIOS SANITARIOS, EDUCATIVOS, CULTURALES",
+"afecto_iva": 1,
+"categoria_tributaria": 1
+},
+{
+"codigo": "841300",
+"descripcion": "REGULACIÓN Y FACILITACIÓN DE LA ACTIVIDAD ECONÓMICA",
+"afecto_iva": 1,
+"categoria_tributaria": 1
+},
+{
+"codigo": "842100",
+"descripcion": "RELACIONES EXTERIORES",
+"afecto_iva": 0,
+"categoria_tributaria": 1
+},
+{
+"codigo": "842200",
+"descripcion": "ACTIVIDADES DE DEFENSA",
+"afecto_iva": 0,
+"categoria_tributaria": 1
+},
+{
+"codigo": "842300",
+"descripcion": "ACTIVIDADES DE MANTENIMIENTO DEL ORDEN PÚBLICO Y DE SEGURIDAD",
+"afecto_iva": 0,
+"categoria_tributaria": 1
+},
+{
+"codigo": "843010",
+"descripcion": "FONDO NACIONAL DE SALUD (FONASA)",
+"afecto_iva": 0,
+"categoria_tributaria": 1
+},
+{
+"codigo": "843020",
+"descripcion": "INSTITUTO DE PREVISIÓN SOCIAL (IPS)",
+"afecto_iva": 0,
+"categoria_tributaria": 1
+},
+{
+"codigo": "843090",
+"descripcion": "OTROS PLANES DE SEGURIDAD SOCIAL DE AFILIACIÓN OBLIGATORIA N.C.P.",
+"afecto_iva": 0,
+"categoria_tributaria": 1
+},
+{
+"codigo": "850011",
+"descripcion": "ENSEÑANZA PREESCOLAR PÚBLICA",
+"afecto_iva": 0,
+"categoria_tributaria": 1
+},
+{
+"codigo": "850012",
+"descripcion": "ENSEÑANZA PRIMARIA, SECUNDARIA CIENTÍFICO HUMANISTA Y TÉCNICO PROFESIONAL PÚBLICA",
+"afecto_iva": 0,
+"categoria_tributaria": 1
+},
+{
+"codigo": "850021",
+"descripcion": "ENSEÑANZA PREESCOLAR PRIVADA",
+"afecto_iva": 0,
+"categoria_tributaria": 1
+},
+{
+"codigo": "850022",
+"descripcion": "ENSEÑANZA PRIMARIA, SECUNDARIA CIENTÍFICO HUMANISTA Y TÉCNICO PROFESIONAL PRIVADA",
+"afecto_iva": 0,
+"categoria_tributaria": 1
+},
+{
+"codigo": "853110",
+"descripcion": "ENSEÑANZA SUPERIOR EN UNIVERSIDADES PÚBLICAS",
+"afecto_iva": 0,
+"categoria_tributaria": 1
+},
+{
+"codigo": "853120",
+"descripcion": "ENSEÑANZA SUPERIOR EN UNIVERSIDADES PRIVADAS",
+"afecto_iva": 0,
+"categoria_tributaria": 1
+},
+{
+"codigo": "853201",
+"descripcion": "ENSEÑANZA SUPERIOR EN INSTITUTOS PROFESIONALES",
+"afecto_iva": 0,
+"categoria_tributaria": 1
+},
+{
+"codigo": "853202",
+"descripcion": "ENSEÑANZA SUPERIOR EN CENTROS DE FORMACIÓN TÉCNICA",
+"afecto_iva": 0,
+"categoria_tributaria": 1
+},
+{
+"codigo": "854100",
+"descripcion": "ENSEÑANZA DEPORTIVA Y RECREATIVA",
+"afecto_iva": 1,
+"categoria_tributaria": 1
+},
+{
+"codigo": "854200",
+"descripcion": "ENSEÑANZA CULTURAL",
+"afecto_iva": 0,
+"categoria_tributaria": null
+},
+{
+"codigo": "854901",
+"descripcion": "ENSEÑANZA PREUNIVERSITARIA",
+"afecto_iva": 0,
+"categoria_tributaria": 1
+},
+{
+"codigo": "854902",
+"descripcion": "SERVICIOS PERSONALES DE EDUCACIÓN",
+"afecto_iva": 0,
+"categoria_tributaria": 2
+},
+{
+"codigo": "854909",
+"descripcion": "OTROS TIPOS DE ENSEÑANZA N.C.P.",
+"afecto_iva": 0,
+"categoria_tributaria": 1
+},
+{
+"codigo": "855000",
+"descripcion": "ACTIVIDADES DE APOYO A LA ENSEÑANZA",
+"afecto_iva": 0,
+"categoria_tributaria": null
+},
+{
+"codigo": "861010",
+"descripcion": "ACTIVIDADES DE HOSPITALES Y CLÍNICAS PÚBLICAS",
+"afecto_iva": 1,
+"categoria_tributaria": 1
+},
+{
+"codigo": "861020",
+"descripcion": "ACTIVIDADES DE HOSPITALES Y CLÍNICAS PRIVADAS",
+"afecto_iva": 1,
+"categoria_tributaria": 1
+},
+{
+"codigo": "862010",
+"descripcion": "ACTIVIDADES DE CENTROS DE SALUD MUNICIPALIZADOS (SERVICIOS DE SALUD PÚBLICA)",
+"afecto_iva": 0,
+"categoria_tributaria": 1
+},
+{
+"codigo": "862021",
+"descripcion": "CENTROS MÉDICOS PRIVADOS (ESTABLECIMIENTOS DE ATENCIÓN AMBULATORIA)",
+"afecto_iva": 0,
+"categoria_tributaria": 1
+},
+{
+"codigo": "862022",
+"descripcion": "CENTROS DE ATENCIÓN ODONTOLÓGICA PRIVADOS (ESTABLECIMIENTOS DE ATENCIÓN AMBULATORIA)",
+"afecto_iva": 0,
+"categoria_tributaria": 1
+},
+{
+"codigo": "862031",
+"descripcion": "SERVICIOS DE MÉDICOS PRESTADOS DE FORMA INDEPENDIENTE",
+"afecto_iva": 0,
+"categoria_tributaria": 2
+},
+{
+"codigo": "862032",
+"descripcion": "SERVICIOS DE ODONTÓLOGOS PRESTADOS DE FORMA INDEPENDIENTE",
+"afecto_iva": 0,
+"categoria_tributaria": 2
+},
+{
+"codigo": "869010",
+"descripcion": "ACTIVIDADES DE LABORATORIOS CLÍNICOS Y BANCOS DE SANGRE",
+"afecto_iva": 1,
+"categoria_tributaria": 1
+},
+{
+"codigo": "869091",
+"descripcion": "OTROS SERVICIOS DE ATENCIÓN DE LA SALUD HUMANA PRESTADOS POR EMPRESAS",
+"afecto_iva": 0,
+"categoria_tributaria": 1
+},
+{
+"codigo": "869092",
+"descripcion": "SERVICIOS PRESTADOS DE FORMA INDEPENDIENTE POR OTROS PROFESIONALES DE LA SALUD",
+"afecto_iva": 0,
+"categoria_tributaria": 2
+},
+{
+"codigo": "871000",
+"descripcion": "ACTIVIDADES DE ATENCIÓN DE ENFERMERÍA EN INSTITUCIONES",
+"afecto_iva": 0,
+"categoria_tributaria": 1
+},
+{
+"codigo": "872000",
+"descripcion": "ACTIVIDADES DE ATENCIÓN EN INSTITUCIONES PARA PERSONAS CON DISCAPACIDAD MENTAL Y TOXICÓMANOS",
+"afecto_iva": 1,
+"categoria_tributaria": 1
+},
+{
+"codigo": "873000",
+"descripcion": "ACTIVIDADES DE ATENCIÓN EN INSTITUCIONES PARA PERSONAS DE EDAD Y PERSONAS CON DISCAPACIDAD FÍSICA",
+"afecto_iva": 1,
+"categoria_tributaria": 1
+},
+{
+"codigo": "879000",
+"descripcion": "OTRAS ACTIVIDADES DE ATENCIÓN EN INSTITUCIONES",
+"afecto_iva": 1,
+"categoria_tributaria": 1
+},
+{
+"codigo": "881000",
+"descripcion": "ACTIVIDADES DE ASISTENCIA SOCIAL SIN ALOJAMIENTO PARA PERSONAS DE EDAD Y PERSONAS CON DISCAPACIDAD",
+"afecto_iva": 1,
+"categoria_tributaria": 1
+},
+{
+"codigo": "889000",
+"descripcion": "OTRAS ACTIVIDADES DE ASISTENCIA SOCIAL SIN ALOJAMIENTO",
+"afecto_iva": 1,
+"categoria_tributaria": 1
+},
+{
+"codigo": "900001",
+"descripcion": "SERVICIOS DE PRODUCCIÓN DE OBRAS DE TEATRO, CONCIERTOS, ESPECTÁCULOS DE DANZA, OTRAS PROD. ESCÉNICAS",
+"afecto_iva": 0,
+"categoria_tributaria": null
+},
+{
+"codigo": "900002",
+"descripcion": "ACTIVIDADES ARTÍSTICAS REALIZADAS POR BANDAS DE MÚSICA, COMPAÑÍAS DE TEATRO, CIRCENSES Y SIMILARES",
+"afecto_iva": 0,
+"categoria_tributaria": null
+},
+{
+"codigo": "900003",
+"descripcion": "ACTIVIDADES DE ARTISTAS REALIZADAS DE FORMA INDEPENDIENTE: ACTORES, MÚSICOS, ESCRITORES, ENTRE OTROS",
+"afecto_iva": 0,
+"categoria_tributaria": 2
+},
+{
+"codigo": "900004",
+"descripcion": "SERVICIOS PRESTADOS POR PERIODISTAS INDEPENDIENTES",
+"afecto_iva": 0,
+"categoria_tributaria": 2
+},
+{
+"codigo": "900009",
+"descripcion": "OTRAS ACTIVIDADES CREATIVAS, ARTÍSTICAS Y DE ENTRETENIMIENTO N.C.P.",
+"afecto_iva": 0,
+"categoria_tributaria": null
+},
+{
+"codigo": "910100",
+"descripcion": "ACTIVIDADES DE BIBLIOTECAS Y ARCHIVOS",
+"afecto_iva": 0,
+"categoria_tributaria": null
+},
+{
+"codigo": "910200",
+"descripcion": "ACTIVIDADES DE MUSEOS, GESTIÓN DE LUGARES Y EDIFICIOS HISTÓRICOS",
+"afecto_iva": 0,
+"categoria_tributaria": null
+},
+{
+"codigo": "910300",
+"descripcion": "ACTIVIDADES DE JARDINES BOTÁNICOS, ZOOLÓGICOS Y RESERVAS NATURALES",
+"afecto_iva": 0,
+"categoria_tributaria": null
+},
+{
+"codigo": "920010",
+"descripcion": "ACTIVIDADES DE CASINOS DE JUEGOS",
+"afecto_iva": 1,
+"categoria_tributaria": 1
+},
+{
+"codigo": "920090",
+"descripcion": "OTRAS ACTIVIDADES DE JUEGOS DE AZAR Y APUESTAS N.C.P.",
+"afecto_iva": 1,
+"categoria_tributaria": 1
+},
+{
+"codigo": "931101",
+"descripcion": "HIPÓDROMOS",
+"afecto_iva": 1,
+"categoria_tributaria": 1
+},
+{
+"codigo": "931102",
+"descripcion": "GESTIÓN DE SALAS DE BILLAR; GESTIÓN DE SALAS DE BOLOS (BOWLING)",
+"afecto_iva": 1,
+"categoria_tributaria": 1
+},
+{
+"codigo": "931109",
+"descripcion": "GESTIÓN DE OTRAS INSTALACIONES DEPORTIVAS N.C.P.",
+"afecto_iva": 1,
+"categoria_tributaria": 1
+},
+{
+"codigo": "931201",
+"descripcion": "ACTIVIDADES DE CLUBES DE FÚTBOL AMATEUR Y PROFESIONAL",
+"afecto_iva": 0,
+"categoria_tributaria": 1
+},
+{
+"codigo": "931209",
+"descripcion": "ACTIVIDADES DE OTROS CLUBES DEPORTIVOS N.C.P.",
+"afecto_iva": 0,
+"categoria_tributaria": 1
+},
+{
+"codigo": "931901",
+"descripcion": "PROMOCIÓN Y ORGANIZACIÓN DE COMPETENCIAS DEPORTIVAS",
+"afecto_iva": 1,
+"categoria_tributaria": 1
+},
+{
+"codigo": "931909",
+"descripcion": "OTRAS ACTIVIDADES DEPORTIVAS N.C.P.",
+"afecto_iva": 1,
+"categoria_tributaria": 1
+},
+{
+"codigo": "932100",
+"descripcion": "ACTIVIDADES DE PARQUES DE ATRACCIONES Y PARQUES TEMÁTICOS",
+"afecto_iva": 1,
+"categoria_tributaria": 1
+},
+{
+"codigo": "932901",
+"descripcion": "GESTIÓN DE SALAS DE POOL; GESTIÓN (EXPLOTACIÓN) DE JUEGOS ELECTRÓNICOS",
+"afecto_iva": 1,
+"categoria_tributaria": 1
+},
+{
+"codigo": "932909",
+"descripcion": "OTRAS ACTIVIDADES DE ESPARCIMIENTO Y RECREATIVAS N.C.P.",
+"afecto_iva": 0,
+"categoria_tributaria": null
+},
+{
+"codigo": "941100",
+"descripcion": "ACTIVIDADES DE ASOCIACIONES EMPRESARIALES Y DE EMPLEADORES",
+"afecto_iva": 1,
+"categoria_tributaria": 1
+},
+{
+"codigo": "941200",
+"descripcion": "ACTIVIDADES DE ASOCIACIONES PROFESIONALES",
+"afecto_iva": 1,
+"categoria_tributaria": 1
+},
+{
+"codigo": "942000",
+"descripcion": "ACTIVIDADES DE SINDICATOS",
+"afecto_iva": 1,
+"categoria_tributaria": 1
+},
+{
+"codigo": "949100",
+"descripcion": "ACTIVIDADES DE ORGANIZACIONES RELIGIOSAS",
+"afecto_iva": 1,
+"categoria_tributaria": 1
+},
+{
+"codigo": "949200",
+"descripcion": "ACTIVIDADES DE ORGANIZACIONES POLÍTICAS",
+"afecto_iva": 1,
+"categoria_tributaria": 1
+},
+{
+"codigo": "949901",
+"descripcion": "ACTIVIDADES DE CENTROS DE MADRES",
+"afecto_iva": 1,
+"categoria_tributaria": 1
+},
+{
+"codigo": "949902",
+"descripcion": "ACTIVIDADES DE CLUBES SOCIALES",
+"afecto_iva": 1,
+"categoria_tributaria": 1
+},
+{
+"codigo": "949903",
+"descripcion": "FUNDACIONES Y CORPORACIONES; ASOCIACIONES QUE PROMUEVEN ACTIVIDADES CULTURALES O RECREATIVAS",
+"afecto_iva": 1,
+"categoria_tributaria": 1
+},
+{
+"codigo": "949904",
+"descripcion": "CONSEJO DE ADMINISTRACIÓN DE EDIFICIOS Y CONDOMINIOS",
+"afecto_iva": 0,
+"categoria_tributaria": 1
+},
+{
+"codigo": "949909",
+"descripcion": "ACTIVIDADES DE OTRAS ASOCIACIONES N.C.P.",
+"afecto_iva": 1,
+"categoria_tributaria": 1
+},
+{
+"codigo": "951100",
+"descripcion": "REPARACIÓN DE COMPUTADORES Y EQUIPO PERIFÉRICO",
+"afecto_iva": 1,
+"categoria_tributaria": 1
+},
+{
+"codigo": "951200",
+"descripcion": "REPARACIÓN DE EQUIPO DE COMUNICACIONES (INCLUYE LA REPARACIÓN TELÉFONOS CELULARES)",
+"afecto_iva": 1,
+"categoria_tributaria": 1
+},
+{
+"codigo": "952100",
+"descripcion": "REPARACIÓN DE APARATOS ELECTRÓNICOS DE CONSUMO (INCLUYE APARATOS DE TELEVISIÓN Y RADIO)",
+"afecto_iva": 1,
+"categoria_tributaria": 1
+},
+{
+"codigo": "952200",
+"descripcion": "REPARACIÓN DE APARATOS DE USO DOMÉSTICO, EQUIPO DOMÉSTICO Y DE JARDINERÍA",
+"afecto_iva": 1,
+"categoria_tributaria": 1
+},
+{
+"codigo": "952300",
+"descripcion": "REPARACIÓN DE CALZADO Y DE ARTÍCULOS DE CUERO",
+"afecto_iva": 1,
+"categoria_tributaria": 1
+},
+{
+"codigo": "952400",
+"descripcion": "REPARACIÓN DE MUEBLES Y ACCESORIOS DOMÉSTICOS",
+"afecto_iva": 1,
+"categoria_tributaria": 1
+},
+{
+"codigo": "952900",
+"descripcion": "REPARACIÓN DE OTROS EFECTOS PERSONALES Y ENSERES DOMÉSTICOS",
+"afecto_iva": 1,
+"categoria_tributaria": 1
+},
+{
+"codigo": "960100",
+"descripcion": "LAVADO Y LIMPIEZA, INCLUIDA LA LIMPIEZA EN SECO, DE PRODUCTOS TEXTILES Y DE PIEL",
+"afecto_iva": 1,
+"categoria_tributaria": 1
+},
+{
+"codigo": "960200",
+"descripcion": "PELUQUERÍA Y OTROS TRATAMIENTOS DE BELLEZA",
+"afecto_iva": 0,
+"categoria_tributaria": null
+},
+{
+"codigo": "960310",
+"descripcion": "SERVICIOS FUNERARIOS",
+"afecto_iva": 1,
+"categoria_tributaria": 1
+},
+{
+"codigo": "960320",
+"descripcion": "SERVICIOS DE CEMENTERIOS",
+"afecto_iva": 1,
+"categoria_tributaria": 1
+},
+{
+"codigo": "960901",
+"descripcion": "SERVICIOS DE ADIESTRAMIENTO, GUARDERÍA, PELUQUERÍA, PASEO DE MASCOTAS (EXCEPTO ACT. VETERINARIAS)",
+"afecto_iva": 1,
+"categoria_tributaria": 1
+},
+{
+"codigo": "960902",
+"descripcion": "ACTIVIDADES DE SALONES DE MASAJES, BAÑOS TURCOS, SAUNAS, SERVICIO DE BAÑOS PÚBLICOS",
+"afecto_iva": 1,
+"categoria_tributaria": 1
+},
+{
+"codigo": "960909",
+"descripcion": "OTRAS ACTIVIDADES DE SERVICIOS PERSONALES N.C.P.",
+"afecto_iva": 0,
+"categoria_tributaria": 2
+},
+{
+"codigo": "970000",
+"descripcion": "ACTIVIDADES DE LOS HOGARES COMO EMPLEADORES DE PERSONAL DOMÉSTICO",
+"afecto_iva": 0,
+"categoria_tributaria": null
+},
+{
+"codigo": "990000",
+"descripcion": "ACTIVIDADES DE ORGANIZACIONES Y ÓRGANOS EXTRATERRITORIALES",
+"afecto_iva": 0,
+"categoria_tributaria": 1
+}
+]
