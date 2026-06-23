@@ -44,6 +44,15 @@ const pool = require('./config/database');
         ultimo INT NOT NULL DEFAULT 0
       )`);
   } catch (e) { if (e.errno !== 1050) console.error('[op_secuencia migration]', e.message); }
+  // Registro de PAGO de la orden (egreso desde una caja) — incremental.
+  try {
+    await pool.query(`ALTER TABLE op_correlativos ADD COLUMN IF NOT EXISTS pagada TINYINT(1) NOT NULL DEFAULT 0`);
+    await pool.query(`ALTER TABLE op_correlativos ADD COLUMN IF NOT EXISTS fecha_pagada DATETIME NULL`);
+    await pool.query(`ALTER TABLE op_correlativos ADD COLUMN IF NOT EXISTS pagada_por INT NULL`);
+    await pool.query(`ALTER TABLE op_correlativos ADD COLUMN IF NOT EXISTS pagada_nombre VARCHAR(200) NULL`);
+    await pool.query(`ALTER TABLE op_correlativos ADD COLUMN IF NOT EXISTS id_caja INT NULL`);
+    await pool.query(`ALTER TABLE op_correlativos ADD COLUMN IF NOT EXISTS metodo_pago VARCHAR(40) NULL`);
+  } catch (e) { console.error('[op_correlativos pago cols]', e.message); }
 })();
 
 // Próximo correlativo del año (atómico: lock de fila con FOR UPDATE).

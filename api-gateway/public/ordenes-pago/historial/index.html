@@ -5,7 +5,7 @@
   <link rel="icon" href="/img/favicon.png" type="image/png">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Historial de Órdenes de Pago — AutoFácil</title>
-  <!-- v1.5 -->
+  <!-- v1.6 -->
   <link href="/css/bootstrap.min.css" rel="stylesheet">
   <link href="/css/bootstrap-icons.css" rel="stylesheet">
   <style>
@@ -49,6 +49,9 @@
     .btn-ghost { background:#fff; border:1.5px solid #e2e8f0; border-radius:8px; padding:7px 12px; font-size:.82rem; cursor:pointer; color:#334155; }
     dialog { border:none; border-radius:16px; padding:0; box-shadow:0 20px 60px rgba(0,0,0,.3); max-width:880px; width:96%; }
     .dlg-foot { flex-wrap:wrap; }
+    #dlgPago { max-width:440px; }
+    #dlgPago label { display:block; font-size:.72rem; font-weight:800; text-transform:uppercase; color:#64748b; margin-bottom:10px; }
+    #dlgPago select, #dlgPago input { width:100%; border:1.5px solid #e2e8f0; border-radius:8px; padding:8px 11px; font-size:.86rem; box-sizing:border-box; margin-top:4px; font-weight:400; }
     .toast { position:fixed; top:70px; right:20px; background:#16a34a; color:#fff; padding:12px 18px; border-radius:9px; font-weight:600; font-size:.86rem; z-index:3000; display:none; max-width:360px; }
     dialog::backdrop { background:rgba(15,23,42,.55); }
     .dlg-head { background:linear-gradient(135deg,#012d70,#0255c5); color:#fff; padding:15px 20px; font-weight:700; display:flex; justify-content:space-between; }
@@ -118,6 +121,22 @@
   <div class="dlg-body" id="dBody"></div>
   <div class="dlg-foot" id="dFoot"></div>
 </dialog>
+<dialog id="dlgPago">
+  <div class="dlg-head"><span id="pgTit">Registrar pago</span><i class="bi bi-x-lg" style="cursor:pointer" onclick="cerrarPago()"></i></div>
+  <div class="dlg-body">
+    <p id="pgInfo" style="margin:0 0 14px;font-size:.9rem"></p>
+    <label>Método de pago
+      <select id="pgMetodo"><option>Transferencia</option><option>Cheque</option><option>Efectivo</option><option>Tarjeta</option></select>
+    </label>
+    <label>Fecha de pago<input id="pgFecha" type="date"></label>
+    <div id="pgCaja" style="font-size:.8rem;color:#15803d;font-weight:700"></div>
+  </div>
+  <div class="dlg-foot">
+    <span id="pgMsg" style="font-size:.82rem;color:#b91c1c;margin-right:auto;display:none"></span>
+    <button class="btn-ghost" onclick="cerrarPago()">Cancelar</button>
+    <button class="btn-af" id="pgBtn" onclick="confirmarPago()"><i class="bi bi-cash-coin me-1"></i>Registrar pago</button>
+  </div>
+</dialog>
 <div class="toast" id="toast"></div>
 
 <script>
@@ -135,8 +154,9 @@ function toast(m){ const t=document.getElementById('toast'); t.textContent=m; t.
 function chk401(r){ if(r && r.status===401){ sessionStorage.clear(); location.href='/login.html'; return true; } return false; }
 const fdate = d => d? String(d).slice(0,10).split('-').reverse().join('-') : '—';
 const fdatetime = d => { if(!d) return '—'; const s=String(d); const f=fdate(s); const hm=(s.slice(11,16)||''); return hm? f+' '+hm : f; };
-let DATA = [], PUEDE = (yo.perfil==='Administrador'), ORIGEN='';
+let DATA = [], PUEDE = (yo.perfil==='Administrador'), ORIGEN='', MICAJA=null, PAGO_ID=null;
 const isAdmin = (yo.perfil==='Administrador');   // solo Admin puede anular
+async function cargarCaja(){ try{ const r=await fetch('/api/ordenes-pago/mi-caja',{headers:H}); if(chk401(r))return; const j=await r.json(); MICAJA=j.data||null; }catch(e){} }
 
 let tmr=null; function debounced(){ clearTimeout(tmr); tmr=setTimeout(cargar, 280); }
 function limpiar(){ document.getElementById('q').value=''; document.getElementById('fEstado').value=''; document.getElementById('fDesde').value=''; document.getElementById('fHasta').value=''; cargar(); }
@@ -165,10 +185,8 @@ async function cargar(){
     if (!DATA.length) { tb.innerHTML='<tr><td colspan="10" style="text-align:center;color:#94a3b8;padding:24px">Sin órdenes para el filtro.</td></tr>'; return; }
     tb.innerHTML = DATA.map(o => {
       let acc = '';
-      if (o.editable && o.estado==='EMITIDA'){
-        if (PUEDE)   acc += `<button class="icon-btn" title="Marcar pagada" onclick="marcar(${o.id},'PAGADA')"><i class="bi bi-cash-coin" style="color:#16a34a"></i></button>`;
-        if (isAdmin) acc += `<button class="icon-btn" title="Anular (solo Admin)" onclick="marcar(${o.id},'ANULADA')"><i class="bi bi-x-octagon" style="color:#dc2626"></i></button>`;
-      }
+      if (o.pagable && MICAJA) acc += `<button class="icon-btn" title="Pagar" onclick="pagar(${o.id})"><i class="bi bi-cash-coin" style="color:#16a34a"></i></button>`;
+      if (o.editable && o.estado==='EMITIDA' && isAdmin) acc += `<button class="icon-btn" title="Anular (solo Admin)" onclick="marcar(${o.id},'ANULADA')"><i class="bi bi-x-octagon" style="color:#dc2626"></i></button>`;
       return `<tr>
         <td><b>${escH(o.numero||'—')}</b></td>
         <td><span class="tipo-badge tipo-${o.origen}">${escH(o.origen_label)}</span></td>
@@ -293,7 +311,8 @@ async function ver(id){
       <span class="k">Emitida por</span><span>${escH(row.usuario_nombre||'—')}</span>
       ${row.estado==='ANULADA'?`<span class="k" style="color:#b91c1c">Anulada por</span><span style="color:#b91c1c">${escH(row.anulada_nombre||'—')}${row.fecha_anulada?' · '+fdatetime(row.fecha_anulada):''}</span>`:''}
     </div><p style="margin-top:12px;font-size:.8rem;color:#94a3b8"><i class="bi bi-info-circle me-1"></i>Esta orden (${escH(row.origen_label)}) se emite y gestiona en Post Venta.</p>`;
-    document.getElementById('dFoot').innerHTML = `<button class="btn-ghost" onclick="document.getElementById('dlg').close()">Cerrar</button>`;
+    const pagarBtn = (row.pagable && MICAJA) ? `<button class="btn-af" onclick="pagar(${row.id})"><i class="bi bi-cash-coin me-1"></i>Pagar</button>` : '';
+    document.getElementById('dFoot').innerHTML = `<button class="btn-ghost" onclick="document.getElementById('dlg').close()">Cerrar</button>${pagarBtn}`;
     document.getElementById('dlg').showModal();
     return;
   }
@@ -308,16 +327,13 @@ async function ver(id){
   else if (full.estado==='PAGADA') extra = `<p style="color:#15803d;font-size:.82rem;margin:0 0 10px"><i class="bi bi-check-circle me-1"></i>Pagada el ${fdate(full.fecha_pago)}${full.metodo_pago?' · '+escH(full.metodo_pago):''}</p>`;
   document.getElementById('dBody').innerHTML = extra + docHTML(full);
   const foot = document.getElementById('dFoot');
-  let accAdmin = '';
-  if (full.estado==='EMITIDA'){
-    if (isAdmin) accAdmin += `<button class="btn-ghost" onclick="marcarVista('ANULADA')">Anular</button>`;
-    if (PUEDE)   accAdmin += `<button class="btn-ghost" onclick="marcarVista('PAGADA')"><i class="bi bi-cash-coin me-1"></i>Marcar pagada</button>`;
-  }
+  const anularBtn = (full.estado==='EMITIDA' && isAdmin) ? `<button class="btn-ghost" onclick="marcarVista('ANULADA')">Anular</button>` : '';
+  const pagarBtn  = (row.pagable && MICAJA) ? `<button class="btn-af" onclick="pagar(${row.id})"><i class="bi bi-cash-coin me-1"></i>Pagar</button>` : '';
   const enviar = PUEDE ? `<button class="btn-af" id="btnEnviar" onclick="enviarCorreo()"><i class="bi bi-envelope-paper me-1"></i>Enviar a Contabilidad</button>` : '';
   foot.innerHTML = `<button class="btn-ghost" onclick="document.getElementById('dlg').close()">Cerrar</button>
     <button class="btn-ghost" onclick="copiarDoc()"><i class="bi bi-clipboard me-1"></i>Copiar</button>
     <button class="btn-ghost" onclick="descargarDoc()"><i class="bi bi-download me-1"></i>Descargar</button>
-    ${accAdmin}${enviar}`;
+    ${anularBtn}${enviar}${pagarBtn}`;
   document.getElementById('dlg').showModal();
 }
 
@@ -375,13 +391,43 @@ async function doMarcar(opId, numero, estado){
   if (!confirm(`¿${label} la orden ${numero||opId}?`)) return;
   try {
     const r = await fetch(`/api/ordenes-pago/ordenes/${opId}/estado`, { method:'PUT', headers:H, body: JSON.stringify({ estado }) });
+    if (chk401(r)) return;
     const j = await r.json();
     if (j.success) { try{document.getElementById('dlg').close();}catch(e){} cargar(); }
     else alert(j.error||'Error');
   } catch(e) { alert('Error de red'); }
 }
 
-(async()=>{ await permisos(); cargar(); })();
+/* ── Pago (egreso desde caja) — aplica a todas las órdenes ── */
+function pagar(ocId){
+  const o = DATA.find(x=>x.id===ocId); if(!o) return;
+  if (!MICAJA){ alert('Necesitas una Caja Activa para registrar pagos.'); return; }
+  PAGO_ID = ocId;
+  document.getElementById('pgTit').textContent = 'Registrar pago — '+(o.numero||'');
+  document.getElementById('pgInfo').innerHTML = `<b>${escH(o.proveedor_nombre||'—')}</b> · ${escH(o.concepto||'')}<br>Monto a pagar: <b style="color:#0141A2">${fmtMon(o.monto)}</b>`;
+  document.getElementById('pgFecha').value = new Date().toISOString().slice(0,10);
+  document.getElementById('pgCaja').innerHTML = '<i class="bi bi-cash-stack me-1"></i>Caja: '+escH(MICAJA.nombre||'—');
+  document.getElementById('pgMsg').style.display='none';
+  try{ document.getElementById('dlg').close(); }catch(e){}
+  document.getElementById('dlgPago').showModal();
+}
+function cerrarPago(){ try{ document.getElementById('dlgPago').close(); }catch(e){} PAGO_ID=null; }
+async function confirmarPago(){
+  if (!PAGO_ID) return;
+  const btn=document.getElementById('pgBtn'), msg=document.getElementById('pgMsg');
+  btn.disabled=true; btn.innerHTML='<i class="bi bi-hourglass-split me-1"></i>Registrando…'; msg.style.display='none';
+  try {
+    const r = await fetch(`/api/ordenes-pago/ordenes/${PAGO_ID}/pagar`, { method:'POST', headers:H,
+      body: JSON.stringify({ metodo_pago: document.getElementById('pgMetodo').value, fecha_pago: document.getElementById('pgFecha').value||null }) });
+    if (chk401(r)) { return; }
+    const j = await r.json();
+    if (j.success){ cerrarPago(); cargar(); toast('Pago registrado en caja '+(j.data?.caja||'')); }
+    else { msg.textContent=j.error||'Error al registrar el pago'; msg.style.display='inline'; }
+  } catch(e){ msg.textContent='Error de red'; msg.style.display='inline'; }
+  btn.disabled=false; btn.innerHTML='<i class="bi bi-cash-coin me-1"></i>Registrar pago';
+}
+
+(async()=>{ await permisos(); await cargarCaja(); cargar(); })();
 </script>
 <script src="/js/app-version.js"></script>
 </body>

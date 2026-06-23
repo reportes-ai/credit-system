@@ -265,7 +265,7 @@ const listarOrdenes = async (req, res) => {
     }
     const [rows] = await pool.query(`
       SELECT oc.id, oc.numero, oc.origen, oc.origen_id, oc.concepto, oc.monto, oc.created_at AS fecha_emision,
-             oc.usuario_nombre, oc.anulada, oc.anulada_nombre, oc.fecha_anulada,
+             oc.usuario_nombre, oc.anulada, oc.anulada_nombre, oc.fecha_anulada, oc.pagada, oc.fecha_pagada,
              op.proveedor_nombre AS g_prov, op.tipo_documento AS g_tipodoc, op.numero_documento AS g_numdoc,
              op.estado AS g_estado, op.fecha_pago AS g_fechapago,
              pfc.numero_factura AS c_factura,
@@ -297,9 +297,10 @@ const listarOrdenes = async (req, res) => {
         id: r.id, op_id: r.origen_id, origen: r.origen, origen_label: ORIGEN_LBL[r.origen] || r.origen,
         numero: r.numero, concepto: r.concepto || '—', monto: r.monto, fecha_emision: r.fecha_emision,
         usuario_nombre: r.usuario_nombre, proveedor_nombre: proveedor || '—', documento: documento || '—',
-        estado, fecha_pago: esGen ? r.g_fechapago : null,
+        estado, fecha_pago: r.fecha_pagada || (esGen ? r.g_fechapago : null),
         anulada_nombre: r.anulada_nombre, fecha_anulada: r.fecha_anulada,
-        editable: esGen,   // solo las generales se gestionan en este módulo
+        editable: esGen,   // solo las generales se gestionan (editar/anular) en este módulo
+        pagable: (estado === 'EMITIDA' && !r.anulada),   // se puede pagar desde el historial
       };
     });
     if (ESTADOS.includes(estFiltro)) data = data.filter(o => o.estado === estFiltro);
@@ -471,7 +472,70 @@ const enviarCorreoOrden = async (req, res) => {
   }
 };
 
+/* ════════════════ PAGO (egreso desde caja) ════════════════ */
+
+// Caja activa del usuario (asignación vigente a una caja abierta), o null.
+async function cajaActiva(idUsuario) {
+  try {
+    const [[c]] = await pool.query(
+      `SELECT cu.id_caja, cj.nombre FROM caja_usuarios cu JOIN cajas cj ON cu.id_caja = cj.id_caja
+        WHERE cu.id_usuario = ? AND cu.activo = 1 AND cj.activo = 1 LIMIT 1`, [idUsuario]);
+    return c || null;
+  } catch (e) { return null; }
+}
+
+// POST /api/ordenes-pago/ordenes/:id/pagar  (:id = op_correlativos.id) — registra el pago/egreso.
+// Solo usuarios con Caja Activa. Marca el pago en el libro central y cierra la etapa en su módulo.
+const pagarOrden = async (req, res) => {
+  try {
+    const id = parseInt(req.params.id);
+    const idU = (req.usuario || {}).id_usuario || null;
+    const caja = await cajaActiva(idU);
+    if (!caja) return res.status(403).json({ success: false, data: null, error: 'Necesitas una Caja Activa para registrar pagos' });
+
+    const [[oc]] = await pool.query('SELECT * FROM op_correlativos WHERE id=?', [id]);
+    if (!oc) return res.status(404).json({ success: false, data: null, error: 'Orden no encontrada' });
+    if (oc.anulada) return res.status(409).json({ success: false, data: null, error: 'La orden está anulada' });
+    if (oc.pagada)  return res.status(409).json({ success: false, data: null, error: 'La orden ya está pagada' });
+
+    const quien = nombreUsuario(req);
+    const metodo = norm((req.body || {}).metodo_pago) || null;
+    const fechaPago = fdate((req.body || {}).fecha_pago) || new Date().toISOString().slice(0, 10);
+
+    // 1) Registro central (egreso de caja).
+    await pool.query(
+      `UPDATE op_correlativos SET pagada=1, fecha_pagada=NOW(), pagada_por=?, pagada_nombre=?, id_caja=?, metodo_pago=? WHERE id=?`,
+      [idU, quien, caja.id_caja, metodo, id]);
+
+    // 2) Cierre en el módulo de origen.
+    if (oc.origen === 'GENERAL') {
+      await pool.query(`UPDATE ordenes_pago SET estado='PAGADA', fecha_pago=?, metodo_pago=COALESCE(?, metodo_pago) WHERE id=?`,
+        [fechaPago, metodo, oc.origen_id]);
+    } else if (oc.origen === 'SALDO') {
+      const [[s]] = await pool.query('SELECT id_seguimiento FROM postventa_ordenes WHERE id=?', [oc.origen_id]);
+      if (s) await pool.query(`INSERT IGNORE INTO postventa_etapas (id_seguimiento, track, etapa, usuario) VALUES (?, 'SALDO', 'SALDO PRECIO PAGADO', ?)`, [s.id_seguimiento, quien]);
+    } else if (oc.origen === 'COMISION') {
+      const [[s]] = await pool.query('SELECT id_seguimiento FROM postventa_ordenes_comision WHERE id=?', [oc.origen_id]);
+      if (s) await pool.query(`INSERT IGNORE INTO postventa_etapas (id_seguimiento, track, etapa, usuario) VALUES (?, 'COMISION', 'COMISION PAGADA', ?)`, [s.id_seguimiento, quien]);
+    }
+
+    auditar({ req, accion: 'PAGAR', modulo: 'ordenes-pago', entidad: 'orden_pago', entidad_id: id,
+      detalle: `Pagó ${oc.numero || id} ($${Number(oc.monto || 0).toLocaleString('es-CL')}) desde caja ${caja.nombre}${metodo ? ' · ' + metodo : ''}` });
+    res.json({ success: true, data: { id, caja: caja.nombre }, error: null });
+  } catch (e) {
+    console.error('[ordenes-pago pagarOrden]', e.message);
+    res.status(500).json({ success: false, data: null, error: 'Error interno del servidor' });
+  }
+};
+
+// GET /api/ordenes-pago/mi-caja — la caja activa del usuario (para el front: mostrar/ocultar pagar).
+const miCajaOP = async (req, res) => {
+  const caja = await cajaActiva((req.usuario || {}).id_usuario);
+  res.json({ success: true, data: caja, error: null });
+};
+
 module.exports = {
   listarProveedores, crearProveedor, actualizarProveedor, eliminarProveedor,
   listarOrdenes, getOrden, crearOrden, cambiarEstadoOrden, estadisticas, enviarCorreoOrden,
+  pagarOrden, miCajaOP,
 };

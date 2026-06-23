@@ -177,6 +177,25 @@ const getCierre = async (req, res) => {
       cartola = cart || [];
     }
 
+    /* ── 3b. EGRESOS: órdenes de pago pagadas en el período (libro op_correlativos) ── */
+    let whereE = `oc.pagada = 1 AND DATE(oc.fecha_pagada) BETWEEN ? AND ?`;
+    const parE = [desde, hasta];
+    if (id_usuario)        { whereE += ` AND oc.pagada_por = ?`; parE.push(id_usuario); }
+    else if (id_caja)      { whereE += ` AND oc.id_caja = ?`;    parE.push(id_caja); }
+    let egresos = [];
+    try {
+      const [erows] = await pool.query(
+        `SELECT oc.id, oc.numero, oc.origen, oc.concepto, oc.monto, oc.fecha_pagada, oc.metodo_pago,
+                oc.pagada_por AS id_registrado_por, oc.pagada_nombre AS nombre_cajero,
+                oc.id_caja, cj.nombre AS nombre_caja
+           FROM op_correlativos oc
+           LEFT JOIN cajas cj ON cj.id_caja = oc.id_caja
+          WHERE ${whereE}
+          ORDER BY oc.fecha_pagada DESC`, parE);
+      egresos = erows || [];
+    } catch (e) { egresos = []; }
+    const totalEgresos = egresos.reduce((s, e) => s + (Number(e.monto) || 0), 0);
+
     /* ── 4. Resumen por cajero (solo ABONOs) ─────────────────────────────── */
     const resumenMap = new Map();
     for (const m of pagos) {   // solo pagos, no reversiones
@@ -221,10 +240,13 @@ const getCierre = async (req, res) => {
       total_reversiones:  totalReversiones,
       total_neto:         totalNeto,
       total_transitorias: totalTransit,
-      total_recaudado:    totalNeto,  // neto = bruto - reversiones
+      egresos_ordenes:    egresos.length,
+      total_egresos_ordenes: totalEgresos,
+      // Neto de caja = recaudación neta − egresos de órdenes de pago
+      total_recaudado:    totalNeto - totalEgresos,
     };
 
-    ok(res, { movimientos, transitorias: transitorias || [], cartola, resumen, totales, desde, hasta });
+    ok(res, { movimientos, egresos, transitorias: transitorias || [], cartola, resumen, totales, desde, hasta });
   } catch(e) { err(res, e); }
 };
 

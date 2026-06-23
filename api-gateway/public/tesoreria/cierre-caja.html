@@ -231,6 +231,27 @@
     </div>
   </div>
 
+  <!-- Egresos: Órdenes de Pago pagadas en el período -->
+  <div class="panel" id="panelEgresos" style="display:none">
+    <div class="panel-header">
+      <h5><i class="bi bi-cash-stack me-2" style="color:#b45309"></i>Órdenes de Pago (Egresos)</h5>
+      <span id="egrCount" style="font-size:.8rem;color:#6b7280"></span>
+    </div>
+    <div class="panel-body">
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>N° Orden</th><th>Tipo</th><th>Fecha</th><th>Concepto</th><th>Cajero</th><th>Método</th><th class="text-right">Monto</th>
+            </tr>
+          </thead>
+          <tbody id="tbodyEgresos"></tbody>
+          <tfoot><tr id="tfootEgresos" class="tfoot-row"></tr></tfoot>
+        </table>
+      </div>
+    </div>
+  </div>
+
   <!-- Cuentas Transitorias del período -->
   <div class="panel" id="panelTransitorias" style="display:none">
     <div class="panel-header">
@@ -405,7 +426,7 @@ function renderResultados(d) {
   document.getElementById('statIntereses').textContent    = clp(t.intereses_mora);
   document.getElementById('statGastos').textContent       = clp(t.gastos_cobranza);
   document.getElementById('statTransitorias').textContent = clp(t.total_transitorias);
-  document.getElementById('statTotal').textContent        = clp(t.total_neto ?? t.total_recaudado);
+  document.getElementById('statTotal').textContent        = clp(t.total_recaudado ?? t.total_neto);
   document.getElementById('statsRow').style.display       = '';
 
   // Stat reversiones
@@ -442,8 +463,33 @@ function renderResultados(d) {
   }
 
   renderMovimientos(d);
+  renderEgresos(d);
   renderTransitorias(d);
   renderCartola(d);
+}
+
+/* ── egresos: órdenes de pago pagadas en el período ─────────────────────── */
+function renderEgresos(d) {
+  const egr = d.egresos || [];
+  const panel = document.getElementById('panelEgresos');
+  if (!egr.length) { panel.style.display = 'none'; return; }
+  panel.style.display = '';
+  const LBL = { SALDO:'Saldo Precio', COMISION:'Comisión', GENERAL:'Otros' };
+  const fd = s => s ? String(s).slice(0,10).split('-').reverse().join('-') : '—';
+  const tot = d.totales.total_egresos_ordenes || 0;
+  document.getElementById('egrCount').textContent = `${egr.length} orden${egr.length!==1?'es':''} · ${clp(tot)}`;
+  document.getElementById('tbodyEgresos').innerHTML = egr.map(e => `
+    <tr>
+      <td><strong>${esc(e.numero||'—')}</strong></td>
+      <td>${esc(LBL[e.origen]||e.origen||'')}</td>
+      <td>${fd(e.fecha_pagada)}</td>
+      <td>${esc(e.concepto||'—')}</td>
+      <td>${esc(e.nombre_cajero||'—')}</td>
+      <td>${esc(e.metodo_pago||'—')}</td>
+      <td class="text-right"><strong>${clp(e.monto)}</strong></td>
+    </tr>`).join('');
+  document.getElementById('tfootEgresos').innerHTML =
+    `<td>TOTAL EGRESOS</td><td></td><td></td><td></td><td></td><td></td><td class="text-right" style="color:#b91c1c">-${clp(tot)}</td>`;
 }
 
 /* ── movimientos agrupados (ABONO y CARGO) ──────────────────────────────── */
