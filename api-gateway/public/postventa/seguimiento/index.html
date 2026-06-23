@@ -5,7 +5,7 @@
   <link rel="icon" href="/img/favicon.png" type="image/png">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Seguimiento Post Venta — AutoFácil</title>
-  <!-- v3.0 -->
+  <!-- v3.1 -->
   <link href="/css/bootstrap.min.css" rel="stylesheet">
   <link href="/css/bootstrap-icons.css" rel="stylesheet">
   <style>
@@ -508,7 +508,7 @@ async function fcGuardar(){
     if (row){
       if (!editar){ row.etapas = row.etapas.filter(e=>!(e.track==='COMISION'&&e.etapa==='FACTURA RECIBIDA'));
         row.etapas.push({ id_seguimiento:FC.id, track:'COMISION', etapa:'FACTURA RECIBIDA', usuario:(j.data&&j.data.usuario)||'', fecha:new Date().toISOString() }); }
-      row.fac_fecha=fecha; row.fac_numero=numero; row.fac_monto=monto; row.fac_terceros=factura.es_terceros; row.fac_boleta=factura.es_boleta;
+      row.fac_fecha=fecha; row.fac_numero=numero; row.fac_monto=base; row.fac_terceros=factura.es_terceros; row.fac_boleta=factura.es_boleta;
     }
     document.getElementById('modalFactura').close(); FC = {id:null,chk:null}; render();
   } catch(e){ al.textContent='Error de conexión'; al.style.display='block'; }
