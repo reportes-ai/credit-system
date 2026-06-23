@@ -5,7 +5,7 @@
   <link rel="icon" href="/img/favicon.png" type="image/png">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Historial de Órdenes de Pago — AutoFácil</title>
-  <!-- v1.3 -->
+  <!-- v1.4 -->
   <link href="/css/bootstrap.min.css" rel="stylesheet">
   <link href="/css/bootstrap-icons.css" rel="stylesheet">
   <style>
@@ -132,6 +132,7 @@ const H = { 'Content-Type':'application/json', Authorization:'Bearer '+token };
 const escH = s => String(s??'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
 const fmtMon = n => '$'+Number(n||0).toLocaleString('es-CL');
 function toast(m){ const t=document.getElementById('toast'); t.textContent=m; t.style.display='block'; clearTimeout(t._t); t._t=setTimeout(()=>t.style.display='none',3000); }
+function chk401(r){ if(r && r.status===401){ sessionStorage.clear(); location.href='/login.html'; return true; } return false; }
 const fdate = d => d? String(d).slice(0,10).split('-').reverse().join('-') : '—';
 const fdatetime = d => { if(!d) return '—'; const s=String(d); const f=fdate(s); const hm=(s.slice(11,16)||''); return hm? f+' '+hm : f; };
 let DATA = [], PUEDE = (yo.perfil==='Administrador'), ORIGEN='';
@@ -156,6 +157,7 @@ async function cargar(){
   tb.innerHTML = '<tr><td colspan="10" style="text-align:center;color:#94a3b8;padding:24px">Cargando…</td></tr>';
   try {
     const r = await fetch('/api/ordenes-pago/ordenes?'+p.toString(), { headers:H });
+    if (chk401(r)) return;
     const j = await r.json();
     DATA = j.data || [];
     pintaChips(j.resumen||{}, DATA.length);
@@ -294,7 +296,7 @@ async function ver(id){
   }
   // Orden general → traer la orden completa y mostrar el documento Solicitud de Pago.
   let full;
-  try { const r=await fetch('/api/ordenes-pago/ordenes/'+row.op_id,{headers:H}); const j=await r.json(); if(!j.success||!j.data) throw 0; full=j.data; }
+  try { const r=await fetch('/api/ordenes-pago/ordenes/'+row.op_id,{headers:H}); if(chk401(r)) return; const j=await r.json(); if(!j.success||!j.data) throw 0; full=j.data; }
   catch(e){ toast('No se pudo cargar la orden'); return; }
   VISTA = full;
   document.getElementById('dTitulo').textContent = full.numero||'Orden';
