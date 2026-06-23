@@ -2,7 +2,7 @@
    AutoFácil — Versión global de la aplicación
    Editar SOLO este archivo para cambiar la versión
    ───────────────────────────────────────────── */
-const APP_VERSION = 'v46.3';
+const APP_VERSION = 'v46.4';
 
 document.addEventListener('DOMContentLoaded', () => {
 
@@ -564,7 +564,12 @@ document.addEventListener('DOMContentLoaded', () => {
       list.innerHTML = rows.length ? rows.map(n => `
         <div data-href="${escN(n.href || '')}" class="af-notif-item" style="padding:10px 34px 10px 16px;border-bottom:1px solid #f8fafc;cursor:pointer;position:relative;${n.leida ? '' : 'background:#eff6ff'}">
           <button class="af-notif-x" data-del="${n.id}" title="Borrar" style="position:absolute;top:8px;right:8px;background:none;border:none;color:#cbd5e1;cursor:pointer;font-size:.9rem;line-height:1;padding:2px 5px;border-radius:5px">✕</button>
-          <div style="font-weight:700;color:#0f172a">${escN(n.titulo)}</div>
+          <div style="display:flex;align-items:center;gap:7px;margin-right:18px">
+            <span style="font-weight:700;color:#0f172a;flex:1">${escN(n.titulo)}</span>
+            ${n.prioridad === 'alta'
+              ? '<span title="Prioridad alta" style="font-size:.58rem;font-weight:800;letter-spacing:.3px;color:#fff;background:#dc2626;border-radius:8px;padding:1px 7px">ALTA</span>'
+              : '<span title="Prioridad normal" style="font-size:.58rem;font-weight:800;letter-spacing:.3px;color:#64748b;background:#e2e8f0;border-radius:8px;padding:1px 7px">NORMAL</span>'}
+          </div>
           <div style="color:#475569;margin:2px 0">${escN(n.mensaje || '')}</div>
           <div style="font-size:.68rem;color:#94a3b8">${new Date(n.created_at).toLocaleString('es-CL')}</div>
         </div>`).join('')

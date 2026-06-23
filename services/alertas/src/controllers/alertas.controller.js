@@ -77,6 +77,13 @@ const pool = require('../../../../shared/config/database');
         `INSERT INTO alertas_config (nombre, origen, campo, operador, valor1, valor2, prioridad, destino, activo, sonido)
          VALUES (?,?,?,?,?,?,?,?,?,?)`, e);
     }
+    // Cartola emitida: avisar UNA vez por cartola (delay 0), informativa (sin sonido) por defecto.
+    {
+      const [[ex]] = await pool.query("SELECT 1 v FROM alertas_config WHERE origen = 'cartolas_emitidas' LIMIT 1");
+      if (!ex) await pool.query(
+        `INSERT INTO alertas_config (nombre, origen, campo, operador, valor1, valor2, prioridad, destino, activo, sonido, delay_min)
+         VALUES ('Cartola emitida a dealer','cartolas_emitidas','total_bruto','siempre',NULL,NULL,'normal','Administrador',1,0,0)`);
+    }
     console.log('[alertas] tabla OK');
   } catch (e) { console.error('[alertas migration]', e.message); }
 })();
@@ -288,6 +295,28 @@ const ORIGENES = {
         titulo: 'Solicitud de cuenta dealer',
         mensaje: `${r.razon_social || r.rut || ('#' + r.id)} solicitó acceso al portal hace ${r.dias} día(s); aún sin aprobar.`,
         href: '/atencion-remota/?tab=solicitudes',
+      }));
+    },
+  },
+  cartolas_emitidas: {
+    label: 'Cartola emitida a dealer',
+    href: '/aprobaciones/',
+    campos: [
+      { campo: 'total_bruto',   label: 'Total bruto ($)', tipo: 'numero' },
+      { campo: 'nombre_dealer', label: 'Dealer',          tipo: 'texto' },
+    ],
+    async filas() {
+      // Solo cartolas recién emitidas (últimas 48h): con delay 0, el motor avisa una sola vez por cartola.
+      const [rows] = await pool.query(`
+        SELECT id, mes, nombre_dealer, rut_dealer, total_bruto
+        FROM cartolas_enviadas
+        WHERE fecha_envio >= (NOW() - INTERVAL 2 DAY)`);
+      return rows.map(r => ({
+        key: 'cartola:' + r.id,
+        vars: { total_bruto: r.total_bruto, nombre_dealer: r.nombre_dealer },
+        titulo: 'Cartola emitida',
+        mensaje: `Se emitió la cartola de ${r.nombre_dealer || r.rut_dealer || '—'} (${r.mes}) por $${Number(r.total_bruto || 0).toLocaleString('es-CL')}.`,
+        href: '/aprobaciones/',
       }));
     },
   },
