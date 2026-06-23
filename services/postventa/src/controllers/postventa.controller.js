@@ -1169,10 +1169,10 @@ async function etapasPorTrack(ids, track, orden) {
   return map;
 }
 
-// Visibilidad por ejecutivo (misma lógica que Comisiones): Administrador ve todo;
-// el resto solo los ejecutivos asignados en usuario_ejecutivos. { all:true } o { all:false, lista:[...] }.
+// Visibilidad por ejecutivo: TODOS ven todo, EXCEPTO el perfil "Ejecutivo Comercial",
+// que solo ve sus casos (ejecutivos asignados en usuario_ejecutivos, igual que en Comisiones).
 async function visibilidadEjecutivo(req) {
-  if (req.usuario && req.usuario.perfil_nombre === 'Administrador') return { all: true, lista: null };
+  if (!req.usuario || req.usuario.perfil_nombre !== 'Ejecutivo Comercial') return { all: true, lista: null };
   const [asg] = await pool.query('SELECT ejecutivo FROM usuario_ejecutivos WHERE id_usuario = ?', [req.usuario.id_usuario]);
   return { all: false, lista: asg.map(r => r.ejecutivo) };
 }
