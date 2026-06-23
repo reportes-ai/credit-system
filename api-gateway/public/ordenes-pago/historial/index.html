@@ -5,7 +5,7 @@
   <link rel="icon" href="/img/favicon.png" type="image/png">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Historial de Órdenes de Pago — AutoFácil</title>
-  <!-- v1.9 -->
+  <!-- v1.10 -->
   <link href="/css/bootstrap.min.css" rel="stylesheet">
   <link href="/css/bootstrap-icons.css" rel="stylesheet">
   <style>
@@ -99,8 +99,9 @@
     </div>
   </div>
 
-  <div class="card-af" style="padding:14px 18px">
+  <div class="card-af" style="padding:14px 18px;display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap">
     <div class="chips" id="chips"><span class="chip">Cargando…</span></div>
+    <div id="cajaStatus"></div>
   </div>
 
   <div class="card-af">
@@ -156,7 +157,13 @@ const fdate = d => d? String(d).slice(0,10).split('-').reverse().join('-') : '�
 const fdatetime = d => { if(!d) return '—'; const s=String(d); const f=fdate(s); const hm=(s.slice(11,16)||''); return hm? f+' '+hm : f; };
 let DATA = [], PUEDE = (yo.perfil==='Administrador'), ORIGEN='', MICAJA=null, PAGO_ID=null;
 const isAdmin = (yo.perfil==='Administrador');   // solo Admin puede anular
-async function cargarCaja(){ try{ const r=await fetch('/api/ordenes-pago/mi-caja',{headers:H}); if(chk401(r))return; const j=await r.json(); MICAJA=j.data||null; }catch(e){} }
+async function cargarCaja(){ try{ const r=await fetch('/api/ordenes-pago/mi-caja',{headers:H}); if(chk401(r))return; const j=await r.json(); MICAJA=j.data||null; }catch(e){} renderCajaStatus(); }
+function renderCajaStatus(){
+  const el=document.getElementById('cajaStatus'); if(!el) return;
+  el.innerHTML = MICAJA
+    ? `<span title="${escH(MICAJA.nombre||'')}" style="display:inline-flex;align-items:center;gap:7px;background:#dcfce7;color:#15803d;border:1px solid #bbf7d0;border-radius:999px;padding:6px 14px;font-size:.82rem;font-weight:800"><i class="bi bi-cash-stack"></i>CAJA #${MICAJA.id_caja} · ACTIVA</span>`
+    : `<span style="display:inline-flex;align-items:center;gap:7px;background:#f1f5f9;color:#64748b;border:1px solid #e2e8f0;border-radius:999px;padding:6px 14px;font-size:.82rem;font-weight:700"><i class="bi bi-cash-stack"></i>Sin caja activa</span>`;
+}
 
 let tmr=null; function debounced(){ clearTimeout(tmr); tmr=setTimeout(cargar, 280); }
 function limpiar(){ document.getElementById('q').value=''; document.getElementById('fEstado').value=''; document.getElementById('fDesde').value=''; document.getElementById('fHasta').value=''; cargar(); }

@@ -591,6 +591,25 @@ async function cajaActiva(idUsuario) {
   } catch (e) { return null; }
 }
 
+// Horario de pagos paramétrico (mantenedor Cajas → caja_horario_pago). Hora de Chile (tz del pool).
+// Fail-open: si no hay config aún, no bloquea. DAYOFWEEK(): 1=domingo … 7=sábado.
+async function horarioPagoPermitido() {
+  try {
+    const [[h]] = await pool.query(`
+      SELECT h.activo, h.hora_inicio, h.hora_fin, h.dia_lun,h.dia_mar,h.dia_mie,h.dia_jue,h.dia_vie,h.dia_sab,h.dia_dom,
+             (CURTIME() >= h.hora_inicio AND CURTIME() < h.hora_fin) AS hora_ok, DAYOFWEEK(NOW()) AS dow
+      FROM caja_horario_pago h WHERE h.id = 1`);
+    if (!h || !h.activo) return { permitido: true };
+    const col = { 1: 'dia_dom', 2: 'dia_lun', 3: 'dia_mar', 4: 'dia_mie', 5: 'dia_jue', 6: 'dia_vie', 7: 'dia_sab' }[h.dow];
+    if (h.hora_ok && h[col]) return { permitido: true };
+    const map = [['dia_lun', 'Lun'], ['dia_mar', 'Mar'], ['dia_mie', 'Mié'], ['dia_jue', 'Jue'], ['dia_vie', 'Vie'], ['dia_sab', 'Sáb'], ['dia_dom', 'Dom']];
+    const dias = map.filter(([k]) => h[k]).map(([, n]) => n);
+    const diasTxt = dias.length === 7 ? 'todos los días' : (dias.join(', ') || 'ningún día');
+    const ini = String(h.hora_inicio).slice(0, 5), fin = String(h.hora_fin).slice(0, 5);
+    return { permitido: false, motivo: `Fuera del horario de pagos: se permiten ${diasTxt} de ${ini} a ${fin} hrs.` };
+  } catch (e) { return { permitido: true }; }
+}
+
 // POST /api/ordenes-pago/ordenes/:id/pagar  (:id = op_correlativos.id) — registra el pago/egreso.
 // Solo usuarios con Caja Activa. Marca el pago en el libro central y cierra la etapa en su módulo.
 const pagarOrden = async (req, res) => {
@@ -599,6 +618,9 @@ const pagarOrden = async (req, res) => {
     const idU = (req.usuario || {}).id_usuario || null;
     const caja = await cajaActiva(idU);
     if (!caja) return res.status(403).json({ success: false, data: null, error: 'Necesitas una Caja Activa para registrar pagos' });
+    // Horario de pagos (mantenedor Cajas): fuera de la ventana habilitada no se permite pagar.
+    const hp = await horarioPagoPermitido();
+    if (!hp.permitido) return res.status(403).json({ success: false, data: null, error: hp.motivo });
 
     const [[oc]] = await pool.query('SELECT * FROM op_correlativos WHERE id=?', [id]);
     if (!oc) return res.status(404).json({ success: false, data: null, error: 'Orden no encontrada' });

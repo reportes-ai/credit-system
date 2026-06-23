@@ -30,6 +30,24 @@ const initTablas = async () => {
       UNIQUE KEY uq_caja_usuario (id_caja, id_usuario)
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
   `);
+  // Horario de pagos paramétrico (1 fila global, id=1). Por defecto 09:00–16:00, Lun–Vie.
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS caja_horario_pago (
+      id           INT PRIMARY KEY,
+      activo       TINYINT(1) NOT NULL DEFAULT 1,
+      hora_inicio  TIME NOT NULL DEFAULT '09:00:00',
+      hora_fin     TIME NOT NULL DEFAULT '16:00:00',
+      dia_lun      TINYINT(1) NOT NULL DEFAULT 1,
+      dia_mar      TINYINT(1) NOT NULL DEFAULT 1,
+      dia_mie      TINYINT(1) NOT NULL DEFAULT 1,
+      dia_jue      TINYINT(1) NOT NULL DEFAULT 1,
+      dia_vie      TINYINT(1) NOT NULL DEFAULT 1,
+      dia_sab      TINYINT(1) NOT NULL DEFAULT 0,
+      dia_dom      TINYINT(1) NOT NULL DEFAULT 0,
+      updated_at   DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
+  `);
+  await pool.query(`INSERT IGNORE INTO caja_horario_pago (id) VALUES (1)`);
 };
 // Migraciones: perfil Tesorero + funcionalidad /tesoreria/caja/
 (async () => {
@@ -253,4 +271,45 @@ const miCaja = async (req, res) => {
   } catch(e) { err(res, e); }
 };
 
-module.exports = { list, create, update, remove, listUsuarios, upsertUsuario, removeUsuario, todosUsuarios, miCaja };
+/* ════════════════════════ HORARIO DE PAGOS (paramétrico) ═══════════════════ */
+const DIAS_COL = ['dia_lun', 'dia_mar', 'dia_mie', 'dia_jue', 'dia_vie', 'dia_sab', 'dia_dom'];
+// MySQL DAYOFWEEK(): 1=domingo … 7=sábado.
+const DOW_COL = { 1: 'dia_dom', 2: 'dia_lun', 3: 'dia_mar', 4: 'dia_mie', 5: 'dia_jue', 6: 'dia_vie', 7: 'dia_sab' };
+
+/* GET /api/cajas/horario — config del horario + si AHORA está permitido (hora de Chile del server) */
+const getHorario = async (req, res) => {
+  try {
+    const [[h]] = await pool.query(`
+      SELECT h.*, (CURTIME() >= h.hora_inicio AND CURTIME() < h.hora_fin) AS hora_ok,
+             DAYOFWEEK(NOW()) AS dow, DATE_FORMAT(NOW(),'%H:%i') AS ahora
+      FROM caja_horario_pago h WHERE h.id = 1`);
+    if (!h) return ok(res, null);
+    const diaOk = !!h[DOW_COL[h.dow]];
+    h.permitido_ahora = !h.activo || (!!h.hora_ok && diaOk);
+    ok(res, h);
+  } catch (e) { err(res, e); }
+};
+
+/* PUT /api/cajas/horario — actualiza el horario (permiso tesoreria_cajas) */
+const putHorario = async (req, res) => {
+  const b = req.body || {};
+  const hhmm = s => { const m = String(s || '').match(/^(\d{1,2}):(\d{2})$/); if (!m) return null; const H = +m[1], M = +m[2]; if (H > 23 || M > 59) return null; return String(H).padStart(2, '0') + ':' + m[2] + ':00'; };
+  const ini = hhmm(b.hora_inicio), fin = hhmm(b.hora_fin);
+  if (!ini || !fin) return err(res, 'Horas inválidas (use formato HH:MM)', 400);
+  if (ini >= fin) return err(res, 'La hora de inicio debe ser anterior a la de término', 400);
+  try {
+    const dias = DIAS_COL.map(d => (b[d] ? 1 : 0));
+    const activo = b.activo ? 1 : 0;
+    await pool.query(
+      `INSERT INTO caja_horario_pago (id, activo, hora_inicio, hora_fin, dia_lun,dia_mar,dia_mie,dia_jue,dia_vie,dia_sab,dia_dom)
+       VALUES (1,?,?,?,?,?,?,?,?,?,?)
+       ON DUPLICATE KEY UPDATE activo=VALUES(activo), hora_inicio=VALUES(hora_inicio), hora_fin=VALUES(hora_fin),
+         dia_lun=VALUES(dia_lun), dia_mar=VALUES(dia_mar), dia_mie=VALUES(dia_mie), dia_jue=VALUES(dia_jue),
+         dia_vie=VALUES(dia_vie), dia_sab=VALUES(dia_sab), dia_dom=VALUES(dia_dom)`,
+      [activo, ini, fin, ...dias]);
+    auditar({ req, accion: 'EDITAR', modulo: 'tesoreria', entidad: 'caja_horario', entidad_id: 1, detalle: `Actualizó horario de pagos: ${activo ? 'activo' : 'sin restricción'} ${ini.slice(0, 5)}-${fin.slice(0, 5)}` });
+    ok(res, { saved: true });
+  } catch (e) { err(res, e); }
+};
+
+module.exports = { list, create, update, remove, listUsuarios, upsertUsuario, removeUsuario, todosUsuarios, miCaja, getHorario, putHorario };

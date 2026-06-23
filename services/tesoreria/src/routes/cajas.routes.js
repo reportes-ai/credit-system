@@ -13,6 +13,10 @@ router.get('/mi-caja', verifyToken, ctrl.miCaja);
 // Usuarios disponibles (para el select del modal)
 router.get('/todos-usuarios', ...gestionar, ctrl.todosUsuarios);
 
+// Horario de pagos paramétrico (antes de /:id para no colisionar)
+router.get('/horario', ...lectura,  ctrl.getHorario);
+router.put('/horario', ...gestionar, ctrl.putHorario);
+
 // CRUD Cajas
 router.get('/',       ...lectura,  ctrl.list);
 router.post('/',      ...gestionar, ctrl.create);

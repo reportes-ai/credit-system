@@ -86,7 +86,7 @@
   <div class="topnav-left">
     <a href="/" class="topnav-brand">
       <img src="/img/logo.png" alt="AutoFácil">
-      <span class="version-badge">v1.5</span>
+      <span class="version-badge">v1.6</span>
     </a>
     <div class="breadcrumb-nav">
       <a href="/">Inicio</a><span class="sep">›</span>
@@ -126,6 +126,47 @@
     <div class="cajas-grid" id="cajasGrid">
       <div class="spinner-wrap"><div class="spinner-border text-primary" style="width:2rem;height:2rem"></div></div>
     </div>
+  </div>
+
+  <!-- ══ HORARIO DE PAGOS (paramétrico) ══════════════════════════════════════ -->
+  <div class="panel">
+    <div class="panel-header">
+      <h5><i class="bi bi-clock-history me-2 text-primary"></i>Horario de pagos</h5>
+    </div>
+    <div style="padding:2px 4px 6px">
+      <p style="font-size:.85rem;color:#64748b;margin:0 0 14px">Ventana horaria y días en que se pueden registrar pagos desde las cajas (Órdenes de Pago y egresos). Fuera de este horario, el sistema rechaza el pago.</p>
+      <div class="form-check form-switch mb-3">
+        <input class="form-check-input" type="checkbox" id="hpActivo">
+        <label class="form-check-label" for="hpActivo" style="font-weight:600">Restringir pagos por horario</label>
+      </div>
+      <div class="row g-3 align-items-end">
+        <div class="col-auto">
+          <label style="font-size:.8rem;font-weight:600;color:#374151;display:block">Desde</label>
+          <input type="time" id="hpInicio" class="form-control" style="max-width:150px">
+        </div>
+        <div class="col-auto">
+          <label style="font-size:.8rem;font-weight:600;color:#374151;display:block">Hasta</label>
+          <input type="time" id="hpFin" class="form-control" style="max-width:150px">
+        </div>
+      </div>
+      <div style="margin-top:14px">
+        <label style="font-size:.8rem;font-weight:600;color:#374151;display:block;margin-bottom:6px">Días habilitados</label>
+        <div id="hpDias" style="display:flex;gap:8px;flex-wrap:wrap"></div>
+      </div>
+      <div style="display:flex;align-items:center;gap:14px;margin-top:18px">
+        <button class="btn btn-primary btn-sm" id="hpGuardar" onclick="guardarHorario()"><i class="bi bi-save me-1"></i>Guardar horario</button>
+        <span id="hpEstado" style="font-size:.83rem"></span>
+      </div>
+    </div>
+  </div>
+
+  <!-- ══ Qué afecta este mantenedor ══════════════════════════════════════════ -->
+  <div style="background:#f8fafc;border-left:4px solid #0141A2;border-radius:8px;padding:16px 18px;margin-top:8px">
+    <h6 style="font-weight:800;color:#012d70;margin:0 0 10px"><i class="bi bi-diagram-3 me-2"></i>Qué afecta este mantenedor</h6>
+    <ul style="font-size:.85rem;color:#374151;margin:0;padding-left:18px;line-height:1.75">
+      <li><b>Cajas y asignaciones</b> → definen quién tiene <b>Caja Activa</b> para registrar pagos en <a href="/ordenes-pago/historial/">Órdenes de Pago → Historial</a> y en la <a href="/tesoreria/caja/">Caja operativa</a>; los movimientos quedan en el <a href="/tesoreria/cierre-caja.html">Cierre de Caja</a>.</li>
+      <li><b>Horario de pagos</b> → ventana horaria y días habilitados para pagar. Fuera de ese horario, el sistema rechaza el pago de <a href="/ordenes-pago/historial/">Órdenes de Pago</a> y demás egresos de caja.</li>
+    </ul>
   </div>
 </div>
 
@@ -281,6 +322,37 @@ let _usuarioSeleccionado = null;   // usuario cuyo panel de permisos está abier
   await cargarTodasAsignaciones();
   renderCajas();
 })();
+cargarHorario();
+
+/* ── Horario de pagos (paramétrico) ─────────────────────────────────────── */
+const HP_DIAS = [['dia_lun','Lunes'],['dia_mar','Martes'],['dia_mie','Miércoles'],['dia_jue','Jueves'],['dia_vie','Viernes'],['dia_sab','Sábado'],['dia_dom','Domingo']];
+async function cargarHorario(){
+  try{
+    const r = await API('/api/cajas/horario'); const j = await r.json(); const h = j.data || {};
+    document.getElementById('hpDias').innerHTML = HP_DIAS.map(([k,n]) =>
+      `<label style="display:inline-flex;align-items:center;gap:6px;background:#f8fafc;border:1px solid #e2e8f0;border-radius:8px;padding:6px 12px;font-size:.82rem;cursor:pointer"><input type="checkbox" id="hp_${k}" ${h[k]?'checked':''}>${n}</label>`).join('');
+    document.getElementById('hpActivo').checked = !!h.activo;
+    document.getElementById('hpInicio').value = String(h.hora_inicio || '09:00').slice(0,5);
+    document.getElementById('hpFin').value    = String(h.hora_fin    || '16:00').slice(0,5);
+    const est = document.getElementById('hpEstado');
+    if (!h.activo) est.innerHTML = '<span style="color:#64748b">Sin restricción de horario</span>';
+    else est.innerHTML = h.permitido_ahora
+      ? '<span style="color:#15803d;font-weight:700">● Pagos abiertos ahora</span>'
+      : '<span style="color:#b45309;font-weight:700">● Pagos cerrados ahora</span>';
+  }catch(e){}
+}
+async function guardarHorario(){
+  const body = { activo: document.getElementById('hpActivo').checked, hora_inicio: document.getElementById('hpInicio').value, hora_fin: document.getElementById('hpFin').value };
+  HP_DIAS.forEach(([k]) => body[k] = document.getElementById('hp_'+k).checked);
+  const btn = document.getElementById('hpGuardar'); const est = document.getElementById('hpEstado');
+  btn.disabled = true;
+  try{
+    const r = await API('/api/cajas/horario', { method:'PUT', body: JSON.stringify(body) }); const j = await r.json();
+    if (j.success){ est.innerHTML = '<span style="color:#15803d;font-weight:700">✓ Guardado</span>'; cargarHorario(); }
+    else est.innerHTML = `<span style="color:#b91c1c">${j.error || 'Error'}</span>`;
+  }catch(e){ est.innerHTML = '<span style="color:#b91c1c">Error de red</span>'; }
+  btn.disabled = false;
+}
 
 async function cargarCajas() {
   const r = await API('/api/cajas'); const j = await r.json();
