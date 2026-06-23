@@ -610,6 +610,34 @@ async function horarioPagoPermitido() {
   } catch (e) { return { permitido: true }; }
 }
 
+// Estado del horario para la UI: abierta/cerrada + segundos al próximo cambio (cierre o apertura).
+// Todo en hora de Chile (tz del pool). DAYOFWEEK(): 1=domingo … 7=sábado.
+async function estadoHorarioPago() {
+  try {
+    const [[h]] = await pool.query(`
+      SELECT h.activo, h.hora_inicio, h.hora_fin,
+             h.dia_lun,h.dia_mar,h.dia_mie,h.dia_jue,h.dia_vie,h.dia_sab,h.dia_dom,
+             DAYOFWEEK(NOW()) AS dow, TIME_TO_SEC(CURTIME()) AS cs,
+             TIME_TO_SEC(h.hora_inicio) AS ini_s, TIME_TO_SEC(h.hora_fin) AS fin_s
+      FROM caja_horario_pago h WHERE h.id = 1`);
+    if (!h) return { restringido: false, abierta: true };
+    const hi = String(h.hora_inicio).slice(0, 5), hf = String(h.hora_fin).slice(0, 5);
+    if (!h.activo) return { restringido: false, abierta: true, hora_inicio: hi, hora_fin: hf };
+    const dias = [h.dia_lun, h.dia_mar, h.dia_mie, h.dia_jue, h.dia_vie, h.dia_sab, h.dia_dom].map(Number); // 0=Lun … 6=Dom
+    const today = (Number(h.dow) + 5) % 7;   // DAYOFWEEK→ índice Lun0
+    const cs = Number(h.cs), iniS = Number(h.ini_s), finS = Number(h.fin_s);
+    if (dias[today] === 1 && cs >= iniS && cs < finS)
+      return { restringido: true, abierta: true, hora_inicio: hi, hora_fin: hf, proximo: 'CIERRE', segundos: finS - cs };
+    for (let d = 0; d <= 7; d++) {
+      const idx = (today + d) % 7;
+      if (dias[idx] !== 1) continue;
+      if (d === 0) { if (cs < iniS) return { restringido: true, abierta: false, hora_inicio: hi, hora_fin: hf, proximo: 'APERTURA', segundos: iniS - cs }; continue; }
+      return { restringido: true, abierta: false, hora_inicio: hi, hora_fin: hf, proximo: 'APERTURA', segundos: d * 86400 - cs + iniS };
+    }
+    return { restringido: true, abierta: false, hora_inicio: hi, hora_fin: hf };  // ningún día habilitado
+  } catch (e) { return { restringido: false, abierta: true }; }
+}
+
 // POST /api/ordenes-pago/ordenes/:id/pagar  (:id = op_correlativos.id) — registra el pago/egreso.
 // Solo usuarios con Caja Activa. Marca el pago en el libro central y cierra la etapa en su módulo.
 const pagarOrden = async (req, res) => {
@@ -660,10 +688,11 @@ const pagarOrden = async (req, res) => {
   }
 };
 
-// GET /api/ordenes-pago/mi-caja — la caja activa del usuario (para el front: mostrar/ocultar pagar).
+// GET /api/ordenes-pago/mi-caja — caja activa del usuario + estado del horario (abierta/cerrada + countdown).
 const miCajaOP = async (req, res) => {
   const caja = await cajaActiva((req.usuario || {}).id_usuario);
-  res.json({ success: true, data: caja, error: null });
+  const horario = await estadoHorarioPago();
+  res.json({ success: true, data: { caja, horario }, error: null });
 };
 
 module.exports = {
