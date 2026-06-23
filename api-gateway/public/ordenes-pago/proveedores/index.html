@@ -5,7 +5,7 @@
   <link rel="icon" href="/img/favicon.png" type="image/png">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Base de Proveedores — AutoFácil</title>
-  <!-- v1.0 -->
+  <!-- v1.1 -->
   <link href="/css/bootstrap.min.css" rel="stylesheet">
   <link href="/css/bootstrap-icons.css" rel="stylesheet">
   <style>
@@ -93,7 +93,14 @@
       <div class="grid2">
         <div class="fld"><label>Nombre / Razón social *</label><input id="fNombre" maxlength="200"></div>
         <div class="fld"><label>RUT</label><input id="fRut" maxlength="20" placeholder="76.123.456-7" oninput="onRut()"></div>
-        <div class="fld"><label>Giro</label><input id="fGiro" maxlength="200"></div>
+        <div class="fld" style="grid-column:1 / -1"><label>Giro / Actividad económica (SII)</label>
+          <input id="fGiro" list="actList" maxlength="200" placeholder="Busca por código o actividad…" autocomplete="off">
+          <datalist id="actList"></datalist>
+          <div style="font-size:.7rem;color:#94a3b8;margin-top:3px">Escribe el código o parte de la glosa y elige de la lista; también puedes dejarlo libre.</div>
+        </div>
+        <div class="fld" style="grid-column:1 / -1"><label>Comentario (para búsquedas)</label>
+          <input id="fComentario" maxlength="300" placeholder="Ej: artículos de librería, repuestos, fletes…">
+        </div>
         <div class="fld"><label>Contacto</label><input id="fContacto" maxlength="150"></div>
         <div class="fld"><label>Email</label><input id="fEmail" maxlength="150"></div>
         <div class="fld"><label>Teléfono</label><input id="fTelefono" maxlength="40"></div>
@@ -134,6 +141,32 @@ function onRut(){ const el=document.getElementById('fRut'); el.value=formatRUT(e
 const fmtMon = n => '$'+Number(n||0).toLocaleString('es-CL');
 let tmr=null; function debounced(){ clearTimeout(tmr); tmr=setTimeout(cargar, 280); }
 
+/* ── Catálogo de Actividades Económicas (SII) para el giro ── */
+let ACT = [];                 // [{codigo, descripcion}]
+const dispMap = new Map();    // "codigo — glosa" → {codigo, glosa}
+const codeMap = new Map();    // codigo → glosa
+const dispDe = (cod, glosa) => `${cod} — ${glosa}`;
+async function cargarActividades(){
+  try {
+    const r = await fetch('/api/actividades-economicas', { headers:H });
+    const j = await r.json();
+    ACT = j.data || [];
+    const dl = document.getElementById('actList');
+    dl.innerHTML = ACT.map(a => `<option value="${escH(dispDe(a.codigo, a.descripcion))}"></option>`).join('');
+    ACT.forEach(a => { const d = dispDe(a.codigo, a.descripcion); dispMap.set(d, { codigo:a.codigo, glosa:a.descripcion }); codeMap.set(String(a.codigo), a.descripcion); });
+  } catch(e) { /* el giro queda como texto libre si falla */ }
+}
+// Interpreta lo escrito en el giro: si coincide con un ítem del catálogo, devuelve {codigo, glosa}.
+function parseGiro(v){
+  const s = String(v||'').trim();
+  if (!s) return { codigo:null, glosa:null };
+  if (dispMap.has(s)) return { codigo: dispMap.get(s).codigo, glosa: dispMap.get(s).glosa };
+  // ¿escribió solo el código?
+  if (codeMap.has(s)) return { codigo:s, glosa: codeMap.get(s) };
+  // texto libre
+  return { codigo:null, glosa:s };
+}
+
 async function cargar(){
   const q = encodeURIComponent(document.getElementById('q').value.trim());
   const inc = document.getElementById('verInactivos').checked ? '&incluir_inactivos=1' : '';
@@ -147,10 +180,12 @@ async function cargar(){
     tb.innerHTML = DATA.map(p => {
       const cuenta = [p.banco, p.tipo_cuenta, p.numero_cuenta].filter(Boolean).join(' · ') || '—';
       const contacto = [p.contacto, p.telefono, p.email].filter(Boolean).join(' · ') || '—';
+      const giro = [p.codigo_actividad, p.giro].filter(Boolean).join(' — ') || '—';
+      const coment = p.comentario ? `<div style="font-size:.72rem;color:#94a3b8">${escH(p.comentario)}</div>` : '';
       return `<tr class="${p.activo? '':'inactivo'}">
         <td><b>${escH(p.nombre)}</b></td>
         <td>${escH(p.rut? formatRUT(p.rut):'—')}</td>
-        <td>${escH(p.giro||'—')}</td>
+        <td>${escH(giro)}${coment}</td>
         <td style="font-size:.78rem">${escH(contacto)}</td>
         <td style="font-size:.78rem">${escH(cuenta)}</td>
         <td><span class="pill ${p.activo?'on':'off'}">${p.activo?'Activo':'Inactivo'}</span></td>
@@ -169,7 +204,8 @@ function setForm(p){
   document.getElementById('fId').value = p.id||'';
   document.getElementById('fNombre').value = p.nombre||'';
   document.getElementById('fRut').value = p.rut? formatRUT(p.rut):'';
-  document.getElementById('fGiro').value = p.giro||'';
+  document.getElementById('fGiro').value = p.codigo_actividad ? dispDe(p.codigo_actividad, p.giro||'') : (p.giro||'');
+  document.getElementById('fComentario').value = p.comentario||'';
   document.getElementById('fContacto').value = p.contacto||'';
   document.getElementById('fEmail').value = p.email||'';
   document.getElementById('fTelefono').value = p.telefono||'';
@@ -190,9 +226,12 @@ async function guardar(){
   const msg = document.getElementById('dlgMsg');
   if (!nombre) { msg.textContent='El nombre es obligatorio.'; msg.style.display='inline'; return; }
   if (rut && !validarRUT(rut)) { msg.textContent='El RUT no es válido.'; msg.style.display='inline'; return; }
+  const g = parseGiro(document.getElementById('fGiro').value);
   const body = {
     nombre, rut,
-    giro: document.getElementById('fGiro').value.trim(),
+    giro: g.glosa,
+    codigo_actividad: g.codigo,
+    comentario: document.getElementById('fComentario').value.trim(),
     contacto: document.getElementById('fContacto').value.trim(),
     email: document.getElementById('fEmail').value.trim(),
     telefono: document.getElementById('fTelefono').value.trim(),
@@ -222,6 +261,7 @@ async function toggle(id){
   } catch(e) { alert('Error de red'); }
 }
 
+cargarActividades();
 cargar();
 </script>
 <script src="/js/app-version.js"></script>

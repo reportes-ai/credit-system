@@ -34,6 +34,12 @@ const { emitirCorrelativo, anularCorrelativo } = require('../../../../shared/ord
       )`);
   } catch (e) { if (e.errno !== 1050) console.error('[proveedores migration]', e.message); }
 
+  // Código de actividad económica (SII) + comentario libre buscable — incremental.
+  try {
+    await pool.query(`ALTER TABLE proveedores ADD COLUMN IF NOT EXISTS codigo_actividad VARCHAR(20) NULL`);
+    await pool.query(`ALTER TABLE proveedores ADD COLUMN IF NOT EXISTS comentario VARCHAR(300) NULL`);
+  } catch (e) { console.error('[proveedores alter cols]', e.message); }
+
   try {
     await pool.query(`
       CREATE TABLE IF NOT EXISTS ordenes_pago (
@@ -117,7 +123,7 @@ const listarProveedores = async (req, res) => {
     const where = [];
     const args = [];
     if (!incluirInactivos) where.push('activo = 1');
-    if (q) { where.push('(nombre LIKE ? OR rut LIKE ? OR giro LIKE ?)'); args.push(`%${q}%`, `%${q}%`, `%${q}%`); }
+    if (q) { where.push('(nombre LIKE ? OR rut LIKE ? OR giro LIKE ? OR codigo_actividad LIKE ? OR comentario LIKE ?)'); args.push(`%${q}%`, `%${q}%`, `%${q}%`, `%${q}%`, `%${q}%`); }
     const [rows] = await pool.query(
       `SELECT * FROM proveedores ${where.length ? 'WHERE ' + where.join(' AND ') : ''} ORDER BY nombre LIMIT 500`, args);
     res.json({ success: true, data: rows, error: null });
@@ -138,9 +144,10 @@ const crearProveedor = async (req, res) => {
       if (dup) return res.status(409).json({ success: false, data: null, error: 'Ya existe un proveedor con ese RUT' });
     }
     const [r] = await pool.query(
-      `INSERT INTO proveedores (rut, nombre, giro, email, telefono, direccion, contacto, banco, tipo_cuenta, numero_cuenta)
-       VALUES (?,?,?,?,?,?,?,?,?,?)`,
-      [rut, nombre, norm(b.giro) || null, norm(b.email) || null, norm(b.telefono) || null, norm(b.direccion) || null,
+      `INSERT INTO proveedores (rut, nombre, giro, codigo_actividad, comentario, email, telefono, direccion, contacto, banco, tipo_cuenta, numero_cuenta)
+       VALUES (?,?,?,?,?,?,?,?,?,?,?,?)`,
+      [rut, nombre, norm(b.giro) || null, norm(b.codigo_actividad) || null, norm(b.comentario) || null,
+       norm(b.email) || null, norm(b.telefono) || null, norm(b.direccion) || null,
        norm(b.contacto) || null, norm(b.banco) || null, norm(b.tipo_cuenta) || null, norm(b.numero_cuenta) || null]);
     auditar({ req, accion: 'CREAR', modulo: 'ordenes-pago', entidad: 'proveedor', entidad_id: r.insertId, detalle: `Creó proveedor ${nombre}` });
     res.json({ success: true, data: { id: r.insertId }, error: null });
@@ -162,8 +169,9 @@ const actualizarProveedor = async (req, res) => {
       if (dup) return res.status(409).json({ success: false, data: null, error: 'Ya existe otro proveedor con ese RUT' });
     }
     const [r] = await pool.query(
-      `UPDATE proveedores SET rut=?, nombre=?, giro=?, email=?, telefono=?, direccion=?, contacto=?, banco=?, tipo_cuenta=?, numero_cuenta=? WHERE id=?`,
-      [rut, nombre, norm(b.giro) || null, norm(b.email) || null, norm(b.telefono) || null, norm(b.direccion) || null,
+      `UPDATE proveedores SET rut=?, nombre=?, giro=?, codigo_actividad=?, comentario=?, email=?, telefono=?, direccion=?, contacto=?, banco=?, tipo_cuenta=?, numero_cuenta=? WHERE id=?`,
+      [rut, nombre, norm(b.giro) || null, norm(b.codigo_actividad) || null, norm(b.comentario) || null,
+       norm(b.email) || null, norm(b.telefono) || null, norm(b.direccion) || null,
        norm(b.contacto) || null, norm(b.banco) || null, norm(b.tipo_cuenta) || null, norm(b.numero_cuenta) || null, id]);
     if (!r.affectedRows) return res.status(404).json({ success: false, data: null, error: 'Proveedor no encontrado' });
     auditar({ req, accion: 'EDITAR', modulo: 'ordenes-pago', entidad: 'proveedor', entidad_id: id, detalle: `Editó proveedor ${nombre}` });
