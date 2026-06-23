@@ -124,19 +124,20 @@ const { emitirCorrelativo, anularCorrelativo } = require('../../../../shared/ord
     if (pend.length) console.log('[ordenes-pago] órdenes pagadas congeladas en duro (backfill):', pend.length);
   } catch (e) { console.error('[ordenes-pago snapshot backfill]', e.message); }
 
-  // Reparación idempotente: re-congelar snapshots con fecha mal formateada (bug soloFecha sobre Date).
+  // Reparación idempotente: re-congelar snapshots de versión anterior (fechas mal formateadas,
+  // desglose IVA de comisión, etc.). Se rehace si falta _v=DOC_VERSION o la fecha no es ISO.
   try {
     const [snaps] = await pool.query(`SELECT id, snapshot_json FROM op_correlativos WHERE snapshot_json IS NOT NULL LIMIT 2000`);
     let fixed = 0;
     for (const r of snaps) {
-      let okFecha = false;
-      try { const s = JSON.parse(r.snapshot_json); okFecha = /^\d{4}-\d{2}-\d{2}$/.test(String(s.fecha_emision || '')); } catch (_) {}
-      if (okFecha) continue;
+      let okSnap = false;
+      try { const s = JSON.parse(r.snapshot_json); okSnap = s._v === DOC_VERSION && /^\d{4}-\d{2}-\d{2}$/.test(String(s.fecha_emision || '')); } catch (_) {}
+      if (okSnap) continue;
       const [[oc]] = await pool.query('SELECT * FROM op_correlativos WHERE id=?', [r.id]);
       const snap = oc && await construirDocumento(oc);
       if (snap) { await pool.query('UPDATE op_correlativos SET snapshot_json=? WHERE id=?', [JSON.stringify(snap), r.id]); fixed++; }
     }
-    if (fixed) console.log('[ordenes-pago] snapshots con fecha reparados:', fixed);
+    if (fixed) console.log('[ordenes-pago] snapshots re-congelados (v' + DOC_VERSION + '):', fixed);
   } catch (e) { console.error('[ordenes-pago snapshot repair]', e.message); }
 })();
 
@@ -353,6 +354,9 @@ const getOrden = async (req, res) => {
 };
 
 const ORIGEN_LBL = { SALDO: 'Saldo Precio', COMISION: 'Comisión', GENERAL: 'Otros' };
+// Versión del esquema del documento congelado. Subir cuando cambie la lógica de armado
+// (fechas, desglose IVA, etc.) para forzar el re-congelado idempotente de los snapshots.
+const DOC_VERSION = 2;
 // YYYY-MM-DD. mysql2 devuelve DATETIME/DATE como objeto Date: formatear en hora de Chile
 // (NO usar String(Date).slice, que da "Tue Jun 23"). Si ya viene string ISO, recortar.
 const soloFecha = v => {
@@ -374,6 +378,7 @@ async function construirDocumento(oc) {
       origen: 'GENERAL', origen_label: ORIGEN_LBL.GENERAL, numero: oc.numero || op.numero, estado,
       fecha_pago: soloFecha(oc.fecha_pagada) || op.fecha_pago, metodo_pago: oc.metodo_pago || op.metodo_pago,
       anulada_nombre: oc.anulada_nombre || op.anulada_nombre, fecha_anulada: oc.fecha_anulada || op.fecha_anulada,
+      _v: DOC_VERSION,
     });
   }
   // SALDO / COMISION (Post Venta): se arma el documento desde el seguimiento + dealer (+ factura en comisión).
@@ -383,6 +388,7 @@ async function construirDocumento(oc) {
               COALESCE(c.nombre_local, d.nombre_razon, s.nombre_dealer) AS dealer_nombre,
               COALESCE(c.rut_dealer, d.rut) AS dealer_rut, d.num_cuenta, d.banco,
               fc.numero_factura, fc.es_boleta, fc.fecha_factura,
+              fc.monto_bruto AS fc_base, fc.impuesto_pct AS fc_pct, fc.impuesto_monto AS fc_imp, fc.monto_liquido AS fc_liquido,
               (SELECT 1 FROM postventa_etapas pe WHERE pe.id_seguimiento=s.id AND pe.track='COMISION' AND pe.etapa='COMISION PAGADA' LIMIT 1) AS pagado
          FROM postventa_ordenes_comision poc
          JOIN postventa_seguimiento s ON s.id = poc.id_seguimiento
@@ -401,9 +407,23 @@ async function construirDocumento(oc) {
         WHERE spo.id = ?`;
   const [rws] = await pool.query(sql, [oc.origen_id]);
   const row = rws[0] || {};
-  const monto = Number(oc.monto) || 0;
+  const monto = Number(oc.monto) || 0;   // = A pagar (líquido del correlativo)
   const estado = oc.anulada ? 'ANULADA' : ((oc.pagada || row.pagado) ? 'PAGADA' : 'EMITIDA');
   const destino = [row.num_cuenta, row.banco].filter(Boolean).join(' · ') || null;
+
+  // Desglose tributario. Saldo Precio: exento. Comisión: usa el desglose CONGELADO de la
+  // factura/boleta (postventa_facturas_comision: base/neto, impuesto, líquido).
+  //   Factura (IVA):   neto=base, IVA=imp, bruto=neto+IVA=líquido, A pagar=bruto.
+  //   Boleta (Retenc): bruto=base honorarios, retención=imp, neto=líquido, A pagar=neto.
+  let tratamiento = 'EXENTO', neto = monto, imp = 0, bruto = monto, pct = 0;
+  if (esCom) {
+    const fcBase = Number(row.fc_base) || 0, fcImp = Number(row.fc_imp) || 0, fcLiq = Number(row.fc_liquido) || 0, fcPct = Number(row.fc_pct) || 0;
+    if (fcImp > 0) {
+      if (row.es_boleta) { tratamiento = 'RET'; bruto = fcBase || monto; imp = fcImp; neto = fcLiq || monto; pct = fcPct || 15.25; }
+      else { tratamiento = 'IVA'; neto = fcBase || monto; imp = fcImp; bruto = fcLiq || (neto + imp); pct = fcPct || 19; }
+    }
+  }
+
   return {
     id: oc.id, origen: oc.origen, origen_label: ORIGEN_LBL[oc.origen] || oc.origen,
     numero: oc.numero, concepto: oc.concepto || (esCom ? 'Comisión' : 'Saldo Precio'),
@@ -412,11 +432,10 @@ async function construirDocumento(oc) {
     tipo_documento: esCom ? (row.es_boleta ? 'Boleta de Honorarios' : 'Factura') : null,
     numero_documento: esCom ? (row.numero_factura || null) : null,
     fecha_documento: esCom ? soloFecha(row.fecha_factura) : null,
-    // El monto del correlativo ya es el líquido a pagar (saldo/comisión); sin desglose tributario por línea.
-    tratamiento: 'EXENTO', monto_bruto: monto, monto_neto: monto, impuesto_pct: 0, impuesto_monto: 0, monto,
+    tratamiento, monto_bruto: bruto, monto_neto: neto, impuesto_pct: pct, impuesto_monto: imp, monto,
     destino, fecha_emision: soloFecha(oc.created_at), fecha_pago: soloFecha(oc.fecha_pagada),
     metodo_pago: oc.metodo_pago, estado, usuario_nombre: oc.usuario_nombre,
-    anulada_nombre: oc.anulada_nombre, fecha_anulada: oc.fecha_anulada, num_op: row.num_op,
+    anulada_nombre: oc.anulada_nombre, fecha_anulada: oc.fecha_anulada, num_op: row.num_op, _v: DOC_VERSION,
   };
 }
 
@@ -438,7 +457,7 @@ const getDocumento = async (req, res) => {
     if (oc.pagada) {
       try {
         const [[p]] = await pool.query(
-          `SELECT DATE_FORMAT(o.fecha_pagada,'%d-%m-%Y') AS fecha, DATE_FORMAT(o.fecha_pagada,'%H:%i:%s') AS hora, cj.nombre AS caja
+          `SELECT DATE_FORMAT(o.fecha_pagada,'%d/%m/%Y') AS fecha, DATE_FORMAT(o.fecha_pagada,'%H:%i:%s') AS hora, cj.nombre AS caja
            FROM op_correlativos o LEFT JOIN cajas cj ON cj.id_caja = o.id_caja WHERE o.id = ?`, [oc.id]);
         if (p) data.pago = { caja: p.caja || (oc.id_caja ? 'Caja #' + oc.id_caja : null), fecha: p.fecha, hora: p.hora };
       } catch (_) {}
