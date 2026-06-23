@@ -268,7 +268,7 @@ const listarOrdenes = async (req, res) => {
              oc.usuario_nombre, oc.anulada, oc.anulada_nombre, oc.fecha_anulada,
              op.proveedor_nombre AS g_prov, op.tipo_documento AS g_tipodoc, op.numero_documento AS g_numdoc,
              op.estado AS g_estado, op.fecha_pago AS g_fechapago,
-             poc.numero_factura AS c_factura,
+             pfc.numero_factura AS c_factura,
              spv.nombre_dealer AS s_dealer, cpv.nombre_dealer AS c_dealer,
              (SELECT 1 FROM postventa_etapas pe WHERE pe.id_seguimiento=spo.id_seguimiento AND pe.track='SALDO' AND pe.etapa='SALDO PRECIO PAGADO' LIMIT 1) AS saldo_pagado,
              (SELECT 1 FROM postventa_etapas pe WHERE pe.id_seguimiento=poc.id_seguimiento AND pe.track='COMISION' AND pe.etapa='COMISION PAGADA' LIMIT 1) AS comision_pagada
@@ -278,6 +278,7 @@ const listarOrdenes = async (req, res) => {
       LEFT JOIN postventa_seguimiento spv      ON spv.id = spo.id_seguimiento
       LEFT JOIN postventa_ordenes_comision poc ON oc.origen='COMISION' AND poc.id = oc.origen_id
       LEFT JOIN postventa_seguimiento cpv      ON cpv.id = poc.id_seguimiento
+      LEFT JOIN postventa_facturas_comision pfc ON oc.origen='COMISION' AND pfc.id_seguimiento = poc.id_seguimiento
       WHERE ${where.join(' AND ')}
       ORDER BY oc.created_at DESC, oc.id DESC LIMIT 1000`, args);
 
