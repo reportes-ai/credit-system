@@ -86,7 +86,7 @@
   <div class="topnav-left">
     <a href="/" class="topnav-brand">
       <img src="/img/logo.png" alt="AutoFácil">
-      <span class="version-badge">v1.6</span>
+      <span class="version-badge">v1.7</span>
     </a>
     <div class="breadcrumb-nav">
       <a href="/">Inicio</a><span class="sep">›</span>
@@ -387,8 +387,8 @@ function renderCajas() {
       </div>
       <div class="caja-card-footer">
         <div class="usuarios-count">
-          <i class="bi bi-people"></i>
-          ${asigs.length} usuario${asigs.length!==1?'s':''} asignado${asigs.length!==1?'s':''}
+          <i class="bi bi-person-circle"></i>
+          ${asigs.length ? esc(asigs[0].nombre_usuario||'Usuario asignado') : '<span style="color:#9ca3af">Sin usuario</span>'}
         </div>
         <span style="font-size:.78rem;color:var(--navy);font-weight:600"><i class="bi bi-pencil me-1"></i>Editar</span>
       </div>
