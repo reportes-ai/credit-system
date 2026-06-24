@@ -1,0 +1,205 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<!-- v1.0 -->
+<link rel="icon" href="/img/favicon.png" type="image/png">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Migración Cartera INDEXA — AutoFácil</title>
+<link rel="stylesheet" href="/css/bootstrap-icons.css">
+<style>
+  :root { --navy:#0f2d6b; --blue:#1565c0; --bg:#f0f4f8; --card:#fff; --border:#e2e8f0; --text:#1e293b; --muted:#64748b; }
+  *{ box-sizing:border-box; margin:0; padding:0; }
+  body{ font-family:'Segoe UI',system-ui,sans-serif; background:var(--bg); color:var(--text); }
+  .topnav{ background:linear-gradient(135deg,var(--navy),var(--blue)); padding:0 24px; height:52px; display:flex; align-items:center; justify-content:space-between; }
+  .topnav-brand{ display:flex; align-items:center; gap:10px; color:#fff; font-weight:800; font-size:1rem; text-decoration:none; }
+  .topnav-brand img{ height:28px; filter:brightness(0) invert(1); }
+  .version-badge{ background:rgba(255,255,255,.15); color:rgba(255,255,255,.75); font-size:.65rem; font-weight:700; border-radius:6px; padding:2px 8px; letter-spacing:.5px; }
+  .btn-nav{ background:rgba(255,255,255,.15); border:1px solid rgba(255,255,255,.3); color:#fff; border-radius:8px; padding:6px 14px; font-size:.82rem; font-weight:600; cursor:pointer; text-decoration:none; display:flex; align-items:center; gap:6px; }
+  .topnav-right{ display:flex; align-items:center; gap:12px; }
+  .page{ max-width:1080px; margin:0 auto; padding:24px 16px 80px; }
+  h1{ font-size:1.3rem; color:var(--navy); margin-bottom:4px; }
+  .sub{ color:var(--muted); font-size:.9rem; margin-bottom:20px; }
+  .card{ background:var(--card); border:1px solid var(--border); border-radius:14px; padding:20px 22px; box-shadow:0 2px 10px rgba(0,0,0,.05); margin-bottom:20px; }
+  .note{ background:#eff6ff; border-left:4px solid var(--blue); border-radius:8px; padding:12px 16px; font-size:.85rem; color:#1e3a5f; line-height:1.55; margin-bottom:18px; }
+  .uploads{ display:grid; grid-template-columns:1fr 1fr; gap:16px; }
+  @media(max-width:680px){ .uploads{ grid-template-columns:1fr; } }
+  .up{ border:1.5px dashed #cbd5e1; border-radius:12px; padding:16px; transition:.15s; }
+  .up.has{ border-color:#16a34a; background:#f0fdf4; }
+  .up label{ display:block; font-weight:700; font-size:.85rem; color:var(--navy); margin-bottom:6px; }
+  .up .hint{ font-size:.72rem; color:var(--muted); margin-bottom:8px; }
+  .up input[type=file]{ font-size:.8rem; width:100%; }
+  .actions{ display:flex; gap:10px; align-items:center; margin-top:18px; }
+  .btn{ border:none; border-radius:9px; padding:10px 20px; font-size:.9rem; font-weight:700; cursor:pointer; display:inline-flex; align-items:center; gap:8px; }
+  .btn-go{ background:linear-gradient(135deg,var(--navy),var(--blue)); color:#fff; }
+  .btn-go:disabled{ opacity:.5; cursor:not-allowed; }
+  .spinner{ width:16px; height:16px; border:.18em solid rgba(255,255,255,.4); border-top-color:#fff; border-radius:50%; animation:spin .7s linear infinite; }
+  @keyframes spin{ to{ transform:rotate(360deg); } }
+  .err{ background:#fef2f2; border:1px solid #fca5a5; color:#b91c1c; border-radius:8px; padding:10px 14px; font-size:.85rem; margin-top:14px; display:none; }
+  .stats{ display:grid; grid-template-columns:repeat(auto-fill,minmax(150px,1fr)); gap:12px; margin:6px 0 4px; }
+  .stat{ background:#f8fafc; border:1px solid var(--border); border-radius:10px; padding:12px 14px; }
+  .stat .n{ font-size:1.45rem; font-weight:800; color:var(--navy); }
+  .stat .l{ font-size:.72rem; color:var(--muted); text-transform:uppercase; letter-spacing:.04em; margin-top:2px; }
+  .stat.good .n{ color:#15803d; } .stat.warn .n{ color:#b45309; } .stat.bad .n{ color:#b91c1c; }
+  .sec-h{ font-size:.78rem; font-weight:800; text-transform:uppercase; letter-spacing:.06em; color:var(--navy); margin:18px 0 10px; display:flex; align-items:center; gap:8px; }
+  .sec-h::after{ content:''; flex:1; height:1px; background:var(--border); }
+  table{ width:100%; border-collapse:collapse; font-size:.82rem; }
+  th,td{ padding:7px 9px; text-align:left; border-bottom:1px solid #f1f5f9; white-space:nowrap; }
+  th{ background:#f8fafc; color:var(--navy); font-size:.7rem; text-transform:uppercase; letter-spacing:.04em; position:sticky; top:0; }
+  td.r,th.r{ text-align:right; }
+  .pill{ display:inline-block; border-radius:20px; padding:2px 10px; font-size:.72rem; font-weight:700; }
+  .p-pag{ background:#dcfce7; color:#15803d; } .p-cob{ background:#fee2e2; color:#b91c1c; } .p-vig{ background:#dbeafe; color:#1d4ed8; }
+  .tbl-wrap{ overflow:auto; max-height:420px; border:1px solid var(--border); border-radius:10px; }
+  #results{ display:none; }
+</style>
+</head>
+<body>
+
+<nav class="topnav">
+  <a class="topnav-brand" href="/cobranza">
+    <img src="/img/logo.png" alt="AutoFácil" onerror="this.style.display='none'">
+    <span>Migración Cartera INDEXA</span>
+    <span class="version-badge" id="versionBadge"></span>
+  </a>
+  <div class="topnav-right">
+    <span id="navUser" class="user-chip" style="color:rgba(255,255,255,.75);font-size:.82rem"></span>
+    <a href="/cobranza" class="btn-nav"><i class="bi bi-arrow-left"></i>Cobranza</a>
+  </div>
+</nav>
+
+<div class="page">
+  <h1>Migración Cartera INDEXA</h1>
+  <div class="sub">Carga del informe diario de INDEXA a Business Suite.</div>
+
+  <div class="card">
+    <div class="note">
+      <b>Etapa 1 — Análisis (Dry-run):</b> sube los <b>2 archivos</b> y revisa el cuadre. <u>No se escribe nada todavía.</u>
+      La llave de cruce es <b>OP = ID_Credito</b>. Un crédito es <b>AutoFácil</b> si tiene cuotas VIGENTE/COBRANZA;
+      si están todas PAGADA es <b>prepagado/brokerage</b>.
+    </div>
+    <div class="uploads">
+      <div class="up" id="upDes">
+        <label><i class="bi bi-filetype-csv text-success"></i> Tabla de Desarrollo (CSV)</label>
+        <div class="hint">El calendario de cuotas — <code>TablaDesarrollo….csv</code> (separado por ; )</div>
+        <input type="file" id="fDes" accept=".csv,text/csv" onchange="markUp()">
+      </div>
+      <div class="up" id="upCob">
+        <label><i class="bi bi-file-earmark-excel text-success"></i> Archivo Cobranza (Excel)</label>
+        <div class="hint">Datos de contacto + vehículo — <code>ARCHIVO COBRANZA….xlsx</code></div>
+        <input type="file" id="fCob" accept=".xlsx" onchange="markUp()">
+      </div>
+    </div>
+    <div class="actions">
+      <button class="btn btn-go" id="btnGo" onclick="analizar()" disabled><i class="bi bi-search"></i>Analizar (Dry-run)</button>
+      <span id="status" style="font-size:.82rem;color:var(--muted)"></span>
+    </div>
+    <div class="err" id="err"></div>
+  </div>
+
+  <div id="results"></div>
+</div>
+
+<script src="/js/auth-guard.js"></script>
+<script>
+const TOKEN = () => sessionStorage.getItem('token');
+(function(){
+  if(!TOKEN()){ location.href='/login.html'; return; }
+  try{ const u=JSON.parse(sessionStorage.getItem('usuario')||'{}'); document.getElementById('navUser').textContent=u.nombre||''; }catch(e){}
+})();
+const $ = id => document.getElementById(id);
+const nfmt = n => (n==null?'—':Number(n).toLocaleString('es-CL'));
+const esc = s => String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+
+function markUp(){
+  $('upDes').classList.toggle('has', !!$('fDes').files.length);
+  $('upCob').classList.toggle('has', !!$('fCob').files.length);
+  $('btnGo').disabled = !($('fDes').files.length && $('fCob').files.length);
+}
+
+async function analizar(){
+  const err=$('err'); err.style.display='none';
+  const btn=$('btnGo'); btn.disabled=true; btn.innerHTML='<span class="spinner"></span>Analizando…';
+  $('status').textContent='Subiendo y procesando los 2 archivos (puede tardar)…';
+  try{
+    const fd=new FormData();
+    fd.append('desarrollo', $('fDes').files[0]);
+    fd.append('cobranza',   $('fCob').files[0]);
+    const r=await fetch('/api/migracion-indexa/dry-run',{ method:'POST', headers:{ Authorization:'Bearer '+TOKEN() }, body:fd });
+    const j=await r.json();
+    if(!j.success) throw new Error(j.error||'Error');
+    render(j.data);
+    $('status').textContent='Análisis completo. Revisa el cuadre antes de aplicar.';
+  }catch(e){
+    err.textContent='⚠ '+e.message; err.style.display='block';
+    $('status').textContent='';
+  }finally{
+    btn.disabled=false; btn.innerHTML='<i class="bi bi-search"></i>Analizar (Dry-run)';
+  }
+}
+
+function statCard(n,l,cls){ return `<div class="stat ${cls||''}"><div class="n">${n}</div><div class="l">${l}</div></div>`; }
+
+function render(d){
+  const a=d.anomalias||{};
+  const estados = Object.entries(d.cuotas.por_estado||{}).map(([k,v])=>`${esc(k)}: <b>${nfmt(v)}</b>`).join(' · ');
+  const anomBad = (a.num_op_colision||0)+(a.venc_no_parse||0)+(d.clientes.rut_nulos||0);
+  const muestra = (d.muestra||[]).map(m=>`
+    <tr>
+      <td><b>${nfmt(m.num_op)}</b></td><td>${esc(m.rut)}</td><td>${esc(m.nombre)}</td>
+      <td class="r">${nfmt(m.plazo)}</td><td class="r">${m.tasa==null?'—':m.tasa+'%'}</td>
+      <td class="r">${nfmt(m.pagadas)}/${nfmt(m.cuotas)}</td>
+      <td class="r">${nfmt(m.saldo_vigente)}</td><td>${esc(m.prox_venc_impaga||'—')}</td>
+      <td>${esc(m.vehiculo)}</td><td>${esc(m.tel||'—')}</td><td>${esc(m.comuna||'—')}</td>
+    </tr>`).join('');
+
+  $('results').innerHTML = `
+  <div class="card">
+    <div class="sec-h"><i class="bi bi-credit-card-2-front"></i>Créditos</div>
+    <div class="stats">
+      ${statCard(nfmt(d.creditos.total),'Créditos en la tabla')}
+      ${statCard(nfmt(d.creditos.autofacil_activos),'AutoFácil activos (a cobrar)','good')}
+      ${statCard(nfmt(d.creditos.prepagados),'Prepagados / brokerage')}
+      ${statCard(nfmt(d.creditos.en_cobranza),'Con datos de contacto')}
+      ${statCard(nfmt(d.clientes.unicos),'Clientes únicos (RUT)')}
+    </div>
+    <div class="sec-h"><i class="bi bi-list-ol"></i>Cuotas y pagos</div>
+    <div class="stats">
+      ${statCard(nfmt(d.cuotas.total),'Cuotas (calendario)')}
+      ${statCard(nfmt(d.pagos.pagadas_total),'Cuotas PAGADAS','good')}
+      ${statCard(nfmt(d.pagos.pagadas_activas_sin_fecha),'Pagadas activas sin fecha', d.pagos.pagadas_activas_sin_fecha? 'warn':'good')}
+      ${statCard(nfmt(d.pagos.pagadas_sin_fecha),'Pagadas sin fecha (total)', d.pagos.pagadas_sin_fecha? 'warn':'')}
+    </div>
+    <div style="font-size:.82rem;color:var(--muted);margin-top:8px">Por estado de cuota → ${estados}</div>
+
+    <div class="sec-h"><i class="bi bi-exclamation-triangle"></i>Cuadre y anomalías</div>
+    <div class="stats">
+      ${statCard(nfmt(a.num_op_colision),'N° Op que chocan con nativos', a.num_op_colision? 'bad':'good')}
+      ${statCard(nfmt(a.venc_no_parse),'Vencimientos no parseables', a.venc_no_parse? 'bad':'good')}
+      ${statCard(nfmt(a.fpago_no_parse),'Fechas de pago no parseables', a.fpago_no_parse? 'warn':'good')}
+      ${statCard(nfmt(d.clientes.rut_nulos),'RUT nulos', d.clientes.rut_nulos? 'warn':'good')}
+      ${statCard(nfmt(d.archivos.desarrollo_malformadas),'Filas CSV malformadas', d.archivos.desarrollo_malformadas? 'warn':'good')}
+    </div>
+    ${a.colisiones && a.colisiones.length ? `<div style="font-size:.8rem;color:#b91c1c;margin-top:6px">Ejemplos de N° Op en conflicto: ${a.colisiones.map(nfmt).join(', ')}…</div>`:''}
+
+    <div class="sec-h"><i class="bi bi-table"></i>Muestra — primeros activos AutoFácil</div>
+    <div class="tbl-wrap">
+      <table>
+        <thead><tr>
+          <th>N° Op</th><th>RUT</th><th>Nombre</th><th class="r">Plazo</th><th class="r">Tasa</th>
+          <th class="r">Pag/Tot</th><th class="r">Saldo vigente</th><th>Próx. venc. impaga</th><th>Vehículo</th><th>Teléfono</th><th>Comuna</th>
+        </tr></thead>
+        <tbody>${muestra || '<tr><td colspan="11" style="text-align:center;color:#94a3b8;padding:20px">Sin activos en la muestra</td></tr>'}</tbody>
+      </table>
+    </div>
+    <div class="note" style="margin-top:16px;background:#fffbeb;border-color:#f59e0b;color:#78350f">
+      <b>Siguiente etapa (APLICAR)</b> — cuando valides estos números: cargo clientes, créditos (num_op = OP, origen INDEXA),
+      el calendario en <code>cuotas_credito</code> y los pagos (cuota PAGADA → pago con su fecha). Idempotente: lo puedes re-correr a diario.
+    </div>
+  </div>`;
+  $('results').style.display='block';
+  $('results').scrollIntoView({ behavior:'smooth', block:'start' });
+}
+</script>
+<script src="/js/app-version.js"></script>
+</body>
+</html>

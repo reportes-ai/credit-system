@@ -173,6 +173,7 @@ app.use('/api/crm', require('../../services/crm/src/routes/gestiones.routes'));
 
 // Cobranza
 app.use('/api/cobranza', require('../../services/cobranza/src/routes/cobranza.routes'));
+app.use('/api/migracion-indexa', require('../../services/cobranza/src/routes/migracion-indexa.routes'));
 
 // Comisiones ejecutivos
 app.use('/api/comisiones', require('../../services/comisiones/src/routes/comisiones.routes'));
@@ -404,6 +405,9 @@ app.get(['/cobranza/mis-cobranza', '/cobranza/mis-cobranza/'], (req, res) =>
 
 app.get(['/cobranza/reporteria', '/cobranza/reporteria/'], (req, res) =>
   res.sendFile(path.join(__dirname, '../public/cobranza/reporteria.html')));
+
+app.get(['/cobranza/migracion-indexa', '/cobranza/migracion-indexa/'], (req, res) =>
+  res.sendFile(path.join(__dirname, '../public/cobranza/migracion-indexa/index.html')));
 
 app.get(['/reporteria', '/reporteria/'], (req, res) =>
   res.sendFile(path.join(__dirname, '../public/reporteria/index.html')));
