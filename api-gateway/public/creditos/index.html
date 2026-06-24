@@ -17,7 +17,7 @@
   <div class="topnav-left">
     <a href="/" class="topnav-brand">
       <img src="/img/logo.png" alt="AutoFácil" style="display:block">
-      <span class="version-badge" id="versionBadge">v5.5</span>
+      <span class="version-badge" id="versionBadge">v5.6</span>
     </a>
       <div class="breadcrumb-nav">
         <a href="/">Inicio</a><span class="sep">›</span>
@@ -88,37 +88,47 @@
   ════════════════════════════════ -->
   <div class="tab-panel active" id="panelConsulta">
 
-    <!-- Stats -->
-    <div class="stats-bar" id="statsBar">
-      <div class="stat-chip" onclick="filtrarPorEstado('')" style="cursor:pointer" title="Ver todos">
-        <div class="sc-label">Total</div><div class="sc-val" id="statTotal">—</div>
+    <!-- Stats: fila 1 = Etapas (originación) · fila 2 = Estados de cartera + Total -->
+    <div class="stats-rows" id="statsBar">
+      <div class="stats-line">
+        <span class="stats-line-lbl" title="Etapa del crédito (originación)">Etapas</span>
+        <div class="stats-bar">
+          <div class="stat-chip stat-revision" onclick="filtrarPorEstado('INGRESO')" style="cursor:pointer" title="Ver ingresados">
+            <div class="sc-label">Ingresados</div>
+            <div class="sc-val" id="statRevision" style="color:#854d0e">—</div>
+          </div>
+          <div class="stat-chip" onclick="filtrarPorEstado('CARTA_APROBACION')" style="cursor:pointer" title="Ver créditos con Carta de Aprobación">
+            <div class="sc-label">Carta Enviada</div>
+            <div class="sc-val" id="statCartaAprobacion" style="color:#0369a1">—</div>
+          </div>
+          <div class="stat-chip stat-proceso" id="chipProceso" onclick="filtrarPorEstado('__PROCESO__')" style="cursor:pointer" title="Ver créditos en proceso (no cursados ni anulados)">
+            <div class="sc-label">En Proceso</div>
+            <div class="sc-val" id="statProceso" style="color:#c2410c">—</div>
+          </div>
+          <div class="stat-chip" onclick="filtrarPorEstado('OTORGADO')" style="cursor:pointer" title="Ver otorgados (broker)">
+            <div class="sc-label">Otorgados</div><div class="sc-val" id="statOtorgados" style="color:#854d0e">—</div>
+          </div>
+          <div class="stat-chip" onclick="filtrarPorEstado('CURSADO')" style="cursor:pointer" title="Ver cursados">
+            <div class="sc-label">Cursados</div><div class="sc-val" id="statCursados" style="color:#15803d">—</div>
+          </div>
+          <div class="stat-chip" onclick="filtrarPorEstado('DESISTIDO')" style="cursor:pointer" title="Ver desistidos">
+            <div class="sc-label">Desistidos</div><div class="sc-val" id="statDesistidos" style="color:#b91c1c">—</div>
+          </div>
+        </div>
       </div>
-      <div class="stat-chip stat-revision" onclick="filtrarPorEstado('INGRESO')" style="cursor:pointer" title="Ver ingresados">
-        <div class="sc-label">Ingresados</div>
-        <div class="sc-val" id="statRevision" style="color:#854d0e">—</div>
-      </div>
-      <div class="stat-chip" onclick="filtrarPorEstado('CARTA_APROBACION')" style="cursor:pointer" title="Ver créditos con Carta de Aprobación">
-        <div class="sc-label">Carta Enviada</div>
-        <div class="sc-val" id="statCartaAprobacion" style="color:#0369a1">—</div>
-      </div>
-      <div class="stat-chip stat-proceso" id="chipProceso" onclick="filtrarPorEstado('__PROCESO__')" style="cursor:pointer" title="Ver créditos en proceso (no cursados ni anulados)">
-        <div class="sc-label">En Proceso</div>
-        <div class="sc-val" id="statProceso" style="color:#c2410c">—</div>
-      </div>
-      <div class="stat-chip" onclick="filtrarPorEstado('OTORGADO')" style="cursor:pointer" title="Ver otorgados (broker)">
-        <div class="sc-label">Otorgados</div><div class="sc-val" id="statOtorgados" style="color:#854d0e">—</div>
-      </div>
-      <div class="stat-chip" onclick="filtrarPorEstado('CURSADO')" style="cursor:pointer" title="Ver cursados">
-        <div class="sc-label">Cursados</div><div class="sc-val" id="statCursados" style="color:#15803d">—</div>
-      </div>
-      <div class="stat-chip" onclick="filtrarPorEstado('DESISTIDO')" style="cursor:pointer" title="Ver desistidos">
-        <div class="sc-label">Desistidos</div><div class="sc-val" id="statDesistidos" style="color:#b91c1c">—</div>
-      </div>
-      <div class="stat-chip" onclick="filtrarPorEstado('VIGENTE')" style="cursor:pointer" title="Ver vigentes (AutoFácil)">
-        <div class="sc-label">Vigentes</div><div class="sc-val" id="statVigentes" style="color:#166534">—</div>
-      </div>
-      <div class="stat-chip" onclick="filtrarPorEstado('EN MORA')" style="cursor:pointer" title="Ver en mora">
-        <div class="sc-label">En Mora</div><div class="sc-val" id="statMora" style="color:#92400e">—</div>
+      <div class="stats-line">
+        <span class="stats-line-lbl" title="Estado de cartera (pago del crédito vivo)">Estados</span>
+        <div class="stats-bar">
+          <div class="stat-chip" onclick="filtrarPorEstado('')" style="cursor:pointer" title="Ver todos">
+            <div class="sc-label">Total</div><div class="sc-val" id="statTotal">—</div>
+          </div>
+          <div class="stat-chip" onclick="filtrarPorEstado('VIGENTE')" style="cursor:pointer" title="Ver vigentes (AutoFácil)">
+            <div class="sc-label">Vigentes</div><div class="sc-val" id="statVigentes" style="color:#166534">—</div>
+          </div>
+          <div class="stat-chip" onclick="filtrarPorEstado('EN MORA')" style="cursor:pointer" title="Ver en mora">
+            <div class="sc-label">En Mora</div><div class="sc-val" id="statMora" style="color:#92400e">—</div>
+          </div>
+        </div>
       </div>
     </div>
 
