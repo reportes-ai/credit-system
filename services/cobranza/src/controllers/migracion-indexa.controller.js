@@ -551,7 +551,9 @@ function parseEnriquecimiento(buf) {
   lines[hi].split(';').forEach((h, i) => { const k = normKey(h); if (ix[k] === undefined) ix[k] = i; });
   const iOp = ix['NUM_OP'], iSexo = ix['SEXO'], iFnac = ix['FECHA_NACIMIENTO'],
         iCurse = ix['FECHA_CURSE'], iNom = ix['NOMBRE'], iEje = ix['EJECUTIVO'],
-        iVen = ix['VENDEDOR'], iRut = ix['RUT_DEALER'];
+        iVen = ix['VENDEDOR'], iRut = ix['RUT_DEALER'],
+        iMarca = ix['MARCA'], iModelo = ix['MODELO'], iAnio = ix['ANIO'],
+        iTasa = ix['TASA_PISO'], iRdh = ix['SEGURO_RDH'], iRep = ix['SEGURO_REP_MENOR'];
   if (iOp === undefined) throw new Error('El CSV no tiene la columna num_op. Usa el archivo de enriquecimiento generado.');
   const g = (c, j) => (j === undefined || c[j] == null) ? '' : String(c[j]).trim();
   const rows = [];
@@ -569,17 +571,24 @@ function parseEnriquecimiento(buf) {
       ejecutivo:  g(c, iEje) || null,
       vendedor:   g(c, iVen) || null,
       rut_dealer: g(c, iRut) || null,
+      marca:      g(c, iMarca) || null,
+      modelo:     g(c, iModelo) || null,
+      anio:       g(c, iAnio) || null,
+      tasa_piso:  g(c, iTasa) || null,
+      seguro_rdh: g(c, iRdh) || null,
+      seguro_rep: g(c, iRep) || null,
     });
   }
   return rows;
 }
 
 async function procesarEnriqChunk(slice) {
-  const st = { filas: 0, sexo: 0, fnac: 0, curse: 0, ejecutivo: 0, vendedor: 0, rut_dealer: 0 };
+  const st = { filas: 0, sexo: 0, fnac: 0, curse: 0, ejecutivo: 0, vendedor: 0, rut_dealer: 0, marca: 0, tasa_piso: 0, seguro_rdh: 0, seguro_rep: 0 };
   for (const d of slice) {
     st.filas++;
     if (d.sexo) st.sexo++; if (d.fnac) st.fnac++; if (d.curse) st.curse++;
     if (d.ejecutivo) st.ejecutivo++; if (d.vendedor) st.vendedor++; if (d.rut_dealer) st.rut_dealer++;
+    if (d.marca) st.marca++; if (d.tasa_piso) st.tasa_piso++; if (d.seguro_rdh) st.seguro_rdh++; if (d.seguro_rep) st.seguro_rep++;
     // 1) Cliente (vía el crédito ya linkeado): rellena SOLO lo vacío (no pisa lo cargado).
     await pool.query(
       `UPDATE creditos c JOIN clientes cl ON cl.id_cliente = c.id_cliente
@@ -588,17 +597,25 @@ async function procesarEnriqChunk(slice) {
               cl.nombre_completo  = COALESCE(NULLIF(cl.nombre_completo,''), ?)
         WHERE c.num_op = ?`,
       [d.sexo, d.fnac, d.nombre, d.op]);
-    // 2) Crédito: ejecutivo/vendedor/rut_dealer → rellena lo vacío; fecha_otorgado + mes
-    //    = FECHA DE CURSE (autoritativa: reemplaza la aproximación de la migración INDEXA).
+    // 2) Crédito: rellena lo vacío (vehículo, tasa piso, primas de seguro). fecha_otorgado +
+    //    mes = FECHA DE CURSE (autoritativa: reemplaza la aproximación de la migración INDEXA).
+    //    Para montos de seguro, NULLIF(...,0) trata 0 como vacío (INDEXA los dejó en 0/NULL).
     await pool.query(
       `UPDATE creditos
-          SET ejecutivo      = COALESCE(NULLIF(ejecutivo,''), ?),
-              vendedor       = COALESCE(NULLIF(vendedor,''), ?),
-              rut_dealer     = COALESCE(NULLIF(rut_dealer,''), ?),
-              fecha_otorgado = COALESCE(?, fecha_otorgado),
-              mes            = CASE WHEN ? IS NOT NULL THEN DATE_FORMAT(?, '%Y-%m-01') ELSE mes END
+          SET ejecutivo        = COALESCE(NULLIF(ejecutivo,''), ?),
+              vendedor         = COALESCE(NULLIF(vendedor,''), ?),
+              rut_dealer       = COALESCE(NULLIF(rut_dealer,''), ?),
+              id_dealer        = COALESCE(NULLIF(id_dealer,0), (SELECT d.id_dealer FROM dealers d WHERE UPPER(d.rut)=UPPER(REPLACE(?, '-','')) LIMIT 1)),
+              marca            = COALESCE(NULLIF(marca,''), ?),
+              modelo           = COALESCE(NULLIF(modelo,''), ?),
+              anio             = COALESCE(NULLIF(anio,0), ?),
+              tasa_piso        = COALESCE(NULLIF(tasa_piso,0), ?),
+              seguro_rdh       = COALESCE(NULLIF(seguro_rdh,0), ?, seguro_rdh),
+              seguro_rep_menor = COALESCE(NULLIF(seguro_rep_menor,0), ?, seguro_rep_menor),
+              fecha_otorgado   = COALESCE(?, fecha_otorgado),
+              mes              = CASE WHEN ? IS NOT NULL THEN DATE_FORMAT(?, '%Y-%m-01') ELSE mes END
         WHERE num_op = ?`,
-      [d.ejecutivo, d.vendedor, d.rut_dealer, d.curse, d.curse, d.curse, d.op]);
+      [d.ejecutivo, d.vendedor, d.rut_dealer, d.rut_dealer, d.marca, d.modelo, d.anio, d.tasa_piso, d.seguro_rdh, d.seguro_rep, d.curse, d.curse, d.curse, d.op]);
   }
   return st;
 }
