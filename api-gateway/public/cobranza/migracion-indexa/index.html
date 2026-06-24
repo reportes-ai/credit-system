@@ -2,7 +2,7 @@
 <html lang="es">
 <head>
 <meta charset="UTF-8">
-<!-- v1.2 -->
+<!-- v1.3 -->
 <link rel="icon" href="/img/favicon.png" type="image/png">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Migración Cartera INDEXA — AutoFácil</title>
@@ -184,12 +184,14 @@ function render(d){
     <div class="sec-h"><i class="bi bi-exclamation-triangle"></i>Cuadre y anomalías</div>
     <div class="stats">
       ${statCard(nfmt(a.num_op_colision),'N° Op que chocan con nativos', a.num_op_colision? 'bad':'good')}
+      ${statCard(nfmt(a.num_op_colision_activos),'…de ellos en cartera ACTIVA', a.num_op_colision_activos? 'bad':'good')}
       ${statCard(nfmt(a.venc_no_parse),'Vencimientos no parseables', a.venc_no_parse? 'bad':'good')}
       ${statCard(nfmt(a.fpago_no_parse),'Fechas de pago no parseables', a.fpago_no_parse? 'warn':'good')}
       ${statCard(nfmt(d.clientes.rut_nulos),'RUT nulos', d.clientes.rut_nulos? 'warn':'good')}
       ${statCard(nfmt(d.archivos.desarrollo_malformadas),'Filas CSV malformadas', d.archivos.desarrollo_malformadas? 'warn':'good')}
     </div>
     ${a.colisiones && a.colisiones.length ? `<div style="font-size:.8rem;color:#b91c1c;margin-top:6px">Ejemplos de N° Op en conflicto: ${a.colisiones.map(nfmt).join(', ')}…</div>`:''}
+    ${a.colisiones_activas && a.colisiones_activas.length ? `<div style="font-size:.8rem;color:#b91c1c;margin-top:4px;font-weight:700">⚠ N° Op ACTIVOS en conflicto: ${a.colisiones_activas.map(nfmt).join(', ')}${a.num_op_colision_activos>a.colisiones_activas.length?'…':''}</div>`:''}
 
     <div class="sec-h"><i class="bi bi-table"></i>Muestra — primeros activos AutoFácil</div>
     <div class="tbl-wrap">

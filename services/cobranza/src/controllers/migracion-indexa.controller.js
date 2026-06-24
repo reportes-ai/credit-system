@@ -247,6 +247,9 @@ const dryRun = async (req, res) => {
            AND (origen IS NULL OR origen <> 'INDEXA')`, chunk);
       colisiones.push(...rows.map(r => r.num_op));
     }
+    // ¿algún choque cae en la cartera ACTIVA (lo urgente a cobrar)?
+    const colSet = new Set(colisiones.map(String));
+    const colActivas = data.filter(d => d.activo && colSet.has(String(d.num_op))).map(d => d.num_op);
 
     // muestra (primeros 8 activos)
     const muestra = activos.slice(0, 8).map(d => {
@@ -273,7 +276,7 @@ const dryRun = async (req, res) => {
         cuotas: { total: cuotasAll.length, por_estado: estadoCuota },
         pagos: { pagadas_total: pagadas.length, pagadas_sin_fecha: pagadasSinFecha, pagadas_activas_sin_fecha: pagadasActSinFecha },
         clientes: { unicos: ruts.size, rut_nulos: rutNulos },
-        anomalias: { venc_no_parse: vencNoParse, fpago_no_parse: fpagoNoParse, num_op_colision: colisiones.length, colisiones: colisiones.slice(0, 20) },
+        anomalias: { venc_no_parse: vencNoParse, fpago_no_parse: fpagoNoParse, num_op_colision: colisiones.length, num_op_colision_activos: colActivas.length, colisiones: colisiones.slice(0, 20), colisiones_activas: colActivas.slice(0, 20) },
         muestra,
       },
       error: null,
