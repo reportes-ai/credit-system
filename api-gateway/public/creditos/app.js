@@ -230,6 +230,7 @@ function toggleFinanciera(el) {
     // Brokerage: AutoFin y Unidad tienen su propio formulario diferenciado
     if (empresa === 'AUTOFIN')  { window.location.href = '/creditos/digitacion-autofin';  return; }
     if (empresa === 'UNIDAD')   { window.location.href = '/creditos/digitacion-unidad';   return; }
+    if (empresa === 'CFC')      { alert('CFC es una financiera de brokerage en preparación. Por ahora está disponible solo como filtro de consulta.'); return; }
     // AutoFácil: formulario integrado en esta página
     document.querySelectorAll('.fin-card').forEach(c => c.classList.remove('active'));
     el.classList.add('active');
@@ -382,6 +383,32 @@ function toggleSortCred(col) {
 function limpiarRangoFecha() {
   const a = document.getElementById('searchFDesde'), b = document.getElementById('searchFHasta');
   if (a) a.value = ''; if (b) b.value = '';
+  const m = document.getElementById('searchMes'); if (m) m.value = '';
+  buscarCreditos(1);
+}
+
+/* ── Filtro por mes (rellena el rango de fecha de otorgamiento) ── */
+const _MESES_NOM = ['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
+function llenarMeses() {
+  const sel = document.getElementById('searchMes'); if (!sel) return;
+  const now = new Date(); let html = '<option value="">Todos los meses</option>';
+  for (let i = 0; i < 24; i++) {
+    const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
+    const ym = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+    html += `<option value="${ym}">${_MESES_NOM[d.getMonth()]} ${d.getFullYear()}</option>`;
+  }
+  sel.innerHTML = html;
+}
+function filtrarPorMes() {
+  const v = document.getElementById('searchMes').value;
+  const fd = document.getElementById('searchFDesde'), fh = document.getElementById('searchFHasta');
+  if (!v) { if (fd) fd.value = ''; if (fh) fh.value = ''; }
+  else {
+    const [y, m] = v.split('-').map(Number);
+    const ultimo = new Date(y, m, 0).getDate();   // último día del mes
+    if (fd) fd.value = `${v}-01`;
+    if (fh) fh.value = `${v}-${String(ultimo).padStart(2, '0')}`;
+  }
   buscarCreditos(1);
 }
 
@@ -1749,6 +1776,7 @@ function setEjecutivoCred(nombre) {
 }
 
 /* ─── Init ─────────────────────────────────────────────────────────── */
+llenarMeses();
 buscarCreditos(1);
 vehCargaMarcas();
 credCargarParams();
