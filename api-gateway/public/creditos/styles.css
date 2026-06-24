@@ -62,7 +62,8 @@
     }
     .fin-card:hover { transform:translateY(-2px); box-shadow:0 6px 20px rgba(1,65,162,.13); border-color:#93c5fd; }
     .fin-card img { max-width:100%; max-height:42px; object-fit:contain; filter:grayscale(40%) opacity(.65); transition:filter .18s; }
-    .fin-card[data-empresa="CFC"] img { max-height:63px; }   /* logo CFC 50% más grande */
+    .fin-card[data-empresa="CFC"] img,
+    .fin-card[data-empresa="UNIDAD"] img { max-height:63px; }   /* logos CFC y Unidad 50% más grandes */
     .fin-card:hover img { filter:grayscale(15%) opacity(.9); }
     .fin-card.active img { filter:none; }
     .fin-card.active { border-color:var(--navy); box-shadow:0 6px 20px rgba(1,65,162,.18); }
