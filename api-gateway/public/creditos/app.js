@@ -320,6 +320,7 @@ function onRutInputCred(el) {
 ═══════════════════════════════════════════════════════════════════ */
 let _todosCreditos = [];   // lista completa (sin filtro estado)
 let _filtroProceso = false;
+let _filtroSinEstado = false;   // Estados → "Sin Estado" (créditos sin estado de cartera = Brokerage)
 
 // Estados que se consideran "terminales" o activos (NO son "en proceso")
 const ESTADOS_FUERA_PROCESO = new Set(['VIGENTE','CANCELADO','PREPAGADO','CASTIGADO','EN MORA','OTORGADO','CURSADO','DESISTIDO']);
@@ -398,6 +399,7 @@ async function buscarCreditos(page = 1) {
     if (_sortColCred) { params.set('sort', _sortColCred); params.set('dir', _sortDirCred); }
     // Estado: server-side (paginación correcta). EN MORA es calculado → client-side.
     if (_filtroProceso) params.set('estado', '__PROCESO__');
+    else if (_filtroSinEstado) params.set('estado', '__SIN_ESTADO__');
     else if (estadoSel && estadoSel !== 'EN MORA') params.set('estado', estadoSel);
     const r = await fetch('/api/creditos?' + params, { headers: apiHdr() });
     const j = await r.json();
@@ -454,6 +456,8 @@ function actualizarStats(stats, totalServidor) {
   set('statOtorgados', g('OTORGADO'));   // "Cursado" de AutoFin = nuestro Otorgado
   set('statRechazados', g('CANCELADO'));   // CANCELADO = rechazados + anulados
   set('statDesistidos', g('DESISTIDO'));
+  set('statPrepagadoEt', g('PREPAGADO'));
+  set('statAnulado', g('ANULADO'));
   // Estados (cartera)
   set('statVigentes', g('VIGENTE'));
   set('statMora', g('EN MORA') || 0);
@@ -461,6 +465,9 @@ function actualizarStats(stats, totalServidor) {
   set('statTerminado', g('TERMINADO'));
   set('statPrepagado', g('PREPAGADO'));
   set('statCastigado', g('CASTIGADO'));
+  // "Sin Estado" = sin estado de cartera (los de Brokerage) → hace cuadrar la fila con el Total.
+  const carteraSum = g('VIGENTE') + (g('EN MORA') || 0) + g('VENCIDO') + g('TERMINADO') + g('PREPAGADO') + g('CASTIGADO');
+  set('statSinEstado', Math.max(0, (totalServidor || 0) - carteraSum));
   // Resaltar badge ingresados
   const chipRev = document.querySelector('.stat-revision');
   if (chipRev) chipRev.style.borderColor = ingresados > 0 ? '#854d0e' : '';
@@ -469,12 +476,13 @@ function actualizarStats(stats, totalServidor) {
 }
 
 function filtrarPorEstado(estado) {
+  _filtroSinEstado = (estado === '__SIN_ESTADO__');
   if (estado === '__PROCESO__') {
     _filtroProceso = true;
     document.getElementById('searchEstado').value = '';
   } else {
     _filtroProceso = false;
-    document.getElementById('searchEstado').value = estado;
+    document.getElementById('searchEstado').value = _filtroSinEstado ? '' : estado;
   }
   const chipPro = document.getElementById('chipProceso');
   if (chipPro) chipPro.classList.toggle('activo', _filtroProceso);

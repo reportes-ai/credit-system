@@ -17,7 +17,7 @@
   <div class="topnav-left">
     <a href="/" class="topnav-brand">
       <img src="/img/logo.png" alt="AutoFácil" style="display:block">
-      <span class="version-badge" id="versionBadge">v5.9</span>
+      <span class="version-badge" id="versionBadge">v5.10</span>
     </a>
       <div class="breadcrumb-nav">
         <a href="/">Inicio</a><span class="sep">›</span>
@@ -116,6 +116,12 @@
           <div class="stat-chip" onclick="filtrarPorEstado('DESISTIDO')" style="cursor:pointer" title="Ver desistidos">
             <div class="sc-label">Desistidos</div><div class="sc-val" id="statDesistidos" style="color:#b91c1c">—</div>
           </div>
+          <div class="stat-chip" onclick="filtrarPorEstado('PREPAGADO')" style="cursor:pointer" title="Ver prepagados">
+            <div class="sc-label">Prepagado</div><div class="sc-val" id="statPrepagadoEt" style="color:#7c3aed">—</div>
+          </div>
+          <div class="stat-chip" onclick="filtrarPorEstado('ANULADO')" style="cursor:pointer" title="Ver anulados">
+            <div class="sc-label">Anulado</div><div class="sc-val" id="statAnulado" style="color:#475569">—</div>
+          </div>
           <div class="stat-chip stat-total" onclick="filtrarPorEstado('')" style="cursor:pointer" title="Ver todos">
             <div class="sc-label">Total</div><div class="sc-val" id="statTotalEt">—</div>
           </div>
@@ -141,6 +147,9 @@
           </div>
           <div class="stat-chip" onclick="filtrarPorEstado('CASTIGADO')" style="cursor:pointer" title="Ver castigados (incobrable)">
             <div class="sc-label">Castigado</div><div class="sc-val" id="statCastigado" style="color:#111827">—</div>
+          </div>
+          <div class="stat-chip" onclick="filtrarPorEstado('__SIN_ESTADO__')" style="cursor:pointer" title="Sin estado de cartera (créditos de Brokerage)">
+            <div class="sc-label">Sin Estado</div><div class="sc-val" id="statSinEstado" style="color:#64748b">—</div>
           </div>
           <div class="stat-chip stat-total" onclick="filtrarPorEstado('')" style="cursor:pointer" title="Ver todos">
             <div class="sc-label">Total</div><div class="sc-val" id="statTotal">—</div>
@@ -175,6 +184,7 @@
           <option value="APROBADO">Aprobado</option>
           <option value="OTORGADO">Otorgado</option>
           <option value="DESISTIDO">Desistido</option>
+          <option value="ANULADO">Anulado</option>
           </optgroup>
         </select>
         <button class="btn-buscar-rut" onclick="buscarCreditos()">

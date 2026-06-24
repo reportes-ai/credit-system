@@ -386,6 +386,9 @@ const getAll = async (req, res) => {
     const paramsData = [...paramsBase];
     if (estado === '__PROCESO__') {
       whereData += ` AND ${estadoExpr} NOT IN ('VIGENTE','CANCELADO','PREPAGADO','CASTIGADO','EN MORA','OTORGADO','CURSADO','DESISTIDO')`;
+    } else if (estado === '__SIN_ESTADO__') {
+      // Sin estado de cartera = créditos de Brokerage (hace cuadrar la fila Estados con el Total)
+      whereData += ` AND ${estadoExpr} NOT IN ('VIGENTE','EN MORA','VENCIDO','TERMINADO','PREPAGADO','CASTIGADO')`;
     } else if (estado && estado !== 'todos') {
       whereData += ` AND ${estadoExpr} = ?`;
       paramsData.push(estado.toUpperCase());
