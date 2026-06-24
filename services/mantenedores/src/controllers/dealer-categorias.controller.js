@@ -154,7 +154,7 @@ const movimientos = async (req, res) => {
     const [cats] = await pool.query('SELECT codigo, nombre, nivel, meta_min_unidades, meta_texto, color FROM dealer_categorias');
     const nivel = Object.fromEntries(cats.map(c => [c.codigo, c.nivel]));
     const [rows] = await pool.query(`
-      SELECT id_dealer, numero, rut, nombre_indexa, nombre_razon, categoria_asignada, categoria_propuesta, unidades_mes_pasado
+      SELECT id_dealer, numero, rut, nombre_indexa, nombre_razon, ccs_parque, categoria_asignada, categoria_propuesta, unidades_mes_pasado
       FROM dealers
       WHERE categoria_propuesta IS NOT NULL AND categoria_asignada IS NOT NULL
         AND categoria_propuesta <> categoria_asignada
@@ -180,7 +180,7 @@ const porInactivar = async (req, res) => {
     ult.forEach(r => ultPorRut.set(normRut(r.rut_dealer), r.ultima));
     if (!ultPorRut.size) return res.json({ success: true, data: { rows: [] }, error: null });
 
-    const [dealers] = await pool.query('SELECT id_dealer, numero, rut, nombre_indexa, nombre_razon, activo, categoria_asignada FROM dealers');
+    const [dealers] = await pool.query('SELECT id_dealer, numero, rut, nombre_indexa, nombre_razon, ccs_parque, activo, categoria_asignada FROM dealers');
     const rows = [];
     for (const d of dealers) {
       const u = ultPorRut.get(normRut(d.rut));

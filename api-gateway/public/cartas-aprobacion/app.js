@@ -499,7 +499,7 @@ function viewDealer(rut){
   if(!d) return;
   const fields = [
     ['N°', d.n], ['N° IND', d.nind], ['RUT', d.rut], ['RUT Pago', d.rutPago],
-    ['Nombre Indexa', d.nombreIndexa], ['Nombre Razón Social', d.nombreRS],
+    ['Nombre Dealer', d.nombreIndexa], ['Nombre Razón Social', d.nombreRS],
     ['CCS / Parque', d.ccsParque], ['Dirección', d.direccion],
     ['Fecha Incorporación', d.fechaInc], ['Contacto Comercial', d.contacto],
     ['Teléfono', d.telefono], ['Correo', d.correo],
@@ -532,7 +532,7 @@ function openDealerModal(rut){
       <div class="field"><label>RUT *</label><input type="text" id="dm_rut" value="${d.rut||''}" ${!isNew?'readonly style="color:#999"':''}></div>
     </div>
     <div class="form-row cols-2">
-      <div class="field"><label>Nombre Indexa *</label><input type="text" id="dm_nombreIndexa" value="${(d.nombreIndexa||'').replace(/"/g,'&quot;')}"></div>
+      <div class="field"><label>Nombre Dealer *</label><input type="text" id="dm_nombreIndexa" value="${(d.nombreIndexa||'').replace(/"/g,'&quot;')}"></div>
       <div class="field"><label>Nombre Razón Social *</label><input type="text" id="dm_nombreRS" value="${(d.nombreRS||'').replace(/"/g,'&quot;')}"></div>
     </div>
     <div class="form-row cols-2">
@@ -584,7 +584,7 @@ function saveDealer(originalRut, isNew){
   const errEl = document.getElementById('dm_error');
   
   if(!rut || !nombreIndexa || !nombreRS){
-    errEl.textContent = 'RUT, Nombre Indexa y Nombre Razón Social son obligatorios.';
+    errEl.textContent = 'RUT, Nombre Dealer y Nombre Razón Social son obligatorios.';
     errEl.style.display = '';
     return;
   }

@@ -142,7 +142,7 @@
   <div class="topnav-left">
     <a href="/" class="topnav-brand">
       <img src="/img/logo.png" alt="AutoFácil" style="display:block">
-      <span class="version-badge" id="versionBadge">v4.9</span>
+      <span class="version-badge" id="versionBadge">v5.0</span>
     </a>
       <div class="breadcrumb-nav"><a href="/">Inicio</a><span class="sep">›</span><a href="/mantenedores">Mantenedores</a><span class="sep">›</span><span style="color:#fff;font-weight:600"><i class="bi bi-shop me-1"></i>Dealers</span></div></div>
   <div class="topnav-right">
@@ -190,7 +190,7 @@
   <div class="toolbar">
     <div class="search-wrap">
       <i class="bi bi-search"></i>
-      <input type="text" id="filtroQ" class="form-control form-control-sm" placeholder="Buscar por Nombre Indexa, Razón Social o RUT..." oninput="debounceCargar()">
+      <input type="text" id="filtroQ" class="form-control form-control-sm" placeholder="Buscar por Nombre Dealer, Razón Social o RUT..." oninput="debounceCargar()">
     </div>
     <select id="filtroCcs" class="form-select form-select-sm" style="width:180px" onchange="cargar(1)">
       <option value="">Todos los tipos</option>
@@ -224,7 +224,7 @@
           <th>N°</th>
           <th>N° IND</th>
           <th>RUT</th>
-          <th>NOMBRE INDEXA</th>
+          <th>NOMBRE DEALER</th>
           <th>NOMBRE RAZÓN SOCIAL</th>
           <th>CCS / PARQUE</th>
           <th>CAT. PROPUESTA</th>
@@ -358,7 +358,7 @@
             <input type="date" class="form-control form-control-sm" id="fFecha">
           </div>
           <div class="col-md-6">
-            <label class="form-label">Nombre Indexa <span class="required-star">*</span></label>
+            <label class="form-label">Nombre Dealer <span class="required-star">*</span></label>
             <input type="text" class="form-control form-control-sm" id="fNombreIndexa">
           </div>
           <div class="col-md-6">
@@ -487,6 +487,31 @@ function activoBadge(v) {
   return v ? '<span class="activo-si">✓ SI</span>' : '<span class="activo-no">✗ NO</span>';
 }
 function fmt(v) { return v || '—'; }
+// Nombre del dealer SIN el prefijo del parque (suele venir como "PARQUE X NOMBRE
+// REAL"). Solo para mostrar; el valor crudo se conserva en BD (lo usan los match
+// dealer↔crédito por nombre). Cae a razón social si quedara vacío.
+function nombreDealer(d) {
+  let n = String((d && d.nombre_indexa) || '').trim();
+  const p = String((d && d.ccs_parque) || '').trim();
+  if (p && n.toUpperCase().startsWith(p.toUpperCase())) {
+    const s = n.slice(p.length).replace(/^[\s\-–—_.,·|:]+/, '').trim();
+    if (s) n = s;                       // si quedaría vacío, conserva el completo
+  }
+  return n || String((d && d.nombre_razon) || '').trim();
+}
+// Al guardar, reanteponer el prefijo del parque (la UI muestra el nombre sin él)
+// para no romper los match por nombre dealer↔crédito.
+function nombreIndexaParaGuardar() {
+  const el = document.getElementById('fNombreIndexa');
+  let ni = el.value.trim();
+  const full = (el.dataset.full || '').trim();
+  const pq   = (el.dataset.parque || '').trim();
+  if (pq && ni && full.toUpperCase().startsWith(pq.toUpperCase())
+        && !ni.toUpperCase().startsWith(pq.toUpperCase())) {
+    ni = (pq + ' ' + ni).trim();
+  }
+  return ni;
+}
 function fmtDate(v) {
   if (!v) return '—';
   return new Date(v).toLocaleDateString('es-CL', { day:'2-digit', month:'2-digit', year:'numeric' });
@@ -523,7 +548,7 @@ async function cargar(p) {
       <td class="td-n">${d.numero ?? (pag-1)*100+i+1}</td>
       <td class="td-ind">${fmt(d.numero_ind)}</td>
       <td class="td-rut">${fmt(d.rut)}</td>
-      <td class="td-nombre">${fmt(d.nombre_indexa)}</td>
+      <td class="td-nombre">${fmt(nombreDealer(d))}</td>
       <td class="td-razon">${fmt(d.nombre_razon)}</td>
       <td>${ccsBadge(d.ccs_parque)}</td>
       <td>${catBadge(d.categoria_propuesta)}</td>
@@ -705,7 +730,7 @@ async function cargarInactivos(){
     tb.innerHTML = rows.map(d=>`
       <tr>
         <td class="td-n">${d.numero ?? '—'}</td>
-        <td class="td-nombre">${esc(d.nombre_indexa||d.nombre_razon||'—')}</td>
+        <td class="td-nombre">${esc(nombreDealer(d)||'—')}</td>
         <td class="td-rut">${esc(d.rut||'—')}</td>
         <td style="font-weight:600;color:#b45309">${fechaCorta(d.ultima_venta)}</td>
         <td>${catBadge(d.categoria_asignada)}</td>
@@ -742,7 +767,7 @@ function renderMov(){
   tb.innerHTML = rows.map(d=>`
     <tr>
       <td class="td-n">${d.numero ?? '—'}</td>
-      <td class="td-nombre">${esc(d.nombre_indexa||d.nombre_razon||'—')}</td>
+      <td class="td-nombre">${esc(nombreDealer(d)||'—')}</td>
       <td class="td-rut">${esc(d.rut||'—')}</td>
       <td style="text-align:center;font-weight:700">${d.unidades_mes_pasado ?? 0}</td>
       <td>${catBadge(d.categoria_asignada)}</td>
@@ -767,13 +792,13 @@ async function cargarCcs() {
 // ---- VER DETALLE ----
 function verDealer(d) {
   dealerActual = d;
-  document.getElementById('detTitulo').textContent = d.nombre_indexa || 'Dealer';
+  document.getElementById('detTitulo').textContent = nombreDealer(d) || 'Dealer';
   document.getElementById('detTable').innerHTML = [
     ['N°',                d.numero ?? '—'],
     ['N° IND',            fmt(d.numero_ind)],
     ['RUT',               fmt(d.rut)],
     ['RUT Pago',          fmt(d.rut_pago)],
-    ['Nombre Indexa',     fmt(d.nombre_indexa)],
+    ['Nombre Dealer',     fmt(nombreDealer(d))],
     ['Nombre Razón Social', fmt(d.nombre_razon)],
     ['CCS / Parque',      fmt(d.ccs_parque)],
     ['Categoría Propuesta', CATS[d.categoria_propuesta]?.nombre || '—'],
@@ -799,13 +824,16 @@ function abrirEditar() {
 
 function abrirEditarDirecto(d) {
   dealerActual = d;
-  document.getElementById('formTitulo').textContent = 'Editar Dealer: ' + (d.nombre_indexa || '');
+  document.getElementById('formTitulo').textContent = 'Editar Dealer: ' + (nombreDealer(d) || '');
   document.getElementById('fId').value         = d.id_dealer;
   document.getElementById('fNumInd').value     = d.numero_ind  || '';
   document.getElementById('fRut').value        = d.rut         || '';
   document.getElementById('fRutPago').value    = d.rut_pago    || '';
   document.getElementById('fFecha').value      = d.fecha_incorporacion ? d.fecha_incorporacion.slice(0,10) : '';
-  document.getElementById('fNombreIndexa').value = d.nombre_indexa || '';
+  const _fni = document.getElementById('fNombreIndexa');
+  _fni.value = nombreDealer(d);
+  _fni.dataset.full = d.nombre_indexa || '';
+  _fni.dataset.parque = d.ccs_parque || '';
   document.getElementById('fNombreRazon').value  = d.nombre_razon  || '';
   document.getElementById('fCcs').value        = d.ccs_parque  || '';
   document.getElementById('fDireccion').value  = d.direccion   || '';
@@ -826,6 +854,7 @@ function abrirNuevo() {
   ['fId','fNumInd','fRut','fRutPago','fFecha','fNombreIndexa','fNombreRazon',
    'fCcs','fDireccion','fContacto','fTelefono','fCorreo','fCuenta','fBanco','fObs']
     .forEach(id => document.getElementById(id).value = '');
+  { const _fni = document.getElementById('fNombreIndexa'); _fni.dataset.full = ''; _fni.dataset.parque = ''; }
   document.getElementById('fActivo').value  = '1';
   document.getElementById('fFactura').value = '0';
   new bootstrap.Modal(document.getElementById('modalForm')).show();
@@ -840,7 +869,7 @@ async function guardar() {
     rut,
     rut_pago:            document.getElementById('fRutPago').value.trim(),
     fecha_incorporacion: document.getElementById('fFecha').value || null,
-    nombre_indexa:       document.getElementById('fNombreIndexa').value.trim(),
+    nombre_indexa:       nombreIndexaParaGuardar(),
     nombre_razon:        document.getElementById('fNombreRazon').value.trim(),
     ccs_parque:          document.getElementById('fCcs').value.trim(),
     direccion:           document.getElementById('fDireccion').value.trim(),
