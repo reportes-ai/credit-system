@@ -163,6 +163,44 @@ function sectionFromHref(href) {
   return 'home';
 }
 
+// ── Ventanas dinámicas: una pantalla por MÓDULO de BD ──────────────────────
+// La clave de la ventana de un módulo = último segmento de su ruta, con alias
+// para conservar las llaves curadas que usan las landings y los configs guardados.
+const _SECTION_ALIAS = { 'carga-masiva': 'carga_masiva' };
+function moduleKey(ruta) {
+  const seg = String(ruta || '').replace(/^\/+|\/+$/g, '').split('/').pop();
+  return _SECTION_ALIAS[seg] || seg;
+}
+// Sub-item → ventana de su módulo padre (la ruta de módulo más larga que lo prefija).
+function moduleSectionForHref(href, moduleRoutes) {
+  const h = _phNorm(href);
+  if (!h) return null;
+  let best = null;
+  (moduleRoutes instanceof Set ? moduleRoutes : new Set(moduleRoutes || [])).forEach(r => {
+    if (r && r !== '/' && h.startsWith(r) && (!best || r.length > best.length)) best = r;
+  });
+  return best ? moduleKey(best) : null;
+}
+// Paleta para ventanas generadas (las curadas conservan su color).
+const _SECTION_PALETTE = ['#0e7490', '#7c3aed', '#b45309', '#be123c', '#15803d', '#4338ca', '#9333ea', '#0369a1', '#a16207', '#0f766e', '#7c2d12', '#1e40af'];
+function _colorForKey(k) { let h = 0; for (let i = 0; i < k.length; i++) h = (h * 31 + k.charCodeAt(i)) >>> 0; return _SECTION_PALETTE[h % _SECTION_PALETTE.length]; }
+
+// Construye el set COMPLETO de ventanas: HOME + curadas + una por módulo activo (BD).
+// dbList = `data` de /api/auth/mis-permisos (módulos: {nombre, ruta, icono, ...}).
+function buildDynamicSections(dbList) {
+  const sections = { home: PLACEMENT_SECTIONS.home };
+  // Curadas (conservar llave/label/color: compat con landings y placement_v2 guardado)
+  Object.entries(PLACEMENT_SECTIONS).forEach(([k, v]) => { if (k !== 'home') sections[k] = v; });
+  // Una ventana por módulo que aún no tenga sección curada
+  (dbList || []).forEach(m => {
+    if (!m || !m.ruta) return;
+    const k = moduleKey(m.ruta);
+    if (k === 'home' || sections[k]) return;
+    sections[k] = { label: m.nombre || k, icon: m.icono || 'bi-grid', color: _colorForKey(k) };
+  });
+  return sections;
+}
+
 function buildPlacementItems(funcionalidadesInfo, moduleRoutes) {
   const items = {};
   for (const [k, v] of Object.entries(PLACEMENT_ITEMS)) items[k] = { ...v, desc: PLACEMENT_DESCS[k] || v.desc || '' };
@@ -173,8 +211,13 @@ function buildPlacementItems(funcionalidadesInfo, moduleRoutes) {
     const h = _phNorm(f.href);
     if (cubiertos.has(h) || mods.has(h)) return;        // ya cubierto por el manifiesto o es un módulo
     const seg = String(f.href).replace(/^\/+|\/+$/g, '').split('/').pop();
-    if (!seg || items[seg]) return;                     // sin segmento o choque de clave
-    items[seg] = { section: sectionFromHref(f.href), href: f.href, icon: f.icono || 'bi-grid', titulo: f.nombre || seg, desc: PLACEMENT_DESCS[seg] || '' };
+    if (!seg) return;
+    // Ventana = la de su módulo padre (prefijo de ruta más largo); fallback al heurístico.
+    const sec = moduleSectionForHref(f.href, mods) || sectionFromHref(f.href);
+    // Clave = último segmento; si choca entre módulos, namespacing por ventana (no se pierde).
+    let key = seg;
+    if (items[key]) { key = sec + ':' + seg; if (items[key]) return; }
+    items[key] = { section: sec, href: f.href, icon: f.icono || 'bi-grid', titulo: f.nombre || seg, desc: PLACEMENT_DESCS[seg] || '' };
     cubiertos.add(h);
   });
   return items;

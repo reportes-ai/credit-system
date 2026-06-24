@@ -85,7 +85,7 @@
 <body>
   <nav class="topnav">
     <div class="topnav-left">
-      <a href="/" class="topnav-brand"><img src="/img/logo.png" alt="AutoFácil"><span class="version-badge">v2.6</span></a>
+      <a href="/" class="topnav-brand"><img src="/img/logo.png" alt="AutoFácil"><span class="version-badge">v2.7</span></a>
       <div class="breadcrumb-nav">
         <a href="/">Inicio</a><span style="color:rgba(255,255,255,.35)">›</span>
         <a href="/mantenedores/">Mantenedores</a><span style="color:rgba(255,255,255,.35)">›</span>
@@ -140,6 +140,9 @@
 
     let sortables = [];
     let reorderMode = false;
+    // Ventanas (pantallas): se reconstruyen dinámicamente desde los módulos de BD.
+    // Arranca con las curadas; init()/actualizarModulos() agregan una por módulo.
+    let SECTIONS = { ...PLACEMENT_SECTIONS };
 
     function makeChip(key, titulo, icon, type) {
       const span = document.createElement('span');
@@ -150,7 +153,8 @@
     }
 
     function buildGroup(sectionId, chips) {
-      const cfg = PLACEMENT_SECTIONS[sectionId];
+      const cfg = SECTIONS[sectionId];
+      if (!cfg) return;
       const card = document.createElement('div');
       card.className = 'group-card';
       card.innerHTML = `
@@ -182,7 +186,7 @@
     function enableSortables() {
       sortables.forEach(s => s.destroy());
       sortables = [];
-      Object.keys(PLACEMENT_SECTIONS).forEach(sid => {
+      Object.keys(SECTIONS).forEach(sid => {
         const body = document.getElementById(`grp-${sid}`);
         if (!body) return;
         sortables.push(Sortable.create(body, {
@@ -192,7 +196,7 @@
           filter: '.group-empty',
           ghostClass: 'sortable-ghost',
           chosenClass: 'sortable-chosen',
-          onEnd: () => Object.keys(PLACEMENT_SECTIONS).forEach(refreshCount),
+          onEnd: () => Object.keys(SECTIONS).forEach(refreshCount),
         }));
       });
     }
@@ -262,9 +266,12 @@
 
       grid.innerHTML = '';
 
+      // Ventanas dinámicas: HOME + curadas + una por módulo de BD.
+      SECTIONS = buildDynamicSections(dbList);
+
       const master = buildMasterList(dbList, funcInfo);
       const zones = {};
-      Object.keys(PLACEMENT_SECTIONS).forEach(s => { zones[s] = []; });
+      Object.keys(SECTIONS).forEach(s => { zones[s] = []; });
 
       // Normalizar placement: soporta tanto formato nuevo {sec:[keys]} como viejo {key:sec}
       const isNewFmt = Object.values(placement).some(v => Array.isArray(v));
@@ -303,7 +310,7 @@
         });
       }
 
-      Object.keys(PLACEMENT_SECTIONS).forEach(sid => buildGroup(sid, zones[sid] || []));
+      Object.keys(SECTIONS).forEach(sid => buildGroup(sid, zones[sid] || []));
     }
 
     async function guardar() {
@@ -313,8 +320,9 @@
 
       // Nuevo formato: { sectionId: [key1, key2, ...] } (ordenado)
       const placement = {};
-      Object.keys(PLACEMENT_SECTIONS).forEach(sid => {
+      Object.keys(SECTIONS).forEach(sid => {
         const body = document.getElementById(`grp-${sid}`);
+        if (!body) return;
         placement[sid] = [...body.querySelectorAll('.chip')].map(c => c.dataset.key);
       });
 
@@ -351,12 +359,19 @@
         if (r.success) { dbList = r.data; funcInfo = r.funcionalidadesInfo || []; }
       } catch {}
 
+      // Reconstruir ventanas (una por módulo de BD) y crear en el DOM las que falten
+      SECTIONS = buildDynamicSections(dbList);
+      let addedWin = 0;
+      Object.keys(SECTIONS).forEach(sid => {
+        if (!document.getElementById(`grp-${sid}`)) { buildGroup(sid, []); addedWin++; }
+      });
+
       // Master list con normalización de rutas
       const master = buildMasterList(dbList, funcInfo);
 
       // Keys ya presentes (en ambas formas: con y sin slash final)
       const yaPresentes = new Set();
-      Object.keys(PLACEMENT_SECTIONS).forEach(sid => {
+      Object.keys(SECTIONS).forEach(sid => {
         document.getElementById(`grp-${sid}`)?.querySelectorAll('.chip').forEach(c => {
           yaPresentes.add(c.dataset.key);
           yaPresentes.add(norm(c.dataset.key));
@@ -366,7 +381,8 @@
       let addedMod = 0, addedSub = 0;
       master.forEach((info, key) => {
         if (yaPresentes.has(key) || yaPresentes.has(norm(key))) return;
-        const sec = info.defaultSection;
+        // Sub-item → ventana de su módulo; módulo → HOME. Fallback a HOME si no existe.
+        const sec = document.getElementById(`grp-${info.defaultSection}`) ? info.defaultSection : 'home';
         const body = document.getElementById(`grp-${sec}`);
         if (!body) return;
         body.appendChild(makeChip(key, info.nombre, info.icono, info.type));
@@ -375,13 +391,14 @@
       });
 
       const ok = document.getElementById('saveOk');
-      const total = addedMod + addedSub;
+      const total = addedMod + addedSub + addedWin;
       if (total === 0) {
         ok.textContent = '✓ Todo al día — sin elementos nuevos';
       } else {
         const partes = [];
+        if (addedWin) partes.push(`${addedWin} ventana(s) de módulo`);
         if (addedMod) partes.push(`${addedMod} módulo(s) → HOME`);
-        if (addedSub) partes.push(`${addedSub} sub-módulo(s) → sección por defecto`);
+        if (addedSub) partes.push(`${addedSub} sub-módulo(s) → su módulo`);
         ok.textContent = `✓ Agregados: ${partes.join(' · ')}`;
       }
       ok.style.display = 'flex';
