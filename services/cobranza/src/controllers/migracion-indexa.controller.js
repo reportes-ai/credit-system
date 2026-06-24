@@ -62,21 +62,28 @@ const { auditar } = require('../../../../shared/audit');
 
     // RUT clientes: con puntos → sin puntos. Si ya existe el sin-puntos, fusiona
     // (re-apunta créditos al existente y borra el duplicado punteado).
-    const [dotted] = await pool.query("SELECT id_cliente, rut FROM clientes WHERE rut LIKE '%.%'");
-    let renombrados = 0, fusionados = 0;
-    for (const c of dotted) {
-      const nodot = String(c.rut).replace(/\./g, '');
-      const [[ex]] = await pool.query('SELECT id_cliente FROM clientes WHERE rut=? AND id_cliente<>? LIMIT 1', [nodot, c.id_cliente]);
-      if (ex) {
-        await pool.query('UPDATE creditos SET id_cliente=? WHERE id_cliente=?', [ex.id_cliente, c.id_cliente]);
-        await pool.query('DELETE FROM clientes WHERE id_cliente=?', [c.id_cliente]);
-        fusionados++;
-      } else {
-        await pool.query('UPDATE clientes SET rut=? WHERE id_cliente=?', [nodot, c.id_cliente]);
-        renombrados++;
-      }
+    // 1) Fusiones: los punteados con gemelo sin-puntos → copia contacto faltante al
+    //    que se conserva, re-apunta créditos y borra el duplicado.
+    const [merges] = await pool.query(`
+      SELECT c.id_cliente AS dup, c2.id_cliente AS keep
+      FROM clientes c JOIN clientes c2
+        ON c2.rut = REPLACE(c.rut,'.','') AND c2.id_cliente <> c.id_cliente
+      WHERE c.rut LIKE '%.%'`);
+    for (const m of merges) {
+      await pool.query(
+        `UPDATE clientes k JOIN clientes d ON d.id_cliente=?
+           SET k.email=COALESCE(k.email,d.email), k.direccion=COALESCE(k.direccion,d.direccion),
+               k.telefono_movil=COALESCE(k.telefono_movil,d.telefono_movil),
+               k.nombres=COALESCE(k.nombres,d.nombres),
+               k.apellido_paterno=COALESCE(k.apellido_paterno,d.apellido_paterno),
+               k.apellido_materno=COALESCE(k.apellido_materno,d.apellido_materno)
+         WHERE k.id_cliente=?`, [m.dup, m.keep]).catch(() => {});
+      await pool.query('UPDATE creditos SET id_cliente=? WHERE id_cliente=?', [m.keep, m.dup]);
+      await pool.query('DELETE FROM clientes WHERE id_cliente=?', [m.dup]);
     }
-    if (dotted.length) console.log(`[migracion-indexa fix] RUT clientes: ${renombrados} renombrados, ${fusionados} fusionados`);
+    // 2) El resto (sin gemelo): renombrar a sin-puntos EN BLOQUE (ya sin colisiones).
+    const [r2] = await pool.query("UPDATE clientes SET rut=REPLACE(rut,'.','') WHERE rut LIKE '%.%'");
+    if (merges.length || r2.affectedRows) console.log(`[migracion-indexa fix] RUT: ${r2.affectedRows} renombrados, ${merges.length} fusionados`);
   } catch (e) { console.error('[migracion-indexa fix]', e.message); }
 })();
 
