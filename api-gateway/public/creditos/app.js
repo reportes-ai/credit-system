@@ -444,7 +444,9 @@ function actualizarStats(stats, totalServidor) {
   const g = (e) => (stats[e] || 0);
   const ingresados = g('INGRESO') + g('REVISION');
   const proceso    = (totalServidor || 0) - g('CANCELADO') - g('VIGENTE') - g('OTORGADO') - g('CURSADO') - g('DESISTIDO') - g('CARTA_APROBACION');
-  document.getElementById('statTotal').textContent     = (totalServidor || 0).toLocaleString('es-CL');
+  const _totTxt = (totalServidor || 0).toLocaleString('es-CL');
+  document.getElementById('statTotal').textContent     = _totTxt;
+  const _totEt = document.getElementById('statTotalEt'); if (_totEt) _totEt.textContent = _totTxt;
   document.getElementById('statRevision').textContent  = ingresados;
   const elAn = document.getElementById('statCartaAprobacion');
   if (elAn) elAn.textContent = g('CARTA_APROBACION');
