@@ -175,6 +175,19 @@ const SALDO = `ROUND(
     END
   )`;
 
+// ── Cartera migrada de INDEXA (origen='INDEXA'): la mora/saldo salen del calendario
+//    REAL guardado en cuotas_credito (irregular), NO de la fórmula francesa. ──
+//    venc. de la cuota impaga más antigua / cuotas vencidas impagas / su monto /
+//    saldo insoluto = saldo de la última cuota PAGADA (cae a monto_financiado).
+const CC_VENC_OLDEST = `(SELECT cc.fecha_vencimiento FROM cuotas_credito cc
+    WHERE cc.id_credito = c.id AND cc.estado_cuota <> 'PAGADA' ORDER BY cc.numero_cuota LIMIT 1)`;
+const CC_CUOTAS_MORA = `(SELECT COUNT(*) FROM cuotas_credito cc
+    WHERE cc.id_credito = c.id AND cc.estado_cuota <> 'PAGADA' AND cc.fecha_vencimiento <= CURDATE())`;
+const CC_MONTO_MORA = `(SELECT COALESCE(SUM(cc.valor_cuota),0) FROM cuotas_credito cc
+    WHERE cc.id_credito = c.id AND cc.estado_cuota <> 'PAGADA' AND cc.fecha_vencimiento <= CURDATE())`;
+const CC_SALDO = `COALESCE((SELECT cc.saldo_insoluto FROM cuotas_credito cc
+    WHERE cc.id_credito = c.id AND cc.estado_cuota = 'PAGADA' ORDER BY cc.numero_cuota DESC LIMIT 1), c.monto_financiado, 0)`;
+
 // Query base plana — whereExtra va dentro del WHERE, havingExtra dentro del HAVING
 const MORA_SQL = (whereExtra = '', havingExtra = '') => `
   SELECT
@@ -183,16 +196,19 @@ const MORA_SQL = (whereExtra = '', havingExtra = '') => `
     COALESCE(cl_m.rut,             '')    AS rut_cliente,
     COALESCE(cl_m.nombre_completo, '') AS nombre_cliente,
     COALESCE(pp.cnt, 0)                        AS cuotas_pagadas,
-    GREATEST(0, ${CV} - COALESCE(pp.cnt, 0))   AS cuotas_mora,
-    GREATEST(0, ${CV} - COALESCE(pp.cnt, 0)) * COALESCE(c.cuota, 0) AS monto_mora,
+    CASE WHEN c.origen='INDEXA' THEN ${CC_CUOTAS_MORA}
+         ELSE GREATEST(0, ${CV} - COALESCE(pp.cnt, 0)) END AS cuotas_mora,
+    CASE WHEN c.origen='INDEXA' THEN ${CC_MONTO_MORA}
+         ELSE GREATEST(0, ${CV} - COALESCE(pp.cnt, 0)) * COALESCE(c.cuota, 0) END AS monto_mora,
     CASE
+      WHEN c.origen='INDEXA' THEN GREATEST(0, DATEDIFF(CURDATE(), ${CC_VENC_OLDEST}))
       WHEN GREATEST(0, ${CV} - COALESCE(pp.cnt, 0)) > 0
         THEN DATEDIFF(CURDATE(),
                DATE_ADD(c.fecha_primera_cuota,
                  INTERVAL COALESCE(pp.cnt, 0) MONTH))
       ELSE 0
     END AS dias_mora,
-    ${SALDO} AS saldo_insoluto
+    CASE WHEN c.origen='INDEXA' THEN ${CC_SALDO} ELSE ${SALDO} END AS saldo_insoluto
   FROM creditos c
   LEFT JOIN clientes cl_m ON cl_m.id_cliente = c.id_cliente
   LEFT JOIN (
@@ -203,6 +219,7 @@ const MORA_SQL = (whereExtra = '', havingExtra = '') => `
   ) pp ON pp.id_credito = c.id
   WHERE c.estado IN ('VIGENTE','EN MORA','OTORGADO')
     AND (c.financiera = 'AUTOFACIL' OR c.financiera IS NULL)
+    AND COALESCE(c.estado_cartera,'') <> 'PREPAGADO'
     AND c.plazo IS NOT NULL
     AND c.plazo > 0
     AND c.fecha_primera_cuota IS NOT NULL
@@ -218,16 +235,19 @@ const MORA_CREDITO_SQL = `
     c.*,
     c.id                                      AS id_credito,
     COALESCE(pp.cnt, 0)                        AS cuotas_pagadas,
-    GREATEST(0, ${CV} - COALESCE(pp.cnt, 0))   AS cuotas_mora,
-    GREATEST(0, ${CV} - COALESCE(pp.cnt, 0)) * COALESCE(c.cuota, 0) AS monto_mora,
+    CASE WHEN c.origen='INDEXA' THEN ${CC_CUOTAS_MORA}
+         ELSE GREATEST(0, ${CV} - COALESCE(pp.cnt, 0)) END AS cuotas_mora,
+    CASE WHEN c.origen='INDEXA' THEN ${CC_MONTO_MORA}
+         ELSE GREATEST(0, ${CV} - COALESCE(pp.cnt, 0)) * COALESCE(c.cuota, 0) END AS monto_mora,
     CASE
+      WHEN c.origen='INDEXA' THEN GREATEST(0, DATEDIFF(CURDATE(), ${CC_VENC_OLDEST}))
       WHEN GREATEST(0, ${CV} - COALESCE(pp.cnt, 0)) > 0
         THEN DATEDIFF(CURDATE(),
                DATE_ADD(c.fecha_primera_cuota,
                  INTERVAL COALESCE(pp.cnt, 0) MONTH))
       ELSE 0
     END AS dias_mora,
-    ${SALDO} AS saldo_insoluto,
+    CASE WHEN c.origen='INDEXA' THEN ${CC_SALDO} ELSE ${SALDO} END AS saldo_insoluto,
     COALESCE(cl.rut,             '') AS rut_cliente,
     COALESCE(cl.nombre_completo, '') AS nombre_cliente,
     cl.sexo           AS sexo_cliente,
