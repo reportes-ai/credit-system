@@ -2,7 +2,7 @@
 <html lang="es">
 <head>
 <meta charset="UTF-8">
-<!-- v1.5 -->
+<!-- v1.6 -->
 <link rel="icon" href="/img/favicon.png" type="image/png">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Migración Cartera INDEXA — AutoFácil</title>
@@ -94,6 +94,32 @@
       <span id="status" style="font-size:.82rem;color:var(--muted)"></span>
     </div>
     <div class="err" id="err"></div>
+  </div>
+
+  <div class="card">
+    <div class="sec-h" style="margin-top:0"><i class="bi bi-stars"></i>Enriquecer cartera (Informe de Créditos Otorgados)</div>
+    <div class="note" style="background:#f5f3ff;border-color:#7c3aed;color:#4c1d95">
+      Completa la cartera ya migrada con lo que <b>INDEXA no traía</b>: <b>género</b>, <b>fecha de nacimiento</b>,
+      <b>ejecutivo</b>, <b>vendedor</b>, <b>RUT del dealer</b> y la <b>Fecha de Curse = fecha de otorgamiento real</b>
+      (reemplaza la aproximación de la migración). Cruce por <b>N° Op</b>. Rellena solo lo vacío; la fecha de curse sí
+      actualiza el otorgamiento. <b>Idempotente.</b><br>
+      <span style="font-size:.78rem">Sube el CSV liviano <code>enriquecimiento-creditos.csv</code> (generado del .xls oficial).</span>
+    </div>
+    <div class="up" id="upEnr" style="max-width:520px">
+      <label><i class="bi bi-filetype-csv" style="color:#7c3aed"></i> CSV de enriquecimiento</label>
+      <div class="hint"><code>num_op;sexo;fecha_nacimiento;fecha_curse;nombre;ejecutivo;vendedor;rut_dealer</code></div>
+      <input type="file" id="fEnr" accept=".csv,text/csv" onchange="markEnr()">
+    </div>
+    <div class="actions">
+      <button class="btn" id="btnEnr" style="background:linear-gradient(135deg,#6d28d9,#7c3aed);color:#fff" onclick="enriquecer()" disabled>
+        <i class="bi bi-stars"></i>Enriquecer cartera</button>
+      <span id="enrStatus" style="font-size:.82rem;color:var(--muted)"></span>
+    </div>
+    <div id="enrProg" style="display:none;margin-top:14px">
+      <div style="height:14px;background:#e2e8f0;border-radius:8px;overflow:hidden"><div id="enrBar" style="height:100%;width:0;background:linear-gradient(135deg,#6d28d9,#a78bfa);transition:width .25s"></div></div>
+      <div id="enrText" style="font-size:.82rem;color:var(--muted);margin-top:6px"></div>
+    </div>
+    <div class="err" id="enrErr"></div>
   </div>
 
   <div id="results"></div>
@@ -250,6 +276,42 @@ async function aplicar(){
     $('err').textContent='⚠ '+e.message; $('err').style.display='block';
     $('err').scrollIntoView({behavior:'smooth',block:'center'});
     btn.disabled=false; btn.innerHTML='<i class="bi bi-database-down"></i>Reintentar';
+  }
+}
+
+/* ── Enriquecer cartera desde el CSV de Créditos Otorgados ── */
+function markEnr(){
+  $('upEnr').classList.toggle('has', !!$('fEnr').files.length);
+  $('btnEnr').disabled = !$('fEnr').files.length;
+}
+async function enriquecer(){
+  if(!confirm('¿Enriquecer la cartera migrada con el informe de Créditos Otorgados?\n\nAgrega género, fecha de nacimiento, ejecutivo, vendedor, RUT del dealer y la fecha de curse (= otorgamiento). Rellena lo vacío; la fecha de curse actualiza el otorgamiento. Es idempotente.')) return;
+  const btn=$('btnEnr'); btn.disabled=true; btn.innerHTML='<span class="spinner"></span>Iniciando…';
+  $('enrProg').style.display='block'; $('enrErr').style.display='none';
+  try{
+    const fd=new FormData(); fd.append('archivo', $('fEnr').files[0]);
+    const ri=await fetch('/api/migracion-indexa/enriquecer-init',{ method:'POST', headers:{ Authorization:'Bearer '+TOKEN() }, body:fd });
+    const ji=await readJson(ri); if(!ji.success) throw new Error(ji.error||'Error al iniciar');
+    const { jobId, total, match, conSexo, conFnac, conCurse } = ji.data;
+    $('enrStatus').textContent = `${nfmt(match)}/${nfmt(total)} N° Op calzan · sexo ${nfmt(conSexo)} · nacimiento ${nfmt(conFnac)} · curse ${nfmt(conCurse)}`;
+    let off=0, acc={}; const SIZE=200;
+    while(off<total){
+      const rc=await fetch('/api/migracion-indexa/enriquecer-chunk',{ method:'POST',
+        headers:{ 'Content-Type':'application/json', Authorization:'Bearer '+TOKEN() },
+        body:JSON.stringify({ jobId, offset:off, size:SIZE }) });
+      const jc=await readJson(rc); if(!jc.success) throw new Error(jc.error||'Error en un lote');
+      off=jc.data.processed; acc=jc.data.acumulado||acc;
+      const pct=Math.round(off/total*100);
+      $('enrBar').style.width=pct+'%';
+      $('enrText').innerHTML=`${nfmt(off)}/${nfmt(total)} filas (${pct}%) — sexo ${nfmt(acc.sexo||0)}, nacimiento ${nfmt(acc.fnac||0)}, curse→otorgamiento ${nfmt(acc.curse||0)}, ejecutivo ${nfmt(acc.ejecutivo||0)}, dealer ${nfmt(acc.rut_dealer||0)}`;
+      if(jc.data.done) break;
+    }
+    btn.innerHTML='<i class="bi bi-check-lg"></i>Enriquecido';
+    $('enrText').innerHTML='✅ Cartera enriquecida. '+$('enrText').innerHTML;
+  }catch(e){
+    $('enrErr').textContent='⚠ '+e.message; $('enrErr').style.display='block';
+    $('enrErr').scrollIntoView({behavior:'smooth',block:'center'});
+    btn.disabled=false; btn.innerHTML='<i class="bi bi-stars"></i>Reintentar';
   }
 }
 </script>

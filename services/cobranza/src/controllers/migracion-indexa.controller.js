@@ -532,4 +532,131 @@ const aplicarChunk = async (req, res) => {
   }
 };
 
-module.exports = { dryRun, aplicarInit, aplicarChunk, _internos: { construir, parseDesarrollo, parseCobranza, fmtRutConDV, pDate, pNum, pTasa, procesarChunk } };
+/* ════════════════════════════════════════════════════════════════════════
+   ENRIQUECER — completa la cartera ya migrada con datos del "Informe de
+   Créditos Otorgados" (el .xls oficial trae lo que INDEXA no: género, fecha
+   de nacimiento, ejecutivo, vendedor, rut del dealer y la FECHA DE CURSE =
+   fecha de otorgamiento real). El .xls crudo pesa 38MB y revienta el instance
+   (528MB de heap); por eso se ingiere un CSV LIVIANO (';', UTF-8) con solo las
+   columnas necesarias, extraído del .xls. Cruce por num_op (la llave fiable:
+   el crédito ya está linkeado a su cliente). Idempotente, por lotes.
+   Columnas CSV: num_op;sexo;fecha_nacimiento;fecha_curse;nombre;ejecutivo;vendedor;rut_dealer
+   ════════════════════════════════════════════════════════════════════════ */
+function parseEnriquecimiento(buf) {
+  let txt = Buffer.from(buf).toString('utf8');
+  if (txt.charCodeAt(0) === 0xFEFF) txt = txt.slice(1);   // BOM
+  const lines = txt.split(/\r?\n/);
+  let hi = 0; while (hi < lines.length && lines[hi].trim() === '') hi++;
+  const ix = {};
+  lines[hi].split(';').forEach((h, i) => { const k = normKey(h); if (ix[k] === undefined) ix[k] = i; });
+  const iOp = ix['NUM_OP'], iSexo = ix['SEXO'], iFnac = ix['FECHA_NACIMIENTO'],
+        iCurse = ix['FECHA_CURSE'], iNom = ix['NOMBRE'], iEje = ix['EJECUTIVO'],
+        iVen = ix['VENDEDOR'], iRut = ix['RUT_DEALER'];
+  if (iOp === undefined) throw new Error('El CSV no tiene la columna num_op. Usa el archivo de enriquecimiento generado.');
+  const g = (c, j) => (j === undefined || c[j] == null) ? '' : String(c[j]).trim();
+  const rows = [];
+  for (let i = hi + 1; i < lines.length; i++) {
+    if (!lines[i].trim()) continue;
+    const c = lines[i].split(';');
+    const op = parseInt(g(c, iOp), 10);
+    if (isNaN(op)) continue;
+    rows.push({
+      op,
+      sexo:       g(c, iSexo) || null,
+      fnac:       g(c, iFnac) || null,
+      curse:      g(c, iCurse) || null,
+      nombre:     g(c, iNom) || null,
+      ejecutivo:  g(c, iEje) || null,
+      vendedor:   g(c, iVen) || null,
+      rut_dealer: g(c, iRut) || null,
+    });
+  }
+  return rows;
+}
+
+async function procesarEnriqChunk(slice) {
+  const st = { filas: 0, sexo: 0, fnac: 0, curse: 0, ejecutivo: 0, vendedor: 0, rut_dealer: 0 };
+  for (const d of slice) {
+    st.filas++;
+    if (d.sexo) st.sexo++; if (d.fnac) st.fnac++; if (d.curse) st.curse++;
+    if (d.ejecutivo) st.ejecutivo++; if (d.vendedor) st.vendedor++; if (d.rut_dealer) st.rut_dealer++;
+    // 1) Cliente (vía el crédito ya linkeado): rellena SOLO lo vacío (no pisa lo cargado).
+    await pool.query(
+      `UPDATE creditos c JOIN clientes cl ON cl.id_cliente = c.id_cliente
+          SET cl.sexo             = COALESCE(NULLIF(cl.sexo,''), ?),
+              cl.fecha_nacimiento = COALESCE(cl.fecha_nacimiento, ?),
+              cl.nombre_completo  = COALESCE(NULLIF(cl.nombre_completo,''), ?)
+        WHERE c.num_op = ?`,
+      [d.sexo, d.fnac, d.nombre, d.op]);
+    // 2) Crédito: ejecutivo/vendedor/rut_dealer → rellena lo vacío; fecha_otorgado + mes
+    //    = FECHA DE CURSE (autoritativa: reemplaza la aproximación de la migración INDEXA).
+    await pool.query(
+      `UPDATE creditos
+          SET ejecutivo      = COALESCE(NULLIF(ejecutivo,''), ?),
+              vendedor       = COALESCE(NULLIF(vendedor,''), ?),
+              rut_dealer     = COALESCE(NULLIF(rut_dealer,''), ?),
+              fecha_otorgado = COALESCE(?, fecha_otorgado),
+              mes            = CASE WHEN ? IS NOT NULL THEN DATE_FORMAT(?, '%Y-%m-01') ELSE mes END
+        WHERE num_op = ?`,
+      [d.ejecutivo, d.vendedor, d.rut_dealer, d.curse, d.curse, d.curse, d.op]);
+  }
+  return st;
+}
+
+// POST /enriquecer-init — sube el CSV liviano, lo parsea y deja el job listo
+const enriquecerInit = async (req, res) => {
+  try {
+    gcJobs();
+    const f = (req.files && req.files.archivo && req.files.archivo[0]) || req.file;
+    if (!f) throw new Error('Falta el archivo CSV de enriquecimiento.');
+    const rows = parseEnriquecimiento(f.buffer);
+    if (!rows.length) throw new Error('El CSV no tiene filas válidas.');
+    // cuántos num_op del CSV calzan con créditos (informativo, una sola pasada)
+    const ops = [...new Set(rows.map(r => r.op))];
+    let match = 0;
+    for (let i = 0; i < ops.length; i += 900) {
+      const ch = ops.slice(i, i + 900);
+      const [rr] = await pool.query(
+        `SELECT COUNT(*) n FROM creditos WHERE num_op IN (${ch.map(() => '?').join(',')})`, ch);
+      match += rr[0].n;
+    }
+    const conSexo = rows.filter(r => r.sexo).length;
+    const conFnac = rows.filter(r => r.fnac).length;
+    const conCurse = rows.filter(r => r.curse).length;
+    const jobId = 'enr_' + Date.now() + '_' + Math.random().toString(36).slice(2, 8);
+    JOBS.set(jobId, { data: rows, total: rows.length, createdAt: Date.now(), stats: {} });
+    res.json({ success: true, data: { jobId, total: rows.length, match, conSexo, conFnac, conCurse }, error: null });
+  } catch (e) {
+    console.error('[migracion-indexa enriquecerInit]', e);
+    res.status(400).json({ success: false, data: null, error: e.message || 'Error procesando el CSV' });
+  }
+};
+
+// POST /enriquecer-chunk — procesa un tramo del job { jobId, offset, size }
+const enriquecerChunk = async (req, res) => {
+  try {
+    const { jobId } = req.body;
+    const off = parseInt(req.body.offset, 10) || 0;
+    const size = Math.min(parseInt(req.body.size, 10) || 200, 400);
+    const job = JOBS.get(jobId);
+    if (!job) return res.status(404).json({ success: false, data: null, error: 'Job expirado. Vuelve a iniciar la carga.' });
+
+    const slice = job.data.slice(off, off + size);
+    const st = await procesarEnriqChunk(slice);
+    const acc = job.stats;
+    for (const k of Object.keys(st)) acc[k] = (acc[k] || 0) + st[k];
+
+    const processed = Math.min(off + slice.length, job.total);
+    const done = processed >= job.total;
+    if (done) {
+      try { auditar({ req, accion: 'ENRIQUECER', modulo: 'cobranza', entidad: 'cartera_indexa', detalle: `Enriquecimiento Créditos Otorgados: ${job.total} filas`, meta: acc }); } catch (_) {}
+      JOBS.delete(jobId);
+    }
+    res.json({ success: true, data: { processed, total: job.total, done, stats: st, acumulado: acc }, error: null });
+  } catch (e) {
+    console.error('[migracion-indexa enriquecerChunk]', e);
+    res.status(400).json({ success: false, data: null, error: 'ENRIQUECER falló: ' + (e.sqlMessage || e.message || 'Error aplicando') });
+  }
+};
+
+module.exports = { dryRun, aplicarInit, aplicarChunk, enriquecerInit, enriquecerChunk, _internos: { construir, parseDesarrollo, parseCobranza, parseEnriquecimiento, fmtRutConDV, pDate, pNum, pTasa, procesarChunk, procesarEnriqChunk } };
