@@ -2,7 +2,7 @@
 <html lang="es">
 <head>
 <meta charset="UTF-8">
-<!-- v1.0 -->
+<!-- v1.1 -->
 <link rel="icon" href="/img/favicon.png" type="image/png">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Certificados — AutoFácil</title>
@@ -57,20 +57,21 @@
   /* ── Documento del certificado (imprimible) ── */
   #certWrap{ display:none; }
   .doc{ background:#fff; border:1px solid var(--border); border-radius:10px; padding:42px 48px; max-width:780px; margin:0 auto; box-shadow:0 6px 24px rgba(0,0,0,.08); }
-  .doc-head{ display:flex; justify-content:space-between; align-items:flex-start; border-bottom:2px solid var(--navy); padding-bottom:14px; margin-bottom:22px; }
-  .doc-head .brand{ font-size:1.4rem; font-weight:800; color:var(--navy); letter-spacing:.5px; }
-  .doc-head .brand small{ display:block; font-size:.7rem; font-weight:600; color:var(--muted); letter-spacing:2px; }
-  .doc-head .folio{ text-align:right; font-size:.72rem; color:var(--muted); }
-  .doc-head .folio b{ color:var(--navy); font-size:.95rem; letter-spacing:1px; }
-  .doc h2{ text-align:center; font-size:1.18rem; color:var(--navy); text-transform:uppercase; letter-spacing:1px; margin:8px 0 26px; }
+  .doc-head{ display:flex; justify-content:space-between; align-items:flex-start; border-bottom:2px solid #0141A2; padding-bottom:10px; margin-bottom:8px; }
+  .doc-head .addr{ font-size:.62rem; color:#546E7A; line-height:1.65; }
+  .doc-head img.logo{ height:40px; object-fit:contain; }
+  .folio-row{ text-align:right; font-size:.7rem; color:var(--muted); margin-bottom:16px; }
+  .folio-row b{ color:#0141A2; letter-spacing:1px; }
+  .doc h2{ text-align:center; font-size:1.18rem; color:#0141A2; text-transform:uppercase; letter-spacing:1px; margin:6px 0 26px; }
   .doc .body{ font-size:.95rem; line-height:1.9; text-align:justify; color:#1e293b; }
   .doc .body b{ color:#0f172a; }
   .doc .grid{ display:grid; grid-template-columns:1fr 1fr; gap:6px 24px; margin:22px 0; font-size:.88rem; }
   .doc .grid div{ border-bottom:1px dotted #cbd5e1; padding:4px 0; display:flex; justify-content:space-between; }
   .doc .grid span{ color:var(--muted); }
-  .doc-foot{ display:flex; justify-content:space-between; align-items:flex-end; margin-top:40px; gap:20px; }
-  .doc-foot .firma{ font-size:.78rem; color:var(--muted); }
-  .doc-foot .firma .ln{ border-top:1px solid #1e293b; width:200px; margin-bottom:4px; padding-top:6px; }
+  .doc-foot{ display:flex; justify-content:space-between; align-items:flex-end; margin-top:44px; gap:20px; }
+  .doc-foot .firma{ text-align:center; flex:1; }
+  .doc-foot .firma .cargo{ font-weight:800; font-size:.8rem; color:#0f172a; letter-spacing:.3px; }
+  .doc-foot .firma .fch{ font-size:.7rem; color:var(--muted); margin-top:2px; }
   .doc-actions{ max-width:780px; margin:14px auto 0; display:flex; gap:10px; justify-content:flex-end; }
   @media print{
     body{ background:#fff; }
@@ -192,6 +193,9 @@ const TIPOS = [
   ['CERT_PREAPROBADO',    'bi-patch-plus',  'Crédito Preaprobado','Oferta de crédito vigente',    'preap'],
 ];
 let tipoSel=null, modoSel=null, credSel=null;
+// Firma de la empresa (misma que usan las Cartas de Aprobación)
+let FIRMA_EMPRESA=null;
+fetch('/api/cartas-params/firma_empresa',{headers:H()}).then(r=>r.ok?r.json():null).then(j=>{ if(j&&j.data) FIRMA_EMPRESA=j.data; }).catch(()=>{});
 
 (function pintarTipos(){
   $('tipos').innerHTML = TIPOS.map(([t,ic,nom,desc])=>`
@@ -281,18 +285,23 @@ function gridDatos(d){
 }
 function render(d){
   const qr = (typeof qrVerificacionHTML==='function') ? qrVerificacionHTML(d.codigo,{px:108}) : '';
+  const firmaImg = FIRMA_EMPRESA
+    ? `<img src="${FIRMA_EMPRESA}" style="max-width:160px;max-height:60px;display:block;margin:0 auto 4px">`
+    : `<div style="border-bottom:1px solid #555;width:180px;margin:0 auto 6px">&nbsp;</div>`;
   $('doc').innerHTML = `
     <div class="doc-head">
-      <div class="brand">AutoFácil<small>CRÉDITO AUTOMOTRIZ</small></div>
-      <div class="folio">Folio<br><b>${esc(d.codigo)}</b><br>${fechaLarga(d.fecha_emision)}</div>
+      <div class="addr">Av. Presidente Kennedy 5757, Of. 1601, Las Condes<br>Santiago, Chile · www.autofacilchile.cl</div>
+      <img class="logo" src="/img/logo.png" alt="AutoFácil" onerror="this.style.display='none'">
     </div>
+    <div class="folio-row">Folio <b>${esc(d.codigo)}</b> · ${fechaLarga(d.fecha_emision)}</div>
     <h2>${esc(d.tipo_label||'')}</h2>
     <div class="body">${cuerpo(d)}</div>
     ${gridDatos(d)}
     <div class="doc-foot">
       <div class="firma">
-        <div class="ln"></div>
-        AutoFácil Chile<br>${esc(d.emitido_por||'')} · ${fechaLarga(d.fecha_emision)}
+        ${firmaImg}
+        <div class="cargo">GERENTE OPERACIONES AUTOFÁCIL SPA</div>
+        <div class="fch">${fechaLarga(d.fecha_emision)}</div>
       </div>
       <div>${qr}</div>
     </div>`;
