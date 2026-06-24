@@ -430,7 +430,9 @@ const aplicarChunk = async (req, res) => {
     res.json({ success: true, data: { processed, total: job.total, done, stats: st, acumulado: acc }, error: null });
   } catch (e) {
     console.error('[migracion-indexa aplicarChunk]', e);
-    res.status(500).json({ success: false, data: null, error: e.message || 'Error aplicando' });
+    // 400 (no 500) a propósito: es una herramienta de admin y conviene VER el detalle
+    // real (el middleware oculta el cuerpo de los 500). Surfacea la causa exacta.
+    res.status(400).json({ success: false, data: null, error: 'APLICAR falló: ' + (e.sqlMessage || e.message || 'Error aplicando') });
   }
 };
 
