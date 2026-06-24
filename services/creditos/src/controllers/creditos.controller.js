@@ -381,6 +381,44 @@ const getAll = async (req, res) => {
     if (fd) { whereBase += ` AND DATE(COALESCE(ob.fecha_otorgado, ob.created_at)) >= ?`; paramsBase.push(fd); }
     if (fh) { whereBase += ` AND DATE(COALESCE(ob.fecha_otorgado, ob.created_at)) <= ?`; paramsBase.push(fh); }
 
+    // ── ESTADO de cartera EN VIVO (reusa carteraLiveRow; los propios son pocos) ──
+    // Se calcula UNA vez y se usa para el filtro y los conteos de los chips de cartera,
+    // así coinciden con la columna ESTADO del detalle (que también usa carteraLiveRow).
+    let um = { mora: 1, vencido: 91 };
+    try {
+      const [ump] = await pool.query('SELECT clave, valor FROM cartera_parametros');
+      const UM = {}; ump.forEach(u => { UM[u.clave] = parseInt(u.valor, 10); });
+      um = { mora: Number.isFinite(UM.mora_desde) ? UM.mora_desde : 1, vencido: Number.isFinite(UM.vencido_desde) ? UM.vencido_desde : 91 };
+    } catch (_) {}
+    const CARTERA_ESTADOS = ['VIGENTE', 'EN MORA', 'VENCIDO', 'TERMINADO', 'PREPAGADO', 'CASTIGADO'];
+    const carteraIds = {};    // estado vivo → [ids]
+    const carteraCount = {};  // estado vivo → conteo
+    try {
+      const [props] = await pool.query(
+        `SELECT ob.id,
+                COALESCE(ob.estado_cartera, CASE
+                  WHEN ob.estado = 'EN MORA' THEN 'MORA'
+                  WHEN ob.estado IN ('VIGENTE','VENCIDO','PREPAGADO','CASTIGADO') THEN ob.estado
+                  WHEN (ob.financiera IS NULL OR ob.financiera NOT IN ('AUTOFIN','UNIDAD DE CREDITO')) AND ob.estado = 'OTORGADO' THEN 'VIGENTE'
+                  ELSE NULL END) AS estado_cartera,
+                ob.plazo, ob.fecha_primera_cuota,
+                IF(ob.numero_credito IS NOT NULL, COALESCE(pp.cnt,0), NULL) AS cuotas_pagadas
+           FROM creditos ob
+           LEFT JOIN clientes cl ON cl.id_cliente = ob.id_cliente
+           LEFT JOIN (SELECT id_credito, COUNT(DISTINCT numero_cuota) AS cnt FROM pagos_credito WHERE estado_pago='PAGADO' GROUP BY id_credito) pp ON pp.id_credito = ob.id
+          ${whereBase}
+            AND (ob.financiera IS NULL OR ob.financiera NOT IN ('AUTOFIN','UNIDAD DE CREDITO'))
+            AND (ob.estado_cartera IS NOT NULL OR ob.estado = 'OTORGADO' OR ob.estado IN ('VIGENTE','EN MORA','VENCIDO','PREPAGADO','CASTIGADO'))`,
+        paramsBase);
+      for (const p of props) {
+        let e = carteraLiveRow(p, um);
+        if (!e) continue;
+        e = String(e).toUpperCase() === 'MORA' ? 'EN MORA' : String(e).toUpperCase();
+        (carteraIds[e] = carteraIds[e] || []).push(p.id);
+        carteraCount[e] = (carteraCount[e] || 0) + 1;
+      }
+    } catch (e) { console.error('[creditos carteraLive]', e.message); }
+
     // whereData = whereBase + estado → para la lista paginada y su total
     let whereData = whereBase;
     const paramsData = [...paramsBase];
@@ -389,6 +427,11 @@ const getAll = async (req, res) => {
     } else if (estado === '__SIN_ESTADO__') {
       // Sin estado de cartera = créditos de Brokerage (hace cuadrar la fila Estados con el Total)
       whereData += ` AND ${estadoExpr} NOT IN ('VIGENTE','EN MORA','VENCIDO','TERMINADO','PREPAGADO','CASTIGADO')`;
+    } else if (CARTERA_ESTADOS.includes(String(estado || '').toUpperCase())) {
+      // Estado de cartera → filtrar por el estado VIVO (ids ya calculados con carteraLiveRow).
+      const ids = carteraIds[String(estado).toUpperCase()] || [];
+      whereData += ` AND ob.id IN (${ids.length ? ids.map(() => '?').join(',') : 'NULL'})`;
+      paramsData.push(...ids);
     } else if (estado && estado !== 'todos') {
       whereData += ` AND ${estadoExpr} = ?`;
       paramsData.push(estado.toUpperCase());
@@ -415,6 +458,8 @@ const getAll = async (req, res) => {
     const stats = {};
     let statsTotal = 0;
     for (const r of statsRows) { stats[r.estado || 'SIN_ESTADO'] = r.cnt; statsTotal += r.cnt; }
+    // Conteos de cartera = cálculo EN VIVO (coinciden con la columna ESTADO del detalle).
+    for (const e of CARTERA_ESTADOS) stats[e] = carteraCount[e] || 0;
 
     // Orden por columna (whitelist) — default: mes/id desc
     const SORT_MAP = {
@@ -436,14 +481,8 @@ const getAll = async (req, res) => {
     const sql = SELECT_GESTION + whereData + ` ORDER BY ${orderBy} LIMIT ? OFFSET ?`;
     const [rows] = await pool.query(sql, [...paramsData, limitNum, offset]);
 
-    // ESTADO de cartera EN VIVO (no depende de cuándo corrió el motor): recalcula
-    // por días de atraso con los umbrales del mantenedor. Solo afecta a propios.
-    try {
-      const [ump] = await pool.query('SELECT clave, valor FROM cartera_parametros');
-      const UM = {}; ump.forEach(u => { UM[u.clave] = parseInt(u.valor, 10); });
-      const um = { mora: Number.isFinite(UM.mora_desde) ? UM.mora_desde : 1, vencido: Number.isFinite(UM.vencido_desde) ? UM.vencido_desde : 91 };
-      rows.forEach(r => { r.estado_cartera = carteraLiveRow(r, um); });
-    } catch (_) { /* deja el valor del SELECT */ }
+    // ESTADO de cartera EN VIVO en cada fila del listado (umbrales `um` ya cargados arriba).
+    try { rows.forEach(r => { r.estado_cartera = carteraLiveRow(r, um); }); } catch (_) {}
 
     res.json({
       success: true,

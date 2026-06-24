@@ -356,10 +356,13 @@ function _enMoraReal(c) {
 }
 
 /* ── Filtro client-side por estado ── */
+const _CART_ESTADOS = ['VIGENTE','EN MORA','VENCIDO','TERMINADO','PREPAGADO','CASTIGADO'];
+const _cartUp = e => { const u = String(e || '').toUpperCase(); return u === 'MORA' ? 'EN MORA' : u; };
 function _aplicarFiltroEstado(lista) {
   const estado = document.getElementById('searchEstado').value;
   if (!estado) return lista;
-  if (estado === 'EN MORA') return lista.filter(_enMoraReal);
+  // Estados de cartera → por el estado VIVO ya calculado (estado_cartera), no por la etapa.
+  if (_CART_ESTADOS.includes(estado)) return lista.filter(c => _cartUp(c.estado_cartera) === estado);
   if (estado === '__PROCESO__') return lista.filter(c => !ESTADOS_FUERA_PROCESO.has(c.estado));
   return lista.filter(c => c.estado === estado);
 }
@@ -400,7 +403,7 @@ async function buscarCreditos(page = 1) {
     // Estado: server-side (paginación correcta). EN MORA es calculado → client-side.
     if (_filtroProceso) params.set('estado', '__PROCESO__');
     else if (_filtroSinEstado) params.set('estado', '__SIN_ESTADO__');
-    else if (estadoSel && estadoSel !== 'EN MORA') params.set('estado', estadoSel);
+    else if (estadoSel) params.set('estado', estadoSel);   // incl. cartera (VIGENTE/EN MORA/…) → server-side por estado vivo
     const r = await fetch('/api/creditos?' + params, { headers: apiHdr() });
     const j = await r.json();
     if (!j.success) throw new Error(j.error);
@@ -413,9 +416,8 @@ async function buscarCreditos(page = 1) {
     _lastTotal = (j.statsTotal != null ? j.statsTotal : pag.total) || 0;
     actualizarStats(_lastStats, _lastTotal);
 
-    // El servidor ya filtró por estado/proceso; solo EN MORA se filtra en cliente
+    // El servidor ya filtró por estado/cartera (estado vivo) → solo se filtra por empresa.
     let baseEmpresa = _filtrarPorEmpresa(_todosCreditos);
-    if (estadoSel === 'EN MORA') baseEmpresa = baseEmpresa.filter(_enMoraReal);
     renderConsulta(baseEmpresa);
     renderPaginacion(pag);
   } catch(e) {
@@ -445,9 +447,9 @@ function actualizarStats(stats, totalServidor) {
   // stats es el objeto {ESTADO: count} del servidor — totales reales
   const g = (e) => (stats[e] || 0);
   const ingresados = g('INGRESO') + g('REVISION');
-  const _totTxt = (totalServidor || 0).toLocaleString('es-CL');
-  const set = (id, v) => { const el = document.getElementById(id); if (el) el.textContent = v; };
-  set('statTotal', _totTxt); set('statTotalEt', _totTxt);
+  // Formato es-CL: punto = miles (conteos enteros, sin decimales). Ver feedback_formato_numeros.
+  const set = (id, v) => { const el = document.getElementById(id); if (el) el.textContent = (typeof v === 'number') ? v.toLocaleString('es-CL') : v; };
+  set('statTotal', totalServidor || 0); set('statTotalEt', totalServidor || 0);
   // Etapas (originación)
   set('statDigitado', g('DIGITADO'));
   set('statRevision', ingresados);
