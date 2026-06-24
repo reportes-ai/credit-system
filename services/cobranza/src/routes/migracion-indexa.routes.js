@@ -10,6 +10,8 @@ const dos = upload.fields([{ name: 'desarrollo', maxCount: 1 }, { name: 'cobranz
 // Acción de migración: solo perfiles con el permiso (Admin pasa por bypass).
 const puede = requireFunc('cobranza_migracion_indexa');
 
-router.post('/dry-run', verifyToken, puede, dos, ctrl.dryRun);
+router.post('/dry-run',       verifyToken, puede, dos, ctrl.dryRun);
+router.post('/aplicar-init',  verifyToken, puede, dos, ctrl.aplicarInit);   // sube 2 archivos, deja el job listo
+router.post('/aplicar-chunk', verifyToken, puede, ctrl.aplicarChunk);       // procesa un tramo (JSON)
 
 module.exports = router;

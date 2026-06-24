@@ -12,6 +12,7 @@
    ════════════════════════════════════════════════════════════════════════ */
 const pool = require('../../../../shared/config/database');
 const XLSX = require('xlsx');
+const { auditar } = require('../../../../shared/audit');
 
 /* ── Schema: calendario real (no se recalcula) + marca de origen ───────── */
 (async () => {
@@ -258,4 +259,139 @@ const dryRun = async (req, res) => {
   }
 };
 
-module.exports = { dryRun, _internos: { construir, parseDesarrollo, parseCobranza, fmtRutConDV, pDate, pNum, pTasa } };
+/* ════════════════════════════════════════════════════════════════════════
+   APLICAR — escritura idempotente, por lotes (job en memoria para no re-subir
+   los archivos en cada chunk). Re-ejecutable: vuelve a correr y solo actualiza.
+   ════════════════════════════════════════════════════════════════════════ */
+const JOBS = new Map(); // jobId -> { data, total, createdAt, stats }
+function gcJobs() { const now = Date.now(); for (const [k, v] of JOBS) if (now - v.createdAt > 30 * 60 * 1000) JOBS.delete(k); }
+
+async function procesarChunk(slice) {
+  const st = { clientes: 0, creditos_new: 0, creditos_upd: 0, cuotas: 0, pagos: 0, sin_rut: 0 };
+  // ids ya existentes de esta migración para los num_op del lote
+  const ops = slice.map(d => d.num_op).filter(Boolean);
+  const idByOp = new Map();
+  if (ops.length) {
+    const [ex] = await pool.query(
+      `SELECT id, num_op FROM creditos WHERE origen='INDEXA' AND num_op IN (${ops.map(() => '?').join(',')})`, ops);
+    ex.forEach(r => idByOp.set(r.num_op, r.id));
+  }
+
+  for (const d of slice) {
+    // 1) Cliente (upsert por rut; nunca pisa con null)
+    if (d.rut) {
+      await pool.query(
+        `INSERT INTO clientes (rut, tipo_cliente, nombres, apellido_paterno, apellido_materno, email, direccion, telefono_movil)
+         VALUES (?, 'PERSONA', ?, ?, ?, ?, ?, ?)
+         ON DUPLICATE KEY UPDATE
+           nombres=COALESCE(VALUES(nombres),nombres),
+           apellido_paterno=COALESCE(VALUES(apellido_paterno),apellido_paterno),
+           apellido_materno=COALESCE(VALUES(apellido_materno),apellido_materno),
+           email=COALESCE(VALUES(email),email),
+           direccion=COALESCE(VALUES(direccion),direccion),
+           telefono_movil=COALESCE(VALUES(telefono_movil),telefono_movil)`,
+        [d.rut, d.nombres, d.ap_paterno, d.ap_materno, d.email, d.direccion, d.telefono]);
+      st.clientes++;
+    } else st.sin_rut++;
+
+    // 2) Crédito (upsert por num_op+origen). Prepagado → estado_cartera=PREPAGADO;
+    //    activo → null (lo calcula el motor de cartera en la Etapa 3).
+    const estadoCartera = d.activo ? null : 'PREPAGADO';
+    let idc = idByOp.get(d.num_op);
+    if (idc) {
+      await pool.query(
+        `UPDATE creditos SET rut_cliente=?, nombre_cliente=?, estado_credito='OTORGADO', estado_cartera=?,
+           fecha_primera_cuota=?, plazo=?, tascli_real=?, monto_financiado=?, marca=?, modelo=?, anio_vehiculo=?
+         WHERE id=?`,
+        [d.rut, d.nombre_completo, estadoCartera, d.fecha_primera_cuota, d.plazo, d.tasa, d.monto_financiado, d.marca, d.modelo, d.anio, idc]);
+      st.creditos_upd++;
+    } else {
+      const [r] = await pool.query(
+        `INSERT INTO creditos (num_op, origen, financiera, rut_cliente, nombre_cliente, estado_credito, estado_cartera,
+           fecha_primera_cuota, plazo, tascli_real, monto_financiado, marca, modelo, anio_vehiculo)
+         VALUES (?, 'INDEXA', 'AUTOFACIL', ?, ?, 'OTORGADO', ?, ?, ?, ?, ?, ?, ?, ?)`,
+        [d.num_op, d.rut, d.nombre_completo, estadoCartera, d.fecha_primera_cuota, d.plazo, d.tasa, d.monto_financiado, d.marca, d.modelo, d.anio]);
+      idc = r.insertId; st.creditos_new++;
+    }
+
+    // 3) Calendario (cuotas_credito) — bulk upsert por (id_credito, numero_cuota)
+    if (d.cuotas.length) {
+      const ph = [], v = [];
+      for (const c of d.cuotas) {
+        ph.push('(?,?,?,?,?,?,?,?,?,?,?,?,?)');
+        v.push(idc, d.num_op, c.numero, c.venc, c.interes, c.amort, c.valor, c.saldo, c.estado, c.fpago, d.tasa, c.dias, 'INDEXA');
+      }
+      await pool.query(
+        `INSERT INTO cuotas_credito
+           (id_credito,num_op,numero_cuota,fecha_vencimiento,interes,amortizacion,valor_cuota,saldo_insoluto,estado_cuota,fecha_pago,tasa,dias_desfase,origen)
+         VALUES ${ph.join(',')}
+         ON DUPLICATE KEY UPDATE
+           fecha_vencimiento=VALUES(fecha_vencimiento), interes=VALUES(interes), amortizacion=VALUES(amortizacion),
+           valor_cuota=VALUES(valor_cuota), saldo_insoluto=VALUES(saldo_insoluto), estado_cuota=VALUES(estado_cuota),
+           fecha_pago=VALUES(fecha_pago), tasa=VALUES(tasa), dias_desfase=VALUES(dias_desfase)`, v);
+      st.cuotas += d.cuotas.length;
+    }
+
+    // 4) Pagos (cuotas PAGADA) — idempotente: borra los de esta migración y reinserta
+    await pool.query(`DELETE FROM pagos_credito WHERE id_credito=? AND origen_fondos='MIGRACION INDEXA'`, [idc]);
+    const pagadas = d.cuotas.filter(c => c.estado === 'PAGADA');
+    if (pagadas.length) {
+      const ph = [], v = [];
+      for (const c of pagadas) {
+        ph.push("(?,?,?,?,?,?,'PAGADO','Migración INDEXA','MIGRACION INDEXA')");
+        v.push(idc, c.numero, c.venc, c.valor, c.valor, c.fpago);
+      }
+      await pool.query(
+        `INSERT INTO pagos_credito
+           (id_credito,numero_cuota,fecha_vencimiento,monto_cuota,total_pagado,fecha_pago,estado_pago,registrado_por,origen_fondos)
+         VALUES ${ph.join(',')}`, v);
+      st.pagos += pagadas.length;
+    }
+  }
+  return st;
+}
+
+// POST /aplicar-init — sube los 2 archivos, parsea y deja el job listo en memoria
+const aplicarInit = async (req, res) => {
+  try {
+    gcJobs();
+    const { byOp, des } = leerArchivos(req);
+    const data = construir(byOp, des);
+    const jobId = 'idx_' + Date.now() + '_' + Math.random().toString(36).slice(2, 8);
+    JOBS.set(jobId, { data, total: data.length, createdAt: Date.now(), stats: {} });
+    res.json({ success: true, data: { jobId, total: data.length }, error: null });
+  } catch (e) {
+    console.error('[migracion-indexa aplicarInit]', e);
+    res.status(400).json({ success: false, data: null, error: e.message || 'Error procesando archivos' });
+  }
+};
+
+// POST /aplicar-chunk — procesa un tramo del job { jobId, offset, size }
+const aplicarChunk = async (req, res) => {
+  try {
+    const { jobId } = req.body;
+    const off = parseInt(req.body.offset, 10) || 0;
+    const size = Math.min(parseInt(req.body.size, 10) || 120, 300);
+    const job = JOBS.get(jobId);
+    if (!job) return res.status(404).json({ success: false, data: null, error: 'Job expirado. Vuelve a iniciar la carga.' });
+
+    const slice = job.data.slice(off, off + size);
+    const st = await procesarChunk(slice);
+    // acumular
+    const acc = job.stats;
+    for (const k of Object.keys(st)) acc[k] = (acc[k] || 0) + st[k];
+
+    const processed = Math.min(off + slice.length, job.total);
+    const done = processed >= job.total;
+    if (done) {
+      try { auditar({ req, accion: 'MIGRAR', modulo: 'cobranza', entidad: 'cartera_indexa', detalle: `Carga INDEXA aplicada: ${job.total} créditos`, meta: acc }); } catch (_) {}
+      JOBS.delete(jobId);
+    }
+    res.json({ success: true, data: { processed, total: job.total, done, stats: st, acumulado: acc }, error: null });
+  } catch (e) {
+    console.error('[migracion-indexa aplicarChunk]', e);
+    res.status(500).json({ success: false, data: null, error: e.message || 'Error aplicando' });
+  }
+};
+
+module.exports = { dryRun, aplicarInit, aplicarChunk, _internos: { construir, parseDesarrollo, parseCobranza, fmtRutConDV, pDate, pNum, pTasa, procesarChunk } };

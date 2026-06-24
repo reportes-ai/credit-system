@@ -2,7 +2,7 @@
 <html lang="es">
 <head>
 <meta charset="UTF-8">
-<!-- v1.0 -->
+<!-- v1.1 -->
 <link rel="icon" href="/img/favicon.png" type="image/png">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Migración Cartera INDEXA — AutoFácil</title>
@@ -192,12 +192,51 @@ function render(d){
       </table>
     </div>
     <div class="note" style="margin-top:16px;background:#fffbeb;border-color:#f59e0b;color:#78350f">
-      <b>Siguiente etapa (APLICAR)</b> — cuando valides estos números: cargo clientes, créditos (num_op = OP, origen INDEXA),
-      el calendario en <code>cuotas_credito</code> y los pagos (cuota PAGADA → pago con su fecha). Idempotente: lo puedes re-correr a diario.
+      <b>APLICAR a Business Suite</b> — escribe clientes, créditos (num_op = OP, origen INDEXA), el calendario en
+      <code>cuotas_credito</code> y los pagos (PAGADA → pago con su fecha; sin fecha → NULL). <b>Idempotente</b>: re-ejecutable a diario.
+    </div>
+    <div class="actions" style="margin-top:12px">
+      <button class="btn" id="btnApply" style="background:#15803d;color:#fff" onclick="aplicar()"><i class="bi bi-database-down"></i>Aplicar a Business Suite</button>
+    </div>
+    <div id="progress" style="display:none;margin-top:14px">
+      <div style="height:14px;background:#e2e8f0;border-radius:8px;overflow:hidden"><div id="pbar" style="height:100%;width:0;background:linear-gradient(135deg,#15803d,#22c55e);transition:width .25s"></div></div>
+      <div id="ptext" style="font-size:.82rem;color:var(--muted);margin-top:6px"></div>
     </div>
   </div>`;
   $('results').style.display='block';
   $('results').scrollIntoView({ behavior:'smooth', block:'start' });
+}
+
+async function aplicar(){
+  if(!confirm('¿Aplicar la carga a Business Suite?\n\nEscribe créditos, clientes, calendario y pagos. Es idempotente: puedes re-correrlo a diario sin duplicar.')) return;
+  const btn=$('btnApply'); btn.disabled=true; btn.innerHTML='<span class="spinner"></span>Iniciando…';
+  $('progress').style.display='block'; $('err').style.display='none';
+  try{
+    const fd=new FormData();
+    fd.append('desarrollo', $('fDes').files[0]);
+    fd.append('cobranza',   $('fCob').files[0]);
+    const ri=await fetch('/api/migracion-indexa/aplicar-init',{ method:'POST', headers:{ Authorization:'Bearer '+TOKEN() }, body:fd });
+    const ji=await ri.json(); if(!ji.success) throw new Error(ji.error||'Error al iniciar');
+    const jobId=ji.data.jobId, total=ji.data.total;
+    let off=0, acc={}; const SIZE=120;
+    while(off<total){
+      const rc=await fetch('/api/migracion-indexa/aplicar-chunk',{ method:'POST',
+        headers:{ 'Content-Type':'application/json', Authorization:'Bearer '+TOKEN() },
+        body:JSON.stringify({ jobId, offset:off, size:SIZE }) });
+      const jc=await rc.json(); if(!jc.success) throw new Error(jc.error||'Error en un lote');
+      off=jc.data.processed; acc=jc.data.acumulado||acc;
+      const pct=Math.round(off/total*100);
+      $('pbar').style.width=pct+'%';
+      $('ptext').innerHTML=`${nfmt(off)}/${nfmt(total)} créditos (${pct}%) — creados ${nfmt(acc.creditos_new||0)}, actualizados ${nfmt(acc.creditos_upd||0)}, cuotas ${nfmt(acc.cuotas||0)}, pagos ${nfmt(acc.pagos||0)}, clientes ${nfmt(acc.clientes||0)}`;
+      if(jc.data.done) break;
+    }
+    btn.innerHTML='<i class="bi bi-check-lg"></i>Aplicado';
+    $('ptext').innerHTML='✅ Carga aplicada a Business Suite. '+$('ptext').innerHTML;
+  }catch(e){
+    $('err').textContent='⚠ '+e.message; $('err').style.display='block';
+    $('err').scrollIntoView({behavior:'smooth',block:'center'});
+    btn.disabled=false; btn.innerHTML='<i class="bi bi-database-down"></i>Reintentar';
+  }
 }
 </script>
 <script src="/js/app-version.js"></script>
