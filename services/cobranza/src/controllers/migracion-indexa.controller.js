@@ -308,7 +308,8 @@ async function procesarChunk(slice) {
   }
 
   for (const d of slice) {
-    // 1) Cliente (upsert por rut; nunca pisa con null)
+    // 1) Cliente (upsert por rut) + obtener su id_cliente (FK que usa creditos)
+    let idCliente = null;
     if (d.rut) {
       await pool.query(
         `INSERT INTO clientes (rut, tipo_cliente, nombres, apellido_paterno, apellido_materno, email, direccion, telefono_movil)
@@ -321,6 +322,8 @@ async function procesarChunk(slice) {
            direccion=COALESCE(VALUES(direccion),direccion),
            telefono_movil=COALESCE(VALUES(telefono_movil),telefono_movil)`,
         [d.rut, d.nombres, d.ap_paterno, d.ap_materno, d.email, d.direccion, d.telefono]);
+      const [[cli]] = await pool.query('SELECT id_cliente FROM clientes WHERE rut=? LIMIT 1', [d.rut]);
+      idCliente = cli ? cli.id_cliente : null;
       st.clientes++;
     } else st.sin_rut++;
 
@@ -331,11 +334,11 @@ async function procesarChunk(slice) {
     if (idc) {
       await pool.query(
         `UPDATE creditos SET
-           rut_cliente         = COALESCE(NULLIF(rut_cliente,''), ?),
-           nombre_cliente      = COALESCE(NULLIF(nombre_cliente,''), ?),
+           id_cliente          = COALESCE(id_cliente, ?),
            marca               = COALESCE(NULLIF(marca,''), ?),
            modelo              = COALESCE(NULLIF(modelo,''), ?),
-           anio_vehiculo       = COALESCE(anio_vehiculo, ?),
+           anio                = COALESCE(anio, ?),
+           tipo_vehiculo       = COALESCE(NULLIF(tipo_vehiculo,''), ?),
            fecha_primera_cuota = COALESCE(fecha_primera_cuota, ?),
            plazo               = COALESCE(plazo, ?),
            tascli_real         = COALESCE(tascli_real, ?),
@@ -343,14 +346,14 @@ async function procesarChunk(slice) {
            estado_cartera      = COALESCE(NULLIF(estado_cartera,''), ?),
            origen              = COALESCE(NULLIF(origen,''), 'INDEXA')
          WHERE id=?`,
-        [d.rut, d.nombre_completo, d.marca, d.modelo, d.anio, d.fecha_primera_cuota, d.plazo, d.tasa, d.monto_financiado, estadoCartera, idc]);
+        [idCliente, d.marca, d.modelo, d.anio, d.tipo_vehiculo, d.fecha_primera_cuota, d.plazo, d.tasa, d.monto_financiado, estadoCartera, idc]);
       st.creditos_enriquecidos++;
     } else {
       const [r] = await pool.query(
-        `INSERT INTO creditos (num_op, origen, financiera, rut_cliente, nombre_cliente, estado_credito, estado_cartera,
-           fecha_primera_cuota, plazo, tascli_real, monto_financiado, marca, modelo, anio_vehiculo)
-         VALUES (?, 'INDEXA', 'AUTOFACIL', ?, ?, 'OTORGADO', ?, ?, ?, ?, ?, ?, ?, ?)`,
-        [d.num_op, d.rut, d.nombre_completo, estadoCartera, d.fecha_primera_cuota, d.plazo, d.tasa, d.monto_financiado, d.marca, d.modelo, d.anio]);
+        `INSERT INTO creditos (num_op, origen, financiera, id_cliente, estado, estado_cartera,
+           fecha_primera_cuota, plazo, tascli_real, monto_financiado, marca, modelo, anio, tipo_vehiculo)
+         VALUES (?, 'INDEXA', 'AUTOFACIL', ?, 'OTORGADO', ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        [d.num_op, idCliente, estadoCartera, d.fecha_primera_cuota, d.plazo, d.tasa, d.monto_financiado, d.marca, d.modelo, d.anio, d.tipo_vehiculo]);
       idc = r.insertId; st.creditos_new++;
     }
 
