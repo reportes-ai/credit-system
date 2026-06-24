@@ -2,7 +2,7 @@
 <html lang="es">
 <head>
 <meta charset="UTF-8">
-<!-- v1.1 -->
+<!-- v1.2 -->
 <link rel="icon" href="/img/favicon.png" type="image/png">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Migración Cartera INDEXA — AutoFácil</title>
@@ -109,6 +109,16 @@ const TOKEN = () => sessionStorage.getItem('token');
 const $ = id => document.getElementById(id);
 const nfmt = n => (n==null?'—':Number(n).toLocaleString('es-CL'));
 const esc = s => String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+// Si el endpoint aún no está desplegado, el server devuelve HTML (404) → mensaje claro.
+async function readJson(r){
+  const ct = r.headers.get('content-type')||'';
+  if(!ct.includes('application/json')){
+    throw new Error(r.status===404
+      ? 'La ruta /api/migracion-indexa aún no responde (deploy en curso o sin aplicar). Espera a que despliegue y reintenta.'
+      : 'El servidor respondió '+r.status+' sin JSON. Reintenta cuando termine el deploy.');
+  }
+  return r.json();
+}
 
 function markUp(){
   $('upDes').classList.toggle('has', !!$('fDes').files.length);
@@ -125,7 +135,7 @@ async function analizar(){
     fd.append('desarrollo', $('fDes').files[0]);
     fd.append('cobranza',   $('fCob').files[0]);
     const r=await fetch('/api/migracion-indexa/dry-run',{ method:'POST', headers:{ Authorization:'Bearer '+TOKEN() }, body:fd });
-    const j=await r.json();
+    const j=await readJson(r);
     if(!j.success) throw new Error(j.error||'Error');
     render(j.data);
     $('status').textContent='Análisis completo. Revisa el cuadre antes de aplicar.';
@@ -216,14 +226,14 @@ async function aplicar(){
     fd.append('desarrollo', $('fDes').files[0]);
     fd.append('cobranza',   $('fCob').files[0]);
     const ri=await fetch('/api/migracion-indexa/aplicar-init',{ method:'POST', headers:{ Authorization:'Bearer '+TOKEN() }, body:fd });
-    const ji=await ri.json(); if(!ji.success) throw new Error(ji.error||'Error al iniciar');
+    const ji=await readJson(ri); if(!ji.success) throw new Error(ji.error||'Error al iniciar');
     const jobId=ji.data.jobId, total=ji.data.total;
     let off=0, acc={}; const SIZE=120;
     while(off<total){
       const rc=await fetch('/api/migracion-indexa/aplicar-chunk',{ method:'POST',
         headers:{ 'Content-Type':'application/json', Authorization:'Bearer '+TOKEN() },
         body:JSON.stringify({ jobId, offset:off, size:SIZE }) });
-      const jc=await rc.json(); if(!jc.success) throw new Error(jc.error||'Error en un lote');
+      const jc=await readJson(rc); if(!jc.success) throw new Error(jc.error||'Error en un lote');
       off=jc.data.processed; acc=jc.data.acumulado||acc;
       const pct=Math.round(off/total*100);
       $('pbar').style.width=pct+'%';
