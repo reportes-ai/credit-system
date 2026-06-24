@@ -120,7 +120,7 @@
   <a class="topnav-brand" href="/mantenedores">
     <img src="/img/logo.png" alt="AutoFácil" onerror="this.style.display='none'">
     <span>Flujo Crédito Brokerage</span>
-    <span class="version-badge">v2.1</span>
+    <span class="version-badge">v2.2</span>
   </a>
   <div class="breadcrumb-nav">
     <a href="/">Inicio</a><span class="sep">›</span>
@@ -137,7 +137,7 @@
 
   <div class="note">
     <i class="bi bi-info-circle-fill"></i>
-    <div>Haz clic en <strong><i class="bi bi-pencil"></i></strong> en cualquier paso para editar su nombre o descripción. Los documentos de la <strong>Carga de Documentos</strong> se toman automáticamente desde el mantenedor <a href="/mantenedores/tipos-documento/" style="color:#92400e;font-weight:700">Tipos de Documento</a>.</div>
+    <div>El flujo brokerage se define por las <strong>etapas y transiciones</strong> del mantenedor <a href="/mantenedores/estado-creditos/" style="color:#92400e;font-weight:700">Estado Créditos</a> (AutoFin y Unidad comparten el mismo flujo). Edita ahí las etapas y este flujo se actualiza solo.</div>
   </div>
 
   <div class="estados-box" id="estadosBox">
@@ -148,11 +148,12 @@
     <div id="estadosFlujo"><div class="spinner"></div></div>
   </div>
 
-  <div class="sec-title" style="margin-bottom:18px"><i class="bi bi-diagram-3"></i>Flujo por Institución</div>
-
-  <div class="fin-grid" id="finGrid">
-    <div class="spinner"></div>
-    <div class="spinner"></div>
+  <div class="sec-title" style="margin-bottom:14px"><i class="bi bi-diagram-3"></i>Flujo por Institución</div>
+  <div style="background:#f8fafc;border:1px dashed #cbd5e1;border-radius:12px;padding:16px 18px;color:#475569;font-size:.9rem;line-height:1.65">
+    <i class="bi bi-info-circle me-1" style="color:#0141A2"></i>
+    El flujo de <strong>AutoFin</strong> y <strong>Unidad de Crédito</strong> es el mismo: el de las <strong>etapas de arriba</strong> (Estados del Crédito), administrado en
+    <a href="/mantenedores/estado-creditos/" style="color:#0141A2;font-weight:700">Estado Créditos</a>. (Nota: lo que AutoFin llama <em>Cursado</em>, para nosotros es <strong>Otorgado</strong>.)
+    El flujo operativo por institución (carga de documentos, envío a la financiera, etc.) se retomará más adelante.
   </div>
 
   <div style="margin-top:28px">
@@ -184,53 +185,11 @@ function toast(msg, ok=true){
   el.style.display='block'; setTimeout(()=>{ el.style.display='none'; },3000);
 }
 
-// ── Defaults de pasos (4 fijos por financiera) ────────────────────────────────
-const DEFAULTS = {
-  AUTOFIN: [
-    { id:'carta',    num:1, color:'n1', estado:'CARTA_APROBACION',
-      title:'Carta de Aprobación',
-      desc:'El ejecutivo genera la Carta de Aprobación y la somete a revisión. Al aprobarse, el crédito queda en estado CARTA_APROBACION.' },
-    { id:'docs',     num:2, color:'n2', estado:'CARTA_APROBACION — Carga Docs',
-      title:'Carga de Documentos',
-      desc:'El Analista de Crédito carga los documentos requeridos para Autofin. Los documentos obligatorios se configuran en el mantenedor Tipos de Documento.',
-      showDocs: true },
-    { id:'envio',    num:3, color:'n3', estado:'OTORGADO',
-      title:'Envío a Autofin',
-      desc:'Expediente completo. Se envía a Autofin para evaluación y desembolso del crédito.' },
-    { id:'resultado',num:4, color:'n4', estado:'CURSADO / DESISTIDO',
-      title:'Resultado Final',
-      desc:'El Analista registra el resultado final una vez confirmado por Autofin.',
-      showResult: true }
-  ],
-  UNIDAD: [
-    { id:'carta',    num:1, color:'n1', estado:'CARTA_APROBACION',
-      title:'Carta de Aprobación',
-      desc:'El ejecutivo genera la Carta de Aprobación y la somete a revisión. Al aprobarse, el crédito queda en estado CARTA_APROBACION.' },
-    { id:'docs',     num:2, color:'n2', estado:'CARTA_APROBACION — Carga Docs',
-      title:'Carga de Documentos',
-      desc:'El Analista de Crédito carga los documentos requeridos para Unidad de Crédito. Los documentos obligatorios se configuran en el mantenedor Tipos de Documento.',
-      showDocs: true },
-    { id:'envio',    num:3, color:'n3', estado:'OTORGADO',
-      title:'Envío a Unidad de Crédito',
-      desc:'Expediente completo. Se envía a la Unidad de Crédito para evaluación y desembolso del crédito.' },
-    { id:'resultado',num:4, color:'n4', estado:'CURSADO / DESISTIDO',
-      title:'Resultado Final',
-      desc:'El Analista registra el resultado final una vez confirmado por la Unidad de Crédito.',
-      showResult: true }
-  ]
-};
-
-// Estado por financiera
-const _state = {
-  AUTOFIN: { steps:null, docs:[], dirty:false },
-  UNIDAD:  { steps:null, docs:[], dirty:false }
-};
+// Flujo operativo por institución (carga de documentos, etc.) removido — se retomará más adelante (recuperable del historial git).
 
 // ── Cargar datos ──────────────────────────────────────────────────────────────
 async function cargarTodo(){
   cargarEstados();
-  await Promise.all([cargarFinanciera('AUTOFIN'), cargarFinanciera('UNIDAD')]);
-  renderGrid();
 }
 
 // ── Estados del crédito (desde el mantenedor Estado Créditos) ──────────────────
@@ -270,147 +229,6 @@ function renderEstados(estados){
 }
 
 function escapeHtml(s){ return String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
-
-async function cargarFinanciera(fin){
-  // 1. Config guardada
-  try{
-    const r = await fetch(`/api/cartas-params/flujo_brokerage_${fin.toLowerCase()}`, { headers:HDR() });
-    const j = await r.json();
-    if(j.success && j.data){
-      try{ _state[fin].steps = JSON.parse(j.data); }catch(e){ _state[fin].steps = null; }
-    }
-  }catch(e){}
-  if(!_state[fin].steps) _state[fin].steps = JSON.parse(JSON.stringify(DEFAULTS[fin]));
-
-  // 2. Documentos activos
-  try{
-    const r = await fetch(`/api/tipos-documento/activos?financiera=${fin}`, { headers:HDR() });
-    const j = await r.json();
-    _state[fin].docs = j.success ? j.data : [];
-  }catch(e){ _state[fin].docs = []; }
-}
-
-// ── Render ────────────────────────────────────────────────────────────────────
-function renderGrid(){
-  const grid = document.getElementById('finGrid');
-  grid.innerHTML = [
-    renderCard('AUTOFIN', 'ic-afin', 'fb-afin', 'AUTOFIN', 'bi-building'),
-    renderCard('UNIDAD',  'ic-uc',   'fb-uc',   'UNIDAD DE CRÉDITO', 'bi-bank'),
-  ].join('');
-}
-
-function renderCard(fin, iconCls, badgeCls, label, icon){
-  const s = _state[fin];
-  return `
-  <div class="fin-card">
-    <div class="fin-head">
-      <div class="fin-head-left">
-        <div class="fin-icon ${iconCls}"><i class="bi ${icon}"></i></div>
-        <div>
-          <div class="fin-name">${label}</div>
-          <div class="fin-sub">Flujo de etapas brokerage</div>
-        </div>
-        <span class="fin-badge ${badgeCls}">${fin}</span>
-      </div>
-      <button id="btnSave_${fin}" class="btn-save-flow" onclick="guardarFlujo('${fin}')">
-        <i class="bi bi-floppy"></i>Guardar
-      </button>
-    </div>
-    <div class="steps-wrap">
-      ${s.steps.map(step => renderStep(fin, step, s.docs)).join('')}
-    </div>
-  </div>`;
-}
-
-function renderStep(fin, step, docs){
-  let docsHtml = '';
-  if(step.showDocs){
-    const activos = docs.filter(d => d.activo);
-    if(activos.length){
-      docsHtml = `<div class="step-docs">${activos.map(d =>
-        `<span class="doc-tag ${d.obligatorio?'obl':''}" title="${d.obligatorio?'Obligatorio':'Opcional'}">${d.nombre}</span>`
-      ).join('')}</div>`;
-    } else {
-      docsHtml = `<div class="step-docs"><span class="doc-tag empty">Sin documentos activos — configura en Tipos de Documento</span></div>`;
-    }
-  }
-  const resultHtml = step.showResult
-    ? `<div class="result-row"><span class="r-ok"><i class="bi bi-check2-circle me-1"></i>CURSADO</span><span class="r-no"><i class="bi bi-x-circle me-1"></i>DESISTIDO</span></div>`
-    : '';
-
-  return `
-  <div class="step">
-    <div class="step-num ${step.color}">${step.num}</div>
-    <div class="step-body" id="sb_${fin}_${step.id}">
-      <div class="step-estado">Estado: ${step.estado}</div>
-      <div class="step-title" id="title_${fin}_${step.id}">${step.title}</div>
-      <div class="step-desc"  id="desc_${fin}_${step.id}">${step.desc}</div>
-      ${docsHtml}
-      ${resultHtml}
-      <button class="step-edit-btn" id="ebtn_${fin}_${step.id}" onclick="toggleEdit('${fin}','${step.id}')" title="Editar paso">
-        <i class="bi bi-pencil"></i>
-      </button>
-    </div>
-  </div>`;
-}
-
-// ── Edición inline ────────────────────────────────────────────────────────────
-const _editing = {};  // { 'AUTOFIN_carta': true }
-
-function toggleEdit(fin, stepId){
-  const key = `${fin}_${stepId}`;
-  const isEditing = _editing[key];
-
-  const titleEl = document.getElementById(`title_${fin}_${stepId}`);
-  const descEl  = document.getElementById(`desc_${fin}_${stepId}`);
-  const body    = document.getElementById(`sb_${fin}_${stepId}`);
-  const btn     = document.getElementById(`ebtn_${fin}_${stepId}`);
-
-  if(isEditing){
-    // Guardar cambios locales
-    const step = _state[fin].steps.find(s => s.id === stepId);
-    if(step){
-      step.title = titleEl.textContent.trim() || step.title;
-      step.desc  = descEl.textContent.trim()  || step.desc;
-    }
-    titleEl.removeAttribute('contenteditable');
-    descEl.removeAttribute('contenteditable');
-    body.classList.remove('editing');
-    btn.classList.remove('active');
-    btn.innerHTML = '<i class="bi bi-pencil"></i>';
-    _editing[key] = false;
-
-    // Marcar como pendiente de guardar
-    _state[fin].dirty = true;
-    const saveBtn = document.getElementById(`btnSave_${fin}`);
-    if(saveBtn) saveBtn.classList.add('visible');
-  } else {
-    titleEl.setAttribute('contenteditable', 'true');
-    descEl.setAttribute('contenteditable', 'true');
-    body.classList.add('editing');
-    btn.classList.add('active');
-    btn.innerHTML = '<i class="bi bi-check-lg"></i>';
-    titleEl.focus();
-    _editing[key] = true;
-  }
-}
-
-// ── Guardar flujo en DB ───────────────────────────────────────────────────────
-async function guardarFlujo(fin){
-  const steps = _state[fin].steps;
-  try{
-    const r = await fetch(`/api/cartas-params/flujo_brokerage_${fin.toLowerCase()}`, {
-      method:'PUT', headers:HDR(),
-      body: JSON.stringify({ value: JSON.stringify(steps) })
-    });
-    const j = await r.json();
-    if(!j.success) throw new Error(j.error);
-    _state[fin].dirty = false;
-    const saveBtn = document.getElementById(`btnSave_${fin}`);
-    if(saveBtn) saveBtn.classList.remove('visible');
-    toast(`Flujo ${fin} guardado correctamente`);
-  }catch(e){ toast('Error al guardar: '+e.message, false); }
-}
 
 // ── Inicio ────────────────────────────────────────────────────────────────────
 cargarTodo();

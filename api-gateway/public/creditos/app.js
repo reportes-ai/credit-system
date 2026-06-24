@@ -451,8 +451,7 @@ function actualizarStats(stats, totalServidor) {
   set('statRevision', ingresados);
   set('statAprobado', g('APROBADO'));
   set('statCartaAprobacion', g('CARTA_APROBACION'));
-  set('statOtorgados', g('OTORGADO'));
-  set('statCursados', g('CURSADO'));
+  set('statOtorgados', g('OTORGADO'));   // "Cursado" de AutoFin = nuestro Otorgado
   set('statRechazados', g('CANCELADO'));   // CANCELADO = rechazados + anulados
   set('statDesistidos', g('DESISTIDO'));
   // Estados (cartera)

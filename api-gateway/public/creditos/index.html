@@ -17,7 +17,7 @@
   <div class="topnav-left">
     <a href="/" class="topnav-brand">
       <img src="/img/logo.png" alt="AutoFácil" style="display:block">
-      <span class="version-badge" id="versionBadge">v5.8</span>
+      <span class="version-badge" id="versionBadge">v5.9</span>
     </a>
       <div class="breadcrumb-nav">
         <a href="/">Inicio</a><span class="sep">›</span>
@@ -107,11 +107,8 @@
             <div class="sc-label">Carta Enviada</div>
             <div class="sc-val" id="statCartaAprobacion" style="color:#0369a1">—</div>
           </div>
-          <div class="stat-chip" onclick="filtrarPorEstado('OTORGADO')" style="cursor:pointer" title="Ver otorgados (broker)">
+          <div class="stat-chip" onclick="filtrarPorEstado('OTORGADO')" style="cursor:pointer" title="Ver otorgados (lo que AutoFin llama Cursado, para nosotros es Otorgado)">
             <div class="sc-label">Otorgados</div><div class="sc-val" id="statOtorgados" style="color:#854d0e">—</div>
-          </div>
-          <div class="stat-chip" onclick="filtrarPorEstado('CURSADO')" style="cursor:pointer" title="Ver cursados">
-            <div class="sc-label">Cursados</div><div class="sc-val" id="statCursados" style="color:#15803d">—</div>
           </div>
           <div class="stat-chip" onclick="filtrarPorEstado('CANCELADO')" style="cursor:pointer" title="Ver rechazados / anulados">
             <div class="sc-label">Rechazados</div><div class="sc-val" id="statRechazados" style="color:#b91c1c">—</div>
@@ -177,7 +174,6 @@
           <option value="DIGITADO">Digitado</option>
           <option value="APROBADO">Aprobado</option>
           <option value="OTORGADO">Otorgado</option>
-          <option value="CURSADO">Cursado</option>
           <option value="DESISTIDO">Desistido</option>
           </optgroup>
         </select>
