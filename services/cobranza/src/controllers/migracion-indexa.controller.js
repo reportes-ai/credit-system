@@ -76,15 +76,37 @@ function normKey(s) {
 }
 
 /* ── Parseo de archivos ────────────────────────────────────────────────── */
-// Cobranza xlsx → Map(OP → primera fila del crédito)
+// Cobranza xlsx → Map(OP → SOLO los ~12 campos que usamos del crédito).
+// Liviano a propósito (free tier ~256MB heap): header:1 + dense, no retiene las
+// 38k filas completas (34 cols c/u) sino un objeto chico por OP.
 function parseCobranza(buf) {
-  const wb = XLSX.read(buf, { type: 'buffer', cellDates: false });
+  const wb = XLSX.read(buf, { type: 'buffer', dense: true, cellDates: false, cellNF: false, cellStyles: false, cellFormula: false, cellText: false, bookVBA: false, bookProps: false });
   const ws = wb.Sheets[wb.SheetNames[0]];
-  const rows = XLSX.utils.sheet_to_json(ws, { defval: '' });
+  const aoa = XLSX.utils.sheet_to_json(ws, { header: 1, defval: '', blankrows: false });  // arrays, no objetos por fila
   const byOp = new Map();
-  for (const r of rows) {
-    const op = String(r['OP'] == null ? '' : r['OP']).trim();
-    if (op && !byOp.has(op)) byOp.set(op, r);
+  if (!aoa.length) return byOp;
+  const ix = {};
+  aoa[0].forEach((h, i) => { const k = normKey(h); if (ix[k] === undefined) ix[k] = i; });
+  const get = (row, name) => { const i = ix[normKey(name)]; return i === undefined ? '' : String(row[i] == null ? '' : row[i]).trim(); };
+  const opIx = ix['OP'];
+  for (let r = 1; r < aoa.length; r++) {
+    const row = aoa[r];
+    const op = opIx === undefined ? '' : String(row[opIx] == null ? '' : row[opIx]).trim();
+    if (!op || byOp.has(op)) continue;
+    byOp.set(op, {
+      nombre:      get(row, 'NOMBRE'),
+      mail:        get(row, 'MAIL'),
+      direccion:   get(row, 'DIRECCION APRTICUALR'),
+      comuna:      get(row, 'COMUNA'),
+      region:      get(row, 'REGION'),
+      telefono:    get(row, 'TELEFONO CELUALR') || get(row, 'TELEFONO PARTICULAR'),
+      cuotas:      get(row, 'CUOTAS'),
+      marca:       get(row, 'MARCA VEHICULO'),
+      modelo:      get(row, 'MODELO VEHICULO'),
+      anio:        get(row, 'AÑO VEHICULO'),
+      tipo:        get(row, 'TIPO VEHICULO'),
+      nuevo_usado: get(row, 'NUEVO/USADO'),
+    });
   }
   return byOp;
 }
@@ -123,13 +145,13 @@ function construir(byOp, des) {
   }
 
   const out = [];
+  let vencNoParse = 0, fpagoNoParse = 0;
   for (const [id, cuotas] of porCredito) {
     cuotas.sort((a, b) => pNum(G(a, 'Numero_Cuota')) - pNum(G(b, 'Numero_Cuota')));
     const estados = new Set(cuotas.map(c => G(c, 'Estado_Cuota')));
     const activo = estados.has('VIGENTE') || estados.has('COBRANZA');
     const first = cuotas[0];
     const cob = byOp.get(id) || {};
-    const sCob = (k) => { const v = cob[k]; return v == null ? '' : String(v).trim(); };
 
     out.push({
       id,
@@ -138,42 +160,45 @@ function construir(byOp, des) {
       nombres: G(first, 'Nombre_RazonSocial_Cliente') || null,
       ap_paterno: G(first, 'PN_Apellido_Paterno_Cliente') || null,
       ap_materno: G(first, 'PN_Apellido_Materno_Cliente') || null,
-      nombre_completo: sCob('NOMBRE') ||
+      nombre_completo: (cob.nombre || '') ||
         [G(first, 'Nombre_RazonSocial_Cliente'), G(first, 'PN_Apellido_Paterno_Cliente'), G(first, 'PN_Apellido_Materno_Cliente')].filter(Boolean).join(' '),
       activo,
-      plazo: sCob('CUOTAS') ? pNum(sCob('CUOTAS')) : cuotas.length,
+      plazo: cob.cuotas ? pNum(cob.cuotas) : cuotas.length,
       tasa: pTasa(G(first, 'Tasa_Interes')),
       fecha_primera_cuota: pDate(G(first, 'Fecha_Vencimiento_Cuota')),
       monto_financiado: pNum(G(first, 'Saldo_Insoluto_Cuota')) + pNum(G(first, 'Amortizacion_Cuota')),
-      // vehículo (xlsx)
-      marca: sCob('MARCA VEHICULO') || null,
-      modelo: sCob('MODELO VEHICULO') || null,
-      anio: sCob('AÑO VEHICULO') ? pNum(sCob('AÑO VEHICULO')) : null,
-      tipo_vehiculo: sCob('TIPO VEHICULO') || null,
-      nuevo_usado: sCob('Nuevo/usado') || null,
-      // contacto (xlsx)
-      email: sCob('MAIL') || null,
-      direccion: sCob('DIRECCION APRTICUALR') || null,
-      telefono: sCob('TELEFONO CELUALR') || sCob('TELEFONO PARTICULAR') || null,
-      comuna: sCob('COMUNA') || null,
-      region: sCob('REGION') || null,
+      // vehículo + contacto (xlsx, ya recortado en parseCobranza)
+      marca: cob.marca || null,
+      modelo: cob.modelo || null,
+      anio: cob.anio ? pNum(cob.anio) : null,
+      tipo_vehiculo: cob.tipo || null,
+      nuevo_usado: cob.nuevo_usado || null,
+      email: cob.mail || null,
+      direccion: cob.direccion || null,
+      telefono: cob.telefono || null,
+      comuna: cob.comuna || null,
+      region: cob.region || null,
       en_cobranza: byOp.has(id),
-      cuotas: cuotas.map(c => ({
-        numero: pNum(G(c, 'Numero_Cuota')),
-        venc: pDate(G(c, 'Fecha_Vencimiento_Cuota')),
-        venc_raw: G(c, 'Fecha_Vencimiento_Cuota'),
-        interes: pNum(G(c, 'Interes_Cuota')),
-        amort: pNum(G(c, 'Amortizacion_Cuota')),
-        valor: pNum(G(c, 'Valor_Cuota')),
-        saldo: pNum(G(c, 'Saldo_Insoluto_Cuota')),
-        estado: G(c, 'Estado_Cuota') || null,
-        fpago: pDate(G(c, 'Fecha_Pago')),
-        fpago_raw: G(c, 'Fecha_Pago'),
-        dias: pNum(G(c, 'Días desfase')),
-      })),
+      cuotas: cuotas.map(c => {
+        const rv = G(c, 'Fecha_Vencimiento_Cuota'), rp = G(c, 'Fecha_Pago');
+        const venc = pDate(rv), fpago = pDate(rp);
+        if (rv && !venc) vencNoParse++;
+        if (rp && !fpago) fpagoNoParse++;
+        return {
+          numero: pNum(G(c, 'Numero_Cuota')),
+          venc,
+          interes: pNum(G(c, 'Interes_Cuota')),
+          amort: pNum(G(c, 'Amortizacion_Cuota')),
+          valor: pNum(G(c, 'Valor_Cuota')),
+          saldo: pNum(G(c, 'Saldo_Insoluto_Cuota')),
+          estado: G(c, 'Estado_Cuota') || null,
+          fpago,
+          dias: pNum(G(c, 'Días desfase')),
+        };
+      }),
     });
   }
-  return out;
+  return { rows: out, meta: { vencNoParse, fpagoNoParse } };
 }
 
 /* ── Helper: lee los 2 buffers subidos ─────────────────────────────────── */
@@ -193,7 +218,7 @@ function leerArchivos(req) {
 const dryRun = async (req, res) => {
   try {
     const { byOp, des } = leerArchivos(req);
-    const data = construir(byOp, des);
+    const { rows: data, meta } = construir(byOp, des);
 
     const cuotasAll = data.flatMap(d => d.cuotas);
     const estadoCuota = {};
@@ -204,9 +229,9 @@ const dryRun = async (req, res) => {
     const pagadasSinFecha = pagadas.filter(c => !c.fpago).length;
     const pagadasActSinFecha = activos.flatMap(d => d.cuotas).filter(c => c.estado === 'PAGADA' && !c.fpago).length;
 
-    // anomalías de parseo
-    const vencNoParse = cuotasAll.filter(c => c.venc_raw && !c.venc).length;
-    const fpagoNoParse = cuotasAll.filter(c => c.fpago_raw && !c.fpago).length;
+    // anomalías de parseo (contadas durante construir, sin retener los crudos)
+    const vencNoParse = meta.vencNoParse;
+    const fpagoNoParse = meta.fpagoNoParse;
     const rutNulos = data.filter(d => !d.rut).length;
 
     // clientes únicos por rut
@@ -356,7 +381,7 @@ const aplicarInit = async (req, res) => {
   try {
     gcJobs();
     const { byOp, des } = leerArchivos(req);
-    const data = construir(byOp, des);
+    const { rows: data } = construir(byOp, des);
     const jobId = 'idx_' + Date.now() + '_' + Math.random().toString(36).slice(2, 8);
     JOBS.set(jobId, { data, total: data.length, createdAt: Date.now(), stats: {} });
     res.json({ success: true, data: { jobId, total: data.length }, error: null });

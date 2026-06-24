@@ -4,7 +4,7 @@
   "description": "Sistema de cotización y venta de créditos",
   "main": "index.js",
   "scripts": {
-    "start": "node api-gateway/src/index.js"
+    "start": "node --max-old-space-size=400 api-gateway/src/index.js"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.105.0",
