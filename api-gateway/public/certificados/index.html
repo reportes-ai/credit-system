@@ -1,0 +1,332 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<!-- v1.0 -->
+<link rel="icon" href="/img/favicon.png" type="image/png">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Certificados — AutoFácil</title>
+<link rel="stylesheet" href="/css/bootstrap-icons.css">
+<style>
+  :root { --navy:#0f2d6b; --blue:#1565c0; --bg:#f0f4f8; --card:#fff; --border:#e2e8f0; --text:#1e293b; --muted:#64748b; --violet:#7c3aed; }
+  *{ box-sizing:border-box; margin:0; padding:0; }
+  body{ font-family:'Segoe UI',system-ui,sans-serif; background:var(--bg); color:var(--text); }
+  .topnav{ background:linear-gradient(135deg,var(--navy),var(--blue)); padding:0 24px; height:52px; display:flex; align-items:center; justify-content:space-between; }
+  .topnav-brand{ display:flex; align-items:center; gap:10px; color:#fff; font-weight:800; font-size:1rem; text-decoration:none; }
+  .topnav-brand img{ height:28px; filter:brightness(0) invert(1); }
+  .version-badge{ background:rgba(255,255,255,.15); color:rgba(255,255,255,.75); font-size:.65rem; font-weight:700; border-radius:6px; padding:2px 8px; letter-spacing:.5px; }
+  .btn-nav{ background:rgba(255,255,255,.15); border:1px solid rgba(255,255,255,.3); color:#fff; border-radius:8px; padding:6px 14px; font-size:.82rem; font-weight:600; cursor:pointer; text-decoration:none; display:flex; align-items:center; gap:6px; }
+  .topnav-right{ display:flex; align-items:center; gap:12px; }
+  .page{ max-width:1000px; margin:0 auto; padding:24px 16px 80px; }
+  h1{ font-size:1.3rem; color:var(--navy); margin-bottom:4px; }
+  .sub{ color:var(--muted); font-size:.9rem; margin-bottom:20px; }
+  .card{ background:var(--card); border:1px solid var(--border); border-radius:14px; padding:20px 22px; box-shadow:0 2px 10px rgba(0,0,0,.05); margin-bottom:20px; }
+  .tipos{ display:grid; grid-template-columns:repeat(auto-fill,minmax(180px,1fr)); gap:12px; }
+  .tipo{ border:1.5px solid var(--border); border-radius:12px; padding:14px; cursor:pointer; transition:.15s; background:#fff; text-align:left; }
+  .tipo:hover{ border-color:var(--violet); box-shadow:0 4px 14px rgba(124,58,237,.15); }
+  .tipo.sel{ border-color:var(--violet); background:#f5f3ff; }
+  .tipo i{ font-size:1.4rem; color:var(--violet); }
+  .tipo .t{ font-weight:700; font-size:.9rem; color:var(--navy); margin-top:6px; }
+  .tipo .d{ font-size:.74rem; color:var(--muted); margin-top:2px; }
+  label{ display:block; font-weight:700; font-size:.8rem; color:var(--navy); margin-bottom:6px; }
+  input[type=text], input[type=number]{ width:100%; padding:9px 12px; border:1.5px solid #cbd5e1; border-radius:9px; font-size:.9rem; }
+  .row{ display:grid; grid-template-columns:1fr 1fr; gap:14px; }
+  @media(max-width:640px){ .row{ grid-template-columns:1fr; } }
+  .btn{ border:none; border-radius:9px; padding:10px 20px; font-size:.9rem; font-weight:700; cursor:pointer; display:inline-flex; align-items:center; gap:8px; }
+  .btn-go{ background:linear-gradient(135deg,#6d28d9,var(--violet)); color:#fff; }
+  .btn-go:disabled{ opacity:.5; cursor:not-allowed; }
+  .btn-light{ background:#eef2ff; color:#4338ca; }
+  .spinner{ width:15px; height:15px; border:.18em solid rgba(255,255,255,.4); border-top-color:#fff; border-radius:50%; animation:spin .7s linear infinite; }
+  @keyframes spin{ to{ transform:rotate(360deg); } }
+  .err{ background:#fef2f2; border:1px solid #fca5a5; color:#b91c1c; border-radius:8px; padding:10px 14px; font-size:.85rem; margin-top:12px; display:none; }
+  .res{ border:1px solid var(--border); border-radius:10px; margin-top:10px; max-height:260px; overflow:auto; }
+  .res .it{ padding:9px 12px; border-bottom:1px solid #f1f5f9; cursor:pointer; font-size:.85rem; display:flex; justify-content:space-between; gap:10px; }
+  .res .it:hover{ background:#f5f3ff; }
+  .res .it b{ color:var(--navy); }
+  .selbox{ background:#f0fdf4; border:1px solid #86efac; border-radius:10px; padding:10px 14px; font-size:.86rem; margin-top:10px; display:none; }
+  .tabs{ display:flex; gap:8px; margin-bottom:14px; }
+  .tab{ padding:7px 16px; border-radius:20px; font-size:.84rem; font-weight:700; cursor:pointer; border:1.5px solid var(--border); background:#fff; color:var(--muted); }
+  .tab.active{ background:var(--navy); color:#fff; border-color:var(--navy); }
+  table{ width:100%; border-collapse:collapse; font-size:.82rem; }
+  th,td{ padding:8px 10px; text-align:left; border-bottom:1px solid #f1f5f9; }
+  th{ background:#f8fafc; color:var(--navy); font-size:.7rem; text-transform:uppercase; letter-spacing:.04em; }
+  .pill{ display:inline-block; border-radius:20px; padding:1px 9px; font-size:.7rem; font-weight:700; background:#ede9fe; color:#6d28d9; }
+  .pill.anul{ background:#fee2e2; color:#b91c1c; }
+  .hide{ display:none; }
+
+  /* ── Documento del certificado (imprimible) ── */
+  #certWrap{ display:none; }
+  .doc{ background:#fff; border:1px solid var(--border); border-radius:10px; padding:42px 48px; max-width:780px; margin:0 auto; box-shadow:0 6px 24px rgba(0,0,0,.08); }
+  .doc-head{ display:flex; justify-content:space-between; align-items:flex-start; border-bottom:2px solid var(--navy); padding-bottom:14px; margin-bottom:22px; }
+  .doc-head .brand{ font-size:1.4rem; font-weight:800; color:var(--navy); letter-spacing:.5px; }
+  .doc-head .brand small{ display:block; font-size:.7rem; font-weight:600; color:var(--muted); letter-spacing:2px; }
+  .doc-head .folio{ text-align:right; font-size:.72rem; color:var(--muted); }
+  .doc-head .folio b{ color:var(--navy); font-size:.95rem; letter-spacing:1px; }
+  .doc h2{ text-align:center; font-size:1.18rem; color:var(--navy); text-transform:uppercase; letter-spacing:1px; margin:8px 0 26px; }
+  .doc .body{ font-size:.95rem; line-height:1.9; text-align:justify; color:#1e293b; }
+  .doc .body b{ color:#0f172a; }
+  .doc .grid{ display:grid; grid-template-columns:1fr 1fr; gap:6px 24px; margin:22px 0; font-size:.88rem; }
+  .doc .grid div{ border-bottom:1px dotted #cbd5e1; padding:4px 0; display:flex; justify-content:space-between; }
+  .doc .grid span{ color:var(--muted); }
+  .doc-foot{ display:flex; justify-content:space-between; align-items:flex-end; margin-top:40px; gap:20px; }
+  .doc-foot .firma{ font-size:.78rem; color:var(--muted); }
+  .doc-foot .firma .ln{ border-top:1px solid #1e293b; width:200px; margin-bottom:4px; padding-top:6px; }
+  .doc-actions{ max-width:780px; margin:14px auto 0; display:flex; gap:10px; justify-content:flex-end; }
+  @media print{
+    body{ background:#fff; }
+    .topnav,.page > *:not(#certWrap),.doc-actions,#af-topnav{ display:none !important; }
+    .page{ padding:0; max-width:none; }
+    #certWrap{ display:block !important; }
+    .doc{ border:none; box-shadow:none; border-radius:0; max-width:none; padding:0; }
+  }
+</style>
+</head>
+<body>
+
+<nav class="topnav">
+  <a class="topnav-brand" href="/">
+    <img src="/img/logo.png" alt="AutoFácil" onerror="this.style.display='none'">
+    <span>Certificados</span>
+    <span class="version-badge" id="versionBadge"></span>
+  </a>
+  <div class="topnav-right">
+    <span id="navUser" class="user-chip" style="color:rgba(255,255,255,.75);font-size:.82rem"></span>
+    <a href="/" class="btn-nav"><i class="bi bi-arrow-left"></i>Inicio</a>
+  </div>
+</nav>
+
+<div class="page">
+  <h1>Certificados</h1>
+  <div class="sub">Emite constancias con código QR de verificación pública.</div>
+
+  <div class="tabs">
+    <div class="tab active" id="tabEmitir" onclick="verTab('emitir')">Emitir</div>
+    <div class="tab" id="tabHist" onclick="verTab('hist')">Historial</div>
+  </div>
+
+  <!-- ── EMITIR ── -->
+  <div id="vEmitir">
+    <div class="card">
+      <label>1. Tipo de certificado</label>
+      <div class="tipos" id="tipos"></div>
+    </div>
+
+    <!-- Crédito (4 tipos) -->
+    <div class="card hide" id="boxCredito">
+      <label>2. Crédito (busca por N° Operación, RUT o nombre)</label>
+      <input type="text" id="q" placeholder="Ej. 88604 · 17.373.323-2 · FERNANDO SANCHEZ" oninput="buscarDeb()">
+      <div class="res hide" id="res"></div>
+      <div class="selbox" id="selbox"></div>
+      <div id="boxCuota" class="hide" style="margin-top:12px">
+        <label>N° de cuota a certificar</label>
+        <input type="number" id="numCuota" min="1" placeholder="Ej. 3" style="max-width:160px">
+      </div>
+    </div>
+
+    <!-- Preaprobado (manual) -->
+    <div class="card hide" id="boxPreap">
+      <label>2. Datos del crédito preaprobado</label>
+      <div class="row">
+        <div><label>RUT cliente</label><input type="text" id="pRut" placeholder="12.345.678-9"></div>
+        <div><label>Nombre cliente</label><input type="text" id="pNombre" placeholder="Nombre completo"></div>
+      </div>
+      <div class="row" style="margin-top:12px">
+        <div><label>Monto preaprobado ($)</label><input type="number" id="pMonto" placeholder="8000000"></div>
+        <div><label>Plazo (meses)</label><input type="number" id="pPlazo" placeholder="48"></div>
+      </div>
+      <div class="row" style="margin-top:12px">
+        <div><label>Tasa mensual (%)</label><input type="number" id="pTasa" step="0.01" placeholder="1.92"></div>
+        <div><label>Vigencia de la oferta (días)</label><input type="number" id="pVig" placeholder="30"></div>
+      </div>
+    </div>
+
+    <div class="card hide" id="boxGen">
+      <button class="btn btn-go" id="btnGen" onclick="generar()" disabled><i class="bi bi-patch-check"></i>Generar certificado</button>
+      <div class="err" id="err"></div>
+    </div>
+  </div>
+
+  <!-- ── DOCUMENTO ── -->
+  <div id="certWrap">
+    <div class="doc" id="doc"></div>
+    <div class="doc-actions">
+      <button class="btn btn-light" onclick="nuevo()"><i class="bi bi-arrow-left"></i>Nuevo</button>
+      <button class="btn btn-go" onclick="window.print()"><i class="bi bi-printer"></i>Imprimir / PDF</button>
+    </div>
+  </div>
+
+  <!-- ── HISTORIAL ── -->
+  <div id="vHist" class="hide">
+    <div class="card">
+      <div style="overflow:auto">
+        <table>
+          <thead><tr><th>Fecha</th><th>Tipo</th><th>N° Op</th><th>Cliente</th><th>Código</th><th>Emitió</th><th></th></tr></thead>
+          <tbody id="histBody"><tr><td colspan="7" style="text-align:center;color:#94a3b8;padding:18px">Cargando…</td></tr></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script src="/js/qrcode-generator.js"></script>
+<script src="/js/qr-verificacion.js"></script>
+<script src="/js/auth-guard.js"></script>
+<script>
+const TOKEN = () => sessionStorage.getItem('token');
+(function(){ if(!TOKEN()){ location.href='/login.html'; return; }
+  try{ const u=JSON.parse(sessionStorage.getItem('usuario')||'{}'); document.getElementById('navUser').textContent=u.nombre||''; }catch(e){} })();
+const $ = id => document.getElementById(id);
+const H = () => ({ Authorization:'Bearer '+TOKEN() });
+const HJ = () => ({ 'Content-Type':'application/json', Authorization:'Bearer '+TOKEN() });
+const nf = n => Number(n||0).toLocaleString('es-CL');
+const esc = s => String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+const money = n => '$'+nf(n);
+function fechaLarga(iso){ if(!iso) return '—'; const M=['enero','febrero','marzo','abril','mayo','junio','julio','agosto','septiembre','octubre','noviembre','diciembre'];
+  const [y,m,d]=iso.split('-').map(Number); return `${d} de ${M[m-1]} de ${y}`; }
+
+const TIPOS = [
+  ['CERT_CREDITO_VIGENTE','bi-shield-check','Crédito Vigente','Estado y saldo del crédito',  'credito'],
+  ['CERT_PREPAGO',        'bi-cash-coin',   'Prepago','Crédito pagado en su totalidad',        'credito'],
+  ['CERT_ALZAMIENTO',     'bi-unlock',      'Alzamiento de Prenda','Libera la prenda del vehículo','credito'],
+  ['CERT_PAGO_CUOTA',     'bi-receipt',     'Pago de Cuota','Una cuota pagada en particular',    'credito'],
+  ['CERT_PREAPROBADO',    'bi-patch-plus',  'Crédito Preaprobado','Oferta de crédito vigente',    'preap'],
+];
+let tipoSel=null, modoSel=null, credSel=null;
+
+(function pintarTipos(){
+  $('tipos').innerHTML = TIPOS.map(([t,ic,nom,desc])=>`
+    <div class="tipo" data-t="${t}" onclick="selTipo('${t}')">
+      <i class="bi ${ic}"></i><div class="t">${nom}</div><div class="d">${desc}</div>
+    </div>`).join('');
+})();
+
+function selTipo(t){
+  tipoSel=t; credSel=null;
+  modoSel = TIPOS.find(x=>x[0]===t)[4];
+  document.querySelectorAll('.tipo').forEach(e=>e.classList.toggle('sel', e.dataset.t===t));
+  $('boxCredito').classList.toggle('hide', modoSel!=='credito');
+  $('boxPreap').classList.toggle('hide', modoSel!=='preap');
+  $('boxCuota').classList.toggle('hide', t!=='CERT_PAGO_CUOTA');
+  $('boxGen').classList.remove('hide');
+  $('selbox').style.display='none'; $('res').classList.add('hide'); $('q').value=''; $('err').style.display='none';
+  refreshGen();
+}
+
+let debT=null;
+function buscarDeb(){ clearTimeout(debT); debT=setTimeout(buscar,300); }
+async function buscar(){
+  const q=$('q').value.trim();
+  if(q.length<2){ $('res').classList.add('hide'); return; }
+  try{
+    const r=await fetch('/api/certificados/buscar?q='+encodeURIComponent(q),{headers:H()});
+    const j=await r.json(); if(!j.success) return;
+    const rows=j.data||[];
+    $('res').innerHTML = rows.length ? rows.map(c=>`
+      <div class="it" onclick='selCred(${JSON.stringify(c).replace(/'/g,"&#39;")})'>
+        <span><b>N° ${nf(c.num_op)}</b> · ${esc(c.nombre||'')}</span>
+        <span style="color:#64748b">${esc(c.rut||'')} · ${esc([c.marca,c.modelo,c.anio].filter(Boolean).join(' '))} ${c.estado_cartera?'· '+esc(c.estado_cartera):''}</span>
+      </div>`).join('') : '<div class="it" style="color:#94a3b8;cursor:default">Sin resultados</div>';
+    $('res').classList.remove('hide');
+  }catch(e){}
+}
+function selCred(c){
+  credSel=c; $('res').classList.add('hide');
+  $('selbox').style.display='block';
+  $('selbox').innerHTML=`<b>N° ${nf(c.num_op)}</b> — ${esc(c.nombre||'')} · ${esc(c.rut||'')} · ${esc([c.marca,c.modelo,c.anio].filter(Boolean).join(' '))}`;
+  refreshGen();
+}
+function refreshGen(){
+  let ok=false;
+  if(modoSel==='credito') ok=!!credSel && (tipoSel!=='CERT_PAGO_CUOTA' || $('numCuota').value>0);
+  else ok = $('pRut').value.trim() && $('pNombre').value.trim() && Number($('pMonto').value)>0;
+  $('btnGen').disabled=!ok;
+}
+['numCuota','pRut','pNombre','pMonto'].forEach(id=>document.addEventListener('input',e=>{ if(e.target.id===id) refreshGen(); }));
+
+async function generar(){
+  const btn=$('btnGen'); btn.disabled=true; btn.innerHTML='<span class="spinner"></span>Generando…'; $('err').style.display='none';
+  const body={ tipo:tipoSel };
+  if(modoSel==='credito'){ body.num_op=credSel.num_op; if(tipoSel==='CERT_PAGO_CUOTA') body.numero_cuota=Number($('numCuota').value); }
+  else body.manual={ rut:$('pRut').value.trim(), nombre:$('pNombre').value.trim(), monto:Number($('pMonto').value), plazo:Number($('pPlazo').value)||null, tasa:$('pTasa').value||null, vigencia_dias:Number($('pVig').value)||null };
+  try{
+    const r=await fetch('/api/certificados/generar',{method:'POST',headers:HJ(),body:JSON.stringify(body)});
+    const j=await r.json(); if(!j.success) throw new Error(j.error||'Error');
+    render(j.data);
+  }catch(e){ $('err').textContent='⚠ '+e.message; $('err').style.display='block'; }
+  finally{ btn.disabled=false; btn.innerHTML='<i class="bi bi-patch-check"></i>Generar certificado'; refreshGen(); }
+}
+
+function cuerpo(d){
+  const c=d.credito||{}, x=d.datos||{}, nom=esc(d.nombre||''), rut=esc(d.rut||'');
+  if(d.tipo==='CERT_CREDITO_VIGENTE') return `AutoFácil Chile certifica que <b>${nom}</b>, RUT <b>${rut}</b>, mantiene <b>vigente</b> el crédito automotriz N° <b>${nf(c.num_op)}</b> (${esc(c.financiera||'')}), otorgado con fecha ${esc(c.fecha_otorgado||'—')}, asociado al vehículo <b>${esc(c.vehiculo||'—')}</b>. A la fecha registra <b>${nf(x.cuotas_pagadas)}</b> de <b>${nf(x.cuotas_total)}</b> cuotas pagadas, con un saldo insoluto de <b>${money(x.saldo_insoluto)}</b> y una cuota mensual de <b>${money(x.cuota_mensual)}</b>.`;
+  if(d.tipo==='CERT_PREPAGO') return `AutoFácil Chile certifica que el crédito automotriz N° <b>${nf(c.num_op)}</b> (${esc(c.financiera||'')}), de <b>${nom}</b>, RUT <b>${rut}</b>, asociado al vehículo <b>${esc(c.vehiculo||'—')}</b>, fue <b>PREPAGADO</b> (pagado en su totalidad) con fecha <b>${esc(x.fecha_prepago||'—')}</b>. El cliente <b>no registra saldos pendientes</b> por este crédito.`;
+  if(d.tipo==='CERT_ALZAMIENTO') return `Habiéndose pagado íntegramente el crédito automotriz N° <b>${nf(c.num_op)}</b> de <b>${nom}</b>, RUT <b>${rut}</b>, AutoFácil Chile autoriza y certifica el <b>ALZAMIENTO DE LA PRENDA</b> que afecta al vehículo <b>${esc(x.vehiculo||'—')}</b>${x.tipo_vehiculo?' ('+esc(x.tipo_vehiculo)+')':''}. Fecha del pago final: <b>${esc(x.fecha_pago_final||'—')}</b>.`;
+  if(d.tipo==='CERT_PAGO_CUOTA') return `AutoFácil Chile certifica que, respecto del crédito automotriz N° <b>${nf(c.num_op)}</b> de <b>${nom}</b>, RUT <b>${rut}</b>, la <b>cuota N° ${nf(x.numero_cuota)}</b> (vencimiento ${esc(x.fecha_vencimiento||'—')}) fue <b>pagada</b> con fecha <b>${esc(x.fecha_pago||'—')}</b> por un monto de <b>${money(x.monto)}</b>.`;
+  if(d.tipo==='CERT_PREAPROBADO') return `AutoFácil Chile certifica que <b>${nom}</b>, RUT <b>${rut}</b>, cuenta con un crédito automotriz <b>PREAPROBADO</b> por un monto de hasta <b>${money(x.monto_preaprobado)}</b>${x.plazo?', a un plazo de <b>'+nf(x.plazo)+'</b> meses':''}${x.tasa!=null?', con una tasa referencial de <b>'+x.tasa+'%</b> mensual':''}. La presente oferta tiene una vigencia de <b>${nf(x.vigencia_dias||30)} días</b> a contar de la fecha de emisión.`;
+  return '';
+}
+function gridDatos(d){
+  const x=d.datos||{}, c=d.credito||{}, items=[];
+  const add=(k,v)=>items.push(`<div><span>${k}</span><b>${v}</b></div>`);
+  add('Cliente', esc(d.nombre||'—')); add('RUT', esc(d.rut||'—'));
+  if(c.num_op) add('N° Operación', nf(c.num_op));
+  if(c.financiera) add('Financiera', esc(c.financiera));
+  if(c.vehiculo) add('Vehículo', esc(c.vehiculo));
+  if(d.tipo==='CERT_CREDITO_VIGENTE'){ add('Cuotas pagadas', `${nf(x.cuotas_pagadas)} / ${nf(x.cuotas_total)}`); add('Saldo insoluto', money(x.saldo_insoluto)); add('Cuota mensual', money(x.cuota_mensual)); }
+  if(d.tipo==='CERT_PREPAGO'){ add('Fecha de prepago', esc(x.fecha_prepago||'—')); add('Monto financiado', money(x.monto_financiado)); }
+  if(d.tipo==='CERT_PAGO_CUOTA'){ add('Cuota', nf(x.numero_cuota)); add('Fecha de pago', esc(x.fecha_pago||'—')); add('Monto', money(x.monto)); }
+  if(d.tipo==='CERT_ALZAMIENTO'){ add('Fecha pago final', esc(x.fecha_pago_final||'—')); }
+  if(d.tipo==='CERT_PREAPROBADO'){ add('Monto preaprobado', money(x.monto_preaprobado)); if(x.plazo) add('Plazo', nf(x.plazo)+' meses'); if(x.tasa!=null) add('Tasa mensual', x.tasa+'%'); add('Vigencia', nf(x.vigencia_dias||30)+' días'); }
+  return `<div class="grid">${items.join('')}</div>`;
+}
+function render(d){
+  const qr = (typeof qrVerificacionHTML==='function') ? qrVerificacionHTML(d.codigo,{px:108}) : '';
+  $('doc').innerHTML = `
+    <div class="doc-head">
+      <div class="brand">AutoFácil<small>CRÉDITO AUTOMOTRIZ</small></div>
+      <div class="folio">Folio<br><b>${esc(d.codigo)}</b><br>${fechaLarga(d.fecha_emision)}</div>
+    </div>
+    <h2>${esc(d.tipo_label||'')}</h2>
+    <div class="body">${cuerpo(d)}</div>
+    ${gridDatos(d)}
+    <div class="doc-foot">
+      <div class="firma">
+        <div class="ln"></div>
+        AutoFácil Chile<br>${esc(d.emitido_por||'')} · ${fechaLarga(d.fecha_emision)}
+      </div>
+      <div>${qr}</div>
+    </div>`;
+  $('certWrap').style.display='block';
+  $('vEmitir').classList.add('hide');
+  window.scrollTo({top:0,behavior:'smooth'});
+}
+function nuevo(){ $('certWrap').style.display='none'; $('vEmitir').classList.remove('hide'); }
+
+/* ── Tabs / Historial ── */
+function verTab(t){
+  $('tabEmitir').classList.toggle('active', t==='emitir');
+  $('tabHist').classList.toggle('active', t==='hist');
+  $('certWrap').style.display='none';
+  if(t==='hist'){ $('vEmitir').classList.add('hide'); $('vHist').classList.remove('hide'); cargarHist(); }
+  else { $('vHist').classList.add('hide'); $('vEmitir').classList.remove('hide'); }
+}
+async function cargarHist(){
+  try{
+    const r=await fetch('/api/certificados/historial',{headers:H()});
+    const j=await r.json(); const rows=j.data||[];
+    $('histBody').innerHTML = rows.length ? rows.map(c=>`
+      <tr>
+        <td>${esc(c.created_at)}</td>
+        <td>${esc(c.tipo_label)}</td>
+        <td>${c.num_op?nf(c.num_op):'—'}</td>
+        <td>${esc(c.nombre||'—')}<br><span style="color:#94a3b8;font-size:.74rem">${esc(c.rut||'')}</span></td>
+        <td><a href="/verificar/${esc(c.codigo)}" target="_blank" style="font-family:monospace;color:#6d28d9">${esc(c.codigo)}</a></td>
+        <td>${esc(c.emitido_por||'')}</td>
+        <td>${c.anulado?'<span class="pill anul">ANULADO</span>':'<span class="pill">Válido</span>'}</td>
+      </tr>`).join('') : '<tr><td colspan="7" style="text-align:center;color:#94a3b8;padding:18px">Sin certificados emitidos</td></tr>';
+  }catch(e){ $('histBody').innerHTML='<tr><td colspan="7" style="text-align:center;color:#b91c1c;padding:18px">Error al cargar</td></tr>'; }
+}
+</script>
+<script src="/js/app-version.js"></script>
+</body>
+</html>
