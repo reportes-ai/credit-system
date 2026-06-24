@@ -1,0 +1,110 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<!-- v1.0 -->
+<link rel="icon" href="/img/favicon.png" type="image/png">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Verificación de Documento — AutoFácil</title>
+<link rel="stylesheet" href="/css/bootstrap-icons.css">
+<style>
+  :root { --navy:#0f2d6b; --blue:#1565c0; --ok:#15803d; --bad:#b91c1c; --bg:#eef2f7; --muted:#64748b; --border:#e2e8f0; }
+  *{ box-sizing:border-box; margin:0; padding:0; }
+  body{ font-family:'Segoe UI',system-ui,sans-serif; background:var(--bg); color:#1e293b; min-height:100vh; display:flex; flex-direction:column; }
+  .top{ background:linear-gradient(135deg,var(--navy),var(--blue)); padding:16px; text-align:center; }
+  .top img{ height:34px; filter:brightness(0) invert(1); }
+  .wrap{ flex:1; display:flex; align-items:flex-start; justify-content:center; padding:18px 14px 40px; }
+  .card{ background:#fff; border-radius:18px; box-shadow:0 8px 30px rgba(0,0,0,.10); width:100%; max-width:430px; overflow:hidden; }
+  .head{ padding:26px 22px 18px; text-align:center; }
+  .ico{ width:74px; height:74px; border-radius:50%; display:flex; align-items:center; justify-content:center; font-size:2.3rem; color:#fff; margin:0 auto 12px; }
+  .ico.ok{ background:linear-gradient(135deg,#16a34a,#15803d); box-shadow:0 8px 22px rgba(22,163,74,.4); }
+  .ico.bad{ background:linear-gradient(135deg,#ef4444,#b91c1c); box-shadow:0 8px 22px rgba(185,28,28,.4); }
+  .ico.q{ background:linear-gradient(135deg,#64748b,#475569); }
+  .estado{ font-size:1.25rem; font-weight:800; }
+  .estado.ok{ color:var(--ok); } .estado.bad{ color:var(--bad); } .estado.q{ color:var(--muted); }
+  .tipo{ font-size:.92rem; color:var(--navy); font-weight:700; margin-top:3px; }
+  .sub{ font-size:.8rem; color:var(--muted); margin-top:6px; }
+  .rows{ border-top:1px solid var(--border); }
+  .row{ display:flex; justify-content:space-between; gap:14px; padding:11px 22px; border-bottom:1px solid #f1f5f9; font-size:.88rem; }
+  .row .k{ color:var(--muted); }
+  .row .v{ font-weight:700; text-align:right; color:#0f172a; }
+  .foot{ padding:14px 22px 22px; text-align:center; font-size:.72rem; color:#94a3b8; }
+  .badge-cod{ display:inline-block; background:#f1f5f9; border:1px solid var(--border); border-radius:8px; padding:4px 12px; font-weight:800; letter-spacing:2px; color:#334155; margin-top:6px; }
+  .spin{ width:30px; height:30px; border:3px solid #e2e8f0; border-top-color:var(--blue); border-radius:50%; animation:s .7s linear infinite; margin:40px auto; }
+  @keyframes s{ to{ transform:rotate(360deg); } }
+  .motivo{ background:#fef2f2; border:1px solid #fecaca; color:#b91c1c; border-radius:10px; padding:10px 14px; font-size:.82rem; margin:14px 22px; }
+</style>
+</head>
+<body>
+  <div class="top"><img src="/img/logo.png" alt="AutoFácil" onerror="this.style.display='none'"></div>
+  <div class="wrap">
+    <div class="card" id="card"><div class="spin"></div></div>
+  </div>
+
+<script>
+const esc = s => String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+function fechaCL(v){ if(!v) return '—'; try{ return new Date(v).toLocaleString('es-CL',{day:'2-digit',month:'2-digit',year:'numeric',hour:'2-digit',minute:'2-digit'}); }catch(_){ return v; } }
+
+function rowsDatos(datos){
+  if(!datos || typeof datos!=='object') return '';
+  return Object.entries(datos).map(([k,v]) =>
+    `<div class="row"><span class="k">${esc(k)}</span><span class="v">${esc(v)}</span></div>`).join('');
+}
+
+function render(d){
+  const card = document.getElementById('card');
+  if(d.anulado){
+    card.innerHTML = `
+      <div class="head">
+        <div class="ico bad"><i class="bi bi-x-octagon-fill"></i></div>
+        <div class="estado bad">Documento Anulado</div>
+        <div class="tipo">${esc(d.tipo_label)}</div>
+      </div>
+      ${d.motivo ? `<div class="motivo"><b>Motivo:</b> ${esc(d.motivo)}</div>` : ''}
+      <div class="rows">
+        <div class="row"><span class="k">N° Operación</span><span class="v">${esc(d.num_op||'—')}</span></div>
+        <div class="row"><span class="k">Cliente</span><span class="v">${esc(d.nombre||'—')}</span></div>
+      </div>
+      <div class="foot">AutoFácil — Crédito Automotriz · Código <span class="badge-cod">${esc(d.codigo)}</span></div>`;
+    return;
+  }
+  card.innerHTML = `
+    <div class="head">
+      <div class="ico ok"><i class="bi bi-patch-check-fill"></i></div>
+      <div class="estado ok">Documento Válido</div>
+      <div class="tipo">${esc(d.tipo_label)}</div>
+      <div class="sub">Emitido por AutoFácil Crédito Automotriz</div>
+    </div>
+    <div class="rows">
+      <div class="row"><span class="k">N° Operación</span><span class="v">${esc(d.num_op||'—')}</span></div>
+      <div class="row"><span class="k">Cliente</span><span class="v">${esc(d.nombre||'—')}</span></div>
+      <div class="row"><span class="k">RUT</span><span class="v">${esc(d.rut||'—')}</span></div>
+      ${rowsDatos(d.datos)}
+      <div class="row"><span class="k">Emitido</span><span class="v">${fechaCL(d.emitido)}</span></div>
+    </div>
+    <div class="foot">Verificación oficial · Código <span class="badge-cod">${esc(d.codigo)}</span></div>`;
+}
+
+function noEncontrado(){
+  document.getElementById('card').innerHTML = `
+    <div class="head">
+      <div class="ico q"><i class="bi bi-question-lg"></i></div>
+      <div class="estado q">Documento no encontrado</div>
+      <div class="sub">El código no corresponde a un documento emitido por AutoFácil.</div>
+    </div>
+    <div class="foot">AutoFácil — Crédito Automotriz</div>`;
+}
+
+(async () => {
+  const codigo = decodeURIComponent(location.pathname.replace(/\/+$/,'').split('/').pop() || '');
+  if(!codigo || codigo==='verificar'){ noEncontrado(); return; }
+  try {
+    const r = await fetch('/api/verificar/' + encodeURIComponent(codigo));
+    if(!r.ok){ noEncontrado(); return; }
+    const j = await r.json();
+    if(j.success && j.data) render(j.data); else noEncontrado();
+  } catch(e){ noEncontrado(); }
+})();
+</script>
+</body>
+</html>

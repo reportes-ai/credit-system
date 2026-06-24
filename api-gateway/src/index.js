@@ -175,6 +175,9 @@ app.use('/api/crm', require('../../services/crm/src/routes/gestiones.routes'));
 app.use('/api/cobranza', require('../../services/cobranza/src/routes/cobranza.routes'));
 app.use('/api/migracion-indexa', require('../../services/cobranza/src/routes/migracion-indexa.routes'));
 
+// Verificación pública de documentos por QR (SIN auth: se escanea desde afuera)
+app.use('/api/verificar', require('../../services/certificados/src/routes/verificacion.routes'));
+
 // Comisiones ejecutivos
 app.use('/api/comisiones', require('../../services/comisiones/src/routes/comisiones.routes'));
 
@@ -408,6 +411,10 @@ app.get(['/cobranza/reporteria', '/cobranza/reporteria/'], (req, res) =>
 
 app.get(['/cobranza/migracion-indexa', '/cobranza/migracion-indexa/'], (req, res) =>
   res.sendFile(path.join(__dirname, '../public/cobranza/migracion-indexa/index.html')));
+
+// Página PÚBLICA de verificación de documentos (la abre el QR): /verificar/<codigo>
+app.get(['/verificar', '/verificar/', '/verificar/:codigo'], (req, res) =>
+  res.sendFile(path.join(__dirname, '../public/verificar/index.html')));
 
 app.get(['/reporteria', '/reporteria/'], (req, res) =>
   res.sendFile(path.join(__dirname, '../public/reporteria/index.html')));
