@@ -553,7 +553,8 @@ function parseEnriquecimiento(buf) {
         iCurse = ix['FECHA_CURSE'], iNom = ix['NOMBRE'], iEje = ix['EJECUTIVO'],
         iVen = ix['VENDEDOR'], iRut = ix['RUT_DEALER'],
         iMarca = ix['MARCA'], iModelo = ix['MODELO'], iAnio = ix['ANIO'],
-        iTasa = ix['TASA_PISO'], iRdh = ix['SEGURO_RDH'], iRep = ix['SEGURO_REP_MENOR'];
+        iTasa = ix['TASA_PISO'], iRdh = ix['SEGURO_RDH'], iRep = ix['SEGURO_REP_MENOR'],
+        iVal = ix['VALOR_VEHICULO'], iPie = ix['PIE'], iSp = ix['SALDO_PRECIO'];
   if (iOp === undefined) throw new Error('El CSV no tiene la columna num_op. Usa el archivo de enriquecimiento generado.');
   const g = (c, j) => (j === undefined || c[j] == null) ? '' : String(c[j]).trim();
   const rows = [];
@@ -577,18 +578,22 @@ function parseEnriquecimiento(buf) {
       tasa_piso:  g(c, iTasa) || null,
       seguro_rdh: g(c, iRdh) || null,
       seguro_rep: g(c, iRep) || null,
+      valor_veh:  g(c, iVal) || null,
+      pie:        g(c, iPie) || null,
+      saldo_pre:  g(c, iSp) || null,
     });
   }
   return rows;
 }
 
 async function procesarEnriqChunk(slice) {
-  const st = { filas: 0, sexo: 0, fnac: 0, curse: 0, ejecutivo: 0, vendedor: 0, rut_dealer: 0, marca: 0, tasa_piso: 0, seguro_rdh: 0, seguro_rep: 0 };
+  const st = { filas: 0, sexo: 0, fnac: 0, curse: 0, ejecutivo: 0, vendedor: 0, rut_dealer: 0, marca: 0, tasa_piso: 0, seguro_rdh: 0, seguro_rep: 0, valor_veh: 0, pie: 0, saldo_pre: 0 };
   for (const d of slice) {
     st.filas++;
     if (d.sexo) st.sexo++; if (d.fnac) st.fnac++; if (d.curse) st.curse++;
     if (d.ejecutivo) st.ejecutivo++; if (d.vendedor) st.vendedor++; if (d.rut_dealer) st.rut_dealer++;
     if (d.marca) st.marca++; if (d.tasa_piso) st.tasa_piso++; if (d.seguro_rdh) st.seguro_rdh++; if (d.seguro_rep) st.seguro_rep++;
+    if (d.valor_veh) st.valor_veh++; if (d.pie) st.pie++; if (d.saldo_pre) st.saldo_pre++;
     // 1) Cliente (vía el crédito ya linkeado): rellena SOLO lo vacío (no pisa lo cargado).
     await pool.query(
       `UPDATE creditos c JOIN clientes cl ON cl.id_cliente = c.id_cliente
@@ -612,10 +617,13 @@ async function procesarEnriqChunk(slice) {
               tasa_piso        = COALESCE(NULLIF(tasa_piso,0), ?),
               seguro_rdh       = COALESCE(NULLIF(seguro_rdh,0), ?, seguro_rdh),
               seguro_rep_menor = COALESCE(NULLIF(seguro_rep_menor,0), ?, seguro_rep_menor),
+              valor_vehiculo   = COALESCE(NULLIF(valor_vehiculo,0), ?),
+              pie              = COALESCE(NULLIF(pie,0), ?),
+              saldo_precio     = COALESCE(NULLIF(saldo_precio,0), ?),
               fecha_otorgado   = COALESCE(?, fecha_otorgado),
               mes              = CASE WHEN ? IS NOT NULL THEN DATE_FORMAT(?, '%Y-%m-01') ELSE mes END
         WHERE num_op = ?`,
-      [d.ejecutivo, d.vendedor, d.rut_dealer, d.rut_dealer, d.marca, d.modelo, d.anio, d.tasa_piso, d.seguro_rdh, d.seguro_rep, d.curse, d.curse, d.curse, d.op]);
+      [d.ejecutivo, d.vendedor, d.rut_dealer, d.rut_dealer, d.marca, d.modelo, d.anio, d.tasa_piso, d.seguro_rdh, d.seguro_rep, d.valor_veh, d.pie, d.saldo_pre, d.curse, d.curse, d.curse, d.op]);
   }
   return st;
 }

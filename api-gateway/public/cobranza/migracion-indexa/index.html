@@ -2,7 +2,7 @@
 <html lang="es">
 <head>
 <meta charset="UTF-8">
-<!-- v1.8 -->
+<!-- v1.9 -->
 <link rel="icon" href="/img/favicon.png" type="image/png">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Migración Cartera INDEXA — AutoFácil</title>
@@ -101,14 +101,15 @@
     <div class="note" style="background:#f5f3ff;border-color:#7c3aed;color:#4c1d95">
       Completa la cartera ya migrada con lo que <b>INDEXA no traía</b>: <b>género</b>, <b>fecha de nacimiento</b>,
       <b>ejecutivo</b>, <b>vendedor</b>, <b>RUT del dealer</b>, <b>marca/modelo/año</b>, <b>tasa piso</b>,
-      <b>primas de seguro (RDH y reparación menor)</b> y la <b>Fecha de Curse = fecha de otorgamiento real</b>
+      <b>primas de seguro (RDH y reparación menor)</b>, <b>valor del vehículo</b>, <b>pie</b>, <b>saldo precio</b>
+      y la <b>Fecha de Curse = fecha de otorgamiento real</b>
       (reemplaza la aproximación de la migración). Cruce por <b>N° Op</b>. Rellena solo lo vacío; la fecha de curse sí
       actualiza el otorgamiento. <b>Idempotente.</b><br>
       <span style="font-size:.78rem">Sube el CSV liviano <code>enriquecimiento-creditos-v2.csv</code> (generado del .xls oficial).</span>
     </div>
     <div class="up" id="upEnr" style="max-width:620px">
       <label><i class="bi bi-filetype-csv" style="color:#7c3aed"></i> CSV de enriquecimiento</label>
-      <div class="hint"><code>num_op;sexo;fecha_nacimiento;fecha_curse;nombre;ejecutivo;vendedor;rut_dealer;marca;modelo;anio;tasa_piso;seguro_rdh;seguro_rep_menor</code></div>
+      <div class="hint"><code>num_op;sexo;fecha_nacimiento;fecha_curse;nombre;ejecutivo;vendedor;rut_dealer;marca;modelo;anio;tasa_piso;seguro_rdh;seguro_rep_menor;valor_vehiculo;pie;saldo_precio</code></div>
       <input type="file" id="fEnr" accept=".csv,text/csv" onchange="markEnr()">
     </div>
     <div class="actions">
@@ -304,7 +305,7 @@ async function enriquecer(){
       off=jc.data.processed; acc=jc.data.acumulado||acc;
       const pct=Math.round(off/total*100);
       $('enrBar').style.width=pct+'%';
-      $('enrText').innerHTML=`${nfmt(off)}/${nfmt(total)} filas (${pct}%) — sexo ${nfmt(acc.sexo||0)}, nacimiento ${nfmt(acc.fnac||0)}, curse ${nfmt(acc.curse||0)}, ejecutivo ${nfmt(acc.ejecutivo||0)}, dealer ${nfmt(acc.rut_dealer||0)}, vehículo ${nfmt(acc.marca||0)}, tasa piso ${nfmt(acc.tasa_piso||0)}, RDH ${nfmt(acc.seguro_rdh||0)}, rep.menor ${nfmt(acc.seguro_rep||0)}`;
+      $('enrText').innerHTML=`${nfmt(off)}/${nfmt(total)} filas (${pct}%) — sexo ${nfmt(acc.sexo||0)}, nacimiento ${nfmt(acc.fnac||0)}, curse ${nfmt(acc.curse||0)}, ejecutivo ${nfmt(acc.ejecutivo||0)}, dealer ${nfmt(acc.rut_dealer||0)}, vehículo ${nfmt(acc.marca||0)}, tasa piso ${nfmt(acc.tasa_piso||0)}, RDH ${nfmt(acc.seguro_rdh||0)}, rep.menor ${nfmt(acc.seguro_rep||0)}, valor ${nfmt(acc.valor_veh||0)}, pie ${nfmt(acc.pie||0)}, saldo ${nfmt(acc.saldo_pre||0)}`;
       if(jc.data.done) break;
     }
     btn.innerHTML='<i class="bi bi-check-lg"></i>Enriquecido';
