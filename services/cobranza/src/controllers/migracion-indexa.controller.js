@@ -295,13 +295,15 @@ const JOBS = new Map(); // jobId -> { data, total, createdAt, stats }
 function gcJobs() { const now = Date.now(); for (const [k, v] of JOBS) if (now - v.createdAt > 30 * 60 * 1000) JOBS.delete(k); }
 
 async function procesarChunk(slice) {
-  const st = { clientes: 0, creditos_new: 0, creditos_upd: 0, cuotas: 0, pagos: 0, sin_rut: 0 };
-  // ids ya existentes de esta migración para los num_op del lote
+  const st = { clientes: 0, creditos_new: 0, creditos_enriquecidos: 0, cuotas: 0, pagos: 0, sin_rut: 0 };
+  // Match por num_op SIN importar origen: muchos ya existen (cargados desde la base
+  // única ene-2025+, incompletos y con financiera puesta a mano). Esos se ENRIQUECEN
+  // (se rellena solo lo que falta, preservando financiera y lo ya cargado), no se duplican.
   const ops = slice.map(d => d.num_op).filter(Boolean);
   const idByOp = new Map();
   if (ops.length) {
     const [ex] = await pool.query(
-      `SELECT id, num_op FROM creditos WHERE origen='INDEXA' AND num_op IN (${ops.map(() => '?').join(',')})`, ops);
+      `SELECT id, num_op FROM creditos WHERE num_op IN (${ops.map(() => '?').join(',')}) ORDER BY id`, ops);
     ex.forEach(r => idByOp.set(r.num_op, r.id));
   }
 
@@ -322,17 +324,27 @@ async function procesarChunk(slice) {
       st.clientes++;
     } else st.sin_rut++;
 
-    // 2) Crédito (upsert por num_op+origen). Prepagado → estado_cartera=PREPAGADO;
-    //    activo → null (lo calcula el motor de cartera en la Etapa 3).
+    // 2) Crédito. Existe (base única) → ENRIQUECER: rellena SOLO lo vacío (COALESCE),
+    //    NO toca financiera ni estado_credito ni lo ya cargado. No existe → INSERT nuevo.
     const estadoCartera = d.activo ? null : 'PREPAGADO';
     let idc = idByOp.get(d.num_op);
     if (idc) {
       await pool.query(
-        `UPDATE creditos SET rut_cliente=?, nombre_cliente=?, estado_credito='OTORGADO', estado_cartera=?,
-           fecha_primera_cuota=?, plazo=?, tascli_real=?, monto_financiado=?, marca=?, modelo=?, anio_vehiculo=?
+        `UPDATE creditos SET
+           rut_cliente         = COALESCE(NULLIF(rut_cliente,''), ?),
+           nombre_cliente      = COALESCE(NULLIF(nombre_cliente,''), ?),
+           marca               = COALESCE(NULLIF(marca,''), ?),
+           modelo              = COALESCE(NULLIF(modelo,''), ?),
+           anio_vehiculo       = COALESCE(anio_vehiculo, ?),
+           fecha_primera_cuota = COALESCE(fecha_primera_cuota, ?),
+           plazo               = COALESCE(plazo, ?),
+           tascli_real         = COALESCE(tascli_real, ?),
+           monto_financiado    = COALESCE(monto_financiado, ?),
+           estado_cartera      = COALESCE(NULLIF(estado_cartera,''), ?),
+           origen              = COALESCE(NULLIF(origen,''), 'INDEXA')
          WHERE id=?`,
-        [d.rut, d.nombre_completo, estadoCartera, d.fecha_primera_cuota, d.plazo, d.tasa, d.monto_financiado, d.marca, d.modelo, d.anio, idc]);
-      st.creditos_upd++;
+        [d.rut, d.nombre_completo, d.marca, d.modelo, d.anio, d.fecha_primera_cuota, d.plazo, d.tasa, d.monto_financiado, estadoCartera, idc]);
+      st.creditos_enriquecidos++;
     } else {
       const [r] = await pool.query(
         `INSERT INTO creditos (num_op, origen, financiera, rut_cliente, nombre_cliente, estado_credito, estado_cartera,
