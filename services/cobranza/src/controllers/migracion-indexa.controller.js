@@ -76,10 +76,34 @@ function normKey(s) {
 }
 
 /* ── Parseo de archivos ────────────────────────────────────────────────── */
-// Cobranza xlsx → Map(OP → SOLO los ~12 campos que usamos del crédito).
-// Liviano a propósito (free tier ~256MB heap): header:1 + dense, no retiene las
-// 38k filas completas (34 cols c/u) sino un objeto chico por OP.
+// Cobranza → Map(OP → SOLO los ~12 campos del crédito). Acepta el .txt CRUDO de
+// INDEXA (latin1, ';', SIN encabezado, por posición) o el xlsx con encabezados.
 function parseCobranza(buf) {
+  return (buf[0] === 0x50 && buf[1] === 0x4B) ? parseCobranzaXlsx(buf) : parseCobranzaTxt(buf);
+}
+// Export crudo de INDEXA: 34 columnas FIJAS por posición, sin encabezado.
+function parseCobranzaTxt(buf) {
+  const lines = Buffer.from(buf).toString('latin1').split(/\r?\n/);
+  const byOp = new Map();
+  const I = { op: 1, nombre: 2, mail: 3, direccion: 4, comuna: 6, region: 8, telCel: 10, telPar: 9, cuotas: 25, marca: 27, modelo: 28, anio: 29, tipo: 30, nuevo: 31 };
+  for (const ln of lines) {
+    if (!ln.trim()) continue;
+    const c = ln.split(';');
+    const g = i => String(c[i] == null ? '' : c[i]).trim();
+    const op = g(I.op);
+    if (!/^\d+$/.test(op) || byOp.has(op)) continue;   // salta líneas sin OP numérico
+    byOp.set(op, {
+      nombre: g(I.nombre), mail: g(I.mail), direccion: g(I.direccion),
+      comuna: g(I.comuna), region: g(I.region),
+      telefono: g(I.telCel) || g(I.telPar),
+      cuotas: g(I.cuotas), marca: g(I.marca), modelo: g(I.modelo),
+      anio: g(I.anio), tipo: g(I.tipo), nuevo_usado: g(I.nuevo),
+    });
+  }
+  return byOp;
+}
+// xlsx con encabezados (versión armada a mano). Liviano: header:1 + dense.
+function parseCobranzaXlsx(buf) {
   const wb = XLSX.read(buf, { type: 'buffer', dense: true, cellDates: false, cellNF: false, cellStyles: false, cellFormula: false, cellText: false, bookVBA: false, bookProps: false });
   const ws = wb.Sheets[wb.SheetNames[0]];
   const aoa = XLSX.utils.sheet_to_json(ws, { header: 1, defval: '', blankrows: false });  // arrays, no objetos por fila

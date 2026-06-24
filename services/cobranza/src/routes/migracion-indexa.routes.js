@@ -4,8 +4,8 @@ const ctrl   = require('../controllers/migracion-indexa.controller');
 const { verifyToken } = require('../../../../shared/middleware/auth');
 const { requireFunc } = require('../../../../shared/middleware/permisos');
 
-// Los informes de INDEXA pesan ~6MB c/u; holgura a 12MB por archivo.
-const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 12 * 1024 * 1024 } });
+// El .txt crudo de cobranza pesa ~12MB; holgura a 30MB por archivo.
+const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 30 * 1024 * 1024 } });
 const dos = upload.fields([{ name: 'desarrollo', maxCount: 1 }, { name: 'cobranza', maxCount: 1 }]);
 // Acción de migración: solo perfiles con el permiso (Admin pasa por bypass).
 const puede = requireFunc('cobranza_migracion_indexa');
