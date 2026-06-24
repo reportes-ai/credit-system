@@ -44,6 +44,42 @@ const { auditar } = require('../../../../shared/audit');
   } catch (e) { console.error('[migracion-indexa schema]', e.message); }
 })();
 
+/* ── Fix one-time (idempotente): la 1a carga dejó los créditos INDEXA con campos
+   que el listado exige en NULL (numero_credito/estado_eval/fecha_otorgado/mes) y
+   los RUT con puntos (el sistema usa SIN puntos). Esto los hace visibles y
+   buscables sin re-aplicar. Tras correr no quedan filas que tocar. ── */
+(async () => {
+  try {
+    const [r1] = await pool.query(
+      `UPDATE creditos
+          SET numero_credito = COALESCE(NULLIF(numero_credito,''), CAST(num_op AS CHAR)),
+              estado_eval    = COALESCE(NULLIF(estado_eval,''), 'OTORGADO'),
+              fecha_otorgado = COALESCE(fecha_otorgado, fecha_primera_cuota),
+              mes            = COALESCE(mes, DATE_FORMAT(fecha_primera_cuota, '%Y-%m-01'))
+        WHERE origen='INDEXA'
+          AND (numero_credito IS NULL OR estado_eval IS NULL OR mes IS NULL)`);
+    if (r1.affectedRows) console.log(`[migracion-indexa fix] créditos completados: ${r1.affectedRows}`);
+
+    // RUT clientes: con puntos → sin puntos. Si ya existe el sin-puntos, fusiona
+    // (re-apunta créditos al existente y borra el duplicado punteado).
+    const [dotted] = await pool.query("SELECT id_cliente, rut FROM clientes WHERE rut LIKE '%.%'");
+    let renombrados = 0, fusionados = 0;
+    for (const c of dotted) {
+      const nodot = String(c.rut).replace(/\./g, '');
+      const [[ex]] = await pool.query('SELECT id_cliente FROM clientes WHERE rut=? AND id_cliente<>? LIMIT 1', [nodot, c.id_cliente]);
+      if (ex) {
+        await pool.query('UPDATE creditos SET id_cliente=? WHERE id_cliente=?', [ex.id_cliente, c.id_cliente]);
+        await pool.query('DELETE FROM clientes WHERE id_cliente=?', [c.id_cliente]);
+        fusionados++;
+      } else {
+        await pool.query('UPDATE clientes SET rut=? WHERE id_cliente=?', [nodot, c.id_cliente]);
+        renombrados++;
+      }
+    }
+    if (dotted.length) console.log(`[migracion-indexa fix] RUT clientes: ${renombrados} renombrados, ${fusionados} fusionados`);
+  } catch (e) { console.error('[migracion-indexa fix]', e.message); }
+})();
+
 /* ── Normalizadores ────────────────────────────────────────────────────── */
 // CSV trae RUT con DV pegado ("129382163" → 12.938.216-3)
 function fmtRutConDV(rutConDV) {
@@ -51,8 +87,7 @@ function fmtRutConDV(rutConDV) {
   if (s.length < 2) return null;
   const dv = s.slice(-1), cuerpo = s.slice(0, -1);
   if (!/^\d+$/.test(cuerpo)) return null;
-  const miles = cuerpo.replace(/\B(?=(\d{3})+(?!\d))/g, '.');
-  return `${miles}-${dv}`;
+  return `${cuerpo}-${dv}`;   // formato del sistema: SIN puntos (ej. 11428178-6)
 }
 // dd/mm/yyyy → yyyy-mm-dd (null si no parsea)
 function pDate(s) {
@@ -359,6 +394,10 @@ async function procesarChunk(slice) {
       await pool.query(
         `UPDATE creditos SET
            id_cliente          = COALESCE(id_cliente, ?),
+           numero_credito      = COALESCE(NULLIF(numero_credito,''), ?),
+           estado_eval         = COALESCE(NULLIF(estado_eval,''), 'OTORGADO'),
+           fecha_otorgado      = COALESCE(fecha_otorgado, ?),
+           mes                 = COALESCE(mes, DATE_FORMAT(?, '%Y-%m-01')),
            marca               = COALESCE(NULLIF(marca,''), ?),
            modelo              = COALESCE(NULLIF(modelo,''), ?),
            anio                = COALESCE(anio, ?),
@@ -370,14 +409,14 @@ async function procesarChunk(slice) {
            estado_cartera      = COALESCE(NULLIF(estado_cartera,''), ?),
            origen              = COALESCE(NULLIF(origen,''), 'INDEXA')
          WHERE id=?`,
-        [idCliente, d.marca, d.modelo, d.anio, d.tipo_vehiculo, d.fecha_primera_cuota, d.plazo, d.tasa, d.monto_financiado, estadoCartera, idc]);
+        [idCliente, String(d.num_op), d.fecha_primera_cuota, d.fecha_primera_cuota, d.marca, d.modelo, d.anio, d.tipo_vehiculo, d.fecha_primera_cuota, d.plazo, d.tasa, d.monto_financiado, estadoCartera, idc]);
       st.creditos_enriquecidos++;
     } else {
       const [r] = await pool.query(
-        `INSERT INTO creditos (num_op, origen, financiera, id_cliente, estado, estado_cartera,
-           fecha_primera_cuota, plazo, tascli_real, monto_financiado, marca, modelo, anio, tipo_vehiculo)
-         VALUES (?, 'INDEXA', 'AUTOFACIL', ?, 'OTORGADO', ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-        [d.num_op, idCliente, estadoCartera, d.fecha_primera_cuota, d.plazo, d.tasa, d.monto_financiado, d.marca, d.modelo, d.anio, d.tipo_vehiculo]);
+        `INSERT INTO creditos (num_op, numero_credito, origen, financiera, id_cliente, estado, estado_eval, estado_cartera,
+           fecha_otorgado, mes, fecha_primera_cuota, plazo, tascli_real, monto_financiado, marca, modelo, anio, tipo_vehiculo)
+         VALUES (?, ?, 'INDEXA', 'AUTOFACIL', ?, 'OTORGADO', 'OTORGADO', ?, ?, DATE_FORMAT(?, '%Y-%m-01'), ?, ?, ?, ?, ?, ?, ?, ?)`,
+        [d.num_op, String(d.num_op), idCliente, estadoCartera, d.fecha_primera_cuota, d.fecha_primera_cuota, d.fecha_primera_cuota, d.plazo, d.tasa, d.monto_financiado, d.marca, d.modelo, d.anio, d.tipo_vehiculo]);
       idc = r.insertId; st.creditos_new++;
     }
 
