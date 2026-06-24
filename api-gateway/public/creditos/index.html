@@ -17,7 +17,7 @@
   <div class="topnav-left">
     <a href="/" class="topnav-brand">
       <img src="/img/logo.png" alt="AutoFácil" style="display:block">
-      <span class="version-badge" id="versionBadge">v5.7</span>
+      <span class="version-badge" id="versionBadge">v5.8</span>
     </a>
       <div class="breadcrumb-nav">
         <a href="/">Inicio</a><span class="sep">›</span>
@@ -93,13 +93,15 @@
       <div class="stats-line">
         <span class="stats-line-lbl" title="Etapa del crédito (originación)">Etapas</span>
         <div class="stats-bar">
+          <div class="stat-chip" onclick="filtrarPorEstado('DIGITADO')" style="cursor:pointer" title="Ver digitados (broker)">
+            <div class="sc-label">Digitado</div><div class="sc-val" id="statDigitado" style="color:#6d28d9">—</div>
+          </div>
           <div class="stat-chip stat-revision" onclick="filtrarPorEstado('INGRESO')" style="cursor:pointer" title="Ver ingresados">
             <div class="sc-label">Ingresados</div>
             <div class="sc-val" id="statRevision" style="color:#854d0e">—</div>
           </div>
-          <div class="stat-chip stat-proceso" id="chipProceso" onclick="filtrarPorEstado('__PROCESO__')" style="cursor:pointer" title="Ver créditos en proceso (no cursados ni anulados)">
-            <div class="sc-label">En Proceso</div>
-            <div class="sc-val" id="statProceso" style="color:#c2410c">—</div>
+          <div class="stat-chip" onclick="filtrarPorEstado('APROBADO')" style="cursor:pointer" title="Ver aprobados">
+            <div class="sc-label">Aprobado</div><div class="sc-val" id="statAprobado" style="color:#15803d">—</div>
           </div>
           <div class="stat-chip" onclick="filtrarPorEstado('CARTA_APROBACION')" style="cursor:pointer" title="Ver créditos con Carta de Aprobación">
             <div class="sc-label">Carta Enviada</div>
@@ -110,6 +112,9 @@
           </div>
           <div class="stat-chip" onclick="filtrarPorEstado('CURSADO')" style="cursor:pointer" title="Ver cursados">
             <div class="sc-label">Cursados</div><div class="sc-val" id="statCursados" style="color:#15803d">—</div>
+          </div>
+          <div class="stat-chip" onclick="filtrarPorEstado('CANCELADO')" style="cursor:pointer" title="Ver rechazados / anulados">
+            <div class="sc-label">Rechazados</div><div class="sc-val" id="statRechazados" style="color:#b91c1c">—</div>
           </div>
           <div class="stat-chip" onclick="filtrarPorEstado('DESISTIDO')" style="cursor:pointer" title="Ver desistidos">
             <div class="sc-label">Desistidos</div><div class="sc-val" id="statDesistidos" style="color:#b91c1c">—</div>
@@ -127,6 +132,18 @@
           </div>
           <div class="stat-chip" onclick="filtrarPorEstado('EN MORA')" style="cursor:pointer" title="Ver en mora">
             <div class="sc-label">En Mora</div><div class="sc-val" id="statMora" style="color:#92400e">—</div>
+          </div>
+          <div class="stat-chip" onclick="filtrarPorEstado('VENCIDO')" style="cursor:pointer" title="Ver vencidos">
+            <div class="sc-label">Vencido</div><div class="sc-val" id="statVencido" style="color:#dc2626">—</div>
+          </div>
+          <div class="stat-chip" onclick="filtrarPorEstado('TERMINADO')" style="cursor:pointer" title="Ver terminados (pagó todas las cuotas)">
+            <div class="sc-label">Terminado</div><div class="sc-val" id="statTerminado" style="color:#0f766e">—</div>
+          </div>
+          <div class="stat-chip" onclick="filtrarPorEstado('PREPAGADO')" style="cursor:pointer" title="Ver prepagados">
+            <div class="sc-label">Prepagado</div><div class="sc-val" id="statPrepagado" style="color:#7c3aed">—</div>
+          </div>
+          <div class="stat-chip" onclick="filtrarPorEstado('CASTIGADO')" style="cursor:pointer" title="Ver castigados (incobrable)">
+            <div class="sc-label">Castigado</div><div class="sc-val" id="statCastigado" style="color:#111827">—</div>
           </div>
           <div class="stat-chip stat-total" onclick="filtrarPorEstado('')" style="cursor:pointer" title="Ver todos">
             <div class="sc-label">Total</div><div class="sc-val" id="statTotal">—</div>
@@ -151,10 +168,14 @@
           <option value="VALIDACION_FIRMA">Validación Firma</option>
           <option value="VIGENTE">Vigente</option>
           <option value="EN MORA">En Mora</option>
+          <option value="VENCIDO">Vencido</option>
+          <option value="TERMINADO">Terminado</option>
           <option value="CANCELADO">Cancelado</option>
           <option value="PREPAGADO">Prepagado</option>
           <option value="CASTIGADO">Castigado</option>
           <optgroup label="── Broker ──">
+          <option value="DIGITADO">Digitado</option>
+          <option value="APROBADO">Aprobado</option>
           <option value="OTORGADO">Otorgado</option>
           <option value="CURSADO">Cursado</option>
           <option value="DESISTIDO">Desistido</option>

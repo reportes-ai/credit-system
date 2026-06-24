@@ -443,24 +443,25 @@ function actualizarStats(stats, totalServidor) {
   // stats es el objeto {ESTADO: count} del servidor — totales reales
   const g = (e) => (stats[e] || 0);
   const ingresados = g('INGRESO') + g('REVISION');
-  const proceso    = (totalServidor || 0) - g('CANCELADO') - g('VIGENTE') - g('OTORGADO') - g('CURSADO') - g('DESISTIDO') - g('CARTA_APROBACION');
   const _totTxt = (totalServidor || 0).toLocaleString('es-CL');
-  document.getElementById('statTotal').textContent     = _totTxt;
-  const _totEt = document.getElementById('statTotalEt'); if (_totEt) _totEt.textContent = _totTxt;
-  document.getElementById('statRevision').textContent  = ingresados;
-  const elAn = document.getElementById('statCartaAprobacion');
-  if (elAn) elAn.textContent = g('CARTA_APROBACION');
-  document.getElementById('statProceso').textContent   = Math.max(0, proceso);
-  document.getElementById('statVigentes').textContent  = g('VIGENTE');
-  document.getElementById('statMora').textContent      = g('EN MORA') || 0;
-  const elCanc = document.getElementById('statCancelados');
-  if (elCanc) elCanc.textContent = g('CANCELADO');
-  const elOtorg = document.getElementById('statOtorgados');
-  if (elOtorg) elOtorg.textContent = g('OTORGADO');
-  const elCurs = document.getElementById('statCursados');
-  if (elCurs) elCurs.textContent = g('CURSADO');
-  const elDes = document.getElementById('statDesistidos');
-  if (elDes) elDes.textContent = g('DESISTIDO');
+  const set = (id, v) => { const el = document.getElementById(id); if (el) el.textContent = v; };
+  set('statTotal', _totTxt); set('statTotalEt', _totTxt);
+  // Etapas (originación)
+  set('statDigitado', g('DIGITADO'));
+  set('statRevision', ingresados);
+  set('statAprobado', g('APROBADO'));
+  set('statCartaAprobacion', g('CARTA_APROBACION'));
+  set('statOtorgados', g('OTORGADO'));
+  set('statCursados', g('CURSADO'));
+  set('statRechazados', g('CANCELADO'));   // CANCELADO = rechazados + anulados
+  set('statDesistidos', g('DESISTIDO'));
+  // Estados (cartera)
+  set('statVigentes', g('VIGENTE'));
+  set('statMora', g('EN MORA') || 0);
+  set('statVencido', g('VENCIDO'));
+  set('statTerminado', g('TERMINADO'));
+  set('statPrepagado', g('PREPAGADO'));
+  set('statCastigado', g('CASTIGADO'));
   // Resaltar badge ingresados
   const chipRev = document.querySelector('.stat-revision');
   if (chipRev) chipRev.style.borderColor = ingresados > 0 ? '#854d0e' : '';

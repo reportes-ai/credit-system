@@ -359,7 +359,8 @@
     .stats-line:last-child { margin-bottom:0; }
     .stats-line-lbl { flex:0 0 62px; display:flex; align-items:center; font-size:.64rem; font-weight:800; color:#9ca3af; text-transform:uppercase; letter-spacing:.07em; }
     .stats-line .stats-bar { flex:1; margin-bottom:0; }
-    .stats-line .stat-chip { max-width:210px; }
+    .stats-line .stat-chip { max-width:210px; min-width:96px; padding:10px 12px; }
+    .stats-line .stat-chip .sc-val { font-size:1.15rem; }
     .stat-total { background:#eef2f7; border-color:#e2e8f0; }   /* Total = ancla al final de cada fila */
     @media (max-width:640px){ .stats-line{flex-direction:column;gap:4px} .stats-line-lbl{flex:none} .stats-line .stat-chip{max-width:none} }
     .stat-chip { background:#fff; border-radius:10px; padding:12px 18px; flex:1; min-width:120px; box-shadow:0 1px 4px rgba(0,0,0,.07); border:2px solid transparent; transition:border-color .2s,box-shadow .2s; }
