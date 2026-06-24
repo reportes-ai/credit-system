@@ -60,6 +60,25 @@ const { auditar } = require('../../../../shared/audit');
           AND (numero_credito IS NULL OR estado_eval IS NULL OR mes IS NULL)`);
     if (r1.affectedRows) console.log(`[migracion-indexa fix] créditos completados: ${r1.affectedRows}`);
 
+    // Monto de la cuota mensual = valor de la cuota 1 del calendario
+    const [rc] = await pool.query(
+      `UPDATE creditos c SET c.cuota = (
+           SELECT cc.valor_cuota FROM cuotas_credito cc
+            WHERE cc.id_credito = c.id AND cc.numero_cuota = 1 LIMIT 1)
+        WHERE c.origen='INDEXA' AND (c.cuota IS NULL OR c.cuota = 0)`);
+    // Fecha de otorgamiento ≈ 1 mes antes de la 1a cuota (solo los nuevos, que quedaron = fecha_primera_cuota)
+    const [rf] = await pool.query(
+      `UPDATE creditos
+          SET fecha_otorgado = DATE_SUB(fecha_primera_cuota, INTERVAL 1 MONTH),
+              mes            = DATE_FORMAT(DATE_SUB(fecha_primera_cuota, INTERVAL 1 MONTH), '%Y-%m-01')
+        WHERE origen='INDEXA' AND fecha_otorgado = fecha_primera_cuota`);
+    // nombre_completo de clientes (lo usa el listado) = nombres + apellidos
+    const [rn] = await pool.query(
+      `UPDATE clientes SET nombre_completo = TRIM(CONCAT_WS(' ', nombres, apellido_paterno, apellido_materno))
+        WHERE (nombre_completo IS NULL OR nombre_completo='') AND COALESCE(nombres,apellido_paterno,apellido_materno) IS NOT NULL`);
+    if (rc.affectedRows || rf.affectedRows || rn.affectedRows)
+      console.log(`[migracion-indexa fix2] cuota:${rc.affectedRows} fecha:${rf.affectedRows} nombre_completo:${rn.affectedRows}`);
+
     // RUT clientes: con puntos → sin puntos. Si ya existe el sin-puntos, fusiona
     // (re-apunta créditos al existente y borra el duplicado punteado).
     // 1) Fusiones: los punteados con gemelo sin-puntos → copia contacto faltante al
@@ -378,16 +397,17 @@ async function procesarChunk(slice) {
     let idCliente = null;
     if (d.rut) {
       await pool.query(
-        `INSERT INTO clientes (rut, tipo_cliente, nombres, apellido_paterno, apellido_materno, email, direccion, telefono_movil)
-         VALUES (?, 'PERSONA', ?, ?, ?, ?, ?, ?)
+        `INSERT INTO clientes (rut, tipo_cliente, nombres, apellido_paterno, apellido_materno, nombre_completo, email, direccion, telefono_movil)
+         VALUES (?, 'PERSONA', ?, ?, ?, ?, ?, ?, ?)
          ON DUPLICATE KEY UPDATE
            nombres=COALESCE(VALUES(nombres),nombres),
            apellido_paterno=COALESCE(VALUES(apellido_paterno),apellido_paterno),
            apellido_materno=COALESCE(VALUES(apellido_materno),apellido_materno),
+           nombre_completo=COALESCE(NULLIF(nombre_completo,''),VALUES(nombre_completo)),
            email=COALESCE(VALUES(email),email),
            direccion=COALESCE(VALUES(direccion),direccion),
            telefono_movil=COALESCE(VALUES(telefono_movil),telefono_movil)`,
-        [d.rut, d.nombres, d.ap_paterno, d.ap_materno, d.email, d.direccion, d.telefono]);
+        [d.rut, d.nombres, d.ap_paterno, d.ap_materno, d.nombre_completo, d.email, d.direccion, d.telefono]);
       const [[cli]] = await pool.query('SELECT id_cliente FROM clientes WHERE rut=? LIMIT 1', [d.rut]);
       idCliente = cli ? cli.id_cliente : null;
       st.clientes++;
@@ -396,6 +416,7 @@ async function procesarChunk(slice) {
     // 2) Crédito. Existe (base única) → ENRIQUECER: rellena SOLO lo vacío (COALESCE),
     //    NO toca financiera ni estado_credito ni lo ya cargado. No existe → INSERT nuevo.
     const estadoCartera = d.activo ? null : 'PREPAGADO';
+    const cuotaMonto = (d.cuotas[0] && d.cuotas[0].valor) || null;   // cuota mensual = valor de la cuota 1
     let idc = idByOp.get(d.num_op);
     if (idc) {
       await pool.query(
@@ -412,18 +433,20 @@ async function procesarChunk(slice) {
            fecha_primera_cuota = COALESCE(fecha_primera_cuota, ?),
            plazo               = COALESCE(plazo, ?),
            tascli_real         = COALESCE(tascli_real, ?),
+           cuota               = COALESCE(cuota, ?),
            monto_financiado    = COALESCE(monto_financiado, ?),
            estado_cartera      = COALESCE(NULLIF(estado_cartera,''), ?),
            origen              = COALESCE(NULLIF(origen,''), 'INDEXA')
          WHERE id=?`,
-        [idCliente, String(d.num_op), d.fecha_primera_cuota, d.fecha_primera_cuota, d.marca, d.modelo, d.anio, d.tipo_vehiculo, d.fecha_primera_cuota, d.plazo, d.tasa, d.monto_financiado, estadoCartera, idc]);
+        [idCliente, String(d.num_op), d.fecha_primera_cuota, d.fecha_primera_cuota, d.marca, d.modelo, d.anio, d.tipo_vehiculo, d.fecha_primera_cuota, d.plazo, d.tasa, cuotaMonto, d.monto_financiado, estadoCartera, idc]);
       st.creditos_enriquecidos++;
     } else {
       const [r] = await pool.query(
         `INSERT INTO creditos (num_op, numero_credito, origen, financiera, id_cliente, estado, estado_eval, estado_cartera,
-           fecha_otorgado, mes, fecha_primera_cuota, plazo, tascli_real, monto_financiado, marca, modelo, anio, tipo_vehiculo)
-         VALUES (?, ?, 'INDEXA', 'AUTOFACIL', ?, 'OTORGADO', 'OTORGADO', ?, ?, DATE_FORMAT(?, '%Y-%m-01'), ?, ?, ?, ?, ?, ?, ?, ?)`,
-        [d.num_op, String(d.num_op), idCliente, estadoCartera, d.fecha_primera_cuota, d.fecha_primera_cuota, d.fecha_primera_cuota, d.plazo, d.tasa, d.monto_financiado, d.marca, d.modelo, d.anio, d.tipo_vehiculo]);
+           fecha_otorgado, mes, fecha_primera_cuota, plazo, tascli_real, cuota, monto_financiado, marca, modelo, anio, tipo_vehiculo)
+         VALUES (?, ?, 'INDEXA', 'AUTOFACIL', ?, 'OTORGADO', 'OTORGADO', ?,
+           DATE_SUB(?, INTERVAL 1 MONTH), DATE_FORMAT(DATE_SUB(?, INTERVAL 1 MONTH), '%Y-%m-01'), ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        [d.num_op, String(d.num_op), idCliente, estadoCartera, d.fecha_primera_cuota, d.fecha_primera_cuota, d.fecha_primera_cuota, d.plazo, d.tasa, cuotaMonto, d.monto_financiado, d.marca, d.modelo, d.anio, d.tipo_vehiculo]);
       idc = r.insertId; st.creditos_new++;
     }
 
