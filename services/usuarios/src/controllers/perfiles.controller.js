@@ -920,7 +920,6 @@ const getUsuariosByPerfil = async (req, res) => {
     await addFuncV8('Mantenedores', 'Comisiones Seguro',    'mantenedores_comisiones_seguro',    { Administrador:1 });
     await addFuncV8('Mantenedores', 'BD Operaciones',       'mantenedores_bd_operaciones',       { Administrador:1 });
     await addFuncV8('Mantenedores', 'BD Clientes',          'mantenedores_bd_clientes',          { Administrador:1 });
-    await addFuncV8('Mantenedores', 'Flujo Brokerage',      'mantenedores_flujo_brokerage',      { Administrador:1, Gerente:1, Supervisor:1 });
     await addFuncV8('Mantenedores', 'Broker Validaciones',  'mantenedores_broker_validaciones',  { Administrador:1, Gerente:1, Supervisor:1 });
 
     // Comisión Ejecutivos — subpáginas
@@ -956,7 +955,6 @@ const getUsuariosByPerfil = async (req, res) => {
     const renombres = [
       // Mantenedores
       ['mantenedores_parques',             'Arriendo y Comisión Parques'],
-      ['mantenedores_flujo_brokerage',     'Flujo Crédito Brokerage'],
       ['mantenedores_broker_validaciones', 'Documentos a Validar Brokers'],
       ['mantenedores_financieras',         'Fórmulas Financieras'],
       ['mantenedores_comisiones_seguro',   'Comisiones de Seguro'],
@@ -1981,7 +1979,7 @@ const getUsuariosByPerfil = async (req, res) => {
    no usada como gate. Lista extensible. */
 (async () => {
   // codigo a eliminar → (canónica que se conserva, solo informativo)
-  const OBSOLETAS = ['creditos_cargar_doc']; // "Documentos del Crédito" dup → canónica: creditos_documentos
+  const OBSOLETAS = ['creditos_cargar_doc', 'mantenedores_flujo_brokerage']; // creditos_cargar_doc: "Documentos del Crédito" dup → creditos_documentos. mantenedores_flujo_brokerage: submódulo redundante con Estado Créditos (se unificó)
   try {
     for (const cod of OBSOLETAS) {
       const [rows] = await pool.query('SELECT id_funcionalidad FROM funcionalidades WHERE codigo=?', [cod]);

@@ -315,8 +315,10 @@ app.get(['/mantenedores/cuentas-bancarias', '/mantenedores/cuentas-bancarias/'],
 app.get(['/mantenedores/parques', '/mantenedores/parques/'], (req, res) =>
   res.sendFile(path.join(__dirname, '../public/mantenedores/parques/index.html')));
 
+// Submódulo "Flujo Crédito Brokerage" eliminado: era un espejo de solo lectura del
+// mantenedor Estado Créditos (pestaña Brokerage). Se redirige por si queda algún link viejo.
 app.get(['/mantenedores/flujo-brokerage', '/mantenedores/flujo-brokerage/'], (req, res) =>
-  res.sendFile(path.join(__dirname, '../public/mantenedores/flujo-brokerage/index.html')));
+  res.redirect(302, '/mantenedores/estado-creditos/'));
 
 app.get(['/mantenedores/estado-creditos', '/mantenedores/estado-creditos/'], (req, res) =>
   res.sendFile(path.join(__dirname, '../public/mantenedores/estado-creditos/index.html')));

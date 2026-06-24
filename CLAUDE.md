@@ -66,7 +66,7 @@ shared/
 - Máquina de estados PARAMÉTRICA por `ambito` (hoy `brokerage` = AutoFin+Unidad; a futuro `autofacil` = recursos propios).
 - API `/api/estado-creditos` (controller/routes en services/mantenedores). CRUD estados + `PUT /:codigo/transiciones`.
 - Fase actual: **solo configura y dibuja el flujo; NO bloquea transiciones en créditos** (activar el enforcement cuando el mapa esté validado).
-- El **Flujo Brokerage** (`/mantenedores/flujo-brokerage/`) lee estos estados/transiciones en vivo.
+- El **Flujo Brokerage** se dibuja DENTRO de este mismo mantenedor (pestaña Brokerage: puertas de entrada + transiciones). El submódulo aparte `/mantenedores/flujo-brokerage/` se eliminó por redundante (la ruta redirige a Estado Créditos).
 - Mapa brokerage sembrado: **iniciales** DIGITADO (digitación/carga masiva) y CARTA_APROBACION (vía cartas). DIGITADO→{APROBADO,RECHAZADO}; APROBADO→{CARTA_APROBACION,OTORGADO,DESISTIDO}; RECHAZADO→{APELADO,OTORGADO,RECHAZADO}; CARTA_APROBACION→{OTORGADO,DESISTIDO}; OTORGADO→{PREPAGADO,ANULADO}.
 
 ## Principio Rector: Aplicación Paramétrica (FILOSOFÍA CENTRAL)
