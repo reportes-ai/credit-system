@@ -70,24 +70,44 @@ async function enviarCorreo({ to, cc, bcc, subject, html, text, replyTo, from } 
     const tx = getTransporter();
     if (!tx) return { ok: false, error: 'Correo no configurado (faltan variables MAIL_* en el servidor)' };
     if (!to) return { ok: false, error: 'Destinatario (to) requerido' };
-    // Suplencias: agrega al CC los suplentes activos (categoría Correos) de los destinatarios.
-    let ccFinal = cc;
-    try {
-      const { ccCorreos } = require('./backups');
-      const extra = await ccCorreos(to);
-      if (extra && extra.length) {
-        const base = (Array.isArray(cc) ? cc : String(cc || '').split(/[,;]/)).map(s => String(s).trim()).filter(Boolean);
-        ccFinal = [...new Set([...base, ...extra].map(s => s.toLowerCase()))].join(',');
-      }
-    } catch (_) { /* backups opcional */ }
+
+    let toFinal = to, ccFinal = cc, bccFinal = bcc;
+    let subjectFinal = subject || '(sin asunto)', htmlFinal = html, textFinal = text;
+
+    // ── Modo DESARROLLO: redirige TODO a los correos de prueba (no sale a clientes) ──
+    let dev = { activo: false };
+    try { dev = await require('./dev-mode').getDevMode(); } catch (_) {}
+    if (dev.activo) {
+      const { destinosDev } = require('./dev-mode');
+      const d = destinosDev(dev);
+      if (!d.to) return { ok: false, error: 'Modo Desarrollo activo pero sin correos de prueba configurados.' };
+      const orig = `TO: ${to}${cc ? ' · CC: ' + cc : ''}${bcc ? ' · BCC: ' + bcc : ''}`;
+      toFinal = d.to; ccFinal = d.cc; bccFinal = d.bcc;
+      subjectFinal = '[DESARROLLO] ' + subjectFinal;
+      const escH = s => String(s || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+      const banner = `<div style="background:#fef3c7;border:1px solid #f59e0b;color:#92400e;padding:9px 13px;border-radius:8px;margin-bottom:14px;font-size:13px;font-family:Arial,sans-serif"><b>&#9888; MODO DESARROLLO.</b> Correo redirigido — destinatario(s) original(es): <b>${escH(orig)}</b></div>`;
+      if (htmlFinal) htmlFinal = banner + htmlFinal;
+      textFinal = `[MODO DESARROLLO] Correo redirigido. Destinatario original → ${orig}\n\n` + (textFinal || '');
+    } else {
+      // Suplencias (solo fuera de modo dev): agrega al CC los suplentes activos (categoría Correos).
+      try {
+        const { ccCorreos } = require('./backups');
+        const extra = await ccCorreos(to);
+        if (extra && extra.length) {
+          const base = (Array.isArray(cc) ? cc : String(cc || '').split(/[,;]/)).map(s => String(s).trim()).filter(Boolean);
+          ccFinal = [...new Set([...base, ...extra].map(s => s.toLowerCase()))].join(',');
+        }
+      } catch (_) { /* backups opcional */ }
+    }
+
     const info = await tx.sendMail({
       from: from || remitente(),
-      to,
+      to: toFinal,
       cc: ccFinal || undefined,
-      bcc: bcc || undefined,
-      subject: subject || '(sin asunto)',
-      text: text || undefined,
-      html: html || undefined,
+      bcc: bccFinal || undefined,
+      subject: subjectFinal,
+      text: textFinal || undefined,
+      html: htmlFinal || undefined,
       replyTo: replyTo || process.env.MAIL_REPLY_TO || undefined,
     });
     return { ok: true, messageId: info.messageId };

@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Mantención de Sistema — AutoFácil</title>
-  <!-- v1.0 -->
+  <!-- v1.1 -->
   <link href="/css/bootstrap-icons.css" rel="stylesheet">
   <style>
     :root { --navy:#012d70; --blue:#0141A2; }
@@ -31,6 +31,14 @@
     textarea:focus { outline:none; border-color:var(--blue); box-shadow:0 0 0 2px rgba(1,65,162,.12); }
     .btn-primary-af { background:var(--blue); color:#fff; border:none; border-radius:9px; padding:9px 18px; font-size:.88rem; font-weight:700; cursor:pointer; }
     .btn-primary-af:hover { background:#0255c5; }
+    /* Modo Desarrollo */
+    .inp { width:100%; box-sizing:border-box; border:1.5px solid #d1d5db; border-radius:9px; padding:9px 12px; font-size:.92rem; }
+    .inp:focus { outline:none; border-color:var(--blue); box-shadow:0 0 0 2px rgba(1,65,162,.12); }
+    .dev-row { display:flex; gap:8px; margin-bottom:8px; align-items:center; }
+    .dev-row .inp { flex:1; }
+    .dev-row select { border:1.5px solid #d1d5db; border-radius:9px; padding:9px 10px; font-size:.85rem; background:#fff; min-width:120px; cursor:pointer; }
+    .switch.dev input:checked + .slider { background:#d97706; }
+    .sw-estado.on.dev { color:#d97706; }
     .afecta { background:#f8fafc; border-left:4px solid var(--blue); border-radius:8px; padding:14px 18px; margin-top:14px; }
     .afecta h4 { font-size:.85rem; font-weight:800; color:var(--navy); margin:0 0 8px; }
     .afecta ul { margin:0; padding-left:18px; font-size:.8rem; color:#475569; line-height:1.7; }
@@ -116,17 +124,76 @@
           </div>
         </div>
 
+        <div class="card-af" style="border-top:4px solid #d97706">
+          <h3><i class="bi bi-code-slash"></i>Modo Desarrollo</h3>
+          <div class="sub">Al activar, <b>todas las comunicaciones</b> (correo; a futuro WhatsApp) se redirigen a los correos de prueba: <b>no se envían mails a clientes, dealers ni proveedores</b>. Además aparece una cinta <b>DESARROLLO</b> sobre el logo en todas las páginas.</div>
+          <div class="sw-row">
+            <label class="switch dev"><input type="checkbox" id="devActivo" onchange="onDevSwitch()"><span class="slider"></span></label>
+            <span class="sw-estado off" id="devTxt">Desactivado</span>
+          </div>
+          <label class="lbl" style="margin-top:10px">Correos de destino (a dónde se redirige todo)</label>
+          <div id="devCorreos"></div>
+          <div style="font-size:.74rem;color:#94a3b8;margin-top:2px">Cada correo puede ir como <b>Para</b>, <b>CC</b> o <b>CCO</b> (copia oculta). Deja en blanco los que no uses.</div>
+          <label class="lbl" style="margin-top:14px"><i class="bi bi-whatsapp"></i> WhatsApp de prueba (se usará cuando WhatsApp esté activo)</label>
+          <input type="text" id="devWa" class="inp" placeholder="+56 9 1234 5678">
+          <div style="margin-top:16px;display:flex;justify-content:flex-end">
+            <button class="btn-primary-af" style="background:#d97706" onclick="guardarDev()"><i class="bi bi-save me-1"></i>Guardar Modo Desarrollo</button>
+          </div>
+        </div>
+
         <div class="afecta">
           <h4><i class="bi bi-diagram-3"></i> Qué afecta este mantenedor</h4>
           <ul>
             <li><b>Switch de mantención</b> → cuando está activo, <b>todos los usuarios</b> (excepto BG-ADMIN) ven un aviso centrado al ingresar o cambiar de pantalla, en cualquier página del sistema.</li>
             <li><b>Mensaje</b> → el texto que aparece en ese aviso.</li>
-            <li><b>Acceso</b> → este mantenedor y la activación son <b>exclusivos de BG-ADMIN</b>; ningún otro usuario (ni Administrador) puede verlo ni activarlo.</li>
+            <li><b>Modo Desarrollo</b> → cuando está activo, <b>todo correo del sistema</b> (cartas, comprobantes, alertas, claves, ODP, etc.) se <b>redirige a los correos de prueba</b> con un aviso del destinatario original; y se muestra la cinta <b>DESARROLLO</b> sobre el logo en todas las páginas. <a href="/usuarios">Prueba de correo</a> también se redirige.</li>
+            <li><b>Acceso</b> → este mantenedor y ambas activaciones son <b>exclusivos de BG-ADMIN</b>; ningún otro usuario (ni Administrador) puede verlo ni activarlo.</li>
           </ul>
         </div>`;
       document.getElementById('swActivo').checked = !!j.data.activo;
       document.getElementById('msg').value = j.data.mensaje || 'AVISO. El sistema se encuentra en Mantención.';
       onSwitch(); renderPreview();
+      cargarDev();
+    }
+
+    /* ── Modo Desarrollo ── */
+    async function cargarDev(){
+      let d = { activo:false, correos:[], whatsapp:'' };
+      try { const r = await fetch('/api/mantenimiento/dev', { headers:H }); const j = await r.json(); if (j.success) d = j.data; }
+      catch(_){}
+      document.getElementById('devActivo').checked = !!d.activo;
+      document.getElementById('devWa').value = d.whatsapp || '';
+      renderDevRows(d.correos || []);
+      onDevSwitch();
+    }
+    function renderDevRows(correos){
+      const roles = [['to','Para'],['cc','CC'],['bcc','CCO (oculto)']];
+      document.getElementById('devCorreos').innerHTML = [0,1,2].map(i => {
+        const c = correos[i] || { email:'', rol: i===0?'to':i===1?'cc':'bcc' };
+        return `<div class="dev-row">
+          <input type="email" class="inp" id="devMail${i}" value="${esc(c.email)}" placeholder="correo${i+1}@ejemplo.cl">
+          <select id="devRol${i}">${roles.map(([v,l])=>`<option value="${v}" ${c.rol===v?'selected':''}>${l}</option>`).join('')}</select>
+        </div>`;
+      }).join('');
+    }
+    function onDevSwitch(){
+      const on = document.getElementById('devActivo').checked;
+      const t = document.getElementById('devTxt');
+      t.textContent = on ? 'ACTIVADO' : 'Desactivado';
+      t.className = 'sw-estado dev ' + (on ? 'on' : 'off');
+    }
+    async function guardarDev(){
+      const activo = document.getElementById('devActivo').checked;
+      const correos = [0,1,2].map(i => ({ email: document.getElementById('devMail'+i).value, rol: document.getElementById('devRol'+i).value }));
+      const whatsapp = document.getElementById('devWa').value;
+      try {
+        const r = await fetch('/api/mantenimiento/dev', { method:'PUT', headers:H, body:JSON.stringify({ activo, correos, whatsapp }) });
+        const j = await r.json();
+        if (!j.success) return toast(j.error||'Error', false);
+        toast(activo ? 'Modo Desarrollo ACTIVADO' : 'Modo Desarrollo desactivado');
+        document.getElementById('devActivo').checked = !!j.data.activo;
+        renderDevRows(j.data.correos || []); onDevSwitch();
+      } catch(_){ toast('Error de conexión', false); }
     }
 
     function onSwitch(){

@@ -2,7 +2,7 @@
    AutoFácil — Versión global de la aplicación
    Editar SOLO este archivo para cambiar la versión
    ───────────────────────────────────────────── */
-const APP_VERSION = 'v52.8';
+const APP_VERSION = 'v52.9';
 
 document.addEventListener('DOMContentLoaded', () => {
 
@@ -912,11 +912,23 @@ document.addEventListener('DOMContentLoaded', () => {
 document.addEventListener('DOMContentLoaded', async () => {
   const token = sessionStorage.getItem('token');
   if (!token) return;                                          // sin sesión (login)
+  // Cinta "DESARROLLO" diagonal sobre el logo cuando el Modo Desarrollo está activo.
+  function afMostrarCintaDesarrollo() {
+    if (document.getElementById('afDevRibbon')) return;
+    const st = document.createElement('style');
+    st.textContent = `#afDevRibbon{position:fixed;top:13px;left:-46px;z-index:100000;transform:rotate(-45deg);background:#f59e0b;color:#1f2937;font-weight:800;font-size:10px;letter-spacing:2px;padding:4px 54px;box-shadow:0 2px 8px rgba(0,0,0,.4);pointer-events:none;font-family:'Segoe UI',system-ui,sans-serif;border-top:1px solid #fcd34d;border-bottom:1px solid #b45309}`;
+    document.head.appendChild(st);
+    const d = document.createElement('div'); d.id = 'afDevRibbon'; d.textContent = 'DESARROLLO';
+    document.body.appendChild(d);
+  }
+
   let data;
   try {
     const r = await fetch('/api/mantenimiento', { headers: { Authorization: 'Bearer ' + token } });
     const j = await r.json();
-    if (!j.success || !j.data.activo || j.data.es_bg) return;  // BG-ADMIN (servidor) no ve el aviso
+    if (!j.success) return;
+    if (j.data.dev_activo) afMostrarCintaDesarrollo();         // cinta DESARROLLO (independiente de la mantención)
+    if (!j.data.activo || j.data.es_bg) return;                // overlay solo si mantención activa y no BG-ADMIN
     data = j.data;
   } catch (e) { return; }                                      // si falla, no bloquea
 

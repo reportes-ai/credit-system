@@ -16,6 +16,13 @@ const MSG_DEFAULT = 'AVISO. El sistema se encuentra en Mantención.';
     await pool.query(`CREATE TABLE IF NOT EXISTS mantenimiento_config (
       clave VARCHAR(40) PRIMARY KEY, valor TEXT )`);
     await pool.query("INSERT IGNORE INTO mantenimiento_config (clave, valor) VALUES ('activo','0'), ('mensaje', ?)", [MSG_DEFAULT]);
+    // Modo DESARROLLO: redirige TODAS las comunicaciones a correos de prueba (no salen a clientes/dealers/proveedores).
+    await pool.query(`INSERT IGNORE INTO mantenimiento_config (clave, valor) VALUES
+      ('dev_activo','0'),
+      ('dev_correo1',''),('dev_correo1_rol','to'),
+      ('dev_correo2',''),('dev_correo2_rol','cc'),
+      ('dev_correo3',''),('dev_correo3_rol','bcc'),
+      ('dev_whatsapp','')`);
   } catch (e) { console.error('[mantenimiento migration]', e.message); }
 })();
 
@@ -30,13 +37,58 @@ async function leerConfig() {
   return { activo: m.activo === '1', mensaje: m.mensaje || MSG_DEFAULT };
 }
 
+// Config del Modo Desarrollo (3 correos con rol to/cc/bcc + whatsapp de prueba).
+async function leerDev() {
+  const [rows] = await pool.query("SELECT clave, valor FROM mantenimiento_config WHERE clave LIKE 'dev_%'");
+  const m = {}; rows.forEach(r => { m[r.clave] = r.valor; });
+  const def = { 1: 'to', 2: 'cc', 3: 'bcc' };
+  const correos = [1, 2, 3].map(i => ({
+    email: m['dev_correo' + i] || '',
+    rol:   (m['dev_correo' + i + '_rol'] || def[i]).toLowerCase(),
+  }));
+  return { activo: m.dev_activo === '1', correos, whatsapp: m.dev_whatsapp || '' };
+}
+
 /* GET /api/mantenimiento → { activo, mensaje, es_bg }. El mensaje en reposo solo va a BG-ADMIN. */
 const getEstado = async (req, res) => {
   try {
     const cfg = await leerConfig();
     const bg = await esBreakGlass(req.usuario.id_usuario);
-    res.json({ success: true, data: { activo: cfg.activo, mensaje: (cfg.activo || bg) ? cfg.mensaje : '', es_bg: bg }, error: null });
+    const dev = await leerDev();
+    res.json({ success: true, data: { activo: cfg.activo, mensaje: (cfg.activo || bg) ? cfg.mensaje : '', es_bg: bg, dev_activo: dev.activo }, error: null });
   } catch (e) { console.error('[mantenimiento getEstado]', e.message); res.status(500).json({ success: false, data: null, error: 'Error interno del servidor' }); }
+};
+
+/* GET /api/mantenimiento/dev → config del Modo Desarrollo. SOLO BG-ADMIN. */
+const getDev = async (req, res) => {
+  try {
+    if (!(await esBreakGlass(req.usuario.id_usuario)))
+      return res.status(403).json({ success: false, data: null, error: 'Solo BG-ADMIN puede ver el Modo Desarrollo.' });
+    res.json({ success: true, data: await leerDev(), error: null });
+  } catch (e) { console.error('[mantenimiento getDev]', e.message); res.status(500).json({ success: false, data: null, error: 'Error interno del servidor' }); }
+};
+
+/* PUT /api/mantenimiento/dev → activa/edita Modo Desarrollo. SOLO BG-ADMIN. */
+const setDev = async (req, res) => {
+  try {
+    if (!(await esBreakGlass(req.usuario.id_usuario)))
+      return res.status(403).json({ success: false, data: null, error: 'Solo BG-ADMIN puede modificar el Modo Desarrollo.' });
+    const b = req.body || {};
+    const activo = b.activo ? '1' : '0';
+    const correos = Array.isArray(b.correos) ? b.correos : [];
+    const okMail = e => { e = String(e || '').trim().slice(0, 200); return /^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(e) ? e : ''; };
+    const okRol  = r => ['to', 'cc', 'bcc'].includes(String(r || '').toLowerCase()) ? String(r).toLowerCase() : 'to';
+    const norm   = [0, 1, 2].map(i => ({ email: okMail((correos[i] || {}).email), rol: okRol((correos[i] || {}).rol) }));
+    if (activo === '1' && !norm.some(c => c.email))
+      return res.status(400).json({ success: false, data: null, error: 'Configura al menos un correo de destino para activar el Modo Desarrollo.' });
+    const setKv = (k, v) => pool.query("INSERT INTO mantenimiento_config (clave, valor) VALUES (?, ?) ON DUPLICATE KEY UPDATE valor = VALUES(valor)", [k, v]);
+    await setKv('dev_activo', activo);
+    for (let i = 0; i < 3; i++) { await setKv('dev_correo' + (i + 1), norm[i].email); await setKv('dev_correo' + (i + 1) + '_rol', norm[i].rol); }
+    await setKv('dev_whatsapp', String(b.whatsapp || '').trim().slice(0, 30));
+    auditar({ req, accion: 'EDITAR', modulo: 'mantenedores', entidad: 'modo_desarrollo', entidad_id: 'config',
+      detalle: `Modo Desarrollo ${activo === '1' ? 'ACTIVADO' : 'desactivado'}`, meta: { activo, correos: norm.filter(c => c.email).map(c => c.email + '(' + c.rol + ')') } });
+    res.json({ success: true, data: await leerDev(), error: null });
+  } catch (e) { console.error('[mantenimiento setDev]', e.message); res.status(500).json({ success: false, data: null, error: 'Error interno del servidor' }); }
 };
 
 /* PUT /api/mantenimiento → activa/desactiva + mensaje. SOLO BG-ADMIN. */
@@ -55,4 +107,4 @@ const setEstado = async (req, res) => {
   } catch (e) { console.error('[mantenimiento setEstado]', e.message); res.status(500).json({ success: false, data: null, error: 'Error interno del servidor' }); }
 };
 
-module.exports = { getEstado, setEstado };
+module.exports = { getEstado, setEstado, getDev, setDev };
