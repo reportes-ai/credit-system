@@ -737,29 +737,45 @@ const getOrdenPago = async (req, res) => {
   }
 };
 
+/* ── Asegura la Orden de Pago de SALDO PRECIO: crea (si falta) la fila en
+ *    postventa_ordenes y su correlativo global en op_correlativos. Idempotente.
+ *    Así, marcar "ORDEN DE PAGO EMITIDA" SIEMPRE registra la orden en el módulo
+ *    Órdenes de Pago. Devuelve num_orden o null si la operación no existe. ── */
+async function asegurarOrdenSaldo(id, reqUsuario) {
+  const [[ya]] = await pool.query('SELECT id, num_orden FROM postventa_ordenes WHERE id_seguimiento=?', [id]);
+  if (ya && ya.num_orden) return ya.num_orden;
+  const [[seg]] = await pool.query('SELECT num_op, saldo_precio FROM postventa_seguimiento WHERE id=?', [id]);
+  if (!seg) return null;
+  let poId = ya && ya.id;
+  if (!poId) {
+    try {
+      const [ins] = await pool.query(
+        'INSERT INTO postventa_ordenes (id_seguimiento, num_op, monto, usuario) VALUES (?,?,?,?)',
+        [id, seg.num_op, seg.saldo_precio, loginDe(reqUsuario)]);
+      poId = ins.insertId;
+    } catch (e) {
+      if (e.code !== 'ER_DUP_ENTRY') throw e;
+      const [[r]] = await pool.query('SELECT id, num_orden FROM postventa_ordenes WHERE id_seguimiento=?', [id]);
+      if (r && r.num_orden) return r.num_orden;
+      poId = r && r.id;
+    }
+  }
+  const { numero } = await emitirCorrelativo({
+    origen: 'SALDO', origen_id: poId, concepto: 'Saldo Precio OP ' + (seg.num_op || ''),
+    monto: seg.saldo_precio, id_usuario: reqUsuario && reqUsuario.id_usuario, usuario_nombre: loginDe(reqUsuario) });
+  await pool.query('UPDATE postventa_ordenes SET num_orden=? WHERE id=?', [numero, poId]);
+  return numero;
+}
+
 /* ── GET /api/postventa/orden-pago/:id/correlativo — crea o devuelve el N° de orden ── */
 const correlativoOrden = async (req, res) => {
   const id = Number(req.params.id);
   try {
     if (!id) return res.status(400).json({ success: false, data: null, error: 'id inválido' });
-    const [[ya]] = await pool.query('SELECT num_orden FROM postventa_ordenes WHERE id_seguimiento=?', [id]);
-    if (ya) return res.json({ success: true, data: { num_orden: ya.num_orden }, error: null });
-    const [[seg]] = await pool.query('SELECT num_op, saldo_precio FROM postventa_seguimiento WHERE id=?', [id]);
-    if (!seg) return res.status(404).json({ success: false, data: null, error: 'Operación no encontrada' });
-    const [ins] = await pool.query(
-      'INSERT INTO postventa_ordenes (id_seguimiento, num_op, monto, usuario) VALUES (?,?,?,?)',
-      [id, seg.num_op, seg.saldo_precio, loginDe(req.usuario)]);
-    // Correlativo global único ODP- (libro central op_correlativos)
-    const { numero: num } = await emitirCorrelativo({
-      origen: 'SALDO', origen_id: ins.insertId, concepto: 'Saldo Precio OP ' + (seg.num_op || ''),
-      monto: seg.saldo_precio, id_usuario: req.usuario && req.usuario.id_usuario, usuario_nombre: loginDe(req.usuario) });
-    await pool.query('UPDATE postventa_ordenes SET num_orden=? WHERE id=?', [num, ins.insertId]);
+    const num = await asegurarOrdenSaldo(id, req.usuario);
+    if (!num) return res.status(404).json({ success: false, data: null, error: 'Operación no encontrada' });
     res.json({ success: true, data: { num_orden: num }, error: null });
   } catch (e) {
-    if (e.code === 'ER_DUP_ENTRY') {
-      const [[row]] = await pool.query('SELECT num_orden FROM postventa_ordenes WHERE id_seguimiento=?', [id]);
-      if (row) return res.json({ success: true, data: { num_orden: row.num_orden }, error: null });
-    }
     console.error('[postventa correlativoOrden]', e.message);
     res.status(500).json({ success: false, data: null, error: 'Error interno del servidor' });
   }
@@ -775,6 +791,7 @@ const emitirOrdenPago = async (req, res) => {
     // Marca ORDEN DE PAGO EMITIDA (y FONDOS RECIBIDOS por si faltara, para mantener secuencia)
     const vals = [];
     for (const id of ids) {
+      await asegurarOrdenSaldo(id, req.usuario);   // crea orden + correlativo si falta → aparece en módulo Órdenes de Pago
       vals.push([id, 'SALDO', 'FONDOS RECIBIDOS', usuario]);
       vals.push([id, 'SALDO', 'ORDEN DE PAGO EMITIDA', usuario]);
     }
@@ -1012,29 +1029,43 @@ const getOrdenPagoComision = async (req, res) => {
   }
 };
 
+/* ── Asegura la Orden de Pago de COMISIÓN (postventa_ordenes_comision + correlativo).
+ *    Idempotente. Devuelve num_orden o null. ── */
+async function asegurarOrdenComision(id, reqUsuario) {
+  const [[ya]] = await pool.query('SELECT id, num_orden FROM postventa_ordenes_comision WHERE id_seguimiento=?', [id]);
+  if (ya && ya.num_orden) return ya.num_orden;
+  const [[seg]] = await pool.query('SELECT num_op, comision FROM postventa_seguimiento WHERE id=?', [id]);
+  if (!seg) return null;
+  let poId = ya && ya.id;
+  if (!poId) {
+    try {
+      const [ins] = await pool.query(
+        'INSERT INTO postventa_ordenes_comision (id_seguimiento, num_op, monto, usuario) VALUES (?,?,?,?)',
+        [id, seg.num_op, seg.comision, loginDe(reqUsuario)]);
+      poId = ins.insertId;
+    } catch (e) {
+      if (e.code !== 'ER_DUP_ENTRY') throw e;
+      const [[r]] = await pool.query('SELECT id, num_orden FROM postventa_ordenes_comision WHERE id_seguimiento=?', [id]);
+      if (r && r.num_orden) return r.num_orden;
+      poId = r && r.id;
+    }
+  }
+  const { numero } = await emitirCorrelativo({
+    origen: 'COMISION', origen_id: poId, concepto: 'Comisión OP ' + (seg.num_op || ''),
+    monto: seg.comision, id_usuario: reqUsuario && reqUsuario.id_usuario, usuario_nombre: loginDe(reqUsuario) });
+  await pool.query('UPDATE postventa_ordenes_comision SET num_orden=? WHERE id=?', [numero, poId]);
+  return numero;
+}
+
 /* ── GET /api/postventa/orden-pago-comision/:id/correlativo ── */
 const correlativoOrdenComision = async (req, res) => {
   const id = Number(req.params.id);
   try {
     if (!id) return res.status(400).json({ success: false, data: null, error: 'id inválido' });
-    const [[ya]] = await pool.query('SELECT num_orden FROM postventa_ordenes_comision WHERE id_seguimiento=?', [id]);
-    if (ya) return res.json({ success: true, data: { num_orden: ya.num_orden }, error: null });
-    const [[seg]] = await pool.query('SELECT num_op, comision FROM postventa_seguimiento WHERE id=?', [id]);
-    if (!seg) return res.status(404).json({ success: false, data: null, error: 'Operación no encontrada' });
-    const [ins] = await pool.query(
-      'INSERT INTO postventa_ordenes_comision (id_seguimiento, num_op, monto, usuario) VALUES (?,?,?,?)',
-      [id, seg.num_op, seg.comision, loginDe(req.usuario)]);
-    // Correlativo global único ODP- (libro central op_correlativos)
-    const { numero: num } = await emitirCorrelativo({
-      origen: 'COMISION', origen_id: ins.insertId, concepto: 'Comisión OP ' + (seg.num_op || ''),
-      monto: seg.comision, id_usuario: req.usuario && req.usuario.id_usuario, usuario_nombre: loginDe(req.usuario) });
-    await pool.query('UPDATE postventa_ordenes_comision SET num_orden=? WHERE id=?', [num, ins.insertId]);
+    const num = await asegurarOrdenComision(id, req.usuario);
+    if (!num) return res.status(404).json({ success: false, data: null, error: 'Operación no encontrada' });
     res.json({ success: true, data: { num_orden: num }, error: null });
   } catch (e) {
-    if (e.code === 'ER_DUP_ENTRY') {
-      const [[row]] = await pool.query('SELECT num_orden FROM postventa_ordenes_comision WHERE id_seguimiento=?', [id]);
-      if (row) return res.json({ success: true, data: { num_orden: row.num_orden }, error: null });
-    }
     console.error('[postventa correlativoOrdenComision]', e.message);
     res.status(500).json({ success: false, data: null, error: 'Error interno del servidor' });
   }
@@ -1049,6 +1080,7 @@ const emitirOrdenPagoComision = async (req, res) => {
     const usuario = loginDe(req.usuario);
     const vals = [];
     for (const id of ids) {
+      await asegurarOrdenComision(id, req.usuario);   // crea orden + correlativo si falta → aparece en módulo Órdenes de Pago
       vals.push([id, 'COMISION', 'FACTURA RECIBIDA', usuario]);
       vals.push([id, 'COMISION', 'ORDEN DE PAGO EMITIDA', usuario]);
     }
