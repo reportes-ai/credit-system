@@ -18,7 +18,8 @@ const { auditar } = require('../../../../shared/audit');
 const { tieneFunc } = require('../../../../shared/middleware/permisos');
 const { notificar } = require('../../../notificaciones/src/controllers/notificaciones.controller');
 
-const MODULO_ID = 420001;   // 410001 era Certificados (colisión corregida)
+const MODULO_ID = 420001;    // card "Seguimiento Fundantes" (ejecutivo) — 410001 era Certificados
+const MODULO_OPS = 420002;   // card "Seguimiento Fundantes - Operaciones" (módulo propio → card en Home)
 const FINANCIERAS = ['AUTOFIN', 'UNIDAD DE CREDITO'];          // brokerage (configurable vía seed de tipos)
 const ESTADOS = ['PENDIENTE', 'ENVIADO', 'CERRADO', 'RECHAZADO'];
 // Buckets de antigüedad (días pendientes) para la matriz resumen.
@@ -77,26 +78,31 @@ const bucketDe = d => BUCKETS.findIndex(b => d <= b.max);
     // Corrección: en AUTOFIN la Solicitud de Limitación es SIEMPRE obligatoria (no condicional). Idempotente.
     await pool.query("UPDATE fundantes_seg_tipos SET obligatorio=1, requiere_contrato=NULL WHERE financiera='AUTOFIN' AND codigo='SOL_LIMITACION'");
 
-    // Registro del módulo/card en Home (idempotente).
+    // Registro de los módulos/cards en Home (idempotentes). Dos cards: ejecutivo y Operaciones.
     await pool.query(
       `INSERT IGNORE INTO modulos (id_modulo, nombre, descripcion, icono, ruta, orden, estado)
-       VALUES (?, 'Seguimiento Fundantes', 'Carga y validación de los documentos fundantes de operaciones otorgadas (contrato de compraventa, transferencia, limitación, GPS): el ejecutivo los sube y Operaciones los valida', 'bi-folder-check', '/fundantes-seguimiento/', 108, 'activo')`,
+       VALUES (?, 'Seguimiento Fundantes', 'Carga de los documentos fundantes de cada operación otorgada (contrato de compraventa, transferencia, limitación, GPS) y envío a validación', 'bi-folder-check', '/fundantes-seguimiento/', 108, 'activo')`,
       [MODULO_ID]);
-    // Corrección: si una versión previa creó estas funcionalidades bajo otro módulo (410001=Certificados),
-    // re-engancharlas al módulo correcto. Idempotente.
+    await pool.query(
+      `INSERT IGNORE INTO modulos (id_modulo, nombre, descripcion, icono, ruta, orden, estado)
+       VALUES (?, 'Seguimiento Fundantes - Operaciones', 'Revisión y validación por Operaciones de los fundantes enviados: visor 1 a 1, descarga total, aprobar o rechazar', 'bi-inboxes', '/fundantes-operaciones/', 109, 'activo')`,
+      [MODULO_OPS]);
+    // Corrección idempotente: re-enganchar las funcionalidades a su módulo correcto
+    // (versiones previas las dejaron bajo 410001=Certificados o todas bajo 420001).
     await pool.query("UPDATE funcionalidades SET id_modulo=? WHERE codigo IN ('fundantes_seguimiento','fundantes_validar')", [MODULO_ID]);
+    await pool.query("UPDATE funcionalidades SET id_modulo=? WHERE codigo='fundantes_operaciones'", [MODULO_OPS]);
     const funcs = [
-      ['Seguimiento Fundantes', 'fundantes_seguimiento', '/fundantes-seguimiento/', 'bi-folder-check'],
-      ['Seguimiento Fundantes - Operaciones', 'fundantes_operaciones', '/fundantes-operaciones/', 'bi-inboxes'],
-      ['Validar Fundantes', 'fundantes_validar', null, 'bi-check2-circle'],
+      [MODULO_ID,  'Seguimiento Fundantes', 'fundantes_seguimiento', '/fundantes-seguimiento/', 'bi-folder-check'],
+      [MODULO_OPS, 'Seguimiento Fundantes - Operaciones', 'fundantes_operaciones', '/fundantes-operaciones/', 'bi-inboxes'],
+      [MODULO_ID,  'Validar Fundantes', 'fundantes_validar', null, 'bi-check2-circle'],
     ];
     const idFunc = {};
-    for (const [nombre, codigo, href, icono] of funcs) {
+    for (const [idMod, nombre, codigo, href, icono] of funcs) {
       const [[ex]] = await pool.query('SELECT id_funcionalidad FROM funcionalidades WHERE codigo=? LIMIT 1', [codigo]);
       if (ex) { idFunc[codigo] = ex.id_funcionalidad; continue; }
       const [r] = await pool.query(
         `INSERT INTO funcionalidades (id_modulo, nombre, codigo, href, icono) VALUES (?,?,?,?,?)`,
-        [MODULO_ID, nombre, codigo, href, icono]);
+        [idMod, nombre, codigo, href, icono]);
       idFunc[codigo] = r.insertId;
     }
     for (const codigo of Object.keys(idFunc)) {
