@@ -942,7 +942,7 @@ exports.calcularCobranza = async (req, res) => {
     }
 
     // Interés por mora: por día con la TMC mensual vigente del tramo del crédito
-    const [tasas] = await pool.query('SELECT fecha_desde, fecha_hasta, tasa_mensual_menor, tasa_mensual_mayor FROM tasas');
+    const [tasas] = await pool.query("SELECT DATE_FORMAT(fecha_desde,'%Y-%m-%d') fecha_desde, DATE_FORMAT(fecha_hasta,'%Y-%m-%d') fecha_hasta, tasa_mensual_menor, tasa_mensual_mayor FROM tasas");
     const interes = calcularInteresMora(cuota, fechaVenc, fechaCalc, tramo, tasas);
 
     const total = cuota + (gasto.gasto_pesos || 0) + (interes.interes || 0);
@@ -969,7 +969,7 @@ exports.calcularCobranzaLote = async (req, res) => {
     const cfg = await getCobranzaConfig();
     const gastosDias = Number(cfg.gastos_dias) || 21;
     let tramos = []; try { tramos = JSON.parse(cfg.tramos_uf); } catch (_) {}
-    const [tasas] = await pool.query('SELECT fecha_desde, fecha_hasta, tasa_mensual_menor, tasa_mensual_mayor FROM tasas');
+    const [tasas] = await pool.query("SELECT DATE_FORMAT(fecha_desde,'%Y-%m-%d') fecha_desde, DATE_FORMAT(fecha_hasta,'%Y-%m-%d') fecha_hasta, tasa_mensual_menor, tasa_mensual_mayor FROM tasas");
 
     // Tramo del crédito: saldo precio (o monto financiado) vs umbral × UF de la fecha de otorgamiento
     let tramo = 'menor';

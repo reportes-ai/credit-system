@@ -402,7 +402,7 @@ async function armar(tipo, body) {
     const cfg = await COB.getCobranzaConfig();
     const gastosDias = Number(cfg.gastos_dias) || 21;
     let tramosUF = []; try { tramosUF = JSON.parse(cfg.tramos_uf); } catch (_) {}
-    const [tasasMora] = await pool.query('SELECT fecha_desde, fecha_hasta, tasa_mensual_menor, tasa_mensual_mayor FROM tasas');
+    const [tasasMora] = await pool.query("SELECT DATE_FORMAT(fecha_desde,'%Y-%m-%d') fecha_desde, DATE_FORMAT(fecha_hasta,'%Y-%m-%d') fecha_hasta, tasa_mensual_menor, tasa_mensual_mayor FROM tasas");
     // Tramo del crédito (menor/mayor 200 UF) = saldo precio vs umbral × UF de otorgamiento
     let tramo = 'menor';
     try {
