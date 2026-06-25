@@ -55,7 +55,7 @@
     .doc-subir { background:#eff6ff; color:#1d4ed8; border:1px solid #bfdbfe; border-radius:7px; padding:4px 10px; font-size:.74rem; font-weight:700; cursor:pointer; }
     .doc-subir.opc { background:#f8fafc; color:#64748b; border-color:#e2e8f0; }
     .doc-up { color:var(--green); font-weight:800; font-size:.76rem; cursor:pointer; text-decoration:none; }
-    .doc-re { color:#64748b; cursor:pointer; font-size:.85rem; margin-left:3px; text-decoration:none; }
+    .doc-re { background:#fff7ed; color:#9a3412; border:1px solid #fed7aa; border-radius:6px; padding:2px 8px; font-size:.68rem; font-weight:700; cursor:pointer; margin-left:5px; display:inline-flex; align-items:center; gap:3px; }
     .btn-env { background:linear-gradient(135deg,#0255c5,#0141A2); color:#fff; border:none; border-radius:7px; padding:5px 13px; font-size:.76rem; font-weight:800; cursor:pointer; }
     .btn-ap { background:linear-gradient(135deg,#16a34a,#15803d); color:#fff; border:none; border-radius:7px; padding:4px 10px; font-size:.74rem; font-weight:700; cursor:pointer; }
     .btn-rc { background:#fff1f2; color:#991b1b; border:1px solid #fca5a5; border-radius:7px; padding:4px 10px; font-size:.74rem; font-weight:700; cursor:pointer; }
@@ -86,7 +86,8 @@
 <script>
   window.AF_TOPNAV = { breadcrumb: [
     { label:'Inicio', href:'/' },
-    { label:'Seguimiento Fundantes', icon:'bi-folder-check', current:true }
+    { label:'Seguimiento Fundantes', href:'/fundantes/' },
+    { label:'Ejecutivo Comercial', icon:'bi-folder-check', current:true }
   ] };
 </script>
 
@@ -209,7 +210,7 @@ function celdaDoc(row, codigo){
   if (!d) return `<td class="cell-na">—</td>`;                       // no aplica a esta financiera
   const editable = (row.estado==='PENDIENTE' || row.estado==='RECHAZADO');
   if (d.subido) {
-    const re = editable ? ` <a class="doc-re" title="Reemplazar" onclick="subir(${row.id_credito},'${codigo}')">↺</a>` : '';
+    const re = editable ? ` <button class="doc-re" title="Subir uno nuevo en su lugar" onclick="subir(${row.id_credito},'${codigo}')"><i class="bi bi-arrow-repeat"></i> Reemplazar</button>` : '';
     return `<td><a class="doc-up" onclick="verDoc(${d.doc_id})"><i class="bi bi-check-circle-fill"></i> Subido</a>${re}</td>`;
   }
   if (editable) return `<td><button class="doc-subir ${d.obligatorio?'':'opc'}" onclick="subir(${row.id_credito},'${codigo}')">Subir${d.obligatorio?'':' (opc.)'}</button></td>`;

@@ -1,0 +1,87 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <link rel="icon" href="/img/favicon.png" type="image/png">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Seguimiento Fundantes — AutoFácil</title>
+  <link href="/css/bootstrap-icons.css" rel="stylesheet">
+  <style>
+    :root { --navy:#0141A2; --navy-dark:#012d70; --accent:#009AFE; --bg:#f0f4f8; }
+    * { box-sizing:border-box; }
+    body { background:var(--bg); font-family:'Segoe UI',system-ui,sans-serif; margin:0; min-height:100vh; color:#1e293b; }
+    .page { max-width:1100px; margin:0 auto; padding:26px 24px 80px; }
+    .page-banner { background:linear-gradient(135deg,#012d70,#0141A2 50%,#009AFE); border-radius:16px; color:#fff; padding:22px 30px; margin-bottom:24px; display:flex; align-items:center; gap:18px; }
+    .page-banner i { font-size:2.4rem; opacity:.85; }
+    .page-banner h2 { font-weight:800; margin:0 0 3px; font-size:1.3rem; }
+    .page-banner p { opacity:.85; margin:0; font-size:.88rem; }
+    .cards { display:grid; grid-template-columns:repeat(auto-fit,minmax(300px,1fr)); gap:18px; }
+    .module-card { background:#fff; border-radius:16px; box-shadow:0 1px 6px rgba(0,0,0,.08); padding:26px 24px; text-decoration:none; color:inherit; display:flex; flex-direction:column; gap:10px; border:1.5px solid transparent; transition:.15s; }
+    .module-card:hover { border-color:#bfdbfe; transform:translateY(-2px); box-shadow:0 8px 24px rgba(1,65,162,.12); }
+    .card-icon { width:54px; height:54px; border-radius:14px; background:linear-gradient(135deg,#eff6ff,#dbeafe); display:flex; align-items:center; justify-content:center; }
+    .card-icon i { font-size:1.7rem; color:var(--navy); }
+    .module-card h6 { margin:6px 0 0; font-size:1.08rem; font-weight:800; color:var(--navy-dark); }
+    .module-card p { margin:0; font-size:.86rem; color:#64748b; line-height:1.45; }
+    .btn-acceder { margin-top:8px; font-size:.82rem; font-weight:700; color:var(--navy); display:inline-flex; align-items:center; gap:6px; }
+    .empty { text-align:center; color:#94a3b8; padding:50px 0; }
+  </style>
+</head>
+<body>
+
+<div id="af-topnav"></div>
+<script>
+  window.AF_TOPNAV = { breadcrumb: [
+    { label:'Inicio', href:'/' },
+    { label:'Seguimiento Fundantes', icon:'bi-folder-check', current:true }
+  ] };
+</script>
+
+<div class="page">
+  <div class="page-banner">
+    <i class="bi bi-folder-check"></i>
+    <div>
+      <h2>Seguimiento Fundantes</h2>
+      <p>Documentos fundantes de las operaciones otorgadas: el ejecutivo los carga y Operaciones los valida.</p>
+    </div>
+  </div>
+
+  <div class="cards" id="cards">
+    <a href="/fundantes-seguimiento/" class="module-card" id="cardEjec" style="display:none">
+      <div class="card-icon"><i class="bi bi-folder-check"></i></div>
+      <h6>Seguimiento Fundantes - Ejecutivo Comercial</h6>
+      <p>Carga los documentos fundantes de tus operaciones otorgadas y envíalos a validación.</p>
+      <span class="btn-acceder"><i class="bi bi-arrow-right-circle"></i> Acceder</span>
+    </a>
+    <a href="/fundantes-operaciones/" class="module-card" id="cardOps" style="display:none">
+      <div class="card-icon"><i class="bi bi-inboxes"></i></div>
+      <h6>Seguimiento Fundantes - Operaciones</h6>
+      <p>Revisa los fundantes enviados 1 a 1, descárgalos y apruébalos o recházalos.</p>
+      <span class="btn-acceder"><i class="bi bi-arrow-right-circle"></i> Acceder</span>
+    </a>
+  </div>
+  <div class="empty" id="vacio" style="display:none">No tienes acceso a submódulos de Seguimiento Fundantes.</div>
+</div>
+
+<script src="/js/auth-guard.js"></script>
+<script>
+const token = sessionStorage.getItem('token');
+const yo = JSON.parse(sessionStorage.getItem('usuario') || 'null');
+if (!token || !yo) location.href = '/login.html';
+(async () => {
+  let funcs = new Set();
+  try {
+    const j = await (await fetch('/api/auth/mis-permisos?_=' + Date.now(), { cache:'no-store', headers:{ Authorization:'Bearer ' + token } })).json();
+    (j.funcionalidades || []).forEach(c => funcs.add(c));
+  } catch (e) {}
+  const esAdmin = yo?.perfil === 'Administrador';
+  const tiene = c => esAdmin || funcs.has(c);
+  let alguna = false;
+  if (tiene('fundantes_seguimiento')) { document.getElementById('cardEjec').style.display = ''; alguna = true; }
+  if (tiene('fundantes_operaciones') || tiene('fundantes_validar')) { document.getElementById('cardOps').style.display = ''; alguna = true; }
+  if (!alguna) document.getElementById('vacio').style.display = '';
+})();
+</script>
+<script src="/js/topnav.js"></script>
+<script src="/js/app-version.js"></script>
+</body>
+</html>

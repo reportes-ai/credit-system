@@ -78,31 +78,32 @@ const bucketDe = d => BUCKETS.findIndex(b => d <= b.max);
     // Corrección: en AUTOFIN la Solicitud de Limitación es SIEMPRE obligatoria (no condicional). Idempotente.
     await pool.query("UPDATE fundantes_seg_tipos SET obligatorio=1, requiere_contrato=NULL WHERE financiera='AUTOFIN' AND codigo='SOL_LIMITACION'");
 
-    // Registro de los módulos/cards en Home (idempotentes). Dos cards: ejecutivo y Operaciones.
+    // Card PADRE única en Home → landing /fundantes/ con 2 sub-cards (Ejecutivo Comercial / Operaciones).
     await pool.query(
       `INSERT IGNORE INTO modulos (id_modulo, nombre, descripcion, icono, ruta, orden, estado)
-       VALUES (?, 'Seguimiento Fundantes', 'Carga de los documentos fundantes de cada operación otorgada (contrato de compraventa, transferencia, limitación, GPS) y envío a validación', 'bi-folder-check', '/fundantes-seguimiento/', 108, 'activo')`,
+       VALUES (?, 'Seguimiento Fundantes', 'Documentos fundantes de las operaciones otorgadas: carga del Ejecutivo Comercial y validación por Operaciones', 'bi-folder-check', '/fundantes/', 108, 'activo')`,
       [MODULO_ID]);
-    await pool.query(
-      `INSERT IGNORE INTO modulos (id_modulo, nombre, descripcion, icono, ruta, orden, estado)
-       VALUES (?, 'Seguimiento Fundantes - Operaciones', 'Revisión y validación por Operaciones de los fundantes enviados: visor 1 a 1, descarga total, aprobar o rechazar', 'bi-inboxes', '/fundantes-operaciones/', 109, 'activo')`,
-      [MODULO_OPS]);
-    // Corrección idempotente: re-enganchar las funcionalidades a su módulo correcto
-    // (versiones previas las dejaron bajo 410001=Certificados o todas bajo 420001).
-    await pool.query("UPDATE funcionalidades SET id_modulo=? WHERE codigo IN ('fundantes_seguimiento','fundantes_validar')", [MODULO_ID]);
-    await pool.query("UPDATE funcionalidades SET id_modulo=? WHERE codigo='fundantes_operaciones'", [MODULO_OPS]);
+    // Converge al estado final (idempotente, tolera versiones previas):
+    await pool.query("UPDATE modulos SET nombre='Seguimiento Fundantes', ruta='/fundantes/', estado='activo' WHERE id_modulo=?", [MODULO_ID]);
+    await pool.query("UPDATE modulos SET estado='inactivo' WHERE id_modulo=?", [MODULO_OPS]);   // ya no es card propia: va dentro del landing
+    // Todas las funcionalidades cuelgan del módulo padre.
+    await pool.query("UPDATE funcionalidades SET id_modulo=? WHERE codigo IN ('fundantes_seguimiento','fundantes_operaciones','fundantes_validar')", [MODULO_ID]);
     const funcs = [
-      [MODULO_ID,  'Seguimiento Fundantes', 'fundantes_seguimiento', '/fundantes-seguimiento/', 'bi-folder-check'],
-      [MODULO_OPS, 'Seguimiento Fundantes - Operaciones', 'fundantes_operaciones', '/fundantes-operaciones/', 'bi-inboxes'],
-      [MODULO_ID,  'Validar Fundantes', 'fundantes_validar', null, 'bi-check2-circle'],
+      ['Seguimiento Fundantes - Ejecutivo Comercial', 'fundantes_seguimiento', '/fundantes-seguimiento/', 'bi-folder-check'],
+      ['Seguimiento Fundantes - Operaciones', 'fundantes_operaciones', '/fundantes-operaciones/', 'bi-inboxes'],
+      ['Validar Fundantes', 'fundantes_validar', null, 'bi-check2-circle'],
     ];
     const idFunc = {};
-    for (const [idMod, nombre, codigo, href, icono] of funcs) {
+    for (const [nombre, codigo, href, icono] of funcs) {
       const [[ex]] = await pool.query('SELECT id_funcionalidad FROM funcionalidades WHERE codigo=? LIMIT 1', [codigo]);
-      if (ex) { idFunc[codigo] = ex.id_funcionalidad; continue; }
+      if (ex) {
+        idFunc[codigo] = ex.id_funcionalidad;     // converge nombre/href/icono/módulo de versiones previas
+        await pool.query('UPDATE funcionalidades SET nombre=?, href=?, icono=?, id_modulo=? WHERE id_funcionalidad=?', [nombre, href, icono, MODULO_ID, ex.id_funcionalidad]);
+        continue;
+      }
       const [r] = await pool.query(
         `INSERT INTO funcionalidades (id_modulo, nombre, codigo, href, icono) VALUES (?,?,?,?,?)`,
-        [idMod, nombre, codigo, href, icono]);
+        [MODULO_ID, nombre, codigo, href, icono]);
       idFunc[codigo] = r.insertId;
     }
     for (const codigo of Object.keys(idFunc)) {
