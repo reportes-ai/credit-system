@@ -117,7 +117,8 @@ async function enviarCorreo({ to, cc, bcc, subject, html, text, replyTo, from } 
       html: htmlFinal || undefined,
       replyTo: replyTo || process.env.MAIL_REPLY_TO || undefined,
     });
-    return { ok: true, messageId: info.messageId };
+    // `to` = destinatario EFECTIVO (en Modo Desarrollo es el correo de prueba, no el original).
+    return { ok: true, messageId: info.messageId, to: toFinal, dev: !!dev.activo };
   } catch (e) {
     console.error('[mailer]', e.message);
     return { ok: false, error: e.message };

@@ -1576,7 +1576,8 @@
       const body = {}; if (to) body.to = to; if (from) body.from = from;
       const r = await api('POST', '/api/config/mail/test', body);
       if (r?.success) {
-        msg.innerHTML = `<span style="color:#166534"><i class="bi bi-check-circle me-1"></i>Enviado a <b>${r.data.to}</b> desde <b>${r.data.from||''}</b>. Revisa la bandeja (y spam la primera vez).</span>`;
+        const devNota = r.data.dev ? ` <span style="color:#92400e">⚠ Modo Desarrollo activo: se redirigió al correo de prueba (no a ${r.data.solicitado||'el destinatario'}).</span>` : '';
+        msg.innerHTML = `<span style="color:#166534"><i class="bi bi-check-circle me-1"></i>Enviado a <b>${r.data.to}</b> desde <b>${r.data.from||''}</b>.</span>${devNota}`;
       } else {
         msg.innerHTML = `<span style="color:#991b1b"><i class="bi bi-x-circle me-1"></i>${r?.error || 'Error al enviar'}</span>`;
       }

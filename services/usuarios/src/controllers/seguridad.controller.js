@@ -96,7 +96,8 @@ const testEmail = async (req, res) => {
           + '<p style="color:#64748b;font-size:12px">Enviado desde ' + from + '</p></div>',
     });
     if (!r.ok) return res.status(400).json({ success: false, data: null, error: r.error });
-    res.json({ success: true, data: { to, from, messageId: r.messageId }, error: null });
+    // r.to = destinatario efectivo (en Modo Desarrollo, el correo de prueba, no el solicitado).
+    res.json({ success: true, data: { to: r.to || to, solicitado: to, from, dev: !!r.dev, messageId: r.messageId }, error: null });
   } catch (e) {
     (console.error('[testEmail]', e), res.status(500).json({ success: false, data: null, error: 'Error interno del servidor' }));
   }
