@@ -30,110 +30,20 @@
     .estado-pill { border-radius:20px; padding:4px 14px; font-size:.78rem; font-weight:800; background:#dcfce7; color:#166534; border:1.5px solid #86efac; }
     .estado-pill.mora { background:#fef3c7; color:#92400e; border-color:#fcd34d; }
 
-    /* Stats */
-    .stats-row { display:grid; grid-template-columns:repeat(auto-fit,minmax(140px,1fr)); gap:12px; margin-bottom:20px; }
-    .stat-box { background:var(--card); border-radius:12px; border:2px solid var(--border); padding:14px 16px; }
-    .stat-box.paid   { border-color:#86efac; background:#f0fdf4; }
-    .stat-box.pending { border-color:#fcd34d; background:#fefce8; }
-    .stat-box.overdue { border-color:#fca5a5; background:#fef2f2; }
-    .sb-label { font-size:.65rem; font-weight:700; text-transform:uppercase; letter-spacing:.07em; color:var(--muted); margin-bottom:4px; }
-    .stat-box.paid   .sb-label { color:#15803d; }
-    .stat-box.pending .sb-label { color:#a16207; }
-    .stat-box.overdue .sb-label { color:#b91c1c; }
-    .sb-val { font-size:1.5rem; font-weight:900; color:var(--navy); }
-
-    /* Table */
-    .table-card { background:var(--card); border-radius:14px; border:1px solid var(--border); overflow:hidden; }
-    .table-head { padding:14px 20px; background:#f8faff; border-bottom:1px solid var(--border); display:flex; align-items:center; justify-content:space-between; }
-    .table-title { font-size:.82rem; font-weight:800; text-transform:uppercase; letter-spacing:.07em; color:var(--navy); display:flex; align-items:center; gap:8px; }
-    .cuotas-table { width:100%; border-collapse:collapse; font-size:.83rem; }
-    .cuotas-table th { background:#f1f5f9; color:#374151; font-size:.72rem; font-weight:700; text-transform:uppercase; letter-spacing:.05em; padding:9px 14px; border-bottom:2px solid var(--border); white-space:nowrap; }
-    .cuotas-table td { padding:10px 14px; border-bottom:1px solid #f0f4f8; color:var(--text); vertical-align:middle; }
-    .cuotas-table tr:last-child td { border-bottom:none; }
-    .cuotas-table tr.row-pagado  td { background:#f0fdf4; }
-    .cuotas-table tr.row-vencido td { background:#fff5f5; }
-
-    /* Estado badges inline */
-    .pill { display:inline-flex; align-items:center; gap:4px; border-radius:20px; padding:3px 10px; font-size:.72rem; font-weight:700; white-space:nowrap; }
-    .pill-pagada   { background:#dcfce7; color:#166534; }
-    .pill-mora     { background:#fee2e2; color:#991b1b; }
-    .pill-aldia    { background:#dbeafe; color:#1d4ed8; }
-
-    /* Amount */
-    .amt { font-weight:700; font-family:monospace; font-size:.84rem; }
-    .amt-mora { color:var(--red); }
-    .amt-muted { color:var(--muted); }
-
-    /* Buttons */
-    .btn-pagar { background:linear-gradient(135deg,#16a34a,#15803d); color:#fff; border:none; border-radius:8px; padding:7px 16px; font-size:.8rem; font-weight:700; cursor:pointer; display:flex; align-items:center; gap:5px; white-space:nowrap; }
-    .btn-pagar:hover { opacity:.88; }
-    .btn-comprobante { background:#eff6ff; color:#1d4ed8; border:1px solid #bfdbfe; border-radius:7px; padding:6px 12px; font-size:.78rem; font-weight:600; cursor:pointer; display:flex; align-items:center; gap:4px; }
-    .btn-comprobante:hover { background:#dbeafe; }
-    .btn-del { background:#fff; color:var(--red); border:1px solid #fca5a5; border-radius:7px; padding:6px 8px; font-size:.8rem; cursor:pointer; }
-    .btn-del:hover { background:#fef2f2; }
-
     /* Action bar */
     .action-bar { position:fixed; bottom:0; left:0; right:0; background:#fff; border-top:1.5px solid var(--border); padding:12px 24px; display:flex; align-items:center; justify-content:space-between; box-shadow:0 -4px 16px rgba(0,0,0,.07); z-index:100; }
     .btn-accion { border:none; border-radius:9px; padding:10px 22px; font-size:.9rem; font-weight:700; cursor:pointer; display:flex; align-items:center; gap:7px; text-decoration:none; }
     .btn-volver { background:#f1f5f9; color:var(--text); }
     .btn-revisar { background:linear-gradient(135deg,var(--navy),var(--blue)); color:#fff; }
 
-    /* Modal pago */
-    .modal-overlay { display:none; position:fixed; inset:0; background:rgba(15,23,42,.6); z-index:500; align-items:center; justify-content:center; padding:16px; }
-    .modal-overlay.open { display:flex; }
-    .modal-box { background:#fff; border-radius:16px; width:min(480px,100%); box-shadow:0 24px 60px rgba(0,0,0,.3); overflow:hidden; }
-    .modal-head { background:linear-gradient(135deg,var(--navy),var(--blue)); color:#fff; padding:16px 20px; display:flex; align-items:center; justify-content:space-between; }
-    .modal-head h5 { margin:0; font-size:.95rem; font-weight:800; }
-    .modal-body { padding:20px; }
-    .modal-foot { padding:14px 20px; border-top:1px solid var(--border); display:flex; justify-content:flex-end; gap:10px; background:#f9fafb; }
-    .form-row { display:grid; grid-template-columns:1fr 1fr; gap:12px; margin-bottom:12px; }
-    .form-row.single { grid-template-columns:1fr; }
-    .field-label { font-size:.75rem; font-weight:700; text-transform:uppercase; letter-spacing:.05em; color:var(--muted); margin-bottom:4px; }
-    .field-input { width:100%; border:1.5px solid var(--border); border-radius:8px; padding:8px 11px; font-size:.88rem; font-family:inherit; }
-    .field-input:focus { outline:none; border-color:var(--blue); box-shadow:0 0 0 3px rgba(21,101,192,.1); }
-    .total-preview { background:#f0fdf4; border:1.5px solid #86efac; border-radius:10px; padding:12px 16px; margin-top:4px; display:flex; justify-content:space-between; align-items:center; }
-    .tp-label { font-size:.78rem; font-weight:700; color:#15803d; }
-    .tp-val   { font-size:1.2rem; font-weight:900; color:var(--navy); }
-    .btn-guardar { background:linear-gradient(135deg,#16a34a,#15803d); color:#fff; border:none; border-radius:9px; padding:10px 22px; font-size:.9rem; font-weight:700; cursor:pointer; display:flex; align-items:center; gap:7px; }
-    .btn-cancelar { background:#f1f5f9; color:var(--text); border:none; border-radius:9px; padding:10px 18px; font-size:.9rem; cursor:pointer; font-weight:600; }
-
-    /* Comprobante modal */
-    .comp-box { background:#fff; border-radius:16px; width:min(520px,100%); box-shadow:0 24px 60px rgba(0,0,0,.3); overflow:hidden; max-height:90vh; display:flex; flex-direction:column; }
-    .comp-body { padding:0; overflow-y:auto; flex:1; }
-    .comp-print { padding:28px 32px; font-family:'Segoe UI',sans-serif; }
-    .comp-logo { text-align:center; margin-bottom:16px; }
-    .comp-logo .co-brand { font-size:1.4rem; font-weight:900; color:var(--navy); }
-    .comp-logo .co-sub { font-size:.78rem; color:var(--muted); margin-top:2px; }
-    .comp-titulo { text-align:center; font-size:1rem; font-weight:800; text-transform:uppercase; letter-spacing:.08em; color:var(--navy); margin:16px 0 4px; }
-    .comp-num { text-align:center; font-size:.78rem; color:var(--muted); margin-bottom:20px; }
-    .comp-section { border-top:1px solid var(--border); padding:10px 0; }
-    .comp-section-title { font-size:.68rem; font-weight:800; text-transform:uppercase; letter-spacing:.07em; color:var(--muted); margin-bottom:8px; }
-    .comp-row { display:flex; justify-content:space-between; align-items:flex-start; padding:3px 0; font-size:.83rem; }
-    .comp-row .cr-label { color:var(--muted); }
-    .comp-row .cr-val   { font-weight:700; text-align:right; }
-    .comp-total { background:linear-gradient(135deg,var(--navy),var(--blue)); border-radius:10px; padding:14px 18px; margin-top:14px; display:flex; justify-content:space-between; align-items:center; color:#fff; }
-    .ct-label { font-size:.78rem; font-weight:700; opacity:.85; text-transform:uppercase; }
-    .ct-val   { font-size:1.4rem; font-weight:900; }
-    .comp-footer { text-align:center; font-size:.72rem; color:var(--muted); margin-top:20px; padding-top:12px; border-top:1px dashed var(--border); }
-    .comp-foot-btns { padding:14px 20px; border-top:1px solid var(--border); display:flex; justify-content:flex-end; gap:10px; background:#f9fafb; flex-shrink:0; }
-    .btn-print { background:linear-gradient(135deg,var(--navy),var(--blue)); color:#fff; border:none; border-radius:9px; padding:9px 20px; font-size:.88rem; font-weight:700; cursor:pointer; display:flex; align-items:center; gap:6px; }
-
-    @media print {
-      body * { visibility:hidden; }
-      .comp-print, .comp-print * { visibility:visible; }
-      .comp-print { position:fixed; inset:0; padding:32px; }
-    }
-
     .spinner-wrap { text-align:center; padding:60px; color:var(--muted); }
     .no-data { text-align:center; padding:60px; color:var(--muted); font-size:.9rem; }
     .no-data i { font-size:2.5rem; display:block; margin-bottom:10px; opacity:.4; }
-    .toast-msg { position:fixed; bottom:80px; left:50%; transform:translateX(-50%); padding:10px 24px; border-radius:10px; font-size:.9rem; font-weight:600; display:none; z-index:999; }
-    .toast-ok  { background:#166534; color:#fff; }
-    .toast-err { background:#991b1b; color:#fff; }
     .breadcrumb-nav { color:rgba(255,255,255,.6); font-size:.85rem; display:flex; align-items:center; gap:6px; }
     .breadcrumb-nav a { color:rgba(255,255,255,.75); text-decoration:none; }
     .breadcrumb-nav a:hover { color:#fff; }
-    .breadcrumb-nav .sep { color:rgba(255,255,255,.35); }  </style>
+    .breadcrumb-nav .sep { color:rgba(255,255,255,.35); }
+  </style>
 </head>
 <body>
 
@@ -141,7 +51,7 @@
   <a href="/creditos" class="nav-brand">
     <img src="/img/logo-autofacil.png" alt="AutoFácil" style="filter:brightness(0) invert(1);height:32px;display:block" onerror="this.style.display='none'">
     <span>Pago de Cuotas</span>
-    <span class="version-badge">v1.9</span>
+    <span class="version-badge">v2.0</span>
   </a>
   <div class="breadcrumb-nav">
   <a href="/">Inicio</a><span class="sep">›</span>
@@ -156,8 +66,11 @@
   </div>
 </nav>
 
-<div class="page-wrap" id="pageWrap">
-  <div class="spinner-wrap"><i class="bi bi-hourglass-split" style="font-size:2rem;display:block;margin-bottom:12px"></i>Cargando…</div>
+<div class="page-wrap">
+  <div id="credHeader"></div>
+  <div id="payHost">
+    <div class="spinner-wrap"><i class="bi bi-hourglass-split" style="font-size:2rem;display:block;margin-bottom:12px"></i>Cargando…</div>
+  </div>
 </div>
 
 <!-- Action bar -->
@@ -169,488 +82,63 @@
   </div>
 </div>
 
-<!-- Modal Registrar Pago -->
-<div class="modal-overlay" id="modalPago">
-  <div class="modal-box">
-    <div class="modal-head">
-      <h5><i class="bi bi-cash-coin me-2"></i>Registrar Pago — Cuota N° <span id="mpNumeroCuota">—</span></h5>
-      <button onclick="cerrarModal()" style="background:none;border:none;color:rgba(255,255,255,.8);font-size:1.1rem;cursor:pointer"><i class="bi bi-x-lg"></i></button>
-    </div>
-    <div class="modal-body">
-      <div class="form-row">
-        <div>
-          <div class="field-label">Fecha de Pago</div>
-          <input type="datetime-local" class="field-input" id="mpFechaPago">
-        </div>
-        <div>
-          <div class="field-label">Monto Cuota</div>
-          <input type="number" class="field-input" id="mpMontoCuota" oninput="calcTotal()" placeholder="0">
-        </div>
-      </div>
-      <div class="form-row">
-        <div>
-          <div class="field-label">Intereses por Mora ($)</div>
-          <input type="number" class="field-input" id="mpInteresMora" oninput="calcTotal()" placeholder="0" value="0">
-          <div id="mpMoraInfo" style="font-size:.72rem;color:#b45309;margin-top:3px"></div>
-        </div>
-        <div>
-          <div class="field-label">Gastos de Cobranza ($)</div>
-          <input type="number" class="field-input" id="mpGastosCob" oninput="calcTotal()" placeholder="0" value="0">
-          <div id="mpGastosInfo" style="font-size:.72rem;color:#b45309;margin-top:3px"></div>
-        </div>
-      </div>
-      <div class="form-row single">
-        <div>
-          <div class="field-label">Observación (opcional)</div>
-          <input type="text" class="field-input" id="mpObservacion" placeholder="Ej: Pagado en caja sucursal…">
-        </div>
-      </div>
-      <div class="total-preview">
-        <span class="tp-label"><i class="bi bi-calculator me-1"></i>Total a cobrar</span>
-        <span class="tp-val" id="mpTotalPreview">$0</span>
-      </div>
-    </div>
-    <div class="modal-foot">
-      <button class="btn-cancelar" onclick="cerrarModal()">Cancelar</button>
-      <button class="btn-guardar" onclick="guardarPago()"><i class="bi bi-check-circle"></i>Registrar Pago</button>
-    </div>
-  </div>
-</div>
-
-<!-- Modal Comprobante -->
-<div class="modal-overlay" id="modalComp">
-  <div class="comp-box">
-    <div class="comp-body" id="compBody"></div>
-    <div class="comp-foot-btns">
-      <button class="btn-cancelar" onclick="cerrarComp()">Cerrar</button>
-      <button id="btnCapturarImg" class="btn-print" style="background:#16a34a" onclick="capturarComprobanteImagen()"><i class="bi bi-image"></i>Copiar imagen</button>
-      <button class="btn-print" onclick="window.print()"><i class="bi bi-printer"></i>Imprimir</button>
-    </div>
-  </div>
-</div>
-
-<div class="toast-msg" id="toastMsg"></div>
-
 <script src="/js/auth-guard.js"></script>
 <script>
 /* ── Auth ── */
 const token = sessionStorage.getItem('token');
 const yo    = JSON.parse(sessionStorage.getItem('usuario') || 'null');
 if (!token || !yo) location.href = '/login.html';
-function apiHdr() { return { 'Content-Type':'application/json', Authorization:'Bearer '+token }; }
 document.getElementById('navUser').textContent = `${yo?.nombre||''} ${yo?.apellido||''}`.trim();
 
-const qp       = new URLSearchParams(location.search);
-const creditId = qp.get('id');
+const creditId = new URLSearchParams(location.search).get('id');
 if (creditId) {
   document.getElementById('btnRevisar').href    = '/creditos/revisar?id='+creditId;
   document.getElementById('btnRevisarBot').href = '/creditos/revisar?id='+creditId;
 }
 
-let _credito  = null;
-let _pagos    = [];
-let _amort    = []; // schedule calculado
-let _pagoModal = null; // cuota en edición
-let _tmc         = null;          // tasa máxima convencional vigente
-let _uf          = null;          // valor UF hoy (fallback)
-let _ufPorFecha  = new Map();     // UF del día-21 de mora por cuota: 'YYYY-MM-DD' → valor
-
-const fmtP  = v => v != null ? '$'+Math.round(Number(v)).toLocaleString('es-CL') : '$0';
-const fmtD  = s => s ? new Date(s).toLocaleDateString('es-CL',{timeZone:'UTC',day:'2-digit',month:'2-digit',year:'numeric'}) : '—';
-const fmtDT = s => s ? new Date(s).toLocaleString('es-CL',{day:'2-digit',month:'2-digit',year:'numeric',hour:'2-digit',minute:'2-digit'}) : '—';
+const esc = s => String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+const clp = v => '$' + Math.round(Number(v)||0).toLocaleString('es-CL');
 const fmtRut = v => { v=String(v||'').replace(/[^0-9kK]/g,'').toUpperCase(); if(v.length<2) return String(v||''); const dv=v.slice(-1); return v.slice(0,-1).replace(/\B(?=(\d{3})+(?!\d))/g,'.')+'-'+dv; };
 
-function showToast(msg, ok) {
-  const el = document.getElementById('toastMsg');
-  el.textContent = msg; el.className='toast-msg '+(ok?'toast-ok':'toast-err');
-  el.style.display='block'; setTimeout(()=>el.style.display='none',3000);
-}
-
-/* ── French amortization ── */
-function buildAmort(mf, tasa, plazo, fechaPrimera) {
-  const r   = tasa/100;
-  const pot = Math.pow(1+r, plazo);
-  const cu  = r > 0 ? Math.round(mf*r*pot/(pot-1)) : Math.round(mf/plazo);
-  const rows = [];
-  let saldo = mf;
-  const f0 = fechaPrimera ? new Date(fechaPrimera.split('T')[0]+'T00:00:00') : null;
-  for (let n=1; n<=plazo; n++) {
-    const fechaCuota = f0 ? new Date(f0.getFullYear(), f0.getMonth()+(n-1), f0.getDate()) : null;
-    const interes = Math.round(saldo*r);
-    let   amort   = cu - interes;
-    if (n === plazo) amort = saldo;
-    saldo = Math.max(0, saldo - amort);
-    rows.push({ n, fecha:fechaCuota, cuota:cu, interes, amort, saldo });
-  }
-  return rows;
-}
-
-/* ── Mora calculation ── */
-function tmcAnual() {
-  if (!_tmc) return 0;
-  return parseFloat(_tmc.tasa_anual_mayor) || 0;
-}
-function calcMora(montoCuota, fechaVenc, fechaPago) {
-  const tmc = tmcAnual();
-  if (!tmc || !fechaVenc) return 0;
-  const venc = new Date(fechaVenc.split('T')[0]+'T00:00:00');
-  const pago = new Date(fechaPago || new Date()); pago.setHours(0,0,0,0);
-  const dias = Math.max(0, Math.floor((pago - venc) / 86400000));
-  return { monto: Math.round(montoCuota * (tmc/100/365) * dias), dias, tmc };
-}
-
-/* ── Gastos de cobranza (escalonado legal, aplica desde día 21) ── */
-// UF fija: la del día en que la cuota cumplió exactamente 21 días de mora
-function dia21Str(fechaVencStr) {
-  if (!fechaVencStr) return null;
-  const d = new Date(fechaVencStr.split('T')[0]+'T00:00:00');
-  d.setDate(d.getDate()+21);
-  return d.toISOString().split('T')[0];
-}
-function calcGastosCobranza(montoVencido, diasMora, fechaVencStr) {
-  if (diasMora < 21 || !montoVencido) return { monto:0, aplica:false };
-  const key    = dia21Str(fechaVencStr);
-  const ufVal  = (key && _ufPorFecha.has(key)) ? _ufPorFecha.get(key)
-               : (parseFloat(_uf?.valor) || 0); // fallback al valor actual
-  if (!ufVal) return { monto:0, aplica:false };
-  const uf10 = ufVal * 10;
-  const uf40 = ufVal * 40; // ancho del tramo 2 (10→50 UF)
-  let gastos = 0, saldo = montoVencido;
-  const t1 = Math.min(saldo, uf10); gastos += t1 * 0.09; saldo -= t1;
-  const t2 = Math.min(saldo, uf40); gastos += t2 * 0.06; saldo -= t2;
-  if (saldo > 0)                     gastos += saldo * 0.03;
-  return { monto: Math.round(gastos), aplica:true, ufVal, key };
-}
-
-/* ── Pre-carga UF del día-21 para todas las cuotas vencidas ── */
-async function precargarUFDias21(schedule) {
-  const hoy = new Date(); hoy.setHours(0,0,0,0);
-  const fechasNecesarias = new Set();
-  schedule.forEach(r => {
-    if (!r.fecha) return;
-    const venc = new Date(r.fecha); venc.setHours(0,0,0,0);
-    if (venc >= hoy) return;
-    const d21 = new Date(venc); d21.setDate(d21.getDate()+21);
-    if (d21 <= hoy) fechasNecesarias.add(d21.toISOString().split('T')[0]);
-  });
-  await Promise.all([...fechasNecesarias].map(async fecha => {
-    if (_ufPorFecha.has(fecha)) return;
-    try {
-      const r = await fetch('/api/uf/en/'+fecha, { headers:apiHdr() });
-      const j = await r.json();
-      if (j.success && j.data) _ufPorFecha.set(fecha, parseFloat(j.data.valor));
-    } catch(_) {}
-  }));
-}
-
-/* ── Load ── */
-async function cargarPagina() {
-  if (!creditId) { document.getElementById('pageWrap').innerHTML='<div class="no-data"><i class="bi bi-exclamation-triangle"></i>ID no especificado</div>'; return; }
-  try {
-    const [rc, rp, rt, ru] = await Promise.all([
-      fetch('/api/creditos/'+creditId, { headers:apiHdr() }),
-      fetch('/api/pagos-credito/'+creditId, { headers:apiHdr() }),
-      fetch('/api/tasas/vigente', { headers:apiHdr() }),
-      fetch('/api/uf/vigente',    { headers:apiHdr() }),
-    ]);
-    const [jc, jp, jt, ju] = await Promise.all([rc.json(), rp.json(), rt.json(), ru.json()]);
-    if (!jc.success) throw new Error(jc.error);
-    _credito = jc.data;
-    _pagos   = jp.success ? (jp.data||[]) : [];
-    _tmc     = jt.success ? jt.data : null;
-    _uf      = ju.success ? ju.data : null;
-    _amort   = buildAmort(
-      parseFloat(_credito.monto_financiado)||0,
-      parseFloat(_credito.tasa_mensual)||0,
-      parseInt(_credito.plazo)||0,
-      _credito.fecha_primera_cuota
-    );
-    await precargarUFDias21(_amort);
-    renderPagina();
-  } catch(e) {
-    document.getElementById('pageWrap').innerHTML=`<div class="no-data"><i class="bi bi-exclamation-triangle"></i>${e.message}</div>`;
-  }
-}
-
-function pagosDeCuota(n) { return _pagos.filter(p=>p.numero_cuota===n); }
-
-function renderPagina() {
-  const c  = _credito;
-  const hoy = new Date(); hoy.setHours(0,0,0,0);
-
-  // ODP (Orden de Pago a Tesorería): solo para cartera propia AutoFácil
-  const btnODP = document.getElementById('btnODP');
-  if (btnODP) btnODP.style.display = (String(c.financiera||'').toUpperCase()==='AUTOFACIL') ? 'flex' : 'none';
-
-  let countPagado=0, countVencido=0, countPendiente=0, montoMoraTotal=0;
-  _amort.forEach(r => {
-    const pagos = pagosDeCuota(r.n);
-    if (pagos.length) { countPagado++; return; }
-    const venc = r.fecha && new Date(r.fecha) < hoy;
-    if (venc) {
-      countVencido++;
-      const fvs = r.fecha ? r.fecha.toISOString().split('T')[0] : '';
-      const mi  = calcMora(r.cuota, fvs, null);
-      const gc  = calcGastosCobranza(r.cuota, mi.dias, fvs);
-      montoMoraTotal += r.cuota + (mi.monto||0) + (gc.monto||0);
-    } else countPendiente++;
-  });
-
-  // Estado de cartera real (estado_cartera_disp viene del getById en tiempo real).
-  // Antes pedía c.estado==='EN MORA', pero ahora los propios cursados son OTORGADO.
-  const ec     = String(c.estado_cartera_disp || c.estado_cartera || '').toUpperCase();
-  const esMora = ec === 'MORA' || ec === 'EN MORA' || ec === 'VENCIDO';
-  const pill   = ec === 'VENCIDO'
+/* ── Cabecera del crédito + visibilidad ODP (solo AutoFácil) ── */
+function pintarHeader(c) {
+  const ec = String(c.estado_cartera_disp || c.estado_cartera || '').toUpperCase();
+  const esMora = ['MORA','EN MORA','VENCIDO','CASTIGADO'].includes(ec);
+  const pill = ec === 'VENCIDO'
     ? '<span class="estado-pill" style="background:#fee2e2;color:#991b1b;border-color:#fca5a5">VENCIDO</span>'
-    : esMora
-      ? '<span class="estado-pill mora">EN MORA</span>'
-      : `<span class="estado-pill">${ec || 'VIGENTE'}</span>`;
-
-  let rows='';
-  _amort.forEach(r => {
-    const pagos = pagosDeCuota(r.n);
-    const vencida = !pagos.length && r.fecha && new Date(r.fecha) < hoy;
-    const rowCls  = pagos.length ? 'row-pagado' : (vencida ? 'row-vencido' : '');
-
-    let pillHtml, accionHtml;
-    const fechaVencStr = r.fecha ? r.fecha.toISOString().split('T')[0] : '';
-    let moraInfo = null, gcInfo = null;
-    if (vencida) {
-      moraInfo = calcMora(r.cuota, fechaVencStr, null);
-      gcInfo   = calcGastosCobranza(r.cuota, moraInfo.dias, fechaVencStr);
-    }
-
-    let intMoraDisplay = '—', gtosDisplay = '—', totalDisplay = '—', totalHoyDisplay = '—';
-    if (pagos.length) {
-      intMoraDisplay  = fmtP(pagos[0].interes_mora);
-      gtosDisplay     = fmtP(pagos[0].gastos_cobranza);
-      totalDisplay    = fmtP(pagos[0].total_pagado);
-    } else if (moraInfo && moraInfo.dias > 0) {
-      intMoraDisplay = `<span class="amt-mora">${fmtP(moraInfo.monto)}</span><br><span style="font-size:.68rem;color:#b45309">${moraInfo.dias} días</span>`;
-      if (gcInfo && gcInfo.aplica) {
-        gtosDisplay = `<span class="amt-mora">${fmtP(gcInfo.monto)}</span>`;
-      } else if (moraInfo.dias > 0) {
-        gtosDisplay = `<span style="font-size:.72rem;color:#b45309">día ${21-moraInfo.dias>0?21-moraInfo.dias+' para cobro':'—'}</span>`;
-      }
-      const totalHoy = r.cuota + (moraInfo.monto||0) + (gcInfo?.monto||0);
-      totalHoyDisplay = `<span style="font-weight:900;color:var(--red)">${fmtP(totalHoy)}</span>`;
-    } else if (!pagos.length) {
-      // Al día: solo cuota
-      totalHoyDisplay = `<span style="color:#1d4ed8;font-weight:700">${fmtP(r.cuota)}</span>`;
-    }
-
-    if (pagos.length) {
-      const pg = pagos[0];
-      pillHtml  = `<span class="pill pill-pagada"><i class="bi bi-check-circle-fill"></i>Pagada</span>`;
-      accionHtml= `
-        <div style="display:flex;gap:6px;flex-wrap:wrap">
-          <button class="btn-comprobante" onclick="verComprobante(${pg.id_pago})">
-            <i class="bi bi-receipt"></i>Comprobante
-          </button>
-          <button class="btn-del" title="Eliminar pago" onclick="eliminarPago(${pg.id_pago},${r.n})">
-            <i class="bi bi-trash3"></i>
-          </button>
-        </div>`;
-    } else if (vencida) {
-      pillHtml  = `<span class="pill pill-mora"><i class="bi bi-exclamation-triangle-fill"></i>En Mora</span>`;
-      accionHtml= `<button class="btn-pagar" onclick="abrirModalPago(${r.n},'${fechaVencStr}',${r.cuota})">
-                     <i class="bi bi-cash-coin"></i>Registrar Pago
-                   </button>`;
-    } else {
-      pillHtml  = `<span class="pill pill-aldia"><i class="bi bi-check2"></i>Al Día</span>`;
-      accionHtml= `<button class="btn-pagar" onclick="abrirModalPago(${r.n},'${fechaVencStr}',${r.cuota})">
-                     <i class="bi bi-cash-coin"></i>Registrar Pago
-                   </button>`;
-    }
-
-    rows += `<tr class="${rowCls}">
-      <td style="font-weight:700;color:var(--navy);text-align:center">${r.n}</td>
-      <td>${r.fecha ? r.fecha.toLocaleDateString('es-CL',{day:'2-digit',month:'2-digit',year:'numeric'}) : '—'}</td>
-      <td class="amt">${fmtP(r.cuota)}</td>
-      <td class="amt">${intMoraDisplay}</td>
-      <td class="amt amt-mora">${gtosDisplay}</td>
-      <td class="amt" style="text-align:right">${totalHoyDisplay}</td>
-      <td class="amt" style="color:var(--green)">${totalDisplay}</td>
-      <td class="amt-muted">${pagos.length ? fmtDT(pagos[0].fecha_pago) : '—'}</td>
-      <td style="text-align:center">${pillHtml}</td>
-      <td>${accionHtml}</td>
-    </tr>`;
-  });
-
-  document.getElementById('pageWrap').innerHTML = `
+    : esMora ? `<span class="estado-pill mora">${esc(ec)}</span>`
+             : `<span class="estado-pill">${esc(ec || 'VIGENTE')}</span>`;
+  document.getElementById('credHeader').innerHTML = `
     <div class="cred-header">
       <div>
-        <div class="ch-title"><i class="bi bi-credit-card me-2"></i>${c.nombre_cliente||'—'}</div>
-        <div class="ch-sub">N° ${c.numero_credito||c.id_credito} &nbsp;·&nbsp; ${fmtRut(c.rut_cliente)} &nbsp;·&nbsp; ${c.plazo||'—'} cuotas de ${fmtP(c.cuota)}</div>
+        <div class="ch-title"><i class="bi bi-credit-card me-2"></i>${esc(c.nombre_cliente||'—')}</div>
+        <div class="ch-sub">N° ${esc(c.numero_credito||c.id_credito)} &nbsp;·&nbsp; ${fmtRut(c.rut_cliente)} &nbsp;·&nbsp; ${c.plazo||'—'} cuotas de ${clp(c.cuota)}</div>
       </div>
       ${pill}
-    </div>
-
-    <div class="stats-row">
-      <div class="stat-box paid"><div class="sb-label"><i class="bi bi-check-circle me-1"></i>Pagadas</div><div class="sb-val">${countPagado}</div></div>
-      <div class="stat-box pending"><div class="sb-label"><i class="bi bi-check2 me-1"></i>Al Día</div><div class="sb-val">${countPendiente}</div></div>
-      <div class="stat-box overdue">
-        <div class="sb-label"><i class="bi bi-exclamation-triangle me-1"></i>En Mora</div>
-        <div class="sb-val">${countVencido}</div>
-        ${montoMoraTotal>0?`<div style="font-size:.72rem;font-weight:700;color:#b91c1c;margin-top:2px">${fmtP(montoMoraTotal)}</div>`:''}
-      </div>
-      <div class="stat-box"><div class="sb-label">Total cuotas</div><div class="sb-val">${_amort.length}</div></div>
-    </div>
-
-    <div class="table-card">
-      <div class="table-head">
-        <div class="table-title"><i class="bi bi-table"></i>Cuadro de Pagos</div>
-        <span style="font-size:.75rem;color:var(--muted)">${c.marca||''} ${c.modelo||''} ${c.anio||''}</span>
-      </div>
-      <div style="overflow-x:auto">
-        <table class="cuotas-table">
-          <thead>
-            <tr>
-              <th style="text-align:center">N°</th>
-              <th>Vencimiento</th>
-              <th>Monto Cuota</th>
-              <th>Int. Mora</th>
-              <th>Gtos. Cobranza</th>
-              <th style="text-align:right">Total Hoy</th>
-              <th>Total Pagado</th>
-              <th>Fecha Pago</th>
-              <th style="text-align:center">Estado</th>
-              <th style="text-align:center">Acción</th>
-            </tr>
-          </thead>
-          <tbody>${rows}</tbody>
-        </table>
-      </div>
     </div>`;
+  // ODP solo para cartera propia AutoFácil
+  const btnODP = document.getElementById('btnODP');
+  if (btnODP) btnODP.style.display = (String(c.financiera||'').toUpperCase()==='AUTOFACIL') ? 'flex' : 'none';
 }
 
-/* ── Modal pago ── */
-function abrirModalPago(numeroCuota, fechaVenc, montoCuota) {
-  _pagoModal = { numeroCuota, fechaVenc, montoCuota };
-  document.getElementById('mpNumeroCuota').textContent = numeroCuota;
-  document.getElementById('mpMontoCuota').value  = montoCuota;
-  document.getElementById('mpGastosCob').value   = 0;
-  document.getElementById('mpObservacion').value = '';
-  // Fecha pago: ahora mismo
-  const ahora = new Date();
-  const local  = new Date(ahora.getTime() - ahora.getTimezoneOffset()*60000).toISOString().slice(0,16);
-  document.getElementById('mpFechaPago').value = local;
-  // Calcular mora automáticamente (TMC diaria)
-  const mora = calcMora(montoCuota, fechaVenc, null);
-  document.getElementById('mpInteresMora').value = mora.monto || 0;
-  const infoEl = document.getElementById('mpMoraInfo');
-  if (mora.dias > 0 && mora.tmc > 0) {
-    infoEl.innerHTML = `<i class="bi bi-info-circle"></i> ${mora.dias} días en mora · TMC ${mora.tmc.toFixed(2)}% anual`;
+/* ── Emitir ODP (las cuotas se eligen en el modal compartido) ── */
+function emitirODPficha() { if (creditId) ODP.abrir(creditId); }
+
+/* ── Montar el panel de pago (multi-cuota + condonación + pago en lote) ──
+   En DOMContentLoaded: para entonces ya cargó /js/pago-cuotas-panel.js (script
+   síncrono del body), así que window.PagoCuotas existe. */
+document.addEventListener('DOMContentLoaded', () => {
+  if (!creditId) {
+    document.getElementById('payHost').innerHTML = '<div class="no-data"><i class="bi bi-exclamation-triangle"></i>ID no especificado</div>';
   } else {
-    infoEl.textContent = '';
+    PagoCuotas.montar(document.getElementById('payHost'), { creditId, onLoad: pintarHeader });
   }
-  // Calcular gastos de cobranza (aplica desde día 21; UF fija del día-21)
-  const gc = calcGastosCobranza(montoCuota, mora.dias, fechaVenc);
-  document.getElementById('mpGastosCob').value = gc.monto || 0;
-  const gcInfoEl = document.getElementById('mpGastosInfo');
-  if (gc.aplica) {
-    gcInfoEl.innerHTML = `<i class="bi bi-info-circle"></i> Escalonado legal · UF del ${gc.key}: $${Math.round(gc.ufVal).toLocaleString('es-CL')}`;
-  } else if (mora.dias > 0 && mora.dias < 21) {
-    gcInfoEl.innerHTML = `<i class="bi bi-clock"></i> Aplica a partir del día 21 (faltan ${21-mora.dias} días)`;
-  } else {
-    gcInfoEl.textContent = '';
-  }
-  calcTotal();
-  document.getElementById('modalPago').classList.add('open');
-}
-function cerrarModal() { document.getElementById('modalPago').classList.remove('open'); }
-
-function calcTotal() {
-  const cuota  = parseFloat(document.getElementById('mpMontoCuota').value)||0;
-  const mora   = parseFloat(document.getElementById('mpInteresMora').value)||0;
-  const gastos = parseFloat(document.getElementById('mpGastosCob').value)||0;
-  document.getElementById('mpTotalPreview').textContent = fmtP(cuota+mora+gastos);
-}
-
-async function guardarPago() {
-  if (!_pagoModal) return;
-  const cuota  = parseFloat(document.getElementById('mpMontoCuota').value)||0;
-  const mora   = parseFloat(document.getElementById('mpInteresMora').value)||0;
-  const gastos = parseFloat(document.getElementById('mpGastosCob').value)||0;
-  const fecha  = document.getElementById('mpFechaPago').value;
-  const obs    = document.getElementById('mpObservacion').value.trim();
-  if (!fecha) { showToast('Ingresa la fecha de pago', false); return; }
-  try {
-    const r = await fetch('/api/pagos-credito', {
-      method:'POST', headers:apiHdr(),
-      body: JSON.stringify({
-        id_credito:        creditId,
-        numero_cuota:      _pagoModal.numeroCuota,
-        fecha_vencimiento: _pagoModal.fechaVenc || null,
-        monto_cuota:       cuota,
-        interes_mora:      mora,
-        gastos_cobranza:   gastos,
-        total_pagado:      cuota+mora+gastos,
-        fecha_pago:        fecha || null,
-        observacion:       obs || null,
-      })
-    });
-    const j = await r.json();
-    if (!j.success) throw new Error(j.error);
-    cerrarModal();
-    showToast('Pago registrado correctamente', true);
-    // Recargar pagos
-    const rp = await fetch('/api/pagos-credito/'+creditId, { headers:apiHdr() });
-    const jp = await rp.json();
-    _pagos = jp.success ? (jp.data||[]) : [];
-    renderPagina();
-    // Mostrar comprobante
-    verComprobante(j.data.id_pago);
-  } catch(e) { showToast('Error: '+e.message, false); }
-}
-
-async function eliminarPago(idPago, numeroCuota) {
-  if (!confirm(`¿Eliminar el registro de pago de la cuota N° ${numeroCuota}?`)) return;
-  try {
-    const r = await fetch('/api/pagos-credito/'+idPago, { method:'DELETE', headers:apiHdr() });
-    const j = await r.json();
-    if (!j.success) throw new Error(j.error);
-    showToast('Pago eliminado', true);
-    const rp = await fetch('/api/pagos-credito/'+creditId, { headers:apiHdr() });
-    const jp = await rp.json();
-    _pagos = jp.success ? (jp.data||[]) : [];
-    renderPagina();
-  } catch(e) { showToast('Error: '+e.message, false); }
-}
-
-/* ── Comprobante ── */
-async function verComprobante(idPago) {
-  try {
-    const r = await fetch('/api/pagos-credito/pago/'+idPago, { headers:apiHdr() });
-    const j = await r.json();
-    if (!j.success) throw new Error(j.error);
-    const pg = j.data;
-    document.getElementById('compBody').innerHTML = buildRecibo({
-      credito:    _credito,
-      pagos:      [pg],
-      cajaNombre: pg.nombre_caja || null,
-      idPago:     idPago,
-    });
-    document.getElementById('modalComp').classList.add('open');
-  } catch(e) { showToast('Error al cargar comprobante: '+e.message, false); }
-}
-function cerrarComp() { document.getElementById('modalComp').classList.remove('open'); }
-
-document.addEventListener('keydown', e => {
-  if (e.key==='Escape') { cerrarModal(); cerrarComp(); }
 });
-
-/* ── Emitir ODP desde la ficha (cuotas se eligen en el modal compartido) ── */
-function emitirODPficha() {
-  if (!creditId) return;
-  ODP.abrir(creditId);
-}
-
-cargarPagina();
 </script>
 <script src="/js/html2canvas.min.js"></script>
 <script src="/js/timbre-pagado.js"></script>
 <script src="/js/comprobante.js"></script>
+<script src="/js/pago-cuotas-panel.js"></script>
 <script src="/js/odp-emitir.js"></script>
 <script src="/js/app-version.js"></script>
 </body>

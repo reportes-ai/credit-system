@@ -43,6 +43,12 @@ function buildRecibo({ credito, pagos, cajaNombre, trxNum, idPago }) {
   const totalPagado = pagos.reduce((s, p) => s + (Number(p.total_pagado) || 0), 0);
   const totMora     = pagos.reduce((s, p) => s + (Number(p.interes_mora) || 0), 0);
   const totGastos   = pagos.reduce((s, p) => s + (Number(p.gastos_cobranza) || 0), 0);
+  // Condonación = monto full (antes de condonar) − cobrado
+  const totMoraFull   = pagos.reduce((s, p) => s + (Number(p.interes_mora_total    != null ? p.interes_mora_total    : p.interes_mora)    || 0), 0);
+  const totGastosFull = pagos.reduce((s, p) => s + (Number(p.gastos_cobranza_total != null ? p.gastos_cobranza_total : p.gastos_cobranza) || 0), 0);
+  const condGastos = Math.max(0, Math.round(totGastosFull - totGastos));
+  const condMora   = Math.max(0, Math.round(totMoraFull   - totMora));
+  const condTotal  = condGastos + condMora;
   const isMulti     = pagos.length > 1;
   const primerPago  = pagos[0] || {};
 
@@ -163,6 +169,20 @@ function buildRecibo({ credito, pagos, cajaNombre, trxNum, idPago }) {
         </div>
         ${detalleHTML}
       </div>
+
+      ${condTotal > 0 ? `
+      <!-- Condonación -->
+      <div style="border-top:1.5px solid #e5e7eb;padding:10px 0">
+        <div style="font-size:.65rem;font-weight:800;text-transform:uppercase;letter-spacing:.07em;color:#15803d;margin-bottom:8px">Condonación Otorgada</div>
+        ${condGastos > 0 ? `<div style="display:flex;justify-content:space-between;padding:3px 0;font-size:.83rem">
+          <span style="color:#6b7280">Gastos de cobranza condonados</span>
+          <span style="font-weight:700;color:#15803d;font-family:monospace">-${_cClp(condGastos)}</span>
+        </div>` : ''}
+        ${condMora > 0 ? `<div style="display:flex;justify-content:space-between;padding:3px 0;font-size:.83rem">
+          <span style="color:#6b7280">Intereses por mora condonados</span>
+          <span style="font-weight:700;color:#15803d;font-family:monospace">-${_cClp(condMora)}</span>
+        </div>` : ''}
+      </div>` : ''}
 
       <!-- Total -->
       <div style="background:linear-gradient(135deg,#012d70,#0141A2);border-radius:10px;padding:14px 18px;margin-top:10px;display:flex;justify-content:space-between;align-items:center;color:#fff">

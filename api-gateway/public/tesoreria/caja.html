@@ -1071,11 +1071,11 @@ async function confirmarMultiPago() {
 
   if (!fecha) return mostrarError('Selecciona la fecha de pago.');
 
-  // Leer valores del breakdown
+  // Leer valores del breakdown (g/m = cobrado; gFull/mFull = full antes de condonar)
   const pagosDet = datos.map(d => {
     const g = getPesoVal(document.getElementById(`g_${d.num}`));
     const m = getPesoVal(document.getElementById(`m_${d.num}`));
-    return { num: d.num, s: d.s, g, m, moraMin: d.moraMin, gastosMin: d.gastosMin };
+    return { num: d.num, s: d.s, g, m, gFull: d.gastos, mFull: d.mora, moraMin: d.moraMin, gastosMin: d.gastosMin };
   });
 
   // Validar mínimos
@@ -1101,12 +1101,14 @@ async function confirmarMultiPago() {
       origen_fondos:      origenLabel || null,
       id_cuenta_bancaria: origenCuentaId ? parseInt(origenCuentaId) : null,
       pagos: pagosDet.map(p => ({
-        numero_cuota:      p.num,
-        fecha_vencimiento: p.s.fecha,
-        monto_cuota:       Math.round(p.s.monto),
-        interes_mora:      Math.round(p.m),
-        gastos_cobranza:   Math.round(p.g),
-        total_pagado:      Math.round(p.s.monto + p.m + p.g),
+        numero_cuota:          p.num,
+        fecha_vencimiento:     p.s.fecha,
+        monto_cuota:           Math.round(p.s.monto),
+        interes_mora:          Math.round(p.m),
+        gastos_cobranza:       Math.round(p.g),
+        interes_mora_total:    Math.round(p.mFull),
+        gastos_cobranza_total: Math.round(p.gFull),
+        total_pagado:          Math.round(p.s.monto + p.m + p.g),
       })),
     };
 

@@ -37,6 +37,9 @@ const { auditar } = require('../../../../shared/audit');
     await addCol(`ALTER TABLE pagos_credito ADD COLUMN IF NOT EXISTS reversado_por       VARCHAR(200) NULL`);
     await addCol(`ALTER TABLE pagos_credito ADD COLUMN IF NOT EXISTS id_reversado_por    INT          NULL`);
     await addCol(`ALTER TABLE pagos_credito ADD COLUMN IF NOT EXISTS fecha_reverso       DATETIME     NULL`);
+    // Registro de condonación: montos FULL (antes de condonar). Condonado = total - cobrado.
+    await addCol(`ALTER TABLE pagos_credito ADD COLUMN IF NOT EXISTS interes_mora_total    DECIMAL(14,2) NULL`);
+    await addCol(`ALTER TABLE pagos_credito ADD COLUMN IF NOT EXISTS gastos_cobranza_total DECIMAL(14,2) NULL`);
 
     // Tablas necesarias para el batch
     await pool.query(`
@@ -117,7 +120,8 @@ const create = async (req, res) => {
       id_credito, numero_cuota, fecha_vencimiento,
       monto_cuota, interes_mora, gastos_cobranza,
       total_pagado, fecha_pago, estado_pago, observacion, id_caja,
-      origen_fondos, id_cuenta_bancaria
+      origen_fondos, id_cuenta_bancaria,
+      interes_mora_total, gastos_cobranza_total
     } = req.body;
     if (!id_credito || !numero_cuota)
       return res.status(400).json({ success: false, error: 'id_credito y numero_cuota son requeridos' });
@@ -129,21 +133,25 @@ const create = async (req, res) => {
     const id_registrado_por = u.id_usuario || null;
     const tp = parseFloat(total_pagado) ||
                (parseFloat(monto_cuota)||0) + (parseFloat(interes_mora)||0) + (parseFloat(gastos_cobranza)||0);
+    // Montos full (antes de condonar): si no vienen, igualan a lo cobrado (sin condonación)
+    const imTot = (interes_mora_total    != null) ? parseFloat(interes_mora_total)    || 0 : parseFloat(interes_mora)    || 0;
+    const gcTot = (gastos_cobranza_total != null) ? parseFloat(gastos_cobranza_total) || 0 : parseFloat(gastos_cobranza) || 0;
 
     const [r] = await pool.query(
       `INSERT INTO pagos_credito
          (id_credito, numero_cuota, fecha_vencimiento, monto_cuota,
           interes_mora, gastos_cobranza, total_pagado, fecha_pago,
           estado_pago, observacion, registrado_por, id_registrado_por, id_caja,
-          origen_fondos, id_cuenta_bancaria)
-       VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
+          origen_fondos, id_cuenta_bancaria, interes_mora_total, gastos_cobranza_total)
+       VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
       [id_credito, numero_cuota, fecha_vencimiento || null,
        parseFloat(monto_cuota)||0, parseFloat(interes_mora)||0,
        parseFloat(gastos_cobranza)||0, tp,
        fecha_pago || null, estado_pago || 'PAGADO',
        observacion || null, registrado_por, id_registrado_por,
        parseInt(id_caja) || null,
-       origen_fondos || null, parseInt(id_cuenta_bancaria) || null]
+       origen_fondos || null, parseInt(id_cuenta_bancaria) || null,
+       imTot, gcTot]
     );
     audit.registrar({
       id_credito, req,
@@ -239,13 +247,17 @@ const createBatch = async (req, res) => {
     for (const p of pagos) {
       const tp = parseFloat(p.total_pagado) ||
         (parseFloat(p.monto_cuota)||0) + (parseFloat(p.interes_mora)||0) + (parseFloat(p.gastos_cobranza)||0);
+      // Montos full (antes de condonar): si no vienen, igualan a lo cobrado
+      const imTot = (p.interes_mora_total    != null) ? parseFloat(p.interes_mora_total)    || 0 : parseFloat(p.interes_mora)    || 0;
+      const gcTot = (p.gastos_cobranza_total != null) ? parseFloat(p.gastos_cobranza_total) || 0 : parseFloat(p.gastos_cobranza) || 0;
       await conn.query(
         `INSERT INTO pagos_credito
            (id_credito, numero_cuota, fecha_vencimiento, monto_cuota,
             interes_mora, gastos_cobranza, total_pagado, fecha_pago,
             estado_pago, observacion, registrado_por, id_registrado_por,
-            id_caja, origen_fondos, id_cuenta_bancaria, numero_transaccion)
-         VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
+            id_caja, origen_fondos, id_cuenta_bancaria, numero_transaccion,
+            interes_mora_total, gastos_cobranza_total)
+         VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
         [
           id_credito, p.numero_cuota, p.fecha_vencimiento || null,
           parseFloat(p.monto_cuota)||0, parseFloat(p.interes_mora)||0,
@@ -253,7 +265,8 @@ const createBatch = async (req, res) => {
           fecha_pago || null, 'PAGADO',
           observacion || null, registrado_por, id_registrado_por,
           idCajaInt, origen_fondos || null, idCuentaInt,
-          numero_transaccion
+          numero_transaccion,
+          imTot, gcTot
         ]
       );
     }
