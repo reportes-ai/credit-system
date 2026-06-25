@@ -316,9 +316,14 @@ function carteraLiveRow(row, um) {
   const meses = (nY - fpY) * 12 + (nM - fpM) + (nD >= fpD ? 1 : 0);
   const CV = Math.min(plazo, Math.max(0, meses));              // cuotas vencidas
   const pagadas = parseInt(row.cuotas_pagadas, 10) || 0;
-  if (CV - pagadas <= 0) return 'VIGENTE';                     // al día
+  // Días de atraso para el chip: prefiere el calendario real (subconsulta a
+  // cuotas_credito, exacta para INDEXA); si no hay (créditos nuevos AutoFácil sin
+  // calendario congelado), usa el derivado de fecha_primera_cuota (igual que la ficha).
+  const realDias = parseInt(row.dias_atraso, 10) || 0;
+  if (CV - pagadas <= 0) { row.dias_atraso = realDias; return 'VIGENTE'; }  // al día
   const due = Date.UTC(fpY, fpM + pagadas, fpD);               // venc. cuota impaga más antigua
   const dias = Math.max(0, Math.floor((Date.UTC(nY, nM, nD) - due) / 86400000));
+  row.dias_atraso = realDias > 0 ? realDias : dias;
   if (dias >= um.vencido) return 'VENCIDO';
   if (dias >= um.mora) return 'MORA';
   return 'VIGENTE';
