@@ -274,11 +274,18 @@ const historial = async (req, res) => {
 const ver = async (req, res) => {
   try {
     const [[r]] = await pool.query(
-      `SELECT codigo, tipo, datos_json, emitido_por, anulado,
+      `SELECT codigo, tipo, num_op, rut, nombre, datos_json, emitido_por, anulado,
               DATE_FORMAT(created_at,'%Y-%m-%d') fecha_emision
          FROM certificados WHERE codigo=? LIMIT 1`, [req.params.codigo]);
     if (!r) return res.status(404).json({ success: false, data: null, error: 'Certificado no encontrado' });
     let snap = {}; try { snap = r.datos_json ? JSON.parse(r.datos_json) : {}; } catch (_) {}
+    // Registros viejos (sin snapshot completo): reconstruye desde el origen.
+    if (!snap.nombre && !snap.credito) {
+      try {
+        const o = await armar(r.tipo, { num_op: r.num_op, op_carta: snap.op_carta, numero_cuota: snap.numero_cuota });
+        snap = { ...o, tipo_label: TIPOS[o.tipo] };
+      } catch (_) { snap = { ...snap, nombre: r.nombre, rut: r.rut, num_op: r.num_op }; }
+    }
     res.json({ success: true, data: { ...snap, codigo: r.codigo, tipo: r.tipo, tipo_label: snap.tipo_label || TIPOS[r.tipo] || r.tipo, emitido_por: snap.emitido_por || r.emitido_por, fecha_emision: r.fecha_emision, anulado: !!r.anulado }, error: null });
   } catch (e) {
     console.error('[certificados ver]', e.message);
