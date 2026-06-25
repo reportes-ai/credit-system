@@ -2,7 +2,7 @@
 <html lang="es">
 <head>
 <meta charset="UTF-8">
-<!-- v1.5 -->
+<!-- v1.6 -->
 <link rel="icon" href="/img/favicon.png" type="image/png">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Certificados — AutoFácil</title>
@@ -305,6 +305,7 @@ function render(d){
     <div class="folio-row">Folio <b>${esc(d.codigo)}</b> · ${fechaLarga(d.fecha_emision)}</div>
     <h2>${esc(d.tipo_label||'')}</h2>
     <div class="body">${d.cuerpo_html||''}</div>
+    ${d.detalle_html||''}
     <div class="body" style="margin-top:16px">${d.cierre_html||''}</div>
     <div class="doc-foot">
       <div class="firma">

@@ -67,7 +67,10 @@ const { _calc: COB } = require('../../../cobranza/src/controllers/cobranza.contr
         updated_por VARCHAR(120) NULL
       )`);
     for (const [tipo, cuerpo] of Object.entries(DEFAULT_TEXTOS)) {
-      await pool.query('INSERT IGNORE INTO certificados_textos (tipo, titulo, cuerpo) VALUES (?,?,?)',
+      // Siembra; y re-sincroniza el texto por defecto solo si el admin no lo ha editado.
+      await pool.query(
+        `INSERT INTO certificados_textos (tipo, titulo, cuerpo) VALUES (?,?,?)
+         ON DUPLICATE KEY UPDATE cuerpo = IF(updated_por IS NULL, VALUES(cuerpo), cuerpo), titulo = VALUES(titulo)`,
         [tipo, TIPOS[tipo] || 'Párrafo de cierre (común)', cuerpo]);
     }
     // Mantenedor de textos → funcionalidad bajo Mantenedores (módulo 30001)
@@ -122,7 +125,7 @@ const DEFAULT_TEXTOS = {
   CERT_ALZAMIENTO:      'Habiéndose pagado íntegramente el crédito automotriz N° <b>{num_op}</b> de <b>{nombre}</b>, RUT <b>{rut}</b>, AutoFácil Chile autoriza y certifica el <b>ALZAMIENTO DE LA PRENDA</b> que afecta al vehículo <b>{vehiculo}</b>. Fecha del pago final: <b>{fecha_prepago}</b>.',
   CERT_PAGO_CUOTA:      'AutoFácil Chile certifica que, respecto del crédito automotriz N° <b>{num_op}</b> de <b>{nombre}</b>, RUT <b>{rut}</b>, la <b>cuota N° {numero_cuota}</b> (vencimiento {fecha_vencimiento}) fue <b>pagada</b> con fecha <b>{fecha_pago}</b> por un monto de <b>{monto_cuota}</b>.',
   CERT_DEUDA_VIGENTE:   'AutoFácil Chile certifica que <b>{nombre}</b>, RUT <b>{rut}</b>, mantiene una <b>deuda vigente</b> de <b>{saldo}</b> por el crédito automotriz N° <b>{num_op}</b>, asociado al vehículo <b>{vehiculo}</b>, correspondiente a <b>{cuotas_pendientes}</b> cuotas pendientes de un total de <b>{cuotas_total}</b>.',
-  CERT_DEUDA_PREPAGO:   'AutoFácil Chile certifica que, al día de la fecha, el monto requerido para <b>prepagar (saldar)</b> íntegramente el crédito automotriz N° <b>{num_op}</b> de <b>{nombre}</b>, RUT <b>{rut}</b>, asociado al vehículo <b>{vehiculo}</b>, asciende a <b>{saldo}</b>, de acuerdo al siguiente detalle: capital de cuotas vigentes <b>{capital_vigente}</b>; cuotas en mora <b>{mora_cuotas}</b>; interés por mora <b>{interes_mora}</b>; gastos de cobranza <b>{gastos_cobranza}</b>; intereses corrientes <b>{interes_corriente}</b>; comisión de prepago <b>{comision_prepago}</b>.',
+  CERT_DEUDA_PREPAGO:   'AutoFácil Chile certifica que, al día de hoy, el monto requerido para <b>prepagar (saldar)</b> íntegramente el crédito automotriz N° <b>{num_op}</b> de <b>{nombre}</b>, RUT <b>{rut}</b>, asociado al vehículo <b>{vehiculo}</b>, asciende a <b>{saldo}</b>, de acuerdo al siguiente detalle:',
   CERT_PREAPROBADO:     'AutoFácil Chile certifica que <b>{nombre}</b>, RUT <b>{rut}</b>, cuenta con un crédito automotriz <b>PREAPROBADO</b>{fin_parens} según la carta de aprobación N° <b>{op_carta}</b>, bajo las siguientes condiciones: vehículo <b>{vehiculo}</b>{patente_txt}; precio del vehículo <b>{precio}</b>; pie <b>{pie}</b>; saldo precio a financiar <b>{saldo_precio}</b>; plazo <b>{plazo}</b> cuotas{tasa_txt}{monto_txt}. La presente oferta tiene una <b>vigencia de {vigencia} días corridos</b> a contar de la fecha de emisión (vence el <b>{vence}</b>).',
   CIERRE:               'Se emite el presente certificado a solicitud de <b>{nombre}</b> para los fines que estime convenientes, sin ulterior responsabilidad para Auto Fácil SpA.',
 };
@@ -156,6 +159,45 @@ function buildVars(out, fechaEmisionISO) {
   };
 }
 
+// Próximos N días hábiles (salta fines de semana y feriados de la tabla).
+async function proxDiasHabiles(fromISO, n) {
+  let feriados = new Set();
+  try { const [f] = await pool.query("SELECT DATE_FORMAT(fecha,'%Y-%m-%d') f FROM feriados"); feriados = new Set(f.map(x => x.f)); } catch (_) {}
+  const out = []; const d = new Date(fromISO + 'T00:00:00');
+  while (out.length < n) {
+    d.setDate(d.getDate() + 1);
+    const iso = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+    const dow = d.getDay();
+    if (dow === 0 || dow === 6 || feriados.has(iso)) continue;
+    out.push(iso);
+  }
+  return out;
+}
+
+// Bloque del desglose de prepago: solo ítems con saldo + recuadro de 3 días hábiles.
+function detallePrepagoHTML(x) {
+  if (!x) return '';
+  const items = [
+    ['Capital de cuotas vigentes', x.capital_vigente],
+    ['Cuotas en mora', x.mora_cuotas],
+    ['Interés por mora', x.interes_mora],
+    ['Gastos de cobranza', x.gastos_cobranza],
+    ['Intereses corrientes', x.interes_corriente],
+    ['Comisión de prepago', x.comision_prepago],
+  ].filter(([, v]) => N(v) > 0);
+  const filas = items.map(([k, v]) => `<tr><td style="padding:4px 0;color:#475569">${k}</td><td style="padding:4px 0;text-align:right;font-weight:600">${fmtMoney(v)}</td></tr>`).join('');
+  const proy = (x.proyeccion || []).map(p => `<tr><td style="padding:3px 12px;color:#475569">${fechaLargaES(p.fecha)}</td><td style="padding:3px 12px;text-align:right;font-weight:700;color:#0141A2">${fmtMoney(p.total)}</td></tr>`).join('');
+  return `
+    <table style="width:100%;max-width:470px;margin:14px 0 4px;font-size:.9rem;border-collapse:collapse">
+      ${filas}
+      <tr><td style="padding:7px 0;border-top:1.5px solid #0141A2;font-weight:800;color:#0f172a">Total a prepagar</td><td style="padding:7px 0;border-top:1.5px solid #0141A2;text-align:right;font-weight:800;color:#0141A2">${fmtMoney(x.saldo_insoluto)}</td></tr>
+    </table>
+    ${proy ? `<div style="margin-top:16px;border:1px solid #cbd5e1;border-radius:10px;padding:12px 16px;max-width:470px;background:#f8fafc">
+      <div style="font-weight:700;font-size:.82rem;color:#0141A2;margin-bottom:6px">Monto a prepagar — próximos 3 días hábiles</div>
+      <table style="width:100%;border-collapse:collapse;font-size:.87rem">${proy}</table>
+    </div>` : ''}`;
+}
+
 // Renderiza el cuerpo + el párrafo de cierre desde las plantillas de BD.
 async function renderCuerpo(out, fechaEmisionISO) {
   const [[t]] = await pool.query('SELECT cuerpo FROM certificados_textos WHERE tipo=? LIMIT 1', [out.tipo]);
@@ -164,6 +206,7 @@ async function renderCuerpo(out, fechaEmisionISO) {
   return {
     cuerpo_html: renderTpl((t && t.cuerpo) || DEFAULT_TEXTOS[out.tipo] || '', v),
     cierre_html: renderTpl((cierre && cierre.cuerpo) || DEFAULT_TEXTOS.CIERRE, v),
+    detalle_html: out.tipo === 'CERT_DEUDA_PREPAGO' ? detallePrepagoHTML(out.datos) : '',
   };
 }
 
@@ -313,11 +356,6 @@ async function armar(tipo, body) {
   if (tipo === 'CERT_DEUDA_PREPAGO') {
     if (pagado) throw { code: 400, msg: 'El crédito ya está pagado; no hay monto de prepago.' };
     if (!cuotas.length) throw { code: 400, msg: 'El crédito no tiene calendario de cuotas para calcular el prepago.' };
-    // Liquidación de prepago:
-    //  capital de cuotas vigentes + cuotas en mora (valor) + interés por mora +
-    //  gastos de cobranza + intereses corrientes sobre el capital vigente + comisión de prepago (1 mes).
-    const hoy = new Date(); hoy.setHours(0, 0, 0, 0);
-    const fechaCalc = new Date().toLocaleDateString('sv-SE', { timeZone: 'America/Santiago' });
     const noPag = cuotas.filter(q => q.estado_cuota !== 'PAGADA');
     const tasaMes = N((noPag[0] || cuotas[0]).tasa) || N(c.tascli_real) || 0;  // % mensual
     const tasaDia = (tasaMes / 100) / 30;
@@ -335,33 +373,43 @@ async function armar(tipo, body) {
       const baseTramo = N(c.saldo_precio) || N(c.monto_financiado) || 0;
       if (ufOt > 0 && baseTramo > umbral * ufOt) tramo = 'mayor';
     } catch (_) {}
-    let capitalVigente = 0, moraCuotas = 0, interesMora = 0, gastosCobranza = 0, ultVencPasado = null;
-    let nMora = 0, nVig = 0;
-    for (const q of noPag) {
-      const venc = q.venc ? new Date(q.venc + 'T00:00:00') : null;
-      const amort = N(q.amortizacion);
-      if (venc && venc < hoy) {                       // en mora
-        nMora++; moraCuotas += N(q.valor_cuota);
-        const diasMora = Math.floor((hoy - venc) / 86400000);
-        interesMora += (COB.calcularInteresMora(N(q.valor_cuota), q.venc, fechaCalc, tramo, tasasMora).interes || 0);
-        if (diasMora >= gastosDias) {
-          const uf = await COB.getUFporFecha(COB.addDias(q.venc, gastosDias));
-          gastosCobranza += (COB.calcularGastoCobranza(N(q.valor_cuota), uf, tramosUF).gasto_pesos || 0);
-        }
-        if (!ultVencPasado || venc > ultVencPasado) ultVencPasado = venc;
-      } else { nVig++; capitalVigente += amort; }     // vigente (futura)
-    }
-    const diasCorr = ultVencPasado ? Math.max(0, Math.floor((hoy - ultVencPasado) / 86400000)) : 0;
-    const interesCorriente = capitalVigente * tasaDia * diasCorr;
-    const comisionPrepago = capitalVigente * (tasaMes / 100);   // un mes de interés sobre el capital vigente
-    const totalPrepago = capitalVigente + moraCuotas + interesMora + gastosCobranza + interesCorriente + comisionPrepago;
-    return { ...base, datos: {
-      saldo_insoluto: Math.round(totalPrepago),
-      capital_vigente: Math.round(capitalVigente), mora_cuotas: Math.round(moraCuotas),
-      interes_mora: Math.round(interesMora), gastos_cobranza: gastosCobranza,
-      interes_corriente: Math.round(interesCorriente), comision_prepago: Math.round(comisionPrepago),
-      dias_corrientes: diasCorr, tasa_mensual: tasaMes, cuotas_mora: nMora, cuotas_vigentes: nVig,
-    } };
+
+    // Liquidación a una fecha dada (YYYY-MM-DD)
+    const liquidar = async (fechaISO) => {
+      const ref = new Date(fechaISO + 'T00:00:00');
+      let capV = 0, moraC = 0, intMora = 0, gastos = 0, ultPasado = null, nM = 0, nV = 0;
+      for (const q of noPag) {
+        const venc = q.venc ? new Date(q.venc + 'T00:00:00') : null;
+        const amort = N(q.amortizacion);
+        if (venc && venc < ref) {                       // en mora
+          nM++; moraC += N(q.valor_cuota);
+          const diasMora = Math.floor((ref - venc) / 86400000);
+          intMora += (COB.calcularInteresMora(N(q.valor_cuota), q.venc, fechaISO, tramo, tasasMora).interes || 0);
+          if (diasMora >= gastosDias) {
+            const uf = await COB.getUFporFecha(COB.addDias(q.venc, gastosDias));
+            gastos += (COB.calcularGastoCobranza(N(q.valor_cuota), uf, tramosUF).gasto_pesos || 0);
+          }
+          if (!ultPasado || venc > ultPasado) ultPasado = venc;
+        } else { nV++; capV += amort; }                 // vigente (futura)
+      }
+      const diasCorr = ultPasado ? Math.max(0, Math.floor((ref - ultPasado) / 86400000)) : 0;
+      const intCorr = capV * tasaDia * diasCorr;
+      const comision = capV * (tasaMes / 100);          // un mes de interés sobre el capital vigente
+      const total = capV + moraC + intMora + gastos + intCorr + comision;
+      return {
+        fecha: fechaISO, saldo_insoluto: Math.round(total),
+        capital_vigente: Math.round(capV), mora_cuotas: Math.round(moraC),
+        interes_mora: Math.round(intMora), gastos_cobranza: Math.round(gastos),
+        interes_corriente: Math.round(intCorr), comision_prepago: Math.round(comision),
+        dias_corrientes: diasCorr, cuotas_mora: nM, cuotas_vigentes: nV,
+      };
+    };
+    const hoyISO = new Date().toLocaleDateString('sv-SE', { timeZone: 'America/Santiago' });
+    const liq = await liquidar(hoyISO);
+    // Proyección: monto a prepagar en los próximos 3 días hábiles
+    const proyeccion = [];
+    for (const f of await proxDiasHabiles(hoyISO, 3)) proyeccion.push({ fecha: f, total: (await liquidar(f)).saldo_insoluto });
+    return { ...base, datos: { ...liq, tasa_mensual: tasaMes, proyeccion } };
   }
   throw { code: 400, msg: 'Tipo no soportado.' };
 }
@@ -457,6 +505,8 @@ const ver = async (req, res) => {
         snap.cuerpo_html = txt.cuerpo_html; snap.cierre_html = txt.cierre_html;
       } catch (_) {}
     }
+    // El desglose del prepago se deriva del snapshot de datos (inmutable).
+    if (r.tipo === 'CERT_DEUDA_PREPAGO' && snap.datos && !snap.detalle_html) snap.detalle_html = detallePrepagoHTML(snap.datos);
     res.json({ success: true, data: { ...snap, codigo: r.codigo, tipo: r.tipo, tipo_label: snap.tipo_label || TIPOS[r.tipo] || r.tipo, emitido_por: snap.emitido_por || r.emitido_por, fecha_emision: r.fecha_emision, anulado: !!r.anulado }, error: null });
   } catch (e) {
     console.error('[certificados ver]', e.message);
