@@ -1,6 +1,6 @@
 'use strict';
 const pool = require('../../../../shared/config/database');
-const { emitirCorrelativo } = require('../../../../shared/ordenes-pago');
+const { emitirCorrelativo, pagarCorrelativo } = require('../../../../shared/ordenes-pago');
 
 /* ── Migración ───────────────────────────────────────────────────── */
 (async () => {
@@ -188,6 +188,11 @@ const { emitirCorrelativo } = require('../../../../shared/ordenes-pago');
 })();
 
 const loginDe = u => (u?.nombre ? (u.nombre + ' ' + (u.apellido || '')).trim() : u?.email) || 'Sistema';
+// Caja activa del usuario (para timbrar el pago en op_correlativos). null si no tiene.
+const cajaActivaDe = async (id_usuario) => {
+  try { const [[c]] = await pool.query('SELECT id_caja FROM caja_usuarios WHERE id_usuario=? AND activo=1 LIMIT 1', [id_usuario]); return c ? c.id_caja : null; }
+  catch { return null; }
+};
 
 // Guarda los datos de la factura/boleta de comisión con el desglose CONGELADO
 // (monto, impuesto y líquido a pagar tal como se registraron; la orden no recalcula).
@@ -854,6 +859,13 @@ const pagarSaldos = async (req, res) => {
       for (const e of etapas) vals.push([id, 'SALDO', e, usuario]);
     await pool.query(
       `INSERT IGNORE INTO postventa_etapas (id_seguimiento, track, etapa, usuario) VALUES ?`, [vals]);
+    // Registrar el PAGO en el libro central op_correlativos → timbre PAGADO en el documento
+    const idCaja = await cajaActivaDe(req.usuario?.id_usuario);
+    for (const id of ids) {
+      await asegurarOrdenSaldo(id, req.usuario);   // garantiza orden + correlativo
+      const [[po]] = await pool.query('SELECT id FROM postventa_ordenes WHERE id_seguimiento=?', [id]);
+      if (po) await pagarCorrelativo({ origen: 'SALDO', origen_id: po.id, id_usuario: req.usuario?.id_usuario, usuario_nombre: usuario, id_caja: idCaja, metodo: 'Transferencia' });
+    }
     // Alerta: pago realizado → Gerente/Jefe Comercial, ejecutivo de la operación y extra
     for (const id of ids) {
       const c = await ctxSeguimiento(id);
@@ -1136,6 +1148,13 @@ const pagarComisiones = async (req, res) => {
     for (const id of ids)
       for (const e of etapas) vals.push([id, 'COMISION', e, usuario]);
     await pool.query(`INSERT IGNORE INTO postventa_etapas (id_seguimiento, track, etapa, usuario) VALUES ?`, [vals]);
+    // Registrar el PAGO en el libro central op_correlativos → timbre PAGADO en el documento
+    const idCaja = await cajaActivaDe(req.usuario?.id_usuario);
+    for (const id of ids) {
+      await asegurarOrdenComision(id, req.usuario);   // garantiza orden + correlativo
+      const [[po]] = await pool.query('SELECT id FROM postventa_ordenes_comision WHERE id_seguimiento=?', [id]);
+      if (po) await pagarCorrelativo({ origen: 'COMISION', origen_id: po.id, id_usuario: req.usuario?.id_usuario, usuario_nombre: usuario, id_caja: idCaja, metodo: 'Transferencia' });
+    }
     for (const id of ids) {
       const c = await ctxSeguimiento(id);
       await notificarEventoSaldo('com_pago_realizado', { op: c.num_op, id_seguimiento: id, ejecutivo: c.ejecutivo });

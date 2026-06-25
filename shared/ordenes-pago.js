@@ -121,4 +121,23 @@ async function anularCorrelativo({ numero = null, origen = null, origen_id = nul
   } catch (e) { console.error('[anularCorrelativo]', e.message); return false; }
 }
 
-module.exports = { emitirCorrelativo, anularCorrelativo };
+/**
+ * Registra el PAGO de un correlativo (egreso): pagada=1 + fecha/quién/caja/método.
+ * Por número o por origen+id. No-op si ya estaba pagada o anulada. Esto es lo que
+ * llena los datos del TIMBRE PAGADO en el documento ([[reference_timbre_pagado]]).
+ * @returns {boolean} true si marcó el pago.
+ */
+async function pagarCorrelativo({ numero = null, origen = null, origen_id = null, id_usuario = null, usuario_nombre = null, id_caja = null, metodo = null }) {
+  try {
+    let where, args;
+    if (numero) { where = 'numero=? AND anulada=0 AND pagada=0'; args = [numero]; }
+    else if (origen && origen_id) { where = 'origen=? AND origen_id=? AND anulada=0 AND pagada=0'; args = [origen, origen_id]; }
+    else return false;
+    const [r] = await pool.query(
+      `UPDATE op_correlativos SET pagada=1, fecha_pagada=NOW(), pagada_por=?, pagada_nombre=?, id_caja=?, metodo_pago=? WHERE ${where}`,
+      [id_usuario, usuario_nombre, id_caja, metodo, ...args]);
+    return r.affectedRows > 0;
+  } catch (e) { console.error('[pagarCorrelativo]', e.message); return false; }
+}
+
+module.exports = { emitirCorrelativo, anularCorrelativo, pagarCorrelativo };
