@@ -1,0 +1,317 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <link rel="icon" href="/img/favicon.png" type="image/png">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Órdenes de Pago de Cuotas — AutoFácil</title>
+  <link href="/css/bootstrap-icons.css" rel="stylesheet">
+  <style>
+    :root { --navy:#0141A2; --navy-dark:#012d70; --navy-light:#0255c5; --accent:#009AFE; --bg:#f0f4f8; --green:#15803d; --red:#dc2626; --amber:#b45309; }
+    * { box-sizing:border-box; }
+    body { background:var(--bg); font-family:'Segoe UI',system-ui,sans-serif; margin:0; min-height:100vh; color:#1e293b; }
+
+    .topnav { background:linear-gradient(90deg,var(--navy-dark),var(--navy-light)); color:#fff; height:60px; padding:0 24px; display:flex; align-items:center; justify-content:space-between; position:sticky; top:0; z-index:200; box-shadow:0 2px 8px rgba(0,0,0,.3); }
+    .topnav-left { display:flex; align-items:center; gap:16px; }
+    .topnav-brand { display:flex; align-items:center; gap:8px; text-decoration:none; }
+    .topnav-brand img { height:32px; filter:brightness(0) invert(1); }
+    .version-badge { background:rgba(255,255,255,.15); color:rgba(255,255,255,.75); font-size:.65rem; font-weight:700; border-radius:6px; padding:2px 8px; }
+    .breadcrumb-nav { color:rgba(255,255,255,.6); font-size:.85rem; display:flex; align-items:center; gap:6px; }
+    .breadcrumb-nav a { color:rgba(255,255,255,.75); text-decoration:none; }
+    .breadcrumb-nav .sep { color:rgba(255,255,255,.35); }
+    .topnav-right { display:flex; align-items:center; gap:10px; }
+    .user-chip { background:rgba(255,255,255,.12); border-radius:24px; padding:5px 12px; display:flex; align-items:center; gap:8px; font-size:.85rem; }
+    .btn-logout { background:rgba(255,255,255,.1); border:1px solid rgba(255,255,255,.2); color:#fff; border-radius:8px; padding:5px 12px; font-size:.82rem; cursor:pointer; }
+
+    .page { max-width:1200px; margin:0 auto; padding:26px 24px 80px; }
+    .page-banner { background:linear-gradient(135deg,#012d70,#0141A2 50%,#009AFE); border-radius:16px; color:#fff; padding:22px 30px; margin-bottom:22px; display:flex; align-items:center; gap:18px; }
+    .page-banner i { font-size:2.4rem; opacity:.85; }
+    .page-banner h2 { font-weight:800; margin:0 0 3px; font-size:1.3rem; }
+    .page-banner p { opacity:.85; margin:0; font-size:.88rem; }
+
+    .tabs { display:flex; gap:8px; margin-bottom:16px; flex-wrap:wrap; }
+    .tab { background:#fff; border:1.5px solid #e5e7eb; border-radius:10px; padding:8px 16px; font-size:.85rem; font-weight:700; cursor:pointer; color:#475569; display:flex; align-items:center; gap:7px; }
+    .tab.active { background:var(--navy); border-color:var(--navy); color:#fff; }
+    .tab .cnt { background:rgba(0,0,0,.08); border-radius:20px; padding:1px 8px; font-size:.72rem; }
+    .tab.active .cnt { background:rgba(255,255,255,.25); }
+
+    .table-wrap { background:#fff; border-radius:14px; box-shadow:0 1px 4px rgba(0,0,0,.07); overflow:hidden; }
+    table { width:100%; border-collapse:collapse; font-size:.85rem; }
+    thead tr { background:var(--navy); color:#fff; }
+    thead th { padding:11px 14px; font-weight:600; font-size:.74rem; letter-spacing:.4px; text-transform:uppercase; white-space:nowrap; text-align:left; }
+    tbody tr { border-bottom:1px solid #f1f5f9; }
+    tbody tr:hover { background:#f8fafc; }
+    tbody td { padding:10px 14px; vertical-align:middle; }
+    .td-folio { font-weight:800; color:var(--navy); font-family:monospace; }
+    .td-amt { font-family:monospace; font-weight:700; text-align:right; }
+    .muted { color:#94a3b8; }
+
+    .badge-estado { display:inline-flex; align-items:center; gap:5px; border-radius:20px; padding:3px 11px; font-size:.73rem; font-weight:800; }
+    .e-PENDIENTE { background:#fef3c7; color:#92400e; }
+    .e-APROBADA  { background:#dcfce7; color:#166534; }
+    .e-RECHAZADA { background:#fee2e2; color:#991b1b; }
+    .e-ANULADA   { background:#e2e8f0; color:#475569; }
+
+    .btn { border:none; border-radius:8px; padding:6px 13px; font-size:.78rem; font-weight:700; cursor:pointer; display:inline-flex; align-items:center; gap:5px; }
+    .btn-ver { background:#eff6ff; color:#1d4ed8; border:1px solid #bfdbfe; }
+    .btn-ap  { background:linear-gradient(135deg,#16a34a,#15803d); color:#fff; }
+    .btn-rc  { background:#fff1f2; color:#991b1b; border:1px solid #fca5a5; }
+
+    .empty { text-align:center; color:#94a3b8; padding:54px 0; }
+    .empty i { font-size:2.4rem; display:block; margin-bottom:10px; opacity:.5; }
+
+    /* Modal */
+    .ov { position:fixed; inset:0; background:rgba(15,23,42,.6); z-index:500; display:none; align-items:center; justify-content:center; padding:16px; }
+    .ov.open { display:flex; }
+    .box { background:#fff; border-radius:16px; width:min(720px,100%); max-height:92vh; display:flex; flex-direction:column; overflow:hidden; box-shadow:0 24px 60px rgba(0,0,0,.3); }
+    .box-head { background:linear-gradient(135deg,var(--navy-dark),var(--navy-light)); color:#fff; padding:16px 22px; display:flex; align-items:center; justify-content:space-between; }
+    .box-head h5 { margin:0; font-size:1rem; font-weight:800; }
+    .box-head .sub { font-size:.8rem; opacity:.85; margin-top:2px; }
+    .box-x { background:rgba(255,255,255,.15); border:1px solid rgba(255,255,255,.3); color:#fff; border-radius:8px; width:30px; height:30px; cursor:pointer; }
+    .box-body { padding:18px 22px; overflow-y:auto; }
+    .box-foot { padding:14px 22px; border-top:1px solid #e5e7eb; background:#f8fafc; display:flex; gap:10px; justify-content:flex-end; flex-wrap:wrap; }
+    .dl { display:grid; grid-template-columns:auto 1fr; gap:4px 16px; font-size:.86rem; margin-bottom:14px; }
+    .dl dt { color:#64748b; font-weight:600; }
+    .dl dd { margin:0; font-weight:700; }
+    .ct { width:100%; border-collapse:collapse; font-size:.82rem; }
+    .ct th { background:#f1f5f9; color:#374151; font-size:.68rem; text-transform:uppercase; padding:7px 9px; border-bottom:2px solid #e5e7eb; }
+    .ct td { padding:6px 9px; border-bottom:1px solid #f1f5f9; }
+    .ct .r { text-align:right; font-family:monospace; font-weight:700; }
+    .txta { width:100%; border:1.5px solid #d1d5db; border-radius:8px; padding:9px 12px; font-size:.88rem; font-family:inherit; resize:vertical; }
+    .modal-err { background:#fef2f2; border:1.5px solid #fca5a5; color:#991b1b; border-radius:8px; padding:8px 14px; font-size:.82rem; font-weight:600; margin-top:10px; display:none; }
+    .btn-lg { border:none; border-radius:9px; padding:10px 20px; font-size:.9rem; font-weight:800; cursor:pointer; display:inline-flex; align-items:center; gap:7px; }
+    .btn-lg.ap { background:linear-gradient(135deg,#16a34a,#15803d); color:#fff; }
+    .btn-lg.rc { background:#fff1f2; color:#991b1b; border:1px solid #fca5a5; }
+    .btn-lg.sec { background:#eef2f7; color:#334155; }
+    .toast { position:fixed; bottom:26px; left:50%; transform:translateX(-50%); padding:11px 26px; border-radius:10px; font-size:.92rem; font-weight:700; z-index:600; display:none; box-shadow:0 8px 24px rgba(0,0,0,.25); }
+    .toast.ok { background:#15803d; color:#fff; } .toast.err { background:#991b1b; color:#fff; }
+  </style>
+</head>
+<body>
+
+<nav class="topnav">
+  <div class="topnav-left">
+    <a href="/" class="topnav-brand">
+      <img src="/img/logo.png" alt="AutoFácil">
+      <span class="version-badge">v1.0</span>
+    </a>
+    <div class="breadcrumb-nav">
+      <a href="/">Inicio</a><span class="sep">›</span>
+      <a href="/tesoreria/">Tesorería</a><span class="sep">›</span>
+      <span style="color:#fff;font-weight:600"><i class="bi bi-inbox me-1"></i>Órdenes de Pago de Cuotas</span>
+    </div>
+  </div>
+  <div class="topnav-right">
+    <div class="user-chip"><i class="bi bi-person-circle"></i><span id="navNombre">—</span></div>
+    <button class="btn-logout" onclick="logout()"><i class="bi bi-box-arrow-right me-1"></i>Salir</button>
+  </div>
+</nav>
+
+<div class="page">
+  <div class="page-banner">
+    <i class="bi bi-inbox"></i>
+    <div>
+      <h2>Órdenes de Pago de Cuotas</h2>
+      <p>Solicitudes de pago de cuotas. Al aprobar, se registra el pago y se envía el comprobante al cliente.</p>
+    </div>
+  </div>
+
+  <div class="tabs" id="tabs">
+    <div class="tab active" data-estado="PENDIENTE" onclick="setTab('PENDIENTE')"><i class="bi bi-hourglass-split"></i>Pendientes <span class="cnt" id="cntP">0</span></div>
+    <div class="tab" data-estado="APROBADA" onclick="setTab('APROBADA')"><i class="bi bi-check-circle"></i>Aprobadas</div>
+    <div class="tab" data-estado="RECHAZADA" onclick="setTab('RECHAZADA')"><i class="bi bi-x-circle"></i>Rechazadas</div>
+    <div class="tab" data-estado="TODAS" onclick="setTab('TODAS')"><i class="bi bi-list-ul"></i>Todas</div>
+  </div>
+
+  <div class="table-wrap" id="tableWrap">
+    <div class="empty"><i class="bi bi-hourglass-split"></i>Cargando…</div>
+  </div>
+</div>
+
+<!-- Modal detalle / resolución -->
+<div class="ov" id="ov">
+  <div class="box">
+    <div class="box-head">
+      <div>
+        <h5><i class="bi bi-receipt me-2"></i>ODP <span id="mFolio">—</span></h5>
+        <div class="sub" id="mSub">—</div>
+      </div>
+      <button class="box-x" onclick="cerrar()">&times;</button>
+    </div>
+    <div class="box-body" id="mBody"></div>
+    <div class="box-foot" id="mFoot"></div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script src="/js/auth-guard.js"></script>
+<script>
+const token = sessionStorage.getItem('token');
+const yo = JSON.parse(sessionStorage.getItem('usuario') || 'null');
+if (!token || !yo) location.href = '/login.html';
+const API = (p, o = {}) => fetch(p, { headers: { Authorization: 'Bearer ' + token, 'Content-Type': 'application/json' }, ...o });
+const clp = v => '$' + Math.round(Number(v) || 0).toLocaleString('es-CL');
+const esc = s => String(s == null ? '' : s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+const fmtF  = f => { if (!f) return '—'; try { return new Date(f).toLocaleDateString('es-CL',{timeZone:'UTC',day:'2-digit',month:'2-digit',year:'numeric'}); } catch { return '—'; } };
+const fmtDT = f => { if (!f) return '—'; try { return new Date(f).toLocaleString('es-CL',{day:'2-digit',month:'2-digit',year:'numeric',hour:'2-digit',minute:'2-digit'}); } catch { return '—'; } };
+document.getElementById('navNombre').textContent = `${yo?.nombre||''} ${yo?.apellido||''}`.trim();
+function logout(){ sessionStorage.clear(); location.href='/login.html'; }
+function toast(m, ok){ const t=document.getElementById('toast'); t.textContent=m; t.className='toast '+(ok?'ok':'err'); t.style.display='block'; setTimeout(()=>t.style.display='none',4000); }
+
+let _estado = 'PENDIENTE';
+let _detalle = null;
+
+function setTab(e){
+  _estado = e;
+  document.querySelectorAll('.tab').forEach(t => t.classList.toggle('active', t.dataset.estado === e));
+  cargar();
+}
+
+async function cargar(){
+  const wrap = document.getElementById('tableWrap');
+  wrap.innerHTML = `<div class="empty"><i class="bi bi-hourglass-split"></i>Cargando…</div>`;
+  try {
+    const j = await (await API('/api/odp-cuotas?estado=' + _estado)).json();
+    if (!j.success) throw new Error(j.error);
+    const rows = j.data || [];
+    // contador de pendientes (siempre)
+    if (_estado === 'PENDIENTE') document.getElementById('cntP').textContent = rows.length;
+    else { try { const jp = await (await API('/api/odp-cuotas?estado=PENDIENTE')).json(); document.getElementById('cntP').textContent = (jp.data||[]).length; } catch(_){} }
+
+    if (!rows.length) {
+      wrap.innerHTML = `<div class="empty"><i class="bi bi-inbox"></i>Sin órdenes ${_estado==='TODAS'?'':esc(_estado.toLowerCase())}.</div>`;
+      return;
+    }
+    wrap.innerHTML = `
+      <table>
+        <thead><tr>
+          <th>ODP</th><th>Fecha</th><th>Crédito</th><th>Cliente</th>
+          <th style="text-align:center">Cuotas</th><th style="text-align:right">Monto</th>
+          <th>Origen</th><th>Solicitante</th><th>Estado</th><th></th>
+        </tr></thead>
+        <tbody>${rows.map(rowHTML).join('')}</tbody>
+      </table>`;
+  } catch(e) {
+    wrap.innerHTML = `<div class="empty"><i class="bi bi-exclamation-triangle"></i>${esc(e.message)}</div>`;
+  }
+}
+
+function rowHTML(o){
+  const folio = 'ODP-' + String(o.id_odp).padStart(5,'0');
+  const acc = o.estado === 'PENDIENTE'
+    ? `<button class="btn btn-ver" onclick="abrir(${o.id_odp})"><i class="bi bi-eye"></i>Revisar</button>`
+    : `<button class="btn btn-ver" onclick="abrir(${o.id_odp})"><i class="bi bi-eye"></i>Ver</button>`;
+  return `<tr>
+    <td class="td-folio">${folio}</td>
+    <td>${fmtDT(o.created_at)}</td>
+    <td><strong>${esc(o.numero_credito || ('#'+o.id_credito))}</strong></td>
+    <td>${esc(o.nombre_cliente||'—')}<div class="muted" style="font-size:.78rem">${esc(o.rut_cliente||'')}</div></td>
+    <td style="text-align:center">${o.n_cuotas}</td>
+    <td class="td-amt">${clp(o.monto_total)}</td>
+    <td>${esc(o.origen_fondos||'—')}</td>
+    <td>${esc(o.solicitante_nombre||'—')}</td>
+    <td><span class="badge-estado e-${esc(o.estado)}">${esc(o.estado)}</span></td>
+    <td style="text-align:right">${acc}</td>
+  </tr>`;
+}
+
+async function abrir(id){
+  document.getElementById('ov').classList.add('open');
+  document.getElementById('mBody').innerHTML = `<div class="empty"><i class="bi bi-hourglass-split"></i>Cargando…</div>`;
+  document.getElementById('mFoot').innerHTML = '';
+  try {
+    const j = await (await API('/api/odp-cuotas/' + id)).json();
+    if (!j.success) throw new Error(j.error);
+    _detalle = j.data;
+    render();
+  } catch(e) {
+    document.getElementById('mBody').innerHTML = `<div class="empty"><i class="bi bi-exclamation-triangle"></i>${esc(e.message)}</div>`;
+  }
+}
+function cerrar(){ document.getElementById('ov').classList.remove('open'); _detalle = null; }
+
+function render(){
+  const o = _detalle;
+  document.getElementById('mFolio').textContent = 'ODP-' + String(o.id_odp).padStart(5,'0');
+  document.getElementById('mSub').textContent = `Crédito N° ${o.numero_credito || o.id_credito} · ${o.nombre_cliente || ''}`;
+  const cuotas = Array.isArray(o.cuotas) ? o.cuotas : [];
+  const filas = cuotas.map(c => `
+    <tr>
+      <td style="text-align:center"><strong>${c.numero_cuota}</strong></td>
+      <td>${fmtF(c.fecha_vencimiento)}</td>
+      <td class="r">${clp(c.monto_cuota)}</td>
+      <td class="r">${c.interes_mora?clp(c.interes_mora):'—'}</td>
+      <td class="r">${c.gastos_cobranza?clp(c.gastos_cobranza):'—'}</td>
+      <td class="r">${clp(c.total_pagado)}</td>
+    </tr>`).join('');
+
+  const resuelta = o.estado !== 'PENDIENTE';
+  document.getElementById('mBody').innerHTML = `
+    <dl class="dl">
+      <dt>Estado</dt><dd><span class="badge-estado e-${esc(o.estado)}">${esc(o.estado)}</span></dd>
+      <dt>Solicitante</dt><dd>${esc(o.solicitante_nombre||'—')}${o.solicitante_email?` · <span class="muted">${esc(o.solicitante_email)}</span>`:''}</dd>
+      <dt>Origen de fondos</dt><dd>${esc(o.origen_fondos||'—')}</dd>
+      <dt>Cliente / RUT</dt><dd>${esc(o.nombre_cliente||'—')} · ${esc(o.rut_cliente||'')}</dd>
+      <dt>Email cliente</dt><dd>${o.email_cliente?esc(o.email_cliente):'<span class="muted">sin email — no se enviará comprobante</span>'}</dd>
+      <dt>Fecha de pago</dt><dd>${fmtF(o.fecha_pago) || '—'}</dd>
+      ${o.observacion?`<dt>Observación</dt><dd>${esc(o.observacion)}</dd>`:''}
+      ${resuelta?`<dt>Resuelta por</dt><dd>${esc(o.resolutor_nombre||'—')} · ${fmtDT(o.fecha_resolucion)}</dd>`:''}
+      ${resuelta&&o.numero_transaccion?`<dt>Transacción</dt><dd>TRX-${String(o.numero_transaccion).padStart(6,'0')}</dd>`:''}
+      ${resuelta&&o.comentario_resolucion?`<dt>Comentario</dt><dd>${esc(o.comentario_resolucion)}</dd>`:''}
+    </dl>
+    <div style="overflow-x:auto;border:1px solid #eef2f7;border-radius:10px">
+      <table class="ct">
+        <thead><tr><th style="text-align:center">N°</th><th>Vencimiento</th><th class="r">Cuota</th><th class="r">Int. Mora</th><th class="r">Gtos.</th><th class="r">Total</th></tr></thead>
+        <tbody>${filas}</tbody>
+        <tfoot><tr style="background:#f8fafc;font-weight:800"><td colspan="5" style="padding:8px 9px">TOTAL ${o.n_cuotas} cuota(s)</td><td class="r" style="color:var(--navy)">${clp(o.monto_total)}</td></tr></tfoot>
+      </table>
+    </div>
+    ${o.estado==='PENDIENTE'?`
+      <div style="margin-top:14px">
+        <label style="font-size:.78rem;font-weight:700;color:#475569;display:block;margin-bottom:5px">Comentario (obligatorio si rechazas)</label>
+        <textarea id="mComent" class="txta" rows="2" placeholder="Motivo / nota de la resolución…"></textarea>
+      </div>`:''}
+    <div class="modal-err" id="mErr"></div>`;
+
+  document.getElementById('mFoot').innerHTML = o.estado === 'PENDIENTE'
+    ? `<button class="btn-lg sec" onclick="cerrar()">Cerrar</button>
+       <button class="btn-lg rc" onclick="resolver('rechazar')"><i class="bi bi-x-circle"></i>Rechazar</button>
+       <button class="btn-lg ap" onclick="resolver('aprobar')"><i class="bi bi-check2-circle"></i>Aprobar y pagar</button>`
+    : `<button class="btn-lg sec" onclick="cerrar()">Cerrar</button>`;
+}
+
+function mErr(m){ const e=document.getElementById('mErr'); if(m){e.style.display='block';e.textContent=m;}else e.style.display='none'; }
+
+async function resolver(accion){
+  if (!_detalle) return;
+  const coment = (document.getElementById('mComent')?.value || '').trim();
+  if (accion === 'rechazar' && !coment) return mErr('El comentario es obligatorio para rechazar.');
+  mErr('');
+  const btns = document.querySelectorAll('#mFoot .btn-lg'); btns.forEach(b => b.disabled = true);
+  try {
+    const j = await (await API(`/api/odp-cuotas/${_detalle.id_odp}/${accion}`, {
+      method: 'POST', body: JSON.stringify({ comentario: coment || null }),
+    })).json();
+    if (!j.success) throw new Error(j.error);
+    cerrar();
+    if (accion === 'aprobar') {
+      const correo = j.data.correo === 'enviado' ? 'comprobante enviado al cliente'
+        : (j.data.correo === 'sin email del cliente' ? 'sin email del cliente' : 'correo: ' + j.data.correo);
+      toast(`✓ ODP aprobada — TRX-${String(j.data.numero_transaccion).padStart(6,'0')} · ${correo}`, true);
+    } else {
+      toast('ODP rechazada.', true);
+    }
+    cargar();
+  } catch(e) {
+    mErr(e.message); btns.forEach(b => b.disabled = false);
+  }
+}
+
+document.addEventListener('keydown', e => { if (e.key === 'Escape') cerrar(); });
+document.getElementById('ov').addEventListener('click', e => { if (e.target.id === 'ov') cerrar(); });
+cargar();
+</script>
+<script src="/js/app-version.js"></script>
+</body>
+</html>

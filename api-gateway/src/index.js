@@ -174,6 +174,7 @@ app.use('/api/crm', require('../../services/crm/src/routes/gestiones.routes'));
 // Cobranza
 app.use('/api/cobranza', require('../../services/cobranza/src/routes/cobranza.routes'));
 app.use('/api/migracion-indexa', require('../../services/cobranza/src/routes/migracion-indexa.routes'));
+app.use('/api/odp-cuotas', require('../../services/cobranza/src/routes/odp-cuotas.routes'));
 
 // Verificación pública de documentos por QR (SIN auth: se escanea desde afuera)
 app.use('/api/verificar', require('../../services/certificados/src/routes/verificacion.routes'));
@@ -426,6 +427,10 @@ app.get(['/certificados', '/certificados/'], (req, res) =>
 // Mantenedor de textos de certificados
 app.get(['/mantenedores/certificados-textos', '/mantenedores/certificados-textos/'], (req, res) =>
   res.sendFile(path.join(__dirname, '../public/mantenedores/certificados-textos/index.html')));
+
+// Cola de Órdenes de Pago de Cuotas (Tesorería)
+app.get(['/tesoreria/odp-cuotas', '/tesoreria/odp-cuotas/'], (req, res) =>
+  res.sendFile(path.join(__dirname, '../public/tesoreria/odp-cuotas.html')));
 
 app.get(['/reporteria', '/reporteria/'], (req, res) =>
   res.sendFile(path.join(__dirname, '../public/reporteria/index.html')));

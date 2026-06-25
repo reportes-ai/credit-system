@@ -141,7 +141,7 @@
   <a href="/creditos" class="nav-brand">
     <img src="/img/logo-autofacil.png" alt="AutoFácil" style="filter:brightness(0) invert(1);height:32px;display:block" onerror="this.style.display='none'">
     <span>Pago de Cuotas</span>
-    <span class="version-badge">v1.7</span>
+    <span class="version-badge">v1.8</span>
   </a>
   <div class="breadcrumb-nav">
   <a href="/">Inicio</a><span class="sep">›</span>
@@ -163,7 +163,10 @@
 <!-- Action bar -->
 <div class="action-bar">
   <a href="/creditos" class="btn-accion btn-volver"><i class="bi bi-arrow-left"></i>Volver</a>
-  <a id="btnRevisarBot" href="#" class="btn-accion btn-revisar"><i class="bi bi-eye"></i>Ver Revisión</a>
+  <div style="display:flex;gap:10px;align-items:center">
+    <button id="btnODP" onclick="emitirODPficha()" class="btn-accion" style="display:none;background:linear-gradient(135deg,#0141A2,#0255c5);color:#fff"><i class="bi bi-send"></i>Emitir ODP</button>
+    <a id="btnRevisarBot" href="#" class="btn-accion btn-revisar"><i class="bi bi-eye"></i>Ver Revisión</a>
+  </div>
 </div>
 
 <!-- Modal Registrar Pago -->
@@ -373,6 +376,10 @@ function pagosDeCuota(n) { return _pagos.filter(p=>p.numero_cuota===n); }
 function renderPagina() {
   const c  = _credito;
   const hoy = new Date(); hoy.setHours(0,0,0,0);
+
+  // ODP (Orden de Pago a Tesorería): solo para cartera propia AutoFácil
+  const btnODP = document.getElementById('btnODP');
+  if (btnODP) btnODP.style.display = (String(c.financiera||'').toUpperCase()==='AUTOFACIL') ? 'flex' : 'none';
 
   let countPagado=0, countVencido=0, countPendiente=0, montoMoraTotal=0;
   _amort.forEach(r => {
@@ -632,11 +639,18 @@ document.addEventListener('keydown', e => {
   if (e.key==='Escape') { cerrarModal(); cerrarComp(); }
 });
 
+/* ── Emitir ODP desde la ficha (cuotas se eligen en el modal compartido) ── */
+function emitirODPficha() {
+  if (!creditId) return;
+  ODP.abrir(creditId);
+}
+
 cargarPagina();
 </script>
 <script src="/js/html2canvas.min.js"></script>
 <script src="/js/timbre-pagado.js"></script>
 <script src="/js/comprobante.js"></script>
+<script src="/js/odp-emitir.js"></script>
 <script src="/js/app-version.js"></script>
 </body>
 </html>

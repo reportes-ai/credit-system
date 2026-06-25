@@ -218,7 +218,7 @@
   <div class="topnav-left">
     <a href="/" class="topnav-brand">
       <img src="/img/logo.png" alt="AutoFácil">
-      <span class="version-badge">v2.3</span>
+      <span class="version-badge">v2.4</span>
     </a>
     <div class="breadcrumb-nav">
       <a href="/">Inicio</a><span class="sep">›</span>
@@ -333,8 +333,10 @@
       </div>
       <select id="ppOrigenFondos" class="pp-origen" onchange="this.classList.remove('required')">
         <option value="">— Origen de fondos —</option>
-        <optgroup label="Efectivo / Documentos">
-          <option value="Efectivo|">💵 Efectivo</option>
+        <optgroup label="Efectivo / Tarjetas / Documentos">
+          <option value="Efectivo|">💵 Efectivo (al contado)</option>
+          <option value="Tarjeta de Débito|">💳 Tarjeta de Débito</option>
+          <option value="Tarjeta de Crédito|">💳 Tarjeta de Crédito</option>
           <option value="Cheque|">📋 Cheque</option>
           <option value="Vale Vista|">🏦 Vale Vista</option>
         </optgroup>
@@ -476,14 +478,13 @@ function renderCajaHeader() {
   if (!_miCaja) {
     wrap.innerHTML = `
       <div class="no-caja-alert">
-        <i class="bi bi-lock"></i>
+        <i class="bi bi-send-check"></i>
         <div>
-          <strong>Sin caja asignada</strong>
-          <p style="margin:4px 0 0;font-size:.88rem">No tienes una caja activa asignada. Los pagos deben registrarse contra una caja. Contacta al administrador.</p>
+          <strong>Sin caja asignada — modo Orden de Pago</strong>
+          <p style="margin:4px 0 0;font-size:.88rem">No tienes una caja activa, así que no puedes cobrar directo. Sí puedes <strong>buscar el crédito y emitir una Orden de Pago (ODP)</strong> a Tesorería para que ellos registren el pago.</p>
         </div>
       </div>`;
-    document.getElementById('searchInput').disabled = true;
-    document.querySelector('.btn-buscar').disabled  = true;
+    // Sin caja: igual puede buscar para emitir ODP (no cobra directo).
     return;
   }
   const perms = [];
@@ -500,10 +501,8 @@ function renderCajaHeader() {
         <div class="perm-chips">${perms.join('')}</div>
       </div>
     </div>`;
-  if (!_miCaja.puede_pagar_cuotas) {
-    document.getElementById('searchInput').disabled = true;
-    document.querySelector('.btn-buscar').disabled  = true;
-  }
+  // Con caja pero sin permiso de cobrar: igual puede emitir ODP, así que no se
+  // bloquea la búsqueda (el panel oculta los checkboxes de pago por su cuenta).
 }
 
 /* ── Búsqueda ── */
@@ -720,6 +719,7 @@ function renderPanel() {
       </div>
       <div style="display:flex;gap:8px;align-items:center">
         <span style="background:rgba(255,255,255,.15);border-radius:8px;padding:4px 12px;font-size:.78rem;font-weight:700">${c.plazo} meses · ${clp(c.cuota||_schedule[0]?.monto||0)}/mes</span>
+        <button class="btn-cerrar" onclick="emitirODP()" title="Emitir Orden de Pago a Tesorería" style="background:rgba(255,255,255,.25)"><i class="bi bi-send me-1"></i>Emitir ODP</button>
         <button class="btn-cerrar" onclick="cerrarPanel()"><i class="bi bi-x-lg me-1"></i>Cerrar</button>
       </div>
     </div>
@@ -1233,7 +1233,29 @@ function fmtFecha(f) {
   if (!f) return '—';
   return new Date(f).toLocaleDateString('es-CL', { day:'2-digit', month:'2-digit', year:'numeric' });
 }
+
+/* ── Emitir ODP (Orden de Pago a Tesorería) ──
+   Lleva las cuotas seleccionadas (si hay) al modal compartido; si no hay
+   selección, el modal deja elegirlas. La ODP no cobra: queda pendiente para
+   que Tesorería la apruebe. */
+function emitirODP() {
+  if (!_credito) return;
+  const hoy = new Date();
+  const pre = [..._seleccionadas].sort((a,b)=>a-b).map(num => {
+    const s = _schedule.find(x => x.numero === num);
+    if (!s) return null;
+    const mora   = calcMora(s.monto, s.fecha, hoy).monto || 0;
+    const gastos = calcGastos(s.monto, s.fecha, hoy).monto || 0;
+    return {
+      numero_cuota: num, fecha_vencimiento: s.fecha, monto_cuota: Math.round(s.monto),
+      interes_mora: Math.round(mora), gastos_cobranza: Math.round(gastos),
+      total_pagado: Math.round(s.monto + mora + gastos),
+    };
+  }).filter(Boolean);
+  ODP.abrir(_credito.id_credito, { preCuotas: pre });
+}
 </script>
+<script src="/js/odp-emitir.js"></script>
 <script src="/js/app-version.js"></script>
 </body>
 </html>
