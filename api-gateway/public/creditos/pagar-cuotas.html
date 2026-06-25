@@ -11,14 +11,7 @@
     * { box-sizing:border-box; margin:0; padding:0; }
     body { font-family:'Segoe UI',system-ui,sans-serif; background:var(--bg); color:var(--text); }
 
-    /* Navbar */
-    .navbar { background:linear-gradient(135deg,var(--navy),var(--blue)); padding:0 24px; height:52px; display:flex; align-items:center; justify-content:space-between; }
-    .nav-brand { display:flex; align-items:center; gap:10px; color:#fff; font-weight:800; font-size:1rem; text-decoration:none; }
-    .nav-brand img { height:28px; }
-    .nav-actions { display:flex; align-items:center; gap:10px; }
-    .btn-nav { background:rgba(255,255,255,.15); border:1px solid rgba(255,255,255,.3); color:#fff; border-radius:8px; padding:6px 14px; font-size:.82rem; font-weight:600; cursor:pointer; display:flex; align-items:center; gap:6px; text-decoration:none; }
-    .btn-nav:hover { background:rgba(255,255,255,.25); }
-    .version-badge { background:rgba(255,255,255,.15); color:rgba(255,255,255,.75); font-size:.65rem; font-weight:700; border-radius:6px; padding:2px 8px; margin-left:4px; }
+    /* Barra superior: componente único /js/topnav.js */
 
     /* Page */
     .page-wrap { max-width:1100px; margin:0 auto; padding:24px 16px 100px; }
@@ -47,24 +40,21 @@
 </head>
 <body>
 
-<nav class="navbar">
-  <a href="/creditos" class="nav-brand">
-    <img src="/img/logo-autofacil.png" alt="AutoFácil" style="filter:brightness(0) invert(1);height:32px;display:block" onerror="this.style.display='none'">
-    <span>Pago de Cuotas</span>
-    <span class="version-badge">v2.0</span>
-  </a>
-  <div class="breadcrumb-nav">
-  <a href="/">Inicio</a><span class="sep">›</span>
-  <a href="/tesoreria/">Tesorería</a><span class="sep">›</span>
-  <a href="/tesoreria/caja">Caja</a><span class="sep">›</span>
-  <span style="color:#fff;font-weight:600"><i class="bi bi-cash-coin me-1"></i>Pago de Cuotas</span>
-  </div>
-  <div class="nav-actions">
-    <span id="navUser" class="user-chip" style="color:rgba(255,255,255,.75);font-size:.82rem"></span>
-    <a id="btnRevisar" href="#" class="btn-nav"><i class="bi bi-eye"></i>Ver Crédito</a>
-    <a href="/creditos" class="btn-nav"><i class="bi bi-arrow-left"></i>Volver</a>
-  </div>
-</nav>
+<div id="af-topnav"></div>
+<script>
+  (function () {
+    var id = new URLSearchParams(location.search).get('id') || '';
+    window.AF_TOPNAV = {
+      breadcrumb: [
+        { label:'Inicio', href:'/' },
+        { label:'Tesorería', href:'/tesoreria/' },
+        { label:'Caja', href:'/tesoreria/caja' },
+        { label:'Pago de Cuotas', icon:'bi-cash-coin', current:true }
+      ],
+      actions: id ? [{ label:'Ver Crédito', icon:'bi-eye', href:'/creditos/revisar?id=' + id }] : []
+    };
+  })();
+</script>
 
 <div class="page-wrap">
   <div id="credHeader"></div>
@@ -88,11 +78,8 @@
 const token = sessionStorage.getItem('token');
 const yo    = JSON.parse(sessionStorage.getItem('usuario') || 'null');
 if (!token || !yo) location.href = '/login.html';
-document.getElementById('navUser').textContent = `${yo?.nombre||''} ${yo?.apellido||''}`.trim();
-
 const creditId = new URLSearchParams(location.search).get('id');
 if (creditId) {
-  document.getElementById('btnRevisar').href    = '/creditos/revisar?id='+creditId;
   document.getElementById('btnRevisarBot').href = '/creditos/revisar?id='+creditId;
 }
 
@@ -140,6 +127,7 @@ document.addEventListener('DOMContentLoaded', () => {
 <script src="/js/comprobante.js"></script>
 <script src="/js/pago-cuotas-panel.js"></script>
 <script src="/js/odp-emitir.js"></script>
+<script src="/js/topnav.js"></script>
 <script src="/js/app-version.js"></script>
 </body>
 </html>

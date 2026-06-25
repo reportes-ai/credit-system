@@ -11,12 +11,7 @@
   :root { --navy:#0f2d6b; --blue:#1565c0; --bg:#f0f4f8; --card:#fff; --border:#e2e8f0; --text:#1e293b; --muted:#64748b; --violet:#7c3aed; }
   *{ box-sizing:border-box; margin:0; padding:0; }
   body{ font-family:'Segoe UI',system-ui,sans-serif; background:var(--bg); color:var(--text); }
-  .topnav{ background:linear-gradient(135deg,var(--navy),var(--blue)); padding:0 24px; height:52px; display:flex; align-items:center; justify-content:space-between; }
-  .topnav-brand{ display:flex; align-items:center; gap:10px; color:#fff; font-weight:800; font-size:1rem; text-decoration:none; }
-  .topnav-brand img{ height:28px; filter:brightness(0) invert(1); }
-  .version-badge{ background:rgba(255,255,255,.15); color:rgba(255,255,255,.75); font-size:.65rem; font-weight:700; border-radius:6px; padding:2px 8px; letter-spacing:.5px; }
-  .btn-nav{ background:rgba(255,255,255,.15); border:1px solid rgba(255,255,255,.3); color:#fff; border-radius:8px; padding:6px 14px; font-size:.82rem; font-weight:600; cursor:pointer; text-decoration:none; display:flex; align-items:center; gap:6px; }
-  .topnav-right{ display:flex; align-items:center; gap:12px; }
+  /* Barra superior: componente único /js/topnav.js */
   .page{ max-width:1000px; margin:0 auto; padding:24px 16px 80px; }
   h1{ font-size:1.3rem; color:var(--navy); margin-bottom:4px; }
   .sub{ color:var(--muted); font-size:.9rem; margin-bottom:20px; }
@@ -85,17 +80,13 @@
 </head>
 <body>
 
-<nav class="topnav">
-  <a class="topnav-brand" href="/">
-    <img src="/img/logo.png" alt="AutoFácil" onerror="this.style.display='none'">
-    <span>Certificados</span>
-    <span class="version-badge" id="versionBadge"></span>
-  </a>
-  <div class="topnav-right">
-    <span id="navUser" class="user-chip" style="color:rgba(255,255,255,.75);font-size:.82rem"></span>
-    <a href="/" class="btn-nav"><i class="bi bi-arrow-left"></i>Inicio</a>
-  </div>
-</nav>
+<div id="af-topnav"></div>
+<script>
+  window.AF_TOPNAV = { breadcrumb: [
+    { label:'Inicio', href:'/' },
+    { label:'Certificados', icon:'bi-patch-check', current:true }
+  ] };
+</script>
 
 <div class="page">
   <h1>Certificados</h1>
@@ -374,6 +365,7 @@ function filtrarRut(){
   pintarHist(HIST_ROWS.filter(r=>String(r.rut||'').replace(/[^0-9kK]/g,'').toUpperCase().includes(raw)));
 }
 </script>
+<script src="/js/topnav.js"></script>
 <script src="/js/app-version.js"></script>
 </body>
 </html>
