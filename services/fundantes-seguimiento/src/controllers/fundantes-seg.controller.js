@@ -17,7 +17,7 @@ const pool = require('../../../../shared/config/database');
 const { auditar } = require('../../../../shared/audit');
 const { tieneFunc } = require('../../../../shared/middleware/permisos');
 
-const MODULO_ID = 410001;
+const MODULO_ID = 420001;   // 410001 era Certificados (colisión corregida)
 const FINANCIERAS = ['AUTOFIN', 'UNIDAD DE CREDITO'];          // brokerage (configurable vía seed de tipos)
 const ESTADOS = ['PENDIENTE', 'ENVIADO', 'CERRADO', 'RECHAZADO'];
 // Buckets de antigüedad (días pendientes) para la matriz resumen.
@@ -79,6 +79,9 @@ const bucketDe = d => BUCKETS.findIndex(b => d <= b.max);
       `INSERT IGNORE INTO modulos (id_modulo, nombre, descripcion, icono, ruta, orden, estado)
        VALUES (?, 'Seguimiento Fundantes', 'Carga y validación de los documentos fundantes de operaciones otorgadas (contrato de compraventa, transferencia, limitación, GPS): el ejecutivo los sube y Operaciones los valida', 'bi-folder-check', '/fundantes-seguimiento/', 108, 'activo')`,
       [MODULO_ID]);
+    // Corrección: si una versión previa creó estas funcionalidades bajo otro módulo (410001=Certificados),
+    // re-engancharlas al módulo correcto. Idempotente.
+    await pool.query("UPDATE funcionalidades SET id_modulo=? WHERE codigo IN ('fundantes_seguimiento','fundantes_validar')", [MODULO_ID]);
     const funcs = [
       ['Seguimiento Fundantes', 'fundantes_seguimiento', '/fundantes-seguimiento/', 'bi-folder-check'],
       ['Validar Fundantes', 'fundantes_validar', null, 'bi-check2-circle'],
