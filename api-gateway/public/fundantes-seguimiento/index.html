@@ -117,22 +117,6 @@
   </div>
 </div>
 
-<!-- Modal rechazo -->
-<div class="ov" id="ovRc">
-  <div class="box">
-    <div class="box-head"><span>Rechazar fundantes</span><button class="box-x" onclick="cerrarRc()">&times;</button></div>
-    <div class="box-body">
-      <label>Comentario (obligatorio) — indica qué corregir</label>
-      <textarea class="txta" id="rcTxt" rows="4" placeholder="Ej: el contrato de compraventa no está firmado…"></textarea>
-      <div class="modal-err" id="rcErr"></div>
-    </div>
-    <div class="box-foot">
-      <button class="btn-sec" onclick="cerrarRc()">Cancelar</button>
-      <button class="btn-pri" style="background:linear-gradient(135deg,#dc2626,#991b1b)" id="rcOk" onclick="confirmarRc()">Rechazar</button>
-    </div>
-  </div>
-</div>
-
 <input type="file" id="fileInput" style="display:none" accept=".pdf,.jpg,.jpeg,.png">
 <div class="toast" id="toast"></div>
 
@@ -218,11 +202,8 @@ function celdaDoc(row, codigo){
 }
 
 function celdaEnvio(row){
-  if (row.estado==='ENVIADO') {
-    let v = `<span class="pill p-ENVIADO">Enviado</span>`;
-    if (META.puede_validar) v += ` <button class="btn-ap" onclick="validar(${row.id_credito})">Aprobar</button> <button class="btn-rc" onclick="abrirRc(${row.id_credito})">Rechazar</button>`;
-    return `<td>${v}</td>`;
-  }
+  // El ejecutivo sólo envía; aprobar/rechazar es exclusivo de la card de Operaciones.
+  if (row.estado==='ENVIADO') return `<td><span class="pill p-ENVIADO">Enviado</span></td>`;
   if (row.estado==='CERRADO') return `<td><span class="pill p-CERRADO"><i class="bi bi-lock-fill"></i> Cerrado</span></td>`;
   if (row.puede_enviar) return `<td><button class="btn-env" onclick="enviar(${row.id_credito})"><i class="bi bi-send"></i> Enviar</button></td>`;
   return `<td><span class="muted">Faltan ${row.faltan}</span></td>`;
@@ -277,29 +258,6 @@ async function enviar(idCredito){
     if (!j.success) throw new Error(j.error||'Error');
     toast('Enviado a validación', true); cargar();
   } catch(e){ toast(e.message, false); }
-}
-
-/* ── Validar (Operaciones): aprobar / rechazar ── */
-async function validar(idCredito){
-  if (!confirm('¿Aprobar los fundantes? La operación quedará CERRADA.')) return;
-  try {
-    const j = await (await API(`/api/fundantes-seguimiento/${idCredito}/validar`, { method:'POST', body: JSON.stringify({ accion:'aprobar' }) })).json();
-    if (!j.success) throw new Error(j.error||'Error');
-    toast('Aprobado — operación cerrada', true); cargar();
-  } catch(e){ toast(e.message, false); }
-}
-let _rcId = null;
-function abrirRc(idCredito){ _rcId = idCredito; document.getElementById('rcTxt').value=''; document.getElementById('rcErr').style.display='none'; document.getElementById('ovRc').classList.add('open'); }
-function cerrarRc(){ document.getElementById('ovRc').classList.remove('open'); _rcId=null; }
-async function confirmarRc(){
-  const txt = document.getElementById('rcTxt').value.trim();
-  const err = document.getElementById('rcErr');
-  if (!txt) { err.textContent='El comentario es obligatorio.'; err.style.display='block'; return; }
-  try {
-    const j = await (await API(`/api/fundantes-seguimiento/${_rcId}/validar`, { method:'POST', body: JSON.stringify({ accion:'rechazar', comentario:txt }) })).json();
-    if (!j.success) throw new Error(j.error||'Error');
-    cerrarRc(); toast('Fundantes rechazados', true); cargar();
-  } catch(e){ err.textContent=e.message; err.style.display='block'; }
 }
 
 cargar();
