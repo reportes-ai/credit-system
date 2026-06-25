@@ -327,7 +327,7 @@ function render(){
       <td>${escH(r.banco||'—')}</td>
       <td>${fechaCL(r.fecha_fondos)}</td>
       <td style="text-align:center"><span class="dias-pill ${r.dcls}">${r.dias==null?'—':r.dias+' d'}</span></td>
-      <td class="num">${fmt(r.saldo_precio)}</td>
+      <td class="num">${fmt(montoP(r))}${esAutoFinRow(r)?` <span title="Saldo ${fmt(r.saldo_precio)} + Transferencia + Limitación" style="color:#0141A2;cursor:help">ⓘ</span>`:''}</td>
       <td style="text-align:center">${celdaAccion(r)}</td>
     </tr>`).join('');
   recalc();
@@ -356,7 +356,10 @@ async function revertir(id){
   } catch(e){ toast(e.message, true); }
 }
 
-const sum = arr => arr.reduce((a,r)=>a+Number(r.saldo_precio||0),0);
+// Monto a pagar/disponer por operación: AUTOFIN suma Transferencia + Limitación (backend → monto_pagar).
+const montoP = r => Number(r.monto_pagar != null ? r.monto_pagar : r.saldo_precio) || 0;
+const esAutoFinRow = r => String(r.financiera||'').toUpperCase()==='AUTOFIN' && montoP(r) > (Number(r.saldo_precio)||0);
+const sum = arr => arr.reduce((a,r)=>a+montoP(r),0);
 // Selección transitoria por enviar (Comercial) vs. cola firme ya enviada (Tesorería paga)
 const seleccionadas = () => DATA.filter(r => !r.pagado && !r.enviado && r.sel);
 const enviadas      = () => DATA.filter(r => !r.pagado && r.enviado);
@@ -461,10 +464,10 @@ function recalcPropuestas(){
   const cand = DATA.filter(r => !r.pagado && !r.enviado);
 
   const llenar = lista => { const set=[]; let acc=0;
-    for (const r of lista){ const v=Number(r.saldo_precio||0); if (acc+v <= D){ set.push(r); acc+=v; } }
+    for (const r of lista){ const v=montoP(r); if (acc+v <= D){ set.push(r); acc+=v; } }
     return { set, monto:acc };
   };
-  lastProp.max = llenar(cand.slice().sort((a,b)=>Number(a.saldo_precio||0)-Number(b.saldo_precio||0)));
+  lastProp.max = llenar(cand.slice().sort((a,b)=>montoP(a)-montoP(b)));
   lastProp.ant = llenar(cand); // cand ya está en orden de antigüedad
 
   const pintar = (which, nEl, mEl, btn) => {
@@ -580,7 +583,7 @@ const COLS = ['RUT Beneficiario','Nombre Beneficiario','Banco','N° Cuenta','Mon
 function nominaMatriz(){
   return nominaRows().map(r => [
     r.rut_dealer||'', r.nombre_dealer||'', r.banco||'', r.num_cuenta||'',
-    Math.round(Number(r.saldo_precio)||0), `Saldo Precio OP ${r.num_op||''}`
+    Math.round(montoP(r)), `Saldo Precio OP ${r.num_op||''}`
   ]);
 }
 async function copiarNomina(){

@@ -279,6 +279,32 @@ function docHTML(o){
   const Sres='border-collapse:collapse;margin-top:14px;width:100%;max-width:860px';
   const SresL='border:1px solid #cbd5e1;padding:5px 8px;font-size:11px;background:#eff6ff;font-weight:700;width:22%;white-space:nowrap';
   const SresV='border:1px solid #cbd5e1;padding:5px 8px;font-size:11px';
+  // Saldo Precio de AUTOFIN: desglose (Saldo + Transferencia + Limitación); el resto: tabla tributaria.
+  const hayDesg = Array.isArray(o.desglose) && o.desglose.length > 0;
+  const tablaDetalle = hayDesg ? `
+    <table style="${Stbl}">
+      <colgroup><col style="width:30%"><col style="width:22%"><col style="width:33%"><col style="width:15%"></colgroup>
+      <thead><tr><th style="${Sth}">Proveedor</th><th style="${Sth}">RUT</th><th style="${Sth}">Detalle</th><th style="${Sth}">Monto</th></tr></thead>
+      <tbody>
+        ${o.desglose.map((d,idx)=>`<tr><td style="${Std}">${idx===0?escH(o.proveedor_nombre||''):''}</td><td style="${Std}">${idx===0?escH(o.proveedor_rut||''):''}</td><td style="${Std}">${escH(d.label||'')}</td><td style="${Snum}">${fmtMon(d.monto)}</td></tr>`).join('')}
+        <tr><td colspan="3" style="${Std};text-align:right;font-weight:800;background:#f1f5f9">A PAGAR</td><td style="${Snum};font-weight:800;background:#dbeafe;color:#1e3a8a">${fmtMon(i.pagar)}</td></tr>
+      </tbody>
+    </table>` : `
+    <table style="${Stbl}">
+      <colgroup><col style="width:23%"><col style="width:12%"><col style="width:21%"><col style="width:8%"><col style="width:12%"><col style="width:12%"><col style="width:12%"></colgroup>
+      <thead><tr><th style="${Sth}">Proveedor</th><th style="${Sth}">RUT</th><th style="${Sth}">Detalle</th><th style="${Sth}">Mes</th><th style="${Sth}">Monto Bruto</th><th style="${Sth}">${escH(i.lbl)}</th><th style="${Sth}">Monto Neto</th></tr></thead>
+      <tbody>
+        <tr><td style="${Std}">${escH(o.proveedor_nombre||'')}</td><td style="${Std}">${escH(o.proveedor_rut||'')}</td>
+          <td style="${Std}">${escH(o.concepto||'')}</td><td style="${Std}">${periodo}</td>
+          <td style="${Snum}">${fmtMon(i.bruto)}</td><td style="${Snum}">${i.esEx?'—':fmtMon(i.imp)}</td><td style="${Snum}">${fmtMon(i.neto)}</td></tr>
+        <tr><td colspan="6" style="${Std};text-align:right;font-weight:800;background:#f1f5f9">A PAGAR</td><td style="${Snum};font-weight:800;background:#dbeafe;color:#1e3a8a">${fmtMon(i.pagar)}</td></tr>
+      </tbody>
+    </table>`;
+  const montoRows = hayDesg
+    ? o.desglose.map(d=>`<tr><td style="${SresL}">${escH(d.label||'')}</td><td style="${SresV}">${fmtMon(d.monto)}</td></tr>`).join('')
+    : `<tr><td style="${SresL}">Monto bruto</td><td style="${SresV}">${fmtMon(i.bruto)}</td></tr>
+      <tr><td style="${SresL}">${escH(i.lbl)}</td><td style="${SresV}">${i.esEx?'—':fmtMon(i.imp)}</td></tr>
+      <tr><td style="${SresL}">Monto neto</td><td style="${SresV}">${fmtMon(i.neto)}</td></tr>`;
   return `<div style="${Sdoc}">${sello}
     <table style="width:100%;border-collapse:collapse;margin-bottom:14px"><tbody><tr>
       <td style="vertical-align:top"><table style="${Smeta}"><tbody>
@@ -293,25 +319,14 @@ function docHTML(o){
         <img width="150" height="34" style="height:34px;width:auto" src="${location.origin}/img/logo-autofacil.png" onerror="this.src='${location.origin}/img/logo.png'">
       </td>
     </tr></tbody></table>
-    <table style="${Stbl}">
-      <colgroup><col style="width:23%"><col style="width:12%"><col style="width:21%"><col style="width:8%"><col style="width:12%"><col style="width:12%"><col style="width:12%"></colgroup>
-      <thead><tr><th style="${Sth}">Proveedor</th><th style="${Sth}">RUT</th><th style="${Sth}">Detalle</th><th style="${Sth}">Mes</th><th style="${Sth}">Monto Bruto</th><th style="${Sth}">${escH(i.lbl)}</th><th style="${Sth}">Monto Neto</th></tr></thead>
-      <tbody>
-        <tr><td style="${Std}">${escH(o.proveedor_nombre||'')}</td><td style="${Std}">${escH(o.proveedor_rut||'')}</td>
-          <td style="${Std}">${escH(o.concepto||'')}</td><td style="${Std}">${periodo}</td>
-          <td style="${Snum}">${fmtMon(i.bruto)}</td><td style="${Snum}">${i.esEx?'—':fmtMon(i.imp)}</td><td style="${Snum}">${fmtMon(i.neto)}</td></tr>
-        <tr><td colspan="6" style="${Std};text-align:right;font-weight:800;background:#f1f5f9">A PAGAR</td><td style="${Snum};font-weight:800;background:#dbeafe;color:#1e3a8a">${fmtMon(i.pagar)}</td></tr>
-      </tbody>
-    </table>
+    ${tablaDetalle}
     <table style="${Sres}"><tbody>
       <tr><td style="${SresL}">Proveedor</td><td style="${SresV}">${escH(o.proveedor_nombre||'')}</td></tr>
       <tr><td style="${SresL}">Concepto</td><td style="${SresV}">${escH(o.concepto||'')}</td></tr>
       <tr><td style="${SresL}">Período</td><td style="${SresV}">${periodo}</td></tr>
       <tr><td style="${SresL}">Documento</td><td style="${SresV}">${escH(o.tipo_documento||'—')}${docNum&&o.numero_documento?' N° '+escH(o.numero_documento):''}${o.fecha_documento?' · '+fdate(o.fecha_documento):''}</td></tr>
       <tr><td style="${SresL}">Destino</td><td style="${SresV}">${escH(o.destino||'—')}</td></tr>
-      <tr><td style="${SresL}">Monto bruto</td><td style="${SresV}">${fmtMon(i.bruto)}</td></tr>
-      <tr><td style="${SresL}">${escH(i.lbl)}</td><td style="${SresV}">${i.esEx?'—':fmtMon(i.imp)}</td></tr>
-      <tr><td style="${SresL}">Monto neto</td><td style="${SresV}">${fmtMon(i.neto)}</td></tr>
+      ${montoRows}
       <tr><td style="${SresL}">A pagar</td><td style="${SresV};font-weight:700">${fmtMon(i.pagar)}</td></tr>
       <tr><td style="${SresL}">Fecha a pagar</td><td style="${SresV}">${fechaPagar}</td></tr>
     </tbody></table>

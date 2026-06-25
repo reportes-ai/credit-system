@@ -103,6 +103,7 @@ const escH = s => String(s??'').replace(/&/g,'&amp;').replace(/</g,'&lt;').repla
 const fmtF = f => { if(!f) return ''; const d=new Date(f); return isNaN(d)?'':d.toLocaleDateString('es-CL'); };
 
 let DATA = [], CFG = { etapas_saldo:[], etapas_comision:[] };
+let FIJOS = { autofin_inscripcion:0, autofin_limitacion:0 };   // Saldo Precio AUTOFIN = saldo + estos fijos
 let IMPUESTOS = { IVA:19, RETENCION_HONORARIOS:15.25 };
 let selFin = new Set(), selSaldo = new Set(), selCom = new Set(), selMes = new Set();
 let filtroPagado = true; // por defecto oculta completamente pagados
@@ -122,6 +123,7 @@ const mesLbl = m => MESES_N[parseInt(m.slice(5))-1]+' '+m.slice(0,4);
   const jD = await rD.json(), jC = await rC.json();
   try { const jI = await rI.json(); if (jI.success && jI.data) IMPUESTOS = Object.assign(IMPUESTOS, jI.data); } catch(e){}
   DATA = jD.data || [];
+  if (jD.fijos) FIJOS = jD.fijos;
   if (jC.data) CFG = { etapas_saldo: jC.data.etapas_saldo||[], etapas_comision: jC.data.etapas_comision||[] };
   renderFiltros();
   render();
@@ -608,14 +610,23 @@ function abrirEmitirODP(id, track){
   ensureEmitirModal();
   const r = DATA.find(x => x.id === id); if (!r) return;
   _emitirCtx = { id, track };
-  const monto = track === 'SALDO' ? r.saldo_precio : r.comision;
   const tLabel = track === 'SALDO' ? 'Saldo Precio' : 'Comisión';
+  // Saldo Precio de AUTOFIN: A pagar = Saldo + Transferencia + Limitación de dominio.
+  const esAutoFin = track === 'SALDO' && String(r.financiera||'').toUpperCase() === 'AUTOFIN';
+  const insc = +FIJOS.autofin_inscripcion || 0, lim = +FIJOS.autofin_limitacion || 0;
+  const base = track === 'SALDO' ? (+r.saldo_precio || 0) : (+r.comision || 0);
+  const monto = esAutoFin ? base + insc + lim : base;
+  const desgloseHTML = esAutoFin ? `
+    <div class="em-row"><span>Saldo Precio</span><b>${fmtCLP(base)}</b></div>
+    <div class="em-row"><span>Transferencia</span><b>${fmtCLP(insc)}</b></div>
+    <div class="em-row"><span>Limitación de Dominio</span><b>${fmtCLP(lim)}</b></div>` : '';
   document.getElementById('emTitulo').textContent = 'Emitir Orden de Pago — ' + tLabel;
   document.getElementById('emBody').innerHTML = `
     <div class="em-row"><span>N° Operación</span><b>${escH(r.num_op||'')}</b></div>
     <div class="em-row"><span>Dealer</span><b>${escH(r.nombre_dealer||'—')}</b></div>
     ${r.rut_dealer?`<div class="em-row"><span>RUT</span><b>${escH(r.rut_dealer)}</b></div>`:''}
     <div class="em-row"><span>Concepto</span><b>${tLabel} OP ${escH(r.num_op||'')}</b></div>
+    ${desgloseHTML}
     <div class="em-total"><span>Monto a pagar</span><b>${fmtCLP(monto)}</b></div>
     <p style="font-size:.78rem;color:#64748b;margin:12px 0 0">Al confirmar se <b>emite la Orden de Pago</b> (se asigna el N° ODP), queda registrada en <b>Órdenes de Pago</b> y disponible en <b>Saldos Precios a Pagar</b>.</p>`;
   const err = document.getElementById('emErr'); err.style.display = 'none';
@@ -634,6 +645,7 @@ async function confirmarEmitirODP(){
     cerrarEmitirODP();
     const jd = await (await fetch('/api/postventa', { headers:H })).json();
     DATA = jd.data || DATA;
+    if (jd.fijos) FIJOS = jd.fijos;
     render();
   } catch(e){
     const err = document.getElementById('emErr'); err.textContent = e.message; err.style.display = 'block';

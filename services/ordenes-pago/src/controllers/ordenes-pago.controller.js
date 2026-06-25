@@ -356,7 +356,7 @@ const getOrden = async (req, res) => {
 const ORIGEN_LBL = { SALDO: 'Saldo Precio', COMISION: 'Comisión', GENERAL: 'Otros' };
 // Versión del esquema del documento congelado. Subir cuando cambie la lógica de armado
 // (fechas, desglose IVA, etc.) para forzar el re-congelado idempotente de los snapshots.
-const DOC_VERSION = 3;
+const DOC_VERSION = 4;
 // YYYY-MM-DD. mysql2 devuelve DATETIME/DATE como objeto Date: formatear en hora de Chile
 // (NO usar String(Date).slice, que da "Tue Jun 23"). Si ya viene string ISO, recortar.
 const soloFecha = v => {
@@ -396,7 +396,7 @@ async function construirDocumento(oc) {
          LEFT JOIN dealers  d ON d.nombre_indexa = c.automotora
          LEFT JOIN postventa_facturas_comision fc ON fc.id_seguimiento = s.id
         WHERE poc.id = ?`
-    : `SELECT s.id AS id_seg, s.num_op, s.financiera,
+    : `SELECT s.id AS id_seg, s.num_op, s.financiera, s.saldo_precio,
               COALESCE(c.nombre_local, d.nombre_razon, s.nombre_dealer) AS dealer_nombre,
               COALESCE(c.rut_dealer, d.rut) AS dealer_rut, d.num_cuenta, d.banco,
               (SELECT 1 FROM postventa_etapas pe WHERE pe.id_seguimiento=s.id AND pe.track='SALDO' AND pe.etapa='SALDO PRECIO PAGADO' LIMIT 1) AS pagado
@@ -407,7 +407,7 @@ async function construirDocumento(oc) {
         WHERE spo.id = ?`;
   const [rws] = await pool.query(sql, [oc.origen_id]);
   const row = rws[0] || {};
-  const monto = Number(oc.monto) || 0;   // = A pagar (líquido del correlativo)
+  let monto = Number(oc.monto) || 0;   // = A pagar (líquido del correlativo)
   const estado = oc.anulada ? 'ANULADA' : ((oc.pagada || row.pagado) ? 'PAGADA' : 'EMITIDA');
   const destino = [row.num_cuenta, row.banco].filter(Boolean).join(' · ') || null;
 
@@ -424,6 +424,23 @@ async function construirDocumento(oc) {
     }
   }
 
+  // Saldo Precio de AUTOFIN: el documento desglosa Saldo + Transferencia + Limitación de
+  // dominio; A pagar = la suma de los tres (exento). Los fijos viven en parametros_credito.
+  let desglose = null;
+  if (!esCom && String(row.financiera || '').toUpperCase() === 'AUTOFIN') {
+    const base = Number(row.saldo_precio) || 0;
+    const [pr] = await pool.query(
+      "SELECT clave, valor FROM parametros_credito WHERE clave IN ('autofin_inscripcion','autofin_limitacion')");
+    let insc = 0, lim = 0;
+    pr.forEach(p => { if (p.clave === 'autofin_inscripcion') insc = parseFloat(p.valor) || 0; if (p.clave === 'autofin_limitacion') lim = parseFloat(p.valor) || 0; });
+    desglose = [
+      { label: 'Saldo Precio', monto: base },
+      { label: 'Transferencia', monto: insc },
+      { label: 'Limitación de Dominio', monto: lim },
+    ];
+    monto = base + insc + lim; neto = monto; bruto = monto;
+  }
+
   return {
     id: oc.id, origen: oc.origen, origen_label: ORIGEN_LBL[oc.origen] || oc.origen,
     numero: oc.numero, concepto: (oc.concepto || (esCom ? 'Comisión' : 'Saldo Precio')) + (row.financiera ? ' (' + row.financiera + ')' : ''),
@@ -432,7 +449,7 @@ async function construirDocumento(oc) {
     tipo_documento: esCom ? (row.es_boleta ? 'Boleta de Honorarios' : 'Factura') : null,
     numero_documento: esCom ? (row.numero_factura || null) : null,
     fecha_documento: esCom ? soloFecha(row.fecha_factura) : null,
-    tratamiento, monto_bruto: bruto, monto_neto: neto, impuesto_pct: pct, impuesto_monto: imp, monto,
+    tratamiento, monto_bruto: bruto, monto_neto: neto, impuesto_pct: pct, impuesto_monto: imp, monto, desglose,
     destino, fecha_emision: soloFecha(oc.created_at), fecha_pago: soloFecha(oc.fecha_pagada),
     metodo_pago: oc.metodo_pago, estado, usuario_nombre: oc.usuario_nombre,
     anulada_nombre: oc.anulada_nombre, fecha_anulada: oc.fecha_anulada, num_op: row.num_op, _v: DOC_VERSION,

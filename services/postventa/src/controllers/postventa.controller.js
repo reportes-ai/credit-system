@@ -387,7 +387,7 @@ const getAll = async (req, res) => {
     const map = {};
     etapas.forEach(e => (map[e.id_seguimiento] = map[e.id_seguimiento] || []).push(e));
     rows.forEach(r => r.etapas = map[r.id] || []);
-    res.json({ success: true, data: rows, error: null });
+    res.json({ success: true, data: rows, fijos: await getFijosAutoFin(), error: null });
   } catch (e) {
     console.error('[postventa getAll]', e.message);
     res.status(500).json({ success: false, data: null, error: 'Error interno del servidor' });
@@ -703,12 +703,34 @@ const getSaldosAPagar = async (req, res) => {
               AND DATE(ep.fecha) < CURDATE())
       ORDER BY efr.fecha ASC, s.num_op ASC
     `);
-    res.json({ success: true, data: rows, error: null });
+    // AUTOFIN: el monto a pagar/disponer = saldo + Transferencia + Limitación (la orden ya lo registra así).
+    const fijos = await getFijosAutoFin();
+    rows.forEach(r => { r.monto_pagar = montoSaldoOrden(r.financiera, r.saldo_precio, fijos); });
+    res.json({ success: true, data: rows, fijos, error: null });
   } catch (e) {
     console.error('[postventa saldosAPagar]', e.message);
     res.status(500).json({ success: false, data: null, error: 'Error interno del servidor' });
   }
 };
+
+/* ── Montos fijos de AutoFin (Transferencia/inscripción + Limitación de dominio) ──
+ *  Para Saldo Precio de AUTOFIN la Orden de Pago = saldo_precio + estos dos fijos.
+ *  Viven en el mantenedor parametros_credito (claves autofin_inscripcion/limitacion). */
+async function getFijosAutoFin() {
+  try {
+    const [rows] = await pool.query(
+      "SELECT clave, valor FROM parametros_credito WHERE clave IN ('autofin_inscripcion','autofin_limitacion')");
+    const f = { autofin_inscripcion: 0, autofin_limitacion: 0 };
+    rows.forEach(r => { f[r.clave] = parseFloat(r.valor) || 0; });
+    return f;
+  } catch (_) { return { autofin_inscripcion: 0, autofin_limitacion: 0 }; }
+}
+const esAutoFin = fin => String(fin || '').toUpperCase() === 'AUTOFIN';
+// Monto total a pagar de la Orden de Saldo Precio (AUTOFIN suma los dos fijos al saldo base).
+function montoSaldoOrden(financiera, saldoBase, fijos) {
+  const base = Number(saldoBase) || 0;
+  return esAutoFin(financiera) ? base + (fijos.autofin_inscripcion || 0) + (fijos.autofin_limitacion || 0) : base;
+}
 
 /* ── GET /api/postventa/orden-pago — casos en FONDOS RECIBIDOS sin ORDEN DE PAGO EMITIDA ── */
 const getOrdenPago = async (req, res) => {
@@ -731,10 +753,7 @@ const getOrdenPago = async (req, res) => {
       ORDER BY efr.fecha ASC, s.num_op ASC
     `);
     // Montos fijos AutoFin (inscripción + limitación) desde el mantenedor de parámetros
-    const [params] = await pool.query(
-      "SELECT clave, valor FROM parametros_credito WHERE clave IN ('autofin_inscripcion','autofin_limitacion')");
-    const fijos = {};
-    params.forEach(p => fijos[p.clave] = parseFloat(p.valor) || 0);
+    const fijos = await getFijosAutoFin();
     res.json({ success: true, data: { rows, fijos }, error: null });
   } catch (e) {
     console.error('[postventa getOrdenPago]', e.message);
@@ -749,14 +768,16 @@ const getOrdenPago = async (req, res) => {
 async function asegurarOrdenSaldo(id, reqUsuario) {
   const [[ya]] = await pool.query('SELECT id, num_orden FROM postventa_ordenes WHERE id_seguimiento=?', [id]);
   if (ya && ya.num_orden) return ya.num_orden;
-  const [[seg]] = await pool.query('SELECT num_op, saldo_precio FROM postventa_seguimiento WHERE id=?', [id]);
+  const [[seg]] = await pool.query('SELECT num_op, saldo_precio, financiera FROM postventa_seguimiento WHERE id=?', [id]);
   if (!seg) return null;
+  const fijos = await getFijosAutoFin();
+  const monto = montoSaldoOrden(seg.financiera, seg.saldo_precio, fijos);   // AUTOFIN: + Transferencia + Limitación
   let poId = ya && ya.id;
   if (!poId) {
     try {
       const [ins] = await pool.query(
         'INSERT INTO postventa_ordenes (id_seguimiento, num_op, monto, usuario) VALUES (?,?,?,?)',
-        [id, seg.num_op, seg.saldo_precio, loginDe(reqUsuario)]);
+        [id, seg.num_op, monto, loginDe(reqUsuario)]);
       poId = ins.insertId;
     } catch (e) {
       if (e.code !== 'ER_DUP_ENTRY') throw e;
@@ -767,7 +788,7 @@ async function asegurarOrdenSaldo(id, reqUsuario) {
   }
   const { numero } = await emitirCorrelativo({
     origen: 'SALDO', origen_id: poId, concepto: 'Saldo Precio OP ' + (seg.num_op || ''),
-    monto: seg.saldo_precio, id_usuario: reqUsuario && reqUsuario.id_usuario, usuario_nombre: loginDe(reqUsuario) });
+    monto, id_usuario: reqUsuario && reqUsuario.id_usuario, usuario_nombre: loginDe(reqUsuario) });
   await pool.query('UPDATE postventa_ordenes SET num_orden=? WHERE id=?', [numero, poId]);
   return numero;
 }
@@ -1483,6 +1504,35 @@ const enviarCorreoOrden = async (req, res) => {
     await pool.query("INSERT INTO postventa_config (clave, valor) VALUES ('backfill_pago_timbre_v1','1') ON DUPLICATE KEY UPDATE valor='1'");
     if (s.affectedRows || c.affectedRows) console.log('[postventa] saneo timbre pago → saldo:', s.affectedRows, 'comisión:', c.affectedRows);
   } catch (e) { console.error('[postventa saneo timbre]', e.message); }
+})();
+
+/* ── Saneo único (flag): Saldo Precio de AUTOFIN — la Orden de Pago debe disponer
+ *    saldo_precio + Transferencia + Limitación de dominio. Las órdenes emitidas antes
+ *    guardaron solo el saldo base → se ajusta el monto del correlativo y de
+ *    postventa_ordenes al total (asignación absoluta = idempotente). El documento se
+ *    re-congela aparte por el bump de DOC_VERSION en ordenes-pago. ── */
+(async () => {
+  try {
+    const [[flag]] = await pool.query("SELECT valor FROM postventa_config WHERE clave='backfill_autofin_saldo_total_v1'");
+    if (flag && flag.valor === '1') return;
+    const f = await getFijosAutoFin();
+    const extra = (f.autofin_inscripcion || 0) + (f.autofin_limitacion || 0);
+    if (extra > 0) {
+      const [oc] = await pool.query(`
+        UPDATE op_correlativos oc
+        JOIN postventa_ordenes po ON oc.origen='SALDO' AND po.id=oc.origen_id
+        JOIN postventa_seguimiento s ON s.id=po.id_seguimiento
+        SET oc.monto = s.saldo_precio + ?
+        WHERE oc.anulada=0 AND UPPER(s.financiera)='AUTOFIN'`, [extra]);
+      await pool.query(`
+        UPDATE postventa_ordenes po
+        JOIN postventa_seguimiento s ON s.id=po.id_seguimiento
+        SET po.monto = s.saldo_precio + ?
+        WHERE UPPER(s.financiera)='AUTOFIN'`, [extra]);
+      if (oc.affectedRows) console.log('[postventa] saneo AUTOFIN saldo total → correlativos:', oc.affectedRows);
+    }
+    await pool.query("INSERT INTO postventa_config (clave, valor) VALUES ('backfill_autofin_saldo_total_v1','1') ON DUPLICATE KEY UPDATE valor='1'");
+  } catch (e) { console.error('[postventa saneo AUTOFIN saldo]', e.message); }
 })();
 
 module.exports = { sync, getAll, setEtapa, getConfig, setConfig, marcarHistorico, getPerfiles, getSaldosAPagar, enviarAPago, pagarSaldos, getOrdenPago, correlativoOrden, emitirOrdenPago, desmarcarSaldos, getAtribuciones, getFondos, setFondos, getAlertasConfig, setAlertasConfig,
