@@ -197,15 +197,21 @@ const generar = async (req, res) => {
       tipo: out.tipo, ref_tabla: 'certificados', ref_id: refId,
       num_op: out.num_op, rut: out.rut, nombre: out.nombre, datos: out.datos, emitido_por: emisor,
     });
+    // Snapshot COMPLETO "en duro" (inmutable): se guarda todo lo necesario para
+    // re-ver el documento idéntico aunque cambie el crédito después.
+    const snapshot = {
+      tipo: out.tipo, tipo_label: TIPOS[out.tipo], num_op: out.num_op,
+      rut: out.rut, nombre: out.nombre, credito: out.credito, datos: out.datos, emitido_por: emisor,
+    };
     // registro propio (idempotente por codigo)
     const [[ex]] = await pool.query('SELECT id FROM certificados WHERE codigo=? LIMIT 1', [codigo]);
     if (ex) {
-      await pool.query('UPDATE certificados SET datos_json=?, anulado=0 WHERE codigo=?', [JSON.stringify(out.datos), codigo]);
+      await pool.query('UPDATE certificados SET datos_json=?, anulado=0 WHERE codigo=?', [JSON.stringify(snapshot), codigo]);
     } else {
       await pool.query(
         `INSERT INTO certificados (codigo, tipo, num_op, rut, nombre, datos_json, emitido_por, id_usuario)
          VALUES (?,?,?,?,?,?,?,?)`,
-        [codigo, out.tipo, out.num_op, out.rut, out.nombre, JSON.stringify(out.datos), emisor, req.usuario && req.usuario.id_usuario]);
+        [codigo, out.tipo, out.num_op, out.rut, out.nombre, JSON.stringify(snapshot), emisor, req.usuario && req.usuario.id_usuario]);
     }
     try { auditar({ req, accion: 'EMITIR', modulo: 'certificados', entidad: out.tipo, entidad_id: codigo, detalle: `${TIPOS[out.tipo]} — ${out.nombre || ''} (op ${out.num_op || '—'})` }); } catch (_) {}
     res.json({ success: true, data: { ...out, codigo, tipo_label: TIPOS[out.tipo], emitido_por: emisor, fecha_emision: iso(new Date()) }, error: null });
@@ -230,6 +236,22 @@ const historial = async (req, res) => {
   }
 };
 
+/* ── Ver un certificado emitido (snapshot en duro, inmutable) ───────────── */
+const ver = async (req, res) => {
+  try {
+    const [[r]] = await pool.query(
+      `SELECT codigo, tipo, datos_json, emitido_por, anulado,
+              DATE_FORMAT(created_at,'%Y-%m-%d') fecha_emision
+         FROM certificados WHERE codigo=? LIMIT 1`, [req.params.codigo]);
+    if (!r) return res.status(404).json({ success: false, data: null, error: 'Certificado no encontrado' });
+    let snap = {}; try { snap = r.datos_json ? JSON.parse(r.datos_json) : {}; } catch (_) {}
+    res.json({ success: true, data: { ...snap, codigo: r.codigo, tipo: r.tipo, tipo_label: snap.tipo_label || TIPOS[r.tipo] || r.tipo, emitido_por: snap.emitido_por || r.emitido_por, fecha_emision: r.fecha_emision, anulado: !!r.anulado }, error: null });
+  } catch (e) {
+    console.error('[certificados ver]', e.message);
+    res.status(500).json({ success: false, data: null, error: 'Error abriendo el certificado' });
+  }
+};
+
 /* ── Anular ─────────────────────────────────────────────────────────────── */
 const anular = async (req, res) => {
   try {
@@ -245,4 +267,4 @@ const anular = async (req, res) => {
   }
 };
 
-module.exports = { buscar, preview, generar, historial, anular };
+module.exports = { buscar, preview, generar, historial, ver, anular };

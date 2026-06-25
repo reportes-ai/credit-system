@@ -9,6 +9,7 @@ router.get('/buscar',     verifyToken, puede, ctrl.buscar);
 router.post('/preview',   verifyToken, puede, ctrl.preview);
 router.post('/generar',   verifyToken, puede, ctrl.generar);
 router.get('/historial',  verifyToken, puede, ctrl.historial);
+router.get('/ver/:codigo', verifyToken, puede, ctrl.ver);
 router.post('/:codigo/anular', verifyToken, requireFunc('certificados_anular'), ctrl.anular);
 
 module.exports = router;
