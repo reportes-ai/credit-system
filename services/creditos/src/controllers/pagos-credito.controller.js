@@ -1,6 +1,7 @@
 const pool  = require('../../../../shared/config/database');
 const audit = require('../../../../shared/auditoria');
 const { auditar } = require('../../../../shared/audit');
+const { _calc: COB } = require('../../../cobranza/src/controllers/cobranza.controller');
 
 (async () => {
   try {
@@ -84,6 +85,76 @@ const { auditar } = require('../../../../shared/audit');
   } catch(e) { if (e.errno !== 1050) console.error('[pagos_credito migration]', e.message); }
 })();
 
+/* ─── Condonación: validación server-side contra atribuciones de la caja ──────
+ * Recalcula (canónico, igual que /api/cobranza/calcular-cobranza-lote) la mora y
+ * los gastos FULL de cada cuota y verifica que lo COBRADO no condone más de lo
+ * que el usuario puede en su caja (caja_usuarios). Blinda contra requests
+ * manipulados. Fail-open si el cálculo de cobranza no está disponible. */
+async function cobranzaFullMap(id_credito, pagos, fechaCalc) {
+  const out = new Map();
+  try {
+    const cfg = await COB.getCobranzaConfig();
+    const gastosDias = Number(cfg.gastos_dias) || 21;
+    let tramosUF = []; try { tramosUF = JSON.parse(cfg.tramos_uf); } catch (_) {}
+    const [tasas] = await pool.query(
+      "SELECT DATE_FORMAT(fecha_desde,'%Y-%m-%d') fecha_desde, DATE_FORMAT(fecha_hasta,'%Y-%m-%d') fecha_hasta, tasa_mensual_menor, tasa_mensual_mayor FROM tasas");
+    // Tramo del crédito (menor/mayor 200 UF) = saldo precio vs umbral × UF de otorgamiento
+    let tramo = 'menor';
+    const [[cr]] = await pool.query(
+      "SELECT saldo_precio, monto_financiado, DATE_FORMAT(fecha_otorgado,'%Y-%m-%d') fecha_otorgado FROM creditos WHERE id=?", [id_credito]);
+    if (cr) {
+      const [[um]] = await pool.query("SELECT valor FROM parametros_credito WHERE clave='umbral_uf_tramo'");
+      const umbral = um ? parseFloat(um.valor) || 200 : 200;
+      const ufOt = await COB.getUFporFecha(cr.fecha_otorgado);
+      const base = Number(cr.saldo_precio) || Number(cr.monto_financiado) || 0;
+      if (ufOt > 0 && base > umbral * ufOt) tramo = 'mayor';
+    }
+    const ufCache = new Map();
+    for (const q of pagos) {
+      const cuota = parseFloat(q.monto_cuota) || 0;
+      const fv = q.fecha_vencimiento ? String(q.fecha_vencimiento).slice(0, 10) : null;
+      let gastos = 0;
+      if (fv) {
+        const diasMora = Math.max(0, Math.floor((new Date(fechaCalc + 'T00:00:00Z') - new Date(fv + 'T00:00:00Z')) / 86400000));
+        if (diasMora >= gastosDias) {
+          const key = COB.addDias(fv, gastosDias);
+          let uf = ufCache.get(key); if (uf === undefined) { uf = await COB.getUFporFecha(key); ufCache.set(key, uf); }
+          gastos = COB.calcularGastoCobranza(cuota, uf, tramosUF).gasto_pesos || 0;
+        }
+      }
+      const mora = fv ? (COB.calcularInteresMora(cuota, fv, fechaCalc, tramo, tasas).interes || 0) : 0;
+      out.set(Number(q.numero_cuota), { mora: Math.round(mora), gastos: Math.round(gastos) });
+    }
+  } catch (e) { console.error('[cobranzaFullMap]', e.message); }
+  return out;
+}
+
+async function validarCondonacionTopes({ id_credito, id_caja, id_usuario, pagos, fecha_pago }) {
+  const fechaCalc = (fecha_pago ? String(fecha_pago).slice(0, 10) : null)
+    || new Date().toLocaleDateString('sv-SE', { timeZone: 'America/Santiago' });
+  const fullMap = await cobranzaFullMap(id_credito, pagos, fechaCalc);
+  let perm = null;
+  try {
+    const [[row]] = await pool.query(
+      `SELECT puede_condonar_intereses, tope_intereses, puede_condonar_gastos, tope_gastos
+         FROM caja_usuarios WHERE id_caja=? AND id_usuario=? AND activo=1 LIMIT 1`, [id_caja, id_usuario]);
+    perm = row || null;
+  } catch (_) {}
+  const fmt = n => '$' + Math.round(n).toLocaleString('es-CL');
+  for (const p of pagos) {
+    const f = fullMap.get(Number(p.numero_cuota)); if (!f) continue;  // fail-open si no se pudo recalcular
+    const moraMin   = perm?.puede_condonar_intereses ? Math.round(f.mora   * (1 - (parseFloat(perm.tope_intereses) || 0) / 100)) : f.mora;
+    const gastosMin = perm?.puede_condonar_gastos    ? Math.round(f.gastos * (1 - (parseFloat(perm.tope_gastos)    || 0) / 100)) : f.gastos;
+    const imCharged = Math.round(parseFloat(p.interes_mora) || 0);
+    const gcCharged = Math.round(parseFloat(p.gastos_cobranza) || 0);
+    if (imCharged < moraMin - 1)
+      return { error: `Cuota N°${p.numero_cuota}: la condonación de intereses por mora supera tu atribución (mínimo a cobrar ${fmt(moraMin)}).`, fullMap };
+    if (gcCharged < gastosMin - 1)
+      return { error: `Cuota N°${p.numero_cuota}: la condonación de gastos de cobranza supera tu atribución (mínimo a cobrar ${fmt(gastosMin)}).`, fullMap };
+  }
+  return { error: null, fullMap };
+}
+
 /* ─── GET historial por crédito ─────────────────────────────────────────── */
 const getByCredito = async (req, res) => {
   try {
@@ -133,9 +204,14 @@ const create = async (req, res) => {
     const id_registrado_por = u.id_usuario || null;
     const tp = parseFloat(total_pagado) ||
                (parseFloat(monto_cuota)||0) + (parseFloat(interes_mora)||0) + (parseFloat(gastos_cobranza)||0);
-    // Montos full (antes de condonar): si no vienen, igualan a lo cobrado (sin condonación)
-    const imTot = (interes_mora_total    != null) ? parseFloat(interes_mora_total)    || 0 : parseFloat(interes_mora)    || 0;
-    const gcTot = (gastos_cobranza_total != null) ? parseFloat(gastos_cobranza_total) || 0 : parseFloat(gastos_cobranza) || 0;
+    // Blindaje: condonación dentro de las atribuciones de la caja (full canónico del servidor)
+    const { error: condErr, fullMap } = await validarCondonacionTopes({
+      id_credito, id_caja: parseInt(id_caja) || null, id_usuario: u.id_usuario,
+      pagos: [{ numero_cuota, fecha_vencimiento, monto_cuota, interes_mora, gastos_cobranza }], fecha_pago });
+    if (condErr) return res.status(403).json({ success: false, data: null, error: condErr });
+    const f = fullMap.get(Number(numero_cuota));
+    const imTot = (f && f.mora   != null) ? f.mora   : ((interes_mora_total    != null) ? parseFloat(interes_mora_total)    || 0 : parseFloat(interes_mora)    || 0);
+    const gcTot = (f && f.gastos != null) ? f.gastos : ((gastos_cobranza_total != null) ? parseFloat(gastos_cobranza_total) || 0 : parseFloat(gastos_cobranza) || 0);
 
     const [r] = await pool.query(
       `INSERT INTO pagos_credito
@@ -244,12 +320,21 @@ const createBatch = async (req, res) => {
     const idCajaInt         = parseInt(id_caja) || null;
     const idCuentaInt       = parseInt(id_cuenta_bancaria) || null;
 
+    // ── Blindaje: condonación dentro de las atribuciones de la caja ─────────
+    const { error: condErr, fullMap } = await validarCondonacionTopes({
+      id_credito, id_caja: idCajaInt, id_usuario: u.id_usuario, pagos, fecha_pago });
+    if (condErr) {
+      await conn.rollback();
+      return res.status(403).json({ success: false, data: null, error: condErr });
+    }
+
     for (const p of pagos) {
       const tp = parseFloat(p.total_pagado) ||
         (parseFloat(p.monto_cuota)||0) + (parseFloat(p.interes_mora)||0) + (parseFloat(p.gastos_cobranza)||0);
-      // Montos full (antes de condonar): si no vienen, igualan a lo cobrado
-      const imTot = (p.interes_mora_total    != null) ? parseFloat(p.interes_mora_total)    || 0 : parseFloat(p.interes_mora)    || 0;
-      const gcTot = (p.gastos_cobranza_total != null) ? parseFloat(p.gastos_cobranza_total) || 0 : parseFloat(p.gastos_cobranza) || 0;
+      // Montos full (antes de condonar) = canónico del servidor; fallback al cliente
+      const f = fullMap.get(Number(p.numero_cuota));
+      const imTot = (f && f.mora   != null) ? f.mora   : ((p.interes_mora_total    != null) ? parseFloat(p.interes_mora_total)    || 0 : parseFloat(p.interes_mora)    || 0);
+      const gcTot = (f && f.gastos != null) ? f.gastos : ((p.gastos_cobranza_total != null) ? parseFloat(p.gastos_cobranza_total) || 0 : parseFloat(p.gastos_cobranza) || 0);
       await conn.query(
         `INSERT INTO pagos_credito
            (id_credito, numero_cuota, fecha_vencimiento, monto_cuota,
