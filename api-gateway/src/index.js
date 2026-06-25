@@ -153,6 +153,7 @@ app.use('/api/postventa', require('../../services/postventa/src/routes/postventa
 app.use('/api/correos-programados', require('../../services/correos-programados/src/routes/correos.routes'));
 app.use('/api/backups', require('../../services/backups/src/routes/backups.routes'));
 app.use('/api/ordenes-pago', require('../../services/ordenes-pago/src/routes/ordenes-pago.routes'));
+app.use('/api/fundantes-seguimiento', require('../../services/fundantes-seguimiento/src/routes/fundantes-seg.routes'));
 app.use('/api/cartas-ejecutivos', require('../../services/cartas/src/routes/ejecutivos.routes'));
 app.use('/api/cartas-params',     require('../../services/cartas/src/routes/parametros.routes'));
 

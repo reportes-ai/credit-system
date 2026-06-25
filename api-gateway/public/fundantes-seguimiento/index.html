@@ -1,0 +1,309 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <link rel="icon" href="/img/favicon.png" type="image/png">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Seguimiento Fundantes — AutoFácil</title>
+  <link href="/css/bootstrap-icons.css" rel="stylesheet">
+  <style>
+    :root { --navy:#0141A2; --navy-dark:#012d70; --navy-light:#0255c5; --accent:#009AFE; --bg:#f0f4f8; --green:#15803d; --red:#dc2626; --amber:#b45309; }
+    * { box-sizing:border-box; }
+    body { background:var(--bg); font-family:'Segoe UI',system-ui,sans-serif; margin:0; min-height:100vh; color:#1e293b; }
+    .page { max-width:1320px; margin:0 auto; padding:24px 22px 80px; }
+    .page-banner { background:linear-gradient(135deg,#012d70,#0141A2 50%,#009AFE); border-radius:16px; color:#fff; padding:20px 28px; margin-bottom:18px; display:flex; align-items:center; gap:18px; }
+    .page-banner i { font-size:2.2rem; opacity:.85; }
+    .page-banner h2 { font-weight:800; margin:0 0 3px; font-size:1.25rem; }
+    .page-banner p { opacity:.85; margin:0; font-size:.86rem; }
+
+    /* Recuadro superior: ejecutivo + ≤7 días + matriz */
+    .top { display:flex; gap:16px; flex-wrap:wrap; align-items:stretch; margin-bottom:16px; }
+    .card { background:#fff; border-radius:14px; box-shadow:0 1px 4px rgba(0,0,0,.07); padding:16px 18px; }
+    .card.who { min-width:240px; display:flex; flex-direction:column; justify-content:center; gap:8px; }
+    .who .ejec { font-size:1.15rem; font-weight:800; color:var(--navy); display:flex; align-items:center; gap:9px; }
+    .who .ejec i { font-size:1.5rem; }
+    .who .hl { background:#ecfdf5; border:1px solid #a7f3d0; color:#065f46; border-radius:10px; padding:8px 12px; font-size:.84rem; font-weight:700; }
+    .who .hl b { font-size:1.1rem; }
+    .filtros { display:flex; gap:10px; flex-wrap:wrap; margin-top:4px; }
+    .filtros select { border:1.5px solid #d1d5db; border-radius:9px; padding:7px 11px; font-size:.82rem; font-weight:600; color:#334155; background:#fff; }
+    .card.matriz { flex:1; min-width:430px; overflow-x:auto; }
+    .mtitle { font-size:.74rem; font-weight:800; text-transform:uppercase; letter-spacing:.4px; color:#64748b; margin:0 0 8px; }
+    table.mx { width:100%; border-collapse:collapse; font-size:.82rem; }
+    table.mx th { background:var(--navy); color:#fff; padding:6px 10px; font-size:.68rem; text-transform:uppercase; text-align:center; white-space:nowrap; }
+    table.mx th:first-child { text-align:left; }
+    table.mx td { padding:5px 10px; text-align:center; border-bottom:1px solid #f1f5f9; }
+    table.mx td:first-child { text-align:left; font-weight:700; color:#475569; }
+    table.mx tr.tot td { font-weight:800; border-top:2px solid #e5e7eb; }
+    table.mx .pend { color:var(--amber); } table.mx .env { color:var(--navy); }
+
+    .table-wrap { background:#fff; border-radius:14px; box-shadow:0 1px 4px rgba(0,0,0,.07); overflow:auto; }
+    table.grid { width:100%; border-collapse:collapse; font-size:.82rem; white-space:nowrap; }
+    table.grid thead tr { background:var(--navy); color:#fff; }
+    table.grid thead th { padding:9px 11px; font-weight:600; font-size:.68rem; letter-spacing:.3px; text-transform:uppercase; text-align:left; position:sticky; top:0; }
+    table.grid tbody tr { border-bottom:1px solid #f1f5f9; }
+    table.grid tbody tr:hover { background:#f8fafc; }
+    table.grid tbody td { padding:8px 11px; vertical-align:middle; }
+    .td-op { font-weight:800; color:var(--navy); font-family:monospace; }
+    .muted { color:#94a3b8; } .cell-na { color:#cbd5e1; text-align:center; }
+
+    .pill { display:inline-flex; align-items:center; gap:5px; border-radius:20px; padding:2px 10px; font-size:.7rem; font-weight:800; }
+    .p-PENDIENTE { background:#fef3c7; color:#92400e; } .p-ENVIADO { background:#dbeafe; color:#1e40af; }
+    .p-CERRADO   { background:#dcfce7; color:#166534; } .p-RECHAZADO { background:#fee2e2; color:#991b1b; }
+    .dias-pill { display:inline-block; border-radius:20px; padding:2px 9px; font-size:.72rem; font-weight:800; }
+    .d0 { background:#dcfce7; color:#166534; } .d1 { background:#fef9c3; color:#854d0e; } .d2 { background:#fed7aa; color:#9a3412; } .d3 { background:#fecaca; color:#991b1b; }
+
+    .doc-subir { background:#eff6ff; color:#1d4ed8; border:1px solid #bfdbfe; border-radius:7px; padding:4px 10px; font-size:.74rem; font-weight:700; cursor:pointer; }
+    .doc-subir.opc { background:#f8fafc; color:#64748b; border-color:#e2e8f0; }
+    .doc-up { color:var(--green); font-weight:800; font-size:.76rem; cursor:pointer; text-decoration:none; }
+    .doc-re { color:#64748b; cursor:pointer; font-size:.85rem; margin-left:3px; text-decoration:none; }
+    .btn-env { background:linear-gradient(135deg,#0255c5,#0141A2); color:#fff; border:none; border-radius:7px; padding:5px 13px; font-size:.76rem; font-weight:800; cursor:pointer; }
+    .btn-ap { background:linear-gradient(135deg,#16a34a,#15803d); color:#fff; border:none; border-radius:7px; padding:4px 10px; font-size:.74rem; font-weight:700; cursor:pointer; }
+    .btn-rc { background:#fff1f2; color:#991b1b; border:1px solid #fca5a5; border-radius:7px; padding:4px 10px; font-size:.74rem; font-weight:700; cursor:pointer; }
+    .com { max-width:220px; white-space:normal; font-size:.76rem; color:#991b1b; }
+
+    .empty { text-align:center; color:#94a3b8; padding:48px 0; }
+    .empty i { font-size:2.2rem; display:block; margin-bottom:8px; opacity:.5; }
+
+    .ov { position:fixed; inset:0; background:rgba(15,23,42,.6); z-index:500; display:none; align-items:center; justify-content:center; padding:16px; }
+    .ov.open { display:flex; }
+    .box { background:#fff; border-radius:14px; width:min(460px,100%); box-shadow:0 24px 60px rgba(0,0,0,.3); overflow:hidden; }
+    .box-head { background:linear-gradient(135deg,var(--navy-dark),var(--navy-light)); color:#fff; padding:14px 18px; font-weight:800; display:flex; justify-content:space-between; align-items:center; }
+    .box-x { background:rgba(255,255,255,.15); border:none; color:#fff; border-radius:7px; width:28px; height:28px; cursor:pointer; font-size:1.1rem; }
+    .box-body { padding:16px 18px; }
+    .box-body label { font-size:.8rem; font-weight:700; color:#475569; display:block; margin-bottom:6px; }
+    .txta { width:100%; border:1.5px solid #d1d5db; border-radius:8px; padding:9px 12px; font-size:.88rem; font-family:inherit; resize:vertical; }
+    .box-foot { padding:12px 18px; border-top:1px solid #e5e7eb; background:#f8fafc; display:flex; gap:10px; justify-content:flex-end; }
+    .btn-sec { background:#eef2f7; color:#334155; border:none; border-radius:8px; padding:8px 16px; font-size:.85rem; font-weight:600; cursor:pointer; }
+    .btn-pri { background:linear-gradient(135deg,#16a34a,#15803d); color:#fff; border:none; border-radius:8px; padding:8px 18px; font-size:.85rem; font-weight:700; cursor:pointer; }
+    .modal-err { background:#fef2f2; border:1.5px solid #fca5a5; color:#991b1b; border-radius:8px; padding:8px 12px; font-size:.8rem; font-weight:600; margin-top:10px; display:none; }
+    .toast { position:fixed; bottom:26px; left:50%; transform:translateX(-50%); padding:11px 26px; border-radius:10px; font-size:.9rem; font-weight:700; z-index:600; display:none; box-shadow:0 8px 24px rgba(0,0,0,.25); }
+    .toast.ok { background:#15803d; color:#fff; } .toast.err { background:#991b1b; color:#fff; }
+  </style>
+</head>
+<body>
+
+<div id="af-topnav"></div>
+<script>
+  window.AF_TOPNAV = { breadcrumb: [
+    { label:'Inicio', href:'/' },
+    { label:'Seguimiento Fundantes', icon:'bi-folder-check', current:true }
+  ] };
+</script>
+
+<div class="page">
+  <div class="page-banner">
+    <i class="bi bi-folder-check"></i>
+    <div>
+      <h2>Seguimiento Fundantes</h2>
+      <p>Carga de los documentos fundantes de cada operación otorgada y su validación por Operaciones.</p>
+    </div>
+  </div>
+
+  <div class="top">
+    <div class="card who">
+      <div class="ejec"><i class="bi bi-person-badge"></i><span id="ejecNombre">…</span></div>
+      <div class="hl"><b id="hl7">0</b> fundantes con ≤7 días pendientes</div>
+      <div class="filtros" id="filtros"></div>
+    </div>
+    <div class="card matriz">
+      <p class="mtitle">Antigüedad (días pendientes)</p>
+      <table class="mx" id="mx"><tbody><tr><td>Cargando…</td></tr></tbody></table>
+    </div>
+  </div>
+
+  <div class="table-wrap" id="tableWrap">
+    <div class="empty"><i class="bi bi-hourglass-split"></i>Cargando…</div>
+  </div>
+</div>
+
+<!-- Modal rechazo -->
+<div class="ov" id="ovRc">
+  <div class="box">
+    <div class="box-head"><span>Rechazar fundantes</span><button class="box-x" onclick="cerrarRc()">&times;</button></div>
+    <div class="box-body">
+      <label>Comentario (obligatorio) — indica qué corregir</label>
+      <textarea class="txta" id="rcTxt" rows="4" placeholder="Ej: el contrato de compraventa no está firmado…"></textarea>
+      <div class="modal-err" id="rcErr"></div>
+    </div>
+    <div class="box-foot">
+      <button class="btn-sec" onclick="cerrarRc()">Cancelar</button>
+      <button class="btn-pri" style="background:linear-gradient(135deg,#dc2626,#991b1b)" id="rcOk" onclick="confirmarRc()">Rechazar</button>
+    </div>
+  </div>
+</div>
+
+<input type="file" id="fileInput" style="display:none" accept=".pdf,.jpg,.jpeg,.png">
+<div class="toast" id="toast"></div>
+
+<script src="/js/auth-guard.js"></script>
+<script>
+const token = sessionStorage.getItem('token');
+const yo = JSON.parse(sessionStorage.getItem('usuario') || 'null');
+if (!token || !yo) location.href = '/login.html';
+const API = (p, o = {}) => fetch(p, { headers: { Authorization: 'Bearer ' + token, 'Content-Type': 'application/json' }, ...o });
+const esc = s => String(s == null ? '' : s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+const opNum = v => String(v == null ? '' : v).replace(/\./g,'');   // N° operación nunca lleva puntos
+const fmtF = f => { if (!f) return '—'; try { return new Date(f).toLocaleDateString('es-CL',{timeZone:'UTC',day:'2-digit',month:'2-digit',year:'numeric'}); } catch { return '—'; } };
+function toast(m, ok){ const t=document.getElementById('toast'); t.textContent=m; t.className='toast '+(ok?'ok':'err'); t.style.display='block'; setTimeout(()=>t.style.display='none',4000); }
+
+// Columnas fijas de documentos (todas las financieras se mapean a estas)
+const DOC_COLS = [
+  { codigo:'CONTRATO_CV',       lbl:'Contrato Compraventa' },
+  { codigo:'SOL_TRANSFERENCIA', lbl:'Sol. Transferencia' },
+  { codigo:'SOL_LIMITACION',    lbl:'Sol. Limitación' },
+  { codigo:'INFORME_GPS',       lbl:'Informe GPS' },
+];
+
+let DATA = [], META = { es_ejecutivo:false, puede_validar:false, ejecutivos:[], nombre:'' };
+let F = { ejecutivo:'', financiera:'' };
+const diasCls = d => d<=7?'d0':d<=15?'d1':d<=30?'d2':'d3';
+
+async function cargar(){
+  const wrap = document.getElementById('tableWrap');
+  wrap.innerHTML = `<div class="empty"><i class="bi bi-hourglass-split"></i>Cargando…</div>`;
+  const qs = new URLSearchParams();
+  if (F.ejecutivo) qs.set('ejecutivo', F.ejecutivo);
+  if (F.financiera) qs.set('financiera', F.financiera);
+  try {
+    const j = await (await API('/api/fundantes-seguimiento?' + qs.toString())).json();
+    if (!j.success) throw new Error(j.error || 'Error');
+    DATA = j.data || [];
+    META = { es_ejecutivo:j.es_ejecutivo, puede_validar:j.puede_validar, ejecutivos:j.ejecutivos||[], nombre:j.nombre||'' };
+    pintarTop(j.resumen);
+    pintarFiltros();
+    pintarTabla();
+  } catch(e){ wrap.innerHTML = `<div class="empty"><i class="bi bi-x-octagon"></i>${esc(e.message)}</div>`; }
+}
+
+function pintarTop(r){
+  document.getElementById('ejecNombre').textContent = META.nombre || (META.es_ejecutivo ? (yo.nombre||'') : 'Todos los ejecutivos');
+  document.getElementById('hl7').textContent = (r && r.pendientes ? r.pendientes[0] : 0);
+  const labels = (r && r.buckets) || ['<=7 días','8-15','16-30','31-60','61-90','91+'];
+  const fila = (lbl, arr, cls) => `<tr><td>${lbl}</td>${arr.map(n=>`<td class="${cls||''}">${(n||0).toLocaleString('es-CL')}</td>`).join('')}</tr>`;
+  document.getElementById('mx').innerHTML = `
+    <thead><tr><th>Estado</th>${labels.map(l=>`<th>${esc(l)}</th>`).join('')}</tr></thead>
+    <tbody>
+      ${fila('Pendientes', r?r.pendientes:[0,0,0,0,0,0], 'pend')}
+      ${fila('Enviados',  r?r.enviados :[0,0,0,0,0,0], 'env')}
+      <tr class="tot">${`<td>Total</td>`+ (r?r.total:[0,0,0,0,0,0]).map(n=>`<td>${(n||0).toLocaleString('es-CL')}</td>`).join('')}</tr>
+    </tbody>`;
+}
+
+function pintarFiltros(){
+  const cont = document.getElementById('filtros');
+  let h = '';
+  if (!META.es_ejecutivo) {
+    h += `<select onchange="F.ejecutivo=this.value;cargar()"><option value="">Todos los ejecutivos</option>` +
+      META.ejecutivos.map(e=>`<option value="${esc(e)}" ${F.ejecutivo===e?'selected':''}>${esc(e)}</option>`).join('') + `</select>`;
+  }
+  h += `<select onchange="F.financiera=this.value;cargar()">
+      <option value="">Todas las financieras</option>
+      <option value="AUTOFIN" ${F.financiera==='AUTOFIN'?'selected':''}>AUTOFIN</option>
+      <option value="UNIDAD DE CREDITO" ${F.financiera==='UNIDAD DE CREDITO'?'selected':''}>UNIDAD</option>
+    </select>`;
+  cont.innerHTML = h;
+}
+
+function celdaDoc(row, codigo){
+  const d = (row.docs||[]).find(x => x.codigo === codigo);
+  if (!d) return `<td class="cell-na">—</td>`;                       // no aplica a esta financiera
+  const editable = (row.estado==='PENDIENTE' || row.estado==='RECHAZADO');
+  if (d.subido) {
+    const re = editable ? ` <a class="doc-re" title="Reemplazar" onclick="subir(${row.id_credito},'${codigo}')">↺</a>` : '';
+    return `<td><a class="doc-up" onclick="verDoc(${d.doc_id})"><i class="bi bi-check-circle-fill"></i> Subido</a>${re}</td>`;
+  }
+  if (editable) return `<td><button class="doc-subir ${d.obligatorio?'':'opc'}" onclick="subir(${row.id_credito},'${codigo}')">Subir${d.obligatorio?'':' (opc.)'}</button></td>`;
+  return `<td class="cell-na">${d.obligatorio?'Pendiente':'Opcional'}</td>`;
+}
+
+function celdaEnvio(row){
+  if (row.estado==='ENVIADO') {
+    let v = `<span class="pill p-ENVIADO">Enviado</span>`;
+    if (META.puede_validar) v += ` <button class="btn-ap" onclick="validar(${row.id_credito})">Aprobar</button> <button class="btn-rc" onclick="abrirRc(${row.id_credito})">Rechazar</button>`;
+    return `<td>${v}</td>`;
+  }
+  if (row.estado==='CERRADO') return `<td><span class="pill p-CERRADO"><i class="bi bi-lock-fill"></i> Cerrado</span></td>`;
+  if (row.puede_enviar) return `<td><button class="btn-env" onclick="enviar(${row.id_credito})"><i class="bi bi-send"></i> Enviar</button></td>`;
+  return `<td><span class="muted">Faltan ${row.faltan}</span></td>`;
+}
+
+function pintarTabla(){
+  const wrap = document.getElementById('tableWrap');
+  if (!DATA.length) { wrap.innerHTML = `<div class="empty"><i class="bi bi-inbox"></i>No hay operaciones para mostrar.</div>`; return; }
+  const head = `<tr>
+    <th>Ejecutivo Comercial</th><th>N° Op</th><th>Estado</th><th>Días</th>
+    <th>Financiera</th><th>ID Financiera</th><th>Fecha Otorgado</th>
+    ${DOC_COLS.map(c=>`<th>${esc(c.lbl)}</th>`).join('')}
+    <th>Envío</th><th>Comentario</th></tr>`;
+  const body = DATA.map(r => `<tr>
+    <td>${esc(r.ejecutivo||'—')}</td>
+    <td class="td-op">${esc(opNum(r.num_op))}</td>
+    <td><span class="pill p-${esc(r.estado)}">${esc(r.estado)}</span></td>
+    <td><span class="dias-pill ${diasCls(r.dias)}">${r.dias} d</span></td>
+    <td>${esc(r.financiera||'—')}</td>
+    <td>${esc(r.id_financiera||'—')}</td>
+    <td>${fmtF(r.fecha_otorgado)}</td>
+    ${DOC_COLS.map(c=>celdaDoc(r, c.codigo)).join('')}
+    ${celdaEnvio(r)}
+    <td class="com">${r.estado==='RECHAZADO' && r.comentario_rechazo ? esc(r.comentario_rechazo) : ''}</td>
+  </tr>`).join('');
+  wrap.innerHTML = `<table class="grid"><thead>${head}</thead><tbody>${body}</tbody></table>`;
+}
+
+/* ── Subir documento (input file → base64) ── */
+let _subCtx = null;
+function subir(idCredito, codigo){ _subCtx = { idCredito, codigo }; const i = document.getElementById('fileInput'); i.value=''; i.click(); }
+document.getElementById('fileInput').addEventListener('change', async function(){
+  const file = this.files[0]; if (!file || !_subCtx) return;
+  if (file.size > 12*1024*1024) { toast('El archivo supera 12 MB', false); return; }
+  try {
+    const archivo_data = await fileB64(file);
+    const { idCredito, codigo } = _subCtx;
+    const j = await (await API(`/api/fundantes-seguimiento/${idCredito}/doc`, { method:'POST',
+      body: JSON.stringify({ codigo, archivo_nombre:file.name, mime_type:file.type, archivo_data }) })).json();
+    if (!j.success) throw new Error(j.error||'Error al subir');
+    toast('Documento subido', true); cargar();
+  } catch(e){ toast(e.message, false); }
+});
+const fileB64 = file => new Promise((res,rej)=>{ const r=new FileReader(); r.onload=()=>res(String(r.result).split(',')[1]); r.onerror=rej; r.readAsDataURL(file); });
+function verDoc(docId){ window.open(`/api/fundantes-seguimiento/doc/${docId}/download?token=${encodeURIComponent(token)}`, '_blank'); }
+
+/* ── Enviar a validación ── */
+async function enviar(idCredito){
+  if (!confirm('¿Enviar los fundantes de esta operación a validación?')) return;
+  try {
+    const j = await (await API(`/api/fundantes-seguimiento/${idCredito}/enviar`, { method:'POST' })).json();
+    if (!j.success) throw new Error(j.error||'Error');
+    toast('Enviado a validación', true); cargar();
+  } catch(e){ toast(e.message, false); }
+}
+
+/* ── Validar (Operaciones): aprobar / rechazar ── */
+async function validar(idCredito){
+  if (!confirm('¿Aprobar los fundantes? La operación quedará CERRADA.')) return;
+  try {
+    const j = await (await API(`/api/fundantes-seguimiento/${idCredito}/validar`, { method:'POST', body: JSON.stringify({ accion:'aprobar' }) })).json();
+    if (!j.success) throw new Error(j.error||'Error');
+    toast('Aprobado — operación cerrada', true); cargar();
+  } catch(e){ toast(e.message, false); }
+}
+let _rcId = null;
+function abrirRc(idCredito){ _rcId = idCredito; document.getElementById('rcTxt').value=''; document.getElementById('rcErr').style.display='none'; document.getElementById('ovRc').classList.add('open'); }
+function cerrarRc(){ document.getElementById('ovRc').classList.remove('open'); _rcId=null; }
+async function confirmarRc(){
+  const txt = document.getElementById('rcTxt').value.trim();
+  const err = document.getElementById('rcErr');
+  if (!txt) { err.textContent='El comentario es obligatorio.'; err.style.display='block'; return; }
+  try {
+    const j = await (await API(`/api/fundantes-seguimiento/${_rcId}/validar`, { method:'POST', body: JSON.stringify({ accion:'rechazar', comentario:txt }) })).json();
+    if (!j.success) throw new Error(j.error||'Error');
+    cerrarRc(); toast('Fundantes rechazados', true); cargar();
+  } catch(e){ err.textContent=e.message; err.style.display='block'; }
+}
+
+cargar();
+</script>
+<script src="/js/topnav.js"></script>
+<script src="/js/app-version.js"></script>
+</body>
+</html>
