@@ -179,6 +179,7 @@ async function ctxCredito(num_op) {
   if (!c) return null;
   const [cuotas] = await pool.query(
     `SELECT numero_cuota, DATE_FORMAT(fecha_vencimiento,'%Y-%m-%d') venc, valor_cuota,
+            interes, amortizacion, tasa,
             estado_cuota, DATE_FORMAT(fecha_pago,'%Y-%m-%d') fpago, saldo_insoluto
        FROM cuotas_credito WHERE id_credito=? ORDER BY numero_cuota`, [c.id]);
   // métricas de cartera
