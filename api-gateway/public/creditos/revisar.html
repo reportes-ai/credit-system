@@ -513,7 +513,14 @@ function renderPagina(c, ant, com) {
           ${(()=>{
             const ec = c.estado_cartera_disp || c.estado_cartera;
             const M = { VIGENTE:'#16a34a', MORA:'#d97706', 'EN MORA':'#d97706', VENCIDO:'#dc2626', TERMINADO:'#0f766e', PREPAGADO:'#7c3aed', CASTIGADO:'#111827' };
-            if (ec) return `<span style="font-size:.58rem;color:#94a3b8;font-weight:800;letter-spacing:.06em">ESTADO</span><span class="estado-badge" style="background:${M[ec]||'#64748b'};color:#fff" title="Estado de cartera">${ec}</span>`;
+            if (ec) {
+              // AutoFácil en mora/vencido/castigado: muestra los días de atraso al costado.
+              const esAF = String(c.financiera||'').toUpperCase()==='AUTOFACIL';
+              const dias = Number(c.dias_atraso)||0;
+              const enMora = ['MORA','EN MORA','VENCIDO','CASTIGADO'].includes(String(ec).toUpperCase());
+              const suf = (esAF && enMora && dias>0) ? ` (${dias} días)` : '';
+              return `<span style="font-size:.58rem;color:#94a3b8;font-weight:800;letter-spacing:.06em">ESTADO</span><span class="estado-badge" style="background:${M[ec]||'#64748b'};color:#fff" title="Estado de cartera">${ec}${suf}</span>`;
+            }
             if (c.estado!=='VIGENTE') return '';
             const ep=getEstadoPago(c); return `<span class="pago-estado-badge pago-${ep.cls}">${ep.label}</span>`;
           })()}
