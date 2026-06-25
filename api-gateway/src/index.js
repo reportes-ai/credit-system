@@ -174,6 +174,7 @@ app.use('/api/crm', require('../../services/crm/src/routes/gestiones.routes'));
 
 // Cobranza
 app.use('/api/cobranza', require('../../services/cobranza/src/routes/cobranza.routes'));
+app.use('/api/cobranza-mora', require('../../services/cobranza/src/routes/mora-motor.routes'));
 app.use('/api/migracion-indexa', require('../../services/cobranza/src/routes/migracion-indexa.routes'));
 app.use('/api/odp-cuotas', require('../../services/cobranza/src/routes/odp-cuotas.routes'));
 

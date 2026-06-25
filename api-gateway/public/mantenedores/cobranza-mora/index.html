@@ -1,0 +1,231 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <link rel="icon" href="/img/favicon.png" type="image/png">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Automatización Cobranza (Mora) — AutoFácil</title>
+  <link href="/css/bootstrap-icons.css" rel="stylesheet">
+  <style>
+    :root { --navy:#0141A2; --navy-dark:#012d70; --accent:#009AFE; --bg:#f0f4f8; --green:#15803d; --red:#dc2626; --amber:#b45309; }
+    * { box-sizing:border-box; }
+    body { background:var(--bg); font-family:'Segoe UI',system-ui,sans-serif; margin:0; min-height:100vh; color:#1e293b; }
+    .page { max-width:980px; margin:0 auto; padding:24px 22px 80px; }
+    .page-banner { background:linear-gradient(135deg,#7f1d1d,#b91c1c 60%,#f59e0b); border-radius:16px; color:#fff; padding:20px 28px; margin-bottom:18px; display:flex; align-items:center; gap:16px; }
+    .page-banner i { font-size:2.1rem; opacity:.9; }
+    .page-banner h2 { font-weight:800; margin:0 0 3px; font-size:1.2rem; }
+    .page-banner p { opacity:.9; margin:0; font-size:.85rem; }
+    .card-af { background:#fff; border-radius:14px; box-shadow:0 1px 4px rgba(0,0,0,.07); padding:18px 20px; margin-bottom:16px; }
+    .card-af h3 { margin:0 0 12px; font-size:1rem; font-weight:800; color:var(--navy); display:flex; align-items:center; gap:8px; }
+    label { font-size:.72rem; font-weight:700; text-transform:uppercase; letter-spacing:.3px; color:#64748b; display:block; margin-bottom:5px; }
+    input, select, textarea { font-family:inherit; border:1.5px solid #d1d5db; border-radius:8px; padding:8px 11px; font-size:.9rem; width:100%; }
+    textarea { resize:vertical; min-height:120px; line-height:1.5; }
+    .grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(150px,1fr)); gap:14px; }
+    .dias { display:flex; gap:6px; flex-wrap:wrap; }
+    .dchip { width:32px; height:32px; border-radius:8px; border:1.5px solid #d1d5db; display:flex; align-items:center; justify-content:center; font-weight:800; font-size:.8rem; cursor:pointer; color:#64748b; }
+    .dchip.on { background:var(--navy); border-color:var(--navy); color:#fff; }
+    .sw { position:relative; display:inline-block; width:46px; height:26px; }
+    .sw input { display:none; } .sl { position:absolute; inset:0; background:#cbd5e1; border-radius:20px; transition:.2s; cursor:pointer; }
+    .sl::before { content:''; position:absolute; width:20px; height:20px; left:3px; top:3px; background:#fff; border-radius:50%; transition:.2s; }
+    .sw input:checked + .sl { background:var(--green); } .sw input:checked + .sl::before { transform:translateX(20px); }
+    .btn-af { background:var(--navy); color:#fff; border:none; border-radius:8px; padding:8px 16px; font-size:.85rem; font-weight:700; cursor:pointer; display:inline-flex; align-items:center; gap:6px; }
+    .btn-ghost { background:#eef2f7; color:#334155; border:none; border-radius:8px; padding:8px 14px; font-size:.85rem; font-weight:700; cursor:pointer; }
+    .btn-run { background:linear-gradient(135deg,#0255c5,#0141A2); color:#fff; border:none; border-radius:8px; padding:8px 16px; font-size:.85rem; font-weight:800; cursor:pointer; }
+    .btn-real { background:linear-gradient(135deg,#dc2626,#991b1b); color:#fff; border:none; border-radius:8px; padding:8px 16px; font-size:.85rem; font-weight:800; cursor:pointer; }
+    .pl { border:1.5px solid #e5e7eb; border-radius:12px; padding:14px; margin-bottom:12px; }
+    .pl-head { display:flex; align-items:center; justify-content:space-between; gap:10px; margin-bottom:10px; }
+    .pl-head b { color:var(--navy); font-size:.95rem; }
+    .vars { font-size:.78rem; color:#64748b; background:#f8fafc; border:1px dashed #cbd5e1; border-radius:8px; padding:8px 11px; margin-bottom:12px; }
+    .vars code { background:#eef2f7; padding:1px 5px; border-radius:4px; color:#0f172a; }
+    .res { background:#0f172a; color:#e2e8f0; border-radius:10px; padding:12px 14px; font-size:.82rem; margin-top:12px; white-space:pre-wrap; max-height:320px; overflow:auto; display:none; }
+    .foot { background:#f8fafc; border-left:4px solid var(--navy); border-radius:8px; padding:14px 16px; font-size:.84rem; color:#475569; }
+    .foot h4 { margin:0 0 8px; font-size:.82rem; color:var(--navy); display:flex; align-items:center; gap:6px; }
+    .foot ul { margin:0; padding-left:18px; } .foot li { margin-bottom:4px; }
+    .muted { color:#94a3b8; font-size:.82rem; }
+    .toast { position:fixed; bottom:24px; left:50%; transform:translateX(-50%); padding:11px 24px; border-radius:10px; font-size:.9rem; font-weight:700; z-index:600; display:none; box-shadow:0 8px 24px rgba(0,0,0,.25); }
+    .toast.ok { background:#15803d; color:#fff; } .toast.err { background:#991b1b; color:#fff; }
+    .warn { background:#fffbeb; border:1px solid #fcd34d; color:#92400e; border-radius:8px; padding:9px 13px; font-size:.82rem; margin-bottom:12px; }
+  </style>
+</head>
+<body>
+
+<div id="af-topnav"></div>
+<script>
+  window.AF_TOPNAV = { breadcrumb: [
+    { label:'Inicio', href:'/' },
+    { label:'Mantenedores', href:'/mantenedores/' },
+    { label:'Automatización Cobranza (Mora)', icon:'bi-envelope-heart', current:true }
+  ] };
+</script>
+
+<div class="page">
+  <div class="page-banner">
+    <i class="bi bi-envelope-heart"></i>
+    <div>
+      <h2>Automatización de Cobranza por Mora</h2>
+      <p>Correos automáticos al cliente según sus días de mora. Configura el motor y redacta las plantillas por tramo.</p>
+    </div>
+  </div>
+
+  <div class="warn" id="devWarn" style="display:none"><b>⚠ Modo Desarrollo activo:</b> aunque esté encendido, los correos se redirigen a los correos de prueba (no salen al cliente).</div>
+
+  <!-- Motor -->
+  <div class="card-af">
+    <h3><i class="bi bi-robot"></i> Motor (programación)</h3>
+    <div style="display:flex;align-items:center;gap:12px;margin-bottom:14px">
+      <label class="sw"><input type="checkbox" id="mActivo"><span class="sl"></span></label>
+      <span id="mActivoLbl" style="font-weight:700">—</span>
+      <span class="muted" style="margin-left:auto" id="mUlt"></span>
+    </div>
+    <div class="grid">
+      <div><label>Hora (Chile)</label><input type="time" id="mHora"></div>
+      <div><label>Días</label><div class="dias" id="mDias"></div></div>
+      <div><label>Desde (cuenta)</label><select id="mRem"></select></div>
+      <div><label>No reenviar el mismo tramo en (días)</label><input type="number" id="mCooldown" min="0" max="90"></div>
+      <div><label>Máx. correos por corrida</label><input type="number" id="mMax" min="1" max="2000"></div>
+    </div>
+    <div style="display:flex;gap:10px;flex-wrap:wrap;margin-top:14px;align-items:center">
+      <button class="btn-af" onclick="guardarConfig()"><i class="bi bi-check-lg"></i> Guardar configuración</button>
+      <button class="btn-run" onclick="correr(false)"><i class="bi bi-search"></i> Correr ahora (prueba, no envía)</button>
+      <button class="btn-real" onclick="correr(true)" title="Envía de verdad (respeta Modo Desarrollo)"><i class="bi bi-send"></i> Correr y enviar</button>
+    </div>
+    <div class="res" id="res"></div>
+  </div>
+
+  <!-- Plantillas -->
+  <div class="card-af">
+    <h3><i class="bi bi-envelope-paper"></i> Plantillas por tramo de mora</h3>
+    <div class="vars">Variables disponibles: <code>{trato}</code> <code>{nombre}</code> <code>{numero}</code> <code>{dias}</code> <code>{cuotas}</code> <code>{monto}</code> <code>{datos}</code></div>
+    <div id="plantillas"></div>
+  </div>
+
+  <div class="foot">
+    <h4><i class="bi bi-diagram-3"></i> Qué afecta este mantenedor</h4>
+    <ul>
+      <li><b>Motor (encendido/hora/días)</b> → cuándo corre el envío automático de correos de mora (hora de Chile). Nace <b>desactivado</b>.</li>
+      <li><b>Desde (cuenta)</b> → remitente de estos correos (recomendado <b>Cobranza</b>). Ver <a href="/usuarios/">Usuarios → Seguridad</a> para probar las cuentas.</li>
+      <li><b>No reenviar mismo tramo</b> → evita repetir el mismo correo al mismo crédito dentro de N días.</li>
+      <li><b>Plantillas por tramo</b> → el texto que recibe el cliente según sus <b>días de mora</b> (cartera AutoFácil). Edita asunto y cuerpo con las variables.</li>
+      <li><b>Correr ahora (prueba)</b> → muestra a qué créditos y con qué tramo iría, <b>sin enviar</b>. Para la cartera ver <a href="/cobranza/">Cobranza</a>.</li>
+    </ul>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script src="/js/auth-guard.js"></script>
+<script>
+const token = sessionStorage.getItem('token');
+const yo = JSON.parse(sessionStorage.getItem('usuario') || 'null');
+if (!token || !yo) location.href = '/login.html';
+const H = { Authorization:'Bearer '+token, 'Content-Type':'application/json' };
+const esc = s => String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+function toast(m, ok=true){ const t=document.getElementById('toast'); t.textContent=m; t.className='toast '+(ok?'ok':'err'); t.style.display='block'; setTimeout(()=>t.style.display='none',3500); }
+const DIAS = [['1','L'],['2','M'],['3','X'],['4','J'],['5','V'],['6','S'],['7','D']];
+
+let PLANTILLAS = [];
+
+async function cargar(){
+  try {
+    const j = await (await fetch('/api/cobranza-mora', { headers:H })).json();
+    if (!j.success) throw new Error(j.error||'Error');
+    const { plantillas, config, cuentas, ultimos7 } = j.data;
+    PLANTILLAS = plantillas || [];
+    // Motor
+    const activo = config.mora_activo === '1';
+    document.getElementById('mActivo').checked = activo;
+    document.getElementById('mActivoLbl').textContent = activo ? 'ACTIVO' : 'DESACTIVADO';
+    document.getElementById('mActivo').onchange = e => document.getElementById('mActivoLbl').textContent = e.target.checked ? 'ACTIVO' : 'DESACTIVADO';
+    document.getElementById('mHora').value = String(config.mora_hora||'10:00').slice(0,5);
+    document.getElementById('mCooldown').value = config.mora_cooldown_dias || '7';
+    document.getElementById('mMax').value = config.mora_max || '200';
+    document.getElementById('mRem').innerHTML = (cuentas||[]).map(c=>`<option value="${esc(c.clave)}" ${config.mora_remitente===c.clave?'selected':''}>${esc(c.label)}</option>`).join('');
+    const sel = String(config.mora_dias||'').split(',');
+    document.getElementById('mDias').innerHTML = DIAS.map(([v,l])=>`<span class="dchip ${sel.includes(v)?'on':''}" data-v="${v}" onclick="this.classList.toggle('on')">${l}</span>`).join('');
+    document.getElementById('mUlt').textContent = ultimos7 && ultimos7.n ? `${ultimos7.n} envíos últimos 7 días` : 'Sin envíos recientes';
+    document.getElementById('devWarn').style.display = (window.__DEV_MODE__) ? 'block':'none';
+    renderPlantillas();
+  } catch(e){ toast('Error al cargar: '+e.message, false); }
+}
+
+function renderPlantillas(){
+  document.getElementById('plantillas').innerHTML = PLANTILLAS.map((p,i)=>`
+    <div class="pl">
+      <div class="pl-head">
+        <b><i class="bi bi-bookmark-fill"></i> ${esc(p.nombre)} <span class="muted">(${esc(p.codigo)})</span></b>
+        <label class="sw"><input type="checkbox" id="pa_${i}" ${p.activo?'checked':''}><span class="sl"></span></label>
+      </div>
+      <div class="grid" style="margin-bottom:10px">
+        <div><label>Nombre</label><input id="pn_${i}" value="${esc(p.nombre)}"></div>
+        <div><label>Mora desde (días)</label><input type="number" id="pd_${i}" value="${p.dias_desde}" min="0"></div>
+        <div><label>Mora hasta (días)</label><input type="number" id="ph_${i}" value="${p.dias_hasta}" min="0"></div>
+      </div>
+      <div style="margin-bottom:10px"><label>Asunto</label><input id="ps_${i}" value="${esc(p.asunto)}"></div>
+      <div style="margin-bottom:10px"><label>Cuerpo</label><textarea id="pc_${i}">${esc(p.cuerpo)}</textarea></div>
+      <button class="btn-af" onclick="guardarPlantilla(${i})"><i class="bi bi-check-lg"></i> Guardar plantilla</button>
+    </div>`).join('');
+}
+
+async function guardarConfig(){
+  const dias = [...document.querySelectorAll('#mDias .dchip.on')].map(c=>c.dataset.v).join(',');
+  const body = {
+    mora_activo: document.getElementById('mActivo').checked ? 1 : 0,
+    mora_hora: document.getElementById('mHora').value || '10:00',
+    mora_dias: dias || '1,2,3,4,5',
+    mora_remitente: document.getElementById('mRem').value,
+    mora_cooldown_dias: document.getElementById('mCooldown').value || '7',
+    mora_max: document.getElementById('mMax').value || '200',
+  };
+  try {
+    const j = await (await fetch('/api/cobranza-mora/config', { method:'PUT', headers:H, body:JSON.stringify(body) })).json();
+    if (!j.success) throw new Error(j.error||'Error');
+    toast('✓ Configuración guardada'); cargar();
+  } catch(e){ toast('Error: '+e.message, false); }
+}
+
+async function guardarPlantilla(i){
+  const body = {
+    codigo: PLANTILLAS[i].codigo,
+    nombre: document.getElementById('pn_'+i).value.trim(),
+    dias_desde: document.getElementById('pd_'+i).value,
+    dias_hasta: document.getElementById('ph_'+i).value,
+    asunto: document.getElementById('ps_'+i).value.trim(),
+    cuerpo: document.getElementById('pc_'+i).value,
+    activo: document.getElementById('pa_'+i).checked ? 1 : 0,
+  };
+  if (!body.asunto || !body.cuerpo) { toast('Asunto y cuerpo son obligatorios', false); return; }
+  try {
+    const j = await (await fetch('/api/cobranza-mora/plantilla', { method:'PUT', headers:H, body:JSON.stringify(body) })).json();
+    if (!j.success) throw new Error(j.error||'Error');
+    toast('✓ Plantilla guardada'); cargar();
+  } catch(e){ toast('Error: '+e.message, false); }
+}
+
+async function correr(real){
+  if (real && !confirm('Esto ENVÍA los correos de mora de verdad (respeta Modo Desarrollo). ¿Continuar?')) return;
+  const res = document.getElementById('res');
+  res.style.display='block'; res.textContent = real ? 'Enviando…' : 'Calculando (modo prueba)…';
+  try {
+    const j = await (await fetch('/api/cobranza-mora/correr'+(real?'?real=1':''), { method:'POST', headers:H })).json();
+    if (!j.success) throw new Error(j.error||'Error');
+    const d = j.data;
+    if (d.ok === false){ res.textContent = 'No corrió: '+(d.motivo||''); return; }
+    let txt = `${real?'ENVIADO':'PRUEBA (no se envió)'}\n`;
+    txt += `Cartera en mora revisada: ${d.total}\n`;
+    txt += `${real?'Enviados':'Irían'}: ${d.enviados} · Saltados (cooldown/error): ${d.saltados||0} · Sin email: ${d.sin_email||0} · Sin tramo: ${d.sin_tramo||0}\n`;
+    if (d.detalle && d.detalle.length){
+      txt += `\nDetalle (primeros ${d.detalle.length}):\n`;
+      txt += d.detalle.map(x=>`  OP ${x.numero} · ${x.dias}d · ${x.tramo} · ${x.email}`).join('\n');
+    }
+    res.textContent = txt;
+    if (real) cargar();
+  } catch(e){ res.textContent = 'Error: '+e.message; }
+}
+
+// Detecta Modo Desarrollo (best-effort) para el aviso
+(async()=>{ try { const j = await (await fetch('/api/mantenimiento', { headers:H })).json(); window.__DEV_MODE__ = !!(j && j.data && j.data.dev_activo); } catch(_){} cargar(); })();
+</script>
+<script src="/js/topnav.js"></script>
+<script src="/js/app-version.js"></script>
+</body>
+</html>

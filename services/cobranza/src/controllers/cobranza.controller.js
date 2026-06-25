@@ -195,6 +195,8 @@ const MORA_SQL = (whereExtra = '', havingExtra = '') => `
     c.id                                      AS id_credito,
     COALESCE(cl_m.rut,             '')    AS rut_cliente,
     COALESCE(cl_m.nombre_completo, '') AS nombre_cliente,
+    cl_m.email                                AS email_cliente,
+    cl_m.sexo                                 AS sexo_cliente,
     COALESCE(pp.cnt, 0)                        AS cuotas_pagadas,
     CASE WHEN c.origen='INDEXA' THEN ${CC_CUOTAS_MORA}
          ELSE GREATEST(0, ${CV} - COALESCE(pp.cnt, 0)) END AS cuotas_mora,
@@ -887,6 +889,8 @@ function addDias(fechaStr, n) {
 
 // Reutilizable por otros módulos (ej. certificados: liquidación de prepago).
 exports._calc = { calcularGastoCobranza, calcularInteresMora, getCobranzaConfig, getUFporFecha, addDias };
+// Dependencias para el motor de automatización de mora (mora-motor.controller).
+exports._motor = { MORA_SQL, getCobranzaConfig, rellenar, tratamiento, titleCase };
 
 // ─── Calcular gasto de cobranza para un monto (Caja / consultas) ───────────────
 // body: { monto, uf?, fecha?, fecha_vencimiento? }
