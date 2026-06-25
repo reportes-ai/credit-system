@@ -218,7 +218,7 @@
   <div class="topnav-left">
     <a href="/" class="topnav-brand">
       <img src="/img/logo.png" alt="AutoFácil">
-      <span class="version-badge">v2.6</span>
+      <span class="version-badge">v2.7</span>
     </a>
     <div class="breadcrumb-nav">
       <a href="/">Inicio</a><span class="sep">›</span>
@@ -878,7 +878,7 @@ function setPesoVal(el, n) {
 
 function renderBreakdown(gastosOverride={}, moraOverride={}) {
   const datos = datosCuotasSeleccionadas();
-  let sumBase=0, sumGastos=0, sumMora=0;
+  let sumBase=0, sumGastos=0, sumMora=0, sumGcond=0, sumMcond=0;
 
   const filas = datos.map(d => {
     const g = gastosOverride[d.num] !== undefined ? gastosOverride[d.num] : d.gastos;
@@ -889,6 +889,7 @@ function renderBreakdown(gastosOverride={}, moraOverride={}) {
     sumMora   += m;
 
     const gCond = d.gastos - g, mCond = d.mora - m;
+    sumGcond += Math.max(0, gCond); sumMcond += Math.max(0, mCond);
     const gClass = g < d.gastosMin ? 'err' : g < d.gastos ? 'warn' : '';
     const mClass = m < d.moraMin   ? 'err' : m < d.mora   ? 'warn' : '';
 
@@ -924,43 +925,40 @@ function renderBreakdown(gastosOverride={}, moraOverride={}) {
     </tr>`;
   }).join('');
 
-  const totalGlobal = sumBase + sumGastos + sumMora;
   document.getElementById('breakdownBody').innerHTML = filas;
+  pintarFooterCaja(datos.length, sumBase, sumGastos, sumMora, sumGcond, sumMcond);
+}
+
+// Fila TOTAL del desglose: N° de cuotas, cuota base, gastos (cobrado + condonado),
+// intereses (cobrado + condonado) y total.
+function pintarFooterCaja(n, sB, sG, sM, sGc, sMc) {
+  const tg = sB + sG + sM;
+  const cd = v => v > 0 ? `<br><span style="font-size:.72rem;color:#15803d;font-weight:700">-${clp(v)} cond.</span>` : '';
   document.getElementById('breakdownFoot').innerHTML = `
     <tr style="border-top:2px solid #e5e7eb;background:#f8fafc">
-      <td colspan="2" style="font-weight:700;padding:8px 10px;font-size:.8rem;color:#374151">TOTAL</td>
-      <td class="text-right amt">${clp(sumBase)}</td>
-      <td class="text-right amt">${clp(sumGastos)}</td>
-      <td class="text-right amt">${clp(sumMora)}</td>
-      <td class="text-right amt" style="font-weight:900;color:var(--navy);font-size:.95rem">${clp(totalGlobal)}</td>
+      <td style="font-weight:700;padding:8px 10px;font-size:.8rem;color:#374151">TOTAL</td>
+      <td style="font-weight:700;padding:8px 10px;font-size:.78rem;color:#6b7280">${n} cuota${n!==1?'s':''}</td>
+      <td class="text-right amt">${clp(sB)}</td>
+      <td class="text-right amt">${clp(sG)}${cd(sGc)}</td>
+      <td class="text-right amt">${clp(sM)}${cd(sMc)}</td>
+      <td class="text-right amt" style="font-weight:900;color:var(--navy);font-size:.95rem">${clp(tg)}</td>
     </tr>`;
-  document.getElementById('ppTotal').textContent = clp(totalGlobal);
+  document.getElementById('ppTotal').textContent = clp(tg);
 }
 
 function onBreakdownChange() {
-  let total = 0;
   const datos = datosCuotasSeleccionadas();
-  let hasErr = false;
+  let sumBase=0, sumGastos=0, sumMora=0, sumGcond=0, sumMcond=0, hasErr=false;
   datos.forEach(d => {
     const g = getPesoVal(document.getElementById(`g_${d.num}`));
     const m = getPesoVal(document.getElementById(`m_${d.num}`));
-    total += d.s.monto + g + m;
-    // actualizar el total de esa fila
+    sumBase += d.s.monto; sumGastos += g; sumMora += m;
+    sumGcond += Math.max(0, d.gastos - g); sumMcond += Math.max(0, d.mora - m);
     const totEl = document.getElementById(`tot_${d.num}`);
     if (totEl) totEl.textContent = clp(d.s.monto + g + m);
     if (g < d.gastosMin || m < d.moraMin) hasErr = true;
   });
-  document.getElementById('ppTotal').textContent = clp(total);
-  // actualizar fila de totales
-  const tfoot = document.getElementById('breakdownFoot');
-  if (tfoot) {
-    const cells = tfoot.querySelectorAll('td');
-    if (cells.length >= 6) {
-      cells[3].textContent = clp(datos.reduce((a,d)=>a+getPesoVal(document.getElementById(`g_${d.num}`)),0));
-      cells[4].textContent = clp(datos.reduce((a,d)=>a+getPesoVal(document.getElementById(`m_${d.num}`)),0));
-      cells[5].textContent = clp(total);
-    }
-  }
+  pintarFooterCaja(datos.length, sumBase, sumGastos, sumMora, sumGcond, sumMcond);
   mostrarError(hasErr ? 'La condonación supera el límite permitido en una o más cuotas.' : '');
 }
 

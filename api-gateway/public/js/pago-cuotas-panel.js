@@ -360,12 +360,13 @@
   function getPeso(el) { if (!el) return 0; if (el.dataset.raw !== undefined) return parseInt(el.dataset.raw, 10) || 0; return parseInt(String(el.value).replace(/[^\d]/g, ''), 10) || 0; }
 
   function renderBreakdown(gOv = {}, mOv = {}) {
-    const datos = datosSel(); let sB = 0, sG = 0, sM = 0;
+    const datos = datosSel(); let sB = 0, sG = 0, sM = 0, sGc = 0, sMc = 0;
     const filas = datos.map(d => {
       const g = gOv[d.n] !== undefined ? gOv[d.n] : d.gastos;
       const m = mOv[d.n] !== undefined ? mOv[d.n] : d.mora;
       const total = d.s.monto + g + m; sB += d.s.monto; sG += g; sM += m;
       const gCond = d.gastos - g, mCond = d.mora - m;
+      sGc += Math.max(0, gCond); sMc += Math.max(0, mCond);
       const gCls = g < d.gastosMin ? 'err' : g < d.gastos ? 'warn' : '';
       const mCls = m < d.moraMin ? 'err' : m < d.mora ? 'warn' : '';
       const gPct = d.gastos > 0 ? Math.round(gCond / d.gastos * 100) : 0;
@@ -379,24 +380,36 @@
         <td class="pcp-r"><input type="text" inputmode="numeric" class="pcp-in ${mCls}" id="pcpm_${d.n}" value="${m > 0 ? '$' + Math.round(m).toLocaleString('es-CL') : '$0'}" data-raw="${Math.round(m)}" ${d.mora === 0 ? 'disabled' : (!S.miCaja?.puede_condonar_intereses ? 'readonly' : '')} oninput="PagoCuotas.onBreakdown(this)"> ${mB}</td>
         <td class="pcp-r pcp-amt" style="font-weight:800" id="pcpt_${d.n}">${clp(total)}</td></tr>`;
     }).join('');
-    const tg = sB + sG + sM;
     document.getElementById('pcpBd').innerHTML = filas;
+    pintarFooter(datos.length, sB, sG, sM, sGc, sMc);
+  }
+
+  // Fila TOTAL del desglose: N° de cuotas, cuota base, gastos (cobrado + condonado),
+  // intereses (cobrado + condonado) y total.
+  function pintarFooter(n, sB, sG, sM, sGc, sMc) {
+    const tg = sB + sG + sM;
+    const cd = v => v > 0 ? `<br><span style="font-size:.72rem;color:#15803d;font-weight:700">-${clp(v)} cond.</span>` : '';
     document.getElementById('pcpBdF').innerHTML = `<tr style="border-top:2px solid #e5e7eb;background:#f8fafc">
-      <td colspan="2" style="font-weight:700;padding:8px 10px;font-size:.8rem;color:#374151">TOTAL</td>
-      <td class="pcp-r pcp-amt">${clp(sB)}</td><td class="pcp-r pcp-amt">${clp(sG)}</td><td class="pcp-r pcp-amt">${clp(sM)}</td>
+      <td style="font-weight:700;padding:8px 10px;font-size:.8rem;color:#374151">TOTAL</td>
+      <td style="font-weight:700;padding:8px 10px;font-size:.78rem;color:#6b7280">${n} cuota${n !== 1 ? 's' : ''}</td>
+      <td class="pcp-r pcp-amt">${clp(sB)}</td>
+      <td class="pcp-r pcp-amt">${clp(sG)}${cd(sGc)}</td>
+      <td class="pcp-r pcp-amt">${clp(sM)}${cd(sMc)}</td>
       <td class="pcp-r pcp-amt" style="font-weight:900;color:#0f2d6b">${clp(tg)}</td></tr>`;
     document.getElementById('pcpTot').textContent = clp(tg);
   }
 
   function onBreakdown(el) { onPeso(el); recalcBreakdown(); }
   function recalcBreakdown() {
-    let total = 0, hasErr = false; const datos = datosSel();
+    let hasErr = false; const datos = datosSel();
+    let sB = 0, sG = 0, sM = 0, sGc = 0, sMc = 0;
     datos.forEach(d => {
       const g = getPeso(document.getElementById('pcpg_' + d.n)); const m = getPeso(document.getElementById('pcpm_' + d.n));
-      total += d.s.monto + g + m; const te = document.getElementById('pcpt_' + d.n); if (te) te.textContent = clp(d.s.monto + g + m);
+      sB += d.s.monto; sG += g; sM += m; sGc += Math.max(0, d.gastos - g); sMc += Math.max(0, d.mora - m);
+      const te = document.getElementById('pcpt_' + d.n); if (te) te.textContent = clp(d.s.monto + g + m);
       if (g < d.gastosMin || m < d.moraMin) hasErr = true;
     });
-    document.getElementById('pcpTot').textContent = clp(total);
+    pintarFooter(datos.length, sB, sG, sM, sGc, sMc);
     showErr(hasErr ? 'La condonación supera el límite permitido en una o más cuotas.' : '');
   }
 
