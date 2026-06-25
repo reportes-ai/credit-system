@@ -368,8 +368,10 @@
       const gCond = d.gastos - g, mCond = d.mora - m;
       const gCls = g < d.gastosMin ? 'err' : g < d.gastos ? 'warn' : '';
       const mCls = m < d.moraMin ? 'err' : m < d.mora ? 'warn' : '';
-      const gB = gCond > 0 ? `<span class="pcp-cond ${gCls ? 'max' : 'ok'}">-${clp(gCond)}</span>` : '';
-      const mB = mCond > 0 ? `<span class="pcp-cond ${mCls ? 'max' : 'ok'}">-${clp(mCond)}</span>` : '';
+      const gPct = d.gastos > 0 ? Math.round(gCond / d.gastos * 100) : 0;
+      const mPct = d.mora   > 0 ? Math.round(mCond / d.mora   * 100) : 0;
+      const gB = gCond > 0 ? `<span class="pcp-cond ${gCls ? 'max' : 'ok'}" title="Condonación">-${clp(gCond)} (${gPct}%)</span>` : '';
+      const mB = mCond > 0 ? `<span class="pcp-cond ${mCls ? 'max' : 'ok'}" title="Condonación">-${clp(mCond)} (${mPct}%)</span>` : '';
       return `<tr>
         <td><strong>N°${d.n}</strong></td><td style="color:#6b7280;font-size:.78rem">${fmtFecha(d.s.fecha)}</td>
         <td class="pcp-r pcp-amt">${clp(d.s.monto)}</td>
@@ -399,28 +401,38 @@
   }
 
   function onMonto(el) { onPeso(el); autoAjustar(); }
+  // Condona gastos primero, luego intereses, SIEMPRE dentro de las atribuciones de
+  // la caja (no baja de gastosMin/moraMin). Si el monto exige condonar más de lo
+  // permitido, avisa (requiere atribución mayor).
   function autoAjustar() {
-    const mrec = getPeso(document.getElementById('pcpMonto')); const T = mrec + S.saldoAFavor;
+    const T = getPeso(document.getElementById('pcpMonto')) + S.saldoAFavor;
     const datos = datosSel(); if (!datos.length) return;
-    const sB = datos.reduce((a, d) => a + d.s.monto, 0), sG = datos.reduce((a, d) => a + d.gastos, 0), sM = datos.reduce((a, d) => a + d.mora, 0);
-    const sT = sB + sG + sM;
-    if (T > 0 && T < sB) { showErr(`Monto insuficiente. El mínimo es ${clp(sB)} (solo cuotas base).`); renderBreakdown({}, {}); return; }
+    const sB = datos.reduce((a, d) => a + d.s.monto, 0);
+    const sG = datos.reduce((a, d) => a + d.gastos, 0), sM = datos.reduce((a, d) => a + d.mora, 0);
+    const sGmin = datos.reduce((a, d) => a + d.gastosMin, 0), sMmin = datos.reduce((a, d) => a + d.moraMin, 0);
+    const maxTotal = sB + sG + sM, minTotal = sB + sGmin + sMmin;
     if (T === 0) { renderBreakdown(); return; }
-    showErr('');
-    const ex = T - sB; const gOv = {}, mOv = {};
-    if (ex >= sM + sG) { datos.forEach(d => { gOv[d.n] = d.gastos; mOv[d.n] = d.mora; }); }
-    else if (ex >= sM) {
-      datos.forEach(d => mOv[d.n] = d.mora); const rg = ex - sM;
-      datos.forEach(d => { const p = sG > 0 ? Math.round(d.gastos * rg / sG) : 0; gOv[d.n] = Math.max(d.gastosMin, Math.min(d.gastos, p)); });
-    } else {
-      datos.forEach(d => gOv[d.n] = 0);
-      if (sM > 0) { datos.forEach(d => { const p = Math.round(d.mora * ex / sM); mOv[d.n] = Math.max(d.moraMin, Math.min(d.mora, p)); }); }
-      else datos.forEach(d => mOv[d.n] = 0);
+    if (T < sB) { showErr(`Monto insuficiente. El mínimo es ${clp(sB)} (solo cuotas base, sin gastos ni mora).`); renderBreakdown({}, {}); return; }
+    if (T < minTotal - 0.5) {
+      showErr(`El monto recibido exige condonar ${clp(maxTotal - T)}, pero tu atribución permite condonar hasta ${clp(maxTotal - minTotal)} (mínimo a cobrar ${clp(minTotal)}). Se requiere una atribución mayor.`);
+      const gOv = {}, mOv = {}; datos.forEach(d => { gOv[d.n] = d.gastosMin; mOv[d.n] = d.moraMin; });
+      renderBreakdown(gOv, mOv); return;
     }
-    const tRes = sB + datos.reduce((a, d) => a + (gOv[d.n] ?? d.gastos), 0) + datos.reduce((a, d) => a + (mOv[d.n] ?? d.mora), 0);
-    const cond = sT - tRes, exc = T - sT;
-    document.getElementById('pcpHint').textContent = cond > 0
-      ? `Se condona ${clp(cond)}: gastos de cobranza primero, luego intereses por mora.`
+    showErr('');
+    const cond = Math.max(0, maxTotal - T);
+    const gMax = sG - sGmin, mMax = sM - sMmin;
+    const gCondT = Math.min(cond, gMax), mCondT = Math.min(cond - gCondT, mMax);
+    const gOv = {}, mOv = {};
+    datos.forEach(d => {
+      const gShare = gMax > 0 ? Math.round((d.gastos - d.gastosMin) * gCondT / gMax) : 0;
+      gOv[d.n] = Math.max(d.gastosMin, d.gastos - gShare);
+      const mShare = mMax > 0 ? Math.round((d.mora - d.moraMin) * mCondT / mMax) : 0;
+      mOv[d.n] = Math.max(d.moraMin, d.mora - mShare);
+    });
+    const condReal = (sG - datos.reduce((a, d) => a + gOv[d.n], 0)) + (sM - datos.reduce((a, d) => a + mOv[d.n], 0));
+    const exc = T - maxTotal;
+    document.getElementById('pcpHint').textContent = condReal > 0
+      ? `Se condona ${clp(condReal)} (dentro de tus atribuciones): gastos de cobranza primero, luego intereses por mora.`
       : exc > 0 ? `Se cobrará el total. El excedente de ${clp(exc)} quedará como Saldo a Favor.` : 'Se cobrará el total sin condonación.';
     renderBreakdown(gOv, mOv);
   }
