@@ -532,10 +532,14 @@ function renderConsulta(list) {
   };
   // Estado de CARTERA (2da dimensión, solo recursos propios). Etapa = c.estado.
   const CART_COL = { VIGENTE:'#16a34a', MORA:'#d97706', 'EN MORA':'#d97706', VENCIDO:'#dc2626', TERMINADO:'#0f766e', PREPAGADO:'#7c3aed', CASTIGADO:'#111827' };
-  const carteraTag = ec => {
+  const carteraTag = (ec, dias, fin) => {
     if (!ec) return '<span style="color:#cbd5e1">—</span>';
     const col = CART_COL[ec] || '#64748b';
-    return `<span style="font-size:.68rem;font-weight:800;color:#fff;background:${col};border-radius:10px;padding:2px 9px">${ec}</span>`;
+    // AutoFácil en mora/vencido/castigado: días de atraso al costado.
+    const esAF = String(fin || '').toUpperCase() === 'AUTOFACIL';
+    const enMora = ['MORA', 'EN MORA', 'VENCIDO', 'CASTIGADO'].includes(String(ec).toUpperCase());
+    const suf = (esAF && enMora && Number(dias) > 0) ? ` (${Number(dias)} días)` : '';
+    return `<span style="font-size:.68rem;font-weight:800;color:#fff;background:${col};border-radius:10px;padding:2px 9px">${ec}${suf}</span>`;
   };
   const sArrow = col => { const a = _sortColCred===col; return `<span style="color:${a?'#0141A2':'#cbd5e1'};font-size:.72em">${a?(_sortDirCred==='asc'?'▲':'▼'):'⇅'}</span>`; };
   const sTh = (label, col, cls='', st='') => `<th class="${cls}" onclick="toggleSortCred('${col}')" style="cursor:pointer;user-select:none;white-space:nowrap;${st}" title="Ordenar mayor/menor">${label} ${sArrow(col)}</th>`;
@@ -572,7 +576,7 @@ function renderConsulta(list) {
           <td class="num" style="color:var(--navy);font-weight:800">${fmtPeso(c.cuota)}</td>
           <td style="text-align:center">${c.plazo?c.plazo+' m':'—'}</td>
           <td style="text-align:center"><span class="badge-estado badge-${(c.estado||'').replace(' ','-')}">${c.estado||'—'}</span></td>
-          <td style="text-align:center">${carteraTag(c.estado_cartera)}</td>
+          <td style="text-align:center">${carteraTag(c.estado_cartera, c.dias_atraso, c.financiera)}</td>
           <td style="text-align:center">
             <button class="btn-ver-detalle" onclick="location.href='/creditos/revisar?id=${c.id_credito}'">
               <i class="bi bi-eye me-1"></i>Ver

@@ -142,6 +142,12 @@ const SELECT_GESTION = `
              AND ob.estado = 'OTORGADO' THEN 'VIGENTE'
         ELSE NULL
       END)                                                     AS estado_cartera,
+    -- Días de atraso = hoy − venc. de la cuota impaga más antigua (calendario real
+    -- cuotas_credito). NULL → 0 para los que no tienen calendario. Lo usa el chip.
+    COALESCE(DATEDIFF(CURDATE(), (
+      SELECT MIN(cc.fecha_vencimiento) FROM cuotas_credito cc
+       WHERE cc.id_credito = ob.id AND cc.estado_cuota <> 'PAGADA'
+         AND cc.fecha_vencimiento <= CURDATE())), 0)           AS dias_atraso,
     ob.fecha_otorgado                                          AS fecha_otorgamiento,
     ob.valor_vehiculo,
     ob.pie,
