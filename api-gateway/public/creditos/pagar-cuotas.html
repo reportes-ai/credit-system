@@ -141,7 +141,7 @@
   <a href="/creditos" class="nav-brand">
     <img src="/img/logo-autofacil.png" alt="AutoFácil" style="filter:brightness(0) invert(1);height:32px;display:block" onerror="this.style.display='none'">
     <span>Pago de Cuotas</span>
-    <span class="version-badge">v1.8</span>
+    <span class="version-badge">v1.9</span>
   </a>
   <div class="breadcrumb-nav">
   <a href="/">Inicio</a><span class="sep">›</span>
@@ -258,6 +258,7 @@ let _ufPorFecha  = new Map();     // UF del día-21 de mora por cuota: 'YYYY-MM-
 const fmtP  = v => v != null ? '$'+Math.round(Number(v)).toLocaleString('es-CL') : '$0';
 const fmtD  = s => s ? new Date(s).toLocaleDateString('es-CL',{timeZone:'UTC',day:'2-digit',month:'2-digit',year:'numeric'}) : '—';
 const fmtDT = s => s ? new Date(s).toLocaleString('es-CL',{day:'2-digit',month:'2-digit',year:'numeric',hour:'2-digit',minute:'2-digit'}) : '—';
+const fmtRut = v => { v=String(v||'').replace(/[^0-9kK]/g,'').toUpperCase(); if(v.length<2) return String(v||''); const dv=v.slice(-1); return v.slice(0,-1).replace(/\B(?=(\d{3})+(?!\d))/g,'.')+'-'+dv; };
 
 function showToast(msg, ok) {
   const el = document.getElementById('toastMsg');
@@ -480,7 +481,7 @@ function renderPagina() {
     <div class="cred-header">
       <div>
         <div class="ch-title"><i class="bi bi-credit-card me-2"></i>${c.nombre_cliente||'—'}</div>
-        <div class="ch-sub">N° ${c.numero_credito||c.id_credito} &nbsp;·&nbsp; ${c.rut_cliente||''} &nbsp;·&nbsp; ${c.plazo||'—'} cuotas de ${fmtP(c.cuota)}</div>
+        <div class="ch-sub">N° ${c.numero_credito||c.id_credito} &nbsp;·&nbsp; ${fmtRut(c.rut_cliente)} &nbsp;·&nbsp; ${c.plazo||'—'} cuotas de ${fmtP(c.cuota)}</div>
       </div>
       ${pill}
     </div>

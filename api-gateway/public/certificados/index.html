@@ -169,8 +169,10 @@ const $ = id => document.getElementById(id);
 const H = () => ({ Authorization:'Bearer '+TOKEN() });
 const HJ = () => ({ 'Content-Type':'application/json', Authorization:'Bearer '+TOKEN() });
 const nf = n => Number(n||0).toLocaleString('es-CL');
+const opf = n => String(n==null?'':n);            // N° de operación: SIN puntos de miles
 const esc = s => String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
 const money = n => '$'+nf(n);
+const fmtRut = v => { v=String(v||'').replace(/[^0-9kK]/g,'').toUpperCase(); if(v.length<2) return String(v||''); const dv=v.slice(-1); const c=v.slice(0,-1).replace(/\B(?=(\d{3})+(?!\d))/g,'.'); return c+'-'+dv; };
 function fechaLarga(iso){ if(!iso) return '—'; const M=['enero','febrero','marzo','abril','mayo','junio','julio','agosto','septiembre','octubre','noviembre','diciembre'];
   const [y,m,d]=iso.split('-').map(Number); return `${d} de ${M[m-1]} de ${y}`; }
 function addDias(iso,n){ if(!iso) return '—'; const dt=new Date(iso+'T00:00:00'); dt.setDate(dt.getDate()+(n||0)); return fechaLarga(dt.toISOString().slice(0,10)); }
@@ -223,8 +225,8 @@ async function buscar(){
     const rows=j.data||[];
     $('res').innerHTML = rows.length ? rows.map(c=>{
       const veh=esc([c.marca,c.modelo,c.anio].filter(Boolean).join(' '));
-      const left = modoSel==='carta' ? `<b>${esc(c.op_carta||'')}</b> · ${esc(c.cliente||'')}` : `<b>N° ${nf(c.num_op)}</b> · ${esc(c.nombre||'')}`;
-      const right = modoSel==='carta' ? `${esc(c.rut||'')} · ${veh} · ${money(c.precio_venta)}` : `${esc(c.rut||'')} · ${veh}${c.estado_cartera?' · '+esc(c.estado_cartera):''}`;
+      const left = modoSel==='carta' ? `<b>${esc(c.op_carta||'')}</b> · ${esc(c.cliente||'')}` : `<b>N° ${opf(c.num_op)}</b> · ${esc(c.nombre||'')}`;
+      const right = modoSel==='carta' ? `${esc(fmtRut(c.rut))} · ${veh} · ${money(c.precio_venta)}` : `${esc(fmtRut(c.rut))} · ${veh}${c.estado_cartera?' · '+esc(c.estado_cartera):''}`;
       return `<div class="it" onclick='selCred(${JSON.stringify(c).replace(/'/g,"&#39;")})'><span>${left}</span><span style="color:#64748b">${right}</span></div>`;
     }).join('') : '<div class="it" style="color:#94a3b8;cursor:default">Sin resultados</div>';
     $('res').classList.remove('hide');
@@ -234,8 +236,8 @@ function selCred(c){
   credSel=c; $('res').classList.add('hide'); $('selbox').style.display='block';
   const veh=esc([c.marca,c.modelo,c.anio].filter(Boolean).join(' '));
   $('selbox').innerHTML = modoSel==='carta'
-    ? `<b>Carta ${esc(c.op_carta||'')}</b> — ${esc(c.cliente||'')} · ${esc(c.rut||'')} · ${veh} · Precio ${money(c.precio_venta)} · Pie ${money(c.pie)} · Saldo ${money(c.saldo)}`
-    : `<b>N° ${nf(c.num_op)}</b> — ${esc(c.nombre||'')} · ${esc(c.rut||'')} · ${veh}`;
+    ? `<b>Carta ${esc(c.op_carta||'')}</b> — ${esc(c.cliente||'')} · ${esc(fmtRut(c.rut))} · ${veh} · Precio ${money(c.precio_venta)} · Pie ${money(c.pie)} · Saldo ${money(c.saldo)}`
+    : `<b>N° ${opf(c.num_op)}</b> — ${esc(c.nombre||'')} · ${esc(fmtRut(c.rut))} · ${veh}`;
   refreshGen();
 }
 function refreshGen(){
@@ -260,11 +262,11 @@ async function generar(){
 }
 
 function cuerpo(d){
-  const c=d.credito||{}, x=d.datos||{}, nom=esc(d.nombre||''), rut=esc(d.rut||'');
-  if(d.tipo==='CERT_CREDITO_VIGENTE') return `AutoFácil Chile certifica que <b>${nom}</b>, RUT <b>${rut}</b>, mantiene <b>vigente</b> el crédito automotriz N° <b>${nf(c.num_op)}</b> (${esc(c.financiera||'')}), otorgado con fecha ${esc(c.fecha_otorgado||'—')}, asociado al vehículo <b>${esc(c.vehiculo||'—')}</b>. A la fecha registra <b>${nf(x.cuotas_pagadas)}</b> de <b>${nf(x.cuotas_total)}</b> cuotas pagadas, con un saldo insoluto de <b>${money(x.saldo_insoluto)}</b> y una cuota mensual de <b>${money(x.cuota_mensual)}</b>.`;
-  if(d.tipo==='CERT_PREPAGO') return `AutoFácil Chile certifica que el crédito automotriz N° <b>${nf(c.num_op)}</b> (${esc(c.financiera||'')}), de <b>${nom}</b>, RUT <b>${rut}</b>, asociado al vehículo <b>${esc(c.vehiculo||'—')}</b>, fue <b>PREPAGADO</b> (pagado en su totalidad) con fecha <b>${esc(x.fecha_prepago||'—')}</b>. El cliente <b>no registra saldos pendientes</b> por este crédito.`;
-  if(d.tipo==='CERT_ALZAMIENTO') return `Habiéndose pagado íntegramente el crédito automotriz N° <b>${nf(c.num_op)}</b> de <b>${nom}</b>, RUT <b>${rut}</b>, AutoFácil Chile autoriza y certifica el <b>ALZAMIENTO DE LA PRENDA</b> que afecta al vehículo <b>${esc(x.vehiculo||'—')}</b>${x.tipo_vehiculo?' ('+esc(x.tipo_vehiculo)+')':''}. Fecha del pago final: <b>${esc(x.fecha_pago_final||'—')}</b>.`;
-  if(d.tipo==='CERT_PAGO_CUOTA') return `AutoFácil Chile certifica que, respecto del crédito automotriz N° <b>${nf(c.num_op)}</b> de <b>${nom}</b>, RUT <b>${rut}</b>, la <b>cuota N° ${nf(x.numero_cuota)}</b> (vencimiento ${esc(x.fecha_vencimiento||'—')}) fue <b>pagada</b> con fecha <b>${esc(x.fecha_pago||'—')}</b> por un monto de <b>${money(x.monto)}</b>.`;
+  const c=d.credito||{}, x=d.datos||{}, nom=esc(d.nombre||''), rut=esc(fmtRut(d.rut));
+  if(d.tipo==='CERT_CREDITO_VIGENTE') return `AutoFácil Chile certifica que <b>${nom}</b>, RUT <b>${rut}</b>, mantiene <b>vigente</b> el crédito automotriz N° <b>${opf(c.num_op)}</b> (${esc(c.financiera||'')}), otorgado con fecha ${esc(c.fecha_otorgado||'—')}, asociado al vehículo <b>${esc(c.vehiculo||'—')}</b>. A la fecha registra <b>${nf(x.cuotas_pagadas)}</b> de <b>${nf(x.cuotas_total)}</b> cuotas pagadas, con un saldo insoluto de <b>${money(x.saldo_insoluto)}</b> y una cuota mensual de <b>${money(x.cuota_mensual)}</b>.`;
+  if(d.tipo==='CERT_PREPAGO') return `AutoFácil Chile certifica que el crédito automotriz N° <b>${opf(c.num_op)}</b> (${esc(c.financiera||'')}), de <b>${nom}</b>, RUT <b>${rut}</b>, asociado al vehículo <b>${esc(c.vehiculo||'—')}</b>, fue <b>PREPAGADO</b> (pagado en su totalidad) con fecha <b>${esc(x.fecha_prepago||'—')}</b>. El cliente <b>no registra saldos pendientes</b> por este crédito.`;
+  if(d.tipo==='CERT_ALZAMIENTO') return `Habiéndose pagado íntegramente el crédito automotriz N° <b>${opf(c.num_op)}</b> de <b>${nom}</b>, RUT <b>${rut}</b>, AutoFácil Chile autoriza y certifica el <b>ALZAMIENTO DE LA PRENDA</b> que afecta al vehículo <b>${esc(x.vehiculo||'—')}</b>${x.tipo_vehiculo?' ('+esc(x.tipo_vehiculo)+')':''}. Fecha del pago final: <b>${esc(x.fecha_pago_final||'—')}</b>.`;
+  if(d.tipo==='CERT_PAGO_CUOTA') return `AutoFácil Chile certifica que, respecto del crédito automotriz N° <b>${opf(c.num_op)}</b> de <b>${nom}</b>, RUT <b>${rut}</b>, la <b>cuota N° ${nf(x.numero_cuota)}</b> (vencimiento ${esc(x.fecha_vencimiento||'—')}) fue <b>pagada</b> con fecha <b>${esc(x.fecha_pago||'—')}</b> por un monto de <b>${money(x.monto)}</b>.`;
   if(d.tipo==='CERT_PREAPROBADO'){
     const veh=esc([x.tipo_vehiculo,x.marca,x.modelo,x.anio].filter(Boolean).join(' '));
     return `AutoFácil Chile certifica que <b>${nom}</b>, RUT <b>${rut}</b>, cuenta con un crédito automotriz <b>PREAPROBADO</b> según la carta de aprobación N° <b>${esc(x.op_carta||'')}</b>, bajo las siguientes condiciones: vehículo <b>${veh}</b>${x.patente?', patente <b>'+esc(x.patente)+'</b>':''}; precio del vehículo <b>${money(x.precio_venta)}</b>; pie <b>${money(x.pie)}</b>; saldo precio a financiar <b>${money(x.saldo_precio)}</b>; plazo <b>${nf(x.plazo)}</b> cuotas${x.tasa!=null?'; tasa <b>'+x.tasa+'%</b> mensual':''}${x.monto_credito?'; monto del crédito <b>'+money(x.monto_credito)+'</b>':''}. Financiamiento a través de <b>${esc(x.financiera||'')}</b>. La presente oferta tiene una <b>vigencia de ${nf(x.vigencia_dias||5)} días corridos</b> a contar de la fecha de emisión (vence el <b>${addDias(d.fecha_emision,x.vigencia_dias||5)}</b>).`;
@@ -274,8 +276,8 @@ function cuerpo(d){
 function gridDatos(d){
   const x=d.datos||{}, c=d.credito||{}, items=[];
   const add=(k,v)=>items.push(`<div><span>${k}</span><b>${v}</b></div>`);
-  add('Cliente', esc(d.nombre||'—')); add('RUT', esc(d.rut||'—'));
-  if(c.num_op){ add('N° Operación', nf(c.num_op)); if(c.financiera) add('Financiera', esc(c.financiera)); if(c.vehiculo) add('Vehículo', esc(c.vehiculo)); }
+  add('Cliente', esc(d.nombre||'—')); add('RUT', esc(d.rut?fmtRut(d.rut):'—'));
+  if(c.num_op){ add('N° Operación', opf(c.num_op)); if(c.financiera) add('Financiera', esc(c.financiera)); if(c.vehiculo) add('Vehículo', esc(c.vehiculo)); }
   if(d.tipo==='CERT_CREDITO_VIGENTE'){ add('Cuotas pagadas', `${nf(x.cuotas_pagadas)} / ${nf(x.cuotas_total)}`); add('Saldo insoluto', money(x.saldo_insoluto)); add('Cuota mensual', money(x.cuota_mensual)); }
   if(d.tipo==='CERT_PREPAGO'){ add('Fecha de prepago', esc(x.fecha_prepago||'—')); add('Monto financiado', money(x.monto_financiado)); }
   if(d.tipo==='CERT_PAGO_CUOTA'){ add('Cuota', nf(x.numero_cuota)); add('Fecha de pago', esc(x.fecha_pago||'—')); add('Monto', money(x.monto)); }
@@ -342,8 +344,8 @@ function pintarHist(rows){
     <tr>
       <td>${esc(c.created_at)}</td>
       <td>${esc(c.tipo_label)}</td>
-      <td>${c.num_op?nf(c.num_op):'—'}</td>
-      <td>${esc(c.nombre||'—')}<br><span style="color:#94a3b8;font-size:.74rem">${esc(c.rut||'')}</span></td>
+      <td>${c.num_op?opf(c.num_op):'—'}</td>
+      <td>${esc(c.nombre||'—')}<br><span style="color:#94a3b8;font-size:.74rem">${esc(fmtRut(c.rut))}</span></td>
       <td><a href="/verificar/${esc(c.codigo)}" target="_blank" style="font-family:monospace;color:#6d28d9">${esc(c.codigo)}</a></td>
       <td>${esc(c.emitido_por||'')}</td>
       <td>${c.anulado?'<span class="pill anul">ANULADO</span>':'<span class="pill">Válido</span>'}</td>

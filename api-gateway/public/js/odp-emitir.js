@@ -20,6 +20,7 @@
   const clp = v => '$' + Math.round(Number(v) || 0).toLocaleString('es-CL');
   const esc = s => String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
   const fmtFecha = f => { if (!f) return '—'; try { return new Date(f).toLocaleDateString('es-CL', { timeZone: 'UTC', day: '2-digit', month: '2-digit', year: 'numeric' }); } catch { return '—'; } };
+  const fmtRut = v => { v = String(v || '').replace(/[^0-9kK]/g, '').toUpperCase(); if (v.length < 2) return String(v || ''); const dv = v.slice(-1); return v.slice(0, -1).replace(/\B(?=(\d{3})+(?!\d))/g, '.') + '-' + dv; };
 
   let _modalEl = null;
   let _state = { credito: null, cuotas: [], cuentas: [], sel: new Set(), onDone: null, busy: false };
@@ -152,7 +153,7 @@
   function render() {
     const c = _state.credito;
     document.getElementById('odpSub').textContent =
-      `${c.nombre_cliente || '—'} · N° ${c.numero_credito || c.id_credito} · ${c.rut_cliente || ''}`;
+      `${c.nombre_cliente || '—'} · N° ${c.numero_credito || c.id_credito} · ${fmtRut(c.rut_cliente)}`;
 
     const filas = _state.cuotas.map(q => {
       const sel = _state.sel.has(q.numero_cuota);

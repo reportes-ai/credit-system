@@ -210,21 +210,60 @@ async function renderCuerpo(out, fechaEmisionISO) {
   };
 }
 
+// Calendario francés sintético cuando el crédito no tiene filas en cuotas_credito.
+// Mismos parámetros que /creditos/pagar-cuotas: monto_financiado, tascli_real (% mensual),
+// plazo y fecha_primera_cuota → calza con lo que ve el usuario en Pago de Cuotas.
+function calendarioFrancesSintetico(c) {
+  const mf = N(c.monto_financiado), plazo = N(c.plazo), r = (N(c.tascli_real) || 0) / 100;
+  if (!mf || !plazo) return [];
+  const pot = Math.pow(1 + r, plazo);
+  const cu  = r > 0 ? Math.round(mf * r * pot / (pot - 1)) : Math.round(mf / plazo);
+  const f0  = c.fecha_primera_cuota ? new Date(c.fecha_primera_cuota + 'T00:00:00') : null;
+  let saldo = mf; const out = [];
+  for (let n = 1; n <= plazo; n++) {
+    const interes = Math.round(saldo * r);
+    let amort = cu - interes;
+    if (n === plazo) amort = saldo;
+    saldo = Math.max(0, saldo - amort);
+    const venc = f0 ? new Date(f0.getFullYear(), f0.getMonth() + (n - 1), f0.getDate()) : null;
+    out.push({
+      numero_cuota: n,
+      venc: venc ? venc.toISOString().slice(0, 10) : null,
+      valor_cuota: cu, interes, amortizacion: amort,
+      tasa: r * 100, estado_cuota: 'PENDIENTE', fpago: null, saldo_insoluto: saldo,
+    });
+  }
+  return out;
+}
+
 // Contexto del crédito + su calendario real (cuotas_credito si existe).
 async function ctxCredito(num_op) {
   const [[c]] = await pool.query(
     `SELECT c.id, c.num_op, c.numero_credito, c.financiera, c.estado, c.estado_cartera,
             c.plazo, DATE_FORMAT(c.fecha_otorgado,'%Y-%m-%d') fecha_otorgado,
             c.monto_financiado, c.saldo_precio, c.tascli_real, c.cuota, c.marca, c.modelo, c.anio, c.tipo_vehiculo, c.valor_vehiculo,
+            DATE_FORMAT(c.fecha_primera_cuota,'%Y-%m-%d') fecha_primera_cuota,
             cl.rut, cl.nombre_completo nombre, cl.direccion
        FROM creditos c JOIN clientes cl ON cl.id_cliente=c.id_cliente
       WHERE c.num_op=? LIMIT 1`, [num_op]);
   if (!c) return null;
-  const [cuotas] = await pool.query(
+  let [cuotas] = await pool.query(
     `SELECT numero_cuota, DATE_FORMAT(fecha_vencimiento,'%Y-%m-%d') venc, valor_cuota,
             interes, amortizacion, tasa,
             estado_cuota, DATE_FORMAT(fecha_pago,'%Y-%m-%d') fpago, saldo_insoluto
        FROM cuotas_credito WHERE id_credito=? ORDER BY numero_cuota`, [c.id]);
+  // Sin calendario real → calendario francés sintético (mismos parámetros que
+  // /creditos/pagar-cuotas) + pagos reales registrados en pagos_credito.
+  if (!cuotas.length) {
+    cuotas = calendarioFrancesSintetico(c);
+    if (cuotas.length) {
+      const [pgs] = await pool.query(
+        `SELECT numero_cuota, DATE_FORMAT(fecha_pago,'%Y-%m-%d') fpago
+           FROM pagos_credito WHERE id_credito=? AND estado_pago='PAGADO'`, [c.id]);
+      const pagMap = new Map(pgs.map(p => [N(p.numero_cuota), p.fpago]));
+      cuotas.forEach(q => { if (pagMap.has(q.numero_cuota)) { q.estado_cuota = 'PAGADA'; q.fpago = pagMap.get(q.numero_cuota) || null; } });
+    }
+  }
   // métricas de cartera
   const total    = cuotas.length || N(c.plazo);
   const pagadas  = cuotas.filter(q => q.estado_cuota === 'PAGADA').length;

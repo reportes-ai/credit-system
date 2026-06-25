@@ -218,7 +218,7 @@
   <div class="topnav-left">
     <a href="/" class="topnav-brand">
       <img src="/img/logo.png" alt="AutoFácil">
-      <span class="version-badge">v2.4</span>
+      <span class="version-badge">v2.5</span>
     </a>
     <div class="breadcrumb-nav">
       <a href="/">Inicio</a><span class="sep">›</span>
@@ -426,6 +426,7 @@ const API = (path, opts={}) =>
   fetch(path, { headers:{ Authorization:`Bearer ${token}`, 'Content-Type':'application/json' }, ...opts });
 const clp = v => '$' + Math.round(v||0).toLocaleString('es-CL');
 const esc = s => String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+const fmtRut = v => { v=String(v||'').replace(/[^0-9kK]/g,'').toUpperCase(); if(v.length<2) return String(v||''); const dv=v.slice(-1); return v.slice(0,-1).replace(/\B(?=(\d{3})+(?!\d))/g,'.')+'-'+dv; };
 
 /* ── Estado global ── */
 let _miCaja       = null;
@@ -527,7 +528,7 @@ async function buscar() {
         <div class="cc-icon"><i class="bi bi-car-front"></i></div>
         <div class="cc-main">
           <div class="cc-nombre">${esc(c.nombre_cliente)}</div>
-          <div class="cc-sub">RUT ${esc(c.rut_cliente)} · ${esc(c.marca||'')} ${esc(c.modelo||'')} ${c.anio||''}</div>
+          <div class="cc-sub">RUT ${esc(fmtRut(c.rut_cliente))} · ${esc(c.marca||'')} ${esc(c.modelo||'')} ${c.anio||''}</div>
         </div>
         <div class="cc-right">
           <div class="cc-num">${esc(c.numero_credito||'#'+c.id_credito)}</div>
@@ -715,7 +716,7 @@ function renderPanel() {
     <div class="cp-header">
       <div>
         <div class="cp-title"><i class="bi bi-car-front me-2"></i>${esc(c.nombre_cliente)}</div>
-        <div class="cp-sub">RUT ${esc(c.rut_cliente)} &nbsp;·&nbsp; N° ${esc(c.numero_credito||c.id_credito)} &nbsp;·&nbsp; ${esc(c.marca||'')} ${esc(c.modelo||'')} ${c.anio||''}</div>
+        <div class="cp-sub">RUT ${esc(fmtRut(c.rut_cliente))} &nbsp;·&nbsp; N° ${esc(c.numero_credito||c.id_credito)} &nbsp;·&nbsp; ${esc(c.marca||'')} ${esc(c.modelo||'')} ${c.anio||''}</div>
       </div>
       <div style="display:flex;gap:8px;align-items:center">
         <span style="background:rgba(255,255,255,.15);border-radius:8px;padding:4px 12px;font-size:.78rem;font-weight:700">${c.plazo} meses · ${clp(c.cuota||_schedule[0]?.monto||0)}/mes</span>

@@ -155,6 +155,7 @@ const clp = v => '$' + Math.round(Number(v) || 0).toLocaleString('es-CL');
 const esc = s => String(s == null ? '' : s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
 const fmtF  = f => { if (!f) return '—'; try { return new Date(f).toLocaleDateString('es-CL',{timeZone:'UTC',day:'2-digit',month:'2-digit',year:'numeric'}); } catch { return '—'; } };
 const fmtDT = f => { if (!f) return '—'; try { return new Date(f).toLocaleString('es-CL',{day:'2-digit',month:'2-digit',year:'numeric',hour:'2-digit',minute:'2-digit'}); } catch { return '—'; } };
+const fmtRut = v => { v=String(v||'').replace(/[^0-9kK]/g,'').toUpperCase(); if(v.length<2) return String(v||''); const dv=v.slice(-1); return v.slice(0,-1).replace(/\B(?=(\d{3})+(?!\d))/g,'.')+'-'+dv; };
 document.getElementById('navNombre').textContent = `${yo?.nombre||''} ${yo?.apellido||''}`.trim();
 function logout(){ sessionStorage.clear(); location.href='/login.html'; }
 function toast(m, ok){ const t=document.getElementById('toast'); t.textContent=m; t.className='toast '+(ok?'ok':'err'); t.style.display='block'; setTimeout(()=>t.style.display='none',4000); }
@@ -206,7 +207,7 @@ function rowHTML(o){
     <td class="td-folio">${folio}</td>
     <td>${fmtDT(o.created_at)}</td>
     <td><strong>${esc(o.numero_credito || ('#'+o.id_credito))}</strong></td>
-    <td>${esc(o.nombre_cliente||'—')}<div class="muted" style="font-size:.78rem">${esc(o.rut_cliente||'')}</div></td>
+    <td>${esc(o.nombre_cliente||'—')}<div class="muted" style="font-size:.78rem">${esc(fmtRut(o.rut_cliente))}</div></td>
     <td style="text-align:center">${o.n_cuotas}</td>
     <td class="td-amt">${clp(o.monto_total)}</td>
     <td>${esc(o.origen_fondos||'—')}</td>
@@ -252,7 +253,7 @@ function render(){
       <dt>Estado</dt><dd><span class="badge-estado e-${esc(o.estado)}">${esc(o.estado)}</span></dd>
       <dt>Solicitante</dt><dd>${esc(o.solicitante_nombre||'—')}${o.solicitante_email?` · <span class="muted">${esc(o.solicitante_email)}</span>`:''}</dd>
       <dt>Origen de fondos</dt><dd>${esc(o.origen_fondos||'—')}</dd>
-      <dt>Cliente / RUT</dt><dd>${esc(o.nombre_cliente||'—')} · ${esc(o.rut_cliente||'')}</dd>
+      <dt>Cliente / RUT</dt><dd>${esc(o.nombre_cliente||'—')} · ${esc(fmtRut(o.rut_cliente))}</dd>
       <dt>Email cliente</dt><dd>${o.email_cliente?esc(o.email_cliente):'<span class="muted">sin email — no se enviará comprobante</span>'}</dd>
       <dt>Fecha de pago</dt><dd>${fmtF(o.fecha_pago) || '—'}</dd>
       ${o.observacion?`<dt>Observación</dt><dd>${esc(o.observacion)}</dd>`:''}
