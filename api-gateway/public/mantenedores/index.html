@@ -74,7 +74,7 @@
     <div class="topnav-left">
       <a href="/" class="topnav-brand">
         <img src="/img/logo.png" alt="AutoFácil" style="display:block">
-        <span class="version-badge" id="versionBadge">v5.3</span>
+        <span class="version-badge" id="versionBadge">v5.4</span>
       </a>
         <div class="breadcrumb-nav"><a href="/">Inicio</a><span class="sep">›</span><span style="color:#fff;font-weight:600"><i class="bi bi-gear me-1"></i>Mantenedores</span></div></div>
     <div class="topnav-right">
@@ -163,6 +163,41 @@
       'bd-informacion-comercial': 'Base de datos de información comercial',
     };
 
+    // Palabras clave por mantenedor (submódulos, pestañas y sinónimos) para la búsqueda.
+    // No son datos de negocio: solo enriquecen el filtro (ej. "suplencias" → Backups).
+    const KEYWORDS = {
+      'usuarios': 'perfiles permisos usuarios suspendidos seguridad sesiones contraseña roles ejecutivos comerciales',
+      'tasas': 'tmc tasa máxima convencional mensual anual tramo menor mayor 200 uf interés mora',
+      'uf': 'unidad de fomento indicadores valor diario utm',
+      'dealers': 'concesionarios contacto incorporación parque potencial categoría rut vendedor',
+      'vehiculos': 'tasación sii marca modelo año valor vehículo',
+      'comunas': 'regiones provincias comunas geográfico ciudad región',
+      'parametros': 'gastos operacionales comisiones crédito umbral uf tramo',
+      'factores-seguro': 'desgravamen cesantía prima factor comisión seguro plazo tasa neta',
+      'tipos-documento': 'documentos respaldo aprobación plantillas requeridos',
+      'pagares': 'hoja resumen contrato pagaré mandato plantillas documento',
+      'cuentas-bancarias': 'banco cuenta corriente transferencia razón social rut depósito',
+      'parques': 'arriendo comisión parque dealer porcentaje',
+      'estado-creditos': 'estados transiciones máquina de estados brokerage flujo etapa estado cartera vigente mora vencido prepagado castigado',
+      'broker-validaciones': 'validación documental autofin unidad de crédito ítems checklist broker',
+      'financieras': 'autofin uac ingresos fórmulas financieras cálculo',
+      'comisiones-seguro': 'desgravamen cesantía comisión prima porcentaje seguro',
+      'productos-financiera': 'productos digitación financiera autofin unidad',
+      'dealernet': 'dealernet productos costos integración informe central de información',
+      'vista-pantallas': 'placement pantallas home secciones cards módulos submódulos ubicación',
+      'actividades-economicas': 'sii giro código glosa afecto iva categoría tributaria actividad económica',
+      'correos-programados': 'correos automáticos cron informe diario de ventas horario programados destinatarios',
+      'backups': 'suplencias suplente backup funciones alertas correos reemplazo titular',
+      'solo-dios': 'base de datos sql dios edición total acceso directo bd',
+      'mantencion-sistema': 'mantención modo desarrollo aviso bg-admin cinta correos de prueba whatsapp',
+      'impuestos': 'iva retención honorarios boleta impuesto',
+      'cobranza-parametros': 'gastos de cobranza tramos uf interés mora día 21 whatsapp sms email plantillas datos de transferencia',
+      'alertas': 'alertas notificaciones campana orígenes post venta sonido',
+      'feriados': 'feriados días hábiles calendario festivos',
+      'meses-cerrados': 'meses cerrados cierre de mes contable',
+      'dealer-categorias': 'categoría potencial dealer factor ventas posiciones',
+    };
+
     let sortable = null, modoReordenar = false;
     const CONFIG_KEY = 'submenu_mantenedores';
 
@@ -232,7 +267,7 @@
 
       const grid = document.getElementById('modulesGrid');
       grid.innerHTML = items.map(m => `
-        <a href="${m.href}" class="module-card" data-id="${m.id}" data-href="${m.href}">
+        <a href="${m.href}" class="module-card" data-id="${m.id}" data-href="${m.href}" data-keywords="${KEYWORDS[m.id]||''}">
           <i class="bi bi-grip-vertical drag-handle"></i>
           <div class="card-icon"><i class="bi ${m.icon}"></i></div>
           <h6>${m.titulo}</h6>
@@ -315,7 +350,7 @@
       document.getElementById('clrMant').style.display = q ? 'block' : 'none';
       let visibles = 0;
       document.querySelectorAll('#modulesGrid .module-card').forEach(c => {
-        const txt = ((c.querySelector('h6')?.textContent || '') + ' ' + (c.querySelector('p')?.textContent || '')).toLowerCase();
+        const txt = ((c.querySelector('h6')?.textContent || '') + ' ' + (c.querySelector('p')?.textContent || '') + ' ' + (c.dataset.keywords || '')).toLowerCase();
         const show = !q || txt.includes(q);
         c.style.display = show ? '' : 'none';
         if (show) visibles++;
