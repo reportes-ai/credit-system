@@ -885,6 +885,9 @@ function addDias(fechaStr, n) {
   return d.toISOString().slice(0, 10);
 }
 
+// Reutilizable por otros módulos (ej. certificados: liquidación de prepago).
+exports._calc = { calcularGastoCobranza, calcularInteresMora, getCobranzaConfig, getUFporFecha, addDias };
+
 // ─── Calcular gasto de cobranza para un monto (Caja / consultas) ───────────────
 // body: { monto, uf?, fecha?, fecha_vencimiento? }
 //   - uf explícita tiene prioridad.

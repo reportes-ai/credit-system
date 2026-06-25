@@ -11,6 +11,8 @@
 const pool = require('../../../../shared/config/database');
 const { registrarVerificable, anularVerificable } = require('../../../../shared/verificacion');
 const { auditar } = require('../../../../shared/audit');
+// Lógica canónica de cobranza (interés por mora + gastos de cobranza, parametrizables).
+const { _calc: COB } = require('../../../cobranza/src/controllers/cobranza.controller');
 
 /* ── Schema + auto-registro del módulo (sin hardcode en el frontend) ─────── */
 (async () => {
@@ -120,7 +122,7 @@ const DEFAULT_TEXTOS = {
   CERT_ALZAMIENTO:      'Habiéndose pagado íntegramente el crédito automotriz N° <b>{num_op}</b> de <b>{nombre}</b>, RUT <b>{rut}</b>, AutoFácil Chile autoriza y certifica el <b>ALZAMIENTO DE LA PRENDA</b> que afecta al vehículo <b>{vehiculo}</b>. Fecha del pago final: <b>{fecha_prepago}</b>.',
   CERT_PAGO_CUOTA:      'AutoFácil Chile certifica que, respecto del crédito automotriz N° <b>{num_op}</b> de <b>{nombre}</b>, RUT <b>{rut}</b>, la <b>cuota N° {numero_cuota}</b> (vencimiento {fecha_vencimiento}) fue <b>pagada</b> con fecha <b>{fecha_pago}</b> por un monto de <b>{monto_cuota}</b>.',
   CERT_DEUDA_VIGENTE:   'AutoFácil Chile certifica que <b>{nombre}</b>, RUT <b>{rut}</b>, mantiene una <b>deuda vigente</b> de <b>{saldo}</b> por el crédito automotriz N° <b>{num_op}</b>, asociado al vehículo <b>{vehiculo}</b>, correspondiente a <b>{cuotas_pendientes}</b> cuotas pendientes de un total de <b>{cuotas_total}</b>.',
-  CERT_DEUDA_PREPAGO:   'AutoFácil Chile certifica que, al día de la fecha, el monto requerido para <b>prepagar (saldar)</b> íntegramente el crédito automotriz N° <b>{num_op}</b> de <b>{nombre}</b>, RUT <b>{rut}</b>, asociado al vehículo <b>{vehiculo}</b>, asciende a <b>{saldo}</b>.',
+  CERT_DEUDA_PREPAGO:   'AutoFácil Chile certifica que, al día de la fecha, el monto requerido para <b>prepagar (saldar)</b> íntegramente el crédito automotriz N° <b>{num_op}</b> de <b>{nombre}</b>, RUT <b>{rut}</b>, asociado al vehículo <b>{vehiculo}</b>, asciende a <b>{saldo}</b>, de acuerdo al siguiente detalle: capital de cuotas vigentes <b>{capital_vigente}</b>; cuotas en mora <b>{mora_cuotas}</b>; interés por mora <b>{interes_mora}</b>; gastos de cobranza <b>{gastos_cobranza}</b>; intereses corrientes <b>{interes_corriente}</b>; comisión de prepago <b>{comision_prepago}</b>.',
   CERT_PREAPROBADO:     'AutoFácil Chile certifica que <b>{nombre}</b>, RUT <b>{rut}</b>, cuenta con un crédito automotriz <b>PREAPROBADO</b>{fin_parens} según la carta de aprobación N° <b>{op_carta}</b>, bajo las siguientes condiciones: vehículo <b>{vehiculo}</b>{patente_txt}; precio del vehículo <b>{precio}</b>; pie <b>{pie}</b>; saldo precio a financiar <b>{saldo_precio}</b>; plazo <b>{plazo}</b> cuotas{tasa_txt}{monto_txt}. La presente oferta tiene una <b>vigencia de {vigencia} días corridos</b> a contar de la fecha de emisión (vence el <b>{vence}</b>).',
   CIERRE:               'Se emite el presente certificado a solicitud de <b>{nombre}</b> para los fines que estime convenientes, sin ulterior responsabilidad para Auto Fácil SpA.',
 };
@@ -147,6 +149,10 @@ function buildVars(out, fechaEmisionISO) {
     tasa_txt: x.tasa != null ? `; tasa <b>${x.tasa}%</b> mensual` : '',
     monto_txt: x.monto_credito ? `; monto del crédito <b>${fmtMoney(x.monto_credito)}</b>` : '',
     vigencia: x.vigencia_dias || 5, vence: addDiasLargo(fe, x.vigencia_dias || 5),
+    // desglose de la liquidación de prepago
+    capital_vigente: fmtMoney(x.capital_vigente), mora_cuotas: fmtMoney(x.mora_cuotas),
+    interes_mora: fmtMoney(x.interes_mora), gastos_cobranza: fmtMoney(x.gastos_cobranza),
+    interes_corriente: fmtMoney(x.interes_corriente), comision_prepago: fmtMoney(x.comision_prepago),
   };
 }
 
@@ -166,7 +172,7 @@ async function ctxCredito(num_op) {
   const [[c]] = await pool.query(
     `SELECT c.id, c.num_op, c.numero_credito, c.financiera, c.estado, c.estado_cartera,
             c.plazo, DATE_FORMAT(c.fecha_otorgado,'%Y-%m-%d') fecha_otorgado,
-            c.monto_financiado, c.cuota, c.marca, c.modelo, c.anio, c.tipo_vehiculo, c.valor_vehiculo,
+            c.monto_financiado, c.saldo_precio, c.tascli_real, c.cuota, c.marca, c.modelo, c.anio, c.tipo_vehiculo, c.valor_vehiculo,
             cl.rut, cl.nombre_completo nombre, cl.direccion
        FROM creditos c JOIN clientes cl ON cl.id_cliente=c.id_cliente
       WHERE c.num_op=? LIMIT 1`, [num_op]);
@@ -305,7 +311,56 @@ async function armar(tipo, body) {
   }
   if (tipo === 'CERT_DEUDA_PREPAGO') {
     if (pagado) throw { code: 400, msg: 'El crédito ya está pagado; no hay monto de prepago.' };
-    return { ...base, datos: { saldo_insoluto: saldo, cuotas_pendientes: impagas, cuotas_total: total } };
+    if (!cuotas.length) throw { code: 400, msg: 'El crédito no tiene calendario de cuotas para calcular el prepago.' };
+    // Liquidación de prepago:
+    //  capital de cuotas vigentes + cuotas en mora (valor) + interés por mora +
+    //  gastos de cobranza + intereses corrientes sobre el capital vigente + comisión de prepago (1 mes).
+    const hoy = new Date(); hoy.setHours(0, 0, 0, 0);
+    const fechaCalc = new Date().toLocaleDateString('sv-SE', { timeZone: 'America/Santiago' });
+    const noPag = cuotas.filter(q => q.estado_cuota !== 'PAGADA');
+    const tasaMes = N((noPag[0] || cuotas[0]).tasa) || N(c.tascli_real) || 0;  // % mensual
+    const tasaDia = (tasaMes / 100) / 30;
+    // Parámetros canónicos de cobranza (interés por mora + gastos de cobranza)
+    const cfg = await COB.getCobranzaConfig();
+    const gastosDias = Number(cfg.gastos_dias) || 21;
+    let tramosUF = []; try { tramosUF = JSON.parse(cfg.tramos_uf); } catch (_) {}
+    const [tasasMora] = await pool.query('SELECT fecha_desde, fecha_hasta, tasa_mensual_menor, tasa_mensual_mayor FROM tasas');
+    // Tramo del crédito (menor/mayor 200 UF) = saldo precio vs umbral × UF de otorgamiento
+    let tramo = 'menor';
+    try {
+      const [[um]] = await pool.query("SELECT valor FROM parametros_credito WHERE clave='umbral_uf_tramo'");
+      const umbral = um ? (parseFloat(um.valor) || 200) : 200;
+      const ufOt = await COB.getUFporFecha(c.fecha_otorgado);
+      const baseTramo = N(c.saldo_precio) || N(c.monto_financiado) || 0;
+      if (ufOt > 0 && baseTramo > umbral * ufOt) tramo = 'mayor';
+    } catch (_) {}
+    let capitalVigente = 0, moraCuotas = 0, interesMora = 0, gastosCobranza = 0, ultVencPasado = null;
+    let nMora = 0, nVig = 0;
+    for (const q of noPag) {
+      const venc = q.venc ? new Date(q.venc + 'T00:00:00') : null;
+      const amort = N(q.amortizacion);
+      if (venc && venc < hoy) {                       // en mora
+        nMora++; moraCuotas += N(q.valor_cuota);
+        const diasMora = Math.floor((hoy - venc) / 86400000);
+        interesMora += (COB.calcularInteresMora(N(q.valor_cuota), q.venc, fechaCalc, tramo, tasasMora).interes || 0);
+        if (diasMora >= gastosDias) {
+          const uf = await COB.getUFporFecha(COB.addDias(q.venc, gastosDias));
+          gastosCobranza += (COB.calcularGastoCobranza(N(q.valor_cuota), uf, tramosUF).gasto_pesos || 0);
+        }
+        if (!ultVencPasado || venc > ultVencPasado) ultVencPasado = venc;
+      } else { nVig++; capitalVigente += amort; }     // vigente (futura)
+    }
+    const diasCorr = ultVencPasado ? Math.max(0, Math.floor((hoy - ultVencPasado) / 86400000)) : 0;
+    const interesCorriente = capitalVigente * tasaDia * diasCorr;
+    const comisionPrepago = capitalVigente * (tasaMes / 100);   // un mes de interés sobre el capital vigente
+    const totalPrepago = capitalVigente + moraCuotas + interesMora + gastosCobranza + interesCorriente + comisionPrepago;
+    return { ...base, datos: {
+      saldo_insoluto: Math.round(totalPrepago),
+      capital_vigente: Math.round(capitalVigente), mora_cuotas: Math.round(moraCuotas),
+      interes_mora: Math.round(interesMora), gastos_cobranza: gastosCobranza,
+      interes_corriente: Math.round(interesCorriente), comision_prepago: Math.round(comisionPrepago),
+      dias_corrientes: diasCorr, tasa_mensual: tasaMes, cuotas_mora: nMora, cuotas_vigentes: nVig,
+    } };
   }
   throw { code: 400, msg: 'Tipo no soportado.' };
 }

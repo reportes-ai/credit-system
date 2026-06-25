@@ -2,7 +2,7 @@
 <html lang="es">
 <head>
 <meta charset="UTF-8">
-<!-- v1.0 -->
+<!-- v1.1 -->
 <link rel="icon" href="/img/favicon.png" type="image/png">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Textos de Certificados — AutoFácil</title>
@@ -83,7 +83,7 @@ const $=id=>document.getElementById(id);
 const HJ=()=>({ 'Content-Type':'application/json', Authorization:'Bearer '+TOKEN() });
 const esc=s=>String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
 
-const PHS=['{nombre}','{rut}','{num_op}','{financiera}','{vehiculo}','{fecha_otorgado}','{cuotas_pagadas}','{cuotas_total}','{cuotas_pendientes}','{saldo}','{cuota_mensual}','{fecha_prepago}','{numero_cuota}','{fecha_vencimiento}','{fecha_pago}','{monto_cuota}','{op_carta}','{precio}','{pie}','{saldo_precio}','{plazo}','{tasa}','{monto_credito}','{fin_parens}','{vigencia}','{vence}'];
+const PHS=['{nombre}','{rut}','{num_op}','{financiera}','{vehiculo}','{fecha_otorgado}','{cuotas_pagadas}','{cuotas_total}','{cuotas_pendientes}','{saldo}','{cuota_mensual}','{fecha_prepago}','{numero_cuota}','{fecha_vencimiento}','{fecha_pago}','{monto_cuota}','{op_carta}','{precio}','{pie}','{saldo_precio}','{plazo}','{tasa}','{monto_credito}','{fin_parens}','{vigencia}','{vence}','{capital_vigente}','{mora_cuotas}','{interes_mora}','{gastos_cobranza}','{interes_corriente}','{comision_prepago}'];
 $('placeholders').innerHTML = PHS.map(p=>`<span class="ph" onclick="navigator.clipboard&&navigator.clipboard.writeText('${p}')">${p}</span>`).join('');
 
 async function cargar(){
