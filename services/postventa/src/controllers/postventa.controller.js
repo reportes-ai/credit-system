@@ -1460,6 +1460,31 @@ const enviarCorreoOrden = async (req, res) => {
   } catch (e) { console.error('[postventa saneo op_correlativos]', e.message); }
 })();
 
+/* ── Saneo único del TIMBRE (guardado por flag): órdenes ya PAGADAS por la etapa de
+ *    Post Venta pero sin pago en el libro (pagada=0) → quedan sin timbre. Les pone la
+ *    fecha de su etapa de pago como fecha_pagada (sin N° de caja, porque no se registró
+ *    en su momento) para que el documento muestre el timbre PAGADO + fecha. ── */
+(async () => {
+  try {
+    const [[flag]] = await pool.query("SELECT valor FROM postventa_config WHERE clave='backfill_pago_timbre_v1'");
+    if (flag && flag.valor === '1') return;
+    const [s] = await pool.query(`
+      UPDATE op_correlativos oc
+      JOIN postventa_ordenes po ON oc.origen='SALDO' AND po.id=oc.origen_id
+      JOIN postventa_etapas e ON e.id_seguimiento=po.id_seguimiento AND e.track='SALDO' AND e.etapa='SALDO PRECIO PAGADO'
+      SET oc.pagada=1, oc.fecha_pagada=e.fecha, oc.pagada_nombre=e.usuario, oc.metodo_pago=COALESCE(oc.metodo_pago,'Transferencia')
+      WHERE oc.anulada=0 AND oc.pagada=0`);
+    const [c] = await pool.query(`
+      UPDATE op_correlativos oc
+      JOIN postventa_ordenes_comision po ON oc.origen='COMISION' AND po.id=oc.origen_id
+      JOIN postventa_etapas e ON e.id_seguimiento=po.id_seguimiento AND e.track='COMISION' AND e.etapa='COMISION PAGADA'
+      SET oc.pagada=1, oc.fecha_pagada=e.fecha, oc.pagada_nombre=e.usuario, oc.metodo_pago=COALESCE(oc.metodo_pago,'Transferencia')
+      WHERE oc.anulada=0 AND oc.pagada=0`);
+    await pool.query("INSERT INTO postventa_config (clave, valor) VALUES ('backfill_pago_timbre_v1','1') ON DUPLICATE KEY UPDATE valor='1'");
+    if (s.affectedRows || c.affectedRows) console.log('[postventa] saneo timbre pago → saldo:', s.affectedRows, 'comisión:', c.affectedRows);
+  } catch (e) { console.error('[postventa saneo timbre]', e.message); }
+})();
+
 module.exports = { sync, getAll, setEtapa, getConfig, setConfig, marcarHistorico, getPerfiles, getSaldosAPagar, enviarAPago, pagarSaldos, getOrdenPago, correlativoOrden, emitirOrdenPago, desmarcarSaldos, getAtribuciones, getFondos, setFondos, getAlertasConfig, setAlertasConfig,
   getComisionesAPagar, getOrdenPagoComision, correlativoOrdenComision, emitirOrdenPagoComision, enviarAPagoComision, pagarComisiones, desmarcarComisiones, getAtribucionesComision, getFondosComision, setFondosComision,
   getFacturaComision, updateFacturaComision, consultaSaldos, consultaFacturas, consultaFundantes, enviarCorreoOrden };
