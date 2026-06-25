@@ -1419,6 +1419,28 @@ const enviarCorreoOrden = async (req, res) => {
   } catch (e) { console.error('[enviarCorreoOrden]', e.message); res.status(500).json({ success: false, data: null, error: 'Error interno del servidor' }); }
 };
 
+/* ── Saneo único (guardado por flag): órdenes ya marcadas "ORDEN DE PAGO EMITIDA"
+ *    sin correlativo en op_correlativos → quedaron invisibles en el módulo Órdenes
+ *    de Pago. Les asigna el ODP ahora para que aparezcan en el historial. ── */
+(async () => {
+  try {
+    const [[flag]] = await pool.query("SELECT valor FROM postventa_config WHERE clave='backfill_op_correlativos_v1'");
+    if (flag && flag.valor === '1') return;
+    const [saldo] = await pool.query(`
+      SELECT DISTINCT e.id_seguimiento AS id FROM postventa_etapas e
+      LEFT JOIN postventa_ordenes po ON po.id_seguimiento = e.id_seguimiento
+      WHERE e.track='SALDO' AND e.etapa='ORDEN DE PAGO EMITIDA' AND po.id IS NULL`);
+    for (const r of saldo) { try { await asegurarOrdenSaldo(r.id, null); } catch (e) { console.error('[saneo saldo]', r.id, e.message); } }
+    const [com] = await pool.query(`
+      SELECT DISTINCT e.id_seguimiento AS id FROM postventa_etapas e
+      LEFT JOIN postventa_ordenes_comision po ON po.id_seguimiento = e.id_seguimiento
+      WHERE e.track='COMISION' AND e.etapa='ORDEN DE PAGO EMITIDA' AND po.id IS NULL`);
+    for (const r of com) { try { await asegurarOrdenComision(r.id, null); } catch (e) { console.error('[saneo comision]', r.id, e.message); } }
+    await pool.query("INSERT INTO postventa_config (clave, valor) VALUES ('backfill_op_correlativos_v1','1') ON DUPLICATE KEY UPDATE valor='1'");
+    if (saldo.length || com.length) console.log('[postventa] saneo op_correlativos → saldo:', saldo.length, 'comisión:', com.length);
+  } catch (e) { console.error('[postventa saneo op_correlativos]', e.message); }
+})();
+
 module.exports = { sync, getAll, setEtapa, getConfig, setConfig, marcarHistorico, getPerfiles, getSaldosAPagar, enviarAPago, pagarSaldos, getOrdenPago, correlativoOrden, emitirOrdenPago, desmarcarSaldos, getAtribuciones, getFondos, setFondos, getAlertasConfig, setAlertasConfig,
   getComisionesAPagar, getOrdenPagoComision, correlativoOrdenComision, emitirOrdenPagoComision, enviarAPagoComision, pagarComisiones, desmarcarComisiones, getAtribucionesComision, getFondosComision, setFondosComision,
   getFacturaComision, updateFacturaComision, consultaSaldos, consultaFacturas, consultaFundantes, enviarCorreoOrden };
