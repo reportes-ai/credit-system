@@ -320,9 +320,11 @@ function trackHTML(r, track, lista){
       <div class="tit">${escH(x.etapa)}</div>
       <div class="usr">${m?escH(m.usuario||''):''}</div>
       <div>
-        <input type="checkbox" ${m?'checked':''} ${disabled} title="${escH(title)}"
-          onchange="toggleEtapa(${r.id},'${track}','${escH(x.etapa)}',this)">
-        ${!m?`<span class="pend">${canMark?'Pendiente':'🔒'}</span>`:''}
+        ${(x.etapa==='ORDEN DE PAGO EMITIDA' && !m && prevMarcado)
+          ? `<button onclick="abrirEmitirODP(${r.id},'${track}')" title="Emitir la Orden de Pago" style="background:#0141A2;color:#fff;border:none;border-radius:6px;padding:3px 10px;font-size:.66rem;font-weight:700;cursor:pointer;white-space:nowrap">📄 Emitir</button>`
+          : `<input type="checkbox" ${m?'checked':''} ${disabled} title="${escH(title)}"
+              onchange="toggleEtapa(${r.id},'${track}','${escH(x.etapa)}',this)">
+            ${!m?`<span class="pend">${canMark?'Pendiente':'🔒'}</span>`:''}`}
         ${(esAuto && x.etapa==='SALDO PRECIO PAGADO' && m && esAdmin)?`<button onclick="revertirPago(${r.id})" title="Revertir pago (con motivo, Administrador)" style="display:block;margin:3px auto 0;background:#fff1f2;color:#b91c1c;border:1px solid #fecaca;border-radius:6px;padding:1px 7px;font-size:.68rem;font-weight:700;cursor:pointer">↶ Revertir</button>`:''}
         ${(track==='COMISION' && x.etapa==='FACTURA RECIBIDA' && m)?`<button onclick="editarFactura(${r.id})" title="Ver / editar datos de la factura" style="display:block;margin:3px auto 0;background:#eff6ff;color:#1d4ed8;border:1px solid #bfdbfe;border-radius:6px;padding:1px 7px;font-size:.68rem;font-weight:700;cursor:pointer">✎ Factura</button>`:''}
       </div>
@@ -564,6 +566,79 @@ async function toggleEtapa(id, track, etapa, chk){
     render();
   } catch(e) { alert('Error de conexión'); chk.checked = !chk.checked; }
   finally { chk.disabled = false; }
+}
+
+/* ── Emitir Orden de Pago (pop-up desde el Seguimiento) ──
+   Al confirmar se emite la orden: crea el correlativo (libro op_correlativos),
+   marca la etapa y queda en el módulo Órdenes de Pago + Saldos Precios a Pagar. */
+let _emitirCtx = null;
+function ensureEmitirModal(){
+  if (document.getElementById('emOverlay')) return;
+  const st = document.createElement('style');
+  st.textContent = `
+    #emOverlay{position:fixed;inset:0;background:rgba(15,23,42,.6);z-index:600;display:none;align-items:center;justify-content:center;padding:16px}
+    #emOverlay.open{display:flex}
+    .em-box{background:#fff;border-radius:14px;width:min(440px,100%);box-shadow:0 24px 60px rgba(0,0,0,.3);overflow:hidden;font-family:'Segoe UI',system-ui,sans-serif}
+    .em-head{background:linear-gradient(135deg,#012d70,#0141A2);color:#fff;padding:14px 18px;display:flex;align-items:center;justify-content:space-between;font-weight:800;font-size:.95rem}
+    .em-x{background:rgba(255,255,255,.15);border:none;color:#fff;border-radius:7px;width:28px;height:28px;cursor:pointer;font-size:1.1rem;line-height:1}
+    .em-content{padding:16px 18px}
+    .em-row{display:flex;justify-content:space-between;gap:12px;padding:5px 0;font-size:.85rem;border-bottom:1px solid #f1f5f9}
+    .em-row span{color:#64748b}.em-row b{text-align:right}
+    .em-total{display:flex;justify-content:space-between;align-items:center;background:#eff6ff;border:1.5px solid #bfdbfe;border-radius:10px;padding:10px 14px;margin-top:12px}
+    .em-total span{color:#1e40af;font-size:.8rem;font-weight:600}.em-total b{color:#0141A2;font-size:1.25rem}
+    .em-err{margin:0 18px 4px;background:#fef2f2;border:1px solid #fca5a5;color:#991b1b;border-radius:8px;padding:8px 12px;font-size:.82rem}
+    .em-foot{padding:12px 18px;border-top:1px solid #e5e7eb;background:#f8fafc;display:flex;justify-content:flex-end;gap:10px}
+    .em-cancel{background:#eef2f7;color:#334155;border:none;border-radius:8px;padding:8px 16px;font-size:.85rem;font-weight:600;cursor:pointer}
+    .em-confirm{background:linear-gradient(135deg,#16a34a,#15803d);color:#fff;border:none;border-radius:8px;padding:8px 18px;font-size:.85rem;font-weight:700;cursor:pointer}
+    .em-confirm:disabled{opacity:.6;cursor:default}`;
+  document.head.appendChild(st);
+  const ov = document.createElement('div');
+  ov.id = 'emOverlay';
+  ov.innerHTML = `<div class="em-box">
+    <div class="em-head"><span id="emTitulo">Emitir Orden de Pago</span><button class="em-x" onclick="cerrarEmitirODP()">&times;</button></div>
+    <div class="em-content" id="emBody"></div>
+    <div class="em-err" id="emErr" style="display:none"></div>
+    <div class="em-foot"><button class="em-cancel" onclick="cerrarEmitirODP()">Cancelar</button>
+      <button class="em-confirm" id="emConfirmar" onclick="confirmarEmitirODP()">📄 Emitir Orden de Pago</button></div>
+  </div>`;
+  ov.addEventListener('click', e => { if (e.target === ov) cerrarEmitirODP(); });
+  document.body.appendChild(ov);
+}
+function abrirEmitirODP(id, track){
+  ensureEmitirModal();
+  const r = DATA.find(x => x.id === id); if (!r) return;
+  _emitirCtx = { id, track };
+  const monto = track === 'SALDO' ? r.saldo_precio : r.comision;
+  const tLabel = track === 'SALDO' ? 'Saldo Precio' : 'Comisión';
+  document.getElementById('emTitulo').textContent = 'Emitir Orden de Pago — ' + tLabel;
+  document.getElementById('emBody').innerHTML = `
+    <div class="em-row"><span>N° Operación</span><b>${escH(r.num_op||'')}</b></div>
+    <div class="em-row"><span>Dealer</span><b>${escH(r.nombre_dealer||'—')}</b></div>
+    ${r.rut_dealer?`<div class="em-row"><span>RUT</span><b>${escH(r.rut_dealer)}</b></div>`:''}
+    <div class="em-row"><span>Concepto</span><b>${tLabel} OP ${escH(r.num_op||'')}</b></div>
+    <div class="em-total"><span>Monto a pagar</span><b>${fmtCLP(monto)}</b></div>
+    <p style="font-size:.78rem;color:#64748b;margin:12px 0 0">Al confirmar se <b>emite la Orden de Pago</b> (se asigna el N° ODP), queda registrada en <b>Órdenes de Pago</b> y disponible en <b>Saldos Precios a Pagar</b>.</p>`;
+  const err = document.getElementById('emErr'); err.style.display = 'none';
+  const btn = document.getElementById('emConfirmar'); btn.disabled = false; btn.textContent = '📄 Emitir Orden de Pago';
+  document.getElementById('emOverlay').classList.add('open');
+}
+function cerrarEmitirODP(){ const o = document.getElementById('emOverlay'); if (o) o.classList.remove('open'); _emitirCtx = null; }
+async function confirmarEmitirODP(){
+  if (!_emitirCtx) return;
+  const { id, track } = _emitirCtx;
+  const url = track === 'SALDO' ? '/api/postventa/orden-pago/emitir' : '/api/postventa/orden-pago-comision/emitir';
+  const btn = document.getElementById('emConfirmar'); btn.disabled = true; btn.textContent = 'Emitiendo…';
+  try {
+    const j = await (await fetch(url, { method:'POST', headers:H, body: JSON.stringify({ ids:[id] }) })).json();
+    if (!j.success) throw new Error(j.error || 'Error al emitir');
+    cerrarEmitirODP();
+    const jd = await (await fetch('/api/postventa', { headers:H })).json();
+    DATA = jd.data || DATA;
+    render();
+  } catch(e){
+    const err = document.getElementById('emErr'); err.textContent = e.message; err.style.display = 'block';
+    btn.disabled = false; btn.textContent = '📄 Emitir Orden de Pago';
+  }
 }
 </script>
 
