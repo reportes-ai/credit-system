@@ -356,7 +356,7 @@ const getOrden = async (req, res) => {
 const ORIGEN_LBL = { SALDO: 'Saldo Precio', COMISION: 'Comisión', GENERAL: 'Otros' };
 // Versión del esquema del documento congelado. Subir cuando cambie la lógica de armado
 // (fechas, desglose IVA, etc.) para forzar el re-congelado idempotente de los snapshots.
-const DOC_VERSION = 2;
+const DOC_VERSION = 3;
 // YYYY-MM-DD. mysql2 devuelve DATETIME/DATE como objeto Date: formatear en hora de Chile
 // (NO usar String(Date).slice, que da "Tue Jun 23"). Si ya viene string ISO, recortar.
 const soloFecha = v => {
@@ -371,7 +371,7 @@ const soloFecha = v => {
 async function construirDocumento(oc) {
   // GENERAL: la orden vive completa en ordenes_pago (mismo shape que getOrden).
   if (oc.origen === 'GENERAL') {
-    const [[op]] = await pool.query('SELECT * FROM ordenes_pago WHERE id=?', [oc.origen_id]);
+    const [[op]] = await pool.query('SELECT * FROM ordenes_pago WHERE id = ?', [oc.origen_id]);
     if (!op) return null;
     const estado = oc.anulada ? 'ANULADA' : (oc.pagada ? 'PAGADA' : (op.estado || 'EMITIDA'));
     return Object.assign({}, op, {
@@ -384,7 +384,7 @@ async function construirDocumento(oc) {
   // SALDO / COMISION (Post Venta): se arma el documento desde el seguimiento + dealer (+ factura en comisión).
   const esCom = oc.origen === 'COMISION';
   const sql = esCom
-    ? `SELECT s.id AS id_seg, s.num_op,
+    ? `SELECT s.id AS id_seg, s.num_op, s.financiera,
               COALESCE(c.nombre_local, d.nombre_razon, s.nombre_dealer) AS dealer_nombre,
               COALESCE(c.rut_dealer, d.rut) AS dealer_rut, d.num_cuenta, d.banco,
               fc.numero_factura, fc.es_boleta, fc.fecha_factura,
@@ -396,7 +396,7 @@ async function construirDocumento(oc) {
          LEFT JOIN dealers  d ON d.nombre_indexa = c.automotora
          LEFT JOIN postventa_facturas_comision fc ON fc.id_seguimiento = s.id
         WHERE poc.id = ?`
-    : `SELECT s.id AS id_seg, s.num_op,
+    : `SELECT s.id AS id_seg, s.num_op, s.financiera,
               COALESCE(c.nombre_local, d.nombre_razon, s.nombre_dealer) AS dealer_nombre,
               COALESCE(c.rut_dealer, d.rut) AS dealer_rut, d.num_cuenta, d.banco,
               (SELECT 1 FROM postventa_etapas pe WHERE pe.id_seguimiento=s.id AND pe.track='SALDO' AND pe.etapa='SALDO PRECIO PAGADO' LIMIT 1) AS pagado
@@ -426,7 +426,7 @@ async function construirDocumento(oc) {
 
   return {
     id: oc.id, origen: oc.origen, origen_label: ORIGEN_LBL[oc.origen] || oc.origen,
-    numero: oc.numero, concepto: oc.concepto || (esCom ? 'Comisión' : 'Saldo Precio'),
+    numero: oc.numero, concepto: (oc.concepto || (esCom ? 'Comisión' : 'Saldo Precio')) + (row.financiera ? ' (' + row.financiera + ')' : ''),
     categoria: esCom ? 'PAGO DE COMISIÓN' : 'SALDO DE PRECIO',
     proveedor_nombre: row.dealer_nombre || '—', proveedor_rut: row.dealer_rut || '',
     tipo_documento: esCom ? (row.es_boleta ? 'Boleta de Honorarios' : 'Factura') : null,
