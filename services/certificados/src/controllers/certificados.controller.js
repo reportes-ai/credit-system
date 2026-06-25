@@ -54,7 +54,33 @@ const { auditar } = require('../../../../shared/audit');
       const [[pp]] = await pool.query('SELECT 1 ok FROM permisos_perfil WHERE id_perfil=1 AND id_funcionalidad=? LIMIT 1', [idf]);
       if (!pp) await pool.query('INSERT INTO permisos_perfil (id_perfil, id_funcionalidad, habilitado) VALUES (1,?,1)', [idf]);
     }
-    console.log('✓ certificados: módulo + tabla listos');
+
+    // Textos editables de los certificados (mantenedor)
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS certificados_textos (
+        tipo        VARCHAR(40) PRIMARY KEY,
+        titulo      VARCHAR(120) NULL,
+        cuerpo      TEXT NULL,
+        updated_at  DATETIME DEFAULT NOW() ON UPDATE NOW(),
+        updated_por VARCHAR(120) NULL
+      )`);
+    for (const [tipo, cuerpo] of Object.entries(DEFAULT_TEXTOS)) {
+      await pool.query('INSERT IGNORE INTO certificados_textos (tipo, titulo, cuerpo) VALUES (?,?,?)',
+        [tipo, TIPOS[tipo] || 'Párrafo de cierre (común)', cuerpo]);
+    }
+    // Mantenedor de textos → funcionalidad bajo Mantenedores (módulo 30001)
+    const [[exm]] = await pool.query("SELECT id_funcionalidad FROM funcionalidades WHERE codigo='certificados_textos' LIMIT 1");
+    let idm = exm && exm.id_funcionalidad;
+    if (!idm) {
+      const [rr] = await pool.query(
+        "INSERT INTO funcionalidades (id_modulo, nombre, codigo, href, icono) VALUES (30001,?,?,?,?)",
+        ['Textos de Certificados', 'certificados_textos', '/mantenedores/certificados-textos/', 'bi-file-earmark-text']);
+      idm = rr.insertId;
+    }
+    const [[ppm]] = await pool.query('SELECT 1 ok FROM permisos_perfil WHERE id_perfil=1 AND id_funcionalidad=? LIMIT 1', [idm]);
+    if (!ppm) await pool.query('INSERT INTO permisos_perfil (id_perfil, id_funcionalidad, habilitado) VALUES (1,?,1)', [idm]);
+
+    console.log('✓ certificados: módulo + tabla + textos listos');
   } catch (e) { console.error('[certificados migration]', e.message); }
 })();
 
@@ -67,8 +93,73 @@ const TIPOS = {
   CERT_PREPAGO:         'Certificado de Prepago',
   CERT_ALZAMIENTO:      'Certificado de Alzamiento de Prenda',
   CERT_PAGO_CUOTA:      'Certificado de Pago de Cuota',
+  CERT_DEUDA_VIGENTE:   'Certificado de Deuda Vigente',
+  CERT_DEUDA_PREPAGO:   'Certificado de Deuda Vigente para Prepago',
   CERT_PREAPROBADO:     'Certificado de Crédito Preaprobado',
 };
+// Estos certificados son SOLO para clientes AutoFácil (cartera propia), no Brokerage.
+const SOLO_AUTOFACIL = new Set(['CERT_CREDITO_VIGENTE', 'CERT_PREPAGO', 'CERT_PAGO_CUOTA', 'CERT_DEUDA_VIGENTE', 'CERT_DEUDA_PREPAGO']);
+
+/* ── Motor de plantillas (textos editables desde el mantenedor) ─────────── */
+const escH = s => String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+const fmtMoney = v => '$' + String(Math.round(N(v))).replace(/\B(?=(\d{3})+(?!\d))/g, '.');
+function rutPuntos(r) {
+  const s = String(r || '').replace(/[^0-9kK]/g, '').toUpperCase();
+  if (s.length < 2) return r || '';
+  return s.slice(0, -1).replace(/\B(?=(\d{3})+(?!\d))/g, '.') + '-' + s.slice(-1);
+}
+const MESES = ['enero', 'febrero', 'marzo', 'abril', 'mayo', 'junio', 'julio', 'agosto', 'septiembre', 'octubre', 'noviembre', 'diciembre'];
+function fechaLargaES(isoStr) { if (!isoStr) return '—'; const [y, m, d] = String(isoStr).slice(0, 10).split('-').map(Number); return `${d} de ${MESES[m - 1]} de ${y}`; }
+function addDiasLargo(isoStr, n) { const dt = new Date(String(isoStr).slice(0, 10) + 'T00:00:00'); dt.setDate(dt.getDate() + (n || 0)); return fechaLargaES(dt.toISOString().slice(0, 10)); }
+function renderTpl(tpl, vars) { return String(tpl || '').replace(/\{(\w+)\}/g, (m, k) => (k in vars) ? String(vars[k] == null ? '' : vars[k]) : m); }
+
+// Plantillas por defecto (se siembran; el admin las edita en el mantenedor).
+const DEFAULT_TEXTOS = {
+  CERT_CREDITO_VIGENTE: 'AutoFácil Chile certifica que <b>{nombre}</b>, RUT <b>{rut}</b>, mantiene <b>vigente</b> el crédito automotriz N° <b>{num_op}</b>, otorgado con fecha {fecha_otorgado}, asociado al vehículo <b>{vehiculo}</b>. A la fecha registra <b>{cuotas_pagadas}</b> de <b>{cuotas_total}</b> cuotas pagadas, con un saldo insoluto de <b>{saldo}</b> y una cuota mensual de <b>{cuota_mensual}</b>.',
+  CERT_PREPAGO:         'AutoFácil Chile certifica que el crédito automotriz N° <b>{num_op}</b>, de <b>{nombre}</b>, RUT <b>{rut}</b>, asociado al vehículo <b>{vehiculo}</b>, fue <b>PREPAGADO</b> (pagado en su totalidad) con fecha <b>{fecha_prepago}</b>. El cliente <b>no registra saldos pendientes</b> por este crédito.',
+  CERT_ALZAMIENTO:      'Habiéndose pagado íntegramente el crédito automotriz N° <b>{num_op}</b> de <b>{nombre}</b>, RUT <b>{rut}</b>, AutoFácil Chile autoriza y certifica el <b>ALZAMIENTO DE LA PRENDA</b> que afecta al vehículo <b>{vehiculo}</b>. Fecha del pago final: <b>{fecha_prepago}</b>.',
+  CERT_PAGO_CUOTA:      'AutoFácil Chile certifica que, respecto del crédito automotriz N° <b>{num_op}</b> de <b>{nombre}</b>, RUT <b>{rut}</b>, la <b>cuota N° {numero_cuota}</b> (vencimiento {fecha_vencimiento}) fue <b>pagada</b> con fecha <b>{fecha_pago}</b> por un monto de <b>{monto_cuota}</b>.',
+  CERT_DEUDA_VIGENTE:   'AutoFácil Chile certifica que <b>{nombre}</b>, RUT <b>{rut}</b>, mantiene una <b>deuda vigente</b> de <b>{saldo}</b> por el crédito automotriz N° <b>{num_op}</b>, asociado al vehículo <b>{vehiculo}</b>, correspondiente a <b>{cuotas_pendientes}</b> cuotas pendientes de un total de <b>{cuotas_total}</b>.',
+  CERT_DEUDA_PREPAGO:   'AutoFácil Chile certifica que, al día de la fecha, el monto requerido para <b>prepagar (saldar)</b> íntegramente el crédito automotriz N° <b>{num_op}</b> de <b>{nombre}</b>, RUT <b>{rut}</b>, asociado al vehículo <b>{vehiculo}</b>, asciende a <b>{saldo}</b>.',
+  CERT_PREAPROBADO:     'AutoFácil Chile certifica que <b>{nombre}</b>, RUT <b>{rut}</b>, cuenta con un crédito automotriz <b>PREAPROBADO</b>{fin_parens} según la carta de aprobación N° <b>{op_carta}</b>, bajo las siguientes condiciones: vehículo <b>{vehiculo}</b>{patente_txt}; precio del vehículo <b>{precio}</b>; pie <b>{pie}</b>; saldo precio a financiar <b>{saldo_precio}</b>; plazo <b>{plazo}</b> cuotas{tasa_txt}{monto_txt}. La presente oferta tiene una <b>vigencia de {vigencia} días corridos</b> a contar de la fecha de emisión (vence el <b>{vence}</b>).',
+  CIERRE:               'Se emite el presente certificado a solicitud de <b>{nombre}</b> para los fines que estime convenientes, sin ulterior responsabilidad para Auto Fácil SpA.',
+};
+
+// Arma el mapa de placeholders (todo pre-formateado: RUT con puntos, montos $#.###).
+function buildVars(out, fechaEmisionISO) {
+  const c = out.credito || {}, x = out.datos || {};
+  const fin = String(x.financiera || c.financiera || '').toUpperCase();
+  const finParens = (fin && fin !== 'AUTOFACIL') ? ` (${escH(fin)})` : '';
+  const fe = fechaEmisionISO || iso(new Date());
+  return {
+    nombre: escH(out.nombre), rut: rutPuntos(out.rut), num_op: out.num_op || '',
+    financiera: escH(fin), vehiculo: escH(c.vehiculo || x.vehiculo || ''),
+    fecha_otorgado: c.fecha_otorgado || '—',
+    cuotas_pagadas: x.cuotas_pagadas != null ? x.cuotas_pagadas : '', cuotas_total: x.cuotas_total != null ? x.cuotas_total : '',
+    cuotas_pendientes: x.cuotas_pendientes != null ? x.cuotas_pendientes : '',
+    saldo: fmtMoney(x.saldo_insoluto), cuota_mensual: fmtMoney(x.cuota_mensual),
+    fecha_prepago: x.fecha_prepago || x.fecha_pago_final || '—', monto_financiado: fmtMoney(x.monto_financiado),
+    numero_cuota: x.numero_cuota || '', fecha_vencimiento: x.fecha_vencimiento || '—', fecha_pago: x.fecha_pago || '—', monto_cuota: fmtMoney(x.monto),
+    op_carta: escH(x.op_carta || ''), precio: fmtMoney(x.precio_venta), pie: fmtMoney(x.pie), saldo_precio: fmtMoney(x.saldo_precio),
+    plazo: x.plazo != null ? x.plazo : '', tasa: x.tasa != null ? x.tasa : '', monto_credito: fmtMoney(x.monto_credito),
+    fin_parens: finParens,
+    patente_txt: x.patente ? `, patente <b>${escH(x.patente)}</b>` : '',
+    tasa_txt: x.tasa != null ? `; tasa <b>${x.tasa}%</b> mensual` : '',
+    monto_txt: x.monto_credito ? `; monto del crédito <b>${fmtMoney(x.monto_credito)}</b>` : '',
+    vigencia: x.vigencia_dias || 5, vence: addDiasLargo(fe, x.vigencia_dias || 5),
+  };
+}
+
+// Renderiza el cuerpo + el párrafo de cierre desde las plantillas de BD.
+async function renderCuerpo(out, fechaEmisionISO) {
+  const [[t]] = await pool.query('SELECT cuerpo FROM certificados_textos WHERE tipo=? LIMIT 1', [out.tipo]);
+  const [[cierre]] = await pool.query("SELECT cuerpo FROM certificados_textos WHERE tipo='CIERRE' LIMIT 1");
+  const v = buildVars(out, fechaEmisionISO);
+  return {
+    cuerpo_html: renderTpl((t && t.cuerpo) || DEFAULT_TEXTOS[out.tipo] || '', v),
+    cierre_html: renderTpl((cierre && cierre.cuerpo) || DEFAULT_TEXTOS.CIERRE, v),
+  };
+}
 
 // Contexto del crédito + su calendario real (cuotas_credito si existe).
 async function ctxCredito(num_op) {
@@ -184,6 +275,10 @@ async function armar(tipo, body) {
   const cred = baseCredito(c);
   const base = { tipo, rut: c.rut, nombre: c.nombre, num_op, credito: cred };
 
+  // Solo clientes AutoFácil (cartera propia), no Brokerage (AUTOFIN/UNIDAD).
+  if (SOLO_AUTOFACIL.has(tipo) && String(c.financiera || '').toUpperCase() !== 'AUTOFACIL')
+    throw { code: 400, msg: 'Este certificado es solo para clientes AutoFácil (no Brokerage).' };
+
   if (tipo === 'CERT_CREDITO_VIGENTE') {
     if (pagado) throw { code: 400, msg: 'El crédito no está vigente (está pagado/prepagado). Usa Prepago o Alzamiento.' };
     return { ...base, datos: { estado: 'VIGENTE', plazo: N(c.plazo), cuotas_total: total, cuotas_pagadas: pagadas, cuotas_pendientes: impagas, saldo_insoluto: saldo, cuota_mensual: N(c.cuota), fecha_otorgado: c.fecha_otorgado } };
@@ -204,13 +299,23 @@ async function armar(tipo, body) {
     if (cu.estado_cuota !== 'PAGADA' || !cu.fpago) throw { code: 400, msg: `La cuota N° ${ncuota} no figura pagada.` };
     return { ...base, datos: { numero_cuota: ncuota, fecha_vencimiento: cu.venc, fecha_pago: cu.fpago, monto: N(cu.valor_cuota) } };
   }
+  if (tipo === 'CERT_DEUDA_VIGENTE') {
+    if (pagado) throw { code: 400, msg: 'El crédito no tiene deuda vigente (está pagado/prepagado).' };
+    return { ...base, datos: { saldo_insoluto: saldo, cuotas_pendientes: impagas, cuotas_total: total } };
+  }
+  if (tipo === 'CERT_DEUDA_PREPAGO') {
+    if (pagado) throw { code: 400, msg: 'El crédito ya está pagado; no hay monto de prepago.' };
+    return { ...base, datos: { saldo_insoluto: saldo, cuotas_pendientes: impagas, cuotas_total: total } };
+  }
   throw { code: 400, msg: 'Tipo no soportado.' };
 }
 
 const preview = async (req, res) => {
   try {
+    const fe = iso(new Date());
     const out = await armar(req.body.tipo, req.body);
-    res.json({ success: true, data: { ...out, tipo_label: TIPOS[out.tipo] }, error: null });
+    const txt = await renderCuerpo(out, fe);
+    res.json({ success: true, data: { ...out, ...txt, tipo_label: TIPOS[out.tipo], fecha_emision: fe }, error: null });
   } catch (e) {
     if (e && e.code) return res.status(e.code).json({ success: false, data: null, error: e.msg });
     console.error('[certificados preview]', e);
@@ -221,7 +326,9 @@ const preview = async (req, res) => {
 /* ── Generar: arma + registra verificable + guarda ──────────────────────── */
 const generar = async (req, res) => {
   try {
+    const feISO = iso(new Date());
     const out = await armar(req.body.tipo, req.body);
+    const txt = await renderCuerpo(out, feISO);   // texto en duro al momento de emitir
     const emisor = (req.usuario && (`${req.usuario.nombre || ''} ${req.usuario.apellido || ''}`).trim()) || 'Sistema';
     // ref único por tipo+operación(+cuota): re-emitir devuelve el MISMO código/QR
     const refId = out.num_op
@@ -236,6 +343,7 @@ const generar = async (req, res) => {
     const snapshot = {
       tipo: out.tipo, tipo_label: TIPOS[out.tipo], num_op: out.num_op,
       rut: out.rut, nombre: out.nombre, credito: out.credito, datos: out.datos, emitido_por: emisor,
+      cuerpo_html: txt.cuerpo_html, cierre_html: txt.cierre_html,
     };
     // registro propio (idempotente por codigo)
     const [[ex]] = await pool.query('SELECT id FROM certificados WHERE codigo=? LIMIT 1', [codigo]);
@@ -248,7 +356,7 @@ const generar = async (req, res) => {
         [codigo, out.tipo, out.num_op, out.rut, out.nombre, JSON.stringify(snapshot), emisor, req.usuario && req.usuario.id_usuario]);
     }
     try { auditar({ req, accion: 'EMITIR', modulo: 'certificados', entidad: out.tipo, entidad_id: codigo, detalle: `${TIPOS[out.tipo]} — ${out.nombre || ''} (op ${out.num_op || '—'})` }); } catch (_) {}
-    res.json({ success: true, data: { ...out, codigo, tipo_label: TIPOS[out.tipo], emitido_por: emisor, fecha_emision: iso(new Date()) }, error: null });
+    res.json({ success: true, data: { ...out, ...txt, codigo, tipo_label: TIPOS[out.tipo], emitido_por: emisor, fecha_emision: feISO }, error: null });
   } catch (e) {
     if (e && e.code) return res.status(e.code).json({ success: false, data: null, error: e.msg });
     console.error('[certificados generar]', e);
@@ -286,6 +394,13 @@ const ver = async (req, res) => {
         snap = { ...o, tipo_label: TIPOS[o.tipo] };
       } catch (_) { snap = { ...snap, nombre: r.nombre, rut: r.rut, num_op: r.num_op }; }
     }
+    // Si no tiene el texto renderizado (anterior al motor de plantillas), lo genera.
+    if (!snap.cuerpo_html && snap.datos) {
+      try {
+        const txt = await renderCuerpo({ tipo: r.tipo, credito: snap.credito, datos: snap.datos, nombre: snap.nombre, rut: snap.rut, num_op: snap.num_op }, r.fecha_emision);
+        snap.cuerpo_html = txt.cuerpo_html; snap.cierre_html = txt.cierre_html;
+      } catch (_) {}
+    }
     res.json({ success: true, data: { ...snap, codigo: r.codigo, tipo: r.tipo, tipo_label: snap.tipo_label || TIPOS[r.tipo] || r.tipo, emitido_por: snap.emitido_por || r.emitido_por, fecha_emision: r.fecha_emision, anulado: !!r.anulado }, error: null });
   } catch (e) {
     console.error('[certificados ver]', e.message);
@@ -308,4 +423,26 @@ const anular = async (req, res) => {
   }
 };
 
-module.exports = { buscar, buscarCarta, preview, generar, historial, ver, anular };
+/* ── Mantenedor de textos ───────────────────────────────────────────────── */
+const ORDEN_TEXTOS = ['CERT_CREDITO_VIGENTE', 'CERT_PREPAGO', 'CERT_ALZAMIENTO', 'CERT_PAGO_CUOTA', 'CERT_DEUDA_VIGENTE', 'CERT_DEUDA_PREPAGO', 'CERT_PREAPROBADO', 'CIERRE'];
+const getTextos = async (req, res) => {
+  try {
+    const [rows] = await pool.query('SELECT tipo, titulo, cuerpo, DATE_FORMAT(updated_at,"%Y-%m-%d %H:%i") updated_at, updated_por FROM certificados_textos');
+    rows.sort((a, b) => ORDEN_TEXTOS.indexOf(a.tipo) - ORDEN_TEXTOS.indexOf(b.tipo));
+    res.json({ success: true, data: rows, error: null });
+  } catch (e) { console.error('[certificados getTextos]', e.message); res.status(500).json({ success: false, data: null, error: 'Error cargando textos' }); }
+};
+const updateTexto = async (req, res) => {
+  try {
+    const tipo = req.params.tipo;
+    const { cuerpo, titulo } = req.body || {};
+    if (!cuerpo || !String(cuerpo).trim()) return res.status(400).json({ success: false, data: null, error: 'El texto no puede estar vacío.' });
+    const emisor = (req.usuario && (`${req.usuario.nombre || ''} ${req.usuario.apellido || ''}`).trim()) || 'Sistema';
+    const [r] = await pool.query('UPDATE certificados_textos SET cuerpo=?, titulo=COALESCE(?,titulo), updated_por=? WHERE tipo=?', [String(cuerpo), titulo || null, emisor, tipo]);
+    if (!r.affectedRows) return res.status(404).json({ success: false, data: null, error: 'Tipo no encontrado.' });
+    try { auditar({ req, accion: 'EDITAR', modulo: 'certificados', entidad: 'texto', entidad_id: tipo, detalle: `Editó texto ${tipo}` }); } catch (_) {}
+    res.json({ success: true, data: { tipo }, error: null });
+  } catch (e) { console.error('[certificados updateTexto]', e.message); res.status(500).json({ success: false, data: null, error: 'Error guardando el texto' }); }
+};
+
+module.exports = { buscar, buscarCarta, preview, generar, historial, ver, anular, getTextos, updateTexto };

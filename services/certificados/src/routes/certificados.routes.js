@@ -12,5 +12,8 @@ router.post('/generar',   verifyToken, puede, ctrl.generar);
 router.get('/historial',  verifyToken, puede, ctrl.historial);
 router.get('/ver/:codigo', verifyToken, puede, ctrl.ver);
 router.post('/:codigo/anular', verifyToken, requireFunc('certificados_anular'), ctrl.anular);
+// Mantenedor de textos
+router.get('/textos',        verifyToken, requireFunc('certificados_textos'), ctrl.getTextos);
+router.put('/textos/:tipo',  verifyToken, requireFunc('certificados_textos'), ctrl.updateTexto);
 
 module.exports = router;

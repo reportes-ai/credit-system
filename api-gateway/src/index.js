@@ -423,6 +423,10 @@ app.get(['/verificar', '/verificar/', '/verificar/:codigo'], (req, res) =>
 app.get(['/certificados', '/certificados/'], (req, res) =>
   res.sendFile(path.join(__dirname, '../public/certificados/index.html')));
 
+// Mantenedor de textos de certificados
+app.get(['/mantenedores/certificados-textos', '/mantenedores/certificados-textos/'], (req, res) =>
+  res.sendFile(path.join(__dirname, '../public/mantenedores/certificados-textos/index.html')));
+
 app.get(['/reporteria', '/reporteria/'], (req, res) =>
   res.sendFile(path.join(__dirname, '../public/reporteria/index.html')));
 

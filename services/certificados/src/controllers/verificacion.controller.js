@@ -8,6 +8,8 @@ const TIPO_LABEL = {
   CERT_PREPAGO:         'Certificado de Prepago',
   CERT_ALZAMIENTO:      'Certificado de Alzamiento de Prenda',
   CERT_CREDITO_VIGENTE: 'Certificado de Crédito Vigente',
+  CERT_DEUDA_VIGENTE:   'Certificado de Deuda Vigente',
+  CERT_DEUDA_PREPAGO:   'Certificado de Deuda Vigente para Prepago',
   CERT_PREAPROBADO:     'Certificado de Crédito Preaprobado',
   COMPROBANTE_CUOTA:    'Comprobante de Pago de Cuota',
   ORDEN_PAGO:           'Orden de Pago',

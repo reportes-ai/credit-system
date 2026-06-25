@@ -1,0 +1,117 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<!-- v1.0 -->
+<link rel="icon" href="/img/favicon.png" type="image/png">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Textos de Certificados — AutoFácil</title>
+<link rel="stylesheet" href="/css/bootstrap-icons.css">
+<style>
+  :root { --navy:#0f2d6b; --blue:#1565c0; --bg:#f0f4f8; --card:#fff; --border:#e2e8f0; --text:#1e293b; --muted:#64748b; --violet:#7c3aed; }
+  *{ box-sizing:border-box; margin:0; padding:0; }
+  body{ font-family:'Segoe UI',system-ui,sans-serif; background:var(--bg); color:var(--text); }
+  .topnav{ background:linear-gradient(135deg,var(--navy),var(--blue)); padding:0 24px; height:52px; display:flex; align-items:center; justify-content:space-between; }
+  .topnav-brand{ display:flex; align-items:center; gap:10px; color:#fff; font-weight:800; font-size:1rem; text-decoration:none; }
+  .topnav-brand img{ height:28px; filter:brightness(0) invert(1); }
+  .version-badge{ background:rgba(255,255,255,.15); color:rgba(255,255,255,.75); font-size:.65rem; font-weight:700; border-radius:6px; padding:2px 8px; letter-spacing:.5px; }
+  .btn-nav{ background:rgba(255,255,255,.15); border:1px solid rgba(255,255,255,.3); color:#fff; border-radius:8px; padding:6px 14px; font-size:.82rem; font-weight:600; cursor:pointer; text-decoration:none; display:flex; align-items:center; gap:6px; }
+  .topnav-right{ display:flex; align-items:center; gap:12px; }
+  .page{ max-width:980px; margin:0 auto; padding:24px 16px 80px; }
+  h1{ font-size:1.3rem; color:var(--navy); margin-bottom:4px; }
+  .sub{ color:var(--muted); font-size:.9rem; margin-bottom:18px; }
+  .card{ background:var(--card); border:1px solid var(--border); border-radius:14px; padding:18px 20px; box-shadow:0 2px 10px rgba(0,0,0,.05); margin-bottom:16px; }
+  .card h3{ font-size:.98rem; color:var(--navy); margin-bottom:4px; display:flex; align-items:center; gap:8px; }
+  .card .meta{ font-size:.72rem; color:var(--muted); margin-bottom:8px; }
+  textarea{ width:100%; min-height:120px; border:1.5px solid #cbd5e1; border-radius:9px; padding:11px 13px; font-size:.86rem; font-family:inherit; line-height:1.6; resize:vertical; }
+  textarea:focus{ outline:none; border-color:var(--violet); }
+  .actions{ display:flex; align-items:center; gap:10px; margin-top:10px; }
+  .btn{ border:none; border-radius:9px; padding:8px 16px; font-size:.85rem; font-weight:700; cursor:pointer; display:inline-flex; align-items:center; gap:7px; }
+  .btn-save{ background:linear-gradient(135deg,#6d28d9,var(--violet)); color:#fff; }
+  .btn-save:disabled{ opacity:.5; cursor:not-allowed; }
+  .ok{ color:#16a34a; font-size:.82rem; font-weight:600; display:none; }
+  .note{ background:#f5f3ff; border-left:4px solid var(--violet); border-radius:8px; padding:12px 16px; font-size:.82rem; color:#4c1d95; line-height:1.6; margin-bottom:18px; }
+  .ph{ display:inline-block; background:#ede9fe; color:#6d28d9; border-radius:6px; padding:1px 7px; font-size:.74rem; font-family:monospace; margin:2px 3px 2px 0; cursor:pointer; }
+  .ph:hover{ background:#ddd6fe; }
+  .afecta{ background:#f8fafc; border-left:4px solid var(--blue); border-radius:8px; padding:14px 18px; font-size:.84rem; color:#1e293b; line-height:1.7; }
+  .afecta h4{ color:var(--navy); font-size:.9rem; margin-bottom:6px; display:flex; align-items:center; gap:8px; }
+  .afecta a{ color:var(--blue); }
+</style>
+</head>
+<body>
+<nav class="topnav">
+  <a class="topnav-brand" href="/">
+    <img src="/img/logo.png" alt="AutoFácil" onerror="this.style.display='none'">
+    <span>Textos de Certificados</span>
+    <span class="version-badge" id="versionBadge"></span>
+  </a>
+  <div class="topnav-right">
+    <span id="navUser" class="user-chip" style="color:rgba(255,255,255,.75);font-size:.82rem"></span>
+    <a href="/mantenedores/" class="btn-nav"><i class="bi bi-arrow-left"></i>Mantenedores</a>
+  </div>
+</nav>
+
+<div class="page">
+  <h1>Textos de Certificados</h1>
+  <div class="sub">Edita el texto de cada certificado. Los cambios aplican a los certificados que se emitan de aquí en adelante.</div>
+
+  <div class="note">
+    Usa <b>campos entre llaves</b> que se reemplazan al emitir, por ejemplo
+    <span class="ph">{nombre}</span><span class="ph">{rut}</span><span class="ph">{num_op}</span><span class="ph">{vehiculo}</span><span class="ph">{saldo}</span>.
+    Puedes usar <code>&lt;b&gt;negrita&lt;/b&gt;</code>. Campos disponibles (haz click para copiar):
+    <div id="placeholders" style="margin-top:8px"></div>
+  </div>
+
+  <div id="lista"><p style="color:#94a3b8;text-align:center;padding:30px"><i class="bi bi-hourglass-split"></i> Cargando…</p></div>
+
+  <div class="afecta">
+    <h4><i class="bi bi-diagram-3"></i> Qué afecta este mantenedor</h4>
+    <ul style="margin:0;padding-left:18px">
+      <li><b>Texto de cada certificado</b> → el cuerpo del documento en <a href="/certificados/">Certificados</a> (Crédito Vigente, Prepago, Alzamiento, Pago de Cuota, Deuda Vigente, Deuda para Prepago, Preaprobado).</li>
+      <li><b>Párrafo de cierre (común)</b> → la frase final ("Se emite el presente certificado…") que aparece en <b>todos</b> los certificados.</li>
+      <li>No cambia los <b>datos</b> (montos, fechas, cuotas) — esos siempre salen del crédito. Solo cambia la redacción.</li>
+    </ul>
+  </div>
+</div>
+
+<script src="/js/auth-guard.js"></script>
+<script>
+const TOKEN=()=>sessionStorage.getItem('token');
+(function(){ if(!TOKEN()){ location.href='/login.html'; return; }
+  try{ const u=JSON.parse(sessionStorage.getItem('usuario')||'{}'); document.getElementById('navUser').textContent=u.nombre||''; }catch(e){} })();
+const $=id=>document.getElementById(id);
+const HJ=()=>({ 'Content-Type':'application/json', Authorization:'Bearer '+TOKEN() });
+const esc=s=>String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+
+const PHS=['{nombre}','{rut}','{num_op}','{financiera}','{vehiculo}','{fecha_otorgado}','{cuotas_pagadas}','{cuotas_total}','{cuotas_pendientes}','{saldo}','{cuota_mensual}','{fecha_prepago}','{numero_cuota}','{fecha_vencimiento}','{fecha_pago}','{monto_cuota}','{op_carta}','{precio}','{pie}','{saldo_precio}','{plazo}','{tasa}','{monto_credito}','{fin_parens}','{vigencia}','{vence}'];
+$('placeholders').innerHTML = PHS.map(p=>`<span class="ph" onclick="navigator.clipboard&&navigator.clipboard.writeText('${p}')">${p}</span>`).join('');
+
+async function cargar(){
+  try{
+    const r=await fetch('/api/certificados/textos',{headers:{Authorization:'Bearer '+TOKEN()}});
+    const j=await r.json(); if(!j.success) throw new Error(j.error||'Error');
+    $('lista').innerHTML = (j.data||[]).map(t=>`
+      <div class="card">
+        <h3><i class="bi bi-file-earmark-text" style="color:var(--violet)"></i> ${esc(t.titulo||t.tipo)}</h3>
+        <div class="meta">${t.updated_por?('Última edición: '+esc(t.updated_at)+' · '+esc(t.updated_por)):'Texto por defecto'}</div>
+        <textarea id="ta_${t.tipo}">${esc(t.cuerpo||'')}</textarea>
+        <div class="actions">
+          <button class="btn btn-save" onclick="guardar('${t.tipo}')"><i class="bi bi-save"></i> Guardar</button>
+          <span class="ok" id="ok_${t.tipo}"><i class="bi bi-check-circle-fill"></i> Guardado</span>
+        </div>
+      </div>`).join('');
+  }catch(e){ $('lista').innerHTML='<p style="color:#b91c1c;text-align:center;padding:20px">⚠ '+e.message+'</p>'; }
+}
+async function guardar(tipo){
+  const cuerpo=$('ta_'+tipo).value;
+  try{
+    const r=await fetch('/api/certificados/textos/'+encodeURIComponent(tipo),{method:'PUT',headers:HJ(),body:JSON.stringify({cuerpo})});
+    const j=await r.json(); if(!j.success) throw new Error(j.error||'Error');
+    const ok=$('ok_'+tipo); ok.style.display='inline-flex'; setTimeout(()=>ok.style.display='none',2200);
+  }catch(e){ alert('Error al guardar: '+e.message); }
+}
+cargar();
+</script>
+<script src="/js/app-version.js"></script>
+</body>
+</html>

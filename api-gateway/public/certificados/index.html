@@ -2,7 +2,7 @@
 <html lang="es">
 <head>
 <meta charset="UTF-8">
-<!-- v1.4 -->
+<!-- v1.5 -->
 <link rel="icon" href="/img/favicon.png" type="image/png">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Certificados — AutoFácil</title>
@@ -180,6 +180,8 @@ const TIPOS = [
   ['CERT_PREPAGO',        'bi-cash-coin',   'Prepago','Crédito pagado en su totalidad',        'credito'],
   ['CERT_ALZAMIENTO',     'bi-unlock',      'Alzamiento de Prenda','Libera la prenda del vehículo','credito'],
   ['CERT_PAGO_CUOTA',     'bi-receipt',     'Pago de Cuota','Una cuota pagada en particular',    'credito'],
+  ['CERT_DEUDA_VIGENTE',  'bi-cash-stack',  'Deuda Vigente','Saldo de deuda actual',             'credito'],
+  ['CERT_DEUDA_PREPAGO',  'bi-wallet2',     'Deuda para Prepago','Monto para saldar el crédito',  'credito'],
   ['CERT_PREAPROBADO',    'bi-patch-plus',  'Crédito Preaprobado','Desde la carta de aprobación',  'carta'],
 ];
 let tipoSel=null, modoSel=null, credSel=null;
@@ -302,8 +304,8 @@ function render(d){
     </div>
     <div class="folio-row">Folio <b>${esc(d.codigo)}</b> · ${fechaLarga(d.fecha_emision)}</div>
     <h2>${esc(d.tipo_label||'')}</h2>
-    <div class="body">${cuerpo(d)}</div>
-    <div class="body" style="margin-top:16px">Se emite el presente certificado a solicitud de <b>${esc(d.nombre||'')}</b> para los fines que estime convenientes, sin ulterior responsabilidad para Auto Fácil SpA.</div>
+    <div class="body">${d.cuerpo_html||''}</div>
+    <div class="body" style="margin-top:16px">${d.cierre_html||''}</div>
     <div class="doc-foot">
       <div class="firma">
         ${firmaImg}
