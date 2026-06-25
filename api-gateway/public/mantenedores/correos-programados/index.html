@@ -104,12 +104,13 @@ const esAdmin = (yo.perfil||'') === 'Administrador';
 const esc = s => String(s??'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
 function toast(m){ const t=document.getElementById('toast'); t.textContent=m; t.style.display='block'; setTimeout(()=>t.style.display='none',3000); }
 const DIAS = [['1','L'],['2','M'],['3','X'],['4','J'],['5','V'],['6','S'],['7','D']];
-let DATA = [];
+let DATA = [], CUENTAS = [{clave:'sistema',label:'Sistema'}];
 
 async function cargar(){
   try {
     const j = await (await fetch('/api/correos-programados', { headers:H })).json();
     DATA = j.data || [];
+    if (Array.isArray(j.cuentas) && j.cuentas.length) CUENTAS = j.cuentas;
     render();
   } catch(e){ document.getElementById('lista').innerHTML = '<div class="card-af" style="color:#b91c1c">Error al cargar.</div>'; }
 }
@@ -135,7 +136,10 @@ function render(){
         <div><label>Hora (Chile)</label><input type="time" id="hora_${i}" value="${esc(String(r.hora||'08:30').slice(0,5))}" ${esAdmin?'':'disabled'}></div>
         <div><label>Días</label><div class="dias" id="dias_${i}">${DIAS.map(([v,l])=>`<span class="dchip ${sel.includes(v)?'on':''}" data-v="${v}" onclick="${esAdmin?`togDia(${i},'${v}',this)`:''}">${l}</span>`).join('')}</div></div>
       </div>
-      <div style="margin-bottom:12px"><label>Destinatarios (separar con comas)</label><textarea id="dest_${i}" ${esAdmin?'':'disabled'}>${esc(r.destinatarios||'')}</textarea></div>
+      <div class="grid" style="margin-bottom:12px">
+        <div><label>Destinatarios (separar con comas)</label><textarea id="dest_${i}" ${esAdmin?'':'disabled'}>${esc(r.destinatarios||'')}</textarea></div>
+        <div><label>Desde (cuenta remitente)</label><select id="rem_${i}" ${esAdmin?'':'disabled'} style="width:100%;padding:8px 10px;border:1.5px solid #d1d5db;border-radius:8px;font-size:.9rem">${CUENTAS.map(c=>`<option value="${esc(c.clave)}" ${String(r.remitente||'sistema')===c.clave?'selected':''}>${esc(c.label)}</option>`).join('')}</select></div>
+      </div>
       <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
         ${esAdmin?`<button class="btn-af" onclick="guardar(${i})"><i class="bi bi-check-lg me-1"></i>Guardar</button>`:''}
         <button class="btn-ghost" onclick="vistaPrevia('${esc(r.codigo)}','${esc(r.nombre)}')"><i class="bi bi-eye me-1"></i>Vista previa</button>
@@ -154,9 +158,10 @@ async function guardar(i){
   const hora = document.getElementById('hora_'+i).value || '08:30';
   const dias = [...document.querySelectorAll('#dias_'+i+' .dchip.on')].map(c=>c.dataset.v).join(',');
   const destinatarios = document.getElementById('dest_'+i).value.trim();
+  const remitente = document.getElementById('rem_'+i).value;
   if (!dias){ toast('Selecciona al menos un día'); return; }
   try {
-    const j = await (await fetch('/api/correos-programados/'+encodeURIComponent(r.codigo), { method:'PUT', headers:H, body:JSON.stringify({ activo, hora, dias, destinatarios }) })).json();
+    const j = await (await fetch('/api/correos-programados/'+encodeURIComponent(r.codigo), { method:'PUT', headers:H, body:JSON.stringify({ activo, hora, dias, destinatarios, remitente }) })).json();
     if (!j.success) throw new Error(j.error||'Error');
     toast('✓ Guardado');
     cargar();

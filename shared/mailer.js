@@ -46,6 +46,20 @@ function remitenteCobranza() {
   return process.env.MAIL_FROM_COBRANZA || 'Cobranza AutoFácil <cobranza@autofacilchile.cl>';
 }
 
+// Cuentas remitentes disponibles (deben estar verificadas en Brevo o el dominio autenticado).
+// Para los selectores "Desde" de correos programados / automatizaciones — evita enviar
+// desde la cuenta equivocada. Ampliar aquí cuando se verifiquen nuevos remitentes.
+function cuentasRemitente() {
+  return [
+    { clave: 'sistema',  label: 'Sistema (afbs@)',      from: remitente() },
+    { clave: 'cobranza', label: 'Cobranza (cobranza@)', from: remitenteCobranza() },
+  ];
+}
+function remitentePorClave(clave) {
+  const c = cuentasRemitente().find(x => x.clave === clave);
+  return c ? c.from : remitente();
+}
+
 // URL base para imágenes/enlaces de los correos
 const APP_URL = (process.env.APP_URL || 'https://credit-system-45em.onrender.com').replace(/\/+$/, '');
 
@@ -125,4 +139,4 @@ async function enviarCorreo({ to, cc, bcc, subject, html, text, replyTo, from } 
   }
 }
 
-module.exports = { enviarCorreo, mailConfigurado, remitente, remitenteCobranza, envolverHTML };
+module.exports = { enviarCorreo, mailConfigurado, remitente, remitenteCobranza, cuentasRemitente, remitentePorClave, envolverHTML };

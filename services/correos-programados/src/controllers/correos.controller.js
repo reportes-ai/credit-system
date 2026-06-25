@@ -6,7 +6,7 @@
    con dedup diario (no reenvía el mismo día).
    ════════════════════════════════════════════════════════════════ */
 const pool = require('../../../../shared/config/database');
-const { enviarCorreo } = require('../../../../shared/mailer');
+const { enviarCorreo, cuentasRemitente, remitentePorClave } = require('../../../../shared/mailer');
 
 const APP_URL = (process.env.APP_URL || 'https://credit-system-45em.onrender.com').replace(/\/+$/, '');
 const DIAS_NOMBRE = { '1': 'Lun', '2': 'Mar', '3': 'Mié', '4': 'Jue', '5': 'Vie', '6': 'Sáb', '7': 'Dom' };
@@ -28,6 +28,8 @@ const MESES = ['enero', 'febrero', 'marzo', 'abril', 'mayo', 'junio', 'julio', '
       ultimo_estado VARCHAR(250) DEFAULT NULL,
       updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
     )`);
+    // Cuenta remitente ("Desde") por correo — evita enviar desde la cuenta equivocada.
+    try { await pool.query("ALTER TABLE correos_programados ADD COLUMN IF NOT EXISTS remitente VARCHAR(20) NOT NULL DEFAULT 'sistema'"); } catch (_) {}
     await pool.query(
       `INSERT IGNORE INTO correos_programados (codigo, nombre, descripcion, hora, dias, destinatarios, activo)
        VALUES (?,?,?,?,?,?,0)`,
@@ -163,7 +165,7 @@ async function ejecutarReporte(r, { auto = false } = {}) {
   try { built = await builder(); } catch (e) { return { ok: false, error: 'Error generando: ' + e.message }; }
   const to = String(r.destinatarios || '').split(/[,;]/).map(s => s.trim()).filter(Boolean).join(',');
   if (!to) return { ok: false, error: 'Sin destinatarios configurados' };
-  const res = await enviarCorreo({ to, subject: built.asunto, html: built.html });
+  const res = await enviarCorreo({ to, from: remitentePorClave(r.remitente), subject: built.asunto, html: built.html });
   const ch = chileParts();
   const estado = res.ok ? `Enviado OK a ${to}` : ('Error: ' + (res.error || ''));
   try {
@@ -201,19 +203,21 @@ const listar = async (req, res) => {
   try {
     const [rows] = await pool.query('SELECT * FROM correos_programados ORDER BY nombre');
     const data = rows.map(r => ({ ...r, dias_label: String(r.dias || '').split(',').map(d => DIAS_NOMBRE[d.trim()] || d).join(' ') }));
-    res.json({ success: true, data, error: null });
+    const cuentas = cuentasRemitente().map(c => ({ clave: c.clave, label: c.label }));
+    res.json({ success: true, data, cuentas, error: null });
   } catch (e) { res.status(500).json({ success: false, data: null, error: 'Error interno del servidor' }); }
 };
 
 const actualizar = async (req, res) => {
   try {
     if (!esAdmin(req)) return res.status(403).json({ success: false, data: null, error: 'Solo Administrador puede configurar correos programados' });
-    const { activo, hora, dias, destinatarios } = req.body || {};
+    const { activo, hora, dias, destinatarios, remitente } = req.body || {};
     const sets = [], vals = [];
     if (activo !== undefined) { sets.push('activo=?'); vals.push(activo ? 1 : 0); }
     if (hora !== undefined && /^\d{2}:\d{2}$/.test(hora)) { sets.push('hora=?'); vals.push(hora); }
     if (dias !== undefined) { sets.push('dias=?'); vals.push(String(dias).split(',').map(s => s.trim()).filter(d => /^[1-7]$/.test(d)).join(',')); }
     if (destinatarios !== undefined) { sets.push('destinatarios=?'); vals.push(String(destinatarios || '').trim()); }
+    if (remitente !== undefined && cuentasRemitente().some(c => c.clave === remitente)) { sets.push('remitente=?'); vals.push(remitente); }
     if (!sets.length) return res.status(400).json({ success: false, data: null, error: 'Nada que actualizar' });
     vals.push(req.params.codigo);
     await pool.query(`UPDATE correos_programados SET ${sets.join(', ')} WHERE codigo=?`, vals);
