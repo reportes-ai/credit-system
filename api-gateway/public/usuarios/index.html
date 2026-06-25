@@ -377,6 +377,7 @@
               <div class="d-flex align-items-center flex-wrap gap-2">
                 <input type="email" id="mailTestTo" class="form-control" style="max-width:280px" placeholder="correo de destino (opcional)">
                 <button class="btn btn-outline-primary btn-sm" onclick="enviarCorreoPrueba()"><i class="bi bi-send me-1"></i>Enviar correo de prueba</button>
+                <button class="btn btn-outline-warning btn-sm" onclick="enviarCorreoPrueba('cobranza')" title="Prueba el remitente cobranza@autofacilchile.cl"><i class="bi bi-envelope-paper me-1"></i>Probar como Cobranza</button>
               </div>
               <div id="mailTestMsg" class="mt-2" style="font-size:.85rem"></div>
             </div>
@@ -1568,13 +1569,14 @@
       }
     }
 
-    async function enviarCorreoPrueba() {
+    async function enviarCorreoPrueba(from) {
       const to = document.getElementById('mailTestTo').value.trim();
       const msg = document.getElementById('mailTestMsg');
       msg.innerHTML = '<span class="text-muted"><i class="bi bi-hourglass-split me-1"></i>Enviando…</span>';
-      const r = await api('POST', '/api/config/mail/test', to ? { to } : {});
+      const body = {}; if (to) body.to = to; if (from) body.from = from;
+      const r = await api('POST', '/api/config/mail/test', body);
       if (r?.success) {
-        msg.innerHTML = `<span style="color:#166534"><i class="bi bi-check-circle me-1"></i>Enviado a <b>${r.data.to}</b>. Revisa la bandeja (y spam la primera vez).</span>`;
+        msg.innerHTML = `<span style="color:#166534"><i class="bi bi-check-circle me-1"></i>Enviado a <b>${r.data.to}</b> desde <b>${r.data.from||''}</b>. Revisa la bandeja (y spam la primera vez).</span>`;
       } else {
         msg.innerHTML = `<span style="color:#991b1b"><i class="bi bi-x-circle me-1"></i>${r?.error || 'Error al enviar'}</span>`;
       }

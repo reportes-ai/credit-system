@@ -39,6 +39,13 @@ function remitente() {
   return process.env.MAIL_FROM || 'AutoFácil <afbs@autofacilchile.cl>';
 }
 
+// Remitente de los correos de COBRANZA (comprobantes de cuota, etc.). Configurable por
+// env MAIL_FROM_COBRANZA; el remitente debe estar verificado en Brevo (o el dominio
+// autofacilchile.cl autenticado) para que no rebote.
+function remitenteCobranza() {
+  return process.env.MAIL_FROM_COBRANZA || 'Cobranza AutoFácil <cobranza@autofacilchile.cl>';
+}
+
 // URL base para imágenes/enlaces de los correos
 const APP_URL = (process.env.APP_URL || 'https://credit-system-45em.onrender.com').replace(/\/+$/, '');
 
@@ -117,4 +124,4 @@ async function enviarCorreo({ to, cc, bcc, subject, html, text, replyTo, from } 
   }
 }
 
-module.exports = { enviarCorreo, mailConfigurado, remitente, envolverHTML };
+module.exports = { enviarCorreo, mailConfigurado, remitente, remitenteCobranza, envolverHTML };

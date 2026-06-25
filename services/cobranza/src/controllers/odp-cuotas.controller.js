@@ -15,7 +15,7 @@
 const pool    = require('../../../../shared/config/database');
 const audit   = require('../../../../shared/auditoria');
 const { auditar } = require('../../../../shared/audit');
-const { enviarCorreo, envolverHTML } = require('../../../../shared/mailer');
+const { enviarCorreo, envolverHTML, remitenteCobranza } = require('../../../../shared/mailer');
 
 /* ─── Migración + auto-registro de módulo/funcionalidades ───────────────────── */
 (async () => {
@@ -369,7 +369,7 @@ const aprobar = async (req, res) => {
       const r = await enviarCorreo({
         to:      odp.email_cliente,
         bcc:     odp.solicitante_email || undefined,
-        from:    process.env.MAIL_FROM_COBRANZA || 'Cobranza AutoFácil <cobranza@autofacilchile.cl>',
+        from:    remitenteCobranza(),
         subject: `Comprobante de pago — Crédito N° ${odp.numero_credito || odp.id_credito} (TRX-${String(numero_transaccion).padStart(6,'0')})`,
         html,
       });

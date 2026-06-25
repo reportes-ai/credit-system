@@ -1,5 +1,5 @@
 const pool = require('../../../../shared/config/database');
-const { enviarCorreo, mailConfigurado, remitente, envolverHTML } = require('../../../../shared/mailer');
+const { enviarCorreo, mailConfigurado, remitente, remitenteCobranza, envolverHTML } = require('../../../../shared/mailer');
 const { auditar } = require('../../../../shared/audit');
 
 /* ─── Migración ──────────────────────────────────────────────────────────── */
@@ -83,17 +83,20 @@ const testEmail = async (req, res) => {
   try {
     const to = (req.body && req.body.to && String(req.body.to).trim()) || req.usuario?.email;
     if (!to) return res.status(400).json({ success: false, data: null, error: 'No hay destinatario (indica un correo)' });
+    // Permite probar el remitente de Cobranza (cobranza@) para verificar su configuración en Brevo.
+    const esCobranza = req.body && req.body.from === 'cobranza';
+    const from = esCobranza ? remitenteCobranza() : remitente();
     const r = await enviarCorreo({
-      to,
-      subject: 'AutoFácil — Correo de prueba',
+      to, from,
+      subject: esCobranza ? 'AutoFácil Cobranza — Correo de prueba' : 'AutoFácil — Correo de prueba',
       text: 'Este es un correo de prueba del sistema AutoFácil. Si lo recibiste, el envío de correos quedó configurado correctamente.',
       html: '<div style="font-family:Arial,sans-serif;font-size:14px;color:#1e293b">'
-          + '<h2 style="color:#0141A2">AutoFácil — Correo de prueba</h2>'
+          + '<h2 style="color:#0141A2">AutoFácil — Correo de prueba' + (esCobranza ? ' (Cobranza)' : '') + '</h2>'
           + '<p>Este es un correo de prueba del sistema. Si lo recibiste, el envío de correos quedó <b>configurado correctamente</b>.</p>'
-          + '<p style="color:#64748b;font-size:12px">Enviado desde ' + remitente() + '</p></div>',
+          + '<p style="color:#64748b;font-size:12px">Enviado desde ' + from + '</p></div>',
     });
     if (!r.ok) return res.status(400).json({ success: false, data: null, error: r.error });
-    res.json({ success: true, data: { to, messageId: r.messageId }, error: null });
+    res.json({ success: true, data: { to, from, messageId: r.messageId }, error: null });
   } catch (e) {
     (console.error('[testEmail]', e), res.status(500).json({ success: false, data: null, error: 'Error interno del servidor' }));
   }
