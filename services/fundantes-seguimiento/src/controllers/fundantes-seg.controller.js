@@ -17,6 +17,7 @@ const pool = require('../../../../shared/config/database');
 const { auditar } = require('../../../../shared/audit');
 const { tieneFunc } = require('../../../../shared/middleware/permisos');
 const { notificar } = require('../../../notificaciones/src/controllers/notificaciones.controller');
+const { ejecutivosVisibles: _visEjec } = require('../../../../shared/visibilidad-ejecutivos');
 
 const MODULO_ID = 420001;    // card "Seguimiento Fundantes" (ejecutivo) — 410001 era Certificados
 const MODULO_OPS = 420002;   // card "Seguimiento Fundantes - Operaciones" (módulo propio → card en Home)
@@ -118,16 +119,12 @@ const bucketDe = d => BUCKETS.findIndex(b => d <= b.max);
 /* ─── helpers ─────────────────────────────────────────────────────────────── */
 const nombreUsuario = req => (req.usuario && `${req.usuario.nombre || ''} ${req.usuario.apellido || ''}`.trim()) ||
   (req.usuario && req.usuario.email) || 'Sistema';
-const esEjecutivoComercial = req => req.usuario && req.usuario.perfil_nombre === 'Ejecutivo Comercial';
 // ¿el campo contratado (gps/limitacion) viene "con el crédito"?  null/0/'' → no contratado.
 const contratado = v => { const s = String(v == null ? '' : v).trim(); return s !== '' && s !== '0' && Number(s) !== 0; };
 
-// Lista de ejecutivos visibles para este usuario (Ejecutivo Comercial → sólo los suyos; resto → todos).
-async function ejecutivosVisibles(req) {
-  if (!esEjecutivoComercial(req)) return { all: true, lista: null };
-  const [asg] = await pool.query('SELECT ejecutivo FROM usuario_ejecutivos WHERE id_usuario = ?', [req.usuario.id_usuario]);
-  return { all: false, lista: asg.map(r => r.ejecutivo) };
-}
+// Visibilidad por ejecutivo: regla central paramétrica (shared/visibilidad-ejecutivos),
+// por ámbito del perfil ('todos' | 'asignados'). Soporta varios supervisores.
+async function ejecutivosVisibles(req) { return _visEjec(req.usuario); }
 
 // Pool de Operaciones: usuarios activos cuyo perfil puede validar fundantes (fundantes_validar /
 // fundantes_operaciones) + Administradores. Para avisar cuando llegan fundantes a validación.
@@ -253,8 +250,8 @@ const matrizVacia = () => ({ pendientes: [0, 0, 0, 0, 0, 0], enviados: [0, 0, 0,
 /* ─── helper de propiedad: ¿el usuario puede tocar esta operación? ──────────── */
 async function puedeOperar(req, id_credito) {
   if (await tieneFunc(req.usuario.id_usuario, 'fundantes_validar', 'fundantes_operaciones')) return true;   // Operaciones / Admin
-  if (!esEjecutivoComercial(req)) return true;                                     // otros perfiles ven todo
   const vis = await ejecutivosVisibles(req);
+  if (vis.all) return true;                                                         // ámbito 'todos'
   const [[c]] = await pool.query('SELECT ejecutivo FROM creditos WHERE id=?', [id_credito]);
   return !!c && vis.lista.includes(c.ejecutivo);
 }

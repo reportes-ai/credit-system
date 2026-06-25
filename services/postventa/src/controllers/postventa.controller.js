@@ -1,6 +1,7 @@
 'use strict';
 const pool = require('../../../../shared/config/database');
 const { emitirCorrelativo, pagarCorrelativo } = require('../../../../shared/ordenes-pago');
+const { ejecutivosVisibles: _visEjec } = require('../../../../shared/visibilidad-ejecutivos');
 
 /* ── Migración ───────────────────────────────────────────────────── */
 (async () => {
@@ -1286,13 +1287,10 @@ async function etapasPorTrack(ids, track, orden) {
   return map;
 }
 
-// Visibilidad por ejecutivo: TODOS ven todo, EXCEPTO el perfil "Ejecutivo Comercial",
-// que solo ve sus casos (ejecutivos asignados en usuario_ejecutivos, igual que en Comisiones).
-async function visibilidadEjecutivo(req) {
-  if (!req.usuario || req.usuario.perfil_nombre !== 'Ejecutivo Comercial') return { all: true, lista: null };
-  const [asg] = await pool.query('SELECT ejecutivo FROM usuario_ejecutivos WHERE id_usuario = ?', [req.usuario.id_usuario]);
-  return { all: false, lista: asg.map(r => r.ejecutivo) };
-}
+// Visibilidad por ejecutivo: regla central paramétrica (shared/visibilidad-ejecutivos),
+// por ámbito del perfil ('todos' | 'asignados', vía usuario_ejecutivos). Soporta varios
+// supervisores: el perfil supervisor se marca 'asignados' y se le asigna su equipo.
+async function visibilidadEjecutivo(req) { return _visEjec(req.usuario); }
 
 const consultaSaldos = async (req, res) => {
   try {

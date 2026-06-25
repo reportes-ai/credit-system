@@ -764,6 +764,14 @@
             <label class="form-label">Descripción</label>
             <input type="text" id="npDescripcion" class="form-control" placeholder="Opcional" maxlength="200">
           </div>
+          <div class="mb-2">
+            <label class="form-label">Ámbito de ejecutivos</label>
+            <select id="npAmbito" class="form-select">
+              <option value="todos">Ve todos los ejecutivos</option>
+              <option value="asignados">Solo sus ejecutivos asignados (su equipo)</option>
+            </select>
+            <div class="form-text" style="font-size:.78rem">Controla qué operaciones ve el perfil en Seguimiento Fundantes y Post Venta. "Solo asignados" usa los ejecutivos marcados a cada usuario (Usuarios → Ejecutivos asignados) — úsalo para ejecutivos y supervisores. Comisiones ya funciona por asignación.</div>
+          </div>
           <div id="npError" class="alert alert-danger mt-2 d-none" style="font-size:.84rem"></div>
         </div>
         <div class="modal-footer">
@@ -1773,6 +1781,7 @@
       document.getElementById('npEditId').value = '';
       document.getElementById('npNombre').value = '';
       document.getElementById('npDescripcion').value = '';
+      document.getElementById('npAmbito').value = 'todos';
       document.getElementById('npError').classList.add('d-none');
       document.getElementById('npModalTitulo').innerHTML = '<i class="bi bi-shield-plus me-2"></i>Nuevo Perfil';
       document.getElementById('npBtnGuardar').innerHTML = '<i class="bi bi-floppy me-1"></i>Crear perfil';
@@ -1784,6 +1793,7 @@
       document.getElementById('npEditId').value = id;
       document.getElementById('npNombre').value = nombre;
       document.getElementById('npDescripcion').value = descripcion || '';
+      document.getElementById('npAmbito').value = (perfilesData.find(x => x.id_perfil === id)?.ambito_ejecutivos) || 'todos';
       document.getElementById('npError').classList.add('d-none');
       document.getElementById('npModalTitulo').innerHTML = '<i class="bi bi-pencil me-2"></i>Editar Perfil';
       document.getElementById('npBtnGuardar').innerHTML = '<i class="bi bi-floppy me-1"></i>Guardar cambios';
@@ -1799,10 +1809,11 @@
       const desc   = document.getElementById('npDescripcion').value.trim();
       if (!nombre) { errEl.textContent = 'El nombre es obligatorio.'; errEl.classList.remove('d-none'); return; }
 
+      const ambito = document.getElementById('npAmbito').value;
       const esEdicion = !!id;
       const data = esEdicion
-        ? await api('PUT',  `/api/perfiles/${id}`, { nombre, descripcion: desc || null })
-        : await api('POST', '/api/perfiles',        { nombre, descripcion: desc || null });
+        ? await api('PUT',  `/api/perfiles/${id}`, { nombre, descripcion: desc || null, ambito_ejecutivos: ambito })
+        : await api('POST', '/api/perfiles',        { nombre, descripcion: desc || null, ambito_ejecutivos: ambito });
 
       if (data?.success) {
         bootstrap.Modal.getInstance(document.getElementById('modalNuevoPerfil')).hide();

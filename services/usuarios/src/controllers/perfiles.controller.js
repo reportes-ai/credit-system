@@ -632,17 +632,20 @@ const reordenarModulos = async (req, res) => {
 /* ─── CREATE PERFIL ──────────────────────────────────────────────────────── */
 const createPerfil = async (req, res) => {
   try {
-    const { nombre, descripcion = null } = req.body;
+    const { nombre, descripcion = null, ambito_ejecutivos } = req.body;
     if (!nombre?.trim()) return res.status(400).json({ success: false, data: null, error: 'El nombre es requerido' });
+    const amb = ['todos', 'asignados'].includes(ambito_ejecutivos) ? ambito_ejecutivos : 'todos';
 
     // Verificar que no exista
     const [[ex]] = await pool.query('SELECT id_perfil FROM perfiles WHERE nombre = ?', [nombre.trim()]);
     if (ex) return res.status(400).json({ success: false, data: null, error: 'Ya existe un perfil con ese nombre' });
 
-    const [r] = await pool.query(
-      'INSERT INTO perfiles (nombre, descripcion) VALUES (?, ?)',
-      [nombre.trim(), descripcion || null]
-    );
+    let r;
+    try {
+      [r] = await pool.query('INSERT INTO perfiles (nombre, descripcion, ambito_ejecutivos) VALUES (?, ?, ?)', [nombre.trim(), descripcion || null, amb]);
+    } catch (_) {   // por si la columna aún no existe en este arranque
+      [r] = await pool.query('INSERT INTO perfiles (nombre, descripcion) VALUES (?, ?)', [nombre.trim(), descripcion || null]);
+    }
     const id_perfil = r.insertId;
 
     // Copiar todas las funcionalidades con habilitado=0 (un solo INSERT masivo)
@@ -666,8 +669,9 @@ const createPerfil = async (req, res) => {
 const updatePerfil = async (req, res) => {
   try {
     const { id } = req.params;
-    const { nombre, descripcion = null } = req.body;
+    const { nombre, descripcion = null, ambito_ejecutivos } = req.body;
     if (!nombre?.trim()) return res.status(400).json({ success: false, data: null, error: 'El nombre es requerido' });
+    const amb = ['todos', 'asignados'].includes(ambito_ejecutivos) ? ambito_ejecutivos : null;
 
     const [[perfil]] = await pool.query('SELECT nombre FROM perfiles WHERE id_perfil = ?', [id]);
     if (!perfil) return res.status(404).json({ success: false, data: null, error: 'Perfil no encontrado' });
@@ -677,7 +681,12 @@ const updatePerfil = async (req, res) => {
     const [[dup]] = await pool.query('SELECT id_perfil FROM perfiles WHERE nombre = ? AND id_perfil != ?', [nombre.trim(), id]);
     if (dup) return res.status(400).json({ success: false, data: null, error: 'Ya existe un perfil con ese nombre' });
 
-    await pool.query('UPDATE perfiles SET nombre = ?, descripcion = ? WHERE id_perfil = ?', [nombre.trim(), descripcion || null, id]);
+    if (amb) {
+      await pool.query('UPDATE perfiles SET nombre=?, descripcion=?, ambito_ejecutivos=? WHERE id_perfil=?', [nombre.trim(), descripcion || null, amb, id]);
+      try { require('../../../../shared/visibilidad-ejecutivos').invalidarCache(); } catch (_) {}
+    } else {
+      await pool.query('UPDATE perfiles SET nombre = ?, descripcion = ? WHERE id_perfil = ?', [nombre.trim(), descripcion || null, id]);
+    }
     const [[updated]] = await pool.query('SELECT * FROM perfiles WHERE id_perfil = ?', [id]);
     auditar({ req, accion: 'EDITAR', modulo: 'usuarios', entidad: 'perfil', entidad_id: id, detalle: `Editó el perfil/rol #${id} → "${nombre.trim()}"` });
     res.json({ success: true, data: updated, error: null });
