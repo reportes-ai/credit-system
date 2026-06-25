@@ -126,20 +126,54 @@ const buscar = async (req, res) => {
   }
 };
 
+/* ── Buscar carta de aprobación (enviada/APROBADA) para preaprobado ─────── */
+const buscarCarta = async (req, res) => {
+  try {
+    const q = String(req.query.q || '').trim();
+    if (q.length < 2) return res.json({ success: true, data: [], error: null });
+    const rutN = q.replace(/[^0-9kK]/g, '').toUpperCase();
+    const [rows] = await pool.query(
+      `SELECT op_carta, cliente, rut_cliente rut, marca, modelo, anio, tipo_vehiculo,
+              precio_venta, pie, saldo, plazo, acreedor
+         FROM cartas_aprobacion
+        WHERE status='APROBADA'
+          AND (op_carta LIKE ?
+            OR REPLACE(REPLACE(REPLACE(rut_cliente,'.',''),'-',''),' ','') LIKE ?
+            OR UPPER(cliente) LIKE ?)
+        ORDER BY id DESC LIMIT 25`,
+      [`%${q}%`, `%${rutN}%`, `%${q.toUpperCase()}%`]);
+    res.json({ success: true, data: rows, error: null });
+  } catch (e) {
+    console.error('[certificados buscarCarta]', e.message);
+    res.status(500).json({ success: false, data: null, error: 'Error buscando cartas' });
+  }
+};
+
 /* ── Vista previa: arma los datos del certificado SIN registrarlo ────────── */
 async function armar(tipo, body) {
   if (!TIPOS[tipo]) throw { code: 400, msg: 'Tipo de certificado inválido.' };
 
-  // Preaprobado = datos ingresados (aún no hay crédito otorgado)
+  // Preaprobado = sale de una CARTA DE APROBACIÓN enviada (status APROBADA),
+  // con todas las condiciones del crédito. Vigencia de la oferta: 5 días.
   if (tipo === 'CERT_PREAPROBADO') {
-    const m = body.manual || {};
-    if (!m.rut || !m.nombre || !N(m.monto)) throw { code: 400, msg: 'Completa RUT, nombre y monto preaprobado.' };
+    const op_carta = String(body.op_carta || '').trim();
+    if (!op_carta) throw { code: 400, msg: 'Selecciona la carta de aprobación.' };
+    const [[k]] = await pool.query(
+      `SELECT op_carta, cliente, rut_cliente, tipo_vehiculo, marca, modelo, anio, patente,
+              precio_venta, pie, saldo, plazo, acreedor, tasa_credito, monto_credito_clp, status
+         FROM cartas_aprobacion WHERE op_carta=? LIMIT 1`, [op_carta]);
+    if (!k) throw { code: 404, msg: 'No se encontró la carta de aprobación.' };
+    if (k.status !== 'APROBADA') throw { code: 400, msg: 'La carta debe estar aprobada/enviada para preaprobar.' };
+    const vehiculo = [k.marca, k.modelo, k.anio].filter(Boolean).join(' ');
     const datos = {
-      monto_preaprobado: N(m.monto), plazo: m.plazo ? N(m.plazo) : null,
-      tasa: m.tasa != null && m.tasa !== '' ? Number(m.tasa) : null,
-      vigencia_dias: m.vigencia_dias ? N(m.vigencia_dias) : 30,
+      op_carta: k.op_carta, financiera: k.acreedor,
+      tipo_vehiculo: k.tipo_vehiculo, marca: k.marca, modelo: k.modelo, anio: k.anio, patente: k.patente,
+      precio_venta: N(k.precio_venta), pie: N(k.pie), saldo_precio: N(k.saldo),
+      plazo: N(k.plazo), tasa: k.tasa_credito != null ? Number(k.tasa_credito) : null,
+      monto_credito: N(k.monto_credito_clp), vigencia_dias: 5,
     };
-    return { tipo, rut: m.rut, nombre: m.nombre, num_op: null, datos, credito: null };
+    return { tipo, rut: k.rut_cliente, nombre: k.cliente, num_op: null,
+             datos, credito: { op_carta: k.op_carta, vehiculo, financiera: k.acreedor } };
   }
 
   const num_op = N(body.num_op);
@@ -192,7 +226,7 @@ const generar = async (req, res) => {
     // ref único por tipo+operación(+cuota): re-emitir devuelve el MISMO código/QR
     const refId = out.num_op
       ? `${out.tipo}:${out.num_op}${out.datos.numero_cuota ? ':' + out.datos.numero_cuota : ''}`
-      : `${out.tipo}:${out.rut}:${Date.now()}`;
+      : (out.datos && out.datos.op_carta ? `${out.tipo}:${out.datos.op_carta}` : `${out.tipo}:${out.rut}:${Date.now()}`);
     const codigo = await registrarVerificable({
       tipo: out.tipo, ref_tabla: 'certificados', ref_id: refId,
       num_op: out.num_op, rut: out.rut, nombre: out.nombre, datos: out.datos, emitido_por: emisor,
@@ -267,4 +301,4 @@ const anular = async (req, res) => {
   }
 };
 
-module.exports = { buscar, preview, generar, historial, ver, anular };
+module.exports = { buscar, buscarCarta, preview, generar, historial, ver, anular };

@@ -2,7 +2,7 @@
 <html lang="es">
 <head>
 <meta charset="UTF-8">
-<!-- v1.2 -->
+<!-- v1.3 -->
 <link rel="icon" href="/img/favicon.png" type="image/png">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Certificados — AutoFácil</title>
@@ -112,32 +112,15 @@
       <div class="tipos" id="tipos"></div>
     </div>
 
-    <!-- Crédito (4 tipos) -->
+    <!-- Búsqueda (crédito para 4 tipos · carta de aprobación para preaprobado) -->
     <div class="card hide" id="boxCredito">
-      <label>2. Crédito (busca por N° Operación, RUT o nombre)</label>
+      <label id="lblBusq">2. Crédito (busca por N° Operación, RUT o nombre)</label>
       <input type="text" id="q" placeholder="Ej. 88604 · 17.373.323-2 · FERNANDO SANCHEZ" oninput="buscarDeb()">
       <div class="res hide" id="res"></div>
       <div class="selbox" id="selbox"></div>
       <div id="boxCuota" class="hide" style="margin-top:12px">
         <label>N° de cuota a certificar</label>
         <input type="number" id="numCuota" min="1" placeholder="Ej. 3" style="max-width:160px">
-      </div>
-    </div>
-
-    <!-- Preaprobado (manual) -->
-    <div class="card hide" id="boxPreap">
-      <label>2. Datos del crédito preaprobado</label>
-      <div class="row">
-        <div><label>RUT cliente</label><input type="text" id="pRut" placeholder="12.345.678-9"></div>
-        <div><label>Nombre cliente</label><input type="text" id="pNombre" placeholder="Nombre completo"></div>
-      </div>
-      <div class="row" style="margin-top:12px">
-        <div><label>Monto preaprobado ($)</label><input type="number" id="pMonto" placeholder="8000000"></div>
-        <div><label>Plazo (meses)</label><input type="number" id="pPlazo" placeholder="48"></div>
-      </div>
-      <div class="row" style="margin-top:12px">
-        <div><label>Tasa mensual (%)</label><input type="number" id="pTasa" step="0.01" placeholder="1.92"></div>
-        <div><label>Vigencia de la oferta (días)</label><input type="number" id="pVig" placeholder="30"></div>
       </div>
     </div>
 
@@ -189,13 +172,14 @@ const esc = s => String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;')
 const money = n => '$'+nf(n);
 function fechaLarga(iso){ if(!iso) return '—'; const M=['enero','febrero','marzo','abril','mayo','junio','julio','agosto','septiembre','octubre','noviembre','diciembre'];
   const [y,m,d]=iso.split('-').map(Number); return `${d} de ${M[m-1]} de ${y}`; }
+function addDias(iso,n){ if(!iso) return '—'; const dt=new Date(iso+'T00:00:00'); dt.setDate(dt.getDate()+(n||0)); return fechaLarga(dt.toISOString().slice(0,10)); }
 
 const TIPOS = [
   ['CERT_CREDITO_VIGENTE','bi-shield-check','Crédito Vigente','Estado y saldo del crédito',  'credito'],
   ['CERT_PREPAGO',        'bi-cash-coin',   'Prepago','Crédito pagado en su totalidad',        'credito'],
   ['CERT_ALZAMIENTO',     'bi-unlock',      'Alzamiento de Prenda','Libera la prenda del vehículo','credito'],
   ['CERT_PAGO_CUOTA',     'bi-receipt',     'Pago de Cuota','Una cuota pagada en particular',    'credito'],
-  ['CERT_PREAPROBADO',    'bi-patch-plus',  'Crédito Preaprobado','Oferta de crédito vigente',    'preap'],
+  ['CERT_PREAPROBADO',    'bi-patch-plus',  'Crédito Preaprobado','Desde la carta de aprobación',  'carta'],
 ];
 let tipoSel=null, modoSel=null, credSel=null;
 // Firma de la empresa (misma que usan las Cartas de Aprobación)
@@ -213,8 +197,11 @@ function selTipo(t){
   tipoSel=t; credSel=null;
   modoSel = TIPOS.find(x=>x[0]===t)[4];
   document.querySelectorAll('.tipo').forEach(e=>e.classList.toggle('sel', e.dataset.t===t));
-  $('boxCredito').classList.toggle('hide', modoSel!=='credito');
-  $('boxPreap').classList.toggle('hide', modoSel!=='preap');
+  $('boxCredito').classList.remove('hide');
+  $('lblBusq').textContent = modoSel==='carta'
+    ? '2. Carta de aprobación enviada (busca por N° carta, RUT o nombre)'
+    : '2. Crédito (busca por N° Operación, RUT o nombre)';
+  $('q').placeholder = modoSel==='carta' ? 'Ej. 266024855DI · 19.201.958-3 · YAIR FUENTES' : 'Ej. 88604 · 17.373.323-2 · FERNANDO SANCHEZ';
   $('boxCuota').classList.toggle('hide', t!=='CERT_PAGO_CUOTA');
   $('boxGen').classList.remove('hide');
   $('selbox').style.display='none'; $('res').classList.add('hide'); $('q').value=''; $('err').style.display='none';
@@ -226,37 +213,41 @@ function buscarDeb(){ clearTimeout(debT); debT=setTimeout(buscar,300); }
 async function buscar(){
   const q=$('q').value.trim();
   if(q.length<2){ $('res').classList.add('hide'); return; }
+  const ep = modoSel==='carta' ? '/api/certificados/buscar-carta' : '/api/certificados/buscar';
   try{
-    const r=await fetch('/api/certificados/buscar?q='+encodeURIComponent(q),{headers:H()});
+    const r=await fetch(ep+'?q='+encodeURIComponent(q),{headers:H()});
     const j=await r.json(); if(!j.success) return;
     const rows=j.data||[];
-    $('res').innerHTML = rows.length ? rows.map(c=>`
-      <div class="it" onclick='selCred(${JSON.stringify(c).replace(/'/g,"&#39;")})'>
-        <span><b>N° ${nf(c.num_op)}</b> · ${esc(c.nombre||'')}</span>
-        <span style="color:#64748b">${esc(c.rut||'')} · ${esc([c.marca,c.modelo,c.anio].filter(Boolean).join(' '))} ${c.estado_cartera?'· '+esc(c.estado_cartera):''}</span>
-      </div>`).join('') : '<div class="it" style="color:#94a3b8;cursor:default">Sin resultados</div>';
+    $('res').innerHTML = rows.length ? rows.map(c=>{
+      const veh=esc([c.marca,c.modelo,c.anio].filter(Boolean).join(' '));
+      const left = modoSel==='carta' ? `<b>${esc(c.op_carta||'')}</b> · ${esc(c.cliente||'')}` : `<b>N° ${nf(c.num_op)}</b> · ${esc(c.nombre||'')}`;
+      const right = modoSel==='carta' ? `${esc(c.rut||'')} · ${veh} · ${money(c.precio_venta)}` : `${esc(c.rut||'')} · ${veh}${c.estado_cartera?' · '+esc(c.estado_cartera):''}`;
+      return `<div class="it" onclick='selCred(${JSON.stringify(c).replace(/'/g,"&#39;")})'><span>${left}</span><span style="color:#64748b">${right}</span></div>`;
+    }).join('') : '<div class="it" style="color:#94a3b8;cursor:default">Sin resultados</div>';
     $('res').classList.remove('hide');
   }catch(e){}
 }
 function selCred(c){
-  credSel=c; $('res').classList.add('hide');
-  $('selbox').style.display='block';
-  $('selbox').innerHTML=`<b>N° ${nf(c.num_op)}</b> — ${esc(c.nombre||'')} · ${esc(c.rut||'')} · ${esc([c.marca,c.modelo,c.anio].filter(Boolean).join(' '))}`;
+  credSel=c; $('res').classList.add('hide'); $('selbox').style.display='block';
+  const veh=esc([c.marca,c.modelo,c.anio].filter(Boolean).join(' '));
+  $('selbox').innerHTML = modoSel==='carta'
+    ? `<b>Carta ${esc(c.op_carta||'')}</b> — ${esc(c.cliente||'')} · ${esc(c.rut||'')} · ${veh} · Precio ${money(c.precio_venta)} · Pie ${money(c.pie)} · Saldo ${money(c.saldo)}`
+    : `<b>N° ${nf(c.num_op)}</b> — ${esc(c.nombre||'')} · ${esc(c.rut||'')} · ${veh}`;
   refreshGen();
 }
 function refreshGen(){
   let ok=false;
   if(modoSel==='credito') ok=!!credSel && (tipoSel!=='CERT_PAGO_CUOTA' || $('numCuota').value>0);
-  else ok = $('pRut').value.trim() && $('pNombre').value.trim() && Number($('pMonto').value)>0;
+  else if(modoSel==='carta') ok=!!credSel;
   $('btnGen').disabled=!ok;
 }
-['numCuota','pRut','pNombre','pMonto'].forEach(id=>document.addEventListener('input',e=>{ if(e.target.id===id) refreshGen(); }));
+document.addEventListener('input',e=>{ if(e.target.id==='numCuota') refreshGen(); });
 
 async function generar(){
   const btn=$('btnGen'); btn.disabled=true; btn.innerHTML='<span class="spinner"></span>Generando…'; $('err').style.display='none';
   const body={ tipo:tipoSel };
   if(modoSel==='credito'){ body.num_op=credSel.num_op; if(tipoSel==='CERT_PAGO_CUOTA') body.numero_cuota=Number($('numCuota').value); }
-  else body.manual={ rut:$('pRut').value.trim(), nombre:$('pNombre').value.trim(), monto:Number($('pMonto').value), plazo:Number($('pPlazo').value)||null, tasa:$('pTasa').value||null, vigencia_dias:Number($('pVig').value)||null };
+  else if(modoSel==='carta'){ body.op_carta=credSel.op_carta; }
   try{
     const r=await fetch('/api/certificados/generar',{method:'POST',headers:HJ(),body:JSON.stringify(body)});
     const j=await r.json(); if(!j.success) throw new Error(j.error||'Error');
@@ -271,21 +262,30 @@ function cuerpo(d){
   if(d.tipo==='CERT_PREPAGO') return `AutoFácil Chile certifica que el crédito automotriz N° <b>${nf(c.num_op)}</b> (${esc(c.financiera||'')}), de <b>${nom}</b>, RUT <b>${rut}</b>, asociado al vehículo <b>${esc(c.vehiculo||'—')}</b>, fue <b>PREPAGADO</b> (pagado en su totalidad) con fecha <b>${esc(x.fecha_prepago||'—')}</b>. El cliente <b>no registra saldos pendientes</b> por este crédito.`;
   if(d.tipo==='CERT_ALZAMIENTO') return `Habiéndose pagado íntegramente el crédito automotriz N° <b>${nf(c.num_op)}</b> de <b>${nom}</b>, RUT <b>${rut}</b>, AutoFácil Chile autoriza y certifica el <b>ALZAMIENTO DE LA PRENDA</b> que afecta al vehículo <b>${esc(x.vehiculo||'—')}</b>${x.tipo_vehiculo?' ('+esc(x.tipo_vehiculo)+')':''}. Fecha del pago final: <b>${esc(x.fecha_pago_final||'—')}</b>.`;
   if(d.tipo==='CERT_PAGO_CUOTA') return `AutoFácil Chile certifica que, respecto del crédito automotriz N° <b>${nf(c.num_op)}</b> de <b>${nom}</b>, RUT <b>${rut}</b>, la <b>cuota N° ${nf(x.numero_cuota)}</b> (vencimiento ${esc(x.fecha_vencimiento||'—')}) fue <b>pagada</b> con fecha <b>${esc(x.fecha_pago||'—')}</b> por un monto de <b>${money(x.monto)}</b>.`;
-  if(d.tipo==='CERT_PREAPROBADO') return `AutoFácil Chile certifica que <b>${nom}</b>, RUT <b>${rut}</b>, cuenta con un crédito automotriz <b>PREAPROBADO</b> por un monto de hasta <b>${money(x.monto_preaprobado)}</b>${x.plazo?', a un plazo de <b>'+nf(x.plazo)+'</b> meses':''}${x.tasa!=null?', con una tasa referencial de <b>'+x.tasa+'%</b> mensual':''}. La presente oferta tiene una vigencia de <b>${nf(x.vigencia_dias||30)} días</b> a contar de la fecha de emisión.`;
+  if(d.tipo==='CERT_PREAPROBADO'){
+    const veh=esc([x.tipo_vehiculo,x.marca,x.modelo,x.anio].filter(Boolean).join(' '));
+    return `AutoFácil Chile certifica que <b>${nom}</b>, RUT <b>${rut}</b>, cuenta con un crédito automotriz <b>PREAPROBADO</b> según la carta de aprobación N° <b>${esc(x.op_carta||'')}</b>, bajo las siguientes condiciones: vehículo <b>${veh}</b>${x.patente?', patente <b>'+esc(x.patente)+'</b>':''}; precio del vehículo <b>${money(x.precio_venta)}</b>; pie <b>${money(x.pie)}</b>; saldo precio a financiar <b>${money(x.saldo_precio)}</b>; plazo <b>${nf(x.plazo)}</b> cuotas${x.tasa!=null?'; tasa <b>'+x.tasa+'%</b> mensual':''}${x.monto_credito?'; monto del crédito <b>'+money(x.monto_credito)+'</b>':''}. Financiamiento a través de <b>${esc(x.financiera||'')}</b>. La presente oferta tiene una <b>vigencia de ${nf(x.vigencia_dias||5)} días corridos</b> a contar de la fecha de emisión (vence el <b>${addDias(d.fecha_emision,x.vigencia_dias||5)}</b>).`;
+  }
   return '';
 }
 function gridDatos(d){
   const x=d.datos||{}, c=d.credito||{}, items=[];
   const add=(k,v)=>items.push(`<div><span>${k}</span><b>${v}</b></div>`);
   add('Cliente', esc(d.nombre||'—')); add('RUT', esc(d.rut||'—'));
-  if(c.num_op) add('N° Operación', nf(c.num_op));
-  if(c.financiera) add('Financiera', esc(c.financiera));
-  if(c.vehiculo) add('Vehículo', esc(c.vehiculo));
+  if(c.num_op){ add('N° Operación', nf(c.num_op)); if(c.financiera) add('Financiera', esc(c.financiera)); if(c.vehiculo) add('Vehículo', esc(c.vehiculo)); }
   if(d.tipo==='CERT_CREDITO_VIGENTE'){ add('Cuotas pagadas', `${nf(x.cuotas_pagadas)} / ${nf(x.cuotas_total)}`); add('Saldo insoluto', money(x.saldo_insoluto)); add('Cuota mensual', money(x.cuota_mensual)); }
   if(d.tipo==='CERT_PREPAGO'){ add('Fecha de prepago', esc(x.fecha_prepago||'—')); add('Monto financiado', money(x.monto_financiado)); }
   if(d.tipo==='CERT_PAGO_CUOTA'){ add('Cuota', nf(x.numero_cuota)); add('Fecha de pago', esc(x.fecha_pago||'—')); add('Monto', money(x.monto)); }
   if(d.tipo==='CERT_ALZAMIENTO'){ add('Fecha pago final', esc(x.fecha_pago_final||'—')); }
-  if(d.tipo==='CERT_PREAPROBADO'){ add('Monto preaprobado', money(x.monto_preaprobado)); if(x.plazo) add('Plazo', nf(x.plazo)+' meses'); if(x.tasa!=null) add('Tasa mensual', x.tasa+'%'); add('Vigencia', nf(x.vigencia_dias||30)+' días'); }
+  if(d.tipo==='CERT_PREAPROBADO'){
+    add('N° Carta', esc(x.op_carta||'—'));
+    add('Vehículo', esc([x.tipo_vehiculo,x.marca,x.modelo,x.anio].filter(Boolean).join(' ')));
+    if(x.patente) add('Patente', esc(x.patente));
+    add('Precio vehículo', money(x.precio_venta)); add('Pie', money(x.pie)); add('Saldo precio', money(x.saldo_precio));
+    add('Plazo', nf(x.plazo)+' cuotas'); if(x.tasa!=null) add('Tasa mensual', x.tasa+'%');
+    if(x.monto_credito) add('Monto crédito', money(x.monto_credito));
+    add('Financiera', esc(x.financiera||'—')); add('Vigencia', nf(x.vigencia_dias||5)+' días');
+  }
   return `<div class="grid">${items.join('')}</div>`;
 }
 function render(d){
