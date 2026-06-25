@@ -16,6 +16,7 @@
 const pool = require('../../../../shared/config/database');
 const { auditar } = require('../../../../shared/audit');
 const { tieneFunc } = require('../../../../shared/middleware/permisos');
+const { notificar } = require('../../../notificaciones/src/controllers/notificaciones.controller');
 
 const MODULO_ID = 420001;   // 410001 era Certificados (colisión corregida)
 const FINANCIERAS = ['AUTOFIN', 'UNIDAD DE CREDITO'];          // brokerage (configurable vía seed de tipos)
@@ -86,6 +87,7 @@ const bucketDe = d => BUCKETS.findIndex(b => d <= b.max);
     await pool.query("UPDATE funcionalidades SET id_modulo=? WHERE codigo IN ('fundantes_seguimiento','fundantes_validar')", [MODULO_ID]);
     const funcs = [
       ['Seguimiento Fundantes', 'fundantes_seguimiento', '/fundantes-seguimiento/', 'bi-folder-check'],
+      ['Seguimiento Fundantes - Operaciones', 'fundantes_operaciones', '/fundantes-operaciones/', 'bi-inboxes'],
       ['Validar Fundantes', 'fundantes_validar', null, 'bi-check2-circle'],
     ];
     const idFunc = {};
@@ -120,6 +122,22 @@ async function ejecutivosVisibles(req) {
   return { all: false, lista: asg.map(r => r.ejecutivo) };
 }
 
+// Pool de Operaciones: usuarios activos cuyo perfil puede validar fundantes (fundantes_validar /
+// fundantes_operaciones) + Administradores. Para avisar cuando llegan fundantes a validación.
+async function idsOperaciones(excluirId) {
+  try {
+    const [rows] = await pool.query(
+      `SELECT DISTINCT u.id_usuario
+         FROM usuarios u JOIN perfiles p ON p.id_perfil = u.id_perfil
+        WHERE u.estado='activo' AND u.id_usuario <> ?
+          AND (p.nombre='Administrador'
+               OR EXISTS (SELECT 1 FROM permisos_perfil pp JOIN funcionalidades f ON f.id_funcionalidad=pp.id_funcionalidad
+                          WHERE pp.id_perfil=p.id_perfil AND pp.habilitado=1 AND f.codigo IN ('fundantes_validar','fundantes_operaciones')))`,
+      [excluirId || 0]);
+    return rows.map(r => r.id_usuario);
+  } catch (e) { console.error('[fundantes idsOperaciones]', e.message); return []; }
+}
+
 // Tipos requeridos para una operación según financiera + lo contratado. Devuelve [{codigo,nombre,obligatorio,orden}].
 function tiposDeOperacion(op, tiposPorFin) {
   const arr = tiposPorFin[String(op.financiera || '').toUpperCase()] || [];
@@ -135,6 +153,7 @@ const listar = async (req, res) => {
   try {
     const fEjec = String(req.query.ejecutivo || '').trim();
     const fFin = String(req.query.financiera || '').trim().toUpperCase();
+    const fEstado = String(req.query.estado || '').trim().toUpperCase();   // ej. ENVIADO (cola Operaciones)
     const incluirCerrados = req.query.cerrados === '1' || req.query.cerrados === 'true';
 
     const vis = await ejecutivosVisibles(req);
@@ -164,8 +183,11 @@ const listar = async (req, res) => {
     agg.forEach(r => { const b = bucketDe(Number(r.dias) || 0); if (b < 0) return; const k = r.grp === 'ENV' ? 'enviados' : 'pendientes'; resumen[k][b] += Number(r.n) || 0; });
     for (let i = 0; i < BUCKETS.length; i++) resumen.total[i] = resumen.pendientes[i] + resumen.enviados[i];
 
-    // Lista de operaciones (limitada). Por defecto oculta CERRADO; orden: más días pendientes primero.
-    const whereData = where + (incluirCerrados ? '' : " AND COALESCE(fs.estado,'PENDIENTE') <> 'CERRADO'");
+    // Lista de operaciones (limitada). Filtro por estado (cola Operaciones); por defecto oculta CERRADO.
+    const fpData = [...fp];
+    let whereData = where;
+    if (fEstado && ESTADOS.includes(fEstado)) { whereData += " AND COALESCE(fs.estado,'PENDIENTE') = ?"; fpData.push(fEstado); }
+    else if (!incluirCerrados) whereData += " AND COALESCE(fs.estado,'PENDIENTE') <> 'CERRADO'";
     const [ops] = await pool.query(`
       SELECT c.id AS id_credito, c.num_op, c.financiera, c.id_financiera, c.ejecutivo,
              c.fecha_otorgado, c.gps, c.limitacion,
@@ -175,7 +197,7 @@ const listar = async (req, res) => {
       FROM creditos c LEFT JOIN fundantes_seg fs ON fs.id_credito = c.id
       ${whereData}
       ORDER BY dias DESC, c.num_op DESC
-      LIMIT 500`, fp);
+      LIMIT 500`, fpData);
 
     // Documentos subidos de esas operaciones
     const ids = ops.map(o => o.id_credito);
@@ -209,7 +231,7 @@ const listar = async (req, res) => {
     const [ejRows] = await pool.query(
       `SELECT DISTINCT ejecutivo FROM creditos WHERE fecha_otorgado IS NOT NULL AND UPPER(financiera) IN (?) AND ejecutivo IS NOT NULL AND ejecutivo<>'' ORDER BY ejecutivo`, [FINANCIERAS]);
     const ejecutivos = vis.all ? ejRows.map(r => r.ejecutivo) : (vis.lista || []);
-    const puede_validar = await tieneFunc(req.usuario.id_usuario, 'fundantes_validar');
+    const puede_validar = await tieneFunc(req.usuario.id_usuario, 'fundantes_validar', 'fundantes_operaciones');
 
     res.json({ success: true, data, resumen, ejecutivos, puede_validar,
       es_ejecutivo: !vis.all, nombre: vis.all ? (fEjec || 'Todos los ejecutivos') : nombreUsuario(req), error: null });
@@ -223,7 +245,7 @@ const matrizVacia = () => ({ pendientes: [0, 0, 0, 0, 0, 0], enviados: [0, 0, 0,
 
 /* ─── helper de propiedad: ¿el usuario puede tocar esta operación? ──────────── */
 async function puedeOperar(req, id_credito) {
-  if (await tieneFunc(req.usuario.id_usuario, 'fundantes_validar')) return true;   // Operaciones / Admin
+  if (await tieneFunc(req.usuario.id_usuario, 'fundantes_validar', 'fundantes_operaciones')) return true;   // Operaciones / Admin
   if (!esEjecutivoComercial(req)) return true;                                     // otros perfiles ven todo
   const vis = await ejecutivosVisibles(req);
   const [[c]] = await pool.query('SELECT ejecutivo FROM creditos WHERE id=?', [id_credito]);
@@ -314,6 +336,14 @@ const enviar = async (req, res) => {
       [id, nombreUsuario(req), req.usuario.id_usuario || null]);
     auditar({ req, accion: 'ENVIAR_FUNDANTES', modulo: 'fundantes-seguimiento', entidad: 'credito', entidad_id: id,
       detalle: `Envió a validación los fundantes de la OP ${op.num_op}` });
+    // Alerta al pool de Operaciones: llegaron fundantes para validar.
+    try {
+      const pooln = await idsOperaciones(req.usuario.id_usuario);
+      if (pooln.length) await notificar(pooln, {
+        tipo: 'fundantes', titulo: 'Fundantes por validar',
+        mensaje: `${nombreUsuario(req)} envió los fundantes de la OP ${op.num_op} (${op.financiera || ''}).`,
+        href: '/fundantes-operaciones/', prioridad: 'normal', sonar: true, clave: 'fund_env_' + id });
+    } catch (_) {}
     res.json({ success: true, data: { id_credito: id, estado: 'ENVIADO' }, error: null });
   } catch (e) {
     console.error('[fundantes-seguimiento enviar]', e.message);
@@ -332,9 +362,9 @@ const validar = async (req, res) => {
       return res.status(400).json({ success: false, data: null, error: 'accion debe ser aprobar o rechazar' });
     if (accion === 'rechazar' && !comentario)
       return res.status(400).json({ success: false, data: null, error: 'El rechazo requiere un comentario' });
-    const [[op]] = await pool.query('SELECT id, num_op FROM creditos WHERE id=?', [id]);
+    const [[op]] = await pool.query('SELECT id, num_op, financiera FROM creditos WHERE id=?', [id]);
     if (!op) return res.status(404).json({ success: false, data: null, error: 'Operación no encontrada' });
-    const [[fs]] = await pool.query('SELECT estado FROM fundantes_seg WHERE id_credito=?', [id]);
+    const [[fs]] = await pool.query('SELECT estado, id_enviado_por FROM fundantes_seg WHERE id_credito=?', [id]);
     if (!fs || fs.estado !== 'ENVIADO')
       return res.status(409).json({ success: false, data: null, error: 'Sólo se pueden validar operaciones ENVIADAS' });
 
@@ -344,6 +374,13 @@ const validar = async (req, res) => {
       [estado, accion === 'rechazar' ? comentario : null, nombreUsuario(req), req.usuario.id_usuario || null, id]);
     auditar({ req, accion: accion === 'aprobar' ? 'APROBAR_FUNDANTES' : 'RECHAZAR_FUNDANTES', modulo: 'fundantes-seguimiento', entidad: 'credito', entidad_id: id,
       detalle: `${accion === 'aprobar' ? 'Aprobó (CERRADO)' : 'Rechazó'} los fundantes de la OP ${op.num_op}${comentario ? ' — ' + comentario : ''}`, meta: { estado, comentario: comentario || null } });
+    // Alerta al ejecutivo que envió: rechazo (con el motivo) → debe corregir y reenviar.
+    if (accion === 'rechazar' && fs.id_enviado_por) {
+      try { await notificar([fs.id_enviado_por], {
+        tipo: 'fundantes', titulo: 'Fundantes rechazados',
+        mensaje: `Operaciones rechazó los fundantes de la OP ${op.num_op}: ${comentario}`,
+        href: '/fundantes-seguimiento/', prioridad: 'alta', sonar: true, clave: 'fund_rec_' + id }); } catch (_) {}
+    }
     res.json({ success: true, data: { id_credito: id, estado }, error: null });
   } catch (e) {
     console.error('[fundantes-seguimiento validar]', e.message);
@@ -351,4 +388,65 @@ const validar = async (req, res) => {
   }
 };
 
-module.exports = { listar, subirDoc, eliminarDoc, descargar, enviar, validar };
+/* ─── ZIP "store" mínimo (sin dependencias) para "Descargar Todos" ──────────── */
+const _crcTable = (() => { const t = []; for (let n = 0; n < 256; n++) { let c = n; for (let k = 0; k < 8; k++) c = (c & 1) ? (0xEDB88320 ^ (c >>> 1)) : (c >>> 1); t[n] = c >>> 0; } return t; })();
+function crc32(buf) { let c = 0xFFFFFFFF; for (let i = 0; i < buf.length; i++) c = _crcTable[(c ^ buf[i]) & 0xFF] ^ (c >>> 8); return (c ^ 0xFFFFFFFF) >>> 0; }
+function zipStore(files) {                       // files: [{ name, buf }]  (método 0 = sin compresión)
+  const parts = [], central = []; let offset = 0;
+  const T = 0, D = 0x21;                          // hora/fecha DOS fijas (1980-01-01)
+  for (const f of files) {
+    const name = Buffer.from(f.name, 'utf8'), data = f.buf, crc = crc32(data);
+    const lh = Buffer.alloc(30);
+    lh.writeUInt32LE(0x04034b50, 0); lh.writeUInt16LE(20, 4); lh.writeUInt16LE(0x0800, 6); lh.writeUInt16LE(0, 8);
+    lh.writeUInt16LE(T, 10); lh.writeUInt16LE(D, 12); lh.writeUInt32LE(crc, 14);
+    lh.writeUInt32LE(data.length, 18); lh.writeUInt32LE(data.length, 22); lh.writeUInt16LE(name.length, 26); lh.writeUInt16LE(0, 28);
+    parts.push(lh, name, data);
+    const ch = Buffer.alloc(46);
+    ch.writeUInt32LE(0x02014b50, 0); ch.writeUInt16LE(20, 4); ch.writeUInt16LE(20, 6); ch.writeUInt16LE(0x0800, 8); ch.writeUInt16LE(0, 10);
+    ch.writeUInt16LE(T, 12); ch.writeUInt16LE(D, 14); ch.writeUInt32LE(crc, 16);
+    ch.writeUInt32LE(data.length, 20); ch.writeUInt32LE(data.length, 24); ch.writeUInt16LE(name.length, 28);
+    ch.writeUInt16LE(0, 30); ch.writeUInt16LE(0, 32); ch.writeUInt16LE(0, 34); ch.writeUInt16LE(0, 36);
+    ch.writeUInt32LE(0, 38); ch.writeUInt32LE(offset, 42);
+    central.push(ch, name);
+    offset += lh.length + name.length + data.length;
+  }
+  const cBuf = Buffer.concat(central);
+  const end = Buffer.alloc(22);
+  end.writeUInt32LE(0x06054b50, 0); end.writeUInt16LE(0, 4); end.writeUInt16LE(0, 6);
+  end.writeUInt16LE(files.length, 8); end.writeUInt16LE(files.length, 10);
+  end.writeUInt32LE(cBuf.length, 12); end.writeUInt32LE(offset, 16); end.writeUInt16LE(0, 20);
+  return Buffer.concat([...parts, cBuf, end]);
+}
+const DOC_LABEL = { CONTRATO_CV: 'COMPRAVENTA', SOL_TRANSFERENCIA: 'TRANSFERENCIA', SOL_LIMITACION: 'LIMITACION', INFORME_GPS: 'GPS' };
+const extDe = (nombre, mime) => {
+  const m = String(nombre || '').match(/\.([a-z0-9]{1,5})$/i); if (m) return '.' + m[1].toLowerCase();
+  const mm = { 'application/pdf': '.pdf', 'image/jpeg': '.jpg', 'image/jpg': '.jpg', 'image/png': '.png' };
+  return mm[String(mime || '').toLowerCase()] || '.bin';
+};
+const sanitizeFn = s => String(s || '').replace(/[\\/:*?"<>|]+/g, '').replace(/\s+/g, ' ').trim();
+
+/* ─── GET /api/fundantes-seguimiento/:id/zip — "Descargar Todos" (carpeta + archivos renombrados) ── */
+const descargarZip = async (req, res) => {
+  try {
+    const id = Number(req.params.id);
+    const [[op]] = await pool.query('SELECT num_op, financiera, id_financiera FROM creditos WHERE id=?', [id]);
+    if (!op) return res.status(404).json({ success: false, data: null, error: 'Operación no encontrada' });
+    const [docs] = await pool.query('SELECT codigo, archivo_nombre, mime_type, archivo_data FROM fundantes_seg_docs WHERE id_credito=? AND archivo_data IS NOT NULL', [id]);
+    if (!docs.length) return res.status(404).json({ success: false, data: null, error: 'No hay documentos para descargar' });
+    const idf = op.id_financiera || op.num_op || id;
+    const carpeta = sanitizeFn(`Fundantes ${op.financiera || ''} ID${idf}`);
+    const files = docs.map(d => ({
+      name: `${carpeta}/${sanitizeFn((DOC_LABEL[d.codigo] || d.codigo) + ' ID' + idf)}${extDe(d.archivo_nombre, d.mime_type)}`,
+      buf: d.archivo_data,
+    }));
+    const zip = zipStore(files);
+    res.set('Content-Type', 'application/zip');
+    res.set('Content-Disposition', `attachment; filename="${carpeta}.zip"`);
+    res.send(zip);
+  } catch (e) {
+    console.error('[fundantes-seguimiento descargarZip]', e.message);
+    res.status(500).json({ success: false, data: null, error: 'Error interno del servidor' });
+  }
+};
+
+module.exports = { listar, subirDoc, eliminarDoc, descargar, descargarZip, enviar, validar };
