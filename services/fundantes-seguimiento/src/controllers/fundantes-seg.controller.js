@@ -65,7 +65,7 @@ const bucketDe = d => BUCKETS.findIndex(b => d <= b.max);
     const seed = [
       ['AUTOFIN', 'CONTRATO_CV', 'Contrato Compraventa', 1, null, 1],
       ['AUTOFIN', 'SOL_TRANSFERENCIA', 'Solicitud Transferencia', 1, null, 2],
-      ['AUTOFIN', 'SOL_LIMITACION', 'Solicitud Limitación', 1, 'limitacion', 3],
+      ['AUTOFIN', 'SOL_LIMITACION', 'Solicitud Limitación', 1, null, 3],
       ['AUTOFIN', 'INFORME_GPS', 'Informe GPS', 1, 'gps', 4],
       ['UNIDAD DE CREDITO', 'CONTRATO_CV', 'Contrato Compraventa', 1, null, 1],
       ['UNIDAD DE CREDITO', 'SOL_TRANSFERENCIA', 'Solicitud Transferencia', 1, null, 2],
@@ -73,6 +73,8 @@ const bucketDe = d => BUCKETS.findIndex(b => d <= b.max);
     for (const s of seed)
       await pool.query(
         `INSERT IGNORE INTO fundantes_seg_tipos (financiera, codigo, nombre, obligatorio, requiere_contrato, orden) VALUES (?,?,?,?,?,?)`, s);
+    // Corrección: en AUTOFIN la Solicitud de Limitación es SIEMPRE obligatoria (no condicional). Idempotente.
+    await pool.query("UPDATE fundantes_seg_tipos SET obligatorio=1, requiere_contrato=NULL WHERE financiera='AUTOFIN' AND codigo='SOL_LIMITACION'");
 
     // Registro del módulo/card en Home (idempotente).
     await pool.query(
