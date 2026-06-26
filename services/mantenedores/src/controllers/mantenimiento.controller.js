@@ -23,8 +23,18 @@ const MSG_DEFAULT = 'AVISO. El sistema se encuentra en Mantención.';
       ('dev_correo2',''),('dev_correo2_rol','cc'),
       ('dev_correo3',''),('dev_correo3_rol','bcc'),
       ('dev_whatsapp','')`);
+    // Humoradas (BG-ADMIN): juego flotante que aparece en la pantalla de TODOS los usuarios.
+    await pool.query(`INSERT IGNORE INTO mantenimiento_config (clave, valor) VALUES
+      ('juego_activo','0'),('juego_nombre',''),('juego_mensaje','')`);
   } catch (e) { console.error('[mantenimiento migration]', e.message); }
 })();
+
+const JUEGOS_OK = ['snake', 'runner', 'breakout', 'topo', 'catapulta'];
+async function leerJuego() {
+  const [rows] = await pool.query("SELECT clave, valor FROM mantenimiento_config WHERE clave LIKE 'juego_%'");
+  const m = {}; rows.forEach(r => { m[r.clave] = r.valor; });
+  return { activo: m.juego_activo === '1', nombre: m.juego_nombre || '', mensaje: m.juego_mensaje || '' };
+}
 
 async function esBreakGlass(id) {
   try { const [[u]] = await pool.query('SELECT protegido FROM usuarios WHERE id_usuario = ? LIMIT 1', [id]); return !!(u && u.protegido); }
@@ -55,7 +65,9 @@ const getEstado = async (req, res) => {
     const cfg = await leerConfig();
     const bg = await esBreakGlass(req.usuario.id_usuario);
     const dev = await leerDev();
-    res.json({ success: true, data: { activo: cfg.activo, mensaje: (cfg.activo || bg) ? cfg.mensaje : '', es_bg: bg, dev_activo: dev.activo }, error: null });
+    const jg = await leerJuego();
+    res.json({ success: true, data: { activo: cfg.activo, mensaje: (cfg.activo || bg) ? cfg.mensaje : '', es_bg: bg, dev_activo: dev.activo,
+      juego: (jg.activo && JUEGOS_OK.includes(jg.nombre)) ? { nombre: jg.nombre, mensaje: jg.mensaje } : null }, error: null });
   } catch (e) { console.error('[mantenimiento getEstado]', e.message); res.status(500).json({ success: false, data: null, error: 'Error interno del servidor' }); }
 };
 
@@ -107,4 +119,24 @@ const setEstado = async (req, res) => {
   } catch (e) { console.error('[mantenimiento setEstado]', e.message); res.status(500).json({ success: false, data: null, error: 'Error interno del servidor' }); }
 };
 
-module.exports = { getEstado, setEstado, getDev, setDev };
+/* PUT /api/mantenimiento/juego → enciende/apaga la humorada para todos. SOLO BG-ADMIN. */
+const setJuego = async (req, res) => {
+  try {
+    if (!(await esBreakGlass(req.usuario.id_usuario)))
+      return res.status(403).json({ success: false, data: null, error: 'Solo BG-ADMIN puede lanzar humoradas.' });
+    const activo = req.body.activo ? '1' : '0';
+    const nombre = JUEGOS_OK.includes(req.body.juego) ? req.body.juego : '';
+    const mensaje = String(req.body.mensaje == null ? '' : req.body.mensaje).slice(0, 200);
+    if (activo === '1' && !nombre)
+      return res.status(400).json({ success: false, data: null, error: 'Elige un juego válido.' });
+    const setKv = (k, v) => pool.query("INSERT INTO mantenimiento_config (clave, valor) VALUES (?, ?) ON DUPLICATE KEY UPDATE valor = VALUES(valor)", [k, v]);
+    await setKv('juego_activo', activo);
+    await setKv('juego_nombre', nombre);
+    await setKv('juego_mensaje', mensaje);
+    auditar({ req, accion: 'EDITAR', modulo: 'mantenedores', entidad: 'humorada', entidad_id: 'config',
+      detalle: `Humorada ${activo === '1' ? 'LANZADA (' + nombre + ')' : 'apagada'}`, meta: { activo, nombre, mensaje } });
+    res.json({ success: true, data: await leerJuego(), error: null });
+  } catch (e) { console.error('[mantenimiento setJuego]', e.message); res.status(500).json({ success: false, data: null, error: 'Error interno del servidor' }); }
+};
+
+module.exports = { getEstado, setEstado, getDev, setDev, setJuego };

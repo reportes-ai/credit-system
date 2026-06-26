@@ -333,6 +333,9 @@ app.get(['/mantenedores/dealers-mapa', '/mantenedores/dealers-mapa/'], (req, res
 app.get(['/mantenedores/dealers-direcciones', '/mantenedores/dealers-direcciones/'], (req, res) =>
   res.sendFile(path.join(__dirname, '../public/mantenedores/dealers-direcciones/index.html')));
 
+app.get(['/juegos', '/juegos/'], (req, res) =>
+  res.sendFile(path.join(__dirname, '../public/juegos/index.html')));
+
 // Submódulo "Flujo Crédito Brokerage" eliminado: era un espejo de solo lectura del
 // mantenedor Estado Créditos (pestaña Brokerage). Se redirige por si queda algún link viejo.
 app.get(['/mantenedores/flujo-brokerage', '/mantenedores/flujo-brokerage/'], (req, res) =>

@@ -1,0 +1,139 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <link rel="icon" href="/img/favicon.png" type="image/png">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Humoradas 🎮 — AutoFácil</title>
+  <!-- v1.0 — Sala de Humoradas (BG-ADMIN): lanza juegos a toda la app -->
+  <link href="/css/bootstrap.min.css" rel="stylesheet">
+  <link href="/css/bootstrap-icons.css" rel="stylesheet">
+  <style>
+    :root { --navy:#0141A2; --navy-dark:#012d70; --navy-light:#0255c5; --bg:#f0f4f8; }
+    body { background:var(--bg); font-family:'Segoe UI',system-ui,sans-serif; margin:0; min-height:100vh; }
+    .topnav { background:linear-gradient(90deg,var(--navy-dark),var(--navy-light)); color:#fff; height:60px; padding:0 24px; display:flex; align-items:center; justify-content:space-between; position:sticky; top:0; z-index:200; box-shadow:0 2px 8px rgba(0,0,0,0.3); }
+    .topnav-brand { display:flex; align-items:center; gap:8px; text-decoration:none; }
+    .topnav-brand img { height:32px; filter:brightness(0) invert(1); }
+    .version-badge { background:rgba(255,255,255,0.15); color:rgba(255,255,255,0.75); font-size:0.65rem; font-weight:700; border-radius:6px; padding:2px 8px; }
+    .btn-back { color:rgba(255,255,255,0.9); text-decoration:none; font-size:13px; font-weight:600; padding:6px 14px; border:1px solid rgba(255,255,255,0.3); border-radius:7px; }
+    .wrap { max-width:1080px; margin:0 auto; padding:22px 20px 50px; }
+    .head { background:linear-gradient(135deg,#111827,#1f2937 60%,#0141A2); color:#fff; border-radius:16px; padding:20px 26px; margin-bottom:18px; }
+    .head h2 { font-weight:800; margin:0 0 4px; font-size:1.4rem; }
+    .head p { margin:0; opacity:.85; font-size:.88rem; }
+    .activo { background:#ecfdf5; border:1px solid #a7f3d0; color:#065f46; border-radius:12px; padding:11px 16px; margin-bottom:16px; font-size:.9rem; display:none; align-items:center; gap:10px; }
+    .grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(280px,1fr)); gap:16px; }
+    .card-j { background:#fff; border:1px solid #e3e8ef; border-radius:14px; padding:18px; box-shadow:0 2px 10px rgba(1,65,162,.06); display:flex; flex-direction:column; gap:8px; }
+    .card-j.on { border-color:#16a34a; box-shadow:0 0 0 2px #16a34a33; }
+    .card-j .em { font-size:2.2rem; }
+    .card-j h5 { font-weight:800; color:#0f172a; margin:0; font-size:1.02rem; }
+    .card-j .tip { color:#64748b; font-size:.8rem; flex:1; }
+    .card-j .row { display:flex; gap:8px; margin-top:6px; }
+    .btn-probar { background:#eef4ff; color:#0141A2; border:1px solid #cdddff; border-radius:8px; padding:7px 12px; font-size:.82rem; font-weight:700; cursor:pointer; flex:1; }
+    .btn-lanzar { background:#16a34a; color:#fff; border:none; border-radius:8px; padding:7px 12px; font-size:.82rem; font-weight:800; cursor:pointer; flex:1; }
+    .btn-lanzar:hover { background:#15803d; }
+    .bar { background:#fff; border:1px solid #e3e8ef; border-radius:14px; padding:14px 16px; margin-bottom:16px; display:flex; gap:12px; align-items:center; flex-wrap:wrap; }
+    .bar input { flex:1; min-width:220px; border:1px solid #cbd5e1; border-radius:9px; padding:9px 12px; font-size:.9rem; }
+    .btn-apagar { background:#fef2f2; color:#b91c1c; border:1px solid #fecaca; border-radius:9px; padding:9px 16px; font-weight:800; font-size:.86rem; cursor:pointer; }
+    .nobg { text-align:center; padding:60px 20px; color:#64748b; }
+    .nobg i { font-size:3rem; color:#cbd5e1; }
+    .toast-af { position:fixed; bottom:22px; left:50%; transform:translateX(-50%); background:#0f172a; color:#fff; padding:11px 20px; border-radius:10px; font-size:.88rem; z-index:3000; display:none; box-shadow:0 8px 28px rgba(0,0,0,.35); }
+    .toast-af.err { background:#b91c1c; }
+  </style>
+</head>
+<body>
+
+<nav class="topnav">
+  <a href="/" class="topnav-brand"><img src="/img/logo.png" alt="AutoFácil"><span class="version-badge" id="versionBadge"></span></a>
+  <a href="/" class="btn-back"><i class="bi bi-house me-1"></i>Inicio</a>
+</nav>
+
+<div class="wrap">
+  <div class="head">
+    <h2>🎮 Sala de Humoradas</h2>
+    <p>Lanza un juego que aparece flotando en la pantalla de <b>todos los usuarios</b>. Para los viernes (y los fines de semana de pega). Solo BG-ADMIN.</p>
+  </div>
+
+  <div id="contenido" style="display:none">
+    <div class="activo" id="bannerActivo"></div>
+    <div class="bar">
+      <i class="bi bi-chat-quote" style="color:#0141A2;font-size:1.2rem"></i>
+      <input id="msg" maxlength="200" placeholder="Mensaje sorpresa (opcional): ej. ¡Break del jefe! 5 min de Snake 😜">
+      <button class="btn-apagar" onclick="apagar()"><i class="bi bi-power me-1"></i>Apagar para todos</button>
+    </div>
+    <div class="grid" id="grid"></div>
+  </div>
+
+  <div id="noBg" class="nobg" style="display:none">
+    <i class="bi bi-shield-lock"></i>
+    <h4 style="margin-top:12px;color:#475569">Solo para BG-ADMIN</h4>
+    <p>Esta sala de humoradas está reservada a la cuenta break-glass.</p>
+  </div>
+</div>
+
+<div id="toast" class="toast-af"></div>
+
+<script src="/js/juegos.js"></script>
+<script>
+const token = sessionStorage.getItem('token');
+if (!token) location.href = '/login.html';
+const H = { 'Content-Type':'application/json', Authorization:'Bearer '+token };
+const $ = id => document.getElementById(id);
+function toast(m, err){ const t=$('toast'); t.textContent=m; t.className='toast-af'+(err?' err':''); t.style.display='block'; setTimeout(()=>t.style.display='none',3000); }
+let ACTIVO = null;   // {nombre, mensaje} si hay humorada encendida
+
+function pintar(){
+  const juegos = window.AF_JUEGOS ? window.AF_JUEGOS.lista() : [];
+  $('grid').innerHTML = juegos.map(g => {
+    const on = ACTIVO && ACTIVO.nombre === g.id;
+    const em = (g.nombre.match(/^\S+/)||[''])[0];
+    const nom = g.nombre.replace(/^\S+\s*/,'');
+    return `<div class="card-j ${on?'on':''}">
+      <div class="em">${em}</div>
+      <h5>${nom} ${on?'<span style="color:#16a34a;font-size:.72rem;font-weight:800">● EN VIVO</span>':''}</h5>
+      <div class="tip">${g.tip}</div>
+      <div class="row">
+        <button class="btn-probar" onclick="probar('${g.id}')"><i class="bi bi-play-fill"></i> Probar aquí</button>
+        <button class="btn-lanzar" onclick="lanzar('${g.id}')"><i class="bi bi-broadcast"></i> Lanzar a todos</button>
+      </div>
+    </div>`;
+  }).join('');
+  const b = $('bannerActivo');
+  if (ACTIVO) { b.style.display='flex'; b.innerHTML = `<i class="bi bi-broadcast-pin"></i> Humorada <b>EN VIVO</b> para todos: <b>${esc(ACTIVO.nombre)}</b>${ACTIVO.mensaje?` — "${esc(ACTIVO.mensaje)}"`:''}`; }
+  else b.style.display='none';
+}
+const esc = s => String(s==null?'':s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+
+function probar(id){ if (window.AF_JUEGOS) window.AF_JUEGOS.lanzar(id, 'Modo prueba (solo tú lo ves)'); }
+
+async function lanzar(id){
+  try {
+    const r = await fetch('/api/mantenimiento/juego', { method:'PUT', headers:H, body: JSON.stringify({ activo:true, juego:id, mensaje:$('msg').value.trim() }) });
+    const j = await r.json(); if (!j.success) throw new Error(j.error||'Error');
+    ACTIVO = { nombre: j.data.nombre, mensaje: j.data.mensaje }; pintar();
+    if (window.AF_JUEGOS) window.AF_JUEGOS.lanzar(id, $('msg').value.trim());
+    toast('¡Lanzada a todos! 🎉 Aparecerá en sus pantallas en ~25s.');
+  } catch(e){ toast(e.message, true); }
+}
+async function apagar(){
+  try {
+    const r = await fetch('/api/mantenimiento/juego', { method:'PUT', headers:H, body: JSON.stringify({ activo:false }) });
+    const j = await r.json(); if (!j.success) throw new Error(j.error||'Error');
+    ACTIVO = null; pintar(); if (window.AF_JUEGOS) window.AF_JUEGOS.cerrar();
+    toast('Humorada apagada para todos.');
+  } catch(e){ toast(e.message, true); }
+}
+
+(async function init(){
+  try {
+    const j = await (await fetch('/api/mantenimiento', { headers:H })).json();
+    if (!j.success) return;
+    if (!j.data.es_bg) { $('noBg').style.display='block'; return; }
+    $('contenido').style.display='block';
+    if (j.data.juego) ACTIVO = { nombre:j.data.juego.nombre, mensaje:j.data.juego.mensaje };
+    pintar();
+  } catch(e){ toast('No se pudo cargar', true); }
+})();
+</script>
+<script src="/js/app-version.js"></script>
+</body>
+</html>

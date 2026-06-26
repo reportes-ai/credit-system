@@ -2,7 +2,7 @@
    AutoFácil — Versión global de la aplicación
    Editar SOLO este archivo para cambiar la versión
    ───────────────────────────────────────────── */
-const APP_VERSION = 'v66.6';
+const APP_VERSION = 'v66.7';
 
 document.addEventListener('DOMContentLoaded', () => {
 
@@ -387,6 +387,10 @@ document.addEventListener('DOMContentLoaded', () => {
       ${yo?.perfil === 'Administrador' ? `
       <button class="af-menu-item" onclick="afToggleDebug();document.getElementById('afUserMenu')?.remove()">
         <i class="bi bi-bug"></i> Modo debug <span id="afDebugState" style="margin-left:auto;font-size:.72rem;color:#94a3b8">${localStorage.getItem('af_debug')==='1'?'ON':'OFF'}</span>
+      </button>` : ''}
+      ${window.__AF_ESBG ? `
+      <button class="af-menu-item" onclick="window.location.href='/juegos/';document.getElementById('afUserMenu')?.remove()">
+        <i class="bi bi-controller"></i> Humoradas <span style="margin-left:auto">🎮</span>
       </button>` : ''}
       <hr class="af-menu-divider">
       <button class="af-menu-item" style="color:#dc2626" onclick="sessionStorage.removeItem('token');sessionStorage.removeItem('usuario');window.location.href='/login.html'">
@@ -966,4 +970,33 @@ document.addEventListener('DOMContentLoaded', async () => {
   document.body.appendChild(ov);
   // "Entendido" colapsa el mensaje pero deja la pantalla gris con el logo (sigue bloqueado).
   ov.querySelector('.ok').addEventListener('click', () => { const b = ov.querySelector('.box'); if (b) b.remove(); });
+});
+
+/* ═══════════════════════════════════════════════════════════════
+   🎮 HUMORADAS — juego flotante lanzado por BG-ADMIN a toda la app.
+   Poll a /api/mantenimiento (mismo estado que la mantención): si hay
+   un juego activo, carga /js/juegos.js y lo lanza en pantalla; si se
+   apaga, lo cierra. También guarda es_bg para el menú de usuario.
+   ═══════════════════════════════════════════════════════════════ */
+document.addEventListener('DOMContentLoaded', () => {
+  const token = sessionStorage.getItem('token');
+  if (!token) return;
+  let actual = null;
+  function cargarJuegos(cb) {
+    if (window.AF_JUEGOS) return cb();
+    const s = document.createElement('script'); s.src = '/js/juegos.js'; s.onload = cb; document.head.appendChild(s);
+  }
+  async function chk() {
+    try {
+      const r = await fetch('/api/mantenimiento', { headers: { Authorization: 'Bearer ' + token } });
+      const j = await r.json();
+      if (!j.success) return;
+      window.__AF_ESBG = !!j.data.es_bg;
+      const g = j.data.juego, nombre = g && g.nombre;
+      if (nombre && nombre !== actual) { actual = nombre; cargarJuegos(() => window.AF_JUEGOS && window.AF_JUEGOS.lanzar(nombre, g.mensaje)); }
+      else if (!nombre && actual) { actual = null; if (window.AF_JUEGOS) window.AF_JUEGOS.cerrar(); }
+    } catch (e) {}
+  }
+  chk();
+  setInterval(chk, 25000);
 });
