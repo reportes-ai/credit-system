@@ -52,6 +52,12 @@
     .dlg-body { padding:20px 22px; max-height:70vh; overflow:auto; }
     .dlg-foot { padding:14px 22px; border-top:1px solid #f1f5f9; display:flex; gap:10px; justify-content:flex-end; }
     .kv { display:grid; grid-template-columns:160px 1fr; gap:6px 14px; font-size:.85rem; }
+    .fdoc { font-size:.84rem; }
+    .fdoc-t { text-align:center; font-size:1rem; margin:2px 0 12px; color:#0141A2; font-weight:800; letter-spacing:.3px; }
+    .fdoc table.p { width:100%; border-collapse:collapse; margin-bottom:8px; }
+    .fdoc table.p th { background:#0141A2; color:#fff; text-align:left; padding:5px 9px; font-size:.76rem; letter-spacing:.3px; }
+    .fdoc table.p td { border:1px solid #d1d5db; padding:5px 9px; }
+    .fdoc table.p td.lbl { background:#f1f5f9; font-weight:600; color:#334155; width:42%; }
     .kv b { color:#475569; font-weight:600; }
     .grid2 { display:grid; grid-template-columns:repeat(2,1fr); gap:12px 16px; }
     .grid2 .full{ grid-column:1/-1; }
@@ -398,19 +404,7 @@ async function verFicha(id, revisar, historico){
       cadenaHtml = `<div style="margin-top:14px;border:1px solid #c7d2fe;background:#eef2ff;border-radius:10px;padding:12px 14px">
         <b style="color:#3730a3;font-size:.82rem"><i class="bi bi-diagram-3 me-1"></i>Cadena de autorización</b>${items||'<div style="font-size:.8rem;color:#94a3b8;margin-top:4px">Sin autorizaciones aún</div>'}${pend}</div>`;
     }
-    $('verBody').innerHTML = `${(revisar||historico)?barraInformes(f):''}<div class="kv">
-      ${row('Ejecutivo', f.ejecutivo_nombre)} ${row('Fecha solicitud', f.fecha_solicitud?String(f.fecha_solicitud).slice(0,10):'—')}
-      ${row('RUT', f.rut)} ${row('Razón Social', f.nombre_razon)} ${row('Fantasía', f.nombre_fantasia)}
-      ${row('Dirección', f.direccion)} ${row('Comuna', f.comuna)} ${row('Provincia/Ciudad', f.provincia)} ${row('Región', f.region)}
-      ${row('Contacto comercial', `${f.cc_nombre||''} · ${f.cc_telefono||''} · ${f.cc_email||''}`)}
-      ${row('Contacto financiero', `${f.cf_nombre||''} · ${f.cf_telefono||''} · ${f.cf_email||''}`)}
-      ${row('Representante Legal', `${f.rl_nombre||'—'} · ${f.rl_telefono||''} · ${f.rl_email||''}${f.rep_legal_origen&&f.rep_legal_origen!=='PROPIO'?' (es el contacto '+(f.rep_legal_origen==='COMERCIAL'?'comercial':'financiero')+')':''}`)}
-      ${row('Comisión 6-12 / 13-24 / 25-36 / 37+', `${f.com_6_12||0}% / ${f.com_13_24||0}% / ${f.com_25_36||0}% / ${f.com_37||0}%`)}
-      ${row('Documento', f.tipo_documento)} ${row('Cuenta', `${f.cuenta_tipo||''} · ${f.tipo_cuenta||''} · ${f.nombre_cuenta||''} · ${f.banco||''} · N° ${f.num_cuenta||''} · RUT ${f.rut_cuenta||''}`)}
-      ${row('Email confirmación', f.correo_confirmacion)} ${row('Observaciones', f.observaciones)}
-      ${f.apelacion?row('Apelación', f.apelacion):''}
-      ${f.motivo_rechazo?row('Motivo rechazo', f.motivo_rechazo):''}
-    </div>${cadenaHtml}${espHtml}${firmaHtml}${difHtml}${faltHtml}${excHtml}<div style="margin-top:16px;display:flex;flex-wrap:wrap;gap:6px">${adjHtml||'<span style="font-size:.8rem;color:#94a3b8">Sin adjuntos</span>'}</div>${historico?timbreFicha(f):''}`;
+    $('verBody').innerHTML = `${(revisar||historico)?barraInformes(f):''}${fichaDocHTML(f)}${(f.apelacion||f.motivo_rechazo)?`<div class="kv" style="margin-top:10px">${f.apelacion?row('Apelación', f.apelacion):''}${f.motivo_rechazo?row('Motivo rechazo', f.motivo_rechazo):''}</div>`:''}${cadenaHtml}${espHtml}${firmaHtml}${difHtml}${faltHtml}${excHtml}<div style="margin-top:16px;display:flex;flex-wrap:wrap;gap:6px">${adjHtml||'<span style="font-size:.8rem;color:#94a3b8">Sin adjuntos</span>'}</div>${historico?timbreFicha(f):''}`;
     dlgVer.showModal();
     // Registrar que se revisó (para detectar "Aprobado sin revisión de ficha").
     if (revisar) { try { await fetch('/api/dealer-incorporacion/fichas/'+id+'/marcar-revisada',{method:'POST',headers:H}); } catch(_){} }
@@ -418,61 +412,109 @@ async function verFicha(id, revisar, historico){
 }
 function abrirArchivo(id){ window.open('/api/dealer-incorporacion/fichas/'+id+'/archivo?token='+encodeURIComponent(token),'_blank'); }
 
-// Barra superior de "Revisar": informe DealerNet (HTML) + Reporte IA por empresa y cada socio.
+// La ficha con el MISMO formato del PDF que firma el dealer (tablas con cabecera azul).
+function fichaDocHTML(f){
+  const E = escH;
+  const X = (v,t)=> (String(v||'').toUpperCase()===String(t).toUpperCase()) ? '✕' : '';
+  const esP = f.tipo==='PARQUE';
+  const dirLbl = esP?'Dirección de Parque Automotriz':'Dirección de Sucursal';
+  const comLbl = esP?'Comuna de Parque Automotriz':'Comuna de Sucursal';
+  return `<div class="fdoc">
+    <h2 class="fdoc-t">FICHA DE INCORPORACIÓN DE CONCESIONARIO${esP?' · Parque Automotriz':''}</h2>
+    <table class="p"><tr><th colspan="2">EJECUTIVO COMERCIAL</th></tr>
+      <tr><td class="lbl">Nombre Ejecutivo</td><td>${E(f.ejecutivo_nombre)}</td></tr>
+      <tr><td class="lbl">Fecha de solicitud</td><td>${E(f.fecha_solicitud?String(f.fecha_solicitud).slice(0,10):'')}</td></tr></table>
+    <table class="p"><tr><th colspan="2">DATOS DE CONCESIONARIO</th></tr>
+      <tr><td class="lbl">Rut de Concesionario</td><td>${E(f.rut)}</td></tr>
+      <tr><td class="lbl">Nombre Razón Social</td><td>${E(f.nombre_razon)}</td></tr>
+      <tr><td class="lbl">Nombre de Fantasía</td><td>${E(f.nombre_fantasia)}</td></tr>
+      <tr><td class="lbl">${dirLbl}</td><td>${E(f.direccion)}</td></tr>
+      <tr><td class="lbl">${comLbl}</td><td>${E(f.comuna)}</td></tr>
+      <tr><td class="lbl">Provincia / Ciudad</td><td>${E(f.provincia)}</td></tr>
+      <tr><td class="lbl">Región</td><td>${E(f.region)}</td></tr></table>
+    <table class="p"><tr><th colspan="2">CONTACTO COMERCIAL</th></tr>
+      <tr><td class="lbl">Nombre</td><td>${E(f.cc_nombre)}</td></tr><tr><td class="lbl">Teléfono</td><td>${E(f.cc_telefono)}</td></tr><tr><td class="lbl">Email</td><td>${E(f.cc_email)}</td></tr></table>
+    <table class="p"><tr><th colspan="2">CONTACTO FINANCIERO</th></tr>
+      <tr><td class="lbl">Nombre</td><td>${E(f.cf_nombre)}</td></tr><tr><td class="lbl">Teléfono</td><td>${E(f.cf_telefono)}</td></tr><tr><td class="lbl">Email</td><td>${E(f.cf_email)}</td></tr></table>
+    <table class="p"><tr><th colspan="2">REPRESENTANTE LEGAL</th></tr>
+      <tr><td class="lbl">Nombre</td><td>${E(f.rl_nombre)}</td></tr><tr><td class="lbl">Teléfono</td><td>${E(f.rl_telefono)}</td></tr><tr><td class="lbl">Email</td><td>${E(f.rl_email)}</td></tr></table>
+    <table class="p"><tr><th colspan="5">COMISIÓN PACTADA</th></tr>
+      <tr><td class="lbl">Cantidad de Cuotas</td><td>6 a 12</td><td>13 a 24</td><td>25 a 36</td><td>37 y Más</td></tr>
+      <tr><td class="lbl">Porcentaje de Comisión</td><td>${E(f.com_6_12)}%</td><td>${E(f.com_13_24)}%</td><td>${E(f.com_25_36)}%</td><td>${E(f.com_37)}%</td></tr></table>
+    <table class="p"><tr><th colspan="3">TIPO DE DOCUMENTO TRIBUTARIO</th></tr>
+      <tr><td class="lbl">Tipo de documento</td><td>BOLETA: ${X(f.tipo_documento,'BOLETA')}</td><td>FACTURA: ${X(f.tipo_documento,'FACTURA')}</td></tr></table>
+    <table class="p"><tr><th colspan="3">FORMA DE PAGO SALDO PRECIO</th></tr>
+      <tr><td class="lbl">Cuenta</td><td>EMPRESA: ${X(f.cuenta_tipo,'EMPRESA')}</td><td>PERSONA: ${X(f.cuenta_tipo,'PERSONA')}</td></tr>
+      <tr><td class="lbl">Tipo de Cuenta</td><td colspan="2">${E(f.tipo_cuenta)}</td></tr>
+      <tr><td class="lbl">Nombre de la cuenta</td><td colspan="2">${E(f.nombre_cuenta)}</td></tr>
+      <tr><td class="lbl">Banco de Transferencia</td><td colspan="2">${E(f.banco)}</td></tr>
+      <tr><td class="lbl">Rut de Cuenta</td><td colspan="2">${E(f.rut_cuenta)}</td></tr>
+      <tr><td class="lbl">Número de Cuenta</td><td colspan="2">${E(f.num_cuenta)}</td></tr>
+      <tr><td class="lbl">Email Confirmación</td><td colspan="2">${E(f.correo_confirmacion)}</td></tr></table>
+    <table class="p"><tr><th>OBSERVACIONES</th></tr><tr><td style="height:26px;vertical-align:top">${E(f.observaciones)}</td></tr></table>
+  </div>`;
+}
+
+// Barra superior de "Revisar": informe DealerNet (HTML) por entidad + UN solo botón Reporte IA.
 function barraInformes(f){
   const ents = [{ tag:'Empresa', nombre: f.nombre_razon||f.rut||'Empresa', rut: f.rut }];
   let socs = f.socios; if(typeof socs==='string'){ try{ socs=JSON.parse(socs); }catch{ socs=[]; } }
   (Array.isArray(socs)?socs:[]).slice(0,3).forEach((s,i)=>{ if(s&&s.rut) ents.push({ tag:'Socio '+(i+1), nombre:s.nombre||s.rut, rut:s.rut }); });
+  window._revEnts = ents;   // lo usa el botón único de Reporte IA
   const filas = ents.map(e=>{
-    const rut = escH(e.rut||''), nom = escH(e.nombre||'').replace(/'/g,'&#39;');
+    const rut = escH(e.rut||'');
     return `<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:7px">
       <span style="font-size:.8rem;color:#0f172a;min-width:170px"><b>${escH(e.tag)}</b> · ${escH(e.nombre||'')} <span style="color:#94a3b8">${rut||'—'}</span></span>
       ${e.rut
-        ? `<button class="btn btn-light btn-sm" onclick="window.open('/dealernet-informes/?rut='+encodeURIComponent('${rut}'),'_blank')"><i class="bi bi-clipboard-data"></i> Informe DealerNet</button>
-           <button class="btn btn-sm" style="background:#fdf3ee;border:1px solid #f2d3c4;color:#c2410c" onclick="verReporteIAm('${rut}','${nom}')"><i class="bi bi-stars"></i> Reporte IA</button>`
+        ? `<button class="btn btn-light btn-sm" onclick="window.open('/dealernet-informes/?rut='+encodeURIComponent('${rut}'),'_blank')"><i class="bi bi-clipboard-data"></i> Informe DealerNet</button>`
         : '<span style="font-size:.78rem;color:#94a3b8">sin RUT</span>'}
     </div>`;
   }).join('');
   return `<div style="margin-bottom:14px;border:1px solid #dbeafe;background:#eff6ff;border-radius:10px;padding:12px 14px">
-    <b style="color:#1e40af;font-size:.82rem"><i class="bi bi-search me-1"></i>Revisar informes (DealerNet + Reporte IA)</b>
+    <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px">
+      <b style="color:#1e40af;font-size:.82rem"><i class="bi bi-search me-1"></i>Revisar informes</b>
+      <button class="btn btn-sm" style="background:#fdf3ee;border:1px solid #f2d3c4;color:#c2410c" onclick="verReportesIA()"><i class="bi bi-stars"></i> Reporte IA</button>
+    </div>
     <div style="margin-top:9px">${filas||'<span style="font-size:.8rem;color:#94a3b8">Sin RUT de empresa ni socios.</span>'}</div></div>`;
 }
 
-// Modal del Reporte IA (Anthropic) por RUT, con fecha (mismo formato que en Base Dealer).
-async function verReporteIAm(rut, nombre){
+// UN modal (<dialog>, queda sobre el de revisión) con el Reporte IA de empresa + cada socio.
+async function verReportesIA(){
+  const ents = window._revEnts || [];
+  let dlg = document.getElementById('dlgRepIA');
+  if(!dlg){ dlg=document.createElement('dialog'); dlg.id='dlgRepIA'; dlg.style.cssText='border:none;border-radius:14px;max-width:640px;width:92%;padding:0;background:#fff'; document.body.appendChild(dlg); }
+  dlg.innerHTML = `<div style="padding:16px 20px;background:linear-gradient(135deg,#9a3412,#c2410c);color:#fff;display:flex;align-items:center;gap:10px;position:sticky;top:0">
+      <i class="bi bi-stars" style="font-size:1.2rem"></i><h3 style="margin:0;font-size:1.02rem">Reporte IA — Anthropic</h3>
+      <button onclick="document.getElementById('dlgRepIA').close()" style="margin-left:auto;background:rgba(255,255,255,.2);border:none;color:#fff;width:30px;height:30px;border-radius:8px;cursor:pointer">✕</button></div>
+    <div id="repIAall" style="padding:16px 20px;max-height:72vh;overflow:auto"><div style="text-align:center;color:#94a3b8;padding:20px">Cargando…</div></div>`;
+  dlg.showModal();
+  const cont = dlg.querySelector('#repIAall');
+  if(!ents.length){ cont.innerHTML='<div style="color:#94a3b8">Sin entidades con RUT.</div>'; return; }
+  const secs = [];
+  for(const e of ents){
+    let d=null; try{ const r=await fetch('/api/ia/informe-dealernet/por-rut/'+encodeURIComponent(e.rut),{headers:H}); const j=await r.json(); if(j.success) d=j.data; }catch(_){}
+    secs.push(reporteSecHTML(e, d));
+  }
+  cont.innerHTML = secs.join('<hr style="border:none;border-top:1px solid #eef2f7;margin:18px 0">');
+}
+function reporteSecHTML(e, d){
   const E = s => String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
-  const ov = document.createElement('div');
-  ov.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:10001;display:flex;align-items:center;justify-content:center;padding:18px';
-  ov.innerHTML = `<div style="background:#fff;border-radius:14px;max-width:620px;width:100%;max-height:88vh;overflow:auto;box-shadow:0 20px 60px rgba(0,0,0,.3)">
-    <div style="padding:18px 22px;background:linear-gradient(135deg,#9a3412,#c2410c);color:#fff;border-radius:14px 14px 0 0;display:flex;align-items:center;gap:10px">
-      <i class="bi bi-stars" style="font-size:1.3rem"></i>
-      <div><h3 style="margin:0;font-size:1.05rem">Reporte IA — Anthropic</h3>
-        <div style="font-size:.82rem;opacity:.9">${E(nombre||'')} · ${E(rut||'')}</div></div>
-      <button onclick="this.closest('div[style*=fixed]').remove()" style="margin-left:auto;background:rgba(255,255,255,.2);border:none;color:#fff;width:30px;height:30px;border-radius:8px;cursor:pointer">✕</button>
-    </div>
-    <div id="repIAmBody" style="padding:18px 22px"><div style="text-align:center;color:#94a3b8;padding:20px">Cargando…</div></div></div>`;
-  document.body.appendChild(ov);
-  let d=null;
-  try { const r=await fetch('/api/ia/informe-dealernet/por-rut/'+encodeURIComponent(rut),{headers:H}); const j=await r.json(); if(j.success) d=j.data; } catch(e){}
-  const body = ov.querySelector('#repIAmBody');
-  if(!d){ body.innerHTML='<div style="color:#94a3b8;padding:8px 0">Sin reporte IA para este RUT (aún no se ha analizado, o la IA estaba desactivada al enviar).</div>'; return; }
+  const head = `<div style="font-weight:800;color:#0f172a;margin-bottom:8px"><i class="bi bi-${e.tag==='Empresa'?'building':'person'} me-1"></i>${E(e.tag)} · ${E(e.nombre||'')} <span style="color:#94a3b8;font-weight:600">${E(e.rut||'')}</span></div>`;
+  if(!d) return head+'<div style="color:#94a3b8">Sin reporte IA para este RUT (aún no analizado, o la IA estaba desactivada al enviar).</div>';
   const RIESGO={ BAJO:{c:'#166534',b:'#dcfce7'}, MEDIO:{c:'#92400e',b:'#fef9c3'}, ALTO:{c:'#991b1b',b:'#fee2e2'} };
   const rg=RIESGO[String(d.nivel_riesgo||'').toUpperCase()]||{c:'#475569',b:'#f1f5f9'};
   const fecha=d.fecha?new Date(d.fecha).toLocaleString('es-CL'):'—';
-  const lst=(a,vac)=>(a&&a.length)?'<ul style="margin:4px 0 0;padding-left:18px">'+a.map(x=>`<li>${E(typeof x==='string'?x:JSON.stringify(x))}</li>`).join('')+'</ul>':`<div style="color:#94a3b8">${vac}</div>`;
-  const causas=(d.causas||[]).map(c=>`<li><b>${E(c.tipo||'')}</b> · ${E(c.materia||c.caratula||'')}${c.fecha?' · '+E(c.fecha):''}${c.demandante?' · '+E(c.demandante):''}${c.tribunal?' · '+E(c.tribunal):''}${c.estado?' · '+E(c.estado):''}</li>`).join('');
-  body.innerHTML=`
-    <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:12px">
+  const lst=(a,vac)=>(a&&a.length)?'<ul style="margin:3px 0 0;padding-left:18px">'+a.map(x=>`<li>${E(typeof x==='string'?x:JSON.stringify(x))}</li>`).join('')+'</ul>':`<span style="color:#94a3b8">${vac}</span>`;
+  const causas=(d.causas||[]).map(c=>`<li><b>${E(c.tipo||'')}</b> · ${E(c.materia||c.caratula||'')}${c.fecha?' · '+E(c.fecha):''}${c.demandante?' · '+E(c.demandante):''}${c.tribunal?' · '+E(c.tribunal):''}</li>`).join('');
+  return head+`
+    <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:10px">
       <span style="font-size:.72rem;font-weight:800;color:${rg.c};background:${rg.b};border-radius:8px;padding:3px 10px">RIESGO ${E(d.nivel_riesgo||'—')}</span>
-      <span style="font-size:.78rem;color:#64748b"><i class="bi bi-clock-history"></i> ${E(fecha)}</span>
-      ${d.modelo?`<span style="font-size:.72rem;color:#94a3b8">${E(d.modelo)}</span>`:''}</div>
-    <div style="margin-bottom:12px"><b>Resumen</b><div style="color:#374151;margin-top:3px">${E(d.resumen||'—')}</div></div>
-    <div style="margin-bottom:12px"><b>Deudas / morosidades</b><div style="color:#374151;margin-top:3px">${E(d.deudas||'—')}</div></div>
-    <div style="margin-bottom:12px"><b>Causas judiciales</b>${causas?`<ul style="margin:4px 0 0;padding-left:18px;color:#991b1b">${causas}</ul>`:'<div style="color:#94a3b8">Sin causas judiciales detectadas</div>'}</div>
-    <div style="margin-bottom:12px"><b style="color:#991b1b">Alertas</b>${lst(d.alertas,'Sin alertas')}</div>
-    <div style="margin-bottom:12px"><b style="color:#166534">Factores positivos</b>${lst(d.factores,'—')}</div>
-    <div style="background:#eff6ff;border-left:4px solid #0141A2;border-radius:8px;padding:10px 12px"><b>Recomendación</b><div style="color:#1e3a5f;margin-top:3px">${E(d.recomendacion||'—')}</div></div>
-    ${d.productos?`<div style="font-size:.74rem;color:#94a3b8;margin-top:10px">Informes: ${E(d.productos)}</div>`:''}`;
+      <span style="font-size:.78rem;color:#64748b"><i class="bi bi-clock-history"></i> ${E(fecha)}</span></div>
+    <div style="margin-bottom:7px;font-size:.85rem"><b>Resumen:</b> ${E(d.resumen||'—')}</div>
+    <div style="margin-bottom:7px;font-size:.85rem"><b>Deudas/morosidades:</b> ${E(d.deudas||'—')}</div>
+    <div style="margin-bottom:7px;font-size:.85rem"><b>Causas judiciales:</b>${causas?`<ul style="margin:3px 0 0;padding-left:18px;color:#991b1b">${causas}</ul>`:' <span style="color:#94a3b8">sin causas</span>'}</div>
+    <div style="margin-bottom:7px;font-size:.85rem"><b style="color:#991b1b">Alertas:</b> ${lst(d.alertas,'sin alertas')}</div>
+    <div style="font-size:.85rem"><b>Recomendación:</b> ${E(d.recomendacion||'—')}</div>`;
 }
 
 async function accion(id, path, body, okMsg){
