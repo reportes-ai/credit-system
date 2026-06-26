@@ -303,8 +303,8 @@
         if (n >= 2) swapDos(card); else wiggle(card);
       };
       document.addEventListener('click', onClick, true);
-      function tick() { if (!alive) return; const el = Date.now() - t0; if (el >= 120000) { cleanup(); return; }
-        const f = el / 120000, nS = 1 + Math.floor(f * 2); for (let i = 0; i < nS; i++) swapDos();
+      function tick() { if (!alive) return; const el = Date.now() - t0; if (el >= 60000) { cleanup(); return; }
+        const f = el / 60000, nS = 1 + Math.floor(f * 2); for (let i = 0; i < nS; i++) swapDos();
         timer = setTimeout(tick, Math.max(550, 4500 - f * 3800));
       }
       timer = setTimeout(tick, 4000);
@@ -384,7 +384,7 @@
   const GAMES = {
     comeletras:{ nombre: '🟡 Come-Letras', tip: 'Pac-Man se come las letras de TU pantalla 😈 (Restaurar = recargar)', page: true, run: comeLetras },
     vidrio:    { nombre: '🪟 Vidrio Roto', tip: 'Cambia el cursor y cada clic quiebra el vidrio (con sonido). 10 veces y vuelve a la normalidad.', page: true, run: vidrio },
-    escapistas:{ nombre: '🃏 Módulos Escurridizos', tip: 'El módulo no responde al 1er clic; al 2º se escapa y cambia de lugar. Escala y a los 2 min vuelve a la normalidad.', page: true, run: escapistas },
+    escapistas:{ nombre: '🃏 Módulos Escurridizos', tip: 'El módulo no responde al 1er clic; al 2º se escapa y cambia de lugar. Escala y a 1 min vuelve a la normalidad.', page: true, run: escapistas },
     snake:     { nombre: '🐍 Culebra Cobradora', tip: 'Flechas para mover · come las cuotas 💵', run: snake },
     runner:    { nombre: '🦆 Pato Run',          tip: 'Espacio o clic para saltar los morosos', run: runner },
     breakout:  { nombre: '🧱 Rompe-Mora',        tip: 'Mueve el mouse · rompe toda la mora', run: breakout },
