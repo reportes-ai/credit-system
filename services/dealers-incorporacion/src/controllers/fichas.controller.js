@@ -313,6 +313,113 @@ async function siguienteNivel(f, despues) {
   return null;
 }
 
+/* ── Alertas de cada etapa, configurables en el mantenedor de Alertas ──────── */
+const SONIDOS_DEALER = ['campana', 'dingdong', 'alarma', 'aplausos'];
+const EVENTOS_DEALER = [
+  { evento: 'dealer_para_autorizar', titulo: 'Dealer — ficha por autorizar',        son_def: 'dingdong' },
+  { evento: 'dealer_autorizada',     titulo: 'Dealer — ficha autorizada (imprimir/firmar)', son_def: 'aplausos' },
+  { evento: 'dealer_firmada',        titulo: 'Dealer — ficha firmada (revisar y cerrar)',   son_def: 'dingdong' },
+  { evento: 'dealer_cerrada',        titulo: 'Dealer — creado/actualizado',          son_def: 'dingdong' },
+  { evento: 'dealer_rechazada',      titulo: 'Dealer — ficha rechazada',             son_def: 'alarma' },
+];
+(async () => {
+  try {
+    await pool.query(`CREATE TABLE IF NOT EXISTS dealer_alertas_config (
+      evento            VARCHAR(40) PRIMARY KEY,
+      perfiles          TEXT,
+      incluir_ejecutivo TINYINT(1) NOT NULL DEFAULT 0,
+      usuarios_extra    TEXT,
+      activo            TINYINT(1) NOT NULL DEFAULT 1,
+      prioridad         VARCHAR(10) NOT NULL DEFAULT 'alta',
+      sonido            TINYINT(1) NOT NULL DEFAULT 1,
+      sonido_tipo       VARCHAR(20) NOT NULL DEFAULT 'dingdong',
+      sonido_cada_seg   INT NOT NULL DEFAULT 30,
+      sonido_max_min    INT NOT NULL DEFAULT 5
+    )`);
+    for (const e of EVENTOS_DEALER)
+      await pool.query(
+        `INSERT IGNORE INTO dealer_alertas_config (evento, perfiles, incluir_ejecutivo, activo, prioridad, sonido, sonido_tipo) VALUES (?,?,0,1,'alta',1,?)`,
+        [e.evento, '', e.son_def]);
+  } catch (e) { console.error('[dealer_alertas migration]', e.message); }
+})();
+
+// Envía la alerta de una etapa respetando su configuración (activo/perfiles/sonido).
+// idsBase = destinatarios intrínsecos del flujo (pool del nivel o el ejecutivo); el
+// mantenedor puede sumar perfiles/usuarios y togglear activo/sonido/prioridad.
+async function notificarEventoDealer(evento, { idsBase = [], ejecutivo = null, titulo, mensaje, href, clave } = {}) {
+  try {
+    const [[cfg]] = await pool.query('SELECT * FROM dealer_alertas_config WHERE evento=?', [evento]);
+    if (cfg && !cfg.activo) return;   // desactivado en el mantenedor de Alertas
+    const ids = new Set((idsBase || []).filter(Boolean));
+    if (cfg) {
+      const perfiles = String(cfg.perfiles || '').split(',').map(s => s.trim()).filter(Boolean);
+      if (perfiles.length) {
+        const [us] = await pool.query(
+          `SELECT u.id_usuario FROM usuarios u JOIN perfiles p ON p.id_perfil=u.id_perfil
+           WHERE p.nombre IN (?) AND (u.estado IS NULL OR u.estado<>'inactivo')`, [perfiles]);
+        us.forEach(u => ids.add(u.id_usuario));
+      }
+      if (cfg.incluir_ejecutivo && ejecutivo) ids.add(ejecutivo);
+      String(cfg.usuarios_extra || '').split(',').map(s => parseInt(s.trim())).filter(Boolean).forEach(id => ids.add(id));
+    }
+    if (!ids.size) return;
+    let dest = [...ids];
+    try { dest = await require('../../../../shared/backups').expandirAlerta(dest); } catch (_) {}
+    const def = EVENTOS_DEALER.find(e => e.evento === evento) || {};
+    const prioridad = cfg?.prioridad || 'alta';
+    const sonar = cfg ? (cfg.sonido ? 1 : 0) : 1;
+    const sonTipo = SONIDOS_DEALER.includes(cfg?.sonido_tipo) ? cfg.sonido_tipo : (def.son_def || 'dingdong');
+    const sonCada = cfg?.sonido_cada_seg || 30;
+    const sonMax = cfg?.sonido_max_min || 5;
+    const k = clave || `dealerficha:${evento}:${Date.now()}`;
+    for (const uid of dest) {
+      const [[ex]] = await pool.query('SELECT 1 FROM notificaciones WHERE id_usuario=? AND clave=? AND leida=0 LIMIT 1', [uid, k]);
+      if (ex) continue;
+      await pool.query(
+        `INSERT INTO notificaciones (id_usuario, tipo, titulo, mensaje, href, clave, prioridad, sonar, son_cada, son_max, son_tipo)
+         VALUES (?,?,?,?,?,?,?,?,?,?,?)`,
+        [uid, 'DEALER_FICHA', titulo || def.titulo, mensaje, href, k, prioridad, sonar, sonCada, sonMax, sonTipo]);
+    }
+  } catch (e) { console.error('[notificarEventoDealer]', evento, e.message); }
+}
+
+/* ── GET/PUT /alertas-config — para el mantenedor de Alertas ───────────────── */
+const getAlertasConfig = async (req, res) => {
+  try {
+    const [rows] = await pool.query('SELECT * FROM dealer_alertas_config');
+    const map = {}; rows.forEach(r => { map[r.evento] = r; });
+    const data = EVENTOS_DEALER.map(e => {
+      const c = map[e.evento] || {};
+      return { evento: e.evento, titulo: e.titulo,
+        perfiles: c.perfiles || '', incluir_ejecutivo: !!c.incluir_ejecutivo,
+        usuarios_extra: c.usuarios_extra || '', activo: c.activo === undefined ? 1 : c.activo,
+        prioridad: c.prioridad || 'alta', sonido: c.sonido === undefined ? 1 : c.sonido,
+        sonido_tipo: c.sonido_tipo || e.son_def, sonido_cada_seg: c.sonido_cada_seg || 30,
+        sonido_max_min: c.sonido_max_min || 5 };
+    });
+    res.json({ success: true, data, sonidos: SONIDOS_DEALER, error: null });
+  } catch (e) { console.error('[dealer alertas-config get]', e.message); res.status(500).json({ success: false, data: null, error: 'Error interno del servidor' }); }
+};
+const setAlertasConfig = async (req, res) => {
+  try {
+    const lista = Array.isArray(req.body?.config) ? req.body.config : [];
+    for (const c of lista) {
+      if (!EVENTOS_DEALER.find(e => e.evento === c.evento)) continue;
+      const sonTipo = SONIDOS_DEALER.includes(c.sonido_tipo) ? c.sonido_tipo : 'dingdong';
+      await pool.query(
+        `INSERT INTO dealer_alertas_config (evento, perfiles, incluir_ejecutivo, usuarios_extra, activo, prioridad, sonido, sonido_tipo, sonido_cada_seg, sonido_max_min)
+         VALUES (?,?,?,?,?,?,?,?,?,?)
+         ON DUPLICATE KEY UPDATE perfiles=VALUES(perfiles), incluir_ejecutivo=VALUES(incluir_ejecutivo),
+           usuarios_extra=VALUES(usuarios_extra), activo=VALUES(activo), prioridad=VALUES(prioridad),
+           sonido=VALUES(sonido), sonido_tipo=VALUES(sonido_tipo), sonido_cada_seg=VALUES(sonido_cada_seg), sonido_max_min=VALUES(sonido_max_min)`,
+        [c.evento, String(c.perfiles || ''), c.incluir_ejecutivo ? 1 : 0, String(c.usuarios_extra || ''), c.activo ? 1 : 0,
+         c.prioridad === 'alta' ? 'alta' : 'normal', c.sonido ? 1 : 0, sonTipo,
+         Math.max(5, parseInt(c.sonido_cada_seg) || 30), Math.max(1, parseInt(c.sonido_max_min) || 5)]);
+    }
+    res.json({ success: true, data: { actualizados: lista.length }, error: null });
+  } catch (e) { console.error('[dealer alertas-config set]', e.message); res.status(500).json({ success: false, data: null, error: 'Error interno del servidor' }); }
+};
+
 // Campos editables de la ficha (todo menos workflow/archivo).
 const CAMPOS = ['tipo','ejecutivo_nombre','fecha_solicitud','rut','nombre_razon','nombre_fantasia','direccion','comuna','provincia','region',
   'cc_nombre','cc_telefono','cc_email','cf_nombre','cf_telefono','cf_email',
@@ -647,23 +754,20 @@ const enviar = async (req, res) => {
     if (!niveles.length) {
       // Sin niveles configurados → directo a AUTORIZADA (listo para imprimir/firmar).
       await pool.query(`UPDATE dealer_fichas SET estado='AUTORIZADA', nivel_actual=NULL, ${baseSet} WHERE id=?`, [...baseVals, f.id]);
-      if (f.id_ejecutivo) await notificar([f.id_ejecutivo], {
-        tipo: 'DEALER_FICHA_AUTORIZADA', titulo: '🖨️ Ficha autorizada — imprime y firma',
+      await notificarEventoDealer('dealer_autorizada', { idsBase: [f.id_ejecutivo],
+        titulo: '🖨️ Ficha autorizada — imprime y firma',
         mensaje: `Tu ficha de ${f.nombre_razon || f.rut || ''} quedó autorizada. Imprímela, hazla firmar y súbela.`,
-        href: '/dealers-incorporacion/mantencion.html?tab=mias', prioridad: 'alta', sonar: 1, son_tipo: 'dingdong',
-      });
+        href: '/dealers-incorporacion/mantencion.html?tab=mias' });
     } else {
       const n0 = niveles[0];
       await pool.query(`UPDATE dealer_fichas SET estado='PEND_AUTORIZACION', nivel_actual=?, ${baseSet} WHERE id=?`, [n0.orden, ...baseVals, f.id]);
       const ids = await idsConPermiso(n0.permiso, req.usuario.id_usuario);
-      await notificar(ids, {
-        tipo: 'DEALER_FICHA', titulo: reenvio ? '🔁 Ficha de dealer corregida' : '🛎️ Ficha de dealer para autorizar',
+      await notificarEventoDealer('dealer_para_autorizar', { idsBase: ids, ejecutivo: f.id_ejecutivo,
+        titulo: reenvio ? '🔁 Ficha de dealer corregida' : '🛎️ Ficha de dealer para autorizar',
         mensaje: `${f.ejecutivo_nombre || 'Un ejecutivo'} envió la ficha de ${f.nombre_razon || f.rut || ''} — nivel: ${n0.nombre}`
           + (diferencias.length ? ` · ⚠ ${diferencias.length} diferencia(s) con el sistema` : '')
           + (especial ? ' · ⭐ participación especial' : ''),
-        href: '/dealers-incorporacion/mantencion.html?tab=revision', prioridad: 'alta', sonar: 1,
-        son_tipo: (diferencias.length || especial) ? 'alarma' : 'dingdong', clave: `dealerficha:${f.id}:rev`,
-      });
+        href: '/dealers-incorporacion/mantencion.html?tab=revision', clave: `dealerficha:${f.id}:rev` });
     }
     auditar({ req, accion: reenvio ? 'EDITAR' : 'CREAR', modulo: 'dealers', entidad: 'dealer_ficha', entidad_id: f.id,
       detalle: `${reenvio ? 'Reenvió' : 'Envió'} a autorización la ficha de ${f.nombre_razon || f.rut || ''}`, rut: f.rut });
@@ -700,19 +804,16 @@ const autorizar = async (req, res) => {
     if (next) {
       await pool.query('UPDATE dealer_fichas SET nivel_actual=? WHERE id=?', [next.orden, f.id]);
       const ids = await idsConPermiso(next.permiso, req.usuario.id_usuario);
-      await notificar(ids, {
-        tipo: 'DEALER_FICHA', titulo: '🛎️ Ficha de dealer para autorizar',
+      await notificarEventoDealer('dealer_para_autorizar', { idsBase: ids, ejecutivo: f.id_ejecutivo,
+        titulo: '🛎️ Ficha de dealer para autorizar',
         mensaje: `${f.nombre_razon || f.rut || ''} — nivel: ${next.nombre}`,
-        href: '/dealers-incorporacion/mantencion.html?tab=revision', prioridad: 'alta', sonar: 1, son_tipo: 'dingdong',
-        clave: `dealerficha:${f.id}:rev`,
-      });
+        href: '/dealers-incorporacion/mantencion.html?tab=revision', clave: `dealerficha:${f.id}:rev` });
     } else {
       await pool.query('UPDATE dealer_fichas SET estado=\'AUTORIZADA\', nivel_actual=NULL WHERE id=?', [f.id]);
-      if (f.id_ejecutivo) await notificar([f.id_ejecutivo], {
-        tipo: 'DEALER_FICHA_AUTORIZADA', titulo: '🖨️ Ficha autorizada — imprime y firma',
+      await notificarEventoDealer('dealer_autorizada', { idsBase: [f.id_ejecutivo],
+        titulo: '🖨️ Ficha autorizada — imprime y firma',
         mensaje: `Tu ficha de ${f.nombre_razon || f.rut || ''} fue autorizada por todos los niveles. Imprímela, hazla firmar y súbela.`,
-        href: '/dealers-incorporacion/mantencion.html?tab=mias', prioridad: 'alta', sonar: 1, son_tipo: 'aplausos',
-      });
+        href: '/dealers-incorporacion/mantencion.html?tab=mias' });
     }
     auditar({ req, accion: 'APROBAR', modulo: 'dealers', entidad: 'dealer_ficha', entidad_id: f.id,
       detalle: `Autorizó el nivel "${niv.nombre}" de la ficha de ${f.nombre_razon || f.rut || ''}`, rut: f.rut });
@@ -737,14 +838,12 @@ const enviarFirmada = async (req, res) => {
       `UPDATE dealer_fichas SET estado='PEND_CIERRE', firma_sospecha=?, firma_detalle=?, ficha_faltantes=? WHERE id=?`,
       [firma.sospecha, firma.detalle, JSON.stringify(cmpTexto.faltantes), f.id]);
     const ids = await idsConPermiso('dealer_ficha_revisar', req.usuario.id_usuario);
-    await notificar(ids, {
-      tipo: 'DEALER_FICHA', titulo: '✍️ Ficha firmada — revisar y cerrar',
+    await notificarEventoDealer('dealer_firmada', { idsBase: ids, ejecutivo: f.id_ejecutivo,
+      titulo: '✍️ Ficha firmada — revisar y cerrar',
       mensaje: `${f.nombre_razon || f.rut || ''}: ${f.ejecutivo_nombre || 'el ejecutivo'} subió la ficha firmada para el cierre`
         + (firma.sospecha ? ' · ⚠ posible SIN FIRMA' : '')
         + (cmpTexto.faltantes.length ? ` · ⚠ ${cmpTexto.faltantes.length} dato(s) no coinciden con el documento` : ''),
-      href: '/dealers-incorporacion/mantencion.html?tab=revision', prioridad: 'alta', sonar: 1,
-      son_tipo: (firma.sospecha || cmpTexto.faltantes.length) ? 'alarma' : 'dingdong', clave: `dealerficha:${f.id}:rev`,
-    });
+      href: '/dealers-incorporacion/mantencion.html?tab=revision', clave: `dealerficha:${f.id}:rev` });
     auditar({ req, accion: 'EDITAR', modulo: 'dealers', entidad: 'dealer_ficha', entidad_id: f.id,
       detalle: `Subió la ficha firmada de ${f.nombre_razon || f.rut || ''} para el cierre`, rut: f.rut });
     res.json({ success: true, data: { estado: 'PEND_CIERRE' }, error: null });
@@ -842,12 +941,10 @@ async function avisarFinalizado(f, numero, esMod, sello) {
   if (f.id_ejecutivo) avisar.add(f.id_ejecutivo);
   if (sello && f.revisor_id) avisar.add(f.revisor_id);
   if (!avisar.size) return;
-  await notificar([...avisar], {
-    tipo: 'DEALER_FICHA_APROBADA',
+  await notificarEventoDealer('dealer_cerrada', { idsBase: [...avisar],
     titulo: esMod ? '✅ Dealer actualizado' : '✅ Dealer creado',
     mensaje: `${sello ? 'Participación especial de ' : 'Tu ficha de '}${f.nombre_razon || f.rut || ''} ${sello ? 'aprobada por ' + sello : 'fue aprobada'} — el dealer N°${numero} ${esMod ? 'fue actualizado' : 'ya está'} en el sistema.`,
-    href: '/dealers-incorporacion/mantencion.html', prioridad: 'alta', sonar: 1, son_tipo: sello ? 'aplausos' : 'dingdong',
-  });
+    href: '/dealers-incorporacion/mantencion.html' });
 }
 
 /* ── POST /fichas/:id/cerrar — el analista revisa la ficha FIRMADA y cierra:
@@ -898,12 +995,10 @@ const rechazar = async (req, res) => {
       [req.usuario.id_usuario, nombre, motivo, req.params.id]);
     await pool.query('DELETE FROM notificaciones WHERE clave=? AND leida=0', [`dealerficha:${f.id}:rev`]).catch(() => {});
 
-    if (f.id_ejecutivo) await notificar([f.id_ejecutivo], {
-      tipo: 'DEALER_FICHA_RECHAZADA',
+    await notificarEventoDealer('dealer_rechazada', { idsBase: [f.id_ejecutivo],
       titulo: '❌ Ficha de dealer rechazada',
       mensaje: `Tu ficha de ${f.nombre_razon || f.rut || ''} fue rechazada: ${motivo}. Corrígela y reenvíala.`,
-      href: '/dealers-incorporacion/mantencion.html', prioridad: 'alta', sonar: 1, son_tipo: 'alarma',
-    });
+      href: '/dealers-incorporacion/mantencion.html' });
     auditar({ req, accion: 'RECHAZAR', modulo: 'dealers', entidad: 'dealer_ficha', entidad_id: f.id,
       detalle: `Rechazó la ficha de ${f.nombre_razon || f.rut || ''}: "${motivo}"`, rut: f.rut });
     res.json({ success: true, data: { estado: 'RECHAZADA' }, error: null });
@@ -1077,4 +1172,4 @@ const nivelEliminar = async (req, res) => {
 };
 
 module.exports = { ejecutivos, comisionesDefault, dealerBuscar, listar, obtener, crear, editar, subirFicha, verFicha, enviar, autorizar, enviarFirmada, tomar, cerrar, rechazar, eliminar,
-  listarArchivos, subirArchivo, verArchivo, eliminarArchivo, nivelesListar, nivelGuardar, nivelEliminar };
+  listarArchivos, subirArchivo, verArchivo, eliminarArchivo, nivelesListar, nivelGuardar, nivelEliminar, getAlertasConfig, setAlertasConfig };

@@ -117,8 +117,8 @@
   <!-- Eventos de Pago (Post Venta) — event-driven, se disparan al ocurrir cada paso -->
   <div class="head-row" style="margin-top:26px">
     <div>
-      <h5 style="font-weight:800;color:var(--navy);margin:0"><i class="bi bi-cash-coin me-2"></i>Eventos de Pago — Post Venta</h5>
-      <span style="font-size:.82rem;color:#64748b">Avisos que se disparan al ocurrir cada paso del flujo de pago (Saldos Precio y Comisiones). Edita aquí destino, prioridad y sonido.</span>
+      <h5 style="font-weight:800;color:var(--navy);margin:0"><i class="bi bi-lightning-charge-fill me-2"></i>Eventos del sistema — Post Venta y Dealers</h5>
+      <span style="font-size:.82rem;color:#64748b">Avisos que se disparan al ocurrir cada etapa: flujo de pago (Saldos Precio y Comisiones) y flujo de fichas de Dealer (autorización, firma, cierre, rechazo). Edita aquí destino, prioridad y sonido.</span>
     </div>
   </div>
   <div class="card-af">
@@ -136,6 +136,7 @@
       <li><b>Prioridad «Alta»</b> → pone la campana <span style="color:#dc2626;font-weight:700">roja y vibrando</span> + sonido insistente (configurable por regla).</li>
       <li><b>Destino</b> → perfiles que reciben el aviso; <b>CREADOR</b> = quien creó el registro; <b>TODOS</b> = todos los usuarios.</li>
       <li><b>Eventos de Pago — Post Venta</b> → avisos del flujo de <a href="/postventa/saldos-a-pagar/">Saldos a Pagar</a> y <a href="/postventa/comisiones-a-pagar/">Comisiones a Pagar</a> (fondos cargados, enviado a pago, orden emitida, pago). Editarlos aquí también los cambia en la configuración de Post Venta (misma fuente).</li>
+      <li><b>Eventos — Dealers</b> → avisos del flujo de <a href="/dealers-incorporacion/">fichas de Dealer</a> en cada etapa: por autorizar (a cada nivel), autorizada (al ejecutivo), firmada (al cierre), creado/actualizado y rechazada. Los destinatarios base salen de la <a href="/dealers-incorporacion/niveles.html">cadena de niveles</a>; aquí sumas perfiles/usuarios y controlas activo, prioridad y sonido.</li>
     </ul>
   </div>
 </div>
@@ -307,22 +308,24 @@ async function toggleCampo(id, campo, val){
 let EVENTS = [];
 async function cargarEventos(){
   try{
-    const [rs, rc] = await Promise.all([
+    const [rs, rc, rd] = await Promise.all([
       fetch('/api/postventa/alertas-config?track=saldo',   {headers:H}),
       fetch('/api/postventa/alertas-config?track=comision',{headers:H}),
+      fetch('/api/dealer-incorporacion/alertas-config',    {headers:H}),
     ]);
-    const js = await rs.json(), jc = await rc.json();
-    EVENTS = [...(js.data||[]), ...(jc.data||[])];
+    const js = await rs.json(), jc = await rc.json(), jd = await rd.json();
+    const tag=(arr,src)=>(arr||[]).map(e=>({...e,_src:src}));
+    EVENTS = [...tag(js.data,'postventa'), ...tag(jc.data,'postventa'), ...tag(jd.data,'dealer')];
     renderEventos();
   }catch(e){
-    document.getElementById('bodyEv').innerHTML = '<tr><td colspan="7" style="text-align:center;color:#b91c1c;padding:20px">No se pudieron cargar los eventos de Post Venta.</td></tr>';
+    document.getElementById('bodyEv').innerHTML = '<tr><td colspan="7" style="text-align:center;color:#b91c1c;padding:20px">No se pudieron cargar los eventos.</td></tr>';
   }
 }
 function renderEventos(){
   const tb=document.getElementById('bodyEv');
   if(!EVENTS.length){ tb.innerHTML='<tr><td colspan="7" style="text-align:center;color:#94a3b8;padding:24px">Sin eventos.</td></tr>'; return; }
   tb.innerHTML = EVENTS.map((e,i)=>`<tr>
-    <td><b>${esc(e.titulo)}</b><br><span style="font-size:.72rem;color:#94a3b8">Post Venta · evento</span></td>
+    <td><b>${esc(e.titulo)}</b><br><span style="font-size:.72rem;color:#94a3b8">${e._src==='dealer'?'Dealers':'Post Venta'} · evento</span></td>
     <td><span style="font-size:.78rem;color:#64748b"><i class="bi bi-lightning-charge-fill" style="color:#f59e0b"></i> Al ocurrir el evento</span></td>
     <td><select onchange="evInline(${i},'prioridad',this.value)" style="width:auto;padding:4px 8px;font-size:.75rem">
         <option value="normal" ${e.prioridad!=='alta'?'selected':''}>Normal</option>
@@ -381,7 +384,8 @@ async function evPersist(e){
       usuarios_extra:e.usuarios_extra||'', activo:e.activo?1:0, prioridad:e.prioridad==='alta'?'alta':'normal',
       sonido:e.sonido!=0?1:0, sonido_tipo:e.sonido_tipo||'campana',
       sonido_cada_seg:e.sonido_cada_seg||30, sonido_max_min:e.sonido_max_min||5 };
-    const r=await fetch('/api/postventa/alertas-config',{method:'PUT',headers:H,body:JSON.stringify({config:[row]})});
+    const url = e._src==='dealer' ? '/api/dealer-incorporacion/alertas-config' : '/api/postventa/alertas-config';
+    const r=await fetch(url,{method:'PUT',headers:H,body:JSON.stringify({config:[row]})});
     const j=await r.json(); return !!j.success;
   }catch(_){ return false; }
 }

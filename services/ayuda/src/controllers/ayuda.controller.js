@@ -209,6 +209,54 @@ const pool = require('../../../../shared/config/database');
         ],
         submodulos:[],
         siguiente:'Si el escenario te convence, genera una cotización formal en "Cotizaciones".' },
+
+      { ruta:'/dealers-incorporacion/', titulo:'Creación/Mantenedor de Dealer', icono:'bi-building-add',
+        descripcion:'Ficha de incorporación de concesionarios y parques, su autorización por niveles, la firma del cliente y la mantención de los dealers vigentes. Cada dealer guarda su PROPIA tabla de comisiones (la que rige sus operaciones); la pizarra Parque/Calle solo precarga el default y sirve para detectar excepciones que escalan a Gerencia.',
+        pasos:[
+          { titulo:'Crea o modifica la ficha', detalle:'En "Creación Nuevo Dealer" llenas la ficha. Si el RUT ya existe, pasa a Modificación y precarga los datos actuales.' },
+          { titulo:'Autoriza por niveles', detalle:'La ficha se autoriza ANTES de imprimirse. En "Mantención Dealers → Revisión" cada nivel autoriza (o rechaza) según su permiso.' },
+          { titulo:'Imprime, firma y cierra', detalle:'Autorizada la ficha, el ejecutivo la imprime (con las autorizaciones en letra chica), la firma con el cliente, la sube y Operaciones la cierra creando/actualizando el dealer.' },
+        ],
+        submodulos:[
+          { nombre:'Creación Nuevo Dealer', para_que:'Llena la ficha (General/Parque o Modificación), adjunta informes y envíala a autorización.' },
+          { nombre:'Mantención Dealers', para_que:'Autoriza/cierra las fichas pendientes, sigue tus solicitudes y edita dealers vigentes.' },
+          { nombre:'Niveles de Aprobación', para_que:'Configura la cadena de autorización (orden, condición, permiso). Restringible por usuario.' },
+        ],
+        siguiente:'La comisión pactada de cada dealer es la que rige; la pizarra es solo referencia y umbral de escalamiento.' },
+
+      { ruta:'/dealers-incorporacion/nuevo.html/', titulo:'Ficha de Dealer — Creación / Modificación', icono:'bi-building-add',
+        descripcion:'Completa la ficha del concesionario. Cada dealer lleva su PROPIA tabla de comisiones, que es la que rige sus operaciones; la pizarra Parque/Calle solo precarga el valor por defecto y define el umbral: lo que la supere es "participación especial" y escala a Gerencia. Los términos se autorizan ANTES de imprimir y firmar.',
+        pasos:[
+          { titulo:'Identifica el dealer', detalle:'Tipea el RUT o usa "Buscar dealer existente". Si ya existe, la ficha pasa a Modificación de Dealer y precarga sus datos; lo que cambies saldrá en rojo en la revisión.' },
+          { titulo:'Define la comisión pactada', detalle:'Viene precargada desde la pizarra (Parque o Calle). Ajústala solo si hubo negociación. Si algún tramo supera la pizarra, se marca participación especial y requerirá visto de Gerencia.' },
+          { titulo:'Adjunta los respaldos', detalle:'Sube el Informe Comercial Empresa y Socios. Si la cuenta es de un tercero o cambias el depósito del dealer, sube también el Poder Simple y los Poderes del Representante Legal.' },
+          { titulo:'Envía a autorización', detalle:'Pulsa "Enviar a autorización" (todavía NO se firma). La ficha recorre la cadena de niveles configurada.' },
+          { titulo:'Imprime y firma', detalle:'Cuando quede AUTORIZADA, en "Mis fichas" pulsa "Imprimir / Firmar": la ficha sale con las autorizaciones en letra chica. Hazla firmar por el cliente, súbela y pulsa "Enviar firmada".' },
+          { titulo:'Cierre', detalle:'Operaciones/Crédito revisa la firma y cierra: el dealer queda creado o actualizado con su tabla de comisiones.' },
+        ],
+        submodulos:[],
+        siguiente:'Para autorizar/cerrar fichas ve a "Mantención Dealers". Para cambiar quién autoriza cada nivel, "Niveles de Aprobación".' },
+
+      { ruta:'/dealers-incorporacion/mantencion.html/', titulo:'Mantención de Dealers', icono:'bi-clipboard-check',
+        descripcion:'Revisión por niveles de las fichas, cierre de las firmadas y mantención de los dealers vigentes. Cada autorización queda registrada con nombre y fecha (se imprime en la ficha).',
+        pasos:[
+          { titulo:'Autoriza tu nivel', detalle:'En "Revisión" verás las fichas pendientes. Si tienes el permiso del nivel actual, pulsa Autorizar (o Rechazar con motivo). Al pasar todos los niveles, la ficha queda AUTORIZADA.' },
+          { titulo:'Cierra la firmada', detalle:'Cuando el ejecutivo sube la ficha firmada, pasa a PEND. CIERRE: revisa el documento y pulsa Cerrar para crear/actualizar el dealer.' },
+          { titulo:'Mantén los dealers', detalle:'En "Dealers vigentes" editas los datos de los dealers ya creados. Los que tienen participación especial muestran un sello con quién la aprobó.' },
+        ],
+        submodulos:[],
+        siguiente:'Para configurar la cadena de niveles (quién autoriza qué) ve a "Niveles de Aprobación".' },
+
+      { ruta:'/dealers-incorporacion/niveles.html/', titulo:'Niveles de Aprobación de Dealer', icono:'bi-diagram-3',
+        descripcion:'Configura la cadena PARAMÉTRICA que autoriza cada ficha antes de imprimirla y firmarla. Defines qué niveles aprueban, en qué orden, bajo qué condición y con qué permiso. La pizarra Parque/Calle es el umbral: lo que la supera escala al nivel de Gerencia.',
+        pasos:[
+          { titulo:'Agrega un nivel', detalle:'Define orden (la secuencia), un nombre y la condición: "Siempre" (toda ficha), "Comisión sobre la pizarra" (solo si algún tramo supera el default) o "Depósito modificado" (solo si cambia el banco/cuenta).' },
+          { titulo:'Elige el permiso requerido', detalle:'Quien tenga ese permiso (según la matriz de Perfiles y Permisos) podrá autorizar/rechazar ese nivel. Ej: Análisis usa "Revisar fichas de dealer"; Gerencia usa "Aprobar participación especial".' },
+          { titulo:'Activa/ordena', detalle:'Activa o desactiva niveles; el orden define la secuencia. Solo se aplican los niveles cuya condición calce con la ficha.' },
+          { titulo:'Restringe quién configura', detalle:'Esta página se abre solo con el permiso "Configurar niveles de aprobación de dealer". Dáselo o quítaselo a cada perfil/usuario en Usuarios → Perfiles y Permisos.' },
+        ],
+        submodulos:[],
+        siguiente:'Los niveles con condición "Comisión sobre la pizarra" sellan "Participación especial aprobada por…" al autorizar. El resultado se ve en Mantención Dealers → Revisión.' },
     ];
 
     for (const a of SEED) {

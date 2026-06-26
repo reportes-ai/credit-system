@@ -46,4 +46,8 @@ router.post('/niveles',         verifyToken, requireFunc('dealer_aprob_config'),
 router.put('/niveles/:id',      verifyToken, requireFunc('dealer_aprob_config'), ctrl.nivelGuardar);
 router.delete('/niveles/:id',   verifyToken, requireFunc('dealer_aprob_config'), ctrl.nivelEliminar);
 
+// Alertas de las etapas — leídas/escritas desde el mantenedor central de Alertas.
+router.get('/alertas-config',   verifyToken, ctrl.getAlertasConfig);
+router.put('/alertas-config',   verifyToken, requireFunc('mantenedores_alertas'), ctrl.setAlertasConfig);
+
 module.exports = router;
