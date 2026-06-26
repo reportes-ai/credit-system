@@ -1,5 +1,6 @@
 const pool  = require('../../../../shared/config/database');
 const audit = require('../../../../shared/auditoria');
+require('../migrations/fix-financieras');   // migración one-time de datos (financiera/estado/automotora) — guard propio
 const { isMesCerrado, getMesDeOp } = require('../../../../shared/utils/mes-cerrado');
 const { marcarForzadosCalculo } = require('../utils/recalcular-mes');
 const { clasificar: clasificarCartera } = require('../utils/recalcular-estado-cartera');
