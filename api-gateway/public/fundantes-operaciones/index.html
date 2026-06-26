@@ -165,7 +165,7 @@ const fmtF = f => { if (!f) return '—'; try { return new Date(f).toLocaleDateS
 function toast(m, ok){ const t=document.getElementById('toast'); t.textContent=m; t.className='toast '+(ok?'ok':'err'); t.style.display='block'; setTimeout(()=>t.style.display='none',4000); }
 const diasCls = d => d<=7?'d0':d<=15?'d1':d<=30?'d2':'d3';
 
-let DATA = [], F = { ejecutivo:'', financiera:'' }, ACT = null, DOCS = [], IDX = 0;
+let DATA = [], F = { ejecutivo:'', financiera:'', q:'' }, ACT = null, DOCS = [], IDX = 0;
 const _urls = {};   // cache de objectURL por doc_id
 
 async function cargar(){
@@ -174,6 +174,7 @@ async function cargar(){
   const qs = new URLSearchParams({ estado:'ENVIADO' });
   if (F.ejecutivo) qs.set('ejecutivo', F.ejecutivo);
   if (F.financiera) qs.set('financiera', F.financiera);
+  if (F.q) qs.set('q', F.q);
   try {
     const j = await (await API('/api/fundantes-seguimiento?' + qs.toString())).json();
     if (!j.success) throw new Error(j.error||'Error');
@@ -190,27 +191,25 @@ async function cargar(){
 }
 
 // Filtra DATA por el buscador (N° OP o ID Financiera). Vacío = todo.
-function filtradas(){
-  const q = (document.getElementById('buscarOp')?.value || '').trim().toLowerCase();
-  if (!q) return DATA;
-  return DATA.filter(r =>
-    String(opNum(r.num_op)||'').toLowerCase().includes(q) ||
-    String(r.num_op||'').toLowerCase().includes(q) ||
-    String(r.id_financiera||'').toLowerCase().includes(q));
-}
+// Búsqueda server-side (busca en TODA la base, no solo lo cargado). Debounce.
+let _buscarT = null;
 function buscar(){
-  const v = document.getElementById('buscarOp')?.value || '';
+  const v = (document.getElementById('buscarOp')?.value || '').trim();
   const cl = document.getElementById('buscarClear'); if (cl) cl.style.display = v ? '' : 'none';
-  pintar();
+  clearTimeout(_buscarT);
+  _buscarT = setTimeout(() => { if (F.q !== v) { F.q = v; cargar(); } }, 350);
 }
 function pintar(){
   const wrap = document.getElementById('tableWrap');
-  const rows = filtradas();
-  const q = (document.getElementById('buscarOp')?.value || '').trim();
+  const rows = DATA;
   const cnt = document.getElementById('buscarCount');
-  if (cnt) cnt.textContent = q ? `${rows.length} resultado${rows.length===1?'':'s'} de ${DATA.length}` : '';
-  if (!DATA.length){ wrap.innerHTML = `<div class="empty"><i class="bi bi-inbox"></i>No hay fundantes pendientes de validar.</div>`; return; }
-  if (!rows.length){ wrap.innerHTML = `<div class="empty"><i class="bi bi-search"></i>Sin coincidencias para "${esc(q)}".</div>`; return; }
+  if (cnt) cnt.textContent = F.q ? `${rows.length} resultado${rows.length===1?'':'s'}` : '';
+  if (!rows.length){
+    wrap.innerHTML = F.q
+      ? `<div class="empty"><i class="bi bi-search"></i>Sin coincidencias para "${esc(F.q)}".</div>`
+      : `<div class="empty"><i class="bi bi-inbox"></i>No hay fundantes pendientes de validar.</div>`;
+    return;
+  }
   const body = rows.map(r => {
     const subidos = (r.docs||[]).filter(d=>d.subido).length;
     return `<tr>

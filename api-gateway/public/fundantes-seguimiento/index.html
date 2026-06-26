@@ -150,7 +150,7 @@ const DOC_COLS = [
 ];
 
 let DATA = [], META = { es_ejecutivo:false, puede_validar:false, ejecutivos:[], nombre:'' };
-let F = { ejecutivo:'', financiera:'' };
+let F = { ejecutivo:'', financiera:'', q:'' };
 const diasCls = d => d<=7?'d0':d<=15?'d1':d<=30?'d2':'d3';
 
 async function cargar(){
@@ -159,6 +159,7 @@ async function cargar(){
   const qs = new URLSearchParams();
   if (F.ejecutivo) qs.set('ejecutivo', F.ejecutivo);
   if (F.financiera) qs.set('financiera', F.financiera);
+  if (F.q) qs.set('q', F.q);
   try {
     const j = await (await API('/api/fundantes-seguimiento?' + qs.toString())).json();
     if (!j.success) throw new Error(j.error || 'Error');
@@ -219,28 +220,25 @@ function celdaEnvio(row){
   return `<td><span class="muted">Faltan ${row.faltan}</span></td>`;
 }
 
-// Filtra DATA por el buscador (N° OP o ID Financiera). Vacío = todo.
-function filtradas(){
-  const q = (document.getElementById('buscarOp')?.value || '').trim().toLowerCase();
-  if (!q) return DATA;
-  return DATA.filter(r =>
-    String(opNum(r.num_op)||'').toLowerCase().includes(q) ||
-    String(r.num_op||'').toLowerCase().includes(q) ||
-    String(r.id_financiera||'').toLowerCase().includes(q));
-}
+// Búsqueda server-side (busca en TODA la base, no solo lo cargado). Debounce.
+let _buscarT = null;
 function buscar(){
-  const v = document.getElementById('buscarOp')?.value || '';
+  const v = (document.getElementById('buscarOp')?.value || '').trim();
   const cl = document.getElementById('buscarClear'); if (cl) cl.style.display = v ? '' : 'none';
-  pintarTabla();
+  clearTimeout(_buscarT);
+  _buscarT = setTimeout(() => { if (F.q !== v) { F.q = v; cargar(); } }, 350);
 }
 function pintarTabla(){
   const wrap = document.getElementById('tableWrap');
-  const rows = filtradas();
-  const q = (document.getElementById('buscarOp')?.value || '').trim();
+  const rows = DATA;
   const cnt = document.getElementById('buscarCount');
-  if (cnt) cnt.textContent = q ? `${rows.length} resultado${rows.length===1?'':'s'} de ${DATA.length}` : '';
-  if (!DATA.length) { wrap.innerHTML = `<div class="empty"><i class="bi bi-inbox"></i>No hay operaciones para mostrar.</div>`; return; }
-  if (!rows.length) { wrap.innerHTML = `<div class="empty"><i class="bi bi-search"></i>Sin coincidencias para "${esc(q)}".</div>`; return; }
+  if (cnt) cnt.textContent = F.q ? `${rows.length} resultado${rows.length===1?'':'s'}` : '';
+  if (!rows.length) {
+    wrap.innerHTML = F.q
+      ? `<div class="empty"><i class="bi bi-search"></i>Sin coincidencias para "${esc(F.q)}".</div>`
+      : `<div class="empty"><i class="bi bi-inbox"></i>No hay operaciones para mostrar.</div>`;
+    return;
+  }
   const head = `<tr>
     <th>Ejecutivo Comercial</th><th>N° Op</th><th>Estado</th><th>Días</th>
     <th>Financiera</th><th>ID Financiera</th><th>Fecha Otorgado</th>

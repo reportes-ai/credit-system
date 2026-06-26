@@ -192,6 +192,12 @@ const listar = async (req, res) => {
     let whereData = where;
     if (fEstado && ESTADOS.includes(fEstado)) { whereData += " AND COALESCE(fs.estado,'PENDIENTE') = ?"; fpData.push(fEstado); }
     else if (!incluirCerrados) whereData += " AND COALESCE(fs.estado,'PENDIENTE') <> 'CERRADO'";
+    // Búsqueda por N° OP o ID Financiera (server-side: encuentra aunque esté fuera de las primeras 500).
+    const q = String(req.query.q || '').trim();
+    if (q) {
+      whereData += " AND (REPLACE(c.num_op,'.','') LIKE ? OR c.id_financiera LIKE ?)";
+      fpData.push('%' + q.replace(/\./g, '') + '%', '%' + q + '%');
+    }
     const [ops] = await pool.query(`
       SELECT c.id AS id_credito, c.num_op, c.financiera, c.id_financiera, c.ejecutivo,
              c.fecha_otorgado, c.gps, c.limitacion,
