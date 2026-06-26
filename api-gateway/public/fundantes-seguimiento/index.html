@@ -112,6 +112,16 @@
     </div>
   </div>
 
+  <div style="margin:0 0 12px;display:flex;gap:10px;align-items:center;flex-wrap:wrap">
+    <div style="position:relative;flex:0 0 340px;max-width:100%">
+      <i class="bi bi-search" style="position:absolute;left:12px;top:50%;transform:translateY(-50%);color:#94a3b8"></i>
+      <input id="buscarOp" placeholder="Buscar por N° OP o ID Financiera…" oninput="buscar()" autocomplete="off"
+        style="width:100%;padding:9px 30px 9px 34px;border:1px solid #cbd5e1;border-radius:9px;font-size:.9rem;box-sizing:border-box">
+      <i id="buscarClear" class="bi bi-x-circle" onclick="document.getElementById('buscarOp').value='';buscar()" style="display:none;position:absolute;right:11px;top:50%;transform:translateY(-50%);color:#94a3b8;cursor:pointer"></i>
+    </div>
+    <span id="buscarCount" style="font-size:.82rem;color:#64748b"></span>
+  </div>
+
   <div class="table-wrap" id="tableWrap">
     <div class="empty"><i class="bi bi-hourglass-split"></i>Cargando…</div>
   </div>
@@ -209,15 +219,34 @@ function celdaEnvio(row){
   return `<td><span class="muted">Faltan ${row.faltan}</span></td>`;
 }
 
+// Filtra DATA por el buscador (N° OP o ID Financiera). Vacío = todo.
+function filtradas(){
+  const q = (document.getElementById('buscarOp')?.value || '').trim().toLowerCase();
+  if (!q) return DATA;
+  return DATA.filter(r =>
+    String(opNum(r.num_op)||'').toLowerCase().includes(q) ||
+    String(r.num_op||'').toLowerCase().includes(q) ||
+    String(r.id_financiera||'').toLowerCase().includes(q));
+}
+function buscar(){
+  const v = document.getElementById('buscarOp')?.value || '';
+  const cl = document.getElementById('buscarClear'); if (cl) cl.style.display = v ? '' : 'none';
+  pintarTabla();
+}
 function pintarTabla(){
   const wrap = document.getElementById('tableWrap');
+  const rows = filtradas();
+  const q = (document.getElementById('buscarOp')?.value || '').trim();
+  const cnt = document.getElementById('buscarCount');
+  if (cnt) cnt.textContent = q ? `${rows.length} resultado${rows.length===1?'':'s'} de ${DATA.length}` : '';
   if (!DATA.length) { wrap.innerHTML = `<div class="empty"><i class="bi bi-inbox"></i>No hay operaciones para mostrar.</div>`; return; }
+  if (!rows.length) { wrap.innerHTML = `<div class="empty"><i class="bi bi-search"></i>Sin coincidencias para "${esc(q)}".</div>`; return; }
   const head = `<tr>
     <th>Ejecutivo Comercial</th><th>N° Op</th><th>Estado</th><th>Días</th>
     <th>Financiera</th><th>ID Financiera</th><th>Fecha Otorgado</th>
     ${DOC_COLS.map(c=>`<th>${esc(c.lbl)}</th>`).join('')}
     <th>Envío</th><th>Comentario</th></tr>`;
-  const body = DATA.map(r => `<tr>
+  const body = rows.map(r => `<tr>
     <td>${esc(r.ejecutivo||'—')}</td>
     <td class="td-op">${esc(opNum(r.num_op))}</td>
     <td><span class="pill p-${esc(r.estado)}">${esc(r.estado)}</span></td>
