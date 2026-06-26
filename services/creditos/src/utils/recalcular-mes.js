@@ -118,6 +118,23 @@ async function cargarParques() {
   return map;
 }
 
+/* ── Tabla de comisión por dealer (su pactada; manda sobre la pizarra) ─── */
+const normRutD = r => String(r || '').replace(/[.\-\s]/g, '').toUpperCase();
+async function cargarDealers() {
+  const map = {};
+  try {
+    const [rows] = await pool.query('SELECT rut, com_6_12, com_13_24, com_25_36, com_37 FROM dealers WHERE rut IS NOT NULL');
+    rows.forEach(d => { map[normRutD(d.rut)] = d; });
+  } catch (e) { /* sin tabla/columnas → todo cae a la pizarra */ }
+  return map;
+}
+// Tramo de la tabla del dealer (pct/100) o null si no tiene ese tramo (→ fallback pizarra).
+function dealerTablePct(d, plazo) {
+  if (!d) return null;
+  const v = plazo <= 12 ? d.com_6_12 : plazo <= 24 ? d.com_13_24 : plazo <= 36 ? d.com_25_36 : d.com_37;
+  return (v == null || v === '') ? null : Number(v) / 100;
+}
+
 /* ── Tier UNIDAD ────────────────────────────────────────────────────── */
 function getTierUAC(cnt, p) {
   if (cnt >= (p.uac_ops_tier3_max || 15)) return (p.uac_pct_tier4 || p.uac_pct_tier3) / 100;
@@ -135,7 +152,7 @@ function getTierUAC(cnt, p) {
 /* ── Cálculo por operación (Ing x Colocaciones, Comisión Dealer y Parque) ───
    Misma fórmula que usa el recálculo, aislada para reusarla en la detección
    de campos forzados. p=params, parqMap=parques, todasTasas. */
-async function calcularValoresOp(op, p, parqMap, todasTasas) {
+async function calcularValoresOp(op, p, parqMap, todasTasas, dealerMap) {
   const parqKey  = (op.parque || '').toUpperCase().trim();
   const esParque = parqKey.includes('PARQUE');
   const saldo    = parseFloat(op.saldo_precio)       || 0;
@@ -163,14 +180,16 @@ async function calcularValoresOp(op, p, parqMap, todasTasas) {
 
   let comdea_real = 0, com_parque = 0, arriendo = 0;
   if (saldo > 0 && plazo > 0) {
+    // La tabla pactada del dealer manda; si no tiene ese tramo, cae a la pizarra.
+    const dPct = dealerTablePct((dealerMap || {})[normRutD(op.rut_dealer)], plazo);
     if (esParque) {
       const parqData = parqMap[parqKey];
       const patioPct = parqData ? parseFloat(parqData.comision_pct) : (p.patio_pct / 100);
       arriendo    = parqData ? parseFloat(parqData.arriendo) || 0 : 0;
-      comdea_real = Math.round(saldo * getDealerPct(plazo, p));
+      comdea_real = Math.round(saldo * (dPct != null ? dPct : getDealerPct(plazo, p)));
       com_parque  = Math.round(saldo * patioPct);
     } else {
-      comdea_real = Math.round(saldo * getDealerCallePct(plazo, p));
+      comdea_real = Math.round(saldo * (dPct != null ? dPct : getDealerCallePct(plazo, p)));
     }
   }
   return { monto_comision_fin, comdea_real, com_parque, arriendo };
@@ -188,13 +207,13 @@ async function marcarForzadosCalculo(opIds, opts = {}) {
   const campos = (opts.campos || CAMPOS).filter(c => CAMPOS.includes(c));
   if (!campos.length) return;
   const tol = opts.tol != null ? opts.tol : 1; // $ de tolerancia por redondeo
-  const [p, parqMap, todasTasas] = await Promise.all([cargarParams(), cargarParques(), cargarTasas()]);
+  const [p, parqMap, todasTasas, dealerMap] = await Promise.all([cargarParams(), cargarParques(), cargarTasas(), cargarDealers()]);
   const [ops] = await pool.query(
-    `SELECT id, financiera, parque, saldo_precio, monto_financiado, monto_capitalizado, plazo, fecha_otorgado,
+    `SELECT id, financiera, parque, rut_dealer, saldo_precio, monto_financiado, monto_capitalizado, plazo, fecha_otorgado,
             monto_comision_fin, comdea_real, com_parque, campos_forzados
      FROM creditos WHERE id IN (?)`, [ids]);
   for (const op of ops) {
-    const calc = await calcularValoresOp(op, p, parqMap, todasTasas);
+    const calc = await calcularValoresOp(op, p, parqMap, todasTasas, dealerMap);
     const forz = forzadosSet(op.campos_forzados);
     for (const campo of campos) {
       const dif = Math.abs((parseFloat(op[campo]) || 0) - (parseFloat(calc[campo]) || 0)) > tol;
@@ -208,10 +227,11 @@ async function marcarForzadosCalculo(opIds, opts = {}) {
 async function recalcularMeses(meses, opciones = {}) {
   if (!meses || !meses.length) return { actualizados: 0, log: [] };
 
-  const [p, parqMap, todasTasas] = await Promise.all([
+  const [p, parqMap, todasTasas, dealerMap] = await Promise.all([
     cargarParams(),
     cargarParques(),
     cargarTasas(),
+    cargarDealers(),
   ]);
 
   let actualizados = 0;
@@ -229,7 +249,7 @@ async function recalcularMeses(meses, opciones = {}) {
 
     // ── Traer todas las ops del mes (estados activos) ────────────────
     const [ops] = await pool.query(`
-      SELECT id, num_op, financiera, parque,
+      SELECT id, num_op, financiera, parque, rut_dealer,
              saldo_precio, monto_financiado, monto_capitalizado,
              plazo, fecha_otorgado, mes,
              seguro_rdh, seguro_cesantia, seguro_rep_menor,
@@ -259,7 +279,7 @@ async function recalcularMeses(meses, opciones = {}) {
     // ── Paso 3: recalcular cada op ───────────────────────────────────
     for (const op of ops) {
       // 1-3. Valores calculados por fórmula (Ing x Colocaciones, Comisión Dealer, Parque)
-      const calc = await calcularValoresOp(op, p, parqMap, todasTasas);
+      const calc = await calcularValoresOp(op, p, parqMap, todasTasas, dealerMap);
       const monto_comision_fin = calc.monto_comision_fin;
       const com_parque_val     = calc.com_parque;
       const arriendo_val       = calc.arriendo;

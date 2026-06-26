@@ -46,6 +46,15 @@ function getDealerCallePct(plazo, p) {
   return p.dealer_calle_pct_99 != null ? p.dealer_calle_pct_99 / 100 : fb;
 }
 
+/* ── Tabla de comisión por dealer (su pactada; manda sobre la pizarra) ─── */
+const normRutD = r => String(r || '').replace(/[.\-\s]/g, '').toUpperCase();
+// Tramo de la tabla del dealer (pct/100) o null si no tiene ese tramo (→ fallback pizarra).
+function dealerTablePct(d, plazo) {
+  if (!d) return null;
+  const v = plazo <= 12 ? d.com_6_12 : plazo <= 24 ? d.com_13_24 : plazo <= 36 ? d.com_25_36 : d.com_37;
+  return (v == null || v === '') ? null : Number(v) / 100;
+}
+
 /* ── Cargar tramos de comisión por penetración ──────────────────────── */
 async function cargarPenTramos() {
   const [rows] = await pool.query(
@@ -80,6 +89,15 @@ async function calcularOperacion(op) {
   const p      = await cargarParams();
   const tramos = await cargarPenTramos();
   const uf     = await getUF(op.fecha_otorgado);
+
+  // Tabla de comisión del dealer (su pactada): manda sobre la pizarra cuando existe.
+  let dealerCom = null;
+  if (op.rut_dealer) {
+    const [drows] = await pool.query(
+      "SELECT com_6_12, com_13_24, com_25_36, com_37 FROM dealers WHERE UPPER(REPLACE(REPLACE(REPLACE(rut,'.',''),'-',''),' ','')) = ? LIMIT 1",
+      [normRutD(op.rut_dealer)]);
+    dealerCom = drows[0] || null;
+  }
 
   const saldo_precio  = parseFloat(op.saldo_precio)    || 0;
   const monto_fin     = parseFloat(op.monto_financiado)   || 0;
@@ -143,15 +161,16 @@ async function calcularOperacion(op) {
   }
 
   // ── 3. Comisión dealer ─────────────────────────────────────────────
+  // La tabla pactada del dealer manda; si no tiene ese tramo, cae a la pizarra.
+  // El patio del parque sigue siendo global (patio_pct).
   if (saldo_precio > 0 && plazo > 0) {
-    const dealer_pct = getDealerPct(plazo, p);
-    const patio_pct  = p.patio_pct / 100;
-    const calle_pct  = getDealerCallePct(plazo, p);
-    // Parque: dealer recibe dealer_pct (neto), parque recibe patio_pct por separado
-    // Calle:  dealer recibe calle_pct (parámetro independiente)
+    const patio_pct = p.patio_pct / 100;
+    const dPct      = dealerTablePct(dealerCom, plazo);
+    const baseParque = dPct != null ? dPct : getDealerPct(plazo, p);
+    const baseCalle  = dPct != null ? dPct : getDealerCallePct(plazo, p);
     comdea_real     = esParque
-      ? Math.round(saldo_precio * dealer_pct)
-      : Math.round(saldo_precio * calle_pct);
+      ? Math.round(saldo_precio * baseParque)
+      : Math.round(saldo_precio * baseCalle);
     com_parque_calc = esParque ? Math.round(saldo_precio * patio_pct) : 0;
   }
 
