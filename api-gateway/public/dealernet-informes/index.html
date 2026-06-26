@@ -857,6 +857,8 @@ async function cargarHistorialFac(){
 
 document.getElementById('rut').addEventListener('blur', ()=>{ const v=document.getElementById('rut').value.trim(); if(v) cargarHistoricos(v); });
 cargarProductos();
+// Prefill por ?rut= (lo usa el botón "Informe DealerNet" de la revisión de fichas de dealer).
+(()=>{ try{ const rp=new URLSearchParams(location.search).get('rut'); if(rp){ const el=document.getElementById('rut'); if(el){ el.value=rp; cargarHistoricos(rp); } } }catch(_){}})();
 </script>
 <script src="/js/app-version.js"></script>
 </body>

@@ -141,6 +141,19 @@ async function comDefaults() {
       )`);
   } catch (e) { if (e.errno !== 1050) console.error('[dealer_ficha_archivos migration]', e.message); }
 
+  // Revisiones de ficha por el analista (abrir "Revisar"): base para "Aprobado sin revisión".
+  try {
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS dealer_ficha_revisiones (
+        id          INT AUTO_INCREMENT PRIMARY KEY,
+        id_ficha    INT NOT NULL,
+        id_usuario  INT NULL,
+        usuario_nombre VARCHAR(160) NULL,
+        fecha       DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        INDEX idx_fr (id_ficha, id_usuario)
+      )`);
+  } catch (e) { if (e.errno !== 1050) console.error('[dealer_ficha_revisiones migration]', e.message); }
+
   // Cadena de aprobación PARAMÉTRICA: niveles que autorizan la ficha antes de imprimir/firmar.
   // condicion: SIEMPRE | COMISION_SOBRE_PIZARRA | DEPOSITO_MODIFICADO
   // permiso: código de funcionalidad que habilita autorizar ese nivel (gobernado por la matriz de Perfiles).
@@ -923,6 +936,20 @@ const autorizar = async (req, res) => {
   } catch (e) { console.error('[fichas autorizar]', e.message); res.status(500).json({ success: false, data: null, error: 'Error interno del servidor' }); }
 };
 
+/* ── POST /fichas/:id/marcar-revisada — el analista abrió "Revisar" la ficha ──
+   Registra que este usuario revisó la ficha (informes + Reporte IA). Base para
+   detectar "Aprobado sin revisión de ficha" al autorizar. */
+const marcarRevisada = async (req, res) => {
+  try {
+    const [[f]] = await pool.query('SELECT id FROM dealer_fichas WHERE id=?', [req.params.id]);
+    if (!f) return res.status(404).json({ success: false, data: null, error: 'Ficha no encontrada' });
+    const nombre = [req.usuario.nombre, req.usuario.apellido].filter(Boolean).join(' ') || req.usuario.email || null;
+    await pool.query('INSERT INTO dealer_ficha_revisiones (id_ficha, id_usuario, usuario_nombre) VALUES (?,?,?)',
+      [req.params.id, req.usuario.id_usuario, nombre]);
+    res.json({ success: true, data: { ok: true }, error: null });
+  } catch (e) { console.error('[fichas marcarRevisada]', e.message); res.status(500).json({ success: false, data: null, error: 'Error interno del servidor' }); }
+};
+
 /* ── POST /fichas/:id/enviar-firmada — ficha firmada subida → vuelve al cierre ── */
 const enviarFirmada = async (req, res) => {
   try {
@@ -1273,5 +1300,5 @@ const nivelEliminar = async (req, res) => {
   } catch (e) { console.error('[niveles eliminar]', e.message); res.status(500).json({ success: false, data: null, error: 'Error interno del servidor' }); }
 };
 
-module.exports = { ejecutivos, comisionesDefault, dealerBuscar, listar, obtener, crear, editar, subirFicha, verFicha, enviar, autorizar, enviarFirmada, tomar, cerrar, rechazar, eliminar,
+module.exports = { ejecutivos, comisionesDefault, dealerBuscar, listar, obtener, crear, editar, subirFicha, verFicha, enviar, autorizar, marcarRevisada, enviarFirmada, tomar, cerrar, rechazar, eliminar,
   listarArchivos, subirArchivo, verArchivo, eliminarArchivo, nivelesListar, nivelGuardar, nivelEliminar, getAlertasConfig, setAlertasConfig };

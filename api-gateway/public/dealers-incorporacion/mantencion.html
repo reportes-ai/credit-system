@@ -219,7 +219,8 @@ function renderRevision(){
       <td><span class="estado-pill e-${f.estado}">${escH(f.estado.replace(/_/g,' '))}</span>${f.estado==='PEND_AUTORIZACION'&&f.nivel_actual_nombre?`<div style="font-size:.72rem;color:#854d0e">${escH(f.nivel_actual_nombre)}</div>`:''}${f.tomada_por_nombre?`<div style="font-size:.72rem;color:#92400e">por ${escH(f.tomada_por_nombre)}</div>`:''}</td>
       <td>${fH(f.updated_at)}</td>
       <td><div class="acts">
-        <button class="btn btn-light btn-sm" onclick="verFicha(${f.id})"><i class="bi bi-eye"></i></button>
+        <button class="btn btn-light btn-sm" onclick="verFicha(${f.id})" title="Ver ficha"><i class="bi bi-eye"></i></button>
+        <button class="btn btn-sm" style="background:#1e40af;color:#fff" onclick="verFicha(${f.id}, true)" title="Revisar ficha + informes DealerNet + Reporte IA"><i class="bi bi-search"></i> Revisar</button>
         ${f.tiene_ficha?`<button class="btn btn-sky btn-sm" onclick="abrirArchivo(${f.id})" title="Ficha firmada"><i class="bi bi-file-earmark-pdf"></i></button>`:''}
         ${(()=>{
           if(f.estado==='PEND_AUTORIZACION'){
@@ -280,11 +281,11 @@ function renderDealers(){
 }
 
 /* ── Acciones ficha ── */
-async function verFicha(id){
+async function verFicha(id, revisar){
   try {
     const r=await fetch('/api/dealer-incorporacion/fichas/'+id,{headers:H}); const j=await r.json();
     if(!j.success) throw new Error(j.error); const f=j.data;
-    $('verTitulo').textContent = (f.nombre_razon||f.rut||'Ficha')+' · '+(f.tipo==='PARQUE'?'Parque':'General');
+    $('verTitulo').textContent = (revisar?'Revisar — ':'')+(f.nombre_razon||f.rut||'Ficha')+' · '+(f.tipo==='PARQUE'?'Parque':'General');
     const row=(k,v)=>`<b>${k}</b><span>${escH(v??'—')}</span>`;
     // Adjuntos (ficha firmada + informes comerciales)
     let adjHtml = '';
@@ -342,7 +343,7 @@ async function verFicha(id){
       cadenaHtml = `<div style="margin-top:14px;border:1px solid #c7d2fe;background:#eef2ff;border-radius:10px;padding:12px 14px">
         <b style="color:#3730a3;font-size:.82rem"><i class="bi bi-diagram-3 me-1"></i>Cadena de autorización</b>${items||'<div style="font-size:.8rem;color:#94a3b8;margin-top:4px">Sin autorizaciones aún</div>'}${pend}</div>`;
     }
-    $('verBody').innerHTML = `<div class="kv">
+    $('verBody').innerHTML = `${revisar?barraInformes(f):''}<div class="kv">
       ${row('Ejecutivo', f.ejecutivo_nombre)} ${row('Fecha solicitud', f.fecha_solicitud?String(f.fecha_solicitud).slice(0,10):'—')}
       ${row('RUT', f.rut)} ${row('Razón Social', f.nombre_razon)} ${row('Fantasía', f.nombre_fantasia)}
       ${row('Dirección', f.direccion)} ${row('Comuna', f.comuna)} ${row('Provincia/Ciudad', f.provincia)} ${row('Región', f.region)}
@@ -356,9 +357,68 @@ async function verFicha(id){
       ${f.motivo_rechazo?row('Motivo rechazo', f.motivo_rechazo):''}
     </div>${cadenaHtml}${espHtml}${firmaHtml}${difHtml}${faltHtml}${excHtml}<div style="margin-top:16px;display:flex;flex-wrap:wrap;gap:6px">${adjHtml||'<span style="font-size:.8rem;color:#94a3b8">Sin adjuntos</span>'}</div>`;
     dlgVer.showModal();
+    // Registrar que se revisó (para detectar "Aprobado sin revisión de ficha").
+    if (revisar) { try { await fetch('/api/dealer-incorporacion/fichas/'+id+'/marcar-revisada',{method:'POST',headers:H}); } catch(_){} }
   } catch(e){ toast(e.message,true); }
 }
 function abrirArchivo(id){ window.open('/api/dealer-incorporacion/fichas/'+id+'/archivo?token='+encodeURIComponent(token),'_blank'); }
+
+// Barra superior de "Revisar": informe DealerNet (HTML) + Reporte IA por empresa y cada socio.
+function barraInformes(f){
+  const ents = [{ tag:'Empresa', nombre: f.nombre_razon||f.rut||'Empresa', rut: f.rut }];
+  let socs = f.socios; if(typeof socs==='string'){ try{ socs=JSON.parse(socs); }catch{ socs=[]; } }
+  (Array.isArray(socs)?socs:[]).slice(0,3).forEach((s,i)=>{ if(s&&s.rut) ents.push({ tag:'Socio '+(i+1), nombre:s.nombre||s.rut, rut:s.rut }); });
+  const filas = ents.map(e=>{
+    const rut = escH(e.rut||''), nom = escH(e.nombre||'').replace(/'/g,'&#39;');
+    return `<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:7px">
+      <span style="font-size:.8rem;color:#0f172a;min-width:170px"><b>${escH(e.tag)}</b> · ${escH(e.nombre||'')} <span style="color:#94a3b8">${rut||'—'}</span></span>
+      ${e.rut
+        ? `<button class="btn btn-light btn-sm" onclick="window.open('/dealernet-informes/?rut='+encodeURIComponent('${rut}'),'_blank')"><i class="bi bi-clipboard-data"></i> Informe DealerNet</button>
+           <button class="btn btn-sm" style="background:#fdf3ee;border:1px solid #f2d3c4;color:#c2410c" onclick="verReporteIAm('${rut}','${nom}')"><i class="bi bi-stars"></i> Reporte IA</button>`
+        : '<span style="font-size:.78rem;color:#94a3b8">sin RUT</span>'}
+    </div>`;
+  }).join('');
+  return `<div style="margin-bottom:14px;border:1px solid #dbeafe;background:#eff6ff;border-radius:10px;padding:12px 14px">
+    <b style="color:#1e40af;font-size:.82rem"><i class="bi bi-search me-1"></i>Revisar informes (DealerNet + Reporte IA)</b>
+    <div style="margin-top:9px">${filas||'<span style="font-size:.8rem;color:#94a3b8">Sin RUT de empresa ni socios.</span>'}</div></div>`;
+}
+
+// Modal del Reporte IA (Anthropic) por RUT, con fecha (mismo formato que en Base Dealer).
+async function verReporteIAm(rut, nombre){
+  const E = s => String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+  const ov = document.createElement('div');
+  ov.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:10001;display:flex;align-items:center;justify-content:center;padding:18px';
+  ov.innerHTML = `<div style="background:#fff;border-radius:14px;max-width:620px;width:100%;max-height:88vh;overflow:auto;box-shadow:0 20px 60px rgba(0,0,0,.3)">
+    <div style="padding:18px 22px;background:linear-gradient(135deg,#9a3412,#c2410c);color:#fff;border-radius:14px 14px 0 0;display:flex;align-items:center;gap:10px">
+      <i class="bi bi-stars" style="font-size:1.3rem"></i>
+      <div><h3 style="margin:0;font-size:1.05rem">Reporte IA — Anthropic</h3>
+        <div style="font-size:.82rem;opacity:.9">${E(nombre||'')} · ${E(rut||'')}</div></div>
+      <button onclick="this.closest('div[style*=fixed]').remove()" style="margin-left:auto;background:rgba(255,255,255,.2);border:none;color:#fff;width:30px;height:30px;border-radius:8px;cursor:pointer">✕</button>
+    </div>
+    <div id="repIAmBody" style="padding:18px 22px"><div style="text-align:center;color:#94a3b8;padding:20px">Cargando…</div></div></div>`;
+  document.body.appendChild(ov);
+  let d=null;
+  try { const r=await fetch('/api/ia/informe-dealernet/por-rut/'+encodeURIComponent(rut),{headers:H}); const j=await r.json(); if(j.success) d=j.data; } catch(e){}
+  const body = ov.querySelector('#repIAmBody');
+  if(!d){ body.innerHTML='<div style="color:#94a3b8;padding:8px 0">Sin reporte IA para este RUT (aún no se ha analizado, o la IA estaba desactivada al enviar).</div>'; return; }
+  const RIESGO={ BAJO:{c:'#166534',b:'#dcfce7'}, MEDIO:{c:'#92400e',b:'#fef9c3'}, ALTO:{c:'#991b1b',b:'#fee2e2'} };
+  const rg=RIESGO[String(d.nivel_riesgo||'').toUpperCase()]||{c:'#475569',b:'#f1f5f9'};
+  const fecha=d.fecha?new Date(d.fecha).toLocaleString('es-CL'):'—';
+  const lst=(a,vac)=>(a&&a.length)?'<ul style="margin:4px 0 0;padding-left:18px">'+a.map(x=>`<li>${E(typeof x==='string'?x:JSON.stringify(x))}</li>`).join('')+'</ul>':`<div style="color:#94a3b8">${vac}</div>`;
+  const causas=(d.causas||[]).map(c=>`<li><b>${E(c.tipo||'')}</b> · ${E(c.materia||c.caratula||'')}${c.fecha?' · '+E(c.fecha):''}${c.demandante?' · '+E(c.demandante):''}${c.tribunal?' · '+E(c.tribunal):''}${c.estado?' · '+E(c.estado):''}</li>`).join('');
+  body.innerHTML=`
+    <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:12px">
+      <span style="font-size:.72rem;font-weight:800;color:${rg.c};background:${rg.b};border-radius:8px;padding:3px 10px">RIESGO ${E(d.nivel_riesgo||'—')}</span>
+      <span style="font-size:.78rem;color:#64748b"><i class="bi bi-clock-history"></i> ${E(fecha)}</span>
+      ${d.modelo?`<span style="font-size:.72rem;color:#94a3b8">${E(d.modelo)}</span>`:''}</div>
+    <div style="margin-bottom:12px"><b>Resumen</b><div style="color:#374151;margin-top:3px">${E(d.resumen||'—')}</div></div>
+    <div style="margin-bottom:12px"><b>Deudas / morosidades</b><div style="color:#374151;margin-top:3px">${E(d.deudas||'—')}</div></div>
+    <div style="margin-bottom:12px"><b>Causas judiciales</b>${causas?`<ul style="margin:4px 0 0;padding-left:18px;color:#991b1b">${causas}</ul>`:'<div style="color:#94a3b8">Sin causas judiciales detectadas</div>'}</div>
+    <div style="margin-bottom:12px"><b style="color:#991b1b">Alertas</b>${lst(d.alertas,'Sin alertas')}</div>
+    <div style="margin-bottom:12px"><b style="color:#166534">Factores positivos</b>${lst(d.factores,'—')}</div>
+    <div style="background:#eff6ff;border-left:4px solid #0141A2;border-radius:8px;padding:10px 12px"><b>Recomendación</b><div style="color:#1e3a5f;margin-top:3px">${E(d.recomendacion||'—')}</div></div>
+    ${d.productos?`<div style="font-size:.74rem;color:#94a3b8;margin-top:10px">Informes: ${E(d.productos)}</div>`:''}`;
+}
 
 async function accion(id, path, body, okMsg){
   try {

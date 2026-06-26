@@ -35,6 +35,7 @@ router.delete('/fichas/:id',      verifyToken, requireFunc('dealer_ficha_crear',
 
 // Cadena de autorización: autorizar/rechazar validan el permiso del NIVEL actual dentro del controller (paramétrico).
 router.post('/fichas/:id/autorizar', verifyToken, ctrl.autorizar);
+router.post('/fichas/:id/marcar-revisada', verifyToken, ctrl.marcarRevisada);
 router.post('/fichas/:id/rechazar',  verifyToken, ctrl.rechazar);
 // Cierre (Analista de Operaciones/Crédito): tomar (claim) + cerrar (crea/actualiza el dealer).
 router.post('/fichas/:id/tomar',   verifyToken, requireFunc('dealer_ficha_revisar'), ctrl.tomar);
