@@ -203,6 +203,9 @@
     <select id="filtroCat" class="form-select form-select-sm" style="width:170px" onchange="cargar(1)">
       <option value="">Todas las categorías</option>
     </select>
+    <label class="form-check-label d-inline-flex align-items-center" style="gap:6px;font-size:.82rem;color:#c2410c;background:#fdf3ee;border:1px solid #f2d3c4;border-radius:8px;padding:4px 10px;cursor:pointer" title="Mostrar solo dealers con Reporte IA (Anthropic)">
+      <input type="checkbox" id="filtroIA" class="form-check-input mt-0" onchange="cargar(1)"> <i class="bi bi-stars"></i> Con Reporte IA
+    </label>
     <button class="btn-importar" onclick="document.getElementById('fileInput').click()">
       <i class="bi bi-file-earmark-excel me-1 text-success"></i>Importar Excel
     </button>
@@ -472,6 +475,49 @@ function logout() { sessionStorage.removeItem('token'); sessionStorage.removeIte
 
 const H = { 'Content-Type':'application/json', 'Authorization':'Bearer '+token };
 let pag = 1, totalRows = 0, debTimer, dealerActual = null;
+// Reporte IA (Anthropic) por RUT: cuerpos de RUT que tienen un análisis guardado.
+let RUTS_IA = new Set();
+const normRutNum = r => { const c = String(r||'').replace(/[.\-\s]/g,'').toUpperCase(); return c.length > 1 ? c.slice(0,-1) : c; };
+async function cargarRutsIA(){
+  try { const r = await fetch('/api/ia/informe-dealernet/ruts', { headers: H }); const j = await r.json(); if (j.success) RUTS_IA = new Set((j.data||[]).map(String)); } catch(e){}
+}
+// Modal: muestra el Reporte IA (Anthropic) del RUT, con fecha.
+async function verReporteIA(rut, nombre){
+  const E = s => String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+  const ov = document.createElement('div');
+  ov.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:10000;display:flex;align-items:center;justify-content:center;padding:18px';
+  ov.innerHTML = `<div style="background:#fff;border-radius:14px;max-width:620px;width:100%;max-height:88vh;overflow:auto;box-shadow:0 20px 60px rgba(0,0,0,.3)">
+    <div style="padding:18px 22px;background:linear-gradient(135deg,#9a3412,#c2410c);color:#fff;border-radius:14px 14px 0 0;display:flex;align-items:center;gap:10px">
+      <i class="bi bi-stars" style="font-size:1.3rem"></i>
+      <div><h3 style="margin:0;font-size:1.05rem">Reporte IA — Anthropic</h3>
+        <div style="font-size:.82rem;opacity:.9">${E(nombre||'')} · ${E(rut||'')}</div></div>
+      <button onclick="this.closest('div[style*=fixed]').remove()" style="margin-left:auto;background:rgba(255,255,255,.2);border:none;color:#fff;width:30px;height:30px;border-radius:8px;cursor:pointer">✕</button>
+    </div>
+    <div id="repIABody" style="padding:18px 22px"><div class="text-center text-muted py-4">Cargando…</div></div></div>`;
+  document.body.appendChild(ov);
+  let d = null;
+  try { const r = await fetch('/api/ia/informe-dealernet/por-rut/'+encodeURIComponent(rut), { headers: H }); const j = await r.json(); if (j.success) d = j.data; } catch(e){}
+  const body = ov.querySelector('#repIABody');
+  if (!d) { body.innerHTML = '<div class="text-muted py-3">Sin reporte IA para este RUT.</div>'; return; }
+  const RIESGO = { BAJO:{c:'#166534',b:'#dcfce7'}, MEDIO:{c:'#92400e',b:'#fef9c3'}, ALTO:{c:'#991b1b',b:'#fee2e2'} };
+  const rg = RIESGO[String(d.nivel_riesgo||'').toUpperCase()] || { c:'#475569', b:'#f1f5f9' };
+  const fecha = d.fecha ? new Date(d.fecha).toLocaleString('es-CL') : '—';
+  const lista = (a, vacio) => (a&&a.length) ? '<ul style="margin:4px 0 0;padding-left:18px">'+a.map(x=>`<li>${E(typeof x==='string'?x:JSON.stringify(x))}</li>`).join('')+'</ul>' : `<div style="color:#94a3b8">${vacio}</div>`;
+  const causas = (d.causas||[]).map(c=>`<li><b>${E(c.tipo||'')}</b> · ${E(c.materia||c.caratula||'')}${c.fecha?' · '+E(c.fecha):''}${c.demandante?' · '+E(c.demandante):''}${c.tribunal?' · '+E(c.tribunal):''}${c.estado?' · '+E(c.estado):''}</li>`).join('');
+  body.innerHTML = `
+    <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:12px">
+      <span style="font-size:.72rem;font-weight:800;color:${rg.c};background:${rg.b};border-radius:8px;padding:3px 10px">RIESGO ${E(d.nivel_riesgo||'—')}</span>
+      <span style="font-size:.78rem;color:#64748b"><i class="bi bi-clock-history"></i> ${E(fecha)}</span>
+      ${d.modelo?`<span style="font-size:.72rem;color:#94a3b8">${E(d.modelo)}</span>`:''}
+    </div>
+    <div style="margin-bottom:12px"><b style="color:#0f172a">Resumen</b><div style="color:#374151;margin-top:3px">${E(d.resumen||'—')}</div></div>
+    <div style="margin-bottom:12px"><b style="color:#0f172a">Deudas / morosidades</b><div style="color:#374151;margin-top:3px">${E(d.deudas||'—')}</div></div>
+    <div style="margin-bottom:12px"><b style="color:#0f172a">Causas judiciales</b>${causas?`<ul style="margin:4px 0 0;padding-left:18px;color:#991b1b">${causas}</ul>`:'<div style="color:#94a3b8">Sin causas judiciales detectadas</div>'}</div>
+    <div style="margin-bottom:12px"><b style="color:#991b1b">Alertas</b>${lista(d.alertas,'Sin alertas')}</div>
+    <div style="margin-bottom:12px"><b style="color:#166534">Factores positivos</b>${lista(d.factores,'—')}</div>
+    <div style="background:#eff6ff;border-left:4px solid #0141A2;border-radius:8px;padding:10px 12px"><b>Recomendación</b><div style="color:#1e3a5f;margin-top:3px">${E(d.recomendacion||'—')}</div></div>
+    ${d.productos?`<div style="font-size:.74rem;color:#94a3b8;margin-top:10px">Informes: ${E(d.productos)}</div>`:''}`;
+}
 
 function debounceCargar() { clearTimeout(debTimer); debTimer = setTimeout(() => cargar(1), 350); }
 function cambiarPag(d) { pag += d; cargar(); }
@@ -534,16 +580,20 @@ async function cargar(p) {
   if (!json.success) return;
   const { rows, total } = json.data;
   totalRows = total;
+  const soloIA = document.getElementById('filtroIA')?.checked;
+  const lista = soloIA ? rows.filter(d => RUTS_IA.has(normRutNum(d.rut))) : rows;
 
-  document.getElementById('countBadge').textContent = `${total.toLocaleString('es-CL')} dealers encontrados`;
+  document.getElementById('countBadge').textContent = soloIA
+    ? `${lista.length} con Reporte IA (en esta página)`
+    : `${total.toLocaleString('es-CL')} dealers encontrados`;
   const desde = (pag - 1) * 100 + 1, hasta = Math.min(pag * 100, total);
   document.getElementById('pagInfo').textContent = total > 0 ? `Mostrando ${desde}–${hasta} de ${total.toLocaleString('es-CL')}` : '';
   document.getElementById('btnPrev').disabled = pag <= 1;
   document.getElementById('btnNext').disabled = hasta >= total;
 
   const tb = document.getElementById('tbody');
-  if (!rows.length) { tb.innerHTML = '<tr><td colspan="10" class="text-center text-muted py-5">Sin resultados</td></tr>'; return; }
-  tb.innerHTML = rows.map((d, i) => `
+  if (!lista.length) { tb.innerHTML = `<tr><td colspan="10" class="text-center text-muted py-5">${soloIA ? 'Sin dealers con Reporte IA en esta página' : 'Sin resultados'}</td></tr>`; return; }
+  tb.innerHTML = lista.map((d, i) => `
     <tr>
       <td class="td-n">${d.numero ?? (pag-1)*100+i+1}</td>
       <td class="td-ind">${fmt(d.numero_ind)}</td>
@@ -558,6 +608,7 @@ async function cargar(p) {
         <div class="acciones-cell">
           <button class="btn-ver" onclick='verDealer(${JSON.stringify(d).replace(/'/g,"&#39;")})'>Ver</button>
           <button class="btn-editar-row" onclick='abrirEditarDirecto(${JSON.stringify(d).replace(/'/g,"&#39;")})'>Editar</button>
+          ${RUTS_IA.has(normRutNum(d.rut)) ? `<button class="btn-ver" title="Ver Reporte IA (Anthropic)" style="background:#fdf3ee;border-color:#f2d3c4;color:#c2410c" onclick='verReporteIA(${JSON.stringify(d.rut).replace(/'/g,"&#39;")}, ${JSON.stringify(nombreDealer(d)||"").replace(/'/g,"&#39;")})'><i class="bi bi-stars"></i> IA</button>` : ''}
         </div>
       </td>
     </tr>`).join('');
@@ -1035,7 +1086,7 @@ async function confirmarImport() {
 }
 
 // Init
-Promise.all([cargarCategorias(), cargarPizarraDef()]).then(() => cargar(1));
+Promise.all([cargarCategorias(), cargarPizarraDef(), cargarRutsIA()]).then(() => cargar(1));
 cargarCcs();
 </script>
 <script src="/js/app-version.js"></script>

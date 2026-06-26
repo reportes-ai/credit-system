@@ -15,6 +15,8 @@ router.get('/evaluaciones', verifyToken, liquidaciones.historial);
 
 router.post('/informe-dealernet', verifyToken, informeDn.analizar);
 router.get('/informe-dealernet/historial', verifyToken, informeDn.historial);
+router.get('/informe-dealernet/ruts', verifyToken, informeDn.rutsConReporte);
+router.get('/informe-dealernet/por-rut/:rut', verifyToken, informeDn.porRut);
 
 router.post('/evaluacion-credito', verifyToken, evalCredito.evaluar);
 router.get('/evaluacion-credito/detalle/:id', verifyToken, evalCredito.detalle);

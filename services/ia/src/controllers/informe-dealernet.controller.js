@@ -178,3 +178,24 @@ exports.historial = async (req, res) => {
     res.json({ success: true, data: rows, error: null });
   } catch (e) { console.error('[ia informe-dn historial]', e.message); res.status(500).json({ success: false, data: null, error: 'Error interno del servidor' }); }
 };
+
+/* GET /api/ia/informe-dealernet/ruts — cuerpos de RUT con al menos un reporte IA (íconos/filtro) */
+exports.rutsConReporte = async (req, res) => {
+  try {
+    const [rows] = await pool.query('SELECT DISTINCT rut FROM ia_informes_dealernet WHERE rut IS NOT NULL AND rut<>""');
+    res.json({ success: true, data: rows.map(r => r.rut), error: null });
+  } catch (e) { console.error('[ia informe-dn ruts]', e.message); res.status(500).json({ success: false, data: null, error: 'Error interno del servidor' }); }
+};
+
+/* GET /api/ia/informe-dealernet/por-rut/:rut — último reporte IA de un RUT (con fecha), para verlo */
+exports.porRut = async (req, res) => {
+  try {
+    const rut = rutNum(req.params.rut);
+    if (!rut) return res.status(400).json({ success: false, data: null, error: 'RUT inválido' });
+    const [[r]] = await pool.query(
+      `SELECT id, fecha, rut, nivel_riesgo, resumen, deudas, causas, alertas, factores, recomendacion, productos, modelo
+       FROM ia_informes_dealernet WHERE rut = ? ORDER BY fecha DESC LIMIT 1`, [rut]);
+    if (!r) return res.json({ success: true, data: null, error: null });
+    res.json({ success: true, data: { ...r, causas: arr(r.causas), alertas: arr(r.alertas), factores: arr(r.factores) }, error: null });
+  } catch (e) { console.error('[ia informe-dn porRut]', e.message); res.status(500).json({ success: false, data: null, error: 'Error interno del servidor' }); }
+};
