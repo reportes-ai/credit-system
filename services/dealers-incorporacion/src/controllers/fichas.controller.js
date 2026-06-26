@@ -191,6 +191,7 @@ async function comDefaults() {
         fecha          DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP,
         INDEX idx_ficha (id_ficha)
       )`);
+    await pool.query('ALTER TABLE dealer_ficha_autorizaciones ADD COLUMN IF NOT EXISTS sin_revision TINYINT(1) NOT NULL DEFAULT 0');
   } catch (e) { if (e.errno !== 1050) console.error('[dealer_ficha_autorizaciones migration]', e.message); }
 
   // Registro del módulo en el menú (idempotente).
@@ -542,7 +543,7 @@ const obtener = async (req, res) => {
       return res.status(403).json({ success: false, data: null, error: 'Sin acceso a esta ficha' });
     // Autorizaciones registradas (para la letra chica) + nombre del nivel actual pendiente.
     const [autoriz] = await pool.query(
-      'SELECT orden, nombre_nivel, usuario_nombre, perfil, fecha FROM dealer_ficha_autorizaciones WHERE id_ficha=? ORDER BY orden, id', [req.params.id]);
+      'SELECT orden, nombre_nivel, usuario_nombre, perfil, fecha, sin_revision FROM dealer_ficha_autorizaciones WHERE id_ficha=? ORDER BY orden, id', [req.params.id]);
     f.autorizaciones = autoriz;
     if (f.estado === 'PEND_AUTORIZACION') {
       const [[niv]] = await pool.query('SELECT nombre FROM dealer_aprob_niveles WHERE orden=? AND activo=1 ORDER BY id LIMIT 1', [f.nivel_actual]);
@@ -906,9 +907,13 @@ const autorizar = async (req, res) => {
       return res.status(403).json({ success: false, data: null, error: `No tienes el permiso para autorizar el nivel "${niv.nombre}"` });
 
     const nombre = [req.usuario.nombre, req.usuario.apellido].filter(Boolean).join(' ') || req.usuario.email;
+    // ¿Revisó la ficha (abrió "Revisar") antes de autorizar? Si no → "Aprobado sin revisión de ficha".
+    const [[rev]] = await pool.query('SELECT 1 ok FROM dealer_ficha_revisiones WHERE id_ficha=? AND id_usuario=? LIMIT 1', [f.id, req.usuario.id_usuario]);
+    const sinRevision = rev ? 0 : 1;
+    const sinRevTxt = sinRevision ? ` · ⚠ APROBADO SIN REVISIÓN DE FICHA por ${nombre}` : '';
     await pool.query(
-      'INSERT INTO dealer_ficha_autorizaciones (id_ficha, orden, nombre_nivel, permiso, usuario_id, usuario_nombre, perfil) VALUES (?,?,?,?,?,?,?)',
-      [f.id, niv.orden, niv.nombre, niv.permiso, req.usuario.id_usuario, nombre, req.usuario.perfil_nombre || null]);
+      'INSERT INTO dealer_ficha_autorizaciones (id_ficha, orden, nombre_nivel, permiso, usuario_id, usuario_nombre, perfil, sin_revision) VALUES (?,?,?,?,?,?,?,?)',
+      [f.id, niv.orden, niv.nombre, niv.permiso, req.usuario.id_usuario, nombre, req.usuario.perfil_nombre || null, sinRevision]);
     // Si este nivel es el de participación especial, sella "aprobada por XXXX".
     if (niv.condicion === 'COMISION_SOBRE_PIZARRA')
       await pool.query('UPDATE dealer_fichas SET part_especial=1, part_especial_por=?, part_especial_por_id=?, part_especial_fecha=NOW() WHERE id=?',
@@ -921,7 +926,7 @@ const autorizar = async (req, res) => {
       const ids = await idsConPermiso(next.permiso, req.usuario.id_usuario);
       await notificarEventoDealer('dealer_para_autorizar', { idsBase: ids, ejecutivo: f.id_ejecutivo,
         titulo: '🛎️ Ficha de dealer para autorizar',
-        mensaje: `${f.nombre_razon || f.rut || ''} — nivel: ${next.nombre}`,
+        mensaje: `${f.nombre_razon || f.rut || ''} — nivel: ${next.nombre}` + sinRevTxt,
         href: '/dealers-incorporacion/mantencion.html?tab=revision', clave: `dealerficha:${f.id}:rev` });
     } else {
       await pool.query('UPDATE dealer_fichas SET estado=\'AUTORIZADA\', nivel_actual=NULL WHERE id=?', [f.id]);
@@ -931,8 +936,8 @@ const autorizar = async (req, res) => {
         href: '/dealers-incorporacion/mantencion.html?tab=mias' });
     }
     auditar({ req, accion: 'APROBAR', modulo: 'dealers', entidad: 'dealer_ficha', entidad_id: f.id,
-      detalle: `Autorizó el nivel "${niv.nombre}" de la ficha de ${f.nombre_razon || f.rut || ''}`, rut: f.rut });
-    res.json({ success: true, data: { estado: next ? 'PEND_AUTORIZACION' : 'AUTORIZADA', siguiente: next ? next.nombre : null }, error: null });
+      detalle: `Autorizó el nivel "${niv.nombre}" de la ficha de ${f.nombre_razon || f.rut || ''}` + (sinRevision ? ' (SIN revisión de ficha)' : ''), rut: f.rut });
+    res.json({ success: true, data: { estado: next ? 'PEND_AUTORIZACION' : 'AUTORIZADA', siguiente: next ? next.nombre : null, sin_revision: !!sinRevision }, error: null });
   } catch (e) { console.error('[fichas autorizar]', e.message); res.status(500).json({ success: false, data: null, error: 'Error interno del servidor' }); }
 };
 

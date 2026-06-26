@@ -338,7 +338,7 @@ async function verFicha(id, revisar){
     // Cadena de autorización: autorizaciones registradas + nivel pendiente
     let cadenaHtml = '';
     if ((Array.isArray(f.autorizaciones) && f.autorizaciones.length) || f.estado==='PEND_AUTORIZACION') {
-      const items = (f.autorizaciones||[]).map(a=>`<div style="margin-top:5px;font-size:.82rem"><i class="bi bi-check2-circle me-1" style="color:#15803d"></i><b>${escH(a.nombre_nivel||'Nivel')}:</b> ${escH(a.usuario_nombre||'—')}${a.perfil?` (${escH(a.perfil)})`:''} · ${fH(a.fecha)}</div>`).join('');
+      const items = (f.autorizaciones||[]).map(a=>`<div style="margin-top:5px;font-size:.82rem"><i class="bi bi-check2-circle me-1" style="color:#15803d"></i><b>${escH(a.nombre_nivel||'Nivel')}:</b> ${escH(a.usuario_nombre||'—')}${a.perfil?` (${escH(a.perfil)})`:''} · ${fH(a.fecha)}${a.sin_revision?' <span style="color:#b91c1c;font-weight:700">· SIN REVISIÓN DE FICHA</span>':''}</div>`).join('');
       const pend = (f.estado==='PEND_AUTORIZACION' && f.nivel_actual_nombre) ? `<div style="margin-top:5px;font-size:.82rem;color:#854d0e"><i class="bi bi-hourglass-split me-1"></i>Pendiente: <b>${escH(f.nivel_actual_nombre)}</b></div>` : '';
       cadenaHtml = `<div style="margin-top:14px;border:1px solid #c7d2fe;background:#eef2ff;border-radius:10px;padding:12px 14px">
         <b style="color:#3730a3;font-size:.82rem"><i class="bi bi-diagram-3 me-1"></i>Cadena de autorización</b>${items||'<div style="font-size:.8rem;color:#94a3b8;margin-top:4px">Sin autorizaciones aún</div>'}${pend}</div>`;
