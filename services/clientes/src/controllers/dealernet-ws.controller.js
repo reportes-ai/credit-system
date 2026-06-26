@@ -736,15 +736,18 @@ const PENAL_CODIGOS = ['3403', '3433', '3439'];   // Comportamiento Penal, Índi
 // Penal con registros → alerta grave. Devuelve {tieneRegistros, grave, nota}.
 function analizarInforme(codigo, contenido) {
   const esPenal = PENAL_CODIGOS.includes(String(codigo));
-  if (contenido == null) return { tieneRegistros: false, grave: false, nota: 'sin datos' };
+  if (contenido == null) return { tieneRegistros: false, grave: false, severidad: 'sin_datos', nota: 'sin datos' };
   let txt; try { txt = JSON.stringify(contenido).toLowerCase(); } catch { txt = String(contenido).toLowerCase(); }
   const numMatch = txt.match(/"(?:cantidad|registros|total|nreg|num|count)"\s*:\s*"?(\d+)"?/);
   const nreg = numMatch ? parseInt(numMatch[1], 10) : null;
+  const negativo = /(moroso|protesto|impago|deuda|quiebra|demanda|juicio|causa|condena|delito|aliment)/.test(txt);
   const hallazgo = /(moroso|protesto|impago|deuda|juicio|causa|demanda|proceso|delito|quiebra|aliment|condena|penal)/.test(txt);
   const tieneRegistros = (nreg != null ? nreg > 0 : hallazgo);
   const grave = esPenal && tieneRegistros;
+  // Clasificación: grave (penal con registros) > malo (deudas/morosidades/juicios) > regular (otros registros) > bueno (limpio).
+  const severidad = tieneRegistros ? (grave ? 'grave' : (negativo ? 'malo' : 'regular')) : 'bueno';
   const nota = tieneRegistros ? (esPenal ? 'registros penales/judiciales' : 'con observaciones') : 'sin observaciones';
-  return { tieneRegistros, grave, nota };
+  return { tieneRegistros, grave, severidad, nota };
 }
 
 async function asegurarInformes({ rut, productos, usuario }) {
@@ -795,7 +798,7 @@ async function asegurarInformes({ rut, productos, usuario }) {
     const a = analizarInforme(cod, contenido);
     out.items.push({ codigo: cod, nombre: nombreDe(cod), disponible: !!u, fecha: u ? u.created_at : null,
       dias: u ? Number(u.dias) : null, vencido: u ? Number(u.dias) > cfg.dias_bloqueo : false,
-      tiene_registros: a.tieneRegistros, grave: a.grave, nota: a.nota });
+      tiene_registros: a.tieneRegistros, grave: a.grave, severidad: a.severidad, nota: a.nota });
   }
   return out;
 }

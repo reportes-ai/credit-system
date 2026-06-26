@@ -197,6 +197,14 @@
   </div>
 
   <div class="card-sec">
+    <h3><i class="bi bi-people me-1"></i> Socios</h3>
+    <div class="card-body">
+      <p class="hint" style="margin-top:0">RUT y nombre de los socios (hasta 3). Al <b>Enviar a Autorización</b> se consultan sus informes comerciales en DealerNet junto con el de la empresa.</p>
+      <div id="sociosWrap"></div>
+    </div>
+  </div>
+
+  <div class="card-sec">
     <h3><i class="bi bi-telephone me-1"></i> Contacto Comercial</h3>
     <div class="card-body grid">
       <div class="fld"><label>Nombre</label><input id="cc_nombre"></div>
@@ -288,23 +296,6 @@
     </div>
   </div>
 
-  <div class="card-sec">
-    <h3><i class="bi bi-folder2-open me-1"></i> Informes Comerciales</h3>
-    <div class="card-body">
-      <p class="hint" style="margin-top:0">Adjunta los informes (PDF o imagen, máx 3 c/u) <b>o déjalos vacíos</b>: al <b>Enviar a Autorización</b>, Business Suite los busca en el repositorio DealerNet y, si faltan o tienen más de <b>15 días</b>, los <b>solicita y procesa</b> automáticamente. La empresa no lleva el informe de Deudores de Alimentos; los socios sí.</p>
-
-      <!-- Empresa -->
-      <div class="fld full" style="border:1px solid #e2e8f0;border-radius:10px;padding:12px;margin-bottom:12px">
-        <label><i class="bi bi-building me-1"></i> Empresa (concesionario)</label>
-        <div class="reqlist" id="reqEmpresa" style="font-size:.78rem;color:#64748b;margin:4px 0 8px"></div>
-        <input type="file" id="fileEMPRESA" accept="application/pdf,image/*" multiple onchange="onInformes('EMPRESA')">
-        <div id="listEMPRESA" class="filelist"></div>
-      </div>
-
-      <!-- Socios 1..3 (generados por JS) -->
-      <div id="sociosWrap"></div>
-    </div>
-  </div>
 
   <div class="card-sec" id="cardFirma" style="display:none">
     <h3><i class="bi bi-cloud-upload me-1"></i> Ficha firmada por el cliente</h3>
@@ -602,36 +593,36 @@ function repLegalData(){
   return { origen:'PROPIO', nombre:val('rl_nombre'), telefono:val('rl_telefono'), email:val('rl_email') };
 }
 
-/* ── Adjuntos (informes empresa + 3 socios + poderes tercero) ── */
-const CAT_UI = { EMPRESA:{input:'fileEMPRESA',list:'listEMPRESA'},
-  SOCIO1:{input:'fileSOCIO1',list:'listSOCIO1'}, SOCIO2:{input:'fileSOCIO2',list:'listSOCIO2'}, SOCIO3:{input:'fileSOCIO3',list:'listSOCIO3'},
-  PODER_SIMPLE:{input:'filePoderSimple',list:'listPoderSimple'}, PODER_REP_LEGAL:{input:'filePoderRepLegal',list:'listPoderRepLegal'} };
+/* ── Adjuntos (poderes a tercero; los informes ya NO se suben: van por DealerNet) ── */
+const CAT_UI = { PODER_SIMPLE:{input:'filePoderSimple',list:'listPoderSimple'}, PODER_REP_LEGAL:{input:'filePoderRepLegal',list:'listPoderRepLegal'} };
 
-// Render de las 3 filas de Socios (RUT + nombre + informes a subir). Ids fijos para CAT_UI.
+// 3 filas de Socios: RUT (autoformato) + Nombre (autocompleta desde base de clientes).
 function renderSocios(){
   const w=$('sociosWrap'); if(!w || w.dataset.done) return;
   let html='';
-  for(let i=1;i<=3;i++) html+=`<div class="fld full" style="border:1px solid #e2e8f0;border-radius:10px;padding:12px;margin-bottom:10px">
-      <label><i class="bi bi-person me-1"></i> Socio ${i}</label>
-      <div class="grid" style="grid-template-columns:1fr 1.4fr;gap:8px;margin-bottom:2px">
-        <input id="socio_rut_${i}" placeholder="RUT del socio" maxlength="12" oninput="onRutInput(this,'socioHint_${i}')">
-        <input id="socio_nombre_${i}" placeholder="Nombre del socio">
-      </div>
-      <small id="socioHint_${i}" class="vmsg"></small>
-      <div class="reqlist" id="reqSocio_${i}" style="font-size:.78rem;color:#64748b;margin:6px 0 8px"></div>
-      <input type="file" id="fileSOCIO${i}" accept="application/pdf,image/*" multiple onchange="onInformes('SOCIO${i}')">
-      <div id="listSOCIO${i}" class="filelist"></div>
+  for(let i=1;i<=3;i++) html+=`<div class="grid" style="grid-template-columns:1fr 1.4fr;gap:10px;margin-bottom:10px">
+      <div class="fld"><label>RUT Socio ${i}</label>
+        <input id="socio_rut_${i}" placeholder="76.123.456-7" maxlength="12" oninput="onRutInput(this,'socioHint_${i}')" onchange="buscarSocio(${i})">
+        <small id="socioHint_${i}" class="vmsg"></small></div>
+      <div class="fld"><label>Nombre Socio ${i}</label><input id="socio_nombre_${i}" placeholder="Se autocompleta desde clientes"></div>
     </div>`;
   w.innerHTML=html; w.dataset.done='1';
 }
 
-// Sets de informes por entidad (paramétricos desde Mantenedores → Productos DealerNet).
-let SETS_INF={ empresa:[], socio:[] };
-async function cargarSetsInformes(){
-  try{ const r=await fetch('/api/dealernet/ficha-informes',{headers:H}); const j=await r.json(); if(j.success) SETS_INF=j.data||SETS_INF; }catch(e){}
-  const fmt = arr => (arr&&arr.length) ? ('Se validan: '+arr.map(p=>p.nombre).join(', ')+'.') : 'Sin informes configurados (Mantenedores → Productos DealerNet).';
-  const re=$('reqEmpresa'); if(re) re.textContent='Se valida el RUT del concesionario. '+fmt(SETS_INF.empresa);
-  for(let i=1;i<=3;i++){ const el=$('reqSocio_'+i); if(el) el.textContent=fmt(SETS_INF.socio); }
+// Autocompleta el nombre del socio desde la base de clientes (no pisa lo ya escrito).
+async function buscarSocio(i){
+  const clean=val('socio_rut_'+i).replace(/[^0-9kK]/g,'').toUpperCase();
+  if(clean.length<7 || !validarRUT(clean)) return;
+  const nm=$('socio_nombre_'+i); if(nm && nm.value.trim()) return;
+  try{
+    const r=await fetch('/api/clientes/rut/'+encodeURIComponent(clean),{headers:H}); const j=await r.json();
+    if(j.success && j.data){
+      const d=j.data;
+      const nombre = d.nombre_razon_social || d.razon_social || d.nombre_completo
+        || [d.nombres,d.apellido_paterno,d.apellido_materno].filter(Boolean).join(' ').trim();
+      if(nombre && nm) nm.value=nombre;
+    }
+  }catch(e){}
 }
 async function ensureId(){ if(FICHA_ID) return true; return await guardar(true); }
 async function onInformes(cat){
@@ -891,10 +882,13 @@ async function enviarFinal(){
 function mostrarResumenEnvio(resumen, grave){
   const E=s=>String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;');
   const nombreEnt = t => t==='EMPRESA' ? 'Empresa' : String(t||'').replace('SOCIO','Socio ');
+  const RAT = { bueno:{t:'Bueno',c:'#166534',b:'#dcfce7'}, regular:{t:'Regular',c:'#92400e',b:'#fef9c3'},
+    malo:{t:'Malo',c:'#9a3412',b:'#ffedd5'}, grave:{t:'Grave',c:'#991b1b',b:'#fee2e2'}, sin_datos:{t:'Sin datos',c:'#475569',b:'#f1f5f9'} };
+  const badge = r => { const x=RAT[r.rating||'sin_datos']||RAT.sin_datos; return `<span style="font-size:.66rem;font-weight:800;color:${x.c};background:${x.b};border-radius:8px;padding:2px 8px;margin-left:6px">${x.t.toUpperCase()}</span>`; };
   let body = '';
   if(grave) body += `<div style="background:#fef2f2;border:1px solid #fca5a5;color:#991b1b;border-radius:10px;padding:10px 12px;margin-bottom:12px;font-weight:700"><i class="bi bi-exclamation-octagon-fill me-1"></i> ALERTA GRAVE: se detectaron registros penales/judiciales. Operaciones lo revisará al autorizar.</div>`;
   body += (resumen||[]).map(r=>`<div style="border:1px solid #e2e8f0;border-radius:10px;padding:10px 12px;margin-bottom:8px">
-      <div style="font-weight:700;color:#0f172a">${E(nombreEnt(r.tipo))} — ${E(r.nombre||r.rut||'')}${r.grave?' <span style="color:#dc2626;font-weight:700">· GRAVE</span>':''}</div>
+      <div style="font-weight:700;color:#0f172a">${E(nombreEnt(r.tipo))} — ${E(r.nombre||'')} <span style="color:#64748b;font-weight:600">${E(r.rut||'')}</span>${badge(r)}</div>
       <div style="font-size:.8rem;color:#475569;margin-top:3px">${((r.advertencias)||[]).map(a=>'• '+E(a)).join('<br>')||'—'}</div>
     </div>`).join('') || '<p style="color:#64748b">Sin informes para resumir.</p>';
   const ov=document.createElement('div');
@@ -914,7 +908,6 @@ function mostrarResumenEnvio(resumen, grave){
 
 async function cargar(){
   renderSocios();
-  cargarSetsInformes();
   await cargarGeo();
   await cargarComDefault();
   if (!FICHA_ID) { await cargarEjecutivos(); $('fecha_solicitud').value = new Date().toLocaleDateString('sv-SE',{timeZone:'America/Santiago'}); onTipo(); actualizarTercero(); onRepToggle(); onTipoCuenta(); aplicarEstadoUI('BORRADOR'); return; }

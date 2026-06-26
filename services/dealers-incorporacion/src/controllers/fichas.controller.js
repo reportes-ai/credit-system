@@ -766,7 +766,7 @@ async function procesarInformesFicha(f, porCat, usuario) {
   const resumen = []; let grave = false;
   for (const e of entidades) {
     const subio = (porCat[e.cat] || 0) > 0;
-    const r = { tipo: e.tipo, nombre: e.nombre, rut: e.rut, modo: null, grave: false, productos: [], advertencias: [] };
+    const r = { tipo: e.tipo, nombre: e.nombre, rut: e.rut, modo: null, rating: 'sin_datos', grave: false, productos: [], advertencias: [] };
     if (subio) {
       r.modo = 'subido';
       r.advertencias.push('Informes adjuntados manualmente por el ejecutivo.');
@@ -774,8 +774,12 @@ async function procesarInformesFicha(f, porCat, usuario) {
       r.modo = 'dealernet';
       try {
         const a = await dnet.asegurarInformes({ rut: e.rut, productos: e.productos, usuario });
-        r.productos = a.items || [];
-        r.grave = (a.items || []).some(it => it.grave);
+        const items = a.items || [];
+        r.productos = items;
+        const RANK = { sin_datos: 0, bueno: 1, regular: 2, malo: 3, grave: 4 };
+        const disp = items.filter(it => it.disponible);
+        r.rating = disp.length ? disp.reduce((w, it) => (RANK[it.severidad] || 0) > (RANK[w] || 0) ? it.severidad : w, 'bueno') : 'sin_datos';
+        r.grave = r.rating === 'grave';
         if (a.faltaban && a.faltaban.length) r.advertencias.push(a.consultado
           ? 'No se habían consultado previamente; Business Suite los solicitó a DealerNet.'
           : ('Faltaban informes y no se pudieron obtener: ' + (a.error || 'sin credenciales/contacto') + '.'));
