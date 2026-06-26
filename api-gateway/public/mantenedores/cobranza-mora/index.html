@@ -83,7 +83,9 @@
       <div><label>Desde (cuenta)</label><select id="mRem"></select></div>
       <div><label>No reenviar el mismo tramo en (días)</label><input type="number" id="mCooldown" min="0" max="90"></div>
       <div><label>Máx. correos por corrida</label><input type="number" id="mMax" min="1" max="2000"></div>
+      <div><label>Pausa entre correos (seg)</label><input type="number" id="mPausa" min="0" max="120"></div>
     </div>
+    <p class="muted" style="margin:8px 0 0">La corrida es 1 vez al día (a la hora/días indicados). Los correos salen espaciados según la pausa (ej. 5 s × 200 ≈ 17 min).</p>
     <div style="display:flex;gap:10px;flex-wrap:wrap;margin-top:14px;align-items:center">
       <button class="btn-af" onclick="guardarConfig()"><i class="bi bi-check-lg"></i> Guardar configuración</button>
       <button class="btn-run" onclick="correr(false)"><i class="bi bi-search"></i> Correr ahora (prueba, no envía)</button>
@@ -139,6 +141,7 @@ async function cargar(){
     document.getElementById('mHora').value = String(config.mora_hora||'10:00').slice(0,5);
     document.getElementById('mCooldown').value = config.mora_cooldown_dias || '7';
     document.getElementById('mMax').value = config.mora_max || '200';
+    document.getElementById('mPausa').value = config.mora_pausa_seg != null ? config.mora_pausa_seg : '5';
     document.getElementById('mRem').innerHTML = (cuentas||[]).map(c=>`<option value="${esc(c.clave)}" ${config.mora_remitente===c.clave?'selected':''}>${esc(c.label)}</option>`).join('');
     const sel = String(config.mora_dias||'').split(',');
     document.getElementById('mDias').innerHTML = DIAS.map(([v,l])=>`<span class="dchip ${sel.includes(v)?'on':''}" data-v="${v}" onclick="this.classList.toggle('on')">${l}</span>`).join('');
@@ -175,6 +178,7 @@ async function guardarConfig(){
     mora_remitente: document.getElementById('mRem').value,
     mora_cooldown_dias: document.getElementById('mCooldown').value || '7',
     mora_max: document.getElementById('mMax').value || '200',
+    mora_pausa_seg: document.getElementById('mPausa').value || '0',
   };
   try {
     const j = await (await fetch('/api/cobranza-mora/config', { method:'PUT', headers:H, body:JSON.stringify(body) })).json();
@@ -210,6 +214,7 @@ async function correr(real){
     if (!j.success) throw new Error(j.error||'Error');
     const d = j.data;
     if (d.ok === false){ res.textContent = 'No corrió: '+(d.motivo||''); return; }
+    if (d.lanzado){ res.textContent = '✓ '+(d.msg||'Corrida iniciada en segundo plano.'); setTimeout(cargar, 4000); return; }
     let txt = `${real?'ENVIADO':'PRUEBA (no se envió)'}\n`;
     txt += `Cartera en mora revisada: ${d.total}\n`;
     txt += `${real?'Enviados':'Irían'}: ${d.enviados} · Saltados (cooldown/error): ${d.saltados||0} · Sin email: ${d.sin_email||0} · Sin tramo: ${d.sin_tramo||0}\n`;

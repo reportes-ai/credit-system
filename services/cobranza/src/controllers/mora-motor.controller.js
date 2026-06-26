@@ -13,6 +13,7 @@ const pool = require('../../../../shared/config/database');
 const { enviarCorreo, remitentePorClave, envolverHTML, cuentasRemitente } = require('../../../../shared/mailer');
 const cob = require('./cobranza.controller');
 const { MORA_SQL, getCobranzaConfig, rellenar, tratamiento, titleCase } = cob._motor;
+const sleep = ms => new Promise(r => setTimeout(r, ms));
 
 /* ── Migración + seed (3 tramos) + config (desactivada) + funcionalidad ── */
 (async () => {
@@ -49,7 +50,7 @@ const { MORA_SQL, getCobranzaConfig, rellenar, tratamiento, titleCase } = cob._m
     for (const s of seed)
       await pool.query(`INSERT IGNORE INTO cobranza_mora_plantillas (codigo,nombre,dias_desde,dias_hasta,asunto,cuerpo,activo,orden) VALUES (?,?,?,?,?,?,1,?)`,
         [s[0], s[1], s[2], s[3], s[4], s[5].replace('{datos}', datos), s[6]]);
-    const cfg = { mora_activo: '0', mora_hora: '10:00', mora_dias: '1,2,3,4,5', mora_remitente: 'cobranza', mora_cooldown_dias: '7', mora_max: '200' };
+    const cfg = { mora_activo: '0', mora_hora: '10:00', mora_dias: '1,2,3,4,5', mora_remitente: 'cobranza', mora_cooldown_dias: '7', mora_max: '200', mora_pausa_seg: '5' };
     for (const [k, v] of Object.entries(cfg)) await pool.query('INSERT IGNORE INTO cobranza_config (clave,valor) VALUES (?,?)', [k, v]);
     // Funcionalidad del mantenedor, junto al de Parámetros Cobranza
     const [[fp]] = await pool.query("SELECT id_modulo FROM funcionalidades WHERE codigo='mant_cobranza_parametros' LIMIT 1");
@@ -67,7 +68,7 @@ const { MORA_SQL, getCobranzaConfig, rellenar, tratamiento, titleCase } = cob._m
 })();
 
 /* ── Config del motor (claves en cobranza_config) ── */
-const CFG_KEYS = ['mora_activo', 'mora_hora', 'mora_dias', 'mora_remitente', 'mora_cooldown_dias', 'mora_max'];
+const CFG_KEYS = ['mora_activo', 'mora_hora', 'mora_dias', 'mora_remitente', 'mora_cooldown_dias', 'mora_max', 'mora_pausa_seg'];
 async function getMotorCfg() {
   const [rows] = await pool.query('SELECT clave,valor FROM cobranza_config WHERE clave IN (?)', [CFG_KEYS.concat(['mora_ultimo_envio_fecha'])]);
   const m = {}; rows.forEach(r => { m[r.clave] = r.valor; });
@@ -104,6 +105,7 @@ async function procesar({ dryRun = false } = {}) {
   const from = remitentePorClave(cfg.mora_remitente || 'cobranza');
   const cooldown = Math.max(0, parseInt(cfg.mora_cooldown_dias, 10) || 7);
   const max = Math.min(2000, Math.max(1, parseInt(cfg.mora_max, 10) || 200));
+  const pausaMs = Math.max(0, parseInt(cfg.mora_pausa_seg, 10) || 0) * 1000;   // espaciado entre correos
   const [rows] = await pool.query(MORA_SQL('', '') + ' ORDER BY dias_mora DESC LIMIT ' + max);
   const tramoDe = d => plantillas.find(p => d >= p.dias_desde && d <= p.dias_hasta);
   let enviados = 0, saltados = 0, sin_email = 0, sin_tramo = 0; const detalle = [];
@@ -130,6 +132,7 @@ async function procesar({ dryRun = false } = {}) {
     await pool.query('INSERT INTO cobranza_mora_envios (id_credito,codigo_plantilla,dias_mora,email,estado) VALUES (?,?,?,?,?)',
       [c.id_credito, p.codigo, dias, email, r.ok ? 'enviado' : ('error: ' + (r.error || '')).slice(0, 140)]);
     if (r.ok) enviados++; else saltados++;
+    if (pausaMs && enviados + saltados < rows.length) await sleep(pausaMs);   // espacia los correos (anti-ráfaga)
   }
   return { ok: true, total: rows.length, enviados, saltados, sin_email, sin_tramo, detalle: dryRun ? detalle.slice(0, 100) : undefined };
 }
@@ -185,7 +188,14 @@ exports.guardarConfig = async (req, res) => {
 exports.correrAhora = async (req, res) => {
   try {
     const real = req.query.real === '1';
-    const r = await procesar({ dryRun: !real });
-    res.json({ success: true, data: r, error: null });
+    if (!real) {   // PRUEBA: síncrono, no envía, devuelve el detalle
+      const r = await procesar({ dryRun: true });
+      return res.json({ success: true, data: r, error: null });
+    }
+    // REAL: corre en segundo plano (con la pausa entre correos no cuelga el request) y responde de inmediato.
+    procesar({ dryRun: false })
+      .then(r => console.log('[mora correrAhora] real listo', JSON.stringify(r)))
+      .catch(e => console.error('[mora correrAhora] real error', e.message));
+    res.json({ success: true, data: { ok: true, lanzado: true, msg: 'Corrida iniciada en segundo plano. Los correos se envían espaciados; revisa el resultado en "envíos últimos 7 días".' }, error: null });
   } catch (e) { console.error('[mora correrAhora]', e.message); res.status(500).json({ success: false, data: null, error: 'Error interno del servidor' }); }
 };
