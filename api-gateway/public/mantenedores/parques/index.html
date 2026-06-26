@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <link rel="icon" href="/img/favicon.png" type="image/png">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Arriendo y Comisión Parques — AutoFácil</title>
+  <title>Arriendos y Comisiones Parque y Calle — AutoFácil</title>
   <link href="/css/bootstrap.min.css" rel="stylesheet">
   <link href="/css/bootstrap-icons.css" rel="stylesheet">
   <style>
@@ -67,6 +67,17 @@
     .btn-save { background:var(--navy); color:#fff; border:none; border-radius:8px; padding:9px 18px; font-size:.87rem; font-weight:600; cursor:pointer; }
     .btn-save:hover { background:var(--navy-light); }
     .alert-err { background:#fef2f2; border:1px solid #fecaca; color:#dc2626; border-radius:8px; padding:9px 13px; font-size:.83rem; display:none; margin-bottom:12px; }
+    /* Sección Comisión Dealer por Plazo (movida desde Parámetros Financieras) */
+    .cd-card { background:#fff; border-radius:14px; box-shadow:0 1px 4px rgba(0,0,0,.07); margin-top:20px; }
+    .cd-hdr { background:#f8fafc; border-bottom:1px solid #e5e7eb; border-radius:14px 14px 0 0; padding:13px 20px; font-weight:700; font-size:.85rem; color:var(--navy); display:flex; align-items:center; gap:8px; }
+    .cd-bd { padding:20px; }
+    .cd-formula { background:#eff6ff; border:1px solid #bfdbfe; border-radius:8px; padding:12px 16px; font-size:.8rem; color:#1e40af; margin-bottom:16px; font-family:monospace; line-height:1.7; }
+    table.cd-tbl { width:100%; border-collapse:collapse; font-size:.85rem; }
+    table.cd-tbl th { background:#f8fafc; color:#374151; font-weight:700; font-size:.72rem; text-transform:uppercase; letter-spacing:.3px; padding:10px 12px; text-align:center; border-bottom:2px solid #e5e7eb; }
+    table.cd-tbl td { padding:8px 12px; border-bottom:1px solid #f3f4f6; text-align:center; }
+    table.cd-tbl input { width:90px; border:1.5px solid #d1d5db; border-radius:6px; padding:5px 8px; font-size:.83rem; text-align:center; outline:none; }
+    table.cd-tbl input:focus { border-color:var(--navy); }
+    table.cd-tbl input.changed { border-color:#f59e0b; background:#fffbeb; }
     .pct-hint { font-size:.75rem; color:#64748b; margin-top:3px; }
   </style>
 </head>
@@ -81,7 +92,7 @@
     <div class="breadcrumb-nav">
       <a href="/">Inicio</a><span class="sep">›</span>
       <a href="/mantenedores">Mantenedores</a><span class="sep">›</span>
-      <span style="color:#fff;font-weight:600"><i class="bi bi-p-circle me-1"></i>Arriendo y Comisión Parques</span>
+      <span style="color:#fff;font-weight:600"><i class="bi bi-p-circle me-1"></i>Arriendos y Comisiones Parque y Calle</span>
     </div>
   </div>
   <div class="topnav-right">
@@ -104,8 +115,8 @@
   <div class="banner">
     <i class="bi bi-p-circle-fill"></i>
     <div>
-      <h2>Arriendo y Comisión Parques</h2>
-      <p>Arriendo mensual y porcentaje de comisión sobre saldo precio por parque. Usados en el cálculo automático de operaciones brokerage.</p>
+      <h2>Arriendos y Comisiones Parque y Calle</h2>
+      <p>Arriendo y comisión por parque, y comisión dealer por plazo (parque y calle). Usados en el cálculo automático de operaciones brokerage.</p>
     </div>
   </div>
 
@@ -142,6 +153,57 @@
     <strong>Fórmulas utilizadas en digitación:</strong><br>
     • <strong>Comisión Parque</strong> = Comisión% × Saldo Precio (por operación)<br>
     • <strong>Arriendo Parque</strong> = Arriendo mensual ÷ Nº operaciones otorgadas en ese parque ese mes (se prorratea)
+  </div>
+
+  <!-- ── Comisión Dealer por Plazo (movida desde Parámetros Financieras) ── -->
+  <div class="cd-card">
+    <div class="cd-hdr"><i class="bi bi-shop"></i> COMISIÓN DEALER POR PLAZO (% SOBRE SALDO PRECIO)</div>
+    <div class="cd-bd">
+      <div class="cd-formula">
+        Dealer PARQUE: Com_dealer = Saldo Precio × Dealer_parque% &nbsp;+&nbsp; Com_parque = Saldo Precio × Patio% &nbsp;(el 2.5% va al parque)<br>
+        Dealer CALLE: Com = Saldo Precio × Dealer_calle% &nbsp;(el dealer recibe todo, sin descuento parque)
+      </div>
+      <table class="cd-tbl">
+        <thead><tr><th>Plazo</th><th>Dealer PARQUE (%)</th><th>Patio / Parque (%)</th><th>Total PARQUE (%)</th><th>Total CALLE (%)</th></tr></thead>
+        <tbody>
+          <tr>
+            <td>≤ 6 meses</td>
+            <td><input type="number" step="0.01" id="p_dealer_pct_6" oninput="cdMark(this);cdTotal('6')"></td>
+            <td rowspan="5" style="vertical-align:middle"><input type="number" step="0.01" id="p_patio_pct" oninput="cdMark(this);cdAllTotals()"><div style="font-size:.7rem;color:#9ca3af;margin-top:3px">Fijo todos los plazos</div></td>
+            <td id="total_6" style="color:var(--navy);font-weight:600">—</td>
+            <td><input type="number" step="0.01" id="p_dealer_calle_pct_6" oninput="cdMark(this)" style="border-color:#059669"></td>
+          </tr>
+          <tr>
+            <td>≤ 12 meses</td>
+            <td><input type="number" step="0.01" id="p_dealer_pct_12" oninput="cdMark(this);cdTotal('12')"></td>
+            <td id="total_12" style="color:var(--navy);font-weight:600">—</td>
+            <td><input type="number" step="0.01" id="p_dealer_calle_pct_12" oninput="cdMark(this)" style="border-color:#059669"></td>
+          </tr>
+          <tr>
+            <td>≤ 24 meses</td>
+            <td><input type="number" step="0.01" id="p_dealer_pct_24" oninput="cdMark(this);cdTotal('24')"></td>
+            <td id="total_24" style="color:var(--navy);font-weight:600">—</td>
+            <td><input type="number" step="0.01" id="p_dealer_calle_pct_24" oninput="cdMark(this)" style="border-color:#059669"></td>
+          </tr>
+          <tr>
+            <td>≤ 36 meses</td>
+            <td><input type="number" step="0.01" id="p_dealer_pct_36" oninput="cdMark(this);cdTotal('36')"></td>
+            <td id="total_36" style="color:var(--navy);font-weight:600">—</td>
+            <td><input type="number" step="0.01" id="p_dealer_calle_pct_36" oninput="cdMark(this)" style="border-color:#059669"></td>
+          </tr>
+          <tr>
+            <td>&gt; 36 meses</td>
+            <td><input type="number" step="0.01" id="p_dealer_pct_99" oninput="cdMark(this);cdTotal('99')"></td>
+            <td id="total_99" style="color:var(--navy);font-weight:600">—</td>
+            <td><input type="number" step="0.01" id="p_dealer_calle_pct_99" oninput="cdMark(this)" style="border-color:#059669"></td>
+          </tr>
+        </tbody>
+      </table>
+      <div style="display:flex;align-items:center;gap:14px;margin-top:14px">
+        <button class="btn-navy" id="btnGuardarCD" onclick="guardarComisionDealer()"><i class="bi bi-check-lg me-1"></i>Guardar comisiones</button>
+        <span id="cdMsg" style="font-size:.85rem;font-weight:700"></span>
+      </div>
+    </div>
   </div>
 </div>
 
@@ -323,6 +385,32 @@
     await cargar();
   }
 
+  // ── Comisión Dealer por Plazo (carga/guarda propio, vía parametros-credito) ──
+  const CD_CLAVES = ['dealer_pct_6','dealer_pct_12','dealer_pct_24','dealer_pct_36','dealer_pct_99','patio_pct',
+    'dealer_calle_pct_6','dealer_calle_pct_12','dealer_calle_pct_24','dealer_calle_pct_36','dealer_calle_pct_99'];
+  function cdMark(el){ el.classList.add('changed'); }
+  function cdTotal(plazo){ const d=parseFloat(document.getElementById('p_dealer_pct_'+plazo)?.value)||0; const pa=parseFloat(document.getElementById('p_patio_pct')?.value)||0; const e=document.getElementById('total_'+plazo); if(e) e.textContent=(d+pa).toFixed(2)+'%'; }
+  function cdAllTotals(){ ['6','12','24','36','99'].forEach(cdTotal); }
+  async function cargarComisionDealer(){
+    try {
+      const j = await (await fetch('/api/parametros-credito', { headers:{ Authorization:'Bearer '+token } })).json();
+      if(!j.success || !j.data) return; const obj=j.data.obj||{};
+      CD_CLAVES.forEach(k=>{ const el=document.getElementById('p_'+k); if(el && obj[k]!==undefined) el.value=obj[k]; });
+      cdAllTotals();
+    } catch(e){ console.error('[comision dealer]', e); }
+  }
+  async function guardarComisionDealer(){
+    const msg=document.getElementById('cdMsg'), btn=document.getElementById('btnGuardarCD');
+    msg.textContent=''; btn.disabled=true;
+    const payload={}; CD_CLAVES.forEach(k=>{ const el=document.getElementById('p_'+k); if(el && el.value!=='') payload[k]=parseFloat(el.value); });
+    try {
+      const j = await (await fetch('/api/parametros-credito', { method:'PUT', headers:{ 'Content-Type':'application/json', Authorization:'Bearer '+token }, body:JSON.stringify(payload) })).json();
+      if(j.success){ msg.textContent='✓ Comisiones guardadas'; msg.style.color='#15803d'; document.querySelectorAll('.cd-tbl .changed').forEach(e=>e.classList.remove('changed')); }
+      else { msg.textContent=j.error||'Error al guardar'; msg.style.color='#b91c1c'; }
+    } catch(e){ msg.textContent='Error de conexión'; msg.style.color='#b91c1c'; }
+    finally { btn.disabled=false; }
+  }
+
   (async () => {
     if (!esAdmin) {
       try {
@@ -333,6 +421,7 @@
     }
     if (esAdmin) document.getElementById('btnNuevo').style.display = '';
     cargar();
+    cargarComisionDealer();
   })();
 </script>
 <script src="/js/app-version.js"></script>

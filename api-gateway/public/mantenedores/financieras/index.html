@@ -194,65 +194,6 @@
     </div>
   </div>
 
-  <!-- ── Comisión Dealer ───────────────────────────────────────────────── -->
-  <div class="card">
-    <div class="card-hdr">
-      <div class="card-hdr-left"><i class="bi bi-shop"></i> Comisión Dealer por Plazo (% sobre Saldo Precio)</div>
-    </div>
-    <div class="card-bd">
-      <div class="formula-box">
-        Dealer PARQUE: Com_dealer = Saldo Precio × Dealer_parque% &nbsp;+&nbsp; Com_parque = Saldo Precio × Patio% &nbsp;(el 2.5% va al parque)<br>
-        Dealer CALLE: Com = Saldo Precio × Dealer_calle% &nbsp;(el dealer recibe todo, sin descuento parque)
-      </div>
-      <table class="tbl">
-        <thead>
-          <tr>
-            <th>Plazo</th>
-            <th>Dealer PARQUE (%)</th>
-            <th>Patio / Parque (%)</th>
-            <th>Total PARQUE (%)</th>
-            <th>Total CALLE (%)</th>
-          </tr>
-        </thead>
-        <tbody>
-          <tr>
-            <td>≤ 6 meses</td>
-            <td><input type="number" step="0.01" id="p_dealer_pct_6"  oninput="markChanged(this);calcTotal(this,'6')"></td>
-            <td rowspan="5" style="vertical-align:middle">
-              <input type="number" step="0.01" id="p_patio_pct" oninput="markChanged(this);calcAllTotals()">
-              <div style="font-size:.7rem;color:#9ca3af;margin-top:3px">Fijo todos los plazos</div>
-            </td>
-            <td id="total_6" style="color:var(--navy);font-weight:600">—</td>
-            <td><input type="number" step="0.01" id="p_dealer_calle_pct_6"  oninput="markChanged(this)" style="border-color:#059669"></td>
-          </tr>
-          <tr>
-            <td>≤ 12 meses</td>
-            <td><input type="number" step="0.01" id="p_dealer_pct_12" oninput="markChanged(this);calcTotal(this,'12')"></td>
-            <td id="total_12" style="color:var(--navy);font-weight:600">—</td>
-            <td><input type="number" step="0.01" id="p_dealer_calle_pct_12" oninput="markChanged(this)" style="border-color:#059669"></td>
-          </tr>
-          <tr>
-            <td>≤ 24 meses</td>
-            <td><input type="number" step="0.01" id="p_dealer_pct_24" oninput="markChanged(this);calcTotal(this,'24')"></td>
-            <td id="total_24" style="color:var(--navy);font-weight:600">—</td>
-            <td><input type="number" step="0.01" id="p_dealer_calle_pct_24" oninput="markChanged(this)" style="border-color:#059669"></td>
-          </tr>
-          <tr>
-            <td>≤ 36 meses</td>
-            <td><input type="number" step="0.01" id="p_dealer_pct_36" oninput="markChanged(this);calcTotal(this,'36')"></td>
-            <td id="total_36" style="color:var(--navy);font-weight:600">—</td>
-            <td><input type="number" step="0.01" id="p_dealer_calle_pct_36" oninput="markChanged(this)" style="border-color:#059669"></td>
-          </tr>
-          <tr>
-            <td>&gt; 36 meses</td>
-            <td><input type="number" step="0.01" id="p_dealer_pct_99" oninput="markChanged(this);calcTotal(this,'99')"></td>
-            <td id="total_99" style="color:var(--navy);font-weight:600">—</td>
-            <td><input type="number" step="0.01" id="p_dealer_calle_pct_99" oninput="markChanged(this)" style="border-color:#059669"></td>
-          </tr>
-        </tbody>
-      </table>
-    </div>
-  </div>
 
   <!-- ── Ejecutivo ─────────────────────────────────────────────────────── -->
   <div class="card">
@@ -284,8 +225,6 @@ const CLAVES = [
   'autofin_spread_fondo','autofin_inscripcion','autofin_limitacion',
   'uac_pct_tier1','uac_pct_tier2','uac_pct_tier3','uac_pct_tier4',
   'uac_ops_tier1_max','uac_ops_tier2_max','uac_ops_tier3_max',
-  'dealer_pct_6','dealer_pct_12','dealer_pct_24','dealer_pct_36','dealer_pct_99','patio_pct',
-  'dealer_calle_pct_6','dealer_calle_pct_12','dealer_calle_pct_24','dealer_calle_pct_36','dealer_calle_pct_99',
   'pct_ejecutivo_fin'
 ];
 
@@ -313,22 +252,10 @@ async function cargar() {
     }
   } catch(e) { console.warn('[financieras] no se pudo cargar TMC vigente:', e.message); }
 
-  calcAllTotals();
   updateTierLabels();
 }
 
 function markChanged(el) { el.classList.add('changed'); }
-
-function calcTotal(inp, plazo) {
-  const dealer = parseFloat(document.getElementById('p_dealer_pct_' + plazo)?.value) || 0;
-  const patio  = parseFloat(document.getElementById('p_patio_pct')?.value) || 0;
-  const total  = dealer + patio;
-  const el = document.getElementById('total_' + plazo);
-  if (el) el.textContent = total.toFixed(2) + '%';
-}
-function calcAllTotals() {
-  ['6','12','24','36','99'].forEach(p => calcTotal(null, p));
-}
 
 function updateTierLabels() {
   const t1max = parseInt(document.getElementById('p_uac_ops_tier1_max')?.value) || 5;

@@ -47,6 +47,8 @@ const dispararRecalc = () => recalcularMesesAbiertos()
       }
       console.log('✓ parques_comisiones: datos iniciales insertados');
     }
+    // La card incorpora la comisión dealer por plazo (parque y calle) → nombre actualizado.
+    await pool.query("UPDATE funcionalidades SET nombre='Arriendos y Comisiones Parque y Calle' WHERE codigo='mantenedores_parques' AND nombre<>'Arriendos y Comisiones Parque y Calle'").catch(()=>{});
   } catch (e) {
     console.error('[parques migration]', e.message);
   }
