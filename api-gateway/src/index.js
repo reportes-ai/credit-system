@@ -253,8 +253,10 @@ app.get(['/mantenedores/uf', '/mantenedores/uf/'], (req, res) =>
   res.sendFile(path.join(__dirname, '../public/mantenedores/uf/index.html')));
 app.get(['/mantenedores/vehiculos', '/mantenedores/vehiculos/'], (req, res) =>
   res.sendFile(path.join(__dirname, '../public/mantenedores/vehiculos/index.html')));
-app.get(['/mantenedores/dealers', '/mantenedores/dealers/'], (req, res) =>
+// La card "Dealers" vive en el Home (no en Mantenedores) → URL limpia /dealers/; la antigua redirige.
+app.get(['/dealers', '/dealers/'], (req, res) =>
   res.sendFile(path.join(__dirname, '../public/mantenedores/dealers/index.html')));
+app.get(['/mantenedores/dealers', '/mantenedores/dealers/'], (req, res) => res.redirect('/dealers/'));
 app.get(['/mantenedores/potencial-dealer', '/mantenedores/potencial-dealer/'], (req, res) =>
   res.sendFile(path.join(__dirname, '../public/mantenedores/potencial-dealer/index.html')));
 app.get(['/mantenedores/mantencion-sistema', '/mantenedores/mantencion-sistema/'], (req, res) =>
