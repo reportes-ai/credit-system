@@ -315,8 +315,71 @@
     return { esPagina: true, stop() { if (!alive) return; finish(); } };
   }
 
+  /* ════════════ 8 · VIDRIO ROTO — el clic quiebra la pantalla (10 veces) 🔨🪟 ════════════
+     Cambia el cursor y, en cada clic, dibuja una grieta de vidrio en ese punto con
+     sonido de vidrio roto (sintetizado). Tras 10 clics, restaura todo. Cosmético: no
+     bloquea la app (overlay pointer-events:none, no preventDefault). */
+  function vidrio(mensaje) {
+    if (sessionStorage.getItem('af_vidrio_done') === '1') return { esPagina: true, stop() {} };
+    let alive = true, left = parseInt(sessionStorage.getItem('af_vidrio_left') || '10', 10) || 10, actx = null;
+    const NS = 'http://www.w3.org/2000/svg';
+    const lay = document.createElement('div'); lay.id = 'afVidrio';
+    lay.style.cssText = 'position:fixed;inset:0;z-index:2000000;pointer-events:none;overflow:hidden';
+    document.body.appendChild(lay);
+    const curSvg = '<svg xmlns="http://www.w3.org/2000/svg" width="30" height="30"><g fill="none" stroke="#ffffff" stroke-width="2" stroke-linecap="round"><circle cx="15" cy="15" r="2.5" fill="#ffffff"/><path d="M15 3 L15 9 M15 21 L15 27 M3 15 L9 15 M21 15 L27 15"/><path d="M7 7 L11 11 M23 7 L19 11 M7 23 L11 19 M23 23 L19 19" stroke="#7ab8ff"/></g></svg>';
+    const CUR = 'url("data:image/svg+xml,' + encodeURIComponent(curSvg) + '") 15 15, crosshair';
+    const st = document.createElement('style'); st.id = 'afVidrioStyle';
+    st.textContent = 'html.af-vidrio, html.af-vidrio *{cursor:' + CUR + ' !important}';
+    document.head.appendChild(st); document.documentElement.classList.add('af-vidrio');
+    const chip = document.createElement('div'); chip.id = 'afVidrioChip';
+    chip.style.cssText = 'position:fixed;bottom:18px;left:50%;transform:translateX(-50%);z-index:2000003;background:#111827;color:#fff;border-radius:30px;padding:8px 14px;font:600 13px system-ui;display:flex;gap:12px;align-items:center;box-shadow:0 10px 30px rgba(0,0,0,.45)';
+    chip.innerHTML = '<span>🔨 Vidrio Roto' + (mensaje ? ' — <span style="color:#93c5fd">' + mensaje + '</span>' : '') + ' · quedan <b id="afVn">' + left + '</b></span><button id="afVx" style="background:#7f1d1d;border:none;color:#fff;border-radius:20px;padding:4px 10px;cursor:pointer;font-weight:800">✕</button>';
+    document.body.appendChild(chip);
+    chip.querySelector('#afVx').onclick = () => window.AF_JUEGOS.cerrar();
+
+    function snd() { try { actx = actx || new (window.AudioContext || window.webkitAudioContext)(); if (actx.state === 'suspended') actx.resume();
+      const t = actx.currentTime, dur = 0.4, buf = actx.createBuffer(1, actx.sampleRate * dur, actx.sampleRate), d = buf.getChannelData(0);
+      for (let i = 0; i < d.length; i++) d[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / d.length, 2);
+      const src = actx.createBufferSource(); src.buffer = buf; const hp = actx.createBiquadFilter(); hp.type = 'highpass'; hp.frequency.value = 2200;
+      const g = actx.createGain(); g.gain.setValueAtTime(0.5, t); g.gain.exponentialRampToValueAtTime(0.001, t + dur);
+      src.connect(hp).connect(g).connect(actx.destination); src.start(t); src.stop(t + dur);
+      for (let i = 0; i < 7; i++) { const o = actx.createOscillator(), gg = actx.createGain(), f = 1600 + Math.random() * 3400, tt = t + Math.random() * 0.16;
+        o.type = 'triangle'; o.frequency.setValueAtTime(f, tt); o.frequency.exponentialRampToValueAtTime(f * 0.5, tt + 0.22);
+        gg.gain.setValueAtTime(0.11, tt); gg.gain.exponentialRampToValueAtTime(0.001, tt + 0.24);
+        o.connect(gg).connect(actx.destination); o.start(tt); o.stop(tt + 0.26); }
+    } catch (e) {} }
+
+    function grieta(x, y) {
+      const size = 190 + Math.random() * 130, svg = document.createElementNS(NS, 'svg');
+      svg.setAttribute('width', size); svg.setAttribute('height', size);
+      svg.style.cssText = 'position:fixed;left:' + (x - size / 2) + 'px;top:' + (y - size / 2) + 'px;pointer-events:none;overflow:visible;opacity:0;transform:scale(.5);transition:opacity .12s,transform .12s';
+      const cx = size / 2, cy = size / 2; let d = '';
+      const n = 9 + (Math.random() * 6 | 0);
+      for (let i = 0; i < n; i++) { const a = (i / n) * Math.PI * 2 + Math.random() * 0.4; let r = 8, p = 'M' + cx + ',' + cy; const segs = 3 + (Math.random() * 3 | 0);
+        for (let s = 0; s < segs; s++) { r += (size / 2 / segs) * (0.6 + Math.random() * 0.6); const aa = a + (Math.random() - 0.5) * 0.4; p += ' L' + (cx + Math.cos(aa) * r).toFixed(1) + ',' + (cy + Math.sin(aa) * r).toFixed(1); } d += p + ' '; }
+      for (let ring = 1; ring <= 2; ring++) { const rr = size / 2 * (ring / 3), m = 11; let p = '';
+        for (let k = 0; k <= m; k++) { const a = k / m * Math.PI * 2, r2 = rr * (0.82 + Math.random() * 0.32); p += (k ? 'L' : 'M') + (cx + Math.cos(a) * r2).toFixed(1) + ',' + (cy + Math.sin(a) * r2).toFixed(1); } d += p + 'Z '; }
+      svg.innerHTML = '<path d="' + d + '" fill="none" stroke="rgba(140,190,255,.45)" stroke-width="3.5"/><path d="' + d + '" fill="none" stroke="rgba(255,255,255,.9)" stroke-width="1.3"/><circle cx="' + cx + '" cy="' + cy + '" r="7" fill="rgba(255,255,255,.55)"/>';
+      lay.appendChild(svg);
+      requestAnimationFrame(() => { svg.style.opacity = '1'; svg.style.transform = 'scale(1)'; });
+    }
+
+    function onClick(e) { if (!alive || left <= 0) return;
+      if (e.target && e.target.closest && e.target.closest('#afVidrioChip')) return;
+      grieta(e.clientX, e.clientY); snd();
+      left--; sessionStorage.setItem('af_vidrio_left', left); const el = document.getElementById('afVn'); if (el) el.textContent = left;
+      if (left <= 0) { sessionStorage.setItem('af_vidrio_done', '1'); setTimeout(() => window.AF_JUEGOS.cerrar(), 1600); }
+    }
+    document.addEventListener('click', onClick, true);
+
+    return { esPagina: true, stop() { alive = false; document.removeEventListener('click', onClick, true);
+      document.documentElement.classList.remove('af-vidrio'); st.remove(); lay.remove(); chip.remove();
+      if (actx) try { actx.close(); } catch (e) {} } };
+  }
+
   const GAMES = {
     comeletras:{ nombre: '🟡 Come-Letras', tip: 'Pac-Man se come las letras de TU pantalla 😈 (Restaurar = recargar)', page: true, run: comeLetras },
+    vidrio:    { nombre: '🪟 Vidrio Roto', tip: 'Cambia el cursor y cada clic quiebra el vidrio (con sonido). 10 veces y vuelve a la normalidad.', page: true, run: vidrio },
     escapistas:{ nombre: '🃏 Módulos Escurridizos', tip: 'El módulo no responde al 1er clic; al 2º se escapa y cambia de lugar. Escala y a los 2 min vuelve a la normalidad.', page: true, run: escapistas },
     snake:     { nombre: '🐍 Culebra Cobradora', tip: 'Flechas para mover · come las cuotas 💵', run: snake },
     runner:    { nombre: '🦆 Pato Run',          tip: 'Espacio o clic para saltar los morosos', run: runner },
