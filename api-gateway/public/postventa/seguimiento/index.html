@@ -292,7 +292,7 @@ function trackHTML(r, track, lista){
 
     // Etapas automáticas: se marcan desde sus módulos (Emisión Orden de Pago /
     // Saldos Precios a Pagar). No se marcan ni desmarcan a mano en Seguimiento.
-    const esAuto = track==='SALDO' && ['ORDEN DE PAGO EMITIDA','ENVIADO A PAGO','SALDO PRECIO PAGADO'].includes(x.etapa);
+    const esAuto = track==='SALDO' && ['FUNDANTES RECIBIDOS','ORDEN DE PAGO EMITIDA','ENVIADO A PAGO','SALDO PRECIO PAGADO'].includes(x.etapa);
 
     // ¿Puede marcar? Etapa anterior debe estar marcada
     const prevMarcado = i === 0 || !!marc[lista[i-1].etapa];
@@ -304,7 +304,9 @@ function trackHTML(r, track, lista){
 
     const disabled = esAuto || esSistema || (!m && !canMark) || (m && !canUnmark) ? 'disabled' : '';
     let title = '';
-    if (esAuto) title = x.etapa==='ORDEN DE PAGO EMITIDA'
+    if (esAuto) title = x.etapa==='FUNDANTES RECIBIDOS'
+      ? 'Se marca automáticamente al aprobar los fundantes en Seguimiento Fundantes (Operaciones)'
+      : x.etapa==='ORDEN DE PAGO EMITIDA'
       ? 'Se marca automáticamente al emitir la orden en "Emisión Orden de Pago"'
       : x.etapa==='ENVIADO A PAGO'
       ? 'Se marca al presionar "Enviar a Pago" en "Saldos Precios a Pagar"'

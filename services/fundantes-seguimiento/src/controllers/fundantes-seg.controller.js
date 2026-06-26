@@ -114,6 +114,20 @@ const bucketDe = d => BUCKETS.findIndex(b => d <= b.max);
     }
     console.log('[fundantes-seguimiento] módulo registrado');
   } catch (e) { console.error('[fundantes-seguimiento migration]', e.message); }
+
+  // Backfill: créditos con fundantes ya CERRADO (aprobados antes de la automatización)
+  // → marca la etapa "FUNDANTES RECIBIDOS" en su seguimiento Post Venta. Idempotente.
+  try {
+    await pool.query(
+      `INSERT INTO postventa_etapas (id_seguimiento, track, etapa, usuario)
+       SELECT ps.id, 'SALDO', 'FUNDANTES RECIBIDOS', 'Sistema'
+         FROM fundantes_seg fs
+         JOIN postventa_seguimiento ps ON ps.id_credito = fs.id_credito
+        WHERE fs.estado = 'CERRADO'
+          AND NOT EXISTS (SELECT 1 FROM postventa_etapas e
+                            WHERE e.id_seguimiento = ps.id AND e.track='SALDO' AND e.etapa='FUNDANTES RECIBIDOS')
+       ON DUPLICATE KEY UPDATE id_seguimiento = id_seguimiento`);
+  } catch (e) { console.error('[fundantes RECIBIDOS backfill]', e.message); }
 })();
 
 /* ─── helpers ─────────────────────────────────────────────────────────────── */

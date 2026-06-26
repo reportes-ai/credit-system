@@ -405,6 +405,8 @@ const setEtapa = async (req, res) => {
     if (ETAPAS_SISTEMA.includes(etapa))
       return res.status(400).json({ success: false, data: null, error: 'Etapa de sistema — no editable' });
     // Etapas automáticas: solo se marcan desde sus módulos dedicados
+    if (track === 'SALDO' && etapa === 'FUNDANTES RECIBIDOS')
+      return res.status(400).json({ success: false, data: null, error: `"FUNDANTES RECIBIDOS" se marca automáticamente al aprobar los fundantes en Seguimiento Fundantes (Operaciones)` });
     if (track === 'SALDO' && ['ORDEN DE PAGO EMITIDA','ENVIADO A PAGO','SALDO PRECIO PAGADO'].includes(etapa))
       return res.status(400).json({ success: false, data: null, error: `"${etapa}" se marca automáticamente desde su módulo (Emisión Orden de Pago / Saldos Precios a Pagar)` });
     if (track === 'COMISION' && ['ORDEN DE PAGO EMITIDA','ENVIADO A PAGO','COMISION PAGADA'].includes(etapa))
