@@ -5,7 +5,7 @@
   <link rel="icon" href="/img/favicon.png" type="image/png">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Nueva Ficha de Dealer — AutoFácil</title>
-  <!-- v1.21 — Nombre del Parque movido al recuadro "Datos del Parque Automotriz" -->
+  <!-- v1.22 — Nombre del Parque: datalist con los parques del mantenedor -->
   <link href="/css/bootstrap.min.css" rel="stylesheet">
   <link href="/css/bootstrap-icons.css" rel="stylesheet">
   <style>
@@ -200,7 +200,10 @@
   <div class="card-sec" id="cardParqueDir" style="display:none">
     <h3><i class="bi bi-car-front me-1"></i> Datos del Parque Automotriz</h3>
     <div class="card-body grid">
-      <div class="fld full"><label>Nombre del Parque Automotriz *</label><input id="nombre_parque" placeholder="Nombre del parque"></div>
+      <div class="fld full"><label>Nombre del Parque Automotriz *</label>
+        <input id="nombre_parque" list="parquesList" placeholder="Escribe o elige el parque…" autocomplete="off">
+        <datalist id="parquesList"></datalist>
+        <small class="hint">Elige un parque registrado (mantenedor de Parques) para que los créditos hechos ahí calculen su comisión.</small></div>
       <div class="fld full" id="fldDirParque"><label>Dirección de Parque</label><input id="direccion_parque"></div>
       <div class="fld" id="fldComParque"><label>Comuna de Parque</label>
         <input id="comuna_parque" list="comunasList" placeholder="Escribe o elige la comuna…"></div>
@@ -402,6 +405,15 @@ let COM_DEFAULT = { GENERAL:{com_6_12:2.5,com_13_24:5.0,com_25_36:7.5,com_37:10.
 async function cargarComDefault(){
   try { const j = await (await fetch('/api/dealer-incorporacion/com-default', { headers:H })).json();
     if (j.success && j.data && j.data.GENERAL && j.data.PARQUE) COM_DEFAULT = j.data; } catch(e){}
+}
+// Parques registrados (mantenedor "Arriendos y Comisiones Parque y Calle") → datalist del nombre de parque.
+async function cargarParques(){
+  try {
+    const j = await (await fetch('/api/parques-comisiones?activos=1', { headers:H })).json();
+    const dl = $('parquesList'); if (!dl) return;
+    const rows = (j && j.data) || [];
+    dl.innerHTML = rows.map(p => `<option value="${escH(p.nombre)}"></option>`).join('');
+  } catch(e){}
 }
 
 /* ── Creación vs Modificación de Dealer ──────────────────────────────────── */
@@ -954,6 +966,7 @@ async function cargar(){
   renderSocios();
   await cargarGeo();
   await cargarComDefault();
+  await cargarParques();
   if (!FICHA_ID) { await cargarEjecutivos(); $('fecha_solicitud').value = new Date().toLocaleDateString('sv-SE',{timeZone:'America/Santiago'}); onTipo(); actualizarTercero(); onRepToggle(); onTipoCuenta(); aplicarEstadoUI('BORRADOR'); return; }
   try {
     const r = await fetch('/api/dealer-incorporacion/fichas/'+FICHA_ID, { headers:H });
