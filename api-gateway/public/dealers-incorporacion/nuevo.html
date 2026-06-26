@@ -369,6 +369,7 @@
 
 <script src="/js/auth-guard.js"></script>
 <script src="/js/ia-branding.js"></script>
+<script src="/js/reporte-ia.js"></script>
 <script>
 const token = sessionStorage.getItem('token');
 const yo    = JSON.parse(sessionStorage.getItem('usuario') || 'null');
@@ -878,36 +879,12 @@ async function enviarFinal(){
     if (iaOv) iaOv.cerrar();
     if (!j.success) throw new Error(j.error||'Error');
     toast('Enviada a autorización ✓');
-    mostrarResumenEnvio(j.data && j.data.informes, j.data && j.data.alerta_grave);
+    // Mismo reporte consolidado (empresa + socios) que ven el analista y el gerente.
+    const ents = [{ tag:'Empresa', nombre: val('nombre_razon')||val('rut'), rut: val('rut') }];
+    [1,2,3].forEach(i=>{ const ru=val('socio_rut_'+i); if(ru) ents.push({ tag:'Socio '+i, nombre: val('socio_nombre_'+i)||ru, rut: ru }); });
+    if (window.AF_REP_IA) AF_REP_IA.abrir(ents, { subtitulo:'Ficha enviada a autorización — te avisaremos cuando tenga respuesta.', onClose:()=>{ location.href='/dealers-incorporacion/mantencion.html'; } });
+    else location.href='/dealers-incorporacion/mantencion.html';
   } catch(e){ if (iaOv) iaOv.cerrar(); toast(e.message, true); }
-}
-
-// Resumen de informes por entidad (empresa + socios) al enviar a autorización.
-function mostrarResumenEnvio(resumen, grave){
-  const E=s=>String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;');
-  const nombreEnt = t => t==='EMPRESA' ? 'Empresa' : String(t||'').replace('SOCIO','Socio ');
-  const RAT = { bueno:{t:'Bueno',c:'#166534',b:'#dcfce7'}, regular:{t:'Regular',c:'#92400e',b:'#fef9c3'},
-    malo:{t:'Malo',c:'#9a3412',b:'#ffedd5'}, grave:{t:'Grave',c:'#991b1b',b:'#fee2e2'}, sin_datos:{t:'Sin datos',c:'#475569',b:'#f1f5f9'} };
-  const badge = r => { const x=RAT[r.rating||'sin_datos']||RAT.sin_datos; return `<span style="font-size:.66rem;font-weight:800;color:${x.c};background:${x.b};border-radius:8px;padding:2px 8px;margin-left:6px">${x.t.toUpperCase()}</span>`; };
-  let body = '';
-  if(grave) body += `<div style="background:#fef2f2;border:1px solid #fca5a5;color:#991b1b;border-radius:10px;padding:10px 12px;margin-bottom:12px;font-weight:700"><i class="bi bi-exclamation-octagon-fill me-1"></i> ALERTA GRAVE: se detectaron registros penales/judiciales. Operaciones lo revisará al autorizar.</div>`;
-  body += (resumen||[]).map(r=>`<div style="border:1px solid #e2e8f0;border-radius:10px;padding:10px 12px;margin-bottom:8px">
-      <div style="font-weight:700;color:#0f172a">${E(nombreEnt(r.tipo))} — ${E(r.nombre||'')} <span style="color:#64748b;font-weight:600">${E(r.rut||'')}</span>${badge(r)}</div>
-      <div style="font-size:.8rem;color:#475569;margin-top:3px">${((r.advertencias)||[]).map(a=>'• '+E(a)).join('<br>')||'—'}</div>
-    </div>`).join('') || '<p style="color:#64748b">Sin informes para resumir.</p>';
-  const ov=document.createElement('div');
-  ov.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:10000;display:flex;align-items:center;justify-content:center;padding:18px';
-  ov.innerHTML=`<div style="background:#fff;border-radius:14px;max-width:560px;width:100%;max-height:86vh;overflow:auto;box-shadow:0 20px 60px rgba(0,0,0,.3)">
-      <div style="padding:18px 22px;background:linear-gradient(135deg,#012d70,#0141A2);color:#fff;border-radius:14px 14px 0 0">
-        <h3 style="margin:0;font-size:1.05rem"><i class="bi bi-send-check me-1"></i> Ficha enviada a autorización</h3>
-        <p style="margin:6px 0 0;font-size:.85rem;opacity:.9">Te avisaremos cuando tenga respuesta.</p>
-      </div>
-      <div style="padding:18px 22px">${body}</div>
-      <div style="padding:0 22px 18px;text-align:right">
-        <button id="resEnvOk" style="background:#0141A2;color:#fff;border:none;border-radius:9px;padding:9px 20px;font-weight:600;cursor:pointer">Entendido</button>
-      </div></div>`;
-  document.body.appendChild(ov);
-  ov.querySelector('#resEnvOk').onclick=()=>location.href='/dealers-incorporacion/mantencion.html';
 }
 
 async function cargar(){

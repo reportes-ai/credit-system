@@ -39,14 +39,19 @@
   }
 
   // Abre el modal (<dialog>, top-layer → queda sobre cualquier otro modal) con 1+ entidades.
-  async function abrir(entidades) {
+  // opts: { subtitulo, onClose } — opcional (lo usa el ejecutivo al enviar la ficha).
+  async function abrir(entidades, opts) {
+    opts = opts || {};
     const ents = Array.isArray(entidades) ? entidades : [entidades];
     let dlg = document.getElementById('dlgRepIA');
     if (!dlg) { dlg = document.createElement('dialog'); dlg.id = 'dlgRepIA'; dlg.style.cssText = 'border:none;border-radius:14px;max-width:640px;width:92%;padding:0;background:#fff;box-shadow:0 20px 60px rgba(0,0,0,.3)'; document.body.appendChild(dlg); }
+    const sub = opts.subtitulo ? `<div style="font-size:.8rem;opacity:.92;margin-top:2px">${E(opts.subtitulo)}</div>` : '';
     dlg.innerHTML = `<div style="padding:16px 20px;background:linear-gradient(135deg,#9a3412,#c2410c);color:#fff;display:flex;align-items:center;gap:10px;position:sticky;top:0">
-        <i class="bi bi-stars" style="font-size:1.2rem"></i><h3 style="margin:0;font-size:1.02rem">Reporte IA — Anthropic</h3>
-        <button onclick="document.getElementById('dlgRepIA').close()" style="margin-left:auto;background:rgba(255,255,255,.2);border:none;color:#fff;width:30px;height:30px;border-radius:8px;cursor:pointer">✕</button></div>
+        <i class="bi bi-stars" style="font-size:1.2rem"></i>
+        <div style="flex:1"><h3 style="margin:0;font-size:1.02rem">Reporte IA — Anthropic</h3>${sub}</div>
+        <button onclick="document.getElementById('dlgRepIA').close()" style="background:rgba(255,255,255,.2);border:none;color:#fff;width:30px;height:30px;border-radius:8px;cursor:pointer">✕</button></div>
       <div id="repIAall" style="padding:16px 20px;max-height:72vh;overflow:auto"><div style="text-align:center;color:#94a3b8;padding:20px">Cargando…</div></div>`;
+    if (typeof opts.onClose === 'function') dlg.addEventListener('close', opts.onClose, { once: true });
     if (typeof dlg.showModal === 'function') { try { dlg.showModal(); } catch (_) { dlg.setAttribute('open', ''); } }
     const cont = dlg.querySelector('#repIAall');
     const valid = ents.filter(e => e && e.rut);
