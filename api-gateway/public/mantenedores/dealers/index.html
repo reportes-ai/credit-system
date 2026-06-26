@@ -476,13 +476,8 @@ function logout() { sessionStorage.removeItem('token'); sessionStorage.removeIte
 
 const H = { 'Content-Type':'application/json', 'Authorization':'Bearer '+token };
 let pag = 1, totalRows = 0, debTimer, dealerActual = null;
-// Reporte IA (Anthropic) por RUT: cuerpos de RUT que tienen un análisis guardado.
-let RUTS_IA = new Set();
-const normRutNum = r => { const c = String(r||'').replace(/[.\-\s]/g,'').toUpperCase(); return c.length > 1 ? c.slice(0,-1) : c; };
-async function cargarRutsIA(){
-  try { const r = await fetch('/api/ia/informe-dealernet/ruts', { headers: H }); const j = await r.json(); if (j.success) RUTS_IA = new Set((j.data||[]).map(String)); } catch(e){}
-}
-// Reporte IA: usa el componente compartido AF_REP_IA (mismo formato en TODAS las pantallas).
+// Reporte IA: el flag tiene_reporte_ia viene del servidor (cruce de RUT) y el modal usa
+// el componente compartido AF_REP_IA (mismo formato en TODAS las pantallas).
 function verReporteIA(rut, nombre){ if(window.AF_REP_IA) AF_REP_IA.abrirRut(rut, nombre); else toast('Reporte IA no disponible', true); }
 
 function debounceCargar() { clearTimeout(debTimer); debTimer = setTimeout(() => cargar(1), 350); }
@@ -540,6 +535,7 @@ async function cargar(p) {
   if (ccs)    params.append('ccs', ccs);
   if (activo !== '') params.append('activo', activo);
   if (cat)    params.append('categoria', cat);
+  if (document.getElementById('filtroIA')?.checked) params.append('con_ia', '1');
 
   const res  = await fetch('/api/dealers?' + params, { headers: H });
   const json = await res.json();
@@ -547,10 +543,8 @@ async function cargar(p) {
   const { rows, total } = json.data;
   totalRows = total;
   const soloIA = document.getElementById('filtroIA')?.checked;
-  const lista = soloIA ? rows.filter(d => RUTS_IA.has(normRutNum(d.rut))) : rows;
-
   document.getElementById('countBadge').textContent = soloIA
-    ? `${lista.length} con Reporte IA (en esta página)`
+    ? `${total.toLocaleString('es-CL')} con Reporte IA`
     : `${total.toLocaleString('es-CL')} dealers encontrados`;
   const desde = (pag - 1) * 100 + 1, hasta = Math.min(pag * 100, total);
   document.getElementById('pagInfo').textContent = total > 0 ? `Mostrando ${desde}–${hasta} de ${total.toLocaleString('es-CL')}` : '';
@@ -558,8 +552,8 @@ async function cargar(p) {
   document.getElementById('btnNext').disabled = hasta >= total;
 
   const tb = document.getElementById('tbody');
-  if (!lista.length) { tb.innerHTML = `<tr><td colspan="10" class="text-center text-muted py-5">${soloIA ? 'Sin dealers con Reporte IA en esta página' : 'Sin resultados'}</td></tr>`; return; }
-  tb.innerHTML = lista.map((d, i) => `
+  if (!rows.length) { tb.innerHTML = `<tr><td colspan="10" class="text-center text-muted py-5">${soloIA ? 'Sin dealers con Reporte IA' : 'Sin resultados'}</td></tr>`; return; }
+  tb.innerHTML = rows.map((d, i) => `
     <tr>
       <td class="td-n">${d.numero ?? (pag-1)*100+i+1}</td>
       <td class="td-ind">${fmt(d.numero_ind)}</td>
@@ -574,7 +568,7 @@ async function cargar(p) {
         <div class="acciones-cell">
           <button class="btn-ver" onclick='verDealer(${JSON.stringify(d).replace(/'/g,"&#39;")})'>Ver</button>
           <button class="btn-editar-row" onclick='abrirEditarDirecto(${JSON.stringify(d).replace(/'/g,"&#39;")})'>Editar</button>
-          ${RUTS_IA.has(normRutNum(d.rut)) ? `<button class="btn-ver" title="Ver Reporte IA (Anthropic)" style="background:#fdf3ee;border-color:#f2d3c4;color:#c2410c" onclick='verReporteIA(${JSON.stringify(d.rut).replace(/'/g,"&#39;")}, ${JSON.stringify(nombreDealer(d)||"").replace(/'/g,"&#39;")})'><i class="bi bi-stars"></i> IA</button>` : ''}
+          ${d.tiene_reporte_ia ? `<button class="btn-ver" title="Ver Reporte IA (Anthropic)" style="background:#fdf3ee;border-color:#f2d3c4;color:#c2410c" onclick='verReporteIA(${JSON.stringify(d.rut).replace(/'/g,"&#39;")}, ${JSON.stringify(nombreDealer(d)||"").replace(/'/g,"&#39;")})'><i class="bi bi-stars"></i> IA</button>` : ''}
         </div>
       </td>
     </tr>`).join('');
@@ -1052,7 +1046,7 @@ async function confirmarImport() {
 }
 
 // Init
-Promise.all([cargarCategorias(), cargarPizarraDef(), cargarRutsIA()]).then(() => cargar(1));
+Promise.all([cargarCategorias(), cargarPizarraDef()]).then(() => cargar(1));
 cargarCcs();
 </script>
 <script src="/js/app-version.js"></script>

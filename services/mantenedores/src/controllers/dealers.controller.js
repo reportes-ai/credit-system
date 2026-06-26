@@ -32,29 +32,44 @@ function excelDate(v) {
   return d.toISOString().slice(0, 10);
 }
 
+// Cuerpo del RUT (sin puntos/guión/espacios ni dígito verificador) para cruzar con
+// ia_informes_dealernet.rut (que se guarda como el cuerpo). Maneja DV numérico o K.
+const RUT_BODY = "LEFT(REPLACE(REPLACE(REPLACE(UPPER(d.rut),'.',''),'-',''),' ',''), GREATEST(CHAR_LENGTH(REPLACE(REPLACE(REPLACE(UPPER(d.rut),'.',''),'-',''),' ',''))-1,0))";
+const EXISTS_IA = `EXISTS (SELECT 1 FROM ia_informes_dealernet i WHERE i.rut = ${RUT_BODY})`;
+
 const getDealers = async (req, res) => {
   try {
-    const { q, ccs, activo, categoria, page = 1, limit = 100 } = req.query;
+    const { q, ccs, activo, categoria, con_ia, page = 1, limit = 100 } = req.query;
     const offset = (parseInt(page) - 1) * parseInt(limit);
     const conds = [], params = [];
     if (q) {
       const ql = `%${q.toLowerCase()}%`;
-      conds.push('(LOWER(nombre_indexa) LIKE ? OR LOWER(nombre_razon) LIKE ? OR LOWER(rut) LIKE ?)');
+      conds.push('(LOWER(d.nombre_indexa) LIKE ? OR LOWER(d.nombre_razon) LIKE ? OR LOWER(d.rut) LIKE ?)');
       params.push(ql, ql, ql);
     }
-    if (ccs)    { conds.push('ccs_parque = ?'); params.push(ccs); }
-    if (activo !== undefined && activo !== '') { conds.push('activo = ?'); params.push(parseInt(activo)); }
+    if (ccs)    { conds.push('d.ccs_parque = ?'); params.push(ccs); }
+    if (activo !== undefined && activo !== '') { conds.push('d.activo = ?'); params.push(parseInt(activo)); }
     if (categoria) {
-      if (categoria === 'SIN') conds.push('(categoria_asignada IS NULL OR categoria_asignada = \'\')');
-      else { conds.push('categoria_asignada = ?'); params.push(categoria); }
+      if (categoria === 'SIN') conds.push("(d.categoria_asignada IS NULL OR d.categoria_asignada = '')");
+      else { conds.push('d.categoria_asignada = ?'); params.push(categoria); }
     }
+    const soloIA = con_ia === '1' || con_ia === 'true';
+    if (soloIA) conds.push(EXISTS_IA);
     const where = conds.length ? 'WHERE ' + conds.join(' AND ') : '';
-    const [[{ total }]] = await pool.query(`SELECT COUNT(*) AS total FROM dealers ${where}`, params);
-    const [rows] = await pool.query(
-      `SELECT * FROM dealers ${where} ORDER BY numero ASC LIMIT ? OFFSET ?`,
-      [...params, parseInt(limit), offset]
-    );
-    res.json({ success: true, data: { rows, total, page: parseInt(page) }, error: null });
+    try {
+      const [[{ total }]] = await pool.query(`SELECT COUNT(*) AS total FROM dealers d ${where}`, params);
+      const [rows] = await pool.query(
+        `SELECT d.*, ${EXISTS_IA} AS tiene_reporte_ia FROM dealers d ${where} ORDER BY d.numero ASC LIMIT ? OFFSET ?`,
+        [...params, parseInt(limit), offset]);
+      return res.json({ success: true, data: { rows, total, page: parseInt(page) }, error: null });
+    } catch (eIA) {
+      // Fallback si ia_informes_dealernet no existe aún: lista normal sin el flag IA.
+      console.error('[dealers getDealers IA fallback]', eIA.message);
+      const where2 = where.replace(EXISTS_IA, '1=1');
+      const [[{ total }]] = await pool.query(`SELECT COUNT(*) AS total FROM dealers d ${where2}`, params);
+      const [rows] = await pool.query(`SELECT d.* FROM dealers d ${where2} ORDER BY d.numero ASC LIMIT ? OFFSET ?`, [...params, parseInt(limit), offset]);
+      return res.json({ success: true, data: { rows, total, page: parseInt(page) }, error: null });
+    }
   } catch (e) { (console.error('[error]', e), res.status(500).json({success:false,data:null,error:'Error interno del servidor'})); }
 };
 
