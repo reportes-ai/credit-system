@@ -464,6 +464,7 @@
 
 <script src="/js/bootstrap.bundle.min.js"></script>
 <script src="/js/auth-guard.js"></script>
+<script src="/js/reporte-ia.js"></script>
 <script>
 const token = sessionStorage.getItem('token');
 const yo = JSON.parse(sessionStorage.getItem('usuario') || 'null');
@@ -481,43 +482,8 @@ const normRutNum = r => { const c = String(r||'').replace(/[.\-\s]/g,'').toUpper
 async function cargarRutsIA(){
   try { const r = await fetch('/api/ia/informe-dealernet/ruts', { headers: H }); const j = await r.json(); if (j.success) RUTS_IA = new Set((j.data||[]).map(String)); } catch(e){}
 }
-// Modal: muestra el Reporte IA (Anthropic) del RUT, con fecha.
-async function verReporteIA(rut, nombre){
-  const E = s => String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
-  const ov = document.createElement('div');
-  ov.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:10000;display:flex;align-items:center;justify-content:center;padding:18px';
-  ov.innerHTML = `<div style="background:#fff;border-radius:14px;max-width:620px;width:100%;max-height:88vh;overflow:auto;box-shadow:0 20px 60px rgba(0,0,0,.3)">
-    <div style="padding:18px 22px;background:linear-gradient(135deg,#9a3412,#c2410c);color:#fff;border-radius:14px 14px 0 0;display:flex;align-items:center;gap:10px">
-      <i class="bi bi-stars" style="font-size:1.3rem"></i>
-      <div><h3 style="margin:0;font-size:1.05rem">Reporte IA — Anthropic</h3>
-        <div style="font-size:.82rem;opacity:.9">${E(nombre||'')} · ${E(rut||'')}</div></div>
-      <button onclick="this.closest('div[style*=fixed]').remove()" style="margin-left:auto;background:rgba(255,255,255,.2);border:none;color:#fff;width:30px;height:30px;border-radius:8px;cursor:pointer">✕</button>
-    </div>
-    <div id="repIABody" style="padding:18px 22px"><div class="text-center text-muted py-4">Cargando…</div></div></div>`;
-  document.body.appendChild(ov);
-  let d = null;
-  try { const r = await fetch('/api/ia/informe-dealernet/por-rut/'+encodeURIComponent(rut), { headers: H }); const j = await r.json(); if (j.success) d = j.data; } catch(e){}
-  const body = ov.querySelector('#repIABody');
-  if (!d) { body.innerHTML = '<div class="text-muted py-3">Sin reporte IA para este RUT.</div>'; return; }
-  const RIESGO = { BAJO:{c:'#166534',b:'#dcfce7'}, MEDIO:{c:'#92400e',b:'#fef9c3'}, ALTO:{c:'#991b1b',b:'#fee2e2'} };
-  const rg = RIESGO[String(d.nivel_riesgo||'').toUpperCase()] || { c:'#475569', b:'#f1f5f9' };
-  const fecha = d.fecha ? new Date(d.fecha).toLocaleString('es-CL') : '—';
-  const lista = (a, vacio) => (a&&a.length) ? '<ul style="margin:4px 0 0;padding-left:18px">'+a.map(x=>`<li>${E(typeof x==='string'?x:JSON.stringify(x))}</li>`).join('')+'</ul>' : `<div style="color:#94a3b8">${vacio}</div>`;
-  const causas = (d.causas||[]).map(c=>`<li><b>${E(c.tipo||'')}</b> · ${E(c.materia||c.caratula||'')}${c.fecha?' · '+E(c.fecha):''}${c.demandante?' · '+E(c.demandante):''}${c.tribunal?' · '+E(c.tribunal):''}${c.estado?' · '+E(c.estado):''}</li>`).join('');
-  body.innerHTML = `
-    <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:12px">
-      <span style="font-size:.72rem;font-weight:800;color:${rg.c};background:${rg.b};border-radius:8px;padding:3px 10px">RIESGO ${E(d.nivel_riesgo||'—')}</span>
-      <span style="font-size:.78rem;color:#64748b"><i class="bi bi-clock-history"></i> ${E(fecha)}</span>
-      ${d.modelo?`<span style="font-size:.72rem;color:#94a3b8">${E(d.modelo)}</span>`:''}
-    </div>
-    <div style="margin-bottom:12px"><b style="color:#0f172a">Resumen</b><div style="color:#374151;margin-top:3px">${E(d.resumen||'—')}</div></div>
-    <div style="margin-bottom:12px"><b style="color:#0f172a">Deudas / morosidades</b><div style="color:#374151;margin-top:3px">${E(d.deudas||'—')}</div></div>
-    <div style="margin-bottom:12px"><b style="color:#0f172a">Causas judiciales</b>${causas?`<ul style="margin:4px 0 0;padding-left:18px;color:#991b1b">${causas}</ul>`:'<div style="color:#94a3b8">Sin causas judiciales detectadas</div>'}</div>
-    <div style="margin-bottom:12px"><b style="color:#991b1b">Alertas</b>${lista(d.alertas,'Sin alertas')}</div>
-    <div style="margin-bottom:12px"><b style="color:#166534">Factores positivos</b>${lista(d.factores,'—')}</div>
-    <div style="background:#eff6ff;border-left:4px solid #0141A2;border-radius:8px;padding:10px 12px"><b>Recomendación</b><div style="color:#1e3a5f;margin-top:3px">${E(d.recomendacion||'—')}</div></div>
-    ${d.productos?`<div style="font-size:.74rem;color:#94a3b8;margin-top:10px">Informes: ${E(d.productos)}</div>`:''}`;
-}
+// Reporte IA: usa el componente compartido AF_REP_IA (mismo formato en TODAS las pantallas).
+function verReporteIA(rut, nombre){ if(window.AF_REP_IA) AF_REP_IA.abrirRut(rut, nombre); else toast('Reporte IA no disponible', true); }
 
 function debounceCargar() { clearTimeout(debTimer); debTimer = setTimeout(() => cargar(1), 350); }
 function cambiarPag(d) { pag += d; cargar(); }

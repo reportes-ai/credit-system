@@ -140,6 +140,7 @@
 <div class="toast-af" id="toast"></div>
 
 <script src="/js/auth-guard.js"></script>
+<script src="/js/reporte-ia.js"></script>
 <script>
 const token = sessionStorage.getItem('token');
 const yo    = JSON.parse(sessionStorage.getItem('usuario') || 'null');
@@ -485,44 +486,8 @@ function barraInformes(f){
     <div style="margin-top:9px">${filas||'<span style="font-size:.8rem;color:#94a3b8">Sin RUT de empresa ni socios.</span>'}</div></div>`;
 }
 
-// UN modal (<dialog>, queda sobre el de revisión) con el Reporte IA de empresa + cada socio.
-async function verReportesIA(){
-  const ents = window._revEnts || [];
-  let dlg = document.getElementById('dlgRepIA');
-  if(!dlg){ dlg=document.createElement('dialog'); dlg.id='dlgRepIA'; dlg.style.cssText='border:none;border-radius:14px;max-width:640px;width:92%;padding:0;background:#fff'; document.body.appendChild(dlg); }
-  dlg.innerHTML = `<div style="padding:16px 20px;background:linear-gradient(135deg,#9a3412,#c2410c);color:#fff;display:flex;align-items:center;gap:10px;position:sticky;top:0">
-      <i class="bi bi-stars" style="font-size:1.2rem"></i><h3 style="margin:0;font-size:1.02rem">Reporte IA — Anthropic</h3>
-      <button onclick="document.getElementById('dlgRepIA').close()" style="margin-left:auto;background:rgba(255,255,255,.2);border:none;color:#fff;width:30px;height:30px;border-radius:8px;cursor:pointer">✕</button></div>
-    <div id="repIAall" style="padding:16px 20px;max-height:72vh;overflow:auto"><div style="text-align:center;color:#94a3b8;padding:20px">Cargando…</div></div>`;
-  dlg.showModal();
-  const cont = dlg.querySelector('#repIAall');
-  if(!ents.length){ cont.innerHTML='<div style="color:#94a3b8">Sin entidades con RUT.</div>'; return; }
-  const secs = [];
-  for(const e of ents){
-    let d=null; try{ const r=await fetch('/api/ia/informe-dealernet/por-rut/'+encodeURIComponent(e.rut),{headers:H}); const j=await r.json(); if(j.success) d=j.data; }catch(_){}
-    secs.push(reporteSecHTML(e, d));
-  }
-  cont.innerHTML = secs.join('<hr style="border:none;border-top:1px solid #eef2f7;margin:18px 0">');
-}
-function reporteSecHTML(e, d){
-  const E = s => String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
-  const head = `<div style="font-weight:800;color:#0f172a;margin-bottom:8px"><i class="bi bi-${e.tag==='Empresa'?'building':'person'} me-1"></i>${E(e.tag)} · ${E(e.nombre||'')} <span style="color:#94a3b8;font-weight:600">${E(e.rut||'')}</span></div>`;
-  if(!d) return head+'<div style="color:#94a3b8">Sin reporte IA para este RUT (aún no analizado, o la IA estaba desactivada al enviar).</div>';
-  const RIESGO={ BAJO:{c:'#166534',b:'#dcfce7'}, MEDIO:{c:'#92400e',b:'#fef9c3'}, ALTO:{c:'#991b1b',b:'#fee2e2'} };
-  const rg=RIESGO[String(d.nivel_riesgo||'').toUpperCase()]||{c:'#475569',b:'#f1f5f9'};
-  const fecha=d.fecha?new Date(d.fecha).toLocaleString('es-CL'):'—';
-  const lst=(a,vac)=>(a&&a.length)?'<ul style="margin:3px 0 0;padding-left:18px">'+a.map(x=>`<li>${E(typeof x==='string'?x:JSON.stringify(x))}</li>`).join('')+'</ul>':`<span style="color:#94a3b8">${vac}</span>`;
-  const causas=(d.causas||[]).map(c=>`<li><b>${E(c.tipo||'')}</b> · ${E(c.materia||c.caratula||'')}${c.fecha?' · '+E(c.fecha):''}${c.demandante?' · '+E(c.demandante):''}${c.tribunal?' · '+E(c.tribunal):''}</li>`).join('');
-  return head+`
-    <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:10px">
-      <span style="font-size:.72rem;font-weight:800;color:${rg.c};background:${rg.b};border-radius:8px;padding:3px 10px">RIESGO ${E(d.nivel_riesgo||'—')}</span>
-      <span style="font-size:.78rem;color:#64748b"><i class="bi bi-clock-history"></i> ${E(fecha)}</span></div>
-    <div style="margin-bottom:7px;font-size:.85rem"><b>Resumen:</b> ${E(d.resumen||'—')}</div>
-    <div style="margin-bottom:7px;font-size:.85rem"><b>Deudas/morosidades:</b> ${E(d.deudas||'—')}</div>
-    <div style="margin-bottom:7px;font-size:.85rem"><b>Causas judiciales:</b>${causas?`<ul style="margin:3px 0 0;padding-left:18px;color:#991b1b">${causas}</ul>`:' <span style="color:#94a3b8">sin causas</span>'}</div>
-    <div style="margin-bottom:7px;font-size:.85rem"><b style="color:#991b1b">Alertas:</b> ${lst(d.alertas,'sin alertas')}</div>
-    <div style="font-size:.85rem"><b>Recomendación:</b> ${E(d.recomendacion||'—')}</div>`;
-}
+// Reporte IA: usa el componente compartido AF_REP_IA (mismo formato en TODAS las pantallas).
+function verReportesIA(){ if(window.AF_REP_IA) AF_REP_IA.abrir(window._revEnts||[]); else toast('Reporte IA no disponible', true); }
 
 async function accion(id, path, body, okMsg){
   try {
