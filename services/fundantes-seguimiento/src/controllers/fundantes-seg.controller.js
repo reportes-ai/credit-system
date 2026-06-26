@@ -384,6 +384,17 @@ const validar = async (req, res) => {
       [estado, accion === 'rechazar' ? comentario : null, nombreUsuario(req), req.usuario.id_usuario || null, id]);
     auditar({ req, accion: accion === 'aprobar' ? 'APROBAR_FUNDANTES' : 'RECHAZAR_FUNDANTES', modulo: 'fundantes-seguimiento', entidad: 'credito', entidad_id: id,
       detalle: `${accion === 'aprobar' ? 'Aprobó (CERRADO)' : 'Rechazó'} los fundantes de la OP ${op.num_op}${comentario ? ' — ' + comentario : ''}`, meta: { estado, comentario: comentario || null } });
+    // Al APROBAR fundantes: marca automáticamente la etapa "FUNDANTES RECIBIDOS" del Post Venta
+    // (Seguimiento Saldo Precio), para no tener que marcarla a mano. Idempotente.
+    if (accion === 'aprobar') {
+      try {
+        const [[seg]] = await pool.query('SELECT id FROM postventa_seguimiento WHERE id_credito=? LIMIT 1', [id]);
+        if (seg) await pool.query(
+          `INSERT INTO postventa_etapas (id_seguimiento, track, etapa, usuario) VALUES (?, 'SALDO', 'FUNDANTES RECIBIDOS', ?)
+           ON DUPLICATE KEY UPDATE id_seguimiento = id_seguimiento`,
+          [seg.id, nombreUsuario(req)]);
+      } catch (e) { console.error('[fundantes→postventa FUNDANTES RECIBIDOS]', e.message); }
+    }
     // Alerta al ejecutivo que envió: rechazo (con el motivo) → debe corregir y reenviar.
     if (accion === 'rechazar' && fs.id_enviado_por) {
       try { await notificar([fs.id_enviado_por], {
