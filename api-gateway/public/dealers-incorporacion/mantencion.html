@@ -157,6 +157,7 @@ async function init(){
   if (canRev)   tabs.push(['revision','Revisión (pool)','bi-clipboard-check']);
   if (canCrear) tabs.push(['mias','Mis fichas','bi-folder']);
   if (canMant)  tabs.push(['dealers','Dealers vigentes','bi-building']);
+  if (canRev || canMant) tabs.push(['historicas','Aprobaciones Históricas','bi-archive']);
   if (!tabs.length){ $('contenido').innerHTML='<div class="vacio"><i class="bi bi-lock"></i><br>Sin acceso.</div>'; return; }
   if (!tabs.find(t=>t[0]===TAB)) TAB = tabs[0][0];
   window._tabs = tabs;
@@ -190,6 +191,60 @@ function render(){
   if (TAB==='revision') return renderRevision();
   if (TAB==='mias')     return renderMias();
   if (TAB==='dealers')  return renderDealers();
+  if (TAB==='historicas') return renderHistoricas();
+}
+
+let histFiltro = 'todos';
+function setHistFiltro(v){ histFiltro = v; renderHistoricas(); }
+// Timbre al pie de la ficha aprobada (verde) o rechazada (rojo), con fecha y hora.
+function timbreFicha(f){
+  if (f.estado==='APROBADA'){
+    return `<div style="margin-top:18px;display:flex;justify-content:center">
+      <div style="border:3px solid #15803d;color:#15803d;border-radius:10px;padding:8px 20px;transform:rotate(-4deg);font-weight:800;letter-spacing:1px;text-align:center;background:#f0fdf4">
+        <div style="font-size:1.2rem"><i class="bi bi-patch-check-fill"></i> APROBADO</div>
+        <div style="font-size:.74rem;font-weight:600">${fH(f.updated_at)}</div>
+        ${f.id_dealer?'<div style="font-size:.68rem;font-weight:600;opacity:.85">Dealer creado/actualizado</div>':''}
+      </div></div>`;
+  }
+  if (f.estado==='RECHAZADA'){
+    return `<div style="margin-top:18px;display:flex;justify-content:center">
+      <div style="border:3px solid #b91c1c;color:#b91c1c;border-radius:10px;padding:8px 20px;transform:rotate(-4deg);font-weight:800;letter-spacing:1px;text-align:center;background:#fef2f2">
+        <div style="font-size:1.2rem"><i class="bi bi-x-octagon-fill"></i> RECHAZADO</div>
+        <div style="font-size:.74rem;font-weight:600">${fH(f.fecha_revision||f.updated_at)}</div>
+        ${f.revisor_nombre?`<div style="font-size:.68rem;font-weight:600;opacity:.85">por ${escH(f.revisor_nombre)}</div>`:''}
+      </div></div>${f.motivo_rechazo?`<div style="width:100%;text-align:center;margin-top:8px;font-size:.82rem;color:#991b1b"><b>Motivo:</b> ${escH(f.motivo_rechazo)}</div>`:''}`;
+  }
+  return '';
+}
+function renderHistoricas(){
+  let rows = FICHAS.filter(f=>['APROBADA','RECHAZADA'].includes(f.estado));
+  if (histFiltro==='aprobados')  rows = rows.filter(f=>f.estado==='APROBADA');
+  if (histFiltro==='rechazados') rows = rows.filter(f=>f.estado==='RECHAZADA');
+  rows = filtroQ(rows, ['rut','nombre_razon','nombre_fantasia','ejecutivo_nombre']);
+  const sel = `<div style="display:flex;gap:8px;align-items:center;margin-bottom:12px">
+    <span style="font-size:.82rem;color:#475569">Mostrar:</span>
+    ${['todos','Todos','aprobados','Aprobados','rechazados','Rechazados'].reduce((acc,_,i,a)=>{ if(i%2) return acc; const v=a[i],l=a[i+1];
+      return acc+`<button class="btn btn-sm ${histFiltro===v?'btn-navy':'btn-light'}" onclick="setHistFiltro('${v}')">${l}</button>`; },'')}
+    <span style="margin-left:auto;font-size:.8rem;color:#94a3b8">${rows.length} ficha(s)</span></div>`;
+  if (!rows.length){ $('contenido').innerHTML = sel+'<div class="vacio"><i class="bi bi-archive" style="font-size:1.6rem"></i><br>Sin aprobaciones históricas con ese criterio.</div>'; return; }
+  $('contenido').innerHTML = sel + `<table class="tb"><thead><tr>
+    <th>Tipo</th><th>Concesionario</th><th>RUT</th><th>Ejecutivo</th><th>Comisión</th><th>Resultado</th><th>Fecha</th><th></th></tr></thead><tbody>${
+    rows.map(f=>{
+      const aprob = f.estado==='APROBADA';
+      const chip = aprob
+        ? `<span class="estado-pill" style="background:#dcfce7;color:#166534"><i class="bi bi-patch-check-fill"></i> APROBADO</span>`
+        : `<span class="estado-pill" style="background:#fee2e2;color:#991b1b"><i class="bi bi-x-octagon-fill"></i> RECHAZADO</span>`;
+      return `<tr>
+        <td>${f.tipo==='PARQUE'?'<i class="bi bi-car-front"></i> Parque':'<i class="bi bi-shop"></i> General'}</td>
+        <td><b>${escH(f.nombre_razon||f.nombre_fantasia||'—')}</b>${f.id_dealer_origen?'<div class="alert-row"><span class="alert-chip" style="background:#ffedd5;color:#9a3412"><i class="bi bi-pencil-square"></i> modificación</span></div>':''}</td>
+        <td>${escH(f.rut||'—')}</td>
+        <td>${escH(f.ejecutivo_nombre||'—')}</td>
+        <td>${comResumen(f)}</td>
+        <td>${chip}</td>
+        <td>${fH(aprob?f.updated_at:(f.fecha_revision||f.updated_at))}</td>
+        <td><div class="acts"><button class="btn btn-sm" style="background:#1e40af;color:#fff" onclick="verFicha(${f.id}, false, true)"><i class="bi bi-eye"></i> Ver</button></div></td>
+      </tr>`;
+    }).join('')}</tbody></table>`;
 }
 
 function comResumen(f){ return `${f.com_6_12||0}/${f.com_13_24||0}/${f.com_25_36||0}/${f.com_37||0}%`; }
@@ -281,11 +336,11 @@ function renderDealers(){
 }
 
 /* ── Acciones ficha ── */
-async function verFicha(id, revisar){
+async function verFicha(id, revisar, historico){
   try {
     const r=await fetch('/api/dealer-incorporacion/fichas/'+id,{headers:H}); const j=await r.json();
     if(!j.success) throw new Error(j.error); const f=j.data;
-    $('verTitulo').textContent = (revisar?'Revisar — ':'')+(f.nombre_razon||f.rut||'Ficha')+' · '+(f.tipo==='PARQUE'?'Parque':'General');
+    $('verTitulo').textContent = (revisar?'Revisar — ':historico?'Histórico — ':'')+(f.nombre_razon||f.rut||'Ficha')+' · '+(f.tipo==='PARQUE'?'Parque':'General');
     const row=(k,v)=>`<b>${k}</b><span>${escH(v??'—')}</span>`;
     // Adjuntos (ficha firmada + informes comerciales)
     let adjHtml = '';
@@ -343,7 +398,7 @@ async function verFicha(id, revisar){
       cadenaHtml = `<div style="margin-top:14px;border:1px solid #c7d2fe;background:#eef2ff;border-radius:10px;padding:12px 14px">
         <b style="color:#3730a3;font-size:.82rem"><i class="bi bi-diagram-3 me-1"></i>Cadena de autorización</b>${items||'<div style="font-size:.8rem;color:#94a3b8;margin-top:4px">Sin autorizaciones aún</div>'}${pend}</div>`;
     }
-    $('verBody').innerHTML = `${revisar?barraInformes(f):''}<div class="kv">
+    $('verBody').innerHTML = `${(revisar||historico)?barraInformes(f):''}<div class="kv">
       ${row('Ejecutivo', f.ejecutivo_nombre)} ${row('Fecha solicitud', f.fecha_solicitud?String(f.fecha_solicitud).slice(0,10):'—')}
       ${row('RUT', f.rut)} ${row('Razón Social', f.nombre_razon)} ${row('Fantasía', f.nombre_fantasia)}
       ${row('Dirección', f.direccion)} ${row('Comuna', f.comuna)} ${row('Provincia/Ciudad', f.provincia)} ${row('Región', f.region)}
@@ -355,7 +410,7 @@ async function verFicha(id, revisar){
       ${row('Email confirmación', f.correo_confirmacion)} ${row('Observaciones', f.observaciones)}
       ${f.apelacion?row('Apelación', f.apelacion):''}
       ${f.motivo_rechazo?row('Motivo rechazo', f.motivo_rechazo):''}
-    </div>${cadenaHtml}${espHtml}${firmaHtml}${difHtml}${faltHtml}${excHtml}<div style="margin-top:16px;display:flex;flex-wrap:wrap;gap:6px">${adjHtml||'<span style="font-size:.8rem;color:#94a3b8">Sin adjuntos</span>'}</div>`;
+    </div>${cadenaHtml}${espHtml}${firmaHtml}${difHtml}${faltHtml}${excHtml}<div style="margin-top:16px;display:flex;flex-wrap:wrap;gap:6px">${adjHtml||'<span style="font-size:.8rem;color:#94a3b8">Sin adjuntos</span>'}</div>${historico?timbreFicha(f):''}`;
     dlgVer.showModal();
     // Registrar que se revisó (para detectar "Aprobado sin revisión de ficha").
     if (revisar) { try { await fetch('/api/dealer-incorporacion/fichas/'+id+'/marcar-revisada',{method:'POST',headers:H}); } catch(_){} }
