@@ -65,7 +65,7 @@
     <div class="topnav-left">
       <a href="/" class="topnav-brand">
         <img src="/img/logo.png" alt="AutoFácil">
-        <span class="version-badge">v5.1</span>
+        <span class="version-badge">v62.8</span>
       </a>
       <div class="breadcrumb-nav">
         <a href="/">Inicio</a><span class="sep">›</span>
@@ -103,21 +103,6 @@
     </div>
     <div class="section-title"><i class="bi bi-grid-3x3-gap-fill"></i> Submódulos disponibles</div>
     <div class="modules-grid" id="modulesGrid"></div>
-
-    <div class="section-title" style="margin-top:32px"><i class="bi bi-journal-arrow-up"></i> Fundantes Brokerage</div>
-    <div class="modules-grid" style="grid-template-columns:repeat(2,1fr)">
-      <div class="module-card" style="cursor:default">
-        <div class="card-icon"><i class="bi bi-folder2-open"></i></div>
-        <h6>Cargar Fundantes</h6>
-        <p>Sube los documentos fundantes de una operación brokerage ingresando el ID de operación</p>
-        <div style="display:flex;gap:8px;margin-top:6px">
-          <input type="number" id="inputOpFund" placeholder="ID Operación" style="border:1.5px solid #d1d5db;border-radius:8px;padding:6px 10px;font-size:.83rem;width:130px">
-          <a id="linkFundantes" href="/creditos/fundantes" class="btn-acceder" style="display:inline-flex;align-items:center;gap:6px;text-decoration:none" onclick="abrirFundantes(event)">
-            <i class="bi bi-arrow-right-circle me-1"></i>Ir a Fundantes
-          </a>
-        </div>
-      </div>
-    </div>
   </div>
 
   <script src="/js/placement-manifest.js"></script>
@@ -137,7 +122,7 @@
     if (esAdmin) document.getElementById('btnReordenar').style.display = 'flex';
 
     // Mapa: último segmento de href → clave placement (para compatibilidad con orden guardado)
-    const KEY = { 'caja':'teso-caja','cajas':'teso-cajas','cierre-caja':'teso-cierre-caja','cuentas-transitorias':'teso-cuentas-transitorias','brokerage':'teso-brokerage' };
+    const KEY = { 'caja':'teso-caja','cajas':'teso-cajas','cierre-caja':'teso-cierre-caja','cuentas-transitorias':'teso-cuentas-transitorias' };
 
     let sortable = null, modoReordenar = false;
 
@@ -267,12 +252,6 @@
         btn.disabled = false;
         btn.innerHTML = '<i class="bi bi-floppy"></i>Guardar orden';
       }
-    }
-
-    function abrirFundantes(e) {
-      e.preventDefault();
-      const op = document.getElementById('inputOpFund').value.trim();
-      window.location.href = op ? `/creditos/fundantes?op=${op}` : '/creditos/fundantes';
     }
 
     function logout() { sessionStorage.removeItem('token'); sessionStorage.removeItem('usuario'); window.location.href = '/login.html'; }

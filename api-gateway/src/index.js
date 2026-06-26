@@ -380,11 +380,12 @@ app.get(['/tesoreria/cierre-caja', '/tesoreria/cierre-caja/'], (req, res) =>
 app.get(['/tesoreria/cuentas-transitorias', '/tesoreria/cuentas-transitorias/'], (req, res) =>
   res.sendFile(path.join(__dirname, '../public/tesoreria/cuentas-transitorias.html')));
 
-app.get(['/tesoreria/brokerage', '/tesoreria/brokerage/'], (req, res) =>
-  res.sendFile(path.join(__dirname, '../public/tesoreria/brokerage.html')));
+// Flujo brokerage/fundantes VIEJO retirado (jun-2026): reemplazado por Seguimiento
+// Fundantes (/fundantes/) y Post Venta. Tablas en 0, sin uso. Páginas legacy quedan
+// en el repo pero las rutas redirigen para no dejar pantallas muertas accesibles.
+app.get(['/tesoreria/brokerage', '/tesoreria/brokerage/'], (req, res) => res.redirect('/tesoreria/'));
 
-app.get(['/creditos/fundantes', '/creditos/fundantes/'], (req, res) =>
-  res.sendFile(path.join(__dirname, '../public/creditos/fundantes.html')));
+app.get(['/creditos/fundantes', '/creditos/fundantes/'], (req, res) => res.redirect('/fundantes/'));
 
 app.get(['/crm', '/crm/'], (req, res) =>
   res.sendFile(path.join(__dirname, '../public/crm/index.html')));

@@ -50,7 +50,6 @@ const PLACEMENT_ITEMS = {
   'teso-cajas':              { section:'tesoreria',     href:'/tesoreria/cajas',                icon:'bi-cash-stack',        titulo:'Administración de Cajas' },
   'teso-cierre-caja':        { section:'tesoreria',     href:'/tesoreria/cierre-caja',          icon:'bi-journal-check',     titulo:'Cierre de Caja' },
   'teso-cuentas-transitorias':{ section:'tesoreria',    href:'/tesoreria/cuentas-transitorias', icon:'bi-arrow-left-right',  titulo:'Cuentas Transitorias' },
-  'teso-brokerage':          { section:'tesoreria',     href:'/tesoreria/brokerage',            icon:'bi-building-check',    titulo:'Panel Brokerage Tesorería' },
   // ── COBRANZA ──────────────────────────────────────────────────────────────
   'cobr-prejudicial':        { section:'cobranza',      href:'/cobranza/prejudicial', icon:'bi-exclamation-triangle-fill', titulo:'Pre-judicial' },
   'cobr-judicial':           { section:'cobranza',      href:'/cobranza/judicial',    icon:'bi-file-earmark-text-fill',    titulo:'Judicial' },

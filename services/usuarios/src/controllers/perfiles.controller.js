@@ -480,6 +480,39 @@ const { auditar } = require('../../../../shared/audit');
   }
 })();
 
+/* ─── Retiro del flujo brokerage/fundantes VIEJO (jun-2026) ───────────────────
+   La generación vieja —Tesorería "Panel Brokerage" + "Fundantes Brokerage" en
+   Créditos— quedó sin uso: la reemplazaron Seguimiento Fundantes (/fundantes/) y
+   Post Venta. Las tablas facturas_brokerage / pagos_brokerage / fundantes_brokerage
+   están en 0 (nunca se usaron). Archivamos sus 6 funcionalidades en un módulo
+   inactivo "Retirados" y les quitamos el href → dejan de aparecer como card en
+   Tesorería y como checkbox en la grilla de Perfiles. Reversible: mover de vuelta
+   a su módulo (Créditos/Tesorería) y restaurar el href. Los permisos_perfil y el
+   código legacy se conservan. */
+(async () => {
+  try {
+    const FLAG = 'retiro_brokerage_fundantes_viejo_v1';
+    await pool.query(`CREATE TABLE IF NOT EXISTS migraciones_aplicadas (
+      clave VARCHAR(80) PRIMARY KEY, applied_at DATETIME DEFAULT CURRENT_TIMESTAMP)`);
+    const [[ya]] = await pool.query('SELECT 1 ok FROM migraciones_aplicadas WHERE clave=? LIMIT 1', [FLAG]);
+    if (ya) return;
+
+    let [[mod]] = await pool.query("SELECT id_modulo FROM modulos WHERE nombre='Retirados' LIMIT 1");
+    if (!mod) {
+      const [ins] = await pool.query(
+        `INSERT INTO modulos (nombre, descripcion, icono, ruta, orden, estado)
+         VALUES ('Retirados','Funcionalidades de módulos retirados (archivadas, sin uso)','bi-archive','/retirados/',999,'inactivo')`);
+      mod = { id_modulo: ins.insertId };
+    }
+    const codigos = ['tesoreria_brokerage_ver','tesoreria_brokerage_facturas','tesoreria_brokerage_pagos',
+                     'creditos_fundantes_cargar','creditos_fundantes_validar','creditos_fundantes_ver'];
+    await pool.query('UPDATE funcionalidades SET id_modulo=?, href=NULL WHERE codigo IN (?)', [mod.id_modulo, codigos]);
+    await pool.query('INSERT IGNORE INTO migraciones_aplicadas (clave) VALUES (?)', [FLAG]);
+    limpiarCachePermisos();
+    console.log('✓ Retiro brokerage/fundantes viejo: 6 funcionalidades archivadas en módulo inactivo "Retirados"');
+  } catch (e) { console.error('[retiro brokerage viejo]', e.message); }
+})();
+
 const getAllPerfiles = async (req, res) => {
   try {
     // Administrador siempre primero; el resto en orden alfabético descendente (Z→A)
