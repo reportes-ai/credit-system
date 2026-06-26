@@ -49,8 +49,13 @@ function getDealerCallePct(plazo, p) {
 /* ── Tabla de comisión por dealer (su pactada; manda sobre la pizarra) ─── */
 const normRutD = r => String(r || '').replace(/[.\-\s]/g, '').toUpperCase();
 // Tramo de la tabla del dealer (pct/100) o null si no tiene ese tramo (→ fallback pizarra).
-function dealerTablePct(d, plazo) {
+// Si la operación es en PARQUE y el dealer es AMBOS (tiene com_parque_*), usa esa tabla.
+function dealerTablePct(d, plazo, esParque) {
   if (!d) return null;
+  if (esParque) {
+    const pv = plazo <= 12 ? d.com_parque_6_12 : plazo <= 24 ? d.com_parque_13_24 : plazo <= 36 ? d.com_parque_25_36 : d.com_parque_37;
+    if (pv != null && pv !== '') return Number(pv) / 100;
+  }
   const v = plazo <= 12 ? d.com_6_12 : plazo <= 24 ? d.com_13_24 : plazo <= 36 ? d.com_25_36 : d.com_37;
   return (v == null || v === '') ? null : Number(v) / 100;
 }
@@ -94,9 +99,16 @@ async function calcularOperacion(op) {
   let dealerCom = null;
   if (op.rut_dealer) {
     try {
-      const [drows] = await pool.query(
-        "SELECT com_6_12, com_13_24, com_25_36, com_37 FROM dealers WHERE UPPER(REPLACE(REPLACE(REPLACE(rut,'.',''),'-',''),' ','')) = ? LIMIT 1",
-        [normRutD(op.rut_dealer)]);
+      let drows;
+      try {
+        drows = (await pool.query(
+          "SELECT com_6_12, com_13_24, com_25_36, com_37, com_parque_6_12, com_parque_13_24, com_parque_25_36, com_parque_37 FROM dealers WHERE UPPER(REPLACE(REPLACE(REPLACE(rut,'.',''),'-',''),' ','')) = ? LIMIT 1",
+          [normRutD(op.rut_dealer)]))[0];
+      } catch (e) {
+        drows = (await pool.query(
+          "SELECT com_6_12, com_13_24, com_25_36, com_37 FROM dealers WHERE UPPER(REPLACE(REPLACE(REPLACE(rut,'.',''),'-',''),' ','')) = ? LIMIT 1",
+          [normRutD(op.rut_dealer)]))[0];
+      }
       dealerCom = drows[0] || null;
     } catch (e) { dealerCom = null; }   // columnas aún no creadas → cae a la pizarra
   }
@@ -167,12 +179,12 @@ async function calcularOperacion(op) {
   // El patio del parque sigue siendo global (patio_pct).
   if (saldo_precio > 0 && plazo > 0) {
     const patio_pct = p.patio_pct / 100;
-    const dPct      = dealerTablePct(dealerCom, plazo);
-    const baseParque = dPct != null ? dPct : getDealerPct(plazo, p);
-    const baseCalle  = dPct != null ? dPct : getDealerCallePct(plazo, p);
-    comdea_real     = esParque
-      ? Math.round(saldo_precio * baseParque)
-      : Math.round(saldo_precio * baseCalle);
+    // AMBOS: la op en parque usa la tabla PARQUE del dealer; en calle, la de CALLE.
+    const dPct      = dealerTablePct(dealerCom, plazo, esParque);
+    const base      = esParque
+      ? (dPct != null ? dPct : getDealerPct(plazo, p))
+      : (dPct != null ? dPct : getDealerCallePct(plazo, p));
+    comdea_real     = Math.round(saldo_precio * base);
     com_parque_calc = esParque ? Math.round(saldo_precio * patio_pct) : 0;
   }
 

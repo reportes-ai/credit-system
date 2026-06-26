@@ -5,7 +5,7 @@
   <link rel="icon" href="/img/favicon.png" type="image/png">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Nueva Ficha de Dealer — AutoFácil</title>
-  <!-- v1.19 -->
+  <!-- v1.20 — Ambos (Calle+Parque): 2 tablas de comisión + doble dirección -->
   <link href="/css/bootstrap.min.css" rel="stylesheet">
   <link href="/css/bootstrap-icons.css" rel="stylesheet">
   <style>
@@ -161,8 +161,9 @@
       <div class="tipo-toggle">
         <label><input type="radio" name="tipo" value="GENERAL" checked onchange="onTipo()"><span><i class="bi bi-shop me-1"></i>General (Calle)</span></label>
         <label><input type="radio" name="tipo" value="PARQUE" onchange="onTipo()"><span><i class="bi bi-car-front me-1"></i>Parque Automotriz</span></label>
+        <label><input type="radio" name="tipo" value="AMBOS" onchange="onTipo()"><span><i class="bi bi-signpost-split me-1"></i>Ambos (Calle+Parque)</span></label>
       </div>
-      <p class="hint">El tipo ajusta los porcentajes de comisión por defecto y las etiquetas de dirección/comuna.</p>
+      <p class="hint">El tipo ajusta los porcentajes de comisión por defecto y las etiquetas de dirección/comuna. <b>Ambos</b> = el concesionario opera en calle y en parque (dos tablas de comisión, según dónde se haga cada crédito).</p>
     </div>
   </div>
 
@@ -187,6 +188,7 @@
       <div class="fld"><label>RUT de Concesionario *</label><input id="rut" placeholder="76.123.456-7" maxlength="12" oninput="onRutInput(this,'rutHint')" onchange="detectarDealerRut()"><small id="rutHint" class="vmsg"></small></div>
       <div class="fld"><label>Nombre Razón Social *</label><input id="nombre_razon"></div>
       <div class="fld"><label>Nombre de Fantasía</label><input id="nombre_fantasia"></div>
+      <div class="fld" id="fldNombreParque" style="display:none"><label>Nombre del Parque Automotriz *</label><input id="nombre_parque" placeholder="Nombre del parque"></div>
       <div class="fld"><label id="lblDir">Dirección de Sucursal</label><input id="direccion"></div>
       <div class="fld"><label id="lblCom">Comuna de Sucursal</label>
         <input id="comuna" list="comunasList" placeholder="Escribe o elige la comuna…" oninput="onComuna()">
@@ -194,6 +196,16 @@
       <div class="fld"><label>Provincia / Ciudad</label><input id="provincia" readonly style="background:#f8fafc"></div>
       <div class="fld"><label>Región</label><input id="region" readonly style="background:#f8fafc"></div>
     </div>
+  </div>
+
+  <div class="card-sec" id="cardParqueDir" style="display:none">
+    <h3><i class="bi bi-car-front me-1"></i> Dirección del Parque Automotriz</h3>
+    <div class="card-body grid">
+      <div class="fld full"><label>Dirección de Parque</label><input id="direccion_parque"></div>
+      <div class="fld"><label>Comuna de Parque</label>
+        <input id="comuna_parque" list="comunasList" placeholder="Escribe o elige la comuna…"></div>
+    </div>
+    <p class="hint">Dirección física del parque automotriz donde el concesionario también opera (se usa para los créditos hechos en parque).</p>
   </div>
 
   <div class="card-sec">
@@ -238,15 +250,24 @@
     <div class="card-body">
       <table class="com-table">
         <thead><tr><th>Cantidad de Cuotas</th><th>6 a 12</th><th>13 a 24</th><th>25 a 36</th><th>37 y Más</th></tr></thead>
-        <tbody><tr>
-          <td style="background:#f8fafc;font-weight:700;text-align:left">Porcentaje de Comisión (%)</td>
-          <td><input id="com_6_12" type="number" step="0.1" oninput="chequearEspecial()"></td>
-          <td><input id="com_13_24" type="number" step="0.1" oninput="chequearEspecial()"></td>
-          <td><input id="com_25_36" type="number" step="0.1" oninput="chequearEspecial()"></td>
-          <td><input id="com_37" type="number" step="0.1" oninput="chequearEspecial()"></td>
-        </tr></tbody>
+        <tbody>
+          <tr id="rowCalle">
+            <td id="lblComRow" style="background:#f8fafc;font-weight:700;text-align:left">Porcentaje de Comisión (%)</td>
+            <td><input id="com_6_12" type="number" step="0.1" oninput="chequearEspecial()"></td>
+            <td><input id="com_13_24" type="number" step="0.1" oninput="chequearEspecial()"></td>
+            <td><input id="com_25_36" type="number" step="0.1" oninput="chequearEspecial()"></td>
+            <td><input id="com_37" type="number" step="0.1" oninput="chequearEspecial()"></td>
+          </tr>
+          <tr id="rowParque" style="display:none">
+            <td style="background:#f0f9ff;font-weight:700;text-align:left;color:#0369a1">Parque (%)</td>
+            <td><input id="com_parque_6_12" type="number" step="0.1" oninput="chequearEspecial()"></td>
+            <td><input id="com_parque_13_24" type="number" step="0.1" oninput="chequearEspecial()"></td>
+            <td><input id="com_parque_25_36" type="number" step="0.1" oninput="chequearEspecial()"></td>
+            <td><input id="com_parque_37" type="number" step="0.1" oninput="chequearEspecial()"></td>
+          </tr>
+        </tbody>
       </table>
-      <p class="hint">Pre-cargado según la pizarra (Parque/Calle). Ajústalo solo si hubo una negociación especial con el concesionario.</p>
+      <p class="hint">Pre-cargado según la pizarra (Parque/Calle). Ajústalo solo si hubo una negociación especial con el concesionario. En <b>Ambos</b>, la fila <b>Calle</b> se usa para créditos en calle y la fila <b>Parque</b> para créditos hechos en parque.</p>
       <div id="espBanner" style="display:none;margin-top:10px;background:#f5f3ff;border:1px solid #ddd6fe;border-left:4px solid #7c3aed;border-radius:8px;padding:10px 13px;font-size:.82rem;color:#5b21b6"></div>
     </div>
   </div>
@@ -423,8 +444,17 @@ async function onEnviarFirmada(){
 function chequearEspecial(){
   const b=$('espBanner'); if(!b) return;
   if(ESP_APROBADA){ b.style.display='block'; b.innerHTML='<i class="bi bi-patch-check-fill me-1"></i><b>Participación especial aprobada por '+escH(ESP_APROBADA)+'</b>'; return; }
-  const d = COM_DEFAULT[getTipo()]||{};
-  const over = ['com_6_12','com_13_24','com_25_36','com_37'].some(k=>{ const v=parseFloat($(k).value); return !isNaN(v) && v > (Number(d[k])||0) + 1e-9; });
+  const t = getTipo();
+  const gt = (v,base)=>{ const x=parseFloat(v); return !isNaN(x) && x > (Number(base)||0) + 1e-9; };
+  let over;
+  if(t==='AMBOS'){
+    const c = COM_DEFAULT.GENERAL||{}, pq = COM_DEFAULT.PARQUE||{};
+    over = ['com_6_12','com_13_24','com_25_36','com_37'].some(k=>gt($(k).value, c[k]))
+        || ['6_12','13_24','25_36','37'].some(k=>gt($('com_parque_'+k).value, pq['com_'+k]));
+  } else {
+    const d = COM_DEFAULT[t]||{};
+    over = ['com_6_12','com_13_24','com_25_36','com_37'].some(k=>gt($(k).value, d[k]));
+  }
   if(over){ b.style.display='block'; b.innerHTML='<i class="bi bi-star-fill me-1"></i><b>Participación especial:</b> la comisión supera la pizarra. Tras la revisión del analista, requerirá <b>aprobación de Gerencia</b> para fijar los %.'; }
   else { b.style.display='none'; b.innerHTML=''; }
 }
@@ -454,7 +484,8 @@ function aplicarDealer(d){
   setVal('direccion', d.direccion); setVal('comuna', d.comuna);
   if(d.provincia) setVal('provincia', d.provincia); if(d.region) setVal('region', d.region);
   setVal('cc_nombre', d.cc_nombre); setVal('cc_telefono', d.cc_telefono); setVal('cc_email', d.cc_email);
-  if(d.tipo==='PARQUE'||d.tipo==='GENERAL') setRadio('tipo', d.tipo);
+  if(['PARQUE','GENERAL','AMBOS'].includes(d.tipo)) setRadio('tipo', d.tipo);
+  setVal('nombre_parque', d.nombre_parque); setVal('direccion_parque', d.direccion_parque); setVal('comuna_parque', d.comuna_parque);
   if(d.tipo_documento) setRadio('tipo_documento', d.tipo_documento);
   // El banco puede venir de datos importados con un nombre fuera de la lista → asegurarlo como opción (así round-trip y no falsea "depósito cambió").
   if(d.banco){ const sel=$('banco'); if(sel && ![...sel.options].some(o=>o.value===d.banco)){ const op=document.createElement('option'); op.value=d.banco; op.textContent=d.banco; sel.appendChild(op); } }
@@ -462,6 +493,7 @@ function aplicarDealer(d){
   setVal('tipo_cuenta', d.tipo_cuenta); setVal('nombre_cuenta', d.nombre_cuenta);
   onTipo();   // ajusta etiquetas + defaults de comisión según tipo
   ['com_6_12','com_13_24','com_25_36','com_37'].forEach(k=>{ if(d[k]!=null && d[k]!=='') setVal(k, d[k]); });
+  ['com_parque_6_12','com_parque_13_24','com_parque_25_36','com_parque_37'].forEach(k=>{ if(d[k]!=null && d[k]!=='') setVal(k, d[k]); });
   actualizarTercero(); if(typeof onTipoCuenta==='function') onTipoCuenta(); chequearEspecial();
   mostrarMod();
   toast(`Dealer N°${d.numero} cargado — modo Modificación.`);
@@ -761,14 +793,29 @@ async function onEnviar(){
 }
 
 function onTipo(){
-  const t = getTipo();
-  $('lblDir').textContent = t==='PARQUE' ? 'Dirección de Parque Automotriz' : 'Dirección de Sucursal';
-  $('lblCom').textContent = t==='PARQUE' ? 'Comuna de Parque Automotriz' : 'Comuna de Sucursal';
-  // Solo precarga defaults si los campos están vacíos o coinciden con el otro default (no pisa edición manual)
-  const d = COM_DEFAULT[t], o = COM_DEFAULT[t==='PARQUE'?'GENERAL':'PARQUE'];
+  const t = getTipo(), esP = t==='PARQUE', esA = t==='AMBOS';
+  $('lblDir').textContent = esP ? 'Dirección de Parque Automotriz' : (esA ? 'Dirección de Sucursal (Calle)' : 'Dirección de Sucursal');
+  $('lblCom').textContent = esP ? 'Comuna de Parque Automotriz' : (esA ? 'Comuna de Sucursal (Calle)' : 'Comuna de Sucursal');
+  // Nombre del parque (PARQUE y AMBOS) + card Dirección de Parque (solo AMBOS) + fila PARQUE de la comisión (solo AMBOS).
+  $('fldNombreParque').style.display = (esP||esA) ? '' : 'none';
+  $('cardParqueDir').style.display = esA ? '' : 'none';
+  $('rowParque').style.display = esA ? '' : 'none';
+  $('lblComRow').textContent = esA ? 'Calle (%)' : 'Porcentaje de Comisión (%)';
+  // Tabla CALLE (com_*): GENERAL/AMBOS ← pizarra calle (GENERAL); PARQUE ← pizarra parque.
+  // Solo precarga si está vacío o coincide con el otro default (no pisa edición manual).
+  const calleSrc = esP ? 'PARQUE' : 'GENERAL';
+  const d = COM_DEFAULT[calleSrc], o = COM_DEFAULT[calleSrc==='PARQUE'?'GENERAL':'PARQUE'];
   for (const k of ['com_6_12','com_13_24','com_25_36','com_37']) {
     const cur = $(k).value;
     if (cur==='' || parseFloat(cur)===o[k]) $(k).value = d[k];
+  }
+  // Tabla PARQUE (com_parque_*) solo AMBOS ← pizarra parque.
+  if (esA) {
+    const dP = COM_DEFAULT.PARQUE;
+    for (const k of ['6_12','13_24','25_36','37']) {
+      const id = 'com_parque_' + k;
+      if ($(id).value === '') $(id).value = dP['com_' + k];
+    }
   }
   chequearEspecial();
 }
@@ -798,6 +845,14 @@ function recolectar(){
   o.rep_legal_origen = rl.origen; o.rl_nombre = rl.nombre; o.rl_telefono = rl.telefono; o.rl_email = rl.email;
   o.id_dealer_origen = MOD ? MOD.id_dealer : null;   // NULL = creación; con valor = modifica ese dealer
   o.socios = [1,2,3].map(i=>({ rut:val('socio_rut_'+i), nombre:val('socio_nombre_'+i) })).filter(s=>s.rut||s.nombre);
+  // Parque: nombre (PARQUE+AMBOS) y, solo en AMBOS, dirección + 2ª tabla de comisión.
+  const t = o.tipo;
+  if (t==='PARQUE' || t==='AMBOS') o.nombre_parque = val('nombre_parque');
+  if (t==='AMBOS') {
+    o.direccion_parque = val('direccion_parque'); o.comuna_parque = val('comuna_parque');
+    o.com_parque_6_12 = val('com_parque_6_12'); o.com_parque_13_24 = val('com_parque_13_24');
+    o.com_parque_25_36 = val('com_parque_25_36'); o.com_parque_37 = val('com_parque_37');
+  }
   return o;
 }
 
@@ -839,6 +894,12 @@ const REQUERIDOS = [
 function validarEnvio(){
   const errs=[];
   for(const [id,lbl] of REQUERIDOS) if(!val(id)) errs.push('Falta: '+lbl);
+  const t = getTipo();
+  if((t==='PARQUE'||t==='AMBOS') && !val('nombre_parque')) errs.push('Falta: Nombre del Parque Automotriz');
+  if(t==='AMBOS'){
+    for(const [id,lbl] of [['com_parque_6_12','Comisión Parque 6-12'],['com_parque_13_24','Comisión Parque 13-24'],['com_parque_25_36','Comisión Parque 25-36'],['com_parque_37','Comisión Parque 37+']])
+      if(!val(id)) errs.push('Falta: '+lbl);
+  }
   if(!getRadio('tipo_documento')) errs.push('Falta: Tipo de documento');
   if(!calcCuentaTipo())           errs.push('Falta: RUT de la cuenta (define Empresa/Persona)');
   // Validaciones de formato (solo si el campo tiene contenido)
@@ -953,12 +1014,19 @@ function imprimir(){
   const _prevTitle = document.title;
   document.title = nombreFichaBase();   // nombre sugerido al "Guardar como PDF"
   window.addEventListener('afterprint', function _r(){ document.title = _prevTitle; window.removeEventListener('afterprint', _r); });
-  const esP = o.tipo==='PARQUE';
-  const dirLbl = esP?'Dirección de Parque Automotriz':'Dirección de Sucursal';
-  const comLbl = esP?'Comuna de Parque Automotriz':'Comuna de Sucursal';
+  const esP = o.tipo==='PARQUE', esA = o.tipo==='AMBOS';
+  const dirLbl = esP?'Dirección de Parque Automotriz':(esA?'Dirección de Sucursal (Calle)':'Dirección de Sucursal');
+  const comLbl = esP?'Comuna de Parque Automotriz':(esA?'Comuna de Sucursal (Calle)':'Comuna de Sucursal');
+  const subt = esP?'Parque Automotriz':(esA?'Calle + Parque Automotriz':'');
   const E = s => String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;');
+  const parqueNombreRow = (esP||esA) ? `<tr><td class="lbl">Nombre del Parque</td><td>${E(o.nombre_parque)}</td></tr>` : '';
+  const parqueDirRows = esA ? `<tr><td class="lbl">Dirección de Parque</td><td>${E(o.direccion_parque)}</td></tr><tr><td class="lbl">Comuna de Parque</td><td>${E(o.comuna_parque)}</td></tr>` : '';
+  const comRows = esA
+    ? `<tr><td class="lbl">Calle</td><td>${E(o.com_6_12)}%</td><td>${E(o.com_13_24)}%</td><td>${E(o.com_25_36)}%</td><td>${E(o.com_37)}%</td></tr>
+       <tr><td class="lbl">Parque</td><td>${E(o.com_parque_6_12)}%</td><td>${E(o.com_parque_13_24)}%</td><td>${E(o.com_parque_25_36)}%</td><td>${E(o.com_parque_37)}%</td></tr>`
+    : `<tr><td class="lbl">Porcentaje de Comisión</td><td>${E(o.com_6_12)}%</td><td>${E(o.com_13_24)}%</td><td>${E(o.com_25_36)}%</td><td>${E(o.com_37)}%</td></tr>`;
   printHTML(`${LOGO_PRINT}
-    <h1${esP?'':' class="solo"'}>FICHA DE INCORPORACIÓN DE CONCESIONARIO</h1>${esP?'<div class="subt">Parque Automotriz</div>':''}
+    <h1${subt?'':' class="solo"'}>FICHA DE INCORPORACIÓN DE CONCESIONARIO</h1>${subt?`<div class="subt">${subt}</div>`:''}
     <table class="p"><tr><th colspan="2">EJECUTIVO COMERCIAL</th></tr>
       <tr><td class="lbl">Nombre Ejecutivo</td><td>${E($('ejecutivo_nombre').value)}</td></tr>
       <tr><td class="lbl">Fecha de solicitud</td><td>${E(o.fecha_solicitud)}</td></tr></table>
@@ -966,10 +1034,11 @@ function imprimir(){
       <tr><td class="lbl">Rut de Concesionario</td><td>${E(o.rut)}</td></tr>
       <tr><td class="lbl">Nombre Razón Social</td><td>${E(o.nombre_razon)}</td></tr>
       <tr><td class="lbl">Nombre de Fantasía</td><td>${E(o.nombre_fantasia)}</td></tr>
+      ${parqueNombreRow}
       <tr><td class="lbl">${dirLbl}</td><td>${E(o.direccion)}</td></tr>
       <tr><td class="lbl">${comLbl}</td><td>${E(o.comuna)}</td></tr>
       <tr><td class="lbl">Provincia / Ciudad</td><td>${E(o.provincia)}</td></tr>
-      <tr><td class="lbl">Región</td><td>${E(o.region)}</td></tr></table>
+      <tr><td class="lbl">Región</td><td>${E(o.region)}</td></tr>${parqueDirRows}</table>
     <table class="p"><tr><th colspan="2">CONTACTO COMERCIAL</th></tr>
       <tr><td class="lbl">Nombre</td><td>${E(o.cc_nombre)}</td></tr>
       <tr><td class="lbl">Teléfono</td><td>${E(o.cc_telefono)}</td></tr>
@@ -982,9 +1051,9 @@ function imprimir(){
       <tr><td class="lbl">Nombre</td><td>${E(o.rl_nombre)}</td></tr>
       <tr><td class="lbl">Teléfono</td><td>${E(o.rl_telefono)}</td></tr>
       <tr><td class="lbl">Email</td><td>${E(o.rl_email)}</td></tr></table>
-    <table class="p"><tr><th colspan="5">COMISIÓN PACTADA</th></tr>
+    <table class="p"><tr><th colspan="5">COMISIÓN PACTADA${esA?' (Calle / Parque)':''}</th></tr>
       <tr><td class="lbl">Cantidad de Cuotas</td><td>6 a 12</td><td>13 a 24</td><td>25 a 36</td><td>37 y Más</td></tr>
-      <tr><td class="lbl">Porcentaje de Comisión</td><td>${E(o.com_6_12)}%</td><td>${E(o.com_13_24)}%</td><td>${E(o.com_25_36)}%</td><td>${E(o.com_37)}%</td></tr></table>
+      ${comRows}</table>
     <table class="p"><tr><th colspan="4">TIPO DE DOCUMENTO TRIBUTARIO</th></tr>
       <tr><td class="lbl">Tipo de documento</td><td>BOLETA: ${celdaX(o.tipo_documento,'BOLETA')}</td><td>FACTURA: ${celdaX(o.tipo_documento,'FACTURA')}</td><td></td></tr></table>
     <table class="p"><tr><th colspan="4">FORMA DE PAGO SALDO PRECIO</th></tr>

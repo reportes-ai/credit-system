@@ -123,14 +123,25 @@ const normRutD = r => String(r || '').replace(/[.\-\s]/g, '').toUpperCase();
 async function cargarDealers() {
   const map = {};
   try {
-    const [rows] = await pool.query('SELECT rut, com_6_12, com_13_24, com_25_36, com_37 FROM dealers WHERE rut IS NOT NULL');
+    let rows;
+    try {
+      // Dealers AMBOS traen una 2ª tabla PARQUE (com_parque_*). Lectura defensiva por si aún no existen.
+      [rows] = await pool.query('SELECT rut, com_6_12, com_13_24, com_25_36, com_37, com_parque_6_12, com_parque_13_24, com_parque_25_36, com_parque_37 FROM dealers WHERE rut IS NOT NULL');
+    } catch (e) {
+      [rows] = await pool.query('SELECT rut, com_6_12, com_13_24, com_25_36, com_37 FROM dealers WHERE rut IS NOT NULL');
+    }
     rows.forEach(d => { map[normRutD(d.rut)] = d; });
   } catch (e) { /* sin tabla/columnas → todo cae a la pizarra */ }
   return map;
 }
 // Tramo de la tabla del dealer (pct/100) o null si no tiene ese tramo (→ fallback pizarra).
-function dealerTablePct(d, plazo) {
+// Si la operación es en PARQUE y el dealer es AMBOS (tiene com_parque_*), usa esa tabla.
+function dealerTablePct(d, plazo, esParque) {
   if (!d) return null;
+  if (esParque) {
+    const pv = plazo <= 12 ? d.com_parque_6_12 : plazo <= 24 ? d.com_parque_13_24 : plazo <= 36 ? d.com_parque_25_36 : d.com_parque_37;
+    if (pv != null && pv !== '') return Number(pv) / 100;
+  }
   const v = plazo <= 12 ? d.com_6_12 : plazo <= 24 ? d.com_13_24 : plazo <= 36 ? d.com_25_36 : d.com_37;
   return (v == null || v === '') ? null : Number(v) / 100;
 }
@@ -181,7 +192,8 @@ async function calcularValoresOp(op, p, parqMap, todasTasas, dealerMap) {
   let comdea_real = 0, com_parque = 0, arriendo = 0;
   if (saldo > 0 && plazo > 0) {
     // La tabla pactada del dealer manda; si no tiene ese tramo, cae a la pizarra.
-    const dPct = dealerTablePct((dealerMap || {})[normRutD(op.rut_dealer)], plazo);
+    // AMBOS: si la op es en parque usa la tabla PARQUE del dealer; si no, la de CALLE.
+    const dPct = dealerTablePct((dealerMap || {})[normRutD(op.rut_dealer)], plazo, esParque);
     if (esParque) {
       const parqData = parqMap[parqKey];
       const patioPct = parqData ? parseFloat(parqData.comision_pct) : (p.patio_pct / 100);

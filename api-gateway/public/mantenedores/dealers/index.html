@@ -819,13 +819,8 @@ async function cargarPizarraDef(){
   try { const j = await (await fetch('/api/dealer-incorporacion/com-default', { headers:H })).json();
     if(j.success && j.data) PIZARRA_DEF = j.data; } catch(e){}
 }
-function comTablaDealer(d){
-  const propias = !(d.com_6_12==null && d.com_13_24==null && d.com_25_36==null && d.com_37==null);
-  let vals, fuente, fcolor, ficon;
-  if(propias){ vals = d; fuente = 'tabla pactada del dealer'; fcolor='#166534'; ficon='check-circle-fill'; }
-  else if(PIZARRA_DEF){ const tipo = String(d.ccs_parque||'').toUpperCase().includes('PARQUE') ? 'PARQUE' : 'GENERAL';
-    vals = PIZARRA_DEF[tipo] || {}; fuente = 'pizarra por defecto · '+(tipo==='PARQUE'?'Parque':'Calle')+' — se fija al pasar por ficha'; fcolor='#64748b'; ficon='info-circle-fill'; }
-  else return '<span style="color:#94a3b8">— (usa la pizarra)</span>';
+// Un bloque segmentado (6-12/13-24/25-36/37+) a partir de un objeto con com_6_12..com_37.
+function comSegBloque(vals){
   const pc = v => (v==null||v==='')?'—':(Number(v).toLocaleString('es-CL',{maximumFractionDigits:2})+'%');
   const tramos = [['6 — 12', vals.com_6_12],['13 — 24', vals.com_13_24],['25 — 36', vals.com_25_36],['37 y +', vals.com_37]];
   const seg = tramos.map((t,i)=>`<div style="flex:1;text-align:center;padding:9px 6px 8px;${i<3?'border-right:1px solid #eef2f7;':''}">
@@ -833,8 +828,25 @@ function comTablaDealer(d){
       <div style="font-size:1.12rem;font-weight:800;color:#0141A2;line-height:1.2;margin-top:3px">${pc(t[1])}</div>
       <div style="font-size:.58rem;color:#cbd5e1;margin-top:1px">cuotas</div>
     </div>`).join('');
-  let h = `<div style="max-width:380px">
-    <div style="display:flex;border:1px solid #e3e8ef;border-radius:12px;overflow:hidden;background:linear-gradient(180deg,#fbfdff,#fff);box-shadow:0 2px 8px rgba(1,65,162,.06)">${seg}</div>`;
+  return `<div style="display:flex;border:1px solid #e3e8ef;border-radius:12px;overflow:hidden;background:linear-gradient(180deg,#fbfdff,#fff);box-shadow:0 2px 8px rgba(1,65,162,.06)">${seg}</div>`;
+}
+function comTablaDealer(d){
+  const propias = !(d.com_6_12==null && d.com_13_24==null && d.com_25_36==null && d.com_37==null);
+  const tieneParque = !(d.com_parque_6_12==null && d.com_parque_13_24==null && d.com_parque_25_36==null && d.com_parque_37==null);
+  const esAmbos = (String(d.tipo_ficha||'').toUpperCase()==='AMBOS' || tieneParque) && propias;
+  let vals, fuente, fcolor, ficon;
+  if(propias){ vals = d; fuente = 'tabla pactada del dealer'; fcolor='#166534'; ficon='check-circle-fill'; }
+  else if(PIZARRA_DEF){ const tipo = String(d.ccs_parque||'').toUpperCase().includes('PARQUE') ? 'PARQUE' : 'GENERAL';
+    vals = PIZARRA_DEF[tipo] || {}; fuente = 'pizarra por defecto · '+(tipo==='PARQUE'?'Parque':'Calle')+' — se fija al pasar por ficha'; fcolor='#64748b'; ficon='info-circle-fill'; }
+  else return '<span style="color:#94a3b8">— (usa la pizarra)</span>';
+  let h = `<div style="max-width:380px">`;
+  if(esAmbos){
+    const parqueVals = { com_6_12:d.com_parque_6_12, com_13_24:d.com_parque_13_24, com_25_36:d.com_parque_25_36, com_37:d.com_parque_37 };
+    h += `<div style="font-size:.66rem;font-weight:800;color:#0141A2;text-transform:uppercase;letter-spacing:.4px;margin-bottom:3px"><i class="bi bi-shop me-1"></i>Calle</div>${comSegBloque(vals)}`;
+    h += `<div style="font-size:.66rem;font-weight:800;color:#0369a1;text-transform:uppercase;letter-spacing:.4px;margin:10px 0 3px"><i class="bi bi-car-front me-1"></i>Parque</div>${comSegBloque(parqueVals)}`;
+  } else {
+    h += comSegBloque(vals);
+  }
   if(d.part_especial_por) h += `<div style="margin-top:8px;display:inline-flex;align-items:center;gap:6px;font-size:.75rem;color:#5b21b6;background:#f5f3ff;border:1px solid #ddd6fe;border-radius:20px;padding:4px 11px"><i class="bi bi-patch-check-fill"></i> Participación especial aprobada por <b>${esc(d.part_especial_por)}</b></div>`;
   h += `<div style="margin-top:8px;font-size:.72rem;color:${fcolor};display:flex;align-items:center;gap:5px"><i class="bi bi-${ficon}"></i> Fuente: ${fuente}.</div>`;
   h += `<div style="margin-top:3px;font-size:.72rem;color:#b45309;display:flex;align-items:center;gap:5px"><i class="bi bi-lock-fill"></i> Solo se modifica vía ficha de Modificación (cadena de aprobación).</div>
@@ -843,6 +855,8 @@ function comTablaDealer(d){
 }
 function verDealer(d) {
   dealerActual = d;
+  const tipoLabel = t => ({GENERAL:'General (Calle)',PARQUE:'Parque Automotriz',AMBOS:'Ambos (Calle+Parque)'}[String(t||'').toUpperCase()] || '—');
+  const esAmbos = String(d.tipo_ficha||'').toUpperCase()==='AMBOS';
   document.getElementById('detTitulo').textContent = nombreDealer(d) || 'Dealer';
   document.getElementById('detTable').innerHTML = [
     ['N°',                d.numero ?? '—'],
@@ -851,10 +865,12 @@ function verDealer(d) {
     ['RUT Pago',          fmt(d.rut_pago)],
     ['Nombre Dealer',     fmt(nombreDealer(d))],
     ['Nombre Razón Social', fmt(d.nombre_razon)],
-    ['CCS / Parque',      fmt(d.ccs_parque)],
+    ['Tipo',              tipoLabel(d.tipo_ficha)],
+    [esAmbos ? 'Nombre del Parque' : 'CCS / Parque', fmt(d.ccs_parque)],
     ['Categoría Propuesta', CATS[d.categoria_propuesta]?.nombre || '—'],
     ['Categoría Asignada',  CATS[d.categoria_asignada]?.nombre || '—'],
-    ['Dirección',         fmt(d.direccion)],
+    [esAmbos ? 'Dirección Sucursal (Calle)' : 'Dirección', fmt(d.direccion)],
+    ...(esAmbos ? [['Dirección Parque', fmt(d.direccion_parque)], ['Comuna Parque', fmt(d.comuna_parque)]] : []),
     ['Fecha Incorporación', fmtDate(d.fecha_incorporacion)],
     ['Contacto Comercial',fmt(d.contacto)],
     ['Teléfono',          fmt(d.telefono)],

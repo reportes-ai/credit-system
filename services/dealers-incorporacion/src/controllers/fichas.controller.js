@@ -124,6 +124,16 @@ async function comDefaults() {
     await pool.query(`ALTER TABLE dealer_fichas ADD COLUMN IF NOT EXISTS socios JSON NULL`);
     await pool.query(`ALTER TABLE dealer_fichas ADD COLUMN IF NOT EXISTS informes_resumen JSON NULL`);
     await pool.query(`ALTER TABLE dealer_fichas ADD COLUMN IF NOT EXISTS informes_alerta_grave TINYINT(1) NULL`);
+    // AMBOS (Calle+Parque): segunda tabla de comisión PARQUE + dirección y nombre del parque.
+    await pool.query(`ALTER TABLE dealer_fichas ADD COLUMN IF NOT EXISTS com_parque_6_12  DECIMAL(5,2) NULL`);
+    await pool.query(`ALTER TABLE dealer_fichas ADD COLUMN IF NOT EXISTS com_parque_13_24 DECIMAL(5,2) NULL`);
+    await pool.query(`ALTER TABLE dealer_fichas ADD COLUMN IF NOT EXISTS com_parque_25_36 DECIMAL(5,2) NULL`);
+    await pool.query(`ALTER TABLE dealer_fichas ADD COLUMN IF NOT EXISTS com_parque_37    DECIMAL(5,2) NULL`);
+    await pool.query(`ALTER TABLE dealer_fichas ADD COLUMN IF NOT EXISTS nombre_parque    VARCHAR(150) NULL`);
+    await pool.query(`ALTER TABLE dealer_fichas ADD COLUMN IF NOT EXISTS direccion_parque VARCHAR(300) NULL`);
+    await pool.query(`ALTER TABLE dealer_fichas ADD COLUMN IF NOT EXISTS comuna_parque    VARCHAR(120) NULL`);
+    await pool.query(`ALTER TABLE dealer_fichas ADD COLUMN IF NOT EXISTS provincia_parque VARCHAR(120) NULL`);
+    await pool.query(`ALTER TABLE dealer_fichas ADD COLUMN IF NOT EXISTS region_parque    VARCHAR(120) NULL`);
   } catch (e) { console.error('[dealer_fichas alter cols]', e.message); }
 
   // Archivos adjuntos múltiples (informes comerciales empresa/socios, hasta 3 c/u).
@@ -279,8 +289,15 @@ async function idsGerencia() {
 async function esEspecial(f) {
   try {
     const defs = await comDefaults();
-    const d = defs[f.tipo === 'PARQUE' ? 'PARQUE' : 'GENERAL'];
     const gt = (v, base) => v != null && v !== '' && Number(v) > Number(base) + 1e-9;
+    if (f.tipo === 'AMBOS') {
+      // CALLE (com_*) vs pizarra calle (GENERAL) + PARQUE (com_parque_*) vs pizarra parque.
+      const c = defs.GENERAL, pq = defs.PARQUE;
+      const calle  = gt(f.com_6_12, c.com_6_12) || gt(f.com_13_24, c.com_13_24) || gt(f.com_25_36, c.com_25_36) || gt(f.com_37, c.com_37);
+      const parque = gt(f.com_parque_6_12, pq.com_6_12) || gt(f.com_parque_13_24, pq.com_13_24) || gt(f.com_parque_25_36, pq.com_25_36) || gt(f.com_parque_37, pq.com_37);
+      return calle || parque;
+    }
+    const d = defs[f.tipo === 'PARQUE' ? 'PARQUE' : 'GENERAL'];
     return gt(f.com_6_12, d.com_6_12) || gt(f.com_13_24, d.com_13_24) || gt(f.com_25_36, d.com_25_36) || gt(f.com_37, d.com_37);
   } catch (e) { console.error('[esEspecial]', e.message); return false; }
 }
@@ -440,9 +457,12 @@ const setAlertasConfig = async (req, res) => {
 
 // Campos editables de la ficha (todo menos workflow/archivo).
 const CAMPOS = ['tipo','ejecutivo_nombre','fecha_solicitud','rut','nombre_razon','nombre_fantasia','direccion','comuna','provincia','region',
+  'nombre_parque','direccion_parque','comuna_parque','provincia_parque','region_parque',
   'cc_nombre','cc_telefono','cc_email','cf_nombre','cf_telefono','cf_email',
   'rep_legal_origen','rl_nombre','rl_telefono','rl_email',
-  'com_6_12','com_13_24','com_25_36','com_37','tipo_documento','cuenta_tipo','tipo_cuenta','nombre_cuenta','banco',
+  'com_6_12','com_13_24','com_25_36','com_37',
+  'com_parque_6_12','com_parque_13_24','com_parque_25_36','com_parque_37',
+  'tipo_documento','cuenta_tipo','tipo_cuenta','nombre_cuenta','banco',
   'rut_cuenta','num_cuenta','correo_confirmacion','observaciones'];
 
 const CATEGORIAS = ['EMPRESA', 'SOCIOS', 'SOCIO1', 'SOCIO2', 'SOCIO3', 'PODER_SIMPLE', 'PODER_REP_LEGAL'];   // adjuntos
@@ -474,7 +494,7 @@ function armarValores(body) {
   for (const k of CAMPOS) {
     if (!(k in body)) continue;
     if (k.startsWith('com_')) v[k] = num(body[k]);
-    else if (k === 'tipo') v[k] = (norm(body[k]).toUpperCase() === 'PARQUE') ? 'PARQUE' : 'GENERAL';
+    else if (k === 'tipo') { const t = norm(body[k]).toUpperCase(); v[k] = (t === 'PARQUE' || t === 'AMBOS') ? t : 'GENERAL'; }
     else if (k === 'fecha_solicitud') v[k] = body[k] || null;
     else v[k] = norm(body[k]) || null;
   }
@@ -527,9 +547,12 @@ const obtener = async (req, res) => {
     const [[f]] = await pool.query(
       `SELECT id, tipo, estado, id_ejecutivo, ejecutivo_email, ejecutivo_nombre, fecha_solicitud,
               rut, nombre_razon, nombre_fantasia, direccion, comuna, provincia, region,
+              nombre_parque, direccion_parque, comuna_parque, provincia_parque, region_parque,
               cc_nombre, cc_telefono, cc_email, cf_nombre, cf_telefono, cf_email,
               rep_legal_origen, rl_nombre, rl_telefono, rl_email,
-              com_6_12, com_13_24, com_25_36, com_37, tipo_documento, cuenta_tipo, tipo_cuenta, nombre_cuenta, banco,
+              com_6_12, com_13_24, com_25_36, com_37,
+              com_parque_6_12, com_parque_13_24, com_parque_25_36, com_parque_37,
+              tipo_documento, cuenta_tipo, tipo_cuenta, nombre_cuenta, banco,
               rut_cuenta, num_cuenta, correo_confirmacion, observaciones,
               excepciones, excepciones_comentarios, diferencias, firma_sospecha, firma_detalle, ficha_faltantes,
               ficha_nombre, ficha_mime, (ficha_data IS NOT NULL) AS tiene_ficha,
@@ -576,11 +599,15 @@ const crear = async (req, res) => {
   try {
     const v = armarValores(req.body);
     if (!v.tipo) v.tipo = 'GENERAL';
-    // Comisiones por defecto (derivadas de la pizarra Parque/Calle) si no vienen
+    // Comisiones por defecto (derivadas de la pizarra Parque/Calle) si no vienen.
+    // AMBOS: tabla CALLE (com_*) ← pizarra calle (GENERAL); tabla PARQUE (com_parque_*) ← pizarra parque.
     const defs = await comDefaults();
-    const def = defs[v.tipo] || defs.GENERAL;
+    const def = v.tipo === 'AMBOS' ? defs.GENERAL : (defs[v.tipo] || defs.GENERAL);
     for (const k of ['com_6_12','com_13_24','com_25_36','com_37'])
       if (v[k] == null) v[k] = def[k];
+    if (v.tipo === 'AMBOS')
+      for (const k of ['6_12','13_24','25_36','37'])
+        if (v['com_parque_' + k] == null) v['com_parque_' + k] = defs.PARQUE['com_' + k];
     const u = req.usuario;
     // ejecutivo_nombre es editable (otro Ejecutivo/Jefe Comercial/Analista); default = creador.
     if (!v.ejecutivo_nombre) v.ejecutivo_nombre = [u.nombre, u.apellido].filter(Boolean).join(' ') || null;
@@ -713,10 +740,20 @@ async function calcularDiferencias(f) {
       const b = (sv == null || sv === '') ? null : Number(sv);
       if (a != null && a !== b) dif.push({ campo, ficha: a + '%', sistema: (b == null ? '—' : b + '%') });
     };
-    cmpCom('Comisión 6–12', f.com_6_12, dl.com_6_12);
-    cmpCom('Comisión 13–24', f.com_13_24, dl.com_13_24);
-    cmpCom('Comisión 25–36', f.com_25_36, dl.com_25_36);
-    cmpCom('Comisión 37+', f.com_37, dl.com_37);
+    const calleLbl = f.tipo === 'AMBOS' ? ' (Calle)' : '';
+    cmpCom('Comisión 6–12' + calleLbl, f.com_6_12, dl.com_6_12);
+    cmpCom('Comisión 13–24' + calleLbl, f.com_13_24, dl.com_13_24);
+    cmpCom('Comisión 25–36' + calleLbl, f.com_25_36, dl.com_25_36);
+    cmpCom('Comisión 37+' + calleLbl, f.com_37, dl.com_37);
+    if (f.tipo === 'AMBOS') {
+      // Segunda tabla PARQUE + nombre/dirección del parque (solo cuando el dealer opera en ambos).
+      cmpCom('Comisión Parque 6–12', f.com_parque_6_12, dl.com_parque_6_12);
+      cmpCom('Comisión Parque 13–24', f.com_parque_13_24, dl.com_parque_13_24);
+      cmpCom('Comisión Parque 25–36', f.com_parque_25_36, dl.com_parque_25_36);
+      cmpCom('Comisión Parque 37+', f.com_parque_37, dl.com_parque_37);
+      cmp('Nombre del Parque', f.nombre_parque, dl.ccs_parque);
+      cmp('Dirección de Parque', f.direccion_parque, dl.direccion_parque);
+    }
   } catch (e) { console.error('[calcularDiferencias]', e.message); }
   return dif;
 }
@@ -1033,6 +1070,8 @@ function ensureDealersCols() {
     'cf_nombre VARCHAR(150)', 'cf_telefono VARCHAR(40)', 'cf_email VARCHAR(150)',
     'rl_nombre VARCHAR(150)', 'rl_telefono VARCHAR(40)', 'rl_email VARCHAR(150)',
     'com_6_12 DECIMAL(5,2)', 'com_13_24 DECIMAL(5,2)', 'com_25_36 DECIMAL(5,2)', 'com_37 DECIMAL(5,2)',
+    'com_parque_6_12 DECIMAL(5,2)', 'com_parque_13_24 DECIMAL(5,2)', 'com_parque_25_36 DECIMAL(5,2)', 'com_parque_37 DECIMAL(5,2)',
+    'direccion_parque VARCHAR(300)', 'comuna_parque VARCHAR(120)',
     'cuenta_tipo VARCHAR(10)', 'tipo_cuenta VARCHAR(30)', 'nombre_cuenta VARCHAR(150)',
     'part_especial_por VARCHAR(200)', 'part_especial_fecha DATETIME',
   ];
@@ -1053,16 +1092,20 @@ async function finalizarDealer(f) {
     const [[dl]] = await pool.query('SELECT id_dealer, numero FROM dealers WHERE id_dealer=?', [f.id_dealer_origen]);
     if (dl) {
       await pool.query(
-        `UPDATE dealers SET rut=?, nombre_indexa=?, nombre_razon=?, tipo_ficha=?, direccion=?,
+        `UPDATE dealers SET rut=?, nombre_indexa=?, nombre_razon=?, tipo_ficha=?, ccs_parque=COALESCE(?,ccs_parque), direccion=?,
            comuna=?, provincia=?, region=?, contacto=?, telefono=?, correo=?,
            cf_nombre=?, cf_telefono=?, cf_email=?, rl_nombre=?, rl_telefono=?, rl_email=?,
            com_6_12=?, com_13_24=?, com_25_36=?, com_37=?,
+           com_parque_6_12=?, com_parque_13_24=?, com_parque_25_36=?, com_parque_37=?,
+           direccion_parque=?, comuna_parque=?,
            cuenta_tipo=?, tipo_cuenta=?, nombre_cuenta=?, num_cuenta=?, banco=?, rut_pago=?,
            tiene_factura=?, observaciones=?, part_especial_por=?, part_especial_fecha=? WHERE id_dealer=?`,
-        [f.rut, f.nombre_fantasia || f.nombre_razon, f.nombre_razon, f.tipo, f.direccion,
+        [f.rut, f.nombre_fantasia || f.nombre_razon, f.nombre_razon, f.tipo, f.nombre_parque || null, f.direccion,
          f.comuna, f.provincia, f.region, f.cc_nombre, f.cc_telefono, f.cc_email,
          f.cf_nombre, f.cf_telefono, f.cf_email, f.rl_nombre, f.rl_telefono, f.rl_email,
          f.com_6_12, f.com_13_24, f.com_25_36, f.com_37,
+         f.com_parque_6_12, f.com_parque_13_24, f.com_parque_25_36, f.com_parque_37,
+         f.direccion_parque || null, f.comuna_parque || null,
          f.cuenta_tipo, f.tipo_cuenta, f.nombre_cuenta, f.num_cuenta, f.banco, f.rut_cuenta,
          f.tipo_documento === 'FACTURA' ? 1 : 0, f.observaciones, partPor, partFecha, dl.id_dealer]);
       return { idDealer: dl.id_dealer, numero: dl.numero, esMod: true };
@@ -1075,13 +1118,17 @@ async function finalizarDealer(f) {
        comuna, provincia, region, fecha_incorporacion, contacto, telefono, correo,
        cf_nombre, cf_telefono, cf_email, rl_nombre, rl_telefono, rl_email,
        com_6_12, com_13_24, com_25_36, com_37,
+       com_parque_6_12, com_parque_13_24, com_parque_25_36, com_parque_37,
+       direccion_parque, comuna_parque,
        cuenta_tipo, tipo_cuenta, nombre_cuenta, num_cuenta, banco, rut_pago,
        activo, tiene_factura, observaciones, part_especial_por, part_especial_fecha)
-     VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,1,?,?,?,?)`,
-    [maxN, f.rut, f.nombre_fantasia || f.nombre_razon, f.nombre_razon, f.tipo, f.tipo, f.direccion,
+     VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,1,?,?,?,?)`,
+    [maxN, f.rut, f.nombre_fantasia || f.nombre_razon, f.nombre_razon, f.nombre_parque || null, f.tipo, f.direccion,
      f.comuna, f.provincia, f.region, f.fecha_solicitud, f.cc_nombre, f.cc_telefono, f.cc_email,
      f.cf_nombre, f.cf_telefono, f.cf_email, f.rl_nombre, f.rl_telefono, f.rl_email,
      f.com_6_12, f.com_13_24, f.com_25_36, f.com_37,
+     f.com_parque_6_12, f.com_parque_13_24, f.com_parque_25_36, f.com_parque_37,
+     f.direccion_parque || null, f.comuna_parque || null,
      f.cuenta_tipo, f.tipo_cuenta, f.nombre_cuenta, f.num_cuenta, f.banco, f.rut_cuenta,
      f.tipo_documento === 'FACTURA' ? 1 : 0, f.observaciones, partPor, partFecha]);
   return { idDealer: d.insertId, numero: maxN, esMod: false };
@@ -1253,11 +1300,13 @@ function dealerAFicha(d) {
     id_dealer: d.id_dealer, numero: d.numero,
     rut: d.rut, nombre_razon: d.nombre_razon, nombre_fantasia: d.nombre_indexa,
     direccion: d.direccion, comuna: d.comuna || '', provincia: d.provincia || '', region: d.region || '',
-    tipo: (d.tipo_ficha === 'PARQUE' || d.tipo_ficha === 'GENERAL') ? d.tipo_ficha : null,
+    tipo: (['PARQUE','GENERAL','AMBOS'].includes(d.tipo_ficha)) ? d.tipo_ficha : null,
+    nombre_parque: d.ccs_parque || '', direccion_parque: d.direccion_parque || '', comuna_parque: d.comuna_parque || '',
     cc_nombre: d.contacto || '', cc_telefono: d.telefono || '', cc_email: d.correo || '',
     cf_nombre: d.cf_nombre || '', cf_telefono: d.cf_telefono || '', cf_email: d.cf_email || '',
     rl_nombre: d.rl_nombre || '', rl_telefono: d.rl_telefono || '', rl_email: d.rl_email || '',
     com_6_12: d.com_6_12, com_13_24: d.com_13_24, com_25_36: d.com_25_36, com_37: d.com_37,
+    com_parque_6_12: d.com_parque_6_12, com_parque_13_24: d.com_parque_13_24, com_parque_25_36: d.com_parque_25_36, com_parque_37: d.com_parque_37,
     tipo_documento: d.tiene_factura ? 'FACTURA' : 'BOLETA',
     cuenta_tipo: d.cuenta_tipo || '', tipo_cuenta: d.tipo_cuenta || '', nombre_cuenta: d.nombre_cuenta || '',
     banco: d.banco || '', rut_cuenta: d.rut_pago || '', num_cuenta: d.num_cuenta || '',

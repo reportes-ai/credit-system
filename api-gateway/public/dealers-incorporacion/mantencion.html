@@ -249,7 +249,7 @@ function renderHistoricas(){
         ? `<span class="estado-pill" style="background:#dcfce7;color:#166534"><i class="bi bi-patch-check-fill"></i> APROBADO</span>`
         : `<span class="estado-pill" style="background:#fee2e2;color:#991b1b"><i class="bi bi-x-octagon-fill"></i> RECHAZADO</span>`;
       return `<tr>
-        <td>${f.tipo==='PARQUE'?'<i class="bi bi-car-front"></i> Parque':'<i class="bi bi-shop"></i> General'}</td>
+        <td>${f.tipo==='AMBOS'?'<i class="bi bi-signpost-split"></i> Ambos':(f.tipo==='PARQUE'?'<i class="bi bi-car-front"></i> Parque':'<i class="bi bi-shop"></i> General')}</td>
         <td><b>${escH(f.nombre_razon||f.nombre_fantasia||'—')}</b>${f.id_dealer_origen?'<div class="alert-row"><span class="alert-chip" style="background:#ffedd5;color:#9a3412"><i class="bi bi-pencil-square"></i> modificación</span></div>':''}</td>
         <td>${escH(f.rut||'—')}</td>
         <td>${escH(f.ejecutivo_nombre||'—')}</td>
@@ -280,7 +280,7 @@ function renderRevision(){
   $('contenido').innerHTML = `<table class="tb"><thead><tr>
     <th>Tipo</th><th>Concesionario</th><th>RUT</th><th>Ejecutivo</th><th>Comisión</th><th>Estado</th><th>Enviada</th><th></th></tr></thead><tbody>${
     rows.map(f=>`<tr>
-      <td>${f.tipo==='PARQUE'?'<i class="bi bi-car-front"></i> Parque':'<i class="bi bi-shop"></i> General'}</td>
+      <td>${f.tipo==='AMBOS'?'<i class="bi bi-signpost-split"></i> Ambos':(f.tipo==='PARQUE'?'<i class="bi bi-car-front"></i> Parque':'<i class="bi bi-shop"></i> General')}</td>
       <td><b>${escH(f.nombre_razon||f.nombre_fantasia||'—')}</b>${f.apelacion?`<div class="apel-line"><i class="bi bi-megaphone"></i> Apelación: ${escH(f.apelacion)}</div>`:''}${alertasFila(f)}</td>
       <td>${escH(f.rut||'—')}</td>
       <td>${escH(f.ejecutivo_nombre||'—')}</td>
@@ -319,7 +319,7 @@ function renderMias(){
   $('contenido').innerHTML = `<table class="tb"><thead><tr>
     <th>Tipo</th><th>Concesionario</th><th>RUT</th><th>Estado</th><th>Actualizada</th><th>N° Dealer</th><th></th></tr></thead><tbody>${
     rows.map(f=>`<tr>
-      <td>${f.tipo==='PARQUE'?'Parque':'General'}</td>
+      <td>${f.tipo==='AMBOS'?'Ambos':(f.tipo==='PARQUE'?'Parque':'General')}</td>
       <td><b>${escH(f.nombre_razon||f.nombre_fantasia||'—')}</b>${f.estado==='RECHAZADA'&&f.motivo_rechazo?`<div class="motivo-line"><i class="bi bi-x-octagon"></i> ${escH(f.motivo_rechazo)}</div>`:''}</td>
       <td>${escH(f.rut||'—')}</td>
       <td><span class="estado-pill e-${f.estado}">${f.estado.replace('_',' ')}</span></td>
@@ -354,7 +354,7 @@ async function verFicha(id, revisar, historico){
   try {
     const r=await fetch('/api/dealer-incorporacion/fichas/'+id,{headers:H}); const j=await r.json();
     if(!j.success) throw new Error(j.error); const f=j.data;
-    $('verTitulo').textContent = (revisar?'Revisar — ':historico?'Histórico — ':'')+(f.nombre_razon||f.rut||'Ficha')+' · '+(f.tipo==='PARQUE'?'Parque':'General');
+    $('verTitulo').textContent = (revisar?'Revisar — ':historico?'Histórico — ':'')+(f.nombre_razon||f.rut||'Ficha')+' · '+(f.tipo==='AMBOS'?'Ambos':(f.tipo==='PARQUE'?'Parque':'General'));
     const row=(k,v)=>`<b>${k}</b><span>${escH(v??'—')}</span>`;
     // Adjuntos (ficha firmada + informes comerciales)
     let adjHtml = '';
@@ -424,11 +424,18 @@ function abrirArchivo(id){ window.open('/api/dealer-incorporacion/fichas/'+id+'/
 function fichaDocHTML(f){
   const E = escH;
   const X = (v,t)=> (String(v||'').toUpperCase()===String(t).toUpperCase()) ? '✕' : '';
-  const esP = f.tipo==='PARQUE';
-  const dirLbl = esP?'Dirección de Parque Automotriz':'Dirección de Sucursal';
-  const comLbl = esP?'Comuna de Parque Automotriz':'Comuna de Sucursal';
+  const esP = f.tipo==='PARQUE', esA = f.tipo==='AMBOS';
+  const dirLbl = esP?'Dirección de Parque Automotriz':(esA?'Dirección de Sucursal (Calle)':'Dirección de Sucursal');
+  const comLbl = esP?'Comuna de Parque Automotriz':(esA?'Comuna de Sucursal (Calle)':'Comuna de Sucursal');
+  const subt = esP?' · Parque Automotriz':(esA?' · Calle + Parque Automotriz':'');
+  const parqueNombreRow = (esP||esA) ? `<tr><td class="lbl">Nombre del Parque</td><td>${E(f.nombre_parque)}</td></tr>` : '';
+  const parqueDirRows = esA ? `<tr><td class="lbl">Dirección de Parque</td><td>${E(f.direccion_parque)}</td></tr><tr><td class="lbl">Comuna de Parque</td><td>${E(f.comuna_parque)}</td></tr>` : '';
+  const comRows = esA
+    ? `<tr><td class="lbl">Calle</td><td>${E(f.com_6_12)}%</td><td>${E(f.com_13_24)}%</td><td>${E(f.com_25_36)}%</td><td>${E(f.com_37)}%</td></tr>
+       <tr><td class="lbl">Parque</td><td>${E(f.com_parque_6_12)}%</td><td>${E(f.com_parque_13_24)}%</td><td>${E(f.com_parque_25_36)}%</td><td>${E(f.com_parque_37)}%</td></tr>`
+    : `<tr><td class="lbl">Porcentaje de Comisión</td><td>${E(f.com_6_12)}%</td><td>${E(f.com_13_24)}%</td><td>${E(f.com_25_36)}%</td><td>${E(f.com_37)}%</td></tr>`;
   return `<div class="fdoc">
-    <h2 class="fdoc-t">FICHA DE INCORPORACIÓN DE CONCESIONARIO${esP?' · Parque Automotriz':''}</h2>
+    <h2 class="fdoc-t">FICHA DE INCORPORACIÓN DE CONCESIONARIO${subt}</h2>
     <table class="p"><tr><th colspan="2">EJECUTIVO COMERCIAL</th></tr>
       <tr><td class="lbl">Nombre Ejecutivo</td><td>${E(f.ejecutivo_nombre)}</td></tr>
       <tr><td class="lbl">Fecha de solicitud</td><td>${E(f.fecha_solicitud?String(f.fecha_solicitud).slice(0,10):'')}</td></tr></table>
@@ -436,19 +443,20 @@ function fichaDocHTML(f){
       <tr><td class="lbl">Rut de Concesionario</td><td>${E(f.rut)}</td></tr>
       <tr><td class="lbl">Nombre Razón Social</td><td>${E(f.nombre_razon)}</td></tr>
       <tr><td class="lbl">Nombre de Fantasía</td><td>${E(f.nombre_fantasia)}</td></tr>
+      ${parqueNombreRow}
       <tr><td class="lbl">${dirLbl}</td><td>${E(f.direccion)}</td></tr>
       <tr><td class="lbl">${comLbl}</td><td>${E(f.comuna)}</td></tr>
       <tr><td class="lbl">Provincia / Ciudad</td><td>${E(f.provincia)}</td></tr>
-      <tr><td class="lbl">Región</td><td>${E(f.region)}</td></tr></table>
+      <tr><td class="lbl">Región</td><td>${E(f.region)}</td></tr>${parqueDirRows}</table>
     <table class="p"><tr><th colspan="2">CONTACTO COMERCIAL</th></tr>
       <tr><td class="lbl">Nombre</td><td>${E(f.cc_nombre)}</td></tr><tr><td class="lbl">Teléfono</td><td>${E(f.cc_telefono)}</td></tr><tr><td class="lbl">Email</td><td>${E(f.cc_email)}</td></tr></table>
     <table class="p"><tr><th colspan="2">CONTACTO FINANCIERO</th></tr>
       <tr><td class="lbl">Nombre</td><td>${E(f.cf_nombre)}</td></tr><tr><td class="lbl">Teléfono</td><td>${E(f.cf_telefono)}</td></tr><tr><td class="lbl">Email</td><td>${E(f.cf_email)}</td></tr></table>
     <table class="p"><tr><th colspan="2">REPRESENTANTE LEGAL</th></tr>
       <tr><td class="lbl">Nombre</td><td>${E(f.rl_nombre)}</td></tr><tr><td class="lbl">Teléfono</td><td>${E(f.rl_telefono)}</td></tr><tr><td class="lbl">Email</td><td>${E(f.rl_email)}</td></tr></table>
-    <table class="p"><tr><th colspan="5">COMISIÓN PACTADA</th></tr>
+    <table class="p"><tr><th colspan="5">COMISIÓN PACTADA${esA?' (Calle / Parque)':''}</th></tr>
       <tr><td class="lbl">Cantidad de Cuotas</td><td>6 a 12</td><td>13 a 24</td><td>25 a 36</td><td>37 y Más</td></tr>
-      <tr><td class="lbl">Porcentaje de Comisión</td><td>${E(f.com_6_12)}%</td><td>${E(f.com_13_24)}%</td><td>${E(f.com_25_36)}%</td><td>${E(f.com_37)}%</td></tr></table>
+      ${comRows}</table>
     <table class="p"><tr><th colspan="3">TIPO DE DOCUMENTO TRIBUTARIO</th></tr>
       <tr><td class="lbl">Tipo de documento</td><td>BOLETA: ${X(f.tipo_documento,'BOLETA')}</td><td>FACTURA: ${X(f.tipo_documento,'FACTURA')}</td></tr></table>
     <table class="p"><tr><th colspan="3">FORMA DE PAGO SALDO PRECIO</th></tr>
