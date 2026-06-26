@@ -121,6 +121,11 @@
       <div class="fld"><label>Emite Factura</label><select id="d_tiene_factura"><option value="1">Sí</option><option value="0">No (Boleta)</option></select></div>
       <div class="fld full"><label>Observaciones</label><textarea id="d_observaciones" rows="2"></textarea></div>
     </div>
+    <div style="margin-top:8px;border-top:1px solid #f1f5f9;padding-top:10px">
+      <label style="display:block;font-size:.8rem;font-weight:600;color:#374151;margin-bottom:6px"><i class="bi bi-percent me-1"></i>Comisión pactada del dealer (solo lectura)</label>
+      <div id="d_com_tabla"></div>
+      <div style="margin-top:8px;font-size:.76rem;color:#92400e;background:#fffbeb;border:1px solid #fde68a;border-radius:8px;padding:8px 10px"><i class="bi bi-lock me-1"></i>Las comisiones <b>no se editan aquí</b>. Para cambiarlas, crea una <b>ficha de Modificación</b> del dealer: pasa por la cadena de aprobación (y por Gerencia si supera la pizarra).</div>
+    </div>
   </div>
   <div class="dlg-foot"><button class="btn btn-light" onclick="dlgDealer.close()">Cancelar</button>
     <button class="btn btn-navy" onclick="guardarDealer()"><i class="bi bi-save me-1"></i>Guardar</button></div>
@@ -263,10 +268,11 @@ function renderDealers(){
   let rows = filtroQ(DEALERS, ['rut','nombre_razon','nombre_indexa','ccs_parque']);
   if (!rows.length) { $('contenido').innerHTML='<div class="vacio">Sin dealers.</div>'; return; }
   $('contenido').innerHTML = `<table class="tb"><thead><tr>
-    <th>N°</th><th>Razón Social</th><th>Fantasía</th><th>RUT</th><th>Categoría</th><th>Factura</th><th>Activo</th><th></th></tr></thead><tbody>${
+    <th>N°</th><th>Razón Social</th><th>Fantasía</th><th>RUT</th><th>Categoría</th><th title="Comisión pactada por tramo 6-12 / 13-24 / 25-36 / 37+">Comisión</th><th>Factura</th><th>Activo</th><th></th></tr></thead><tbody>${
     rows.map(d=>`<tr>
       <td>${d.numero||'—'}</td><td><b>${escH(d.nombre_razon||'—')}</b></td><td>${escH(d.nombre_indexa||'—')}</td>
       <td>${escH(d.rut||'—')}</td><td>${escH(d.ccs_parque||'—')}${d.part_especial_por?` <span class="alert-chip" style="background:#ede9fe;color:#5b21b6" title="Participación especial aprobada por ${escH(d.part_especial_por)}"><i class="bi bi-star-fill"></i> especial</span>`:''}</td>
+      <td style="white-space:nowrap">${(d.com_6_12==null&&d.com_13_24==null&&d.com_25_36==null&&d.com_37==null)?'<span style="color:#94a3b8">—</span>':comResumen(d)}</td>
       <td>${d.tiene_factura?'Factura':'Boleta'}</td>
       <td>${d.activo?'<span class="estado-pill e-APROBADA">Sí</span>':'<span class="estado-pill e-RECHAZADA">No</span>'}</td>
       <td><div class="acts"><button class="btn btn-navy btn-sm" onclick="editarDealer(${d.id_dealer})"><i class="bi bi-pencil"></i> Editar</button></div></td>
@@ -391,6 +397,13 @@ function editarDealer(id){
   const set=(k,v)=>{ $('d_'+k).value = v==null?'':v; };
   ['rut','nombre_razon','nombre_indexa','ccs_parque','direccion','contacto','telefono','correo','banco','num_cuenta','rut_pago','observaciones'].forEach(k=>set(k,d[k]));
   $('d_activo').value = d.activo?'1':'0'; $('d_tiene_factura').value = d.tiene_factura?'1':'0';
+  // Comisión pactada del dealer (solo lectura) + sello de participación especial
+  const pc = v => (v==null||v==='')?'—':(Number(v)+'%');
+  const th = 'style="background:#f8fafc;padding:6px;border:1px solid #e5e7eb"', td = 'style="padding:7px;border:1px solid #e5e7eb"';
+  $('d_com_tabla').innerHTML = `<table style="width:100%;border-collapse:collapse;font-size:.82rem;text-align:center">
+    <thead><tr><th ${th}>6 a 12</th><th ${th}>13 a 24</th><th ${th}>25 a 36</th><th ${th}>37 y +</th></tr></thead>
+    <tbody><tr><td ${td}><b>${pc(d.com_6_12)}</b></td><td ${td}><b>${pc(d.com_13_24)}</b></td><td ${td}><b>${pc(d.com_25_36)}</b></td><td ${td}><b>${pc(d.com_37)}</b></td></tr></tbody></table>`
+    + (d.part_especial_por?`<div style="margin-top:6px;font-size:.78rem;color:#5b21b6"><i class="bi bi-patch-check-fill me-1"></i>Participación especial aprobada por <b>${escH(d.part_especial_por)}</b></div>`:'');
   dlgDealer.showModal();
 }
 async function guardarDealer(){
