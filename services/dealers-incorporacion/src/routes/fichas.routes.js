@@ -35,6 +35,9 @@ router.delete('/fichas/:id',     verifyToken, requireFunc('dealer_ficha_crear', 
 // Analista de Operaciones (pool): tomar, aprobar, rechazar.
 router.post('/fichas/:id/tomar',    verifyToken, requireFunc('dealer_ficha_revisar'), ctrl.tomar);
 router.post('/fichas/:id/aprobar',  verifyToken, requireFunc('dealer_ficha_revisar'), ctrl.aprobar);
-router.post('/fichas/:id/rechazar', verifyToken, requireFunc('dealer_ficha_revisar'), ctrl.rechazar);
+router.post('/fichas/:id/rechazar', verifyToken, requireFunc('dealer_ficha_revisar', 'dealer_part_especial'), ctrl.rechazar);
+
+// Gerencia (Gerente General / Operaciones y Crédito): aprobar participación especial sobre la pizarra.
+router.post('/fichas/:id/aprobar-gerencia', verifyToken, requireFunc('dealer_part_especial'), ctrl.aprobarGerencia);
 
 module.exports = router;

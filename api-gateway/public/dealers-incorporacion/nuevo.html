@@ -229,13 +229,14 @@
         <thead><tr><th>Cantidad de Cuotas</th><th>6 a 12</th><th>13 a 24</th><th>25 a 36</th><th>37 y Más</th></tr></thead>
         <tbody><tr>
           <td style="background:#f8fafc;font-weight:700;text-align:left">Porcentaje de Comisión (%)</td>
-          <td><input id="com_6_12" type="number" step="0.1"></td>
-          <td><input id="com_13_24" type="number" step="0.1"></td>
-          <td><input id="com_25_36" type="number" step="0.1"></td>
-          <td><input id="com_37" type="number" step="0.1"></td>
+          <td><input id="com_6_12" type="number" step="0.1" oninput="chequearEspecial()"></td>
+          <td><input id="com_13_24" type="number" step="0.1" oninput="chequearEspecial()"></td>
+          <td><input id="com_25_36" type="number" step="0.1" oninput="chequearEspecial()"></td>
+          <td><input id="com_37" type="number" step="0.1" oninput="chequearEspecial()"></td>
         </tr></tbody>
       </table>
-      <p class="hint">Pre-cargado según el tipo de ficha. Ajústalo solo si hubo una negociación especial con el concesionario.</p>
+      <p class="hint">Pre-cargado según la pizarra (Parque/Calle). Ajústalo solo si hubo una negociación especial con el concesionario.</p>
+      <div id="espBanner" style="display:none;margin-top:10px;background:#f5f3ff;border:1px solid #ddd6fe;border-left:4px solid #7c3aed;border-radius:8px;padding:10px 13px;font-size:.82rem;color:#5b21b6"></div>
     </div>
   </div>
 
@@ -257,14 +258,14 @@
       </div>
       <div class="grid">
         <div class="fld"><label>RUT de Cuenta</label><input id="rut_cuenta" maxlength="12" oninput="onRutInput(this,'rutCtaHint')"><small id="rutCtaHint" class="vmsg"></small></div>
-        <div class="fld"><label>Número de Cuenta</label><input id="num_cuenta" inputmode="numeric"></div>
+        <div class="fld"><label>Número de Cuenta</label><input id="num_cuenta" inputmode="numeric" oninput="actualizarTercero()"></div>
         <div class="fld"><label>Tipo de Cuenta</label>
           <select id="tipo_cuenta" onchange="onTipoCuenta()">
             <option>Cuenta Corriente</option><option>Cuenta Vista</option><option>Cuenta RUT</option>
           </select></div>
         <div class="fld"><label>Nombre de la cuenta</label><input id="nombre_cuenta" placeholder="Titular de la cuenta"></div>
         <div class="fld"><label>Banco de Transferencia</label>
-          <select id="banco">
+          <select id="banco" onchange="actualizarTercero()">
             <option value="">— Seleccionar banco —</option>
             <option>Banco de Chile</option><option>BancoEstado</option><option>Banco Santander</option>
             <option>BCI</option><option>Itaú</option><option>Scotiabank</option><option>Banco Security</option>
@@ -313,9 +314,9 @@
   </div>
 
   <div class="card-sec" id="cardPoderes" style="display:none;border:1.5px solid #fca5a5">
-    <h3 style="border-left-color:#dc2626;color:#991b1b"><i class="bi bi-shield-lock me-1"></i> Depósito a tercero — Poderes (obligatorios)</h3>
+    <h3 style="border-left-color:#dc2626;color:#991b1b"><i class="bi bi-shield-lock me-1"></i> Poderes del depósito (obligatorios)</h3>
     <div class="card-body">
-      <p class="hint" style="margin-top:0">El RUT de la cuenta es <b>distinto</b> al del concesionario (depósito a un tercero). Descarga el <b>Poder Simple</b>, hazlo firmar por el Representante Legal y adjúntalo junto con los <b>Poderes del Representante Legal</b>.</p>
+      <p class="hint" id="poderesHint" style="margin-top:0">El RUT de la cuenta es <b>distinto</b> al del concesionario (depósito a un tercero). Descarga el <b>Poder Simple</b>, hazlo firmar por el Representante Legal y adjúntalo junto con los <b>Poderes del Representante Legal</b>.</p>
       <button class="btn btn-light" type="button" onclick="descargarPoderSimple()" style="margin-bottom:12px"><i class="bi bi-download"></i> Descargar Poder Simple</button>
       <div class="grid">
         <div class="fld full">
@@ -387,7 +388,26 @@ async function cargarComDefault(){
 }
 
 /* ── Creación vs Modificación de Dealer ──────────────────────────────────── */
-let MOD = null;   // {id_dealer, numero} si la ficha MODIFICA un dealer existente
+let MOD = null;        // {id_dealer, numero} si la ficha MODIFICA un dealer existente
+let MOD_ORIG = null;   // depósito original del dealer {banco,num_cuenta,rut_cuenta} (para detectar cambio)
+let ESP_APROBADA = null; // nombre del gerente que ya aprobó la participación especial (al reabrir)
+// Avisa si la comisión pactada supera la pizarra → participación especial (visto de Gerencia).
+function chequearEspecial(){
+  const b=$('espBanner'); if(!b) return;
+  if(ESP_APROBADA){ b.style.display='block'; b.innerHTML='<i class="bi bi-patch-check-fill me-1"></i><b>Participación especial aprobada por '+escH(ESP_APROBADA)+'</b>'; return; }
+  const d = COM_DEFAULT[getTipo()]||{};
+  const over = ['com_6_12','com_13_24','com_25_36','com_37'].some(k=>{ const v=parseFloat($(k).value); return !isNaN(v) && v > (Number(d[k])||0) + 1e-9; });
+  if(over){ b.style.display='block'; b.innerHTML='<i class="bi bi-star-fill me-1"></i><b>Participación especial:</b> la comisión supera la pizarra. Tras la revisión del analista, requerirá <b>aprobación de Gerencia</b> para fijar los %.'; }
+  else { b.style.display='none'; b.innerHTML=''; }
+}
+// En modificación, ¿cambió el depósito vs el dealer original? (exige poderes al enviar)
+function depositoCambio(){
+  if(!MOD || !MOD_ORIG) return false;
+  const nz = v => String(v==null?'':v).trim().toUpperCase();
+  const cr = v => String(v||'').replace(/[^0-9kK]/gi,'').toUpperCase();
+  return nz(val('banco'))!==nz(MOD_ORIG.banco) || nz(val('num_cuenta'))!==nz(MOD_ORIG.num_cuenta) || cr(val('rut_cuenta'))!==cr(MOD_ORIG.rut_cuenta);
+}
+function requierePoderes(){ return esTercero() || depositoCambio(); }
 const escH = s => String(s==null?'':s).replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
 function mostrarMod(){
   const b=$('modBanner'), bc=document.querySelector('.breadcrumb-nav span:last-child');
@@ -395,11 +415,12 @@ function mostrarMod(){
     if(bc) bc.textContent='Modificar Dealer'; }
   else { b.style.display='none'; if(bc) bc.textContent='Nueva Ficha'; }
 }
-function salirModificacion(){ MOD=null; mostrarMod(); toast('Volviste a modo Creación de Dealer.'); }
+function salirModificacion(){ MOD=null; MOD_ORIG=null; ESP_APROBADA=null; mostrarMod(); actualizarTercero(); chequearEspecial(); toast('Volviste a modo Creación de Dealer.'); }
 // Precarga la ficha con los datos actuales del dealer existente.
 function aplicarDealer(d){
   if(!d) return;
   MOD = { id_dealer:d.id_dealer, numero:d.numero };
+  MOD_ORIG = { banco:d.banco||'', num_cuenta:d.num_cuenta||'', rut_cuenta:d.rut_cuenta||'' }; ESP_APROBADA = null;
   setVal('rut', d.rut); if($('rut')) onRutInput($('rut'),'rutHint');
   setVal('nombre_razon', d.nombre_razon); setVal('nombre_fantasia', d.nombre_fantasia);
   setVal('direccion', d.direccion); setVal('comuna', d.comuna);
@@ -407,11 +428,13 @@ function aplicarDealer(d){
   setVal('cc_nombre', d.cc_nombre); setVal('cc_telefono', d.cc_telefono); setVal('cc_email', d.cc_email);
   if(d.tipo==='PARQUE'||d.tipo==='GENERAL') setRadio('tipo', d.tipo);
   if(d.tipo_documento) setRadio('tipo_documento', d.tipo_documento);
+  // El banco puede venir de datos importados con un nombre fuera de la lista → asegurarlo como opción (así round-trip y no falsea "depósito cambió").
+  if(d.banco){ const sel=$('banco'); if(sel && ![...sel.options].some(o=>o.value===d.banco)){ const op=document.createElement('option'); op.value=d.banco; op.textContent=d.banco; sel.appendChild(op); } }
   setVal('banco', d.banco); setVal('rut_cuenta', d.rut_cuenta); setVal('num_cuenta', d.num_cuenta);
   setVal('tipo_cuenta', d.tipo_cuenta); setVal('nombre_cuenta', d.nombre_cuenta);
   onTipo();   // ajusta etiquetas + defaults de comisión según tipo
   ['com_6_12','com_13_24','com_25_36','com_37'].forEach(k=>{ if(d[k]!=null && d[k]!=='') setVal(k, d[k]); });
-  actualizarTercero(); if(typeof onTipoCuenta==='function') onTipoCuenta();
+  actualizarTercero(); if(typeof onTipoCuenta==='function') onTipoCuenta(); chequearEspecial();
   mostrarMod();
   toast(`Dealer N°${d.numero} cargado — modo Modificación.`);
 }
@@ -582,7 +605,14 @@ async function cargarInformes(){
 
 /* ── Depósito a tercero (RUT cuenta ≠ RUT concesionario) ── */
 function esTercero(){ const a=val('rut').replace(/[^0-9kK]/gi,'').toUpperCase(), b=val('rut_cuenta').replace(/[^0-9kK]/gi,'').toUpperCase(); return !!b && !!a && a!==b; }
-function actualizarTercero(){ $('cardPoderes').style.display = esTercero() ? '' : 'none'; }
+function actualizarTercero(){
+  const req = requierePoderes();
+  $('cardPoderes').style.display = req ? '' : 'none';
+  const h=$('poderesHint');
+  if(req && h) h.innerHTML = esTercero()
+    ? 'El RUT de la cuenta es <b>distinto</b> al del concesionario (depósito a un tercero). Descarga el <b>Poder Simple</b>, hazlo firmar por el Representante Legal y adjúntalo junto con los <b>Poderes del Representante Legal</b>.'
+    : 'Estás <b>modificando el depósito</b> del dealer (banco / cuenta / RUT). Descarga el <b>Poder Simple</b>, hazlo firmar por el Representante Legal y adjúntalo junto con los <b>Poderes del Representante Legal</b>.';
+}
 // El aviso de depósito a tercero ahora es la sección inline "Depósito a tercero —
 // Poderes" (se muestra sola al ingresar un RUT distinto). Ya no se usa el popup;
 // la obligatoriedad sigue en la validación de onEnviar (exige el Poder Simple).
@@ -665,8 +695,8 @@ async function gateExcepciones(){
 async function onGuardar(){ if(!(await gateExcepciones())) return; if(!(await gateTercero())) return; await guardar(false); }
 async function onEnviar(){
   const errs=validarEnvio();
-  if(esTercero() && nArch('PODER_SIMPLE')<1) errs.push('Falta: Poder Simple firmado (cuenta de tercero)');
-  if(esTercero() && nArch('PODER_REP_LEGAL')<1) errs.push('Falta: Poderes del Representante Legal (cuenta de tercero)');
+  if(requierePoderes() && nArch('PODER_SIMPLE')<1) errs.push('Falta: Poder Simple firmado'+(esTercero()?' (cuenta de tercero)':' (cambiaste el depósito del dealer)'));
+  if(requierePoderes() && nArch('PODER_REP_LEGAL')<1) errs.push('Falta: Poderes del Representante Legal'+(esTercero()?' (cuenta de tercero)':' (cambiaste el depósito del dealer)'));
   mostrarErrsEnvio(errs);
   if(errs.length){ if(esTercero()) await gateTercero(); return; }
   if(!(await gateExcepciones())) return;
@@ -684,6 +714,7 @@ function onTipo(){
     const cur = $(k).value;
     if (cur==='' || parseFloat(cur)===o[k]) $(k).value = d[k];
   }
+  chequearEspecial();
 }
 
 function onFile(){
@@ -827,11 +858,15 @@ async function cargar(){
     actualizarTercero();
     // Modo Modificación: si la ficha modifica un dealer existente, mostrar el banner.
     if (f.id_dealer_origen) {
-      let numero='—';
+      let dl=null;
       try { const jb=await (await fetch('/api/dealer-incorporacion/dealer-buscar?rut='+encodeURIComponent(f.rut||''),{headers:H})).json();
-        if(jb.data&&jb.data.exacto) numero=jb.data.exacto.numero; } catch(e){}
-      MOD = { id_dealer:f.id_dealer_origen, numero }; mostrarMod();
+        if(jb.data&&jb.data.exacto) dl=jb.data.exacto; } catch(e){}
+      MOD = { id_dealer:f.id_dealer_origen, numero: dl?dl.numero:'—' };
+      MOD_ORIG = dl ? { banco:dl.banco||'', num_cuenta:dl.num_cuenta||'', rut_cuenta:dl.rut_cuenta||'' } : null;
+      mostrarMod();
     }
+    ESP_APROBADA = f.part_especial_por || null;   // sello "aprobada por XXXX" si ya pasó por Gerencia
+    actualizarTercero(); chequearEspecial();
     // Solo BORRADOR/RECHAZADA son editables
     const editable = ['BORRADOR','RECHAZADA'].includes(f.estado);
     if (!editable) {

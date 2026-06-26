@@ -113,6 +113,11 @@ async function comDefaults() {
     await pool.query(`ALTER TABLE dealer_fichas ADD COLUMN IF NOT EXISTS ficha_faltantes JSON NULL`);
     // Si la ficha MODIFICA un dealer ya existente, aquí va su id_dealer (NULL = creación).
     await pool.query(`ALTER TABLE dealer_fichas ADD COLUMN IF NOT EXISTS id_dealer_origen INT NULL`);
+    // Participación especial: comisión pactada por sobre la pizarra → requiere visto de Gerencia.
+    await pool.query(`ALTER TABLE dealer_fichas ADD COLUMN IF NOT EXISTS part_especial TINYINT(1) NULL`);
+    await pool.query(`ALTER TABLE dealer_fichas ADD COLUMN IF NOT EXISTS part_especial_por VARCHAR(200) NULL`);
+    await pool.query(`ALTER TABLE dealer_fichas ADD COLUMN IF NOT EXISTS part_especial_por_id INT NULL`);
+    await pool.query(`ALTER TABLE dealer_fichas ADD COLUMN IF NOT EXISTS part_especial_fecha DATETIME NULL`);
   } catch (e) { console.error('[dealer_fichas alter cols]', e.message); }
 
   // Archivos adjuntos múltiples (informes comerciales empresa/socios, hasta 3 c/u).
@@ -140,6 +145,7 @@ async function comDefaults() {
       ['Crear ficha de dealer',         'dealer_ficha_crear', null,                      null],
       ['Revisar fichas de dealer',      'dealer_ficha_revisar', null,                    null],
       ['Mantener dealers',              'dealer_mantener',    null,                      null],
+      ['Aprobar participación especial (Gerencia)', 'dealer_part_especial', null,        null],
     ];
     const idFunc = {};
     for (const [nombre, codigo, href, icono] of funcs) {
@@ -150,12 +156,15 @@ async function comDefaults() {
         [nombre, codigo, href, icono]);
       idFunc[codigo] = r.insertId;
     }
-    // Permisos por defecto: { codigo: [perfiles] }  (1 Admin, 4 Ejecutivo Comercial, 6 Analista de Operaciones, 90008 Gerente Operaciones)
+    // Permisos por defecto: { codigo: [perfiles] }
+    // 1 Admin · 4 Ejecutivo Comercial · 6 Analista de Operaciones
+    // 90008 Gerente de Operaciones y Crédito · 90009 Gerente General
     const seed = {
-      dealer_inc_ver:       [1, 4, 6, 90008],
+      dealer_inc_ver:       [1, 4, 6, 90008, 90009],
       dealer_ficha_crear:   [1, 4],
       dealer_ficha_revisar: [1, 6, 90008],
       dealer_mantener:      [1, 6, 90008],
+      dealer_part_especial: [1, 90008, 90009],   // visto de Gerencia para comisión sobre la pizarra
     };
     for (const [codigo, perfiles] of Object.entries(seed)) {
       const idf = idFunc[codigo]; if (!idf) continue;
@@ -190,6 +199,40 @@ async function idsRevisores(excluirId) {
 function puedeRevisar(req) {
   if ((req.usuario || {}).perfil_nombre === 'Administrador') return true;
   return tieneFunc(req.usuario.id_usuario, 'dealer_ficha_revisar');
+}
+
+// Pool de Gerencia (Gerente General / Operaciones y Crédito + Admin) para participación especial.
+async function idsGerencia() {
+  const [rows] = await pool.query(
+    `SELECT u.id_usuario FROM usuarios u JOIN perfiles p ON p.id_perfil=u.id_perfil
+       WHERE p.nombre='Administrador' AND u.estado='activo'
+     UNION
+     SELECT u.id_usuario FROM usuarios u
+       JOIN permisos_perfil pp ON pp.id_perfil=u.id_perfil
+       JOIN funcionalidades f  ON f.id_funcionalidad=pp.id_funcionalidad
+     WHERE f.codigo='dealer_part_especial' AND pp.habilitado=1 AND u.estado='activo'`);
+  return [...new Set(rows.map(r => r.id_usuario))];
+}
+
+// ¿La comisión pactada de la ficha supera la PIZARRA de su tipo? → participación especial.
+async function esEspecial(f) {
+  try {
+    const defs = await comDefaults();
+    const d = defs[f.tipo === 'PARQUE' ? 'PARQUE' : 'GENERAL'];
+    const gt = (v, base) => v != null && v !== '' && Number(v) > Number(base) + 1e-9;
+    return gt(f.com_6_12, d.com_6_12) || gt(f.com_13_24, d.com_13_24) || gt(f.com_25_36, d.com_25_36) || gt(f.com_37, d.com_37);
+  } catch (e) { console.error('[esEspecial]', e.message); return false; }
+}
+
+// En una modificación, ¿cambió el depósito (banco/cuenta/RUT de pago) vs el dealer actual?
+async function depositoCambioVsDealer(f) {
+  if (!f.id_dealer_origen) return false;
+  try {
+    const [[dl]] = await pool.query('SELECT banco, num_cuenta, rut_pago FROM dealers WHERE id_dealer=?', [f.id_dealer_origen]);
+    if (!dl) return false;
+    const nz = v => String(v == null ? '' : v).trim().toUpperCase();
+    return nz(f.banco) !== nz(dl.banco) || nz(f.num_cuenta) !== nz(dl.num_cuenta) || normRut(f.rut_cuenta) !== normRut(dl.rut_pago);
+  } catch (e) { console.error('[depositoCambio]', e.message); return false; }
 }
 
 // Campos editables de la ficha (todo menos workflow/archivo).
@@ -251,7 +294,8 @@ const listar = async (req, res) => {
       `SELECT id, tipo, estado, id_ejecutivo, ejecutivo_nombre, fecha_solicitud, rut, nombre_razon, nombre_fantasia,
               comuna, direccion, apelacion, tomada_por, tomada_por_nombre, revisor_nombre, fecha_revision, motivo_rechazo,
               com_6_12, com_13_24, com_25_36, com_37, tipo_documento, cuenta_tipo, banco, num_cuenta, rut_cuenta,
-              cc_nombre, cc_telefono, cc_email, id_dealer, (ficha_data IS NOT NULL) AS tiene_ficha,
+              cc_nombre, cc_telefono, cc_email, id_dealer, id_dealer_origen, part_especial, part_especial_por,
+              (ficha_data IS NOT NULL) AS tiene_ficha,
               firma_sospecha, JSON_LENGTH(diferencias) AS n_diferencias, JSON_LENGTH(ficha_faltantes) AS n_faltantes,
               created_at, updated_at
        FROM dealer_fichas ${whereStr} ORDER BY
@@ -273,8 +317,9 @@ const obtener = async (req, res) => {
               rut_cuenta, num_cuenta, correo_confirmacion, observaciones,
               excepciones, excepciones_comentarios, diferencias, firma_sospecha, firma_detalle, ficha_faltantes,
               ficha_nombre, ficha_mime, (ficha_data IS NOT NULL) AS tiene_ficha,
-              tomada_por, tomada_por_nombre, fecha_tomada, revisor_nombre, fecha_revision,
-              motivo_rechazo, apelacion, id_dealer, id_dealer_origen, created_at, updated_at
+              tomada_por, tomada_por_nombre, fecha_tomada, revisor_id, revisor_nombre, fecha_revision,
+              motivo_rechazo, apelacion, id_dealer, id_dealer_origen,
+              part_especial, part_especial_por, part_especial_fecha, created_at, updated_at
        FROM dealer_fichas WHERE id = ?`, [req.params.id]);
     if (!f) return res.status(404).json({ success: false, data: null, error: 'Ficha no encontrada' });
     if (!(await puedeRevisar(req)) && f.id_ejecutivo !== req.usuario.id_usuario)
@@ -489,10 +534,14 @@ const enviar = async (req, res) => {
     const porCat = Object.fromEntries(cats.map(c => [c.categoria, c.n]));
     if (!porCat.EMPRESA) return res.status(400).json({ success: false, data: null, error: 'Debes cargar al menos un Informe Comercial Empresa antes de enviar' });
     if (!porCat.SOCIOS)  return res.status(400).json({ success: false, data: null, error: 'Debes cargar al menos un Informe Comercial Socios antes de enviar' });
-    // Depósito a tercero (RUT de la cuenta distinto al del concesionario): exige Poder Simple + Poderes del Rep. Legal.
-    if (f.rut_cuenta && normRut(f.rut_cuenta) !== normRut(f.rut)) {
-      if (!porCat.PODER_SIMPLE)    return res.status(400).json({ success: false, data: null, error: 'La cuenta es de un tercero: debes cargar el Poder Simple firmado antes de enviar' });
-      if (!porCat.PODER_REP_LEGAL) return res.status(400).json({ success: false, data: null, error: 'La cuenta es de un tercero: debes cargar los Poderes del Representante Legal antes de enviar' });
+    // Poderes obligatorios cuando: (a) la cuenta es de un tercero, o (b) es una
+    // MODIFICACIÓN que cambia el depósito del dealer (banco/cuenta/RUT de pago).
+    const cuentaTercero = f.rut_cuenta && normRut(f.rut_cuenta) !== normRut(f.rut);
+    const depCambio = await depositoCambioVsDealer(f);
+    if (cuentaTercero || depCambio) {
+      const motivo = cuentaTercero ? 'La cuenta es de un tercero' : 'Modificaste el depósito del dealer';
+      if (!porCat.PODER_SIMPLE)    return res.status(400).json({ success: false, data: null, error: `${motivo}: debes cargar el Poder Simple firmado antes de enviar` });
+      if (!porCat.PODER_REP_LEGAL) return res.status(400).json({ success: false, data: null, error: `${motivo}: debes cargar los Poderes del Representante Legal antes de enviar` });
     }
 
     // Compara la ficha con los datos del dealer ya cargado en el sistema (por RUT) → diferencias para el revisor.
@@ -504,10 +553,15 @@ const enviar = async (req, res) => {
 
     const reenvio = f.estado === 'RECHAZADA';
     const apelacion = norm(req.body.apelacion) || null;
+    // Participación especial: ¿la comisión supera la pizarra? Se recalcula y se
+    // limpia cualquier visto de Gerencia previo (el reenvío vuelve a revisión completa).
+    const especial = await esEspecial(f);
     await pool.query(
       `UPDATE dealer_fichas SET estado='EN_REVISION', tomada_por=NULL, tomada_por_nombre=NULL, fecha_tomada=NULL,
-         motivo_rechazo=NULL, apelacion=?, diferencias=?, firma_sospecha=?, firma_detalle=?, ficha_faltantes=?, fecha_revision=NULL, revisor_id=NULL, revisor_nombre=NULL WHERE id=?`,
-      [apelacion, JSON.stringify(diferencias), firma.sospecha, firma.detalle, JSON.stringify(cmpTexto.faltantes), req.params.id]);
+         motivo_rechazo=NULL, apelacion=?, diferencias=?, firma_sospecha=?, firma_detalle=?, ficha_faltantes=?,
+         part_especial=?, part_especial_por=NULL, part_especial_por_id=NULL, part_especial_fecha=NULL,
+         fecha_revision=NULL, revisor_id=NULL, revisor_nombre=NULL WHERE id=?`,
+      [apelacion, JSON.stringify(diferencias), firma.sospecha, firma.detalle, JSON.stringify(cmpTexto.faltantes), especial ? 1 : 0, req.params.id]);
 
     // Pool: avisa a todos los revisores con una clave compartida (para anular luego al resto)
     const ids = await idsRevisores(req.usuario.id_usuario);
@@ -562,6 +616,7 @@ function ensureDealersCols() {
     'rl_nombre VARCHAR(150)', 'rl_telefono VARCHAR(40)', 'rl_email VARCHAR(150)',
     'com_6_12 DECIMAL(5,2)', 'com_13_24 DECIMAL(5,2)', 'com_25_36 DECIMAL(5,2)', 'com_37 DECIMAL(5,2)',
     'cuenta_tipo VARCHAR(10)', 'tipo_cuenta VARCHAR(30)', 'nombre_cuenta VARCHAR(150)',
+    'part_especial_por VARCHAR(200)', 'part_especial_fecha DATETIME',
   ];
   _dealersColsReady = (async () => {
     for (const c of cols) { try { await pool.query(`ALTER TABLE dealers ADD COLUMN IF NOT EXISTS ${c} NULL`); } catch (e) {} }
@@ -569,75 +624,130 @@ function ensureDealersCols() {
   return _dealersColsReady;
 }
 
-/* ── POST /fichas/:id/aprobar — crea (o ACTUALIZA si es modificación) el dealer y avisa al ejecutivo ── */
+/* Crea (o ACTUALIZA si es modificación) el dealer a partir de la ficha aprobada.
+   Copia el sello de participación especial (part_especial_por/fecha) al dealer.
+   Devuelve {idDealer, numero, esMod}. */
+async function finalizarDealer(f) {
+  await ensureDealersCols();
+  const partPor = f.part_especial_por || null, partFecha = f.part_especial_fecha || null;
+  // MODIFICACIÓN: ACTUALIZA el dealer de origen (no crea uno nuevo; el RUT es UNIQUE). ccs_parque se preserva.
+  if (f.id_dealer_origen) {
+    const [[dl]] = await pool.query('SELECT id_dealer, numero FROM dealers WHERE id_dealer=?', [f.id_dealer_origen]);
+    if (dl) {
+      await pool.query(
+        `UPDATE dealers SET rut=?, nombre_indexa=?, nombre_razon=?, tipo_ficha=?, direccion=?,
+           comuna=?, provincia=?, region=?, contacto=?, telefono=?, correo=?,
+           cf_nombre=?, cf_telefono=?, cf_email=?, rl_nombre=?, rl_telefono=?, rl_email=?,
+           com_6_12=?, com_13_24=?, com_25_36=?, com_37=?,
+           cuenta_tipo=?, tipo_cuenta=?, nombre_cuenta=?, num_cuenta=?, banco=?, rut_pago=?,
+           tiene_factura=?, observaciones=?, part_especial_por=?, part_especial_fecha=? WHERE id_dealer=?`,
+        [f.rut, f.nombre_fantasia || f.nombre_razon, f.nombre_razon, f.tipo, f.direccion,
+         f.comuna, f.provincia, f.region, f.cc_nombre, f.cc_telefono, f.cc_email,
+         f.cf_nombre, f.cf_telefono, f.cf_email, f.rl_nombre, f.rl_telefono, f.rl_email,
+         f.com_6_12, f.com_13_24, f.com_25_36, f.com_37,
+         f.cuenta_tipo, f.tipo_cuenta, f.nombre_cuenta, f.num_cuenta, f.banco, f.rut_cuenta,
+         f.tipo_documento === 'FACTURA' ? 1 : 0, f.observaciones, partPor, partFecha, dl.id_dealer]);
+      return { idDealer: dl.id_dealer, numero: dl.numero, esMod: true };
+    }
+  }
+  // CREACIÓN: dealer nuevo con número correlativo y la info COMPLETA de la ficha.
+  const [[{ maxN }]] = await pool.query('SELECT COALESCE(MAX(numero),0)+1 AS maxN FROM dealers');
+  const [d] = await pool.query(
+    `INSERT INTO dealers (numero, rut, nombre_indexa, nombre_razon, ccs_parque, tipo_ficha, direccion,
+       comuna, provincia, region, fecha_incorporacion, contacto, telefono, correo,
+       cf_nombre, cf_telefono, cf_email, rl_nombre, rl_telefono, rl_email,
+       com_6_12, com_13_24, com_25_36, com_37,
+       cuenta_tipo, tipo_cuenta, nombre_cuenta, num_cuenta, banco, rut_pago,
+       activo, tiene_factura, observaciones, part_especial_por, part_especial_fecha)
+     VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,1,?,?,?,?)`,
+    [maxN, f.rut, f.nombre_fantasia || f.nombre_razon, f.nombre_razon, f.tipo, f.tipo, f.direccion,
+     f.comuna, f.provincia, f.region, f.fecha_solicitud, f.cc_nombre, f.cc_telefono, f.cc_email,
+     f.cf_nombre, f.cf_telefono, f.cf_email, f.rl_nombre, f.rl_telefono, f.rl_email,
+     f.com_6_12, f.com_13_24, f.com_25_36, f.com_37,
+     f.cuenta_tipo, f.tipo_cuenta, f.nombre_cuenta, f.num_cuenta, f.banco, f.rut_cuenta,
+     f.tipo_documento === 'FACTURA' ? 1 : 0, f.observaciones, partPor, partFecha]);
+  return { idDealer: d.insertId, numero: maxN, esMod: false };
+}
+
+// Aviso al ejecutivo (+ analista si lo cerró Gerencia) cuando el dealer queda creado/actualizado.
+async function avisarFinalizado(f, numero, esMod, sello) {
+  const avisar = new Set();
+  if (f.id_ejecutivo) avisar.add(f.id_ejecutivo);
+  if (sello && f.revisor_id) avisar.add(f.revisor_id);
+  if (!avisar.size) return;
+  await notificar([...avisar], {
+    tipo: 'DEALER_FICHA_APROBADA',
+    titulo: esMod ? '✅ Dealer actualizado' : '✅ Dealer creado',
+    mensaje: `${sello ? 'Participación especial de ' : 'Tu ficha de '}${f.nombre_razon || f.rut || ''} ${sello ? 'aprobada por ' + sello : 'fue aprobada'} — el dealer N°${numero} ${esMod ? 'fue actualizado' : 'ya está'} en el sistema.`,
+    href: '/dealers-incorporacion/mantencion.html', prioridad: 'alta', sonar: 1, son_tipo: sello ? 'aplausos' : 'dingdong',
+  });
+}
+
+/* ── POST /fichas/:id/aprobar — visto del analista. Si la comisión supera la
+   pizarra (participación especial), deriva a Gerencia en vez de finalizar. ─── */
 const aprobar = async (req, res) => {
   try {
     const [[f]] = await pool.query('SELECT * FROM dealer_fichas WHERE id=?', [req.params.id]);
     if (!f) return res.status(404).json({ success: false, data: null, error: 'Ficha no encontrada' });
     if (!['EN_REVISION', 'TOMADA'].includes(f.estado))
       return res.status(400).json({ success: false, data: null, error: 'La ficha no está en revisión' });
-
-    await ensureDealersCols();
-    let idDealer, numero, esMod = false;
-    // MODIFICACIÓN: si la ficha declara un dealer de origen, ACTUALIZA ese dealer
-    // (no crea uno nuevo: el RUT es UNIQUE). ccs_parque se preserva.
-    if (f.id_dealer_origen) {
-      const [[dl]] = await pool.query('SELECT id_dealer, numero FROM dealers WHERE id_dealer=?', [f.id_dealer_origen]);
-      if (dl) {
-        esMod = true; idDealer = dl.id_dealer; numero = dl.numero;
-        await pool.query(
-          `UPDATE dealers SET rut=?, nombre_indexa=?, nombre_razon=?, tipo_ficha=?, direccion=?,
-             comuna=?, provincia=?, region=?, contacto=?, telefono=?, correo=?,
-             cf_nombre=?, cf_telefono=?, cf_email=?, rl_nombre=?, rl_telefono=?, rl_email=?,
-             com_6_12=?, com_13_24=?, com_25_36=?, com_37=?,
-             cuenta_tipo=?, tipo_cuenta=?, nombre_cuenta=?, num_cuenta=?, banco=?, rut_pago=?,
-             tiene_factura=?, observaciones=? WHERE id_dealer=?`,
-          [f.rut, f.nombre_fantasia || f.nombre_razon, f.nombre_razon, f.tipo, f.direccion,
-           f.comuna, f.provincia, f.region, f.cc_nombre, f.cc_telefono, f.cc_email,
-           f.cf_nombre, f.cf_telefono, f.cf_email, f.rl_nombre, f.rl_telefono, f.rl_email,
-           f.com_6_12, f.com_13_24, f.com_25_36, f.com_37,
-           f.cuenta_tipo, f.tipo_cuenta, f.nombre_cuenta, f.num_cuenta, f.banco, f.rut_cuenta,
-           f.tipo_documento === 'FACTURA' ? 1 : 0, f.observaciones, dl.id_dealer]);
-      }
-    }
-    // CREACIÓN: dealer nuevo con número correlativo y la info COMPLETA de la ficha.
-    if (!esMod) {
-      const [[{ maxN }]] = await pool.query('SELECT COALESCE(MAX(numero),0)+1 AS maxN FROM dealers');
-      const [d] = await pool.query(
-        `INSERT INTO dealers (numero, rut, nombre_indexa, nombre_razon, ccs_parque, tipo_ficha, direccion,
-           comuna, provincia, region, fecha_incorporacion, contacto, telefono, correo,
-           cf_nombre, cf_telefono, cf_email, rl_nombre, rl_telefono, rl_email,
-           com_6_12, com_13_24, com_25_36, com_37,
-           cuenta_tipo, tipo_cuenta, nombre_cuenta, num_cuenta, banco, rut_pago,
-           activo, tiene_factura, observaciones)
-         VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,1,?,?)`,
-        [maxN, f.rut, f.nombre_fantasia || f.nombre_razon, f.nombre_razon, f.tipo, f.tipo, f.direccion,
-         f.comuna, f.provincia, f.region, f.fecha_solicitud, f.cc_nombre, f.cc_telefono, f.cc_email,
-         f.cf_nombre, f.cf_telefono, f.cf_email, f.rl_nombre, f.rl_telefono, f.rl_email,
-         f.com_6_12, f.com_13_24, f.com_25_36, f.com_37,
-         f.cuenta_tipo, f.tipo_cuenta, f.nombre_cuenta, f.num_cuenta, f.banco, f.rut_cuenta,
-         f.tipo_documento === 'FACTURA' ? 1 : 0, f.observaciones]);
-      idDealer = d.insertId; numero = maxN;
-    }
-
     const nombre = [req.usuario.nombre, req.usuario.apellido].filter(Boolean).join(' ') || req.usuario.email;
+
+    // Participación especial sin visto de Gerencia → derivar (no se toca el dealer aún).
+    if (await esEspecial(f) && !f.part_especial_por) {
+      await pool.query(
+        `UPDATE dealer_fichas SET estado='PEND_GERENCIA', part_especial=1, revisor_id=?, revisor_nombre=?, fecha_revision=NOW() WHERE id=?`,
+        [req.usuario.id_usuario, nombre, req.params.id]);
+      await pool.query('DELETE FROM notificaciones WHERE clave=? AND leida=0', [`dealerficha:${f.id}:rev`]).catch(() => {});
+      const ids = await idsGerencia();
+      await notificar(ids, {
+        tipo: 'DEALER_PART_ESPECIAL',
+        titulo: '⭐ Participación especial por aprobar',
+        mensaje: `${f.nombre_razon || f.rut || ''}: la comisión pactada supera la pizarra. ${nombre} (análisis) la aprobó; requiere visto de Gerencia para fijar los %.`,
+        href: '/dealers-incorporacion/mantencion.html?tab=revision', prioridad: 'alta', sonar: 1, son_tipo: 'alarma',
+        clave: `dealerficha:${f.id}:ger`,
+      });
+      auditar({ req, accion: 'EDITAR', modulo: 'dealers', entidad: 'dealer_ficha', entidad_id: f.id,
+        detalle: `Derivó a Gerencia la ficha de ${f.nombre_razon || f.rut || ''} (participación especial sobre la pizarra)`, rut: f.rut });
+      return res.json({ success: true, data: { estado: 'PEND_GERENCIA' }, error: null });
+    }
+
+    // Sin participación especial (o ya sellada): crea/actualiza el dealer.
+    const { idDealer, numero, esMod } = await finalizarDealer(f);
     await pool.query(
       `UPDATE dealer_fichas SET estado='APROBADA', revisor_id=?, revisor_nombre=?, fecha_revision=NOW(),
          motivo_rechazo=NULL, id_dealer=? WHERE id=?`,
       [req.usuario.id_usuario, nombre, idDealer, req.params.id]);
-    // Limpia cualquier aviso de pool pendiente
     await pool.query('DELETE FROM notificaciones WHERE clave=? AND leida=0', [`dealerficha:${f.id}:rev`]).catch(() => {});
-
-    if (f.id_ejecutivo) await notificar([f.id_ejecutivo], {
-      tipo: 'DEALER_FICHA_APROBADA',
-      titulo: esMod ? '✅ Dealer actualizado' : '✅ Dealer creado',
-      mensaje: `Tu ficha de ${f.nombre_razon || f.rut || ''} fue aprobada — el dealer N°${numero} ${esMod ? 'fue actualizado' : 'ya está'} en el sistema.`,
-      href: '/dealers-incorporacion/mantencion.html', prioridad: 'alta', sonar: 1, son_tipo: 'dingdong',
-    });
+    await avisarFinalizado(f, numero, esMod, null);
     auditar({ req, accion: 'APROBAR', modulo: 'dealers', entidad: 'dealer_ficha', entidad_id: f.id,
       detalle: `Aprobó la ficha de ${f.nombre_razon || f.rut || ''} → dealer N°${numero}${esMod ? ' (modificación)' : ''}`, rut: f.rut, meta: { id_dealer: idDealer, numero, modificacion: esMod } });
     res.json({ success: true, data: { estado: 'APROBADA', id_dealer: idDealer, numero, modificacion: esMod }, error: null });
   } catch (e) { console.error('[fichas aprobar]', e.message); res.status(500).json({ success: false, data: null, error: 'Error interno del servidor' }); }
+};
+
+/* ── POST /fichas/:id/aprobar-gerencia — Gerencia aprueba la participación especial:
+   sella "aprobada por XXXX" y finaliza el dealer (fija los %). ─────────────── */
+const aprobarGerencia = async (req, res) => {
+  try {
+    const [[f]] = await pool.query('SELECT * FROM dealer_fichas WHERE id=?', [req.params.id]);
+    if (!f) return res.status(404).json({ success: false, data: null, error: 'Ficha no encontrada' });
+    if (f.estado !== 'PEND_GERENCIA')
+      return res.status(400).json({ success: false, data: null, error: 'La ficha no está pendiente de Gerencia' });
+    const gerente = [req.usuario.nombre, req.usuario.apellido].filter(Boolean).join(' ') || req.usuario.email;
+    // Sella la participación especial antes de finalizar (finalizarDealer lo copia al dealer).
+    f.part_especial_por = gerente; f.part_especial_fecha = new Date();
+    const { idDealer, numero, esMod } = await finalizarDealer(f);
+    await pool.query(
+      `UPDATE dealer_fichas SET estado='APROBADA', part_especial=1, part_especial_por=?, part_especial_por_id=?,
+         part_especial_fecha=NOW(), motivo_rechazo=NULL, id_dealer=? WHERE id=?`,
+      [gerente, req.usuario.id_usuario, idDealer, req.params.id]);
+    await pool.query('DELETE FROM notificaciones WHERE clave IN (?,?) AND leida=0', [`dealerficha:${f.id}:ger`, `dealerficha:${f.id}:rev`]).catch(() => {});
+    await avisarFinalizado(f, numero, esMod, gerente);
+    auditar({ req, accion: 'APROBAR', modulo: 'dealers', entidad: 'dealer_ficha', entidad_id: f.id,
+      detalle: `Gerencia aprobó la participación especial de ${f.nombre_razon || f.rut || ''} → dealer N°${numero}${esMod ? ' (modificación)' : ''}`, rut: f.rut, meta: { id_dealer: idDealer, numero, part_especial_por: gerente } });
+    res.json({ success: true, data: { estado: 'APROBADA', id_dealer: idDealer, numero, part_especial_por: gerente }, error: null });
+  } catch (e) { console.error('[fichas aprobarGerencia]', e.message); res.status(500).json({ success: false, data: null, error: 'Error interno del servidor' }); }
 };
 
 /* ── POST /fichas/:id/rechazar — exige motivo y avisa al ejecutivo ─────────── */
@@ -647,13 +757,17 @@ const rechazar = async (req, res) => {
     if (motivo.length < 5) return res.status(400).json({ success: false, data: null, error: 'Debes indicar un motivo de rechazo válido' });
     const [[f]] = await pool.query('SELECT * FROM dealer_fichas WHERE id=?', [req.params.id]);
     if (!f) return res.status(404).json({ success: false, data: null, error: 'Ficha no encontrada' });
-    if (!['EN_REVISION', 'TOMADA'].includes(f.estado))
+    if (!['EN_REVISION', 'TOMADA', 'PEND_GERENCIA'].includes(f.estado))
       return res.status(400).json({ success: false, data: null, error: 'La ficha no está en revisión' });
+    // Una ficha en Gerencia solo la puede rechazar un Gerente (no el analista).
+    if (f.estado === 'PEND_GERENCIA' && req.usuario.perfil_nombre !== 'Administrador'
+        && !(await tieneFunc(req.usuario.id_usuario, 'dealer_part_especial')))
+      return res.status(403).json({ success: false, data: null, error: 'Solo Gerencia puede rechazar una participación especial' });
     const nombre = [req.usuario.nombre, req.usuario.apellido].filter(Boolean).join(' ') || req.usuario.email;
     await pool.query(
       `UPDATE dealer_fichas SET estado='RECHAZADA', revisor_id=?, revisor_nombre=?, fecha_revision=NOW(), motivo_rechazo=? WHERE id=?`,
       [req.usuario.id_usuario, nombre, motivo, req.params.id]);
-    await pool.query('DELETE FROM notificaciones WHERE clave=? AND leida=0', [`dealerficha:${f.id}:rev`]).catch(() => {});
+    await pool.query('DELETE FROM notificaciones WHERE clave IN (?,?) AND leida=0', [`dealerficha:${f.id}:rev`, `dealerficha:${f.id}:ger`]).catch(() => {});
 
     if (f.id_ejecutivo) await notificar([f.id_ejecutivo], {
       tipo: 'DEALER_FICHA_RECHAZADA',
@@ -800,5 +914,5 @@ const dealerBuscar = async (req, res) => {
   } catch (e) { console.error('[dealerBuscar]', e.message); res.status(500).json({ success: false, data: null, error: 'Error interno del servidor' }); }
 };
 
-module.exports = { ejecutivos, comisionesDefault, dealerBuscar, listar, obtener, crear, editar, subirFicha, verFicha, enviar, tomar, aprobar, rechazar, eliminar,
+module.exports = { ejecutivos, comisionesDefault, dealerBuscar, listar, obtener, crear, editar, subirFicha, verFicha, enviar, tomar, aprobar, aprobarGerencia, rechazar, eliminar,
   listarArchivos, subirArchivo, verArchivo, eliminarArchivo };
