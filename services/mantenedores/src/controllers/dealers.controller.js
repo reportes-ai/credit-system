@@ -36,6 +36,8 @@ ensureTable().catch(e => console.error('dealers table init:', e.message));
     // Geocodificación para el Mapa de Dealers (Google Geocoding API → lat/lng).
     'lat DECIMAL(10,7)', 'lng DECIMAL(10,7)', 'lat_parque DECIMAL(10,7)', 'lng_parque DECIMAL(10,7)',
     'geo_estado VARCHAR(20)', 'geo_dir VARCHAR(300)', 'geo_at DATETIME',
+    // Revisión de direcciones: precisión de Google + marca de revisada manual.
+    'geo_precision VARCHAR(30)', 'geo_partial TINYINT(1)', 'dir_revisada TINYINT(1)',
   ];
   for (const c of cols) { try { await pool.query(`ALTER TABLE dealers ADD COLUMN IF NOT EXISTS ${c} NULL`); } catch (e) {} }
 })();
@@ -190,7 +192,8 @@ async function geocodeDireccion(dir) {
     const j = await (await fetch(url)).json();
     if (j.status === 'OK' && j.results && j.results[0]) {
       const g = j.results[0];
-      return { status: 'OK', lat: g.geometry.location.lat, lng: g.geometry.location.lng, formatted: g.formatted_address };
+      return { status: 'OK', lat: g.geometry.location.lat, lng: g.geometry.location.lng, formatted: g.formatted_address,
+               precision: (g.geometry && g.geometry.location_type) || null, partial: g.partial_match ? 1 : 0 };
     }
     return { status: j.status || 'ERROR', error: j.error_message || null };
   } catch (e) { return { status: 'ERROR', error: e.message }; }
@@ -219,7 +222,7 @@ const geocodificar = async (req, res) => {
     for (const d of rows) {
       if (d.direccion && d.lat == null) {
         const g = await geocodeDireccion(dirCompleta(d, false));
-        if (g.status === 'OK') { await pool.query('UPDATE dealers SET lat=?, lng=?, geo_dir=?, geo_estado=?, geo_at=NOW() WHERE id_dealer=?', [g.lat, g.lng, g.formatted, 'OK', d.id_dealer]); ok++; }
+        if (g.status === 'OK') { await pool.query('UPDATE dealers SET lat=?, lng=?, geo_dir=?, geo_precision=?, geo_partial=?, geo_estado=?, geo_at=NOW() WHERE id_dealer=?', [g.lat, g.lng, g.formatted, g.precision, g.partial, 'OK', d.id_dealer]); ok++; }
         else { await pool.query('UPDATE dealers SET geo_estado=?, geo_at=NOW() WHERE id_dealer=?', [g.status, d.id_dealer]); fail++; }
         await _sleep(120);
       }
@@ -257,4 +260,54 @@ const getMapa = async (req, res) => {
   } catch (e) { console.error('[getMapa]', e.message); res.status(500).json({ success: false, data: null, error: 'Error interno del servidor' }); }
 };
 
-module.exports = { getDealers, getDealer, getCcsList, importar, createDealer, updateDealer, deleteDealer, getMapa, geocodificar };
+/* ── Revisión de direcciones: tu dirección vs la normalizada por Google ──────
+   `duda` = Google no está seguro (partial_match), o la precisión es baja
+   (APPROXIMATE/GEOMETRIC_CENTER), o no se pudo geocodificar. Se priorizan. */
+const DUDA_SQL = "(geo_partial=1 OR geo_precision IN ('APPROXIMATE','GEOMETRIC_CENTER') OR geo_dir IS NULL)";
+const getDirecciones = async (req, res) => {
+  try {
+    const [rows] = await pool.query(
+      `SELECT id_dealer, numero, rut, COALESCE(NULLIF(nombre_indexa,''), nombre_razon) AS nombre,
+              comuna, region, direccion, geo_dir, geo_precision, geo_partial, lat, lng,
+              COALESCE(dir_revisada,0) AS dir_revisada, ${DUDA_SQL} AS duda
+         FROM dealers
+        WHERE activo=1 AND direccion IS NOT NULL AND direccion<>''
+        ORDER BY COALESCE(dir_revisada,0) ASC, ${DUDA_SQL} DESC, numero ASC`);
+    const [[stats]] = await pool.query(
+      `SELECT COUNT(*) AS total,
+              SUM(CASE WHEN COALESCE(dir_revisada,0)=1 THEN 1 ELSE 0 END) AS revisadas,
+              SUM(CASE WHEN COALESCE(dir_revisada,0)=0 AND ${DUDA_SQL} THEN 1 ELSE 0 END) AS dudas
+         FROM dealers WHERE activo=1 AND direccion IS NOT NULL AND direccion<>''`);
+    res.json({ success: true, data: { rows, stats, tiene_key: !!process.env.GOOGLE_MAPS_API_KEY }, error: null });
+  } catch (e) { console.error('[getDirecciones]', e.message); res.status(500).json({ success: false, data: null, error: 'Error interno del servidor' }); }
+};
+
+// POST /:id/direccion { accion:'guardar'|'mantener', direccion? }
+const setDireccion = async (req, res) => {
+  try {
+    const id = req.params.id;
+    const accion = (req.body && req.body.accion) || 'guardar';
+    const [[d]] = await pool.query('SELECT id_dealer, comuna, region FROM dealers WHERE id_dealer=?', [id]);
+    if (!d) return res.status(404).json({ success: false, data: null, error: 'Dealer no encontrado' });
+    if (accion === 'mantener') {
+      await pool.query('UPDATE dealers SET dir_revisada=1 WHERE id_dealer=?', [id]);
+      auditar({ req, accion: 'EDITAR', modulo: 'mantenedores', entidad: 'dealer', entidad_id: id, detalle: 'Mantuvo la dirección original (revisión de direcciones)' });
+      const [[r]] = await pool.query('SELECT lat, lng, geo_dir, geo_precision, geo_partial, dir_revisada FROM dealers WHERE id_dealer=?', [id]);
+      return res.json({ success: true, data: r, error: null });
+    }
+    const nueva = String((req.body && req.body.direccion) || '').trim();
+    if (!nueva) return res.status(400).json({ success: false, data: null, error: 'Dirección vacía' });
+    // Guarda la dirección elegida y re-geocodifica para refrescar el punto del mapa.
+    const g = await geocodeDireccion([nueva, d.comuna, d.region, 'Chile'].filter(x => x && String(x).trim()).join(', '));
+    if (g.status === 'OK')
+      await pool.query('UPDATE dealers SET direccion=?, lat=?, lng=?, geo_dir=?, geo_precision=?, geo_partial=?, geo_estado=?, geo_at=NOW(), dir_revisada=1 WHERE id_dealer=?',
+        [nueva, g.lat, g.lng, g.formatted, g.precision, g.partial, 'OK', id]);
+    else
+      await pool.query('UPDATE dealers SET direccion=?, dir_revisada=1 WHERE id_dealer=?', [nueva, id]);
+    auditar({ req, accion: 'EDITAR', modulo: 'mantenedores', entidad: 'dealer', entidad_id: id, detalle: `Actualizó la dirección a "${nueva}" (revisión de direcciones)` });
+    const [[r]] = await pool.query('SELECT lat, lng, geo_dir, geo_precision, geo_partial, dir_revisada FROM dealers WHERE id_dealer=?', [id]);
+    res.json({ success: true, data: { ...r, geo_status: g.status }, error: null });
+  } catch (e) { console.error('[setDireccion]', e.message); res.status(500).json({ success: false, data: null, error: 'Error interno del servidor' }); }
+};
+
+module.exports = { getDealers, getDealer, getCcsList, importar, createDealer, updateDealer, deleteDealer, getMapa, geocodificar, getDirecciones, setDireccion };

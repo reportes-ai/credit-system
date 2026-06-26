@@ -9,6 +9,9 @@ router.post('/importar', verifyToken, requireFunc('mantenedores_dealers'), ctrl.
 // Mapa de Dealers (geocodificación Google → lat/lng cacheadas). Antes de '/:id'.
 router.get('/mapa',          verifyToken, requireFunc('mantenedores_dealers', 'dealer_inc_ver', 'dealer_ficha_revisar'), ctrl.getMapa);
 router.post('/geocodificar', verifyToken, requireFunc('mantenedores_dealers'), ctrl.geocodificar);
+// Revisión de direcciones (tu dirección vs la normalizada por Google).
+router.get('/direcciones',        verifyToken, requireFunc('mantenedores_dealers', 'dealer_ficha_revisar'), ctrl.getDirecciones);
+router.post('/:id/direccion',     verifyToken, requireFunc('mantenedores_dealers', 'dealer_ficha_revisar'), ctrl.setDireccion);
 router.get('/',          verifyToken, ctrl.getDealers);
 router.get('/:id',       verifyToken, ctrl.getDealer);
 router.post('/',         verifyToken, requireFunc('mantenedores_dealers', 'dealer_mantener'), ctrl.createDealer);
