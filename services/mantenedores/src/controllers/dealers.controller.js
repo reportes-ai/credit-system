@@ -59,7 +59,9 @@ const getDealers = async (req, res) => {
     try {
       const [[{ total }]] = await pool.query(`SELECT COUNT(*) AS total FROM dealers d ${where}`, params);
       const [rows] = await pool.query(
-        `SELECT d.*, ${EXISTS_IA} AS tiene_reporte_ia FROM dealers d ${where} ORDER BY d.numero ASC LIMIT ? OFFSET ?`,
+        `SELECT d.*, ${EXISTS_IA} AS tiene_reporte_ia,
+                (SELECT df.socios FROM dealer_fichas df WHERE df.id_dealer = d.id_dealer AND df.socios IS NOT NULL ORDER BY df.updated_at DESC LIMIT 1) AS ficha_socios
+         FROM dealers d ${where} ORDER BY d.numero ASC LIMIT ? OFFSET ?`,
         [...params, parseInt(limit), offset]);
       return res.json({ success: true, data: { rows, total, page: parseInt(page) }, error: null });
     } catch (eIA) {

@@ -476,9 +476,14 @@ function logout() { sessionStorage.removeItem('token'); sessionStorage.removeIte
 
 const H = { 'Content-Type':'application/json', 'Authorization':'Bearer '+token };
 let pag = 1, totalRows = 0, debTimer, dealerActual = null;
-// Reporte IA: el flag tiene_reporte_ia viene del servidor (cruce de RUT) y el modal usa
-// el componente compartido AF_REP_IA (mismo formato en TODAS las pantallas).
-function verReporteIA(rut, nombre){ if(window.AF_REP_IA) AF_REP_IA.abrirRut(rut, nombre); else toast('Reporte IA no disponible', true); }
+// Reporte IA: el flag tiene_reporte_ia viene del servidor; el modal usa el componente
+// compartido AF_REP_IA (MISMO formato que la revisión: empresa + socios juntos).
+function verReporteIADealer(d){
+  const ents = [{ tag:'Empresa', nombre: nombreDealer(d), rut: d.rut }];
+  let socs = d.ficha_socios; if(typeof socs==='string'){ try{ socs=JSON.parse(socs); }catch{ socs=[]; } }
+  (Array.isArray(socs)?socs:[]).slice(0,3).forEach((s,i)=>{ if(s&&s.rut) ents.push({ tag:'Socio '+(i+1), nombre:s.nombre||s.rut, rut:s.rut }); });
+  if(window.AF_REP_IA) AF_REP_IA.abrir(ents); else toast('Reporte IA no disponible', true);
+}
 
 function debounceCargar() { clearTimeout(debTimer); debTimer = setTimeout(() => cargar(1), 350); }
 function cambiarPag(d) { pag += d; cargar(); }
@@ -568,7 +573,7 @@ async function cargar(p) {
         <div class="acciones-cell">
           <button class="btn-ver" onclick='verDealer(${JSON.stringify(d).replace(/'/g,"&#39;")})'>Ver</button>
           <button class="btn-editar-row" onclick='abrirEditarDirecto(${JSON.stringify(d).replace(/'/g,"&#39;")})'>Editar</button>
-          ${d.tiene_reporte_ia ? `<button class="btn-ver" title="Ver Reporte IA (Anthropic)" style="background:#fdf3ee;border-color:#f2d3c4;color:#c2410c" onclick='verReporteIA(${JSON.stringify(d.rut).replace(/'/g,"&#39;")}, ${JSON.stringify(nombreDealer(d)||"").replace(/'/g,"&#39;")})'><i class="bi bi-stars"></i> IA</button>` : ''}
+          ${d.tiene_reporte_ia ? `<button class="btn-ver" title="Ver Reporte IA (Anthropic) — empresa + socios" style="background:#fdf3ee;border-color:#f2d3c4;color:#c2410c" onclick='verReporteIADealer(${JSON.stringify(d).replace(/'/g,"&#39;")})'><i class="bi bi-stars"></i> IA</button>` : ''}
         </div>
       </td>
     </tr>`).join('');
