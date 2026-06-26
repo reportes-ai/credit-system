@@ -47,8 +47,10 @@ function fechaCL(v){ if(!v) return '—'; try{ return new Date(v).toLocaleString
 
 function rowsDatos(datos){
   if(!datos || typeof datos!=='object') return '';
-  return Object.entries(datos).map(([k,v]) =>
-    `<div class="row"><span class="k">${esc(k)}</span><span class="v">${esc(v)}</span></div>`).join('');
+  const OCULTAR = new Set(['proyeccion']);   // campos internos que no van en el verificador público
+  return Object.entries(datos)
+    .filter(([k,v]) => !OCULTAR.has(k) && v!=null && typeof v!=='object')   // sin objetos/arreglos (evita "[object Object]")
+    .map(([k,v]) => `<div class="row"><span class="k">${esc(k)}</span><span class="v">${esc(v)}</span></div>`).join('');
 }
 
 function render(d){
