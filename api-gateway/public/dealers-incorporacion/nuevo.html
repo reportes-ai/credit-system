@@ -368,6 +368,7 @@
 <div class="toast-af" id="toast"></div>
 
 <script src="/js/auth-guard.js"></script>
+<script src="/js/ia-branding.js"></script>
 <script>
 const token = sessionStorage.getItem('token');
 const yo    = JSON.parse(sessionStorage.getItem('usuario') || 'null');
@@ -869,13 +870,16 @@ async function enviarFinal(){
   if (ESTADO === 'RECHAZADA') {
     apelacion = prompt('Esta ficha fue rechazada. Puedes escribir una apelación o nota para Operaciones (opcional):') || null;
   }
+  const iaOv = (window.AF_IA && AF_IA.analizando)
+    ? AF_IA.analizando('Enviando a autorización: consultando informes comerciales y analizando con IA…') : null;
   try {
     const r = await fetch('/api/dealer-incorporacion/fichas/'+FICHA_ID+'/enviar', { method:'POST', headers:H, body:JSON.stringify({ apelacion }) });
     const j = await r.json();
+    if (iaOv) iaOv.cerrar();
     if (!j.success) throw new Error(j.error||'Error');
     toast('Enviada a autorización ✓');
     mostrarResumenEnvio(j.data && j.data.informes, j.data && j.data.alerta_grave);
-  } catch(e){ toast(e.message, true); }
+  } catch(e){ if (iaOv) iaOv.cerrar(); toast(e.message, true); }
 }
 
 // Resumen de informes por entidad (empresa + socios) al enviar a autorización.
