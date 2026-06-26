@@ -14,6 +14,29 @@ const { enviarCorreo, remitentePorClave, envolverHTML, cuentasRemitente } = requ
 const cob = require('./cobranza.controller');
 const { MORA_SQL, getCobranzaConfig, rellenar, tratamiento, titleCase } = cob._motor;
 const sleep = ms => new Promise(r => setTimeout(r, ms));
+const APP_URL = (process.env.APP_URL || 'https://credit-system-45em.onrender.com').replace(/\/+$/, '');
+const esc = s => String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+
+// Email "pro" de cobranza: shell con branding AutoFácil. Mismo render para envío y vista previa.
+function emailHTMLCobranza(cuerpoTxt) {
+  const parrafos = String(cuerpoTxt || '').split(/\n\s*\n/).filter(p => p.trim() !== '')
+    .map(p => `<p style="margin:0 0 14px;font-size:14px;line-height:1.65;color:#1e293b">${esc(p).replace(/\n/g, '<br>')}</p>`).join('');
+  return `<div style="background:#eef2f7;padding:26px 12px;font-family:Arial,Helvetica,sans-serif">
+    <div style="max-width:580px;margin:0 auto;background:#fff;border-radius:14px;overflow:hidden;box-shadow:0 2px 10px rgba(2,45,112,.12)">
+      <div style="background:linear-gradient(135deg,#012d70,#0141A2 60%,#009AFE);padding:18px 26px">
+        <table width="100%" cellpadding="0" cellspacing="0"><tr>
+          <td style="color:#fff;font-weight:800;font-size:20px;letter-spacing:.3px">AutoFácil</td>
+          <td align="right"><span style="background:rgba(255,255,255,.18);color:#fff;font-size:11px;font-weight:700;padding:4px 12px;border-radius:20px;letter-spacing:.5px">COBRANZA</span></td>
+        </tr></table>
+      </div>
+      <div style="padding:24px 26px">${parrafos}</div>
+      <div style="background:#f8fafc;border-top:1px solid #e9eef5;padding:15px 26px;color:#64748b;font-size:11px;line-height:1.6">
+        Mensaje automático de <b>AutoFácil SpA</b> &middot; cobranza@autofacilchile.cl<br>
+        Si ya regularizaste tu pago, por favor omite este correo.
+      </div>
+    </div>
+  </div>`;
+}
 
 /* ── Migración + seed (3 tramos) + config (desactivada) + funcionalidad ── */
 (async () => {
@@ -127,7 +150,7 @@ async function procesar({ dryRun = false } = {}) {
     const asunto = rellenar(p.asunto, vars);
     const cuerpoTxt = rellenar(p.cuerpo, vars);
     if (dryRun) { detalle.push({ id_credito: c.id_credito, numero: vars.numero, dias, tramo: p.codigo, email }); enviados++; continue; }
-    const html = envolverHTML(String(cuerpoTxt).replace(/\n/g, '<br>'));
+    const html = emailHTMLCobranza(cuerpoTxt);
     const r = await enviarCorreo({ to: email, from, subject: asunto, html, text: cuerpoTxt });
     await pool.query('INSERT INTO cobranza_mora_envios (id_credito,codigo_plantilla,dias_mora,email,estado) VALUES (?,?,?,?,?)',
       [c.id_credito, p.codigo, dias, email, r.ok ? 'enviado' : ('error: ' + (r.error || '')).slice(0, 140)]);
@@ -183,6 +206,15 @@ exports.guardarPlantilla = async (req, res) => {
 exports.guardarConfig = async (req, res) => {
   try { await setMotorCfg(req.body || {}); res.json({ success: true, data: { ok: true }, error: null }); }
   catch (e) { console.error('[mora guardarConfig]', e.message); res.status(500).json({ success: false, data: null, error: 'Error interno del servidor' }); }
+};
+// Vista previa: renderiza una plantilla (la del body, para reflejar ediciones sin guardar) con datos de ejemplo.
+exports.preview = async (req, res) => {
+  try {
+    const { asunto, cuerpo } = req.body || {};
+    const conf = await getCobranzaConfig();
+    const vars = { trato: 'Estimada', nombre: 'Sara Fuentes Toro', numero: '2606009', dias: 7, cuotas: 3, monto: '1.347.825', datos: conf.datos_transferencia };
+    res.json({ success: true, data: { asunto: rellenar(asunto || '', vars), html: emailHTMLCobranza(rellenar(cuerpo || '', vars)) }, error: null });
+  } catch (e) { console.error('[mora preview]', e.message); res.status(500).json({ success: false, data: null, error: 'Error interno del servidor' }); }
 };
 // Corre el motor a demanda. Por defecto DRY-RUN (no envía, solo muestra a quién iría). ?real=1 envía.
 exports.correrAhora = async (req, res) => {
