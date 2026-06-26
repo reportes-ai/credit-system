@@ -336,6 +336,6 @@
 
   window.AF_JUEGOS = {
     lanzar, cerrar,
-    lista: () => Object.keys(GAMES).map(id => ({ id, nombre: GAMES[id].nombre, tip: GAMES[id].tip })),
+    lista: () => Object.keys(GAMES).map(id => ({ id, nombre: GAMES[id].nombre, tip: GAMES[id].tip, page: !!GAMES[id].page })),
   };
 })();

@@ -2,7 +2,7 @@
    AutoFácil — Versión global de la aplicación
    Editar SOLO este archivo para cambiar la versión
    ───────────────────────────────────────────── */
-const APP_VERSION = 'v66.9';
+const APP_VERSION = 'v67.0';
 
 document.addEventListener('DOMContentLoaded', () => {
 
@@ -986,6 +986,9 @@ document.addEventListener('DOMContentLoaded', () => {
     if (window.AF_JUEGOS) return cb();
     const s = document.createElement('script'); s.src = '/js/juegos.js'; s.onload = cb; document.head.appendChild(s);
   }
+  // Prueba local (BG-ADMIN apretó "Probar aquí" en una humorada de pantalla → llega al Inicio).
+  const probar = sessionStorage.getItem('af_probar');
+  if (probar) { sessionStorage.removeItem('af_probar'); cargarJuegos(() => window.AF_JUEGOS && window.AF_JUEGOS.lanzar(probar, 'Modo prueba (solo tú lo ves)')); }
   async function chk() {
     try {
       const r = await fetch('/api/mantenimiento', { headers: { Authorization: 'Bearer ' + token } });
@@ -998,5 +1001,5 @@ document.addEventListener('DOMContentLoaded', () => {
     } catch (e) {}
   }
   chk();
-  setInterval(chk, 25000);
+  setInterval(chk, 12000);
 });
