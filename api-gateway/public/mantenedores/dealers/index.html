@@ -213,9 +213,6 @@
     <button class="btn-importar" onclick="recalcularCategorias()" title="Propone la categoría de cada dealer según las ventas del mes pasado">
       <i class="bi bi-arrow-repeat me-1 text-primary"></i>Recalcular categorías
     </button>
-    <button class="btn-nuevo" onclick="abrirNuevo()">
-      <i class="bi bi-plus-circle me-1"></i>+ Nuevo Dealer
-    </button>
     <span class="count-badge" id="countBadge"></span>
   </div>
 
@@ -281,10 +278,11 @@
       </div>
       <div class="modal-body p-0">
         <table class="det-table" id="detTable"></table>
+        <div id="detFicha" style="padding:14px 18px"></div>
       </div>
       <div class="modal-footer" style="border-top:1px solid #f1f5f9">
         <button class="btn-det-cerrar" data-bs-dismiss="modal">Cerrar</button>
-        <button class="btn-det-editar" onclick="abrirEditar()"><i class="bi bi-pencil me-1"></i>Editar</button>
+        <button class="btn-det-editar" id="btnDetEditar" onclick="abrirEditar()"><i class="bi bi-pencil me-1"></i>Editar</button>
       </div>
     </div>
   </div>
@@ -476,6 +474,14 @@ function logout() { sessionStorage.removeItem('token'); sessionStorage.removeIte
 
 const H = { 'Content-Type':'application/json', 'Authorization':'Bearer '+token };
 let pag = 1, totalRows = 0, debTimer, dealerActual = null;
+// Editar dealer: SOLO Administrador + Analista de Operaciones (dealer_ficha_revisar).
+const esAdmin = yo?.perfil === 'Administrador';
+let puedeEditarDealer = esAdmin;
+async function cargarPermisos(){
+  if (puedeEditarDealer) return;
+  try { const r=await fetch('/api/auth/mis-permisos?_='+Date.now(),{headers:H}); const j=await r.json();
+    if ((j.funcionalidades||[]).includes('dealer_ficha_revisar')) puedeEditarDealer = true; } catch(e){}
+}
 // Reporte IA: el flag tiene_reporte_ia viene del servidor; el modal usa el componente
 // compartido AF_REP_IA (MISMO formato que la revisión: empresa + socios juntos).
 function verReporteIADealer(d){
@@ -572,7 +578,7 @@ async function cargar(p) {
       <td>
         <div class="acciones-cell">
           <button class="btn-ver" onclick='verDealer(${JSON.stringify(d).replace(/'/g,"&#39;")})'>Ver</button>
-          <button class="btn-editar-row" onclick='abrirEditarDirecto(${JSON.stringify(d).replace(/'/g,"&#39;")})'>Editar</button>
+          ${puedeEditarDealer ? `<button class="btn-editar-row" onclick='abrirEditarDirecto(${JSON.stringify(d).replace(/'/g,"&#39;")})'>Editar</button>` : ''}
           ${d.tiene_reporte_ia ? `<button class="btn-ver" title="Ver Reporte IA (Anthropic) — empresa + socios" style="background:#fdf3ee;border-color:#f2d3c4;color:#c2410c" onclick='verReporteIADealer(${JSON.stringify(d).replace(/'/g,"&#39;")})'><i class="bi bi-stars"></i> IA</button>` : ''}
         </div>
       </td>
@@ -860,7 +866,35 @@ function verDealer(d) {
     ['¿Tiene Factura?',   d.tiene_factura ? 'SI' : 'NO'],
     ['Observaciones',     fmt(d.observaciones)],
   ].map(([k,v]) => `<tr><td>${k}</td><td>${v}</td></tr>`).join('');
+  const be = document.getElementById('btnDetEditar'); if (be) be.style.display = puedeEditarDealer ? '' : 'none';
+  document.getElementById('detFicha').innerHTML = '<div style="color:#94a3b8;font-size:.85rem"><i class="bi bi-hourglass-split me-1"></i>Cargando ficha de incorporación…</div>';
+  cargarFichaDealer(d.id_dealer);
   new bootstrap.Modal(document.getElementById('modalDetalle')).show();
+}
+
+// Última ficha APROBADA del dealer: firma + timbre APROBADO (fecha/hora) + quién autorizó cada etapa.
+async function cargarFichaDealer(idDealer){
+  const cont = document.getElementById('detFicha'); if(!cont) return;
+  const E = s => String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+  const DT = x => x ? new Date(x).toLocaleString('es-CL') : '—';
+  let f = null;
+  try { const r=await fetch('/api/dealer-incorporacion/fichas/por-dealer/'+idDealer,{headers:H}); const j=await r.json(); if(j.success) f=j.data; } catch(e){}
+  if(!f){ cont.innerHTML = '<div style="color:#94a3b8;font-size:.85rem"><i class="bi bi-info-circle me-1"></i>Sin ficha de incorporación asociada (dealer antiguo o importado).</div>'; return; }
+  const timbre = `<div style="display:flex;justify-content:center;margin:4px 0 12px">
+    <div style="border:3px solid #15803d;color:#15803d;border-radius:10px;padding:8px 22px;transform:rotate(-4deg);font-weight:800;letter-spacing:1px;text-align:center;background:#f0fdf4">
+      <div style="font-size:1.15rem"><i class="bi bi-patch-check-fill"></i> APROBADO</div>
+      <div style="font-size:.74rem;font-weight:600">${E(DT(f.updated_at))}</div></div></div>`;
+  const fichaBtn = f.tiene_ficha
+    ? `<a href="/api/dealer-incorporacion/fichas/${f.id}/archivo?token=${encodeURIComponent(token)}" target="_blank" class="btn btn-sm" style="background:#0ea5e9;color:#fff;text-decoration:none"><i class="bi bi-file-earmark-pdf me-1"></i>Ver ficha firmada por el dealer</a>`
+    : '<span style="font-size:.82rem;color:#94a3b8">Sin ficha firmada subida.</span>';
+  const cadena = (f.autorizaciones||[]).map(a=>`<div style="margin-top:5px;font-size:.83rem"><i class="bi bi-check2-circle me-1" style="color:#15803d"></i><b>${E(a.nombre_nivel||'Nivel')}:</b> ${E(a.usuario_nombre||'—')}${a.perfil?` (${E(a.perfil)})`:''} · ${E(DT(a.fecha))}${a.sin_revision?' <span style="color:#b91c1c;font-weight:700">· sin revisión</span>':''}</div>`).join('')
+    || '<div style="font-size:.82rem;color:#94a3b8">Sin registro de autorizaciones.</div>';
+  const esp = f.part_especial_por ? `<div style="margin-top:6px;font-size:.82rem;color:#5b21b6"><i class="bi bi-patch-check-fill me-1"></i>Participación especial aprobada por <b>${E(f.part_especial_por)}</b></div>` : '';
+  cont.innerHTML = `<div style="border-top:1px solid #f1f5f9;padding-top:12px">
+    ${timbre}
+    <div style="margin-bottom:12px">${fichaBtn}</div>
+    <div style="font-weight:800;color:#3730a3;font-size:.82rem;margin-bottom:2px"><i class="bi bi-diagram-3 me-1"></i>Aprobaciones por etapa</div>
+    ${cadena}${esp}</div>`;
 }
 
 function abrirEditar() {
@@ -1051,7 +1085,7 @@ async function confirmarImport() {
 }
 
 // Init
-Promise.all([cargarCategorias(), cargarPizarraDef()]).then(() => cargar(1));
+Promise.all([cargarCategorias(), cargarPizarraDef(), cargarPermisos()]).then(() => cargar(1));
 cargarCcs();
 </script>
 <script src="/js/app-version.js"></script>

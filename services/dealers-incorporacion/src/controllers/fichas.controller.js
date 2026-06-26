@@ -553,6 +553,24 @@ const obtener = async (req, res) => {
   } catch (e) { console.error('[fichas obtener]', e.message); res.status(500).json({ success: false, data: null, error: 'Error interno del servidor' }); }
 };
 
+/* ── GET /fichas/por-dealer/:idDealer — última ficha APROBADA del dealer ───────
+   Para el "Ver" de la Base Dealer: ficha firmada + timbre APROBADO + quién autorizó
+   cada etapa. */
+const fichaPorDealer = async (req, res) => {
+  try {
+    const [[f]] = await pool.query(
+      `SELECT id, estado, nombre_razon, rut, ficha_nombre, (ficha_data IS NOT NULL) AS tiene_ficha,
+              part_especial_por, part_especial_fecha, fecha_revision, revisor_nombre, updated_at
+       FROM dealer_fichas WHERE id_dealer = ? AND estado = 'APROBADA' ORDER BY updated_at DESC LIMIT 1`,
+      [req.params.idDealer]);
+    if (!f) return res.json({ success: true, data: null, error: null });
+    const [autoriz] = await pool.query(
+      'SELECT orden, nombre_nivel, usuario_nombre, perfil, fecha, sin_revision FROM dealer_ficha_autorizaciones WHERE id_ficha = ? ORDER BY orden, id', [f.id]);
+    f.autorizaciones = autoriz;
+    res.json({ success: true, data: f, error: null });
+  } catch (e) { console.error('[fichas porDealer]', e.message); res.status(500).json({ success: false, data: null, error: 'Error interno del servidor' }); }
+};
+
 /* ── POST /fichas — crear borrador ────────────────────────────────────────── */
 const crear = async (req, res) => {
   try {
@@ -1305,5 +1323,5 @@ const nivelEliminar = async (req, res) => {
   } catch (e) { console.error('[niveles eliminar]', e.message); res.status(500).json({ success: false, data: null, error: 'Error interno del servidor' }); }
 };
 
-module.exports = { ejecutivos, comisionesDefault, dealerBuscar, listar, obtener, crear, editar, subirFicha, verFicha, enviar, autorizar, marcarRevisada, enviarFirmada, tomar, cerrar, rechazar, eliminar,
+module.exports = { ejecutivos, comisionesDefault, dealerBuscar, listar, obtener, fichaPorDealer, crear, editar, subirFicha, verFicha, enviar, autorizar, marcarRevisada, enviarFirmada, tomar, cerrar, rechazar, eliminar,
   listarArchivos, subirArchivo, verArchivo, eliminarArchivo, nivelesListar, nivelGuardar, nivelEliminar, getAlertasConfig, setAlertasConfig };

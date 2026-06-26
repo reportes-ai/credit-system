@@ -9,7 +9,9 @@ router.post('/importar', verifyToken, requireFunc('mantenedores_dealers'), ctrl.
 router.get('/',          verifyToken, ctrl.getDealers);
 router.get('/:id',       verifyToken, ctrl.getDealer);
 router.post('/',         verifyToken, requireFunc('mantenedores_dealers', 'dealer_mantener'), ctrl.createDealer);
-router.put('/:id',       verifyToken, requireFunc('mantenedores_dealers', 'dealer_mantener'), ctrl.updateDealer);
+// Editar dealer: solo Analista de Operaciones (dealer_ficha_revisar) + Admin (bypass). Las
+// comisiones pactadas NO se editan aquí — solo vía ficha aprobada o BD. (Crear = solo vía ficha.)
+router.put('/:id',       verifyToken, requireFunc('dealer_ficha_revisar'), ctrl.updateDealer);
 router.delete('/:id',    verifyToken, requireFunc('mantenedores_dealers'), ctrl.deleteDealer);
 
 module.exports = router;

@@ -16,6 +16,8 @@ router.get('/dealer-buscar',     verifyToken, requireFunc('dealer_inc_ver', 'dea
 
 // Lectura: cualquiera con acceso al módulo (el controller filtra por rol).
 router.get('/fichas',            verifyToken, requireFunc('dealer_inc_ver', 'dealer_ficha_crear', 'dealer_ficha_revisar'), ctrl.listar);
+// Última ficha APROBADA de un dealer (para el "Ver" de la Base Dealer): firma + timbre + cadena.
+router.get('/fichas/por-dealer/:idDealer', verifyToken, requireFunc('mantenedores_dealers', 'dealer_inc_ver', 'dealer_ficha_crear', 'dealer_ficha_revisar'), ctrl.fichaPorDealer);
 router.get('/fichas/:id',        verifyToken, requireFunc('dealer_inc_ver', 'dealer_ficha_crear', 'dealer_ficha_revisar'), ctrl.obtener);
 router.get('/fichas/:id/archivo', verifyToken, requireFunc('dealer_inc_ver', 'dealer_ficha_crear', 'dealer_ficha_revisar'), ctrl.verFicha);
 
