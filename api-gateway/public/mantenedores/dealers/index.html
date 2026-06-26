@@ -799,20 +799,24 @@ async function cargarPizarraDef(){
 }
 function comTablaDealer(d){
   const propias = !(d.com_6_12==null && d.com_13_24==null && d.com_25_36==null && d.com_37==null);
-  let vals, fuente;
-  if(propias){ vals = d; fuente = 'tabla pactada del dealer'; }
+  let vals, fuente, fcolor, ficon;
+  if(propias){ vals = d; fuente = 'tabla pactada del dealer'; fcolor='#166534'; ficon='check-circle-fill'; }
   else if(PIZARRA_DEF){ const tipo = String(d.ccs_parque||'').toUpperCase().includes('PARQUE') ? 'PARQUE' : 'GENERAL';
-    vals = PIZARRA_DEF[tipo] || {}; fuente = 'pizarra por defecto ('+(tipo==='PARQUE'?'Parque':'Calle')+') — se fija al pasar por ficha'; }
+    vals = PIZARRA_DEF[tipo] || {}; fuente = 'pizarra por defecto · '+(tipo==='PARQUE'?'Parque':'Calle')+' — se fija al pasar por ficha'; fcolor='#64748b'; ficon='info-circle-fill'; }
   else return '<span style="color:#94a3b8">— (usa la pizarra)</span>';
-  const pc = v => (v==null||v==='')?'—':(Number(v)+'%');
-  const c = 'padding:3px 9px;border:1px solid #e5e7eb;text-align:center';
-  const th = 'padding:3px 9px;border:1px solid #e5e7eb;background:#f8fafc;font-size:.78rem';
-  let h = `<table style="border-collapse:collapse;font-size:.85rem">
-    <tr><th style="${th}">6-12</th><th style="${th}">13-24</th><th style="${th}">25-36</th><th style="${th}">37 y +</th></tr>
-    <tr><td style="${c}"><b>${pc(vals.com_6_12)}</b></td><td style="${c}"><b>${pc(vals.com_13_24)}</b></td><td style="${c}"><b>${pc(vals.com_25_36)}</b></td><td style="${c}"><b>${pc(vals.com_37)}</b></td></tr></table>`;
-  if(d.part_especial_por) h += `<div style="margin-top:5px;font-size:.78rem;color:#5b21b6"><i class="bi bi-patch-check-fill"></i> Participación especial aprobada por <b>${esc(d.part_especial_por)}</b></div>`;
-  h += `<div style="margin-top:5px;font-size:.72rem;color:#64748b">Fuente: ${fuente}.</div>`;
-  h += `<div style="margin-top:2px;font-size:.72rem;color:#92400e"><i class="bi bi-lock"></i> Solo se modifica vía ficha de Modificación (cadena de aprobación).</div>`;
+  const pc = v => (v==null||v==='')?'—':(Number(v).toLocaleString('es-CL',{maximumFractionDigits:2})+'%');
+  const tramos = [['6 — 12', vals.com_6_12],['13 — 24', vals.com_13_24],['25 — 36', vals.com_25_36],['37 y +', vals.com_37]];
+  const seg = tramos.map((t,i)=>`<div style="flex:1;text-align:center;padding:9px 6px 8px;${i<3?'border-right:1px solid #eef2f7;':''}">
+      <div style="font-size:.62rem;font-weight:700;letter-spacing:.4px;color:#94a3b8;text-transform:uppercase">${t[0]}</div>
+      <div style="font-size:1.12rem;font-weight:800;color:#0141A2;line-height:1.2;margin-top:3px">${pc(t[1])}</div>
+      <div style="font-size:.58rem;color:#cbd5e1;margin-top:1px">cuotas</div>
+    </div>`).join('');
+  let h = `<div style="max-width:380px">
+    <div style="display:flex;border:1px solid #e3e8ef;border-radius:12px;overflow:hidden;background:linear-gradient(180deg,#fbfdff,#fff);box-shadow:0 2px 8px rgba(1,65,162,.06)">${seg}</div>`;
+  if(d.part_especial_por) h += `<div style="margin-top:8px;display:inline-flex;align-items:center;gap:6px;font-size:.75rem;color:#5b21b6;background:#f5f3ff;border:1px solid #ddd6fe;border-radius:20px;padding:4px 11px"><i class="bi bi-patch-check-fill"></i> Participación especial aprobada por <b>${esc(d.part_especial_por)}</b></div>`;
+  h += `<div style="margin-top:8px;font-size:.72rem;color:${fcolor};display:flex;align-items:center;gap:5px"><i class="bi bi-${ficon}"></i> Fuente: ${fuente}.</div>`;
+  h += `<div style="margin-top:3px;font-size:.72rem;color:#b45309;display:flex;align-items:center;gap:5px"><i class="bi bi-lock-fill"></i> Solo se modifica vía ficha de Modificación (cadena de aprobación).</div>
+    </div>`;
   return h;
 }
 function verDealer(d) {
