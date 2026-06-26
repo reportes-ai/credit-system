@@ -106,7 +106,7 @@
     <h3><i class="bi bi-list-ul me-1"></i>Catálogo de productos</h3>
     <p style="font-size:.8rem;color:#64748b;margin:-6px 0 12px"><i class="bi bi-grip-vertical"></i> Arrastra las filas para cambiar el orden. Ese orden rige la selección y el <a href="/dealernet-informes/">Descargar todos</a> en Informes DealerNet.</p>
     <table class="tb">
-      <thead><tr><th style="width:28px"></th><th style="width:90px">Código</th><th>Producto</th><th style="width:90px">Activo</th><th style="width:60px"></th></tr></thead>
+      <thead><tr><th style="width:28px"></th><th style="width:90px">Código</th><th>Producto</th><th style="width:90px">Activo</th><th style="width:78px" title="Informe que pide la Ficha de Dealer para la EMPRESA">Ficha Empresa</th><th style="width:78px" title="Informe que pide la Ficha de Dealer para cada SOCIO">Ficha Socio</th><th style="width:60px"></th></tr></thead>
       <tbody id="body"></tbody>
     </table>
   </div>
@@ -139,6 +139,7 @@
     <h4><i class="bi bi-diagram-3"></i> Qué afecta este mantenedor</h4>
     <ul>
       <li><b>Productos activos</b> → definen qué pide cada <b>Consulta DealerNet</b> por RUT. Menos productos activos = menos saldo por consulta.</li>
+      <li><b>Ficha Empresa / Ficha Socio</b> → definen qué informes pide y valida la <a href="/dealers-incorporacion/nuevo.html">Ficha de Dealer</a> (creación/modificación) para la <b>empresa</b> y para cada <b>socio</b>. Al enviar a autorización, Business Suite revisa el repositorio y, si falta o tiene más de 15 días, los solicita a DealerNet. La empresa normalmente NO lleva <code>2101</code> Deudores de Alimentos; los socios sí.</li>
       <li><b>Código / Nombre</b> → identifican cada producto del catálogo DealerNet (rango 3401–3450 y códigos propios como <code>16</code> Comportamiento Vigente o <code>2101</code> Boletín Deudores de Pensión). Agrega aquí los códigos nuevos que te confirme DealerNet.</li>
       <li><b>Vigencia de informes (bloqueo / vigencia)</b> → controlan la reutilización del repositorio en <a href="/dealernet-informes/">Informes DealerNet</a>: bajo el bloqueo no deja consultar (usa histórico), entre bloqueo y vigencia pregunta, sobre la vigencia consulta directo.</li>
       <li><b>Credenciales</b> → en variables de entorno de Render; afectan a toda consulta al Web Service.</li>
@@ -166,15 +167,17 @@ async function cargar(){
   try {
     const r=await fetch('/api/dealernet/productos',{ headers:H }); const j=await r.json();
     const b=document.getElementById('body');
-    if(!j.success){ b.innerHTML='<tr><td colspan="4" style="color:#b91c1c">'+esc(j.error||'Error')+'</td></tr>'; return; }
+    if(!j.success){ b.innerHTML='<tr><td colspan="7" style="color:#b91c1c">'+esc(j.error||'Error')+'</td></tr>'; return; }
     b.innerHTML=(j.data||[]).map(p=>`
       <tr data-id="${p.id}">
         <td class="drag-handle" title="Arrastrar para reordenar" style="cursor:grab;color:#94a3b8;text-align:center"><i class="bi bi-grip-vertical"></i></td>
         <td class="cod">${esc(p.codigo)}</td>
         <td><input value="${esc(p.nombre)}" data-nom="${p.id}" style="width:100%;border:1px solid #e2e8f0;border-radius:6px;padding:5px 8px;font-size:.85rem" onblur="renombrar(${p.id}, this.value)"></td>
         <td><label class="switch"><input type="checkbox" ${p.activo?'checked':''} onchange="toggle(${p.id}, this.checked)"><span class="slider"></span></label></td>
+        <td style="text-align:center"><input type="checkbox" ${p.ficha_empresa?'checked':''} onchange="toggleFicha(${p.id}, 'ficha_empresa', this.checked)" title="Informe pedido para la empresa en la Ficha de Dealer"></td>
+        <td style="text-align:center"><input type="checkbox" ${p.ficha_socio?'checked':''} onchange="toggleFicha(${p.id}, 'ficha_socio', this.checked)" title="Informe pedido para cada socio en la Ficha de Dealer"></td>
         <td><button class="btn-ghost" onclick="eliminar(${p.id})" title="Eliminar"><i class="bi bi-trash"></i></button></td>
-      </tr>`).join('') || '<tr><td colspan="5" style="color:#94a3b8">Sin productos.</td></tr>';
+      </tr>`).join('') || '<tr><td colspan="7" style="color:#94a3b8">Sin productos.</td></tr>';
     initSortable();
   } catch(_){ toast('Error al cargar', true); }
 }
@@ -200,6 +203,10 @@ async function agregar(){
 async function toggle(id, activo){
   try { const r=await fetch('/api/dealernet/productos/'+id,{ method:'PUT', headers:H, body:JSON.stringify({ activo }) });
     const j=await r.json(); if(!j.success) toast(j.error||'Error', true); } catch(_){}
+}
+async function toggleFicha(id, campo, val){
+  try { const r=await fetch('/api/dealernet/productos/'+id,{ method:'PUT', headers:H, body:JSON.stringify({ [campo]: val }) });
+    const j=await r.json(); if(j.success) toast(val?'Agregado al set de la ficha':'Quitado del set de la ficha'); else toast(j.error||'Error', true); } catch(_){ toast('Error', true); }
 }
 async function renombrar(id, nombre){
   try { await fetch('/api/dealernet/productos/'+id,{ method:'PUT', headers:H, body:JSON.stringify({ nombre }) }); } catch(_){}

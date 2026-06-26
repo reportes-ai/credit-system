@@ -293,6 +293,32 @@ const PRECIO_UF4 = {
   } catch (e) { console.error('[dealernet-costos migration]', e.message); }
 })();
 
+/* ── Migración: set de informes para la Ficha de Dealer (empresa / socio) ────
+   Flags paramétricos por producto: qué informes pide/valida la ficha de dealer
+   para la EMPRESA y para cada SOCIO. La empresa NO lleva Deudores de Alimentos
+   (2101); los socios sí. El Administrador ajusta los sets en el mantenedor de
+   Productos DealerNet. Seed conservador (incluye un penal para la alerta grave). */
+(async () => {
+  try {
+    for (const c of ['ficha_empresa', 'ficha_socio']) {
+      try { await pool.query(`ALTER TABLE dealernet_productos ADD COLUMN ${c} TINYINT(1) NOT NULL DEFAULT 0`); }
+      catch (e) { if (e.errno !== 1060) throw e; }
+    }
+    // Sembrar el default sólo una vez (flag), para no pisar lo que configure el admin.
+    const [[ya]] = await pool.query("SELECT 1 ok FROM migraciones_aplicadas WHERE clave='dealernet_ficha_sets_v1' LIMIT 1").catch(() => [[null]]);
+    if (!ya) {
+      await pool.query(`CREATE TABLE IF NOT EXISTS migraciones_aplicadas (
+        clave VARCHAR(80) PRIMARY KEY, applied_at DATETIME DEFAULT CURRENT_TIMESTAMP)`);
+      const EMPRESA = ['3435', '3425', '16', '3439'];          // Perfil Comercial, Impagos, Comportamiento, Boletín Procesos Penales
+      const SOCIO   = ['3435', '3425', '16', '3439', '2101'];  // + Deudores de Pensión de Alimentos
+      await pool.query('UPDATE dealernet_productos SET ficha_empresa=1 WHERE codigo IN (?)', [EMPRESA]);
+      await pool.query('UPDATE dealernet_productos SET ficha_socio=1   WHERE codigo IN (?)', [SOCIO]);
+      await pool.query("INSERT IGNORE INTO migraciones_aplicadas (clave) VALUES ('dealernet_ficha_sets_v1')");
+    }
+    console.log('[dealernet-ws] sets de informes para ficha de dealer listos');
+  } catch (e) { console.error('[dealernet-ficha-sets migration]', e.message); }
+})();
+
 /* ── Utilidades RUT ──────────────────────────────────────────────────────── */
 function splitRut(rut) {
   const clean = String(rut || '').replace(/[.\s]/g, '').toUpperCase();
@@ -357,6 +383,15 @@ const getProductos = async (req, res) => {
   try { const [rows] = await pool.query('SELECT * FROM dealernet_productos ORDER BY orden, codigo'); res.json({ success: true, data: rows, error: null }); }
   catch (e) { errSrv(res, e, 'getProductos'); }
 };
+
+// Sets de informes que pide/valida la Ficha de Dealer: empresa (sin Alimentos) y socio.
+const fichaInformes = async (req, res) => {
+  try {
+    const [emp] = await pool.query('SELECT codigo, nombre FROM dealernet_productos WHERE ficha_empresa=1 ORDER BY orden, codigo');
+    const [soc] = await pool.query('SELECT codigo, nombre FROM dealernet_productos WHERE ficha_socio=1 ORDER BY orden, codigo');
+    res.json({ success: true, data: { empresa: emp, socio: soc }, error: null });
+  } catch (e) { errSrv(res, e, 'fichaInformes'); }
+};
 const addProducto = async (req, res) => {
   try {
     const codigo = String(req.body?.codigo || '').trim();
@@ -372,9 +407,11 @@ const addProducto = async (req, res) => {
 };
 const updateProducto = async (req, res) => {
   try {
-    const { nombre, activo } = req.body || {};
+    const { nombre, activo, ficha_empresa, ficha_socio } = req.body || {};
     if (nombre !== undefined) await pool.query('UPDATE dealernet_productos SET nombre=? WHERE id=?', [String(nombre).trim(), req.params.id]);
     if (activo !== undefined) await pool.query('UPDATE dealernet_productos SET activo=? WHERE id=?', [activo ? 1 : 0, req.params.id]);
+    if (ficha_empresa !== undefined) await pool.query('UPDATE dealernet_productos SET ficha_empresa=? WHERE id=?', [ficha_empresa ? 1 : 0, req.params.id]);
+    if (ficha_socio   !== undefined) await pool.query('UPDATE dealernet_productos SET ficha_socio=?   WHERE id=?', [ficha_socio ? 1 : 0, req.params.id]);
     auditar({ req, accion: 'EDITAR', modulo: 'dealernet', entidad: 'producto', entidad_id: req.params.id, detalle: `Editó producto DealerNet #${req.params.id}` });
     res.json({ success: true, data: { id: req.params.id }, error: null });
   } catch (e) { errSrv(res, e, 'updateProducto'); }
@@ -927,6 +964,6 @@ const historialFacturacion = async (req, res) => {
   } catch (e) { errSrv(res, e, 'historialFacturacion'); }
 };
 
-module.exports = { getProductos, addProducto, updateProducto, deleteProducto, reordenarProductos, consultar, listConsultas, estado,
+module.exports = { getProductos, fichaInformes, addProducto, updateProducto, deleteProducto, reordenarProductos, consultar, listConsultas, estado,
   verificarRepositorio, solicitarInformes, productosActivos, historicos, verInforme, descargarPdf, getConfigEndpoint, updateConfigEndpoint,
   clasificarRut, auditoria, getCostos, updateCostos, facturacion, guardarFacturacion, historialFacturacion };

@@ -6,6 +6,8 @@ const C = require('../controllers/dealernet-ws.controller');
 
 /* ── Mantenedor de productos ─────────────────────────────────────────────── */
 router.get('/productos',        verifyToken, requireFunc('mant_dealernet_productos'), C.getProductos);
+// Sets de informes de la Ficha de Dealer (empresa/socio): lectura para la ficha (cualquier sesión válida).
+router.get('/ficha-informes',   verifyToken, C.fichaInformes);
 router.post('/productos',       verifyToken, requireFunc('mant_dealernet_productos'), C.addProducto);
 router.put('/productos/orden',  verifyToken, requireFunc('mant_dealernet_productos'), C.reordenarProductos);
 router.put('/productos/:id',    verifyToken, requireFunc('mant_dealernet_productos'), C.updateProducto);
