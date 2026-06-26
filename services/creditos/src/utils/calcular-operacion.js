@@ -93,10 +93,12 @@ async function calcularOperacion(op) {
   // Tabla de comisión del dealer (su pactada): manda sobre la pizarra cuando existe.
   let dealerCom = null;
   if (op.rut_dealer) {
-    const [drows] = await pool.query(
-      "SELECT com_6_12, com_13_24, com_25_36, com_37 FROM dealers WHERE UPPER(REPLACE(REPLACE(REPLACE(rut,'.',''),'-',''),' ','')) = ? LIMIT 1",
-      [normRutD(op.rut_dealer)]);
-    dealerCom = drows[0] || null;
+    try {
+      const [drows] = await pool.query(
+        "SELECT com_6_12, com_13_24, com_25_36, com_37 FROM dealers WHERE UPPER(REPLACE(REPLACE(REPLACE(rut,'.',''),'-',''),' ','')) = ? LIMIT 1",
+        [normRutD(op.rut_dealer)]);
+      dealerCom = drows[0] || null;
+    } catch (e) { dealerCom = null; }   // columnas aún no creadas → cae a la pizarra
   }
 
   const saldo_precio  = parseFloat(op.saldo_precio)    || 0;
