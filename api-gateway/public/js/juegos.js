@@ -199,7 +199,73 @@
     return { stop() { al = false; document.removeEventListener('mouseup', up); } };
   }
 
+  /* ════════════ 6 · COME-LETRAS — Pac-Man que se come la pantalla real 😈 ════════════
+     Humorada INTRUSIVA: un Pac-Man recorre la app y va borrando las letras visibles
+     del DOM (no toca inputs/textarea para no perder lo que el usuario escribe).
+     "Restaurar" recarga la página. */
+  function comeLetras(mensaje) {
+    let alive = true, eaten = 0, raf = null, target = null, biteCd = 0, lastT = 0;
+    let px = window.innerWidth / 2, py = window.innerHeight * 0.4;
+    const BAD = new Set(['SCRIPT', 'STYLE', 'NOSCRIPT', 'INPUT', 'TEXTAREA', 'SELECT', 'OPTION', 'SVG', 'CANVAS', 'IMG']);
+
+    const lay = document.createElement('div');
+    lay.id = 'afComeLetras'; lay.style.cssText = 'position:fixed;inset:0;z-index:2000000;pointer-events:none';
+    const pac = document.createElement('div');
+    pac.style.cssText = 'position:fixed;font-size:30px;line-height:1;text-align:center;left:0;top:0;transform:translate(-50%,-50%);filter:drop-shadow(0 2px 5px rgba(0,0,0,.45));transition:none';
+    pac.textContent = '🟡';
+    const chip = document.createElement('div');
+    chip.id = 'afCLchip';
+    chip.style.cssText = 'position:fixed;bottom:18px;left:50%;transform:translateX(-50%);pointer-events:auto;background:#111827;color:#fff;border-radius:30px;padding:8px 14px;font:600 13px system-ui;display:flex;gap:12px;align-items:center;z-index:2000003;box-shadow:0 10px 30px rgba(0,0,0,.45)';
+    chip.innerHTML = '<span>🟡 Come-Letras' + (mensaje ? ' — <span style="color:#93c5fd">' + mensaje + '</span>' : '') + '</span>' +
+      '<span style="color:#fbbf24">comidas <b id="afCLn">0</b></span>' +
+      '<button id="afCLrest" style="background:#1f2937;border:none;color:#fff;border-radius:20px;padding:4px 11px;cursor:pointer;font-weight:700">🔄 Restaurar</button>' +
+      '<button id="afCLx" style="background:#7f1d1d;border:none;color:#fff;border-radius:20px;padding:4px 10px;cursor:pointer;font-weight:800">✕</button>';
+    document.body.appendChild(lay); lay.appendChild(pac); document.body.appendChild(chip);
+    pac.style.left = px + 'px'; pac.style.top = py + 'px';
+
+    function visible(el) { if (!el) return false; const r = el.getBoundingClientRect(); return r.width > 0 && r.height > 0 && r.bottom > 0 && r.top < innerHeight && r.right > 0 && r.left < innerWidth; }
+    function nodos() {
+      const out = []; const w = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT, {
+        acceptNode(n) {
+          if (!n.nodeValue || !n.nodeValue.trim()) return NodeFilter.FILTER_REJECT;
+          let p = n.parentElement; if (!p) return NodeFilter.FILTER_REJECT;
+          if (p.closest('#afComeLetras') || p.closest('#afCLchip') || p.closest('#afJuegoWin')) return NodeFilter.FILTER_REJECT;
+          for (let a = p; a; a = a.parentElement) if (BAD.has(a.tagName)) return NodeFilter.FILTER_REJECT;
+          if (!visible(p)) return NodeFilter.FILTER_REJECT;
+          return NodeFilter.FILTER_ACCEPT;
+        }
+      });
+      let c, i = 0; while ((c = w.nextNode()) && i++ < 600) out.push(c);
+      return out;
+    }
+    function primChar(n) { const s = n.nodeValue; let i = 0; while (i < s.length && /\s/.test(s[i])) i++; if (i >= s.length) return null;
+      try { const r = document.createRange(); r.setStart(n, i); r.setEnd(n, i + 1); const rc = r.getBoundingClientRect(); if (!rc.width && !rc.height) return null; return { rect: rc, index: i }; } catch (e) { return null; } }
+    function pick() { const ns = nodos(); let best = null, bd = Infinity;
+      for (const n of ns) { const fc = primChar(n); if (!fc) continue; const cx = fc.rect.left + fc.rect.width / 2, cy = fc.rect.top + fc.rect.height / 2; const d = (cx - px) * (cx - px) + (cy - py) * (cy - py); if (d < bd) { bd = d; best = n; } }
+      return best; }
+
+    function frame(t) { if (!alive) return; const dt = Math.min(t - lastT || 16, 50); lastT = t;
+      if (!target || !target.parentElement || !target.nodeValue || !target.nodeValue.trim()) target = pick();
+      if (target) { const fc = primChar(target);
+        if (!fc) { target = null; }
+        else { const cx = fc.rect.left + fc.rect.width / 2, cy = fc.rect.top + fc.rect.height / 2, dx = cx - px, dy = cy - py, dist = Math.hypot(dx, dy) || 1, sp = Math.min(9, dist);
+          if (dist > 3) { px += dx / dist * sp; py += dy / dist * sp; }
+          pac.style.left = px + 'px'; pac.style.top = py + 'px';
+          biteCd -= dt;
+          if (dist < 18 && biteCd <= 0) { const s = target.nodeValue; target.nodeValue = s.slice(0, fc.index) + s.slice(fc.index + 1);
+            eaten++; const e = document.getElementById('afCLn'); if (e) e.textContent = eaten; biteCd = 55; pac.textContent = pac.textContent === '🟡' ? '😮' : '🟡'; }
+        }
+      }
+      raf = requestAnimationFrame(frame);
+    }
+    raf = requestAnimationFrame(frame);
+    chip.querySelector('#afCLx').onclick = () => window.AF_JUEGOS.cerrar();
+    chip.querySelector('#afCLrest').onclick = () => location.reload();
+    return { esPagina: true, stop() { alive = false; if (raf) cancelAnimationFrame(raf); lay.remove(); chip.remove(); } };
+  }
+
   const GAMES = {
+    comeletras:{ nombre: '🟡 Come-Letras', tip: 'Pac-Man se come las letras de TU pantalla 😈 (Restaurar = recargar)', page: true, run: comeLetras },
     snake:     { nombre: '🐍 Culebra Cobradora', tip: 'Flechas para mover · come las cuotas 💵', run: snake },
     runner:    { nombre: '🦆 Pato Run',          tip: 'Espacio o clic para saltar los morosos', run: runner },
     breakout:  { nombre: '🧱 Rompe-Mora',        tip: 'Mueve el mouse · rompe toda la mora', run: breakout },
@@ -208,7 +274,9 @@
   };
 
   function lanzar(id, mensaje) {
+    cerrar();
     const g = GAMES[id] || GAMES.snake;
+    if (g.page) { current = g.run(mensaje) || {}; return; }   // juego intrusivo (sobre la página real)
     const cv = shell(g.nombre, mensaje || '¡Break sorpresa del jefe! 🎉', g.tip);
     const ctx = cv.getContext('2d');
     current = g.run(cv, ctx, setScore) || {};
