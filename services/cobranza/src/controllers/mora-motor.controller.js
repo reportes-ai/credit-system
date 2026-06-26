@@ -23,12 +23,13 @@ function emailHTMLCobranza(cuerpoTxt) {
     .map(p => `<p style="margin:0 0 14px;font-size:14px;line-height:1.65;color:#1e293b">${esc(p).replace(/\n/g, '<br>')}</p>`).join('');
   return `<div style="background:#eef2f7;padding:26px 12px;font-family:Arial,Helvetica,sans-serif">
     <div style="max-width:580px;margin:0 auto;background:#fff;border-radius:14px;overflow:hidden;box-shadow:0 2px 10px rgba(2,45,112,.12)">
-      <div style="background:linear-gradient(135deg,#012d70,#0141A2 60%,#009AFE);padding:18px 26px">
+      <div style="padding:20px 26px 14px;background:#fff">
         <table width="100%" cellpadding="0" cellspacing="0"><tr>
-          <td style="color:#fff;font-weight:800;font-size:20px;letter-spacing:.3px">AutoFácil</td>
-          <td align="right"><span style="background:rgba(255,255,255,.18);color:#fff;font-size:11px;font-weight:700;padding:4px 12px;border-radius:20px;letter-spacing:.5px">COBRANZA</span></td>
+          <td style="vertical-align:middle"><img src="${APP_URL}/img/logo-autofacil.png" alt="AutoFácil — Crédito Automotriz" height="36" style="height:36px;display:block;border:0"></td>
+          <td align="right" style="vertical-align:middle"><span style="background:#eff6ff;color:#0141A2;font-size:11px;font-weight:800;padding:5px 12px;border-radius:20px;letter-spacing:.5px;border:1px solid #bfdbfe">COBRANZA</span></td>
         </tr></table>
       </div>
+      <div style="height:4px;background:linear-gradient(90deg,#012d70,#0141A2 50%,#009AFE)"></div>
       <div style="padding:24px 26px">${parrafos}</div>
       <div style="background:#f8fafc;border-top:1px solid #e9eef5;padding:15px 26px;color:#64748b;font-size:11px;line-height:1.6">
         Mensaje automático de <b>AutoFácil SpA</b> &middot; cobranza@autofacilchile.cl<br>
