@@ -33,6 +33,9 @@ ensureTable().catch(e => console.error('dealers table init:', e.message));
     'com_parque_6_12 DECIMAL(5,2)', 'com_parque_13_24 DECIMAL(5,2)',
     'com_parque_25_36 DECIMAL(5,2)', 'com_parque_37 DECIMAL(5,2)',
     'direccion_parque VARCHAR(300)', 'comuna_parque VARCHAR(120)',
+    // Geocodificación para el Mapa de Dealers (Google Geocoding API → lat/lng).
+    'lat DECIMAL(10,7)', 'lng DECIMAL(10,7)', 'lat_parque DECIMAL(10,7)', 'lng_parque DECIMAL(10,7)',
+    'geo_estado VARCHAR(20)', 'geo_dir VARCHAR(300)', 'geo_at DATETIME',
   ];
   for (const c of cols) { try { await pool.query(`ALTER TABLE dealers ADD COLUMN IF NOT EXISTS ${c} NULL`); } catch (e) {} }
 })();
@@ -173,4 +176,85 @@ const deleteDealer = async (req, res) => {
   } catch (e) { (console.error('[error]', e), res.status(500).json({success:false,data:null,error:'Error interno del servidor'})); }
 };
 
-module.exports = { getDealers, getDealer, getCcsList, importar, createDealer, updateDealer, deleteDealer };
+/* ── Mapa de Dealers: geocodificación (Google) + datos para el mapa ──────────
+   La API key vive en env GOOGLE_MAPS_API_KEY (NO en código). El mapa se pinta con
+   Leaflet + OpenStreetMap (sin key); solo la geocodificación usa Google → la key
+   nunca se expone al frontend. Las coordenadas se cachean en `dealers` (1 sola vez). */
+async function geocodeDireccion(dir) {
+  const key = process.env.GOOGLE_MAPS_API_KEY;
+  if (!key) return { status: 'NO_KEY' };
+  if (!dir || !String(dir).trim()) return { status: 'SIN_DIR' };
+  try {
+    const url = 'https://maps.googleapis.com/maps/api/geocode/json?region=cl&language=es'
+      + '&address=' + encodeURIComponent(String(dir).trim()) + '&key=' + key;
+    const j = await (await fetch(url)).json();
+    if (j.status === 'OK' && j.results && j.results[0]) {
+      const g = j.results[0];
+      return { status: 'OK', lat: g.geometry.location.lat, lng: g.geometry.location.lng, formatted: g.formatted_address };
+    }
+    return { status: j.status || 'ERROR', error: j.error_message || null };
+  } catch (e) { return { status: 'ERROR', error: e.message }; }
+}
+const _sleep = ms => new Promise(r => setTimeout(r, ms));
+// Arma "calle, comuna, región, Chile" para mejorar la precisión del geocoder.
+const dirCompleta = (d, parque) => [
+  parque ? d.direccion_parque : d.direccion,
+  parque ? (d.comuna_parque || d.comuna) : d.comuna,
+  d.region, 'Chile'
+].filter(x => x && String(x).trim()).join(', ');
+
+const geocodificar = async (req, res) => {
+  try {
+    if (!process.env.GOOGLE_MAPS_API_KEY)
+      return res.status(400).json({ success: false, data: null, error: 'Falta GOOGLE_MAPS_API_KEY en el servidor (Render → Environment).' });
+    const limite = Math.min(parseInt(req.body && req.body.limite) || 40, 100);
+    const [rows] = await pool.query(
+      `SELECT id_dealer, numero, direccion, comuna, region, direccion_parque, comuna_parque, lat, lat_parque
+         FROM dealers
+        WHERE activo=1 AND (
+              (direccion IS NOT NULL AND direccion<>'' AND lat IS NULL)
+           OR (direccion_parque IS NOT NULL AND direccion_parque<>'' AND lat_parque IS NULL))
+        ORDER BY numero LIMIT ?`, [limite]);
+    let ok = 0, fail = 0;
+    for (const d of rows) {
+      if (d.direccion && d.lat == null) {
+        const g = await geocodeDireccion(dirCompleta(d, false));
+        if (g.status === 'OK') { await pool.query('UPDATE dealers SET lat=?, lng=?, geo_dir=?, geo_estado=?, geo_at=NOW() WHERE id_dealer=?', [g.lat, g.lng, g.formatted, 'OK', d.id_dealer]); ok++; }
+        else { await pool.query('UPDATE dealers SET geo_estado=?, geo_at=NOW() WHERE id_dealer=?', [g.status, d.id_dealer]); fail++; }
+        await _sleep(120);
+      }
+      if (d.direccion_parque && d.lat_parque == null) {
+        const g = await geocodeDireccion(dirCompleta(d, true));
+        if (g.status === 'OK') { await pool.query('UPDATE dealers SET lat_parque=?, lng_parque=? WHERE id_dealer=?', [g.lat, g.lng, d.id_dealer]); ok++; }
+        else fail++;
+        await _sleep(120);
+      }
+    }
+    const [[{ pend }]] = await pool.query(
+      `SELECT COUNT(*) AS pend FROM dealers WHERE activo=1 AND (
+            (direccion IS NOT NULL AND direccion<>'' AND lat IS NULL)
+         OR (direccion_parque IS NOT NULL AND direccion_parque<>'' AND lat_parque IS NULL))`);
+    auditar({ req, accion: 'GEOCODIFICAR', modulo: 'mantenedores', entidad: 'dealer', detalle: `Geocodificó ${ok} dirección(es) de dealers (${fail} fallida(s))` });
+    res.json({ success: true, data: { ok, fallidos: fail, pendientes: pend }, error: null });
+  } catch (e) { console.error('[geocodificar]', e.message); res.status(500).json({ success: false, data: null, error: 'Error interno del servidor' }); }
+};
+
+const getMapa = async (req, res) => {
+  try {
+    const [rows] = await pool.query(
+      `SELECT id_dealer, numero, rut, COALESCE(NULLIF(nombre_indexa,''), nombre_razon) AS nombre,
+              nombre_razon, ccs_parque, tipo_ficha, direccion, comuna, region,
+              direccion_parque, comuna_parque, categoria_asignada, categoria_propuesta,
+              telefono, lat, lng, lat_parque, lng_parque, geo_estado
+         FROM dealers WHERE activo=1 ORDER BY numero`);
+    const [[stats]] = await pool.query(
+      `SELECT COUNT(*) AS total,
+              SUM(CASE WHEN lat IS NOT NULL THEN 1 ELSE 0 END) AS con_coord,
+              SUM(CASE WHEN (direccion IS NOT NULL AND direccion<>'' AND lat IS NULL)
+                         OR (direccion_parque IS NOT NULL AND direccion_parque<>'' AND lat_parque IS NULL) THEN 1 ELSE 0 END) AS pendientes
+         FROM dealers WHERE activo=1`);
+    res.json({ success: true, data: { rows, stats, tiene_key: !!process.env.GOOGLE_MAPS_API_KEY }, error: null });
+  } catch (e) { console.error('[getMapa]', e.message); res.status(500).json({ success: false, data: null, error: 'Error interno del servidor' }); }
+};
+
+module.exports = { getDealers, getDealer, getCcsList, importar, createDealer, updateDealer, deleteDealer, getMapa, geocodificar };

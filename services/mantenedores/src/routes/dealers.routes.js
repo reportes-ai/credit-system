@@ -6,6 +6,9 @@ const { requireFunc } = require('../../../../shared/middleware/permisos');
 router.get('/ccs',       verifyToken, ctrl.getCcsList);
 router.get('/importar',  verifyToken, (req, res) => res.status(405).json({ error: 'Use POST' }));
 router.post('/importar', verifyToken, requireFunc('mantenedores_dealers'), ctrl.importar);
+// Mapa de Dealers (geocodificación Google → lat/lng cacheadas). Antes de '/:id'.
+router.get('/mapa',          verifyToken, requireFunc('mantenedores_dealers', 'dealer_inc_ver', 'dealer_ficha_revisar'), ctrl.getMapa);
+router.post('/geocodificar', verifyToken, requireFunc('mantenedores_dealers'), ctrl.geocodificar);
 router.get('/',          verifyToken, ctrl.getDealers);
 router.get('/:id',       verifyToken, ctrl.getDealer);
 router.post('/',         verifyToken, requireFunc('mantenedores_dealers', 'dealer_mantener'), ctrl.createDealer);

@@ -1,0 +1,208 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <link rel="icon" href="/img/favicon.png" type="image/png">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Mapa de Dealers — AutoFácil</title>
+  <!-- v1.0 — Mapa de Dealers (Leaflet + OSM, geocodificación Google) -->
+  <link href="/css/bootstrap.min.css" rel="stylesheet">
+  <link href="/css/bootstrap-icons.css" rel="stylesheet">
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+  <link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.css">
+  <link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.Default.css">
+  <style>
+    :root { --navy:#0141A2; --navy-dark:#012d70; --navy-light:#0255c5; --accent:#009AFE; --bg:#f0f4f8; }
+    body { background:var(--bg); font-family:'Segoe UI',system-ui,sans-serif; margin:0; min-height:100vh; }
+    .topnav { background:linear-gradient(90deg,var(--navy-dark),var(--navy-light)); color:#fff; height:60px; padding:0 24px; display:flex; align-items:center; justify-content:space-between; position:sticky; top:0; z-index:1100; box-shadow:0 2px 8px rgba(0,0,0,0.3); }
+    .topnav-left { display:flex; align-items:center; gap:16px; }
+    .topnav-brand { display:flex; align-items:center; gap:8px; text-decoration:none; }
+    .topnav-brand img { height:32px; filter:brightness(0) invert(1); }
+    .version-badge { background:rgba(255,255,255,0.15); color:rgba(255,255,255,0.75); font-size:0.65rem; font-weight:700; border-radius:6px; padding:2px 8px; }
+    .breadcrumb-nav a { color:rgba(255,255,255,0.8); text-decoration:none; font-size:0.85rem; }
+    .breadcrumb-nav .sep { color:rgba(255,255,255,0.5); margin:0 7px; }
+    .btn-back { color:rgba(255,255,255,0.9); text-decoration:none; font-size:13px; font-weight:600; padding:6px 14px; border:1px solid rgba(255,255,255,0.3); border-radius:7px; }
+    .btn-back:hover { background:rgba(255,255,255,0.12); color:#fff; }
+    .wrap { max-width:1500px; margin:0 auto; padding:16px 20px 24px; }
+    .toolbar { display:flex; flex-wrap:wrap; gap:10px; align-items:center; background:#fff; border:1px solid #e3e8ef; border-radius:12px; padding:12px 14px; box-shadow:0 2px 8px rgba(1,65,162,.05); margin-bottom:14px; }
+    .toolbar .fld { display:flex; flex-direction:column; gap:2px; }
+    .toolbar label { font-size:.66rem; font-weight:700; color:#64748b; text-transform:uppercase; letter-spacing:.4px; }
+    .toolbar select, .toolbar input { border:1px solid #d1d5db; border-radius:8px; padding:6px 9px; font-size:.85rem; min-width:140px; }
+    .stat { display:inline-flex; align-items:center; gap:6px; font-size:.82rem; color:#334155; background:#f8fafc; border:1px solid #e3e8ef; border-radius:20px; padding:5px 12px; font-weight:600; }
+    .stat b { color:#0141A2; }
+    .btn-geo { background:var(--navy); color:#fff; border:none; border-radius:8px; padding:8px 16px; font-weight:700; font-size:.85rem; cursor:pointer; }
+    .btn-geo:hover { background:var(--navy-light); }
+    .btn-geo:disabled { background:#94a3b8; cursor:not-allowed; }
+    #map { height:calc(100vh - 210px); min-height:440px; border-radius:14px; border:1px solid #e3e8ef; box-shadow:0 4px 16px rgba(1,65,162,.08); z-index:1; }
+    .leaflet-popup-content { font-size:.85rem; line-height:1.5; }
+    .lp-t { font-weight:800; color:#0141A2; font-size:.95rem; margin-bottom:3px; }
+    .lp-r { color:#475569; }
+    .lp-r b { color:#0f172a; }
+    .lp-a { display:inline-block; margin-top:7px; background:#0141A2; color:#fff !important; text-decoration:none; border-radius:7px; padding:5px 11px; font-size:.78rem; font-weight:700; }
+    .lp-a.alt { background:#16a34a; }
+    .legend { display:flex; gap:16px; align-items:center; font-size:.78rem; color:#475569; margin:8px 2px 0; }
+    .legend .dot { display:inline-block; width:12px; height:12px; border-radius:50%; margin-right:5px; vertical-align:-1px; border:2px solid #fff; box-shadow:0 0 0 1px #cbd5e1; }
+    .toast-af { position:fixed; bottom:22px; left:50%; transform:translateX(-50%); background:#0f172a; color:#fff; padding:11px 20px; border-radius:10px; font-size:.88rem; z-index:3000; display:none; box-shadow:0 8px 28px rgba(0,0,0,.35); }
+    .toast-af.err { background:#b91c1c; }
+    .warn { background:#fffbeb; border:1px solid #fde68a; border-left:4px solid #f59e0b; border-radius:10px; padding:10px 14px; color:#92400e; font-size:.84rem; margin-bottom:12px; }
+  </style>
+</head>
+<body>
+
+<nav class="topnav">
+  <div class="topnav-left">
+    <a href="/" class="topnav-brand"><img src="/img/logo.png" alt="AutoFácil"><span class="version-badge" id="versionBadge"></span></a>
+    <div class="breadcrumb-nav"><a href="/">Inicio</a><span class="sep">›</span><a href="/mantenedores/dealers/">Dealers</a><span class="sep">›</span><span style="color:#fff;font-weight:600"><i class="bi bi-geo-alt me-1"></i>Mapa</span></div>
+  </div>
+  <div class="topnav-right" style="display:flex;align-items:center;gap:12px">
+    <a href="/mantenedores/dealers/" class="btn-back"><i class="bi bi-arrow-left me-1"></i>Base Dealer</a>
+  </div>
+</nav>
+
+<div class="wrap">
+  <div id="noKey" class="warn" style="display:none">
+    <i class="bi bi-exclamation-triangle me-1"></i><b>Falta la API key de Google.</b> Crea una key de <b>Geocoding API</b> en Google Cloud y agrégala en Render como <code>GOOGLE_MAPS_API_KEY</code>. Sin ella no se pueden geocodificar nuevas direcciones (el mapa igual muestra las ya geocodificadas).
+  </div>
+
+  <div class="toolbar">
+    <div class="fld"><label>Buscar</label><input id="fBuscar" placeholder="Nombre o RUT…" oninput="render()"></div>
+    <div class="fld"><label>Comuna</label><select id="fComuna" onchange="render()"><option value="">Todas</option></select></div>
+    <div class="fld"><label>Categoría</label><select id="fCat" onchange="render()"><option value="">Todas</option></select></div>
+    <div class="fld"><label>Parque</label><select id="fParque" onchange="render()"><option value="">Todos</option></select></div>
+    <div class="fld"><label>Tipo</label><select id="fTipo" onchange="render()"><option value="">Todos</option><option value="GENERAL">General (Calle)</option><option value="PARQUE">Parque</option><option value="AMBOS">Ambos</option></select></div>
+    <div style="flex:1"></div>
+    <span class="stat"><i class="bi bi-shop"></i> Total <b id="stTotal">0</b></span>
+    <span class="stat"><i class="bi bi-geo-alt-fill"></i> En mapa <b id="stCoord">0</b></span>
+    <span class="stat"><i class="bi bi-hourglass-split"></i> Pendientes <b id="stPend">0</b></span>
+    <button class="btn-geo" id="btnGeo" onclick="geocodificar()" style="display:none"><i class="bi bi-pin-map me-1"></i>Geocodificar pendientes</button>
+  </div>
+
+  <div id="map"></div>
+  <div class="legend">
+    <span><span class="dot" style="background:#0141A2"></span>Sucursal / Calle</span>
+    <span><span class="dot" style="background:#f59e0b"></span>Parque Automotriz</span>
+    <span style="margin-left:auto;color:#94a3b8"><i class="bi bi-info-circle"></i> Clic en un punto para ver el dealer y "Cómo llegar".</span>
+  </div>
+</div>
+
+<div id="toast" class="toast-af"></div>
+
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script src="https://unpkg.com/leaflet.markercluster@1.5.3/dist/leaflet.markercluster.js"></script>
+<script>
+const token = sessionStorage.getItem('token');
+const yo = JSON.parse(sessionStorage.getItem('usuario') || 'null');
+if (!token || !yo) location.href = '/login.html';
+const H = { 'Content-Type':'application/json', Authorization:'Bearer '+token };
+const $ = id => document.getElementById(id);
+const esc = s => String(s==null?'':s).replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+function toast(m, err){ const t=$('toast'); t.textContent=m; t.className='toast-af'+(err?' err':''); t.style.display='block'; setTimeout(()=>t.style.display='none',3200); }
+
+let DATA = [], CATS = {}, map, cluster, puedeGeo = false;
+
+// Pin tipo gota de color (sucursal azul / parque naranjo).
+function pin(color){ return L.divIcon({ className:'af-pin', iconSize:[18,18], iconAnchor:[9,18], popupAnchor:[0,-16],
+  html:`<div style="width:16px;height:16px;border-radius:50% 50% 50% 0;background:${color};transform:rotate(-45deg);border:2px solid #fff;box-shadow:0 1px 5px rgba(0,0,0,.45)"></div>` }); }
+const PIN_SUC = pin('#0141A2'), PIN_PARQUE = pin('#f59e0b');
+
+async function cargarPermisos(){
+  try { const j = await (await fetch('/api/auth/mis-permisos',{headers:H})).json();
+    const fs = j.funcionalidades || [];
+    puedeGeo = (yo && yo.perfil==='Administrador') || fs.includes('mantenedores_dealers');
+  } catch(e){}
+}
+async function cargarCategorias(){
+  try { const j = await (await fetch('/api/dealer-categorias',{headers:H})).json();
+    (j.data||[]).forEach(c => { CATS[c.codigo] = { nombre:c.nombre, color:c.color||'#64748b' }; });
+  } catch(e){}
+}
+async function cargarMapa(){
+  const j = await (await fetch('/api/dealers/mapa',{headers:H})).json();
+  if (!j.success) { toast(j.error||'Error al cargar', true); return; }
+  DATA = j.data.rows || [];
+  const st = j.data.stats || {};
+  $('stTotal').textContent = (st.total||0).toLocaleString('es-CL');
+  $('stCoord').textContent = (st.con_coord||0).toLocaleString('es-CL');
+  $('stPend').textContent  = (st.pendientes||0).toLocaleString('es-CL');
+  $('noKey').style.display = j.data.tiene_key ? 'none' : 'block';
+  $('btnGeo').style.display = (puedeGeo && j.data.tiene_key && (st.pendientes||0) > 0) ? '' : 'none';
+  $('btnGeo').innerHTML = `<i class="bi bi-pin-map me-1"></i>Geocodificar pendientes (${st.pendientes||0})`;
+  llenarFiltros();
+  render();
+}
+function llenarFiltros(){
+  const uniq = (arr) => [...new Set(arr.filter(x=>x&&String(x).trim()))].sort((a,b)=>String(a).localeCompare(b));
+  const fill = (id, vals, cur) => { const s=$(id); const v=s.value; s.innerHTML = `<option value="">${cur}</option>` + vals.map(x=>`<option value="${esc(x)}">${esc(x)}</option>`).join(''); s.value=v; };
+  fill('fComuna', uniq(DATA.map(d=>d.comuna)), 'Todas');
+  fill('fParque', uniq(DATA.map(d=>d.ccs_parque)), 'Todos');
+  const cats = uniq(DATA.map(d=>d.categoria_asignada||d.categoria_propuesta));
+  const sCat=$('fCat'), v=sCat.value;
+  sCat.innerHTML = '<option value="">Todas</option>' + cats.map(c=>`<option value="${esc(c)}">${esc(CATS[c]?.nombre||c)}</option>`).join('');
+  sCat.value=v;
+}
+function pasa(d){
+  const q = $('fBuscar').value.trim().toLowerCase();
+  if (q && !((d.nombre||'').toLowerCase().includes(q) || (d.nombre_razon||'').toLowerCase().includes(q) || (d.rut||'').toLowerCase().includes(q))) return false;
+  if ($('fComuna').value && d.comuna !== $('fComuna').value) return false;
+  const cat = d.categoria_asignada||d.categoria_propuesta||'';
+  if ($('fCat').value && cat !== $('fCat').value) return false;
+  if ($('fParque').value && d.ccs_parque !== $('fParque').value) return false;
+  if ($('fTipo').value && String(d.tipo_ficha||'').toUpperCase() !== $('fTipo').value) return false;
+  return true;
+}
+function popupHTML(d, esParque, lat, lng){
+  const cat = d.categoria_asignada||d.categoria_propuesta;
+  const dir = esParque ? (d.direccion_parque||'') : (d.direccion||'');
+  const com = esParque ? (d.comuna_parque||d.comuna||'') : (d.comuna||'');
+  return `<div class="lp-t">${esc(d.nombre||d.nombre_razon||'Dealer')} ${esParque?'<span style="color:#f59e0b">· Parque</span>':''}</div>
+    <div class="lp-r"><b>N°</b> ${d.numero??'—'} · <b>RUT</b> ${esc(d.rut||'—')}</div>
+    ${d.ccs_parque?`<div class="lp-r"><b>Parque:</b> ${esc(d.ccs_parque)}</div>`:''}
+    <div class="lp-r"><b>Dirección:</b> ${esc(dir||'—')}${com?', '+esc(com):''}</div>
+    ${cat?`<div class="lp-r"><b>Categoría:</b> ${esc(CATS[cat]?.nombre||cat)}</div>`:''}
+    ${d.telefono?`<div class="lp-r"><b>Tel:</b> ${esc(d.telefono)}</div>`:''}
+    <a class="lp-a" target="_blank" href="https://www.google.com/maps/dir/?api=1&destination=${lat},${lng}"><i class="bi bi-signpost-2"></i> Cómo llegar</a>
+    <a class="lp-a alt" target="_blank" href="/mantenedores/dealers/"><i class="bi bi-eye"></i> Ver dealer</a>`;
+}
+function render(){
+  if (!cluster) return;
+  cluster.clearLayers();
+  const bounds = [];
+  DATA.filter(pasa).forEach(d => {
+    if (d.lat != null && d.lng != null) {
+      const m = L.marker([d.lat, d.lng], { icon: PIN_SUC }).bindPopup(popupHTML(d, false, d.lat, d.lng));
+      cluster.addLayer(m); bounds.push([d.lat, d.lng]);
+    }
+    if (d.lat_parque != null && d.lng_parque != null) {
+      const m = L.marker([d.lat_parque, d.lng_parque], { icon: PIN_PARQUE }).bindPopup(popupHTML(d, true, d.lat_parque, d.lng_parque));
+      cluster.addLayer(m); bounds.push([d.lat_parque, d.lng_parque]);
+    }
+  });
+  if (bounds.length) map.fitBounds(bounds, { padding:[40,40], maxZoom:14 });
+}
+async function geocodificar(){
+  const b=$('btnGeo'); b.disabled=true; const orig=b.innerHTML; b.innerHTML='<i class="bi bi-arrow-repeat me-1"></i>Geocodificando…';
+  try {
+    const j = await (await fetch('/api/dealers/geocodificar',{method:'POST',headers:H,body:JSON.stringify({limite:60})})).json();
+    if (!j.success) throw new Error(j.error||'Error');
+    toast(`Geocodificadas ${j.data.ok} · fallidas ${j.data.fallidos} · quedan ${j.data.pendientes}`);
+    await cargarMapa();
+    if (j.data.pendientes > 0) toast(`Quedan ${j.data.pendientes} pendientes — vuelve a pulsar para seguir.`);
+  } catch(e){ toast(e.message, true); }
+  b.disabled=false; b.innerHTML=orig;
+}
+
+(async function init(){
+  map = L.map('map', { zoomControl:true }).setView([-33.45, -70.66], 11); // Santiago por defecto
+  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+    maxZoom: 19, attribution: '© OpenStreetMap'
+  }).addTo(map);
+  cluster = L.markerClusterGroup({ maxClusterRadius: 45 });
+  map.addLayer(cluster);
+  await cargarPermisos();
+  await cargarCategorias();
+  await cargarMapa();
+})();
+</script>
+<script src="/js/app-version.js"></script>
+</body>
+</html>
