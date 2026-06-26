@@ -112,22 +112,37 @@ const MESES_N = ['ENE','FEB','MAR','ABR','MAY','JUN','JUL','AGO','SEP','OCT','NO
 const mesDe = f => { if(!f) return ''; const d=new Date(f); return isNaN(d)?'':d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0'); };
 const mesLbl = m => MESES_N[parseInt(m.slice(5))-1]+' '+m.slice(0,4);
 
-(async function init(){
-  try { await fetch('/api/postventa/sync',             { method:'POST', headers:H }); } catch(e) {}
-  try { await fetch('/api/postventa/marcar-historico', { method:'POST', headers:H }); } catch(e) {}
-  const [rD, rC, rI] = await Promise.all([
-    fetch('/api/postventa', { headers:H }),
-    fetch('/api/postventa/config', { headers:H }),
-    fetch('/api/impuestos/valores', { headers:H }),
-  ]);
-  const jD = await rD.json(), jC = await rC.json();
-  try { const jI = await rI.json(); if (jI.success && jI.data) IMPUESTOS = Object.assign(IMPUESTOS, jI.data); } catch(e){}
-  DATA = jD.data || [];
-  if (jD.fijos) FIJOS = jD.fijos;
-  if (jC.data) CFG = { etapas_saldo: jC.data.etapas_saldo||[], etapas_comision: jC.data.etapas_comision||[] };
-  renderFiltros();
-  render();
-})();
+async function init(){
+  const lista = document.getElementById('lista');
+  lista.innerHTML = '<div style="text-align:center;color:#94a3b8;padding:30px">Cargando…</div>';
+  try {
+    await fetch('/api/postventa/sync',             { method:'POST', headers:H }).catch(()=>{});
+    await fetch('/api/postventa/marcar-historico', { method:'POST', headers:H }).catch(()=>{});
+    const [rD, rC, rI] = await Promise.all([
+      fetch('/api/postventa', { headers:H }),
+      fetch('/api/postventa/config', { headers:H }),
+      fetch('/api/impuestos/valores', { headers:H }),
+    ]);
+    if (!rD.ok) throw new Error('El servidor respondió ' + rD.status);
+    const jD = await rD.json(), jC = await rC.json();
+    if (jD.success === false) throw new Error(jD.error || 'No se pudo cargar el seguimiento');
+    try { const jI = await rI.json(); if (jI.success && jI.data) IMPUESTOS = Object.assign(IMPUESTOS, jI.data); } catch(e){}
+    DATA = jD.data || [];
+    if (jD.fijos) FIJOS = jD.fijos;
+    if (jC.data) CFG = { etapas_saldo: jC.data.etapas_saldo||[], etapas_comision: jC.data.etapas_comision||[] };
+    renderFiltros();
+    render();
+  } catch(e){
+    // Falló la carga ≠ "no hay datos": mostramos error explícito + Reintentar (no una pantalla vacía).
+    lista.innerHTML = '<div style="text-align:center;padding:44px 20px">'
+      + '<div style="font-size:2.1rem">⚠️</div>'
+      + '<div style="font-weight:800;color:#b91c1c;margin:8px 0 4px">No se pudo cargar el seguimiento</div>'
+      + '<div style="color:#64748b;font-size:.85rem;margin-bottom:16px">' + escH(e.message) + ' · Tus datos están a salvo — fue solo la carga.</div>'
+      + '<button onclick="init()" style="background:#0141A2;color:#fff;border:none;border-radius:9px;padding:9px 22px;font-weight:700;cursor:pointer"><i class="bi bi-arrow-clockwise me-1"></i>Reintentar</button>'
+      + '</div>';
+  }
+}
+init();
 
 function esPagado(r){
   return estadoDe(etapaActual(r,'SALDO'),'SALDO') === 'PAGADO'
