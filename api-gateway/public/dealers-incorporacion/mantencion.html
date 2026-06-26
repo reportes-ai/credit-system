@@ -202,6 +202,13 @@ function render(){
 
 let histFiltro = 'todos';
 function setHistFiltro(v){ histFiltro = v; renderHistoricas(); }
+// Borrar un registro histórico (solo Administrador). NO elimina el dealer creado.
+async function borrarHistorico(id){
+  if(!ESADMIN){ toast('Solo el Administrador puede borrar históricos.', true); return; }
+  if(!confirm('¿Borrar este registro histórico (la ficha)?\n\nEl dealer creado NO se elimina. Esta acción no se puede deshacer.')) return;
+  try{ const r=await fetch('/api/dealer-incorporacion/fichas/'+id,{method:'DELETE',headers:H}); const j=await r.json(); if(!j.success)throw new Error(j.error); toast('Registro histórico borrado'); await cargar(); }
+  catch(e){ toast(e.message,true); }
+}
 // Timbre al pie de la ficha aprobada (verde) o rechazada (rojo), con fecha y hora.
 function timbreFicha(f){
   if (f.estado==='APROBADA'){
@@ -248,7 +255,7 @@ function renderHistoricas(){
         <td>${comResumen(f)}</td>
         <td>${chip}</td>
         <td>${fH(aprob?f.updated_at:(f.fecha_revision||f.updated_at))}</td>
-        <td><div class="acts"><button class="btn btn-sm" style="background:#1e40af;color:#fff" onclick="verFicha(${f.id}, false, true)"><i class="bi bi-eye"></i> Ver</button></div></td>
+        <td><div class="acts"><button class="btn btn-sm" style="background:#1e40af;color:#fff" onclick="verFicha(${f.id}, false, true)"><i class="bi bi-eye"></i> Ver</button>${ESADMIN?`<button class="btn btn-red btn-sm" onclick="borrarHistorico(${f.id})" title="Borrar registro histórico (solo Admin — no elimina el dealer)"><i class="bi bi-trash"></i></button>`:''}</div></td>
       </tr>`;
     }).join('')}</tbody></table>`;
 }
