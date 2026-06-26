@@ -614,6 +614,50 @@ const updatePermisosPerfil = async (req, res) => {
   }
 };
 
+/* ─── Asignación / desasignación MASIVA (un módulo o submódulo, todos los perfiles) ─
+   Activa o desactiva una funcionalidad (o todas las de un módulo) en TODOS los
+   perfiles de una sola vez. Excluye al Administrador (siempre ve todo). */
+const masivoPermisos = async (req, res) => {
+  try {
+    const { id_modulo, id_funcionalidad, habilitado } = req.body;
+    const hab = habilitado ? 1 : 0;
+
+    // Resolver las funcionalidades objetivo
+    let funcs = [];
+    if (id_funcionalidad != null && id_funcionalidad !== '') {
+      funcs = [parseInt(id_funcionalidad)];
+    } else if (id_modulo != null && id_modulo !== '') {
+      const [rows] = await pool.query('SELECT id_funcionalidad FROM funcionalidades WHERE id_modulo = ?', [id_modulo]);
+      funcs = rows.map(r => r.id_funcionalidad);
+    } else {
+      return res.status(400).json({ success: false, data: null, error: 'Indica un módulo o un submódulo' });
+    }
+    if (!funcs.length) return res.status(400).json({ success: false, data: null, error: 'No hay funcionalidades para aplicar' });
+
+    // Perfiles destino: todos menos Administrador (que siempre tiene acceso total)
+    const [perfiles] = await pool.query("SELECT id_perfil FROM perfiles WHERE nombre <> 'Administrador'");
+    if (!perfiles.length) return res.json({ success: true, data: { perfiles: 0, funcionalidades: funcs.length }, error: null });
+
+    // Producto perfiles × funcionalidades → un solo INSERT masivo (upsert)
+    const valores = [];
+    for (const p of perfiles) for (const f of funcs) valores.push([p.id_perfil, f, hab]);
+    await pool.query(
+      `INSERT INTO permisos_perfil (id_perfil, id_funcionalidad, habilitado)
+       VALUES ?
+       ON DUPLICATE KEY UPDATE habilitado = VALUES(habilitado)`,
+      [valores]
+    );
+    limpiarCachePermisos();   // efecto inmediato en las APIs
+
+    auditar({ req, accion: 'PERMISOS', modulo: 'usuarios', entidad: 'masivo', entidad_id: (id_modulo || id_funcionalidad),
+      detalle: `Asignación masiva: ${hab ? 'activó' : 'desactivó'} ${funcs.length} funcionalidad(es) en ${perfiles.length} perfiles` });
+    res.json({ success: true, data: { perfiles: perfiles.length, funcionalidades: funcs.length, habilitado: hab }, error: null });
+  } catch (error) {
+    console.error('[masivoPermisos]', error.message);
+    res.status(500).json({ success: false, data: null, error: error.message });
+  }
+};
+
 const reordenarModulos = async (req, res) => {
   try {
     const { orden } = req.body; // [{ id_modulo, orden }]
@@ -2220,4 +2264,4 @@ const getUsuariosByPerfil = async (req, res) => {
   } catch (e) { console.error('[auditoria_credito_requirefunc_v1]', e.message); }
 })();
 
-module.exports = { getAllPerfiles, getModulosConFuncionalidades, getPermisosPerfil, updatePermisosPerfil, reordenarModulos, createPerfil, updatePerfil, deletePerfil, getUsuariosByPerfil };
+module.exports = { getAllPerfiles, getModulosConFuncionalidades, getPermisosPerfil, updatePermisosPerfil, masivoPermisos, reordenarModulos, createPerfil, updatePerfil, deletePerfil, getUsuariosByPerfil };

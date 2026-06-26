@@ -149,7 +149,7 @@
     <div class="topnav-left">
       <a href="/" class="topnav-brand">
         <img src="/img/logo.png" alt="AutoFácil" style="display:block">
-        <span class="version-badge" id="versionBadge">v44.2</span>
+        <span class="version-badge" id="versionBadge">v62.7</span>
       </a>
       <div class="breadcrumb-nav">
         <a href="/">Inicio</a><span class="sep">›</span>
@@ -317,6 +317,12 @@
         <div class="col-md-9">
           <div class="card">
             <div class="card-body">
+              <!-- Barra de acciones globales -->
+              <div id="permisosToolbar" class="d-flex justify-content-end mb-2" style="display:none">
+                <button class="btn btn-outline-primary btn-sm" onclick="abrirModalMasivo()" title="Activar o desactivar un módulo/submódulo para todos los perfiles">
+                  <i class="bi bi-people-fill me-1"></i>Asignación masiva
+                </button>
+              </div>
               <!-- Header modo PERFIL -->
               <div id="perfilSeleccionadoHeader" class="mb-3 d-none">
                 <div class="d-flex justify-content-between align-items-center">
@@ -779,6 +785,47 @@
           <button class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
           <button class="btn btn-primary" id="npBtnGuardar" onclick="guardarNuevoPerfil()">
             <i class="bi bi-floppy me-1"></i>Crear perfil
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- MODAL ASIGNACIÓN MASIVA -->
+  <div class="modal fade" id="modalMasivo" tabindex="-1">
+    <div class="modal-dialog">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h5 class="modal-title"><i class="bi bi-people-fill me-2"></i>Asignación masiva de permisos</h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+        </div>
+        <div class="modal-body">
+          <p class="text-muted" style="font-size:.84rem">Activa o desactiva un módulo completo (o un submódulo puntual) en <b>todos los perfiles</b> de una sola vez.</p>
+          <div class="mb-3">
+            <label class="form-label">Módulo *</label>
+            <select id="masModulo" class="form-select" onchange="onMasivoModuloChange()">
+              <option value="">— Selecciona un módulo —</option>
+            </select>
+          </div>
+          <div class="mb-2">
+            <label class="form-label">Submódulo</label>
+            <select id="masFunc" class="form-select" disabled>
+              <option value="">Todo el módulo (todos sus submódulos)</option>
+            </select>
+            <div class="form-text" style="font-size:.78rem">Deja "Todo el módulo" para aplicar a todas sus funcionalidades, o elige una específica.</div>
+          </div>
+          <div class="alert alert-warning py-2 mb-2" style="font-size:.8rem">
+            <i class="bi bi-shield-lock me-1"></i>Se aplica a todos los perfiles <b>excepto Administrador</b> (siempre tiene acceso total).
+          </div>
+          <div id="masError" class="alert alert-danger mt-2 d-none" style="font-size:.84rem"></div>
+        </div>
+        <div class="modal-footer">
+          <button class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+          <button class="btn btn-outline-danger" id="masBtnOff" onclick="aplicarMasivo(false)">
+            <i class="bi bi-x-circle me-1"></i>Desactivar para todos
+          </button>
+          <button class="btn btn-success" id="masBtnOn" onclick="aplicarMasivo(true)">
+            <i class="bi bi-check-circle me-1"></i>Activar para todos
           </button>
         </div>
       </div>
@@ -1401,6 +1448,68 @@
       }
     }
 
+    // ── Asignación masiva (módulo/submódulo → todos los perfiles) ───────────
+    function abrirModalMasivo() {
+      const selM = document.getElementById('masModulo');
+      selM.innerHTML = '<option value="">— Selecciona un módulo —</option>' +
+        modulosRaw.map(m => `<option value="${m.id_modulo}">${m.nombre}</option>`).join('');
+      const selF = document.getElementById('masFunc');
+      selF.innerHTML = '<option value="">Todo el módulo (todos sus submódulos)</option>';
+      selF.disabled = true;
+      document.getElementById('masError').classList.add('d-none');
+      bootstrap.Modal.getOrCreateInstance(document.getElementById('modalMasivo')).show();
+    }
+
+    function onMasivoModuloChange() {
+      const idMod = document.getElementById('masModulo').value;
+      const selF  = document.getElementById('masFunc');
+      const mod   = modulosRaw.find(m => String(m.id_modulo) === String(idMod));
+      if (!mod) {
+        selF.innerHTML = '<option value="">Todo el módulo (todos sus submódulos)</option>';
+        selF.disabled = true;
+        return;
+      }
+      selF.innerHTML = '<option value="">Todo el módulo (todos sus submódulos)</option>' +
+        mod.funcionalidades.map(f => `<option value="${f.id_funcionalidad}">${f.nombre}</option>`).join('');
+      selF.disabled = false;
+    }
+
+    async function aplicarMasivo(habilitar) {
+      const errEl = document.getElementById('masError');
+      errEl.classList.add('d-none');
+      const idMod  = document.getElementById('masModulo').value;
+      const idFunc = document.getElementById('masFunc').value;
+      if (!idMod) { errEl.textContent = 'Selecciona un módulo.'; errEl.classList.remove('d-none'); return; }
+
+      const mod  = modulosRaw.find(m => String(m.id_modulo) === String(idMod));
+      const func = idFunc ? mod?.funcionalidades.find(f => String(f.id_funcionalidad) === String(idFunc)) : null;
+      const queTxt = func ? `"${func.nombre}"` : `todo el módulo "${mod?.nombre}"`;
+      const accion = habilitar ? 'ACTIVAR' : 'DESACTIVAR';
+      if (!confirm(`¿${accion} ${queTxt} para TODOS los perfiles (excepto Administrador)?`)) return;
+
+      const body = { habilitado: !!habilitar };
+      if (idFunc) body.id_funcionalidad = parseInt(idFunc); else body.id_modulo = parseInt(idMod);
+
+      const bOn = document.getElementById('masBtnOn'), bOff = document.getElementById('masBtnOff');
+      bOn.disabled = bOff.disabled = true;
+      const data = await api('PUT', '/api/perfiles/masivo', body);
+      bOn.disabled = bOff.disabled = false;
+
+      if (data?.success) {
+        bootstrap.Modal.getInstance(document.getElementById('modalMasivo')).hide();
+        showToast(`${habilitar ? 'Activado' : 'Desactivado'} ${queTxt} en ${data.data.perfiles} perfiles.`);
+        // Refrescar la grilla si hay un perfil abierto en modo perfil
+        if (perfilActualId && !modoUsuario) {
+          const d = await api('GET', `/api/perfiles/${perfilActualId}/permisos`);
+          permisosActuales = d?.data || {};
+          renderGridPerfil();
+        }
+      } else {
+        errEl.textContent = data?.error || 'Error al aplicar la asignación masiva.';
+        errEl.classList.remove('d-none');
+      }
+    }
+
     // ── Seleccionar usuario (modo edición overrides de usuario) ─
     async function seleccionarUsuario(id, nombre, id_perfil, perfilNombre) {
       modoUsuario = true;
@@ -1884,6 +1993,8 @@
       puedeEliminarDef = tiene('usuarios.eliminar');
       // Editar la matriz de permisos: requiere "Perfiles y Permisos" o "Gestionar Permisos" (igual que el backend)
       puedeEditarPermisos = tiene('usuarios_perfiles') || tiene('usuarios.permisos');
+      const _tb = document.getElementById('permisosToolbar');
+      if (_tb) _tb.style.display = puedeEditarPermisos ? 'flex' : 'none';
       const _btnNuevo = document.getElementById('btnNuevoUsuario');
       if (_btnNuevo) _btnNuevo.style.display = puedeCrear ? '' : 'none';
       // Tab Seguridad por permiso usuarios_seguridad (Admin incluido vía tiene())

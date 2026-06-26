@@ -5,6 +5,7 @@ const { requireFunc } = require('../../../../shared/middleware/permisos');
 
 router.get('/',    verifyToken, ctrl.getAllPerfiles);
 router.post('/',      verifyToken, requireFunc('usuarios_perfiles'), ctrl.createPerfil);
+router.put('/masivo', verifyToken, requireFunc('usuarios_perfiles'), ctrl.masivoPermisos);
 router.put('/:id',    verifyToken, requireFunc('usuarios_perfiles'), ctrl.updatePerfil);
 router.delete('/:id', verifyToken, requireFunc('usuarios_perfiles'), ctrl.deletePerfil);
 router.get('/modulos-funcionalidades', verifyToken, ctrl.getModulosConFuncionalidades);
