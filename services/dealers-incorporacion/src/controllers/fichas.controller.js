@@ -118,6 +118,8 @@ async function comDefaults() {
     await pool.query(`ALTER TABLE dealer_fichas ADD COLUMN IF NOT EXISTS part_especial_por VARCHAR(200) NULL`);
     await pool.query(`ALTER TABLE dealer_fichas ADD COLUMN IF NOT EXISTS part_especial_por_id INT NULL`);
     await pool.query(`ALTER TABLE dealer_fichas ADD COLUMN IF NOT EXISTS part_especial_fecha DATETIME NULL`);
+    // Nivel actual dentro de la cadena de autorización paramétrica (NULL = no está autorizándose).
+    await pool.query(`ALTER TABLE dealer_fichas ADD COLUMN IF NOT EXISTS nivel_actual INT NULL`);
   } catch (e) { console.error('[dealer_fichas alter cols]', e.message); }
 
   // Archivos adjuntos múltiples (informes comerciales empresa/socios, hasta 3 c/u).
@@ -135,6 +137,45 @@ async function comDefaults() {
       )`);
   } catch (e) { if (e.errno !== 1050) console.error('[dealer_ficha_archivos migration]', e.message); }
 
+  // Cadena de aprobación PARAMÉTRICA: niveles que autorizan la ficha antes de imprimir/firmar.
+  // condicion: SIEMPRE | COMISION_SOBRE_PIZARRA | DEPOSITO_MODIFICADO
+  // permiso: código de funcionalidad que habilita autorizar ese nivel (gobernado por la matriz de Perfiles).
+  try {
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS dealer_aprob_niveles (
+        id        INT AUTO_INCREMENT PRIMARY KEY,
+        orden     INT          NOT NULL DEFAULT 1,
+        nombre    VARCHAR(120) NOT NULL,
+        condicion VARCHAR(30)  NOT NULL DEFAULT 'SIEMPRE',
+        permiso   VARCHAR(60)  NOT NULL,
+        activo    TINYINT(1)   NOT NULL DEFAULT 1,
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+      )`);
+    const [[{ n }]] = await pool.query('SELECT COUNT(*) n FROM dealer_aprob_niveles');
+    if (!n) await pool.query(
+      `INSERT INTO dealer_aprob_niveles (orden, nombre, condicion, permiso, activo) VALUES
+        (1, 'Análisis Operaciones/Crédito', 'SIEMPRE', 'dealer_ficha_revisar', 1),
+        (2, 'Visto de Gerencia (participación especial)', 'COMISION_SOBRE_PIZARRA', 'dealer_part_especial', 1)`);
+  } catch (e) { if (e.errno !== 1050) console.error('[dealer_aprob_niveles migration]', e.message); }
+
+  // Autorizaciones registradas por ficha (quién autorizó cada nivel) → letra chica en la ficha impresa.
+  try {
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS dealer_ficha_autorizaciones (
+        id             INT AUTO_INCREMENT PRIMARY KEY,
+        id_ficha       INT          NOT NULL,
+        orden          INT          NOT NULL,
+        nombre_nivel   VARCHAR(120) NULL,
+        permiso        VARCHAR(60)  NULL,
+        usuario_id     INT          NULL,
+        usuario_nombre VARCHAR(200) NULL,
+        perfil         VARCHAR(120) NULL,
+        fecha          DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        INDEX idx_ficha (id_ficha)
+      )`);
+  } catch (e) { if (e.errno !== 1050) console.error('[dealer_ficha_autorizaciones migration]', e.message); }
+
   // Registro del módulo en el menú (idempotente).
   try {
     await pool.query(
@@ -146,6 +187,7 @@ async function comDefaults() {
       ['Revisar fichas de dealer',      'dealer_ficha_revisar', null,                    null],
       ['Mantener dealers',              'dealer_mantener',    null,                      null],
       ['Aprobar participación especial (Gerencia)', 'dealer_part_especial', null,        null],
+      ['Configurar niveles de aprobación de dealer', 'dealer_aprob_config', '/dealers-incorporacion/niveles.html', 'bi-diagram-3'],
     ];
     const idFunc = {};
     for (const [nombre, codigo, href, icono] of funcs) {
@@ -165,6 +207,7 @@ async function comDefaults() {
       dealer_ficha_revisar: [1, 6, 90008],
       dealer_mantener:      [1, 6, 90008],
       dealer_part_especial: [1, 90008, 90009],   // visto de Gerencia para comisión sobre la pizarra
+      dealer_aprob_config:  [1],                  // configurar la cadena de niveles (restringible por usuario)
     };
     for (const [codigo, perfiles] of Object.entries(seed)) {
       const idf = idFunc[codigo]; if (!idf) continue;
@@ -235,6 +278,41 @@ async function depositoCambioVsDealer(f) {
   } catch (e) { console.error('[depositoCambio]', e.message); return false; }
 }
 
+/* ── Motor de la cadena de aprobación paramétrica ─────────────────────────── */
+// Pool de usuarios (Admin + quien tenga el permiso) — para notificar/validar un nivel.
+async function idsConPermiso(codigo, excluir) {
+  const [rows] = await pool.query(
+    `SELECT u.id_usuario FROM usuarios u JOIN perfiles p ON p.id_perfil=u.id_perfil
+       WHERE p.nombre='Administrador' AND u.estado='activo'
+     UNION
+     SELECT u.id_usuario FROM usuarios u
+       JOIN permisos_perfil pp ON pp.id_perfil=u.id_perfil
+       JOIN funcionalidades f  ON f.id_funcionalidad=pp.id_funcionalidad
+     WHERE f.codigo=? AND pp.habilitado=1 AND u.estado='activo'`, [codigo]);
+  return [...new Set(rows.map(r => r.id_usuario))].filter(id => id !== excluir);
+}
+async function nivelesActivos() {
+  const [rows] = await pool.query('SELECT id, orden, nombre, condicion, permiso FROM dealer_aprob_niveles WHERE activo=1 ORDER BY orden, id');
+  return rows;
+}
+// ¿Aplica este nivel a esta ficha, según su condición?
+async function nivelAplica(niv, f) {
+  if (niv.condicion === 'COMISION_SOBRE_PIZARRA') return await esEspecial(f);
+  if (niv.condicion === 'DEPOSITO_MODIFICADO')    return await depositoCambioVsDealer(f);
+  return true;   // SIEMPRE (o condición desconocida → fail-safe: exige autorización)
+}
+// Niveles aplicables a la ficha, en orden.
+async function nivelesAplicables(f) {
+  const out = [];
+  for (const n of await nivelesActivos()) if (await nivelAplica(n, f)) out.push(n);
+  return out;
+}
+// Siguiente nivel aplicable con orden > despues (o null si no hay más).
+async function siguienteNivel(f, despues) {
+  for (const n of await nivelesAplicables(f)) if (n.orden > despues) return n;
+  return null;
+}
+
 // Campos editables de la ficha (todo menos workflow/archivo).
 const CAMPOS = ['tipo','ejecutivo_nombre','fecha_solicitud','rut','nombre_razon','nombre_fantasia','direccion','comuna','provincia','region',
   'cc_nombre','cc_telefono','cc_email','cf_nombre','cf_telefono','cf_email',
@@ -291,15 +369,17 @@ const listar = async (req, res) => {
       const like = '%' + q + '%'; vals.push(like, like, like, like); }
     const whereStr = where.length ? 'WHERE ' + where.join(' AND ') : '';
     const [rows] = await pool.query(
-      `SELECT id, tipo, estado, id_ejecutivo, ejecutivo_nombre, fecha_solicitud, rut, nombre_razon, nombre_fantasia,
-              comuna, direccion, apelacion, tomada_por, tomada_por_nombre, revisor_nombre, fecha_revision, motivo_rechazo,
-              com_6_12, com_13_24, com_25_36, com_37, tipo_documento, cuenta_tipo, banco, num_cuenta, rut_cuenta,
-              cc_nombre, cc_telefono, cc_email, id_dealer, id_dealer_origen, part_especial, part_especial_por,
-              (ficha_data IS NOT NULL) AS tiene_ficha,
-              firma_sospecha, JSON_LENGTH(diferencias) AS n_diferencias, JSON_LENGTH(ficha_faltantes) AS n_faltantes,
-              created_at, updated_at
-       FROM dealer_fichas ${whereStr} ORDER BY
-         FIELD(estado,'RECHAZADA','EN_REVISION','TOMADA','BORRADOR','APROBADA'), updated_at DESC
+      `SELECT df.id, df.tipo, df.estado, df.id_ejecutivo, df.ejecutivo_nombre, df.fecha_solicitud, df.rut, df.nombre_razon, df.nombre_fantasia,
+              df.comuna, df.direccion, df.apelacion, df.tomada_por, df.tomada_por_nombre, df.revisor_nombre, df.fecha_revision, df.motivo_rechazo,
+              df.com_6_12, df.com_13_24, df.com_25_36, df.com_37, df.tipo_documento, df.cuenta_tipo, df.banco, df.num_cuenta, df.rut_cuenta,
+              df.cc_nombre, df.cc_telefono, df.cc_email, df.id_dealer, df.id_dealer_origen, df.part_especial, df.part_especial_por, df.nivel_actual,
+              (SELECT n.nombre  FROM dealer_aprob_niveles n WHERE n.orden=df.nivel_actual AND n.activo=1 ORDER BY n.id LIMIT 1) AS nivel_actual_nombre,
+              (SELECT n.permiso FROM dealer_aprob_niveles n WHERE n.orden=df.nivel_actual AND n.activo=1 ORDER BY n.id LIMIT 1) AS nivel_actual_permiso,
+              (df.ficha_data IS NOT NULL) AS tiene_ficha,
+              df.firma_sospecha, JSON_LENGTH(df.diferencias) AS n_diferencias, JSON_LENGTH(df.ficha_faltantes) AS n_faltantes,
+              df.created_at, df.updated_at
+       FROM dealer_fichas df ${whereStr} ORDER BY
+         FIELD(df.estado,'RECHAZADA','PEND_AUTORIZACION','PEND_CIERRE','TOMADA','AUTORIZADA','BORRADOR','APROBADA'), df.updated_at DESC
        LIMIT 500`, vals);
     res.json({ success: true, data: { rows, puede_revisar: rev }, error: null });
   } catch (e) { console.error('[fichas listar]', e.message); res.status(500).json({ success: false, data: null, error: 'Error interno del servidor' }); }
@@ -318,12 +398,20 @@ const obtener = async (req, res) => {
               excepciones, excepciones_comentarios, diferencias, firma_sospecha, firma_detalle, ficha_faltantes,
               ficha_nombre, ficha_mime, (ficha_data IS NOT NULL) AS tiene_ficha,
               tomada_por, tomada_por_nombre, fecha_tomada, revisor_id, revisor_nombre, fecha_revision,
-              motivo_rechazo, apelacion, id_dealer, id_dealer_origen,
+              motivo_rechazo, apelacion, id_dealer, id_dealer_origen, nivel_actual,
               part_especial, part_especial_por, part_especial_fecha, created_at, updated_at
        FROM dealer_fichas WHERE id = ?`, [req.params.id]);
     if (!f) return res.status(404).json({ success: false, data: null, error: 'Ficha no encontrada' });
     if (!(await puedeRevisar(req)) && f.id_ejecutivo !== req.usuario.id_usuario)
       return res.status(403).json({ success: false, data: null, error: 'Sin acceso a esta ficha' });
+    // Autorizaciones registradas (para la letra chica) + nombre del nivel actual pendiente.
+    const [autoriz] = await pool.query(
+      'SELECT orden, nombre_nivel, usuario_nombre, perfil, fecha FROM dealer_ficha_autorizaciones WHERE id_ficha=? ORDER BY orden, id', [req.params.id]);
+    f.autorizaciones = autoriz;
+    if (f.estado === 'PEND_AUTORIZACION') {
+      const [[niv]] = await pool.query('SELECT nombre FROM dealer_aprob_niveles WHERE orden=? AND activo=1 ORDER BY id LIMIT 1', [f.nivel_actual]);
+      f.nivel_actual_nombre = niv ? niv.nombre : null;
+    }
     res.json({ success: true, data: f, error: null });
   } catch (e) { console.error('[fichas obtener]', e.message); res.status(500).json({ success: false, data: null, error: 'Error interno del servidor' }); }
 };
@@ -400,8 +488,9 @@ const subirFicha = async (req, res) => {
     if (!f) return res.status(404).json({ success: false, data: null, error: 'Ficha no encontrada' });
     if (f.id_ejecutivo !== req.usuario.id_usuario && req.usuario.perfil_nombre !== 'Administrador')
       return res.status(403).json({ success: false, data: null, error: 'Sin permiso' });
-    if (!['BORRADOR', 'RECHAZADA'].includes(f.estado))
-      return res.status(400).json({ success: false, data: null, error: 'No se puede cambiar el archivo en este estado' });
+    // La ficha firmada se sube DESPUÉS de la autorización (AUTORIZADA), o se reemplaza antes del cierre.
+    if (!['AUTORIZADA', 'PEND_CIERRE'].includes(f.estado))
+      return res.status(400).json({ success: false, data: null, error: 'La ficha firmada se sube una vez AUTORIZADA' });
     const buffer = Buffer.from(archivo_data, 'base64');
     await pool.query('UPDATE dealer_fichas SET ficha_nombre=?, ficha_mime=?, ficha_data=? WHERE id=?',
       [archivo_nombre || 'ficha.pdf', mime_type || 'application/octet-stream', buffer, req.params.id]);
@@ -518,7 +607,8 @@ async function compararFichaTexto(buffer, mime, f) {
   } catch (e) { return { revisado: false, faltantes: [] }; }
 }
 
-/* ── POST /fichas/:id/enviar — manda a revisión (pool) ─────────────────────── */
+/* ── POST /fichas/:id/enviar — manda a AUTORIZACIÓN (cadena paramétrica) ────
+   Antes de imprimir/firmar: valida datos + informes + poderes (NO la firma).  */
 const enviar = async (req, res) => {
   try {
     const [[f]] = await pool.query('SELECT * FROM dealer_fichas WHERE id=?', [req.params.id]);
@@ -526,16 +616,14 @@ const enviar = async (req, res) => {
     if (f.id_ejecutivo !== req.usuario.id_usuario && req.usuario.perfil_nombre !== 'Administrador')
       return res.status(403).json({ success: false, data: null, error: 'Solo el ejecutivo que la creó puede enviarla' });
     if (!['BORRADOR', 'RECHAZADA'].includes(f.estado))
-      return res.status(400).json({ success: false, data: null, error: 'La ficha ya está en revisión o aprobada' });
-    if (!f.ficha_data) return res.status(400).json({ success: false, data: null, error: 'Debes subir la ficha firmada (PDF o foto) antes de enviar' });
+      return res.status(400).json({ success: false, data: null, error: 'La ficha ya está en proceso de autorización o aprobada' });
     if (!f.rut || !f.nombre_razon) return res.status(400).json({ success: false, data: null, error: 'Faltan datos obligatorios (RUT y Razón Social)' });
     // Informes comerciales obligatorios: al menos 1 de Empresa y 1 de Socios.
     const [cats] = await pool.query('SELECT categoria, COUNT(*) n FROM dealer_ficha_archivos WHERE id_ficha=? GROUP BY categoria', [req.params.id]);
     const porCat = Object.fromEntries(cats.map(c => [c.categoria, c.n]));
     if (!porCat.EMPRESA) return res.status(400).json({ success: false, data: null, error: 'Debes cargar al menos un Informe Comercial Empresa antes de enviar' });
     if (!porCat.SOCIOS)  return res.status(400).json({ success: false, data: null, error: 'Debes cargar al menos un Informe Comercial Socios antes de enviar' });
-    // Poderes obligatorios cuando: (a) la cuenta es de un tercero, o (b) es una
-    // MODIFICACIÓN que cambia el depósito del dealer (banco/cuenta/RUT de pago).
+    // Poderes obligatorios: cuenta de tercero o modificación que cambia el depósito.
     const cuentaTercero = f.rut_cuenta && normRut(f.rut_cuenta) !== normRut(f.rut);
     const depCambio = await depositoCambioVsDealer(f);
     if (cuentaTercero || depCambio) {
@@ -544,44 +632,123 @@ const enviar = async (req, res) => {
       if (!porCat.PODER_REP_LEGAL) return res.status(400).json({ success: false, data: null, error: `${motivo}: debes cargar los Poderes del Representante Legal antes de enviar` });
     }
 
-    // Compara la ficha con los datos del dealer ya cargado en el sistema (por RUT) → diferencias para el revisor.
     const diferencias = await calcularDiferencias(f);
-    // Verifica si la ficha subida parece venir firmada (heurística).
-    const firma = await verificarFirma(f.ficha_data, f.ficha_mime);
-    // Compara el texto del documento subido contra los datos ingresados.
-    const cmpTexto = await compararFichaTexto(f.ficha_data, f.ficha_mime, f);
-
-    const reenvio = f.estado === 'RECHAZADA';
-    const apelacion = norm(req.body.apelacion) || null;
-    // Participación especial: ¿la comisión supera la pizarra? Se recalcula y se
-    // limpia cualquier visto de Gerencia previo (el reenvío vuelve a revisión completa).
     const especial = await esEspecial(f);
-    await pool.query(
-      `UPDATE dealer_fichas SET estado='EN_REVISION', tomada_por=NULL, tomada_por_nombre=NULL, fecha_tomada=NULL,
-         motivo_rechazo=NULL, apelacion=?, diferencias=?, firma_sospecha=?, firma_detalle=?, ficha_faltantes=?,
-         part_especial=?, part_especial_por=NULL, part_especial_por_id=NULL, part_especial_fecha=NULL,
-         fecha_revision=NULL, revisor_id=NULL, revisor_nombre=NULL WHERE id=?`,
-      [apelacion, JSON.stringify(diferencias), firma.sospecha, firma.detalle, JSON.stringify(cmpTexto.faltantes), especial ? 1 : 0, req.params.id]);
+    const apelacion = norm(req.body.apelacion) || null;
+    const reenvio = f.estado === 'RECHAZADA';
+    // Reinicia la cadena: limpia autorizaciones, sellos y firma previa.
+    await pool.query('DELETE FROM dealer_ficha_autorizaciones WHERE id_ficha=?', [f.id]);
+    const niveles = await nivelesAplicables(f);   // niveles que aplican a ESTA ficha (paramétrico)
+    const baseSet = `apelacion=?, diferencias=?, part_especial=?, part_especial_por=NULL, part_especial_por_id=NULL, part_especial_fecha=NULL,
+       firma_sospecha=NULL, firma_detalle=NULL, ficha_faltantes=NULL, motivo_rechazo=NULL, fecha_revision=NULL, revisor_id=NULL, revisor_nombre=NULL,
+       tomada_por=NULL, tomada_por_nombre=NULL, fecha_tomada=NULL`;
+    const baseVals = [apelacion, JSON.stringify(diferencias), especial ? 1 : 0];
 
-    // Pool: avisa a todos los revisores con una clave compartida (para anular luego al resto)
-    const ids = await idsRevisores(req.usuario.id_usuario);
-    await notificar(ids, {
-      tipo: 'DEALER_FICHA',
-      titulo: reenvio ? '🔁 Ficha de dealer corregida' : '🛎️ Nueva ficha de dealer para revisión',
-      mensaje: `${f.ejecutivo_nombre || 'Un ejecutivo'} envió la ficha de ${f.nombre_razon || f.rut || ''}`
-        + (apelacion ? ` · Apelación: ${apelacion}` : '')
-        + (diferencias.length ? ` · ⚠ ${diferencias.length} diferencia(s) con los datos del sistema` : '')
-        + (cmpTexto.faltantes.length ? ` · ⚠ ${cmpTexto.faltantes.length} dato(s) no coinciden con el documento subido` : '')
-        + (firma.sospecha ? ' · ⚠ posible ficha SIN FIRMA' : ''),
-      href: '/dealers-incorporacion/mantencion.html?tab=revision',
-      prioridad: 'alta', sonar: 1, son_tipo: (diferencias.length || firma.sospecha || cmpTexto.faltantes.length) ? 'alarma' : 'dingdong',
-      clave: `dealerficha:${f.id}:rev`,
-    });
+    if (!niveles.length) {
+      // Sin niveles configurados → directo a AUTORIZADA (listo para imprimir/firmar).
+      await pool.query(`UPDATE dealer_fichas SET estado='AUTORIZADA', nivel_actual=NULL, ${baseSet} WHERE id=?`, [...baseVals, f.id]);
+      if (f.id_ejecutivo) await notificar([f.id_ejecutivo], {
+        tipo: 'DEALER_FICHA_AUTORIZADA', titulo: '🖨️ Ficha autorizada — imprime y firma',
+        mensaje: `Tu ficha de ${f.nombre_razon || f.rut || ''} quedó autorizada. Imprímela, hazla firmar y súbela.`,
+        href: '/dealers-incorporacion/mantencion.html?tab=mias', prioridad: 'alta', sonar: 1, son_tipo: 'dingdong',
+      });
+    } else {
+      const n0 = niveles[0];
+      await pool.query(`UPDATE dealer_fichas SET estado='PEND_AUTORIZACION', nivel_actual=?, ${baseSet} WHERE id=?`, [n0.orden, ...baseVals, f.id]);
+      const ids = await idsConPermiso(n0.permiso, req.usuario.id_usuario);
+      await notificar(ids, {
+        tipo: 'DEALER_FICHA', titulo: reenvio ? '🔁 Ficha de dealer corregida' : '🛎️ Ficha de dealer para autorizar',
+        mensaje: `${f.ejecutivo_nombre || 'Un ejecutivo'} envió la ficha de ${f.nombre_razon || f.rut || ''} — nivel: ${n0.nombre}`
+          + (diferencias.length ? ` · ⚠ ${diferencias.length} diferencia(s) con el sistema` : '')
+          + (especial ? ' · ⭐ participación especial' : ''),
+        href: '/dealers-incorporacion/mantencion.html?tab=revision', prioridad: 'alta', sonar: 1,
+        son_tipo: (diferencias.length || especial) ? 'alarma' : 'dingdong', clave: `dealerficha:${f.id}:rev`,
+      });
+    }
     auditar({ req, accion: reenvio ? 'EDITAR' : 'CREAR', modulo: 'dealers', entidad: 'dealer_ficha', entidad_id: f.id,
-      detalle: `${reenvio ? 'Reenvió' : 'Envió'} a revisión la ficha de ${f.nombre_razon || f.rut || ''}`
-        + (apelacion ? ` · Apelación: "${apelacion}"` : ''), rut: f.rut });
-    res.json({ success: true, data: { estado: 'EN_REVISION' }, error: null });
+      detalle: `${reenvio ? 'Reenvió' : 'Envió'} a autorización la ficha de ${f.nombre_razon || f.rut || ''}`, rut: f.rut });
+    res.json({ success: true, data: { estado: niveles.length ? 'PEND_AUTORIZACION' : 'AUTORIZADA' }, error: null });
   } catch (e) { console.error('[fichas enviar]', e.message); res.status(500).json({ success: false, data: null, error: 'Error interno del servidor' }); }
+};
+
+/* ── POST /fichas/:id/autorizar — un nivel de la cadena autoriza los términos ── */
+const autorizar = async (req, res) => {
+  try {
+    const [[f]] = await pool.query('SELECT * FROM dealer_fichas WHERE id=?', [req.params.id]);
+    if (!f) return res.status(404).json({ success: false, data: null, error: 'Ficha no encontrada' });
+    if (f.estado !== 'PEND_AUTORIZACION')
+      return res.status(400).json({ success: false, data: null, error: 'La ficha no está pendiente de autorización' });
+    // Nivel actual de la cadena.
+    const [[niv]] = await pool.query('SELECT * FROM dealer_aprob_niveles WHERE orden=? AND activo=1 ORDER BY id LIMIT 1', [f.nivel_actual]);
+    if (!niv) return res.status(409).json({ success: false, data: null, error: 'El nivel de autorización ya no existe; reenvía la ficha' });
+    // ¿El usuario tiene el permiso que exige este nivel?
+    const esAdmin = req.usuario.perfil_nombre === 'Administrador';
+    if (!esAdmin && !(await tieneFunc(req.usuario.id_usuario, niv.permiso)))
+      return res.status(403).json({ success: false, data: null, error: `No tienes el permiso para autorizar el nivel "${niv.nombre}"` });
+
+    const nombre = [req.usuario.nombre, req.usuario.apellido].filter(Boolean).join(' ') || req.usuario.email;
+    await pool.query(
+      'INSERT INTO dealer_ficha_autorizaciones (id_ficha, orden, nombre_nivel, permiso, usuario_id, usuario_nombre, perfil) VALUES (?,?,?,?,?,?,?)',
+      [f.id, niv.orden, niv.nombre, niv.permiso, req.usuario.id_usuario, nombre, req.usuario.perfil_nombre || null]);
+    // Si este nivel es el de participación especial, sella "aprobada por XXXX".
+    if (niv.condicion === 'COMISION_SOBRE_PIZARRA')
+      await pool.query('UPDATE dealer_fichas SET part_especial=1, part_especial_por=?, part_especial_por_id=?, part_especial_fecha=NOW() WHERE id=?',
+        [nombre, req.usuario.id_usuario, f.id]);
+    await pool.query('DELETE FROM notificaciones WHERE clave=? AND leida=0', [`dealerficha:${f.id}:rev`]).catch(() => {});
+
+    const next = await siguienteNivel(f, niv.orden);
+    if (next) {
+      await pool.query('UPDATE dealer_fichas SET nivel_actual=? WHERE id=?', [next.orden, f.id]);
+      const ids = await idsConPermiso(next.permiso, req.usuario.id_usuario);
+      await notificar(ids, {
+        tipo: 'DEALER_FICHA', titulo: '🛎️ Ficha de dealer para autorizar',
+        mensaje: `${f.nombre_razon || f.rut || ''} — nivel: ${next.nombre}`,
+        href: '/dealers-incorporacion/mantencion.html?tab=revision', prioridad: 'alta', sonar: 1, son_tipo: 'dingdong',
+        clave: `dealerficha:${f.id}:rev`,
+      });
+    } else {
+      await pool.query('UPDATE dealer_fichas SET estado=\'AUTORIZADA\', nivel_actual=NULL WHERE id=?', [f.id]);
+      if (f.id_ejecutivo) await notificar([f.id_ejecutivo], {
+        tipo: 'DEALER_FICHA_AUTORIZADA', titulo: '🖨️ Ficha autorizada — imprime y firma',
+        mensaje: `Tu ficha de ${f.nombre_razon || f.rut || ''} fue autorizada por todos los niveles. Imprímela, hazla firmar y súbela.`,
+        href: '/dealers-incorporacion/mantencion.html?tab=mias', prioridad: 'alta', sonar: 1, son_tipo: 'aplausos',
+      });
+    }
+    auditar({ req, accion: 'APROBAR', modulo: 'dealers', entidad: 'dealer_ficha', entidad_id: f.id,
+      detalle: `Autorizó el nivel "${niv.nombre}" de la ficha de ${f.nombre_razon || f.rut || ''}`, rut: f.rut });
+    res.json({ success: true, data: { estado: next ? 'PEND_AUTORIZACION' : 'AUTORIZADA', siguiente: next ? next.nombre : null }, error: null });
+  } catch (e) { console.error('[fichas autorizar]', e.message); res.status(500).json({ success: false, data: null, error: 'Error interno del servidor' }); }
+};
+
+/* ── POST /fichas/:id/enviar-firmada — ficha firmada subida → vuelve al cierre ── */
+const enviarFirmada = async (req, res) => {
+  try {
+    const [[f]] = await pool.query('SELECT * FROM dealer_fichas WHERE id=?', [req.params.id]);
+    if (!f) return res.status(404).json({ success: false, data: null, error: 'Ficha no encontrada' });
+    if (f.id_ejecutivo !== req.usuario.id_usuario && req.usuario.perfil_nombre !== 'Administrador')
+      return res.status(403).json({ success: false, data: null, error: 'Solo el ejecutivo que la creó puede enviarla' });
+    if (f.estado !== 'AUTORIZADA')
+      return res.status(400).json({ success: false, data: null, error: 'La ficha debe estar AUTORIZADA para subir la firmada' });
+    if (!f.ficha_data) return res.status(400).json({ success: false, data: null, error: 'Debes subir la ficha firmada (PDF o foto) antes de enviar' });
+    // Verifica la firma + compara el documento con los datos ingresados (para el analista).
+    const firma = await verificarFirma(f.ficha_data, f.ficha_mime);
+    const cmpTexto = await compararFichaTexto(f.ficha_data, f.ficha_mime, f);
+    await pool.query(
+      `UPDATE dealer_fichas SET estado='PEND_CIERRE', firma_sospecha=?, firma_detalle=?, ficha_faltantes=? WHERE id=?`,
+      [firma.sospecha, firma.detalle, JSON.stringify(cmpTexto.faltantes), f.id]);
+    const ids = await idsConPermiso('dealer_ficha_revisar', req.usuario.id_usuario);
+    await notificar(ids, {
+      tipo: 'DEALER_FICHA', titulo: '✍️ Ficha firmada — revisar y cerrar',
+      mensaje: `${f.nombre_razon || f.rut || ''}: ${f.ejecutivo_nombre || 'el ejecutivo'} subió la ficha firmada para el cierre`
+        + (firma.sospecha ? ' · ⚠ posible SIN FIRMA' : '')
+        + (cmpTexto.faltantes.length ? ` · ⚠ ${cmpTexto.faltantes.length} dato(s) no coinciden con el documento` : ''),
+      href: '/dealers-incorporacion/mantencion.html?tab=revision', prioridad: 'alta', sonar: 1,
+      son_tipo: (firma.sospecha || cmpTexto.faltantes.length) ? 'alarma' : 'dingdong', clave: `dealerficha:${f.id}:rev`,
+    });
+    auditar({ req, accion: 'EDITAR', modulo: 'dealers', entidad: 'dealer_ficha', entidad_id: f.id,
+      detalle: `Subió la ficha firmada de ${f.nombre_razon || f.rut || ''} para el cierre`, rut: f.rut });
+    res.json({ success: true, data: { estado: 'PEND_CIERRE' }, error: null });
+  } catch (e) { console.error('[fichas enviarFirmada]', e.message); res.status(500).json({ success: false, data: null, error: 'Error interno del servidor' }); }
 };
 
 /* ── POST /fichas/:id/tomar — un revisor la reclama (anula aviso al resto) ──── */
@@ -591,8 +758,8 @@ const tomar = async (req, res) => {
     if (!f) return res.status(404).json({ success: false, data: null, error: 'Ficha no encontrada' });
     if (f.estado === 'TOMADA' && f.tomada_por && f.tomada_por !== req.usuario.id_usuario)
       return res.status(409).json({ success: false, data: null, error: 'Otro analista ya está revisando esta ficha' });
-    if (!['EN_REVISION', 'TOMADA'].includes(f.estado))
-      return res.status(400).json({ success: false, data: null, error: 'La ficha no está en revisión' });
+    if (!['PEND_CIERRE', 'TOMADA'].includes(f.estado))
+      return res.status(400).json({ success: false, data: null, error: 'La ficha no está en revisión de cierre' });
     const nombre = [req.usuario.nombre, req.usuario.apellido].filter(Boolean).join(' ') || req.usuario.email;
     await pool.query('UPDATE dealer_fichas SET estado=\'TOMADA\', tomada_por=?, tomada_por_nombre=?, fecha_tomada=NOW() WHERE id=?',
       [req.usuario.id_usuario, nombre, req.params.id]);
@@ -683,71 +850,26 @@ async function avisarFinalizado(f, numero, esMod, sello) {
   });
 }
 
-/* ── POST /fichas/:id/aprobar — visto del analista. Si la comisión supera la
-   pizarra (participación especial), deriva a Gerencia en vez de finalizar. ─── */
-const aprobar = async (req, res) => {
+/* ── POST /fichas/:id/cerrar — el analista revisa la ficha FIRMADA y cierra:
+   crea/actualiza el dealer en el sistema. ────────────────────────────────── */
+const cerrar = async (req, res) => {
   try {
     const [[f]] = await pool.query('SELECT * FROM dealer_fichas WHERE id=?', [req.params.id]);
     if (!f) return res.status(404).json({ success: false, data: null, error: 'Ficha no encontrada' });
-    if (!['EN_REVISION', 'TOMADA'].includes(f.estado))
-      return res.status(400).json({ success: false, data: null, error: 'La ficha no está en revisión' });
-    const nombre = [req.usuario.nombre, req.usuario.apellido].filter(Boolean).join(' ') || req.usuario.email;
-
-    // Participación especial sin visto de Gerencia → derivar (no se toca el dealer aún).
-    if (await esEspecial(f) && !f.part_especial_por) {
-      await pool.query(
-        `UPDATE dealer_fichas SET estado='PEND_GERENCIA', part_especial=1, revisor_id=?, revisor_nombre=?, fecha_revision=NOW() WHERE id=?`,
-        [req.usuario.id_usuario, nombre, req.params.id]);
-      await pool.query('DELETE FROM notificaciones WHERE clave=? AND leida=0', [`dealerficha:${f.id}:rev`]).catch(() => {});
-      const ids = await idsGerencia();
-      await notificar(ids, {
-        tipo: 'DEALER_PART_ESPECIAL',
-        titulo: '⭐ Participación especial por aprobar',
-        mensaje: `${f.nombre_razon || f.rut || ''}: la comisión pactada supera la pizarra. ${nombre} (análisis) la aprobó; requiere visto de Gerencia para fijar los %.`,
-        href: '/dealers-incorporacion/mantencion.html?tab=revision', prioridad: 'alta', sonar: 1, son_tipo: 'alarma',
-        clave: `dealerficha:${f.id}:ger`,
-      });
-      auditar({ req, accion: 'EDITAR', modulo: 'dealers', entidad: 'dealer_ficha', entidad_id: f.id,
-        detalle: `Derivó a Gerencia la ficha de ${f.nombre_razon || f.rut || ''} (participación especial sobre la pizarra)`, rut: f.rut });
-      return res.json({ success: true, data: { estado: 'PEND_GERENCIA' }, error: null });
-    }
-
-    // Sin participación especial (o ya sellada): crea/actualiza el dealer.
+    if (!['PEND_CIERRE', 'TOMADA'].includes(f.estado))
+      return res.status(400).json({ success: false, data: null, error: 'La ficha no está en revisión de cierre' });
+    if (!f.ficha_data) return res.status(400).json({ success: false, data: null, error: 'No hay ficha firmada para cerrar' });
     const { idDealer, numero, esMod } = await finalizarDealer(f);
+    const nombre = [req.usuario.nombre, req.usuario.apellido].filter(Boolean).join(' ') || req.usuario.email;
     await pool.query(
-      `UPDATE dealer_fichas SET estado='APROBADA', revisor_id=?, revisor_nombre=?, fecha_revision=NOW(),
-         motivo_rechazo=NULL, id_dealer=? WHERE id=?`,
+      `UPDATE dealer_fichas SET estado='APROBADA', revisor_id=?, revisor_nombre=?, fecha_revision=NOW(), motivo_rechazo=NULL, id_dealer=? WHERE id=?`,
       [req.usuario.id_usuario, nombre, idDealer, req.params.id]);
     await pool.query('DELETE FROM notificaciones WHERE clave=? AND leida=0', [`dealerficha:${f.id}:rev`]).catch(() => {});
-    await avisarFinalizado(f, numero, esMod, null);
+    await avisarFinalizado(f, numero, esMod, f.part_especial_por || null);
     auditar({ req, accion: 'APROBAR', modulo: 'dealers', entidad: 'dealer_ficha', entidad_id: f.id,
-      detalle: `Aprobó la ficha de ${f.nombre_razon || f.rut || ''} → dealer N°${numero}${esMod ? ' (modificación)' : ''}`, rut: f.rut, meta: { id_dealer: idDealer, numero, modificacion: esMod } });
+      detalle: `Cerró la ficha de ${f.nombre_razon || f.rut || ''} → dealer N°${numero}${esMod ? ' (modificación)' : ''}`, rut: f.rut, meta: { id_dealer: idDealer, numero, modificacion: esMod } });
     res.json({ success: true, data: { estado: 'APROBADA', id_dealer: idDealer, numero, modificacion: esMod }, error: null });
-  } catch (e) { console.error('[fichas aprobar]', e.message); res.status(500).json({ success: false, data: null, error: 'Error interno del servidor' }); }
-};
-
-/* ── POST /fichas/:id/aprobar-gerencia — Gerencia aprueba la participación especial:
-   sella "aprobada por XXXX" y finaliza el dealer (fija los %). ─────────────── */
-const aprobarGerencia = async (req, res) => {
-  try {
-    const [[f]] = await pool.query('SELECT * FROM dealer_fichas WHERE id=?', [req.params.id]);
-    if (!f) return res.status(404).json({ success: false, data: null, error: 'Ficha no encontrada' });
-    if (f.estado !== 'PEND_GERENCIA')
-      return res.status(400).json({ success: false, data: null, error: 'La ficha no está pendiente de Gerencia' });
-    const gerente = [req.usuario.nombre, req.usuario.apellido].filter(Boolean).join(' ') || req.usuario.email;
-    // Sella la participación especial antes de finalizar (finalizarDealer lo copia al dealer).
-    f.part_especial_por = gerente; f.part_especial_fecha = new Date();
-    const { idDealer, numero, esMod } = await finalizarDealer(f);
-    await pool.query(
-      `UPDATE dealer_fichas SET estado='APROBADA', part_especial=1, part_especial_por=?, part_especial_por_id=?,
-         part_especial_fecha=NOW(), motivo_rechazo=NULL, id_dealer=? WHERE id=?`,
-      [gerente, req.usuario.id_usuario, idDealer, req.params.id]);
-    await pool.query('DELETE FROM notificaciones WHERE clave IN (?,?) AND leida=0', [`dealerficha:${f.id}:ger`, `dealerficha:${f.id}:rev`]).catch(() => {});
-    await avisarFinalizado(f, numero, esMod, gerente);
-    auditar({ req, accion: 'APROBAR', modulo: 'dealers', entidad: 'dealer_ficha', entidad_id: f.id,
-      detalle: `Gerencia aprobó la participación especial de ${f.nombre_razon || f.rut || ''} → dealer N°${numero}${esMod ? ' (modificación)' : ''}`, rut: f.rut, meta: { id_dealer: idDealer, numero, part_especial_por: gerente } });
-    res.json({ success: true, data: { estado: 'APROBADA', id_dealer: idDealer, numero, part_especial_por: gerente }, error: null });
-  } catch (e) { console.error('[fichas aprobarGerencia]', e.message); res.status(500).json({ success: false, data: null, error: 'Error interno del servidor' }); }
+  } catch (e) { console.error('[fichas cerrar]', e.message); res.status(500).json({ success: false, data: null, error: 'Error interno del servidor' }); }
 };
 
 /* ── POST /fichas/:id/rechazar — exige motivo y avisa al ejecutivo ─────────── */
@@ -757,17 +879,24 @@ const rechazar = async (req, res) => {
     if (motivo.length < 5) return res.status(400).json({ success: false, data: null, error: 'Debes indicar un motivo de rechazo válido' });
     const [[f]] = await pool.query('SELECT * FROM dealer_fichas WHERE id=?', [req.params.id]);
     if (!f) return res.status(404).json({ success: false, data: null, error: 'Ficha no encontrada' });
-    if (!['EN_REVISION', 'TOMADA', 'PEND_GERENCIA'].includes(f.estado))
-      return res.status(400).json({ success: false, data: null, error: 'La ficha no está en revisión' });
-    // Una ficha en Gerencia solo la puede rechazar un Gerente (no el analista).
-    if (f.estado === 'PEND_GERENCIA' && req.usuario.perfil_nombre !== 'Administrador'
-        && !(await tieneFunc(req.usuario.id_usuario, 'dealer_part_especial')))
-      return res.status(403).json({ success: false, data: null, error: 'Solo Gerencia puede rechazar una participación especial' });
+    if (!['PEND_AUTORIZACION', 'PEND_CIERRE', 'TOMADA'].includes(f.estado))
+      return res.status(400).json({ success: false, data: null, error: 'La ficha no está en un estado que permita rechazo' });
+    // Quién puede rechazar: en autorización, el permiso del nivel actual; en cierre, el analista.
+    const esAdmin = req.usuario.perfil_nombre === 'Administrador';
+    if (!esAdmin) {
+      if (f.estado === 'PEND_AUTORIZACION') {
+        const [[niv]] = await pool.query('SELECT permiso FROM dealer_aprob_niveles WHERE orden=? AND activo=1 ORDER BY id LIMIT 1', [f.nivel_actual]);
+        if (!niv || !(await tieneFunc(req.usuario.id_usuario, niv.permiso)))
+          return res.status(403).json({ success: false, data: null, error: 'No tienes el permiso para rechazar este nivel' });
+      } else if (!(await tieneFunc(req.usuario.id_usuario, 'dealer_ficha_revisar'))) {
+        return res.status(403).json({ success: false, data: null, error: 'Solo el analista de cierre puede rechazar en esta etapa' });
+      }
+    }
     const nombre = [req.usuario.nombre, req.usuario.apellido].filter(Boolean).join(' ') || req.usuario.email;
     await pool.query(
       `UPDATE dealer_fichas SET estado='RECHAZADA', revisor_id=?, revisor_nombre=?, fecha_revision=NOW(), motivo_rechazo=? WHERE id=?`,
       [req.usuario.id_usuario, nombre, motivo, req.params.id]);
-    await pool.query('DELETE FROM notificaciones WHERE clave IN (?,?) AND leida=0', [`dealerficha:${f.id}:rev`, `dealerficha:${f.id}:ger`]).catch(() => {});
+    await pool.query('DELETE FROM notificaciones WHERE clave=? AND leida=0', [`dealerficha:${f.id}:rev`]).catch(() => {});
 
     if (f.id_ejecutivo) await notificar([f.id_ejecutivo], {
       tipo: 'DEALER_FICHA_RECHAZADA',
@@ -914,5 +1043,38 @@ const dealerBuscar = async (req, res) => {
   } catch (e) { console.error('[dealerBuscar]', e.message); res.status(500).json({ success: false, data: null, error: 'Error interno del servidor' }); }
 };
 
-module.exports = { ejecutivos, comisionesDefault, dealerBuscar, listar, obtener, crear, editar, subirFicha, verFicha, enviar, tomar, aprobar, aprobarGerencia, rechazar, eliminar,
-  listarArchivos, subirArchivo, verArchivo, eliminarArchivo };
+/* ── Niveles de aprobación — mantenedor paramétrico (gated dealer_aprob_config) ── */
+const CONDICIONES = ['SIEMPRE', 'COMISION_SOBRE_PIZARRA', 'DEPOSITO_MODIFICADO'];
+const nivelesListar = async (req, res) => {
+  try {
+    const [niveles] = await pool.query('SELECT id, orden, nombre, condicion, permiso, activo FROM dealer_aprob_niveles ORDER BY orden, id');
+    const [permisos] = await pool.query("SELECT codigo, nombre FROM funcionalidades WHERE id_modulo=370001 AND codigo<>'dealer_inc_ver' ORDER BY nombre");
+    res.json({ success: true, data: { niveles, permisos, condiciones: CONDICIONES }, error: null });
+  } catch (e) { console.error('[niveles listar]', e.message); res.status(500).json({ success: false, data: null, error: 'Error interno del servidor' }); }
+};
+const nivelGuardar = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const orden = parseInt(req.body.orden) || 1;
+    const nombre = norm(req.body.nombre);
+    const condicion = CONDICIONES.includes(req.body.condicion) ? req.body.condicion : 'SIEMPRE';
+    const permiso = norm(req.body.permiso);
+    const activo = req.body.activo ? 1 : 0;
+    if (!nombre)  return res.status(400).json({ success: false, data: null, error: 'Nombre requerido' });
+    if (!permiso) return res.status(400).json({ success: false, data: null, error: 'Permiso requerido' });
+    if (id) await pool.query('UPDATE dealer_aprob_niveles SET orden=?, nombre=?, condicion=?, permiso=?, activo=? WHERE id=?', [orden, nombre, condicion, permiso, activo, id]);
+    else     await pool.query('INSERT INTO dealer_aprob_niveles (orden, nombre, condicion, permiso, activo) VALUES (?,?,?,?,?)', [orden, nombre, condicion, permiso, activo]);
+    auditar({ req, accion: id ? 'EDITAR' : 'CREAR', modulo: 'dealers', entidad: 'dealer_aprob_nivel', entidad_id: id || null, detalle: `${id ? 'Editó' : 'Creó'} el nivel de aprobación "${nombre}"`, meta: req.body });
+    res.json({ success: true, data: { ok: true }, error: null });
+  } catch (e) { console.error('[niveles guardar]', e.message); res.status(500).json({ success: false, data: null, error: 'Error interno del servidor' }); }
+};
+const nivelEliminar = async (req, res) => {
+  try {
+    await pool.query('DELETE FROM dealer_aprob_niveles WHERE id=?', [req.params.id]);
+    auditar({ req, accion: 'ELIMINAR', modulo: 'dealers', entidad: 'dealer_aprob_nivel', entidad_id: req.params.id, detalle: `Eliminó el nivel de aprobación #${req.params.id}` });
+    res.json({ success: true, data: { ok: true }, error: null });
+  } catch (e) { console.error('[niveles eliminar]', e.message); res.status(500).json({ success: false, data: null, error: 'Error interno del servidor' }); }
+};
+
+module.exports = { ejecutivos, comisionesDefault, dealerBuscar, listar, obtener, crear, editar, subirFicha, verFicha, enviar, autorizar, enviarFirmada, tomar, cerrar, rechazar, eliminar,
+  listarArchivos, subirArchivo, verArchivo, eliminarArchivo, nivelesListar, nivelGuardar, nivelEliminar };

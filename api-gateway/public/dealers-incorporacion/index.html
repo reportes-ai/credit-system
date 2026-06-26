@@ -80,8 +80,14 @@
     <a href="/dealers-incorporacion/mantencion.html" class="module-card" id="cardMantencion" style="display:none">
       <div class="card-icon"><i class="bi bi-clipboard-check"></i></div>
       <h5>Mantención Dealers</h5>
-      <p>Revisa y aprueba/rechaza las fichas pendientes (pool de Operaciones), haz seguimiento del estado de tus solicitudes y edita los datos de los dealers vigentes.</p>
+      <p>Revisa, autoriza y cierra las fichas pendientes (cadena de niveles), haz seguimiento del estado de tus solicitudes y edita los datos de los dealers vigentes.</p>
       <span class="btn-acceder"><i class="bi bi-arrow-right-circle me-1"></i>Acceder</span>
+    </a>
+    <a href="/dealers-incorporacion/niveles.html" class="module-card" id="cardNiveles" style="display:none">
+      <div class="card-icon"><i class="bi bi-diagram-3"></i></div>
+      <h5>Niveles de Aprobación</h5>
+      <p>Configura la cadena de autorización de las fichas: qué niveles aprueban, en qué orden, bajo qué condición (siempre / comisión sobre pizarra / depósito modificado) y con qué permiso.</p>
+      <span class="btn-acceder"><i class="bi bi-arrow-right-circle me-1"></i>Configurar</span>
     </a>
   </div>
   <div id="sinSubmodulos" style="display:none;text-align:center;color:#6b7280;padding:40px 0">
@@ -111,7 +117,8 @@
     const tiene = (...cs) => esAdmin || cs.some(c => funcs.has(c));
     let alguna = false;
     if (tiene('dealer_ficha_crear'))                      { document.getElementById('cardNuevo').style.display = '';      alguna = true; }
-    if (tiene('dealer_ficha_revisar','dealer_mantener'))  { document.getElementById('cardMantencion').style.display = ''; alguna = true; }
+    if (tiene('dealer_ficha_revisar','dealer_mantener','dealer_part_especial'))  { document.getElementById('cardMantencion').style.display = ''; alguna = true; }
+    if (tiene('dealer_aprob_config'))                     { document.getElementById('cardNiveles').style.display = '';    alguna = true; }
     if (!alguna) document.getElementById('sinSubmodulos').style.display = '';
   })();
 </script>

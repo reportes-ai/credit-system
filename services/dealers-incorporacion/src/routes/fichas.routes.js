@@ -25,19 +25,25 @@ router.get('/fichas/:id/archivos/:archivoId',   verifyToken, requireFunc('dealer
 router.post('/fichas/:id/archivos',             verifyToken, requireFunc('dealer_ficha_crear'), ctrl.subirArchivo);
 router.delete('/fichas/:id/archivos/:archivoId', verifyToken, requireFunc('dealer_ficha_crear'), ctrl.eliminarArchivo);
 
-// Ejecutivo Comercial: crear, editar, subir ficha firmada, enviar a revisión, eliminar borrador.
-router.post('/fichas',           verifyToken, requireFunc('dealer_ficha_crear'), ctrl.crear);
-router.put('/fichas/:id',        verifyToken, requireFunc('dealer_ficha_crear'), ctrl.editar);
+// Ejecutivo Comercial: crear, editar, enviar a autorización, subir ficha firmada (post-autorización), eliminar borrador.
+router.post('/fichas',            verifyToken, requireFunc('dealer_ficha_crear'), ctrl.crear);
+router.put('/fichas/:id',         verifyToken, requireFunc('dealer_ficha_crear'), ctrl.editar);
 router.post('/fichas/:id/archivo', verifyToken, requireFunc('dealer_ficha_crear'), ctrl.subirFicha);
-router.post('/fichas/:id/enviar', verifyToken, requireFunc('dealer_ficha_crear'), ctrl.enviar);
-router.delete('/fichas/:id',     verifyToken, requireFunc('dealer_ficha_crear', 'dealer_ficha_revisar'), ctrl.eliminar);
+router.post('/fichas/:id/enviar',  verifyToken, requireFunc('dealer_ficha_crear'), ctrl.enviar);
+router.post('/fichas/:id/enviar-firmada', verifyToken, requireFunc('dealer_ficha_crear'), ctrl.enviarFirmada);
+router.delete('/fichas/:id',      verifyToken, requireFunc('dealer_ficha_crear', 'dealer_ficha_revisar'), ctrl.eliminar);
 
-// Analista de Operaciones (pool): tomar, aprobar, rechazar.
-router.post('/fichas/:id/tomar',    verifyToken, requireFunc('dealer_ficha_revisar'), ctrl.tomar);
-router.post('/fichas/:id/aprobar',  verifyToken, requireFunc('dealer_ficha_revisar'), ctrl.aprobar);
-router.post('/fichas/:id/rechazar', verifyToken, requireFunc('dealer_ficha_revisar', 'dealer_part_especial'), ctrl.rechazar);
+// Cadena de autorización: autorizar/rechazar validan el permiso del NIVEL actual dentro del controller (paramétrico).
+router.post('/fichas/:id/autorizar', verifyToken, ctrl.autorizar);
+router.post('/fichas/:id/rechazar',  verifyToken, ctrl.rechazar);
+// Cierre (Analista de Operaciones/Crédito): tomar (claim) + cerrar (crea/actualiza el dealer).
+router.post('/fichas/:id/tomar',   verifyToken, requireFunc('dealer_ficha_revisar'), ctrl.tomar);
+router.post('/fichas/:id/cerrar',  verifyToken, requireFunc('dealer_ficha_revisar'), ctrl.cerrar);
 
-// Gerencia (Gerente General / Operaciones y Crédito): aprobar participación especial sobre la pizarra.
-router.post('/fichas/:id/aprobar-gerencia', verifyToken, requireFunc('dealer_part_especial'), ctrl.aprobarGerencia);
+// Mantenedor de niveles de aprobación (restringible por usuario).
+router.get('/niveles',          verifyToken, requireFunc('dealer_aprob_config'), ctrl.nivelesListar);
+router.post('/niveles',         verifyToken, requireFunc('dealer_aprob_config'), ctrl.nivelGuardar);
+router.put('/niveles/:id',      verifyToken, requireFunc('dealer_aprob_config'), ctrl.nivelGuardar);
+router.delete('/niveles/:id',   verifyToken, requireFunc('dealer_aprob_config'), ctrl.nivelEliminar);
 
 module.exports = router;

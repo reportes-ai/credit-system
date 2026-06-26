@@ -1,0 +1,202 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <link rel="icon" href="/img/favicon.png" type="image/png">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Niveles de Aprobación de Dealer — AutoFácil</title>
+  <!-- v1.0 -->
+  <link href="/css/bootstrap.min.css" rel="stylesheet">
+  <link href="/css/bootstrap-icons.css" rel="stylesheet">
+  <style>
+    :root { --navy:#0141A2; --navy-dark:#012d70; --navy-light:#0255c5; --accent:#009AFE; --bg:#f0f4f8; }
+    body { background:var(--bg); font-family:'Segoe UI',system-ui,sans-serif; margin:0; min-height:100vh; }
+    .topnav { background:linear-gradient(90deg,var(--navy-dark),var(--navy-light)); color:#fff; height:60px; padding:0 24px; display:flex; align-items:center; justify-content:space-between; position:sticky; top:0; z-index:200; box-shadow:0 2px 8px rgba(0,0,0,.3); }
+    .topnav-left { display:flex; align-items:center; gap:16px; }
+    .topnav-brand { display:flex; align-items:center; gap:8px; text-decoration:none; }
+    .topnav-brand img { height:32px; filter:brightness(0) invert(1); }
+    .version-badge { background:rgba(255,255,255,.15); color:rgba(255,255,255,.75); font-size:.65rem; font-weight:700; border-radius:6px; padding:2px 8px; }
+    .breadcrumb-nav { color:rgba(255,255,255,.6); font-size:.85rem; display:flex; align-items:center; gap:6px; }
+    .breadcrumb-nav a { color:rgba(255,255,255,.75); text-decoration:none; }
+    .breadcrumb-nav .sep { color:rgba(255,255,255,.35); }
+    .topnav-right { display:flex; align-items:center; gap:10px; }
+    .btn-logout { background:rgba(255,255,255,.1); border:1px solid rgba(255,255,255,.2); color:#fff; border-radius:8px; padding:5px 12px; font-size:.82rem; cursor:pointer; text-decoration:none; }
+    .main-content { padding:32px 40px; max-width:1000px; margin:0 auto; }
+    .page-banner { background:linear-gradient(135deg,#012d70,#0141A2 50%,#009AFE); border-radius:16px; color:#fff; padding:24px 32px; margin-bottom:28px; display:flex; align-items:center; gap:20px; }
+    .page-banner i { font-size:2.6rem; opacity:.85; }
+    .page-banner h2 { font-weight:700; margin:0 0 4px; font-size:1.3rem; }
+    .page-banner p { opacity:.82; margin:0; font-size:.88rem; }
+    .card-box { background:#fff; border-radius:14px; padding:22px 24px; box-shadow:0 1px 6px rgba(0,0,0,.07); margin-bottom:22px; }
+    .card-head { display:flex; align-items:center; justify-content:space-between; margin-bottom:16px; }
+    .card-head h3 { font-size:1.02rem; font-weight:700; margin:0; color:#111827; }
+    table.tb { width:100%; border-collapse:collapse; font-size:.86rem; }
+    table.tb th { text-align:left; font-size:.72rem; text-transform:uppercase; letter-spacing:.3px; color:#6b7280; border-bottom:2px solid #e5e7eb; padding:9px 10px; }
+    table.tb td { padding:10px; border-bottom:1px solid #f1f5f9; vertical-align:middle; }
+    .chip { font-size:.72rem; font-weight:700; border-radius:20px; padding:3px 10px; display:inline-block; }
+    .c-on { background:#dcfce7; color:#166534; } .c-off { background:#fee2e2; color:#991b1b; }
+    .c-cond { background:#eef2ff; color:#3730a3; }
+    .btn { border:none; border-radius:8px; padding:7px 14px; font-size:.82rem; font-weight:600; cursor:pointer; display:inline-flex; align-items:center; gap:6px; }
+    .btn-navy { background:var(--navy); color:#fff; } .btn-navy:hover { background:var(--navy-light); }
+    .btn-light { background:#f1f5f9; color:#374151; } .btn-light:hover { background:#e2e8f0; }
+    .btn-red { background:#fee2e2; color:#b91c1c; } .btn-red:hover { background:#fecaca; }
+    .btn-sm { padding:5px 10px; font-size:.78rem; }
+    dialog { border:none; border-radius:16px; padding:0; box-shadow:0 24px 60px rgba(0,0,0,.3); max-width:480px; width:92vw; }
+    dialog::backdrop { background:rgba(0,0,0,.45); }
+    .dlg-head { background:linear-gradient(135deg,#012d70,#0141A2 60%,#0255c5); color:#fff; padding:18px 22px; font-weight:700; font-size:1.02rem; }
+    .dlg-body { padding:22px; }
+    .fld { margin-bottom:14px; }
+    .fld label { display:block; font-size:.8rem; font-weight:600; color:#374151; margin-bottom:5px; }
+    .fld input, .fld select { width:100%; padding:9px 11px; border:1.5px solid #d1d5db; border-radius:8px; font-size:.88rem; outline:none; box-sizing:border-box; }
+    .fld input:focus, .fld select:focus { border-color:var(--navy); }
+    .dlg-foot { padding:14px 22px 18px; display:flex; gap:10px; justify-content:flex-end; border-top:1px solid #f1f5f9; }
+    .afecta { background:#f8fafc; border-left:4px solid var(--navy); border-radius:10px; padding:16px 20px; font-size:.84rem; color:#374151; }
+    .afecta h4 { font-size:.82rem; font-weight:700; color:var(--navy); margin:0 0 10px; display:flex; align-items:center; gap:7px; }
+    .afecta ul { margin:0; padding-left:18px; line-height:1.7; }
+    .afecta a { color:var(--navy); }
+    .vacio { text-align:center; color:#94a3b8; padding:30px 0; }
+    .toast-af { position:fixed; bottom:24px; left:50%; transform:translateX(-50%); background:#0f172a; color:#fff; padding:11px 20px; border-radius:10px; font-size:.86rem; display:none; z-index:500; box-shadow:0 8px 24px rgba(0,0,0,.3); }
+    .toast-af.err { background:#b91c1c; }
+  </style>
+</head>
+<body>
+<nav class="topnav">
+  <div class="topnav-left">
+    <a href="/" class="topnav-brand"><img src="/img/logo.png" alt="AutoFácil"><span class="version-badge" id="versionBadge"></span></a>
+    <div class="breadcrumb-nav">
+      <a href="/">Inicio</a><span class="sep">›</span>
+      <a href="/dealers-incorporacion/">Dealer</a><span class="sep">›</span>
+      <span style="color:#fff;font-weight:600">Niveles de Aprobación</span>
+    </div>
+  </div>
+  <div class="topnav-right">
+    <a class="btn-logout" href="/dealers-incorporacion/"><i class="bi bi-arrow-left me-1"></i>Volver</a>
+    <button class="btn-logout" onclick="logout()"><i class="bi bi-box-arrow-right me-1"></i>Salir</button>
+  </div>
+</nav>
+
+<div class="main-content">
+  <div class="page-banner">
+    <i class="bi bi-diagram-3"></i>
+    <div>
+      <h2>Niveles de Aprobación de Dealer</h2>
+      <p>Cadena paramétrica que autoriza la ficha ANTES de imprimirla y firmarla. Cada nivel define orden, condición y el permiso que habilita autorizarlo.</p>
+    </div>
+  </div>
+
+  <div class="card-box">
+    <div class="card-head">
+      <h3><i class="bi bi-list-ol me-1"></i> Cadena de niveles</h3>
+      <button class="btn btn-navy" onclick="abrir()"><i class="bi bi-plus-lg"></i> Agregar nivel</button>
+    </div>
+    <div id="cont"></div>
+  </div>
+
+  <div class="afecta">
+    <h4><i class="bi bi-diagram-3"></i> Qué afecta este mantenedor</h4>
+    <ul>
+      <li><b>Niveles y orden</b> → definen por qué etapas pasa cada ficha al <a href="/dealers-incorporacion/nuevo.html">enviarla a autorización</a> antes de que el ejecutivo pueda imprimirla y firmarla.</li>
+      <li><b>Condición</b> → <i>Siempre</i> aplica a toda ficha; <i>Comisión sobre la pizarra</i> solo si algún tramo supera la <a href="/mantenedores/parques/">pizarra Parque/Calle</a> (sella "Participación especial aprobada por…"); <i>Depósito modificado</i> solo si cambia banco/cuenta del dealer.</li>
+      <li><b>Permiso</b> → quién puede autorizar/rechazar ese nivel, gobernado por la <a href="/usuarios/">matriz de Perfiles y Permisos</a>.</li>
+      <li>El resultado se ve en <a href="/dealers-incorporacion/mantencion.html">Mantención Dealers → Revisión</a> (botón Autorizar por nivel) y en las autorizaciones impresas en la ficha.</li>
+    </ul>
+  </div>
+</div>
+
+<dialog id="dlg">
+  <div class="dlg-head" id="dlgTitle">Nuevo nivel</div>
+  <div class="dlg-body">
+    <input type="hidden" id="f_id">
+    <div class="fld"><label>Orden</label><input type="number" id="f_orden" min="1" step="1" value="1"></div>
+    <div class="fld"><label>Nombre del nivel</label><input id="f_nombre" placeholder="Ej: Visto de Gerencia"></div>
+    <div class="fld"><label>Condición (cuándo aplica)</label><select id="f_condicion"></select></div>
+    <div class="fld"><label>Permiso requerido para autorizar</label><select id="f_permiso"></select></div>
+    <div class="fld" style="display:flex;align-items:center;gap:8px"><input type="checkbox" id="f_activo" checked style="width:auto"><label style="margin:0">Activo</label></div>
+  </div>
+  <div class="dlg-foot">
+    <button class="btn btn-light" onclick="dlg.close()">Cancelar</button>
+    <button class="btn btn-navy" id="btnSave" onclick="guardar()"><i class="bi bi-check-lg"></i> Guardar</button>
+  </div>
+</dialog>
+
+<div class="toast-af" id="toast"></div>
+
+<script src="/js/auth-guard.js"></script>
+<script>
+const token = sessionStorage.getItem('token');
+const yo    = JSON.parse(sessionStorage.getItem('usuario') || 'null');
+if (!token || !yo) location.href = '/login.html';
+const H = { 'Content-Type':'application/json', Authorization:'Bearer '+token };
+const dlg = document.getElementById('dlg');
+const $ = id => document.getElementById(id);
+const escH = s => String(s==null?'':s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+function logout(){ sessionStorage.clear(); location.href='/login.html'; }
+function toast(m,err){ const t=$('toast'); t.textContent=m; t.className='toast-af'+(err?' err':''); t.style.display='block'; setTimeout(()=>t.style.display='none',2600); }
+
+const COND_LBL = { SIEMPRE:'Siempre', COMISION_SOBRE_PIZARRA:'Comisión sobre la pizarra', DEPOSITO_MODIFICADO:'Depósito modificado' };
+let NIVELES = [], PERMISOS = [], CONDICIONES = [];
+
+async function cargar(){
+  try {
+    const r = await fetch('/api/dealer-incorporacion/niveles', { headers:H });
+    if (r.status === 403) { $('cont').innerHTML = '<div class="vacio"><i class="bi bi-lock" style="font-size:1.6rem"></i><br>No tienes permiso para configurar los niveles.</div>'; return; }
+    const j = await r.json(); if (!j.success) throw new Error(j.error);
+    NIVELES = j.data.niveles||[]; PERMISOS = j.data.permisos||[]; CONDICIONES = j.data.condiciones||[];
+    render();
+  } catch(e){ toast(e.message||'Error al cargar', true); }
+}
+function render(){
+  if (!NIVELES.length) { $('cont').innerHTML = '<div class="vacio">Sin niveles configurados. Agrega el primero.</div>'; return; }
+  $('cont').innerHTML = `<table class="tb"><thead><tr>
+    <th>Orden</th><th>Nombre</th><th>Condición</th><th>Permiso</th><th>Estado</th><th></th></tr></thead><tbody>${
+    NIVELES.map(n=>`<tr>
+      <td><b>${n.orden}</b></td>
+      <td>${escH(n.nombre)}</td>
+      <td><span class="chip c-cond">${escH(COND_LBL[n.condicion]||n.condicion)}</span></td>
+      <td><code style="font-size:.8rem">${escH(n.permiso)}</code></td>
+      <td><span class="chip ${n.activo?'c-on':'c-off'}">${n.activo?'Activo':'Inactivo'}</span></td>
+      <td style="text-align:right;white-space:nowrap">
+        <button class="btn btn-light btn-sm" onclick="abrir(${n.id})"><i class="bi bi-pencil"></i></button>
+        <button class="btn btn-red btn-sm" onclick="eliminar(${n.id})"><i class="bi bi-trash"></i></button>
+      </td></tr>`).join('')}</tbody></table>`;
+}
+function abrir(id){
+  $('f_condicion').innerHTML = CONDICIONES.map(c=>`<option value="${c}">${escH(COND_LBL[c]||c)}</option>`).join('');
+  $('f_permiso').innerHTML = PERMISOS.map(p=>`<option value="${escH(p.codigo)}">${escH(p.nombre)} (${escH(p.codigo)})</option>`).join('');
+  const n = id ? NIVELES.find(x=>x.id===id) : null;
+  $('dlgTitle').textContent = n ? 'Editar nivel' : 'Nuevo nivel';
+  $('f_id').value = n ? n.id : '';
+  $('f_orden').value = n ? n.orden : (NIVELES.reduce((m,x)=>Math.max(m,x.orden),0)+1);
+  $('f_nombre').value = n ? n.nombre : '';
+  $('f_condicion').value = n ? n.condicion : 'SIEMPRE';
+  $('f_permiso').value = n ? n.permiso : (PERMISOS[0]?.codigo||'');
+  $('f_activo').checked = n ? !!n.activo : true;
+  dlg.showModal();
+}
+async function guardar(){
+  const id = $('f_id').value;
+  const body = { orden: parseInt($('f_orden').value)||1, nombre: $('f_nombre').value.trim(),
+    condicion: $('f_condicion').value, permiso: $('f_permiso').value, activo: $('f_activo').checked ? 1 : 0 };
+  if (!body.nombre) { toast('El nombre es obligatorio', true); return; }
+  if (!body.permiso) { toast('Elige un permiso', true); return; }
+  $('btnSave').disabled = true;
+  try {
+    const url = id ? '/api/dealer-incorporacion/niveles/'+id : '/api/dealer-incorporacion/niveles';
+    const r = await fetch(url, { method: id?'PUT':'POST', headers:H, body:JSON.stringify(body) });
+    const j = await r.json(); if (!j.success) throw new Error(j.error);
+    dlg.close(); toast('Guardado ✓'); await cargar();
+  } catch(e){ toast(e.message||'Error', true); }
+  $('btnSave').disabled = false;
+}
+async function eliminar(id){
+  if (!confirm('¿Eliminar este nivel de la cadena?')) return;
+  try {
+    const r = await fetch('/api/dealer-incorporacion/niveles/'+id, { method:'DELETE', headers:H });
+    const j = await r.json(); if (!j.success) throw new Error(j.error);
+    toast('Eliminado'); await cargar();
+  } catch(e){ toast(e.message||'Error', true); }
+}
+cargar();
+</script>
+<script src="/js/app-version.js"></script>
+</body>
+</html>

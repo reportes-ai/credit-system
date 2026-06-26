@@ -64,7 +64,8 @@
     .btn:disabled { opacity:.5; cursor:not-allowed; }
     .hint { font-size:.78rem; color:#64748b; margin:6px 0 0; }
     .estado-pill { font-size:.74rem; font-weight:800; border-radius:20px; padding:3px 12px; }
-    .e-BORRADOR{ background:#e2e8f0; color:#475569; } .e-EN_REVISION,.e-TOMADA{ background:#fef9c3; color:#854d0e; }
+    .e-BORRADOR{ background:#e2e8f0; color:#475569; } .e-PEND_AUTORIZACION,.e-TOMADA,.e-PEND_CIERRE{ background:#fef9c3; color:#854d0e; }
+    .e-AUTORIZADA{ background:#dbeafe; color:#1e40af; }
     .e-APROBADA{ background:#dcfce7; color:#166534; } .e-RECHAZADA{ background:#fee2e2; color:#991b1b; }
     .alert-box { border-radius:10px; padding:12px 16px; font-size:.85rem; margin-bottom:18px; }
     .alert-rej { background:#fef2f2; border:1px solid #fecaca; color:#991b1b; }
@@ -144,6 +145,8 @@
 
 <div class="main">
   <div class="alert-box alert-rej" id="boxRechazo" style="display:none"></div>
+
+  <div id="estadoBanner" style="display:none;border-radius:10px;padding:12px 16px;margin-bottom:14px;font-weight:600;font-size:.9rem"></div>
 
   <div id="modBanner" style="display:none;background:#fff7ed;border:1px solid #fdba74;border-left:4px solid #ea580c;border-radius:10px;padding:12px 16px;margin-bottom:14px;color:#9a3412;display:none;align-items:center;gap:12px">
     <i class="bi bi-pencil-square" style="font-size:1.3rem"></i>
@@ -304,10 +307,10 @@
     </div>
   </div>
 
-  <div class="card-sec">
+  <div class="card-sec" id="cardFirma" style="display:none">
     <h3><i class="bi bi-cloud-upload me-1"></i> Ficha firmada por el cliente</h3>
     <div class="card-body">
-      <p class="hint" style="margin-top:0">1) Guarda · 2) <b>Imprime</b> la ficha · 3) hazla <b>firmar</b> por el cliente · 4) sube el <b>PDF o foto</b> · 5) <b>envía a revisión</b>.</p>
+      <p class="hint" style="margin-top:0">Ya autorizada: 1) <b>Imprime</b> la ficha (incluye las autorizaciones) · 2) hazla <b>firmar</b> por el cliente · 3) sube el <b>PDF o foto</b> · 4) pulsa <b>Enviar firmada</b>.</p>
       <input type="file" id="fileFicha" accept="application/pdf,image/*" onchange="onFile()">
       <div class="fileinfo" id="fileInfo"></div>
     </div>
@@ -336,9 +339,10 @@
 
 <div class="actionbar">
   <div id="enviarErrs" class="enviar-errs"></div>
-  <button class="btn btn-light" onclick="imprimir()"><i class="bi bi-printer"></i> Imprimir ficha</button>
+  <button class="btn btn-light" id="btnImprimir" onclick="imprimir()" style="display:none"><i class="bi bi-printer"></i> Imprimir ficha</button>
   <button class="btn btn-ghost" id="btnGuardar" onclick="onGuardar()"><i class="bi bi-save"></i> Guardar borrador</button>
-  <button class="btn btn-green" id="btnEnviar" onclick="onEnviar()"><i class="bi bi-send-check"></i> Enviar a revisión</button>
+  <button class="btn btn-green" id="btnEnviar" onclick="onEnviar()"><i class="bi bi-send-check"></i> Enviar a autorización</button>
+  <button class="btn btn-green" id="btnEnviarFirmada" onclick="onEnviarFirmada()" style="display:none"><i class="bi bi-send-check"></i> Enviar firmada</button>
 </div>
 
 <!-- Modal de excepciones -->
@@ -391,6 +395,38 @@ async function cargarComDefault(){
 let MOD = null;        // {id_dealer, numero} si la ficha MODIFICA un dealer existente
 let MOD_ORIG = null;   // depósito original del dealer {banco,num_cuenta,rut_cuenta} (para detectar cambio)
 let ESP_APROBADA = null; // nombre del gerente que ya aprobó la participación especial (al reabrir)
+let FICHA = null;      // ficha cargada (incluye autorizaciones para la letra chica)
+let TIENE_FICHA = false; // ¿ya hay una ficha firmada subida?
+// Muestra/oculta cards y botones según el estado del flujo.
+function aplicarEstadoUI(estado, f){
+  const editable = ['BORRADOR','RECHAZADA'].includes(estado);
+  const show = (id,on)=>{ const e=$(id); if(e) e.style.display = on?'':'none'; };
+  show('btnGuardar', editable);
+  show('btnEnviar', editable);
+  show('btnImprimir', ['AUTORIZADA','PEND_CIERRE','APROBADA'].includes(estado));
+  show('btnEnviarFirmada', estado==='AUTORIZADA');
+  show('cardFirma', ['AUTORIZADA','PEND_CIERRE'].includes(estado));
+  const b=$('estadoBanner'); if(!b) return;
+  const set=(bg,col,html)=>{ b.style.display='block'; b.style.background=bg; b.style.color=col; b.innerHTML=html; };
+  if(estado==='PEND_AUTORIZACION') set('#fef9c3','#854d0e','<i class="bi bi-hourglass-split me-1"></i>En autorización'+(f&&f.nivel_actual_nombre?' — nivel: <b>'+escH(f.nivel_actual_nombre)+'</b>':'')+'. No editable hasta autorizar o rechazar.');
+  else if(estado==='AUTORIZADA') set('#dbeafe','#1e40af','<i class="bi bi-printer me-1"></i><b>Autorizada.</b> Imprime la ficha (trae las autorizaciones en letra chica), hazla firmar, súbela y pulsa "Enviar firmada".');
+  else if(estado==='PEND_CIERRE') set('#fde68a','#92400e','<i class="bi bi-hourglass-split me-1"></i>Ficha firmada enviada — en revisión de cierre por Operaciones/Crédito.');
+  else if(estado==='APROBADA') set('#dcfce7','#166534','<i class="bi bi-check-circle me-1"></i>Aprobada — el dealer ya está en el sistema.');
+  else b.style.display='none';
+}
+async function onEnviarFirmada(){
+  if(!fileB64 && !TIENE_FICHA){ toast('Sube la ficha firmada (PDF o foto) primero.', true); return; }
+  if(fileB64){
+    try{ const ru=await fetch('/api/dealer-incorporacion/fichas/'+FICHA_ID+'/archivo',{method:'POST',headers:H,body:JSON.stringify({archivo_nombre:nombreFichaArchivo(),mime_type:fileMime,archivo_data:fileB64})});
+      const ju=await ru.json(); if(!ju.success) throw new Error(ju.error||'Error al subir'); fileB64=null; TIENE_FICHA=true;
+    }catch(e){ toast(e.message,true); return; }
+  }
+  try{ const r=await fetch('/api/dealer-incorporacion/fichas/'+FICHA_ID+'/enviar-firmada',{method:'POST',headers:H});
+    const j=await r.json(); if(!j.success) throw new Error(j.error);
+    toast('Ficha firmada enviada al cierre ✓');
+    setTimeout(()=>location.href='/dealers-incorporacion/mantencion.html',1200);
+  }catch(e){ toast(e.message,true); }
+}
 // Avisa si la comisión pactada supera la pizarra → participación especial (visto de Gerencia).
 function chequearEspecial(){
   const b=$('espBanner'); if(!b) return;
@@ -591,7 +627,7 @@ function nArch(cat){ return document.querySelectorAll('#'+CAT_UI[cat].list+' .fi
 async function cargarInformes(){
   if(!FICHA_ID) return;
   try{ const r=await fetch('/api/dealer-incorporacion/fichas/'+FICHA_ID+'/archivos',{headers:H}); const j=await r.json(); if(!j.success)return;
-    const bloqueado = ['APROBADA','EN_REVISION','TOMADA'].includes(ESTADO);
+    const bloqueado = !['BORRADOR','RECHAZADA'].includes(ESTADO);
     for(const cat of Object.keys(CAT_UI)){
       const cont=$(CAT_UI[cat].list); if(!cont) continue;
       const rows=(j.data||[]).filter(a=>a.categoria===cat);
@@ -818,7 +854,7 @@ async function enviarFinal(){
     const r = await fetch('/api/dealer-incorporacion/fichas/'+FICHA_ID+'/enviar', { method:'POST', headers:H, body:JSON.stringify({ apelacion }) });
     const j = await r.json();
     if (!j.success) throw new Error(j.error||'Error');
-    toast('Enviada a revisión de Operaciones ✓');
+    toast('Enviada a autorización ✓');
     setTimeout(()=>location.href='/dealers-incorporacion/mantencion.html', 1200);
   } catch(e){ toast(e.message, true); }
 }
@@ -826,12 +862,12 @@ async function enviarFinal(){
 async function cargar(){
   await cargarGeo();
   await cargarComDefault();
-  if (!FICHA_ID) { await cargarEjecutivos(); $('fecha_solicitud').value = new Date().toLocaleDateString('sv-SE',{timeZone:'America/Santiago'}); onTipo(); actualizarTercero(); onRepToggle(); onTipoCuenta(); return; }
+  if (!FICHA_ID) { await cargarEjecutivos(); $('fecha_solicitud').value = new Date().toLocaleDateString('sv-SE',{timeZone:'America/Santiago'}); onTipo(); actualizarTercero(); onRepToggle(); onTipoCuenta(); aplicarEstadoUI('BORRADOR'); return; }
   try {
     const r = await fetch('/api/dealer-incorporacion/fichas/'+FICHA_ID, { headers:H });
     const j = await r.json();
     if (!j.success) throw new Error(j.error);
-    const f = j.data; ESTADO = f.estado;
+    const f = j.data; ESTADO = f.estado; FICHA = f; TIENE_FICHA = !!f.tiene_ficha;
     setRadio('tipo', f.tipo); onTipo();
     await cargarEjecutivos(f.ejecutivo_nombre);
     ['fecha_solicitud','rut','nombre_razon','nombre_fantasia','direccion','comuna','provincia','region','cc_nombre','cc_telefono','cc_email','cf_nombre','cf_telefono','cf_email','com_6_12','com_13_24','com_25_36','com_37','tipo_cuenta','nombre_cuenta','banco','rut_cuenta','num_cuenta','correo_confirmacion','observaciones']
@@ -867,19 +903,20 @@ async function cargar(){
     }
     ESP_APROBADA = f.part_especial_por || null;   // sello "aprobada por XXXX" si ya pasó por Gerencia
     actualizarTercero(); chequearEspecial();
-    // Solo BORRADOR/RECHAZADA son editables
+    // Solo BORRADOR/RECHAZADA son editables; en AUTORIZADA se habilita subir la firmada.
     const editable = ['BORRADOR','RECHAZADA'].includes(f.estado);
     if (!editable) {
       document.querySelectorAll('.main input, .main select, .main textarea').forEach(el=>el.disabled=true);
-      $('btnGuardar').disabled = true; $('btnEnviar').disabled = true; $('fileFicha').disabled = true;
-      $('btnEnviar').title = 'La ficha está en revisión o aprobada';
+      if (f.estado==='AUTORIZADA' && $('fileFicha')) $('fileFicha').disabled=false;
     }
+    aplicarEstadoUI(f.estado, f);
   } catch(e){ toast(e.message||'Error al cargar', true); }
 }
 
 /* ── Impresión: arma la ficha replicando el documento oficial ── */
 function celdaX(v,target){ return v===target ? 'X' : ''; }
 function imprimir(){
+  if(!['AUTORIZADA','PEND_CIERRE','APROBADA'].includes(ESTADO)){ toast('La ficha se imprime solo una vez AUTORIZADA por los niveles.', true); return; }
   const o = recolectar();
   const _prevTitle = document.title;
   document.title = nombreFichaBase();   // nombre sugerido al "Guardar como PDF"
@@ -927,7 +964,17 @@ function imprimir(){
       <tr><td class="lbl">Número de Cuenta</td><td colspan="3">${E(o.num_cuenta)}</td></tr>
       <tr><td class="lbl">Email Confirmación</td><td colspan="3">${E(o.correo_confirmacion)}</td></tr></table>
     <table class="p"><tr><th>OBSERVACIONES</th></tr><tr><td style="height:30px;vertical-align:top">${E(o.observaciones)}</td></tr></table>
+    ${autorizacionesPrintHTML(E)}
     <div class="firma"><div class="sign-space"></div><div class="line">Firma Representante Legal del Concesionario${o.rl_nombre?' · '+E(o.rl_nombre):''}</div></div>`);
+}
+// Autorizaciones internas (letra chica) que se imprimen en la ficha autorizada.
+function autorizacionesPrintHTML(E){
+  const a = (FICHA && FICHA.autorizaciones) || [];
+  const esp = FICHA && FICHA.part_especial_por;
+  if(!a.length && !esp) return '';
+  const parts = a.map(x=>`${E(x.nombre_nivel||'Nivel')}: ${E(x.usuario_nombre||'—')}${x.perfil?' ('+E(x.perfil)+')':''} (${String(x.fecha||'').slice(0,10)})`);
+  if(esp) parts.push('Participación especial aprobada por '+E(FICHA.part_especial_por));
+  return `<div style="margin-top:10px;border-top:1px dashed #94a3b8;padding-top:4px;font-size:7.5px;color:#444;line-height:1.5"><b>Autorizaciones internas:</b> ${parts.join(' · ')}</div>`;
 }
 /* Imprime cualquier HTML reutilizando el área de impresión */
 const LOGO_PRINT = '<div class="plogo"><img src="/img/logo.png" alt="AutoFácil"></div>';

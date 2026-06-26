@@ -42,7 +42,7 @@
     .estado-pill { font-size:.7rem; font-weight:800; border-radius:20px; padding:3px 10px; white-space:nowrap; }
     .e-BORRADOR{ background:#e2e8f0; color:#475569; } .e-EN_REVISION{ background:#fef9c3; color:#854d0e; }
     .e-TOMADA{ background:#fde68a; color:#92400e; } .e-APROBADA{ background:#dcfce7; color:#166534; } .e-RECHAZADA{ background:#fee2e2; color:#991b1b; }
-    .e-PEND_GERENCIA{ background:#ede9fe; color:#5b21b6; }
+    .e-PEND_AUTORIZACION{ background:#fef9c3; color:#854d0e; } .e-AUTORIZADA{ background:#dbeafe; color:#1e40af; } .e-PEND_CIERRE{ background:#fde68a; color:#92400e; }
     .acts { display:flex; gap:5px; flex-wrap:wrap; justify-content:flex-end; }
     .vacio { text-align:center; color:#94a3b8; padding:40px 0; }
     /* modal */
@@ -168,7 +168,7 @@ async function cargar(){
 }
 
 function pintarTabs(){
-  const pend = FICHAS.filter(f=>['EN_REVISION','TOMADA','PEND_GERENCIA'].includes(f.estado)).length;
+  const pend = FICHAS.filter(f=>['PEND_AUTORIZACION','PEND_CIERRE','TOMADA'].includes(f.estado)).length;
   $('tabs').innerHTML = window._tabs.map(([id,label,ic])=>{
     const n = (id==='revision' && pend) ? `<span class="badge-n">${pend}</span>` : '';
     return `<button class="tab ${id===TAB?'on':''}" onclick="setTab('${id}')"><i class="bi ${ic}"></i> ${label} ${n}</button>`;
@@ -200,7 +200,7 @@ function alertasFila(f){
   return a.length ? `<div class="alert-row">${a.join(' ')}</div>` : '';
 }
 function renderRevision(){
-  let rows = FICHAS.filter(f=>['EN_REVISION','TOMADA','PEND_GERENCIA'].includes(f.estado));
+  let rows = FICHAS.filter(f=>['PEND_AUTORIZACION','PEND_CIERRE','TOMADA'].includes(f.estado));
   rows = filtroQ(rows, ['rut','nombre_razon','nombre_fantasia','ejecutivo_nombre']);
   if (!rows.length) { $('contenido').innerHTML='<div class="vacio"><i class="bi bi-inbox" style="font-size:1.6rem"></i><br>No hay fichas pendientes de revisión.</div>'; return; }
   $('contenido').innerHTML = `<table class="tb"><thead><tr>
@@ -211,21 +211,28 @@ function renderRevision(){
       <td>${escH(f.rut||'—')}</td>
       <td>${escH(f.ejecutivo_nombre||'—')}</td>
       <td>${comResumen(f)}</td>
-      <td><span class="estado-pill e-${f.estado}">${f.estado.replace('_',' ')}</span>${f.tomada_por_nombre?`<div style="font-size:.72rem;color:#92400e">por ${escH(f.tomada_por_nombre)}</div>`:''}</td>
+      <td><span class="estado-pill e-${f.estado}">${escH(f.estado.replace(/_/g,' '))}</span>${f.estado==='PEND_AUTORIZACION'&&f.nivel_actual_nombre?`<div style="font-size:.72rem;color:#854d0e">${escH(f.nivel_actual_nombre)}</div>`:''}${f.tomada_por_nombre?`<div style="font-size:.72rem;color:#92400e">por ${escH(f.tomada_por_nombre)}</div>`:''}</td>
       <td>${fH(f.updated_at)}</td>
       <td><div class="acts">
         <button class="btn btn-light btn-sm" onclick="verFicha(${f.id})"><i class="bi bi-eye"></i></button>
         ${f.tiene_ficha?`<button class="btn btn-sky btn-sm" onclick="abrirArchivo(${f.id})" title="Ficha firmada"><i class="bi bi-file-earmark-pdf"></i></button>`:''}
-        ${f.estado==='PEND_GERENCIA'
-          ? (CANGER
-              ? `<button class="btn btn-sm" style="background:#7c3aed;color:#fff" onclick="aprobarGer(${f.id})"><i class="bi bi-star-fill"></i> Aprobar participación</button>
+        ${(()=>{
+          if(f.estado==='PEND_AUTORIZACION'){
+            const canAuth = ESADMIN || (f.nivel_actual_permiso && PERMS.has(f.nivel_actual_permiso));
+            const niv = escH(f.nivel_actual_nombre||'nivel');
+            return canAuth
+              ? `<button class="btn btn-green btn-sm" onclick="autorizar(${f.id})" title="Autorizar: ${niv}"><i class="bi bi-check2-circle"></i> Autorizar</button>
                  <button class="btn btn-red btn-sm" onclick="rechazar(${f.id})"><i class="bi bi-x-lg"></i> Rechazar</button>`
-              : `<span class="estado-pill e-PEND_GERENCIA"><i class="bi bi-hourglass-split"></i> En Gerencia</span>`)
-          : (CANREV
-              ? `${f.estado==='EN_REVISION'?`<button class="btn btn-amber btn-sm" onclick="tomar(${f.id})"><i class="bi bi-hand-index"></i> Tomar</button>`:''}
-                 <button class="btn btn-green btn-sm" onclick="aprobar(${f.id},${f.part_especial?1:0})"><i class="bi bi-check-lg"></i> Aprobar</button>
+              : `<span class="estado-pill e-PEND_AUTORIZACION" title="Pendiente de ${niv}"><i class="bi bi-hourglass-split"></i> ${niv}</span>`;
+          }
+          if(['PEND_CIERRE','TOMADA'].includes(f.estado)){
+            return CANREV
+              ? `<button class="btn btn-green btn-sm" onclick="cerrar(${f.id})"><i class="bi bi-check-lg"></i> Cerrar</button>
                  <button class="btn btn-red btn-sm" onclick="rechazar(${f.id})"><i class="bi bi-x-lg"></i> Rechazar</button>`
-              : '')}
+              : `<span class="estado-pill e-PEND_CIERRE"><i class="bi bi-hourglass-split"></i> En cierre</span>`;
+          }
+          return '';
+        })()}
       </div></td></tr>`).join('')}</tbody></table>`;
 }
 
@@ -246,6 +253,7 @@ function renderMias(){
       <td><div class="acts">
         <button class="btn btn-light btn-sm" onclick="verFicha(${f.id})"><i class="bi bi-eye"></i></button>
         ${['BORRADOR','RECHAZADA'].includes(f.estado)?`<button class="btn btn-navy btn-sm" onclick="location.href='/dealers-incorporacion/nuevo.html?id=${f.id}'"><i class="bi bi-pencil"></i> ${f.estado==='RECHAZADA'?'Corregir':'Editar'}</button>`:''}
+        ${f.estado==='AUTORIZADA'?`<button class="btn btn-sm" style="background:#1e40af;color:#fff" onclick="location.href='/dealers-incorporacion/nuevo.html?id=${f.id}'"><i class="bi bi-printer"></i> Imprimir / Firmar</button>`:''}
         ${['BORRADOR','RECHAZADA'].includes(f.estado)?`<button class="btn btn-red btn-sm" onclick="eliminar(${f.id})"><i class="bi bi-trash"></i></button>`:''}
       </div></td></tr>`).join('')}</tbody></table>`;
 }
@@ -320,6 +328,14 @@ async function verFicha(id){
       espHtml = `<div style="margin-top:14px;border:1px solid #ddd6fe;background:#f5f3ff;border-radius:10px;padding:12px 14px">
         <b style="color:#5b21b6;font-size:.82rem"><i class="bi bi-star-fill me-1"></i>Participación especial (comisión sobre la pizarra)</b>${aprob}</div>`;
     }
+    // Cadena de autorización: autorizaciones registradas + nivel pendiente
+    let cadenaHtml = '';
+    if ((Array.isArray(f.autorizaciones) && f.autorizaciones.length) || f.estado==='PEND_AUTORIZACION') {
+      const items = (f.autorizaciones||[]).map(a=>`<div style="margin-top:5px;font-size:.82rem"><i class="bi bi-check2-circle me-1" style="color:#15803d"></i><b>${escH(a.nombre_nivel||'Nivel')}:</b> ${escH(a.usuario_nombre||'—')}${a.perfil?` (${escH(a.perfil)})`:''} · ${fH(a.fecha)}</div>`).join('');
+      const pend = (f.estado==='PEND_AUTORIZACION' && f.nivel_actual_nombre) ? `<div style="margin-top:5px;font-size:.82rem;color:#854d0e"><i class="bi bi-hourglass-split me-1"></i>Pendiente: <b>${escH(f.nivel_actual_nombre)}</b></div>` : '';
+      cadenaHtml = `<div style="margin-top:14px;border:1px solid #c7d2fe;background:#eef2ff;border-radius:10px;padding:12px 14px">
+        <b style="color:#3730a3;font-size:.82rem"><i class="bi bi-diagram-3 me-1"></i>Cadena de autorización</b>${items||'<div style="font-size:.8rem;color:#94a3b8;margin-top:4px">Sin autorizaciones aún</div>'}${pend}</div>`;
+    }
     $('verBody').innerHTML = `<div class="kv">
       ${row('Ejecutivo', f.ejecutivo_nombre)} ${row('Fecha solicitud', f.fecha_solicitud?String(f.fecha_solicitud).slice(0,10):'—')}
       ${row('RUT', f.rut)} ${row('Razón Social', f.nombre_razon)} ${row('Fantasía', f.nombre_fantasia)}
@@ -332,7 +348,7 @@ async function verFicha(id){
       ${row('Email confirmación', f.correo_confirmacion)} ${row('Observaciones', f.observaciones)}
       ${f.apelacion?row('Apelación', f.apelacion):''}
       ${f.motivo_rechazo?row('Motivo rechazo', f.motivo_rechazo):''}
-    </div>${espHtml}${firmaHtml}${difHtml}${faltHtml}${excHtml}<div style="margin-top:16px;display:flex;flex-wrap:wrap;gap:6px">${adjHtml||'<span style="font-size:.8rem;color:#94a3b8">Sin adjuntos</span>'}</div>`;
+    </div>${cadenaHtml}${espHtml}${firmaHtml}${difHtml}${faltHtml}${excHtml}<div style="margin-top:16px;display:flex;flex-wrap:wrap;gap:6px">${adjHtml||'<span style="font-size:.8rem;color:#94a3b8">Sin adjuntos</span>'}</div>`;
     dlgVer.showModal();
   } catch(e){ toast(e.message,true); }
 }
@@ -346,15 +362,17 @@ async function accion(id, path, body, okMsg){
   } catch(e){ toast(e.message,true); }
 }
 const tomar   = id => accion(id,'tomar',{},'Ficha tomada — el resto del pool ya no la verá pendiente.');
-function aprobar(id, esp){
+function autorizar(id){
+  const f = FICHAS.find(x=>x.id===id) || {};
+  const esp = f.part_especial && (f.nivel_actual_permiso==='dealer_part_especial');
   const msg = esp
-    ? '⭐ Esta ficha tiene PARTICIPACIÓN ESPECIAL (comisión sobre la pizarra).\n\nAl aprobar como análisis, pasará a GERENCIA para fijar los %. ¿Continuar?'
-    : '¿Aprobar la ficha y crear/actualizar el dealer en el sistema?';
-  if(confirm(msg)) accion(id,'aprobar',{}, esp ? 'Enviada a Gerencia para aprobar la participación especial.' : 'Dealer aprobado ✓ (se notificó al ejecutivo).');
+    ? '⭐ Vas a autorizar la PARTICIPACIÓN ESPECIAL (comisión sobre la pizarra).\nQuedará registrado: "aprobada por '+((yo?.nombre||'')+' '+(yo?.apellido||'')).trim()+'". ¿Confirmar?'
+    : '¿Autorizar este nivel de la ficha?';
+  if(confirm(msg)) accion(id,'autorizar',{},'Nivel autorizado ✓.');
 }
-function aprobarGer(id){
-  if(confirm('Aprobar la PARTICIPACIÓN ESPECIAL y fijar los % en el dealer.\nQuedará registrado: "Participación especial aprobada por '+((yo?.nombre||'')+' '+(yo?.apellido||'')).trim()+'". ¿Confirmar?'))
-    accion(id,'aprobar-gerencia',{},'Participación especial aprobada ✓ — dealer actualizado.');
+function cerrar(id){
+  if(confirm('¿Cerrar la ficha firmada y crear/actualizar el dealer en el sistema?'))
+    accion(id,'cerrar',{},'Dealer creado/actualizado ✓ (se notificó al ejecutivo).');
 }
 function rechazar(id){
   const m=prompt('Motivo del rechazo (obligatorio, mínimo 5 caracteres):'); if(m==null) return;
