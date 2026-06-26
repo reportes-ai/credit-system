@@ -5,7 +5,7 @@
   <link rel="icon" href="/img/favicon.png" type="image/png">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Nueva Ficha de Dealer — AutoFácil</title>
-  <!-- v1.20 — Ambos (Calle+Parque): 2 tablas de comisión + doble dirección -->
+  <!-- v1.21 — Nombre del Parque movido al recuadro "Datos del Parque Automotriz" -->
   <link href="/css/bootstrap.min.css" rel="stylesheet">
   <link href="/css/bootstrap-icons.css" rel="stylesheet">
   <style>
@@ -188,7 +188,6 @@
       <div class="fld"><label>RUT de Concesionario *</label><input id="rut" placeholder="76.123.456-7" maxlength="12" oninput="onRutInput(this,'rutHint')" onchange="detectarDealerRut()"><small id="rutHint" class="vmsg"></small></div>
       <div class="fld"><label>Nombre Razón Social *</label><input id="nombre_razon"></div>
       <div class="fld"><label>Nombre de Fantasía</label><input id="nombre_fantasia"></div>
-      <div class="fld" id="fldNombreParque" style="display:none"><label>Nombre del Parque Automotriz *</label><input id="nombre_parque" placeholder="Nombre del parque"></div>
       <div class="fld"><label id="lblDir">Dirección de Sucursal</label><input id="direccion"></div>
       <div class="fld"><label id="lblCom">Comuna de Sucursal</label>
         <input id="comuna" list="comunasList" placeholder="Escribe o elige la comuna…" oninput="onComuna()">
@@ -199,13 +198,14 @@
   </div>
 
   <div class="card-sec" id="cardParqueDir" style="display:none">
-    <h3><i class="bi bi-car-front me-1"></i> Dirección del Parque Automotriz</h3>
+    <h3><i class="bi bi-car-front me-1"></i> Datos del Parque Automotriz</h3>
     <div class="card-body grid">
-      <div class="fld full"><label>Dirección de Parque</label><input id="direccion_parque"></div>
-      <div class="fld"><label>Comuna de Parque</label>
+      <div class="fld full"><label>Nombre del Parque Automotriz *</label><input id="nombre_parque" placeholder="Nombre del parque"></div>
+      <div class="fld full" id="fldDirParque"><label>Dirección de Parque</label><input id="direccion_parque"></div>
+      <div class="fld" id="fldComParque"><label>Comuna de Parque</label>
         <input id="comuna_parque" list="comunasList" placeholder="Escribe o elige la comuna…"></div>
     </div>
-    <p class="hint">Dirección física del parque automotriz donde el concesionario también opera (se usa para los créditos hechos en parque).</p>
+    <p class="hint">Nombre y dirección física del parque automotriz donde el concesionario opera (se usa para los créditos hechos en parque).</p>
   </div>
 
   <div class="card-sec">
@@ -796,9 +796,11 @@ function onTipo(){
   const t = getTipo(), esP = t==='PARQUE', esA = t==='AMBOS';
   $('lblDir').textContent = esP ? 'Dirección de Parque Automotriz' : (esA ? 'Dirección de Sucursal (Calle)' : 'Dirección de Sucursal');
   $('lblCom').textContent = esP ? 'Comuna de Parque Automotriz' : (esA ? 'Comuna de Sucursal (Calle)' : 'Comuna de Sucursal');
-  // Nombre del parque (PARQUE y AMBOS) + card Dirección de Parque (solo AMBOS) + fila PARQUE de la comisión (solo AMBOS).
-  $('fldNombreParque').style.display = (esP||esA) ? '' : 'none';
-  $('cardParqueDir').style.display = esA ? '' : 'none';
+  // Recuadro "Datos del Parque" con Nombre (PARQUE y AMBOS); su dirección solo en AMBOS
+  // (en PARQUE puro la dirección de arriba YA es la del parque). Fila PARQUE de la comisión solo AMBOS.
+  $('cardParqueDir').style.display = (esP||esA) ? '' : 'none';
+  $('fldDirParque').style.display = esA ? '' : 'none';
+  $('fldComParque').style.display = esA ? '' : 'none';
   $('rowParque').style.display = esA ? '' : 'none';
   $('lblComRow').textContent = esA ? 'Calle (%)' : 'Porcentaje de Comisión (%)';
   // Tabla CALLE (com_*): GENERAL/AMBOS ← pizarra calle (GENERAL); PARQUE ← pizarra parque.
