@@ -275,44 +275,48 @@
   }
   function escapistas(mensaje) {
     const SEL = '.module-card, .ap-card, .report-card';
-    const first = document.querySelector(SEL);
-    let alive = true, timer = null, t0 = Date.now();
-    const intentos = new Map();
-    if (!first) { const n = notaFlotante('🃏 Humorada activa — anda al Inicio (módulos) para verla'); return { esPagina: true, stop() { alive = false; if (n) n.remove(); } }; }
-    const grid = first.parentElement;
-    const original = [...grid.children].filter(c => c.matches(SEL));
-    const cards = () => [...grid.children].filter(c => c.matches(SEL));
-    const rnd = a => a[Math.random() * a.length | 0];
-    function swapNodes(a, b) { if (!a || !b || a === b) return; const m = document.createComment('x'); a.parentNode.insertBefore(m, a); b.parentNode.insertBefore(a, b); m.parentNode.insertBefore(b, m); m.remove(); }
-    function flip(reorder) {
-      const cs = cards(), bef = new Map(); cs.forEach(c => bef.set(c, c.getBoundingClientRect())); reorder();
-      cs.forEach(c => { const a = bef.get(c), b = c.getBoundingClientRect(), dx = a.left - b.left, dy = a.top - b.top; if (!dx && !dy) return;
-        c.style.transition = 'none'; c.style.transform = 'translate(' + dx + 'px,' + dy + 'px)'; c.style.zIndex = '40';
-        requestAnimationFrame(() => { c.style.transition = 'transform .5s cubic-bezier(.2,.85,.3,1)'; c.style.transform = 'translate(0,0)'; });
-        setTimeout(() => { c.style.transition = ''; c.style.transform = ''; c.style.zIndex = ''; }, 560);
-      });
+    let alive = true, waitId = null, tries = 0, cleanup = null;
+    // Las cards del Inicio se generan por JS tras cargar permisos → esperamos a que existan.
+    function start() {
+      if (!alive) return;
+      const lista = [...document.querySelectorAll(SEL)];
+      if (lista.length < 2) { if (tries++ < 40) waitId = setTimeout(start, 500); else notaFlotante('🃏 Humorada activa — abre una pantalla con módulos para verla'); return; }
+      let timer = null, torn = false, t0 = Date.now(); const intentos = new Map();
+      const grid = lista[0].parentElement;
+      const original = [...grid.children].filter(c => c.matches(SEL));
+      const cards = () => [...grid.children].filter(c => c.matches(SEL));
+      const rnd = a => a[Math.random() * a.length | 0];
+      function swapNodes(a, b) { if (!a || !b || a === b) return; const m = document.createComment('x'); a.parentNode.insertBefore(m, a); b.parentNode.insertBefore(a, b); m.parentNode.insertBefore(b, m); m.remove(); }
+      function flip(reorder) {
+        const cs = cards(), bef = new Map(); cs.forEach(c => bef.set(c, c.getBoundingClientRect())); reorder();
+        cs.forEach(c => { const a = bef.get(c), b = c.getBoundingClientRect(), dx = a.left - b.left, dy = a.top - b.top; if (!dx && !dy) return;
+          c.style.transition = 'none'; c.style.transform = 'translate(' + dx + 'px,' + dy + 'px)'; c.style.zIndex = '40';
+          requestAnimationFrame(() => { c.style.transition = 'transform .5s cubic-bezier(.2,.85,.3,1)'; c.style.transform = 'translate(0,0)'; });
+          setTimeout(() => { c.style.transition = ''; c.style.transform = ''; c.style.zIndex = ''; }, 560);
+        });
+      }
+      function swapDos(excl) { const cs = cards(); if (cs.length < 2) return; const a = excl && cs.includes(excl) ? excl : rnd(cs); let b, g = 0; do { b = rnd(cs); } while (b === a && g++ < 12); flip(() => swapNodes(a, b)); }
+      function wiggle(el) { let i = 0; el.style.transition = 'transform .08s'; const id = setInterval(() => { el.style.transform = 'translate(' + ((i % 2 ? -1 : 1) * 6) + 'px,0)'; if (i++ > 5) { clearInterval(id); el.style.transform = ''; setTimeout(() => el.style.transition = '', 120); } }, 50); }
+      const onClick = e => { if (!alive) return; const card = e.target.closest(SEL); if (!card || !grid.contains(card)) return;
+        e.preventDefault(); e.stopPropagation();
+        const n = (intentos.get(card) || 0) + 1; intentos.set(card, n);
+        if (n >= 2) swapDos(card); else wiggle(card);
+      };
+      document.addEventListener('click', onClick, true);
+      function tick() { if (!alive) return; const el = Date.now() - t0; if (el >= 120000) { cleanup(); return; }
+        const f = el / 120000, nS = 1 + Math.floor(f * 2); for (let i = 0; i < nS; i++) swapDos();
+        timer = setTimeout(tick, Math.max(550, 4500 - f * 3800));
+      }
+      timer = setTimeout(tick, 4000);
+      const chip = document.createElement('div'); chip.id = 'afEscChip';
+      chip.style.cssText = 'position:fixed;bottom:18px;left:50%;transform:translateX(-50%);z-index:2000003;background:#111827;color:#fff;border-radius:30px;padding:8px 14px;font:600 13px system-ui;display:flex;gap:12px;align-items:center;box-shadow:0 10px 30px rgba(0,0,0,.45)';
+      chip.innerHTML = '<span>🃏 Módulos Escurridizos' + (mensaje ? ' — <span style="color:#93c5fd">' + mensaje + '</span>' : '') + '</span><button id="afEscX" style="background:#7f1d1d;border:none;color:#fff;border-radius:20px;padding:4px 10px;cursor:pointer;font-weight:800">✕</button>';
+      document.body.appendChild(chip);
+      chip.querySelector('#afEscX').onclick = () => window.AF_JUEGOS.cerrar();
+      cleanup = function () { if (torn) return; torn = true; alive = false; if (timer) clearTimeout(timer); document.removeEventListener('click', onClick, true); try { flip(() => original.forEach(c => grid.appendChild(c))); } catch (e) {} chip.remove(); };
     }
-    function swapDos(excl) { const cs = cards(); if (cs.length < 2) return; const a = excl && cs.includes(excl) ? excl : rnd(cs); let b, g = 0; do { b = rnd(cs); } while (b === a && g++ < 12); flip(() => swapNodes(a, b)); }
-    function wiggle(el) { let i = 0; el.style.transition = 'transform .08s'; const id = setInterval(() => { el.style.transform = 'translate(' + ((i % 2 ? -1 : 1) * 6) + 'px,0)'; if (i++ > 5) { clearInterval(id); el.style.transform = ''; setTimeout(() => el.style.transition = '', 120); } }, 50); }
-    const onClick = e => { if (!alive) return; const card = e.target.closest(SEL); if (!card || !grid.contains(card)) return;
-      e.preventDefault(); e.stopPropagation();
-      const n = (intentos.get(card) || 0) + 1; intentos.set(card, n);
-      if (n >= 2) swapDos(card); else wiggle(card);
-    };
-    document.addEventListener('click', onClick, true);
-    function tick() { if (!alive) return; const el = Date.now() - t0; if (el >= 120000) return finish();
-      const f = el / 120000, nS = 1 + Math.floor(f * 2); for (let i = 0; i < nS; i++) swapDos();
-      timer = setTimeout(tick, Math.max(550, 4500 - f * 3800));
-    }
-    timer = setTimeout(tick, 4000);
-    const chip = document.createElement('div'); chip.id = 'afEscChip';
-    chip.style.cssText = 'position:fixed;bottom:18px;left:50%;transform:translateX(-50%);z-index:2000003;background:#111827;color:#fff;border-radius:30px;padding:8px 14px;font:600 13px system-ui;display:flex;gap:12px;align-items:center;box-shadow:0 10px 30px rgba(0,0,0,.45)';
-    chip.innerHTML = '<span>🃏 Módulos Escurridizos' + (mensaje ? ' — <span style="color:#93c5fd">' + mensaje + '</span>' : '') + '</span><button id="afEscX" style="background:#7f1d1d;border:none;color:#fff;border-radius:20px;padding:4px 10px;cursor:pointer;font-weight:800">✕</button>';
-    document.body.appendChild(chip);
-    chip.querySelector('#afEscX').onclick = () => window.AF_JUEGOS.cerrar();
-    function cleanup() { alive = false; if (timer) clearTimeout(timer); document.removeEventListener('click', onClick, true); chip.remove(); }
-    function finish() { try { flip(() => original.forEach(c => grid.appendChild(c))); } catch (e) {} cleanup(); }
-    return { esPagina: true, stop() { if (!alive) return; finish(); } };
+    start();
+    return { esPagina: true, stop() { alive = false; if (waitId) clearTimeout(waitId); if (cleanup) cleanup(); } };
   }
 
   /* ════════════ 8 · VIDRIO ROTO — el clic quiebra la pantalla (10 veces) 🔨🪟 ════════════

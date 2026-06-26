@@ -2,7 +2,7 @@
    AutoFácil — Versión global de la aplicación
    Editar SOLO este archivo para cambiar la versión
    ───────────────────────────────────────────── */
-const APP_VERSION = 'v67.1';
+const APP_VERSION = 'v67.2';
 
 document.addEventListener('DOMContentLoaded', () => {
 
@@ -987,8 +987,13 @@ document.addEventListener('DOMContentLoaded', () => {
     const s = document.createElement('script'); s.src = '/js/juegos.js'; s.onload = cb; document.head.appendChild(s);
   }
   // Prueba local (BG-ADMIN apretó "Probar aquí" en una humorada de pantalla → llega al Inicio).
+  // "vidrio" persiste entre páginas hasta completar sus 10 quiebres; el resto es de una página.
   const probar = sessionStorage.getItem('af_probar');
-  if (probar) { sessionStorage.removeItem('af_probar'); cargarJuegos(() => window.AF_JUEGOS && window.AF_JUEGOS.lanzar(probar, 'Modo prueba (solo tú lo ves)')); }
+  if (probar) {
+    const persiste = probar === 'vidrio';
+    if (persiste && sessionStorage.getItem('af_vidrio_done') === '1') { sessionStorage.removeItem('af_probar'); }
+    else { if (!persiste) sessionStorage.removeItem('af_probar'); cargarJuegos(() => window.AF_JUEGOS && window.AF_JUEGOS.lanzar(probar, 'Modo prueba (solo tú lo ves)')); }
+  }
   async function chk() {
     try {
       const r = await fetch('/api/mantenimiento', { headers: { Authorization: 'Bearer ' + token } });
