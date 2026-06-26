@@ -785,6 +785,24 @@ async function procesarInformesFicha(f, porCat, usuario) {
           : ('Faltaban informes y no se pudieron obtener: ' + (a.error || 'sin credenciales/contacto') + '.'));
         const conObs = (a.items || []).filter(it => it.tiene_registros).map(it => it.nombre);
         r.advertencias.push(conObs.length ? ('Con observaciones: ' + conObs.join(', ') + '.') : 'Sin observaciones relevantes.');
+        // Análisis con IA (si está activo): refina el rating + crea/actualiza cliente + información comercial.
+        try {
+          const iaCtrl = require('../../../ia/src/controllers/informe-dealernet.controller');
+          const ai = await iaCtrl.analizarRut({ rut: e.rut, nombre: e.nombre, id_usuario: usuario && usuario.id_usuario });
+          if (ai && ai.ok) {
+            const penal = (ai.causas_judiciales || []).some(c => String(c.tipo || '').toUpperCase() === 'PENAL');
+            const nr = String(ai.nivel_riesgo || '').toUpperCase();
+            r.rating = penal ? 'grave' : (nr === 'ALTO' ? 'malo' : nr === 'MEDIO' ? 'regular' : 'bueno');
+            r.grave = r.rating === 'grave';
+            r.ia = true;
+            if (ai.resumen) r.advertencias.push('IA: ' + ai.resumen);
+            if (ai.guardado && ai.guardado.ok) r.advertencias.push('Base de clientes ' + (ai.guardado.creado ? 'creada' : 'actualizada') + ' + información comercial.');
+          }
+        } catch (eIA) {
+          if (eIA.code === 'IA_OFF') r.advertencias.push('Análisis con IA desactivado (Mantenedores → Inteligencia Artificial).');
+          else if (eIA.code === 'NO_KEY') r.advertencias.push('IA sin API key configurada en el servidor.');
+          // otros errores: queda el rating heurístico, sin romper el envío
+        }
       } catch (err) { r.advertencias.push('Error consultando DealerNet: ' + err.message); }
     } else {
       r.modo = 'sin_set';
