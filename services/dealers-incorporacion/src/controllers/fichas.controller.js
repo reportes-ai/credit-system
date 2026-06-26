@@ -120,6 +120,10 @@ async function comDefaults() {
     await pool.query(`ALTER TABLE dealer_fichas ADD COLUMN IF NOT EXISTS part_especial_fecha DATETIME NULL`);
     // Nivel actual dentro de la cadena de autorización paramétrica (NULL = no está autorizándose).
     await pool.query(`ALTER TABLE dealer_fichas ADD COLUMN IF NOT EXISTS nivel_actual INT NULL`);
+    // Socios de la empresa (hasta 3) + resultado de los informes comerciales al enviar.
+    await pool.query(`ALTER TABLE dealer_fichas ADD COLUMN IF NOT EXISTS socios JSON NULL`);
+    await pool.query(`ALTER TABLE dealer_fichas ADD COLUMN IF NOT EXISTS informes_resumen JSON NULL`);
+    await pool.query(`ALTER TABLE dealer_fichas ADD COLUMN IF NOT EXISTS informes_alerta_grave TINYINT(1) NULL`);
   } catch (e) { console.error('[dealer_fichas alter cols]', e.message); }
 
   // Archivos adjuntos múltiples (informes comerciales empresa/socios, hasta 3 c/u).
@@ -427,11 +431,22 @@ const CAMPOS = ['tipo','ejecutivo_nombre','fecha_solicitud','rut','nombre_razon'
   'com_6_12','com_13_24','com_25_36','com_37','tipo_documento','cuenta_tipo','tipo_cuenta','nombre_cuenta','banco',
   'rut_cuenta','num_cuenta','correo_confirmacion','observaciones'];
 
-const CATEGORIAS = ['EMPRESA', 'SOCIOS', 'PODER_SIMPLE', 'PODER_REP_LEGAL'];   // adjuntos
+const CATEGORIAS = ['EMPRESA', 'SOCIOS', 'SOCIO1', 'SOCIO2', 'SOCIO3', 'PODER_SIMPLE', 'PODER_REP_LEGAL'];   // adjuntos
 const normRut = r => String(r || '').replace(/[.\-\s]/g, '').toUpperCase();
 
 // Comentario de excepción válido: ≥10 caracteres y al menos un espacio (no se avisan las reglas al usuario).
 const comentarioOK = c => { const s = String(c || '').trim(); return s.length >= 10 && /\s/.test(s); };
+
+// Socios de la empresa (hasta 3): normaliza [{rut, nombre}] desde el payload.
+function normSocios(body) {
+  let s = body && body.socios;
+  if (typeof s === 'string') { try { s = JSON.parse(s); } catch { s = []; } }
+  if (!Array.isArray(s)) return [];
+  return s.slice(0, 3).map(x => ({
+    rut: String((x && x.rut) || '').trim(),
+    nombre: String((x && x.nombre) || '').trim(),
+  })).filter(x => x.rut || x.nombre);
+}
 
 // Normaliza el payload de excepciones y valida sus comentarios.
 function excepcionesDe(body) {
@@ -506,6 +521,7 @@ const obtener = async (req, res) => {
               ficha_nombre, ficha_mime, (ficha_data IS NOT NULL) AS tiene_ficha,
               tomada_por, tomada_por_nombre, fecha_tomada, revisor_id, revisor_nombre, fecha_revision,
               motivo_rechazo, apelacion, id_dealer, id_dealer_origen, nivel_actual,
+              socios, informes_resumen, informes_alerta_grave,
               part_especial, part_especial_por, part_especial_fecha, created_at, updated_at
        FROM dealer_fichas WHERE id = ?`, [req.params.id]);
     if (!f) return res.status(404).json({ success: false, data: null, error: 'Ficha no encontrada' });
@@ -541,10 +557,10 @@ const crear = async (req, res) => {
     if (exc.length && !com.every(c => comentarioOK(c.comentario)))
       return res.status(400).json({ success: false, data: null, error: 'Cada excepción requiere un comentario válido' });
     const idOrigen = Number(req.body.id_dealer_origen) || null;   // dealer existente que esta ficha modifica
-    const cols = ['id_ejecutivo','ejecutivo_email', ...Object.keys(v), 'excepciones','excepciones_comentarios','id_dealer_origen'];
+    const cols = ['id_ejecutivo','ejecutivo_email', ...Object.keys(v), 'excepciones','excepciones_comentarios','id_dealer_origen','socios'];
     const ph   = cols.map(() => '?').join(',');
     const vals = [u.id_usuario, u.email || null, ...Object.values(v),
-      JSON.stringify(exc), JSON.stringify(com), idOrigen];
+      JSON.stringify(exc), JSON.stringify(com), idOrigen, JSON.stringify(normSocios(req.body))];
     const [r] = await pool.query(`INSERT INTO dealer_fichas (${cols.join(',')}) VALUES (${ph})`, vals);
     auditar({ req, accion: 'CREAR', modulo: 'dealers', entidad: 'dealer_ficha', entidad_id: r.insertId,
       detalle: `Creó ficha de incorporación (${v.tipo}) ${v.nombre_razon || v.rut || ''}`.trim()
@@ -577,6 +593,11 @@ const editar = async (req, res) => {
     if ('id_dealer_origen' in req.body) {
       setCols.push('id_dealer_origen=?');
       setVals.push(Number(req.body.id_dealer_origen) || null);
+    }
+    // Socios de la empresa (hasta 3).
+    if ('socios' in req.body) {
+      setCols.push('socios=?');
+      setVals.push(JSON.stringify(normSocios(req.body)));
     }
     if (!setCols.length) return res.status(400).json({ success: false, data: null, error: 'Sin cambios' });
     await pool.query(`UPDATE dealer_fichas SET ${setCols.join(',')} WHERE id=?`, [...setVals, req.params.id]);
@@ -716,6 +737,63 @@ async function compararFichaTexto(buffer, mime, f) {
 
 /* ── POST /fichas/:id/enviar — manda a AUTORIZACIÓN (cadena paramétrica) ────
    Antes de imprimir/firmar: valida datos + informes + poderes (NO la firma).  */
+
+/* ── Informes comerciales: set por entidad + verificación/auto-solicitud DealerNet ──
+   Empresa + hasta 3 socios. Si la entidad NO subió informes, Business Suite revisa el
+   repositorio y, si falta o supera el umbral (15 días), los pide a DealerNet y arma un
+   resumen. Alerta GRAVE si hay registros penales/judiciales. NO bloquea el envío: deja
+   el resultado en la ficha (informes_resumen / informes_alerta_grave). */
+async function setsFichaInformes() {
+  try {
+    const [emp] = await pool.query("SELECT codigo FROM dealernet_productos WHERE ficha_empresa=1 ORDER BY orden, codigo");
+    const [soc] = await pool.query("SELECT codigo FROM dealernet_productos WHERE ficha_socio=1 ORDER BY orden, codigo");
+    return { empresa: emp.map(x => String(x.codigo)), socio: soc.map(x => String(x.codigo)) };
+  } catch { return { empresa: [], socio: [] }; }
+}
+
+async function procesarInformesFicha(f, porCat, usuario) {
+  const dnet = (() => { try { return require('../../../clientes/src/controllers/dealernet-ws.controller'); } catch { return null; } })();
+  const sets = await setsFichaInformes();
+  let socios = f.socios;
+  if (typeof socios === 'string') { try { socios = JSON.parse(socios); } catch { socios = []; } }
+  if (!Array.isArray(socios)) socios = [];
+  const entidades = [
+    { tipo: 'EMPRESA', cat: 'EMPRESA', rut: f.rut, nombre: f.nombre_razon || f.rut, productos: sets.empresa },
+    ...socios.slice(0, 3).map((s, i) => ({ tipo: 'SOCIO' + (i + 1), cat: 'SOCIO' + (i + 1),
+      rut: s && s.rut, nombre: (s && s.nombre) || (s && s.rut) || ('Socio ' + (i + 1)), productos: sets.socio })),
+  ].filter(e => e.rut && String(e.rut).trim());
+
+  const resumen = []; let grave = false;
+  for (const e of entidades) {
+    const subio = (porCat[e.cat] || 0) > 0;
+    const r = { tipo: e.tipo, nombre: e.nombre, rut: e.rut, modo: null, grave: false, productos: [], advertencias: [] };
+    if (subio) {
+      r.modo = 'subido';
+      r.advertencias.push('Informes adjuntados manualmente por el ejecutivo.');
+    } else if (dnet && dnet.asegurarInformes && e.productos.length) {
+      r.modo = 'dealernet';
+      try {
+        const a = await dnet.asegurarInformes({ rut: e.rut, productos: e.productos, usuario });
+        r.productos = a.items || [];
+        r.grave = (a.items || []).some(it => it.grave);
+        if (a.faltaban && a.faltaban.length) r.advertencias.push(a.consultado
+          ? 'No se habían consultado previamente; Business Suite los solicitó a DealerNet.'
+          : ('Faltaban informes y no se pudieron obtener: ' + (a.error || 'sin credenciales/contacto') + '.'));
+        const conObs = (a.items || []).filter(it => it.tiene_registros).map(it => it.nombre);
+        r.advertencias.push(conObs.length ? ('Con observaciones: ' + conObs.join(', ') + '.') : 'Sin observaciones relevantes.');
+      } catch (err) { r.advertencias.push('Error consultando DealerNet: ' + err.message); }
+    } else {
+      r.modo = 'sin_set';
+      r.advertencias.push('Sin informes configurados para esta entidad (o módulo DealerNet no disponible).');
+    }
+    if (r.grave) grave = true;
+    resumen.push(r);
+  }
+  try { await pool.query('UPDATE dealer_fichas SET informes_resumen=?, informes_alerta_grave=? WHERE id=?',
+    [JSON.stringify(resumen), grave ? 1 : 0, f.id]); } catch (_) {}
+  return { resumen, grave };
+}
+
 const enviar = async (req, res) => {
   try {
     const [[f]] = await pool.query('SELECT * FROM dealer_fichas WHERE id=?', [req.params.id]);
@@ -725,11 +803,11 @@ const enviar = async (req, res) => {
     if (!['BORRADOR', 'RECHAZADA'].includes(f.estado))
       return res.status(400).json({ success: false, data: null, error: 'La ficha ya está en proceso de autorización o aprobada' });
     if (!f.rut || !f.nombre_razon) return res.status(400).json({ success: false, data: null, error: 'Faltan datos obligatorios (RUT y Razón Social)' });
-    // Informes comerciales obligatorios: al menos 1 de Empresa y 1 de Socios.
+    // Informes comerciales: si la entidad no subió archivos, Business Suite los verifica
+    // y solicita en DealerNet (repositorio 15 días). No bloquea el envío; deja el resumen.
     const [cats] = await pool.query('SELECT categoria, COUNT(*) n FROM dealer_ficha_archivos WHERE id_ficha=? GROUP BY categoria', [req.params.id]);
     const porCat = Object.fromEntries(cats.map(c => [c.categoria, c.n]));
-    if (!porCat.EMPRESA) return res.status(400).json({ success: false, data: null, error: 'Debes cargar al menos un Informe Comercial Empresa antes de enviar' });
-    if (!porCat.SOCIOS)  return res.status(400).json({ success: false, data: null, error: 'Debes cargar al menos un Informe Comercial Socios antes de enviar' });
+    const informes = await procesarInformesFicha(f, porCat, req.usuario);
     // Poderes obligatorios: cuenta de tercero o modificación que cambia el depósito.
     const cuentaTercero = f.rut_cuenta && normRut(f.rut_cuenta) !== normRut(f.rut);
     const depCambio = await depositoCambioVsDealer(f);
@@ -766,12 +844,14 @@ const enviar = async (req, res) => {
         titulo: reenvio ? '🔁 Ficha de dealer corregida' : '🛎️ Ficha de dealer para autorizar',
         mensaje: `${f.ejecutivo_nombre || 'Un ejecutivo'} envió la ficha de ${f.nombre_razon || f.rut || ''} — nivel: ${n0.nombre}`
           + (diferencias.length ? ` · ⚠ ${diferencias.length} diferencia(s) con el sistema` : '')
-          + (especial ? ' · ⭐ participación especial' : ''),
+          + (especial ? ' · ⭐ participación especial' : '')
+          + (informes.grave ? ' · 🚨 ALERTA GRAVE: registros penales/judiciales' : ''),
         href: '/dealers-incorporacion/mantencion.html?tab=revision', clave: `dealerficha:${f.id}:rev` });
     }
     auditar({ req, accion: reenvio ? 'EDITAR' : 'CREAR', modulo: 'dealers', entidad: 'dealer_ficha', entidad_id: f.id,
       detalle: `${reenvio ? 'Reenvió' : 'Envió'} a autorización la ficha de ${f.nombre_razon || f.rut || ''}`, rut: f.rut });
-    res.json({ success: true, data: { estado: niveles.length ? 'PEND_AUTORIZACION' : 'AUTORIZADA' }, error: null });
+    res.json({ success: true, data: { estado: niveles.length ? 'PEND_AUTORIZACION' : 'AUTORIZADA',
+      informes: informes.resumen, alerta_grave: informes.grave }, error: null });
   } catch (e) { console.error('[fichas enviar]', e.message); res.status(500).json({ success: false, data: null, error: 'Error interno del servidor' }); }
 };
 

@@ -289,21 +289,20 @@
   </div>
 
   <div class="card-sec">
-    <h3><i class="bi bi-folder2-open me-1"></i> Informes Comerciales (obligatorios)</h3>
+    <h3><i class="bi bi-folder2-open me-1"></i> Informes Comerciales</h3>
     <div class="card-body">
-      <p class="hint" style="margin-top:0">Adjunta los informes comerciales (PDF o imagen). Hasta <b>3 archivos por sección</b>. Son obligatorios para enviar a revisión.</p>
-      <div class="grid">
-        <div class="fld full">
-          <label><i class="bi bi-building me-1"></i> Informes Comerciales Empresa</label>
-          <input type="file" id="fileEmpresa" accept="application/pdf,image/*" multiple onchange="onInformes('EMPRESA')">
-          <div id="listEmpresa" class="filelist"></div>
-        </div>
-        <div class="fld full">
-          <label><i class="bi bi-people me-1"></i> Informes Comerciales Socios</label>
-          <input type="file" id="fileSocios" accept="application/pdf,image/*" multiple onchange="onInformes('SOCIOS')">
-          <div id="listSocios" class="filelist"></div>
-        </div>
+      <p class="hint" style="margin-top:0">Adjunta los informes (PDF o imagen, máx 3 c/u) <b>o déjalos vacíos</b>: al <b>Enviar a Autorización</b>, Business Suite los busca en el repositorio DealerNet y, si faltan o tienen más de <b>15 días</b>, los <b>solicita y procesa</b> automáticamente. La empresa no lleva el informe de Deudores de Alimentos; los socios sí.</p>
+
+      <!-- Empresa -->
+      <div class="fld full" style="border:1px solid #e2e8f0;border-radius:10px;padding:12px;margin-bottom:12px">
+        <label><i class="bi bi-building me-1"></i> Empresa (concesionario)</label>
+        <div class="reqlist" id="reqEmpresa" style="font-size:.78rem;color:#64748b;margin:4px 0 8px"></div>
+        <input type="file" id="fileEMPRESA" accept="application/pdf,image/*" multiple onchange="onInformes('EMPRESA')">
+        <div id="listEMPRESA" class="filelist"></div>
       </div>
+
+      <!-- Socios 1..3 (generados por JS) -->
+      <div id="sociosWrap"></div>
     </div>
   </div>
 
@@ -603,9 +602,37 @@ function repLegalData(){
   return { origen:'PROPIO', nombre:val('rl_nombre'), telefono:val('rl_telefono'), email:val('rl_email') };
 }
 
-/* ── Adjuntos (informes empresa/socios + poderes tercero) ── */
-const CAT_UI = { EMPRESA:{input:'fileEmpresa',list:'listEmpresa'}, SOCIOS:{input:'fileSocios',list:'listSocios'},
+/* ── Adjuntos (informes empresa + 3 socios + poderes tercero) ── */
+const CAT_UI = { EMPRESA:{input:'fileEMPRESA',list:'listEMPRESA'},
+  SOCIO1:{input:'fileSOCIO1',list:'listSOCIO1'}, SOCIO2:{input:'fileSOCIO2',list:'listSOCIO2'}, SOCIO3:{input:'fileSOCIO3',list:'listSOCIO3'},
   PODER_SIMPLE:{input:'filePoderSimple',list:'listPoderSimple'}, PODER_REP_LEGAL:{input:'filePoderRepLegal',list:'listPoderRepLegal'} };
+
+// Render de las 3 filas de Socios (RUT + nombre + informes a subir). Ids fijos para CAT_UI.
+function renderSocios(){
+  const w=$('sociosWrap'); if(!w || w.dataset.done) return;
+  let html='';
+  for(let i=1;i<=3;i++) html+=`<div class="fld full" style="border:1px solid #e2e8f0;border-radius:10px;padding:12px;margin-bottom:10px">
+      <label><i class="bi bi-person me-1"></i> Socio ${i}</label>
+      <div class="grid" style="grid-template-columns:1fr 1.4fr;gap:8px;margin-bottom:2px">
+        <input id="socio_rut_${i}" placeholder="RUT del socio" maxlength="12" oninput="onRutInput(this,'socioHint_${i}')">
+        <input id="socio_nombre_${i}" placeholder="Nombre del socio">
+      </div>
+      <small id="socioHint_${i}" class="vmsg"></small>
+      <div class="reqlist" id="reqSocio_${i}" style="font-size:.78rem;color:#64748b;margin:6px 0 8px"></div>
+      <input type="file" id="fileSOCIO${i}" accept="application/pdf,image/*" multiple onchange="onInformes('SOCIO${i}')">
+      <div id="listSOCIO${i}" class="filelist"></div>
+    </div>`;
+  w.innerHTML=html; w.dataset.done='1';
+}
+
+// Sets de informes por entidad (paramétricos desde Mantenedores → Productos DealerNet).
+let SETS_INF={ empresa:[], socio:[] };
+async function cargarSetsInformes(){
+  try{ const r=await fetch('/api/dealernet/ficha-informes',{headers:H}); const j=await r.json(); if(j.success) SETS_INF=j.data||SETS_INF; }catch(e){}
+  const fmt = arr => (arr&&arr.length) ? ('Se validan: '+arr.map(p=>p.nombre).join(', ')+'.') : 'Sin informes configurados (Mantenedores → Productos DealerNet).';
+  const re=$('reqEmpresa'); if(re) re.textContent='Se valida el RUT del concesionario. '+fmt(SETS_INF.empresa);
+  for(let i=1;i<=3;i++){ const el=$('reqSocio_'+i); if(el) el.textContent=fmt(SETS_INF.socio); }
+}
 async function ensureId(){ if(FICHA_ID) return true; return await guardar(true); }
 async function onInformes(cat){
   const ui=CAT_UI[cat]; const inp=$(ui.input); const files=[...inp.files]; inp.value='';
@@ -777,6 +804,7 @@ function recolectar(){
   const rl = repLegalData();
   o.rep_legal_origen = rl.origen; o.rl_nombre = rl.nombre; o.rl_telefono = rl.telefono; o.rl_email = rl.email;
   o.id_dealer_origen = MOD ? MOD.id_dealer : null;   // NULL = creación; con valor = modifica ese dealer
+  o.socios = [1,2,3].map(i=>({ rut:val('socio_rut_'+i), nombre:val('socio_nombre_'+i) })).filter(s=>s.rut||s.nombre);
   return o;
 }
 
@@ -855,11 +883,38 @@ async function enviarFinal(){
     const j = await r.json();
     if (!j.success) throw new Error(j.error||'Error');
     toast('Enviada a autorización ✓');
-    setTimeout(()=>location.href='/dealers-incorporacion/mantencion.html', 1200);
+    mostrarResumenEnvio(j.data && j.data.informes, j.data && j.data.alerta_grave);
   } catch(e){ toast(e.message, true); }
 }
 
+// Resumen de informes por entidad (empresa + socios) al enviar a autorización.
+function mostrarResumenEnvio(resumen, grave){
+  const E=s=>String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;');
+  const nombreEnt = t => t==='EMPRESA' ? 'Empresa' : String(t||'').replace('SOCIO','Socio ');
+  let body = '';
+  if(grave) body += `<div style="background:#fef2f2;border:1px solid #fca5a5;color:#991b1b;border-radius:10px;padding:10px 12px;margin-bottom:12px;font-weight:700"><i class="bi bi-exclamation-octagon-fill me-1"></i> ALERTA GRAVE: se detectaron registros penales/judiciales. Operaciones lo revisará al autorizar.</div>`;
+  body += (resumen||[]).map(r=>`<div style="border:1px solid #e2e8f0;border-radius:10px;padding:10px 12px;margin-bottom:8px">
+      <div style="font-weight:700;color:#0f172a">${E(nombreEnt(r.tipo))} — ${E(r.nombre||r.rut||'')}${r.grave?' <span style="color:#dc2626;font-weight:700">· GRAVE</span>':''}</div>
+      <div style="font-size:.8rem;color:#475569;margin-top:3px">${((r.advertencias)||[]).map(a=>'• '+E(a)).join('<br>')||'—'}</div>
+    </div>`).join('') || '<p style="color:#64748b">Sin informes para resumir.</p>';
+  const ov=document.createElement('div');
+  ov.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:10000;display:flex;align-items:center;justify-content:center;padding:18px';
+  ov.innerHTML=`<div style="background:#fff;border-radius:14px;max-width:560px;width:100%;max-height:86vh;overflow:auto;box-shadow:0 20px 60px rgba(0,0,0,.3)">
+      <div style="padding:18px 22px;background:linear-gradient(135deg,#012d70,#0141A2);color:#fff;border-radius:14px 14px 0 0">
+        <h3 style="margin:0;font-size:1.05rem"><i class="bi bi-send-check me-1"></i> Ficha enviada a autorización</h3>
+        <p style="margin:6px 0 0;font-size:.85rem;opacity:.9">Te avisaremos cuando tenga respuesta.</p>
+      </div>
+      <div style="padding:18px 22px">${body}</div>
+      <div style="padding:0 22px 18px;text-align:right">
+        <button id="resEnvOk" style="background:#0141A2;color:#fff;border:none;border-radius:9px;padding:9px 20px;font-weight:600;cursor:pointer">Entendido</button>
+      </div></div>`;
+  document.body.appendChild(ov);
+  ov.querySelector('#resEnvOk').onclick=()=>location.href='/dealers-incorporacion/mantencion.html';
+}
+
 async function cargar(){
+  renderSocios();
+  cargarSetsInformes();
   await cargarGeo();
   await cargarComDefault();
   if (!FICHA_ID) { await cargarEjecutivos(); $('fecha_solicitud').value = new Date().toLocaleDateString('sv-SE',{timeZone:'America/Santiago'}); onTipo(); actualizarTercero(); onRepToggle(); onTipoCuenta(); aplicarEstadoUI('BORRADOR'); return; }
@@ -884,6 +939,9 @@ async function cargar(){
     // Restaurar comentarios de excepciones previos (para no reescribirlos)
     (f.excepciones_comentarios||[]).forEach(c=>{ if(c&&c.tipo) EXC_COM[c.tipo]=c.comentario; });
     EXC_LIST = (f.excepciones||[]).map(e=>({tipo:e.tipo, label:e.label, comentario:(EXC_COM[e.tipo]||'')}));
+    // Socios guardados
+    let _socs = f.socios; if(typeof _socs==='string'){ try{ _socs=JSON.parse(_socs); }catch{ _socs=[]; } }
+    (Array.isArray(_socs)?_socs:[]).slice(0,3).forEach((s,idx)=>{ setVal('socio_rut_'+(idx+1), s&&s.rut); setVal('socio_nombre_'+(idx+1), s&&s.nombre); });
     const pill = $('estadoPill'); pill.textContent = f.estado.replace('_',' '); pill.className = 'estado-pill e-'+f.estado;
     if (f.tiene_ficha) { $('fileInfo').textContent = '✓ Ficha firmada ya cargada (puedes reemplazarla)'; $('fileInfo').style.display='block'; }
     if (f.estado === 'RECHAZADA' && f.motivo_rechazo) {

@@ -726,6 +726,80 @@ const solicitarInformes = async (req, res) => {
   } catch (e) { errSrv(res, e, 'solicitarInformes'); }
 };
 
+/* ── Reutilizable: asegura informes vigentes para un RUT (repo + pull) ────────
+   Usado por la Ficha de Dealer al enviar a autorización. Por producto: si hay
+   copia ≤ dias_bloqueo la reutiliza; si falta o está vencida la pide a DealerNet
+   (gasta saldo) y la guarda. Degrada sin romper si no hay credenciales/contacto. */
+const PENAL_CODIGOS = ['3403', '3433', '3439'];   // Comportamiento Penal, Índice Judicial Penal, Boletín de Procesos Penales
+
+// Análisis best-effort del contenido (se afina con la respuesta real del WS).
+// Penal con registros → alerta grave. Devuelve {tieneRegistros, grave, nota}.
+function analizarInforme(codigo, contenido) {
+  const esPenal = PENAL_CODIGOS.includes(String(codigo));
+  if (contenido == null) return { tieneRegistros: false, grave: false, nota: 'sin datos' };
+  let txt; try { txt = JSON.stringify(contenido).toLowerCase(); } catch { txt = String(contenido).toLowerCase(); }
+  const numMatch = txt.match(/"(?:cantidad|registros|total|nreg|num|count)"\s*:\s*"?(\d+)"?/);
+  const nreg = numMatch ? parseInt(numMatch[1], 10) : null;
+  const hallazgo = /(moroso|protesto|impago|deuda|juicio|causa|demanda|proceso|delito|quiebra|aliment|condena|penal)/.test(txt);
+  const tieneRegistros = (nreg != null ? nreg > 0 : hallazgo);
+  const grave = esPenal && tieneRegistros;
+  const nota = tieneRegistros ? (esPenal ? 'registros penales/judiciales' : 'con observaciones') : 'sin observaciones';
+  return { tieneRegistros, grave, nota };
+}
+
+async function asegurarInformes({ rut, productos, usuario }) {
+  const { num, dv } = splitRut(rut || '');
+  const out = { rut: (num && dv) ? `${num}-${dv}` : String(rut || ''), items: [], pedidos: [], faltaban: [], consultado: false, error: null };
+  if (!num || !dv) { out.error = 'RUT inválido'; return out; }
+  productos = (productos || []).map(String);
+  if (!productos.length) return out;
+  const cfg = await getConfig();
+  const [prods] = await pool.query('SELECT codigo, nombre FROM dealernet_productos');
+  const nombreDe = c => (prods.find(p => String(p.codigo) === String(c)) || {}).nombre || c;
+  const ultimoDe = async (cod) => {
+    const [[u]] = await pool.query(
+      `SELECT id, contenido, DATEDIFF(NOW(), created_at) dias, created_at FROM dealernet_informes
+       WHERE rut=? AND codigo_producto=? AND retcode='0' ORDER BY created_at DESC LIMIT 1`, [num, cod]);
+    return u || null;
+  };
+
+  const vigentes = {}, aPedir = [];
+  for (const cod of productos) {
+    const u = await ultimoDe(cod);
+    if (u && Number(u.dias) <= cfg.dias_bloqueo) vigentes[cod] = u;
+    else { aPedir.push(cod); out.faltaban.push(cod); }
+  }
+
+  if (aPedir.length) {
+    try {
+      const r = await consultarCentral({ ruts: [{ num, dv }], productos: aPedir });
+      out.consultado = true;
+      const [ins] = await pool.query(
+        `INSERT INTO dealernet_consultas (rut, dv, productos, retcode, retmsg, output_raw, parsed, id_usuario)
+         VALUES (?,?,?,?,?,?,?,?)`,
+        [num, dv, aPedir.join(','), r.retcode, (r.retmsg || '').slice(0, 255), r.raw, r.parsed ? JSON.stringify(r.parsed) : null, usuario?.id_usuario || null]);
+      if (String(r.retcode) === '0') {
+        await guardarInformes({ num, dv, productosPedidos: aPedir, r, idConsulta: ins.insertId, usuario });
+        out.pedidos = aPedir;
+        for (const cod of aPedir) { const u = await ultimoDe(cod); if (u) vigentes[cod] = u; }
+      } else out.error = r.retmsg || ('DealerNet retcode ' + r.retcode);
+    } catch (e) {
+      out.error = e.code === 'NOCREDS' ? 'Credenciales DealerNet no configuradas' : ('No se pudo consultar DealerNet: ' + e.message);
+    }
+  }
+
+  for (const cod of productos) {
+    const u = vigentes[cod];
+    let contenido = null;
+    if (u && u.contenido) { try { contenido = typeof u.contenido === 'string' ? JSON.parse(u.contenido) : u.contenido; } catch { contenido = u.contenido; } }
+    const a = analizarInforme(cod, contenido);
+    out.items.push({ codigo: cod, nombre: nombreDe(cod), disponible: !!u, fecha: u ? u.created_at : null,
+      dias: u ? Number(u.dias) : null, vencido: u ? Number(u.dias) > cfg.dias_bloqueo : false,
+      tiene_registros: a.tieneRegistros, grave: a.grave, nota: a.nota });
+  }
+  return out;
+}
+
 // Histórico del repositorio (todos los usuarios ven lo mismo). Filtra por RUT opcional.
 // Productos activos para poblar la selección (gratis, permiso de la página).
 const productosActivos = async (req, res) => {
@@ -964,6 +1038,6 @@ const historialFacturacion = async (req, res) => {
   } catch (e) { errSrv(res, e, 'historialFacturacion'); }
 };
 
-module.exports = { getProductos, fichaInformes, addProducto, updateProducto, deleteProducto, reordenarProductos, consultar, listConsultas, estado,
+module.exports = { getProductos, fichaInformes, asegurarInformes, analizarInforme, addProducto, updateProducto, deleteProducto, reordenarProductos, consultar, listConsultas, estado,
   verificarRepositorio, solicitarInformes, productosActivos, historicos, verInforme, descargarPdf, getConfigEndpoint, updateConfigEndpoint,
   clasificarRut, auditoria, getCostos, updateCostos, facturacion, guardarFacturacion, historialFacturacion };
