@@ -272,9 +272,10 @@ async function verFicha(id){
     // Diferencias vs datos cargados en el sistema
     let difHtml = '';
     if (Array.isArray(f.diferencias) && f.diferencias.length) {
+      const esMod = !!f.id_dealer_origen;
       difHtml = `<div style="margin-top:14px;border:1px solid #fecaca;background:#fef2f2;border-radius:10px;padding:12px 14px">
-        <b style="color:#991b1b;font-size:.82rem"><i class="bi bi-exclamation-octagon me-1"></i>Diferencias con los datos del sistema</b>
-        ${f.diferencias.map(d=>`<div style="margin-top:6px;font-size:.82rem"><b>${escH(d.campo)}:</b> ficha "<span style="color:#991b1b">${escH(d.ficha)}</span>" · sistema "${escH(d.sistema)}"</div>`).join('')}</div>`;
+        <b style="color:#991b1b;font-size:.82rem"><i class="bi bi-${esMod?'pencil-square':'exclamation-octagon'} me-1"></i>${esMod?'MODIFICACIÓN DE DEALER — datos que cambian respecto al sistema':'Diferencias con los datos del sistema'}</b>
+        ${f.diferencias.map(d=>`<div style="margin-top:6px;font-size:.82rem"><b>${escH(d.campo)}:</b> ficha "<span style="color:#991b1b;font-weight:600">${escH(d.ficha)}</span>" · sistema "${escH(d.sistema)}"</div>`).join('')}</div>`;
     }
     // Datos que no coinciden con el texto del documento subido
     let faltHtml = '';

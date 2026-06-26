@@ -145,6 +145,13 @@
 <div class="main">
   <div class="alert-box alert-rej" id="boxRechazo" style="display:none"></div>
 
+  <div id="modBanner" style="display:none;background:#fff7ed;border:1px solid #fdba74;border-left:4px solid #ea580c;border-radius:10px;padding:12px 16px;margin-bottom:14px;color:#9a3412;display:none;align-items:center;gap:12px">
+    <i class="bi bi-pencil-square" style="font-size:1.3rem"></i>
+    <div style="flex:1"><b id="modBannerTxt"></b>
+      <div style="font-size:.78rem;font-weight:500;color:#b45309;margin-top:2px">Los datos que cambies respecto al dealer actual se marcarán en rojo en la revisión del analista.</div></div>
+    <button type="button" onclick="salirModificacion()" style="background:#fff;border:1px solid #fdba74;color:#9a3412;border-radius:7px;padding:6px 12px;font-size:.8rem;font-weight:600;cursor:pointer;white-space:nowrap"><i class="bi bi-x-circle me-1"></i>Volver a creación</button>
+  </div>
+
   <div class="card-sec">
     <h3><i class="bi bi-file-earmark-text me-1"></i> Tipo de ficha</h3>
     <div class="card-body">
@@ -168,7 +175,13 @@
   <div class="card-sec">
     <h3><i class="bi bi-building me-1"></i> Datos del Concesionario</h3>
     <div class="card-body grid">
-      <div class="fld"><label>RUT de Concesionario *</label><input id="rut" placeholder="76.123.456-7" maxlength="12" oninput="onRutInput(this,'rutHint')"><small id="rutHint" class="vmsg"></small></div>
+      <div class="fld" style="grid-column:1/-1;position:relative">
+        <label><i class="bi bi-search me-1"></i>Buscar dealer existente (para modificarlo)</label>
+        <input id="dealerBuscar" placeholder="Escribe RUT o nombre del concesionario…" autocomplete="off" oninput="buscarDealerDebounced()">
+        <div id="dealerResults" style="display:none;position:absolute;z-index:30;left:0;right:0;top:100%;background:#fff;border:1px solid #d1d5db;border-radius:8px;box-shadow:0 8px 24px rgba(0,0,0,.12);max-height:260px;overflow:auto"></div>
+        <small class="hint">Si el concesionario ya existe, la ficha pasa a <b>Modificación de Dealer</b> y precarga sus datos.</small>
+      </div>
+      <div class="fld"><label>RUT de Concesionario *</label><input id="rut" placeholder="76.123.456-7" maxlength="12" oninput="onRutInput(this,'rutHint')" onchange="detectarDealerRut()"><small id="rutHint" class="vmsg"></small></div>
       <div class="fld"><label>Nombre Razón Social *</label><input id="nombre_razon"></div>
       <div class="fld"><label>Nombre de Fantasía</label><input id="nombre_fantasia"></div>
       <div class="fld"><label id="lblDir">Dirección de Sucursal</label><input id="direccion"></div>
@@ -365,7 +378,78 @@ const token = sessionStorage.getItem('token');
 const yo    = JSON.parse(sessionStorage.getItem('usuario') || 'null');
 if (!token || !yo) location.href = '/login.html';
 const H = { 'Content-Type':'application/json', Authorization:'Bearer '+token };
-const COM_DEFAULT = { GENERAL:{com_6_12:2.5,com_13_24:5.0,com_25_36:7.5,com_37:10.0}, PARQUE:{com_6_12:0.0,com_13_24:2.5,com_25_36:5.0,com_37:7.5} };
+// Comisiones pactadas por defecto: se cargan desde la PIZARRA (mantenedor
+// "Arriendos y Comisiones Parque y Calle"); el hardcode es solo fallback inicial.
+let COM_DEFAULT = { GENERAL:{com_6_12:2.5,com_13_24:5.0,com_25_36:7.5,com_37:10.0}, PARQUE:{com_6_12:0.0,com_13_24:2.5,com_25_36:5.0,com_37:7.5} };
+async function cargarComDefault(){
+  try { const j = await (await fetch('/api/dealer-incorporacion/com-default', { headers:H })).json();
+    if (j.success && j.data && j.data.GENERAL && j.data.PARQUE) COM_DEFAULT = j.data; } catch(e){}
+}
+
+/* ── Creación vs Modificación de Dealer ──────────────────────────────────── */
+let MOD = null;   // {id_dealer, numero} si la ficha MODIFICA un dealer existente
+const escH = s => String(s==null?'':s).replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+function mostrarMod(){
+  const b=$('modBanner'), bc=document.querySelector('.breadcrumb-nav span:last-child');
+  if(MOD){ b.style.display='flex'; $('modBannerTxt').textContent = `MODIFICACIÓN DE DEALER N°${MOD.numero}`;
+    if(bc) bc.textContent='Modificar Dealer'; }
+  else { b.style.display='none'; if(bc) bc.textContent='Nueva Ficha'; }
+}
+function salirModificacion(){ MOD=null; mostrarMod(); toast('Volviste a modo Creación de Dealer.'); }
+// Precarga la ficha con los datos actuales del dealer existente.
+function aplicarDealer(d){
+  if(!d) return;
+  MOD = { id_dealer:d.id_dealer, numero:d.numero };
+  setVal('rut', d.rut); if($('rut')) onRutInput($('rut'),'rutHint');
+  setVal('nombre_razon', d.nombre_razon); setVal('nombre_fantasia', d.nombre_fantasia);
+  setVal('direccion', d.direccion); setVal('comuna', d.comuna);
+  if(d.provincia) setVal('provincia', d.provincia); if(d.region) setVal('region', d.region);
+  setVal('cc_nombre', d.cc_nombre); setVal('cc_telefono', d.cc_telefono); setVal('cc_email', d.cc_email);
+  if(d.tipo==='PARQUE'||d.tipo==='GENERAL') setRadio('tipo', d.tipo);
+  if(d.tipo_documento) setRadio('tipo_documento', d.tipo_documento);
+  setVal('banco', d.banco); setVal('rut_cuenta', d.rut_cuenta); setVal('num_cuenta', d.num_cuenta);
+  setVal('tipo_cuenta', d.tipo_cuenta); setVal('nombre_cuenta', d.nombre_cuenta);
+  onTipo();   // ajusta etiquetas + defaults de comisión según tipo
+  ['com_6_12','com_13_24','com_25_36','com_37'].forEach(k=>{ if(d[k]!=null && d[k]!=='') setVal(k, d[k]); });
+  actualizarTercero(); if(typeof onTipoCuenta==='function') onTipoCuenta();
+  mostrarMod();
+  toast(`Dealer N°${d.numero} cargado — modo Modificación.`);
+}
+let _buscarT=null;
+function buscarDealerDebounced(){ clearTimeout(_buscarT); _buscarT=setTimeout(buscarDealer, 300); }
+async function buscarDealer(){
+  const q=val('dealerBuscar'), box=$('dealerResults');
+  if(q.length<2){ box.style.display='none'; box.innerHTML=''; return; }
+  try{
+    const j=await (await fetch('/api/dealer-incorporacion/dealer-buscar?q='+encodeURIComponent(q),{headers:H})).json();
+    const rs=(j.data&&j.data.resultados)||[];
+    box.innerHTML = rs.length
+      ? rs.map(r=>`<div onclick="elegirDealer('${escH(r.rut)}')" onmouseover="this.style.background='#f1f5f9'" onmouseout="this.style.background='#fff'" style="padding:9px 12px;cursor:pointer;border-bottom:1px solid #f1f5f9;font-size:.85rem"><b>N°${r.numero}</b> · ${escH(r.nombre)} <span style="color:#64748b">· ${escH(r.rut)}</span>${r.parque?` <span style="color:#94a3b8;font-size:.78rem">(${escH(r.parque)})</span>`:''}</div>`).join('')
+      : '<div style="padding:10px 12px;color:#94a3b8;font-size:.85rem">Sin coincidencias</div>';
+    box.style.display='block';
+  }catch(e){ box.style.display='none'; }
+}
+async function elegirDealer(rut){
+  $('dealerResults').style.display='none'; setVal('dealerBuscar','');
+  try{
+    const j=await (await fetch('/api/dealer-incorporacion/dealer-buscar?rut='+encodeURIComponent(rut),{headers:H})).json();
+    if(j.data&&j.data.exacto) aplicarDealer(j.data.exacto);
+  }catch(e){}
+}
+// Al terminar de escribir el RUT del concesionario, si ya existe ofrece modificarlo.
+async function detectarDealerRut(){
+  if(MOD) return;
+  const clean=val('rut').replace(/[^0-9kK]/g,'').toUpperCase();
+  if(clean.length<7 || !validarRUT(clean)) return;
+  try{
+    const j=await (await fetch('/api/dealer-incorporacion/dealer-buscar?rut='+encodeURIComponent(clean),{headers:H})).json();
+    const d=j.data&&j.data.exacto;
+    if(d && confirm(`Ya existe el dealer N°${d.numero} (${d.nombre_razon||d.rut}).\n\n¿Cargar sus datos para MODIFICARLO?`)) aplicarDealer(d);
+  }catch(e){}
+}
+document.addEventListener('click', e=>{ const b=$('dealerResults'), i=$('dealerBuscar');
+  if(b && i && !b.contains(e.target) && e.target!==i) b.style.display='none'; });
+
 let FICHA_ID = new URLSearchParams(location.search).get('id') || null;
 let ESTADO = 'BORRADOR';
 let fileB64 = null, fileName = null, fileMime = null;
@@ -625,6 +709,7 @@ function recolectar(){
     correo_confirmacion:val('correo_confirmacion'), observaciones:val('observaciones') };
   const rl = repLegalData();
   o.rep_legal_origen = rl.origen; o.rl_nombre = rl.nombre; o.rl_telefono = rl.telefono; o.rl_email = rl.email;
+  o.id_dealer_origen = MOD ? MOD.id_dealer : null;   // NULL = creación; con valor = modifica ese dealer
   return o;
 }
 
@@ -709,6 +794,7 @@ async function enviarFinal(){
 
 async function cargar(){
   await cargarGeo();
+  await cargarComDefault();
   if (!FICHA_ID) { await cargarEjecutivos(); $('fecha_solicitud').value = new Date().toLocaleDateString('sv-SE',{timeZone:'America/Santiago'}); onTipo(); actualizarTercero(); onRepToggle(); onTipoCuenta(); return; }
   try {
     const r = await fetch('/api/dealer-incorporacion/fichas/'+FICHA_ID, { headers:H });
@@ -739,6 +825,13 @@ async function cargar(){
     }
     await cargarInformes();
     actualizarTercero();
+    // Modo Modificación: si la ficha modifica un dealer existente, mostrar el banner.
+    if (f.id_dealer_origen) {
+      let numero='—';
+      try { const jb=await (await fetch('/api/dealer-incorporacion/dealer-buscar?rut='+encodeURIComponent(f.rut||''),{headers:H})).json();
+        if(jb.data&&jb.data.exacto) numero=jb.data.exacto.numero; } catch(e){}
+      MOD = { id_dealer:f.id_dealer_origen, numero }; mostrarMod();
+    }
     // Solo BORRADOR/RECHAZADA son editables
     const editable = ['BORRADOR','RECHAZADA'].includes(f.estado);
     if (!editable) {

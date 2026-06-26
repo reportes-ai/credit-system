@@ -8,6 +8,12 @@ const ctrl = require('../controllers/fichas.controller');
 // Nombres elegibles para el campo "Ejecutivo" (Ejecutivo/Jefe Comercial, Analista de Operaciones).
 router.get('/ejecutivos',        verifyToken, requireFunc('dealer_ficha_crear', 'dealer_ficha_revisar'), ctrl.ejecutivos);
 
+// Comisiones pactadas por defecto (derivadas de la pizarra Parque/Calle).
+router.get('/com-default',       verifyToken, requireFunc('dealer_inc_ver', 'dealer_ficha_crear', 'dealer_ficha_revisar'), ctrl.comisionesDefault);
+
+// ¿El dealer ya existe? (para Creación vs Modificación de Dealer).
+router.get('/dealer-buscar',     verifyToken, requireFunc('dealer_inc_ver', 'dealer_ficha_crear', 'dealer_ficha_revisar'), ctrl.dealerBuscar);
+
 // Lectura: cualquiera con acceso al módulo (el controller filtra por rol).
 router.get('/fichas',            verifyToken, requireFunc('dealer_inc_ver', 'dealer_ficha_crear', 'dealer_ficha_revisar'), ctrl.listar);
 router.get('/fichas/:id',        verifyToken, requireFunc('dealer_inc_ver', 'dealer_ficha_crear', 'dealer_ficha_revisar'), ctrl.obtener);
