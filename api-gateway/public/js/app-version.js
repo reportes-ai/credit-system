@@ -2,7 +2,7 @@
    AutoFácil — Versión global de la aplicación
    Editar SOLO este archivo para cambiar la versión
    ───────────────────────────────────────────── */
-const APP_VERSION = 'v67.6';
+const APP_VERSION = 'v67.7';
 
 document.addEventListener('DOMContentLoaded', () => {
 
@@ -981,10 +981,18 @@ document.addEventListener('DOMContentLoaded', async () => {
 document.addEventListener('DOMContentLoaded', () => {
   const token = sessionStorage.getItem('token');
   if (!token) return;
-  let actual = null;
+  let actual = null, armarFn = null;
   function cargarJuegos(cb) {
     if (window.AF_JUEGOS) return cb();
     const s = document.createElement('script'); s.src = '/js/juegos.js'; s.onload = cb; document.head.appendChild(s);
+  }
+  // La humorada se "arma" y se dispara con el PRIMER CLIC del usuario → así nos
+  // aseguramos de que esté frente al computador (no le pasa estando ausente).
+  function desarmar() { if (armarFn) { document.removeEventListener('click', armarFn, true); armarFn = null; } }
+  function armar(nombre, mensaje) {
+    desarmar();
+    armarFn = function () { desarmar(); cargarJuegos(() => window.AF_JUEGOS && window.AF_JUEGOS.lanzar(nombre, mensaje)); };
+    document.addEventListener('click', armarFn, { capture: true, once: true });
   }
   // Prueba local (BG-ADMIN apretó "Probar aquí" en una humorada de pantalla → llega al Inicio).
   // "vidrio" persiste entre páginas hasta completar sus 10 quiebres; el resto es de una página.
@@ -1002,8 +1010,8 @@ document.addEventListener('DOMContentLoaded', () => {
       if (!j.success) return;
       window.__AF_ESBG = !!j.data.es_bg;
       const g = j.data.juego, nombre = g && g.nombre;
-      if (nombre && nombre !== actual) { actual = nombre; cargarJuegos(() => window.AF_JUEGOS && window.AF_JUEGOS.lanzar(nombre, g.mensaje)); }
-      else if (!nombre && actual) { actual = null; if (window.AF_JUEGOS) window.AF_JUEGOS.cerrar(); }
+      if (nombre && nombre !== actual) { actual = nombre; armar(nombre, g.mensaje); }   // espera el clic del usuario
+      else if (!nombre && actual) { actual = null; desarmar(); if (window.AF_JUEGOS) window.AF_JUEGOS.cerrar(); }
     } catch (e) {}
   }
   chk();
