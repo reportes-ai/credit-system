@@ -324,8 +324,7 @@
      sonido de vidrio roto (sintetizado). Tras 10 clics, restaura todo. Cosmético: no
      bloquea la app (overlay pointer-events:none, no preventDefault). */
   function vidrio(mensaje) {
-    if (sessionStorage.getItem('af_vidrio_done') === '1') return { esPagina: true, stop() {} };
-    let alive = true, left = parseInt(sessionStorage.getItem('af_vidrio_left') || '10', 10) || 10, actx = null;
+    let alive = true, left = 10, actx = null;
     const NS = 'http://www.w3.org/2000/svg';
     const lay = document.createElement('div'); lay.id = 'afVidrio';
     lay.style.cssText = 'position:fixed;inset:0;z-index:2000000;pointer-events:none;overflow:hidden';
@@ -371,8 +370,8 @@
     function onClick(e) { if (!alive || left <= 0) return;
       if (e.target && e.target.closest && e.target.closest('#afVidrioChip')) return;
       grieta(e.clientX, e.clientY); snd();
-      left--; sessionStorage.setItem('af_vidrio_left', left); const el = document.getElementById('afVn'); if (el) el.textContent = left;
-      if (left <= 0) { sessionStorage.setItem('af_vidrio_done', '1'); setTimeout(() => window.AF_JUEGOS.cerrar(), 1600); }
+      left--; const el = document.getElementById('afVn'); if (el) el.textContent = left;
+      if (left <= 0) { setTimeout(() => window.AF_JUEGOS.cerrar(), 1600); }
     }
     document.addEventListener('click', onClick, true);
 
@@ -383,7 +382,6 @@
 
   /* ════════════ 9 · PANTALLA HACKER — consola C:\ falsa por 15s 🖥️ ════════════ */
   function terminal(mensaje) {
-    if (sessionStorage.getItem('af_terminal_done') === '1') return { esPagina: true, stop() {} };
     let alive = true, t = null, end = null, lines = [], i = 0;
     const st = document.createElement('style'); st.id = 'afTermStyle';
     st.textContent = '@keyframes afBlink{50%{opacity:0}} #afTermCur{animation:afBlink 1s steps(1) infinite}';
@@ -405,12 +403,11 @@
     end = setTimeout(() => { if (window.AF_JUEGOS) window.AF_JUEGOS.cerrar(); }, 30000);
     const esc = e => { if (e.key === 'Escape' && window.AF_JUEGOS) window.AF_JUEGOS.cerrar(); };
     window.addEventListener('keydown', esc);
-    return { esPagina: true, stop() { alive = false; if (t) clearTimeout(t); if (end) clearTimeout(end); window.removeEventListener('keydown', esc); sessionStorage.setItem('af_terminal_done', '1'); st.remove(); lay.remove(); } };
+    return { esPagina: true, stop() { alive = false; if (t) clearTimeout(t); if (end) clearTimeout(end); window.removeEventListener('keydown', esc); st.remove(); lay.remove(); } };
   }
 
   /* ════════════ 10 · MOUSE LOCO — clic en cards intermitente (15s sí / 15s no) 🖱️ ════════════ */
   function clickloco(mensaje) {
-    if (sessionStorage.getItem('af_clickloco_done') === '1') return { esPagina: true, stop() {} };
     const SEL = '.module-card, .ap-card, .report-card';
     let alive = true, blocked = true, phase = 0, timer = null;
     const onClick = e => { if (!alive || !blocked) return; const card = e.target.closest(SEL); if (!card) return;
@@ -423,7 +420,7 @@
     function setChip() { chip.innerHTML = '<span>🖱️ Mouse Loco' + (mensaje ? ' — <span style="color:#93c5fd">' + mensaje + '</span>' : '') + '</span><span style="color:' + (blocked ? '#f87171' : '#34d399') + ';font-weight:800">' + (blocked ? '● clic BLOQUEADO' : '● clic OK') + '</span><button id="afClX" style="background:#7f1d1d;border:none;color:#fff;border-radius:20px;padding:4px 10px;cursor:pointer;font-weight:800">✕</button>';
       chip.querySelector('#afClX').onclick = () => window.AF_JUEGOS.cerrar(); }
     const PHASES = 3;  // bloqueado → ok → bloqueado, y luego vuelve a la normalidad
-    function next() { if (!alive) return; if (phase >= PHASES) { sessionStorage.setItem('af_clickloco_done', '1'); cleanup(); return; } blocked = (phase % 2 === 0); setChip(); phase++; timer = setTimeout(next, 15000); }
+    function next() { if (!alive) return; if (phase >= PHASES) { cleanup(); return; } blocked = (phase % 2 === 0); setChip(); phase++; timer = setTimeout(next, 15000); }
     next();
     function cleanup() { alive = false; if (timer) clearTimeout(timer); document.removeEventListener('click', onClick, true); chip.remove(); }
     return { esPagina: true, stop() { cleanup(); } };

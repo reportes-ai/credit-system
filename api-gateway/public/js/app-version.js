@@ -2,7 +2,7 @@
    AutoFácil — Versión global de la aplicación
    Editar SOLO este archivo para cambiar la versión
    ───────────────────────────────────────────── */
-const APP_VERSION = 'v67.8';
+const APP_VERSION = 'v67.9';
 
 document.addEventListener('DOMContentLoaded', () => {
 
@@ -989,9 +989,9 @@ document.addEventListener('DOMContentLoaded', () => {
   // La humorada se "arma" y se dispara con el PRIMER CLIC del usuario → así nos
   // aseguramos de que esté frente al computador (no le pasa estando ausente).
   function desarmar() { if (armarFn) { document.removeEventListener('click', armarFn, true); armarFn = null; } }
-  function armar(nombre, mensaje) {
+  function armar(nombre, mensaje, key) {
     desarmar();
-    armarFn = function () { desarmar(); cargarJuegos(() => window.AF_JUEGOS && window.AF_JUEGOS.lanzar(nombre, mensaje)); };
+    armarFn = function () { desarmar(); sessionStorage.setItem('af_consumido', key); cargarJuegos(() => window.AF_JUEGOS && window.AF_JUEGOS.lanzar(nombre, mensaje)); };
     document.addEventListener('click', armarFn, { capture: true, once: true });
   }
   // Prueba local (BG-ADMIN apretó "Probar aquí" en una humorada de pantalla → llega al Inicio).
@@ -999,9 +999,8 @@ document.addEventListener('DOMContentLoaded', () => {
   const probar = sessionStorage.getItem('af_probar');
   if (probar) {
     window.__AF_ESBG = true;   // a "Probar" solo llega el BG-ADMIN → muestra el chip de control
-    const persiste = probar === 'vidrio';
-    if (persiste && sessionStorage.getItem('af_vidrio_done') === '1') { sessionStorage.removeItem('af_probar'); }
-    else { if (!persiste) sessionStorage.removeItem('af_probar'); cargarJuegos(() => window.AF_JUEGOS && window.AF_JUEGOS.lanzar(probar, 'Modo prueba (solo tú lo ves)')); }
+    sessionStorage.removeItem('af_probar');
+    cargarJuegos(() => window.AF_JUEGOS && window.AF_JUEGOS.lanzar(probar, 'Modo prueba (solo tú lo ves)'));
   }
   async function chk() {
     try {
@@ -1010,8 +1009,13 @@ document.addEventListener('DOMContentLoaded', () => {
       if (!j.success) return;
       window.__AF_ESBG = !!j.data.es_bg;
       const g = j.data.juego, nombre = g && g.nombre;
-      if (nombre && nombre !== actual) { actual = nombre; armar(nombre, g.mensaje); }   // espera el clic del usuario
-      else if (!nombre && actual) { actual = null; desarmar(); if (window.AF_JUEGOS) window.AF_JUEGOS.cerrar(); }
+      const key = nombre ? (nombre + '|' + (g.nonce || '')) : null;
+      if (key && key !== actual) {
+        actual = key;
+        // Dispara una vez por LANZAMIENTO (nombre+nonce): no re-dispara al navegar dentro del
+        // mismo lanzamiento, pero si el BG relanza (nonce nuevo) vuelve a armar.
+        if (sessionStorage.getItem('af_consumido') !== key) armar(nombre, g.mensaje, key);
+      } else if (!nombre && actual) { actual = null; desarmar(); if (window.AF_JUEGOS) window.AF_JUEGOS.cerrar(); }
     } catch (e) {}
   }
   chk();

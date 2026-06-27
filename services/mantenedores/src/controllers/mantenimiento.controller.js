@@ -25,7 +25,7 @@ const MSG_DEFAULT = 'AVISO. El sistema se encuentra en Mantención.';
       ('dev_whatsapp','')`);
     // Humoradas (BG-ADMIN): juego flotante que aparece en la pantalla de TODOS los usuarios.
     await pool.query(`INSERT IGNORE INTO mantenimiento_config (clave, valor) VALUES
-      ('juego_activo','0'),('juego_nombre',''),('juego_mensaje','')`);
+      ('juego_activo','0'),('juego_nombre',''),('juego_mensaje',''),('juego_nonce','')`);
   } catch (e) { console.error('[mantenimiento migration]', e.message); }
 })();
 
@@ -33,7 +33,7 @@ const JUEGOS_OK = ['snake', 'runner', 'breakout', 'topo', 'catapulta', 'comeletr
 async function leerJuego() {
   const [rows] = await pool.query("SELECT clave, valor FROM mantenimiento_config WHERE clave LIKE 'juego_%'");
   const m = {}; rows.forEach(r => { m[r.clave] = r.valor; });
-  return { activo: m.juego_activo === '1', nombre: m.juego_nombre || '', mensaje: m.juego_mensaje || '' };
+  return { activo: m.juego_activo === '1', nombre: m.juego_nombre || '', mensaje: m.juego_mensaje || '', nonce: m.juego_nonce || '' };
 }
 
 async function esBreakGlass(id) {
@@ -67,7 +67,7 @@ const getEstado = async (req, res) => {
     const dev = await leerDev();
     const jg = await leerJuego();
     res.json({ success: true, data: { activo: cfg.activo, mensaje: (cfg.activo || bg) ? cfg.mensaje : '', es_bg: bg, dev_activo: dev.activo,
-      juego: (jg.activo && JUEGOS_OK.includes(jg.nombre)) ? { nombre: jg.nombre, mensaje: jg.mensaje } : null }, error: null });
+      juego: (jg.activo && JUEGOS_OK.includes(jg.nombre)) ? { nombre: jg.nombre, mensaje: jg.mensaje, nonce: jg.nonce } : null }, error: null });
   } catch (e) { console.error('[mantenimiento getEstado]', e.message); res.status(500).json({ success: false, data: null, error: 'Error interno del servidor' }); }
 };
 
@@ -133,6 +133,7 @@ const setJuego = async (req, res) => {
     await setKv('juego_activo', activo);
     await setKv('juego_nombre', nombre);
     await setKv('juego_mensaje', mensaje);
+    if (activo === '1') await setKv('juego_nonce', String(Date.now()));   // instancia nueva → permite relanzar
     auditar({ req, accion: 'EDITAR', modulo: 'mantenedores', entidad: 'humorada', entidad_id: 'config',
       detalle: `Humorada ${activo === '1' ? 'LANZADA (' + nombre + ')' : 'apagada'}`, meta: { activo, nombre, mensaje } });
     res.json({ success: true, data: await leerJuego(), error: null });
