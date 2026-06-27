@@ -5,7 +5,7 @@
   <link rel="icon" href="/img/favicon.png" type="image/png">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Alertas — Mantenedor — AutoFácil</title>
-  <!-- v1.2 — sección Anuncios en pantalla (push) -->
+  <!-- v1.3 — Anuncios push + Enviar comunicado dirigido -->
   <link href="/css/bootstrap.min.css" rel="stylesheet">
   <link href="/css/bootstrap-icons.css" rel="stylesheet">
   <style>
@@ -137,6 +137,40 @@
   </div>
   <div id="anunciosWrap"><div class="card-af"><div style="text-align:center;color:#94a3b8;padding:18px">Cargando…</div></div></div>
 
+  <!-- Enviar comunicado manual dirigido -->
+  <div class="head-row" style="margin-top:26px">
+    <div>
+      <h5 style="font-weight:800;color:var(--navy);margin:0"><i class="bi bi-send-fill me-2"></i>Enviar comunicado</h5>
+      <span style="font-size:.82rem;color:#64748b">Manda un mensaje en pantalla a <b>toda la empresa</b>, a un <b>perfil</b>, a un <b>área</b> (centro de costo) o a una <b>persona</b>. Con duración, o <b>permanente</b> (queda con una X para cerrarlo).</span>
+    </div>
+  </div>
+  <div class="card-af">
+    <div class="grid">
+      <div class="field" style="grid-column:1/-1"><label>Mensaje</label><input id="coMensaje" type="text" maxlength="500" placeholder="Escribe el comunicado…"></div>
+      <div class="field"><label>Destino</label><select id="coTipo" onchange="coOnTipo()">
+        <option value="todos">Toda la empresa</option>
+        <option value="perfil">Perfil de cargo</option>
+        <option value="area">Área (centro de costo)</option>
+        <option value="usuario">Persona</option></select></div>
+      <div class="field" id="coValorWrap" style="display:none"><label id="coValorLbl">Valor</label><select id="coValor"></select></div>
+      <div class="field"><label>Modo</label><select id="coModo" onchange="coOnModo()">
+        <option value="timed">Por tiempo</option><option value="perm">Permanente (con X)</option></select></div>
+      <div class="field" id="coDurWrap"><label>Duración (seg)</label><input id="coDur" type="number" min="3" max="120" value="10"></div>
+      <div class="field"><label>Color de fondo</label><input id="coBg" type="color" value="#0a0a0a" style="height:38px;padding:2px"></div>
+      <div class="field"><label>Color de letra</label><input id="coFg" type="color" value="#ffffff" style="height:38px;padding:2px"></div>
+      <div class="field"><label>Ancho (% pantalla)</label><input id="coAncho" type="number" min="15" max="100" value="40"></div>
+    </div>
+    <div style="display:flex;justify-content:flex-end;gap:10px;align-items:center;margin-top:12px">
+      <span id="coMsg" style="font-size:.84rem"></span>
+      <button class="btn-ghost" onclick="coProbar()"><i class="bi bi-eye me-1"></i>Probar aquí</button>
+      <button class="btn-af" onclick="coEnviar()"><i class="bi bi-send me-1"></i>Enviar</button>
+    </div>
+    <div style="margin-top:14px">
+      <div style="font-weight:700;color:#475569;font-size:.85rem;margin-bottom:6px">Comunicados activos</div>
+      <div id="coActivos" style="font-size:.85rem;color:#64748b">—</div>
+    </div>
+  </div>
+
   <!-- Qué afecta este mantenedor -->
   <div class="card-af" style="border-left:4px solid #0141A2;background:#f8fafc">
     <div style="font-weight:800;color:var(--navy);margin-bottom:8px"><i class="bi bi-diagram-3 me-2"></i>Qué afecta este mantenedor</div>
@@ -147,6 +181,7 @@
       <li><b>Eventos de Pago — Post Venta</b> → avisos del flujo de <a href="/postventa/saldos-a-pagar/">Saldos a Pagar</a> y <a href="/postventa/comisiones-a-pagar/">Comisiones a Pagar</a> (fondos cargados, enviado a pago, orden emitida, pago). Editarlos aquí también los cambia en la configuración de Post Venta (misma fuente).</li>
       <li><b>Eventos — Dealers</b> → avisos del flujo de <a href="/dealers-incorporacion/">fichas de Dealer</a> en cada etapa: por autorizar (a cada nivel), autorizada (al ejecutivo), firmada (al cierre), creado/actualizado y rechazada. Los destinatarios base salen de la <a href="/dealers-incorporacion/niveles.html">cadena de niveles</a>; aquí sumas perfiles/usuarios y controlas activo, prioridad y sonido.</li>
       <li><b>Anuncios en pantalla (push)</b> → banner que baja desde arriba a <b>todos los usuarios</b> cuando ocurre el evento (hoy: <b>Crédito otorgado</b>, al apretar Otorgado en <a href="/aprobaciones/">Cartas Vigentes</a>). Configurable: mensaje (con variables como <code>{ejecutivo}</code>), colores, ancho, sonido y tiempos.</li>
+      <li><b>Enviar comunicado</b> → mensaje manual en pantalla a <b>toda la empresa / un perfil / un área (centro de costo) / una persona</b>; por tiempo o <b>permanente</b> (con X para cerrar). Aparece en ~12s a los usuarios conectados; los permanentes se quitan al <b>Desactivar</b>.</li>
     </ul>
   </div>
 </div>
@@ -476,6 +511,62 @@ async function anGuardar(btn){
   finally{ btn.disabled=false; setTimeout(()=>{msg.textContent='';},2500); }
 }
 cargarAnuncios();
+
+/* ── Enviar comunicado manual dirigido ── */
+let CO_META = { perfiles:[], usuarios:[], areas:[] };
+async function cargarComunicados(){
+  try{
+    const r=await fetch('/api/alertas/comunicados',{headers:H}); const j=await r.json(); if(!j.success) throw 0;
+    CO_META = j.data.meta||CO_META; renderCoActivos(j.data.activos||[]);
+  }catch(e){ document.getElementById('coActivos').innerHTML='<span style="color:#b91c1c">No se pudieron cargar.</span>'; }
+}
+function coOnTipo(){
+  const t=document.getElementById('coTipo').value;
+  const wrap=document.getElementById('coValorWrap'), lbl=document.getElementById('coValorLbl'), sel=document.getElementById('coValor');
+  if(t==='todos'){ wrap.style.display='none'; return; }
+  wrap.style.display='';
+  if(t==='perfil'){ lbl.textContent='Perfil'; sel.innerHTML=CO_META.perfiles.map(p=>`<option value="${esc(p)}">${esc(p)}</option>`).join(''); }
+  else if(t==='area'){ lbl.textContent='Área'; sel.innerHTML=CO_META.areas.length?CO_META.areas.map(a=>`<option value="${esc(a)}">${esc(a)}</option>`).join(''):'<option value="">(sin áreas definidas)</option>'; }
+  else if(t==='usuario'){ lbl.textContent='Persona'; sel.innerHTML=CO_META.usuarios.map(u=>`<option value="${u.id_usuario}">${esc(u.nombre)}</option>`).join(''); }
+}
+function coOnModo(){ document.getElementById('coDurWrap').style.display = document.getElementById('coModo').value==='perm'?'none':''; }
+function coLeer(){
+  const tipo=document.getElementById('coTipo').value;
+  return { mensaje:document.getElementById('coMensaje').value, destino_tipo:tipo,
+    destino_valor: tipo==='todos'?null:document.getElementById('coValor').value,
+    permanente: document.getElementById('coModo').value==='perm',
+    duracion_seg: document.getElementById('coDur').value,
+    color_fondo: document.getElementById('coBg').value, color_texto: document.getElementById('coFg').value,
+    ancho_pct: document.getElementById('coAncho').value };
+}
+function coProbar(){
+  const c=coLeer(); if(!c.mensaje.trim()){ const m=document.getElementById('coMsg'); m.textContent='Escribe el mensaje.'; m.style.cssText='font-size:.84rem;color:#b91c1c'; return; }
+  if(window.afMostrarAnuncio) window.afMostrarAnuncio(c.mensaje,{ bg:c.color_fondo, fg:c.color_texto, ancho:c.ancho_pct, dur:c.duracion_seg, permanente:c.permanente, icon:'📣', onClose:()=>{} });
+}
+async function coEnviar(){
+  const c=coLeer(); const msg=document.getElementById('coMsg');
+  if(!c.mensaje.trim()){ msg.textContent='Escribe el mensaje.'; msg.style.cssText='font-size:.84rem;color:#b91c1c'; return; }
+  try{
+    const r=await fetch('/api/alertas/comunicados',{method:'POST',headers:H,body:JSON.stringify(c)});
+    const j=await r.json(); if(!j.success) throw new Error(j.error||'Error');
+    msg.textContent='Enviado ✓'; msg.style.cssText='font-size:.84rem;color:#15803d';
+    document.getElementById('coMensaje').value=''; cargarComunicados();
+    setTimeout(()=>{msg.textContent='';},2500);
+  }catch(e){ msg.textContent=e.message; msg.style.cssText='font-size:.84rem;color:#b91c1c'; }
+}
+function renderCoActivos(list){
+  const el=document.getElementById('coActivos');
+  if(!list.length){ el.innerHTML='<span style="color:#94a3b8">Sin comunicados activos.</span>'; return; }
+  const destLbl=c=>({todos:'Toda la empresa',perfil:'Perfil: '+(c.destino_valor||''),usuario:'Persona #'+(c.destino_valor||''),area:'Área: '+(c.destino_valor||'')}[c.destino_tipo]||c.destino_tipo);
+  el.innerHTML=list.map(c=>`<div style="display:flex;align-items:center;gap:10px;padding:7px 0;border-bottom:1px solid #f1f5f9">
+    <span style="flex:1"><b>${esc(c.mensaje)}</b><br><span style="font-size:.76rem;color:#94a3b8">${esc(destLbl(c))} · ${c.permanente?'permanente':c.duracion_seg+'s'}</span></span>
+    <button class="btn-del" onclick="coDesactivar(${c.id})"><i class="bi bi-x-circle"></i> Desactivar</button></div>`).join('');
+}
+async function coDesactivar(id){
+  if(!confirm('¿Desactivar este comunicado? Dejará de mostrarse a los usuarios.')) return;
+  await fetch('/api/alertas/comunicados/'+id,{method:'DELETE',headers:H}); cargarComunicados();
+}
+cargarComunicados();
 </script>
 <script src="/js/app-version.js"></script>
 </body>

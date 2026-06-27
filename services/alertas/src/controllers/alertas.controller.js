@@ -1,6 +1,7 @@
 'use strict';
 const pool = require('../../../../shared/config/database');
 const ANUN = require('../../../../shared/anuncios');
+const COM  = require('../../../../shared/comunicados');
 
 /* ════════════════════════════════════════════════════════════════
    MOTOR DE ALERTAS CONFIGURABLE
@@ -529,4 +530,21 @@ const saveAnuncios = async (req, res) => {
   } catch (e) { console.error('[anuncios save]', e.message); res.status(400).json({ success: false, data: null, error: e.message || 'Error' }); }
 };
 
-module.exports = { getMeta, listAlertas, saveAlerta, deleteAlerta, marcarVisto, getAnuncios, saveAnuncios };
+/* ── Comunicados manuales (banner push dirigido) ── */
+const getComunicados = async (req, res) => {
+  try { res.json({ success: true, data: { activos: await COM.listarActivos(), meta: await COM.meta() }, error: null }); }
+  catch (e) { console.error('[comunicados get]', e.message); res.status(500).json({ success: false, data: null, error: 'Error interno del servidor' }); }
+};
+const crearComunicado = async (req, res) => {
+  try {
+    if (!String(req.body?.mensaje || '').trim()) return res.status(400).json({ success: false, data: null, error: 'El mensaje es obligatorio.' });
+    await COM.crear(req.body || {}, req.usuario);
+    res.json({ success: true, data: { ok: true }, error: null });
+  } catch (e) { console.error('[comunicados crear]', e.message); res.status(500).json({ success: false, data: null, error: 'Error interno del servidor' }); }
+};
+const desactivarComunicado = async (req, res) => {
+  try { await COM.desactivar(parseInt(req.params.id, 10)); res.json({ success: true, data: { ok: true }, error: null }); }
+  catch (e) { console.error('[comunicados desactivar]', e.message); res.status(500).json({ success: false, data: null, error: 'Error interno del servidor' }); }
+};
+
+module.exports = { getMeta, listAlertas, saveAlerta, deleteAlerta, marcarVisto, getAnuncios, saveAnuncios, getComunicados, crearComunicado, desactivarComunicado };

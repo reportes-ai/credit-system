@@ -1,6 +1,7 @@
 const pool = require('../../../../shared/config/database');
 const { auditar } = require('../../../../shared/audit');
 const { leerAnuncio } = require('../../../../shared/anuncios');
+const { comunicadosParaUsuario } = require('../../../../shared/comunicados');
 
 /* ─────────────────────────────────────────────────────────────────────────────
    Mantención de Sistema. Estado (activo/mensaje) en tabla propia mantenimiento_config
@@ -68,9 +69,10 @@ const getEstado = async (req, res) => {
     const dev = await leerDev();
     const jg = await leerJuego();
     const anuncio = await leerAnuncio();
+    const comunicados = await comunicadosParaUsuario(req.usuario);
     res.json({ success: true, data: { activo: cfg.activo, mensaje: (cfg.activo || bg) ? cfg.mensaje : '', es_bg: bg, dev_activo: dev.activo,
       juego: (jg.activo && JUEGOS_OK.includes(jg.nombre)) ? { nombre: jg.nombre, mensaje: jg.mensaje, nonce: jg.nonce } : null,
-      anuncio }, error: null });
+      anuncio, comunicados }, error: null });
   } catch (e) { console.error('[mantenimiento getEstado]', e.message); res.status(500).json({ success: false, data: null, error: 'Error interno del servidor' }); }
 };
 

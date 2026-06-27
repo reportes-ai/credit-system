@@ -2,7 +2,7 @@
    AutoFácil — Versión global de la aplicación
    Editar SOLO este archivo para cambiar la versión
    ───────────────────────────────────────────── */
-const APP_VERSION = 'v68.7';
+const APP_VERSION = 'v68.8';
 
 document.addEventListener('DOMContentLoaded', () => {
 
@@ -521,21 +521,35 @@ document.addEventListener('DOMContentLoaded', () => {
     g.gain.setValueAtTime(0.5, t0 + 1.2); g.gain.linearRampToValueAtTime(0, t0 + dur);
     src.connect(bp).connect(g).connect(ctx.destination); src.start(t0); src.stop(t0 + dur);
   }
-  function sAnuncio(ctx) { // chime tipo anuncio de aeropuerto: 4 notas con cola de campana
-    const notas = [1046.50, 783.99, 659.25, 523.25]; // C6 · G5 · E5 · C5 (descendente)
-    const paso = 0.34;
+  function sAnuncio(ctx) { // chime tipo PA de aeropuerto: 4 "bong" de campana con eco/reverb
+    const now = ctx.currentTime;
+    // Bus principal con filtro (suaviza) → salida
+    const master = ctx.createGain(); master.gain.value = 0.9;
+    const lp = ctx.createBiquadFilter(); lp.type = 'lowpass'; lp.frequency.value = 5200;
+    master.connect(lp); lp.connect(ctx.destination);
+    // Eco: delay con realimentación (los "rebotes" tipo terminal grande)
+    const delay = ctx.createDelay(1.5); delay.delayTime.value = 0.34;
+    const fb = ctx.createGain(); fb.gain.value = 0.4;            // cuánto se repite
+    const echoMix = ctx.createGain(); echoMix.gain.value = 0.45; // volumen del eco
+    lp.connect(delay); delay.connect(fb); fb.connect(delay); delay.connect(echoMix); echoMix.connect(ctx.destination);
+    // Cola de reverb corta (2º delay más denso)
+    const rev = ctx.createDelay(0.2); rev.delayTime.value = 0.08;
+    const revFb = ctx.createGain(); revFb.gain.value = 0.5; const revMix = ctx.createGain(); revMix.gain.value = 0.18;
+    lp.connect(rev); rev.connect(revFb); revFb.connect(rev); rev.connect(revMix); revMix.connect(ctx.destination);
+    // Notas: descendente G5·E5·C5·G4 (el clásico "dong-dong" de anuncio)
+    const notas = [783.99, 659.25, 523.25, 392.00];
+    const paso = 0.46;
     notas.forEach((f, i) => {
-      const t0 = ctx.currentTime + i * paso;
-      const o1 = ctx.createOscillator(), g1 = ctx.createGain();
-      o1.type = 'sine'; o1.frequency.value = f;
-      g1.gain.setValueAtTime(0.0001, t0); g1.gain.exponentialRampToValueAtTime(0.5, t0 + 0.02);
-      g1.gain.exponentialRampToValueAtTime(0.0008, t0 + 1.1);
-      o1.connect(g1).connect(ctx.destination); o1.start(t0); o1.stop(t0 + 1.2);
-      const o2 = ctx.createOscillator(), g2 = ctx.createGain();
-      o2.type = 'sine'; o2.frequency.value = f * 2;
-      g2.gain.setValueAtTime(0.0001, t0); g2.gain.exponentialRampToValueAtTime(0.12, t0 + 0.02);
-      g2.gain.exponentialRampToValueAtTime(0.0006, t0 + 0.7);
-      o2.connect(g2).connect(ctx.destination); o2.start(t0); o2.stop(t0 + 0.8);
+      const t0 = now + i * paso;
+      // tono de campana: fundamental + 2 parciales con decaimiento largo
+      [[f, 0.55, 1.8], [f * 2.01, 0.13, 1.0], [f * 3.01, 0.05, 0.6]].forEach(([freq, amp, dec]) => {
+        const o = ctx.createOscillator(), g = ctx.createGain();
+        o.type = 'sine'; o.frequency.value = freq;
+        g.gain.setValueAtTime(0.0001, t0);
+        g.gain.exponentialRampToValueAtTime(amp, t0 + 0.012);
+        g.gain.exponentialRampToValueAtTime(0.0005, t0 + dec);
+        o.connect(g).connect(master); o.start(t0); o.stop(t0 + dec + 0.05);
+      });
     });
   }
   function reproducir(tipo) {
@@ -546,7 +560,7 @@ document.addEventListener('DOMContentLoaded', () => {
       else if (tipo === 'aplausos') sAplausos(ctx);
       else if (tipo === 'anuncio') sAnuncio(ctx);
       else sCampana(ctx);
-      setTimeout(() => ctx.close(), tipo === 'anuncio' ? 3500 : 2500);
+      setTimeout(() => ctx.close(), tipo === 'anuncio' ? 5500 : 2500);
     } catch (e) {}
   }
   const dingDing = () => reproducir(ringTipo);
@@ -1026,31 +1040,66 @@ document.addEventListener('DOMContentLoaded', () => {
     sessionStorage.removeItem('af_probar');
     cargarJuegos(() => window.AF_JUEGOS && window.AF_JUEGOS.lanzar(probar, 'Modo prueba (solo tú lo ves)'));
   }
-  // Banner "push" que baja desde arriba (ancho 1/3, negro, letras blancas).
+  // Banner "push" que baja desde arriba. Se apilan en un contenedor (arriba-centro).
   const escAn = s => String(s == null ? '' : s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
-  function mostrarAnuncio(texto, opts) {
-    try {
-      opts = opts || {};
-      const bg = opts.bg || '#0a0a0a', fg = opts.fg || '#ffffff';
-      const ancho = Math.min(100, Math.max(15, parseInt(opts.ancho) || 33));
-      const dur = Math.min(30, Math.max(2, parseInt(opts.dur) || 6)) * 1000;
-      const prev = document.getElementById('afAnuncioBanner'); if (prev) prev.remove();
-      const b = document.createElement('div');
-      b.id = 'afAnuncioBanner';
-      b.style.cssText = 'position:fixed;top:0;left:50%;transform:translateX(-50%) translateY(-160%);'
-        + 'width:' + ancho + 'vw;min-width:300px;max-width:620px;background:' + bg + ';color:' + fg + ';'
-        + 'border-radius:0 0 16px 16px;box-shadow:0 14px 44px rgba(0,0,0,.55);'
-        + 'padding:16px 22px;z-index:2147483600;display:flex;align-items:center;gap:14px;'
-        + "font-family:'Segoe UI',system-ui,sans-serif;transition:transform .6s cubic-bezier(.18,.89,.32,1.28);";
-      b.innerHTML = '<span style="font-size:1.7rem;line-height:1">🎉</span>'
-        + '<div style="font-size:.98rem;font-weight:600;letter-spacing:.2px">' + escAn(texto) + '</div>';
-      document.body.appendChild(b);
-      requestAnimationFrame(() => { b.style.transform = 'translateX(-50%) translateY(0)'; });
-      setTimeout(() => { b.style.transform = 'translateX(-50%) translateY(-160%)'; setTimeout(() => b.remove(), 800); }, dur);
-    } catch (e) {}
+  function afStack() {
+    let s = document.getElementById('afPushStack');
+    if (!s) {
+      s = document.createElement('div'); s.id = 'afPushStack';
+      s.style.cssText = 'position:fixed;top:0;left:50%;transform:translateX(-50%);z-index:2147483600;display:flex;flex-direction:column;gap:8px;align-items:center;pointer-events:none;';
+      document.body.appendChild(s);
+    }
+    return s;
   }
-  // Expuesto para "Probar" desde el mantenedor de Alertas
-  window.afMostrarAnuncio = mostrarAnuncio;
+  function bannerPush(texto, opts) {
+    opts = opts || {};
+    const bg = opts.bg || '#0a0a0a', fg = opts.fg || '#ffffff';
+    const ancho = Math.min(100, Math.max(15, parseInt(opts.ancho) || 33));
+    const b = document.createElement('div');
+    b.style.cssText = 'pointer-events:auto;width:' + ancho + 'vw;min-width:300px;max-width:640px;background:' + bg + ';color:' + fg + ';'
+      + 'border-radius:0 0 16px 16px;box-shadow:0 14px 44px rgba(0,0,0,.55);padding:15px 20px;display:flex;align-items:center;gap:13px;'
+      + "font-family:'Segoe UI',system-ui,sans-serif;transform:translateY(-160%);transition:transform .6s cubic-bezier(.18,.89,.32,1.28);";
+    b.innerHTML = '<span style="font-size:1.6rem;line-height:1">' + (opts.icon || '🎉') + '</span>'
+      + '<div style="flex:1;font-size:.97rem;font-weight:600;letter-spacing:.2px">' + escAn(texto) + '</div>';
+    let cerrado = false;
+    function cerrar() { if (cerrado) return; cerrado = true; b.style.transform = 'translateY(-160%)'; setTimeout(() => b.remove(), 700); }
+    if (opts.permanente) {
+      const x = document.createElement('button');
+      x.innerHTML = '&times;'; x.title = 'Cerrar';
+      x.style.cssText = 'pointer-events:auto;background:transparent;border:none;color:' + fg + ';opacity:.65;font-size:1.4rem;line-height:1;cursor:pointer;padding:0 2px';
+      x.onclick = () => { if (opts.onClose) try { opts.onClose(); } catch (_) {} cerrar(); };
+      b.appendChild(x);
+    }
+    afStack().appendChild(b);
+    requestAnimationFrame(() => { b.style.transform = 'translateY(0)'; });
+    if (!opts.permanente) setTimeout(cerrar, Math.min(120, Math.max(2, parseInt(opts.dur) || 6)) * 1000);
+    return { cerrar };
+  }
+  function mostrarAnuncio(texto, opts) { bannerPush(texto, opts); }
+  window.afMostrarAnuncio = mostrarAnuncio;   // "Probar" desde el mantenedor de Alertas
+
+  // ── Comunicados manuales dirigidos ──
+  const COM_ON = {};   // id → handle de banner permanente en pantalla
+  function comSeen() { try { return JSON.parse(localStorage.getItem('af_com_seen') || '[]'); } catch (_) { return []; } }
+  function comMark(id) { const s = comSeen(); if (!s.includes(id)) { s.push(id); localStorage.setItem('af_com_seen', JSON.stringify(s.slice(-300))); } }
+  function manejarComunicados(coms) {
+    coms = Array.isArray(coms) ? coms : [];
+    const ids = coms.map(c => c.id);
+    // Cerrar permanentes que el admin desactivó (ya no vienen en la lista)
+    Object.keys(COM_ON).forEach(id => { if (!ids.includes(parseInt(id, 10))) { COM_ON[id].cerrar(); delete COM_ON[id]; } });
+    const seen = comSeen();
+    coms.forEach(c => {
+      if (c.permanente) {
+        if (COM_ON[c.id] || seen.includes(c.id)) return;  // ya en pantalla o ya cerrado por el usuario
+        COM_ON[c.id] = bannerPush(c.mensaje, { bg: c.bg, fg: c.fg, ancho: c.ancho, permanente: true, icon: '📣',
+          onClose: () => { comMark(c.id); delete COM_ON[c.id]; } });
+      } else {
+        if (seen.includes(c.id)) return;
+        comMark(c.id);
+        bannerPush(c.mensaje, { bg: c.bg, fg: c.fg, ancho: c.ancho, dur: c.dur, icon: '📣' });
+      }
+    });
+  }
   async function chk() {
     try {
       const r = await fetch('/api/mantenimiento?_=' + Date.now(), { headers: { Authorization: 'Bearer ' + token }, cache: 'no-store' });
@@ -1067,6 +1116,8 @@ document.addEventListener('DOMContentLoaded', () => {
         if (o.sonido && o.sonido !== 'none') { try { if (window.afPlaySound) window.afPlaySound(o.sonido); } catch (e) {} }
         setTimeout(() => mostrarAnuncio(an.texto, o), antes);
       }
+      // Comunicados manuales dirigidos (persona/área/perfil/empresa)
+      manejarComunicados(j.data.comunicados);
       const g = j.data.juego, nombre = g && g.nombre;
       const key = nombre ? (nombre + '|' + (g.nonce || '')) : null;
       if (key && key !== actual) {
