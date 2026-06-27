@@ -5,7 +5,7 @@
   <link rel="icon" href="/img/favicon.png" type="image/png">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Alertas — Mantenedor — AutoFácil</title>
-  <!-- v1.4 — botón Probar local (solo yo) en Anuncios y Comunicado -->
+  <!-- v1.5 — selector de sonido en Comunicado -->
   <link href="/css/bootstrap.min.css" rel="stylesheet">
   <link href="/css/bootstrap-icons.css" rel="stylesheet">
   <style>
@@ -161,6 +161,7 @@
       <div class="field"><label>Color de fondo</label><input id="coBg" type="color" value="#0a0a0a" style="height:38px;padding:2px"></div>
       <div class="field"><label>Color de letra</label><input id="coFg" type="color" value="#ffffff" style="height:38px;padding:2px"></div>
       <div class="field"><label>Ancho (% pantalla)</label><input id="coAncho" type="number" min="15" max="100" value="40"></div>
+      <div class="field"><label>Sonido</label><div style="display:flex;gap:6px"><select id="coSonido" style="flex:1"></select><button type="button" class="btn-ghost" style="padding:6px 11px" onclick="coProbarSon()"><i class="bi bi-play-fill"></i></button></div></div>
     </div>
     <div style="display:flex;justify-content:flex-end;gap:10px;align-items:center;margin-top:12px">
       <span id="coMsg" style="font-size:.84rem"></span>
@@ -519,9 +520,13 @@ let CO_META = { perfiles:[], usuarios:[], areas:[] };
 async function cargarComunicados(){
   try{
     const r=await fetch('/api/alertas/comunicados',{headers:H}); const j=await r.json(); if(!j.success) throw 0;
-    CO_META = j.data.meta||CO_META; renderCoActivos(j.data.activos||[]);
+    CO_META = j.data.meta||CO_META;
+    document.getElementById('coSonido').innerHTML = (CO_META.sonidos||[]).map(s=>`<option value="${esc(s.id)}">${esc(s.label)}</option>`).join('');
+    document.getElementById('coSonido').value = 'none';
+    renderCoActivos(j.data.activos||[]);
   }catch(e){ document.getElementById('coActivos').innerHTML='<span style="color:#b91c1c">No se pudieron cargar.</span>'; }
 }
+function coProbarSon(){ const t=document.getElementById('coSonido').value; if(t&&t!=='none'&&window.afPlaySound) window.afPlaySound(t); }
 function coOnTipo(){
   const t=document.getElementById('coTipo').value;
   const wrap=document.getElementById('coValorWrap'), lbl=document.getElementById('coValorLbl'), sel=document.getElementById('coValor');
@@ -539,10 +544,12 @@ function coLeer(){
     permanente: document.getElementById('coModo').value==='perm',
     duracion_seg: document.getElementById('coDur').value,
     color_fondo: document.getElementById('coBg').value, color_texto: document.getElementById('coFg').value,
-    ancho_pct: document.getElementById('coAncho').value };
+    ancho_pct: document.getElementById('coAncho').value,
+    sonido: document.getElementById('coSonido').value };
 }
 function coProbar(){
   const c=coLeer(); if(!c.mensaje.trim()){ const m=document.getElementById('coMsg'); m.textContent='Escribe el mensaje.'; m.style.cssText='font-size:.84rem;color:#b91c1c'; return; }
+  if(c.sonido&&c.sonido!=='none'&&window.afPlaySound) window.afPlaySound(c.sonido);
   if(window.afMostrarAnuncio) window.afMostrarAnuncio(c.mensaje,{ bg:c.color_fondo, fg:c.color_texto, ancho:c.ancho_pct, dur:c.duracion_seg, permanente:c.permanente, icon:'📣', onClose:()=>{} });
 }
 async function coEnviar(){
@@ -561,7 +568,7 @@ function renderCoActivos(list){
   if(!list.length){ el.innerHTML='<span style="color:#94a3b8">Sin comunicados activos.</span>'; return; }
   const destLbl=c=>({todos:'Toda la empresa',perfil:'Perfil: '+(c.destino_valor||''),usuario:'Persona #'+(c.destino_valor||''),area:'Área: '+(c.destino_valor||'')}[c.destino_tipo]||c.destino_tipo);
   el.innerHTML=list.map(c=>`<div style="display:flex;align-items:center;gap:10px;padding:7px 0;border-bottom:1px solid #f1f5f9">
-    <span style="flex:1"><b>${esc(c.mensaje)}</b><br><span style="font-size:.76rem;color:#94a3b8">${esc(destLbl(c))} · ${c.permanente?'permanente':c.duracion_seg+'s'}</span></span>
+    <span style="flex:1"><b>${esc(c.mensaje)}</b><br><span style="font-size:.76rem;color:#94a3b8">${esc(destLbl(c))} · ${c.permanente?'permanente':c.duracion_seg+'s'}${c.sonido&&c.sonido!=='none'?' · 🔊':''}</span></span>
     <button class="btn-del" onclick="coDesactivar(${c.id})"><i class="bi bi-x-circle"></i> Desactivar</button></div>`).join('');
 }
 async function coDesactivar(id){

@@ -532,7 +532,7 @@ const saveAnuncios = async (req, res) => {
 
 /* ── Comunicados manuales (banner push dirigido) ── */
 const getComunicados = async (req, res) => {
-  try { res.json({ success: true, data: { activos: await COM.listarActivos(), meta: await COM.meta() }, error: null }); }
+  try { res.json({ success: true, data: { activos: await COM.listarActivos(), meta: { ...(await COM.meta()), sonidos: ANUN.SONIDOS } }, error: null }); }
   catch (e) { console.error('[comunicados get]', e.message); res.status(500).json({ success: false, data: null, error: 'Error interno del servidor' }); }
 };
 const crearComunicado = async (req, res) => {

@@ -2,7 +2,7 @@
    AutoFácil — Versión global de la aplicación
    Editar SOLO este archivo para cambiar la versión
    ───────────────────────────────────────────── */
-const APP_VERSION = 'v68.9';
+const APP_VERSION = 'v69.0';
 
 document.addEventListener('DOMContentLoaded', () => {
 
@@ -1088,14 +1088,17 @@ document.addEventListener('DOMContentLoaded', () => {
     // Cerrar permanentes que el admin desactivó (ya no vienen en la lista)
     Object.keys(COM_ON).forEach(id => { if (!ids.includes(parseInt(id, 10))) { COM_ON[id].cerrar(); delete COM_ON[id]; } });
     const seen = comSeen();
+    const sonar = c => { if (c.sonido && c.sonido !== 'none') { try { if (window.afPlaySound) window.afPlaySound(c.sonido); } catch (e) {} } };
     coms.forEach(c => {
       if (c.permanente) {
         if (COM_ON[c.id] || seen.includes(c.id)) return;  // ya en pantalla o ya cerrado por el usuario
+        sonar(c);
         COM_ON[c.id] = bannerPush(c.mensaje, { bg: c.bg, fg: c.fg, ancho: c.ancho, permanente: true, icon: '📣',
           onClose: () => { comMark(c.id); delete COM_ON[c.id]; } });
       } else {
         if (seen.includes(c.id)) return;
         comMark(c.id);
+        sonar(c);
         bannerPush(c.mensaje, { bg: c.bg, fg: c.fg, ancho: c.ancho, dur: c.dur, icon: '📣' });
       }
     });

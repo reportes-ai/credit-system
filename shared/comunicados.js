@@ -20,6 +20,7 @@ const ready = (async () => {
       color_fondo   VARCHAR(20)  NOT NULL DEFAULT '#0a0a0a',
       color_texto   VARCHAR(20)  NOT NULL DEFAULT '#ffffff',
       ancho_pct     INT          NOT NULL DEFAULT 40,
+      sonido        VARCHAR(20)  NOT NULL DEFAULT 'none',
       permanente    TINYINT(1)   NOT NULL DEFAULT 0,
       duracion_seg  INT          NOT NULL DEFAULT 10,
       activo        TINYINT(1)   NOT NULL DEFAULT 1,
@@ -27,6 +28,7 @@ const ready = (async () => {
       creado_por_nombre VARCHAR(200) DEFAULT NULL,
       created_at    DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP
     )`);
+    await pool.query("ALTER TABLE comunicados ADD COLUMN IF NOT EXISTS sonido VARCHAR(20) NOT NULL DEFAULT 'none'").catch(() => {});
   } catch (e) { console.error('[comunicados migration]', e.message); }
 })();
 
@@ -36,11 +38,11 @@ async function crear(c, usuario) {
   await ready;
   const tipo = TIPOS.includes(c.destino_tipo) ? c.destino_tipo : 'todos';
   await pool.query(
-    `INSERT INTO comunicados (mensaje, destino_tipo, destino_valor, color_fondo, color_texto, ancho_pct, permanente, duracion_seg, creado_por, creado_por_nombre)
-     VALUES (?,?,?,?,?,?,?,?,?,?)`,
+    `INSERT INTO comunicados (mensaje, destino_tipo, destino_valor, color_fondo, color_texto, ancho_pct, sonido, permanente, duracion_seg, creado_por, creado_por_nombre)
+     VALUES (?,?,?,?,?,?,?,?,?,?,?)`,
     [String(c.mensaje || '').slice(0, 500), tipo, tipo === 'todos' ? null : String(c.destino_valor || '').slice(0, 120),
      String(c.color_fondo || '#0a0a0a').slice(0, 20), String(c.color_texto || '#ffffff').slice(0, 20),
-     Math.min(100, Math.max(15, parseInt(c.ancho_pct) || 40)), c.permanente ? 1 : 0,
+     Math.min(100, Math.max(15, parseInt(c.ancho_pct) || 40)), String(c.sonido || 'none').slice(0, 20), c.permanente ? 1 : 0,
      Math.min(120, Math.max(3, parseInt(c.duracion_seg) || 10)),
      (usuario && usuario.email) || null, (usuario && [usuario.nombre, usuario.apellido].filter(Boolean).join(' ')) || null]);
 }
@@ -75,7 +77,7 @@ async function comunicadosParaUsuario(usuario) {
       else if (r.destino_tipo === 'perfil') m = String(r.destino_valor || '') === String(perfil || '');
       else if (r.destino_tipo === 'usuario') m = String(r.destino_valor || '') === String(idu || '');
       else if (r.destino_tipo === 'area') m = !!area && String(r.destino_valor || '').toLowerCase() === String(area || '').toLowerCase();
-      if (m) out.push({ id: r.id, mensaje: r.mensaje, permanente: !!r.permanente, dur: r.duracion_seg, bg: r.color_fondo, fg: r.color_texto, ancho: r.ancho_pct });
+      if (m) out.push({ id: r.id, mensaje: r.mensaje, permanente: !!r.permanente, dur: r.duracion_seg, bg: r.color_fondo, fg: r.color_texto, ancho: r.ancho_pct, sonido: r.sonido || 'none' });
     }
     return out;
   } catch (e) { return []; }
