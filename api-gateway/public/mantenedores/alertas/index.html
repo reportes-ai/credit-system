@@ -5,7 +5,7 @@
   <link rel="icon" href="/img/favicon.png" type="image/png">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Alertas — Mantenedor — AutoFácil</title>
-  <!-- v1.5 — selector de sonido en Comunicado -->
+  <!-- v1.6 — Guardar por defecto en Comunicado -->
   <link href="/css/bootstrap.min.css" rel="stylesheet">
   <link href="/css/bootstrap-icons.css" rel="stylesheet">
   <style>
@@ -165,6 +165,7 @@
     </div>
     <div style="display:flex;justify-content:flex-end;gap:10px;align-items:center;margin-top:12px">
       <span id="coMsg" style="font-size:.84rem"></span>
+      <button class="btn-ghost" onclick="coGuardarDefault()" title="Deja estos colores, sonido, ancho y modo como predeterminados"><i class="bi bi-bookmark-star me-1"></i>Guardar por defecto</button>
       <button class="btn-probar" onclick="coProbar()"><i class="bi bi-play-circle me-1"></i>Probar local (solo yo)</button>
       <button class="btn-af" onclick="coEnviar()"><i class="bi bi-send me-1"></i>Enviar</button>
     </div>
@@ -522,9 +523,29 @@ async function cargarComunicados(){
     const r=await fetch('/api/alertas/comunicados',{headers:H}); const j=await r.json(); if(!j.success) throw 0;
     CO_META = j.data.meta||CO_META;
     document.getElementById('coSonido').innerHTML = (CO_META.sonidos||[]).map(s=>`<option value="${esc(s.id)}">${esc(s.label)}</option>`).join('');
-    document.getElementById('coSonido').value = 'none';
+    aplicarDefaultsComunicado(CO_META.defaults||{});
     renderCoActivos(j.data.activos||[]);
   }catch(e){ document.getElementById('coActivos').innerHTML='<span style="color:#b91c1c">No se pudieron cargar.</span>'; }
+}
+function aplicarDefaultsComunicado(d){
+  if(d.color_fondo) document.getElementById('coBg').value = d.color_fondo;
+  if(d.color_texto) document.getElementById('coFg').value = d.color_texto;
+  if(d.ancho_pct)   document.getElementById('coAncho').value = d.ancho_pct;
+  document.getElementById('coSonido').value = d.sonido || 'none';
+  document.getElementById('coModo').value = d.permanente ? 'perm' : 'timed';
+  if(d.duracion_seg) document.getElementById('coDur').value = d.duracion_seg;
+  coOnModo();
+}
+async function coGuardarDefault(){
+  const c=coLeer(); const msg=document.getElementById('coMsg');
+  try{
+    const r=await fetch('/api/alertas/comunicados/defaults',{method:'PUT',headers:H,body:JSON.stringify({
+      color_fondo:c.color_fondo, color_texto:c.color_texto, ancho_pct:c.ancho_pct,
+      sonido:c.sonido, permanente:c.permanente, duracion_seg:c.duracion_seg })});
+    const j=await r.json(); if(!j.success) throw new Error(j.error||'Error');
+    msg.textContent='Predeterminados guardados ✓'; msg.style.cssText='font-size:.84rem;color:#15803d';
+    setTimeout(()=>{msg.textContent='';},2500);
+  }catch(e){ msg.textContent=e.message; msg.style.cssText='font-size:.84rem;color:#b91c1c'; }
 }
 function coProbarSon(){ const t=document.getElementById('coSonido').value; if(t&&t!=='none'&&window.afPlaySound) window.afPlaySound(t); }
 function coOnTipo(){

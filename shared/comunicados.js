@@ -29,8 +29,35 @@ const ready = (async () => {
       created_at    DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP
     )`);
     await pool.query("ALTER TABLE comunicados ADD COLUMN IF NOT EXISTS sonido VARCHAR(20) NOT NULL DEFAULT 'none'").catch(() => {});
+    // Preferencias por defecto del composer (colores/sonido/ancho/modo/duración)
+    await pool.query(`CREATE TABLE IF NOT EXISTS comunicado_config (clave VARCHAR(40) PRIMARY KEY, valor TEXT)`);
   } catch (e) { console.error('[comunicados migration]', e.message); }
 })();
+
+const DEFAULTS_BASE = { color_fondo: '#0a0a0a', color_texto: '#ffffff', ancho_pct: 40, sonido: 'none', permanente: 0, duracion_seg: 10 };
+
+async function getDefaults() {
+  await ready;
+  try {
+    const [[r]] = await pool.query("SELECT valor FROM comunicado_config WHERE clave='defaults' LIMIT 1");
+    if (r && r.valor) return { ...DEFAULTS_BASE, ...JSON.parse(r.valor) };
+  } catch (_) {}
+  return { ...DEFAULTS_BASE };
+}
+
+async function saveDefaults(d) {
+  await ready;
+  const clean = {
+    color_fondo: String((d && d.color_fondo) || '#0a0a0a').slice(0, 20),
+    color_texto: String((d && d.color_texto) || '#ffffff').slice(0, 20),
+    ancho_pct: Math.min(100, Math.max(15, parseInt(d && d.ancho_pct) || 40)),
+    sonido: String((d && d.sonido) || 'none').slice(0, 20),
+    permanente: (d && d.permanente) ? 1 : 0,
+    duracion_seg: Math.min(120, Math.max(3, parseInt(d && d.duracion_seg) || 10)),
+  };
+  await pool.query("INSERT INTO comunicado_config (clave, valor) VALUES ('defaults', ?) ON DUPLICATE KEY UPDATE valor = VALUES(valor)", [JSON.stringify(clean)]);
+  return clean;
+}
 
 const TIPOS = ['todos', 'perfil', 'usuario', 'area'];
 
@@ -92,4 +119,4 @@ async function meta() {
   return { perfiles: perfiles.map(p => p.nombre), usuarios, areas: areas.map(a => a.area) };
 }
 
-module.exports = { crear, listarActivos, desactivar, comunicadosParaUsuario, meta };
+module.exports = { crear, listarActivos, desactivar, comunicadosParaUsuario, meta, getDefaults, saveDefaults };

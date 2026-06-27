@@ -12,9 +12,10 @@ router.get('/meta',    verifyToken, requireFunc('mantenedores_alertas'), c.getMe
 router.get('/anuncios', verifyToken, requireFunc('mantenedores_alertas'), c.getAnuncios);
 router.put('/anuncios', verifyToken, requireFunc('mantenedores_alertas'), c.saveAnuncios);
 // Comunicados manuales dirigidos (banner push a persona/área/perfil/empresa)
-router.get('/comunicados',        verifyToken, requireFunc('mantenedores_alertas'), c.getComunicados);
-router.post('/comunicados',       verifyToken, requireFunc('mantenedores_alertas'), c.crearComunicado);
-router.delete('/comunicados/:id', verifyToken, requireFunc('mantenedores_alertas'), c.desactivarComunicado);
+router.get('/comunicados',          verifyToken, requireFunc('mantenedores_alertas'), c.getComunicados);
+router.post('/comunicados',         verifyToken, requireFunc('mantenedores_alertas'), c.crearComunicado);
+router.put('/comunicados/defaults', verifyToken, requireFunc('mantenedores_alertas'), c.guardarComunicadoDefaults);
+router.delete('/comunicados/:id',   verifyToken, requireFunc('mantenedores_alertas'), c.desactivarComunicado);
 router.get('/',        verifyToken, requireFunc('mantenedores_alertas'), c.listAlertas);
 router.post('/',       verifyToken, requireFunc('mantenedores_alertas'), c.saveAlerta);
 router.delete('/:id',  verifyToken, requireFunc('mantenedores_alertas'), c.deleteAlerta);

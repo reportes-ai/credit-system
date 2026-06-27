@@ -532,8 +532,12 @@ const saveAnuncios = async (req, res) => {
 
 /* ── Comunicados manuales (banner push dirigido) ── */
 const getComunicados = async (req, res) => {
-  try { res.json({ success: true, data: { activos: await COM.listarActivos(), meta: { ...(await COM.meta()), sonidos: ANUN.SONIDOS } }, error: null }); }
+  try { res.json({ success: true, data: { activos: await COM.listarActivos(), meta: { ...(await COM.meta()), sonidos: ANUN.SONIDOS, defaults: await COM.getDefaults() } }, error: null }); }
   catch (e) { console.error('[comunicados get]', e.message); res.status(500).json({ success: false, data: null, error: 'Error interno del servidor' }); }
+};
+const guardarComunicadoDefaults = async (req, res) => {
+  try { res.json({ success: true, data: await COM.saveDefaults(req.body || {}), error: null }); }
+  catch (e) { console.error('[comunicados defaults]', e.message); res.status(500).json({ success: false, data: null, error: 'Error interno del servidor' }); }
 };
 const crearComunicado = async (req, res) => {
   try {
@@ -547,4 +551,4 @@ const desactivarComunicado = async (req, res) => {
   catch (e) { console.error('[comunicados desactivar]', e.message); res.status(500).json({ success: false, data: null, error: 'Error interno del servidor' }); }
 };
 
-module.exports = { getMeta, listAlertas, saveAlerta, deleteAlerta, marcarVisto, getAnuncios, saveAnuncios, getComunicados, crearComunicado, desactivarComunicado };
+module.exports = { getMeta, listAlertas, saveAlerta, deleteAlerta, marcarVisto, getAnuncios, saveAnuncios, getComunicados, crearComunicado, desactivarComunicado, guardarComunicadoDefaults };
