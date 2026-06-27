@@ -402,7 +402,7 @@
     function paint() { lay.textContent = lines.slice(-44).join('\n') + '\n'; const c = document.createElement('span'); c.id = 'afTermCur'; c.textContent = '█'; lay.appendChild(c); }
     function step() { if (!alive) return; lines.push(i < SEED.length ? SEED[i++] : rp()); paint(); t = setTimeout(step, 90 + Math.random() * 160); }
     step();
-    end = setTimeout(() => { if (window.AF_JUEGOS) window.AF_JUEGOS.cerrar(); }, 15000);
+    end = setTimeout(() => { if (window.AF_JUEGOS) window.AF_JUEGOS.cerrar(); }, 30000);
     const esc = e => { if (e.key === 'Escape' && window.AF_JUEGOS) window.AF_JUEGOS.cerrar(); };
     window.addEventListener('keydown', esc);
     return { esPagina: true, stop() { alive = false; if (t) clearTimeout(t); if (end) clearTimeout(end); window.removeEventListener('keydown', esc); sessionStorage.setItem('af_terminal_done', '1'); st.remove(); lay.remove(); } };
@@ -430,7 +430,7 @@
   }
 
   const GAMES = {
-    terminal:  { nombre: '🖥️ Pantalla Hacker', tip: 'La pantalla se apaga y corre una consola C:\\ "haciendo procesos" por 15s; luego vuelve. (Esc para salir)', page: true, run: terminal },
+    terminal:  { nombre: '🖥️ Pantalla Hacker', tip: 'La pantalla se apaga y corre una consola C:\\ "haciendo procesos" por 30s; luego vuelve. (Esc para salir)', page: true, run: terminal },
     clickloco: { nombre: '🖱️ Mouse Loco', tip: 'El clic en las cards no funciona 15s, funciona 15s y no funciona 15s más; después, normal.', page: true, run: clickloco },
     comeletras:{ nombre: '🟡 Come-Letras', tip: 'Pac-Man se come las letras de TU pantalla 😈 (Restaurar = recargar)', page: true, run: comeLetras },
     vidrio:    { nombre: '🪟 Vidrio Roto', tip: 'Cambia el cursor y cada clic quiebra el vidrio (con sonido). 10 veces y vuelve a la normalidad.', page: true, run: vidrio },
