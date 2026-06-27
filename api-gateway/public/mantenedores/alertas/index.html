@@ -5,7 +5,7 @@
   <link rel="icon" href="/img/favicon.png" type="image/png">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Alertas — Mantenedor — AutoFácil</title>
-  <!-- v1.3 — Anuncios push + Enviar comunicado dirigido -->
+  <!-- v1.4 — botón Probar local (solo yo) en Anuncios y Comunicado -->
   <link href="/css/bootstrap.min.css" rel="stylesheet">
   <link href="/css/bootstrap-icons.css" rel="stylesheet">
   <style>
@@ -34,6 +34,8 @@
     .on { color:#15803d; font-weight:700; } .off { color:#94a3b8; }
     .btn-af { background:linear-gradient(135deg,#0141A2,#0255c5); color:#fff; border:none; border-radius:9px; padding:9px 20px; font-size:.85rem; font-weight:700; cursor:pointer; }
     .btn-ghost { background:#fff; border:1.5px solid #0141A2; color:#0141A2; border-radius:9px; padding:8px 16px; font-size:.83rem; font-weight:700; cursor:pointer; }
+    .btn-probar { background:#fff7ed; border:1.5px solid #f59e0b; color:#b45309; border-radius:9px; padding:8px 16px; font-size:.83rem; font-weight:700; cursor:pointer; }
+    .btn-probar:hover { background:#ffedd5; }
     .btn-del { background:#fef2f2; color:#b91c1c; border:none; border-radius:7px; padding:5px 9px; cursor:pointer; }
     .btn-ed { background:#eff6ff; color:#1d4ed8; border:none; border-radius:7px; padding:5px 9px; cursor:pointer; margin-right:5px; }
     .grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(180px,1fr)); gap:12px; }
@@ -162,7 +164,7 @@
     </div>
     <div style="display:flex;justify-content:flex-end;gap:10px;align-items:center;margin-top:12px">
       <span id="coMsg" style="font-size:.84rem"></span>
-      <button class="btn-ghost" onclick="coProbar()"><i class="bi bi-eye me-1"></i>Probar aquí</button>
+      <button class="btn-probar" onclick="coProbar()"><i class="bi bi-play-circle me-1"></i>Probar local (solo yo)</button>
       <button class="btn-af" onclick="coEnviar()"><i class="bi bi-send me-1"></i>Enviar</button>
     </div>
     <div style="margin-top:14px">
@@ -471,7 +473,7 @@ function renderAnuncios(eventos){
       </div>
       <div style="display:flex;justify-content:flex-end;gap:10px;align-items:center;margin-top:12px">
         <span class="an-msg" style="font-size:.84rem"></span>
-        <button class="btn-ghost" onclick="anProbar(this)"><i class="bi bi-eye me-1"></i>Probar aquí</button>
+        <button class="btn-probar" onclick="anProbar(this)"><i class="bi bi-play-circle me-1"></i>Probar local (solo yo)</button>
         <button class="btn-af" onclick="anGuardar(this)"><i class="bi bi-check-lg me-1"></i>Guardar</button>
       </div>
     </div>`;
