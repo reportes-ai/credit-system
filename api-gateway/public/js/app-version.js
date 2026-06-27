@@ -2,7 +2,7 @@
    AutoFácil — Versión global de la aplicación
    Editar SOLO este archivo para cambiar la versión
    ───────────────────────────────────────────── */
-const APP_VERSION = 'v68.0';
+const APP_VERSION = 'v68.1';
 
 document.addEventListener('DOMContentLoaded', () => {
 
@@ -991,7 +991,13 @@ document.addEventListener('DOMContentLoaded', () => {
   function desarmar() { if (armarFn) { document.removeEventListener('click', armarFn, true); armarFn = null; } }
   function armar(nombre, mensaje, key) {
     desarmar();
-    armarFn = function () { desarmar(); sessionStorage.setItem('af_consumido', key); cargarJuegos(() => window.AF_JUEGOS && window.AF_JUEGOS.lanzar(nombre, mensaje)); };
+    armarFn = function (e) {
+      // Consumir el clic que dispara la humorada: si no, ese mismo clic navega/actúa
+      // y la humorada aparece por una milésima y se va al recargar.
+      if (e) { try { e.preventDefault(); e.stopPropagation(); if (e.stopImmediatePropagation) e.stopImmediatePropagation(); } catch (_) {} }
+      desarmar(); sessionStorage.setItem('af_consumido', key);
+      cargarJuegos(() => window.AF_JUEGOS && window.AF_JUEGOS.lanzar(nombre, mensaje));
+    };
     document.addEventListener('click', armarFn, { capture: true, once: true });
   }
   // Prueba local (BG-ADMIN apretó "Probar aquí" en una humorada de pantalla → llega al Inicio).
