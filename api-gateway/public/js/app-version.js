@@ -2,7 +2,7 @@
    AutoFácil — Versión global de la aplicación
    Editar SOLO este archivo para cambiar la versión
    ───────────────────────────────────────────── */
-const APP_VERSION = 'v68.5';
+const APP_VERSION = 'v68.6';
 
 document.addEventListener('DOMContentLoaded', () => {
 
@@ -521,14 +521,32 @@ document.addEventListener('DOMContentLoaded', () => {
     g.gain.setValueAtTime(0.5, t0 + 1.2); g.gain.linearRampToValueAtTime(0, t0 + dur);
     src.connect(bp).connect(g).connect(ctx.destination); src.start(t0); src.stop(t0 + dur);
   }
+  function sAnuncio(ctx) { // chime tipo anuncio de aeropuerto: 4 notas con cola de campana
+    const notas = [1046.50, 783.99, 659.25, 523.25]; // C6 · G5 · E5 · C5 (descendente)
+    const paso = 0.34;
+    notas.forEach((f, i) => {
+      const t0 = ctx.currentTime + i * paso;
+      const o1 = ctx.createOscillator(), g1 = ctx.createGain();
+      o1.type = 'sine'; o1.frequency.value = f;
+      g1.gain.setValueAtTime(0.0001, t0); g1.gain.exponentialRampToValueAtTime(0.5, t0 + 0.02);
+      g1.gain.exponentialRampToValueAtTime(0.0008, t0 + 1.1);
+      o1.connect(g1).connect(ctx.destination); o1.start(t0); o1.stop(t0 + 1.2);
+      const o2 = ctx.createOscillator(), g2 = ctx.createGain();
+      o2.type = 'sine'; o2.frequency.value = f * 2;
+      g2.gain.setValueAtTime(0.0001, t0); g2.gain.exponentialRampToValueAtTime(0.12, t0 + 0.02);
+      g2.gain.exponentialRampToValueAtTime(0.0006, t0 + 0.7);
+      o2.connect(g2).connect(ctx.destination); o2.start(t0); o2.stop(t0 + 0.8);
+    });
+  }
   function reproducir(tipo) {
     try {
       const ctx = new (window.AudioContext || window.webkitAudioContext)();
       if (tipo === 'dingdong') sDingDong(ctx);
       else if (tipo === 'alarma') sAlarma(ctx);
       else if (tipo === 'aplausos') sAplausos(ctx);
+      else if (tipo === 'anuncio') sAnuncio(ctx);
       else sCampana(ctx);
-      setTimeout(() => ctx.close(), 2500);
+      setTimeout(() => ctx.close(), tipo === 'anuncio' ? 3500 : 2500);
     } catch (e) {}
   }
   const dingDing = () => reproducir(ringTipo);
@@ -1008,12 +1026,39 @@ document.addEventListener('DOMContentLoaded', () => {
     sessionStorage.removeItem('af_probar');
     cargarJuegos(() => window.AF_JUEGOS && window.AF_JUEGOS.lanzar(probar, 'Modo prueba (solo tú lo ves)'));
   }
+  // Banner "push" que baja desde arriba (ancho 1/3, negro, letras blancas).
+  const escAn = s => String(s == null ? '' : s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+  function mostrarAnuncio(texto) {
+    try {
+      const prev = document.getElementById('afAnuncioBanner'); if (prev) prev.remove();
+      const b = document.createElement('div');
+      b.id = 'afAnuncioBanner';
+      b.style.cssText = 'position:fixed;top:0;left:50%;transform:translateX(-50%) translateY(-160%);'
+        + 'width:33vw;min-width:300px;max-width:540px;background:#0a0a0a;color:#fff;'
+        + 'border-radius:0 0 16px 16px;box-shadow:0 14px 44px rgba(0,0,0,.55);'
+        + 'padding:16px 22px;z-index:2147483600;display:flex;align-items:center;gap:14px;'
+        + "font-family:'Segoe UI',system-ui,sans-serif;transition:transform .6s cubic-bezier(.18,.89,.32,1.28);";
+      b.innerHTML = '<span style="font-size:1.7rem;line-height:1">🎉</span>'
+        + '<div style="font-size:.98rem;font-weight:600;letter-spacing:.2px">' + escAn(texto) + '</div>';
+      document.body.appendChild(b);
+      requestAnimationFrame(() => { b.style.transform = 'translateX(-50%) translateY(0)'; });
+      setTimeout(() => { b.style.transform = 'translateX(-50%) translateY(-160%)'; setTimeout(() => b.remove(), 800); }, 6000);
+    } catch (e) {}
+  }
   async function chk() {
     try {
       const r = await fetch('/api/mantenimiento?_=' + Date.now(), { headers: { Authorization: 'Bearer ' + token }, cache: 'no-store' });
       const j = await r.json();
       if (!j.success) return;
       window.__AF_ESBG = !!j.data.es_bg;
+      // Anuncio push global (p.ej. "Juan Pérez acaba de colocar un nuevo crédito").
+      // Sonido tipo aeropuerto y, 2s después, baja el banner. Dedup por nonce (1 vez por navegador).
+      const an = j.data.anuncio;
+      if (an && an.nonce && localStorage.getItem('af_anuncio_nonce') !== String(an.nonce)) {
+        localStorage.setItem('af_anuncio_nonce', String(an.nonce));
+        try { if (window.afPlaySound) window.afPlaySound('anuncio'); } catch (e) {}
+        setTimeout(() => mostrarAnuncio(an.texto), 2000);
+      }
       const g = j.data.juego, nombre = g && g.nombre;
       const key = nombre ? (nombre + '|' + (g.nonce || '')) : null;
       if (key && key !== actual) {
