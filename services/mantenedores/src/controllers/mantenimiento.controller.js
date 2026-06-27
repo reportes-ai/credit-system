@@ -29,7 +29,7 @@ const MSG_DEFAULT = 'AVISO. El sistema se encuentra en Mantención.';
   } catch (e) { console.error('[mantenimiento migration]', e.message); }
 })();
 
-const JUEGOS_OK = ['snake', 'runner', 'breakout', 'topo', 'catapulta', 'comeletras', 'escapistas', 'vidrio'];
+const JUEGOS_OK = ['snake', 'runner', 'breakout', 'topo', 'catapulta', 'comeletras', 'escapistas', 'vidrio', 'terminal', 'clickloco'];
 async function leerJuego() {
   const [rows] = await pool.query("SELECT clave, valor FROM mantenimiento_config WHERE clave LIKE 'juego_%'");
   const m = {}; rows.forEach(r => { m[r.clave] = r.valor; });

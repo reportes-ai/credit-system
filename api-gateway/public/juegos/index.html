@@ -108,7 +108,7 @@ function esPagina(id){ const g=(window.AF_JUEGOS?window.AF_JUEGOS.lista():[]).fi
 function probar(id){
   // Las humoradas "de pantalla" (Come-Letras, Módulos Escurridizos) se ven en las
   // pantallas de trabajo → te llevo al Inicio y la lanzo allá solo para ti.
-  if (esPagina(id)) { sessionStorage.removeItem('af_vidrio_done'); sessionStorage.removeItem('af_vidrio_left'); sessionStorage.setItem('af_probar', id); toast('Te llevo al Inicio para probarla…'); setTimeout(()=>location.href='/', 600); return; }
+  if (esPagina(id)) { ['af_vidrio_done','af_vidrio_left','af_terminal_done','af_clickloco_done'].forEach(k=>sessionStorage.removeItem(k)); sessionStorage.setItem('af_probar', id); toast('Te llevo al Inicio para probarla…'); setTimeout(()=>location.href='/', 600); return; }
   if (window.AF_JUEGOS) window.AF_JUEGOS.lanzar(id, 'Modo prueba (solo tú lo ves)');
 }
 
