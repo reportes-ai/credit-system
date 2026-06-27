@@ -5,7 +5,7 @@
   <link rel="icon" href="/img/favicon.png" type="image/png">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Mantenedor de Cartas de Aprobación — AutoFácil</title>
-  <!-- v1.1 -->
+  <!-- v1.2 — card Vigencia de la Carta -->
   <link href="/css/bootstrap.min.css" rel="stylesheet">
   <link href="/css/bootstrap-icons.css" rel="stylesheet">
   <style>
@@ -57,6 +57,11 @@
       <h5>Firma Cartas de Aprobación</h5>
       <p>Sube la imagen de la firma de la empresa que aparece al pie de las cartas impresas.</p>
     </button>
+    <button class="card-m" onclick="abrir('vigencia')">
+      <div class="ic"><i class="bi bi-hourglass-split"></i></div>
+      <h5>Vigencia de la Carta</h5>
+      <p>Días corridos (desde la fecha de la carta) que la aprobación se mantiene vigente. Al vencer pasa a Desistida y deja de imprimirse.</p>
+    </button>
   </div>
 
   <!-- Panel TEXTO -->
@@ -87,6 +92,30 @@
     <input type="file" id="firmaInput" accept="image/png,image/jpeg" style="display:none" onchange="subirFirma(this)">
     <button class="btn btn-primary me-2" onclick="document.getElementById('firmaInput').click()"><i class="bi bi-upload me-1"></i>Subir Firma</button>
     <button class="btn btn-danger" onclick="eliminarFirma()"><i class="bi bi-trash me-1"></i>Eliminar Firma</button>
+  </div>
+
+  <!-- Panel VIGENCIA -->
+  <div class="panel" id="panelVigencia">
+    <div style="display:flex;justify-content:space-between;align-items:start">
+      <div><h4>Vigencia de la Carta de Aprobación</h4>
+      <p class="hint">La carta se mantiene vigente este número de <b>días corridos</b> contados desde la <b>fecha de la carta</b>. Al vencer, pasa automáticamente a <b>Desistida</b> y ya no se puede imprimir.</p></div>
+      <button class="btn-volver" onclick="volver()"><i class="bi bi-arrow-left me-1"></i>Volver</button>
+    </div>
+    <div class="lbl">Días de vigencia</div>
+    <input type="number" id="vigDias" min="1" max="60" step="1" style="width:120px;border:1.5px solid #d1d5db;border-radius:10px;padding:10px 14px;font-size:1rem;font-weight:700">
+    <div style="margin-top:16px;text-align:right">
+      <button class="btn btn-primary" onclick="guardarVigencia()"><i class="bi bi-floppy me-1"></i>Guardar vigencia</button>
+    </div>
+  </div>
+
+  <!-- Qué afecta este mantenedor -->
+  <div style="margin-top:26px;background:#f8fafc;border-left:4px solid #0141A2;border-radius:10px;padding:16px 18px">
+    <div style="font-weight:700;color:#012d70;margin-bottom:8px"><i class="bi bi-diagram-3 me-1"></i>Qué afecta este mantenedor</div>
+    <ul style="font-size:.84rem;color:#475569;margin:0;padding-left:18px;line-height:1.7">
+      <li><b>Texto Cartas</b> → contenido (introducción + consideraciones) que se imprime en cada <a href="/aprobaciones/">Carta de Aprobación</a>.</li>
+      <li><b>Firma Cartas</b> → imagen de firma al pie de las cartas impresas.</li>
+      <li><b>Vigencia de la Carta</b> → días corridos que la carta queda vigente en <a href="/aprobaciones/">Cartas de Aprobación Vigentes</a>; al vencer pasa a <b>Desistida</b> (y el crédito a DESISTIDO) y deja de imprimirse.</li>
+    </ul>
   </div>
 </div>
 
@@ -130,11 +159,30 @@ function abrir(cual){
   document.getElementById('cardsView').style.display='none';
   document.getElementById('panelTexto').style.display = cual==='texto' ? 'block' : 'none';
   document.getElementById('panelFirma').style.display = cual==='firma' ? 'block' : 'none';
+  document.getElementById('panelVigencia').style.display = cual==='vigencia' ? 'block' : 'none';
+  if (cual==='vigencia') cargarVigencia();
 }
 function volver(){
   document.getElementById('cardsView').style.display='grid';
   document.getElementById('panelTexto').style.display='none';
   document.getElementById('panelFirma').style.display='none';
+  document.getElementById('panelVigencia').style.display='none';
+}
+
+/* ── Vigencia ── */
+async function cargarVigencia(){
+  try { const r = await fetch('/api/cartas/vigencia', { headers: hdr() }); const j = await r.json();
+    document.getElementById('vigDias').value = (j.success && j.data && j.data.dias) ? j.data.dias : 5; }
+  catch(e){ document.getElementById('vigDias').value = 5; }
+}
+async function guardarVigencia(){
+  const n = parseInt(document.getElementById('vigDias').value, 10);
+  if (!(n>=1 && n<=60)) { toast('Ingresa un número de días entre 1 y 60.'); return; }
+  try {
+    const r = await fetch('/api/cartas/vigencia', { method:'PUT', headers: hdr(), body: JSON.stringify({ dias:n }) });
+    const j = await r.json(); if (!j.success) throw new Error(j.error||'Error');
+    toast('Vigencia guardada: '+n+' días corridos.');
+  } catch(e){ toast('Error: '+e.message); }
 }
 
 /* ── Texto ── */

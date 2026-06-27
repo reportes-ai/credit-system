@@ -104,6 +104,8 @@ const ensureTable = async () => {
     ['pct_ejecutivo_fin', 2.12, 'Comisión ejecutivo sobre monto financiado (%)'],
     // ── Umbral del tramo UF (MAYOR/MENOR) — editable desde Tasas → Modificar Umbrales ──
     ['umbral_uf_tramo', 200, 'Umbral en UF que separa el tramo MENOR/MAYOR (default 200 UF)'],
+    // ── Vigencia de la Carta de Aprobación (días corridos desde la fecha de la carta) ──
+    ['vigencia_carta_dias', 5, 'Vigencia de la Carta de Aprobación (días corridos desde la fecha de la carta; al vencer pasa a DESISTIDA)'],
   ];
   for (const [clave, valor, descripcion] of defaults) {
     await pool.query(

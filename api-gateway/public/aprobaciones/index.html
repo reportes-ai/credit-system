@@ -94,6 +94,13 @@
     .st-APROBADA  { background:#dcfce7; color:#15803d; }
     .st-RECHAZADA { background:#fee2e2; color:#b91c1c; }
     .st-ANULADA   { background:#f1f5f9; color:#64748b; }
+    .st-DESISTIDA { background:#fae8ff; color:#a21caf; }
+    .st-OTORGADA  { background:#dbeafe; color:#1d4ed8; }
+    .bm-otorgar  { background:#16a34a; color:#fff; }
+    .bm-desistir { background:#fef2f2; color:#b91c1c; border:1px solid #fecaca; }
+    .vig-chip { font-size:.68rem; font-weight:800; border-radius:10px; padding:2px 8px; }
+    .vig-ok   { background:#dcfce7; color:#15803d; }
+    .vig-warn { background:#fef9c3; color:#a16207; }
     .btn-mini { border:none; border-radius:7px; padding:4px 10px; font-size:.75rem; font-weight:600; cursor:pointer; margin-right:4px; white-space:nowrap; }
     .bm-ver   { background:#eff6ff; color:#1d4ed8; }
     .bm-print { background:#ecfdf5; color:#047857; }
@@ -209,6 +216,12 @@
       <h6>Revisión de Cartas</h6><p>Aprueba o rechaza las cartas pendientes del pool</p>
       <span class="btn-acceder"><i class="bi bi-arrow-right-circle me-1"></i>Acceder</span>
     </button>
+    <button class="ap-card" id="cardVigentes" onclick="showTab('vigentes')" style="display:none">
+      <span class="ap-badge" id="badgeVigCard">0</span>
+      <div class="card-icon"><i class="bi bi-hourglass-split"></i></div>
+      <h6>Cartas de Aprobación Vigentes</h6><p>Aprobadas dentro de su plazo: márcalas Otorgada o Desistida</p>
+      <span class="btn-acceder"><i class="bi bi-arrow-right-circle me-1"></i>Acceder</span>
+    </button>
     <button class="ap-card" id="cardImpresion" onclick="showTab('impresion')">
       <span class="ap-badge" id="badgeImpCard">0</span>
       <div class="card-icon"><i class="bi bi-printer"></i></div>
@@ -261,7 +274,7 @@
       <input type="text" id="fBuscar" placeholder="Buscar cliente, RUT u operación…" oninput="renderLista()" style="flex:1;min-width:200px">
       <select id="fEstado" onchange="renderLista()">
         <option value="">Todos los estados</option>
-        <option>PENDIENTE</option><option>APROBADA</option><option>RECHAZADA</option><option>ANULADA</option>
+        <option>PENDIENTE</option><option>APROBADA</option><option>RECHAZADA</option><option>ANULADA</option><option>DESISTIDA</option>
       </select>
       <button class="btn-sec" onclick="cargarCartas()"><i class="bi bi-arrow-clockwise"></i></button>
     </div>
@@ -450,6 +463,27 @@
   </div>
 </div>
 
+<!-- ════════ TAB: CARTAS DE APROBACIÓN VIGENTES ════════ -->
+<div class="tab-pane" id="pane-vigentes" style="max-width:none">
+  <div class="card-af">
+    <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:6px">
+      <i class="bi bi-hourglass-split" style="color:var(--navy);font-size:1.2rem"></i>
+      <b style="color:var(--navy)">Cartas de Aprobación Vigentes</b>
+      <span id="vigCount" style="font-size:.8rem;color:#64748b"></span>
+      <span style="margin-left:auto;font-size:.78rem;color:#94a3b8">Vence a los <b id="vigDiasLbl">5</b> días corridos desde la fecha de la carta · al vencer pasa a Desistida</span>
+    </div>
+    <div class="filters-bar">
+      <input type="text" id="vigBuscar" placeholder="Buscar N° operación, cliente, dealer o ejecutivo…" oninput="renderVigentes()" style="flex:1;min-width:240px">
+    </div>
+    <div style="overflow-x:auto">
+      <table class="tbl">
+        <thead><tr><th>N° Op Carta</th><th>N° Operación</th><th>Tipo</th><th>RUT</th><th>Cliente</th><th>Dealer</th><th>Ejecutivo</th><th>Fecha carta</th><th>Vence</th><th style="text-align:center">Vigencia</th><th style="text-align:right">Acciones</th></tr></thead>
+        <tbody id="bodyVigentes"></tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
 <!-- ════════ TAB: IMPRESIÓN (solo aprobadas) ════════ -->
 <div class="tab-pane" id="pane-impresion">
   <div class="card-af">
@@ -472,7 +506,7 @@
       <input type="date" id="infDesde" onchange="renderInformes()">
       <input type="date" id="infHasta" onchange="renderInformes()">
       <select id="infEstado" onchange="renderInformes()">
-        <option value="">Todos</option><option>PENDIENTE</option><option>APROBADA</option><option>RECHAZADA</option><option>ANULADA</option>
+        <option value="">Todos</option><option>PENDIENTE</option><option>APROBADA</option><option>RECHAZADA</option><option>ANULADA</option><option>DESISTIDA</option>
       </select>
       <select id="infTipo" onchange="renderInformes()">
         <option value="">Todos</option><option>DEALER PARQUE</option><option>DEALER CALLE</option>
@@ -666,6 +700,7 @@ let CARTA_INTRO = CARTA_INTRO_DEFAULT;
 let CARTA_CONSID = CARTA_CONSID_DEFAULT;
 let editandoId = null;
 let UF_HOY = null, TASAS = null, PARAMS_CRED = null, montoCredManual = false;
+let VIGENCIA_DIAS = 5;   // días corridos de vigencia de la carta (parametros_credito.vigencia_carta_dias)
 let FINANCIERAS = [
   { nombre:'AUTOFIN',           estado:'normal' },
   { nombre:'UNIDAD DE CREDITO', estado:'normal' },
@@ -725,7 +760,8 @@ async function cargarUFyTasas(){
     const u = Array.isArray(jUf.data) ? jUf.data[0] : jUf.data;
     if (u?.valor) UF_HOY = parseFloat(u.valor);
     if (jTas.data) TASAS = jTas.data;
-    if (jPar.success && jPar.data?.obj) PARAMS_CRED = jPar.data.obj;
+    if (jPar.success && jPar.data?.obj) { PARAMS_CRED = jPar.data.obj;
+      const vd = parseInt(PARAMS_CRED.vigencia_carta_dias, 10); if (vd > 0) VIGENCIA_DIAS = vd; }
   } catch(e) { console.error('uf/tasas/params', e); }
 }
 
@@ -777,6 +813,7 @@ async function cargarPermisos(){
   const can = c => ES_ADMIN || PERMISOS.has(c);
   if (can('aprob_crear'))     document.getElementById('cardGenerador').style.display = '';
   if (can('aprob_revisar'))   document.getElementById('cardRevision').style.display = '';
+  if (can('aprob_vigentes'))  document.getElementById('cardVigentes').style.display = '';
   if (can('aprob_ver_todas')) document.getElementById('cardInformes').style.display = '';
   // Cartolas (Emisión + Enviadas) se movieron a Post Venta; sus cards ya no se muestran aquí.
   if (can('aprob_desempeno')) document.getElementById('cardDesempeno').style.display = '';
@@ -850,7 +887,8 @@ function abrirCargaMasivaCartas(){
 const TITULOS = { home:'', lista:'Mis Cartas', nueva:'Generador de Carta de Aprobación',
   revision:'Revisión de Cartas de Aprobación', impresion:'Impresión de Cartas de Aprobación',
   informes:'Informes de Cartas de Aprobación', cartolas:'Emisión de Cartolas',
-  enviadas:'Cartolas Enviadas', params:'Preferencia Financiera', desempeno:'Desempeño Analistas de Crédito' };
+  enviadas:'Cartolas Enviadas', params:'Preferencia Financiera', desempeno:'Desempeño Analistas de Crédito',
+  vigentes:'Cartas de Aprobación Vigentes' };
 
 function showTab(t){
   document.querySelectorAll('.tab-pane').forEach(p=>p.classList.remove('active'));
@@ -861,6 +899,7 @@ function showTab(t){
   // Ayuda contextual por pestaña
   if (window.afAyudaSet) window.afAyudaSet('/aprobaciones/' + (t==='home' ? '' : t + '/'));
   if (t==='revision')  renderRevision();
+  if (t==='vigentes')  renderVigentes();
   if (t==='impresion') renderImpresion();
   if (t==='informes')  initInformes();
   if (t==='cartolas')  initCartolas();
@@ -1169,6 +1208,9 @@ function actualizarBadge(){
   const nImp = CARTAS.filter(c => c.status==='APROBADA' && !vistas.has(c.id)).length;
   document.getElementById('badgeImpCard').textContent = nImp;
   document.getElementById('cardImpresion').classList.toggle('alerta-verde', nImp > 0);
+  // Vigentes: cartas aprobadas no otorgadas dentro de plazo
+  const nVig = CARTAS.filter(c => c.status==='APROBADA' && !c.otorgado && !vigenciaDeCarta(c).vencida).length;
+  const bv = document.getElementById('badgeVigCard'); if (bv) bv.textContent = nVig;
 }
 
 /* ── Formulario nueva carta ───────────────────────── */
@@ -2155,6 +2197,7 @@ function imprimirCarta(id){
   const c = CARTAS.find(x=>x.id===id);
   if (!c) return;
   if (c.status !== 'APROBADA') { alert('La carta debe estar APROBADA para imprimir.'); return; }
+  if (!c.otorgado && vigenciaDeCarta(c).vencida) { alert('La carta venció su plazo de vigencia (' + VIGENCIA_DIAS + ' días) y quedó Desistida. Ya no se puede imprimir.'); return; }
   marcarImpVista(c.id);
   const title = `Carta de Aprobación - ${(c.cliente||'').replace(/[^a-zA-Z0-9áéíóúÁÉÍÓÚñÑ ]/g,'').trim()} - ${c.opCarta||''} - ${(c.rutCliente||'').replace(/[^0-9kK\-]/g,'')}`;
   const w = window.open('', '_blank');
@@ -2273,6 +2316,74 @@ async function guardarFactores(){
     const el = document.getElementById('paramsAlert');
     el.textContent='Error de conexión'; el.className='alert-inline err';
   }
+}
+
+/* ═══════════ CARTAS DE APROBACIÓN VIGENTES ═══════════ */
+// Vigencia = fecha de la carta + VIGENCIA_DIAS días corridos. dias = días restantes.
+function vigenciaDeCarta(c){
+  const f = dDate(c.fecha);
+  if (!f) return { vence:null, dias:null, vencida:false };
+  const base = new Date(f + 'T00:00:00'); if (isNaN(base)) return { vence:null, dias:null, vencida:false };
+  const vence = new Date(base); vence.setDate(vence.getDate() + VIGENCIA_DIAS);
+  const hoy = new Date(); hoy.setHours(0,0,0,0);
+  const dias = Math.round((vence - hoy) / 86400000);
+  return { vence, dias, vencida: dias < 0 };
+}
+function renderVigentes(){
+  const lbl = document.getElementById('vigDiasLbl'); if (lbl) lbl.textContent = VIGENCIA_DIAS;
+  const q = (document.getElementById('vigBuscar').value||'').toLowerCase();
+  const rows = CARTAS
+    .filter(c => c.status==='APROBADA' && !c.otorgado && !vigenciaDeCarta(c).vencida)
+    .filter(c => !q || [c.opCarta,c.numOp,c.numeroCredito,c.cliente,c.concesionario,c.ejecutivoNombre,c.rutCliente].some(v=>String(v||'').toLowerCase().includes(q)))
+    .sort((a,b)=> (vigenciaDeCarta(a).dias) - (vigenciaDeCarta(b).dias));
+  document.getElementById('vigCount').textContent = rows.length + ' carta(s) vigente(s)';
+  const body = document.getElementById('bodyVigentes');
+  if (!rows.length){ body.innerHTML='<tr><td colspan="11" style="text-align:center;color:#94a3b8;padding:24px">Sin cartas vigentes</td></tr>'; return; }
+  const fd = v => { const d=dDate(v); if(!d) return '—'; const x=new Date(d+'T00:00:00'); return isNaN(x)?'—':x.toLocaleDateString('es-CL'); };
+  body.innerHTML = rows.map(c=>{
+    const v = vigenciaDeCarta(c);
+    const chip = v.dias<=1 ? `<span class="vig-chip vig-warn">${v.dias} día${v.dias===1?'':'s'}</span>`
+                           : `<span class="vig-chip vig-ok">${v.dias} días</span>`;
+    return `<tr>
+      <td><b>${escH(c.opCarta||'')}</b></td>
+      <td style="font-size:.78rem">${escH(c.numOp||c.numeroCredito||'—')}</td>
+      <td style="font-size:.72rem">${escH(c.tipo||'')}</td>
+      <td style="font-size:.76rem">${escH(c.rutCliente||'—')}</td>
+      <td>${escH(toTitle(c.cliente||''))}</td>
+      <td style="font-size:.76rem">${escH(c.concesionario||'')}</td>
+      <td style="font-size:.74rem">${escH(c.ejecutivoNombre||'')}</td>
+      <td style="font-size:.76rem">${fd(c.fecha)}</td>
+      <td style="font-size:.76rem">${v.vence?v.vence.toLocaleDateString('es-CL'):'—'}</td>
+      <td style="text-align:center">${chip}</td>
+      <td style="text-align:right;white-space:nowrap">
+        <button class="btn-mini bm-ver" onclick="verCarta(${c.id})" title="Ver"><i class="bi bi-eye"></i></button>
+        <button class="btn-mini bm-print" onclick="imprimirCarta(${c.id})" title="Imprimir"><i class="bi bi-printer"></i></button>
+        <button class="btn-mini bm-otorgar" onclick="otorgarCarta(${c.id})"><i class="bi bi-check2-circle"></i> Otorgado</button>
+        <button class="btn-mini bm-desistir" onclick="desistirCarta(${c.id})"><i class="bi bi-x-circle"></i> Desistido</button>
+      </td>
+    </tr>`;
+  }).join('');
+}
+async function otorgarCarta(id){
+  const c = CARTAS.find(x=>x.id===id); if (!c) return;
+  if (!confirm(`¿Marcar OTORGADA la carta ${c.opCarta||id}?\n\nEl crédito pasará a OTORGADO y se generará la cartola de comisión del mes.`)) return;
+  try {
+    const r = await fetch(`/api/cartas/${id}/otorgar`, { method:'POST', headers: hdr() });
+    const j = await r.json(); if (!j.success) throw new Error(j.error||'Error');
+    await cargarCartas(); renderVigentes();
+    alert('Carta otorgada: crédito → OTORGADO y cartola de comisión generada.');
+  } catch(e){ alert(e.message); }
+}
+async function desistirCarta(id){
+  const c = CARTAS.find(x=>x.id===id); if (!c) return;
+  if (!confirm(`¿Marcar DESISTIDA la carta ${c.opCarta||id}?\n\nDejará de estar vigente, no se podrá imprimir y el crédito pasará a DESISTIDO.`)) return;
+  const motivo = prompt('Motivo del desistimiento (opcional):','') || '';
+  try {
+    const r = await fetch(`/api/cartas/${id}/desistir`, { method:'POST', headers: hdr(), body: JSON.stringify({ motivo }) });
+    const j = await r.json(); if (!j.success) throw new Error(j.error||'Error');
+    await cargarCartas(); renderVigentes();
+    alert('Carta desistida.');
+  } catch(e){ alert(e.message); }
 }
 
 /* ═══════════ IMPRESIÓN (solo aprobadas) ═══════════ */

@@ -2037,6 +2037,28 @@ const getUsuariosByPerfil = async (req, res) => {
   } catch (e) { console.error('[perfiles migration v32]', e.message); }
 })();
 
+/* ─── Migración v33: funcionalidad Cartas de Aprobación Vigentes (Aprobaciones) ─
+   Card + acciones Otorgar/Desistir sobre cartas aprobadas dentro de su vigencia. */
+(async () => {
+  try {
+    const [[mod]] = await pool.query("SELECT id_modulo FROM modulos WHERE ruta='/aprobaciones/' LIMIT 1");
+    if (!mod) return;
+    const [[adm]] = await pool.query("SELECT id_perfil FROM perfiles WHERE nombre='Administrador' LIMIT 1");
+    const [[ex]] = await pool.query("SELECT id_funcionalidad FROM funcionalidades WHERE codigo='aprob_vigentes'");
+    let idF = ex?.id_funcionalidad;
+    if (!idF) {
+      const [ins] = await pool.query(
+        'INSERT INTO funcionalidades (id_modulo, nombre, codigo, href) VALUES (?,?,?,?)',
+        [mod.id_modulo, 'Cartas de Aprobación Vigentes', 'aprob_vigentes', null]);
+      idF = ins.insertId;
+    }
+    if (adm) await pool.query(
+      'INSERT IGNORE INTO permisos_perfil (id_perfil, id_funcionalidad, habilitado) VALUES (?,?,1)',
+      [adm.id_perfil, idF]);
+    console.log('✓ Perfiles v33: funcionalidad Cartas de Aprobación Vigentes registrada');
+  } catch (e) { console.error('[perfiles migration v33]', e.message); }
+})();
+
 /* ─── Migración: consolidar "Parques". Había la card huérfana "Parques y Comisiones"
    (con href, generaba el menú) además del permiso canónico mantenedores_parques
    (sin href). Se le da el href al canónico y se elimina la huérfana. */

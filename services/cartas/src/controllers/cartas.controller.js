@@ -195,6 +195,17 @@ async function idsRevisores(excluirEmail) {
     await pool.query(`ALTER TABLE cartas_aprobacion ADD COLUMN IF NOT EXISTS id_credito_creado INT DEFAULT NULL`);
   } catch(e) { /* columna ya existe */ }
 
+  // Desistimiento de carta (vencida o manual): la carta sale de "Vigentes".
+  try {
+    await pool.query(`ALTER TABLE cartas_aprobacion ADD COLUMN IF NOT EXISTS desistido_por VARCHAR(150) DEFAULT NULL`);
+    await pool.query(`ALTER TABLE cartas_aprobacion ADD COLUMN IF NOT EXISTS desistido_por_nombre VARCHAR(200) DEFAULT NULL`);
+    await pool.query(`ALTER TABLE cartas_aprobacion ADD COLUMN IF NOT EXISTS fecha_desistimiento DATETIME DEFAULT NULL`);
+    await pool.query(`ALTER TABLE cartas_aprobacion ADD COLUMN IF NOT EXISTS motivo_desistimiento TEXT DEFAULT NULL`);
+    await pool.query(`ALTER TABLE cartas_aprobacion ADD COLUMN IF NOT EXISTS desistido_auto TINYINT(1) NOT NULL DEFAULT 0`);
+  } catch(e) { /* columna ya existe */ }
+  // Barrer vencidas al arrancar (por si el servicio estuvo caído al cumplirse el plazo).
+  barrerVencidas().catch(e => console.error('[cartas barrerVencidas boot]', e.message));
+
   // Homologación: renombrar op_origen → id_financiera (alinear con creditos.id_financiera)
   try {
     const [[oc]] = await pool.query(
@@ -338,6 +349,10 @@ function mapRow(r) {
     corregidoPor:             r.corregido_por,
     otorgado:                 !!r.otorgado,
     fechaOtorgado:            r.fecha_otorgado,
+    desistidoPorNombre:       r.desistido_por_nombre,
+    fechaDesistimiento:       r.fecha_desistimiento,
+    motivoDesistimiento:      r.motivo_desistimiento,
+    desistidoAuto:            !!r.desistido_auto,
     tasaCredito:              r.tasa_credito ? parseFloat(r.tasa_credito) : 0,
     montoCreditoCLP:          r.monto_credito_clp,
     montoCreditoUF:           r.monto_credito_uf ? parseFloat(r.monto_credito_uf) : 0,
@@ -377,10 +392,143 @@ async function puedeVerTodas(usuario) {
   } catch (_) { return true; }
 }
 
+// ── Vigencia de la carta (paramétrico) ─────────────────────────────────────────
+// Días corridos desde la FECHA de la carta. Configurable en parametros_credito
+// (clave vigencia_carta_dias, mantenedor Parámetros de Crédito). Default 5.
+async function vigenciaDias() {
+  try {
+    const [[r]] = await pool.query("SELECT valor FROM parametros_credito WHERE clave='vigencia_carta_dias' LIMIT 1");
+    const n = r ? parseInt(r.valor, 10) : 0;
+    return n > 0 ? n : 5;
+  } catch { return 5; }
+}
+
+// Best-effort: pasa el crédito vinculado a un estado, solo si viene de un estado de
+// originación abierto (no clobberea otorgados/prepagados). Enlaza por FK explícita
+// (id_credito_creado) y por num_op = id_financiera (como el sync de cartolas).
+async function _ligarCreditoEstado(carta, nuevoEstado, estadosOrigen) {
+  const cond = [], args = [];
+  if (carta.id_credito_creado) { cond.push('id = ?'); args.push(carta.id_credito_creado); }
+  if (carta.id_financiera)     { cond.push('num_op = ?'); args.push(carta.id_financiera); }
+  if (!cond.length) return 0;
+  const ins = estadosOrigen.map(() => '?').join(',');
+  try {
+    const [r] = await pool.query(
+      `UPDATE creditos SET estado=?, updated_at=NOW() WHERE (${cond.join(' OR ')}) AND estado IN (${ins})`,
+      [nuevoEstado, ...args, ...estadosOrigen]);
+    return r.affectedRows;
+  } catch (e) { console.error('[carta→credito estado]', e.message); return 0; }
+}
+
+// Pasa a DESISTIDA (auto) las cartas APROBADA no otorgadas cuyo plazo de vigencia
+// (fecha de la carta + N días corridos) ya venció. Quedan no imprimibles.
+async function barrerVencidas() {
+  const dias = await vigenciaDias();
+  const [r] = await pool.query(
+    `UPDATE cartas_aprobacion
+        SET status='DESISTIDA', desistido_auto=1, fecha_desistimiento=NOW(),
+            motivo_desistimiento=CONCAT('Vencida automáticamente (', ?, ' días corridos desde la fecha de la carta).')
+      WHERE status='APROBADA' AND otorgado=0 AND fecha IS NOT NULL
+        AND DATE_ADD(fecha, INTERVAL ? DAY) < CURDATE()`, [dias, dias]);
+  if (r.affectedRows) {
+    await pool.query(
+      `UPDATE creditos cr JOIN cartas_aprobacion ca ON ca.id_credito_creado = cr.id
+          SET cr.estado='DESISTIDO', cr.updated_at=NOW()
+        WHERE ca.status='DESISTIDA' AND ca.desistido_auto=1 AND cr.estado='CARTA_APROBACION'`).catch(()=>{});
+  }
+  return r.affectedRows;
+}
+
 // ── Controladores ─────────────────────────────────────────────────────────────
+
+// GET /api/cartas/vigencia → { dias }. Cualquiera autenticado (lo usa la pantalla).
+const getVigencia = async (req, res) => {
+  try { res.json({ success: true, data: { dias: await vigenciaDias() }, error: null }); }
+  catch (e) { console.error('[cartas getVigencia]', e.message); res.status(500).json({ success: false, data: null, error: 'Error interno del servidor' }); }
+};
+
+// PUT /api/cartas/vigencia → fija los días de vigencia en parametros_credito. Solo aprob_mantenedor.
+const setVigencia = async (req, res) => {
+  try {
+    const n = parseInt(req.body?.dias, 10);
+    if (!(n >= 1 && n <= 60)) return res.status(400).json({ success: false, data: null, error: 'Días de vigencia inválidos (1 a 60).' });
+    await pool.query(
+      `INSERT INTO parametros_credito (clave, valor, descripcion)
+       VALUES ('vigencia_carta_dias', ?, 'Vigencia de la Carta de Aprobación (días corridos desde la fecha de la carta; al vencer pasa a DESISTIDA)')
+       ON DUPLICATE KEY UPDATE valor=VALUES(valor)`, [n]);
+    auditar({ req, accion: 'EDITAR', modulo: 'cartas', entidad: 'config', entidad_id: 'vigencia_carta_dias', detalle: `Vigencia de carta = ${n} días corridos` });
+    barrerVencidas().catch(() => {});   // re-aplica el plazo nuevo de inmediato
+    res.json({ success: true, data: { dias: n }, error: null });
+  } catch (e) { console.error('[cartas setVigencia]', e.message); res.status(500).json({ success: false, data: null, error: 'Error interno del servidor' }); }
+};
+
+// POST /api/cartas/:id/otorgar — la carta vigente pasa a OTORGADA: marca otorgado,
+// pone el crédito vinculado en OTORGADO y genera la cartola de comisión del mes.
+const otorgar = async (req, res) => {
+  try {
+    const id = parseInt(req.params.id, 10);
+    const [[ca]] = await pool.query('SELECT * FROM cartas_aprobacion WHERE id=? LIMIT 1', [id]);
+    if (!ca) return res.status(404).json({ success: false, data: null, error: 'Carta no encontrada.' });
+    if (ca.status !== 'APROBADA') return res.status(400).json({ success: false, data: null, error: 'Solo una carta APROBADA puede otorgarse.' });
+    if (ca.otorgado) return res.status(400).json({ success: false, data: null, error: 'La carta ya está otorgada.' });
+
+    await pool.query('UPDATE cartas_aprobacion SET otorgado=1, fecha_otorgado=NOW() WHERE id=?', [id]);
+    // Enlaza el crédito si ya existe (carga masiva) para poblar la FK
+    await pool.query(
+      `UPDATE cartas_aprobacion ca JOIN creditos cr ON cr.num_op = ca.id_financiera
+          SET ca.id_credito_creado = COALESCE(ca.id_credito_creado, cr.id),
+              ca.numero_credito_creado = COALESCE(ca.numero_credito_creado, cr.num_op)
+        WHERE ca.id=?`, [id]).catch(()=>{});
+    // Crédito → OTORGADO (operaciones brokerage de la carta)
+    await _ligarCreditoEstado(ca, 'OTORGADO', ['CARTA_APROBACION', 'APROBADO', 'INGRESO']);
+    // Cartola COMISION del mes (misma lógica que /api/cartolas/sync, acotada a esta carta)
+    await pool.query(
+      `INSERT INTO cartolas_movimientos
+         (mes, id_carta, num_op, movimiento, rut_dealer, nombre_dealer,
+          ejecutivo, nombre_cliente, rut_cliente, saldo, comision,
+          estado_comision, num_carta, vendedor, acreedor)
+       SELECT DATE_FORMAT(COALESCE(ca.fecha_otorgado, NOW()), '%Y-%m'),
+              ca.id, ca.id_financiera, 'COMISION', ca.rut_dealer, ca.nombre_dealer,
+              ca.ejecutivo, ca.cliente, ca.rut_cliente, ca.saldo,
+              COALESCE(NULLIF(ca.part_bruto,0), crx.comdea_real),
+              'PENDIENTE', ca.op_carta, ca.vendedor, ca.acreedor
+         FROM cartas_aprobacion ca
+         LEFT JOIN creditos crx ON crx.id = ca.id_credito_creado
+        WHERE ca.id = ? AND ca.otorgado = 1 AND ca.status = 'APROBADA'
+          AND NOT EXISTS (SELECT 1 FROM cartolas_movimientos m WHERE m.id_carta = ca.id AND m.movimiento = 'COMISION')`,
+      [id]).catch(e => console.error('[carta otorgar→cartola]', e.message));
+    auditar({ req, accion: 'OTORGAR', modulo: 'cartas', entidad: 'carta', entidad_id: id,
+      detalle: `Carta ${ca.op_carta || id} otorgada (crédito → OTORGADO + cartola de comisión)` });
+    res.json({ success: true, data: { id, otorgado: true }, error: null });
+  } catch (e) { console.error('[cartas otorgar]', e.message); res.status(500).json({ success: false, data: null, error: 'Error interno del servidor' }); }
+};
+
+// POST /api/cartas/:id/desistir — la carta vigente pasa a DESISTIDA (manual) y el
+// crédito vinculado a DESISTIDO. Deja de ser imprimible.
+const desistir = async (req, res) => {
+  try {
+    const id = parseInt(req.params.id, 10);
+    const motivo = String(req.body?.motivo == null ? '' : req.body.motivo).trim().slice(0, 500) || null;
+    const [[ca]] = await pool.query('SELECT * FROM cartas_aprobacion WHERE id=? LIMIT 1', [id]);
+    if (!ca) return res.status(404).json({ success: false, data: null, error: 'Carta no encontrada.' });
+    if (ca.status !== 'APROBADA') return res.status(400).json({ success: false, data: null, error: 'Solo una carta APROBADA puede pasar a Desistida.' });
+    if (ca.otorgado) return res.status(400).json({ success: false, data: null, error: 'La carta ya está otorgada; no puede desistirse.' });
+    const nombre = [req.usuario?.nombre, req.usuario?.apellido].filter(Boolean).join(' ') || req.usuario?.email || '';
+    await pool.query(
+      `UPDATE cartas_aprobacion
+          SET status='DESISTIDA', desistido_auto=0, desistido_por=?, desistido_por_nombre=?,
+              fecha_desistimiento=NOW(), motivo_desistimiento=? WHERE id=?`,
+      [req.usuario?.email || null, nombre, motivo, id]);
+    await _ligarCreditoEstado(ca, 'DESISTIDO', ['CARTA_APROBACION', 'APROBADO', 'INGRESO']);
+    auditar({ req, accion: 'DESISTIR', modulo: 'cartas', entidad: 'carta', entidad_id: id,
+      detalle: `Carta ${ca.op_carta || id} desistida${motivo ? ': ' + motivo : ''}` });
+    res.json({ success: true, data: { id, status: 'DESISTIDA' }, error: null });
+  } catch (e) { console.error('[cartas desistir]', e.message); res.status(500).json({ success: false, data: null, error: 'Error interno del servidor' }); }
+};
 
 const getAll = async (req, res) => {
   try {
+    await barrerVencidas().catch(() => {});   // mantiene la lista de vigentes al día
     const verTodas = await puedeVerTodas(req.usuario);
     const login = req.usuario?.email || String(req.usuario?.id_usuario || '');
     // JOIN al crédito enlazado: NUESTRO N° de operación (num_op), numero_credito,
@@ -852,4 +1000,4 @@ const verDocumento = async (req, res) => {
   } catch (e) { console.error('[verDocumento]', e.message); res.status(500).json({ success: false, data: null, error: 'Error interno del servidor' }); }
 };
 
-module.exports = { getAll, upsert, cargaMasivaCartas, parseUnidad, parseAutofin, subirDocumento, listarDocumentos, verDocumento };
+module.exports = { getAll, upsert, otorgar, desistir, getVigencia, setVigencia, cargaMasivaCartas, parseUnidad, parseAutofin, subirDocumento, listarDocumentos, verDocumento };

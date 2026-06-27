@@ -6,6 +6,14 @@ const { requireFunc } = require('../../../../shared/middleware/permisos');
 
 router.get('/',  verifyToken, ctrl.getAll);
 router.post('/', verifyToken, ctrl.upsert);   // create o update según body.id
+
+// Vigencia configurable de la carta (días corridos). Lectura abierta; edición = mantenedor.
+router.get('/vigencia', verifyToken, ctrl.getVigencia);
+router.put('/vigencia', verifyToken, requireFunc('aprob_mantenedor'), ctrl.setVigencia);
+
+// Cartas de Aprobación Vigentes: otorgar (→ crédito OTORGADO + cartola) o desistir (→ DESISTIDA)
+router.post('/:id/otorgar',  verifyToken, requireFunc('aprob_vigentes'), ctrl.otorgar);
+router.post('/:id/desistir', verifyToken, requireFunc('aprob_vigentes'), ctrl.desistir);
 router.post('/carga-masiva', verifyToken, requireFunc('aprob_carga_masiva'), ctrl.cargaMasivaCartas);
 
 // Documentos Unidad: parseo para autocompletar + almacenamiento para revisión
