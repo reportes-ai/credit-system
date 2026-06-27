@@ -479,8 +479,18 @@ const otorgar = async (req, res) => {
           SET ca.id_credito_creado = COALESCE(ca.id_credito_creado, cr.id),
               ca.numero_credito_creado = COALESCE(ca.numero_credito_creado, cr.num_op)
         WHERE ca.id=?`, [id]).catch(()=>{});
-    // Crédito → OTORGADO (operaciones brokerage de la carta)
-    await _ligarCreditoEstado(ca, 'OTORGADO', ['CARTA_APROBACION', 'APROBADO', 'INGRESO']);
+    // Crédito vinculado → OTORGADO + fecha_otorgado. La fecha es lo que gatilla Post Venta
+    // (su sync crea la fila + etapas FUNDANTES PENDIENTES y COMISION A PAGAR para todo
+    //  crédito con fecha_otorgado). El crédito que crea la carta nace con fecha_otorgado NULL.
+    {
+      const cond = [], args = [];
+      if (ca.id_credito_creado) { cond.push('id = ?'); args.push(ca.id_credito_creado); }
+      if (ca.id_financiera)     { cond.push('num_op = ?'); args.push(ca.id_financiera); }
+      if (cond.length) await pool.query(
+        `UPDATE creditos SET estado='OTORGADO', fecha_otorgado=COALESCE(fecha_otorgado, CURDATE()), updated_at=NOW()
+          WHERE (${cond.join(' OR ')}) AND estado IN ('CARTA_APROBACION','APROBADO','INGRESO')`, args
+      ).catch(e => console.error('[carta otorgar→credito]', e.message));
+    }
     // Cartola COMISION del mes (misma lógica que /api/cartolas/sync, acotada a esta carta)
     await pool.query(
       `INSERT INTO cartolas_movimientos
