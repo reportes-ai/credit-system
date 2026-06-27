@@ -510,9 +510,9 @@ const otorgar = async (req, res) => {
       [id]).catch(e => console.error('[carta otorgar→cartola]', e.message));
     auditar({ req, accion: 'OTORGAR', modulo: 'cartas', entidad: 'carta', entidad_id: id,
       detalle: `Carta ${ca.op_carta || id} otorgada (crédito → OTORGADO + cartola de comisión)` });
-    // Anuncio push a toda la app: "<Ejecutivo> acaba de colocar un nuevo crédito"
+    // Anuncio push a toda la app (mensaje/colores/sonido configurables en mantenedor de Alertas)
     const ejec = String(ca.ejecutivo || '').trim().toLowerCase().replace(/\b\p{L}/gu, m => m.toUpperCase());
-    if (ejec) publicarAnuncio(`${ejec} acaba de colocar un nuevo crédito`).catch(() => {});
+    if (ejec) publicarAnuncio('credito_otorgado', { ejecutivo: ejec }).catch(() => {});
     res.json({ success: true, data: { id, otorgado: true }, error: null });
   } catch (e) { console.error('[cartas otorgar]', e.message); res.status(500).json({ success: false, data: null, error: 'Error interno del servidor' }); }
 };

@@ -1,5 +1,6 @@
 'use strict';
 const pool = require('../../../../shared/config/database');
+const ANUN = require('../../../../shared/anuncios');
 
 /* ════════════════════════════════════════════════════════════════
    MOTOR DE ALERTAS CONFIGURABLE
@@ -514,4 +515,18 @@ const marcarVisto = async (req, res) => {
   }
 };
 
-module.exports = { getMeta, listAlertas, saveAlerta, deleteAlerta, marcarVisto };
+/* ── Anuncios "push" en pantalla (banner). Config paramétrica por evento ── */
+const getAnuncios = async (req, res) => {
+  try {
+    res.json({ success: true, data: { eventos: await ANUN.getAnunciosConfig(), sonidos: ANUN.SONIDOS }, error: null });
+  } catch (e) { console.error('[anuncios get]', e.message); res.status(500).json({ success: false, data: null, error: 'Error interno del servidor' }); }
+};
+const saveAnuncios = async (req, res) => {
+  try {
+    const { evento, config } = req.body || {};
+    await ANUN.saveAnunciosConfig(evento, config || {});
+    res.json({ success: true, data: { ok: true }, error: null });
+  } catch (e) { console.error('[anuncios save]', e.message); res.status(400).json({ success: false, data: null, error: e.message || 'Error' }); }
+};
+
+module.exports = { getMeta, listAlertas, saveAlerta, deleteAlerta, marcarVisto, getAnuncios, saveAnuncios };

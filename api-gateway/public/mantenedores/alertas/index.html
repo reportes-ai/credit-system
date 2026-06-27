@@ -5,7 +5,7 @@
   <link rel="icon" href="/img/favicon.png" type="image/png">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Alertas — Mantenedor — AutoFácil</title>
-  <!-- v1.1 -->
+  <!-- v1.2 — sección Anuncios en pantalla (push) -->
   <link href="/css/bootstrap.min.css" rel="stylesheet">
   <link href="/css/bootstrap-icons.css" rel="stylesheet">
   <style>
@@ -128,6 +128,15 @@
     </table>
   </div>
 
+  <!-- Anuncios en pantalla (banner push que baja desde arriba, a TODOS los usuarios) -->
+  <div class="head-row" style="margin-top:26px">
+    <div>
+      <h5 style="font-weight:800;color:var(--navy);margin:0"><i class="bi bi-megaphone-fill me-2"></i>Anuncios en pantalla (push)</h5>
+      <span style="font-size:.82rem;color:#64748b">Banner que baja desde arriba a <b>todos los usuarios conectados</b> cuando ocurre el evento. Configura el mensaje, colores, ancho, sonido y tiempos.</span>
+    </div>
+  </div>
+  <div id="anunciosWrap"><div class="card-af"><div style="text-align:center;color:#94a3b8;padding:18px">Cargando…</div></div></div>
+
   <!-- Qué afecta este mantenedor -->
   <div class="card-af" style="border-left:4px solid #0141A2;background:#f8fafc">
     <div style="font-weight:800;color:var(--navy);margin-bottom:8px"><i class="bi bi-diagram-3 me-2"></i>Qué afecta este mantenedor</div>
@@ -137,6 +146,7 @@
       <li><b>Destino</b> → perfiles que reciben el aviso; <b>CREADOR</b> = quien creó el registro; <b>TODOS</b> = todos los usuarios.</li>
       <li><b>Eventos de Pago — Post Venta</b> → avisos del flujo de <a href="/postventa/saldos-a-pagar/">Saldos a Pagar</a> y <a href="/postventa/comisiones-a-pagar/">Comisiones a Pagar</a> (fondos cargados, enviado a pago, orden emitida, pago). Editarlos aquí también los cambia en la configuración de Post Venta (misma fuente).</li>
       <li><b>Eventos — Dealers</b> → avisos del flujo de <a href="/dealers-incorporacion/">fichas de Dealer</a> en cada etapa: por autorizar (a cada nivel), autorizada (al ejecutivo), firmada (al cierre), creado/actualizado y rechazada. Los destinatarios base salen de la <a href="/dealers-incorporacion/niveles.html">cadena de niveles</a>; aquí sumas perfiles/usuarios y controlas activo, prioridad y sonido.</li>
+      <li><b>Anuncios en pantalla (push)</b> → banner que baja desde arriba a <b>todos los usuarios</b> cuando ocurre el evento (hoy: <b>Crédito otorgado</b>, al apretar Otorgado en <a href="/aprobaciones/">Cartas Vigentes</a>). Configurable: mensaje (con variables como <code>{ejecutivo}</code>), colores, ancho, sonido y tiempos.</li>
     </ul>
   </div>
 </div>
@@ -391,6 +401,81 @@ async function evPersist(e){
 }
 document.getElementById('evModal').addEventListener('click',e=>{ if(e.target.id==='evModal') evCerrar(); });
 cargarEventos();
+
+/* ── Anuncios en pantalla (push) — banner global configurable ── */
+let ANUN_SON = [];
+async function cargarAnuncios(){
+  try{
+    const r = await fetch('/api/alertas/anuncios',{headers:H}); const j = await r.json();
+    if(!j.success) throw 0;
+    ANUN_SON = j.data.sonidos||[];
+    renderAnuncios(j.data.eventos||[]);
+  }catch(e){
+    document.getElementById('anunciosWrap').innerHTML='<div class="card-af"><div style="text-align:center;color:#b91c1c;padding:18px">No se pudieron cargar los anuncios.</div></div>';
+  }
+}
+function renderAnuncios(eventos){
+  const son = ANUN_SON.map(s=>`<option value="${esc(s.id)}">${esc(s.label)}</option>`).join('');
+  document.getElementById('anunciosWrap').innerHTML = eventos.map(ev=>{
+    const c = ev.cfg||{};
+    const tokens = (ev.tokens||[]).map(t=>`<code style="background:#eef2ff;color:#3730a3;border-radius:5px;padding:1px 6px;font-size:.74rem">${esc(t)}</code>`).join(' ');
+    return `<div class="card-af" data-ev="${esc(ev.evento)}">
+      <div style="display:flex;align-items:center;gap:10px;margin-bottom:10px">
+        <label class="sw"><input type="checkbox" class="an-activo" ${c.activo?'checked':''}><span class="sl"></span></label>
+        <b style="color:var(--navy)">${esc(ev.label)}</b>
+        <span style="font-size:.76rem;color:#94a3b8">Variables: ${tokens||'—'}</span>
+      </div>
+      <div class="grid">
+        <div class="field" style="grid-column:1/-1"><label>Mensaje</label><input class="an-mensaje" type="text" maxlength="200" value="${esc(c.mensaje||'')}"></div>
+        <div class="field"><label>Color de fondo</label><input class="an-bg" type="color" value="${esc(c.color_fondo||'#0a0a0a')}" style="height:38px;padding:2px"></div>
+        <div class="field"><label>Color de letra</label><input class="an-fg" type="color" value="${esc(c.color_texto||'#ffffff')}" style="height:38px;padding:2px"></div>
+        <div class="field"><label>Ancho (% pantalla)</label><input class="an-ancho" type="number" min="15" max="100" value="${c.ancho_pct||33}"></div>
+        <div class="field"><label>Sonido</label><div style="display:flex;gap:6px"><select class="an-sonido" style="flex:1">${son}</select><button type="button" class="btn-ghost" style="padding:6px 11px" onclick="anProbarSon(this)"><i class="bi bi-play-fill"></i></button></div></div>
+        <div class="field"><label>Segundos antes del banner</label><input class="an-antes" type="number" min="0" max="10" value="${c.segundos_antes!=null?c.segundos_antes:2}"></div>
+        <div class="field"><label>Duración visible (seg)</label><input class="an-dur" type="number" min="2" max="30" value="${c.duracion_seg||6}"></div>
+      </div>
+      <div style="display:flex;justify-content:flex-end;gap:10px;align-items:center;margin-top:12px">
+        <span class="an-msg" style="font-size:.84rem"></span>
+        <button class="btn-ghost" onclick="anProbar(this)"><i class="bi bi-eye me-1"></i>Probar aquí</button>
+        <button class="btn-af" onclick="anGuardar(this)"><i class="bi bi-check-lg me-1"></i>Guardar</button>
+      </div>
+    </div>`;
+  }).join('') || '<div class="card-af"><div style="text-align:center;color:#94a3b8;padding:18px">Sin anuncios configurables.</div></div>';
+  document.querySelectorAll('#anunciosWrap [data-ev]').forEach((card,i)=>{
+    const ev = eventos[i]; if(ev&&ev.cfg&&ev.cfg.sonido) card.querySelector('.an-sonido').value = ev.cfg.sonido;
+  });
+}
+function anLeer(card){
+  return {
+    activo: card.querySelector('.an-activo').checked,
+    mensaje: card.querySelector('.an-mensaje').value,
+    color_fondo: card.querySelector('.an-bg').value,
+    color_texto: card.querySelector('.an-fg').value,
+    ancho_pct: card.querySelector('.an-ancho').value,
+    sonido: card.querySelector('.an-sonido').value,
+    segundos_antes: card.querySelector('.an-antes').value,
+    duracion_seg: card.querySelector('.an-dur').value,
+  };
+}
+function anProbarSon(btn){ const t=btn.closest('[data-ev]').querySelector('.an-sonido').value; if(t&&t!=='none'&&window.afPlaySound) window.afPlaySound(t); }
+function anProbar(btn){
+  const c=anLeer(btn.closest('[data-ev]'));
+  const texto=(c.mensaje||'').replace(/\{(\w+)\}/g,(_,k)=> k==='ejecutivo'?'Juan Pérez':('{'+k+'}'));
+  if(c.sonido&&c.sonido!=='none'&&window.afPlaySound) window.afPlaySound(c.sonido);
+  const antes=(parseInt(c.segundos_antes)||0)*1000;
+  setTimeout(()=>{ if(window.afMostrarAnuncio) window.afMostrarAnuncio(texto,{ bg:c.color_fondo, fg:c.color_texto, ancho:c.ancho_pct, dur:c.duracion_seg }); }, antes);
+}
+async function anGuardar(btn){
+  const card=btn.closest('[data-ev]'); const evento=card.getAttribute('data-ev'); const config=anLeer(card);
+  const msg=card.querySelector('.an-msg'); btn.disabled=true;
+  try{
+    const r=await fetch('/api/alertas/anuncios',{method:'PUT',headers:H,body:JSON.stringify({evento,config})});
+    const j=await r.json(); if(!j.success) throw new Error(j.error||'Error');
+    msg.textContent='Guardado ✓'; msg.style.cssText='font-size:.84rem;color:#15803d';
+  }catch(e){ msg.textContent=e.message; msg.style.cssText='font-size:.84rem;color:#b91c1c'; }
+  finally{ btn.disabled=false; setTimeout(()=>{msg.textContent='';},2500); }
+}
+cargarAnuncios();
 </script>
 <script src="/js/app-version.js"></script>
 </body>

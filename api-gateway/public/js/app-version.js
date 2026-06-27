@@ -2,7 +2,7 @@
    AutoFácil — Versión global de la aplicación
    Editar SOLO este archivo para cambiar la versión
    ───────────────────────────────────────────── */
-const APP_VERSION = 'v68.6';
+const APP_VERSION = 'v68.7';
 
 document.addEventListener('DOMContentLoaded', () => {
 
@@ -1028,13 +1028,17 @@ document.addEventListener('DOMContentLoaded', () => {
   }
   // Banner "push" que baja desde arriba (ancho 1/3, negro, letras blancas).
   const escAn = s => String(s == null ? '' : s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
-  function mostrarAnuncio(texto) {
+  function mostrarAnuncio(texto, opts) {
     try {
+      opts = opts || {};
+      const bg = opts.bg || '#0a0a0a', fg = opts.fg || '#ffffff';
+      const ancho = Math.min(100, Math.max(15, parseInt(opts.ancho) || 33));
+      const dur = Math.min(30, Math.max(2, parseInt(opts.dur) || 6)) * 1000;
       const prev = document.getElementById('afAnuncioBanner'); if (prev) prev.remove();
       const b = document.createElement('div');
       b.id = 'afAnuncioBanner';
       b.style.cssText = 'position:fixed;top:0;left:50%;transform:translateX(-50%) translateY(-160%);'
-        + 'width:33vw;min-width:300px;max-width:540px;background:#0a0a0a;color:#fff;'
+        + 'width:' + ancho + 'vw;min-width:300px;max-width:620px;background:' + bg + ';color:' + fg + ';'
         + 'border-radius:0 0 16px 16px;box-shadow:0 14px 44px rgba(0,0,0,.55);'
         + 'padding:16px 22px;z-index:2147483600;display:flex;align-items:center;gap:14px;'
         + "font-family:'Segoe UI',system-ui,sans-serif;transition:transform .6s cubic-bezier(.18,.89,.32,1.28);";
@@ -1042,9 +1046,11 @@ document.addEventListener('DOMContentLoaded', () => {
         + '<div style="font-size:.98rem;font-weight:600;letter-spacing:.2px">' + escAn(texto) + '</div>';
       document.body.appendChild(b);
       requestAnimationFrame(() => { b.style.transform = 'translateX(-50%) translateY(0)'; });
-      setTimeout(() => { b.style.transform = 'translateX(-50%) translateY(-160%)'; setTimeout(() => b.remove(), 800); }, 6000);
+      setTimeout(() => { b.style.transform = 'translateX(-50%) translateY(-160%)'; setTimeout(() => b.remove(), 800); }, dur);
     } catch (e) {}
   }
+  // Expuesto para "Probar" desde el mantenedor de Alertas
+  window.afMostrarAnuncio = mostrarAnuncio;
   async function chk() {
     try {
       const r = await fetch('/api/mantenimiento?_=' + Date.now(), { headers: { Authorization: 'Bearer ' + token }, cache: 'no-store' });
@@ -1056,8 +1062,10 @@ document.addEventListener('DOMContentLoaded', () => {
       const an = j.data.anuncio;
       if (an && an.nonce && localStorage.getItem('af_anuncio_nonce') !== String(an.nonce)) {
         localStorage.setItem('af_anuncio_nonce', String(an.nonce));
-        try { if (window.afPlaySound) window.afPlaySound('anuncio'); } catch (e) {}
-        setTimeout(() => mostrarAnuncio(an.texto), 2000);
+        const o = an.opts || {};
+        const antes = Math.min(10, Math.max(0, parseInt(o.antes) != null ? parseInt(o.antes) : 2)) * 1000;
+        if (o.sonido && o.sonido !== 'none') { try { if (window.afPlaySound) window.afPlaySound(o.sonido); } catch (e) {} }
+        setTimeout(() => mostrarAnuncio(an.texto, o), antes);
       }
       const g = j.data.juego, nombre = g && g.nombre;
       const key = nombre ? (nombre + '|' + (g.nonce || '')) : null;
