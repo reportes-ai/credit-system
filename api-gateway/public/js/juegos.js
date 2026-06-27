@@ -220,7 +220,7 @@
       '<span style="color:#fbbf24">comidas <b id="afCLn">0</b></span>' +
       '<button id="afCLrest" style="background:#1f2937;border:none;color:#fff;border-radius:20px;padding:4px 11px;cursor:pointer;font-weight:700">🔄 Restaurar</button>' +
       '<button id="afCLx" style="background:#7f1d1d;border:none;color:#fff;border-radius:20px;padding:4px 10px;cursor:pointer;font-weight:800">✕</button>';
-    document.body.appendChild(lay); lay.appendChild(pac); document.body.appendChild(chip);
+    document.body.appendChild(lay); lay.appendChild(pac); if (window.__AF_ESBG) document.body.appendChild(chip);  // chip de control: SOLO BG-ADMIN
     pac.style.left = px + 'px'; pac.style.top = py + 'px';
 
     function visible(el) { if (!el) return false; const r = el.getBoundingClientRect(); return r.width > 0 && r.height > 0 && r.bottom > 0 && r.top < innerHeight && r.right > 0 && r.left < innerWidth; }
@@ -311,7 +311,7 @@
       const chip = document.createElement('div'); chip.id = 'afEscChip';
       chip.style.cssText = 'position:fixed;bottom:18px;left:50%;transform:translateX(-50%);z-index:2000003;background:#111827;color:#fff;border-radius:30px;padding:8px 14px;font:600 13px system-ui;display:flex;gap:12px;align-items:center;box-shadow:0 10px 30px rgba(0,0,0,.45)';
       chip.innerHTML = '<span>🃏 Módulos Escurridizos' + (mensaje ? ' — <span style="color:#93c5fd">' + mensaje + '</span>' : '') + '</span><button id="afEscX" style="background:#7f1d1d;border:none;color:#fff;border-radius:20px;padding:4px 10px;cursor:pointer;font-weight:800">✕</button>';
-      document.body.appendChild(chip);
+      if (window.__AF_ESBG) document.body.appendChild(chip);  // chip de control: SOLO BG-ADMIN
       chip.querySelector('#afEscX').onclick = () => window.AF_JUEGOS.cerrar();
       cleanup = function () { if (torn) return; torn = true; alive = false; if (timer) clearTimeout(timer); document.removeEventListener('click', onClick, true); try { flip(() => original.forEach(c => grid.appendChild(c))); } catch (e) {} chip.remove(); };
     }
@@ -338,7 +338,7 @@
     const chip = document.createElement('div'); chip.id = 'afVidrioChip';
     chip.style.cssText = 'position:fixed;bottom:18px;left:50%;transform:translateX(-50%);z-index:2000003;background:#111827;color:#fff;border-radius:30px;padding:8px 14px;font:600 13px system-ui;display:flex;gap:12px;align-items:center;box-shadow:0 10px 30px rgba(0,0,0,.45)';
     chip.innerHTML = '<span>🔨 Vidrio Roto' + (mensaje ? ' — <span style="color:#93c5fd">' + mensaje + '</span>' : '') + ' · quedan <b id="afVn">' + left + '</b></span><button id="afVx" style="background:#7f1d1d;border:none;color:#fff;border-radius:20px;padding:4px 10px;cursor:pointer;font-weight:800">✕</button>';
-    document.body.appendChild(chip);
+    if (window.__AF_ESBG) document.body.appendChild(chip);  // chip de control: SOLO BG-ADMIN
     chip.querySelector('#afVx').onclick = () => window.AF_JUEGOS.cerrar();
 
     function snd() { try { actx = actx || new (window.AudioContext || window.webkitAudioContext)(); if (actx.state === 'suspended') actx.resume();
@@ -419,7 +419,7 @@
     document.addEventListener('click', onClick, true);
     const chip = document.createElement('div'); chip.id = 'afClChip';
     chip.style.cssText = 'position:fixed;bottom:18px;left:50%;transform:translateX(-50%);z-index:2000003;background:#111827;color:#fff;border-radius:30px;padding:8px 14px;font:600 13px system-ui;display:flex;gap:10px;align-items:center;box-shadow:0 10px 30px rgba(0,0,0,.45)';
-    document.body.appendChild(chip);
+    if (window.__AF_ESBG) document.body.appendChild(chip);  // chip de control: SOLO BG-ADMIN
     function setChip() { chip.innerHTML = '<span>🖱️ Mouse Loco' + (mensaje ? ' — <span style="color:#93c5fd">' + mensaje + '</span>' : '') + '</span><span style="color:' + (blocked ? '#f87171' : '#34d399') + ';font-weight:800">' + (blocked ? '● clic BLOQUEADO' : '● clic OK') + '</span><button id="afClX" style="background:#7f1d1d;border:none;color:#fff;border-radius:20px;padding:4px 10px;cursor:pointer;font-weight:800">✕</button>';
       chip.querySelector('#afClX').onclick = () => window.AF_JUEGOS.cerrar(); }
     const PHASES = 3;  // bloqueado → ok → bloqueado, y luego vuelve a la normalidad

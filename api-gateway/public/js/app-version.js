@@ -2,7 +2,7 @@
    AutoFácil — Versión global de la aplicación
    Editar SOLO este archivo para cambiar la versión
    ───────────────────────────────────────────── */
-const APP_VERSION = 'v67.5';
+const APP_VERSION = 'v67.6';
 
 document.addEventListener('DOMContentLoaded', () => {
 
@@ -990,6 +990,7 @@ document.addEventListener('DOMContentLoaded', () => {
   // "vidrio" persiste entre páginas hasta completar sus 10 quiebres; el resto es de una página.
   const probar = sessionStorage.getItem('af_probar');
   if (probar) {
+    window.__AF_ESBG = true;   // a "Probar" solo llega el BG-ADMIN → muestra el chip de control
     const persiste = probar === 'vidrio';
     if (persiste && sessionStorage.getItem('af_vidrio_done') === '1') { sessionStorage.removeItem('af_probar'); }
     else { if (!persiste) sessionStorage.removeItem('af_probar'); cargarJuegos(() => window.AF_JUEGOS && window.AF_JUEGOS.lanzar(probar, 'Modo prueba (solo tú lo ves)')); }
