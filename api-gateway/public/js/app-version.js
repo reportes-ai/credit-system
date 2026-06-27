@@ -2,7 +2,7 @@
    AutoFácil — Versión global de la aplicación
    Editar SOLO este archivo para cambiar la versión
    ───────────────────────────────────────────── */
-const APP_VERSION = 'v67.9';
+const APP_VERSION = 'v68.0';
 
 document.addEventListener('DOMContentLoaded', () => {
 
@@ -1004,7 +1004,7 @@ document.addEventListener('DOMContentLoaded', () => {
   }
   async function chk() {
     try {
-      const r = await fetch('/api/mantenimiento', { headers: { Authorization: 'Bearer ' + token } });
+      const r = await fetch('/api/mantenimiento?_=' + Date.now(), { headers: { Authorization: 'Bearer ' + token }, cache: 'no-store' });
       const j = await r.json();
       if (!j.success) return;
       window.__AF_ESBG = !!j.data.es_bg;
