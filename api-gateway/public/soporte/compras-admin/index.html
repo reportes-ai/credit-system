@@ -117,6 +117,7 @@
       <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
         <h5 style="font-weight:700;margin:0" id="dlgOrdTit">Orden</h5>
         <div>
+          <button class="btn btn-sm btn-success" onclick="copiarDimerc()"><i class="bi bi-clipboard-check me-1"></i>Copiar para Dimerc</button>
           <button class="btn btn-sm btn-outline-secondary" onclick="imprimirOrden()"><i class="bi bi-printer me-1"></i>Imprimir</button>
           <button class="btn btn-sm btn-light" onclick="document.getElementById('dlgOrd').close()">✕</button>
         </div>
@@ -207,10 +208,33 @@
       const j = await api(`/api/compras/admin/ordenes/${id}/estado`, { method:'PUT', body: JSON.stringify({ estado }) });
       if (j?.success) { toast('Actualizada'); cargarOrdenes(); cargarPed(); } else toast(j?.error||'Error', false);
     }
-    let ordenActual = null;
+    let ordenActual = null, DIMERC_TXT = '';
+    // Arma el pedido en texto listo para enviar a Dimerc (copiar/pegar)
+    function buildDimerc(d) {
+      const o = d.orden, items = d.items, peds = d.pedidos || [];
+      const nUni = items.reduce((s,i)=>s+Number(i.cantidad||0),0);
+      const dirJoin = (...p)=>p.filter(Boolean).join(', ');
+      const L = [];
+      L.push('PEDIDO DE COMPRA — AutoFácil Crédito Automotriz');
+      L.push(`Orden interna: #${o.id}   ·   Fecha: ${new Date(o.fecha).toLocaleDateString('es-CL')}`);
+      L.push('');
+      L.push(`DETALLE DEL PEDIDO  (${items.length} producto(s) · ${nUni} unidad(es))`);
+      items.forEach(it => L.push(`- ${it.cantidad} x ${it.nombre}${it.sku?`  [SKU: ${it.sku}]`:''}`));
+      L.push('');
+      L.push('DESPACHO  (horario: 11:00 a 18:00 hrs, lunes a viernes)');
+      L.push(`Enviar a: ${dirJoin(o.destino, o.dest_calle, o.dest_comuna) || o.destino || 'Casa Matriz'}`);
+      L.push('Direcciones y contactos:');
+      peds.forEach(p => {
+        const sd = dirJoin(p.direccion, p.dir_calle, p.comuna) || 'sin dirección';
+        L.push(`  - ${sd} — Contacto: ${p.usuario_nombre||''}${p.email?` (${p.email})`:''}`);
+      });
+      L.push('');
+      L.push(`Total referencial: ${fmt(o.total)}`);
+      return L.join('\n');
+    }
     async function verOrden(id) {
       const j = await api('/api/compras/admin/ordenes/'+id); if (!j?.success) return;
-      ordenActual = j.data;
+      ordenActual = j.data; DIMERC_TXT = buildDimerc(j.data);
       const o = j.data.orden, items = j.data.items, peds = j.data.pedidos;
       document.getElementById('dlgOrdTit').innerHTML = `Orden #${o.id} <span class="est" style="background:${ESTC[o.estado]||'#64748b'};margin-left:6px">${esc(o.estado)}</span>`;
       document.getElementById('dlgOrdBody').innerHTML = `
@@ -219,8 +243,15 @@
         <table class="table table-sm"><thead><tr><th>Artículo</th><th>SKU</th><th class="text-end">Cant.</th><th class="text-end">Precio</th><th class="text-end">Subtotal</th></tr></thead>
           <tbody>${items.map(it=>`<tr><td>${esc(it.nombre)}</td><td class="muted">${esc(it.sku||'')}</td><td class="text-end">${it.cantidad}</td><td class="text-end">${fmt(it.precio_unit)}</td><td class="text-end">${fmt(it.subtotal)}</td></tr>`).join('')}</tbody></table>
         <h6 style="font-weight:700;margin:12px 0 6px">Pedidos incluidos (${peds.length})</h6>
-        <ul style="font-size:.82rem;color:#475569;padding-left:18px">${peds.map(p=>`<li>#${p.id} — ${esc(p.usuario_nombre||'')} · ${esc(p.direccion||'')} · ${esc(p.centro_costo||'')} · ${fmt(p.total)}</li>`).join('')}</ul>`;
+        <ul style="font-size:.82rem;color:#475569;padding-left:18px">${peds.map(p=>`<li>#${p.id} — ${esc(p.usuario_nombre||'')} · ${esc(p.direccion||'')} · ${esc(p.centro_costo||'')} · ${fmt(p.total)}</li>`).join('')}</ul>
+        <h6 style="font-weight:700;margin:14px 0 6px"><i class="bi bi-clipboard-check me-1"></i>Pedido para Dimerc (copiar y pegar)</h6>
+        <textarea id="dimercTa" readonly style="width:100%;height:170px;font:12px/1.45 ui-monospace,Consolas,monospace;border:1px solid #cbd5e1;border-radius:8px;padding:10px;background:#f8fafc">${esc(DIMERC_TXT)}</textarea>`;
       document.getElementById('dlgOrd').showModal();
+    }
+    async function copiarDimerc() {
+      if (!DIMERC_TXT) return;
+      try { await navigator.clipboard.writeText(DIMERC_TXT); toast('Pedido copiado — pégalo en el correo a Dimerc'); }
+      catch { const ta=document.getElementById('dimercTa'); if(ta){ ta.focus(); ta.select(); document.execCommand('copy'); toast('Pedido copiado'); } }
     }
     function imprimirOrden() {
       if (!ordenActual) return;

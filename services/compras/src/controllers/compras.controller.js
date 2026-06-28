@@ -502,15 +502,21 @@ const adminOrdenes = async (req, res) => {
 const adminOrdenDetalle = async (req, res) => {
   try {
     const id = num(req.params.id);
-    const [[orden]] = await pool.query('SELECT * FROM compras_ordenes WHERE id=?', [id]);
+    const [[orden]] = await pool.query(
+      `SELECT o.*, dd.direccion AS dest_calle, dd.comuna AS dest_comuna
+       FROM compras_ordenes o LEFT JOIN compras_direcciones dd ON dd.id=o.id_direccion WHERE o.id=?`, [id]);
     if (!orden) return res.status(404).json({ success: false, data: null, error: 'Orden no encontrada' });
     const [items] = await pool.query(
       `SELECT sku, nombre, SUM(cantidad) AS cantidad, MAX(precio_unit) AS precio_unit, SUM(subtotal) AS subtotal
        FROM compras_pedido_items WHERE id_pedido IN (SELECT id FROM compras_pedidos WHERE id_orden=?)
        GROUP BY sku, nombre ORDER BY nombre`, [id]);
     const [pedidos] = await pool.query(
-      `SELECT p.id, p.usuario_nombre, p.centro_costo, p.total, d.nombre AS direccion
-       FROM compras_pedidos p LEFT JOIN compras_direcciones d ON d.id=p.id_direccion WHERE p.id_orden=? ORDER BY p.id`, [id]);
+      `SELECT p.id, p.usuario_nombre, p.centro_costo, p.total, u.email,
+              d.nombre AS direccion, d.direccion AS dir_calle, d.comuna
+       FROM compras_pedidos p
+       LEFT JOIN compras_direcciones d ON d.id=p.id_direccion
+       LEFT JOIN usuarios u ON u.id_usuario=p.id_usuario
+       WHERE p.id_orden=? ORDER BY p.id`, [id]);
     res.json({ success: true, data: { orden, items, pedidos }, error: null });
   } catch (e) { err(res, e); }
 };
