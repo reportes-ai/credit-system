@@ -16,6 +16,7 @@ const PLACEMENT_SECTIONS = {
   politica:      { label: 'Política',             icon: 'bi-shield-lock',            color: '#7c3aed' },
   simulador:     { label: 'Simulador Rentabilidad', icon: 'bi-calculator',            color: '#0369a1' },
   carga_masiva:  { label: 'Carga Masiva',         icon: 'bi-cloud-upload',           color: '#0f766e' },
+  soporte:       { label: 'Soporte',              icon: 'bi-headset',                color: '#155e75' },
 };
 
 const PLACEMENT_ITEMS = {
@@ -35,6 +36,7 @@ const PLACEMENT_ITEMS = {
   '/carga-masiva/':          { section:'home', href:'/carga-masiva/',           icon:'bi-cloud-upload',           titulo:'Carga Masiva' },
   '/simulador/':             { section:'home', href:'/simulador/',              icon:'bi-calculator',             titulo:'Simulador Rentabilidad' },
   '/evaluacion-crediticia/': { section:'home', href:'/evaluacion-crediticia/',  icon:'bi-clipboard-pulse',        titulo:'Evaluación Crediticia' },
+  '/soporte/':               { section:'home', href:'/soporte/',                 icon:'bi-headset',                titulo:'Soporte' },
   // ── CLIENTES — sub-páginas ────────────────────────────────────────────────
   'ant-laborales':           { section:'clientes',      href:'/antecedentes-laborales/', icon:'bi-briefcase',             titulo:'Antecedentes Laborales' },
   'inf-comercial':           { section:'clientes',      href:'/informacion-comercial/',  icon:'bi-building',              titulo:'Información Comercial' },
@@ -101,6 +103,8 @@ const PLACEMENT_ITEMS = {
   'cm-eq-ejecs':             { section:'carga_masiva',  href:'/carga-masiva/#secEqEjecs',         icon:'bi-person-lines-fill',      titulo:'Equivalencia Ejecutivos' },
   'cm-historial':            { section:'carga_masiva',  href:'/carga-masiva/#secHistorial',       icon:'bi-clock-history',          titulo:'Historial' },
   'digitacion':              { section:'carga_masiva',  href:'/carga-masiva/digitacion/',         icon:'bi-pencil-square',          titulo:'Digitación Datos Faltantes' },
+  // ── SOPORTE ───────────────────────────────────────────────────────────────
+  'compras':                 { section:'soporte',       href:'/soporte/compras/',                 icon:'bi-bag',                    titulo:'Compras de Oficina' },
 };
 
 // Descripciones (subtítulo) por key — se muestran cuando un sub-item se coloca en Home.
@@ -142,6 +146,8 @@ const PLACEMENT_DESCS = {
   'cm-cargar':'Carga masiva de operaciones (Excel)', 'cm-trinidad':'Carga de archivos Trinidad', 'cm-eq-estados':'Equivalencias de estados Trinidad',
   'cm-eq-ejecs':'Equivalencia de ejecutivos', 'cm-historial':'Historial de cargas masivas',
   'digitacion':'Completa los créditos incompletos por la carga masiva, uno por uno',
+  // Soporte
+  'compras':'Pide artículos de oficina y elige la dirección de despacho',
 };
 
 // ── Registro COMBINADO de sub-items: manifiesto (curado) + funcionalidades de BD ──

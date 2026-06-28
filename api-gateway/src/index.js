@@ -155,6 +155,7 @@ app.use('/api/postventa', require('../../services/postventa/src/routes/postventa
 app.use('/api/correos-programados', require('../../services/correos-programados/src/routes/correos.routes'));
 app.use('/api/backups', require('../../services/backups/src/routes/backups.routes'));
 app.use('/api/ordenes-pago', require('../../services/ordenes-pago/src/routes/ordenes-pago.routes'));
+app.use('/api/compras', require('../../services/compras/src/routes/compras.routes'));
 app.use('/api/fundantes-seguimiento', require('../../services/fundantes-seguimiento/src/routes/fundantes-seg.routes'));
 app.use('/api/cartas-ejecutivos', require('../../services/cartas/src/routes/ejecutivos.routes'));
 app.use('/api/cartas-params',     require('../../services/cartas/src/routes/parametros.routes'));
@@ -516,6 +517,14 @@ app.get(['/ordenes-pago/proveedores', '/ordenes-pago/proveedores/'], (req, res) 
   res.sendFile(path.join(__dirname, '../public/ordenes-pago/proveedores/index.html')));
 app.get(['/ordenes-pago/estadisticas', '/ordenes-pago/estadisticas/'], (req, res) =>
   res.sendFile(path.join(__dirname, '../public/ordenes-pago/estadisticas/index.html')));
+
+// Soporte (Home) + Compras de oficina + su mantenedor
+app.get(['/soporte', '/soporte/'], (req, res) =>
+  res.sendFile(path.join(__dirname, '../public/soporte/index.html')));
+app.get(['/soporte/compras', '/soporte/compras/'], (req, res) =>
+  res.sendFile(path.join(__dirname, '../public/soporte/compras/index.html')));
+app.get(['/mantenedores/compras', '/mantenedores/compras/'], (req, res) =>
+  res.sendFile(path.join(__dirname, '../public/mantenedores/compras/index.html')));
 
 app.get(['/edicion-creditos', '/edicion-creditos/'], (req, res) =>
   res.sendFile(path.join(__dirname, '../public/edicion-creditos/index.html')));
