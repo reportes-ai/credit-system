@@ -92,6 +92,18 @@ const err = (res, code, msg) => res.status(code).json({ success: false, data: nu
 const isoDow = (ymd) => { const d = new Date(ymd + 'T12:00:00'); const n = d.getDay(); return n === 0 ? 7 : n; };
 const nombreUsuario = u => [u?.nombre, u?.apellido].filter(Boolean).join(' ') || u?.email || 'Usuario';
 
+// Extrae la comuna de la dirección normalizada por Google (geo_dir),
+// formato típico CL: "Calle 123, 7550099 Las Condes, Región Metropolitana, Chile".
+function comunaDeGeoDir(s) {
+  if (!s) return '';
+  let p = String(s).split(',').map(x => x.trim()).filter(Boolean)
+    .filter(x => !/^chile$/i.test(x))
+    .filter(x => !/regi[oó]n|metropolitana/i.test(x));
+  if (p.length < 2) return ''; // solo calle, sin comuna fiable
+  return p[p.length - 1].replace(/^\d{4,7}\s*/, '').trim(); // quita código postal
+}
+const comunaDe = d => d.comuna || d.comuna_parque || comunaDeGeoDir(d.geo_dir) || '';
+
 async function leerConfig() {
   const [[c]] = await pool.query('SELECT * FROM visitas_config WHERE id=1');
   const dias = String(c?.dias_semana || DIAS_DEFAULT).split(',').map(s => parseInt(s.trim())).filter(n => n >= 1 && n <= 7);
@@ -138,9 +150,9 @@ const getDealers = async (req, res) => {
     const [rows] = await pool.query(
       `SELECT id_dealer, rut,
               COALESCE(NULLIF(TRIM(nombre_indexa),''), NULLIF(TRIM(nombre_razon),''), rut) AS nombre,
-              comuna
+              comuna, comuna_parque, geo_dir
          FROM dealers ORDER BY nombre LIMIT 5000`);
-    ok(res, rows);
+    ok(res, rows.map(d => ({ id_dealer: d.id_dealer, rut: d.rut, nombre: d.nombre, comuna: comunaDe(d) })));
   } catch (e) { console.error('[visitas getDealers]', e); err(res, 500, 'Error interno del servidor'); }
 };
 
@@ -152,7 +164,7 @@ const planificador = async (req, res) => {
     const [dealers] = await pool.query(
       `SELECT id_dealer, rut, numero,
               COALESCE(NULLIF(TRIM(nombre_indexa),''), NULLIF(TRIM(nombre_razon),''), rut) AS nombre,
-              comuna, lat, lng, activo, categoria_asignada
+              comuna, comuna_parque, geo_dir, lat, lng, activo, categoria_asignada
          FROM dealers ORDER BY nombre`);
     // Última venta (crédito otorgado) por RUT de dealer
     let ult = [];
@@ -170,7 +182,7 @@ const planificador = async (req, res) => {
       const ultima = u ? u.ultima : null;
       const en_riesgo = d.activo == 1 && (!ultima || new Date(ultima).getTime() < lim90);
       return {
-        id_dealer: d.id_dealer, rut: d.rut, nombre: d.nombre, comuna: d.comuna || '',
+        id_dealer: d.id_dealer, rut: d.rut, nombre: d.nombre, comuna: comunaDe(d),
         lat: d.lat != null ? Number(d.lat) : null, lng: d.lng != null ? Number(d.lng) : null,
         activo: d.activo, categoria: d.categoria_asignada || null,
         ultimo_credito: ultima, creditos_total: u ? u.n : 0, en_riesgo,
