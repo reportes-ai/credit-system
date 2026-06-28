@@ -150,6 +150,17 @@
         </button>
       </div>
     </div>
+    <div class="report-card pregunta" id="cardPregunta" style="display:none" onclick="window.location='/ia/pregunta/'">
+      <div class="card-icon-wrap" style="background:linear-gradient(135deg,#4338ca,#0891b2);color:#fff"><i class="bi bi-chat-dots"></i></div>
+      <h6>Pregúntale a AutoFácil</h6>
+      <p>Pregunta en lenguaje natural sobre tus datos (ventas, cartera, mora, ranking de dealers…) y obtén la respuesta con tabla y gráfico al instante. Con IA, sobre la base interna de AutoFácil.</p>
+      <div class="card-footer-row">
+        <span class="badge-status activo"><i class="bi bi-check-circle-fill"></i>Disponible</span>
+        <button class="btn-abrir" style="background:linear-gradient(135deg,#4338ca,#0891b2)">
+          <i class="bi bi-arrow-right-circle"></i>Abrir
+        </button>
+      </div>
+    </div>
     <div class="report-card disabled">
       <div class="card-icon-wrap" style="background:#f0f4f8;color:#94a3b8"><i class="bi bi-file-earmark-bar-graph"></i></div>
       <h6 style="color:#9ca3af">Cartera de Créditos</h6>
@@ -360,6 +371,9 @@ function logout()     { sessionStorage.removeItem('token'); sessionStorage.remov
     }
     if (esAdmin || perms.has('rep_bitacora')) {
       const el = document.getElementById('cardBitacora'); if (el) el.style.display = '';
+    }
+    if (esAdmin || perms.has('ia_consulta')) {
+      const el = document.getElementById('cardPregunta'); if (el) el.style.display = '';
     }
   } catch(e){ /* sin permiso → card oculta */ }
 })();

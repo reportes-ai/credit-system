@@ -31,23 +31,26 @@ const ALLOW = new Set(TABLAS_BI);
       descripcion: 'Responde preguntas en lenguaje natural sobre los datos del sistema (texto → SQL de solo lectura)',
       modelo: 'claude-sonnet-4-6',
     });
-    // Módulo Home + funcionalidad/permiso de acceso (idempotente)
-    await pool.query(
-      `INSERT IGNORE INTO modulos (id_modulo, nombre, descripcion, icono, ruta, orden, estado)
-       VALUES (?, 'Pregúntale a AutoFácil', 'Pregunta en lenguaje natural sobre tus datos y obtén la respuesta al instante', 'bi-chat-dots', '/ia/pregunta/', 6, 'activo')`,
-      [MOD_BI]);
+    // La card vive DENTRO de Reportería (no es módulo propio del Home): la funcionalidad
+    // ia_consulta cuelga del módulo Reportería; la card se pinta gateada en /reporteria/.
+    const [[modRep]] = await pool.query("SELECT id_modulo FROM modulos WHERE ruta='/reporteria/' LIMIT 1");
+    const idModRep = modRep ? modRep.id_modulo : null;
     const [[ex]] = await pool.query("SELECT id_funcionalidad FROM funcionalidades WHERE codigo='ia_consulta' LIMIT 1");
     let idf = ex && ex.id_funcionalidad;
-    if (!idf) {
+    if (idf) {
+      if (idModRep) await pool.query('UPDATE funcionalidades SET id_modulo=?, href=?, icono=? WHERE id_funcionalidad=?', [idModRep, '/ia/pregunta/', 'bi-chat-dots', idf]);
+    } else if (idModRep) {
       const [r] = await pool.query(
         `INSERT INTO funcionalidades (id_modulo, nombre, codigo, href, icono)
-         VALUES (?, 'Pregúntale a AutoFácil', 'ia_consulta', '/ia/pregunta/', 'bi-chat-dots')`, [MOD_BI]);
+         VALUES (?, 'Pregúntale a AutoFácil', 'ia_consulta', '/ia/pregunta/', 'bi-chat-dots')`, [idModRep]);
       idf = r.insertId;
     }
-    for (const idp of [1, 2, 90008, 90009]) {   // Admin · Gerente · Gte Op y Crédito · Gte General
+    if (idf) for (const idp of [1, 2, 90008, 90009]) {   // Admin · Gerente · Gte Op y Crédito · Gte General
       const [[pp]] = await pool.query('SELECT 1 ok FROM permisos_perfil WHERE id_perfil=? AND id_funcionalidad=? LIMIT 1', [idp, idf]);
       if (!pp) await pool.query('INSERT INTO permisos_perfil (id_perfil, id_funcionalidad, habilitado) VALUES (?,?,1)', [idp, idf]);
     }
+    // Limpieza: quitar el módulo propio del Home (ya no se usa) una vez re-apuntada la func.
+    if (idModRep) { try { await pool.query('DELETE FROM modulos WHERE id_modulo=?', [MOD_BI]); } catch (_) {} }
     // Límite de preguntas por perfil (configurable) + log de uso
     await pool.query(`CREATE TABLE IF NOT EXISTS ia_consulta_uso (
       id BIGINT AUTO_INCREMENT PRIMARY KEY, id_usuario INT NOT NULL,
