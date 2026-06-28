@@ -97,7 +97,13 @@
     if (!token || !yo) window.location.href = '/login.html';
     function logout(){ sessionStorage.clear(); window.location.href='/login.html'; }
     const esc = s => String(s==null?'':s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
-    const fmtCell = v => (typeof v === 'number') ? v.toLocaleString('es-CL') : esc(v);
+    function fmtVal(v) {
+      if (v == null) return '';
+      if (typeof v === 'number') return v.toLocaleString('es-CL');
+      if (typeof v === 'string') { const m = v.match(/^(\d{4})-(\d{2})-(\d{2})T/); if (m) return `${m[3]}-${m[2]}-${m[1]}`; }  // ISO → DD-MM-AAAA
+      return String(v);
+    }
+    const fmtCell = v => esc(fmtVal(v));
     async function api(ruta, opts={}) {
       const headers = { 'Content-Type':'application/json', Authorization:'Bearer '+token, ...(opts.headers||{}) };
       const res = await fetch(ruta, { ...opts, headers });
@@ -169,7 +175,7 @@
       let txt = `Pregunta: ${d.pregunta}\n\n${d.respuesta || ''}\n`;
       if (d.columns && d.columns.length && d.rows && d.rows.length) {
         txt += '\n' + d.columns.join('\t') + '\n';
-        txt += d.rows.slice(0, 200).map(r => d.columns.map(c => r[c] == null ? '' : r[c]).join('\t')).join('\n');
+        txt += d.rows.slice(0, 200).map(r => d.columns.map(c => fmtVal(r[c])).join('\t')).join('\n');
       }
       txt += '\n\nFuente: AutoFácil — base de datos interna.';
       navigator.clipboard.writeText(txt).then(() => toast('Información copiada')).catch(() => toast('No se pudo copiar', false));

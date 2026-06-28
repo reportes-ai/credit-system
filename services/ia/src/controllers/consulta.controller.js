@@ -85,7 +85,12 @@ function validarSQL(s) {
   const tablas = [...s.matchAll(/\b(?:from|join)\s+`?([a-z_][a-z0-9_]*)`?/gi)].map(m => m[1].toLowerCase());
   for (const t of tablas) if (!ALLOW.has(t)) throw new Error('Tabla no permitida: ' + t);
 }
-function forzarLimit(s) { return /\blimit\b/i.test(s) ? s : (s + ' LIMIT 500'); }
+function forzarLimit(s) {
+  if (/\blimit\b/i.test(s)) return s;
+  // Con UNION no se puede pegar LIMIT al final (MySQL lo rechaza): se envuelve.
+  if (/\bunion\b/i.test(s)) return `SELECT * FROM (\n${s}\n) AS _sub LIMIT 500`;
+  return s + ' LIMIT 500';
+}
 
 async function ejecutarSeguro(sqlRaw) {
   const sql = forzarLimit(limpiarSQL(sqlRaw));
