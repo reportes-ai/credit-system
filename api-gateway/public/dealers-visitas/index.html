@@ -1,0 +1,564 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <link rel="icon" href="/img/favicon.png" type="image/png">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Calendario de Visitas — AutoFácil</title>
+  <link href="/css/bootstrap.min.css" rel="stylesheet">
+  <link href="/css/bootstrap-icons.css" rel="stylesheet">
+  <style>
+    :root { --navy:#001345; --blue:#0141A2; --sky:#009AFE; --teal:#0e7490; }
+    body { background:#f0f4f8; font-family:'Segoe UI',system-ui,sans-serif; }
+    .topnav { background:linear-gradient(90deg,#012d70,#0255c5); color:#fff; height:60px; padding:0 24px; display:flex; align-items:center; justify-content:space-between; position:sticky; top:0; z-index:200; box-shadow:0 2px 8px rgba(0,0,0,.3); }
+    .topnav-left { display:flex; align-items:center; gap:16px; }
+    .topnav-brand { display:flex; align-items:center; gap:8px; text-decoration:none; }
+    .topnav-brand img { height:32px; filter:brightness(0) invert(1); }
+    .version-badge { background:rgba(255,255,255,.15); color:rgba(255,255,255,.75); font-size:.65rem; font-weight:700; border-radius:6px; padding:2px 8px; letter-spacing:.5px; }
+    .breadcrumb-nav { color:rgba(255,255,255,.6); font-size:.85rem; display:flex; align-items:center; gap:6px; }
+    .breadcrumb-nav a { color:rgba(255,255,255,.75); text-decoration:none; }
+    .breadcrumb-nav .sep { color:rgba(255,255,255,.35); }
+    .topnav-right { display:flex; align-items:center; gap:10px; }
+    .user-chip { background:rgba(255,255,255,.12); border-radius:24px; padding:5px 12px; display:flex; align-items:center; gap:8px; font-size:.85rem; }
+    .avatar { width:28px; height:28px; background:#90caf9; border-radius:50%; display:flex; align-items:center; justify-content:center; color:#0141A2; font-weight:700; font-size:.75rem; }
+    .perfil-badge { background:rgba(144,202,249,.2); border:1px solid rgba(144,202,249,.4); color:#90caf9; border-radius:12px; padding:2px 10px; font-size:.73rem; font-weight:600; }
+    .btn-logout { background:rgba(255,255,255,.1); border:1px solid rgba(255,255,255,.2); color:#fff; border-radius:8px; padding:5px 12px; font-size:.82rem; cursor:pointer; }
+    .btn-logout:hover { background:rgba(255,255,255,.22); }
+    .page-wrap { max-width:1180px; margin:22px auto; padding:0 22px 70px; }
+    .page-banner { background:linear-gradient(135deg,#0c4a6e,#0e7490 55%,#0891b2); border-radius:16px; color:#fff; padding:22px 30px; margin-bottom:18px; display:flex; align-items:center; gap:18px; }
+    .page-banner > i { font-size:2.5rem; opacity:.85; }
+    .page-banner h2 { font-weight:700; margin:0 0 3px; font-size:1.22rem; }
+    .page-banner p { opacity:.85; margin:0; font-size:.85rem; }
+
+    .tabs { display:flex; gap:6px; margin-bottom:16px; flex-wrap:wrap; }
+    .tab { background:#fff; border:1.5px solid #e2e8f0; color:#475569; border-radius:10px; padding:9px 18px; font-size:.86rem; font-weight:700; cursor:pointer; display:inline-flex; align-items:center; gap:7px; }
+    .tab.on { background:var(--teal); border-color:var(--teal); color:#fff; box-shadow:0 2px 8px rgba(14,116,144,.3); }
+
+    .panel { background:#fff; border-radius:14px; box-shadow:0 1px 6px rgba(0,0,0,.07); padding:18px 20px; }
+    .toolbar { display:flex; align-items:center; gap:12px; flex-wrap:wrap; margin-bottom:14px; }
+    .toolbar label { font-size:.74rem; font-weight:700; color:#475569; margin:0; }
+    .toolbar input, .toolbar select { border:1.5px solid #d1d5db; border-radius:8px; padding:6px 10px; font-size:.84rem; color:#1e293b; outline:none; }
+    .toolbar input:focus, .toolbar select:focus { border-color:var(--teal); box-shadow:0 0 0 3px rgba(14,116,144,.12); }
+    .btn { border:none; border-radius:8px; padding:7px 14px; font-size:.82rem; font-weight:600; cursor:pointer; display:inline-flex; align-items:center; gap:6px; }
+    .btn-primary { background:var(--teal); color:#fff; } .btn-primary:hover{ filter:brightness(1.08); }
+    .btn-soft { background:#f1f5f9; color:#334155; } .btn-soft:hover{ background:#e2e8f0; }
+    .btn-ghost { background:transparent; color:#475569; border:1.5px solid #e2e8f0; }
+    .seg2 { display:inline-flex; background:#f1f5f9; border-radius:9px; padding:3px; }
+    .seg2 button { background:transparent; border:none; color:#475569; border-radius:7px; padding:6px 14px; font-size:.8rem; font-weight:700; cursor:pointer; }
+    .seg2 button.on { background:var(--teal); color:#fff; }
+
+    /* Calendario */
+    .cal-head { display:flex; align-items:center; justify-content:space-between; gap:12px; margin-bottom:12px; flex-wrap:wrap; }
+    .cal-title { font-size:1.05rem; font-weight:800; color:#0f172a; text-transform:capitalize; min-width:200px; text-align:center; }
+    .cal-grid { display:grid; grid-template-columns:repeat(7,1fr); gap:6px; }
+    .cal-dow { font-size:.68rem; font-weight:800; color:#64748b; text-transform:uppercase; text-align:center; padding:4px 0; letter-spacing:.04em; }
+    .cal-cell { min-height:104px; border:1.5px solid #eef2f7; border-radius:10px; padding:5px 6px; background:#fff; cursor:pointer; transition:.12s; position:relative; overflow:hidden; }
+    .cal-cell:hover { border-color:#0e7490; background:#f0fdff; }
+    .cal-cell.off { background:#f8fafc; cursor:default; opacity:.6; background-image:repeating-linear-gradient(45deg,#f1f5f9,#f1f5f9 6px,#fff 6px,#fff 12px); }
+    .cal-cell.off:hover { border-color:#eef2f7; }
+    .cal-cell.empty { background:transparent; border:none; cursor:default; }
+    .cal-cell.today { border-color:#0891b2; box-shadow:0 0 0 2px rgba(8,145,178,.25); }
+    .cal-d { font-size:.78rem; font-weight:800; color:#334155; display:flex; justify-content:space-between; align-items:center; }
+    .cal-cap { font-size:.6rem; font-weight:800; border-radius:6px; padding:1px 5px; }
+    .cap-ok { background:#e0f2fe; color:#075985; } .cap-full { background:#fee2e2; color:#b91c1c; }
+    .vchip { font-size:.66rem; font-weight:600; border-radius:5px; padding:2px 5px; margin-top:3px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; display:flex; align-items:center; gap:4px; }
+    .v-prog { background:#e0e7ff; color:#3730a3; }
+    .v-pos  { background:#dcfce7; color:#166534; }
+    .v-neg  { background:#fee2e2; color:#b91c1c; }
+    .vchip .dot { width:6px; height:6px; border-radius:50%; flex-shrink:0; }
+
+    /* Tabla bitácora */
+    table.bt { width:100%; border-collapse:collapse; font-size:.8rem; }
+    table.bt th { background:#f0f4f8; padding:8px 9px; text-align:left; font-size:.64rem; font-weight:800; color:#475569; text-transform:uppercase; letter-spacing:.02em; white-space:nowrap; }
+    table.bt td { padding:8px 9px; border-bottom:1px solid #f1f5f9; vertical-align:top; }
+    table.bt tbody tr:hover { background:#f8fafc; }
+    .pill { font-size:.64rem; font-weight:800; border-radius:6px; padding:2px 7px; text-transform:uppercase; }
+    .pill-prog { background:#e0e7ff; color:#3730a3; } .pill-real { background:#dcfce7; color:#166534; }
+    .res-pos { color:#166534; font-weight:800; } .res-neg { color:#b91c1c; font-weight:800; }
+    .stat { display:inline-flex; align-items:center; gap:7px; background:#f8fafc; border:1.5px solid #e2e8f0; border-radius:10px; padding:7px 13px; font-size:.8rem; }
+    .stat b { color:#0f172a; }
+    .empty { padding:42px; text-align:center; color:#94a3b8; }
+    .empty i { font-size:2.2rem; display:block; margin-bottom:8px; opacity:.4; }
+
+    /* Modales */
+    .modal-bg { display:none; position:fixed; inset:0; background:rgba(2,12,40,.55); z-index:600; overflow-y:auto; padding:30px 14px; }
+    .modal-bg.show { display:block; }
+    .modal-card { background:#fff; border-radius:16px; max-width:560px; margin:0 auto; box-shadow:0 24px 64px rgba(0,0,0,.28); overflow:hidden; }
+    .modal-head { background:linear-gradient(135deg,#0c4a6e,#0e7490,#0891b2); color:#fff; padding:16px 22px; display:flex; align-items:center; justify-content:space-between; gap:12px; }
+    .modal-head h3 { margin:0; font-size:1.05rem; font-weight:800; }
+    .modal-head .x { background:rgba(255,255,255,.16); border:none; color:#fff; border-radius:8px; padding:6px 12px; cursor:pointer; }
+    .modal-body { padding:20px 22px; }
+    .fld { margin-bottom:14px; }
+    .fld label { display:block; font-size:.76rem; font-weight:700; color:#374151; margin-bottom:5px; }
+    .fld input, .fld textarea, .fld select { width:100%; border:1.5px solid #d1d5db; border-radius:8px; padding:9px 11px; font-size:.88rem; outline:none; box-sizing:border-box; }
+    .fld input:focus, .fld textarea:focus, .fld select:focus { border-color:#0e7490; box-shadow:0 0 0 3px rgba(14,116,144,.12); }
+    .res-btns { display:flex; gap:10px; }
+    .res-btns button { flex:1; border:2px solid #e2e8f0; background:#fff; border-radius:10px; padding:11px; font-weight:800; cursor:pointer; font-size:.9rem; }
+    .res-btns button.sel-pos { border-color:#16a34a; background:#dcfce7; color:#166534; }
+    .res-btns button.sel-neg { border-color:#dc2626; background:#fee2e2; color:#b91c1c; }
+    .day-visit { border:1.5px solid #eef2f7; border-radius:10px; padding:10px 12px; margin-bottom:8px; display:flex; align-items:center; justify-content:space-between; gap:10px; }
+    .day-visit .nm { font-weight:700; color:#0f172a; font-size:.9rem; }
+    .day-visit .sub { font-size:.74rem; color:#64748b; }
+    .footer-box { margin-top:18px; background:#f8fafc; border-left:4px solid var(--blue); border-radius:0 10px 10px 0; padding:14px 16px; font-size:.8rem; color:#475569; }
+    .footer-box b { color:#0f172a; }
+    .dow-pick { display:flex; gap:6px; flex-wrap:wrap; }
+    .dow-pick label { display:inline-flex; align-items:center; gap:6px; border:1.5px solid #e2e8f0; border-radius:9px; padding:7px 12px; font-size:.82rem; font-weight:600; cursor:pointer; user-select:none; }
+    .dow-pick label:has(input:checked) { background:#cffafe; border-color:#0891b2; color:#0c4a6e; }
+    .hide { display:none !important; }
+  </style>
+</head>
+<body>
+
+<nav class="topnav">
+  <div class="topnav-left">
+    <a href="/" class="topnav-brand">
+      <img src="/img/logo.png" alt="AutoFácil">
+      <span class="version-badge" id="versionBadge">v1.0</span>
+    </a>
+    <div class="breadcrumb-nav">
+      <a href="/">Inicio</a><span class="sep">›</span>
+      <a href="/dealers/">Dealers</a><span class="sep">›</span>
+      <span style="color:#fff;font-weight:600"><i class="bi bi-calendar-check me-1"></i>Calendario de Visitas</span>
+    </div>
+  </div>
+  <div class="topnav-right">
+    <a href="/mantenedores/dealers-mapa/" style="display:flex;align-items:center;gap:5px;color:rgba(255,255,255,.85);text-decoration:none;font-size:12px;font-weight:500;padding:5px 10px;border:1px solid rgba(255,255,255,.25);border-radius:6px"><i class="bi bi-geo-alt"></i> Mapa</a>
+    <div class="user-chip">
+      <div class="avatar" id="avatarInicial">?</div>
+      <div>
+        <div style="font-weight:600;line-height:1.3;color:#fff" id="navNombre">—</div>
+        <div class="perfil-badge" id="navPerfil">—</div>
+      </div>
+    </div>
+    <button class="btn-logout" onclick="logout()"><i class="bi bi-box-arrow-right me-1"></i>Salir</button>
+  </div>
+</nav>
+
+<div class="page-wrap">
+  <div class="page-banner">
+    <i class="bi bi-calendar-check"></i>
+    <div>
+      <h2>Calendario de Visitas de Concesionarios</h2>
+      <p>Agenda tus visitas respetando el cupo diario, registra el resultado de cada gestión y haz seguimiento.</p>
+    </div>
+  </div>
+
+  <div class="tabs">
+    <button class="tab on" id="tabCal" onclick="setTab('cal')"><i class="bi bi-calendar3"></i> Calendario</button>
+    <button class="tab" id="tabBit" onclick="setTab('bit')"><i class="bi bi-journal-text"></i> Gestiones</button>
+    <button class="tab hide" id="tabCfg" onclick="setTab('cfg')"><i class="bi bi-sliders"></i> Configuración</button>
+  </div>
+
+  <!-- Selector de alcance (solo revisores) -->
+  <div id="scopeBar" class="toolbar hide" style="margin-bottom:14px">
+    <label><i class="bi bi-people me-1" style="color:#0e7490"></i>Ver:</label>
+    <div class="seg2"><button id="scMios" class="on" onclick="setScope('mios')">Mis visitas</button><button id="scTodos" onclick="setScope('todos')">Todo el equipo</button></div>
+    <span id="scUserWrap" class="hide"><label>Ejecutivo:</label>
+      <select id="scUser" onchange="recargar()"><option value="">Todos</option></select></span>
+  </div>
+
+  <!-- ── Calendario ── -->
+  <div id="viewCal" class="panel">
+    <div class="cal-head">
+      <button class="btn btn-soft" onclick="navMes(-1)"><i class="bi bi-chevron-left"></i></button>
+      <div class="cal-title" id="calTitle">—</div>
+      <button class="btn btn-soft" onclick="navMes(1)"><i class="bi bi-chevron-right"></i></button>
+      <button class="btn btn-ghost" onclick="hoyMes()"><i class="bi bi-dot"></i> Hoy</button>
+      <span class="stat" style="margin-left:auto" id="calInfo">—</span>
+    </div>
+    <div class="cal-grid" id="calDows"></div>
+    <div class="cal-grid" id="calGrid" style="margin-top:6px"></div>
+  </div>
+
+  <!-- ── Bitácora ── -->
+  <div id="viewBit" class="panel hide">
+    <div class="toolbar">
+      <label>Desde</label><input type="date" id="bDesde" onchange="cargarBitacora()">
+      <label>Hasta</label><input type="date" id="bHasta" onchange="cargarBitacora()">
+      <label>Estado</label>
+      <select id="bEstado" onchange="cargarBitacora()"><option value="">Todos</option><option value="PROGRAMADA">Programada</option><option value="REALIZADA">Realizada</option></select>
+      <label>Resultado</label>
+      <select id="bResultado" onchange="cargarBitacora()"><option value="">Todos</option><option value="POSITIVO">Positivo</option><option value="NEGATIVO">Negativo</option></select>
+      <button class="btn btn-ghost" id="bSeg" onclick="toggleSeg()"><i class="bi bi-flag"></i> Seguimientos</button>
+      <span class="stat" style="margin-left:auto" id="bitInfo">—</span>
+    </div>
+    <div style="overflow:auto">
+      <table class="bt" id="bitTabla">
+        <thead><tr id="bitHead"></tr></thead>
+        <tbody id="bitBody"><tr><td class="empty">Cargando…</td></tr></tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- ── Configuración ── -->
+  <div id="viewCfg" class="panel hide">
+    <h5 style="font-weight:800;color:#0f172a;margin-bottom:4px"><i class="bi bi-sliders me-1" style="color:#0e7490"></i>Parámetros del calendario</h5>
+    <p style="font-size:.83rem;color:#64748b;margin-bottom:18px">Define cuántas visitas puede agendar cada ejecutivo por día y en qué días de la semana.</p>
+    <div class="fld" style="max-width:240px">
+      <label>Visitas por día (por ejecutivo)</label>
+      <input type="number" id="cfgDia" min="1" max="50" value="4">
+    </div>
+    <div class="fld">
+      <label>Días de la semana habilitados</label>
+      <div class="dow-pick" id="cfgDias"></div>
+    </div>
+    <button class="btn btn-primary" onclick="guardarConfig()"><i class="bi bi-check-lg"></i> Guardar configuración</button>
+    <span id="cfgMsg" style="margin-left:12px;font-size:.84rem"></span>
+    <div class="footer-box">
+      <b><i class="bi bi-diagram-3 me-1"></i>Qué afecta este mantenedor</b>
+      <ul style="margin:8px 0 0;padding-left:18px">
+        <li><b>Visitas por día</b> → tope de visitas que cada ejecutivo puede agendar por fecha en el <a href="/dealers-visitas/">Calendario de Visitas</a>.</li>
+        <li><b>Días habilitados</b> → días en que se permite agendar visitas (el resto aparece bloqueado en el calendario).</li>
+      </ul>
+    </div>
+  </div>
+</div>
+
+<!-- Modal: día del calendario -->
+<div class="modal-bg" id="mDia" onclick="if(event.target===this)cerrar('mDia')">
+  <div class="modal-card">
+    <div class="modal-head"><h3 id="mDiaTit">Visitas</h3><button class="x" onclick="cerrar('mDia')"><i class="bi bi-x-lg"></i></button></div>
+    <div class="modal-body">
+      <div id="mDiaList"></div>
+      <div id="mDiaAdd">
+        <div class="fld" style="margin-top:6px">
+          <label>Agendar concesionario</label>
+          <input list="dealersList" id="addDealer" placeholder="Escribe nombre o RUT…" autocomplete="off">
+          <datalist id="dealersList"></datalist>
+        </div>
+        <button class="btn btn-primary" onclick="agendar()"><i class="bi bi-plus-lg"></i> Agendar visita</button>
+        <span id="addMsg" style="margin-left:10px;font-size:.82rem"></span>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Modal: gestión -->
+<div class="modal-bg" id="mGes" onclick="if(event.target===this)cerrar('mGes')">
+  <div class="modal-card">
+    <div class="modal-head"><h3 id="mGesTit">Registrar gestión</h3><button class="x" onclick="cerrar('mGes')"><i class="bi bi-x-lg"></i></button></div>
+    <div class="modal-body">
+      <div style="font-size:.86rem;color:#475569;margin-bottom:14px" id="mGesInfo"></div>
+      <div class="fld">
+        <label>Resultado de la visita</label>
+        <div class="res-btns">
+          <button type="button" id="rbPos" onclick="setRes('POSITIVO')"><i class="bi bi-hand-thumbs-up me-1"></i>Positivo</button>
+          <button type="button" id="rbNeg" onclick="setRes('NEGATIVO')"><i class="bi bi-hand-thumbs-down me-1"></i>Negativo</button>
+        </div>
+      </div>
+      <div class="fld"><label>Comentarios</label><textarea id="gComent" rows="3" placeholder="Qué pasó en la visita…"></textarea></div>
+      <div class="fld"><label>Seguimiento (opcional)</label>
+        <input type="date" id="gSegFecha" style="max-width:200px">
+        <input type="text" id="gSegNota" placeholder="Nota del seguimiento…" style="margin-top:8px">
+      </div>
+      <button class="btn btn-primary" onclick="guardarGestion()"><i class="bi bi-check-lg"></i> Guardar gestión</button>
+      <span id="gMsg" style="margin-left:10px;font-size:.82rem"></span>
+    </div>
+  </div>
+</div>
+
+<script src="/js/auth-guard.js"></script>
+<script>
+/* ── Sesión ── */
+const YO = JSON.parse(sessionStorage.getItem('usuario') || 'null');
+if (!YO) location.href = '/login.html';
+function getToken(){ return sessionStorage.getItem('token'); }
+function hdr(){ return { 'Content-Type':'application/json', 'Authorization':'Bearer '+getToken() }; }
+function logout(){ sessionStorage.clear(); location.href='/login.html'; }
+if (YO){
+  document.getElementById('navNombre').textContent = YO.nombre + ' ' + (YO.apellido||'');
+  document.getElementById('navPerfil').textContent = YO.perfil || '';
+  document.getElementById('avatarInicial').textContent = (YO.nombre||'?')[0].toUpperCase();
+}
+const ES_ADMIN = YO && YO.perfil === 'Administrador';
+
+/* ── Estado ── */
+let CFG = { visitas_dia:4, dias_semana:[1,2,3,4,5] };
+let ES_REVISOR = false, PUEDE_GESTIONAR = false;
+let SCOPE = 'mios';
+let CUR = new Date(); CUR.setDate(1);
+let MES_VISITAS = [];          // visitas del mes (calendario)
+let DEALERS = [], DEALER_MAP = {};
+let segOnly = false;
+const DOW = ['Lun','Mar','Mié','Jue','Vie','Sáb','Dom'];
+
+/* ── Utils ── */
+function esc(s){ return String(s==null?'':s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c])); }
+function pad(n){ return String(n).padStart(2,'0'); }
+function ymd(d){ return d.getFullYear()+'-'+pad(d.getMonth()+1)+'-'+pad(d.getDate()); }
+function isoDow(d){ const n=d.getDay(); return n===0?7:n; }
+function fFecha(v){ if(!v) return '—'; const d=new Date(String(v).slice(0,10)+'T12:00:00'); return isNaN(d)?'—':d.toLocaleDateString('es-CL',{day:'2-digit',month:'2-digit',year:'numeric'}); }
+function hoyYmd(){ return ymd(new Date()); }
+
+/* ── Permisos ── */
+async function cargarPermisos(){
+  try{
+    const r = await fetch('/api/auth/mis-permisos?_='+Date.now(),{cache:'no-store',headers:hdr()});
+    const j = await r.json(); const fs = new Set(j.funcionalidades||[]);
+    ES_REVISOR = ES_ADMIN || fs.has('visitas_supervisar');
+    PUEDE_GESTIONAR = ES_ADMIN || fs.has('visitas_dealers') || fs.has('visitas_supervisar');
+  }catch(e){ ES_REVISOR=ES_ADMIN; PUEDE_GESTIONAR=ES_ADMIN; }
+  if(ES_REVISOR){
+    document.getElementById('tabCfg').classList.remove('hide');
+    document.getElementById('scopeBar').classList.remove('hide');
+  }
+}
+
+/* ── Tabs ── */
+function setTab(t){
+  document.getElementById('tabCal').classList.toggle('on',t==='cal');
+  document.getElementById('tabBit').classList.toggle('on',t==='bit');
+  document.getElementById('tabCfg').classList.toggle('on',t==='cfg');
+  document.getElementById('viewCal').classList.toggle('hide',t!=='cal');
+  document.getElementById('viewBit').classList.toggle('hide',t!=='bit');
+  document.getElementById('viewCfg').classList.toggle('hide',t!=='cfg');
+  document.getElementById('scopeBar').classList.toggle('hide', !(ES_REVISOR && t!=='cfg'));
+  if(t==='bit') cargarBitacora();
+  if(t==='cfg') pintarConfig();
+}
+function setScope(s){
+  SCOPE=s;
+  document.getElementById('scMios').classList.toggle('on',s==='mios');
+  document.getElementById('scTodos').classList.toggle('on',s==='todos');
+  document.getElementById('scUserWrap').classList.toggle('hide', s!=='todos');
+  recargar();
+}
+function recargar(){ cargarMes(); if(!document.getElementById('viewBit').classList.contains('hide')) cargarBitacora(); }
+
+/* ── Parámetros de query de alcance ── */
+function scopeQS(){
+  if(!ES_REVISOR) return '';
+  if(SCOPE==='todos'){ const u=document.getElementById('scUser').value; return u?('&usuario='+u):'&scope=todos'; }
+  return '';
+}
+
+/* ── Calendario ── */
+function navMes(d){ CUR.setMonth(CUR.getMonth()+d); cargarMes(); }
+function hoyMes(){ CUR=new Date(); CUR.setDate(1); cargarMes(); }
+
+async function cargarMes(){
+  const y=CUR.getFullYear(), m=CUR.getMonth();
+  const desde=ymd(new Date(y,m,1)), hasta=ymd(new Date(y,m+1,0));
+  document.getElementById('calTitle').textContent = CUR.toLocaleDateString('es-CL',{month:'long',year:'numeric'});
+  try{
+    const r=await fetch(`/api/visitas?desde=${desde}&hasta=${hasta}${scopeQS()}`,{headers:hdr()});
+    const j=await r.json();
+    MES_VISITAS = (j.data&&j.data.rows)||[];
+    if(j.data && Array.isArray(j.data.usuarios)) pintarUsuarios(j.data.usuarios);
+  }catch(e){ MES_VISITAS=[]; }
+  pintarCal();
+}
+function pintarUsuarios(us){
+  const sel=document.getElementById('scUser'); const cur=sel.value;
+  sel.innerHTML='<option value="">Todos</option>'+us.map(u=>`<option value="${u.id_usuario}">${esc(u.usuario_nombre||('Usuario '+u.id_usuario))}</option>`).join('');
+  sel.value=cur;
+}
+function visitasDe(fecha){ return MES_VISITAS.filter(v=>String(v.fecha_programada).slice(0,10)===fecha); }
+
+function pintarCal(){
+  document.getElementById('calDows').innerHTML = DOW.map(d=>`<div class="cal-dow">${d}</div>`).join('');
+  const y=CUR.getFullYear(), m=CUR.getMonth();
+  const primero=new Date(y,m,1), ndias=new Date(y,m+1,0).getDate();
+  const offset=isoDow(primero)-1;   // celdas vacías antes del día 1
+  let html='';
+  for(let i=0;i<offset;i++) html+='<div class="cal-cell empty"></div>';
+  const hoy=hoyYmd();
+  let totMes=0, realMes=0;
+  for(let d=1; d<=ndias; d++){
+    const fecha=ymd(new Date(y,m,d));
+    const dow=isoDow(new Date(y,m,d));
+    const permitido=CFG.dias_semana.includes(dow);
+    const vs=visitasDe(fecha);
+    totMes+=vs.length; realMes+=vs.filter(v=>v.estado==='REALIZADA').length;
+    const cap = (SCOPE==='todos'&&ES_REVISOR) ? null : CFG.visitas_dia;
+    const full = cap!=null && vs.length>=cap;
+    const chips = vs.slice(0,3).map(v=>{
+      const cls = v.estado!=='REALIZADA' ? 'v-prog' : (v.resultado==='POSITIVO'?'v-pos':'v-neg');
+      return `<div class="vchip ${cls}">${esc((v.nombre_dealer||v.rut_dealer||'—')).slice(0,22)}</div>`;
+    }).join('');
+    const mas = vs.length>3 ? `<div class="vchip" style="background:#f1f5f9;color:#64748b">+${vs.length-3} más</div>`:'';
+    html+=`<div class="cal-cell ${permitido?'':'off'} ${fecha===hoy?'today':''}" ${permitido?`onclick="abrirDia('${fecha}')"`:''}>
+      <div class="cal-d"><span>${d}</span>${permitido?`<span class="cal-cap ${full?'cap-full':'cap-ok'}">${vs.length}${cap!=null?'/'+cap:''}</span>`:''}</div>
+      ${chips}${mas}
+    </div>`;
+  }
+  document.getElementById('calGrid').innerHTML=html;
+  document.getElementById('calInfo').innerHTML=`<i class="bi bi-calendar-week"></i> <b>${totMes}</b> visita(s) · <b>${realMes}</b> realizada(s)`;
+}
+
+/* ── Modal Día ── */
+let DIA_SEL=null;
+function abrirDia(fecha){
+  DIA_SEL=fecha;
+  document.getElementById('mDiaTit').textContent='Visitas — '+fFecha(fecha);
+  const vs=visitasDe(fecha);
+  const cap=CFG.visitas_dia;
+  const propias=vs.filter(v=>!ES_REVISOR||SCOPE!=='todos');
+  document.getElementById('mDiaList').innerHTML = vs.length ? vs.map(v=>{
+    const estado = v.estado!=='REALIZADA'
+      ? '<span class="pill pill-prog">Programada</span>'
+      : `<span class="pill pill-real">Realizada</span> <span class="${v.resultado==='POSITIVO'?'res-pos':'res-neg'}">${v.resultado}</span>`;
+    const acc = PUEDE_GESTIONAR ? (
+      (v.estado!=='REALIZADA' ? `<button class="btn btn-primary" style="padding:5px 10px" onclick="abrirGestion(${v.id})"><i class="bi bi-pencil"></i> Gestión</button>`
+       : `<button class="btn btn-soft" style="padding:5px 10px" onclick="abrirGestion(${v.id})"><i class="bi bi-eye"></i> Editar</button>`)
+      + `<button class="btn btn-ghost" style="padding:5px 10px;margin-left:5px" onclick="elimVisita(${v.id})"><i class="bi bi-trash"></i></button>`
+    ) : '';
+    return `<div class="day-visit">
+      <div><div class="nm">${esc(v.nombre_dealer||v.rut_dealer||'—')}</div>
+        <div class="sub">${esc(v.comuna||'')} ${ES_REVISOR?(' · '+esc(v.usuario_nombre||'')):''} · ${estado}</div></div>
+      <div style="display:flex;align-items:center">${acc}</div>
+    </div>`;
+  }).join('') : '<div style="color:#94a3b8;font-size:.85rem;padding:6px 0">Sin visitas este día.</div>';
+
+  // Form agendar: solo si puede gestionar, alcance propio, y no superó el tope
+  const puedeAgendar = PUEDE_GESTIONAR && SCOPE!=='todos';
+  const tope = visitasDe(fecha).filter(()=>true).length;   // en alcance "mios" todas son del usuario
+  const lleno = SCOPE!=='todos' && tope>=cap;
+  const add=document.getElementById('mDiaAdd');
+  if(!puedeAgendar){ add.classList.add('hide'); }
+  else { add.classList.remove('hide');
+    add.querySelector('#addMsg').textContent = lleno ? `Tope de ${cap} visitas alcanzado.` : '';
+    add.querySelector('#addMsg').style.color = '#b91c1c';
+    document.getElementById('addDealer').value='';
+  }
+  abrir('mDia');
+}
+function agendar(){
+  const val=document.getElementById('addDealer').value.trim();
+  if(!val){ flash('addMsg','Selecciona un concesionario.','#b91c1c'); return; }
+  const d=DEALER_MAP[val] || null;
+  const body = d ? { id_dealer:d.id_dealer, rut_dealer:d.rut, nombre_dealer:d.nombre, comuna:d.comuna, fecha_programada:DIA_SEL }
+                 : { nombre_dealer:val, fecha_programada:DIA_SEL };
+  fetch('/api/visitas',{method:'POST',headers:hdr(),body:JSON.stringify(body)})
+    .then(r=>r.json()).then(j=>{
+      if(!j.success){ flash('addMsg', j.error||'Error', '#b91c1c'); return; }
+      cerrar('mDia'); cargarMes();
+    }).catch(()=>flash('addMsg','Error de conexión','#b91c1c'));
+}
+function elimVisita(id){
+  if(!confirm('¿Eliminar esta visita?')) return;
+  fetch('/api/visitas/'+id,{method:'DELETE',headers:hdr()}).then(r=>r.json()).then(j=>{
+    if(!j.success){ alert(j.error||'Error'); return; }
+    cerrar('mDia'); cargarMes(); if(!document.getElementById('viewBit').classList.contains('hide')) cargarBitacora();
+  });
+}
+
+/* ── Modal Gestión ── */
+let GES_ID=null, GES_RES=null;
+function abrirGestion(id){
+  const v = MES_VISITAS.find(x=>x.id===id) || (BIT_ROWS||[]).find(x=>x.id===id);
+  GES_ID=id; GES_RES=v?.resultado||null;
+  document.getElementById('mGesInfo').innerHTML = v ? `<b>${esc(v.nombre_dealer||v.rut_dealer||'—')}</b> · ${esc(v.comuna||'')} · ${fFecha(v.fecha_programada)}` : '';
+  document.getElementById('gComent').value = v?.comentarios||'';
+  document.getElementById('gSegFecha').value = v?.seguimiento_fecha? String(v.seguimiento_fecha).slice(0,10):'';
+  document.getElementById('gSegNota').value = v?.seguimiento_nota||'';
+  setRes(GES_RES);
+  document.getElementById('gMsg').textContent='';
+  cerrar('mDia'); abrir('mGes');
+}
+function setRes(r){
+  GES_RES=r;
+  document.getElementById('rbPos').className = r==='POSITIVO'?'sel-pos':'';
+  document.getElementById('rbNeg').className = r==='NEGATIVO'?'sel-neg':'';
+}
+function guardarGestion(){
+  if(!GES_RES){ flash('gMsg','Elige Positivo o Negativo.','#b91c1c'); return; }
+  const body={ resultado:GES_RES, comentarios:document.getElementById('gComent').value.trim(),
+    seguimiento_fecha:document.getElementById('gSegFecha').value||null,
+    seguimiento_nota:document.getElementById('gSegNota').value.trim()||null };
+  fetch('/api/visitas/'+GES_ID+'/gestion',{method:'PUT',headers:hdr(),body:JSON.stringify(body)})
+    .then(r=>r.json()).then(j=>{
+      if(!j.success){ flash('gMsg', j.error||'Error','#b91c1c'); return; }
+      cerrar('mGes'); cargarMes(); if(!document.getElementById('viewBit').classList.contains('hide')) cargarBitacora();
+    }).catch(()=>flash('gMsg','Error de conexión','#b91c1c'));
+}
+
+/* ── Bitácora ── */
+let BIT_ROWS=[];
+function toggleSeg(){ segOnly=!segOnly; document.getElementById('bSeg').classList.toggle('btn-primary',segOnly); document.getElementById('bSeg').classList.toggle('btn-ghost',!segOnly); cargarBitacora(); }
+async function cargarBitacora(){
+  const qs=[];
+  const dd=document.getElementById('bDesde').value, hh=document.getElementById('bHasta').value;
+  if(dd) qs.push('desde='+dd); if(hh) qs.push('hasta='+hh);
+  const es=document.getElementById('bEstado').value, rs=document.getElementById('bResultado').value;
+  if(es) qs.push('estado='+es); if(rs) qs.push('resultado='+rs);
+  let url='/api/visitas?'+qs.join('&')+scopeQS();
+  document.getElementById('bitBody').innerHTML='<tr><td class="empty"><div class="spinner-border spinner-border-sm"></div></td></tr>';
+  try{
+    const r=await fetch(url,{headers:hdr()}); const j=await r.json();
+    BIT_ROWS=(j.data&&j.data.rows)||[];
+    if(j.data&&Array.isArray(j.data.usuarios)) pintarUsuarios(j.data.usuarios);
+  }catch(e){ BIT_ROWS=[]; }
+  let rows=BIT_ROWS;
+  if(segOnly) rows=rows.filter(v=>v.seguimiento_fecha);
+  pintarBitacora(rows);
+}
+function pintarBitacora(rows){
+  const cols = ['Fecha','Concesionario','Comuna'].concat(ES_REVISOR?['Ejecutivo']:[],['Estado','Resultado','Comentarios','Seguimiento','']);
+  document.getElementById('bitHead').innerHTML = cols.map(c=>`<th>${c}</th>`).join('');
+  document.getElementById('bitInfo').innerHTML = `<i class="bi bi-journal-text"></i> <b>${rows.length}</b> gestión(es)`;
+  if(!rows.length){ document.getElementById('bitBody').innerHTML=`<tr><td colspan="${cols.length}" class="empty"><i class="bi bi-inbox"></i>Sin gestiones con esos filtros.</td></tr>`; return; }
+  document.getElementById('bitBody').innerHTML = rows.map(v=>{
+    const estado = v.estado!=='REALIZADA' ? '<span class="pill pill-prog">Programada</span>' : '<span class="pill pill-real">Realizada</span>';
+    const res = v.resultado ? `<span class="${v.resultado==='POSITIVO'?'res-pos':'res-neg'}">${v.resultado}</span>` : '—';
+    const seg = v.seguimiento_fecha ? `<i class="bi bi-flag-fill" style="color:#ea580c"></i> ${fFecha(v.seguimiento_fecha)}${v.seguimiento_nota?('<div class="sub" style="font-size:.72rem;color:#94a3b8">'+esc(v.seguimiento_nota)+'</div>'):''}` : '—';
+    const acc = PUEDE_GESTIONAR ? `<button class="btn btn-soft" style="padding:4px 9px" onclick="abrirGestion(${v.id})"><i class="bi bi-pencil"></i></button>` : '';
+    return `<tr>
+      <td>${fFecha(v.fecha_programada)}</td>
+      <td><b>${esc(v.nombre_dealer||v.rut_dealer||'—')}</b></td>
+      <td>${esc(v.comuna||'—')}</td>
+      ${ES_REVISOR?`<td>${esc(v.usuario_nombre||'—')}</td>`:''}
+      <td>${estado}</td>
+      <td>${res}</td>
+      <td style="max-width:240px">${esc(v.comentarios||'')}</td>
+      <td>${seg}</td>
+      <td>${acc}</td>
+    </tr>`;
+  }).join('');
+}
+
+/* ── Config ── */
+function pintarConfig(){
+  document.getElementById('cfgDia').value = CFG.visitas_dia;
+  const dows=[['1','Lunes'],['2','Martes'],['3','Miércoles'],['4','Jueves'],['5','Viernes'],['6','Sábado'],['7','Domingo']];
+  document.getElementById('cfgDias').innerHTML = dows.map(([n,lbl])=>
+    `<label><input type="checkbox" value="${n}" ${CFG.dias_semana.includes(+n)?'checked':''}> ${lbl}</label>`).join('');
+}
+function guardarConfig(){
+  const visitas_dia=parseInt(document.getElementById('cfgDia').value);
+  const dias_semana=[...document.querySelectorAll('#cfgDias input:checked')].map(i=>+i.value);
+  fetch('/api/visitas/config',{method:'PUT',headers:hdr(),body:JSON.stringify({visitas_dia,dias_semana})})
+    .then(r=>r.json()).then(j=>{
+      if(!j.success){ flash('cfgMsg', j.error||'Error','#b91c1c'); return; }
+      CFG=j.data; flash('cfgMsg','✓ Guardado','#16a34a'); pintarCal();
+    }).catch(()=>flash('cfgMsg','Error de conexión','#b91c1c'));
+}
+
+/* ── Dealers para selector ── */
+async function cargarDealers(){
+  try{
+    const r=await fetch('/api/visitas/dealers',{headers:hdr()}); const j=await r.json();
+    DEALERS=(j.data)||[]; DEALER_MAP={};
+    document.getElementById('dealersList').innerHTML = DEALERS.map(d=>{
+      const label = `${d.nombre}${d.comuna?(' — '+d.comuna):''} (${d.rut||''})`;
+      DEALER_MAP[label]=d; return `<option value="${esc(label)}"></option>`;
+    }).join('');
+  }catch(e){ DEALERS=[]; }
+}
+
+/* ── Helpers UI ── */
+function abrir(id){ document.getElementById(id).classList.add('show'); document.body.style.overflow='hidden'; }
+function cerrar(id){ document.getElementById(id).classList.remove('show'); document.body.style.overflow=''; }
+function flash(id,txt,color){ const e=document.getElementById(id); e.textContent=txt; e.style.color=color||'#475569'; }
+
+/* ── Init ── */
+(async function init(){
+  await cargarPermisos();
+  try{ const r=await fetch('/api/visitas/config',{headers:hdr()}); const j=await r.json(); if(j.success) CFG=j.data; }catch(e){}
+  await cargarDealers();
+  cargarMes();
+})();
+</script>
+<script src="/js/app-version.js"></script>
+</body>
+</html>

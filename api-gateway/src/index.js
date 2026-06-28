@@ -91,6 +91,7 @@ app.use('/api/ia-config',        require('../../services/mantenedores/src/routes
 app.use('/api/ia',               require('../../services/ia/src/routes/ia.routes'));
 app.use('/api/dealer-incorporacion', require('../../services/dealers-incorporacion/src/routes/fichas.routes'));
 app.use('/api/dealer-categorias',    require('../../services/mantenedores/src/routes/dealer-categorias.routes'));
+app.use('/api/visitas',              require('../../services/mantenedores/src/routes/visitas.routes'));
 app.use('/api/parametros-credito', require('../../services/mantenedores/src/routes/parametros.routes'));
 app.use('/api/definiciones',       require('../../services/mantenedores/src/routes/definiciones.routes'));
 app.use('/api/feriados',           require('../../services/mantenedores/src/routes/feriados.routes'));
@@ -330,6 +331,9 @@ app.get(['/mantenedores/parques', '/mantenedores/parques/'], (req, res) =>
 
 app.get(['/mantenedores/dealers-mapa', '/mantenedores/dealers-mapa/'], (req, res) =>
   res.sendFile(path.join(__dirname, '../public/mantenedores/dealers-mapa/index.html')));
+
+app.get(['/dealers-visitas', '/dealers-visitas/'], (req, res) =>
+  res.sendFile(path.join(__dirname, '../public/dealers-visitas/index.html')));
 
 app.get(['/mantenedores/dealers-direcciones', '/mantenedores/dealers-direcciones/'], (req, res) =>
   res.sendFile(path.join(__dirname, '../public/mantenedores/dealers-direcciones/index.html')));
