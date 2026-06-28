@@ -5,6 +5,7 @@ const { requireFunc } = require('../../../../shared/middleware/permisos');
 
 router.get('/', verifyToken, ctrl.getAll);
 router.get('/estado-sync', verifyToken, ctrl.estadoSync);
+router.get('/diag-cmf', verifyToken, requireFunc('mantenedores_uf'), ctrl.diagCmf);   // diagnóstico temporal CMF
 router.get('/vigente', verifyToken, ctrl.getVigente);
 router.get('/en/:fecha', verifyToken, ctrl.getEnFecha);
 router.post('/importar', verifyToken, requireFunc('mantenedores_uf'), ctrl.importarCSV);

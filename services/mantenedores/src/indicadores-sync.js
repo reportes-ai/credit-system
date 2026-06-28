@@ -57,13 +57,13 @@ async function sincronizar(opts = {}) {
     try { out[tab] = await syncTabla(rec, tab, y, m, false); await setEstado('sync_' + tab, ''); await setEstado('sync_' + tab + '_ts', new Date().toISOString()); }
     catch (e) { out[tab] = { error: e.message }; await setEstado('sync_' + tab, eMsg(tab.toUpperCase(), e)); if (e.code !== 'NOCMF') console.error('[indicadores]', tab, e.message); }
   }
-  // Mensuales: UTM e IPC. Se intentan mes ACTUAL y ANTERIOR de forma INDEPENDIENTE:
-  // el IPC del mes en curso casi nunca está publicado (sale ~día 8 del mes siguiente), así
-  // que un fallo del mes actual NO debe impedir cargar el último mes publicado (mes anterior).
+  // Mensuales: UTM e IPC → se piden por AÑO (/recurso/AAAA trae TODOS los meses publicados del
+  // año, según doc CMF), no mes a mes. Se trae el año en curso y el anterior (cubre enero y da
+  // respaldo); INSERT IGNORE deduplica. Esto evita depender de la publicación tardía del mes.
   for (const [rec, tab] of [['utm', 'utm'], ['ipc', 'ipc']]) {
     let nuevos = 0, total = 0, ok = false, lastErr = null;
-    for (const [yy, mm] of [[y, m], [py, pm]]) {
-      try { const r = await syncTabla(rec, tab, yy, mm, true); nuevos += r.nuevos; total += r.total; ok = true; }
+    for (const yy of [y, py]) {
+      try { const r = await syncTabla(rec, tab, yy, null, true); nuevos += r.nuevos; total += r.total; ok = true; }
       catch (e) { lastErr = e; }
     }
     if (ok) {

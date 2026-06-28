@@ -1,4 +1,5 @@
 const pool = require('../../../../shared/config/database');
+const axios = require('axios');
 const { auditar } = require('../../../../shared/audit');
 const { sincronizar } = require('../indicadores-sync');   // sync automático de indicadores desde la CMF
 
@@ -124,4 +125,31 @@ const estadoSync = async (req, res) => {
   }
 };
 
-module.exports = { getAll, getVigente, getEnFecha, create, update, remove, importarCSV, sincronizarManual, estadoSync };
+// DIAGNÓSTICO TEMPORAL: pega directo a la CMF y devuelve la respuesta CRUDA (sin exponer la key)
+// para ver el formato real (keys del body, largo del array, muestra). Quitar cuando IPC/Dólar carguen.
+const diagCmf = async (req, res) => {
+  try {
+    const key = process.env.CMF_API_KEY;
+    const now = new Date();
+    const y = now.getFullYear(), m = String(now.getMonth() + 1).padStart(2, '0');
+    const paths = [`ipc/${y}`, `ipc/${y}/${m}`, `dolar/${y}/${m}`, `uf/${y}/${m}`, `utm/${y}`];
+    const out = { keyPresent: !!key, keyLen: key ? key.length : 0 };
+    for (const p of paths) {
+      try {
+        const url = `https://api.cmfchile.cl/api-sbifv3/recursos_api/${p}?apikey=${encodeURIComponent(key || '')}&formato=json`;
+        const r = await axios.get(url, { timeout: 15000, headers: { Accept: 'application/json' }, validateStatus: () => true });
+        const body = r.data;
+        const arr = (body && typeof body === 'object') ? (Object.values(body).find(v => Array.isArray(v)) || null) : null;
+        out[p] = {
+          status: r.status,
+          keys: body && typeof body === 'object' ? Object.keys(body) : typeof body,
+          arrLen: arr ? arr.length : null,
+          sample: arr ? arr.slice(0, 2) : (typeof body === 'string' ? body.slice(0, 200) : body),
+        };
+      } catch (e) { out[p] = { error: e.message }; }
+    }
+    res.json({ success: true, data: out, error: null });
+  } catch (e) { res.status(500).json({ success: false, data: null, error: e.message }); }
+};
+
+module.exports = { getAll, getVigente, getEnFecha, create, update, remove, importarCSV, sincronizarManual, estadoSync, diagCmf };
