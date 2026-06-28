@@ -5,7 +5,7 @@
   <link rel="icon" href="/img/favicon.png" type="image/png">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Portal Dealer — AutoFácil</title>
-  <!-- v2.2 — Onboarding self-service (email→RUT→clave por correo) + tour de bienvenida -->
+  <!-- v2.3 — Onboarding self-service + tour + previsualización /portal-dealer?demo=1 -->
   <link href="/css/bootstrap-icons.css" rel="stylesheet">
   <style>
     :root { --navy:#0141A2; --navy-dark:#012d70; --navy-light:#0255c5; --accent:#009AFE; }
@@ -860,13 +860,24 @@ function tourEnd(){
   document.querySelectorAll('.tour-target').forEach(e=>e.classList.remove('tour-target'));
   const pop=document.getElementById('tourPop'); if(pop) pop.style.display='none';
   document.getElementById('tourDemoBadge').style.display='none';
-  if(!tourPreview){ fetch('/api/atencion-remota/dealer/tour-visto',{method:'POST',headers:{Authorization:'Bearer '+dToken}}).catch(()=>{}); if(dInfo) dInfo.primer_ingreso=0; }
-  tab('inicio'); cargarDashboard();
+  if(!tourPreview && dToken){ fetch('/api/atencion-remota/dealer/tour-visto',{method:'POST',headers:{Authorization:'Bearer '+dToken}}).catch(()=>{}); if(dInfo) dInfo.primer_ingreso=0; }
+  tab('inicio'); if(dToken) cargarDashboard(); else pintarDemo();
+}
+// Previsualización sin login (para mostrar la demo): /portal-dealer?demo=1
+function entrarDemo(){
+  dInfo={ nombre:'Dealer Demo' };
+  document.getElementById('login').classList.add('hidden');
+  document.getElementById('app').classList.remove('hidden');
+  document.getElementById('hdNombre').textContent='Dealer Demo';
+  document.getElementById('dealerNombre').textContent='Dealer Demo';
+  document.getElementById('hdEstado2').textContent='Vista demo';
+  tourStart(true);
 }
 
 /* ── Arranque ── */
 (function(){
   const qs=new URLSearchParams(location.search);
+  if(qs.get('demo')){ entrarDemo(); return; }            // previsualización del tour sin login
   const rs=qs.get('reset');
   if(rs){ limpiarSesion(); mostrarReset(rs); return; }   // enlace de recuperación: muestra el formulario de nueva clave
   const k=qs.get('k');
