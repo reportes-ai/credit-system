@@ -74,7 +74,7 @@
   <div class="topnav-left">
     <a href="/" class="topnav-brand">
       <img src="/img/logo.png" alt="AutoFácil">
-      <span class="version-badge" id="versionBadge">v1.0</span>
+      <span class="version-badge" id="versionBadge">v1.1</span>
     </a>
     <div class="breadcrumb-nav">
       <a href="/">Inicio</a><span class="sep">›</span>
@@ -237,16 +237,19 @@ function recalcular(){
     const fin   = (c.financiera||'').toUpperCase();
     const colo  = fin.includes('AUTOFIN') ? 'AF' : (fin.includes('UNIDAD') ? 'UAC' : (fin.includes('AUTOFACIL') ? 'AFAC' : ''));
     const valor = Number(c.valor_vehiculo)||(Number(c.saldo_precio||0)+Number(c.pie||0));
-    const tasa  = Number(c.tasa_mensual)||0;
+    const plazo = Number(c.plazo||0);
+    const tasa  = Number(c.tasa_mensual)||0;   // tascli_real ya es decimal mensual (0.0211 = 2,11%)
+    const pq    = String(c.parque||'').trim().toUpperCase();
     const inp = {
-      valor, pie:Number(c.pie||0), plazo:Number(c.plazo||0),
+      valor, pie:Number(c.pie||0), plazo,
       seguros:{ desg:true, rdh:true, cesa:true },
-      esPatio: !!String(c.parque||'').trim() || Number(c.com_parque||0)>0,
+      esPatio: (pq && pq!=='NO APLICA') || Number(c.com_parque||0)>0,
       dealerComCLP: Number(c.comision_dealer||0)||null,
-      tasaCli: tasa>0 ? tasa/100 : null,
+      tasaCli: tasa>0 ? tasa : null,        // si falta → TMC vigente por tramo (motor)
       uacPct: tier.pct/100,
     };
-    const R = (window.AF_RENT && window.AF_RENT.calcular(inp, PARAMS, UF_HOY)) || null;
+    // Sin plazo no se puede calcular (crédito incompleto) → se marca "Datos incompletos"
+    const R = (plazo>0 && window.AF_RENT) ? (window.AF_RENT.calcular(inp, PARAMS, UF_HOY) || null) : null;
     let rentAF=null, rentUAC=null, mejor=null, esOptima=null, diffCLP=null, diffPct=null;
     if (R){
       rentAF = R.af.rentab; rentUAC = R.uac.rentab;
