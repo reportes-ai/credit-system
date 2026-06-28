@@ -48,6 +48,7 @@
     <ul class="nav nav-tabs" role="tablist">
       <li class="nav-item"><button class="nav-link active" data-bs-toggle="tab" data-bs-target="#tab-ped">Pedidos pendientes</button></li>
       <li class="nav-item"><button class="nav-link" data-bs-toggle="tab" data-bs-target="#tab-ord" onclick="cargarOrdenes()">Órdenes</button></li>
+      <li class="nav-item"><button class="nav-link" data-bs-toggle="tab" data-bs-target="#tab-rep" onclick="cargarReporte()">Reporte mensual</button></li>
     </ul>
 
     <div class="tab-content">
@@ -89,6 +90,23 @@
               <tbody id="tbodyOrd"><tr><td colspan="8" class="text-center py-4 muted">—</td></tr></tbody>
             </table>
           </div>
+        </div>
+      </div>
+
+      <!-- REPORTE MENSUAL -->
+      <div class="tab-pane fade" id="tab-rep">
+        <div class="card-box">
+          <div class="toolbar">
+            <b>Reporte mensual por sucursal</b>
+            <input type="number" id="repAnio" style="width:92px;border:1px solid #cbd5e1;border-radius:8px;padding:6px 9px;font-size:.85rem;margin-left:8px">
+            <select id="repModo" style="border:1px solid #cbd5e1;border-radius:8px;padding:6px 9px;font-size:.85rem">
+              <option value="todas">No anuladas</option>
+              <option value="efectivas">Solo compradas/recibidas</option>
+            </select>
+            <button class="btn btn-sm btn-primary" onclick="cargarReporte()"><i class="bi bi-arrow-clockwise"></i></button>
+            <button class="btn btn-sm btn-outline-success" style="margin-left:auto" onclick="exportCSV()"><i class="bi bi-filetype-csv me-1"></i>Exportar CSV</button>
+          </div>
+          <div class="table-responsive" id="repTabla"><p class="muted">Cargando…</p></div>
         </div>
       </div>
     </div>
@@ -218,6 +236,47 @@
         <tr><td colspan="4" class="r tot">TOTAL</td><td class="r tot">${fmt(o.total)}</td></tr></tbody></table>
         </body></html>`);
       w.document.close(); setTimeout(()=>w.print(), 350);
+    }
+
+    /* ── REPORTE MENSUAL ── */
+    const MESES = ['Ene','Feb','Mar','Abr','May','Jun','Jul','Ago','Sep','Oct','Nov','Dic'];
+    const csv = s => '"' + String(s==null?'':s).replace(/"/g,'""') + '"';
+    let REP = null;
+    async function cargarReporte() {
+      const anioEl = document.getElementById('repAnio');
+      if (!anioEl.value) anioEl.value = new Date().getFullYear();
+      const anio = anioEl.value, modo = document.getElementById('repModo').value;
+      const j = await api(`/api/compras/admin/reporte?anio=${anio}&modo=${modo}`); if (!j?.success) return;
+      const map = {};
+      for (const f of j.data.filas) {
+        const key = f.id_direccion + '|' + f.direccion;
+        if (!map[key]) map[key] = { nombre: f.direccion, meses: Array(12).fill(0), total: 0 };
+        map[key].meses[f.mes-1] += Number(f.monto)||0;
+        map[key].total += Number(f.monto)||0;
+      }
+      const sucursales = Object.values(map).sort((a,b)=>String(a.nombre).localeCompare(b.nombre));
+      const totMes = Array(12).fill(0); let gran = 0;
+      sucursales.forEach(s => { s.meses.forEach((m,i)=>totMes[i]+=m); gran += s.total; });
+      REP = { anio, sucursales, totMes, gran };
+      renderReporte();
+    }
+    function renderReporte() {
+      const cont = document.getElementById('repTabla');
+      if (!REP || !REP.sucursales.length) { cont.innerHTML = '<p class="muted">Sin compras registradas en el año.</p>'; return; }
+      cont.innerHTML = `<table class="table table-bordered table-sm" style="font-size:.8rem;white-space:nowrap">
+        <thead><tr><th>Sucursal</th>${MESES.map(m=>`<th class="text-end">${m}</th>`).join('')}<th class="text-end">Total</th></tr></thead>
+        <tbody>${REP.sucursales.map(s=>`<tr><td><b>${esc(s.nombre)}</b></td>${s.meses.map(m=>`<td class="text-end">${m?fmt(m):'<span class="muted">–</span>'}</td>`).join('')}<td class="text-end"><b>${fmt(s.total)}</b></td></tr>`).join('')}</tbody>
+        <tfoot><tr style="background:#f1f5f9;font-weight:700"><td>Total</td>${REP.totMes.map(m=>`<td class="text-end">${m?fmt(m):'–'}</td>`).join('')}<td class="text-end">${fmt(REP.gran)}</td></tr></tfoot></table>`;
+    }
+    function exportCSV() {
+      if (!REP || !REP.sucursales.length) { toast('Nada que exportar', false); return; }
+      const sep = ';';
+      const head = ['Sucursal', ...MESES, 'Total'].join(sep);
+      const lines = REP.sucursales.map(s => [csv(s.nombre), ...s.meses, s.total].join(sep));
+      const tot = ['Total', ...REP.totMes, REP.gran].join(sep);
+      const txt = [head, ...lines, tot].join('\r\n');
+      const blob = new Blob(['﻿' + txt], { type: 'text/csv;charset=utf-8' });
+      const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = `compras_${REP.anio}.csv`; a.click();
     }
 
     cargarPed();

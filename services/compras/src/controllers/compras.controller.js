@@ -535,6 +535,23 @@ const adminOrdenEstado = async (req, res) => {
   } catch (e) { err(res, e); }
 };
 
+// GET /api/compras/admin/reporte?anio=YYYY&modo=todas|efectivas → montos por sucursal y mes
+const reporteMensual = async (req, res) => {
+  try {
+    const anio = num(req.query.anio) || new Date().getFullYear();
+    const modo = req.query.modo === 'efectivas' ? 'efectivas' : 'todas';
+    // "todas" = pedidos no anulados; "efectivas" = solo comprados/recibidos
+    const cond = modo === 'efectivas' ? "p.estado IN ('COMPRADO','RECIBIDO')" : "p.estado <> 'ANULADO'";
+    const [filas] = await pool.query(
+      `SELECT MONTH(p.fecha) AS mes, COALESCE(p.id_direccion,0) AS id_direccion,
+              COALESCE(d.nombre,'Sin dirección') AS direccion, COUNT(*) AS n, SUM(p.total) AS monto
+       FROM compras_pedidos p LEFT JOIN compras_direcciones d ON d.id=p.id_direccion
+       WHERE ${cond} AND YEAR(p.fecha)=?
+       GROUP BY mes, id_direccion, direccion ORDER BY direccion, mes`, [anio]);
+    res.json({ success: true, data: { anio, modo, filas }, error: null });
+  } catch (e) { err(res, e); }
+};
+
 module.exports = {
   catalogo, categorias, sincronizar,
   perfiles, articuloPerfilGet, articuloPerfilSet,
@@ -542,4 +559,5 @@ module.exports = {
   usuariosConfig, usuarioConfigSet,
   misArticulos, misCategorias, miConfig, crearPedido, misPedidos,
   adminPedidos, consolidar, adminOrdenes, adminOrdenDetalle, adminOrdenEstado,
+  reporteMensual,
 };

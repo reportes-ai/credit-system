@@ -42,5 +42,6 @@ router.post('/admin/consolidar',        verifyToken, admin, c.consolidar);
 router.get('/admin/ordenes',            verifyToken, admin, c.adminOrdenes);
 router.get('/admin/ordenes/:id',        verifyToken, admin, c.adminOrdenDetalle);
 router.put('/admin/ordenes/:id/estado', verifyToken, admin, c.adminOrdenEstado);
+router.get('/admin/reporte',            verifyToken, admin, c.reporteMensual);
 
 module.exports = router;
