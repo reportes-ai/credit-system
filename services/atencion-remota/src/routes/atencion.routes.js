@@ -2,12 +2,16 @@
 const router = require('express').Router();
 const { verifyToken } = require('../../../../shared/middleware/auth');
 const { requireFunc } = require('../../../../shared/middleware/permisos');
+const { rateLimit } = require('../../../../shared/middleware/rate-limit');
 const C = require('../controllers/atencion.controller');
 
-/* ── Portal Dealer ───────────────────────────────────────────────────────── */
-router.post('/dealer/login', C.dealerLogin);
-router.post('/dealer/solicitar', C.solicitarCuenta);   // autoregistro (público)
-router.post('/dealer/acceso',    C.dealerAcceso);      // acceso por link (público, ?k=token)
+/* ── Portal Dealer (endpoints públicos: con rate limit anti fuerza-bruta/spam) ── */
+const rlLogin     = rateLimit({ key: 'dealer_login',     windowMs: 15 * 60 * 1000, max: 8 });
+const rlAcceso    = rateLimit({ key: 'dealer_acceso',    windowMs: 60 * 60 * 1000, max: 15 });
+const rlSolicitar = rateLimit({ key: 'dealer_solicitar', windowMs: 24 * 60 * 60 * 1000, max: 5 });
+router.post('/dealer/login',     rlLogin,     C.dealerLogin);
+router.post('/dealer/solicitar', rlSolicitar, C.solicitarCuenta);   // autoregistro (público)
+router.post('/dealer/acceso',    rlAcceso,    C.dealerAcceso);       // acceso por link (público, ?k=token)
 
 /* ── Compartido (ejecutivo o dealer) ─────────────────────────────────────── */
 router.get('/ice', C.verifyAny, C.getIce);

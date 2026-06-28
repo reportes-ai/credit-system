@@ -76,7 +76,10 @@ const ESTADO_CARTERA_SQL = `
 const NO_ANULADA = `ob.estado_eval <> 'ANULADO' AND (ob.estado_credito IS NULL OR ob.estado_credito <> 'ANULADO')`;
 
 // Catálogos de estados (para que el frontend muestre nombre + color).
+// Cacheados en memoria (TTL 5 min): cambian poquísimo y los pega cada request.
+let _catCache = null, _catExp = 0;
 async function catalogos() {
+  if (_catCache && _catExp > Date.now()) return _catCache;
   const out = { etapa: {}, cartera: {} };
   try {
     const [e] = await pool.query('SELECT codigo, nombre, color FROM estados_credito');
@@ -86,16 +89,36 @@ async function catalogos() {
     const [c] = await pool.query('SELECT codigo, nombre, color FROM estados_cartera');
     for (const r of c) out.cartera[r.codigo] = { nombre: r.nombre, color: r.color };
   } catch (_) {}
+  _catCache = out; _catExp = Date.now() + 5 * 60 * 1000;
   return out;
 }
 
-// Lee un plazo (días) desde cartas_parametros (key-value); default si falta.
+// Lee un plazo (días) desde cartas_parametros (key-value); default si falta. Cache 60s.
+const _paramCache = new Map();
 async function paramNum(key, def) {
+  const hit = _paramCache.get(key);
+  if (hit && hit.exp > Date.now()) return hit.v;
+  let v = def;
   try {
     const [[r]] = await pool.query('SELECT `value` AS v FROM cartas_parametros WHERE `key` = ?', [key]);
     const n = r ? parseInt(r.v, 10) : NaN;
-    return Number.isFinite(n) ? n : def;
-  } catch (_) { return def; }
+    v = Number.isFinite(n) ? n : def;
+  } catch (_) { v = def; }
+  _paramCache.set(key, { v, exp: Date.now() + 60 * 1000 });
+  return v;
+}
+
+// RUT efectivo del dealer de la sesión: el del JWT, o si viene vacío, el de la
+// tabla dealers por id_dealer (cuentas con id_dealer pero sin rut poblado).
+async function rutEfectivo(req) {
+  let rut = rutNorm(req.dealer && req.dealer.rut);
+  if (!rut && req.dealer && req.dealer.id_dealer) {
+    try {
+      const [[d]] = await pool.query('SELECT rut FROM dealers WHERE id_dealer = ?', [req.dealer.id_dealer]);
+      if (d && d.rut) rut = rutNorm(d.rut);
+    } catch (_) {}
+  }
+  return rut;
 }
 
 // Devuelve la operación SOLO si pertenece al dealer de la sesión; si no, null.
@@ -342,7 +365,7 @@ exports.cartolas = async (req, res) => {
     const sc = dealerScope(req);
     if (!sc.hasScope) return res.json({ success: true, data: { vinculado: false, rows: [], plazos: {} }, error: null });
 
-    const rut = rutNorm(req.dealer && req.dealer.rut);
+    const rut = await rutEfectivo(req);
     const [rows] = await pool.query(
       `SELECT id, mes, total_bruto, fecha_envio, nombre_dealer
        FROM cartolas_enviadas
@@ -378,7 +401,7 @@ async function datosDelDealer(req) {
      WHERE ${sc.where} AND ${NO_ANULADA}
      ORDER BY COALESCE(ob.fecha_otorgado, ob.created_at) DESC LIMIT 120`, sc.params);
 
-  const rut = rutNorm(req.dealer && req.dealer.rut);
+  const rut = await rutEfectivo(req);
   let cart = [];
   try {
     const [c] = await pool.query(
@@ -419,6 +442,12 @@ exports.ia = async (req, res) => {
       return res.json({ success: true, data: { disponible: true, respuesta: `Llegaste al máximo de ${limite} preguntas por hoy. Puedes seguir mañana o escribirle a tu ejecutivo.`, restantes: 0 }, error: null });
     }
 
+    // Reservar el cupo ANTES de llamar a la IA: cierra la ventana de carrera
+    // (dos requests paralelas) y controla costo aunque la llamada falle.
+    await pool.query('INSERT INTO portal_ia_uso (id_dealer, id_cuenta, rut, pregunta) VALUES (?,?,?,?)',
+      [idd, idc, await rutEfectivo(req), pregunta.slice(0, 500)]);
+    const restantes = limite > 0 ? Math.max(0, limite - Number(u.c) - 1) : null;
+
     const ctx = await datosDelDealer(req);
     const system = `Eres el asistente virtual de AutoFácil para el dealer "${ctx.dealer}". Respondes ÚNICAMENTE con la información provista (las operaciones y cartolas de ESTE dealer). Si la respuesta no está en los datos, dilo con claridad y sugiere escribir al ejecutivo. Nunca inventes datos ni menciones a otros dealers ni a otros clientes. Responde en español, en tono cercano, breve y claro. Los montos están en pesos chilenos.`;
     const prompt = `Datos del dealer (JSON):\n${JSON.stringify(ctx)}\n\nPregunta del dealer: ${pregunta}`;
@@ -431,9 +460,6 @@ exports.ia = async (req, res) => {
       throw e;
     }
 
-    await pool.query('INSERT INTO portal_ia_uso (id_dealer, id_cuenta, rut, pregunta) VALUES (?,?,?,?)',
-      [idd, idc, rutNorm(req.dealer && req.dealer.rut), pregunta.slice(0, 500)]);
-    const restantes = limite > 0 ? Math.max(0, limite - Number(u.c) - 1) : null;
     return res.json({ success: true, data: { disponible: true, respuesta: r.texto || 'No tengo una respuesta para eso.', restantes }, error: null });
   } catch (err) {
     console.error('[portal-dealer] ia:', err.message);

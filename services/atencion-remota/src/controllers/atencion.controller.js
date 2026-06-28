@@ -296,12 +296,14 @@ const verifyAny = async (req, res, next) => {
 };
 
 /* ── REST: dealer (cuentas + login + conversaciones) ─────────────────────── */
+// Hash dummy para igualar la latencia cuando el email no existe (evita enumeración por timing).
+const DUMMY_HASH = bcrypt.hashSync('af-portal-dummy', 10);
 const dealerLogin = async (req, res) => {
   try {
     const { email, password } = req.body || {};
     if (!email || !password) return res.status(400).json({ success: false, data: null, error: 'Email y contraseña requeridos' });
     const [[c]] = await pool.query('SELECT * FROM ar_dealer_cuentas WHERE email=? AND activo=1', [String(email).toLowerCase().trim()]);
-    if (!c) return res.status(401).json({ success: false, data: null, error: 'Credenciales inválidas' });
+    if (!c) { await bcrypt.compare(String(password), DUMMY_HASH); return res.status(401).json({ success: false, data: null, error: 'Credenciales inválidas' }); }
     const ok = await bcrypt.compare(password, c.password_hash);
     if (!ok) return res.status(401).json({ success: false, data: null, error: 'Credenciales inválidas' });
     await pool.query('UPDATE ar_dealer_cuentas SET ultimo_acceso=NOW() WHERE id=?', [c.id]);
@@ -356,7 +358,8 @@ const crearCuenta = async (req, res) => {
     if (String(password).length < 6) return res.status(400).json({ success: false, data: null, error: 'La contraseña debe tener al menos 6 caracteres' });
     if (id_dealer) {
       const [[d]] = await pool.query('SELECT rut, nombre_indexa, nombre_razon FROM dealers WHERE id_dealer=?', [id_dealer]);
-      if (d) { rut = rut || d.rut; nombre = nombre || d.nombre_razon || d.nombre_indexa; }
+      if (!d) return res.status(400).json({ success: false, data: null, error: 'El dealer indicado no existe' });
+      rut = rut || d.rut; nombre = nombre || d.nombre_razon || d.nombre_indexa;
     }
     const [[dup]] = await pool.query('SELECT id FROM ar_dealer_cuentas WHERE email=?', [email]);
     if (dup) return res.status(409).json({ success: false, data: null, error: 'Ya existe una cuenta con ese email' });
