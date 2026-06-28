@@ -162,7 +162,7 @@
   <div class="topnav-left">
     <a href="/" class="topnav-brand">
       <img src="/img/logo.png" alt="AutoFácil">
-      <span class="version-badge" id="versionBadge">v1.1</span>
+      <span class="version-badge" id="versionBadge">v1.2</span>
     </a>
     <div class="breadcrumb-nav">
       <span class="bc-normal">
@@ -739,7 +739,8 @@ const dDT   = v => { if(!v) return null; const d=new Date(v); if(isNaN(d)) retur
   // de preferencia y termina — no espera cartas/catálogos (más rápido). El menú
   // ya quedó oculto por CSS en el <head>, así que no hay flash.
   if (tabParam === 'params') {
-    if (puede('aprob_params')) { await cargarFactores(); showTab('params'); }
+    // cargarUFyTasas trae PARAMS_CRED + TASAS + UF_HOY, que necesita "Calcular óptimo (motor)"
+    if (puede('aprob_params')) { await Promise.all([cargarFactores(), cargarUFyTasas()]); showTab('params'); }
     return;
   }
   await Promise.all([cargarCartas(), cargarCatalogos(), cargarFactores(), cargarFirma(), cargarUFyTasas()]);
@@ -2329,9 +2330,15 @@ function renderPrefTabla(){
 }
 /* Calcula los cortes óptimos con el motor de rentabilidad y rellena el cuadro.
    El motor usa el módulo de tasas (CF/spread). UAC = tier 1 (14%), dealer calle. */
-function calcularOptimoPref(){
+async function calcularOptimoPref(){
   const el = document.getElementById('paramsAlert');
   if (!window.AF_RENT) { el.textContent='El motor de rentabilidad aún no carga, reintenta.'; el.className='alert-inline err'; return; }
+  // En el mantenedor standalone puede no haberse cargado parámetros/tasas/UF: cargar a demanda.
+  if (!UF_HOY || !PARAMS_CRED || !Object.keys(PARAMS_CRED||{}).length || !TASAS || !TASAS.tasa_mensual_mayor) {
+    el.textContent = 'Cargando parámetros y tasas…'; el.className='alert-inline';
+    await cargarUFyTasas();
+  }
+  if (!UF_HOY || !TASAS || !TASAS.tasa_mensual_mayor) { el.textContent='No se pudieron cargar tasas/UF. Reintenta.'; el.className='alert-inline err'; return; }
   const uacPct = (parseFloat(PARAMS_CRED?.uac_pct_tier1)||14)/100;
   const flip = (saldo) => {                       // primera cuota donde AutoFin ≥ UAC
     for (let p=12; p<=48; p++){
