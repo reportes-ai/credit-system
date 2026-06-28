@@ -2156,10 +2156,13 @@ async function cargarRentabilidad(c){
 function rentHTML(c,R,tier){
   const f=fmtCLP, fp=n=>(isNaN(n)?'—':n.toFixed(1)+'%');
   const mejorAf = R.af.rentab>=R.uac.rentab;
-  const card=(nom,color,D,ingSegDetail,mejor)=>`
-    <div style="flex:1;min-width:270px;border:1px solid #e3e8ef;border-radius:12px;overflow:hidden">
+  const ac = (c.acreedor||'').toUpperCase();
+  const elegida = ac.includes('AUTOFIN') ? 'AF' : (ac.includes('UNIDAD')||ac.includes('UAC')) ? 'UAC' : (ac.includes('AUTOFACIL') ? 'AFAC' : '');
+  const aprobLbl = { AF:'AutoFin', UAC:'Unidad de Crédito', AFAC:'AutoFácil (cartera propia)' }[elegida] || (c.acreedor||'—');
+  const card=(nom,color,D,ingSegDetail,mejor,aprobada)=>`
+    <div style="flex:1;min-width:270px;border:${aprobada?'2px solid '+color:'1px solid #e3e8ef'};border-radius:12px;overflow:hidden;box-shadow:${aprobada?'0 0 0 3px '+color+'22':'none'}">
       <div style="background:${color};color:#fff;padding:10px 14px;font-weight:800;display:flex;align-items:center;gap:8px">
-        ${nom}${mejor?` <span style="margin-left:auto;background:#fff;color:${color};border-radius:10px;padding:1px 8px;font-size:.7rem">⭐ Más rentable</span>`:''}
+        ${nom}<span style="margin-left:auto;display:flex;gap:6px;align-items:center">${aprobada?`<span style="background:#fff;color:${color};border-radius:10px;padding:1px 8px;font-size:.7rem;font-weight:800">✅ Aprobada por esta</span>`:''}${mejor?`<span style="background:rgba(255,255,255,.22);border:1px solid rgba(255,255,255,.6);color:#fff;border-radius:10px;padding:1px 8px;font-size:.7rem">⭐ Más rentable</span>`:''}</span>
       </div>
       <div style="padding:12px 14px">
         <div style="font-size:.72rem;font-weight:700;color:#059669;text-transform:uppercase;letter-spacing:.04em;margin-bottom:4px">Ingresos</div>
@@ -2196,12 +2199,14 @@ function rentHTML(c,R,tier){
       <span>Plazo: <b>${R.plazo}m</b></span>
       <span>${R.esMayor?'> 200 UF':'≤ 200 UF'}</span>
       <span>Tier UAC: <b>${tier.tier_uac_n||'—'} (${(Number(tier.tier_uac_pct)||0).toFixed(0)}%)</b></span>
+      <span>Aprobada por: <b style="color:#0141A2">${escH(aprobLbl)}</b></span>
     </div>
   </div>
   <div style="display:flex;gap:14px;flex-wrap:wrap">
-    ${card('AutoFin','#0141A2',R.af,segDetailAf,mejorAf)}
-    ${card('Unidad de Crédito','#166534',R.uac,segDetailUac,!mejorAf)}
+    ${card('AutoFin','#0141A2',R.af,segDetailAf,mejorAf,elegida==='AF')}
+    ${card('Unidad de Crédito','#166534',R.uac,segDetailUac,!mejorAf,elegida==='UAC')}
   </div>
+  ${elegida==='AFAC'?'<div style="margin-top:8px;background:#eff6ff;border:1px solid #bfdbfe;border-radius:8px;padding:8px 12px;font-size:.8rem;color:#1e40af">Esta carta fue aprobada por <b>AutoFácil (cartera propia)</b>; la comparación de arriba es referencial entre las financieras de brokerage.</div>':''}
   <div style="margin-top:10px;font-size:.73rem;color:#94a3b8">Comisión Dealer = participación de la carta (si no la trae, pizarra por plazo). Tasa cliente = TMC vigente por tramo. Tier UAC fijado al emitir la carta. Mismas fórmulas del Simulador de Rentabilidad.</div>`;
 }
 
