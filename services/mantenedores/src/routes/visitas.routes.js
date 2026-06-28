@@ -11,6 +11,7 @@ const gestionar  = requireFunc('visitas_dealers', 'visitas_supervisar');
 router.get('/config',          verifyToken, verVisitas, c.getConfig);
 router.put('/config',          verifyToken, requireFunc('visitas_supervisar'), c.putConfig);
 router.get('/dealers',         verifyToken, verVisitas, c.getDealers);
+router.get('/planificador',    verifyToken, verVisitas, c.planificador);
 router.get('/',                verifyToken, verVisitas, c.listar);
 router.post('/',               verifyToken, gestionar,  c.crear);
 router.put('/:id/gestion',     verifyToken, gestionar,  c.gestionar);

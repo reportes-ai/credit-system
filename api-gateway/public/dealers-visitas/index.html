@@ -113,7 +113,7 @@
   <div class="topnav-left">
     <a href="/" class="topnav-brand">
       <img src="/img/logo.png" alt="AutoFácil">
-      <span class="version-badge" id="versionBadge">v1.0</span>
+      <span class="version-badge" id="versionBadge">v1.1</span>
     </a>
     <div class="breadcrumb-nav">
       <a href="/">Inicio</a><span class="sep">›</span>
@@ -144,6 +144,7 @@
   </div>
 
   <div class="tabs">
+    <button class="tab" id="tabPlan" onclick="setTab('plan')"><i class="bi bi-signpost-split"></i> Planificador de rutas</button>
     <button class="tab on" id="tabCal" onclick="setTab('cal')"><i class="bi bi-calendar3"></i> Calendario</button>
     <button class="tab" id="tabBit" onclick="setTab('bit')"><i class="bi bi-journal-text"></i> Gestiones</button>
     <button class="tab hide" id="tabCfg" onclick="setTab('cfg')"><i class="bi bi-sliders"></i> Configuración</button>
@@ -155,6 +156,40 @@
     <div class="seg2"><button id="scMios" class="on" onclick="setScope('mios')">Mis visitas</button><button id="scTodos" onclick="setScope('todos')">Todo el equipo</button></div>
     <span id="scUserWrap" class="hide"><label>Ejecutivo:</label>
       <select id="scUser" onchange="recargar()"><option value="">Todos</option></select></span>
+  </div>
+
+  <!-- ── Planificador de rutas ── -->
+  <div id="viewPlan" class="panel hide">
+    <h5 style="font-weight:800;color:#0f172a;margin-bottom:4px"><i class="bi bi-signpost-split me-1" style="color:#0e7490"></i>Planificador de rutas</h5>
+    <p style="font-size:.83rem;color:#64748b;margin-bottom:16px">Define tus rangos y la app arma el calendario óptimo (ruta más corta), te dice por quién partir y qué % de dealers alcanzas a recorrer.</p>
+    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px;margin-bottom:14px">
+      <div class="fld" style="margin:0"><label>Visitas por día (máx)</label><input type="number" id="pVis" min="1" max="50" value="4"></div>
+      <div class="fld" style="margin:0"><label>Hora inicio</label><input type="time" id="pIni" value="09:00"></div>
+      <div class="fld" style="margin:0"><label>Hora término</label><input type="time" id="pFin" value="18:00"></div>
+      <div class="fld" style="margin:0"><label>Duración visita (min)</label><input type="number" id="pDur" min="5" max="480" value="45"></div>
+      <div class="fld" style="margin:0"><label>Velocidad ciudad (km/h)</label><input type="number" id="pVel" min="5" max="120" value="25"></div>
+      <div class="fld" style="margin:0"><label>Inicio del plan</label><input type="date" id="pDesde"></div>
+      <div class="fld" style="margin:0"><label>Dealers</label>
+        <select id="pEstado">
+          <option value="activos">Activos</option>
+          <option value="riesgo">En riesgo (pasando a inactivo)</option>
+          <option value="inactivos">Inactivos</option>
+          <option value="todos">Todos</option>
+        </select>
+      </div>
+      <div class="fld" style="margin:0"><label>Comuna</label><select id="pComuna"><option value="">Todas</option></select></div>
+    </div>
+    <div class="fld" style="max-width:520px">
+      <label>Punto de partida (opcional)</label>
+      <select id="pOrigen"><option value="">Auto (extremo norte de la zona)</option></select>
+      <span style="font-size:.72rem;color:#94a3b8">Desde aquí se traza la ruta más corta (vecino más cercano).</span>
+    </div>
+    <div class="dow-pick" id="pDias" style="margin-bottom:14px"></div>
+    <button class="btn btn-primary" onclick="generarPlan()"><i class="bi bi-magic"></i> Generar plan</button>
+    <span id="pMsg" style="margin-left:12px;font-size:.84rem"></span>
+
+    <div id="planCobertura" style="margin-top:18px"></div>
+    <div id="planLista" style="margin-top:6px"></div>
   </div>
 
   <!-- ── Calendario ── -->
@@ -194,9 +229,11 @@
   <div id="viewCfg" class="panel hide">
     <h5 style="font-weight:800;color:#0f172a;margin-bottom:4px"><i class="bi bi-sliders me-1" style="color:#0e7490"></i>Parámetros del calendario</h5>
     <p style="font-size:.83rem;color:#64748b;margin-bottom:18px">Define cuántas visitas puede agendar cada ejecutivo por día y en qué días de la semana.</p>
-    <div class="fld" style="max-width:240px">
-      <label>Visitas por día (por ejecutivo)</label>
-      <input type="number" id="cfgDia" min="1" max="50" value="4">
+    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px;max-width:620px">
+      <div class="fld"><label>Visitas por día (por ejecutivo)</label><input type="number" id="cfgDia" min="1" max="50" value="4"></div>
+      <div class="fld"><label>Hora inicio</label><input type="time" id="cfgIni" value="09:00"></div>
+      <div class="fld"><label>Hora término</label><input type="time" id="cfgFin" value="18:00"></div>
+      <div class="fld"><label>Duración visita (min)</label><input type="number" id="cfgDur" min="5" max="480" value="45"></div>
     </div>
     <div class="fld">
       <label>Días de la semana habilitados</label>
@@ -207,8 +244,9 @@
     <div class="footer-box">
       <b><i class="bi bi-diagram-3 me-1"></i>Qué afecta este mantenedor</b>
       <ul style="margin:8px 0 0;padding-left:18px">
-        <li><b>Visitas por día</b> → tope de visitas que cada ejecutivo puede agendar por fecha en el <a href="/dealers-visitas/">Calendario de Visitas</a>.</li>
-        <li><b>Días habilitados</b> → días en que se permite agendar visitas (el resto aparece bloqueado en el calendario).</li>
+        <li><b>Visitas por día</b> → tope de visitas que cada ejecutivo puede agendar por fecha en el Calendario, y máximo por día en el Planificador.</li>
+        <li><b>Días habilitados</b> → días en que se permite agendar (el resto aparece bloqueado en el calendario y se salta en el plan).</li>
+        <li><b>Hora inicio / término / duración</b> → ventana diaria y minutos por visita; el Planificador calcula cuántas visitas caben por día (con el tiempo de traslado).</li>
       </ul>
     </div>
   </div>
@@ -306,15 +344,14 @@ async function cargarPermisos(){
 
 /* ── Tabs ── */
 function setTab(t){
-  document.getElementById('tabCal').classList.toggle('on',t==='cal');
-  document.getElementById('tabBit').classList.toggle('on',t==='bit');
-  document.getElementById('tabCfg').classList.toggle('on',t==='cfg');
-  document.getElementById('viewCal').classList.toggle('hide',t!=='cal');
-  document.getElementById('viewBit').classList.toggle('hide',t!=='bit');
-  document.getElementById('viewCfg').classList.toggle('hide',t!=='cfg');
-  document.getElementById('scopeBar').classList.toggle('hide', !(ES_REVISOR && t!=='cfg'));
+  ['plan','cal','bit','cfg'].forEach(x=>{
+    document.getElementById('tab'+x[0].toUpperCase()+x.slice(1)).classList.toggle('on',t===x);
+    document.getElementById('view'+x[0].toUpperCase()+x.slice(1)).classList.toggle('hide',t!==x);
+  });
+  document.getElementById('scopeBar').classList.toggle('hide', !(ES_REVISOR && (t==='cal'||t==='bit')));
   if(t==='bit') cargarBitacora();
   if(t==='cfg') pintarConfig();
+  if(t==='plan') initPlan();
 }
 function setScope(s){
   SCOPE=s;
@@ -446,7 +483,7 @@ function elimVisita(id){
 /* ── Modal Gestión ── */
 let GES_ID=null, GES_RES=null;
 function abrirGestion(id){
-  const v = MES_VISITAS.find(x=>x.id===id) || (BIT_ROWS||[]).find(x=>x.id===id);
+  const v = MES_VISITAS.find(x=>x.id===id) || (BIT_ROWS||[]).find(x=>x.id===id) || Object.values(PLAN_VIS_EXIST).find(x=>x.id===id);
   GES_ID=id; GES_RES=v?.resultado||null;
   document.getElementById('mGesInfo').innerHTML = v ? `<b>${esc(v.nombre_dealer||v.rut_dealer||'—')}</b> · ${esc(v.comuna||'')} · ${fFecha(v.fecha_programada)}` : '';
   document.getElementById('gComent').value = v?.comentarios||'';
@@ -469,7 +506,10 @@ function guardarGestion(){
   fetch('/api/visitas/'+GES_ID+'/gestion',{method:'PUT',headers:hdr(),body:JSON.stringify(body)})
     .then(r=>r.json()).then(j=>{
       if(!j.success){ flash('gMsg', j.error||'Error','#b91c1c'); return; }
-      cerrar('mGes'); cargarMes(); if(!document.getElementById('viewBit').classList.contains('hide')) cargarBitacora();
+      cerrar('mGes'); cargarMes();
+      if(!document.getElementById('viewBit').classList.contains('hide')) cargarBitacora();
+      if(PLAN_RESULT && !document.getElementById('viewPlan').classList.contains('hide'))
+        cargarVisitasPlan(PLAN_RESULT.plan).then(()=>renderPlanLista(PLAN_RESULT.plan));
     }).catch(()=>flash('gMsg','Error de conexión','#b91c1c'));
 }
 
@@ -518,16 +558,24 @@ function pintarBitacora(rows){
 }
 
 /* ── Config ── */
+const DOWS=[['1','Lunes'],['2','Martes'],['3','Miércoles'],['4','Jueves'],['5','Viernes'],['6','Sábado'],['7','Domingo']];
 function pintarConfig(){
   document.getElementById('cfgDia').value = CFG.visitas_dia;
-  const dows=[['1','Lunes'],['2','Martes'],['3','Miércoles'],['4','Jueves'],['5','Viernes'],['6','Sábado'],['7','Domingo']];
-  document.getElementById('cfgDias').innerHTML = dows.map(([n,lbl])=>
+  document.getElementById('cfgIni').value = CFG.hora_inicio||'09:00';
+  document.getElementById('cfgFin').value = CFG.hora_fin||'18:00';
+  document.getElementById('cfgDur').value = CFG.duracion_min||45;
+  document.getElementById('cfgDias').innerHTML = DOWS.map(([n,lbl])=>
     `<label><input type="checkbox" value="${n}" ${CFG.dias_semana.includes(+n)?'checked':''}> ${lbl}</label>`).join('');
 }
 function guardarConfig(){
-  const visitas_dia=parseInt(document.getElementById('cfgDia').value);
-  const dias_semana=[...document.querySelectorAll('#cfgDias input:checked')].map(i=>+i.value);
-  fetch('/api/visitas/config',{method:'PUT',headers:hdr(),body:JSON.stringify({visitas_dia,dias_semana})})
+  const body={
+    visitas_dia:parseInt(document.getElementById('cfgDia').value),
+    dias_semana:[...document.querySelectorAll('#cfgDias input:checked')].map(i=>+i.value),
+    hora_inicio:document.getElementById('cfgIni').value,
+    hora_fin:document.getElementById('cfgFin').value,
+    duracion_min:parseInt(document.getElementById('cfgDur').value),
+  };
+  fetch('/api/visitas/config',{method:'PUT',headers:hdr(),body:JSON.stringify(body)})
     .then(r=>r.json()).then(j=>{
       if(!j.success){ flash('cfgMsg', j.error||'Error','#b91c1c'); return; }
       CFG=j.data; flash('cfgMsg','✓ Guardado','#16a34a'); pintarCal();
@@ -544,6 +592,167 @@ async function cargarDealers(){
       DEALER_MAP[label]=d; return `<option value="${esc(label)}"></option>`;
     }).join('');
   }catch(e){ DEALERS=[]; }
+}
+
+/* ══════════════ PLANIFICADOR DE RUTAS ══════════════ */
+let PLAN_DEALERS=[], PLAN_RESULT=null, PLAN_VIS_EXIST={};
+const hm2min = s => { const [h,m]=String(s||'0:0').split(':').map(Number); return (h||0)*60+(m||0); };
+const min2hm = m => pad(Math.floor(m/60))+':'+pad(Math.round(m%60));
+function proxDiaHabil(){ const d=new Date(); for(let i=0;i<14;i++){ if(CFG.dias_semana.includes(isoDow(d))) return ymd(d); d.setDate(d.getDate()+1);} return hoyYmd(); }
+function pintarDiasPlan(){
+  document.getElementById('pDias').innerHTML = DOWS.map(([n,lbl])=>
+    `<label><input type="checkbox" value="${n}" ${CFG.dias_semana.includes(+n)?'checked':''}> ${lbl.slice(0,3)}</label>`).join('');
+}
+async function initPlan(){
+  const v=document.getElementById('pVis');
+  if(!v.dataset.init){
+    v.value=CFG.visitas_dia; document.getElementById('pIni').value=CFG.hora_inicio||'09:00';
+    document.getElementById('pFin').value=CFG.hora_fin||'18:00'; document.getElementById('pDur').value=CFG.duracion_min||45;
+    document.getElementById('pDesde').value=proxDiaHabil(); pintarDiasPlan(); v.dataset.init='1';
+  }
+  if(!PLAN_DEALERS.length) await loadPlanData();
+}
+async function loadPlanData(){
+  try{ const r=await fetch('/api/visitas/planificador',{headers:hdr()}); const j=await r.json(); PLAN_DEALERS=(j.data&&j.data.rows)||[]; }
+  catch(e){ PLAN_DEALERS=[]; }
+  const comunas=[...new Set(PLAN_DEALERS.map(d=>d.comuna).filter(Boolean))].sort();
+  document.getElementById('pComuna').innerHTML='<option value="">Todas</option>'+comunas.map(c=>`<option>${esc(c)}</option>`).join('');
+  const conc=PLAN_DEALERS.filter(d=>d.lat&&d.lng).slice().sort((a,b)=>a.nombre.localeCompare(b.nombre));
+  document.getElementById('pOrigen').innerHTML='<option value="">Auto (extremo norte de la zona)</option>'+
+    conc.map(d=>`<option value="${d.id_dealer}">${esc(d.nombre)}${d.comuna?(' — '+esc(d.comuna)):''}</option>`).join('');
+}
+function filtraEstado(d,e){ if(e==='activos')return d.activo==1; if(e==='inactivos')return d.activo==0; if(e==='riesgo')return !!d.en_riesgo; return true; }
+function hav(a,b){ const R=6371,toR=x=>x*Math.PI/180; const dLat=toR(b.lat-a.lat),dLng=toR(b.lng-a.lng);
+  const s=Math.sin(dLat/2)**2+Math.cos(toR(a.lat))*Math.cos(toR(b.lat))*Math.sin(dLng/2)**2; return 2*R*Math.asin(Math.sqrt(s)); }
+function rutaNN(puntos, origenId){
+  const rest=puntos.slice(); let start=null;
+  if(origenId){ const i=rest.findIndex(d=>d.id_dealer==origenId); if(i>=0) start=rest.splice(i,1)[0]; }
+  if(!start){ rest.sort((a,b)=>b.lat-a.lat); start=rest.shift(); }
+  start._dist=0; const out=[start]; let cur=start;
+  while(rest.length){ let bi=0,bd=Infinity; for(let i=0;i<rest.length;i++){ const dd=hav(cur,rest[i]); if(dd<bd){bd=dd;bi=i;} }
+    cur=rest.splice(bi,1)[0]; cur._dist=bd; out.push(cur); }
+  return out;
+}
+function distribuir(ruta,o){
+  const dias=[]; let idx=0; const fecha=new Date(o.fechaInicio+'T12:00:00'); let guard=0;
+  while(idx<ruta.length && guard<1000){ guard++;
+    if(!o.diasSet.includes(isoDow(fecha))){ fecha.setDate(fecha.getDate()+1); continue; }
+    const vis=[]; let t=o.iniMin, prev=null;
+    while(idx<ruta.length && vis.length<o.visDia){
+      const d=ruta[idx]; const travel= prev? (hav(prev,d)/o.velKmh*60):0; const arr=t+travel;
+      if(arr+o.durMin > o.finMin) break;
+      t=arr+o.durMin; prev=d; vis.push({...d, distKm:d._dist||0, hora:min2hm(arr)}); idx++;
+    }
+    if(vis.length) dias.push({fecha:ymd(fecha), visitas:vis}); else break;
+    fecha.setDate(fecha.getDate()+1);
+  }
+  return { dias, asignados:idx };
+}
+async function generarPlan(){
+  if(!PLAN_DEALERS.length) await loadPlanData();
+  const estado=document.getElementById('pEstado').value, comuna=document.getElementById('pComuna').value;
+  const visDia=Math.max(1,parseInt(document.getElementById('pVis').value)||4);
+  const dur=Math.max(5,parseInt(document.getElementById('pDur').value)||45);
+  const vel=Math.max(5,parseInt(document.getElementById('pVel').value)||25);
+  const ini=hm2min(document.getElementById('pIni').value), fin=hm2min(document.getElementById('pFin').value);
+  if(fin<=ini){ flash('pMsg','La hora de término debe ser mayor a la de inicio.','#b91c1c'); return; }
+  const dias=[...document.querySelectorAll('#pDias input:checked')].map(i=>+i.value);
+  if(!dias.length){ flash('pMsg','Selecciona al menos un día.','#b91c1c'); return; }
+  const fechaIni=document.getElementById('pDesde').value||hoyYmd();
+  const origenId=document.getElementById('pOrigen').value||null;
+
+  let universo=PLAN_DEALERS.filter(d=>filtraEstado(d,estado));
+  if(comuna) universo=universo.filter(d=>d.comuna===comuna);
+  const sinCoord=universo.filter(d=>!(d.lat&&d.lng)).length;
+  const conCoord=universo.filter(d=>d.lat&&d.lng).map(d=>({...d}));
+  if(!conCoord.length){ flash('pMsg','No hay dealers geocodificados con ese filtro. Geocodifícalos en el Mapa de Dealers.','#b91c1c');
+    document.getElementById('planCobertura').innerHTML=''; document.getElementById('planLista').innerHTML=''; return; }
+  flash('pMsg','','');
+
+  const ruta=rutaNN(conCoord, origenId);
+  const { dias:plan }=distribuir(ruta,{visDia,iniMin:ini,finMin:fin,durMin:dur,velKmh:vel,diasSet:dias,fechaInicio:fechaIni});
+  const startMs=new Date(fechaIni+'T12:00:00').getTime();
+  let vMes=0,vAno=0,kmTot=0;
+  plan.forEach(d=>{ const days=(new Date(d.fecha+'T12:00:00').getTime()-startMs)/86400000;
+    d.visitas.forEach(v=>kmTot+=(v.distKm||0)); if(days<30)vMes+=d.visitas.length; if(days<365)vAno+=d.visitas.length; });
+  PLAN_RESULT={plan,total:ruta.length,sinCoord};
+  await cargarVisitasPlan(plan);
+  renderCobertura({total:ruta.length,sinCoord,vMes,vAno,nDias:plan.length,kmTot});
+  renderPlanLista(plan);
+}
+async function cargarVisitasPlan(plan){
+  PLAN_VIS_EXIST={}; if(!plan.length) return;
+  try{ const r=await fetch(`/api/visitas?desde=${plan[0].fecha}&hasta=${plan[plan.length-1].fecha}`,{headers:hdr()}); const j=await r.json();
+    ((j.data&&j.data.rows)||[]).forEach(v=>{ PLAN_VIS_EXIST[(v.id_dealer||'x')+'|'+String(v.fecha_programada).slice(0,10)]=v; }); }catch(e){}
+}
+function renderCobertura(c){
+  const total=c.total||1;
+  const card=(lbl,val,sub,col)=>`<div class="stat" style="flex-direction:column;align-items:flex-start;min-width:150px;border-left:4px solid ${col}">
+    <span style="font-size:.7rem;color:#64748b;font-weight:700;text-transform:uppercase">${lbl}</span>
+    <span style="font-size:1.3rem;font-weight:800;color:#0f172a">${val}</span>${sub?`<span style="font-size:.72rem;color:#94a3b8">${sub}</span>`:''}</div>`;
+  document.getElementById('planCobertura').innerHTML=`<div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:8px">
+    ${card('Dealers a recorrer', total, c.sinCoord?(c.sinCoord+' sin geo excluidos'):'geocodificados','#0e7490')}
+    ${card('% en 1 mes', Math.round(c.vMes/total*100)+'%', c.vMes+' visitas','#16a34a')}
+    ${card('% en 1 año', Math.min(100,Math.round(c.vAno/total*100))+'%', c.vAno+' visitas','#2563eb')}
+    ${card('Recorrer todo', c.nDias+' días', 'hábiles','#7c3aed')}
+    ${card('Distancia total', Math.round(c.kmTot)+' km', 'aprox. (línea recta)','#ea580c')}
+  </div>`;
+}
+function dealerEstadoBadge(d){
+  if(d.activo==0) return '<span class="pill" style="background:#e2e8f0;color:#475569">Inactivo</span>';
+  if(d.en_riesgo) return '<span class="pill" style="background:#ffedd5;color:#c2410c">En riesgo</span>';
+  return '<span class="pill" style="background:#dcfce7;color:#166534">Activo</span>';
+}
+function renderPlanLista(plan){
+  if(!plan.length){ document.getElementById('planLista').innerHTML='<div class="empty"><i class="bi bi-geo"></i>Sin dealers para planificar.</div>'; return; }
+  const verLim=20; let html=`<div style="display:flex;justify-content:space-between;align-items:center;margin:14px 0 6px">
+    <h6 style="font-weight:800;color:#0f172a;margin:0"><i class="bi bi-list-ol me-1" style="color:#0e7490"></i>Ruta sugerida (orden óptimo)</h6>
+    <button class="btn btn-primary" onclick="agendarPlan()"><i class="bi bi-calendar-plus"></i> Agendar este plan</button></div>`;
+  plan.slice(0,verLim).forEach((d,di)=>{
+    html+=`<div style="margin:12px 0 4px;font-weight:800;color:#0c4a6e;font-size:.84rem;text-transform:capitalize">
+      <i class="bi bi-calendar-event me-1"></i>${esc(new Date(d.fecha+'T12:00:00').toLocaleDateString('es-CL',{weekday:'long',day:'2-digit',month:'long'}))} · ${d.visitas.length} visita(s)</div>`;
+    html+='<div style="overflow:auto"><table class="bt"><thead><tr><th>#</th><th>Hora</th><th>Concesionario</th><th>Comuna</th><th>Dist.</th><th>Último crédito</th><th>Estado</th><th></th></tr></thead><tbody>';
+    d.visitas.forEach((v,vi)=>{
+      const key=(v.id_dealer||'x')+'|'+d.fecha; const ex=PLAN_VIS_EXIST[key];
+      let acc;
+      if(ex){ acc = ex.estado==='REALIZADA'
+          ? `<span class="${ex.resultado==='POSITIVO'?'res-pos':'res-neg'}">${ex.resultado}</span> <button class="btn btn-soft" style="padding:3px 8px" onclick="abrirGestion(${ex.id})"><i class="bi bi-pencil"></i></button>`
+          : `<button class="btn btn-primary" style="padding:4px 9px" onclick="abrirGestion(${ex.id})" title="Anotar gestión"><i class="bi bi-pencil-square"></i> Gestión</button>`;
+      } else { acc = `<button class="btn btn-soft" style="padding:4px 9px" onclick="agendarUno(${di},${vi})"><i class="bi bi-plus-lg"></i> Agendar</button>`; }
+      html+=`<tr>
+        <td><b>${vi+1}</b></td><td>${v.hora||''}</td>
+        <td><b>${esc(v.nombre||'—')}</b></td><td>${esc(v.comuna||'—')}</td>
+        <td>${v.distKm?Math.round(v.distKm*10)/10+' km':'—'}</td>
+        <td>${v.ultimo_credito?fFecha(v.ultimo_credito):'<span style="color:#b91c1c">Nunca</span>'}</td>
+        <td>${dealerEstadoBadge(v)}</td>
+        <td style="white-space:nowrap">${acc}</td>
+      </tr>`;
+    });
+    html+='</tbody></table></div>';
+  });
+  if(plan.length>verLim) html+=`<div style="font-size:.8rem;color:#94a3b8;margin-top:10px"><i class="bi bi-three-dots"></i> Mostrando los primeros ${verLim} días de ${plan.length}. La cobertura considera el plan completo.</div>`;
+  document.getElementById('planLista').innerHTML=html;
+}
+function agendarUno(di,vi){
+  const v=PLAN_RESULT.plan[di].visitas[vi], fecha=PLAN_RESULT.plan[di].fecha;
+  fetch('/api/visitas',{method:'POST',headers:hdr(),body:JSON.stringify({id_dealer:v.id_dealer,rut_dealer:v.rut,nombre_dealer:v.nombre,comuna:v.comuna,fecha_programada:fecha})})
+    .then(r=>r.json()).then(async j=>{
+      if(!j.success){ alert(j.error||'Error al agendar'); return; }
+      await cargarVisitasPlan(PLAN_RESULT.plan); renderPlanLista(PLAN_RESULT.plan); cargarMes();
+    }).catch(()=>alert('Error de conexión'));
+}
+async function agendarPlan(){
+  if(!PLAN_RESULT) return;
+  const pend=[]; PLAN_RESULT.plan.forEach(d=>d.visitas.forEach(v=>{ if(!PLAN_VIS_EXIST[(v.id_dealer||'x')+'|'+d.fecha]) pend.push({v,fecha:d.fecha}); }));
+  if(!pend.length){ flash('pMsg','Todo el plan ya está agendado.','#16a34a'); return; }
+  if(!confirm(`Se agendarán ${pend.length} visita(s) en tu calendario. ¿Continuar?`)) return;
+  let okN=0,fail=0;
+  for(const p of pend){
+    try{ const r=await fetch('/api/visitas',{method:'POST',headers:hdr(),body:JSON.stringify({id_dealer:p.v.id_dealer,rut_dealer:p.v.rut,nombre_dealer:p.v.nombre,comuna:p.v.comuna,fecha_programada:p.fecha})});
+      const j=await r.json(); j.success?okN++:fail++; }catch(e){ fail++; }
+  }
+  flash('pMsg',`Agendadas ${okN}${fail?(' · '+fail+' no se pudieron (tope diario)'):''}.`, fail?'#c2410c':'#16a34a');
+  await cargarVisitasPlan(PLAN_RESULT.plan); renderPlanLista(PLAN_RESULT.plan); cargarMes();
 }
 
 /* ── Helpers UI ── */

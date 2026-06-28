@@ -30,6 +30,10 @@ const DIAS_DEFAULT = '1,2,3,4,5'; // ISO: 1=Lun … 7=Dom
       )`);
     await pool.query(
       `INSERT IGNORE INTO visitas_config (id, visitas_dia, dias_semana) VALUES (1, 4, ?)`, [DIAS_DEFAULT]);
+    // Parámetros del planificador de rutas
+    await pool.query("ALTER TABLE visitas_config ADD COLUMN IF NOT EXISTS hora_inicio VARCHAR(5) DEFAULT '09:00'").catch(() => {});
+    await pool.query("ALTER TABLE visitas_config ADD COLUMN IF NOT EXISTS hora_fin   VARCHAR(5) DEFAULT '18:00'").catch(() => {});
+    await pool.query("ALTER TABLE visitas_config ADD COLUMN IF NOT EXISTS duracion_min INT     DEFAULT 45").catch(() => {});
 
     await pool.query(`
       CREATE TABLE IF NOT EXISTS visitas_dealers (
@@ -89,9 +93,15 @@ const isoDow = (ymd) => { const d = new Date(ymd + 'T12:00:00'); const n = d.get
 const nombreUsuario = u => [u?.nombre, u?.apellido].filter(Boolean).join(' ') || u?.email || 'Usuario';
 
 async function leerConfig() {
-  const [[c]] = await pool.query('SELECT visitas_dia, dias_semana FROM visitas_config WHERE id=1');
+  const [[c]] = await pool.query('SELECT * FROM visitas_config WHERE id=1');
   const dias = String(c?.dias_semana || DIAS_DEFAULT).split(',').map(s => parseInt(s.trim())).filter(n => n >= 1 && n <= 7);
-  return { visitas_dia: c?.visitas_dia || 4, dias_semana: dias };
+  return {
+    visitas_dia: c?.visitas_dia || 4,
+    dias_semana: dias,
+    hora_inicio: c?.hora_inicio || '09:00',
+    hora_fin: c?.hora_fin || '18:00',
+    duracion_min: c?.duracion_min || 45,
+  };
 }
 
 /* ─── GET /api/visitas/config ──────────────────────────────────────── */
@@ -109,11 +119,15 @@ const putConfig = async (req, res) => {
     const dias = (Array.isArray(dias_semana) ? dias_semana : String(dias_semana || '').split(','))
       .map(d => parseInt(d)).filter(n => n >= 1 && n <= 7);
     if (!dias.length) return err(res, 400, 'Debes habilitar al menos un día de la semana.');
+    const hhmm = v => /^\d{1,2}:\d{2}$/.test(String(v || '')) ? v : null;
+    const hi = hhmm(req.body.hora_inicio) || '09:00';
+    const hf = hhmm(req.body.hora_fin) || '18:00';
+    let dur = parseInt(req.body.duracion_min); if (!dur || dur < 5 || dur > 480) dur = 45;
     await pool.query(
-      'UPDATE visitas_config SET visitas_dia=?, dias_semana=?, updated_by=? WHERE id=1',
-      [visitas_dia, [...new Set(dias)].sort((a, b) => a - b).join(','), nombreUsuario(req.usuario)]);
+      'UPDATE visitas_config SET visitas_dia=?, dias_semana=?, hora_inicio=?, hora_fin=?, duracion_min=?, updated_by=? WHERE id=1',
+      [visitas_dia, [...new Set(dias)].sort((a, b) => a - b).join(','), hi, hf, dur, nombreUsuario(req.usuario)]);
     auditar({ req, accion: 'EDITAR', modulo: 'visitas', entidad: 'config', entidad_id: 1,
-      detalle: `Config visitas: ${visitas_dia}/día · días ${dias.join(',')}` });
+      detalle: `Config visitas: ${visitas_dia}/día · días ${dias.join(',')} · ${hi}-${hf} · ${dur}min` });
     ok(res, await leerConfig());
   } catch (e) { console.error('[visitas putConfig]', e); err(res, 500, 'Error interno del servidor'); }
 };
@@ -128,6 +142,42 @@ const getDealers = async (req, res) => {
          FROM dealers ORDER BY nombre LIMIT 5000`);
     ok(res, rows);
   } catch (e) { console.error('[visitas getDealers]', e); err(res, 500, 'Error interno del servidor'); }
+};
+
+/* ─── GET /api/visitas/planificador — dealers + coords + estado + última venta ─
+   Devuelve TODOS los dealers; el frontend optimiza la ruta y filtra por estado.
+   en_riesgo = activo y sin crédito cursado en los últimos 90 días. */
+const planificador = async (req, res) => {
+  try {
+    const [dealers] = await pool.query(
+      `SELECT id_dealer, rut, numero,
+              COALESCE(NULLIF(TRIM(nombre_indexa),''), NULLIF(TRIM(nombre_razon),''), rut) AS nombre,
+              comuna, lat, lng, activo, categoria_asignada
+         FROM dealers ORDER BY nombre`);
+    // Última venta (crédito otorgado) por RUT de dealer
+    let ult = [];
+    try {
+      [ult] = await pool.query(
+        `SELECT rut_dealer, MAX(fecha_otorgado) AS ultima, COUNT(*) AS n
+           FROM creditos WHERE rut_dealer IS NOT NULL AND fecha_otorgado IS NOT NULL
+          GROUP BY rut_dealer`);
+    } catch (_) { ult = []; }
+    const norm = s => String(s || '').replace(/[.\-\s]/g, '').toUpperCase();
+    const mUlt = new Map(); ult.forEach(r => mUlt.set(norm(r.rut_dealer), { ultima: r.ultima, n: r.n }));
+    const lim90 = Date.now() - 90 * 86400000;
+    const rows = dealers.map(d => {
+      const u = mUlt.get(norm(d.rut));
+      const ultima = u ? u.ultima : null;
+      const en_riesgo = d.activo == 1 && (!ultima || new Date(ultima).getTime() < lim90);
+      return {
+        id_dealer: d.id_dealer, rut: d.rut, nombre: d.nombre, comuna: d.comuna || '',
+        lat: d.lat != null ? Number(d.lat) : null, lng: d.lng != null ? Number(d.lng) : null,
+        activo: d.activo, categoria: d.categoria_asignada || null,
+        ultimo_credito: ultima, creditos_total: u ? u.n : 0, en_riesgo,
+      };
+    });
+    ok(res, { rows, config: await leerConfig() });
+  } catch (e) { console.error('[visitas planificador]', e); err(res, 500, 'Error interno del servidor'); }
 };
 
 /* ─── GET /api/visitas?desde=&hasta=&estado=&resultado=&usuario=&scope= ─ */
@@ -235,4 +285,4 @@ const eliminar = async (req, res) => {
   } catch (e) { console.error('[visitas eliminar]', e); err(res, 500, 'Error interno del servidor'); }
 };
 
-module.exports = { getConfig, putConfig, getDealers, listar, crear, gestionar, eliminar };
+module.exports = { getConfig, putConfig, getDealers, planificador, listar, crear, gestionar, eliminar };
