@@ -70,16 +70,19 @@
         <div class="card-box">
           <div class="toolbar">
             <label><b>Perfil:</b></label>
-            <select id="selPerfil" onchange="cargarAsignados()"></select>
+            <select id="selPerfil" onchange="onPerfilChange()"></select>
             <input type="text" id="qArt" placeholder="Buscar artículo, marca o SKU…" style="flex:1;min-width:220px" oninput="liveBuscar()" onkeydown="if(event.key==='Enter')buscarArt(0)">
             <select id="selCat" onchange="buscarArt(0)"><option value="">Todas las categorías</option></select>
             <button class="btn btn-sm btn-primary" onclick="buscarArt(0)"><i class="bi bi-search"></i></button>
             <button class="btn btn-sm btn-outline-secondary" id="btnSync" onclick="sincronizar()" title="Recarga el catálogo desde Dimeiggs"><i class="bi bi-cloud-download me-1"></i>Sincronizar catálogo</button>
           </div>
-          <div style="display:flex;gap:8px;margin-bottom:8px">
+          <div style="display:flex;gap:8px;margin-bottom:8px;align-items:center;flex-wrap:wrap">
             <button class="btn btn-sm btn-outline-success" onclick="bulkPagina(true)"><i class="bi bi-check2-all me-1"></i>Asignar los de esta página</button>
             <button class="btn btn-sm btn-outline-danger" onclick="bulkPagina(false)"><i class="bi bi-x me-1"></i>Quitar los de esta página</button>
+            <span class="muted" style="font-size:.8rem"><i class="bi bi-shop me-1"></i>Proveedor: <a href="https://www.dimeiggs.cl" target="_blank" rel="noopener">Dimeiggs</a> · <a href="https://www.dimeiggs.cl" target="_blank" rel="noopener">dimeiggs.cl</a></span>
             <span class="muted" id="artInfo" style="margin-left:auto;align-self:center"></span>
+            <span id="sucio" style="display:none;color:#b45309;font-weight:600;font-size:.8rem">● sin guardar</span>
+            <button class="btn btn-sm btn-outline-secondary" id="btnGrabar" onclick="grabar()" disabled><i class="bi bi-floppy me-1"></i>Grabar modificaciones</button>
           </div>
           <div class="table-responsive">
             <table class="table table-hover align-middle">
@@ -176,13 +179,19 @@
     function toast(msg, ok=true){ const d=document.createElement('div'); d.textContent=msg; d.style.cssText=`position:fixed;top:74px;right:20px;z-index:9999;background:${ok?'#16a34a':'#dc2626'};color:#fff;padding:10px 16px;border-radius:8px;box-shadow:0 6px 20px rgba(0,0,0,.25);font-size:.88rem`; document.body.appendChild(d); setTimeout(()=>d.remove(),3000); }
 
     /* ════ ARTÍCULOS POR PERFIL ════ */
-    let asignados = new Set(), pagOffset = 0, pagLimit = 100, pagTotal = 0, pagRows = [], TOTAL_CAT = 0, searchTimer = null;
+    let asignados = new Set(), baseline = new Set(), pagOffset = 0, pagLimit = 100, pagTotal = 0, pagRows = [], TOTAL_CAT = 0, searchTimer = null, perfilActual = '';
 
-    // Contador "X de Y artículos asignados a este perfil" (Y = total del catálogo)
+    // Contador "X de Y artículos" (X = selección actual del perfil; Y = total del catálogo)
     function updArtInfo() {
       const idp = document.getElementById('selPerfil').value;
       document.getElementById('artInfo').textContent = idp
         ? `${fmt(asignados.size)} de ${fmt(TOTAL_CAT)} artículos asignados a este perfil` : '';
+    }
+    function dirty() { if (asignados.size !== baseline.size) return true; for (const x of asignados) if (!baseline.has(x)) return true; return false; }
+    function marcarSucio() {
+      const d = dirty(), b = document.getElementById('btnGrabar');
+      b.disabled = !d; b.classList.toggle('btn-success', d); b.classList.toggle('btn-outline-secondary', !d);
+      document.getElementById('sucio').style.display = d ? 'inline' : 'none';
     }
     // Búsqueda en vivo (debounce mientras se digita)
     function liveBuscar() { clearTimeout(searchTimer); searchTimer = setTimeout(() => buscarArt(0), 300); }
@@ -197,15 +206,20 @@
       const jt = await api('/api/compras/catalogo?limit=1');
       if (jt?.success) { TOTAL_CAT = jt.data.total; updArtInfo(); }
     }
+    // Cambio de perfil: avisa si hay cambios sin guardar antes de descartarlos
+    function onPerfilChange() {
+      const sel = document.getElementById('selPerfil');
+      if (dirty() && !confirm('Hay cambios sin guardar en el perfil anterior. ¿Descartarlos?')) { sel.value = perfilActual; return; }
+      perfilActual = sel.value; cargarAsignados();
+    }
     async function cargarAsignados() {
       const idp = document.getElementById('selPerfil').value;
-      asignados = new Set();
+      asignados = new Set(); baseline = new Set();
       if (idp) {
         const j = await api('/api/compras/articulo-perfil?id_perfil='+idp);
-        if (j?.success) asignados = new Set(j.data.asignados);
-        updArtInfo();
-      } else document.getElementById('artInfo').textContent = '';
-      buscarArt(0);
+        if (j?.success) { baseline = new Set(j.data.asignados); asignados = new Set(j.data.asignados); }
+      }
+      updArtInfo(); marcarSucio(); buscarArt(0);
     }
     async function buscarArt(offset) {
       const idp = document.getElementById('selPerfil').value;
@@ -229,24 +243,35 @@
       document.getElementById('btnNext').disabled = hasta>=pagTotal;
     }
     function paginar(d){ const next = pagOffset + d*pagLimit; if (next>=0 && next<pagTotal) buscarArt(next); }
-    async function toggleArt(id, on) {
-      const idp = document.getElementById('selPerfil').value; if (!idp) return;
-      const j = await api('/api/compras/articulo-perfil', { method:'POST', body: JSON.stringify({ id_perfil:+idp, ids:[id], asignar:on }) });
-      if (j?.success) { on ? asignados.add(id) : asignados.delete(id); updArtInfo(); }
-      else toast('No se pudo guardar', false);
+    // Marcar/desmarcar = SOLO local; se persiste con "Grabar modificaciones"
+    function toggleArt(id, on) { on ? asignados.add(id) : asignados.delete(id); updArtInfo(); marcarSucio(); }
+    function bulkPagina(on) {
+      if (!document.getElementById('selPerfil').value || !pagRows.length) return;
+      pagRows.forEach(a => on ? asignados.add(a.id) : asignados.delete(a.id));
+      buscarArt(pagOffset); updArtInfo(); marcarSucio();
     }
-    async function bulkPagina(on) {
-      const idp = document.getElementById('selPerfil').value; if (!idp || !pagRows.length) return;
-      const ids = pagRows.map(a => a.id);
-      const j = await api('/api/compras/articulo-perfil', { method:'POST', body: JSON.stringify({ id_perfil:+idp, ids, asignar:on }) });
-      if (j?.success) { ids.forEach(id => on?asignados.add(id):asignados.delete(id)); buscarArt(pagOffset); updArtInfo(); toast(on?'Asignados':'Quitados'); }
+    async function grabar() {
+      const idp = document.getElementById('selPerfil').value; if (!idp) return;
+      const added   = [...asignados].filter(x => !baseline.has(x));
+      const removed = [...baseline].filter(x => !asignados.has(x));
+      if (!added.length && !removed.length) { toast('No hay cambios que guardar'); return; }
+      const b = document.getElementById('btnGrabar'); b.disabled = true; b.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span>Guardando…';
+      let ok = true;
+      if (added.length)   { const j = await api('/api/compras/articulo-perfil', { method:'POST', body: JSON.stringify({ id_perfil:+idp, ids:added,   asignar:true  }) }); ok = ok && j?.success; }
+      if (removed.length) { const j = await api('/api/compras/articulo-perfil', { method:'POST', body: JSON.stringify({ id_perfil:+idp, ids:removed, asignar:false }) }); ok = ok && j?.success; }
+      b.innerHTML = '<i class="bi bi-floppy me-1"></i>Grabar modificaciones';
+      if (ok) { baseline = new Set(asignados); marcarSucio(); toast(`Guardado: +${added.length} asignados · −${removed.length} quitados`); }
+      else { toast('Error al guardar', false); marcarSucio(); }
     }
     async function sincronizar() {
       const b = document.getElementById('btnSync'); b.disabled=true; b.innerHTML='<span class="spinner-border spinner-border-sm me-1"></span>Sincronizando…';
       const j = await api('/api/compras/sincronizar', { method:'POST' });
       b.disabled=false; b.innerHTML='<i class="bi bi-cloud-download me-1"></i>Sincronizar catálogo';
-      if (j?.success) { toast(`Catálogo actualizado: ${fmt(j.data.upserts)} artículos`); initArt(); buscarArt(0); }
-      else toast(j?.error||'Error al sincronizar', false);
+      if (j?.success) {
+        toast(`Catálogo actualizado: ${fmt(j.data.upserts)} artículos`);
+        const prev = document.getElementById('selPerfil').value;
+        await initArt(); document.getElementById('selPerfil').value = prev; updArtInfo(); buscarArt(pagOffset);
+      } else toast(j?.error||'Error al sincronizar', false);
     }
 
     /* ════ DIRECCIONES ════ */
