@@ -45,13 +45,13 @@
     .stat-card .val { font-size:1.5rem; font-weight:800; color:#111827; margin-top:3px; line-height:1.1; }
     .stat-card .sub { font-size:.74rem; color:#9ca3af; margin-top:2px; }
 
-    .tbl-wrap { background:#fff; border-radius:12px; box-shadow:0 1px 6px rgba(0,0,0,.07); overflow:auto; }
-    table.rt { width:100%; border-collapse:collapse; font-size:.82rem; }
-    table.rt th { background:#f0f4f8; padding:10px 12px; text-align:left; font-size:.68rem; font-weight:700; color:#475569; text-transform:uppercase; letter-spacing:.03em; white-space:nowrap; position:sticky; top:0; z-index:1; }
+    .tbl-wrap { background:#fff; border-radius:12px; box-shadow:0 1px 6px rgba(0,0,0,.07); overflow:hidden; }
+    table.rt { width:100%; border-collapse:collapse; font-size:.78rem; table-layout:fixed; }
+    table.rt th { background:#f0f4f8; padding:9px 8px; text-align:left; font-size:.64rem; font-weight:700; color:#475569; text-transform:uppercase; letter-spacing:.02em; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; position:sticky; top:0; z-index:1; }
     table.rt th.num, table.rt td.num { text-align:right; }
-    table.rt td { padding:9px 12px; border-bottom:1px solid #f1f5f9; white-space:nowrap; }
+    table.rt td { padding:7px 8px; border-bottom:1px solid #f1f5f9; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
     table.rt tbody tr:hover { background:#f8fafc; }
-    .fin-badge { display:inline-block; font-size:.68rem; font-weight:700; border-radius:7px; padding:2px 9px; }
+    .fin-badge { display:inline-block; font-size:.64rem; font-weight:700; border-radius:6px; padding:2px 6px; max-width:100%; overflow:hidden; text-overflow:ellipsis; }
     .fin-AF   { background:#dbeafe; color:#1e40af; }
     .fin-UAC  { background:#dcfce7; color:#166534; }
     .fin-AFAC { background:#ede9fe; color:#5b21b6; }
@@ -69,7 +69,7 @@
     .op-bad  { color:#dc2626; }
     .op-na   { color:#334155; }
     .op-link:hover { filter:brightness(1.15); }
-    .op-pct  { display:inline-block; margin-left:8px; font-size:.72rem; font-weight:800; border-radius:7px; padding:1px 7px; vertical-align:middle; }
+    .op-pct  { display:inline-block; margin-left:5px; font-size:.66rem; font-weight:800; border-radius:6px; padding:1px 5px; vertical-align:middle; }
     .op-pct.pos { background:#dcfce7; color:#166534; }
     .op-pct.neg { background:#fee2e2; color:#b91c1c; }
     .op-pct.zero{ background:#eef2f7; color:#64748b; }
@@ -102,7 +102,7 @@
   <div class="topnav-left">
     <a href="/" class="topnav-brand">
       <img src="/img/logo.png" alt="AutoFácil">
-      <span class="version-badge" id="versionBadge">v1.5</span>
+      <span class="version-badge" id="versionBadge">v1.6</span>
     </a>
     <div class="breadcrumb-nav">
       <a href="/">Inicio</a><span class="sep">›</span>
@@ -143,15 +143,15 @@
   <div class="tbl-wrap">
     <table class="rt" id="tabla">
       <thead><tr>
-        <th>N° Operación · Δ%</th>
-        <th>Cliente</th>
-        <th>Ejecutivo</th>
-        <th>Colocada en</th>
-        <th class="num">Monto Fin.</th>
-        <th class="num">Rentab. AutoFin</th>
-        <th class="num">Rentab. UAC</th>
-        <th>Más rentable</th>
-        <th class="num">Δ entre financieras ($)</th>
+        <th style="width:12%">N° Op · Δ%</th>
+        <th style="width:19%">Cliente</th>
+        <th style="width:13%">Ejecutivo</th>
+        <th style="width:9%">Colocada</th>
+        <th class="num" style="width:10%">Monto Fin.</th>
+        <th class="num" style="width:10%">Rent. AutoFin</th>
+        <th class="num" style="width:10%">Rent. UAC</th>
+        <th style="width:8%">+ rentable</th>
+        <th class="num" style="width:9%">Δ financieras</th>
       </tr></thead>
       <tbody id="tbody">
         <tr><td colspan="9" class="empty"><div class="spinner-border spinner-border-sm me-2"></div>Cargando…</td></tr>
@@ -359,7 +359,7 @@ function render(){
   tb.innerHTML = FILAS.map((f,idx)=>{
     const c=f.c;
     const numTxt = escH(c.numero_credito||c.num_op||'—');
-    const finLbl = { AF:'AutoFin', UAC:'Unidad de Crédito', AFAC:'AutoFácil (propia)' }[f.colo] || (c.financiera||'—');
+    const finLbl = { AF:'AutoFin', UAC:'UCA', AFAC:'AutoFácil' }[f.colo] || (c.financiera||'—');
     const finCls = { AF:'fin-AF', UAC:'fin-UAC', AFAC:'fin-AFAC' }[f.colo] || '';
     // N° de operación: clickable, veredicto de color + chip de Δ% entre financieras
     //  · ROJO si la rentabilidad de la financiera elegida < $100.000 → no conviene cursar
@@ -387,16 +387,16 @@ function render(){
         <td class="num chip-na" colspan="5">Datos incompletos (precio/plazo)</td>
       </tr>`;
     }
-    const masRent = f.mejor==='AF' ? 'AutoFin' : 'Unidad de Crédito';
+    const masRent = f.mejor==='AF' ? 'AutoFin' : 'UCA';
     let masRentCell, vsCell;
     if (f.colo==='AFAC'){
-      masRentCell = `<span class="chip-na">referencial: ${masRent}</span>`;
+      masRentCell = `<span class="chip-na" title="referencial">${masRent}</span>`;
       vsCell = '<span class="chip-na">—</span>';
     } else if (f.esOptima){
-      masRentCell = `<span class="chip-ok"><i class="bi bi-check-circle-fill"></i> Óptima (${masRent})</span>`;
+      masRentCell = `<span class="star" title="Colocada en la más rentable"><i class="bi bi-star-fill"></i></span> ${masRent}`;
       vsCell = `<span class="diff-pos">+${fmtCLP(f.vsOtraCLP)}</span>`;
     } else {
-      masRentCell = `<span class="star"><i class="bi bi-star-fill"></i></span> ${masRent}`;
+      masRentCell = `<span class="star" title="La más rentable era esta"><i class="bi bi-star-fill"></i></span> ${masRent}`;
       vsCell = `<span class="diff-neg">${fmtCLP(f.vsOtraCLP)}</span>`;
     }
     const afBest  = f.mejor==='AF'  ? 'best' : '';
