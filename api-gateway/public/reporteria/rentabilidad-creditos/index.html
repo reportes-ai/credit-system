@@ -102,7 +102,7 @@
   <div class="topnav-left">
     <a href="/" class="topnav-brand">
       <img src="/img/logo.png" alt="AutoFácil">
-      <span class="version-badge" id="versionBadge">v1.4</span>
+      <span class="version-badge" id="versionBadge">v1.5</span>
     </a>
     <div class="breadcrumb-nav">
       <a href="/">Inicio</a><span class="sep">›</span>
@@ -160,6 +160,12 @@
   </div>
 
   <div class="footnote">
+    <div style="margin-bottom:8px;color:#475569">
+      <b>Colores:</b>
+      <span style="color:#16a34a;font-weight:700">N° verde</span> = bien (diferencia entre financieras &lt; 10% o colocada en la más rentable) ·
+      <span style="color:#dc2626;font-weight:700">N° rojo</span> = colocada en la menos rentable, o rentabilidad de esa financiera &lt; $100.000 (mejor no cursar por esa vía) ·
+      <span style="color:#dc2626;font-weight:700">Rentab. en rojo</span> = esa financiera rinde &lt; $100.000.
+    </div>
     <i class="bi bi-info-circle me-1"></i>
     Mismas fórmulas del <a class="mini-link" href="/simulador/" target="_blank">Simulador de Rentabilidad</a>.
     <b>Comisión Dealer</b> = la real negociada del crédito (si no la trae, pizarra por plazo); <b>Comisión Parque</b> 2,5% del saldo (si es parque); <b>Comisión Ejecutivo</b> según <code>pct_ejecutivo_fin</code> de los <a class="mini-link" href="/aprobaciones/mantenedor/" target="_blank">parámetros del crédito</a>.
@@ -215,6 +221,7 @@ function tasaMensualDecimal(v){
 
 /* ── Estado ───────────────────────────────────────── */
 let UF_HOY = null, PARAMS = {}, TASAS = {}, CREDITOS = [], FILAS = [];
+const UMBRAL_RENT = 100000;   // rentabilidad mínima por operación; bajo esto → rojo (no conviene cursar)
 
 /* ── Init ─────────────────────────────────────────── */
 (async function init(){
@@ -354,14 +361,21 @@ function render(){
     const numTxt = escH(c.numero_credito||c.num_op||'—');
     const finLbl = { AF:'AutoFin', UAC:'Unidad de Crédito', AFAC:'AutoFácil (propia)' }[f.colo] || (c.financiera||'—');
     const finCls = { AF:'fin-AF', UAC:'fin-UAC', AFAC:'fin-AFAC' }[f.colo] || '';
-    // N° de operación: clickable, color por óptimo/subóptimo + chip de Δ% entre financieras
+    // N° de operación: clickable, veredicto de color + chip de Δ% entre financieras
+    //  · ROJO si la rentabilidad de la financiera elegida < $100.000 → no conviene cursar
+    //  · VERDE si la diferencia entre financieras < 10% → da casi lo mismo
+    //  · si no: verde si se colocó en la más rentable, rojo si en la menos
     let opCls='op-na', chip='';
     if (f.R && (f.colo==='AF'||f.colo==='UAC')){
-      opCls = f.esOptima ? 'op-ok' : 'op-bad';
+      const rentColo = f.colo==='AF' ? f.rentAF : f.rentUAC;
       const p = f.vsOtraPct;
-      const cls = p>0.05?'pos':p<-0.05?'neg':'zero';
+      let ok, motivo;
+      if (rentColo < UMBRAL_RENT) { ok = false; motivo = 'rentabilidad bajo $100.000 — mejor no cursar'; }
+      else if (Math.abs(p) < 10) { ok = true;  motivo = 'diferencia menor a 10% — da casi lo mismo'; }
+      else { ok = f.esOptima;     motivo = f.esOptima ? 'colocada en la más rentable' : 'colocada en la menos rentable'; }
+      opCls = ok ? 'op-ok' : 'op-bad';
       const sign = p>0?'+':'';
-      chip = `<span class="op-pct ${cls}" title="Diferencia de rentabilidad vs la otra financiera">${sign}${p.toFixed(1)}%</span>`;
+      chip = `<span class="op-pct ${ok?'pos':'neg'}" title="${motivo}">${sign}${p.toFixed(1)}%</span>`;
     }
     const opCell = `<td><a class="op-link ${opCls}" onclick="verDetalle(${idx})">${numTxt}</a>${chip}</td>`;
     if(!f.R){
@@ -393,8 +407,8 @@ function render(){
       <td>${escH(c.ejecutivo||'')}</td>
       <td><span class="fin-badge ${finCls}">${escH(finLbl)}</span></td>
       <td class="num">${fmtCLP(f.R.monto_fin)}</td>
-      <td class="num rentcell ${afBest}" style="color:${f.rentAF>=0?'#166534':'#dc2626'}">${fmtCLP(f.rentAF)}</td>
-      <td class="num rentcell ${uacBest}" style="color:${f.rentUAC>=0?'#166534':'#dc2626'}">${fmtCLP(f.rentUAC)}</td>
+      <td class="num rentcell ${afBest}" style="color:${f.rentAF>=UMBRAL_RENT?'#166534':'#dc2626'}" title="${f.rentAF<UMBRAL_RENT?'Bajo $100.000 — no conviene cursar por AutoFin':''}">${fmtCLP(f.rentAF)}</td>
+      <td class="num rentcell ${uacBest}" style="color:${f.rentUAC>=UMBRAL_RENT?'#166534':'#dc2626'}" title="${f.rentUAC<UMBRAL_RENT?'Bajo $100.000 — no conviene cursar por UCA':''}">${fmtCLP(f.rentUAC)}</td>
       <td>${masRentCell}</td>
       <td class="num">${vsCell}</td>
     </tr>`;
