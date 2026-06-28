@@ -85,7 +85,7 @@
   <div class="topnav-left">
     <a href="/" class="topnav-brand">
       <img src="/img/logo.png" alt="AutoFácil">
-      <span class="version-badge" id="versionBadge">v1.0</span>
+      <span class="version-badge" id="versionBadge">v1.1</span>
     </a>
     <div class="breadcrumb-nav">
       <a href="/">Inicio</a><span class="sep">›</span>
@@ -115,16 +115,11 @@
   </div>
 
   <div class="search-card">
-    <div class="seg" id="seg">
-      <button data-t="rut" class="active" onclick="setTipo('rut')"><i class="bi bi-person-vcard me-1"></i>RUT</button>
-      <button data-t="op"  onclick="setTipo('op')"><i class="bi bi-hash me-1"></i>N° Operación</button>
-      <button data-t="id"  onclick="setTipo('id')"><i class="bi bi-building me-1"></i>ID Financiera</button>
-    </div>
     <div class="search-row">
-      <input id="q" type="text" placeholder="Ingresa el RUT del cliente…" onkeydown="if(event.key==='Enter')buscar()" autocomplete="off">
+      <input id="q" type="text" placeholder="RUT, N° Operación o ID Financiera…" onkeydown="if(event.key==='Enter')buscar()" autocomplete="off">
       <button class="btn-buscar" onclick="buscar()"><i class="bi bi-search"></i> Buscar</button>
     </div>
-    <div class="search-hint" id="hint"><i class="bi bi-info-circle me-1"></i><b>N° Operación</b> = número AutoFácil (num_op / N° crédito) · <b>ID Financiera</b> = número de la institución.</div>
+    <div class="search-hint"><i class="bi bi-info-circle me-1"></i>Se detecta solo: si trae guion/puntos es <b>RUT</b>; si es solo número busca por <b>N° Operación</b> (num_op / N° crédito) e <b>ID Financiera</b> (N° de la institución).</div>
   </div>
 
   <div id="resultado"></div>
@@ -145,14 +140,7 @@ if (YO){
 }
 
 /* ── Estado ───────────────────────────────────────── */
-let TIPO = 'rut';
-const PLACEHOLDER = { rut:'Ingresa el RUT del cliente…', op:'Ingresa el N° de Operación (num_op / N° crédito)…', id:'Ingresa el ID de la financiera…' };
-function setTipo(t){
-  TIPO = t;
-  document.querySelectorAll('#seg button').forEach(b => b.classList.toggle('active', b.dataset.t===t));
-  document.getElementById('q').placeholder = PLACEHOLDER[t];
-  document.getElementById('q').focus();
-}
+const TIPO = 'auto';   // un solo buscador: el backend autodetecta RUT / N° Op / ID Financiera
 
 /* ── Catálogo de categorías → ícono + color ───────── */
 const CAT = {

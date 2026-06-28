@@ -59,27 +59,39 @@ const buscar = async (req, res) => {
   try {
     let cliente = null, creditos = [], cartas = [];
 
+    // Modo: explícito (rut|op|id, compat) o autodetectado. RUT si trae guion,
+    // punto o termina en K; si es solo número, se busca N° Op e ID Financiera a la vez.
+    let modo = tipo;
+    if (!['rut', 'op', 'id'].includes(modo))
+      modo = (/[.\-]/.test(valor) || /k$/i.test(valor)) ? 'rut' : 'num';
+
+    const SEL_CLI = `SELECT id_cliente, rut, fecha_creacion,
+        COALESCE(NULLIF(TRIM(nombre_completo),''),
+                 NULLIF(TRIM(CONCAT(COALESCE(nombres,''),' ',COALESCE(apellido_paterno,''),' ',COALESCE(apellido_materno,''))),'')) AS nombre
+      FROM clientes`;
+
     /* ── 1. Resolver el caso ─────────────────────────────────────── */
-    if (tipo === 'rut') {
-      const [[cl]] = await pool.query(
-        `SELECT id_cliente, rut, fecha_creacion,
-                COALESCE(NULLIF(TRIM(nombre_completo),''),
-                         NULLIF(TRIM(CONCAT(COALESCE(nombres,''),' ',COALESCE(apellido_paterno,''),' ',COALESCE(apellido_materno,''))),'')) AS nombre
-           FROM clientes WHERE ${RUT_SQL('rut')} = ? LIMIT 1`, [normRut(valor)]);
+    if (modo === 'rut') {
+      const [[cl]] = await pool.query(`${SEL_CLI} WHERE ${RUT_SQL('rut')} = ? LIMIT 1`, [normRut(valor)]);
       cliente = cl || null;
-    } else if (tipo === 'op') {
+    } else if (modo === 'op') {
       const [cr] = await pool.query(
         `SELECT * FROM creditos WHERE num_op = ? OR numero_credito = ? ORDER BY id DESC LIMIT 5`,
         [valor, valor]);
       creditos = cr || [];
-    } else { // id financiera
+    } else if (modo === 'id') {
       const [cr] = await pool.query(
         `SELECT * FROM creditos WHERE id_financiera = ? ORDER BY id DESC LIMIT 5`, [valor]);
+      creditos = cr || [];
+    } else { // num — número genérico: N° Operación o ID Financiera
+      const [cr] = await pool.query(
+        `SELECT * FROM creditos WHERE num_op = ? OR numero_credito = ? OR id_financiera = ? ORDER BY id DESC LIMIT 5`,
+        [valor, valor, valor]);
       creditos = cr || [];
     }
 
     /* ── 2. Completar el conjunto (cliente ↔ créditos ↔ cartas) ──── */
-    if (tipo === 'rut' && cliente) {
+    if (modo === 'rut' && cliente) {
       const [cr] = await pool.query(
         `SELECT * FROM creditos WHERE id_cliente = ? ORDER BY id DESC LIMIT 50`, [cliente.id_cliente]);
       creditos = cr || [];
@@ -113,21 +125,31 @@ const buscar = async (req, res) => {
       }
     }
 
-    // ID financiera sin crédito → buscar la carta directamente
-    if (tipo === 'id' && !creditos.length && !cartas.length) {
+    // ID financiera (o número genérico) sin crédito → buscar la carta directamente
+    if ((modo === 'id' || modo === 'num') && !creditos.length && !cartas.length) {
       const [ca] = await pool.query(
         `SELECT * FROM cartas_aprobacion WHERE id_financiera = ? ORDER BY id DESC LIMIT 50`, [valor]);
       cartas = ca || [];
     }
+
+    // Fallback: número genérico que en realidad era un RUT escrito sin guion
+    if (modo === 'num' && !cliente && !creditos.length && !cartas.length && /^\d{7,9}$/.test(valor)) {
+      const [[cl]] = await pool.query(`${SEL_CLI} WHERE ${RUT_SQL('rut')} = ? LIMIT 1`, [normRut(valor)]);
+      if (cl) {
+        cliente = cl;
+        const [cr] = await pool.query(`SELECT * FROM creditos WHERE id_cliente = ? ORDER BY id DESC LIMIT 50`, [cl.id_cliente]);
+        creditos = cr || [];
+        const [ca] = await pool.query(
+          `SELECT * FROM cartas_aprobacion WHERE ${RUT_SQL('rut_cliente')} = ? ORDER BY id DESC LIMIT 50`, [normRut(cl.rut)]);
+        cartas = ca || [];
+      }
+    }
+
     // Resolver cliente desde la carta si aún no lo tenemos
     if (!cliente && cartas.length) {
       const rc = cartas.find(c => c.rut_cliente)?.rut_cliente;
       if (rc) {
-        const [[cl]] = await pool.query(
-          `SELECT id_cliente, rut, fecha_creacion,
-                  COALESCE(NULLIF(TRIM(nombre_completo),''),
-                           NULLIF(TRIM(CONCAT(COALESCE(nombres,''),' ',COALESCE(apellido_paterno,''),' ',COALESCE(apellido_materno,''))),'')) AS nombre
-             FROM clientes WHERE ${RUT_SQL('rut')} = ? LIMIT 1`, [normRut(rc)]);
+        const [[cl]] = await pool.query(`${SEL_CLI} WHERE ${RUT_SQL('rut')} = ? LIMIT 1`, [normRut(rc)]);
         cliente = cl || null;
       }
     }
