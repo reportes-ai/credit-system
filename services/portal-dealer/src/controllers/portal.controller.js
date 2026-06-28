@@ -104,7 +104,8 @@ async function opDelDealer(req, id) {
   const sc = dealerScope(req);
   if (!sc.hasScope || !id) return null;
   const [[row]] = await pool.query(
-    `SELECT ob.* FROM creditos ob WHERE ob.id = ? AND ${sc.where} AND ${NO_ANULADA}`,
+    `SELECT ob.*, ${ESTADO_SQL} AS _estado, ${ESTADO_CARTERA_SQL} AS _estado_cartera
+       FROM creditos ob WHERE ob.id = ? AND ${sc.where} AND ${NO_ANULADA}`,
     [id, ...sc.params]);
   return row || null;
 }
@@ -163,9 +164,8 @@ exports.operaciones = async (req, res) => {
     const off   = (page - 1) * limit;
     const filtroEstado = String(req.query.estado || '').trim().toUpperCase();
 
-    let extra = '', extraParams = [];
-    if (filtroEstado) { extra = ` HAVING estado = ?`; extraParams = [filtroEstado]; }
-
+    // El estado es una columna derivada (ESTADO_SQL); se filtra con WHERE sobre
+    // la subconsulta aliada `t`, no con HAVING.
     // total (mismo scope, sin paginar) — sobre subconsulta para poder filtrar por estado calculado
     const [[cnt]] = await pool.query(
       `SELECT COUNT(*) AS total FROM (
@@ -228,9 +228,6 @@ exports.detalle = async (req, res) => {
       const [[c]] = await pool.query('SELECT nombre_completo, rut FROM clientes WHERE id_cliente = ?', [ob.id_cliente]);
       if (c) cli = { nombre: c.nombre_completo || '', rut: c.rut || '' };
     }
-    const [[st]] = await pool.query(
-      `SELECT ${ESTADO_SQL} AS estado, ${ESTADO_CARTERA_SQL} AS estado_cartera FROM creditos ob WHERE ob.id = ?`, [id]);
-
     return res.json({
       success: true,
       data: {
@@ -241,8 +238,8 @@ exports.detalle = async (req, res) => {
         cliente_nombre: cli.nombre,
         cliente_rut: cli.rut,
         vehiculo: { tipo: ob.tipo_vehiculo, marca: ob.marca, modelo: ob.modelo, anio: ob.anio, patente: ob.patente },
-        estado: st ? st.estado : null,
-        estado_cartera: st ? st.estado_cartera : null,
+        estado: ob._estado,
+        estado_cartera: ob._estado_cartera,
         fecha_ingreso: ob.created_at,
         fecha_otorgado: ob.fecha_otorgado,
         fecha_primera_cuota: ob.fecha_primera_cuota,
@@ -410,8 +407,8 @@ exports.ia = async (req, res) => {
       return res.json({ success: true, data: { disponible: true, respuesta: 'Tu cuenta está en validación; aún no puedo consultar tus operaciones.' }, error: null });
     }
 
-    // Cuota diaria por dealer (configurable; 0 = sin límite)
-    const limite = await paramNum('dealer_ia_limite_dia', 15);
+    // Cuota diaria por dealer (configurable; 0 = sin límite). Clamp defensivo.
+    const limite = Math.max(0, Math.min(200, await paramNum('dealer_ia_limite_dia', 15)));
     const idd = req.dealer.id_dealer || null;
     const idc = req.dealer.id_cuenta || null;
     const [[u]] = await pool.query(
