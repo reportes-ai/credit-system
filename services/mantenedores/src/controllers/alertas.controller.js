@@ -108,7 +108,7 @@ exports.getVencimientos = async (req, res) => {
     // ── Errores de la sincronización automática (UF/UTM/TMC) ──────────────
     try {
       const [rows] = await pool.query(
-        "SELECT clave, valor FROM parametros_credito WHERE clave IN ('sync_uf','sync_utm','sync_dolar','sync_ipc','sync_tmc') AND valor <> ''");
+        "SELECT clave, valor FROM indicadores_estado WHERE clave IN ('sync_uf','sync_utm','sync_dolar','sync_ipc','sync_tmc') AND valor <> ''");
       for (const r of rows) {
         alertas.push({
           tipo:    r.clave,

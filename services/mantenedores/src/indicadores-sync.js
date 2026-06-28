@@ -10,12 +10,19 @@ const pool = require('../../../shared/config/database');
 const { cmfGet } = require('./cmf-api');
 const { sincronizarTMC } = require('./tmc-sync');
 
-// Estado de la última sincronización por indicador ('' = OK) → lo usa el módulo de Alertas.
+// Estado de la última sincronización por indicador ('' = OK) → lo usan Alertas y el sello de la
+// página. Tabla propia con valor TEXT: parametros_credito.valor es DECIMAL y NO admite las
+// fechas/errores que guardamos aquí (el INSERT fallaba en silencio → sello siempre vacío).
+(async () => {
+  try { await pool.query("CREATE TABLE IF NOT EXISTS indicadores_estado (clave VARCHAR(50) PRIMARY KEY, valor TEXT)"); }
+  catch (e) { if (e.errno !== 1050) console.error('[indicadores_estado migration]', e.message); }
+})();
+
 async function setEstado(clave, valor) {
   try {
     await pool.query(
-      "INSERT INTO parametros_credito (clave, valor, descripcion) VALUES (?,?,?) ON DUPLICATE KEY UPDATE valor=VALUES(valor)",
-      [clave, String(valor || '').slice(0, 255), 'Estado de la última sincronización de indicadores']);
+      "INSERT INTO indicadores_estado (clave, valor) VALUES (?,?) ON DUPLICATE KEY UPDATE valor=VALUES(valor)",
+      [clave, String(valor == null ? '' : valor).slice(0, 255)]);
   } catch (_) {}
 }
 

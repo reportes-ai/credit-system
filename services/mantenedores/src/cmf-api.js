@@ -21,7 +21,10 @@ function normFecha(s) {
 async function cmfGet(recurso, year, month) {
   const key = process.env.CMF_API_KEY;
   if (!key) { const e = new Error('Falta CMF_API_KEY'); e.code = 'NOCMF'; throw e; }
-  const url = `https://api.cmfchile.cl/api-sbifv3/recursos_api/${recurso}/${year}/${month}?apikey=${encodeURIComponent(key)}&formato=json`;
+  // La CMF exige el mes con DOS dígitos (MM): a una ruta con mes sin cero (…/2026/6) responde
+  // lista VACÍA y sin error → "+0" con la tabla vacía. Padding a MM. (month vacío → ruta por año.)
+  const mm = (month === undefined || month === null || month === '') ? '' : '/' + String(month).padStart(2, '0');
+  const url = `https://api.cmfchile.cl/api-sbifv3/recursos_api/${recurso}/${year}${mm}?apikey=${encodeURIComponent(key)}&formato=json`;
   // validateStatus: la CMF responde el detalle del error (key inválida, sin datos, etc.) en el body con
   // CodigoError AUN con HTTP != 200 (ej. 421 "API key no valida"). Sin esto, axios lo oculta tras un
   // genérico "Request failed with status code 421" y no se sabe la causa real.

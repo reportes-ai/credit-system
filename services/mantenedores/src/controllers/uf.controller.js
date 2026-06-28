@@ -113,7 +113,7 @@ const estadoSync = async (req, res) => {
     const claves = [];
     inds.forEach(i => claves.push('sync_' + i, 'sync_' + i + '_ts'));
     const [rows] = await pool.query(
-      `SELECT clave, valor FROM parametros_credito WHERE clave IN (${claves.map(() => '?').join(',')})`, claves);
+      `SELECT clave, valor FROM indicadores_estado WHERE clave IN (${claves.map(() => '?').join(',')})`, claves);
     const map = {};
     for (const r of rows) map[r.clave] = r.valor;
     const data = {};
