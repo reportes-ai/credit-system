@@ -5,7 +5,7 @@
   <link rel="icon" href="/img/favicon.png" type="image/png">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Atención Remota — AutoFácil</title>
-  <!-- v1.9 -->
+  <!-- v2.0 — acceso_token guardado como hash SHA2 (hardening) -->
   <link href="/css/bootstrap.min.css" rel="stylesheet">
   <link href="/css/bootstrap-icons.css" rel="stylesheet">
   <style>
@@ -513,8 +513,7 @@ async function cargarCuentas(){
         <td>${esc(c.email)}</td>
         <td><span class="pill ${c.activo?'ok':'no'}">${c.activo?'Activa':'Inactiva'}</span></td>
         <td style="white-space:nowrap">
-          <button class="btn-ghost" onclick="copiarLink('${c.acceso_token||''}')" title="Copiar link de acceso directo (sin login)"><i class="bi bi-link-45deg"></i></button>
-          <button class="btn-ghost" onclick="regenLink(${c.id})" title="Regenerar link"><i class="bi bi-arrow-repeat"></i></button>
+          <button class="btn-ghost" onclick="regenLink(${c.id})" title="Generar y copiar link de acceso (el anterior deja de funcionar)"><i class="bi bi-link-45deg"></i></button>
           <button class="btn-ghost" onclick="resetClave(${c.id})" title="Resetear clave"><i class="bi bi-key"></i></button>
           <button class="btn-ghost" onclick="toggleCuenta(${c.id},${c.activo?0:1})" title="${c.activo?'Desactivar':'Activar'}"><i class="bi bi-${c.activo?'pause':'play'}-circle"></i></button>
         </td>

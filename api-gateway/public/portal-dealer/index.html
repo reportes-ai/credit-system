@@ -5,7 +5,7 @@
   <link rel="icon" href="/img/favicon.png" type="image/png">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Portal Dealer — AutoFácil</title>
-  <!-- v1.8 — Portal: asistente IA acotado a sus datos -->
+  <!-- v1.9 — Sesión solo en sessionStorage (hardening auth dealer) -->
   <link href="/css/bootstrap-icons.css" rel="stylesheet">
   <style>
     :root { --navy:#0141A2; --navy-dark:#012d70; --navy-light:#0255c5; --accent:#009AFE; }
@@ -295,11 +295,14 @@ const hora = d => new Date(d).toLocaleTimeString('es-CL',{hour:'2-digit',minute:
 const esImg = n => /\.(png|jpe?g|gif|webp|bmp)$/i.test(String(n||''));
 function toast(msg, err){ const t=document.getElementById('toast'); t.textContent=msg; t.className='toast-af'+(err?' err':''); t.style.display='block'; clearTimeout(t._h); t._h=setTimeout(()=>t.style.display='none',3000); }
 
-let dToken = sessionStorage.getItem('dealer_token') || localStorage.getItem('dealer_token');
-let dInfo  = JSON.parse(sessionStorage.getItem('dealer_info') || localStorage.getItem('dealer_info') || 'null');
+// Sesión SOLO en sessionStorage: se cierra al cerrar el navegador (decisión de negocio).
+// Limpiamos cualquier token heredado en localStorage de versiones anteriores.
+try { localStorage.removeItem('dealer_token'); localStorage.removeItem('dealer_info'); } catch(_){}
+let dToken = sessionStorage.getItem('dealer_token');
+let dInfo  = JSON.parse(sessionStorage.getItem('dealer_info') || 'null');
 let conv = null, ws=null, reconnTimer=null, seen=new Set();
 
-function guardarSesion(t, info){ dToken=t; dInfo=info; sessionStorage.setItem('dealer_token',t); sessionStorage.setItem('dealer_info',JSON.stringify(info)); localStorage.setItem('dealer_token',t); localStorage.setItem('dealer_info',JSON.stringify(info)); }
+function guardarSesion(t, info){ dToken=t; dInfo=info; sessionStorage.setItem('dealer_token',t); sessionStorage.setItem('dealer_info',JSON.stringify(info)); }
 function limpiarSesion(){ ['dealer_token','dealer_info'].forEach(k=>{ sessionStorage.removeItem(k); localStorage.removeItem(k); }); }
 function tokenVigente(t){ try{ const p=JSON.parse(atob(t.split('.')[1].replace(/-/g,'+').replace(/_/g,'/'))); return !p.exp || Math.floor(Date.now()/1000) < p.exp; }catch(_){ return false; } }
 async function accederConLink(k){

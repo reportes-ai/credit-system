@@ -190,9 +190,16 @@ const errSrv  = (res, e, tag) => { console.error(`[${tag}]`, e.message); res.sta
     await pool.query('ALTER TABLE ar_conversaciones ADD COLUMN IF NOT EXISTS interlocutor VARCHAR(150) NULL');
 
     // Acceso del dealer por link (sin login): token único por cuenta.
+    // Se guarda SOLO el hash (SHA2-256); el token en claro nunca persiste en BD.
     await pool.query('ALTER TABLE ar_dealer_cuentas ADD COLUMN IF NOT EXISTS acceso_token VARCHAR(64) NULL');
-    const [sinTok] = await pool.query("SELECT id FROM ar_dealer_cuentas WHERE acceso_token IS NULL OR acceso_token=''");
-    for (const row of sinTok) await pool.query('UPDATE ar_dealer_cuentas SET acceso_token=? WHERE id=?', [genToken(), row.id]);
+    await pool.query('ALTER TABLE ar_dealer_cuentas ADD COLUMN IF NOT EXISTS acceso_token_hash VARCHAR(64) NULL');
+    // Backfill: hashea los tokens en claro existentes (NO cambia los links ya repartidos).
+    await pool.query("UPDATE ar_dealer_cuentas SET acceso_token_hash=SHA2(acceso_token,256) WHERE (acceso_token_hash IS NULL OR acceso_token_hash='') AND acceso_token IS NOT NULL AND acceso_token<>''");
+    // Cuentas sin token alguno: genera uno nuevo (solo su hash).
+    const [sinTok] = await pool.query("SELECT id FROM ar_dealer_cuentas WHERE acceso_token_hash IS NULL OR acceso_token_hash=''");
+    for (const row of sinTok) await pool.query('UPDATE ar_dealer_cuentas SET acceso_token_hash=SHA2(?,256) WHERE id=?', [genToken(), row.id]);
+    // Scrub: borra el token en claro de la BD (ya solo se usa el hash).
+    await pool.query("UPDATE ar_dealer_cuentas SET acceso_token=NULL WHERE acceso_token IS NOT NULL");
 
     console.log('[atencion-remota] módulo y esquema listos');
   } catch (e) { console.error('[atencion-remota migration]', e.message); }
@@ -310,7 +317,7 @@ const dealerAcceso = async (req, res) => {
   try {
     const k = String(req.body && req.body.k || req.query.k || '').trim();
     if (!k) return res.status(400).json({ success: false, data: null, error: 'Link inválido' });
-    const [[c]] = await pool.query('SELECT * FROM ar_dealer_cuentas WHERE acceso_token=? AND activo=1', [k]);
+    const [[c]] = await pool.query('SELECT * FROM ar_dealer_cuentas WHERE acceso_token_hash=SHA2(?,256) AND activo=1', [k]);
     if (!c) return res.status(401).json({ success: false, data: null, error: 'Link inválido o cuenta deshabilitada' });
     await pool.query('UPDATE ar_dealer_cuentas SET ultimo_acceso=NOW() WHERE id=?', [c.id]);
     const payload = { tipo: 'dealer', id_cuenta: c.id, id_dealer: c.id_dealer, rut: c.rut, nombre: c.nombre, email: c.email };
@@ -324,7 +331,7 @@ const dealerAcceso = async (req, res) => {
 const regenerarLink = async (req, res) => {
   try {
     const tk = genToken();
-    await pool.query('UPDATE ar_dealer_cuentas SET acceso_token=? WHERE id=?', [tk, req.params.id]);
+    await pool.query('UPDATE ar_dealer_cuentas SET acceso_token_hash=SHA2(?,256), acceso_token=NULL WHERE id=?', [tk, req.params.id]);
     auditar({ req, accion: 'EDITAR', modulo: 'atencion-remota', entidad: 'dealer_cuenta', entidad_id: req.params.id, detalle: `Regeneró el link de acceso de la cuenta #${req.params.id}` });
     res.json({ success: true, data: { acceso_token: tk }, error: null });
   } catch (e) { errSrv(res, e, 'regenerarLink'); }
@@ -333,7 +340,7 @@ const regenerarLink = async (req, res) => {
 const listarCuentas = async (req, res) => {
   try {
     const [rows] = await pool.query(
-      `SELECT c.id, c.id_dealer, c.rut, c.nombre, c.email, c.activo, c.ultimo_acceso, c.created_at, c.acceso_token,
+      `SELECT c.id, c.id_dealer, c.rut, c.nombre, c.email, c.activo, c.ultimo_acceso, c.created_at,
               d.nombre_indexa AS dealer_nombre
        FROM ar_dealer_cuentas c LEFT JOIN dealers d ON d.id_dealer=c.id_dealer
        ORDER BY c.created_at DESC`);
@@ -354,12 +361,13 @@ const crearCuenta = async (req, res) => {
     const [[dup]] = await pool.query('SELECT id FROM ar_dealer_cuentas WHERE email=?', [email]);
     if (dup) return res.status(409).json({ success: false, data: null, error: 'Ya existe una cuenta con ese email' });
     const hash = await bcrypt.hash(String(password), 10);
+    const acceso = genToken();
     const [r] = await pool.query(
-      `INSERT INTO ar_dealer_cuentas (id_dealer, rut, nombre, email, password_hash, acceso_token, creado_por)
-       VALUES (?,?,?,?,?,?,?)`,
-      [id_dealer || null, rut || null, nombre || null, email, hash, genToken(), req.usuario.id_usuario]);
+      `INSERT INTO ar_dealer_cuentas (id_dealer, rut, nombre, email, password_hash, acceso_token_hash, creado_por)
+       VALUES (?,?,?,?,?,SHA2(?,256),?)`,
+      [id_dealer || null, rut || null, nombre || null, email, hash, acceso, req.usuario.id_usuario]);
     auditar({ req, accion: 'CREAR', modulo: 'atencion-remota', entidad: 'dealer_cuenta', entidad_id: r.insertId, detalle: `Creó cuenta de portal para dealer ${nombre || email}`, rut });
-    res.status(201).json({ success: true, data: { id: r.insertId }, error: null });
+    res.status(201).json({ success: true, data: { id: r.insertId, acceso_token: acceso }, error: null });
   } catch (e) { errSrv(res, e, 'crearCuenta'); }
 };
 
@@ -563,8 +571,8 @@ const aprobarSolicitud = async (req, res) => {
     const hash = await bcrypt.hash(String(password), 10);
     const acceso = genToken();
     const [c] = await pool.query(
-      `INSERT INTO ar_dealer_cuentas (id_dealer, rut, nombre, email, password_hash, acceso_token, creado_por)
-       VALUES (?,?,?,?,?,?,?)`,
+      `INSERT INTO ar_dealer_cuentas (id_dealer, rut, nombre, email, password_hash, acceso_token_hash, creado_por)
+       VALUES (?,?,?,?,?,SHA2(?,256),?)`,
       [id_dealer, s.rut, s.razon_social, s.email, hash, acceso, req.usuario.id_usuario]);
     await pool.query("UPDATE ar_solicitudes_cuenta SET estado='APROBADA', procesada_by=?, procesada_at=NOW() WHERE id=?",
       [req.usuario.id_usuario, req.params.id]);
