@@ -5,7 +5,7 @@
   <link rel="icon" href="/img/favicon.png" type="image/png">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Portal Dealer — AutoFácil</title>
-  <!-- v2.0 — Adjuntos del chat por header Authorization (sin JWT en la URL) -->
+  <!-- v2.1 — Recuperación de clave self-service (¿olvidaste tu clave?) -->
   <link href="/css/bootstrap-icons.css" rel="stylesheet">
   <style>
     :root { --navy:#0141A2; --navy-dark:#012d70; --navy-light:#0255c5; --accent:#009AFE; }
@@ -162,7 +162,8 @@
         <div class="fld"><label>Email</label><input type="email" id="liEmail" placeholder="tucorreo@dealer.cl" autocomplete="username"></div>
         <div class="fld"><label>Contraseña</label><input type="password" id="liPass" placeholder="Tu contraseña" autocomplete="current-password"></div>
         <button class="btn-login" id="liBtn" onclick="login()">Ingresar</button>
-        <div style="text-align:center;margin-top:14px"><a href="#" onclick="verRegistro(event)" style="font-size:.84rem;color:var(--navy);font-weight:600;text-decoration:none">¿No tienes cuenta? Solicítala aquí</a></div>
+        <div style="text-align:center;margin-top:12px"><a href="#" onclick="verRecuperar(event)" style="font-size:.84rem;color:var(--navy);font-weight:600;text-decoration:none">¿Olvidaste tu clave?</a></div>
+        <div style="text-align:center;margin-top:8px"><a href="#" onclick="verRegistro(event)" style="font-size:.84rem;color:var(--navy);font-weight:600;text-decoration:none">¿No tienes cuenta? Solicítala aquí</a></div>
         <div class="login-foot"><i class="bi bi-shield-lock"></i> Conexión segura · AutoFácil Crédito Automotriz</div>
       </div>
       <!-- Solicitud de cuenta -->
@@ -180,6 +181,33 @@
           <div class="fld"><label>Nombre del contacto</label><input type="text" id="rgContacto" placeholder="Tu nombre"></div>
           <div class="fld"><label>Email * (será tu acceso)</label><input type="email" id="rgEmail" placeholder="tucorreo@dealer.cl"></div>
           <button class="btn-login" id="rgBtn" onclick="solicitar()">Enviar solicitud</button>
+        </div>
+        <div style="text-align:center;margin-top:14px"><a href="#" onclick="verLogin(event)" style="font-size:.84rem;color:var(--navy);font-weight:600;text-decoration:none">← Volver a ingresar</a></div>
+      </div>
+      <!-- Recuperar clave (pedir enlace) -->
+      <div id="recuperarForm" style="display:none">
+        <div class="login-err" id="recErr"></div>
+        <div id="recOk" style="display:none;background:#f0fdf4;border:1px solid #bbf7d0;color:#15803d;border-radius:9px;padding:14px;font-size:.88rem;text-align:center">
+          <i class="bi bi-check-circle-fill"></i> Si el correo está registrado, te enviamos un enlace para crear una nueva clave. Revisa tu bandeja.
+        </div>
+        <div id="recFields">
+          <p style="font-size:.84rem;color:#64748b;margin:0 0 14px">Ingresa tu email y te enviaremos un enlace para restablecer tu clave.</p>
+          <div class="fld"><label>Email</label><input type="email" id="recEmail" placeholder="tucorreo@dealer.cl"></div>
+          <button class="btn-login" id="recBtn" onclick="recuperar()">Enviar enlace</button>
+        </div>
+        <div style="text-align:center;margin-top:14px"><a href="#" onclick="verLogin(event)" style="font-size:.84rem;color:var(--navy);font-weight:600;text-decoration:none">← Volver a ingresar</a></div>
+      </div>
+      <!-- Restablecer clave (desde enlace ?reset=) -->
+      <div id="resetForm" style="display:none">
+        <div class="login-err" id="rsErr"></div>
+        <div id="rsOk" style="display:none;background:#f0fdf4;border:1px solid #bbf7d0;color:#15803d;border-radius:9px;padding:14px;font-size:.88rem;text-align:center">
+          <i class="bi bi-check-circle-fill"></i> ¡Listo! Tu clave fue actualizada. Ya puedes ingresar.
+        </div>
+        <div id="rsFields">
+          <p style="font-size:.84rem;color:#64748b;margin:0 0 14px">Crea tu nueva clave (mínimo 6 caracteres).</p>
+          <div class="fld"><label>Nueva contraseña</label><input type="password" id="rsPass" placeholder="••••••" autocomplete="new-password"></div>
+          <div class="fld"><label>Repetir contraseña</label><input type="password" id="rsPass2" placeholder="••••••" autocomplete="new-password"></div>
+          <button class="btn-login" id="rsBtn" onclick="resetear()">Guardar nueva clave</button>
         </div>
         <div style="text-align:center;margin-top:14px"><a href="#" onclick="verLogin(event)" style="font-size:.84rem;color:var(--navy);font-weight:600;text-decoration:none">← Volver a ingresar</a></div>
       </div>
@@ -360,8 +388,40 @@ document.getElementById('liPass').addEventListener('keydown', e=>{ if(e.key==='E
 
 /* ── Solicitud de cuenta (autoregistro) ── */
 const val=id=>document.getElementById(id).value.trim();
-function verRegistro(e){ if(e) e.preventDefault(); document.getElementById('loginForm').style.display='none'; document.getElementById('registroForm').style.display='block'; }
-function verLogin(e){ if(e) e.preventDefault(); document.getElementById('registroForm').style.display='none'; document.getElementById('loginForm').style.display='block'; }
+function soloForm(id){ ['loginForm','registroForm','recuperarForm','resetForm'].forEach(f=>{ const el=document.getElementById(f); if(el) el.style.display = f===id ? 'block':'none'; }); }
+function verRegistro(e){ if(e) e.preventDefault(); soloForm('registroForm'); }
+function verLogin(e){ if(e) e.preventDefault(); soloForm('loginForm'); }
+function verRecuperar(e){ if(e) e.preventDefault(); soloForm('recuperarForm'); }
+
+/* ── Recuperar clave (pedir enlace) ── */
+async function recuperar(){
+  const email=val('recEmail'); const err=document.getElementById('recErr'); err.style.display='none';
+  if(!email){ err.textContent='Ingresa tu email.'; err.style.display='block'; return; }
+  const btn=document.getElementById('recBtn'); btn.disabled=true; btn.textContent='Enviando…';
+  try{
+    const r=await fetch('/api/atencion-remota/dealer/recuperar',{ method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({ email }) });
+    const j=await r.json();
+    if(j.success){ document.getElementById('recFields').style.display='none'; document.getElementById('recOk').style.display='block'; }
+    else { err.textContent=j.error||'No se pudo enviar.'; err.style.display='block'; btn.disabled=false; btn.textContent='Enviar enlace'; }
+  }catch(_){ err.textContent='Error de conexión. Intenta nuevamente.'; err.style.display='block'; btn.disabled=false; btn.textContent='Enviar enlace'; }
+}
+
+/* ── Restablecer clave (desde enlace ?reset=token) ── */
+let RESET_TK=null;
+function mostrarReset(tk){ RESET_TK=tk; soloForm('resetForm'); }
+async function resetear(){
+  const p1=document.getElementById('rsPass').value, p2=document.getElementById('rsPass2').value;
+  const err=document.getElementById('rsErr'); err.style.display='none';
+  if(p1.length<6){ err.textContent='La clave debe tener al menos 6 caracteres.'; err.style.display='block'; return; }
+  if(p1!==p2){ err.textContent='Las claves no coinciden.'; err.style.display='block'; return; }
+  const btn=document.getElementById('rsBtn'); btn.disabled=true; btn.textContent='Guardando…';
+  try{
+    const r=await fetch('/api/atencion-remota/dealer/reset',{ method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({ token:RESET_TK, password:p1 }) });
+    const j=await r.json();
+    if(j.success){ document.getElementById('rsFields').style.display='none'; document.getElementById('rsOk').style.display='block'; history.replaceState(null,'',location.pathname); }
+    else { err.textContent=j.error||'No se pudo actualizar.'; err.style.display='block'; btn.disabled=false; btn.textContent='Guardar nueva clave'; }
+  }catch(_){ err.textContent='Error de conexión. Intenta nuevamente.'; err.style.display='block'; btn.disabled=false; btn.textContent='Guardar nueva clave'; }
+}
 async function solicitar(){
   const body={ rut:val('rgRut'), razon_social:val('rgRazon'), direccion:val('rgDir'), telefono:val('rgTel'), contacto:val('rgContacto'), email:val('rgEmail') };
   const err=document.getElementById('regErr'); err.style.display='none';
@@ -671,6 +731,8 @@ document.getElementById('fileInput').addEventListener('change', async function()
 /* ── Arranque ── */
 (function(){
   const qs=new URLSearchParams(location.search);
+  const rs=qs.get('reset');
+  if(rs){ limpiarSesion(); mostrarReset(rs); return; }   // enlace de recuperación: muestra el formulario de nueva clave
   const k=qs.get('k');
   if(k){ accederConLink(k); return; }
   if(dToken && dInfo && tokenVigente(dToken)){ entrarApp(); return; }

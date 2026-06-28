@@ -17,7 +17,9 @@ const { auditar } = require('../../../../shared/audit');
 const { notificar } = require('../../../notificaciones/src/controllers/notificaciones.controller');
 const { tieneFunc } = require('../../../../shared/middleware/permisos');
 const { clientIp } = require('../../../../shared/middleware/rate-limit');
+const { enviarCorreo, envolverHTML } = require('../../../../shared/mailer');
 const crypto = require('crypto');
+const APP_URL = (process.env.APP_URL || 'https://credit-system-45em.onrender.com').replace(/\/+$/, '');
 
 const normRut = r => String(r || '').replace(/[.\-\s]/g, '').toUpperCase();
 const genToken = () => crypto.randomBytes(24).toString('hex');
@@ -48,6 +50,19 @@ async function logAcceso({ tipo, email, id_cuenta, resultado, req }) {
       ultimo_acceso DATETIME NULL,
       creado_por    INT NULL,
       created_at    DATETIME DEFAULT CURRENT_TIMESTAMP
+    )`);
+
+    // Tokens de recuperación de clave self-service (un solo uso, con expiración).
+    await pool.query(`CREATE TABLE IF NOT EXISTS ar_dealer_reset (
+      id         INT AUTO_INCREMENT PRIMARY KEY,
+      id_cuenta  INT NOT NULL,
+      token_hash CHAR(64) NOT NULL,
+      expira     DATETIME NOT NULL,
+      usado      TINYINT(1) NOT NULL DEFAULT 0,
+      usado_at   DATETIME NULL,
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+      INDEX idx_token (token_hash),
+      INDEX idx_cuenta (id_cuenta)
     )`);
 
     await pool.query(`CREATE TABLE IF NOT EXISTS ar_conversaciones (
@@ -389,6 +404,51 @@ const dealerAcceso = async (req, res) => {
   } catch (e) { errSrv(res, e, 'dealerAcceso'); }
 };
 
+// Recuperación de clave self-service: el dealer pide un enlace a su correo.
+// Respuesta uniforme SIEMPRE (no revela si el email existe). Token de un solo
+// uso con expiración de 60 min. El correo respeta el Modo Desarrollo (mailer).
+const recuperarClave = async (req, res) => {
+  try {
+    const email = String((req.body && req.body.email) || '').toLowerCase().trim();
+    const okResp = () => res.json({ success: true, data: { enviado: true }, error: null });
+    if (!email) return res.status(400).json({ success: false, data: null, error: 'Email requerido' });
+    const [[c]] = await pool.query('SELECT id, nombre FROM ar_dealer_cuentas WHERE email=? AND activo=1', [email]);
+    if (!c) return okResp();   // no enumeración: igual responde "enviado"
+    const tk = genToken();
+    await pool.query(
+      'INSERT INTO ar_dealer_reset (id_cuenta, token_hash, expira) VALUES (?, SHA2(?,256), DATE_ADD(NOW(), INTERVAL 60 MINUTE))',
+      [c.id, tk]);
+    const nombre = String(c.nombre || '').replace(/[<>&]/g, ' ').trim();
+    const link = `${APP_URL}/portal-dealer?reset=${tk}`;
+    const html = envolverHTML(`<p>Hola${nombre ? ' ' + nombre : ''},</p>
+      <p>Recibimos una solicitud para restablecer la clave de tu acceso al <b>Portal del Dealer</b> de AutoFácil.</p>
+      <p style="margin:18px 0"><a href="${link}" style="display:inline-block;background:#0141A2;color:#fff;text-decoration:none;padding:11px 22px;border-radius:8px;font-weight:700">Crear una nueva clave</a></p>
+      <p style="font-size:13px;color:#64748b">El enlace vence en 60 minutos y se puede usar una sola vez. Si no fuiste tú, ignora este correo.</p>`);
+    await enviarCorreo({ to: email, subject: 'Restablece tu clave — Portal Dealer AutoFácil', html, text: `Restablece tu clave: ${link} (vence en 60 minutos, un solo uso).` }).catch(() => {});
+    logAcceso({ tipo: 'recuperar', email, id_cuenta: c.id, resultado: 'OK', req });
+    return okResp();
+  } catch (e) { errSrv(res, e, 'recuperarClave'); }
+};
+
+// Fija la nueva clave a partir del token del enlace.
+const resetClave = async (req, res) => {
+  try {
+    const { token, password } = req.body || {};
+    if (!token || !password) return res.status(400).json({ success: false, data: null, error: 'Faltan datos' });
+    if (String(password).length < 6) return res.status(400).json({ success: false, data: null, error: 'La contraseña debe tener al menos 6 caracteres' });
+    const [[r]] = await pool.query(
+      'SELECT id, id_cuenta FROM ar_dealer_reset WHERE token_hash=SHA2(?,256) AND usado=0 AND expira > NOW() ORDER BY id DESC LIMIT 1',
+      [String(token)]);
+    if (!r) return res.status(400).json({ success: false, data: null, error: 'El enlace es inválido o ya venció. Solicita uno nuevo.' });
+    const hash = await bcrypt.hash(String(password), 10);
+    await pool.query('UPDATE ar_dealer_cuentas SET password_hash=? WHERE id=?', [hash, r.id_cuenta]);
+    await pool.query('UPDATE ar_dealer_reset SET usado=1, usado_at=NOW() WHERE id=?', [r.id]);
+    invalidarCuenta(Number(r.id_cuenta));
+    logAcceso({ tipo: 'reset', id_cuenta: r.id_cuenta, resultado: 'OK', req });
+    return res.json({ success: true, data: { ok: true }, error: null });
+  } catch (e) { errSrv(res, e, 'resetClave'); }
+};
+
 // Regenera el link de acceso de una cuenta (invalida el anterior).
 const regenerarLink = async (req, res) => {
   try {
@@ -685,7 +745,7 @@ module.exports = {
   // middlewares
   verifyDealer, verifyAny, cuentaVigente,
   // dealer
-  dealerLogin, dealerAcceso, listarCuentas, crearCuenta, actualizarCuenta, regenerarLink,
+  dealerLogin, dealerAcceso, recuperarClave, resetClave, listarCuentas, crearCuenta, actualizarCuenta, regenerarLink,
   // ejecutivo
   getCola, getMensajes,
   // comunes

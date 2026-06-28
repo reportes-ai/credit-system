@@ -9,9 +9,13 @@ const C = require('../controllers/atencion.controller');
 const rlLogin     = rateLimit({ key: 'dealer_login',     windowMs: 15 * 60 * 1000, max: 8 });
 const rlAcceso    = rateLimit({ key: 'dealer_acceso',    windowMs: 60 * 60 * 1000, max: 15 });
 const rlSolicitar = rateLimit({ key: 'dealer_solicitar', windowMs: 24 * 60 * 60 * 1000, max: 5 });
+const rlRecuperar = rateLimit({ key: 'dealer_recuperar', windowMs: 60 * 60 * 1000, max: 5 });
+const rlReset     = rateLimit({ key: 'dealer_reset',     windowMs: 60 * 60 * 1000, max: 10 });
 router.post('/dealer/login',     rlLogin,     C.dealerLogin);
 router.post('/dealer/solicitar', rlSolicitar, C.solicitarCuenta);   // autoregistro (público)
 router.post('/dealer/acceso',    rlAcceso,    C.dealerAcceso);       // acceso por link (público, ?k=token)
+router.post('/dealer/recuperar', rlRecuperar, C.recuperarClave);    // pedir enlace de reset (público)
+router.post('/dealer/reset',     rlReset,     C.resetClave);        // fijar nueva clave (público, ?reset=token)
 
 /* ── Compartido (ejecutivo o dealer) ─────────────────────────────────────── */
 router.get('/ice', C.verifyAny, C.getIce);
