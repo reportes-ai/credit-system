@@ -2058,6 +2058,7 @@ function abrirRevision(id){
   udRenderDocs(c.id);   // adjuntar documentos Unidad/Autofin para que el analista los revise
   document.getElementById('modalFoot').innerHTML = `
     <input id="motivoRechazo" placeholder="Comentario (obligatorio si rechazas, opcional si apruebas)" style="flex:1;min-width:220px;border:1.5px solid #e2e8f0;border-radius:8px;padding:7px 10px;font-size:.83rem">
+    ${puede('aprob_rentabilidad') ? `<button class="btn-mini bm-rent" style="padding:9px 18px;font-size:.85rem" onclick="verRentabilidad(${c.id}, true)"><i class="bi bi-cash-coin"></i> Rentabilidad</button>` : ''}
     <button class="btn-mini bm-no" style="padding:9px 18px;font-size:.85rem" onclick="resolverRevision(${c.id},'RECHAZADA')"><i class="bi bi-x-lg"></i> Rechazar</button>
     <button class="btn-mini bm-ok" style="padding:9px 18px;font-size:.85rem" onclick="resolverRevision(${c.id},'APROBADA')"><i class="bi bi-check-lg"></i> Aprobar</button>`;
   document.getElementById('modalCarta').classList.add('show');
@@ -2131,12 +2132,12 @@ function verCarta(id){
 function cerrarModal(){ document.getElementById('modalCarta').classList.remove('show'); }
 
 /* ── Rentabilidad de la carta (AutoFin vs UAC, tier vigente) ───────── */
-function verRentabilidad(id){
+function verRentabilidad(id, fromRev){
   const c = CARTAS.find(x=>x.id===id); if(!c) return;
   if(!window.AF_RENT){ alert('El motor de rentabilidad aún no carga. Reintenta en un segundo.'); return; }
-  cargarRentabilidad(c);
+  cargarRentabilidad(c, fromRev);
 }
-async function cargarRentabilidad(c){
+async function cargarRentabilidad(c, fromRev){
   let tier = { tier_uac_n: c.tierUacN||1, tier_uac_pct: (c.tierUacPct!=null?c.tierUacPct:14) };
   try { const r = await fetch('/api/cartas/'+c.id+'/rentabilidad',{headers:hdr()}); const j=await r.json(); if(j.success&&j.data) tier=j.data; } catch(e){}
   const valor = Number(c.precioVenta)||(Number(c.saldo||0)+Number(c.pie||0));
@@ -2150,7 +2151,9 @@ async function cargarRentabilidad(c){
   const R = window.AF_RENT.calcular(inp, PARAMS_CRED||{}, UF_HOY);
   document.getElementById('modalTitulo').innerHTML = '<i class="bi bi-cash-coin me-2"></i>Rentabilidad — '+escH(c.opCarta||'');
   document.getElementById('modalBody').innerHTML = R ? rentHTML(c,R,tier) : '<p style="color:#b91c1c;padding:16px">Faltan datos en la carta (precio de venta o plazo) para calcular la rentabilidad.</p>';
-  document.getElementById('modalFoot').innerHTML = '<button class="btn-sec" onclick="cerrarModal()">Cerrar</button>';
+  document.getElementById('modalFoot').innerHTML = fromRev
+    ? `<button class="btn-sec" onclick="abrirRevision(${c.id})"><i class="bi bi-arrow-left me-1"></i>Volver a la revisión</button>`
+    : '<button class="btn-sec" onclick="cerrarModal()">Cerrar</button>';
   document.getElementById('modalCarta').classList.add('show');
 }
 function rentHTML(c,R,tier){
