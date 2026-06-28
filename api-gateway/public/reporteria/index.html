@@ -58,6 +58,10 @@
     .report-card.pivot .card-icon-wrap { background:linear-gradient(135deg,#cffafe,#e0f2fe); color:#0e7490; }
     .report-card.pivot:hover .card-icon-wrap { background:linear-gradient(135deg,#0e7490,#0891b2); color:#fff; }
     .report-card.pivot h6 { color:#164e63; }
+    .report-card.rentab { --card-accent:linear-gradient(90deg,#064e3b,#059669,#10b981); background:linear-gradient(145deg,#f0fdf4,#fff); }
+    .report-card.rentab .card-icon-wrap { background:linear-gradient(135deg,#d1fae5,#dcfce7); color:#059669; }
+    .report-card.rentab:hover .card-icon-wrap { background:linear-gradient(135deg,#059669,#10b981); color:#fff; }
+    .report-card.rentab h6 { color:#065f46; }
   </style>
 </head>
 <body>
@@ -66,7 +70,7 @@
   <div class="topnav-left">
     <a href="/" class="topnav-brand">
       <img src="/img/logo.png" alt="AutoFácil">
-      <span class="version-badge" id="versionBadge">v1.2</span>
+      <span class="version-badge" id="versionBadge">v1.3</span>
     </a>
     <div class="breadcrumb-nav">
       <a href="/">Inicio</a><span class="sep">›</span>
@@ -116,6 +120,17 @@
       <div class="card-footer-row">
         <span class="badge-status activo"><i class="bi bi-check-circle-fill"></i>Disponible</span>
         <button class="btn-abrir" style="background:linear-gradient(135deg,#0e7490,#0891b2)">
+          <i class="bi bi-arrow-right-circle"></i>Abrir
+        </button>
+      </div>
+    </div>
+    <div class="report-card rentab" id="cardRentab" style="display:none" onclick="window.location='/reporteria/rentabilidad-creditos/'">
+      <div class="card-icon-wrap"><i class="bi bi-graph-up-arrow"></i></div>
+      <h6>Rentabilidad Créditos</h6>
+      <p>Revisa cada crédito otorgado del mes: ¿se colocó en la financiera más rentable? Compara AutoFin vs Unidad de Crédito y muestra el % de diferencia.</p>
+      <div class="card-footer-row">
+        <span class="badge-status activo"><i class="bi bi-check-circle-fill"></i>Disponible</span>
+        <button class="btn-abrir" style="background:linear-gradient(135deg,#059669,#10b981)">
           <i class="bi bi-arrow-right-circle"></i>Abrir
         </button>
       </div>
@@ -316,6 +331,20 @@
 function getToken()   { return sessionStorage.getItem('token'); }
 function apiHdrs()    { return { 'Content-Type':'application/json', 'Authorization':'Bearer '+getToken() }; }
 function logout()     { sessionStorage.removeItem('token'); sessionStorage.removeItem('usuario'); location.href='/login.html'; }
+
+/* ── Cards restringidas por permiso (Rentabilidad Créditos) ── */
+(async function gateCards(){
+  try {
+    const yo = JSON.parse(sessionStorage.getItem('usuario')||'null');
+    const esAdmin = yo && yo.perfil === 'Administrador';
+    const perms = new Set();
+    const r = await fetch('/api/auth/mis-permisos?_='+Date.now(), { cache:'no-store', headers: apiHdrs() });
+    const j = await r.json(); (j.funcionalidades||[]).forEach(c=>perms.add(c));
+    if (esAdmin || perms.has('aprob_rentabilidad')) {
+      const el = document.getElementById('cardRentab'); if (el) el.style.display = '';
+    }
+  } catch(e){ /* sin permiso → card oculta */ }
+})();
 
 
 /* ═══════════════════════════════════════════════════════════════

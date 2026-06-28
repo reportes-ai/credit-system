@@ -1,0 +1,372 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <link rel="icon" href="/img/favicon.png" type="image/png">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Rentabilidad Créditos — AutoFácil</title>
+  <link href="/css/bootstrap.min.css" rel="stylesheet">
+  <link href="/css/bootstrap-icons.css" rel="stylesheet">
+  <style>
+    :root { --navy:#001345; --blue:#0141A2; --sky:#009AFE; }
+    body { background:#f0f4f8; font-family:'Segoe UI',system-ui,sans-serif; }
+    .topnav { background:linear-gradient(90deg,#012d70,#0255c5); color:#fff; height:60px; padding:0 24px; display:flex; align-items:center; justify-content:space-between; position:sticky; top:0; z-index:200; box-shadow:0 2px 8px rgba(0,0,0,.3); }
+    .topnav-left { display:flex; align-items:center; gap:16px; }
+    .topnav-brand { display:flex; align-items:center; gap:8px; text-decoration:none; }
+    .topnav-brand img { height:32px; filter:brightness(0) invert(1); }
+    .version-badge { background:rgba(255,255,255,.15); color:rgba(255,255,255,.75); font-size:.65rem; font-weight:700; border-radius:6px; padding:2px 8px; letter-spacing:.5px; }
+    .breadcrumb-nav { color:rgba(255,255,255,.6); font-size:.85rem; display:flex; align-items:center; gap:6px; }
+    .breadcrumb-nav a { color:rgba(255,255,255,.75); text-decoration:none; }
+    .breadcrumb-nav a:hover { color:#fff; }
+    .breadcrumb-nav .sep { color:rgba(255,255,255,.35); }
+    .topnav-right { display:flex; align-items:center; gap:10px; }
+    .user-chip { background:rgba(255,255,255,.12); border-radius:24px; padding:5px 12px; display:flex; align-items:center; gap:8px; font-size:.85rem; }
+    .avatar { width:28px; height:28px; background:#90caf9; border-radius:50%; display:flex; align-items:center; justify-content:center; color:#0141A2; font-weight:700; font-size:.75rem; }
+    .perfil-badge { background:rgba(144,202,249,.2); border:1px solid rgba(144,202,249,.4); color:#90caf9; border-radius:12px; padding:2px 10px; font-size:.73rem; font-weight:600; }
+    .btn-logout { background:rgba(255,255,255,.1); border:1px solid rgba(255,255,255,.2); color:#fff; border-radius:8px; padding:5px 12px; font-size:.82rem; cursor:pointer; transition:background .2s; }
+    .btn-logout:hover { background:rgba(255,255,255,.22); }
+    .page-wrap { max-width:1240px; margin:24px auto; padding:0 24px 60px; }
+    .page-banner { background:linear-gradient(135deg,#064e3b,#059669 60%,#10b981); border-radius:16px; color:#fff; padding:24px 32px; margin-bottom:22px; display:flex; align-items:center; gap:18px; }
+    .page-banner > i { font-size:2.6rem; opacity:.85; }
+    .page-banner h2 { font-weight:700; margin:0 0 3px; font-size:1.25rem; }
+    .page-banner p { opacity:.85; margin:0; font-size:.85rem; }
+
+    .toolbar { display:flex; align-items:center; flex-wrap:wrap; gap:14px; background:#fff; border-radius:12px; padding:14px 18px; box-shadow:0 1px 6px rgba(0,0,0,.07); margin-bottom:18px; }
+    .toolbar label { font-size:.78rem; font-weight:700; color:#374151; margin:0 6px 0 0; }
+    .toolbar input[type=month] { border:1.5px solid #d1d5db; border-radius:8px; padding:6px 10px; font-size:.86rem; color:#1e293b; outline:none; }
+    .toolbar input[type=month]:focus { border-color:#059669; box-shadow:0 0 0 3px rgba(5,150,105,.12); }
+    .btn-exp { margin-left:auto; background:linear-gradient(135deg,#16a34a,#22c55e); color:#fff; border:none; border-radius:8px; padding:8px 16px; font-size:.83rem; font-weight:600; cursor:pointer; display:inline-flex; align-items:center; gap:6px; }
+    .btn-exp:hover { filter:brightness(1.05); }
+
+    .stats { display:grid; grid-template-columns:repeat(4,1fr); gap:14px; margin-bottom:18px; }
+    @media(max-width:860px){ .stats{ grid-template-columns:1fr 1fr; } }
+    .stat-card { background:#fff; border-radius:12px; padding:16px 18px; box-shadow:0 1px 6px rgba(0,0,0,.07); border-left:4px solid var(--ac,#059669); }
+    .stat-card .lbl { font-size:.72rem; font-weight:700; color:#6b7280; text-transform:uppercase; letter-spacing:.04em; }
+    .stat-card .val { font-size:1.5rem; font-weight:800; color:#111827; margin-top:3px; line-height:1.1; }
+    .stat-card .sub { font-size:.74rem; color:#9ca3af; margin-top:2px; }
+
+    .tbl-wrap { background:#fff; border-radius:12px; box-shadow:0 1px 6px rgba(0,0,0,.07); overflow:auto; }
+    table.rt { width:100%; border-collapse:collapse; font-size:.82rem; }
+    table.rt th { background:#f0f4f8; padding:10px 12px; text-align:left; font-size:.68rem; font-weight:700; color:#475569; text-transform:uppercase; letter-spacing:.03em; white-space:nowrap; position:sticky; top:0; z-index:1; }
+    table.rt th.num, table.rt td.num { text-align:right; }
+    table.rt td { padding:9px 12px; border-bottom:1px solid #f1f5f9; white-space:nowrap; }
+    table.rt tbody tr:hover { background:#f8fafc; }
+    .fin-badge { display:inline-block; font-size:.68rem; font-weight:700; border-radius:7px; padding:2px 9px; }
+    .fin-AF   { background:#dbeafe; color:#1e40af; }
+    .fin-UAC  { background:#dcfce7; color:#166534; }
+    .fin-AFAC { background:#ede9fe; color:#5b21b6; }
+    .chip-ok  { color:#166534; font-weight:700; }
+    .chip-bad { color:#b91c1c; font-weight:800; }
+    .chip-na  { color:#94a3b8; }
+    .diff-pos { color:#166534; font-weight:700; }
+    .diff-neg { color:#dc2626; font-weight:800; }
+    .rentcell.best { font-weight:800; }
+    .star { color:#f59e0b; }
+    .empty { padding:40px; text-align:center; color:#9ca3af; }
+    .footnote { font-size:.74rem; color:#94a3b8; margin-top:14px; line-height:1.5; }
+    .mini-link { color:#0141A2; text-decoration:none; }
+    .mini-link:hover { text-decoration:underline; }
+  </style>
+</head>
+<body>
+
+<nav class="topnav">
+  <div class="topnav-left">
+    <a href="/" class="topnav-brand">
+      <img src="/img/logo.png" alt="AutoFácil">
+      <span class="version-badge" id="versionBadge">v1.0</span>
+    </a>
+    <div class="breadcrumb-nav">
+      <a href="/">Inicio</a><span class="sep">›</span>
+      <a href="/reporteria/">Reportería</a><span class="sep">›</span>
+      <span style="color:#fff;font-weight:600"><i class="bi bi-graph-up-arrow me-1"></i>Rentabilidad Créditos</span>
+    </div>
+  </div>
+  <div class="topnav-right">
+    <div class="user-chip">
+      <div class="avatar" id="avatarInicial">?</div>
+      <div>
+        <div style="font-weight:600;line-height:1.3;color:#fff" id="navNombre">—</div>
+        <div class="perfil-badge" id="navPerfil">—</div>
+      </div>
+    </div>
+    <button class="btn-logout" onclick="logout()"><i class="bi bi-box-arrow-right me-1"></i>Salir</button>
+  </div>
+</nav>
+
+<div class="page-wrap">
+  <div class="page-banner">
+    <i class="bi bi-graph-up-arrow"></i>
+    <div>
+      <h2>Rentabilidad Créditos</h2>
+      <p>Por cada crédito otorgado en el mes: ¿se colocó en la financiera más rentable? · AutoFin vs Unidad de Crédito</p>
+    </div>
+  </div>
+
+  <div class="toolbar">
+    <div><label><i class="bi bi-calendar3 me-1" style="color:#059669"></i>Mes otorgamiento</label>
+      <input type="month" id="mesSel" onchange="recalcular()"></div>
+    <span id="tierInfo" style="font-size:.78rem;color:#475569"></span>
+    <button class="btn-exp" onclick="exportarCSV()"><i class="bi bi-file-earmark-excel"></i> Exportar Excel</button>
+  </div>
+
+  <div class="stats" id="stats"></div>
+
+  <div class="tbl-wrap">
+    <table class="rt" id="tabla">
+      <thead><tr>
+        <th>N° Operación</th>
+        <th>Cliente</th>
+        <th>Ejecutivo</th>
+        <th>Colocada en</th>
+        <th class="num">Monto Fin.</th>
+        <th class="num">Rentab. AutoFin</th>
+        <th class="num">Rentab. UAC</th>
+        <th>Más rentable</th>
+        <th class="num">Δ vs óptima ($)</th>
+        <th class="num">% diferencia</th>
+      </tr></thead>
+      <tbody id="tbody">
+        <tr><td colspan="10" class="empty"><div class="spinner-border spinner-border-sm me-2"></div>Cargando…</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="footnote">
+    <i class="bi bi-info-circle me-1"></i>
+    Mismas fórmulas del <a class="mini-link" href="/simulador/" target="_blank">Simulador de Rentabilidad</a>.
+    <b>Comisión Dealer</b> = la real negociada del crédito (si no la trae, pizarra por plazo); <b>Comisión Parque</b> 2,5% del saldo (si es parque); <b>Comisión Ejecutivo</b> según <code>pct_ejecutivo_fin</code> de los <a class="mini-link" href="/aprobaciones/mantenedor/" target="_blank">parámetros del crédito</a>.
+    <b>Tasa cliente</b> = la real del crédito (si falta, TMC vigente por tramo). <b>Tier UAC</b> = vigente del mes (según N° de operaciones Unidad de Crédito otorgadas).
+    AutoFin = colocación + seguros; UAC = % sobre saldo precio (no paga seguros). Los créditos <b>AutoFácil (cartera propia)</b> se muestran como referencia y no entran en el conteo de óptimos.
+  </div>
+</div>
+
+<script src="/js/auth-guard.js"></script>
+<script src="/js/rentabilidad-calc.js"></script>
+<script>
+/* ── Sesión ───────────────────────────────────────── */
+const YO = JSON.parse(sessionStorage.getItem('usuario') || 'null');
+if (!YO) location.href = '/login.html';
+function getToken(){ return sessionStorage.getItem('token'); }
+function hdr(){ return { 'Content-Type':'application/json', 'Authorization':'Bearer '+getToken() }; }
+function logout(){ sessionStorage.clear(); location.href='/login.html'; }
+const ES_ADMIN = (YO && YO.perfil === 'Administrador');
+const PERMISOS = new Set();
+const puede = c => ES_ADMIN || PERMISOS.has(c);
+if (YO){
+  document.getElementById('navNombre').textContent = YO.nombre + ' ' + (YO.apellido||'');
+  document.getElementById('navPerfil').textContent = YO.perfil || '';
+  document.getElementById('avatarInicial').textContent = (YO.nombre||'?')[0].toUpperCase();
+}
+
+/* ── Helpers ──────────────────────────────────────── */
+const fmtCLP = v => { const n=Math.round(Number(v)||0); return '$'+n.toLocaleString('es-CL'); };
+const escH = s => String(s??'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+const fmtRUT = r => { const c=String(r||'').replace(/[^0-9kK]/g,''); if(c.length<2) return r||''; const dv=c.slice(-1), num=c.slice(0,-1); return parseInt(num).toLocaleString('es-CL')+'-'+dv.toUpperCase(); };
+const ym = d => { if(!d) return ''; const x=new Date(d); return isNaN(x)?String(d).slice(0,7):`${x.getFullYear()}-${String(x.getMonth()+1).padStart(2,'0')}`; };
+
+/* ── Estado ───────────────────────────────────────── */
+let UF_HOY = null, PARAMS = {}, CREDITOS = [], FILAS = [];
+
+/* ── Init ─────────────────────────────────────────── */
+(async function init(){
+  // Gate de acceso (igual que la card en Reportería)
+  try {
+    const r = await fetch('/api/auth/mis-permisos?_='+Date.now(), { headers:hdr() });
+    const j = await r.json(); (j.funcionalidades||[]).forEach(c=>PERMISOS.add(c));
+  } catch(e){}
+  if (!puede('aprob_rentabilidad')) {
+    document.getElementById('tbody').innerHTML = '';
+    document.querySelector('.page-wrap').innerHTML =
+      '<div style="background:#fff;border-radius:12px;padding:40px;text-align:center;color:#b91c1c;box-shadow:0 1px 6px rgba(0,0,0,.07)"><i class="bi bi-lock-fill" style="font-size:2rem;display:block;margin-bottom:10px"></i>No tienes permiso para ver la rentabilidad.<br><a class="mini-link" href="/reporteria/">← Volver a Reportería</a></div>';
+    return;
+  }
+  await cargarBase();
+  // Mes por defecto = mes con datos más reciente (o mes actual)
+  const meses = [...new Set(CREDITOS.map(c=>ym(c.fecha_otorgado)).filter(Boolean))].sort().reverse();
+  document.getElementById('mesSel').value = meses[0] || ym(new Date());
+  recalcular();
+})();
+
+async function cargarBase(){
+  try {
+    const [rC, rUf, rPar] = await Promise.all([
+      fetch('/api/creditos/reporteria', { headers:hdr() }),
+      fetch('/api/uf/vigente',          { headers:hdr() }),
+      fetch('/api/parametros-credito',  { headers:hdr() }),
+    ]);
+    const [jC, jUf, jPar] = await Promise.all([rC.json(), rUf.json(), rPar.json()]);
+    CREDITOS = Array.isArray(jC.data) ? jC.data : [];
+    const u = Array.isArray(jUf.data) ? jUf.data[0] : jUf.data;
+    if (u?.valor) UF_HOY = parseFloat(u.valor);
+    if (jPar.success && jPar.data?.obj) PARAMS = jPar.data.obj;
+  } catch(e){ console.error('base', e); }
+}
+
+/* ── Tier UAC vigente del mes (según N° ops Unidad de Crédito otorgadas) ── */
+function tierDelMes(mes){
+  const t1 = parseFloat(PARAMS.uac_ops_tier1_max)||5;
+  const t2 = parseFloat(PARAMS.uac_ops_tier2_max)||10;
+  const t3 = parseFloat(PARAMS.uac_ops_tier3_max)||15;
+  const count = CREDITOS.filter(c =>
+    (c.financiera||'').toUpperCase().includes('UNIDAD') &&
+    c.fecha_otorgado && ym(c.fecha_otorgado)===mes
+  ).length;
+  let n, pct;
+  if (count <= t1)      { n=1; pct=parseFloat(PARAMS.uac_pct_tier1)||14; }
+  else if (count <= t2) { n=2; pct=parseFloat(PARAMS.uac_pct_tier2)||16; }
+  else if (count <= t3) { n=3; pct=parseFloat(PARAMS.uac_pct_tier3)||18; }
+  else                  { n=4; pct=parseFloat(PARAMS.uac_pct_tier4)||20; }
+  return { n, pct, count };
+}
+
+/* ── Recalcular para el mes seleccionado ──────────── */
+function recalcular(){
+  const mes = document.getElementById('mesSel').value;
+  if(!mes){ return; }
+  const tier = tierDelMes(mes);
+  document.getElementById('tierInfo').innerHTML =
+    `<b>Tier UAC del mes:</b> ${tier.n} (${tier.pct.toFixed(0)}%) · ${tier.count} ops Unidad de Crédito`;
+
+  const otorgados = CREDITOS.filter(c =>
+    (String(c.estado||'').toUpperCase()==='OTORGADO') &&
+    c.fecha_otorgado && ym(c.fecha_otorgado)===mes
+  );
+
+  FILAS = otorgados.map(c => {
+    const fin   = (c.financiera||'').toUpperCase();
+    const colo  = fin.includes('AUTOFIN') ? 'AF' : (fin.includes('UNIDAD') ? 'UAC' : (fin.includes('AUTOFACIL') ? 'AFAC' : ''));
+    const valor = Number(c.valor_vehiculo)||(Number(c.saldo_precio||0)+Number(c.pie||0));
+    const tasa  = Number(c.tasa_mensual)||0;
+    const inp = {
+      valor, pie:Number(c.pie||0), plazo:Number(c.plazo||0),
+      seguros:{ desg:true, rdh:true, cesa:true },
+      esPatio: !!String(c.parque||'').trim() || Number(c.com_parque||0)>0,
+      dealerComCLP: Number(c.comision_dealer||0)||null,
+      tasaCli: tasa>0 ? tasa/100 : null,
+      uacPct: tier.pct/100,
+    };
+    const R = (window.AF_RENT && window.AF_RENT.calcular(inp, PARAMS, UF_HOY)) || null;
+    let rentAF=null, rentUAC=null, mejor=null, esOptima=null, diffCLP=null, diffPct=null;
+    if (R){
+      rentAF = R.af.rentab; rentUAC = R.uac.rentab;
+      mejor  = rentAF >= rentUAC ? 'AF' : 'UAC';
+      if (colo==='AF' || colo==='UAC'){
+        const rentColo = colo==='AF' ? rentAF : rentUAC;
+        const rentMejor = Math.max(rentAF, rentUAC);
+        esOptima = (colo===mejor);
+        diffCLP  = rentColo - rentMejor;                       // ≤ 0
+        diffPct  = rentMejor!==0 ? (diffCLP/Math.abs(rentMejor))*100 : 0;
+      }
+    }
+    return { c, colo, R, rentAF, rentUAC, mejor, esOptima, diffCLP, diffPct };
+  });
+
+  // Peores primero (mayor pérdida arriba), luego óptimos
+  FILAS.sort((a,b)=>{
+    const da = (a.diffCLP==null)? 1 : a.diffCLP;
+    const db = (b.diffCLP==null)? 1 : b.diffCLP;
+    return da - db;
+  });
+
+  render();
+}
+
+function render(){
+  // Stats
+  const comparables = FILAS.filter(f => f.esOptima!==null);
+  const optimos = comparables.filter(f => f.esOptima).length;
+  const subop   = comparables.filter(f => !f.esOptima);
+  const lucroCesante = subop.reduce((s,f)=> s + Math.abs(f.diffCLP||0), 0);
+  const rentTotal = FILAS.reduce((s,f)=> s + (f.R ? (f.colo==='AF'?f.rentAF: f.colo==='UAC'?f.rentUAC : Math.max(f.rentAF,f.rentUAC)) : 0), 0);
+
+  document.getElementById('stats').innerHTML = `
+    <div class="stat-card" style="--ac:#0141A2"><div class="lbl">Créditos otorgados</div><div class="val">${FILAS.length.toLocaleString('es-CL')}</div><div class="sub">en el mes seleccionado</div></div>
+    <div class="stat-card" style="--ac:#059669"><div class="lbl">En la más rentable</div><div class="val">${optimos.toLocaleString('es-CL')} / ${comparables.length.toLocaleString('es-CL')}</div><div class="sub">${comparables.length? (optimos/comparables.length*100).toFixed(0):0}% óptimos</div></div>
+    <div class="stat-card" style="--ac:#dc2626"><div class="lbl">Lucro cesante</div><div class="val" style="color:${lucroCesante>0?'#dc2626':'#111827'}">${fmtCLP(lucroCesante)}</div><div class="sub">${subop.length} caso${subop.length===1?'':'s'} subóptimo${subop.length===1?'':'s'}</div></div>
+    <div class="stat-card" style="--ac:#10b981"><div class="lbl">Rentab. realizada</div><div class="val">${fmtCLP(rentTotal)}</div><div class="sub">según financiera colocada</div></div>`;
+
+  // Tabla
+  const tb = document.getElementById('tbody');
+  if(!FILAS.length){
+    tb.innerHTML = '<tr><td colspan="10" class="empty"><i class="bi bi-inbox" style="font-size:1.6rem;display:block;margin-bottom:6px;opacity:.4"></i>Sin créditos otorgados en este mes.</td></tr>';
+    return;
+  }
+  tb.innerHTML = FILAS.map(f=>{
+    const c=f.c;
+    const finLbl = { AF:'AutoFin', UAC:'Unidad de Crédito', AFAC:'AutoFácil (propia)' }[f.colo] || (c.financiera||'—');
+    const finCls = { AF:'fin-AF', UAC:'fin-UAC', AFAC:'fin-AFAC' }[f.colo] || '';
+    if(!f.R){
+      return `<tr>
+        <td><b>${escH(c.numero_credito||c.num_op||'—')}</b></td>
+        <td>${escH(c.nombre_cliente||'')}</td>
+        <td>${escH(c.ejecutivo||'')}</td>
+        <td><span class="fin-badge ${finCls}">${escH(finLbl)}</span></td>
+        <td class="num chip-na" colspan="6">Datos incompletos (precio/plazo)</td>
+      </tr>`;
+    }
+    const masRent = f.mejor==='AF' ? 'AutoFin' : 'Unidad de Crédito';
+    let masRentCell, diffCell, pctCell;
+    if (f.colo==='AFAC'){
+      masRentCell = `<span class="chip-na">referencial: ${masRent}</span>`;
+      diffCell = '<span class="chip-na">—</span>';
+      pctCell  = '<span class="chip-na">cartera propia</span>';
+    } else if (f.esOptima){
+      masRentCell = `<span class="chip-ok"><i class="bi bi-check-circle-fill"></i> Óptima</span>`;
+      diffCell = `<span class="diff-pos">$0</span>`;
+      pctCell  = `<span class="diff-pos">0,0%</span>`;
+    } else {
+      masRentCell = `<span class="star"><i class="bi bi-star-fill"></i></span> ${masRent}`;
+      diffCell = `<span class="diff-neg">${fmtCLP(f.diffCLP)}</span>`;
+      pctCell  = `<span class="diff-neg">${f.diffPct.toFixed(1)}%</span>`;
+    }
+    const afBest  = f.mejor==='AF'  ? 'best' : '';
+    const uacBest = f.mejor==='UAC' ? 'best' : '';
+    return `<tr>
+      <td><b>${escH(c.numero_credito||c.num_op||'—')}</b></td>
+      <td title="${fmtRUT(c.rut_cliente)}">${escH(c.nombre_cliente||'')}</td>
+      <td>${escH(c.ejecutivo||'')}</td>
+      <td><span class="fin-badge ${finCls}">${escH(finLbl)}</span></td>
+      <td class="num">${fmtCLP(f.R.monto_fin)}</td>
+      <td class="num rentcell ${afBest}" style="color:${f.rentAF>=0?'#166534':'#dc2626'}">${fmtCLP(f.rentAF)}</td>
+      <td class="num rentcell ${uacBest}" style="color:${f.rentUAC>=0?'#166534':'#dc2626'}">${fmtCLP(f.rentUAC)}</td>
+      <td>${masRentCell}</td>
+      <td class="num">${diffCell}</td>
+      <td class="num">${pctCell}</td>
+    </tr>`;
+  }).join('');
+}
+
+/* ── Exportar CSV / Excel ─────────────────────────── */
+function exportarCSV(){
+  if(!FILAS.length){ alert('Sin datos para exportar.'); return; }
+  const mes = document.getElementById('mesSel').value;
+  const head = ['N° Operación','RUT','Cliente','Ejecutivo','Colocada en','Monto Financiado',
+                'Rentab. AutoFin','Rentab. UAC','Más rentable','Óptima','Δ vs óptima ($)','% diferencia'];
+  const q = s => `"${String(s??'').replace(/"/g,'""')}"`;
+  const rows = FILAS.map(f=>{
+    const c=f.c;
+    const finLbl = { AF:'AutoFin', UAC:'Unidad de Crédito', AFAC:'AutoFácil (propia)' }[f.colo] || (c.financiera||'');
+    if(!f.R) return [c.numero_credito||c.num_op||'', c.rut_cliente||'', c.nombre_cliente||'', c.ejecutivo||'', finLbl,'','','','','','',''].map(q).join(';');
+    const masRent = f.mejor==='AF' ? 'AutoFin' : 'Unidad de Crédito';
+    const optima = f.colo==='AFAC' ? 'cartera propia' : (f.esOptima ? 'Sí' : 'No');
+    return [
+      c.numero_credito||c.num_op||'', c.rut_cliente||'', c.nombre_cliente||'', c.ejecutivo||'', finLbl,
+      Math.round(f.R.monto_fin), Math.round(f.rentAF), Math.round(f.rentUAC),
+      masRent, optima,
+      f.diffCLP==null?'':Math.round(f.diffCLP),
+      f.diffPct==null?'':f.diffPct.toFixed(1)+'%'
+    ].map(q).join(';');
+  });
+  const csv = '﻿' + [head.map(q).join(';'), ...rows].join('\r\n');
+  const blob = new Blob([csv],{type:'text/csv;charset=utf-8;'});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href=url; a.download=`rentabilidad_creditos_${mes}.csv`;
+  document.body.appendChild(a); a.click(); document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+}
+</script>
+<script src="/js/app-version.js"></script>
+</body>
+</html>
