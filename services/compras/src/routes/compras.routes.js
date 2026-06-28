@@ -27,4 +27,12 @@ router.delete('/direcciones/:id',verifyToken, mant, c.direccionEliminar);
 router.get('/usuarios-config',   verifyToken, mant, c.usuariosConfig);
 router.put('/usuarios-config/:id', verifyToken, mant, c.usuarioConfigSet);
 
+// ── Página del usuario (Compras) — cualquiera con permiso de compras ──
+const usar = requireFunc('compras', 'compras_admin', 'compras_mant');
+router.get('/articulos',      verifyToken, usar, c.misArticulos);
+router.get('/mis-categorias', verifyToken, usar, c.misCategorias);
+router.get('/mi-config',      verifyToken, usar, c.miConfig);
+router.post('/pedidos',       verifyToken, usar, c.crearPedido);
+router.get('/mis-pedidos',    verifyToken, usar, c.misPedidos);
+
 module.exports = router;

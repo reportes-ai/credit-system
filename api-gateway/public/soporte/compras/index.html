@@ -8,31 +8,216 @@
   <link href="/css/bootstrap.min.css" rel="stylesheet">
   <link href="/css/bootstrap-icons.css" rel="stylesheet">
   <style>
-    body { background: #f0f4f8; font-family: 'Segoe UI', system-ui, sans-serif; margin: 0; }
-    .topnav { background: linear-gradient(90deg, #012d70, #0255c5); color: #fff; height: 60px; padding: 0 24px; display: flex; align-items: center; justify-content: space-between; }
-    .topnav a { color: rgba(255,255,255,0.85); text-decoration: none; }
-    .main { max-width: 900px; margin: 60px auto; padding: 0 20px; text-align: center; }
-    .card-soon { background: #fff; border-radius: 16px; padding: 48px; box-shadow: 0 1px 6px rgba(0,0,0,0.08); }
-    .card-soon i { font-size: 3.4rem; color: #155e75; }
-    .card-soon h2 { margin: 16px 0 8px; color: #111827; }
-    .card-soon p { color: #6b7280; }
-    .btn-volver { display:inline-block; margin-top:18px; background:#0141A2; color:#fff; border-radius:8px; padding:8px 18px; text-decoration:none; font-weight:600; }
+    :root { --navy:#0141A2; --navy-dark:#012d70; --navy-light:#0255c5; --accent:#009AFE; --bg:#f0f4f8; }
+    body { background:var(--bg); font-family:'Segoe UI', system-ui, sans-serif; margin:0; }
+    .topnav { background:linear-gradient(90deg,var(--navy-dark),var(--navy-light)); color:#fff; height:60px; padding:0 24px; display:flex; align-items:center; justify-content:space-between; position:sticky; top:0; z-index:200; }
+    .topnav-brand { display:flex; align-items:center; gap:8px; text-decoration:none; }
+    .topnav-brand img { height:34px; filter:brightness(0) invert(1); }
+    .version-badge { background:rgba(255,255,255,0.15); color:rgba(255,255,255,0.75); font-size:0.65rem; font-weight:700; border-radius:6px; padding:2px 8px; }
+    .breadcrumb-nav { color:rgba(255,255,255,0.6); font-size:0.85rem; display:flex; align-items:center; gap:6px; }
+    .breadcrumb-nav a { color:rgba(255,255,255,0.75); text-decoration:none; }
+    .breadcrumb-nav .sep { color:rgba(255,255,255,0.35); }
+    .btn-logout { background:rgba(255,255,255,0.1); border:1px solid rgba(255,255,255,0.2); color:#fff; border-radius:8px; padding:5px 12px; font-size:0.82rem; cursor:pointer; }
+    .wrap { max-width:1400px; margin:0 auto; padding:22px 28px; display:flex; gap:22px; align-items:flex-start; }
+    .col-cat { flex:1; min-width:0; }
+    .col-cart { width:340px; flex-shrink:0; position:sticky; top:80px; }
+    .banner { background:linear-gradient(135deg,#134e4a,#155e75 50%,#0891b2); border-radius:14px; color:#fff; padding:18px 24px; margin-bottom:18px; display:flex; align-items:center; gap:14px; }
+    .banner i { font-size:2rem; opacity:.85; }
+    .banner h2 { font-weight:700; margin:0; font-size:1.15rem; }
+    .banner p { opacity:.85; margin:0; font-size:.82rem; }
+    .toolbar { display:flex; gap:10px; flex-wrap:wrap; align-items:center; margin-bottom:16px; }
+    .toolbar input, .toolbar select { border:1px solid #cbd5e1; border-radius:8px; padding:8px 11px; font-size:.88rem; }
+    .grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(200px,1fr)); gap:14px; }
+    .art { background:#fff; border-radius:12px; padding:12px; box-shadow:0 1px 4px rgba(0,0,0,.06); display:flex; flex-direction:column; }
+    .art .img { height:120px; display:flex; align-items:center; justify-content:center; background:#f8fafc; border-radius:8px; margin-bottom:10px; overflow:hidden; }
+    .art .img img { max-height:118px; max-width:100%; object-fit:contain; }
+    .art .img i { font-size:2.4rem; color:#cbd5e1; }
+    .art .nom { font-size:.82rem; font-weight:600; color:#1e293b; line-height:1.3; min-height:2.6em; display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden; }
+    .art .marca { font-size:.72rem; color:#94a3b8; margin:2px 0 6px; }
+    .art .precio { font-weight:700; color:#0f766e; font-size:1rem; }
+    .art .add { display:flex; gap:6px; align-items:center; margin-top:8px; }
+    .art .add input { width:54px; text-align:center; border:1px solid #cbd5e1; border-radius:7px; padding:5px; font-size:.85rem; }
+    .art .add button { flex:1; }
+    .cart { background:#fff; border-radius:14px; box-shadow:0 2px 10px rgba(0,0,0,.08); overflow:hidden; }
+    .cart-head { background:#0f172a; color:#fff; padding:12px 16px; font-weight:700; display:flex; align-items:center; gap:8px; }
+    .cart-body { padding:14px 16px; max-height:46vh; overflow:auto; }
+    .ci { display:flex; gap:8px; align-items:center; padding:7px 0; border-bottom:1px solid #f1f5f9; }
+    .ci .n { flex:1; font-size:.8rem; color:#1e293b; }
+    .ci input { width:48px; text-align:center; border:1px solid #cbd5e1; border-radius:6px; padding:3px; font-size:.8rem; }
+    .ci .x { border:none; background:none; color:#dc2626; cursor:pointer; }
+    .cart-foot { padding:14px 16px; border-top:1px solid #e5e7eb; }
+    .cart-foot label { font-size:.78rem; font-weight:600; color:#475569; margin-bottom:3px; display:block; }
+    .cart-foot select, .cart-foot textarea { width:100%; box-sizing:border-box; border:1px solid #cbd5e1; border-radius:8px; padding:7px 9px; font-size:.85rem; margin-bottom:10px; }
+    .total { display:flex; justify-content:space-between; font-weight:800; font-size:1.05rem; color:#0f172a; margin-bottom:10px; }
+    .muted { color:#94a3b8; }
+    .cc-chip { background:#e0f2fe; color:#075985; border-radius:8px; padding:2px 8px; font-size:.72rem; font-weight:600; }
+    @media (max-width:920px){ .wrap{flex-direction:column} .col-cart{width:100%;position:static} }
   </style>
 </head>
 <body>
   <nav class="topnav">
-    <a href="/soporte/"><img src="/img/logo.png" style="height:32px;filter:brightness(0) invert(1)"></a>
-    <a href="/soporte/"><i class="bi bi-arrow-left me-1"></i>Volver a Soporte</a>
+    <div style="display:flex;align-items:center;gap:16px">
+      <a href="/" class="topnav-brand"><img src="/img/logo.png" alt="AutoFácil"><span class="version-badge" id="versionBadge"></span></a>
+      <div class="breadcrumb-nav"><a href="/">Inicio</a><span class="sep">›</span><a href="/soporte/">Soporte</a><span class="sep">›</span><span style="color:#fff;font-weight:600"><i class="bi bi-bag me-1"></i>Compras</span></div>
+    </div>
+    <div style="display:flex;align-items:center;gap:10px">
+      <button class="btn-logout" onclick="verPedidos()"><i class="bi bi-receipt me-1"></i>Mis pedidos</button>
+      <button class="btn-logout" onclick="logout()"><i class="bi bi-box-arrow-right me-1"></i>Salir</button>
+    </div>
   </nav>
-  <div class="main">
-    <div class="card-soon">
-      <i class="bi bi-bag"></i>
-      <h2>Compras de Oficina</h2>
-      <p>Esta pantalla estará disponible muy pronto: aquí podrás elegir tus artículos, la cantidad y la dirección de despacho.</p>
-      <p class="text-muted" style="font-size:.85rem">Mientras tanto, el administrador está configurando el catálogo desde <b>Mantenedores › Mantenedor Compras</b>.</p>
-      <a class="btn-volver" href="/soporte/">Volver</a>
+
+  <div class="wrap">
+    <div class="col-cat">
+      <div class="banner"><i class="bi bi-bag"></i><div><h2>Compras de Oficina</h2><p>Elige tus artículos, la cantidad y la dirección de despacho</p></div></div>
+      <div class="toolbar">
+        <input type="text" id="q" placeholder="Buscar artículo…" style="flex:1;min-width:200px" onkeydown="if(event.key==='Enter')buscar(0)">
+        <select id="cat" onchange="buscar(0)"><option value="">Todas las categorías</option></select>
+        <button class="btn btn-primary btn-sm" onclick="buscar(0)"><i class="bi bi-search"></i></button>
+      </div>
+      <div class="grid" id="grid"><p class="muted" style="grid-column:1/-1">Cargando…</p></div>
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-top:16px">
+        <button class="btn btn-sm btn-outline-secondary" id="btnPrev" onclick="paginar(-1)">‹ Anterior</button>
+        <span class="muted" id="pagInfo"></span>
+        <button class="btn btn-sm btn-outline-secondary" id="btnNext" onclick="paginar(1)">Siguiente ›</button>
+      </div>
+    </div>
+
+    <div class="col-cart">
+      <div class="cart">
+        <div class="cart-head"><i class="bi bi-cart3"></i> Tu pedido <span id="cartN" style="margin-left:auto;background:#155e75;border-radius:20px;padding:1px 9px;font-size:.8rem">0</span></div>
+        <div class="cart-body" id="cartBody"><p class="muted" style="font-size:.85rem">Tu carrito está vacío.</p></div>
+        <div class="cart-foot">
+          <div class="total"><span>Total</span><span id="cartTotal">$0</span></div>
+          <label>Dirección de despacho <span id="ccWrap"></span></label>
+          <select id="selDir"></select>
+          <label>Observación (opcional)</label>
+          <textarea id="obs" rows="2" placeholder="Notas para quien compra…"></textarea>
+          <button class="btn btn-success w-100" id="btnEnviar" onclick="enviar()"><i class="bi bi-send me-1"></i>Enviar pedido</button>
+        </div>
+      </div>
     </div>
   </div>
+
+  <dialog id="dlgPed" style="border:none;border-radius:14px;padding:0;width:600px;max-width:94vw">
+    <div style="padding:20px">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
+        <h5 style="font-weight:700;margin:0"><i class="bi bi-receipt me-1"></i>Mis pedidos</h5>
+        <button class="btn btn-sm btn-light" onclick="document.getElementById('dlgPed').close()">✕</button>
+      </div>
+      <div id="pedList" style="max-height:60vh;overflow:auto"></div>
+    </div>
+  </dialog>
+
+  <script>
+    const token = sessionStorage.getItem('token');
+    const yo = JSON.parse(sessionStorage.getItem('usuario') || 'null');
+    if (!token || !yo) window.location.href = '/login.html';
+    function logout(){ sessionStorage.clear(); window.location.href='/login.html'; }
+    const fmt = n => '$' + Number(n||0).toLocaleString('es-CL',{maximumFractionDigits:0});
+    const esc = s => String(s==null?'':s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+    async function api(ruta, opts={}) {
+      const headers = { 'Content-Type':'application/json', Authorization:'Bearer '+token, ...(opts.headers||{}) };
+      const res = await fetch(ruta, { ...opts, headers });
+      if (res.status === 401) { logout(); return null; }
+      return res.json();
+    }
+    function toast(msg, ok=true){ const d=document.createElement('div'); d.textContent=msg; d.style.cssText=`position:fixed;top:74px;right:20px;z-index:9999;background:${ok?'#16a34a':'#dc2626'};color:#fff;padding:10px 16px;border-radius:8px;box-shadow:0 6px 20px rgba(0,0,0,.25);font-size:.88rem`; document.body.appendChild(d); setTimeout(()=>d.remove(),3200); }
+
+    const CART = {};                 // id → {id,nombre,precio,sku,cantidad}
+    let off=0, lim=60, tot=0, rows=[];
+
+    async function init() {
+      const jc = await api('/api/compras/mis-categorias');
+      if (jc?.success) document.getElementById('cat').innerHTML = '<option value="">Todas las categorías</option>' + jc.data.map(c=>`<option value="${esc(c.categoria)}">${esc(c.categoria)} (${c.n})</option>`).join('');
+      const jm = await api('/api/compras/mi-config');
+      if (jm?.success) {
+        const dirs = jm.data.direcciones||[];
+        document.getElementById('selDir').innerHTML = '<option value="">— elige dirección —</option>' + dirs.map(d=>`<option value="${d.id}" ${jm.data.id_direccion==d.id?'selected':''}>${esc(d.nombre)}${d.es_casa_matriz?' (Casa Matriz)':''}</option>`).join('');
+        if (jm.data.centro_costo) document.getElementById('ccWrap').innerHTML = `<span class="cc-chip">CC: ${esc(jm.data.centro_costo)}</span>`;
+      }
+      buscar(0);
+    }
+    async function buscar(offset) {
+      off = offset;
+      const q = encodeURIComponent(document.getElementById('q').value.trim());
+      const cat = encodeURIComponent(document.getElementById('cat').value);
+      const j = await api(`/api/compras/articulos?q=${q}&categoria=${cat}&limit=${lim}&offset=${off}`);
+      const grid = document.getElementById('grid');
+      if (!j?.success) { grid.innerHTML='<p class="text-danger" style="grid-column:1/-1">Error al cargar.</p>'; return; }
+      tot = j.data.total; rows = j.data.items;
+      grid.innerHTML = rows.length ? rows.map(a => `
+        <div class="art">
+          <div class="img">${a.imagen?`<img src="${esc(a.imagen)}" onerror="this.parentNode.innerHTML='&lt;i class=bi bi-box-seam&gt;&lt;/i&gt;'">`:'<i class="bi bi-box-seam"></i>'}</div>
+          <div class="nom" title="${esc(a.nombre)}">${esc(a.nombre)}</div>
+          <div class="marca">${esc(a.marca||'')}</div>
+          <div class="precio">${fmt(a.precio)}</div>
+          <div class="add">
+            <input type="number" min="1" value="1" id="qty_${a.id}">
+            <button class="btn btn-sm btn-primary" onclick="add(${a.id})">Agregar</button>
+          </div>
+        </div>`).join('')
+        : '<p class="muted" style="grid-column:1/-1">No hay artículos disponibles para tu perfil todavía.</p>';
+      const desde = tot?off+1:0, hasta = Math.min(off+lim, tot);
+      document.getElementById('pagInfo').textContent = `${desde}–${hasta} de ${tot.toLocaleString('es-CL')}`;
+      document.getElementById('btnPrev').disabled = off<=0;
+      document.getElementById('btnNext').disabled = hasta>=tot;
+    }
+    function paginar(d){ const n=off+d*lim; if(n>=0&&n<tot) buscar(n); }
+
+    function add(id) {
+      const a = rows.find(x=>x.id===id); if(!a) return;
+      const qty = Math.max(1, parseInt(document.getElementById('qty_'+id).value,10)||1);
+      CART[id] = { id:a.id, nombre:a.nombre, precio:Number(a.precio), sku:a.sku, cantidad:(CART[id]?.cantidad||0)+qty };
+      renderCart(); toast('Agregado al pedido');
+    }
+    function setQty(id, v){ const c=CART[id]; if(!c) return; const n=parseInt(v,10); if(n>=1){ c.cantidad=n; } renderCart(); }
+    function quitar(id){ delete CART[id]; renderCart(); }
+    function renderCart() {
+      const items = Object.values(CART);
+      document.getElementById('cartN').textContent = items.length;
+      const body = document.getElementById('cartBody');
+      body.innerHTML = items.length ? items.map(c => `
+        <div class="ci">
+          <input type="number" min="1" value="${c.cantidad}" onchange="setQty(${c.id}, this.value)">
+          <div class="n">${esc(c.nombre)}<br><span class="muted" style="font-size:.74rem">${fmt(c.precio)} c/u → <b>${fmt(c.precio*c.cantidad)}</b></span></div>
+          <button class="x" onclick="quitar(${c.id})"><i class="bi bi-trash"></i></button>
+        </div>`).join('') : '<p class="muted" style="font-size:.85rem">Tu carrito está vacío.</p>';
+      document.getElementById('cartTotal').textContent = fmt(items.reduce((s,c)=>s+c.precio*c.cantidad,0));
+    }
+    async function enviar() {
+      const items = Object.values(CART);
+      if (!items.length) { toast('Tu carrito está vacío', false); return; }
+      const idDir = document.getElementById('selDir').value;
+      if (!idDir) { toast('Elige una dirección de despacho', false); return; }
+      const b = document.getElementById('btnEnviar'); b.disabled=true; b.innerHTML='<span class="spinner-border spinner-border-sm me-1"></span>Enviando…';
+      const j = await api('/api/compras/pedidos', { method:'POST', body: JSON.stringify({
+        items: items.map(c=>({ id_articulo:c.id, cantidad:c.cantidad })),
+        id_direccion: +idDir,
+        observacion: document.getElementById('obs').value.trim(),
+      }) });
+      b.disabled=false; b.innerHTML='<i class="bi bi-send me-1"></i>Enviar pedido';
+      if (j?.success) { for (const k in CART) delete CART[k]; renderCart(); document.getElementById('obs').value=''; toast(`Pedido #${j.data.id} enviado (${fmt(j.data.total)})`); }
+      else toast(j?.error||'No se pudo enviar', false);
+    }
+
+    async function verPedidos() {
+      const j = await api('/api/compras/mis-pedidos');
+      const cont = document.getElementById('pedList');
+      const E = { PENDIENTE:'#f59e0b', CONSOLIDADO:'#0891b2', COMPRADO:'#2563eb', RECIBIDO:'#16a34a', ANULADO:'#94a3b8' };
+      cont.innerHTML = (j?.success && j.data.length) ? j.data.map(p => `
+        <div style="border:1px solid #e5e7eb;border-radius:10px;padding:12px;margin-bottom:10px">
+          <div style="display:flex;justify-content:space-between;align-items:center">
+            <b>Pedido #${p.id}</b>
+            <span style="background:${E[p.estado]||'#64748b'};color:#fff;border-radius:10px;padding:1px 9px;font-size:.72rem;font-weight:700">${esc(p.estado)}</span>
+          </div>
+          <div class="muted" style="font-size:.78rem">${new Date(p.fecha).toLocaleString('es-CL')} · ${esc(p.direccion||'sin dirección')} · <b>${fmt(p.total)}</b></div>
+          <ul style="margin:6px 0 0;padding-left:18px;font-size:.8rem;color:#475569">${(p.items||[]).map(it=>`<li>${it.cantidad}× ${esc(it.nombre)} — ${fmt(it.subtotal)}</li>`).join('')}</ul>
+        </div>`).join('') : '<p class="muted">Aún no tienes pedidos.</p>';
+      document.getElementById('dlgPed').showModal();
+    }
+
+    init();
+  </script>
   <script src="/js/app-version.js"></script>
 </body>
 </html>

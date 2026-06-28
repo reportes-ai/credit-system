@@ -297,9 +297,131 @@ const usuarioConfigSet = async (req, res) => {
   } catch (e) { err(res, e); }
 };
 
+/* ════════════ USUARIO (página de Compras) ════════════ */
+
+// Perfil del usuario logueado (para filtrar su catálogo)
+async function perfilDe(uid) {
+  const [[u]] = await pool.query('SELECT id_perfil FROM usuarios WHERE id_usuario=? LIMIT 1', [uid]);
+  return u ? u.id_perfil : null;
+}
+
+// GET /api/compras/articulos?q=&categoria=&limit=&offset= → solo los asignados al perfil del usuario
+const misArticulos = async (req, res) => {
+  try {
+    const idp = await perfilDe(req.usuario.id_usuario);
+    if (!idp) return res.json({ success: true, data: { items: [], total: 0 }, error: null });
+    const q = String(req.query.q || '').trim();
+    const cat = String(req.query.categoria || '').trim();
+    const limit = Math.min(parseInt(req.query.limit, 10) || 60, 200);
+    const offset = parseInt(req.query.offset, 10) || 0;
+    const where = ['a.activo=1', 'ap.id_perfil=?'], args = [idp];
+    if (q) { where.push('(a.nombre LIKE ? OR a.marca LIKE ? OR a.sku LIKE ?)'); args.push(`%${q}%`, `%${q}%`, `%${q}%`); }
+    if (cat) { where.push('a.categoria LIKE ?'); args.push(`${cat}%`); }
+    const w = 'WHERE ' + where.join(' AND ');
+    const [[{ total }]] = await pool.query(
+      `SELECT COUNT(*) total FROM compras_articulos a JOIN compras_articulo_perfil ap ON ap.id_articulo=a.id ${w}`, args);
+    const [rows] = await pool.query(
+      `SELECT a.id, a.sku, a.nombre, a.marca, a.categoria, a.precio, a.stock, a.imagen
+       FROM compras_articulos a JOIN compras_articulo_perfil ap ON ap.id_articulo=a.id
+       ${w} ORDER BY a.nombre LIMIT ? OFFSET ?`, [...args, limit, offset]);
+    res.json({ success: true, data: { items: rows, total }, error: null });
+  } catch (e) { err(res, e); }
+};
+
+// GET /api/compras/mis-categorias → categorías del catálogo del perfil del usuario
+const misCategorias = async (req, res) => {
+  try {
+    const idp = await perfilDe(req.usuario.id_usuario);
+    if (!idp) return res.json({ success: true, data: [], error: null });
+    const [rows] = await pool.query(
+      `SELECT SUBSTRING_INDEX(a.categoria,'/',1) cat, COUNT(*) n
+       FROM compras_articulos a JOIN compras_articulo_perfil ap ON ap.id_articulo=a.id
+       WHERE a.activo=1 AND ap.id_perfil=? AND a.categoria<>'' GROUP BY cat ORDER BY cat`, [idp]);
+    res.json({ success: true, data: rows.map(r => ({ categoria: r.cat, n: r.n })), error: null });
+  } catch (e) { err(res, e); }
+};
+
+// GET /api/compras/mi-config → dirección asignada + centro de costo + direcciones activas (para el selector)
+const miConfig = async (req, res) => {
+  try {
+    const uid = req.usuario.id_usuario;
+    const [[cfg]] = await pool.query('SELECT id_direccion, centro_costo FROM compras_usuario_config WHERE id_usuario=? LIMIT 1', [uid]);
+    const [direcciones] = await pool.query('SELECT id, nombre, es_casa_matriz FROM compras_direcciones WHERE activo=1 ORDER BY es_casa_matriz DESC, orden, nombre');
+    res.json({ success: true, data: { id_direccion: cfg?.id_direccion ?? null, centro_costo: cfg?.centro_costo ?? null, direcciones }, error: null });
+  } catch (e) { err(res, e); }
+};
+
+// POST /api/compras/pedidos { items:[{id_articulo, cantidad}], id_direccion, observacion }
+const crearPedido = async (req, res) => {
+  try {
+    const uid = req.usuario.id_usuario;
+    const obs = String(req.body.observacion || '').trim().slice(0, 500) || null;
+    let idDir = num(req.body.id_direccion);
+    const [[u]] = await pool.query(
+      `SELECT u.id_perfil, TRIM(CONCAT(u.nombre,' ',u.apellido)) AS nombre, cfg.id_direccion AS cfgDir, cfg.centro_costo
+       FROM usuarios u LEFT JOIN compras_usuario_config cfg ON cfg.id_usuario=u.id_usuario WHERE u.id_usuario=? LIMIT 1`, [uid]);
+    if (!u) return res.status(400).json({ success: false, data: null, error: 'Usuario no encontrado' });
+    if (!idDir) idDir = u.cfgDir || null;
+    if (!idDir) return res.status(400).json({ success: false, data: null, error: 'Elige una dirección de despacho' });
+    const [[d]] = await pool.query('SELECT id FROM compras_direcciones WHERE id=? AND activo=1 LIMIT 1', [idDir]);
+    if (!d) return res.status(400).json({ success: false, data: null, error: 'Dirección de despacho inválida' });
+
+    // Consolida cantidades por artículo (defensivo)
+    const want = new Map();
+    for (const it of (Array.isArray(req.body.items) ? req.body.items : [])) {
+      const id = num(it.id_articulo), c = num(it.cantidad);
+      if (id && c > 0) want.set(id, (want.get(id) || 0) + c);
+    }
+    if (!want.size) return res.status(400).json({ success: false, data: null, error: 'Agrega al menos un artículo' });
+
+    // Solo artículos permitidos al perfil del usuario; precio SIEMPRE del servidor
+    const [arts] = await pool.query(
+      `SELECT a.id, a.sku, a.nombre, a.precio FROM compras_articulos a
+       JOIN compras_articulo_perfil ap ON ap.id_articulo=a.id
+       WHERE a.activo=1 AND ap.id_perfil=? AND a.id IN (?)`, [u.id_perfil, [...want.keys()]]);
+    if (!arts.length) return res.status(400).json({ success: false, data: null, error: 'Ninguno de los artículos está disponible para tu perfil' });
+
+    let total = 0; const filas = [];
+    for (const a of arts) {
+      const c = want.get(a.id); const sub = Number(a.precio) * c; total += sub;
+      filas.push([a.id, a.sku, a.nombre, a.precio, c, sub]);
+    }
+    const [r] = await pool.query(
+      `INSERT INTO compras_pedidos (id_usuario, usuario_nombre, id_direccion, centro_costo, estado, total, observacion)
+       VALUES (?,?,?,?,'PENDIENTE',?,?)`, [uid, u.nombre, idDir, u.centro_costo || null, total, obs]);
+    const pid = r.insertId;
+    await pool.query(
+      'INSERT INTO compras_pedido_items (id_pedido, id_articulo, sku, nombre, precio_unit, cantidad, subtotal) VALUES ?',
+      [filas.map(f => [pid, ...f])]);
+    auditar({ req, accion: 'CREAR', modulo: 'compras', entidad: 'pedido', entidad_id: pid, detalle: `Pedido de compra #${pid}: ${filas.length} ítem(s), total $${total}`, meta: { items: filas.length, total, id_direccion: idDir } });
+    res.status(201).json({ success: true, data: { id: pid, total, items: filas.length }, error: null });
+  } catch (e) { err(res, e); }
+};
+
+// GET /api/compras/mis-pedidos → historial del usuario (cabecera + ítems)
+const misPedidos = async (req, res) => {
+  try {
+    const uid = req.usuario.id_usuario;
+    const [peds] = await pool.query(
+      `SELECT p.id, p.estado, p.total, p.observacion, p.fecha, d.nombre AS direccion
+       FROM compras_pedidos p LEFT JOIN compras_direcciones d ON d.id=p.id_direccion
+       WHERE p.id_usuario=? ORDER BY p.fecha DESC LIMIT 100`, [uid]);
+    if (peds.length) {
+      const [its] = await pool.query(
+        'SELECT id_pedido, nombre, precio_unit, cantidad, subtotal FROM compras_pedido_items WHERE id_pedido IN (?)',
+        [peds.map(p => p.id)]);
+      const byPed = {};
+      for (const it of its) (byPed[it.id_pedido] = byPed[it.id_pedido] || []).push(it);
+      peds.forEach(p => { p.items = byPed[p.id] || []; });
+    }
+    res.json({ success: true, data: peds, error: null });
+  } catch (e) { err(res, e); }
+};
+
 module.exports = {
   catalogo, categorias, sincronizar,
   perfiles, articuloPerfilGet, articuloPerfilSet,
   direccionesList, direccionCrear, direccionEditar, direccionEliminar,
   usuariosConfig, usuarioConfigSet,
+  misArticulos, misCategorias, miConfig, crearPedido, misPedidos,
 };
