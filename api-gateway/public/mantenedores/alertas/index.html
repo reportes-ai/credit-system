@@ -5,7 +5,7 @@
   <link rel="icon" href="/img/favicon.png" type="image/png">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Alertas — Mantenedor — AutoFácil</title>
-  <!-- v1.6 — Guardar por defecto en Comunicado -->
+  <!-- v1.7 — Avisos popup de inicio parametrizables (activar/desactivar + días) -->
   <link href="/css/bootstrap.min.css" rel="stylesheet">
   <link href="/css/bootstrap-icons.css" rel="stylesheet">
   <style>
@@ -116,6 +116,24 @@
     </table>
   </div>
 
+  <!-- Avisos al iniciar sesión (popup "Datos próximos a vencer") -->
+  <div class="head-row" style="margin-top:26px">
+    <div>
+      <h5 style="font-weight:800;color:var(--navy);margin:0"><i class="bi bi-window-stack me-2"></i>Avisos al iniciar sesión (popup)</h5>
+      <span style="font-size:.82rem;color:#64748b">Recuadro que aparece al conectarse cuando hay datos por vencer o un problema de sincronización automática. Actívalos/desactívalos y fija con cuántos días de anticipación o atraso avisar.</span>
+    </div>
+  </div>
+  <div class="card-af">
+    <table>
+      <thead><tr><th>Aviso</th><th style="width:140px">Días</th><th style="width:90px">Activo</th></tr></thead>
+      <tbody id="bodyVenc"><tr><td colspan="3" style="text-align:center;color:#94a3b8;padding:24px">Cargando…</td></tr></tbody>
+    </table>
+    <div style="display:flex;justify-content:flex-end;gap:12px;align-items:center;margin-top:12px">
+      <span id="vcMsg" style="font-size:.84rem"></span>
+      <button class="btn-af" onclick="vcGuardar()"><i class="bi bi-check-lg me-1"></i>Guardar avisos</button>
+    </div>
+  </div>
+
   <!-- Eventos de Pago (Post Venta) — event-driven, se disparan al ocurrir cada paso -->
   <div class="head-row" style="margin-top:26px">
     <div>
@@ -180,6 +198,7 @@
     <div style="font-weight:800;color:var(--navy);margin-bottom:8px"><i class="bi bi-diagram-3 me-2"></i>Qué afecta este mantenedor</div>
     <ul style="margin:0;padding-left:18px;font-size:.83rem;color:#475569;line-height:1.7">
       <li><b>Reglas de alerta</b> → generan notificaciones en la <b>campana</b> de todas las páginas cuando un registro cumple la condición (cartas en el pool, saldos sin pagar, fichas de dealer, <b>cartola emitida</b>, etc.). Se evalúan cada 60s.</li>
+      <li><b>Avisos al iniciar sesión (popup)</b> → controlan el recuadro <a href="/mantenedores/uf/">«Datos próximos a vencer»</a> que aparece al conectarse (UF/UTM desactualizadas, <a href="/mantenedores/tasas/">tasas</a> vencidas o por vencer, y problemas de sincronización automática de indicadores). Cada aviso se puede apagar y, donde aplica, fijar con cuántos días de anticipación o atraso avisar.</li>
       <li><b>Prioridad «Alta»</b> → pone la campana <span style="color:#dc2626;font-weight:700">roja y vibrando</span> + sonido insistente (configurable por regla).</li>
       <li><b>Destino</b> → perfiles que reciben el aviso; <b>CREADOR</b> = quien creó el registro; <b>TODOS</b> = todos los usuarios.</li>
       <li><b>Eventos de Pago — Post Venta</b> → avisos del flujo de <a href="/postventa/saldos-a-pagar/">Saldos a Pagar</a> y <a href="/postventa/comisiones-a-pagar/">Comisiones a Pagar</a> (fondos cargados, enviado a pago, orden emitida, pago). Editarlos aquí también los cambia en la configuración de Post Venta (misma fuente).</li>
@@ -597,6 +616,39 @@ async function coDesactivar(id){
   await fetch('/api/alertas/comunicados/'+id,{method:'DELETE',headers:H}); cargarComunicados();
 }
 cargarComunicados();
+
+/* ── Avisos al iniciar sesión (popup "Datos próximos a vencer") ── */
+let VENC = [];
+async function cargarVenc(){
+  try{
+    const r=await fetch('/api/alertas/venc-config',{headers:H}); const j=await r.json();
+    if(!j.success) throw 0;
+    VENC = j.data||[];
+    renderVenc();
+  }catch(e){ document.getElementById('bodyVenc').innerHTML='<tr><td colspan="3" style="text-align:center;color:#b91c1c;padding:20px">No se pudieron cargar.</td></tr>'; }
+}
+function renderVenc(){
+  const tb=document.getElementById('bodyVenc');
+  if(!VENC.length){ tb.innerHTML='<tr><td colspan="3" style="text-align:center;color:#94a3b8;padding:24px">Sin avisos.</td></tr>'; return; }
+  tb.innerHTML = VENC.map((v,i)=>`<tr>
+    <td><b>${esc(v.nombre)}</b><br><span style="font-size:.74rem;color:#94a3b8">${esc(v.descripcion||'')}</span></td>
+    <td>${v.usa_dias
+        ? `<input type="number" min="0" value="${v.dias_aviso!=null?v.dias_aviso:''}" style="width:70px;display:inline-block" onchange="VENC[${i}].dias_aviso=this.value"> <span style="font-size:.72rem;color:#94a3b8">día(s)</span>`
+        : '<span style="color:#cbd5e1">—</span>'}</td>
+    <td><label class="sw"><input type="checkbox" ${v.activo?'checked':''} onchange="VENC[${i}].activo=this.checked?1:0"><span class="sl"></span></label></td>
+  </tr>`).join('');
+}
+async function vcGuardar(){
+  const msg=document.getElementById('vcMsg');
+  try{
+    const config = VENC.map(v=>({ clave:v.clave, activo:v.activo?1:0, dias_aviso:v.usa_dias?v.dias_aviso:null }));
+    const r=await fetch('/api/alertas/venc-config',{method:'PUT',headers:H,body:JSON.stringify({config})});
+    const j=await r.json(); if(!j.success) throw new Error(j.error||'Error');
+    msg.textContent='Guardado ✓'; msg.style.cssText='font-size:.84rem;color:#15803d';
+    setTimeout(()=>{msg.textContent='';},2500);
+  }catch(e){ msg.textContent=e.message; msg.style.cssText='font-size:.84rem;color:#b91c1c'; }
+}
+cargarVenc();
 </script>
 <script src="/js/app-version.js"></script>
 </body>
