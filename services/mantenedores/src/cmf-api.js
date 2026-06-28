@@ -31,6 +31,9 @@ async function cmfGet(recurso, year, month) {
   const r = await axios.get(url, { timeout: 15000, headers: { Accept: 'application/json' }, validateStatus: () => true });
   const body = r.data;
   if (body && body.CodigoError) { const e = new Error('CMF: ' + (body.Mensaje || ('error ' + body.CodigoError))); e.code = 'CMFERR'; throw e; }
+  // Bloqueo del WAF de la CMF (ej. "Web Page Blocked", HTTP 500/4xx sin CodigoError): NO debe
+  // pasar como "éxito +0" (devolvería lista vacía). Lo convertimos en error para que se vea/reintente.
+  if (r.status < 200 || r.status >= 300) { const e = new Error('CMF HTTP ' + r.status); e.code = 'CMFHTTP'; throw e; }
   // El array viene bajo distintas llaves (UFs, UTMs, Dolares, IPCs, TMCs): tomamos el primer array.
   const arr = (body && typeof body === 'object') ? (Object.values(body).find(v => Array.isArray(v)) || []) : [];
   return arr.map(x => ({

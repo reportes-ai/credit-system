@@ -112,10 +112,7 @@
         <li class="nav-item"><button class="nav-link" data-bs-toggle="tab" data-bs-target="#pane-dolar">Dólar</button></li>
         <li class="nav-item"><button class="nav-link" data-bs-toggle="tab" data-bs-target="#pane-ipc">IPC</button></li>
       </ul>
-      <div style="display:flex;gap:8px;margin-bottom:6px">
-        <button class="btn btn-outline-secondary btn-sm" id="btnDiag" onclick="diagCmf()" title="Diagnóstico CMF (temporal)"><i class="bi bi-bug me-1"></i>Probar CMF</button>
-        <button class="btn btn-outline-primary btn-sm" id="btnSync" onclick="sincronizarWeb()" title="Trae los valores nuevos de UF, UTM, Dólar e IPC y la TMC desde la CMF"><i class="bi bi-cloud-download me-1"></i>Actualizar desde internet</button>
-      </div>
+      <button class="btn btn-outline-primary btn-sm" id="btnSync" onclick="sincronizarWeb()" title="Trae los valores nuevos de UF, UTM, Dólar e IPC y la TMC desde la CMF" style="margin-bottom:6px"><i class="bi bi-cloud-download me-1"></i>Actualizar desde internet</button>
     </div>
 
     <div class="tab-content">
@@ -434,16 +431,6 @@
         else showToast(`${cnt}${tmcMsg ? ' · ' + tmcMsg : ''}`);
         cargar('uf'); cargar('utm'); cargar('dolar'); cargar('ipc'); cargarSync();
       } else showToast(d?.error || 'Error al sincronizar', 'danger');
-    }
-
-    // DIAGNÓSTICO TEMPORAL: muestra la respuesta cruda de la CMF en un popup para verla/screenshot.
-    async function diagCmf() {
-      const d = await api('GET', '/api/uf/diag-cmf');
-      console.log('CMF DIAG', d?.data);
-      const txt = JSON.stringify(d?.data || d, null, 2);
-      const w = window.open('', '_blank', 'popup=yes,width=780,height=840,scrollbars=yes');
-      if (w) { w.document.title = 'Diagnóstico CMF'; w.document.body.innerHTML = '<pre style="white-space:pre-wrap;font:12px/1.45 monospace;padding:16px">' + txt.replace(/[&<>]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;' }[c])) + '</pre>'; }
-      else alert(txt.slice(0, 3000));
     }
 
     // --- Sello "Actualizado automáticamente desde la CMF" por indicador ---
