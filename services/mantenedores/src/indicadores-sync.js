@@ -50,16 +50,25 @@ async function sincronizar(opts = {}) {
     try { out[tab] = await syncTabla(rec, tab, y, m, false); await setEstado('sync_' + tab, ''); await setEstado('sync_' + tab + '_ts', new Date().toISOString()); }
     catch (e) { out[tab] = { error: e.message }; await setEstado('sync_' + tab, eMsg(tab.toUpperCase(), e)); if (e.code !== 'NOCMF') console.error('[indicadores]', tab, e.message); }
   }
-  // Mensuales: UTM e IPC (mes actual + anterior)
+  // Mensuales: UTM e IPC. Se intentan mes ACTUAL y ANTERIOR de forma INDEPENDIENTE:
+  // el IPC del mes en curso casi nunca está publicado (sale ~día 8 del mes siguiente), así
+  // que un fallo del mes actual NO debe impedir cargar el último mes publicado (mes anterior).
   for (const [rec, tab] of [['utm', 'utm'], ['ipc', 'ipc']]) {
-    try {
-      const a = await syncTabla(rec, tab, y, m, true);
-      let b = { nuevos: 0, total: 0 };
-      try { b = await syncTabla(rec, tab, py, pm, true); } catch (_) {}
-      out[tab] = { nuevos: a.nuevos + b.nuevos, total: a.total + b.total };
+    let nuevos = 0, total = 0, ok = false, lastErr = null;
+    for (const [yy, mm] of [[y, m], [py, pm]]) {
+      try { const r = await syncTabla(rec, tab, yy, mm, true); nuevos += r.nuevos; total += r.total; ok = true; }
+      catch (e) { lastErr = e; }
+    }
+    if (ok) {
+      out[tab] = { nuevos, total };
       await setEstado('sync_' + tab, '');
       await setEstado('sync_' + tab + '_ts', new Date().toISOString());
-    } catch (e) { out[tab] = { error: e.message }; await setEstado('sync_' + tab, eMsg(tab.toUpperCase(), e)); if (e.code !== 'NOCMF') console.error('[indicadores]', tab, e.message); }
+    } else {
+      const e = lastErr || new Error('sin datos');
+      out[tab] = { error: e.message };
+      await setEstado('sync_' + tab, eMsg(tab.toUpperCase(), e));
+      if (e.code !== 'NOCMF') console.error('[indicadores]', tab, e.message);
+    }
   }
   // TMC: desde el día 13 y hasta cargar el período del mes
   try {

@@ -426,7 +426,10 @@
       if (d?.success) {
         const t = d.data.tmc || {};
         const tmcMsg = t.insertado ? 'TMC actualizada' : t.sin_cambios ? 'TMC al día' : (t.motivo ? 'TMC pendiente' : '');
-        showToast(`UF +${d.data.uf?.nuevos || 0} · UTM +${d.data.utm?.nuevos || 0}${tmcMsg ? ' · ' + tmcMsg : ''}`);
+        const cnt = `UF +${d.data.uf?.nuevos || 0} · UTM +${d.data.utm?.nuevos || 0} · Dólar +${d.data.dolar?.nuevos || 0} · IPC +${d.data.ipc?.nuevos || 0}`;
+        const errs = ['uf', 'utm', 'dolar', 'ipc'].filter(k => d.data[k]?.error).map(k => k.toUpperCase());
+        if (errs.length) showToast(`${cnt}${tmcMsg ? ' · ' + tmcMsg : ''} — sin datos: ${errs.join(', ')}`, 'warning');
+        else showToast(`${cnt}${tmcMsg ? ' · ' + tmcMsg : ''}`);
         cargar('uf'); cargar('utm'); cargar('dolar'); cargar('ipc'); cargarSync();
       } else showToast(d?.error || 'Error al sincronizar', 'danger');
     }
