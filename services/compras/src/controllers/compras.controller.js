@@ -123,6 +123,9 @@ const MOD_MANT    = 30001;      // módulo "Mantenedores" (existente)
       }
     }
 
+    // compras_admin pasa a ser card en Soporte (página de consolidación de pedidos)
+    await pool.query("UPDATE funcionalidades SET href='/soporte/compras-admin/', icono='bi-clipboard-check' WHERE codigo='compras_admin' AND (href IS NULL OR href='')");
+
     // ── Precarga de direcciones: parques activos + Casa Matriz (solo si está vacía) ──
     const [[{ n }]] = await pool.query('SELECT COUNT(*) n FROM compras_direcciones');
     if (n === 0) {
@@ -418,10 +421,125 @@ const misPedidos = async (req, res) => {
   } catch (e) { err(res, e); }
 };
 
+/* ════════════ ADMIN (consolidación de pedidos) ════════════ */
+
+// GET /api/compras/admin/pedidos?estado=PENDIENTE → pool de pedidos + ítems
+const adminPedidos = async (req, res) => {
+  try {
+    const estado = String(req.query.estado || 'PENDIENTE').toUpperCase();
+    const [peds] = await pool.query(
+      `SELECT p.id, p.id_usuario, p.usuario_nombre, p.id_direccion, p.centro_costo, p.estado, p.total, p.observacion, p.fecha,
+              d.nombre AS direccion, d.es_casa_matriz
+       FROM compras_pedidos p LEFT JOIN compras_direcciones d ON d.id=p.id_direccion
+       WHERE p.estado=? ORDER BY p.fecha DESC LIMIT 500`, [estado]);
+    if (peds.length) {
+      const [its] = await pool.query(
+        'SELECT id_pedido, nombre, precio_unit, cantidad, subtotal FROM compras_pedido_items WHERE id_pedido IN (?)',
+        [peds.map(p => p.id)]);
+      const by = {};
+      for (const it of its) (by[it.id_pedido] = by[it.id_pedido] || []).push(it);
+      peds.forEach(p => { p.items = by[p.id] || []; });
+    }
+    res.json({ success: true, data: peds, error: null });
+  } catch (e) { err(res, e); }
+};
+
+// POST /api/compras/admin/consolidar { pedido_ids:[...], modo:'CONSOLIDADO'|'SEPARADO' }
+//   CONSOLIDADO → 1 orden, todo a Casa Matriz. SEPARADO → 1 orden por sucursal (id_direccion).
+const consolidar = async (req, res) => {
+  try {
+    const modo = String(req.body.modo || 'CONSOLIDADO').toUpperCase() === 'SEPARADO' ? 'SEPARADO' : 'CONSOLIDADO';
+    const ids = (Array.isArray(req.body.pedido_ids) ? req.body.pedido_ids : []).map(num).filter(Boolean);
+    if (!ids.length) return res.status(400).json({ success: false, data: null, error: 'Selecciona al menos un pedido' });
+    const [peds] = await pool.query(
+      'SELECT id, id_direccion, total FROM compras_pedidos WHERE estado=\'PENDIENTE\' AND id IN (?)', [ids]);
+    if (!peds.length) return res.status(400).json({ success: false, data: null, error: 'No hay pedidos pendientes en la selección' });
+    const uid = req.usuario.id_usuario;
+    const ordenes = [];
+
+    if (modo === 'CONSOLIDADO') {
+      const [[cm]] = await pool.query('SELECT id, nombre FROM compras_direcciones WHERE es_casa_matriz=1 AND activo=1 ORDER BY id LIMIT 1');
+      const total = peds.reduce((s, p) => s + Number(p.total), 0);
+      const [r] = await pool.query(
+        `INSERT INTO compras_ordenes (modo, id_direccion, destino, estado, total, id_usuario) VALUES ('CONSOLIDADO',?,?, 'ABIERTA', ?, ?)`,
+        [cm?.id ?? null, cm?.nombre || 'Casa Matriz', total, uid]);
+      await pool.query('UPDATE compras_pedidos SET estado=\'CONSOLIDADO\', id_orden=? WHERE id IN (?)', [r.insertId, peds.map(p => p.id)]);
+      ordenes.push(r.insertId);
+    } else {
+      const grupos = {};
+      for (const p of peds) (grupos[p.id_direccion || 0] = grupos[p.id_direccion || 0] || []).push(p);
+      for (const [idDir, gr] of Object.entries(grupos)) {
+        const dId = num(idDir);
+        let nombre = 'Sin dirección';
+        if (dId) { const [[d]] = await pool.query('SELECT nombre FROM compras_direcciones WHERE id=?', [dId]); nombre = d?.nombre || nombre; }
+        const total = gr.reduce((s, p) => s + Number(p.total), 0);
+        const [r] = await pool.query(
+          `INSERT INTO compras_ordenes (modo, id_direccion, destino, estado, total, id_usuario) VALUES ('SEPARADO',?,?, 'ABIERTA', ?, ?)`,
+          [dId || null, nombre, total, uid]);
+        await pool.query('UPDATE compras_pedidos SET estado=\'CONSOLIDADO\', id_orden=? WHERE id IN (?)', [r.insertId, gr.map(p => p.id)]);
+        ordenes.push(r.insertId);
+      }
+    }
+    auditar({ req, accion: 'CREAR', modulo: 'compras', entidad: 'orden', detalle: `Consolidó ${peds.length} pedido(s) en ${ordenes.length} orden(es) (${modo})`, meta: { modo, ordenes, pedidos: peds.length } });
+    res.json({ success: true, data: { ordenes, modo }, error: null });
+  } catch (e) { err(res, e); }
+};
+
+// GET /api/compras/admin/ordenes?estado= → órdenes (con conteo de ítems)
+const adminOrdenes = async (req, res) => {
+  try {
+    const estado = String(req.query.estado || '').toUpperCase();
+    const where = estado ? 'WHERE o.estado=?' : '';
+    const args = estado ? [estado] : [];
+    const [rows] = await pool.query(
+      `SELECT o.*, (SELECT COUNT(*) FROM compras_pedidos p WHERE p.id_orden=o.id) AS n_pedidos
+       FROM compras_ordenes o ${where} ORDER BY o.fecha DESC LIMIT 300`, args);
+    res.json({ success: true, data: rows, error: null });
+  } catch (e) { err(res, e); }
+};
+
+// GET /api/compras/admin/ordenes/:id → lista de compra consolidada (agrupada por artículo) + pedidos incluidos
+const adminOrdenDetalle = async (req, res) => {
+  try {
+    const id = num(req.params.id);
+    const [[orden]] = await pool.query('SELECT * FROM compras_ordenes WHERE id=?', [id]);
+    if (!orden) return res.status(404).json({ success: false, data: null, error: 'Orden no encontrada' });
+    const [items] = await pool.query(
+      `SELECT sku, nombre, SUM(cantidad) AS cantidad, MAX(precio_unit) AS precio_unit, SUM(subtotal) AS subtotal
+       FROM compras_pedido_items WHERE id_pedido IN (SELECT id FROM compras_pedidos WHERE id_orden=?)
+       GROUP BY sku, nombre ORDER BY nombre`, [id]);
+    const [pedidos] = await pool.query(
+      `SELECT p.id, p.usuario_nombre, p.centro_costo, p.total, d.nombre AS direccion
+       FROM compras_pedidos p LEFT JOIN compras_direcciones d ON d.id=p.id_direccion WHERE p.id_orden=? ORDER BY p.id`, [id]);
+    res.json({ success: true, data: { orden, items, pedidos }, error: null });
+  } catch (e) { err(res, e); }
+};
+
+// PUT /api/compras/admin/ordenes/:id/estado { estado }
+const adminOrdenEstado = async (req, res) => {
+  try {
+    const id = num(req.params.id);
+    const estado = String(req.body.estado || '').toUpperCase();
+    const OK = ['ABIERTA', 'COMPRADA', 'RECIBIDA', 'ANULADA'];
+    if (!OK.includes(estado)) return res.status(400).json({ success: false, data: null, error: 'Estado inválido' });
+    await pool.query('UPDATE compras_ordenes SET estado=? WHERE id=?', [estado, id]);
+    // Propaga a los pedidos de la orden
+    if (estado === 'ANULADA') {
+      await pool.query('UPDATE compras_pedidos SET estado=\'PENDIENTE\', id_orden=NULL WHERE id_orden=?', [id]);
+    } else {
+      const map = { ABIERTA: 'CONSOLIDADO', COMPRADA: 'COMPRADO', RECIBIDA: 'RECIBIDO' };
+      await pool.query('UPDATE compras_pedidos SET estado=? WHERE id_orden=?', [map[estado], id]);
+    }
+    auditar({ req, accion: 'EDITAR', modulo: 'compras', entidad: 'orden', entidad_id: id, detalle: `Orden #${id} → ${estado}` });
+    res.json({ success: true, data: { id, estado }, error: null });
+  } catch (e) { err(res, e); }
+};
+
 module.exports = {
   catalogo, categorias, sincronizar,
   perfiles, articuloPerfilGet, articuloPerfilSet,
   direccionesList, direccionCrear, direccionEditar, direccionEliminar,
   usuariosConfig, usuarioConfigSet,
   misArticulos, misCategorias, miConfig, crearPedido, misPedidos,
+  adminPedidos, consolidar, adminOrdenes, adminOrdenDetalle, adminOrdenEstado,
 };

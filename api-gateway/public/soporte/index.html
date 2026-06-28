@@ -86,7 +86,10 @@
     document.getElementById('avatarInicial').textContent = (yo?.nombre||'?').charAt(0).toUpperCase();
     function logout() { sessionStorage.clear(); window.location.href = '/login.html'; }
 
-    const DESCS = { 'compras': 'Pide artículos de oficina y elige la dirección de despacho' };
+    const DESCS = {
+      'compras': 'Pide artículos de oficina y elige la dirección de despacho',
+      'compras-admin': 'Consolida los pedidos y arma las órdenes de compra por sucursal',
+    };
 
     async function cargar() {
       let funcInfo = [];

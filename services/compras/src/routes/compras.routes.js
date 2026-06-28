@@ -35,4 +35,12 @@ router.get('/mi-config',      verifyToken, usar, c.miConfig);
 router.post('/pedidos',       verifyToken, usar, c.crearPedido);
 router.get('/mis-pedidos',    verifyToken, usar, c.misPedidos);
 
+// ── Administración / consolidación de pedidos ──
+const admin = requireFunc('compras_admin');
+router.get('/admin/pedidos',            verifyToken, admin, c.adminPedidos);
+router.post('/admin/consolidar',        verifyToken, admin, c.consolidar);
+router.get('/admin/ordenes',            verifyToken, admin, c.adminOrdenes);
+router.get('/admin/ordenes/:id',        verifyToken, admin, c.adminOrdenDetalle);
+router.put('/admin/ordenes/:id/estado', verifyToken, admin, c.adminOrdenEstado);
+
 module.exports = router;

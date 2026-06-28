@@ -1,0 +1,227 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <link rel="icon" href="/img/favicon.png" type="image/png">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Administrar Compras — AutoFácil</title>
+  <link href="/css/bootstrap.min.css" rel="stylesheet">
+  <link href="/css/bootstrap-icons.css" rel="stylesheet">
+  <style>
+    :root { --navy:#0141A2; --navy-dark:#012d70; --navy-light:#0255c5; --accent:#009AFE; --bg:#f0f4f8; }
+    body { background:var(--bg); font-family:'Segoe UI', system-ui, sans-serif; margin:0; }
+    .topnav { background:linear-gradient(90deg,var(--navy-dark),var(--navy-light)); color:#fff; height:60px; padding:0 24px; display:flex; align-items:center; justify-content:space-between; position:sticky; top:0; z-index:200; }
+    .topnav-brand { display:flex; align-items:center; gap:8px; text-decoration:none; }
+    .topnav-brand img { height:34px; filter:brightness(0) invert(1); }
+    .version-badge { background:rgba(255,255,255,0.15); color:rgba(255,255,255,0.75); font-size:0.65rem; font-weight:700; border-radius:6px; padding:2px 8px; }
+    .breadcrumb-nav { color:rgba(255,255,255,0.6); font-size:0.85rem; display:flex; align-items:center; gap:6px; }
+    .breadcrumb-nav a { color:rgba(255,255,255,0.75); text-decoration:none; }
+    .breadcrumb-nav .sep { color:rgba(255,255,255,0.35); }
+    .btn-logout { background:rgba(255,255,255,0.1); border:1px solid rgba(255,255,255,0.2); color:#fff; border-radius:8px; padding:5px 12px; font-size:0.82rem; cursor:pointer; }
+    .main-content { padding:24px 32px; max-width:1400px; margin:0 auto; }
+    .page-banner { background:linear-gradient(135deg,#1e3a8a,#0141A2 50%,#0891b2); border-radius:14px; color:#fff; padding:22px 30px; margin-bottom:20px; display:flex; align-items:center; gap:16px; }
+    .page-banner i { font-size:2.4rem; opacity:.85; }
+    .page-banner h2 { font-weight:700; margin:0 0 3px; font-size:1.25rem; }
+    .page-banner p { opacity:.85; margin:0; font-size:.85rem; }
+    .card-box { background:#fff; border-radius:14px; padding:18px; box-shadow:0 1px 4px rgba(0,0,0,.06); margin-top:16px; }
+    table { font-size:.85rem; }
+    .toolbar { display:flex; gap:10px; flex-wrap:wrap; align-items:center; margin-bottom:12px; }
+    .muted { color:#94a3b8; }
+    .chip { border-radius:10px; padding:1px 9px; font-size:.72rem; font-weight:700; color:#fff; }
+    .nav-tabs .nav-link { color:#475569; font-weight:600; }
+    .nav-tabs .nav-link.active { color:var(--navy); }
+    .est { display:inline-block; border-radius:10px; padding:1px 9px; font-size:.72rem; font-weight:700; color:#fff; }
+  </style>
+</head>
+<body>
+  <nav class="topnav">
+    <div style="display:flex;align-items:center;gap:16px">
+      <a href="/" class="topnav-brand"><img src="/img/logo.png" alt="AutoFácil"><span class="version-badge" id="versionBadge"></span></a>
+      <div class="breadcrumb-nav"><a href="/">Inicio</a><span class="sep">›</span><a href="/soporte/">Soporte</a><span class="sep">›</span><span style="color:#fff;font-weight:600"><i class="bi bi-clipboard-check me-1"></i>Administrar Compras</span></div>
+    </div>
+    <button class="btn-logout" onclick="logout()"><i class="bi bi-box-arrow-right me-1"></i>Salir</button>
+  </nav>
+
+  <div class="main-content">
+    <div class="page-banner"><i class="bi bi-clipboard-check"></i><div><h2>Administrar Compras</h2><p>Consolida los pedidos y arma las órdenes de compra</p></div></div>
+
+    <ul class="nav nav-tabs" role="tablist">
+      <li class="nav-item"><button class="nav-link active" data-bs-toggle="tab" data-bs-target="#tab-ped">Pedidos pendientes</button></li>
+      <li class="nav-item"><button class="nav-link" data-bs-toggle="tab" data-bs-target="#tab-ord" onclick="cargarOrdenes()">Órdenes</button></li>
+    </ul>
+
+    <div class="tab-content">
+      <!-- PEDIDOS PENDIENTES -->
+      <div class="tab-pane fade show active" id="tab-ped">
+        <div class="card-box">
+          <div class="toolbar">
+            <b>Pedidos pendientes</b>
+            <span class="muted" id="pedCount"></span>
+            <div style="margin-left:auto;display:flex;gap:8px">
+              <button class="btn btn-sm btn-primary" onclick="consolidar('CONSOLIDADO')"><i class="bi bi-box-seam me-1"></i>Consolidar a Casa Matriz</button>
+              <button class="btn btn-sm btn-outline-primary" onclick="consolidar('SEPARADO')"><i class="bi bi-diagram-2 me-1"></i>Separar por sucursal</button>
+            </div>
+          </div>
+          <div class="table-responsive">
+            <table class="table table-hover align-middle">
+              <thead><tr>
+                <th style="width:34px"><input type="checkbox" id="chkAll" onchange="toggleAll(this.checked)"></th>
+                <th>#</th><th>Fecha</th><th>Usuario</th><th>Sucursal (despacho)</th><th>Centro costo</th><th class="text-end">Total</th><th>Ítems</th>
+              </tr></thead>
+              <tbody id="tbodyPed"><tr><td colspan="8" class="text-center py-4 muted">Cargando…</td></tr></tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <!-- ÓRDENES -->
+      <div class="tab-pane fade" id="tab-ord">
+        <div class="card-box">
+          <div class="toolbar">
+            <b>Órdenes de compra</b>
+            <select id="fEstadoOrd" onchange="cargarOrdenes()" style="border:1px solid #cbd5e1;border-radius:8px;padding:6px 9px;font-size:.85rem;margin-left:8px">
+              <option value="">Todas</option><option value="ABIERTA">Abiertas</option><option value="COMPRADA">Compradas</option><option value="RECIBIDA">Recibidas</option><option value="ANULADA">Anuladas</option>
+            </select>
+          </div>
+          <div class="table-responsive">
+            <table class="table table-hover align-middle">
+              <thead><tr><th>#</th><th>Modo</th><th>Destino</th><th>Pedidos</th><th class="text-end">Total</th><th>Estado</th><th>Fecha</th><th style="width:230px">Acciones</th></tr></thead>
+              <tbody id="tbodyOrd"><tr><td colspan="8" class="text-center py-4 muted">—</td></tr></tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <dialog id="dlgOrd" style="border:none;border-radius:14px;padding:0;width:680px;max-width:95vw">
+    <div style="padding:20px">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
+        <h5 style="font-weight:700;margin:0" id="dlgOrdTit">Orden</h5>
+        <div>
+          <button class="btn btn-sm btn-outline-secondary" onclick="imprimirOrden()"><i class="bi bi-printer me-1"></i>Imprimir</button>
+          <button class="btn btn-sm btn-light" onclick="document.getElementById('dlgOrd').close()">✕</button>
+        </div>
+      </div>
+      <div id="dlgOrdBody"></div>
+    </div>
+  </dialog>
+
+  <script src="/js/bootstrap.bundle.min.js"></script>
+  <script>
+    const token = sessionStorage.getItem('token');
+    const yo = JSON.parse(sessionStorage.getItem('usuario') || 'null');
+    if (!token || !yo) window.location.href = '/login.html';
+    function logout(){ sessionStorage.clear(); window.location.href='/login.html'; }
+    const fmt = n => '$' + Number(n||0).toLocaleString('es-CL',{maximumFractionDigits:0});
+    const esc = s => String(s==null?'':s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+    async function api(ruta, opts={}) {
+      const headers = { 'Content-Type':'application/json', Authorization:'Bearer '+token, ...(opts.headers||{}) };
+      const res = await fetch(ruta, { ...opts, headers });
+      if (res.status === 401) { logout(); return null; }
+      if (res.status === 403) { document.body.innerHTML='<p style="padding:40px;text-align:center;color:#dc2626">No tienes permiso para administrar compras.</p>'; return null; }
+      return res.json();
+    }
+    function toast(msg, ok=true){ const d=document.createElement('div'); d.textContent=msg; d.style.cssText=`position:fixed;top:74px;right:20px;z-index:9999;background:${ok?'#16a34a':'#dc2626'};color:#fff;padding:10px 16px;border-radius:8px;box-shadow:0 6px 20px rgba(0,0,0,.25);font-size:.88rem`; document.body.appendChild(d); setTimeout(()=>d.remove(),3200); }
+    const ESTC = { PENDIENTE:'#f59e0b', CONSOLIDADO:'#0891b2', ABIERTA:'#0891b2', COMPRADO:'#2563eb', COMPRADA:'#2563eb', RECIBIDO:'#16a34a', RECIBIDA:'#16a34a', ANULADA:'#94a3b8', ANULADO:'#94a3b8' };
+
+    /* ── PEDIDOS PENDIENTES ── */
+    let peds = [];
+    async function cargarPed() {
+      const j = await api('/api/compras/admin/pedidos?estado=PENDIENTE'); if (!j) return;
+      peds = j.success ? j.data : [];
+      document.getElementById('pedCount').textContent = `(${peds.length})`;
+      document.getElementById('chkAll').checked = false;
+      const tb = document.getElementById('tbodyPed');
+      tb.innerHTML = peds.length ? peds.map(p => `
+        <tr>
+          <td><input type="checkbox" class="chkPed form-check-input" value="${p.id}"></td>
+          <td>#${p.id}</td>
+          <td>${new Date(p.fecha).toLocaleDateString('es-CL')}</td>
+          <td>${esc(p.usuario_nombre||'')}</td>
+          <td>${esc(p.direccion||'—')}${p.es_casa_matriz?' <span class="muted">(CM)</span>':''}</td>
+          <td>${esc(p.centro_costo||'')||'<span class="muted">—</span>'}</td>
+          <td class="text-end">${fmt(p.total)}</td>
+          <td><span class="muted" title="${esc((p.items||[]).map(i=>i.cantidad+'× '+i.nombre).join(', '))}">${(p.items||[]).length} ítem(s)</span></td>
+        </tr>`).join('') : '<tr><td colspan="8" class="text-center py-4 muted">No hay pedidos pendientes.</td></tr>';
+    }
+    function toggleAll(on){ document.querySelectorAll('.chkPed').forEach(c=>c.checked=on); }
+    function seleccionados(){ return [...document.querySelectorAll('.chkPed:checked')].map(c=>+c.value); }
+    async function consolidar(modo) {
+      let ids = seleccionados();
+      if (!ids.length) {
+        if (!peds.length) { toast('No hay pedidos', false); return; }
+        if (!confirm(`No seleccionaste pedidos. ¿Consolidar TODOS los ${peds.length} pendientes?`)) return;
+        ids = peds.map(p=>p.id);
+      }
+      const txt = modo==='SEPARADO' ? 'separar por sucursal' : 'consolidar a Casa Matriz';
+      if (!confirm(`¿${txt[0].toUpperCase()+txt.slice(1)} ${ids.length} pedido(s)?`)) return;
+      const j = await api('/api/compras/admin/consolidar', { method:'POST', body: JSON.stringify({ pedido_ids: ids, modo }) });
+      if (j?.success) { toast(`Generada(s) ${j.data.ordenes.length} orden(es)`); cargarPed(); cargarOrdenes(); }
+      else toast(j?.error||'Error', false);
+    }
+
+    /* ── ÓRDENES ── */
+    async function cargarOrdenes() {
+      const est = document.getElementById('fEstadoOrd').value;
+      const j = await api('/api/compras/admin/ordenes'+(est?`?estado=${est}`:'')); if (!j) return;
+      const tb = document.getElementById('tbodyOrd');
+      tb.innerHTML = (j.success && j.data.length) ? j.data.map(o => `
+        <tr>
+          <td><b>#${o.id}</b></td>
+          <td>${o.modo==='SEPARADO'?'Por sucursal':'Casa Matriz'}</td>
+          <td>${esc(o.destino||'')}</td>
+          <td>${o.n_pedidos}</td>
+          <td class="text-end">${fmt(o.total)}</td>
+          <td><span class="est" style="background:${ESTC[o.estado]||'#64748b'}">${esc(o.estado)}</span></td>
+          <td>${new Date(o.fecha).toLocaleDateString('es-CL')}</td>
+          <td>
+            <button class="btn btn-sm btn-outline-secondary" onclick="verOrden(${o.id})"><i class="bi bi-eye"></i></button>
+            ${o.estado==='ABIERTA'?`<button class="btn btn-sm btn-outline-primary" title="Marcar comprada" onclick="estadoOrden(${o.id},'COMPRADA')"><i class="bi bi-bag-check"></i></button>`:''}
+            ${o.estado==='COMPRADA'?`<button class="btn btn-sm btn-outline-success" title="Marcar recibida" onclick="estadoOrden(${o.id},'RECIBIDA')"><i class="bi bi-check2-circle"></i></button>`:''}
+            ${(o.estado==='ABIERTA'||o.estado==='COMPRADA')?`<button class="btn btn-sm btn-outline-danger" title="Anular" onclick="estadoOrden(${o.id},'ANULADA')"><i class="bi bi-x-circle"></i></button>`:''}
+          </td>
+        </tr>`).join('') : '<tr><td colspan="8" class="text-center py-4 muted">Sin órdenes.</td></tr>';
+    }
+    async function estadoOrden(id, estado) {
+      const nom = { COMPRADA:'marcar como COMPRADA', RECIBIDA:'marcar como RECIBIDA', ANULADA:'ANULAR (los pedidos vuelven a pendientes)' }[estado];
+      if (!confirm(`¿${nom} la orden #${id}?`)) return;
+      const j = await api(`/api/compras/admin/ordenes/${id}/estado`, { method:'PUT', body: JSON.stringify({ estado }) });
+      if (j?.success) { toast('Actualizada'); cargarOrdenes(); cargarPed(); } else toast(j?.error||'Error', false);
+    }
+    let ordenActual = null;
+    async function verOrden(id) {
+      const j = await api('/api/compras/admin/ordenes/'+id); if (!j?.success) return;
+      ordenActual = j.data;
+      const o = j.data.orden, items = j.data.items, peds = j.data.pedidos;
+      document.getElementById('dlgOrdTit').innerHTML = `Orden #${o.id} <span class="est" style="background:${ESTC[o.estado]||'#64748b'};margin-left:6px">${esc(o.estado)}</span>`;
+      document.getElementById('dlgOrdBody').innerHTML = `
+        <p class="muted" style="margin:0 0 8px;font-size:.85rem">${o.modo==='SEPARADO'?'Por sucursal':'Consolidada a Casa Matriz'} · Destino: <b>${esc(o.destino||'')}</b> · Total <b>${fmt(o.total)}</b></p>
+        <h6 style="font-weight:700;margin:12px 0 6px">Lista de compra (consolidada)</h6>
+        <table class="table table-sm"><thead><tr><th>Artículo</th><th>SKU</th><th class="text-end">Cant.</th><th class="text-end">Precio</th><th class="text-end">Subtotal</th></tr></thead>
+          <tbody>${items.map(it=>`<tr><td>${esc(it.nombre)}</td><td class="muted">${esc(it.sku||'')}</td><td class="text-end">${it.cantidad}</td><td class="text-end">${fmt(it.precio_unit)}</td><td class="text-end">${fmt(it.subtotal)}</td></tr>`).join('')}</tbody></table>
+        <h6 style="font-weight:700;margin:12px 0 6px">Pedidos incluidos (${peds.length})</h6>
+        <ul style="font-size:.82rem;color:#475569;padding-left:18px">${peds.map(p=>`<li>#${p.id} — ${esc(p.usuario_nombre||'')} · ${esc(p.direccion||'')} · ${esc(p.centro_costo||'')} · ${fmt(p.total)}</li>`).join('')}</ul>`;
+      document.getElementById('dlgOrd').showModal();
+    }
+    function imprimirOrden() {
+      if (!ordenActual) return;
+      const o = ordenActual.orden, items = ordenActual.items;
+      const w = window.open('', '_blank', 'popup=yes,width=760,height=900,scrollbars=yes');
+      if (!w) return;
+      w.document.write(`<html><head><title>Orden #${o.id}</title><style>body{font:13px/1.5 system-ui,Arial;padding:24px;color:#111}h2{margin:0 0 4px}table{width:100%;border-collapse:collapse;margin-top:10px}th,td{border:1px solid #ccc;padding:6px 8px;text-align:left}th{background:#f1f5f9}.r{text-align:right}.tot{font-weight:800}</style></head><body>
+        <h2>Orden de Compra #${o.id}</h2>
+        <div>${o.modo==='SEPARADO'?'Por sucursal':'Consolidada a Casa Matriz'} — Destino: <b>${esc(o.destino||'')}</b></div>
+        <div>Fecha: ${new Date(o.fecha).toLocaleString('es-CL')}</div>
+        <table><thead><tr><th>Artículo</th><th>SKU</th><th class="r">Cant.</th><th class="r">Precio</th><th class="r">Subtotal</th></tr></thead>
+        <tbody>${items.map(it=>`<tr><td>${esc(it.nombre)}</td><td>${esc(it.sku||'')}</td><td class="r">${it.cantidad}</td><td class="r">${fmt(it.precio_unit)}</td><td class="r">${fmt(it.subtotal)}</td></tr>`).join('')}
+        <tr><td colspan="4" class="r tot">TOTAL</td><td class="r tot">${fmt(o.total)}</td></tr></tbody></table>
+        </body></html>`);
+      w.document.close(); setTimeout(()=>w.print(), 350);
+    }
+
+    cargarPed();
+  </script>
+  <script src="/js/app-version.js"></script>
+</body>
+</html>

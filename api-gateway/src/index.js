@@ -523,6 +523,8 @@ app.get(['/soporte', '/soporte/'], (req, res) =>
   res.sendFile(path.join(__dirname, '../public/soporte/index.html')));
 app.get(['/soporte/compras', '/soporte/compras/'], (req, res) =>
   res.sendFile(path.join(__dirname, '../public/soporte/compras/index.html')));
+app.get(['/soporte/compras-admin', '/soporte/compras-admin/'], (req, res) =>
+  res.sendFile(path.join(__dirname, '../public/soporte/compras-admin/index.html')));
 app.get(['/mantenedores/compras', '/mantenedores/compras/'], (req, res) =>
   res.sendFile(path.join(__dirname, '../public/mantenedores/compras/index.html')));
 
