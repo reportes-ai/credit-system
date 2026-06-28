@@ -70,7 +70,7 @@
     <div class="col-cat">
       <div class="banner"><i class="bi bi-bag"></i><div><h2>Compras de Oficina</h2><p>Elige tus artículos, la cantidad y la dirección de despacho</p></div></div>
       <div class="toolbar">
-        <input type="text" id="q" placeholder="Buscar artículo…" style="flex:1;min-width:200px" onkeydown="if(event.key==='Enter')buscar(0)">
+        <input type="text" id="q" placeholder="Buscar artículo…" style="flex:1;min-width:200px" oninput="liveBuscar()" onkeydown="if(event.key==='Enter')buscar(0)">
         <select id="cat" onchange="buscar(0)"><option value="">Todas las categorías</option></select>
         <button class="btn btn-primary btn-sm" onclick="buscar(0)"><i class="bi bi-search"></i></button>
       </div>
@@ -124,7 +124,8 @@
     function toast(msg, ok=true){ const d=document.createElement('div'); d.textContent=msg; d.style.cssText=`position:fixed;top:74px;right:20px;z-index:9999;background:${ok?'#16a34a':'#dc2626'};color:#fff;padding:10px 16px;border-radius:8px;box-shadow:0 6px 20px rgba(0,0,0,.25);font-size:.88rem`; document.body.appendChild(d); setTimeout(()=>d.remove(),3200); }
 
     const CART = {};                 // id → {id,nombre,precio,sku,cantidad}
-    let off=0, lim=60, tot=0, rows=[];
+    let off=0, lim=60, tot=0, rows=[], searchTimer=null;
+    function liveBuscar() { clearTimeout(searchTimer); searchTimer = setTimeout(() => buscar(0), 300); }
 
     async function init() {
       const jc = await api('/api/compras/mis-categorias');
