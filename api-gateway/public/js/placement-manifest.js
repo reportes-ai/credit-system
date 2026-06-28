@@ -37,6 +37,7 @@ const PLACEMENT_ITEMS = {
   '/simulador/':             { section:'home', href:'/simulador/',              icon:'bi-calculator',             titulo:'Simulador Rentabilidad' },
   '/evaluacion-crediticia/': { section:'home', href:'/evaluacion-crediticia/',  icon:'bi-clipboard-pulse',        titulo:'Evaluación Crediticia' },
   '/soporte/':               { section:'home', href:'/soporte/',                 icon:'bi-headset',                titulo:'Soporte' },
+  '/ia/pregunta/':           { section:'home', href:'/ia/pregunta/',             icon:'bi-chat-dots',              titulo:'Pregúntale a AutoFácil' },
   // ── CLIENTES — sub-páginas ────────────────────────────────────────────────
   'ant-laborales':           { section:'clientes',      href:'/antecedentes-laborales/', icon:'bi-briefcase',             titulo:'Antecedentes Laborales' },
   'inf-comercial':           { section:'clientes',      href:'/informacion-comercial/',  icon:'bi-building',              titulo:'Información Comercial' },
