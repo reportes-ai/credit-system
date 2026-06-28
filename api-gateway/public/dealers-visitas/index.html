@@ -7,6 +7,7 @@
   <title>Calendario de Visitas — AutoFácil</title>
   <link href="/css/bootstrap.min.css" rel="stylesheet">
   <link href="/css/bootstrap-icons.css" rel="stylesheet">
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
   <style>
     :root { --navy:#001345; --blue:#0141A2; --sky:#009AFE; --teal:#0e7490; }
     body { background:#f0f4f8; font-family:'Segoe UI',system-ui,sans-serif; }
@@ -105,6 +106,8 @@
     .dow-pick label { display:inline-flex; align-items:center; gap:6px; border:1.5px solid #e2e8f0; border-radius:9px; padding:7px 12px; font-size:.82rem; font-weight:600; cursor:pointer; user-select:none; }
     .dow-pick label:has(input:checked) { background:#cffafe; border-color:#0891b2; color:#0c4a6e; }
     .hide { display:none !important; }
+    .rt-tip { background:#0c4a6e; color:#fff; border:none; box-shadow:0 1px 4px rgba(0,0,0,.35); font-weight:700; font-size:.7rem; padding:2px 7px; border-radius:7px; }
+    .rt-tip::before { display:none; }
   </style>
 </head>
 <body>
@@ -113,7 +116,7 @@
   <div class="topnav-left">
     <a href="/" class="topnav-brand">
       <img src="/img/logo.png" alt="AutoFácil">
-      <span class="version-badge" id="versionBadge">v1.4</span>
+      <span class="version-badge" id="versionBadge">v1.5</span>
     </a>
     <div class="breadcrumb-nav">
       <a href="/">Inicio</a><span class="sep">›</span>
@@ -302,7 +305,18 @@
   </div>
 </div>
 
+<!-- Modal: ruta del día en el mapa -->
+<div class="modal-bg" id="mMapa" onclick="if(event.target===this)cerrar('mMapa')">
+  <div class="modal-card" style="max-width:880px">
+    <div class="modal-head"><h3 id="mMapaTit">Ruta del día</h3><button class="x" onclick="cerrar('mMapa')"><i class="bi bi-x-lg"></i></button></div>
+    <div class="modal-body" style="padding:0">
+      <div id="mapaDia" style="height:540px;width:100%;background:#eef2f7"></div>
+    </div>
+  </div>
+</div>
+
 <script src="/js/auth-guard.js"></script>
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script>
 /* ── Sesión ── */
 const YO = JSON.parse(sessionStorage.getItem('usuario') || 'null');
@@ -767,8 +781,10 @@ function renderPlanLista(plan){
     <h6 style="font-weight:800;color:#0f172a;margin:0"><i class="bi bi-list-ol me-1" style="color:#0e7490"></i>Ruta sugerida (orden óptimo)</h6>
     <button class="btn btn-primary" onclick="agendarPlan()"><i class="bi bi-calendar-plus"></i> Agendar este plan</button></div>`;
   plan.slice(0,verLim).forEach((d,di)=>{
-    html+=`<div style="margin:12px 0 4px;font-weight:800;color:#0c4a6e;font-size:.84rem;text-transform:capitalize">
-      <i class="bi bi-calendar-event me-1"></i>${esc(new Date(d.fecha+'T12:00:00').toLocaleDateString('es-CL',{weekday:'long',day:'2-digit',month:'long'}))} · ${d.visitas.length} visita(s)</div>`;
+    html+=`<div style="display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap;margin:12px 0 4px">
+      <div style="font-weight:800;color:#0c4a6e;font-size:.84rem;text-transform:capitalize"><i class="bi bi-calendar-event me-1"></i>${esc(new Date(d.fecha+'T12:00:00').toLocaleDateString('es-CL',{weekday:'long',day:'2-digit',month:'long'}))} · ${d.visitas.length} visita(s)</div>
+      <button class="btn btn-soft" style="padding:4px 11px" onclick="verRutaMapa(${di})"><i class="bi bi-map"></i> Ver ruta en mapa</button>
+    </div>`;
     html+='<div style="overflow:auto"><table class="bt"><thead><tr><th>#</th><th>Hora</th><th>Concesionario</th><th>Comuna</th><th>Dist.</th><th>Último crédito</th><th>Estado</th><th></th></tr></thead><tbody>';
     d.visitas.forEach((v,vi)=>{
       const key=(v.id_dealer||'x')+'|'+d.fecha; const ex=PLAN_VIS_EXIST[key];
@@ -811,6 +827,41 @@ async function agendarPlan(){
   }
   flash('pMsg',`Agendadas ${okN}${fail?(' · '+fail+' no se pudieron (tope diario)'):''}.`, fail?'#c2410c':'#16a34a');
   await cargarVisitasPlan(PLAN_RESULT.plan); renderPlanLista(PLAN_RESULT.plan); cargarMes();
+}
+
+/* ── Ruta del día en el mapa (Leaflet) ── */
+let MAPA=null, MAPA_LAYERS=[];
+function verRutaMapa(di){
+  const dia=PLAN_RESULT && PLAN_RESULT.plan[di]; if(!dia) return;
+  document.getElementById('mMapaTit').textContent='Ruta — '+new Date(dia.fecha+'T12:00:00').toLocaleDateString('es-CL',{weekday:'long',day:'2-digit',month:'long'});
+  abrir('mMapa');
+  setTimeout(()=>dibujarRuta(dia),80);   // esperar a que el modal tenga tamaño
+}
+function dibujarRuta(dia){
+  if(typeof L==='undefined'){ document.getElementById('mapaDia').innerHTML='<div class="empty">No se pudo cargar el mapa.</div>'; return; }
+  const pts=dia.visitas.filter(v=>v.lat&&v.lng);
+  if(!MAPA){
+    MAPA=L.map('mapaDia',{zoomControl:true}).setView([-33.45,-70.66],11);
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{maxZoom:19,attribution:'© OpenStreetMap'}).addTo(MAPA);
+  }
+  MAPA_LAYERS.forEach(l=>MAPA.removeLayer(l)); MAPA_LAYERS=[];
+  MAPA.invalidateSize();
+  if(!pts.length) return;
+  const latlngs=[];
+  pts.forEach((v,i)=>{
+    const ll=[+v.lat,+v.lng]; latlngs.push(ll);
+    const icon=L.divIcon({className:'',iconSize:[28,28],iconAnchor:[14,14],
+      html:`<div style="background:#0e7490;color:#fff;border-radius:50%;width:28px;height:28px;display:flex;align-items:center;justify-content:center;font-weight:800;font-size:.82rem;border:2px solid #fff;box-shadow:0 1px 5px rgba(0,0,0,.45)">${i+1}</div>`});
+    const m=L.marker(ll,{icon}).addTo(MAPA);
+    m.bindPopup(`<b>${i+1}. ${esc(v.nombre||'—')}</b><br>${v.hora?('🕘 '+v.hora+' hrs<br>'):''}${esc(v.comuna||'')}${v.distKm?('<br>'+Math.round(v.distKm*10)/10+' km del anterior'):''}`);
+    if(v.hora) m.bindTooltip(v.hora,{permanent:true,direction:'top',offset:[0,-15],className:'rt-tip'});
+    MAPA_LAYERS.push(m);
+  });
+  if(latlngs.length>1){
+    const line=L.polyline(latlngs,{color:'#0e7490',weight:3,opacity:.75,dashArray:'7,7'}).addTo(MAPA);
+    MAPA_LAYERS.push(line);
+    MAPA.fitBounds(L.latLngBounds(latlngs).pad(0.25));
+  } else { MAPA.setView(latlngs[0],14); }
 }
 
 /* ── Helpers UI ── */
