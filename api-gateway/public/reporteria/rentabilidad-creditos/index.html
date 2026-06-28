@@ -25,7 +25,7 @@
     .perfil-badge { background:rgba(144,202,249,.2); border:1px solid rgba(144,202,249,.4); color:#90caf9; border-radius:12px; padding:2px 10px; font-size:.73rem; font-weight:600; }
     .btn-logout { background:rgba(255,255,255,.1); border:1px solid rgba(255,255,255,.2); color:#fff; border-radius:8px; padding:5px 12px; font-size:.82rem; cursor:pointer; transition:background .2s; }
     .btn-logout:hover { background:rgba(255,255,255,.22); }
-    .page-wrap { max-width:1240px; margin:24px auto; padding:0 24px 60px; }
+    .page-wrap { max-width:none; margin:24px 0; padding:0 28px 60px; }
     .page-banner { background:linear-gradient(135deg,#064e3b,#059669 60%,#10b981); border-radius:16px; color:#fff; padding:24px 32px; margin-bottom:22px; display:flex; align-items:center; gap:18px; }
     .page-banner > i { font-size:2.6rem; opacity:.85; }
     .page-banner h2 { font-weight:700; margin:0 0 3px; font-size:1.25rem; }
@@ -63,8 +63,36 @@
     .rentcell.best { font-weight:800; }
     .star { color:#f59e0b; }
     .empty { padding:40px; text-align:center; color:#9ca3af; }
+    /* N° de operación clickable, coloreado por óptimo/subóptimo */
+    .op-link { font-weight:800; cursor:pointer; text-decoration:none; border-bottom:1px dashed currentColor; }
+    .op-ok   { color:#16a34a; }
+    .op-bad  { color:#dc2626; }
+    .op-na   { color:#334155; }
+    .op-link:hover { filter:brightness(1.15); }
+    .op-pct  { display:inline-block; margin-left:8px; font-size:.72rem; font-weight:800; border-radius:7px; padding:1px 7px; vertical-align:middle; }
+    .op-pct.pos { background:#dcfce7; color:#166534; }
+    .op-pct.neg { background:#fee2e2; color:#b91c1c; }
+    .op-pct.zero{ background:#eef2f7; color:#64748b; }
     .footnote { font-size:.74rem; color:#94a3b8; margin-top:14px; line-height:1.5; }
     .mini-link { color:#0141A2; text-decoration:none; }
+    /* Modal detalle */
+    .modal-bg { display:none; position:fixed; inset:0; background:rgba(2,12,40,.55); z-index:600; overflow-y:auto; padding:24px 14px; }
+    .modal-bg.show { display:block; }
+    .modal-card { background:#fff; border-radius:16px; max-width:920px; margin:0 auto; box-shadow:0 24px 64px rgba(0,0,0,.28); overflow:hidden; }
+    .modal-head { background:linear-gradient(135deg,#064e3b,#059669,#10b981); color:#fff; padding:18px 24px; display:flex; align-items:center; justify-content:space-between; gap:12px; }
+    .modal-head h3 { margin:0; font-size:1.1rem; font-weight:800; }
+    .modal-head .x { background:rgba(255,255,255,.16); border:none; color:#fff; border-radius:8px; padding:7px 13px; cursor:pointer; font-size:.85rem; }
+    .modal-body { padding:20px 24px; }
+    .cond-grid { display:grid; grid-template-columns:repeat(4,1fr); gap:10px 18px; margin-bottom:8px; }
+    @media(max-width:760px){ .cond-grid{ grid-template-columns:1fr 1fr; } }
+    .cond-grid .it { font-size:.8rem; }
+    .cond-grid .it .k { color:#64748b; font-size:.7rem; text-transform:uppercase; letter-spacing:.03em; }
+    .cond-grid .it .v { color:#0f172a; font-weight:700; }
+    .sec-h { font-size:.74rem; font-weight:800; color:#475569; text-transform:uppercase; letter-spacing:.05em; margin:16px 0 8px; display:flex; align-items:center; gap:8px; }
+    .sec-h::after { content:''; flex:1; height:1px; background:#e5e7eb; }
+    .rr{display:flex;justify-content:space-between;padding:3px 0;font-size:.84rem;color:#334155}
+    .rr.sub{font-size:.78rem;color:#64748b;padding-left:8px}
+    .rr.tot{border-top:1px solid #e5e7eb;margin-top:3px;padding-top:5px;font-weight:700}
     .mini-link:hover { text-decoration:underline; }
   </style>
 </head>
@@ -74,7 +102,7 @@
   <div class="topnav-left">
     <a href="/" class="topnav-brand">
       <img src="/img/logo.png" alt="AutoFácil">
-      <span class="version-badge" id="versionBadge">v1.2</span>
+      <span class="version-badge" id="versionBadge">v1.3</span>
     </a>
     <div class="breadcrumb-nav">
       <a href="/">Inicio</a><span class="sep">›</span>
@@ -115,7 +143,7 @@
   <div class="tbl-wrap">
     <table class="rt" id="tabla">
       <thead><tr>
-        <th>N° Operación</th>
+        <th>N° Operación · Δ%</th>
         <th>Cliente</th>
         <th>Ejecutivo</th>
         <th>Colocada en</th>
@@ -123,11 +151,10 @@
         <th class="num">Rentab. AutoFin</th>
         <th class="num">Rentab. UAC</th>
         <th>Más rentable</th>
-        <th class="num">Δ vs óptima ($)</th>
-        <th class="num">% diferencia</th>
+        <th class="num">Δ entre financieras ($)</th>
       </tr></thead>
       <tbody id="tbody">
-        <tr><td colspan="10" class="empty"><div class="spinner-border spinner-border-sm me-2"></div>Cargando…</td></tr>
+        <tr><td colspan="9" class="empty"><div class="spinner-border spinner-border-sm me-2"></div>Cargando…</td></tr>
       </tbody>
     </table>
   </div>
@@ -138,6 +165,17 @@
     <b>Comisión Dealer</b> = la real negociada del crédito (si no la trae, pizarra por plazo); <b>Comisión Parque</b> 2,5% del saldo (si es parque); <b>Comisión Ejecutivo</b> según <code>pct_ejecutivo_fin</code> de los <a class="mini-link" href="/aprobaciones/mantenedor/" target="_blank">parámetros del crédito</a>.
     <b>Tasa cliente</b> = la real del crédito (si falta, TMC vigente por tramo). <b>Tier UAC</b> = vigente del mes (según N° de operaciones Unidad de Crédito otorgadas).
     AutoFin = colocación + seguros; UAC = % sobre saldo precio (no paga seguros). Los créditos <b>AutoFácil (cartera propia)</b> se muestran como referencia y no entran en el conteo de óptimos.
+  </div>
+</div>
+
+<!-- Modal detalle del crédito -->
+<div class="modal-bg" id="modal" onclick="if(event.target===this)cerrarDetalle()">
+  <div class="modal-card">
+    <div class="modal-head">
+      <h3 id="modalTitulo">Crédito</h3>
+      <button class="x" onclick="cerrarDetalle()"><i class="bi bi-x-lg"></i> Cerrar</button>
+    </div>
+    <div class="modal-body" id="modalBody"></div>
   </div>
 </div>
 
@@ -259,19 +297,24 @@ function recalcular(){
     };
     // Sin plazo no se puede calcular (crédito incompleto) → se marca "Datos incompletos"
     const R = (plazo>0 && window.AF_RENT) ? (window.AF_RENT.calcular(inp, PARAMS, UF_HOY) || null) : null;
-    let rentAF=null, rentUAC=null, mejor=null, esOptima=null, diffCLP=null, diffPct=null;
+    let rentAF=null, rentUAC=null, mejor=null, esOptima=null, diffCLP=null, diffPct=null,
+        vsOtraCLP=null, vsOtraPct=null;
     if (R){
       rentAF = R.af.rentab; rentUAC = R.uac.rentab;
       mejor  = rentAF >= rentUAC ? 'AF' : 'UAC';
       if (colo==='AF' || colo==='UAC'){
-        const rentColo = colo==='AF' ? rentAF : rentUAC;
+        const rentColo  = colo==='AF' ? rentAF : rentUAC;
+        const rentOtra  = colo==='AF' ? rentUAC : rentAF;   // la otra financiera
         const rentMejor = Math.max(rentAF, rentUAC);
         esOptima = (colo===mejor);
-        diffCLP  = rentColo - rentMejor;                       // ≤ 0
+        diffCLP  = rentColo - rentMejor;                    // ≤ 0 (vs óptima → lucro cesante)
         diffPct  = rentMejor!==0 ? (diffCLP/Math.abs(rentMejor))*100 : 0;
+        // Diferencia FIRMADA entre la colocada y la otra (+ si fue la mejor, − si no)
+        vsOtraCLP = rentColo - rentOtra;
+        vsOtraPct = rentOtra!==0 ? (vsOtraCLP/Math.abs(rentOtra))*100 : (vsOtraCLP>0?100:vsOtraCLP<0?-100:0);
       }
     }
-    return { c, colo, R, rentAF, rentUAC, mejor, esOptima, diffCLP, diffPct };
+    return { c, colo, R, rentAF, rentUAC, mejor, esOptima, diffCLP, diffPct, vsOtraCLP, vsOtraPct };
   });
 
   // Peores primero (mayor pérdida arriba), luego óptimos
@@ -301,41 +344,49 @@ function render(){
   // Tabla
   const tb = document.getElementById('tbody');
   if(!FILAS.length){
-    tb.innerHTML = '<tr><td colspan="10" class="empty"><i class="bi bi-inbox" style="font-size:1.6rem;display:block;margin-bottom:6px;opacity:.4"></i>Sin créditos otorgados en este mes.</td></tr>';
+    tb.innerHTML = '<tr><td colspan="9" class="empty"><i class="bi bi-inbox" style="font-size:1.6rem;display:block;margin-bottom:6px;opacity:.4"></i>Sin créditos otorgados en este mes.</td></tr>';
     return;
   }
-  tb.innerHTML = FILAS.map(f=>{
+  tb.innerHTML = FILAS.map((f,idx)=>{
     const c=f.c;
+    const numTxt = escH(c.numero_credito||c.num_op||'—');
     const finLbl = { AF:'AutoFin', UAC:'Unidad de Crédito', AFAC:'AutoFácil (propia)' }[f.colo] || (c.financiera||'—');
     const finCls = { AF:'fin-AF', UAC:'fin-UAC', AFAC:'fin-AFAC' }[f.colo] || '';
+    // N° de operación: clickable, color por óptimo/subóptimo + chip de Δ% entre financieras
+    let opCls='op-na', chip='';
+    if (f.R && (f.colo==='AF'||f.colo==='UAC')){
+      opCls = f.esOptima ? 'op-ok' : 'op-bad';
+      const p = f.vsOtraPct;
+      const cls = p>0.05?'pos':p<-0.05?'neg':'zero';
+      const sign = p>0?'+':'';
+      chip = `<span class="op-pct ${cls}" title="Diferencia de rentabilidad vs la otra financiera">${sign}${p.toFixed(1)}%</span>`;
+    }
+    const opCell = `<td><a class="op-link ${opCls}" onclick="verDetalle(${idx})">${numTxt}</a>${chip}</td>`;
     if(!f.R){
       return `<tr>
-        <td><b>${escH(c.numero_credito||c.num_op||'—')}</b></td>
+        ${opCell}
         <td>${escH(c.nombre_cliente||'')}</td>
         <td>${escH(c.ejecutivo||'')}</td>
         <td><span class="fin-badge ${finCls}">${escH(finLbl)}</span></td>
-        <td class="num chip-na" colspan="6">Datos incompletos (precio/plazo)</td>
+        <td class="num chip-na" colspan="5">Datos incompletos (precio/plazo)</td>
       </tr>`;
     }
     const masRent = f.mejor==='AF' ? 'AutoFin' : 'Unidad de Crédito';
-    let masRentCell, diffCell, pctCell;
+    let masRentCell, vsCell;
     if (f.colo==='AFAC'){
       masRentCell = `<span class="chip-na">referencial: ${masRent}</span>`;
-      diffCell = '<span class="chip-na">—</span>';
-      pctCell  = '<span class="chip-na">cartera propia</span>';
+      vsCell = '<span class="chip-na">—</span>';
     } else if (f.esOptima){
-      masRentCell = `<span class="chip-ok"><i class="bi bi-check-circle-fill"></i> Óptima</span>`;
-      diffCell = `<span class="diff-pos">$0</span>`;
-      pctCell  = `<span class="diff-pos">0,0%</span>`;
+      masRentCell = `<span class="chip-ok"><i class="bi bi-check-circle-fill"></i> Óptima (${masRent})</span>`;
+      vsCell = `<span class="diff-pos">+${fmtCLP(f.vsOtraCLP)}</span>`;
     } else {
       masRentCell = `<span class="star"><i class="bi bi-star-fill"></i></span> ${masRent}`;
-      diffCell = `<span class="diff-neg">${fmtCLP(f.diffCLP)}</span>`;
-      pctCell  = `<span class="diff-neg">${f.diffPct.toFixed(1)}%</span>`;
+      vsCell = `<span class="diff-neg">${fmtCLP(f.vsOtraCLP)}</span>`;
     }
     const afBest  = f.mejor==='AF'  ? 'best' : '';
     const uacBest = f.mejor==='UAC' ? 'best' : '';
     return `<tr>
-      <td><b>${escH(c.numero_credito||c.num_op||'—')}</b></td>
+      ${opCell}
       <td title="${fmtRUT(c.rut_cliente)}">${escH(c.nombre_cliente||'')}</td>
       <td>${escH(c.ejecutivo||'')}</td>
       <td><span class="fin-badge ${finCls}">${escH(finLbl)}</span></td>
@@ -343,10 +394,108 @@ function render(){
       <td class="num rentcell ${afBest}" style="color:${f.rentAF>=0?'#166534':'#dc2626'}">${fmtCLP(f.rentAF)}</td>
       <td class="num rentcell ${uacBest}" style="color:${f.rentUAC>=0?'#166534':'#dc2626'}">${fmtCLP(f.rentUAC)}</td>
       <td>${masRentCell}</td>
-      <td class="num">${diffCell}</td>
-      <td class="num">${pctCell}</td>
+      <td class="num">${vsCell}</td>
     </tr>`;
   }).join('');
+}
+
+/* ── Detalle del crédito (condiciones + rentabilidad) ───────────── */
+const fmtFecha = v => v ? String(v).slice(0,10).split('-').reverse().join('/') : '—';
+const fp = n => (n==null||isNaN(n)?'—':(n>0?'+':'')+n.toFixed(1)+'%');
+
+function verDetalle(idx){
+  const f = FILAS[idx]; if(!f) return;
+  const c = f.c;
+  document.getElementById('modalTitulo').innerHTML =
+    `<i class="bi bi-credit-card-2-front me-2"></i>N° Operación ${escH(c.numero_credito||c.num_op||'—')}`;
+  document.getElementById('modalBody').innerHTML = detalleHTML(f);
+  document.getElementById('modal').classList.add('show');
+  document.body.style.overflow='hidden';
+}
+function cerrarDetalle(){
+  document.getElementById('modal').classList.remove('show');
+  document.body.style.overflow='';
+}
+document.addEventListener('keydown', e=>{ if(e.key==='Escape') cerrarDetalle(); });
+
+function detalleHTML(f){
+  const c=f.c, R=f.R;
+  const finLbl = { AF:'AutoFin', UAC:'Unidad de Crédito', AFAC:'AutoFácil (cartera propia)' }[f.colo] || (c.financiera||'—');
+  const tasaDec = tasaMensualDecimal(c.tasa_mensual);
+  const it = (k,v)=>`<div class="it"><div class="k">${k}</div><div class="v">${v}</div></div>`;
+  const cond = `
+    <div class="sec-h"><i class="bi bi-card-list"></i>Condiciones del crédito</div>
+    <div class="cond-grid">
+      ${it('Cliente', escH(c.nombre_cliente||'—'))}
+      ${it('RUT', fmtRUT(c.rut_cliente)||'—')}
+      ${it('Financiera (colocada)', escH(finLbl))}
+      ${it('Estado', escH(c.estado||'—'))}
+      ${it('Fecha otorgamiento', fmtFecha(c.fecha_otorgado))}
+      ${it('Ejecutivo', escH(c.ejecutivo||'—'))}
+      ${it('Dealer', escH(c.dealer||'—'))}
+      ${it('Vendedor', escH(c.vendedor||'—'))}
+      ${it('Parque', escH(c.parque && String(c.parque).toUpperCase()!=='NO APLICA' ? c.parque : 'Calle'))}
+      ${it('Vehículo', escH([c.tipo_vehiculo,c.marca,c.modelo,c.anio].filter(Boolean).join(' ')||'—'))}
+      ${it('Valor vehículo', fmtCLP(c.valor_vehiculo))}
+      ${it('Pie', fmtCLP(c.pie))}
+      ${it('Saldo precio', fmtCLP(c.saldo_precio||((c.valor_vehiculo||0)-(c.pie||0))))}
+      ${it('Monto financiado', fmtCLP(R?R.monto_fin:c.monto_financiado))}
+      ${it('Plazo', (c.plazo||'—')+(c.plazo?' meses':''))}
+      ${it('Tasa cliente (mensual)', tasaDec?(tasaDec*100).toFixed(2)+'%':'TMC')}
+      ${it('Cuota', fmtCLP(c.cuota))}
+      ${it('Comisión dealer', fmtCLP(c.comision_dealer))}
+    </div>`;
+
+  if(!R) return cond + `<div class="sec-h"><i class="bi bi-cash-coin"></i>Rentabilidad</div>
+    <div style="color:#b91c1c;font-size:.85rem;padding:6px 0">Faltan datos (precio/plazo) para calcular la rentabilidad.</div>`;
+
+  const card = (nom,color,D,segDetail,esMejor,esColocada)=>`
+    <div style="flex:1;min-width:260px;border:${esColocada?'2px solid '+color:'1px solid #e3e8ef'};border-radius:12px;overflow:hidden;box-shadow:${esColocada?'0 0 0 3px '+color+'22':'none'}">
+      <div style="background:${color};color:#fff;padding:9px 13px;font-weight:800;display:flex;align-items:center;gap:8px">
+        ${nom}<span style="margin-left:auto;display:flex;gap:6px">${esColocada?`<span style="background:#fff;color:${color};border-radius:10px;padding:1px 8px;font-size:.68rem;font-weight:800">● Colocada</span>`:''}${esMejor?`<span style="background:rgba(255,255,255,.22);border:1px solid rgba(255,255,255,.6);border-radius:10px;padding:1px 8px;font-size:.68rem">⭐ Más rentable</span>`:''}</span>
+      </div>
+      <div style="padding:11px 13px">
+        <div style="font-size:.7rem;font-weight:700;color:#059669;text-transform:uppercase;letter-spacing:.04em;margin-bottom:3px">Ingresos</div>
+        <div class="rr"><span>Ingreso por Colocación</span><b>${fmtCLP(D.ing_tasa)}</b></div>
+        ${segDetail}
+        ${D.com_corfo?`<div class="rr"><span>Comisión CORFO</span><b>${fmtCLP(D.com_corfo)}</b></div>`:''}
+        <div class="rr tot"><span>Total Ingresos</span><b style="color:#059669">${fmtCLP(D.total_ing)}</b></div>
+        <div style="font-size:.7rem;font-weight:700;color:#dc2626;text-transform:uppercase;letter-spacing:.04em;margin:9px 0 3px">Descuentos</div>
+        <div class="rr"><span>Comisión Dealer${R.costos.esPatio?' (Parque)':' (Calle)'}</span><b>${fmtCLP(R.costos.dealer)}</b></div>
+        ${R.costos.patio?`<div class="rr"><span>Comisión Parque (2,5%)</span><b>${fmtCLP(R.costos.patio)}</b></div>`:''}
+        <div class="rr"><span>Comisión Ejecutivo</span><b>${fmtCLP(R.costos.ejecutivo)}</b></div>
+        <div class="rr tot"><span>Total Descuentos</span><b style="color:#dc2626">${fmtCLP(R.costos.total)}</b></div>
+        <div style="margin-top:9px;border-radius:10px;padding:9px 12px;display:flex;justify-content:space-between;align-items:center;background:${D.rentab>=0?'#059669':'#dc2626'};color:#fff">
+          <div><div style="font-size:.7rem;opacity:.85">Rentabilidad</div><div style="font-size:1.25rem;font-weight:800">${fmtCLP(D.rentab)}</div></div>
+          <div style="font-size:.78rem;opacity:.9;text-align:right">${(D.pct||0).toFixed(1)}%<br>del monto fin.</div>
+        </div>
+      </div>
+    </div>`;
+  const segAf = `
+    <div class="rr sub"><span>· Desgravamen</span><b>${fmtCLP(R.af.ing_seg_desg)}</b></div>
+    <div class="rr sub"><span>· Cesantía</span><b>${fmtCLP(R.af.ing_seg_cesa)}</b></div>
+    <div class="rr sub"><span>· RDH</span><b>${fmtCLP(R.af.ing_seg_rdh)}</b></div>
+    <div class="rr"><span>Ingreso por Seguros</span><b>${fmtCLP(R.af.ing_seg)}</b></div>`;
+  const segUac = `<div class="rr"><span>Ingreso por Seguros</span><b>${fmtCLP(0)}</b></div><div class="rr sub"><span style="color:#94a3b8">UAC no paga comisión de seguros</span></div>`;
+
+  const resumen = `
+    <div style="background:#f8fafc;border-radius:10px;padding:9px 13px;margin:4px 0 12px;font-size:.8rem;color:#475569;display:flex;flex-wrap:wrap;gap:6px 16px">
+      <span>Saldo: <b>${fmtCLP(R.saldo)}</b></span>
+      <span>Gastos: <b>${fmtCLP(R.gastos)}</b></span>
+      <span>Primas: <b>${fmtCLP(R.primas.total)}</b></span>
+      <span>${R.esMayor?'> 200 UF':'≤ 200 UF'}</span>
+      <span>Tier UAC: <b>${(R.uacPct*100).toFixed(0)}%</b></span>
+      ${(f.colo==='AF'||f.colo==='UAC')?`<span>Δ vs la otra: <b style="color:${f.vsOtraCLP>=0?'#166534':'#dc2626'}">${(f.vsOtraCLP>0?'+':'')}${fmtCLP(f.vsOtraCLP)} (${fp(f.vsOtraPct)})</b></span>`:''}
+    </div>`;
+
+  return cond
+    + `<div class="sec-h"><i class="bi bi-cash-coin"></i>Detalle de rentabilidad — AutoFin vs Unidad de Crédito</div>`
+    + resumen
+    + `<div style="display:flex;gap:12px;flex-wrap:wrap">
+        ${card('AutoFin','#0141A2',R.af,segAf,f.mejor==='AF',f.colo==='AF')}
+        ${card('Unidad de Crédito','#166534',R.uac,segUac,f.mejor==='UAC',f.colo==='UAC')}
+       </div>`
+    + (f.colo==='AFAC'?'<div style="margin-top:8px;background:#eff6ff;border:1px solid #bfdbfe;border-radius:8px;padding:8px 12px;font-size:.8rem;color:#1e40af">Crédito de <b>cartera propia (AutoFácil)</b>; la comparación es referencial entre las financieras de brokerage.</div>':'');
 }
 
 /* ── Exportar CSV / Excel ─────────────────────────── */
@@ -354,7 +503,7 @@ function exportarCSV(){
   if(!FILAS.length){ alert('Sin datos para exportar.'); return; }
   const mes = document.getElementById('mesSel').value;
   const head = ['N° Operación','RUT','Cliente','Ejecutivo','Colocada en','Monto Financiado',
-                'Rentab. AutoFin','Rentab. UAC','Más rentable','Óptima','Δ vs óptima ($)','% diferencia'];
+                'Rentab. AutoFin','Rentab. UAC','Más rentable','Óptima','Δ entre financieras ($)','% diferencia'];
   const q = s => `"${String(s??'').replace(/"/g,'""')}"`;
   const rows = FILAS.map(f=>{
     const c=f.c;
@@ -366,8 +515,8 @@ function exportarCSV(){
       c.numero_credito||c.num_op||'', c.rut_cliente||'', c.nombre_cliente||'', c.ejecutivo||'', finLbl,
       Math.round(f.R.monto_fin), Math.round(f.rentAF), Math.round(f.rentUAC),
       masRent, optima,
-      f.diffCLP==null?'':Math.round(f.diffCLP),
-      f.diffPct==null?'':f.diffPct.toFixed(1)+'%'
+      f.vsOtraCLP==null?'':Math.round(f.vsOtraCLP),
+      f.vsOtraPct==null?'':(f.vsOtraPct>0?'+':'')+f.vsOtraPct.toFixed(1)+'%'
     ].map(q).join(';');
   });
   const csv = '﻿' + [head.map(q).join(';'), ...rows].join('\r\n');
