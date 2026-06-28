@@ -116,7 +116,7 @@
   <div class="topnav-left">
     <a href="/" class="topnav-brand">
       <img src="/img/logo.png" alt="AutoFácil">
-      <span class="version-badge" id="versionBadge">v1.11</span>
+      <span class="version-badge" id="versionBadge">v1.12</span>
     </a>
     <div class="breadcrumb-nav">
       <a href="/">Inicio</a><span class="sep">›</span>
@@ -855,7 +855,7 @@ function imprimirDirecciones(di){
     const pts=lista[0].visitas.filter(v=>v.lat&&v.lng).map(v=>({lat:+v.lat,lng:+v.lng,nombre:v.nombre||'',hora:v.hora||''}));
     const json=JSON.stringify(pts).replace(/</g,'\\u003c');
     mapaCSS=`<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
-      <style>#mapa{height:430px;width:100%;border:1px solid #cbd5e1;border-radius:8px;margin-top:14px}
+      <style>#mapa{height:480px;width:100%;border:1px solid #cbd5e1;border-radius:8px;margin-top:14px}
       .rt-tip{background:#0c4a6e;color:#fff;border:none;font-weight:700;font-size:11px;padding:1px 6px;border-radius:6px}
       .rt-tip::before{display:none}
       *{ -webkit-print-color-adjust:exact; print-color-adjust:exact; }</style>`;
@@ -891,22 +891,26 @@ function imprimirDirecciones(di){
   const doc=`<!doctype html><html lang="es"><head><meta charset="utf-8"><title>${esc(titulo)}</title>
     ${mapaCSS}
     <style>
-      *{box-sizing:border-box} body{font-family:Arial,Helvetica,sans-serif;color:#111;margin:26px}
+      *{box-sizing:border-box} body{font-family:Arial,Helvetica,sans-serif;color:#111;margin:18px}
+      /* Ancho fijo ≈ hoja carta para que lo que se ve sea lo que se imprime (mapa incluido) */
+      .wrap{width:720px;max-width:100%;margin:0 auto}
       h1{font-size:17px;margin:0 0 2px} .sub{color:#666;font-size:12px;margin:0 0 14px}
       table{width:100%;border-collapse:collapse;font-size:12px}
       th,td{border:1px solid #cbd5e1;padding:6px 9px;text-align:left;vertical-align:top}
       th{background:#eef2f7;text-transform:uppercase;font-size:10px;letter-spacing:.03em}
       td.n{text-align:center;font-weight:bold;width:28px} tr.dia td{background:#0e7490;color:#fff;font-weight:bold;font-size:12.5px}
-      @media print{body{margin:12mm}}
+      @page{size:portrait;margin:12mm} @media print{body{margin:0}}
     </style></head><body>
+    <div class="wrap">
     <h1>${esc(titulo)}</h1>
     <p class="sub">Generado el ${esc(hoy)} · orden óptimo de recorrido</p>
     <table><thead><tr><th>#</th><th>Hora</th><th>Concesionario</th><th>Dirección</th><th>Comuna</th></tr></thead>
     <tbody>${filas}</tbody></table>
     ${mapaDiv}
+    </div>
     ${unDia ? '' : '<script>window.onload=function(){window.print();}<\/script>'}
     ${mapaJS}</body></html>`;
-  const w=window.open('','_blank');
+  const w=window.open('','_blank','popup=yes,width=820,height=1040,scrollbars=yes,resizable=yes');
   if(!w){ alert('Permite las ventanas emergentes para imprimir las direcciones.'); return; }
   w.document.write(doc); w.document.close();
 }
