@@ -12,5 +12,6 @@ router.get('/cartolas',    verifyDealer, c.cartolas);
 router.get('/operaciones/:id',           verifyDealer, c.detalle);
 router.get('/operaciones/:id/fundantes', verifyDealer, c.fundantes);
 router.get('/operaciones/:id/pago',      verifyDealer, c.pago);
+router.post('/ia',                       verifyDealer, c.ia);
 
 module.exports = router;

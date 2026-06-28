@@ -7,6 +7,34 @@
  * Fase 1: resumen (KPIs) + operaciones (listado).
  */
 const pool = require('../../../../shared/config/database');
+const anthropic = require('../../../../shared/anthropic');
+const ia = require('../../../../shared/ia');
+
+const CODIGO_IA = 'dealer_ia';
+
+// ── Migración: feature IA del portal (nace DESACTIVADA) + log de uso ────────
+(async () => {
+  try {
+    await ia.registrarFuncionalidad({
+      codigo: CODIGO_IA,
+      nombre: 'Portal Dealer — Asistente IA',
+      descripcion: 'Responde al dealer sobre SUS propias operaciones (datos acotados a su id_dealer; sin acceso a otros dealers).',
+      modelo: 'claude-haiku-4-5',
+    });
+  } catch (_) {}
+  try {
+    await pool.query(`CREATE TABLE IF NOT EXISTS portal_ia_uso (
+      id        INT AUTO_INCREMENT PRIMARY KEY,
+      id_dealer INT NULL,
+      id_cuenta INT NULL,
+      rut       VARCHAR(20) NULL,
+      pregunta  VARCHAR(500) NULL,
+      ts        DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      INDEX idx_dealer_ts (id_dealer, ts),
+      INDEX idx_cuenta_ts (id_cuenta, ts)
+    )`);
+  } catch (e) { console.error('[portal-dealer] migracion ia:', e.message); }
+})();
 
 // ── Helpers ──────────────────────────────────────────────────────────────
 const rutNorm = (r) =>
@@ -335,5 +363,83 @@ exports.cartolas = async (req, res) => {
   } catch (err) {
     console.error('[portal-dealer] cartolas:', err.message);
     return res.status(500).json({ success: false, data: null, error: 'No se pudieron cargar las cartolas.' });
+  }
+};
+
+// ── Contexto del dealer para la IA — SOLO sus datos (acotado por dealerScope) ─
+async function datosDelDealer(req) {
+  const sc = dealerScope(req);
+  if (!sc.hasScope) return null;
+  const [ops] = await pool.query(
+    `SELECT COALESCE(ob.numero_credito, CAST(ob.num_op AS CHAR)) AS num_op,
+            COALESCE(cl.nombre_completo,'') AS cliente, COALESCE(cl.rut,'') AS rut_cliente,
+            ob.financiera, ob.marca, ob.modelo, ob.anio, ob.patente,
+            DATE(ob.fecha_otorgado) AS fecha_otorgado, ob.monto_financiado, ob.plazo,
+            ob.comdea_real AS comision,
+            ${ESTADO_SQL} AS estado, ${ESTADO_CARTERA_SQL} AS estado_cartera
+     FROM creditos ob LEFT JOIN clientes cl ON cl.id_cliente = ob.id_cliente
+     WHERE ${sc.where} AND ${NO_ANULADA}
+     ORDER BY COALESCE(ob.fecha_otorgado, ob.created_at) DESC LIMIT 120`, sc.params);
+
+  const rut = rutNorm(req.dealer && req.dealer.rut);
+  let cart = [];
+  try {
+    const [c] = await pool.query(
+      `SELECT mes, total_bruto, DATE(fecha_envio) AS fecha_envio FROM cartolas_enviadas
+       WHERE ? <> '' AND REPLACE(REPLACE(REPLACE(UPPER(COALESCE(rut_dealer,'')),'.',''),'-',''),' ','') = ?
+       ORDER BY fecha_envio DESC LIMIT 24`, [rut, rut]);
+    cart = c;
+  } catch (_) {}
+  return { dealer: (req.dealer && req.dealer.nombre) || 'Dealer', operaciones: ops, cartolas: cart };
+}
+
+// ── POST /api/portal-dealer/ia ─────────────────────────────────────────────
+// Asistente conversacional acotado: NO genera SQL; Claude solo ve los datos
+// del propio dealer (ya filtrados). Imposible exponer datos de otro dealer.
+exports.ia = async (req, res) => {
+  try {
+    const pregunta = String((req.body && req.body.pregunta) || '').trim();
+    if (!pregunta) return res.status(400).json({ success: false, data: null, error: 'Escribe tu pregunta.' });
+    if (pregunta.length > 500) return res.status(400).json({ success: false, data: null, error: 'La pregunta es muy larga.' });
+
+    if (!(await ia.iaActiva(CODIGO_IA))) {
+      return res.json({ success: true, data: { disponible: false, respuesta: 'El asistente con IA no está disponible por ahora. Puedes escribirle a tu ejecutivo desde la pestaña Chat.' }, error: null });
+    }
+    const sc = dealerScope(req);
+    if (!sc.hasScope) {
+      return res.json({ success: true, data: { disponible: true, respuesta: 'Tu cuenta está en validación; aún no puedo consultar tus operaciones.' }, error: null });
+    }
+
+    // Cuota diaria por dealer (configurable; 0 = sin límite)
+    const limite = await paramNum('dealer_ia_limite_dia', 15);
+    const idd = req.dealer.id_dealer || null;
+    const idc = req.dealer.id_cuenta || null;
+    const [[u]] = await pool.query(
+      `SELECT COUNT(*) AS c FROM portal_ia_uso
+       WHERE DATE(ts)=CURDATE() AND ((? IS NOT NULL AND id_dealer=?) OR (? IS NOT NULL AND id_cuenta=?))`,
+      [idd, idd, idc, idc]);
+    if (limite > 0 && Number(u.c) >= limite) {
+      return res.json({ success: true, data: { disponible: true, respuesta: `Llegaste al máximo de ${limite} preguntas por hoy. Puedes seguir mañana o escribirle a tu ejecutivo.`, restantes: 0 }, error: null });
+    }
+
+    const ctx = await datosDelDealer(req);
+    const system = `Eres el asistente virtual de AutoFácil para el dealer "${ctx.dealer}". Respondes ÚNICAMENTE con la información provista (las operaciones y cartolas de ESTE dealer). Si la respuesta no está en los datos, dilo con claridad y sugiere escribir al ejecutivo. Nunca inventes datos ni menciones a otros dealers ni a otros clientes. Responde en español, en tono cercano, breve y claro. Los montos están en pesos chilenos.`;
+    const prompt = `Datos del dealer (JSON):\n${JSON.stringify(ctx)}\n\nPregunta del dealer: ${pregunta}`;
+
+    let r;
+    try {
+      r = await anthropic.analizar({ codigo: CODIGO_IA, system, prompt, max_tokens: 900, id_usuario: null });
+    } catch (e) {
+      if (e.code === 'IA_OFF') return res.json({ success: true, data: { disponible: false, respuesta: 'El asistente con IA no está disponible por ahora.' }, error: null });
+      throw e;
+    }
+
+    await pool.query('INSERT INTO portal_ia_uso (id_dealer, id_cuenta, rut, pregunta) VALUES (?,?,?,?)',
+      [idd, idc, rutNorm(req.dealer && req.dealer.rut), pregunta.slice(0, 500)]);
+    const restantes = limite > 0 ? Math.max(0, limite - Number(u.c) - 1) : null;
+    return res.json({ success: true, data: { disponible: true, respuesta: r.texto || 'No tengo una respuesta para eso.', restantes }, error: null });
+  } catch (err) {
+    console.error('[portal-dealer] ia:', err.message);
+    return res.status(500).json({ success: false, data: null, error: 'No pude responder en este momento.' });
   }
 };
