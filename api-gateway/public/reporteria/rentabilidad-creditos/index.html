@@ -102,7 +102,7 @@
   <div class="topnav-left">
     <a href="/" class="topnav-brand">
       <img src="/img/logo.png" alt="AutoFácil">
-      <span class="version-badge" id="versionBadge">v1.6</span>
+      <span class="version-badge" id="versionBadge">v1.7</span>
     </a>
     <div class="breadcrumb-nav">
       <a href="/">Inicio</a><span class="sep">›</span>
@@ -143,18 +143,19 @@
   <div class="tbl-wrap">
     <table class="rt" id="tabla">
       <thead><tr>
-        <th style="width:12%">N° Op · Δ%</th>
-        <th style="width:19%">Cliente</th>
-        <th style="width:13%">Ejecutivo</th>
-        <th style="width:9%">Colocada</th>
-        <th class="num" style="width:10%">Monto Fin.</th>
-        <th class="num" style="width:10%">Rent. AutoFin</th>
-        <th class="num" style="width:10%">Rent. UAC</th>
+        <th style="width:11%">N° Op · Δ%</th>
+        <th style="width:17%">Cliente</th>
+        <th style="width:12%">Ejecutivo</th>
+        <th style="width:8%">Colocada</th>
+        <th class="num" style="width:9%">Monto Fin.</th>
+        <th class="num" style="width:9%">Rent. AutoFin</th>
+        <th class="num" style="width:9%">Rent. UAC</th>
         <th style="width:8%">+ rentable</th>
-        <th class="num" style="width:9%">Δ financieras</th>
+        <th class="num" style="width:9%">Δ financ.</th>
+        <th style="width:9%">Según cuadro</th>
       </tr></thead>
       <tbody id="tbody">
-        <tr><td colspan="9" class="empty"><div class="spinner-border spinner-border-sm me-2"></div>Cargando…</td></tr>
+        <tr><td colspan="10" class="empty"><div class="spinner-border spinner-border-sm me-2"></div>Cargando…</td></tr>
       </tbody>
     </table>
   </div>
@@ -223,6 +224,24 @@ function tasaMensualDecimal(v){
 let UF_HOY = null, PARAMS = {}, TASAS = {}, CREDITOS = [], FILAS = [];
 const UMBRAL_RENT = 100000;   // rentabilidad mínima por operación; bajo esto → rojo (no conviene cursar)
 
+/* Cuadro de Preferencia de Financiera (mantenedor financiera_preferencia). El informe LO LEE:
+   si lo editas en el mantenedor, cambia la columna "Según cuadro" de acá. */
+let PREF_TABLA = [
+  { desde:12, hasta:23, af_min:'4000000', af_max:'200 UF',   un_min:'2000000', un_max:'18000000' },
+  { desde:24, hasta:35, af_min:'2000000', af_max:'200 UF',   un_min:'2000000', un_max:'18000000' },
+  { desde:36, hasta:47, af_min:'2000000', af_max:'99999999', un_min:'2000000', un_max:'18000000' },
+  { desde:48, hasta:60, af_min:'2000000', af_max:'99999999', un_min:'NO SE PUEDE', un_max:'NO SE PUEDE' },
+];
+function parsePrefVal(v){ const s=String(v??'').toUpperCase().trim(); if(!s||s.includes('NO SE PUEDE')) return null; if(s.includes('UF')){ const n=parseFloat(s.replace(/[^0-9.]/g,'')); return (UF_HOY&&n)?n*UF_HOY:null; } return parseInt(s.replace(/[^0-9]/g,''))||null; }
+function preferenteSegunTabla(plazo, saldo){
+  const p=parseInt(plazo)||0;
+  const row=PREF_TABLA.find(r=>p>=parseInt(r.desde)&&p<=parseInt(r.hasta));
+  if(!row||!saldo) return null;
+  const enRango=(min,max)=>{ const mi=parsePrefVal(min),ma=parsePrefVal(max); if(mi===null&&ma===null) return false; return saldo>=(mi??0)&&saldo<=(ma??Infinity); };
+  const puedeAF=enRango(row.af_min,row.af_max), puedeUN=enRango(row.un_min,row.un_max);
+  return puedeAF ? 'AF' : (puedeUN ? 'UAC' : null);
+}
+
 /* ── Init ─────────────────────────────────────────── */
 (async function init(){
   // Gate de acceso (igual que la card en Reportería)
@@ -245,18 +264,20 @@ const UMBRAL_RENT = 100000;   // rentabilidad mínima por operación; bajo esto 
 
 async function cargarBase(){
   try {
-    const [rC, rUf, rPar, rTas] = await Promise.all([
+    const [rC, rUf, rPar, rTas, rPref] = await Promise.all([
       fetch('/api/creditos/reporteria', { headers:hdr() }),
       fetch('/api/uf/vigente',          { headers:hdr() }),
       fetch('/api/parametros-credito',  { headers:hdr() }),
       fetch('/api/tasas/vigente',       { headers:hdr() }),
+      fetch('/api/cartas-params/financiera_preferencia', { headers:hdr() }),
     ]);
-    const [jC, jUf, jPar, jTas] = await Promise.all([rC.json(), rUf.json(), rPar.json(), rTas.json()]);
+    const [jC, jUf, jPar, jTas, jPref] = await Promise.all([rC.json(), rUf.json(), rPar.json(), rTas.json(), rPref.json()]);
     CREDITOS = Array.isArray(jC.data) ? jC.data : [];
     const u = Array.isArray(jUf.data) ? jUf.data[0] : jUf.data;
     if (u?.valor) UF_HOY = parseFloat(u.valor);
     if (jPar.success && jPar.data?.obj) PARAMS = jPar.data.obj;
     if (jTas.data) TASAS = Array.isArray(jTas.data) ? jTas.data[0] : jTas.data;
+    try { if (jPref.success && jPref.data) { const t = JSON.parse(jPref.data); if (Array.isArray(t) && t.length) PREF_TABLA = t; } } catch(e){}
   } catch(e){ console.error('base', e); }
 }
 
@@ -323,7 +344,10 @@ function recalcular(){
         vsOtraPct = rentOtra!==0 ? (vsOtraCLP/Math.abs(rentOtra))*100 : (vsOtraCLP>0?100:vsOtraCLP<0?-100:0);
       }
     }
-    return { c, colo, R, rentAF, rentUAC, mejor, esOptima, diffCLP, diffPct, vsOtraCLP, vsOtraPct };
+    // Preferencia según el cuadro (mantenedor) — el informe la LEE de ahí
+    const saldoPref = Number(c.saldo_precio) || (valor - Number(c.pie||0));
+    const pref = preferenteSegunTabla(plazo, saldoPref);   // 'AF' | 'UAC' | null
+    return { c, colo, R, rentAF, rentUAC, mejor, esOptima, diffCLP, diffPct, vsOtraCLP, vsOtraPct, pref };
   });
 
   // Peores primero (mayor pérdida arriba), luego óptimos
@@ -353,7 +377,7 @@ function render(){
   // Tabla
   const tb = document.getElementById('tbody');
   if(!FILAS.length){
-    tb.innerHTML = '<tr><td colspan="9" class="empty"><i class="bi bi-inbox" style="font-size:1.6rem;display:block;margin-bottom:6px;opacity:.4"></i>Sin créditos otorgados en este mes.</td></tr>';
+    tb.innerHTML = '<tr><td colspan="10" class="empty"><i class="bi bi-inbox" style="font-size:1.6rem;display:block;margin-bottom:6px;opacity:.4"></i>Sin créditos otorgados en este mes.</td></tr>';
     return;
   }
   tb.innerHTML = FILAS.map((f,idx)=>{
@@ -384,9 +408,15 @@ function render(){
         <td>${escH(c.nombre_cliente||'')}</td>
         <td>${escH(c.ejecutivo||'')}</td>
         <td><span class="fin-badge ${finCls}">${escH(finLbl)}</span></td>
-        <td class="num chip-na" colspan="5">Datos incompletos (precio/plazo)</td>
+        <td class="num chip-na" colspan="6">Datos incompletos (precio/plazo)</td>
       </tr>`;
     }
+    // Según el cuadro de Preferencia (editable en el mantenedor)
+    const prefLbl = { AF:'AutoFin', UAC:'UCA' }[f.pref] || '—';
+    let prefCell;
+    if (!f.pref || f.colo==='AFAC') prefCell = `<span class="chip-na">${prefLbl}</span>`;
+    else if (f.pref===f.colo) prefCell = `<span class="chip-ok"><i class="bi bi-check-circle-fill"></i> ${prefLbl}</span>`;
+    else prefCell = `<span class="chip-bad" title="Se cursó por ${finLbl}, el cuadro indicaba ${prefLbl}"><i class="bi bi-exclamation-triangle-fill"></i> ${prefLbl}</span>`;
     const masRent = f.mejor==='AF' ? 'AutoFin' : 'UCA';
     let masRentCell, vsCell;
     if (f.colo==='AFAC'){
@@ -411,6 +441,7 @@ function render(){
       <td class="num rentcell ${uacBest}" style="color:${f.rentUAC>=UMBRAL_RENT?'#166534':'#dc2626'}" title="${f.rentUAC<UMBRAL_RENT?'Bajo $100.000 — no conviene cursar por UCA':''}">${fmtCLP(f.rentUAC)}</td>
       <td>${masRentCell}</td>
       <td class="num">${vsCell}</td>
+      <td>${prefCell}</td>
     </tr>`;
   }).join('');
 }

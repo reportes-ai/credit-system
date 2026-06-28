@@ -109,7 +109,7 @@
   <div class="topnav-left">
     <a href="/" class="topnav-brand">
       <img src="/img/logo.png" alt="AutoFácil">
-      <span class="version-badge">v1.1</span>
+      <span class="version-badge">v1.2</span>
     </a>
     <div class="breadcrumb-nav">
       <a href="/">Inicio</a><span class="sep">›</span>
@@ -274,6 +274,7 @@ function logout() { sessionStorage.removeItem('token'); sessionStorage.removeIte
 function hdr() { return { Authorization: 'Bearer ' + token }; }
 
 let P = {};    // parámetros del sistema
+let T = {};    // tasas vigentes (CF / spreads, módulo de tasas)
 let UF = 0;   // valor UF hoy
 
 /* ── Helpers formato ──────────────────────────────────────────────── */
@@ -338,6 +339,13 @@ async function cargarDatos() {
       jp.data.lista.forEach(r => { P[r.clave] = parseFloat(r.valor); });
     }
   } catch(e) { console.warn('[simulador] parametros-credito:', e.message); }
+
+  // ── Tasas vigentes (CF y spreads) ──
+  try {
+    const rt = await fetch('/api/tasas/vigente', { headers: hdr() });
+    const jt = await rt.json();
+    if (jt.data) T = Array.isArray(jt.data) ? jt.data[0] : jt.data;
+  } catch(e) { console.warn('[simulador] tasas/vigente:', e.message); }
 
   // ── UF: primero vigente (más confiable), sin depender de fecha ──
   try {
@@ -443,8 +451,10 @@ function simular() {
   // Determinar mayor/menor 200 UF
   const limite200 = UF ? 200 * UF : null;
   const esMayor   = limite200 ? monto_fin > limite200 : false;
-  const tmcMenor  = (P.autofin_tmc_menor_200 || 33.60) / 100 / 12;
-  const tmcMayor  = (P.autofin_tmc_mayor_200 || 29.40) / 100 / 12;
+  // Tasas vigentes = fuente de verdad (módulo de tasas). En % (2.5525, 0.67). Fallback a parámetros viejos.
+  const tmcMenor  = (T.tasa_mensual_menor != null) ? Number(T.tasa_mensual_menor) / 100 : (P.autofin_tmc_menor_200 || 33.60) / 100 / 12;
+  const tmcMayor  = (T.tasa_mensual_mayor != null) ? Number(T.tasa_mensual_mayor) / 100 : (P.autofin_tmc_mayor_200 || 29.40) / 100 / 12;
+  const spreadMayor = (T.spread_mayor != null) ? Number(T.spread_mayor) / 100 : (P.autofin_spread_fondo || 0.67) / 100;
   const tasaAuto  = esMayor ? tmcMayor : tmcMenor;
 
   // Tasa (usar campo manual si lo modificaron)
@@ -463,8 +473,8 @@ function simular() {
   }
 
   // ── AutoFin ────────────────────────────────────────────────────────
-  const spread    = (P.autofin_spread_fondo || 0.67) / 100;
-  const costoFondo = tmcMayor - spread; // fijo 1.78%
+  // CF = tasa_mensual_mayor − spread_mayor (módulo de tasas; mismo para ambos tramos)
+  const costoFondo = tmcMayor - spreadMayor;
   let ing_tasa_af = 0;
   if (tasaCli > 0 && costoFondo > 0 && plazo > 0) {
     const cuota = monto_fin * tasaCli * Math.pow(1+tasaCli,plazo) / (Math.pow(1+tasaCli,plazo)-1);

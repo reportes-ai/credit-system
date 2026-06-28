@@ -162,7 +162,7 @@
   <div class="topnav-left">
     <a href="/" class="topnav-brand">
       <img src="/img/logo.png" alt="AutoFácil">
-      <span class="version-badge" id="versionBadge">v1.0</span>
+      <span class="version-badge" id="versionBadge">v1.1</span>
     </a>
     <div class="breadcrumb-nav">
       <span class="bc-normal">
@@ -445,7 +445,8 @@
       </tr></thead>
       <tbody id="bodyPrefTabla"></tbody>
     </table>
-    <div style="display:flex;justify-content:flex-end;margin-top:16px">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-top:16px;gap:12px">
+      <button class="btn-af" style="background:#0f766e" onclick="calcularOptimoPref()" title="Rellena el cuadro con los cortes óptimos calculados por el motor de rentabilidad (UAC tier 1)"><i class="bi bi-cpu me-1"></i>Calcular óptimo (motor)</button>
       <button class="btn-af" onclick="guardarPrefTabla()"><i class="bi bi-check-lg me-1"></i>Guardar Tabla</button>
     </div>
   </div>
@@ -2326,6 +2327,34 @@ function renderPrefTabla(){
     <td>${inp(i,'un_min',r.un_min)}</td><td>${inp(i,'un_max',r.un_max)}</td>
   </tr>`).join('');
 }
+/* Calcula los cortes óptimos con el motor de rentabilidad y rellena el cuadro.
+   El motor usa el módulo de tasas (CF/spread). UAC = tier 1 (14%), dealer calle. */
+function calcularOptimoPref(){
+  const el = document.getElementById('paramsAlert');
+  if (!window.AF_RENT) { el.textContent='El motor de rentabilidad aún no carga, reintenta.'; el.className='alert-inline err'; return; }
+  const uacPct = (parseFloat(PARAMS_CRED?.uac_pct_tier1)||14)/100;
+  const flip = (saldo) => {                       // primera cuota donde AutoFin ≥ UAC
+    for (let p=12; p<=48; p++){
+      const R = window.AF_RENT.calcular({ valor:saldo, pie:0, plazo:p, seguros:{desg:true,rdh:true,cesa:true},
+        esPatio:false, dealerComCLP:null, tasaCli:null, uacPct }, PARAMS_CRED||{}, UF_HOY, TASAS||{});
+      if (R && R.af.rentab >= R.uac.rentab) return p;
+    }
+    return 49;
+  };
+  const mF = Math.min(24, Math.max(12, flip(5000000)));    // representante menor 200 UF
+  const yF = Math.min(37, Math.max(25, flip(12000000)));   // representante mayor 200 UF
+  const rows = [];
+  if (mF > 12)   rows.push({ desde:12,    hasta:mF-1, af_min:'NO SE PUEDE', af_max:'NO SE PUEDE', un_min:'2000000', un_max:'18000000' });
+  if (mF <= 23)  rows.push({ desde:mF,    hasta:23,   af_min:'4000000',     af_max:'200 UF',      un_min:'2000000', un_max:'18000000' });
+  if (yF-1 >= 24)rows.push({ desde:24,    hasta:yF-1, af_min:'2000000',     af_max:'200 UF',      un_min:'2000000', un_max:'18000000' });
+  if (yF <= 36)  rows.push({ desde:yF,    hasta:36,   af_min:'2000000',     af_max:'99999999',    un_min:'2000000', un_max:'18000000' });
+  rows.push({ desde:37, hasta:48, af_min:'2000000', af_max:'99999999', un_min:'NO SE PUEDE', un_max:'NO SE PUEDE' });
+  PREF_TABLA = rows;
+  renderPrefTabla();
+  el.innerHTML = `Óptimo del motor: <b>Unidad</b> hasta ${mF-1} cuotas (≤200 UF) y hasta ${yF-1} (>200 UF); <b>AutoFin</b> desde ahí. Revisa y presiona <b>Guardar Tabla</b> para aplicarlo.`;
+  el.className = 'alert-inline ok';
+}
+
 async function guardarPrefTabla(){
   const nuevos = PREF_TABLA.map(r=>({...r}));
   document.querySelectorAll('#bodyPrefTabla input').forEach(el=>{
