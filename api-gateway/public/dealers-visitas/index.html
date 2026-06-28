@@ -116,7 +116,7 @@
   <div class="topnav-left">
     <a href="/" class="topnav-brand">
       <img src="/img/logo.png" alt="AutoFácil">
-      <span class="version-badge" id="versionBadge">v1.9</span>
+      <span class="version-badge" id="versionBadge">v1.10</span>
     </a>
     <div class="breadcrumb-nav">
       <a href="/">Inicio</a><span class="sep">›</span>
@@ -848,7 +848,46 @@ function imprimirDirecciones(di){
   });
   const hoy=new Date().toLocaleDateString('es-CL');
   const titulo = unDia ? ('Visitas — '+fmtDia(lista[0].fecha)) : 'Ruta de visitas a concesionarios';
+
+  // Mapa solo en la impresión de UN día (los lugares de ese día)
+  let mapaCSS='', mapaDiv='', mapaJS='';
+  if(unDia){
+    const pts=lista[0].visitas.filter(v=>v.lat&&v.lng).map(v=>({lat:+v.lat,lng:+v.lng,nombre:v.nombre||'',hora:v.hora||''}));
+    const json=JSON.stringify(pts).replace(/</g,'\\u003c');
+    mapaCSS=`<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+      <style>#mapa{height:430px;width:100%;border:1px solid #cbd5e1;border-radius:8px;margin-top:14px}
+      .rt-tip{background:#0c4a6e;color:#fff;border:none;font-weight:700;font-size:11px;padding:1px 6px;border-radius:6px}
+      .rt-tip::before{display:none}
+      *{ -webkit-print-color-adjust:exact; print-color-adjust:exact; }</style>`;
+    mapaDiv=`<div id="mapa"></div>`;
+    mapaJS=`<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"><\/script>
+    <script>
+      var PTS=${json};
+      window.addEventListener('load',function(){
+        if(typeof L==='undefined'||!PTS.length){ window.print(); return; }
+        var disp=PTS.map(function(v){return [v.lat,v.lng];});
+        var grupos={}; PTS.forEach(function(v,i){var k=v.lat.toFixed(5)+','+v.lng.toFixed(5);(grupos[k]=grupos[k]||[]).push(i);});
+        Object.keys(grupos).forEach(function(k){var idx=grupos[k]; if(idx.length<2)return;
+          var base=[disp[idx[0]][0],disp[idx[0]][1]],R=0.0006,cl=Math.cos(base[0]*Math.PI/180)||1;
+          idx.forEach(function(gi,j){var a=2*Math.PI*j/idx.length-Math.PI/2; disp[gi]=[base[0]+R*Math.sin(a),base[1]+(R/cl)*Math.cos(a)];});});
+        var map=L.map('mapa',{zoomControl:false,attributionControl:false});
+        var tl=L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{maxZoom:19}).addTo(map);
+        var lls=[];
+        PTS.forEach(function(v,i){var ll=disp[i]; lls.push(ll);
+          var ic=L.divIcon({className:'',iconSize:[26,26],iconAnchor:[13,13],html:'<div style="background:#0e7490;color:#fff;border-radius:50%;width:26px;height:26px;display:flex;align-items:center;justify-content:center;font-weight:800;font-size:12px;border:2px solid #fff">'+(i+1)+'</div>'});
+          var m=L.marker(ll,{icon:ic}).addTo(map);
+          if(v.hora) m.bindTooltip(v.hora,{permanent:true,direction:'top',offset:[0,-14],className:'rt-tip'});
+        });
+        if(lls.length>1){ L.polyline(lls,{color:'#0e7490',weight:3,opacity:.8,dashArray:'7,7'}).addTo(map); map.fitBounds(L.latLngBounds(lls).pad(0.25)); }
+        else { map.setView(lls[0],14); }
+        var done=false; function go(){ if(done)return; done=true; map.invalidateSize(); setTimeout(function(){window.print();},500); }
+        tl.on('load',go); setTimeout(go,3000);
+      });
+    <\/script>`;
+  }
+
   const doc=`<!doctype html><html lang="es"><head><meta charset="utf-8"><title>${esc(titulo)}</title>
+    ${mapaCSS}
     <style>
       *{box-sizing:border-box} body{font-family:Arial,Helvetica,sans-serif;color:#111;margin:26px}
       h1{font-size:17px;margin:0 0 2px} .sub{color:#666;font-size:12px;margin:0 0 14px}
@@ -862,7 +901,9 @@ function imprimirDirecciones(di){
     <p class="sub">Generado el ${esc(hoy)} · orden óptimo de recorrido</p>
     <table><thead><tr><th>#</th><th>Hora</th><th>Concesionario</th><th>Dirección</th><th>Comuna</th></tr></thead>
     <tbody>${filas}</tbody></table>
-    <script>window.onload=function(){window.print();}<\/script></body></html>`;
+    ${mapaDiv}
+    ${unDia ? '' : '<script>window.onload=function(){window.print();}<\/script>'}
+    ${mapaJS}</body></html>`;
   const w=window.open('','_blank');
   if(!w){ alert('Permite las ventanas emergentes para imprimir las direcciones.'); return; }
   w.document.write(doc); w.document.close();
