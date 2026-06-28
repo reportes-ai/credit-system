@@ -126,7 +126,8 @@
       hilo.appendChild(turn); turn.scrollIntoView({ behavior:'smooth', block:'end' });
       cargando = true; document.getElementById('btnSend').disabled = true;
 
-      const j = await api('/api/ia/consulta', { method:'POST', body: JSON.stringify({ pregunta }) });
+      const historial = TURNS.filter(t => t && t.sql).slice(-3).map(t => ({ pregunta: t.pregunta, sql: t.sql }));
+      const j = await api('/api/ia/consulta', { method:'POST', body: JSON.stringify({ pregunta, historial }) });
       cargando = false; document.getElementById('btnSend').disabled = false;
       const a = turn.querySelector('.a');
       if (!j) return;

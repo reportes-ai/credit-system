@@ -111,15 +111,20 @@ async function ejecutarSeguro(sqlRaw) {
 }
 
 /* ── IA: generar SQL desde la pregunta ── */
-async function generarSQL(pregunta, esquema, errPrevio, id_usuario) {
+async function generarSQL(pregunta, esquema, errPrevio, id_usuario, historial) {
   const system =
     'Eres un analista de datos experto en SQL (MySQL/TiDB) para AutoFácil, una automotora de crédito en Chile. ' +
     'Genera UNA sola consulta SELECT (sin punto y coma) que responda la pregunta, usando SOLO estas tablas y columnas:\n' +
     esquema +
     '\n\nReglas: solo SELECT (jamás modificar datos); usa JOIN/agregaciones según convenga; agrega LIMIT cuando devuelvas listas; ' +
-    'montos en pesos; las fechas son tipo DATE/DATETIME. Si la pregunta NO se puede responder con estas tablas, marca no_aplica=true y explica en motivo. ' +
+    'montos en pesos; las fechas son tipo DATE/DATETIME. Si la pregunta NO se puede responder con estas tablas (ej. pide una simulación o un escenario "qué pasaría si"), marca no_aplica=true y explica en motivo. ' +
     'Devuelve JSON: {"sql": "...", "intencion": "...", "grafico": {"tipo":"bar|line|pie", "etiqueta":"<columna categórica>", "valor":"<columna numérica>", "titulo":"..."} | null, "no_aplica": false, "motivo": ""}.';
-  let prompt = `Pregunta del usuario: "${pregunta}"`;
+  let prompt = '';
+  if (historial && historial.length) {
+    prompt += 'Contexto de la conversación (preguntas previas y el SQL usado). La nueva pregunta puede ser una REPREGUNTA que se apoya en estas (ej. "y por dealer", "pero solo los morosos", "ahora del mes pasado"); reescribe la consulta COMPLETA considerando ese contexto:\n' +
+      historial.map((h, i) => `${i + 1}) Pregunta: ${h.pregunta}\n   SQL: ${h.sql}`).join('\n') + '\n\n';
+  }
+  prompt += `Pregunta del usuario: "${pregunta}"`;
   if (errPrevio) prompt += `\n\nTu consulta SQL anterior falló con este error: ${errPrevio}\nCorrígela.`;
   const { datos } = await analizar({ codigo: CODIGO_IA, system, prompt, json: true, id_usuario, max_tokens: 1000 });
   return datos;
@@ -132,8 +137,12 @@ const preguntar = async (req, res) => {
     if (!pregunta) return res.status(400).json({ success: false, data: null, error: 'Escribe una pregunta' });
     const uid = req.usuario.id_usuario;
     const esquema = await getEsquema();
+    const historial = (Array.isArray(req.body.historial) ? req.body.historial : [])
+      .filter(h => h && h.pregunta && h.sql)
+      .slice(-3)
+      .map(h => ({ pregunta: String(h.pregunta).slice(0, 300), sql: String(h.sql).slice(0, 1500) }));
 
-    let gen = await generarSQL(pregunta, esquema, null, uid);
+    let gen = await generarSQL(pregunta, esquema, null, uid, historial);
     if (!gen || (!gen.sql && !gen.no_aplica)) return res.json({ success: true, data: { pregunta, respuesta: 'No pude interpretar la pregunta. ¿Puedes reformularla?', sql: null, columns: [], rows: [], grafico: null }, error: null });
     if (gen.no_aplica) return res.json({ success: true, data: { pregunta, respuesta: gen.motivo || 'No puedo responder eso con los datos disponibles.', sql: null, columns: [], rows: [], grafico: null }, error: null });
 
@@ -141,7 +150,7 @@ const preguntar = async (req, res) => {
     try { resultado = await ejecutarSeguro(gen.sql); }
     catch (e1) {
       // Un reintento: le devolvemos el error a la IA para que corrija
-      gen = await generarSQL(pregunta, esquema, e1.message || String(e1), uid);
+      gen = await generarSQL(pregunta, esquema, e1.message || String(e1), uid, historial);
       if (!gen || !gen.sql) throw e1;
       resultado = await ejecutarSeguro(gen.sql);
     }
