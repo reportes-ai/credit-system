@@ -116,7 +116,7 @@
   <div class="topnav-left">
     <a href="/" class="topnav-brand">
       <img src="/img/logo.png" alt="AutoFácil">
-      <span class="version-badge" id="versionBadge">v1.6</span>
+      <span class="version-badge" id="versionBadge">v1.7</span>
     </a>
     <div class="breadcrumb-nav">
       <a href="/">Inicio</a><span class="sep">›</span>
@@ -179,6 +179,13 @@
           <option value="riesgo">En riesgo (pasando a inactivo)</option>
           <option value="inactivos">Inactivos</option>
           <option value="todos">Todos</option>
+        </select>
+      </div>
+      <div class="fld" style="margin:0"><label>Tipo</label>
+        <select id="pTipo">
+          <option value="ambos">Ambos (calle y parque)</option>
+          <option value="calle">Solo Calle</option>
+          <option value="parque">Solo Parque</option>
         </select>
       </div>
       <div class="fld" style="margin:0"><label>Comuna</label><select id="pComuna"><option value="">Todas</option></select></div>
@@ -653,6 +660,10 @@ async function loadPlanData(){
     conc.map(d=>`<option value="${d.id_dealer}">${esc(d.nombre)}${d.comuna?(' — '+esc(d.comuna)):''}</option>`).join('');
 }
 function filtraEstado(d,e){ if(e==='activos')return d.activo==1; if(e==='inactivos')return d.activo==0; if(e==='riesgo')return !!d.en_riesgo; return true; }
+// Tipo de dealer: usa tipo_ficha (GENERAL/CALLE, PARQUE, AMBOS); si no hay, cae a ccs_parque.
+function esParqueD(d){ const t=(d.tipo_ficha||'').toUpperCase(); if(t) return t==='PARQUE'||t==='AMBOS'; return /^PARQUE/i.test(d.ccs_parque||''); }
+function esCalleD(d){ const t=(d.tipo_ficha||'').toUpperCase(); if(t) return t==='AMBOS'||t==='GENERAL'||t==='CALLE'||t==='PARTICULAR'; return !/^PARQUE/i.test(d.ccs_parque||''); }
+function filtraTipo(d,sel){ if(sel==='calle')return esCalleD(d); if(sel==='parque')return esParqueD(d); return true; }
 function hav(a,b){ const R=6371,toR=x=>x*Math.PI/180; const dLat=toR(b.lat-a.lat),dLng=toR(b.lng-a.lng);
   const s=Math.sin(dLat/2)**2+Math.cos(toR(a.lat))*Math.cos(toR(b.lat))*Math.sin(dLng/2)**2; return 2*R*Math.asin(Math.sqrt(s)); }
 function mediana(a){ const s=a.slice().sort((x,y)=>x-y); const m=s.length>>1; return s.length%2?s[m]:(s[m-1]+s[m])/2; }
@@ -704,7 +715,8 @@ async function generarPlan(){
   const radio=Math.max(0, parseFloat(document.getElementById('pRadio').value)||0);
   const limpiar=()=>{ document.getElementById('planCobertura').innerHTML=''; document.getElementById('planLista').innerHTML=''; };
 
-  let universo=PLAN_DEALERS.filter(d=>filtraEstado(d,estado));
+  const tipo=document.getElementById('pTipo').value;
+  let universo=PLAN_DEALERS.filter(d=>filtraEstado(d,estado)).filter(d=>filtraTipo(d,tipo));
   if(comuna) universo=universo.filter(d=>d.comuna===comuna);
   const sinCoord=universo.filter(d=>!(d.lat&&d.lng)).length;
   let conCoord=universo.filter(d=>d.lat&&d.lng).map(d=>({...d}));

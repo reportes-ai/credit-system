@@ -164,7 +164,8 @@ const planificador = async (req, res) => {
     const [dealers] = await pool.query(
       `SELECT id_dealer, rut, numero,
               COALESCE(NULLIF(TRIM(nombre_indexa),''), NULLIF(TRIM(nombre_razon),''), rut) AS nombre,
-              comuna, comuna_parque, geo_dir, lat, lng, activo, categoria_asignada
+              comuna, comuna_parque, geo_dir, lat, lng, activo, categoria_asignada,
+              ccs_parque, tipo_ficha
          FROM dealers ORDER BY nombre`);
     // Última venta (crédito otorgado) por RUT de dealer
     let ult = [];
@@ -185,6 +186,7 @@ const planificador = async (req, res) => {
         id_dealer: d.id_dealer, rut: d.rut, nombre: d.nombre, comuna: comunaDe(d),
         lat: d.lat != null ? Number(d.lat) : null, lng: d.lng != null ? Number(d.lng) : null,
         activo: d.activo, categoria: d.categoria_asignada || null,
+        ccs_parque: d.ccs_parque || null, tipo_ficha: d.tipo_ficha || null,
         ultimo_credito: ultima, creditos_total: u ? u.n : 0, en_riesgo,
       };
     });
