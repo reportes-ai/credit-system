@@ -150,6 +150,9 @@ app.use('/api/notif', require('../../services/notificaciones/src/routes/notifica
 // Atención Remota (chat + videollamada WebRTC + documentos)
 app.use('/api/atencion-remota', require('../../services/atencion-remota/src/routes/atencion.routes'));
 
+// Portal del Dealer (self-service read-only: sus operaciones, estado, pagos, chat)
+app.use('/api/portal-dealer', require('../../services/portal-dealer/src/routes/portal.routes'));
+
 // Post Venta
 app.use('/api/postventa', require('../../services/postventa/src/routes/postventa.routes'));
 app.use('/api/correos-programados', require('../../services/correos-programados/src/routes/correos.routes'));
