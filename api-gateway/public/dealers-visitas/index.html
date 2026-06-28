@@ -113,7 +113,7 @@
   <div class="topnav-left">
     <a href="/" class="topnav-brand">
       <img src="/img/logo.png" alt="AutoFácil">
-      <span class="version-badge" id="versionBadge">v1.2</span>
+      <span class="version-badge" id="versionBadge">v1.3</span>
     </a>
     <div class="breadcrumb-nav">
       <a href="/">Inicio</a><span class="sep">›</span>
@@ -168,6 +168,7 @@
       <div class="fld" style="margin:0"><label>Hora término</label><input type="time" id="pFin" value="18:00"></div>
       <div class="fld" style="margin:0"><label>Duración visita (min)</label><input type="number" id="pDur" min="5" max="480" value="45"></div>
       <div class="fld" style="margin:0"><label>Velocidad ciudad (km/h)</label><input type="number" id="pVel" min="5" max="120" value="25"></div>
+      <div class="fld" style="margin:0"><label>Radio máx. (km, opc.)</label><input type="number" id="pRadio" min="0" placeholder="sin límite"></div>
       <div class="fld" style="margin:0"><label>Inicio del plan</label><input type="date" id="pDesde"></div>
       <div class="fld" style="margin:0"><label>Dealers</label>
         <select id="pEstado">
@@ -181,8 +182,8 @@
     </div>
     <div class="fld" style="max-width:520px">
       <label>Punto de partida (opcional)</label>
-      <select id="pOrigen"><option value="">Auto (extremo norte de la zona)</option></select>
-      <span style="font-size:.72rem;color:#94a3b8">Desde aquí se traza la ruta más corta (vecino más cercano).</span>
+      <select id="pOrigen"><option value="">Auto (dealer más céntrico)</option></select>
+      <span style="font-size:.72rem;color:#94a3b8">Desde aquí se traza la ruta más corta (vecino más cercano) y se mide el radio máximo.</span>
     </div>
     <div class="dow-pick" id="pDias" style="margin-bottom:14px"></div>
     <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap">
@@ -634,16 +635,22 @@ async function loadPlanData(){
   const comunas=[...new Set(PLAN_DEALERS.map(d=>d.comuna).filter(Boolean))].sort();
   document.getElementById('pComuna').innerHTML='<option value="">Todas</option>'+comunas.map(c=>`<option>${esc(c)}</option>`).join('');
   const conc=PLAN_DEALERS.filter(d=>d.lat&&d.lng).slice().sort((a,b)=>a.nombre.localeCompare(b.nombre));
-  document.getElementById('pOrigen').innerHTML='<option value="">Auto (extremo norte de la zona)</option>'+
+  document.getElementById('pOrigen').innerHTML='<option value="">Auto (dealer más céntrico)</option>'+
     conc.map(d=>`<option value="${d.id_dealer}">${esc(d.nombre)}${d.comuna?(' — '+esc(d.comuna)):''}</option>`).join('');
 }
 function filtraEstado(d,e){ if(e==='activos')return d.activo==1; if(e==='inactivos')return d.activo==0; if(e==='riesgo')return !!d.en_riesgo; return true; }
 function hav(a,b){ const R=6371,toR=x=>x*Math.PI/180; const dLat=toR(b.lat-a.lat),dLng=toR(b.lng-a.lng);
   const s=Math.sin(dLat/2)**2+Math.cos(toR(a.lat))*Math.cos(toR(b.lat))*Math.sin(dLng/2)**2; return 2*R*Math.asin(Math.sqrt(s)); }
+function centroide(p){ let la=0,lo=0; p.forEach(d=>{la+=d.lat;lo+=d.lng;}); return {lat:la/p.length,lng:lo/p.length}; }
 function rutaNN(puntos, origenId){
   const rest=puntos.slice(); let start=null;
   if(origenId){ const i=rest.findIndex(d=>d.id_dealer==origenId); if(i>=0) start=rest.splice(i,1)[0]; }
-  if(!start){ rest.sort((a,b)=>b.lat-a.lat); start=rest.shift(); }
+  if(!start && rest.length){
+    // Arranque = dealer más céntrico (más cercano al centroide), NO el outlier extremo.
+    const c=centroide(rest); let bi=0,bd=Infinity;
+    for(let i=0;i<rest.length;i++){ const dd=hav(c,rest[i]); if(dd<bd){bd=dd;bi=i;} }
+    start=rest.splice(bi,1)[0];
+  }
   start._dist=0; const out=[start]; let cur=start;
   while(rest.length){ let bi=0,bd=Infinity; for(let i=0;i<rest.length;i++){ const dd=hav(cur,rest[i]); if(dd<bd){bd=dd;bi=i;} }
     cur=rest.splice(bi,1)[0]; cur._dist=bd; out.push(cur); }
@@ -678,26 +685,47 @@ async function generarPlan(){
   const origenId=document.getElementById('pOrigen').value||null;
 
   const excluir=document.getElementById('pExcluir').checked;
+  const radio=Math.max(0, parseFloat(document.getElementById('pRadio').value)||0);
+  const limpiar=()=>{ document.getElementById('planCobertura').innerHTML=''; document.getElementById('planLista').innerHTML=''; };
+
   let universo=PLAN_DEALERS.filter(d=>filtraEstado(d,estado));
   if(comuna) universo=universo.filter(d=>d.comuna===comuna);
   const sinCoord=universo.filter(d=>!(d.lat&&d.lng)).length;
   let conCoord=universo.filter(d=>d.lat&&d.lng).map(d=>({...d}));
   let excluidosVis=0;
   if(excluir){ const before=conCoord.length; conCoord=conCoord.filter(d=>!VISITED_SET.has(d.id_dealer)); excluidosVis=before-conCoord.length; }
-  if(!conCoord.length){
-    flash('pMsg', excluir&&excluidosVis ? 'Todos los dealers de este filtro ya fueron visitados. 🎉' : 'No hay dealers geocodificados con ese filtro. Geocodifícalos en el Mapa de Dealers.','#b91c1c');
-    document.getElementById('planCobertura').innerHTML=''; document.getElementById('planLista').innerHTML=''; return; }
-  flash('pMsg', excluir? `Excluidos ${excluidosVis} ya visitado(s).` : '', excluir?'#0e7490':'');
 
-  const ruta=rutaNN(conCoord, origenId);
+  // Punto de partida (origen elegido o el más céntrico) — base para radio y ruta
+  let startCoord=null;
+  if(origenId){ const o=PLAN_DEALERS.find(d=>d.id_dealer==origenId); if(o&&o.lat&&o.lng) startCoord={lat:+o.lat,lng:+o.lng}; }
+  if(!startCoord && conCoord.length) startCoord=centroide(conCoord);
+  let fueraRadio=0;
+  if(radio>0 && startCoord){ const before=conCoord.length; conCoord=conCoord.filter(d=>hav(startCoord,d)<=radio); fueraRadio=before-conCoord.length; }
+
+  if(!conCoord.length){
+    flash('pMsg', (excluir&&excluidosVis) ? 'Todos los dealers de este filtro ya fueron visitados. 🎉'
+        : (radio?'Ningún dealer dentro del radio indicado.':'No hay dealers geocodificados con ese filtro. Geocodifícalos en el Mapa de Dealers.'),'#b91c1c');
+    limpiar(); return;
+  }
+  // Guarda: la duración no cabe en la ventana horaria
+  if(ini+dur > fin){ flash('pMsg',`Cada visita dura ${dur} min y la ventana ${document.getElementById('pIni').value}-${document.getElementById('pFin').value} es de ${fin-ini} min. No alcanza ni una visita.`,'#b91c1c'); limpiar(); return; }
+
+  const ruta=rutaNN(conCoord, origenId||null);
   const { dias:plan }=distribuir(ruta,{visDia,iniMin:ini,finMin:fin,durMin:dur,velKmh:vel,diasSet:dias,fechaInicio:fechaIni});
+  if(!plan.length){ flash('pMsg','No se pudo armar el plan con esos parámetros.','#b91c1c'); limpiar(); return; }
+
+  const notas=[]; if(excluir&&excluidosVis) notas.push(`${excluidosVis} ya visitado(s)`); if(fueraRadio) notas.push(`${fueraRadio} fuera de radio`);
+  flash('pMsg', notas.length?('Excluidos: '+notas.join(' · ')):'', '#0e7490');
+
   const startMs=new Date(fechaIni+'T12:00:00').getTime();
-  let vMes=0,vAno=0,kmTot=0;
-  plan.forEach(d=>{ const days=(new Date(d.fecha+'T12:00:00').getTime()-startMs)/86400000;
-    d.visitas.forEach(v=>kmTot+=(v.distKm||0)); if(days<30)vMes+=d.visitas.length; if(days<365)vAno+=d.visitas.length; });
+  let vMes=0,vAno=0,kmTot=0,tot=0,lastMs=startMs;
+  plan.forEach(d=>{ const ms=new Date(d.fecha+'T12:00:00').getTime(); const days=(ms-startMs)/86400000;
+    d.visitas.forEach(v=>{kmTot+=(v.distKm||0);tot++;}); if(days<30)vMes+=d.visitas.length; if(days<365)vAno+=d.visitas.length; lastMs=ms; });
+  const avgDia = plan.length ? tot/plan.length : 0;
+  const mesesCubrir = Math.max(1, Math.ceil(((lastMs-startMs)/86400000+1)/30));
   PLAN_RESULT={plan,total:ruta.length,sinCoord};
   await cargarVisitasPlan(plan);
-  renderCobertura({total:ruta.length,sinCoord,vMes,vAno,nDias:plan.length,kmTot,excluidosVis});
+  renderCobertura({total:ruta.length,sinCoord,fueraRadio,excluidosVis,vMes,vAno,nDias:plan.length,kmTot,avgDia,mesesCubrir});
   renderPlanLista(plan);
 }
 async function cargarVisitasPlan(plan){
@@ -710,14 +738,15 @@ function renderCobertura(c){
   const card=(lbl,val,sub,col)=>`<div class="stat" style="flex-direction:column;align-items:flex-start;min-width:150px;border-left:4px solid ${col}">
     <span style="font-size:.7rem;color:#64748b;font-weight:700;text-transform:uppercase">${lbl}</span>
     <span style="font-size:1.3rem;font-weight:800;color:#0f172a">${val}</span>${sub?`<span style="font-size:.72rem;color:#94a3b8">${sub}</span>`:''}</div>`;
-  document.getElementById('planCobertura').innerHTML=`<div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:8px">
-    ${card('Dealers a recorrer', total, c.sinCoord?(c.sinCoord+' sin geo excluidos'):'geocodificados','#0e7490')}
-    ${card('% en 1 mes', Math.round(c.vMes/total*100)+'%', c.vMes+' visitas','#16a34a')}
-    ${card('% en 1 año', Math.min(100,Math.round(c.vAno/total*100))+'%', c.vAno+' visitas','#2563eb')}
-    ${card('Recorrer todo', c.nDias+' días', 'hábiles','#7c3aed')}
+  const excl=[]; if(c.sinCoord)excl.push(c.sinCoord+' sin geo'); if(c.fueraRadio)excl.push(c.fueraRadio+' fuera radio'); if(c.excluidosVis)excl.push(c.excluidosVis+' visitados');
+  document.getElementById('planCobertura').innerHTML=`<div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:4px">
+    ${card('Dealers a recorrer', total, excl.length?('excluidos: '+excl.join(' · ')):'geocodificados','#0e7490')}
+    ${card('Visitas por día', (Math.round(c.avgDia*10)/10), 'promedio efectivo','#0891b2')}
+    ${card('Cobertura en 1 mes', Math.round(c.vMes/total*100)+'%', c.vMes+' visitas','#16a34a')}
+    ${card('Cubrir el 100%', '≈ '+c.mesesCubrir+(c.mesesCubrir===1?' mes':' meses'), c.nDias+' días hábiles','#2563eb')}
     ${card('Distancia total', Math.round(c.kmTot)+' km', 'aprox. (línea recta)','#ea580c')}
-    ${c.excluidosVis?card('Ya visitados', c.excluidosVis, 'excluidos del plan','#64748b'):''}
-  </div>`;
+  </div>
+  <div style="font-size:.74rem;color:#94a3b8;margin-bottom:8px"><i class="bi bi-info-circle"></i> La cobertura cuenta dealers <b>únicos</b> (sin revisitar): por eso "1 mes" es parcial y al cabo de ~${c.mesesCubrir} mes(es) llegas al 100%.</div>`;
 }
 function dealerEstadoBadge(d){
   if(d.activo==0) return '<span class="pill" style="background:#e2e8f0;color:#475569">Inactivo</span>';
