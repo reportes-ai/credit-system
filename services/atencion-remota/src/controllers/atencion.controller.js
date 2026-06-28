@@ -303,10 +303,33 @@ const rawToken = (req) => {
   const h = req.headers.authorization;
   return (h && h.startsWith('Bearer ')) ? h.split(' ')[1] : req.query.token;
 };
-const verifyDealer = (req, res, next) => {
+// Vigencia de la cuenta del dealer (revocación casi inmediata sin pegar a BD en
+// cada request). Caché 30s + invalidación explícita al desactivar/editar la
+// cuenta → al desactivar, el corte es inmediato. Refresca id_dealer/rut desde BD
+// (cambios del staff aplican sin re-login). Ante error de BD: no bloquea.
+const _cuentaCache = new Map(); // id_cuenta -> { exp, row }
+const CUENTA_TTL = 30 * 1000;
+async function cuentaVigente(id_cuenta) {
+  if (!id_cuenta) return { ok: true, row: null }; // tokens sin id_cuenta: no se bloquea por esto
+  const hit = _cuentaCache.get(id_cuenta);
+  if (hit && hit.exp > Date.now()) return { ok: true, row: hit.row };
+  try {
+    const [[c]] = await pool.query('SELECT id_dealer, rut, activo FROM ar_dealer_cuentas WHERE id=?', [id_cuenta]);
+    const row = (c && c.activo == 1) ? { revocada: false, id_dealer: c.id_dealer, rut: c.rut } : { revocada: true };
+    _cuentaCache.set(id_cuenta, { exp: Date.now() + CUENTA_TTL, row });
+    return { ok: true, row };
+  } catch (_) { return { ok: false }; } // error de BD → fail-open (no dejar fuera a todos)
+}
+function invalidarCuenta(id) { _cuentaCache.delete(Number(id)); }
+
+const verifyDealer = async (req, res, next) => {
   try {
     const d = jwt.verify(rawToken(req), JWT_SECRET);
     if (d.tipo !== 'dealer') throw new Error('no-dealer');
+    const v = await cuentaVigente(d.id_cuenta);
+    if (v.ok && v.row && v.row.revocada)
+      return res.status(401).json({ success: false, data: null, error: 'Tu cuenta fue desactivada. Contacta a AutoFácil.' });
+    if (v.ok && v.row && !v.row.revocada) { d.id_dealer = v.row.id_dealer; d.rut = v.row.rut; }
     req.dealer = d; next();
   } catch { res.status(401).json({ success: false, data: null, error: 'Token inválido o expirado' }); }
 };
@@ -314,10 +337,17 @@ const verifyAny = async (req, res, next) => {
   try {
     const d = jwt.verify(rawToken(req), JWT_SECRET);
     req.auth = d; req.esDealer = d.tipo === 'dealer';
-    // Internos: además del login, exige el permiso del módulo (los dealers
-    // pasan: su acceso se acota por pertenencia a la conversación en cada handler).
-    if (!req.esDealer && !(await tieneFunc(d.id_usuario, 'atencion_remota')))
+    if (req.esDealer) {
+      // Dealer: su acceso se acota por pertenencia en cada handler, pero validamos
+      // que la cuenta siga activa (corte inmediato al desactivar).
+      const v = await cuentaVigente(d.id_cuenta);
+      if (v.ok && v.row && v.row.revocada)
+        return res.status(401).json({ success: false, data: null, error: 'Tu cuenta fue desactivada. Contacta a AutoFácil.' });
+      if (v.ok && v.row && !v.row.revocada) { d.id_dealer = v.row.id_dealer; d.rut = v.row.rut; }
+    } else if (!(await tieneFunc(d.id_usuario, 'atencion_remota'))) {
+      // Internos: además del login, exige el permiso del módulo.
       return res.status(403).json({ success: false, data: null, error: 'Sin permisos suficientes (atencion_remota)' });
+    }
     next();
   } catch { res.status(401).json({ success: false, data: null, error: 'Token inválido o expirado' }); }
 };
@@ -413,6 +443,7 @@ const actualizarCuenta = async (req, res) => {
       await pool.query('UPDATE ar_dealer_cuentas SET password_hash=? WHERE id=?', [hash, req.params.id]);
     }
     if (activo !== undefined) await pool.query('UPDATE ar_dealer_cuentas SET activo=? WHERE id=?', [activo ? 1 : 0, req.params.id]);
+    invalidarCuenta(Number(req.params.id));   // corte inmediato: la próxima request del dealer re-valida
     auditar({ req, accion: 'EDITAR', modulo: 'atencion-remota', entidad: 'dealer_cuenta', entidad_id: req.params.id, detalle: `Actualizó cuenta de portal #${req.params.id}${password ? ' (reset clave)' : ''}` });
     res.json({ success: true, data: { id: req.params.id }, error: null });
   } catch (e) { errSrv(res, e, 'actualizarCuenta'); }
@@ -652,7 +683,7 @@ const interlocutoresDe = async (req, res) => {
 
 module.exports = {
   // middlewares
-  verifyDealer, verifyAny,
+  verifyDealer, verifyAny, cuentaVigente,
   // dealer
   dealerLogin, dealerAcceso, listarCuentas, crearCuenta, actualizarCuenta, regenerarLink,
   // ejecutivo

@@ -50,6 +50,11 @@ function initAtencionWS(server) {
 
     // El ejecutivo interno necesita el permiso del módulo para operar la consola.
     if (ident.tipo === 'user' && !(await tieneFunc(ident.id, 'atencion_remota'))) return ws.close(4003, 'forbidden');
+    // Dealer: la cuenta debe seguir activa (corte inmediato al desactivar).
+    if (ident.tipo === 'dealer') {
+      const v = await C.cuentaVigente(ident.id_cuenta);
+      if (v.ok && v.row && v.row.revocada) { C.logAcceso({ tipo: 'ws', email: ident.email, id_cuenta: ident.id_cuenta, resultado: 'FAIL', req }); return ws.close(4003, 'cuenta desactivada'); }
+    }
 
     ws.ident = ident; ws.rooms = new Set(); ws.isAlive = true; ws.disponible = false;
     ws.on('pong', () => { ws.isAlive = true; });
