@@ -116,7 +116,7 @@
   <div class="topnav-left">
     <a href="/" class="topnav-brand">
       <img src="/img/logo.png" alt="AutoFácil">
-      <span class="version-badge" id="versionBadge">v1.8</span>
+      <span class="version-badge" id="versionBadge">v1.9</span>
     </a>
     <div class="breadcrumb-nav">
       <a href="/">Inicio</a><span class="sep">›</span>
@@ -798,7 +798,10 @@ function renderPlanLista(plan){
   plan.slice(0,verLim).forEach((d,di)=>{
     html+=`<div style="display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap;margin:12px 0 4px">
       <div style="font-weight:800;color:#0c4a6e;font-size:.84rem;text-transform:capitalize"><i class="bi bi-calendar-event me-1"></i>${esc(new Date(d.fecha+'T12:00:00').toLocaleDateString('es-CL',{weekday:'long',day:'2-digit',month:'long'}))} · ${d.visitas.length} visita(s)</div>
-      <button class="btn btn-soft" style="padding:4px 11px" onclick="verRutaMapa(${di})"><i class="bi bi-map"></i> Ver ruta en mapa</button>
+      <div style="display:flex;gap:6px">
+        <button class="btn btn-soft" style="padding:4px 11px" onclick="verRutaMapa(${di})"><i class="bi bi-map"></i> Ver ruta en mapa</button>
+        <button class="btn btn-ghost" style="padding:4px 11px" onclick="imprimirDirecciones(${di})"><i class="bi bi-printer"></i> Imprimir</button>
+      </div>
     </div>`;
     html+='<div style="overflow:auto"><table class="bt"><thead><tr><th>#</th><th>Hora</th><th>Concesionario</th><th>Comuna</th><th>Dist.</th><th>Último crédito</th><th>Estado</th><th></th></tr></thead><tbody>';
     d.visitas.forEach((v,vi)=>{
@@ -830,18 +833,22 @@ function agendarUno(di,vi){
       await cargarVisitasPlan(PLAN_RESULT.plan); renderPlanLista(PLAN_RESULT.plan); cargarMes();
     }).catch(()=>alert('Error de conexión'));
 }
-function imprimirDirecciones(){
+function imprimirDirecciones(di){
   if(!PLAN_RESULT || !PLAN_RESULT.plan.length){ return; }
   const fmtDia=f=>new Date(f+'T12:00:00').toLocaleDateString('es-CL',{weekday:'long',day:'2-digit',month:'long',year:'numeric'});
+  const unDia = (di!=null);
+  const lista = unDia ? [PLAN_RESULT.plan[di]] : PLAN_RESULT.plan;
+  if(!lista[0]) return;
   let filas='';
-  PLAN_RESULT.plan.forEach(d=>{
-    filas+=`<tr class="dia"><td colspan="5">${esc(fmtDia(d.fecha))} — ${d.visitas.length} visita(s)</td></tr>`;
+  lista.forEach(d=>{
+    if(!unDia) filas+=`<tr class="dia"><td colspan="5">${esc(fmtDia(d.fecha))} — ${d.visitas.length} visita(s)</td></tr>`;
     d.visitas.forEach((v,i)=>{
       filas+=`<tr><td class="n">${i+1}</td><td>${esc(v.hora||'')}</td><td><b>${esc(v.nombre||'—')}</b></td><td>${esc(v.direccion||'—')}</td><td>${esc(v.comuna||'')}</td></tr>`;
     });
   });
   const hoy=new Date().toLocaleDateString('es-CL');
-  const doc=`<!doctype html><html lang="es"><head><meta charset="utf-8"><title>Direcciones de visitas</title>
+  const titulo = unDia ? ('Visitas — '+fmtDia(lista[0].fecha)) : 'Ruta de visitas a concesionarios';
+  const doc=`<!doctype html><html lang="es"><head><meta charset="utf-8"><title>${esc(titulo)}</title>
     <style>
       *{box-sizing:border-box} body{font-family:Arial,Helvetica,sans-serif;color:#111;margin:26px}
       h1{font-size:17px;margin:0 0 2px} .sub{color:#666;font-size:12px;margin:0 0 14px}
@@ -851,7 +858,7 @@ function imprimirDirecciones(){
       td.n{text-align:center;font-weight:bold;width:28px} tr.dia td{background:#0e7490;color:#fff;font-weight:bold;font-size:12.5px}
       @media print{body{margin:12mm}}
     </style></head><body>
-    <h1>Ruta de visitas a concesionarios</h1>
+    <h1>${esc(titulo)}</h1>
     <p class="sub">Generado el ${esc(hoy)} · orden óptimo de recorrido</p>
     <table><thead><tr><th>#</th><th>Hora</th><th>Concesionario</th><th>Dirección</th><th>Comuna</th></tr></thead>
     <tbody>${filas}</tbody></table>
