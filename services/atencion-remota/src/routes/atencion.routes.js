@@ -16,6 +16,11 @@ router.post('/dealer/solicitar', rlSolicitar, C.solicitarCuenta);   // autoregis
 router.post('/dealer/acceso',    rlAcceso,    C.dealerAcceso);       // acceso por link (público, ?k=token)
 router.post('/dealer/recuperar', rlRecuperar, C.recuperarClave);    // pedir enlace de reset (público)
 router.post('/dealer/reset',     rlReset,     C.resetClave);        // fijar nueva clave (público, ?reset=token)
+const rlIniciar    = rateLimit({ key: 'dealer_iniciar',    windowMs: 15 * 60 * 1000, max: 30 });
+const rlOnboarding = rateLimit({ key: 'dealer_onboarding', windowMs: 60 * 60 * 1000, max: 6 });
+router.post('/dealer/iniciar',    rlIniciar,    C.iniciarAcceso);   // ¿el email ya tiene cuenta? (público)
+router.post('/dealer/onboarding', rlOnboarding, C.onboarding);      // auto-alta self-service (público)
+router.post('/dealer/tour-visto', C.verifyDealer, C.tourVisto);    // marca tour de bienvenida visto
 
 /* ── Compartido (ejecutivo o dealer) ─────────────────────────────────────── */
 router.get('/ice', C.verifyAny, C.getIce);

@@ -23,6 +23,9 @@ const APP_URL = (process.env.APP_URL || 'https://credit-system-45em.onrender.com
 
 const normRut = r => String(r || '').replace(/[.\-\s]/g, '').toUpperCase();
 const genToken = () => crypto.randomBytes(24).toString('hex');
+// Clave aleatoria legible (sin caracteres ambiguos) para enviar por correo.
+const genClave = (n = 10) => { const a = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnpqrstuvwxyz23456789'; const b = crypto.randomBytes(n); let s = ''; for (let i = 0; i < n; i++) s += a[b[i] % a.length]; return s; };
+const DEALER_INACTIVIDAD_MESES = 6;   // sin entrar este tiempo → cuenta se desactiva (re-onboarding al volver)
 const errSrv  = (res, e, tag) => { console.error(`[${tag}]`, e.message); res.status(500).json({ success: false, data: null, error: 'Error interno del servidor' }); };
 
 // Bitácora de accesos de dealers (login por email, acceso por link, sesión WS).
@@ -64,6 +67,8 @@ async function logAcceso({ tipo, email, id_cuenta, resultado, req }) {
       INDEX idx_token (token_hash),
       INDEX idx_cuenta (id_cuenta)
     )`);
+    // Marca de primer ingreso (dispara el tour de bienvenida una vez).
+    await pool.query('ALTER TABLE ar_dealer_cuentas ADD COLUMN IF NOT EXISTS primer_ingreso TINYINT(1) NOT NULL DEFAULT 0').catch(() => {});
 
     await pool.query(`CREATE TABLE IF NOT EXISTS ar_conversaciones (
       id               INT AUTO_INCREMENT PRIMARY KEY,
@@ -384,7 +389,7 @@ const dealerLogin = async (req, res) => {
     const payload = { tipo: 'dealer', id_cuenta: c.id, id_dealer: c.id_dealer, rut: c.rut, nombre: c.nombre, email: c.email };
     const token = jwt.sign(payload, JWT_SECRET, { expiresIn: JWT_EXPIRES });
     const cfg = await getCfg().catch(() => ({}));
-    res.json({ success: true, data: { token, dealer: { id_dealer: c.id_dealer, rut: c.rut, nombre: c.nombre, email: c.email }, bienvenida: cfg.mensaje_bienvenida || '' }, error: null });
+    res.json({ success: true, data: { token, dealer: { id_dealer: c.id_dealer, rut: c.rut, nombre: c.nombre, email: c.email, primer_ingreso: c.primer_ingreso ? 1 : 0 }, bienvenida: cfg.mensaje_bienvenida || '' }, error: null });
   } catch (e) { errSrv(res, e, 'dealerLogin'); }
 };
 
@@ -400,8 +405,77 @@ const dealerAcceso = async (req, res) => {
     const payload = { tipo: 'dealer', id_cuenta: c.id, id_dealer: c.id_dealer, rut: c.rut, nombre: c.nombre, email: c.email };
     const token = jwt.sign(payload, JWT_SECRET, { expiresIn: JWT_EXPIRES });
     const cfg = await getCfg().catch(() => ({}));
-    res.json({ success: true, data: { token, dealer: { id_dealer: c.id_dealer, rut: c.rut, nombre: c.nombre, email: c.email }, bienvenida: cfg.mensaje_bienvenida || '' }, error: null });
+    res.json({ success: true, data: { token, dealer: { id_dealer: c.id_dealer, rut: c.rut, nombre: c.nombre, email: c.email, primer_ingreso: c.primer_ingreso ? 1 : 0 }, bienvenida: cfg.mensaje_bienvenida || '' }, error: null });
   } catch (e) { errSrv(res, e, 'dealerAcceso'); }
+};
+
+// POST /dealer/iniciar — el portal pregunta si el email ya tiene cuenta ACTIVA,
+// para decidir el siguiente paso (pedir clave vs onboarding de primera vez).
+const iniciarAcceso = async (req, res) => {
+  try {
+    const email = String((req.body && req.body.email) || '').toLowerCase().trim();
+    if (!email) return res.status(400).json({ success: false, data: null, error: 'Email requerido' });
+    const [[c]] = await pool.query('SELECT id FROM ar_dealer_cuentas WHERE email=? AND activo=1', [email]);
+    return res.json({ success: true, data: { existe: !!c }, error: null });
+  } catch (e) { errSrv(res, e, 'iniciarAcceso'); }
+};
+
+// POST /dealer/onboarding {email, rut} — auto-alta self-service.
+// SOLO crea la cuenta y envía la clave si el email coincide con el correo
+// REGISTRADO del dealer y el RUT apunta al MISMO dealer → la clave llega a un
+// correo confiable. Si no coincide, deja una solicitud en revisión del staff.
+const onboarding = async (req, res) => {
+  try {
+    const email = String((req.body && req.body.email) || '').toLowerCase().trim();
+    const rut = normRut((req.body && req.body.rut) || '');
+    if (!email || !rut) return res.status(400).json({ success: false, data: null, error: 'Email y RUT requeridos' });
+
+    const [[dEmail]] = await pool.query(
+      'SELECT id_dealer, rut, correo, nombre_razon, nombre_indexa FROM dealers WHERE LOWER(correo)=? LIMIT 1', [email]);
+    const [[dRut]] = await pool.query(
+      "SELECT id_dealer FROM dealers WHERE REPLACE(REPLACE(REPLACE(UPPER(COALESCE(rut,'')),'.',''),'-',''),' ','')=? LIMIT 1", [rut]);
+    const match = dEmail && dRut && dEmail.id_dealer && dEmail.id_dealer === dRut.id_dealer;
+
+    if (!match) {
+      // No se pudo validar → solicitud en revisión del staff (NO auto-alta).
+      try { await pool.query("INSERT INTO ar_solicitudes_cuenta (rut, razon_social, email, estado) VALUES (?,?,?,'PENDIENTE')", [rut, '', email]); } catch (_) {}
+      logAcceso({ tipo: 'onboarding', email, resultado: 'FAIL', req });
+      return res.json({ success: true, data: { estado: 'revision' }, error: null });
+    }
+
+    const correoDealer = dEmail.correo;                       // correo confiable (registrado)
+    const nombre = dEmail.nombre_razon || dEmail.nombre_indexa || null;
+    const clave = genClave(10);
+    const hash = await bcrypt.hash(clave, 10);
+    const [[ex]] = await pool.query('SELECT id FROM ar_dealer_cuentas WHERE email=?', [email]);
+    if (ex) {
+      await pool.query(
+        'UPDATE ar_dealer_cuentas SET password_hash=?, activo=1, primer_ingreso=1, id_dealer=?, rut=?, nombre=COALESCE(nombre,?) WHERE id=?',
+        [hash, dEmail.id_dealer, dEmail.rut, nombre, ex.id]);
+      invalidarCuenta(ex.id);
+    } else {
+      await pool.query(
+        'INSERT INTO ar_dealer_cuentas (id_dealer, rut, nombre, email, password_hash, primer_ingreso, activo) VALUES (?,?,?,?,?,1,1)',
+        [dEmail.id_dealer, dEmail.rut, nombre, email, hash]);
+    }
+    const nombreSafe = nombre ? ' ' + String(nombre).replace(/[<>&]/g, ' ').trim() : '';
+    const html = envolverHTML(`<p>Hola${nombreSafe},</p>
+      <p>¡Bienvenido al <b>Portal Dealer de AutoFácil</b>! Ya puedes ingresar con:</p>
+      <p style="font-size:15px"><b>Usuario:</b> ${email}<br><b>Clave:</b> <span style="font-family:monospace;font-size:18px;background:#f1f5f9;padding:3px 8px;border-radius:6px">${clave}</span></p>
+      <p style="margin:16px 0"><a href="${APP_URL}/portal-dealer" style="display:inline-block;background:#0141A2;color:#fff;text-decoration:none;padding:11px 22px;border-radius:8px;font-weight:700">Ir al portal</a></p>
+      <p style="font-size:13px;color:#64748b">Por seguridad puedes cambiar tu clave cuando quieras desde "¿Olvidaste tu clave?".</p>`);
+    await enviarCorreo({ to: correoDealer, subject: 'Bienvenido al Portal Dealer de AutoFácil — tu clave de acceso', html, text: `Bienvenido al Portal Dealer de AutoFácil. Usuario: ${email}  Clave: ${clave}  —  ${APP_URL}/portal-dealer` }).catch(() => {});
+    logAcceso({ tipo: 'onboarding', email, id_cuenta: ex ? ex.id : null, resultado: 'OK', req });
+    return res.json({ success: true, data: { estado: 'creado' }, error: null });
+  } catch (e) { errSrv(res, e, 'onboarding'); }
+};
+
+// POST /dealer/tour-visto (verifyDealer) — marca que ya vio el tour de bienvenida.
+const tourVisto = async (req, res) => {
+  try {
+    await pool.query('UPDATE ar_dealer_cuentas SET primer_ingreso=0 WHERE id=?', [req.dealer.id_cuenta]);
+    res.json({ success: true, data: { ok: true }, error: null });
+  } catch (e) { errSrv(res, e, 'tourVisto'); }
 };
 
 // Recuperación de clave self-service: el dealer pide un enlace a su correo.
@@ -741,11 +815,27 @@ const interlocutoresDe = async (req, res) => {
   } catch (e) { errSrv(res, e, 'interlocutoresDe'); }
 };
 
+// ── Job: desactiva cuentas de dealer inactivas (>N meses) → re-onboarding al volver ──
+let _inactJobRunning = false;
+async function desactivarInactivos() {
+  if (_inactJobRunning) return; _inactJobRunning = true;
+  try {
+    const [r] = await pool.query(
+      `UPDATE ar_dealer_cuentas SET activo=0
+        WHERE activo=1 AND COALESCE(ultimo_acceso, created_at) < (NOW() - INTERVAL ? MONTH)`,
+      [DEALER_INACTIVIDAD_MESES]);
+    if (r.affectedRows) console.log(`[atencion-remota] ${r.affectedRows} cuenta(s) de dealer desactivada(s) por inactividad (>${DEALER_INACTIVIDAD_MESES}m)`);
+  } catch (e) { console.error('[dealer inactividad]', e.message); }
+  finally { _inactJobRunning = false; }
+}
+setTimeout(desactivarInactivos, 25000);
+{ const _t = setInterval(desactivarInactivos, 12 * 3600 * 1000); if (_t.unref) _t.unref(); }
+
 module.exports = {
   // middlewares
   verifyDealer, verifyAny, cuentaVigente,
   // dealer
-  dealerLogin, dealerAcceso, recuperarClave, resetClave, listarCuentas, crearCuenta, actualizarCuenta, regenerarLink,
+  dealerLogin, dealerAcceso, iniciarAcceso, onboarding, tourVisto, recuperarClave, resetClave, listarCuentas, crearCuenta, actualizarCuenta, regenerarLink,
   // ejecutivo
   getCola, getMensajes,
   // comunes
