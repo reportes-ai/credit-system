@@ -102,7 +102,7 @@
   <div class="topnav-left">
     <a href="/" class="topnav-brand">
       <img src="/img/logo.png" alt="AutoFácil">
-      <span class="version-badge" id="versionBadge">v1.3</span>
+      <span class="version-badge" id="versionBadge">v1.4</span>
     </a>
     <div class="breadcrumb-nav">
       <a href="/">Inicio</a><span class="sep">›</span>
@@ -214,7 +214,7 @@ function tasaMensualDecimal(v){
 }
 
 /* ── Estado ───────────────────────────────────────── */
-let UF_HOY = null, PARAMS = {}, CREDITOS = [], FILAS = [];
+let UF_HOY = null, PARAMS = {}, TASAS = {}, CREDITOS = [], FILAS = [];
 
 /* ── Init ─────────────────────────────────────────── */
 (async function init(){
@@ -238,16 +238,18 @@ let UF_HOY = null, PARAMS = {}, CREDITOS = [], FILAS = [];
 
 async function cargarBase(){
   try {
-    const [rC, rUf, rPar] = await Promise.all([
+    const [rC, rUf, rPar, rTas] = await Promise.all([
       fetch('/api/creditos/reporteria', { headers:hdr() }),
       fetch('/api/uf/vigente',          { headers:hdr() }),
       fetch('/api/parametros-credito',  { headers:hdr() }),
+      fetch('/api/tasas/vigente',       { headers:hdr() }),
     ]);
-    const [jC, jUf, jPar] = await Promise.all([rC.json(), rUf.json(), rPar.json()]);
+    const [jC, jUf, jPar, jTas] = await Promise.all([rC.json(), rUf.json(), rPar.json(), rTas.json()]);
     CREDITOS = Array.isArray(jC.data) ? jC.data : [];
     const u = Array.isArray(jUf.data) ? jUf.data[0] : jUf.data;
     if (u?.valor) UF_HOY = parseFloat(u.valor);
     if (jPar.success && jPar.data?.obj) PARAMS = jPar.data.obj;
+    if (jTas.data) TASAS = Array.isArray(jTas.data) ? jTas.data[0] : jTas.data;
   } catch(e){ console.error('base', e); }
 }
 
@@ -296,7 +298,7 @@ function recalcular(){
       uacPct: tier.pct/100,
     };
     // Sin plazo no se puede calcular (crédito incompleto) → se marca "Datos incompletos"
-    const R = (plazo>0 && window.AF_RENT) ? (window.AF_RENT.calcular(inp, PARAMS, UF_HOY) || null) : null;
+    const R = (plazo>0 && window.AF_RENT) ? (window.AF_RENT.calcular(inp, PARAMS, UF_HOY, TASAS) || null) : null;
     let rentAF=null, rentUAC=null, mejor=null, esOptima=null, diffCLP=null, diffPct=null,
         vsOtraCLP=null, vsOtraPct=null;
     if (R){

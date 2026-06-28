@@ -3,7 +3,10 @@
    Rentabilidad /simulador/). Lo usa el Simulador y la pestaña Rentabilidad de las
    Cartas de Aprobación, para que nunca diverjan.
 
-   AF_RENT.calcular(inp, P, UF) → desglose AutoFin vs UAC.
+   AF_RENT.calcular(inp, P, UF, T) → desglose AutoFin vs UAC.
+     T = fila de tasas vigente (/api/tasas/vigente): tasa_mensual_menor/mayor y
+         spread_menor/mayor (en %). Define el costo de fondo (CF = mensual_mayor −
+         spread_mayor) y los spreads por tramo. Si se omite, usa los parámetros viejos.
      inp = {
        valor, pie, plazo,
        gastos:  { prenda, gps, rep, lim },       // booleans (default todos true)
@@ -48,8 +51,9 @@
     return P.dealer_calle_pct_99 != null ? P.dealer_calle_pct_99 / 100 : fb;
   };
 
-  function calcular(inp, P, UF) {
+  function calcular(inp, P, UF, T) {
     P = P || {};
+    T = T || {};
     const g = inp.gastos || { prenda: true, gps: true, rep: true, lim: true };
     const s = inp.seguros || { desg: true, rdh: true, cesa: true };
     const valor = Math.round(inp.valor || 0);
@@ -82,14 +86,18 @@
     // Mayor / menor 200 UF
     const limite200 = UF ? 200 * UF : null;
     const esMayor   = limite200 ? monto_fin > limite200 : false;
-    const tmcMenor  = (P.autofin_tmc_menor_200 || 33.60) / 100 / 12;
-    const tmcMayor  = (P.autofin_tmc_mayor_200 || 29.40) / 100 / 12;
-    const tasaAuto  = esMayor ? tmcMayor : tmcMenor;
+    // Tasas vigentes = FUENTE DE VERDAD (módulo de tasas). Vienen en % (2.5525, 0.67).
+    // Fallback a parámetros viejos solo si no se pasa la tabla de tasas.
+    const mensualMenor = (T.tasa_mensual_menor != null) ? Number(T.tasa_mensual_menor) / 100 : (P.autofin_tmc_menor_200 || 33.60) / 100 / 12;
+    const mensualMayor = (T.tasa_mensual_mayor != null) ? Number(T.tasa_mensual_mayor) / 100 : (P.autofin_tmc_mayor_200 || 29.40) / 100 / 12;
+    const spreadMayor  = (T.spread_mayor != null) ? Number(T.spread_mayor) / 100 : (P.autofin_spread_fondo || 0.67) / 100;
+    const tasaAuto  = esMayor ? mensualMayor : mensualMenor;
     const tasaCli   = (inp.tasaCli != null && inp.tasaCli > 0) ? inp.tasaCli : tasaAuto;
 
     // ── AutoFin: ingreso por colocación (VP de la cuota al costo de fondo) ──
-    const spread     = (P.autofin_spread_fondo || 0.67) / 100;
-    const costoFondo = tmcMayor - spread; // ≈ 1,78% mensual
+    // CF = tasa_mensual_mayor − spread_mayor (igual para ambos tramos; ver módulo de tasas).
+    // Así el spread ganado = spread_mayor (0,67%) en >200 UF y spread_menor (implícito) en ≤200 UF.
+    const costoFondo = mensualMayor - spreadMayor;
     const cuotaDe = (tasa) => monto_fin * tasa * Math.pow(1 + tasa, plazo) / (Math.pow(1 + tasa, plazo) - 1);
     let ing_tasa_af = 0;
     if (tasaCli > 0 && costoFondo > 0) {

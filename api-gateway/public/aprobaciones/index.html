@@ -2148,7 +2148,7 @@ async function cargarRentabilidad(c, fromRev){
     dealerComCLP: Number(c.partBruto||0)||null,
     uacPct:(Number(tier.tier_uac_pct)||14)/100,
   };
-  const R = window.AF_RENT.calcular(inp, PARAMS_CRED||{}, UF_HOY);
+  const R = window.AF_RENT.calcular(inp, PARAMS_CRED||{}, UF_HOY, TASAS||{});
   document.getElementById('modalTitulo').innerHTML = '<i class="bi bi-cash-coin me-2"></i>Rentabilidad — '+escH(c.opCarta||'');
   document.getElementById('modalBody').innerHTML = R ? rentHTML(c,R,tier) : '<p style="color:#b91c1c;padding:16px">Faltan datos en la carta (precio de venta o plazo) para calcular la rentabilidad.</p>';
   document.getElementById('modalFoot').innerHTML = fromRev
