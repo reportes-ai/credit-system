@@ -61,6 +61,33 @@ async function catalogos() {
   return out;
 }
 
+// Lee un plazo (días) desde cartas_parametros (key-value); default si falta.
+async function paramNum(key, def) {
+  try {
+    const [[r]] = await pool.query('SELECT `value` AS v FROM cartas_parametros WHERE `key` = ?', [key]);
+    const n = r ? parseInt(r.v, 10) : NaN;
+    return Number.isFinite(n) ? n : def;
+  } catch (_) { return def; }
+}
+
+// Devuelve la operación SOLO si pertenece al dealer de la sesión; si no, null.
+// Es el guardia anti fuga cross-dealer de todos los endpoints /operaciones/:id.
+async function opDelDealer(req, id) {
+  const sc = dealerScope(req);
+  if (!sc.hasScope || !id) return null;
+  const [[row]] = await pool.query(
+    `SELECT ob.* FROM creditos ob WHERE ob.id = ? AND ${sc.where} AND ${NO_ANULADA}`,
+    [id, ...sc.params]);
+  return row || null;
+}
+
+const contratado = (v) => { const s = String(v == null ? '' : v).trim(); return s !== '' && s !== '0' && Number(s) !== 0; };
+const addDiasISO = (fecha, dias) => {
+  if (!fecha) return null;
+  const x = new Date(fecha); if (isNaN(x)) return null;
+  x.setDate(x.getDate() + dias); return x.toISOString();
+};
+
 // ── GET /api/portal-dealer/resumen ─────────────────────────────────────────
 exports.resumen = async (req, res) => {
   try {
@@ -158,5 +185,155 @@ exports.operaciones = async (req, res) => {
   } catch (err) {
     console.error('[portal-dealer] operaciones:', err.message);
     return res.status(500).json({ success: false, data: null, error: 'No se pudieron cargar las operaciones.' });
+  }
+};
+
+// ── GET /api/portal-dealer/operaciones/:id ─────────────────────────────────
+exports.detalle = async (req, res) => {
+  try {
+    const id = parseInt(req.params.id, 10);
+    const ob = await opDelDealer(req, id);
+    if (!ob) return res.status(404).json({ success: false, data: null, error: 'Operación no encontrada.' });
+
+    let cli = { nombre: '', rut: '' };
+    if (ob.id_cliente) {
+      const [[c]] = await pool.query('SELECT nombre_completo, rut FROM clientes WHERE id_cliente = ?', [ob.id_cliente]);
+      if (c) cli = { nombre: c.nombre_completo || '', rut: c.rut || '' };
+    }
+    const [[st]] = await pool.query(
+      `SELECT ${ESTADO_SQL} AS estado, ${ESTADO_CARTERA_SQL} AS estado_cartera FROM creditos ob WHERE ob.id = ?`, [id]);
+
+    return res.json({
+      success: true,
+      data: {
+        id: ob.id,
+        num_op: ob.numero_credito || ob.num_op,
+        id_financiera: ob.id_financiera,
+        financiera: ob.financiera || 'AUTOFACIL',
+        cliente_nombre: cli.nombre,
+        cliente_rut: cli.rut,
+        vehiculo: { tipo: ob.tipo_vehiculo, marca: ob.marca, modelo: ob.modelo, anio: ob.anio, patente: ob.patente },
+        estado: st ? st.estado : null,
+        estado_cartera: st ? st.estado_cartera : null,
+        fecha_ingreso: ob.created_at,
+        fecha_otorgado: ob.fecha_otorgado,
+        fecha_primera_cuota: ob.fecha_primera_cuota,
+        valor_vehiculo: ob.valor_vehiculo,
+        pie: ob.pie,
+        monto_financiado: ob.monto_financiado,
+        plazo: ob.plazo,
+        cuota: ob.cuota,
+        tasa: ob.tascli_real,
+        comision_dealer: ob.comdea_real,
+        ejecutivo: ob.ejecutivo,
+        vendedor: ob.vendedor,
+        catalogos: await catalogos(),
+      },
+      error: null,
+    });
+  } catch (err) {
+    console.error('[portal-dealer] detalle:', err.message);
+    return res.status(500).json({ success: false, data: null, error: 'No se pudo cargar la operación.' });
+  }
+};
+
+// ── GET /api/portal-dealer/operaciones/:id/fundantes ───────────────────────
+// Qué antecedentes faltan y cuándo llegó cada uno (reusa el modelo de fundantes-seg).
+exports.fundantes = async (req, res) => {
+  try {
+    const id = parseInt(req.params.id, 10);
+    const ob = await opDelDealer(req, id);
+    if (!ob) return res.status(404).json({ success: false, data: null, error: 'Operación no encontrada.' });
+
+    const fin = String(ob.financiera || '').toUpperCase();
+    const [tipos] = await pool.query(
+      'SELECT codigo, nombre, obligatorio, requiere_contrato, orden FROM fundantes_seg_tipos WHERE UPPER(financiera) = ? ORDER BY orden', [fin]);
+    const [[fs]] = await pool.query('SELECT estado, fecha_envio, fecha_validacion FROM fundantes_seg WHERE id_credito = ?', [id]);
+    const [docs] = await pool.query('SELECT codigo, archivo_nombre, created_at FROM fundantes_seg_docs WHERE id_credito = ?', [id]);
+    const subidos = {}; docs.forEach(d => { subidos[d.codigo] = d; });
+
+    const lista = tipos.map(t => {
+      const oblig = t.requiere_contrato ? contratado(ob[t.requiere_contrato]) : !!t.obligatorio;
+      const d = subidos[t.codigo];
+      return { codigo: t.codigo, nombre: t.nombre, obligatorio: oblig, recibido: !!d, fecha: d ? d.created_at : null };
+    });
+    const faltan = lista.filter(x => x.obligatorio && !x.recibido).length;
+
+    return res.json({
+      success: true,
+      data: {
+        aplica: tipos.length > 0,
+        estado: (fs && fs.estado) || 'PENDIENTE',
+        fecha_envio: fs ? fs.fecha_envio : null,
+        fecha_validacion: fs ? fs.fecha_validacion : null,
+        docs: lista,
+        faltan,
+      },
+      error: null,
+    });
+  } catch (err) {
+    console.error('[portal-dealer] fundantes:', err.message);
+    return res.status(500).json({ success: false, data: null, error: 'No se pudieron cargar los antecedentes.' });
+  }
+};
+
+// ── GET /api/portal-dealer/operaciones/:id/pago ────────────────────────────
+exports.pago = async (req, res) => {
+  try {
+    const id = parseInt(req.params.id, 10);
+    const ob = await opDelDealer(req, id);
+    if (!ob) return res.status(404).json({ success: false, data: null, error: 'Operación no encontrada.' });
+
+    const [[seg]] = await pool.query('SELECT id, saldo_precio, comision FROM postventa_seguimiento WHERE id_credito = ?', [id]);
+    if (!seg) {
+      return res.json({ success: true, data: { tiene: false, comision: ob.comdea_real || null, saldo_precio: ob.saldo_precio || null }, error: null });
+    }
+    const [et] = await pool.query(
+      'SELECT track, etapa, fecha FROM postventa_etapas WHERE id_seguimiento = ? ORDER BY fecha DESC, id DESC', [seg.id]);
+    const ult = {};
+    for (const e of et) { if (!ult[e.track]) ult[e.track] = { etapa: e.etapa, fecha: e.fecha }; }
+
+    return res.json({
+      success: true,
+      data: {
+        tiene: true,
+        saldo_precio: seg.saldo_precio,
+        comision: seg.comision,
+        saldo: ult['SALDO'] || null,
+        comision_pago: ult['COMISION'] || null,
+      },
+      error: null,
+    });
+  } catch (err) {
+    console.error('[portal-dealer] pago:', err.message);
+    return res.status(500).json({ success: false, data: null, error: 'No se pudo cargar el estado de pago.' });
+  }
+};
+
+// ── GET /api/portal-dealer/cartolas ────────────────────────────────────────
+// Cartolas enviadas al dealer + plazos calculados (reparos / factura).
+exports.cartolas = async (req, res) => {
+  try {
+    const sc = dealerScope(req);
+    if (!sc.hasScope) return res.json({ success: true, data: { vinculado: false, rows: [], plazos: {} }, error: null });
+
+    const rut = rutNorm(req.dealer && req.dealer.rut);
+    const [rows] = await pool.query(
+      `SELECT id, mes, total_bruto, fecha_envio, nombre_dealer
+       FROM cartolas_enviadas
+       WHERE ? <> '' AND REPLACE(REPLACE(REPLACE(UPPER(COALESCE(rut_dealer,'')),'.',''),'-',''),' ','') = ?
+       ORDER BY fecha_envio DESC LIMIT 200`, [rut, rut]);
+
+    const plazoRep = await paramNum('plazo_reparos_dias', 5);
+    const plazoFac = await paramNum('plazo_factura_dias', 10);
+    const out = rows.map(r => ({
+      id: r.id, mes: r.mes, total_bruto: r.total_bruto, fecha_envio: r.fecha_envio, nombre_dealer: r.nombre_dealer,
+      limite_reparos: addDiasISO(r.fecha_envio, plazoRep),
+      limite_factura: addDiasISO(r.fecha_envio, plazoFac),
+    }));
+    return res.json({ success: true, data: { vinculado: true, rows: out, plazos: { reparos: plazoRep, factura: plazoFac } }, error: null });
+  } catch (err) {
+    console.error('[portal-dealer] cartolas:', err.message);
+    return res.status(500).json({ success: false, data: null, error: 'No se pudieron cargar las cartolas.' });
   }
 };
