@@ -4,6 +4,7 @@ const XLSX      = require('xlsx');
 const historial = require('./carga-historial.controller');
 const { recalcularMeses } = require('../utils/recalcular-mes');
 const { isMesCerrado, getMesDeNumOp } = require('../../../../shared/utils/mes-cerrado');
+const { esFechaFutura } = require('../../../../shared/utils/fecha-futura');
 
 /* ── Migraciones ────────────────────────────────────────────────── */
 (async () => {
@@ -236,6 +237,7 @@ exports.importar = async (req, res) => {
 
     let insertados   = 0;
     let actualizados = 0;
+    let omitidosFuturo = 0;   // filas nuevas saltadas por fecha futura
     let errores      = 0;
     const clienteCache = {};   // rut → id_cliente (resuelto/creado en tabla clientes)
     const log          = [];
@@ -313,6 +315,12 @@ exports.importar = async (req, res) => {
           log.push(`✓ Actualizado ${f.num_op} → ${f.estado_autofin} / ${f.estado_credito}`);
           if ((f.estado_credito||'').toLowerCase() === 'otorgado') cursadosIds.push(f.num_op);
         } else {
+          // Restricción: no insertar créditos nuevos con fecha (otorgamiento/mes) futura
+          if (esFechaFutura(f.fecha_otorgado) || esFechaFutura(f.mes)) {
+            omitidosFuturo++;
+            log.push(`⏭ Omitido ${f.num_op}: fecha futura (${f.fecha_otorgado || f.mes})`);
+            continue;
+          }
           await pool.query(
             `INSERT INTO creditos
                (num_op, id_financiera, estado_autofin, estado_credito, estado_eval,
@@ -393,7 +401,7 @@ exports.importar = async (req, res) => {
 
     return res.json({
       success: true,
-      data: { total: filas.length, insertados, actualizados, errores, log, cursados },
+      data: { total: filas.length, insertados, actualizados, omitidos_futuro: omitidosFuturo, errores, log, cursados },
     });
   } catch (e) {
     console.error('[carga-trinidad importar]', e);

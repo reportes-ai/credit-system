@@ -2,6 +2,7 @@ const pool  = require('../../../../shared/config/database');
 const audit = require('../../../../shared/auditoria');
 require('../migrations/fix-financieras');   // migración one-time de datos (financiera/estado/automotora) — guard propio
 const { isMesCerrado, getMesDeOp } = require('../../../../shared/utils/mes-cerrado');
+const { esFechaFutura, hoyChileDMY } = require('../../../../shared/utils/fecha-futura');
 const { marcarForzadosCalculo } = require('../utils/recalcular-mes');
 const { clasificar: clasificarCartera } = require('../utils/recalcular-estado-cartera');
 const { notificar } = require('../../../notificaciones/src/controllers/notificaciones.controller');
@@ -208,6 +209,10 @@ const create = async (req, res) => {
 
     if (!rut_cliente)
       return res.status(400).json({ success: false, data: null, error: 'rut_cliente es requerido' });
+
+    // Restricción: no se permiten créditos con fecha de otorgamiento futura
+    if (esFechaFutura(fecha_otorgamiento))
+      return res.status(400).json({ success: false, data: null, error: `No se permiten créditos con fecha de otorgamiento futura (posterior a ${hoyChileDMY()}).` });
 
     const numero_credito = await generarNumero();
     const id_usuario = req.usuario?.id_usuario || null;
@@ -600,6 +605,10 @@ const update = async (req, res) => {
       datos_json,
       rut_dealer, vendedor, comision_dealer, id_financiera,
     } = req.body;
+
+    // Restricción: no se permite editar un crédito con fecha de otorgamiento futura
+    if (esFechaFutura(fecha_otorgamiento))
+      return res.status(400).json({ success: false, data: null, error: `No se permiten créditos con fecha de otorgamiento futura (posterior a ${hoyChileDMY()}).` });
 
     const [prev] = await pool.query(
       `SELECT c.estado, c.numero_credito, c.id_usuario AS creador_id, c.financiera,

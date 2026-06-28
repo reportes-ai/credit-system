@@ -67,7 +67,7 @@
 <body>
 <nav class="topnav">
   <div class="topnav-left">
-    <a href="/" class="topnav-brand"><img src="/img/logo.png" alt="AutoFácil"><span class="version-badge">v6.0</span></a>
+    <a href="/" class="topnav-brand"><img src="/img/logo.png" alt="AutoFácil"><span class="version-badge">v6.1</span></a>
     <div class="breadcrumb-nav">
       <a href="/">Inicio</a><span class="sep">›</span>
       <a href="/carga-masiva/">Carga Masiva</a><span class="sep">›</span>
@@ -250,7 +250,8 @@ function mostrarPreview({ resumen, preview }) {
     <div class="stat-item blue"><div class="lbl">Total archivo</div><div class="val">${resumen.total}</div></div>
     <div class="stat-item green"><div class="lbl">Nuevos a importar</div><div class="val">${resumen.nuevos}</div></div>
     <div class="stat-item amber"><div class="lbl">Ya existentes</div><div class="val">${resumen.existentes}</div></div>
-    <div class="stat-item blue"><div class="lbl">OTORGADOS</div><div class="val">${resumen.otorgados}</div></div>`;
+    <div class="stat-item blue"><div class="lbl">OTORGADOS</div><div class="val">${resumen.otorgados}</div></div>
+    ${resumen.futuros ? `<div class="stat-item" style="background:#fef2f2;color:#b91c1c"><div class="lbl">Fecha futura (se omiten)</div><div class="val">${resumen.futuros}</div></div>` : ''}`;
   const tbody = document.getElementById('previewBody');
   tbody.innerHTML = preview.length
     ? preview.map(r => `<tr>
@@ -298,6 +299,7 @@ function mostrarResultado(d) {
       <div class="log-line">⏭️ Ya existentes (saltados): <strong>${d.ya_existentes}</strong></div>
       <div class="log-line">🆕 Nuevos procesados: <strong>${d.nuevos_intentados}</strong></div>
       <div class="log-line" style="color:#166534;font-weight:700">✅ Insertados: <strong>${d.insertados}</strong></div>
+      ${d.omitidos_futuro ? `<div class="log-line" style="color:#b91c1c">🚫 Omitidos por fecha futura: <strong>${d.omitidos_futuro}</strong></div>` : ''}
       ${errHtml}
     </div>`;
   document.getElementById('paso3').style.display = '';

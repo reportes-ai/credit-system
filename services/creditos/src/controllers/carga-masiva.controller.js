@@ -3,6 +3,7 @@ const pool = require('../../../../shared/config/database');
 const XLSX = require('xlsx');
 const { recalcularMeses, extraerMeses } = require('../utils/recalcular-mes');
 const { isMesCerrado } = require('../../../../shared/utils/mes-cerrado');
+const { esFechaFutura } = require('../../../../shared/utils/fecha-futura');
 const historial = require('./carga-historial.controller');
 const { auditar } = require('../../../../shared/audit');
 
@@ -154,6 +155,7 @@ function detectarCols(data) {
     colProducto:find('PRODUCTO'),
     colFin:     find('FINANCIERA'),
     colMonto:   find('MONTO FINANCIADO INDEXA', 'MONTO FINANCIADO'),
+    colFechaOtorg: find('FECHA OTORGADO'),
   };
 }
 
@@ -184,7 +186,7 @@ const preview = async (req, res) => {
 
     if (!data.length) return res.status(400).json({ success: false, data: null, error: 'Archivo vacío' });
 
-    const { colOP, colIdFin, colEstado, colNombre, colProducto, colFin, colMonto } = detectarCols(data);
+    const { colOP, colIdFin, colEstado, colNombre, colProducto, colFin, colMonto, colFechaOtorg } = detectarCols(data);
 
     // Llave: ID FINANCIERA
     const ids = data.map(r => String(r[colIdFin] || '').trim()).filter(v => v && v !== '' && v.toUpperCase() !== 'NO APLICA');
@@ -197,6 +199,8 @@ const preview = async (req, res) => {
       nuevos:     data.filter(r => !setExistentes.has(String(r[colIdFin]||'').trim())).length,
       existentes: setExistentes.size,
       otorgados:  data.filter(r => (r[colEstado]||'').toString().toUpperCase() === 'OTORGADO').length,
+      // Filas con fecha de otorgamiento futura → serán OMITIDAS al importar
+      futuros:    data.filter(r => esFechaFutura(normDate(r[colFechaOtorg]))).length,
     };
 
     // Vista previa: primeras 10 nuevas
@@ -239,6 +243,7 @@ const importar = async (req, res) => {
     const mesOverride = req.body.mes_override || null;
 
     let insertados = 0;
+    let omitidosFuturo = 0;   // filas saltadas por fecha futura
     let errores    = [];
     const clienteCache   = {};
     const detallesLog    = [];   // para log historial
@@ -247,6 +252,13 @@ const importar = async (req, res) => {
       try {
         const obj = mapRow(row, mesOverride);
         if (!obj.num_op) continue;
+
+        // Restricción: no cargar créditos con fecha (otorgamiento/mes) futura
+        if (esFechaFutura(obj.fecha_otorgado) || esFechaFutura(obj.mes)) {
+          omitidosFuturo++;
+          errores.push({ op: obj.num_op, error: `Omitido: fecha futura (${obj.fecha_otorgado || obj.mes})` });
+          continue;
+        }
 
         // ── Resolver id_cliente ──────────────────────────────────────────
         if (obj.rut_cliente) {
@@ -329,8 +341,8 @@ const importar = async (req, res) => {
     }
 
     auditar({ req, accion: 'CARGA_MASIVA', modulo: 'creditos', entidad: 'carga', entidad_id: req.file?.originalname || null,
-      detalle: `Carga masiva AutoFácil: ${insertados} operación(es) insertada(s) de ${data.length} del archivo${errores.length ? ` · ${errores.length} con error` : ''}`,
-      meta: { insertados, total: data.length, errores: errores.length, recalculados } });
+      detalle: `Carga masiva AutoFácil: ${insertados} operación(es) insertada(s) de ${data.length} del archivo${omitidosFuturo ? ` · ${omitidosFuturo} omitida(s) por fecha futura` : ''}${errores.length ? ` · ${errores.length} con error` : ''}`,
+      meta: { insertados, total: data.length, errores: errores.length, omitidos_futuro: omitidosFuturo, recalculados } });
     res.json({
       success: true,
       data: {
@@ -338,6 +350,7 @@ const importar = async (req, res) => {
         ya_existentes:     setExistentes.size,
         nuevos_intentados: data.length,
         insertados,
+        omitidos_futuro:   omitidosFuturo,
         recalculados_comisiones: recalculados,
         errores,
       },
@@ -472,6 +485,8 @@ const actualizar = async (req, res) => {
         for (const [campo, valorNuevo] of Object.entries(obj)) {
           if (CAMPOS_PROTEGIDOS.has(campo)) continue;
           if (valorNuevo === null || valorNuevo === undefined) continue;
+          // Restricción: nunca rellenar fecha de otorgamiento/mes con una fecha futura
+          if ((campo === 'fecha_otorgado' || campo === 'mes') && esFechaFutura(valorNuevo)) continue;
           const valorActual = existente[campo];
           const estaVacio = valorActual === null || valorActual === undefined || valorActual === '' || valorActual === 0;
           if (estaVacio) {
