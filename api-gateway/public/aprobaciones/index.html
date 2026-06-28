@@ -162,7 +162,7 @@
   <div class="topnav-left">
     <a href="/" class="topnav-brand">
       <img src="/img/logo.png" alt="AutoFácil">
-      <span class="version-badge" id="versionBadge">v1.2</span>
+      <span class="version-badge" id="versionBadge">v1.3</span>
     </a>
     <div class="breadcrumb-nav">
       <span class="bc-normal">
@@ -2360,24 +2360,37 @@ async function calcularOptimoPref(){
   renderPrefTabla();
   el.innerHTML = `Óptimo del motor: <b>Unidad</b> hasta ${mF-1} cuotas (≤200 UF) y hasta ${yF-1} (>200 UF); <b>AutoFin</b> desde ahí. Revisa y presiona <b>Guardar Tabla</b> para aplicarlo.`;
   el.className = 'alert-inline ok';
+  prefToast(`Óptimo: Unidad ≤${mF-1}c (≤200 UF) y ≤${yF-1}c (>200 UF). Presiona Guardar Tabla.`, true);
 }
 
+function prefToast(msg, ok){
+  const t = document.getElementById('af-toast'); if(!t) return;
+  t.textContent = msg; t.className = (ok?'ok':'err') + ' show';
+  clearTimeout(_toastTimer); _toastTimer = setTimeout(()=>t.classList.remove('show'), ok?3500:6000);
+}
 async function guardarPrefTabla(){
   const nuevos = PREF_TABLA.map(r=>({...r}));
   document.querySelectorAll('#bodyPrefTabla input').forEach(el=>{
     const i = parseInt(el.dataset.i), k = el.dataset.k;
     nuevos[i][k] = (k==='desde'||k==='hasta') ? (parseInt(el.value)||0) : el.value.trim();
   });
+  const el = document.getElementById('paramsAlert');
   try {
     const r = await fetch('/api/cartas-params/financiera_preferencia', {
       method:'POST', headers: hdr(), body: JSON.stringify({ value: JSON.stringify(nuevos) }) });
     const j = await r.json();
-    const el = document.getElementById('paramsAlert');
-    if (j.success) { PREF_TABLA = nuevos; el.textContent='Tabla de preferencia guardada en BD'; el.className='alert-inline ok'; avisoFinanciera(); }
-    else { el.textContent = j.error||'Error'; el.className='alert-inline err'; }
+    if (j.success) {
+      PREF_TABLA = nuevos;
+      if (el){ el.textContent='✓ Tabla de preferencia guardada en BD'; el.className='alert-inline ok'; }
+      prefToast('✓ Tabla de preferencia guardada', true);
+      try { if (document.getElementById('cAcreedor')) avisoFinanciera(); } catch(_){}
+    } else {
+      if (el){ el.textContent = j.error||'Error'; el.className='alert-inline err'; }
+      prefToast(j.error||'Error al guardar', false);
+    }
   } catch(e) {
-    const el = document.getElementById('paramsAlert');
-    el.textContent='Error de conexión'; el.className='alert-inline err';
+    if (el){ el.textContent='Error de conexión'; el.className='alert-inline err'; }
+    prefToast('Error de conexión al guardar', false);
   }
 }
 
