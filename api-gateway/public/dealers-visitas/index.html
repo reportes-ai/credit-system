@@ -116,7 +116,7 @@
   <div class="topnav-left">
     <a href="/" class="topnav-brand">
       <img src="/img/logo.png" alt="AutoFácil">
-      <span class="version-badge" id="versionBadge">v1.7</span>
+      <span class="version-badge" id="versionBadge">v1.8</span>
     </a>
     <div class="breadcrumb-nav">
       <a href="/">Inicio</a><span class="sep">›</span>
@@ -789,8 +789,11 @@ function dealerEstadoBadge(d){
 }
 function renderPlanLista(plan){
   if(!plan.length){ document.getElementById('planLista').innerHTML='<div class="empty"><i class="bi bi-geo"></i>Sin dealers para planificar.</div>'; return; }
-  const verLim=20; let html=`<div style="display:flex;justify-content:space-between;align-items:center;margin:14px 0 6px">
-    <h6 style="font-weight:800;color:#0f172a;margin:0"><i class="bi bi-list-ol me-1" style="color:#0e7490"></i>Ruta sugerida (orden óptimo)</h6>
+  const verLim=20; let html=`<div style="display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;margin:14px 0 6px">
+    <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
+      <h6 style="font-weight:800;color:#0f172a;margin:0"><i class="bi bi-list-ol me-1" style="color:#0e7490"></i>Ruta sugerida (orden óptimo)</h6>
+      <button class="btn btn-ghost" style="padding:4px 11px" onclick="imprimirDirecciones()"><i class="bi bi-printer"></i> Imprimir direcciones</button>
+    </div>
     <button class="btn btn-primary" onclick="agendarPlan()"><i class="bi bi-calendar-plus"></i> Agendar este plan</button></div>`;
   plan.slice(0,verLim).forEach((d,di)=>{
     html+=`<div style="display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap;margin:12px 0 4px">
@@ -826,6 +829,36 @@ function agendarUno(di,vi){
       if(!j.success){ alert(j.error||'Error al agendar'); return; }
       await cargarVisitasPlan(PLAN_RESULT.plan); renderPlanLista(PLAN_RESULT.plan); cargarMes();
     }).catch(()=>alert('Error de conexión'));
+}
+function imprimirDirecciones(){
+  if(!PLAN_RESULT || !PLAN_RESULT.plan.length){ return; }
+  const fmtDia=f=>new Date(f+'T12:00:00').toLocaleDateString('es-CL',{weekday:'long',day:'2-digit',month:'long',year:'numeric'});
+  let filas='';
+  PLAN_RESULT.plan.forEach(d=>{
+    filas+=`<tr class="dia"><td colspan="5">${esc(fmtDia(d.fecha))} — ${d.visitas.length} visita(s)</td></tr>`;
+    d.visitas.forEach((v,i)=>{
+      filas+=`<tr><td class="n">${i+1}</td><td>${esc(v.hora||'')}</td><td><b>${esc(v.nombre||'—')}</b></td><td>${esc(v.direccion||'—')}</td><td>${esc(v.comuna||'')}</td></tr>`;
+    });
+  });
+  const hoy=new Date().toLocaleDateString('es-CL');
+  const doc=`<!doctype html><html lang="es"><head><meta charset="utf-8"><title>Direcciones de visitas</title>
+    <style>
+      *{box-sizing:border-box} body{font-family:Arial,Helvetica,sans-serif;color:#111;margin:26px}
+      h1{font-size:17px;margin:0 0 2px} .sub{color:#666;font-size:12px;margin:0 0 14px}
+      table{width:100%;border-collapse:collapse;font-size:12px}
+      th,td{border:1px solid #cbd5e1;padding:6px 9px;text-align:left;vertical-align:top}
+      th{background:#eef2f7;text-transform:uppercase;font-size:10px;letter-spacing:.03em}
+      td.n{text-align:center;font-weight:bold;width:28px} tr.dia td{background:#0e7490;color:#fff;font-weight:bold;font-size:12.5px}
+      @media print{body{margin:12mm}}
+    </style></head><body>
+    <h1>Ruta de visitas a concesionarios</h1>
+    <p class="sub">Generado el ${esc(hoy)} · orden óptimo de recorrido</p>
+    <table><thead><tr><th>#</th><th>Hora</th><th>Concesionario</th><th>Dirección</th><th>Comuna</th></tr></thead>
+    <tbody>${filas}</tbody></table>
+    <script>window.onload=function(){window.print();}<\/script></body></html>`;
+  const w=window.open('','_blank');
+  if(!w){ alert('Permite las ventanas emergentes para imprimir las direcciones.'); return; }
+  w.document.write(doc); w.document.close();
 }
 async function agendarPlan(){
   if(!PLAN_RESULT) return;

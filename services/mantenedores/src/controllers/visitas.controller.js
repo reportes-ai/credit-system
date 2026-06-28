@@ -103,6 +103,7 @@ function comunaDeGeoDir(s) {
   return p[p.length - 1].replace(/^\d{4,7}\s*/, '').trim(); // quita código postal
 }
 const comunaDe = d => d.comuna || d.comuna_parque || comunaDeGeoDir(d.geo_dir) || '';
+const direccionDe = d => (d.geo_dir || d.direccion || d.direccion_parque || '').trim();
 
 async function leerConfig() {
   const [[c]] = await pool.query('SELECT * FROM visitas_config WHERE id=1');
@@ -164,8 +165,8 @@ const planificador = async (req, res) => {
     const [dealers] = await pool.query(
       `SELECT id_dealer, rut, numero,
               COALESCE(NULLIF(TRIM(nombre_indexa),''), NULLIF(TRIM(nombre_razon),''), rut) AS nombre,
-              comuna, comuna_parque, geo_dir, lat, lng, activo, categoria_asignada,
-              ccs_parque, tipo_ficha
+              comuna, comuna_parque, geo_dir, direccion, direccion_parque,
+              lat, lng, activo, categoria_asignada, ccs_parque, tipo_ficha
          FROM dealers ORDER BY nombre`);
     // Última venta (crédito otorgado) por RUT de dealer
     let ult = [];
@@ -183,7 +184,7 @@ const planificador = async (req, res) => {
       const ultima = u ? u.ultima : null;
       const en_riesgo = d.activo == 1 && (!ultima || new Date(ultima).getTime() < lim90);
       return {
-        id_dealer: d.id_dealer, rut: d.rut, nombre: d.nombre, comuna: comunaDe(d),
+        id_dealer: d.id_dealer, rut: d.rut, nombre: d.nombre, comuna: comunaDe(d), direccion: direccionDe(d),
         lat: d.lat != null ? Number(d.lat) : null, lng: d.lng != null ? Number(d.lng) : null,
         activo: d.activo, categoria: d.categoria_asignada || null,
         ccs_parque: d.ccs_parque || null, tipo_ficha: d.tipo_ficha || null,
