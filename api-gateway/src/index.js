@@ -112,6 +112,7 @@ app.use('/api/db-maintenance',            require('../../services/mantenedores/s
 app.use('/api/alertas',                   require('../../services/mantenedores/src/routes/alertas.routes'));
 app.use('/api/meses-cerrados',            require('../../services/mantenedores/src/routes/meses-cerrados.routes'));
 app.use('/api/tablas-dinamicas',          require('../../services/reporteria/src/routes/tablas-dinamicas.routes'));
+app.use('/api/bitacora',                  require('../../services/reporteria/src/routes/bitacora.routes'));
 
 // Cotizaciones
 app.use('/api/cotizaciones', require('../../services/cotizaciones/src/routes/cotizaciones.routes'));
@@ -451,6 +452,9 @@ app.get(['/reporteria', '/reporteria/'], (req, res) =>
 
 app.get(['/reporteria/tablas-dinamicas', '/reporteria/tablas-dinamicas/'], (req, res) =>
   res.sendFile(path.join(__dirname, '../public/reporteria/tablas-dinamicas/index.html')));
+
+app.get(['/reporteria/bitacora-credito', '/reporteria/bitacora-credito/'], (req, res) =>
+  res.sendFile(path.join(__dirname, '../public/reporteria/bitacora-credito/index.html')));
 
 app.get(['/politica', '/politica/'], (req, res) =>
   res.sendFile(path.join(__dirname, '../public/politica/index.html')));

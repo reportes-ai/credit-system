@@ -62,6 +62,10 @@
     .report-card.rentab .card-icon-wrap { background:linear-gradient(135deg,#d1fae5,#dcfce7); color:#059669; }
     .report-card.rentab:hover .card-icon-wrap { background:linear-gradient(135deg,#059669,#10b981); color:#fff; }
     .report-card.rentab h6 { color:#065f46; }
+    .report-card.bitacora { --card-accent:linear-gradient(90deg,#312e81,#4f46e5,#6366f1); background:linear-gradient(145deg,#eef2ff,#fff); }
+    .report-card.bitacora .card-icon-wrap { background:linear-gradient(135deg,#e0e7ff,#ede9fe); color:#4f46e5; }
+    .report-card.bitacora:hover .card-icon-wrap { background:linear-gradient(135deg,#4f46e5,#6366f1); color:#fff; }
+    .report-card.bitacora h6 { color:#3730a3; }
   </style>
 </head>
 <body>
@@ -70,7 +74,7 @@
   <div class="topnav-left">
     <a href="/" class="topnav-brand">
       <img src="/img/logo.png" alt="AutoFácil">
-      <span class="version-badge" id="versionBadge">v1.3</span>
+      <span class="version-badge" id="versionBadge">v1.4</span>
     </a>
     <div class="breadcrumb-nav">
       <a href="/">Inicio</a><span class="sep">›</span>
@@ -131,6 +135,17 @@
       <div class="card-footer-row">
         <span class="badge-status activo"><i class="bi bi-check-circle-fill"></i>Disponible</span>
         <button class="btn-abrir" style="background:linear-gradient(135deg,#059669,#10b981)">
+          <i class="bi bi-arrow-right-circle"></i>Abrir
+        </button>
+      </div>
+    </div>
+    <div class="report-card bitacora" id="cardBitacora" style="display:none" onclick="window.location='/reporteria/bitacora-credito/'">
+      <div class="card-icon-wrap"><i class="bi bi-clock-history"></i></div>
+      <h6>Bitácora de un Crédito</h6>
+      <p>Toda la historia de un cliente/operación en una línea de tiempo: alta, informes, análisis, carta, excepciones, aprobaciones, documentos y pagos. Busca por RUT, N° Operación o ID Financiera.</p>
+      <div class="card-footer-row">
+        <span class="badge-status activo"><i class="bi bi-check-circle-fill"></i>Disponible</span>
+        <button class="btn-abrir" style="background:linear-gradient(135deg,#4f46e5,#6366f1)">
           <i class="bi bi-arrow-right-circle"></i>Abrir
         </button>
       </div>
@@ -342,6 +357,9 @@ function logout()     { sessionStorage.removeItem('token'); sessionStorage.remov
     const j = await r.json(); (j.funcionalidades||[]).forEach(c=>perms.add(c));
     if (esAdmin || perms.has('aprob_rentabilidad')) {
       const el = document.getElementById('cardRentab'); if (el) el.style.display = '';
+    }
+    if (esAdmin || perms.has('rep_bitacora')) {
+      const el = document.getElementById('cardBitacora'); if (el) el.style.display = '';
     }
   } catch(e){ /* sin permiso → card oculta */ }
 })();

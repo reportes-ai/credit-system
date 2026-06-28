@@ -1,0 +1,281 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <link rel="icon" href="/img/favicon.png" type="image/png">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Bitácora de un Crédito — AutoFácil</title>
+  <link href="/css/bootstrap.min.css" rel="stylesheet">
+  <link href="/css/bootstrap-icons.css" rel="stylesheet">
+  <style>
+    :root { --navy:#001345; --blue:#0141A2; --sky:#009AFE; --indigo:#4f46e5; }
+    body { background:#f0f4f8; font-family:'Segoe UI',system-ui,sans-serif; }
+    .topnav { background:linear-gradient(90deg,#012d70,#0255c5); color:#fff; height:60px; padding:0 24px; display:flex; align-items:center; justify-content:space-between; position:sticky; top:0; z-index:200; box-shadow:0 2px 8px rgba(0,0,0,.3); }
+    .topnav-left { display:flex; align-items:center; gap:16px; }
+    .topnav-brand { display:flex; align-items:center; gap:8px; text-decoration:none; }
+    .topnav-brand img { height:32px; filter:brightness(0) invert(1); }
+    .version-badge { background:rgba(255,255,255,.15); color:rgba(255,255,255,.75); font-size:.65rem; font-weight:700; border-radius:6px; padding:2px 8px; letter-spacing:.5px; }
+    .breadcrumb-nav { color:rgba(255,255,255,.6); font-size:.85rem; display:flex; align-items:center; gap:6px; }
+    .breadcrumb-nav a { color:rgba(255,255,255,.75); text-decoration:none; }
+    .breadcrumb-nav a:hover { color:#fff; }
+    .breadcrumb-nav .sep { color:rgba(255,255,255,.35); }
+    .topnav-right { display:flex; align-items:center; gap:10px; }
+    .user-chip { background:rgba(255,255,255,.12); border-radius:24px; padding:5px 12px; display:flex; align-items:center; gap:8px; font-size:.85rem; }
+    .avatar { width:28px; height:28px; background:#90caf9; border-radius:50%; display:flex; align-items:center; justify-content:center; color:#0141A2; font-weight:700; font-size:.75rem; }
+    .perfil-badge { background:rgba(144,202,249,.2); border:1px solid rgba(144,202,249,.4); color:#90caf9; border-radius:12px; padding:2px 10px; font-size:.73rem; font-weight:600; }
+    .btn-logout { background:rgba(255,255,255,.1); border:1px solid rgba(255,255,255,.2); color:#fff; border-radius:8px; padding:5px 12px; font-size:.82rem; cursor:pointer; transition:background .2s; }
+    .btn-logout:hover { background:rgba(255,255,255,.22); }
+    .page-wrap { max-width:1080px; margin:24px auto; padding:0 24px 80px; }
+    .page-banner { background:linear-gradient(135deg,#312e81,#4f46e5 55%,#6366f1); border-radius:16px; color:#fff; padding:24px 32px; margin-bottom:22px; display:flex; align-items:center; gap:18px; }
+    .page-banner > i { font-size:2.6rem; opacity:.85; }
+    .page-banner h2 { font-weight:700; margin:0 0 3px; font-size:1.25rem; }
+    .page-banner p { opacity:.85; margin:0; font-size:.85rem; }
+
+    .search-card { background:#fff; border-radius:14px; padding:18px 20px; box-shadow:0 1px 6px rgba(0,0,0,.07); margin-bottom:22px; }
+    .seg { display:inline-flex; background:#f1f5f9; border-radius:10px; padding:3px; gap:2px; }
+    .seg button { background:transparent; border:none; color:#475569; border-radius:8px; padding:7px 16px; font-size:.83rem; font-weight:600; cursor:pointer; transition:.15s; }
+    .seg button.active { background:var(--indigo); color:#fff; box-shadow:0 2px 6px rgba(79,70,229,.35); }
+    .search-row { display:flex; gap:10px; align-items:center; margin-top:14px; flex-wrap:wrap; }
+    .search-row input { flex:1; min-width:220px; border:1.5px solid #d1d5db; border-radius:10px; padding:11px 14px; font-size:1rem; color:#1e293b; outline:none; transition:.15s; }
+    .search-row input:focus { border-color:var(--indigo); box-shadow:0 0 0 3px rgba(79,70,229,.12); }
+    .btn-buscar { background:var(--indigo); color:#fff; border:none; border-radius:10px; padding:11px 24px; font-size:.92rem; font-weight:700; cursor:pointer; display:inline-flex; align-items:center; gap:7px; transition:.15s; }
+    .btn-buscar:hover { filter:brightness(1.08); }
+    .search-hint { font-size:.76rem; color:#94a3b8; margin-top:9px; }
+
+    /* Ficha */
+    .ficha { background:#fff; border-radius:14px; box-shadow:0 1px 6px rgba(0,0,0,.07); padding:20px 24px; margin-bottom:20px; }
+    .ficha-head { display:flex; align-items:flex-start; justify-content:space-between; gap:16px; flex-wrap:wrap; }
+    .ficha-cli h3 { margin:0; font-size:1.15rem; font-weight:800; color:#0f172a; }
+    .ficha-cli .rut { font-size:.85rem; color:#64748b; font-weight:600; margin-top:2px; }
+    .ficha-cli .alta { font-size:.76rem; color:#94a3b8; margin-top:3px; }
+    .btn-print { background:#eef2ff; color:#4338ca; border:none; border-radius:8px; padding:8px 14px; font-size:.8rem; font-weight:600; cursor:pointer; display:inline-flex; align-items:center; gap:6px; }
+    .btn-print:hover { background:#e0e7ff; }
+    .chips { display:flex; flex-wrap:wrap; gap:8px; margin-top:14px; }
+    .chip { display:inline-flex; align-items:center; gap:7px; border:1.5px solid #e2e8f0; border-radius:10px; padding:7px 12px; font-size:.8rem; background:#f8fafc; }
+    .chip b { color:#0f172a; }
+    .chip .st { font-size:.66rem; font-weight:800; border-radius:6px; padding:2px 7px; text-transform:uppercase; letter-spacing:.02em; }
+    .st-OTORGADO,.st-APROBADA { background:#dcfce7; color:#166534; }
+    .st-RECHAZADA,.st-RECHAZADO,.st-ANULADO,.st-DESISTIDO,.st-DESISTIDA { background:#fee2e2; color:#b91c1c; }
+    .st-PENDIENTE,.st-VIGENTE,.st-default { background:#e0e7ff; color:#3730a3; }
+
+    /* Timeline */
+    .tl-wrap { background:#fff; border-radius:14px; box-shadow:0 1px 6px rgba(0,0,0,.07); padding:8px 24px 24px; }
+    .tl-daysep { font-size:.72rem; font-weight:800; color:#64748b; text-transform:uppercase; letter-spacing:.06em; margin:20px 0 6px; padding-top:14px; border-top:1px dashed #e5e7eb; }
+    .tl-daysep:first-child { border-top:none; padding-top:6px; }
+    .tl { list-style:none; margin:0; padding:0; position:relative; }
+    .tl::before { content:''; position:absolute; left:17px; top:6px; bottom:6px; width:2px; background:#eef2f7; }
+    .tl-item { position:relative; padding:10px 0 10px 50px; }
+    .tl-dot { position:absolute; left:4px; top:10px; width:30px; height:30px; border-radius:50%; display:flex; align-items:center; justify-content:center; color:#fff; font-size:.85rem; box-shadow:0 0 0 4px #fff; z-index:1; }
+    .tl-title { font-size:.9rem; font-weight:700; color:#0f172a; }
+    .tl-detail { font-size:.82rem; color:#475569; margin-top:2px; line-height:1.45; }
+    .tl-meta { font-size:.73rem; color:#94a3b8; margin-top:3px; display:flex; flex-wrap:wrap; gap:5px 14px; }
+    .tl-meta .who { color:#6366f1; font-weight:600; }
+    .empty { padding:48px 20px; text-align:center; color:#94a3b8; }
+    .empty i { font-size:2.4rem; display:block; margin-bottom:10px; opacity:.4; }
+    @media print {
+      .topnav,.search-card,.btn-print,.btn-logout { display:none !important; }
+      body { background:#fff; }
+      .ficha,.tl-wrap { box-shadow:none; border:1px solid #e5e7eb; }
+    }
+  </style>
+</head>
+<body>
+
+<nav class="topnav">
+  <div class="topnav-left">
+    <a href="/" class="topnav-brand">
+      <img src="/img/logo.png" alt="AutoFácil">
+      <span class="version-badge" id="versionBadge">v1.0</span>
+    </a>
+    <div class="breadcrumb-nav">
+      <a href="/">Inicio</a><span class="sep">›</span>
+      <a href="/reporteria/">Reportería</a><span class="sep">›</span>
+      <span style="color:#fff;font-weight:600"><i class="bi bi-clock-history me-1"></i>Bitácora de un Crédito</span>
+    </div>
+  </div>
+  <div class="topnav-right">
+    <div class="user-chip">
+      <div class="avatar" id="avatarInicial">?</div>
+      <div>
+        <div style="font-weight:600;line-height:1.3;color:#fff" id="navNombre">—</div>
+        <div class="perfil-badge" id="navPerfil">—</div>
+      </div>
+    </div>
+    <button class="btn-logout" onclick="logout()"><i class="bi bi-box-arrow-right me-1"></i>Salir</button>
+  </div>
+</nav>
+
+<div class="page-wrap">
+  <div class="page-banner">
+    <i class="bi bi-clock-history"></i>
+    <div>
+      <h2>Bitácora de un Crédito</h2>
+      <p>Toda la historia de un cliente/operación: alta, informes, análisis, carta de aprobación, excepciones, aprobaciones, documentos y pagos.</p>
+    </div>
+  </div>
+
+  <div class="search-card">
+    <div class="seg" id="seg">
+      <button data-t="rut" class="active" onclick="setTipo('rut')"><i class="bi bi-person-vcard me-1"></i>RUT</button>
+      <button data-t="op"  onclick="setTipo('op')"><i class="bi bi-hash me-1"></i>N° Operación</button>
+      <button data-t="id"  onclick="setTipo('id')"><i class="bi bi-building me-1"></i>ID Financiera</button>
+    </div>
+    <div class="search-row">
+      <input id="q" type="text" placeholder="Ingresa el RUT del cliente…" onkeydown="if(event.key==='Enter')buscar()" autocomplete="off">
+      <button class="btn-buscar" onclick="buscar()"><i class="bi bi-search"></i> Buscar</button>
+    </div>
+    <div class="search-hint" id="hint"><i class="bi bi-info-circle me-1"></i><b>N° Operación</b> = número AutoFácil (num_op / N° crédito) · <b>ID Financiera</b> = número de la institución.</div>
+  </div>
+
+  <div id="resultado"></div>
+</div>
+
+<script src="/js/auth-guard.js"></script>
+<script>
+/* ── Sesión ───────────────────────────────────────── */
+const YO = JSON.parse(sessionStorage.getItem('usuario') || 'null');
+if (!YO) location.href = '/login.html';
+function getToken(){ return sessionStorage.getItem('token'); }
+function hdr(){ return { 'Content-Type':'application/json', 'Authorization':'Bearer '+getToken() }; }
+function logout(){ sessionStorage.clear(); location.href='/login.html'; }
+if (YO){
+  document.getElementById('navNombre').textContent = YO.nombre + ' ' + (YO.apellido||'');
+  document.getElementById('navPerfil').textContent = YO.perfil || '';
+  document.getElementById('avatarInicial').textContent = (YO.nombre||'?')[0].toUpperCase();
+}
+
+/* ── Estado ───────────────────────────────────────── */
+let TIPO = 'rut';
+const PLACEHOLDER = { rut:'Ingresa el RUT del cliente…', op:'Ingresa el N° de Operación (num_op / N° crédito)…', id:'Ingresa el ID de la financiera…' };
+function setTipo(t){
+  TIPO = t;
+  document.querySelectorAll('#seg button').forEach(b => b.classList.toggle('active', b.dataset.t===t));
+  document.getElementById('q').placeholder = PLACEHOLDER[t];
+  document.getElementById('q').focus();
+}
+
+/* ── Catálogo de categorías → ícono + color ───────── */
+const CAT = {
+  cliente:        ['bi-person-plus-fill','#0141A2'],
+  antecedentes:   ['bi-briefcase-fill','#0e7490'],
+  comercial:      ['bi-bank','#0e7490'],
+  informe:        ['bi-file-earmark-medical-fill','#7c3aed'],
+  cotizacion:     ['bi-calculator-fill','#0891b2'],
+  evaluacion:     ['bi-clipboard2-check-fill','#4f46e5'],
+  carta_crear:    ['bi-envelope-paper-fill','#0141A2'],
+  carta_aprobar:  ['bi-check-circle-fill','#16a34a'],
+  carta_excepcion:['bi-exclamation-triangle-fill','#d97706'],
+  carta_rechazar: ['bi-x-circle-fill','#dc2626'],
+  carta_correccion:['bi-arrow-repeat','#ea580c'],
+  carta_otorgar:  ['bi-cash-coin','#16a34a'],
+  carta_desistir: ['bi-slash-circle-fill','#64748b'],
+  carta_doc:      ['bi-paperclip','#475569'],
+  credito:        ['bi-credit-card-2-front-fill','#0141A2'],
+  documento:      ['bi-file-earmark-arrow-up-fill','#475569'],
+  doc_ok:         ['bi-file-earmark-check-fill','#16a34a'],
+  doc_bad:        ['bi-file-earmark-x-fill','#dc2626'],
+  pago:           ['bi-cash-stack','#16a34a'],
+  estado:         ['bi-arrow-left-right','#475569'],
+  postventa:      ['bi-diagram-3-fill','#4f46e5'],
+  cobranza:       ['bi-telephone-fill','#ea580c'],
+  crm:            ['bi-chat-dots-fill','#0891b2'],
+  _def:           ['bi-record-circle','#94a3b8'],
+};
+
+/* ── Utilidades de formato ────────────────────────── */
+function esc(s){ return String(s==null?'':s).replace(/[&<>"]/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c])); }
+function dDate(v){ if(!v) return null; const d=new Date(v); return isNaN(d)?null:d; }
+function fFecha(v){ const d=dDate(v); if(!d) return '—'; return d.toLocaleDateString('es-CL',{day:'2-digit',month:'2-digit',year:'numeric'}); }
+function fHora(v){ const d=dDate(v); if(!d) return ''; const hh=d.getHours(), mm=d.getMinutes(); return (hh||mm)? d.toLocaleTimeString('es-CL',{hour:'2-digit',minute:'2-digit'}) : ''; }
+function fDiaLargo(v){ const d=dDate(v); if(!d) return 'Sin fecha'; return d.toLocaleDateString('es-CL',{weekday:'long',day:'2-digit',month:'long',year:'numeric'}); }
+function stClass(s){ s=(s||'').toUpperCase(); return ['OTORGADO','APROBADA','RECHAZADA','RECHAZADO','ANULADO','DESISTIDO','DESISTIDA','PENDIENTE','VIGENTE'].includes(s)?('st-'+s):'st-default'; }
+
+/* ── Buscar ───────────────────────────────────────── */
+async function buscar(){
+  const valor = document.getElementById('q').value.trim();
+  const cont  = document.getElementById('resultado');
+  if(!valor){ cont.innerHTML=''; return; }
+  cont.innerHTML = `<div class="tl-wrap"><div class="empty"><div class="spinner-border text-primary"></div><div class="mt-2">Buscando…</div></div></div>`;
+  try {
+    const r = await fetch(`/api/bitacora?tipo=${encodeURIComponent(TIPO)}&valor=${encodeURIComponent(valor)}`, { headers: hdr() });
+    if(r.status===403){ cont.innerHTML = msgVacio('bi-shield-lock','Sin permiso para ver la bitácora.'); return; }
+    const j = await r.json();
+    if(!j.success){ cont.innerHTML = msgVacio('bi-exclamation-octagon', j.error||'Error al consultar.'); return; }
+    if(!j.data || !j.data.encontrado){ cont.innerHTML = msgVacio('bi-search','Sin resultados para «'+esc(valor)+'».'); return; }
+    render(j.data);
+  } catch(e){
+    cont.innerHTML = msgVacio('bi-wifi-off','Error de conexión: '+esc(e.message));
+  }
+}
+function msgVacio(icon,txt){ return `<div class="tl-wrap"><div class="empty"><i class="bi ${icon}"></i>${esc(txt)}</div></div>`; }
+
+/* ── Render ───────────────────────────────────────── */
+function render(d){
+  const cli = d.cliente;
+  const creditos = d.creditos||[], cartas = d.cartas||[], eventos = d.eventos||[];
+
+  // Ficha
+  let chips = '';
+  creditos.forEach(c=>{
+    const nro = c.num_op || c.numero_credito || ('#'+c.id_credito);
+    chips += `<span class="chip"><i class="bi bi-credit-card-2-front" style="color:#0141A2"></i> Crédito <b>${esc(nro)}</b>`
+          + (c.financiera?` · ${esc(c.financiera)}`:'')
+          + (c.estado?` <span class="st ${stClass(c.estado)}">${esc(c.estado)}</span>`:'') + `</span>`;
+  });
+  cartas.forEach(c=>{
+    chips += `<span class="chip"><i class="bi bi-envelope-paper" style="color:#4f46e5"></i> Carta <b>${esc(c.op_carta||('#'+c.id))}</b>`
+          + (c.status?` <span class="st ${stClass(c.status)}">${esc(c.status)}</span>`:'') + `</span>`;
+  });
+
+  const ficha = `
+    <div class="ficha">
+      <div class="ficha-head">
+        <div class="ficha-cli">
+          <h3>${esc(cli?.nombre || (cartas[0]?.cliente) || 'Cliente')}</h3>
+          ${cli?.rut?`<div class="rut"><i class="bi bi-person-vcard me-1"></i>${esc(cli.rut)}</div>`:''}
+          ${cli?.fecha_creacion?`<div class="alta">Cliente registrado el ${fFecha(cli.fecha_creacion)}</div>`:''}
+        </div>
+        <button class="btn-print" onclick="window.print()"><i class="bi bi-printer"></i> Imprimir</button>
+      </div>
+      ${chips?`<div class="chips">${chips}</div>`:''}
+    </div>`;
+
+  // Timeline
+  let tl = '';
+  if(!eventos.length){
+    tl = `<div class="tl-wrap"><div class="empty"><i class="bi bi-calendar-x"></i>Sin eventos registrados para este caso.</div></div>`;
+  } else {
+    let html = '<div class="tl-wrap">', curDay = null, open = false;
+    eventos.forEach(e=>{
+      const day = fFecha(e.fecha);
+      if(day !== curDay){
+        if(open){ html += '</ul>'; }
+        html += `<div class="tl-daysep">${esc(fDiaLargo(e.fecha))}</div><ul class="tl">`;
+        curDay = day; open = true;
+      }
+      const [icon,color] = CAT[e.cat] || CAT._def;
+      const hora = fHora(e.fecha);
+      html += `<li class="tl-item">
+        <span class="tl-dot" style="background:${color}"><i class="bi ${icon}"></i></span>
+        <div class="tl-title">${esc(e.titulo)}</div>
+        ${e.detalle?`<div class="tl-detail">${esc(e.detalle)}</div>`:''}
+        <div class="tl-meta">
+          ${hora?`<span><i class="bi bi-clock me-1"></i>${hora}</span>`:''}
+          ${e.usuario?`<span class="who"><i class="bi bi-person me-1"></i>${esc(e.usuario)}</span>`:''}
+        </div>
+      </li>`;
+    });
+    if(open) html += '</ul>';
+    html += '</div>';
+    tl = html;
+  }
+
+  document.getElementById('resultado').innerHTML = ficha + tl;
+}
+
+/* Foco inicial */
+document.getElementById('q').focus();
+</script>
+<script src="/js/app-version.js"></script>
+</body>
+</html>
