@@ -34,6 +34,16 @@ const CODIGO_IA = 'dealer_ia';
       INDEX idx_cuenta_ts (id_cuenta, ts)
     )`);
   } catch (e) { console.error('[portal-dealer] migracion ia:', e.message); }
+
+  // Índices para el filtro por dealer. La expresión RUT es IDÉNTICA a la de
+  // dealerScope/cartolas → el optimizador puede usar estos índices (index merge
+  // sobre el OR id_dealer/rut). Idempotente y tolerante a fallos: si el índice
+  // ya existe el ALTER falla y se ignora; si fallara, las queries siguen OK
+  // (solo sin acelerar). Barato ahora con poco volumen.
+  const RUTNORM_EXPR = "(REPLACE(REPLACE(REPLACE(UPPER(COALESCE(rut_dealer,'')),'.',''),'-',''),' ',''))";
+  await pool.query('ALTER TABLE creditos ADD INDEX idx_creditos_id_dealer (id_dealer)').catch(() => {});
+  await pool.query(`ALTER TABLE creditos ADD INDEX idx_creditos_rutnorm (${RUTNORM_EXPR})`).catch(() => {});
+  await pool.query(`ALTER TABLE cartolas_enviadas ADD INDEX idx_cartenv_rutnorm (${RUTNORM_EXPR})`).catch(() => {});
 })();
 
 // ── Helpers ──────────────────────────────────────────────────────────────
