@@ -2059,6 +2059,28 @@ const getUsuariosByPerfil = async (req, res) => {
   } catch (e) { console.error('[perfiles migration v33]', e.message); }
 })();
 
+/* ─── Migración v34: funcionalidad Rentabilidad de Cartas (Aprobaciones) ─
+   Pestaña/acción restringida: ve la rentabilidad por carta (AutoFin vs UAC). */
+(async () => {
+  try {
+    const [[mod]] = await pool.query("SELECT id_modulo FROM modulos WHERE ruta='/aprobaciones/' LIMIT 1");
+    if (!mod) return;
+    const [[adm]] = await pool.query("SELECT id_perfil FROM perfiles WHERE nombre='Administrador' LIMIT 1");
+    const [[ex]] = await pool.query("SELECT id_funcionalidad FROM funcionalidades WHERE codigo='aprob_rentabilidad'");
+    let idF = ex?.id_funcionalidad;
+    if (!idF) {
+      const [ins] = await pool.query(
+        'INSERT INTO funcionalidades (id_modulo, nombre, codigo, href) VALUES (?,?,?,?)',
+        [mod.id_modulo, 'Rentabilidad de la Carta', 'aprob_rentabilidad', null]);
+      idF = ins.insertId;
+    }
+    if (adm) await pool.query(
+      'INSERT IGNORE INTO permisos_perfil (id_perfil, id_funcionalidad, habilitado) VALUES (?,?,1)',
+      [adm.id_perfil, idF]);
+    console.log('✓ Perfiles v34: funcionalidad Rentabilidad de la Carta registrada');
+  } catch (e) { console.error('[perfiles migration v34]', e.message); }
+})();
+
 /* ─── Migración: consolidar "Parques". Había la card huérfana "Parques y Comisiones"
    (con href, generaba el menú) además del permiso canónico mantenedores_parques
    (sin href). Se le da el href al canónico y se elimina la huérfana. */

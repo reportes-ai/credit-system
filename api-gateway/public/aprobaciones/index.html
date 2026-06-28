@@ -108,6 +108,7 @@
     .bm-no    { background:#fee2e2; color:#b91c1c; }
     .bm-edit  { background:#f1f5f9; color:#374151; }
     .bm-anular{ background:#fff7ed; color:#c2410c; }
+    .bm-rent  { background:#ecfeff; color:#0e7490; }
     /* ── formulario ── */
     .form-grid { display:grid; grid-template-columns:repeat(4, 1fr); gap:12px 16px; }
     .fg-2 { grid-column:span 2; } .fg-4 { grid-column:span 4; }
@@ -648,6 +649,7 @@
 
 <div id="af-toast" onclick="this.classList.remove('show')"></div>
 <script src="/js/app-version.js"></script>
+<script src="/js/rentabilidad-calc.js"></script>
 <script src="/js/xlsx.full.min.js"></script>
 <script src="/js/html2pdf.bundle.min.js"></script>
 <script>
@@ -1173,6 +1175,8 @@ function renderLista(){
       acc.push(`<button class="btn-mini bm-ok" onclick="abrirRevision(${c.id})"><i class="bi bi-check2-square"></i> Revisar</button>`);
     if (c.status==='APROBADA' && puede('aprob_revisar'))
       acc.push(`<button class="btn-mini bm-anular" onclick="anularCarta(${c.id})"><i class="bi bi-x-octagon"></i></button>`);
+    if (puede('aprob_rentabilidad'))
+      acc.push(`<button class="btn-mini bm-rent" onclick="verRentabilidad(${c.id})"><i class="bi bi-cash-coin"></i> Rentab.</button>`);
     return `<tr>
       <td><b>${escH(c.opCarta||'')}</b></td>
       <td>${fmtFecha(c.fecha)}</td>
@@ -2120,10 +2124,86 @@ function verCarta(id){
   udRenderDocs(c.id);
   document.getElementById('modalFoot').innerHTML =
     (c.status==='APROBADA' ? `<button class="btn-mini bm-print" style="padding:9px 18px;font-size:.85rem" onclick="imprimirCarta(${c.id})"><i class="bi bi-printer"></i> Imprimir PDF</button>` : '') +
+    (puede('aprob_rentabilidad') ? `<button class="btn-mini bm-rent" style="padding:9px 18px;font-size:.85rem" onclick="verRentabilidad(${c.id})"><i class="bi bi-cash-coin"></i> Rentabilidad</button>` : '') +
     `<button class="btn-sec" onclick="cerrarModal()">Cerrar</button>`;
   document.getElementById('modalCarta').classList.add('show');
 }
 function cerrarModal(){ document.getElementById('modalCarta').classList.remove('show'); }
+
+/* ── Rentabilidad de la carta (AutoFin vs UAC, tier vigente) ───────── */
+function verRentabilidad(id){
+  const c = CARTAS.find(x=>x.id===id); if(!c) return;
+  if(!window.AF_RENT){ alert('El motor de rentabilidad aún no carga. Reintenta en un segundo.'); return; }
+  cargarRentabilidad(c);
+}
+async function cargarRentabilidad(c){
+  let tier = { tier_uac_n: c.tierUacN||1, tier_uac_pct: (c.tierUacPct!=null?c.tierUacPct:14) };
+  try { const r = await fetch('/api/cartas/'+c.id+'/rentabilidad',{headers:hdr()}); const j=await r.json(); if(j.success&&j.data) tier=j.data; } catch(e){}
+  const valor = Number(c.precioVenta)||(Number(c.saldo||0)+Number(c.pie||0));
+  const inp = {
+    valor, pie:Number(c.pie||0), plazo:Number(c.plazo||0),
+    seguros:{desg:true,rdh:true,cesa:true},
+    esPatio:(c.tipo||'').toUpperCase().includes('PARQUE'),
+    dealerComCLP: Number(c.partBruto||0)||null,
+    uacPct:(Number(tier.tier_uac_pct)||14)/100,
+  };
+  const R = window.AF_RENT.calcular(inp, PARAMS_CRED||{}, UF_HOY);
+  document.getElementById('modalTitulo').innerHTML = '<i class="bi bi-cash-coin me-2"></i>Rentabilidad — '+escH(c.opCarta||'');
+  document.getElementById('modalBody').innerHTML = R ? rentHTML(c,R,tier) : '<p style="color:#b91c1c;padding:16px">Faltan datos en la carta (precio de venta o plazo) para calcular la rentabilidad.</p>';
+  document.getElementById('modalFoot').innerHTML = '<button class="btn-sec" onclick="cerrarModal()">Cerrar</button>';
+  document.getElementById('modalCarta').classList.add('show');
+}
+function rentHTML(c,R,tier){
+  const f=fmtCLP, fp=n=>(isNaN(n)?'—':n.toFixed(1)+'%');
+  const mejorAf = R.af.rentab>=R.uac.rentab;
+  const card=(nom,color,D,ingSegDetail,mejor)=>`
+    <div style="flex:1;min-width:270px;border:1px solid #e3e8ef;border-radius:12px;overflow:hidden">
+      <div style="background:${color};color:#fff;padding:10px 14px;font-weight:800;display:flex;align-items:center;gap:8px">
+        ${nom}${mejor?` <span style="margin-left:auto;background:#fff;color:${color};border-radius:10px;padding:1px 8px;font-size:.7rem">⭐ Más rentable</span>`:''}
+      </div>
+      <div style="padding:12px 14px">
+        <div style="font-size:.72rem;font-weight:700;color:#059669;text-transform:uppercase;letter-spacing:.04em;margin-bottom:4px">Ingresos</div>
+        <div class="rr"><span>Ingreso por Colocación</span><b>${f(D.ing_tasa)}</b></div>
+        ${ingSegDetail}
+        ${D.com_corfo?`<div class="rr"><span>Comisión CORFO</span><b>${f(D.com_corfo)}</b></div>`:''}
+        <div class="rr tot"><span>Total Ingresos</span><b style="color:#059669">${f(D.total_ing)}</b></div>
+        <div style="font-size:.72rem;font-weight:700;color:#dc2626;text-transform:uppercase;letter-spacing:.04em;margin:10px 0 4px">Descuentos</div>
+        <div class="rr"><span>Comisión Dealer${R.costos.esPatio?' (Parque)':' (Calle)'}</span><b>${f(R.costos.dealer)}</b></div>
+        ${R.costos.patio?`<div class="rr"><span>Comisión Parque (2,5%)</span><b>${f(R.costos.patio)}</b></div>`:''}
+        <div class="rr"><span>Comisión Ejecutivo</span><b>${f(R.costos.ejecutivo)}</b></div>
+        <div class="rr tot"><span>Total Descuentos</span><b style="color:#dc2626">${f(R.costos.total)}</b></div>
+        <div style="margin-top:10px;border-radius:10px;padding:10px 12px;display:flex;justify-content:space-between;align-items:center;background:${D.rentab>=0?'#059669':'#dc2626'};color:#fff">
+          <div><div style="font-size:.72rem;opacity:.85">Rentabilidad</div><div style="font-size:1.3rem;font-weight:800">${f(D.rentab)}</div></div>
+          <div style="font-size:.8rem;opacity:.9;text-align:right">${fp(D.pct)}<br>del monto fin.</div>
+        </div>
+        <div style="margin-top:6px;font-size:.75rem;color:#64748b;text-align:center">Cuota cliente estimada: <b>${f(D.cuota)}</b></div>
+      </div>
+    </div>`;
+  const segDetailAf = `
+    <div class="rr sub"><span>· Desgravamen</span><b>${f(R.af.ing_seg_desg)}</b></div>
+    <div class="rr sub"><span>· Cesantía</span><b>${f(R.af.ing_seg_cesa)}</b></div>
+    <div class="rr sub"><span>· RDH</span><b>${f(R.af.ing_seg_rdh)}</b></div>
+    <div class="rr"><span>Ingreso por Seguros</span><b>${f(R.af.ing_seg)}</b></div>`;
+  const segDetailUac = `<div class="rr"><span>Ingreso por Seguros</span><b>${f(0)}</b></div><div class="rr sub"><span style="color:#94a3b8">UAC no paga comisión de seguros</span></div>`;
+  return `
+  <style>.rr{display:flex;justify-content:space-between;padding:3px 0;font-size:.84rem;color:#334155}.rr.sub{font-size:.78rem;color:#64748b;padding-left:8px}.rr.tot{border-top:1px solid #e5e7eb;margin-top:3px;padding-top:5px;font-weight:700}</style>
+  <div style="background:#f8fafc;border-radius:10px;padding:10px 14px;margin-bottom:12px;font-size:.82rem;color:#475569">
+    <div style="display:flex;flex-wrap:wrap;gap:6px 16px">
+      <span>Saldo precio: <b>${f(R.saldo)}</b></span>
+      <span>Gastos: <b>${f(R.gastos)}</b></span>
+      <span>Primas seguros: <b>${f(R.primas.total)}</b></span>
+      <span>Monto financiado: <b>${f(R.monto_fin)}</b></span>
+      <span>Plazo: <b>${R.plazo}m</b></span>
+      <span>${R.esMayor?'> 200 UF':'≤ 200 UF'}</span>
+      <span>Tier UAC: <b>${tier.tier_uac_n||'—'} (${(Number(tier.tier_uac_pct)||0).toFixed(0)}%)</b></span>
+    </div>
+  </div>
+  <div style="display:flex;gap:14px;flex-wrap:wrap">
+    ${card('AutoFin','#0141A2',R.af,segDetailAf,mejorAf)}
+    ${card('Unidad de Crédito','#166534',R.uac,segDetailUac,!mejorAf)}
+  </div>
+  <div style="margin-top:10px;font-size:.73rem;color:#94a3b8">Comisión Dealer = participación de la carta (si no la trae, pizarra por plazo). Tasa cliente = TMC vigente por tramo. Tier UAC fijado al emitir la carta. Mismas fórmulas del Simulador de Rentabilidad.</div>`;
+}
 
 /* Formato de carta — fiel al documento original */
 function cartaHTML(c, preview){
@@ -2358,6 +2438,7 @@ function renderVigentes(){
       <td style="text-align:right;white-space:nowrap">
         <button class="btn-mini bm-ver" onclick="verCarta(${c.id})" title="Ver"><i class="bi bi-eye"></i></button>
         <button class="btn-mini bm-print" onclick="imprimirCarta(${c.id})" title="Imprimir"><i class="bi bi-printer"></i></button>
+        ${puede('aprob_rentabilidad')?`<button class="btn-mini bm-rent" onclick="verRentabilidad(${c.id})" title="Rentabilidad"><i class="bi bi-cash-coin"></i></button>`:''}
         <button class="btn-mini bm-otorgar" onclick="otorgarCarta(${c.id})"><i class="bi bi-check2-circle"></i> Otorgado</button>
         <button class="btn-mini bm-desistir" onclick="desistirCarta(${c.id})"><i class="bi bi-x-circle"></i> Desistido</button>
       </td>

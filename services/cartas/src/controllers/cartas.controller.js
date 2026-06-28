@@ -203,6 +203,9 @@ async function idsRevisores(excluirEmail) {
     await pool.query(`ALTER TABLE cartas_aprobacion ADD COLUMN IF NOT EXISTS fecha_desistimiento DATETIME DEFAULT NULL`);
     await pool.query(`ALTER TABLE cartas_aprobacion ADD COLUMN IF NOT EXISTS motivo_desistimiento TEXT DEFAULT NULL`);
     await pool.query(`ALTER TABLE cartas_aprobacion ADD COLUMN IF NOT EXISTS desistido_auto TINYINT(1) NOT NULL DEFAULT 0`);
+    // Snapshot del TIER UAC vigente al emitir la carta (para la rentabilidad). Se puede recalcular por mes.
+    await pool.query(`ALTER TABLE cartas_aprobacion ADD COLUMN IF NOT EXISTS tier_uac_n INT DEFAULT NULL`);
+    await pool.query(`ALTER TABLE cartas_aprobacion ADD COLUMN IF NOT EXISTS tier_uac_pct DECIMAL(6,3) DEFAULT NULL`);
   } catch(e) { /* columna ya existe */ }
   // Barrer vencidas al arrancar (por si el servicio estuvo caído al cumplirse el plazo).
   barrerVencidas().catch(e => console.error('[cartas barrerVencidas boot]', e.message));
@@ -354,6 +357,8 @@ function mapRow(r) {
     fechaDesistimiento:       r.fecha_desistimiento,
     motivoDesistimiento:      r.motivo_desistimiento,
     desistidoAuto:            !!r.desistido_auto,
+    tierUacN:                 r.tier_uac_n != null ? Number(r.tier_uac_n) : null,
+    tierUacPct:               r.tier_uac_pct != null ? parseFloat(r.tier_uac_pct) : null,
     tasaCredito:              r.tasa_credito ? parseFloat(r.tasa_credito) : 0,
     montoCreditoCLP:          r.monto_credito_clp,
     montoCreditoUF:           r.monto_credito_uf ? parseFloat(r.monto_credito_uf) : 0,
@@ -391,6 +396,42 @@ async function puedeVerTodas(usuario) {
     );
     return pp ? pp.habilitado === 1 : true; // sin registro → legacy: ve todas
   } catch (_) { return true; }
+}
+
+// ── TIER UAC (rentabilidad) ─────────────────────────────────────────────────────
+// El % que paga UAC escala con el volumen de operaciones UAC otorgadas en el mes
+// (tramos uac_ops_tier*_max). Devuelve { n, pct(%), count }.
+async function tierUAC(fechaRef) {
+  try {
+    const [pr] = await pool.query(
+      "SELECT clave, valor FROM parametros_credito WHERE clave IN ('uac_ops_tier1_max','uac_ops_tier2_max','uac_ops_tier3_max','uac_pct_tier1','uac_pct_tier2','uac_pct_tier3','uac_pct_tier4')");
+    const P = {}; pr.forEach(r => { P[r.clave] = parseFloat(r.valor); });
+    const t1 = P.uac_ops_tier1_max || 5, t2 = P.uac_ops_tier2_max || 10, t3 = P.uac_ops_tier3_max || 15;
+    const ref = fechaRef ? new Date(fechaRef) : new Date();
+    const ym = isNaN(ref) ? null : `${ref.getFullYear()}-${String(ref.getMonth() + 1).padStart(2, '0')}`;
+    let count = 0;
+    if (ym) {
+      const [[c]] = await pool.query(
+        "SELECT COUNT(*) n FROM creditos WHERE financiera='UNIDAD DE CREDITO' AND fecha_otorgado IS NOT NULL AND DATE_FORMAT(fecha_otorgado,'%Y-%m')=?", [ym]);
+      count = c.n || 0;
+    }
+    let n, pct;
+    if (count <= t1)      { n = 1; pct = P.uac_pct_tier1 || 14; }
+    else if (count <= t2) { n = 2; pct = P.uac_pct_tier2 || 16; }
+    else if (count <= t3) { n = 3; pct = P.uac_pct_tier3 || 18; }
+    else                  { n = 4; pct = P.uac_pct_tier4 || 20; }
+    return { n, pct, count };
+  } catch (e) { console.error('[tierUAC]', e.message); return { n: 1, pct: 14, count: 0 }; }
+}
+
+// Recalcula el snapshot de tier para todas las cartas de un mes (dashboard más aproximado).
+async function recalcularTierMes(fechaRef) {
+  const t = await tierUAC(fechaRef);
+  const ref = fechaRef ? new Date(fechaRef) : new Date();
+  if (isNaN(ref)) return t;
+  const ym = `${ref.getFullYear()}-${String(ref.getMonth() + 1).padStart(2, '0')}`;
+  await pool.query("UPDATE cartas_aprobacion SET tier_uac_n=?, tier_uac_pct=? WHERE DATE_FORMAT(COALESCE(fecha, DATE(fecha_creacion)),'%Y-%m')=?", [t.n, t.pct, ym]).catch(() => {});
+  return t;
 }
 
 // ── Vigencia de la carta (paramétrico) ─────────────────────────────────────────
@@ -463,6 +504,20 @@ const setVigencia = async (req, res) => {
   } catch (e) { console.error('[cartas setVigencia]', e.message); res.status(500).json({ success: false, data: null, error: 'Error interno del servidor' }); }
 };
 
+// GET /api/cartas/:id/rentabilidad — refresca el snapshot del tier del mes y lo devuelve.
+const rentabilidadTier = async (req, res) => {
+  try {
+    const id = parseInt(req.params.id, 10);
+    const [[ca]] = await pool.query('SELECT fecha, tier_uac_n, tier_uac_pct FROM cartas_aprobacion WHERE id=? LIMIT 1', [id]);
+    if (!ca) return res.status(404).json({ success: false, data: null, error: 'Carta no encontrada.' });
+    let t = null;
+    try { t = await recalcularTierMes(ca.fecha); } catch (_) {}
+    const n   = t ? t.n   : (ca.tier_uac_n != null ? Number(ca.tier_uac_n) : 1);
+    const pct = t ? t.pct : (ca.tier_uac_pct != null ? parseFloat(ca.tier_uac_pct) : 14);
+    res.json({ success: true, data: { tier_uac_n: n, tier_uac_pct: pct, count: t ? t.count : null }, error: null });
+  } catch (e) { console.error('[cartas rentabilidadTier]', e.message); res.status(500).json({ success: false, data: null, error: 'Error interno del servidor' }); }
+};
+
 // POST /api/cartas/:id/otorgar — la carta vigente pasa a OTORGADA: marca otorgado,
 // pone el crédito vinculado en OTORGADO y genera la cartola de comisión del mes.
 const otorgar = async (req, res) => {
@@ -508,6 +563,8 @@ const otorgar = async (req, res) => {
         WHERE ca.id = ? AND ca.otorgado = 1 AND ca.status = 'APROBADA'
           AND NOT EXISTS (SELECT 1 FROM cartolas_movimientos m WHERE m.id_carta = ca.id AND m.movimiento = 'COMISION')`,
       [id]).catch(e => console.error('[carta otorgar→cartola]', e.message));
+    // Otorgar una UAC puede subir el tier del mes → refresca el snapshot de ese mes
+    recalcularTierMes(ca.fecha).catch(() => {});
     auditar({ req, accion: 'OTORGAR', modulo: 'cartas', entidad: 'carta', entidad_id: id,
       detalle: `Carta ${ca.op_carta || id} otorgada (crédito → OTORGADO + cartola de comisión)` });
     // Anuncio push a toda la app (mensaje/colores/sonido configurables en mantenedor de Alertas)
@@ -676,6 +733,8 @@ const upsert = async (req, res) => {
         ) VALUES (${vals.map(() => '?').join(',')})`,
         vals
       );
+      // Snapshot del TIER UAC vigente al generar la carta (para la rentabilidad)
+      tierUAC(c.fecha).then(t => pool.query('UPDATE cartas_aprobacion SET tier_uac_n=?, tier_uac_pct=? WHERE id=?', [t.n, t.pct, r.insertId])).catch(() => {});
       res.status(201).json({ success: true, data: { id: r.insertId, numero_credito_creado: credCreado?.numero_credito || null }, error: null });
       notificarCambios(c, null, req);
     }
@@ -1014,4 +1073,4 @@ const verDocumento = async (req, res) => {
   } catch (e) { console.error('[verDocumento]', e.message); res.status(500).json({ success: false, data: null, error: 'Error interno del servidor' }); }
 };
 
-module.exports = { getAll, upsert, otorgar, desistir, getVigencia, setVigencia, cargaMasivaCartas, parseUnidad, parseAutofin, subirDocumento, listarDocumentos, verDocumento };
+module.exports = { getAll, upsert, otorgar, desistir, getVigencia, setVigencia, rentabilidadTier, cargaMasivaCartas, parseUnidad, parseAutofin, subirDocumento, listarDocumentos, verDocumento };

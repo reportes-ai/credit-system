@@ -11,6 +11,9 @@ router.post('/', verifyToken, ctrl.upsert);   // create o update según body.id
 router.get('/vigencia', verifyToken, ctrl.getVigencia);
 router.put('/vigencia', verifyToken, requireFunc('aprob_mantenedor'), ctrl.setVigencia);
 
+// Rentabilidad de la carta (tier UAC vigente). Acceso restringido.
+router.get('/:id/rentabilidad', verifyToken, requireFunc('aprob_rentabilidad'), ctrl.rentabilidadTier);
+
 // Cartas de Aprobación Vigentes: otorgar (→ crédito OTORGADO + cartola) o desistir (→ DESISTIDA)
 router.post('/:id/otorgar',  verifyToken, requireFunc('aprob_vigentes'), ctrl.otorgar);
 router.post('/:id/desistir', verifyToken, requireFunc('aprob_vigentes'), ctrl.desistir);
