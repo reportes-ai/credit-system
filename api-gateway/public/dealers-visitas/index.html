@@ -116,7 +116,7 @@
   <div class="topnav-left">
     <a href="/" class="topnav-brand">
       <img src="/img/logo.png" alt="AutoFácil">
-      <span class="version-badge" id="versionBadge">v1.5</span>
+      <span class="version-badge" id="versionBadge">v1.6</span>
     </a>
     <div class="breadcrumb-nav">
       <a href="/">Inicio</a><span class="sep">›</span>
@@ -847,13 +847,28 @@ function dibujarRuta(dia){
   MAPA_LAYERS.forEach(l=>MAPA.removeLayer(l)); MAPA_LAYERS=[];
   MAPA.invalidateSize();
   if(!pts.length) return;
+
+  // Separar marcadores co-localizados (varios dealers en el mismo parque/dirección)
+  // en un pequeño círculo para que se vean todos en vez de apilarse.
+  const disp = pts.map(v=>[+v.lat,+v.lng]);
+  const colocados = new Set();
+  const grupos = {};
+  pts.forEach((v,i)=>{ const k=(+v.lat).toFixed(5)+','+(+v.lng).toFixed(5); (grupos[k]=grupos[k]||[]).push(i); });
+  Object.values(grupos).forEach(idxs=>{
+    if(idxs.length<2) return;
+    const base=[disp[idxs[0]][0], disp[idxs[0]][1]];
+    const R=0.0006, coslat=Math.cos(base[0]*Math.PI/180)||1; // ~65 m
+    idxs.forEach((gi,j)=>{ const a=2*Math.PI*j/idxs.length - Math.PI/2;
+      disp[gi]=[base[0]+R*Math.sin(a), base[1]+(R/coslat)*Math.cos(a)]; colocados.add(gi); });
+  });
+
   const latlngs=[];
   pts.forEach((v,i)=>{
-    const ll=[+v.lat,+v.lng]; latlngs.push(ll);
+    const ll=disp[i]; latlngs.push(ll);
     const icon=L.divIcon({className:'',iconSize:[28,28],iconAnchor:[14,14],
       html:`<div style="background:#0e7490;color:#fff;border-radius:50%;width:28px;height:28px;display:flex;align-items:center;justify-content:center;font-weight:800;font-size:.82rem;border:2px solid #fff;box-shadow:0 1px 5px rgba(0,0,0,.45)">${i+1}</div>`});
     const m=L.marker(ll,{icon}).addTo(MAPA);
-    m.bindPopup(`<b>${i+1}. ${esc(v.nombre||'—')}</b><br>${v.hora?('🕘 '+v.hora+' hrs<br>'):''}${esc(v.comuna||'')}${v.distKm?('<br>'+Math.round(v.distKm*10)/10+' km del anterior'):''}`);
+    m.bindPopup(`<b>${i+1}. ${esc(v.nombre||'—')}</b><br>${v.hora?('🕘 '+v.hora+' hrs<br>'):''}${esc(v.comuna||'')}${v.distKm?('<br>'+Math.round(v.distKm*10)/10+' km del anterior'):(colocados.has(i)?'<br><span style="color:#64748b">misma ubicación (parque)</span>':'')}`);
     if(v.hora) m.bindTooltip(v.hora,{permanent:true,direction:'top',offset:[0,-15],className:'rt-tip'});
     MAPA_LAYERS.push(m);
   });
