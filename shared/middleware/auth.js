@@ -14,7 +14,15 @@ const verifyToken = (req, res, next) => {
     return res.status(401).json({ success: false, data: null, error: 'Token requerido' });
   }
   try {
-    req.usuario = jwt.verify(rawToken, JWT_SECRET);
+    const payload = jwt.verify(rawToken, JWT_SECRET);
+    // Blindaje de frontera: los tokens de DEALER (portal externo) están firmados
+    // con el mismo JWT_SECRET, pero NO deben acceder a rutas internas del staff.
+    // Las rutas del dealer usan verifyDealer/verifyAny (atención-remota), nunca este
+    // middleware. Rechazar aquí cierra la puerta a endpoints internos sin requireFunc.
+    if (payload && payload.tipo === 'dealer') {
+      return res.status(403).json({ success: false, data: null, error: 'Token no válido para esta sección' });
+    }
+    req.usuario = payload;
     req.user    = req.usuario;   // alias para controllers que usan req.user
     next();
   } catch {
