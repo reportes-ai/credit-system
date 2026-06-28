@@ -21,6 +21,9 @@ router.get('/informe-dealernet/ruts', verifyToken, informeDn.rutsConReporte);
 router.get('/informe-dealernet/por-rut/:rut', verifyToken, informeDn.porRut);
 
 router.post('/consulta', verifyToken, requireFunc('ia_consulta'), consulta.preguntar);
+router.get('/consulta/cuota', verifyToken, requireFunc('ia_consulta'), consulta.cuota);
+router.get('/consulta/limites', verifyToken, requireFunc('mant_ia'), consulta.getLimites);
+router.put('/consulta/limites', verifyToken, requireFunc('mant_ia'), consulta.setLimites);
 
 router.post('/evaluacion-credito', verifyToken, evalCredito.evaluar);
 router.get('/evaluacion-credito/detalle/:id', verifyToken, evalCredito.detalle);

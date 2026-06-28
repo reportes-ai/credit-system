@@ -48,6 +48,14 @@ const ALLOW = new Set(TABLAS_BI);
       const [[pp]] = await pool.query('SELECT 1 ok FROM permisos_perfil WHERE id_perfil=? AND id_funcionalidad=? LIMIT 1', [idp, idf]);
       if (!pp) await pool.query('INSERT INTO permisos_perfil (id_perfil, id_funcionalidad, habilitado) VALUES (?,?,1)', [idp, idf]);
     }
+    // Límite de preguntas por perfil (configurable) + log de uso
+    await pool.query(`CREATE TABLE IF NOT EXISTS ia_consulta_uso (
+      id BIGINT AUTO_INCREMENT PRIMARY KEY, id_usuario INT NOT NULL,
+      ts DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP, INDEX idx_u (id_usuario, ts))`);
+    await pool.query(`CREATE TABLE IF NOT EXISTS ia_consulta_limites (
+      id_perfil INT PRIMARY KEY, cantidad INT NOT NULL DEFAULT 5, periodo VARCHAR(10) NOT NULL DEFAULT 'semana')`);
+    await pool.query("INSERT IGNORE INTO ia_consulta_limites (id_perfil, cantidad, periodo) VALUES (0, 5, 'semana')");  // por defecto
+    await pool.query("INSERT IGNORE INTO ia_consulta_limites (id_perfil, cantidad, periodo) VALUES (1, 0, 'semana')");  // Administrador: ilimitado (0)
     console.log('[ia consulta] registrado');
   } catch (e) { console.error('[ia consulta init]', e.message); }
 })();
@@ -68,6 +76,31 @@ async function getEsquema() {
   _esq = Object.entries(byT).map(([t, cs]) => `${t}(${cs.join(', ')})`).join('\n');
   _esqAt = Date.now();
   return _esq;
+}
+
+/* ── Cuota de preguntas por perfil (configurable) ── */
+const num = v => { const n = parseInt(v, 10); return Number.isFinite(n) ? n : null; };
+const err = (res, e) => { console.error('[ia consulta]', e.message); res.status(500).json({ success: false, data: null, error: 'Error interno del servidor' }); };
+const PERIODOS = { dia: 'día', semana: 'semana', mes: 'mes' };
+const ddmmaaaa = s => { const m = String(s || '').match(/^(\d{4})-(\d{2})-(\d{2})/); return m ? `${m[3]}/${m[2]}/${m[1]}` : String(s || ''); };
+function periodoSQL(periodo) {
+  if (periodo === 'dia') return { cond: 'DATE(ts)=CURDATE()', hasta: "DATE_FORMAT(CURDATE(),'%Y-%m-%d')" };
+  if (periodo === 'mes') return { cond: "DATE_FORMAT(ts,'%Y-%m')=DATE_FORMAT(CURDATE(),'%Y-%m')", hasta: "DATE_FORMAT(LAST_DAY(CURDATE()),'%Y-%m-%d')" };
+  return { cond: 'YEARWEEK(ts,1)=YEARWEEK(CURDATE(),1)', hasta: "DATE_FORMAT(DATE_ADD(CURDATE(), INTERVAL (6-WEEKDAY(CURDATE())) DAY),'%Y-%m-%d')" };
+}
+async function perfilDe(uid) { const [[u]] = await pool.query('SELECT id_perfil FROM usuarios WHERE id_usuario=? LIMIT 1', [uid]); return u ? u.id_perfil : 0; }
+async function getLimite(id_perfil) {
+  const ip = id_perfil || 0;
+  const [[row]] = await pool.query('SELECT cantidad, periodo FROM ia_consulta_limites WHERE id_perfil IN (?,0) ORDER BY (id_perfil=?) DESC, id_perfil DESC LIMIT 1', [ip, ip]);
+  return row || { cantidad: 5, periodo: 'semana' };
+}
+async function cuotaDe(id_usuario, id_perfil) {
+  const lim = await getLimite(id_perfil);
+  const p = periodoSQL(lim.periodo);
+  const [[r]] = await pool.query(`SELECT (SELECT COUNT(*) FROM ia_consulta_uso WHERE id_usuario=? AND ${p.cond}) usados, ${p.hasta} hasta`, [id_usuario]);
+  const usados = Number(r.usados) || 0;
+  const ilimitado = !lim.cantidad || lim.cantidad <= 0;
+  return { cantidad: lim.cantidad, periodo: lim.periodo, usados, restantes: ilimitado ? null : Math.max(0, lim.cantidad - usados), ilimitado, hasta: r.hasta };
 }
 
 /* ── Blindaje SQL (solo lectura) ── */
@@ -136,6 +169,11 @@ const preguntar = async (req, res) => {
     const pregunta = String(req.body.pregunta || '').trim().slice(0, 500);
     if (!pregunta) return res.status(400).json({ success: false, data: null, error: 'Escribe una pregunta' });
     const uid = req.usuario.id_usuario;
+    const idp = await perfilDe(uid);
+    const cuotaPre = await cuotaDe(uid, idp);
+    if (!cuotaPre.ilimitado && cuotaPre.restantes <= 0)
+      return res.json({ success: false, data: { cuota: cuotaPre }, error: `Alcanzaste tu límite de ${cuotaPre.cantidad} pregunta(s) por ${PERIODOS[cuotaPre.periodo] || cuotaPre.periodo}. Se renueva el ${ddmmaaaa(cuotaPre.hasta)}.` });
+    if (!cuotaPre.ilimitado) { try { await pool.query('INSERT INTO ia_consulta_uso (id_usuario) VALUES (?)', [uid]); } catch (_) {} }
     const esquema = await getEsquema();
     const historial = (Array.isArray(req.body.historial) ? req.body.historial : [])
       .filter(h => h && h.pregunta && h.sql)
@@ -143,8 +181,8 @@ const preguntar = async (req, res) => {
       .map(h => ({ pregunta: String(h.pregunta).slice(0, 300), sql: String(h.sql).slice(0, 1500) }));
 
     let gen = await generarSQL(pregunta, esquema, null, uid, historial);
-    if (!gen || (!gen.sql && !gen.no_aplica)) return res.json({ success: true, data: { pregunta, respuesta: 'No pude interpretar la pregunta. ¿Puedes reformularla?', sql: null, columns: [], rows: [], grafico: null }, error: null });
-    if (gen.no_aplica) return res.json({ success: true, data: { pregunta, respuesta: gen.motivo || 'No puedo responder eso con los datos disponibles.', sql: null, columns: [], rows: [], grafico: null }, error: null });
+    if (!gen || (!gen.sql && !gen.no_aplica)) return res.json({ success: true, data: { pregunta, respuesta: 'No pude interpretar la pregunta. ¿Puedes reformularla?', sql: null, columns: [], rows: [], grafico: null, cuota: await cuotaDe(uid, idp) }, error: null });
+    if (gen.no_aplica) return res.json({ success: true, data: { pregunta, respuesta: gen.motivo || 'No puedo responder eso con los datos disponibles.', sql: null, columns: [], rows: [], grafico: null, cuota: await cuotaDe(uid, idp) }, error: null });
 
     let resultado;
     try { resultado = await ejecutarSeguro(gen.sql); }
@@ -163,7 +201,7 @@ const preguntar = async (req, res) => {
     });
 
     auditar({ req, accion: 'CONSULTA', modulo: 'ia', entidad: 'bi_consulta', detalle: `Pregunta: ${pregunta}`, meta: { sql: resultado.sql, filas: resultado.rows.length } });
-    res.json({ success: true, data: { pregunta, respuesta: texto, sql: resultado.sql, columns: resultado.columns, rows: resultado.rows, grafico: gen.grafico || null }, error: null });
+    res.json({ success: true, data: { pregunta, respuesta: texto, sql: resultado.sql, columns: resultado.columns, rows: resultado.rows, grafico: gen.grafico || null, cuota: await cuotaDe(uid, idp) }, error: null });
   } catch (e) {
     if (e.code === 'IA_OFF') return res.status(400).json({ success: false, data: null, error: 'La IA para esta función está desactivada. Actívala en Mantenedores → Inteligencia Artificial.' });
     if (e.code === 'NO_KEY') return res.status(400).json({ success: false, data: null, error: 'Falta configurar la IA en el servidor.' });
@@ -173,4 +211,40 @@ const preguntar = async (req, res) => {
   }
 };
 
-module.exports = { preguntar };
+// GET /api/ia/consulta/cuota → cuota del usuario logueado
+const cuota = async (req, res) => {
+  try { const idp = await perfilDe(req.usuario.id_usuario); res.json({ success: true, data: await cuotaDe(req.usuario.id_usuario, idp), error: null }); }
+  catch (e) { err(res, e); }
+};
+
+// GET /api/ia/consulta/limites → límites por perfil (para el config admin)
+const getLimites = async (req, res) => {
+  try {
+    const [perfiles] = await pool.query(
+      `SELECT p.id_perfil, p.nombre, l.cantidad, l.periodo
+       FROM perfiles p LEFT JOIN ia_consulta_limites l ON l.id_perfil = p.id_perfil
+       WHERE p.estado='activo' ORDER BY p.nombre`);
+    const [[def]] = await pool.query('SELECT cantidad, periodo FROM ia_consulta_limites WHERE id_perfil=0');
+    res.json({ success: true, data: { porDefecto: def || { cantidad: 5, periodo: 'semana' }, perfiles }, error: null });
+  } catch (e) { err(res, e); }
+};
+
+// PUT /api/ia/consulta/limites { limites:[{id_perfil, cantidad, periodo}] } (id_perfil 0 = por defecto)
+const setLimites = async (req, res) => {
+  try {
+    const items = Array.isArray(req.body.limites) ? req.body.limites : [];
+    const OKP = new Set(['dia', 'semana', 'mes']);
+    let n = 0;
+    for (const it of items) {
+      const idp = num(it.id_perfil); if (idp == null) continue;
+      const cant = Math.max(0, parseInt(it.cantidad, 10) || 0);
+      const per = OKP.has(it.periodo) ? it.periodo : 'semana';
+      await pool.query('INSERT INTO ia_consulta_limites (id_perfil, cantidad, periodo) VALUES (?,?,?) ON DUPLICATE KEY UPDATE cantidad=VALUES(cantidad), periodo=VALUES(periodo)', [idp, cant, per]);
+      n++;
+    }
+    auditar({ req, accion: 'EDITAR', modulo: 'ia', entidad: 'bi_consulta_limites', detalle: `Actualizó límites de preguntas por perfil (${n})` });
+    res.json({ success: true, data: { ok: true, n }, error: null });
+  } catch (e) { err(res, e); }
+};
+
+module.exports = { preguntar, cuota, getLimites, setLimites };
