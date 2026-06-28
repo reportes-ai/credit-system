@@ -89,16 +89,20 @@ function forzarLimit(s) { return /\blimit\b/i.test(s) ? s : (s + ' LIMIT 500'); 
 
 async function ejecutarSeguro(sqlRaw) {
   const sql = forzarLimit(limpiarSQL(sqlRaw));
-  validarSQL(sql);
+  validarSQL(sql);   // guard real: solo SELECT, allowlist, sin palabras peligrosas
   const conn = await pool.getConnection();
+  let tx = false;
   try {
-    try { await conn.query('SET SESSION MAX_EXECUTION_TIME=8000'); } catch (_) {}
-    await conn.query('START TRANSACTION READ ONLY');
-    const [rows, fields] = await conn.query({ sql, timeout: 9000 });
-    try { await conn.query('ROLLBACK'); } catch (_) {}
+    try { await conn.query('SET @@session.max_execution_time = 8000'); } catch (_) {}
+    // READ ONLY es defensa extra; si la BD no lo soporta, igual corre (el SELECT-only ya protege)
+    try { await conn.query('START TRANSACTION READ ONLY'); tx = true; } catch (_) { tx = false; }
+    const [rows, fields] = await conn.query(sql);
+    if (tx) { try { await conn.query('COMMIT'); } catch (_) {} }
     return { sql, rows: Array.isArray(rows) ? rows.slice(0, 500) : [], columns: (fields || []).map(f => f.name) };
-  } catch (e) { try { await conn.query('ROLLBACK'); } catch (_) {} throw e; }
-  finally { conn.release(); }
+  } catch (e) {
+    if (tx) { try { await conn.query('ROLLBACK'); } catch (_) {} }
+    throw e;
+  } finally { conn.release(); }
 }
 
 /* ── IA: generar SQL desde la pregunta ── */
@@ -150,7 +154,8 @@ const preguntar = async (req, res) => {
     if (e.code === 'IA_OFF') return res.status(400).json({ success: false, data: null, error: 'La IA para esta función está desactivada. Actívala en Mantenedores → Inteligencia Artificial.' });
     if (e.code === 'NO_KEY') return res.status(400).json({ success: false, data: null, error: 'Falta configurar la IA en el servidor.' });
     console.error('[ia consulta]', e.message);
-    res.status(500).json({ success: false, data: null, error: 'No pude responder con seguridad esa pregunta. Intenta reformularla.' });
+    // 422 (no 500) para que el gateway no enmascare el detalle: ayuda a diagnosticar.
+    return res.status(422).json({ success: false, data: null, error: 'No pude responder: ' + String(e.message || 'error').slice(0, 200) });
   }
 };
 
