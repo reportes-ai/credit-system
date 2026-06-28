@@ -341,12 +341,20 @@ const sync = async (req, res) => {
     const [r1] = await pool.query(`
       INSERT INTO postventa_seguimiento
         (id_credito, num_op, financiera, nombre_dealer, ejecutivo, fecha_otorgado, saldo_precio, comision)
-      SELECT c.id, c.num_op, c.financiera, c.automotora, c.ejecutivo,
+      SELECT c.id,
+             COALESCE(c.num_op, CASE WHEN c.numero_credito REGEXP '^[0-9]+$' THEN CAST(c.numero_credito AS UNSIGNED) ELSE NULL END),
+             c.financiera, c.automotora, c.ejecutivo,
              DATE(c.fecha_otorgado), c.saldo_precio, c.comdea_real
       FROM creditos c
       WHERE c.fecha_otorgado IS NOT NULL
         AND NOT EXISTS (SELECT 1 FROM postventa_seguimiento s WHERE s.id_credito = c.id)
     `);
+    // Backfill de filas ya creadas sin N° Operación (los créditos de carta nacen sin num_op)
+    await pool.query(`
+      UPDATE postventa_seguimiento s JOIN creditos c ON c.id = s.id_credito
+      SET s.num_op = COALESCE(c.num_op, CAST(c.numero_credito AS UNSIGNED))
+      WHERE s.num_op IS NULL AND (c.num_op IS NOT NULL OR c.numero_credito REGEXP '^[0-9]+$')
+    `).catch(e => console.error('[postventa backfill num_op]', e.message));
     // Etapas "Sistema" automáticas para los nuevos
     await pool.query(`
       INSERT IGNORE INTO postventa_etapas (id_seguimiento, track, etapa, usuario, fecha)

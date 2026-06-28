@@ -35,14 +35,14 @@ async function crearCreditoDesdeCartas(c) {
 
   const [r] = await pool.query(`
     INSERT INTO creditos
-      (numero_credito, financiera, estado_eval, estado,
+      (numero_credito, num_op, financiera, estado_eval, estado,
        id_cliente, rut_dealer, vendedor,
        fecha_otorgado, mes, valor_vehiculo, pie, saldo_precio, pct_financiado,
        monto_financiado, plazo, tascli_real,
        tipo_vehiculo, marca, modelo, anio, patente,
        automotora, ejecutivo, comdea_real,
        created_at, updated_at)
-    VALUES (?,?,
+    VALUES (?,?,?,
             'OTORGADO','INGRESO',
             ?,?,?,
             NULL, DATE_FORMAT(NOW(),'%Y-%m-01'), ?,?,?,?,
@@ -51,7 +51,7 @@ async function crearCreditoDesdeCartas(c) {
             ?,?,?,
             NOW(),NOW())
   `, [
-    numero_credito, financiera,
+    numero_credito, (/^\d+$/.test(String(numero_credito)) ? parseInt(numero_credito, 10) : null), financiera,
     cliRow?.id_cliente || null,
     (c.rut_conc || c.rutConc || null),
     (c.vendedor || null),
@@ -542,10 +542,18 @@ const otorgar = async (req, res) => {
       const cond = [], args = [];
       if (ca.id_credito_creado) { cond.push('id = ?'); args.push(ca.id_credito_creado); }
       if (ca.id_financiera)     { cond.push('num_op = ?'); args.push(ca.id_financiera); }
-      if (cond.length) await pool.query(
-        `UPDATE creditos SET estado='OTORGADO', fecha_otorgado=COALESCE(fecha_otorgado, CURDATE()), updated_at=NOW()
-          WHERE (${cond.join(' OR ')}) AND estado IN ('CARTA_APROBACION','APROBADO','INGRESO')`, args
-      ).catch(e => console.error('[carta otorgar→credito]', e.message));
+      if (cond.length) {
+        await pool.query(
+          `UPDATE creditos SET estado='OTORGADO', fecha_otorgado=COALESCE(fecha_otorgado, CURDATE()), updated_at=NOW()
+            WHERE (${cond.join(' OR ')}) AND estado IN ('CARTA_APROBACION','APROBADO','INGRESO')`, args
+        ).catch(e => console.error('[carta otorgar→credito]', e.message));
+        // El crédito de la carta nace sin num_op → asígnalo (= numero_credito) para que
+        // aparezca y sea buscable en Post Venta.
+        await pool.query(
+          `UPDATE creditos SET num_op = CAST(numero_credito AS UNSIGNED)
+            WHERE (${cond.join(' OR ')}) AND num_op IS NULL AND numero_credito REGEXP '^[0-9]+$'`, args
+        ).catch(() => {});
+      }
     }
     // Cartola COMISION del mes (misma lógica que /api/cartolas/sync, acotada a esta carta)
     await pool.query(
