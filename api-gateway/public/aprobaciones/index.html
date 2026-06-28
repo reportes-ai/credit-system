@@ -162,7 +162,7 @@
   <div class="topnav-left">
     <a href="/" class="topnav-brand">
       <img src="/img/logo.png" alt="AutoFácil">
-      <span class="version-badge" id="versionBadge">v1.5</span>
+      <span class="version-badge" id="versionBadge">v1.6</span>
     </a>
     <div class="breadcrumb-nav">
       <span class="bc-normal">
@@ -723,10 +723,10 @@ let PREF_TABLA = [
   { cd:16, ch:23, sd:'2000000', sh:'3999999',  af:'NO', un:'SI', pref:'UNIDAD' },
   { cd:16, ch:23, sd:'4000000', sh:'200 UF',   af:'SI', un:'SI', pref:'AUTOFIN' },
   { cd:16, ch:23, sd:'200 UF',  sh:'18000000', af:'NO', un:'SI', pref:'UNIDAD' },
-  { cd:24, ch:24, sd:'2000000', sh:'200 UF',   af:'SI', un:'SI', pref:'AUTOFIN' },
-  { cd:24, ch:24, sd:'200 UF',  sh:'18000000', af:'NO', un:'SI', pref:'UNIDAD' },
-  { cd:25, ch:36, sd:'2000000', sh:'18000000', af:'SI', un:'SI', pref:'AUTOFIN' },
-  { cd:25, ch:36, sd:'18000001',sh:'SIN TOPE', af:'SI', un:'NO', pref:'AUTOFIN' },
+  { cd:24, ch:35, sd:'2000000', sh:'200 UF',   af:'SI', un:'SI', pref:'AUTOFIN' },
+  { cd:24, ch:35, sd:'200 UF',  sh:'18000000', af:'NO', un:'SI', pref:'UNIDAD' },
+  { cd:36, ch:36, sd:'2000000', sh:'18000000', af:'SI', un:'SI', pref:'AUTOFIN' },
+  { cd:36, ch:36, sd:'18000001',sh:'SIN TOPE', af:'SI', un:'NO', pref:'AUTOFIN' },
   { cd:37, ch:48, sd:'2000000', sh:'SIN TOPE', af:'SI', un:'NO', pref:'AUTOFIN' },
 ];
 
@@ -2362,17 +2362,20 @@ async function calcularOptimoPref(){
     }
     return 49;
   };
-  const mF = Math.min(24, Math.max(12, flip(5000000)));    // flip ≤200 UF (preferencia)
-  const yF = Math.min(37, Math.max(25, flip(12000000)));   // flip >200 UF
-  PREF_TABLA = construirGridPref(mF, yF);
+  const mF = Math.min(24, Math.max(12, flip(5000000)));    // flip ≤200 UF (preferencia, del motor)
+  PREF_TABLA = construirGridPref(mF);
   renderPrefTabla();
-  el.innerHTML = `Óptimo del motor — <b>1ª opción Unidad</b> hasta ${mF-1} cuotas (≤200 UF) y hasta ${yF-1} (>200 UF); <b>AutoFin</b> desde ahí. AutoFin sigue permitido (2ª opción) donde la política lo deja. Revisa y presiona <b>Guardar Tabla</b>.`;
+  el.innerHTML = `Óptimo del motor — <b>1ª opción Unidad</b> hasta ${mF-1} cuotas (≤200 UF); AutoFin desde ${mF}. En >200 UF, AutoFin recién se puede desde 36 cuotas (tope 200 UF hasta 35, por política), antes va Unidad. Revisa y presiona <b>Guardar Tabla</b>.`;
   el.className = 'alert-inline ok';
-  prefToast(`Óptimo: 1ª opción Unidad ≤${mF-1}c (≤200 UF) y ≤${yF-1}c (>200 UF). Presiona Guardar Tabla.`, true);
+  prefToast(`Óptimo: 1ª opción Unidad ≤${mF-1}c (≤200 UF); >200 UF va Unidad hasta 35 (AutoFin desde 36). Presiona Guardar Tabla.`, true);
 }
-/* Construye la grilla cuotas × saldo (formato nuevo) con elegibilidad del correo y
-   preferencia = óptimo. mF/yF = primera cuota AutoFin en ≤200UF / >200UF. */
-function construirGridPref(mF, yF){
+/* Construye la grilla cuotas × saldo. Elegibilidad = reglas del correo:
+   AutoFin <24 cuotas solo >$4M; tope 200 UF hasta 35 cuotas (SIN TOPE desde 36); mín $2M.
+   Unidad $2M–$18M hasta 36 cuotas. Preferencia ≤200 UF = óptimo del motor (mF). */
+function construirGridPref(mF){
+  const CAP = 36;   // AutoFin puede >200 UF desde 36 cuotas
+  const AFMIN4 = 24; // AutoFin bajo 24 cuotas requiere >$4.000.000
+  const UNMAX = 36;  // Unidad hasta 36 cuotas
   const BANDS = [
     { sd:'2000000',  sh:'3999999',  le200:true  },  // A: $2M–$3.999.999
     { sd:'4000000',  sh:'200 UF',   le200:true  },  // B: $4M–200 UF
@@ -2380,27 +2383,26 @@ function construirGridPref(mF, yF){
     { sd:'18000001', sh:'SIN TOPE', le200:false },  // D: >$18M
   ];
   const segs = [];
-  const bps = [...new Set([12, mF, 24, yF, 37])].filter(x=>x>=12&&x<=48).sort((a,b)=>a-b);
+  const bps = [...new Set([12, mF, AFMIN4, CAP, UNMAX+1])].filter(x=>x>=12&&x<=48).sort((a,b)=>a-b);
   bps.push(49);
   for (let i=0;i<bps.length-1;i++){ const cd=bps[i], ch=Math.min(bps[i+1]-1,48); if(ch>=cd) segs.push([cd,ch]); }
   const rows = [];
   for (const [cd,ch] of segs){
     const cells = BANDS.map((b,bi)=>{
       let af;
-      if (bi===0)      af = cd>=24;        // $2M–3.999M: AutoFin solo ≥24
-      else if (bi===1) af = true;          // $4M–200UF
-      else             af = cd>=yF;        // >200UF: AutoFin desde yF
-      const un = (bi===3) ? false : (cd<=36);   // Unidad: ≤$18M y ≤36 cuotas
-      let pref = b.le200 ? (cd>=mF?'AUTOFIN':'UNIDAD') : (cd>=yF?'AUTOFIN':'UNIDAD');
+      if (bi===0)      af = cd>=AFMIN4;    // $2M–3.999M: AutoFin solo ≥24 cuotas
+      else if (bi===1) af = true;          // $4M–200UF: AutoFin siempre
+      else             af = cd>=CAP;       // >200UF: AutoFin solo desde 36 cuotas
+      const un = (bi===3) ? false : (cd<=UNMAX);  // Unidad: ≤$18M y ≤36 cuotas
+      let pref = b.le200 ? (cd>=mF?'AUTOFIN':'UNIDAD') : (cd>=CAP?'AUTOFIN':'UNIDAD');
       if (pref==='AUTOFIN' && !af) pref = un?'UNIDAD':null;
       else if (pref==='UNIDAD' && !un) pref = af?'AUTOFIN':null;
       return { ...b, af, un, pref };
     }).filter(c => c.af || c.un);   // descarta celdas donde ninguna se puede
-    // Colapsa bandas contiguas con misma (af,un,pref)
     for (const c of cells){
       const last = rows[rows.length-1];
       if (last && last.cd===cd && last.ch===ch && _si(last.af)===c.af && _si(last.un)===c.un && (last.pref||'')===(c.pref||'')){
-        last.sh = c.sh;   // extiende el saldo de la fila anterior
+        last.sh = c.sh;   // colapsa bandas contiguas con misma (af,un,pref)
       } else {
         rows.push({ cd, ch, sd:c.sd, sh:c.sh, af:c.af?'SI':'NO', un:c.un?'SI':'NO', pref:c.pref||(c.af?'AUTOFIN':'UNIDAD') });
       }

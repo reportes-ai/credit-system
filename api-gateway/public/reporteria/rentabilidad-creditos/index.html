@@ -102,7 +102,7 @@
   <div class="topnav-left">
     <a href="/" class="topnav-brand">
       <img src="/img/logo.png" alt="AutoFácil">
-      <span class="version-badge" id="versionBadge">v1.9</span>
+      <span class="version-badge" id="versionBadge">v1.10</span>
     </a>
     <div class="breadcrumb-nav">
       <a href="/">Inicio</a><span class="sep">›</span>
@@ -233,10 +233,10 @@ let PREF_TABLA = [
   { cd:16, ch:23, sd:'2000000', sh:'3999999',  af:'NO', un:'SI', pref:'UNIDAD' },
   { cd:16, ch:23, sd:'4000000', sh:'200 UF',   af:'SI', un:'SI', pref:'AUTOFIN' },
   { cd:16, ch:23, sd:'200 UF',  sh:'18000000', af:'NO', un:'SI', pref:'UNIDAD' },
-  { cd:24, ch:24, sd:'2000000', sh:'200 UF',   af:'SI', un:'SI', pref:'AUTOFIN' },
-  { cd:24, ch:24, sd:'200 UF',  sh:'18000000', af:'NO', un:'SI', pref:'UNIDAD' },
-  { cd:25, ch:36, sd:'2000000', sh:'18000000', af:'SI', un:'SI', pref:'AUTOFIN' },
-  { cd:25, ch:36, sd:'18000001',sh:'SIN TOPE', af:'SI', un:'NO', pref:'AUTOFIN' },
+  { cd:24, ch:35, sd:'2000000', sh:'200 UF',   af:'SI', un:'SI', pref:'AUTOFIN' },
+  { cd:24, ch:35, sd:'200 UF',  sh:'18000000', af:'NO', un:'SI', pref:'UNIDAD' },
+  { cd:36, ch:36, sd:'2000000', sh:'18000000', af:'SI', un:'SI', pref:'AUTOFIN' },
+  { cd:36, ch:36, sd:'18000001',sh:'SIN TOPE', af:'SI', un:'NO', pref:'AUTOFIN' },
   { cd:37, ch:48, sd:'2000000', sh:'SIN TOPE', af:'SI', un:'NO', pref:'AUTOFIN' },
 ];
 function saldoNum(v, def){ const s=String(v??'').toUpperCase().trim(); if(!s||s.includes('SIN TOPE')||s.includes('NO SE PUEDE')) return def; if(s.includes('UF')){ const n=parseFloat(s.replace(/[^0-9.]/g,'')); return (UF_HOY&&n)?n*UF_HOY:def; } const n=parseInt(s.replace(/[^0-9]/g,'')); return isNaN(n)?def:n; }
