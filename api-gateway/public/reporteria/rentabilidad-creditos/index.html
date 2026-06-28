@@ -74,7 +74,7 @@
   <div class="topnav-left">
     <a href="/" class="topnav-brand">
       <img src="/img/logo.png" alt="AutoFácil">
-      <span class="version-badge" id="versionBadge">v1.1</span>
+      <span class="version-badge" id="versionBadge">v1.2</span>
     </a>
     <div class="breadcrumb-nav">
       <a href="/">Inicio</a><span class="sep">›</span>
@@ -164,6 +164,16 @@ const fmtCLP = v => { const n=Math.round(Number(v)||0); return '$'+n.toLocaleStr
 const escH = s => String(s??'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
 const fmtRUT = r => { const c=String(r||'').replace(/[^0-9kK]/g,''); if(c.length<2) return r||''; const dv=c.slice(-1), num=c.slice(0,-1); return parseInt(num).toLocaleString('es-CL')+'-'+dv.toUpperCase(); };
 const ym = d => { if(!d) return ''; const x=new Date(d); return isNaN(x)?String(d).slice(0,7):`${x.getFullYear()}-${String(x.getMonth()+1).padStart(2,'0')}`; };
+/* tascli_real viene con unidades mezcladas según el origen del crédito:
+   decimal mensual (0.0255), porcentaje mensual (2.55) o porcentaje anual (28).
+   Lo normalizamos a decimal mensual. <=0 → null (el motor usa TMC vigente). */
+function tasaMensualDecimal(v){
+  const n = Number(v)||0;
+  if (n <= 0)  return null;
+  if (n < 0.5) return n;       // ya es decimal mensual (0.0255 = 2,55%)
+  if (n < 10)  return n/100;   // porcentaje mensual (2.55 → 0.0255)
+  return n/1200;               // porcentaje anual (28 → 0.0233)
+}
 
 /* ── Estado ───────────────────────────────────────── */
 let UF_HOY = null, PARAMS = {}, CREDITOS = [], FILAS = [];
@@ -238,14 +248,13 @@ function recalcular(){
     const colo  = fin.includes('AUTOFIN') ? 'AF' : (fin.includes('UNIDAD') ? 'UAC' : (fin.includes('AUTOFACIL') ? 'AFAC' : ''));
     const valor = Number(c.valor_vehiculo)||(Number(c.saldo_precio||0)+Number(c.pie||0));
     const plazo = Number(c.plazo||0);
-    const tasa  = Number(c.tasa_mensual)||0;   // tascli_real ya es decimal mensual (0.0211 = 2,11%)
     const pq    = String(c.parque||'').trim().toUpperCase();
     const inp = {
       valor, pie:Number(c.pie||0), plazo,
       seguros:{ desg:true, rdh:true, cesa:true },
       esPatio: (pq && pq!=='NO APLICA') || Number(c.com_parque||0)>0,
       dealerComCLP: Number(c.comision_dealer||0)||null,
-      tasaCli: tasa>0 ? tasa : null,        // si falta → TMC vigente por tramo (motor)
+      tasaCli: tasaMensualDecimal(c.tasa_mensual),   // normaliza unidades; si falta → TMC vigente
       uacPct: tier.pct/100,
     };
     // Sin plazo no se puede calcular (crédito incompleto) → se marca "Datos incompletos"
