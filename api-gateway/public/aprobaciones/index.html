@@ -162,7 +162,7 @@
   <div class="topnav-left">
     <a href="/" class="topnav-brand">
       <img src="/img/logo.png" alt="AutoFácil">
-      <span class="version-badge" id="versionBadge">v1.3</span>
+      <span class="version-badge" id="versionBadge">v1.4</span>
     </a>
     <div class="breadcrumb-nav">
       <span class="bc-normal">
@@ -438,10 +438,11 @@
     <table class="tbl">
       <thead><tr>
         <th colspan="2" style="background:#dbeafe;text-align:center">Cuotas</th>
-        <th colspan="2" style="background:#fee2e2;text-align:center">AUTOFIN</th>
-        <th colspan="2" style="background:#fef3c7;text-align:center">UNIDAD</th>
+        <th colspan="2" style="background:#fee2e2;text-align:center">AUTOFIN (se puede)</th>
+        <th colspan="2" style="background:#fef3c7;text-align:center">UNIDAD (se puede)</th>
+        <th style="background:#dcfce7;text-align:center">Primera opción</th>
       </tr><tr>
-        <th>Desde</th><th>Hasta</th><th>Monto mín.</th><th>Monto máx.</th><th>Monto mín.</th><th>Monto máx.</th>
+        <th>Desde</th><th>Hasta</th><th>Monto mín.</th><th>Monto máx.</th><th>Monto mín.</th><th>Monto máx.</th><th>Preferente</th>
       </tr></thead>
       <tbody id="bodyPrefTabla"></tbody>
     </table>
@@ -712,10 +713,11 @@ let FINANCIERAS = [
 /* Tabla preferencia financiera según saldo precio y cuotas (mantenedor en BD).
    Valores: monto CLP, "200 UF" (dinámico con UF del día) o "NO SE PUEDE". */
 let PREF_TABLA = [
-  { desde:12, hasta:23, af_min:'4000000', af_max:'200 UF',    un_min:'2000000',    un_max:'18000000' },
-  { desde:24, hasta:35, af_min:'2000000', af_max:'200 UF',    un_min:'2000000',    un_max:'18000000' },
-  { desde:36, hasta:47, af_min:'2000000', af_max:'99999999',  un_min:'2000000',    un_max:'18000000' },
-  { desde:48, hasta:60, af_min:'2000000', af_max:'99999999',  un_min:'NO SE PUEDE',un_max:'NO SE PUEDE' },
+  { desde:12, hasta:15, af_min:'4000000', af_max:'200 UF',    un_min:'2000000',    un_max:'18000000', preferente:'UNIDAD' },
+  { desde:16, hasta:23, af_min:'4000000', af_max:'200 UF',    un_min:'2000000',    un_max:'18000000', preferente:'AUTOFIN' },
+  { desde:24, hasta:24, af_min:'2000000', af_max:'200 UF',    un_min:'2000000',    un_max:'18000000', preferente:'AUTOFIN' },
+  { desde:25, hasta:36, af_min:'2000000', af_max:'99999999',  un_min:'2000000',    un_max:'18000000', preferente:'AUTOFIN' },
+  { desde:37, hasta:48, af_min:'2000000', af_max:'99999999',  un_min:'NO SE PUEDE',un_max:'NO SE PUEDE', preferente:'AUTOFIN' },
 ];
 
 /* ── Helpers ──────────────────────────────────────── */
@@ -1516,8 +1518,15 @@ function preferenteSegunTabla(plazo, saldo){
   };
   const puedeAF = enRango(row.af_min, row.af_max);
   const puedeUN = enRango(row.un_min, row.un_max);
-  return { pref: puedeAF ? 'AUTOFIN' : (puedeUN ? 'UNIDAD' : null),
-           puede: { AUTOFIN:puedeAF, UNIDAD:puedeUN }, row };
+  // "Preferente" (primera opción) es SEPARADO de la elegibilidad. Si ambas se pueden,
+  // manda la columna preferente de la fila; si solo una se puede, esa; si ninguna, null.
+  const prefDecl = String(row.preferente||'AUTOFIN').toUpperCase().includes('UNIDAD') ? 'UNIDAD' : 'AUTOFIN';
+  let pref;
+  if (puedeAF && puedeUN) pref = prefDecl;
+  else if (puedeAF) pref = 'AUTOFIN';
+  else if (puedeUN) pref = 'UNIDAD';
+  else pref = null;
+  return { pref, puede: { AUTOFIN:puedeAF, UNIDAD:puedeUN }, row };
 }
 /* Texto legible de un valor de la tabla de preferencia */
 function fmtPrefVal(v){
@@ -2322,10 +2331,15 @@ function renderFactores(){
 }
 function renderPrefTabla(){
   const inp = (i,k,v,w) => `<input value="${escH(v??'')}" data-i="${i}" data-k="${k}" style="width:${w||'110px'};border:1px solid #e2e8f0;border-radius:6px;padding:4px 8px">`;
+  const sel = (i,v) => { const cur=String(v||'AUTOFIN').toUpperCase().includes('UNIDAD')?'UNIDAD':'AUTOFIN';
+    return `<select data-i="${i}" data-k="preferente" style="border:1px solid #e2e8f0;border-radius:6px;padding:4px 8px">
+      <option value="AUTOFIN" ${cur==='AUTOFIN'?'selected':''}>AutoFin</option>
+      <option value="UNIDAD" ${cur==='UNIDAD'?'selected':''}>Unidad</option></select>`; };
   document.getElementById('bodyPrefTabla').innerHTML = PREF_TABLA.map((r,i)=>`<tr>
     <td>${inp(i,'desde',r.desde,'60px')}</td><td>${inp(i,'hasta',r.hasta,'60px')}</td>
     <td>${inp(i,'af_min',r.af_min)}</td><td>${inp(i,'af_max',r.af_max)}</td>
     <td>${inp(i,'un_min',r.un_min)}</td><td>${inp(i,'un_max',r.un_max)}</td>
+    <td>${sel(i,r.preferente)}</td>
   </tr>`).join('');
 }
 /* Calcula los cortes óptimos con el motor de rentabilidad y rellena el cuadro.
@@ -2348,19 +2362,31 @@ async function calcularOptimoPref(){
     }
     return 49;
   };
-  const mF = Math.min(24, Math.max(12, flip(5000000)));    // representante menor 200 UF
-  const yF = Math.min(37, Math.max(25, flip(12000000)));   // representante mayor 200 UF
+  const mF = Math.min(24, Math.max(12, flip(5000000)));    // flip ≤200 UF (preferencia)
+  const yF = Math.min(37, Math.max(25, flip(12000000)));   // flip >200 UF (vía tope 200 UF de AutoFin)
+  // Elegibilidad ("lo que se puede") = reglas del correo, NO cambian. La preferencia = óptimo.
+  // AutoFin: <24m solo >$4M; tope 200 UF hasta yF-1, luego sin tope. Unidad: hasta 36m / $18M.
+  // Preferente: Unidad si la cuota < mF, AutoFin si ≥ mF.
+  const bps = [...new Set([12, mF, 24, yF, 37])].filter(x=>x>=12 && x<=48).sort((a,b)=>a-b);
+  bps.push(49);
   const rows = [];
-  if (mF > 12)   rows.push({ desde:12,    hasta:mF-1, af_min:'NO SE PUEDE', af_max:'NO SE PUEDE', un_min:'2000000', un_max:'18000000' });
-  if (mF <= 23)  rows.push({ desde:mF,    hasta:23,   af_min:'4000000',     af_max:'200 UF',      un_min:'2000000', un_max:'18000000' });
-  if (yF-1 >= 24)rows.push({ desde:24,    hasta:yF-1, af_min:'2000000',     af_max:'200 UF',      un_min:'2000000', un_max:'18000000' });
-  if (yF <= 36)  rows.push({ desde:yF,    hasta:36,   af_min:'2000000',     af_max:'99999999',    un_min:'2000000', un_max:'18000000' });
-  rows.push({ desde:37, hasta:48, af_min:'2000000', af_max:'99999999', un_min:'NO SE PUEDE', un_max:'NO SE PUEDE' });
+  for (let i=0;i<bps.length-1;i++){
+    const a = bps[i], hasta = Math.min(bps[i+1]-1, 48);
+    if (a>48 || hasta<a) continue;
+    rows.push({
+      desde:a, hasta,
+      af_min: a<24 ? '4000000' : '2000000',
+      af_max: a<yF ? '200 UF' : '99999999',
+      un_min: a<=36 ? '2000000' : 'NO SE PUEDE',
+      un_max: a<=36 ? '18000000' : 'NO SE PUEDE',
+      preferente: a>=mF ? 'AUTOFIN' : 'UNIDAD',
+    });
+  }
   PREF_TABLA = rows;
   renderPrefTabla();
-  el.innerHTML = `Óptimo del motor: <b>Unidad</b> hasta ${mF-1} cuotas (≤200 UF) y hasta ${yF-1} (>200 UF); <b>AutoFin</b> desde ahí. Revisa y presiona <b>Guardar Tabla</b> para aplicarlo.`;
+  el.innerHTML = `Óptimo del motor — <b>primera opción Unidad</b> hasta ${mF-1} cuotas (≤200 UF) y hasta ${yF-1} (>200 UF); <b>AutoFin</b> desde ahí. AutoFin sigue permitido como 2ª opción donde lo permite la política. Revisa y presiona <b>Guardar Tabla</b>.`;
   el.className = 'alert-inline ok';
-  prefToast(`Óptimo: Unidad ≤${mF-1}c (≤200 UF) y ≤${yF-1}c (>200 UF). Presiona Guardar Tabla.`, true);
+  prefToast(`Óptimo: 1ª opción Unidad ≤${mF-1}c (≤200 UF) y ≤${yF-1}c (>200 UF). Presiona Guardar Tabla.`, true);
 }
 
 function prefToast(msg, ok){
@@ -2370,7 +2396,7 @@ function prefToast(msg, ok){
 }
 async function guardarPrefTabla(){
   const nuevos = PREF_TABLA.map(r=>({...r}));
-  document.querySelectorAll('#bodyPrefTabla input').forEach(el=>{
+  document.querySelectorAll('#bodyPrefTabla input, #bodyPrefTabla select').forEach(el=>{
     const i = parseInt(el.dataset.i), k = el.dataset.k;
     nuevos[i][k] = (k==='desde'||k==='hasta') ? (parseInt(el.value)||0) : el.value.trim();
   });

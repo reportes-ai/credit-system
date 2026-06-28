@@ -102,7 +102,7 @@
   <div class="topnav-left">
     <a href="/" class="topnav-brand">
       <img src="/img/logo.png" alt="AutoFácil">
-      <span class="version-badge" id="versionBadge">v1.7</span>
+      <span class="version-badge" id="versionBadge">v1.8</span>
     </a>
     <div class="breadcrumb-nav">
       <a href="/">Inicio</a><span class="sep">›</span>
@@ -227,10 +227,11 @@ const UMBRAL_RENT = 100000;   // rentabilidad mínima por operación; bajo esto 
 /* Cuadro de Preferencia de Financiera (mantenedor financiera_preferencia). El informe LO LEE:
    si lo editas en el mantenedor, cambia la columna "Según cuadro" de acá. */
 let PREF_TABLA = [
-  { desde:12, hasta:23, af_min:'4000000', af_max:'200 UF',   un_min:'2000000', un_max:'18000000' },
-  { desde:24, hasta:35, af_min:'2000000', af_max:'200 UF',   un_min:'2000000', un_max:'18000000' },
-  { desde:36, hasta:47, af_min:'2000000', af_max:'99999999', un_min:'2000000', un_max:'18000000' },
-  { desde:48, hasta:60, af_min:'2000000', af_max:'99999999', un_min:'NO SE PUEDE', un_max:'NO SE PUEDE' },
+  { desde:12, hasta:15, af_min:'4000000', af_max:'200 UF',   un_min:'2000000', un_max:'18000000', preferente:'UNIDAD' },
+  { desde:16, hasta:23, af_min:'4000000', af_max:'200 UF',   un_min:'2000000', un_max:'18000000', preferente:'AUTOFIN' },
+  { desde:24, hasta:24, af_min:'2000000', af_max:'200 UF',   un_min:'2000000', un_max:'18000000', preferente:'AUTOFIN' },
+  { desde:25, hasta:36, af_min:'2000000', af_max:'99999999', un_min:'2000000', un_max:'18000000', preferente:'AUTOFIN' },
+  { desde:37, hasta:48, af_min:'2000000', af_max:'99999999', un_min:'NO SE PUEDE', un_max:'NO SE PUEDE', preferente:'AUTOFIN' },
 ];
 function parsePrefVal(v){ const s=String(v??'').toUpperCase().trim(); if(!s||s.includes('NO SE PUEDE')) return null; if(s.includes('UF')){ const n=parseFloat(s.replace(/[^0-9.]/g,'')); return (UF_HOY&&n)?n*UF_HOY:null; } return parseInt(s.replace(/[^0-9]/g,''))||null; }
 function preferenteSegunTabla(plazo, saldo){
@@ -239,7 +240,11 @@ function preferenteSegunTabla(plazo, saldo){
   if(!row||!saldo) return null;
   const enRango=(min,max)=>{ const mi=parsePrefVal(min),ma=parsePrefVal(max); if(mi===null&&ma===null) return false; return saldo>=(mi??0)&&saldo<=(ma??Infinity); };
   const puedeAF=enRango(row.af_min,row.af_max), puedeUN=enRango(row.un_min,row.un_max);
-  return puedeAF ? 'AF' : (puedeUN ? 'UAC' : null);
+  const prefDecl = String(row.preferente||'AUTOFIN').toUpperCase().includes('UNIDAD') ? 'UAC' : 'AF';
+  if (puedeAF && puedeUN) return prefDecl;   // ambas se pueden → manda la preferencia
+  if (puedeAF) return 'AF';
+  if (puedeUN) return 'UAC';
+  return null;
 }
 
 /* ── Init ─────────────────────────────────────────── */
