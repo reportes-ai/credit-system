@@ -105,16 +105,15 @@
       </div>
     </div>
 
-    <div style="display:flex;justify-content:flex-end;margin-bottom:12px">
-      <button class="btn btn-outline-primary btn-sm" id="btnSync" onclick="sincronizarWeb()" title="Trae los valores nuevos de UF y UTM (mindicador.cl) y la TMC (CMF)"><i class="bi bi-cloud-download me-1"></i>Actualizar desde internet</button>
+    <div style="display:flex;justify-content:space-between;align-items:flex-end;gap:12px;flex-wrap:wrap;border-bottom:1px solid #dee2e6;margin-bottom:16px">
+      <ul class="nav nav-tabs" style="border-bottom:0;margin-bottom:-1px">
+        <li class="nav-item"><button class="nav-link active" data-bs-toggle="tab" data-bs-target="#pane-uf">Valores UF</button></li>
+        <li class="nav-item"><button class="nav-link" data-bs-toggle="tab" data-bs-target="#pane-utm">Valores UTM</button></li>
+        <li class="nav-item"><button class="nav-link" data-bs-toggle="tab" data-bs-target="#pane-dolar">Dólar</button></li>
+        <li class="nav-item"><button class="nav-link" data-bs-toggle="tab" data-bs-target="#pane-ipc">IPC</button></li>
+      </ul>
+      <button class="btn btn-outline-primary btn-sm" id="btnSync" onclick="sincronizarWeb()" title="Trae los valores nuevos de UF, UTM, Dólar e IPC y la TMC desde la CMF" style="margin-bottom:6px"><i class="bi bi-cloud-download me-1"></i>Actualizar desde internet</button>
     </div>
-
-    <ul class="nav nav-tabs">
-      <li class="nav-item"><button class="nav-link active" data-bs-toggle="tab" data-bs-target="#pane-uf">Valores UF</button></li>
-      <li class="nav-item"><button class="nav-link" data-bs-toggle="tab" data-bs-target="#pane-utm">Valores UTM</button></li>
-      <li class="nav-item"><button class="nav-link" data-bs-toggle="tab" data-bs-target="#pane-dolar">Dólar</button></li>
-      <li class="nav-item"><button class="nav-link" data-bs-toggle="tab" data-bs-target="#pane-ipc">IPC</button></li>
-    </ul>
 
     <div class="tab-content">
       <!-- ── UF ── -->

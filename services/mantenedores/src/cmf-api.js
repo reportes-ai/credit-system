@@ -22,7 +22,10 @@ async function cmfGet(recurso, year, month) {
   const key = process.env.CMF_API_KEY;
   if (!key) { const e = new Error('Falta CMF_API_KEY'); e.code = 'NOCMF'; throw e; }
   const url = `https://api.cmfchile.cl/api-sbifv3/recursos_api/${recurso}/${year}/${month}?apikey=${encodeURIComponent(key)}&formato=json`;
-  const r = await axios.get(url, { timeout: 15000, headers: { Accept: 'application/json' } });
+  // validateStatus: la CMF responde el detalle del error (key inválida, sin datos, etc.) en el body con
+  // CodigoError AUN con HTTP != 200 (ej. 421 "API key no valida"). Sin esto, axios lo oculta tras un
+  // genérico "Request failed with status code 421" y no se sabe la causa real.
+  const r = await axios.get(url, { timeout: 15000, headers: { Accept: 'application/json' }, validateStatus: () => true });
   const body = r.data;
   if (body && body.CodigoError) { const e = new Error('CMF: ' + (body.Mensaje || ('error ' + body.CodigoError))); e.code = 'CMFERR'; throw e; }
   // El array viene bajo distintas llaves (UFs, UTMs, Dolares, IPCs, TMCs): tomamos el primer array.
