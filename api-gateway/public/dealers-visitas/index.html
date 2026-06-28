@@ -113,7 +113,7 @@
   <div class="topnav-left">
     <a href="/" class="topnav-brand">
       <img src="/img/logo.png" alt="AutoFácil">
-      <span class="version-badge" id="versionBadge">v1.1</span>
+      <span class="version-badge" id="versionBadge">v1.2</span>
     </a>
     <div class="breadcrumb-nav">
       <a href="/">Inicio</a><span class="sep">›</span>
@@ -185,8 +185,14 @@
       <span style="font-size:.72rem;color:#94a3b8">Desde aquí se traza la ruta más corta (vecino más cercano).</span>
     </div>
     <div class="dow-pick" id="pDias" style="margin-bottom:14px"></div>
-    <button class="btn btn-primary" onclick="generarPlan()"><i class="bi bi-magic"></i> Generar plan</button>
-    <span id="pMsg" style="margin-left:12px;font-size:.84rem"></span>
+    <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap">
+      <button class="btn btn-primary" onclick="generarPlan()"><i class="bi bi-magic"></i> Simular plan</button>
+      <button class="btn btn-soft" onclick="recalcular()"><i class="bi bi-arrow-repeat"></i> Recalcular (excluir visitados)</button>
+      <label style="font-size:.82rem;color:#475569;display:inline-flex;align-items:center;gap:6px;cursor:pointer">
+        <input type="checkbox" id="pExcluir"> Excluir dealers ya visitados</label>
+      <span id="pMsg" style="font-size:.84rem"></span>
+    </div>
+    <div style="font-size:.74rem;color:#94a3b8;margin-top:6px"><i class="bi bi-info-circle"></i> Es una <b>simulación</b>: nada se agenda hasta presionar «Agendar este plan».</div>
 
     <div id="planCobertura" style="margin-top:18px"></div>
     <div id="planLista" style="margin-top:6px"></div>
@@ -509,7 +515,7 @@ function guardarGestion(){
       cerrar('mGes'); cargarMes();
       if(!document.getElementById('viewBit').classList.contains('hide')) cargarBitacora();
       if(PLAN_RESULT && !document.getElementById('viewPlan').classList.contains('hide'))
-        cargarVisitasPlan(PLAN_RESULT.plan).then(()=>renderPlanLista(PLAN_RESULT.plan));
+        Promise.all([loadVisited(), cargarVisitasPlan(PLAN_RESULT.plan)]).then(()=>renderPlanLista(PLAN_RESULT.plan));
     }).catch(()=>flash('gMsg','Error de conexión','#b91c1c'));
 }
 
@@ -595,7 +601,7 @@ async function cargarDealers(){
 }
 
 /* ══════════════ PLANIFICADOR DE RUTAS ══════════════ */
-let PLAN_DEALERS=[], PLAN_RESULT=null, PLAN_VIS_EXIST={};
+let PLAN_DEALERS=[], PLAN_RESULT=null, PLAN_VIS_EXIST={}, VISITED_SET=new Set(), VISITED_MAP={};
 const hm2min = s => { const [h,m]=String(s||'0:0').split(':').map(Number); return (h||0)*60+(m||0); };
 const min2hm = m => pad(Math.floor(m/60))+':'+pad(Math.round(m%60));
 function proxDiaHabil(){ const d=new Date(); for(let i=0;i<14;i++){ if(CFG.dias_semana.includes(isoDow(d))) return ymd(d); d.setDate(d.getDate()+1);} return hoyYmd(); }
@@ -611,7 +617,17 @@ async function initPlan(){
     document.getElementById('pDesde').value=proxDiaHabil(); pintarDiasPlan(); v.dataset.init='1';
   }
   if(!PLAN_DEALERS.length) await loadPlanData();
+  await loadVisited();
 }
+async function loadVisited(){
+  try{ const r=await fetch('/api/visitas?estado=REALIZADA',{headers:hdr()}); const j=await r.json();
+    VISITED_SET=new Set(); VISITED_MAP={};
+    ((j.data&&j.data.rows)||[]).forEach(v=>{ if(v.id_dealer){ VISITED_SET.add(v.id_dealer);
+      const f=String(v.fecha_realizada||v.fecha_programada||'').slice(0,10);
+      if(!VISITED_MAP[v.id_dealer]||f>VISITED_MAP[v.id_dealer]) VISITED_MAP[v.id_dealer]=f; } });
+  }catch(e){}
+}
+async function recalcular(){ document.getElementById('pExcluir').checked=true; await loadVisited(); generarPlan(); }
 async function loadPlanData(){
   try{ const r=await fetch('/api/visitas/planificador',{headers:hdr()}); const j=await r.json(); PLAN_DEALERS=(j.data&&j.data.rows)||[]; }
   catch(e){ PLAN_DEALERS=[]; }
@@ -661,13 +677,17 @@ async function generarPlan(){
   const fechaIni=document.getElementById('pDesde').value||hoyYmd();
   const origenId=document.getElementById('pOrigen').value||null;
 
+  const excluir=document.getElementById('pExcluir').checked;
   let universo=PLAN_DEALERS.filter(d=>filtraEstado(d,estado));
   if(comuna) universo=universo.filter(d=>d.comuna===comuna);
   const sinCoord=universo.filter(d=>!(d.lat&&d.lng)).length;
-  const conCoord=universo.filter(d=>d.lat&&d.lng).map(d=>({...d}));
-  if(!conCoord.length){ flash('pMsg','No hay dealers geocodificados con ese filtro. Geocodifícalos en el Mapa de Dealers.','#b91c1c');
+  let conCoord=universo.filter(d=>d.lat&&d.lng).map(d=>({...d}));
+  let excluidosVis=0;
+  if(excluir){ const before=conCoord.length; conCoord=conCoord.filter(d=>!VISITED_SET.has(d.id_dealer)); excluidosVis=before-conCoord.length; }
+  if(!conCoord.length){
+    flash('pMsg', excluir&&excluidosVis ? 'Todos los dealers de este filtro ya fueron visitados. 🎉' : 'No hay dealers geocodificados con ese filtro. Geocodifícalos en el Mapa de Dealers.','#b91c1c');
     document.getElementById('planCobertura').innerHTML=''; document.getElementById('planLista').innerHTML=''; return; }
-  flash('pMsg','','');
+  flash('pMsg', excluir? `Excluidos ${excluidosVis} ya visitado(s).` : '', excluir?'#0e7490':'');
 
   const ruta=rutaNN(conCoord, origenId);
   const { dias:plan }=distribuir(ruta,{visDia,iniMin:ini,finMin:fin,durMin:dur,velKmh:vel,diasSet:dias,fechaInicio:fechaIni});
@@ -677,7 +697,7 @@ async function generarPlan(){
     d.visitas.forEach(v=>kmTot+=(v.distKm||0)); if(days<30)vMes+=d.visitas.length; if(days<365)vAno+=d.visitas.length; });
   PLAN_RESULT={plan,total:ruta.length,sinCoord};
   await cargarVisitasPlan(plan);
-  renderCobertura({total:ruta.length,sinCoord,vMes,vAno,nDias:plan.length,kmTot});
+  renderCobertura({total:ruta.length,sinCoord,vMes,vAno,nDias:plan.length,kmTot,excluidosVis});
   renderPlanLista(plan);
 }
 async function cargarVisitasPlan(plan){
@@ -696,6 +716,7 @@ function renderCobertura(c){
     ${card('% en 1 año', Math.min(100,Math.round(c.vAno/total*100))+'%', c.vAno+' visitas','#2563eb')}
     ${card('Recorrer todo', c.nDias+' días', 'hábiles','#7c3aed')}
     ${card('Distancia total', Math.round(c.kmTot)+' km', 'aprox. (línea recta)','#ea580c')}
+    ${c.excluidosVis?card('Ya visitados', c.excluidosVis, 'excluidos del plan','#64748b'):''}
   </div>`;
 }
 function dealerEstadoBadge(d){
@@ -724,7 +745,7 @@ function renderPlanLista(plan){
         <td><b>${esc(v.nombre||'—')}</b></td><td>${esc(v.comuna||'—')}</td>
         <td>${v.distKm?Math.round(v.distKm*10)/10+' km':'—'}</td>
         <td>${v.ultimo_credito?fFecha(v.ultimo_credito):'<span style="color:#b91c1c">Nunca</span>'}</td>
-        <td>${dealerEstadoBadge(v)}</td>
+        <td>${dealerEstadoBadge(v)}${VISITED_MAP[v.id_dealer]?`<div class="sub" style="font-size:.66rem;color:#16a34a;margin-top:2px"><i class="bi bi-check2-circle"></i> visitado ${fFecha(VISITED_MAP[v.id_dealer])}</div>`:''}</td>
         <td style="white-space:nowrap">${acc}</td>
       </tr>`;
     });
