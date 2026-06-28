@@ -77,8 +77,10 @@
             <button class="btn btn-sm btn-outline-secondary" id="btnSync" onclick="sincronizar()" title="Recarga el catálogo desde Dimeiggs"><i class="bi bi-cloud-download me-1"></i>Sincronizar catálogo</button>
           </div>
           <div style="display:flex;gap:8px;margin-bottom:8px;align-items:center;flex-wrap:wrap">
-            <button class="btn btn-sm btn-outline-success" onclick="bulkPagina(true)"><i class="bi bi-check2-all me-1"></i>Asignar los de esta página</button>
-            <button class="btn btn-sm btn-outline-danger" onclick="bulkPagina(false)"><i class="bi bi-x me-1"></i>Quitar los de esta página</button>
+            <button class="btn btn-sm btn-success" onclick="bulkFiltro(true)" title="Marca todos los artículos que cumplen el filtro/categoría actual (todas las páginas)"><i class="bi bi-check-all me-1"></i>Asignar TODO el filtro</button>
+            <button class="btn btn-sm btn-outline-danger" onclick="bulkFiltro(false)" title="Desmarca todos los del filtro/categoría actual"><i class="bi bi-x-circle me-1"></i>Quitar TODO el filtro</button>
+            <button class="btn btn-sm btn-outline-success" onclick="bulkPagina(true)"><i class="bi bi-check2 me-1"></i>Asignar esta página</button>
+            <button class="btn btn-sm btn-outline-danger" onclick="bulkPagina(false)"><i class="bi bi-x me-1"></i>Quitar esta página</button>
             <span class="muted" style="font-size:.8rem"><i class="bi bi-shop me-1"></i>Proveedor: <a href="https://www.dimeiggs.cl" target="_blank" rel="noopener">Dimeiggs</a> · <a href="https://www.dimeiggs.cl" target="_blank" rel="noopener">dimeiggs.cl</a></span>
             <span class="muted" id="artInfo" style="margin-left:auto;align-self:center"></span>
             <span id="sucio" style="display:none;color:#b45309;font-weight:600;font-size:.8rem">● sin guardar</span>
@@ -249,6 +251,19 @@
       if (!document.getElementById('selPerfil').value || !pagRows.length) return;
       pagRows.forEach(a => on ? asignados.add(a.id) : asignados.delete(a.id));
       buscarArt(pagOffset); updArtInfo(); marcarSucio();
+    }
+    // Asignar/quitar TODOS los del filtro/categoría actual (todas las páginas) — local, luego "Grabar"
+    async function bulkFiltro(on) {
+      if (!document.getElementById('selPerfil').value) { toast('Elige un perfil', false); return; }
+      const q = encodeURIComponent(document.getElementById('qArt').value.trim());
+      const cat = encodeURIComponent(document.getElementById('selCat').value);
+      const j = await api(`/api/compras/catalogo-ids?q=${q}&categoria=${cat}`);
+      if (!j?.success) return;
+      const ids = j.data.ids;
+      if (!ids.length) { toast('El filtro no tiene artículos', false); return; }
+      ids.forEach(id => on ? asignados.add(id) : asignados.delete(id));
+      buscarArt(pagOffset); updArtInfo(); marcarSucio();
+      toast(`${on ? 'Marcados' : 'Desmarcados'} ${fmt(ids.length)} artículo(s) — recuerda Grabar`);
     }
     async function grabar() {
       const idp = document.getElementById('selPerfil').value; if (!idp) return;

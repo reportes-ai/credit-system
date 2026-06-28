@@ -9,6 +9,7 @@ const mant = requireFunc('compras_mant');
 
 // Catálogo (lo lee el mantenedor para curar por perfil)
 router.get('/catalogo',          verifyToken, mant, c.catalogo);
+router.get('/catalogo-ids',      verifyToken, mant, c.catalogoIds);
 router.get('/categorias',        verifyToken, mant, c.categorias);
 router.post('/sincronizar',      verifyToken, mant, c.sincronizar);
 

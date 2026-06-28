@@ -177,6 +177,20 @@ const categorias = async (req, res) => {
   } catch (e) { err(res, e); }
 };
 
+// GET /api/compras/catalogo-ids?q=&categoria= → IDs de TODOS los artículos que matchean el filtro
+// (todas las páginas). Lo usa "Asignar/Quitar todo el filtro" del mantenedor.
+const catalogoIds = async (req, res) => {
+  try {
+    const q = String(req.query.q || '').trim();
+    const cat = String(req.query.categoria || '').trim();
+    const where = ['activo=1'], args = [];
+    if (q) { where.push('(nombre LIKE ? OR marca LIKE ? OR sku LIKE ? OR codigo_ref LIKE ?)'); args.push(`%${q}%`, `%${q}%`, `%${q}%`, `%${q}%`); }
+    if (cat) { where.push('categoria LIKE ?'); args.push(`${cat}%`); }
+    const [rows] = await pool.query(`SELECT id FROM compras_articulos WHERE ${where.join(' AND ')} ORDER BY id LIMIT 10000`, args);
+    res.json({ success: true, data: { ids: rows.map(r => r.id) }, error: null });
+  } catch (e) { err(res, e); }
+};
+
 // POST /api/compras/sincronizar → recarga el catálogo desde Dimeiggs
 const sincronizar = async (req, res) => {
   try {
@@ -559,7 +573,7 @@ const reporteMensual = async (req, res) => {
 };
 
 module.exports = {
-  catalogo, categorias, sincronizar,
+  catalogo, categorias, catalogoIds, sincronizar,
   perfiles, articuloPerfilGet, articuloPerfilSet,
   direccionesList, direccionCrear, direccionEditar, direccionEliminar,
   usuariosConfig, usuarioConfigSet,
