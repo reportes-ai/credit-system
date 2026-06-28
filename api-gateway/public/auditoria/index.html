@@ -5,7 +5,7 @@
   <link rel="icon" href="/img/favicon.png" type="image/png">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Auditoría — AutoFácil</title>
-  <!-- v1.8 -->
+  <!-- v1.9 — pestaña Dealers (bitácora separada de usuarios internos) -->
   <link href="/css/bootstrap.min.css" rel="stylesheet">
   <link href="/css/bootstrap-icons.css" rel="stylesheet">
   <style>
@@ -89,6 +89,7 @@
   <div class="tabs">
     <div class="tab on" id="tabLogins" onclick="setTab('logins')"><i class="bi bi-box-arrow-in-right"></i>Logins</div>
     <div class="tab" id="tabMov" onclick="setTab('mov')"><i class="bi bi-list-columns-reverse"></i>Movimientos</div>
+    <div class="tab" id="tabDealers" onclick="setTab('dealers')"><i class="bi bi-shop"></i>Dealers</div>
     <div class="tab" id="tabBackups" onclick="setTab('backups')"><i class="bi bi-people"></i>BackUps <b style="color:#ef4444">*</b></div>
   </div>
 
@@ -98,10 +99,11 @@
     <div class="fld"><label>Usuario</label><select id="f-usuario" style="min-width:170px"><option value="">— Todos —</option></select></div>
     <div class="fld" id="wrapAccion" style="display:none"><label>Acción</label><select id="f-accion" style="min-width:140px"><option value="">— Todas —</option></select></div>
     <div class="fld" id="wrapModulo" style="display:none"><label>Módulo</label><select id="f-modulo" style="min-width:130px"><option value="">— Todos —</option></select></div>
+    <div class="fld" id="wrapCategoria" style="display:none"><label>Tipo</label><select id="f-categoria" style="min-width:140px"><option value="">— Todos —</option><option>Acceso</option><option>Acción</option><option>Asistente IA</option></select></div>
     <div class="fld" id="wrapQ" style="display:none"><label>Buscar (detalle/RUT)</label><input id="f-q" type="text" placeholder="texto, rut, n° op…" style="width:180px"></div>
     <button class="btn btn-f" onclick="aplicar()"><i class="bi bi-funnel"></i>Filtrar</button>
     <button class="btn btn-clear" onclick="limpiar()"><i class="bi bi-x-circle"></i>Limpiar</button>
-    <button class="btn btn-x" onclick="exportar()"><i class="bi bi-file-earmark-excel"></i>Exportar Excel</button>
+    <button class="btn btn-x" id="btnExport" onclick="exportar()"><i class="bi bi-file-earmark-excel"></i>Exportar Excel</button>
   </div>
 
   <div class="meta-row"><span id="resumen">—</span><span id="rango"></span></div>
@@ -145,11 +147,15 @@ function setTab(t){
   TAB = t; PAGE = 1;
   document.getElementById('tabLogins').classList.toggle('on', t==='logins');
   document.getElementById('tabMov').classList.toggle('on', t==='mov');
+  document.getElementById('tabDealers').classList.toggle('on', t==='dealers');
   document.getElementById('tabBackups').classList.toggle('on', t==='backups');
-  const mov = t==='mov', bk = t==='backups';
+  const mov = t==='mov', bk = t==='backups', dl = t==='dealers';
   document.getElementById('wrapAccion').style.display = mov?'':'none';
   document.getElementById('wrapModulo').style.display = mov?'':'none';
-  document.getElementById('wrapQ').style.display      = mov?'':'none';
+  document.getElementById('wrapQ').style.display      = (mov||dl)?'':'none';
+  document.getElementById('wrapCategoria').style.display = dl?'':'none';
+  document.getElementById('f-usuario').parentElement.style.display = dl?'none':'';
+  document.getElementById('btnExport').style.display = (bk||dl)?'none':'';
   document.querySelector('.filtros').style.display = bk?'none':'';
   document.querySelector('.pager').style.display   = bk?'none':'';
   cargar();
@@ -158,11 +164,15 @@ function setTab(t){
 function qs(extra){
   const p = new URLSearchParams();
   const d = document.getElementById('f-desde').value, h = document.getElementById('f-hasta').value;
-  const u = document.getElementById('f-usuario').value;
-  if (d) p.set('desde', d); if (h) p.set('hasta', h); if (u) p.set('usuario', u);
+  if (d) p.set('desde', d); if (h) p.set('hasta', h);
+  if (TAB!=='dealers'){ const u = document.getElementById('f-usuario').value; if (u) p.set('usuario', u); }
   if (TAB==='mov'){
     const a = document.getElementById('f-accion').value, m = document.getElementById('f-modulo').value, q = document.getElementById('f-q').value.trim();
     if (a) p.set('accion', a); if (m) p.set('modulo', m); if (q) p.set('q', q);
+  }
+  if (TAB==='dealers'){
+    const cat = document.getElementById('f-categoria').value, q = document.getElementById('f-q').value.trim();
+    if (cat) p.set('categoria', cat); if (q) p.set('q', q);
   }
   if (extra) for (const [k,v] of Object.entries(extra)) p.set(k, v);
   return p;
@@ -192,6 +202,21 @@ async function cargar(){
       document.getElementById('resumen').textContent = `${j.data.rows.length} periodo(s) de backup`;
       document.getElementById('rango').textContent = '';
       renderBackups(j.data.rows);
+    } catch(e){ tb.innerHTML = '<tr><td class="vacio">Error de conexión</td></tr>'; }
+    return;
+  }
+  if (TAB==='dealers'){
+    const url = '/api/auditoria-mov/dealers?' + qs({ page:PAGE, limit:100 }).toString();
+    try {
+      const r = await fetch(url, { headers:H }); const j = await r.json();
+      if (!j.success){ tb.innerHTML = '<tr><td class="vacio">Error al cargar</td></tr>'; return; }
+      PAGES = j.data.pages || 1;
+      document.getElementById('resumen').textContent = `${j.data.total} evento(s) de dealers`;
+      document.getElementById('rango').textContent = '';
+      document.getElementById('pgInfo').textContent = `Página ${j.data.page} de ${PAGES}`;
+      document.getElementById('pgPrev').disabled = j.data.page<=1;
+      document.getElementById('pgNext').disabled = j.data.page>=PAGES;
+      renderDealers(j.data.rows);
     } catch(e){ tb.innerHTML = '<tr><td class="vacio">Error de conexión</td></tr>'; }
     return;
   }
@@ -267,6 +292,23 @@ function renderMov(rows){
   }).join('');
 }
 
+function renderDealers(rows){
+  document.getElementById('thead').innerHTML =
+    '<tr><th>Fecha</th><th>Hora</th><th>Dealer</th><th>Tipo</th><th>Acción</th><th>Detalle</th><th>IP</th></tr>';
+  const tb = document.getElementById('tbody');
+  if (!rows.length){ tb.innerHTML='<tr><td colspan="7" class="vacio">Sin actividad de dealers en el rango/filtros seleccionados</td></tr>'; return; }
+  const catColor = c => c==='Acceso'?'#7dd3fc':(c==='Asistente IA'?'#d8b4fe':'#6ee7b7');
+  tb.innerHTML = rows.map(r => `<tr>
+    <td class="c-fecha">${fFecha(r.fecha)}</td>
+    <td>${fHora(r.fecha)}</td>
+    <td class="c-user">${escH(r.dealer||'—')}</td>
+    <td><span class="acc" style="background:#10192c;color:${catColor(r.categoria)}">${escH(r.categoria||'')}</span></td>
+    <td>${escH(r.accion||'')}${r.resultado==='FAIL'?' <span style="color:#fca5a5">✕</span>':''}</td>
+    <td class="c-detalle">${escH(r.detalle||'')}</td>
+    <td class="c-ip">${escH(r.ip||'')}</td>
+  </tr>`).join('');
+}
+
 function renderBackups(rows){
   document.getElementById('thead').innerHTML =
     '<tr><th>Titular <b style="color:#ef4444">*</b></th><th>BackUp</th><th>Categorías</th><th>Desde</th><th>Hasta</th><th>Activado por</th></tr>';
@@ -290,9 +332,11 @@ function limpiar(){
   if (document.getElementById('f-accion')) document.getElementById('f-accion').value='';
   if (document.getElementById('f-modulo')) document.getElementById('f-modulo').value='';
   if (document.getElementById('f-q')) document.getElementById('f-q').value='';
+  if (document.getElementById('f-categoria')) document.getElementById('f-categoria').value='';
   PAGE=1; cargar();
 }
 function exportar(){
+  if (TAB==='dealers' || TAB==='backups') return;
   const base = TAB==='mov' ? '/api/auditoria-mov/movimientos/export?' : '/api/auditoria-mov/logins/export?';
   const p = qs({ token });
   window.location.href = base + p.toString();

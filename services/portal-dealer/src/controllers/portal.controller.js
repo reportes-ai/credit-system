@@ -9,6 +9,7 @@
 const pool = require('../../../../shared/config/database');
 const anthropic = require('../../../../shared/anthropic');
 const ia = require('../../../../shared/ia');
+const { clientIp } = require('../../../../shared/middleware/rate-limit');
 
 const CODIGO_IA = 'dealer_ia';
 
@@ -32,6 +33,19 @@ const CODIGO_IA = 'dealer_ia';
       ts        DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
       INDEX idx_dealer_ts (id_dealer, ts),
       INDEX idx_cuenta_ts (id_cuenta, ts)
+    )`);
+    // Bitácora de acciones del dealer en el portal (qué hacen). Los accesos
+    // (login/link/ws) viven en ar_auth_logs; la IA en portal_ia_uso.
+    await pool.query(`CREATE TABLE IF NOT EXISTS portal_dealer_log (
+      id         INT AUTO_INCREMENT PRIMARY KEY,
+      id_dealer  INT NULL,
+      id_cuenta  INT NULL,
+      accion     VARCHAR(40) NOT NULL,
+      detalle    VARCHAR(200) NULL,
+      ip         VARCHAR(64) NULL,
+      created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      INDEX idx_cuenta (id_cuenta),
+      INDEX idx_fecha (created_at)
     )`);
   } catch (e) { console.error('[portal-dealer] migracion ia:', e.message); }
 
@@ -150,6 +164,15 @@ const addDiasISO = (fecha, dias) => {
   x.setDate(x.getDate() + dias); return x.toISOString();
 };
 
+// Bitácora de acciones del dealer (fire-and-forget, nunca rompe el request).
+function logDealer(req, accion, detalle) {
+  try {
+    const d = req.dealer || {};
+    pool.query('INSERT INTO portal_dealer_log (id_dealer, id_cuenta, accion, detalle, ip) VALUES (?,?,?,?,?)',
+      [d.id_dealer || null, d.id_cuenta || null, accion, String(detalle || '').slice(0, 200), clientIp(req)]).catch(() => {});
+  } catch (_) {}
+}
+
 // ── GET /api/portal-dealer/resumen ─────────────────────────────────────────
 exports.resumen = async (req, res) => {
   try {
@@ -255,6 +278,7 @@ exports.detalle = async (req, res) => {
     const id = parseInt(req.params.id, 10);
     const ob = await opDelDealer(req, id);
     if (!ob) return res.status(404).json({ success: false, data: null, error: 'Operación no encontrada.' });
+    logDealer(req, 'ver_operacion', 'Op #' + (ob.numero_credito || ob.num_op || ob.id));
 
     let cli = { nombre: '', rut: '' };
     if (ob.id_cliente) {
@@ -374,6 +398,7 @@ exports.cartolas = async (req, res) => {
   try {
     const sc = dealerScope(req);
     if (!sc.hasScope) return res.json({ success: true, data: { vinculado: false, rows: [], plazos: {} }, error: null });
+    logDealer(req, 'ver_cartolas', '');
 
     const rut = await rutEfectivo(req);
     const [rows] = await pool.query(

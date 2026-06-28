@@ -164,4 +164,63 @@ const getBackups = async (req, res) => {
   }
 };
 
-module.exports = { getMovimientos, getLogins, getFiltros, exportMovimientos, exportLogins, getBackups };
+/* ── GET /api/auditoria-mov/dealers — bitácora de dealers (separada de internos) ──
+   Mezcla 3 fuentes: accesos (ar_auth_logs), acciones en el portal
+   (portal_dealer_log) y preguntas a la IA (portal_ia_uso). Cada fuente es
+   tolerante a fallos (si su tabla no existe aún, se omite). */
+const accesoLabel = t => ({ login: 'Ingreso (clave)', acceso: 'Ingreso (link)', ws: 'Conexión chat', recuperar: 'Solicitó recuperar clave', reset: 'Cambió su clave' }[t] || t || 'Acceso');
+const accionLabel = a => ({ ver_operacion: 'Vio operación', ver_cartolas: 'Vio cartolas' }[a] || a || 'Acción');
+
+const getBitacoraDealers = async (req, res) => {
+  try {
+    const qy = req.query;
+    const desde = qy.desde ? qy.desde + ' 00:00:00' : null;
+    const hasta = qy.hasta ? qy.hasta + ' 23:59:59' : null;
+    const cond = (col) => {
+      const w = [], v = [];
+      if (desde) { w.push(`${col} >= ?`); v.push(desde); }
+      if (hasta) { w.push(`${col} <= ?`); v.push(hasta); }
+      return { w: w.length ? 'WHERE ' + w.join(' AND ') : '', v };
+    };
+    const eventos = [];
+    try {
+      const c = cond('l.created_at');
+      const [rows] = await pool.query(
+        `SELECT l.created_at AS fecha, l.tipo AS accion, l.resultado, l.ip,
+                COALESCE(cu.nombre, l.email) AS dealer, l.email
+         FROM ar_auth_logs l LEFT JOIN ar_dealer_cuentas cu ON cu.id = l.id_cuenta
+         ${c.w} ORDER BY l.id DESC LIMIT 2000`, c.v);
+      rows.forEach(r => eventos.push({ categoria: 'Acceso', fecha: r.fecha, dealer: r.dealer || r.email || '—', accion: accesoLabel(r.accion), detalle: r.resultado === 'FAIL' ? 'Intento fallido' : '', resultado: r.resultado || 'OK', ip: r.ip || '' }));
+    } catch (_) {}
+    try {
+      const c = cond('l.created_at');
+      const [rows] = await pool.query(
+        `SELECT l.created_at AS fecha, l.accion, l.detalle, l.ip, cu.nombre AS dealer
+         FROM portal_dealer_log l LEFT JOIN ar_dealer_cuentas cu ON cu.id = l.id_cuenta
+         ${c.w} ORDER BY l.id DESC LIMIT 2000`, c.v);
+      rows.forEach(r => eventos.push({ categoria: 'Acción', fecha: r.fecha, dealer: r.dealer || '—', accion: accionLabel(r.accion), detalle: r.detalle || '', resultado: 'OK', ip: r.ip || '' }));
+    } catch (_) {}
+    try {
+      const c = cond('u.ts');
+      const [rows] = await pool.query(
+        `SELECT u.ts AS fecha, u.pregunta, cu.nombre AS dealer
+         FROM portal_ia_uso u LEFT JOIN ar_dealer_cuentas cu ON cu.id = u.id_cuenta
+         ${c.w} ORDER BY u.id DESC LIMIT 2000`, c.v);
+      rows.forEach(r => eventos.push({ categoria: 'Asistente IA', fecha: r.fecha, dealer: r.dealer || '—', accion: 'Pregunta', detalle: r.pregunta || '', resultado: 'OK', ip: '' }));
+    } catch (_) {}
+
+    let merged = eventos.sort((a, b) => new Date(b.fecha) - new Date(a.fecha));
+    if (qy.categoria) merged = merged.filter(e => e.categoria === qy.categoria);
+    if (qy.q) {
+      const k = String(qy.q).toLowerCase();
+      merged = merged.filter(e => [e.dealer, e.accion, e.detalle].join(' ').toLowerCase().includes(k));
+    }
+    const total = merged.length;
+    const page  = Math.max(1, parseInt(qy.page) || 1);
+    const limit = Math.min(500, Math.max(10, parseInt(qy.limit) || 100));
+    const rows  = merged.slice((page - 1) * limit, (page - 1) * limit + limit);
+    res.json({ success: true, data: { rows, total, page, limit, pages: Math.ceil(total / limit) }, error: null });
+  } catch (e) { console.error('[auditoria dealers]', e.message); res.status(500).json({ success: false, data: null, error: 'Error interno del servidor' }); }
+};
+
+module.exports = { getMovimientos, getLogins, getFiltros, exportMovimientos, exportLogins, getBackups, getBitacoraDealers };

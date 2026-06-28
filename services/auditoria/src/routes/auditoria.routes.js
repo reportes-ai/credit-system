@@ -8,6 +8,7 @@ router.get('/movimientos',        verifyToken, requireFunc('auditoria_ver'), ctr
 router.get('/movimientos/export', verifyToken, requireFunc('auditoria_ver'), ctrl.exportMovimientos);
 router.get('/logins',             verifyToken, requireFunc('auditoria_ver'), ctrl.getLogins);
 router.get('/logins/export',      verifyToken, requireFunc('auditoria_ver'), ctrl.exportLogins);
+router.get('/dealers',            verifyToken, requireFunc('auditoria_ver'), ctrl.getBitacoraDealers);
 router.get('/filtros',            verifyToken, requireFunc('auditoria_ver'), ctrl.getFiltros);
 router.get('/backups',            verifyToken, requireFunc('auditoria_ver'), ctrl.getBackups);
 
