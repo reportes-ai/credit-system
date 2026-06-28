@@ -102,7 +102,7 @@
   <div class="topnav-left">
     <a href="/" class="topnav-brand">
       <img src="/img/logo.png" alt="AutoFácil">
-      <span class="version-badge" id="versionBadge">v1.8</span>
+      <span class="version-badge" id="versionBadge">v1.9</span>
     </a>
     <div class="breadcrumb-nav">
       <a href="/">Inicio</a><span class="sep">›</span>
@@ -227,24 +227,34 @@ const UMBRAL_RENT = 100000;   // rentabilidad mínima por operación; bajo esto 
 /* Cuadro de Preferencia de Financiera (mantenedor financiera_preferencia). El informe LO LEE:
    si lo editas en el mantenedor, cambia la columna "Según cuadro" de acá. */
 let PREF_TABLA = [
-  { desde:12, hasta:15, af_min:'4000000', af_max:'200 UF',   un_min:'2000000', un_max:'18000000', preferente:'UNIDAD' },
-  { desde:16, hasta:23, af_min:'4000000', af_max:'200 UF',   un_min:'2000000', un_max:'18000000', preferente:'AUTOFIN' },
-  { desde:24, hasta:24, af_min:'2000000', af_max:'200 UF',   un_min:'2000000', un_max:'18000000', preferente:'AUTOFIN' },
-  { desde:25, hasta:36, af_min:'2000000', af_max:'99999999', un_min:'2000000', un_max:'18000000', preferente:'AUTOFIN' },
-  { desde:37, hasta:48, af_min:'2000000', af_max:'99999999', un_min:'NO SE PUEDE', un_max:'NO SE PUEDE', preferente:'AUTOFIN' },
+  { cd:12, ch:15, sd:'2000000', sh:'3999999',  af:'NO', un:'SI', pref:'UNIDAD' },
+  { cd:12, ch:15, sd:'4000000', sh:'200 UF',   af:'SI', un:'SI', pref:'UNIDAD' },
+  { cd:12, ch:15, sd:'200 UF',  sh:'18000000', af:'NO', un:'SI', pref:'UNIDAD' },
+  { cd:16, ch:23, sd:'2000000', sh:'3999999',  af:'NO', un:'SI', pref:'UNIDAD' },
+  { cd:16, ch:23, sd:'4000000', sh:'200 UF',   af:'SI', un:'SI', pref:'AUTOFIN' },
+  { cd:16, ch:23, sd:'200 UF',  sh:'18000000', af:'NO', un:'SI', pref:'UNIDAD' },
+  { cd:24, ch:24, sd:'2000000', sh:'200 UF',   af:'SI', un:'SI', pref:'AUTOFIN' },
+  { cd:24, ch:24, sd:'200 UF',  sh:'18000000', af:'NO', un:'SI', pref:'UNIDAD' },
+  { cd:25, ch:36, sd:'2000000', sh:'18000000', af:'SI', un:'SI', pref:'AUTOFIN' },
+  { cd:25, ch:36, sd:'18000001',sh:'SIN TOPE', af:'SI', un:'NO', pref:'AUTOFIN' },
+  { cd:37, ch:48, sd:'2000000', sh:'SIN TOPE', af:'SI', un:'NO', pref:'AUTOFIN' },
 ];
-function parsePrefVal(v){ const s=String(v??'').toUpperCase().trim(); if(!s||s.includes('NO SE PUEDE')) return null; if(s.includes('UF')){ const n=parseFloat(s.replace(/[^0-9.]/g,'')); return (UF_HOY&&n)?n*UF_HOY:null; } return parseInt(s.replace(/[^0-9]/g,''))||null; }
-function preferenteSegunTabla(plazo, saldo){
-  const p=parseInt(plazo)||0;
-  const row=PREF_TABLA.find(r=>p>=parseInt(r.desde)&&p<=parseInt(r.hasta));
-  if(!row||!saldo) return null;
-  const enRango=(min,max)=>{ const mi=parsePrefVal(min),ma=parsePrefVal(max); if(mi===null&&ma===null) return false; return saldo>=(mi??0)&&saldo<=(ma??Infinity); };
-  const puedeAF=enRango(row.af_min,row.af_max), puedeUN=enRango(row.un_min,row.un_max);
-  const prefDecl = String(row.preferente||'AUTOFIN').toUpperCase().includes('UNIDAD') ? 'UAC' : 'AF';
-  if (puedeAF && puedeUN) return prefDecl;   // ambas se pueden → manda la preferencia
-  if (puedeAF) return 'AF';
-  if (puedeUN) return 'UAC';
-  return null;
+function saldoNum(v, def){ const s=String(v??'').toUpperCase().trim(); if(!s||s.includes('SIN TOPE')||s.includes('NO SE PUEDE')) return def; if(s.includes('UF')){ const n=parseFloat(s.replace(/[^0-9.]/g,'')); return (UF_HOY&&n)?n*UF_HOY:def; } const n=parseInt(s.replace(/[^0-9]/g,'')); return isNaN(n)?def:n; }
+const _si = v => { const s=String(v??'').toUpperCase().trim(); return s.startsWith('S')||v===true||v===1||s==='1'; };
+function preferenteSegunTabla(plazo, saldo){   // → 'AF' | 'UAC' | null (primera opción del cuadro)
+  const p=parseInt(plazo)||0; if(!saldo) return null;
+  // Formato nuevo (grilla cuotas × saldo)
+  let row=PREF_TABLA.find(r=>(r.cd!=null||r.sd!=null)&&p>=parseInt(r.cd??r.desde)&&p<=parseInt(r.ch??r.hasta)&&saldo>=saldoNum(r.sd,0)&&saldo<=saldoNum(r.sh,Infinity));
+  if(row){ const afOk=_si(row.af),unOk=_si(row.un); let pr=String(row.pref||row.preferente||'').toUpperCase();
+    pr = pr.includes('UNIDAD')?'UAC':(pr.includes('AUTOFIN')?'AF':null);
+    if(pr==='AF'&&!afOk) pr=unOk?'UAC':null; else if(pr==='UAC'&&!unOk) pr=afOk?'AF':null; else if(!pr) pr=afOk?'AF':(unOk?'UAC':null);
+    return pr; }
+  // Compat formato viejo
+  const old=PREF_TABLA.find(r=>r.af_min!=null&&p>=parseInt(r.desde)&&p<=parseInt(r.hasta)); if(!old) return null;
+  const enRango=(mn,mx)=>{ if(String(mn).toUpperCase().includes('NO SE PUEDE')) return false; const a=saldoNum(mn,0),b=saldoNum(mx,Infinity); return saldo>=a&&saldo<=b; };
+  const afOk=enRango(old.af_min,old.af_max),unOk=enRango(old.un_min,old.un_max);
+  const prefDecl=String(old.preferente||'AUTOFIN').toUpperCase().includes('UNIDAD')?'UAC':'AF';
+  if(afOk&&unOk) return prefDecl; if(afOk) return 'AF'; if(unOk) return 'UAC'; return null;
 }
 
 /* ── Init ─────────────────────────────────────────── */
