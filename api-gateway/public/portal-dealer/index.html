@@ -5,7 +5,7 @@
   <link rel="icon" href="/img/favicon.png" type="image/png">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Portal Dealer — AutoFácil</title>
-  <!-- v2.3 — Onboarding self-service + tour + previsualización /portal-dealer?demo=1 -->
+  <!-- v2.4 — Enlace permanente "Ver demostración" en el login -->
   <link href="/css/bootstrap-icons.css" rel="stylesheet">
   <style>
     :root { --navy:#0141A2; --navy-dark:#012d70; --navy-light:#0255c5; --accent:#009AFE; }
@@ -178,6 +178,7 @@
         <div id="liForgot" style="display:none;text-align:center;margin-top:12px"><a href="#" onclick="verRecuperar(event)" style="font-size:.84rem;color:var(--navy);font-weight:600;text-decoration:none">¿Olvidaste tu clave?</a></div>
         <div id="liCambiar" style="display:none;text-align:center;margin-top:8px"><a href="#" onclick="liReset(event)" style="font-size:.84rem;color:var(--navy);font-weight:600;text-decoration:none">← Usar otro email</a></div>
         <div class="login-foot"><i class="bi bi-shield-lock"></i> Conexión segura · AutoFácil Crédito Automotriz</div>
+        <div style="text-align:center;margin-top:10px"><a href="#" onclick="entrarDemo();return false;" style="font-size:.82rem;color:#94a3b8;font-weight:600;text-decoration:none"><i class="bi bi-play-circle"></i> Ver demostración</a></div>
       </div>
       <!-- Solicitud de cuenta -->
       <div id="registroForm" style="display:none">
