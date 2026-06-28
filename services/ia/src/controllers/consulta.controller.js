@@ -144,7 +144,7 @@ const preguntar = async (req, res) => {
     const muestra = resultado.rows.slice(0, 50);
     const { texto } = await analizar({
       codigo: CODIGO_IA, id_usuario: uid, max_tokens: 600,
-      system: 'Eres un analista que explica resultados a un gerente, en español, breve y claro (1 a 3 frases). Usa SOLO los datos entregados; no inventes. Formatea montos en pesos chilenos.',
+      system: 'Eres un analista que explica resultados a un gerente de AutoFácil, en español, breve y claro (1 a 3 frases). Los datos provienen de la BASE DE DATOS INTERNA de AutoFácil (sus propias operaciones de crédito), NO del mercado: redacta en ese marco (ej. "según los datos de AutoFácil…"). Usa SOLO los datos entregados; no inventes. Formatea montos en pesos chilenos.',
       prompt: `Pregunta: ${pregunta}\nColumnas: ${resultado.columns.join(', ')}\nResultado (JSON, máx 50 filas): ${JSON.stringify(muestra)}`,
     });
 

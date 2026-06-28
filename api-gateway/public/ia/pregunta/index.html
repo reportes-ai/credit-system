@@ -52,6 +52,11 @@
     .composer button:disabled { opacity:.5; }
     .muted { color:#94a3b8; }
     .nota { font-size:.72rem; color:#94a3b8; text-align:center; margin-top:6px; }
+    .fuente-info { background:#eff6ff; border:1px solid #dbeafe; color:#1e40af; border-radius:10px; padding:8px 12px; font-size:.78rem; margin-bottom:14px; display:flex; align-items:center; gap:8px; }
+    .acciones { display:flex; gap:8px; margin-top:12px; flex-wrap:wrap; }
+    .btn-mini { background:#f1f5f9; border:1px solid #cbd5e1; color:#334155; border-radius:8px; padding:5px 11px; font-size:.78rem; cursor:pointer; display:inline-flex; align-items:center; gap:5px; }
+    .btn-mini:hover { background:#e2e8f0; border-color:#94a3b8; }
+    .fuente { font-size:.72rem; color:#94a3b8; margin-top:10px; }
   </style>
 </head>
 <body>
@@ -74,6 +79,7 @@
       <span class="chip" onclick="usarChip(this)">Top 5 dealers por número de operaciones</span>
       <span class="chip" onclick="usarChip(this)">Cartas de aprobación por vencer</span>
     </div>
+    <div class="fuente-info"><i class="bi bi-info-circle"></i> Todas las respuestas se basan en los <b>datos internos de AutoFácil</b> (tu base de datos de operaciones), <b>no</b> en datos de mercado.</div>
     <div id="hilo"></div>
   </div>
 
@@ -101,6 +107,7 @@
     function usarChip(el){ document.getElementById('q').value = el.textContent; preguntar(); }
 
     let cargando = false;
+    const TURNS = [];   // guarda cada respuesta para los botones Copiar
     async function preguntar() {
       if (cargando) return;
       const inp = document.getElementById('q');
@@ -118,12 +125,14 @@
       const a = turn.querySelector('.a');
       if (!j) return;
       if (!j.success) { a.innerHTML = `<div class="resp" style="color:#dc2626">${esc(j.error||'No se pudo responder')}</div>`; return; }
-      a.innerHTML = render(j.data);
+      const idx = TURNS.push(j.data) - 1;
+      a.innerHTML = render(j.data, idx);
       turn.scrollIntoView({ behavior:'smooth', block:'end' });
       inp.focus();
     }
 
-    function render(d) {
+    const tieneGrafico = d => !!(d && d.grafico && d.grafico.etiqueta && d.grafico.valor && d.rows && d.rows.length);
+    function render(d, idx) {
       let html = `<div class="ia-tag"><i class="bi bi-stars"></i> RESPUESTA IA</div><div class="resp">${esc(d.respuesta||'')}</div>`;
       // Gráfico simple de barras (si la IA lo sugirió y hay datos)
       if (d.grafico && d.grafico.etiqueta && d.grafico.valor && d.rows && d.rows.length) {
@@ -146,7 +155,70 @@
       if (d.sql) {
         html += `<div class="sql-toggle" onclick="const b=this.nextElementSibling;b.style.display=b.style.display==='block'?'none':'block'"><i class="bi bi-code-slash"></i> Ver consulta SQL</div><div class="sql-box">${esc(d.sql)}</div>`;
       }
+      html += `<div class="acciones">
+        <button class="btn-mini" onclick="copiarInfo(${idx})"><i class="bi bi-clipboard"></i> Copiar info</button>
+        ${tieneGrafico(d) ? `<button class="btn-mini" onclick="copiarGrafico(${idx})"><i class="bi bi-image"></i> Copiar gráfico</button>` : ''}
+      </div>
+      <div class="fuente"><i class="bi bi-database"></i> Fuente: AutoFácil — base de datos interna.</div>`;
       return html;
+    }
+
+    // Copiar la información (texto + tabla) al portapapeles
+    function copiarInfo(i) {
+      const d = TURNS[i]; if (!d) return;
+      let txt = `Pregunta: ${d.pregunta}\n\n${d.respuesta || ''}\n`;
+      if (d.columns && d.columns.length && d.rows && d.rows.length) {
+        txt += '\n' + d.columns.join('\t') + '\n';
+        txt += d.rows.slice(0, 200).map(r => d.columns.map(c => r[c] == null ? '' : r[c]).join('\t')).join('\n');
+      }
+      txt += '\n\nFuente: AutoFácil — base de datos interna.';
+      navigator.clipboard.writeText(txt).then(() => toast('Información copiada')).catch(() => toast('No se pudo copiar', false));
+    }
+
+    // Dibuja el gráfico de barras en un canvas (para copiar/descargar como imagen)
+    function dibujarChartCanvas(d) {
+      const lab = d.grafico.etiqueta, val = d.grafico.valor;
+      const filas = d.rows.filter(r => r[lab] != null && r[val] != null).slice(0, 12).map(r => ({ l: String(r[lab]), v: Number(r[val]) || 0 }));
+      if (!filas.length) return null;
+      const max = Math.max(1, ...filas.map(f => f.v));
+      const W = 760, padL = 190, padR = 96, padT = 52, rowH = 30, padB = 34;
+      const H = padT + filas.length * rowH + padB;
+      const c = document.createElement('canvas'); c.width = W; c.height = H;
+      const x = c.getContext('2d');
+      x.fillStyle = '#fff'; x.fillRect(0, 0, W, H);
+      x.fillStyle = '#0f172a'; x.font = 'bold 16px Segoe UI, system-ui'; x.textAlign = 'left'; x.textBaseline = 'top';
+      x.fillText(d.grafico.titulo || 'Gráfico', 20, 16);
+      const barW = W - padL - padR;
+      filas.forEach((f, i) => {
+        const y = padT + i * rowH;
+        x.fillStyle = '#475569'; x.font = '12px Segoe UI, system-ui'; x.textAlign = 'right'; x.textBaseline = 'middle';
+        x.fillText(f.l.length > 28 ? f.l.slice(0, 27) + '…' : f.l, padL - 10, y + rowH / 2 - 2);
+        x.fillStyle = '#eef2f7'; x.fillRect(padL, y + 4, barW, 18);
+        const w = Math.max(2, barW * (f.v / max));
+        const g = x.createLinearGradient(padL, 0, padL + w, 0); g.addColorStop(0, '#0141A2'); g.addColorStop(1, '#009AFE');
+        x.fillStyle = g; x.fillRect(padL, y + 4, w, 18);
+        x.fillStyle = '#0f172a'; x.font = '600 12px Segoe UI, system-ui'; x.textAlign = 'left';
+        x.fillText(f.v.toLocaleString('es-CL'), padL + w + 6, y + rowH / 2 - 2);
+      });
+      x.fillStyle = '#94a3b8'; x.font = '11px Segoe UI, system-ui'; x.textAlign = 'left'; x.textBaseline = 'alphabetic';
+      x.fillText('Fuente: AutoFácil — base de datos interna', 20, H - 12);
+      return c;
+    }
+
+    // Copiar el gráfico como imagen (fallback: descargar PNG)
+    async function copiarGrafico(i) {
+      const d = TURNS[i];
+      if (!tieneGrafico(d)) { toast('Esta respuesta no tiene gráfico', false); return; }
+      const canvas = dibujarChartCanvas(d);
+      if (!canvas) { toast('No hay datos para el gráfico', false); return; }
+      try {
+        const blob = await new Promise(r => canvas.toBlob(r, 'image/png'));
+        await navigator.clipboard.write([new ClipboardItem({ 'image/png': blob })]);
+        toast('Gráfico copiado como imagen');
+      } catch (e) {
+        const a = document.createElement('a'); a.href = canvas.toDataURL('image/png'); a.download = 'grafico-autofacil.png'; a.click();
+        toast('Gráfico descargado como imagen');
+      }
     }
   </script>
   <script src="/js/app-version.js"></script>
