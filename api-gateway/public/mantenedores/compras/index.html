@@ -71,7 +71,7 @@
           <div class="toolbar">
             <label><b>Perfil:</b></label>
             <select id="selPerfil" onchange="cargarAsignados()"></select>
-            <input type="text" id="qArt" placeholder="Buscar artículo, marca o SKU…" style="flex:1;min-width:220px" onkeydown="if(event.key==='Enter')buscarArt(0)">
+            <input type="text" id="qArt" placeholder="Buscar artículo, marca o SKU…" style="flex:1;min-width:220px" oninput="liveBuscar()" onkeydown="if(event.key==='Enter')buscarArt(0)">
             <select id="selCat" onchange="buscarArt(0)"><option value="">Todas las categorías</option></select>
             <button class="btn btn-sm btn-primary" onclick="buscarArt(0)"><i class="bi bi-search"></i></button>
             <button class="btn btn-sm btn-outline-secondary" id="btnSync" onclick="sincronizar()" title="Recarga el catálogo desde Dimeiggs"><i class="bi bi-cloud-download me-1"></i>Sincronizar catálogo</button>
@@ -176,7 +176,16 @@
     function toast(msg, ok=true){ const d=document.createElement('div'); d.textContent=msg; d.style.cssText=`position:fixed;top:74px;right:20px;z-index:9999;background:${ok?'#16a34a':'#dc2626'};color:#fff;padding:10px 16px;border-radius:8px;box-shadow:0 6px 20px rgba(0,0,0,.25);font-size:.88rem`; document.body.appendChild(d); setTimeout(()=>d.remove(),3000); }
 
     /* ════ ARTÍCULOS POR PERFIL ════ */
-    let asignados = new Set(), pagOffset = 0, pagLimit = 100, pagTotal = 0, pagRows = [];
+    let asignados = new Set(), pagOffset = 0, pagLimit = 100, pagTotal = 0, pagRows = [], TOTAL_CAT = 0, searchTimer = null;
+
+    // Contador "X de Y artículos asignados a este perfil" (Y = total del catálogo)
+    function updArtInfo() {
+      const idp = document.getElementById('selPerfil').value;
+      document.getElementById('artInfo').textContent = idp
+        ? `${fmt(asignados.size)} de ${fmt(TOTAL_CAT)} artículos asignados a este perfil` : '';
+    }
+    // Búsqueda en vivo (debounce mientras se digita)
+    function liveBuscar() { clearTimeout(searchTimer); searchTimer = setTimeout(() => buscarArt(0), 300); }
 
     async function initArt() {
       const jp = await api('/api/compras/perfiles');
@@ -185,6 +194,8 @@
       const jc = await api('/api/compras/categorias');
       if (jc?.success) document.getElementById('selCat').innerHTML =
         '<option value="">Todas las categorías</option>' + jc.data.map(c => `<option value="${esc(c.categoria)}">${esc(c.categoria)} (${c.n})</option>`).join('');
+      const jt = await api('/api/compras/catalogo?limit=1');
+      if (jt?.success) { TOTAL_CAT = jt.data.total; updArtInfo(); }
     }
     async function cargarAsignados() {
       const idp = document.getElementById('selPerfil').value;
@@ -192,7 +203,7 @@
       if (idp) {
         const j = await api('/api/compras/articulo-perfil?id_perfil='+idp);
         if (j?.success) asignados = new Set(j.data.asignados);
-        document.getElementById('artInfo').textContent = `${asignados.size} artículo(s) asignados a este perfil`;
+        updArtInfo();
       } else document.getElementById('artInfo').textContent = '';
       buscarArt(0);
     }
@@ -221,14 +232,14 @@
     async function toggleArt(id, on) {
       const idp = document.getElementById('selPerfil').value; if (!idp) return;
       const j = await api('/api/compras/articulo-perfil', { method:'POST', body: JSON.stringify({ id_perfil:+idp, ids:[id], asignar:on }) });
-      if (j?.success) { on ? asignados.add(id) : asignados.delete(id); document.getElementById('artInfo').textContent = `${asignados.size} artículo(s) asignados a este perfil`; }
+      if (j?.success) { on ? asignados.add(id) : asignados.delete(id); updArtInfo(); }
       else toast('No se pudo guardar', false);
     }
     async function bulkPagina(on) {
       const idp = document.getElementById('selPerfil').value; if (!idp || !pagRows.length) return;
       const ids = pagRows.map(a => a.id);
       const j = await api('/api/compras/articulo-perfil', { method:'POST', body: JSON.stringify({ id_perfil:+idp, ids, asignar:on }) });
-      if (j?.success) { ids.forEach(id => on?asignados.add(id):asignados.delete(id)); buscarArt(pagOffset); document.getElementById('artInfo').textContent = `${asignados.size} artículo(s) asignados a este perfil`; toast(on?'Asignados':'Quitados'); }
+      if (j?.success) { ids.forEach(id => on?asignados.add(id):asignados.delete(id)); buscarArt(pagOffset); updArtInfo(); toast(on?'Asignados':'Quitados'); }
     }
     async function sincronizar() {
       const b = document.getElementById('btnSync'); b.disabled=true; b.innerHTML='<span class="spinner-border spinner-border-sm me-1"></span>Sincronizando…';
