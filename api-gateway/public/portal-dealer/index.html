@@ -5,7 +5,7 @@
   <link rel="icon" href="/img/favicon.png" type="image/png">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Portal Dealer — AutoFácil</title>
-  <!-- v1.9 — Sesión solo en sessionStorage (hardening auth dealer) -->
+  <!-- v2.0 — Adjuntos del chat por header Authorization (sin JWT en la URL) -->
   <link href="/css/bootstrap-icons.css" rel="stylesheet">
   <style>
     :root { --navy:#0141A2; --navy-dark:#012d70; --navy-light:#0255c5; --accent:#009AFE; }
@@ -294,6 +294,31 @@ const esc = s => String(s ?? '').replace(/&/g,'&amp;').replace(/</g,'&lt;').repl
 const hora = d => new Date(d).toLocaleTimeString('es-CL',{hour:'2-digit',minute:'2-digit'});
 const esImg = n => /\.(png|jpe?g|gif|webp|bmp)$/i.test(String(n||''));
 function toast(msg, err){ const t=document.getElementById('toast'); t.textContent=msg; t.className='toast-af'+(err?' err':''); t.style.display='block'; clearTimeout(t._h); t._h=setTimeout(()=>t.style.display='none',3000); }
+
+/* ── Adjuntos protegidos: se piden con el token en el header Authorization
+   (nunca en la URL, para no filtrar el JWT a logs/historial/Referer). ── */
+const _objUrls = [];
+window.addEventListener('beforeunload', ()=>{ _objUrls.forEach(u=>{ try{ URL.revokeObjectURL(u); }catch(_){ } }); });
+async function cargarImagenAdjunto(img){
+  try{
+    const r=await fetch('/api/atencion-remota/adjuntos/'+img.dataset.adj,{ headers:{ Authorization:'Bearer '+dToken } });
+    if(!r.ok) return;
+    const url=URL.createObjectURL(await r.blob()); _objUrls.push(url);
+    img.src=url; img.onclick=()=>window.open(url,'_blank');
+  }catch(_){ }
+}
+async function descargarAdjunto(e){
+  e.preventDefault();
+  const a=e.currentTarget;
+  try{
+    const r=await fetch('/api/atencion-remota/adjuntos/'+a.dataset.adj,{ headers:{ Authorization:'Bearer '+dToken } });
+    if(!r.ok) return toast('No se pudo descargar el documento', true);
+    const url=URL.createObjectURL(await r.blob());
+    const tmp=document.createElement('a'); tmp.href=url; tmp.download=a.dataset.name||'documento';
+    document.body.appendChild(tmp); tmp.click(); tmp.remove();
+    setTimeout(()=>URL.revokeObjectURL(url), 5000);
+  }catch(_){ toast('No se pudo descargar el documento', true); }
+}
 
 // Sesión SOLO en sessionStorage: se cierra al cerrar el navegador (decisión de negocio).
 // Limpiamos cualquier token heredado en localStorage de versiones anteriores.
@@ -606,12 +631,20 @@ function addMessage(msg){
   if(msg.emisor==='SISTEMA'){ w.insertAdjacentHTML('beforeend', `<div class="msg sys">${esc(msg.cuerpo||'')}</div>`); box.scrollTop=box.scrollHeight; return; }
   const mine = msg.emisor==='DEALER';
   let inner='';
-  if(msg.tipo==='ARCHIVO' && msg.id_adjunto){
-    const url='/api/atencion-remota/adjuntos/'+msg.id_adjunto+'?token='+encodeURIComponent(dToken);
-    inner = esImg(msg.cuerpo) ? `<img src="${url}" onclick="window.open('${url}','_blank')">`
-      : `<a class="file" href="${url}" target="_blank"><i class="bi bi-file-earmark-arrow-down"></i>${esc(msg.cuerpo||'documento')}</a>`;
+  const esArchivo = msg.tipo==='ARCHIVO' && msg.id_adjunto;
+  if(esArchivo){
+    inner = esImg(msg.cuerpo)
+      ? `<img class="adj-img" style="cursor:pointer">`
+      : `<a class="file adj-file" href="#"><i class="bi bi-file-earmark-arrow-down"></i>${esc(msg.cuerpo||'documento')}</a>`;
   } else inner = esc(msg.cuerpo||'');
   w.insertAdjacentHTML('beforeend', `<div class="msg ${mine?'me':'them'}">${inner}<div class="t">${hora(msg.created_at)}</div></div>`);
+  if(esArchivo){
+    const node=w.lastElementChild;
+    const img=node && node.querySelector('img.adj-img');
+    if(img){ img.dataset.adj=msg.id_adjunto; cargarImagenAdjunto(img); }
+    const a=node && node.querySelector('a.adj-file');
+    if(a){ a.dataset.adj=msg.id_adjunto; a.dataset.name=msg.cuerpo||'documento'; a.addEventListener('click', descargarAdjunto); }
+  }
   box.scrollTop=box.scrollHeight;
 }
 function enviar(){ const inp=document.getElementById('inp'); const v=inp.value.trim(); if(!v||!conv) return; wsSend({ t:'chat', id:conv.id, cuerpo:v }); inp.value=''; wsSend({t:'typing',id:conv.id,on:false}); }

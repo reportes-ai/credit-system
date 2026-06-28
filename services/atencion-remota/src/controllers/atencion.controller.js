@@ -16,11 +16,23 @@ const { JWT_SECRET, JWT_EXPIRES } = require('../../../../shared/middleware/auth'
 const { auditar } = require('../../../../shared/audit');
 const { notificar } = require('../../../notificaciones/src/controllers/notificaciones.controller');
 const { tieneFunc } = require('../../../../shared/middleware/permisos');
+const { clientIp } = require('../../../../shared/middleware/rate-limit');
 const crypto = require('crypto');
 
 const normRut = r => String(r || '').replace(/[.\-\s]/g, '').toUpperCase();
 const genToken = () => crypto.randomBytes(24).toString('hex');
 const errSrv  = (res, e, tag) => { console.error(`[${tag}]`, e.message); res.status(500).json({ success: false, data: null, error: 'Error interno del servidor' }); };
+
+// Bitácora de accesos de dealers (login por email, acceso por link, sesión WS).
+// Nunca lanza: un fallo de log no debe afectar el flujo de autenticación.
+async function logAcceso({ tipo, email, id_cuenta, resultado, req }) {
+  try {
+    await pool.query(
+      'INSERT INTO ar_auth_logs (tipo, email, id_cuenta, resultado, ip, user_agent) VALUES (?,?,?,?,?,?)',
+      [tipo, email || null, id_cuenta || null, resultado,
+       clientIp(req), String((req && req.headers && req.headers['user-agent']) || '').slice(0, 300)]);
+  } catch (e) { console.error('[ar_auth_logs]', e.message); }
+}
 
 /* ── Migraciones ─────────────────────────────────────────────────────────── */
 (async () => {
@@ -201,6 +213,21 @@ const errSrv  = (res, e, tag) => { console.error(`[${tag}]`, e.message); res.sta
     // Scrub: borra el token en claro de la BD (ya solo se usa el hash).
     await pool.query("UPDATE ar_dealer_cuentas SET acceso_token=NULL WHERE acceso_token IS NOT NULL");
 
+    // Bitácora de accesos de dealers: detección de fuerza bruta / accesos anómalos.
+    await pool.query(`CREATE TABLE IF NOT EXISTS ar_auth_logs (
+      id          INT AUTO_INCREMENT PRIMARY KEY,
+      tipo        VARCHAR(10) NOT NULL,            -- login | acceso | ws
+      email       VARCHAR(150) NULL,
+      id_cuenta   INT NULL,
+      resultado   VARCHAR(8)  NOT NULL,            -- OK | FAIL
+      ip          VARCHAR(64) NULL,
+      user_agent  VARCHAR(300) NULL,
+      created_at  DATETIME DEFAULT CURRENT_TIMESTAMP,
+      INDEX idx_tipo_fecha (tipo, created_at),
+      INDEX idx_ip_fecha (ip, created_at),
+      INDEX idx_email (email)
+    )`);
+
     console.log('[atencion-remota] módulo y esquema listos');
   } catch (e) { console.error('[atencion-remota migration]', e.message); }
 })();
@@ -302,11 +329,13 @@ const dealerLogin = async (req, res) => {
   try {
     const { email, password } = req.body || {};
     if (!email || !password) return res.status(400).json({ success: false, data: null, error: 'Email y contraseña requeridos' });
-    const [[c]] = await pool.query('SELECT * FROM ar_dealer_cuentas WHERE email=? AND activo=1', [String(email).toLowerCase().trim()]);
-    if (!c) { await bcrypt.compare(String(password), DUMMY_HASH); return res.status(401).json({ success: false, data: null, error: 'Credenciales inválidas' }); }
+    const mail = String(email).toLowerCase().trim();
+    const [[c]] = await pool.query('SELECT * FROM ar_dealer_cuentas WHERE email=? AND activo=1', [mail]);
+    if (!c) { await bcrypt.compare(String(password), DUMMY_HASH); await logAcceso({ tipo: 'login', email: mail, resultado: 'FAIL', req }); return res.status(401).json({ success: false, data: null, error: 'Credenciales inválidas' }); }
     const ok = await bcrypt.compare(password, c.password_hash);
-    if (!ok) return res.status(401).json({ success: false, data: null, error: 'Credenciales inválidas' });
+    if (!ok) { await logAcceso({ tipo: 'login', email: mail, id_cuenta: c.id, resultado: 'FAIL', req }); return res.status(401).json({ success: false, data: null, error: 'Credenciales inválidas' }); }
     await pool.query('UPDATE ar_dealer_cuentas SET ultimo_acceso=NOW() WHERE id=?', [c.id]);
+    await logAcceso({ tipo: 'login', email: mail, id_cuenta: c.id, resultado: 'OK', req });
     const payload = { tipo: 'dealer', id_cuenta: c.id, id_dealer: c.id_dealer, rut: c.rut, nombre: c.nombre, email: c.email };
     const token = jwt.sign(payload, JWT_SECRET, { expiresIn: JWT_EXPIRES });
     const cfg = await getCfg().catch(() => ({}));
@@ -320,8 +349,9 @@ const dealerAcceso = async (req, res) => {
     const k = String(req.body && req.body.k || req.query.k || '').trim();
     if (!k) return res.status(400).json({ success: false, data: null, error: 'Link inválido' });
     const [[c]] = await pool.query('SELECT * FROM ar_dealer_cuentas WHERE acceso_token_hash=SHA2(?,256) AND activo=1', [k]);
-    if (!c) return res.status(401).json({ success: false, data: null, error: 'Link inválido o cuenta deshabilitada' });
+    if (!c) { await logAcceso({ tipo: 'acceso', resultado: 'FAIL', req }); return res.status(401).json({ success: false, data: null, error: 'Link inválido o cuenta deshabilitada' }); }
     await pool.query('UPDATE ar_dealer_cuentas SET ultimo_acceso=NOW() WHERE id=?', [c.id]);
+    await logAcceso({ tipo: 'acceso', email: c.email, id_cuenta: c.id, resultado: 'OK', req });
     const payload = { tipo: 'dealer', id_cuenta: c.id, id_dealer: c.id_dealer, rut: c.rut, nombre: c.nombre, email: c.email };
     const token = jwt.sign(payload, JWT_SECRET, { expiresIn: JWT_EXPIRES });
     const cfg = await getCfg().catch(() => ({}));
@@ -638,4 +668,5 @@ module.exports = {
   // service helpers (ws.js)
   buildIce, getCfg, crearConversacion, getConversacion, asignarConversacion,
   cerrarConversacion, persistMensaje, colaEspera, activasDe, contarActivas,
+  logAcceso,
 };

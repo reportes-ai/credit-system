@@ -5,7 +5,7 @@
   <link rel="icon" href="/img/favicon.png" type="image/png">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Atención Remota — AutoFácil</title>
-  <!-- v2.0 — acceso_token guardado como hash SHA2 (hardening) -->
+  <!-- v2.1 — Adjuntos del chat por header Authorization (sin JWT en la URL) -->
   <link href="/css/bootstrap.min.css" rel="stylesheet">
   <link href="/css/bootstrap-icons.css" rel="stylesheet">
   <style>
@@ -315,6 +315,31 @@ function toast(msg, err){ const t=document.getElementById('toast'); t.textConten
 const hora = d => new Date(d).toLocaleTimeString('es-CL',{hour:'2-digit',minute:'2-digit'});
 const esImg = n => /\.(png|jpe?g|gif|webp|bmp)$/i.test(String(n||''));
 
+/* ── Adjuntos protegidos: token en el header Authorization, no en la URL
+   (evita filtrar el JWT a logs/historial/Referer). ── */
+const _objUrls = [];
+window.addEventListener('beforeunload', ()=>{ _objUrls.forEach(u=>{ try{ URL.revokeObjectURL(u); }catch(_){ } }); });
+async function cargarImagenAdjunto(img){
+  try{
+    const r=await fetch('/api/atencion-remota/adjuntos/'+img.dataset.adj,{ headers:{ Authorization:'Bearer '+token } });
+    if(!r.ok) return;
+    const url=URL.createObjectURL(await r.blob()); _objUrls.push(url);
+    img.src=url; img.onclick=()=>window.open(url,'_blank');
+  }catch(_){ }
+}
+async function descargarAdjunto(e){
+  e.preventDefault();
+  const a=e.currentTarget;
+  try{
+    const r=await fetch('/api/atencion-remota/adjuntos/'+a.dataset.adj,{ headers:{ Authorization:'Bearer '+token } });
+    if(!r.ok) return toast('No se pudo descargar el documento', true);
+    const url=URL.createObjectURL(await r.blob());
+    const tmp=document.createElement('a'); tmp.href=url; tmp.download=a.dataset.name||'documento';
+    document.body.appendChild(tmp); tmp.click(); tmp.remove();
+    setTimeout(()=>URL.revokeObjectURL(url), 5000);
+  }catch(_){ toast('No se pudo descargar el documento', true); }
+}
+
 /* ── Tabs ── */
 document.querySelectorAll('.tab').forEach(t => t.addEventListener('click', () => {
   document.querySelectorAll('.tab').forEach(x=>x.classList.remove('active'));
@@ -457,15 +482,22 @@ function addMessage(convId, msg, noScrollForce){
   const mine = msg.emisor==='EJECUTIVO';
   let inner='';
   if (msg.emisor==='SISTEMA'){ box.insertAdjacentHTML('beforeend', `<div class="msg sys">${esc(msg.cuerpo||'')}</div>`); box.scrollTop=box.scrollHeight; return; }
-  if (msg.tipo==='ARCHIVO' && msg.id_adjunto){
-    const url = '/api/atencion-remota/adjuntos/'+msg.id_adjunto+'?token='+encodeURIComponent(token);
+  const esArchivo = msg.tipo==='ARCHIVO' && msg.id_adjunto;
+  if (esArchivo){
     inner = esImg(msg.cuerpo)
-      ? `<img src="${url}" onclick="window.open('${url}','_blank')" alt="documento">`
-      : `<a class="file" href="${url}" target="_blank"><i class="bi bi-file-earmark-arrow-down"></i>${esc(msg.cuerpo||'documento')}</a>`;
+      ? `<img class="adj-img" alt="documento" style="cursor:pointer">`
+      : `<a class="file adj-file" href="#"><i class="bi bi-file-earmark-arrow-down"></i>${esc(msg.cuerpo||'documento')}</a>`;
   } else {
     inner = esc(msg.cuerpo||'');
   }
   box.insertAdjacentHTML('beforeend', `<div class="msg ${mine?'me':'them'}">${inner}<div class="t">${hora(msg.created_at)}</div></div>`);
+  if (esArchivo){
+    const node=box.lastElementChild;
+    const img=node && node.querySelector('img.adj-img');
+    if(img){ img.dataset.adj=msg.id_adjunto; cargarImagenAdjunto(img); }
+    const a=node && node.querySelector('a.adj-file');
+    if(a){ a.dataset.adj=msg.id_adjunto; a.dataset.name=msg.cuerpo||'documento'; a.addEventListener('click', descargarAdjunto); }
+  }
   box.scrollTop = box.scrollHeight;
 }
 function enviar(convId){

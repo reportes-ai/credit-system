@@ -44,7 +44,7 @@ function initAtencionWS(server) {
       const { token } = url.parse(req.url, true).query;
       const d = jwt.verify(token, JWT_SECRET);
       ident = d.tipo === 'dealer'
-        ? { tipo: 'dealer', id: d.id_cuenta, id_cuenta: d.id_cuenta, id_dealer: d.id_dealer, rut: d.rut, nombre: d.nombre || 'Dealer' }
+        ? { tipo: 'dealer', id: d.id_cuenta, id_cuenta: d.id_cuenta, id_dealer: d.id_dealer, rut: d.rut, nombre: d.nombre || 'Dealer', email: d.email }
         : { tipo: 'user', id: d.id_usuario, nombre: [d.nombre, d.apellido].filter(Boolean).join(' ') || 'Ejecutivo' };
     } catch { return ws.close(4001, 'auth'); }
 
@@ -63,6 +63,8 @@ function initAtencionWS(server) {
       send(ws, { t: 'cola', espera: await C.colaEspera() });
       await enviarActivas(ident.id);
     } else {
+      // Bitácora de sesión WS del dealer (no bloquea: el helper traga sus errores).
+      C.logAcceso({ tipo: 'ws', email: ident.email, id_cuenta: ident.id_cuenta, resultado: 'OK', req });
       // Dealer: reanuda su conversación abierta si existe (ESPERA/ACTIVA).
       const [[abierta]] = await pool.query(
         "SELECT * FROM ar_conversaciones WHERE id_cuenta=? AND estado IN ('ESPERA','ACTIVA') ORDER BY id DESC LIMIT 1",
