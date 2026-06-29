@@ -295,6 +295,8 @@ function corregirCarta(id){
   _corregirPartManual = false;
   rawSaldoCorr = c.saldo || 0;
   buildCorregirForm(c);
+  // Carga la tabla pactada del dealer de la carta y recalcula con ella.
+  ensureTablaDealer(c.rutConc).then(()=>{ try{ calcCorregirPart(c.id); }catch(e){} });
 }
 
 function buildCorregirForm(c){
@@ -399,7 +401,7 @@ function calcCorregirPart(cartaId){
   const plazo = document.getElementById('cPlazo').value;
   const saldo = rawSaldoCorr || c.saldo;
   if(!plazo || !saldo) return;
-  const factor = getComisionFactor(plazo, c.tipo);
+  const factor = getComisionFactor(plazo, c.tipo, c.rutConc);
   const bruto = Math.round(saldo * factor);
   const neto = Math.round(bruto / 1.19);
   const iva = bruto - neto;
@@ -1007,7 +1009,7 @@ function recalcExcepcionesFromCarta(c){
   }
 
   // PARTICIPACION
-  const factor = getComisionFactor(String(plazoN), c.tipo || '');
+  const factor = getComisionFactor(String(plazoN), c.tipo || '', c.rutConc);
   const autoPartBruto = (factor > 0 && saldoN > 0) ? Math.round(saldoN * factor) : 0;
   const manualPartBruto = c.partBruto || 0;
   if(autoPartBruto > 0 && manualPartBruto > autoPartBruto){
@@ -2662,8 +2664,36 @@ function genCorrelativo(){
   return year + String(next).padStart(6,'0') + initials;
 }
 
-function getComisionFactor(plazo, tipo){
+// ── Tabla de comisión POR DEALER (motor único backend) ──
+// La carta ya no hardcodea su % de participación: cuando el dealer tiene tabla
+// pactada propia, se consume /api/comision-dealer/tabla (que corre el MISMO motor
+// que guardar/recalcular) para no divergir. Sin tabla propia → cae a la pizarra.
+const DEALER_TABLAS = {};   // rutNorm -> tabla[{desde,hasta,parque,calle}] | false (consultado, sin tabla propia)
+function normRutKey(r){ return String(r||'').replace(/[.\-\s]/g,'').toUpperCase(); }
+async function ensureTablaDealer(rut){
+  const k = normRutKey(rut);
+  if(!k || (k in DEALER_TABLAS)) return;   // vacío o ya consultado → no refetch
+  DEALER_TABLAS[k] = false;                 // marca en curso (evita fetch en paralelo)
+  try{
+    const r = await fetch('/api/comision-dealer/tabla?rut_dealer=' + encodeURIComponent(rut),
+      { headers:{ 'Authorization':'Bearer '+sessionStorage.getItem('token') } });
+    const j = await r.json();
+    if(j && j.success && j.data && j.data.tiene_tabla_propia && Array.isArray(j.data.tabla)){
+      DEALER_TABLAS[k] = j.data.tabla;
+    }
+  }catch(e){ /* deja false → usa pizarra (comportamiento histórico) */ }
+}
+
+function getComisionFactor(plazo, tipo, rut){
   const p = parseInt(plazo);
+  // 1) Tabla pactada del dealer (motor único) si está cargada para este RUT.
+  const dt = rut ? DEALER_TABLAS[normRutKey(rut)] : null;
+  if(dt && (tipo==='DEALER PARQUE' || tipo==='DEALER CALLE')){
+    for(const c of dt){
+      if(p >= c.desde && p <= c.hasta) return tipo==='DEALER PARQUE' ? c.parque : c.calle;
+    }
+  }
+  // 2) Fallback: pizarra global (COMISIONES) — comportamiento histórico.
   for(const c of getComisiones()){
     if(p >= c.desde && p <= c.hasta){
       if(tipo==='DEALER PARQUE') return c.parque;
@@ -3504,7 +3534,7 @@ function calcParticipacion(){
     document.getElementById('fPartIVA').value='';
     return; 
   }
-  const factor = getComisionFactor(plazo, selectedTipoCarta);
+  const factor = getComisionFactor(plazo, selectedTipoCarta, (document.getElementById('fRutConc')||{}).value);
   const bruto = Math.round(saldo * factor);
   const neto = Math.round(bruto / 1.19);
   const iva = bruto - neto;
@@ -3644,6 +3674,8 @@ function selectConcItem(el, nombre, rut){
   document.getElementById('fConcesionario').value = nombre;
   document.getElementById('fRutConc').value = formatRUT(rut);
   document.getElementById('concList').style.display='none';
+  // Carga la tabla pactada del dealer y recalcula la participación con ella.
+  ensureTablaDealer(rut).then(()=>{ try{ calcParticipacion(); }catch(e){} });
 }
 
 function selectConc(idx){
@@ -3652,6 +3684,7 @@ function selectConc(idx){
   document.getElementById('fConcesionario').value = c.nombre;
   document.getElementById('fRutConc').value = formatRUT(c.rut);
   document.getElementById('concList').style.display='none';
+  ensureTablaDealer(c.rut).then(()=>{ try{ calcParticipacion(); }catch(e){} });
 }
 
 document.addEventListener('click', e => {
