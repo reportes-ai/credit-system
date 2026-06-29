@@ -39,7 +39,7 @@ async function calibrar(tmcs) {
 async function sincronizarTMC() {
   const now = new Date();
   const tmcs = await cmfGet('tmc', now.getFullYear(), now.getMonth() + 1);
-  if (!tmcs.length) return { ok: false, motivo: 'La CMF no devolvió datos de TMC para el mes.' };
+  if (!tmcs.length) return { ok: false, pendiente: true, motivo: 'La CMF aún no publica datos de TMC para este mes.' };
 
   let tipoMenor = await getParam('tmc_tipo_menor');
   let tipoMayor = await getParam('tmc_tipo_mayor');
@@ -52,7 +52,7 @@ async function sincronizarTMC() {
 
   const eMenor = tmcs.find(x => x.tipo === String(tipoMenor));
   const eMayor = tmcs.find(x => x.tipo === String(tipoMayor));
-  if (!eMenor || !eMayor) return { ok: false, motivo: 'La CMF no trae este mes los tipos de TMC calibrados.' };
+  if (!eMenor || !eMayor) return { ok: false, pendiente: true, motivo: 'La CMF aún no publica los TMC calibrados de este mes.' };
 
   const desde = eMenor.fecha || eMayor.fecha;
   const hasta = eMenor.hasta || eMayor.hasta;

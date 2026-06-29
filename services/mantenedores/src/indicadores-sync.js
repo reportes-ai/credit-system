@@ -84,6 +84,10 @@ async function sincronizar(opts = {}) {
       else {
         out.tmc = await sincronizarTMC();
         if (out.tmc.ok) { await setEstado('sync_tmc', ''); await setEstado('sync_tmc_ts', new Date().toISOString()); }
+        // "pendiente" = la CMF aún no publica el TMC del mes (normal a inicios de mes):
+        // NO es un problema y NO debe alarmar; las tasas vigentes siguen OK y el
+        // vencimiento real ya lo cubren las alertas de Tasas. Se limpia el estado.
+        else if (out.tmc.pendiente) await setEstado('sync_tmc', '');
         else await setEstado('sync_tmc', 'TMC: ' + (out.tmc.motivo || 'no se pudo sincronizar'));
       }
     } else out.tmc = { skipped: true, motivo: 'la TMC se busca desde el día 13' };
