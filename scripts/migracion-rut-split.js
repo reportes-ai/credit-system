@@ -20,11 +20,29 @@ const CHECK_ONLY = process.argv.includes('--check');
 
 // (tabla, columna_rut) maestras donde el RUT es identidad.
 const COLS = [
+  // Maestras (el RUT es identidad):
   ['clientes', 'rut'],
   ['dealers', 'rut'], ['dealers', 'rut_pago'],
   ['proveedores', 'rut'],
   ['usuarios', 'rut'],
   ['dealer_fichas', 'rut'], ['dealer_fichas', 'rut_cuenta'],
+  // Referencias / transaccionales / logs (FK o lookup por RUT):
+  ['antecedentes_laborales', 'rut_cliente'], ['antecedentes_laborales', 'rut_empresa'],
+  ['auditoria_movimientos', 'rut'],
+  ['cartas_aprobacion', 'rut_cliente'], ['cartas_aprobacion', 'rut_dealer'],
+  ['cartolas_enviadas', 'rut_dealer'],
+  ['cartolas_movimientos', 'rut_cliente'], ['cartolas_movimientos', 'rut_dealer'],
+  ['certificados', 'rut'],
+  ['cotizaciones', 'rut_cliente'],
+  ['creditos', 'rut_dealer'],
+  ['crm_gestiones', 'rut_cliente'],
+  ['cuentas_bancarias', 'rut'],
+  // OJO: dealernet_consultas/informes e ia_informes_dealernet NO van — guardan el RUT
+  // CUERPO-ONLY (sin DV; es el target del join por RUT_BODY), no aplica el split BODY-DV.
+  ['informacion_comercial', 'rut_cliente'],
+  ['informes_dealernet', 'rut'],
+  ['ordenes_pago', 'proveedor_rut'],
+  ['postventa_facturas_comision', 'rut_dealer'],
 ];
 
 const clean = col => `UPPER(REPLACE(REPLACE(REPLACE(\`${col}\`,'.',''),'-',''),' ',''))`;
