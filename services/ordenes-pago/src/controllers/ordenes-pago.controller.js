@@ -386,7 +386,7 @@ async function construirDocumento(oc) {
   const esCom = oc.origen === 'COMISION';
   const sql = esCom
     ? `SELECT s.id AS id_seg, s.num_op, s.financiera,
-              COALESCE(c.nombre_local, d.nombre_razon, s.nombre_dealer) AS dealer_nombre,
+              COALESCE(NULLIF(d.nombre_indexa,''), d.nombre_razon, c.nombre_local, s.nombre_dealer) AS dealer_nombre,
               COALESCE(c.rut_dealer, d.rut) AS dealer_rut, d.num_cuenta, d.banco,
               fc.numero_factura, fc.es_boleta, fc.fecha_factura,
               fc.monto_bruto AS fc_base, fc.impuesto_pct AS fc_pct, fc.impuesto_monto AS fc_imp, fc.monto_liquido AS fc_liquido,
@@ -398,7 +398,7 @@ async function construirDocumento(oc) {
          LEFT JOIN postventa_facturas_comision fc ON fc.id_seguimiento = s.id
         WHERE poc.id = ?`
     : `SELECT s.id AS id_seg, s.num_op, s.financiera, s.saldo_precio,
-              COALESCE(c.nombre_local, d.nombre_razon, s.nombre_dealer) AS dealer_nombre,
+              COALESCE(NULLIF(d.nombre_indexa,''), d.nombre_razon, c.nombre_local, s.nombre_dealer) AS dealer_nombre,
               COALESCE(c.rut_dealer, d.rut) AS dealer_rut, d.num_cuenta, d.banco,
               (SELECT 1 FROM postventa_etapas pe WHERE pe.id_seguimiento=s.id AND pe.track='SALDO' AND pe.etapa='SALDO PRECIO PAGADO' LIMIT 1) AS pagado
          FROM postventa_ordenes spo
