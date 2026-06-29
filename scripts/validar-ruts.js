@@ -11,6 +11,8 @@
 'use strict';
 const pool = require('../shared/config/database');
 const R = require('../api-gateway/public/js/rut-core');
+// UBER/YAPO: canales de venta con RUT placeholder (no son RUTs reales) — se ignoran.
+const PLACEHOLDERS = new Set(['45840', '45901']);
 
 const COLS = [
   ['clientes', 'rut'],
@@ -38,7 +40,7 @@ const COLS = [
         `SELECT \`${c}\` rut, \`${cuerpo}\` cuerpo, \`${dv}\` dv, COUNT(*) n
            FROM \`${t}\` WHERE \`${cuerpo}\` IS NOT NULL
           GROUP BY \`${c}\`, \`${cuerpo}\`, \`${dv}\``);
-      const malos = rows.filter(r => R.calcDV(String(r.cuerpo)) !== r.dv);
+      const malos = rows.filter(r => R.calcDV(String(r.cuerpo)) !== r.dv && !PLACEHOLDERS.has(String(r.cuerpo)));
       if (malos.length) {
         const filas = malos.reduce((s, r) => s + r.n, 0);
         totalMal += filas;
