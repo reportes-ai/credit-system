@@ -18,6 +18,7 @@
  */
 
 const pool = require('../../../../shared/config/database');
+const { cargarPenTramos, calcularPenetracionMes, comisionesSeguro } = require('./penetracion');
 
 // Campos calculados que el usuario puede dejar "forzados" (negociación puntual).
 // El recálculo los respeta: conserva el valor guardado y solo recalcula los demás.
@@ -92,21 +93,7 @@ function getDealerCallePct(plazo, p) {
   return (p.dealer_calle_pct_99 != null ? p.dealer_calle_pct_99 : (p.dealer_pct_99 || 0) + (p.patio_pct || 0)) / 100;
 }
 
-/* ── Comisión seguro por penetración ────────────────────────────────── */
-function getPenComision(tipo, pen, tramos) {
-  const filas = tramos.filter(r => r.tipo === tipo && parseFloat(pen) >= parseFloat(r.pen_min));
-  if (!filas.length) return 0;
-  const best = filas.reduce((a, b) => parseFloat(a.pen_min) > parseFloat(b.pen_min) ? a : b);
-  return parseFloat(best.pct_comision) / 100;
-}
-
-/* ── Tramos de penetración activos ──────────────────────────────────── */
-async function cargarPenTramos() {
-  const [rows] = await pool.query(
-    'SELECT tipo, pen_min, pct_comision FROM comisiones_seguro_penetracion WHERE estado="activo" ORDER BY tipo, pen_min'
-  );
-  return rows;
-}
+/* getPenComision, cargarPenTramos y la penetración mensual viven en ./penetracion.js (motor único). */
 
 /* ── Comisión parque desde tabla parques_comisiones ─────────────────── */
 async function cargarParques() {
@@ -163,16 +150,22 @@ function getTierUAC(cnt, p) {
 /* ── Cálculo por operación (Ing x Colocaciones, Comisión Dealer y Parque) ───
    Misma fórmula que usa el recálculo, aislada para reusarla en la detección
    de campos forzados. p=params, parqMap=parques, todasTasas. */
-async function calcularValoresOp(op, p, parqMap, todasTasas, dealerMap) {
+async function calcularValoresOp(op, p, parqMap, todasTasas, dealerMap, pctUAC) {
   const parqKey  = (op.parque || '').toUpperCase().trim();
   const esParque = parqKey.includes('PARQUE');
+  const fin      = (op.financiera || '').toUpperCase();
+  const esUAC    = fin.includes('UNIDAD') || fin.includes('UAC');
   const saldo    = parseFloat(op.saldo_precio)       || 0;
   const montoFin = parseFloat(op.monto_financiado)   || 0;
   const montoCap = parseFloat(op.monto_capitalizado) || montoFin;
   const plazo    = parseInt(op.plazo)                || 0;
 
   let monto_comision_fin = 0;
-  if (plazo > 0 && montoCap > 0) {
+  if (esUAC) {
+    // UAC: % del saldo precio según el tier DINÁMICO del mes (proyecta el cierre).
+    // El snapshot de la decisión se congela aparte en la carta (cartas_aprobacion.tier_uac_*).
+    monto_comision_fin = Math.round(saldo * (pctUAC || 0));
+  } else if (plazo > 0 && montoCap > 0) {
     const tasa = getTasaByFecha(op.fecha_otorgado, todasTasas);
     if (tasa) {
       const uf         = await getUF(op.fecha_otorgado);
@@ -225,9 +218,15 @@ async function marcarForzadosCalculo(opIds, opts = {}) {
             monto_comision_fin, comdea_real, com_parque, campos_forzados
      FROM creditos WHERE id IN (?)`, [ids]);
   for (const op of ops) {
-    const calc = await calcularValoresOp(op, p, parqMap, todasTasas, dealerMap);
-    const forz = forzadosSet(op.campos_forzados);
+    const fin   = (op.financiera || '').toUpperCase();
+    const esUAC = fin.includes('UNIDAD') || fin.includes('UAC');
+    // pctUAC se omite a propósito: el único campo que lo usaría (monto_comision_fin
+    // de UAC) se salta abajo, así que su valor aquí nunca se compara.
+    const calc  = await calcularValoresOp(op, p, parqMap, todasTasas, dealerMap);
+    const forz  = forzadosSet(op.campos_forzados);
     for (const campo of campos) {
+      // UAC: monto_comision_fin es dinámico (tier del mes), nunca se marca forzado.
+      if (campo === 'monto_comision_fin' && esUAC) { forz.delete(campo); continue; }
       const dif = Math.abs((parseFloat(op[campo]) || 0) - (parseFloat(calc[campo]) || 0)) > tol;
       if (dif) forz.add(campo); else forz.delete(campo);
     }
@@ -266,6 +265,7 @@ async function recalcularMeses(meses, opciones = {}) {
              plazo, fecha_otorgado, mes,
              seguro_rdh, seguro_cesantia, seguro_rep_menor,
              com_rdh, com_cesantia, com_reparaciones,
+             pen_rdh, pen_cesantia, pen_reparaciones,
              tascli_real,
              campos_forzados, monto_comision_fin, comdea_real, com_parque
       FROM creditos
@@ -286,21 +286,35 @@ async function recalcularMeses(meses, opciones = {}) {
     ).length;
     const pctUAC = getTierUAC(cntUAC, p);
 
-    log.push(`Mes ${mesStr}: ${ops.length} ops | UAC=${cntUAC} (${(pctUAC*100).toFixed(0)}%)`);
+    // Penetración de seguros del mes (AUTOFIN) — motor único penetracion.js.
+    // Solo corre en meses abiertos (los cerrados ya se saltaron arriba).
+    const penTramos = await cargarPenTramos();
+    const penMes    = await calcularPenetracionMes(mesStr);
+    log.push(`Mes ${mesStr}: ${ops.length} ops | UAC=${cntUAC} (${(pctUAC*100).toFixed(0)}%) | pen RDH ${penMes.pen_rdh.toFixed(0)}% Ces ${penMes.pen_cesantia.toFixed(0)}% Rep ${penMes.pen_reparaciones.toFixed(0)}%`);
 
     // ── Paso 3: recalcular cada op ───────────────────────────────────
     for (const op of ops) {
       // 1-3. Valores calculados por fórmula (Ing x Colocaciones, Comisión Dealer, Parque)
-      const calc = await calcularValoresOp(op, p, parqMap, todasTasas, dealerMap);
+      const calc = await calcularValoresOp(op, p, parqMap, todasTasas, dealerMap, pctUAC);
       const monto_comision_fin = calc.monto_comision_fin;
       const com_parque_val     = calc.com_parque;
       const arriendo_val       = calc.arriendo;
       const comdea_real        = calc.comdea_real;
 
-      // Comisiones de seguros — vienen del Excel (leídas desde BD). No se recalculan.
-      const com_rdh          = parseFloat(op.com_rdh)          || 0;
-      const com_cesantia     = parseFloat(op.com_cesantia)     || 0;
-      const com_reparaciones = parseFloat(op.com_reparaciones) || 0;
+      // Comisiones de seguros — para AUTOFIN se recalculan con la penetración del mes
+      // (motor penetracion.js); para el resto se conservan los valores guardados.
+      const esAutofinOp = (op.financiera || '').toUpperCase().includes('AUTOFIN');
+      let com_rdh, com_cesantia, com_reparaciones, pen_rdh, pen_cesantia, pen_reparaciones;
+      if (esAutofinOp) {
+        const cs = comisionesSeguro(op, penMes, penTramos);
+        com_rdh = cs.com_rdh; com_cesantia = cs.com_cesantia; com_reparaciones = cs.com_reparaciones;
+        pen_rdh = penMes.pen_rdh; pen_cesantia = penMes.pen_cesantia; pen_reparaciones = penMes.pen_reparaciones;
+      } else {
+        com_rdh = parseFloat(op.com_rdh) || 0;
+        com_cesantia = parseFloat(op.com_cesantia) || 0;
+        com_reparaciones = parseFloat(op.com_reparaciones) || 0;
+        pen_rdh = op.pen_rdh; pen_cesantia = op.pen_cesantia; pen_reparaciones = op.pen_reparaciones;
+      }
 
       // 4. Respetar campos forzados ───────────────────────────────────
       // Si un campo calculado fue digitado a mano (forzado), se conserva el
@@ -322,6 +336,12 @@ async function recalcularMeses(meses, opciones = {}) {
           comdea_real         = ?,
           com_parque          = ?,
           arriendo_parque     = ?,
+          com_rdh             = ?,
+          com_cesantia        = ?,
+          com_reparaciones    = ?,
+          pen_rdh             = ?,
+          pen_cesantia        = ?,
+          pen_reparaciones    = ?,
           ingreso_neto_total  = ?,
           updated_at          = NOW()
         WHERE id = ?
@@ -330,6 +350,12 @@ async function recalcularMeses(meses, opciones = {}) {
         eff_cdr,
         eff_cpq,
         arriendo_val,
+        com_rdh,
+        com_cesantia,
+        com_reparaciones,
+        pen_rdh,
+        pen_cesantia,
+        pen_reparaciones,
         ingreso_neto_total,
         op.id,
       ]);

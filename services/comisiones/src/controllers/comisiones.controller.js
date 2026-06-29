@@ -21,6 +21,7 @@ const { auditar } = require('../../../../shared/audit');
       ['peso_cesantia', 0.50,   'Peso cruce cesantía',             'Peso del indicador de cruce de seguro cesantía en el ajuste',     'factor'],
       ['peso_rep',      0.30,   'Peso cruce reparaciones',         'Peso del indicador de cruce de seguro reparaciones en el ajuste', 'factor'],
       ['peso_calidad',  0.20,   'Peso calidad',                    'Peso del indicador de calidad en el ajuste',                      'factor'],
+      ['meta_unidad',   3,      'Meta créditos UNIDAD (calidad)',  'Cantidad de créditos UNIDAD DE CRÉDITO en el mes para alcanzar el 100% del indicador de calidad', 'factor'],
       ['umbral_cesantia',0.65,  'Umbral mínimo cesantía',          'Si el cruce es ≤ este valor el aporte de cesantía es 0',          'porcentaje'],
       ['umbral_rep',    0.50,   'Umbral mínimo reparaciones',      'Si el cruce es ≤ este valor el aporte de reparaciones es 0',      'porcentaje'],
       ['semana_corrida',1.20,   'Multiplicador semana corrida',    'Factor aproximado para cálculo con semana corrida',               'multiplicador'],
@@ -174,6 +175,7 @@ function calcularComision(creditos, vars) {
     pct_24, pct_mas24, minimo_monto, factor_max,
     peso_cesantia, peso_rep, peso_calidad,
     umbral_cesantia, umbral_rep, semana_corrida,
+    meta_unidad,
   } = vars;
 
   const otorgados = creditos.filter(c => (c.estado_credito || '').toUpperCase() === 'OTORGADO');
@@ -207,8 +209,8 @@ function calcularComision(creditos, vars) {
   const cruce_cesantia     = ncnu_total > 0 ? ncnu_cesantia / ncnu_total : 0;
   const cruce_reparaciones = ncnu_total > 0 ? ncnu_rep      / ncnu_total : 0;
 
-  // Calidad: meta = 3 créditos UNIDAD DE CRÉDITO en el mes
-  const META_UNIDAD = 3;
+  // Calidad: meta = N créditos UNIDAD DE CRÉDITO en el mes (paramétrico: comisiones_variables.meta_unidad)
+  const META_UNIDAD = meta_unidad > 0 ? meta_unidad : 3;
   const unidad_logrado = otorgados.filter(c =>
     (c.financiera || '').toUpperCase().includes('UNIDAD') ||
     (c.producto   || '').toUpperCase().includes('UNIDAD')

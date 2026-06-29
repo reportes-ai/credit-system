@@ -6,6 +6,7 @@
 'use strict';
 
 const pool = require('../../../../shared/config/database');
+const { cargarPenTramos, calcularPenetracionMes, comisionesSeguro } = require('./penetracion');
 
 /* ── Cargar todos los parámetros del mantenedor ─────────────────────── */
 async function cargarParams() {
@@ -60,21 +61,7 @@ function dealerTablePct(d, plazo, esParque) {
   return (v == null || v === '') ? null : Number(v) / 100;
 }
 
-/* ── Cargar tramos de comisión por penetración ──────────────────────── */
-async function cargarPenTramos() {
-  const [rows] = await pool.query(
-    'SELECT tipo, pen_min, pct_comision FROM comisiones_seguro_penetracion WHERE estado="activo" ORDER BY tipo, pen_min'
-  );
-  return rows;
-}
-
-/* Dado el % de penetración, retorna el pct_comision del tramo más alto alcanzado */
-function getPenComision(tipo, pen, tramos) {
-  const filas = tramos.filter(r => r.tipo === tipo && parseFloat(pen) >= parseFloat(r.pen_min));
-  if (!filas.length) return 0;
-  const best = filas.reduce((a, b) => parseFloat(a.pen_min) > parseFloat(b.pen_min) ? a : b);
-  return parseFloat(best.pct_comision) / 100;
-}
+/* cargarPenTramos, getPenComision y la penetración mensual viven en ./penetracion.js (motor único). */
 
 /* ── Contar operaciones UAC otorgadas/aprobadas en el mes ───────────── */
 async function contarOpsUAC(mes) {
@@ -129,6 +116,7 @@ async function calcularOperacion(op) {
   let com_rdh            = 0;
   let com_cesantia       = 0;
   let com_reparaciones   = 0;
+  let pen_rdh = null, pen_cesantia = null, pen_reparaciones = null;
   let comdea_real        = 0;
   let com_parque_calc    = 0;
   let comej              = 0;
@@ -160,18 +148,16 @@ async function calcularOperacion(op) {
     }
   }
 
-  // ── 2. Ingreso por seguros — comisión según tramo de penetración ──────
-  // pen_rdh/cesantia/reparacion deben venir en op (calculados previamente por mes)
-  // com_rdh          = seguro_rdh       × pct_comision(pen_rdh)
-  // com_cesantia     = seguro_cesantia  × pct_comision(pen_cesantia)
-  // com_reparaciones = seguro_rep_menor × pct_comision(pen_reparacion)
-  if (plazo > 0) {
-    const pctRdh  = getPenComision('rdh',        op.pen_rdh          ?? 0, tramos);
-    const pctCes  = getPenComision('cesantia',   op.pen_cesantia     ?? 0, tramos);
-    const pctRep  = getPenComision('reparacion', op.pen_reparaciones ?? 0, tramos);
-    com_rdh          = Math.round(pctRdh  * primaRDH);
-    com_cesantia     = Math.round(pctCes  * primaCesantia);
-    com_reparaciones = Math.round(pctRep  * (parseFloat(op.seguro_rep_menor) || 0));
+  // ── 2. Ingreso por seguros — comisión según la PENETRACIÓN del mes ────
+  // Penetración mensual real (motor penetracion.js), no el campo pen_* del op
+  // (que venía vacío y dejaba la comisión en 0). com_x = prima × pct_comision(tramo).
+  if (plazo > 0 && financiera.includes('AUTOFIN')) {
+    const penMes = await calcularPenetracionMes(op.mes);
+    const cs = comisionesSeguro(op, penMes, tramos);
+    com_rdh          = cs.com_rdh;
+    com_cesantia     = cs.com_cesantia;
+    com_reparaciones = cs.com_reparaciones;
+    pen_rdh = penMes.pen_rdh; pen_cesantia = penMes.pen_cesantia; pen_reparaciones = penMes.pen_reparaciones;
   }
 
   // ── 3. Comisión dealer ─────────────────────────────────────────────
@@ -203,6 +189,9 @@ async function calcularOperacion(op) {
     com_rdh,
     com_cesantia,
     com_reparaciones,
+    pen_rdh,
+    pen_cesantia,
+    pen_reparaciones,
     comdea_real,
     com_parque:        com_parque_calc,
     comej,
