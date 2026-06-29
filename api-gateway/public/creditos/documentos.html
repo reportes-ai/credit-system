@@ -192,6 +192,7 @@
   </div>
 
   <script src="/js/auth-guard.js"></script>
+  <script src="/js/rentabilidad-core.js"></script>
 <script>
     /* ── Auth ── */
     const token = sessionStorage.getItem('token');
@@ -218,7 +219,7 @@
     /* ── French amortization ── */
     function buildAmortizacion(montoFinanciado, tasaMensual, plazo, fechaPrimeraCuota) {
       const i = tasaMensual / 100;
-      const cuota = Math.round(montoFinanciado * i * Math.pow(1+i, plazo) / (Math.pow(1+i, plazo) - 1));
+      const cuota = Math.round(window.AF_RENT_CORE ? AF_RENT_CORE.cuotaFrancesa(montoFinanciado, i, plazo) : montoFinanciado * i * Math.pow(1+i, plazo) / (Math.pow(1+i, plazo) - 1));
       const rows = [];
       let saldo = montoFinanciado;
       const f0 = fechaPrimeraCuota ? new Date(fechaPrimeraCuota) : new Date();

@@ -100,6 +100,31 @@ Reglas de diseño que se derivan de este principio:
   una lista `<ul>` de `<b>Variable</b> → proceso/página <a href="…">enlace</a>` (ver
   `tasas/index.html` y `cobranza-parametros/index.html` como referencia).
 
+## Máximas Fundamentales (NO negociables)
+
+### 1. Un solo motor por cálculo
+> Cada magnitud de negocio se calcula en UN SOLO lugar (función pura compartida) que usan
+> TODOS los consumidores. Interés por mora, gastos de cobranza, cuota francesa, tabla de
+> desarrollo, saldo insoluto, comisiones, rentabilidad, UF, penetración — cada una su motor único.
+- **Antes de escribir un cálculo, buscar dónde ya se computa esa magnitud y reusar/extender.**
+  Nunca una segunda copia "rápida" inline.
+- **Una magnitud = un motor; pero dos magnitudes distintas que se parecen NO se fusionan.**
+  Ej.: "saldo insoluto neto" ≠ "monto de prepago" (capital + accesorios) → motores distintos.
+- Patrón: módulo puro isomorfo (`module.exports` + `window.AF_*`), como `rentabilidad-core.js`
+  o `shared/uf.js`. Objetivo: no duplicar esfuerzo, garantizar correctitud en un solo punto y
+  consistencia de datos. Si se arregla, se arregla una vez.
+
+### 2. Una sola fuente de datos (single source of truth)
+> Cada dato vive en UN SOLO lugar autoritativo. Nombres, apellidos, direcciones, comunas,
+> comisión pactada, nombre de dealers, informes comerciales, antecedentes laborales — una
+> sola fuente; todo lo demás la referencia (JOIN/FK/lookup), nunca la copia.
+- **Un dato no se re-almacena en varias tablas.** Mismo dato = misma columna homologada;
+  los consumidores apuntan a la fuente.
+- **Snapshot deliberado ≠ duplicado.** Si un valor se congela a propósito (comisión pactada
+  de la carta al emitir, lo congelado al otorgar), ese snapshot inmutable también tiene UN solo hogar.
+- Objetivo: que el mismo nombre / dirección / comisión sea idéntico en cobranza, cartas,
+  dashboard y reportería porque todos leen del mismo origen.
+
 ## Reglas Anti-Hardcode (NO negociables)
 1. **Módulos y sub-items SIEMPRE desde BD** — nunca listas JS con rutas/íconos fijos
    - Módulos principales → tabla `modulos` (nombre, icono, ruta, orden)

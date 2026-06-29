@@ -13,6 +13,8 @@ const { registrarVerificable, anularVerificable } = require('../../../../shared/
 const { auditar } = require('../../../../shared/audit');
 // Lógica canónica de cobranza (interés por mora + gastos de cobranza, parametrizables).
 const { _calc: COB } = require('../../../cobranza/src/controllers/cobranza.controller');
+// Motor único de cuota francesa (isomorfo) — máxima: un solo motor por cálculo.
+const core = require('../../../../api-gateway/public/js/rentabilidad-core');
 
 /* ── Schema + auto-registro del módulo (sin hardcode en el frontend) ─────── */
 (async () => {
@@ -216,8 +218,7 @@ async function renderCuerpo(out, fechaEmisionISO) {
 function calendarioFrancesSintetico(c) {
   const mf = N(c.monto_financiado), plazo = N(c.plazo), r = (N(c.tascli_real) || 0) / 100;
   if (!mf || !plazo) return [];
-  const pot = Math.pow(1 + r, plazo);
-  const cu  = r > 0 ? Math.round(mf * r * pot / (pot - 1)) : Math.round(mf / plazo);
+  const cu  = r > 0 ? Math.round(core.cuotaFrancesa(mf, r, plazo)) : Math.round(mf / plazo);
   const f0  = c.fecha_primera_cuota ? new Date(c.fecha_primera_cuota + 'T00:00:00') : null;
   let saldo = mf; const out = [];
   for (let n = 1; n <= plazo; n++) {

@@ -105,6 +105,7 @@
 </head>
 <body>
 <script src="/js/auth-guard.js"></script>
+<script src="/js/rentabilidad-core.js"></script>
 <nav class="topnav">
   <div class="topnav-left">
     <a href="/" class="topnav-brand">
@@ -522,9 +523,9 @@ function simular() {
   const com_ej = Math.round(monto_fin * pctEj);
 
   // ── Cuota mensual ──────────────────────────────────────────────────
-  const cuota_af  = tasaCli > 0 ? Math.round(monto_fin * tasaCli * Math.pow(1+tasaCli,plazo) / (Math.pow(1+tasaCli,plazo)-1)) : Math.round(monto_fin/plazo);
+  const cuota_af  = tasaCli > 0 ? Math.round(window.AF_RENT_CORE ? AF_RENT_CORE.cuotaFrancesa(monto_fin, tasaCli, plazo) : monto_fin * tasaCli * Math.pow(1+tasaCli,plazo) / (Math.pow(1+tasaCli,plazo)-1)) : Math.round(monto_fin/plazo);
   const tasaUAC   = esMayor ? tmcMayor : tmcMenor;
-  const cuota_uac = tasaUAC > 0 ? Math.round(monto_fin * tasaUAC * Math.pow(1+tasaUAC,plazo) / (Math.pow(1+tasaUAC,plazo)-1)) : Math.round(monto_fin/plazo);
+  const cuota_uac = tasaUAC > 0 ? Math.round(window.AF_RENT_CORE ? AF_RENT_CORE.cuotaFrancesa(monto_fin, tasaUAC, plazo) : monto_fin * tasaUAC * Math.pow(1+tasaUAC,plazo) / (Math.pow(1+tasaUAC,plazo)-1)) : Math.round(monto_fin/plazo);
 
   // ── Rentabilidad ───────────────────────────────────────────────────
   const total_costos = com_dealer + com_patio + com_ej;
