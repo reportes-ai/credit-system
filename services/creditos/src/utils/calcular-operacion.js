@@ -7,6 +7,7 @@
 
 const pool = require('../../../../shared/config/database');
 const { cargarPenTramos, calcularPenetracionMes, comisionesSeguro } = require('./penetracion');
+const { comisionDealer } = require('./comision-dealer');
 
 /* ── Cargar todos los parámetros del mantenedor ─────────────────────── */
 async function cargarParams() {
@@ -28,38 +29,11 @@ async function getUF(fecha) {
   return rows.length ? parseFloat(rows[0].valor) : null;
 }
 
-/* ── Tabla de comisión dealer por plazo ─────────────────────────────── */
-function getDealerPct(plazo, p) {
-  if (plazo <= 6)  return p.dealer_pct_6  / 100;
-  if (plazo <= 12) return p.dealer_pct_12 / 100;
-  if (plazo <= 24) return p.dealer_pct_24 / 100;
-  if (plazo <= 36) return p.dealer_pct_36 / 100;
-  return p.dealer_pct_99 / 100;
-}
-function getDealerCallePct(plazo, p) {
-  // Usa parámetro independiente dealer_calle_pct_X; fallback a parque+patio
-  const patio = (p.patio_pct || 0) / 100;
-  const fb = getDealerPct(plazo, p) + patio;
-  if (plazo <= 6)  return p.dealer_calle_pct_6  != null ? p.dealer_calle_pct_6  / 100 : fb;
-  if (plazo <= 12) return p.dealer_calle_pct_12 != null ? p.dealer_calle_pct_12 / 100 : fb;
-  if (plazo <= 24) return p.dealer_calle_pct_24 != null ? p.dealer_calle_pct_24 / 100 : fb;
-  if (plazo <= 36) return p.dealer_calle_pct_36 != null ? p.dealer_calle_pct_36 / 100 : fb;
-  return p.dealer_calle_pct_99 != null ? p.dealer_calle_pct_99 / 100 : fb;
-}
+/* La pizarra de comisión dealer (parque/calle) vive en ./comision-dealer.js (motor único). */
 
 /* ── Tabla de comisión por dealer (su pactada; manda sobre la pizarra) ─── */
 const normRutD = r => String(r || '').replace(/[.\-\s]/g, '').toUpperCase();
-// Tramo de la tabla del dealer (pct/100) o null si no tiene ese tramo (→ fallback pizarra).
-// Si la operación es en PARQUE y el dealer es AMBOS (tiene com_parque_*), usa esa tabla.
-function dealerTablePct(d, plazo, esParque) {
-  if (!d) return null;
-  if (esParque) {
-    const pv = plazo <= 12 ? d.com_parque_6_12 : plazo <= 24 ? d.com_parque_13_24 : plazo <= 36 ? d.com_parque_25_36 : d.com_parque_37;
-    if (pv != null && pv !== '') return Number(pv) / 100;
-  }
-  const v = plazo <= 12 ? d.com_6_12 : plazo <= 24 ? d.com_13_24 : plazo <= 36 ? d.com_25_36 : d.com_37;
-  return (v == null || v === '') ? null : Number(v) / 100;
-}
+// dealerTablePct vive en ./comision-dealer.js (motor único).
 
 /* cargarPenTramos, getPenComision y la penetración mensual viven en ./penetracion.js (motor único). */
 
@@ -119,6 +93,7 @@ async function calcularOperacion(op) {
   let pen_rdh = null, pen_cesantia = null, pen_reparaciones = null;
   let comdea_real        = 0;
   let com_parque_calc    = 0;
+  let arriendo_parque_calc = 0;
   let comej              = 0;
 
   // ── 1. Ingreso por tasa ────────────────────────────────────────────
@@ -160,18 +135,23 @@ async function calcularOperacion(op) {
     pen_rdh = penMes.pen_rdh; pen_cesantia = penMes.pen_cesantia; pen_reparaciones = penMes.pen_reparaciones;
   }
 
-  // ── 3. Comisión dealer ─────────────────────────────────────────────
-  // La tabla pactada del dealer manda; si no tiene ese tramo, cae a la pizarra.
-  // El patio del parque sigue siendo global (patio_pct).
+  // ── 3. Comisión dealer y parque — motor único comision-dealer.js ────
+  // La tabla pactada del dealer manda; si no, pizarra. El parque (arriendo + %) sale
+  // del mantenedor parques_comisiones (mismo origen que el recálculo), no de patio_pct.
   if (saldo_precio > 0 && plazo > 0) {
-    const patio_pct = p.patio_pct / 100;
-    // AMBOS: la op en parque usa la tabla PARQUE del dealer; en calle, la de CALLE.
-    const dPct      = dealerTablePct(dealerCom, plazo, esParque);
-    const base      = esParque
-      ? (dPct != null ? dPct : getDealerPct(plazo, p))
-      : (dPct != null ? dPct : getDealerCallePct(plazo, p));
-    comdea_real     = Math.round(saldo_precio * base);
-    com_parque_calc = esParque ? Math.round(saldo_precio * patio_pct) : 0;
+    let parqData = null;
+    if (esParque) {
+      try {
+        const [pr] = await pool.query(
+          'SELECT arriendo, comision_pct FROM parques_comisiones WHERE activo=1 AND UPPER(TRIM(nombre)) = ? LIMIT 1',
+          [parqueVal]);
+        parqData = pr[0] || null;
+      } catch (e) { /* sin tabla → el motor cae a patio_pct */ }
+    }
+    const cd = comisionDealer({ saldo: saldo_precio, plazo, esParque }, { dealerTabla: dealerCom, parqData, pizarra: p });
+    comdea_real          = cd.comdea_real;
+    com_parque_calc      = cd.com_parque;
+    arriendo_parque_calc = cd.arriendo;
   }
 
   // ── 4. Comisión ejecutivo ──────────────────────────────────────────
@@ -182,7 +162,7 @@ async function calcularOperacion(op) {
   // ── 5. Ingreso neto total ──────────────────────────────────────────
   const com_seguros_total  = com_rdh + com_cesantia + com_reparaciones;
   const ingreso_neto_total = monto_comision_fin + com_seguros_total
-                           - comdea_real - com_parque_calc;
+                           - comdea_real - com_parque_calc - arriendo_parque_calc;
 
   return {
     monto_comision_fin,
@@ -194,6 +174,7 @@ async function calcularOperacion(op) {
     pen_reparaciones,
     comdea_real,
     com_parque:        com_parque_calc,
+    arriendo_parque:   arriendo_parque_calc,
     comej,
     ingreso_neto_total,
     com_seguros_total,

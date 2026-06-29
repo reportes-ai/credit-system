@@ -278,12 +278,12 @@ const create = async (req, res) => {
           UPDATE creditos SET
             monto_comision_fin = ?, com_rdh = ?, com_cesantia = ?,
             com_reparaciones = ?, pen_rdh = ?, pen_cesantia = ?, pen_reparaciones = ?,
-            comdea_real = ?, com_parque = ?,
+            comdea_real = ?, com_parque = ?, arriendo_parque = ?,
             comej = ?, ingreso_neto_total = ?
           WHERE id = ?`,
           [calc.monto_comision_fin, calc.com_rdh, calc.com_cesantia,
            calc.com_reparaciones, calc.pen_rdh, calc.pen_cesantia, calc.pen_reparaciones,
-           calc.comdea_real, calc.com_parque,
+           calc.comdea_real, calc.com_parque, calc.arriendo_parque,
            calc.comej, calc.ingreso_neto_total, r.insertId]
         );
       } catch(calcErr) { console.error('[calcular-operacion create]', calcErr.message); }
@@ -366,12 +366,12 @@ const update = async (req, res) => {
           UPDATE creditos SET
             monto_comision_fin = ?, com_rdh = ?, com_cesantia = ?,
             com_reparaciones = ?, pen_rdh = ?, pen_cesantia = ?, pen_reparaciones = ?,
-            comdea_real = ?, com_parque = ?,
+            comdea_real = ?, com_parque = ?, arriendo_parque = ?,
             comej = ?, ingreso_neto_total = ?
           WHERE id = ?`,
           [calc.monto_comision_fin, calc.com_rdh, calc.com_cesantia,
            calc.com_reparaciones, calc.pen_rdh, calc.pen_cesantia, calc.pen_reparaciones,
-           calc.comdea_real, calc.com_parque,
+           calc.comdea_real, calc.com_parque, calc.arriendo_parque,
            calc.comej, calc.ingreso_neto_total, id]
         );
       } catch(calcErr) { console.error('[calcular-operacion update]', calcErr.message); }

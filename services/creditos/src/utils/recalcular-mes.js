@@ -19,6 +19,7 @@
 
 const pool = require('../../../../shared/config/database');
 const { cargarPenTramos, calcularPenetracionMes, comisionesSeguro } = require('./penetracion');
+const { comisionDealer } = require('./comision-dealer');
 
 // Campos calculados que el usuario puede dejar "forzados" (negociación puntual).
 // El recálculo los respeta: conserva el valor guardado y solo recalcula los demás.
@@ -77,21 +78,7 @@ async function getUF(fecha) {
   return rows.length ? parseFloat(rows[0].valor) : null;
 }
 
-/* ── Comisión dealer por plazo ──────────────────────────────────────── */
-function getDealerPct(plazo, p) {
-  if (plazo <= 6)  return (p.dealer_pct_6  || 0) / 100;
-  if (plazo <= 12) return (p.dealer_pct_12 || 0) / 100;
-  if (plazo <= 24) return (p.dealer_pct_24 || 0) / 100;
-  if (plazo <= 36) return (p.dealer_pct_36 || 0) / 100;
-  return (p.dealer_pct_99 || 0) / 100;
-}
-function getDealerCallePct(plazo, p) {
-  if (plazo <= 6)  return (p.dealer_calle_pct_6  != null ? p.dealer_calle_pct_6  : (p.dealer_pct_6  || 0) + (p.patio_pct || 0)) / 100;
-  if (plazo <= 12) return (p.dealer_calle_pct_12 != null ? p.dealer_calle_pct_12 : (p.dealer_pct_12 || 0) + (p.patio_pct || 0)) / 100;
-  if (plazo <= 24) return (p.dealer_calle_pct_24 != null ? p.dealer_calle_pct_24 : (p.dealer_pct_24 || 0) + (p.patio_pct || 0)) / 100;
-  if (plazo <= 36) return (p.dealer_calle_pct_36 != null ? p.dealer_calle_pct_36 : (p.dealer_pct_36 || 0) + (p.patio_pct || 0)) / 100;
-  return (p.dealer_calle_pct_99 != null ? p.dealer_calle_pct_99 : (p.dealer_pct_99 || 0) + (p.patio_pct || 0)) / 100;
-}
+/* La comisión dealer/parque (pizarra + tabla del dealer) vive en ./comision-dealer.js (motor único). */
 
 /* getPenComision, cargarPenTramos y la penetración mensual viven en ./penetracion.js (motor único). */
 
@@ -121,17 +108,7 @@ async function cargarDealers() {
   } catch (e) { /* sin tabla/columnas → todo cae a la pizarra */ }
   return map;
 }
-// Tramo de la tabla del dealer (pct/100) o null si no tiene ese tramo (→ fallback pizarra).
-// Si la operación es en PARQUE y el dealer es AMBOS (tiene com_parque_*), usa esa tabla.
-function dealerTablePct(d, plazo, esParque) {
-  if (!d) return null;
-  if (esParque) {
-    const pv = plazo <= 12 ? d.com_parque_6_12 : plazo <= 24 ? d.com_parque_13_24 : plazo <= 36 ? d.com_parque_25_36 : d.com_parque_37;
-    if (pv != null && pv !== '') return Number(pv) / 100;
-  }
-  const v = plazo <= 12 ? d.com_6_12 : plazo <= 24 ? d.com_13_24 : plazo <= 36 ? d.com_25_36 : d.com_37;
-  return (v == null || v === '') ? null : Number(v) / 100;
-}
+// dealerTablePct vive en ./comision-dealer.js (motor único).
 
 /* ── Tier UNIDAD ────────────────────────────────────────────────────── */
 function getTierUAC(cnt, p) {
@@ -182,21 +159,11 @@ async function calcularValoresOp(op, p, parqMap, todasTasas, dealerMap, pctUAC) 
     }
   }
 
-  let comdea_real = 0, com_parque = 0, arriendo = 0;
-  if (saldo > 0 && plazo > 0) {
-    // La tabla pactada del dealer manda; si no tiene ese tramo, cae a la pizarra.
-    // AMBOS: si la op es en parque usa la tabla PARQUE del dealer; si no, la de CALLE.
-    const dPct = dealerTablePct((dealerMap || {})[normRutD(op.rut_dealer)], plazo, esParque);
-    if (esParque) {
-      const parqData = parqMap[parqKey];
-      const patioPct = parqData ? parseFloat(parqData.comision_pct) : (p.patio_pct / 100);
-      arriendo    = parqData ? parseFloat(parqData.arriendo) || 0 : 0;
-      comdea_real = Math.round(saldo * (dPct != null ? dPct : getDealerPct(plazo, p)));
-      com_parque  = Math.round(saldo * patioPct);
-    } else {
-      comdea_real = Math.round(saldo * (dPct != null ? dPct : getDealerCallePct(plazo, p)));
-    }
-  }
+  // Comisión dealer y parque — motor único comision-dealer.js (tabla del dealer manda).
+  const { comdea_real, com_parque, arriendo } = comisionDealer(
+    { saldo, plazo, esParque },
+    { dealerTabla: (dealerMap || {})[normRutD(op.rut_dealer)], parqData: parqMap[parqKey], pizarra: p }
+  );
   return { monto_comision_fin, comdea_real, com_parque, arriendo };
 }
 
