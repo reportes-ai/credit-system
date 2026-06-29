@@ -69,8 +69,7 @@
         <div class="tipo-selector" id="tipoSelector">
           <div class="tipo-opt" onclick="selectTipo('DEALER CALLE')">Dealer Calle</div>
           <div class="tipo-opt" onclick="selectTipo('DEALER PARQUE')">Dealer Parque</div>
-          <div class="tipo-opt" onclick="selectTipo('ALTA GAMA - CALLE')">Alta Gama – Calle</div>
-          <div class="tipo-opt" onclick="selectTipo('ALTA GAMA - PARQUE')">Alta Gama – Parque</div>
+          <!-- Alta Gama (producto Autofin Especial) oculto: no se usa hoy. Lógica de cálculo intacta para cartas históricas. -->
         </div>
         <div id="tipoAlert" class="alert alert-warning" style="display:none;margin-top:8px;padding:6px 10px;font-size:11px">⚠ Seleccione el Tipo de Carta para calcular la participación del dealer.</div>
 </div>
@@ -476,8 +475,6 @@
             <option value="">Todos</option>
             <option value="DEALER CALLE">Dealer Calle</option>
             <option value="DEALER PARQUE">Dealer Parque</option>
-            <option value="ALTA GAMA - CALLE">Alta Gama – Calle</option>
-            <option value="ALTA GAMA - PARQUE">Alta Gama – Parque</option>
           </select>
         </div>
         <div class="field" style="flex:1;min-width:160px">
