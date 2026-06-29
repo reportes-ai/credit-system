@@ -1122,14 +1122,20 @@ function credPctf(n, dec=2) {
 /* Resultado completo incluyendo rentabilidad */
 function credCalcFull(p) {
   const base = credCalc(p);
-  const tasaD = p.tasa / 100;
   const costoFondoD = (p.costoFondo || 0) / 100;
-  const ambosFactor = credAmbosFactor(p.plazo);
-  const capitalAjustado = base.montoFin + base.montoFin * tasaD * ((p.diasPrimeraCuota||30)-30) / 30;
   const ingTasa    = costoFondoD > 0 ? credPvf(costoFondoD, p.plazo, base.cuota) - base.montoFin : 0;
-  const ingSeguros = p.chkD ? base.segDesg * ambosFactor : 0;
+  // Ingreso por seguros = comisión REAL = (factor desg + factor cesa) × prima desgravamen,
+  // igual que AF_RENT (parametros_credito.seg_com_*). Antes usaba ambosFactor fijo (~1,15-1,17)
+  // que sobreestimaba la comisión ~4×.
+  const segComFactor = (tipo) => {
+    const pl = p.plazo;
+    const k = pl <= 6 ? 6 : pl <= 12 ? 12 : pl <= 24 ? 24 : 36;
+    return (credParams['seg_com_' + tipo + '_' + k] || 0) / 100;
+  };
+  const ingSeguros = p.chkD ? Math.round((segComFactor('desg') + segComFactor('cesa')) * base.segDesg) : 0;
   const totalIngresos = ingTasa + ingSeguros;
-  const comEjecutivo  = base.saldoPrecio * ((p.pctEjec||0) / 100);
+  // Comisión ejecutivo = % del MONTO FINANCIADO (no del saldo precio), igual que AF_RENT/backend.
+  const comEjecutivo  = base.montoFin * ((p.pctEjec||0) / 100);
   const totalCostos   = (p.dealer||0) + (p.patio||0) + comEjecutivo + (p.corfo||0) + (p.bono||0);
   const rentabilidad  = totalIngresos - totalCostos;
   const pb            = credPlazoBracket(p.plazo);
@@ -1140,7 +1146,7 @@ function credCalcFull(p) {
     comEjecutivo, totalCostos, rentabilidad,
     pctMonto:    base.montoFin > 0   ? (rentabilidad / base.montoFin)   * 100 : 0,
     pctVehiculo: p.valorVehiculo > 0 ? (rentabilidad / p.valorVehiculo) * 100 : 0,
-    pb, rates, ambosFactor,
+    pb, rates,
   };
 }
 
