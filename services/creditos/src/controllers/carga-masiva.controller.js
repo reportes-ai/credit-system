@@ -308,6 +308,19 @@ const importar = async (req, res) => {
       }
     }
 
+    // ── Enganchar id_dealer al maestro por RUT (los créditos nacen ligados a la tabla
+    //    `dealers`, no por el nombre). El match dealer↔crédito de postventa/órdenes usa
+    //    id_dealer. Idempotente: solo rellena los que están sin enganche. ──
+    if (insertados > 0) {
+      try {
+        await pool.query(
+          `UPDATE creditos c JOIN dealers d ON d.rut = c.rut_dealer
+              SET c.id_dealer = d.id_dealer
+            WHERE (c.id_dealer IS NULL OR c.id_dealer = 0)
+              AND c.rut_dealer IS NOT NULL AND c.rut_dealer <> ''`);
+      } catch (e) { console.error('[carga-masiva id_dealer]', e.message); }
+    }
+
     // ── Recálculo completo de comisiones para todos los meses afectados ──
     // Incluye: monto_comision_fin, comdea_real, com_parque, arriendo_parque,
     //          com_rdh/cesantia/reparaciones, ingreso_neto_total
