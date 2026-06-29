@@ -133,6 +133,7 @@ app.use('/api/auditoria-credito',   require('../../services/creditos/src/routes/
 app.use('/api/broker-validation-items', require('../../services/creditos/src/routes/broker-validation-items.routes'));
 app.use('/api/broker-validaciones',     require('../../services/creditos/src/routes/broker-validaciones.routes'));
 app.use('/api/fundantes',               require('../../services/creditos/src/routes/fundantes.routes'));
+app.use('/api/comision-dealer',         require('../../services/creditos/src/routes/comision-dealer.routes'));
 
 // Tesorería
 app.use('/api/cajas',                require('../../services/tesoreria/src/routes/cajas.routes'));
