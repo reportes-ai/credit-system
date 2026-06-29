@@ -8,6 +8,8 @@
 const pool = require('../../../../shared/config/database');
 const { cargarPenTramos, calcularPenetracionMes, comisionesSeguro } = require('./penetracion');
 const { comisionDealer } = require('./comision-dealer');
+const core = require('../../../../api-gateway/public/js/rentabilidad-core');
+const { cargarTasas, getTasaByFecha } = require('./recalcular-mes');
 
 /* ── Cargar todos los parámetros del mantenedor ─────────────────────── */
 async function cargarParams() {
@@ -52,9 +54,10 @@ async function contarOpsUAC(mes) {
 
 /* ── CÁLCULO PRINCIPAL ──────────────────────────────────────────────── */
 async function calcularOperacion(op) {
-  const p      = await cargarParams();
-  const tramos = await cargarPenTramos();
-  const uf     = await getUF(op.fecha_otorgado);
+  const p          = await cargarParams();
+  const tramos     = await cargarPenTramos();
+  const uf         = await getUF(op.fecha_otorgado);
+  const todasTasas = await cargarTasas();
 
   // Tabla de comisión del dealer (su pactada): manda sobre la pizarra cuando existe.
   let dealerCom = null;
@@ -96,22 +99,21 @@ async function calcularOperacion(op) {
   let arriendo_parque_calc = 0;
   let comej              = 0;
 
-  // ── 1. Ingreso por tasa ────────────────────────────────────────────
+  // ── 1. Ingreso por tasa — MOTOR ÚNICO rentabilidad-core ─────────────
   if (plazo > 0 && monto_fin > 0) {
     if (financiera.includes('AUTOFIN') || financiera.includes('AUTOF')) {
-      // AutoFin: PV spread — usa monto_capitalizado como base
-      const tmc_menor = (p.autofin_tmc_menor_200 / 100) / 12; // mensual
-      const tmc_mayor = (p.autofin_tmc_mayor_200 / 100) / 12;
-      const spread    = (p.autofin_spread_fondo  / 100);       // mensual
-      const costo_fondo = tmc_mayor - spread;                  // 1.78% fijo
-      const limite_200  = uf ? (p.umbral_uf_tramo || 200) * uf : null;
-      const tasa_cli    = (limite_200 && monto_cap > limite_200) ? tmc_mayor : tmc_menor;
-
-      if (tasa_cli > 0 && costo_fondo > 0) {
-        const cuota = monto_cap * tasa_cli * Math.pow(1 + tasa_cli, plazo)
-                    / (Math.pow(1 + tasa_cli, plazo) - 1);
-        const pv = cuota * (1 - Math.pow(1 + costo_fondo, -plazo)) / costo_fondo;
-        monto_comision_fin = Math.round(pv - monto_cap);
+      // AutoFin: VP del spread. Tasa del MANTENEDOR a la fecha de otorgamiento (tramo
+      // >/≤200 UF) define el costo de fondo; la tasa CLIENTE (tascli_real) MANDA para la
+      // cuota, con default al mantenedor. Mismo criterio que el recálculo mensual.
+      const tasa = getTasaByFecha(op.fecha_otorgado, todasTasas);
+      if (tasa) {
+        const mayor      = core.esMayor200({ montoCap: monto_cap, uf, umbralUf: p.umbral_uf_tramo });
+        const mantTasa   = mayor ? parseFloat(tasa.tasa_mensual_mayor) : parseFloat(tasa.tasa_mensual_menor);
+        const mantSpread = mayor ? parseFloat(tasa.spread_mayor)       : parseFloat(tasa.spread_menor);
+        const costoFondo = (mantTasa - mantSpread) / 100;
+        const real    = parseFloat(op.tascli_real) || 0;
+        const tasaCli = (real > 0 ? real : mantTasa) / 100;
+        monto_comision_fin = core.ingresoColocacionAutoFin({ montoCap: monto_cap, plazo, tasaCli, costoFondo });
       }
     } else if (financiera.includes('UNIDAD') || financiera.includes('UAC')) {
       // UAC: % del saldo precio según volumen del mes
@@ -119,7 +121,7 @@ async function calcularOperacion(op) {
       let pct = p.uac_pct_tier1 / 100;
       if (ops >= p.uac_ops_tier2_max) pct = p.uac_pct_tier3 / 100;
       else if (ops >= p.uac_ops_tier1_max) pct = p.uac_pct_tier2 / 100;
-      monto_comision_fin = Math.round(saldo_precio * pct);
+      monto_comision_fin = core.ingresoColocacionUAC({ saldo: saldo_precio, pctUAC: pct });
     }
   }
 
@@ -154,10 +156,8 @@ async function calcularOperacion(op) {
     arriendo_parque_calc = cd.arriendo;
   }
 
-  // ── 4. Comisión ejecutivo ──────────────────────────────────────────
-  if (monto_fin > 0) {
-    comej = Math.round(monto_fin * (p.pct_ejecutivo_fin / 100));
-  }
+  // ── 4. Comisión ejecutivo — motor único ────────────────────────────
+  comej = core.comisionEjecutivo({ montoFin: monto_fin, pctEj: (p.pct_ejecutivo_fin || 0) / 100 });
 
   // ── 5. Ingreso neto total ──────────────────────────────────────────
   const com_seguros_total  = com_rdh + com_cesantia + com_reparaciones;

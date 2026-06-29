@@ -20,6 +20,7 @@
 const pool = require('../../../../shared/config/database');
 const { cargarPenTramos, calcularPenetracionMes, comisionesSeguro } = require('./penetracion');
 const { comisionDealer } = require('./comision-dealer');
+const core = require('../../../../api-gateway/public/js/rentabilidad-core');
 
 // Campos calculados que el usuario puede dejar "forzados" (negociación puntual).
 // El recálculo los respeta: conserva el valor guardado y solo recalcula los demás.
@@ -141,21 +142,20 @@ async function calcularValoresOp(op, p, parqMap, todasTasas, dealerMap, pctUAC) 
   if (esUAC) {
     // UAC: % del saldo precio según el tier DINÁMICO del mes (proyecta el cierre).
     // El snapshot de la decisión se congela aparte en la carta (cartas_aprobacion.tier_uac_*).
-    monto_comision_fin = Math.round(saldo * (pctUAC || 0));
+    monto_comision_fin = core.ingresoColocacionUAC({ saldo, pctUAC });
   } else if (plazo > 0 && montoCap > 0) {
     const tasa = getTasaByFecha(op.fecha_otorgado, todasTasas);
     if (tasa) {
-      const uf         = await getUF(op.fecha_otorgado);
-      const limite_200 = uf ? (p.umbral_uf_tramo || 200) * uf : null;
-      const esMayor200 = limite_200 ? montoCap > limite_200 : false;
-      const tasa_cli   = (esMayor200 ? parseFloat(tasa.tasa_mensual_mayor) : parseFloat(tasa.tasa_mensual_menor)) / 100;
-      const spread_val = (esMayor200 ? parseFloat(tasa.spread_mayor) : parseFloat(tasa.spread_menor)) / 100;
-      const costo_fondo = tasa_cli - spread_val;
-      if (tasa_cli > 0 && costo_fondo > 0) {
-        const cuota = montoCap * tasa_cli * Math.pow(1 + tasa_cli, plazo) / (Math.pow(1 + tasa_cli, plazo) - 1);
-        const pv = cuota * (1 - Math.pow(1 + costo_fondo, -plazo)) / costo_fondo;
-        monto_comision_fin = Math.round(pv - montoCap);
-      }
+      const uf    = await getUF(op.fecha_otorgado);
+      const mayor = core.esMayor200({ montoCap, uf, umbralUf: p.umbral_uf_tramo });
+      const mantTasa   = mayor ? parseFloat(tasa.tasa_mensual_mayor) : parseFloat(tasa.tasa_mensual_menor); // %
+      const mantSpread = mayor ? parseFloat(tasa.spread_mayor)       : parseFloat(tasa.spread_menor);        // %
+      const costoFondo = (mantTasa - mantSpread) / 100;        // costo de fondo del mantenedor a la fecha
+      // Tasa cliente (cuota): la real de la op (tascli_real, % mensual normalizado) MANDA;
+      // por defecto la del mantenedor a la fecha de otorgamiento.
+      const real    = parseFloat(op.tascli_real) || 0;
+      const tasaCli = (real > 0 ? real : mantTasa) / 100;
+      monto_comision_fin = core.ingresoColocacionAutoFin({ montoCap, plazo, tasaCli, costoFondo });
     }
   }
 
@@ -181,7 +181,7 @@ async function marcarForzadosCalculo(opIds, opts = {}) {
   const tol = opts.tol != null ? opts.tol : 1; // $ de tolerancia por redondeo
   const [p, parqMap, todasTasas, dealerMap] = await Promise.all([cargarParams(), cargarParques(), cargarTasas(), cargarDealers()]);
   const [ops] = await pool.query(
-    `SELECT id, financiera, parque, rut_dealer, saldo_precio, monto_financiado, monto_capitalizado, plazo, fecha_otorgado,
+    `SELECT id, financiera, parque, rut_dealer, saldo_precio, monto_financiado, monto_capitalizado, plazo, fecha_otorgado, tascli_real,
             monto_comision_fin, comdea_real, com_parque, campos_forzados
      FROM creditos WHERE id IN (?)`, [ids]);
   for (const op of ops) {
@@ -204,6 +204,11 @@ async function marcarForzadosCalculo(opIds, opts = {}) {
 
 async function recalcularMeses(meses, opciones = {}) {
   if (!meses || !meses.length) return { actualizados: 0, log: [] };
+
+  // Filtro opcional por financiera (brokerage). Sin él, recalcula TODAS las ops del mes
+  // (incluida la cartera propia AUTOFACIL/INDEXA). Con él, solo las financieras dadas.
+  const soloFin = (Array.isArray(opciones.soloFinancieras) && opciones.soloFinancieras.length)
+    ? opciones.soloFinancieras.map(f => String(f).toUpperCase()) : null;
 
   const [p, parqMap, todasTasas, dealerMap] = await Promise.all([
     cargarParams(),
@@ -238,7 +243,8 @@ async function recalcularMeses(meses, opciones = {}) {
       FROM creditos
       WHERE DATE_FORMAT(mes, '%Y-%m') = ?
         AND estado_eval NOT IN ('RECHAZADO','ANULADO')
-    `, [mesStr]);
+        ${soloFin ? 'AND UPPER(financiera) IN (?)' : ''}
+    `, soloFin ? [mesStr, soloFin] : [mesStr]);
 
     if (!ops.length) continue;
 
@@ -403,4 +409,4 @@ function extraerMeses(ops) {
   return [...set];
 }
 
-module.exports = { recalcularMeses, recalcularMesesAbiertos, marcarForzadosCalculo, extraerMeses, normalizarEjecutivosMes };
+module.exports = { recalcularMeses, recalcularMesesAbiertos, marcarForzadosCalculo, extraerMeses, normalizarEjecutivosMes, cargarTasas, getTasaByFecha };
