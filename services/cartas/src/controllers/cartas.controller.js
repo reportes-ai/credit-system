@@ -976,7 +976,9 @@ function parseCartaAutofin(t) {
     anio: g(/\n(\d{4})\n:?Año/),
     patente: g(/PPU\s+([A-Z]{4}\d{2}|[A-Z]{2}\d{4})/),
     precioVenta, pie, saldo, plazo,
-    tasaCredito: tasaRaw ? Number(tasaRaw.replace(',', '.')).toFixed(2) : null,
+    // AutoFin trae 4 decimales; se toman solo los 2 primeros TRUNCADOS hacia abajo
+    // (2,8683 → 2,86), nunca al más próximo ni al alza, para no quedar sobre la pizarra.
+    tasaCredito: tasaRaw ? (Math.floor(Number(tasaRaw.replace(',', '.')) * 100 + 1e-6) / 100).toFixed(2) : null,
     montoCreditoCLP: totalPagare != null ? totalPagare : saldo,
     ejecutivo: g(/\n([A-ZÁÉÍÓÚ][A-ZÁÉÍÓÚ ]+?) \(AFA\)\n/),
     acreedor: 'AUTOFIN',
