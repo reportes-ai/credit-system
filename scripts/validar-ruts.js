@@ -12,7 +12,7 @@
 const pool = require('../shared/config/database');
 const R = require('../api-gateway/public/js/rut-core');
 // UBER/YAPO: canales de venta con RUT placeholder (no son RUTs reales) — se ignoran.
-const PLACEHOLDERS = new Set(['45840', '45901']);
+const PLACEHOLDERS = new Set(['4584', '4590']);  // UBER (4584-0), YAPO (4590-1) — cuerpo
 
 const COLS = [
   ['clientes', 'rut'],
