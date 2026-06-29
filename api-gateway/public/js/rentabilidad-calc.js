@@ -99,23 +99,22 @@
     // Así el spread ganado = spread_mayor (0,67%) en >200 UF y spread_menor (implícito) en ≤200 UF.
     const costoFondo = mensualMayor - spreadMayor;
     const cuotaDe = (tasa) => monto_fin * tasa * Math.pow(1 + tasa, plazo) / (Math.pow(1 + tasa, plazo) - 1);
-    let ing_tasa_af = 0;
-    if (tasaCli > 0 && costoFondo > 0) {
-      const pv = cuotaDe(tasaCli) * (1 - Math.pow(1 + costoFondo, -plazo)) / costoFondo;
-      ing_tasa_af = Math.round(pv - monto_fin);
-    }
+    // Ingreso por colocación: MOTOR ÚNICO rentabilidad-core (mismo cálculo que guardar/recalcular).
+    // Fallback a la fórmula inline si el core no cargó (cero regresión).
+    const CORE = (typeof window !== 'undefined' && window.AF_RENT_CORE) ? window.AF_RENT_CORE : null;
+    const ingColAF = (tCli) => CORE
+      ? CORE.ingresoColocacionAutoFin({ montoCap: monto_fin, plazo, tasaCli: tCli, costoFondo })
+      : ((tCli > 0 && costoFondo > 0) ? Math.round(cuotaDe(tCli) * (1 - Math.pow(1 + costoFondo, -plazo)) / costoFondo - monto_fin) : 0);
+    const ing_tasa_af = ingColAF(tasaCli);
     let com_corfo_af = 0;
     if (inp.corfo) {
       const corfoSpread = esMayor ? 0.004 : 0.005;
-      if (tasaCli - corfoSpread > 0) {
-        const pv2 = cuotaDe(tasaCli - corfoSpread) * (1 - Math.pow(1 + costoFondo, -plazo)) / costoFondo;
-        com_corfo_af = Math.round(pv2 - monto_fin);
-      }
+      if (tasaCli - corfoSpread > 0) com_corfo_af = ingColAF(tasaCli - corfoSpread);
     }
 
     // ── UAC: % sobre saldo precio (tier vigente) ──
     const uacPct = (inp.uacPct != null && inp.uacPct > 0) ? inp.uacPct : ((P.uac_pct_tier1 || 14) / 100);
-    const ing_tasa_uac = Math.round(saldo * uacPct);
+    const ing_tasa_uac = CORE ? CORE.ingresoColocacionUAC({ saldo, pctUAC: uacPct }) : Math.round(saldo * uacPct);
 
     // ── Ingreso por seguros (detalle por seguro). UAC no paga comisión de seguros ──
     const factorComDesg = segComFactor(P, 'desg', plazo);
@@ -140,7 +139,7 @@
       com_patio  = 0;
     }
     const pctEj  = (P.pct_ejecutivo_fin || 2.12) / 100;
-    const com_ej = Math.round(monto_fin * pctEj);
+    const com_ej = CORE ? CORE.comisionEjecutivo({ montoFin: monto_fin, pctEj }) : Math.round(monto_fin * pctEj);
     const total_cos = com_dealer + com_patio + com_ej;
 
     const cuota_af  = tasaCli > 0 ? Math.round(cuotaDe(tasaCli)) : Math.round(monto_fin / plazo);
