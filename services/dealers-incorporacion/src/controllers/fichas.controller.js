@@ -7,6 +7,7 @@
  * el ejecutivo corrige/apela y reenvía).
  */
 const pool = require('../../../../shared/config/database');
+const RUT = require('../../../../api-gateway/public/js/rut-core');  // enforcement: RUT canónico
 const { auditar } = require('../../../../shared/audit');
 const { notificar } = require('../../../notificaciones/src/controllers/notificaciones.controller');
 const { tieneFunc } = require('../../../../shared/middleware/permisos');
@@ -616,6 +617,8 @@ const crear = async (req, res) => {
     if (exc.length && !com.every(c => comentarioOK(c.comentario)))
       return res.status(400).json({ success: false, data: null, error: 'Cada excepción requiere un comentario válido' });
     const idOrigen = Number(req.body.id_dealer_origen) || null;   // dealer existente que esta ficha modifica
+    if (v.rut) v.rut = RUT.normalizar(v.rut) || v.rut;
+    if (v.rut_cuenta) v.rut_cuenta = RUT.normalizar(v.rut_cuenta) || v.rut_cuenta;
     const cols = ['id_ejecutivo','ejecutivo_email', ...Object.keys(v), 'excepciones','excepciones_comentarios','id_dealer_origen','socios'];
     const ph   = cols.map(() => '?').join(',');
     const vals = [u.id_usuario, u.email || null, ...Object.values(v),
@@ -1100,13 +1103,13 @@ async function finalizarDealer(f) {
            direccion_parque=?, comuna_parque=?,
            cuenta_tipo=?, tipo_cuenta=?, nombre_cuenta=?, num_cuenta=?, banco=?, rut_pago=?,
            tiene_factura=?, observaciones=?, part_especial_por=?, part_especial_fecha=? WHERE id_dealer=?`,
-        [f.rut, f.nombre_fantasia || f.nombre_razon, f.nombre_razon, f.tipo, f.nombre_parque || null, f.direccion,
+        [RUT.normalizar(f.rut) || f.rut, f.nombre_fantasia || f.nombre_razon, f.nombre_razon, f.tipo, f.nombre_parque || null, f.direccion,
          f.comuna, f.provincia, f.region, f.cc_nombre, f.cc_telefono, f.cc_email,
          f.cf_nombre, f.cf_telefono, f.cf_email, f.rl_nombre, f.rl_telefono, f.rl_email,
          f.com_6_12, f.com_13_24, f.com_25_36, f.com_37,
          f.com_parque_6_12, f.com_parque_13_24, f.com_parque_25_36, f.com_parque_37,
          f.direccion_parque || null, f.comuna_parque || null,
-         f.cuenta_tipo, f.tipo_cuenta, f.nombre_cuenta, f.num_cuenta, f.banco, f.rut_cuenta,
+         f.cuenta_tipo, f.tipo_cuenta, f.nombre_cuenta, f.num_cuenta, f.banco, RUT.normalizar(f.rut_cuenta) || f.rut_cuenta,
          f.tipo_documento === 'FACTURA' ? 1 : 0, f.observaciones, partPor, partFecha, dl.id_dealer]);
       return { idDealer: dl.id_dealer, numero: dl.numero, esMod: true };
     }
@@ -1123,13 +1126,13 @@ async function finalizarDealer(f) {
        cuenta_tipo, tipo_cuenta, nombre_cuenta, num_cuenta, banco, rut_pago,
        activo, tiene_factura, observaciones, part_especial_por, part_especial_fecha)
      VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,1,?,?,?,?)`,
-    [maxN, f.rut, f.nombre_fantasia || f.nombre_razon, f.nombre_razon, f.nombre_parque || null, f.tipo, f.direccion,
+    [maxN, RUT.normalizar(f.rut) || f.rut, f.nombre_fantasia || f.nombre_razon, f.nombre_razon, f.nombre_parque || null, f.tipo, f.direccion,
      f.comuna, f.provincia, f.region, f.fecha_solicitud, f.cc_nombre, f.cc_telefono, f.cc_email,
      f.cf_nombre, f.cf_telefono, f.cf_email, f.rl_nombre, f.rl_telefono, f.rl_email,
      f.com_6_12, f.com_13_24, f.com_25_36, f.com_37,
      f.com_parque_6_12, f.com_parque_13_24, f.com_parque_25_36, f.com_parque_37,
      f.direccion_parque || null, f.comuna_parque || null,
-     f.cuenta_tipo, f.tipo_cuenta, f.nombre_cuenta, f.num_cuenta, f.banco, f.rut_cuenta,
+     f.cuenta_tipo, f.tipo_cuenta, f.nombre_cuenta, f.num_cuenta, f.banco, RUT.normalizar(f.rut_cuenta) || f.rut_cuenta,
      f.tipo_documento === 'FACTURA' ? 1 : 0, f.observaciones, partPor, partFecha]);
   return { idDealer: d.insertId, numero: maxN, esMod: false };
 }

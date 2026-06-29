@@ -6,6 +6,7 @@ const { isMesCerrado } = require('../../../../shared/utils/mes-cerrado');
 const { esFechaFutura } = require('../../../../shared/utils/fecha-futura');
 const historial = require('./carga-historial.controller');
 const { auditar } = require('../../../../shared/audit');
+const RUT = require('../../../../api-gateway/public/js/rut-core');  // enforcement: RUT canónico
 
 /* ── Asegurar columnas extra en creditos ──────────────────── */
 (async () => {
@@ -44,7 +45,7 @@ function norm(v) {
 function normRut(v) {
   const s = norm(v);
   if (!s) return null;
-  return s.replace(/\./g, '').toUpperCase();
+  return RUT.normalizar(s) || s.replace(/\./g, '').toUpperCase();
 }
 function normNum(v) {
   const s = norm(v);
@@ -135,7 +136,7 @@ function mapRow(row, mesOverride) {
     monto_capitalizado: i('MONTO CAPITALIZADO'),
     fecha_primera_cuota:d('FECHA PRIMERA CUOTA'),
     id_financiera:      s('ID FINANCIERA'),
-    rut_dealer:         s('RUT DEALER'),
+    rut_dealer:         RUT.normalizar(s('RUT DEALER')) || s('RUT DEALER'),
     com_rdh:            i('COM.RDH'),
     com_cesantia:       i('COM.CESANTIA'),
     com_reparaciones:   i('COM.REPARACIONES'),

@@ -1,5 +1,6 @@
 'use strict';
 const pool      = require('../../../../shared/config/database');
+const RUT       = require('../../../../api-gateway/public/js/rut-core');  // enforcement: RUT canónico
 const XLSX      = require('xlsx');
 const historial = require('./carga-historial.controller');
 const { recalcularMeses } = require('../utils/recalcular-mes');
@@ -78,7 +79,7 @@ function mapEjecutivo(nombreTrinidad, mapaEjecutivos) {
 /* ── Normaliza RUT (quita puntos, espacios) ─────────────────────── */
 function normRut(v) {
   if (!v) return null;
-  return String(v).replace(/\./g, '').trim().toUpperCase() || null;
+  return RUT.normalizar(v) || (String(v).replace(/\./g, '').trim().toUpperCase() || null);
 }
 
 /* ── Normaliza fecha de Excel (Date object o string) ───────────── */

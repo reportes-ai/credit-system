@@ -1,5 +1,6 @@
 'use strict';
 const pool = require('../../../../shared/config/database');
+const RUT = require('../../../../api-gateway/public/js/rut-core');  // enforcement: RUT canónico
 const { notificar } = require('../../../notificaciones/src/controllers/notificaciones.controller');
 const { auditar } = require('../../../../shared/audit');
 const { publicarAnuncio } = require('../../../../shared/anuncios');
@@ -22,7 +23,7 @@ async function generarNumeroCreditoDesdeCartas() {
 
 /* Crea registro en creditos a partir de una carta y devuelve { id, numero_credito } */
 async function crearCreditoDesdeCartas(c) {
-  const rutNorm = (c.rut_cliente || c.rutCliente || '').replace(/\./g, '').toUpperCase().trim();
+  const rutNorm = RUT.normalizar(c.rut_cliente || c.rutCliente) || (c.rut_cliente || c.rutCliente || '').replace(/\./g, '').toUpperCase().trim();
   const [[cliRow]] = await pool.query('SELECT id_cliente FROM clientes WHERE rut = ? LIMIT 1', [rutNorm]).catch(() => [[null]]);
   const numero_credito = await generarNumeroCreditoDesdeCartas();
   // Mapear acreedor → financiera
@@ -877,9 +878,10 @@ const cargaMasivaCartas = async (req, res) => {
         } else {
           let idCliente = null;
           if (rutCli) {
-            const [[clx]] = await pool.query('SELECT id_cliente FROM clientes WHERE rut=? LIMIT 1', [rutCli]);
+            const rcN = RUT.normalizar(rutCli) || rutCli;
+            const [[clx]] = await pool.query('SELECT id_cliente FROM clientes WHERE rut=? LIMIT 1', [rcN]);
             if (clx) idCliente = clx.id_cliente;
-            else { const [ci] = await pool.query('INSERT INTO clientes (rut, nombre_completo) VALUES (?,?)', [rutCli, r.cliente || null]); idCliente = ci.insertId; clientesCreados++; }
+            else { const [ci] = await pool.query('INSERT INTO clientes (rut, nombre_completo) VALUES (?,?)', [rcN, r.cliente || null]); idCliente = ci.insertId; clientesCreados++; }
           }
           numeroCredito = await _numeroCreditoMes(yy, mm);
           const [ci] = await pool.query(

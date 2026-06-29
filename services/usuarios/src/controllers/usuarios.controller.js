@@ -1,4 +1,5 @@
 const pool = require('../../../../shared/config/database');
+const RUT = require('../../../../api-gateway/public/js/rut-core');  // enforcement: RUT canónico
 const bcrypt = require('bcryptjs');
 const { auditar } = require('../../../../shared/audit');
 const { tieneFunc } = require('../../../../shared/middleware/permisos');
@@ -256,7 +257,7 @@ const createUsuario = async (req, res) => {
     const passwordHash = await bcrypt.hash(claveTemporal, 10);
     const [result] = await pool.query(
       'INSERT INTO usuarios (rut, nombre, apellido, apellido_materno, centro_costo, email, password_hash, id_perfil, id_supervisor, telefono, debe_cambiar_clave, password_updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1, NOW())',
-      [rut, nombre, apellido, apellido_materno || null, centro_costo || null, email, passwordHash, id_perfil, id_supervisor || null, telefono || null]
+      [RUT.normalizar(rut) || rut, nombre, apellido, apellido_materno || null, centro_costo || null, email, passwordHash, id_perfil, id_supervisor || null, telefono || null]
     );
 
     auditar({ req, accion: 'CREAR', modulo: 'usuarios', entidad: 'usuario', entidad_id: result.insertId,

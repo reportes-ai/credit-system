@@ -1,4 +1,5 @@
 const pool = require('../../../../shared/config/database');
+const RUT = require('../../../../api-gateway/public/js/rut-core');  // enforcement: RUT canónico
 
 /* ─── Crear / migrar tabla ──────────────────────────────────────────────── */
 const ensureTable = async () => {
@@ -125,7 +126,7 @@ ensureTable().catch(console.error);
 
 /* ─── Helpers ───────────────────────────────────────────────────────────── */
 const up      = v => (v && typeof v === 'string' ? v.toUpperCase().trim() : v ?? null);
-const normRut = v => v ? v.replace(/\./g, '').toUpperCase().trim() : null;
+const normRut = v => RUT.normalizar(v) || (v ? v.replace(/\./g, '').toUpperCase().trim() : null);
 
 /* Calcula nombre_completo según tipo_cliente */
 const calcNombreCompleto = (tipo, b) => {

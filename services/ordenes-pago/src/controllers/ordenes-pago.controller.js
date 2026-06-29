@@ -8,6 +8,7 @@
  * Numeración: correlativo único ODPaannnn → ODP260001 (libro central shared/ordenes-pago.js).
  */
 const pool = require('../../../../shared/config/database');
+const RUT = require('../../../../api-gateway/public/js/rut-core');  // enforcement: RUT canónico
 const { auditar } = require('../../../../shared/audit');
 const { emitirCorrelativo, anularCorrelativo } = require('../../../../shared/ordenes-pago');
 
@@ -143,7 +144,7 @@ const { emitirCorrelativo, anularCorrelativo } = require('../../../../shared/ord
 
 /* ── Helpers ────────────────────────────────────────────────────────────────── */
 const norm = s => String(s ?? '').trim();
-const normRut = r => String(r || '').replace(/[.\-\s]/g, '').toUpperCase();
+const normRut = r => RUT.normalizar(r) || String(r || '').replace(/[.\-\s]/g, '').toUpperCase();
 const num = v => { const n = Number(String(v ?? '').replace(/\./g, '').replace(',', '.').replace(/[^\d.-]/g, '')); return isNaN(n) ? null : n; };
 const ESTADOS = ['EMITIDA', 'PAGADA', 'ANULADA'];
 const fdate = v => { const s = norm(v); return /^\d{4}-\d{2}-\d{2}$/.test(s) ? s : null; };
