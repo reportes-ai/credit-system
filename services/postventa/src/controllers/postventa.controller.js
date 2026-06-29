@@ -387,7 +387,7 @@ const getAll = async (req, res) => {
              fc.es_terceros AS fac_terceros, fc.es_boleta AS fac_boleta
       FROM postventa_seguimiento s
       LEFT JOIN creditos c ON c.id = s.id_credito
-      LEFT JOIN dealers  d ON d.nombre_indexa = c.automotora
+      LEFT JOIN dealers  d ON d.id_dealer = c.id_dealer
       LEFT JOIN postventa_facturas_comision fc ON fc.id_seguimiento = s.id
       ORDER BY s.fecha_otorgado DESC, s.id DESC LIMIT 1000`);
     const [etapas] = await pool.query(
@@ -707,7 +707,7 @@ const getSaldosAPagar = async (req, res) => {
         ON esp.id_seguimiento = s.id AND esp.track='SALDO' AND esp.etapa='SALDO PRECIO PAGADO'
            AND DATE(esp.fecha) = CURDATE()
       LEFT JOIN creditos c ON c.id = s.id_credito
-      LEFT JOIN dealers  d ON d.nombre_indexa = c.automotora
+      LEFT JOIN dealers  d ON d.id_dealer = c.id_dealer
       WHERE NOT EXISTS (
         SELECT 1 FROM postventa_etapas ep
         WHERE ep.id_seguimiento = s.id AND ep.track='SALDO' AND ep.etapa='SALDO PRECIO PAGADO'
@@ -757,7 +757,7 @@ const getOrdenPago = async (req, res) => {
       JOIN postventa_etapas efr
         ON efr.id_seguimiento = s.id AND efr.track='SALDO' AND efr.etapa='FONDOS RECIBIDOS'
       LEFT JOIN creditos c ON c.id = s.id_credito
-      LEFT JOIN dealers  d ON d.nombre_indexa = c.automotora
+      LEFT JOIN dealers  d ON d.id_dealer = c.id_dealer
       WHERE NOT EXISTS (
         SELECT 1 FROM postventa_etapas ep
         WHERE ep.id_seguimiento = s.id AND ep.track='SALDO' AND ep.etapa='ORDEN DE PAGO EMITIDA')
@@ -1027,7 +1027,7 @@ const getComisionesAPagar = async (req, res) => {
         ON epg.id_seguimiento = s.id AND epg.track='COMISION' AND epg.etapa='COMISION PAGADA'
            AND DATE(epg.fecha) = CURDATE()
       LEFT JOIN creditos c ON c.id = s.id_credito
-      LEFT JOIN dealers  d ON d.nombre_indexa = c.automotora
+      LEFT JOIN dealers  d ON d.id_dealer = c.id_dealer
       WHERE NOT EXISTS (
         SELECT 1 FROM postventa_etapas ep
         WHERE ep.id_seguimiento = s.id AND ep.track='COMISION' AND ep.etapa='COMISION PAGADA'
@@ -1060,7 +1060,7 @@ const getOrdenPagoComision = async (req, res) => {
         ON efa.id_seguimiento = s.id AND efa.track='COMISION' AND efa.etapa='FACTURA RECIBIDA'
       LEFT JOIN postventa_facturas_comision fc ON fc.id_seguimiento = s.id
       LEFT JOIN creditos c ON c.id = s.id_credito
-      LEFT JOIN dealers  d ON d.nombre_indexa = c.automotora
+      LEFT JOIN dealers  d ON d.id_dealer = c.id_dealer
       WHERE NOT EXISTS (
         SELECT 1 FROM postventa_etapas ep
         WHERE ep.id_seguimiento = s.id AND ep.track='COMISION' AND ep.etapa='ORDEN DE PAGO EMITIDA')

@@ -394,7 +394,7 @@ async function construirDocumento(oc) {
          FROM postventa_ordenes_comision poc
          JOIN postventa_seguimiento s ON s.id = poc.id_seguimiento
          LEFT JOIN creditos c ON c.id = s.id_credito
-         LEFT JOIN dealers  d ON d.nombre_indexa = c.automotora
+         LEFT JOIN dealers  d ON d.id_dealer = c.id_dealer
          LEFT JOIN postventa_facturas_comision fc ON fc.id_seguimiento = s.id
         WHERE poc.id = ?`
     : `SELECT s.id AS id_seg, s.num_op, s.financiera, s.saldo_precio,
@@ -404,7 +404,7 @@ async function construirDocumento(oc) {
          FROM postventa_ordenes spo
          JOIN postventa_seguimiento s ON s.id = spo.id_seguimiento
          LEFT JOIN creditos c ON c.id = s.id_credito
-         LEFT JOIN dealers  d ON d.nombre_indexa = c.automotora
+         LEFT JOIN dealers  d ON d.id_dealer = c.id_dealer
         WHERE spo.id = ?`;
   const [rws] = await pool.query(sql, [oc.origen_id]);
   const row = rws[0] || {};
