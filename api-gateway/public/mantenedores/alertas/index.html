@@ -621,7 +621,7 @@ cargarComunicados();
 let VENC = [];
 async function cargarVenc(){
   try{
-    const r=await fetch('/api/alertas/venc-config',{headers:H}); const j=await r.json();
+    const r=await fetch('/api/alertas-vencimiento/config',{headers:H}); const j=await r.json();
     if(!j.success) throw 0;
     VENC = j.data||[];
     renderVenc();
@@ -642,7 +642,7 @@ async function vcGuardar(){
   const msg=document.getElementById('vcMsg');
   try{
     const config = VENC.map(v=>({ clave:v.clave, activo:v.activo?1:0, dias_aviso:v.usa_dias?v.dias_aviso:null }));
-    const r=await fetch('/api/alertas/venc-config',{method:'PUT',headers:H,body:JSON.stringify({config})});
+    const r=await fetch('/api/alertas-vencimiento/config',{method:'PUT',headers:H,body:JSON.stringify({config})});
     const j=await r.json(); if(!j.success) throw new Error(j.error||'Error');
     msg.textContent='Guardado ✓'; msg.style.cssText='font-size:.84rem;color:#15803d';
     setTimeout(()=>{msg.textContent='';},2500);

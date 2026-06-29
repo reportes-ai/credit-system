@@ -11,7 +11,7 @@
 
   // Esperar a que el DOM esté listo
   function init() {
-    fetch('/api/alertas/vencimientos', {
+    fetch('/api/alertas-vencimiento', {
       headers: { Authorization: 'Bearer ' + token }
     })
       .then(r => r.ok ? r.json() : null)

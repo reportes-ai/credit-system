@@ -5,10 +5,12 @@ const { verifyToken } = require('../../../../shared/middleware/auth');
 const { requireFunc } = require('../../../../shared/middleware/permisos');
 const ctrl       = require('../controllers/alertas.controller');
 
-router.get('/vencimientos', verifyToken, ctrl.getVencimientos);
+// Montado en /api/alertas-vencimiento (alertas de vencimiento de crédito).
+// Separado del motor de campana en /api/alertas para no compartir prefijo.
+router.get('/', verifyToken, ctrl.getVencimientos);
 
 // Config paramétrica de los avisos del popup (mantenedor de Alertas)
-router.get('/venc-config', verifyToken, requireFunc('mantenedores_alertas'), ctrl.getVencConfig);
-router.put('/venc-config', verifyToken, requireFunc('mantenedores_alertas'), ctrl.setVencConfig);
+router.get('/config', verifyToken, requireFunc('mantenedores_alertas'), ctrl.getVencConfig);
+router.put('/config', verifyToken, requireFunc('mantenedores_alertas'), ctrl.setVencConfig);
 
 module.exports = router;

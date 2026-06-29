@@ -110,7 +110,7 @@ app.use('/api/productos-financiera',      require('../../services/mantenedores/s
 app.use('/api/noticias',                  require('../../services/mantenedores/src/routes/noticias.routes'));
 app.use('/api/servidor-hora',             require('../../services/mantenedores/src/routes/servidor-hora.routes'));
 app.use('/api/db-maintenance',            require('../../services/mantenedores/src/routes/db-maintenance.routes'));
-app.use('/api/alertas',                   require('../../services/mantenedores/src/routes/alertas.routes'));
+app.use('/api/alertas-vencimiento',       require('../../services/mantenedores/src/routes/alertas.routes'));
 app.use('/api/meses-cerrados',            require('../../services/mantenedores/src/routes/meses-cerrados.routes'));
 app.use('/api/tablas-dinamicas',          require('../../services/reporteria/src/routes/tablas-dinamicas.routes'));
 app.use('/api/bitacora',                  require('../../services/reporteria/src/routes/bitacora.routes'));
@@ -169,7 +169,8 @@ app.use('/api/dashboard', require('../../services/dashboard/src/routes/dashboard
 // Ayuda contextual (botón "?")
 app.use('/api/ayuda', require('../../services/ayuda/src/routes/ayuda.routes'));
 
-// Motor de alertas configurable
+// Motor de alertas configurable (campana + comunicados). Dueño único de /api/alertas;
+// las alertas de VENCIMIENTO de crédito van aparte en /api/alertas-vencimiento (arriba).
 app.use('/api/alertas', require('../../services/alertas/src/routes/alertas.routes'));
 
 // Desempeño analistas (sesiones + eventos de carta + informe)
@@ -212,339 +213,157 @@ app.get(['/login', '/login/'], (req, res) =>
 // Health check
 app.get('/health', (req, res) => res.json({ status: 'Sistema operativo', timestamp: new Date() }));
 
-// Mantenedor comisiones seguro SPA
-app.get(['/mantenedores/comisiones-seguro', '/mantenedores/comisiones-seguro/'], (req, res) =>
-  res.sendFile(path.join(__dirname, '../public/mantenedores/comisiones-seguro/index.html')));
-
-// Carga masiva SPA
-app.get(['/carga-masiva', '/carga-masiva/'], (req, res) =>
-  res.sendFile(path.join(__dirname, '../public/carga-masiva/index.html')));
-app.get(['/carga-masiva/digitacion', '/carga-masiva/digitacion/'], (req, res) =>
-  res.sendFile(path.join(__dirname, '../public/carga-masiva/digitacion/index.html')));
-app.get(['/carga-masiva/digitacion/cola', '/carga-masiva/digitacion/cola/'], (req, res) =>
-  res.sendFile(path.join(__dirname, '../public/carga-masiva/digitacion/cola.html')));
-app.get(['/carga-masiva/digitacion/estadisticas', '/carga-masiva/digitacion/estadisticas/'], (req, res) =>
-  res.sendFile(path.join(__dirname, '../public/carga-masiva/digitacion/estadisticas.html')));
-
-// Comisiones SPA
-app.get(['/comisiones', '/comisiones/'], (req, res) =>
-  res.sendFile(path.join(__dirname, '../public/comisiones/index.html')));
-app.get(['/comisiones/revision', '/comisiones/revision/'], (req, res) =>
-  res.sendFile(path.join(__dirname, '../public/comisiones/revision/index.html')));
-app.get(['/comisiones/variables', '/comisiones/variables/'], (req, res) =>
-  res.sendFile(path.join(__dirname, '../public/comisiones/variables/index.html')));
-
-// SPA fallbacks
-app.get(['/simulador', '/simulador/'], (req, res) =>
-  res.sendFile(path.join(__dirname, '../public/simulador/index.html')));
-app.get(['/usuarios', '/usuarios/'], (req, res) =>
-  res.sendFile(path.join(__dirname, '../public/usuarios/index.html')));
-app.get(['/mantenedores', '/mantenedores/'], (req, res) =>
-  res.sendFile(path.join(__dirname, '../public/mantenedores/index.html')));
-app.get(['/mantenedores/comunas', '/mantenedores/comunas/'], (req, res) =>
-  res.sendFile(path.join(__dirname, '../public/mantenedores/comunas/index.html')));
-app.get(['/mantenedores/presupuesto', '/mantenedores/presupuesto/'], (req, res) =>
-  res.sendFile(path.join(__dirname, '../public/mantenedores/presupuesto/index.html')));
-app.get(['/mantenedores/ayuda', '/mantenedores/ayuda/'], (req, res) =>
-  res.sendFile(path.join(__dirname, '../public/mantenedores/ayuda/index.html')));
-app.get(['/mantenedores/alertas', '/mantenedores/alertas/'], (req, res) =>
-  res.sendFile(path.join(__dirname, '../public/mantenedores/alertas/index.html')));
-app.get(['/mantenedores/correos-programados', '/mantenedores/correos-programados/'], (req, res) =>
-  res.sendFile(path.join(__dirname, '../public/mantenedores/correos-programados/index.html')));
-app.get(['/mantenedores/backups', '/mantenedores/backups/'], (req, res) =>
-  res.sendFile(path.join(__dirname, '../public/mantenedores/backups/index.html')));
-app.get(['/mantenedores/tasas', '/mantenedores/tasas/'], (req, res) =>
-  res.sendFile(path.join(__dirname, '../public/mantenedores/tasas/index.html')));
-app.get(['/mantenedores/uf', '/mantenedores/uf/'], (req, res) =>
-  res.sendFile(path.join(__dirname, '../public/mantenedores/uf/index.html')));
-app.get(['/mantenedores/vehiculos', '/mantenedores/vehiculos/'], (req, res) =>
-  res.sendFile(path.join(__dirname, '../public/mantenedores/vehiculos/index.html')));
-// La card "Dealers" vive en el Home (no en Mantenedores) → URL limpia /dealers/; la antigua redirige.
-app.get(['/dealers', '/dealers/'], (req, res) =>
-  res.sendFile(path.join(__dirname, '../public/mantenedores/dealers/index.html')));
-app.get(['/mantenedores/dealers', '/mantenedores/dealers/'], (req, res) => res.redirect('/dealers/'));
-app.get(['/mantenedores/potencial-dealer', '/mantenedores/potencial-dealer/'], (req, res) =>
-  res.sendFile(path.join(__dirname, '../public/mantenedores/potencial-dealer/index.html')));
-app.get(['/mantenedores/mantencion-sistema', '/mantenedores/mantencion-sistema/'], (req, res) =>
-  res.sendFile(path.join(__dirname, '../public/mantenedores/mantencion-sistema/index.html')));
-app.get(['/mantenedores/inteligencia-artificial', '/mantenedores/inteligencia-artificial/'], (req, res) =>
-  res.sendFile(path.join(__dirname, '../public/mantenedores/inteligencia-artificial/index.html')));
-app.get(['/ia/liquidaciones', '/ia/liquidaciones/'], (req, res) =>
-  res.sendFile(path.join(__dirname, '../public/ia/liquidaciones/index.html')));
-app.get(['/ia/informe-dealernet', '/ia/informe-dealernet/'], (req, res) =>
-  res.sendFile(path.join(__dirname, '../public/ia/informe-dealernet/index.html')));
-app.get(['/ia/pregunta', '/ia/pregunta/'], (req, res) =>
-  res.sendFile(path.join(__dirname, '../public/ia/pregunta/index.html')));
-app.get(['/mantenedores/respuestas-rapidas', '/mantenedores/respuestas-rapidas/'], (req, res) =>
-  res.sendFile(path.join(__dirname, '../public/mantenedores/respuestas-rapidas/index.html')));
-app.get(['/mantenedores/dealernet-productos', '/mantenedores/dealernet-productos/'], (req, res) =>
-  res.sendFile(path.join(__dirname, '../public/mantenedores/dealernet-productos/index.html')));
-app.get(['/mantenedores/dealernet-costos', '/mantenedores/dealernet-costos/'], (req, res) =>
-  res.sendFile(path.join(__dirname, '../public/mantenedores/dealernet-costos/index.html')));
-app.get(['/mantenedores/dealernet', '/mantenedores/dealernet/'], (req, res) =>
-  res.sendFile(path.join(__dirname, '../public/mantenedores/dealernet/index.html')));
-app.get(['/mantenedores/parametros', '/mantenedores/parametros/'], (req, res) =>
-  res.sendFile(path.join(__dirname, '../public/mantenedores/parametros/index.html')));
-app.get(['/mantenedores/cobranza-parametros', '/mantenedores/cobranza-parametros/'], (req, res) =>
-  res.sendFile(path.join(__dirname, '../public/mantenedores/cobranza-parametros/index.html')));
-app.get(['/mantenedores/definiciones', '/mantenedores/definiciones/'], (req, res) =>
-  res.sendFile(path.join(__dirname, '../public/mantenedores/definiciones/index.html')));
-app.get(['/mantenedores/alertas-saldos', '/mantenedores/alertas-saldos/'], (req, res) =>
-  res.sendFile(path.join(__dirname, '../public/mantenedores/alertas-saldos/index.html')));
-app.get(['/mantenedores/factores-seguro', '/mantenedores/factores-seguro/'], (req, res) =>
-  res.sendFile(path.join(__dirname, '../public/mantenedores/factores-seguro/index.html')));
-app.get(['/mantenedores/financieras', '/mantenedores/financieras/'], (req, res) =>
-  res.sendFile(path.join(__dirname, '../public/mantenedores/financieras/index.html')));
-
-app.get(['/mantenedores/solo-dios', '/mantenedores/solo-dios/'], (req, res) =>
-  res.sendFile(path.join(__dirname, '../public/mantenedores/solo-dios/index.html')));
-
-app.get(['/mantenedores/servidor-hora', '/mantenedores/servidor-hora/'], (req, res) =>
-  res.sendFile(path.join(__dirname, '../public/mantenedores/servidor-hora/index.html')));
-
-app.get(['/mantenedores/db-maintenance', '/mantenedores/db-maintenance/'], (req, res) =>
-  res.sendFile(path.join(__dirname, '../public/mantenedores/db-maintenance/index.html')));
-
-app.get(['/mantenedores/tipos-documento', '/mantenedores/tipos-documento/'], (req, res) =>
-  res.sendFile(path.join(__dirname, '../public/mantenedores/tipos-documento/index.html')));
-
-app.get(['/mantenedores/actividades-economicas', '/mantenedores/actividades-economicas/'], (req, res) =>
-  res.sendFile(path.join(__dirname, '../public/mantenedores/actividades-economicas/index.html')));
-
-app.get(['/clientes', '/clientes/'], (req, res) =>
-  res.sendFile(path.join(__dirname, '../public/clientes/index.html')));
-
-app.get(['/creditos', '/creditos/'], (req, res) =>
-  res.sendFile(path.join(__dirname, '../public/creditos/index.html')));
-
-app.get(['/creditos/revisar', '/creditos/revisar/'], (req, res) =>
-  res.sendFile(path.join(__dirname, '../public/creditos/revisar.html')));
-
-app.get(['/creditos/respaldos', '/creditos/respaldos/'], (req, res) =>
-  res.sendFile(path.join(__dirname, '../public/creditos/respaldos.html')));
-
-app.get(['/creditos/documentos', '/creditos/documentos/'], (req, res) =>
-  res.sendFile(path.join(__dirname, '../public/creditos/documentos.html')));
-
-app.get(['/mantenedores/pagares', '/mantenedores/pagares/'], (req, res) =>
-  res.sendFile(path.join(__dirname, '../public/mantenedores/pagares/index.html')));
-
-app.get(['/mantenedores/cuentas-bancarias', '/mantenedores/cuentas-bancarias/'], (req, res) =>
-  res.sendFile(path.join(__dirname, '../public/mantenedores/cuentas-bancarias/index.html')));
-
-app.get(['/mantenedores/parques', '/mantenedores/parques/'], (req, res) =>
-  res.sendFile(path.join(__dirname, '../public/mantenedores/parques/index.html')));
-
-app.get(['/mantenedores/dealers-mapa', '/mantenedores/dealers-mapa/'], (req, res) =>
-  res.sendFile(path.join(__dirname, '../public/mantenedores/dealers-mapa/index.html')));
-
-app.get(['/dealers-visitas', '/dealers-visitas/'], (req, res) =>
-  res.sendFile(path.join(__dirname, '../public/dealers-visitas/index.html')));
-
-app.get(['/mantenedores/dealers-direcciones', '/mantenedores/dealers-direcciones/'], (req, res) =>
-  res.sendFile(path.join(__dirname, '../public/mantenedores/dealers-direcciones/index.html')));
-
-app.get(['/juegos', '/juegos/'], (req, res) =>
-  res.sendFile(path.join(__dirname, '../public/juegos/index.html')));
-
-// Submódulo "Flujo Crédito Brokerage" eliminado: era un espejo de solo lectura del
-// mantenedor Estado Créditos (pestaña Brokerage). Se redirige por si queda algún link viejo.
-app.get(['/mantenedores/flujo-brokerage', '/mantenedores/flujo-brokerage/'], (req, res) =>
-  res.redirect(302, '/mantenedores/estado-creditos/'));
-
-app.get(['/mantenedores/estado-creditos', '/mantenedores/estado-creditos/'], (req, res) =>
-  res.sendFile(path.join(__dirname, '../public/mantenedores/estado-creditos/index.html')));
-
-app.get(['/mantenedores/estado-cartera', '/mantenedores/estado-cartera/'], (req, res) =>
-  res.sendFile(path.join(__dirname, '../public/mantenedores/estado-cartera/index.html')));
-
-app.get(['/mantenedores/broker-validaciones', '/mantenedores/broker-validaciones/'], (req, res) =>
-  res.sendFile(path.join(__dirname, '../public/mantenedores/broker-validaciones/index.html')));
-
-app.get(['/creditos/digitacion-autofin', '/creditos/digitacion-autofin/'], (req, res) =>
-  res.sendFile(path.join(__dirname, '../public/creditos/digitacion-autofin.html')));
-
-app.get(['/creditos/digitacion-unidad', '/creditos/digitacion-unidad/'], (req, res) =>
-  res.sendFile(path.join(__dirname, '../public/creditos/digitacion-unidad.html')));
-
-app.get(['/creditos/carga-documentos-af', '/creditos/carga-documentos-af/'], (req, res) =>
-  res.sendFile(path.join(__dirname, '../public/creditos/carga-documentos-af.html')));
-
-app.get(['/creditos/validacion-firma', '/creditos/validacion-firma/'], (req, res) =>
-  res.sendFile(path.join(__dirname, '../public/creditos/validacion-firma.html')));
-
-app.get(['/creditos/pagar-cuotas', '/creditos/pagar-cuotas/'], (req, res) =>
-  res.sendFile(path.join(__dirname, '../public/creditos/pagar-cuotas.html')));
-
-app.get(['/creditos/auditoria', '/creditos/auditoria/'], (req, res) =>
-  res.sendFile(path.join(__dirname, '../public/creditos/auditoria.html')));
-
-app.get(['/antecedentes-laborales', '/antecedentes-laborales/'], (req, res) =>
-  res.sendFile(path.join(__dirname, '../public/antecedentes-laborales/index.html')));
-
-app.get(['/informacion-comercial', '/informacion-comercial/'], (req, res) =>
-  res.sendFile(path.join(__dirname, '../public/informacion-comercial/index.html')));
-
-app.get(['/cotizaciones', '/cotizaciones/'], (req, res) =>
-  res.sendFile(path.join(__dirname, '../public/cotizaciones/index.html')));
-
-app.get(['/tesoreria', '/tesoreria/'], (req, res) =>
-  res.sendFile(path.join(__dirname, '../public/tesoreria/index.html')));
-app.get(['/tesoreria/caja', '/tesoreria/caja/'], (req, res) =>
-  res.sendFile(path.join(__dirname, '../public/tesoreria/caja.html')));
-app.get(['/tesoreria/cajas', '/tesoreria/cajas/'], (req, res) =>
-  res.sendFile(path.join(__dirname, '../public/tesoreria/cajas.html')));
-app.get(['/tesoreria/cierre-caja', '/tesoreria/cierre-caja/'], (req, res) =>
-  res.sendFile(path.join(__dirname, '../public/tesoreria/cierre-caja.html')));
-
-app.get(['/tesoreria/cuentas-transitorias', '/tesoreria/cuentas-transitorias/'], (req, res) =>
-  res.sendFile(path.join(__dirname, '../public/tesoreria/cuentas-transitorias.html')));
-
-// Flujo brokerage/fundantes VIEJO retirado (jun-2026): reemplazado por Seguimiento
-// Fundantes (/fundantes/) y Post Venta. Tablas en 0, sin uso. Páginas legacy quedan
-// en el repo pero las rutas redirigen para no dejar pantallas muertas accesibles.
-app.get(['/tesoreria/brokerage', '/tesoreria/brokerage/'], (req, res) => res.redirect('/tesoreria/'));
-
-app.get(['/creditos/fundantes', '/creditos/fundantes/'], (req, res) => res.redirect('/fundantes/'));
-
-app.get(['/crm', '/crm/'], (req, res) =>
-  res.sendFile(path.join(__dirname, '../public/crm/index.html')));
-
-app.get(['/crm/gestiones', '/crm/gestiones/'], (req, res) =>
-  res.sendFile(path.join(__dirname, '../public/crm/gestiones.html')));
-app.get(['/crm/estadisticas', '/crm/estadisticas/'], (req, res) =>
-  res.sendFile(path.join(__dirname, '../public/crm/estadisticas.html')));
-app.get(['/crm/campanas', '/crm/campanas/'], (req, res) =>
-  res.sendFile(path.join(__dirname, '../public/crm/campanas/index.html')));
-app.get(['/crm/campanas/crear', '/crm/campanas/crear/'], (req, res) =>
-  res.sendFile(path.join(__dirname, '../public/crm/campanas/crear.html')));
-app.get(['/crm/campanas/gestion', '/crm/campanas/gestion/'], (req, res) =>
-  res.sendFile(path.join(__dirname, '../public/crm/campanas/gestion.html')));
-app.get(['/crm/campanas/resultados', '/crm/campanas/resultados/'], (req, res) =>
-  res.sendFile(path.join(__dirname, '../public/crm/campanas/resultados.html')));
-
-app.get(['/cobranza', '/cobranza/'], (req, res) =>
-  res.sendFile(path.join(__dirname, '../public/cobranza/index.html')));
-
-app.get(['/cobranza/prejudicial', '/cobranza/prejudicial/'], (req, res) =>
-  res.sendFile(path.join(__dirname, '../public/cobranza/prejudicial.html')));
-
-app.get(['/cobranza/judicial', '/cobranza/judicial/'], (req, res) =>
-  res.sendFile(path.join(__dirname, '../public/cobranza/judicial.html')));
-
-app.get(['/cobranza/mis-cobranza', '/cobranza/mis-cobranza/'], (req, res) =>
-  res.sendFile(path.join(__dirname, '../public/cobranza/mis-cobranza.html')));
-
-app.get(['/cobranza/reporteria', '/cobranza/reporteria/'], (req, res) =>
-  res.sendFile(path.join(__dirname, '../public/cobranza/reporteria.html')));
-
-app.get(['/cobranza/migracion-indexa', '/cobranza/migracion-indexa/'], (req, res) =>
-  res.sendFile(path.join(__dirname, '../public/cobranza/migracion-indexa/index.html')));
-
-// Página PÚBLICA de verificación de documentos (la abre el QR): /verificar/<codigo>
-app.get(['/verificar', '/verificar/', '/verificar/:codigo'], (req, res) =>
-  res.sendFile(path.join(__dirname, '../public/verificar/index.html')));
-
-// Módulo Certificados (constancias)
-app.get(['/certificados', '/certificados/'], (req, res) =>
-  res.sendFile(path.join(__dirname, '../public/certificados/index.html')));
-
-// Mantenedor de textos de certificados
-app.get(['/mantenedores/certificados-textos', '/mantenedores/certificados-textos/'], (req, res) =>
-  res.sendFile(path.join(__dirname, '../public/mantenedores/certificados-textos/index.html')));
-
-// Cola de Órdenes de Pago de Cuotas (Tesorería)
-app.get(['/tesoreria/odp-cuotas', '/tesoreria/odp-cuotas/'], (req, res) =>
-  res.sendFile(path.join(__dirname, '../public/tesoreria/odp-cuotas.html')));
-
-app.get(['/reporteria', '/reporteria/'], (req, res) =>
-  res.sendFile(path.join(__dirname, '../public/reporteria/index.html')));
-
-app.get(['/reporteria/tablas-dinamicas', '/reporteria/tablas-dinamicas/'], (req, res) =>
-  res.sendFile(path.join(__dirname, '../public/reporteria/tablas-dinamicas/index.html')));
-
-app.get(['/reporteria/bitacora-credito', '/reporteria/bitacora-credito/'], (req, res) =>
-  res.sendFile(path.join(__dirname, '../public/reporteria/bitacora-credito/index.html')));
-
-app.get(['/politica', '/politica/'], (req, res) =>
-  res.sendFile(path.join(__dirname, '../public/politica/index.html')));
-
-app.get(['/dashboard', '/dashboard/'], (req, res) =>
-  res.sendFile(path.join(__dirname, '../public/dashboard/index.html')));
-
-app.get(['/auditoria', '/auditoria/'], (req, res) =>
-  res.sendFile(path.join(__dirname, '../public/auditoria/index.html')));
-
-// Atención Remota — consola del ejecutivo (interno) y portal del dealer (externo)
-app.get(['/atencion-remota', '/atencion-remota/'], (req, res) =>
-  res.sendFile(path.join(__dirname, '../public/atencion-remota/index.html')));
-app.get(['/portal-dealer', '/portal-dealer/'], (req, res) =>
-  res.sendFile(path.join(__dirname, '../public/portal-dealer/index.html')));
-
-app.get(['/cartas-aprobacion', '/cartas-aprobacion/'], (req, res) =>
-  res.sendFile(path.join(__dirname, '../public/cartas-aprobacion/index.html')));
-
-app.get(['/aprobaciones', '/aprobaciones/'], (req, res) =>
-  res.sendFile(path.join(__dirname, '../public/aprobaciones/index.html')));
-app.get(['/aprobaciones/mantenedor', '/aprobaciones/mantenedor/'], (req, res) =>
-  res.sendFile(path.join(__dirname, '../public/aprobaciones/mantenedor/index.html')));
-
-// Card en Mantenedores → abre la pestaña Parámetros de Aprobaciones
-app.get(['/mantenedores/preferencia-financiera', '/mantenedores/preferencia-financiera/'], (req, res) =>
-  res.redirect('/aprobaciones/?tab=params'));
-
-// Post Venta
-app.get(['/postventa', '/postventa/'], (req, res) =>
-  res.sendFile(path.join(__dirname, '../public/postventa/index.html')));
-app.get(['/postventa/seguimiento', '/postventa/seguimiento/'], (req, res) =>
-  res.sendFile(path.join(__dirname, '../public/postventa/seguimiento/index.html')));
-app.get(['/postventa/mantenedores', '/postventa/mantenedores/'], (req, res) =>
-  res.sendFile(path.join(__dirname, '../public/postventa/mantenedores/index.html')));
-app.get(['/postventa/saldos-a-pagar', '/postventa/saldos-a-pagar/'], (req, res) =>
-  res.sendFile(path.join(__dirname, '../public/postventa/saldos-a-pagar/index.html')));
-app.get(['/postventa/orden-pago', '/postventa/orden-pago/'], (req, res) =>
-  res.sendFile(path.join(__dirname, '../public/postventa/orden-pago/index.html')));
-app.get(['/postventa/fundantes-pendientes', '/postventa/fundantes-pendientes/'], (req, res) =>
-  res.sendFile(path.join(__dirname, '../public/postventa/fundantes-pendientes/index.html')));
-app.get(['/postventa/consulta-saldos', '/postventa/consulta-saldos/'], (req, res) =>
-  res.sendFile(path.join(__dirname, '../public/postventa/consulta-saldos/index.html')));
-app.get(['/postventa/consulta-factura', '/postventa/consulta-factura/'], (req, res) =>
-  res.sendFile(path.join(__dirname, '../public/postventa/consulta-factura/index.html')));
-
-// Órdenes de Pago (módulo general de cuentas por pagar a proveedores)
-app.get(['/ordenes-pago', '/ordenes-pago/'], (req, res) =>
-  res.sendFile(path.join(__dirname, '../public/ordenes-pago/index.html')));
-app.get(['/ordenes-pago/emision', '/ordenes-pago/emision/'], (req, res) =>
-  res.sendFile(path.join(__dirname, '../public/ordenes-pago/emision/index.html')));
-app.get(['/ordenes-pago/historial', '/ordenes-pago/historial/'], (req, res) =>
-  res.sendFile(path.join(__dirname, '../public/ordenes-pago/historial/index.html')));
-app.get(['/ordenes-pago/proveedores', '/ordenes-pago/proveedores/'], (req, res) =>
-  res.sendFile(path.join(__dirname, '../public/ordenes-pago/proveedores/index.html')));
-app.get(['/ordenes-pago/estadisticas', '/ordenes-pago/estadisticas/'], (req, res) =>
-  res.sendFile(path.join(__dirname, '../public/ordenes-pago/estadisticas/index.html')));
-
-// Soporte (Home) + Compras de oficina + su mantenedor
-app.get(['/soporte', '/soporte/'], (req, res) =>
-  res.sendFile(path.join(__dirname, '../public/soporte/index.html')));
-app.get(['/soporte/compras', '/soporte/compras/'], (req, res) =>
-  res.sendFile(path.join(__dirname, '../public/soporte/compras/index.html')));
-app.get(['/soporte/compras-admin', '/soporte/compras-admin/'], (req, res) =>
-  res.sendFile(path.join(__dirname, '../public/soporte/compras-admin/index.html')));
-app.get(['/mantenedores/compras', '/mantenedores/compras/'], (req, res) =>
-  res.sendFile(path.join(__dirname, '../public/mantenedores/compras/index.html')));
-
-app.get(['/edicion-creditos', '/edicion-creditos/'], (req, res) =>
-  res.sendFile(path.join(__dirname, '../public/edicion-creditos/index.html')));
-app.get(['/edicion-creditos/otorgados', '/edicion-creditos/otorgados/'], (req, res) =>
-  res.sendFile(path.join(__dirname, '../public/edicion-creditos/otorgados/index.html')));
-app.get(['/edicion-creditos/otros', '/edicion-creditos/otros/'], (req, res) =>
-  res.sendFile(path.join(__dirname, '../public/edicion-creditos/otros/index.html')));
-
-app.get(['/informes-dealernet', '/informes-dealernet/'], (req, res) =>
-  res.sendFile(path.join(__dirname, '../public/informes-dealernet/index.html')));
-
-app.get(['/dealernet-informes', '/dealernet-informes/'], (req, res) =>
-  res.sendFile(path.join(__dirname, '../public/dealernet-informes/index.html')));
+// ── Páginas estáticas (SPA) ──────────────────────────────────────────────────
+// Cada entrada: [ruta, archivo-bajo-public]. Una ruta string '/x' se expande a
+// '/x' y '/x/'; un array explícito permite paths extra (ej. el :codigo público de
+// verificar). El archivo se mapea explícito porque algunas rutas no lo derivan de
+// la URL (ej. /dealers vive en mantenedores/dealers/). Agregar página = 1 línea.
+const PAGINAS = [
+  ['/mantenedores/comisiones-seguro', 'mantenedores/comisiones-seguro/index.html'],
+  ['/carga-masiva', 'carga-masiva/index.html'],
+  ['/carga-masiva/digitacion', 'carga-masiva/digitacion/index.html'],
+  ['/carga-masiva/digitacion/cola', 'carga-masiva/digitacion/cola.html'],
+  ['/carga-masiva/digitacion/estadisticas', 'carga-masiva/digitacion/estadisticas.html'],
+  ['/comisiones', 'comisiones/index.html'],
+  ['/comisiones/revision', 'comisiones/revision/index.html'],
+  ['/comisiones/variables', 'comisiones/variables/index.html'],
+  ['/simulador', 'simulador/index.html'],
+  ['/usuarios', 'usuarios/index.html'],
+  ['/mantenedores', 'mantenedores/index.html'],
+  ['/mantenedores/comunas', 'mantenedores/comunas/index.html'],
+  ['/mantenedores/presupuesto', 'mantenedores/presupuesto/index.html'],
+  ['/mantenedores/ayuda', 'mantenedores/ayuda/index.html'],
+  ['/mantenedores/alertas', 'mantenedores/alertas/index.html'],
+  ['/mantenedores/correos-programados', 'mantenedores/correos-programados/index.html'],
+  ['/mantenedores/backups', 'mantenedores/backups/index.html'],
+  ['/mantenedores/tasas', 'mantenedores/tasas/index.html'],
+  ['/mantenedores/uf', 'mantenedores/uf/index.html'],
+  ['/mantenedores/vehiculos', 'mantenedores/vehiculos/index.html'],
+  // La card "Dealers" vive en el Home (no en Mantenedores) → URL limpia /dealers/.
+  ['/dealers', 'mantenedores/dealers/index.html'],
+  ['/mantenedores/potencial-dealer', 'mantenedores/potencial-dealer/index.html'],
+  ['/mantenedores/mantencion-sistema', 'mantenedores/mantencion-sistema/index.html'],
+  ['/mantenedores/inteligencia-artificial', 'mantenedores/inteligencia-artificial/index.html'],
+  ['/ia/liquidaciones', 'ia/liquidaciones/index.html'],
+  ['/ia/informe-dealernet', 'ia/informe-dealernet/index.html'],
+  ['/ia/pregunta', 'ia/pregunta/index.html'],
+  ['/mantenedores/respuestas-rapidas', 'mantenedores/respuestas-rapidas/index.html'],
+  ['/mantenedores/dealernet-productos', 'mantenedores/dealernet-productos/index.html'],
+  ['/mantenedores/dealernet-costos', 'mantenedores/dealernet-costos/index.html'],
+  ['/mantenedores/dealernet', 'mantenedores/dealernet/index.html'],
+  ['/mantenedores/parametros', 'mantenedores/parametros/index.html'],
+  ['/mantenedores/cobranza-parametros', 'mantenedores/cobranza-parametros/index.html'],
+  ['/mantenedores/definiciones', 'mantenedores/definiciones/index.html'],
+  ['/mantenedores/alertas-saldos', 'mantenedores/alertas-saldos/index.html'],
+  ['/mantenedores/factores-seguro', 'mantenedores/factores-seguro/index.html'],
+  ['/mantenedores/financieras', 'mantenedores/financieras/index.html'],
+  ['/mantenedores/solo-dios', 'mantenedores/solo-dios/index.html'],
+  ['/mantenedores/servidor-hora', 'mantenedores/servidor-hora/index.html'],
+  ['/mantenedores/db-maintenance', 'mantenedores/db-maintenance/index.html'],
+  ['/mantenedores/tipos-documento', 'mantenedores/tipos-documento/index.html'],
+  ['/mantenedores/actividades-economicas', 'mantenedores/actividades-economicas/index.html'],
+  ['/clientes', 'clientes/index.html'],
+  ['/creditos', 'creditos/index.html'],
+  ['/creditos/revisar', 'creditos/revisar.html'],
+  ['/creditos/respaldos', 'creditos/respaldos.html'],
+  ['/creditos/documentos', 'creditos/documentos.html'],
+  ['/mantenedores/pagares', 'mantenedores/pagares/index.html'],
+  ['/mantenedores/cuentas-bancarias', 'mantenedores/cuentas-bancarias/index.html'],
+  ['/mantenedores/parques', 'mantenedores/parques/index.html'],
+  ['/mantenedores/dealers-mapa', 'mantenedores/dealers-mapa/index.html'],
+  ['/dealers-visitas', 'dealers-visitas/index.html'],
+  ['/mantenedores/dealers-direcciones', 'mantenedores/dealers-direcciones/index.html'],
+  ['/juegos', 'juegos/index.html'],
+  ['/mantenedores/estado-creditos', 'mantenedores/estado-creditos/index.html'],
+  ['/mantenedores/estado-cartera', 'mantenedores/estado-cartera/index.html'],
+  ['/mantenedores/broker-validaciones', 'mantenedores/broker-validaciones/index.html'],
+  ['/creditos/digitacion-autofin', 'creditos/digitacion-autofin.html'],
+  ['/creditos/digitacion-unidad', 'creditos/digitacion-unidad.html'],
+  ['/creditos/carga-documentos-af', 'creditos/carga-documentos-af.html'],
+  ['/creditos/validacion-firma', 'creditos/validacion-firma.html'],
+  ['/creditos/pagar-cuotas', 'creditos/pagar-cuotas.html'],
+  ['/creditos/auditoria', 'creditos/auditoria.html'],
+  ['/antecedentes-laborales', 'antecedentes-laborales/index.html'],
+  ['/informacion-comercial', 'informacion-comercial/index.html'],
+  ['/cotizaciones', 'cotizaciones/index.html'],
+  ['/tesoreria', 'tesoreria/index.html'],
+  ['/tesoreria/caja', 'tesoreria/caja.html'],
+  ['/tesoreria/cajas', 'tesoreria/cajas.html'],
+  ['/tesoreria/cierre-caja', 'tesoreria/cierre-caja.html'],
+  ['/tesoreria/cuentas-transitorias', 'tesoreria/cuentas-transitorias.html'],
+  ['/crm', 'crm/index.html'],
+  ['/crm/gestiones', 'crm/gestiones.html'],
+  ['/crm/estadisticas', 'crm/estadisticas.html'],
+  ['/crm/campanas', 'crm/campanas/index.html'],
+  ['/crm/campanas/crear', 'crm/campanas/crear.html'],
+  ['/crm/campanas/gestion', 'crm/campanas/gestion.html'],
+  ['/crm/campanas/resultados', 'crm/campanas/resultados.html'],
+  ['/cobranza', 'cobranza/index.html'],
+  ['/cobranza/prejudicial', 'cobranza/prejudicial.html'],
+  ['/cobranza/judicial', 'cobranza/judicial.html'],
+  ['/cobranza/mis-cobranza', 'cobranza/mis-cobranza.html'],
+  ['/cobranza/reporteria', 'cobranza/reporteria.html'],
+  ['/cobranza/migracion-indexa', 'cobranza/migracion-indexa/index.html'],
+  // Página PÚBLICA (la abre el QR): /verificar/<codigo>. El array agrega el path con param.
+  [['/verificar', '/verificar/', '/verificar/:codigo'], 'verificar/index.html'],
+  ['/certificados', 'certificados/index.html'],
+  ['/mantenedores/certificados-textos', 'mantenedores/certificados-textos/index.html'],
+  ['/tesoreria/odp-cuotas', 'tesoreria/odp-cuotas.html'],
+  ['/reporteria', 'reporteria/index.html'],
+  ['/reporteria/tablas-dinamicas', 'reporteria/tablas-dinamicas/index.html'],
+  ['/reporteria/bitacora-credito', 'reporteria/bitacora-credito/index.html'],
+  ['/politica', 'politica/index.html'],
+  ['/dashboard', 'dashboard/index.html'],
+  ['/auditoria', 'auditoria/index.html'],
+  ['/atencion-remota', 'atencion-remota/index.html'],
+  ['/portal-dealer', 'portal-dealer/index.html'],
+  ['/cartas-aprobacion', 'cartas-aprobacion/index.html'],
+  ['/aprobaciones', 'aprobaciones/index.html'],
+  ['/aprobaciones/mantenedor', 'aprobaciones/mantenedor/index.html'],
+  ['/postventa', 'postventa/index.html'],
+  ['/postventa/seguimiento', 'postventa/seguimiento/index.html'],
+  ['/postventa/mantenedores', 'postventa/mantenedores/index.html'],
+  ['/postventa/saldos-a-pagar', 'postventa/saldos-a-pagar/index.html'],
+  ['/postventa/orden-pago', 'postventa/orden-pago/index.html'],
+  ['/postventa/fundantes-pendientes', 'postventa/fundantes-pendientes/index.html'],
+  ['/postventa/consulta-saldos', 'postventa/consulta-saldos/index.html'],
+  ['/postventa/consulta-factura', 'postventa/consulta-factura/index.html'],
+  ['/ordenes-pago', 'ordenes-pago/index.html'],
+  ['/ordenes-pago/emision', 'ordenes-pago/emision/index.html'],
+  ['/ordenes-pago/historial', 'ordenes-pago/historial/index.html'],
+  ['/ordenes-pago/proveedores', 'ordenes-pago/proveedores/index.html'],
+  ['/ordenes-pago/estadisticas', 'ordenes-pago/estadisticas/index.html'],
+  ['/soporte', 'soporte/index.html'],
+  ['/soporte/compras', 'soporte/compras/index.html'],
+  ['/soporte/compras-admin', 'soporte/compras-admin/index.html'],
+  ['/mantenedores/compras', 'mantenedores/compras/index.html'],
+  ['/edicion-creditos', 'edicion-creditos/index.html'],
+  ['/edicion-creditos/otorgados', 'edicion-creditos/otorgados/index.html'],
+  ['/edicion-creditos/otros', 'edicion-creditos/otros/index.html'],
+  ['/informes-dealernet', 'informes-dealernet/index.html'],
+  ['/dealernet-informes', 'dealernet-informes/index.html'],
+];
+for (const [ruta, archivo] of PAGINAS) {
+  const urls = Array.isArray(ruta) ? ruta : [ruta, ruta + '/'];
+  app.get(urls, (req, res) => res.sendFile(path.join(__dirname, '../public/' + archivo)));
+}
+
+// ── Redirecciones de rutas legacy (302) ──────────────────────────────────────
+// - /mantenedores/dealers: la card se movió al Home (/dealers/).
+// - /mantenedores/flujo-brokerage: submódulo eliminado (espejo de Estado Créditos).
+// - /tesoreria/brokerage y /creditos/fundantes: flujo viejo retirado (jun-2026),
+//   reemplazado por Seguimiento Fundantes (/fundantes/) y Post Venta.
+// - /mantenedores/preferencia-financiera: ahora es una pestaña de Aprobaciones.
+const REDIRECTS = [
+  ['/mantenedores/dealers', '/dealers/'],
+  ['/mantenedores/flujo-brokerage', '/mantenedores/estado-creditos/'],
+  ['/tesoreria/brokerage', '/tesoreria/'],
+  ['/creditos/fundantes', '/fundantes/'],
+  ['/mantenedores/preferencia-financiera', '/aprobaciones/?tab=params'],
+];
+for (const [desde, hacia] of REDIRECTS) {
+  app.get([desde, desde + '/'], (req, res) => res.redirect(hacia));
+}
 
 app.use((req, res) => res.status(404).json({ success: false, error: 'Ruta no encontrada' }));
 

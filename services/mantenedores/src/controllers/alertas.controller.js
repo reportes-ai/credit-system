@@ -30,7 +30,7 @@ const pool = require('../../../../shared/config/database');
   } catch (e) { console.error('[alertas] migracion venc-config:', e.message); }
 })();
 
-// GET /api/alertas/vencimientos
+// GET /api/alertas-vencimiento
 // Verifica UF y Tasas — retorna alertas para mostrar al admin al conectarse
 exports.getVencimientos = async (req, res) => {
   try {
@@ -181,7 +181,7 @@ exports.getVencimientos = async (req, res) => {
   }
 };
 
-// GET /api/alertas/venc-config — config de los avisos del popup de inicio
+// GET /api/alertas-vencimiento/config — config de los avisos del popup de inicio
 exports.getVencConfig = async (req, res) => {
   try {
     const [rows] = await pool.query(
@@ -194,7 +194,7 @@ exports.getVencConfig = async (req, res) => {
   }
 };
 
-// PUT /api/alertas/venc-config — body: { config:[{clave, activo, dias_aviso}] }
+// PUT /api/alertas-vencimiento/config — body: { config:[{clave, activo, dias_aviso}] }
 exports.setVencConfig = async (req, res) => {
   try {
     const list = Array.isArray(req.body && req.body.config) ? req.body.config : [];
