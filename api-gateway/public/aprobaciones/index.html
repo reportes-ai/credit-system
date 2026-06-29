@@ -5,7 +5,7 @@
   <link rel="icon" href="/img/favicon.png" type="image/png">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Cartas de Aprobación — AutoFácil</title>
-  <!-- v4.10 -->
+  <!-- v4.11 — AutoFin: tasa pizarra truncada a 2 decimales hacia abajo (sugerida + máx visible) -->
   <!-- Standalone desde Mantenedores: marca la clase ANTES de pintar para no mostrar el menú -->
   <script>try{var _t=new URLSearchParams(location.search).get('tab');if(_t==='params')document.documentElement.classList.add('standalone-params');if(_t==='cartolas'||_t==='enviadas')document.documentElement.classList.add('standalone-cv');}catch(e){}</script>
   <link href="/css/bootstrap.min.css" rel="stylesheet">
@@ -1393,8 +1393,14 @@ function calcUFyTasa(){
       ? parseFloat(TASAS.tasa_mensual_menor ?? TASAS.tasa_menor)
       : parseFloat(TASAS.tasa_mensual_mayor ?? TASAS.tasa_mayor);
     if (!isNaN(pizarra)) {
+      // AutoFin maneja 4 decimales, pero la tasa usable se toma a 2 decimales
+      // TRUNCADOS hacia abajo (2,8683% → 2,86%), nunca al más próximo ni al alza.
+      const topePiz = tope2(pizarra);
       document.getElementById('cTasaPizarra').value =
-        pizarra.toFixed(4).replace('.',',') + ' % (' + (esMenor200 ? '≤' : '>') + '200 UF)';
+        pizarra.toFixed(4).replace('.',',') + ' % (' + (esMenor200 ? '≤' : '>') + '200 UF · máx ' + topePiz.toFixed(2).replace('.',',') + ')';
+      // Sugerir la tasa crédito = pizarra truncada a 2 decimales, solo si está vacía.
+      const cTasaEl = document.getElementById('cTasa');
+      if (!String(cTasaEl.value).trim()) cTasaEl.value = topePiz.toFixed(2).replace('.',',');
     }
   }
   // Comparación tasa crédito vs pizarra: SOLO décimas y centésimas (a 2 decimales).
