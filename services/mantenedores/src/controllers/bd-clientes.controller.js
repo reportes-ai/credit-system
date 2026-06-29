@@ -1,5 +1,6 @@
 'use strict';
 const pool = require('../../../../shared/config/database');
+const RUT = require('../../../../api-gateway/public/js/rut-core');  // enforcement: RUT canónico
 const { auditar } = require('../../../../shared/audit');
 
 /* Campos duplicados/vacíos excluidos de la vista */
@@ -106,7 +107,7 @@ const update = async (req, res) => {
     for (const [col, val] of Object.entries(body)) {
       if (!validCols.includes(col)) continue;
       sets.push(`\`${col}\` = ?`);
-      vals.push(val === '' ? null : val);
+      vals.push(col === 'rut' ? (RUT.normalizar(val) || (val === '' ? null : val)) : (val === '' ? null : val));
     }
     if (!sets.length) return res.status(400).json({ success: false, data: null, error: 'Sin campos válidos' });
 

@@ -1,4 +1,5 @@
 const pool = require('../../../../shared/config/database');
+const RUT = require('../../../../api-gateway/public/js/rut-core');  // enforcement: RUT canónico
 const { limpiarCachePermisos } = require('../../../../shared/middleware/permisos');
 const { auditar } = require('../../../../shared/audit');
 
@@ -1602,7 +1603,7 @@ const getUsuariosByPerfil = async (req, res) => {
         await pool.query(
           `INSERT INTO usuarios (rut, nombre, apellido, apellido_materno, centro_costo, email, password_hash, id_perfil, estado)
            VALUES (?,?,?,?,?,?,?,?,'activo')`,
-          [rut, nombre, apP, apM, centro, mail, hashAF2026, idPerfil]
+          [RUT.normalizar(rut) || rut, nombre, apP, apM, centro, mail, hashAF2026, idPerfil]
         );
         creados++;
       }

@@ -41,7 +41,8 @@ const CODIGO = 'informe_crediticio';
 })();
 
 const rutNum = r => { const c = String(r || '').replace(/[.\s-]/g, '').toUpperCase(); return c.length > 1 ? c.slice(0, -1) : c; };
-const normCli = v => v ? String(v).replace(/\./g, '').toUpperCase().trim() : null;   // formato clientes: NNNNNNN-DV
+const RUT = require('../../../../api-gateway/public/js/rut-core');  // enforcement: RUT canónico
+const normCli = v => RUT.normalizar(v) || (v ? String(v).replace(/\./g, '').toUpperCase().trim() : null);   // formato clientes: NNNNNNN-DV
 const arr = v => { try { return Array.isArray(v) ? v : (v ? JSON.parse(v) : []); } catch { return []; } };
 
 /* Crea o actualiza el cliente (base de clientes) + su informacion_comercial con los
