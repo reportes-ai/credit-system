@@ -362,6 +362,18 @@ const update = async (req, res) => {
     if (['OTORGADO','APROBADO'].includes((b.estado_credito||'').toUpperCase())) {
       try {
         const calc = await calcularOperacion({ ...b, saldo_precio, id });
+        // Respetar campos forzados (negociaciones manuales / part_bruto pactado de la carta):
+        // si monto_comision_fin / comdea_real / com_parque están forzados, se conserva el valor
+        // guardado y NO se pisa con el cálculo (mismo criterio que recalcular-mes.js:290-297).
+        const [[cur]] = await pool.query(
+          'SELECT campos_forzados, monto_comision_fin, comdea_real, com_parque FROM creditos WHERE id = ?', [id]);
+        let forz; try { forz = new Set(JSON.parse(cur?.campos_forzados || '[]')); } catch { forz = new Set(); }
+        const eff_mcf = forz.has('monto_comision_fin') ? (parseFloat(cur.monto_comision_fin) || 0) : calc.monto_comision_fin;
+        const eff_cdr = forz.has('comdea_real')        ? (parseFloat(cur.comdea_real)        || 0) : calc.comdea_real;
+        const eff_cpq = forz.has('com_parque')         ? (parseFloat(cur.com_parque)         || 0) : calc.com_parque;
+        // ingreso_neto_total con los valores EFECTIVOS (forzado o calculado).
+        const com_seguros_total  = (calc.com_rdh || 0) + (calc.com_cesantia || 0) + (calc.com_reparaciones || 0);
+        const ingreso_neto_total = eff_mcf + com_seguros_total - eff_cdr - eff_cpq - (calc.arriendo_parque || 0);
         await pool.query(`
           UPDATE creditos SET
             monto_comision_fin = ?, com_rdh = ?, com_cesantia = ?,
@@ -369,10 +381,10 @@ const update = async (req, res) => {
             comdea_real = ?, com_parque = ?, arriendo_parque = ?,
             comej = ?, ingreso_neto_total = ?
           WHERE id = ?`,
-          [calc.monto_comision_fin, calc.com_rdh, calc.com_cesantia,
+          [eff_mcf, calc.com_rdh, calc.com_cesantia,
            calc.com_reparaciones, calc.pen_rdh, calc.pen_cesantia, calc.pen_reparaciones,
-           calc.comdea_real, calc.com_parque, calc.arriendo_parque,
-           calc.comej, calc.ingreso_neto_total, id]
+           eff_cdr, eff_cpq, calc.arriendo_parque,
+           calc.comej, ingreso_neto_total, id]
         );
       } catch(calcErr) { console.error('[calcular-operacion update]', calcErr.message); }
     }
