@@ -1,5 +1,6 @@
 const pool = require('../../../../shared/config/database');
 const { auditar } = require('../../../../shared/audit');
+const RUT = require('../../../../api-gateway/public/js/rut-core');  // enforcement: RUT canónico al guardar
 
 const ensureTable = () => pool.query(`CREATE TABLE IF NOT EXISTS dealers (
   id_dealer        INT AUTO_INCREMENT PRIMARY KEY,
@@ -114,10 +115,10 @@ const importar = async (req, res) => {
       return res.status(400).json({ success: false, data: null, error: 'Sin registros' });
 
     const vals = registros.map(r => [
-      r.numero, r.numero_ind, r.rut, r.nombre_indexa, r.nombre_razon,
+      r.numero, r.numero_ind, RUT.normalizar(r.rut) || r.rut, r.nombre_indexa, r.nombre_razon,
       r.ccs_parque, r.direccion, r.fecha_incorporacion,
       r.contacto, r.telefono, r.correo,
-      r.num_cuenta, r.banco, r.rut_pago,
+      r.num_cuenta, r.banco, RUT.normalizar(r.rut_pago) || r.rut_pago,
       r.activo ? 1 : 0, r.tiene_factura ? 1 : 0, r.observaciones || null
     ]);
 
@@ -135,6 +136,8 @@ const importar = async (req, res) => {
 const createDealer = async (req, res) => {
   try {
     const r = req.body;
+    r.rut = RUT.normalizar(r.rut) || r.rut;
+    r.rut_pago = RUT.normalizar(r.rut_pago) || r.rut_pago;
     const [[{ maxN }]] = await pool.query('SELECT COALESCE(MAX(numero),0)+1 AS maxN FROM dealers');
     const [result] = await pool.query(
       `INSERT INTO dealers (numero,numero_ind,rut,nombre_indexa,nombre_razon,ccs_parque,
@@ -154,6 +157,8 @@ const createDealer = async (req, res) => {
 const updateDealer = async (req, res) => {
   try {
     const r = req.body;
+    r.rut = RUT.normalizar(r.rut) || r.rut;
+    r.rut_pago = RUT.normalizar(r.rut_pago) || r.rut_pago;
     await pool.query(
       `UPDATE dealers SET numero_ind=?,rut=?,nombre_indexa=?,nombre_razon=?,ccs_parque=?,
        direccion=?,fecha_incorporacion=?,contacto=?,telefono=?,correo=?,
