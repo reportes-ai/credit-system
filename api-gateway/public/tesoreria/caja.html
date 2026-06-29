@@ -644,15 +644,11 @@ function calcMora(montoCuota, fechaVenc, hoy = new Date()) {
 function calcGastos(montoCuota, fechaVenc, hoy = new Date()) {
   const c = _cob(fechaVenc);
   if (c) return { monto: c.gastos, dias: c.dias, aplica: c.gastosAplica };
-  // Fallback local
+  // Sin dato del backend: NO inventar gastos con tramos hardcodeados. Los tramos de gasto
+  // de cobranza son paramétricos (motor único calcularGastoCobranza en cobranza); se difiere
+  // a ese cálculo. Hasta tenerlo, 0 (igual que pago-cuotas-panel; el pago igual se postea por backend).
   const dias = Math.max(0, Math.floor((hoy - new Date(fechaVenc+'T12:00:00')) / 86400000));
-  if (dias < 21) return { monto: 0, dias, aplica: false };
-  const ufVal = _ufMap.get(dia21Str(fechaVenc)) || _ufHoy;
-  const uf10 = ufVal*10, uf40 = ufVal*40;
-  let g = montoCuota <= uf10 ? montoCuota*0.09 :
-          montoCuota <= uf10+uf40 ? uf10*0.09+(montoCuota-uf10)*0.06 :
-          uf10*0.09+uf40*0.06+(montoCuota-uf10-uf40)*0.03;
-  return { monto: Math.round(g), dias, aplica: true };
+  return { monto: 0, dias, aplica: false };
 }
 
 /* ── Render tabla principal ── */
