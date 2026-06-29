@@ -200,6 +200,23 @@ const COMISIONES = [
   {desde:37,hasta:72,parque:0.075,calle:0.1,agCalle:0.05,agParque:0.045},
 ];
 
+// IVA paramétrico desde el mantenedor de Impuestos (default 19% si la API falla).
+// Reemplaza el 1.19 hardcodeado en los cálculos neto/bruto de participación y cartola.
+let IVA_PCT = 19;
+let IVA_FACTOR = 1.19;
+async function cargarImpuestos(){
+  try {
+    const r = await fetch('/api/impuestos/valores', { headers:{ 'Authorization':'Bearer '+sessionStorage.getItem('token') } });
+    const j = await r.json();
+    const iva = (j && j.data) ? (j.data.IVA ?? j.data.iva) : null;
+    if (iva != null && !isNaN(iva) && Number(iva) > 0) {
+      IVA_PCT = Number(iva); IVA_FACTOR = 1 + IVA_PCT / 100;
+      const lbl = document.getElementById('fPartIVALabel');
+      if (lbl) lbl.textContent = 'IVA (' + IVA_PCT + '%)';
+    }
+  } catch(e){ /* deja el default 1.19 */ }
+}
+
 let selectedTipoCarta = '';
 let cambioParticActivo = false;
 let rawSaldo = 0;
@@ -359,7 +376,7 @@ function buildCorregirForm(c){
       <div style="font-size:11px;color:#546E7A;margin-bottom:8px">Edita el <strong>Valor Bruto</strong> para ajustar la participación. Neto e IVA se recalculan automáticamente.</div>
       <div class="form-row cols-3">
         <div class="field"><label>Valor Neto</label><input type="text" id="cPartNeto" value="$${Math.round(c.partNeto).toLocaleString('es-CL')}" readonly style="color:#546E7A;background:#F5F5F5"></div>
-        <div class="field"><label>IVA (19%)</label><input type="text" id="cPartIVA" value="$${Math.round(c.partIVA).toLocaleString('es-CL')}" readonly style="color:#546E7A;background:#F5F5F5"></div>
+        <div class="field"><label>IVA (${IVA_PCT}%)</label><input type="text" id="cPartIVA" value="$${Math.round(c.partIVA).toLocaleString('es-CL')}" readonly style="color:#546E7A;background:#F5F5F5"></div>
         <div class="field"><label>Valor Bruto</label><input type="text" id="cPartBruto" value="$${Math.round(c.partBruto).toLocaleString('es-CL')}" oninput="onCorregirPartBrutoChange()" style="border-color:#0141A2;font-weight:700"></div>
       </div>
     </div>
@@ -380,7 +397,7 @@ let _corregirPartManual = false; // true when user manually edits partBruto
 function onCorregirPartBrutoChange(){
   _corregirPartManual = true;
   const bruto = parseInt(String(document.getElementById('cPartBruto').value).replace(/[^0-9]/g,'')) || 0;
-  const neto = Math.round(bruto / 1.19);
+  const neto = Math.round(bruto / IVA_FACTOR);
   const iva = bruto - neto;
   document.getElementById('cPartNeto').value = '$' + neto.toLocaleString('es-CL');
   document.getElementById('cPartIVA').value = '$' + iva.toLocaleString('es-CL');
@@ -403,7 +420,7 @@ function calcCorregirPart(cartaId){
   if(!plazo || !saldo) return;
   const factor = getComisionFactor(plazo, c.tipo, c.rutConc);
   const bruto = Math.round(saldo * factor);
-  const neto = Math.round(bruto / 1.19);
+  const neto = Math.round(bruto / IVA_FACTOR);
   const iva = bruto - neto;
   document.getElementById('cPartBruto').value = '$' + bruto.toLocaleString('es-CL');
   document.getElementById('cPartNeto').value = '$' + neto.toLocaleString('es-CL');
@@ -1714,7 +1731,7 @@ function renderRevisionCartolas(){
     const totalAnul = g.anulaciones.filter(r => r.estadoComision === 'A DESCONTAR' || r.estadoComision === 'A PAGAR').reduce((s,r) => s + (r.comisionBruta||0), 0);
     const totalPrep = g.prepagos.filter(r => r.estadoComision === 'A DESCONTAR').reduce((s,r) => s + (r.comisionBruta||0), 0);
     const subtotal = totalComis - totalAnul - totalPrep;
-    const neto = Math.round(subtotal / 1.19);
+    const neto = Math.round(subtotal / IVA_FACTOR);
     const iva = subtotal - neto;
 
     const rowsSection = (rows, label, color) => {
@@ -1797,7 +1814,7 @@ function renderRevisionCartolas(){
             <tr><td style="padding:3px 10px;border:1px solid #E0E0E0">− Reversas por Prepago</td><td style="padding:3px 10px;border:1px solid #E0E0E0;text-align:right;color:#E65100">${totalPrep>0?'− '+fmtCLP(totalPrep):'$0'}</td></tr>
             <tr style="background:#FFF9C4"><td style="padding:4px 10px;border:1px solid #F9A825;font-weight:700">Sub Total Comisión a Pagar</td><td style="padding:4px 10px;border:1px solid #F9A825;text-align:right;font-weight:700">${fmtCLP(subtotal)}</td></tr>
             <tr><td style="padding:3px 10px;border:1px solid #E0E0E0">Comisión Neta</td><td style="padding:3px 10px;border:1px solid #E0E0E0;text-align:right">${fmtCLP(neto)}</td></tr>
-            <tr><td style="padding:3px 10px;border:1px solid #E0E0E0">IVA (19%)</td><td style="padding:3px 10px;border:1px solid #E0E0E0;text-align:right">${fmtCLP(iva)}</td></tr>
+            <tr><td style="padding:3px 10px;border:1px solid #E0E0E0">IVA (${IVA_PCT}%)</td><td style="padding:3px 10px;border:1px solid #E0E0E0;text-align:right">${fmtCLP(iva)}</td></tr>
             <tr style="background:#E8F5E9"><td style="padding:4px 10px;border:1px solid #C8E6C9;font-weight:700">Comisión Bruta Total</td><td style="padding:4px 10px;border:1px solid #C8E6C9;text-align:right;font-weight:700;color:#1B5E20;font-size:13px">${fmtCLP(subtotal)}</td></tr>
           </table>
         </div>
@@ -2277,7 +2294,7 @@ function buildCartolaPDF(concName, g, mes, totalComis, totalAnul, totalPrep, sub
         <tr><td style="padding:3px 6px;border:0.5px solid #E0E0E0">−</td><td style="padding:3px 6px;border:0.5px solid #E0E0E0">Monto por Prepago</td><td style="padding:3px 10px;border:0.5px solid #E0E0E0;text-align:right;color:#E65100">${totalPrep>0?fmtCLP(totalPrep):'$0'}</td></tr>
         <tr style="background:#FFF9C4"><td colspan="2" style="padding:4px 6px;border:0.5px solid #F9A825;font-weight:700">Sub Total Comisión a Pagar</td><td style="padding:4px 10px;border:0.5px solid #F9A825;text-align:right;font-weight:700">${fmtCLP(subtotal)}</td></tr>
         <tr><td colspan="2" style="padding:3px 6px;border:0.5px solid #E0E0E0">Comisión Neta</td><td style="padding:3px 10px;border:0.5px solid #E0E0E0;text-align:right">${fmtCLP(neto)}</td></tr>
-        <tr><td colspan="2" style="padding:3px 6px;border:0.5px solid #E0E0E0">IVA (19%)</td><td style="padding:3px 10px;border:0.5px solid #E0E0E0;text-align:right">${fmtCLP(iva)}</td></tr>
+        <tr><td colspan="2" style="padding:3px 6px;border:0.5px solid #E0E0E0">IVA (${IVA_PCT}%)</td><td style="padding:3px 10px;border:0.5px solid #E0E0E0;text-align:right">${fmtCLP(iva)}</td></tr>
         <tr style="background:#E8F5E9"><td colspan="2" style="padding:5px 6px;border:0.5px solid #C8E6C9;font-weight:700">Comisión Bruta Total</td><td style="padding:5px 10px;border:0.5px solid #C8E6C9;text-align:right;font-weight:700;color:#1B5E20;font-size:11px">${fmtCLP(subtotal)}</td></tr>
       </table>
     </div>
@@ -2315,7 +2332,7 @@ function openCartolaSend(concName){
   const totalAnul  = g.anulaciones.filter(r=>r.estadoComision==='A DESCONTAR'||r.estadoComision==='A PAGAR').reduce((s,r)=>s+(r.comisionBruta||0),0);
   const totalPrep  = g.prepagos.filter(r=>r.estadoComision==='A DESCONTAR').reduce((s,r)=>s+(r.comisionBruta||0),0);
   const subtotal = totalComis - totalAnul - totalPrep;
-  const neto = Math.round(subtotal / 1.19);
+  const neto = Math.round(subtotal / IVA_FACTOR);
   const iva  = subtotal - neto;
 
   document.getElementById('cartolaSendPDFArea').innerHTML = buildCartolaPDF(concName, g, mes, totalComis, totalAnul, totalPrep, subtotal, neto, iva);
@@ -2807,6 +2824,9 @@ async function initApp(){
     // Load comisiones from params
     const comStr = await dbGetParam('comisiones');
     if(comStr){ try{ const c=JSON.parse(comStr); COMISIONES.length=0; c.forEach(x=>COMISIONES.push(x)); }catch(e){} }
+
+    // Load IVA paramétrico (mantenedor de Impuestos) — reemplaza el 1.19 hardcodeado.
+    await cargarImpuestos();
 
     // Load financiera preferente from Supabase (overrides localStorage if saved)
     const finStr = await dbGetParam('financiera');
@@ -3536,7 +3556,7 @@ function calcParticipacion(){
   }
   const factor = getComisionFactor(plazo, selectedTipoCarta, (document.getElementById('fRutConc')||{}).value);
   const bruto = Math.round(saldo * factor);
-  const neto = Math.round(bruto / 1.19);
+  const neto = Math.round(bruto / IVA_FACTOR);
   const iva = bruto - neto;
   const partBrutoEl = document.getElementById('fPartBruto');
   partBrutoEl.value = bruto > 0 ? '$' + bruto.toLocaleString('es-CL') : '$0';
@@ -3598,7 +3618,7 @@ function onPartBrutoInput(el) {
     const newPos = pos + (el.value.length - prevLen);
     try { el.setSelectionRange(newPos, newPos); } catch(e){}
   }
-  const neto = Math.round(raw / 1.19);
+  const neto = Math.round(raw / IVA_FACTOR);
   const iva  = raw - neto;
   document.getElementById('fPartNeto').value = raw > 0 ? '$' + neto.toLocaleString('es-CL') : '';
   document.getElementById('fPartIVA').value  = raw > 0 ? '$' + iva.toLocaleString('es-CL')  : '';
@@ -3625,7 +3645,7 @@ function onPartPctInput(el) {
     parseMoneyInput(document.getElementById('fPrecioVenta')) - parseMoneyInput(document.getElementById('fPie')));
   if (!saldo || !pct) return;
   const bruto = Math.round(saldo * pct / 100);
-  const neto  = Math.round(bruto / 1.19);
+  const neto  = Math.round(bruto / IVA_FACTOR);
   const iva   = bruto - neto;
   const brutoEl = document.getElementById('fPartBruto');
   brutoEl.value = '$' + bruto.toLocaleString('es-CL');
