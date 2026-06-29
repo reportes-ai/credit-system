@@ -10,6 +10,7 @@ const { cargarPenTramos, calcularPenetracionMes, comisionesSeguro } = require('.
 const { comisionDealer } = require('./comision-dealer');
 const core = require('../../../../api-gateway/public/js/rentabilidad-core');
 const { cargarTasas, getTasaByFecha } = require('./recalcular-mes');
+const { getUF } = require('../../../../shared/uf');
 
 /* ── Cargar todos los parámetros del mantenedor ─────────────────────── */
 async function cargarParams() {
@@ -21,15 +22,7 @@ async function cargarParams() {
   return p;
 }
 
-/* ── Obtener UF de una fecha ────────────────────────────────────────── */
-async function getUF(fecha) {
-  if (!fecha) return null;
-  const f = fecha.toString().slice(0, 10);
-  const [rows] = await pool.query(
-    'SELECT valor FROM uf WHERE fecha = ? LIMIT 1', [f]
-  );
-  return rows.length ? parseFloat(rows[0].valor) : null;
-}
+/* getUF (UF vigente a una fecha) vive en ../../../../shared/uf.js (motor único). */
 
 /* La pizarra de comisión dealer (parque/calle) vive en ./comision-dealer.js (motor único). */
 

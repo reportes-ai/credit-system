@@ -2,6 +2,7 @@
 
 const pool = require('../../../../shared/config/database');
 const { auditar } = require('../../../../shared/audit');
+const { getUF } = require('../../../../shared/uf');
 
 // ─── Migración automática ─────────────────────────────────────────────────────
 (async () => {
@@ -872,12 +873,11 @@ exports.setParametros = async (req, res) => {
   }
 };
 
-// UF vigente a una fecha dada (la última con fecha <= fecha); fallback a la más reciente.
+// UF vigente a una fecha dada (motor único shared/uf.js); con fallback a la más reciente
+// (propio de cobranza: para cálculos del día sin fecha exacta). 0 si no hay UF cargada.
 async function getUFporFecha(fecha) {
-  if (fecha) {
-    const [[u]] = await pool.query('SELECT valor FROM uf WHERE fecha <= ? ORDER BY fecha DESC LIMIT 1', [fecha]);
-    if (u) return parseFloat(u.valor);
-  }
+  const v = await getUF(fecha);
+  if (v != null) return v;
   const [[u2]] = await pool.query('SELECT valor FROM uf ORDER BY fecha DESC LIMIT 1');
   return u2 ? parseFloat(u2.valor) : 0;
 }

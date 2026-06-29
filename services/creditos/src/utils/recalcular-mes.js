@@ -21,6 +21,7 @@ const pool = require('../../../../shared/config/database');
 const { cargarPenTramos, calcularPenetracionMes, comisionesSeguro } = require('./penetracion');
 const { comisionDealer } = require('./comision-dealer');
 const core = require('../../../../api-gateway/public/js/rentabilidad-core');
+const { getUF } = require('../../../../shared/uf');
 
 // Campos calculados que el usuario puede dejar "forzados" (negociación puntual).
 // El recálculo los respeta: conserva el valor guardado y solo recalcula los demás.
@@ -71,13 +72,7 @@ function getTasaByFecha(fecha, tasas) {
   return t;
 }
 
-/* ── UF de una fecha ────────────────────────────────────────────────── */
-async function getUF(fecha) {
-  if (!fecha) return null;
-  const f = (fecha instanceof Date ? fecha.toISOString() : fecha.toString()).slice(0, 10);
-  const [rows] = await pool.query('SELECT valor FROM uf WHERE fecha = ? LIMIT 1', [f]);
-  return rows.length ? parseFloat(rows[0].valor) : null;
-}
+/* getUF (UF vigente a una fecha) vive en ../../../../shared/uf.js (motor único). */
 
 /* La comisión dealer/parque (pizarra + tabla del dealer) vive en ./comision-dealer.js (motor único). */
 
