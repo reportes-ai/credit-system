@@ -60,5 +60,17 @@
     return n.slice(0, i).replace(/\B(?=(\d{3})+(?!\d))/g, '.') + n.slice(i);
   }
 
-  return { normalizar, calcDV, validar, formatear };
+  // Cuerpo (número, sin DV) y DV por separado — espejo de las columnas generadas
+  // `<col>_cuerpo` (BIGINT, indexado) / `<col>_dv` (CHAR) de las tablas maestras.
+  // null si no es RUT. Para joins/lookups por entero usar el cuerpo.
+  function cuerpo(raw) {
+    const n = normalizar(raw);
+    return n ? parseInt(n.slice(0, n.indexOf('-')), 10) : null;
+  }
+  function dv(raw) {
+    const n = normalizar(raw);
+    return n ? n.slice(n.indexOf('-') + 1) : null;
+  }
+
+  return { normalizar, calcDV, validar, formatear, cuerpo, dv };
 });
