@@ -516,9 +516,9 @@ function activoBadge(v) {
   return v ? '<span class="activo-si">✓ SI</span>' : '<span class="activo-no">✗ NO</span>';
 }
 function fmt(v) { return v || '—'; }
-// Nombre del dealer SIN el prefijo del parque (suele venir como "PARQUE X NOMBRE
-// REAL"). Solo para mostrar; el valor crudo se conserva en BD (lo usan los match
-// dealer↔crédito por nombre). Cae a razón social si quedara vacío.
+// Nombre del dealer para mostrar. La columna nombre_indexa ya está homologada SIN el
+// prefijo del parque (v77.26); este strip queda solo como defensa por si entrara algún
+// valor sucio. Cae a razón social si quedara vacío.
 function nombreDealer(d) {
   let n = String((d && d.nombre_indexa) || '').trim();
   const p = String((d && d.ccs_parque) || '').trim();
@@ -528,18 +528,11 @@ function nombreDealer(d) {
   }
   return n || String((d && d.nombre_razon) || '').trim();
 }
-// Al guardar, reanteponer el prefijo del parque (la UI muestra el nombre sin él)
-// para no romper los match por nombre dealer↔crédito.
+// El nombre del dealer se guarda LIMPIO (sin prefijo del parque). La columna ya está
+// homologada sin prefijo y el match dealer↔crédito es por nombre limpio en AMBAS puntas
+// (dealers.nombre_indexa y creditos.automotora), así que no se re-antepone nada.
 function nombreIndexaParaGuardar() {
-  const el = document.getElementById('fNombreIndexa');
-  let ni = el.value.trim();
-  const full = (el.dataset.full || '').trim();
-  const pq   = (el.dataset.parque || '').trim();
-  if (pq && ni && full.toUpperCase().startsWith(pq.toUpperCase())
-        && !ni.toUpperCase().startsWith(pq.toUpperCase())) {
-    ni = (pq + ' ' + ni).trim();
-  }
-  return ni;
+  return document.getElementById('fNombreIndexa').value.trim();
 }
 function fmtDate(v) {
   if (!v) return '—';
