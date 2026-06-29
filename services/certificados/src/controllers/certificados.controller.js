@@ -216,25 +216,18 @@ async function renderCuerpo(out, fechaEmisionISO) {
 // Mismos parámetros que /creditos/pagar-cuotas: monto_financiado, tascli_real (% mensual),
 // plazo y fecha_primera_cuota → calza con lo que ve el usuario en Pago de Cuotas.
 function calendarioFrancesSintetico(c) {
-  const mf = N(c.monto_financiado), plazo = N(c.plazo), r = (N(c.tascli_real) || 0) / 100;
-  if (!mf || !plazo) return [];
-  const cu  = r > 0 ? Math.round(core.cuotaFrancesa(mf, r, plazo)) : Math.round(mf / plazo);
+  const plazo = N(c.plazo), r = (N(c.tascli_real) || 0) / 100;
   const f0  = c.fecha_primera_cuota ? new Date(c.fecha_primera_cuota + 'T00:00:00') : null;
-  let saldo = mf; const out = [];
-  for (let n = 1; n <= plazo; n++) {
-    const interes = Math.round(saldo * r);
-    let amort = cu - interes;
-    if (n === plazo) amort = saldo;
-    saldo = Math.max(0, saldo - amort);
-    const venc = f0 ? new Date(f0.getFullYear(), f0.getMonth() + (n - 1), f0.getDate()) : null;
-    out.push({
-      numero_cuota: n,
+  // Tabla de desarrollo desde el motor único; acá solo se decoran fecha/estado.
+  return core.tablaDesarrollo(N(c.monto_financiado), r, plazo).map(row => {
+    const venc = f0 ? new Date(f0.getFullYear(), f0.getMonth() + (row.numero_cuota - 1), f0.getDate()) : null;
+    return {
+      numero_cuota: row.numero_cuota,
       venc: venc ? venc.toISOString().slice(0, 10) : null,
-      valor_cuota: cu, interes, amortizacion: amort,
-      tasa: r * 100, estado_cuota: 'PENDIENTE', fpago: null, saldo_insoluto: saldo,
-    });
-  }
-  return out;
+      valor_cuota: row.valor_cuota, interes: row.interes, amortizacion: row.amortizacion,
+      tasa: r * 100, estado_cuota: 'PENDIENTE', fpago: null, saldo_insoluto: row.saldo_insoluto,
+    };
+  });
 }
 
 // Contexto del crédito + su calendario real (cuotas_credito si existe).

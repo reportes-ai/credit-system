@@ -115,7 +115,7 @@
   function buildSchedule(c) {
     const r = (parseFloat(c.tasa_mensual) || 0) / 100, n = parseInt(c.plazo) || 0, mf = parseFloat(c.monto_financiado) || 0;
     if (!n) return [];
-    const cuota = r === 0 ? mf / n : mf * r * Math.pow(1 + r, n) / (Math.pow(1 + r, n) - 1);
+    const cuota = r === 0 ? mf / n : (window.AF_RENT_CORE ? AF_RENT_CORE.cuotaFrancesa(mf, r, n) : mf * r * Math.pow(1 + r, n) / (Math.pow(1 + r, n) - 1));
     const base = c.fecha_primera_cuota ? new Date(c.fecha_primera_cuota) : new Date();
     let saldo = mf;
     return Array.from({ length: n }, (_, i) => {

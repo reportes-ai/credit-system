@@ -476,22 +476,19 @@ function simular() {
   // ── AutoFin ────────────────────────────────────────────────────────
   // CF = tasa_mensual_mayor − spread_mayor (módulo de tasas; mismo para ambos tramos)
   const costoFondo = tmcMayor - spreadMayor;
-  let ing_tasa_af = 0;
-  if (tasaCli > 0 && costoFondo > 0 && plazo > 0) {
-    const cuota = monto_fin * tasaCli * Math.pow(1+tasaCli,plazo) / (Math.pow(1+tasaCli,plazo)-1);
-    const pv    = cuota * (1 - Math.pow(1+costoFondo,-plazo)) / costoFondo;
-    ing_tasa_af = Math.round(pv - monto_fin);
-  }
-  // CORFO: ingreso adicional por diferencial de tasa
+  // Ingreso por colocación AutoFin (VP de la cuota al costo de fondo − capital) → motor único.
+  let ing_tasa_af = window.AF_RENT_CORE
+    ? AF_RENT_CORE.ingresoColocacionAutoFin({ montoCap: monto_fin, plazo, tasaCli, costoFondo })
+    : (tasaCli > 0 && costoFondo > 0 && plazo > 0
+        ? Math.round(monto_fin * tasaCli * Math.pow(1+tasaCli,plazo)/(Math.pow(1+tasaCli,plazo)-1) * (1-Math.pow(1+costoFondo,-plazo))/costoFondo - monto_fin) : 0);
+  // CORFO: ingreso adicional por diferencial de tasa (misma colocación, tasa − spread CORFO)
   let com_corfo_af = 0;
   if (esCorfo) {
     const corfoSpread = esMayor ? 0.004 : 0.005; // 0.4% o 0.5% mensual
-    if (tasaCli - corfoSpread > 0 && plazo > 0) {
-      const cuota2 = monto_fin * (tasaCli-corfoSpread) * Math.pow(1+(tasaCli-corfoSpread),plazo)
-                   / (Math.pow(1+(tasaCli-corfoSpread),plazo)-1);
-      const pv2 = cuota2 * (1-Math.pow(1+costoFondo,-plazo)) / costoFondo;
-      com_corfo_af = Math.round(pv2 - monto_fin);
-    }
+    com_corfo_af = window.AF_RENT_CORE
+      ? AF_RENT_CORE.ingresoColocacionAutoFin({ montoCap: monto_fin, plazo, tasaCli: tasaCli - corfoSpread, costoFondo })
+      : (tasaCli - corfoSpread > 0 && plazo > 0
+          ? Math.round(monto_fin * (tasaCli-corfoSpread) * Math.pow(1+(tasaCli-corfoSpread),plazo)/(Math.pow(1+(tasaCli-corfoSpread),plazo)-1) * (1-Math.pow(1+costoFondo,-plazo))/costoFondo - monto_fin) : 0);
   }
 
   // ── UAC ────────────────────────────────────────────────────────────

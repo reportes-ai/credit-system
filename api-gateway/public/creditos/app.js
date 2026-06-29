@@ -832,7 +832,7 @@ const CRED_SEG_RATES = {
   72: { d:0.054964, r:0.034875, c:0.058985, dr:0.093853, dc:0.120825, rc:0.098177, drc:0.164822 },
 };
 function credPlazoBracket(n) { for (const b of [6,12,24,36,48,72]) if (n<=b) return b; return 72; }
-function credPmt(r,n,pv) { if(Math.abs(r)<1e-10) return pv/n; return pv*r*Math.pow(1+r,n)/(Math.pow(1+r,n)-1); }
+function credPmt(r,n,pv) { if(Math.abs(r)<1e-10) return pv/n; return (window.AF_RENT_CORE ? AF_RENT_CORE.cuotaFrancesa(pv,r,n) : pv*r*Math.pow(1+r,n)/(Math.pow(1+r,n)-1)); }
 function credRateNR(nper,pmt,pv,guess=0.1) {
   let r=guess;
   for(let i=0;i<200;i++){
@@ -1102,6 +1102,7 @@ function credAmbosFactor(plazo) {
   return 1.173526;
 }
 function credPvf(r, n, p) {
+  if (window.AF_RENT_CORE) return AF_RENT_CORE.valorPresenteAnualidad(p, r, n);
   if (Math.abs(r) < 1e-10) return p * n;
   return p * (1 - Math.pow(1 + r, -n)) / r;
 }

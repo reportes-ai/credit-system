@@ -32,6 +32,35 @@
     return c * t * Math.pow(1 + t, n) / (Math.pow(1 + t, n) - 1);
   }
 
+  // Valor presente de una anualidad: VP de N cuotas iguales a tasa mensual (fracción).
+  // Con tasa ~0 el VP es la suma simple de las cuotas (sin descuento). Primitivo único
+  // que comparten el ingreso por colocación AutoFin y el cotizador (credPvf).
+  function valorPresenteAnualidad(cuota, tasaMensual, plazo) {
+    const c = +cuota || 0, r = +tasaMensual || 0, n = parseInt(plazo) || 0;
+    if (!(n > 0)) return 0;
+    if (Math.abs(r) < 1e-10) return c * n;
+    return c * (1 - Math.pow(1 + r, -n)) / r;
+  }
+
+  // Tabla de desarrollo (amortización francesa) SOLO numérica (sin fechas ni estados):
+  // cuota constante; la última cuota ajusta el capital para dejar saldo 0. Interés y
+  // amortización redondeados a peso. Cada consumidor decora con vencimiento/estado.
+  // Motor único de la tabla de desarrollo (certificados, pago de cuotas, etc.).
+  function tablaDesarrollo(capital, tasaMensual, plazo) {
+    const mf = +capital || 0, r = +tasaMensual || 0, n = parseInt(plazo) || 0;
+    if (!(mf > 0 && n > 0)) return [];
+    const cu = r > 0 ? Math.round(cuotaFrancesa(mf, r, n)) : Math.round(mf / n);
+    let saldo = mf; const out = [];
+    for (let k = 1; k <= n; k++) {
+      const interes = Math.round(saldo * r);
+      let amort = cu - interes;
+      if (k === n) amort = saldo;
+      saldo = Math.max(0, saldo - amort);
+      out.push({ numero_cuota: k, valor_cuota: cu, interes, amortizacion: amort, saldo_insoluto: saldo });
+    }
+    return out;
+  }
+
   // Ingreso por colocación AutoFin = VP de la cuota (a la tasa cliente) descontada al
   // costo de fondo, menos el capital. tasaCli y costoFondo en FRACCIÓN mensual.
   function ingresoColocacionAutoFin(o) {
@@ -39,7 +68,7 @@
     const tc = +o.tasaCli || 0, cf = +o.costoFondo || 0;
     if (!(mc > 0 && pl > 0 && tc > 0 && cf > 0)) return 0;
     const cuota = cuotaFrancesa(mc, tc, pl);
-    const pv = cuota * (1 - Math.pow(1 + cf, -pl)) / cf;
+    const pv = valorPresenteAnualidad(cuota, cf, pl);
     return Math.round(pv - mc);
   }
 
@@ -72,6 +101,8 @@
 
   return {
     cuotaFrancesa,
+    valorPresenteAnualidad,
+    tablaDesarrollo,
     ingresoColocacionAutoFin,
     ingresoColocacionUAC,
     comisionEjecutivo,
