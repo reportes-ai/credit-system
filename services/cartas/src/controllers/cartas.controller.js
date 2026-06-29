@@ -542,10 +542,17 @@ const otorgar = async (req, res) => {
       const cond = [], args = [];
       if (ca.id_credito_creado) { cond.push('id = ?'); args.push(ca.id_credito_creado); }
       if (ca.id_financiera)     { cond.push('num_op = ?'); args.push(ca.id_financiera); }
+      // Participación PACTADA de la carta: al otorgar manda sobre el cálculo. Concilia
+      // creditos.comdea_real = part_bruto para que el dashboard (lee comdea_real) y la
+      // cartola (usa COALESCE(part_bruto, comdea_real)) muestren el MISMO monto. Solo si
+      // la carta trae part_bruto (>0); si no, se respeta el comdea_real del motor.
+      const partB = Number(ca.part_bruto) || 0;
       if (cond.length) {
         await pool.query(
-          `UPDATE creditos SET estado='OTORGADO', fecha_otorgado=COALESCE(fecha_otorgado, CURDATE()), updated_at=NOW()
-            WHERE (${cond.join(' OR ')}) AND estado IN ('CARTA_APROBACION','APROBADO','INGRESO')`, args
+          `UPDATE creditos SET estado='OTORGADO', fecha_otorgado=COALESCE(fecha_otorgado, CURDATE()),
+                  comdea_real = CASE WHEN ? > 0 THEN ? ELSE comdea_real END, updated_at=NOW()
+            WHERE (${cond.join(' OR ')}) AND estado IN ('CARTA_APROBACION','APROBADO','INGRESO')`,
+          [partB, partB, ...args]
         ).catch(e => console.error('[carta otorgar→credito]', e.message));
         // El crédito de la carta nace sin num_op → asígnalo (= numero_credito) para que
         // aparezca y sea buscable en Post Venta.
@@ -553,6 +560,14 @@ const otorgar = async (req, res) => {
           `UPDATE creditos SET num_op = CAST(numero_credito AS UNSIGNED)
             WHERE (${cond.join(' OR ')}) AND num_op IS NULL AND numero_credito REGEXP '^[0-9]+$'`, args
         ).catch(() => {});
+        // comdea_real pactado: márcalo forzado para que el recálculo mensual lo respete
+        // (marcarForzadosCalculo re-compara contra el motor: solo queda forzado si difiere).
+        if (partB > 0) {
+          try {
+            const [[cr]] = await pool.query(`SELECT id FROM creditos WHERE (${cond.join(' OR ')}) LIMIT 1`, args);
+            if (cr && cr.id) await marcarForzadosCalculo(cr.id, { campos: ['comdea_real'] });
+          } catch (e) { console.error('[carta otorgar→forzado]', e.message); }
+        }
       }
     }
     // Cartola COMISION del mes (misma lógica que /api/cartolas/sync, acotada a esta carta)
