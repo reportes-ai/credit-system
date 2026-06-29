@@ -106,6 +106,7 @@
 <body>
 <script src="/js/auth-guard.js"></script>
 <script src="/js/rentabilidad-core.js"></script>
+<script src="/js/comision-dealer.js"></script>
 <nav class="topnav">
   <div class="topnav-left">
     <a href="/" class="topnav-brand">
@@ -387,7 +388,9 @@ function getSegComFactor(tipo, plazo) {
   if (plazo <= 24) return (P['seg_com_' + tipo + '_24'] || 0) / 100;
   return              (P['seg_com_' + tipo + '_36'] || 0) / 100;
 }
+// Pizarra dealer parque/calle → motor único comision-dealer.js (fallback inline si no cargó).
 function getDealerPct(plazo) {
+  if (window.AF_COM_DEALER) return AF_COM_DEALER.pizarraParque(plazo, P);
   if (plazo <= 6)  return (P.dealer_pct_6  || 0) / 100;
   if (plazo <= 12) return (P.dealer_pct_12 || 0) / 100;
   if (plazo <= 24) return (P.dealer_pct_24 || 0) / 100;
@@ -395,6 +398,7 @@ function getDealerPct(plazo) {
   return (P.dealer_pct_99 || 0) / 100;
 }
 function getDealerCallePct(plazo) {
+  if (window.AF_COM_DEALER) return AF_COM_DEALER.pizarraCalle(plazo, P);
   const patio = (P.patio_pct || 0) / 100;
   const fb = getDealerPct(plazo) + patio;
   if (plazo <= 6)  return P.dealer_calle_pct_6  != null ? P.dealer_calle_pct_6  / 100 : fb;

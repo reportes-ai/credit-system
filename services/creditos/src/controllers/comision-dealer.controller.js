@@ -1,6 +1,6 @@
 'use strict';
 const pool = require('../../../../shared/config/database');
-const { comisionDealer, normRutD } = require('../utils/comision-dealer');
+const { comisionDealer, normRutD } = require('../../../../api-gateway/public/js/comision-dealer');
 
 // Tramos de la carta (mismos cortes que el array COMISIONES del frontend).
 const TRAMOS = [

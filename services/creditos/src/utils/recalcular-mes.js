@@ -19,7 +19,7 @@
 
 const pool = require('../../../../shared/config/database');
 const { cargarPenTramos, calcularPenetracionMes, comisionesSeguro } = require('./penetracion');
-const { comisionDealer } = require('./comision-dealer');
+const { comisionDealer } = require('../../../../api-gateway/public/js/comision-dealer');
 const core = require('../../../../api-gateway/public/js/rentabilidad-core');
 const { getUF } = require('../../../../shared/uf');
 
