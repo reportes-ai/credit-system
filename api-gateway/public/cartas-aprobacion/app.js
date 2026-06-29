@@ -4679,8 +4679,8 @@ function renderParamsTable(){
         <td>${c.desde}</td><td>${c.hasta}</td>
         <td>${(c.parque*100).toFixed(2)}%</td>
         <td>${(c.calle*100).toFixed(2)}%</td>
-        <td>${(c.agCalle*100).toFixed(2)}%</td>
-        <td>${(c.agParque*100).toFixed(2)}%</td>
+        <td style="display:none">${(c.agCalle*100).toFixed(2)}%</td>
+        <td style="display:none">${(c.agParque*100).toFixed(2)}%</td>
       </tr>
     `).join('');
   } else {
@@ -4709,16 +4709,16 @@ function renderParamsTable(){
             <span style="font-size:12px">%</span>
           </div>
         </td>
-        <td>
+        <td style="display:none">
           <div style="display:flex;align-items:center;gap:3px">
-            <input type="number" id="p_agCalle_${i}" value="${(c.agCalle*100).toFixed(2)}" 
+            <input type="number" id="p_agCalle_${i}" value="${(c.agCalle*100).toFixed(2)}"
               min="0" max="100" step="0.01" style="${inputStyle}">
             <span style="font-size:12px">%</span>
           </div>
         </td>
-        <td>
+        <td style="display:none">
           <div style="display:flex;align-items:center;gap:3px">
-            <input type="number" id="p_agParque_${i}" value="${(c.agParque*100).toFixed(2)}" 
+            <input type="number" id="p_agParque_${i}" value="${(c.agParque*100).toFixed(2)}"
               min="0" max="100" step="0.01" style="${inputStyle}">
             <span style="font-size:12px">%</span>
           </div>
