@@ -1,6 +1,7 @@
 const pool = require('../../../../shared/config/database');
 const { auditar } = require('../../../../shared/audit');
 const { recalcularMesesAbiertos } = require('../../../creditos/src/utils/recalcular-mes');
+const tasaUtils = require('../../../../shared/tasa-utils');
 // Cambiar un parámetro que afecta el cálculo (ingreso por crédito / dealer / parque)
 // dispara el recálculo de los meses abiertos. Fire-and-forget: no bloquea la respuesta.
 // Respeta los campos forzados (no los sobrescribe).
@@ -91,14 +92,10 @@ const create = async (req, res) => {
     if (fecha_hasta < fecha_desde)
       return res.status(400).json({ success: false, data: null, error: 'La fecha hasta no puede ser anterior a la fecha desde' });
 
-    const mensual_menor = Math.round((parseFloat(tasa_anual_menor) / 12) * 10000) / 10000;
-    const mensual_mayor = Math.round((parseFloat(tasa_anual_mayor) / 12) * 10000) / 10000;
-    const sp_mayor = (spread_mayor !== undefined && spread_mayor !== '' && spread_mayor !== null && !isNaN(parseFloat(spread_mayor)))
-      ? parseFloat(spread_mayor) : null;
-    // CF = mensual_mayor - spread_mayor; spread implícito ≤200 = mensual_menor - CF
-    const sp_menor = sp_mayor !== null
-      ? Math.round((mensual_menor - mensual_mayor + sp_mayor) * 10000) / 10000
-      : null;
+    const mensual_menor = tasaUtils.anualAMensual(tasa_anual_menor);
+    const mensual_mayor = tasaUtils.anualAMensual(tasa_anual_mayor);
+    const sp_mayor = tasaUtils.parseSpreadMayor(spread_mayor);
+    const sp_menor = tasaUtils.spreadMenor(mensual_menor, mensual_mayor, sp_mayor);
 
     const [r] = await pool.query(
       'INSERT INTO tasas (fecha_desde, fecha_hasta, tasa_anual_menor, tasa_mensual_menor, tasa_anual_mayor, tasa_mensual_mayor, spread_menor, spread_mayor) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
@@ -120,13 +117,10 @@ const update = async (req, res) => {
     if (fecha_hasta < fecha_desde)
       return res.status(400).json({ success: false, data: null, error: 'La fecha hasta no puede ser anterior a la fecha desde' });
 
-    const mensual_menor = Math.round((parseFloat(tasa_anual_menor) / 12) * 10000) / 10000;
-    const mensual_mayor = Math.round((parseFloat(tasa_anual_mayor) / 12) * 10000) / 10000;
-    const sp_mayor = (spread_mayor !== undefined && spread_mayor !== '' && spread_mayor !== null && !isNaN(parseFloat(spread_mayor)))
-      ? parseFloat(spread_mayor) : null;
-    const sp_menor = sp_mayor !== null
-      ? Math.round((mensual_menor - mensual_mayor + sp_mayor) * 10000) / 10000
-      : null;
+    const mensual_menor = tasaUtils.anualAMensual(tasa_anual_menor);
+    const mensual_mayor = tasaUtils.anualAMensual(tasa_anual_mayor);
+    const sp_mayor = tasaUtils.parseSpreadMayor(spread_mayor);
+    const sp_menor = tasaUtils.spreadMenor(mensual_menor, mensual_mayor, sp_mayor);
 
     await pool.query(
       'UPDATE tasas SET fecha_desde=?, fecha_hasta=?, tasa_anual_menor=?, tasa_mensual_menor=?, tasa_anual_mayor=?, tasa_mensual_mayor=?, spread_menor=?, spread_mayor=? WHERE id_tasa=?',

@@ -61,11 +61,21 @@
     return (+o.montoCap || 0) > ((o.umbralUf || 200) * (+o.uf || 0));
   }
 
+  // Ingreso neto total de la operación = ingreso financiera + ingreso seguros − costos
+  // (comisión dealer + comisión parque + arriendo de parque). Recibe los valores ya
+  // resueltos (forzados o calculados); no redondea (los componentes ya vienen enteros).
+  function ingresoNetoTotal(o) {
+    const f = +o.comFin || 0, s = +o.seguros || 0;
+    const d = +o.comDealer || 0, p = +o.comParque || 0, a = +o.arriendo || 0;
+    return f + s - d - p - a;
+  }
+
   return {
     cuotaFrancesa,
     ingresoColocacionAutoFin,
     ingresoColocacionUAC,
     comisionEjecutivo,
     esMayor200,
+    ingresoNetoTotal,
   };
 });

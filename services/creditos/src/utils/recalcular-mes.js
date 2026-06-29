@@ -295,7 +295,10 @@ async function recalcularMeses(meses, opciones = {}) {
 
       // 5. Ingreso neto total ─────────────────────────────────────────
       const com_seguros_total  = com_rdh + com_cesantia + com_reparaciones;
-      const ingreso_neto_total = eff_mcf + com_seguros_total - eff_cdr - eff_cpq - arriendo_val;
+      const ingreso_neto_total = core.ingresoNetoTotal({
+        comFin: eff_mcf, seguros: com_seguros_total,
+        comDealer: eff_cdr, comParque: eff_cpq, arriendo: arriendo_val,
+      });
 
       // 6. UPDATE (los forzados se reescriben con su propio valor guardado) ──
       await pool.query(`

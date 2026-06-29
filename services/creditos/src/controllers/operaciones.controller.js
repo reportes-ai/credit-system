@@ -2,6 +2,7 @@ const pool = require('../../../../shared/config/database');
 const { auditar } = require('../../../../shared/audit');
 const { calcularOperacion } = require('../utils/calcular-operacion');
 const { recalcularMeses } = require('../utils/recalcular-mes');
+const core = require('../../../../api-gateway/public/js/rentabilidad-core');
 const { isMesCerrado, getMesDeOp } = require('../../../../shared/utils/mes-cerrado');
 
 // Migración: tabla creditos
@@ -373,7 +374,10 @@ const update = async (req, res) => {
         const eff_cpq = forz.has('com_parque')         ? (parseFloat(cur.com_parque)         || 0) : calc.com_parque;
         // ingreso_neto_total con los valores EFECTIVOS (forzado o calculado).
         const com_seguros_total  = (calc.com_rdh || 0) + (calc.com_cesantia || 0) + (calc.com_reparaciones || 0);
-        const ingreso_neto_total = eff_mcf + com_seguros_total - eff_cdr - eff_cpq - (calc.arriendo_parque || 0);
+        const ingreso_neto_total = core.ingresoNetoTotal({
+          comFin: eff_mcf, seguros: com_seguros_total,
+          comDealer: eff_cdr, comParque: eff_cpq, arriendo: (calc.arriendo_parque || 0),
+        });
         await pool.query(`
           UPDATE creditos SET
             monto_comision_fin = ?, com_rdh = ?, com_cesantia = ?,

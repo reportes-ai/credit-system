@@ -13,8 +13,7 @@
 const pool = require('../../../shared/config/database');
 const { cmfGet } = require('./cmf-api');
 const { recalcularMesesAbiertos } = require('../../creditos/src/utils/recalcular-mes');
-
-const round4 = n => Math.round(n * 10000) / 10000;
+const tasaUtils = require('../../../shared/tasa-utils');
 
 async function getParam(clave) {
   try { const [[r]] = await pool.query('SELECT valor FROM parametros_credito WHERE clave=? LIMIT 1', [clave]); return r ? r.valor : null; }
@@ -61,10 +60,10 @@ async function sincronizarTMC() {
   const [[ya]] = await pool.query('SELECT id_tasa FROM tasas WHERE fecha_desde=? LIMIT 1', [desde]);
   if (ya) return { ok: true, sin_cambios: true, desde, menor: eMenor.valor, mayor: eMayor.valor };
 
-  const mensual_menor = round4(eMenor.valor / 12);
-  const mensual_mayor = round4(eMayor.valor / 12);
+  const mensual_menor = tasaUtils.anualAMensual(eMenor.valor);
+  const mensual_mayor = tasaUtils.anualAMensual(eMayor.valor);
   const sp_mayor = 0.67;                                   // spread por defecto (igual que el mantenedor)
-  const sp_menor = round4(mensual_menor - mensual_mayor + sp_mayor);
+  const sp_menor = tasaUtils.spreadMenor(mensual_menor, mensual_mayor, sp_mayor);
   await pool.query(
     'INSERT INTO tasas (fecha_desde, fecha_hasta, tasa_anual_menor, tasa_mensual_menor, tasa_anual_mayor, tasa_mensual_mayor, spread_menor, spread_mayor) VALUES (?,?,?,?,?,?,?,?)',
     [desde, hasta, eMenor.valor, mensual_menor, eMayor.valor, mensual_mayor, sp_menor, sp_mayor]);

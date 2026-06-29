@@ -154,8 +154,10 @@ async function calcularOperacion(op) {
 
   // ── 5. Ingreso neto total ──────────────────────────────────────────
   const com_seguros_total  = com_rdh + com_cesantia + com_reparaciones;
-  const ingreso_neto_total = monto_comision_fin + com_seguros_total
-                           - comdea_real - com_parque_calc - arriendo_parque_calc;
+  const ingreso_neto_total = core.ingresoNetoTotal({
+    comFin: monto_comision_fin, seguros: com_seguros_total,
+    comDealer: comdea_real, comParque: com_parque_calc, arriendo: arriendo_parque_calc,
+  });
 
   return {
     monto_comision_fin,
