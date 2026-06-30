@@ -120,6 +120,26 @@ const ensureTable = async () => {
       if (e.errno !== 1054) console.error('[clientes migration fix]', e.message);
     }
   }
+
+  // 4. SOCIOS de la empresa (N por cliente). El cliente es identidad única; sus socios viven
+  //    en esta tabla hija. Se alimenta desde la ficha de empresa (intake manual). El giro de
+  //    la empresa ya está en clientes.codigo_actividad + actividad_economica (fuente: mantenedor
+  //    SII actividades_economicas).
+  try {
+    await pool.query(`CREATE TABLE IF NOT EXISTS cliente_socios (
+      id BIGINT AUTO_INCREMENT PRIMARY KEY,
+      id_cliente BIGINT NOT NULL,
+      rut VARCHAR(15) NULL,
+      nombre VARCHAR(150) NULL,
+      apellido_paterno VARCHAR(100) NULL,
+      apellido_materno VARCHAR(100) NULL,
+      pct_participacion DECIMAL(5,2) NULL,
+      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+      updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+      UNIQUE KEY uq_cliente_socio (id_cliente, rut),
+      KEY idx_id_cliente (id_cliente)
+    )`);
+  } catch (e) { console.error('[clientes migration socios]', e.message); }
 };
 
 ensureTable().catch(console.error);
