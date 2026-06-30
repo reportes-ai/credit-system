@@ -11,7 +11,7 @@ const { enviarCorreo } = require('../../../../shared/mailer');
 
 const MOTIVOS_SEED = [
   ['Computador / Notebook', 24], ['Impresora / Escáner', 24], ['Internet / Red', 4],
-  ['Correo electrónico', 8], ['Sistema AutoFácil (error/bug)', 8], ['Acceso / Contraseña', 4],
+  ['Correo electrónico', 8], ['Auto Fácil Business Suite (error/bug)', 8], ['Acceso / Contraseña', 4],
   ['Telefonía', 24], ['Software / Instalación', 48], ['Otro', 48],
 ];
 
