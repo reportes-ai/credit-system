@@ -262,6 +262,11 @@ const PAGINAS = [
   ['/mantenedores/factores-seguro', 'mantenedores/factores-seguro/index.html'],
   ['/mantenedores/financieras', 'mantenedores/financieras/index.html'],
   ['/mantenedores/solo-dios', 'mantenedores/solo-dios/index.html'],
+  // Vista analista (misma página, sin Nivel Dios ni eliminar; detecta '-edicion' en la URL)
+  ['/mantenedores/bd-clientes-edicion', 'mantenedores/bd-clientes/index.html'],
+  ['/mantenedores/bd-operaciones-edicion', 'mantenedores/bd-operaciones/index.html'],
+  ['/mantenedores/bd-antecedentes-edicion', 'mantenedores/bd-antecedentes/index.html'],
+  ['/mantenedores/bd-informacion-comercial-edicion', 'mantenedores/bd-informacion-comercial/index.html'],
   ['/mantenedores/servidor-hora', 'mantenedores/servidor-hora/index.html'],
   ['/mantenedores/db-maintenance', 'mantenedores/db-maintenance/index.html'],
   ['/mantenedores/tipos-documento', 'mantenedores/tipos-documento/index.html'],

@@ -300,6 +300,18 @@ function exportCSV() {
 
 init();
 </script>
+<script>
+/* Vista ANALISTA (ruta -edicion): sin "NIVEL DIOS", breadcrumb sin Solo Dios. */
+(function () {
+  if (!/-edicion/.test(location.pathname)) return;
+  const fix = () => {
+    document.title = document.title.replace(/\s*nivel dios/i, '');
+    document.querySelectorAll('h1,h2,h3,h6').forEach(el => { if (/nivel dios/i.test(el.textContent)) el.innerHTML = el.innerHTML.replace(/⚡\s*/, '').replace(/\s*NIVEL DIOS/i, ''); });
+    document.querySelectorAll('a[href*="solo-dios"]').forEach(a => { const sep = a.nextElementSibling; a.remove(); if (sep && /›/.test(sep.textContent || '')) sep.remove(); });
+  };
+  fix(); setTimeout(fix, 150); document.addEventListener('DOMContentLoaded', fix);
+})();
+</script>
 <script src="/js/app-version.js"></script>
 </body>
 </html>
