@@ -275,6 +275,7 @@ const PAGINAS = [
   ['/mantenedores/dealers-mapa', 'mantenedores/dealers-mapa/index.html'],
   ['/dealers-visitas', 'dealers-visitas/index.html'],
   ['/dealers-liquidez', 'dealers-liquidez/index.html'],
+  ['/dealers-liquidez/hojas', 'dealers-liquidez/hojas/index.html'],
   ['/mantenedores/dealers-direcciones', 'mantenedores/dealers-direcciones/index.html'],
   ['/juegos', 'juegos/index.html'],
   ['/mantenedores/estado-creditos', 'mantenedores/estado-creditos/index.html'],
