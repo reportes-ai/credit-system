@@ -103,7 +103,7 @@ const getFiltros = async (req, res) => {
 /* ── Export a Excel ────────────────────────────────────────────────────────── */
 // La BD ya almacena la hora en horario Chile; el driver la etiqueta como UTC.
 // Formateamos en UTC para mostrar el valor literal (= hora Chile real), sin doble desfase.
-const fmt = d => { if (!d) return ''; const x = new Date(d); return isNaN(x) ? '' : x.toLocaleString('es-CL', { hour12: false, timeZone: 'UTC' }); };
+const fmt = d => { if (!d) return ''; const x = new Date(d); return isNaN(x) ? '' : x.toLocaleString('es-CL', { hour12: false, timeZone: 'America/Santiago' }); };
 function enviarXlsx(res, hoja, filas, archivo) {
   const ws = XLSX.utils.json_to_sheet(filas);
   const wb = XLSX.utils.book_new();
