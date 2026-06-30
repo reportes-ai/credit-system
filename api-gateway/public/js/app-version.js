@@ -2,9 +2,19 @@
    AutoFácil — Versión global de la aplicación
    Editar SOLO este archivo para cambiar la versión
    ───────────────────────────────────────────── */
-const APP_VERSION = 'v77.39';
+const APP_VERSION = 'v77.40';
 
 document.addEventListener('DOMContentLoaded', () => {
+
+  /* 0b ── Ocultar el chrome global flotante al imprimir/PDF (cinta DESARROLLO,
+     campana, ayuda, debug). Cuelgan de <body>, así que el print de cada página
+     no los tapa con sus reglas locales y se colaban en el PDF descuadrando el borde. */
+  if (!document.getElementById('af-print-hide')) {
+    const ph = document.createElement('style');
+    ph.id = 'af-print-hide';
+    ph.textContent = '@media print{#afDevRibbon,#afBellWrap,#afHelpBtn,#afHelpOverlay,#afHelpPanel{display:none!important}}';
+    document.head.appendChild(ph);
+  }
 
   /* 0 ── Cards de navegación uniformes en toda la app (CSS scopeado) */
   if (!document.getElementById('af-cards-uniform')) {
