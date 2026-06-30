@@ -89,17 +89,26 @@
     </div>
   </div>
 
-  <div class="bar">
-    <div class="cnt"><b id="cnt">0</b> operaciones por validar</div>
-    <select id="fEjec" onchange="F.ejecutivo=this.value;cargar()"><option value="">Todos los ejecutivos</option></select>
-    <select id="fFin" onchange="F.financiera=this.value;cargar()">
+  <div id="tabs" style="display:flex;gap:8px;margin-bottom:14px;flex-wrap:wrap"></div>
+
+  <div class="bar" id="bar">
+    <div class="cnt"><b id="cnt">0</b> <span id="cntLbl">operaciones por validar</span></div>
+    <select id="fEjec" onchange="F.ejecutivo=this.value;reload()"><option value="">Todos los ejecutivos</option></select>
+    <select id="fFin" onchange="F.financiera=this.value;reload()">
       <option value="">Todas las financieras</option>
       <option value="AUTOFIN">AUTOFIN</option>
       <option value="UNIDAD DE CREDITO">UNIDAD</option>
     </select>
+    <select id="fEstadoOp" onchange="F.estado_op=this.value;cargar()">
+      <option value="POR_VALIDAR">Por validar</option>
+      <option value="FUNDANTES_RECIBIDOS">Fundantes recibidos</option>
+      <option value="LIBERADO_PAGO">Liberado a pago</option>
+      <option value="FONDOS_LIBERADOS">Fondos liberados</option>
+      <option value="RECHAZADO">Rechazado</option>
+    </select>
   </div>
 
-  <div style="margin:0 0 12px;display:flex;gap:10px;align-items:center;flex-wrap:wrap">
+  <div id="buscarBar" style="margin:0 0 12px;display:flex;gap:10px;align-items:center;flex-wrap:wrap">
     <div style="position:relative;flex:0 0 340px;max-width:100%">
       <i class="bi bi-search" style="position:absolute;left:12px;top:50%;transform:translateY(-50%);color:#94a3b8"></i>
       <input id="buscarOp" placeholder="Buscar por N° OP o ID Financiera…" oninput="buscar()" autocomplete="off"
@@ -165,13 +174,75 @@ const fmtF = f => { if (!f) return '—'; try { return new Date(f).toLocaleDateS
 function toast(m, ok){ const t=document.getElementById('toast'); t.textContent=m; t.className='toast '+(ok?'ok':'err'); t.style.display='block'; setTimeout(()=>t.style.display='none',4000); }
 const diasCls = d => d<=7?'d0':d<=15?'d1':d<=30?'d2':'d3';
 
-let DATA = [], F = { ejecutivo:'', financiera:'', q:'' }, ACT = null, DOCS = [], IDX = 0;
+let DATA = [], F = { ejecutivo:'', financiera:'', q:'', estado_op:'POR_VALIDAR' }, ACT = null, DOCS = [], IDX = 0;
 const _urls = {};   // cache de objectURL por doc_id
+const money = v => '$' + (Math.round(Number(v)||0)).toLocaleString('es-CL');
+
+/* ── Pestañas: Operaciones (validar) · Liberadas a Pago · Fondos Liberados ── */
+const TABS = [
+  { v:'validar',  i:'bi-inbox',      t:'Operaciones' },
+  { v:'liberado', i:'bi-cash-stack', t:'Liberadas a Pago' },
+  { v:'pagado',   i:'bi-bank',       t:'Fondos Liberados' },
+];
+let VISTA = 'validar';
+function renderTabs(){
+  document.getElementById('tabs').innerHTML = TABS.map(x=>`<button onclick="tab('${x.v}')" style="padding:8px 16px;border-radius:20px;font-size:.84rem;font-weight:700;cursor:pointer;border:1.5px solid ${VISTA===x.v?'#0141A2':'#e2e8f0'};background:${VISTA===x.v?'#0141A2':'#fff'};color:${VISTA===x.v?'#fff':'#64748b'}"><i class="bi ${x.i} me-1"></i>${x.t}</button>`).join('');
+}
+function tab(v){
+  VISTA = v; renderTabs();
+  document.getElementById('fEstadoOp').style.display = v==='validar' ? '' : 'none';
+  document.getElementById('buscarBar').style.display = v==='validar' ? '' : 'none';
+  document.getElementById('cntLbl').textContent = v==='validar' ? 'operaciones' : (v==='pagado' ? 'operaciones con fondos liberados' : 'operaciones liberadas a pago');
+  if (v==='validar') cargar(); else cargarResumen(v);
+}
+// Recarga según la vista activa (filtros ejecutivo/financiera aplican a ambas).
+function reload(){ if (VISTA==='validar') cargar(); else cargarResumen(VISTA); }
+
+async function cargarResumen(tipo){
+  const wrap = document.getElementById('tableWrap');
+  wrap.innerHTML = `<div class="empty"><i class="bi bi-hourglass-split"></i>Cargando…</div>`;
+  const qs = new URLSearchParams({ tipo });
+  if (F.ejecutivo) qs.set('ejecutivo', F.ejecutivo);
+  if (F.financiera) qs.set('financiera', F.financiera);
+  try {
+    const j = await (await API('/api/fundantes-seguimiento/resumen?' + qs.toString())).json();
+    if (!j.success) throw new Error(j.error||'Error');
+    const d = j.data; document.getElementById('cnt').textContent = d.total_ops;
+    if (!d.dias.length){ wrap.innerHTML = `<div class="empty"><i class="bi bi-inbox"></i>Sin operaciones ${tipo==='pagado'?'con fondos liberados':'liberadas a pago'}.</div>`; return; }
+    let html = `<div style="background:#eff6ff;border:1px solid #bfdbfe;border-radius:12px;padding:14px 18px;margin-bottom:14px;display:flex;gap:34px;flex-wrap:wrap">
+      <div><div style="font-size:.7rem;color:#64748b;text-transform:uppercase;letter-spacing:.4px">Total operaciones</div><div style="font-weight:800;font-size:1.25rem;color:#0141A2">${d.total_ops}</div></div>
+      <div><div style="font-size:.7rem;color:#64748b;text-transform:uppercase;letter-spacing:.4px">Total saldo precio</div><div style="font-weight:800;font-size:1.25rem;color:#0141A2">${money(d.total_monto)}</div></div>
+    </div>`;
+    html += d.dias.map(g=>`<div style="background:#fff;border:1px solid #e5e7eb;border-radius:12px;margin-bottom:12px;overflow:hidden">
+      <div style="background:#f8fafc;padding:10px 16px;display:flex;justify-content:space-between;align-items:center;border-bottom:1px solid #e5e7eb">
+        <b style="color:#0f172a"><i class="bi bi-calendar3 me-1"></i>${fmtF(g.fecha)}</b>
+        <span style="font-size:.85rem;color:#475569"><b>${g.n}</b> op${g.n===1?'':'s'} · <b style="color:#0141A2">${money(g.monto)}</b></span>
+      </div>
+      <table style="width:100%;border-collapse:collapse;font-size:.84rem">
+        <thead><tr>
+          <th style="text-align:left;padding:7px 16px;color:#64748b;font-size:.68rem;text-transform:uppercase">N° OP</th>
+          <th style="text-align:left;padding:7px 16px;color:#64748b;font-size:.68rem;text-transform:uppercase">Ejecutivo</th>
+          <th style="text-align:left;padding:7px 16px;color:#64748b;font-size:.68rem;text-transform:uppercase">Financiera</th>
+          <th style="text-align:left;padding:7px 16px;color:#64748b;font-size:.68rem;text-transform:uppercase">ID Financiera</th>
+          <th style="text-align:right;padding:7px 16px;color:#64748b;font-size:.68rem;text-transform:uppercase">Saldo precio</th>
+        </tr></thead>
+        <tbody>${g.ops.map(o=>`<tr style="border-top:1px solid #f1f5f9">
+          <td style="padding:7px 16px;font-weight:700;color:#0141A2">${esc(o.num_op)}</td>
+          <td style="padding:7px 16px">${esc(o.ejecutivo||'—')}</td>
+          <td style="padding:7px 16px">${esc(o.financiera||'')}</td>
+          <td style="padding:7px 16px">${esc(o.id_financiera||'')}</td>
+          <td style="padding:7px 16px;text-align:right;font-variant-numeric:tabular-nums">${money(o.saldo_precio)}</td>
+        </tr>`).join('')}</tbody>
+      </table>
+    </div>`).join('');
+    wrap.innerHTML = html;
+  } catch(e){ wrap.innerHTML = `<div class="empty"><i class="bi bi-x-octagon"></i>${esc(e.message)}</div>`; }
+}
 
 async function cargar(){
   const wrap = document.getElementById('tableWrap');
   wrap.innerHTML = `<div class="empty"><i class="bi bi-hourglass-split"></i>Cargando…</div>`;
-  const qs = new URLSearchParams({ estado:'ENVIADO' });
+  const qs = new URLSearchParams({ estado_op: F.estado_op || 'POR_VALIDAR' });
   if (F.ejecutivo) qs.set('ejecutivo', F.ejecutivo);
   if (F.financiera) qs.set('financiera', F.financiera);
   if (F.q) qs.set('q', F.q);
@@ -290,7 +361,7 @@ async function confirmarRc(){
   } catch(e){ err.textContent=e.message; err.style.display='block'; }
 }
 
-cargar();
+renderTabs(); cargar();
 </script>
 <script src="/js/topnav.js"></script>
 <script src="/js/app-version.js"></script>

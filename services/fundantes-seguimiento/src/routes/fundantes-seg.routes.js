@@ -6,6 +6,7 @@ const { requireFunc } = require('../../../../shared/middleware/permisos');
 const c = require('../controllers/fundantes-seg.controller');
 
 router.get('/',                         verifyToken, c.listar);
+router.get('/resumen',                  verifyToken, c.resumen);
 router.get('/doc/:docId/download',      verifyToken, c.descargar);
 router.get('/:id/zip',                  verifyToken, c.descargarZip);
 router.post('/:id/doc',                 verifyToken, c.subirDoc);

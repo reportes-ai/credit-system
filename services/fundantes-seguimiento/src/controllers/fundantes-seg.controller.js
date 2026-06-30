@@ -204,7 +204,17 @@ const listar = async (req, res) => {
     // Lista de operaciones (limitada). Filtro por estado (cola Operaciones); por defecto oculta CERRADO.
     const fpData = [...fp];
     let whereData = where;
+    // Filtro por estado de PAGO (operación): liberado a pago / fondos liberados / etc.
+    const fEstadoOp = String(req.query.estado_op || '').trim().toUpperCase();
+    const OP_MAP = {
+      POR_VALIDAR:         "COALESCE(fs.estado,'PENDIENTE')='ENVIADO'",
+      RECHAZADO:           "COALESCE(fs.estado,'PENDIENTE')='RECHAZADO'",
+      FUNDANTES_RECIBIDOS: "fs.estado='CERRADO' AND COALESCE(c.liberado_pago,0)<>1 AND (c.estado_pago IS NULL OR c.estado_pago<>'PAGADO')",
+      LIBERADO_PAGO:       "COALESCE(c.liberado_pago,0)=1 AND (c.estado_pago IS NULL OR c.estado_pago<>'PAGADO')",
+      FONDOS_LIBERADOS:    "c.estado_pago='PAGADO'",
+    };
     if (fEstado && ESTADOS.includes(fEstado)) { whereData += " AND COALESCE(fs.estado,'PENDIENTE') = ?"; fpData.push(fEstado); }
+    else if (fEstadoOp && OP_MAP[fEstadoOp]) { whereData += ' AND ' + OP_MAP[fEstadoOp]; }
     else if (!incluirCerrados) whereData += " AND COALESCE(fs.estado,'PENDIENTE') <> 'CERRADO'";
     // Búsqueda por N° OP o ID Financiera (server-side: encuentra aunque esté fuera de las primeras 500).
     const q = String(req.query.q || '').trim();
@@ -214,7 +224,9 @@ const listar = async (req, res) => {
     }
     const [ops] = await pool.query(`
       SELECT c.id AS id_credito, c.num_op, c.financiera, c.id_financiera, c.ejecutivo,
-             c.fecha_otorgado, c.gps, c.limitacion,
+             c.fecha_otorgado, c.gps, c.limitacion, c.saldo_precio,
+             c.liberado_pago, DATE_FORMAT(c.fecha_liberado_pago,'%Y-%m-%d') fecha_liberado_pago,
+             c.estado_pago, DATE_FORMAT(c.fecha_pago,'%Y-%m-%d') fecha_pago,
              DATEDIFF(CURDATE(), c.fecha_otorgado) AS dias,
              COALESCE(fs.estado,'PENDIENTE') AS estado, fs.comentario_rechazo,
              fs.fecha_envio, fs.fecha_validacion, fs.validado_por
@@ -248,6 +260,9 @@ const listar = async (req, res) => {
         fecha_otorgado: o.fecha_otorgado, dias: Number(o.dias) || 0,
         estado: o.estado, comentario_rechazo: o.comentario_rechazo,
         fecha_envio: o.fecha_envio, fecha_validacion: o.fecha_validacion, validado_por: o.validado_por,
+        saldo_precio: Number(o.saldo_precio) || 0,
+        liberado_pago: Number(o.liberado_pago) || 0, fecha_liberado_pago: o.fecha_liberado_pago, fecha_pago: o.fecha_pago,
+        estado_op: o.estado_pago === 'PAGADO' ? 'FONDOS_LIBERADOS' : (Number(o.liberado_pago) === 1 ? 'LIBERADO_PAGO' : (o.estado === 'CERRADO' ? 'FUNDANTES_RECIBIDOS' : (o.estado === 'ENVIADO' ? 'POR_VALIDAR' : o.estado))),
         docs, faltan, puede_enviar,
       };
     });
@@ -484,4 +499,41 @@ const descargarZip = async (req, res) => {
   }
 };
 
-module.exports = { listar, subirDoc, eliminarDoc, descargar, descargarZip, enviar, validar };
+/* ── Resumen diario: operaciones LIBERADAS A PAGO o FONDOS LIBERADOS por fecha ──
+   tipo=liberado → liberado_pago=1 (fecha_liberado_pago); tipo=pagado → estado_pago='PAGADO' (fecha_pago).
+   Devuelve, por día: detalle (num_op, ejecutivo, financiera, id_financiera, saldo_precio) + N° ops + suma de saldo precio. */
+const resumen = async (req, res) => {
+  try {
+    const tipo = String(req.query.tipo || 'liberado').toLowerCase() === 'pagado' ? 'pagado' : 'liberado';
+    const fechaCol = tipo === 'pagado' ? 'c.fecha_pago' : 'c.fecha_liberado_pago';
+    const cond = tipo === 'pagado' ? "c.estado_pago='PAGADO'" : 'COALESCE(c.liberado_pago,0)=1';
+
+    const vis = await ejecutivosVisibles(req);
+    const filt = ['UPPER(c.financiera) IN (?)', cond, `${fechaCol} IS NOT NULL`];
+    const fp = [FINANCIERAS];
+    if (!vis.all) {
+      if (!vis.lista.length) return res.json({ success: true, data: { tipo, dias: [], total_ops: 0, total_monto: 0 }, error: null });
+      filt.push('c.ejecutivo IN (?)'); fp.push(vis.lista);
+    } else if (req.query.ejecutivo) { filt.push('c.ejecutivo = ?'); fp.push(req.query.ejecutivo); }
+    const fFin = String(req.query.financiera || '').trim().toUpperCase();
+    if (fFin && FINANCIERAS.includes(fFin)) { filt.push('UPPER(c.financiera) = ?'); fp.push(fFin); }
+    if (req.query.desde) { filt.push(`${fechaCol} >= ?`); fp.push(req.query.desde); }
+    if (req.query.hasta) { filt.push(`${fechaCol} <= ?`); fp.push(req.query.hasta); }
+
+    const [rows] = await pool.query(
+      `SELECT DATE_FORMAT(${fechaCol},'%Y-%m-%d') fecha, c.num_op, c.financiera, c.id_financiera, c.ejecutivo, c.saldo_precio
+         FROM creditos c WHERE ${filt.join(' AND ')}
+        ORDER BY ${fechaCol} DESC, c.num_op DESC LIMIT 3000`, fp);
+
+    const map = new Map(); let totOps = 0, totMonto = 0;
+    rows.forEach(r => {
+      if (!map.has(r.fecha)) map.set(r.fecha, { fecha: r.fecha, ops: [], n: 0, monto: 0 });
+      const g = map.get(r.fecha); const sp = Number(r.saldo_precio) || 0;
+      g.ops.push({ num_op: r.num_op, financiera: r.financiera, id_financiera: r.id_financiera, ejecutivo: r.ejecutivo, saldo_precio: sp });
+      g.n++; g.monto += sp; totOps++; totMonto += sp;
+    });
+    res.json({ success: true, data: { tipo, dias: [...map.values()], total_ops: totOps, total_monto: totMonto }, error: null });
+  } catch (e) { console.error('[fundantes-seguimiento resumen]', e.message); res.status(500).json({ success: false, data: null, error: 'Error interno del servidor' }); }
+};
+
+module.exports = { listar, resumen, subirDoc, eliminarDoc, descargar, descargarZip, enviar, validar };
