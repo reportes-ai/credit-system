@@ -185,7 +185,7 @@ async function vistaTesorero() {
         </div>
         ${miCaja ? `<span class="banner-badge"><span class="banner-badge-label">Mi caja</span><span class="banner-badge-value"><i class="bi bi-cash-coin me-1"></i>${esc(miCaja.nombre_caja)}</span></span>` : ''}
         ${miCaja ? `<a href="/ordenes-pago/historial/" style="background:#16a34a;color:#fff;border:none;border-radius:8px;padding:9px 16px;font-size:.85rem;font-weight:700;text-decoration:none;display:inline-flex;align-items:center;gap:6px;box-shadow:0 2px 8px rgba(0,0,0,.25)"><i class="bi bi-receipt"></i>Pagar órdenes</a>` : ''}
-        ${miCaja ? `<a href="/tesoreria/caja" style="background:#0141A2;color:#fff;border:none;border-radius:8px;padding:9px 16px;font-size:.85rem;font-weight:700;text-decoration:none;display:inline-flex;align-items:center;gap:6px;box-shadow:0 2px 8px rgba(0,0,0,.25)"><i class="bi bi-cash-coin"></i>Pagar cuotas</a>` : ''}
+        ${miCaja ? `<a href="/tesoreria/caja.html" style="background:#0141A2;color:#fff;border:none;border-radius:8px;padding:9px 16px;font-size:.85rem;font-weight:700;text-decoration:none;display:inline-flex;align-items:center;gap:6px;box-shadow:0 2px 8px rgba(0,0,0,.25)"><i class="bi bi-cash-coin"></i>Pagar cuotas</a>` : ''}
       </div>
     </div>
 
@@ -280,7 +280,7 @@ async function vistaCajero(miCaja) {
           <button class="btn-filtrar" onclick="recargarCajero(${miCaja.id_caja})"><i class="bi bi-funnel me-1"></i>Filtrar</button>
         </div>
         <a href="/ordenes-pago/historial/" style="background:#16a34a;color:#fff;border:none;border-radius:8px;padding:9px 16px;font-size:.85rem;font-weight:700;text-decoration:none;display:inline-flex;align-items:center;gap:6px;box-shadow:0 2px 8px rgba(0,0,0,.25)"><i class="bi bi-receipt"></i>Pagar órdenes</a>
-        <a href="/tesoreria/caja" style="background:#0141A2;color:#fff;border:none;border-radius:8px;padding:9px 16px;font-size:.85rem;font-weight:700;text-decoration:none;display:inline-flex;align-items:center;gap:6px;box-shadow:0 2px 8px rgba(0,0,0,.25)"><i class="bi bi-cash-coin"></i>Pagar cuotas</a>
+        <a href="/tesoreria/caja.html" style="background:#0141A2;color:#fff;border:none;border-radius:8px;padding:9px 16px;font-size:.85rem;font-weight:700;text-decoration:none;display:inline-flex;align-items:center;gap:6px;box-shadow:0 2px 8px rgba(0,0,0,.25)"><i class="bi bi-cash-coin"></i>Pagar cuotas</a>
       </div>
     </div>
 
