@@ -343,6 +343,7 @@ const PAGINAS = [
   ['/soporte/compras', 'soporte/compras/index.html'],
   ['/soporte/tickets-ti', 'soporte/tickets-ti/index.html'],
   ['/recursos-humanos', 'recursos-humanos/index.html'],
+  ['/soporte/recursos-humanos', 'recursos-humanos/index.html'],
   ['/recursos-humanos/vacaciones', 'recursos-humanos/vacaciones/index.html'],
   ['/recursos-humanos/antiguedad', 'recursos-humanos/antiguedad/index.html'],
   ['/mantenedores/tickets-ti', 'mantenedores/tickets-ti/index.html'],
