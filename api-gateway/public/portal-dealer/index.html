@@ -336,7 +336,7 @@
 <script src="/js/webrtc-atencion.js"></script>
 <script>
 const esc = s => String(s ?? '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
-const hora = d => new Date(d).toLocaleTimeString('es-CL',{hour:'2-digit',minute:'2-digit'});
+const hora = d => new Date(d).toLocaleTimeString('es-CL',{timeZone:'America/Santiago',hour:'2-digit',minute:'2-digit'});
 const esImg = n => /\.(png|jpe?g|gif|webp|bmp)$/i.test(String(n||''));
 function toast(msg, err){ const t=document.getElementById('toast'); t.textContent=msg; t.className='toast-af'+(err?' err':''); t.style.display='block'; clearTimeout(t._h); t._h=setTimeout(()=>t.style.display='none',3000); }
 

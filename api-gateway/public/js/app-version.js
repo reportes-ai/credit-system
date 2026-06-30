@@ -2,7 +2,7 @@
    AutoFácil — Versión global de la aplicación
    Editar SOLO este archivo para cambiar la versión
    ───────────────────────────────────────────── */
-const APP_VERSION = 'v77.27';
+const APP_VERSION = 'v77.28';
 
 document.addEventListener('DOMContentLoaded', () => {
 
@@ -607,7 +607,7 @@ document.addEventListener('DOMContentLoaded', () => {
               : '<span title="Prioridad normal" style="font-size:.58rem;font-weight:800;letter-spacing:.3px;color:#64748b;background:#e2e8f0;border-radius:8px;padding:1px 7px">NORMAL</span>'}
           </div>
           <div style="color:#475569;margin:2px 0">${escN(n.mensaje || '')}</div>
-          <div style="font-size:.68rem;color:#94a3b8">${new Date(n.created_at).toLocaleString('es-CL')}</div>
+          <div style="font-size:.68rem;color:#94a3b8">${new Date(n.created_at).toLocaleString('es-CL',{timeZone:'America/Santiago'})}</div>
         </div>`).join('')
         : '<div style="padding:20px;text-align:center;color:#94a3b8">Sin notificaciones</div>';
       list.querySelectorAll('.af-notif-item').forEach(el => {

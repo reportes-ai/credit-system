@@ -174,7 +174,7 @@ const CAT = {
 function esc(s){ return String(s==null?'':s).replace(/[&<>"]/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c])); }
 function dDate(v){ if(!v) return null; const d=new Date(v); return isNaN(d)?null:d; }
 function fFecha(v){ const d=dDate(v); if(!d) return '—'; return d.toLocaleDateString('es-CL',{day:'2-digit',month:'2-digit',year:'numeric'}); }
-function fHora(v){ const d=dDate(v); if(!d) return ''; const hh=d.getHours(), mm=d.getMinutes(); return (hh||mm)? d.toLocaleTimeString('es-CL',{hour:'2-digit',minute:'2-digit'}) : ''; }
+function fHora(v){ const d=dDate(v); if(!d) return ''; const hh=d.getHours(), mm=d.getMinutes(); return (hh||mm)? d.toLocaleTimeString('es-CL',{timeZone:'America/Santiago',hour:'2-digit',minute:'2-digit'}) : ''; }
 function fDiaLargo(v){ const d=dDate(v); if(!d) return 'Sin fecha'; return d.toLocaleDateString('es-CL',{weekday:'long',day:'2-digit',month:'long',year:'numeric'}); }
 function stClass(s){ s=(s||'').toUpperCase(); return ['OTORGADO','APROBADA','RECHAZADA','RECHAZADO','ANULADO','DESISTIDO','DESISTIDA','PENDIENTE','VIGENTE'].includes(s)?('st-'+s):'st-default'; }
 

@@ -987,7 +987,7 @@ async function cargarDesempeno(){
     }).join('');
   } catch(e){ tb.innerHTML = '<tr><td colspan="7" style="text-align:center;color:#b91c1c;padding:20px">Error al cargar</td></tr>'; }
 }
-function fmtDT(s){ if(!s) return ''; const d=new Date(s); return isNaN(d)?'':d.toLocaleString('es-CL'); }
+function fmtDT(s){ if(!s) return ''; const d=new Date(s); return isNaN(d)?'':d.toLocaleString('es-CL',{timeZone:'America/Santiago'}); }
 async function openCasos(fecha, tipo, dia){
   let modal = document.getElementById('casosModal');
   if(!modal){
@@ -2625,7 +2625,7 @@ function filtrarInformes(){
 function renderInformes(){
   const rows = filtrarInformes();
   document.getElementById('infCount').textContent = rows.length + ' carta(s) encontradas';
-  const fdt = v => { if(!v) return '—'; const d=new Date(v); return isNaN(d)?'—':d.toLocaleDateString('es-CL')+' '+d.toLocaleTimeString('es-CL',{hour:'2-digit',minute:'2-digit'}); };
+  const fdt = v => { if(!v) return '—'; const d=new Date(v); return isNaN(d)?'—':d.toLocaleDateString('es-CL',{timeZone:'America/Santiago'})+' '+d.toLocaleTimeString('es-CL',{timeZone:'America/Santiago',hour:'2-digit',minute:'2-digit'}); };
   const body = document.getElementById('bodyInformes');
   if (!rows.length) { body.innerHTML='<tr><td colspan="14" style="text-align:center;color:#94a3b8;padding:24px">Sin resultados</td></tr>'; return; }
   body.innerHTML = rows.map(c=>{
@@ -2717,7 +2717,7 @@ function aplicarMes(){
   renderMovimientos();
   renderRevCartolas();
 }
-function fdMov(v){ if(!v) return ''; const d=new Date(v); return isNaN(d)?'':d.toLocaleDateString('es-CL')+' '+d.toLocaleTimeString('es-CL',{hour:'2-digit',minute:'2-digit'}); }
+function fdMov(v){ if(!v) return ''; const d=new Date(v); return isNaN(d)?'':d.toLocaleDateString('es-CL',{timeZone:'America/Santiago'})+' '+d.toLocaleTimeString('es-CL',{timeZone:'America/Santiago',hour:'2-digit',minute:'2-digit'}); }
 function renderMovimientos(){
   const q = (document.getElementById('ctaBuscar').value||'').toLowerCase();
   const est = document.getElementById('ctaEstado').value;
@@ -2999,7 +2999,7 @@ async function cargarNotifs(){
         style="padding:10px 16px;border-bottom:1px solid #f8fafc;cursor:pointer;${n.leida?'':'background:#eff6ff'}">
         <div style="font-weight:700;color:#0f172a">${escH(n.titulo)}</div>
         <div style="color:#475569;margin:2px 0">${escH(n.mensaje||'')}</div>
-        <div style="font-size:.68rem;color:#94a3b8">${new Date(n.created_at).toLocaleString('es-CL')}</div>
+        <div style="font-size:.68rem;color:#94a3b8">${new Date(n.created_at).toLocaleString('es-CL',{timeZone:'America/Santiago'})}</div>
       </div>`).join('');
   } catch(e) {}
 }
@@ -3074,7 +3074,7 @@ async function cargarEnviadas(){
       <td style="font-size:.76rem">${escH(e.mail||'—')}</td>
       <td style="text-align:right">${fmtCLP(e.total_bruto)}</td>
       <td style="font-size:.74rem">${escH(e.enviado_por||'')}</td>
-      <td style="font-size:.74rem">${new Date(e.fecha_envio).toLocaleString('es-CL')}</td>
+      <td style="font-size:.74rem">${new Date(e.fecha_envio).toLocaleString('es-CL',{timeZone:'America/Santiago'})}</td>
       ${canRev?`<td style="text-align:right"><button class="btn-mini bm-anular" title="Reversar envío" onclick="reversarEnvio(${e.id},'${escH(e.concesionario)}','${escH(e.mes)}')"><i class="bi bi-arrow-counterclockwise"></i> Reversar</button></td>`:''}
     </tr>`).join('');
   } catch(e) {}

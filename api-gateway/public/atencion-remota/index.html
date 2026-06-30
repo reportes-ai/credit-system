@@ -312,7 +312,7 @@ document.getElementById('avatarInicial').textContent = (yo?.nombre||'?').charAt(
 function logout(){ sessionStorage.removeItem('token'); sessionStorage.removeItem('usuario'); location.href='/login.html'; }
 const esc = s => String(s ?? '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
 function toast(msg, err){ const t=document.getElementById('toast'); t.textContent=msg; t.className='toast-af'+(err?' err':''); t.style.display='block'; clearTimeout(t._h); t._h=setTimeout(()=>t.style.display='none',3000); }
-const hora = d => new Date(d).toLocaleTimeString('es-CL',{hour:'2-digit',minute:'2-digit'});
+const hora = d => new Date(d).toLocaleTimeString('es-CL',{timeZone:'America/Santiago',hour:'2-digit',minute:'2-digit'});
 const esImg = n => /\.(png|jpe?g|gif|webp|bmp)$/i.test(String(n||''));
 
 /* ── Adjuntos protegidos: token en el header Authorization, no en la URL
@@ -649,7 +649,7 @@ async function cargarSolicitudes(){
             <span><i class="bi bi-envelope"></i>${esc(s.email||'')}</span>
             <span><i class="bi bi-geo-alt"></i>${esc(s.direccion||'—')}</span>
           </div>
-          <div class="sol-fecha">Solicitada: ${new Date(s.created_at).toLocaleString('es-CL')}</div>
+          <div class="sol-fecha">Solicitada: ${new Date(s.created_at).toLocaleString('es-CL',{timeZone:'America/Santiago'})}</div>
         </div>
         <div class="sol-acc">
           <button class="btn-primary2" onclick="aprobarSol(${s.id})"><i class="bi bi-check-lg"></i> Aprobar</button>

@@ -21,7 +21,7 @@ const _cHora = p => {
   const s = p.created_at || p.fecha_pago;
   if (!s) return '';
   if (typeof s === 'string') { const t = s.slice(11, 19); return /^\d/.test(t) ? t : ''; }
-  try { return new Date(s).toLocaleTimeString('es-CL', { hour12: false }); } catch (_) { return ''; }
+  try { return new Date(s).toLocaleTimeString('es-CL', { timeZone: 'America/Santiago', hour12: false }); } catch (_) { return ''; }
 };
 
 /**
