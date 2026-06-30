@@ -1,0 +1,77 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8"><link rel="icon" href="/img/favicon.png" type="image/png">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Antigüedad — RRHH</title>
+  <!-- v1.0 -->
+  <link href="/css/bootstrap.min.css" rel="stylesheet"><link href="/css/bootstrap-icons.css" rel="stylesheet">
+  <style>
+    :root { --navy:#0141A2; --navy-dark:#012d70; --navy-light:#0255c5; --bg:#f0f4f8; }
+    body { background:var(--bg); font-family:'Segoe UI',system-ui,sans-serif; margin:0; }
+    .topnav { background:linear-gradient(90deg,var(--navy-dark),var(--navy-light)); color:#fff; height:60px; padding:0 24px; display:flex; align-items:center; justify-content:space-between; position:sticky; top:0; z-index:200; }
+    .topnav-left { display:flex; align-items:center; gap:16px; } .topnav-brand img { height:32px; filter:brightness(0) invert(1); } .topnav-brand { text-decoration:none; display:flex; gap:8px; align-items:center; }
+    .version-badge { background:rgba(255,255,255,.15); color:rgba(255,255,255,.75); font-size:.65rem; font-weight:700; border-radius:6px; padding:2px 8px; }
+    .breadcrumb-nav { color:rgba(255,255,255,.7); font-size:.85rem; } .breadcrumb-nav a { color:rgba(255,255,255,.75); text-decoration:none; }
+    .user-chip { background:rgba(255,255,255,.12); border-radius:24px; padding:5px 12px; color:#fff; font-size:.85rem; } .btn-logout { background:rgba(255,255,255,.1); border:1px solid rgba(255,255,255,.2); color:#fff; border-radius:8px; padding:5px 12px; font-size:.82rem; cursor:pointer; }
+    .main { padding:28px 34px; max-width:980px; margin:0 auto; }
+    .page-banner { background:linear-gradient(135deg,#7c2d12,#b45309 60%,#d97706); border-radius:16px; color:#fff; padding:22px 30px; margin-bottom:22px; display:flex; align-items:center; gap:16px; } .page-banner i { font-size:2.2rem; opacity:.9; } .page-banner h2 { margin:0; font-size:1.25rem; font-weight:700; } .page-banner p { margin:2px 0 0; opacity:.85; font-size:.84rem; }
+    .tabs { display:flex; gap:8px; margin-bottom:16px; flex-wrap:wrap; } .tab { padding:8px 16px; border-radius:20px; font-size:.84rem; font-weight:700; cursor:pointer; border:1.5px solid #e2e8f0; background:#fff; color:#64748b; } .tab.active { background:var(--navy); color:#fff; border-color:var(--navy); }
+    .card-box { background:#fff; border-radius:14px; box-shadow:0 1px 6px rgba(0,0,0,.07); padding:22px; }
+    .fld { margin-bottom:14px; } .fld label { display:block; font-size:.78rem; font-weight:600; color:#475569; margin-bottom:5px; } .fld input, .fld textarea { width:100%; border:1px solid #cbd5e1; border-radius:8px; padding:9px 11px; font-size:.88rem; box-sizing:border-box; }
+    .btn-navy { background:var(--navy); color:#fff; border:none; border-radius:8px; padding:10px 18px; font-weight:700; font-size:.88rem; cursor:pointer; }
+    table { width:100%; border-collapse:collapse; font-size:.85rem; } th { background:#f8fafc; color:#475569; text-transform:uppercase; font-size:.68rem; text-align:left; padding:10px 12px; border-bottom:1px solid #e5e7eb; } td { padding:10px 12px; border-bottom:1px solid #f1f5f9; }
+    .pill { border-radius:12px; padding:2px 9px; font-size:.7rem; font-weight:700; } .PENDIENTE { background:#fef9c3; color:#854d0e; } .EMITIDA { background:#dcfce7; color:#166534; } .RECHAZADA { background:#fee2e2; color:#b91c1c; }
+    .btn-mini { border:1px solid #cbd5e1; background:#fff; border-radius:7px; padding:5px 10px; font-size:.78rem; cursor:pointer; font-weight:600; } .btn-mini.ok { background:#dcfce7; color:#166534; border-color:#86efac; } .btn-mini.no { background:#fee2e2; color:#b91c1c; border-color:#fca5a5; }
+    .empty { text-align:center; color:#94a3b8; padding:30px 0; }
+  </style>
+</head>
+<body>
+<nav class="topnav">
+  <div class="topnav-left"><a href="/" class="topnav-brand"><img src="/img/logo.png" alt="AutoFácil"><span class="version-badge" id="versionBadge"></span></a>
+    <div class="breadcrumb-nav"><a href="/">Inicio</a> › <a href="/recursos-humanos/">Recursos Humanos</a> › <span style="color:#fff;font-weight:600"><i class="bi bi-award me-1"></i>Antigüedad</span></div></div>
+  <div style="display:flex;gap:10px;align-items:center"><span class="user-chip" id="navNombre">—</span><button class="btn-logout" onclick="logout()"><i class="bi bi-box-arrow-right me-1"></i>Salir</button></div>
+</nav>
+<div class="main">
+  <div class="page-banner"><i class="bi bi-award"></i><div><h2>Solicitudes de Antigüedad</h2><p>Pide tu certificado de antigüedad laboral; RRHH lo emite con tu fecha de ingreso.</p></div></div>
+  <div class="tabs"><div class="tab active" id="t1" onclick="tab('crear')"><i class="bi bi-plus-circle me-1"></i>Nueva solicitud</div><div class="tab" id="t2" onclick="tab('mias')"><i class="bi bi-person me-1"></i>Mis solicitudes</div><div class="tab" id="t3" onclick="tab('bandeja')" style="display:none"><i class="bi bi-inbox me-1"></i>Bandeja RRHH</div></div>
+  <div id="secCrear" class="card-box">
+    <div class="fld"><label>¿Para qué la necesitas? (opcional)</label><textarea id="fM" rows="3" placeholder="Ej. trámite bancario, beneficio, etc."></textarea></div>
+    <div style="text-align:right"><button class="btn-navy" onclick="crear()"><i class="bi bi-send me-1"></i>Solicitar certificado</button></div>
+  </div>
+  <div id="secLista" class="card-box" style="display:none">
+    <table><thead><tr><th>Solicitante</th><th>Motivo</th><th>Estado</th><th>Antigüedad</th><th id="thAcc"></th></tr></thead><tbody id="tb"><tr><td colspan="5" class="empty">Cargando…</td></tr></tbody></table>
+  </div>
+</div>
+<script src="/js/auth-guard.js"></script>
+<script>
+  const token=sessionStorage.getItem('token'), yo=JSON.parse(sessionStorage.getItem('usuario')||'null');
+  if(!token||!yo) location.href='/login.html';
+  document.getElementById('navNombre').textContent=`${yo?.nombre||''} ${yo?.apellido||''}`.trim();
+  function logout(){ sessionStorage.clear(); location.href='/login.html'; }
+  const H={Authorization:'Bearer '+token}, HJ={...H,'Content-Type':'application/json'};
+  const esc=s=>String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;'); const fd=s=>s?String(s).slice(0,10):'';
+  let VISTA='mias', ES_RRHH=false;
+  function antiguedadStr(fi){ if(!fi)return''; const a=new Date(fi+'T00:00:00'), b=new Date(); let m=(b.getFullYear()-a.getFullYear())*12+(b.getMonth()-a.getMonth()); if(b.getDate()<a.getDate())m--; m=Math.max(0,m); return `${Math.floor(m/12)} año(s) ${m%12} mes(es)`; }
+  function tab(t){ document.getElementById('t1').classList.toggle('active',t==='crear'); document.getElementById('t2').classList.toggle('active',t==='mias'); document.getElementById('t3').classList.toggle('active',t==='bandeja'); document.getElementById('secCrear').style.display=t==='crear'?'':'none'; document.getElementById('secLista').style.display=t==='crear'?'none':''; if(t!=='crear'){VISTA=t; cargar();} }
+  async function crear(){ const j=await(await fetch('/api/rrhh/antiguedad',{method:'POST',headers:HJ,body:JSON.stringify({motivo:document.getElementById('fM').value})})).json();
+    if(!j.success)return alert(j.error); alert('Solicitud enviada a RRHH'); document.getElementById('fM').value=''; tab('mias'); }
+  async function cargar(){ const tb=document.getElementById('tb'); tb.innerHTML='<tr><td colspan="5" class="empty">Cargando…</td></tr>';
+    const j=await(await fetch('/api/rrhh/antiguedad?vista='+VISTA,{headers:H})).json(); const rows=j.data?.solicitudes||[]; ES_RRHH=j.data?.es_rrhh; document.getElementById('t3').style.display=ES_RRHH?'':'none';
+    document.getElementById('thAcc').textContent=VISTA==='bandeja'?'Acción':'';
+    if(!rows.length){tb.innerHTML='<tr><td colspan="5" class="empty">Sin solicitudes.</td></tr>';return;}
+    tb.innerHTML=rows.map(s=>`<tr><td>${esc(s.nombre||'')}</td><td>${esc(s.motivo||'—')}</td>
+      <td><span class="pill ${s.estado}">${s.estado}</span>${s.motivo_rechazo?`<div style="font-size:.7rem;color:#b91c1c">${esc(s.motivo_rechazo)}</div>`:''}</td>
+      <td>${s.fecha_ingreso?`<b>${antiguedadStr(s.fecha_ingreso)}</b><div style="font-size:.7rem;color:#94a3b8">ingreso ${fd(s.fecha_ingreso)}</div>`:'—'}</td>
+      <td>${(VISTA==='bandeja'&&ES_RRHH&&s.estado==='PENDIENTE')?`<button class="btn-mini ok" onclick="emitir(${s.id})">Emitir</button> <button class="btn-mini no" onclick="resolver(${s.id},'RECHAZADA')">Rechazar</button>`:''}</td></tr>`).join('');
+  }
+  async function emitir(id){ const fi=prompt('Fecha de ingreso del empleado (AAAA-MM-DD):'); if(!fi)return;
+    if(!/^\d{4}-\d{2}-\d{2}$/.test(fi))return alert('Formato AAAA-MM-DD');
+    const j=await(await fetch(`/api/rrhh/antiguedad/${id}/resolver`,{method:'POST',headers:HJ,body:JSON.stringify({estado:'EMITIDA',fecha_ingreso:fi})})).json();
+    if(!j.success)return alert(j.error); cargar(); }
+  async function resolver(id,estado){ const mot=prompt('Motivo del rechazo:')||''; const j=await(await fetch(`/api/rrhh/antiguedad/${id}/resolver`,{method:'POST',headers:HJ,body:JSON.stringify({estado,motivo_rechazo:mot})})).json(); if(!j.success)return alert(j.error); cargar(); }
+  (async()=>{ const qid=new URLSearchParams(location.search).get('id'); if(qid){tab('mias');} else tab('crear'); })();
+</script>
+<script src="/js/app-version.js"></script>
+</body>
+</html>
