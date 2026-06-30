@@ -13,6 +13,7 @@ const { auditar } = require('../../../../shared/audit');
 const { tieneFunc } = require('../../../../shared/middleware/permisos');
 const { liquidar } = require('../../../../shared/liquidez-core');
 const { notificar } = require('../../../notificaciones/src/controllers/notificaciones.controller');
+const { emitirCorrelativo } = require('../../../../shared/ordenes-pago');
 
 const NIVELES_SEED = [
   { nivel: 1, nombre: 'Jefe / Gerente Comercial', tipo: 'APRUEBA',      func: 'liquidez_aprob_n1',        sla_horas: 48, alerta: 1 },
@@ -69,6 +70,18 @@ const NIVELES_SEED = [
         INDEX idx_hoja (id_hoja)
       )`);
   } catch (e) { if (e.errno !== 1050) console.error('[dlz_hoja_lineas migration]', e.message); }
+
+  // Columnas de enlace con la ODP (números formateados para mostrar).
+  try {
+    await pool.query(`ALTER TABLE dealer_liquidez_hoja_lineas ADD COLUMN IF NOT EXISTS odp_num_desc VARCHAR(30) NULL`);
+    await pool.query(`ALTER TABLE dealer_liquidez_hoja_lineas ADD COLUMN IF NOT EXISTS odp_num_aum VARCHAR(30) NULL`);
+  } catch (e) { console.error('[dlz_hoja_lineas alter odp]', e.message); }
+  // Enlace inverso en la ODP general → línea de la hoja (para el hook al pagar).
+  try {
+    await pool.query(`ALTER TABLE ordenes_pago ADD COLUMN IF NOT EXISTS liquidez_linea_id INT NULL`);
+    await pool.query(`ALTER TABLE ordenes_pago ADD COLUMN IF NOT EXISTS liquidez_tipo VARCHAR(8) NULL`);
+    await pool.query(`ALTER TABLE ordenes_pago ADD COLUMN IF NOT EXISTS liquidez_a DECIMAL(14,2) NULL`);
+  } catch (e) { console.error('[ordenes_pago alter liquidez]', e.message); }
 
   try {
     await pool.query(`
@@ -339,6 +352,96 @@ async function tickSLA() {
 setInterval(tickSLA, 30 * 60 * 1000);
 setTimeout(tickSLA, 20 * 1000); // un primer chequeo al arrancar
 
+/* ── Paso 3: emisión de Órdenes de Pago y abono al pagarse ─────────────────── */
+const fmtPesos = n => '$' + new Intl.NumberFormat('es-CL', { maximumFractionDigits: 0 }).format(Math.round(Number(n) || 0));
+
+// Crea una ODP GENERAL (aparece y se paga en el módulo de Órdenes de Pago) ligada a la línea.
+// tipo: 'LIQ' = mueve la deuda al pagarse; 'COM' = solo paga la comisión (sin tocar deuda).
+async function crearOdpLiquidez({ linea, monto, tipo, A, concepto, req }) {
+  monto = Math.round(Number(monto) || 0);
+  const [r] = await pool.query(
+    `INSERT INTO ordenes_pago
+       (id_proveedor, proveedor_nombre, proveedor_rut, concepto, tipo_documento, monto, monto_neto,
+        tratamiento, fecha_emision, estado, id_usuario, usuario_nombre, liquidez_linea_id, liquidez_tipo, liquidez_a)
+     VALUES (NULL,?,?,?,'Factura',?,?,'EXENTO',CURDATE(),'EMITIDA',?,?,?,?,?)`,
+    [linea.nombre_dealer, linea.rut_dealer, concepto, monto, monto,
+     req.usuario?.id_usuario || null, nombreDe(req.usuario), linea.id, tipo, A]);
+  const op = r.insertId;
+  const { numero } = await emitirCorrelativo({
+    origen: 'GENERAL', origen_id: op, concepto, monto,
+    id_usuario: req.usuario?.id_usuario || null, usuario_nombre: nombreDe(req.usuario) });
+  await pool.query('UPDATE ordenes_pago SET numero=? WHERE id=?', [numero, op]);
+  return { id: op, numero };
+}
+
+// Postea el movimiento de liquidación y deja la deuda del plan en A. Idempotente por línea.
+async function aplicarMovimiento(lineaId, idOdp) {
+  const [[l]] = await pool.query('SELECT * FROM dealer_liquidez_hoja_lineas WHERE id=?', [lineaId]);
+  if (!l || l.estado_odp === 'PAGADA') return;
+  const [[h]] = await pool.query('SELECT periodo FROM dealer_liquidez_hojas WHERE id=?', [l.id_hoja]);
+  const [[p]] = await pool.query('SELECT deuda_actual FROM dealer_liquidez_planes WHERE id=?', [l.id_plan]);
+  if (!p) return;
+  const e = efectivo(l);
+  const D = Number(p.deuda_actual), A = e.adelanto;
+  await pool.query(
+    `INSERT INTO dealer_liquidez_movimientos
+       (id_plan, id_dealer, fecha, periodo, tipo, comision, adelanto_obj, descuento, pago_neto, saldo_anterior, saldo_nuevo, glosa, id_odp)
+     VALUES (?,?,CURDATE(),?,'LIQUIDACION',?,?,?,?,?,?,?,?)`,
+    [l.id_plan, l.id_dealer, h?.periodo || null, e.comision, A, e.descuento, e.pago, D, A,
+     `Liquidación ${h?.periodo || ''}`, idOdp || null]);
+  await pool.query('UPDATE dealer_liquidez_planes SET deuda_actual=? WHERE id=?', [A, l.id_plan]);
+  await pool.query("UPDATE dealer_liquidez_hoja_lineas SET estado_odp='PAGADA' WHERE id=?", [lineaId]);
+}
+
+// POST /hojas/:id/emitir-odp — emite las ODP de una hoja APROBADA.
+const emitirOdp = async (req, res) => {
+  try {
+    const [[h]] = await pool.query('SELECT * FROM dealer_liquidez_hojas WHERE id=?', [req.params.id]);
+    if (!h) return res.status(404).json({ success: false, data: null, error: 'Hoja no encontrada' });
+    if (h.estado !== 'APROBADA') return res.status(400).json({ success: false, data: null, error: 'La hoja debe estar aprobada para emitir las ODP' });
+    const [lineas] = await pool.query('SELECT * FROM dealer_liquidez_hoja_lineas WHERE id_hoja=?', [req.params.id]);
+    let creadas = 0, aplicadas = 0;
+    for (const l of lineas) {
+      if (l.id_odp_descuento || l.estado_odp === 'PAGADA') continue; // ya emitida/aplicada
+      const e = efectivo(l);
+      if (e.descuento >= 0) {
+        if (e.pago > 0) {
+          const o = await crearOdpLiquidez({ linea: l, monto: e.pago, tipo: 'LIQ', A: e.adelanto, req,
+            concepto: `Comisión ${h.periodo} Plan Liquidez — ${l.nombre_dealer}` + (e.descuento > 0 ? ` (descuento adelanto ${fmtPesos(e.descuento)})` : '') });
+          await pool.query("UPDATE dealer_liquidez_hoja_lineas SET id_odp_descuento=?, odp_num_desc=?, estado_odp='ODP_EMITIDA' WHERE id=?", [o.id, o.numero, l.id]);
+          creadas++;
+        } else {
+          // Pago $0: no hay ODP; la comisión completa abona la deuda → se aplica de inmediato.
+          await aplicarMovimiento(l.id, null); aplicadas++;
+        }
+      } else {
+        // Aumento: ODP de comisión (no mueve deuda) + 2ª ODP por el adelanto extra (mueve deuda).
+        const oc = await crearOdpLiquidez({ linea: l, monto: e.comision, tipo: 'COM', A: e.adelanto, req,
+          concepto: `Comisión ${h.periodo} — ${l.nombre_dealer}` });
+        const oa = await crearOdpLiquidez({ linea: l, monto: -e.descuento, tipo: 'LIQ', A: e.adelanto, req,
+          concepto: `Aumento de adelanto Plan Liquidez ${h.periodo} — ${l.nombre_dealer}` });
+        await pool.query("UPDATE dealer_liquidez_hoja_lineas SET id_odp_descuento=?, odp_num_desc=?, id_odp_aumento=?, odp_num_aum=?, estado_odp='ODP_EMITIDA' WHERE id=?",
+          [oc.id, oc.numero, oa.id, oa.numero, l.id]);
+        creadas += 2;
+      }
+    }
+    auditar({ req, accion: 'CREAR', modulo: 'ordenes-pago', entidad: 'dealer_liquidez_hoja', entidad_id: h.id,
+      detalle: `Emitió ODP de la Hoja ${h.periodo} (${creadas} órdenes, ${aplicadas} sin pago)` });
+    res.json({ success: true, data: { creadas, aplicadas }, error: null });
+  } catch (e) { console.error('[hojas emitirOdp]', e.message); res.status(500).json({ success: false, data: null, error: 'Error interno del servidor' }); }
+};
+
+// Hook llamado por ordenes-pago al pagarse una ODP GENERAL. idOrdenPago = ordenes_pago.id.
+async function onOdpPagada(idOrdenPago) {
+  try {
+    const [[op]] = await pool.query('SELECT liquidez_linea_id, liquidez_tipo FROM ordenes_pago WHERE id=?', [idOrdenPago]);
+    if (!op || !op.liquidez_linea_id) return;          // no es una ODP de Plan Liquidez
+    if (op.liquidez_tipo !== 'LIQ') return;            // la ODP de comisión (COM) no mueve la deuda
+    await aplicarMovimiento(op.liquidez_linea_id, idOrdenPago);
+  } catch (e) { console.error('[liquidez onOdpPagada]', e.message); }
+}
+
 module.exports = {
-  listarHojas, obtenerHoja, generarHoja, enviarHoja, modificarLinea, aprobarHoja, conocimientoHoja, tickSLA,
+  listarHojas, obtenerHoja, generarHoja, enviarHoja, modificarLinea, aprobarHoja, conocimientoHoja,
+  emitirOdp, onOdpPagada, tickSLA,
 };

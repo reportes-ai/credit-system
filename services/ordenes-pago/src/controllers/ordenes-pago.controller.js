@@ -735,6 +735,12 @@ const pagarOrden = async (req, res) => {
     if (oc.origen === 'GENERAL') {
       await pool.query(`UPDATE ordenes_pago SET estado='PAGADA', fecha_pago=?, metodo_pago=COALESCE(?, metodo_pago) WHERE id=?`,
         [fechaPago, metodo, oc.origen_id]);
+      // Hook Plan Liquidez: si la ODP corresponde a una liquidación, postea el abono y baja/sube la deuda.
+      // Aislado en try/catch: nunca debe romper el pago.
+      try {
+        const liq = require('../../../dealers-liquidez/src/controllers/hojas.controller');
+        if (liq.onOdpPagada) await liq.onOdpPagada(oc.origen_id);
+      } catch (e) { console.error('[ordenes-pago hook liquidez]', e.message); }
     } else if (oc.origen === 'SALDO') {
       const [[s]] = await pool.query('SELECT id_seguimiento FROM postventa_ordenes WHERE id=?', [oc.origen_id]);
       if (s) await pool.query(`INSERT IGNORE INTO postventa_etapas (id_seguimiento, track, etapa, usuario) VALUES (?, 'SALDO', 'SALDO PRECIO PAGADO', ?)`, [s.id_seguimiento, quien]);

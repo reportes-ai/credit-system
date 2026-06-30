@@ -5,7 +5,7 @@
   <link rel="icon" href="/img/favicon.png" type="image/png">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Hojas de Liquidación — Plan Liquidez</title>
-  <!-- v1.1 -->
+  <!-- v1.2 -->
   <link href="/css/bootstrap.min.css" rel="stylesheet">
   <link href="/css/bootstrap-icons.css" rel="stylesheet">
   <style>
@@ -194,6 +194,14 @@
       ? { c:+l.comision_mod, a:+l.adelanto_mod, d:+l.descuento_mod, p:+l.pago_mod }
       : { c:+l.comision, a:+l.adelanto_obj, d:+l.descuento, p:+l.pago_neto };
   }
+  function odpCell(l) {
+    const nums = [l.odp_num_desc, l.odp_num_aum].filter(Boolean);
+    const est = l.estado_odp || 'PENDIENTE';
+    const color = est==='PAGADA' ? '#166534' : (est==='ODP_EMITIDA' ? '#1e40af' : '#94a3b8');
+    if (!nums.length && est==='PENDIENTE') return '<span style="color:#94a3b8">—</span>';
+    return `<div style="font-size:.72rem;color:${color};font-weight:700">${est.replace('_',' ')}</div>` +
+           (nums.length ? `<div style="font-size:.7rem;color:#64748b">${nums.join(' · ')}</div>` : '');
+  }
   function stepHtml(h, nivel) {
     const cfg = (h.niveles||[]).find(n=>n.nivel===nivel) || {};
     const est = h['n'+nivel+'_estado'];
@@ -219,6 +227,8 @@
     if (h.estado==='PENDIENTE_N1' && PERM.n1) acc.push(`<button class="btn-navy" onclick="aprobar(${h.id})"><i class="bi bi-check2-circle"></i> Aprobar Nivel 1</button>`);
     if (h.estado==='PENDIENTE_N2' && PERM.n2) acc.push(`<button class="btn-navy" onclick="aprobar(${h.id})"><i class="bi bi-check2-circle"></i> Aprobar Nivel 2</button>`);
     if (h.estado==='APROBADA' && h.n3_estado!=='VISTO' && PERM.n3) acc.push(`<button class="btn-navy" onclick="conocimiento(${h.id})"><i class="bi bi-eye-fill"></i> Tomar conocimiento (Finanzas)</button>`);
+    const emitida = (h.lineas||[]).some(l => l.id_odp_descuento || (l.estado_odp && l.estado_odp!=='PENDIENTE'));
+    if (h.estado==='APROBADA' && PERM.gestionar && !emitida) acc.push(`<button class="btn-navy" onclick="emitirOdp(${h.id})"><i class="bi bi-receipt"></i> Emitir Órdenes de Pago</button>`);
     const puedeMod = h.estado==='PENDIENTE_N1' && PERM.n1;
 
     const filas = (h.lineas||[]).map(l => { const e = eff(l);
@@ -230,6 +240,7 @@
         <td class="num">${money(e.a)}</td>
         <td class="num">${descTxt}</td>
         <td class="num"><b>${money(e.p)}</b></td>
+        <td>${odpCell(l)}</td>
         ${puedeMod?`<td><button class="link-act" onclick='abrirMod(${JSON.stringify({id:l.id,nombre:l.nombre_dealer,c:e.c}).replace(/'/g,"&#39;")})'>Modificar</button></td>`:'<td></td>'}
       </tr>`; }).join('');
 
@@ -241,15 +252,21 @@
       </div>
       <div class="chain">${stepHtml(h,1)}${stepHtml(h,2)}${stepHtml(h,3)}</div>
       <div class="card-box"><table>
-        <thead><tr><th>Dealer / motivo</th><th class="num">Comisión</th><th class="num">Deuda ant.</th><th class="num">Adelanto (A)</th><th class="num">Desc./Aum.</th><th class="num">Pago neto</th><th></th></tr></thead>
+        <thead><tr><th>Dealer / motivo</th><th class="num">Comisión</th><th class="num">Deuda ant.</th><th class="num">Adelanto (A)</th><th class="num">Desc./Aum.</th><th class="num">Pago neto</th><th>ODP</th><th></th></tr></thead>
         <tbody>${filas || '<tr><td colspan="7" class="empty">Sin líneas</td></tr>'}</tbody>
       </table></div>
-      ${h.estado==='APROBADA'?'<div style="background:#dcfce7;border-left:4px solid #16a34a;border-radius:8px;padding:12px 16px;font-size:.84rem;color:#166534">Hoja aprobada — habilitada para emitir las Órdenes de Pago (descuentos y, para los aumentos, una 2ª ODP). <i>El enganche con la ODP es el siguiente paso.</i></div>':''}`;
+      ${h.estado==='APROBADA'?`<div style="background:#dcfce7;border-left:4px solid #16a34a;border-radius:8px;padding:12px 16px;font-size:.84rem;color:#166534">${emitida?'Órdenes de Pago emitidas. Se pagan en el módulo <b>Órdenes de Pago</b>; al pagarse se postea el abono y la deuda del dealer queda en el nuevo adelanto (A). Los pagos $0 ya se aplicaron solos.':'Hoja aprobada. Usa <b>Emitir Órdenes de Pago</b> para generarlas: los descuentos en la ODP de comisión y, para los aumentos, una 2ª ODP con su glosa.'}</div>`:''}`;
   }
 
   async function enviar(id) { if(!confirm('¿Enviar la hoja a la cadena de aprobación?'))return; const r=await fetch(`/api/dealer-liquidez/hojas/${id}/enviar`,{method:'POST',headers:H}); const j=await r.json(); if(!j.success)return alert(j.error); ver(id); cargar(); }
   async function aprobar(id) { if(!confirm('¿Aprobar este nivel?'))return; const r=await fetch(`/api/dealer-liquidez/hojas/${id}/aprobar`,{method:'POST',headers:H}); const j=await r.json(); if(!j.success)return alert(j.error); ver(id); cargar(); }
   async function conocimiento(id) { const r=await fetch(`/api/dealer-liquidez/hojas/${id}/conocimiento`,{method:'POST',headers:H}); const j=await r.json(); if(!j.success)return alert(j.error); ver(id); }
+  async function emitirOdp(id) {
+    if(!confirm('¿Emitir las Órdenes de Pago de esta hoja? Aparecerán en el módulo Órdenes de Pago para su pago.'))return;
+    const r=await fetch(`/api/dealer-liquidez/hojas/${id}/emitir-odp`,{method:'POST',headers:H}); const j=await r.json();
+    if(!j.success)return alert(j.error||'No se pudo emitir');
+    alert(`Listo: ${j.data.creadas} órdenes emitidas${j.data.aplicadas?`, ${j.data.aplicadas} sin pago aplicadas`:''}.`); ver(id);
+  }
 
   function abrirMod(l) {
     document.getElementById('modLid').value = l.id;

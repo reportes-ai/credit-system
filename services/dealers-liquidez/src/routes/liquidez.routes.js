@@ -36,5 +36,7 @@ router.post('/hojas/:id/enviar',  verifyToken, requireFunc('liquidez_hoja_gestio
 router.put('/hojas/:id/lineas/:lid', verifyToken, hojas.modificarLinea);
 router.post('/hojas/:id/aprobar',    verifyToken, hojas.aprobarHoja);
 router.post('/hojas/:id/conocimiento', verifyToken, hojas.conocimientoHoja);
+// Emisión de las Órdenes de Pago de una hoja aprobada.
+router.post('/hojas/:id/emitir-odp', verifyToken, requireFunc('liquidez_hoja_gestionar'), hojas.emitirOdp);
 
 module.exports = router;
