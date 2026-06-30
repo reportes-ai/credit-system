@@ -21,7 +21,7 @@
     .wrap { max-width:1400px; margin:0 auto; padding:22px 28px; display:flex; gap:22px; align-items:flex-start; }
     .col-cat { flex:1; min-width:0; }
     .col-cart { width:340px; flex-shrink:0; position:sticky; top:80px; }
-    .banner { background:linear-gradient(135deg,#134e4a,#155e75 50%,#0891b2); border-radius:14px; color:#fff; padding:18px 24px; margin-bottom:18px; display:flex; align-items:center; gap:14px; }
+    .banner { background:linear-gradient(135deg,#012d70,#0141A2 50%,#009AFE); border-radius:14px; color:#fff; padding:18px 24px; margin-bottom:18px; display:flex; align-items:center; gap:14px; }
     .banner i { font-size:2rem; opacity:.85; }
     .banner h2 { font-weight:700; margin:0; font-size:1.15rem; }
     .banner p { opacity:.85; margin:0; font-size:.82rem; }
@@ -84,7 +84,7 @@
 
     <div class="col-cart">
       <div class="cart">
-        <div class="cart-head"><i class="bi bi-cart3"></i> Tu pedido <span id="cartN" style="margin-left:auto;background:#155e75;border-radius:20px;padding:1px 9px;font-size:.8rem">0</span></div>
+        <div class="cart-head"><i class="bi bi-cart3"></i> Tu pedido <span id="cartN" style="margin-left:auto;background:#0141A2;border-radius:20px;padding:1px 9px;font-size:.8rem">0</span></div>
         <div class="cart-body" id="cartBody"><p class="muted" style="font-size:.85rem">Tu carrito está vacío.</p></div>
         <div class="cart-foot">
           <div class="total"><span>Total</span><span id="cartTotal">$0</span></div>
@@ -204,7 +204,7 @@
     async function verPedidos() {
       const j = await api('/api/compras/mis-pedidos');
       const cont = document.getElementById('pedList');
-      const E = { PENDIENTE:'#f59e0b', CONSOLIDADO:'#0891b2', COMPRADO:'#2563eb', RECIBIDO:'#16a34a', ANULADO:'#94a3b8' };
+      const E = { PENDIENTE:'#f59e0b', CONSOLIDADO:'#009AFE', COMPRADO:'#2563eb', RECIBIDO:'#16a34a', ANULADO:'#94a3b8' };
       cont.innerHTML = (j?.success && j.data.length) ? j.data.map(p => `
         <div style="border:1px solid #e5e7eb;border-radius:10px;padding:12px;margin-bottom:10px">
           <div style="display:flex;justify-content:space-between;align-items:center">

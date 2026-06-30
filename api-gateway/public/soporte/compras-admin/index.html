@@ -19,7 +19,7 @@
     .breadcrumb-nav .sep { color:rgba(255,255,255,0.35); }
     .btn-logout { background:rgba(255,255,255,0.1); border:1px solid rgba(255,255,255,0.2); color:#fff; border-radius:8px; padding:5px 12px; font-size:0.82rem; cursor:pointer; }
     .main-content { padding:24px 32px; max-width:1400px; margin:0 auto; }
-    .page-banner { background:linear-gradient(135deg,#1e3a8a,#0141A2 50%,#0891b2); border-radius:14px; color:#fff; padding:22px 30px; margin-bottom:20px; display:flex; align-items:center; gap:16px; }
+    .page-banner { background:linear-gradient(135deg,#1e3a8a,#0141A2 50%,#009AFE); border-radius:14px; color:#fff; padding:22px 30px; margin-bottom:20px; display:flex; align-items:center; gap:16px; }
     .page-banner i { font-size:2.4rem; opacity:.85; }
     .page-banner h2 { font-weight:700; margin:0 0 3px; font-size:1.25rem; }
     .page-banner p { opacity:.85; margin:0; font-size:.85rem; }
@@ -142,7 +142,7 @@
       return res.json();
     }
     function toast(msg, ok=true){ const d=document.createElement('div'); d.textContent=msg; d.style.cssText=`position:fixed;top:74px;right:20px;z-index:9999;background:${ok?'#16a34a':'#dc2626'};color:#fff;padding:10px 16px;border-radius:8px;box-shadow:0 6px 20px rgba(0,0,0,.25);font-size:.88rem`; document.body.appendChild(d); setTimeout(()=>d.remove(),3200); }
-    const ESTC = { PENDIENTE:'#f59e0b', CONSOLIDADO:'#0891b2', ABIERTA:'#0891b2', COMPRADO:'#2563eb', COMPRADA:'#2563eb', RECIBIDO:'#16a34a', RECIBIDA:'#16a34a', ANULADA:'#94a3b8', ANULADO:'#94a3b8' };
+    const ESTC = { PENDIENTE:'#f59e0b', CONSOLIDADO:'#009AFE', ABIERTA:'#009AFE', COMPRADO:'#2563eb', COMPRADA:'#2563eb', RECIBIDO:'#16a34a', RECIBIDA:'#16a34a', ANULADA:'#94a3b8', ANULADO:'#94a3b8' };
 
     /* ── PEDIDOS PENDIENTES ── */
     let peds = [];

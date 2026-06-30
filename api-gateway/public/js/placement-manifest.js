@@ -16,7 +16,7 @@ const PLACEMENT_SECTIONS = {
   politica:      { label: 'Política',             icon: 'bi-shield-lock',            color: '#7c3aed' },
   simulador:     { label: 'Simulador Rentabilidad', icon: 'bi-calculator',            color: '#0369a1' },
   carga_masiva:  { label: 'Carga Masiva',         icon: 'bi-cloud-upload',           color: '#0f766e' },
-  soporte:       { label: 'Soporte',              icon: 'bi-headset',                color: '#155e75' },
+  soporte:       { label: 'Soporte',              icon: 'bi-headset',                color: '#0141A2' },
 };
 
 const PLACEMENT_ITEMS = {
@@ -190,7 +190,7 @@ function moduleSectionForHref(href, moduleRoutes) {
   return best ? moduleKey(best) : null;
 }
 // Paleta para ventanas generadas (las curadas conservan su color).
-const _SECTION_PALETTE = ['#0e7490', '#7c3aed', '#b45309', '#be123c', '#15803d', '#4338ca', '#9333ea', '#0369a1', '#a16207', '#0f766e', '#7c2d12', '#1e40af'];
+const _SECTION_PALETTE = ['#0255c5', '#7c3aed', '#b45309', '#be123c', '#15803d', '#4338ca', '#9333ea', '#0369a1', '#a16207', '#0f766e', '#7c2d12', '#1e40af'];
 function _colorForKey(k) { let h = 0; for (let i = 0; i < k.length; i++) h = (h * 31 + k.charCodeAt(i)) >>> 0; return _SECTION_PALETTE[h % _SECTION_PALETTE.length]; }
 
 // Construye el set COMPLETO de ventanas: HOME + curadas + una por módulo activo (BD).
