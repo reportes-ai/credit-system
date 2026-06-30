@@ -551,6 +551,94 @@ function cerrarPanel() {
   document.querySelectorAll('.credito-card.selected').forEach(el => el.classList.remove('selected'));
 }
 
+/* ── PREPAGO (saldar el crédito completo) ─────────────────────────────────── */
+let _prepagoData = null;
+function _dlgPrepago() {
+  let d = document.getElementById('dlgPrepago');
+  if (!d) { d = document.createElement('dialog'); d.id = 'dlgPrepago';
+    d.style.cssText = 'border:none;border-radius:14px;padding:0;max-width:580px;width:94%;box-shadow:0 20px 60px rgba(0,0,0,.35)';
+    document.body.appendChild(d); }
+  return d;
+}
+async function abrirPrepago() {
+  const c = _credito; if (!c) return;
+  const numOp = c.num_op;
+  if (!numOp) return alert('No se pudo obtener el N° de operación del crédito.');
+  const d = _dlgPrepago();
+  d.innerHTML = `<div style="padding:34px;text-align:center;color:#475569"><div class="spinner-border text-primary" style="width:1.6rem;height:1.6rem"></div><div style="margin-top:10px">Calculando prepago…</div></div>`;
+  d.showModal();
+  let j; try { j = await (await API(`/api/pagos-credito/prepago/${encodeURIComponent(numOp)}`)).json(); }
+  catch (e) { d.innerHTML = _prepFoot('Error de red'); return; }
+  if (!j.success) { d.innerHTML = `<div class="dlg-head" style="background:#7c3aed;color:#fff;padding:16px 22px;font-weight:700">Prepago</div><div style="padding:22px;color:#b91c1c"><b>No se puede prepagar:</b><br>${esc(j.error)}</div>${_prepFoot()}`; return; }
+  _prepagoData = j.data;
+  renderPrepago();
+}
+function _prepFoot(msg) {
+  return `${msg ? `<div style="padding:20px;color:#b91c1c">${esc(msg)}</div>` : ''}<div style="padding:14px 22px;border-top:1px solid #e5e7eb;display:flex;justify-content:flex-end;gap:10px;background:#f8fafc"><button onclick="document.getElementById('dlgPrepago').close()" style="background:#fff;border:1px solid #cbd5e1;border-radius:8px;padding:8px 16px;font-weight:600;cursor:pointer">Cerrar</button></div>`;
+}
+function renderPrepago() {
+  const x = _prepagoData, d = _dlgPrepago();
+  const row = (lbl, val, strong) => `<tr><td style="padding:5px 0;color:#475569">${lbl}</td><td style="padding:5px 0;text-align:right;${strong?'font-weight:800;color:#0141A2':'font-weight:600'}">${clp(val)}</td></tr>`;
+  const intBucket = (+x.interes_mora) + (+x.interes_corriente) + (+x.comision_prepago);
+  const maxG = _miCaja?.puede_condonar_gastos ? Math.floor((+x.gastos_cobranza) * (+_miCaja.tope_gastos || 0) / 100) : 0;
+  const maxI = _miCaja?.puede_condonar_intereses ? Math.floor(intBucket * (+_miCaja.tope_intereses || 0) / 100) : 0;
+  const condBox = (id, lbl, max) => max > 0 ? `<div style="display:flex;justify-content:space-between;align-items:center;gap:10px;margin-top:8px">
+      <label style="font-size:.83rem;color:#475569">${lbl} <span style="color:#94a3b8">(máx ${clp(max)})</span></label>
+      <input id="${id}" type="text" value="0" data-max="${max}" oninput="onCondInput(this)" style="width:130px;text-align:right;border:1px solid #cbd5e1;border-radius:8px;padding:6px 9px">
+    </div>` : '';
+  d.innerHTML = `
+    <div class="dlg-head" style="background:#7c3aed;color:#fff;padding:16px 22px;display:flex;justify-content:space-between;align-items:center">
+      <span style="font-weight:700"><i class="bi bi-cash-stack me-1"></i>Prepagar crédito N° ${esc(x.num_op)}</span>
+      <button onclick="document.getElementById('dlgPrepago').close()" style="background:none;border:none;color:#fff;font-size:1.3rem;cursor:pointer">&times;</button>
+    </div>
+    <div style="padding:20px 22px;max-height:70vh;overflow:auto">
+      <div style="font-size:.86rem;color:#0f172a;margin-bottom:6px"><b>${esc(x.nombre||'')}</b> · RUT ${esc(x.rut||'')}</div>
+      <table style="width:100%;font-size:.88rem;border-collapse:collapse">
+        ${row('Capital de cuotas vigentes', x.capital_vigente)}
+        ${(+x.mora_cuotas)?row('Cuotas en mora', x.mora_cuotas):''}
+        ${(+x.interes_mora)?row('Interés por mora', x.interes_mora):''}
+        ${(+x.gastos_cobranza)?row('Gastos de cobranza', x.gastos_cobranza):''}
+        ${(+x.interes_corriente)?row('Interés corriente', x.interes_corriente):''}
+        ${row('Comisión de prepago', x.comision_prepago)}
+        ${row('Total a prepagar', x.saldo_insoluto, true)}
+      </table>
+      ${(maxG>0||maxI>0)?`<div style="margin-top:14px;border-top:1px dashed #cbd5e1;padding-top:10px"><div style="font-size:.78rem;font-weight:700;color:#7c3aed;text-transform:uppercase;letter-spacing:.5px">Condonación (dentro de tu atribución)</div>${condBox('condG','Condonar gastos',maxG)}${condBox('condI','Condonar intereses',maxI)}</div>`:''}
+      <div style="margin-top:16px;background:#f5f3ff;border:1px solid #ddd6fe;border-radius:10px;padding:12px 16px;display:flex;justify-content:space-between;align-items:center">
+        <span style="font-weight:700;color:#5b21b6">Total a cobrar</span>
+        <span id="prepTotal" style="font-weight:800;font-size:1.05rem;color:#5b21b6">${clp(x.saldo_insoluto)}</span>
+      </div>
+    </div>
+    <div style="padding:14px 22px;border-top:1px solid #e5e7eb;display:flex;justify-content:flex-end;gap:10px;background:#f8fafc">
+      <button onclick="document.getElementById('dlgPrepago').close()" style="background:#fff;border:1px solid #cbd5e1;border-radius:8px;padding:9px 16px;font-weight:600;cursor:pointer">Cancelar</button>
+      <button id="btnPrep" onclick="confirmarPrepago()" style="background:#7c3aed;color:#fff;border:none;border-radius:8px;padding:9px 18px;font-weight:700;cursor:pointer"><i class="bi bi-check-lg me-1"></i>Confirmar prepago</button>
+    </div>`;
+}
+function _unfmt(s){ return Number(String(s??'').replace(/[^\d]/g,''))||0; }
+function onCondInput(el){
+  const max = Number(el.dataset.max)||0; let v = _unfmt(el.value); if (v>max) v=max;
+  el.value = clp(v).replace(/^\$/,''); // muestra con separador de miles
+  const condG = _unfmt((document.getElementById('condG')||{}).value);
+  const condI = _unfmt((document.getElementById('condI')||{}).value);
+  const tot = Math.max(0, (+_prepagoData.saldo_insoluto) - condG - condI);
+  document.getElementById('prepTotal').textContent = clp(tot);
+}
+async function confirmarPrepago(){
+  const condG = _unfmt((document.getElementById('condG')||{}).value);
+  const condI = _unfmt((document.getElementById('condI')||{}).value);
+  if (!confirm('¿Confirmar el prepago? El crédito quedará PREPAGADO (estado terminal).')) return;
+  const btn = document.getElementById('btnPrep'); if (btn){ btn.disabled=true; btn.textContent='Procesando…'; }
+  let j; try {
+    j = await (await API('/api/pagos-credito/prepagar', { method:'POST', body: JSON.stringify({
+      num_op: _credito.num_op, id_caja: _miCaja.id_caja,
+      condona_gastos_monto: condG, condona_intereses_monto: condI }) })).json();
+  } catch(e){ if(btn){btn.disabled=false;btn.textContent='Confirmar prepago';} return alert('Error de red'); }
+  if (!j.success){ if(btn){btn.disabled=false;btn.innerHTML='<i class="bi bi-check-lg me-1"></i>Confirmar prepago';} return alert(j.error||'No se pudo prepagar'); }
+  document.getElementById('dlgPrepago').close();
+  alert(`Prepago registrado ✓\nTRX #${j.data.numero_transaccion}\nTotal cobrado: ${clp(j.data.total_cobrado)}` +
+    (j.data.condonado_gastos||j.data.condonado_intereses ? `\nCondonado: gastos ${clp(j.data.condonado_gastos)} · intereses ${clp(j.data.condonado_intereses)}` : ''));
+  cerrarPanel();
+}
+
 /* ── Abrir crédito ── */
 async function abrirCredito(id) {
   document.querySelectorAll('.credito-card').forEach(el => el.classList.remove('selected'));
@@ -716,6 +804,7 @@ function renderPanel() {
       </div>
       <div style="display:flex;gap:8px;align-items:center">
         <span style="background:rgba(255,255,255,.15);border-radius:8px;padding:4px 12px;font-size:.78rem;font-weight:700">${c.plazo} meses · ${clp(c.cuota||_schedule[0]?.monto||0)}/mes</span>
+        ${_miCaja?.puede_pagar_cuotas ? `<button class="btn-cerrar" onclick="abrirPrepago()" title="Prepagar (saldar) el crédito completo" style="background:#7c3aed"><i class="bi bi-cash-stack me-1"></i>Prepagar</button>` : ''}
         <button class="btn-cerrar" onclick="emitirODP()" title="Emitir Orden de Pago a Tesorería" style="background:rgba(255,255,255,.25)"><i class="bi bi-send me-1"></i>Emitir ODP</button>
         <button class="btn-cerrar" onclick="cerrarPanel()"><i class="bi bi-x-lg me-1"></i>Cerrar</button>
       </div>

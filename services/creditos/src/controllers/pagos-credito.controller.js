@@ -449,6 +449,118 @@ const createBatch = async (req, res) => {
   }
 };
 
+/* ─── PREPAGO (saldar el crédito completo en caja) ──────────────────────────
+ * Usa el MOTOR ÚNICO de prepago (certificados.calcularPrepago), el mismo del
+ * Certificado de Deuda para Prepago. Solo cartera propia AutoFácil. */
+const _r2 = n => Math.round(Number(n) || 0);
+
+// GET /prepago/:num_op — desglose para mostrar en el modal (read-only).
+const prepagoInfo = async (req, res) => {
+  try {
+    const { calcularPrepago } = require('../../../certificados/src/controllers/certificados.controller');
+    const pp = await calcularPrepago(req.params.num_op);
+    res.json({ success: true, data: { rut: pp.rut, nombre: pp.nombre, num_op: pp.num_op, financiera: pp.credito.financiera, ...pp.datos }, error: null });
+  } catch (e) { res.status(e.code || 500).json({ success: false, data: null, error: e.msg || 'Error calculando el prepago' }); }
+};
+
+// POST /prepagar — registra el prepago: paga todas las cuotas pendientes + 1 fila
+// sentinela (comisión de prepago + interés corriente) y deja el crédito PREPAGADO.
+// Condonación de intereses/gastos dentro de las atribuciones de la caja (proporcional).
+const prepagar = async (req, res) => {
+  const b = req.body || {};
+  const num_op = b.num_op;
+  const id_caja = b.id_caja;
+  if (!num_op) return res.status(400).json({ success: false, data: null, error: 'Falta el N° de operación' });
+  if (!id_caja) return res.status(400).json({ success: false, data: null, error: 'Se requiere una caja activa para registrar el prepago' });
+  const u = req.usuario || {};
+
+  // Atribuciones de la caja del usuario
+  const [[ca]] = await pool.query(
+    `SELECT cu.* FROM caja_usuarios cu JOIN cajas cj ON cj.id_caja=cu.id_caja
+      WHERE cu.id_caja=? AND cu.id_usuario=? AND cu.activo=1 AND cj.activo=1 LIMIT 1`, [id_caja, u.id_usuario]);
+  if (!ca) return res.status(403).json({ success: false, data: null, error: 'No tienes esta caja activa' });
+
+  // Motor único
+  let pp;
+  try { const { calcularPrepago } = require('../../../certificados/src/controllers/certificados.controller'); pp = await calcularPrepago(num_op); }
+  catch (e) { return res.status(e.code || 500).json({ success: false, data: null, error: e.msg || 'Error calculando el prepago' }); }
+  const c = pp.credito, d = pp.datos;
+  if (String(c.financiera || '').toUpperCase() !== 'AUTOFACIL')
+    return res.status(400).json({ success: false, data: null, error: 'El prepago en caja es solo para créditos AutoFácil (cartera propia)' });
+  const id_credito = c.id;
+
+  // Condonación dentro de atribuciones (gastos y/o intereses)
+  const Gfull = _r2(d.gastos_cobranza);
+  const Ifull = _r2(d.interes_mora) + _r2(d.interes_corriente) + _r2(d.comision_prepago);
+  const maxG = ca.puede_condonar_gastos ? Math.floor(Gfull * (Number(ca.tope_gastos) || 0) / 100) : 0;
+  const maxI = ca.puede_condonar_intereses ? Math.floor(Ifull * (Number(ca.tope_intereses) || 0) / 100) : 0;
+  let condG = Math.max(0, _r2(b.condona_gastos_monto));
+  let condI = Math.max(0, _r2(b.condona_intereses_monto));
+  if (condG > maxG) return res.status(403).json({ success: false, data: null, error: `La condonación de gastos excede tu atribución (máx $${maxG.toLocaleString('es-CL')})` });
+  if (condI > maxI) return res.status(403).json({ success: false, data: null, error: `La condonación de intereses excede tu atribución (máx $${maxI.toLocaleString('es-CL')})` });
+  condG = Math.min(condG, Gfull); condI = Math.min(condI, Ifull);
+
+  // La condonación de intereses se reparte: parte a la mora (por cuota) y parte a corriente+comisión (sentinela)
+  const moraTot = _r2(d.interes_mora);
+  const corrComTot = _r2(d.interes_corriente) + _r2(d.comision_prepago);
+  const condI_mora = Ifull > 0 ? Math.round(condI * (moraTot / Ifull)) : 0;
+  const condI_corr = condI - condI_mora;
+
+  const conn = await pool.getConnection();
+  try {
+    await conn.beginTransaction();
+    const [corr] = await conn.query('INSERT INTO correlativo_transacciones (created_at) VALUES (NOW())');
+    const trx = corr.insertId;
+    const reg = [u.nombre, u.apellido].filter(Boolean).join(' ') || u.email || null;
+    const idCajaInt = parseInt(id_caja) || null;
+    const idCtaInt = parseInt(b.id_cuenta_bancaria) || null;
+    const fp = b.fecha_pago || new Date().toLocaleDateString('sv-SE', { timeZone: 'America/Santiago' });
+    const obs = b.observacion || 'Prepago';
+
+    const detalle = d.detalle || [];
+    const gSum = detalle.reduce((s, q) => s + _r2(q.gastos_cobranza), 0);
+    const mSum = detalle.reduce((s, q) => s + _r2(q.interes_mora), 0);
+    let totalCobrado = 0;
+    const ins = `INSERT INTO pagos_credito
+       (id_credito, numero_cuota, fecha_vencimiento, monto_cuota, interes_mora, gastos_cobranza,
+        total_pagado, fecha_pago, estado_pago, observacion, registrado_por, id_registrado_por,
+        id_caja, origen_fondos, id_cuenta_bancaria, numero_transaccion, interes_mora_total, gastos_cobranza_total)
+       VALUES (?,?,?,?,?,?,?,?,'PAGADO',?,?,?,?,?,?,?,?,?)`;
+
+    for (const q of detalle) {
+      const gFull = _r2(q.gastos_cobranza), mFull = _r2(q.interes_mora);
+      const gCond = gSum > 0 ? Math.round(condG * (gFull / gSum)) : 0;
+      const mCond = mSum > 0 ? Math.round(condI_mora * (mFull / mSum)) : 0;
+      const gCol = Math.max(0, gFull - gCond), mCol = Math.max(0, mFull - mCond);
+      const tp = _r2(q.valor_cuota) + mCol + gCol;
+      totalCobrado += tp;
+      await conn.query(ins, [id_credito, q.numero_cuota, q.fecha_vencimiento || null, _r2(q.valor_cuota),
+        mCol, gCol, tp, fp, obs, reg, u.id_usuario || null, idCajaInt, b.origen_fondos || null, idCtaInt, trx, mFull, gFull]);
+    }
+    // Fila sentinela (numero_cuota = 0): comisión de prepago + interés corriente
+    const corrComCol = Math.max(0, corrComTot - condI_corr);
+    totalCobrado += corrComCol;
+    await conn.query(ins, [id_credito, 0, null, 0, corrComCol, 0, corrComCol, fp,
+      'Comisión de prepago + interés corriente', reg, u.id_usuario || null, idCajaInt, b.origen_fondos || null, idCtaInt, trx, corrComTot, 0]);
+
+    // Calendario real → marcar cuotas PAGADA; y estado terminal PREPAGADO (creditos + brokerage)
+    await conn.query("UPDATE cuotas_credito SET estado_cuota='PAGADA', fecha_pago=? WHERE id_credito=? AND estado_cuota<>'PAGADA'", [fp, id_credito]).catch(() => {});
+    await conn.query("UPDATE creditos SET estado_cartera='PREPAGADO' WHERE id=?", [id_credito]);
+    await conn.query("UPDATE operaciones_brokerage SET estado_cartera='PREPAGADO' WHERE num_op=?", [num_op]).catch(() => {});
+
+    await conn.commit();
+    auditar({ req, accion: 'PAGAR', modulo: 'pagos', entidad: 'prepago', entidad_id: trx,
+      detalle: `Prepago crédito ${num_op} — cobrado $${_r2(totalCobrado).toLocaleString('es-CL')} (condonado gastos $${condG.toLocaleString('es-CL')} / intereses $${condI.toLocaleString('es-CL')}) — TRX #${trx}`,
+      meta: { id_credito, num_op, numero_transaccion: trx, total_cobrado: _r2(totalCobrado), condona_gastos: condG, condona_intereses: condI } });
+    try { audit.registrar({ id_credito, req, accion: 'PREPAGO', detalle: `Prepago — TRX #${trx}, total $${_r2(totalCobrado).toLocaleString('es-CL')}`, meta: { numero_transaccion: trx, total_cobrado: _r2(totalCobrado) } }); } catch (_) {}
+    res.status(201).json({ success: true, data: { numero_transaccion: trx, total_cobrado: _r2(totalCobrado), condonado_gastos: condG, condonado_intereses: condI, cliente: pp.nombre, rut: pp.rut, num_op, desglose: d }, error: null });
+  } catch (e) {
+    try { await conn.rollback(); } catch (_) {}
+    console.error('[prepagar]', e.message);
+    res.status(500).json({ success: false, data: null, error: 'Error interno del servidor' });
+  } finally { conn.release(); }
+};
+
 /* ─── POST /reversar/:id_pago ───────────────────────────────────────────────
  * Reversa un pago registrado. Requiere comentario obligatorio y que el usuario
  * tenga puede_reversar_pagos = 1 en su asignación de caja.
@@ -586,4 +698,4 @@ const reversar = async (req, res) => {
   }
 };
 
-module.exports = { getByCredito, getById, create, createBatch, remove, reversar };
+module.exports = { getByCredito, getById, create, createBatch, remove, reversar, prepagoInfo, prepagar };
