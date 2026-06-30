@@ -553,12 +553,11 @@
           });
         }
 
-        // Orden guardado legacy (array de id_modulo como string) o por defecto
+        // Orden guardado: array UNIFICADO de claves (id_modulo para módulos, ruta para sub-items).
+        // El orden definitivo se arma más abajo, una vez construidas TODAS las cards (módulos + sub-items),
+        // para que el reordenamiento que mezcla ambos tipos se conserve al recargar.
         const ordenGuardado = (dataOrden.success && Array.isArray(dataOrden.data)) ? dataOrden.data : null;
-        const modsSorted = ordenGuardado
-          ? ordenGuardado.map(id => modulosData.find(m => String(m.id_modulo) === String(id))).filter(Boolean)
-              .concat(modulosData.filter(m => !ordenGuardado.includes(String(m.id_modulo))))
-          : modulosData;
+        const modsSorted = modulosData;
 
         // Sub-items colocados en Home vía Vista Pantallas (placement['home']).
         // Antes la home SÓLO pintaba módulos; ahora también pinta sub-items asignados
@@ -576,8 +575,20 @@
             .map(it => ({ ruta: it.href, icono: it.icon, nombre: it.titulo, descripcion: it.desc || '' }));
         }
 
+        // Orden UNIFICADO: respeta el orden guardado para módulos Y sub-items entremezclados.
+        // La clave de cada card es la misma que guarda "Guardar orden" (dataset.id): id_modulo
+        // para módulos, ruta para sub-items. Las cards nuevas (no mencionadas) quedan al final.
+        const _key = c => (c.id_modulo != null ? String(c.id_modulo) : String(c.ruta || ''));
+        let finalCards = [...modsSorted, ...subItemCards];
+        if (ordenGuardado && ordenGuardado.length) {
+          const byKey = new Map(finalCards.map(c => [_key(c), c]));
+          const usados = new Set(ordenGuardado.map(String));
+          finalCards = ordenGuardado.map(k => byKey.get(String(k))).filter(Boolean)
+            .concat(finalCards.filter(c => !usados.has(_key(c))));
+        }
+
         // Renderizar módulos + sub-items colocados en Home (todo desde BD/manifiesto)
-        [...modsSorted, ...subItemCards].forEach(mod => {
+        finalCards.forEach(mod => {
           const a = document.createElement('a');
           a.href = mod.ruta || '#'; a.className = 'module-card';
           a.dataset.id = (mod.id_modulo != null) ? mod.id_modulo : (mod.ruta || '');

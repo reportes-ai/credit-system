@@ -5,7 +5,7 @@
   <link rel="icon" href="/img/favicon.png" type="image/png">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Hojas de Liquidación — Plan Liquidez</title>
-  <!-- v1.0 -->
+  <!-- v1.1 -->
   <link href="/css/bootstrap.min.css" rel="stylesheet">
   <link href="/css/bootstrap-icons.css" rel="stylesheet">
   <style>
@@ -267,7 +267,11 @@
     document.getElementById('dlgMod').close(); ver(HOJA.id);
   }
 
-  (async () => { await cargarPerms(); cargar(); })();
+  (async () => {
+    await cargarPerms(); await cargar();
+    const qid = new URLSearchParams(location.search).get('id');
+    if (qid) ver(Number(qid));
+  })();
 </script>
 <script src="/js/app-version.js"></script>
 </body>

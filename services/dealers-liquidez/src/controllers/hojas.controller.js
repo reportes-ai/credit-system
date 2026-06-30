@@ -12,6 +12,7 @@ const pool = require('../../../../shared/config/database');
 const { auditar } = require('../../../../shared/audit');
 const { tieneFunc } = require('../../../../shared/middleware/permisos');
 const { liquidar } = require('../../../../shared/liquidez-core');
+const { notificar } = require('../../../notificaciones/src/controllers/notificaciones.controller');
 
 const NIVELES_SEED = [
   { nivel: 1, nombre: 'Jefe / Gerente Comercial', tipo: 'APRUEBA',      func: 'liquidez_aprob_n1',        sla_horas: 48, alerta: 1 },
@@ -137,6 +138,38 @@ function motivoDe(C, D, A, desc) {
   if (desc < 0) return `Aumento de adelanto: la comisión subió; se entrega ${f(-desc)} adicional para llevar el adelanto a ${f(A)}.`;
   return `Sin cambio en el adelanto: la comisión (${f(C)}) mantiene la deuda en ${f(A)}.`;
 }
+// Pool de usuarios a avisar para un nivel: Administradores + quien tenga su permiso, activos.
+async function idsPorFunc(func) {
+  const [rows] = await pool.query(
+    `SELECT u.id_usuario FROM usuarios u JOIN perfiles p ON p.id_perfil=u.id_perfil
+       WHERE p.nombre='Administrador' AND u.estado='activo'
+     UNION
+     SELECT u.id_usuario FROM usuarios u
+       JOIN permisos_perfil pp ON pp.id_perfil=u.id_perfil
+       JOIN funcionalidades f ON f.id_funcionalidad=pp.id_funcionalidad
+      WHERE f.codigo=? AND pp.habilitado=1 AND u.estado='activo'`, [func]);
+  return rows.map(r => r.id_usuario);
+}
+// Alerta (campana) al nivel indicado, respetando su flag `alerta`.
+async function alertarNivel(nivel, hoja) {
+  try {
+    const niv = await nivelesCfg();
+    const cfg = niv[nivel]; if (!cfg || !cfg.alerta) return;
+    const ids = await idsPorFunc(cfg.func); if (!ids.length) return;
+    const textos = {
+      1: { t: '🛎️ Hoja de Liquidación para revisar', m: `La Hoja de Liquidación ${hoja.periodo} está lista para tu revisión (Nivel 1 — Comercial).` },
+      2: { t: '🛎️ Hoja de Liquidación — aprobación', m: `La Hoja ${hoja.periodo} fue aprobada en Nivel 1; requiere tu aprobación (Gerencia General). Tienes 48h.` },
+      3: { t: 'ℹ️ Hoja de Liquidación aprobada', m: `La Hoja ${hoja.periodo} quedó aprobada; toma conocimiento (Finanzas). Habilitada para Orden de Pago.` },
+    }[nivel];
+    await notificar(ids, {
+      tipo: 'LIQUIDEZ_HOJA', titulo: textos.t, mensaje: textos.m,
+      href: '/dealers-liquidez/hojas/?id=' + hoja.id,
+      prioridad: nivel === 3 ? 'normal' : 'alta', sonar: nivel === 3 ? 0 : 1, son_tipo: 'dingdong',
+      clave: 'liquidez_hoja_' + hoja.id + '_n' + nivel,
+    });
+  } catch (e) { console.error('[liquidez alertarNivel]', e.message); }
+}
+
 // Valores efectivos de una línea (los modificados mandan).
 function efectivo(l) {
   return l.modificada
@@ -211,6 +244,7 @@ const enviarHoja = async (req, res) => {
     await pool.query(
       `UPDATE dealer_liquidez_hojas SET estado='PENDIENTE_N1', nivel_actual=1, n1_estado='PENDIENTE',
          n1_vence=DATE_ADD(NOW(), INTERVAL ? HOUR) WHERE id=?`, [niv[1]?.sla_horas || 48, req.params.id]);
+    await alertarNivel(1, { id: Number(req.params.id), periodo: h.periodo });
     auditar({ req, accion: 'EDITAR', modulo: 'dealers', entidad: 'dealer_liquidez_hoja', entidad_id: req.params.id,
       detalle: `Envió la Hoja ${h.periodo} a aprobación (Nivel 1)` });
     res.json({ success: true, data: { ok: true }, error: null });
@@ -240,19 +274,21 @@ const modificarLinea = async (req, res) => {
 };
 
 /* ── Aprobar el nivel actual ───────────────────────────────────────────────── */
-async function avanzar(idHoja, nivelAprobado, idUsuario, nombre, modo /* 'APROBADO' | 'AUTO' */) {
+async function avanzar(idHoja, nivelAprobado, idUsuario, nombre, modo /* 'APROBADO' | 'AUTO' */, periodo) {
   const niv = await nivelesCfg();
   if (nivelAprobado === 1) {
     await pool.query(
       `UPDATE dealer_liquidez_hojas SET n1_estado=?, n1_por=?, n1_nombre=?, n1_at=NOW(),
          estado='PENDIENTE_N2', nivel_actual=2, n2_estado='PENDIENTE', n2_vence=DATE_ADD(NOW(), INTERVAL ? HOUR) WHERE id=?`,
       [modo, idUsuario, nombre, niv[2]?.sla_horas || 48, idHoja]);
+    await alertarNivel(2, { id: idHoja, periodo });
   } else if (nivelAprobado === 2) {
     // N2 aprobado → APROBADA (habilita ODP) y pasa a Finanzas para conocimiento.
     await pool.query(
       `UPDATE dealer_liquidez_hojas SET n2_estado=?, n2_por=?, n2_nombre=?, n2_at=NOW(),
          estado='APROBADA', nivel_actual=3, n3_estado='PENDIENTE' WHERE id=?`,
       [modo, idUsuario, nombre, idHoja]);
+    await alertarNivel(3, { id: idHoja, periodo });
   }
 }
 const aprobarHoja = async (req, res) => {
@@ -262,10 +298,10 @@ const aprobarHoja = async (req, res) => {
     const niv = await nivelesCfg();
     if (h.estado === 'PENDIENTE_N1') {
       if (!(await tieneFunc(req.usuario.id_usuario, niv[1].func))) return res.status(403).json({ success: false, data: null, error: 'Sin permiso de Nivel 1' });
-      await avanzar(h.id, 1, req.usuario.id_usuario, nombreDe(req.usuario), 'APROBADO');
+      await avanzar(h.id, 1, req.usuario.id_usuario, nombreDe(req.usuario), 'APROBADO', h.periodo);
     } else if (h.estado === 'PENDIENTE_N2') {
       if (!(await tieneFunc(req.usuario.id_usuario, niv[2].func))) return res.status(403).json({ success: false, data: null, error: 'Sin permiso de Nivel 2' });
-      await avanzar(h.id, 2, req.usuario.id_usuario, nombreDe(req.usuario), 'APROBADO');
+      await avanzar(h.id, 2, req.usuario.id_usuario, nombreDe(req.usuario), 'APROBADO', h.periodo);
     } else {
       return res.status(400).json({ success: false, data: null, error: 'La hoja no está pendiente de aprobación' });
     }
@@ -294,9 +330,9 @@ async function tickSLA() {
   if (_slaCorriendo) return; _slaCorriendo = true;
   try {
     const [n1] = await pool.query(`SELECT id, periodo FROM dealer_liquidez_hojas WHERE estado='PENDIENTE_N1' AND n1_vence IS NOT NULL AND n1_vence < NOW()`);
-    for (const h of n1) { await avanzar(h.id, 1, null, 'Automático (SLA 48h)', 'AUTO'); console.log(`[liquidez SLA] Hoja ${h.periodo} auto-aprobada Nivel 1`); }
+    for (const h of n1) { await avanzar(h.id, 1, null, 'Automático (SLA 48h)', 'AUTO', h.periodo); console.log(`[liquidez SLA] Hoja ${h.periodo} auto-aprobada Nivel 1`); }
     const [n2] = await pool.query(`SELECT id, periodo FROM dealer_liquidez_hojas WHERE estado='PENDIENTE_N2' AND n2_vence IS NOT NULL AND n2_vence < NOW()`);
-    for (const h of n2) { await avanzar(h.id, 2, null, 'Automático (SLA 48h)', 'AUTO'); console.log(`[liquidez SLA] Hoja ${h.periodo} auto-aprobada Nivel 2`); }
+    for (const h of n2) { await avanzar(h.id, 2, null, 'Automático (SLA 48h)', 'AUTO', h.periodo); console.log(`[liquidez SLA] Hoja ${h.periodo} auto-aprobada Nivel 2`); }
   } catch (e) { console.error('[liquidez tickSLA]', e.message); }
   finally { _slaCorriendo = false; }
 }
