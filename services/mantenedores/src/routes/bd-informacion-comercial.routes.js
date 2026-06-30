@@ -1,11 +1,12 @@
 'use strict';
 const router = require('express').Router();
-const { verifyToken, requirePerfil } = require('../../../../shared/middleware/auth');
+const { verifyToken } = require('../../../../shared/middleware/auth');
+const { requireFunc } = require('../../../../shared/middleware/permisos');
 const ctrl = require('../controllers/bd-informacion-comercial.controller');
-const soloAdmin = requirePerfil('Administrador', 'Gerente');
+const F = 'mant_bd_info_comercial', GOD = 'mantenedores_solo_dios';
 
-router.get('/columns', verifyToken, ctrl.getColumns);
-router.get('/',        verifyToken, ctrl.getAll);
-router.put('/:id',     verifyToken, soloAdmin, ctrl.update);
+router.get('/columns', verifyToken, requireFunc(F, GOD), ctrl.getColumns);
+router.get('/',        verifyToken, requireFunc(F, GOD), ctrl.getAll);
+router.put('/:id',     verifyToken, requireFunc(F, GOD), ctrl.update);   // analista: modificar
 
 module.exports = router;

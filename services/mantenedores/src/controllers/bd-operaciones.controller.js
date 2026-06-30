@@ -2,6 +2,7 @@
 const pool = require('../../../../shared/config/database');
 const { isMesCerrado, getMesDeOp } = require('../../../../shared/utils/mes-cerrado');
 const { auditar } = require('../../../../shared/audit');
+const { tieneFunc } = require('../../../../shared/middleware/permisos');
 
 /* Columnas a excluir de la vista (internas/sensibles) */
 const EXCLUIR = ['datos_json'];
@@ -96,10 +97,13 @@ const update = async (req, res) => {
     if (!id || !Object.keys(body).length)
       return res.status(400).json({ success: false, data: null, error: 'Sin datos' });
 
-    // Verificar si el mes de la operación está cerrado
-    const mes = await getMesDeOp(id);
-    if (mes && await isMesCerrado(mes)) {
-      return res.status(403).json({ success: false, data: null, error: `🔒 Mes ${mes} cerrado — no se permiten modificaciones` });
+    // Mes cerrado: el analista NO puede tocar meses cerrados; nivel Dios (Solo Dios) sí.
+    const god = await tieneFunc(req.usuario.id_usuario, 'mantenedores_solo_dios');
+    if (!god) {
+      const mes = await getMesDeOp(id);
+      if (mes && await isMesCerrado(mes)) {
+        return res.status(403).json({ success: false, data: null, error: `🔒 Mes ${mes} cerrado — no se permiten modificaciones` });
+      }
     }
 
     // Validar columnas
