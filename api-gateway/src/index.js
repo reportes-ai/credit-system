@@ -90,6 +90,7 @@ app.use('/api/mantenimiento',    require('../../services/mantenedores/src/routes
 app.use('/api/ia-config',        require('../../services/mantenedores/src/routes/ia-config.routes'));
 app.use('/api/ia',               require('../../services/ia/src/routes/ia.routes'));
 app.use('/api/dealer-incorporacion', require('../../services/dealers-incorporacion/src/routes/fichas.routes'));
+app.use('/api/dealer-liquidez',      require('../../services/dealers-liquidez/src/routes/liquidez.routes'));
 app.use('/api/dealer-categorias',    require('../../services/mantenedores/src/routes/dealer-categorias.routes'));
 app.use('/api/visitas',              require('../../services/mantenedores/src/routes/visitas.routes'));
 app.use('/api/parametros-credito', require('../../services/mantenedores/src/routes/parametros.routes'));

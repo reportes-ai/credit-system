@@ -5,7 +5,7 @@
   <link rel="icon" href="/img/favicon.png" type="image/png">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Plan Liquidez — AutoFácil</title>
-  <!-- v1.0 -->
+  <!-- v1.1 -->
   <link href="/css/bootstrap.min.css" rel="stylesheet">
   <link href="/css/bootstrap-icons.css" rel="stylesheet">
   <style>
@@ -24,26 +24,56 @@
     .avatar { width:28px; height:28px; background:#90caf9; border-radius:50%; display:flex; align-items:center; justify-content:center; color:var(--navy); font-weight:700; font-size:.75rem; }
     .perfil-badge { background:rgba(144,202,249,.2); border:1px solid rgba(144,202,249,.4); color:#90caf9; border-radius:12px; padding:2px 10px; font-size:.73rem; font-weight:600; }
     .btn-logout { background:rgba(255,255,255,.1); border:1px solid rgba(255,255,255,.2); color:#fff; border-radius:8px; padding:5px 12px; font-size:.82rem; cursor:pointer; }
-    .main-content { padding:36px 40px; max-width:1100px; margin:0 auto; }
-    .page-banner { background:linear-gradient(135deg,#012d70,#0141A2 50%,#009AFE); border-radius:16px; color:#fff; padding:28px 36px; margin-bottom:36px; display:flex; align-items:center; gap:20px; }
-    .page-banner i { font-size:3rem; opacity:.8; }
-    .page-banner h2 { font-weight:700; margin:0 0 4px; font-size:1.4rem; }
-    .page-banner p { opacity:.8; margin:0; font-size:.9rem; }
-    .section-title { font-weight:700; font-size:.85rem; color:#6b7280; text-transform:uppercase; letter-spacing:1px; margin-bottom:20px; display:flex; align-items:center; gap:10px; }
-    .section-title::after { content:''; flex:1; height:1px; background:#e5e7eb; }
-    .cards-grid { display:grid; grid-template-columns:repeat(2,1fr); gap:24px; }
-    @media(max-width:700px){ .cards-grid { grid-template-columns:1fr; } }
-    .module-card { background:#fff; border-radius:16px; padding:32px 28px; text-decoration:none; color:inherit; border:2px solid transparent; transition:all .18s; display:block; box-shadow:0 1px 6px rgba(0,0,0,.07); }
-    .module-card.soon { opacity:.6; cursor:default; }
-    .module-card:not(.soon):hover { border-color:var(--navy); transform:translateY(-4px); box-shadow:0 12px 32px rgba(1,65,162,.15); color:inherit; }
-    .card-icon { width:58px; height:58px; border-radius:14px; background:linear-gradient(135deg,#e8eaf6,#c5cae9); display:flex; align-items:center; justify-content:center; font-size:1.7rem; color:var(--navy); margin-bottom:18px; transition:.18s; }
-    .module-card:not(.soon):hover .card-icon { background:linear-gradient(135deg,var(--navy),var(--accent)); color:#fff; }
-    .module-card h5 { font-weight:700; font-size:1.05rem; margin:0 0 8px; color:#111827; }
-    .module-card p { font-size:.83rem; color:#6b7280; margin:0 0 20px; line-height:1.5; }
-    .badge-soon { background:#fef3c7; color:#92400e; border-radius:8px; padding:3px 10px; font-size:.72rem; font-weight:700; }
-    .info-box { background:#eff6ff; border-left:4px solid var(--navy); border-radius:10px; padding:18px 22px; margin-top:36px; color:#1e3a5f; font-size:.86rem; line-height:1.6; }
-    .info-box b { color:#0141A2; }
-    @media(max-width:640px){ .main-content { padding:20px 16px; } }
+    .main-content { padding:30px 36px; max-width:1200px; margin:0 auto; }
+    .page-banner { background:linear-gradient(135deg,#012d70,#0141A2 50%,#009AFE); border-radius:16px; color:#fff; padding:24px 32px; margin-bottom:26px; display:flex; align-items:center; gap:18px; }
+    .page-banner i { font-size:2.6rem; opacity:.85; }
+    .page-banner h2 { font-weight:700; margin:0 0 3px; font-size:1.3rem; }
+    .page-banner p { opacity:.82; margin:0; font-size:.85rem; max-width:760px; }
+    .toolbar { display:flex; gap:12px; align-items:center; margin-bottom:16px; flex-wrap:wrap; }
+    .toolbar input { flex:1; min-width:200px; }
+    .btn-navy { background:var(--navy); color:#fff; border:none; border-radius:8px; padding:9px 16px; font-size:.86rem; font-weight:600; cursor:pointer; display:inline-flex; align-items:center; gap:7px; }
+    .btn-navy:hover { background:var(--navy-light); }
+    .card-box { background:#fff; border-radius:14px; box-shadow:0 1px 6px rgba(0,0,0,.07); overflow:hidden; }
+    table { width:100%; border-collapse:collapse; font-size:.85rem; }
+    th { background:#f8fafc; color:#475569; text-transform:uppercase; font-size:.7rem; letter-spacing:.5px; text-align:left; padding:11px 14px; border-bottom:1px solid #e5e7eb; }
+    td { padding:11px 14px; border-bottom:1px solid #f1f5f9; color:#1f2937; }
+    tr:last-child td { border-bottom:none; }
+    .num { text-align:right; font-variant-numeric:tabular-nums; }
+    .pill { border-radius:12px; padding:2px 10px; font-size:.72rem; font-weight:700; }
+    .pill.ACTIVO { background:#dcfce7; color:#166534; } .pill.SUSPENDIDO { background:#fef3c7; color:#92400e; } .pill.CERRADO { background:#e5e7eb; color:#374151; }
+    .link-act { color:var(--navy); cursor:pointer; font-weight:600; font-size:.82rem; background:none; border:none; }
+    .link-act:hover { text-decoration:underline; }
+    .empty { text-align:center; color:#94a3b8; padding:44px 0; }
+    /* Modal */
+    dialog { border:none; border-radius:16px; padding:0; max-width:820px; width:94%; box-shadow:0 20px 60px rgba(0,0,0,.3); }
+    dialog::backdrop { background:rgba(15,23,42,.55); }
+    .dlg-head { background:linear-gradient(135deg,var(--navy-dark),var(--navy)); color:#fff; padding:18px 24px; display:flex; justify-content:space-between; align-items:center; }
+    .dlg-head h3 { margin:0; font-size:1.05rem; font-weight:700; }
+    .dlg-x { background:none; border:none; color:#fff; font-size:1.3rem; cursor:pointer; }
+    .dlg-body { padding:22px 24px; max-height:72vh; overflow:auto; }
+    .grid2 { display:grid; grid-template-columns:1fr 1fr; gap:14px; }
+    .fld { margin-bottom:14px; }
+    .fld label { display:block; font-size:.76rem; font-weight:600; color:#475569; margin-bottom:5px; }
+    .fld input, .fld select, .fld textarea { width:100%; border:1px solid #cbd5e1; border-radius:8px; padding:8px 10px; font-size:.86rem; box-sizing:border-box; }
+    .fld textarea { resize:vertical; min-height:60px; }
+    .sec-title { font-weight:700; font-size:.78rem; color:#334155; text-transform:uppercase; letter-spacing:.5px; margin:18px 0 12px; border-top:1px solid #e5e7eb; padding-top:16px; display:flex; align-items:center; gap:8px; }
+    .socio-row { display:grid; grid-template-columns:1.1fr 1.2fr 1fr 1fr .7fr auto auto; gap:8px; align-items:center; margin-bottom:8px; }
+    .socio-row input { border:1px solid #cbd5e1; border-radius:7px; padding:6px 8px; font-size:.8rem; width:100%; box-sizing:border-box; }
+    .socio-row .chk { display:flex; align-items:center; justify-content:center; gap:4px; font-size:.72rem; color:#475569; }
+    .btn-mini { background:#eef2ff; color:var(--navy); border:none; border-radius:7px; padding:6px 9px; font-size:.78rem; cursor:pointer; font-weight:600; }
+    .btn-mini.danger { background:#fee2e2; color:#b91c1c; }
+    .dropdown { position:relative; }
+    .dd-list { position:absolute; top:100%; left:0; right:0; background:#fff; border:1px solid #cbd5e1; border-radius:8px; box-shadow:0 8px 24px rgba(0,0,0,.12); max-height:240px; overflow:auto; z-index:10; }
+    .dd-item { padding:8px 12px; cursor:pointer; font-size:.83rem; border-bottom:1px solid #f1f5f9; }
+    .dd-item:hover { background:#eff6ff; }
+    .dlg-foot { padding:16px 24px; border-top:1px solid #e5e7eb; display:flex; justify-content:flex-end; gap:10px; background:#f8fafc; }
+    .btn-ghost { background:#fff; border:1px solid #cbd5e1; color:#475569; border-radius:8px; padding:9px 16px; font-size:.86rem; font-weight:600; cursor:pointer; }
+    .info-box { background:#eff6ff; border-left:4px solid var(--navy); border-radius:8px; padding:12px 16px; font-size:.8rem; color:#1e3a5f; margin-bottom:14px; }
+    .doc-row { display:flex; align-items:center; justify-content:space-between; padding:8px 12px; background:#f8fafc; border-radius:8px; margin-bottom:6px; font-size:.82rem; }
+    .sim-box { background:#f8fafc; border:1px solid #e5e7eb; border-radius:10px; padding:14px; margin-top:10px; }
+    .sim-grid { display:grid; grid-template-columns:repeat(4,1fr); gap:10px; margin-top:10px; }
+    .sim-cell { background:#fff; border:1px solid #e5e7eb; border-radius:8px; padding:10px; text-align:center; }
+    .sim-cell .lbl { font-size:.68rem; color:#64748b; text-transform:uppercase; } .sim-cell .val { font-weight:700; font-size:.95rem; color:#0f172a; }
   </style>
 </head>
 <body>
@@ -69,28 +99,97 @@
     <i class="bi bi-cash-stack"></i>
     <div>
       <h2>Plan Liquidez</h2>
-      <p>Anticipo de comisiones a dealers Super Partner. Una cuenta corriente por dealer donde se reflejan el acuerdo, los documentos de respaldo (contrato y pagaré) y los movimientos mensuales que suben o bajan la deuda por anticipo.</p>
+      <p>Anticipo de comisiones a dealers Super Partner. Cada plan es una cuenta corriente con el acuerdo, los documentos de respaldo (contrato + pagaré) y los movimientos que suben o bajan la deuda por anticipo.</p>
     </div>
   </div>
 
-  <div class="section-title"><i class="bi bi-grid-3x3-gap-fill"></i> Secciones del módulo</div>
-  <div class="cards-grid">
-    <div class="module-card soon">
-      <div class="card-icon"><i class="bi bi-person-vcard"></i></div>
-      <h5>Crear / Editar Plan <span class="badge-soon">Próximamente</span></h5>
-      <p>Alta del dealer en el plan: monto inicial del anticipo, tope al que puede llegar (parametrizable, por defecto $5.000.000), condiciones, representantes y socios que firman como aval, y los documentos de respaldo (contrato + pagaré en blanco).</p>
-    </div>
-    <div class="module-card soon">
-      <div class="card-icon"><i class="bi bi-journal-text"></i></div>
-      <h5>Cuenta Corriente <span class="badge-soon">Próximamente</span></h5>
-      <p>Cartola del dealer: comisiones mensuales y movimientos contables (anticipos, pagos, abonos a la deuda). El dealer también la ve en su página personal.</p>
-    </div>
+  <div class="toolbar">
+    <button class="btn-navy" onclick="abrirNuevo()"><i class="bi bi-plus-lg"></i> Nuevo Plan</button>
+    <input id="buscar" placeholder="Buscar por dealer o RUT…" oninput="render()">
   </div>
 
-  <div class="info-box">
-    <b>En construcción.</b> La card y el módulo ya están creados. El <b>motor de liquidación mensual</b> (cómo cada mes las comisiones se pagan y/o abonan a la deuda del anticipo) se implementa una vez confirmada la regla de cálculo con Gerencia, para dejarlo en un solo motor y correcto desde el inicio.
+  <div class="card-box">
+    <table>
+      <thead><tr>
+        <th>Dealer</th><th>RUT</th><th class="num">Tope</th><th class="num">Anticipo inicial</th>
+        <th class="num">Deuda actual</th><th>Estado</th><th></th>
+      </tr></thead>
+      <tbody id="tbody"><tr><td colspan="7" class="empty">Cargando…</td></tr></tbody>
+    </table>
   </div>
 </div>
+
+<!-- Modal Crear/Editar -->
+<dialog id="dlg">
+  <div class="dlg-head">
+    <h3 id="dlgTitle">Nuevo Plan</h3>
+    <button class="dlg-x" onclick="document.getElementById('dlg').close()">&times;</button>
+  </div>
+  <div class="dlg-body">
+    <input type="hidden" id="fId">
+    <input type="hidden" id="fIdDealer">
+
+    <div class="fld dropdown" id="dealerPick">
+      <label>Dealer Super Partner</label>
+      <input id="fDealer" placeholder="Escribe nombre o RUT del dealer…" oninput="buscarDealer()" autocomplete="off">
+      <div class="dd-list" id="ddList" style="display:none"></div>
+    </div>
+
+    <div class="grid2">
+      <div class="fld"><label>Tope del anticipo ($)</label><input id="fTope" type="text" value="5.000.000" oninput="fmtInput(this)"></div>
+      <div class="fld"><label>Anticipo inicial entregado ($)</label><input id="fAnticipo" type="text" value="0" oninput="fmtInput(this)"></div>
+      <div class="fld"><label>Fecha de inicio</label><input id="fFecha" type="date"></div>
+      <div class="fld" id="fldEstado" style="display:none"><label>Estado</label>
+        <select id="fEstado"><option value="ACTIVO">Activo</option><option value="SUSPENDIDO">Suspendido</option><option value="CERRADO">Cerrado</option></select>
+      </div>
+    </div>
+    <div class="fld"><label>Condiciones del acuerdo</label>
+      <textarea id="fCondiciones" placeholder="Ej. mientras se mantenga categoría Super Partner. AutoFácil Spa puede recuperar los montos avisando con 30 días de anticipación, sin necesidad de justificación…"></textarea>
+    </div>
+    <div class="fld"><label>Observaciones</label><textarea id="fObs"></textarea></div>
+
+    <div class="sec-title"><i class="bi bi-people-fill"></i> Representantes y socios (avales)</div>
+    <div id="sociosBox"></div>
+    <button class="btn-mini" type="button" onclick="addSocio()"><i class="bi bi-plus"></i> Agregar socio/representante</button>
+
+    <div id="docsSection" style="display:none">
+      <div class="sec-title"><i class="bi bi-paperclip"></i> Documentos de respaldo</div>
+      <div class="info-box">Sube el <b>contrato</b> y el <b>pagaré en blanco</b> firmados (PDF o imagen).</div>
+      <div id="docsList"></div>
+      <div class="toolbar" style="margin-top:8px">
+        <select id="docCat" style="max-width:160px;border:1px solid #cbd5e1;border-radius:8px;padding:8px">
+          <option value="CONTRATO">Contrato</option><option value="PAGARE">Pagaré</option><option value="OTRO">Otro</option>
+        </select>
+        <input type="file" id="docFile" accept="application/pdf,image/*" style="flex:1">
+        <button class="btn-mini" type="button" onclick="subirDoc()"><i class="bi bi-upload"></i> Subir</button>
+      </div>
+    </div>
+
+    <div id="ccSection" style="display:none">
+      <div class="sec-title"><i class="bi bi-journal-text"></i> Cuenta corriente</div>
+      <div class="sim-box">
+        <label style="font-size:.76rem;font-weight:600;color:#475569">Simular liquidación del mes — comisión ($)</label>
+        <div style="display:flex;gap:8px;margin-top:6px">
+          <input id="simCom" type="text" value="0" oninput="fmtInput(this)" style="flex:1;border:1px solid #cbd5e1;border-radius:8px;padding:8px">
+          <button class="btn-mini" type="button" onclick="simular()">Calcular</button>
+        </div>
+        <div class="sim-grid" id="simOut" style="display:none">
+          <div class="sim-cell"><div class="lbl">Adelanto objetivo</div><div class="val" id="simA">—</div></div>
+          <div class="sim-cell"><div class="lbl">Descuento ODP</div><div class="val" id="simD">—</div></div>
+          <div class="sim-cell"><div class="lbl">Pago neto</div><div class="val" id="simP">—</div></div>
+          <div class="sim-cell"><div class="lbl">Nueva deuda</div><div class="val" id="simN">—</div></div>
+        </div>
+      </div>
+      <table style="margin-top:14px"><thead><tr>
+        <th>Fecha</th><th>Tipo</th><th class="num">Comisión</th><th class="num">Descuento</th><th class="num">Pago</th><th class="num">Saldo</th>
+      </tr></thead><tbody id="movsBody"><tr><td colspan="6" class="empty">Sin movimientos</td></tr></tbody></table>
+    </div>
+  </div>
+  <div class="dlg-foot">
+    <button class="btn-ghost" onclick="document.getElementById('dlg').close()">Cancelar</button>
+    <button class="btn-navy" id="btnGuardar" onclick="guardar()"><i class="bi bi-check-lg"></i> Guardar</button>
+  </div>
+</dialog>
 
 <script src="/js/auth-guard.js"></script>
 <script>
@@ -101,6 +200,210 @@
   document.getElementById('navPerfil').textContent  = yo?.perfil || '';
   document.getElementById('avatarInicial').textContent = (yo?.nombre||'?').charAt(0).toUpperCase();
   function logout() { sessionStorage.removeItem('token'); sessionStorage.removeItem('usuario'); window.location.href = '/login.html'; }
+  const H = { Authorization: 'Bearer ' + token };
+  const HJ = { ...H, 'Content-Type': 'application/json' };
+
+  const CLP = new Intl.NumberFormat('es-CL', { maximumFractionDigits: 0 });
+  const money = v => '$' + CLP.format(Math.round(Number(v) || 0));
+  const unfmt = s => Number(String(s ?? '').replace(/[^\d-]/g, '')) || 0;
+  function fmtInput(el) { const neg = String(el.value).trim().startsWith('-'); const n = unfmt(el.value); el.value = (neg && n === 0 ? '-' : '') + CLP.format(n); }
+
+  let PLANES = [];
+  async function cargar() {
+    try {
+      const r = await fetch('/api/dealer-liquidez/planes', { headers: H });
+      const j = await r.json(); PLANES = j.data || [];
+    } catch (e) { PLANES = []; }
+    render();
+  }
+  function render() {
+    const q = (document.getElementById('buscar').value || '').toLowerCase();
+    const rows = PLANES.filter(p => !q || (p.nombre_dealer || '').toLowerCase().includes(q) || (p.rut_dealer || '').toLowerCase().includes(q));
+    const tb = document.getElementById('tbody');
+    if (!rows.length) { tb.innerHTML = '<tr><td colspan="7" class="empty">No hay planes registrados.</td></tr>'; return; }
+    tb.innerHTML = rows.map(p => `<tr>
+      <td><b>${p.nombre_dealer || '—'}</b></td>
+      <td>${p.rut_dealer || '—'}</td>
+      <td class="num">${money(p.tope)}</td>
+      <td class="num">${money(p.anticipo_inicial)}</td>
+      <td class="num"><b>${money(p.deuda_actual)}</b></td>
+      <td><span class="pill ${p.estado}">${p.estado}</span></td>
+      <td><button class="link-act" onclick="abrirEditar(${p.id})"><i class="bi bi-pencil-square"></i> Ver / Editar</button></td>
+    </tr>`).join('');
+  }
+
+  /* Dealer typeahead */
+  let _ddT;
+  function buscarDealer() {
+    document.getElementById('fIdDealer').value = '';
+    clearTimeout(_ddT);
+    const q = document.getElementById('fDealer').value.trim();
+    if (q.length < 2) { document.getElementById('ddList').style.display = 'none'; return; }
+    _ddT = setTimeout(async () => {
+      try {
+        const r = await fetch('/api/dealer-liquidez/dealers-disponibles?q=' + encodeURIComponent(q), { headers: H });
+        const j = await r.json(); const items = j.data || [];
+        const dd = document.getElementById('ddList');
+        dd.innerHTML = items.length ? items.map(d =>
+          `<div class="dd-item" onclick='pickDealer(${JSON.stringify(d).replace(/'/g, "&#39;")})'>
+             <b>${d.nombre}</b> · ${d.rut || ''} ${d.numero ? '· #' + d.numero : ''}</div>`).join('')
+          : '<div class="dd-item" style="color:#94a3b8">Sin resultados</div>';
+        dd.style.display = 'block';
+      } catch (e) {}
+    }, 250);
+  }
+  function pickDealer(d) {
+    document.getElementById('fIdDealer').value = d.id_dealer;
+    document.getElementById('fDealer').value = `${d.nombre} · ${d.rut || ''}`;
+    document.getElementById('ddList').style.display = 'none';
+  }
+
+  /* Socios */
+  function socioRow(s = {}) {
+    const div = document.createElement('div'); div.className = 'socio-row';
+    div.innerHTML = `
+      <input placeholder="RUT" value="${s.rut || ''}" data-k="rut">
+      <input placeholder="Nombre" value="${s.nombre || ''}" data-k="nombre">
+      <input placeholder="Ap. paterno" value="${s.apellido_paterno || ''}" data-k="apellido_paterno">
+      <input placeholder="Ap. materno" value="${s.apellido_materno || ''}" data-k="apellido_materno">
+      <input placeholder="% part." value="${s.pct_participacion ?? ''}" data-k="pct_participacion">
+      <label class="chk"><input type="checkbox" data-k="es_aval" ${s.es_aval !== false ? 'checked' : ''}> aval</label>
+      <button class="btn-mini danger" type="button" onclick="this.parentNode.remove()">&times;</button>`;
+    return div;
+  }
+  function addSocio(s) { document.getElementById('sociosBox').appendChild(socioRow(s)); }
+  function leerSocios() {
+    return [...document.querySelectorAll('#sociosBox .socio-row')].map(row => {
+      const o = {};
+      row.querySelectorAll('[data-k]').forEach(i => { o[i.dataset.k] = i.type === 'checkbox' ? i.checked : i.value.trim(); });
+      return o;
+    }).filter(o => o.rut || o.nombre);
+  }
+
+  /* Abrir modal */
+  function reset() {
+    document.getElementById('fId').value = ''; document.getElementById('fIdDealer').value = '';
+    document.getElementById('fDealer').value = ''; document.getElementById('fDealer').disabled = false;
+    document.getElementById('fTope').value = '5.000.000'; document.getElementById('fAnticipo').value = '0';
+    document.getElementById('fFecha').value = ''; document.getElementById('fCondiciones').value = '';
+    document.getElementById('fObs').value = ''; document.getElementById('sociosBox').innerHTML = '';
+    document.getElementById('fldEstado').style.display = 'none';
+    document.getElementById('docsSection').style.display = 'none';
+    document.getElementById('ccSection').style.display = 'none';
+    document.getElementById('simOut').style.display = 'none';
+  }
+  function abrirNuevo() {
+    reset();
+    document.getElementById('dlgTitle').textContent = 'Nuevo Plan';
+    document.getElementById('fAnticipo').disabled = false;
+    document.getElementById('dlg').showModal();
+  }
+  async function abrirEditar(id) {
+    reset();
+    try {
+      const r = await fetch('/api/dealer-liquidez/planes/' + id, { headers: H });
+      const j = await r.json(); const p = j.data; if (!p) return;
+      document.getElementById('dlgTitle').textContent = 'Plan — ' + (p.nombre_dealer || '');
+      document.getElementById('fId').value = p.id;
+      document.getElementById('fIdDealer').value = p.id_dealer;
+      const fd = document.getElementById('fDealer'); fd.value = `${p.nombre_dealer || ''} · ${p.rut_dealer || ''}`; fd.disabled = true;
+      document.getElementById('fTope').value = CLP.format(p.tope);
+      document.getElementById('fAnticipo').value = CLP.format(p.anticipo_inicial);
+      document.getElementById('fAnticipo').disabled = true; // el anticipo inicial no se reescribe; la deuda se mueve por la cuenta corriente
+      document.getElementById('fFecha').value = (p.fecha_inicio || '').slice(0, 10);
+      document.getElementById('fCondiciones').value = p.condiciones || '';
+      document.getElementById('fObs').value = p.observaciones || '';
+      document.getElementById('fldEstado').style.display = ''; document.getElementById('fEstado').value = p.estado || 'ACTIVO';
+      (p.socios || []).forEach(addSocio);
+      document.getElementById('docsSection').style.display = ''; renderDocs(p.documentos || []);
+      document.getElementById('ccSection').style.display = ''; renderMovs(p.movimientos || []);
+      document.getElementById('dlg').showModal();
+    } catch (e) { alert('No se pudo cargar el plan'); }
+  }
+
+  function renderDocs(docs) {
+    const box = document.getElementById('docsList');
+    box.innerHTML = docs.length ? docs.map(d => `<div class="doc-row">
+      <span><i class="bi bi-file-earmark-text me-1"></i><b>${d.categoria}</b> — ${d.nombre || ''}</span>
+      <span>
+        <a class="btn-mini" href="/api/dealer-liquidez/planes/${d.id_plan || document.getElementById('fId').value}/documentos/${d.id}" target="_blank">Ver</a>
+        <button class="btn-mini danger" onclick="borrarDoc(${d.id})">Eliminar</button>
+      </span></div>`).join('') : '<div style="color:#94a3b8;font-size:.82rem">Aún no hay documentos.</div>';
+  }
+  function renderMovs(movs) {
+    const tb = document.getElementById('movsBody');
+    tb.innerHTML = movs.length ? movs.map(m => `<tr>
+      <td>${(m.fecha || '').slice(0,10)}</td><td>${m.tipo}</td>
+      <td class="num">${m.comision != null ? money(m.comision) : '—'}</td>
+      <td class="num">${m.descuento != null ? money(m.descuento) : '—'}</td>
+      <td class="num">${m.pago_neto != null ? money(m.pago_neto) : '—'}</td>
+      <td class="num"><b>${money(m.saldo_nuevo)}</b></td></tr>`).join('')
+      : '<tr><td colspan="6" class="empty">Sin movimientos</td></tr>';
+  }
+
+  /* Guardar */
+  async function guardar() {
+    const id = document.getElementById('fId').value;
+    const body = {
+      tope: unfmt(document.getElementById('fTope').value),
+      anticipo_inicial: unfmt(document.getElementById('fAnticipo').value),
+      fecha_inicio: document.getElementById('fFecha').value || null,
+      condiciones: document.getElementById('fCondiciones').value,
+      observaciones: document.getElementById('fObs').value,
+      socios: leerSocios(),
+    };
+    let url = '/api/dealer-liquidez/planes', method = 'POST';
+    if (id) { url += '/' + id; method = 'PUT'; body.estado = document.getElementById('fEstado').value; }
+    else {
+      body.id_dealer = Number(document.getElementById('fIdDealer').value);
+      if (!body.id_dealer) return alert('Selecciona un dealer de la lista.');
+    }
+    const btn = document.getElementById('btnGuardar'); btn.disabled = true;
+    try {
+      const r = await fetch(url, { method, headers: HJ, body: JSON.stringify(body) });
+      const j = await r.json();
+      if (!j.success) return alert(j.error || 'No se pudo guardar');
+      document.getElementById('dlg').close(); await cargar();
+      if (!id && j.data?.id) abrirEditar(j.data.id); // pasa a edición para subir documentos
+    } catch (e) { alert('Error de red'); } finally { btn.disabled = false; }
+  }
+
+  /* Documentos */
+  function subirDoc() {
+    const id = document.getElementById('fId').value; if (!id) return;
+    const f = document.getElementById('docFile').files[0]; if (!f) return alert('Elige un archivo');
+    const fr = new FileReader();
+    fr.onload = async () => {
+      const b64 = String(fr.result).split(',')[1];
+      const r = await fetch(`/api/dealer-liquidez/planes/${id}/documentos`, { method: 'POST', headers: HJ,
+        body: JSON.stringify({ categoria: document.getElementById('docCat').value, archivo_nombre: f.name, mime_type: f.type, archivo_data: b64 }) });
+      const j = await r.json(); if (!j.success) return alert(j.error || 'No se pudo subir');
+      document.getElementById('docFile').value = ''; abrirEditar(id);
+    };
+    fr.readAsDataURL(f);
+  }
+  async function borrarDoc(docId) {
+    const id = document.getElementById('fId').value; if (!confirm('¿Eliminar el documento?')) return;
+    await fetch(`/api/dealer-liquidez/planes/${id}/documentos/${docId}`, { method: 'DELETE', headers: H });
+    abrirEditar(id);
+  }
+
+  /* Simulador (motor único) */
+  async function simular() {
+    const id = document.getElementById('fId').value; if (!id) return;
+    const c = unfmt(document.getElementById('simCom').value);
+    const r = await fetch(`/api/dealer-liquidez/planes/${id}/preview-liquidacion?comision=${c}`, { headers: H });
+    const j = await r.json(); if (!j.success) return;
+    const d = j.data;
+    document.getElementById('simA').textContent = money(d.adelantoObjetivo);
+    document.getElementById('simD').textContent = money(d.descuento) + (d.esPrestamoExtra ? ' (presta)' : '');
+    document.getElementById('simP').textContent = money(d.pagoNeto);
+    document.getElementById('simN').textContent = money(d.nuevaDeuda);
+    document.getElementById('simOut').style.display = '';
+  }
+
+  document.addEventListener('click', e => { if (!document.getElementById('dealerPick').contains(e.target)) document.getElementById('ddList').style.display = 'none'; });
+  cargar();
 </script>
 <script src="/js/app-version.js"></script>
 </body>
