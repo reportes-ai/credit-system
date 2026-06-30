@@ -246,7 +246,7 @@
   <div id="cajaHeaderWrap"></div>
 
   <div class="search-wrap">
-    <h5><i class="bi bi-search me-2 text-primary"></i>Buscar crédito vigente</h5>
+    <h5><i class="bi bi-search me-2 text-primary"></i>Buscar crédito (AutoFácil)</h5>
     <div class="search-row">
       <div class="search-field">
         <i class="bi bi-search search-icon"></i>
@@ -516,10 +516,10 @@ async function buscar() {
   cerrarPanel();
   const wrap = document.getElementById('resultadosWrap');
   wrap.innerHTML = `<div class="spinner-wrap"><div class="spinner-border text-primary" style="width:1.8rem;height:1.8rem"></div></div>`;
-  const j = await (await API(`/api/creditos?q=${encodeURIComponent(q)}&estado=VIGENTE`)).json();
+  const j = await (await API(`/api/creditos?q=${encodeURIComponent(q)}&financiera=AUTOFACIL`)).json();
   const lista = j.data || [];
   if (!lista.length) {
-    wrap.innerHTML = `<div class="empty-state"><i class="bi bi-search fs-1 d-block mb-3"></i><p>Sin créditos vigentes para <strong>"${esc(q)}"</strong></p></div>`;
+    wrap.innerHTML = `<div class="empty-state"><i class="bi bi-search fs-1 d-block mb-3"></i><p>Sin créditos AutoFácil para <strong>"${esc(q)}"</strong></p></div>`;
     return;
   }
   wrap.innerHTML = `<div class="results-label">${lista.length} crédito${lista.length!==1?'s':''} encontrado${lista.length!==1?'s':''}</div>` +
