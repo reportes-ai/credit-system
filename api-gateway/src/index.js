@@ -105,6 +105,7 @@ app.use('/api/tipos-documento',      require('../../services/mantenedores/src/ro
 app.use('/api/plantillas-documento', require('../../services/mantenedores/src/routes/plantillas.routes'));
 app.use('/api/cuentas-bancarias',    require('../../services/mantenedores/src/routes/cuentas-bancarias.routes'));
 app.use('/api/parques-comisiones',   require('../../services/mantenedores/src/routes/parques.routes'));
+app.use('/api/sql-console',               require('../../services/mantenedores/src/routes/sql-console.routes'));
 app.use('/api/bd-operaciones',            require('../../services/mantenedores/src/routes/bd-operaciones.routes'));
 app.use('/api/bd-clientes',               require('../../services/mantenedores/src/routes/bd-clientes.routes'));
 app.use('/api/bd-antecedentes',           require('../../services/mantenedores/src/routes/bd-antecedentes.routes'));
@@ -262,6 +263,7 @@ const PAGINAS = [
   ['/mantenedores/factores-seguro', 'mantenedores/factores-seguro/index.html'],
   ['/mantenedores/financieras', 'mantenedores/financieras/index.html'],
   ['/mantenedores/solo-dios', 'mantenedores/solo-dios/index.html'],
+  ['/mantenedores/sql-console', 'mantenedores/sql-console/index.html'],
   // Vista analista (misma página, sin Nivel Dios ni eliminar; detecta '-edicion' en la URL)
   ['/mantenedores/bd-clientes-edicion', 'mantenedores/bd-clientes/index.html'],
   ['/mantenedores/bd-operaciones-edicion', 'mantenedores/bd-operaciones/index.html'],
