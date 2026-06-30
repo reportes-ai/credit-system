@@ -310,10 +310,12 @@ exports.stats = async (req, res) => {
 
     // Seguimientos hoy
     const [seguimientos_hoy] = await pool.query(
-      `SELECT id_gestion, nombre_cliente, tipo_solicitud, nombre_usuario, telefono, estado
-       FROM crm_gestiones
-       WHERE fecha_seguimiento = ? AND estado != 'CERRADO'
-       ORDER BY prioridad ASC`,
+      `SELECT g.id_gestion, COALESCE(cl.nombre_completo, g.nombre_cliente) AS nombre_cliente,
+              g.tipo_solicitud, g.nombre_usuario, g.telefono, g.estado
+       FROM crm_gestiones g
+       LEFT JOIN clientes cl ON cl.rut = g.rut_cliente
+       WHERE g.fecha_seguimiento = ? AND g.estado != 'CERRADO'
+       ORDER BY g.prioridad ASC`,
       [hoy]
     );
 
@@ -447,13 +449,15 @@ exports.resultadosCampana = async (req, res) => {
 
     // Gestiones de la campaña
     const [gestiones] = await pool.query(
-      `SELECT id_gestion, rut_cliente, nombre_cliente, telefono, email,
-              canal, tipo_solicitud, resultado, descripcion,
-              accion_siguiente, fecha_seguimiento, estado,
-              nombre_usuario, created_at, updated_at
-       FROM crm_gestiones
-       WHERE id_campana = ?
-       ORDER BY created_at DESC`,
+      `SELECT g.id_gestion, g.rut_cliente, COALESCE(cl.nombre_completo, g.nombre_cliente) AS nombre_cliente,
+              g.telefono, g.email,
+              g.canal, g.tipo_solicitud, g.resultado, g.descripcion,
+              g.accion_siguiente, g.fecha_seguimiento, g.estado,
+              g.nombre_usuario, g.created_at, g.updated_at
+       FROM crm_gestiones g
+       LEFT JOIN clientes cl ON cl.rut = g.rut_cliente
+       WHERE g.id_campana = ?
+       ORDER BY g.created_at DESC`,
       [id]
     );
 

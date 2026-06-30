@@ -100,17 +100,19 @@ const create = async (req, res) => {
 const getAll = async (req, res) => {
   try {
     const { q } = req.query;
-    let sql = `SELECT id_cotizacion, rut_cliente, nombre_cliente, fecha_cotizacion,
-                      valor_vehiculo, pie, plazo, tasa_mensual, monto_financiado, cuota,
-                      datos_json, id_usuario, created_at
-               FROM cotizaciones`;
+    let sql = `SELECT c.id_cotizacion, c.rut_cliente,
+                      COALESCE(cl.nombre_completo, c.nombre_cliente) AS nombre_cliente, c.fecha_cotizacion,
+                      c.valor_vehiculo, c.pie, c.plazo, c.tasa_mensual, c.monto_financiado, c.cuota,
+                      c.datos_json, c.id_usuario, c.created_at
+               FROM cotizaciones c
+               LEFT JOIN clientes cl ON cl.rut = c.rut_cliente`;
     const params = [];
     if (q && q.trim()) {
       const like = `%${q.trim().toUpperCase()}%`;
-      sql += ` WHERE UPPER(rut_cliente) LIKE ? OR UPPER(nombre_cliente) LIKE ?`;
+      sql += ` WHERE UPPER(c.rut_cliente) LIKE ? OR UPPER(COALESCE(cl.nombre_completo, c.nombre_cliente)) LIKE ?`;
       params.push(like, like);
     }
-    sql += ` ORDER BY created_at DESC LIMIT 500`;
+    sql += ` ORDER BY c.created_at DESC LIMIT 500`;
     const [rows] = await pool.query(sql, params);
     res.json({ success: true, data: rows, error: null });
   } catch (e) {
@@ -122,10 +124,13 @@ const getByRut = async (req, res) => {
   try {
     const rut = req.params.rut.toUpperCase().trim();
     const [rows] = await pool.query(
-      `SELECT id_cotizacion, rut_cliente, nombre_cliente, fecha_cotizacion,
-              valor_vehiculo, pie, plazo, tasa_mensual, monto_financiado, cuota,
-              datos_json, created_at
-       FROM cotizaciones WHERE rut_cliente = ? ORDER BY created_at DESC LIMIT 20`,
+      `SELECT c.id_cotizacion, c.rut_cliente,
+              COALESCE(cl.nombre_completo, c.nombre_cliente) AS nombre_cliente, c.fecha_cotizacion,
+              c.valor_vehiculo, c.pie, c.plazo, c.tasa_mensual, c.monto_financiado, c.cuota,
+              c.datos_json, c.created_at
+       FROM cotizaciones c
+       LEFT JOIN clientes cl ON cl.rut = c.rut_cliente
+       WHERE c.rut_cliente = ? ORDER BY c.created_at DESC LIMIT 20`,
       [rut]
     );
     res.json({ success: true, data: rows, error: null });
