@@ -91,6 +91,7 @@ app.use('/api/ia-config',        require('../../services/mantenedores/src/routes
 app.use('/api/ia',               require('../../services/ia/src/routes/ia.routes'));
 app.use('/api/dealer-incorporacion', require('../../services/dealers-incorporacion/src/routes/fichas.routes'));
 app.use('/api/dealer-liquidez',      require('../../services/dealers-liquidez/src/routes/liquidez.routes'));
+app.use('/api/tickets',              require('../../services/tickets/src/routes/tickets.routes'));
 app.use('/api/dealer-categorias',    require('../../services/mantenedores/src/routes/dealer-categorias.routes'));
 app.use('/api/visitas',              require('../../services/mantenedores/src/routes/visitas.routes'));
 app.use('/api/parametros-credito', require('../../services/mantenedores/src/routes/parametros.routes'));
@@ -339,6 +340,8 @@ const PAGINAS = [
   ['/ordenes-pago/estadisticas', 'ordenes-pago/estadisticas/index.html'],
   ['/soporte', 'soporte/index.html'],
   ['/soporte/compras', 'soporte/compras/index.html'],
+  ['/soporte/tickets-ti', 'soporte/tickets-ti/index.html'],
+  ['/mantenedores/tickets-ti', 'mantenedores/tickets-ti/index.html'],
   ['/soporte/compras-admin', 'soporte/compras-admin/index.html'],
   ['/mantenedores/compras', 'mantenedores/compras/index.html'],
   ['/edicion-creditos', 'edicion-creditos/index.html'],

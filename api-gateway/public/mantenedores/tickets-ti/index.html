@@ -1,0 +1,122 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <link rel="icon" href="/img/favicon.png" type="image/png">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Mantenedor Tickets TI — AutoFácil</title>
+  <!-- v1.0 -->
+  <link href="/css/bootstrap.min.css" rel="stylesheet">
+  <link href="/css/bootstrap-icons.css" rel="stylesheet">
+  <style>
+    :root { --navy:#0141A2; --navy-dark:#012d70; --navy-light:#0255c5; --bg:#f0f4f8; }
+    body { background:var(--bg); font-family:'Segoe UI',system-ui,sans-serif; margin:0; }
+    .topnav { background:linear-gradient(90deg,var(--navy-dark),var(--navy-light)); color:#fff; height:60px; padding:0 24px; display:flex; align-items:center; justify-content:space-between; position:sticky; top:0; z-index:200; box-shadow:0 2px 8px rgba(0,0,0,.3); }
+    .topnav-brand { display:flex; align-items:center; gap:8px; text-decoration:none; }
+    .topnav-brand img { height:32px; filter:brightness(0) invert(1); }
+    .version-badge { background:rgba(255,255,255,.15); color:rgba(255,255,255,.75); font-size:.65rem; font-weight:700; border-radius:6px; padding:2px 8px; }
+    .breadcrumb-nav { color:rgba(255,255,255,.6); font-size:.85rem; }
+    .breadcrumb-nav a { color:rgba(255,255,255,.75); text-decoration:none; }
+    .topnav-left { display:flex; align-items:center; gap:16px; }
+    .user-chip { background:rgba(255,255,255,.12); border-radius:24px; padding:5px 12px; color:#fff; font-size:.85rem; }
+    .btn-logout { background:rgba(255,255,255,.1); border:1px solid rgba(255,255,255,.2); color:#fff; border-radius:8px; padding:5px 12px; font-size:.82rem; cursor:pointer; }
+    .main { padding:28px 34px; max-width:980px; margin:0 auto; }
+    .page-banner { background:linear-gradient(135deg,#155e75,#0e7490 60%,#06b6d4); border-radius:16px; color:#fff; padding:22px 30px; margin-bottom:22px; display:flex; align-items:center; gap:16px; }
+    .page-banner i { font-size:2.2rem; opacity:.9; } .page-banner h2 { margin:0; font-size:1.25rem; font-weight:700; } .page-banner p { margin:2px 0 0; opacity:.85; font-size:.84rem; }
+    .tabs { display:flex; gap:8px; margin-bottom:16px; } .tab { padding:8px 16px; border-radius:20px; font-size:.84rem; font-weight:700; cursor:pointer; border:1.5px solid #e2e8f0; background:#fff; color:#64748b; } .tab.active { background:var(--navy); color:#fff; border-color:var(--navy); }
+    .card-box { background:#fff; border-radius:14px; box-shadow:0 1px 6px rgba(0,0,0,.07); padding:20px; }
+    table { width:100%; border-collapse:collapse; font-size:.85rem; } th { background:#f8fafc; color:#475569; text-transform:uppercase; font-size:.68rem; text-align:left; padding:9px 12px; border-bottom:1px solid #e5e7eb; } td { padding:8px 12px; border-bottom:1px solid #f1f5f9; }
+    input,select { border:1px solid #cbd5e1; border-radius:8px; padding:7px 10px; font-size:.85rem; }
+    .btn-navy { background:var(--navy); color:#fff; border:none; border-radius:8px; padding:8px 15px; font-weight:700; font-size:.85rem; cursor:pointer; }
+    .btn-mini { background:#eef2ff; color:var(--navy); border:none; border-radius:7px; padding:5px 9px; font-size:.78rem; cursor:pointer; font-weight:600; } .btn-mini.danger { background:#fee2e2; color:#b91c1c; }
+    .fld { margin-bottom:12px; } .fld label { display:block; font-size:.8rem; font-weight:600; color:#475569; margin-bottom:5px; }
+    .chk { display:flex; align-items:center; gap:8px; margin-bottom:10px; font-size:.88rem; color:#334155; }
+    .footer-afecta { background:#f8fafc; border-left:4px solid var(--navy); border-radius:10px; padding:16px 20px; margin-top:26px; font-size:.85rem; color:#334155; }
+    .footer-afecta h6 { font-weight:700; color:var(--navy); display:flex; align-items:center; gap:8px; } .footer-afecta a { color:var(--navy); }
+  </style>
+</head>
+<body>
+<nav class="topnav">
+  <div class="topnav-left">
+    <a href="/" class="topnav-brand"><img src="/img/logo.png" alt="AutoFácil"><span class="version-badge" id="versionBadge"></span></a>
+    <div class="breadcrumb-nav"><a href="/">Inicio</a> › <a href="/mantenedores/">Mantenedores</a> › <span style="color:#fff;font-weight:600"><i class="bi bi-life-preserver me-1"></i>Mantenedor Tickets TI</span></div>
+  </div>
+  <div style="display:flex;align-items:center;gap:10px"><span class="user-chip" id="navNombre">—</span><button class="btn-logout" onclick="logout()"><i class="bi bi-box-arrow-right me-1"></i>Salir</button></div>
+</nav>
+<div class="main">
+  <div class="page-banner"><i class="bi bi-life-preserver"></i><div><h2>Mantenedor Tickets TI</h2><p>Motivos, SLA de respuesta, escalamiento y correos automáticos del soporte TI</p></div></div>
+  <div class="tabs"><div class="tab active" id="tab1" onclick="tab(1)">Motivos</div><div class="tab" id="tab2" onclick="tab(2)">Escalamiento y correos</div></div>
+
+  <div id="sec1" class="card-box">
+    <div style="display:flex;gap:8px;align-items:end;margin-bottom:14px;flex-wrap:wrap">
+      <div class="fld" style="margin:0;flex:1;min-width:200px"><label>Nuevo motivo</label><input id="mNombre" placeholder="Ej. Cámaras de seguridad"></div>
+      <div class="fld" style="margin:0"><label>SLA respuesta (h)</label><input id="mSla" type="number" value="24" style="width:130px"></div>
+      <button class="btn-navy" onclick="guardarMotivo()"><i class="bi bi-plus-lg"></i> Agregar</button>
+    </div>
+    <table><thead><tr><th>Motivo</th><th>SLA (h)</th><th>Orden</th><th>Activo</th><th></th></tr></thead><tbody id="tbM"><tr><td colspan="5" style="text-align:center;color:#94a3b8;padding:20px">Cargando…</td></tr></tbody></table>
+  </div>
+
+  <div id="sec2" class="card-box" style="display:none">
+    <div class="fld" style="max-width:280px"><label>Escalar si no hay respuesta tras (horas)</label><input id="cEscal" type="number" value="48"></div>
+    <p style="font-size:.8rem;color:#64748b;margin:-6px 0 14px">Si un ticket supera el SLA de su motivo sin primera respuesta, se reescala y se avisa al equipo TI. (Este valor es el tope global de respaldo.)</p>
+    <label class="chk"><input type="checkbox" id="cNuevo"> Enviar <b>correo al crear</b> un ticket (al equipo TI)</label>
+    <label class="chk"><input type="checkbox" id="cEscalM"> Enviar <b>correo al escalar</b> un ticket vencido</label>
+    <label class="chk"><input type="checkbox" id="cCierre"> Enviar <b>correo al solicitante</b> cuando se resuelve/cierra</label>
+    <div style="text-align:right;margin-top:10px"><button class="btn-navy" onclick="guardarConfig()"><i class="bi bi-check-lg"></i> Guardar</button></div>
+  </div>
+
+  <div class="footer-afecta">
+    <h6><i class="bi bi-diagram-3"></i> Qué afecta este mantenedor</h6>
+    <ul>
+      <li><b>Motivos</b> → la lista de motivos que el usuario elige al crear un ticket en <a href="/soporte/tickets-ti/">Soporte › Tickets TI</a>; el <b>SLA</b> de cada motivo define cuándo un ticket sin respuesta se escala.</li>
+      <li><b>Escalamiento</b> → reescala y avisa al equipo TI los tickets que superan su SLA sin primera respuesta.</li>
+      <li><b>Correos automáticos</b> → al crear (a TI), al escalar (a TI) y al cerrar (al solicitante). Respetan el <a href="/mantenedores/mantencion-sistema/">Modo Desarrollo</a> (redirige correos de prueba).</li>
+    </ul>
+  </div>
+</div>
+<script src="/js/auth-guard.js"></script>
+<script>
+  const token = sessionStorage.getItem('token'); const yo = JSON.parse(sessionStorage.getItem('usuario')||'null');
+  if (!token||!yo) location.href='/login.html';
+  document.getElementById('navNombre').textContent = `${yo?.nombre||''} ${yo?.apellido||''}`.trim();
+  function logout(){ sessionStorage.clear(); location.href='/login.html'; }
+  const H={Authorization:'Bearer '+token}, HJ={...H,'Content-Type':'application/json'};
+  const esc=s=>String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;');
+  function tab(n){ document.getElementById('tab1').classList.toggle('active',n===1); document.getElementById('tab2').classList.toggle('active',n===2); document.getElementById('sec1').style.display=n===1?'':'none'; document.getElementById('sec2').style.display=n===2?'':'none'; }
+  async function cargarMotivos(){
+    const j = await (await fetch('/api/tickets/admin/motivos',{headers:H})).json();
+    const tb=document.getElementById('tbM');
+    tb.innerHTML=(j.data||[]).map(m=>`<tr>
+      <td><input value="${esc(m.nombre)}" id="mn${m.id}" style="width:100%"></td>
+      <td><input type="number" value="${m.sla_horas}" id="ms${m.id}" style="width:80px"></td>
+      <td><input type="number" value="${m.orden}" id="mo${m.id}" style="width:70px"></td>
+      <td>${m.activo?'<span style="color:#16a34a">Sí</span>':'<span style="color:#94a3b8">No</span>'}</td>
+      <td><button class="btn-mini" onclick="actualizar(${m.id})">Guardar</button> ${m.activo?`<button class="btn-mini danger" onclick="eliminar(${m.id})">Desactivar</button>`:''}</td>
+    </tr>`).join('')||'<tr><td colspan="5" style="text-align:center;color:#94a3b8;padding:20px">Sin motivos</td></tr>';
+  }
+  async function guardarMotivo(){
+    const nombre=document.getElementById('mNombre').value.trim(); if(!nombre)return alert('Escribe el nombre');
+    const j=await(await fetch('/api/tickets/admin/motivos',{method:'POST',headers:HJ,body:JSON.stringify({nombre,sla_horas:document.getElementById('mSla').value})})).json();
+    if(!j.success)return alert(j.error); document.getElementById('mNombre').value=''; cargarMotivos();
+  }
+  async function actualizar(id){
+    const body={nombre:document.getElementById('mn'+id).value,sla_horas:document.getElementById('ms'+id).value,orden:document.getElementById('mo'+id).value,activo:true};
+    const j=await(await fetch('/api/tickets/admin/motivos/'+id,{method:'PUT',headers:HJ,body:JSON.stringify(body)})).json();
+    if(!j.success)return alert(j.error); cargarMotivos();
+  }
+  async function eliminar(id){ if(!confirm('¿Desactivar este motivo?'))return; await fetch('/api/tickets/admin/motivos/'+id,{method:'DELETE',headers:H}); cargarMotivos(); }
+  async function cargarConfig(){
+    const j=await(await fetch('/api/tickets/admin/config',{headers:H})).json(); const c=j.data||{};
+    document.getElementById('cEscal').value=c.escal_horas??48;
+    document.getElementById('cNuevo').checked=!!c.correo_nuevo; document.getElementById('cEscalM').checked=!!c.correo_escal; document.getElementById('cCierre').checked=!!c.correo_cierre;
+  }
+  async function guardarConfig(){
+    const body={escal_horas:document.getElementById('cEscal').value,correo_nuevo:document.getElementById('cNuevo').checked,correo_escal:document.getElementById('cEscalM').checked,correo_cierre:document.getElementById('cCierre').checked};
+    const j=await(await fetch('/api/tickets/admin/config',{method:'PUT',headers:HJ,body:JSON.stringify(body)})).json();
+    if(!j.success)return alert(j.error); alert('Configuración guardada');
+  }
+  cargarMotivos(); cargarConfig();
+</script>
+<script src="/js/app-version.js"></script>
+</body>
+</html>

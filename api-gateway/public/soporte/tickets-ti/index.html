@@ -1,0 +1,193 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <link rel="icon" href="/img/favicon.png" type="image/png">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Tickets TI — AutoFácil</title>
+  <!-- v1.0 -->
+  <link href="/css/bootstrap.min.css" rel="stylesheet">
+  <link href="/css/bootstrap-icons.css" rel="stylesheet">
+  <style>
+    :root { --navy:#0141A2; --navy-dark:#012d70; --navy-light:#0255c5; --accent:#009AFE; --bg:#f0f4f8; }
+    body { background:var(--bg); font-family:'Segoe UI',system-ui,sans-serif; margin:0; min-height:100vh; }
+    .topnav { background:linear-gradient(90deg,var(--navy-dark),var(--navy-light)); color:#fff; height:60px; padding:0 24px; display:flex; align-items:center; justify-content:space-between; position:sticky; top:0; z-index:200; box-shadow:0 2px 8px rgba(0,0,0,.3); }
+    .topnav-left { display:flex; align-items:center; gap:16px; }
+    .topnav-brand { display:flex; align-items:center; gap:8px; text-decoration:none; }
+    .topnav-brand img { height:32px; filter:brightness(0) invert(1); }
+    .version-badge { background:rgba(255,255,255,.15); color:rgba(255,255,255,.75); font-size:.65rem; font-weight:700; border-radius:6px; padding:2px 8px; }
+    .breadcrumb-nav { color:rgba(255,255,255,.6); font-size:.85rem; display:flex; align-items:center; gap:6px; }
+    .breadcrumb-nav a { color:rgba(255,255,255,.75); text-decoration:none; }
+    .breadcrumb-nav .sep { color:rgba(255,255,255,.35); }
+    .user-chip { background:rgba(255,255,255,.12); border-radius:24px; padding:5px 12px; display:flex; align-items:center; gap:8px; font-size:.85rem; color:#fff; }
+    .avatar { width:28px; height:28px; background:#90caf9; border-radius:50%; display:flex; align-items:center; justify-content:center; color:var(--navy); font-weight:700; font-size:.75rem; }
+    .btn-logout { background:rgba(255,255,255,.1); border:1px solid rgba(255,255,255,.2); color:#fff; border-radius:8px; padding:5px 12px; font-size:.82rem; cursor:pointer; }
+    .main { padding:28px 34px; max-width:1100px; margin:0 auto; }
+    .page-banner { background:linear-gradient(135deg,#155e75,#0e7490 60%,#06b6d4); border-radius:16px; color:#fff; padding:22px 30px; margin-bottom:22px; display:flex; align-items:center; gap:18px; }
+    .page-banner i { font-size:2.4rem; opacity:.9; }
+    .page-banner h2 { font-weight:700; margin:0 0 2px; font-size:1.3rem; }
+    .page-banner p { opacity:.85; margin:0; font-size:.85rem; }
+    .tabs { display:flex; gap:8px; margin-bottom:16px; flex-wrap:wrap; }
+    .tab { padding:8px 16px; border-radius:20px; font-size:.84rem; font-weight:700; cursor:pointer; border:1.5px solid #e2e8f0; background:#fff; color:#64748b; }
+    .tab.active { background:var(--navy); color:#fff; border-color:var(--navy); }
+    .card-box { background:#fff; border-radius:14px; box-shadow:0 1px 6px rgba(0,0,0,.07); padding:22px; }
+    .fld { margin-bottom:14px; } .fld label { display:block; font-size:.78rem; font-weight:600; color:#475569; margin-bottom:5px; }
+    .fld input, .fld select, .fld textarea { width:100%; border:1px solid #cbd5e1; border-radius:8px; padding:9px 11px; font-size:.88rem; box-sizing:border-box; }
+    .fld textarea { resize:vertical; min-height:90px; }
+    .grid2 { display:grid; grid-template-columns:1fr 1fr; gap:14px; }
+    .btn-navy { background:var(--navy); color:#fff; border:none; border-radius:8px; padding:10px 18px; font-size:.88rem; font-weight:700; cursor:pointer; }
+    .btn-navy:hover { background:var(--navy-light); }
+    table { width:100%; border-collapse:collapse; font-size:.85rem; }
+    th { background:#f8fafc; color:#475569; text-transform:uppercase; font-size:.68rem; letter-spacing:.4px; text-align:left; padding:10px 12px; border-bottom:1px solid #e5e7eb; }
+    td { padding:10px 12px; border-bottom:1px solid #f1f5f9; }
+    tr:last-child td { border-bottom:none; }
+    .pill { border-radius:12px; padding:2px 9px; font-size:.7rem; font-weight:700; white-space:nowrap; }
+    .ABIERTO { background:#dbeafe; color:#1e40af; } .EN_PROCESO { background:#fef9c3; color:#854d0e; } .RESUELTO { background:#dcfce7; color:#166534; } .CERRADO { background:#e5e7eb; color:#374151; }
+    .prio-ALTA { color:#b91c1c; font-weight:700; } .prio-MEDIA { color:#a16207; } .prio-BAJA { color:#15803d; }
+    .link-act { color:var(--navy); cursor:pointer; font-weight:600; background:none; border:none; font-size:.82rem; }
+    .empty { text-align:center; color:#94a3b8; padding:34px 0; }
+    dialog { border:none; border-radius:14px; padding:0; max-width:640px; width:94%; box-shadow:0 20px 60px rgba(0,0,0,.3); }
+    dialog::backdrop { background:rgba(15,23,42,.55); }
+    .dh { background:linear-gradient(135deg,#155e75,#0e7490); color:#fff; padding:16px 22px; display:flex; justify-content:space-between; align-items:center; }
+    .db { padding:18px 22px; max-height:64vh; overflow:auto; }
+    .msg { border:1px solid #e5e7eb; border-radius:10px; padding:10px 14px; margin-bottom:8px; font-size:.86rem; }
+    .msg.ti { background:#ecfeff; border-color:#a5f3fc; }
+    .msg .meta { font-size:.72rem; color:#64748b; margin-bottom:3px; }
+    .badge-esc { background:#fee2e2; color:#b91c1c; border-radius:6px; padding:1px 7px; font-size:.66rem; font-weight:700; }
+  </style>
+</head>
+<body>
+<nav class="topnav">
+  <div class="topnav-left">
+    <a href="/" class="topnav-brand"><img src="/img/logo.png" alt="AutoFácil"><span class="version-badge" id="versionBadge"></span></a>
+    <div class="breadcrumb-nav"><a href="/">Inicio</a><span class="sep">›</span><a href="/soporte/">Soporte</a><span class="sep">›</span><span style="color:#fff;font-weight:600"><i class="bi bi-life-preserver me-1"></i>Tickets TI</span></div>
+  </div>
+  <div style="display:flex;align-items:center;gap:10px">
+    <span class="user-chip"><div class="avatar" id="avatarInicial">?</div><span id="navNombre">—</span></span>
+    <button class="btn-logout" onclick="logout()"><i class="bi bi-box-arrow-right me-1"></i>Salir</button>
+  </div>
+</nav>
+
+<div class="main">
+  <div class="page-banner">
+    <i class="bi bi-life-preserver"></i>
+    <div><h2>Tickets TI</h2><p>Reporta un problema a TI: elige el motivo, la prioridad y descríbelo. Recibirás respuesta y avisos del avance.</p></div>
+  </div>
+
+  <div class="tabs">
+    <div class="tab active" id="tCrear" onclick="tab('crear')"><i class="bi bi-plus-circle me-1"></i>Nuevo ticket</div>
+    <div class="tab" id="tMias" onclick="tab('mias')"><i class="bi bi-person me-1"></i>Mis tickets</div>
+    <div class="tab" id="tBandeja" onclick="tab('bandeja')" style="display:none"><i class="bi bi-inbox me-1"></i>Bandeja TI</div>
+  </div>
+
+  <div id="secCrear" class="card-box">
+    <div class="grid2">
+      <div class="fld"><label>Motivo</label><select id="fMotivo"></select></div>
+      <div class="fld"><label>Prioridad</label><select id="fPrio"><option value="BAJA">Baja</option><option value="MEDIA" selected>Media</option><option value="ALTA">Alta</option></select></div>
+    </div>
+    <div class="fld"><label>Asunto</label><input id="fAsunto" maxlength="200" placeholder="Resumen breve del problema"></div>
+    <div class="fld"><label>Descripción</label><textarea id="fDesc" placeholder="Cuéntanos qué pasa, desde cuándo, mensajes de error, etc."></textarea></div>
+    <div style="text-align:right"><button class="btn-navy" onclick="crear()"><i class="bi bi-send me-1"></i>Enviar ticket</button></div>
+  </div>
+
+  <div id="secLista" class="card-box" style="display:none">
+    <div style="margin-bottom:10px"><select id="fEstado" onchange="cargarLista()" style="border:1px solid #cbd5e1;border-radius:8px;padding:7px 10px;font-size:.84rem"><option value="">Todos los estados</option><option>ABIERTO</option><option>EN_PROCESO</option><option>RESUELTO</option><option>CERRADO</option></select></div>
+    <table><thead><tr><th>Ticket</th><th>Motivo / Asunto</th><th>Prioridad</th><th>Estado</th><th id="thQuien">Solicitante</th><th></th></tr></thead><tbody id="tb"><tr><td colspan="6" class="empty">Cargando…</td></tr></tbody></table>
+  </div>
+</div>
+
+<dialog id="dlg"></dialog>
+
+<script src="/js/auth-guard.js"></script>
+<script>
+  const token = sessionStorage.getItem('token');
+  const yo = JSON.parse(sessionStorage.getItem('usuario') || 'null');
+  if (!token || !yo) location.href = '/login.html';
+  document.getElementById('navNombre').textContent = `${yo?.nombre||''} ${yo?.apellido||''}`.trim();
+  document.getElementById('avatarInicial').textContent = (yo?.nombre||'?').charAt(0).toUpperCase();
+  function logout(){ sessionStorage.clear(); location.href='/login.html'; }
+  const H = { Authorization:'Bearer '+token }, HJ = { ...H, 'Content-Type':'application/json' };
+  const esc = s => String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+  const fdt = s => s ? String(s).slice(0,16).replace('T',' ') : '';
+  let ES_TI = false, VISTA = 'mias';
+
+  async function initMotivos(){
+    try { const j = await (await fetch('/api/tickets/motivos',{headers:H})).json();
+      document.getElementById('fMotivo').innerHTML = (j.data||[]).map(m=>`<option value="${m.id}">${esc(m.nombre)}</option>`).join('') || '<option value="">(sin motivos)</option>';
+    } catch(e){}
+  }
+  function tab(t){
+    document.getElementById('tCrear').classList.toggle('active', t==='crear');
+    document.getElementById('tMias').classList.toggle('active', t==='mias');
+    document.getElementById('tBandeja').classList.toggle('active', t==='bandeja');
+    document.getElementById('secCrear').style.display = t==='crear'?'':'none';
+    document.getElementById('secLista').style.display = t==='crear'?'none':'';
+    if (t!=='crear'){ VISTA = t; document.getElementById('thQuien').textContent = t==='bandeja'?'Solicitante':'Solicitante'; cargarLista(); }
+  }
+  async function crear(){
+    const asunto = document.getElementById('fAsunto').value.trim();
+    if (!asunto) return alert('Escribe un asunto');
+    const body = { id_motivo: document.getElementById('fMotivo').value||null, prioridad: document.getElementById('fPrio').value, asunto, descripcion: document.getElementById('fDesc').value };
+    const j = await (await fetch('/api/tickets/tickets',{method:'POST',headers:HJ,body:JSON.stringify(body)})).json();
+    if (!j.success) return alert(j.error||'No se pudo crear');
+    alert('Ticket creado: '+j.data.codigo);
+    document.getElementById('fAsunto').value=''; document.getElementById('fDesc').value='';
+    tab('mias');
+  }
+  async function cargarLista(){
+    const estado = document.getElementById('fEstado').value;
+    const tb = document.getElementById('tb'); tb.innerHTML = '<tr><td colspan="6" class="empty">Cargando…</td></tr>';
+    const j = await (await fetch(`/api/tickets/tickets?vista=${VISTA}${estado?'&estado='+estado:''}`,{headers:H})).json();
+    const rows = j.data?.tickets || [];
+    ES_TI = j.data?.es_ti; document.getElementById('tBandeja').style.display = ES_TI?'':'none';
+    if (!rows.length){ tb.innerHTML = '<tr><td colspan="6" class="empty">Sin tickets.</td></tr>'; return; }
+    tb.innerHTML = rows.map(t=>`<tr>
+      <td><b>${esc(t.codigo||('#'+t.id))}</b>${t.escalado?' <span class="badge-esc">escalado</span>':''}</td>
+      <td>${esc(t.asunto)}<div style="font-size:.72rem;color:#94a3b8">${esc(t.motivo_nombre||'')}</div></td>
+      <td><span class="prio-${t.prioridad}">${t.prioridad}</span></td>
+      <td><span class="pill ${t.estado}">${t.estado.replace('_',' ')}</span></td>
+      <td>${esc(t.creado_nombre||'')}${t.asignado_nombre?`<div style="font-size:.72rem;color:#94a3b8">TI: ${esc(t.asignado_nombre)}</div>`:''}</td>
+      <td><button class="link-act" onclick="ver(${t.id})"><i class="bi bi-eye"></i> Abrir</button></td>
+    </tr>`).join('');
+  }
+  async function ver(id){
+    const j = await (await fetch('/api/tickets/tickets/'+id,{headers:H})).json();
+    if (!j.success) return alert(j.error); const t = j.data;
+    const msgs = (t.mensajes||[]).map(m=>`<div class="msg ${m.es_ti?'ti':''}"><div class="meta">${m.es_ti?'<i class="bi bi-life-preserver"></i> ':''}${esc(m.autor_nombre||'')} · ${fdt(m.created_at)}</div>${esc(m.mensaje)}</div>`).join('') || '<div class="empty">Sin mensajes aún.</div>';
+    const accionesTI = t.es_ti ? `<div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:12px">
+        ${['EN_PROCESO','RESUELTO','CERRADO'].map(e=>`<button class="link-act" style="border:1px solid #cbd5e1;border-radius:8px;padding:5px 10px" onclick="setEstado(${t.id},'${e}')">${e.replace('_',' ')}</button>`).join('')}
+      </div>` : '';
+    document.getElementById('dlg').innerHTML = `
+      <div class="dh"><span style="font-weight:700"><i class="bi bi-life-preserver me-1"></i>${esc(t.codigo)} · <span class="pill ${t.estado}">${t.estado.replace('_',' ')}</span></span>
+        <button onclick="document.getElementById('dlg').close()" style="background:none;border:none;color:#fff;font-size:1.3rem;cursor:pointer">&times;</button></div>
+      <div class="db">
+        <div style="font-weight:700;font-size:1rem;color:#0f172a">${esc(t.asunto)}</div>
+        <div style="font-size:.78rem;color:#64748b;margin:3px 0 12px">${esc(t.motivo_nombre||'')} · Prioridad <span class="prio-${t.prioridad}">${t.prioridad}</span> · ${esc(t.creado_nombre||'')} · ${fdt(t.created_at)}</div>
+        ${t.descripcion?`<div style="background:#f8fafc;border-radius:10px;padding:12px 14px;font-size:.86rem;margin-bottom:14px;white-space:pre-wrap">${esc(t.descripcion)}</div>`:''}
+        ${accionesTI}
+        <div style="font-weight:700;font-size:.78rem;color:#475569;text-transform:uppercase;margin-bottom:8px">Conversación</div>
+        ${msgs}
+        ${t.estado!=='CERRADO'?`<div style="margin-top:12px;display:flex;gap:8px">
+          <input id="msgInput" placeholder="Escribe una respuesta…" style="flex:1;border:1px solid #cbd5e1;border-radius:8px;padding:8px 11px">
+          <button class="btn-navy" onclick="responder(${t.id})">Enviar</button></div>`:''}
+      </div>`;
+    document.getElementById('dlg').showModal();
+  }
+  async function responder(id){
+    const inp = document.getElementById('msgInput'); const m = inp.value.trim(); if(!m) return;
+    const j = await (await fetch(`/api/tickets/tickets/${id}/mensajes`,{method:'POST',headers:HJ,body:JSON.stringify({mensaje:m})})).json();
+    if (!j.success) return alert(j.error); ver(id); cargarLista();
+  }
+  async function setEstado(id,estado){
+    if (!confirm('¿Cambiar el estado a '+estado.replace('_',' ')+'?')) return;
+    const j = await (await fetch(`/api/tickets/tickets/${id}/estado`,{method:'PUT',headers:HJ,body:JSON.stringify({estado})})).json();
+    if (!j.success) return alert(j.error); ver(id); cargarLista();
+  }
+  (async()=>{ await initMotivos();
+    const qid = new URLSearchParams(location.search).get('id');
+    if (qid){ tab('mias'); ver(Number(qid)); } else tab('crear');
+  })();
+</script>
+<script src="/js/app-version.js"></script>
+</body>
+</html>
