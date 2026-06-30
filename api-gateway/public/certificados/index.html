@@ -2,7 +2,7 @@
 <html lang="es">
 <head>
 <meta charset="UTF-8">
-<!-- v1.6 -->
+<!-- v1.7 — nombre de PDF con tipo, N° op, RUT y nombre -->
 <link rel="icon" href="/img/favicon.png" type="image/png">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Certificados — AutoFácil</title>
@@ -127,7 +127,7 @@
     <div class="doc" id="doc"></div>
     <div class="doc-actions">
       <button class="btn btn-light" onclick="nuevo()"><i class="bi bi-arrow-left"></i>Nuevo</button>
-      <button class="btn btn-go" onclick="window.print()"><i class="bi bi-printer"></i>Imprimir / PDF</button>
+      <button class="btn btn-go" onclick="imprimirCert()"><i class="bi bi-printer"></i>Imprimir / PDF</button>
     </div>
   </div>
 
@@ -284,7 +284,9 @@ function gridDatos(d){
   }
   return `<div class="grid">${items.join('')}</div>`;
 }
+let LAST_CERT = null;
 function render(d){
+  LAST_CERT = d;
   const qr = (typeof qrVerificacionHTML==='function') ? qrVerificacionHTML(d.codigo,{px:108}) : '';
   const firmaImg = FIRMA_EMPRESA
     ? `<img src="${FIRMA_EMPRESA}" style="max-width:320px;max-height:120px;display:block;margin:0 auto 6px">`
@@ -311,6 +313,17 @@ function render(d){
   $('certWrap').style.display='block';
   $('vEmitir').classList.add('hide'); $('vHist').classList.add('hide');
   window.scrollTo({top:0,behavior:'smooth'});
+}
+// Imprime/Guarda como PDF con un nombre de archivo útil: tipo — N° op — RUT — nombre.
+function imprimirCert(){
+  const d = LAST_CERT || {};
+  const op = d.num_op || (d.datos && d.datos.op_carta) || (d.credito && d.credito.op_carta) || '';
+  const partes = [d.tipo_label || 'Certificado', op ? ('N° ' + op) : '', d.rut || '', d.nombre || ''].filter(Boolean);
+  const nombre = partes.join(' — ').replace(/[\\/:*?"<>|]+/g, ' ').replace(/\s+/g, ' ').trim();
+  const prev = document.title;
+  document.title = nombre || 'Certificado';
+  window.addEventListener('afterprint', function _r(){ document.title = prev; window.removeEventListener('afterprint', _r); });
+  window.print();
 }
 function nuevo(){ $('certWrap').style.display='none'; $('vEmitir').classList.remove('hide'); }
 
