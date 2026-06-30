@@ -5,7 +5,7 @@
   <link rel="icon" href="/img/favicon.png" type="image/png">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Plan Liquidez — AutoFácil</title>
-  <!-- v1.2 -->
+  <!-- v1.3 -->
   <link href="/css/bootstrap.min.css" rel="stylesheet">
   <link href="/css/bootstrap-icons.css" rel="stylesheet">
   <style>
@@ -247,7 +247,7 @@
         const dd = document.getElementById('ddList');
         dd.innerHTML = items.length ? items.map(d =>
           `<div class="dd-item" onclick='pickDealer(${JSON.stringify(d).replace(/'/g, "&#39;")})'>
-             <b>${d.nombre}</b> · ${d.rut || ''} ${d.numero ? '· #' + d.numero : ''}</div>`).join('')
+             <b>${d.nombre}</b> · ${d.rut || ''} ${d.numero ? '· #' + d.numero : ''}${d.activo === 0 ? ' <span style="color:#b91c1c;font-size:.72rem">· inactivo</span>' : ''}</div>`).join('')
           : '<div class="dd-item" style="color:#94a3b8">Sin resultados</div>';
         dd.style.display = 'block';
       } catch (e) {}

@@ -94,15 +94,27 @@ function parseSocios(raw) {
 /* ── Dealers disponibles para el selector (activos) ────────────────────────── */
 const dealersDisponibles = async (req, res) => {
   try {
-    const q = norm(req.query.q).toLowerCase();
+    const q = norm(req.query.q);
+    const ql = q.toLowerCase();
+    const qd = q.replace(/\D/g, '');           // solo dígitos del RUT buscado
     const params = [];
-    let where = 'activo = 1';
-    if (q.length >= 2) { where += ' AND (LOWER(nombre_razon) LIKE ? OR LOWER(nombre_indexa) LIKE ? OR rut LIKE ?)'; const l = '%' + q + '%'; params.push(l, l, l); }
+    // No se filtra por `activo`: muchos dealers vigentes están con activo=0 en la base;
+    // se muestran todos y se marca el inactivo para que el usuario distinga.
+    let where = '';
+    if (q.length >= 2) {
+      const cond = ['LOWER(nombre_razon) LIKE ?', 'LOWER(nombre_indexa) LIKE ?'];
+      const l = '%' + ql + '%'; params.push(l, l);
+      if (qd.length >= 3) {                     // RUT sin puntos ni guion (compara dígito a dígito)
+        cond.push("REPLACE(REPLACE(REPLACE(rut,'.',''),'-',''),' ','') LIKE ?");
+        params.push('%' + qd + '%');
+      }
+      where = 'WHERE (' + cond.join(' OR ') + ')';
+    }
     const [rows] = await pool.query(
-      `SELECT id_dealer, numero, rut, nombre_razon, nombre_indexa, ccs_parque, comuna
-         FROM dealers WHERE ${where} ORDER BY numero LIMIT 30`, params);
+      `SELECT id_dealer, numero, rut, nombre_razon, nombre_indexa, ccs_parque, comuna, activo
+         FROM dealers ${where} ORDER BY activo DESC, numero LIMIT 30`, params);
     res.json({ success: true, data: rows.map(r => ({
-      id_dealer: r.id_dealer, numero: r.numero, rut: r.rut,
+      id_dealer: r.id_dealer, numero: r.numero, rut: r.rut, activo: r.activo,
       nombre: r.nombre_razon || r.nombre_indexa || '', parque: r.ccs_parque || '', comuna: r.comuna || '',
     })), error: null });
   } catch (e) { console.error('[liquidez dealersDisponibles]', e.message); res.status(500).json({ success: false, data: null, error: 'Error interno del servidor' }); }
