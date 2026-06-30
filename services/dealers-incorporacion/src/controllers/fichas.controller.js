@@ -217,6 +217,7 @@ async function comDefaults() {
       ['Mantener dealers',              'dealer_mantener',    null,                      null],
       ['Aprobar participación especial (Gerencia)', 'dealer_part_especial', null,        null],
       ['Configurar niveles de aprobación de dealer', 'dealer_aprob_config', '/dealers-incorporacion/niveles.html', 'bi-diagram-3'],
+      ['Plan Liquidez (anticipo de comisiones)', 'dealer_plan_liquidez', '/dealers-liquidez/', 'bi-cash-stack'],
     ];
     const idFunc = {};
     for (const [nombre, codigo, href, icono] of funcs) {
@@ -237,6 +238,7 @@ async function comDefaults() {
       dealer_mantener:      [1, 6, 90008],
       dealer_part_especial: [1, 90008, 90009],   // visto de Gerencia para comisión sobre la pizarra
       dealer_aprob_config:  [1],                  // configurar la cadena de niveles (restringible por usuario)
+      dealer_plan_liquidez: [1, 90008, 90009],    // anticipo de comisiones a Super Partners — visto de Gerencia (compromiso financiero)
     };
     for (const [codigo, perfiles] of Object.entries(seed)) {
       const idf = idFunc[codigo]; if (!idf) continue;

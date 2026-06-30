@@ -65,6 +65,7 @@ const PLACEMENT_ITEMS = {
   'tasas':                   { section:'mantenedores',  href:'/mantenedores/tasas/',              icon:'bi-percent',               titulo:'Tasas de Interés' },
   'uf':                      { section:'mantenedores',  href:'/mantenedores/uf/',                 icon:'bi-currency-dollar',        titulo:'Indicadores Económicos' },
   'dealers':                 { section:'home',          href:'/mantenedores/dealers/',            icon:'bi-building',               titulo:'Dealers' },
+  'dealers-liquidez':        { section:'home',          href:'/dealers-liquidez/',                icon:'bi-cash-stack',             titulo:'Plan Liquidez' },
   'vehiculos':               { section:'mantenedores',  href:'/mantenedores/vehiculos/',          icon:'bi-car-front',              titulo:'Vehículos' },
   'comunas':                 { section:'mantenedores',  href:'/mantenedores/comunas/',            icon:'bi-geo-alt',                titulo:'Comunas' },
   'parametros':              { section:'mantenedores',  href:'/mantenedores/parametros/',         icon:'bi-sliders',                titulo:'Parámetros Crédito' },
@@ -125,6 +126,7 @@ const PLACEMENT_DESCS = {
   // Mantenedores
   'tasas':'Gestión de tasas mensuales y anuales para créditos', 'uf':'UF, UTM, Dólar e IPC — sincronizados desde la CMF',
   'dealers':'Administración de concesionarios y datos de contacto', 'vehiculos':'Base de tasación SII con marcas, modelos y valores',
+  'dealers-liquidez':'Anticipo de comisiones a dealers Super Partner — cuenta corriente, documentos y movimientos',
   'comunas':'Gestión de regiones, provincias y comunas de Chile', 'parametros':'Gastos operacionales fijos y comisiones del crédito',
   'factores-seguro':'Tasas netas, factores y comisiones por plazo', 'tipos-documento':'Documentos de respaldo requeridos en la aprobación',
   'pagares':'Plantillas de Hoja Resumen, Contrato, Pagaré y Mandatos', 'cuentas-bancarias':'Razón social, RUT, banco y cuenta para transferencias',

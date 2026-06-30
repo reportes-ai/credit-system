@@ -4,8 +4,8 @@
   <meta charset="UTF-8">
   <link rel="icon" href="/img/favicon.png" type="image/png">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Creación/Mantenedor de Dealer — AutoFácil</title>
-  <!-- v1.1 -->
+  <title>Plan Liquidez — AutoFácil</title>
+  <!-- v1.0 -->
   <link href="/css/bootstrap.min.css" rel="stylesheet">
   <link href="/css/bootstrap-icons.css" rel="stylesheet">
   <style>
@@ -34,13 +34,15 @@
     .cards-grid { display:grid; grid-template-columns:repeat(2,1fr); gap:24px; }
     @media(max-width:700px){ .cards-grid { grid-template-columns:1fr; } }
     .module-card { background:#fff; border-radius:16px; padding:32px 28px; text-decoration:none; color:inherit; border:2px solid transparent; transition:all .18s; display:block; box-shadow:0 1px 6px rgba(0,0,0,.07); }
-    .module-card:hover { border-color:var(--navy); transform:translateY(-4px); box-shadow:0 12px 32px rgba(1,65,162,.15); color:inherit; }
+    .module-card.soon { opacity:.6; cursor:default; }
+    .module-card:not(.soon):hover { border-color:var(--navy); transform:translateY(-4px); box-shadow:0 12px 32px rgba(1,65,162,.15); color:inherit; }
     .card-icon { width:58px; height:58px; border-radius:14px; background:linear-gradient(135deg,#e8eaf6,#c5cae9); display:flex; align-items:center; justify-content:center; font-size:1.7rem; color:var(--navy); margin-bottom:18px; transition:.18s; }
-    .module-card:hover .card-icon { background:linear-gradient(135deg,var(--navy),var(--accent)); color:#fff; }
+    .module-card:not(.soon):hover .card-icon { background:linear-gradient(135deg,var(--navy),var(--accent)); color:#fff; }
     .module-card h5 { font-weight:700; font-size:1.05rem; margin:0 0 8px; color:#111827; }
     .module-card p { font-size:.83rem; color:#6b7280; margin:0 0 20px; line-height:1.5; }
-    .btn-acceder { background:var(--navy); color:#fff; border:none; border-radius:8px; padding:8px 18px; font-size:.83rem; font-weight:600; display:inline-flex; align-items:center; gap:6px; }
-    .module-card:hover .btn-acceder { background:var(--accent); }
+    .badge-soon { background:#fef3c7; color:#92400e; border-radius:8px; padding:3px 10px; font-size:.72rem; font-weight:700; }
+    .info-box { background:#eff6ff; border-left:4px solid var(--navy); border-radius:10px; padding:18px 22px; margin-top:36px; color:#1e3a5f; font-size:.86rem; line-height:1.6; }
+    .info-box b { color:#0141A2; }
     @media(max-width:640px){ .main-content { padding:20px 16px; } }
   </style>
 </head>
@@ -50,7 +52,8 @@
     <a href="/" class="topnav-brand"><img src="/img/logo.png" alt="AutoFácil"><span class="version-badge" id="versionBadge"></span></a>
     <div class="breadcrumb-nav">
       <a href="/">Inicio</a><span class="sep">›</span>
-      <span style="color:#fff;font-weight:600"><i class="bi bi-building-add me-1"></i>Creación/Mantenedor de Dealer</span>
+      <a href="/dealers-incorporacion/">Dealers</a><span class="sep">›</span>
+      <span style="color:#fff;font-weight:600"><i class="bi bi-cash-stack me-1"></i>Plan Liquidez</span>
     </div>
   </div>
   <div class="topnav-right">
@@ -63,42 +66,29 @@
 
 <div class="main-content">
   <div class="page-banner">
-    <i class="bi bi-building-add"></i>
+    <i class="bi bi-cash-stack"></i>
     <div>
-      <h2>Creación/Mantenedor de Dealer</h2>
-      <p>Ficha de incorporación de concesionarios y parques automotrices, su revisión por Operaciones y la mantención de los dealers vigentes</p>
+      <h2>Plan Liquidez</h2>
+      <p>Anticipo de comisiones a dealers Super Partner. Una cuenta corriente por dealer donde se reflejan el acuerdo, los documentos de respaldo (contrato y pagaré) y los movimientos mensuales que suben o bajan la deuda por anticipo.</p>
     </div>
   </div>
-  <div class="section-title"><i class="bi bi-grid-3x3-gap-fill"></i> Submódulos disponibles</div>
+
+  <div class="section-title"><i class="bi bi-grid-3x3-gap-fill"></i> Secciones del módulo</div>
   <div class="cards-grid">
-    <a href="/dealers-incorporacion/nuevo.html" class="module-card" id="cardNuevo" style="display:none">
-      <div class="card-icon"><i class="bi bi-file-earmark-plus"></i></div>
-      <h5>Creación Nuevo Dealer</h5>
-      <p>Completa la ficha de incorporación (General o Parque), imprímela para la firma del cliente, sube el PDF/foto firmado y envíala a revisión de Operaciones.</p>
-      <span class="btn-acceder"><i class="bi bi-arrow-right-circle me-1"></i>Acceder</span>
-    </a>
-    <a href="/dealers-incorporacion/mantencion.html" class="module-card" id="cardMantencion" style="display:none">
-      <div class="card-icon"><i class="bi bi-clipboard-check"></i></div>
-      <h5>Mantención Dealers</h5>
-      <p>Revisa, autoriza y cierra las fichas pendientes (cadena de niveles), haz seguimiento del estado de tus solicitudes y edita los datos de los dealers vigentes.</p>
-      <span class="btn-acceder"><i class="bi bi-arrow-right-circle me-1"></i>Acceder</span>
-    </a>
-    <a href="/dealers-incorporacion/niveles.html" class="module-card" id="cardNiveles" style="display:none">
-      <div class="card-icon"><i class="bi bi-diagram-3"></i></div>
-      <h5>Niveles de Aprobación</h5>
-      <p>Configura la cadena de autorización de las fichas: qué niveles aprueban, en qué orden, bajo qué condición (siempre / comisión sobre pizarra / depósito modificado) y con qué permiso.</p>
-      <span class="btn-acceder"><i class="bi bi-arrow-right-circle me-1"></i>Configurar</span>
-    </a>
-    <a href="/dealers-liquidez/" class="module-card" id="cardLiquidez" style="display:none">
-      <div class="card-icon"><i class="bi bi-cash-stack"></i></div>
-      <h5>Plan Liquidez</h5>
-      <p>Anticipo de comisiones a dealers Super Partner: cuenta corriente con el acuerdo, los documentos de respaldo (contrato y pagaré) y los movimientos mensuales que suben o bajan la deuda.</p>
-      <span class="btn-acceder"><i class="bi bi-arrow-right-circle me-1"></i>Acceder</span>
-    </a>
+    <div class="module-card soon">
+      <div class="card-icon"><i class="bi bi-person-vcard"></i></div>
+      <h5>Crear / Editar Plan <span class="badge-soon">Próximamente</span></h5>
+      <p>Alta del dealer en el plan: monto inicial del anticipo, tope al que puede llegar (parametrizable, por defecto $5.000.000), condiciones, representantes y socios que firman como aval, y los documentos de respaldo (contrato + pagaré en blanco).</p>
+    </div>
+    <div class="module-card soon">
+      <div class="card-icon"><i class="bi bi-journal-text"></i></div>
+      <h5>Cuenta Corriente <span class="badge-soon">Próximamente</span></h5>
+      <p>Cartola del dealer: comisiones mensuales y movimientos contables (anticipos, pagos, abonos a la deuda). El dealer también la ve en su página personal.</p>
+    </div>
   </div>
-  <div id="sinSubmodulos" style="display:none;text-align:center;color:#6b7280;padding:40px 0">
-    <i class="bi bi-lock" style="font-size:2rem"></i>
-    <p style="margin-top:10px">No tienes submódulos habilitados aquí.<br>Contacta al administrador si necesitas acceso.</p>
+
+  <div class="info-box">
+    <b>En construcción.</b> La card y el módulo ya están creados. El <b>motor de liquidación mensual</b> (cómo cada mes las comisiones se pagan y/o abonan a la deuda del anticipo) se implementa una vez confirmada la regla de cálculo con Gerencia, para dejarlo en un solo motor y correcto desde el inicio.
   </div>
 </div>
 
@@ -111,23 +101,6 @@
   document.getElementById('navPerfil').textContent  = yo?.perfil || '';
   document.getElementById('avatarInicial').textContent = (yo?.nombre||'?').charAt(0).toUpperCase();
   function logout() { sessionStorage.removeItem('token'); sessionStorage.removeItem('usuario'); window.location.href = '/login.html'; }
-
-  (async () => {
-    let funcs = new Set();
-    try {
-      const r = await fetch('/api/auth/mis-permisos?_=' + Date.now(), { cache: 'no-store', headers: { Authorization: 'Bearer ' + token } });
-      const j = await r.json();
-      (j.funcionalidades || []).forEach(c => funcs.add(c));
-    } catch (e) {}
-    const esAdmin = yo?.perfil === 'Administrador';
-    const tiene = (...cs) => esAdmin || cs.some(c => funcs.has(c));
-    let alguna = false;
-    if (tiene('dealer_ficha_crear'))                      { document.getElementById('cardNuevo').style.display = '';      alguna = true; }
-    if (tiene('dealer_ficha_revisar','dealer_mantener','dealer_part_especial'))  { document.getElementById('cardMantencion').style.display = ''; alguna = true; }
-    if (tiene('dealer_aprob_config'))                     { document.getElementById('cardNiveles').style.display = '';    alguna = true; }
-    if (tiene('dealer_plan_liquidez'))                    { document.getElementById('cardLiquidez').style.display = '';   alguna = true; }
-    if (!alguna) document.getElementById('sinSubmodulos').style.display = '';
-  })();
 </script>
 <script src="/js/app-version.js"></script>
 </body>
