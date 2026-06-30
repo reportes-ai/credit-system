@@ -253,16 +253,22 @@ exports.dealerBuscar = async (req, res) => {
     const q = String(req.query.q || '').trim();
     if (q.length < 2) return res.json({ success:true, data:[], error:null });
     const like = '%' + q + '%';
+    const qd = q.replace(/\D/g, '');                 // dígitos del RUT/número buscado
+    // Sin filtro por `activo`: se muestran TODOS los dealers (activo es marcador de operación
+    // reciente, no habilitación). RUT se compara por dígitos (ignora puntos y guion).
+    const cond = ['nombre_indexa LIKE ?', 'nombre_razon LIKE ?', 'numero LIKE ?'];
+    const params = [like, like, like];
+    if (qd.length >= 3) { cond.push("REPLACE(REPLACE(REPLACE(rut,'.',''),'-',''),' ','') LIKE ?"); params.push('%' + qd + '%'); }
+    else { cond.push('rut LIKE ?'); params.push(like); }
     const [rows] = await pool.query(
-      `SELECT numero, rut, nombre_indexa, nombre_razon, ccs_parque
+      `SELECT numero, rut, nombre_indexa, nombre_razon, ccs_parque, activo
        FROM dealers
-       WHERE (nombre_indexa LIKE ? OR nombre_razon LIKE ? OR rut LIKE ? OR numero LIKE ?)
-         AND (activo IS NULL OR activo = 1)
-       ORDER BY nombre_indexa LIMIT 20`, [like, like, like, like]);
+       WHERE (${cond.join(' OR ')})
+       ORDER BY activo DESC, nombre_indexa LIMIT 20`, params);
     const data = rows.map(r => {
       const t = String(r.ccs_parque || '').toUpperCase();
       return { numero: r.numero, rut: r.rut, nombre: r.nombre_indexa || r.nombre_razon || '',
-               tipo: t.includes('PARQUE') ? 'PARQUE' : (t ? 'CALLE' : '') };
+               activo: r.activo, tipo: t.includes('PARQUE') ? 'PARQUE' : (t ? 'CALLE' : '') };
     });
     res.json({ success:true, data, error:null });
   } catch (e) { errSrv(res, e, 'digit dealerBuscar'); }
