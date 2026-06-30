@@ -516,9 +516,9 @@ const { auditar } = require('../../../../shared/audit');
 
 const getAllPerfiles = async (req, res) => {
   try {
-    // Administrador siempre primero; el resto en orden alfabético descendente (Z→A)
+    // Perfiles en orden alfabético (A→Z).
     const [perfiles] = await pool.query(
-      "SELECT * FROM perfiles ORDER BY (nombre='Administrador') DESC, nombre DESC"
+      "SELECT * FROM perfiles ORDER BY nombre ASC"
     );
     res.json({ success: true, data: perfiles, error: null });
   } catch (error) {
