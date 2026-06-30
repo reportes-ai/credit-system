@@ -146,6 +146,11 @@ const num = v => { const n = parseInt(v, 10); return Number.isFinite(n) ? n : nu
 
 /* ════════════ CATÁLOGO ════════════ */
 
+// Búsqueda insensible a MAYÚSCULAS y ACENTOS (la colación de la BD es case-sensitive,
+// por eso "papel" no encontraba "Papel…" ni "lapiz" a "Lápiz…"). Se pliega ambos lados.
+const _foldSQL = c => `REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(LOWER(${c}),'á','a'),'é','e'),'í','i'),'ó','o'),'ú','u')`;
+const _foldJS  = s => String(s || '').toLowerCase().replace(/á/g,'a').replace(/é/g,'e').replace(/í/g,'i').replace(/ó/g,'o').replace(/ú/g,'u');
+
 // GET /api/compras/catalogo?q=&categoria=&soloActivos=1&limit=&offset=
 const catalogo = async (req, res) => {
   try {
@@ -156,7 +161,7 @@ const catalogo = async (req, res) => {
     const offset = parseInt(req.query.offset, 10) || 0;
     const where = [], args = [];
     if (soloActivos) where.push('activo=1');
-    if (q) { where.push('(nombre LIKE ? OR marca LIKE ? OR sku LIKE ? OR codigo_ref LIKE ?)'); args.push(`%${q}%`, `%${q}%`, `%${q}%`, `%${q}%`); }
+    if (q) { where.push(`(${_foldSQL('nombre')} LIKE ? OR ${_foldSQL('marca')} LIKE ? OR LOWER(sku) LIKE ? OR LOWER(codigo_ref) LIKE ?)`); const qf = `%${_foldJS(q)}%`, ql = `%${q.toLowerCase()}%`; args.push(qf, qf, ql, ql); }
     if (cat) { where.push('categoria LIKE ?'); args.push(`${cat}%`); }
     const w = where.length ? 'WHERE ' + where.join(' AND ') : '';
     const [[{ total }]] = await pool.query(`SELECT COUNT(*) total FROM compras_articulos ${w}`, args);
@@ -184,7 +189,7 @@ const catalogoIds = async (req, res) => {
     const q = String(req.query.q || '').trim();
     const cat = String(req.query.categoria || '').trim();
     const where = ['activo=1'], args = [];
-    if (q) { where.push('(nombre LIKE ? OR marca LIKE ? OR sku LIKE ? OR codigo_ref LIKE ?)'); args.push(`%${q}%`, `%${q}%`, `%${q}%`, `%${q}%`); }
+    if (q) { where.push(`(${_foldSQL('nombre')} LIKE ? OR ${_foldSQL('marca')} LIKE ? OR LOWER(sku) LIKE ? OR LOWER(codigo_ref) LIKE ?)`); const qf = `%${_foldJS(q)}%`, ql = `%${q.toLowerCase()}%`; args.push(qf, qf, ql, ql); }
     if (cat) { where.push('categoria LIKE ?'); args.push(`${cat}%`); }
     const [rows] = await pool.query(`SELECT id FROM compras_articulos WHERE ${where.join(' AND ')} ORDER BY id LIMIT 10000`, args);
     res.json({ success: true, data: { ids: rows.map(r => r.id) }, error: null });
@@ -332,7 +337,7 @@ const misArticulos = async (req, res) => {
     const limit = Math.min(parseInt(req.query.limit, 10) || 60, 200);
     const offset = parseInt(req.query.offset, 10) || 0;
     const where = ['a.activo=1', 'ap.id_perfil=?'], args = [idp];
-    if (q) { where.push('(a.nombre LIKE ? OR a.marca LIKE ? OR a.sku LIKE ?)'); args.push(`%${q}%`, `%${q}%`, `%${q}%`); }
+    if (q) { where.push(`(${_foldSQL('a.nombre')} LIKE ? OR ${_foldSQL('a.marca')} LIKE ? OR LOWER(a.sku) LIKE ?)`); const qf = `%${_foldJS(q)}%`, ql = `%${q.toLowerCase()}%`; args.push(qf, qf, ql); }
     if (cat) { where.push('a.categoria LIKE ?'); args.push(`${cat}%`); }
     const w = 'WHERE ' + where.join(' AND ');
     const [[{ total }]] = await pool.query(
