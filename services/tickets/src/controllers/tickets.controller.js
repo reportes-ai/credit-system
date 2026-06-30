@@ -185,6 +185,16 @@ const listar = async (req, res) => {
   } catch (e) { console.error('[tickets listar]', e.message); res.status(500).json({ success: false, data: null, error: 'Error interno del servidor' }); }
 };
 
+/* ── Pendientes (para badge en card/bandeja) ───────────────────────────────── */
+const pendientes = async (req, res) => {
+  try {
+    const u = req.usuario || {}; const ti = await esTI(u.id_usuario);
+    let count = 0;
+    if (ti) { const [[r]] = await pool.query("SELECT COUNT(*) c FROM ti_tickets WHERE estado IN ('ABIERTO','EN_PROCESO')"); count = r.c; }
+    res.json({ success: true, data: { count, es_ti: ti }, error: null });
+  } catch (e) { res.status(500).json({ success: false, data: { count: 0 }, error: 'Error' }); }
+};
+
 /* ── Ver ticket + mensajes ─────────────────────────────────────────────────── */
 const obtener = async (req, res) => {
   try {
@@ -281,4 +291,4 @@ async function tickEscalar() {
 setInterval(tickEscalar, 30 * 60 * 1000);
 setTimeout(tickEscalar, 25 * 1000);
 
-module.exports = { motivos, crear, listar, obtener, comentar, cambiarEstado, motivosAdmin, guardarMotivo, eliminarMotivo, getConfig: getConfigEp, setConfig, tickEscalar };
+module.exports = { motivos, crear, listar, obtener, comentar, cambiarEstado, pendientes, motivosAdmin, guardarMotivo, eliminarMotivo, getConfig: getConfigEp, setConfig, tickEscalar };

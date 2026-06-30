@@ -5,6 +5,8 @@ const { verifyToken } = require('../../../../shared/middleware/auth');
 const { requireFunc } = require('../../../../shared/middleware/permisos');
 const ctrl = require('../controllers/rrhh.controller');
 
+router.get('/pendientes', verifyToken, requireFunc('rh_ver', 'rh_vacaciones', 'rh_antiguedad', 'rh_aprobar'), ctrl.pendientes);
+
 // Vacaciones
 router.get('/vacaciones',          verifyToken, requireFunc('rh_vacaciones', 'rh_aprobar'), ctrl.listarVacaciones);
 router.post('/vacaciones',         verifyToken, requireFunc('rh_vacaciones'), ctrl.crearVacaciones);

@@ -114,9 +114,12 @@ const crearVacaciones = async (req, res) => {
 const listarVacaciones = async (req, res) => {
   try {
     const u = req.usuario || {}; const rrhh = await esRRHH(u.id_usuario);
-    const vista = req.query.vista === 'bandeja' && rrhh ? 'bandeja' : 'mias';
+    let vista = req.query.vista || 'mias';
+    if ((vista === 'bandeja' || vista === 'historicas') && !rrhh) vista = 'mias';
     const params = []; let where = '';
     if (vista === 'mias') { where = 'WHERE id_usuario=?'; params.push(u.id_usuario); }
+    else if (vista === 'bandeja') where = "WHERE estado='PENDIENTE'";
+    else if (vista === 'historicas') where = "WHERE estado<>'PENDIENTE'";
     const [rows] = await pool.query(`SELECT * FROM rh_vacaciones ${where} ORDER BY FIELD(estado,'PENDIENTE','APROBADA','RECHAZADA'), created_at DESC LIMIT 300`, params);
     res.json({ success: true, data: { solicitudes: rows, es_rrhh: rrhh }, error: null });
   } catch (e) { res.status(500).json({ success: false, data: null, error: 'Error interno del servidor' }); }
@@ -150,9 +153,12 @@ const crearAntiguedad = async (req, res) => {
 const listarAntiguedad = async (req, res) => {
   try {
     const u = req.usuario || {}; const rrhh = await esRRHH(u.id_usuario);
-    const vista = req.query.vista === 'bandeja' && rrhh ? 'bandeja' : 'mias';
+    let vista = req.query.vista || 'mias';
+    if ((vista === 'bandeja' || vista === 'historicas') && !rrhh) vista = 'mias';
     const params = []; let where = '';
     if (vista === 'mias') { where = 'WHERE id_usuario=?'; params.push(u.id_usuario); }
+    else if (vista === 'bandeja') where = "WHERE estado='PENDIENTE'";
+    else if (vista === 'historicas') where = "WHERE estado<>'PENDIENTE'";
     const [rows] = await pool.query(`SELECT * FROM rh_antiguedad ${where} ORDER BY FIELD(estado,'PENDIENTE','EMITIDA','RECHAZADA'), created_at DESC LIMIT 300`, params);
     res.json({ success: true, data: { solicitudes: rows, es_rrhh: rrhh }, error: null });
   } catch (e) { res.status(500).json({ success: false, data: null, error: 'Error interno del servidor' }); }
@@ -173,4 +179,17 @@ const resolverAntiguedad = async (req, res) => {
   } catch (e) { res.status(500).json({ success: false, data: null, error: 'Error interno del servidor' }); }
 };
 
-module.exports = { crearVacaciones, listarVacaciones, resolverVacaciones, crearAntiguedad, listarAntiguedad, resolverAntiguedad };
+const pendientes = async (req, res) => {
+  try {
+    const u = req.usuario || {}; const rrhh = await esRRHH(u.id_usuario);
+    let vac = 0, ant = 0;
+    if (rrhh) {
+      const [[a]] = await pool.query("SELECT COUNT(*) c FROM rh_vacaciones WHERE estado='PENDIENTE'");
+      const [[b]] = await pool.query("SELECT COUNT(*) c FROM rh_antiguedad WHERE estado='PENDIENTE'");
+      vac = a.c; ant = b.c;
+    }
+    res.json({ success: true, data: { es_rrhh: rrhh, vacaciones: vac, antiguedad: ant, count: vac + ant }, error: null });
+  } catch (e) { res.status(500).json({ success: false, data: { count: 0 }, error: 'Error' }); }
+};
+
+module.exports = { crearVacaciones, listarVacaciones, resolverVacaciones, crearAntiguedad, listarAntiguedad, resolverAntiguedad, pendientes };

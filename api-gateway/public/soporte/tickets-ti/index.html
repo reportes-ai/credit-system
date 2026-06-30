@@ -23,7 +23,8 @@
     .avatar { width:28px; height:28px; background:#90caf9; border-radius:50%; display:flex; align-items:center; justify-content:center; color:var(--navy); font-weight:700; font-size:.75rem; }
     .btn-logout { background:rgba(255,255,255,.1); border:1px solid rgba(255,255,255,.2); color:#fff; border-radius:8px; padding:5px 12px; font-size:.82rem; cursor:pointer; }
     .main { padding:28px 34px; max-width:1100px; margin:0 auto; }
-    .page-banner { background:linear-gradient(135deg,#155e75,#0e7490 60%,#06b6d4); border-radius:16px; color:#fff; padding:22px 30px; margin-bottom:22px; display:flex; align-items:center; gap:18px; }
+    .page-banner { background:linear-gradient(135deg,#012d70,#0141A2 50%,#009AFE); border-radius:16px; color:#fff; padding:22px 30px; margin-bottom:22px; display:flex; align-items:center; gap:18px; }
+    .badge-count { background:#dc2626; color:#fff; border-radius:10px; padding:0 6px; font-size:.68rem; font-weight:800; margin-left:6px; display:none; }
     .page-banner i { font-size:2.4rem; opacity:.9; }
     .page-banner h2 { font-weight:700; margin:0 0 2px; font-size:1.3rem; }
     .page-banner p { opacity:.85; margin:0; font-size:.85rem; }
@@ -77,7 +78,7 @@
   <div class="tabs">
     <div class="tab active" id="tCrear" onclick="tab('crear')"><i class="bi bi-plus-circle me-1"></i>Nuevo ticket</div>
     <div class="tab" id="tMias" onclick="tab('mias')"><i class="bi bi-person me-1"></i>Mis tickets</div>
-    <div class="tab" id="tBandeja" onclick="tab('bandeja')" style="display:none"><i class="bi bi-inbox me-1"></i>Bandeja TI</div>
+    <div class="tab" id="tBandeja" onclick="tab('bandeja')" style="display:none"><i class="bi bi-inbox me-1"></i>Bandeja TI<span class="badge-count" id="bandejaCount">0</span></div>
   </div>
 
   <div id="secCrear" class="card-box">
@@ -139,7 +140,7 @@
     const tb = document.getElementById('tb'); tb.innerHTML = '<tr><td colspan="6" class="empty">Cargando…</td></tr>';
     const j = await (await fetch(`/api/tickets/tickets?vista=${VISTA}${estado?'&estado='+estado:''}`,{headers:H})).json();
     const rows = j.data?.tickets || [];
-    ES_TI = j.data?.es_ti; document.getElementById('tBandeja').style.display = ES_TI?'':'none';
+    ES_TI = j.data?.es_ti; document.getElementById('tBandeja').style.display = ES_TI?'':'none'; cargarPendientes();
     if (!rows.length){ tb.innerHTML = '<tr><td colspan="6" class="empty">Sin tickets.</td></tr>'; return; }
     tb.innerHTML = rows.map(t=>`<tr>
       <td><b>${esc(t.codigo||('#'+t.id))}</b>${t.escalado?' <span class="badge-esc">escalado</span>':''}</td>
@@ -183,7 +184,13 @@
     const j = await (await fetch(`/api/tickets/tickets/${id}/estado`,{method:'PUT',headers:HJ,body:JSON.stringify({estado})})).json();
     if (!j.success) return alert(j.error); ver(id); cargarLista();
   }
-  (async()=>{ await initMotivos();
+  async function cargarPendientes(){
+    try { const j=await(await fetch('/api/tickets/pendientes',{headers:H})).json();
+      if (j.data?.es_ti){ document.getElementById('tBandeja').style.display='';
+        const b=document.getElementById('bandejaCount'); if(j.data.count>0){b.textContent=j.data.count;b.style.display='';}else b.style.display='none'; }
+    } catch(e){}
+  }
+  (async()=>{ await initMotivos(); await cargarPendientes();
     const qid = new URLSearchParams(location.search).get('id');
     if (qid){ tab('mias'); ver(Number(qid)); } else tab('crear');
   })();

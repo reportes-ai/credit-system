@@ -7,6 +7,7 @@ const ctrl = require('../controllers/tickets.controller');
 
 // Crear / ver / responder — cualquiera con acceso a Tickets TI (el controller filtra por dueño/TI).
 router.get('/motivos',          verifyToken, requireFunc('tickets_ti'), ctrl.motivos);
+router.get('/pendientes',       verifyToken, requireFunc('tickets_ti'), ctrl.pendientes);
 router.get('/tickets',          verifyToken, requireFunc('tickets_ti'), ctrl.listar);
 router.post('/tickets',         verifyToken, requireFunc('tickets_ti'), ctrl.crear);
 router.get('/tickets/:id',      verifyToken, requireFunc('tickets_ti'), ctrl.obtener);
