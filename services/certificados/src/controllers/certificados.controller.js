@@ -324,6 +324,78 @@ const buscarCarta = async (req, res) => {
 };
 
 /* ── Vista previa: arma los datos del certificado SIN registrarlo ────────── */
+/* ── Motor ÚNICO de prepago ─────────────────────────────────────────────────
+   Calcula el monto a prepagar (saldar) de un crédito AutoFácil a la fecha de hoy:
+   capital vigente + cuotas en mora + interés por mora + gastos de cobranza +
+   interés corriente + comisión de prepago. Devuelve también el DETALLE por cuota
+   (para que el pago en caja registre cuota por cuota). Lo usan el certificado
+   CERT_DEUDA_PREPAGO y el endpoint de prepago en caja — NO duplicar (máxima #1). */
+async function calcularPrepago(num_op) {
+  const ctx = await ctxCredito(num_op);
+  if (!ctx) throw { code: 404, msg: 'No se encontró el crédito.' };
+  const { c, cuotas, pagado } = ctx;
+  if (pagado) throw { code: 400, msg: 'El crédito ya está pagado/prepagado; no hay monto de prepago.' };
+  if (!cuotas.length) throw { code: 400, msg: 'El crédito no tiene calendario de cuotas para calcular el prepago.' };
+  const noPag = cuotas.filter(q => q.estado_cuota !== 'PAGADA');
+  const tasaMes = N((noPag[0] || cuotas[0]).tasa) || N(c.tascli_real) || 0;  // % mensual
+  const tasaDia = (tasaMes / 100) / 30;
+  const cfg = await COB.getCobranzaConfig();
+  const gastosDias = Number(cfg.gastos_dias) || 21;
+  let tramosUF = []; try { tramosUF = JSON.parse(cfg.tramos_uf); } catch (_) {}
+  const [tasasMora] = await pool.query("SELECT DATE_FORMAT(fecha_desde,'%Y-%m-%d') fecha_desde, DATE_FORMAT(fecha_hasta,'%Y-%m-%d') fecha_hasta, tasa_mensual_menor, tasa_mensual_mayor FROM tasas");
+  let tramo = 'menor';
+  try {
+    const [[um]] = await pool.query("SELECT valor FROM parametros_credito WHERE clave='umbral_uf_tramo'");
+    const umbral = um ? (parseFloat(um.valor) || 200) : 200;
+    const ufOt = await COB.getUFporFecha(c.fecha_otorgado);
+    const baseTramo = N(c.saldo_precio) || N(c.monto_financiado) || 0;
+    if (ufOt > 0 && baseTramo > umbral * ufOt) tramo = 'mayor';
+  } catch (_) {}
+
+  const liquidar = async (fechaISO) => {
+    const ref = new Date(fechaISO + 'T00:00:00');
+    let capV = 0, moraC = 0, intMora = 0, gastos = 0, ultPasado = null, nM = 0, nV = 0;
+    const detalle = [];
+    for (const q of noPag) {
+      const venc = q.venc ? new Date(q.venc + 'T00:00:00') : null;
+      const amort = N(q.amortizacion);
+      let cuMora = 0, cuGasto = 0;
+      const enMora = !!(venc && venc < ref);
+      if (enMora) {                                   // en mora
+        nM++; moraC += N(q.valor_cuota);
+        const diasMora = Math.floor((ref - venc) / 86400000);
+        cuMora = (COB.calcularInteresMora(N(q.valor_cuota), q.venc, fechaISO, tramo, tasasMora).interes || 0);
+        intMora += cuMora;
+        if (diasMora >= gastosDias) {
+          const uf = await COB.getUFporFecha(COB.addDias(q.venc, gastosDias));
+          cuGasto = (COB.calcularGastoCobranza(N(q.valor_cuota), uf, tramosUF).gasto_pesos || 0);
+          gastos += cuGasto;
+        }
+        if (!ultPasado || venc > ultPasado) ultPasado = venc;
+      } else { nV++; capV += amort; }                 // vigente (futura)
+      detalle.push({ numero_cuota: q.numero_cuota, fecha_vencimiento: q.venc || null,
+        valor_cuota: Math.round(N(q.valor_cuota)), amortizacion: Math.round(amort),
+        interes_mora: Math.round(cuMora), gastos_cobranza: Math.round(cuGasto), en_mora: enMora });
+    }
+    const diasCorr = ultPasado ? Math.max(0, Math.floor((ref - ultPasado) / 86400000)) : 0;
+    const intCorr = capV * tasaDia * diasCorr;
+    const comision = capV * (tasaMes / 100);          // un mes de interés sobre el capital vigente
+    const total = capV + moraC + intMora + gastos + intCorr + comision;
+    return {
+      fecha: fechaISO, saldo_insoluto: Math.round(total),
+      capital_vigente: Math.round(capV), mora_cuotas: Math.round(moraC),
+      interes_mora: Math.round(intMora), gastos_cobranza: Math.round(gastos),
+      interes_corriente: Math.round(intCorr), comision_prepago: Math.round(comision),
+      dias_corrientes: diasCorr, cuotas_mora: nM, cuotas_vigentes: nV, detalle,
+    };
+  };
+  const hoyISO = new Date().toLocaleDateString('sv-SE', { timeZone: 'America/Santiago' });
+  const liq = await liquidar(hoyISO);
+  const proyeccion = [];
+  for (const f of await proxDiasHabiles(hoyISO, 3)) proyeccion.push({ fecha: f, total: (await liquidar(f)).saldo_insoluto });
+  return { rut: c.rut, nombre: c.nombre, num_op, credito: c, datos: { ...liq, tasa_mensual: tasaMes, proyeccion } };
+}
+
 async function armar(tipo, body) {
   if (!TIPOS[tipo]) throw { code: 400, msg: 'Tipo de certificado inválido.' };
 
@@ -387,62 +459,8 @@ async function armar(tipo, body) {
     return { ...base, datos: { saldo_insoluto: saldo, cuotas_pendientes: impagas, cuotas_total: total } };
   }
   if (tipo === 'CERT_DEUDA_PREPAGO') {
-    if (pagado) throw { code: 400, msg: 'El crédito ya está pagado; no hay monto de prepago.' };
-    if (!cuotas.length) throw { code: 400, msg: 'El crédito no tiene calendario de cuotas para calcular el prepago.' };
-    const noPag = cuotas.filter(q => q.estado_cuota !== 'PAGADA');
-    const tasaMes = N((noPag[0] || cuotas[0]).tasa) || N(c.tascli_real) || 0;  // % mensual
-    const tasaDia = (tasaMes / 100) / 30;
-    // Parámetros canónicos de cobranza (interés por mora + gastos de cobranza)
-    const cfg = await COB.getCobranzaConfig();
-    const gastosDias = Number(cfg.gastos_dias) || 21;
-    let tramosUF = []; try { tramosUF = JSON.parse(cfg.tramos_uf); } catch (_) {}
-    const [tasasMora] = await pool.query("SELECT DATE_FORMAT(fecha_desde,'%Y-%m-%d') fecha_desde, DATE_FORMAT(fecha_hasta,'%Y-%m-%d') fecha_hasta, tasa_mensual_menor, tasa_mensual_mayor FROM tasas");
-    // Tramo del crédito (menor/mayor 200 UF) = saldo precio vs umbral × UF de otorgamiento
-    let tramo = 'menor';
-    try {
-      const [[um]] = await pool.query("SELECT valor FROM parametros_credito WHERE clave='umbral_uf_tramo'");
-      const umbral = um ? (parseFloat(um.valor) || 200) : 200;
-      const ufOt = await COB.getUFporFecha(c.fecha_otorgado);
-      const baseTramo = N(c.saldo_precio) || N(c.monto_financiado) || 0;
-      if (ufOt > 0 && baseTramo > umbral * ufOt) tramo = 'mayor';
-    } catch (_) {}
-
-    // Liquidación a una fecha dada (YYYY-MM-DD)
-    const liquidar = async (fechaISO) => {
-      const ref = new Date(fechaISO + 'T00:00:00');
-      let capV = 0, moraC = 0, intMora = 0, gastos = 0, ultPasado = null, nM = 0, nV = 0;
-      for (const q of noPag) {
-        const venc = q.venc ? new Date(q.venc + 'T00:00:00') : null;
-        const amort = N(q.amortizacion);
-        if (venc && venc < ref) {                       // en mora
-          nM++; moraC += N(q.valor_cuota);
-          const diasMora = Math.floor((ref - venc) / 86400000);
-          intMora += (COB.calcularInteresMora(N(q.valor_cuota), q.venc, fechaISO, tramo, tasasMora).interes || 0);
-          if (diasMora >= gastosDias) {
-            const uf = await COB.getUFporFecha(COB.addDias(q.venc, gastosDias));
-            gastos += (COB.calcularGastoCobranza(N(q.valor_cuota), uf, tramosUF).gasto_pesos || 0);
-          }
-          if (!ultPasado || venc > ultPasado) ultPasado = venc;
-        } else { nV++; capV += amort; }                 // vigente (futura)
-      }
-      const diasCorr = ultPasado ? Math.max(0, Math.floor((ref - ultPasado) / 86400000)) : 0;
-      const intCorr = capV * tasaDia * diasCorr;
-      const comision = capV * (tasaMes / 100);          // un mes de interés sobre el capital vigente
-      const total = capV + moraC + intMora + gastos + intCorr + comision;
-      return {
-        fecha: fechaISO, saldo_insoluto: Math.round(total),
-        capital_vigente: Math.round(capV), mora_cuotas: Math.round(moraC),
-        interes_mora: Math.round(intMora), gastos_cobranza: Math.round(gastos),
-        interes_corriente: Math.round(intCorr), comision_prepago: Math.round(comision),
-        dias_corrientes: diasCorr, cuotas_mora: nM, cuotas_vigentes: nV,
-      };
-    };
-    const hoyISO = new Date().toLocaleDateString('sv-SE', { timeZone: 'America/Santiago' });
-    const liq = await liquidar(hoyISO);
-    // Proyección: monto a prepagar en los próximos 3 días hábiles
-    const proyeccion = [];
-    for (const f of await proxDiasHabiles(hoyISO, 3)) proyeccion.push({ fecha: f, total: (await liquidar(f)).saldo_insoluto });
-    return { ...base, datos: { ...liq, tasa_mensual: tasaMes, proyeccion } };
+    const pp = await calcularPrepago(num_op);   // motor único compartido
+    return { ...base, datos: pp.datos };
   }
   throw { code: 400, msg: 'Tipo no soportado.' };
 }
@@ -584,4 +602,4 @@ const updateTexto = async (req, res) => {
   } catch (e) { console.error('[certificados updateTexto]', e.message); res.status(500).json({ success: false, data: null, error: 'Error guardando el texto' }); }
 };
 
-module.exports = { buscar, buscarCarta, preview, generar, historial, ver, anular, getTextos, updateTexto };
+module.exports = { buscar, buscarCarta, preview, generar, historial, ver, anular, getTextos, updateTexto, calcularPrepago };
