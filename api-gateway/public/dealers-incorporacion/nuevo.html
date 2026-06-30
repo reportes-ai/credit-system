@@ -5,7 +5,7 @@
   <link rel="icon" href="/img/favicon.png" type="image/png">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Nueva Ficha de Dealer — AutoFácil</title>
-  <!-- v1.22 — Nombre del Parque: datalist con los parques del mantenedor -->
+  <!-- v1.23 — ficha PDF: Contacto Comercial/Financiero lado a lado + sección Socios -->
   <link href="/css/bootstrap.min.css" rel="stylesheet">
   <link href="/css/bootstrap-icons.css" rel="stylesheet">
   <style>
@@ -1040,6 +1040,9 @@ function imprimir(){
     ? `<tr><td class="lbl">Calle</td><td>${E(o.com_6_12)}%</td><td>${E(o.com_13_24)}%</td><td>${E(o.com_25_36)}%</td><td>${E(o.com_37)}%</td></tr>
        <tr><td class="lbl">Parque</td><td>${E(o.com_parque_6_12)}%</td><td>${E(o.com_parque_13_24)}%</td><td>${E(o.com_parque_25_36)}%</td><td>${E(o.com_parque_37)}%</td></tr>`
     : `<tr><td class="lbl">Porcentaje de Comisión</td><td>${E(o.com_6_12)}%</td><td>${E(o.com_13_24)}%</td><td>${E(o.com_25_36)}%</td><td>${E(o.com_37)}%</td></tr>`;
+  const sociosRows = (o.socios && o.socios.length)
+    ? o.socios.slice(0,3).map((s,i)=>`<tr><td class="lbl">Socio ${i+1}</td><td>${E(s.rut)}</td><td>${E(s.nombre)}</td></tr>`).join('')
+    : `<tr><td class="lbl">Socio 1</td><td></td><td></td></tr>`;
   printHTML(`${LOGO_PRINT}
     <h1${subt?'':' class="solo"'}>FICHA DE INCORPORACIÓN DE CONCESIONARIO</h1>${subt?`<div class="subt">${subt}</div>`:''}
     <table class="p"><tr><th colspan="2">EJECUTIVO COMERCIAL</th></tr>
@@ -1054,14 +1057,23 @@ function imprimir(){
       <tr><td class="lbl">${comLbl}</td><td>${E(o.comuna)}</td></tr>
       <tr><td class="lbl">Provincia / Ciudad</td><td>${E(o.provincia)}</td></tr>
       <tr><td class="lbl">Región</td><td>${E(o.region)}</td></tr>${parqueDirRows}</table>
-    <table class="p"><tr><th colspan="2">CONTACTO COMERCIAL</th></tr>
-      <tr><td class="lbl">Nombre</td><td>${E(o.cc_nombre)}</td></tr>
-      <tr><td class="lbl">Teléfono</td><td>${E(o.cc_telefono)}</td></tr>
-      <tr><td class="lbl">Email</td><td>${E(o.cc_email)}</td></tr></table>
-    <table class="p"><tr><th colspan="2">CONTACTO FINANCIERO</th></tr>
-      <tr><td class="lbl">Nombre</td><td>${E(o.cf_nombre)}</td></tr>
-      <tr><td class="lbl">Teléfono</td><td>${E(o.cf_telefono)}</td></tr>
-      <tr><td class="lbl">Email</td><td>${E(o.cf_email)}</td></tr></table>
+    <table style="width:100%;border-collapse:collapse;margin-bottom:4px"><tr>
+      <td style="width:50%;vertical-align:top;padding:0 3px 0 0">
+        <table class="p" style="margin-bottom:0"><tr><th colspan="2">CONTACTO COMERCIAL</th></tr>
+          <tr><td class="lbl">Nombre</td><td>${E(o.cc_nombre)}</td></tr>
+          <tr><td class="lbl">Teléfono</td><td>${E(o.cc_telefono)}</td></tr>
+          <tr><td class="lbl">Email</td><td>${E(o.cc_email)}</td></tr></table>
+      </td>
+      <td style="width:50%;vertical-align:top;padding:0 0 0 3px">
+        <table class="p" style="margin-bottom:0"><tr><th colspan="2">CONTACTO FINANCIERO</th></tr>
+          <tr><td class="lbl">Nombre</td><td>${E(o.cf_nombre)}</td></tr>
+          <tr><td class="lbl">Teléfono</td><td>${E(o.cf_telefono)}</td></tr>
+          <tr><td class="lbl">Email</td><td>${E(o.cf_email)}</td></tr></table>
+      </td>
+    </tr></table>
+    <table class="p"><tr><th colspan="3">SOCIOS (AVALES)</th></tr>
+      <tr><td class="lbl">&nbsp;</td><td class="lbl">RUT</td><td class="lbl">Nombre</td></tr>
+      ${sociosRows}</table>
     <table class="p"><tr><th colspan="2">REPRESENTANTE LEGAL</th></tr>
       <tr><td class="lbl">Nombre</td><td>${E(o.rl_nombre)}</td></tr>
       <tr><td class="lbl">Teléfono</td><td>${E(o.rl_telefono)}</td></tr>
