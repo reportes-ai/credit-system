@@ -330,21 +330,25 @@ async function perfilDe(uid) {
 // GET /api/compras/articulos?q=&categoria=&limit=&offset= → solo los asignados al perfil del usuario
 const misArticulos = async (req, res) => {
   try {
+    const esAdmin = req.usuario?.perfil_nombre === 'Administrador';
     const idp = await perfilDe(req.usuario.id_usuario);
-    if (!idp) return res.json({ success: true, data: { items: [], total: 0 }, error: null });
+    if (!esAdmin && !idp) return res.json({ success: true, data: { items: [], total: 0 }, error: null });
     const q = String(req.query.q || '').trim();
     const cat = String(req.query.categoria || '').trim();
     const limit = Math.min(parseInt(req.query.limit, 10) || 60, 200);
     const offset = parseInt(req.query.offset, 10) || 0;
-    const where = ['a.activo=1', 'ap.id_perfil=?'], args = [idp];
+    // Administrador ve TODO el catálogo (convención del sistema); el resto solo lo asignado a su perfil.
+    const join = esAdmin ? '' : 'JOIN compras_articulo_perfil ap ON ap.id_articulo=a.id';
+    const where = ['a.activo=1'], args = [];
+    if (!esAdmin) { where.push('ap.id_perfil=?'); args.push(idp); }
     if (q) { where.push(`(${_foldSQL('a.nombre')} LIKE ? OR ${_foldSQL('a.marca')} LIKE ? OR LOWER(a.sku) LIKE ?)`); const qf = `%${_foldJS(q)}%`, ql = `%${q.toLowerCase()}%`; args.push(qf, qf, ql); }
     if (cat) { where.push('a.categoria LIKE ?'); args.push(`${cat}%`); }
     const w = 'WHERE ' + where.join(' AND ');
     const [[{ total }]] = await pool.query(
-      `SELECT COUNT(*) total FROM compras_articulos a JOIN compras_articulo_perfil ap ON ap.id_articulo=a.id ${w}`, args);
+      `SELECT COUNT(*) total FROM compras_articulos a ${join} ${w}`, args);
     const [rows] = await pool.query(
       `SELECT a.id, a.sku, a.nombre, a.marca, a.categoria, a.precio, a.stock, a.imagen
-       FROM compras_articulos a JOIN compras_articulo_perfil ap ON ap.id_articulo=a.id
+       FROM compras_articulos a ${join}
        ${w} ORDER BY a.nombre LIMIT ? OFFSET ?`, [...args, limit, offset]);
     res.json({ success: true, data: { items: rows, total }, error: null });
   } catch (e) { err(res, e); }
@@ -353,12 +357,15 @@ const misArticulos = async (req, res) => {
 // GET /api/compras/mis-categorias → categorías del catálogo del perfil del usuario
 const misCategorias = async (req, res) => {
   try {
+    const esAdmin = req.usuario?.perfil_nombre === 'Administrador';
     const idp = await perfilDe(req.usuario.id_usuario);
-    if (!idp) return res.json({ success: true, data: [], error: null });
-    const [rows] = await pool.query(
-      `SELECT SUBSTRING_INDEX(a.categoria,'/',1) cat, COUNT(*) n
-       FROM compras_articulos a JOIN compras_articulo_perfil ap ON ap.id_articulo=a.id
-       WHERE a.activo=1 AND ap.id_perfil=? AND a.categoria<>'' GROUP BY cat ORDER BY cat`, [idp]);
+    if (!esAdmin && !idp) return res.json({ success: true, data: [], error: null });
+    const [rows] = esAdmin
+      ? await pool.query("SELECT SUBSTRING_INDEX(categoria,'/',1) cat, COUNT(*) n FROM compras_articulos WHERE activo=1 AND categoria<>'' GROUP BY cat ORDER BY cat")
+      : await pool.query(
+        `SELECT SUBSTRING_INDEX(a.categoria,'/',1) cat, COUNT(*) n
+         FROM compras_articulos a JOIN compras_articulo_perfil ap ON ap.id_articulo=a.id
+         WHERE a.activo=1 AND ap.id_perfil=? AND a.categoria<>'' GROUP BY cat ORDER BY cat`, [idp]);
     res.json({ success: true, data: rows.map(r => ({ categoria: r.cat, n: r.n })), error: null });
   } catch (e) { err(res, e); }
 };
@@ -396,11 +403,15 @@ const crearPedido = async (req, res) => {
     }
     if (!want.size) return res.status(400).json({ success: false, data: null, error: 'Agrega al menos un artículo' });
 
-    // Solo artículos permitidos al perfil del usuario; precio SIEMPRE del servidor
-    const [arts] = await pool.query(
-      `SELECT a.id, a.sku, a.nombre, a.precio FROM compras_articulos a
-       JOIN compras_articulo_perfil ap ON ap.id_articulo=a.id
-       WHERE a.activo=1 AND ap.id_perfil=? AND a.id IN (?)`, [u.id_perfil, [...want.keys()]]);
+    // Solo artículos permitidos al perfil del usuario; precio SIEMPRE del servidor.
+    // Administrador puede pedir cualquier artículo del catálogo (convención del sistema).
+    const esAdmin = req.usuario?.perfil_nombre === 'Administrador';
+    const [arts] = esAdmin
+      ? await pool.query('SELECT id, sku, nombre, precio FROM compras_articulos WHERE activo=1 AND id IN (?)', [[...want.keys()]])
+      : await pool.query(
+        `SELECT a.id, a.sku, a.nombre, a.precio FROM compras_articulos a
+         JOIN compras_articulo_perfil ap ON ap.id_articulo=a.id
+         WHERE a.activo=1 AND ap.id_perfil=? AND a.id IN (?)`, [u.id_perfil, [...want.keys()]]);
     if (!arts.length) return res.status(400).json({ success: false, data: null, error: 'Ninguno de los artículos está disponible para tu perfil' });
 
     let total = 0; const filas = [];
