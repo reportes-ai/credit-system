@@ -141,19 +141,18 @@ function mapRow(row, mesOverride) {
   const i = (...cols) => normInt(getCol(row, ...cols));
 
   // FECHA OTORGADO real del Excel (INDEXA no admite fechas pasadas: en migraciones
-  // estampa "hoy" como placeholder, por lo que su mes NO es confiable si viene
-  // "Mes contable" y ese día cae en un mes distinto — ahí manda el mes contable).
+  // estampa "hoy" como placeholder, por lo que su mes NO es confiable — el período
+  // contable REAL viene en la columna MES ("ene-25"). Regla de negocio: MES manda.
   const fOtorgRaw = normDate(getCol(row, 'FECHA OTORGADO'));
-  // Respaldo cuando no hay FECHA OTORGADO (típico en APROBADO/RECHAZADO que nunca
-  // se cursaron): columna MES ("may-26"). Mismo motor que carga-trinidad.
-  const mesTxt = parseMesTxt(getCol(row, 'MES'));
+  const mesTxt = parseMesTxt(getCol(row, 'MES'));  // motor único shared/utils/mes-excel.js
   return {
     num_op:             i('OP'),
-    // mes: si viene Mes contable (archivo de UN mes), ese manda siempre. Si no, usa el
-    // mes de FECHA OTORGADO; si tampoco hay, cae a la columna MES del Excel.
+    // mes: prioridad 1) Mes contable elegido en la UI (archivo de UN mes),
+    // 2) columna MES del Excel (período contable real — MANDA sobre la fecha),
+    // 3) mes de FECHA OTORGADO como último recurso.
     mes: mesOverride
       ? (mesOverride.slice(0, 7) + '-01')
-      : ((fOtorgRaw && fOtorgRaw !== 'NO APLICA') ? fOtorgRaw.slice(0, 7) + '-01' : mesTxt),
+      : (mesTxt || ((fOtorgRaw && fOtorgRaw !== 'NO APLICA') ? fOtorgRaw.slice(0, 7) + '-01' : null)),
     rut_cliente:        normRut(getCol(row, 'RUT')),
     nombre_cliente:     s('NOMBRE'),
     comentarios:        s('COMENTARIOS'),
