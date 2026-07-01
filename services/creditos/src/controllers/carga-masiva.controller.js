@@ -8,6 +8,47 @@ const historial = require('./carga-historial.controller');
 const { auditar } = require('../../../../shared/audit');
 const RUT = require('../../../../api-gateway/public/js/rut-core');  // enforcement: RUT canónico
 
+/* ── Lee un Excel acotando el rango real de datos ────────────────────────
+   Archivos que se han editado mucho arrastran formato "de sobra" (columnas/
+   filas vacías con formato aplicado), lo que infla el rango declarado (!ref)
+   de la hoja mucho más allá de los datos reales. sheet_to_json() sin acotar
+   genera un objeto JS por CADA fila/columna de ese rango (aunque esté vacía),
+   lo que puede multiplicar la memoria usada y tumbar el proceso por OOM en
+   archivos grandes. Se detecta la última columna con encabezado real y la
+   última fila con dato real en la columna OP/ID, y se acota antes de parsear. */
+function leerFilasExcel(buffer) {
+  const wb = XLSX.read(buffer, { type: 'buffer', cellDates: false });
+  const ws = wb.Sheets[wb.SheetNames[0]];
+  if (!ws['!ref']) return [];
+  const full = XLSX.utils.decode_range(ws['!ref']);
+
+  let lastCol = full.s.c;
+  for (let c = full.s.c; c <= full.e.c; c++) {
+    const cell = ws[XLSX.utils.encode_cell({ r: full.s.r, c })];
+    if (cell && cell.v !== undefined && String(cell.v).trim() !== '') lastCol = c;
+  }
+
+  let colClave = -1;
+  for (let c = full.s.c; c <= lastCol; c++) {
+    const cell = ws[XLSX.utils.encode_cell({ r: full.s.r, c })];
+    const h = cell && cell.v != null ? String(cell.v).trim().toUpperCase() : '';
+    if (h === 'OP' || h === 'ID') { colClave = c; break; }
+  }
+
+  let lastRow = full.s.r;
+  if (colClave >= 0) {
+    for (let r = full.s.r + 1; r <= full.e.r; r++) {
+      const cell = ws[XLSX.utils.encode_cell({ r, c: colClave })];
+      if (cell && cell.v !== undefined && String(cell.v).trim() !== '') lastRow = r;
+    }
+  } else {
+    lastRow = full.e.r; // no se encontró columna clave: no se puede acotar, usar rango completo
+  }
+
+  const range = { s: { r: full.s.r, c: full.s.c }, e: { r: lastRow, c: lastCol } };
+  return XLSX.utils.sheet_to_json(ws, { defval: '', range });
+}
+
 /* ── Asegurar columnas extra en creditos ──────────────────── */
 (async () => {
   const extra = [
@@ -204,9 +245,7 @@ const preview = async (req, res) => {
   try {
     if (!req.file) return res.status(400).json({ success: false, data: null, error: 'No se recibió archivo' });
 
-    const wb   = XLSX.read(req.file.buffer, { type: 'buffer', cellDates: false });
-    const ws   = wb.Sheets[wb.SheetNames[0]];
-    const data = XLSX.utils.sheet_to_json(ws, { defval: '' });
+    const data = leerFilasExcel(req.file.buffer);
 
     if (!data.length) return res.status(400).json({ success: false, data: null, error: 'Archivo vacío' });
 
@@ -253,9 +292,7 @@ const importar = async (req, res) => {
   try {
     if (!req.file) return res.status(400).json({ success: false, data: null, error: 'No se recibió archivo' });
 
-    const wb   = XLSX.read(req.file.buffer, { type: 'buffer', cellDates: false });
-    const ws   = wb.Sheets[wb.SheetNames[0]];
-    const data = XLSX.utils.sheet_to_json(ws, { defval: '' });
+    const data = leerFilasExcel(req.file.buffer);
 
     const { colOP, colIdFin } = detectarCols(data);
 
@@ -498,9 +535,7 @@ const actualizar = async (req, res) => {
   try {
     if (!req.file) return res.status(400).json({ success: false, data: null, error: 'No se recibió archivo' });
 
-    const wb   = XLSX.read(req.file.buffer, { type: 'buffer', cellDates: false });
-    const ws   = wb.Sheets[wb.SheetNames[0]];
-    const data = XLSX.utils.sheet_to_json(ws, { defval: '' });
+    const data = leerFilasExcel(req.file.buffer);
 
     if (!data.length) return res.status(400).json({ success: false, data: null, error: 'Archivo vacío' });
 
