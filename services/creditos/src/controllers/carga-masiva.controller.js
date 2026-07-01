@@ -7,6 +7,7 @@ const { esFechaFutura } = require('../../../../shared/utils/fecha-futura');
 const historial = require('./carga-historial.controller');
 const { auditar } = require('../../../../shared/audit');
 const RUT = require('../../../../api-gateway/public/js/rut-core');  // enforcement: RUT canónico
+const { parseMesTxt, finDeMes } = require('../../../../shared/utils/mes-excel'); // motor único parseo MES
 
 /* ── Lee un Excel acotando el rango real de datos ────────────────────────
    Archivos que se han editado mucho arrastran formato "de sobra" (columnas/
@@ -111,13 +112,6 @@ function normInt(v) {
   const n = normNum(v);
   return n !== null ? Math.round(n) : null;
 }
-/* Último día de un mes 'YYYY-MM' o 'YYYY-MM-DD' → 'YYYY-MM-DD' */
-function finDeMes(mesStr) {
-  if (!mesStr) return null;
-  const [y, m] = mesStr.slice(0, 7).split('-').map(Number);
-  const d = new Date(y, m, 0).getDate();
-  return `${y}-${String(m).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
-}
 
 /* ── Mapea fila del Excel a objeto DB ──────────────────────────────────── */
 // Resuelve el nombre real de una columna (tolerante a espacios y case)
@@ -150,13 +144,16 @@ function mapRow(row, mesOverride) {
   // estampa "hoy" como placeholder, por lo que su mes NO es confiable si viene
   // "Mes contable" y ese día cae en un mes distinto — ahí manda el mes contable).
   const fOtorgRaw = normDate(getCol(row, 'FECHA OTORGADO'));
+  // Respaldo cuando no hay FECHA OTORGADO (típico en APROBADO/RECHAZADO que nunca
+  // se cursaron): columna MES ("may-26"). Mismo motor que carga-trinidad.
+  const mesTxt = parseMesTxt(getCol(row, 'MES'));
   return {
     num_op:             i('OP'),
-    // mes: si viene Mes contable, ese manda siempre. Si no, usa el mes de FECHA OTORGADO
-    // (o el mes del archivo para APROBADO/RECHAZADO sin fecha real).
+    // mes: si viene Mes contable (archivo de UN mes), ese manda siempre. Si no, usa el
+    // mes de FECHA OTORGADO; si tampoco hay, cae a la columna MES del Excel.
     mes: mesOverride
       ? (mesOverride.slice(0, 7) + '-01')
-      : ((fOtorgRaw && fOtorgRaw !== 'NO APLICA') ? fOtorgRaw.slice(0, 7) + '-01' : null),
+      : ((fOtorgRaw && fOtorgRaw !== 'NO APLICA') ? fOtorgRaw.slice(0, 7) + '-01' : mesTxt),
     rut_cliente:        normRut(getCol(row, 'RUT')),
     nombre_cliente:     s('NOMBRE'),
     comentarios:        s('COMENTARIOS'),
