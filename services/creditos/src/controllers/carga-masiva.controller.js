@@ -160,7 +160,10 @@ function mapRow(row, mesOverride) {
     financiera:         s('FINANCIERA') || s('Institución','INSTITUCION','INSTITUCIÓN') || 'NO APLICA',
     automotora:         s('AUTOMOTORA'),
     nombre_local:       s('NOMBRE LOCAL'),
-    estado_eval:        s('ESTADO EVAL. RIESGO', 'ESTADO EVAL RIESGO'),
+    // estado_eval (lo que clasifica el dashboard: OTORGADA/APROBADA/RECHAZADA) se
+    // deriva de ESTADO CREDITO, NO de la columna de riesgo — igual que carga-trinidad.
+    // ESTADO CREDITO es la fuente autoritativa del estado comercial de la operación.
+    estado_eval:        (s('ESTADO CREDITO', 'ESTADO CRÉDITO') || '').toUpperCase() || null,
     estado_credito:     s('ESTADO CREDITO', 'ESTADO CRÉDITO'),
     // fecha_otorgado: si el día real cae en el mismo mes que "Mes contable", se respeta;
     // si no (placeholder de INDEXA en otro mes), se usa el último día del mes contable.
