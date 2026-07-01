@@ -90,8 +90,17 @@ function resolveCol(row, ...candidates) {
 }
 function getCol(row, ...candidates) { return row[resolveCol(row, ...candidates)]; }
 
+// Tasas mensuales van en escala porcentaje (2.8 = 2,8%) en toda la app. Si el Excel
+// trae la celda con formato "%" (INDEXA), el valor crudo llega como fracción (0.028);
+// se detecta (< 1, imposible como tasa mensual real) y se normaliza a porcentaje.
+function normPct(v) {
+  if (v === null || v === undefined) return null;
+  return (v > 0 && v < 1) ? v * 100 : v;
+}
+
 function mapRow(row, mesOverride) {
   const n = (...cols) => normNum(getCol(row, ...cols));
+  const pct = (...cols) => normPct(normNum(getCol(row, ...cols)));
   const s = (...cols) => { const v = norm(getCol(row, ...cols)); return (v && v.toUpperCase() !== 'NO APLICA') ? v : null; };
   const d = (...cols) => normDate(getCol(row, ...cols));
   const i = (...cols) => normInt(getCol(row, ...cols));
@@ -136,8 +145,8 @@ function mapRow(row, mesOverride) {
     seguro_cesantia:    i('SEG.CESANTIA', 'SEG. CESANTIA', 'SEGURO CESANTIA'),
     seguro_rep_menor:   i('SEG. REP MENOR', 'SEG.REP MENOR', 'SEG. REP. MENOR'),
     monto_financiado:   i('MONTO FINANCIADO INDEXA'),
-    tascli_real:        n('TASCLI REAL'),
-    tascli_pizarra:     n('TASCLI PIZARRA'),
+    tascli_real:        pct('TASCLI REAL'),
+    tascli_pizarra:     pct('TASCLI PIZARRA'),
     tasfin_pizarra:     n('TASFIN PIZARRA'),
     comdea_real:        i('COMDEA $ REAL'),
     comej:              i('COMEJ $'),
@@ -262,6 +271,7 @@ const importar = async (req, res) => {
     let errores    = [];
     const clienteCache   = {};
     const detallesLog    = [];   // para log historial
+    const objsInsertados = [];   // objetos YA mapeados (mes/fecha_otorgado normalizados) para el recálculo
 
     for (const row of data) {
       try {
@@ -317,6 +327,7 @@ const importar = async (req, res) => {
         );
         insertados++;
         detallesLog.push({ num_op: obj.num_op, datos: obj });
+        objsInsertados.push(obj);
       } catch (e) {
         errores.push({ op: row['OP'], error: e.message });
       }
@@ -372,7 +383,7 @@ const importar = async (req, res) => {
     let recalcLog    = [];
     if (insertados > 0) {
       try {
-        const mesesAfectados = extraerMeses(data.map(r => ({ mes: r.mes || r.fecha_otorgado })));
+        const mesesAfectados = extraerMeses(objsInsertados);
         const resultado = await recalcularMeses(mesesAfectados);
         recalculados = resultado.actualizados;
         recalcLog    = resultado.log;
