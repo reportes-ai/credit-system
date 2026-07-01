@@ -70,6 +70,13 @@ function normInt(v) {
   const n = normNum(v);
   return n !== null ? Math.round(n) : null;
 }
+/* Último día de un mes 'YYYY-MM' o 'YYYY-MM-DD' → 'YYYY-MM-DD' */
+function finDeMes(mesStr) {
+  if (!mesStr) return null;
+  const [y, m] = mesStr.slice(0, 7).split('-').map(Number);
+  const d = new Date(y, m, 0).getDate();
+  return `${y}-${String(m).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
+}
 
 /* ── Mapea fila del Excel a objeto DB ──────────────────────────────────── */
 // Resuelve el nombre real de una columna (tolerante a espacios y case)
@@ -89,17 +96,17 @@ function mapRow(row, mesOverride) {
   const d = (...cols) => normDate(getCol(row, ...cols));
   const i = (...cols) => normInt(getCol(row, ...cols));
 
+  // FECHA OTORGADO real del Excel (INDEXA no admite fechas pasadas: en migraciones
+  // estampa "hoy" como placeholder, por lo que su mes NO es confiable si viene
+  // "Mes contable" y ese día cae en un mes distinto — ahí manda el mes contable).
+  const fOtorgRaw = normDate(getCol(row, 'FECHA OTORGADO'));
   return {
     num_op:             i('OP'),
-    // mes = mes de FECHA OTORGADO si existe; si no (APROBADO/RECHAZADO) usa el mes del archivo
-    mes: (() => {
-      const fOtorg = normDate(getCol(row, 'FECHA OTORGADO'));
-      if (fOtorg && fOtorg !== 'NO APLICA') {
-        // primer día del mes de la fecha de otorgamiento
-        return fOtorg.slice(0, 7) + '-01';
-      }
-      return mesOverride || null;
-    })(),
+    // mes: si viene Mes contable, ese manda siempre. Si no, usa el mes de FECHA OTORGADO
+    // (o el mes del archivo para APROBADO/RECHAZADO sin fecha real).
+    mes: mesOverride
+      ? (mesOverride.slice(0, 7) + '-01')
+      : ((fOtorgRaw && fOtorgRaw !== 'NO APLICA') ? fOtorgRaw.slice(0, 7) + '-01' : null),
     rut_cliente:        normRut(getCol(row, 'RUT')),
     nombre_cliente:     s('NOMBRE'),
     comentarios:        s('COMENTARIOS'),
@@ -109,7 +116,14 @@ function mapRow(row, mesOverride) {
     nombre_local:       s('NOMBRE LOCAL'),
     estado_eval:        s('ESTADO EVAL. RIESGO', 'ESTADO EVAL RIESGO'),
     estado_credito:     s('ESTADO CREDITO', 'ESTADO CRÉDITO'),
-    fecha_otorgado:     d('FECHA OTORGADO'),
+    // fecha_otorgado: si el día real cae en el mismo mes que "Mes contable", se respeta;
+    // si no (placeholder de INDEXA en otro mes), se usa el último día del mes contable.
+    fecha_otorgado: (() => {
+      if (mesOverride && fOtorgRaw && fOtorgRaw.slice(0, 7) !== mesOverride.slice(0, 7)) {
+        return finDeMes(mesOverride);
+      }
+      return fOtorgRaw;
+    })(),
     producto:           s('PRODUCTO'),
     valor_vehiculo:     i('VALOR VEHICULO', 'VALOR VEHÍCULO'),
     pie:                i('PIE'),
