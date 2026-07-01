@@ -96,6 +96,36 @@ function normDate(v) {
   return match ? match[1] : null;
 }
 
+/* ── Normaliza columna MES de INDEXA ("may-26", "jun-26"…) → YYYY-MM-01 ──
+   INDEXA no admite fechas pasadas y estampa Fecha Curse = 01/06; el período
+   REAL viene en la columna MES. Guiarse por MES, no por la fecha. */
+const MESES_ABBR = { ene:1,jan:1, feb:2, mar:3, abr:4,apr:4, may:5, jun:6,
+  jul:7, ago:8,aug:8, sep:9,set:9, oct:10, nov:11, dic:12,dec:12 };
+function parseMesTxt(v) {
+  if (v === null || v === undefined || v === '') return null;
+  if (v instanceof Date) return `${v.getFullYear()}-${String(v.getMonth()+1).padStart(2,'0')}-01`;
+  const s = String(v).trim().toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "");
+  let m = s.match(/^([a-z]{3,})[\s\-\/.]+(\d{2,4})$/);   // "may-26" / "mayo 2026"
+  if (m) {
+    const mon = MESES_ABBR[m[1].slice(0, 3)];
+    if (!mon) return null;
+    let yr = parseInt(m[2]); if (yr < 100) yr += 2000;
+    return `${yr}-${String(mon).padStart(2,'0')}-01`;
+  }
+  m = s.match(/^(\d{4})[\-\/](\d{1,2})$/);               // "2026-05"
+  if (m) return `${m[1]}-${String(+m[2]).padStart(2,'0')}-01`;
+  m = s.match(/^(\d{1,2})[\-\/](\d{4})$/);               // "05/2026"
+  if (m) return `${m[2]}-${String(+m[1]).padStart(2,'0')}-01`;
+  return null;
+}
+/* Último día del mes 'YYYY-MM-01' → 'YYYY-MM-DD' (fecha de otorgamiento migrada) */
+function finDeMes(mes01) {
+  if (!mes01) return null;
+  const [y, m] = mes01.split('-').map(Number);
+  const d = new Date(y, m, 0).getDate();
+  return `${y}-${String(m).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
+}
+
 function normInt(v) {
   if (v === null || v === undefined) return null;
   const n = parseFloat(String(v).replace(/[^0-9.\-]/g, ''));
@@ -138,7 +168,11 @@ function parseExcel(buffer, mapaEstados = {}, mapaEjecutivos = {}) {
       const fechaCurse   = normDate(get('Fecha Curse'));
       const fechaIngreso = normDate(get('Fecha Ingreso'));
       const fechaBase    = fechaCurse || fechaIngreso;
-      const mes          = fechaBase ? fechaBase.slice(0, 7) + '-01' : null;
+      // Período REAL desde la columna MES (INDEXA estampa Fecha Curse = 01/06).
+      // Si viene MES, manda MES y la fecha de otorgamiento = último día de ese mes.
+      const mesTxt       = parseMesTxt(get('MES'));
+      const mes          = mesTxt || (fechaBase ? fechaBase.slice(0, 7) + '-01' : null);
+      const fechaOtorgado = mesTxt ? finDeMes(mesTxt) : fechaCurse;
 
       const estadoCredito = mapEstado(estadoTri, mapaEstados);
       // Derivar estado_eval (usado por el dashboard) desde estado_credito
@@ -158,7 +192,7 @@ function parseExcel(buffer, mapaEstados = {}, mapaEjecutivos = {}) {
         pie:             normInt(get('Pie')),
         saldo_precio:    normInt(get('Saldo Precio')),
         monto_financiado:normInt(get('Monto Pagare')),
-        fecha_otorgado:  fechaCurse,
+        fecha_otorgado:  fechaOtorgado,
         mes,
         marca:           normStr(get('Marca')),
         modelo:          normStr(get('Modelo')),
