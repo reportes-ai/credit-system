@@ -106,14 +106,14 @@
 
     <div style="display:flex;gap:16px;margin-top:20px;align-items:center;flex-wrap:wrap">
       <div style="display:flex;align-items:center;gap:8px">
-        <label style="font-weight:600;font-size:.85rem;color:#374151;white-space:nowrap"><i class="bi bi-calendar3 me-1"></i>Mes contable:</label>
+        <label style="font-weight:600;font-size:.85rem;color:#374151;white-space:nowrap"><i class="bi bi-calendar3 me-1"></i>Mes contable (opcional):</label>
         <input type="month" id="mesArchivo" style="border:1.5px solid #d1d5db;border-radius:8px;padding:7px 12px;font-size:.88rem;outline:none">
       </div>
       <button class="btn-main" id="btnPreview" onclick="ejecutarPreview()" disabled>
         <i class="bi bi-eye"></i>Vista previa
       </button>
     </div>
-    <div style="margin-top:8px;font-size:.75rem;color:#9ca3af"><i class="bi bi-info-circle me-1"></i>El mes contable asegura que todos los registros queden asignados al mes correcto.</div>
+    <div style="margin-top:8px;font-size:.75rem;color:#9ca3af"><i class="bi bi-info-circle me-1"></i>Si el archivo es de UN SOLO mes, selecciónalo aquí: asegura que todos los registros queden asignados a ese mes aunque la fecha de otorgamiento venga vacía o mal. Si el archivo trae VARIOS meses (ej. la base completa de migración), déjalo vacío: cada fila usará su propia FECHA OTORGADO.</div>
 
     <!-- Preview -->
     <div id="paso2" style="display:none;margin-top:28px;border-top:1px solid #e5e7eb;padding-top:22px">
@@ -155,7 +155,7 @@
 
     <div style="display:flex;gap:16px;margin-top:20px;align-items:center;flex-wrap:wrap">
       <div style="display:flex;align-items:center;gap:8px">
-        <label style="font-weight:600;font-size:.85rem;color:#374151;white-space:nowrap"><i class="bi bi-calendar3 me-1"></i>Mes contable:</label>
+        <label style="font-weight:600;font-size:.85rem;color:#374151;white-space:nowrap"><i class="bi bi-calendar3 me-1"></i>Mes contable (opcional):</label>
         <input type="month" id="mesArchivoUpd" style="border:1.5px solid #d1d5db;border-radius:8px;padding:7px 12px;font-size:.88rem;outline:none">
       </div>
       <button class="btn-main" id="btnActualizar" onclick="ejecutarActualizar()" disabled style="background:#7c3aed">
@@ -272,14 +272,16 @@ function mostrarPreview({ resumen, preview }) {
 async function ejecutarImport() {
   if (!archivoActual) return;
   const mes = document.getElementById('mesArchivo').value;
-  if (!mes) { toast('Selecciona el mes contable antes de importar', false); return; }
-  if (!confirm(`¿Confirmas la importación con mes contable ${mes}?`)) return;
+  const msgConfirm = mes
+    ? `¿Confirmas la importación con mes contable ${mes}? Todos los registros quedarán asignados a ese mes.`
+    : '¿Confirmas la importación SIN mes contable? Cada registro tomará el mes de su propia FECHA OTORGADO.';
+  if (!confirm(msgConfirm)) return;
   const btn = document.getElementById('btnImportar');
   btn.disabled = true; btn.innerHTML = '<i class="bi bi-hourglass-split"></i>Importando...';
   try {
     const fd = new FormData();
     fd.append('archivo', archivoActual);
-    fd.append('mes_override', mes + '-01');
+    if (mes) fd.append('mes_override', mes + '-01');
     const res  = await fetch('/api/carga-masiva/importar', { method:'POST', headers:H, body:fd });
     const json = await res.json();
     if (!json.success) { toast('Error: ' + json.error, false); return; }
@@ -324,14 +326,16 @@ function cargarArchivoUpd(f) {
 async function ejecutarActualizar() {
   if (!archivoActualUpd) return;
   const mes = document.getElementById('mesArchivoUpd').value;
-  if (!mes) { toast('Selecciona el mes contable antes de continuar', false); return; }
-  if (!confirm(`¿Actualizar campos vacíos con mes contable ${mes}?\nNo se modificará el campo Ejecutivo ni se sobreescribirán valores existentes.`)) return;
+  const msgConfirmUpd = mes
+    ? `¿Actualizar campos vacíos con mes contable ${mes}?\nNo se modificará el campo Ejecutivo ni se sobreescribirán valores existentes.`
+    : '¿Actualizar campos vacíos SIN mes contable?\nCada registro tomará el mes de su propia FECHA OTORGADO. No se modificará el campo Ejecutivo ni se sobreescribirán valores existentes.';
+  if (!confirm(msgConfirmUpd)) return;
   const btn = document.getElementById('btnActualizar');
   btn.disabled = true; btn.innerHTML = '<i class="bi bi-hourglass-split"></i>Actualizando...';
   try {
     const fd = new FormData();
     fd.append('archivo', archivoActualUpd);
-    fd.append('mes_override', mes + '-01');
+    if (mes) fd.append('mes_override', mes + '-01');
     const res  = await fetch('/api/carga-masiva/actualizar', { method:'POST', headers:H, body:fd });
     const json = await res.json();
     if (!json.success) { toast('Error: ' + json.error, false); return; }
