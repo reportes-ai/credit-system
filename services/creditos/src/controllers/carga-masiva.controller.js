@@ -119,7 +119,7 @@ function mapRow(row, mesOverride) {
     // fecha_otorgado: si el día real cae en el mismo mes que "Mes contable", se respeta;
     // si no (placeholder de INDEXA en otro mes), se usa el último día del mes contable.
     fecha_otorgado: (() => {
-      if (mesOverride && fOtorgRaw && fOtorgRaw.slice(0, 7) !== mesOverride.slice(0, 7)) {
+      if (mesOverride && (!fOtorgRaw || fOtorgRaw.slice(0, 7) !== mesOverride.slice(0, 7))) {
         return finDeMes(mesOverride);
       }
       return fOtorgRaw;
@@ -320,6 +320,35 @@ const importar = async (req, res) => {
       } catch (e) {
         errores.push({ op: row['OP'], error: e.message });
       }
+    }
+
+    // ── Completar rut_dealer faltante por nombre (migración: el Excel de INDEXA
+    //    no trae RUT dealer, solo el nombre en `automotora`, a veces con prefijo
+    //    "PARQUE X " concatenado). Match SOLO si es único e inequívoco contra
+    //    dealers.nombre_indexa — si hay 0 o >1 candidato, se deja intacto para
+    //    que quede en la cola de Digitación Datos Faltantes. ──
+    if (insertados > 0) {
+      try {
+        // Caso especial: ventas directas de AutoFácil
+        await pool.query(
+          `UPDATE creditos c JOIN dealers d ON d.nombre_indexa = 'AFA'
+              SET c.rut_dealer = d.rut
+            WHERE (c.rut_dealer IS NULL OR c.rut_dealer = '')
+              AND UPPER(TRIM(c.automotora)) = 'AUTOFACIL DIRECTO'`);
+        // Match único por substring (automotora contiene el nombre_indexa del dealer)
+        await pool.query(
+          `UPDATE creditos c
+              SET c.rut_dealer = (
+                SELECT d.rut FROM dealers d
+                 WHERE d.nombre_indexa IS NOT NULL AND d.nombre_indexa <> ''
+                   AND UPPER(TRIM(c.automotora)) LIKE CONCAT('%', UPPER(TRIM(d.nombre_indexa)), '%')
+              )
+            WHERE (c.rut_dealer IS NULL OR c.rut_dealer = '')
+              AND c.automotora IS NOT NULL AND c.automotora <> ''
+              AND (SELECT COUNT(*) FROM dealers d
+                    WHERE d.nombre_indexa IS NOT NULL AND d.nombre_indexa <> ''
+                      AND UPPER(TRIM(c.automotora)) LIKE CONCAT('%', UPPER(TRIM(d.nombre_indexa)), '%')) = 1`);
+      } catch (e) { console.error('[carga-masiva match dealer por nombre]', e.message); }
     }
 
     // ── Enganchar id_dealer al maestro por RUT (los créditos nacen ligados a la tabla
