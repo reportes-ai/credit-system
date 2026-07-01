@@ -75,6 +75,11 @@ function leerFilasExcel(buffer) {
   try {
     await pool.query(`ALTER TABLE creditos ADD UNIQUE INDEX uq_id_financiera (id_financiera)`);
   } catch (e) { /* ya existe o id_financiera es null en viejos registros — ignorar */ }
+  // Índice único en num_op (clave de negocio real): dedup correcto en recargas —
+  // el ON DUPLICATE KEY UPDATE actualiza la operación existente en vez de duplicarla.
+  try {
+    await pool.query(`ALTER TABLE creditos ADD UNIQUE INDEX uq_num_op (num_op)`);
+  } catch (e) { /* ya existe o hay num_op duplicados legacy — ignorar */ }
 })();
 
 /* ── Normaliza un valor del Excel ──────────────────────────────────────── */
@@ -198,7 +203,9 @@ function mapRow(row, mesOverride) {
     mayor_menor:        s('MAYOR/MENOR'),
     monto_capitalizado: i('MONTO CAPITALIZADO'),
     fecha_primera_cuota:d('FECHA PRIMERA CUOTA'),
-    id_financiera:      s('ID FINANCIERA'),
+    // "0" = sin número de financiera (placeholder INDEXA); se guarda NULL para que
+    // NO colisione en el índice único uq_id_financiera (si no, todas las "0" se pisan).
+    id_financiera:      (() => { const v = s('ID FINANCIERA'); return (v && v !== '0') ? v : null; })(),
     rut_dealer:         RUT.normalizar(s('RUT DEALER')) || s('RUT DEALER'),
     com_rdh:            i('COM.RDH'),
     com_cesantia:       i('COM.CESANTIA'),
