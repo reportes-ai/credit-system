@@ -142,8 +142,11 @@
   const _cob = fechaVenc => { const s = S.schedule.find(x => x.fecha === fechaVenc); return s ? S.cobranzaMap.get(s.numero) : null; };
   function calcMora(monto, fechaVenc) {
     const c = _cob(fechaVenc); if (c) return { monto: c.mora, dias: c.dias };
+    // Fallback (solo si el backend no respondió): MISMA fórmula del motor canónico
+    // de cobranza (calcularInteresMora): interés diario = cuota × (TMC mensual/100) / 30.
+    // S.tmc es la TMC ANUAL → mensual = anual/12.
     const dias = Math.max(0, Math.floor((new Date() - new Date(fechaVenc + 'T12:00:00')) / 86400000));
-    return { monto: dias > 0 ? Math.round(monto * (S.tmc / 100 / 365) * dias) : 0, dias };
+    return { monto: dias > 0 ? Math.round(monto * ((S.tmc / 12) / 100 / 30) * dias) : 0, dias };
   }
   function calcGastos(monto, fechaVenc) {
     const c = _cob(fechaVenc); if (c) return { monto: c.gastos, dias: c.dias };
