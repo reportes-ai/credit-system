@@ -255,6 +255,15 @@
                 <span class="input-group-text" style="font-size:.75rem">%</span>
               </div>
             </div>
+            <div class="perm-row">
+              <i class="bi bi-cash-stack perm-icon" style="color:#7c3aed"></i>
+              <span class="perm-label">Condonar capital (solo prepago)</span>
+              <div class="form-check form-switch mb-0"><input class="form-check-input" type="checkbox" id="permCondK" onchange="toggleTope('topeK',this.checked)"></div>
+              <div class="input-group tope-group">
+                <input type="number" id="topeK" class="form-control form-control-sm" min="0" max="100" placeholder="0" disabled>
+                <span class="input-group-text" style="font-size:.75rem">%</span>
+              </div>
+            </div>
             <div class="perm-row" style="border:none">
               <i class="bi bi-toggle-on perm-icon text-secondary"></i>
               <span class="perm-label">Asignación activa</span>
@@ -540,11 +549,14 @@ function abrirPermisos(asig) {
   document.getElementById('permReversar').checked= !!asig.puede_reversar_pagos;
   document.getElementById('permCondI').checked   = !!asig.puede_condonar_intereses;
   document.getElementById('permCondG').checked   = !!asig.puede_condonar_gastos;
+  document.getElementById('permCondK').checked   = !!asig.puede_condonar_capital;
   document.getElementById('permActivo').checked  = !!asig.activo;
   document.getElementById('topeI').value = asig.tope_intereses || '';
   document.getElementById('topeG').value = asig.tope_gastos    || '';
+  document.getElementById('topeK').value = asig.tope_capital   || '';
   document.getElementById('topeI').disabled = !asig.puede_condonar_intereses;
   document.getElementById('topeG').disabled = !asig.puede_condonar_gastos;
+  document.getElementById('topeK').disabled = !asig.puede_condonar_capital;
   document.getElementById('permPanel').style.display = '';
   document.getElementById('permPanel').scrollIntoView({ behavior:'smooth', block:'nearest' });
 }
@@ -558,6 +570,7 @@ function cerrarPermisos() {
 function permBody() {
   const permCI = document.getElementById('permCondI').checked;
   const permCG = document.getElementById('permCondG').checked;
+  const permCK = document.getElementById('permCondK').checked;
   return {
     id_usuario: _usuarioSeleccionado.id_usuario,
     puede_pagar_cuotas:       document.getElementById('permPagar').checked    ? 1 : 0,
@@ -566,6 +579,8 @@ function permBody() {
     tope_intereses:           permCI ? (parseFloat(document.getElementById('topeI').value)||0) : 0,
     puede_condonar_gastos:    permCG ? 1 : 0,
     tope_gastos:              permCG ? (parseFloat(document.getElementById('topeG').value)||0) : 0,
+    puede_condonar_capital:   permCK ? 1 : 0,
+    tope_capital:             permCK ? (parseFloat(document.getElementById('topeK').value)||0) : 0,
     activo:                   document.getElementById('permActivo').checked ? 1 : 0,
   };
 }

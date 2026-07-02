@@ -2,7 +2,7 @@
 <html lang="es">
 <head>
 <meta charset="UTF-8">
-<!-- v2.0 — historial de pagos lee el calendario congelado (cuotas_credito) -->
+<!-- v2.1 — botón Prepagar Crédito con condonación por atribuciones (gastos→mora→corriente→capital) -->
   <link rel="icon" href="/img/favicon.png" type="image/png">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Revisión de Crédito — AutoFácil</title>
@@ -748,6 +748,10 @@ function renderPagina(c, ant, com) {
       <button class="btn-accion" style="background:linear-gradient(135deg,#16a34a,#15803d);color:#fff"
         onclick="location.href='/creditos/pagar-cuotas?id=${c.id_credito}'">
         <i class="bi bi-cash-coin"></i>Pagar Cuotas
+      </button>
+      <button class="btn-accion" style="background:linear-gradient(135deg,#6d28d9,#7c3aed);color:#fff"
+        onclick="abrirPrepagoFicha()">
+        <i class="bi bi-cash-stack"></i>Prepagar Crédito
       </button>` : ''}
       ` : ['AUTOFIN','UNIDAD DE CREDITO'].includes(c.financiera) ? `
       ${!ESTADOS_BROKER_FINALES.has(c.estado) ? `
@@ -1002,7 +1006,11 @@ function renderHistorialPagos(c) {
           ${puedesPagar ? `<a href="/creditos/pagar-cuotas?id=${c.id_credito}"
               style="background:linear-gradient(135deg,#16a34a,#15803d);color:#fff;border:none;border-radius:8px;padding:6px 14px;font-size:.78rem;font-weight:700;text-decoration:none;display:inline-flex;align-items:center;gap:5px">
               <i class="bi bi-cash-coin"></i>Pagar Cuotas
-            </a>` : ''}
+            </a>
+            <button onclick="abrirPrepagoFicha()"
+              style="background:linear-gradient(135deg,#6d28d9,#7c3aed);color:#fff;border:none;border-radius:8px;padding:6px 14px;font-size:.78rem;font-weight:700;cursor:pointer;display:inline-flex;align-items:center;gap:5px">
+              <i class="bi bi-cash-stack"></i>Prepagar Crédito
+            </button>` : ''}
         </div>
       </div>
       <div style="overflow-x:auto">
@@ -1456,6 +1464,115 @@ document.addEventListener('keydown', e => { if(e.key==='Escape') { cerrarAmort()
 
 function abrirDocumentos() {
   window.open('/creditos/documentos?id=' + creditId, '_blank');
+}
+
+/* ── PREPAGAR CRÉDITO (mismo motor del certificado; condonación por atribuciones
+      de la caja en orden: gastos cobranza → interés mora → interés corriente → capital) ── */
+let _ppData = null, _ppCaja = null;
+const _ppEsc = s => String(s ?? '').replace(/[<>&"]/g, ch => ({'<':'&lt;','>':'&gt;','&':'&amp;','"':'&quot;'}[ch]));
+function _ppDlg() {
+  let d = document.getElementById('dlgPrepagoFicha');
+  if (!d) { d = document.createElement('dialog'); d.id = 'dlgPrepagoFicha';
+    d.style.cssText = 'border:none;border-radius:14px;padding:0;max-width:600px;width:94%;box-shadow:0 20px 60px rgba(0,0,0,.35)';
+    document.body.appendChild(d); }
+  return d;
+}
+async function abrirPrepagoFicha() {
+  const c = _credito; if (!c || !c.num_op) return alert('No se pudo obtener el N° de operación.');
+  const d = _ppDlg();
+  d.innerHTML = `<div style="padding:34px;text-align:center;color:#475569"><i class="bi bi-hourglass-split" style="font-size:1.4rem"></i><div style="margin-top:10px">Calculando prepago…</div></div>`;
+  d.showModal();
+  try {
+    const [jP, jC] = await Promise.all([
+      fetch('/api/pagos-credito/prepago/'+encodeURIComponent(c.num_op), { headers: apiHdr() }).then(r=>r.json()),
+      fetch('/api/cajas/mi-caja', { headers: apiHdr() }).then(r=>r.json()).catch(()=>({data:null})),
+    ]);
+    if (!jP.success) { d.innerHTML = _ppFoot('No se puede prepagar: '+(jP.error||'')); return; }
+    _ppData = jP.data; _ppCaja = jC.data || null;
+    renderPrepagoFicha();
+  } catch(e) { d.innerHTML = _ppFoot('Error de red'); }
+}
+function _ppFoot(msg) {
+  return `${msg?`<div style="padding:22px;color:#b91c1c;font-size:.9rem">${_ppEsc(msg)}</div>`:''}<div style="padding:14px 22px;border-top:1px solid #e5e7eb;display:flex;justify-content:flex-end;background:#f8fafc"><button onclick="document.getElementById('dlgPrepagoFicha').close()" style="background:#fff;border:1px solid #cbd5e1;border-radius:8px;padding:8px 16px;font-weight:600;cursor:pointer">Cerrar</button></div>`;
+}
+function renderPrepagoFicha() {
+  const x = _ppData, d = _ppDlg(), ca = _ppCaja;
+  const row = (lbl, val, strong) => `<tr><td style="padding:5px 0;color:#475569">${lbl}</td><td style="padding:5px 0;text-align:right;${strong?'font-weight:800;color:#0141A2':'font-weight:600'}">${fmtP(val)}</td></tr>`;
+  const moraTot = +x.interes_mora || 0;
+  const corrComTot = (+x.interes_corriente||0) + (+x.comision_prepago||0);
+  const capTot = (+x.capital_vigente||0) + (+x.mora_cuotas||0);
+  const topeI = ca?.puede_condonar_intereses ? Math.floor((moraTot+corrComTot) * (+ca.tope_intereses||0)/100) : 0;
+  // gastos / mora / corriente / capital — cada uno con su máximo (mora+corriente comparten el tope de intereses)
+  const maxG = ca?.puede_condonar_gastos ? Math.floor((+x.gastos_cobranza||0) * (+ca.tope_gastos||0)/100) : 0;
+  const maxM = Math.min(topeI, moraTot);
+  const maxCo = Math.min(topeI, corrComTot);
+  const maxCap = ca?.puede_condonar_capital ? Math.floor(capTot * (+ca.tope_capital||0)/100) : 0;
+  const box = (id, lbl, max) => max > 0 ? `<div style="display:flex;justify-content:space-between;align-items:center;gap:10px;margin-top:8px">
+      <label style="font-size:.83rem;color:#475569">${lbl} <span style="color:#94a3b8">(máx ${fmtP(max)})</span></label>
+      <input id="${id}" type="text" value="0" data-max="${max}" oninput="onPpCond(this)" style="width:130px;text-align:right;border:1px solid #cbd5e1;border-radius:8px;padding:6px 9px">
+    </div>` : '';
+  const condHtml = box('ppG','1. Condonar gastos de cobranza',maxG) + box('ppM','2. Condonar interés por mora',maxM)
+                 + box('ppC','3. Condonar interés corriente',maxCo) + box('ppK','4. Condonar capital',maxCap);
+  d.innerHTML = `
+    <div style="background:#6d28d9;color:#fff;padding:16px 22px;display:flex;justify-content:space-between;align-items:center">
+      <span style="font-weight:700"><i class="bi bi-cash-stack me-1"></i>Prepagar crédito N° ${_ppEsc(x.num_op)}</span>
+      <button onclick="document.getElementById('dlgPrepagoFicha').close()" style="background:none;border:none;color:#fff;font-size:1.3rem;cursor:pointer">&times;</button>
+    </div>
+    <div style="padding:20px 22px;max-height:70vh;overflow:auto">
+      <div style="font-size:.86rem;color:#0f172a;margin-bottom:6px"><b>${_ppEsc(x.nombre||'')}</b> · RUT ${_ppEsc(x.rut||'')}</div>
+      <table style="width:100%;font-size:.88rem;border-collapse:collapse">
+        ${row('Capital de cuotas vigentes', x.capital_vigente)}
+        ${(+x.mora_cuotas)?row('Cuotas en mora', x.mora_cuotas):''}
+        ${(+x.interes_mora)?row('Interés por mora', x.interes_mora):''}
+        ${(+x.gastos_cobranza)?row('Gastos de cobranza', x.gastos_cobranza):''}
+        ${(+x.interes_corriente)?row('Intereses corrientes', x.interes_corriente):''}
+        ${row('Comisión de prepago', x.comision_prepago)}
+        ${row('Total a prepagar', x.saldo_insoluto, true)}
+      </table>
+      ${condHtml ? `<div style="margin-top:14px;border-top:1px dashed #cbd5e1;padding-top:10px">
+        <div style="font-size:.78rem;font-weight:700;color:#7c3aed;text-transform:uppercase;letter-spacing:.5px">Condonación (dentro de tu atribución)</div>
+        ${condHtml}
+        <div style="font-size:.7rem;color:#94a3b8;margin-top:6px">Orden de condonación: gastos de cobranza → interés por mora → interés corriente → capital.</div>
+      </div>` : (ca ? `<div style="margin-top:12px;font-size:.78rem;color:#94a3b8">Tu caja no tiene atribuciones de condonación.</div>` : `<div style="margin-top:12px;font-size:.78rem;color:#b45309">No tienes una caja activa: puedes ver el detalle pero no registrar el prepago.</div>`)}
+      <div style="margin-top:16px;background:#f5f3ff;border:1px solid #ddd6fe;border-radius:10px;padding:12px 16px;display:flex;justify-content:space-between;align-items:center">
+        <span style="font-weight:700;color:#5b21b6">Total a cobrar</span>
+        <span id="ppTotal" style="font-weight:800;font-size:1.05rem;color:#5b21b6">${fmtP(x.saldo_insoluto)}</span>
+      </div>
+    </div>
+    <div style="padding:14px 22px;border-top:1px solid #e5e7eb;display:flex;justify-content:flex-end;gap:10px;background:#f8fafc">
+      <button onclick="document.getElementById('dlgPrepagoFicha').close()" style="background:#fff;border:1px solid #cbd5e1;border-radius:8px;padding:9px 16px;font-weight:600;cursor:pointer">Cancelar</button>
+      ${(ca && ca.puede_pagar_cuotas) ? `<button id="btnPpFicha" onclick="confirmarPrepagoFicha()" style="background:#6d28d9;color:#fff;border:none;border-radius:8px;padding:9px 18px;font-weight:700;cursor:pointer"><i class="bi bi-check-lg me-1"></i>Confirmar prepago</button>` : ''}
+    </div>`;
+}
+function _ppNum(id){ const el=document.getElementById(id); return el ? (Number(String(el.value??'').replace(/[^\d]/g,''))||0) : 0; }
+function onPpCond(el){
+  const max = Number(el.dataset.max)||0; let v = Number(String(el.value??'').replace(/[^\d]/g,''))||0; if (v>max) v=max;
+  el.value = v.toLocaleString('es-CL');
+  // mora + corriente comparten el tope de intereses: lo que usa una, se lo resta a la otra
+  const topeI = Math.max(_ppCaja?.puede_condonar_intereses ? Math.floor(((+_ppData.interes_mora||0)+(+_ppData.interes_corriente||0)+(+_ppData.comision_prepago||0)) * (+_ppCaja.tope_intereses||0)/100) : 0, 0);
+  const m = _ppNum('ppM'), co = _ppNum('ppC');
+  if (m + co > topeI) {
+    const otro = el.id==='ppM' ? 'ppC' : 'ppM';
+    const elOtro = document.getElementById(otro);
+    if (elOtro) elOtro.value = Math.max(0, topeI - _ppNum(el.id)).toLocaleString('es-CL');
+  }
+  const tot = Math.max(0, (+_ppData.saldo_insoluto) - _ppNum('ppG') - _ppNum('ppM') - _ppNum('ppC') - _ppNum('ppK'));
+  document.getElementById('ppTotal').textContent = fmtP(tot);
+}
+async function confirmarPrepagoFicha(){
+  if (!confirm('¿Confirmar el prepago? El crédito quedará PREPAGADO (estado terminal).')) return;
+  const btn = document.getElementById('btnPpFicha'); if (btn){ btn.disabled=true; btn.textContent='Procesando…'; }
+  let j; try {
+    j = await (await fetch('/api/pagos-credito/prepagar', { method:'POST', headers: apiHdr(), body: JSON.stringify({
+      num_op: _credito.num_op, id_caja: _ppCaja.id_caja,
+      condona_gastos_monto: _ppNum('ppG'), condona_mora_monto: _ppNum('ppM'),
+      condona_corriente_monto: _ppNum('ppC'), condona_capital_monto: _ppNum('ppK') }) })).json();
+  } catch(e){ if(btn){btn.disabled=false;btn.textContent='Confirmar prepago';} return alert('Error de red'); }
+  if (!j.success){ if(btn){btn.disabled=false;btn.innerHTML='<i class="bi bi-check-lg me-1"></i>Confirmar prepago';} return alert(j.error||'No se pudo prepagar'); }
+  document.getElementById('dlgPrepagoFicha').close();
+  alert(`Prepago registrado ✓\nTRX #${j.data.numero_transaccion}\nTotal cobrado: ${fmtP(j.data.total_cobrado)}`+
+    ((j.data.condonado_gastos||j.data.condonado_intereses||j.data.condonado_capital) ? `\nCondonado: gastos ${fmtP(j.data.condonado_gastos)} · intereses ${fmtP(j.data.condonado_intereses)} · capital ${fmtP(j.data.condonado_capital)}` : ''));
+  location.reload();
 }
 
 cargarPagina().then(() => {

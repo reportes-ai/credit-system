@@ -30,6 +30,9 @@ const initTablas = async () => {
       UNIQUE KEY uq_caja_usuario (id_caja, id_usuario)
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
   `);
+  // Atribución de condonación de CAPITAL (solo prepago): nace en 0 — se otorga caso a caso
+  await pool.query(`ALTER TABLE caja_usuarios ADD COLUMN puede_condonar_capital TINYINT(1) NOT NULL DEFAULT 0`).catch(() => {});
+  await pool.query(`ALTER TABLE caja_usuarios ADD COLUMN tope_capital DECIMAL(5,2) NOT NULL DEFAULT 0`).catch(() => {});
   // Horario de pagos paramétrico (1 fila global, id=1). Por defecto 09:00–16:00, Lun–Vie.
   await pool.query(`
     CREATE TABLE IF NOT EXISTS caja_horario_pago (
@@ -190,6 +193,8 @@ const upsertUsuario = async (req, res) => {
     tope_intereses = 0,
     puede_condonar_gastos = 0,
     tope_gastos = 0,
+    puede_condonar_capital = 0,
+    tope_capital = 0,
     activo = 1,
   } = req.body;
   if (!id_usuario) return err(res, 'id_usuario es requerido', 400);
@@ -197,8 +202,9 @@ const upsertUsuario = async (req, res) => {
     await pool.query(
       `INSERT INTO caja_usuarios
          (id_caja, id_usuario, puede_pagar_cuotas, puede_reversar_pagos,
-          puede_condonar_intereses, tope_intereses, puede_condonar_gastos, tope_gastos, activo)
-       VALUES (?,?,?,?,?,?,?,?,?)
+          puede_condonar_intereses, tope_intereses, puede_condonar_gastos, tope_gastos,
+          puede_condonar_capital, tope_capital, activo)
+       VALUES (?,?,?,?,?,?,?,?,?,?,?)
        ON DUPLICATE KEY UPDATE
          puede_pagar_cuotas=VALUES(puede_pagar_cuotas),
          puede_reversar_pagos=VALUES(puede_reversar_pagos),
@@ -206,11 +212,14 @@ const upsertUsuario = async (req, res) => {
          tope_intereses=VALUES(tope_intereses),
          puede_condonar_gastos=VALUES(puede_condonar_gastos),
          tope_gastos=VALUES(tope_gastos),
+         puede_condonar_capital=VALUES(puede_condonar_capital),
+         tope_capital=VALUES(tope_capital),
          activo=VALUES(activo)`,
       [id_caja, id_usuario,
        puede_pagar_cuotas ? 1 : 0, puede_reversar_pagos ? 1 : 0,
        puede_condonar_intereses ? 1 : 0, tope_intereses || 0,
        puede_condonar_gastos ? 1 : 0, tope_gastos || 0,
+       puede_condonar_capital ? 1 : 0, tope_capital || 0,
        activo ? 1 : 0]
     );
     const [[row]] = await pool.query(

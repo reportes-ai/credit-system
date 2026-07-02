@@ -515,22 +515,34 @@ const prepagar = async (req, res) => {
     return res.status(400).json({ success: false, data: null, error: 'El prepago en caja es solo para créditos AutoFácil (cartera propia)' });
   const id_credito = c.id;
 
-  // Condonación dentro de atribuciones (gastos y/o intereses)
+  // Condonación dentro de atribuciones (orden de negocio: gastos → interés mora →
+  // interés corriente → capital; el capital tiene atribución propia y nace en 0)
   const Gfull = _r2(d.gastos_cobranza);
-  const Ifull = _r2(d.interes_mora) + _r2(d.interes_corriente) + _r2(d.comision_prepago);
-  const maxG = ca.puede_condonar_gastos ? Math.floor(Gfull * (Number(ca.tope_gastos) || 0) / 100) : 0;
-  const maxI = ca.puede_condonar_intereses ? Math.floor(Ifull * (Number(ca.tope_intereses) || 0) / 100) : 0;
-  let condG = Math.max(0, _r2(b.condona_gastos_monto));
-  let condI = Math.max(0, _r2(b.condona_intereses_monto));
-  if (condG > maxG) return res.status(403).json({ success: false, data: null, error: `La condonación de gastos excede tu atribución (máx $${maxG.toLocaleString('es-CL')})` });
-  if (condI > maxI) return res.status(403).json({ success: false, data: null, error: `La condonación de intereses excede tu atribución (máx $${maxI.toLocaleString('es-CL')})` });
-  condG = Math.min(condG, Gfull); condI = Math.min(condI, Ifull);
-
-  // La condonación de intereses se reparte: parte a la mora (por cuota) y parte a corriente+comisión (sentinela)
   const moraTot = _r2(d.interes_mora);
   const corrComTot = _r2(d.interes_corriente) + _r2(d.comision_prepago);
-  const condI_mora = Ifull > 0 ? Math.round(condI * (moraTot / Ifull)) : 0;
-  const condI_corr = condI - condI_mora;
+  const Ifull = moraTot + corrComTot;
+  const Cfull = _r2(d.capital_vigente) + _r2(d.mora_cuotas);   // capital = cuotas (vigentes + en mora)
+  const maxG = ca.puede_condonar_gastos ? Math.floor(Gfull * (Number(ca.tope_gastos) || 0) / 100) : 0;
+  const maxI = ca.puede_condonar_intereses ? Math.floor(Ifull * (Number(ca.tope_intereses) || 0) / 100) : 0;
+  const maxC = ca.puede_condonar_capital ? Math.floor(Cfull * (Number(ca.tope_capital) || 0) / 100) : 0;
+  let condG = Math.max(0, _r2(b.condona_gastos_monto));
+  // Nuevo (ficha): mora y corriente separados. Legado (caja): un solo monto de intereses.
+  const separado = b.condona_mora_monto != null || b.condona_corriente_monto != null;
+  let condI_mora, condI_corr, condI;
+  if (separado) {
+    condI_mora = Math.min(Math.max(0, _r2(b.condona_mora_monto)), moraTot);
+    condI_corr = Math.min(Math.max(0, _r2(b.condona_corriente_monto)), corrComTot);
+    condI = condI_mora + condI_corr;
+  } else {
+    condI = Math.max(0, _r2(b.condona_intereses_monto));
+    condI_mora = Ifull > 0 ? Math.round(Math.min(condI, Ifull) * (moraTot / Ifull)) : 0;
+    condI_corr = Math.min(condI, Ifull) - condI_mora;
+  }
+  let condC = Math.max(0, _r2(b.condona_capital_monto));
+  if (condG > maxG) return res.status(403).json({ success: false, data: null, error: `La condonación de gastos excede tu atribución (máx $${maxG.toLocaleString('es-CL')})` });
+  if (condI > maxI) return res.status(403).json({ success: false, data: null, error: `La condonación de intereses excede tu atribución (máx $${maxI.toLocaleString('es-CL')})` });
+  if (condC > maxC) return res.status(403).json({ success: false, data: null, error: `La condonación de capital excede tu atribución (máx $${maxC.toLocaleString('es-CL')})` });
+  condG = Math.min(condG, Gfull); condI = Math.min(condI, Ifull); condC = Math.min(condC, Cfull);
 
   const conn = await pool.getConnection();
   try {
@@ -546,6 +558,7 @@ const prepagar = async (req, res) => {
     const detalle = d.detalle || [];
     const gSum = detalle.reduce((s, q) => s + _r2(q.gastos_cobranza), 0);
     const mSum = detalle.reduce((s, q) => s + _r2(q.interes_mora), 0);
+    const cSum = detalle.reduce((s, q) => s + _r2(q.valor_cuota), 0);
     let totalCobrado = 0;
     const ins = `INSERT INTO pagos_credito
        (id_credito, numero_cuota, fecha_vencimiento, monto_cuota, interes_mora, gastos_cobranza,
@@ -554,11 +567,12 @@ const prepagar = async (req, res) => {
        VALUES (?,?,?,?,?,?,?,?,'PAGADO',?,?,?,?,?,?,?,?,?)`;
 
     for (const q of detalle) {
-      const gFull = _r2(q.gastos_cobranza), mFull = _r2(q.interes_mora);
+      const gFull = _r2(q.gastos_cobranza), mFull = _r2(q.interes_mora), cFull = _r2(q.valor_cuota);
       const gCond = gSum > 0 ? Math.round(condG * (gFull / gSum)) : 0;
       const mCond = mSum > 0 ? Math.round(condI_mora * (mFull / mSum)) : 0;
-      const gCol = Math.max(0, gFull - gCond), mCol = Math.max(0, mFull - mCond);
-      const tp = _r2(q.valor_cuota) + mCol + gCol;
+      const cCond = cSum > 0 ? Math.round(condC * (cFull / cSum)) : 0;
+      const gCol = Math.max(0, gFull - gCond), mCol = Math.max(0, mFull - mCond), cCol = Math.max(0, cFull - cCond);
+      const tp = cCol + mCol + gCol;
       totalCobrado += tp;
       await conn.query(ins, [id_credito, q.numero_cuota, q.fecha_vencimiento || null, _r2(q.valor_cuota),
         mCol, gCol, tp, fp, obs, reg, u.id_usuario || null, idCajaInt, b.origen_fondos || null, idCtaInt, trx, mFull, gFull]);
@@ -576,10 +590,10 @@ const prepagar = async (req, res) => {
 
     await conn.commit();
     auditar({ req, accion: 'PAGAR', modulo: 'pagos', entidad: 'prepago', entidad_id: trx,
-      detalle: `Prepago crédito ${num_op} — cobrado $${_r2(totalCobrado).toLocaleString('es-CL')} (condonado gastos $${condG.toLocaleString('es-CL')} / intereses $${condI.toLocaleString('es-CL')}) — TRX #${trx}`,
-      meta: { id_credito, num_op, numero_transaccion: trx, total_cobrado: _r2(totalCobrado), condona_gastos: condG, condona_intereses: condI } });
+      detalle: `Prepago crédito ${num_op} — cobrado $${_r2(totalCobrado).toLocaleString('es-CL')} (condonado gastos $${condG.toLocaleString('es-CL')} / intereses $${condI.toLocaleString('es-CL')} / capital $${condC.toLocaleString('es-CL')}) — TRX #${trx}`,
+      meta: { id_credito, num_op, numero_transaccion: trx, total_cobrado: _r2(totalCobrado), condona_gastos: condG, condona_intereses: condI, condona_capital: condC } });
     try { audit.registrar({ id_credito, req, accion: 'PREPAGO', detalle: `Prepago — TRX #${trx}, total $${_r2(totalCobrado).toLocaleString('es-CL')}`, meta: { numero_transaccion: trx, total_cobrado: _r2(totalCobrado) } }); } catch (_) {}
-    res.status(201).json({ success: true, data: { numero_transaccion: trx, total_cobrado: _r2(totalCobrado), condonado_gastos: condG, condonado_intereses: condI, cliente: pp.nombre, rut: pp.rut, num_op, desglose: d }, error: null });
+    res.status(201).json({ success: true, data: { numero_transaccion: trx, total_cobrado: _r2(totalCobrado), condonado_gastos: condG, condonado_intereses: condI, condonado_capital: condC, cliente: pp.nombre, rut: pp.rut, num_op, desglose: d }, error: null });
   } catch (e) {
     try { await conn.rollback(); } catch (_) {}
     console.error('[prepagar]', e.message);
