@@ -2,7 +2,7 @@
    AutoFácil — Versión global de la aplicación
    Editar SOLO este archivo para cambiar la versión
    ───────────────────────────────────────────── */
-const APP_VERSION = 'v78.7';
+const APP_VERSION = 'v79.0';
 
 /* ── PWA: instalable como app de escritorio (ventana propia, sin barras) ──
    Inyecta el manifest y registra el service worker en TODAS las páginas.
@@ -25,14 +25,16 @@ const APP_VERSION = 'v78.7';
   } catch (e) { /* no bloquear la app si el navegador no soporta PWA */ }
 })();
 
-/* ── 🎂 Popup de cumpleaños (RRHH) — solo con sesión iniciada ── */
+/* ── 🎂 Popup de cumpleaños (RRHH) + 🏆 Ranking mensual — solo con sesión iniciada ── */
 (function () {
   try {
-    if (sessionStorage.getItem('token') && !document.querySelector('script[src="/js/cumple-popup.js"]')) {
+    if (!sessionStorage.getItem('token')) return;
+    ['/js/cumple-popup.js', '/js/ranking-popup.js'].forEach(src => {
+      if (document.querySelector('script[src="' + src + '"]')) return;
       const s = document.createElement('script');
-      s.src = '/js/cumple-popup.js';
+      s.src = src;
       document.head.appendChild(s);
-    }
+    });
   } catch (e) {}
 })();
 
