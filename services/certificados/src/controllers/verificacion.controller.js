@@ -42,6 +42,7 @@ const verificar = async (req, res) => {
         emitido_por: v.emitido_por,
         anulado: v.anulado,
         motivo: v.motivo,
+        firma: v.firma || null,   // Firma Electrónica Simple (firmante, fecha, integridad)
         datos: v.datos || {},
       },
       error: null,

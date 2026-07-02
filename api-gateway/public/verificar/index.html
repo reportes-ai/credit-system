@@ -53,6 +53,21 @@ function rowsDatos(datos){
     .map(([k,v]) => `<div class="row"><span class="k">${esc(k)}</span><span class="v">${esc(v)}</span></div>`).join('');
 }
 
+// Bloque de Firma Electrónica Simple (Ley 19.799): firmante + integridad del documento.
+function bloqueFirma(f){
+  if(!f) return '';
+  const alerta = f.integro===false
+    ? `<div style="background:#fef2f2;border:1px solid #fca5a5;color:#b91c1c;border-radius:8px;padding:8px 10px;margin-top:8px;font-size:.82rem"><b>⚠ Este documento fue alterado</b> — su contenido no coincide con el original firmado.</div>`
+    : `<div style="background:#f0fdf4;border:1px solid #bbf7d0;color:#166534;border-radius:8px;padding:8px 10px;margin-top:8px;font-size:.82rem"><b>✔ Contenido íntegro</b> — no ha sido modificado desde su firma.</div>`;
+  return `
+    <div style="margin-top:14px;border-top:1px dashed #e2e8f0;padding-top:12px">
+      <div style="display:flex;align-items:center;gap:8px;font-weight:700;color:#0f172a;font-size:.9rem"><i class="bi bi-pen"></i> Firma Electrónica Simple</div>
+      <div style="font-size:.82rem;color:#475569;margin-top:4px">Firmado por <b>${esc(f.nombre||'—')}</b>${f.cargo?` · ${esc(f.cargo)}`:''}<br>${fechaCL(f.firmado_at)}</div>
+      ${alerta}
+      <div style="font-size:.68rem;color:#94a3b8;margin-top:6px">Conforme a la Ley N° 19.799 sobre documentos y firma electrónica.</div>
+    </div>`;
+}
+
 function render(d){
   const card = document.getElementById('card');
   if(d.anulado){
@@ -84,6 +99,7 @@ function render(d){
       ${rowsDatos(d.datos)}
       <div class="row"><span class="k">Emitido</span><span class="v">${fechaCL(d.emitido)}</span></div>
     </div>
+    ${bloqueFirma(d.firma)}
     <div class="foot">Verificación oficial · Código <span class="badge-cod">${esc(d.codigo)}</span></div>`;
 }
 

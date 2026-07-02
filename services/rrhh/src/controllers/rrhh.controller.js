@@ -353,11 +353,16 @@ const certEmitir = async (req, res) => {
     const [r] = await pool.query('INSERT INTO rh_certificados (id_usuario, nombre, rut, cargo, fecha_ingreso, emitido_por, emitido_nombre) VALUES (?,?,?,?,?,?,?)',
       [emp.id_usuario, emp.nombre, emp.rut || null, emp.cargo || null, emp.fecha_ingreso, u.id_usuario || null, nombreDe(u)]);
     const { registrarVerificable } = require('../../../../shared/verificacion');
+    // Cargo del firmante (quien emite) para la Firma Electrónica Simple
+    let cargoFirmante = null;
+    try { const [[uf]] = await pool.query('SELECT cargo FROM usuarios WHERE id_usuario=? LIMIT 1', [u.id_usuario]); cargoFirmante = uf && uf.cargo; } catch (_) {}
+    const ipReq = (req.headers['x-forwarded-for'] || '').split(',')[0].trim() || req.socket?.remoteAddress || null;
     const codigo = await registrarVerificable({
       tipo: 'CERT_ANTIGUEDAD', ref_tabla: 'rh_certificados', ref_id: r.insertId,
       rut: emp.rut || null, nombre: emp.nombre,
       datos: { cargo: vars.cargo, fecha_ingreso: isoFecha(emp.fecha_ingreso), antiguedad: vars.antiguedad },
       emitido_por: nombreDe(u),
+      firmante: { id: u.id_usuario, nombre: nombreDe(u), cargo: cargoFirmante || u.perfil_nombre || null, ip: ipReq },
     });
     await pool.query('UPDATE rh_certificados SET codigo=? WHERE id=?', [codigo, r.insertId]);
     auditar({ req, accion: 'CREAR', modulo: 'rrhh', entidad: 'certificado_antiguedad', entidad_id: r.insertId, detalle: `Certificado de antigüedad de ${emp.nombre} (${vars.antiguedad}) — folio ${codigo}` });
@@ -365,7 +370,8 @@ const certEmitir = async (req, res) => {
       success: true, error: null,
       data: { codigo, fecha_emision: hoy, nombre: emp.nombre, rut: emp.rut, cargo: vars.cargo,
               fecha_ingreso: isoFecha(emp.fecha_ingreso), antiguedad: vars.antiguedad,
-              cuerpo_html: tpl(cfg.cert_cuerpo, vars), cierre_html: tpl(cfg.cert_cierre, vars) },
+              cuerpo_html: tpl(cfg.cert_cuerpo, vars), cierre_html: tpl(cfg.cert_cierre, vars),
+              firmante: nombreDe(u), firmante_cargo: cargoFirmante || u.perfil_nombre || null },
     });
   } catch (e) { console.error('[rrhh certEmitir]', e.message); res.status(500).json({ success: false, data: null, error: 'Error interno del servidor' }); }
 };
