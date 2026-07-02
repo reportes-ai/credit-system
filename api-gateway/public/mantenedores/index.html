@@ -245,14 +245,17 @@
         if (SOLO_DIOS.has(seg) || DEALERNET.has(seg)) return null;
         if (placement[seg] && placement[seg] !== 'mantenedores') return null;
         if (asignadasFuera.has(seg)) return null;
-        return { id: seg || f.codigo, href: f.href, icon: f.icono || 'bi-grid', titulo: f.nombre, desc: DESCS[seg] || (typeof PLACEMENT_DESCS !== 'undefined' && PLACEMENT_DESCS[seg]) || '' };
+        const segBase = seg.replace(/-edicion$/, ''); // desc compartida con la variante -edicion
+        return { id: seg || f.codigo, href: f.href, icon: f.icono || 'bi-grid', titulo: f.nombre, desc: DESCS[seg] || DESCS[segBase] || (typeof PLACEMENT_DESCS !== 'undefined' && (PLACEMENT_DESCS[seg] || PLACEMENT_DESCS[segBase])) || '' };
       }).filter(Boolean);
 
       // Extras: sub-items de otras secciones movidos aquí via placement (viejo {k:'mantenedores'} y nuevo {mantenedores:[k]})
       const nativeIds = new Set(nativeItems.map(i => i.id));
       const _mantArrKeys = Array.isArray(placement['mantenedores']) ? placement['mantenedores'] : [];
       const extrasSubitem = Object.entries(PLACEMENT_ITEMS || {})
-        .filter(([k, v]) => !nativeIds.has(k) && (placement[k] === 'mantenedores' || _mantArrKeys.includes(k)))
+        // dedup TAMBIÉN por href: la misma página puede venir de funcionalidades BD
+        // con otra clave (ej. bd-operaciones-edicion vs bd-operaciones del manifiesto)
+        .filter(([k, v]) => !nativeIds.has(k) && !nativeHrefs.has(v.href) && (placement[k] === 'mantenedores' || _mantArrKeys.includes(k)))
         .map(([k, v]) => ({ id: k, href: v.href, icon: v.icon, titulo: v.titulo, desc: DESCS[k] || (typeof PLACEMENT_DESCS !== 'undefined' && PLACEMENT_DESCS[k]) || v.desc || '' }));
 
       // Extras: módulos BD movidos aquí (formato viejo: placement[ruta] === 'mantenedores')
