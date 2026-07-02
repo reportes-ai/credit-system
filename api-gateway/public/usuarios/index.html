@@ -715,6 +715,10 @@
               <input type="text" id="uCargo" class="form-control" placeholder="Ej. Analista de Operaciones">
             </div>
             <div class="col-md-4">
+              <label class="form-label">Sexo <i class="bi bi-file-earmark-person" title="Para don/doña en certificados"></i></label>
+              <select id="uSexo" class="form-select"><option value="">—</option><option value="M">Masculino</option><option value="F">Femenino</option></select>
+            </div>
+            <div class="col-md-4">
               <label class="form-label">Fecha de Ingreso <i class="bi bi-award" title="Usada por el Certificado de Antigüedad"></i></label>
               <input type="date" id="uFechaIngreso" class="form-control">
             </div>
@@ -1106,6 +1110,7 @@
           document.getElementById('uEmail').value = u.email;
           document.getElementById('uTelefono').value = u.telefono || '';
           document.getElementById('uCargo').value = u.cargo || '';
+          document.getElementById('uSexo').value = u.sexo || '';
           document.getElementById('uFechaIngreso').value = u.fecha_ingreso ? String(u.fecha_ingreso).slice(0,10) : '';
           document.getElementById('uFechaNacimiento').value = u.fecha_nacimiento ? String(u.fecha_nacimiento).slice(0,10) : '';
           document.getElementById('uPerfil').value = u.id_perfil;
@@ -1123,6 +1128,7 @@
         document.getElementById('uEmail').value = '';
         document.getElementById('uTelefono').value = '';
         document.getElementById('uCargo').value = '';
+        document.getElementById('uSexo').value = '';
         document.getElementById('uFechaIngreso').value = '';
         document.getElementById('uFechaNacimiento').value = '';
         document.getElementById('uPerfil').value = '';
@@ -1151,6 +1157,7 @@
         email: document.getElementById('uEmail').value.trim(),
         telefono: document.getElementById('uTelefono').value.trim() || null,
         cargo: document.getElementById('uCargo').value.trim() || null,
+        sexo: document.getElementById('uSexo').value || null,
         fecha_ingreso: document.getElementById('uFechaIngreso').value || null,
         fecha_nacimiento: document.getElementById('uFechaNacimiento').value || null,
         id_perfil: document.getElementById('uPerfil').value,

@@ -89,8 +89,8 @@ const { notificar } = require('../../../notificaciones/src/controllers/notificac
     const defaults = [
       ['cert_min_meses', '7'],
       ['cert_cooldown_dias', '15'],
-      ['cert_cuerpo', 'Auto Fácil SpA, RUT 76.916.907-K, certifica que don(ña) <b>{nombre}</b>, cédula de identidad N° <b>{rut}</b>, presta servicios en nuestra empresa desde el <b>{fecha_ingreso}</b> a la fecha, desempeñándose actualmente en el cargo de <b>{cargo}</b>, con contrato de trabajo indefinido, acumulando una antigüedad laboral de <b>{antiguedad}</b>.'],
-      ['cert_cierre', 'Se extiende el presente certificado a solicitud del interesado(a), para los fines que estime conveniente, en Santiago de Chile con fecha {fecha_emision}.'],
+      ['cert_cuerpo', 'Auto Fácil SpA, RUT 76.916.907-K, certifica que {don} <b>{nombre}</b>, cédula de identidad N° <b>{rut}</b>, presta servicios en nuestra empresa desde el <b>{fecha_ingreso}</b> a la fecha, desempeñándose actualmente en el cargo de <b>{cargo}</b>, con contrato de trabajo indefinido, acumulando una antigüedad laboral de <b>{antiguedad}</b>.'],
+      ['cert_cierre', 'Se extiende el presente certificado a solicitud {interesado}, para los fines que estime conveniente, en Santiago de Chile con fecha {fecha_emision}.'],
       ['cumple_popup_activo', '1'],
       ['cumple_campana_activo', '1'],
       ['cumple_musica', '1'],
@@ -256,8 +256,13 @@ function hoyChile() {
   const p = new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Santiago', year: 'numeric', month: '2-digit', day: '2-digit' }).format(new Date());
   return p; // YYYY-MM-DD
 }
+// mysql2 devuelve DATE como objeto Date → normalizar SIEMPRE a 'YYYY-MM-DD' local
+function isoFecha(f) {
+  if (f instanceof Date) return `${f.getFullYear()}-${String(f.getMonth() + 1).padStart(2, '0')}-${String(f.getDate()).padStart(2, '0')}`;
+  return String(f || '').slice(0, 10);
+}
 function mesesAntiguedad(fechaIngreso, hasta) {
-  const a = new Date(String(fechaIngreso).slice(0, 10) + 'T00:00:00');
+  const a = new Date(isoFecha(fechaIngreso) + 'T00:00:00');
   const b = new Date((hasta || hoyChile()) + 'T00:00:00');
   let m = (b.getFullYear() - a.getFullYear()) * 12 + (b.getMonth() - a.getMonth());
   if (b.getDate() < a.getDate()) m--;
@@ -268,7 +273,7 @@ function antiguedadTexto(meses) {
   const py = y === 1 ? '1 año' : y + ' años', pm = m === 1 ? '1 mes' : m + ' meses';
   return y && m ? `${py} y ${pm}` : (y ? py : pm);
 }
-const fechaLargaCL = f => new Date(String(f).slice(0, 10) + 'T12:00:00').toLocaleDateString('es-CL', { day: 'numeric', month: 'long', year: 'numeric' });
+const fechaLargaCL = f => new Date(isoFecha(f) + 'T12:00:00').toLocaleDateString('es-CL', { day: 'numeric', month: 'long', year: 'numeric' });
 
 const getConfigApi = async (req, res) => {
   try { res.json({ success: true, data: await getConfig(), error: null }); }
@@ -289,7 +294,7 @@ const setConfigApi = async (req, res) => {
 
 /* ════════════ CERTIFICADO DE ANTIGÜEDAD (self-service, QR verificable) ════════════ */
 async function estadoCertUsuario(idUsuario, cfg) {
-  const [[u]] = await pool.query("SELECT id_usuario, CONCAT_WS(' ', nombre, apellido, apellido_materno) nombre, rut, cargo, fecha_ingreso FROM usuarios WHERE id_usuario=? LIMIT 1", [idUsuario]);
+  const [[u]] = await pool.query("SELECT id_usuario, CONCAT_WS(' ', nombre, apellido, apellido_materno) nombre, rut, cargo, sexo, fecha_ingreso FROM usuarios WHERE id_usuario=? LIMIT 1", [idUsuario]);
   if (!u) return { puede: false, motivo: 'Usuario no encontrado' };
   if (!u.fecha_ingreso) return { puede: false, usuario: u, motivo: 'SIN_FECHA', mensaje: 'RRHH aún no registra tu fecha de ingreso. Solicítalo abajo.' };
   const minMeses = parseInt(cfg.cert_min_meses || '7', 10);
@@ -333,8 +338,10 @@ const certEmitir = async (req, res) => {
     const emp = st.usuario;
     const meses = mesesAntiguedad(emp.fecha_ingreso);
     const hoy = hoyChile();
+    const esF = emp.sexo === 'F';
     const vars = {
-      nombre: emp.nombre, rut: emp.rut || '—', cargo: emp.cargo || 'Colaborador(a)',
+      nombre: emp.nombre, rut: emp.rut || '—', cargo: emp.cargo || (esF ? 'Colaboradora' : 'Colaborador'),
+      don: esF ? 'doña' : 'don', interesado: esF ? 'de la interesada' : 'del interesado',
       fecha_ingreso: fechaLargaCL(emp.fecha_ingreso), antiguedad: antiguedadTexto(meses), fecha_emision: fechaLargaCL(hoy),
     };
     const [r] = await pool.query('INSERT INTO rh_certificados (id_usuario, nombre, rut, cargo, fecha_ingreso, emitido_por, emitido_nombre) VALUES (?,?,?,?,?,?,?)',
@@ -343,7 +350,7 @@ const certEmitir = async (req, res) => {
     const codigo = await registrarVerificable({
       tipo: 'CERT_ANTIGUEDAD', ref_tabla: 'rh_certificados', ref_id: r.insertId,
       rut: emp.rut || null, nombre: emp.nombre,
-      datos: { cargo: vars.cargo, fecha_ingreso: String(emp.fecha_ingreso).slice(0, 10), antiguedad: vars.antiguedad },
+      datos: { cargo: vars.cargo, fecha_ingreso: isoFecha(emp.fecha_ingreso), antiguedad: vars.antiguedad },
       emitido_por: nombreDe(u),
     });
     await pool.query('UPDATE rh_certificados SET codigo=? WHERE id=?', [codigo, r.insertId]);
@@ -351,7 +358,7 @@ const certEmitir = async (req, res) => {
     res.status(201).json({
       success: true, error: null,
       data: { codigo, fecha_emision: hoy, nombre: emp.nombre, rut: emp.rut, cargo: vars.cargo,
-              fecha_ingreso: String(emp.fecha_ingreso).slice(0, 10), antiguedad: vars.antiguedad,
+              fecha_ingreso: isoFecha(emp.fecha_ingreso), antiguedad: vars.antiguedad,
               cuerpo_html: tpl(cfg.cert_cuerpo, vars), cierre_html: tpl(cfg.cert_cierre, vars) },
     });
   } catch (e) { console.error('[rrhh certEmitir]', e.message); res.status(500).json({ success: false, data: null, error: 'Error interno del servidor' }); }

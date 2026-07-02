@@ -4,7 +4,7 @@
   <meta charset="UTF-8"><link rel="icon" href="/img/favicon.png" type="image/png">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Antigüedad — RRHH</title>
-  <!-- v2.0 certificado self-service con QR -->
+  <!-- v2.1 firma Gte Operaciones + don/doña + fix fechas -->
   <link href="/css/bootstrap.min.css" rel="stylesheet"><link href="/css/bootstrap-icons.css" rel="stylesheet">
   <style>
     :root { --navy:#0141A2; --navy-dark:#012d70; --navy-light:#0255c5; --bg:#f0f4f8; }
@@ -64,6 +64,9 @@
   const H={Authorization:'Bearer '+token}, HJ={...H,'Content-Type':'application/json'};
   const esc=s=>String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;'); const fd=s=>s?String(s).slice(0,10):'';
   let VISTA='mias', ES_RRHH=false;
+  // Firma de la empresa (la misma de los otros certificados / cartas)
+  let FIRMA_EMPRESA=null;
+  fetch('/api/cartas-params/firma_empresa',{headers:H}).then(r=>r.ok?r.json():null).then(j=>{ if(j&&j.data) FIRMA_EMPRESA=j.data; }).catch(()=>{});
   function antiguedadStr(fi){ if(!fi)return''; const a=new Date(fi+'T00:00:00'), b=new Date(); let m=(b.getFullYear()-a.getFullYear())*12+(b.getMonth()-a.getMonth()); if(b.getDate()<a.getDate())m--; m=Math.max(0,m); return `${Math.floor(m/12)} año(s) ${m%12} mes(es)`; }
   const TABMAP={crear:'t1',mias:'t2',bandeja:'t3',historicas:'t4'};
   function tab(t){ ['t1','t2','t3','t4'].forEach(id=>document.getElementById(id).classList.remove('active')); document.getElementById(TABMAP[t]).classList.add('active'); document.getElementById('secCrear').style.display=t==='crear'?'':'none'; document.getElementById('secLista').style.display=t==='crear'?'none':''; if(t!=='crear'){VISTA=t; cargar();} }
@@ -124,7 +127,7 @@
       <h2>Certificado de Antigüedad Laboral</h2>
       <div class="body">${d.cuerpo_html||''}</div>
       <div class="body">${d.cierre_html||''}</div>
-      <div class="foot"><div class="firma"><div class="l">&nbsp;</div><div class="c">Recursos Humanos</div><div class="e">Auto Fácil SpA</div></div><div>${qr}</div></div>
+      <div class="foot"><div class="firma">${FIRMA_EMPRESA?`<img src="${FIRMA_EMPRESA}" style="max-width:320px;max-height:120px;display:block;margin:0 auto 6px">`:'<div class="l">&nbsp;</div>'}<div class="c">Gerente de Operaciones</div><div class="e">Auto Fácil SpA</div></div><div>${qr}</div></div>
       <script>window.onload=()=>setTimeout(()=>window.print(),300)<\/script></body></html>`;
     const w=window.open('','_blank'); if(!w)return alert('Permite las ventanas emergentes para imprimir el certificado'); w.document.write(html); w.document.close();
   }
