@@ -91,10 +91,14 @@
 
   /* Banner a los COMPAÑEROS: mismo banner push de los anuncios ("X acaba de
      colocar un crédito"), 1 vez al día por cumpleañero y navegador. */
-  function bannerConAnuncio(texto) {
+  function bannerConAnuncio(texto, opts) {
+    opts = opts || {};
     let intentos = 0;
-    (function go() { // afMostrarAnuncio lo define app-version.js en DOMContentLoaded
-      if (window.afMostrarAnuncio) return window.afMostrarAnuncio(texto, { bg: '#012d70', fg: '#ffffff', ancho: 38, dur: 9, icon: '🎂' });
+    (function go() { // afMostrarAnuncio/afPlaySound los define app-version.js en DOMContentLoaded
+      if (window.afMostrarAnuncio) {
+        if (opts.sonido && opts.sonido !== 'none' && window.afPlaySound) { try { window.afPlaySound(opts.sonido); } catch (e) {} }
+        return window.afMostrarAnuncio(texto, { bg: '#012d70', fg: '#ffffff', ancho: 38, dur: opts.dur || 9, icon: '🎂' });
+      }
       if (++intentos < 20) setTimeout(go, 500);
     })();
   }
@@ -104,11 +108,12 @@
       const r = await fetch('/api/rrhh/cumple/hoy', { headers: { Authorization: 'Bearer ' + token } });
       if (!r.ok) return;
       const j = await r.json(); const avisos = (j && j.data && j.data.avisos) || [];
+      const opts = (j && j.data && j.data.opts) || {};
       for (const a of avisos) {
         const k = 'afCumpleAviso_' + a.fecha + '_' + a.id;
         if (localStorage.getItem(k)) continue;
         localStorage.setItem(k, '1');
-        bannerConAnuncio(a.texto);
+        bannerConAnuncio(a.texto, opts);
       }
     } catch (e) { /* silencioso */ }
   }

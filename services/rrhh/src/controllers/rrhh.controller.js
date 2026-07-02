@@ -102,6 +102,8 @@ const { notificar } = require('../../../notificaciones/src/controllers/notificac
       ['cumple_aviso_msg', 'No olvides saludar{lo} y desearle un gran día.'],
       ['cumple_aviso_tarde', '🎂 Recuerda que {nombre} estuvo de cumpleaños el {dia}. ¡No olvides saludar{lo}!'],
       ['cumple_dias_tope', '3'],
+      ['cumple_banner_dur', '9'],
+      ['cumple_banner_sonido', 'none'],
     ];
     for (const [k, v] of defaults) await pool.query('INSERT IGNORE INTO rh_config (clave, valor) VALUES (?,?)', [k, v]);
   } catch (e) { console.error('[rh_config migration]', e.message); }
@@ -285,7 +287,7 @@ const getConfigApi = async (req, res) => {
 const setConfigApi = async (req, res) => {
   try {
     const b = req.body || {};
-    const PERMITIDAS = ['cert_min_meses', 'cert_cooldown_dias', 'cert_cuerpo', 'cert_cierre', 'cumple_popup_activo', 'cumple_campana_activo', 'cumple_musica', 'cumple_titulo', 'cumple_linea1', 'cumple_linea2', 'cumple_aviso_titulo', 'cumple_aviso_msg', 'cumple_aviso_tarde', 'cumple_dias_tope'];
+    const PERMITIDAS = ['cert_min_meses', 'cert_cooldown_dias', 'cert_cuerpo', 'cert_cierre', 'cumple_popup_activo', 'cumple_campana_activo', 'cumple_musica', 'cumple_titulo', 'cumple_linea1', 'cumple_linea2', 'cumple_aviso_titulo', 'cumple_aviso_msg', 'cumple_aviso_tarde', 'cumple_dias_tope', 'cumple_banner_dur', 'cumple_banner_sonido'];
     for (const [k, v] of Object.entries(b)) {
       if (!PERMITIDAS.includes(k)) continue;
       await pool.query('INSERT INTO rh_config (clave, valor) VALUES (?,?) ON DUPLICATE KEY UPDATE valor=VALUES(valor)', [k, String(v == null ? '' : v)]);
@@ -441,7 +443,8 @@ const cumpleHoy = async (req, res) => {
         : tpl(cfg.cumple_aviso_tarde, vars); // "Recuerda que {nombre} estuvo de cumpleaños el {dia}…"
       return { id: c.id_usuario, fecha: c.fecha_cumple, texto }; // dedup por cumpleaños, no por día
     });
-    res.json({ success: true, data: { avisos }, error: null });
+    const opts = { dur: Math.min(120, Math.max(2, parseInt(cfg.cumple_banner_dur || '9', 10))), sonido: cfg.cumple_banner_sonido || 'none' };
+    res.json({ success: true, data: { avisos, opts }, error: null });
   } catch (e) { res.status(500).json({ success: false, data: { avisos: [] }, error: 'Error' }); }
 };
 
