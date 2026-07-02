@@ -4,7 +4,7 @@ require('../migrations/fix-financieras');   // migración one-time de datos (fin
 const { isMesCerrado, getMesDeOp } = require('../../../../shared/utils/mes-cerrado');
 const { esFechaFutura, hoyChileDMY } = require('../../../../shared/utils/fecha-futura');
 const { marcarForzadosCalculo, recalcularPorOps } = require('../utils/recalcular-mes');
-const { clasificar: clasificarCartera } = require('../utils/recalcular-estado-cartera');
+const AF_MORA = require('../../../../api-gateway/public/js/mora-core');   // MOTOR ÚNICO de mora
 const { notificar } = require('../../../notificaciones/src/controllers/notificaciones.controller');
 
 /* Pool de quienes analizan/aprueban un crédito: Analistas de Crédito + Supervisor
@@ -338,9 +338,7 @@ function carteraLiveRow(row, um) {
   const due = Date.UTC(fpY, fpM + pagadas, fpD);               // venc. cuota impaga más antigua
   const dias = Math.max(0, Math.floor((Date.UTC(nY, nM, nD) - due) / 86400000));
   row.dias_atraso = realDias > 0 ? realDias : dias;
-  if (dias >= um.vencido) return 'VENCIDO';
-  if (dias >= um.mora) return 'MORA';
-  return 'VIGENTE';
+  return AF_MORA.clasificarPorDias(realDias > 0 ? realDias : dias, um);   // umbrales: motor único
 }
 
 /* ─── GET ALL ────────────────────────────────────────────────────────────── */
@@ -578,17 +576,19 @@ const getById = async (req, res) => {
       if (manualTerm) {
         c.estado_cartera_disp = c.estado_cartera;
       } else if (esPropio && etapaOtorgado && c.fecha_primera_cuota && Number(c.plazo) > 0) {
+        // MOTOR ÚNICO (mora-core): calendario congelado si existe + pagos en app
         const [pg] = await pool.query(
-          `SELECT numero_cuota FROM pagos_credito  WHERE id_credito=? AND estado_pago='PAGADO'
-           UNION
-           SELECT numero_cuota FROM cuotas_credito WHERE id_credito=? AND estado_cuota='PAGADA'`, [c.id, c.id]);
-        const paid = new Set(pg.map(p => parseInt(p.numero_cuota, 10)));
+          `SELECT numero_cuota FROM pagos_credito WHERE id_credito=? AND estado_pago='PAGADO'`, [c.id]);
+        const [cal] = await pool.query(
+          `SELECT numero_cuota, fecha_vencimiento, valor_cuota, estado_cuota, fecha_pago
+             FROM cuotas_credito WHERE id_credito=? ORDER BY numero_cuota`, [c.id]);
         const [ump] = await pool.query('SELECT clave, valor FROM cartera_parametros');
         const UM = {}; ump.forEach(u => { UM[u.clave] = parseInt(u.valor, 10); });
         const um = { mora: Number.isFinite(UM.mora_desde) ? UM.mora_desde : 1, vencido: Number.isFinite(UM.vencido_desde) ? UM.vencido_desde : 91 };
-        const now = new Date();
-        const hoy = Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate());
-        const cls = clasificarCartera(c, paid, hoy, um);
+        const cls = AF_MORA.estadoMora({
+          plazo: c.plazo, fecha_primera_cuota: c.fecha_primera_cuota, cuota: c.cuota,
+          calendario: cal, pagadas: pg.map(p => p.numero_cuota), umbrales: um,
+        });
         if (cls) { c.estado_cartera_disp = cls.estado; c.dias_atraso = cls.dias; }
       }
     } catch (_) { /* deja el fallback del SELECT */ }

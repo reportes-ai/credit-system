@@ -148,6 +148,8 @@ function hoyChile() {
 }
 
 // ─── Query base de mora ────────────────────────────────────────────────────────
+// ⚠ GEMELO SQL del MOTOR ÚNICO /js/mora-core.js (por rendimiento: filtra miles de
+//   créditos en BD). Si cambias una regla de mora, cámbiala en mora-core Y aquí.
 // pagos_credito solo almacena PAGOS REALIZADOS (no hay cuotas "pendientes").
 // La mora se calcula comparando schedule teórico vs pagos registrados.
 // Query PLANA (sin subqueries anidadas) compatible con TiDB.

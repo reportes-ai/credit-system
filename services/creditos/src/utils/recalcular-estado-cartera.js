@@ -13,6 +13,8 @@ const pool = require('../../../../shared/config/database');
    una fase posterior. Sin enforcement: calcula y muestra, no bloquea nada.
    ───────────────────────────────────────────────────────────────────────────── */
 
+const AF_MORA = require('../../../../api-gateway/public/js/mora-core');   // MOTOR ÚNICO de mora
+
 const BROKERAGE = ['AUTOFIN', 'UNIDAD DE CREDITO'];
 const DIA = 86400000;
 
@@ -45,25 +47,14 @@ function hoyUTC() {
 }
 
 // Clasifica un crédito propio → { estado, dias } o null si faltan datos.
+// Adapter sobre el MOTOR ÚNICO (mora-core): calendario francés sintético + pagos.
 function clasificar(cred, paidSet, hoy, um) {
-  const plazo = parseInt(cred.plazo, 10) || 0;
-  const f0 = ymdUTC(cred.fecha_primera_cuota);
-  if (!plazo || f0 == null) return null;
-
-  // Cuota impaga más antigua (1..plazo)
-  let oldest = 0;
-  for (let n = 1; n <= plazo; n++) { if (!paidSet.has(n)) { oldest = n; break; } }
-
-  if (oldest === 0) {                      // todas pagadas → saldo 0
-    const lastDue = addMonthsUTC(f0, plazo - 1);
-    return { estado: hoy < lastDue ? 'PREPAGADO' : 'TERMINADO', dias: 0 };
-  }
-  const venc = addMonthsUTC(f0, oldest - 1);
-  const dias = Math.max(0, Math.floor((hoy - venc) / DIA));
-  let estado = 'VIGENTE';
-  if (dias >= um.vencido) estado = 'VENCIDO';
-  else if (dias >= um.mora) estado = 'MORA';
-  return { estado, dias };
+  const r = AF_MORA.estadoMora({
+    plazo: cred.plazo, fecha_primera_cuota: cred.fecha_primera_cuota,
+    cuota: cred.cuota, pagadas: paidSet, hoy: new Date(hoy), umbrales: um,
+  });
+  if (!r) return null;
+  return { estado: r.estado, dias: r.dias };
 }
 
 /* Recalcula el estado de cartera de todos los créditos propios.
@@ -116,7 +107,7 @@ async function recalcularEstadoCartera() {
     if (vr != null && r.estado !== 'PREPAGADO' && r.estado !== 'TERMINADO') {
       const dias = Math.max(0, Math.floor((hoy - vr) / DIA));
       r.dias = dias;
-      r.estado = dias >= um.vencido ? 'VENCIDO' : (dias >= um.mora ? 'MORA' : 'VIGENTE');
+      r.estado = AF_MORA.clasificarPorDias(dias, um);   // umbrales: motor único
     }
     procesados++;
     porEstado[r.estado] = (porEstado[r.estado] || 0) + 1;

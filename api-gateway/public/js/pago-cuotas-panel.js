@@ -105,6 +105,11 @@
     // Calendario congelado (cuotas_credito) manda: créditos otorgados inmutables.
     // El cálculo francés al vuelo queda como fallback para créditos sin calendario.
     if (Array.isArray(S.calendario) && S.calendario.length) {
+      if (window.AF_MORA) {   // MOTOR ÚNICO (mora-core)
+        return AF_MORA.buildSchedule({ calendario: S.calendario }).map(q => ({
+          numero: q.n, fecha: q.fecha, monto: q.monto, pagadaCal: q.pagadaCal, fpagoCal: q.fpagoCal,
+        }));
+      }
       return S.calendario.map(q => ({
         numero: parseInt(q.numero_cuota, 10),
         fecha: q.fecha_vencimiento,

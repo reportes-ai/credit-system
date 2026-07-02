@@ -867,6 +867,13 @@ function buildAmortSchedule(c) {
   // Crédito con calendario congelado (tabla de desarrollo real) → se lee tal cual.
   // Regla de negocio: los créditos otorgados son inmutables; el cálculo al vuelo
   // es solo un fallback para créditos sin calendario en cuotas_credito.
+  if (_calendario.length && window.AF_MORA) {
+    // MOTOR ÚNICO (mora-core): el calendario congelado manda
+    return AF_MORA.buildSchedule({ calendario: _calendario }).map(q => ({
+      n: q.n, fecha: q.fecha ? new Date(q.fecha+'T00:00:00') : null,
+      cuota: q.monto, pagadaCal: q.pagadaCal, fpagoCal: q.fpagoCal,
+    }));
+  }
   if (_calendario.length) {
     return _calendario.map(q => ({
       n: parseInt(q.numero_cuota,10),
@@ -1599,6 +1606,7 @@ cargarPagina().then(() => {
   } catch(_) {}
 }).catch(() => {});
 </script>
+<script src="/js/mora-core.js"></script>
 <script src="/js/html2canvas.min.js"></script>
 <script src="/js/timbre-pagado.js"></script>
 <script src="/js/comprobante.js"></script>
