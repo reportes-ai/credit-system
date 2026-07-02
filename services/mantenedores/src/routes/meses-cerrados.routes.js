@@ -9,6 +9,7 @@ const gestionar = requireFunc('mant_meses_cerrados');
 
 router.get('/',                    verifyToken, c.getAll);
 router.get('/check/:mes',          verifyToken, c.checkMes);
+router.get('/checklist/:mes',      verifyToken, gestionar, c.checklist);
 router.put('/config/dias-cierre',  verifyToken, gestionar, c.setDiasCierre);
 router.put('/:mes',                verifyToken, gestionar, c.toggle);
 

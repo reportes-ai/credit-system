@@ -133,6 +133,50 @@ const getAll = async (_req, res) => {
   }
 };
 
+/* ── Checklist de cierre ──────────────────────────────────────────────
+   Verifica que el mes esté "sano" antes de cerrarlo. Cada check devuelve
+   cuántos pendientes hay y a qué pantalla ir a resolverlos. */
+async function checklistMes(mes) {
+  const mesDate = mes + '-01';
+  const checks = [];
+  const add = async (codigo, label, sql, params, href) => {
+    try {
+      const [[r]] = await pool.query(sql, params);
+      const n = Number(r.n) || 0;
+      checks.push({ codigo, label, ok: n === 0, n, href });
+    } catch (e) { checks.push({ codigo, label, ok: true, n: 0, href, error: e.message }); }
+  };
+  await add('datos_faltantes', 'Créditos OTORGADOS sin plazo, tasa o monto',
+    `SELECT COUNT(*) n FROM creditos WHERE mes=? AND estado_credito='OTORGADO'
+      AND (plazo IS NULL OR plazo=0 OR tascli_real IS NULL OR tascli_real=0 OR monto_financiado IS NULL OR monto_financiado=0)`,
+    [mesDate], '/carga-masiva/digitacion/cola');
+  await add('sin_calculo', 'Créditos OTORGADOS sin comisiones/ingresos calculados',
+    `SELECT COUNT(*) n FROM creditos WHERE mes=? AND estado_credito='OTORGADO'
+      AND (comej IS NULL OR ingreso_neto_total IS NULL OR comdea_real IS NULL)`,
+    [mesDate], '/creditos/');
+  await add('cartolas_sin_enviar', 'Movimientos de cartola del mes sin enviar al dealer',
+    `SELECT COUNT(*) n FROM cartolas_movimientos WHERE mes=? AND (enviada_fecha IS NULL AND mes_cartola IS NULL)`,
+    [mes], '/tesoreria/');
+  await add('comisiones_pendientes', 'Comisiones dealer del mes sin pagar',
+    `SELECT COUNT(*) n FROM cartolas_movimientos WHERE mes=? AND UPPER(COALESCE(estado_comision,''))='PENDIENTE'`,
+    [mes], '/tesoreria/');
+  await add('odp_pendientes', 'Órdenes de pago del mes emitidas sin pagar',
+    `SELECT COUNT(*) n FROM ordenes_pago WHERE DATE_FORMAT(created_at,'%Y-%m')=? AND estado='EMITIDA'`,
+    [mes], '/ordenes-pago/');
+  return checks;
+}
+
+/* ── GET /api/meses-cerrados/checklist/:mes ──────────────────────────── */
+const checklist = async (req, res) => {
+  try {
+    const { mes } = req.params;
+    if (!/^\d{4}-\d{2}$/.test(mes))
+      return res.status(400).json({ success: false, data: null, error: 'Formato mes inválido (YYYY-MM)' });
+    const checks = await checklistMes(mes);
+    res.json({ success: true, data: { mes, checks, listo: checks.every(c => c.ok) }, error: null });
+  } catch (e) { res.status(500).json({ success: false, data: null, error: e.message }); }
+};
+
 /* ── PUT /api/meses-cerrados/:mes ────────────────────────────────────── */
 const toggle = async (req, res) => {
   try {
@@ -140,8 +184,19 @@ const toggle = async (req, res) => {
     if (!/^\d{4}-\d{2}$/.test(mes))
       return res.status(400).json({ success: false, data: null, error: 'Formato mes inválido (YYYY-MM)' });
 
-    const { cerrado } = req.body;
+    const { cerrado, forzar } = req.body;
     const cerradoPor = req.usuario?.id_usuario || null;
+
+    // Checklist previo al cierre manual: si hay pendientes se devuelven (409)
+    // y el usuario decide si cierra igual (forzar=true, queda auditado).
+    let pendientes = [];
+    if (cerrado && !forzar) {
+      const checks = await checklistMes(mes);
+      pendientes = checks.filter(c => !c.ok);
+      if (pendientes.length) {
+        return res.status(409).json({ success: false, data: { mes, checks, listo: false }, error: 'El mes tiene pendientes en el checklist de cierre' });
+      }
+    }
 
     if (cerrado) {
       // Cierre manual
@@ -160,7 +215,7 @@ const toggle = async (req, res) => {
     }
 
     auditar({ req, accion: 'CIERRE_MES', modulo: 'meses-cerrados', entidad: 'mes', entidad_id: mes,
-      detalle: cerrado ? `Cerró el mes ${mes}` : `Reabrió el mes ${mes}` });
+      detalle: cerrado ? `Cerró el mes ${mes}${forzar ? ' FORZADO (checklist con pendientes)' : ' (checklist OK)'}` : `Reabrió el mes ${mes}` });
     res.json({ success: true, data: { mes, cerrado }, error: null });
   } catch (e) {
     res.status(500).json({ success: false, data: null, error: e.message });
@@ -193,4 +248,4 @@ const checkMes = async (req, res) => {
   }
 };
 
-module.exports = { getAll, toggle, setDiasCierre, checkMes };
+module.exports = { getAll, toggle, setDiasCierre, checkMes, checklist };
