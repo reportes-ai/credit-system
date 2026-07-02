@@ -177,6 +177,10 @@ function mapRow(row, mesOverride) {
     // ESTADO CREDITO es la fuente autoritativa del estado comercial de la operación.
     estado_eval:        (s('ESTADO CREDITO', 'ESTADO CRÉDITO') || '').toUpperCase() || null,
     estado_credito:     s('ESTADO CREDITO', 'ESTADO CRÉDITO'),
+    // fecha_estado (FECHA ESTADO del Excel): el dashboard Historia deriva de aquí el
+    // día del mes y día de la semana (INGRESADOS/OTORGADOS por día). Sin ella, esos
+    // informes quedan vacíos y todo cae en "4ª Semana".
+    fecha_estado:       d('FECHA ESTADO', 'FECHA EV'),
     // fecha_otorgado: si el día real cae en el mismo mes que "Mes contable", se respeta;
     // si no (placeholder de INDEXA en otro mes), se usa el último día del mes contable.
     fecha_otorgado: (() => {
