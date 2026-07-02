@@ -217,8 +217,16 @@ app.use('/api/comisiones-seguro', require('../../services/mantenedores/src/route
 app.get(['/login', '/login/'], (req, res) =>
   res.sendFile(path.join(__dirname, '../public/login.html')));
 
-// Health check
-app.get('/health', (req, res) => res.json({ status: 'Sistema operativo', timestamp: new Date() }));
+// Health check (valida BD: si TiDB no responde → 503, así Render/monitoreo lo detectan)
+app.get('/health', async (req, res) => {
+  try {
+    const pool = require('../../shared/config/database');
+    await pool.query('SELECT 1');
+    res.json({ status: 'Sistema operativo', db: true, uptime: Math.round(process.uptime()), timestamp: new Date() });
+  } catch (e) {
+    res.status(503).json({ status: 'BD no disponible', db: false, uptime: Math.round(process.uptime()), timestamp: new Date() });
+  }
+});
 
 // ── Páginas estáticas (SPA) ──────────────────────────────────────────────────
 // Cada entrada: [ruta, archivo-bajo-public]. Una ruta string '/x' se expande a

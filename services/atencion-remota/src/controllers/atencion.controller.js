@@ -674,11 +674,11 @@ const descargarAdjunto = async (req, res) => {
 
 /* ── REST: respuestas rápidas del chat ───────────────────────────────────── */
 const listarRespuestas = async (req, res) => {
-  try { const [rows] = await pool.query('SELECT id, titulo, texto FROM ar_respuestas_rapidas WHERE activo=1 ORDER BY orden, id'); res.json({ success:true, data:rows, error:null }); }
+  try { const [rows] = await pool.query('SELECT id, titulo, texto FROM ar_respuestas_rapidas WHERE activo=1 ORDER BY orden, id LIMIT 500'); res.json({ success:true, data:rows, error:null }); }
   catch (e) { errSrv(res, e, 'listarRespuestas'); }
 };
 const listarRespuestasAdmin = async (req, res) => {
-  try { const [rows] = await pool.query('SELECT * FROM ar_respuestas_rapidas ORDER BY orden, id'); res.json({ success:true, data:rows, error:null }); }
+  try { const [rows] = await pool.query('SELECT * FROM ar_respuestas_rapidas ORDER BY orden, id LIMIT 500'); res.json({ success:true, data:rows, error:null }); }
   catch (e) { errSrv(res, e, 'listarRespuestasAdmin'); }
 };
 const crearRespuesta = async (req, res) => {

@@ -375,7 +375,7 @@ let evaluando = false;
 async function evaluarAlertas() {
   if (evaluando) return; evaluando = true;
   try {
-    const [reglas] = await pool.query('SELECT * FROM alertas_config WHERE activo = 1');
+    const [reglas] = await pool.query('SELECT * FROM alertas_config WHERE activo = 1 LIMIT 1000');
     for (const rg of reglas) {
       const orig = ORIGENES[rg.origen];
       if (!orig) continue;
@@ -448,7 +448,7 @@ const getMeta = async (req, res) => {
 
 const listAlertas = async (req, res) => {
   try {
-    const [rows] = await pool.query('SELECT * FROM alertas_config ORDER BY id DESC');
+    const [rows] = await pool.query('SELECT * FROM alertas_config ORDER BY id DESC LIMIT 1000');
     res.json({ success: true, data: rows, error: null });
   } catch (e) { res.status(500).json({ success: false, data: null, error: 'Error interno del servidor' }); }
 };

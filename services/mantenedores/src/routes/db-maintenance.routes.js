@@ -1,10 +1,12 @@
 'use strict';
 const express    = require('express');
 const router     = express.Router();
-const { verifyToken, requirePerfil } = require('../../../../shared/middleware/auth');
+const { verifyToken } = require('../../../../shared/middleware/auth');
+const { requireFunc }  = require('../../../../shared/middleware/permisos');
 const ctrl       = require('../controllers/db-maintenance.controller');
 const ctrlX      = require('../controllers/db-maintenance-extra');
-const soloAdmin  = requirePerfil('Administrador');
+// Nivel Dios: matriz de permisos (Admin bypass incluido) — reemplaza requirePerfil deprecado
+const soloAdmin  = requireFunc('mantenedores_solo_dios');
 
 router.get('/',                    verifyToken, soloAdmin, ctrl.getDiagnostico);
 router.get('/historial',           verifyToken, soloAdmin, ctrl.getHistorial);
