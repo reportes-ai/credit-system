@@ -2,7 +2,7 @@
    AutoFácil — Versión global de la aplicación
    Editar SOLO este archivo para cambiar la versión
    ───────────────────────────────────────────── */
-const APP_VERSION = 'v79.3';
+const APP_VERSION = 'v79.4';
 
 /* ── PWA: instalable como app de escritorio (ventana propia, sin barras) ──
    Inyecta el manifest y registra el service worker en TODAS las páginas.
@@ -29,7 +29,7 @@ const APP_VERSION = 'v79.3';
 (function () {
   try {
     if (!sessionStorage.getItem('token')) return;
-    ['/js/cumple-popup.js', '/js/ranking-popup.js'].forEach(src => {
+    ['/js/cumple-popup.js', '/js/ranking-popup.js', '/js/carrera-popup.js'].forEach(src => {
       if (document.querySelector('script[src="' + src + '"]')) return;
       const s = document.createElement('script');
       s.src = src;

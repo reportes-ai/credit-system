@@ -1,0 +1,100 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8"><link rel="icon" href="/img/favicon.png" type="image/png">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Carrera de Colocaciones — Mantenedores</title>
+  <!-- v1.0 -->
+  <link href="/css/bootstrap.min.css" rel="stylesheet"><link href="/css/bootstrap-icons.css" rel="stylesheet">
+  <style>
+    :root { --navy:#0141A2; --navy-dark:#012d70; --navy-light:#0255c5; --bg:#f0f4f8; }
+    body { background:var(--bg); font-family:'Segoe UI',system-ui,sans-serif; margin:0; }
+    .topnav { background:linear-gradient(90deg,var(--navy-dark),var(--navy-light)); color:#fff; height:60px; padding:0 24px; display:flex; align-items:center; justify-content:space-between; position:sticky; top:0; z-index:200; }
+    .topnav-left { display:flex; align-items:center; gap:16px; } .topnav-brand img { height:32px; filter:brightness(0) invert(1); } .topnav-brand { text-decoration:none; display:flex; gap:8px; align-items:center; }
+    .version-badge { background:rgba(255,255,255,.15); color:rgba(255,255,255,.75); font-size:.65rem; font-weight:700; border-radius:6px; padding:2px 8px; }
+    .breadcrumb-nav { color:rgba(255,255,255,.7); font-size:.85rem; } .breadcrumb-nav a { color:rgba(255,255,255,.75); text-decoration:none; }
+    .user-chip { background:rgba(255,255,255,.12); border-radius:24px; padding:5px 12px; color:#fff; font-size:.85rem; } .btn-logout { background:rgba(255,255,255,.1); border:1px solid rgba(255,255,255,.2); color:#fff; border-radius:8px; padding:5px 12px; font-size:.82rem; cursor:pointer; }
+    .main { padding:28px 34px; max-width:980px; margin:0 auto; }
+    .page-banner { background:linear-gradient(135deg,#012d70,#0141A2 50%,#009AFE); border-radius:16px; color:#fff; padding:22px 30px; margin-bottom:22px; display:flex; align-items:center; gap:16px; } .page-banner i { font-size:2.2rem; opacity:.9; } .page-banner h2 { margin:0; font-size:1.25rem; font-weight:700; } .page-banner p { margin:2px 0 0; opacity:.85; font-size:.84rem; }
+    .card-box { background:#fff; border-radius:14px; box-shadow:0 1px 6px rgba(0,0,0,.07); padding:22px; margin-bottom:18px; }
+    .card-box h5 { font-size:1rem; font-weight:800; color:var(--navy-dark); margin:0 0 14px; display:flex; align-items:center; gap:8px; }
+    .fld { margin-bottom:14px; } .fld label { display:block; font-size:.78rem; font-weight:600; color:#475569; margin-bottom:5px; } .fld input { width:100%; border:1px solid #cbd5e1; border-radius:8px; padding:9px 11px; font-size:.88rem; box-sizing:border-box; }
+    .fld .hint { font-size:.72rem; color:#94a3b8; margin-top:3px; }
+    .btn-navy { background:var(--navy); color:#fff; border:none; border-radius:8px; padding:10px 18px; font-weight:700; font-size:.88rem; cursor:pointer; }
+    .btn-test { background:#fff; border:1.5px solid var(--navy); color:var(--navy); border-radius:8px; padding:8px 15px; font-weight:700; font-size:.82rem; cursor:pointer; }
+    .switch-row { display:flex; align-items:center; gap:10px; margin-bottom:12px; font-size:.88rem; font-weight:600; color:#334155; }
+    .afecta { background:#f8fafc; border-left:4px solid var(--navy); border-radius:10px; padding:16px 20px; font-size:.83rem; color:#475569; }
+    .afecta ul { margin:8px 0 0; padding-left:18px; } .afecta a { color:var(--navy); }
+    .toast { position:fixed; bottom:22px; right:22px; background:#16a34a; color:#fff; border-radius:10px; padding:12px 20px; font-weight:700; display:none; z-index:999; }
+  </style>
+</head>
+<body>
+<nav class="topnav">
+  <div class="topnav-left"><a href="/" class="topnav-brand"><img src="/img/logo.png" alt="AutoFácil"><span class="version-badge" id="versionBadge"></span></a>
+    <div class="breadcrumb-nav"><a href="/">Inicio</a> › <a href="/mantenedores/">Mantenedores</a> › <span style="color:#fff;font-weight:600"><i class="bi bi-flag me-1"></i>Carrera de Colocaciones</span></div></div>
+  <div style="display:flex;gap:10px;align-items:center"><span class="user-chip" id="navNombre">—</span><button class="btn-logout" onclick="logout()"><i class="bi bi-box-arrow-right me-1"></i>Salir</button></div>
+</nav>
+<div class="main">
+  <div class="page-banner"><i class="bi bi-flag"></i><div><h2>Carrera de Colocaciones</h2><p>Pista de atletismo diaria: cada ejecutivo corre hacia su meta mensual de créditos otorgados.</p></div></div>
+
+  <div class="card-box">
+    <h5><i class="bi bi-gear"></i> Configuración</h5>
+    <div class="switch-row"><input type="checkbox" id="activo" class="form-check-input"> Popup activo (aparece a diario al conectarse)</div>
+    <div class="row">
+      <div class="col-md-6"><div class="fld"><label>Hora desde la que aparece cada día</label><input type="time" id="hora_desde"><div class="hint">Se muestra 1 vez al día por persona/navegador, desde esta hora.</div></div></div>
+      <div class="col-md-6"><div class="fld"><label>Meta mensual (créditos por ejecutivo)</label><input type="number" id="meta_ops" min="1" max="200"><div class="hint">La línea de llegada 🏁. Quien la cruza corre con 🏆.</div></div></div>
+    </div>
+    <div class="fld"><label>Título</label><input id="titulo"><div class="hint">Variables: {mes} y {meta}.</div></div>
+    <div class="fld"><label>Subtítulo</label><input id="subtitulo"></div>
+    <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap">
+      <button class="btn-test" onclick="probar()"><i class="bi bi-play-circle me-1"></i>Probar pista (con el avance real del mes)</button>
+      <button class="btn-navy" onclick="guardar()"><i class="bi bi-floppy me-1"></i>Guardar cambios</button>
+    </div>
+  </div>
+
+  <div class="afecta">
+    <b><i class="bi bi-diagram-3 me-1"></i>Qué afecta este mantenedor</b>
+    <ul>
+      <li><b>Popup de la pista</b> → aparece en <b>todas las páginas</b> a todos los usuarios, 1 vez al día desde la hora configurada.</li>
+      <li><b>Carriles</b> → Ejecutivos Comerciales <b>activos</b> (perfil en <a href="/usuarios/">Usuarios</a>); avance = créditos <b>OTORGADOS</b> del mes (tabla <code>creditos</code>, mismos datos del <a href="/dashboard/">Dashboard</a>).</li>
+      <li><b>Meta mensual</b> → posición de la línea de llegada para TODOS los ejecutivos.</li>
+    </ul>
+  </div>
+</div>
+<div class="toast" id="toast">✓ Guardado</div>
+<script src="/js/auth-guard.js"></script>
+<script>
+  const token=sessionStorage.getItem('token'), yo=JSON.parse(sessionStorage.getItem('usuario')||'null');
+  if(!token||!yo) location.href='/login.html';
+  document.getElementById('navNombre').textContent=`${yo?.nombre||''} ${yo?.apellido||''}`.trim();
+  function logout(){ sessionStorage.clear(); location.href='/login.html'; }
+  const H={Authorization:'Bearer '+token}, HJ={...H,'Content-Type':'application/json'};
+  const CHECKS=['activo'], TEXTOS=['hora_desde','meta_ops','titulo','subtitulo'];
+  async function cargar(){
+    const j=await(await fetch('/api/carrera/config',{headers:H})).json(); const c=j.data||{};
+    CHECKS.forEach(k=>{ const el=document.getElementById(k); if(el) el.checked=c[k]==='1'; });
+    TEXTOS.forEach(k=>{ const el=document.getElementById(k); if(el) el.value=c[k]||''; });
+  }
+  async function guardar(){
+    const b={};
+    CHECKS.forEach(k=>b[k]=document.getElementById(k).checked?'1':'0');
+    TEXTOS.forEach(k=>b[k]=document.getElementById(k).value);
+    const j=await(await fetch('/api/carrera/config',{method:'PUT',headers:HJ,body:JSON.stringify(b)})).json();
+    if(!j.success)return alert(j.error||'Error al guardar');
+    const t=document.getElementById('toast'); t.style.display='block'; setTimeout(()=>t.style.display='none',2200);
+  }
+  async function probar(){
+    const j=await(await fetch('/api/carrera/popup?test=1',{headers:H})).json(); const d=j.data||{};
+    if(!d.mostrar) return alert('No hay Ejecutivos Comerciales activos para dibujar la pista.');
+    d.meta=parseInt(document.getElementById('meta_ops').value,10)||d.meta;
+    d.titulo=document.getElementById('titulo').value.replace(/\{mes\}/g,(d.titulo.match(/— (.+)$/)||[])[1]||'MES').replace(/\{meta\}/g,d.meta)||d.titulo;
+    d.subtitulo=document.getElementById('subtitulo').value.replace(/\{meta\}/g,d.meta)||d.subtitulo;
+    const go=()=>window.AF_CARRERA.probar(d);
+    if(window.AF_CARRERA) return go();
+    const s=document.createElement('script'); s.src='/js/carrera-popup.js'; s.onload=go; document.head.appendChild(s);
+  }
+  cargar();
+</script>
+<script src="/js/app-version.js"></script>
+</body>
+</html>

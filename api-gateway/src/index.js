@@ -216,6 +216,9 @@ app.use('/api/comisiones-seguro', require('../../services/mantenedores/src/route
 // Ranking de colocaciones (popup mensual del podio)
 app.use('/api/ranking-ventas', require('../../services/mantenedores/src/routes/ranking-ventas.routes'));
 
+// Carrera de colocaciones (popup diario con la pista)
+app.use('/api/carrera', require('../../services/mantenedores/src/routes/carrera.routes'));
+
 // Login
 app.get(['/login', '/login/'], (req, res) =>
   res.sendFile(path.join(__dirname, '../public/login.html')));
@@ -240,6 +243,7 @@ const PAGINAS = [
   ['/mantenedores/comisiones-seguro', 'mantenedores/comisiones-seguro/index.html'],
   ['/mantenedores/rrhh-saludos', 'mantenedores/rrhh-saludos/index.html'],
   ['/mantenedores/ranking-ventas', 'mantenedores/ranking-ventas/index.html'],
+  ['/mantenedores/carrera', 'mantenedores/carrera/index.html'],
   ['/carga-masiva', 'carga-masiva/index.html'],
   ['/carga-masiva/digitacion', 'carga-masiva/digitacion/index.html'],
   ['/carga-masiva/digitacion/cola', 'carga-masiva/digitacion/cola.html'],
