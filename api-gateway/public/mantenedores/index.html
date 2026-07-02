@@ -34,6 +34,8 @@
     .page-banner p { opacity: 0.8; margin: 0; font-size: 0.9rem; }
     .section-title { font-weight: 700; font-size: 0.85rem; color: #6b7280; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 20px; display: flex; align-items: center; gap: 10px; }
     .section-title::after { content: ''; flex: 1; height: 1px; background: #e5e7eb; }
+    .grupo-bloque { margin-bottom: 34px; }
+    .grupo-count { background: #e8eaf6; color: var(--navy); border-radius: 10px; padding: 1px 9px; font-size: 0.72rem; font-weight: 700; letter-spacing: 0; text-transform: none; }
     .modules-grid { display: grid; grid-template-columns: repeat(5, 1fr); gap: 20px; }
     @media (max-width: 900px) { .modules-grid { grid-template-columns: repeat(3, 1fr); } }
     @media (max-width: 640px) { .main-content { padding: 20px 16px; } .modules-grid { grid-template-columns: repeat(2, 1fr); } }
@@ -74,7 +76,7 @@
     <div class="topnav-left">
       <a href="/" class="topnav-brand">
         <img src="/img/logo.png" alt="AutoFácil" style="display:block">
-        <span class="version-badge" id="versionBadge">v5.6</span>
+        <span class="version-badge" id="versionBadge">v5.7</span>
       </a>
         <div class="breadcrumb-nav"><a href="/">Inicio</a><span class="sep">›</span><span style="color:#fff;font-weight:600"><i class="bi bi-gear me-1"></i>Mantenedores</span></div></div>
     <div class="topnav-right">
@@ -112,8 +114,7 @@
       <input type="text" id="buscarMant" placeholder="Buscar mantenedor por nombre o descripción…" oninput="filtrarMant()" autocomplete="off">
       <button class="clr" id="clrMant" onclick="limpiarMant()" title="Limpiar">&times;</button>
     </div>
-    <div class="section-title"><i class="bi bi-grid-3x3-gap-fill"></i> Submódulos disponibles</div>
-    <div class="modules-grid" id="modulesGrid"></div>
+    <div id="gruposWrap"></div>
     <div class="no-result" id="mantNoResult"></div>
   </div>
 
@@ -210,7 +211,42 @@
       'alertas-saldos': 'alertas saldos precio comisiones campana ejecutivo',
     };
 
-    let sortable = null, modoReordenar = false;
+    // Grupos temáticos (presentación, no dato de negocio). Lo que no calce cae en "otros".
+    const GRUPOS_DEF = [
+      { key: 'credito',   titulo: 'Crédito, Tasas y Seguros',    icon: 'bi-cash-coin' },
+      { key: 'dealers',   titulo: 'Dealers y Parques',           icon: 'bi-building' },
+      { key: 'documentos',titulo: 'Documentos y Plantillas',     icon: 'bi-file-earmark-text' },
+      { key: 'cobranza',  titulo: 'Cobranza y Tesorería',        icon: 'bi-cash-stack' },
+      { key: 'personas',  titulo: 'Personas y Comunicaciones',   icon: 'bi-people' },
+      { key: 'sistema',   titulo: 'Sistema y Datos',             icon: 'bi-cpu' },
+      { key: 'otros',     titulo: 'Otros',                       icon: 'bi-three-dots' },
+    ];
+    const GRUPO_DE = {
+      // Crédito, tasas y seguros
+      'tasas':'credito','uf':'credito','parametros':'credito','financieras':'credito',
+      'productos-financiera':'credito','preferencia-financiera':'credito','estado-creditos':'credito',
+      'estado-cartera':'credito','impuestos':'credito','presupuesto':'credito',
+      'recalculo-programado':'credito','factores-seguro':'credito','comisiones-seguro':'credito',
+      // Dealers y parques
+      'dealers':'dealers','parques':'dealers','dealer-categorias':'dealers','potencial-dealer':'dealers',
+      'dealernet':'dealers','dealers-mapa':'dealers',
+      // Documentos y plantillas
+      'tipos-documento':'documentos','pagares':'documentos','broker-validaciones':'documentos',
+      'certificados-textos':'documentos',
+      // Cobranza y tesorería
+      'cobranza-parametros':'cobranza','cobranza-mora':'cobranza','cuentas-bancarias':'cobranza',
+      // Personas y comunicaciones
+      'rrhh-saludos':'personas','mi-dia':'personas','ranking-ventas':'personas','carrera':'personas',
+      'correos-programados':'personas','alertas':'personas','alertas-saldos':'personas',
+      'respuestas-rapidas':'personas','backups':'personas','compras':'personas','tickets-ti':'personas',
+      // Sistema y datos
+      'solo-dios':'sistema','vista-pantallas':'sistema','inteligencia-artificial':'sistema',
+      'servidor-hora':'sistema','db-maintenance':'sistema','sql-console':'sistema',
+      'mantencion-sistema':'sistema','ayuda':'sistema','definiciones':'sistema','feriados':'sistema',
+      'comunas':'sistema','vehiculos':'sistema','actividades-economicas':'sistema',
+    };
+
+    let sortables = [], modoReordenar = false;
     const CONFIG_KEY = 'submenu_mantenedores';
 
     async function cargar() {
@@ -280,43 +316,58 @@
             .concat(allItems.filter(i => !orden.includes(i.id)))
         : allItems;
 
-      const grid = document.getElementById('modulesGrid');
-      grid.innerHTML = items.map(m => `
+      // Agrupar por tema respetando el orden guardado dentro de cada grupo
+      const porGrupo = new Map(GRUPOS_DEF.map(g => [g.key, []]));
+      items.forEach(m => porGrupo.get(GRUPO_DE[m.id] || 'otros').push(m));
+
+      const cardHTML = m => `
         <a href="${m.href}" class="module-card" data-id="${m.id}" data-href="${m.href}" data-keywords="${KEYWORDS[m.id]||''}">
           <i class="bi bi-grip-vertical drag-handle"></i>
           <div class="card-icon"><i class="bi ${m.icon}"></i></div>
           <h6>${m.titulo}</h6>
           <p>${m.desc}</p>
           <span class="btn-acceder"><i class="bi bi-arrow-right-circle me-1"></i>Acceder</span>
-        </a>`).join('');
+        </a>`;
+
+      document.getElementById('gruposWrap').innerHTML = GRUPOS_DEF
+        .filter(g => porGrupo.get(g.key).length)
+        .map(g => `
+          <div class="grupo-bloque" data-grupo="${g.key}">
+            <div class="section-title"><i class="bi ${g.icon}"></i> ${g.titulo} <span class="grupo-count">${porGrupo.get(g.key).length}</span></div>
+            <div class="modules-grid">${porGrupo.get(g.key).map(cardHTML).join('')}</div>
+          </div>`).join('');
     }
 
     function toggleReordenar() {
       modoReordenar = !modoReordenar;
-      const grid = document.getElementById('modulesGrid');
+      const grids = document.querySelectorAll('#gruposWrap .modules-grid');
       const btnR = document.getElementById('btnReordenar');
       const btnG = document.getElementById('btnGuardarOrden');
 
       if (modoReordenar) {
         const bm = document.getElementById('buscarMant'); if (bm && bm.value) { bm.value = ''; filtrarMant(); }
-        grid.classList.add('sortable-mode');
         btnR.classList.add('activo');
         btnR.innerHTML = '<i class="bi bi-x-circle"></i>Cancelar';
         btnG.style.display = 'flex';
-        sortable = new Sortable(grid, {
-          animation: 180,
-          ghostClass: 'sortable-ghost',
-          chosenClass: 'sortable-chosen',
-          onStart: () => grid.querySelectorAll('.module-card').forEach(c => c.removeAttribute('href')),
+        grids.forEach(grid => {
+          grid.classList.add('sortable-mode');
+          sortables.push(new Sortable(grid, {
+            animation: 180,
+            ghostClass: 'sortable-ghost',
+            chosenClass: 'sortable-chosen',
+            onStart: () => grid.querySelectorAll('.module-card').forEach(c => c.removeAttribute('href')),
+          }));
         });
       } else {
-        grid.classList.remove('sortable-mode');
         btnR.classList.remove('activo');
         btnR.innerHTML = '<i class="bi bi-arrows-move"></i>Reordenar';
         btnG.style.display = 'none';
-        if (sortable) { sortable.destroy(); sortable = null; }
-        grid.querySelectorAll('.module-card').forEach(card => {
-          if (card.dataset.href) card.href = card.dataset.href;
+        sortables.forEach(s => s.destroy()); sortables = [];
+        grids.forEach(grid => {
+          grid.classList.remove('sortable-mode');
+          grid.querySelectorAll('.module-card').forEach(card => {
+            if (card.dataset.href) card.href = card.dataset.href;
+          });
         });
       }
     }
@@ -326,7 +377,7 @@
       btn.disabled = true;
       btn.innerHTML = '<i class="bi bi-hourglass-split"></i>Guardando...';
       try {
-        const ids = [...document.getElementById('modulesGrid').querySelectorAll('.module-card')]
+        const ids = [...document.querySelectorAll('#gruposWrap .module-card')]
           .map(c => c.dataset.id);
         const res  = await fetch(`/api/config/ui/${CONFIG_KEY}`, {
           method: 'PUT', headers: H, body: JSON.stringify({ valor: ids }),
@@ -358,17 +409,25 @@
       console.log('GET2 status:', get2.status, await get2.json());
     };
 
-    /* ── Buscador de mantenedores (filtra las cards por nombre/descripción) ── */
+    /* ── Buscador de mantenedores (nombre/descripción/keywords, ignora tildes, oculta grupos vacíos) ── */
+    const norm = s => (s || '').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '');
     function filtrarMant() {
       const inp = document.getElementById('buscarMant');
-      const q = (inp.value || '').trim().toLowerCase();
+      const q = norm(inp.value.trim());
+      const terms = q.split(/\s+/).filter(Boolean); // cada palabra debe calzar (AND)
       document.getElementById('clrMant').style.display = q ? 'block' : 'none';
       let visibles = 0;
-      document.querySelectorAll('#modulesGrid .module-card').forEach(c => {
-        const txt = ((c.querySelector('h6')?.textContent || '') + ' ' + (c.querySelector('p')?.textContent || '') + ' ' + (c.dataset.keywords || '')).toLowerCase();
-        const show = !q || txt.includes(q);
+      document.querySelectorAll('#gruposWrap .module-card').forEach(c => {
+        const txt = norm((c.querySelector('h6')?.textContent || '') + ' ' + (c.querySelector('p')?.textContent || '') + ' ' + (c.dataset.keywords || ''));
+        const show = !terms.length || terms.every(t => txt.includes(t));
         c.style.display = show ? '' : 'none';
         if (show) visibles++;
+      });
+      // ocultar bloques de grupo sin resultados y actualizar el contador
+      document.querySelectorAll('#gruposWrap .grupo-bloque').forEach(b => {
+        const vis = [...b.querySelectorAll('.module-card')].filter(c => c.style.display !== 'none').length;
+        b.style.display = vis ? '' : 'none';
+        const cnt = b.querySelector('.grupo-count'); if (cnt) cnt.textContent = vis;
       });
       const nr = document.getElementById('mantNoResult');
       const sin = q && visibles === 0;
