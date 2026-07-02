@@ -112,7 +112,7 @@
 <body>
 <nav class="topnav">
   <div class="topnav-left">
-    <a href="/" class="topnav-brand"><img src="/img/logo.png" alt="AutoFácil"><span class="version-badge">v5.13</span></a>
+    <a href="/" class="topnav-brand"><img src="/img/logo.png" alt="AutoFácil"><span class="version-badge">v5.14</span></a>
     <div class="breadcrumb-nav">
       <a href="/">Inicio</a><span class="sep">›</span>
       <a href="/comisiones/">Comisión Ejecutivos</a><span class="sep">›</span>
@@ -150,6 +150,7 @@
     </select>
     <button class="btn-buscar" onclick="cargar()"><i class="bi bi-search"></i>Calcular</button>
     <button id="btnInforme" class="btn-buscar" style="background:#374151;display:none" onclick="generarInforme()"><i class="bi bi-file-earmark-text"></i>Generar Informe</button>
+    <button id="btnResumenMail" class="btn-buscar" style="background:#15803d;display:none" onclick="abrirResumenMail()"><i class="bi bi-envelope-paper"></i>Enviar resumen por correo</button>
     <button id="btnAlertas" class="btn-buscar" style="background:#0f766e;display:none" onclick="abrirConfigAlertas()"><i class="bi bi-bell"></i>Configurar alertas</button>
     <span id="loadingSpinner" style="display:none;color:#6b7280;font-size:.85rem"><i class="bi bi-hourglass-split me-1"></i>Calculando...</span>
   </div>
@@ -334,6 +335,7 @@ function renderizar(data, mes) {
 
   document.getElementById('resultado').innerHTML = html;
   document.getElementById('btnInforme').style.display = 'flex';
+  if (esAdmin) document.getElementById('btnResumenMail').style.display = 'flex';
 }
 
 function renderEjSinComision(d, idx, mes) {
@@ -1165,6 +1167,53 @@ cargar();
   </div>
 </dialog>
 
+<dialog id="dlgResumenMail" style="border:none;border-radius:14px;padding:0;max-width:560px;width:94%;box-shadow:0 20px 60px rgba(0,0,0,.3)">
+  <div style="background:linear-gradient(135deg,#0f2d6b,#0141A2);color:#fff;padding:15px 20px;display:flex;align-items:center;gap:10px">
+    <i class="bi bi-envelope-paper" style="font-size:1.25rem"></i>
+    <h6 style="margin:0;font-weight:700;font-size:1rem">Enviar resumen de comisiones por correo</h6>
+  </div>
+  <div style="padding:20px;max-height:62vh;overflow:auto">
+    <p style="font-size:.82rem;color:#475569;margin:0 0 14px">
+      Se enviará el resumen del mes <b id="rmMes">—</b> con, por cada ejecutivo, los créditos colocados, el monto y el <b>bono bruto (sin semana corrida)</b>. Firmado por <b>Auto Fácil Business Suite</b>.
+    </p>
+    <label style="display:block;font-weight:700;font-size:.8rem;color:#0141A2;margin-bottom:4px">Para (destinatarios)</label>
+    <input id="rmPara" type="text" placeholder="correo1@..., correo2@..." style="width:100%;border:1.5px solid #cbd5e1;border-radius:9px;padding:9px 11px;font-size:.9rem">
+    <div style="font-size:.72rem;color:#94a3b8;margin:3px 0 12px">Separados por coma</div>
+    <label style="display:block;font-weight:700;font-size:.8rem;color:#0141A2;margin-bottom:4px">CC (con copia)</label>
+    <input id="rmCC" type="text" placeholder="correo3@... (opcional)" style="width:100%;border:1.5px solid #cbd5e1;border-radius:9px;padding:9px 11px;font-size:.9rem">
+    <div style="font-size:.72rem;color:#94a3b8;margin:3px 0 0">Separados por coma. Los destinatarios se guardan para la próxima vez.</div>
+  </div>
+  <div style="padding:12px 20px;border-top:1px solid #eef2f7;display:flex;justify-content:flex-end;gap:10px">
+    <button onclick="document.getElementById('dlgResumenMail').close()" style="background:#f1f5f9;color:#374151;border:none;border-radius:8px;padding:8px 18px;font-weight:600;cursor:pointer">Cancelar</button>
+    <button id="rmBtnEnviar" onclick="enviarResumenMail()" style="background:#15803d;color:#fff;border:none;border-radius:8px;padding:8px 20px;font-weight:700;cursor:pointer"><i class="bi bi-send me-1"></i>Enviar</button>
+  </div>
+</dialog>
+
+<script>
+async function abrirResumenMail() {
+  if (!datosActuales.length) { toast('Primero calcula un mes', false); return; }
+  const mes = document.getElementById('filtroMes').value;
+  document.getElementById('rmMes').textContent = nombreMes(mes).replace(/^\w/, c => c.toUpperCase());
+  try {
+    const j = await (await fetch('/api/comisiones/resumen-config', { headers: H })).json();
+    if (j.success) { document.getElementById('rmPara').value = j.data.para || ''; document.getElementById('rmCC').value = j.data.cc || ''; }
+  } catch (_) {}
+  document.getElementById('dlgResumenMail').showModal();
+}
+async function enviarResumenMail() {
+  const mes = document.getElementById('filtroMes').value;
+  const para = document.getElementById('rmPara').value.trim();
+  const cc   = document.getElementById('rmCC').value.trim();
+  if (!para) { toast('Ingresa al menos un destinatario', false); return; }
+  const btn = document.getElementById('rmBtnEnviar'); btn.disabled = true; btn.innerHTML = '<i class="bi bi-hourglass-split me-1"></i>Enviando…';
+  let j; try { j = await (await fetch('/api/comisiones/enviar-resumen', { method: 'POST', headers: H, body: JSON.stringify({ mes, para, cc }) })).json(); }
+  catch (e) { j = { success: false, error: 'Error de red' }; }
+  btn.disabled = false; btn.innerHTML = '<i class="bi bi-send me-1"></i>Enviar';
+  if (!j.success) { toast(j.error || 'No se pudo enviar', false); return; }
+  document.getElementById('dlgResumenMail').close();
+  toast('✓ Resumen enviado a ' + j.data.enviado_a.join(', '), true);
+}
+</script>
 <script src="/js/app-version.js"></script>
 </body>
 </html>

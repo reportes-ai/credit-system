@@ -279,12 +279,8 @@ const putVariables = async (req, res) => {
   }
 };
 
-/* ── GET /api/comisiones/calculo?mes=YYYY-MM ─────────────────────────────── */
-const getCalculo = async (req, res) => {
-  try {
-    const { mes } = req.query;
-    if (!mes) return res.status(400).json({ success: false, data: null, error: 'Parámetro mes requerido (YYYY-MM)' });
-
+/* ── Cálculo del mes por ejecutivo (compartido por la vista y el resumen por correo) ── */
+async function calcularMes(mes) {
     const vars = await getVars();
 
     // Trae todos los créditos del mes agrupados por ejecutivo
@@ -345,11 +341,114 @@ const getCalculo = async (req, res) => {
     });
 
     resultado.sort((a, b) => a.ejecutivo.localeCompare(b.ejecutivo));
-    res.json({ success: true, data: resultado, error: null });
+    return resultado;
+}
+
+/* ── GET /api/comisiones/calculo?mes=YYYY-MM ─────────────────────────────── */
+const getCalculo = async (req, res) => {
+  try {
+    const { mes } = req.query;
+    if (!mes) return res.status(400).json({ success: false, data: null, error: 'Parámetro mes requerido (YYYY-MM)' });
+    res.json({ success: true, data: await calcularMes(mes), error: null });
   } catch (e) {
     console.error('[getCalculo]', e.message);
     res.status(500).json({ success: false, data: null, error: e.message });
   }
+};
+
+/* ── Config de destinatarios del resumen por correo ──────────────────────── */
+async function initResumenConfig() {
+  await pool.query(`CREATE TABLE IF NOT EXISTS comisiones_resumen_config (
+    clave VARCHAR(40) PRIMARY KEY, valor VARCHAR(500) NOT NULL DEFAULT '',
+    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP)`);
+  for (const k of ['resumen_para', 'resumen_cc'])
+    await pool.query('INSERT IGNORE INTO comisiones_resumen_config (clave, valor) VALUES (?, \'\')', [k]);
+}
+initResumenConfig().catch(e => console.error('[comisiones resumen cfg]', e.message));
+
+const getResumenConfig = async (req, res) => {
+  try {
+    await initResumenConfig();
+    const [rows] = await pool.query("SELECT clave, valor FROM comisiones_resumen_config");
+    const cfg = {}; rows.forEach(r => { cfg[r.clave] = r.valor; });
+    res.json({ success: true, data: { para: cfg.resumen_para || '', cc: cfg.resumen_cc || '' }, error: null });
+  } catch (e) { res.status(500).json({ success: false, data: null, error: 'Error interno del servidor' }); }
+};
+
+/* ── POST /api/comisiones/enviar-resumen {mes, para, cc} ─────────────────────
+   Resumen por ejecutivo: créditos colocados, monto y bono BRUTO (sin semana
+   corrida = incentivo_final). Guarda los destinatarios y firma el Business Suite. */
+const enviarResumen = async (req, res) => {
+  try {
+    const { enviarCorreo, mailConfigurado } = require('../../../../shared/mailer');
+    if (!mailConfigurado()) return res.status(400).json({ success: false, data: null, error: 'El correo del sistema no está configurado (MAIL_*)' });
+    const mes = /^\d{4}-\d{2}$/.test((req.body && req.body.mes) || '') ? req.body.mes : null;
+    if (!mes) return res.status(400).json({ success: false, data: null, error: 'Mes inválido (YYYY-MM)' });
+
+    // Persistir destinatarios si vienen en el request (edición desde el modal)
+    await initResumenConfig();
+    if (typeof req.body.para === 'string') await pool.query("UPDATE comisiones_resumen_config SET valor=? WHERE clave='resumen_para'", [req.body.para.trim().slice(0, 500)]);
+    if (typeof req.body.cc === 'string')   await pool.query("UPDATE comisiones_resumen_config SET valor=? WHERE clave='resumen_cc'", [req.body.cc.trim().slice(0, 500)]);
+    const [cfgRows] = await pool.query("SELECT clave, valor FROM comisiones_resumen_config");
+    const cfg = {}; cfgRows.forEach(r => { cfg[r.clave] = r.valor; });
+    const split = s => String(s || '').split(/[,;]/).map(x => x.trim()).filter(Boolean);
+    const para = split(cfg.resumen_para), cc = split(cfg.resumen_cc);
+    if (!para.length) return res.status(400).json({ success: false, data: null, error: 'Configura al menos un destinatario (Para).' });
+
+    const datos = (await calcularMes(mes)).sort((a, b) => (b.incentivo_final || 0) - (a.incentivo_final || 0));
+    const clp = v => '$' + Math.round(v || 0).toLocaleString('es-CL');
+    const MESES = ['enero','febrero','marzo','abril','mayo','junio','julio','agosto','septiembre','octubre','noviembre','diciembre'];
+    const [yy, mm] = mes.split('-');
+    const mesLargo = `${MESES[parseInt(mm, 10) - 1]} ${yy}`;
+
+    let totCred = 0, totMonto = 0, totBono = 0;
+    const filas = datos.map((d, i) => {
+      const cred = d.total_creditos || 0, monto = d.total_financiado || 0, bono = d.cumple_minimo ? (d.incentivo_final || 0) : 0;
+      totCred += cred; totMonto += monto; totBono += bono;
+      return `<tr style="background:${i % 2 ? '#f8fafc' : '#fff'}">
+        <td style="padding:7px 12px;border-bottom:1px solid #e5e7eb">${d.ejecutivo}</td>
+        <td style="padding:7px 12px;border-bottom:1px solid #e5e7eb;text-align:right">${cred}</td>
+        <td style="padding:7px 12px;border-bottom:1px solid #e5e7eb;text-align:right">${clp(monto)}</td>
+        <td style="padding:7px 12px;border-bottom:1px solid #e5e7eb;text-align:right;font-weight:700;color:${bono > 0 ? '#0141A2' : '#9ca3af'}">${bono > 0 ? clp(bono) : '—'}</td>
+      </tr>`;
+    }).join('');
+
+    const html = `
+      <div style="font-family:'Segoe UI',Arial,sans-serif;max-width:660px;margin:0 auto;color:#1e293b">
+        <div style="background:linear-gradient(135deg,#012d70,#0141A2 50%,#009AFE);border-radius:14px;color:#fff;padding:22px 26px;margin-bottom:18px">
+          <div style="font-size:1.15rem;font-weight:800">Resumen de Comisiones — ${mesLargo}</div>
+          <div style="font-size:.85rem;opacity:.85">Comisiones de ejecutivos comerciales · Auto Fácil Crédito Automotriz</div>
+        </div>
+        <table style="width:100%;border-collapse:collapse;font-size:.9rem;margin-bottom:14px">
+          <thead><tr style="background:#eff6ff">
+            <th style="padding:8px 12px;text-align:left;color:#0141A2">Ejecutivo</th>
+            <th style="padding:8px 12px;text-align:right;color:#0141A2">Créditos colocados</th>
+            <th style="padding:8px 12px;text-align:right;color:#0141A2">Monto de los créditos</th>
+            <th style="padding:8px 12px;text-align:right;color:#0141A2">Bono bruto</th>
+          </tr></thead>
+          <tbody>${filas}
+            <tr style="background:#0f2d6b;color:#fff;font-weight:800">
+              <td style="padding:9px 12px">TOTAL (${datos.length} ejecutivos)</td>
+              <td style="padding:9px 12px;text-align:right">${totCred}</td>
+              <td style="padding:9px 12px;text-align:right">${clp(totMonto)}</td>
+              <td style="padding:9px 12px;text-align:right">${clp(totBono)}</td>
+            </tr>
+          </tbody>
+        </table>
+        <div style="font-size:.76rem;color:#64748b;line-height:1.5">
+          El <b>bono bruto</b> corresponde al incentivo del mes <b>sin semana corrida</b>. Los ejecutivos que no alcanzan el mínimo del mes figuran con bono “—”.
+        </div>
+        <div style="margin-top:18px;padding-top:12px;border-top:1px dashed #cbd5e1;font-size:.78rem;color:#64748b">
+          Emitido automáticamente por <b>Auto Fácil Business Suite</b>.
+        </div>
+      </div>`;
+
+    await enviarCorreo({ to: para.join(','), cc: cc.length ? cc.join(',') : undefined,
+      subject: `Resumen de Comisiones — ${mesLargo} (bono bruto total ${clp(totBono)})`, html });
+    auditar({ req, accion: 'ENVIAR', modulo: 'comisiones', entidad: 'resumen', entidad_id: mes,
+      detalle: `Resumen de comisiones ${mes} enviado a ${para.join(', ')}${cc.length ? ' (CC: ' + cc.join(', ') + ')' : ''} — bono bruto total ${clp(totBono)}` });
+    res.json({ success: true, data: { enviado_a: para, cc, mes }, error: null });
+  } catch (e) { console.error('[comisiones enviarResumen]', e); res.status(500).json({ success: false, data: null, error: 'Error enviando el resumen' }); }
 };
 
 /* ── POST /api/comisiones/aprobar ────────────────────────────────────────── */
@@ -489,4 +588,4 @@ const setAlertasConfig = async (req, res) => {
   } catch (e) { res.status(500).json({ success: false, data: null, error: 'Error interno del servidor' }); }
 };
 
-module.exports = { getVariables, putVariables, getCalculo, aprobar, ejecutivoResponder, getAlertasConfig, setAlertasConfig, getEjecutivos };
+module.exports = { getVariables, putVariables, getCalculo, aprobar, ejecutivoResponder, getAlertasConfig, setAlertasConfig, getEjecutivos, getResumenConfig, enviarResumen };
