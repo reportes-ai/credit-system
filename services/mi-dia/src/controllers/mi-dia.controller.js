@@ -90,6 +90,15 @@ const WIDGET_MAP = Object.fromEntries(WIDGETS.map(w => [w.codigo, w]));
         orden     INT NOT NULL DEFAULT 0,
         PRIMARY KEY (id_perfil, codigo)
       )`);
+    // Disparador del popup automático de Mi Día
+    await pool.query(`CREATE TABLE IF NOT EXISTS mi_dia_popup ( clave VARCHAR(40) PRIMARY KEY, valor TEXT NULL )`);
+    const popDef = [
+      ['activo', '0'],                 // nace apagado; se enciende en el mantenedor
+      ['primera_conexion', '1'],       // abrir en la primera conexión del día
+      ['cada_horas', '0'],             // reabrir cada N horas (0 = no)
+      ['horarios', ''],                // horarios fijos "HH:MM,HH:MM,HH:MM" (los "cortes")
+    ];
+    for (const [k, v] of popDef) await pool.query('INSERT IGNORE INTO mi_dia_popup (clave, valor) VALUES (?,?)', [k, v]);
     // Siembra defaults del catálogo (solo si el perfil no tiene NINGUNA fila aún)
     const [existentes] = await pool.query('SELECT DISTINCT id_perfil FROM mi_dia_config');
     const yaConfig = new Set(existentes.map(r => r.id_perfil));
@@ -201,6 +210,37 @@ const guardarConfig = async (req, res) => {
   } catch (e) { res.status(500).json({ success: false, data: null, error: 'Error interno del servidor' }); }
 };
 
+/* ── Disparador del popup (cuándo se abre solo Mi Día) ───────────────────── */
+async function popupCfg() {
+  const [rows] = await pool.query('SELECT clave, valor FROM mi_dia_popup LIMIT 20');
+  const c = {}; rows.forEach(r => c[r.clave] = r.valor);
+  return {
+    activo: c.activo === '1',
+    primera_conexion: c.primera_conexion === '1',
+    cada_horas: Math.max(0, parseInt(c.cada_horas || '0', 10)),
+    horarios: String(c.horarios || '').split(',').map(s => s.trim()).filter(s => /^\d{1,2}:\d{2}$/.test(s)),
+  };
+}
+const getPopupCfg = async (req, res) => {
+  try { res.json({ success: true, data: await popupCfg(), error: null }); }
+  catch (e) { res.status(500).json({ success: false, data: { activo: false }, error: 'Error' }); }
+};
+const setPopupCfg = async (req, res) => {
+  try {
+    const b = req.body || {};
+    const map = {
+      activo: b.activo ? '1' : '0',
+      primera_conexion: b.primera_conexion ? '1' : '0',
+      cada_horas: String(Math.max(0, Math.min(24, parseInt(b.cada_horas || '0', 10) || 0))),
+      horarios: (Array.isArray(b.horarios) ? b.horarios : String(b.horarios || '').split(','))
+        .map(s => String(s).trim()).filter(s => /^\d{1,2}:\d{2}$/.test(s)).slice(0, 6).join(','),
+    };
+    for (const [k, v] of Object.entries(map)) await pool.query('INSERT INTO mi_dia_popup (clave, valor) VALUES (?,?) ON DUPLICATE KEY UPDATE valor=VALUES(valor)', [k, v]);
+    require('../../../../shared/audit').auditar({ req, accion: 'EDITAR', modulo: 'mi-dia', entidad: 'popup', detalle: 'Disparador Mi Día: ' + JSON.stringify(map) });
+    res.json({ success: true, data: { ok: true }, error: null });
+  } catch (e) { res.status(500).json({ success: false, data: null, error: 'Error interno del servidor' }); }
+};
+
 /* ── Google OAuth ────────────────────────────────────────────────────────── */
 const googleConnect = async (req, res) => {
   try {
@@ -221,4 +261,4 @@ const googleDisconnect = async (req, res) => {
   catch (e) { res.status(500).json({ success: false, data: null, error: 'Error' }); }
 };
 
-module.exports = { panel, catalogo, guardarConfig, googleConnect, googleCallback, googleDisconnect };
+module.exports = { panel, catalogo, guardarConfig, getPopupCfg, setPopupCfg, googleConnect, googleCallback, googleDisconnect };

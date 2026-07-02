@@ -47,6 +47,18 @@
     <div style="text-align:right;margin-top:16px"><button class="btn-navy" onclick="guardar()"><i class="bi bi-floppy me-1"></i>Guardar para este perfil</button></div>
   </div>
 
+  <div class="card-box">
+    <div style="font-size:1rem;font-weight:800;color:#012d70;margin-bottom:12px"><i class="bi bi-alarm me-1"></i>¿Cuándo se abre solo?</div>
+    <div style="font-size:.78rem;color:#94a3b8;margin-bottom:14px">Mi Día puede aparecer como aviso emergente en cualquier pantalla. Puedes combinar las opciones.</div>
+    <div class="switch-row" style="display:flex;align-items:center;gap:10px;margin-bottom:12px;font-size:.88rem;font-weight:600;color:#334155"><input type="checkbox" id="pop_activo" class="form-check-input"> Popup activo</div>
+    <div class="switch-row" style="display:flex;align-items:center;gap:10px;margin-bottom:14px;font-size:.88rem;font-weight:600;color:#334155"><input type="checkbox" id="pop_primera" class="form-check-input"> En la primera conexión del día</div>
+    <div class="row">
+      <div class="col-md-4"><div class="fld"><label>Reabrir cada N horas (0 = no)</label><input type="number" id="pop_horas" min="0" max="24" style="width:100%;border:1px solid #cbd5e1;border-radius:8px;padding:9px 11px;font-size:.9rem;box-sizing:border-box"></div></div>
+      <div class="col-md-8"><div class="fld"><label>Horarios fijos ("cortes", separados por coma)</label><input id="pop_horarios" placeholder="09:00, 14:00, 18:00" style="width:100%;border:1px solid #cbd5e1;border-radius:8px;padding:9px 11px;font-size:.9rem;box-sizing:border-box"><div style="font-size:.72rem;color:#94a3b8;margin-top:3px">Formato HH:MM. Se muestra una vez pasado cada horario.</div></div></div>
+    </div>
+    <div style="text-align:right;margin-top:8px"><button class="btn-navy" onclick="guardarPopup()"><i class="bi bi-floppy me-1"></i>Guardar disparador</button></div>
+  </div>
+
   <div class="afecta">
     <b><i class="bi bi-diagram-3 me-1"></i>Qué afecta este mantenedor</b>
     <ul style="margin:8px 0 0;padding-left:18px">
@@ -93,7 +105,25 @@
     CONFIG[idp]={}; activos.forEach(c=>CONFIG[idp][c]=true);
     const t=document.getElementById('toast'); t.style.display='block'; setTimeout(()=>t.style.display='none',2000);
   }
-  cargar();
+  async function cargarPopup(){
+    const j=await(await fetch('/api/mi-dia/popup-cfg',{headers:H})).json(); const c=j.data||{};
+    document.getElementById('pop_activo').checked=!!c.activo;
+    document.getElementById('pop_primera').checked=!!c.primera_conexion;
+    document.getElementById('pop_horas').value=c.cada_horas||0;
+    document.getElementById('pop_horarios').value=(c.horarios||[]).join(', ');
+  }
+  async function guardarPopup(){
+    const body={
+      activo:document.getElementById('pop_activo').checked,
+      primera_conexion:document.getElementById('pop_primera').checked,
+      cada_horas:parseInt(document.getElementById('pop_horas').value,10)||0,
+      horarios:document.getElementById('pop_horarios').value.split(',').map(s=>s.trim()).filter(Boolean),
+    };
+    const j=await(await fetch('/api/mi-dia/popup-cfg',{method:'PUT',headers:HJ,body:JSON.stringify(body)})).json();
+    if(!j.success)return alert(j.error||'Error al guardar');
+    const t=document.getElementById('toast'); t.style.display='block'; setTimeout(()=>t.style.display='none',2000);
+  }
+  cargar(); cargarPopup();
 </script>
 <script src="/js/app-version.js"></script>
 </body>
