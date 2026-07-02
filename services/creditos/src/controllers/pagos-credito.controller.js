@@ -136,9 +136,16 @@ async function validarCondonacionTopes({ id_credito, id_caja, id_usuario, pagos,
   let perm = null;
   try {
     const [[row]] = await pool.query(
-      `SELECT puede_condonar_intereses, tope_intereses, puede_condonar_gastos, tope_gastos
+      `SELECT puede_condonar_intereses, tope_intereses, puede_condonar_gastos, tope_gastos,
+              puede_condonar_capital, tope_capital
          FROM caja_usuarios WHERE id_caja=? AND id_usuario=? AND activo=1 LIMIT 1`, [id_caja, id_usuario]);
     perm = row || null;
+  } catch (_) {}
+  // Valor de cuota canónico: calendario congelado si existe (el cliente no define el full)
+  const capMap = new Map();
+  try {
+    const [cc] = await pool.query('SELECT numero_cuota, valor_cuota FROM cuotas_credito WHERE id_credito=?', [id_credito]);
+    cc.forEach(q => capMap.set(Number(q.numero_cuota), Math.round(parseFloat(q.valor_cuota) || 0)));
   } catch (_) {}
   const fmt = n => '$' + Math.round(n).toLocaleString('es-CL');
   for (const p of pagos) {
@@ -151,6 +158,13 @@ async function validarCondonacionTopes({ id_credito, id_caja, id_usuario, pagos,
       return { error: `Cuota N°${p.numero_cuota}: la condonación de intereses por mora supera tu atribución (mínimo a cobrar ${fmt(moraMin)}).`, fullMap };
     if (gcCharged < gastosMin - 1)
       return { error: `Cuota N°${p.numero_cuota}: la condonación de gastos de cobranza supera tu atribución (mínimo a cobrar ${fmt(gastosMin)}).`, fullMap };
+    // Capital (último en el orden de condonación): cobrado = total_pagado − mora − gastos
+    const capFull = capMap.get(Number(p.numero_cuota)) ?? Math.round(parseFloat(p.monto_cuota) || 0);
+    const tp = parseFloat(p.total_pagado);
+    const capCharged = Number.isFinite(tp) ? Math.round(tp) - imCharged - gcCharged : capFull;
+    const capMin = perm?.puede_condonar_capital ? Math.round(capFull * (1 - (parseFloat(perm.tope_capital) || 0) / 100)) : capFull;
+    if (capCharged < capMin - 1)
+      return { error: `Cuota N°${p.numero_cuota}: la condonación de capital supera tu atribución (mínimo a cobrar ${fmt(capMin)}).`, fullMap };
   }
   return { error: null, fullMap };
 }

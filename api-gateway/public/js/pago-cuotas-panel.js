@@ -276,7 +276,7 @@
           <div class="pcp-auto">
             <label><i class="bi bi-cash me-1"></i>Monto recibido</label>
             <input type="text" id="pcpMonto" placeholder="$0" inputmode="numeric" oninput="PagoCuotas.onMonto(this)">
-            <span class="pcp-hint" id="pcpHint">Ingresa el monto recibido: se condonan primero los gastos de cobranza, luego los intereses por mora (proporcional).</span>
+            <span class="pcp-hint" id="pcpHint">Ingresa el monto recibido: se condona en orden gastos de cobranza → intereses por mora → capital (según tu atribución).</span>
           </div>
           <div style="overflow-x:auto"><table class="pcp-bd">
             <thead><tr><th>N°</th><th>Venc.</th><th class="pcp-r">Cuota</th><th class="pcp-r">Gastos cobr.</th><th class="pcp-r">Int. mora</th><th class="pcp-r">Total</th></tr></thead>
@@ -349,7 +349,9 @@
       const mora = calcMora(s.monto, s.fecha).monto, gastos = calcGastos(s.monto, s.fecha).monto;
       const moraMin = S.miCaja?.puede_condonar_intereses ? Math.round(mora * (1 - (S.miCaja.tope_intereses || 0) / 100)) : mora;
       const gastosMin = S.miCaja?.puede_condonar_gastos ? Math.round(gastos * (1 - (S.miCaja.tope_gastos || 0) / 100)) : gastos;
-      return { n, s, mora, gastos, moraMin, gastosMin };
+      // Capital: condonable al FINAL del orden (gastos → mora → capital), atribución propia
+      const capMin = S.miCaja?.puede_condonar_capital ? Math.round(s.monto * (1 - (S.miCaja.tope_capital || 0) / 100)) : s.monto;
+      return { n, s, mora, gastos, moraMin, gastosMin, capMin };
     });
   }
 
@@ -359,7 +361,9 @@
     document.getElementById('pcpBadge2').textContent = '· ' + document.getElementById('pcpBadge').textContent;
     document.getElementById('pcpFecha').value = new Date().toISOString().slice(0, 10);
     document.getElementById('pcpMonto').value = '';
-    document.getElementById('pcpHint').textContent = 'Ingresa el monto recibido: se condonan primero los gastos de cobranza, luego los intereses por mora (proporcional).';
+    document.getElementById('pcpHint').textContent = S.miCaja?.puede_condonar_capital
+      ? 'Ingresa el monto recibido: se condona en orden gastos de cobranza → intereses por mora → capital (proporcional, dentro de tu atribución).'
+      : 'Ingresa el monto recibido: se condonan primero los gastos de cobranza, luego los intereses por mora (proporcional).';
     showErr(''); renderBreakdown();
   }
   function cerrarDetalle() { document.getElementById('pcpDet').style.display = 'none'; document.getElementById('pcpPres').style.display = 'flex'; }
@@ -372,40 +376,48 @@
   }
   function getPeso(el) { if (!el) return 0; if (el.dataset.raw !== undefined) return parseInt(el.dataset.raw, 10) || 0; return parseInt(String(el.value).replace(/[^\d]/g, ''), 10) || 0; }
 
-  function renderBreakdown(gOv = {}, mOv = {}) {
-    const datos = datosSel(); let sB = 0, sG = 0, sM = 0, sGc = 0, sMc = 0;
+  function renderBreakdown(gOv = {}, mOv = {}, cOv = {}) {
+    const datos = datosSel(); let sB = 0, sG = 0, sM = 0, sGc = 0, sMc = 0, sCc = 0;
+    const puedeK = !!S.miCaja?.puede_condonar_capital;
     const filas = datos.map(d => {
       const g = gOv[d.n] !== undefined ? gOv[d.n] : d.gastos;
       const m = mOv[d.n] !== undefined ? mOv[d.n] : d.mora;
-      const total = d.s.monto + g + m; sB += d.s.monto; sG += g; sM += m;
-      const gCond = d.gastos - g, mCond = d.mora - m;
-      sGc += Math.max(0, gCond); sMc += Math.max(0, mCond);
+      const c = cOv[d.n] !== undefined ? cOv[d.n] : d.s.monto;
+      const total = c + g + m; sB += c; sG += g; sM += m;
+      const gCond = d.gastos - g, mCond = d.mora - m, cCond = d.s.monto - c;
+      sGc += Math.max(0, gCond); sMc += Math.max(0, mCond); sCc += Math.max(0, cCond);
       const gCls = g < d.gastosMin ? 'err' : g < d.gastos ? 'warn' : '';
       const mCls = m < d.moraMin ? 'err' : m < d.mora ? 'warn' : '';
+      const cCls = c < d.capMin ? 'err' : c < d.s.monto ? 'warn' : '';
       const gPct = d.gastos > 0 ? Math.round(gCond / d.gastos * 100) : 0;
       const mPct = d.mora   > 0 ? Math.round(mCond / d.mora   * 100) : 0;
+      const cPct = d.s.monto > 0 ? Math.round(cCond / d.s.monto * 100) : 0;
       const gB = gCond > 0 ? `<span class="pcp-cond ${gCls ? 'max' : 'ok'}" title="Condonación">-${clp(gCond)} (${gPct}%)</span>` : '';
       const mB = mCond > 0 ? `<span class="pcp-cond ${mCls ? 'max' : 'ok'}" title="Condonación">-${clp(mCond)} (${mPct}%)</span>` : '';
+      const cB = cCond > 0 ? `<span class="pcp-cond ${cCls ? 'max' : 'ok'}" title="Condonación de capital">-${clp(cCond)} (${cPct}%)</span>` : '';
+      const capCell = puedeK
+        ? `<input type="text" inputmode="numeric" class="pcp-in ${cCls}" id="pcpc_${d.n}" value="${'$' + Math.round(c).toLocaleString('es-CL')}" data-raw="${Math.round(c)}" oninput="PagoCuotas.onBreakdown(this)"> ${cB}`
+        : `${clp(d.s.monto)}`;
       return `<tr>
         <td><strong>N°${d.n}</strong></td><td style="color:#6b7280;font-size:.78rem">${fmtFecha(d.s.fecha)}</td>
-        <td class="pcp-r pcp-amt">${clp(d.s.monto)}</td>
+        <td class="pcp-r pcp-amt">${capCell}</td>
         <td class="pcp-r"><input type="text" inputmode="numeric" class="pcp-in ${gCls}" id="pcpg_${d.n}" value="${g > 0 ? '$' + Math.round(g).toLocaleString('es-CL') : '$0'}" data-raw="${Math.round(g)}" ${d.gastos === 0 ? 'disabled' : (!S.miCaja?.puede_condonar_gastos ? 'readonly' : '')} oninput="PagoCuotas.onBreakdown(this)"> ${gB}</td>
         <td class="pcp-r"><input type="text" inputmode="numeric" class="pcp-in ${mCls}" id="pcpm_${d.n}" value="${m > 0 ? '$' + Math.round(m).toLocaleString('es-CL') : '$0'}" data-raw="${Math.round(m)}" ${d.mora === 0 ? 'disabled' : (!S.miCaja?.puede_condonar_intereses ? 'readonly' : '')} oninput="PagoCuotas.onBreakdown(this)"> ${mB}</td>
         <td class="pcp-r pcp-amt" style="font-weight:800" id="pcpt_${d.n}">${clp(total)}</td></tr>`;
     }).join('');
     document.getElementById('pcpBd').innerHTML = filas;
-    pintarFooter(datos.length, sB, sG, sM, sGc, sMc);
+    pintarFooter(datos.length, sB, sG, sM, sGc, sMc, sCc);
   }
 
-  // Fila TOTAL del desglose: N° de cuotas, cuota base, gastos (cobrado + condonado),
-  // intereses (cobrado + condonado) y total.
-  function pintarFooter(n, sB, sG, sM, sGc, sMc) {
+  // Fila TOTAL del desglose: N° de cuotas, capital (cobrado + condonado), gastos
+  // (cobrado + condonado), intereses (cobrado + condonado) y total.
+  function pintarFooter(n, sB, sG, sM, sGc, sMc, sCc = 0) {
     const tg = sB + sG + sM;
     const cd = v => v > 0 ? `<br><span style="font-size:.72rem;color:#15803d;font-weight:700">-${clp(v)} cond.</span>` : '';
     document.getElementById('pcpBdF').innerHTML = `<tr style="border-top:2px solid #e5e7eb;background:#f8fafc">
       <td style="font-weight:700;padding:8px 10px;font-size:.8rem;color:#374151">TOTAL</td>
       <td style="font-weight:700;padding:8px 10px;font-size:.78rem;color:#6b7280">${n} cuota${n !== 1 ? 's' : ''}</td>
-      <td class="pcp-r pcp-amt">${clp(sB)}</td>
+      <td class="pcp-r pcp-amt">${clp(sB)}${cd(sCc)}</td>
       <td class="pcp-r pcp-amt">${clp(sG)}${cd(sGc)}</td>
       <td class="pcp-r pcp-amt">${clp(sM)}${cd(sMc)}</td>
       <td class="pcp-r pcp-amt" style="font-weight:900;color:#0f2d6b">${clp(tg)}</td></tr>`;
@@ -415,52 +427,58 @@
   function onBreakdown(el) { onPeso(el); recalcBreakdown(); }
   function recalcBreakdown() {
     let hasErr = false; const datos = datosSel();
-    let sB = 0, sG = 0, sM = 0, sGc = 0, sMc = 0;
+    let sB = 0, sG = 0, sM = 0, sGc = 0, sMc = 0, sCc = 0;
     datos.forEach(d => {
       const g = getPeso(document.getElementById('pcpg_' + d.n)); const m = getPeso(document.getElementById('pcpm_' + d.n));
-      sB += d.s.monto; sG += g; sM += m; sGc += Math.max(0, d.gastos - g); sMc += Math.max(0, d.mora - m);
-      const te = document.getElementById('pcpt_' + d.n); if (te) te.textContent = clp(d.s.monto + g + m);
-      if (g < d.gastosMin || m < d.moraMin) hasErr = true;
+      const cEl = document.getElementById('pcpc_' + d.n); const c = cEl ? getPeso(cEl) : d.s.monto;
+      sB += c; sG += g; sM += m; sGc += Math.max(0, d.gastos - g); sMc += Math.max(0, d.mora - m); sCc += Math.max(0, d.s.monto - c);
+      const te = document.getElementById('pcpt_' + d.n); if (te) te.textContent = clp(c + g + m);
+      if (g < d.gastosMin || m < d.moraMin || c < d.capMin) hasErr = true;
     });
-    pintarFooter(datos.length, sB, sG, sM, sGc, sMc);
+    pintarFooter(datos.length, sB, sG, sM, sGc, sMc, sCc);
     showErr(hasErr ? 'La condonación supera el límite permitido en una o más cuotas.' : '');
   }
 
   function onMonto(el) { onPeso(el); autoAjustar(); }
-  // Condona gastos primero, luego intereses, SIEMPRE dentro de las atribuciones de
-  // la caja (no baja de gastosMin/moraMin). Si el monto exige condonar más de lo
-  // permitido, avisa (requiere atribución mayor).
+  // Condona en ORDEN: gastos de cobranza → intereses por mora → capital, SIEMPRE
+  // dentro de las atribuciones de la caja (no baja de gastosMin/moraMin/capMin).
+  // Si el monto exige condonar más de lo permitido, avisa (requiere atribución mayor).
   function autoAjustar() {
     const T = getPeso(document.getElementById('pcpMonto')) + S.saldoAFavor;
     const datos = datosSel(); if (!datos.length) return;
     const sB = datos.reduce((a, d) => a + d.s.monto, 0);
     const sG = datos.reduce((a, d) => a + d.gastos, 0), sM = datos.reduce((a, d) => a + d.mora, 0);
     const sGmin = datos.reduce((a, d) => a + d.gastosMin, 0), sMmin = datos.reduce((a, d) => a + d.moraMin, 0);
-    const maxTotal = sB + sG + sM, minTotal = sB + sGmin + sMmin;
+    const sCmin = datos.reduce((a, d) => a + d.capMin, 0);
+    const maxTotal = sB + sG + sM, minTotal = sCmin + sGmin + sMmin;
     if (T === 0) { renderBreakdown(); return; }
-    if (T < sB) { showErr(`Monto insuficiente. El mínimo es ${clp(sB)} (solo cuotas base, sin gastos ni mora).`); renderBreakdown({}, {}); return; }
     if (T < minTotal - 0.5) {
       showErr(`El monto recibido exige condonar ${clp(maxTotal - T)}, pero tu atribución permite condonar hasta ${clp(maxTotal - minTotal)} (mínimo a cobrar ${clp(minTotal)}). Se requiere una atribución mayor.`);
-      const gOv = {}, mOv = {}; datos.forEach(d => { gOv[d.n] = d.gastosMin; mOv[d.n] = d.moraMin; });
-      renderBreakdown(gOv, mOv); return;
+      const gOv = {}, mOv = {}, cOv = {}; datos.forEach(d => { gOv[d.n] = d.gastosMin; mOv[d.n] = d.moraMin; cOv[d.n] = d.capMin; });
+      renderBreakdown(gOv, mOv, cOv); return;
     }
     showErr('');
     const cond = Math.max(0, maxTotal - T);
-    const gMax = sG - sGmin, mMax = sM - sMmin;
-    const gCondT = Math.min(cond, gMax), mCondT = Math.min(cond - gCondT, mMax);
-    const gOv = {}, mOv = {};
+    const gMax = sG - sGmin, mMax = sM - sMmin, cMax = sB - sCmin;
+    const gCondT = Math.min(cond, gMax);
+    const mCondT = Math.min(cond - gCondT, mMax);
+    const cCondT = Math.min(cond - gCondT - mCondT, cMax);   // capital: al final
+    const gOv = {}, mOv = {}, cOv = {};
     datos.forEach(d => {
       const gShare = gMax > 0 ? Math.round((d.gastos - d.gastosMin) * gCondT / gMax) : 0;
       gOv[d.n] = Math.max(d.gastosMin, d.gastos - gShare);
       const mShare = mMax > 0 ? Math.round((d.mora - d.moraMin) * mCondT / mMax) : 0;
       mOv[d.n] = Math.max(d.moraMin, d.mora - mShare);
+      const cShare = cMax > 0 ? Math.round((d.s.monto - d.capMin) * cCondT / cMax) : 0;
+      cOv[d.n] = Math.max(d.capMin, d.s.monto - cShare);
     });
-    const condReal = (sG - datos.reduce((a, d) => a + gOv[d.n], 0)) + (sM - datos.reduce((a, d) => a + mOv[d.n], 0));
+    const condReal = (sG - datos.reduce((a, d) => a + gOv[d.n], 0)) + (sM - datos.reduce((a, d) => a + mOv[d.n], 0))
+                   + (sB - datos.reduce((a, d) => a + cOv[d.n], 0));
     const exc = T - maxTotal;
     document.getElementById('pcpHint').textContent = condReal > 0
-      ? `Se condona ${clp(condReal)} (dentro de tus atribuciones): gastos de cobranza primero, luego intereses por mora.`
+      ? `Se condona ${clp(condReal)} (dentro de tus atribuciones), en orden: gastos de cobranza → intereses por mora → capital.`
       : exc > 0 ? `Se cobrará el total. El excedente de ${clp(exc)} quedará como Saldo a Favor.` : 'Se cobrará el total sin condonación.';
-    renderBreakdown(gOv, mOv);
+    renderBreakdown(gOv, mOv, cOv);
   }
 
   function showErr(m) { const e = document.getElementById('pcpErr'); if (!e) return; if (m) { e.style.display = ''; e.innerHTML = `<div class="pcp-err"><i class="bi bi-exclamation-triangle-fill"></i> ${esc(m)}</div>`; } else e.style.display = 'none'; }
@@ -472,10 +490,15 @@
     if (!origenVal) { document.getElementById('pcpOrigen').classList.add('req'); return showErr('Selecciona el origen de fondos.'); }
     const [origenLabel, cuentaId] = origenVal.split('|');
     if (!fecha) return showErr('Selecciona la fecha de pago.');
-    const det = datos.map(d => ({ d, g: getPeso(document.getElementById('pcpg_' + d.n)), m: getPeso(document.getElementById('pcpm_' + d.n)) }));
+    const det = datos.map(d => {
+      const cEl = document.getElementById('pcpc_' + d.n);
+      return { d, g: getPeso(document.getElementById('pcpg_' + d.n)), m: getPeso(document.getElementById('pcpm_' + d.n)),
+               c: cEl ? getPeso(cEl) : d.s.monto };
+    });
     for (const p of det) {
       if (p.g < p.d.gastosMin) return showErr(`Cuota N°${p.d.n}: los gastos no pueden ser menores a ${clp(p.d.gastosMin)}.`);
       if (p.m < p.d.moraMin) return showErr(`Cuota N°${p.d.n}: la mora no puede ser menor a ${clp(p.d.moraMin)}.`);
+      if (p.c < p.d.capMin) return showErr(`Cuota N°${p.d.n}: el capital no puede ser menor a ${clp(p.d.capMin)}.`);
     }
     showErr(''); const btn = document.getElementById('pcpConf'); btn.disabled = true; btn.innerHTML = '<i class="bi bi-hourglass-split"></i> Registrando…';
     try {
@@ -487,7 +510,7 @@
           numero_cuota: p.d.n, fecha_vencimiento: p.d.s.fecha, monto_cuota: Math.round(p.d.s.monto),
           interes_mora: Math.round(p.m), gastos_cobranza: Math.round(p.g),
           interes_mora_total: Math.round(p.d.mora), gastos_cobranza_total: Math.round(p.d.gastos),
-          total_pagado: Math.round(p.d.s.monto + p.m + p.g),
+          total_pagado: Math.round(p.c + p.m + p.g),   // capital cobrado (condonado = monto_cuota − c)
         })),
       };
       const j = await (await API('/api/pagos-credito/batch', { method: 'POST', body: JSON.stringify(body) })).json();
