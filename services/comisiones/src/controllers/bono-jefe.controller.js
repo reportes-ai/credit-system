@@ -3,7 +3,7 @@
    BONO JEFE COMERCIAL — réplica del BSC (Balanced Scorecard) Excel de RRHH.
    El bono del Jefe Comercial se calcula sobre el PROMEDIO del equipo de
    Ejecutivos Comerciales en 3 pilares del mes:
-     · CRÉDITOS ingresados   (pond. 45%)  — tramo mínimo/esperado
+     · CRÉDITOS otorgados    (pond. 45%)  — tramo mínimo/esperado
      · MONTOS aprobados      (pond. 40%)  — umbrales = ops × monto por op
      · NUEVOS DEALERS cursados (pond. 15%)
    El score del equipo (0–100+) entra a una curva exponencial sobre el
@@ -92,10 +92,11 @@ const getBSC = async (req, res) => {
          FROM usuarios u JOIN perfiles p ON p.id_perfil=u.id_perfil
         WHERE p.nombre='Ejecutivo Comercial' AND u.estado='activo' ORDER BY ejecutivo`);
 
-    // Pilar 1: créditos INGRESADOS del mes (todo lo digitado, cualquier estado)
+    // Pilar 1: créditos OTORGADOS del mes
     const [ing] = await pool.query(
       `SELECT ejecutivo, COUNT(*) n FROM creditos
-        WHERE DATE_FORMAT(mes,'%Y-%m')=? AND ejecutivo IS NOT NULL AND ejecutivo<>'' GROUP BY ejecutivo`, [mes]);
+        WHERE DATE_FORMAT(mes,'%Y-%m')=? AND estado_credito='OTORGADO'
+          AND ejecutivo IS NOT NULL AND ejecutivo<>'' GROUP BY ejecutivo`, [mes]);
     // Pilar 2: MONTOS aprobados del mes (aprobado u otorgado)
     const [apr] = await pool.query(
       `SELECT ejecutivo, COALESCE(SUM(monto_financiado),0) monto FROM creditos
@@ -126,7 +127,7 @@ const getBSC = async (req, res) => {
       const k = keyEj(e.ejecutivo);
       const E = mIng.get(k) || 0, H = mApr.get(k) || 0, J = mNvd.get(k) || 0;
       return {
-        ejecutivo: e.ejecutivo, ingresados: E,
+        ejecutivo: e.ejecutivo, otorgados: E,
         ptj_creditos: ptjTramo(E, cfg.creditos_min, cfg.creditos_esperado, cfg.pond_creditos),
         monto_aprobado: H,
         ptj_montos: ptjTramo(H, minM, espM, cfg.pond_montos),
@@ -139,11 +140,11 @@ const getBSC = async (req, res) => {
     // y sobre ese promedio se recalculan los puntajes
     const n = filas.length || 1;
     const avg = {
-      ingresados: filas.reduce((a, f) => a + f.ingresados, 0) / n,
+      otorgados: filas.reduce((a, f) => a + f.otorgados, 0) / n,
       monto_aprobado: filas.reduce((a, f) => a + f.monto_aprobado, 0) / n,
       dealers_nuevos: filas.reduce((a, f) => a + f.dealers_nuevos, 0) / n,
     };
-    avg.ptj_creditos = ptjTramo(avg.ingresados, cfg.creditos_min, cfg.creditos_esperado, cfg.pond_creditos);
+    avg.ptj_creditos = ptjTramo(avg.otorgados, cfg.creditos_min, cfg.creditos_esperado, cfg.pond_creditos);
     avg.ptj_montos = ptjTramo(avg.monto_aprobado, minM, espM, cfg.pond_montos);
     avg.ptj_dealers = ptjDealers(avg.dealers_nuevos, cfg.dealers_min, cfg.dealers_esperado, cfg.pond_dealers);
     avg.score = avg.ptj_creditos + avg.ptj_montos + avg.ptj_dealers;
@@ -154,7 +155,7 @@ const getBSC = async (req, res) => {
     const n2 = v => Number(v).toLocaleString('es-CL', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
     const pasos = [
       { titulo: 'Equipo evaluado', detalle: `${filas.length} Ejecutivos Comerciales activos en ${mes}. El bono del Jefe Comercial se calcula sobre el PROMEDIO del equipo, no sobre un ejecutivo individual.` },
-      { titulo: `Pilar 1 — Créditos ingresados (pondera ${Math.round(cfg.pond_creditos * 100)}%)`, detalle: `Promedio del equipo: ${n2(avg.ingresados)} créditos ingresados. Regla: bajo el mínimo (${cfg.creditos_min}) el puntaje es 0; sobre lo esperado (${cfg.creditos_esperado}) se alcanza el máximo del pilar (${n2(cfg.pond_creditos * 100)} pts); entre medio es proporcional → (${n2(avg.ingresados)} ÷ ${cfg.creditos_esperado}) × ${Math.round(cfg.pond_creditos * 100)} = ${n2(avg.ptj_creditos)} pts.` },
+      { titulo: `Pilar 1 — Créditos otorgados (pondera ${Math.round(cfg.pond_creditos * 100)}%)`, detalle: `Promedio del equipo: ${n2(avg.otorgados)} créditos otorgados en el mes. Regla: bajo el mínimo (${cfg.creditos_min}) el puntaje es 0; sobre lo esperado (${cfg.creditos_esperado}) se alcanza el máximo del pilar (${n2(cfg.pond_creditos * 100)} pts); entre medio es proporcional → (${n2(avg.otorgados)} ÷ ${cfg.creditos_esperado}) × ${Math.round(cfg.pond_creditos * 100)} = ${n2(avg.ptj_creditos)} pts.` },
       { titulo: `Pilar 2 — Montos aprobados (pondera ${Math.round(cfg.pond_montos * 100)}%)`, detalle: `Promedio del equipo: ${clp(avg.monto_aprobado)} aprobados en el mes. Umbrales: mínimo ${clp(minM)} (${cfg.creditos_min} ops × ${clp(cfg.monto_por_op)}), esperado ${clp(espM)} (${cfg.creditos_esperado} ops × ${clp(cfg.monto_por_op)}). Puntaje: ${n2(avg.ptj_montos)} pts.` },
       { titulo: `Pilar 3 — Nuevos dealers cursados (pondera ${Math.round(cfg.pond_dealers * 100)}%)`, detalle: `Promedio del equipo: ${n2(avg.dealers_nuevos)} dealers nuevos (dealers cuya primera operación cursada de la historia cae en ${mes}). Regla: bajo el mínimo (${cfg.dealers_min}) es 0; si no, (valor ÷ ${cfg.dealers_esperado}) × ${Math.round(cfg.pond_dealers * 100)} = ${n2(avg.ptj_dealers)} pts (este pilar no tiene tope).` },
       { titulo: 'Score final del equipo', detalle: `${n2(avg.ptj_creditos)} + ${n2(avg.ptj_montos)} + ${n2(avg.ptj_dealers)} = ${n2(avg.score)} puntos.` },

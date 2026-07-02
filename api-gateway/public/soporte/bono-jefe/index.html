@@ -2,7 +2,7 @@
 <html lang="es">
 <head>
 <meta charset="UTF-8">
-<!-- v1.0 — BSC Bono Jefe Comercial (réplica del scorecard Excel de RRHH) -->
+<!-- v1.1 — pilar 1 = OTORGADOS; gráfico de la curva; formato $ y % en variables -->
 <link rel="icon" href="/img/favicon.png" type="image/png">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Bono Jefe Comercial — AutoFácil</title>
@@ -106,7 +106,7 @@
         <thead>
           <tr>
             <th class="nom">#</th><th class="nom">Ejecutivo Comercial</th>
-            <th class="grp-c">Ingresados</th><th class="grp-c">Puntaje</th>
+            <th class="grp-c">Otorgados</th><th class="grp-c">Puntaje</th>
             <th class="grp-m">Monto Aprobado</th><th class="grp-m">Puntaje</th>
             <th class="grp-d">Dealers Nuevos</th><th class="grp-d">Puntaje</th>
             <th>Score Final</th>
@@ -148,22 +148,22 @@
       <div class="vars-grid">
         <div class="var-item"><label>Créditos — mínimo</label><input id="v_creditos_min" type="number" step="1"><div class="hint">Bajo esto el pilar Créditos vale 0</div></div>
         <div class="var-item"><label>Créditos — esperado</label><input id="v_creditos_esperado" type="number" step="1"><div class="hint">Con esto se alcanza el máximo del pilar</div></div>
-        <div class="var-item"><label>Ponderación Créditos (%)</label><input id="v_pond_creditos" type="number" step="1"></div>
-        <div class="var-item"><label>Monto por operación ($)</label><input id="v_monto_por_op" type="number" step="100000"><div class="hint">Umbral montos = ops × este monto</div></div>
-        <div class="var-item"><label>Ponderación Montos (%)</label><input id="v_pond_montos" type="number" step="1"></div>
+        <div class="var-item"><label>Ponderación Créditos</label><input id="v_pond_creditos" type="text" class="fmt-pct" onblur="fmtPctIn(this)"></div>
+        <div class="var-item"><label>Monto por operación</label><input id="v_monto_por_op" type="text" class="fmt-peso" onblur="fmtPesoIn(this)"><div class="hint">Umbral montos = ops × este monto</div></div>
+        <div class="var-item"><label>Ponderación Montos</label><input id="v_pond_montos" type="text" class="fmt-pct" onblur="fmtPctIn(this)"></div>
         <div class="var-item"><label>Dealers — mínimo</label><input id="v_dealers_min" type="number" step="1"></div>
         <div class="var-item"><label>Dealers — esperado</label><input id="v_dealers_esperado" type="number" step="1"></div>
-        <div class="var-item"><label>Ponderación Dealers (%)</label><input id="v_pond_dealers" type="number" step="1"></div>
+        <div class="var-item"><label>Ponderación Dealers</label><input id="v_pond_dealers" type="text" class="fmt-pct" onblur="fmtPctIn(this)"></div>
       </div>
 
       <div class="var-sec"><i class="bi bi-graph-up-arrow"></i> Curva del premio</div>
       <div class="vars-grid">
         <div class="var-item"><label>Score mínimo (parte a pagar)</label><input id="v_score_min" type="number" step="1"><div class="hint">Bajo este puntaje el premio es $0</div></div>
         <div class="var-item"><label>Score máximo</label><input id="v_score_max" type="number" step="1"><div class="hint">Donde el % variable llega a su tope</div></div>
-        <div class="var-item"><label>% variable máximo</label><input id="v_pct_variable" type="number" step="1"><div class="hint">% del sueldo fijo en el máximo</div></div>
+        <div class="var-item"><label>% variable máximo</label><input id="v_pct_variable" type="text" class="fmt-pct" onblur="fmtPctIn(this)"><div class="hint">% del sueldo fijo en el máximo</div></div>
         <div class="var-item"><label>k (curvatura exponencial)</label><input id="v_k" type="number" step="0.05"><div class="hint">Mayor k = curva más cargada al final</div></div>
-        <div class="var-item"><label>Sueldo fijo ($)</label><input id="v_sueldo_fijo" type="number" step="50000"></div>
-        <div class="var-item"><label>Factor semana corrida</label><input id="v_factor_semana" type="number" step="0.0001"><div class="hint">Ej. 0,1667 = 16,67% del variable</div></div>
+        <div class="var-item"><label>Sueldo fijo</label><input id="v_sueldo_fijo" type="text" class="fmt-peso" onblur="fmtPesoIn(this)"></div>
+        <div class="var-item"><label>Semana corrida</label><input id="v_factor_semana" type="text" class="fmt-pct" onblur="fmtPctIn(this)"><div class="hint">% sobre el premio variable (Ej. 16,67%)</div></div>
       </div>
 
       <div style="margin-top:16px;display:flex;gap:10px">
@@ -178,6 +178,7 @@
         <thead><tr><th>Score</th><th>% adicional</th><th>Premio variable</th><th>Semana corrida</th><th>Total variable</th><th>Renta total</th></tr></thead>
         <tbody id="curvaBody"></tbody>
       </table></div>
+      <div id="curvaChart" style="margin-top:18px"></div>
     </div>
 
     <!-- Qué afecta este mantenedor -->
@@ -222,7 +223,7 @@ async function cargarBSC(){
   DATA = j.data;
   const p = DATA.params;
   document.getElementById('umbrales').innerHTML = `
-    <div class="umb"><h6><i class="bi bi-file-earmark-plus" style="color:#0369a1"></i> Créditos ingresados · pondera ${Math.round(p.pond_creditos*100)}%</h6>
+    <div class="umb"><h6><i class="bi bi-check2-circle" style="color:#0369a1"></i> Créditos otorgados · pondera ${Math.round(p.pond_creditos*100)}%</h6>
       <div class="fila"><span>Mínimo</span><b>${p.creditos_min}</b></div><div class="fila"><span>Esperado</span><b>${p.creditos_esperado}</b></div></div>
     <div class="umb"><h6><i class="bi bi-cash-coin" style="color:#15803d"></i> Montos aprobados · pondera ${Math.round(p.pond_montos*100)}%</h6>
       <div class="fila"><span>Mínimo</span><b>${clp(p.min_montos)}</b></div><div class="fila"><span>Esperado</span><b>${clp(p.esperado_montos)}</b></div></div>
@@ -233,14 +234,14 @@ async function cargarBSC(){
 
   const filas = DATA.ejecutivos.map((f,i)=>`<tr>
     <td>${i+1}</td><td class="nom"><b>${esc(f.ejecutivo)}</b></td>
-    <td class="grp-c">${f.ingresados}</td><td class="grp-c ptj">${n2(f.ptj_creditos)}</td>
+    <td class="grp-c">${f.otorgados}</td><td class="grp-c ptj">${n2(f.ptj_creditos)}</td>
     <td class="grp-m">${clp(f.monto_aprobado)}</td><td class="grp-m ptj">${n2(f.ptj_montos)}</td>
     <td class="grp-d">${f.dealers_nuevos}</td><td class="grp-d ptj">${n2(f.ptj_dealers)}</td>
     <td class="score">${n2(f.score)}</td></tr>`).join('');
   const a = DATA.promedio;
   tb.innerHTML = (filas || '<tr><td colspan="9" class="no-data">Sin ejecutivos comerciales activos</td></tr>') + `
     <tr class="prom"><td></td><td class="nom"><i class="bi bi-people-fill me-1"></i>PROMEDIO DEL EQUIPO</td>
-    <td class="grp-c">${n2(a.ingresados)}</td><td class="grp-c ptj">${n2(a.ptj_creditos)}</td>
+    <td class="grp-c">${n2(a.otorgados)}</td><td class="grp-c ptj">${n2(a.ptj_creditos)}</td>
     <td class="grp-m">${clp(a.monto_aprobado)}</td><td class="grp-m ptj">${n2(a.ptj_montos)}</td>
     <td class="grp-d">${n2(a.dealers_nuevos)}</td><td class="grp-d ptj">${n2(a.ptj_dealers)}</td>
     <td class="score">${n2(a.score)}</td></tr>`;
@@ -266,17 +267,38 @@ function toggleInforme(){
 
 /* ── Variables (restringido) ── */
 const VKEYS = ['creditos_min','creditos_esperado','pond_creditos','monto_por_op','pond_montos','dealers_min','dealers_esperado','pond_dealers','score_min','score_max','pct_variable','k','sueldo_fijo','factor_semana'];
+const PESO_KEYS = new Set(['monto_por_op','sueldo_fijo']);
+const PCT_KEYS  = new Set(['pond_creditos','pond_montos','pond_dealers','pct_variable','factor_semana']); // factor_semana se guarda como factor (0,1667) pero se muestra en %
+const parsePeso = v => Math.round(Number(String(v??'').replace(/[^\d]/g,''))||0);
+const parsePct  = v => Number(String(v??'').replace(/[^\d,.-]/g,'').replace(/\./g,'').replace(',','.'))||0;
+function fmtPesoIn(el){ el.value = clp(parsePeso(el.value)); }
+function fmtPctIn(el){ el.value = n2(parsePct(el.value))+'%'; }
 async function cargarVars(){
   const j = await (await fetch('/api/bono-jefe/variables',{headers:H()})).json();
   if (!j.success) return;
-  const map = {}; j.data.forEach(r=>map[r.clave]=r.valor);
-  VKEYS.forEach(k=>{ const el=document.getElementById('v_'+k); if(el) el.value = map[k] ?? ''; });
+  const map = {}; j.data.forEach(r=>map[r.clave]=parseFloat(r.valor));
+  VKEYS.forEach(k=>{
+    const el=document.getElementById('v_'+k); if(!el) return;
+    const v = map[k];
+    if (v==null || !Number.isFinite(v)) { el.value=''; return; }
+    if (PESO_KEYS.has(k)) el.value = clp(v);
+    else if (k==='factor_semana') el.value = n2(v*100)+'%';
+    else if (PCT_KEYS.has(k)) el.value = n2(v)+'%';
+    else el.value = v;
+  });
 }
 async function guardarVars(){
-  const variables = {}; VKEYS.forEach(k=>{ const el=document.getElementById('v_'+k); if(el && el.value!=='') variables[k]=el.value; });
+  const variables = {};
+  VKEYS.forEach(k=>{
+    const el=document.getElementById('v_'+k); if(!el || el.value==='') return;
+    if (PESO_KEYS.has(k)) variables[k] = parsePeso(el.value);
+    else if (k==='factor_semana') variables[k] = parsePct(el.value)/100;   // 16,67% → 0,1667
+    else if (PCT_KEYS.has(k)) variables[k] = parsePct(el.value);
+    else variables[k] = String(el.value).replace(',','.');
+  });
   const j = await (await fetch('/api/bono-jefe/variables',{method:'PUT',headers:H(),body:JSON.stringify({variables})})).json();
   if (!j.success) return alert(j.error||'No se pudo guardar');
-  toast('✓ Variables guardadas'); cargarCurva(); cargarBSC();
+  toast('✓ Variables guardadas'); cargarVars(); cargarCurva(); cargarBSC();
 }
 async function cargarCurva(){
   const j = await (await fetch('/api/bono-jefe/curva',{headers:H()})).json();
@@ -287,6 +309,43 @@ async function cargarCurva(){
       <td>${pct2(f.pct_adicional)}</td><td>${clp(f.variable)}</td>
       <td>${clp(f.semana_corrida)}</td><td>${clp(f.total_variable)}</td>
       <td style="font-weight:700">${clp(f.renta_total)}</td></tr>`).join('');
+  dibujarCurva(j.data);
+}
+
+/* ── Gráfico de la curva (SVG): premio vs score ── */
+function dibujarCurva(data){
+  const filas = data.filas, cfg = data.cfg;
+  if (!filas.length) return;
+  const W=980, Hh=340, mL=90, mR=20, mT=24, mB=44;
+  const xMin = filas[0].score, xMax = filas[filas.length-1].score;
+  const yMax = Math.max(...filas.map(f=>f.total_variable)) * 1.08 || 1;
+  const X = s => mL + (s-xMin)/(xMax-xMin) * (W-mL-mR);
+  const Y = v => Hh-mB - (v/yMax) * (Hh-mT-mB);
+  const path = (key,color,ancho) => `<path d="${filas.map((f,i)=>(i?'L':'M')+X(f.score).toFixed(1)+' '+Y(f[key]).toFixed(1)).join(' ')}" fill="none" stroke="${color}" stroke-width="${ancho}" stroke-linejoin="round"/>`;
+  let grid='';
+  for (let i=0;i<=4;i++){
+    const v = yMax/4*i, y = Y(v);
+    grid += `<line x1="${mL}" y1="${y}" x2="${W-mR}" y2="${y}" stroke="#e2e8f0" stroke-dasharray="3 3"/>
+             <text x="${mL-8}" y="${y+4}" text-anchor="end" font-size="11" fill="#64748b">${clp(v)}</text>`;
+  }
+  let ejeX='';
+  for (let s2=Math.ceil(xMin/5)*5; s2<=xMax; s2+=5)
+    ejeX += `<text x="${X(s2)}" y="${Hh-mB+18}" text-anchor="middle" font-size="11" fill="#64748b">${s2}</text>`;
+  const xm = X(cfg.score_min);
+  const marcaMin = `<line x1="${xm}" y1="${mT}" x2="${xm}" y2="${Hh-mB}" stroke="#f59e0b" stroke-width="1.5" stroke-dasharray="5 4"/>
+    <text x="${xm+5}" y="${mT+12}" font-size="11" fill="#b45309" font-weight="700">mínimo ${cfg.score_min}</text>`;
+  document.getElementById('curvaChart').innerHTML = `
+    <svg viewBox="0 0 ${W} ${Hh}" style="width:100%;height:auto">
+      ${grid}${ejeX}${marcaMin}
+      ${path('total_variable','#009AFE',2)}
+      ${path('variable','#0141A2',3)}
+      <line x1="${mL}" y1="${Hh-mB}" x2="${W-mR}" y2="${Hh-mB}" stroke="#94a3b8"/>
+      <text x="${(mL+W-mR)/2}" y="${Hh-6}" text-anchor="middle" font-size="12" fill="#334155" font-weight="700">Score del equipo</text>
+      <g font-size="12">
+        <rect x="${mL+10}" y="${mT}" width="14" height="4" fill="#0141A2"/><text x="${mL+30}" y="${mT+5}" fill="#334155">Premio variable</text>
+        <rect x="${mL+160}" y="${mT}" width="14" height="4" fill="#009AFE"/><text x="${mL+180}" y="${mT+5}" fill="#334155">Total variable (con semana corrida)</text>
+      </g>
+    </svg>`;
 }
 
 /* ── Init ── */
