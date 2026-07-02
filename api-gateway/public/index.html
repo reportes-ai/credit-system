@@ -913,7 +913,7 @@ initClima();
 async function initIndicadores() {
   try {
     const H = { Authorization: 'Bearer ' + sessionStorage.getItem('token') };
-    const clp = n => '$' + Math.round(Number(n)).toLocaleString('es-CL');
+    const clp = n => '$' + Number(n).toLocaleString('es-CL', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
     const pct = n => Number(n).toLocaleString('es-CL', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + '%';
     const [uf, tasas] = await Promise.all([
       fetch('/api/uf/vigente', { headers: H }).then(r => r.json()).catch(() => null),
