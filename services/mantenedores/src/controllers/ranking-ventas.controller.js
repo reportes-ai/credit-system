@@ -21,6 +21,7 @@ const { auditar } = require('../../../../shared/audit');
       ['activo', '1'],
       ['dia', '1'],                 // día del mes en que aparece
       ['habil_siguiente', '1'],     // si cae sábado/domingo corre al hábil siguiente
+      ['hora', '12:00'],            // hora (Chile) desde la que aparece el primer día
       ['dias_visible', '5'],        // ventana de días en que se sigue mostrando
       ['musica', '1'],
       ['melodia', 'rocky'],        // rocky | corta | olimpica | epica
@@ -53,6 +54,9 @@ async function getConfig() {
 const tpl = (t, vars) => String(t || '').replace(/\{(\w+)\}/g, (_, k) => (vars[k] != null ? vars[k] : ''));
 function hoyChile() {
   return new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Santiago', year: 'numeric', month: '2-digit', day: '2-digit' }).format(new Date());
+}
+function horaChile() { // "HH:MM" en Chile
+  return new Intl.DateTimeFormat('en-GB', { timeZone: 'America/Santiago', hour: '2-digit', minute: '2-digit', hour12: false }).format(new Date());
 }
 const MESES = ['enero', 'febrero', 'marzo', 'abril', 'mayo', 'junio', 'julio', 'agosto', 'septiembre', 'octubre', 'noviembre', 'diciembre'];
 
@@ -89,6 +93,9 @@ const popup = async (req, res) => {
       const fin = new Date(ini); fin.setDate(fin.getDate() + Math.max(1, parseInt(cfg.dias_visible || '5', 10)) - 1);
       const hoyD = new Date(hoy + 'T12:00:00');
       if (hoyD < ini || hoyD > fin) return res.json({ success: true, data: { mostrar: false }, error: null });
+      // El PRIMER día aparece recién desde la hora configurada (deja la mañana para ajustes)
+      const hora = /^\d{2}:\d{2}$/.test(cfg.hora || '') ? cfg.hora : '12:00';
+      if (hoyD.getTime() === ini.getTime() && horaChile() < hora) return res.json({ success: true, data: { mostrar: false }, error: null });
     }
     const { mesAnt, label, top } = await top3MesAnterior(hoy);
     if (!top.length) return res.json({ success: true, data: { mostrar: false }, error: null });
@@ -107,7 +114,7 @@ const getConfigApi = async (req, res) => {
 const setConfigApi = async (req, res) => {
   try {
     const b = req.body || {};
-    const PERMITIDAS = ['activo', 'dia', 'habil_siguiente', 'dias_visible', 'musica', 'melodia', 'titulo', 'subtitulo'];
+    const PERMITIDAS = ['activo', 'dia', 'habil_siguiente', 'hora', 'dias_visible', 'musica', 'melodia', 'titulo', 'subtitulo'];
     for (const [k, v] of Object.entries(b)) {
       if (!PERMITIDAS.includes(k)) continue;
       await pool.query('INSERT INTO rank_config (clave, valor) VALUES (?,?) ON DUPLICATE KEY UPDATE valor=VALUES(valor)', [k, String(v == null ? '' : v)]);

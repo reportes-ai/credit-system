@@ -53,8 +53,9 @@
       <div class="col-md-6" style="display:flex;align-items:flex-end;padding-bottom:14px"><button class="btn-test" onclick="escuchar()"><i class="bi bi-volume-up me-1"></i>Escuchar melodía</button></div>
     </div>
     <div class="row">
-      <div class="col-md-6"><div class="fld"><label>Día del mes en que aparece</label><input type="number" id="dia" min="1" max="28"><div class="hint">El podio muestra el mes ANTERIOR completo.</div></div></div>
-      <div class="col-md-6"><div class="fld"><label>Días de vigencia</label><input type="number" id="dias_visible" min="1" max="20"><div class="hint">Se sigue mostrando N días a quienes no se habían conectado (1 vez por mes por persona/navegador).</div></div></div>
+      <div class="col-md-4"><div class="fld"><label>Día del mes en que aparece</label><input type="number" id="dia" min="1" max="28"><div class="hint">El podio muestra el mes ANTERIOR completo. Si cae fin de semana, corre al hábil siguiente.</div></div></div>
+      <div class="col-md-4"><div class="fld"><label>Hora desde la que aparece</label><input type="time" id="hora"><div class="hint">Solo el primer día: deja la mañana libre para ajustes. Los días siguientes aparece a cualquier hora.</div></div></div>
+      <div class="col-md-4"><div class="fld"><label>Días de vigencia</label><input type="number" id="dias_visible" min="1" max="20"><div class="hint">Se sigue mostrando N días a quienes no se habían conectado (1 vez por mes por persona/navegador).</div></div></div>
     </div>
     <div class="fld"><label>Título</label><input id="titulo"><div class="hint">Usa {mes} para el nombre del mes rankeado (ej. JUNIO 2026).</div></div>
     <div class="fld"><label>Subtítulo</label><input id="subtitulo"></div>
@@ -81,7 +82,7 @@
   document.getElementById('navNombre').textContent=`${yo?.nombre||''} ${yo?.apellido||''}`.trim();
   function logout(){ sessionStorage.clear(); location.href='/login.html'; }
   const H={Authorization:'Bearer '+token}, HJ={...H,'Content-Type':'application/json'};
-  const CHECKS=['activo','habil_siguiente','musica'], TEXTOS=['dia','dias_visible','melodia','titulo','subtitulo'];
+  const CHECKS=['activo','habil_siguiente','musica'], TEXTOS=['dia','hora','dias_visible','melodia','titulo','subtitulo'];
   async function cargar(){
     const j=await(await fetch('/api/ranking-ventas/config',{headers:H})).json(); const c=j.data||{};
     CHECKS.forEach(k=>{ const el=document.getElementById(k); if(el) el.checked=c[k]==='1'; });
