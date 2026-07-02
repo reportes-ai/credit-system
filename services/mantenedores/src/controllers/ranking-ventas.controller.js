@@ -71,9 +71,9 @@ async function top3MesAnterior(hoy) {
   const mesAnt = `${base.getFullYear()}-${String(base.getMonth() + 1).padStart(2, '0')}-01`;
   const label = MESES[base.getMonth()] + ' ' + base.getFullYear();
   const [rows] = await pool.query(
-    "SELECT ejecutivo, COUNT(*) n FROM creditos WHERE mes=? AND UPPER(COALESCE(estado,''))='OTORGADO' AND ejecutivo IS NOT NULL AND ejecutivo<>'' GROUP BY ejecutivo ORDER BY n DESC, ejecutivo ASC LIMIT 3",
+    "SELECT ejecutivo, COUNT(*) n, SUM(COALESCE(monto_financiado,0)) monto FROM creditos WHERE mes=? AND UPPER(COALESCE(estado,''))='OTORGADO' AND ejecutivo IS NOT NULL AND ejecutivo<>'' GROUP BY ejecutivo ORDER BY n DESC, monto DESC, ejecutivo ASC LIMIT 3",
     [mesAnt]);
-  return { mesAnt, label, top: rows.map(r => ({ nombre: r.ejecutivo, n: r.n })) };
+  return { mesAnt, label, top: rows.map(r => ({ nombre: r.ejecutivo, n: r.n, monto: Math.round(Number(r.monto) || 0) })) };
 }
 
 /* GET /api/ranking-ventas/popup — ¿corresponde mostrar el podio hoy? (cualquier usuario) */

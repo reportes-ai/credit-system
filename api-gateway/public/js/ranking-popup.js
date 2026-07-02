@@ -34,19 +34,27 @@
         o.connect(g); g.connect(out); o.start(t0); o.stop(t0 + 0.32);
       }
       let t = ctx.currentTime + 0.08; const q = 0.30; // negra ~100bpm épico
-      // Motivo 1: da-da-daaa (x2 subiendo) — el gancho del tema
+      // ── Intro: el "da-da-daaa" característico, x2 subiendo ──
       trumpet(N.A3, t, q * 0.45); trumpet(N.C4, t + q * 0.5, q * 0.45); trumpet(N.D4, t + q, q * 1.7, 0.2); timbal(t);
       t += q * 3;
       trumpet(N.D4, t, q * 0.45); trumpet(N.F4, t + q * 0.5, q * 0.45); trumpet(N.G4, t + q, q * 1.7, 0.2); timbal(t);
       t += q * 3;
-      // Motivo 2: escalada al clímax
-      trumpet(N.G4, t, q * 0.45); trumpet(N.A4, t + q * 0.5, q * 0.45); trumpet(N.Bb4, t + q, q * 0.9, 0.19);
-      trumpet(N.C5, t + q * 2, q * 0.9, 0.2); timbal(t + q * 2);
+      // ── Tema "Gonna fly now": mi-sol-la… mi-sol-la (el gancho cantado) ──
+      trumpet(N.E4, t, q * 0.55); trumpet(N.G4, t + q * 0.66, q * 0.55); trumpet(N.A4, t + q * 1.33, q * 1.4, 0.19); timbal(t);
       t += q * 3;
-      // Clímax: acorde de fanfarria sostenido (F mayor arriba)
-      [N.F4, N.A4, N.C5, N.F5].forEach(f => trumpet(f, t, q * 4.2, 0.12));
-      timbal(t); timbal(t + q); timbal(t + q * 2);
-      setTimeout(() => ctx.close(), 6500);
+      trumpet(N.E4, t, q * 0.55); trumpet(N.G4, t + q * 0.66, q * 0.55); trumpet(N.A4, t + q * 1.33, q * 0.8, 0.19);
+      trumpet(N.C5, t + q * 2.2, q * 1.2, 0.2); timbal(t); timbal(t + q * 2.2);
+      t += q * 3.6;
+      // ── Escalada al clímax ──
+      trumpet(N.G4, t, q * 0.45); trumpet(N.A4, t + q * 0.5, q * 0.45); trumpet(N.Bb4, t + q, q * 0.9, 0.19);
+      trumpet(N.C5, t + q * 2, q * 0.5, 0.2); trumpet(N.D5, t + q * 2.6, q * 0.5, 0.2); timbal(t + q * 2);
+      t += q * 3.4;
+      // ── Clímax: acorde de fanfarria sostenido + remate ──
+      [N.F4, N.A4, N.C5, N.F5].forEach(f => trumpet(f, t, q * 4.5, 0.12));
+      timbal(t); timbal(t + q); timbal(t + q * 2); timbal(t + q * 3);
+      t += q * 5;
+      trumpet(N.F5, t, q * 2.4, 0.2); timbal(t); // nota final triunfal
+      setTimeout(() => ctx.close(), 11000);
       return true;
     } catch (e) { return false; }
   }
@@ -69,7 +77,8 @@
       '<div style="display:flex;flex-direction:column;align-items:center;justify-content:flex-end;animation:afRkSube .8s ease ' + delay + 's both">' +
       '<div style="font-size:' + (lugar === 1 ? 64 : 46) + 'px;line-height:1;animation:afRkCopa .9s cubic-bezier(.18,.89,.32,1.4) ' + (delay + 0.5) + 's both">' + copa + '</div>' +
       '<div style="font-weight:900;font-size:' + (lugar === 1 ? '1.05rem' : '.88rem') + ';margin:8px 6px 2px;text-align:center;max-width:170px">' + esc(p.nombre) + '</div>' +
-      '<div style="font-size:.8rem;opacity:.85;margin-bottom:10px">' + p.n + ' crédito' + (p.n === 1 ? '' : 's') + '</div>' +
+      '<div style="font-size:.8rem;opacity:.85">' + p.n + ' crédito' + (p.n === 1 ? '' : 's') + '</div>' +
+      (p.monto ? '<div style="font-size:.76rem;font-weight:700;color:#ffd740;margin:2px 0 10px">$ ' + Math.round(p.monto).toLocaleString('es-CL') + '</div>' : '<div style="margin-bottom:10px"></div>') +
       '<div style="width:120px;height:' + alto + 'px;background:linear-gradient(180deg,' + color + ',rgba(255,255,255,.08));border-radius:10px 10px 0 0;display:flex;align-items:center;justify-content:center;font-size:2rem;font-weight:900;color:rgba(0,0,0,.35)">' + lugar + '</div></div>'
     ) : '<div style="width:120px"></div>';
     const ov = document.createElement('div');
@@ -95,7 +104,7 @@
     if (d.musica) fanfarria(); // si el navegador bloquea el audio, suena al hacer clic
     let sono = false;
     document.getElementById('afRankBtn').onclick = function () {
-      if (d.musica && !sono) { sono = true; fanfarria(); this.textContent = '🎺 ¡A romperla este mes!'; setTimeout(() => ov.remove(), 6800); return; }
+      if (d.musica && !sono) { sono = true; fanfarria(); this.textContent = '🎺 ¡A romperla este mes!'; setTimeout(() => ov.remove(), 11500); return; }
       ov.remove();
     };
   }
