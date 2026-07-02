@@ -52,7 +52,10 @@
     <div class="switch-row"><input type="checkbox" id="cumple_campana_activo" class="form-check-input"> Aviso activo</div>
     <div class="fld"><label>Título del aviso</label><input id="cumple_aviso_titulo"><div class="hint">Usa {nombre} para el nombre y {lo} para lo/la según el sexo (ej. saludar{lo} → saludarlo/saludarla).</div></div>
     <div class="fld"><label>Mensaje</label><input id="cumple_aviso_msg"></div>
+    <div class="fld"><label>Mensaje atrasado (cumpleaños en fin de semana/feriado)</label><input id="cumple_aviso_tarde"><div class="hint">Variables: {nombre} {lo} {dia} (día de la semana del cumpleaños, ej. "sábado").</div></div>
+    <div class="fld" style="max-width:280px"><label>Tope de días para saludar atrasado</label><input type="number" id="cumple_dias_tope" min="0" max="14"><div class="hint">Si no se conectó el día del cumpleaños, se saluda hasta N días después.</div></div>
     <button class="btn-test" onclick="probarBanner()"><i class="bi bi-megaphone me-1"></i>Probar banner</button>
+    <button class="btn-test" onclick="probarBannerTarde()"><i class="bi bi-megaphone me-1"></i>Probar banner atrasado</button>
   </div>
 
   <div class="card-box">
@@ -86,7 +89,7 @@
   function logout(){ sessionStorage.clear(); location.href='/login.html'; }
   const H={Authorization:'Bearer '+token}, HJ={...H,'Content-Type':'application/json'};
   const CAMPOS=['cumple_popup_activo','cumple_musica','cumple_campana_activo'];
-  const TEXTOS=['cumple_titulo','cumple_linea1','cumple_linea2','cumple_aviso_titulo','cumple_aviso_msg','cert_min_meses','cert_cooldown_dias','cert_cuerpo','cert_cierre'];
+  const TEXTOS=['cumple_titulo','cumple_linea1','cumple_linea2','cumple_aviso_titulo','cumple_aviso_msg','cumple_aviso_tarde','cumple_dias_tope','cert_min_meses','cert_cooldown_dias','cert_cuerpo','cert_cierre'];
   async function cargar(){
     const j=await(await fetch('/api/rrhh/config',{headers:H})).json(); const c=j.data||{};
     CAMPOS.forEach(k=>{ const el=document.getElementById(k); if(el) el.checked=c[k]==='1'; });
@@ -112,6 +115,13 @@
     const nombre='Juan Pérez';
     const rep=s=>s.replace(/\{nombre\}/g,nombre).replace(/\{lo\}/g,'lo');
     const texto=rep(document.getElementById('cumple_aviso_titulo').value)+' '+rep(document.getElementById('cumple_aviso_msg').value);
+    lanzarBanner(texto);
+  }
+  function probarBannerTarde(){
+    const texto=document.getElementById('cumple_aviso_tarde').value.replace(/\{nombre\}/g,'Juan Pérez').replace(/\{lo\}/g,'lo').replace(/\{dia\}/g,'sábado');
+    lanzarBanner(texto);
+  }
+  function lanzarBanner(texto){
     const go=()=>window.AF_CUMPLE_BANNER(texto);
     if(window.AF_CUMPLE_BANNER) return go();
     const s=document.createElement('script'); s.src='/js/cumple-popup.js'; s.onload=go; document.head.appendChild(s);

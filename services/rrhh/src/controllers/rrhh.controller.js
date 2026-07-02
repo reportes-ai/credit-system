@@ -99,6 +99,8 @@ const { notificar } = require('../../../notificaciones/src/controllers/notificac
       ['cumple_linea2', 'Te desean tus compañeros de AutoFácil'],
       ['cumple_aviso_titulo', '🎂 ¡Hoy está de cumpleaños {nombre}!'],
       ['cumple_aviso_msg', 'No olvides saludar{lo} y desearle un gran día.'],
+      ['cumple_aviso_tarde', '🎂 Recuerda que {nombre} estuvo de cumpleaños el {dia}. ¡No olvides saludar{lo}!'],
+      ['cumple_dias_tope', '3'],
     ];
     for (const [k, v] of defaults) await pool.query('INSERT IGNORE INTO rh_config (clave, valor) VALUES (?,?)', [k, v]);
   } catch (e) { console.error('[rh_config migration]', e.message); }
@@ -282,7 +284,7 @@ const getConfigApi = async (req, res) => {
 const setConfigApi = async (req, res) => {
   try {
     const b = req.body || {};
-    const PERMITIDAS = ['cert_min_meses', 'cert_cooldown_dias', 'cert_cuerpo', 'cert_cierre', 'cumple_popup_activo', 'cumple_campana_activo', 'cumple_musica', 'cumple_titulo', 'cumple_linea1', 'cumple_linea2', 'cumple_aviso_titulo', 'cumple_aviso_msg'];
+    const PERMITIDAS = ['cert_min_meses', 'cert_cooldown_dias', 'cert_cuerpo', 'cert_cierre', 'cumple_popup_activo', 'cumple_campana_activo', 'cumple_musica', 'cumple_titulo', 'cumple_linea1', 'cumple_linea2', 'cumple_aviso_titulo', 'cumple_aviso_msg', 'cumple_aviso_tarde', 'cumple_dias_tope'];
     for (const [k, v] of Object.entries(b)) {
       if (!PERMITIDAS.includes(k)) continue;
       await pool.query('INSERT INTO rh_config (clave, valor) VALUES (?,?) ON DUPLICATE KEY UPDATE valor=VALUES(valor)', [k, String(v == null ? '' : v)]);
@@ -376,24 +378,46 @@ const listarEmpleados = async (req, res) => {
 };
 
 /* ════════════ CUMPLEAÑOS ════════════ */
-// ¿Está de cumpleaños HOY el usuario logueado? (para el popup global)
+/* Cumpleaños dentro de la ventana [hoy - tope, hoy]: si cayó sábado/domingo/feriado
+   y la persona no se conectó, se saluda igual la próxima vez, con tope de N días. */
+async function cumplesEnVentana(tope, soloId) {
+  const hoy = hoyChile();
+  const fechas = []; // [{iso, dias}]
+  for (let d = 0; d <= tope; d++) {
+    const f = new Date(hoy + 'T12:00:00'); f.setDate(f.getDate() - d);
+    fechas.push({ iso: isoFecha(f), dias: d });
+  }
+  const params = []; let extra = '';
+  if (soloId) { extra = ' AND id_usuario=?'; params.push(soloId); }
+  const [rows] = await pool.query(
+    `SELECT id_usuario, CONCAT_WS(' ', nombre, apellido) nombre, nombre nombre_pila, sexo, fecha_nacimiento
+       FROM usuarios WHERE fecha_nacimiento IS NOT NULL AND estado='activo'${extra} LIMIT 600`, params);
+  const out = [];
+  for (const r of rows) {
+    const fn = isoFecha(r.fecha_nacimiento); // YYYY-MM-DD
+    const hit = fechas.find(f => f.iso.slice(5) === fn.slice(5)); // match mes-día
+    if (hit) out.push({ ...r, fecha_cumple: hit.iso, dias: hit.dias });
+  }
+  return out;
+}
+const diaSemanaCL = iso => new Date(iso + 'T12:00:00').toLocaleDateString('es-CL', { weekday: 'long' });
+
+// ¿Estuvo/está de cumpleaños el usuario logueado? (para el popup global)
 const cumpleEstado = async (req, res) => {
   try {
     const u = req.usuario || {}; const cfg = await getConfig();
-    const hoy = hoyChile();
-    let esCumple = false, nombre = '';
+    const tope = Math.max(0, parseInt(cfg.cumple_dias_tope || '3', 10));
+    let hit = null;
     if (String(req.query.test || '') === '1' && (await esRRHH(u.id_usuario))) {
-      esCumple = true; nombre = (u.nombre || '').trim() || 'Colaborador';
+      hit = { nombre_pila: (u.nombre || '').trim() || 'Colaborador', fecha_cumple: hoyChile(), dias: 0 };
     } else if (cfg.cumple_popup_activo === '1') {
-      const [[row]] = await pool.query(
-        "SELECT nombre FROM usuarios WHERE id_usuario=? AND fecha_nacimiento IS NOT NULL AND MONTH(fecha_nacimiento)=MONTH(?) AND DAY(fecha_nacimiento)=DAY(?) AND estado='activo' LIMIT 1",
-        [u.id_usuario, hoy, hoy]);
-      if (row) { esCumple = true; nombre = row.nombre; }
+      const matches = await cumplesEnVentana(tope, u.id_usuario);
+      hit = matches[0] || null;
     }
-    if (!esCumple) return res.json({ success: true, data: { es_cumple: false }, error: null });
+    if (!hit) return res.json({ success: true, data: { es_cumple: false }, error: null });
     res.json({ success: true, data: {
-      es_cumple: true, fecha: hoy,
-      titulo: tpl(cfg.cumple_titulo, { nombre: (nombre || '').toUpperCase() }),
+      es_cumple: true, fecha: hit.fecha_cumple, // el cliente dedupea por CUMPLEAÑOS, no por día
+      titulo: tpl(cfg.cumple_titulo, { nombre: (hit.nombre_pila || '').toUpperCase() }),
       linea1: cfg.cumple_linea1 || '', linea2: cfg.cumple_linea2 || '',
       musica: cfg.cumple_musica === '1',
     }, error: null });
@@ -407,13 +431,14 @@ const cumpleHoy = async (req, res) => {
   try {
     const u = req.usuario || {}; const cfg = await getConfig();
     if (cfg.cumple_campana_activo !== '1') return res.json({ success: true, data: { avisos: [] }, error: null });
-    const hoy = hoyChile();
-    const [cumps] = await pool.query(
-      "SELECT id_usuario, CONCAT_WS(' ', nombre, apellido) nombre, sexo FROM usuarios WHERE fecha_nacimiento IS NOT NULL AND MONTH(fecha_nacimiento)=MONTH(?) AND DAY(fecha_nacimiento)=DAY(?) AND estado='activo' AND id_usuario<>? LIMIT 20",
-      [hoy, hoy, u.id_usuario || 0]);
+    const tope = Math.max(0, parseInt(cfg.cumple_dias_tope || '3', 10));
+    const cumps = (await cumplesEnVentana(tope)).filter(c => c.id_usuario !== (u.id_usuario || 0));
     const avisos = cumps.map(c => {
-      const vars = { nombre: c.nombre, lo: c.sexo === 'F' ? 'la' : 'lo' }; // saludar{lo} → saludarlo/saludarla
-      return { id: c.id_usuario, fecha: hoy, texto: tpl(cfg.cumple_aviso_titulo, vars) + ' ' + tpl(cfg.cumple_aviso_msg, vars) };
+      const vars = { nombre: c.nombre, lo: c.sexo === 'F' ? 'la' : 'lo', dia: diaSemanaCL(c.fecha_cumple) };
+      const texto = c.dias === 0
+        ? tpl(cfg.cumple_aviso_titulo, vars) + ' ' + tpl(cfg.cumple_aviso_msg, vars)
+        : tpl(cfg.cumple_aviso_tarde, vars); // "Recuerda que {nombre} estuvo de cumpleaños el {dia}…"
+      return { id: c.id_usuario, fecha: c.fecha_cumple, texto }; // dedup por cumpleaños, no por día
     });
     res.json({ success: true, data: { avisos }, error: null });
   } catch (e) { res.status(500).json({ success: false, data: { avisos: [] }, error: 'Error' }); }

@@ -75,12 +75,16 @@
   async function check() {
     try {
       const token = sessionStorage.getItem('token'); if (!token) return;
-      if (localStorage.getItem(hoyKey())) return; // ya se mostró hoy
+      if (localStorage.getItem(hoyKey())) return; // atajo: ya consultado/mostrado hoy
       const r = await fetch('/api/rrhh/cumple/estado', { headers: { Authorization: 'Bearer ' + token } });
       if (!r.ok) return;
       const j = await r.json(); const d = (j && j.data) || {};
       if (!d.es_cumple) return;
-      localStorage.setItem(hoyKey(), '1');
+      // Dedup por CUMPLEAÑOS (d.fecha): si cayó en fin de semana se saluda la próxima
+      // conexión dentro del tope, pero una sola vez por cumpleaños.
+      const k = 'afCumpleVisto_' + d.fecha;
+      if (localStorage.getItem(k)) return;
+      localStorage.setItem(k, '1'); localStorage.setItem(hoyKey(), '1');
       mostrar(d);
     } catch (e) { /* silencioso */ }
   }
