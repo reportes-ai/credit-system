@@ -9,8 +9,12 @@
   'use strict';
   if (window.__AF_RANKING__) return; window.__AF_RANKING__ = true;
 
-  /* Fanfarria de trompetas estilo "Gonna Fly Now" (aproximación sintetizada) */
-  function fanfarria() {
+  /* Fanfarrias sintetizadas (WebAudio). Melodías disponibles:
+     rocky     — tema estilo "Gonna Fly Now" extendido (~11s)
+     corta     — fanfarria breve de trompetas (~6s, la original)
+     olimpica  — estilo fanfarria olímpica / Bugler's Dream (~9s)
+     epica     — himno de campeones, acordes ascendentes (~9s) */
+  function fanfarria(melodia) {
     try {
       const ctx = new (window.AudioContext || window.webkitAudioContext)();
       const out = ctx.createGain(); out.gain.value = 0.9; out.connect(ctx.destination);
@@ -34,27 +38,59 @@
         o.connect(g); g.connect(out); o.start(t0); o.stop(t0 + 0.32);
       }
       let t = ctx.currentTime + 0.08; const q = 0.30; // negra ~100bpm épico
-      // ── Intro: el "da-da-daaa" característico, x2 subiendo ──
-      trumpet(N.A3, t, q * 0.45); trumpet(N.C4, t + q * 0.5, q * 0.45); trumpet(N.D4, t + q, q * 1.7, 0.2); timbal(t);
-      t += q * 3;
-      trumpet(N.D4, t, q * 0.45); trumpet(N.F4, t + q * 0.5, q * 0.45); trumpet(N.G4, t + q, q * 1.7, 0.2); timbal(t);
-      t += q * 3;
-      // ── Tema "Gonna fly now": mi-sol-la… mi-sol-la (el gancho cantado) ──
-      trumpet(N.E4, t, q * 0.55); trumpet(N.G4, t + q * 0.66, q * 0.55); trumpet(N.A4, t + q * 1.33, q * 1.4, 0.19); timbal(t);
-      t += q * 3;
-      trumpet(N.E4, t, q * 0.55); trumpet(N.G4, t + q * 0.66, q * 0.55); trumpet(N.A4, t + q * 1.33, q * 0.8, 0.19);
-      trumpet(N.C5, t + q * 2.2, q * 1.2, 0.2); timbal(t); timbal(t + q * 2.2);
-      t += q * 3.6;
-      // ── Escalada al clímax ──
-      trumpet(N.G4, t, q * 0.45); trumpet(N.A4, t + q * 0.5, q * 0.45); trumpet(N.Bb4, t + q, q * 0.9, 0.19);
-      trumpet(N.C5, t + q * 2, q * 0.5, 0.2); trumpet(N.D5, t + q * 2.6, q * 0.5, 0.2); timbal(t + q * 2);
-      t += q * 3.4;
-      // ── Clímax: acorde de fanfarria sostenido + remate ──
-      [N.F4, N.A4, N.C5, N.F5].forEach(f => trumpet(f, t, q * 4.5, 0.12));
-      timbal(t); timbal(t + q); timbal(t + q * 2); timbal(t + q * 3);
-      t += q * 5;
-      trumpet(N.F5, t, q * 2.4, 0.2); timbal(t); // nota final triunfal
-      setTimeout(() => ctx.close(), 11000);
+      let cierre = 11000;
+      const m = melodia || 'rocky';
+      if (m === 'corta') {
+        // Fanfarria breve original: da-da-daaa x2 + escalada + acorde
+        trumpet(N.A3, t, q * 0.45); trumpet(N.C4, t + q * 0.5, q * 0.45); trumpet(N.D4, t + q, q * 1.7, 0.2); timbal(t);
+        t += q * 3;
+        trumpet(N.D4, t, q * 0.45); trumpet(N.F4, t + q * 0.5, q * 0.45); trumpet(N.G4, t + q, q * 1.7, 0.2); timbal(t);
+        t += q * 3;
+        trumpet(N.G4, t, q * 0.45); trumpet(N.A4, t + q * 0.5, q * 0.45); trumpet(N.Bb4, t + q, q * 0.9, 0.19);
+        trumpet(N.C5, t + q * 2, q * 0.9, 0.2); timbal(t + q * 2);
+        t += q * 3;
+        [N.F4, N.A4, N.C5, N.F5].forEach(f => trumpet(f, t, q * 4.2, 0.12));
+        timbal(t); timbal(t + q); timbal(t + q * 2);
+        cierre = 6500;
+      } else if (m === 'olimpica') {
+        // Estilo fanfarria olímpica (Bugler's Dream): llamada solemne de trompetas
+        const seq = [[N.C4, 1.5], [N.C4, 0.5], [N.C4, 1], [N.G4, 2], [N.E4, 1], [N.C4, 1], [N.G4, 2.6]];
+        for (const [f, d] of seq) { trumpet(f, t, q * d * 0.92, 0.2); timbal(t); t += q * d; }
+        t += q * 0.4;
+        const seq2 = [[N.C5, 0.75], [N.C5, 0.75], [N.C5, 0.5], [N.G4, 1], [N.A4, 1], [N.C5, 2.6]];
+        for (const [f, d] of seq2) { trumpet(f, t, q * d * 0.92, 0.2); t += q * d; }
+        [N.C4, N.E4, N.G4, N.C5].forEach(f => trumpet(f, t, q * 4, 0.12));
+        timbal(t); timbal(t + q * 1.5);
+        cierre = 9500;
+      } else if (m === 'epica') {
+        // Himno de campeones: acordes ascendentes con remate coral
+        const acordes = [[N.C4, N.E4, N.G4], [N.F4, N.A4, N.C5], [N.G4, N.Bb4, N.D5], [N.A4, N.C5, N.E5]];
+        for (const ac of acordes) { ac.forEach(f => trumpet(f, t, q * 1.9, 0.11)); timbal(t); t += q * 2; }
+        trumpet(N.C5, t, q * 0.7, 0.2); trumpet(N.D5, t + q * 0.8, q * 0.7, 0.2); timbal(t);
+        t += q * 1.8;
+        [N.F4, N.A4, N.C5, N.F5].forEach(f => trumpet(f, t, q * 5, 0.13));
+        timbal(t); timbal(t + q); timbal(t + q * 2); timbal(t + q * 3);
+        cierre = 9500;
+      } else {
+        // ── ROCKY: intro da-da-daaa x2 + gancho "gonna fly now" + clímax ──
+        trumpet(N.A3, t, q * 0.45); trumpet(N.C4, t + q * 0.5, q * 0.45); trumpet(N.D4, t + q, q * 1.7, 0.2); timbal(t);
+        t += q * 3;
+        trumpet(N.D4, t, q * 0.45); trumpet(N.F4, t + q * 0.5, q * 0.45); trumpet(N.G4, t + q, q * 1.7, 0.2); timbal(t);
+        t += q * 3;
+        trumpet(N.E4, t, q * 0.55); trumpet(N.G4, t + q * 0.66, q * 0.55); trumpet(N.A4, t + q * 1.33, q * 1.4, 0.19); timbal(t);
+        t += q * 3;
+        trumpet(N.E4, t, q * 0.55); trumpet(N.G4, t + q * 0.66, q * 0.55); trumpet(N.A4, t + q * 1.33, q * 0.8, 0.19);
+        trumpet(N.C5, t + q * 2.2, q * 1.2, 0.2); timbal(t); timbal(t + q * 2.2);
+        t += q * 3.6;
+        trumpet(N.G4, t, q * 0.45); trumpet(N.A4, t + q * 0.5, q * 0.45); trumpet(N.Bb4, t + q, q * 0.9, 0.19);
+        trumpet(N.C5, t + q * 2, q * 0.5, 0.2); trumpet(N.D5, t + q * 2.6, q * 0.5, 0.2); timbal(t + q * 2);
+        t += q * 3.4;
+        [N.F4, N.A4, N.C5, N.F5].forEach(f => trumpet(f, t, q * 4.5, 0.12));
+        timbal(t); timbal(t + q); timbal(t + q * 2); timbal(t + q * 3);
+        t += q * 5;
+        trumpet(N.F5, t, q * 2.4, 0.2); timbal(t);
+      }
+      setTimeout(() => ctx.close(), cierre);
       return true;
     } catch (e) { return false; }
   }
@@ -101,10 +137,10 @@
       s.style.cssText = 'position:absolute;top:-40px;left:' + (Math.random() * 100) + '%;font-size:' + (15 + Math.random() * 20) + 'px;animation:afRkCaer ' + (3 + Math.random() * 2.6) + 's linear ' + (Math.random() * 2.8) + 's infinite;pointer-events:none';
       ov.appendChild(s);
     }
-    if (d.musica) fanfarria(); // si el navegador bloquea el audio, suena al hacer clic
+    if (d.musica) fanfarria(d.melodia); // si el navegador bloquea el audio, suena al hacer clic
     let sono = false;
     document.getElementById('afRankBtn').onclick = function () {
-      if (d.musica && !sono) { sono = true; fanfarria(); this.textContent = '🎺 ¡A romperla este mes!'; setTimeout(() => ov.remove(), 11500); return; }
+      if (d.musica && !sono) { sono = true; fanfarria(d.melodia); this.textContent = '🎺 ¡A romperla este mes!'; setTimeout(() => ov.remove(), 11500); return; }
       ov.remove();
     };
   }

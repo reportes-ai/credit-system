@@ -41,7 +41,17 @@
     <h5><i class="bi bi-gear"></i> Configuración</h5>
     <div class="switch-row"><input type="checkbox" id="activo" class="form-check-input"> Popup activo</div>
     <div class="switch-row"><input type="checkbox" id="habil_siguiente" class="form-check-input"> Si cae sábado/domingo, mostrar el día hábil siguiente</div>
-    <div class="switch-row"><input type="checkbox" id="musica" class="form-check-input"> Fanfarria estilo Rocky 🎺</div>
+    <div class="switch-row"><input type="checkbox" id="musica" class="form-check-input"> Música 🎺</div>
+    <div class="row">
+      <div class="col-md-6"><div class="fld"><label>Melodía</label>
+        <select id="melodia" style="width:100%;border:1px solid #cbd5e1;border-radius:8px;padding:9px 11px;font-size:.88rem">
+          <option value="rocky">🥊 Rocky — Gonna Fly Now (extendida)</option>
+          <option value="corta">🎺 Fanfarria breve de trompetas</option>
+          <option value="olimpica">🔥 Fanfarria olímpica</option>
+          <option value="epica">🏅 Himno de campeones (acordes épicos)</option>
+        </select></div></div>
+      <div class="col-md-6" style="display:flex;align-items:flex-end;padding-bottom:14px"><button class="btn-test" onclick="escuchar()"><i class="bi bi-volume-up me-1"></i>Escuchar melodía</button></div>
+    </div>
     <div class="row">
       <div class="col-md-6"><div class="fld"><label>Día del mes en que aparece</label><input type="number" id="dia" min="1" max="28"><div class="hint">El podio muestra el mes ANTERIOR completo.</div></div></div>
       <div class="col-md-6"><div class="fld"><label>Días de vigencia</label><input type="number" id="dias_visible" min="1" max="20"><div class="hint">Se sigue mostrando N días a quienes no se habían conectado (1 vez por mes por persona/navegador).</div></div></div>
@@ -71,7 +81,7 @@
   document.getElementById('navNombre').textContent=`${yo?.nombre||''} ${yo?.apellido||''}`.trim();
   function logout(){ sessionStorage.clear(); location.href='/login.html'; }
   const H={Authorization:'Bearer '+token}, HJ={...H,'Content-Type':'application/json'};
-  const CHECKS=['activo','habil_siguiente','musica'], TEXTOS=['dia','dias_visible','titulo','subtitulo'];
+  const CHECKS=['activo','habil_siguiente','musica'], TEXTOS=['dia','dias_visible','melodia','titulo','subtitulo'];
   async function cargar(){
     const j=await(await fetch('/api/ranking-ventas/config',{headers:H})).json(); const c=j.data||{};
     CHECKS.forEach(k=>{ const el=document.getElementById(k); if(el) el.checked=c[k]==='1'; });
@@ -91,7 +101,11 @@
     d.titulo=document.getElementById('titulo').value.replace(/\{mes\}/g,(d.titulo.match(/— (.+)$/)||[])[1]||'MES ANTERIOR')||d.titulo;
     d.subtitulo=document.getElementById('subtitulo').value||d.subtitulo;
     d.musica=document.getElementById('musica').checked;
-    const go=()=>window.AF_RANKING.probar(d);
+    d.melodia=document.getElementById('melodia').value;
+    conPopup(()=>window.AF_RANKING.probar(d));
+  }
+  function escuchar(){ conPopup(()=>window.AF_RANKING.fanfarria(document.getElementById('melodia').value)); }
+  function conPopup(go){
     if(window.AF_RANKING) return go();
     const s=document.createElement('script'); s.src='/js/ranking-popup.js'; s.onload=go; document.head.appendChild(s);
   }

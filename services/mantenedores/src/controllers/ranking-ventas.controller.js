@@ -23,6 +23,7 @@ const { auditar } = require('../../../../shared/audit');
       ['habil_siguiente', '1'],     // si cae sábado/domingo corre al hábil siguiente
       ['dias_visible', '5'],        // ventana de días en que se sigue mostrando
       ['musica', '1'],
+      ['melodia', 'rocky'],        // rocky | corta | olimpica | epica
       ['titulo', '🏆 RANKING DE COLOCACIONES — {mes}'],
       ['subtitulo', '¡Felicitaciones a los campeones del mes!'],
     ];
@@ -94,7 +95,7 @@ const popup = async (req, res) => {
     res.json({ success: true, data: {
       mostrar: true, clave: mesAnt.slice(0, 7), // dedup mensual en el cliente
       titulo: tpl(cfg.titulo, { mes: label.toUpperCase() }),
-      subtitulo: cfg.subtitulo || '', musica: cfg.musica === '1', top,
+      subtitulo: cfg.subtitulo || '', musica: cfg.musica === '1', melodia: cfg.melodia || 'rocky', top,
     }, error: null });
   } catch (e) { console.error('[ranking popup]', e.message); res.status(500).json({ success: false, data: { mostrar: false }, error: 'Error' }); }
 };
@@ -106,7 +107,7 @@ const getConfigApi = async (req, res) => {
 const setConfigApi = async (req, res) => {
   try {
     const b = req.body || {};
-    const PERMITIDAS = ['activo', 'dia', 'habil_siguiente', 'dias_visible', 'musica', 'titulo', 'subtitulo'];
+    const PERMITIDAS = ['activo', 'dia', 'habil_siguiente', 'dias_visible', 'musica', 'melodia', 'titulo', 'subtitulo'];
     for (const [k, v] of Object.entries(b)) {
       if (!PERMITIDAS.includes(k)) continue;
       await pool.query('INSERT INTO rank_config (clave, valor) VALUES (?,?) ON DUPLICATE KEY UPDATE valor=VALUES(valor)', [k, String(v == null ? '' : v)]);
