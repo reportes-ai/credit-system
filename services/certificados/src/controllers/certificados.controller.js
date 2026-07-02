@@ -162,20 +162,9 @@ function buildVars(out, fechaEmisionISO) {
   };
 }
 
-// Próximos N días hábiles (salta fines de semana y feriados de la tabla).
-async function proxDiasHabiles(fromISO, n) {
-  let feriados = new Set();
-  try { const [f] = await pool.query("SELECT DATE_FORMAT(fecha,'%Y-%m-%d') f FROM feriados"); feriados = new Set(f.map(x => x.f)); } catch (_) {}
-  const out = []; const d = new Date(fromISO + 'T00:00:00');
-  while (out.length < n) {
-    d.setDate(d.getDate() + 1);
-    const iso = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
-    const dow = d.getDay();
-    if (dow === 0 || dow === 6 || feriados.has(iso)) continue;
-    out.push(iso);
-  }
-  return out;
-}
+// Próximos N días hábiles — delega en el MOTOR ÚNICO shared/feriados.js
+const { proximosDiasHabiles } = require('../../../../shared/feriados');
+async function proxDiasHabiles(fromISO, n) { return proximosDiasHabiles(fromISO, n); }
 
 // Bloque del desglose de prepago: solo ítems con saldo + recuadro de 3 días hábiles.
 function detallePrepagoHTML(x) {

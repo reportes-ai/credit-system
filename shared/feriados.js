@@ -87,4 +87,18 @@ function sumarDiasHabiles(fecha, n) {
   return d;
 }
 
-module.exports = { sumarDiasHabiles, esHabil, esFeriado, cargarFeriados: cargar, feriadosDeAnio };
+// Próximos N días hábiles DESPUÉS de fromISO → ['YYYY-MM-DD', ...]
+function proximosDiasHabiles(fromISO, n) {
+  const out = []; const d = new Date(String(fromISO).slice(0, 10) + 'T12:00:00');
+  while (out.length < n) { d.setDate(d.getDate() + 1); if (esHabil(d)) out.push(fmt(d)); }
+  return out;
+}
+
+// Si la fecha no es hábil, avanza hasta el siguiente día hábil (Date in/out)
+function siguienteHabil(fecha) {
+  const d = new Date(fecha);
+  while (!esHabil(d)) d.setDate(d.getDate() + 1);
+  return d;
+}
+
+module.exports = { sumarDiasHabiles, proximosDiasHabiles, siguienteHabil, esHabil, esFeriado, cargarFeriados: cargar, feriadosDeAnio };

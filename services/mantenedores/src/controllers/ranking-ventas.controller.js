@@ -60,7 +60,7 @@ function inicioVentana(hoy, cfg) {
   const dia = Math.min(28, Math.max(1, parseInt(cfg.dia || '1', 10)));
   const d = new Date(hoy.slice(0, 7) + '-' + String(dia).padStart(2, '0') + 'T12:00:00');
   if (cfg.habil_siguiente === '1') {
-    while (d.getDay() === 0 || d.getDay() === 6) d.setDate(d.getDate() + 1); // domingo=0, sábado=6
+    return require('../../../../shared/feriados').siguienteHabil(d);   // MOTOR ÚNICO (finde + feriados)
   }
   return d;
 }
