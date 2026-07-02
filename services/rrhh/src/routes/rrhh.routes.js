@@ -17,4 +17,17 @@ router.get('/antiguedad',          verifyToken, requireFunc('rh_antiguedad', 'rh
 router.post('/antiguedad',         verifyToken, requireFunc('rh_antiguedad'), ctrl.crearAntiguedad);
 router.post('/antiguedad/:id/resolver', verifyToken, requireFunc('rh_aprobar'), ctrl.resolverAntiguedad);
 
+// Certificado de antigüedad self-service (QR verificable)
+router.get('/antiguedad/cert/estado',  verifyToken, requireFunc('rh_antiguedad', 'rh_aprobar'), ctrl.certEstado);
+router.post('/antiguedad/cert/emitir', verifyToken, requireFunc('rh_antiguedad', 'rh_aprobar'), ctrl.certEmitir);
+router.get('/empleados',               verifyToken, requireFunc('rh_aprobar'), ctrl.listarEmpleados);
+
+// Cumpleaños (popup del cumpleañero; cualquier usuario logueado)
+router.get('/cumple/estado',  verifyToken, ctrl.cumpleEstado);
+router.post('/cumple/probar', verifyToken, requireFunc('rh_aprobar'), ctrl.cumpleProbar);
+
+// Config del mantenedor Saludos y Certificados RRHH
+router.get('/config', verifyToken, requireFunc('mant_rrhh_saludos', 'rh_aprobar'), ctrl.getConfigApi);
+router.put('/config', verifyToken, requireFunc('mant_rrhh_saludos', 'rh_aprobar'), ctrl.setConfigApi);
+
 module.exports = router;

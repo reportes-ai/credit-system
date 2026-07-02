@@ -4,7 +4,7 @@
   <meta charset="UTF-8"><link rel="icon" href="/img/favicon.png" type="image/png">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Antigüedad — RRHH</title>
-  <!-- v1.0 -->
+  <!-- v2.0 certificado self-service con QR -->
   <link href="/css/bootstrap.min.css" rel="stylesheet"><link href="/css/bootstrap-icons.css" rel="stylesheet">
   <style>
     :root { --navy:#0141A2; --navy-dark:#012d70; --navy-light:#0255c5; --bg:#f0f4f8; }
@@ -36,15 +36,26 @@
 <div class="main">
   <div class="page-banner"><i class="bi bi-award"></i><div><h2>Solicitudes de Antigüedad</h2><p>Pide tu certificado de antigüedad laboral; RRHH lo emite con tu fecha de ingreso.</p></div></div>
   <div class="tabs"><div class="tab active" id="t1" onclick="tab('crear')"><i class="bi bi-plus-circle me-1"></i>Nueva solicitud</div><div class="tab" id="t2" onclick="tab('mias')"><i class="bi bi-person me-1"></i>Mis solicitudes</div><div class="tab" id="t3" onclick="tab('bandeja')" style="display:none"><i class="bi bi-inbox me-1"></i>Bandeja RRHH<span class="badge-count" id="bandejaCount">0</span></div><div class="tab" id="t4" onclick="tab('historicas')" style="display:none"><i class="bi bi-clock-history me-1"></i>Solicitudes Históricas</div></div>
-  <div id="secCrear" class="card-box">
-    <div class="fld"><label>¿Para qué la necesitas? (opcional)</label><textarea id="fM" rows="3" placeholder="Ej. trámite bancario, beneficio, etc."></textarea></div>
-    <div style="text-align:right"><button class="btn-navy" onclick="crear()"><i class="bi bi-send me-1"></i>Solicitar certificado</button></div>
+  <div id="secCrear">
+    <div class="card-box" id="boxInstant" style="margin-bottom:16px">
+      <div style="display:flex;align-items:center;gap:10px;margin-bottom:8px"><i class="bi bi-lightning-charge-fill" style="color:#f59e0b;font-size:1.3rem"></i><b>Certificado inmediato</b></div>
+      <div id="instMsg" style="font-size:.85rem;color:#64748b;margin-bottom:12px">Verificando tu antigüedad…</div>
+      <div id="instRRHH" style="display:none;margin-bottom:12px" class="fld"><label>Emitir para (RRHH/Admin)</label><select id="selEmp" style="width:100%;border:1px solid #cbd5e1;border-radius:8px;padding:9px 11px;font-size:.88rem"></select></div>
+      <div style="text-align:right"><button class="btn-navy" id="btnEmitir" onclick="emitirCert()" style="display:none"><i class="bi bi-award me-1"></i>Emitir mi certificado ahora</button></div>
+    </div>
+    <div class="card-box">
+      <div style="display:flex;align-items:center;gap:10px;margin-bottom:8px"><i class="bi bi-envelope-paper" style="color:var(--navy);font-size:1.2rem"></i><b>Solicitar a RRHH</b> <span style="font-size:.78rem;color:#94a3b8">(si no puedes emitirlo al instante)</span></div>
+      <div class="fld"><label>¿Para qué la necesitas? (opcional)</label><textarea id="fM" rows="3" placeholder="Ej. trámite bancario, beneficio, etc."></textarea></div>
+      <div style="text-align:right"><button class="btn-navy" onclick="crear()"><i class="bi bi-send me-1"></i>Solicitar certificado</button></div>
+    </div>
   </div>
   <div id="secLista" class="card-box" style="display:none">
     <table><thead><tr><th>Solicitante</th><th>Motivo</th><th>Estado</th><th>Antigüedad</th><th id="thAcc"></th></tr></thead><tbody id="tb"><tr><td colspan="5" class="empty">Cargando…</td></tr></tbody></table>
   </div>
 </div>
 <script src="/js/auth-guard.js"></script>
+<script src="/js/qrcode-generator.js"></script>
+<script src="/js/qr-verificacion.js"></script>
 <script>
   const token=sessionStorage.getItem('token'), yo=JSON.parse(sessionStorage.getItem('usuario')||'null');
   if(!token||!yo) location.href='/login.html';
@@ -73,7 +84,50 @@
     const j=await(await fetch(`/api/rrhh/antiguedad/${id}/resolver`,{method:'POST',headers:HJ,body:JSON.stringify({estado:'EMITIDA',fecha_ingreso:fi})})).json();
     if(!j.success)return alert(j.error); cargar(); }
   async function resolver(id,estado){ const mot=prompt('Motivo del rechazo:')||''; const j=await(await fetch(`/api/rrhh/antiguedad/${id}/resolver`,{method:'POST',headers:HJ,body:JSON.stringify({estado,motivo_rechazo:mot})})).json(); if(!j.success)return alert(j.error); cargar(); }
-  (async()=>{ await cargarPendientes(); const qid=new URLSearchParams(location.search).get('id'); if(qid){tab('mias');} else tab('crear'); })();
+  (async()=>{ await cargarPendientes(); await cargarInstant(); const qid=new URLSearchParams(location.search).get('id'); if(qid){tab('mias');} else tab('crear'); })();
+
+  /* ── Certificado inmediato (self-service con QR) ── */
+  async function cargarInstant(){
+    try{
+      const j=await(await fetch('/api/rrhh/antiguedad/cert/estado',{headers:H})).json(); const d=j.data||{};
+      const msg=document.getElementById('instMsg'), btn=document.getElementById('btnEmitir');
+      if(d.es_rrhh){ document.getElementById('instRRHH').style.display='';
+        try{ const je=await(await fetch('/api/rrhh/empleados',{headers:H})).json();
+          document.getElementById('selEmp').innerHTML=`<option value="">— Yo (${esc(yo.nombre||'')}) —</option>`+(je.data||[]).map(e=>`<option value="${e.id_usuario}">${esc(e.nombre)}${e.fecha_ingreso?'':' (sin fecha de ingreso)'}</option>`).join('');
+        }catch(e){}
+      }
+      if(d.puede){ msg.innerHTML=`Llevas <b>${antiguedadStr(String(d.usuario.fecha_ingreso).slice(0,10))}</b> en AutoFácil. Puedes emitir tu certificado con validación QR al instante.`; btn.style.display=''; }
+      else { msg.innerHTML='⚠️ '+esc(d.mensaje||'No es posible emitir al instante.'); btn.style.display=d.es_rrhh?'':'none'; if(d.es_rrhh) btn.innerHTML='<i class="bi bi-award me-1"></i>Emitir (RRHH)'; }
+    }catch(e){ document.getElementById('instMsg').textContent='No se pudo verificar tu antigüedad.'; }
+  }
+  async function emitirCert(){
+    const sel=document.getElementById('selEmp'); const idU=sel&&sel.value?{id_usuario:parseInt(sel.value,10)}:{};
+    const j=await(await fetch('/api/rrhh/antiguedad/cert/emitir',{method:'POST',headers:HJ,body:JSON.stringify(idU)})).json();
+    if(!j.success)return alert(j.error||'No se pudo emitir'); imprimirCertificado(j.data); cargarInstant();
+  }
+  function imprimirCertificado(d){
+    const qr=(typeof qrVerificacionHTML==='function')?qrVerificacionHTML(d.codigo,{px:108}):'';
+    const fmt=f=>{try{return new Date(String(f).slice(0,10)+'T12:00:00').toLocaleDateString('es-CL',{day:'numeric',month:'long',year:'numeric'})}catch(e){return f}};
+    const html=`<!DOCTYPE html><html lang="es"><head><meta charset="UTF-8"><title>Certificado de Antigüedad — ${esc(d.nombre)}</title>
+      <style>body{font-family:'Segoe UI',system-ui,sans-serif;color:#1e293b;margin:0;padding:46px 56px;font-size:14px}
+        .head{display:flex;justify-content:space-between;align-items:flex-start;border-bottom:3px solid #012d70;padding-bottom:14px;margin-bottom:8px}
+        .addr{font-size:10.5px;color:#64748b;line-height:1.5}.logo{height:44px}
+        .folio{font-size:11px;color:#64748b;text-align:right;margin:8px 0 26px}
+        h2{text-align:center;color:#012d70;font-size:19px;letter-spacing:1px;text-transform:uppercase;margin:0 0 28px}
+        .body{line-height:1.9;text-align:justify;margin-bottom:18px}
+        .foot{display:flex;justify-content:space-between;align-items:flex-end;margin-top:70px}
+        .firma{text-align:center}.firma .l{border-bottom:1px solid #555;width:270px;margin:0 auto 8px}.firma .c{font-size:12px;font-weight:700}.firma .e{font-size:11px;color:#64748b}
+        @media print{body{padding:26px 36px}}</style></head><body>
+      <div class="head"><div class="addr">Av. Presidente Kennedy 5757, Of. 1601, Las Condes<br>Santiago, Chile · www.autofacilchile.cl</div>
+        <img class="logo" src="/img/logo.png" alt="AutoFácil" onerror="this.style.display='none'"></div>
+      <div class="folio">Folio <b>${esc(d.codigo)}</b> · ${fmt(d.fecha_emision)}</div>
+      <h2>Certificado de Antigüedad Laboral</h2>
+      <div class="body">${d.cuerpo_html||''}</div>
+      <div class="body">${d.cierre_html||''}</div>
+      <div class="foot"><div class="firma"><div class="l">&nbsp;</div><div class="c">Recursos Humanos</div><div class="e">Auto Fácil SpA</div></div><div>${qr}</div></div>
+      <script>window.onload=()=>setTimeout(()=>window.print(),300)<\/script></body></html>`;
+    const w=window.open('','_blank'); if(!w)return alert('Permite las ventanas emergentes para imprimir el certificado'); w.document.write(html); w.document.close();
+  }
 </script>
 <script src="/js/app-version.js"></script>
 </body>

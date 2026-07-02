@@ -13,6 +13,7 @@ const TIPO_LABEL = {
   CERT_PREAPROBADO:     'Certificado de Crédito Preaprobado',
   COMPROBANTE_CUOTA:    'Comprobante de Pago de Cuota',
   ORDEN_PAGO:           'Orden de Pago',
+  CERT_ANTIGUEDAD:      'Certificado de Antigüedad Laboral',
 };
 
 function maskRut(rut) {

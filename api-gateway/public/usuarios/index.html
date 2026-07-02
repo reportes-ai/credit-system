@@ -710,6 +710,18 @@
               <label class="form-label">Teléfono</label>
               <input type="text" id="uTelefono" class="form-control" placeholder="+56 9 1234 5678">
             </div>
+            <div class="col-md-4">
+              <label class="form-label">Cargo</label>
+              <input type="text" id="uCargo" class="form-control" placeholder="Ej. Analista de Operaciones">
+            </div>
+            <div class="col-md-4">
+              <label class="form-label">Fecha de Ingreso <i class="bi bi-award" title="Usada por el Certificado de Antigüedad"></i></label>
+              <input type="date" id="uFechaIngreso" class="form-control">
+            </div>
+            <div class="col-md-4">
+              <label class="form-label">Fecha de Nacimiento <i class="bi bi-cake2" title="Usada por el saludo de cumpleaños"></i></label>
+              <input type="date" id="uFechaNacimiento" class="form-control">
+            </div>
             <div class="col-md-6">
               <label class="form-label">Email *</label>
               <input type="email" id="uEmail" class="form-control">
@@ -1093,6 +1105,9 @@
           document.getElementById('uCentroCosto').value = u.centro_costo || '';
           document.getElementById('uEmail').value = u.email;
           document.getElementById('uTelefono').value = u.telefono || '';
+          document.getElementById('uCargo').value = u.cargo || '';
+          document.getElementById('uFechaIngreso').value = u.fecha_ingreso ? String(u.fecha_ingreso).slice(0,10) : '';
+          document.getElementById('uFechaNacimiento').value = u.fecha_nacimiento ? String(u.fecha_nacimiento).slice(0,10) : '';
           document.getElementById('uPerfil').value = u.id_perfil;
           document.getElementById('uSupervisor').value = u.id_supervisor || '';
           document.getElementById('uEstado').value = u.estado;
@@ -1107,6 +1122,9 @@
         document.getElementById('uCentroCosto').value = '';
         document.getElementById('uEmail').value = '';
         document.getElementById('uTelefono').value = '';
+        document.getElementById('uCargo').value = '';
+        document.getElementById('uFechaIngreso').value = '';
+        document.getElementById('uFechaNacimiento').value = '';
         document.getElementById('uPerfil').value = '';
         document.getElementById('uSupervisor').value = '';
         actualizarSupervisorVisibilidad();
@@ -1132,6 +1150,9 @@
         centro_costo: document.getElementById('uCentroCosto').value.trim() || null,
         email: document.getElementById('uEmail').value.trim(),
         telefono: document.getElementById('uTelefono').value.trim() || null,
+        cargo: document.getElementById('uCargo').value.trim() || null,
+        fecha_ingreso: document.getElementById('uFechaIngreso').value || null,
+        fecha_nacimiento: document.getElementById('uFechaNacimiento').value || null,
         id_perfil: document.getElementById('uPerfil').value,
         id_supervisor: document.getElementById('uSupervisor').value || null,
         estado: document.getElementById('uEstado').value || 'activo'

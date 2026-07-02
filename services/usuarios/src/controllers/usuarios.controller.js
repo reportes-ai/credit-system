@@ -69,6 +69,16 @@ const correoClave = (nombre, email, clave, esReset = false) => {
     await pool.query(`ALTER TABLE usuarios ADD COLUMN password_updated_at DATETIME NULL DEFAULT NULL`);
     await pool.query(`UPDATE usuarios SET password_updated_at = COALESCE(fecha_creacion, NOW()) WHERE password_updated_at IS NULL`);
   } catch (e) { if (e.errno !== 1060) console.error('[usuarios migration password_updated_at]', e.message); }
+  // RRHH: datos para certificado de antigüedad y cumpleaños (v78.0)
+  try {
+    await pool.query(`ALTER TABLE usuarios ADD COLUMN fecha_ingreso DATE NULL DEFAULT NULL`);
+  } catch (e) { if (e.errno !== 1060) console.error('[usuarios migration fecha_ingreso]', e.message); }
+  try {
+    await pool.query(`ALTER TABLE usuarios ADD COLUMN fecha_nacimiento DATE NULL DEFAULT NULL`);
+  } catch (e) { if (e.errno !== 1060) console.error('[usuarios migration fecha_nacimiento]', e.message); }
+  try {
+    await pool.query(`ALTER TABLE usuarios ADD COLUMN cargo VARCHAR(120) NULL DEFAULT NULL`);
+  } catch (e) { if (e.errno !== 1060) console.error('[usuarios migration cargo]', e.message); }
 })();
 
 // Tabla de permisos individuales por usuario (excepciones al perfil base)
@@ -203,6 +213,7 @@ const getAllUsuarios = async (req, res) => {
     const wProt = where ? where + ' AND u.protegido = 0' : 'WHERE u.protegido = 0';
     const [usuarios] = await pool.query(
       `SELECT u.id_usuario, u.rut, u.nombre, u.apellido, u.apellido_materno, u.centro_costo, u.email, u.telefono,
+              u.cargo, u.fecha_ingreso, u.fecha_nacimiento,
               u.id_perfil, p.nombre AS perfil, u.id_supervisor,
               CONCAT(s.nombre, ' ', s.apellido) AS supervisor_nombre,
               u.estado, u.ultimo_acceso, u.fecha_creacion,
@@ -226,6 +237,7 @@ const getUsuarioById = async (req, res) => {
   try {
     const [rows] = await pool.query(
       `SELECT u.id_usuario, u.rut, u.nombre, u.apellido, u.apellido_materno, u.centro_costo, u.email, u.telefono,
+              u.cargo, u.fecha_ingreso, u.fecha_nacimiento,
               u.id_perfil, p.nombre AS perfil, u.id_supervisor,
               CONCAT(s.nombre, ' ', s.apellido) AS supervisor_nombre,
               u.estado, u.ultimo_acceso, u.fecha_creacion
@@ -246,7 +258,7 @@ const getUsuarioById = async (req, res) => {
 
 const createUsuario = async (req, res) => {
   try {
-    const { rut, nombre, apellido, apellido_materno, centro_costo, email, id_perfil, id_supervisor, telefono } = req.body;
+    const { rut, nombre, apellido, apellido_materno, centro_costo, email, id_perfil, id_supervisor, telefono, fecha_ingreso, fecha_nacimiento, cargo } = req.body;
 
     if (!rut || !nombre || !apellido || !email || !id_perfil) {
       return res.status(400).json({ success: false, data: null, error: 'RUT, nombre, apellido, email y perfil son requeridos' });
@@ -256,8 +268,8 @@ const createUsuario = async (req, res) => {
     const claveTemporal = generarClaveTemporal();
     const passwordHash = await bcrypt.hash(claveTemporal, 10);
     const [result] = await pool.query(
-      'INSERT INTO usuarios (rut, nombre, apellido, apellido_materno, centro_costo, email, password_hash, id_perfil, id_supervisor, telefono, debe_cambiar_clave, password_updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1, NOW())',
-      [RUT.normalizar(rut) || rut, nombre, apellido, apellido_materno || null, centro_costo || null, email, passwordHash, id_perfil, id_supervisor || null, telefono || null]
+      'INSERT INTO usuarios (rut, nombre, apellido, apellido_materno, centro_costo, email, password_hash, id_perfil, id_supervisor, telefono, fecha_ingreso, fecha_nacimiento, cargo, debe_cambiar_clave, password_updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1, NOW())',
+      [RUT.normalizar(rut) || rut, nombre, apellido, apellido_materno || null, centro_costo || null, email, passwordHash, id_perfil, id_supervisor || null, telefono || null, fecha_ingreso || null, fecha_nacimiento || null, cargo || null]
     );
 
     auditar({ req, accion: 'CREAR', modulo: 'usuarios', entidad: 'usuario', entidad_id: result.insertId,
@@ -288,7 +300,7 @@ const createUsuario = async (req, res) => {
 const updateUsuario = async (req, res) => {
   try {
     const { id } = req.params;
-    const { nombre, apellido, apellido_materno, centro_costo, email, id_perfil, id_supervisor, estado, telefono } = req.body;
+    const { nombre, apellido, apellido_materno, centro_costo, email, id_perfil, id_supervisor, estado, telefono, fecha_ingreso, fecha_nacimiento, cargo } = req.body;
 
     if (!nombre || !apellido || !email || !id_perfil) {
       return res.status(400).json({ success: false, data: null, error: 'Nombre, apellido, email y perfil son requeridos' });
@@ -304,8 +316,9 @@ const updateUsuario = async (req, res) => {
     }
 
     await pool.query(
-      'UPDATE usuarios SET nombre = ?, apellido = ?, apellido_materno = ?, centro_costo = ?, email = ?, id_perfil = ?, id_supervisor = ?, estado = ?, telefono = ? WHERE id_usuario = ?',
-      [nombre, apellido, apellido_materno || null, centro_costo || null, email, perfilFinal, id_supervisor || null, estadoFinal, telefono || null, id]
+      // COALESCE: si el form no envía los campos RRHH (undefined), se preservan los existentes
+      'UPDATE usuarios SET nombre = ?, apellido = ?, apellido_materno = ?, centro_costo = ?, email = ?, id_perfil = ?, id_supervisor = ?, estado = ?, telefono = ?, fecha_ingreso = COALESCE(?, fecha_ingreso), fecha_nacimiento = COALESCE(?, fecha_nacimiento), cargo = COALESCE(?, cargo) WHERE id_usuario = ?',
+      [nombre, apellido, apellido_materno || null, centro_costo || null, email, perfilFinal, id_supervisor || null, estadoFinal, telefono || null, fecha_ingreso || null, fecha_nacimiento || null, cargo || null, id]
     );
 
     auditar({ req, accion: 'EDITAR', modulo: 'usuarios', entidad: 'usuario', entidad_id: id,

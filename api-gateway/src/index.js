@@ -235,6 +235,7 @@ app.get('/health', async (req, res) => {
 // la URL (ej. /dealers vive en mantenedores/dealers/). Agregar página = 1 línea.
 const PAGINAS = [
   ['/mantenedores/comisiones-seguro', 'mantenedores/comisiones-seguro/index.html'],
+  ['/mantenedores/rrhh-saludos', 'mantenedores/rrhh-saludos/index.html'],
   ['/carga-masiva', 'carga-masiva/index.html'],
   ['/carga-masiva/digitacion', 'carga-masiva/digitacion/index.html'],
   ['/carga-masiva/digitacion/cola', 'carga-masiva/digitacion/cola.html'],
