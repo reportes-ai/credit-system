@@ -177,9 +177,14 @@ const SELECT_GESTION = `
   FROM creditos ob
   LEFT JOIN clientes cl ON cl.id_cliente = ob.id_cliente
   LEFT JOIN (
-    SELECT id_credito, COUNT(DISTINCT numero_cuota) AS cnt
-    FROM pagos_credito WHERE estado_pago = 'PAGADO'
-    GROUP BY id_credito
+    -- Pagadas = pagos registrados en la app ∪ calendario real (cartera migrada
+    -- trae su historial en cuotas_credito.estado_cuota='PAGADA'). UNION dedup
+    -- por numero_cuota: nunca doble conteo.
+    SELECT id_credito, COUNT(DISTINCT numero_cuota) AS cnt FROM (
+      SELECT id_credito, numero_cuota FROM pagos_credito  WHERE estado_pago  = 'PAGADO'
+      UNION
+      SELECT id_credito, numero_cuota FROM cuotas_credito WHERE estado_cuota = 'PAGADA'
+    ) u GROUP BY id_credito
   ) pp ON pp.id_credito = ob.id
 `;
 
@@ -425,7 +430,11 @@ const getAll = async (req, res) => {
                 IF(ob.numero_credito IS NOT NULL, COALESCE(pp.cnt,0), NULL) AS cuotas_pagadas
            FROM creditos ob
            LEFT JOIN clientes cl ON cl.id_cliente = ob.id_cliente
-           LEFT JOIN (SELECT id_credito, COUNT(DISTINCT numero_cuota) AS cnt FROM pagos_credito WHERE estado_pago='PAGADO' GROUP BY id_credito) pp ON pp.id_credito = ob.id
+           LEFT JOIN (SELECT id_credito, COUNT(DISTINCT numero_cuota) AS cnt FROM (
+               SELECT id_credito, numero_cuota FROM pagos_credito  WHERE estado_pago  = 'PAGADO'
+               UNION
+               SELECT id_credito, numero_cuota FROM cuotas_credito WHERE estado_cuota = 'PAGADA'
+             ) u GROUP BY id_credito) pp ON pp.id_credito = ob.id
           ${whereBase}
             AND (ob.financiera IS NULL OR ob.financiera NOT IN ('AUTOFIN','UNIDAD DE CREDITO'))
             AND (ob.estado_cartera IS NOT NULL OR ob.estado = 'OTORGADO' OR ob.estado IN ('VIGENTE','EN MORA','VENCIDO','PREPAGADO','CASTIGADO'))`,
@@ -569,7 +578,10 @@ const getById = async (req, res) => {
       if (manualTerm) {
         c.estado_cartera_disp = c.estado_cartera;
       } else if (esPropio && etapaOtorgado && c.fecha_primera_cuota && Number(c.plazo) > 0) {
-        const [pg] = await pool.query("SELECT DISTINCT numero_cuota FROM pagos_credito WHERE id_credito=? AND estado_pago='PAGADO'", [c.id]);
+        const [pg] = await pool.query(
+          `SELECT numero_cuota FROM pagos_credito  WHERE id_credito=? AND estado_pago='PAGADO'
+           UNION
+           SELECT numero_cuota FROM cuotas_credito WHERE id_credito=? AND estado_cuota='PAGADA'`, [c.id, c.id]);
         const paid = new Set(pg.map(p => parseInt(p.numero_cuota, 10)));
         const [ump] = await pool.query('SELECT clave, valor FROM cartera_parametros');
         const UM = {}; ump.forEach(u => { UM[u.clave] = parseInt(u.valor, 10); });
