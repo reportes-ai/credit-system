@@ -2,7 +2,28 @@
    AutoFácil — Versión global de la aplicación
    Editar SOLO este archivo para cambiar la versión
    ───────────────────────────────────────────── */
-const APP_VERSION = 'v77.71';
+const APP_VERSION = 'v77.72';
+
+/* ── PWA: instalable como app de escritorio (ventana propia, sin barras) ──
+   Inyecta el manifest y registra el service worker en TODAS las páginas.
+   Chrome/Edge muestran "Instalar AutoFácil" → ícono en escritorio + menú inicio. */
+(function () {
+  try {
+    if (!document.querySelector('link[rel="manifest"]')) {
+      const l = document.createElement('link');
+      l.rel = 'manifest'; l.href = '/manifest.json';
+      document.head.appendChild(l);
+    }
+    if (!document.querySelector('meta[name="theme-color"]')) {
+      const m = document.createElement('meta');
+      m.name = 'theme-color'; m.content = '#012d70';
+      document.head.appendChild(m);
+    }
+    if ('serviceWorker' in navigator) {
+      navigator.serviceWorker.register('/sw.js').catch(() => {});
+    }
+  } catch (e) { /* no bloquear la app si el navegador no soporta PWA */ }
+})();
 
 document.addEventListener('DOMContentLoaded', () => {
 

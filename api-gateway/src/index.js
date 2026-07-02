@@ -49,7 +49,8 @@ app.use((req, res, next) => {
 
 app.use(express.static(path.join(__dirname, '../public'), {
   setHeaders: (res, filePath) => {
-    if (filePath.endsWith('.html')) res.set('Cache-Control', 'no-cache, no-store, must-revalidate');
+    if (filePath.endsWith('.html') || filePath.endsWith('sw.js'))
+      res.set('Cache-Control', 'no-cache, no-store, must-revalidate');
   }
 }));
 
