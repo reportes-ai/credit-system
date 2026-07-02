@@ -219,6 +219,9 @@ app.use('/api/ranking-ventas', require('../../services/mantenedores/src/routes/r
 // Carrera de colocaciones (popup diario con la pista)
 app.use('/api/carrera', require('../../services/mantenedores/src/routes/carrera.routes'));
 
+// Mi Día (panel personal de pendientes + Google Calendar)
+app.use('/api/mi-dia', require('../../services/mi-dia/src/routes/mi-dia.routes'));
+
 // Login
 app.get(['/login', '/login/'], (req, res) =>
   res.sendFile(path.join(__dirname, '../public/login.html')));
@@ -244,6 +247,8 @@ const PAGINAS = [
   ['/mantenedores/rrhh-saludos', 'mantenedores/rrhh-saludos/index.html'],
   ['/mantenedores/ranking-ventas', 'mantenedores/ranking-ventas/index.html'],
   ['/mantenedores/carrera', 'mantenedores/carrera/index.html'],
+  ['/mantenedores/mi-dia', 'mantenedores/mi-dia/index.html'],
+  ['/mi-dia', 'mi-dia/index.html'],
   ['/carga-masiva', 'carga-masiva/index.html'],
   ['/carga-masiva/digitacion', 'carga-masiva/digitacion/index.html'],
   ['/carga-masiva/digitacion/cola', 'carga-masiva/digitacion/cola.html'],

@@ -1,0 +1,116 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8"><link rel="icon" href="/img/favicon.png" type="image/png">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Mi Día — AutoFácil</title>
+  <!-- v1.0 -->
+  <link href="/css/bootstrap.min.css" rel="stylesheet"><link href="/css/bootstrap-icons.css" rel="stylesheet">
+  <style>
+    :root { --navy:#0141A2; --navy-dark:#012d70; --navy-light:#0255c5; --bg:#f0f4f8; }
+    body { background:var(--bg); font-family:'Segoe UI',system-ui,sans-serif; margin:0; }
+    .topnav { background:linear-gradient(90deg,var(--navy-dark),var(--navy-light)); color:#fff; height:60px; padding:0 24px; display:flex; align-items:center; justify-content:space-between; position:sticky; top:0; z-index:200; }
+    .topnav-left { display:flex; align-items:center; gap:16px; } .topnav-brand img { height:32px; filter:brightness(0) invert(1); } .topnav-brand { text-decoration:none; display:flex; gap:8px; align-items:center; }
+    .version-badge { background:rgba(255,255,255,.15); color:rgba(255,255,255,.75); font-size:.65rem; font-weight:700; border-radius:6px; padding:2px 8px; }
+    .breadcrumb-nav { color:rgba(255,255,255,.7); font-size:.85rem; } .breadcrumb-nav a { color:rgba(255,255,255,.75); text-decoration:none; }
+    .user-chip { background:rgba(255,255,255,.12); border-radius:24px; padding:5px 12px; color:#fff; font-size:.85rem; } .btn-logout { background:rgba(255,255,255,.1); border:1px solid rgba(255,255,255,.2); color:#fff; border-radius:8px; padding:5px 12px; font-size:.82rem; cursor:pointer; }
+    .main { padding:28px 34px; max-width:1080px; margin:0 auto; }
+    .hero { background:linear-gradient(135deg,#012d70,#0141A2 50%,#009AFE); border-radius:18px; color:#fff; padding:26px 32px; margin-bottom:24px; }
+    .hero h1 { margin:0; font-size:1.7rem; font-weight:800; } .hero p { margin:5px 0 0; opacity:.9; font-size:.9rem; text-transform:capitalize; }
+    .grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(215px,1fr)); gap:16px; margin-bottom:26px; }
+    .wcard { background:#fff; border-radius:14px; box-shadow:0 1px 6px rgba(0,0,0,.07); padding:18px 18px 16px; text-decoration:none; color:inherit; display:block; border-left:4px solid var(--navy); transition:transform .12s, box-shadow .12s; position:relative; }
+    .wcard:hover { transform:translateY(-2px); box-shadow:0 6px 20px rgba(0,0,0,.12); }
+    .wcard .ico { font-size:1.5rem; margin-bottom:8px; }
+    .wcard .n { font-size:2rem; font-weight:800; line-height:1; }
+    .wcard .lbl { font-size:.82rem; color:#475569; margin-top:4px; font-weight:600; }
+    .wcard.cero { opacity:.62; } .wcard.cero .n { color:#94a3b8; }
+    .wcard.destacado { background:linear-gradient(135deg,#14532d,#16a34a); color:#fff; border-left-color:#bbf7d0; }
+    .wcard.destacado .lbl { color:rgba(255,255,255,.85); }
+    .sec-title { font-size:.95rem; font-weight:800; color:#012d70; margin:0 0 12px; display:flex; align-items:center; gap:8px; }
+    .cal { background:#fff; border-radius:14px; box-shadow:0 1px 6px rgba(0,0,0,.07); padding:20px 24px; margin-bottom:26px; }
+    .cal-ev { display:flex; align-items:center; gap:14px; padding:10px 0; border-bottom:1px solid #f1f5f9; }
+    .cal-ev:last-child { border-bottom:none; }
+    .cal-ev .hora { font-weight:800; color:var(--navy); font-size:.9rem; min-width:56px; }
+    .cal-ev .tit { flex:1; font-size:.9rem; color:#1e293b; font-weight:600; }
+    .cal-ev .loc { font-size:.76rem; color:#94a3b8; }
+    .btn-g { background:#fff; border:1.5px solid #dadce0; border-radius:8px; padding:9px 16px; font-weight:600; font-size:.85rem; cursor:pointer; display:inline-flex; align-items:center; gap:9px; color:#3c4043; }
+    .empty { color:#94a3b8; font-size:.86rem; padding:8px 0; }
+  </style>
+</head>
+<body>
+<nav class="topnav">
+  <div class="topnav-left"><a href="/" class="topnav-brand"><img src="/img/logo.png" alt="AutoFácil"><span class="version-badge" id="versionBadge"></span></a>
+    <div class="breadcrumb-nav"><a href="/">Inicio</a> › <span style="color:#fff;font-weight:600"><i class="bi bi-sunrise me-1"></i>Mi Día</span></div></div>
+  <div style="display:flex;gap:10px;align-items:center"><span class="user-chip" id="navNombre">—</span><button class="btn-logout" onclick="logout()"><i class="bi bi-box-arrow-right me-1"></i>Salir</button></div>
+</nav>
+<div class="main">
+  <div class="hero"><h1 id="saludo">Hola 👋</h1><p id="fecha">—</p></div>
+
+  <div id="calWrap" style="display:none">
+    <div class="sec-title"><i class="bi bi-calendar-event"></i> Tu agenda de hoy</div>
+    <div class="cal" id="cal"></div>
+  </div>
+
+  <div class="sec-title"><i class="bi bi-list-check"></i> Tus pendientes</div>
+  <div class="grid" id="grid"><div class="empty">Cargando…</div></div>
+</div>
+<script src="/js/auth-guard.js"></script>
+<script>
+  const token=sessionStorage.getItem('token'), yo=JSON.parse(sessionStorage.getItem('usuario')||'null');
+  if(!token||!yo) location.href='/login.html';
+  document.getElementById('navNombre').textContent=`${yo?.nombre||''} ${yo?.apellido||''}`.trim();
+  function logout(){ sessionStorage.clear(); location.href='/login.html'; }
+  const H={Authorization:'Bearer '+token}, HJ={...H,'Content-Type':'application/json'};
+  const esc=s=>String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;');
+
+  async function cargar(){
+    const j=await(await fetch('/api/mi-dia',{headers:H})).json(); const d=j.data||{};
+    document.getElementById('saludo').textContent=`${d.saludo||'Hola'} ${esc(d.nombre||'')} 👋`;
+    document.getElementById('fecha').textContent=d.fecha||'';
+    // Widgets
+    const g=document.getElementById('grid');
+    const w=d.widgets||[];
+    if(!w.length){ g.innerHTML='<div class="empty">No tienes widgets configurados. Pídele a un administrador que los active en el mantenedor Panel Mi Día.</div>'; }
+    else g.innerHTML=w.map(x=>`
+      <a class="wcard ${x.destacado?'destacado':(x.n===0?'cero':'')}" href="${esc(x.href||'#')}" style="border-left-color:${esc(x.color||'#0141A2')}">
+        <div class="ico" style="color:${x.destacado?'#fff':esc(x.color||'#0141A2')}"><i class="bi ${esc(x.icono||'bi-dot')}"></i></div>
+        <div class="n">${x.n}</div><div class="lbl">${esc(x.nombre)}</div>
+      </a>`).join('');
+    // Calendario
+    renderCal(d.calendario||{});
+  }
+
+  function renderCal(c){
+    const wrap=document.getElementById('calWrap'), box=document.getElementById('cal');
+    if(!c.disponible){ wrap.style.display='none'; return; }  // Google no configurado en el server
+    wrap.style.display='';
+    if(!c.conectado){
+      box.innerHTML=`<div style="display:flex;align-items:center;justify-content:space-between;gap:16px;flex-wrap:wrap">
+        <div style="font-size:.88rem;color:#475569">Conecta tu Google Calendar para ver aquí tus reuniones del día.</div>
+        <button class="btn-g" onclick="conectarGoogle()"><img src="https://www.google.com/favicon.ico" onerror="this.style.display='none'" width="16" height="16"><i class="bi bi-google" style="color:#4285F4"></i> Conectar Google Calendar</button>
+      </div>`;
+      return;
+    }
+    const ev=c.eventos||[];
+    const head=`<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px"><div style="font-size:.78rem;color:#94a3b8">${esc(c.email||'')}</div><button class="btn-g" style="padding:4px 10px;font-size:.76rem" onclick="desconectarGoogle()">Desconectar</button></div>`;
+    if(!ev.length){ box.innerHTML=head+'<div class="empty">No tienes eventos hoy. 🎉</div>'; return; }
+    box.innerHTML=head+ev.map(e=>`
+      <div class="cal-ev"><div class="hora">${esc(e.hora)}</div><div class="tit">${esc(e.titulo)}${e.ubicacion?`<div class="loc"><i class="bi bi-geo-alt"></i> ${esc(e.ubicacion)}</div>`:''}</div>${e.link?`<a href="${esc(e.link)}" target="_blank" style="color:#94a3b8"><i class="bi bi-box-arrow-up-right"></i></a>`:''}</div>`).join('');
+  }
+
+  async function conectarGoogle(){
+    const j=await(await fetch('/api/mi-dia/google/connect',{headers:H})).json();
+    if(!j.success||!j.data?.url) return alert(j.error||'No se pudo iniciar la conexión con Google');
+    const w=window.open(j.data.url,'googleAuth','width=520,height=640');
+    // Al cerrar la ventana de Google, recargamos para traer los eventos
+    const timer=setInterval(()=>{ if(w&&w.closed){ clearInterval(timer); cargar(); } }, 1000);
+  }
+  async function desconectarGoogle(){
+    if(!confirm('¿Desconectar tu Google Calendar de AutoFácil?'))return;
+    await fetch('/api/mi-dia/google/disconnect',{method:'POST',headers:H}); cargar();
+  }
+  cargar();
+</script>
+<script src="/js/app-version.js"></script>
+</body>
+</html>
