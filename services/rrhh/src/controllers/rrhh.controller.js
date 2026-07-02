@@ -52,12 +52,13 @@ const { notificar } = require('../../../notificaciones/src/controllers/notificac
     const funcs = [
       ['Recursos Humanos',            'rh_ver',         '/soporte/recursos-humanos/',    'bi-people-fill', MOD_SOPORTE],
       ['Solicitudes de Vacaciones',   'rh_vacaciones',  '/recursos-humanos/vacaciones/', 'bi-airplane',    MOD_SOPORTE],
-      ['Solicitudes de Antigüedad',   'rh_antiguedad',  '/recursos-humanos/antiguedad/', 'bi-award',       MOD_SOPORTE],
+      ['Certificado de Antigüedad',   'rh_antiguedad',  '/recursos-humanos/antiguedad/', 'bi-award',       MOD_SOPORTE],
       ['Aprobar/Gestionar RRHH',      'rh_aprobar',     null,                            null,             MOD_SOPORTE],
     ];
     // Migración: si ya se sembró como módulo Home (v77.49), reubicarlo en Soporte y apagar el módulo suelto.
     await pool.query("UPDATE funcionalidades SET id_modulo=500001, href='/soporte/recursos-humanos/' WHERE codigo='rh_ver'");
     await pool.query("UPDATE funcionalidades SET id_modulo=500001 WHERE codigo IN ('rh_vacaciones','rh_antiguedad','rh_aprobar')");
+    await pool.query("UPDATE funcionalidades SET nombre='Certificado de Antigüedad' WHERE codigo='rh_antiguedad'"); // v78.6: renombrado
     await pool.query("UPDATE modulos SET estado='inactivo' WHERE id_modulo=500002");
     const idFunc = {};
     for (const [nombre, codigo, href, icono, idmod] of funcs) {

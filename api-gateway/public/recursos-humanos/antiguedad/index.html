@@ -3,8 +3,8 @@
 <head>
   <meta charset="UTF-8"><link rel="icon" href="/img/favicon.png" type="image/png">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Antigüedad — RRHH</title>
-  <!-- v2.1 firma Gte Operaciones + don/doña + fix fechas -->
+  <title>Certificado de Antigüedad — RRHH</title>
+  <!-- v2.2 renombrado Certificado de Antigüedad, botón sin (RRHH) -->
   <link href="/css/bootstrap.min.css" rel="stylesheet"><link href="/css/bootstrap-icons.css" rel="stylesheet">
   <style>
     :root { --navy:#0141A2; --navy-dark:#012d70; --navy-light:#0255c5; --bg:#f0f4f8; }
@@ -30,11 +30,11 @@
 <body>
 <nav class="topnav">
   <div class="topnav-left"><a href="/" class="topnav-brand"><img src="/img/logo.png" alt="AutoFácil"><span class="version-badge" id="versionBadge"></span></a>
-    <div class="breadcrumb-nav"><a href="/">Inicio</a> › <a href="/soporte/">Soporte</a> › <a href="/soporte/recursos-humanos/">Recursos Humanos</a> › <span style="color:#fff;font-weight:600"><i class="bi bi-award me-1"></i>Antigüedad</span></div></div>
+    <div class="breadcrumb-nav"><a href="/">Inicio</a> › <a href="/soporte/">Soporte</a> › <a href="/soporte/recursos-humanos/">Recursos Humanos</a> › <span style="color:#fff;font-weight:600"><i class="bi bi-award me-1"></i>Certificado de Antigüedad</span></div></div>
   <div style="display:flex;gap:10px;align-items:center"><span class="user-chip" id="navNombre">—</span><button class="btn-logout" onclick="logout()"><i class="bi bi-box-arrow-right me-1"></i>Salir</button></div>
 </nav>
 <div class="main">
-  <div class="page-banner"><i class="bi bi-award"></i><div><h2>Solicitudes de Antigüedad</h2><p>Pide tu certificado de antigüedad laboral; RRHH lo emite con tu fecha de ingreso.</p></div></div>
+  <div class="page-banner"><i class="bi bi-award"></i><div><h2>Certificado de Antigüedad</h2><p>Emite tu certificado de antigüedad laboral al instante, o solicítalo a RRHH.</p></div></div>
   <div class="tabs"><div class="tab active" id="t1" onclick="tab('crear')"><i class="bi bi-plus-circle me-1"></i>Nueva solicitud</div><div class="tab" id="t2" onclick="tab('mias')"><i class="bi bi-person me-1"></i>Mis solicitudes</div><div class="tab" id="t3" onclick="tab('bandeja')" style="display:none"><i class="bi bi-inbox me-1"></i>Bandeja RRHH<span class="badge-count" id="bandejaCount">0</span></div><div class="tab" id="t4" onclick="tab('historicas')" style="display:none"><i class="bi bi-clock-history me-1"></i>Solicitudes Históricas</div></div>
   <div id="secCrear">
     <div class="card-box" id="boxInstant" style="margin-bottom:16px">
@@ -100,7 +100,7 @@
         }catch(e){}
       }
       if(d.puede){ msg.innerHTML=`Llevas <b>${antiguedadStr(String(d.usuario.fecha_ingreso).slice(0,10))}</b> en AutoFácil. Puedes emitir tu certificado con validación QR al instante.`; btn.style.display=''; }
-      else { msg.innerHTML='⚠️ '+esc(d.mensaje||'No es posible emitir al instante.'); btn.style.display=d.es_rrhh?'':'none'; if(d.es_rrhh) btn.innerHTML='<i class="bi bi-award me-1"></i>Emitir (RRHH)'; }
+      else { msg.innerHTML='⚠️ '+esc(d.mensaje||'No es posible emitir al instante.'); btn.style.display=d.es_rrhh?'':'none'; if(d.es_rrhh) btn.innerHTML='<i class="bi bi-award me-1"></i>Emitir'; }
     }catch(e){ document.getElementById('instMsg').textContent='No se pudo verificar tu antigüedad.'; }
   }
   async function emitirCert(){
