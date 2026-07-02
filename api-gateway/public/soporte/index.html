@@ -94,15 +94,34 @@
     };
 
     async function cargar() {
-      let funcInfo = [];
+      let funcInfo = [], modsBD = [], placement = {};
       try {
-        const r = await fetch('/api/auth/mis-permisos?_='+Date.now(), { headers: H });
-        const j = await r.json();
+        const [r, rp] = await Promise.all([
+          fetch('/api/auth/mis-permisos?_='+Date.now(), { headers: H }),
+          fetch('/api/config/ui/placement_v2', { headers: H }),
+        ]);
+        const j = await r.json(); const jp = await rp.json();
         funcInfo = (j.funcionalidadesInfo || []).filter(f => f.href && f.href.startsWith('/soporte/') && f.href !== '/soporte/');
+        if (j.success && Array.isArray(j.data)) modsBD = j.data;
+        if (jp.success && jp.data) placement = jp.data;
       } catch {}
       const items = funcInfo.map(f => {
         const seg = f.href.replace('/soporte/', '').replace(/\/$/, '');
         return { seg, href: f.href, icon: f.icono || 'bi-grid', titulo: f.nombre, desc: DESCS[seg] || (typeof PLACEMENT_DESCS !== 'undefined' && PLACEMENT_DESCS[seg]) || '' };
+      });
+      // Extras movidos aquí via placement (Vista Pantallas): placement.soporte = [rutas de módulo o claves del manifiesto]
+      const yaHref = new Set(items.map(i => i.href));
+      const sopArr = Array.isArray(placement['soporte']) ? placement['soporte'] : [];
+      const normR = r => r ? (r.endsWith('/') ? r : r + '/') : r;
+      const modsByRuta = new Map(modsBD.map(m => [normR(m.ruta), m]));
+      sopArr.forEach(k => {
+        if (typeof k === 'string' && k.startsWith('/') && modsByRuta.has(normR(k)) && !yaHref.has(normR(k))) {
+          const m = modsByRuta.get(normR(k));
+          items.push({ seg: m.ruta.replace(/\//g, ''), href: m.ruta, icon: m.icono || 'bi-grid', titulo: m.nombre, desc: m.descripcion || (typeof PLACEMENT_DESCS !== 'undefined' && PLACEMENT_DESCS[k]) || '' });
+        } else if (typeof PLACEMENT_ITEMS !== 'undefined' && PLACEMENT_ITEMS[k] && !yaHref.has(PLACEMENT_ITEMS[k].href)) {
+          const v = PLACEMENT_ITEMS[k];
+          items.push({ seg: k, href: v.href, icon: v.icon, titulo: v.titulo, desc: (typeof PLACEMENT_DESCS !== 'undefined' && PLACEMENT_DESCS[k]) || v.desc || '' });
+        }
       });
       const grid = document.getElementById('modulesGrid');
       grid.innerHTML = items.length ? items.map(m => `
