@@ -176,8 +176,10 @@ const SALDO = `ROUND(
     END
   )`;
 
-// ── Cartera migrada de INDEXA (origen='INDEXA'): la mora/saldo salen del calendario
-//    REAL guardado en cuotas_credito (irregular), NO de la fórmula francesa. ──
+// ── Créditos CON calendario congelado en cuotas_credito (migración INDEXA,
+//    cartera cargada por Excel, etc.): la mora/saldo salen del calendario REAL
+//    (incluye el historial PAGADA), NO de la fórmula francesa teórica. ──
+const HAS_CAL = `EXISTS (SELECT 1 FROM cuotas_credito cx WHERE cx.id_credito = c.id)`;
 //    venc. de la cuota impaga más antigua / cuotas vencidas impagas / su monto /
 //    saldo insoluto = saldo de la última cuota PAGADA (cae a monto_financiado).
 const CC_VENC_OLDEST = `(SELECT cc.fecha_vencimiento FROM cuotas_credito cc
@@ -199,19 +201,19 @@ const MORA_SQL = (whereExtra = '', havingExtra = '') => `
     cl_m.email                                AS email_cliente,
     cl_m.sexo                                 AS sexo_cliente,
     COALESCE(pp.cnt, 0)                        AS cuotas_pagadas,
-    CASE WHEN c.origen='INDEXA' THEN ${CC_CUOTAS_MORA}
+    CASE WHEN ${HAS_CAL} THEN ${CC_CUOTAS_MORA}
          ELSE GREATEST(0, ${CV} - COALESCE(pp.cnt, 0)) END AS cuotas_mora,
-    CASE WHEN c.origen='INDEXA' THEN ${CC_MONTO_MORA}
+    CASE WHEN ${HAS_CAL} THEN ${CC_MONTO_MORA}
          ELSE GREATEST(0, ${CV} - COALESCE(pp.cnt, 0)) * COALESCE(c.cuota, 0) END AS monto_mora,
     CASE
-      WHEN c.origen='INDEXA' THEN GREATEST(0, DATEDIFF(CURDATE(), ${CC_VENC_OLDEST}))
+      WHEN ${HAS_CAL} THEN GREATEST(0, DATEDIFF(CURDATE(), ${CC_VENC_OLDEST}))
       WHEN GREATEST(0, ${CV} - COALESCE(pp.cnt, 0)) > 0
         THEN DATEDIFF(CURDATE(),
                DATE_ADD(c.fecha_primera_cuota,
                  INTERVAL COALESCE(pp.cnt, 0) MONTH))
       ELSE 0
     END AS dias_mora,
-    CASE WHEN c.origen='INDEXA' THEN ${CC_SALDO} ELSE ${SALDO} END AS saldo_insoluto
+    CASE WHEN ${HAS_CAL} THEN ${CC_SALDO} ELSE ${SALDO} END AS saldo_insoluto
   FROM creditos c
   LEFT JOIN clientes cl_m ON cl_m.id_cliente = c.id_cliente
   LEFT JOIN (
@@ -238,19 +240,19 @@ const MORA_CREDITO_SQL = `
     c.*,
     c.id                                      AS id_credito,
     COALESCE(pp.cnt, 0)                        AS cuotas_pagadas,
-    CASE WHEN c.origen='INDEXA' THEN ${CC_CUOTAS_MORA}
+    CASE WHEN ${HAS_CAL} THEN ${CC_CUOTAS_MORA}
          ELSE GREATEST(0, ${CV} - COALESCE(pp.cnt, 0)) END AS cuotas_mora,
-    CASE WHEN c.origen='INDEXA' THEN ${CC_MONTO_MORA}
+    CASE WHEN ${HAS_CAL} THEN ${CC_MONTO_MORA}
          ELSE GREATEST(0, ${CV} - COALESCE(pp.cnt, 0)) * COALESCE(c.cuota, 0) END AS monto_mora,
     CASE
-      WHEN c.origen='INDEXA' THEN GREATEST(0, DATEDIFF(CURDATE(), ${CC_VENC_OLDEST}))
+      WHEN ${HAS_CAL} THEN GREATEST(0, DATEDIFF(CURDATE(), ${CC_VENC_OLDEST}))
       WHEN GREATEST(0, ${CV} - COALESCE(pp.cnt, 0)) > 0
         THEN DATEDIFF(CURDATE(),
                DATE_ADD(c.fecha_primera_cuota,
                  INTERVAL COALESCE(pp.cnt, 0) MONTH))
       ELSE 0
     END AS dias_mora,
-    CASE WHEN c.origen='INDEXA' THEN ${CC_SALDO} ELSE ${SALDO} END AS saldo_insoluto,
+    CASE WHEN ${HAS_CAL} THEN ${CC_SALDO} ELSE ${SALDO} END AS saldo_insoluto,
     COALESCE(cl.rut,             '') AS rut_cliente,
     COALESCE(cl.nombre_completo, '') AS nombre_cliente,
     cl.sexo           AS sexo_cliente,
