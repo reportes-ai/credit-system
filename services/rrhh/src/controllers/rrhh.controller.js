@@ -339,8 +339,9 @@ const certEmitir = async (req, res) => {
     const meses = mesesAntiguedad(emp.fecha_ingreso);
     const hoy = hoyChile();
     const esF = emp.sexo === 'F';
+    const RUT = require('../../../../api-gateway/public/js/rut-core'); // motor único de RUT
     const vars = {
-      nombre: emp.nombre, rut: emp.rut || '—', cargo: emp.cargo || (esF ? 'Colaboradora' : 'Colaborador'),
+      nombre: emp.nombre, rut: emp.rut ? RUT.formatear(emp.rut) : '—', cargo: emp.cargo || (esF ? 'Colaboradora' : 'Colaborador'),
       don: esF ? 'doña' : 'don', interesado: esF ? 'de la interesada' : 'del interesado',
       fecha_ingreso: fechaLargaCL(emp.fecha_ingreso), antiguedad: antiguedadTexto(meses), fecha_emision: fechaLargaCL(hoy),
     };
