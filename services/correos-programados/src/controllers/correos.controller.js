@@ -198,16 +198,60 @@ async function buildResumenEjecutivo() {
   const [[mora]] = await pool.query(
     `SELECT COUNT(DISTINCT id_credito) ops, COALESCE(SUM(valor_cuota),0) monto
        FROM cuotas_credito WHERE estado_cuota<>'PAGADA' AND fecha_vencimiento < ?`, [ch.fecha]);
+  // Cumpleaños de MAÑANA (para que la gerencia salude)
+  const mnnD = new Date(`${ch.fecha}T12:00:00`); mnnD.setDate(mnnD.getDate() + 1);
+  const manana = `${mnnD.getFullYear()}-${String(mnnD.getMonth() + 1).padStart(2, '0')}-${String(mnnD.getDate()).padStart(2, '0')}`;
+  const [cumples] = await pool.query(
+    `SELECT CONCAT_WS(' ', nombre, apellido) nombre FROM usuarios
+      WHERE fecha_nacimiento IS NOT NULL AND estado='activo' AND MONTH(fecha_nacimiento)=MONTH(?) AND DAY(fecha_nacimiento)=DAY(?) LIMIT 10`, [manana, manana]);
+  // Ritmo por ejecutivo: mes actual vs mes anterior AL MISMO DÍA (detecta caídos)
+  const [ejMes] = await pool.query(
+    `SELECT ejecutivo, COUNT(*) ops FROM creditos WHERE estado_credito='OTORGADO' AND DATE_FORMAT(fecha_otorgado,'%Y-%m')=? AND ejecutivo<>'' GROUP BY ejecutivo`, [mesStr]);
+  const [ejMesAntMismoDia] = await pool.query(
+    `SELECT ejecutivo, COUNT(*) ops FROM creditos WHERE estado_credito='OTORGADO'
+      AND DATE_FORMAT(fecha_otorgado,'%Y-%m')=DATE_FORMAT(DATE_SUB(?, INTERVAL 1 MONTH),'%Y-%m')
+      AND DAY(fecha_otorgado) <= ? AND ejecutivo<>'' GROUP BY ejecutivo`, [ch.fecha, ch.day]);
+  // Flujo del embudo por ejecutivo (mes): ingresadas a análisis y aprobadas sin otorgar
+  const [ejIngresadas] = await pool.query(
+    `SELECT ejecutivo, COUNT(*) ops FROM creditos WHERE DATE_FORMAT(created_at,'%Y-%m')=? AND ejecutivo<>'' GROUP BY ejecutivo`, [mesStr]);
+  const [ejAprobSinCerrar] = await pool.query(
+    `SELECT ejecutivo, COUNT(*) ops FROM creditos WHERE estado_credito='APROBADO' AND ejecutivo<>'' GROUP BY ejecutivo ORDER BY ops DESC LIMIT 10`);
+  // Colocaciones por financiera: mes actual vs mes anterior al mismo día
+  const [finMes] = await pool.query(
+    `SELECT COALESCE(financiera,'—') financiera, COUNT(*) ops, COALESCE(SUM(monto_financiado),0) monto
+       FROM creditos WHERE estado_credito='OTORGADO' AND DATE_FORMAT(fecha_otorgado,'%Y-%m')=? GROUP BY financiera ORDER BY ops DESC`, [mesStr]);
+  const [finMesAnt] = await pool.query(
+    `SELECT COALESCE(financiera,'—') financiera, COUNT(*) ops FROM creditos WHERE estado_credito='OTORGADO'
+      AND DATE_FORMAT(fecha_otorgado,'%Y-%m')=DATE_FORMAT(DATE_SUB(?, INTERVAL 1 MONTH),'%Y-%m')
+      AND DAY(fecha_otorgado) <= ? GROUP BY financiera`, [ch.fecha, ch.day]);
+  // Presupuesto del mes (dashboard_config, mismo del Dashboard; monto en MM$)
+  let ppto = null;
+  try {
+    const [[p]] = await pool.query("SELECT config_value FROM dashboard_config WHERE config_key='presupuesto' LIMIT 1");
+    if (p) ppto = (JSON.parse(p.config_value) || []).find(x => x.mes === mesStr) || null;
+  } catch (_) {}
 
   const totAyer = ventasAyer.reduce((s, r) => s + Number(r.ops), 0);
   const montoAyer = ventasAyer.reduce((s, r) => s + Number(r.monto), 0);
+  const mapAnt = new Map(ejMesAntMismoDia.map(r => [keyEj(r.ejecutivo), Number(r.ops)]));
+  const ritmoEj = ejMes.map(r => ({ ejecutivo: titulo(r.ejecutivo), mes_actual: Number(r.ops), mes_anterior_mismo_dia: mapAnt.get(keyEj(r.ejecutivo)) || 0 }))
+    .map(x => ({ ...x, variacion: x.mes_actual - x.mes_anterior_mismo_dia }))
+    .sort((a, b) => a.variacion - b.variacion);
+  const mapFinAnt = new Map(finMesAnt.map(r => [r.financiera, Number(r.ops)]));
+  const finanzas = finMes.map(r => ({ financiera: r.financiera, ops: Number(r.ops), monto: Number(r.monto), mes_anterior_mismo_dia: mapFinAnt.get(r.financiera) || 0 }));
   const datos = {
     fecha_ayer: ayer,
     ventas_ayer: { total_creditos: totAyer, monto: montoAyer, por_ejecutivo: ventasAyer.map(r => ({ ejecutivo: titulo(r.ejecutivo), creditos: Number(r.ops), monto: Number(r.monto) })) },
     acumulado_mes: { creditos: Number(mes.ops), monto: Number(mes.monto), dia_del_mes: ch.day },
     mes_anterior_total_creditos: Number(mesAnt.ops),
+    presupuesto_mes: ppto ? { creditos: Number(ppto.ops), monto_mm: Number(ppto.monto) } : null,
+    colocaciones_por_financiera: finanzas,
+    ritmo_ejecutivos_vs_mes_anterior_mismo_dia: ritmoEj,
+    ingresadas_a_analisis_mes_por_ejecutivo: ejIngresadas.map(r => ({ ejecutivo: titulo(r.ejecutivo), ingresadas: Number(r.ops) })).sort((a, b) => a.ingresadas - b.ingresadas),
+    aprobados_sin_otorgar_por_ejecutivo: ejAprobSinCerrar.map(r => ({ ejecutivo: titulo(r.ejecutivo), pendientes: Number(r.ops) })),
     cartas_aprobacion: { vigentes: Number(cartas.vigentes || 0), por_vencer_hoy_o_manana: Number(cartas.por_vencer || 0), vigencia_dias: vigDias },
     mora_cartera: { creditos_en_mora: Number(mora.ops), monto_vencido: Number(mora.monto) },
+    cumpleanos_manana: cumples.map(c => titulo(c.nombre)),
   };
 
   // Narrativa IA (con red de seguridad: si falla, el correo sale igual)
@@ -216,9 +260,9 @@ async function buildResumenEjecutivo() {
     const { analizar } = require('../../../../shared/anthropic');
     const r = await analizar({
       codigo: 'resumen_ejecutivo',
-      system: 'Eres el analista de gestión de AutoFácil (crédito automotriz, Chile). Redacta un resumen ejecutivo BREVE del día para la gerencia: 2 a 3 párrafos cortos en español chileno profesional. Comenta las ventas de ayer (destaca ejecutivos si corresponde), el ritmo del mes vs el mes anterior, y cierra con las alertas accionables (cartas por vencer, mora) SOLO si ameritan. Montos en pesos chilenos con separador de miles (punto). Sin saludos, sin despedidas, sin markdown: devuelve HTML simple usando solo <p> y <b>.',
+      system: 'Eres el analista de gestión de AutoFácil (crédito automotriz, Chile). Redacta un resumen ejecutivo BREVE del día para la gerencia: 3 a 5 párrafos cortos en español chileno profesional. Cubre: (1) ventas de ayer, destacando ejecutivos; (2) ritmo del mes por financiera vs mes anterior al mismo día y avance vs presupuesto (presupuesto_mes.monto_mm está en MILLONES de pesos); (3) gestión comercial: qué ejecutivo viene CAÍDO vs el mes pasado al mismo día, quién ha ingresado menos operaciones a análisis y quién acumula aprobados sin otorgar (nómbralos con tino, en tono de gestión, no de funa); (4) alertas accionables (cartas por vencer, mora) solo si ameritan; (5) si hay cumpleaños mañana, ciérralo con una línea amable recordándolo. Montos en pesos chilenos con separador de miles (punto). Sin saludos ni despedidas ni markdown: devuelve HTML simple usando solo <p> y <b>.',
       prompt: 'Datos del negocio:\n' + JSON.stringify(datos, null, 2),
-      max_tokens: 700,
+      max_tokens: 1100,
     });
     narrativa = String(r.texto || '').trim();
   } catch (e) { console.error('[resumen ejecutivo IA]', e.message); }
@@ -263,6 +307,20 @@ async function buildResumenEjecutivo() {
           </tr></thead>
           <tbody>${filasEj}</tbody>
         </table>
+        <div style="font-weight:800;color:#0f172a;font-size:13px;margin:18px 0 8px;border-left:4px solid #0141A2;padding-left:10px">Colocaciones por financiera — ${esc(MESES[ch.month - 1])} (vs mes anterior al día ${ch.day})</div>
+        <table style="width:100%;border-collapse:collapse;font-size:12.5px">
+          <thead><tr>
+            <th style="color:#fff;padding:7px 12px;font-size:10.5px;font-weight:700;text-transform:uppercase;background:#2f6fd0;text-align:left">Financiera</th>
+            <th style="color:#fff;padding:7px 12px;font-size:10.5px;font-weight:700;text-transform:uppercase;background:#2f6fd0;text-align:center">Mes actual</th>
+            <th style="color:#fff;padding:7px 12px;font-size:10.5px;font-weight:700;text-transform:uppercase;background:#2f6fd0;text-align:center">Mes ant. (mismo día)</th>
+            <th style="color:#fff;padding:7px 12px;font-size:10.5px;font-weight:700;text-transform:uppercase;background:#2f6fd0;text-align:right">Monto</th>
+          </tr></thead>
+          <tbody>
+            ${finanzas.map(f => { const dif = f.ops - f.mes_anterior_mismo_dia; const c = dif >= 0 ? '#16a34a' : '#dc2626'; return `<tr><td style="padding:6px 12px;border-bottom:1px solid #eef2f7;color:#334155">${esc(f.financiera)}</td><td style="padding:6px 12px;border-bottom:1px solid #eef2f7;text-align:center;font-weight:700;color:#1d4ed8">${f.ops}</td><td style="padding:6px 12px;border-bottom:1px solid #eef2f7;text-align:center;color:#64748b">${f.mes_anterior_mismo_dia} <span style="color:${c};font-weight:700">(${dif >= 0 ? '+' : ''}${dif})</span></td><td style="padding:6px 12px;border-bottom:1px solid #eef2f7;text-align:right">${fmt(f.monto)}</td></tr>`; }).join('')}
+            ${ppto ? `<tr><td style="padding:7px 12px;font-weight:800;color:#0f3d8a;background:#eff6ff">Presupuesto del mes</td><td style="padding:7px 12px;text-align:center;font-weight:800;color:#0f3d8a;background:#eff6ff">${Number(ppto.ops)} ops <span style="font-weight:600;color:#64748b">(avance ${Math.round(datos.acumulado_mes.creditos / Number(ppto.ops) * 100)}%)</span></td><td style="padding:7px 12px;background:#eff6ff"></td><td style="padding:7px 12px;text-align:right;font-weight:800;color:#0f3d8a;background:#eff6ff">MM ${fmt(Number(ppto.monto))} <span style="font-weight:600;color:#64748b">(${Math.round(datos.acumulado_mes.monto / (Number(ppto.monto) * 1000000) * 100)}%)</span></td></tr>` : ''}
+          </tbody>
+        </table>
+        ${datos.cumpleanos_manana.length ? `<div style="margin-top:16px;background:#fff8e6;border:1px solid #fde68a;border-radius:10px;padding:10px 14px;font-size:12.5px;color:#7a5b00">🎂 <b>Cumpleaños de mañana:</b> ${datos.cumpleanos_manana.map(esc).join(', ')} — ¡no olviden saludar!</div>` : ''}
       </div>
       <div style="padding:14px 28px;border-top:1px solid #f1f5f9;color:#94a3b8;font-size:11px">
         Correo automático de AutoFácil · cifras del sistema al momento del envío.
