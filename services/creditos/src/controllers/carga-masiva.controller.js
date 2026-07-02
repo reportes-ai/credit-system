@@ -95,8 +95,15 @@ function normRut(v) {
   return RUT.normalizar(s) || s.replace(/\./g, '').toUpperCase();
 }
 function normNum(v) {
-  const s = norm(v);
+  if (v === null || v === undefined) return null;
+  if (typeof v === 'number') return isNaN(v) ? null : v;   // celda numérica del Excel: usar tal cual
+  let s = String(v).trim();
   if (!s || s.toUpperCase() === 'NO APLICA') return null;
+  s = s.replace(/%/g, '').trim();
+  // Formato chileno: coma = decimal, punto = miles. Con coma presente, ese es el
+  // separador decimal ("100,00" → 100.00, no 10000). Sin coma pero varios puntos = miles.
+  if (s.includes(',')) s = s.replace(/\./g, '').replace(',', '.');
+  else if ((s.match(/\./g) || []).length > 1) s = s.replace(/\./g, '');
   const n = parseFloat(s.replace(/[^0-9.\-]/g, ''));
   return isNaN(n) ? null : n;
 }
@@ -182,7 +189,9 @@ function mapRow(row, mesOverride) {
     valor_vehiculo:     i('VALOR VEHICULO', 'VALOR VEHÍCULO'),
     pie:                i('PIE'),
     saldo_precio:       i('SALDO PRECIO'),
-    pct_financiado:     n('% FINANCIADO'),
+    // % FINANCIADO: el archivo mezcla fracción (0,60) y texto porcentaje ("100,00%").
+    // Se normaliza a fracción (0-1): si el valor > 1,5 es un porcentaje → /100.
+    pct_financiado:     (() => { let v = n('% FINANCIADO'); if (v != null && v > 1.5) v = v / 100; return v; })(),
     impuesto:           i('IMPUESTO'),
     estado_impuesto:    s('ESTADO IMPTO', 'ESTADO IMPUESTO'),
     gastos:             i('GASTOS'),
