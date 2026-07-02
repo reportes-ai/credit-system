@@ -285,7 +285,7 @@ async function buildResumenEjecutivo() {
       <div style="padding:18px 28px 12px;background:#fff">
         <img src="${APP_URL}/img/logo.png" alt="AutoFácil" height="34" style="height:34px;width:auto;display:block">
       </div>
-      <div style="background:#0a1c3e;color:#fff;padding:18px 28px">
+      <div style="background:#012d70;background:linear-gradient(135deg,#012d70,#0141A2 50%,#009AFE);color:#fff;padding:18px 28px">
         <div style="font-size:18px;font-weight:800;letter-spacing:.2px">Resumen Ejecutivo Diario</div>
         <div style="font-size:13px;color:#cbd5e1;margin-top:4px;text-transform:capitalize">${esc(fechaLarga)}</div>
         <div style="font-size:11px;color:#8fa3c4;margin-top:2px">Redactado con ${narrativa && narrativa.includes('<p>') ? 'Inteligencia Artificial sobre' : ''} datos en vivo del sistema</div>
