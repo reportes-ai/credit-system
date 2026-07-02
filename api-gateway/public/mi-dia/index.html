@@ -84,18 +84,28 @@
     const wrap=document.getElementById('calWrap'), box=document.getElementById('cal');
     if(!c.disponible){ wrap.style.display='none'; return; }  // Google no configurado en el server
     wrap.style.display='';
+    const listaEventos=(ev)=>ev.map(e=>`
+      <div class="cal-ev"><div class="hora">${esc(e.hora)}</div><div class="tit">${esc(e.titulo)}${e.ubicacion?`<div class="loc"><i class="bi bi-geo-alt"></i> ${esc(e.ubicacion)}</div>`:''}</div>${e.link?`<a href="${esc(e.link)}" target="_blank" style="color:#94a3b8"><i class="bi bi-box-arrow-up-right"></i></a>`:''}</div>`).join('');
+
+    if(c.auto){  // CENTRALIZADO: sin botón de conectar
+      if(c.error==='sin_email'){ box.innerHTML='<div class="empty">Tu usuario no tiene correo registrado; pídele a RRHH que lo complete para ver tu agenda.</div>'; return; }
+      if(c.error){ box.innerHTML='<div class="empty">No se pudo leer tu calendario. Verifica con el administrador que la delegación de Google esté autorizada.</div>'; return; }
+      const ev=c.eventos||[];
+      const head=`<div style="font-size:.78rem;color:#94a3b8;margin-bottom:6px">${esc(c.email||'')}</div>`;
+      box.innerHTML=head+(ev.length?listaEventos(ev):'<div class="empty">No tienes eventos hoy. 🎉</div>');
+      return;
+    }
+    // MODO OAUTH (respaldo): botón conectar / desconectar
     if(!c.conectado){
       box.innerHTML=`<div style="display:flex;align-items:center;justify-content:space-between;gap:16px;flex-wrap:wrap">
         <div style="font-size:.88rem;color:#475569">Conecta tu Google Calendar para ver aquí tus reuniones del día.</div>
-        <button class="btn-g" onclick="conectarGoogle()"><img src="https://www.google.com/favicon.ico" onerror="this.style.display='none'" width="16" height="16"><i class="bi bi-google" style="color:#4285F4"></i> Conectar Google Calendar</button>
+        <button class="btn-g" onclick="conectarGoogle()"><i class="bi bi-google" style="color:#4285F4"></i> Conectar Google Calendar</button>
       </div>`;
       return;
     }
     const ev=c.eventos||[];
     const head=`<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px"><div style="font-size:.78rem;color:#94a3b8">${esc(c.email||'')}</div><button class="btn-g" style="padding:4px 10px;font-size:.76rem" onclick="desconectarGoogle()">Desconectar</button></div>`;
-    if(!ev.length){ box.innerHTML=head+'<div class="empty">No tienes eventos hoy. 🎉</div>'; return; }
-    box.innerHTML=head+ev.map(e=>`
-      <div class="cal-ev"><div class="hora">${esc(e.hora)}</div><div class="tit">${esc(e.titulo)}${e.ubicacion?`<div class="loc"><i class="bi bi-geo-alt"></i> ${esc(e.ubicacion)}</div>`:''}</div>${e.link?`<a href="${esc(e.link)}" target="_blank" style="color:#94a3b8"><i class="bi bi-box-arrow-up-right"></i></a>`:''}</div>`).join('');
+    box.innerHTML=head+(ev.length?listaEventos(ev):'<div class="empty">No tienes eventos hoy. 🎉</div>');
   }
 
   async function conectarGoogle(){

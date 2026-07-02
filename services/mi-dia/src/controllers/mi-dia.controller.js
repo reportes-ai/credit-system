@@ -158,13 +158,12 @@ const panel = async (req, res) => {
       widgets.push({ codigo, nombre: w.nombre, icono: w.icono, color: w.color, href: w.href, destacado: !!w.destacado, n });
     }
 
-    // Google Calendar del usuario
-    let calendario = { disponible: G.configurado(), conectado: false, eventos: [] };
+    // Google Calendar del usuario (centralizado por cuenta de servicio, o OAuth)
+    let calendario = { disponible: false };
     if (G.configurado()) {
-      const est = await G.estado(u.id_usuario);
-      calendario.conectado = est.conectado;
-      calendario.email = est.email;
-      if (est.conectado) { const ev = await G.eventosHoy(u.id_usuario); calendario.eventos = ev || []; }
+      let email = u.email;
+      if (!email) { try { const [[ur]] = await pool.query('SELECT email FROM usuarios WHERE id_usuario=? LIMIT 1', [u.id_usuario]); email = ur && ur.email; } catch (_) {} }
+      calendario = await G.agendaHoy({ id_usuario: u.id_usuario, email });
     }
 
     res.json({ success: true, data: {
@@ -217,13 +216,9 @@ const googleCallback = async (req, res) => {
     cerrar('¡Google Calendar conectado!', true);
   } catch (e) { console.error('[google callback]', e.message); cerrar('No se pudo conectar Google Calendar', false); }
 };
-const googleStatus = async (req, res) => {
-  try { res.json({ success: true, data: await G.estado(req.usuario.id_usuario), error: null }); }
-  catch (e) { res.status(500).json({ success: false, data: null, error: 'Error' }); }
-};
 const googleDisconnect = async (req, res) => {
   try { await G.desconectar(req.usuario.id_usuario); res.json({ success: true, data: { ok: true }, error: null }); }
   catch (e) { res.status(500).json({ success: false, data: null, error: 'Error' }); }
 };
 
-module.exports = { panel, catalogo, guardarConfig, googleConnect, googleCallback, googleStatus, googleDisconnect };
+module.exports = { panel, catalogo, guardarConfig, googleConnect, googleCallback, googleDisconnect };
