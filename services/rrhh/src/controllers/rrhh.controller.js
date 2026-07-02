@@ -98,7 +98,7 @@ const { notificar } = require('../../../notificaciones/src/controllers/notificac
       ['cumple_linea1', 'Que tengas un día hermoso y muy especial'],
       ['cumple_linea2', 'Te desean tus compañeros de AutoFácil'],
       ['cumple_aviso_titulo', '🎂 ¡Hoy está de cumpleaños {nombre}!'],
-      ['cumple_aviso_msg', 'No olvides saludarlo(a) y desearle un gran día.'],
+      ['cumple_aviso_msg', 'No olvides saludar{lo} y desearle un gran día.'],
     ];
     for (const [k, v] of defaults) await pool.query('INSERT IGNORE INTO rh_config (clave, valor) VALUES (?,?)', [k, v]);
   } catch (e) { console.error('[rh_config migration]', e.message); }
@@ -409,12 +409,12 @@ const cumpleHoy = async (req, res) => {
     if (cfg.cumple_campana_activo !== '1') return res.json({ success: true, data: { avisos: [] }, error: null });
     const hoy = hoyChile();
     const [cumps] = await pool.query(
-      "SELECT id_usuario, CONCAT_WS(' ', nombre, apellido) nombre FROM usuarios WHERE fecha_nacimiento IS NOT NULL AND MONTH(fecha_nacimiento)=MONTH(?) AND DAY(fecha_nacimiento)=DAY(?) AND estado='activo' AND id_usuario<>? LIMIT 20",
+      "SELECT id_usuario, CONCAT_WS(' ', nombre, apellido) nombre, sexo FROM usuarios WHERE fecha_nacimiento IS NOT NULL AND MONTH(fecha_nacimiento)=MONTH(?) AND DAY(fecha_nacimiento)=DAY(?) AND estado='activo' AND id_usuario<>? LIMIT 20",
       [hoy, hoy, u.id_usuario || 0]);
-    const avisos = cumps.map(c => ({
-      id: c.id_usuario, fecha: hoy,
-      texto: tpl(cfg.cumple_aviso_titulo, { nombre: c.nombre }) + ' ' + tpl(cfg.cumple_aviso_msg, { nombre: c.nombre }),
-    }));
+    const avisos = cumps.map(c => {
+      const vars = { nombre: c.nombre, lo: c.sexo === 'F' ? 'la' : 'lo' }; // saludar{lo} → saludarlo/saludarla
+      return { id: c.id_usuario, fecha: hoy, texto: tpl(cfg.cumple_aviso_titulo, vars) + ' ' + tpl(cfg.cumple_aviso_msg, vars) };
+    });
     res.json({ success: true, data: { avisos }, error: null });
   } catch (e) { res.status(500).json({ success: false, data: { avisos: [] }, error: 'Error' }); }
 };

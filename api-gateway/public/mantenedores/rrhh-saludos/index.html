@@ -50,7 +50,7 @@
   <div class="card-box">
     <h5><i class="bi bi-megaphone"></i> Aviso a los compañeros (banner superior, como el de créditos nuevos)</h5>
     <div class="switch-row"><input type="checkbox" id="cumple_campana_activo" class="form-check-input"> Aviso activo</div>
-    <div class="fld"><label>Título del aviso</label><input id="cumple_aviso_titulo"><div class="hint">Usa {nombre} para el nombre del cumpleañero.</div></div>
+    <div class="fld"><label>Título del aviso</label><input id="cumple_aviso_titulo"><div class="hint">Usa {nombre} para el nombre y {lo} para lo/la según el sexo (ej. saludar{lo} → saludarlo/saludarla).</div></div>
     <div class="fld"><label>Mensaje</label><input id="cumple_aviso_msg"></div>
     <button class="btn-test" onclick="probarBanner()"><i class="bi bi-megaphone me-1"></i>Probar banner</button>
   </div>
@@ -110,7 +110,8 @@
   }
   function probarBanner(){
     const nombre='Juan Pérez';
-    const texto=document.getElementById('cumple_aviso_titulo').value.replace(/\{nombre\}/g,nombre)+' '+document.getElementById('cumple_aviso_msg').value.replace(/\{nombre\}/g,nombre);
+    const rep=s=>s.replace(/\{nombre\}/g,nombre).replace(/\{lo\}/g,'lo');
+    const texto=rep(document.getElementById('cumple_aviso_titulo').value)+' '+rep(document.getElementById('cumple_aviso_msg').value);
     const go=()=>window.AF_CUMPLE_BANNER(texto);
     if(window.AF_CUMPLE_BANNER) return go();
     const s=document.createElement('script'); s.src='/js/cumple-popup.js'; s.onload=go; document.head.appendChild(s);
