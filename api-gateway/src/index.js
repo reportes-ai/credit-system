@@ -200,6 +200,7 @@ app.use('/api/certificados', require('../../services/certificados/src/routes/cer
 
 // Comisiones ejecutivos
 app.use('/api/comisiones', require('../../services/comisiones/src/routes/comisiones.routes'));
+app.use('/api/bono-jefe',  require('../../services/comisiones/src/routes/bono-jefe.routes'));
 
 // Auditoría de movimientos (logins + bitácora transversal)
 app.use('/api/auditoria-mov', require('../../services/auditoria/src/routes/auditoria.routes'));
@@ -373,6 +374,7 @@ const PAGINAS = [
   ['/ordenes-pago/estadisticas', 'ordenes-pago/estadisticas/index.html'],
   ['/soporte', 'soporte/index.html'],
   ['/soporte/compras', 'soporte/compras/index.html'],
+  ['/soporte/bono-jefe', 'soporte/bono-jefe/index.html'],
   ['/soporte/tickets-ti', 'soporte/tickets-ti/index.html'],
   ['/recursos-humanos', 'recursos-humanos/index.html'],
   ['/soporte/recursos-humanos', 'recursos-humanos/index.html'],
