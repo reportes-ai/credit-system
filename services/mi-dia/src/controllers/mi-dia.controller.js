@@ -17,10 +17,7 @@ function tieneFunc(id, ...codigos) {
 
 const norm = s => String(s || '').normalize('NFD').replace(/[̀-ͯ]/g, '').toUpperCase().replace(/\s+/g, ' ').trim();
 const keyEj = s => norm(s).split(' ').filter(Boolean).sort().join(' ');
-function mesChile() {
-  const p = new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Santiago', year: 'numeric', month: '2-digit' }).format(new Date());
-  return p.slice(0, 7);
-}
+const { mesChile } = require('../../../../shared/utils/fecha-futura');   // MOTOR ÚNICO fecha/hora Chile
 async function nombreEjecutivo(u) {
   // Convención: en creditos.ejecutivo se guarda "PRIMER nombre + apellido PATERNO"
   const n = String(u.nombre || '').trim().split(/\s+/)[0] || '';

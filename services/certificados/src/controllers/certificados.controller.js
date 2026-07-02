@@ -9,6 +9,7 @@
           CERT_PREAPROBADO.
    ════════════════════════════════════════════════════════════════════════ */
 const pool = require('../../../../shared/config/database');
+const { hoyChile } = require('../../../../shared/utils/fecha-futura');   // MOTOR ÚNICO fecha/hora Chile
 const { registrarVerificable, anularVerificable } = require('../../../../shared/verificacion');
 const { auditar } = require('../../../../shared/audit');
 // Lógica canónica de cobranza (interés por mora + gastos de cobranza, parametrizables).
@@ -389,7 +390,7 @@ async function calcularPrepago(num_op) {
       dias_corrientes: diasCorr, cuotas_mora: nM, cuotas_vigentes: nV, detalle,
     };
   };
-  const hoyISO = new Date().toLocaleDateString('sv-SE', { timeZone: 'America/Santiago' });
+  const hoyISO = hoyChile();
   const liq = await liquidar(hoyISO);
   const proyeccion = [];
   for (const f of await proxDiasHabiles(hoyISO, 3)) proyeccion.push({ fecha: f, total: (await liquidar(f)).saldo_insoluto });

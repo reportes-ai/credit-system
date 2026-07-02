@@ -143,9 +143,7 @@ function fail(res, error, status = 400) {
   }
   return res.status(status).json({ success: false, data: null, error });
 }
-function hoyChile() {
-  return new Date().toLocaleDateString('sv-SE', { timeZone: 'America/Santiago' });
-}
+const { hoyChile } = require('../../../../shared/utils/fecha-futura');   // MOTOR ÚNICO fecha/hora Chile
 
 // ─── Query base de mora ────────────────────────────────────────────────────────
 // ⚠ GEMELO SQL del MOTOR ÚNICO /js/mora-core.js (por rendimiento: filtra miles de
@@ -931,7 +929,7 @@ exports.calcularCobranza = async (req, res) => {
     const fechaVenc = req.body?.fecha_vencimiento;
     if (!cuota || !fechaVenc)
       return fail(res, 'monto_cuota y fecha_vencimiento son requeridos');
-    const fechaCalc = req.body?.fecha_calculo || new Date().toLocaleDateString('sv-SE', { timeZone: 'America/Santiago' });
+    const fechaCalc = req.body?.fecha_calculo || hoyChile();
     const tramo = req.body?.tramo === 'mayor' ? 'mayor' : 'menor';
 
     const cfg = await getCobranzaConfig();
@@ -972,7 +970,7 @@ exports.calcularCobranzaLote = async (req, res) => {
     const { id_credito, cuotas } = req.body || {};
     if (!Array.isArray(cuotas) || !cuotas.length)
       return fail(res, 'cuotas requeridas');
-    const fechaCalc = req.body?.fecha_calculo || new Date().toLocaleDateString('sv-SE', { timeZone: 'America/Santiago' });
+    const fechaCalc = req.body?.fecha_calculo || hoyChile();
 
     const cfg = await getCobranzaConfig();
     const gastosDias = Number(cfg.gastos_dias) || 21;

@@ -33,4 +33,27 @@ function esFechaFutura(v) {
   return s > hoyChile();   // comparación lexicográfica YYYY-MM-DD == cronológica
 }
 
-module.exports = { esFechaFutura, hoyChile, hoyChileDMY };
+/* ── Helpers canónicos de fecha/hora CHILE (MOTOR ÚNICO de timezone) ──────────
+   Cualquier "hoy/ahora/mes" de negocio debe salir de aquí — nunca de new Date()
+   directo (el servidor corre en UTC) ni de copias locales por módulo. */
+
+// 'YYYY-MM' del mes actual en Chile
+function mesChile() {
+  return hoyChile().slice(0, 7);
+}
+
+// 'HH:MM' (24h) hora actual de Chile
+function horaChile() {
+  const p = new Intl.DateTimeFormat('en-GB', { timeZone: 'America/Santiago', hour: '2-digit', minute: '2-digit', hour12: false })
+    .formatToParts(new Date()).reduce((o, x) => (o[x.type] = x.value, o), {});
+  return `${p.hour === '24' ? '00' : p.hour}:${p.minute}`;
+}
+
+// Componentes de ahora en Chile: { fecha:'YYYY-MM-DD', hhmm:'HH:MM', year, month(1-12), day, dow(0=Dom) }
+function ahoraChile() {
+  const fecha = hoyChile();
+  const [y, m, d] = fecha.split('-').map(Number);
+  return { fecha, hhmm: horaChile(), year: y, month: m, day: d, dow: new Date(fecha + 'T12:00:00Z').getUTCDay() };
+}
+
+module.exports = { esFechaFutura, hoyChile, hoyChileDMY, mesChile, horaChile, ahoraChile };

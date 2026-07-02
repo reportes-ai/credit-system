@@ -81,9 +81,7 @@ function fail(res, error, status = 400) {
   return res.status(status).json({ success: false, data: null, error });
 }
 
-function hoyChile() {
-  return new Date().toLocaleDateString('sv-SE', { timeZone: 'America/Santiago' });
-}
+const { hoyChile } = require('../../../../shared/utils/fecha-futura');   // MOTOR ÚNICO fecha/hora Chile
 
 // ─── list ─────────────────────────────────────────────────────────────────────
 exports.list = async (req, res) => {

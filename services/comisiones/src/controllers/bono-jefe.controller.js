@@ -12,6 +12,7 @@
    Variables paramétricas en bono_jefe_config (pestaña restringida).
    ════════════════════════════════════════════════════════════════════════ */
 const pool = require('../../../../shared/config/database');
+const { mesChile } = require('../../../../shared/utils/fecha-futura');   // MOTOR ÚNICO fecha/hora Chile
 const { auditar } = require('../../../../shared/audit');
 
 /* ── Migración: tabla de config + funcionalidades (card Soporte) ── */
@@ -83,7 +84,7 @@ function premioDe(score, cfg) {
 /* ── Cálculo central del BSC (lo usan la vista y el informe por correo) ── */
 async function calcularBSC(mesQ) {
     const mes = /^\d{4}-\d{2}$/.test(mesQ || '') ? mesQ
-      : new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Santiago', year: 'numeric', month: '2-digit' }).format(new Date()).slice(0, 7);
+      : mesChile();
     const cfg = await getCfg();
 
     // Equipo: Ejecutivos Comerciales activos (convención: primer nombre + apellido paterno)

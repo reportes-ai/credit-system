@@ -1,4 +1,5 @@
 const pool  = require('../../../../shared/config/database');
+const { hoyChile } = require('../../../../shared/utils/fecha-futura');   // MOTOR ÚNICO fecha/hora Chile
 const audit = require('../../../../shared/auditoria');
 const { auditar } = require('../../../../shared/audit');
 const { _calc: COB } = require('../../../cobranza/src/controllers/cobranza.controller');
@@ -131,7 +132,7 @@ async function cobranzaFullMap(id_credito, pagos, fechaCalc) {
 
 async function validarCondonacionTopes({ id_credito, id_caja, id_usuario, pagos, fecha_pago }) {
   const fechaCalc = (fecha_pago ? String(fecha_pago).slice(0, 10) : null)
-    || new Date().toLocaleDateString('sv-SE', { timeZone: 'America/Santiago' });
+    || hoyChile();
   const fullMap = await cobranzaFullMap(id_credito, pagos, fechaCalc);
   let perm = null;
   try {
@@ -566,7 +567,7 @@ const prepagar = async (req, res) => {
     const reg = [u.nombre, u.apellido].filter(Boolean).join(' ') || u.email || null;
     const idCajaInt = parseInt(id_caja) || null;
     const idCtaInt = parseInt(b.id_cuenta_bancaria) || null;
-    const fp = b.fecha_pago || new Date().toLocaleDateString('sv-SE', { timeZone: 'America/Santiago' });
+    const fp = b.fecha_pago || hoyChile();
     const obs = b.observacion || 'Prepago';
 
     const detalle = d.detalle || [];
