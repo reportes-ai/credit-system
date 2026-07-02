@@ -371,7 +371,8 @@ const certEmitir = async (req, res) => {
       data: { codigo, fecha_emision: hoy, nombre: emp.nombre, rut: emp.rut, cargo: vars.cargo,
               fecha_ingreso: isoFecha(emp.fecha_ingreso), antiguedad: vars.antiguedad,
               cuerpo_html: tpl(cfg.cert_cuerpo, vars), cierre_html: tpl(cfg.cert_cierre, vars),
-              firmante: nombreDe(u), firmante_cargo: cargoFirmante || u.perfil_nombre || null },
+              firmante: nombreDe(u), firmante_cargo: cargoFirmante || u.perfil_nombre || null,
+              autogenerado: !tercero, solicitante: emp.nombre },
     });
   } catch (e) { console.error('[rrhh certEmitir]', e.message); res.status(500).json({ success: false, data: null, error: 'Error interno del servidor' }); }
 };
