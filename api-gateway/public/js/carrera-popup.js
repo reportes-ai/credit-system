@@ -30,8 +30,8 @@
       return `
       <div style="position:relative;height:31px;background:${laneColors[i % 2]};border-bottom:2px dashed rgba(255,255,255,.55)">
         <div style="position:absolute;left:10px;top:50%;transform:translateY(-50%);z-index:2;font-size:10px;font-weight:800;color:#fff;text-shadow:0 1px 3px rgba(0,0,0,.55);max-width:140px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${i + 1}. ${esc(c.nombre)}</div>
-        <div class="af-cr-runner" data-pct="${pct}" style="position:absolute;left:0%;top:50%;transform:translateY(-50%);z-index:3;font-size:18px;animation:afCrCorre ${(0.5 + Math.random() * 0.3).toFixed(2)}s ease-in-out infinite;filter:drop-shadow(0 2px 3px rgba(0,0,0,.4))">${emoji}</div>
-        <div class="af-cr-chip" style="position:absolute;left:0%;top:50%;transform:translate(24px,-50%);z-index:3;background:rgba(0,0,0,.55);color:#fff;border-radius:10px;padding:1px 7px;font-size:9.5px;font-weight:800;white-space:nowrap">${c.ops} <span style="font-weight:600;opacity:.8">/ ${meta}</span>${c.monto ? ` · <span style="color:#ffd740">${clp(c.monto)}</span>` : ''}</div>
+        <div class="af-cr-runner" data-pct="${pct}" style="position:absolute;left:26%;top:50%;transform:translateY(-50%);z-index:3;font-size:18px;animation:afCrCorre ${(0.5 + Math.random() * 0.3).toFixed(2)}s ease-in-out infinite;filter:drop-shadow(0 2px 3px rgba(0,0,0,.4))">${emoji}</div>
+        <div class="af-cr-chip" style="position:absolute;left:26%;top:50%;transform:translate(24px,-50%);z-index:3;background:rgba(0,0,0,.55);color:#fff;border-radius:10px;padding:1px 7px;font-size:9.5px;font-weight:800;white-space:nowrap">${c.ops} <span style="font-weight:600;opacity:.8">/ ${meta}</span>${c.monto ? ` · <span style="color:#ffd740">${clp(c.monto)}</span>` : ''}</div>
       </div>`;
     };
     // Línea de meta a cuadros
@@ -46,7 +46,7 @@
       // Pista: pasto + carriles tartán + partida y meta
       '<div style="background:#14532d;border-radius:12px;padding:10px 9px">' +
       '<div style="position:relative;border-radius:8px;overflow:hidden;border:3px solid #fff3">' +
-      '<div style="position:absolute;left:24px;top:0;bottom:0;width:3px;background:#fff;opacity:.8;z-index:4"></div>' +   // partida
+      '<div style="position:absolute;left:26%;top:0;bottom:0;width:3px;background:#fff;opacity:.8;z-index:1"></div>' +   // partida (deja espacio a los nombres)
       '<div style="position:absolute;right:14px;top:0;bottom:0;width:14px;background:' + cuadros + ';z-index:4;opacity:.95"></div>' + // meta a cuadros
       corredores.map(carril).join('') +
       '</div>' +
@@ -59,7 +59,7 @@
     setTimeout(() => {
       ov.querySelectorAll('.af-cr-runner').forEach(r => {
         const pct = Number(r.dataset.pct) || 0;
-        const left = 3 + pct * 85; // 3% partida → 88% meta
+        const left = 26 + pct * 60; // 26% partida (tras los nombres) → 86% meta
         r.style.left = left + '%';
         const chip = r.parentElement.querySelector('.af-cr-chip');
         if (chip) { chip.style.transition = 'left 1.6s cubic-bezier(.25,.9,.35,1)'; chip.style.left = left + '%'; }

@@ -87,8 +87,10 @@
     const j=await(await fetch('/api/carrera/popup?test=1',{headers:H})).json(); const d=j.data||{};
     if(!d.mostrar) return alert('No hay Ejecutivos Comerciales activos para dibujar la pista.');
     d.meta=parseInt(document.getElementById('meta_ops').value,10)||d.meta;
-    d.titulo=document.getElementById('titulo').value.replace(/\{mes\}/g,(d.titulo.match(/— (.+)$/)||[])[1]||'MES').replace(/\{meta\}/g,d.meta)||d.titulo;
-    d.subtitulo=document.getElementById('subtitulo').value.replace(/\{meta\}/g,d.meta)||d.subtitulo;
+    const hoy=new Date().toLocaleDateString('es-CL',{day:'numeric',month:'long'});
+    const rep=s=>s.replace(/\{mes\}/g,(d.titulo.match(/— (.+)$/)||[])[1]||'MES').replace(/\{meta\}/g,d.meta).replace(/\{fecha\}/g,hoy);
+    d.titulo=rep(document.getElementById('titulo').value)||d.titulo;
+    d.subtitulo=rep(document.getElementById('subtitulo').value)||d.subtitulo;
     const go=()=>window.AF_CARRERA.probar(d);
     if(window.AF_CARRERA) return go();
     const s=document.createElement('script'); s.src='/js/carrera-popup.js'; s.onload=go; document.head.appendChild(s);
