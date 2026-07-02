@@ -2,7 +2,7 @@
 <html lang="es">
 <head>
 <meta charset="UTF-8">
-<!-- v1.7 — nombre de PDF con tipo, N° op, RUT y nombre -->
+<!-- v1.8 — Firma Electrónica Simple (Ley 19.799) en el pie del certificado -->
 <link rel="icon" href="/img/favicon.png" type="image/png">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Certificados — AutoFácil</title>
@@ -309,7 +309,10 @@ function render(d){
         <div class="empresa">Auto Fácil SpA</div>
       </div>
       <div>${qr}</div>
-    </div>`;
+    </div>
+    ${d.emitido_por ? `<div style="margin-top:14px;padding-top:8px;border-top:1px dashed #cbd5e1;font-size:.72rem;color:#64748b;text-align:center">
+      Firmado electrónicamente por <b>${esc(d.emitido_por)}</b>${d.firmante_cargo?', '+esc(d.firmante_cargo):''} — Firma Electrónica Simple, Ley N° 19.799.
+      Verifique autenticidad e integridad escaneando el código QR (folio ${esc(d.codigo)}).</div>` : ''}`;
   $('certWrap').style.display='block';
   $('vEmitir').classList.add('hide'); $('vHist').classList.add('hide');
   window.scrollTo({top:0,behavior:'smooth'});

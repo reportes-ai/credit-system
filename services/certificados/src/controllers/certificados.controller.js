@@ -489,15 +489,21 @@ const generar = async (req, res) => {
     const refId = out.num_op
       ? `${out.tipo}:${out.num_op}${out.datos.numero_cuota ? ':' + out.datos.numero_cuota : ''}`
       : (out.datos && out.datos.op_carta ? `${out.tipo}:${out.datos.op_carta}` : `${out.tipo}:${out.rut}:${Date.now()}`);
+    // Firma Electrónica Simple (Ley 19.799): quién emite firma el documento
+    let cargoFirmante = null;
+    try { const [[uf]] = await pool.query('SELECT cargo FROM usuarios WHERE id_usuario=? LIMIT 1', [req.usuario && req.usuario.id_usuario]); cargoFirmante = uf && uf.cargo; } catch (_) {}
+    const ipReq = (req.headers['x-forwarded-for'] || '').split(',')[0].trim() || req.socket?.remoteAddress || null;
     const codigo = await registrarVerificable({
       tipo: out.tipo, ref_tabla: 'certificados', ref_id: refId,
       num_op: out.num_op, rut: out.rut, nombre: out.nombre, datos: out.datos, emitido_por: emisor,
+      firmante: req.usuario ? { id: req.usuario.id_usuario, nombre: emisor, cargo: cargoFirmante || req.usuario.perfil_nombre || null, ip: ipReq } : null,
     });
     // Snapshot COMPLETO "en duro" (inmutable): se guarda todo lo necesario para
     // re-ver el documento idéntico aunque cambie el crédito después.
     const snapshot = {
       tipo: out.tipo, tipo_label: TIPOS[out.tipo], num_op: out.num_op,
       rut: out.rut, nombre: out.nombre, credito: out.credito, datos: out.datos, emitido_por: emisor,
+      firmante_cargo: cargoFirmante || (req.usuario && req.usuario.perfil_nombre) || null,
       cuerpo_html: txt.cuerpo_html, cierre_html: txt.cierre_html,
     };
     // registro propio (idempotente por codigo)
@@ -511,7 +517,7 @@ const generar = async (req, res) => {
         [codigo, out.tipo, out.num_op, out.rut, out.nombre, JSON.stringify(snapshot), emisor, req.usuario && req.usuario.id_usuario]);
     }
     try { auditar({ req, accion: 'EMITIR', modulo: 'certificados', entidad: out.tipo, entidad_id: codigo, detalle: `${TIPOS[out.tipo]} — ${out.nombre || ''} (op ${out.num_op || '—'})` }); } catch (_) {}
-    res.json({ success: true, data: { ...out, ...txt, codigo, tipo_label: TIPOS[out.tipo], emitido_por: emisor, fecha_emision: feISO }, error: null });
+    res.json({ success: true, data: { ...out, ...txt, codigo, tipo_label: TIPOS[out.tipo], emitido_por: emisor, firmante_cargo: cargoFirmante || (req.usuario && req.usuario.perfil_nombre) || null, fecha_emision: feISO }, error: null });
   } catch (e) {
     if (e && e.code) return res.status(e.code).json({ success: false, data: null, error: e.msg });
     console.error('[certificados generar]', e);
