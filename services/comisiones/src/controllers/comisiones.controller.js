@@ -24,7 +24,7 @@ const { auditar } = require('../../../../shared/audit');
       ['meta_unidad',   3,      'Meta créditos UNIDAD (calidad)',  'Cantidad de créditos UNIDAD DE CRÉDITO en el mes para alcanzar el 100% del indicador de calidad', 'factor'],
       ['umbral_cesantia',0.65,  'Umbral mínimo cesantía',          'Si el cruce es ≤ este valor el aporte de cesantía es 0',          'porcentaje'],
       ['umbral_rep',    0.50,   'Umbral mínimo reparaciones',      'Si el cruce es ≤ este valor el aporte de reparaciones es 0',      'porcentaje'],
-      ['semana_corrida',1.20,   'Multiplicador semana corrida',    'Factor aproximado para cálculo con semana corrida',               'multiplicador'],
+      ['semana_corrida',1.1667, 'Multiplicador semana corrida',    'Incentivo final × 1,1667 = +16,67% por semana corrida (mismo % que el Bono Jefe Comercial)', 'multiplicador'],
     ];
     for (const [clave, valor, etiqueta, descripcion, tipo] of defaults) {
       await pool.query(

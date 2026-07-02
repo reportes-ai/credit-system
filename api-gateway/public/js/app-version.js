@@ -2,7 +2,7 @@
    AutoFácil — Versión global de la aplicación
    Editar SOLO este archivo para cambiar la versión
    ───────────────────────────────────────────── */
-const APP_VERSION = 'v81.9';
+const APP_VERSION = 'v81.10';
 
 /* ── PWA: instalable como app de escritorio (ventana propia, sin barras) ──
    Inyecta el manifest y registra el service worker en TODAS las páginas.
