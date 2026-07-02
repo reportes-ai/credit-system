@@ -37,6 +37,18 @@ const MESES = ['enero', 'febrero', 'marzo', 'abril', 'mayo', 'junio', 'julio', '
         'Créditos otorgados acumulados del mes por Ejecutivo Comercial, ordenados de mayor a menor cantidad de operaciones.',
         '08:30', '1,2,3,4,5,6',
         'grupo.comercial@autofacilchile.cl, operaciones@autofacilchile.cl, validacion@autofacilchile.cl']);
+    // Resumen Ejecutivo Diario con IA (v79.4) — nace desactivado; se activa en el mantenedor.
+    await pool.query(
+      `INSERT IGNORE INTO correos_programados (codigo, nombre, descripcion, hora, dias, destinatarios, activo)
+       VALUES (?,?,?,?,?,?,0)`,
+      ['resumen_ejecutivo_ia', 'Resumen Ejecutivo Diario (IA)',
+        'Narrativa de gestión generada por IA: ventas de ayer y del mes, cartas por vencer y mora de la cartera. No solo cifras: contexto y alertas.',
+        '09:00', '1,2,3,4,5,6', '']);
+    try {
+      require('../../../../shared/ia').registrarFuncionalidad({
+        codigo: 'resumen_ejecutivo', nombre: 'Resumen Ejecutivo Diario',
+        descripcion: 'Redacta la narrativa del correo diario de gestión (ventas, cartas, mora)' });
+    } catch (_) {}
     // Registrar el mantenedor en el menú (funcionalidad) si no existe
     const [[ex]] = await pool.query("SELECT 1 ok FROM funcionalidades WHERE codigo='mantenedores_correos_programados' LIMIT 1");
     if (!ex) await pool.query(
@@ -155,7 +167,115 @@ async function buildInformeVentas() {
   return { asunto, html, totalOps };
 }
 
-const BUILDERS = { informe_ventas_diario: buildInformeVentas };
+/* ── Reporte: Resumen Ejecutivo Diario (IA) ──
+   Junta los datos duros del negocio y le pide a la IA una narrativa corta de
+   gestión. Si la IA está apagada o falla, el correo sale igual con las cifras. */
+async function buildResumenEjecutivo() {
+  const ch = chileParts();
+  const mesStr = `${ch.year}-${String(ch.month).padStart(2, '0')}`;
+  // "ayer" en Chile (el correo sale en la mañana y comenta el día anterior)
+  const ayerD = new Date(`${ch.fecha}T12:00:00`); ayerD.setDate(ayerD.getDate() - 1);
+  const ayer = `${ayerD.getFullYear()}-${String(ayerD.getMonth() + 1).padStart(2, '0')}-${String(ayerD.getDate()).padStart(2, '0')}`;
+
+  const [ventasAyer] = await pool.query(
+    `SELECT ejecutivo, COUNT(*) ops, COALESCE(SUM(monto_financiado),0) monto
+       FROM creditos WHERE estado_credito='OTORGADO' AND DATE(fecha_otorgado)=? AND ejecutivo IS NOT NULL AND ejecutivo<>''
+      GROUP BY ejecutivo ORDER BY ops DESC, monto DESC`, [ayer]);
+  const [[mes]] = await pool.query(
+    `SELECT COUNT(*) ops, COALESCE(SUM(monto_financiado),0) monto
+       FROM creditos WHERE estado_credito='OTORGADO' AND DATE_FORMAT(fecha_otorgado,'%Y-%m')=?`, [mesStr]);
+  const [[mesAnt]] = await pool.query(
+    `SELECT COUNT(*) ops FROM creditos WHERE estado_credito='OTORGADO'
+      AND DATE_FORMAT(fecha_otorgado,'%Y-%m')=DATE_FORMAT(DATE_SUB(?, INTERVAL 1 MONTH),'%Y-%m')`, [ch.fecha]);
+  // Cartas de aprobación vigentes y las que están al borde del vencimiento
+  let vigDias = 5;
+  try { const [[v]] = await pool.query("SELECT valor FROM parametros_credito WHERE clave='vigencia_carta_dias' LIMIT 1"); if (v) vigDias = parseInt(v.valor, 10) || 5; } catch (_) {}
+  const [[cartas]] = await pool.query(
+    `SELECT COUNT(*) vigentes,
+            SUM(CASE WHEN DATEDIFF(?, fecha) >= ?-1 THEN 1 ELSE 0 END) por_vencer
+       FROM cartas_aprobacion WHERE status='APROBADA' AND COALESCE(otorgado,0)=0 AND desistido_por IS NULL`, [ch.fecha, vigDias]);
+  // Mora de la cartera propia (cuotas vencidas impagas)
+  const [[mora]] = await pool.query(
+    `SELECT COUNT(DISTINCT id_credito) ops, COALESCE(SUM(valor_cuota),0) monto
+       FROM cuotas_credito WHERE estado_cuota<>'PAGADA' AND fecha_vencimiento < ?`, [ch.fecha]);
+
+  const totAyer = ventasAyer.reduce((s, r) => s + Number(r.ops), 0);
+  const montoAyer = ventasAyer.reduce((s, r) => s + Number(r.monto), 0);
+  const datos = {
+    fecha_ayer: ayer,
+    ventas_ayer: { total_creditos: totAyer, monto: montoAyer, por_ejecutivo: ventasAyer.map(r => ({ ejecutivo: titulo(r.ejecutivo), creditos: Number(r.ops), monto: Number(r.monto) })) },
+    acumulado_mes: { creditos: Number(mes.ops), monto: Number(mes.monto), dia_del_mes: ch.day },
+    mes_anterior_total_creditos: Number(mesAnt.ops),
+    cartas_aprobacion: { vigentes: Number(cartas.vigentes || 0), por_vencer_hoy_o_manana: Number(cartas.por_vencer || 0), vigencia_dias: vigDias },
+    mora_cartera: { creditos_en_mora: Number(mora.ops), monto_vencido: Number(mora.monto) },
+  };
+
+  // Narrativa IA (con red de seguridad: si falla, el correo sale igual)
+  let narrativa = '';
+  try {
+    const { analizar } = require('../../../../shared/anthropic');
+    const r = await analizar({
+      codigo: 'resumen_ejecutivo',
+      system: 'Eres el analista de gestión de AutoFácil (crédito automotriz, Chile). Redacta un resumen ejecutivo BREVE del día para la gerencia: 2 a 3 párrafos cortos en español chileno profesional. Comenta las ventas de ayer (destaca ejecutivos si corresponde), el ritmo del mes vs el mes anterior, y cierra con las alertas accionables (cartas por vencer, mora) SOLO si ameritan. Montos en pesos chilenos con separador de miles (punto). Sin saludos, sin despedidas, sin markdown: devuelve HTML simple usando solo <p> y <b>.',
+      prompt: 'Datos del negocio:\n' + JSON.stringify(datos, null, 2),
+      max_tokens: 700,
+    });
+    narrativa = String(r.texto || '').trim();
+  } catch (e) { console.error('[resumen ejecutivo IA]', e.message); }
+  if (!narrativa) narrativa = `<p>Ayer se otorgaron <b>${totAyer}</b> créditos por <b>${fmt(montoAyer)}</b>. El mes acumula <b>${datos.acumulado_mes.creditos}</b> operaciones (mes anterior completo: ${datos.mes_anterior_total_creditos}).</p>`;
+
+  const kpi = (label, valor, sub) => `
+    <td style="padding:12px 10px;background:#f8fafc;border-radius:10px;text-align:center">
+      <div style="font-size:10.5px;color:#64748b;text-transform:uppercase;font-weight:700">${label}</div>
+      <div style="font-size:20px;font-weight:800;color:#0f3d8a;margin-top:2px">${valor}</div>
+      ${sub ? `<div style="font-size:10.5px;color:#94a3b8;margin-top:1px">${sub}</div>` : ''}
+    </td>`;
+  const fechaLarga = new Intl.DateTimeFormat('es-CL', { timeZone: 'America/Santiago', weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' }).format(new Date());
+  const filasEj = ventasAyer.length
+    ? ventasAyer.map(r => `<tr><td style="padding:6px 12px;border-bottom:1px solid #eef2f7;color:#334155">${esc(titulo(r.ejecutivo))}</td><td style="padding:6px 12px;border-bottom:1px solid #eef2f7;text-align:center;font-weight:700;color:#1d4ed8">${r.ops}</td><td style="padding:6px 12px;border-bottom:1px solid #eef2f7;text-align:right">${fmt(r.monto)}</td></tr>`).join('')
+    : `<tr><td colspan="3" style="padding:10px 12px;color:#94a3b8;text-align:center">Sin créditos otorgados ayer</td></tr>`;
+
+  const html = `
+  <div style="background:#eef2f7;padding:24px 12px;font-family:'Segoe UI',Arial,sans-serif">
+    <div style="max-width:620px;margin:0 auto;background:#fff;border-radius:14px;overflow:hidden;border:1px solid #e5e7eb;box-shadow:0 8px 28px rgba(2,32,82,.08)">
+      <div style="padding:18px 28px 12px;background:#fff">
+        <img src="${APP_URL}/img/logo.png" alt="AutoFácil" height="34" style="height:34px;width:auto;display:block">
+      </div>
+      <div style="background:#0a1c3e;color:#fff;padding:18px 28px">
+        <div style="font-size:18px;font-weight:800;letter-spacing:.2px">Resumen Ejecutivo Diario</div>
+        <div style="font-size:13px;color:#cbd5e1;margin-top:4px;text-transform:capitalize">${esc(fechaLarga)}</div>
+        <div style="font-size:11px;color:#8fa3c4;margin-top:2px">Redactado con ${narrativa && narrativa.includes('<p>') ? 'Inteligencia Artificial sobre' : ''} datos en vivo del sistema</div>
+      </div>
+      <div style="padding:20px 28px">
+        <div style="font-size:13.5px;color:#1e293b;line-height:1.65">${narrativa}</div>
+        <table style="width:100%;border-collapse:separate;border-spacing:6px;margin:16px 0 6px"><tr>
+          ${kpi('Créditos ayer', String(totAyer), fmt(montoAyer))}
+          ${kpi('Acumulado mes', String(datos.acumulado_mes.creditos), fmt(datos.acumulado_mes.monto))}
+          ${kpi('Cartas por vencer', String(datos.cartas_aprobacion.por_vencer_hoy_o_manana), `${datos.cartas_aprobacion.vigentes} vigentes`)}
+          ${kpi('Créditos en mora', String(datos.mora_cartera.creditos_en_mora), fmt(datos.mora_cartera.monto_vencido) + ' vencido')}
+        </tr></table>
+        <div style="font-weight:800;color:#0f172a;font-size:13px;margin:14px 0 8px;border-left:4px solid #0141A2;padding-left:10px">Ventas de ayer por ejecutivo</div>
+        <table style="width:100%;border-collapse:collapse;font-size:12.5px">
+          <thead><tr>
+            <th style="color:#fff;padding:7px 12px;font-size:10.5px;font-weight:700;text-transform:uppercase;background:#2f6fd0;text-align:left">Ejecutivo</th>
+            <th style="color:#fff;padding:7px 12px;font-size:10.5px;font-weight:700;text-transform:uppercase;background:#2f6fd0;text-align:center">Otorgados</th>
+            <th style="color:#fff;padding:7px 12px;font-size:10.5px;font-weight:700;text-transform:uppercase;background:#2f6fd0;text-align:right">Monto</th>
+          </tr></thead>
+          <tbody>${filasEj}</tbody>
+        </table>
+      </div>
+      <div style="padding:14px 28px;border-top:1px solid #f1f5f9;color:#94a3b8;font-size:11px">
+        Correo automático de AutoFácil · cifras del sistema al momento del envío.
+      </div>
+    </div>
+  </div>`;
+
+  const dd = String(ch.day).padStart(2, '0'), mm = String(ch.month).padStart(2, '0');
+  const asunto = `📊 Resumen Ejecutivo — ${dd}-${mm}-${ch.year} · ${totAyer} otorgados ayer, ${datos.acumulado_mes.creditos} en el mes`;
+  return { asunto, html };
+}
+
+const BUILDERS = { informe_ventas_diario: buildInformeVentas, resumen_ejecutivo_ia: buildResumenEjecutivo };
 
 /* ── Ejecuta y envía un reporte. auto=true marca el dedup diario. ── */
 async function ejecutarReporte(r, { auto = false } = {}) {
