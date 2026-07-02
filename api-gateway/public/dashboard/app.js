@@ -110,12 +110,13 @@ function showV(id, el) {
   el.classList.add('active');
   if(id==='v1b') { buildV1b(); window._v1b=true; }
   if(id==='v2') {
-    destroyCharts();
+    window.destroyCharts && window.destroyCharts();
+    if (!window.DASH?.feb?.detalle_v2?.length) window.aplicarFiltro();
     buildV2();
     window._v2=true;
   }
   if(id==='v2pl') {
-    destroyCharts();
+    window.destroyCharts && window.destroyCharts();
     if (!window.DASH?.feb?.detalle_v2?.length) window.aplicarFiltro();
     buildV2pl();
     window._v2pl=true;
@@ -1152,9 +1153,13 @@ function buildV1b() {
 // ──────────────────────────────────────────────────────────────
 // ======== INLINE DATA FALLBACK (por si no hay servidor) ========
 window.DASH_INLINE = {
-    // CLAUDE: Los datos reales fueron removidos por tamaño. 
+    // CLAUDE: Los datos reales fueron removidos por tamaño.
     // Asume que aquí viene la estructura agrupada del dashboard.
 };
+// window.DASH debe existir ANTES de aplicarFiltro (que hace window.DASH.feb = ...).
+// Sin esto, en el camino exitoso aplicarFiltro lanzaba "Cannot set 'feb' of undefined"
+// y caía al catch, dejando el dashboard vacío (había que apretar "Aplicar").
+window.DASH = window.DASH || { feb: {}, jan: {} };
 // ──────────────────────────────────────────────────────────────
 // BLOQUE ORIGINAL línea 1754
 // ──────────────────────────────────────────────────────────────
@@ -1481,6 +1486,7 @@ window.RAW_DATA = [];
     if (document.getElementById('v8') && document.getElementById('v8').classList.contains('active')) { buildV8(); window._v8 = true; }
   };
 
+  window.destroyCharts = destroyCharts;   // exponer para showV (nivel global)
   function destroyCharts() {
     ['ch-donut','ch-donut-ops','ch-d1-mm','ch-d1-plazo','ch-d1-monto','ch-d1-afa','ch-evol','ch-donut1b','ch-donut1b-ops','ch-evol1b','ch-d1b-mm','ch-d1b-plazo','ch-d1b-monto','ch-d1b-afa','ch-donut2','ch-donut3','ch-mm','ch-com','ch-qmes','ch-t1','ch-t2','ch-t3','ch-t4','ch-donut2-pl','ch-donut3-pl','ch-mm-pl','ch-com-pl','ch-qmes-pl'].forEach(id => {
       const el = document.getElementById(id);
