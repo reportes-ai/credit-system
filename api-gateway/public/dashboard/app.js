@@ -1290,6 +1290,16 @@ async function cargarDatos() {
     buildV1(); buildV1b();
   } finally {
     if (loadingEl) loadingEl.style.display = 'none';
+    // Render inicial garantizado: si hay datos y los selects tienen período, aplicar
+    // el filtro solo — así no hay que apretar "Aplicar" al entrar (aunque algo haya
+    // fallado arriba, RAW_DATA ya quedó cargado y esto lo pinta).
+    try {
+      const sd = document.getElementById('sel-desde');
+      const sh = document.getElementById('sel-hasta');
+      if (window.RAW_DATA && window.RAW_DATA.length && sd && sd.value && sh && sh.value) {
+        window.aplicarFiltro();
+      }
+    } catch (e2) { console.warn('auto-aplicar inicial:', e2.message); }
   }
 }
 
