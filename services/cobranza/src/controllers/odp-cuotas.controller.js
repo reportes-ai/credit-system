@@ -203,8 +203,11 @@ const emitir = async (req, res) => {
     const nums = cuotasN.map(c => c.numero_cuota);
     const [yaPagadas] = await pool.query(
       `SELECT numero_cuota FROM pagos_credito
-        WHERE id_credito = ? AND estado_pago = 'PAGADO' AND numero_cuota IN (?)`,
-      [id_credito, nums]
+        WHERE id_credito = ? AND estado_pago = 'PAGADO' AND numero_cuota IN (?)
+        UNION
+       SELECT numero_cuota FROM cuotas_credito
+        WHERE id_credito = ? AND estado_cuota = 'PAGADA' AND numero_cuota IN (?)`,
+      [id_credito, nums, id_credito, nums]
     );
     if (yaPagadas.length)
       return bad(res, `Las cuotas ${yaPagadas.map(r => r.numero_cuota).join(', ')} ya están pagadas.`);
@@ -310,8 +313,11 @@ const aprobar = async (req, res) => {
     const nums = cuotas.map(c => c.numero_cuota);
     const [yaPagadas] = await conn.query(
       `SELECT numero_cuota FROM pagos_credito
-        WHERE id_credito = ? AND estado_pago = 'PAGADO' AND numero_cuota IN (?)`,
-      [odp.id_credito, nums]
+        WHERE id_credito = ? AND estado_pago = 'PAGADO' AND numero_cuota IN (?)
+        UNION
+       SELECT numero_cuota FROM cuotas_credito
+        WHERE id_credito = ? AND estado_cuota = 'PAGADA' AND numero_cuota IN (?)`,
+      [odp.id_credito, nums, odp.id_credito, nums]
     );
     if (yaPagadas.length) {
       await conn.rollback();

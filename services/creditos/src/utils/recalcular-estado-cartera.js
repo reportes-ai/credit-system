@@ -73,7 +73,7 @@ async function recalcularEstadoCartera() {
   const hoy = hoyUTC();
 
   const [creds] = await pool.query(
-    `SELECT id_credito, plazo, fecha_primera_cuota, estado_cartera
+    `SELECT id AS id_credito, plazo, fecha_primera_cuota, estado_cartera
      FROM creditos
      WHERE (financiera IS NULL OR financiera NOT IN (?, ?))
        AND estado IN ('VIGENTE','OTORGADO')
@@ -82,13 +82,25 @@ async function recalcularEstadoCartera() {
 
   if (!creds.length) return { procesados: 0, cambios: 0, porEstado: {}, umbrales: um };
 
-  // Cuotas pagadas de todos los candidatos en una sola consulta (evita N+1).
+  // Cuotas pagadas = pagos en app ∪ calendario congelado (cartera migrada trae su
+  // historial en cuotas_credito.estado_cuota='PAGADA'). Una consulta, sin N+1.
   const ids = creds.map(c => c.id_credito);
   const paidByCred = {};
   const [pagos] = await pool.query(
     `SELECT id_credito, numero_cuota FROM pagos_credito
-     WHERE estado_pago='PAGADO' AND id_credito IN (?)`, [ids]);
+     WHERE estado_pago='PAGADO' AND id_credito IN (?)
+     UNION
+     SELECT id_credito, numero_cuota FROM cuotas_credito
+     WHERE estado_cuota='PAGADA' AND id_credito IN (?)`, [ids, ids]);
   pagos.forEach(p => { (paidByCred[p.id_credito] = paidByCred[p.id_credito] || new Set()).add(parseInt(p.numero_cuota, 10)); });
+
+  // Calendario congelado: vencimiento REAL de la cuota impaga más antigua (manda
+  // sobre el derivado fecha_primera_cuota + N meses cuando el crédito lo tiene).
+  const vencRealByCred = {};
+  const [vreal] = await pool.query(
+    `SELECT id_credito, MIN(fecha_vencimiento) venc FROM cuotas_credito
+     WHERE estado_cuota<>'PAGADA' AND id_credito IN (?) GROUP BY id_credito`, [ids]);
+  vreal.forEach(v => { vencRealByCred[v.id_credito] = ymdUTC(v.venc); });
 
   let procesados = 0, cambios = 0; const porEstado = {};
   for (const c of creds) {
@@ -99,10 +111,17 @@ async function recalcularEstadoCartera() {
     }
     const r = clasificar(c, paidByCred[c.id_credito] || new Set(), hoy, um);
     if (!r) continue;
+    // Si hay calendario real y el crédito tiene impagas, los días salen del venc real
+    const vr = vencRealByCred[c.id_credito];
+    if (vr != null && r.estado !== 'PREPAGADO' && r.estado !== 'TERMINADO') {
+      const dias = Math.max(0, Math.floor((hoy - vr) / DIA));
+      r.dias = dias;
+      r.estado = dias >= um.vencido ? 'VENCIDO' : (dias >= um.mora ? 'MORA' : 'VIGENTE');
+    }
     procesados++;
     porEstado[r.estado] = (porEstado[r.estado] || 0) + 1;
     if (String(c.estado_cartera || '') !== r.estado) {
-      await pool.query('UPDATE creditos SET estado_cartera=? WHERE id_credito=?', [r.estado, c.id_credito]);
+      await pool.query('UPDATE creditos SET estado_cartera=? WHERE id=?', [r.estado, c.id_credito]);
       cambios++;
     }
   }
